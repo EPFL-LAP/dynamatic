@@ -12,7 +12,7 @@ The following instructions can be used to setup Dynamatic++ from source.
    $ sudo apt-get install git cmake ninja clang lld ccache
    ```
 
-   `clang`, `lld`, and `ccache` are not stictly required but significantly speed up rebuilds. If you do not wish to install them, simple remove flags `DCMAKE_C_COMPILER`, `DCMAKE_CXX_COMPILER`, `DLLVM_ENABLE_LLD`, and `DLLVM_CACHE_BUILD` from the following `cmake` commands.
+   `clang`, `lld`, and `ccache` are not stictly required but significantly speed up (re)builds. If you do not wish to install them, simply remove flags `DCMAKE_C_COMPILER`, `DCMAKE_CXX_COMPILER`, `DLLVM_ENABLE_LLD`, and `DLLVM_CACHE_BUILD` from the following `cmake` commands.
 
 2. **Clone the project and its submodules.** Dynamatic++ depends on [Polygeist](https://github.com/llvm/Polygeist) (C/C++ frontend for MLIR) and [CIRCT](https://github.com/llvm/circt) (Circuit-level IR compiler and tools). Both of them depend on [LLVM/MLIR](https://github.com/llvm/llvm-project).
 
@@ -60,6 +60,7 @@ The following instructions can be used to setup Dynamatic++ from source.
    ```
 
 4. **Build and test CIRCT.** First, build the version of LLVM and MLIR that CIRCT uses.
+
    ```sh
    $ cd dynamatic/circt
    $ mkdir llvm/build
@@ -77,7 +78,9 @@ The following instructions can be used to setup Dynamatic++ from source.
    $ ninja
    $ ninja check-mlir
    ```
+
    Then, build CIRCT itself.
+
    ```sh
    $ cd dynamatic/circt
    $ mkdir build
@@ -103,11 +106,14 @@ The `-DCMAKE_BUILD_TYPE=Debug` flag enables debug information, which makes the w
 The following instructions can be used to get the latest stable version of Dynamatic++.
 
 1. **Pull new changes from the repository and its submodules.** The following command will also automatically update all submodules recursively.
+
    ```sh
    $ cd dynamatic
    $ git pull --recurse-submodules
    ```
+
 2. **Rebuild and test the project.**
+
    ```sh
    # First, the LLVM submodule within Polygeist
    $ cd dynamatic/polygeist/llvm-project/build
