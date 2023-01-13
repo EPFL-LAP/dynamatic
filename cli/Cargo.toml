@@ -7,3 +7,4 @@ edition = "2021"
 
 [dependencies]
 inquire = "0.5.2"
+dyn-clone = "1.0.9"
