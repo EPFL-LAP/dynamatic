@@ -31,7 +31,7 @@ exit_on_fail() {
 
 #### Parse arguments ####
 
-# Loop over command line argument and update script variables
+# Loop over command line arguments and update script variables
 CMAKE_FLAGS_EXT="-DCMAKE_C_COMPILER=clang -DCMAKE_CXX_COMPILER=clang++ \
     -DLLVM_ENABLE_LLD=ON" 
 CMAKE_FLAGS_LLVM="$CMAKE_FLAGS_EXT -DLLVM_CCACHE_BUILD=ON" 
@@ -177,6 +177,34 @@ if [[ DISABLE_TESTS -eq 0 ]]; then
     ninja check-circt-integration
     exit_on_fail "Tests for circt failed"
 fi
+
+#### CIRCT ####
+
+echo -e \
+"\n----------------------------------------
+------------- Building CLI -------------
+----------------------------------------\n"
+
+cd ../../cli
+cargo build
+exit_on_fail "Failed to build CLI"
+
+echo -e \
+"\n----------------------------------------
+------- Creating symbolic links --------
+----------------------------------------\n"
+
+# Create bin directory at the project's root
+cd .. && mkdir -p bin
+
+# Create hard links to all binaries we use from subfolders
+ln -f polygeist/build/bin/cgeist bin/cgeist
+ln -f polygeist/build/bin/polygeist-opt bin/polygeist-opt
+ln -f polygeist/llvm-project/build/bin/mlir-opt bin/mlir-opt
+ln -f circt/build/bin/circt-opt bin/circt-opt
+ln -f cli/target/debug/cli bin/dynamatic-cli
+
+echo "Done!"
 
 echo -e "\n----------- Build successful -----------"
  
