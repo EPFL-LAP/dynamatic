@@ -3,7 +3,7 @@ use crate::{
         handle_prompt_result, Command, CommandEffect, ExecuteError, ExecuteResult, PromptError,
     },
     completer::CommandCompleter,
-    pipeline::{CompileStep, Dialect, PipelineState, DIALECT_NAMES},
+    pipeline::{CompileStep, Dialect, PipelineState, DIALECTS},
     suggest::{
         lcp_match, OneChoiceArgCmd, OneOpaqueArgCmd, SingleKwCmd, Suggest, SuggestResult,
         Suggestion, TokenMatch, NO_SUGGESTION,
@@ -124,21 +124,12 @@ impl OptCmd {
 
     #[inline]
     fn get_kw_suggestion(&self) -> Suggestion {
-        Suggestion::first_token(
-            Self::KW.to_string(),
-            format!("{} {}", Self::STEP, Self::PASSES),
-            true,
-        )
+        Suggestion::first_token(Self::KW, &format!("{} {}", Self::STEP, Self::PASSES), true)
     }
 
     #[inline]
     fn get_step_suggestion(&self, step: &str) -> Suggestion {
-        Suggestion::new(
-            Self::KW.to_string(),
-            step.to_string(),
-            Self::PASSES.to_string(),
-            true,
-        )
+        Suggestion::new(Self::KW, step, Self::PASSES, true)
     }
 }
 
@@ -194,12 +185,7 @@ impl Suggest for OptCmd {
                 passes.push(token.to_string());
                 (
                     TokenMatch::Full,
-                    vec![Suggestion::new(
-                        sugg_previous,
-                        Self::PASSES.to_string(),
-                        String::new(),
-                        false,
-                    )],
+                    vec![Suggestion::last_token(&sugg_previous, Self::PASSES, false)],
                 )
             }
         }
@@ -315,16 +301,25 @@ impl Command<CompileState> for PipelineEndpointCmd {
                 state.pipeline.set_destination(dialect);
                 Some(format!("Updated destination dialect to {}", dialect))
             })),
-            None => Err(ExecuteError::ErrArgument(format!(
-                "Illegal dialect name provided. Expected one of {{{}}}, but got {}",
-                DIALECT_NAMES.join(", "),
-                tokens[1],
-            ))),
+            None => {
+                let names: Vec<&str> = DIALECTS.iter().map(|info| info.get_name()).collect();
+                Err(ExecuteError::ErrArgument(format!(
+                    "Illegal dialect name provided. Expected one of {{{}}}, but got {}",
+                    names.join(", "),
+                    tokens[1],
+                )))
+            }
         }
     }
 
     fn get_suggester(&self) -> Box<dyn Suggest> {
-        Box::new(OneChoiceArgCmd::new(self.kw, &DIALECT_NAMES))
+        Box::new(OneChoiceArgCmd::new(
+            self.kw,
+            &DIALECTS
+                .iter()
+                .map(|info| info.get_name())
+                .collect::<Vec<&str>>(),
+        ))
     }
 }
 
@@ -381,11 +376,13 @@ impl Command<CompileState> for RunCmd {
         Self::check_keyword(&self, tokens, Self::KW)?;
         Self::check_num_args(&self, tokens, 0)?;
 
+        // Create script from pipeline configuration
+
         // TODO: does nothing for now, needs to be implemented
         Ok(CommandEffect::State(Some("Done!".to_string())))
     }
 
     fn get_suggester(&self) -> Box<dyn Suggest> {
-        Box::new(SingleKwCmd::new(Self::KW.to_string()))
+        Box::new(SingleKwCmd::new(Self::KW))
     }
 }

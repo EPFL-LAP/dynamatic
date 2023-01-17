@@ -32,28 +32,28 @@ pub struct Suggestion {
 }
 
 impl Suggestion {
-    pub fn new(previous: String, current: String, leftover: String, autocomplete: bool) -> Self {
+    pub fn new(previous: &str, current: &str, leftover: &str, autocomplete: bool) -> Self {
         Self {
-            previous,
-            current,
-            leftover,
+            previous: previous.to_string(),
+            current: current.to_string(),
+            leftover: leftover.to_string(),
             autocomplete,
         }
     }
 
     #[inline]
-    pub fn first_token(current: String, leftover: String, autocomplete: bool) -> Self {
-        Self::new(String::new(), current, leftover, autocomplete)
+    pub fn first_token(current: &str, leftover: &str, autocomplete: bool) -> Self {
+        Self::new("", current, leftover, autocomplete)
     }
 
     #[inline]
-    pub fn last_token(previous: String, current: String, autocomplete: bool) -> Self {
-        Self::new(previous, current, String::new(), autocomplete)
+    pub fn last_token(previous: &str, current: &str, autocomplete: bool) -> Self {
+        Self::new(previous, current, "", autocomplete)
     }
 
     #[inline]
-    pub fn single_token(current: String, autocomplete: bool) -> Self {
-        Self::new(String::new(), current, String::new(), autocomplete)
+    pub fn single_token(current: &str, autocomplete: bool) -> Self {
+        Self::new("", current, "", autocomplete)
     }
 
     pub fn get_autocompletion(&self) -> Option<&str> {
@@ -133,9 +133,9 @@ pub fn tokenize(input: &str) -> Vec<&str> {
 }
 
 #[derive(Clone)]
-pub struct OneOpaqueArgCmd<'a> {
-    kw: &'a str,
-    arg_name: &'a str,
+pub struct OneOpaqueArgCmd {
+    kw: String,
+    arg_name: String,
     state: OneOpaqueArgCmdState,
 }
 
@@ -149,11 +149,11 @@ enum OneOpaqueArgCmdState {
     End,
 }
 
-impl<'a> OneOpaqueArgCmd<'a> {
-    pub fn new(kw: &'a str, arg_name: &'a str) -> Self {
+impl OneOpaqueArgCmd {
+    pub fn new(kw: &str, arg_name: &str) -> Self {
         Self {
-            kw,
-            arg_name,
+            kw: kw.to_string(),
+            arg_name: arg_name.to_string(),
             state: OneOpaqueArgCmdState::MatchKw,
         }
     }
@@ -165,16 +165,16 @@ impl<'a> OneOpaqueArgCmd<'a> {
 
     #[inline]
     fn get_kw_suggestion(&self) -> Suggestion {
-        Suggestion::first_token(self.kw.to_string(), self.format_arg(), true)
+        Suggestion::first_token(&self.kw, &self.format_arg(), true)
     }
 
     #[inline]
     fn get_arg_suggestion(&self) -> Suggestion {
-        Suggestion::last_token(self.kw.to_string(), self.format_arg(), false)
+        Suggestion::last_token(&self.kw, &self.format_arg(), false)
     }
 }
 
-impl<'a> Suggest for OneOpaqueArgCmd<'a> {
+impl Suggest for OneOpaqueArgCmd {
     fn update(&mut self, token: &str) -> SuggestResult {
         match &self.state {
             OneOpaqueArgCmdState::MatchKw => match lcp_match(&self.kw, token) {
@@ -205,16 +205,16 @@ pub struct SingleKwCmd {
 }
 
 impl SingleKwCmd {
-    pub fn new(kw: String) -> Self {
+    pub fn new(kw: &str) -> Self {
         Self {
-            kw,
+            kw: kw.to_string(),
             matched_kw: false,
         }
     }
 
     #[inline]
     fn get_suggestion(&self) -> Suggestion {
-        Suggestion::single_token(self.kw.to_string(), true)
+        Suggestion::single_token(&self.kw, true)
     }
 }
 
@@ -239,58 +239,56 @@ impl Suggest for SingleKwCmd {
 }
 
 #[derive(Clone)]
-pub struct OneChoiceArgCmd<'a> {
-    kw: &'a str,
-    choices: &'a [&'a str],
-    state: OneChoiceArgCmdState<'a>,
+pub struct OneChoiceArgCmd {
+    kw: String,
+    choices: Vec<String>,
+    state: OneChoiceArgCmdState,
 }
 
 #[derive(Clone)]
-enum OneChoiceArgCmdState<'a> {
+enum OneChoiceArgCmdState {
     /// Matching the command keyword
     MatchKw,
     /// Matching the choice
     MatchChoice,
     /// Nothing left to match
-    End(&'a str),
+    End(String),
 }
 
-impl<'a> OneChoiceArgCmd<'a> {
-    pub fn new(kw: &'a str, choices: &'a [&'a str]) -> Self {
+impl OneChoiceArgCmd {
+    pub fn new(kw: &str, choices: &[&str]) -> Self {
         Self {
-            kw,
-            choices,
+            kw: kw.to_string(),
+            choices: Vec::from_iter(choices.iter().map(|c| c.to_string())),
             state: OneChoiceArgCmdState::MatchKw,
         }
     }
 
     #[inline]
     fn get_choice_suggestion(&self, choice: &str) -> Suggestion {
-        Suggestion::last_token(self.kw.to_string(), choice.to_string(), true)
+        Suggestion::last_token(&self.kw, choice, true)
     }
 }
 
-impl<'a> Suggest for OneChoiceArgCmd<'a> {
+impl Suggest for OneChoiceArgCmd {
     fn update(&mut self, token: &str) -> SuggestResult {
         match &self.state {
-            OneChoiceArgCmdState::MatchKw => match lcp_match(self.kw, token) {
+            OneChoiceArgCmdState::MatchKw => match lcp_match(&self.kw, token) {
                 TokenMatch::Full => {
                     self.state = OneChoiceArgCmdState::MatchChoice;
                     (
                         TokenMatch::Full,
                         self.choices
                             .iter()
-                            .map(|c| {
-                                Suggestion::first_token(self.kw.to_string(), c.to_string(), true)
-                            })
+                            .map(|c| Suggestion::first_token(&self.kw, c, true))
                             .collect(),
                     )
                 }
                 TokenMatch::Partial => (
                     TokenMatch::Partial,
                     vec![Suggestion::first_token(
-                        self.kw.to_string(),
-                        format!("<{}>", self.choices.join("|")),
+                        &self.kw,
+                        &format!("<{}>", self.choices.join("|")),
                         true,
                     )],
                 ),
@@ -300,7 +298,7 @@ impl<'a> Suggest for OneChoiceArgCmd<'a> {
                 let matched_choices: Vec<(TokenMatch, &str)> = self
                     .choices
                     .iter()
-                    .map(|c| (lcp_match(c, token), *c))
+                    .map(|c| (lcp_match(c, token), &c[..]))
                     .filter(|(token_match, _)| match token_match {
                         TokenMatch::None => false,
                         _ => true,
@@ -311,7 +309,7 @@ impl<'a> Suggest for OneChoiceArgCmd<'a> {
                     NO_SUGGESTION
                 } else if matched_choices.len() == 1 {
                     let choice = matched_choices[0].1;
-                    self.state = OneChoiceArgCmdState::End(choice);
+                    self.state = OneChoiceArgCmdState::End(choice.to_string());
                     (
                         matched_choices[0].0,
                         vec![self.get_choice_suggestion(choice)],
@@ -329,7 +327,7 @@ impl<'a> Suggest for OneChoiceArgCmd<'a> {
                 }
             }
             OneChoiceArgCmdState::End(choice) => {
-                end_of_input(token, vec![self.get_choice_suggestion(*choice)])
+                end_of_input(token, vec![self.get_choice_suggestion(choice)])
             }
         }
     }
@@ -364,7 +362,7 @@ mod test {
 
     #[test]
     fn test_consume_input() {
-        let cmd = SingleKwCmd::new("test_cmd".to_string());
+        let cmd = SingleKwCmd::new("test_cmd");
         let update_result = cmd.clone().update("");
         let consume_result = cmd.clone().consume_input("");
         assert_update_result_eq(update_result, consume_result)
@@ -373,8 +371,8 @@ mod test {
     #[test]
     fn test_single_wk_cmd() {
         let cmd_kw = "test_cmd";
-        let full_cmd_suggestion = Suggestion::single_token(cmd_kw.to_string(), true);
-        let cmd = SingleKwCmd::new(cmd_kw.to_string());
+        let full_cmd_suggestion = Suggestion::single_token(cmd_kw, true);
+        let cmd = SingleKwCmd::new(cmd_kw);
 
         // Check result with no input
         let (tm, sugs) = cmd.clone().consume_input("");

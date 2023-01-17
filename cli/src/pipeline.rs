@@ -2,73 +2,62 @@ use std::{cmp::Ordering, collections::HashMap, fmt::Display};
 
 #[derive(PartialEq, Eq, Hash, Clone, Copy)]
 pub enum Dialect {
-    Source,
-    Scf,
-    Affine,
-    Std,
-    Handshake,
+    Source = 0,
+    Scf = 1,
+    Affine = 2,
+    Std = 3,
+    Handshake = 4,
 }
 
 impl Dialect {
-    pub fn get_steps_to(self, dst: Self) -> Vec<CompileStep> {
-        let from_level = self.get_idx();
-        let to_level = dst.get_idx();
+    pub fn get_steps_to(&self, dst: &Self) -> Vec<CompileStep> {
+        let from_level = *self as usize;
+        let to_level = *dst as usize;
         match to_level {
             to if to < from_level => Vec::new(),
-            to if to == from_level => vec![CompileStep::Transformation(self)],
+            to if to == from_level => vec![CompileStep::Transformation(*self)],
             _ => {
                 let mut conversions = Vec::new();
 
                 for idx in from_level..to_level {
-                    conversions.push(CompileStep::Transformation(DIALECT_ORDER[idx]));
+                    conversions.push(CompileStep::Transformation(DIALECTS[idx].dialect));
                     conversions.push(CompileStep::Conversion(
-                        DIALECT_ORDER[idx],
-                        DIALECT_ORDER[idx + 1],
+                        DIALECTS[idx].dialect,
+                        DIALECTS[idx + 1].dialect,
                     ))
                 }
-                conversions.push(CompileStep::Transformation(DIALECT_ORDER[to_level]));
+                conversions.push(CompileStep::Transformation(DIALECTS[to_level].dialect));
                 conversions
             }
         }
     }
 
     pub fn get_short_name(&self) -> &'static str {
-        DIALECT_NAMES[self.get_idx()]
+        DIALECTS[*self as usize].name
     }
 
     pub fn from_string(input: &str) -> Option<Self> {
-        if let Some(idx) = DIALECT_NAMES.iter().position(|dialect| *dialect == input) {
-            Some(DIALECT_ORDER[idx])
+        if let Some(idx) = DIALECTS.iter().position(|info| info.name == input) {
+            Some(DIALECTS[idx].dialect)
         } else {
             None
         }
-    }
-
-    fn get_idx(&self) -> usize {
-        DIALECT_ORDER.iter().position(|d| d == self).unwrap()
     }
 }
 
 impl Display for Dialect {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        let dialect_str = match &self {
-            Self::Source => "C/C++",
-            Self::Scf => "SCF",
-            Self::Affine => "Affine",
-            Self::Std => "Standard",
-            Self::Handshake => "Handshake",
-        };
-        write!(f, "{}", dialect_str)
+        write!(f, "{}", DIALECTS[*self as usize].name)
     }
 }
 
 impl PartialOrd for Dialect {
     fn partial_cmp(&self, other: &Self) -> Option<Ordering> {
-        let idx1 = self.get_idx();
-        let idx2 = other.get_idx();
-        if idx1 < idx2 {
+        let idx_self = *self as usize;
+        let idx_other = *other as usize;
+        if idx_self < idx_other {
             Some(Ordering::Less)
-        } else if idx1 == idx2 {
+        } else if idx_self == idx_other {
             Some(Ordering::Equal)
         } else {
             Some(Ordering::Greater)
@@ -81,16 +70,6 @@ impl Ord for Dialect {
         self.partial_cmp(other).unwrap()
     }
 }
-
-pub const DIALECT_ORDER: [Dialect; 5] = [
-    Dialect::Source,
-    Dialect::Scf,
-    Dialect::Affine,
-    Dialect::Std,
-    Dialect::Handshake,
-];
-
-pub const DIALECT_NAMES: [&str; 5] = ["c_cpp", "scf", "affine", "std", "handshake"];
 
 #[derive(PartialEq, Eq, Hash, Clone, Copy)]
 pub enum CompileStep {
@@ -113,26 +92,19 @@ impl CompileStep {
             Some(idx) => {
                 let src = &input[..idx];
                 let dst = &input[(idx + 4)..];
-                if let Some(idx_src) = DIALECT_NAMES.iter().position(|dialect| *dialect == src) {
-                    if let Some(idx_dst) = DIALECT_NAMES.iter().position(|dialect| *dialect == dst)
-                    {
+                if let Some(idx_src) = DIALECTS.iter().position(|info| info.name == src) {
+                    if let Some(idx_dst) = DIALECTS.iter().position(|info| info.name == dst) {
                         if idx_src == idx_dst - 1 {
                             return Some(CompileStep::Conversion(
-                                DIALECT_ORDER[idx_src],
-                                DIALECT_ORDER[idx_dst],
+                                DIALECTS[idx_src].dialect,
+                                DIALECTS[idx_dst].dialect,
                             ));
                         }
                     }
                 }
                 None
             }
-            None => {
-                if let Some(idx) = DIALECT_NAMES.iter().position(|dialect| *dialect == input) {
-                    Some(CompileStep::Transformation(DIALECT_ORDER[idx]))
-                } else {
-                    None
-                }
-            }
+            None => Dialect::from_string(input).map_or(None, |d| Some(Self::Transformation(d))),
         }
     }
 }
@@ -210,7 +182,7 @@ impl PipelineState {
 
     fn update_steps(&mut self) {
         let mut new_steps_opt = HashMap::new();
-        for step in self.source.get_steps_to(self.destination).into_iter() {
+        for step in self.source.get_steps_to(&self.destination).into_iter() {
             match self.steps.get(&step) {
                 Some(value) => new_steps_opt.insert(step, value.clone()),
                 None => new_steps_opt.insert(step, Vec::new()),
@@ -221,7 +193,7 @@ impl PipelineState {
 
     fn generate_steps(source: Dialect, destination: Dialect) -> HashMap<CompileStep, Vec<String>> {
         let mut steps_opt = HashMap::new();
-        for step in source.get_steps_to(destination).into_iter() {
+        for step in source.get_steps_to(&destination).into_iter() {
             steps_opt.insert(step, Vec::new());
         }
         steps_opt
@@ -244,3 +216,109 @@ impl Display for PipelineState {
         Ok(())
     }
 }
+
+pub struct DialectInfo {
+    dialect: Dialect,
+    name: &'static str,
+}
+
+impl DialectInfo {
+    #[inline]
+    pub fn get_dialect(&self) -> &Dialect {
+        &self.dialect
+    }
+
+    #[inline]
+    pub fn get_name(&self) -> &'static str {
+        &self.name
+    }
+}
+
+pub const DIALECTS: [DialectInfo; 5] = [
+    DialectInfo {
+        dialect: Dialect::Source,
+        name: "c_cpp",
+    },
+    DialectInfo {
+        dialect: Dialect::Scf,
+        name: "scf",
+    },
+    DialectInfo {
+        dialect: Dialect::Affine,
+        name: "affine",
+    },
+    DialectInfo {
+        dialect: Dialect::Std,
+        name: "std",
+    },
+    DialectInfo {
+        dialect: Dialect::Handshake,
+        name: "handshake",
+    },
+];
+
+pub struct CompileStepInfo {
+    pub step: CompileStep,
+    pub binary: &'static str,
+    pub args: &'static str,
+}
+
+impl CompileStepInfo {
+    #[inline]
+    pub fn get_step(&self) -> &CompileStep {
+        &self.step
+    }
+
+    #[inline]
+    pub fn get_binary(&self) -> &'static str {
+        &self.binary
+    }
+
+    #[inline]
+    pub fn get_args(&self) -> &'static str {
+        &self.args
+    }
+}
+
+pub const COMPILE_STEPS: [CompileStepInfo; 8] = [
+    CompileStepInfo {
+        step: CompileStep::Conversion(Dialect::Source, Dialect::Scf),
+        binary: "cgeist",
+        args: "-S -O3",
+    },
+    CompileStepInfo {
+        step: CompileStep::Transformation(Dialect::Scf),
+        binary: "polygeist-opt",
+        args: "",
+    },
+    CompileStepInfo {
+        step: CompileStep::Conversion(Dialect::Scf, Dialect::Affine),
+        binary: "polygeist-opt",
+        args: "-raise-scf-to-affine",
+    },
+    CompileStepInfo {
+        step: CompileStep::Transformation(Dialect::Affine),
+        binary: "polygeist-opt",
+        args: "",
+    },
+    CompileStepInfo {
+        step: CompileStep::Conversion(Dialect::Affine, Dialect::Std),
+        binary: "mlir-opt",
+        args: "-lower-affine -convert-scf-to-cf",
+    },
+    CompileStepInfo {
+        step: CompileStep::Transformation(Dialect::Std),
+        binary: "mlir-opt",
+        args: "",
+    },
+    CompileStepInfo {
+        step: CompileStep::Conversion(Dialect::Std, Dialect::Handshake),
+        binary: "circt-opt",
+        args: "--flatten-memref --flatten-memref-calls --lower-std-to-handshake",
+    },
+    CompileStepInfo {
+        step: CompileStep::Transformation(Dialect::Handshake),
+        binary: "circt-opt",
+        args: "",
+    },
+];

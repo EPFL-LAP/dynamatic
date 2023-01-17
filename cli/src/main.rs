@@ -60,6 +60,6 @@ impl Command<()> for MainCmd {
     }
 
     fn get_suggester(&self) -> Box<dyn Suggest> {
-        Box::new(SingleKwCmd::new(self.kw.clone()))
+        Box::new(SingleKwCmd::new(&self.kw))
     }
 }
