@@ -25,8 +25,14 @@ exit_on_fail() {
             echo -e "\n$1"
         fi
         echo -e "\n-------------- Build failed ------------"
-        exit
+        exit 1
     fi
+}
+
+# Thin wrapper around ln to echo created symbolic links and fix destination path
+echo_symbolic_link() {
+    echo "${2} -> ${1}"
+    ln -f --symbolic ../${1} ${2}
 }
 
 #### Parse arguments ####
@@ -49,6 +55,9 @@ do
             DISABLE_TESTS=1
             ;;
         "--force-rebuild" | "-f")
+            FORCE_REBUILD=1
+            ;;
+        "--refresh-links" | "-l")
             FORCE_REBUILD=1
             ;;
         "--release" | "-r")
@@ -178,7 +187,7 @@ if [[ DISABLE_TESTS -eq 0 ]]; then
     exit_on_fail "Tests for circt failed"
 fi
 
-#### CIRCT ####
+#### CLI ####
 
 echo -e \
 "\n----------------------------------------
@@ -194,17 +203,15 @@ echo -e \
 ------- Creating symbolic links --------
 ----------------------------------------\n"
 
-# Create bin directory at the project's root
-cd .. && mkdir -p bin
+# Create bin/ directory at the project's root
+cd .. && mkdir -p bin 
 
-# Create hard links to all binaries we use from subfolders
-ln -f polygeist/build/bin/cgeist bin/cgeist
-ln -f polygeist/build/bin/polygeist-opt bin/polygeist-opt
-ln -f polygeist/llvm-project/build/bin/mlir-opt bin/mlir-opt
-ln -f circt/build/bin/circt-opt bin/circt-opt
-ln -f cli/target/debug/cli bin/dynamatic-cli
-
-echo "Done!"
+# Create symbolic links to all binaries we use from subfolders
+echo_symbolic_link polygeist/build/bin/cgeist bin/cgeist
+echo_symbolic_link polygeist/build/bin/polygeist-opt bin/polygeist-opt
+echo_symbolic_link polygeist/llvm-project/build/bin/mlir-opt bin/mlir-opt
+echo_symbolic_link circt/build/bin/circt-opt bin/circt-opt
+echo_symbolic_link cli/target/debug/cli bin/dynamatic-cli
 
 echo -e "\n----------- Build successful -----------"
  
