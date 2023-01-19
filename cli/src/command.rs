@@ -1,10 +1,10 @@
-use std::{error::Error, fmt::Display};
+use std::{error::Error, fmt::Display, process::Command};
 
 use crate::suggest::Suggest;
 use dyn_clone::DynClone;
 use inquire::{error::InquireResult, InquireError};
 
-pub trait Command<State>: DynClone
+pub trait Execute<State>: DynClone
 where
     State: Clone,
 {
@@ -36,7 +36,7 @@ pub type ExecuteResult = Result<CommandEffect, ExecuteError>;
 pub enum CommandEffect {
     State(Option<String>),
     Callback(fn() -> ()),
-    Run,
+    Run(Vec<Command>),
     Exit,
 }
 
@@ -71,7 +71,7 @@ impl Error for PromptError {}
 
 pub fn handle_prompt_result<'a, State>(
     prompt: &InquireResult<String>,
-    commands: &'a [Box<dyn Command<State>>],
+    commands: &'a [Box<dyn Execute<State>>],
     state: &mut State,
 ) -> Result<CommandEffect, PromptError>
 where

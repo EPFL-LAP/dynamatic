@@ -7,7 +7,7 @@ mod suggest;
 
 use std::process::exit;
 
-use command::{handle_prompt_result, Command, CommandEffect, ExecuteResult, PromptError};
+use command::{handle_prompt_result, CommandEffect, Execute, ExecuteResult, PromptError};
 use compile::compile;
 use completer::CommandCompleter;
 use inquire::Text;
@@ -16,7 +16,7 @@ use suggest::{SingleKwCmd, Suggest};
 fn manage() {}
 
 fn main() {
-    let commands: [Box<dyn Command<()>>; 2] = [
+    let commands: [Box<dyn Execute<()>>; 2] = [
         Box::new(MainCmd::new("compile".to_string(), compile)),
         Box::new(MainCmd::new("manage".to_string(), manage)),
     ];
@@ -53,7 +53,7 @@ impl MainCmd {
     }
 }
 
-impl Command<()> for MainCmd {
+impl Execute<()> for MainCmd {
     fn execute(&self, tokens: &[&str], _state: &mut ()) -> ExecuteResult {
         Self::check_keyword(&self, tokens, &self.kw)?;
         Ok(CommandEffect::Callback(self.callback))

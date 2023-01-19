@@ -1,6 +1,6 @@
 use crate::{
     command::{
-        handle_prompt_result, Command, CommandEffect, ExecuteError, ExecuteResult, PromptError,
+        handle_prompt_result, CommandEffect, Execute, ExecuteError, ExecuteResult, PromptError,
     },
     completer::CommandCompleter,
     pipeline::{CompileStep, Dialect, PipelineState, DIALECTS},
@@ -10,7 +10,12 @@ use crate::{
     },
 };
 use inquire::Text;
-use std::{fmt::Display, process::exit, vec};
+use std::{
+    fmt::Display,
+    path::Path,
+    process::{exit, Command},
+    vec,
+};
 
 pub fn compile() {
     let mut state = CompileState::new();
@@ -30,6 +35,7 @@ pub fn compile() {
                         println!("{msg}");
                     }
                 }
+                CommandEffect::Run(_) => (),
                 CommandEffect::Exit => break,
                 _ => (),
             },
@@ -48,7 +54,7 @@ struct CompileState {
     pipeline: PipelineState,
 }
 
-dyn_clone::clone_trait_object!(Command<CompileState>);
+dyn_clone::clone_trait_object!(Execute<CompileState>);
 
 impl CompileState {
     fn new() -> Self {
@@ -70,8 +76,8 @@ impl Display for CompileState {
     }
 }
 
-fn get_compile_commands(state: &CompileState) -> Vec<Box<dyn Command<CompileState>>> {
-    let mut root_suggestions: Vec<Box<dyn Command<CompileState>>> = vec![
+fn get_compile_commands(state: &CompileState) -> Vec<Box<dyn Execute<CompileState>>> {
+    let mut root_suggestions: Vec<Box<dyn Execute<CompileState>>> = vec![
         Box::new(OptCmd::new(&state.pipeline)),
         Box::new(SourceCmd::new()),
         Box::new(PipelineEndpointCmd::new(true)),
@@ -116,7 +122,7 @@ impl OptCmd {
             state: OptCmdState::MatchKw,
             steps: pipeline_state
                 .get_steps()
-                .keys()
+                .iter()
                 .map(|step| step.get_short_name())
                 .collect(),
         }
@@ -196,7 +202,7 @@ impl Suggest for OptCmd {
     }
 }
 
-impl Command<CompileState> for OptCmd {
+impl Execute<CompileState> for OptCmd {
     fn execute(&self, tokens: &[&str], state: &mut CompileState) -> ExecuteResult {
         Self::check_keyword(&self, tokens, Self::KW)?;
 
@@ -212,7 +218,7 @@ impl Command<CompileState> for OptCmd {
         let legal_steps: Vec<String> = state
             .pipeline
             .get_steps()
-            .keys()
+            .iter()
             .map(|step| step.get_short_name())
             .collect();
         if let None = legal_steps.iter().find(|step| step == &tokens[1]) {
@@ -254,7 +260,7 @@ impl SourceCmd {
     }
 }
 
-impl Command<CompileState> for SourceCmd {
+impl Execute<CompileState> for SourceCmd {
     fn execute(&self, tokens: &[&str], state: &mut CompileState) -> ExecuteResult {
         Self::check_keyword(&self, tokens, Self::KW)?;
         Self::check_num_args(&self, tokens, 1)?;
@@ -287,7 +293,7 @@ impl PipelineEndpointCmd {
     }
 }
 
-impl Command<CompileState> for PipelineEndpointCmd {
+impl Execute<CompileState> for PipelineEndpointCmd {
     fn execute(&self, tokens: &[&str], state: &mut CompileState) -> ExecuteResult {
         Self::check_keyword(&self, tokens, self.kw)?;
         Self::check_num_args(&self, tokens, 1)?;
@@ -302,7 +308,7 @@ impl Command<CompileState> for PipelineEndpointCmd {
                 Some(format!("Updated destination dialect to {}", dialect))
             })),
             None => {
-                let names: Vec<&str> = DIALECTS.iter().map(|info| info.get_name()).collect();
+                let names: Vec<&str> = DIALECTS.iter().map(|info| info.name).collect();
                 Err(ExecuteError::ErrArgument(format!(
                     "Illegal dialect name provided. Expected one of {{{}}}, but got {}",
                     names.join(", "),
@@ -315,10 +321,7 @@ impl Command<CompileState> for PipelineEndpointCmd {
     fn get_suggester(&self) -> Box<dyn Suggest> {
         Box::new(OneChoiceArgCmd::new(
             self.kw,
-            &DIALECTS
-                .iter()
-                .map(|info| info.get_name())
-                .collect::<Vec<&str>>(),
+            &DIALECTS.iter().map(|info| info.name).collect::<Vec<&str>>(),
         ))
     }
 }
@@ -342,17 +345,12 @@ impl PipelineConfigCmd {
     }
 }
 
-impl Command<CompileState> for PipelineConfigCmd {
+impl Execute<CompileState> for PipelineConfigCmd {
     fn execute(&self, tokens: &[&str], _state: &mut CompileState) -> ExecuteResult {
         Self::check_keyword(&self, tokens, self.kw)?;
         Self::check_num_args(&self, tokens, 1)?;
 
-        // TODO: does nothing for now, needs to be implemented
-        Ok(CommandEffect::State(if self.is_load {
-            Some(format!("Loaded pipeline configuration from {}", tokens[1]))
-        } else {
-            Some(format!("Saved pipeline configuration to {}", tokens[1]))
-        }))
+        todo!()
     }
 
     fn get_suggester(&self) -> Box<dyn Suggest> {
@@ -371,15 +369,52 @@ impl RunCmd {
     }
 }
 
-impl Command<CompileState> for RunCmd {
-    fn execute(&self, tokens: &[&str], _state: &mut CompileState) -> ExecuteResult {
+impl Execute<CompileState> for RunCmd {
+    fn execute(&self, tokens: &[&str], state: &mut CompileState) -> ExecuteResult {
         Self::check_keyword(&self, tokens, Self::KW)?;
         Self::check_num_args(&self, tokens, 0)?;
 
-        // Create script from pipeline configuration
+        let input_file_ref: &str = state.source_filepath.as_ref().unwrap();
+        let mut input_file: String = Path::new(input_file_ref)
+            .file_name()
+            .unwrap()
+            .to_str()
+            .unwrap()
+            .to_string();
+        let out_dir = format!(
+            "./runs/{}",
+            Path::new(input_file_ref)
+                .file_stem()
+                .unwrap()
+                .to_str()
+                .unwrap()
+        );
 
-        // TODO: does nothing for now, needs to be implemented
-        Ok(CommandEffect::State(Some("Done!".to_string())))
+        // First create the output directory for all generated files and copy the source file there
+        let mut cmds = vec![
+            Command::new(format!("mkdir -p {out_dir}")),
+            Command::new(format!("cp {input_file_ref} {out_dir}/{input_file}")),
+        ];
+
+        // Add a command for each compile step
+        for step in state.pipeline.get_steps() {
+            let args = state.pipeline.get_args(step).unwrap();
+            let info = step.get_info();
+            let output_file = format!("{}/{}", out_dir, (info.get_output_file)(&input_file_ref));
+
+            // Push the compile command for this step
+            cmds.push(Command::new(format!(
+                "{} {input_file} {} {} > {output_file}",
+                format!("./bin/{}", info.binary),
+                args.join(" "),
+                info.args.join(" "),
+            )));
+
+            // Output file of current step becomes input file of next step
+            input_file = output_file;
+        }
+
+        Ok(CommandEffect::Run(cmds))
     }
 
     fn get_suggester(&self) -> Box<dyn Suggest> {

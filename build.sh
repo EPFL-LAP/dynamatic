@@ -57,9 +57,6 @@ do
         "--force-rebuild" | "-f")
             FORCE_REBUILD=1
             ;;
-        "--refresh-links" | "-l")
-            FORCE_REBUILD=1
-            ;;
         "--release" | "-r")
             BUILD_TYPE="Release"
             ;;
