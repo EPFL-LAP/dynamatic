@@ -29,10 +29,17 @@ exit_on_fail() {
     fi
 }
 
-# Thin wrapper around ln to echo created symbolic links and fix destination path
-echo_symbolic_link() {
-    echo "${2} -> ${1}"
-    ln -f --symbolic ../${1} ${2}
+# Create symbolic link from the bin/ directory to an executable file built by
+# the repository. The symbolic link's name is the same as the executable file.
+# The path to the executable file must be passed as the first argument to this
+# function and be relative to the repository's root. The function assumes that
+# the bin/ directory exists and that the current working directory is the
+# repository's root. 
+create_symlink() {
+    local src=${1}
+    local dst="bin/$(basename ${1})"
+    echo "${dst} -> ${src}"
+    ln -f --symbolic ../${src} ${dst}
 }
 
 #### Parse arguments ####
@@ -72,11 +79,10 @@ done
 
 # Delete build folders if forcing rebuild
 if [[ $FORCE_REBUILD -ne 0 ]]; then
-    rm -rf polygeist/llvm-project/build polygeist/build
-    rm -rf circt/llvm/build circt/build
+    rm -rf polygeist/llvm-project/build polygeist/build # Polygeist
+    rm -rf circt/llvm/build circt/build # CIRCT
+    rm -rf build # Dynamatic++
 fi
-
-#### Polygeist ####
 
 echo -e \
 "\n----------------------------------------
@@ -130,19 +136,15 @@ if [[ DISABLE_TESTS -eq 0 ]]; then
     exit_on_fail "Tests for polygeist failed"
 fi
 
-#### CIRCT ####
-
 echo -e \
 "\n----------------------------------------
 ------------ Building CIRCT ------------
 ----------------------------------------\n"
 
-cd ../../circt
-
 echo -e "\n---------- Building circt/llvm ---------\n"
 
 # Create build directory and cd to it
-mkdir -p llvm/build && cd llvm/build
+cd ../../circt && mkdir -p llvm/build && cd llvm/build
 
 # Build
 cmake -G Ninja ../llvm \
@@ -184,14 +186,33 @@ if [[ DISABLE_TESTS -eq 0 ]]; then
     exit_on_fail "Tests for circt failed"
 fi
 
-#### CLI ####
+echo -e \
+"\n----------------------------------------
+--------- Building Dynamatic++ ---------
+----------------------------------------\n"
+
+# Create build directory and cd to it
+cd ../.. && mkdir -p build && cd build
+
+cmake -G Ninja .. \
+    -DCIRCT_DIR=$PWD/../circt/build/lib/cmake/circt \
+    -DMLIR_DIR=$PWD/../circt/llvm/build/lib/cmake/mlir \
+    -DLLVM_DIR=$PWD/../circt/llvm/build/lib/cmake/llvm \
+    -DCMAKE_BUILD_TYPE=$BUILD_TYPE \
+    -DLLVM_ENABLE_ASSERTIONS=ON \
+    -DCMAKE_EXPORT_COMPILE_COMMANDS=ON \
+    $CMAKE_FLAGS_EXT
+exit_on_fail "Failed to cmake dynamatic++"
+
+ninja
+exit_on_fail "Failed to build dynamatic++"
 
 echo -e \
 "\n----------------------------------------
 ------------- Building CLI -------------
 ----------------------------------------\n"
 
-cd ../../cli
+cd ../cli
 cargo build
 exit_on_fail "Failed to build CLI"
 
@@ -204,11 +225,12 @@ echo -e \
 cd .. && mkdir -p bin 
 
 # Create symbolic links to all binaries we use from subfolders
-echo_symbolic_link polygeist/build/bin/cgeist bin/cgeist
-echo_symbolic_link polygeist/build/bin/polygeist-opt bin/polygeist-opt
-echo_symbolic_link polygeist/llvm-project/build/bin/mlir-opt bin/mlir-opt
-echo_symbolic_link circt/build/bin/circt-opt bin/circt-opt
-echo_symbolic_link cli/target/debug/cli bin/dynamatic-cli
+create_symlink polygeist/build/bin/cgeist
+create_symlink polygeist/build/bin/polygeist-opt
+create_symlink polygeist/llvm-project/build/bin/mlir-opt
+create_symlink circt/build/bin/circt-opt
+create_symlink cli/target/debug/cli
+create_symlink build/bin/dynamatic++
 
 echo -e "\n----------- Build successful -----------"
  
