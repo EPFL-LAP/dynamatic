@@ -1,0 +1,26 @@
+{
+  // Editor configuration
+  "editor.detectIndentation": false,
+  "editor.tabSize": 2,
+  "editor.insertSpaces": true,
+  "editor.useTabStops": true,
+  "editor.formatOnSave": true,
+  "editor.defaultFormatter": "xaver.clang-format",
+  // CMake configuration
+  "C_Cpp.default.configurationProvider": "ms-vscode.cmake-tools",
+  "cmake.sourceDirectory": "${workspaceFolder}",
+  "cmake.buildDirectory": "${workspaceFolder}/build",
+  "cmake.generator": "Ninja",
+  "cmake.configureArgs": [
+    "-DCIRCT_DIR=${workspaceFolder}/circt/build/lib/cmake/circt",
+    "-DMLIR_DIR=${workspaceFolder}/circt/llvm/build/lib/cmake/mlir",
+    "-DLLVM_DIR=${workspaceFolder}/circt/llvm/build/lib/cmake/llvm",
+    "-DLLVM_ENABLE_ASSERTIONS=ON",
+    "-DCMAKE_EXPORT_COMPILE_COMMANDS=ON",
+    // Arguments below facultative but speed up (re)builds
+    "-DCMAKE_C_COMPILER=clang",
+    "-DCMAKE_CXX_COMPILER=clang++",
+    "-DLLVM_ENABLE_LLD=ON",
+    "-DLLVM_CCACHE_BUILD=ON",
+  ]
+}

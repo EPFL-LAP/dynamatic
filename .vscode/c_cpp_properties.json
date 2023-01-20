@@ -1,0 +1,21 @@
+{
+  "configurations": [
+    {
+      "name": "Linux",
+      "includePath": [
+        "${workspaceFolder}/circt/include/",
+        "${workspaceFolder}/circt/build/include/",
+        "${workspaceFolder}/circt/llvm/llvm/include/",
+        "${workspaceFolder}/circt/llvm/mlir/include/",
+        "${workspaceFolder}/circt/llvm/build/include/",
+        "${workspaceFolder}/circt/llvm/build/tools/mlir/include/"
+      ],
+      "intelliSenseMode": "linux-clang-x64",
+      "compilerPath": "/usr/bin/clang",
+      "cStandard": "c17",
+      "cppStandard": "c++17",
+      "configurationProvider": "ms-vscode.cmake-tools"
+    }
+  ],
+  "version": 4
+}

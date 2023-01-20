@@ -201,7 +201,7 @@ cmake -G Ninja .. \
     -DCMAKE_BUILD_TYPE=$BUILD_TYPE \
     -DLLVM_ENABLE_ASSERTIONS=ON \
     -DCMAKE_EXPORT_COMPILE_COMMANDS=ON \
-    $CMAKE_FLAGS_EXT
+    $CMAKE_FLAGS_LLVM
 exit_on_fail "Failed to cmake dynamatic++"
 
 ninja
