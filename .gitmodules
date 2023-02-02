@@ -1,6 +1,3 @@
 [submodule "polygeist"]
 	path = polygeist
 	url = https://github.com/llvm/Polygeist.git
-[submodule "circt"]
-	path = circt
-	url = https://github.com/llvm/circt.git
