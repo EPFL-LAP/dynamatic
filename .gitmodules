@@ -3,5 +3,5 @@
 	url = https://github.com/llvm/Polygeist.git
 [submodule "circt"]
 	path = circt
-	url = https://github.com/EPFL-LAP/circt
+	url = git@github.com:EPFL-LAP/circt.git
 	branch = dynamatic
