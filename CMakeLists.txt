@@ -3,7 +3,7 @@
 #-------------------------------------------------------------------------------
 
 cmake_minimum_required(VERSION 3.13.4)
-project(Dynamatic++)
+project(Dynamatic)
 
 if(POLICY CMP0075)
   cmake_policy(SET CMP0075 NEW)
@@ -11,6 +11,12 @@ endif()
 
 if(POLICY CMP0077)
   cmake_policy(SET CMP0077 NEW)
+endif()
+
+# CMP0116: Ninja generators transform `DEPFILE`s from `add_custom_command()`
+# New in CMake 3.20. https://cmake.org/cmake/help/latest/policy/CMP0116.html
+if(POLICY CMP0116)
+  cmake_policy(SET CMP0116 OLD)
 endif()
 
 set(CMAKE_CXX_STANDARD 17)
@@ -50,14 +56,41 @@ include_directories(${LLVM_INCLUDE_DIRS})
 include_directories(${MLIR_INCLUDE_DIRS})
 include_directories(${CIRCT_INCLUDE_DIRS})
 
+option(LLVM_BUILD_TOOLS "Build the LLVM tools. If OFF, just generate build targets." ON)
+
 #-------------------------------------------------------------------------------
-# Dynamatic++ configuration
+# Dynamatic configuration
 #-------------------------------------------------------------------------------
 
-set(DYNAMATIC_TOOLS_DIR ${CMAKE_SOURCE_DIR}/tools)
+set(DYNAMATIC_SOURCE_DIR ${CMAKE_SOURCE_DIR})
+set(DYNAMATIC_INCLUDE_DIR ${DYNAMATIC_SOURCE_DIR}/include)
+
+set(DYNAMATIC_BINARY_DIR ${CMAKE_BINARY_DIR})
+set(DYNAMATIC_TOOLS_DIR ${DYNAMATIC_BINARY_DIR}/bin)
+set(DYNAMATIC_BIN_INCLUDE_DIR ${DYNAMATIC_BINARY_DIR}/include)
+
+include_directories(${DYNAMATIC_INCLUDE_DIR})
+include_directories(${DYNAMATIC_BIN_INCLUDE_DIR})
+
+add_custom_target(dynamatic-headers)
+set_target_properties(dynamatic-headers PROPERTIES FOLDER "Misc")
+
+function(add_dynamatic_library name)
+  add_mlir_library(${ARGV})
+  add_dynamatic_library_install(${name})
+endfunction()
+
+function(add_dynamatic_library_install name)
+  install(TARGETS ${name} COMPONENT ${name} EXPORT DynamaticTargets)
+  set_property(GLOBAL APPEND PROPERTY DYNAMATIC_ALL_LIBS ${name})
+  set_property(GLOBAL APPEND PROPERTY DYNAMATIC_EXPORTS ${name})
+endfunction()
 
 #-------------------------------------------------------------------------------
 # Directory setup
 #-------------------------------------------------------------------------------
 
-add_subdirectory(${DYNAMATIC_TOOLS_DIR})
+add_subdirectory(${DYNAMATIC_INCLUDE_DIR}/dynamatic)
+add_subdirectory(${DYNAMATIC_SOURCE_DIR}/lib)
+add_subdirectory(${DYNAMATIC_SOURCE_DIR}/test)
+add_subdirectory(${DYNAMATIC_SOURCE_DIR}/tools)

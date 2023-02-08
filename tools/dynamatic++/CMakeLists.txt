@@ -2,7 +2,7 @@ set(LLVM_LINK_COMPONENTS
   Support
   )
 
-add_llvm_executable(dynamatic++
+add_llvm_tool(dynamatic++
   dynamatic++.cpp
 )
 
