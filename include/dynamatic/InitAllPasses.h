@@ -1,22 +1,31 @@
-//===- InitAllPasses.h - Dynamatic Global Pass Registration ---------------===//
+//===- InitAllPasses.h - Dynamatic Passes Registration -----------*- C++-*-===//
 //
 //===----------------------------------------------------------------------===//
 //
-// TODO
+// This file defines a helper to trigger the registration of all passes that
+// Dynamatic users may care about.
 //
 //===----------------------------------------------------------------------===//
 
 #ifndef DYNAMATIC_INITALLPASSES_H
 #define DYNAMATIC_INITALLPASSES_H
 
-#include "circt/InitAllPasses.h"
+#include "circt/Conversion/Passes.h"
+#include "circt/Dialect/Handshake/HandshakePasses.h"
+#include "circt/Transforms/Passes.h"
 #include "dynamatic/Conversion/Passes.h"
 
 namespace dynamatic {
 
 inline void registerAllPasses() {
+  // Passes defined in Dynamatic
   registerConversionPasses();
-  circt::registerAllPasses();
+
+  // Passed defined in CIRCT
+  circt::registerStandardToHandshake();
+  circt::registerFlattenMemRef();
+  circt::registerFlattenMemRefCalls();
+  handshake::registerPasses();
 }
 
 } // namespace dynamatic

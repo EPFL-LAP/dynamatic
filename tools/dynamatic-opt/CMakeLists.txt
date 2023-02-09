@@ -11,58 +11,9 @@ target_link_libraries(dynamatic-opt
   PRIVATE
   DynamaticStandardToHandshakeFPGA18
 
-  CIRCTAffineToPipeline
-  CIRCTAnalysisTestPasses
-  CIRCTCalyx
-  CIRCTCalyxToHW
-  CIRCTCalyxToFSM
-  CIRCTCalyxTransforms
-  CIRCTESI
-  CIRCTExportChiselInterface
-  CIRCTExportVerilog
-  CIRCTFIRRTL
-  CIRCTFIRRTLToHW
-  CIRCTFIRRTLTransforms
-  CIRCTFSM
-  CIRCTFSMTransforms
-  CIRCTFSMToSV
   CIRCTHandshake
-  CIRCTHandshakeToFIRRTL
-  CIRCTHandshakeToHW
   CIRCTHandshakeTransforms
-  CIRCTLLHD
-  CIRCTLLHDToLLVM
-  CIRCTHWToLLVM
-  CIRCTCombToLLVM
-  CIRCTLLHDTransforms
-  CIRCTMoore
-  CIRCTMooreToCore
-  CIRCTMSFT
-  CIRCTMSFTTransforms
-  CIRCTHW
-  CIRCTHWArith
-  CIRCTHWArithToHW
-  CIRCTInteropDialect
-  CIRCTHWToLLHD
-  CIRCTHWToSystemC
-  CIRCTHWTransforms
-  CIRCTSCFToCalyx
-  CIRCTScheduling
-  CIRCTSeq
-  CIRCTSeqTransforms
-  CIRCTSSP
-  CIRCTSSPTransforms
   CIRCTStandardToHandshake
-  CIRCTPipelineOps
-  CIRCTPipelineToHW
-  CIRCTPipelineTransforms
-  CIRCTPipelineToCalyx
-  CIRCTSV
-  CIRCTSVTransforms
-  CIRCTHWArith
-  CIRCTSystemC
-  CIRCTSystemCTransforms
-  CIRCTTransforms
 
   MLIRIR
   MLIRLLVMDialect
@@ -73,5 +24,4 @@ target_link_libraries(dynamatic-opt
   MLIRSupport
   MLIRTransforms
   MLIRSCFDialect
-  MLIREmitCDialect
 )
