@@ -1,13 +1,13 @@
-//===- PassDetail.h - Conversion Pass class details -----------------------===//
+//===- PassDetails.h - Conversion passes class details ----------*- C++ -*-===//
 //
-//===----------------------------------------------------------------------===//
-//
-// TODO
+// This is the header file for all conversion passes defined in Dynamatic. It
+// contains forward declarations needed by conversion passes and includes
+// auto-generated base class definitions for all conversion passes.
 //
 //===----------------------------------------------------------------------===//
 
-#ifndef CONVERSION_PASSDETAIL_H
-#define CONVERSION_PASSDETAIL_H
+#ifndef DYNAMATIC_CONVERSION_PASSDETAILS_H
+#define DYNAMATIC_CONVERSION_PASSDETAILS_H
 
 #include "mlir/IR/BuiltinOps.h"
 #include "mlir/IR/DialectRegistry.h"
@@ -48,4 +48,4 @@ namespace dynamatic {
 
 } // namespace dynamatic
 
-#endif // CONVERSION_PASSDETAIL_H
+#endif // DYNAMATIC_CONVERSION_PASSDETAILS_H

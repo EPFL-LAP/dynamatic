@@ -1,14 +1,16 @@
-//===- StandardToHandshakeFPGA18.cpp - FPGA'18 elastic pass -*- C++ -*-----===//
+//===- StandardToHandshakeFPGA18.cpp - FPGA18's elastic pass ----*- C++ -*-===//
 //
-//===----------------------------------------------------------------------===//
-//
-// TODO
+// This file contains the implementation of the elastic pass, as described in
+// https://www.epfl.ch/labs/lap/wp-content/uploads/2018/11/JosipovicFeb18_DynamicallyScheduledHighLevelSynthesis_FPGA18.pdf.
+// The implementation relies for some parts on CIRCT's standard-to-handshake
+// conversion pass, but brings siginificant changes related to memory interface
+// management and return network creation.
 //
 //===----------------------------------------------------------------------===//
 
 #include "dynamatic/Conversion/StandardToHandshakeFPGA18.h"
-#include "../PassDetail.h"
 #include "circt/Dialect/Handshake/HandshakeOps.h"
+#include "dynamatic/Conversion/PassDetails.h"
 #include "mlir/Dialect/Affine/Analysis/AffineAnalysis.h"
 #include "mlir/Dialect/Affine/IR/AffineOps.h"
 #include "mlir/Dialect/Affine/Utils.h"
@@ -29,74 +31,34 @@ using namespace dynamatic;
   if (failed(logicalResult))                                                   \
     return failure();
 
-namespace {
-template <typename TOp> class LowerOpTarget : public ConversionTarget {
-public:
-  explicit LowerOpTarget(MLIRContext &context) : ConversionTarget(context) {
-    loweredOps.clear();
-    addLegalDialect<handshake::HandshakeDialect>();
-    addLegalDialect<func::FuncDialect>();
-    addLegalDialect<arith::ArithDialect>();
-    addIllegalDialect<scf::SCFDialect>();
-    addIllegalDialect<mlir::AffineDialect>();
-
-    /// The root operation to be replaced is marked dynamically legal
-    /// based on the lowering status of the given operation, see
-    /// PartialLowerOp.
-    addDynamicallyLegalOp<TOp>([&](const auto &op) { return loweredOps[op]; });
-  }
-  DenseMap<Operation *, bool> loweredOps;
-};
-
-/// Default function for partial lowering of handshake::FuncOp. Lowering is
-/// achieved by a provided partial lowering function.
-///
-/// A partial lowering function may only replace a subset of the operations
-/// within the funcOp currently being lowered. However, the dialect conversion
-/// scheme requires the matched root operation to be replaced/updated, if the
-/// match was successful. To facilitate this, rewriter.updateRootInPlace
-/// wraps the partial update function.
-/// Next, the function operation is expected to go from illegal to legalized,
-/// after matchAndRewrite returned true. To work around this,
-/// LowerFuncOpTarget::loweredFuncs is used to communicate between the target
-/// and the conversion, to indicate that the partial lowering was completed.
-template <typename TOp> struct PartialLowerOp : public ConversionPattern {
-  using PartialLoweringFunc =
-      std::function<LogicalResult(TOp, ConversionPatternRewriter &)>;
-
-public:
-  PartialLowerOp(LowerOpTarget<TOp> &target, MLIRContext *context,
-                 LogicalResult &loweringResRef, const PartialLoweringFunc &fun)
-      : ConversionPattern(TOp::getOperationName(), 1, context), target(target),
-        loweringRes(loweringResRef), fun(fun) {}
-  using ConversionPattern::ConversionPattern;
-  LogicalResult
-  matchAndRewrite(Operation *op, ArrayRef<Value> /*operands*/,
-                  ConversionPatternRewriter &rewriter) const override {
-    assert(isa<TOp>(op));
-    rewriter.updateRootInPlace(
-        op, [&] { loweringRes = fun(dyn_cast<TOp>(op), rewriter); });
-    target.loweredOps[op] = true;
-    return loweringRes;
-  };
-
-private:
-  LowerOpTarget<TOp> &target;
-  LogicalResult &loweringRes;
-  // NOTE: this is basically the rewrite function
-  PartialLoweringFunc fun;
-};
-} // namespace
-
 // ============================================================================
 // Helper functions
 // ============================================================================
 
+/// Determines whether an operation is akin to a load or store memory operation.
 static bool isMemoryOp(Operation *op) {
   return isa<memref::LoadOp, memref::StoreOp, mlir::AffineReadOpInterface,
              mlir::AffineWriteOpInterface>(op);
 }
 
+/// Determines whether an operation is akin to a memory allocation operation.
+static bool isAllocOp(Operation *op) {
+  return isa<memref::AllocOp, memref::AllocaOp>(op);
+}
+
+/// Determines whether a memref type is suitable for covnersion in the context
+/// of this pass.
+static bool isValidMemrefType(Location loc, mlir::MemRefType type) {
+  if (type.getNumDynamicDims() != 0 || type.getShape().size() != 1) {
+    emitError(loc) << "memref's must be both statically sized and "
+                      "unidimensional.";
+    return false;
+  }
+  return true;
+}
+
+/// Extracts the memref argument to a memory operation and puts it in out.
+/// Returns an error whenever the passed operation is not a memory operation.
 static LogicalResult getOpMemRef(Operation *op, Value &out) {
   out = Value();
   if (auto memOp = dyn_cast<memref::LoadOp>(op))
@@ -112,73 +74,10 @@ static LogicalResult getOpMemRef(Operation *op, Value &out) {
   return op->emitOpError("Unknown Op type");
 }
 
-static bool isAllocOp(Operation *op) {
-  return isa<memref::AllocOp, memref::AllocaOp>(op);
-}
-
-/// Returns load/store results which are to be given as operands to a
-/// handshake::MemoryControllerOp
-static SmallVector<Value, 8> getResultsToMemory(Operation *op) {
-
-  if (auto loadOp = dyn_cast<handshake::DynamaticLoadOp>(op)) {
-    // For load, get all address outputs/indices
-    // (load also has one data output which goes to successor operation)
-    SmallVector<Value, 8> results(loadOp.getAddressResults());
-    return results;
-  } else {
-    // For store, all outputs (data and address indices) go to memory
-    auto storeOp = dyn_cast<handshake::DynamaticStoreOp>(op);
-    assert(storeOp && "input operation must either be load or store");
-    SmallVector<Value, 8> results(storeOp.getResults());
-    return results;
-  }
-}
-
-static LogicalResult isValidMemrefType(Location loc, mlir::MemRefType type) {
-  if (type.getNumDynamicDims() != 0 || type.getShape().size() != 1)
-    return emitError(loc) << "memref's must be both statically sized and "
-                             "unidimensional.";
-  return success();
-}
-
-static void addValueToOperands(Operation *op, Value val) {
-  SmallVector<Value, 8> results(op->getOperands());
-  results.push_back(val);
-  op->setOperands(results);
-}
-
-static SmallVector<Value, 8>
-mergeFunctionResults(Region &r, ConversionPatternRewriter &rewriter,
-                     SmallVector<Operation *, 4> &returnOps) {
-  auto entryBlock = &r.front();
-  if (returnOps.size() == 1) {
-    // No need to merge results in case of single return
-    return SmallVector<Value, 8>(returnOps[0]->getResults());
-  }
-
-  // Return values from multiple returns need to be merged together
-  SmallVector<Value, 8> results;
-  Location loc = entryBlock->getOperations().back().getLoc();
-  for (unsigned i = 0, e = returnOps[0]->getNumResults(); i < e; i++) {
-    SmallVector<Value, 4> mergeOperands;
-    for (auto *retOp : returnOps) {
-      mergeOperands.push_back(retOp->getResult(i));
-    }
-    auto mergeOp = rewriter.create<handshake::MergeOp>(loc, mergeOperands);
-    results.push_back(mergeOp.getResult());
-  }
-  return results;
-}
-
-static SmallVector<Value, 8> getFunctionEndControls(Region &r) {
-  SmallVector<Value, 8> controls;
-  for (auto op : r.getOps<handshake::MemoryControllerOp>()) {
-    auto memOp = dyn_cast<handshake::MemoryControllerOp>(&op);
-    controls.push_back(memOp->getDone());
-  }
-  return controls;
-}
-
+/// Adds a new operation (along with its parent block) to memory interfaces
+/// identified so far in the function. If the operation references a so far
+/// unencoutnered memory interface, the latter is added to the set of known
+/// interfaces first.
 static void
 addOpToMemInterfaces(HandshakeLoweringFPGA18::MemInterfacesInfo &memInfo,
                      Value memref, Operation *op) {
@@ -213,8 +112,74 @@ addOpToMemInterfaces(HandshakeLoweringFPGA18::MemInterfacesInfo &memInfo,
   memInfo.push_back(std::make_pair(memref, newBlock));
 }
 
+/// Returns load/store results which are to be given as operands to a
+/// handshake::MemoryControllerOp.
+static SmallVector<Value, 8> getResultsToMemory(Operation *op) {
+
+  if (auto loadOp = dyn_cast<handshake::DynamaticLoadOp>(op)) {
+    // For load, get all address outputs/indices
+    // (load also has one data output which goes to successor operation)
+    SmallVector<Value, 8> results(loadOp.getAddressResults());
+    return results;
+  } else {
+    // For store, all outputs (data and address indices) go to memory
+    auto storeOp = dyn_cast<handshake::DynamaticStoreOp>(op);
+    assert(storeOp && "input operation must either be load or store");
+    SmallVector<Value, 8> results(storeOp.getResults());
+    return results;
+  }
+}
+
+/// Adds a value to the list of operands of an operation.
+static void addValueToOperands(Operation *op, Value val) {
+  SmallVector<Value, 8> results(op->getOperands());
+  results.push_back(val);
+  op->setOperands(results);
+}
+
+/// Returns the list of data inputs to be passed as operands to the
+/// handshake::EndOp of a handshake::FuncOp. In the case of a single return
+/// statement, this is simply the return's outputs. In the case of multiple
+/// returns, this is the list of individually merged outputs of all returns.
+/// In the latter case, the function inserts the required handshake::MergeOp's
+/// in the region.
+static SmallVector<Value, 8>
+mergeFunctionResults(Region &r, ConversionPatternRewriter &rewriter,
+                     SmallVector<Operation *, 4> &returnOps) {
+  auto entryBlock = &r.front();
+  if (returnOps.size() == 1) {
+    // No need to merge results in case of single return
+    return SmallVector<Value, 8>(returnOps[0]->getResults());
+  }
+
+  // Return values from multiple returns need to be merged together
+  SmallVector<Value, 8> results;
+  Location loc = entryBlock->getOperations().back().getLoc();
+  rewriter.setInsertionPointToEnd(entryBlock);
+  for (unsigned i = 0, e = returnOps[0]->getNumResults(); i < e; i++) {
+    SmallVector<Value, 4> mergeOperands;
+    for (auto *retOp : returnOps) {
+      mergeOperands.push_back(retOp->getResult(i));
+    }
+    auto mergeOp = rewriter.create<handshake::MergeOp>(loc, mergeOperands);
+    results.push_back(mergeOp.getResult());
+  }
+  return results;
+}
+
+/// Returns the control signals from memory controllers to be passed as operands
+/// to the handshake::EndOp of a handshake::FuncOp.
+static SmallVector<Value, 8> getFunctionEndControls(Region &r) {
+  SmallVector<Value, 8> controls;
+  for (auto op : r.getOps<handshake::MemoryControllerOp>()) {
+    auto memOp = dyn_cast<handshake::MemoryControllerOp>(&op);
+    controls.push_back(memOp->getDone());
+  }
+  return controls;
+}
+
 // ============================================================================
-// Overriden lowering steps
+// Concrete lowering steps
 // ============================================================================
 
 LogicalResult HandshakeLoweringFPGA18::createControlOnlyNetwork(
@@ -255,7 +220,7 @@ LogicalResult HandshakeLoweringFPGA18::replaceMemoryOps(
       continue;
 
     // Ensure that this is a valid memref-typed value.
-    if (failed(isValidMemrefType(arg.getLoc(), memrefType)))
+    if (!isValidMemrefType(arg.getLoc(), memrefType))
       return failure();
 
     SmallVector<std::pair<Block *, std::vector<Operation *>>> emptyOps;
@@ -474,13 +439,13 @@ LogicalResult HandshakeLoweringFPGA18::createReturnNetwork(
   for (auto *op : terminatorsToErase)
     op->erase();
 
-  // Insert an end node at the end of the function that merges results from all
-  // handshake-level return operations and wait for all memory controllers to
-  // signal completion
-  rewriter.setInsertionPointToEnd(entryBlock);
+  // Insert an end node at the end of the function that merges results from
+  // all handshake-level return operations and wait for all memory controllers
+  // to signal completion
   SmallVector<Value, 8> endOperands;
   endOperands.append(mergeFunctionResults(r, rewriter, newReturnOps));
   endOperands.append(getFunctionEndControls(r));
+  rewriter.setInsertionPointToEnd(entryBlock);
   rewriter.create<handshake::EndOp>(entryBlockOps.back().getLoc(), endOperands);
   return success();
 }
@@ -490,6 +455,65 @@ LogicalResult HandshakeLoweringFPGA18::createReturnNetwork(
 // ============================================================================
 
 namespace {
+
+/// Conversion target for lowering a func::FuncOp to a handshake::FuncOp
+class LowerFuncOpTarget : public ConversionTarget {
+public:
+  explicit LowerFuncOpTarget(MLIRContext &context) : ConversionTarget(context) {
+    loweredFuncs.clear();
+    addLegalDialect<handshake::HandshakeDialect>();
+    addLegalDialect<func::FuncDialect>();
+    addLegalDialect<arith::ArithDialect>();
+    addIllegalDialect<scf::SCFDialect>();
+    addIllegalDialect<mlir::AffineDialect>();
+
+    // The root operation to be replaced is marked dynamically legal based on
+    // the lowering status of the given operation, see PartialLowerOp. This is
+    // to make the operation go from illegal to legal after partial lowering
+    addDynamicallyLegalOp<func::FuncOp>(
+        [&](const auto &op) { return loweredFuncs[op]; });
+  }
+  DenseMap<Operation *, bool> loweredFuncs;
+};
+
+/// Conversion pattern for partially lowering a func::FuncOp to a
+/// handshake::FuncOp. Lowering is achieved by a provided partial lowering
+/// function.
+struct PartialLowerFuncOp : public OpConversionPattern<func::FuncOp> {
+  using PartialLoweringFunc =
+      std::function<LogicalResult(func::FuncOp, ConversionPatternRewriter &)>;
+
+public:
+  PartialLowerFuncOp(LowerFuncOpTarget &target, MLIRContext *context,
+                     const PartialLoweringFunc &fun)
+      : OpConversionPattern<func::FuncOp>(context), target(target),
+        loweringFunc(fun) {}
+  LogicalResult
+  matchAndRewrite(func::FuncOp op, OpAdaptor /*adaptor*/,
+                  ConversionPatternRewriter &rewriter) const override {
+    // Dialect conversion scheme requires the matched root operation to be
+    // replaced or updated if the match was successful. Calling
+    // updateRootInPlace ensures that happens even if loweringFUnc doesn't
+    // modify the root operation
+    LogicalResult res = failure();
+    rewriter.updateRootInPlace(op, [&] { res = loweringFunc(op, rewriter); });
+
+    // Signal to the conversion target that the function was successfully
+    // partially lowered
+    target.loweredFuncs[op] = true;
+
+    // Success status of conversion pattern determined by success of partial
+    // lowering function
+    return res;
+  };
+
+private:
+  /// The conversion target for this pattern
+  LowerFuncOpTarget &target;
+  /// The rewrite function
+  PartialLoweringFunc loweringFunc;
+};
+
 /// Strategy class for SSA maximization during std-to-handshake conversion.
 /// Block arguments of type MemRefType and allocation operations are not
 /// considered for SSA maximization.
@@ -513,75 +537,63 @@ static LogicalResult maximizeSSANoMem(Region &r,
   return maximizeSSA(r, strategy, rewriter);
 }
 
-// Convenience function for running lowerToHandshake with a partial
-// handshake::FuncOp lowering function.
-template <typename TOp>
-static LogicalResult partiallyLowerOp(
-    const std::function<LogicalResult(TOp, ConversionPatternRewriter &)>
-        &loweringFunc,
-    MLIRContext *ctx, TOp op) {
+/// Convenience function for running lowerToHandshake with a partial
+/// handshake::FuncOp lowering function.
+static LogicalResult
+partiallyLowerOp(const PartialLowerFuncOp::PartialLoweringFunc &loweringFunc,
+                 MLIRContext *ctx, func::FuncOp op) {
 
   RewritePatternSet patterns(ctx);
-  auto target = LowerOpTarget<TOp>(*ctx);
-  LogicalResult partialLoweringSuccessfull = success();
-  patterns.add<PartialLowerOp<TOp>>(target, ctx, partialLoweringSuccessfull,
-                                    loweringFunc);
-  return success(
-      applyPartialConversion(op, target, std::move(patterns)).succeeded() &&
-      partialLoweringSuccessfull.succeeded());
+  auto target = LowerFuncOpTarget(*ctx);
+  patterns.add<PartialLowerFuncOp>(target, ctx, loweringFunc);
+  return applyPartialConversion(op, target, std::move(patterns));
 }
 
-// Driver for the HandshakeLowering class.
-// Note: using two different vararg template names due to potantial references
-// that would cause a type mismatch
-template <typename T, typename... TArgs, typename... TArgs2>
-static LogicalResult
-merde(T &instance,
-      LogicalResult (T::*memberFunc)(ConversionPatternRewriter &, TArgs2...),
-      TArgs &...args) {
-  return partiallyLowerRegion(
-      [&](Region &, ConversionPatternRewriter &rewriter) -> LogicalResult {
-        return (instance.*memberFunc)(rewriter, args...);
-      },
-      instance.getContext(), instance.getRegion());
-}
-
+/// Lowers the region referenced by the handshake lowering strategy following a
+/// fixed sequence of steps, some implemented in this file and some in CIRCT's
+/// standard-to-handshake conversion pass.
 static LogicalResult lowerRegion(HandshakeLoweringFPGA18 &hl) {
 
   auto &baseHl = static_cast<HandshakeLowering &>(hl);
 
   HandshakeLoweringFPGA18::MemInterfacesInfo memInfo;
-  if (failed(merde(hl, &HandshakeLoweringFPGA18::replaceMemoryOps, memInfo)))
+  if (failed(runPartialLowering(hl, &HandshakeLoweringFPGA18::replaceMemoryOps,
+                                memInfo)))
     return failure();
 
-  if (failed(merde(hl, &HandshakeLoweringFPGA18::createControlOnlyNetwork)))
+  if (failed(runPartialLowering(
+          hl, &HandshakeLoweringFPGA18::createControlOnlyNetwork)))
     return failure();
 
-  if (failed(merde(baseHl, &HandshakeLowering::addMergeOps)))
+  if (failed(runPartialLowering(baseHl, &HandshakeLowering::addMergeOps)))
     return failure();
 
-  if (failed(merde(baseHl, &HandshakeLowering::replaceCallOps)))
+  if (failed(runPartialLowering(baseHl, &HandshakeLowering::replaceCallOps)))
     return failure();
 
-  if (failed(merde(baseHl, &HandshakeLowering::addBranchOps)))
+  if (failed(runPartialLowering(baseHl, &HandshakeLowering::addBranchOps)))
     return failure();
 
   bool sourceConstants = true;
-  if (failed(merde(baseHl, &HandshakeLowering::connectConstantsToControl,
-                   sourceConstants)))
+  if (failed(runPartialLowering(baseHl,
+                                &HandshakeLowering::connectConstantsToControl,
+                                sourceConstants)))
     return failure();
 
-  if (failed(merde(hl, &HandshakeLoweringFPGA18::connectToMemory, memInfo)))
+  if (failed(runPartialLowering(hl, &HandshakeLoweringFPGA18::connectToMemory,
+                                memInfo)))
     return failure();
 
-  if (failed(merde(hl, &HandshakeLoweringFPGA18::createReturnNetwork)))
+  if (failed(runPartialLowering(hl,
+                                &HandshakeLoweringFPGA18::createReturnNetwork)))
     return failure();
 
   return success();
 }
 
+/// Fully lowers a func::FuncOp to a handshake::FuncOp.
 static LogicalResult lowerFuncOp(func::FuncOp funcOp, MLIRContext *ctx) {
-  // Only retain those attributes that are not constructed by build.
+  // Only retain those attributes that are not constructed by build
   SmallVector<NamedAttribute, 4> attributes;
   for (const auto &attr : funcOp->getAttrs()) {
     if (attr.getName() == SymbolTable::getSymbolAttrName() ||
@@ -602,9 +614,11 @@ static LogicalResult lowerFuncOp(func::FuncOp funcOp, MLIRContext *ctx) {
 
   handshake::FuncOp newFuncOp;
 
+  bool funcIsExternal = funcOp.isExternal();
+
   // Add control input/output to function arguments/results and create a
   // handshake::FuncOp of appropriate type
-  returnOnError(partiallyLowerOp<func::FuncOp>(
+  returnOnError(partiallyLowerOp(
       [&](func::FuncOp funcOp, PatternRewriter &rewriter) {
         auto noneType = rewriter.getNoneType();
         resTypes.push_back(noneType);
@@ -614,18 +628,20 @@ static LogicalResult lowerFuncOp(func::FuncOp funcOp, MLIRContext *ctx) {
             funcOp.getLoc(), funcOp.getName(), func_type, attributes);
         rewriter.inlineRegionBefore(funcOp.getBody(), newFuncOp.getBody(),
                                     newFuncOp.end());
-        if (!newFuncOp.isExternal())
+        if (!funcIsExternal)
           newFuncOp.resolveArgAndResNames();
-        rewriter.eraseOp(funcOp);
         return success();
       },
       ctx, funcOp));
+
+  // Delete the original function
+  funcOp->erase();
 
   // Apply SSA maximization
   returnOnError(
       partiallyLowerRegion(maximizeSSANoMem, ctx, newFuncOp.getBody()));
 
-  if (!newFuncOp.isExternal()) {
+  if (!funcIsExternal) {
     // Lower the region inside the function
     HandshakeLoweringFPGA18 hl(newFuncOp.getBody());
     returnOnError(lowerRegion(hl));
@@ -635,6 +651,9 @@ static LogicalResult lowerFuncOp(func::FuncOp funcOp, MLIRContext *ctx) {
 }
 
 namespace {
+/// FPGA18's elastic pass. Runs elastic pass on every function (func::FuncOp) of
+/// the module it is applied on. Succeeds whenever all functions in the module
+/// were succesfully lowered to handshake.
 struct StandardToHandshakeFPGA18Pass
     : public StandardToHandshakeFPGA18Base<StandardToHandshakeFPGA18Pass> {
 
