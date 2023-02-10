@@ -1,0 +1,4 @@
+set(LLVM_TARGET_DEFINITIONS HandshakePasses.td)
+mlir_tablegen(HandshakePasses.h.inc -gen-pass-decls)
+add_public_tablegen_target(DynamaticHandshakeTransformsIncGen)
+add_dependencies(dynamatic-headers DynamaticHandshakeTransformsIncGen)

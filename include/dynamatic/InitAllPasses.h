@@ -14,14 +14,16 @@
 #include "circt/Dialect/Handshake/HandshakePasses.h"
 #include "circt/Transforms/Passes.h"
 #include "dynamatic/Conversion/Passes.h"
+#include "dynamatic/Dialect/Handshake/HandshakePasses.h"
 
 namespace dynamatic {
 
 inline void registerAllPasses() {
   // Passes defined in Dynamatic
   registerConversionPasses();
+  dynamatic::registerPasses();
 
-  // Passed defined in CIRCT
+  // Passes defined in CIRCT
   circt::registerStandardToHandshake();
   circt::registerFlattenMemRef();
   circt::registerFlattenMemRefCalls();
