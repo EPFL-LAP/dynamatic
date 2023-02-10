@@ -86,6 +86,11 @@ function(add_dynamatic_library_install name)
   set_property(GLOBAL APPEND PROPERTY DYNAMATIC_EXPORTS ${name})
 endfunction()
 
+function(add_dynamatic_dialect_library name)
+  set_property(GLOBAL APPEND PROPERTY DYNAMATIC_DIALECT_LIBS ${name})
+  add_dynamatic_library(${ARGV} DEPENDS dynamatic-headers)
+endfunction()
+
 #-------------------------------------------------------------------------------
 # Directory setup
 #-------------------------------------------------------------------------------
