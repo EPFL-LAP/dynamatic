@@ -1,8 +1,11 @@
-//===- LLVM.h - Import and forward declare core LLVM types ----------------===//
+//===- LLVM.h - Import and forward declare core LLVM types ------*- C++ -*-===//
 //
-//===----------------------------------------------------------------------===//
+// This file forward declares and imports various common LLVM and MLIR datatypes
+// that we want to use unqualified.
 //
-// TODO
+// Note that most of these are forward declared and then imported into the
+// dynamatic namespace with using decls, rather than being #included. This is
+// because we want clients to explicitly #include the files they need.
 //
 //===----------------------------------------------------------------------===//
 

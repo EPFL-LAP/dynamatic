@@ -1,8 +1,6 @@
-//===- Passes.h - Conversion Pass Construction and Registration -----------===//
+//===- Passes.h - Conversion passes registration ---------------=*- C++ -*-===//
 //
-//===----------------------------------------------------------------------===//
-//
-// This fle contains the declarations to register conversion passes.
+// This file contains declarations to register all conversion passes.
 //
 //===----------------------------------------------------------------------===//
 

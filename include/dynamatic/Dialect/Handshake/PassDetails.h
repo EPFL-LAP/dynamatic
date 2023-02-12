@@ -1,8 +1,8 @@
-//===- PassDetails.h - Handshake pass class details -------------*- C++ -*-===//
+//===- PassDetails.h - Handshake passes class details -----------*- C++ -*-===//
 //
-//===----------------------------------------------------------------------===//
-//
-// TODO
+// This is the header file for all handshake passes defined in Dynamatic. It
+// contains forward declarations needed by handshake passes and includes
+// auto-generated base class definitions for all handshake passes.
 //
 //===----------------------------------------------------------------------===//
 

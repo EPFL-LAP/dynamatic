@@ -1,6 +1,4 @@
-//===- InitAllDialects.h - Dynamatic Dialects Registration -------*- C++-*-===//
-//
-//===----------------------------------------------------------------------===//
+//===- InitAllDialects.h - Dynamatic dialects registration -------*- C++-*-===//
 //
 // This file defines a helper to trigger the registration of all dialects that
 // Dynamatic users may care about.

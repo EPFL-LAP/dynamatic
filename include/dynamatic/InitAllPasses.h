@@ -1,6 +1,4 @@
-//===- InitAllPasses.h - Dynamatic Passes Registration -----------*- C++-*-===//
-//
-//===----------------------------------------------------------------------===//
+//===- InitAllPasses.h - Dynamatic passes registration -----------*- C++-*-===//
 //
 // This file defines a helper to trigger the registration of all passes that
 // Dynamatic users may care about.

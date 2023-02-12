@@ -1,20 +1,17 @@
-//===- HandshakePasses.h - Handshake pass entry points ----------*- C++ -*-===//
+//===- HandshakePasses.h - Handshake passes registration --------*- C++ -*-===//
 //
-//===----------------------------------------------------------------------===//
-//
-// TODO
+// This file contains declarations to register handshake passes.
 //
 //===----------------------------------------------------------------------===//
 
 #ifndef DYNAMATIC_DIALECT_HANDSHAKE_HANDSHAKEPASSES_H
 #define DYNAMATIC_DIALECT_HANDSHAKE_HANDSHAKEPASSES_H
 
+#include "dynamatic/Dialect/Handshake/HandshakeToDot.h"
 #include "dynamatic/Support/LLVM.h"
 #include "mlir/Pass/Pass.h"
 
 namespace dynamatic {
-
-std::unique_ptr<mlir::OperationPass<mlir::ModuleOp>> createHandshakeToDotPass();
 
 /// Generate the code for registering passes.
 #define GEN_PASS_REGISTRATION

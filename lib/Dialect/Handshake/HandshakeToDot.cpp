@@ -1,8 +1,9 @@
-//===- HandshakeToDot.cpp - Handshale to DOT conversion ---------*- C++ -*-===//
+//===- HandshakeToDot.cpp - Handshale to DOT pass ---------------*- C++ -*-===//
 //
-//===----------------------------------------------------------------------===//
-//
-// TODO
+// This file contains the implementation of the handshake to DOT pass. It
+// produces a .dot file (in the DOT language) parsable by Graphviz and
+// containing the graph representation of the input handshake-level IR. The pass
+// leaves the actual handshake-level IR unchanged.
 //
 //===----------------------------------------------------------------------===//
 
@@ -10,7 +11,6 @@
 #include "circt/Dialect/Handshake/HandshakePasses.h"
 #include "dynamatic/Dialect/Handshake/HandshakePasses.h"
 #include "dynamatic/Dialect/Handshake/PassDetails.h"
-#include "dynamatic/Support/LLVM.h"
 #include "mlir/Dialect/Arith/IR/Arith.h"
 #include "mlir/IR/BuiltinTypes.h"
 #include "mlir/IR/OperationSupport.h"

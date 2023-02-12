@@ -1,8 +1,6 @@
-//===-- Passes.td - Conversion pass definitions ---------------------------===//
+//===-- Passes.td - Conversion passes definition ----------------*- C++ -*-===//
 //
-//===----------------------------------------------------------------------===//
-//
-// This file contains definitions for all dialect conversions.
+// This file contains definitions for all dialect conversion passes.
 //
 //===----------------------------------------------------------------------===//
 
@@ -16,7 +14,7 @@ include "mlir/Pass/PassBase.td"
 //===----------------------------------------------------------------------===//
 
 def StandardToHandshakeFPGA18 : Pass<"lower-std-to-handshake-fpga18", "mlir::ModuleOp"> {
-  let summary = "Lower Standard MLIR into Handshake IR following elastic pass described in FPGA'18";
+  let summary = "Lower Standard MLIR into Handshake IR following elastic pass described in FPGA18";
   let constructor = "dynamatic::createStandardToHandshakeFPGA18Pass()";
   let dependentDialects = ["circt::handshake::HandshakeDialect"];
 }

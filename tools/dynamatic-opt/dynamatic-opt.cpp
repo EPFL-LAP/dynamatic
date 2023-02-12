@@ -1,8 +1,6 @@
-//===- dynamatic-opt.cpp - The dynamatic-opt driver -----------------------===//
+//===- dynamatic-opt.cpp - The dynamatic-opt driver -------------*- C++ -*-===//
 //
-//===----------------------------------------------------------------------===//
-//
-// This file implements the dynamatic-opt tool, which is the dynamatic analog of
+// This file implements the dynamatic-opt tool, which is the Dynamatic analog of
 // mlir-opt. It allows access to all compiler passes that Dynamatic users may
 // care about, that is all passes defined in the superproject as well as certain
 // passes defined within upstream MLIR, Polygeist, and CIRCT.
