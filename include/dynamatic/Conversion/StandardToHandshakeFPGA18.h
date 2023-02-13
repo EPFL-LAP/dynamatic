@@ -20,6 +20,10 @@ using namespace circt::handshake;
 
 namespace dynamatic {
 
+/// Operation attribute to identify the basic block the operation originated
+/// from in the std-level IR.
+const std::string BB_ATTR = "bb";
+
 // This class is used to inherit from CIRCT's standard-to-handshake lowering
 // infrastructure and implementation while providing us a way to
 // change/add/remove/reorder specific conversion steps to match FPGA18's elastic
@@ -54,16 +58,21 @@ public:
   LogicalResult connectToMemory(ConversionPatternRewriter &rewriter,
                                 MemInterfacesInfo &memInfo);
 
+  /// Sets an integer "bb" attribute on each operation to identify the basic
+  /// block from which the operation originates in the std-level IR.
+  LogicalResult idBasicBlocks(ConversionPatternRewriter &rewriter);
+
   /// Creates the region's return network by sequentially moving all blocks'
   /// operations to the entry block, replacing func::ReturnOp's with
   /// handshake::ReturnOp's, deleting all block terminators and non-entry
   /// blocks, merging the results of all return statements, and creating the
   /// region's end operation.
-  LogicalResult createReturnNetwork(ConversionPatternRewriter &rewriter);
+  LogicalResult createReturnNetwork(ConversionPatternRewriter &rewriter,
+                                    bool idBasicBlocks);
 };
 
 std::unique_ptr<mlir::OperationPass<mlir::ModuleOp>>
-createStandardToHandshakeFPGA18Pass();
+createStandardToHandshakeFPGA18Pass(bool idBasicBlocks = false);
 
 } // namespace dynamatic
 

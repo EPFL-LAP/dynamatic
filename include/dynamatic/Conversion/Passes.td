@@ -17,6 +17,11 @@ def StandardToHandshakeFPGA18 : Pass<"lower-std-to-handshake-fpga18", "mlir::Mod
   let summary = "Lower Standard MLIR into Handshake IR following elastic pass described in FPGA18";
   let constructor = "dynamatic::createStandardToHandshakeFPGA18Pass()";
   let dependentDialects = ["circt::handshake::HandshakeDialect"];
+  let options =
+    [Option<"idBasicBlocks", "id-basic-blocks", "bool", "false",
+            "If true, will attach a 'bb' attribute to each operation in the "
+            "resulting IR to identify the basic block from which the "
+            "operation originates.">];
 }
 
 #endif // DYNAMATIC_CONVERSION_PASSES_TD

@@ -145,24 +145,30 @@ static void addValueToOperands(Operation *op, Value val) {
 /// in the region.
 static SmallVector<Value, 8>
 mergeFunctionResults(Region &r, ConversionPatternRewriter &rewriter,
-                     SmallVector<Operation *, 4> &returnOps) {
+                     SmallVector<Operation *, 4> &newReturnOps,
+                     std::optional<size_t> endNetworkId) {
   auto entryBlock = &r.front();
-  if (returnOps.size() == 1) {
+  if (newReturnOps.size() == 1) {
     // No need to merge results in case of single return
-    return SmallVector<Value, 8>(returnOps[0]->getResults());
+    return SmallVector<Value, 8>(newReturnOps[0]->getResults());
   }
 
   // Return values from multiple returns need to be merged together
   SmallVector<Value, 8> results;
   Location loc = entryBlock->getOperations().back().getLoc();
   rewriter.setInsertionPointToEnd(entryBlock);
-  for (unsigned i = 0, e = returnOps[0]->getNumResults(); i < e; i++) {
+  for (unsigned i = 0, e = newReturnOps[0]->getNumResults(); i < e; i++) {
     SmallVector<Value, 4> mergeOperands;
-    for (auto *retOp : returnOps) {
+    for (auto *retOp : newReturnOps) {
       mergeOperands.push_back(retOp->getResult(i));
     }
     auto mergeOp = rewriter.create<handshake::MergeOp>(loc, mergeOperands);
     results.push_back(mergeOp.getResult());
+    // Merge operation inherits from the bb atttribute of the latest (in program
+    // order) return operation
+    if (endNetworkId.has_value())
+      mergeOp->setAttr(BB_ATTR,
+                       rewriter.getUI32IntegerAttr(endNetworkId.value()));
   }
   return results;
 }
@@ -397,8 +403,16 @@ HandshakeLoweringFPGA18::connectToMemory(ConversionPatternRewriter &rewriter,
   return success();
 }
 
+LogicalResult
+HandshakeLoweringFPGA18::idBasicBlocks(ConversionPatternRewriter &rewriter) {
+  for (auto &indexAndBlock : llvm::enumerate(r))
+    for (auto &op : indexAndBlock.value())
+      op.setAttr(BB_ATTR, rewriter.getUI32IntegerAttr(indexAndBlock.index()));
+  return success();
+}
+
 LogicalResult HandshakeLoweringFPGA18::createReturnNetwork(
-    ConversionPatternRewriter &rewriter) {
+    ConversionPatternRewriter &rewriter, bool idBasicBlocks) {
 
   auto *entryBlock = &r.front();
   auto &entryBlockOps = entryBlock->getOperations();
@@ -418,14 +432,33 @@ LogicalResult HandshakeLoweringFPGA18::createReturnNetwork(
       if (operands.empty())
         operands.push_back(getBlockEntryControl(&block));
 
+      // Insert new return operation next to the old one
       rewriter.setInsertionPoint(&termOp);
-      newReturnOps.push_back(rewriter.create<handshake::DynamaticReturnOp>(
-          termOp.getLoc(), operands));
+      auto newRet = rewriter.create<handshake::DynamaticReturnOp>(
+          termOp.getLoc(), operands);
+      newReturnOps.push_back(newRet);
+
+      if (idBasicBlocks)
+        // New return operation belongs in the same basic block as the old one
+        newRet->setAttr(BB_ATTR, termOp.getAttr(BB_ATTR));
     }
     terminatorsToErase.push_back(&termOp);
     entryBlockOps.splice(entryBlockOps.end(), block.getOperations());
   }
   assert(!newReturnOps.empty() && "function must have at least one return");
+
+  // When identifying basic blocks, the end node is either put in the same block
+  // as the function's single return statement or, in the case of multiple
+  // return statements, it is put in a "fake block" along with the merges that
+  // feed it its data inputs
+  std::optional<size_t> endNetworkID{};
+  if (idBasicBlocks)
+    endNetworkID = (newReturnOps.size() > 1)
+                       ? r.getBlocks().size()
+                       : newReturnOps[0]
+                             ->getAttrOfType<mlir::IntegerAttr>(BB_ATTR)
+                             .getValue()
+                             .getSExtValue();
 
   // Erase all blocks except the entry block
   for (auto &block : llvm::make_early_inc_range(llvm::drop_begin(r, 1))) {
@@ -443,17 +476,21 @@ LogicalResult HandshakeLoweringFPGA18::createReturnNetwork(
   // all handshake-level return operations and wait for all memory controllers
   // to signal completion
   SmallVector<Value, 8> endOperands;
-  endOperands.append(mergeFunctionResults(r, rewriter, newReturnOps));
+  endOperands.append(
+      mergeFunctionResults(r, rewriter, newReturnOps, endNetworkID));
   endOperands.append(getFunctionEndControls(r));
   rewriter.setInsertionPointToEnd(entryBlock);
-  rewriter.create<handshake::EndOp>(entryBlockOps.back().getLoc(), endOperands);
+  auto endOp = rewriter.create<handshake::EndOp>(entryBlockOps.back().getLoc(),
+                                                 endOperands);
+  if (endNetworkID.has_value())
+    endOp->setAttr(BB_ATTR, rewriter.getUI32IntegerAttr(endNetworkID.value()));
+
   return success();
 }
 
 // ============================================================================
 // Lowering strategy
 // ============================================================================
-
 namespace {
 
 /// Conversion target for lowering a func::FuncOp to a handshake::FuncOp
@@ -552,7 +589,8 @@ partiallyLowerOp(const PartialLowerFuncOp::PartialLoweringFunc &loweringFunc,
 /// Lowers the region referenced by the handshake lowering strategy following a
 /// fixed sequence of steps, some implemented in this file and some in CIRCT's
 /// standard-to-handshake conversion pass.
-static LogicalResult lowerRegion(HandshakeLoweringFPGA18 &hl) {
+static LogicalResult lowerRegion(HandshakeLoweringFPGA18 &hl,
+                                 bool idBasicBlocks) {
 
   auto &baseHl = static_cast<HandshakeLowering &>(hl);
 
@@ -584,15 +622,20 @@ static LogicalResult lowerRegion(HandshakeLoweringFPGA18 &hl) {
                                 memInfo)))
     return failure();
 
-  if (failed(runPartialLowering(hl,
-                                &HandshakeLoweringFPGA18::createReturnNetwork)))
+  if (idBasicBlocks &&
+      failed(runPartialLowering(hl, &HandshakeLoweringFPGA18::idBasicBlocks)))
+    return failure();
+
+  if (failed(runPartialLowering(
+          hl, &HandshakeLoweringFPGA18::createReturnNetwork, idBasicBlocks)))
     return failure();
 
   return success();
 }
 
 /// Fully lowers a func::FuncOp to a handshake::FuncOp.
-static LogicalResult lowerFuncOp(func::FuncOp funcOp, MLIRContext *ctx) {
+static LogicalResult lowerFuncOp(func::FuncOp funcOp, MLIRContext *ctx,
+                                 bool idBasicBlocks) {
   // Only retain those attributes that are not constructed by build
   SmallVector<NamedAttribute, 4> attributes;
   for (const auto &attr : funcOp->getAttrs()) {
@@ -644,7 +687,7 @@ static LogicalResult lowerFuncOp(func::FuncOp funcOp, MLIRContext *ctx) {
   if (!funcIsExternal) {
     // Lower the region inside the function
     HandshakeLoweringFPGA18 hl(newFuncOp.getBody());
-    returnOnError(lowerRegion(hl));
+    returnOnError(lowerRegion(hl, idBasicBlocks));
   }
 
   return success();
@@ -657,12 +700,16 @@ namespace {
 struct StandardToHandshakeFPGA18Pass
     : public StandardToHandshakeFPGA18Base<StandardToHandshakeFPGA18Pass> {
 
+  StandardToHandshakeFPGA18Pass(bool idBasicBlocks) {
+    this->idBasicBlocks = idBasicBlocks;
+  }
+
   void runOnOperation() override {
     ModuleOp m = getOperation();
 
     // Lower every function individually
     for (auto funcOp : llvm::make_early_inc_range(m.getOps<func::FuncOp>()))
-      if (failed(lowerFuncOp(funcOp, &getContext())))
+      if (failed(lowerFuncOp(funcOp, &getContext(), idBasicBlocks)))
         return signalPassFailure();
 
     // Legalize the resulting functions by performing any simple conversion
@@ -674,6 +721,6 @@ struct StandardToHandshakeFPGA18Pass
 } // namespace
 
 std::unique_ptr<mlir::OperationPass<mlir::ModuleOp>>
-dynamatic::createStandardToHandshakeFPGA18Pass() {
-  return std::make_unique<StandardToHandshakeFPGA18Pass>();
+dynamatic::createStandardToHandshakeFPGA18Pass(bool idBasicBlocks) {
+  return std::make_unique<StandardToHandshakeFPGA18Pass>(idBasicBlocks);
 }
