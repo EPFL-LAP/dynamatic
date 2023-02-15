@@ -1,5 +1,6 @@
 add_dynamatic_library(DynamaticTransforms
   HandshakeToDot.cpp
+  PushConstants.cpp
 
   DEPENDS
   DynamaticTransformsPassIncGen
