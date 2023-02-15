@@ -407,7 +407,10 @@ LogicalResult
 HandshakeLoweringFPGA18::idBasicBlocks(ConversionPatternRewriter &rewriter) {
   for (auto &indexAndBlock : llvm::enumerate(r))
     for (auto &op : indexAndBlock.value())
-      op.setAttr(BB_ATTR, rewriter.getUI32IntegerAttr(indexAndBlock.index()));
+      // Memory interfaces do not naturally belong to any block, so they do not
+      // get an attribute
+      if (!isa<handshake::MemoryControllerOp>(op))
+        op.setAttr(BB_ATTR, rewriter.getUI32IntegerAttr(indexAndBlock.index()));
   return success();
 }
 
@@ -458,7 +461,7 @@ LogicalResult HandshakeLoweringFPGA18::createReturnNetwork(
                        : newReturnOps[0]
                              ->getAttrOfType<mlir::IntegerAttr>(BB_ATTR)
                              .getValue()
-                             .getSExtValue();
+                             .getZExtValue();
 
   // Erase all blocks except the entry block
   for (auto &block : llvm::make_early_inc_range(llvm::drop_begin(r, 1))) {
@@ -719,6 +722,17 @@ struct StandardToHandshakeFPGA18Pass
   }
 };
 } // namespace
+
+dynamatic::HandshakeBlocks
+dynamatic::getHandshakeBlocks(handshake::FuncOp funcOp) {
+  dynamatic::HandshakeBlocks handshakeBlocks;
+  for (auto &op : funcOp.getOps())
+    if (auto bbAttr = op.getAttrOfType<mlir::IntegerAttr>(BB_ATTR); bbAttr)
+      handshakeBlocks.blocks[bbAttr.getValue().getZExtValue()].push_back(&op);
+    else
+      handshakeBlocks.outOfBlocks.push_back(&op);
+  return handshakeBlocks;
+}
 
 std::unique_ptr<mlir::OperationPass<mlir::ModuleOp>>
 dynamatic::createStandardToHandshakeFPGA18Pass(bool idBasicBlocks) {

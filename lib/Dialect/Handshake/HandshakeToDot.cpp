@@ -9,6 +9,7 @@
 
 #include "circt/Dialect/Handshake/HandshakeOps.h"
 #include "circt/Dialect/Handshake/HandshakePasses.h"
+#include "dynamatic/Conversion/StandardToHandshakeFPGA18.h"
 #include "dynamatic/Dialect/Handshake/HandshakePasses.h"
 #include "dynamatic/Dialect/Handshake/PassDetails.h"
 #include "mlir/Dialect/Arith/IR/Arith.h"
@@ -17,6 +18,7 @@
 #include "mlir/IR/PatternMatch.h"
 #include "mlir/Support/IndentedOstream.h"
 #include "llvm/ADT/TypeSwitch.h"
+#include "llvm/Support/raw_ostream.h"
 
 #include <optional>
 
@@ -25,13 +27,9 @@ using namespace circt::handshake;
 using namespace mlir;
 using namespace dynamatic;
 
-static bool isControlOp(Operation *op) {
-  auto controlInterface = dyn_cast<handshake::ControlInterface>(op);
-  return controlInterface && controlInterface.isControl();
-}
-
 namespace {
 struct HandshakeToDotPass : public HandshakeToDotBase<HandshakeToDotPass> {
+
   void runOnOperation() override {
     ModuleOp m = getOperation();
 
@@ -76,27 +74,36 @@ private:
   /// A mapping between operations and their unique name in the .dot file.
   DenseMap<Operation *, std::string> opNameMap;
 
-  /// A mapping between block arguments and their unique name in the .dot file.
-  DenseMap<Value, std::string> argNameMap;
+  /// Returns the name of the vertex representing the operation.
+  std::string getNodeName(Operation *op);
 
-  void setUsedByMapping(Value v, Operation *op, StringRef node);
-  void setProducedByMapping(Value v, Operation *op, StringRef node);
+  /// Prints an edge between a source and destination operation, which are
+  /// linked by aresult of the source that the destination uses as an operand.
+  template <typename Stream>
+  void printEdge(Stream &os, Operation *src, Operation *dst, Value val);
 
-  /// Returns the name of the vertex using 'v' through 'consumer'.
-  std::string getUsedByNode(Value v, Operation *consumer);
-  /// Returns the name of the vertex producing 'v' through 'producer'.
-  std::string getProducedByNode(Value v, Operation *producer);
+  void openSubgraph(mlir::raw_indented_ostream &os, std::string name,
+                    std::string label);
 
-  /// Maintain mappings between a value, the operation which (uses/produces) it,
-  /// and the node name which the (tail/head) of an edge should refer to. This
-  /// is used to resolve edges across handshake.instance's.
-  // "'value' used by 'operation*' is used by the 'string' vertex"
-  DenseMap<Value, std::map<Operation *, std::string>> usedByMapping;
-  // "'value' produced by 'operation*' is produced from the 'string' vertex"
-  DenseMap<Value, std::map<Operation *, std::string>> producedByMapping;
+  void closeSubgraph(mlir::raw_indented_ostream &os);
 };
 
 } // namespace
+
+static bool isControlOp(Operation *op) {
+  auto controlInterface = dyn_cast<handshake::ControlInterface>(op);
+  return controlInterface && controlInterface.isControl();
+}
+
+static const std::string CONTROL_STYLE = " style=dashed ";
+
+static std::string getNodeStyle(Value val) {
+  return isa<NoneType>(val.getType()) ? CONTROL_STYLE : "";
+}
+
+static std::string getEdgeStyle(Value result) {
+  return isa<NoneType>(result.getType()) ? CONTROL_STYLE : "";
+}
 
 /// Prints an operation to the dot file and returns the unique name for the
 /// operation within the graph.
@@ -258,18 +265,6 @@ static std::string dotPrintNode(mlir::raw_indented_ostream &outfile,
   return opName;
 }
 
-/// Returns true if v is used as a control operand in op
-static bool isControlOperand(Operation *op, Value v) {
-  if (isControlOp(op))
-    return true;
-
-  return llvm::TypeSwitch<Operation *, bool>(op)
-      .Case<handshake::MuxOp, handshake::ConditionalBranchOp>(
-          [&](auto op) { return v == op.getOperand(0); })
-      .Case<handshake::ControlMergeOp>([&](auto) { return true; })
-      .Default([](auto) { return false; });
-}
-
 static std::string getLocalName(StringRef instanceName, StringRef suffix) {
   return (instanceName + "." + suffix).str();
 }
@@ -283,280 +278,142 @@ static std::string getUniqueArgName(StringRef instanceName,
   return getLocalName(instanceName, getArgName(op, index));
 }
 
-static std::string getResName(handshake::FuncOp op, unsigned index) {
-  return op.getResName(index).getValue().str();
-}
-
-static std::string getUniqueResName(StringRef instanceName,
-                                    handshake::FuncOp op, unsigned index) {
-  return getLocalName(instanceName, getResName(op, index));
-}
-
-void HandshakeToDotPass::setUsedByMapping(Value v, Operation *op,
-                                          StringRef node) {
-  usedByMapping[v][op] = node;
-}
-void HandshakeToDotPass::setProducedByMapping(Value v, Operation *op,
-                                              StringRef node) {
-  producedByMapping[v][op] = node;
-}
-
-std::string HandshakeToDotPass::getUsedByNode(Value v, Operation *consumer) {
-  // Check if there is any mapping registerred for the value-use relation.
-  auto it = usedByMapping.find(v);
-  if (it != usedByMapping.end()) {
-    auto it2 = it->second.find(consumer);
-    if (it2 != it->second.end())
-      return it2->second;
-  }
-
-  // fallback to the registerred name for the operation
-  auto opNameIt = opNameMap.find(consumer);
+std::string HandshakeToDotPass::getNodeName(Operation *op) {
+  auto opNameIt = opNameMap.find(op);
   assert(opNameIt != opNameMap.end() &&
          "No name registered for the operation!");
   return opNameIt->second;
 }
 
-std::string HandshakeToDotPass::getProducedByNode(Value v,
-                                                  Operation *producer) {
-  // Check if there is any mapping registerred for the value-produce relation.
-  auto it = producedByMapping.find(v);
-  if (it != producedByMapping.end()) {
-    auto it2 = it->second.find(producer);
-    if (it2 != it->second.end())
-      return it2->second;
-  }
-
-  // fallback to the registerred name for the operation
-  auto opNameIt = opNameMap.find(producer);
-  assert(opNameIt != opNameMap.end() &&
-         "No name registered for the operation!");
-  return opNameIt->second;
+template <typename Stream>
+void HandshakeToDotPass::printEdge(Stream &stream, Operation *src,
+                                   Operation *dst, Value val) {
+  stream << "\"" << getNodeName(src) << "\" -> \"" << getNodeName(dst) << "\" ["
+         << getEdgeStyle(val) << "]\n";
 }
 
-/// Emits additional, non-graphviz information about the connection between
-/// from- and to. This does not have any effect on the graph itself, but may be
-/// used by other tools to reason about the connectivity between nodes.
-static void tryAddExtraEdgeInfo(mlir::raw_indented_ostream &os, Operation *from,
-                                Value result, Operation *to) {
-  os << " // ";
+void HandshakeToDotPass::openSubgraph(mlir::raw_indented_ostream &os,
+                                      std::string name, std::string label) {
+  os << "subgraph \"" << name << "\" {\n";
+  os.indent();
+  os << "label=\"" << label << "\"\n";
+}
 
-  if (from) {
-    // Output port information
-    auto results = from->getResults();
-    unsigned resIdx =
-        std::distance(results.begin(), llvm::find(results, result));
-    auto fromNamedOpInterface = dyn_cast<handshake::NamedIOInterface>(from);
-    if (fromNamedOpInterface) {
-      auto resName = fromNamedOpInterface.getResultName(resIdx);
-      os << " output=\"" << resName << "\"";
-    } else
-      os << " output=\"out" << resIdx << "\"";
-  }
-
-  if (to) {
-    // Input port information
-    auto ops = to->getOperands();
-    unsigned opIdx = std::distance(ops.begin(), llvm::find(ops, result));
-    auto toNamedOpInterface = dyn_cast<handshake::NamedIOInterface>(to);
-    if (toNamedOpInterface) {
-      auto opName = toNamedOpInterface.getOperandName(opIdx);
-      os << " input=\"" << opName << "\"";
-    } else
-      os << " input=\"in" << opIdx << "\"";
-  }
+void HandshakeToDotPass::closeSubgraph(mlir::raw_indented_ostream &os) {
+  os.unindent();
+  os << "}\n";
 }
 
 std::string HandshakeToDotPass::dotPrint(mlir::raw_indented_ostream &os,
                                          StringRef parentName,
-                                         handshake::FuncOp f, bool isTop) {
-  // Prints DOT representation of the dataflow graph, used for debugging.
+                                         handshake::FuncOp funcOp, bool isTop) {
   std::map<std::string, unsigned> opTypeCntrs;
   DenseMap<Operation *, unsigned> opIDs;
-  auto name = f.getName();
+  auto name = funcOp.getName();
   unsigned thisId = instanceIdMap[name.str()]++;
   std::string instanceName = parentName.str() + "." + name.str();
-  // Follow submodule naming convention from FIRRTL lowering:
   if (!isTop)
     instanceName += std::to_string(thisId);
 
-  /// Maintain a reference to any node in the args, body and result. These are
-  /// used to generate cluster edges at the end of this function, to facilitate
-  /// a  nice layout.
-  std::optional<std::string> anyArg, anyBody, anyRes;
-
   // Sequentially scan across the operations in the function and assign instance
-  // IDs to each operation.
-  for (Block &block : f)
-    for (Operation &op : block)
-      opIDs[&op] = opTypeCntrs[op.getName().getStringRef().str()]++;
+  // IDs to each operation
+  for (auto &op : funcOp.getOps())
+    opIDs[&op] = opTypeCntrs[op.getName().getStringRef().str()]++;
 
   if (!isTop) {
     os << "// Subgraph for instance of " << name << "\n";
-    os << "subgraph \"cluster_" << instanceName << "\" {\n";
-    os.indent();
-    os << "label = \"" << name << "\"\n";
+    openSubgraph(os, "cluster_" + instanceName, name.str());
     os << "labeljust=\"l\"\n";
     os << "color = \"darkgreen\"\n";
   }
   os << "node [shape=box style=filled fillcolor=\"white\"]\n";
 
-  Block *bodyBlock = &f.getBody().front();
-
-  /// Print function arg and res nodes.
+  // Print nodes corresponding to function arguments
   os << "// Function argument nodes\n";
-  std::string argsCluster = "cluster_" + instanceName + "_args";
-  os << "subgraph \"" << argsCluster << "\" {\n";
-  os.indent();
-  // No label or border; the subgraph just forces args to stay together in the
-  // diagram.
-  os << "label=\"\"\n";
-  os << "peripheries=0\n";
-  for (const auto &barg : enumerate(bodyBlock->getArguments())) {
-    auto argName = getArgName(f, barg.index());
-    auto localArgName = getLocalName(instanceName, argName);
-    os << "\"" << localArgName << "\" [shape=diamond";
-    if (barg.index() == bodyBlock->getNumArguments() - 1) // ctrl
-      os << ", style=dashed";
-    os << " label=\"" << argName << "\"";
-    os << "]\n";
-    if (!anyArg.has_value())
-      anyArg = localArgName;
-  }
-  os.unindent();
-  os << "}\n";
-
-  os << "// Function return nodes\n";
-  std::string resCluster = "cluster_" + instanceName + "_res";
-  os << "subgraph \"" << resCluster << "\" {\n";
-  os.indent();
-  // No label or border; the subgraph just forces args to stay together in the
-  // diagram.
-  os << "label=\"\"\n";
-  os << "peripheries=0\n";
-  // Get the return op; a handshake.func always has a terminator, making this
-  // safe.
-  auto endOp = *f.getBody().getOps<handshake::EndOp>().begin();
-  for (const auto &res : llvm::enumerate(endOp.getOperands())) {
-    auto resName = std::string("out") + std::to_string(res.index());
-    auto uniqueResName = instanceName + "." + resName;
-    os << "\"" << uniqueResName << "\" [shape=diamond";
-    if (res.value().getType().isa<NoneType>()) // ctrl
-      os << ", style=dashed";
-    os << " label=\"" << resName << "\"";
-    os << "]\n";
-
-    // Create a mapping between the return op argument uses and the return
-    // nodes.
-    setUsedByMapping(res.value(), endOp, uniqueResName);
-
-    if (!anyRes.has_value())
-      anyRes = uniqueResName;
-  }
-  os.unindent();
-  os << "}\n";
-
-  /// Print operation nodes.
-  std::string opsCluster = "cluster_" + instanceName + "_ops";
-  os << "subgraph \"" << opsCluster << "\" {\n";
-  os.indent();
-  // No label or border; the subgraph just forces args to stay together in the
-  // diagram.
-  os << "label=\"\"\n";
-  os << "peripheries=0\n";
-  for (Operation &op : *bodyBlock) {
-    if (!isa<handshake::InstanceOp, handshake::EndOp>(op)) {
-      // Regular node in the diagram.
-      opNameMap[&op] = dotPrintNode(os, instanceName, &op, opIDs);
+  for (const auto &arg : enumerate(funcOp.getArguments())) {
+    if (isa<MemRefType>(arg.value().getType()))
+      // Arguments with memref types are represented by memory interfaces inside
+      // the function so they are not displayed
       continue;
-    }
-    auto instOp = dyn_cast<handshake::InstanceOp>(op);
-    if (instOp) {
-      // Recurse into instantiated submodule.
-      auto calledFuncOp =
-          instOp->getParentOfType<ModuleOp>().lookupSymbol<handshake::FuncOp>(
-              instOp.getModule());
-      assert(calledFuncOp);
-      auto subInstanceName = dotPrint(os, instanceName, calledFuncOp, false);
 
-      // Create a mapping between the instance arguments and the arguments to
-      // the module which it instantiated.
-      for (const auto &arg : llvm::enumerate(instOp.getOperands())) {
-        setUsedByMapping(
-            arg.value(), instOp,
-            getUniqueArgName(subInstanceName, calledFuncOp, arg.index()));
-      }
-      // Create a  mapping between the instance results and the results from the
-      // module which it instantiated.
-      for (const auto &res : llvm::enumerate(instOp.getResults())) {
-        setProducedByMapping(
-            res.value(), instOp,
-            getUniqueResName(subInstanceName, calledFuncOp, res.index()));
-      }
-    }
+    auto argLabel = getArgName(funcOp, arg.index());
+    auto argNodeName = getLocalName(instanceName, argLabel);
+    os << "\"" << argNodeName << "\" [shape=diamond"
+       << getNodeStyle(arg.value()) << " label=\"" << argLabel << "\"]\n";
   }
-  if (!opNameMap.empty())
-    anyBody = opNameMap.begin()->second;
 
-  os.unindent();
-  os << "}\n";
+  // Print nodes corresponding to function operations
+  for (auto &op : funcOp.getOps())
+    if (auto instOp = dyn_cast<handshake::InstanceOp>(op); instOp)
+      assert(false && "not supported yet");
+    else
+      opNameMap[&op] = dotPrintNode(os, instanceName, &op, opIDs);
 
-  /// Print operation result edges.
-  os << "// Operation result edges\n";
-  for (Operation &op : *bodyBlock) {
-    for (auto result : op.getResults()) {
-      for (auto &u : result.getUses()) {
-        Operation *useOp = u.getOwner();
-        if (useOp->getBlock() == bodyBlock) {
-          os << "\"" << getProducedByNode(result, &op);
-          os << "\" -> \"";
-          os << getUsedByNode(result, useOp) << "\"";
-          if (isControlOp(&op) || isControlOperand(useOp, result))
-            os << " [style=\"dashed\"]";
+  // Get function's "blocks". These leverage the "bb" attributes attached to
+  // operations in handshake functions to display operations belonging to the
+  // same original basic block together
+  auto handshakeBlocks = dynamatic::getHandshakeBlocks(funcOp);
 
-          // Add extra, non-graphviz info to the edge.
-          tryAddExtraEdgeInfo(os, &op, result, useOp);
+  // Print all edges incoming from operations in a block
+  for (auto &[blockID, ops] : handshakeBlocks.blocks) {
 
-          os << "\n";
+    // For each block, we create a subgraph to contain all edges between two
+    // operations of that block
+    auto blockStrID = std::to_string(blockID);
+    openSubgraph(os, "cluster" + blockStrID, "block" + blockStrID);
+
+    // Collect all edges leaving the block and print them after the subgraph
+    std::vector<std::string> outgoingEdges;
+
+    // Iterate over all uses of all results of all operations inside the block
+    for (auto op : ops) {
+      for (auto res : op->getResults())
+        for (auto &use : res.getUses()) {
+          // Add edge to subgraph or outgoing edges depending on the block of
+          // the operation using the result
+          Operation *useOp = use.getOwner();
+          if (auto bb = useOp->getAttrOfType<mlir::IntegerAttr>(BB_ATTR);
+              bb && bb.getValue().getZExtValue() == blockID)
+            printEdge(os, op, useOp, res);
+          else {
+            std::stringstream edge;
+            printEdge(edge, op, useOp, res);
+            outgoingEdges.push_back(edge.str());
+          }
         }
-      }
     }
+
+    // For entry block, also add all edges incoming from function arguments
+    if (blockID == 0)
+      for (auto arg : llvm::enumerate(funcOp.getArguments()))
+        if (!isa<MemRefType>(arg.value().getType()))
+          for (auto &use : arg.value().getUses()) {
+            Operation *useOp = use.getOwner();
+            auto argName = getUniqueArgName(instanceName, funcOp, arg.index());
+            os << "\"" << argName << "\" -> \"" << getNodeName(useOp) << "\" ["
+               << getEdgeStyle(arg.value()) << "]\n";
+          }
+
+    // Close the subgraph
+    closeSubgraph(os);
+
+    // Print outgoing edges for this block
+    if (!outgoingEdges.empty())
+      os << "// Outgoing edges of block " << blockID << "\n";
+    for (auto &edge : outgoingEdges)
+      os << edge;
   }
+
+  // Print all edges incoming from operations not belonging to any block outside
+  // of all subgraphs
+  for (auto op : handshakeBlocks.outOfBlocks)
+    for (auto res : op->getResults())
+      for (auto &use : res.getUses())
+        printEdge(os, op, use.getOwner(), res);
 
   if (!isTop)
-    os << "}\n";
+    closeSubgraph(os);
 
-  /// Print edges for function argument uses.
-  os << "// Function argument edges\n";
-  for (const auto &barg : enumerate(bodyBlock->getArguments())) {
-    auto argName = getArgName(f, barg.index());
-    os << "\"" << getLocalName(instanceName, argName) << "\" [shape=diamond";
-    if (barg.index() == bodyBlock->getNumArguments() - 1)
-      os << ", style=dashed";
-    os << "]\n";
-    for (auto *useOp : barg.value().getUsers()) {
-      os << "\"" << getLocalName(instanceName, argName) << "\" -> \""
-         << getUsedByNode(barg.value(), useOp) << "\"";
-      if (isControlOperand(useOp, barg.value()))
-        os << " [style=\"dashed\"]";
-
-      tryAddExtraEdgeInfo(os, nullptr, barg.value(), useOp);
-      os << "\n";
-    }
-  }
-
-  /// Print edges from arguments cluster to ops cluster and ops cluster to
-  /// results cluser, to coerce a nice layout.
-  if (anyArg.has_value() && anyBody.has_value())
-    os << "\"" << anyArg.value() << "\" -> \"" << anyBody.value()
-       << "\" [lhead=\"" << opsCluster << "\" ltail=\"" << argsCluster
-       << "\" style=invis]\n";
-  if (anyBody.has_value() && anyRes.has_value())
-    os << "\"" << anyBody.value() << "\" -> \"" << anyRes.value()
-       << "\" [lhead=\"" << resCluster << "\" ltail=\"" << opsCluster
-       << "\" style=invis]\n";
-
-  os.unindent();
   return instanceName;
 }
 

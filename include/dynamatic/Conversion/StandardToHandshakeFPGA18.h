@@ -74,6 +74,20 @@ public:
 std::unique_ptr<mlir::OperationPass<mlir::ModuleOp>>
 createStandardToHandshakeFPGA18Pass(bool idBasicBlocks = false);
 
+/// This struct groups the operations of a handshake::FuncOp in "blocks" based
+/// on the "bb" attribute potentially attached to each operation.
+struct HandshakeBlocks {
+  /// Maps each block ID to the operations (in program order) that ate tagged
+  /// with it.
+  DenseMap<unsigned, SmallVector<Operation *>> blocks;
+  /// List of operations (in program order) that do not belong to any block
+  SmallVector<Operation *> outOfBlocks;
+};
+
+/// Groups the operations of a function into "blocks" based on the "bb"
+/// attribute of each operation.
+HandshakeBlocks getHandshakeBlocks(handshake::FuncOp funcOp);
+
 } // namespace dynamatic
 
 #endif // DYNAMATIC_CONVERSION_STANDARDTOHANDSHAKEFPGA18_H
