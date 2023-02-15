@@ -12,7 +12,7 @@
 #include "circt/Dialect/Handshake/HandshakePasses.h"
 #include "circt/Transforms/Passes.h"
 #include "dynamatic/Conversion/Passes.h"
-#include "dynamatic/Dialect/Handshake/HandshakePasses.h"
+#include "dynamatic/Transforms/Passes.h"
 
 namespace dynamatic {
 

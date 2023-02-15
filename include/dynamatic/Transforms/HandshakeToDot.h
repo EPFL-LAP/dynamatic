@@ -4,8 +4,8 @@
 //
 //===----------------------------------------------------------------------===//
 
-#ifndef DYNAMATIC_DIALECT_HANDSHAKE_HANDSHAKETODOT_H
-#define DYNAMATIC_DIALECT_HANDSHAKE_HANDSHAKETODOT_H
+#ifndef DYNAMATIC_TRANSFORMS_HANDSHAKETODOT_H
+#define DYNAMATIC_TRANSFORMS_HANDSHAKETODOT_H
 
 #include "dynamatic/Support/LLVM.h"
 
@@ -15,4 +15,4 @@ std::unique_ptr<mlir::OperationPass<mlir::ModuleOp>> createHandshakeToDotPass();
 
 } // namespace dynamatic
 
-#endif // DYNAMATIC_DIALECT_HANDSHAKE_HANDSHAKETODOT_H
+#endif // DYNAMATIC_TRANSFORMS_HANDSHAKETODOT_H

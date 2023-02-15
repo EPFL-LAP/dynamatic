@@ -10,8 +10,8 @@
 #include "circt/Dialect/Handshake/HandshakeOps.h"
 #include "circt/Dialect/Handshake/HandshakePasses.h"
 #include "dynamatic/Conversion/StandardToHandshakeFPGA18.h"
-#include "dynamatic/Dialect/Handshake/HandshakePasses.h"
-#include "dynamatic/Dialect/Handshake/PassDetails.h"
+#include "dynamatic/Transforms/PassDetails.h"
+#include "dynamatic/Transforms/Passes.h"
 #include "mlir/Dialect/Arith/IR/Arith.h"
 #include "mlir/IR/BuiltinTypes.h"
 #include "mlir/IR/OperationSupport.h"
@@ -352,7 +352,7 @@ std::string HandshakeToDotPass::dotPrint(mlir::raw_indented_ostream &os,
   // Get function's "blocks". These leverage the "bb" attributes attached to
   // operations in handshake functions to display operations belonging to the
   // same original basic block together
-  auto handshakeBlocks = dynamatic::getHandshakeBlocks(funcOp);
+  auto handshakeBlocks = getHandshakeBlocks(funcOp);
 
   // Print all edges incoming from operations in a block
   for (auto &[blockID, ops] : handshakeBlocks.blocks) {

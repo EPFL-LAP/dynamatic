@@ -1,11 +1,11 @@
-//===-- HandshakePasses.td - Handshake passes definition ----*- tablegen -*-===//
+//===- Passes.td - Transformation passes definition -------*- tablegen -*-===//
 //
-// This file contains definitions for passes that work on the handshake dialect.
+// This file contains definitions for transformation passes.
 //
 //===----------------------------------------------------------------------===//
 
-#ifndef DYNAMATIC_DIALECT_HANDSHAKE_HANDSHAKEPASSES_TD
-#define DYNAMATIC_DIALECT_HANDSHAKE_HANDSHAKEPASSES_TD
+#ifndef DYNAMATIC_TRANSFORMS_PASSES_TD
+#define DYNAMATIC_TRANSFORMS_PASSES_TD
 
 include "mlir/Pass/PassBase.td"
 
@@ -20,4 +20,4 @@ def HandshakeToDot : Pass<"handshake-to-dot", "mlir::ModuleOp"> {
   let constructor = "dynamatic::createHandshakeToDotPass()";
 }
 
-#endif // DYNAMATIC_DIALECT_HANDSHAKE_HANDSHAKEPASSES_TD
+#endif // DYNAMATIC_TRANSFORMS_PASSES_TD
