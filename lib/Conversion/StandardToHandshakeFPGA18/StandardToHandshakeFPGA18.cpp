@@ -374,10 +374,6 @@ HandshakeLoweringFPGA18::connectToMemory(ConversionPatternRewriter &rewriter,
       memControls.push_back(cstNumStore.getResult());
     }
 
-    // A memory is external if the memref that defines it is provided as a
-    // function (block) argument.
-    bool isExternalMemory = memref.isa<BlockArgument>();
-
     // Combine all memory operands together
     std::vector<Value> memOperands;
     std::copy(memControls.begin(), memControls.end(),
@@ -390,7 +386,7 @@ HandshakeLoweringFPGA18::connectToMemory(ConversionPatternRewriter &rewriter,
     rewriter.setInsertionPointToStart(entryBlock);
     auto memInterface = rewriter.create<handshake::MemoryControllerOp>(
         entryBlock->front().getLoc(), memref, memOperands, memBlockOps.size(),
-        ldCount, stCount, isExternalMemory, memCount++);
+        ldCount, stCount, memCount++);
 
     // Add data result from memory to each load operation's operands
     unsigned memResultIdx = 0;

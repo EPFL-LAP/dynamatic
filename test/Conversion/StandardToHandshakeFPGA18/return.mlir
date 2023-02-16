@@ -82,8 +82,8 @@ func.func @multipleReturns(%arg0 : i1) -> i32 {
 // CHECK-SAME:                                  %[[VAL_0:.*]]: i1, 
 // CHECK-SAME:                                  %[[VAL_1:.*]]: memref<4xi32>, %[[VAL_2:.*]]: memref<4xi32>,
 // CHECK-SAME:                                  %[[VAL_3:.*]]: none, ...) -> (i32, none) attributes {argNames = ["in0", "in1", "in2", "in3"], resNames = ["out0", "out1"]} {
-// CHECK:           %[[VAL_4:.*]] = mem_controller[external = true] [bb = 0, ld = 0, st = 0] (%[[VAL_2]] : memref<4xi32>) () {id = 1 : i32} : () -> none
-// CHECK:           %[[VAL_5:.*]] = mem_controller[external = true] [bb = 0, ld = 0, st = 0] (%[[VAL_1]] : memref<4xi32>) () {id = 0 : i32} : () -> none
+// CHECK:           %[[VAL_4:.*]] = mem_controller[bb = 0, ld = 0, st = 0] (%[[VAL_2]] : memref<4xi32>) () {id = 1 : i32} : () -> none
+// CHECK:           %[[VAL_5:.*]] = mem_controller[bb = 0, ld = 0, st = 0] (%[[VAL_1]] : memref<4xi32>) () {id = 0 : i32} : () -> none
 // CHECK:           %[[VAL_6:.*]] = merge %[[VAL_0]] : i1
 // CHECK:           %[[VAL_7:.*]] = merge %[[VAL_3]] : none
 // CHECK:           %[[VAL_8:.*]] = source

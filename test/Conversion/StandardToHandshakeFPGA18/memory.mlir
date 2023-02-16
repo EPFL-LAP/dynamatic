@@ -5,7 +5,7 @@
 // CHECK-SAME:                                    %[[VAL_0:.*]]: index,
 // CHECK-SAME:                                    %[[VAL_1:.*]]: memref<4xi32>,
 // CHECK-SAME:                                    %[[VAL_2:.*]]: none, ...) -> none attributes {argNames = ["in0", "in1", "in2"], resNames = ["out0"]} {
-// CHECK:           %[[VAL_3:.*]], %[[VAL_4:.*]] = mem_controller[external = true] [bb = 1, ld = 1, st = 1] (%[[VAL_1]] : memref<4xi32>) (%[[VAL_5:.*]], %[[VAL_6:.*]], %[[VAL_7:.*]], %[[VAL_8:.*]]) {id = 0 : i32} : (i32, i32, index, index) -> (i32, none)
+// CHECK:           %[[VAL_3:.*]], %[[VAL_4:.*]] = mem_controller[bb = 1, ld = 1, st = 1] (%[[VAL_1]] : memref<4xi32>) (%[[VAL_5:.*]], %[[VAL_6:.*]], %[[VAL_7:.*]], %[[VAL_8:.*]]) {id = 0 : i32} : (i32, i32, index, index) -> (i32, none)
 // CHECK:           %[[VAL_9:.*]] = merge %[[VAL_0]] : index
 // CHECK:           %[[VAL_10:.*]] = merge %[[VAL_2]] : none
 // CHECK:           %[[VAL_5]] = constant %[[VAL_10]] {value = 1 : i32} : i32
@@ -30,7 +30,7 @@ func.func @simpleLoadStore(%arg0 : index, %arg1 : memref<4xi32>) {
 // CHECK-SAME:                                   %[[VAL_1:.*]]: index,
 // CHECK-SAME:                                   %[[VAL_2:.*]]: memref<4xi32>,
 // CHECK-SAME:                                   %[[VAL_3:.*]]: none, ...) -> none attributes {argNames = ["in0", "in1", "in2", "in3"], resNames = ["out0"]} {
-// CHECK:           %[[VAL_4:.*]] = mem_controller[external = true] [bb = 2, ld = 0, st = 2] (%[[VAL_2]] : memref<4xi32>) (%[[VAL_5:.*]], %[[VAL_6:.*]], %[[VAL_7:.*]], %[[VAL_8:.*]], %[[VAL_9:.*]], %[[VAL_10:.*]]) {id = 0 : i32} : (i32, i32, i32, index, i32, index) -> none
+// CHECK:           %[[VAL_4:.*]] = mem_controller[bb = 2, ld = 0, st = 2] (%[[VAL_2]] : memref<4xi32>) (%[[VAL_5:.*]], %[[VAL_6:.*]], %[[VAL_7:.*]], %[[VAL_8:.*]], %[[VAL_9:.*]], %[[VAL_10:.*]]) {id = 0 : i32} : (i32, i32, i32, index, i32, index) -> none
 // CHECK:           %[[VAL_11:.*]] = merge %[[VAL_0]] : i1
 // CHECK:           %[[VAL_12:.*]] = merge %[[VAL_1]] : index
 // CHECK:           %[[VAL_13:.*]] = merge %[[VAL_3]] : none
@@ -75,7 +75,7 @@ func.func @storeMulBlocks(%arg0 : i1, %arg1 : index, %arg2 : memref<4xi32>) {
 // CHECK-SAME:                                    %[[VAL_1:.*]]: index,
 // CHECK-SAME:                                    %[[VAL_2:.*]]: memref<4xi32>,
 // CHECK-SAME:                                    %[[VAL_3:.*]]: none, ...) -> none attributes {argNames = ["in0", "in1", "in2", "in3"], resNames = ["out0"]} {
-// CHECK:           %[[VAL_4:.*]], %[[VAL_5:.*]] = mem_controller[external = true] [bb = 1, ld = 1, st = 0] (%[[VAL_2]] : memref<4xi32>) (%[[VAL_6:.*]], %[[VAL_7:.*]]) {id = 0 : i32} : (i32, index) -> (i32, none)
+// CHECK:           %[[VAL_4:.*]], %[[VAL_5:.*]] = mem_controller[bb = 1, ld = 1, st = 0] (%[[VAL_2]] : memref<4xi32>) (%[[VAL_6:.*]], %[[VAL_7:.*]]) {id = 0 : i32} : (i32, index) -> (i32, none)
 // CHECK:           %[[VAL_8:.*]] = merge %[[VAL_0]] : i1
 // CHECK:           %[[VAL_9:.*]] = merge %[[VAL_1]] : index
 // CHECK:           %[[VAL_10:.*]] = merge %[[VAL_3]] : none
@@ -110,8 +110,8 @@ func.func @forwardLoadToBB(%arg0 : i1, %arg1 : index, %arg2: memref<4xi32>) {
 // CHECK-SAME:                                     %[[VAL_0:.*]]: i1, 
 // CHECK-SAME:                                     %[[VAL_1:.*]]: memref<4xi32>, %[[VAL_2:.*]]: memref<4xi32>,
 // CHECK-SAME:                                     %[[VAL_3:.*]]: none, ...) -> none attributes {argNames = ["in0", "in1", "in2", "in3"], resNames = ["out0"]} {
-// CHECK:           %[[VAL_4:.*]], %[[VAL_5:.*]] = mem_controller[external = true] [bb = 2, ld = 1, st = 1] (%[[VAL_2]] : memref<4xi32>) (%[[VAL_6:.*]], %[[VAL_7:.*]], %[[VAL_8:.*]], %[[VAL_9:.*]], %[[VAL_10:.*]]) {id = 1 : i32} : (i32, i32, index, i32, index) -> (i32, none)
-// CHECK:           %[[VAL_11:.*]], %[[VAL_12:.*]] = mem_controller[external = true] [bb = 2, ld = 1, st = 1] (%[[VAL_1]] : memref<4xi32>) (%[[VAL_13:.*]], %[[VAL_14:.*]], %[[VAL_15:.*]], %[[VAL_16:.*]], %[[VAL_17:.*]]) {id = 0 : i32} : (i32, i32, i32, index, index) -> (i32, none)
+// CHECK:           %[[VAL_4:.*]], %[[VAL_5:.*]] = mem_controller[bb = 2, ld = 1, st = 1] (%[[VAL_2]] : memref<4xi32>) (%[[VAL_6:.*]], %[[VAL_7:.*]], %[[VAL_8:.*]], %[[VAL_9:.*]], %[[VAL_10:.*]]) {id = 1 : i32} : (i32, i32, index, i32, index) -> (i32, none)
+// CHECK:           %[[VAL_11:.*]], %[[VAL_12:.*]] = mem_controller[bb = 2, ld = 1, st = 1] (%[[VAL_1]] : memref<4xi32>) (%[[VAL_13:.*]], %[[VAL_14:.*]], %[[VAL_15:.*]], %[[VAL_16:.*]], %[[VAL_17:.*]]) {id = 0 : i32} : (i32, i32, i32, index, index) -> (i32, none)
 // CHECK:           %[[VAL_18:.*]] = merge %[[VAL_0]] : i1
 // CHECK:           %[[VAL_19:.*]] = merge %[[VAL_3]] : none
 // CHECK:           %[[VAL_20:.*]] = source
