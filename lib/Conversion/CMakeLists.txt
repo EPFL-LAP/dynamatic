@@ -1,1 +1,2 @@
+add_subdirectory(ExportDOT)
 add_subdirectory(StandardToHandshakeFPGA18)

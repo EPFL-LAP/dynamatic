@@ -1,6 +1,6 @@
-//===- HandshakeToDot.cpp - Handshale to DOT pass ---------------*- C++ -*-===//
+//===- ExportDOT.cpp - Export handshake to DOT pass -------------*- C++ -*-===//
 //
-// This file contains the implementation of the handshake to DOT pass. It
+// This file contains the implementation of the export to DOT pass. It
 // produces a .dot file (in the DOT language) parsable by Graphviz and
 // containing the graph representation of the input handshake-level IR. The pass
 // leaves the actual handshake-level IR unchanged.
@@ -9,18 +9,15 @@
 
 #include "circt/Dialect/Handshake/HandshakeOps.h"
 #include "circt/Dialect/Handshake/HandshakePasses.h"
+#include "dynamatic/Conversion/PassDetails.h"
+#include "dynamatic/Conversion/Passes.h"
 #include "dynamatic/Conversion/StandardToHandshakeFPGA18.h"
-#include "dynamatic/Transforms/PassDetails.h"
-#include "dynamatic/Transforms/Passes.h"
 #include "mlir/Dialect/Arith/IR/Arith.h"
 #include "mlir/IR/BuiltinTypes.h"
 #include "mlir/IR/OperationSupport.h"
 #include "mlir/IR/PatternMatch.h"
 #include "mlir/Support/IndentedOstream.h"
 #include "llvm/ADT/TypeSwitch.h"
-#include "llvm/Support/raw_ostream.h"
-
-#include <optional>
 
 using namespace circt;
 using namespace circt::handshake;
@@ -28,28 +25,26 @@ using namespace mlir;
 using namespace dynamatic;
 
 namespace {
-struct HandshakeToDotPass : public HandshakeToDotBase<HandshakeToDotPass> {
+struct ExportDOTPass : public ExportDOTBase<ExportDOTPass> {
 
   void runOnOperation() override {
     ModuleOp m = getOperation();
 
-    // Resolve the instance graph to get a top-level module.
+    // Resolve the instance graph to get a top-level module
     std::string topLevel;
     handshake::InstanceGraph uses;
     SmallVector<std::string> sortedFuncs;
-    if (resolveInstanceGraph(m, uses, topLevel, sortedFuncs).failed()) {
-      signalPassFailure();
-      return;
-    }
-
+    if (resolveInstanceGraph(m, uses, topLevel, sortedFuncs).failed())
+      return signalPassFailure();
     handshake::FuncOp topLevelOp =
         cast<handshake::FuncOp>(m.lookupSymbol(topLevel));
 
-    // Create top-level graph.
+    // Create the file to store the graph
     std::error_code ec;
     llvm::raw_fd_ostream outfile(topLevel + ".dot", ec);
     mlir::raw_indented_ostream os(outfile);
 
+    // Print the graph
     os << "Digraph G {\n";
     os.indent();
     os << "splines=spline;\n";
@@ -57,7 +52,9 @@ struct HandshakeToDotPass : public HandshakeToDotBase<HandshakeToDotPass> {
     dotPrint(os, "TOP", topLevelOp, /*isTop=*/true);
     os.unindent();
     os << "}\n";
+
     outfile.close();
+    markAllAnalysesPreserved();
   };
 
 private:
@@ -142,14 +139,14 @@ static std::string dotPrintNode(mlir::raw_indented_ostream &outfile,
                  .Default([&](auto) { return "moccasin"; });
 
   // Determine shape
-  outfile << ", shape=";
+  outfile << " shape=";
   if (op->getDialect()->getNamespace() == "handshake")
     outfile << "box";
   else
     outfile << "oval";
 
   // Determine label
-  outfile << ", label=\"";
+  outfile << " label=\"";
   outfile
       << llvm::TypeSwitch<Operation *, std::string>(op)
              // handshake operations
@@ -255,9 +252,10 @@ static std::string dotPrintNode(mlir::raw_indented_ostream &outfile,
              });
   outfile << "\"";
 
-  // Display control nodes with a dashed border
-  outfile << ", style=\"filled";
+  // Determine style
+  outfile << " style=\"filled";
   if (isControlOp(op))
+    // Display control nodes with a dashed border
     outfile << ", dashed";
   outfile << "\"";
   outfile << "]\n";
@@ -278,7 +276,7 @@ static std::string getUniqueArgName(StringRef instanceName,
   return getLocalName(instanceName, getArgName(op, index));
 }
 
-std::string HandshakeToDotPass::getNodeName(Operation *op) {
+std::string ExportDOTPass::getNodeName(Operation *op) {
   auto opNameIt = opNameMap.find(op);
   assert(opNameIt != opNameMap.end() &&
          "No name registered for the operation!");
@@ -286,27 +284,27 @@ std::string HandshakeToDotPass::getNodeName(Operation *op) {
 }
 
 template <typename Stream>
-void HandshakeToDotPass::printEdge(Stream &stream, Operation *src,
-                                   Operation *dst, Value val) {
+void ExportDOTPass::printEdge(Stream &stream, Operation *src, Operation *dst,
+                              Value val) {
   stream << "\"" << getNodeName(src) << "\" -> \"" << getNodeName(dst) << "\" ["
          << getEdgeStyle(val) << "]\n";
 }
 
-void HandshakeToDotPass::openSubgraph(mlir::raw_indented_ostream &os,
-                                      std::string name, std::string label) {
+void ExportDOTPass::openSubgraph(mlir::raw_indented_ostream &os,
+                                 std::string name, std::string label) {
   os << "subgraph \"" << name << "\" {\n";
   os.indent();
   os << "label=\"" << label << "\"\n";
 }
 
-void HandshakeToDotPass::closeSubgraph(mlir::raw_indented_ostream &os) {
+void ExportDOTPass::closeSubgraph(mlir::raw_indented_ostream &os) {
   os.unindent();
   os << "}\n";
 }
 
-std::string HandshakeToDotPass::dotPrint(mlir::raw_indented_ostream &os,
-                                         StringRef parentName,
-                                         handshake::FuncOp funcOp, bool isTop) {
+std::string ExportDOTPass::dotPrint(mlir::raw_indented_ostream &os,
+                                    StringRef parentName,
+                                    handshake::FuncOp funcOp, bool isTop) {
   std::map<std::string, unsigned> opTypeCntrs;
   DenseMap<Operation *, unsigned> opIDs;
   auto name = funcOp.getName();
@@ -329,7 +327,7 @@ std::string HandshakeToDotPass::dotPrint(mlir::raw_indented_ostream &os,
   os << "node [shape=box style=filled fillcolor=\"white\"]\n";
 
   // Print nodes corresponding to function arguments
-  os << "// Function argument nodes\n";
+  os << "// Function arguments\n";
   for (const auto &arg : enumerate(funcOp.getArguments())) {
     if (isa<MemRefType>(arg.value().getType()))
       // Arguments with memref types are represented by memory interfaces inside
@@ -343,6 +341,7 @@ std::string HandshakeToDotPass::dotPrint(mlir::raw_indented_ostream &os,
   }
 
   // Print nodes corresponding to function operations
+  os << "// Function operations\n";
   for (auto &op : funcOp.getOps())
     if (auto instOp = dyn_cast<handshake::InstanceOp>(op); instOp)
       assert(false && "not supported yet");
@@ -360,20 +359,32 @@ std::string HandshakeToDotPass::dotPrint(mlir::raw_indented_ostream &os,
     // For each block, we create a subgraph to contain all edges between two
     // operations of that block
     auto blockStrID = std::to_string(blockID);
+    os << "// Edges within basic block " << blockStrID << "\n";
     openSubgraph(os, "cluster" + blockStrID, "block" + blockStrID);
 
     // Collect all edges leaving the block and print them after the subgraph
     std::vector<std::string> outgoingEdges;
 
-    // Iterate over all uses of all results of all operations inside the block
+    // Determines whether an edge to a destination operation should be inside of
+    // the source operation's basic block
+    auto isEdgeInSubgraph = [](Operation *useOp, unsigned currentBB) {
+      // Sink operations are always displayed outside of blocks
+      if (isa<handshake::SinkOp>(useOp))
+        return false;
+
+      auto bb = useOp->getAttrOfType<mlir::IntegerAttr>(BB_ATTR);
+      return bb && bb.getValue().getZExtValue() == currentBB;
+    };
+
+    // Iterate over all uses of all results of all operations inside the
+    // block
     for (auto op : ops) {
       for (auto res : op->getResults())
         for (auto &use : res.getUses()) {
           // Add edge to subgraph or outgoing edges depending on the block of
           // the operation using the result
           Operation *useOp = use.getOwner();
-          if (auto bb = useOp->getAttrOfType<mlir::IntegerAttr>(BB_ATTR);
-              bb && bb.getValue().getZExtValue() == blockID)
+          if (isEdgeInSubgraph(useOp, blockID))
             printEdge(os, op, useOp, res);
           else {
             std::stringstream edge;
@@ -399,13 +410,14 @@ std::string HandshakeToDotPass::dotPrint(mlir::raw_indented_ostream &os,
 
     // Print outgoing edges for this block
     if (!outgoingEdges.empty())
-      os << "// Outgoing edges of block " << blockID << "\n";
+      os << "// Edges outgoing of basic block " << blockStrID << "\n";
     for (auto &edge : outgoingEdges)
       os << edge;
   }
 
   // Print all edges incoming from operations not belonging to any block outside
   // of all subgraphs
+  os << "// Edges outside of all basic blocks\n";
   for (auto op : handshakeBlocks.outOfBlocks)
     for (auto res : op->getResults())
       for (auto &use : res.getUses())
@@ -418,6 +430,6 @@ std::string HandshakeToDotPass::dotPrint(mlir::raw_indented_ostream &os,
 }
 
 std::unique_ptr<mlir::OperationPass<mlir::ModuleOp>>
-dynamatic::createHandshakeToDotPass() {
-  return std::make_unique<HandshakeToDotPass>();
+dynamatic::createExportDOTPass() {
+  return std::make_unique<ExportDOTPass>();
 }

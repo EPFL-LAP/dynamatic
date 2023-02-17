@@ -24,4 +24,17 @@ def StandardToHandshakeFPGA18 : Pass<"lower-std-to-handshake-fpga18", "mlir::Mod
             "operation originates.">];
 }
 
+
+def ExportDOT : Pass<"export-dot", "mlir::ModuleOp"> {
+  let summary = "Emit the handshake-level IR to a DOT file";
+  let description = [{
+    This pass analyses a handshake::FuncOp operation and exports a .dot graph
+    that corresponds to it. If multiple functions are present in the IR, the top
+    level function will be printed, and called functions will be subgraphs
+    within themain graph.
+  }];
+  let constructor = "dynamatic::createExportDOTPass()";
+  let dependentDialects = ["circt::handshake::HandshakeDialect"];
+}
+
 #endif // DYNAMATIC_CONVERSION_PASSES_TD

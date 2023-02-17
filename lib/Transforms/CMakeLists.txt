@@ -1,6 +1,5 @@
 add_dynamatic_library(DynamaticTransforms
   HandshakeInferBasicBlocks.cpp
-  HandshakeToDot.cpp
   PushConstants.cpp
 
   DEPENDS
