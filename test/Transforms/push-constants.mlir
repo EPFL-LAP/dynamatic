@@ -42,7 +42,6 @@ func.func @simplePush(%arg0: i1) -> i32 {
   return %c1 : i32
 }
 
-
 // -----
 
 // CHECK-LABEL:   func.func @deleteOriginal(

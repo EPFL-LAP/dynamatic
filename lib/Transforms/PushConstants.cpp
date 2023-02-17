@@ -51,7 +51,8 @@ static LogicalResult pushConstants(func::FuncOp funcOp, MLIRContext *ctx) {
 }
 
 namespace {
-struct ArithPushConstants : public ArithPushConstantsBase<ArithPushConstants> {
+struct ArithPushConstantsPass
+    : public ArithPushConstantsBase<ArithPushConstantsPass> {
 
   void runOnOperation() override {
     ModuleOp m = getOperation();
@@ -64,6 +65,6 @@ struct ArithPushConstants : public ArithPushConstantsBase<ArithPushConstants> {
 } // namespace
 
 std::unique_ptr<mlir::OperationPass<mlir::ModuleOp>>
-dynamatic::createArithPushConstants() {
-  return std::make_unique<ArithPushConstants>();
+dynamatic::createArithPushConstantsPass() {
+  return std::make_unique<ArithPushConstantsPass>();
 }

@@ -11,7 +11,8 @@
 
 namespace dynamatic {
 
-std::unique_ptr<mlir::OperationPass<mlir::ModuleOp>> createArithPushConstants();
+std::unique_ptr<mlir::OperationPass<mlir::ModuleOp>>
+createArithPushConstantsPass();
 
 } // namespace dynamatic
 

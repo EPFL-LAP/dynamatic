@@ -41,7 +41,7 @@ def ArithPushConstants : Pass<"push-constants", "mlir::ModuleOp"> {
     constant definitions if they have users in multiple blocks. It will also
     delete the original operation if it not used within its defining block. 
   }];
-  let constructor = "dynamatic::createArithPushConstants()";
+  let constructor = "dynamatic::createArithPushConstantsPass()";
 }
 
 #endif // DYNAMATIC_TRANSFORMS_PASSES_TD
