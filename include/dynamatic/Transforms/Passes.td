@@ -21,6 +21,14 @@ def HandshakeInferBasicBlocks : Pass<"infer-basic-blocks", "mlir::ModuleOp"> {
   let constructor = "dynamatic::createHandshakeInferBasicBlocksPass()";
 }
 
+def HandshakePrepareForLegacy : Pass<"prepare-for-legacy", "mlir::ModuleOp"> {
+  let summary = "Prepare handshake to make it compatible with legacy flow.";
+  let description = [{
+
+  }];
+  let constructor = "dynamatic::createHandshakePrepareForLegacy()";
+}
+
 def ArithPushConstants : Pass<"push-constants", "mlir::ModuleOp"> {
   let summary = "Push constant definitions to blocks that use them.";
   let description = [{

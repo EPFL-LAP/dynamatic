@@ -12,6 +12,12 @@
 // #include "circt/Dialect/Handshake/HandshakeOps.h"
 #include "mlir/Pass/Pass.h"
 
+namespace mlir {
+namespace arith {
+class ArithDialect;
+} // namespace arith
+} // namespace mlir
+
 namespace dynamatic {
 
 #define GEN_PASS_CLASSES

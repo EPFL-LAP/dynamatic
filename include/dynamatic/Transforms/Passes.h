@@ -9,6 +9,7 @@
 
 #include "dynamatic/Support/LLVM.h"
 #include "dynamatic/Transforms/HandshakeInferBasicBlocks.h"
+#include "dynamatic/Transforms/HandshakePrepareForLegacy.h"
 #include "dynamatic/Transforms/PushConstants.h"
 #include "mlir/Pass/Pass.h"
 
