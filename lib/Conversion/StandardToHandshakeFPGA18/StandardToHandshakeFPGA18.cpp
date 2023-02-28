@@ -611,7 +611,7 @@ static LogicalResult lowerRegion(HandshakeLoweringFPGA18 &hl,
   if (failed(runPartialLowering(baseHl, &HandshakeLowering::addBranchOps)))
     return failure();
 
-  bool sourceConstants = true;
+  bool sourceConstants = false;
   if (failed(runPartialLowering(baseHl,
                                 &HandshakeLowering::connectConstantsToControl,
                                 sourceConstants)))

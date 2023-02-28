@@ -9,8 +9,7 @@
 // CHECK:           %[[VAL_9:.*]] = merge %[[VAL_0]] : index
 // CHECK:           %[[VAL_10:.*]] = merge %[[VAL_2]] : none
 // CHECK:           %[[VAL_5]] = constant %[[VAL_10]] {value = 1 : i32} : i32
-// CHECK:           %[[VAL_11:.*]] = source
-// CHECK:           %[[VAL_12:.*]] = constant %[[VAL_11]] {value = 1 : i32} : i32
+// CHECK:           %[[VAL_12:.*]] = constant %[[VAL_10]] {value = 1 : i32} : i32
 // CHECK:           %[[VAL_6]], %[[VAL_7]] = d_store {{\[}}%[[VAL_9]]] %[[VAL_12]] : index, i32
 // CHECK:           %[[VAL_13:.*]], %[[VAL_8]] = d_load {{\[}}%[[VAL_9]]] %[[VAL_3]] : index, i32
 // CHECK:           %[[VAL_14:.*]] = d_return %[[VAL_10]] : (none) -> none
@@ -39,15 +38,13 @@ func.func @simpleLoadStore(%arg0 : index, %arg1 : memref<4xi32>) {
 // CHECK:           %[[VAL_18:.*]] = merge %[[VAL_14]] : index
 // CHECK:           %[[VAL_19:.*]], %[[VAL_20:.*]] = control_merge %[[VAL_16]] : none
 // CHECK:           %[[VAL_5]] = constant %[[VAL_19]] {value = 1 : i32} : i32
-// CHECK:           %[[VAL_21:.*]] = source
-// CHECK:           %[[VAL_22:.*]] = constant %[[VAL_21]] {value = 1 : i32} : i32
+// CHECK:           %[[VAL_22:.*]] = constant %[[VAL_19]] {value = 1 : i32} : i32
 // CHECK:           %[[VAL_7]], %[[VAL_8]] = d_store {{\[}}%[[VAL_18]]] %[[VAL_22]] : index, i32
 // CHECK:           %[[VAL_23:.*]] = br %[[VAL_19]] : none
 // CHECK:           %[[VAL_24:.*]] = merge %[[VAL_15]] : index
 // CHECK:           %[[VAL_25:.*]], %[[VAL_26:.*]] = control_merge %[[VAL_17]] : none
 // CHECK:           %[[VAL_6]] = constant %[[VAL_25]] {value = 1 : i32} : i32
-// CHECK:           %[[VAL_27:.*]] = source
-// CHECK:           %[[VAL_28:.*]] = constant %[[VAL_27]] {value = 2 : i32} : i32
+// CHECK:           %[[VAL_28:.*]] = constant %[[VAL_25]] {value = 2 : i32} : i32
 // CHECK:           %[[VAL_9]], %[[VAL_10]] = d_store {{\[}}%[[VAL_24]]] %[[VAL_28]] : index, i32
 // CHECK:           %[[VAL_29:.*]] = br %[[VAL_25]] : none
 // CHECK:           %[[VAL_30:.*]], %[[VAL_31:.*]] = control_merge %[[VAL_29]], %[[VAL_23]] : none
@@ -85,8 +82,7 @@ func.func @storeMulBlocks(%arg0 : i1, %arg1 : index, %arg2 : memref<4xi32>) {
 // CHECK:           %[[VAL_14:.*]], %[[VAL_15:.*]] = cond_br %[[VAL_8]], %[[VAL_11]] : i32
 // CHECK:           %[[VAL_16:.*]] = merge %[[VAL_14]] : i32
 // CHECK:           %[[VAL_17:.*]], %[[VAL_18:.*]] = control_merge %[[VAL_12]] : none
-// CHECK:           %[[VAL_19:.*]] = source
-// CHECK:           %[[VAL_20:.*]] = constant %[[VAL_19]] {value = 1 : i32} : i32
+// CHECK:           %[[VAL_20:.*]] = constant %[[VAL_17]] {value = 1 : i32} : i32
 // CHECK:           %[[VAL_21:.*]] = arith.addi %[[VAL_16]], %[[VAL_20]] : i32
 // CHECK:           %[[VAL_22:.*]] = br %[[VAL_17]] : none
 // CHECK:           %[[VAL_23:.*]], %[[VAL_24:.*]] = control_merge %[[VAL_22]], %[[VAL_13]] : none
@@ -107,17 +103,15 @@ func.func @forwardLoadToBB(%arg0 : i1, %arg1 : index, %arg2: memref<4xi32>) {
 // -----
 
 // CHECK-LABEL:   handshake.func @multipleMemories(
-// CHECK-SAME:                                     %[[VAL_0:.*]]: i1, 
+// CHECK-SAME:                                     %[[VAL_0:.*]]: i1,
 // CHECK-SAME:                                     %[[VAL_1:.*]]: memref<4xi32>, %[[VAL_2:.*]]: memref<4xi32>,
 // CHECK-SAME:                                     %[[VAL_3:.*]]: none, ...) -> none attributes {argNames = ["in0", "in1", "in2", "in3"], resNames = ["out0"]} {
 // CHECK:           %[[VAL_4:.*]], %[[VAL_5:.*]] = mem_controller[bb = 2, ld = 1, st = 1] (%[[VAL_2]] : memref<4xi32>) (%[[VAL_6:.*]], %[[VAL_7:.*]], %[[VAL_8:.*]], %[[VAL_9:.*]], %[[VAL_10:.*]]) {id = 1 : i32} : (i32, i32, index, i32, index) -> (i32, none)
 // CHECK:           %[[VAL_11:.*]], %[[VAL_12:.*]] = mem_controller[bb = 2, ld = 1, st = 1] (%[[VAL_1]] : memref<4xi32>) (%[[VAL_13:.*]], %[[VAL_14:.*]], %[[VAL_15:.*]], %[[VAL_16:.*]], %[[VAL_17:.*]]) {id = 0 : i32} : (i32, i32, i32, index, index) -> (i32, none)
 // CHECK:           %[[VAL_18:.*]] = merge %[[VAL_0]] : i1
 // CHECK:           %[[VAL_19:.*]] = merge %[[VAL_3]] : none
-// CHECK:           %[[VAL_20:.*]] = source
-// CHECK:           %[[VAL_21:.*]] = constant %[[VAL_20]] {value = 0 : index} : index
-// CHECK:           %[[VAL_22:.*]] = source
-// CHECK:           %[[VAL_23:.*]] = constant %[[VAL_22]] {value = 0 : index} : index
+// CHECK:           %[[VAL_21:.*]] = constant %[[VAL_19]] {value = 0 : index} : index
+// CHECK:           %[[VAL_23:.*]] = constant %[[VAL_19]] {value = 0 : index} : index
 // CHECK:           %[[VAL_24:.*]], %[[VAL_25:.*]] = cond_br %[[VAL_18]], %[[VAL_19]] : none
 // CHECK:           %[[VAL_26:.*]], %[[VAL_27:.*]] = cond_br %[[VAL_18]], %[[VAL_21]] : index
 // CHECK:           %[[VAL_28:.*]], %[[VAL_29:.*]] = cond_br %[[VAL_18]], %[[VAL_23]] : index

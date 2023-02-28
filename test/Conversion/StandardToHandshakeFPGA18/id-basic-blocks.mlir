@@ -31,15 +31,13 @@ func.func @memInterfaceNoID(%arg0: memref<4xi32>, %arg1: index) -> i32 {
 // CHECK:           %[[VAL_8:.*]], %[[VAL_9:.*]] = cond_br %[[VAL_4]], %[[VAL_5]] {bb = 0 : ui32} : none
 // CHECK:           %[[VAL_10:.*]] = merge %[[VAL_6]] {bb = 1 : ui32} : i32
 // CHECK:           %[[VAL_11:.*]], %[[VAL_12:.*]] = control_merge %[[VAL_8]] {bb = 1 : ui32} : none
-// CHECK:           %[[VAL_13:.*]] = source {bb = 1 : ui32}
-// CHECK:           %[[VAL_14:.*]] = constant %[[VAL_13]] {bb = 1 : ui32, value = 1 : i32} : i32
+// CHECK:           %[[VAL_14:.*]] = constant %[[VAL_11]] {bb = 1 : ui32, value = 1 : i32} : i32
 // CHECK:           %[[VAL_15:.*]] = arith.addi %[[VAL_10]], %[[VAL_14]] {bb = 1 : ui32} : i32
 // CHECK:           %[[VAL_16:.*]] = br %[[VAL_11]] {bb = 1 : ui32} : none
 // CHECK:           %[[VAL_17:.*]] = br %[[VAL_15]] {bb = 1 : ui32} : i32
 // CHECK:           %[[VAL_18:.*]] = merge %[[VAL_7]] {bb = 2 : ui32} : i32
 // CHECK:           %[[VAL_19:.*]], %[[VAL_20:.*]] = control_merge %[[VAL_9]] {bb = 2 : ui32} : none
-// CHECK:           %[[VAL_21:.*]] = source {bb = 2 : ui32}
-// CHECK:           %[[VAL_22:.*]] = constant %[[VAL_21]] {bb = 2 : ui32, value = 2 : i32} : i32
+// CHECK:           %[[VAL_22:.*]] = constant %[[VAL_19]] {bb = 2 : ui32, value = 2 : i32} : i32
 // CHECK:           %[[VAL_23:.*]] = arith.addi %[[VAL_18]], %[[VAL_22]] {bb = 2 : ui32} : i32
 // CHECK:           %[[VAL_24:.*]] = br %[[VAL_19]] {bb = 2 : ui32} : none
 // CHECK:           %[[VAL_25:.*]] = br %[[VAL_23]] {bb = 2 : ui32} : i32
@@ -75,14 +73,12 @@ func.func @ifThenElse(%arg0: i32, %arg1: i1) -> i32 {
 // CHECK:           %[[VAL_8:.*]], %[[VAL_9:.*]] = cond_br %[[VAL_4]], %[[VAL_5]] {bb = 0 : ui32} : none
 // CHECK:           %[[VAL_10:.*]] = merge %[[VAL_6]] {bb = 1 : ui32} : i32
 // CHECK:           %[[VAL_11:.*]], %[[VAL_12:.*]] = control_merge %[[VAL_8]] {bb = 1 : ui32} : none
-// CHECK:           %[[VAL_13:.*]] = source {bb = 1 : ui32}
-// CHECK:           %[[VAL_14:.*]] = constant %[[VAL_13]] {bb = 1 : ui32, value = 1 : i32} : i32
+// CHECK:           %[[VAL_14:.*]] = constant %[[VAL_11]] {bb = 1 : ui32, value = 1 : i32} : i32
 // CHECK:           %[[VAL_15:.*]] = arith.addi %[[VAL_10]], %[[VAL_14]] {bb = 1 : ui32} : i32
 // CHECK:           %[[VAL_16:.*]] = d_return {bb = 1 : ui32} %[[VAL_15]] : (i32) -> i32
 // CHECK:           %[[VAL_17:.*]] = merge %[[VAL_7]] {bb = 2 : ui32} : i32
 // CHECK:           %[[VAL_18:.*]], %[[VAL_19:.*]] = control_merge %[[VAL_9]] {bb = 2 : ui32} : none
-// CHECK:           %[[VAL_20:.*]] = source {bb = 2 : ui32}
-// CHECK:           %[[VAL_21:.*]] = constant %[[VAL_20]] {bb = 2 : ui32, value = 2 : i32} : i32
+// CHECK:           %[[VAL_21:.*]] = constant %[[VAL_18]] {bb = 2 : ui32, value = 2 : i32} : i32
 // CHECK:           %[[VAL_22:.*]] = arith.addi %[[VAL_17]], %[[VAL_21]] {bb = 2 : ui32} : i32
 // CHECK:           %[[VAL_23:.*]] = d_return {bb = 2 : ui32} %[[VAL_22]] : (i32) -> i32
 // CHECK:           %[[VAL_24:.*]] = merge %[[VAL_16]], %[[VAL_23]] {bb = 3 : ui32} : i32
@@ -107,10 +103,8 @@ func.func @multipleReturns(%arg0: i32, %arg1: i1) -> i32 {
 // CHECK-SAME:                               %[[VAL_1:.*]]: none, ...) -> none attributes {argNames = ["in0", "in1"], resNames = ["out0"]} {
 // CHECK:           %[[VAL_2:.*]] = merge %[[VAL_0]] {bb = 0 : ui32} : index
 // CHECK:           %[[VAL_3:.*]] = merge %[[VAL_1]] {bb = 0 : ui32} : none
-// CHECK:           %[[VAL_4:.*]] = source {bb = 0 : ui32}
-// CHECK:           %[[VAL_5:.*]] = constant %[[VAL_4]] {bb = 0 : ui32, value = 0 : index} : index
-// CHECK:           %[[VAL_6:.*]] = source {bb = 0 : ui32}
-// CHECK:           %[[VAL_7:.*]] = constant %[[VAL_6]] {bb = 0 : ui32, value = 1 : index} : index
+// CHECK:           %[[VAL_5:.*]] = constant %[[VAL_3]] {bb = 0 : ui32, value = 0 : index} : index
+// CHECK:           %[[VAL_7:.*]] = constant %[[VAL_3]] {bb = 0 : ui32, value = 1 : index} : index
 // CHECK:           %[[VAL_8:.*]] = br %[[VAL_2]] {bb = 0 : ui32} : index
 // CHECK:           %[[VAL_9:.*]] = br %[[VAL_3]] {bb = 0 : ui32} : none
 // CHECK:           %[[VAL_10:.*]] = br %[[VAL_5]] {bb = 0 : ui32} : index

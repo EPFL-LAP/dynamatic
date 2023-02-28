@@ -50,10 +50,8 @@ func.func @retunMultipleValues(%arg0 : i32, %arg1 : i1, %arg2 : index) -> (i32, 
 // CHECK-SAME:                                    %[[VAL_1:.*]]: none, ...) -> (i32, none) attributes {argNames = ["in0", "in1"], resNames = ["out0", "out1"]} {
 // CHECK:           %[[VAL_2:.*]] = merge %[[VAL_0]] : i1
 // CHECK:           %[[VAL_3:.*]] = merge %[[VAL_1]] : none
-// CHECK:           %[[VAL_4:.*]] = source
-// CHECK:           %[[VAL_5:.*]] = constant %[[VAL_4]] {value = 0 : i32} : i32
-// CHECK:           %[[VAL_6:.*]] = source
-// CHECK:           %[[VAL_7:.*]] = constant %[[VAL_6]] {value = 1 : i32} : i32
+// CHECK:           %[[VAL_5:.*]] = constant %[[VAL_3]] {value = 0 : i32} : i32
+// CHECK:           %[[VAL_7:.*]] = constant %[[VAL_3]] {value = 1 : i32} : i32
 // CHECK:           %[[VAL_8:.*]], %[[VAL_9:.*]] = cond_br %[[VAL_2]], %[[VAL_3]] : none
 // CHECK:           %[[VAL_10:.*]], %[[VAL_11:.*]] = cond_br %[[VAL_2]], %[[VAL_5]] : i32
 // CHECK:           %[[VAL_12:.*]], %[[VAL_13:.*]] = cond_br %[[VAL_2]], %[[VAL_7]] : i32
@@ -79,17 +77,15 @@ func.func @multipleReturns(%arg0 : i1) -> i32 {
 // -----
 
 // CHECK-LABEL:   handshake.func @memoryConnect(
-// CHECK-SAME:                                  %[[VAL_0:.*]]: i1, 
+// CHECK-SAME:                                  %[[VAL_0:.*]]: i1,
 // CHECK-SAME:                                  %[[VAL_1:.*]]: memref<4xi32>, %[[VAL_2:.*]]: memref<4xi32>,
 // CHECK-SAME:                                  %[[VAL_3:.*]]: none, ...) -> (i32, none) attributes {argNames = ["in0", "in1", "in2", "in3"], resNames = ["out0", "out1"]} {
 // CHECK:           %[[VAL_4:.*]] = mem_controller[bb = 0, ld = 0, st = 0] (%[[VAL_2]] : memref<4xi32>) () {id = 1 : i32} : () -> none
 // CHECK:           %[[VAL_5:.*]] = mem_controller[bb = 0, ld = 0, st = 0] (%[[VAL_1]] : memref<4xi32>) () {id = 0 : i32} : () -> none
 // CHECK:           %[[VAL_6:.*]] = merge %[[VAL_0]] : i1
 // CHECK:           %[[VAL_7:.*]] = merge %[[VAL_3]] : none
-// CHECK:           %[[VAL_8:.*]] = source
-// CHECK:           %[[VAL_9:.*]] = constant %[[VAL_8]] {value = 0 : i32} : i32
-// CHECK:           %[[VAL_10:.*]] = source
-// CHECK:           %[[VAL_11:.*]] = constant %[[VAL_10]] {value = 1 : i32} : i32
+// CHECK:           %[[VAL_9:.*]] = constant %[[VAL_7]] {value = 0 : i32} : i32
+// CHECK:           %[[VAL_11:.*]] = constant %[[VAL_7]] {value = 1 : i32} : i32
 // CHECK:           %[[VAL_12:.*]], %[[VAL_13:.*]] = cond_br %[[VAL_6]], %[[VAL_7]] : none
 // CHECK:           %[[VAL_14:.*]], %[[VAL_15:.*]] = cond_br %[[VAL_6]], %[[VAL_9]] : i32
 // CHECK:           %[[VAL_16:.*]], %[[VAL_17:.*]] = cond_br %[[VAL_6]], %[[VAL_11]] : i32
