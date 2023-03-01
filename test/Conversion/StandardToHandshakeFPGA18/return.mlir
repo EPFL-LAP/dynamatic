@@ -80,23 +80,23 @@ func.func @multipleReturns(%arg0 : i1) -> i32 {
 // CHECK-SAME:                                  %[[VAL_0:.*]]: i1,
 // CHECK-SAME:                                  %[[VAL_1:.*]]: memref<4xi32>, %[[VAL_2:.*]]: memref<4xi32>,
 // CHECK-SAME:                                  %[[VAL_3:.*]]: none, ...) -> (i32, none) attributes {argNames = ["in0", "in1", "in2", "in3"], resNames = ["out0", "out1"]} {
-// CHECK:           %[[VAL_4:.*]] = mem_controller[bb = 0, ld = 0, st = 0] (%[[VAL_2]] : memref<4xi32>) () {id = 1 : i32} : () -> none
-// CHECK:           %[[VAL_5:.*]] = mem_controller[bb = 0, ld = 0, st = 0] (%[[VAL_1]] : memref<4xi32>) () {id = 0 : i32} : () -> none
+// CHECK:           %[[VAL_4:.*]] = mem_controller{{\[}}%[[VAL_2]] : memref<4xi32>] () {accesses = [], id = 1 : i32} : () -> none
+// CHECK:           %[[VAL_5:.*]] = mem_controller{{\[}}%[[VAL_1]] : memref<4xi32>] () {accesses = [], id = 0 : i32} : () -> none
 // CHECK:           %[[VAL_6:.*]] = merge %[[VAL_0]] : i1
 // CHECK:           %[[VAL_7:.*]] = merge %[[VAL_3]] : none
-// CHECK:           %[[VAL_9:.*]] = constant %[[VAL_7]] {value = 0 : i32} : i32
-// CHECK:           %[[VAL_11:.*]] = constant %[[VAL_7]] {value = 1 : i32} : i32
-// CHECK:           %[[VAL_12:.*]], %[[VAL_13:.*]] = cond_br %[[VAL_6]], %[[VAL_7]] : none
+// CHECK:           %[[VAL_8:.*]] = constant %[[VAL_7]] {value = 0 : i32} : i32
+// CHECK:           %[[VAL_9:.*]] = constant %[[VAL_7]] {value = 1 : i32} : i32
+// CHECK:           %[[VAL_10:.*]], %[[VAL_11:.*]] = cond_br %[[VAL_6]], %[[VAL_7]] : none
+// CHECK:           %[[VAL_12:.*]], %[[VAL_13:.*]] = cond_br %[[VAL_6]], %[[VAL_8]] : i32
 // CHECK:           %[[VAL_14:.*]], %[[VAL_15:.*]] = cond_br %[[VAL_6]], %[[VAL_9]] : i32
-// CHECK:           %[[VAL_16:.*]], %[[VAL_17:.*]] = cond_br %[[VAL_6]], %[[VAL_11]] : i32
-// CHECK:           %[[VAL_18:.*]] = merge %[[VAL_14]] : i32
-// CHECK:           %[[VAL_19:.*]], %[[VAL_20:.*]] = control_merge %[[VAL_12]] : none
-// CHECK:           %[[VAL_21:.*]] = d_return %[[VAL_18]] : (i32) -> i32
-// CHECK:           %[[VAL_22:.*]] = merge %[[VAL_17]] : i32
-// CHECK:           %[[VAL_23:.*]], %[[VAL_24:.*]] = control_merge %[[VAL_13]] : none
-// CHECK:           %[[VAL_25:.*]] = d_return %[[VAL_22]] : (i32) -> i32
-// CHECK:           %[[VAL_26:.*]] = merge %[[VAL_21]], %[[VAL_25]] : i32
-// CHECK:           end %[[VAL_26]], %[[VAL_4]], %[[VAL_5]] : i32, none, none
+// CHECK:           %[[VAL_16:.*]] = merge %[[VAL_12]] : i32
+// CHECK:           %[[VAL_17:.*]], %[[VAL_18:.*]] = control_merge %[[VAL_10]] : none
+// CHECK:           %[[VAL_19:.*]] = d_return %[[VAL_16]] : (i32) -> i32
+// CHECK:           %[[VAL_20:.*]] = merge %[[VAL_15]] : i32
+// CHECK:           %[[VAL_21:.*]], %[[VAL_22:.*]] = control_merge %[[VAL_11]] : none
+// CHECK:           %[[VAL_23:.*]] = d_return %[[VAL_20]] : (i32) -> i32
+// CHECK:           %[[VAL_24:.*]] = merge %[[VAL_19]], %[[VAL_23]] : i32
+// CHECK:           end %[[VAL_24]], %[[VAL_4]], %[[VAL_5]] : i32, none, none
 // CHECK:         }
 func.func @memoryConnect(%arg0: i1, %arg1: memref<4xi32>, %arg2: memref<4xi32>) -> i32 {
   %c0 = arith.constant 0 : i32

@@ -114,27 +114,30 @@ addOpToMemInterfaces(HandshakeLoweringFPGA18::MemInterfacesInfo &memInfo,
 
 /// Returns load/store results which are to be given as operands to a
 /// handshake::MemoryControllerOp.
-static SmallVector<Value, 8> getResultsToMemory(Operation *op) {
+static SmallVector<Value, 2> getResultsToMemory(Operation *op) {
 
   if (auto loadOp = dyn_cast<handshake::DynamaticLoadOp>(op)) {
-    // For load, get all address outputs/indices
-    // (load also has one data output which goes to successor operation)
-    SmallVector<Value, 8> results(loadOp.getAddressResults());
+    // For load, get address output
+    SmallVector<Value, 2> results;
+    results.push_back(loadOp.getAddressResult());
     return results;
   } else {
-    // For store, all outputs (data and address indices) go to memory
+    // For store, all outputs (data and address) go to memory
     auto storeOp = dyn_cast<handshake::DynamaticStoreOp>(op);
     assert(storeOp && "input operation must either be load or store");
-    SmallVector<Value, 8> results(storeOp.getResults());
+    SmallVector<Value, 2> results(storeOp.getResults());
     return results;
   }
 }
 
-/// Adds a value to the list of operands of an operation.
-static void addValueToOperands(Operation *op, Value val) {
-  SmallVector<Value, 8> results(op->getOperands());
-  results.push_back(val);
-  op->setOperands(results);
+/// Adds the data input (from memory interface) to the list of load operands.
+static void addLoadDataOperand(Operation *op, Value dataIn) {
+  assert(op->getNumOperands() == 1 &&
+         "load must have single address operand at this point");
+  SmallVector<Value, 2> operands;
+  operands.push_back(op->getOperand(0));
+  operands.push_back(dataIn);
+  op->setOperands(operands);
 }
 
 /// Returns the list of data inputs to be passed as operands to the
@@ -252,65 +255,26 @@ LogicalResult HandshakeLoweringFPGA18::replaceMemoryOps(
       return failure();
     Operation *newOp = nullptr;
 
+    // Replace memref operation with corresponding handshake operation
     llvm::TypeSwitch<Operation *>(&op)
-        .Case<memref::LoadOp>([&](auto loadOp) {
-          // Get operands which correspond to address indices
-          // This will add all operands except alloc
-          SmallVector<Value, 8> operands(loadOp.getIndices());
-
-          newOp = rewriter.create<handshake::DynamaticLoadOp>(op.getLoc(),
-                                                              memref, operands);
+        .Case<memref::LoadOp>([&](memref::LoadOp loadOp) {
+          auto indices = loadOp.getIndices();
+          assert(indices.size() == 1 && "load must be unidimensional");
+          newOp = rewriter.create<handshake::DynamaticLoadOp>(
+              op.getLoc(), memref, indices[0]);
 
           // Replace uses of old load result with data result of new load
           op.getResult(0).replaceAllUsesWith(
               dyn_cast<handshake::DynamaticLoadOp>(newOp).getDataResult());
         })
-        .Case<memref::StoreOp>([&](auto storeOp) {
-          // Get operands which correspond to address indices
-          // This will add all operands except alloc and data
-          SmallVector<Value, 8> operands(storeOp.getIndices());
-
-          // Create new op where operands are store data and address indices
+        .Case<memref::StoreOp>([&](memref::StoreOp storeOp) {
+          auto indices = storeOp.getIndices();
+          assert(indices.size() == 1 && "load must be unidimensional");
           newOp = rewriter.create<handshake::DynamaticStoreOp>(
-              op.getLoc(), storeOp.getValueToStore(), operands);
+              op.getLoc(), storeOp.getValueToStore(), indices[0]);
         })
-        .Case<mlir::AffineReadOpInterface, mlir::AffineWriteOpInterface>(
-            [&](auto) {
-              // Get essential memref access inforamtion.
-              MemRefAccess access(&op);
-              // The address of an affine load/store operation can be a result
-              // of an affine map, which is a linear combination of constants
-              // and parameters. Therefore, we should extract the affine map of
-              // each address and expand it into proper expressions that
-              // calculate the result.
-              mlir::AffineMap map;
-              if (auto loadOp = dyn_cast<mlir::AffineReadOpInterface>(op))
-                map = loadOp.getAffineMap();
-              else
-                map = dyn_cast<mlir::AffineWriteOpInterface>(op).getAffineMap();
-
-              // The returned object from expandAffineMap is an optional list of
-              // the expansion results from the given affine map, which are the
-              // actual address indices that can be used as operands for
-              // handshake LoadOp/StoreOp. The following processing requires it
-              // to be a valid result.
-              auto operands =
-                  expandAffineMap(rewriter, op.getLoc(), map, access.indices);
-              assert(operands && "Address operands of affine memref access "
-                                 "cannot be reduced.");
-
-              if (isa<mlir::AffineReadOpInterface>(op)) {
-                auto loadOp = rewriter.create<handshake::DynamaticLoadOp>(
-                    op.getLoc(), access.memref, *operands);
-                newOp = loadOp;
-                op.getResult(0).replaceAllUsesWith(loadOp.getDataResult());
-              } else {
-                newOp = rewriter.create<handshake::DynamaticStoreOp>(
-                    op.getLoc(), op.getOperand(0), *operands);
-              }
-            })
         .Default([&](auto) {
-          op.emitOpError("Load/store operation cannot be handled.");
+          return op.emitOpError("Load/store operation cannot be handled.");
         });
 
     // Record operation along the memory interface it uses
@@ -333,67 +297,64 @@ LogicalResult
 HandshakeLoweringFPGA18::connectToMemory(ConversionPatternRewriter &rewriter,
                                          MemInterfacesInfo &memInfo) {
 
-  // Connect memories (externally defined by memref block argument or locally
-  // defined by an allocation operation) to their respective loads and stores.
+  // Connect memories (externally defined by memref block argument) to their
+  // respective loads and stores
   unsigned memCount = 0;
   for (auto &[memref, memBlockOps] : memInfo) {
 
-    // Derive memory interface operands from operations interacting with it.
-    // - memControls for control signal coming from each basic block from which
-    // the memory is interacted with
-    // - memDataInputs for data inputs coming from results of loads (addresses)
-    // and stores (addresses and data)
-    std::vector<Value> memControls, memDataInputs;
-    unsigned ldCount = 0, stCount = 0;
-    for (auto &[block, memOps] : memBlockOps) {
-      unsigned blockStCount = 0;
+    // Derive memory interface inputs from operations interacting with it
+    SmallVector<Value> memInputs;
+    SmallVector<SmallVector<AccessTypeEnum>> accesses;
 
+    for (auto &[block, memOps] : memBlockOps) {
+
+      // Traverse the list of operations once to determine the ordering of loads
+      // and stores
+      unsigned stCount = 0;
+      SmallVector<AccessTypeEnum> blockAccesses;
       for (auto *op : memOps) {
-        // Add results of memory operation to memory interface operands
-        SmallVector<Value, 8> results = getResultsToMemory(op);
-        memDataInputs.insert(memDataInputs.end(), results.begin(),
-                             results.end());
-        // Keep track of the number of loads and stores
         if (isa<handshake::DynamaticLoadOp>(op))
-          ldCount++;
-        else
-          blockStCount++;
+          blockAccesses.push_back(AccessTypeEnum::Load);
+        else {
+          blockAccesses.push_back(AccessTypeEnum::Store);
+          stCount++;
+        }
+      }
+      accesses.push_back(blockAccesses);
+
+      if (stCount > 0) {
+        // Add control signal from block, fed through a constant indicating the
+        // number of stores in the block (to eventually indicate block
+        // completion to the end node)
+        auto blockCtrl = getBlockEntryControl(block);
+        rewriter.setInsertionPointAfter(blockCtrl.getDefiningOp());
+        auto cstNumStore = rewriter.create<handshake::ConstantOp>(
+            blockCtrl.getLoc(), rewriter.getI32Type(),
+            rewriter.getI32IntegerAttr(stCount), blockCtrl);
+        memInputs.push_back(cstNumStore.getResult());
       }
 
-      // Keep track of the total number of stores to the memory interface
-      stCount += blockStCount;
-
-      // Add control signal from block, fed through a constant indicating the
-      // number of stores in the block (to eventually indicate block completion
-      // to the end node)
-      auto blockCtrl = getBlockEntryControl(block);
-      rewriter.setInsertionPointAfter(blockCtrl.getDefiningOp());
-      auto cstNumStore = rewriter.create<handshake::ConstantOp>(
-          blockCtrl.getLoc(), rewriter.getI32Type(),
-          rewriter.getI32IntegerAttr(blockStCount), blockCtrl);
-      memControls.push_back(cstNumStore.getResult());
+      // Traverse the list of operations once more and accumulate memory inputs
+      // coming from the block
+      for (auto *op : memOps) {
+        // Add results of memory operation to memory interface operands
+        SmallVector<Value, 2> results = getResultsToMemory(op);
+        memInputs.insert(memInputs.end(), results.begin(), results.end());
+      }
     }
-
-    // Combine all memory operands together
-    std::vector<Value> memOperands;
-    std::copy(memControls.begin(), memControls.end(),
-              std::back_inserter(memOperands));
-    std::copy(memDataInputs.begin(), memDataInputs.end(),
-              std::back_inserter(memOperands));
 
     // Create memory interface at the top of the function
     Block *entryBlock = &r.front();
     rewriter.setInsertionPointToStart(entryBlock);
     auto memInterface = rewriter.create<handshake::MemoryControllerOp>(
-        entryBlock->front().getLoc(), memref, memOperands, memBlockOps.size(),
-        ldCount, stCount, memCount++);
+        entryBlock->front().getLoc(), memref, memInputs, accesses, memCount++);
 
     // Add data result from memory to each load operation's operands
     unsigned memResultIdx = 0;
     for (auto &[block, memOps] : memBlockOps)
       for (auto *op : memOps)
         if (isa<handshake::DynamaticLoadOp>(op))
-          addValueToOperands(op, memInterface->getResult(memResultIdx++));
+          addLoadDataOperand(op, memInterface->getResult(memResultIdx++));
   }
 
   return success();
@@ -403,8 +364,8 @@ LogicalResult
 HandshakeLoweringFPGA18::idBasicBlocks(ConversionPatternRewriter &rewriter) {
   for (auto &indexAndBlock : llvm::enumerate(r))
     for (auto &op : indexAndBlock.value())
-      // Memory interfaces do not naturally belong to any block, so they do not
-      // get an attribute
+      // Memory interfaces do not naturally belong to any block, so they do
+      // not get an attribute
       if (!isa<handshake::MemoryControllerOp>(op))
         op.setAttr(BB_ATTR, rewriter.getUI32IntegerAttr(indexAndBlock.index()));
   return success();
@@ -446,10 +407,10 @@ LogicalResult HandshakeLoweringFPGA18::createReturnNetwork(
   }
   assert(!newReturnOps.empty() && "function must have at least one return");
 
-  // When identifying basic blocks, the end node is either put in the same block
-  // as the function's single return statement or, in the case of multiple
-  // return statements, it is put in a "fake block" along with the merges that
-  // feed it its data inputs
+  // When identifying basic blocks, the end node is either put in the same
+  // block as the function's single return statement or, in the case of
+  // multiple return statements, it is put in a "fake block" along with the
+  // merges that feed it its data inputs
   std::optional<size_t> endNetworkID{};
   if (idBasicBlocks)
     endNetworkID = (newReturnOps.size() > 1)
@@ -585,9 +546,9 @@ partiallyLowerOp(const PartialLowerFuncOp::PartialLoweringFunc &loweringFunc,
   return applyPartialConversion(op, target, std::move(patterns));
 }
 
-/// Lowers the region referenced by the handshake lowering strategy following a
-/// fixed sequence of steps, some implemented in this file and some in CIRCT's
-/// standard-to-handshake conversion pass.
+/// Lowers the region referenced by the handshake lowering strategy following
+/// a fixed sequence of steps, some implemented in this file and some in
+/// CIRCT's standard-to-handshake conversion pass.
 static LogicalResult lowerRegion(HandshakeLoweringFPGA18 &hl,
                                  bool idBasicBlocks) {
 
@@ -693,9 +654,9 @@ static LogicalResult lowerFuncOp(func::FuncOp funcOp, MLIRContext *ctx,
 }
 
 namespace {
-/// FPGA18's elastic pass. Runs elastic pass on every function (func::FuncOp) of
-/// the module it is applied on. Succeeds whenever all functions in the module
-/// were succesfully lowered to handshake.
+/// FPGA18's elastic pass. Runs elastic pass on every function (func::FuncOp)
+/// of the module it is applied on. Succeeds whenever all functions in the
+/// module were succesfully lowered to handshake.
 struct StandardToHandshakeFPGA18Pass
     : public StandardToHandshakeFPGA18Base<StandardToHandshakeFPGA18Pass> {
 
