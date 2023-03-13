@@ -1,130 +1,48 @@
-# Dynamatic++
+# Dynamatic
 
-Compiler for Dynamically Scheduled High-Level Synthesis
+Dynamatic is an academic, open-source high-level synthesis compiler that produces synchronous dynamically-scheduled circuits from C/C++ code. Dynamatic generates synthesizable RTL which currently targets Xilinx FPGAs and delivers significant performance improvements compared to state-of-the-art commercial HLS tools in specific situations (e.g., applications with irregular memory accesses or control-dominated code). The fully automated compilation flow of Dynamatic is based on MLIR. It is customizable and extensible to target different hardware platforms and easy to use with commercial tools such as Vivado (Xilinx) and Modelsim (Mentor Graphics).
 
 ## Building the Project
 
-The following instructions can be used to setup Dynamatic++ from source.
+The following instructions can be used to setup Dynamatic from source.
 
 1. **Install dependencies required by LLVM/MLIR.** These includes working C and C++ toolchains (compiler, linker), `cmake` and `ninja` for building the project, and `git`. For example, on Ubuntu:
+    
+    ```sh
+    $ sudo apt-get install git cmake ninja clang lld ccache
+    ```
 
-   ```sh
-   $ sudo apt-get install git cmake ninja clang lld ccache
-   ```
+    `clang`, `lld`, and `ccache` are not stictly required but significantly speed up (re)builds. If you do not wish to install them, pass the `--disable-build-opt` flag to the build script to disable their use when building.
 
-   `clang`, `lld`, and `ccache` are not stictly required but significantly speed up (re)builds. If you do not wish to install them, simply remove flags `DCMAKE_C_COMPILER`, `DCMAKE_CXX_COMPILER`, `DLLVM_ENABLE_LLD`, and `DLLVM_CACHE_BUILD` from the following `cmake` commands.
+2. **Clone the project and its submodules.** Dynamatic depends on [Polygeist](https://github.com/llvm/Polygeist) (C/C++ frontend for MLIR) and a fork of [CIRCT](https://github.com/EPFL-LAP/circt) (Circuit-level IR compiler and tools). Both of them depend on [LLVM/MLIR](https://github.com/llvm/llvm-project).
+    
+    ```sh
+    $ git clone --recurse-submodules git@github.com:EPFL-LAP/dynamatic.git
+    $ cd dynamatic
+    ```
 
-2. **Clone the project and its submodules.** Dynamatic++ depends on [Polygeist](https://github.com/llvm/Polygeist) (C/C++ frontend for MLIR) and [CIRCT](https://github.com/llvm/circt) (Circuit-level IR compiler and tools). Both of them depend on [LLVM/MLIR](https://github.com/llvm/llvm-project).
+    *Note:* The repository is set up so that the two submodules are shallow cloned by default, meaning the clone command downloads just enough of them to check out the currently specified commits. If you wish to work with the full history of these repositories, you can manually unshallow them.
 
-   ```sh
-   $ git clone --recurse-submodules https://github.com/EPFL-LAP/dynamatic.git
-   ```
+    ```sh
+    $ cd polygeist
+    $ git fetch --unshallow
+    $ cd ../circt
+    $ git fetch --unshallow
+    ```
 
-3. **Build and test Polygeist.** First, build the version of LLVM, MLIR, and Clang that Polygeist uses.
+3. **Build the project.** Run the build script from the directory created by the clone command (pass it the `--help` flag to see available build options).
 
-   ```sh
-   $ cd dynamatic/polygeist
-   $ mkdir llvm-project/build
-   $ cd llvm-project/build
-   $ cmake -G Ninja ../llvm \
-       -DLLVM_ENABLE_PROJECTS="mlir;clang" \
-       -DLLVM_TARGETS_TO_BUILD="host" \
-       -DCMAKE_BUILD_TYPE=Debug \
-       -DLLVM_ENABLE_ASSERTIONS=ON \
-       -DCMAKE_C_COMPILER=clang \
-       -DCMAKE_CXX_COMPILER=clang++ \
-       -DLLVM_ENABLE_LLD=ON \
-       -DLLVM_CCACHE_BUILD=ON
-   $ ninja
-   $ ninja check-mlir
-   ```
+    ```sh
+    $ cd dynamatic
+    $ chmod +x ./build.sh
+    $ ./build.sh
+    ```
 
-   Then, build Polygeist itself.
+    The build script creates `build` folders in the root directory (i.e., `dynamatic`) and in each submodule to run the build tasks from. All files generated during build (libraries, executable binaries, intermediate compilation files) are placed in these folders, which the repository is configured to not track. Additionally, the build script creates a `bin` folder in the root directory that contains symbolic links to a number of executable binaries built by the superproject and subprojects that Dynamatic users may especially care about.
 
-   ```sh
-    $ cd dynamatic/polygeist
-    $ mkdir build
-    $ cd build
-    $ cmake -G Ninja .. \
-        -DMLIR_DIR=$PWD/../llvm-project/build/lib/cmake/mlir \
-        -DCLANG_DIR=$PWD/../llvm-project/build/lib/cmake/clang \
-        -DLLVM_TARGETS_TO_BUILD="host" \
-        -DCMAKE_BUILD_TYPE=Debug \
-        -DLLVM_ENABLE_ASSERTIONS=ON \
-        -DCMAKE_C_COMPILER=clang \
-        -DCMAKE_CXX_COMPILER=clang++ \
-        -DLLVM_ENABLE_LLD=ON
-   $ ninja
-   $ ninja check-polygeist-opt
-   $ ninja check-cgeist
-   ```
+4. **Run the Dynamatic test-suite.** After building the project, or at any time during development, regression-tests for Dynamatic can be run from the top-level `build` folder using `ninja`.
 
-4. **Build and test CIRCT.** First, build the version of LLVM and MLIR that CIRCT uses.
-
-   ```sh
-   $ cd dynamatic/circt
-   $ mkdir llvm/build
-   $ cd llvm/build
-   $ cmake -G Ninja ../llvm \
-       -DLLVM_ENABLE_PROJECTS="mlir" \
-       -DLLVM_TARGETS_TO_BUILD="host" \
-       -DCMAKE_BUILD_TYPE=Debug \
-       -DLLVM_ENABLE_ASSERTIONS=ON \
-       -DCMAKE_EXPORT_COMPILE_COMMANDS=ON \
-       -DCMAKE_C_COMPILER=clang \
-       -DCMAKE_CXX_COMPILER=clang++ \
-       -DLLVM_ENABLE_LLD=ON \
-       -DLLVM_CCACHE_BUILD=ON
-   $ ninja
-   $ ninja check-mlir
-   ```
-
-   Then, build CIRCT itself.
-
-   ```sh
-   $ cd dynamatic/circt
-   $ mkdir build
-   $ cd build
-   $ cmake -G Ninja .. \
-       -DMLIR_DIR=$PWD/../llvm/build/lib/cmake/mlir \
-       -DLLVM_DIR=$PWD/../llvm/build/lib/cmake/llvm \
-       -DCMAKE_BUILD_TYPE=Debug \
-       -DLLVM_ENABLE_ASSERTIONS=ON \
-       -DCMAKE_EXPORT_COMPILE_COMMANDS=ON \
-       -DCMAKE_C_COMPILER=clang \
-       -DCMAKE_CXX_COMPILER=clang++ \
-       -DLLVM_ENABLE_LLD=ON
-   $ ninja
-   $ ninja check-circt
-   $ ninja check-circt-integration
-   ```
-
-The `-DCMAKE_BUILD_TYPE=Debug` flag enables debug information, which makes the whole tree compile slower, but allows you to step through code into the LLVM and MLIR frameworks. To get something that runs fast, use `-DCMAKE_BUILD_TYPE=Release` or `-DCMAKE_BUILD_TYPE=RelWithDebInfo` if you want to go fast and optionally if you want debug info to go with it.
-
-## Getting the Latest Version of the Project
-
-The following instructions can be used to get the latest stable version of Dynamatic++.
-
-1. **Pull new changes from the repository and its submodules.** The following command will also automatically update all submodules recursively.
-
-   ```sh
-   $ cd dynamatic
-   $ git pull --recurse-submodules
-   ```
-
-2. **Rebuild and test the project.**
-
-   ```sh
-   # First, the LLVM submodule within Polygeist
-   $ cd dynamatic/polygeist/llvm-project/build
-   $ ninja && ninja check-mlir
-   # Then, Polygeist itself
-   $ cd ../../build
-   $ ninja && ninja check-polygeist-opt && ninja check-cgeist
-   # Then, the LLVM submodule within CIRCT
-   $ cd ../../circt/llvm/build
-   $ ninja && ninja check-mlir
-   # Finally, CIRCT itself
-   $ cd ../../build
-   $ ninja && ninja check-circt && ninja check-circt-integration
-   ```
+    ```sh
+    $ cd dynamatic/build
+    $ ninja check-dynamatic
+    ```

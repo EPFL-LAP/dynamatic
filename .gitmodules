@@ -1,7 +1,9 @@
 [submodule "polygeist"]
 	path = polygeist
 	url = https://github.com/llvm/Polygeist.git
+  shallow = true
 [submodule "circt"]
 	path = circt
 	url = git@github.com:EPFL-LAP/circt.git
 	branch = dynamatic
+  shallow = true
