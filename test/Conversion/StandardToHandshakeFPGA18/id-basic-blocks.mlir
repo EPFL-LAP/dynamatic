@@ -4,7 +4,7 @@
 // CHECK-LABEL:   handshake.func @memInterfaceNoID(
 // CHECK-SAME:                                     %[[VAL_0:.*]]: memref<4xi32>,
 // CHECK-SAME:                                     %[[VAL_1:.*]]: index,
-// CHECK-SAME:                                     %[[VAL_2:.*]]: none, ...) -> (i32, none) attributes {argNames = ["in0", "in1", "in2"], resNames = ["out0", "out1"]} {
+// CHECK-SAME:                                     %[[VAL_2:.*]]: none, ...) -> i32 attributes {argNames = ["in0", "in1", "in2"], resNames = ["out0"]} {
 // CHECK:           %[[VAL_3:.*]], %[[VAL_4:.*]] = mem_controller{{\[}}%[[VAL_0]] : memref<4xi32>] (%[[VAL_5:.*]]) {accesses = {{\[\[}}#handshake<AccessType Load>]], id = 0 : i32} : (index) -> (i32, none)
 // CHECK:           %[[VAL_6:.*]] = merge %[[VAL_1]] {bb = 0 : ui32} : index
 // CHECK:           %[[VAL_7:.*]] = merge %[[VAL_2]] {bb = 0 : ui32} : none
@@ -22,7 +22,7 @@ func.func @memInterfaceNoID(%arg0: memref<4xi32>, %arg1: index) -> i32 {
 // CHECK-LABEL:   handshake.func @ifThenElse(
 // CHECK-SAME:                               %[[VAL_0:.*]]: i32,
 // CHECK-SAME:                               %[[VAL_1:.*]]: i1,
-// CHECK-SAME:                               %[[VAL_2:.*]]: none, ...) -> (i32, none) attributes {argNames = ["in0", "in1", "in2"], resNames = ["out0", "out1"]} {
+// CHECK-SAME:                               %[[VAL_2:.*]]: none, ...) -> i32 attributes {argNames = ["in0", "in1", "in2"], resNames = ["out0"]} {
 // CHECK:           %[[VAL_3:.*]] = merge %[[VAL_0]] {bb = 0 : ui32} : i32
 // CHECK:           %[[VAL_4:.*]] = merge %[[VAL_1]] {bb = 0 : ui32} : i1
 // CHECK:           %[[VAL_5:.*]] = merge %[[VAL_2]] {bb = 0 : ui32} : none
@@ -64,7 +64,7 @@ func.func @ifThenElse(%arg0: i32, %arg1: i1) -> i32 {
 // CHECK-LABEL:   handshake.func @multipleReturns(
 // CHECK-SAME:                                    %[[VAL_0:.*]]: i32,
 // CHECK-SAME:                                    %[[VAL_1:.*]]: i1,
-// CHECK-SAME:                                    %[[VAL_2:.*]]: none, ...) -> (i32, none) attributes {argNames = ["in0", "in1", "in2"], resNames = ["out0", "out1"]} {
+// CHECK-SAME:                                    %[[VAL_2:.*]]: none, ...) -> i32 attributes {argNames = ["in0", "in1", "in2"], resNames = ["out0"]} {
 // CHECK:           %[[VAL_3:.*]] = merge %[[VAL_0]] {bb = 0 : ui32} : i32
 // CHECK:           %[[VAL_4:.*]] = merge %[[VAL_1]] {bb = 0 : ui32} : i1
 // CHECK:           %[[VAL_5:.*]] = merge %[[VAL_2]] {bb = 0 : ui32} : none
