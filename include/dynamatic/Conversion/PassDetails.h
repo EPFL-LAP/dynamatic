@@ -38,6 +38,14 @@ class HandshakeDialect;
 class FuncOp;
 } // namespace handshake
 
+namespace hw {
+class HWDialect;
+} // namespace hw
+
+namespace esi {
+class ESIDialect;
+} // namespace esi
+
 } // namespace circt
 
 namespace dynamatic {
