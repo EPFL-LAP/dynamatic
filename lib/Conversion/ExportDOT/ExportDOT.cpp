@@ -71,9 +71,8 @@ private:
   /// A mapping between operations and their unique name in the .dot file.
   DenseMap<Operation *, std::string> opNameMap;
 
-  /// Prints an instance of a handshake.func to the graph. Returns the unique
-  /// name that was assigned to the instance.
-  std::string dotPrint(mlir::raw_indented_ostream &os, handshake::FuncOp f);
+  /// Prints an instance of a handshake.func to the graph.
+  void dotPrint(mlir::raw_indented_ostream &os, handshake::FuncOp f);
 
   /// Returns the name of the vertex representing the operation.
   std::string getNodeName(Operation *op);
@@ -115,13 +114,25 @@ struct NodeInfo {
   /// and a closing bracket after the call.
   void print(mlir::raw_indented_ostream &os) {
     // Print type
-    os << "type=\"" << type << "\" ";
+    os << "type=\"" << type << "\"";
+    if (!stringAttr.empty() || !intAttr.empty())
+      os << ", ";
 
     // Print all attributes
-    for (auto &[name, value] : stringAttr)
-      os << name << "=\"" << value << "\" ";
-    for (auto &[name, value] : intAttr)
-      os << name << "=" << value << " ";
+    for (auto &[idx, attr] : llvm::enumerate(stringAttr)) {
+      auto &[name, value] = attr;
+      os << name << "=\"" << value << "\"";
+      if (idx != stringAttr.size() - 1)
+        os << ", ";
+    }
+    if (!intAttr.empty())
+      os << ", ";
+    for (auto &[idx, attr] : llvm::enumerate(intAttr)) {
+      auto &[name, value] = attr;
+      os << name << "=" << value;
+      if (idx != intAttr.size() - 1)
+        os << ", ";
+    }
   }
 };
 
@@ -140,10 +151,10 @@ struct EdgeInfo {
   /// of the caller of this method to insert an opening bracket before the call
   /// and a closing bracket after the call.
   template <typename Stream> void print(Stream &stream) {
-    stream << "from=\"out" << from << "\" to=\"in" << to << "\" ";
+    stream << "from=\"out" << from << "\", to=\"in" << to << "\"";
     if (memAddress.has_value())
-      stream << "mem_address=\"" << (memAddress.value() ? "true" : "false")
-             << "\" ";
+      stream << ", mem_address=\"" << (memAddress.value() ? "true" : "false")
+             << "\"";
   }
 };
 
@@ -271,7 +282,7 @@ static std::string getIOFromPorts(MemPortsData ports) {
 static std::string getIOFromValues(ValueRange values, std::string portType) {
   PortsData ports;
   for (auto &[idx, val] : llvm::enumerate(values))
-    ports.push_back(std::make_pair(portType + std::to_string(idx), val));
+    ports.push_back(std::make_pair(portType + std::to_string(idx + 1), val));
   return getIOFromPorts(ports);
 }
 
@@ -562,7 +573,7 @@ static void annotateNode(mlir::raw_indented_ostream &os, Operation *op) {
                 auto info = NodeInfo("MC");
                 info.stringAttr["in"] = getInputForMC(op);
                 info.stringAttr["out"] = getOutputForMC(op);
-                info.stringAttr["memory"] = std::to_string(op.getId());
+                info.stringAttr["memory"] = "mem" + std::to_string(op.getId());
                 info.intAttr["bbcount"] = op.getBBCount();
                 info.intAttr["ldcount"] = op.getLdCount();
                 info.intAttr["stcount"] = op.getStCount();
@@ -802,29 +813,13 @@ static const std::string CONTROL_STYLE = "dashed";
 
 /// Determines the style attribute of a value.
 static std::string getStyleOfValue(Value result) {
-  return isa<NoneType>(result.getType()) ? " style=" + CONTROL_STYLE + " " : "";
-}
-
-/// Combines an instance name and suffix into a name.
-static std::string getLocalName(StringRef instanceName, StringRef suffix) {
-  return (instanceName + "." + suffix).str();
-}
-
-/// Returns the name of a function argument.
-static std::string getArgName(handshake::FuncOp op, unsigned index) {
-  return op.getArgName(index).getValue().str();
-}
-
-/// Returns a uniqued version of the name of a function argument.
-static std::string getUniqueArgName(StringRef instanceName,
-                                    handshake::FuncOp op, unsigned index) {
-  return getLocalName(instanceName, getArgName(op, index));
+  return isa<NoneType>(result.getType()) ? "style=" + CONTROL_STYLE + ", " : "";
 }
 
 /// Prints an operation to the output stream and returns the unique name for the
 /// operation within the graph.
 static std::string dotPrintNode(mlir::raw_indented_ostream &outfile,
-                                StringRef instanceName, Operation *op,
+                                Operation *op,
                                 DenseMap<Operation *, unsigned> &opIDs) {
 
   // Determine node name. We use "." to distinguish hierarchy in the dot file,
@@ -832,8 +827,7 @@ static std::string dotPrintNode(mlir::raw_indented_ostream &outfile,
   // name. Replace uses of "." with "_".
   std::string opDialectName = op->getName().getStringRef().str();
   std::replace(opDialectName.begin(), opDialectName.end(), '.', '_');
-  std::string opName =
-      (instanceName + "." + opDialectName + std::to_string(opIDs[op])).str();
+  std::string opName = opDialectName + std::to_string(opIDs[op]);
   outfile << "\"" << opName << "\""
           << " [";
 
@@ -857,14 +851,14 @@ static std::string dotPrintNode(mlir::raw_indented_ostream &outfile,
                  .Default([&](auto) { return "moccasin"; });
 
   // Determine shape
-  outfile << " shape=";
+  outfile << ", shape=";
   if (op->getDialect()->getNamespace() == "handshake")
     outfile << "box";
   else
     outfile << "oval";
 
   // Determine label
-  outfile << " label=\"";
+  outfile << ", label=\"";
   outfile
       << llvm::TypeSwitch<Operation *, std::string>(op)
              // handshake operations
@@ -978,11 +972,11 @@ static std::string dotPrintNode(mlir::raw_indented_ostream &outfile,
   outfile << "\"";
 
   // Determine style
-  outfile << " style=\"filled";
+  outfile << ", style=\"filled";
   if (auto controlInterface = dyn_cast<handshake::ControlInterface>(op);
       controlInterface && controlInterface.isControl())
     outfile << ", " + CONTROL_STYLE;
-  outfile << "\" ";
+  outfile << "\", ";
   annotateNode(outfile, op);
   outfile << "]\n";
 
@@ -1017,18 +1011,17 @@ void ExportDOTPass::closeSubgraph(mlir::raw_indented_ostream &os) {
   os << "}\n";
 }
 
-std::string ExportDOTPass::dotPrint(mlir::raw_indented_ostream &os,
-                                    handshake::FuncOp funcOp) {
+void ExportDOTPass::dotPrint(mlir::raw_indented_ostream &os,
+                             handshake::FuncOp funcOp) {
   std::map<std::string, unsigned> opTypeCntrs;
   DenseMap<Operation *, unsigned> opIDs;
-  auto name = funcOp.getName();
 
   // Sequentially scan across the operations in the function and assign
   // instance IDs to each operation
   for (auto &op : funcOp.getOps())
     opIDs[&op] = opTypeCntrs[op.getName().getStringRef().str()]++;
 
-  os << "node [shape=box style=filled fillcolor=\"white\"]\n";
+  os << "node [shape=box, style=filled, fillcolor=\"white\"]\n";
 
   // Print nodes corresponding to function arguments
   os << "// Function arguments\n";
@@ -1038,10 +1031,9 @@ std::string ExportDOTPass::dotPrint(mlir::raw_indented_ostream &os,
       // inside the function so they are not displayed
       continue;
 
-    auto argLabel = getArgName(funcOp, arg.index());
-    auto argNodeName = getLocalName(name, argLabel);
-    os << "\"" << argNodeName << "\" [shape=diamond"
-       << getStyleOfValue(arg.value()) << " label=\"" << argLabel << "\" ";
+    auto argLabel = funcOp.getArgName(arg.index()).getValue().str();
+    os << "\"" << argLabel << "\" [shape=diamond, "
+       << getStyleOfValue(arg.value()) << "label=\"" << argLabel << "\", ";
     annotateArgument(os, arg.value());
     os << "]\n";
   }
@@ -1052,7 +1044,7 @@ std::string ExportDOTPass::dotPrint(mlir::raw_indented_ostream &os,
     if (auto instOp = dyn_cast<handshake::InstanceOp>(op); instOp)
       assert(false && "multiple functions are not supported");
     else
-      opNameMap[&op] = dotPrintNode(os, name, &op, opIDs);
+      opNameMap[&op] = dotPrintNode(os, &op, opIDs);
 
   // Get function's "blocks". These leverage the "bb" attributes attached to
   // operations in handshake functions to display operations belonging to the
@@ -1105,7 +1097,7 @@ std::string ExportDOTPass::dotPrint(mlir::raw_indented_ostream &os,
       for (auto &[idx, arg] : llvm::enumerate(funcOp.getArguments()))
         if (!isa<MemRefType>(arg.getType()))
           for (auto user : arg.getUsers()) {
-            os << "\"" << getUniqueArgName(name, funcOp, idx) << "\" -> \""
+            os << "\"" << funcOp.getArgName(idx).getValue().str() << "\" -> \""
                << getNodeName(user) << "\" [" << getStyleOfValue(arg);
             annotateArgumentEdge(os, arg, user);
             os << "]\n";
@@ -1128,8 +1120,6 @@ std::string ExportDOTPass::dotPrint(mlir::raw_indented_ostream &os,
     for (auto res : op->getResults())
       for (auto &use : res.getUses())
         printEdge(os, op, use.getOwner(), res);
-
-  return name.str();
 }
 
 std::unique_ptr<mlir::OperationPass<mlir::ModuleOp>>
