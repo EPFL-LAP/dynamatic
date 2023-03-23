@@ -9,7 +9,7 @@ The following instructions can be used to setup Dynamatic from source.
 1. **Install dependencies required by LLVM/MLIR.** These includes working C and C++ toolchains (compiler, linker), `cmake` and `ninja` for building the project, and `git`. For example, on Ubuntu:
     
     ```sh
-    $ sudo apt-get install git cmake ninja clang lld ccache
+    $ sudo apt-get install git cmake ninja-build clang lld ccache graphviz
     ```
 
     `clang`, `lld`, and `ccache` are not stictly required but significantly speed up (re)builds. If you do not wish to install them, pass the `--disable-build-opt` flag to the build script to disable their use when building.

@@ -15,7 +15,7 @@ func.func @returnNothing() {
 
 // CHECK-LABEL:   handshake.func @simpleReturn(
 // CHECK-SAME:                                 %[[VAL_0:.*]]: i32,
-// CHECK-SAME:                                 %[[VAL_1:.*]]: none, ...) -> (i32, none) attributes {argNames = ["in0", "in1"], resNames = ["out0", "out1"]} {
+// CHECK-SAME:                                 %[[VAL_1:.*]]: none, ...) -> i32 attributes {argNames = ["in0", "in1"], resNames = ["out0"]} {
 // CHECK:           %[[VAL_2:.*]] = merge %[[VAL_0]] : i32
 // CHECK:           %[[VAL_3:.*]] = merge %[[VAL_1]] : none
 // CHECK:           %[[VAL_4:.*]] = d_return %[[VAL_2]] : i32
@@ -31,7 +31,7 @@ func.func @simpleReturn(%arg0 : i32) -> i32 {
 // CHECK-SAME:                                        %[[VAL_0:.*]]: i32,
 // CHECK-SAME:                                        %[[VAL_1:.*]]: i1,
 // CHECK-SAME:                                        %[[VAL_2:.*]]: index,
-// CHECK-SAME:                                        %[[VAL_3:.*]]: none, ...) -> (i32, i1, index, none) attributes {argNames = ["in0", "in1", "in2", "in3"], resNames = ["out0", "out1", "out2", "out3"]} {
+// CHECK-SAME:                                        %[[VAL_3:.*]]: none, ...) -> (i32, i1, index) attributes {argNames = ["in0", "in1", "in2", "in3"], resNames = ["out0", "out1", "out2"]} {
 // CHECK:           %[[VAL_4:.*]] = merge %[[VAL_0]] : i32
 // CHECK:           %[[VAL_5:.*]] = merge %[[VAL_1]] : i1
 // CHECK:           %[[VAL_6:.*]] = merge %[[VAL_2]] : index
@@ -47,7 +47,7 @@ func.func @retunMultipleValues(%arg0 : i32, %arg1 : i1, %arg2 : index) -> (i32, 
 
 // CHECK-LABEL:   handshake.func @multipleReturns(
 // CHECK-SAME:                                    %[[VAL_0:.*]]: i1,
-// CHECK-SAME:                                    %[[VAL_1:.*]]: none, ...) -> (i32, none) attributes {argNames = ["in0", "in1"], resNames = ["out0", "out1"]} {
+// CHECK-SAME:                                    %[[VAL_1:.*]]: none, ...) -> i32 attributes {argNames = ["in0", "in1"], resNames = ["out0"]} {
 // CHECK:           %[[VAL_2:.*]] = merge %[[VAL_0]] : i1
 // CHECK:           %[[VAL_3:.*]] = merge %[[VAL_1]] : none
 // CHECK:           %[[VAL_5:.*]] = constant %[[VAL_3]] {value = 0 : i32} : i32
@@ -79,7 +79,7 @@ func.func @multipleReturns(%arg0 : i1) -> i32 {
 // CHECK-LABEL:   handshake.func @memoryConnect(
 // CHECK-SAME:                                  %[[VAL_0:.*]]: i1,
 // CHECK-SAME:                                  %[[VAL_1:.*]]: memref<4xi32>, %[[VAL_2:.*]]: memref<4xi32>,
-// CHECK-SAME:                                  %[[VAL_3:.*]]: none, ...) -> (i32, none) attributes {argNames = ["in0", "in1", "in2", "in3"], resNames = ["out0", "out1"]} {
+// CHECK-SAME:                                  %[[VAL_3:.*]]: none, ...) -> i32 attributes {argNames = ["in0", "in1", "in2", "in3"], resNames = ["out0"]} {
 // CHECK:           %[[VAL_4:.*]] = mem_controller{{\[}}%[[VAL_2]] : memref<4xi32>] () {accesses = [], id = 1 : i32} : () -> none
 // CHECK:           %[[VAL_5:.*]] = mem_controller{{\[}}%[[VAL_1]] : memref<4xi32>] () {accesses = [], id = 0 : i32} : () -> none
 // CHECK:           %[[VAL_6:.*]] = merge %[[VAL_0]] : i1

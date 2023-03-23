@@ -624,7 +624,8 @@ static LogicalResult lowerFuncOp(func::FuncOp funcOp, MLIRContext *ctx,
   returnOnError(partiallyLowerOp(
       [&](func::FuncOp funcOp, PatternRewriter &rewriter) {
         auto noneType = rewriter.getNoneType();
-        resTypes.push_back(noneType);
+        if (resTypes.empty())
+          resTypes.push_back(noneType);
         argTypes.push_back(noneType);
         auto func_type = rewriter.getFunctionType(argTypes, resTypes);
         newFuncOp = rewriter.create<handshake::FuncOp>(

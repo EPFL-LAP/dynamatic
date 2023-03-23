@@ -24,6 +24,9 @@ def StandardToHandshakeFPGA18 : Pass<"lower-std-to-handshake-fpga18", "mlir::Mod
             "operation originates.">];
 }
 
+//===----------------------------------------------------------------------===//
+// ExportDOT
+//===----------------------------------------------------------------------===//
 
 def ExportDOT : Pass<"export-dot", "mlir::ModuleOp"> {
   let summary = "Emit the handshake-level IR to a DOT file";
@@ -35,6 +38,20 @@ def ExportDOT : Pass<"export-dot", "mlir::ModuleOp"> {
   }];
   let constructor = "dynamatic::createExportDOTPass()";
   let dependentDialects = ["circt::handshake::HandshakeDialect"];
+}
+
+//===----------------------------------------------------------------------===//
+// HandshakeToNetlist
+//===----------------------------------------------------------------------===//
+
+def HandshakeToNetlist : Pass<"lower-handshake-to-netlist", "mlir::ModuleOp"> {
+  let summary = "Lower Handshake to ESI/HW (netlist)";
+  let description = [{
+    Lower Handshake IR into a "netlist-level" representation made up of HW
+    instances of external modules interconnected by ESI channels.
+  }];
+  let constructor = "dynamatic::createHandshakeToNetlistPass()";
+  let dependentDialects = ["circt::hw::HWDialect", "circt::esi::ESIDialect"];
 }
 
 #endif // DYNAMATIC_CONVERSION_PASSES_TD

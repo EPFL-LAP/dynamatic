@@ -11,6 +11,7 @@ target_link_libraries(dynamatic-opt
   PRIVATE
   DynamaticStandardToHandshakeFPGA18
   DynamaticExportDOT
+  DynamaticHandshakeToNetlist
   DynamaticTransforms
 
   CIRCTHandshake
