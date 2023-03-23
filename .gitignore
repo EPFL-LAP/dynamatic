@@ -35,3 +35,6 @@
 build/
 bin/
 .cache/
+
+# legacy-dynamatic
+legacy-dynamatic/
