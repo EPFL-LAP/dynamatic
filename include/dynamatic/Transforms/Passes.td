@@ -41,4 +41,12 @@ def ArithPushConstants : Pass<"push-constants", "mlir::ModuleOp"> {
   let constructor = "dynamatic::createArithPushConstantsPass()";
 }
 
+def HandshakeBitsOptimize : Pass<"optimize-bits" , "mlir::ModuleOp"> {
+  let summary = "Optimize bits width that can be reduced.";
+  let description = [{
+
+  }];
+  let constructor = "dynamatic::createBitsOptimizationPass()";
+}
+
 #endif // DYNAMATIC_TRANSFORMS_PASSES_TD

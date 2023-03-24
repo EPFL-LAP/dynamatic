@@ -2,6 +2,7 @@ add_dynamatic_library(DynamaticTransforms
   HandshakePrepareForLegacy.cpp
   HandshakeInferBasicBlocks.cpp
   PushConstants.cpp
+  BitsOptimize.cpp
 
   DEPENDS
   DynamaticTransformsPassIncGen
