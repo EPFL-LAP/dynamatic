@@ -1,6 +1,6 @@
 //===- HandshakePrepareForLegacy.h - Prepare for legacy flow ----*- C++ -*-===//
 //
-// This file declares the --prepare-for-legacy.
+// This file declares the --handshake-prepare-for-legacy pass.
 //
 //===----------------------------------------------------------------------===//
 

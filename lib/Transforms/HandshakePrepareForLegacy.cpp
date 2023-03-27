@@ -1,8 +1,10 @@
 //===- HandshakePrepareForLegacy.h - Prepare for legacy flow ----*- C++ -*-===//
 //
-// This file contains the implementation of a preprocessing step for
-// handshake-level IR so that it can be used in the legacy Dynamatic flow
-// (through DOT export).
+// This file implements of a preprocessing step for handshake-level IR to make
+// it compatible with the legacy Dynamatic flow (through DOT export). At the
+// moment, this pass only turns unconditional branches (which legacy Dynamatic
+// never generates) into conditional branches with a constant condition input
+// and a sinked false output.
 //
 //===----------------------------------------------------------------------===//
 
@@ -159,12 +161,14 @@ struct ConvertSimpleBranches : public OpConversionPattern<handshake::FuncOp> {
   }
 
 private:
-  /// Reference to the conversion target so that we can set mark the operation
-  /// legal once we are done converting branches.
+  /// Reference to the conversion target so that we can mark the operation legal
+  /// once we are done converting branches.
   PrepareForLegacyTarget &target;
 };
 
-/// Gets the module ready for export to DOT and use in legacy Dynamatic.
+/// Simple driver for prepare for legacy pass. Runs a partial conversion by
+/// using a single operation conversion pattern on each handshake::FuncOp in the
+/// module.
 struct HandshakePrepareForLegacyPass
     : public HandshakePrepareForLegacyBase<HandshakePrepareForLegacyPass> {
 
