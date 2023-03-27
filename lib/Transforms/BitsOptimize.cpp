@@ -37,7 +37,27 @@ static LogicalResult convertType(handshake::FuncOp funcOp,
                          PatternRewriter &rewriter) {
   for (auto &op : funcOp.getOps()){
     llvm::errs() << op << '\n';
-    llvm::errs() << op.getOperand(0) << '\n';
+    
+    // https://mlir.llvm.org/doxygen/classmlir_1_1Operation.html
+    // first get the operands type
+    // const auto &opType = op.getOpOperands();
+
+    // get get the type attribute of the operators;
+    SmallVector<Value> vecOperands;
+    for (auto Operand : op.getOperands()){
+      vecOperands.push_back(Operand);
+    }
+
+    // functions to be implemented for forward pass
+    // input: opType, vecOperands
+    // return newOpType: type attributes of the results
+
+
+    // Value optimOp = op.getOpResults();
+    // change results type
+    // https://mlir.llvm.org/doxygen/classmlir_1_1Value.html
+    // optimOp.setType(newOpType)
+    // llvm::errs() << op.getOperand(0) << '\n';
   }
   return success();
 }
