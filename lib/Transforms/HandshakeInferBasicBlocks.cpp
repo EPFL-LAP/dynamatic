@@ -1,6 +1,6 @@
 //===- HandshakeInferBasicBlocks.cpp - Infer ops basic blocks ---*- C++ -*-===//
 //
-// This file contains the implementation of the infer basic blocks pass.
+// This file contains the implementation of the basic block inference pass.
 //
 //===----------------------------------------------------------------------===//
 
@@ -16,21 +16,6 @@ using namespace circt;
 using namespace circt::handshake;
 using namespace mlir;
 using namespace dynamatic;
-
-static bool isLegalForInference(Operation *op) {
-  return !isa<MemoryControllerOp>(op);
-}
-
-/// Iterates over all operations legal for inference that do not have a "bb"
-/// attribute and tries to infer it.
-static void inferBasicBlocks(handshake::FuncOp funcOp,
-                             PatternRewriter &rewriter) {
-  for (auto &op : funcOp.getOps())
-    if (isLegalForInference(&op))
-      if (auto bb = op.getAttrOfType<mlir::IntegerAttr>(BB_ATTR); !bb)
-        if (auto infBB = inferOpBasicBlock(&op); infBB.has_value())
-          op.setAttr(BB_ATTR, rewriter.getUI32IntegerAttr(infBB.value()));
-}
 
 std::optional<unsigned> dynamatic::inferOpBasicBlock(Operation *op) {
   assert(op->getParentOp() && isa<handshake::FuncOp>(op->getParentOp()) &&
@@ -84,8 +69,26 @@ std::optional<unsigned> dynamatic::inferOpBasicBlock(Operation *op) {
   return infBB;
 }
 
+/// Determines if the pass should attempt to infer the basic block of the
+/// operation if it is missing.
+static bool isLegalForInference(Operation *op) {
+  return !isa<MemoryControllerOp>(op);
+}
+
+/// Iterates over all operations legal for inference that do not have a "bb"
+/// attribute and tries to infer it.
+static void inferBasicBlocks(handshake::FuncOp funcOp,
+                             PatternRewriter &rewriter) {
+  for (auto &op : funcOp.getOps())
+    if (isLegalForInference(&op))
+      if (auto bb = op.getAttrOfType<mlir::IntegerAttr>(BB_ATTR); !bb)
+        if (auto infBB = inferOpBasicBlock(&op); infBB.has_value())
+          op.setAttr(BB_ATTR, rewriter.getUI32IntegerAttr(infBB.value()));
+}
+
 namespace {
 
+/// Tries to infer the basic block of untagged operations in a function.
 struct FuncOpInferBasicBlocks : public OpConversionPattern<handshake::FuncOp> {
 
   FuncOpInferBasicBlocks(MLIRContext *ctx) : OpConversionPattern(ctx) {}
@@ -99,6 +102,9 @@ struct FuncOpInferBasicBlocks : public OpConversionPattern<handshake::FuncOp> {
   }
 };
 
+/// Simple driver for basic block inference pass. Runs a partial conversion by
+/// using a single operation conversion pattern on each handshake::FuncOp in the
+/// module.
 struct HandshakeInferBasicBlocksPass
     : public HandshakeInferBasicBlocksBase<HandshakeInferBasicBlocksPass> {
 

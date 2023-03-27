@@ -1,6 +1,6 @@
 //===- HandshakeInferBasicBlocks.h - Infer ops basic blocks -----*- C++ -*-===//
 //
-// This file declares the --infer-basic-blocks pass.
+// This file declares the --handshake-infer-basic-blocks pass.
 //
 //===----------------------------------------------------------------------===//
 

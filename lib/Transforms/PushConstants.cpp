@@ -16,7 +16,7 @@
 using namespace mlir;
 using namespace dynamatic;
 
-/// Pushes all of a function's constants in using blocks.
+/// Pushes all of a function's constants in blocks using them.
 static LogicalResult pushConstants(func::FuncOp funcOp, MLIRContext *ctx) {
   OpBuilder builder(ctx);
 
@@ -51,8 +51,11 @@ static LogicalResult pushConstants(func::FuncOp funcOp, MLIRContext *ctx) {
 }
 
 namespace {
-struct ArithPushConstantsPass
-    : public ArithPushConstantsBase<ArithPushConstantsPass> {
+
+/// Simple driver for constant pushing pass. Runs the pass on every function in
+/// the module independently and succeeds whenever the transformation succeeded
+/// for every function.
+struct PushConstantsPass : public PushConstantsBase<PushConstantsPass> {
 
   void runOnOperation() override {
     ModuleOp m = getOperation();
@@ -65,6 +68,6 @@ struct ArithPushConstantsPass
 } // namespace
 
 std::unique_ptr<mlir::OperationPass<mlir::ModuleOp>>
-dynamatic::createArithPushConstantsPass() {
-  return std::make_unique<ArithPushConstantsPass>();
+dynamatic::createPushConstantsPass() {
+  return std::make_unique<PushConstantsPass>();
 }
