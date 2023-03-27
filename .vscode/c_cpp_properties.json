@@ -15,7 +15,7 @@
         "${workspaceFolder}/circt/llvm/build/tools/mlir/include/"
       ],
       "intelliSenseMode": "linux-clang-x64",
-      "compilerPath": "/usr/bin/clang",
+      "compilerPath": "/usr/local/bin/clang",
       "cStandard": "c17",
       "cppStandard": "c++17",
       "configurationProvider": "ms-vscode.cpptools"
