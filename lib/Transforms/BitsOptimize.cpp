@@ -48,10 +48,9 @@ static LogicalResult convertType(handshake::FuncOp funcOp,
     
     // https://mlir.llvm.org/doxygen/classmlir_1_1Operation.html
     // first get the operands type
-    const auto &opType = op.getOpOperands();
-    // llvm::errs() << opType << '\n';
-
-    // get get the type attribute of the operators;
+    const auto opName = op.getName();
+    llvm::errs() << opName << '\n';
+    // get the type attribute of the operators;
     SmallVector<Value> vecOperands;
     for (auto Operand : op.getOperands()){
       vecOperands.push_back(Operand);
@@ -72,22 +71,20 @@ static LogicalResult convertType(handshake::FuncOp funcOp,
 
     // https://mlir.llvm.org/doxygen/IR_2BuiltinTypes_8cpp_source.html
 
-
-
+    // change results type
+    // https://mlir.llvm.org/doxygen/classmlir_1_1Value.html
+    // optimOp.setType(newOpType)
     llvm::errs() << "Number of result Operators : " << op.getNumResults() << '\n';
     for (auto resultOp : op.getResults()){
       llvm::errs() << "Result type " << resultOp.getType() << " ; ";
       if (isa<IntegerType>(resultOp.getType()))
         resultOp.setType(newOutType);
-        break; //currently only set the first result
+        llvm::errs() << "Optimized result type " << resultOp.getType() << " ; ";
+        break; //currently only set the first result     
     }
       
     llvm::errs() << " \n\n ";
-    // Value optimOp = op.getOpResults();
-    // change results type
-    // https://mlir.llvm.org/doxygen/classmlir_1_1Value.html
-    // optimOp.setType(newOpType)
-    // llvm::errs() << op.getOperand(0) << '\n';
+    
   }
   return success();
 }
