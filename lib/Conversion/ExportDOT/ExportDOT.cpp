@@ -119,7 +119,7 @@ struct NodeInfo {
       os << ", ";
 
     // Print all attributes
-    for (auto &[idx, attr] : llvm::enumerate(stringAttr)) {
+    for (auto [idx, attr] : llvm::enumerate(stringAttr)) {
       auto &[name, value] = attr;
       os << name << "=\"" << value << "\"";
       if (idx != stringAttr.size() - 1)
@@ -127,7 +127,7 @@ struct NodeInfo {
     }
     if (!intAttr.empty())
       os << ", ";
-    for (auto &[idx, attr] : llvm::enumerate(intAttr)) {
+    for (auto [idx, attr] : llvm::enumerate(intAttr)) {
       auto &[name, value] = attr;
       os << name << "=" << value;
       if (idx != intAttr.size() - 1)
@@ -255,7 +255,7 @@ static unsigned getWidth(Value value) { return getWidth(value.getType()); }
 /// "in" or "out" attribute of a node.
 static std::string getIOFromPorts(PortsData ports) {
   std::stringstream stream;
-  for (auto &[idx, port] : llvm::enumerate(ports)) {
+  for (auto [idx, port] : llvm::enumerate(ports)) {
     stream << port.first << ":" << getWidth(port.second);
     if (idx != (ports.size() - 1))
       stream << " ";
@@ -267,7 +267,7 @@ static std::string getIOFromPorts(PortsData ports) {
 /// "in" or "out" attribute of a node.
 static std::string getIOFromPorts(MemPortsData ports) {
   std::stringstream stream;
-  for (auto &[idx, port] : llvm::enumerate(ports)) {
+  for (auto [idx, port] : llvm::enumerate(ports)) {
     stream << std::get<0>(port) << ":" << getWidth(std::get<1>(port));
     if (auto suffix = std::get<2>(port); !suffix.empty())
       stream << "*" << suffix;
@@ -281,7 +281,7 @@ static std::string getIOFromPorts(MemPortsData ports) {
 /// port name (used as prefix to derive numbered port names for all values).
 static std::string getIOFromValues(ValueRange values, std::string portType) {
   PortsData ports;
-  for (auto &[idx, val] : llvm::enumerate(values))
+  for (auto [idx, val] : llvm::enumerate(values))
     ports.push_back(std::make_pair(portType + std::to_string(idx + 1), val));
   return getIOFromPorts(ports);
 }
@@ -290,7 +290,7 @@ static std::string getIOFromValues(ValueRange values, std::string portType) {
 static std::string getInputForMux(handshake::MuxOp op) {
   PortsData ports;
   ports.push_back(std::make_pair("in1?", op.getSelectOperand()));
-  for (auto &[idx, val] : llvm::enumerate(op->getOperands().drop_front(1)))
+  for (auto [idx, val] : llvm::enumerate(op->getOperands().drop_front(1)))
     ports.push_back(std::make_pair("in" + std::to_string(idx + 2), val));
   return getIOFromPorts(ports);
 }
@@ -377,7 +377,7 @@ static std::string getInputForMC(handshake::MemoryControllerOp op) {
   size_t operandIdx = 0;
   ValueRange inputs = op.getInputs();
 
-  for (auto &[idx, blockAccesses] : llvm::enumerate(op.getAccesses())) {
+  for (auto [idx, blockAccesses] : llvm::enumerate(op.getAccesses())) {
     // Add control signal if present
     if (op.bbHasControl(idx))
       allPorts.push_back(std::make_tuple("in" + std::to_string(inputIdx++),
@@ -409,7 +409,7 @@ static std::string getInputForMC(handshake::MemoryControllerOp op) {
 /// Produces the "out" attribute value of a handshake::MemoryControllerOp.
 static std::string getOutputForMC(handshake::MemoryControllerOp op) {
   MemPortsData ports;
-  for (auto &[idx, res] : llvm::enumerate(op->getResults().drop_back(1)))
+  for (auto [idx, res] : llvm::enumerate(op->getResults().drop_back(1)))
     ports.push_back((std::make_tuple("in" + std::to_string(idx + 1), res,
                                      "l" + std::to_string(idx) + "d")));
   ports.push_back((std::make_tuple("in" + std::to_string(op.getNumResults()),
@@ -431,12 +431,12 @@ static unsigned findMemoryPort(Value addressToMem) {
   size_t inputIdx = 0;
   auto memInputs = memOp.getInputs();
   auto accesses = memOp.getAccesses();
-  for (auto &[idx, bbAccesses] : llvm::enumerate(accesses)) {
+  for (auto [idx, bbAccesses] : llvm::enumerate(accesses)) {
     if (memOp.bbHasControl(idx))
       // Skip over the control value
       inputIdx++;
 
-    for (auto &[portIdx, access] :
+    for (auto [portIdx, access] :
          llvm::enumerate(cast<mlir::ArrayAttr>(bbAccesses))) {
       // Check whether this is our port
       if (memInputs[inputIdx] == addressToMem)
@@ -455,7 +455,7 @@ static unsigned findMemoryPort(Value addressToMem) {
 }
 
 static size_t findIndexInRange(ValueRange range, Value val) {
-  for (auto &[idx, res] : llvm::enumerate(range))
+  for (auto [idx, res] : llvm::enumerate(range))
     if (res == val)
       return idx;
   assert(false && "value should exist in range");
@@ -466,8 +466,8 @@ static size_t findIndexInRange(ValueRange range, Value val) {
 /// of a memory interface.
 static std::pair<size_t, size_t>
 findValueInGroups(SmallVector<SmallVector<Value>> &groups, Value val) {
-  for (auto &[groupIdx, bbOperands] : llvm::enumerate(groups))
-    for (auto &[opIdx, operand] : llvm::enumerate(bbOperands))
+  for (auto [groupIdx, bbOperands] : llvm::enumerate(groups))
+    for (auto [opIdx, operand] : llvm::enumerate(bbOperands))
       if (val == operand)
         return std::make_pair(groupIdx, opIdx);
   assert(false && "value should be an operand to the memory interface");
@@ -1094,7 +1094,7 @@ void ExportDOTPass::dotPrint(mlir::raw_indented_ostream &os,
 
     // For entry block, also add all edges incoming from function arguments
     if (blockID == 0)
-      for (auto &[idx, arg] : llvm::enumerate(funcOp.getArguments()))
+      for (auto [idx, arg] : llvm::enumerate(funcOp.getArguments()))
         if (!isa<MemRefType>(arg.getType()))
           for (auto user : arg.getUsers()) {
             os << "\"" << funcOp.getArgName(idx).getValue().str() << "\" -> \""
