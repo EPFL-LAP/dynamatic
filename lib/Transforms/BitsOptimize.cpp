@@ -28,75 +28,14 @@ using namespace mlir;
  using namespace mlir::detail;
 using namespace dynamatic;
 
-const unsigned cpp_max_width = 32;
+const unsigned cpp_max_width = 64;
 
-
-static LogicalResult convertType(handshake::FuncOp funcOp,
-                          MLIRContext *ctx) {
-  OpBuilder builder(ctx);
-  bool optimizeProcess = true;
-  for (auto &op : funcOp.getOps()){
-    llvm::errs() << op << '\n';
-    if (isa<handshake::ConstantOp>(op)){
-      // https://mlir.llvm.org/doxygen/classmlir_1_1Operation.html
-      // first get the operands type
-      const auto opName = op.getName();
-      llvm::errs() << opName << '\n';
-      // get the type attribute of the operators;
-      SmallVector<Value> vecOperands;
-      for (auto Operand : op.getOperands()){
-        vecOperands.push_back(Operand);
-      }
-
-      // functions to be implemented for forward pass
-      // input: opType, vecOperands
-      // return newOpType: type attributes of the results
-      IntegerType::SignednessSemantics ifSign;
-      IntegerType newOutType;
-      llvm::errs() << "Number of operators : " << op.getNumOperands() << '\n';
-      for (auto optimOp : op.getOperands()){
-        llvm::errs() << "Operator type " << optimOp.getType() << " ; ";
-        if (auto validType = optimOp.getType() ; isa<IntegerType>(validType))
-          ifSign = dyn_cast<IntegerType>(validType).getSignedness();
-        newOutType = IntegerType::get(ctx, 16,ifSign);
-      }
-      llvm::errs() << " \n";
-      newOutType = IntegerType::get(ctx, 16,ifSign);
-
-      // change the operator types with the output from the forward function
-      // https://mlir.llvm.org/doxygen/IR_2BuiltinTypes_8cpp_source.html
-
-      // change results type
-      // https://mlir.llvm.org/doxygen/classmlir_1_1Value.html
-      // optimOp.setType(newOpType)
-
-      llvm::errs() << "Number of result Operators : " << op.getNumResults() << '\n';
-      for (auto resultOp : op.getResults()){
-        llvm::errs() << "Result type : " << resultOp.getType() << " \n ";
-        if (!isa<IndexType>(resultOp.getType()) && isa<IntegerType>(resultOp.getType())) {
-          // First change attribute value type to match the output result;
-          if (auto valueAttr = op.getAttrOfType<mlir::IntegerAttr>("value")){
-            auto constanVal = valueAttr.getValue().getZExtValue();
-            op.setAttr("value", builder.getIntegerAttr(newOutType, constanVal));
-          }
-          resultOp.setType(newOutType);
-          llvm::errs() << op << '\n'; // This would create a new operation, should change to conversionPattern
-          llvm::errs() << " ------- UPdate operators -----------\n ";
-          break; //currently only set the first result   
-          // TODO : update values for all the users
-        }
-      }
-
-    }
-  }
-
-  return success();
-}
-
-IntegerType getNewType(Value opType, unsigned bitswidth){                 
-  IntegerType::SignednessSemantics ifSign;
-  if (auto validType = opType.getType() ; isa<IntegerType>(validType))
-    ifSign = dyn_cast<IntegerType>(validType).getSignedness();
+IntegerType getNewType(Value opType, unsigned bitswidth, bool signless=false){                 
+  IntegerType::SignednessSemantics ifSign = 
+  IntegerType::SignednessSemantics::Signless;
+  if (!signless)
+    if (auto validType = opType.getType() ; isa<IntegerType>(validType))
+      ifSign = dyn_cast<IntegerType>(validType).getSignedness();
 
   return IntegerType::get(opType.getContext(), bitswidth,ifSign);
 }
@@ -111,76 +50,213 @@ static void constrcutFuncMap(DenseMap<StringRef,
                      &mapOpNameWidth){
 
   mapOpNameWidth[StringRef("arith.addi")] = [](SmallVector<Value> vecOperands){
-    return 16; // for debugging, the latter expression can be hold after index is implemented
-    // return std::min(cpp_max_width,
-    //             std::max(vecOperands[0].getType().getIntOrFloatBitWidth(), 
-    //                     vecOperands[1].getType().getIntOrFloatBitWidth()));
+    return std::min(cpp_max_width,
+                std::max(vecOperands[0].getType().getIntOrFloatBitWidth(), 
+                        vecOperands[1].getType().getIntOrFloatBitWidth())+1);
   };
   mapOpNameWidth[StringRef("arith.subi")] = [](SmallVector<Value> vecOperands){
-    return 16; 
-    // return std::min(cpp_max_width,
-    //             std::max(vecOperands[0].getType().getIntOrFloatBitWidth(), 
-    //                     vecOperands[1].getType().getIntOrFloatBitWidth()));
+    return std::min(cpp_max_width,
+                std::max(vecOperands[0].getType().getIntOrFloatBitWidth(), 
+                        vecOperands[1].getType().getIntOrFloatBitWidth())+1);
   };
 };
+static void updateUserType(Operation *newResult, Type newType,
+                          MLIRContext *ctx){
+        llvm::errs() << "----------recursive--------------"  << '\n';
+  OpBuilder builder(ctx);
+  llvm::errs() << "New Operation : " << newResult->getName() << " \n";
+
+  bool success = true;
+  if (isa<handshake::BranchOp>(newResult)){
+    if(handshake::BranchOp brOp = dyn_cast<handshake::BranchOp>(newResult)){
+      if (brOp.getResult().getType() == newType){
+        return;
+      } else {
+        brOp.getResult().setType(newType);
+        for(auto &user : brOp.getResult().getUses()) 
+          updateUserType(user.getOwner(), newType, ctx);
+      }
+    }
+  } 
+  else if (isa<handshake::MuxOp>(newResult)){
+    if (handshake::MuxOp muxOp = dyn_cast<handshake::MuxOp>(newResult))
+      // add the extension operation
+      // start from the second operand (i=1), as the first one is the select index
+      for (int i = 1; i < muxOp.getNumOperands(); ++i){
+        auto Operand = muxOp.getOperand(i);
+        if (Operand.getType() != muxOp.getResult().getType()){
+          builder.setInsertionPoint(newResult);
+          auto extOp = builder.create<mlir::arith::ExtSIOp>(newResult->getLoc(),
+                                              muxOp.getResult().getType(),
+                                              Operand); 
+          muxOp.setOperand(i, extOp.getResult());
+        }
+      }
+  }
+  else if (isa<handshake::DynamaticStoreOp>(newResult)){
+    llvm::errs() << "DynamaticStoreOp : " << newResult->getName() << " \n";
+    if (handshake::DynamaticStoreOp dstoreOp = dyn_cast<handshake::DynamaticStoreOp>(newResult))
+      for (int i = 0; i < dstoreOp.getNumOperands(); ++i){
+        auto Operand = dstoreOp.getOperand(i);
+        if (Operand.getType() != dstoreOp.getResult(i).getType()){
+          builder.setInsertionPoint(newResult);
+          auto extOp = builder.create<mlir::arith::ExtSIOp>(newResult->getLoc(),
+                                              dstoreOp.getResult(i).getType(),
+                                              Operand); 
+          dstoreOp.setOperand(i, extOp.getResult());
+        }
+      }
+  }
+  else if (isa<handshake::DynamaticReturnOp>(newResult)){
+    if (handshake::DynamaticReturnOp dreturnOp = dyn_cast<handshake::DynamaticReturnOp>(newResult)){
+      llvm::errs() << "DynamaticReturnOp : " << dreturnOp << " \n";
+    }
+  }
+}
+
+
+static LogicalResult initIndexType(handshake::FuncOp funcOp, MLIRContext *ctx){
+  OpBuilder builder(ctx);
+  for (Operation &op : funcOp.getOps()){
+    for (int i=0; i<op.getNumResults(); ++i){
+
+      auto result = op.getResult(i);
+
+      if (isa<IndexType>(result.getType())){
+        result.setType(IntegerType::get(ctx, cpp_max_width));
+        // For constant operation, change the value attribute to match the new type
+        if (isa<handshake::ConstantOp>(op)){
+          handshake::ConstantOp cstOp = dyn_cast<handshake::ConstantOp>(op);
+          cstOp.setValueAttr(IntegerAttr::get(IntegerType::get(ctx, cpp_max_width), 
+                      cstOp.getValue().cast<IntegerAttr>().getInt()));
+        }
+        
+        builder.setInsertionPoint(&op);
+        Value newVal = builder.clone(op)->getResult(i);
+        newVal.setType(IntegerType::get(ctx, cpp_max_width));
+        result.replaceAllUsesWith(newVal);
+        // op.erase();
+      }
+    }
+    
+  }
+  return success();
+}
 
 static LogicalResult initCstOpBitsWidth(ArrayRef<handshake::ConstantOp> cstOps,
-                         ConversionPatternRewriter &rewriter){
-   
+                        //  ConversionPatternRewriter &rewriter){
+                        MLIRContext *ctx)  {
+  OpBuilder builder(ctx);
   for (auto op : cstOps){
-    if (op.getValue() == nullptr)
-      continue;
+
     unsigned cstBitWidth = cpp_max_width;
-     IntegerType::SignednessSemantics ifSign = IntegerType::SignednessSemantics::Unsigned;
+     IntegerType::SignednessSemantics ifSign = IntegerType::SignednessSemantics::Signless;
     // get the attribute value
     if (auto IntAttr = op.getValue().dyn_cast<mlir::IntegerAttr>()){
-      if (int cstVal = IntAttr.getValue().getSExtValue() ; cstVal>0)
-        cstBitWidth = log2(cstVal)+1;
-      else if (int cstVal = IntAttr.getValue().getSExtValue() ; cstVal<0){
-        ifSign = IntegerType::SignednessSemantics::Signed;
-        cstBitWidth = log2(-cstVal)+1;
+      if (int cstVal = IntAttr.getValue().getZExtValue() ; cstVal>0)
+        cstBitWidth = log2(cstVal)+2;
+      else if (int cstVal = IntAttr.getValue().getZExtValue() ; cstVal<0){
+        cstBitWidth = log2(-cstVal)+2;
       }
       else
-        cstBitWidth = 1;
+        cstBitWidth = 2;
     }
       
     // Get the new type of calculated bitwidth
-    Value resultOp = op.getResult();
-    Type newType = getNewType(resultOp, cstBitWidth, ifSign);
+    Type newType = getNewType(op.getResult(), cstBitWidth, ifSign);
 
-    // update the constant operator for both ValueAttr and result Type
-    // if (op.)
-    rewriter.setInsertionPointAfter(op);
-    auto newResult = 
-                rewriter.create<handshake::ConstantOp>(op.getLoc(), 
+    // Update the constant operator for both ValueAttr and result Type
+    builder.setInsertionPointAfter(op);
+    auto newResult = builder.create<handshake::ConstantOp>(op.getLoc(), 
                                                       newType,
                                                       op.getValue(),
                                                       op.getCtrl());
-      // Determine the sign of the ValAttr
-    if (auto validType = op.getValue().getType() ; isa<IntegerType>(validType)){
-      if (auto ifSign = dyn_cast<IntegerType>(validType).getSignedness();             ifSign==IntegerType::SignednessSemantics::Signed)
-        newResult.setValueAttr(IntegerAttr::get(newType, 
-                    op.getValue().cast<IntegerAttr>().getSInt()));
-    } else
-      newResult.setValueAttr(IntegerAttr::get(newType, 
-                      op.getValue().cast<IntegerAttr>().getInt()));
+
+    // Determine the proper representation of the constant value
+    int intVal = op.getValue().cast<IntegerAttr>().getInt();
+    intVal = ((1 << op.getValue().getType().getIntOrFloatBitWidth()-1) + intVal);
+    newResult.setValueAttr(IntegerAttr::get(newType, intVal));
+
     // save the original bb
     newResult->setAttr("bb", op->getAttr("bb")); 
-    rewriter.replaceAllUsesWith(op.getResult(), newResult.getResult());
 
-    // update the users of the constant operator
-    // For the operation with only 1 operand, replace with the new result
-    // op.getResult().replaceUsesWithIf(newResult.getResult(), 
-    //                                 [&](OpOperand &operand) {
-    //                                   return opek,rand.getOperandNumber()<=1;
-    //                                 });
-    // For the operation with more than 1 operands,  insert arith::uiext before the operation
-    // rewriter.eraseOp(op);
+    // recursively replace the uses of the old constant operation with the new one
+    op->replaceAllUsesWith(newResult);
+    for (auto &user : newResult.getResult().getUses()){
+      auto userOp = user.getOwner();
+      llvm::errs() << "User Op : " << userOp->getName() << '\n';
+      updateUserType(userOp, newType, ctx);
+    }
+
+    op->erase();
+    llvm::errs() << "-----------------------------" << "\n\n";
   }
-  // for (auto op : cstOps)
-  //   rewriter.eraseOp(op);
     
   return success();
+}
+
+static LogicalResult rewriteBitsWidths(handshake::FuncOp funcOp, MLIRContext *ctx) {
+  OpBuilder builder(ctx);
+
+  using forward_func  = std::function<unsigned (SmallVector<Value> vecOperands)>;
+
+    DenseMap<StringRef, forward_func> mapOpNameWidth;
+    constrcutFuncMap(mapOpNameWidth);
+
+    SmallVector<handshake::ConstantOp> cstOps;
+    for (auto constOp : funcOp.getOps<handshake::ConstantOp>()) {
+      cstOps.push_back(constOp);
+    }
+    // adapt the Index type to the Integer type
+    if (failed(initIndexType(funcOp, ctx)))
+      return failure();
+    // initialize bits information we know
+    if (failed(initCstOpBitsWidth(cstOps, ctx)))
+      return failure();
+
+    // bool changed = true;
+    // while (changed)
+    // changed = false;
+
+    // Forward process
+    for (auto &op : funcOp.getOps()){
+      llvm::errs() << "op : " << op << '\n';
+      if (isa<handshake::ConstantOp>(op))
+      continue;
+      // get the name of the operator
+      const auto opName = op.getName().getStringRef();
+
+      // get the type attribute of the operators;
+      SmallVector<Value> vecOperands;
+      for (auto Operand : op.getOperands()){
+        vecOperands.push_back(Operand);
+      }
+
+      // functions implemented for forward pass
+      // input: opType, vecOperands
+      // return newOpType: type attributes of the results
+      if (0 < op.getNumResults()){
+        int newWidth = 32;
+        if (mapOpNameWidth.find(opName) != mapOpNameWidth.end()){
+          // get the new bit width of the result operator
+          newWidth = mapOpNameWidth[opName](vecOperands);
+          llvm::errs() << "change forward resultOp Type\n";
+          // if the new type can be optimized, update the type
+          if(Type newOpResultType = getNewType(op.getResult(0), newWidth, true);  
+              newOpResultType != op.getResult(0).getType()){
+                // changed |= true;
+                op.getResult(0).setType(newOpResultType);
+                updateUserType(&op, newOpResultType, ctx);
+              }
+
+        }
+      }
+    }
+
+    // Backward Process
+    
+    
+    return success();
 }
 
 static LogicalResult rewriteBitsWidths(handshake::FuncOp funcOp,
@@ -196,7 +272,7 @@ static LogicalResult rewriteBitsWidths(handshake::FuncOp funcOp,
     cstOps.push_back(constOp);
   }
   // first initialize bits information we know
-  initCstOpBitsWidth(cstOps, rewriter);
+  // initCstOpBitsWidth(cstOps, rewriter);
 
   // forward process
   for (auto &op : funcOp.getOps()){
@@ -218,24 +294,6 @@ static LogicalResult rewriteBitsWidths(handshake::FuncOp funcOp,
       if (mapOpNameWidth.find(opName) != mapOpNameWidth.end())
         newWidth = mapOpNameWidth[opName](vecOperands);
       auto newOpType = getNewType(op.getResult(0), newWidth);
-    
-      // rewriter.setInsertionPointAfter(&op);
-      // Operation *newOp = op.clone(); 
-      // llvm::errs() << "New op : " << newOp->getName() << '\n';
-      // Value newOpValue = newOp->getResult(0);
-      // llvm::errs() << "New op value : " << newOpValue << "\n\n";
-      // newOpValue.setType(newOpType);
-      // rewriter.replaceAllUsesWith(op.getResult(0), newOp->getResult(0));
-      // rewriter.eraseOp(&op);
-      // llvm::errs() << "New type : " << newOpType << '\n';
-
-      // for (auto optimOp : op.getOpResults())
-      //   llvm::errs() << optimOp << "\n\n";
-      // Value optimOp = op.getOpResults();
-      // change results type
-      // https://mlir.llvm.org/doxygen/classmlir_1_1Value.html
-      // optimOp.setType(newOpType)
-      // llvm::errs() << op.getOperand(0) << '\n';
     }
     
   }
@@ -298,13 +356,13 @@ struct HandshakeBitsOptimizePass
     ModuleOp m = getOperation();
 
     // Apply the patterns to the module.
-    if (failed(applyPartialConversion(m, target, std::move(patterns))))
-      signalPassFailure();
+    // if (failed(applyPartialConversion(m, target, std::move(patterns))))
+    //   signalPassFailure();
 
     llvm::errs() << "Attemp to debug\n";
-    // for (auto funcOp : m.getOps<handshake::FuncOp>())
-    //   if(failed(convertType(funcOp, ctx)))
-    //     return signalPassFailure();
+    for (auto funcOp : m.getOps<handshake::FuncOp>())
+      if(failed(rewriteBitsWidths(funcOp, ctx)))
+        return signalPassFailure();
 
     llvm::errs() << "End of debug\n";
 
