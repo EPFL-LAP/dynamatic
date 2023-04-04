@@ -259,99 +259,15 @@ static LogicalResult rewriteBitsWidths(handshake::FuncOp funcOp, MLIRContext *ct
     return success();
 }
 
-static LogicalResult rewriteBitsWidths(handshake::FuncOp funcOp,
-                         ConversionPatternRewriter &rewriter) {
-
-  using forward_func  = std::function<unsigned (SmallVector<Value> vecOperands)>;
-
-  DenseMap<StringRef, forward_func> mapOpNameWidth;
-  constrcutFuncMap(mapOpNameWidth);
-
-  SmallVector<handshake::ConstantOp> cstOps;
-  for (auto constOp : funcOp.getOps<handshake::ConstantOp>()) {
-    cstOps.push_back(constOp);
-  }
-  // first initialize bits information we know
-  // initCstOpBitsWidth(cstOps, rewriter);
-
-  // forward process
-  for (auto &op : funcOp.getOps()){
-    if (isa<handshake::ConstantOp>(op))
-      continue;
-    llvm::errs() << op << '\n';
-    const auto opName = op.getName().getStringRef();
-    // get the type attribute of the operators;
-    SmallVector<Value> vecOperands;
-    for (auto Operand : op.getOperands()){
-      vecOperands.push_back(Operand);
-    }
-
-    // functions implemented for forward pass
-    // input: opType, vecOperands
-    // return newOpType: type attributes of the results
-    if (0 < op.getNumResults()){
-      int newWidth = 32;
-      if (mapOpNameWidth.find(opName) != mapOpNameWidth.end())
-        newWidth = mapOpNameWidth[opName](vecOperands);
-      auto newOpType = getNewType(op.getResult(0), newWidth);
-    }
-    
-  }
-  return success();
-}
-
-namespace{
-/// Custom conversion target used to mark functions dynamically legal after
-/// we've applied the conversion pattern to them.
-class BitsOptimForwardTarget : public ConversionTarget {
-public:
-  explicit BitsOptimForwardTarget(MLIRContext &context)
-      : ConversionTarget(context) {
-    // addLegalOp<arith::AddIOp>();
-    // addLegalDialect<mlir::arith::ArithDialect>();
-    // addIllegalDialect<handshake::HandshakeDialect>();
-    addLegalDialect<mlir::memref::MemRefDialect>();
-    addLegalOp<handshake::ConstantOp>();
-    // addIllegalOp<handshake::ConstantOp>();
-    // more supported Operations need to be marked as legal
-  }
-};
-
-
-struct BitsOptimForward : public OpConversionPattern<handshake::FuncOp> {
-
-  BitsOptimForward(BitsOptimForwardTarget &target, MLIRContext *ctx)
-      : OpConversionPattern<handshake::FuncOp>(ctx), target(target) {}
-
-
-  LogicalResult
-  matchAndRewrite(handshake::FuncOp op, OpAdaptor /*adaptor*/,
-                  ConversionPatternRewriter &rewriter) const override {
-
-    llvm::errs() << "Attemp to debug forward\n";
-    // Convert legal operator type
-    LogicalResult res = failure();
-    rewriter.updateRootInPlace(op,
-                               [&] { res = rewriteBitsWidths(op, rewriter); });
-
-    return res;
-  }
-
-private:
-
-  BitsOptimForwardTarget &target;
-  
-};
-
 struct HandshakeBitsOptimizePass
     : public HandshakeBitsOptimizeBase<HandshakeBitsOptimizePass> {
 
   void runOnOperation() override {
     auto *ctx = &getContext();
 
-    BitsOptimForwardTarget target(*ctx);
+    // BitsOptimForwardTarget target(*ctx);
     RewritePatternSet patterns{ctx};
-    patterns.add<BitsOptimForward>(target, ctx);
+    // patterns.add<BitsOptimForward>(target, ctx);
 
     ModuleOp m = getOperation();
 
@@ -369,7 +285,6 @@ struct HandshakeBitsOptimizePass
   };
 
 };
-} // namespace
 
 std::unique_ptr<mlir::OperationPass<mlir::ModuleOp>>
 dynamatic::createBitsOptimizationPass() {
