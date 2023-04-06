@@ -8,12 +8,20 @@
 #include "dynamatic/Transforms/PassDetails.h"
 #include "dynamatic/Transforms/Passes.h"
 #include "circt/Dialect/Handshake/HandshakeOps.h"
+#include "mlir/IR/Dialect.h"
 #include "mlir/Dialect/MemRef/IR/MemRef.h"
 #include "mlir/Dialect/Arith/IR/Arith.h"
-#include "mlir/IR/BuiltinTypes.h"
+// #include "mlir/IR/BuiltinTypes.h"
+// #include "mlir/IR/BuiltinDialect.h"
+// #include "mlir/IR//BuiltinOps.h"
+#include "mlir/IR/DialectRegistry.h"
+#include "mlir/IR/OperationSupport.h"
+#include "mlir/Support/TypeID.h"
+
+#include "mlir/IR/MLIRContext.h"
 
 // #include "mlir/IR/BuiltinAttributes.h"
-// #include "mlir/IR/BuiltinDialect.h"
+
 // #include "TypeDetail.h"
 
 #include "mlir/IR/OperationSupport.h"
@@ -25,7 +33,7 @@
 using namespace circt;
 using namespace circt::handshake;
 using namespace mlir;
- using namespace mlir::detail;
+using namespace mlir::detail;
 using namespace dynamatic;
 
 const unsigned cpp_max_width = 64;
@@ -62,7 +70,9 @@ static void constrcutFuncMap(DenseMap<StringRef,
 };
 static void updateUserType(Operation *newResult, Type newType,
                           MLIRContext *ctx){
+  
         llvm::errs() << "----------recursive--------------"  << '\n';
+  // registerDialect<MLIRStandardOpDialect>();
   OpBuilder builder(ctx);
   llvm::errs() << "New Operation : " << newResult->getName() << " \n";
 
@@ -100,10 +110,12 @@ static void updateUserType(Operation *newResult, Type newType,
         auto Operand = dstoreOp.getOperand(i);
         if (Operand.getType() != dstoreOp.getResult(i).getType()){
           builder.setInsertionPoint(newResult);
+          // auto extOp = builder.create<handshake::SourceOp>(newResult->getLoc(),
+          //                                     builder.getNoneType()); 
           auto extOp = builder.create<mlir::arith::ExtSIOp>(newResult->getLoc(),
                                               dstoreOp.getResult(i).getType(),
                                               Operand); 
-          dstoreOp.setOperand(i, extOp.getResult());
+          // dstoreOp.setOperand(i, extOp.getResult());
         }
       }
   }
@@ -211,6 +223,7 @@ static LogicalResult rewriteBitsWidths(handshake::FuncOp funcOp, MLIRContext *ct
     if (failed(initIndexType(funcOp, ctx)))
       return failure();
     // initialize bits information we know
+    return initCstOpBitsWidth(cstOps, ctx);
     if (failed(initCstOpBitsWidth(cstOps, ctx)))
       return failure();
 
