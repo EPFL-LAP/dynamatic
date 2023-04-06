@@ -9,7 +9,8 @@
 #ifndef DYNAMATIC_TRANSFORMS_PASSDETAILS_H
 #define DYNAMATIC_TRANSFORMS_PASSDETAILS_H
 
-// #include "circt/Dialect/Handshake/HandshakeOps.h"
+#include "mlir/IR/BuiltinOps.h"
+#include "mlir/IR/DialectRegistry.h"
 #include "mlir/Pass/Pass.h"
 
 namespace mlir {
