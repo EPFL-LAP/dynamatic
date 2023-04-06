@@ -315,13 +315,13 @@ static FuncModulePortInfo getFuncPortInfo(handshake::FuncOp funcOp) {
 
   // Add all outputs of function
   TypeRange outputs = funcOp.getResultTypes();
-  for (auto &[idx, res] : llvm::enumerate(outputs))
+  for (auto [idx, res] : llvm::enumerate(outputs))
     info.ports.outputs.push_back({funcOp.getResName(idx),
                                   hw::PortDirection::OUTPUT, esiWrapper(res),
                                   idx, hw::InnerSymAttr{}});
 
   // Add all inputs of function, replacing memrefs with appropriate ports
-  for (auto &[idx, arg] : llvm::enumerate(funcOp.getArguments()))
+  for (auto [idx, arg] : llvm::enumerate(funcOp.getArguments()))
     if (isa<MemRefType>(arg.getType()))
       info.addMemIO(dyn_cast<MemRefType>(arg.getType()),
                     funcOp.getArgName(idx).str(), ctx);
@@ -357,14 +357,14 @@ static ModulePortInfo getMemPortInfo(handshake::MemoryControllerOp memOp,
   }
 
   // Add input ports corresponding to memory interface operands
-  for (auto &[idx, arg] : llvm::enumerate(memOp.getInputs()))
+  for (auto [idx, arg] : llvm::enumerate(memOp.getInputs()))
     ports.inputs.push_back({StringAttr::get(ctx, memOp.getOperandName(idx + 1)),
                             hw::PortDirection::INPUT, esiWrapper(arg.getType()),
                             inPortIdx++, hw::InnerSymAttr{}});
 
   // Add output ports corresponding to memory interface operands
   size_t outPortIdx = 0;
-  for (auto &[idx, arg] : llvm::enumerate(memOp.getResults()))
+  for (auto [idx, arg] : llvm::enumerate(memOp.getResults()))
     ports.outputs.push_back({StringAttr::get(ctx, memOp.getResultName(idx)),
                              hw::PortDirection::OUTPUT,
                              esiWrapper(arg.getType()), outPortIdx++,
@@ -396,7 +396,7 @@ static ModulePortInfo getEndPortInfo(handshake::EndOp endOp,
 
   // Add input ports corresponding to end operands
   size_t inPortIdx = 0;
-  for (auto &[idx, arg] : llvm::enumerate(endOp.getOperands()))
+  for (auto [idx, arg] : llvm::enumerate(endOp.getOperands()))
     ports.inputs.push_back({StringAttr::get(ctx, "in" + std::to_string(idx)),
                             hw::PortDirection::INPUT, esiWrapper(arg.getType()),
                             inPortIdx++, hw::InnerSymAttr{}});
@@ -404,7 +404,7 @@ static ModulePortInfo getEndPortInfo(handshake::EndOp endOp,
   // Add output ports corresponding to function return values
   auto numReturnValues = info.ports.outputs.size() - info.getNumMemOutputs();
   auto returnValOperands = endOp.getOperands().take_front(numReturnValues);
-  for (auto &[idx, arg] : llvm::enumerate(returnValOperands))
+  for (auto [idx, arg] : llvm::enumerate(returnValOperands))
     ports.outputs.push_back({StringAttr::get(ctx, "out" + std::to_string(idx)),
                              hw::PortDirection::OUTPUT,
                              esiWrapper(arg.getType()), idx,
@@ -629,7 +629,7 @@ SmallVector<hw::InstanceOp> FuncOpConversionPattern::convertMemories(
 
   SmallVector<hw::InstanceOp> instances;
 
-  for (auto &[memIdx, portIndices] : llvm::enumerate(info.memIO)) {
+  for (auto [memIdx, portIndices] : llvm::enumerate(info.memIO)) {
     // Identify the memory controller refering to the memref
     auto user = *mod.getArgument(portIndices.first).getUsers().begin();
     assert(user && "old memref value should have a user");

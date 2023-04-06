@@ -362,7 +362,7 @@ HandshakeLoweringFPGA18::connectToMemory(ConversionPatternRewriter &rewriter,
 
 LogicalResult
 HandshakeLoweringFPGA18::idBasicBlocks(ConversionPatternRewriter &rewriter) {
-  for (auto &indexAndBlock : llvm::enumerate(r))
+  for (auto indexAndBlock : llvm::enumerate(r))
     for (auto &op : indexAndBlock.value())
       // Memory interfaces do not naturally belong to any block, so they do
       // not get an attribute

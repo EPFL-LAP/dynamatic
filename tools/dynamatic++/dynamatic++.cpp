@@ -184,7 +184,8 @@ static LogicalResult processBuffer(
   PassManager pm(&context);
   pm.enableVerifier(verifyPasses);
   pm.enableTiming(ts);
-  applyPassManagerCLOptions(pm);
+  if (failed(applyPassManagerCLOptions(pm)))
+    return failure();
 
   if (failed(runFlow(pm, module.get(), outputFile)))
     return failure();
