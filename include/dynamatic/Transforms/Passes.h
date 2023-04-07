@@ -12,7 +12,10 @@
 #include "dynamatic/Transforms/HandshakePrepareForLegacy.h"
 #include "dynamatic/Transforms/PushConstants.h" 
 #include "dynamatic/Transforms/BitsOptimize.h"
+#include "mlir/IR/DialectRegistry.h"
 #include "mlir/Pass/Pass.h"
+#include "mlir/Pass/PassRegistry.h"
+
 
 namespace dynamatic {
 

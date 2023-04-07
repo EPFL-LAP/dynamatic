@@ -36,7 +36,7 @@ using namespace mlir;
 using namespace mlir::detail;
 using namespace dynamatic;
 
-const unsigned cpp_max_width = 64;
+const unsigned cpp_max_width = 32;
 
 IntegerType getNewType(Value opType, unsigned bitswidth, bool signless=false){                 
   IntegerType::SignednessSemantics ifSign = 
@@ -104,23 +104,45 @@ static void updateUserType(Operation *newResult, Type newType,
       }
   }
   else if (isa<handshake::DynamaticStoreOp>(newResult)){
-    llvm::errs() << "DynamaticStoreOp : " << newResult->getName() << " \n";
-    if (handshake::DynamaticStoreOp dstoreOp = dyn_cast<handshake::DynamaticStoreOp>(newResult))
+    SmallVector<Type> inferredReturnTypes;
+    if (handshake::DynamaticStoreOp dstoreOp = dyn_cast<handshake::DynamaticStoreOp>(newResult)){
       for (int i = 0; i < dstoreOp.getNumOperands(); ++i){
         auto Operand = dstoreOp.getOperand(i);
         if (Operand.getType() != dstoreOp.getResult(i).getType()){
+      // llvm::errs() << "DynamaticStoreOp : " << dstoreOp.getResult(i) << " \n";
+
           builder.setInsertionPoint(newResult);
-          // auto extOp = builder.create<handshake::SourceOp>(newResult->getLoc(),
-          //                                     builder.getNoneType()); 
           auto extOp = builder.create<mlir::arith::ExtSIOp>(newResult->getLoc(),
                                               dstoreOp.getResult(i).getType(),
                                               Operand); 
-          // dstoreOp.setOperand(i, extOp.getResult());
+          dstoreOp.setOperand(i, extOp.getResult());
+          inferredReturnTypes.push_back(extOp.getResult().getType());
+          
+
+          for(auto &user : dstoreOp.getResult(i).getUses()) 
+            updateUserType(user.getOwner(), newType, ctx);
+      llvm::errs() << "DynamaticStoreOp result: " << dstoreOp.getResult(i) << " \n";
+
         }
+
       }
+      dstoreOp.inferReturnTypes(ctx, dstoreOp.getLoc(), 
+                                    dstoreOp.getOperands(),
+                                    newResult->getAttrDictionary(), newResult->getRegions(),
+                                    inferredReturnTypes);}
   }
   else if (isa<handshake::DynamaticReturnOp>(newResult)){
     if (handshake::DynamaticReturnOp dreturnOp = dyn_cast<handshake::DynamaticReturnOp>(newResult)){
+      for (int i=0; i<dreturnOp.getNumOperands(); ++i){
+        auto Operand = dreturnOp.getOperand(i);
+        if (Operand.getType() != dreturnOp.getResult(i).getType()){
+          builder.setInsertionPoint(newResult);
+          auto extOp = builder.create<mlir::arith::ExtSIOp>(newResult->getLoc(),
+                                              dreturnOp.getResult(i).getType(),
+                                              Operand); 
+          dreturnOp.setOperand(i, extOp.getResult());
+        }
+      }
       llvm::errs() << "DynamaticReturnOp : " << dreturnOp << " \n";
     }
   }
@@ -135,17 +157,19 @@ static LogicalResult initIndexType(handshake::FuncOp funcOp, MLIRContext *ctx){
       auto result = op.getResult(i);
 
       if (isa<IndexType>(result.getType())){
-        result.setType(IntegerType::get(ctx, cpp_max_width));
+        unsigned indexWidth = IndexType::kInternalStorageBitWidth;
+        llvm::errs() << "Current index width : " << indexWidth << " \n";
+        result.setType(IntegerType::get(ctx, indexWidth));
         // For constant operation, change the value attribute to match the new type
         if (isa<handshake::ConstantOp>(op)){
           handshake::ConstantOp cstOp = dyn_cast<handshake::ConstantOp>(op);
-          cstOp.setValueAttr(IntegerAttr::get(IntegerType::get(ctx, cpp_max_width), 
+          cstOp.setValueAttr(IntegerAttr::get(IntegerType::get(ctx, indexWidth), 
                       cstOp.getValue().cast<IntegerAttr>().getInt()));
         }
         
         builder.setInsertionPoint(&op);
         Value newVal = builder.clone(op)->getResult(i);
-        newVal.setType(IntegerType::get(ctx, cpp_max_width));
+        newVal.setType(IntegerType::get(ctx, indexWidth));
         result.replaceAllUsesWith(newVal);
         // op.erase();
       }

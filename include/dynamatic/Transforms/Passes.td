@@ -52,6 +52,7 @@ def HandshakeBitsOptimize : Pass<"optimize-bits" , "mlir::ModuleOp"> {
 
   }];
   let constructor = "dynamatic::createBitsOptimizationPass()";
+  let dependentDialects = ["mlir::arith::ArithDialect"];
 }
 
 #endif // DYNAMATIC_TRANSFORMS_PASSES_TD
