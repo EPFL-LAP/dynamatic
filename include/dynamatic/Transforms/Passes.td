@@ -55,4 +55,22 @@ def HandshakeBitsOptimize : Pass<"optimize-bits" , "mlir::ModuleOp"> {
   let dependentDialects = ["mlir::arith::ArithDialect"];
 }
 
+def HandshakeInitIndexType : Pass<"init-indextype", "mlir::ModuleOp"> {
+  let summary = "Initialize the index type of the module.";
+  let description = [{
+
+  }];
+  let constructor = "dynamatic::createInitIndexTypePass()";
+}
+
+def HandshakeInitCstWidth : Pass<"init-cstwidth", "mlir::ModuleOp"> {
+  let summary = "Initialize the constant bit witth of the module.";
+  let description = [{
+
+  }];
+  let constructor = "dynamatic::createInitCstWidthPass()";
+  let dependentDialects = ["mlir::arith::ArithDialect"];
+
+}
+
 #endif // DYNAMATIC_TRANSFORMS_PASSES_TD
