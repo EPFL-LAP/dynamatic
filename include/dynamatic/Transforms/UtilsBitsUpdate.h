@@ -55,6 +55,50 @@ void constructFuncMap(DenseMap<StringRef,
                   vecOperands[1].getType().getIntOrFloatBitWidth());
   };
 
+  mapOpNameWidth[StringRef("arith.ceildivsi")] = [](Operation::operand_range vecOperands){
+    return std::min(arith_max_width,
+                vecOperands[0].getType().getIntOrFloatBitWidth() + 1);
+  };
+
+  // mapOpNameWidth[StringRef("arith.ceil
+
+  mapOpNameWidth[StringRef("arith.andi")] = [](Operation::operand_range vecOperands){
+    return std::min(arith_max_width,
+                std::min(vecOperands[0].getType().getIntOrFloatBitWidth(),
+                      vecOperands[1].getType().getIntOrFloatBitWidth()));
+  };
+
+  mapOpNameWidth[StringRef("arith.ori")] = [](Operation::operand_range vecOperands){
+    return std::min(arith_max_width,
+                std::max(vecOperands[0].getType().getIntOrFloatBitWidth(),
+                      vecOperands[1].getType().getIntOrFloatBitWidth()));
+  };
+
+  mapOpNameWidth[StringRef("arith.xori")] = mapOpNameWidth[StringRef("arith.ori")];
+
+
+  mapOpNameWidth[StringRef("arith.shli")] = [](Operation::operand_range vecOperands){
+    int shift_bit = 0;
+
+    if (IntegerType validType = dyn_cast<IntegerType>(vecOperands[1].getType()) )
+      llvm::errs() << "shift bit: " << *(uint64_t *)validType.getAsOpaquePointer() << "\n";
+          
+    return std::min(arith_max_width,
+                vecOperands[0].getType().getIntOrFloatBitWidth() + shift_bit);
+  };
+
+  mapOpNameWidth[StringRef("arith.shrsi")] = [](Operation::operand_range vecOperands){
+    int shift_bit = 0;
+
+    if (IntegerType validType = dyn_cast<IntegerType>(vecOperands[1].getType()) )
+      llvm::errs() << "shift bit: " << *(uint64_t *)validType.getAsOpaquePointer() << "\n";
+          
+    return std::min(arith_max_width,
+                vecOperands[0].getType().getIntOrFloatBitWidth() - shift_bit);
+  };
+
+  mapOpNameWidth[StringRef("arith.shrui")] = mapOpNameWidth[StringRef("arith.shrsi")];
+
   mapOpNameWidth[StringRef("handshake.mux")] = [](Operation::operand_range vecOperands){
     unsigned max_width = 2;
     for (auto oprand : vecOperands)
@@ -64,6 +108,7 @@ void constructFuncMap(DenseMap<StringRef,
     return std::min(cpp_max_width, max_width);
   };
 
+  // TODO: need to separate the operand the opresult := 1
   mapOpNameWidth[StringRef("arith.cmpi")] = mapOpNameWidth[StringRef("handshake.mux")];
 
   mapOpNameWidth[StringRef("handshake.d_store")] = [](Operation::operand_range vecOperands){return address_width;
@@ -132,16 +177,16 @@ void updateUserType(Operation *newResult, Type newType, SmallVector<Operation *>
   constructFuncMap(mapOpNameWidth); 
   SmallVector<int> vecIndex;
 
-  // only update the resultOp recursively with updateUserType
+  // only update the resultOp recursively with updated UserType : newType
   bool passType = false; 
   // insert extOp|truncOp to make the multiple operands have the same width
   bool oprAdapt = false; 
-  // insert extOp|truncOp to make the result have the same width as the operands
+  // set the OpResult type to make the result have the same width as the operands
   bool resAdapter = false; 
   // delete the extOp|TruncIOp when the width of its result and operand are not consistent
   bool deleteOp = false;
   
-  // TODO : functions for determine the three flags : passType, oprAdapt, resAdapter
+  // TODO : functions for determine the four flags : passType, oprAdapt, resAdapter, deleteOp
   if (isa<handshake::BranchOp>(newResult)) {
     passType = true;
   } 
@@ -205,10 +250,11 @@ void updateUserType(Operation *newResult, Type newType, SmallVector<Operation *>
       unsigned opWidth = mapOpNameWidth[newResult->getName().getStringRef()](newResult->getOperands());
 
     for (int i = 0; i < newResult->getNumResults(); ++i)
-      if (auto resultOp = newResult->getResult(i)){
+      if (OpResult resultOp = newResult->getResult(i)){
+        // update the passed newType w.r.t. the resultOp
         newType = getNewType(resultOp, opWidth, false);
-        resultOp.setType(newType);
-        
+        setUserType(newResult, newType, ctx, {i});
+
         // update the user type recursively
         for(auto &user : resultOp.getUses()) 
           updateUserType(user.getOwner(), newType, vecOp, ctx);
