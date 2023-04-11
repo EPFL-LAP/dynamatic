@@ -5,6 +5,7 @@ add_dynamatic_library(DynamaticTransforms
   BitsOptimize.cpp
   InitIndexType.cpp
   InitCstWidth.cpp
+  UtilsBitsUpdate.cpp
 
   DEPENDS
   DynamaticTransformsPassIncGen
