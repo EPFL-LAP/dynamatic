@@ -26,11 +26,12 @@ using namespace mlir::detail;
 
 static LogicalResult rewriteBitsWidths(handshake::FuncOp funcOp, MLIRContext *ctx) {
   OpBuilder builder(ctx);
+  SmallVector<Operation *> vecOp;
 
   using forward_func  = std::function<unsigned (mlir::Operation::operand_range vecOperands)>;
 
-    // DenseMap<StringRef, forward_func> mapOpNameWidth;
-    // constructFuncMap(mapOpNameWidth);
+    DenseMap<StringRef, forward_func> mapOpNameWidth;
+    constructFuncMap(mapOpNameWidth);
 
     // bool changed = true;
     // while (changed)
@@ -40,11 +41,11 @@ static LogicalResult rewriteBitsWidths(handshake::FuncOp funcOp, MLIRContext *ct
     for (auto &op : funcOp.getOps()){
       llvm::errs() << "op : " << op << '\n';
       if (isa<handshake::ConstantOp>(op))
-      continue;
+        continue;
       // get the name of the operator
       const auto opName = op.getName().getStringRef();
 
-      /*if (0 < op.getNumResults()){
+      if (0 < op.getNumResults()){
         int newWidth = 32;
         if (mapOpNameWidth.find(opName) != mapOpNameWidth.end()){
           // get the new bit width of the result operator
@@ -55,11 +56,12 @@ static LogicalResult rewriteBitsWidths(handshake::FuncOp funcOp, MLIRContext *ct
               newOpResultType != op.getResult(0).getType()){
                 // changed |= true;
                 op.getResult(0).setType(newOpResultType);
-                updateUserType(&op, newOpResultType, ctx);
+                for (auto &user : op.getResult(0).getUses())
+                  updateUserType(user.getOwner(), newOpResultType, vecOp, ctx);
               }
 
         }
-      }*/
+      }
 
     }
 

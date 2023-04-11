@@ -96,7 +96,9 @@ void constructFuncMap(DenseMap<StringRef,
   };
 
   // TODO: need to separate the operand the opresult := 1
-  mapOpNameWidth[StringRef("arith.cmpi")] = mapOpNameWidth[StringRef("handshake.mux")];
+  mapOpNameWidth[StringRef("arith.cmpi")] = [](Operation::operand_range vecOperands){
+    return 1;
+  };
 
   mapOpNameWidth[StringRef("handshake.d_store")] = [](Operation::operand_range vecOperands){return address_width;
   };
@@ -124,7 +126,7 @@ std::optional<Operation *> insertWidthMatchOp(Operation *newOp, int opInd, Type 
     return {};    
   
   if (isa<IntegerType>(opVal.getType())){
-
+    // insert Truncation operation to match the opresult width
     if (opVal.getType().getIntOrFloatBitWidth() > newType.getIntOrFloatBitWidth()){
       builder.setInsertionPoint(newOp);
       auto extOp = builder.create<mlir::arith::TruncIOp>(newOp->getLoc(), 
@@ -134,6 +136,7 @@ std::optional<Operation *> insertWidthMatchOp(Operation *newOp, int opInd, Type 
       return extOp;
     } 
 
+    // insert Extension operation to match the opresult width
     if (opVal.getType().getIntOrFloatBitWidth() < newType.getIntOrFloatBitWidth()){
       builder.setInsertionPoint(newOp);
       auto extOp = builder.create<mlir::arith::ExtSIOp>(newOp->getLoc(),
@@ -145,6 +148,46 @@ std::optional<Operation *> insertWidthMatchOp(Operation *newOp, int opInd, Type 
   }
   return {};    
 
+}
+
+// TODO: consider a universal method
+void setUpdateFlag(Operation *newResult, 
+                  bool &passType, bool &oprAdapt, bool &resAdapter, bool &deleteOp){
+  if (isa<handshake::BranchOp>(newResult)) {
+    passType = true;
+  } 
+  else if (isa<handshake::MuxOp>(newResult)) {
+    resAdapter = true;
+    oprAdapt = true;
+  }
+  else if (isa<handshake::DynamaticStoreOp>(newResult)) {
+    resAdapter = true;
+    oprAdapt = true;
+  }
+  else if (isa<handshake::DynamaticLoadOp>(newResult)){
+    resAdapter = true;
+    oprAdapt = true;
+  }
+  else if (isa<mlir::arith::CmpIOp>(newResult)) {
+    resAdapter = true;
+    oprAdapt = true;
+  }
+  else if (isa<mlir::arith::AddIOp>(newResult)) {
+    resAdapter = true;
+    oprAdapt = true;
+  }
+  else if (isa<mlir::arith::MulIOp>(newResult)) {
+    resAdapter = true;
+    oprAdapt = true;
+  }
+  else if (isa<mlir::arith::ExtSIOp>(newResult) &&
+          newResult->getResult(0).getType().getIntOrFloatBitWidth() <= newResult->getOperand(0).getType().getIntOrFloatBitWidth()) {
+    deleteOp = true;
+  }
+  else if (isa<mlir::arith::TruncIOp>(newResult) &&
+          newResult->getResult(0).getType().getIntOrFloatBitWidth() >= newResult->getOperand(0).getType().getIntOrFloatBitWidth() ) {
+    deleteOp = true;
+          }
 }
 
 void updateUserType(Operation *newResult, Type newType, SmallVector<Operation *> &vecOp,
@@ -174,40 +217,7 @@ void updateUserType(Operation *newResult, Type newType, SmallVector<Operation *>
   bool deleteOp = false;
   
   // TODO : functions for determine the four flags : passType, oprAdapt, resAdapter, deleteOp
-  if (isa<handshake::BranchOp>(newResult)) {
-    passType = true;
-  } 
-  else if (isa<handshake::MuxOp>(newResult)) {
-    resAdapter = true;
-    oprAdapt = true;
-  }
-  else if (isa<handshake::DynamaticStoreOp>(newResult)) {
-    resAdapter = true;
-    oprAdapt = true;
-  }
-  else if (isa<handshake::DynamaticLoadOp>(newResult)){
-    resAdapter = true;
-    oprAdapt = true;
-  }
-  else if (isa<mlir::arith::CmpIOp>(newResult)) {
-    oprAdapt = true;
-  }
-  else if (isa<mlir::arith::AddIOp>(newResult)) {
-    resAdapter = true;
-    oprAdapt = true;
-  }
-  else if (isa<mlir::arith::MulIOp>(newResult)) {
-    resAdapter = true;
-    oprAdapt = true;
-  }
-  else if (isa<mlir::arith::ExtSIOp>(newResult) &&
-          newResult->getResult(0).getType().getIntOrFloatBitWidth() <= newResult->getOperand(0).getType().getIntOrFloatBitWidth()) {
-    deleteOp = true;
-  }
-  else if (isa<mlir::arith::TruncIOp>(newResult) &&
-          newResult->getResult(0).getType().getIntOrFloatBitWidth() >= newResult->getOperand(0).getType().getIntOrFloatBitWidth() ) {
-    deleteOp = true;
-          }
+  setUpdateFlag(newResult, passType, oprAdapt, resAdapter, deleteOp);
 
 
   if (passType) {
@@ -224,6 +234,13 @@ void updateUserType(Operation *newResult, Type newType, SmallVector<Operation *>
       startInd = 1; // start from the second operand (i=1), as the first one is the select index
 
     unsigned opWidth = mapOpNameWidth[newResult->getName().getStringRef()](newResult->getOperands());
+
+    // the comparsion operation holds different bit width strategy for its operands and opresult: 
+    // for operands, the width follows the same strategy as handshake::muxOp: get the widest operands; 
+    // for opresult, the width is always 1.
+    if (isa<mlir::arith::CmpIOp>(newResult))
+      opWidth = mapOpNameWidth[StringRef("handshake.mux")](newResult->getOperands());
+    
     for (int i = startInd; i < newResult->getNumOperands(); ++i){
       if (auto Operand = newResult->getOperand(i)){
         auto insertOp = insertWidthMatchOp(newResult, i, getNewType(Operand, opWidth, false), ctx);
@@ -235,7 +252,6 @@ void updateUserType(Operation *newResult, Type newType, SmallVector<Operation *>
 
   if (resAdapter) {
       unsigned opWidth = mapOpNameWidth[newResult->getName().getStringRef()](newResult->getOperands());
-
     for (int i = 0; i < newResult->getNumResults(); ++i)
       if (OpResult resultOp = newResult->getResult(i)){
         // update the passed newType w.r.t. the resultOp

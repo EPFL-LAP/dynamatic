@@ -27,5 +27,6 @@ void setUserType(Operation *newOp, Type newType,
                           MLIRContext *ctx, SmallVector<int> vecIndex);
 std::optional<Operation *> insertWidthMatchOp(Operation *newOp, int opInd, Type newType, MLIRContext *ctx);
 void updateUserType(Operation *newResult, Type newType, SmallVector<Operation *> &vecOp, MLIRContext *ctx);
+void setUpdateFlag(Operation *newResult, bool &passType, bool &oprAdapt, bool &resAdapter, bool &deleteOp);
 
 #endif
