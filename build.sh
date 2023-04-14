@@ -16,7 +16,7 @@ print_help_and_exit () {
 
 List of options:
   --disable-build-opt | -o    : don't use clang/lld/ccache to speed up builds
-  --force-rebuild | -f        : force rebuild everything
+  --force-cmake | -f          : force cmake reconfiguration in each (sub)project 
   --release | -r              : build in \"Release\" mode (default is \"Debug\")
   --check | -c                : run tests during build
   --help | -h                 : display this help message
@@ -35,9 +35,7 @@ echo_section() {
 
 # Helper function to print subsection title text
 echo_subsection() {
-    echo ""
     echo "# ===--- $1 ---==="
-    echo ""
 }
 
 # Helper function to exit script on failed command
@@ -53,7 +51,7 @@ exit_on_fail() {
 
 # Helper function to create build directory and cd to it
 create_build_directory() {
-    cd "${SCRIPT_CWD}" && mkdir -p ${1} && cd ${1}
+    cd "$SCRIPT_CWD" && mkdir -p $1 && cd $1
 }
 
 # Create symbolic link from the bin/ directory to an executable file built by
@@ -63,10 +61,22 @@ create_build_directory() {
 # the bin/ directory exists and that the current working directory is the
 # repository's root. 
 create_symlink() {
-    local src=${1}
-    local dst="bin/$(basename ${1})"
-    echo "${dst} -> ${src}"
-    ln -f --symbolic ../${src} ${dst}
+    local src=$1
+    local dst="bin/$(basename $1)"
+    echo "$dst -> $src"
+    ln -f --symbolic ../$src $dst
+}
+
+# Determine whether cmake should be re-configured by looking for a
+# CMakeCache.txt file in the current working directory.
+should_run_cmake() {
+  if [[ -f "CMakeCache.txt" && $FORCE_CMAKE -eq 0 ]]; then
+    echo "CMake configuration found, will not re-configure cmake"
+    echo "Run script with -f or --force-cmake flag to re-configure cmake"
+    echo ""
+    return 1
+  fi 
+  return 0
 }
 
 #### Parse arguments ####
@@ -76,7 +86,7 @@ CMAKE_FLAGS_SUPER="-DCMAKE_C_COMPILER=clang -DCMAKE_CXX_COMPILER=clang++ \
     -DLLVM_ENABLE_LLD=ON" 
 CMAKE_FLAGS_LLVM="$CMAKE_FLAGS_SUPER -DLLVM_CCACHE_BUILD=ON" 
 ENABLE_TESTS=0
-FORCE_REBUILD=0
+FORCE_CMAKE=0
 BUILD_TYPE="Debug"
 for arg in "$@"; 
 do
@@ -85,8 +95,8 @@ do
             CMAKE_FLAGS_LLVM=""
             CMAKE_FLAGS_SUPER=""
             ;;
-        "--force-rebuild" | "-f")
-            FORCE_REBUILD=1
+        "--force-cmake" | "-f")
+            FORCE_CMAKE=1
             ;;
         "--release" | "-r")
             BUILD_TYPE="Release"
@@ -111,15 +121,7 @@ CIRCT_LLVM_BUILD_DIR="circt/llvm/build"
 CIRCT_BUILD_DIR="circt/build"
 DYNAMATIC_BUILD_DIR="build"
 
-# Delete build folders if forcing rebuild
-if [[ $FORCE_REBUILD -ne 0 ]]; then
-    rm -rf "${POLYGEIST_LLVM_BUILD_DIR}" "${POLYGEIST_BUILD_DIR}" # Polygeist
-    rm -rf "${CIRCT_LLVM_BUILD_DIR}" "${CIRCT_BUILD_DIR}" # CIRCT
-    rm -rf "${DYNAMATIC_BUILD_DIR}" # Dynamatic
-fi
-
 #### Build the project (submodules and superproject) ####
-
 
 # Print header
 echo "################################################################################"
@@ -128,16 +130,19 @@ echo "##########################################################################
 
 echo_section "Building Polygeist"
 echo_subsection "Building LLVM submodule"
-create_build_directory "${POLYGEIST_LLVM_BUILD_DIR}"
+echo ""
+create_build_directory "$POLYGEIST_LLVM_BUILD_DIR"
 
 # CMake
-cmake -G Ninja ../llvm \
-    -DLLVM_ENABLE_PROJECTS="mlir;clang" \
-    -DLLVM_TARGETS_TO_BUILD="host" \
-    -DCMAKE_BUILD_TYPE=${BUILD_TYPE} \
-    -DLLVM_ENABLE_ASSERTIONS=ON \
-    ${CMAKE_FLAGS_LLVM}
-exit_on_fail "Failed to cmake polygeist/llvm-project"
+if should_run_cmake ; then
+  cmake -G Ninja ../llvm \
+      -DLLVM_ENABLE_PROJECTS="mlir;clang" \
+      -DLLVM_TARGETS_TO_BUILD="host" \
+      -DCMAKE_BUILD_TYPE=$BUILD_TYPE \
+      -DLLVM_ENABLE_ASSERTIONS=ON \
+      $CMAKE_FLAGS_LLVM
+  exit_on_fail "Failed to cmake polygeist/llvm-project"
+fi
 
 # Build
 ninja
@@ -147,19 +152,23 @@ if [[ ENABLE_TESTS -eq 1 ]]; then
     exit_on_fail "Tests for polygeist/llvm-project failed"
 fi
 
+echo ""
 echo_subsection "Building superproject"
-create_build_directory "${POLYGEIST_BUILD_DIR}"
+echo ""
+create_build_directory "$POLYGEIST_BUILD_DIR"
 
 # CMake
-cmake -G Ninja .. \
-    -DMLIR_DIR=$PWD/../llvm-project/build/lib/cmake/mlir \
-    -DCLANG_DIR=$PWD/../llvm-project/build/lib/cmake/clang \
-    -DLLVM_TARGETS_TO_BUILD="host" \
-    -DCMAKE_BUILD_TYPE=$BUILD_TYPE \
-    -DLLVM_ENABLE_ASSERTIONS=ON \
-    -Wno-dev \
-    $CMAKE_FLAGS_SUPER
-exit_on_fail "Failed to cmake polygeist"
+if should_run_cmake ; then
+  cmake -G Ninja .. \
+      -DMLIR_DIR=$PWD/../llvm-project/build/lib/cmake/mlir \
+      -DCLANG_DIR=$PWD/../llvm-project/build/lib/cmake/clang \
+      -DLLVM_TARGETS_TO_BUILD="host" \
+      -DCMAKE_BUILD_TYPE=$BUILD_TYPE \
+      -DLLVM_ENABLE_ASSERTIONS=ON \
+      -Wno-dev \
+      $CMAKE_FLAGS_SUPER
+  exit_on_fail "Failed to cmake polygeist"
+fi
 
 # Build
 ninja
@@ -173,17 +182,20 @@ fi
 
 echo_section "Building CIRCT"
 echo_subsection "Building LLVM submodule"
-create_build_directory "${CIRCT_LLVM_BUILD_DIR}"
+echo ""
+create_build_directory "$CIRCT_LLVM_BUILD_DIR"
 
 # CMake
-cmake -G Ninja ../llvm \
-    -DLLVM_ENABLE_PROJECTS="mlir" \
-    -DLLVM_TARGETS_TO_BUILD="host" \
-    -DCMAKE_BUILD_TYPE=$BUILD_TYPE \
-    -DLLVM_ENABLE_ASSERTIONS=ON \
-    -DCMAKE_EXPORT_COMPILE_COMMANDS=ON \
-    $CMAKE_FLAGS_LLVM
-exit_on_fail "Failed to cmake circt/llvm"
+if should_run_cmake ; then
+  cmake -G Ninja ../llvm \
+      -DLLVM_ENABLE_PROJECTS="mlir" \
+      -DLLVM_TARGETS_TO_BUILD="host" \
+      -DCMAKE_BUILD_TYPE=$BUILD_TYPE \
+      -DLLVM_ENABLE_ASSERTIONS=ON \
+      -DCMAKE_EXPORT_COMPILE_COMMANDS=ON \
+      $CMAKE_FLAGS_LLVM
+  exit_on_fail "Failed to cmake circt/llvm"
+fi
 
 # Build
 ninja
@@ -193,18 +205,34 @@ if [[ ENABLE_TESTS -eq 1 ]]; then
     exit_on_fail "Tests for circt/llvm failed"
 fi
 
+echo ""
 echo_subsection "Building superproject"
-create_build_directory "${CIRCT_BUILD_DIR}"
+echo 
+create_build_directory "$CIRCT_BUILD_DIR"
 
 # CMake
-cmake -G Ninja .. \
-    -DMLIR_DIR=$PWD/../llvm/build/lib/cmake/mlir \
-    -DLLVM_DIR=$PWD/../llvm/build/lib/cmake/llvm \
-    -DCMAKE_BUILD_TYPE=$BUILD_TYPE \
-    -DLLVM_ENABLE_ASSERTIONS=ON \
-    -DCMAKE_EXPORT_COMPILE_COMMANDS=ON \
-    $CMAKE_FLAGS_SUPER
-exit_on_fail "Failed to cmake circt"
+if should_run_cmake ; then
+  cmake -G Ninja .. \
+      -DMLIR_DIR=$PWD/../llvm/build/lib/cmake/mlir \
+      -DLLVM_DIR=$PWD/../llvm/build/lib/cmake/llvm \
+      -DCMAKE_BUILD_TYPE=$BUILD_TYPE \
+      -DLLVM_ENABLE_ASSERTIONS=ON \
+      -DCMAKE_EXPORT_COMPILE_COMMANDS=ON \
+      -DVERILATOR_DISABLE=ON \
+      -DVIVADO_DISABLE=ON \
+      -DCLANG_TIDY_DISABLE=ON \
+      -DSYSTEMC_DISABLE=ON \
+      -DQUARTUS_DISABLE=ON \
+      -DQUESTA_DISABLE=ON \
+      -DYOSYS_DISABLE=ON \
+      -DIVERILOG_DISABLE=ON \
+      -DYOSYS_DISABLE=ON \
+      -DCAPNP_DISABLE=ON \
+      -DOR_TOOLS_DISABLE=ON \
+      -DCAPNP_DISABLE=ON \
+      $CMAKE_FLAGS_SUPER
+  exit_on_fail "Failed to cmake circt"
+fi
 
 # Build
 ninja
@@ -217,18 +245,20 @@ if [[ ENABLE_TESTS -eq 1 ]]; then
 fi
 
 echo_section "Building Dynamatic"
-create_build_directory "${DYNAMATIC_BUILD_DIR}"
+create_build_directory "$DYNAMATIC_BUILD_DIR"
 
 # CMake
-cmake -G Ninja .. \
-    -DCIRCT_DIR=$PWD/../circt/build/lib/cmake/circt \
-    -DMLIR_DIR=$PWD/../circt/llvm/build/lib/cmake/mlir \
-    -DLLVM_DIR=$PWD/../circt/llvm/build/lib/cmake/llvm \
-    -DCMAKE_BUILD_TYPE=$BUILD_TYPE \
-    -DLLVM_ENABLE_ASSERTIONS=ON \
-    -DCMAKE_EXPORT_COMPILE_COMMANDS=ON \
-    $CMAKE_FLAGS_SUPER
-exit_on_fail "Failed to cmake dynamatic"
+if should_run_cmake ; then
+  cmake -G Ninja .. \
+      -DCIRCT_DIR=$PWD/../circt/build/lib/cmake/circt \
+      -DMLIR_DIR=$PWD/../circt/llvm/build/lib/cmake/mlir \
+      -DLLVM_DIR=$PWD/../circt/llvm/build/lib/cmake/llvm \
+      -DCMAKE_BUILD_TYPE=$BUILD_TYPE \
+      -DLLVM_ENABLE_ASSERTIONS=ON \
+      -DCMAKE_EXPORT_COMPILE_COMMANDS=ON \
+      $CMAKE_FLAGS_SUPER
+  exit_on_fail "Failed to cmake dynamatic"
+fi
 
 # Build
 ninja
@@ -241,7 +271,7 @@ fi
 echo_section "Creating symbolic links"
 
 # Create bin/ directory at the project's root
-cd "${SCRIPT_CWD}" && mkdir -p bin 
+cd "$SCRIPT_CWD" && mkdir -p bin 
 
 # Create symbolic links to all binaries we use from subfolders
 create_symlink polygeist/build/bin/cgeist
