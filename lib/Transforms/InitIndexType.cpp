@@ -27,8 +27,8 @@ static LogicalResult initIndexType(handshake::FuncOp funcOp, MLIRContext *ctx){
   OpBuilder builder(ctx);
 
   for (Operation &op : funcOp.getOps()){
-    if (isa<handshake::ControlMergeOp>(op)) 
-      continue;
+    // if (isa<handshake::ControlMergeOp>(op)) 
+    //   continue;
       
     for (int i=0; i<op.getNumResults(); ++i)
       if (OpResult result = op.getResult(i); isa<IndexType>(result.getType())){
