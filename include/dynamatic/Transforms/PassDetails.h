@@ -9,6 +9,7 @@
 #ifndef DYNAMATIC_TRANSFORMS_PASSDETAILS_H
 #define DYNAMATIC_TRANSFORMS_PASSDETAILS_H
 
+#include "circt/Dialect/Handshake/HandshakeDialect.h"
 #include "mlir/IR/BuiltinOps.h"
 #include "mlir/IR/DialectRegistry.h"
 #include "mlir/Pass/Pass.h"
@@ -18,6 +19,12 @@ namespace arith {
 class ArithDialect;
 } // namespace arith
 } // namespace mlir
+
+namespace circt {
+namespace handshake {
+class HandshakeDialect;
+} // namespace handshake
+} // namespace circt
 
 namespace dynamatic {
 

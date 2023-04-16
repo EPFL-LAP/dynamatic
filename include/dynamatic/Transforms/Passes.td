@@ -9,6 +9,11 @@
 
 include "mlir/Pass/PassBase.td"
 
+
+//===----------------------------------------------------------------------===//
+// Handshake passes
+//===----------------------------------------------------------------------===//
+
 def HandshakeInferBasicBlocks : Pass<"handshake-infer-basic-blocks", "mlir::ModuleOp"> {
   let summary = "Try to infer the basic block of untagged operations.";
   let description = [{
@@ -32,6 +37,56 @@ def HandshakePrepareForLegacy : Pass<"handshake-prepare-for-legacy", "mlir::Modu
     output.  
   }];
   let constructor = "dynamatic::createHandshakePrepareForLegacy()";
+}
+
+//===----------------------------------------------------------------------===//
+// Other passes
+//===----------------------------------------------------------------------===//
+
+def AnalyzeMemoryAccesses : Pass<"analyze-memory-accesses", "mlir::ModuleOp"> {
+  let summary = "Determine memory dependencies between different accesses.";
+  let description = [{
+    Analyzes memory accesses in each function in a module and identifies all
+    dependencies between them. Stores information about these dependencies in a
+    MemDependenceArrayAttr attribute attached to each operation that is the
+    source of at least one dependence. The attribute belongs to the Handshake
+    dialect as it only becomes useful during the std-to-handshake lowering pass.
+
+    The pass attempts to find dependencies between all AffineLoadOp's,
+    AffineStoreOp's, memref::LoadOp's and memref::StoreOp's. It uses MLIR's
+    polyhedral analysis infrastructure to identify complex dependencies between
+    pairs of affine accesses, and uses a pessimistic approach for pairs of
+    accesses that involve at least one non-affine access.
+
+    The pass expects to see unique names attached to each memory access (and
+    stored in a MemAccessNameAttr) to allow operations to reference one another
+    in the attributes holding dependence information. As such, running the
+    NameMemoryOpsPass (--name-memory-ops) is a prerequisite to running this
+    pass, which will fail if a memory access is unnamed. The pass will also fail
+    if MLIR's polyhedral analysis infrastructure fails to check for a dependence
+    between two affine accesses.
+  }];
+  let constructor = "dynamatic::createAnalyzeMemoryAccesses()";
+  let dependentDialects = ["circt::handshake::HandshakeDialect"];
+}
+
+def NameMemoryOps : Pass<"name-memory-ops", "mlir::ModuleOp"> {
+  let summary = "Give a unique name to each memory operation.";
+  let description = [{
+    Sets a MemAccessNameAttr attribute on each AffineLoadOp, AffineStoreOp,
+    memref::LoadOp, and memref::StoreOp instance in the module that holds a
+    unique name (within the context of the parent func::FuncOp) for the
+    operation. These names may be used later to express dependencies between
+    specific memory accesses (for example, in the AnalyzeMemoryAccessesPass).
+    The attribute belongs to the Handshake dialect (and is a simple wrapper
+    around a StringAttr) as it only becomes useful during the std-to-handshake
+    lowering pass.
+
+    The pass fails if one of the previously mentioned memory operation already
+    has one such attribute.
+  }];
+  let constructor = "dynamatic::createNameMemoryOps()";
+  let dependentDialects = ["circt::handshake::HandshakeDialect"];
 }
 
 def PushConstants : Pass<"push-constants", "mlir::ModuleOp"> {
