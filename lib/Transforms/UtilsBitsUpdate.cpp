@@ -129,27 +129,35 @@ std::optional<Operation *> insertWidthMatchOp(Operation *newOp, int opInd, Type 
                           MLIRContext *ctx){
   OpBuilder builder(ctx);
   Value opVal = newOp->getOperand(opInd);
+
+  int opWidth;
   if (isa<IndexType>(opVal.getType()))
-    return {};    
+    opWidth = 64;
+  else
+    opWidth = opVal.getType().getIntOrFloatBitWidth();
   
-  if (isa<IntegerType>(opVal.getType())){
+  if (isa<IntegerType>(opVal.getType()) || isa<IndexType>(opVal.getType())){
     // insert Truncation operation to match the opresult width
-    if (opVal.getType().getIntOrFloatBitWidth() > newType.getIntOrFloatBitWidth()){
+    if (opWidth > newType.getIntOrFloatBitWidth()){
       builder.setInsertionPoint(newOp);
       auto extOp = builder.create<mlir::arith::TruncIOp>(newOp->getLoc(), 
                                                         newType,
                                                         opVal); 
-      newOp->setOperand(opInd, extOp.getResult());
+      if (!isa<IndexType>(opVal.getType()))
+        newOp->setOperand(opInd, extOp.getResult());
+        
       return extOp;
     } 
 
     // insert Extension operation to match the opresult width
-    if (opVal.getType().getIntOrFloatBitWidth() < newType.getIntOrFloatBitWidth()){
+    if (opWidth < newType.getIntOrFloatBitWidth()){
       builder.setInsertionPoint(newOp);
       auto extOp = builder.create<mlir::arith::ExtSIOp>(newOp->getLoc(),
                                           newType,
                                           opVal); 
-      newOp->setOperand(opInd, extOp.getResult());
+      if (!isa<IndexType>(opVal.getType())) 
+        newOp->setOperand(opInd, extOp.getResult());
+      
       return extOp;
     }
   }
