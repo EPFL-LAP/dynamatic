@@ -21,17 +21,19 @@ static LogicalResult initCstOpBitsWidth(handshake::FuncOp funcOp,
                         //  ConversionPatternRewriter &rewriter){
                         MLIRContext *ctx)  {
   OpBuilder builder(ctx);
-  SmallVector<Operation *> vecOp;
-
   SmallVector<handshake::ConstantOp> cstOps;
+
   for (auto constOp : funcOp.getOps<handshake::ConstantOp>()) {
     cstOps.push_back(constOp);
   }
 
   for (auto op : cstOps){
-    llvm::errs() << "ConstantOp: " << op << '\n';
     unsigned cstBitWidth = cpp_max_width;
      IntegerType::SignednessSemantics ifSign = IntegerType::SignednessSemantics::Signless;
+    // skip the bool value constant operation
+    if (auto ValAttr = op.getValue(); isa<BoolAttr>(ValAttr))
+      continue;
+
     // get the attribute value
     if (auto IntAttr = op.getValue().dyn_cast<mlir::IntegerAttr>()){
       if (int cstVal = IntAttr.getValue().getZExtValue() ; cstVal>0)
@@ -62,14 +64,23 @@ static LogicalResult initCstOpBitsWidth(handshake::FuncOp funcOp,
 
     // recursively replace the uses of the old constant operation with the new one
     op->replaceAllUsesWith(newResult);
-    vecOp.insert(vecOp.end(), newResult);
+
+    SmallVector<Operation *> userOps;
     for (auto &user : newResult.getResult().getUses())
-      updateUserType(user.getOwner(), newType, vecOp, ctx);
-    vecOp.clear();
+      userOps.push_back(user.getOwner());
+
+    SmallVector<Operation *> vecOp;
+    for (auto updateOp : userOps){
+      
+      vecOp.insert(vecOp.end(), newResult);
+      // llvm::errs() << "--------------update--------------\n";
+
+      updateUserType(updateOp, newType, vecOp, ctx);
+      vecOp.clear();
+    }
+      // llvm::errs() <<"\n\n";
 
     op->erase();
-    llvm::errs() << "\n\n " ;
-    // builder.create<mlir::arith::TruncIOp>(newOp->getLoc(), 
   }
   
   return success();
