@@ -18,6 +18,14 @@ namespace arith {
 class ArithDialect;
 } // namespace arith
 
+namespace memref {
+class MemRefDialect;
+} // namespace memref
+
+namespace vector {
+class VectorDialect;
+} // namespace vector
+
 namespace cf {
 class ControlFlowDialect;
 } // namespace cf

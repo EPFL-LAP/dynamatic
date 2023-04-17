@@ -52,8 +52,8 @@ static LogicalResult checkAffineAccessPair(Operation *srcOp, Operation *dstOp,
       auto toAccessName = dstOp->getAttrOfType<MemAccessNameAttr>(
           MemAccessNameAttr::getMnemonic());
       assert(toAccessName && "dstOp must have access name");
-      opDeps[srcOp].push_back(
-          MemDependenceAttr::get(ctx, toAccessName, loopDepth, components));
+      opDeps[srcOp].push_back(MemDependenceAttr::get(
+          ctx, toAccessName.getName().strref(), loopDepth, components));
     } else if (result.value == DependenceResult::Failure) {
       auto toAccessName = dstOp->getAttrOfType<MemAccessNameAttr>(
           MemAccessNameAttr::getMnemonic());

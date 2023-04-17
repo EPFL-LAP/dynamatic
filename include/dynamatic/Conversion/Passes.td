@@ -1,6 +1,6 @@
 //===-- Passes.td - Conversion passes definition ----------------*- C++ -*-===//
 //
-// This file contains definitions for all dialect conversion passes.
+// This file contains definitions for all dialect conversion and export passes.
 //
 //===----------------------------------------------------------------------===//
 
@@ -8,6 +8,27 @@
 #define DYNAMATIC_CONVERSION_PASSES_TD
 
 include "mlir/Pass/PassBase.td"
+
+//===----------------------------------------------------------------------===//
+// AffineToScf
+//===----------------------------------------------------------------------===//
+
+def AffineToScf : Pass<"lower-affine-to-scf", "mlir::ModuleOp"> {
+  let summary = "Lower affine operations to a mix of SCF and standard operations";
+  let description = [{
+    Very close analog to the AffineToStandard pass from MLIR that preserves the
+    attributes of AffineLoadOp's and AffineStoreOp's during lowering. Keeping
+    these attributes is required for our memory analysis pass to pass down
+    dependence information between memory accesses to lower IR levels, in
+    particular to the std-to-handshake lowering pass. 
+  }];
+  let constructor = "dynamatic::createAffineToScfPass()";
+  let dependentDialects = [
+    "mlir::memref::MemRefDialect",
+    "mlir::scf::SCFDialect",
+    "mlir::vector::VectorDialect"
+  ];
+}
 
 //===----------------------------------------------------------------------===//
 // StandardToHandshakeFPGA18
