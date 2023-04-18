@@ -45,15 +45,18 @@ static LogicalResult rewriteBitsWidths(handshake::FuncOp funcOp, MLIRContext *ct
       // get the name of the operator
       const auto opName = op.getName().getStringRef();
 
-      if (0 < op.getNumResults()){
-        int newWidth = 32;
+      if (op.getNumResults() > 0){
+        int newWidth;
         if (mapOpNameWidth.find(opName) != mapOpNameWidth.end()){
           // get the new bit width of the result operator
           newWidth = mapOpNameWidth[opName](op.getOperands());
-          llvm::errs() << "change forward resultOp Type\n";
+
           // if the new type can be optimized, update the type
           if(Type newOpResultType = getNewType(op.getResult(0), newWidth, true);  
               newOpResultType != op.getResult(0).getType()){
+                llvm::errs() << "-------------------\n";
+                llvm::errs() << "Update " << op.getResult(0).getType() <<
+                " to " << newOpResultType << "\n";
                 // changed |= true;
                 op.getResult(0).setType(newOpResultType);
                 for (auto &user : op.getResult(0).getUses())
@@ -81,7 +84,7 @@ struct HandshakeBitsOptimizePass
 
     llvm::errs() << "Attemp to debug\n";
     for (auto funcOp : m.getOps<handshake::FuncOp>())
-      // if(failed(rewriteBitsWidths(funcOp, ctx)))
+      if(failed(rewriteBitsWidths(funcOp, ctx)))
         return signalPassFailure();
 
     llvm::errs() << "End of debug\n";

@@ -66,27 +66,33 @@ void constructFuncMap(DenseMap<StringRef,
 
   mapOpNameWidth[StringRef("arith.shli")] = [](Operation::operand_range vecOperands){
     int shift_bit = 0;
-
-    if (IntegerType validType = dyn_cast<IntegerType>(vecOperands[1].getType()) )
-      llvm::errs() << "shift bit: " << *(uint64_t *)validType.getAsOpaquePointer() << "\n";
-          
-    return std::min(arith_max_width,
+    if (auto defOp = vecOperands[1].getDefiningOp(); isa<handshake::ConstantOp>(defOp)){
+      if (handshake::ConstantOp cstOp = dyn_cast<handshake::ConstantOp>(defOp))
+        if (auto IntAttr = cstOp.getValue().dyn_cast<mlir::IntegerAttr>())
+          shift_bit = IntAttr.getValue().getZExtValue();
+      return std::min(cpp_max_width,
                 vecOperands[0].getType().getIntOrFloatBitWidth() + shift_bit);
+    }
+    return cpp_max_width;
   };
 
   mapOpNameWidth[StringRef("arith.shrsi")] = [](Operation::operand_range vecOperands){
     int shift_bit = 0;
+    if (auto defOp = vecOperands[1].getDefiningOp(); isa<handshake::ConstantOp>(defOp))
+      if (handshake::ConstantOp cstOp = dyn_cast<handshake::ConstantOp>(defOp))
+        if (auto IntAttr = cstOp.getValue().dyn_cast<mlir::IntegerAttr>())
+          shift_bit = IntAttr.getValue().getZExtValue();
 
-    if (IntegerType validType = dyn_cast<IntegerType>(vecOperands[1].getType()) )
-      llvm::errs() << "shift bit: " << *(uint64_t *)validType.getAsOpaquePointer() << "\n";
-          
-    return std::min(arith_max_width,
-                vecOperands[0].getType().getIntOrFloatBitWidth() - shift_bit);
+    return std::min(cpp_max_width,
+              vecOperands[0].getType().getIntOrFloatBitWidth() - shift_bit);
+
   };
 
   mapOpNameWidth[StringRef("arith.shrui")] = mapOpNameWidth[StringRef("arith.shrsi")];
 
   mapOpNameWidth[StringRef("handshake.mux")] = [](Operation::operand_range vecOperands){
+    if (isa<NoneType>(vecOperands[1].getType()))
+      return unsigned(0);
     unsigned max_width = 2;
     for (auto oprand : vecOperands)
       if (!isa<IndexType>(oprand.getType()) && 
@@ -131,7 +137,7 @@ std::optional<Operation *> insertWidthMatchOp(Operation *newOp, int opInd, Type 
   OpBuilder builder(ctx);
   Value opVal = newOp->getOperand(opInd);
 
-  int opWidth;
+  unsigned int opWidth;
   if (isa<IndexType>(opVal.getType()))
     opWidth = 64;
   else
@@ -274,7 +280,7 @@ void updateUserType(Operation *newResult, Type newType, SmallVector<Operation *>
 
   // unsigned opWidth;setUserType
   if (oprAdapt) {
-    int startInd = 0;
+    unsigned int startInd = 0;
     unsigned opWidth;
     
     // start from the second operand (i=1), as the first one is the select index
@@ -297,7 +303,7 @@ void updateUserType(Operation *newResult, Type newType, SmallVector<Operation *>
         opWidth = std::min(newResult->getResult(0).getType().getIntOrFloatBitWidth(), opWidth);
     }
 
-    for (int i = startInd; i < newResult->getNumOperands(); ++i){
+    for (unsigned int i = startInd; i < newResult->getNumOperands(); ++i){
       // width of data operand for Load and Store op 
       if (isLdSt && i==1)
         opWidth = address_width;
@@ -323,14 +329,14 @@ void updateUserType(Operation *newResult, Type newType, SmallVector<Operation *>
         // llvm::errs() << "multiplication opwidth : " << opWidth << "\n";
       }
     
-    for (int i = 0; i < newResult->getNumResults(); ++i){
+    for (unsigned int i = 0; i < newResult->getNumResults(); ++i){
 
       if (OpResult resultOp = newResult->getResult(i)){
         if (isLdSt && i==1)
           opWidth = address_width;
         // update the passed newType w.r.t. the resultOp
         newType = getNewType(resultOp, opWidth, false);
-        setUserType(newResult, newType, ctx, {i});
+        setUserType(newResult, newType, ctx, {static_cast<int>(i)});
 
         // update the user type recursively
         for(auto &user : resultOp.getUses()) 
