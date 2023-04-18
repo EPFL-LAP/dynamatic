@@ -39,33 +39,46 @@ static LogicalResult rewriteBitsWidths(handshake::FuncOp funcOp, MLIRContext *ct
 
     // Forward process
     for (auto &op : funcOp.getOps()){
-      llvm::errs() << "op : " << op << '\n';
+
       if (isa<handshake::ConstantOp>(op))
         continue;
       // get the name of the operator
       const auto opName = op.getName().getStringRef();
 
-      if (op.getNumResults() > 0){
-        int newWidth;
-        if (mapOpNameWidth.find(opName) != mapOpNameWidth.end()){
-          // get the new bit width of the result operator
+      if (op.getNumResults() > 0 && !isa<NoneType>(op.getResult(0).getType())){
+        unsigned int newWidth = 0;
+        // get the new bit width of the result operator
+        if (mapOpNameWidth.find(opName) != mapOpNameWidth.end())
           newWidth = mapOpNameWidth[opName](op.getOperands());
+        
+
+        // if newWidth==0 => NoneType, skip operation
+        if (newWidth==0)
+          continue;
 
           // if the new type can be optimized, update the type
-          if(Type newOpResultType = getNewType(op.getResult(0), newWidth, true);  
-              newOpResultType != op.getResult(0).getType()){
-                llvm::errs() << "-------------------\n";
-                llvm::errs() << "Update " << op.getResult(0).getType() <<
-                " to " << newOpResultType << "\n";
-                // changed |= true;
-                op.getResult(0).setType(newOpResultType);
-                for (auto &user : op.getResult(0).getUses())
-                  updateUserType(user.getOwner(), newOpResultType, vecOp, ctx);
-              }
+        if(Type newOpResultType = getNewType(op.getResult(0), newWidth, true);  
+            newWidth < op.getResult(0).getType().getIntOrFloatBitWidth()){
+          // changed |= true;
+          llvm::errs() << "-------------------\n";
+          llvm::errs() << "Update " << op.getResult(0).getType() <<
+          " to " << newOpResultType << "\n";
+          
+          op.getResult(0).setType(newOpResultType);
 
+          SmallVector<Operation *> userOps;
+          for (auto &user : op.getResult(0).getUses())
+            userOps.push_back(user.getOwner());
+
+          SmallVector<Operation *> vecOp;
+          for (auto updateOp : userOps){
+            vecOp.insert(vecOp.end(), &op);
+            updateUserType(updateOp, newOpResultType, vecOp, ctx);
+            vecOp.clear();
+          }
         }
       }
-
+        
     }
 
     // Backward Process
@@ -82,12 +95,10 @@ struct HandshakeBitsOptimizePass
 
     ModuleOp m = getOperation();
 
-    llvm::errs() << "Attemp to debug\n";
     for (auto funcOp : m.getOps<handshake::FuncOp>())
       if(failed(rewriteBitsWidths(funcOp, ctx)))
         return signalPassFailure();
 
-    llvm::errs() << "End of debug\n";
 
   };
 

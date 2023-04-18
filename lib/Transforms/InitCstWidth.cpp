@@ -57,7 +57,7 @@ static LogicalResult initCstOpBitsWidth(handshake::FuncOp funcOp,
 
     // Determine the proper representation of the constant value
     int intVal = op.getValue().cast<IntegerAttr>().getInt();
-    intVal = ((1 << op.getValue().getType().getIntOrFloatBitWidth()-1) + intVal);
+    intVal = ((1 << op.getValue().getType().getIntOrFloatBitWidth())-1 + intVal);
     newResult.setValueAttr(IntegerAttr::get(newType, intVal));
     // save the original bb
     newResult->setAttr("bb", op->getAttr("bb")); 
@@ -71,10 +71,7 @@ static LogicalResult initCstOpBitsWidth(handshake::FuncOp funcOp,
 
     SmallVector<Operation *> vecOp;
     for (auto updateOp : userOps){
-      
       vecOp.insert(vecOp.end(), newResult);
-      // llvm::errs() << "--------------update--------------\n";
-
       updateUserType(updateOp, newType, vecOp, ctx);
       vecOp.clear();
     }

@@ -91,7 +91,7 @@ void constructFuncMap(DenseMap<StringRef,
   mapOpNameWidth[StringRef("arith.shrui")] = mapOpNameWidth[StringRef("arith.shrsi")];
 
   mapOpNameWidth[StringRef("handshake.mux")] = [](Operation::operand_range vecOperands){
-    if (isa<NoneType>(vecOperands[1].getType()))
+    if (isa<NoneType>(vecOperands[0].getType()))
       return unsigned(0);
     unsigned max_width = 2;
     for (auto oprand : vecOperands)
