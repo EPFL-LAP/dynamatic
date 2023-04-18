@@ -6,6 +6,7 @@
 
 #include "dynamatic/Transforms/BitsOptimize.h"
 #include "dynamatic/Transforms/UtilsBitsUpdate.h"
+#include "dynamatic/Transforms/ForwardUpdate.h"
 #include "dynamatic/Transforms/PassDetails.h"
 #include "dynamatic/Transforms/Passes.h"
 #include "circt/Dialect/Handshake/HandshakeOps.h"
@@ -31,7 +32,8 @@ static LogicalResult rewriteBitsWidths(handshake::FuncOp funcOp, MLIRContext *ct
   using forward_func  = std::function<unsigned (mlir::Operation::operand_range vecOperands)>;
 
     DenseMap<StringRef, forward_func> mapOpNameWidth;
-    constructFuncMap(mapOpNameWidth);
+    forward::constructFuncMap(mapOpNameWidth);
+    SmallVector<Operation *> containerOps;
 
     // bool changed = true;
     // while (changed)
@@ -39,6 +41,9 @@ static LogicalResult rewriteBitsWidths(handshake::FuncOp funcOp, MLIRContext *ct
 
     // Forward process
     for (auto &op : funcOp.getOps()){
+      // store the operations in a container for backward process
+      // containerOps.insert(containerOps.end(), &op);
+      containerOps.push_back(&op);
 
       if (isa<handshake::ConstantOp>(op))
         continue;
@@ -73,7 +78,7 @@ static LogicalResult rewriteBitsWidths(handshake::FuncOp funcOp, MLIRContext *ct
           SmallVector<Operation *> vecOp;
           for (auto updateOp : userOps){
             vecOp.insert(vecOp.end(), &op);
-            updateUserType(updateOp, newOpResultType, vecOp, ctx);
+            forward::updateUserType(updateOp, newOpResultType, vecOp, ctx);
             vecOp.clear();
           }
         }
@@ -82,6 +87,11 @@ static LogicalResult rewriteBitsWidths(handshake::FuncOp funcOp, MLIRContext *ct
     }
 
     // Backward Process
+    for (auto op=containerOps.rbegin(); op!=containerOps.rend(); ++op)
+     if ((*op)->getNumResults() > 0 && !isa<NoneType>((*op)->getResult(0).getType()))
+      llvm::errs() << (*op)->getResult(0) << "\n";;
+
+   
     
     
     return success();

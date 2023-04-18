@@ -1,9 +1,14 @@
+//===- UtilsBitsUpdate.h ---------*- C++ -*-===//
+//
+// This file declares basic functions for type updates for --optimize-bits pass.
+//
+//===----------------------------------------------------------------------===//
+
 #ifndef DYNAMATIC_TRANSFORMS_UTILSBITSUPDATE_H
 #define DYNAMATIC_TRANSFORMS_UTILSBITSUPDATE_H
 
 #include <optional>
 #include "circt/Dialect/Handshake/HandshakeOps.h"
-#include "mlir/Dialect/Func/IR/FuncOps.h"
 #include "dynamatic/Support/LLVM.h"
 
 
@@ -20,13 +25,8 @@ const unsigned address_width = 32;
 IntegerType getNewType(Value opType, unsigned bitswidth, bool signless=false);
 IntegerType getNewType(Value opType, unsigned bitswidth,  
                       IntegerType::SignednessSemantics ifSign);
-void constructFuncMap(DenseMap<StringRef, 
-                     std::function<unsigned (Operation::operand_range vecOperands)>> 
-                     &mapOpNameWidth);
+std::optional<Operation *> insertWidthMatchOp(Operation *newOp, int opInd, Type newType, MLIRContext *ctx);
 void setUserType(Operation *newOp, Type newType,
                           MLIRContext *ctx, SmallVector<int> vecIndex);
-std::optional<Operation *> insertWidthMatchOp(Operation *newOp, int opInd, Type newType, MLIRContext *ctx);
-void updateUserType(Operation *newResult, Type newType, SmallVector<Operation *> &vecOp, MLIRContext *ctx);
-void setUpdateFlag(Operation *newResult, bool &passType, bool &oprAdapt, bool &resAdapter, bool &deleteOp);
 
-#endif
+#endif //DYNAMATIC_TRANSFORMS_UTILSBITSUPDATE_H

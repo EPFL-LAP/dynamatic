@@ -6,6 +6,7 @@
 
 #include "dynamatic/Transforms/InitCstWidth.h"
 #include "dynamatic/Transforms/UtilsBitsUpdate.h"
+#include "dynamatic/Transforms/ForwardUpdate.h"
 #include "dynamatic/Transforms/PassDetails.h"
 #include "circt/Dialect/Handshake/HandshakeOps.h"
 #include "mlir/Dialect/Func/IR/FuncOps.h"
@@ -72,7 +73,7 @@ static LogicalResult initCstOpBitsWidth(handshake::FuncOp funcOp,
     SmallVector<Operation *> vecOp;
     for (auto updateOp : userOps){
       vecOp.insert(vecOp.end(), newResult);
-      updateUserType(updateOp, newType, vecOp, ctx);
+      forward::updateUserType(updateOp, newType, vecOp, ctx);
       vecOp.clear();
     }
       // llvm::errs() <<"\n\n";
