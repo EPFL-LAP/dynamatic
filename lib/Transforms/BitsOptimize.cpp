@@ -80,12 +80,16 @@ static LogicalResult rewriteBitsWidths(handshake::FuncOp funcOp, MLIRContext *ct
       // TODO: Insert operation to pass the verification
       if (isa<handshake::DynamaticLoadOp>(op) || 
           isa<handshake::DynamaticStoreOp>(op) || 
-          isa<mlir::arith::MulIOp>(op))  {
+          isa<mlir::arith::MulIOp>(op) ||
+          isa<mlir::arith::AddIOp>(op))  {
         bool isLdSt = isa<handshake::DynamaticLoadOp>(op) || 
                       isa<handshake::DynamaticStoreOp>(op);
         unsigned opWidth = cpp_max_width;
+
+        // TODO: change it to backward function map
         if (!isLdSt)
           opWidth = op.getResult(0).getType().getIntOrFloatBitWidth();
+        
         for (unsigned int i = 0; i < op.getNumOperands(); ++i) {
           // width of data operand for Load and Store op 
           if (isLdSt && i==1)
