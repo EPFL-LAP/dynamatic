@@ -7,6 +7,7 @@
 #include "dynamatic/Transforms/BitsOptimize.h"
 #include "dynamatic/Transforms/UtilsBitsUpdate.h"
 #include "dynamatic/Transforms/ForwardUpdate.h"
+#include "dynamatic/Transforms/BackwardUpdate.h"
 #include "dynamatic/Transforms/PassDetails.h"
 #include "dynamatic/Transforms/Passes.h"
 #include "circt/Dialect/Handshake/HandshakeOps.h"
@@ -30,19 +31,21 @@ static LogicalResult rewriteBitsWidths(handshake::FuncOp funcOp, MLIRContext *ct
   SmallVector<Operation *> vecOp;
 
   using forward_func  = std::function<unsigned (mlir::Operation::operand_range vecOperands)>;
+  using backward_func = std::function<unsigned (mlir::Operation::result_range vecResults)>;
+  
+  DenseMap<StringRef, forward_func> mapOpNameWidth;
+  SmallVector<Operation *> containerOps;
+  update::constructFuncMap(mapOpNameWidth);
 
-    DenseMap<StringRef, forward_func> mapOpNameWidth;
-    forward::constructFuncMap(mapOpNameWidth);
-    SmallVector<Operation *> containerOps;
-
-    // bool changed = true;
-    // while (changed)
-    // changed = false;
+  bool changed = true;
+  while (changed) {
+    changed = false;
 
     // Forward process
     for (auto &op : funcOp.getOps()){
       // store the operations in a container for backward process
       // containerOps.insert(containerOps.end(), &op);
+      llvm::errs() << op << "\n";
       containerOps.push_back(&op);
 
       if (isa<handshake::ConstantOp>(op))
@@ -55,21 +58,11 @@ static LogicalResult rewriteBitsWidths(handshake::FuncOp funcOp, MLIRContext *ct
         // get the new bit width of the result operator
         if (mapOpNameWidth.find(opName) != mapOpNameWidth.end())
           newWidth = mapOpNameWidth[opName](op.getOperands());
-        
 
-        // if newWidth==0 => NoneType, skip operation
-        if (newWidth==0)
-          continue;
-
-          // if the new type can be optimized, update the type
+        // if the new type can be optimized, update the type
         if(Type newOpResultType = getNewType(op.getResult(0), newWidth, true);  
-            newWidth < op.getResult(0).getType().getIntOrFloatBitWidth()){
-          // changed |= true;
-          llvm::errs() << "-------------------\n";
-          llvm::errs() << "Update " << op.getResult(0).getType() <<
-          " to " << newOpResultType << "\n";
-          
-          op.getResult(0).setType(newOpResultType);
+            newWidth < op.getResult(0).getType().getIntOrFloatBitWidth() && newWidth > 0){
+          changed |= true;
 
           SmallVector<Operation *> userOps;
           for (auto &user : op.getResult(0).getUses())
@@ -78,22 +71,72 @@ static LogicalResult rewriteBitsWidths(handshake::FuncOp funcOp, MLIRContext *ct
           SmallVector<Operation *> vecOp;
           for (auto updateOp : userOps){
             vecOp.insert(vecOp.end(), &op);
-            forward::updateUserType(updateOp, newOpResultType, vecOp, ctx);
+            update::updateUserType(updateOp, newOpResultType, vecOp, ctx);
             vecOp.clear();
           }
+        }
+      }
+
+      // TODO: Insert operation to pass the verification
+      if (isa<handshake::DynamaticLoadOp>(op) || 
+          isa<handshake::DynamaticStoreOp>(op) || 
+          isa<mlir::arith::MulIOp>(op))  {
+        bool isLdSt = isa<handshake::DynamaticLoadOp>(op) || 
+                      isa<handshake::DynamaticStoreOp>(op);
+        unsigned opWidth = cpp_max_width;
+        if (!isLdSt)
+          opWidth = op.getResult(0).getType().getIntOrFloatBitWidth();
+        for (unsigned int i = 0; i < op.getNumOperands(); ++i) {
+          // width of data operand for Load and Store op 
+          if (isLdSt && i==1)
+            opWidth = address_width;
+
+          // opWidth = 0 indicates the operand is none type operand, skip matched width insertion
+          if (auto Operand = op.getOperand(i) ; opWidth != 0)
+            auto insertOp = insertWidthMatchOp(&op, 
+                                                i, 
+                                                getNewType(Operand, opWidth, false), 
+                                                ctx);
         }
       }
         
     }
 
-    // Backward Process
-    for (auto op=containerOps.rbegin(); op!=containerOps.rend(); ++op)
-     if ((*op)->getNumResults() > 0 && !isa<NoneType>((*op)->getResult(0).getType()))
-      llvm::errs() << (*op)->getResult(0) << "\n";;
+    
 
+    // Backward Process
+    // all operations width are matched for verification, 
+    // backward only update the trunc operation
+    SmallVector<Operation *> truncOps;
+
+    for (auto op=containerOps.rbegin(); op!=containerOps.rend(); ++op) {
+    //  if ((*op)->getNumResults() > 0 && !isa<N'oneType>((*op)->getResult(0).getType()))
+      if (isa<mlir::arith::TruncIOp>(*op)) {
+          changed |= true;
+
+        truncOps.push_back(*op);
+        SmallVector<Operation *> vecOp;
+        vecOp.insert(vecOp.end(), *op);
+
+        backward::updateDefOpType((*op)->getOperand(0).getDefiningOp(),
+                                  (*op)->getResult(0).getType(),
+                                  vecOp,
+                                  ctx);
+        (*op)->getResult(0).replaceAllUsesWith((*op)->getOperand(0));
+      }
+    }
    
+    llvm::errs() << "-----------------end one round-----------------\n";
+    // remove truncOps
+    for (auto op : truncOps)
+      op->erase();
+
+    // clear the operations
+    containerOps.clear();
     
-    
+  }
+
+  
     return success();
 }
 

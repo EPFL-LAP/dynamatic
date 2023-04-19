@@ -7,6 +7,7 @@ add_dynamatic_library(DynamaticTransforms
   InitCstWidth.cpp
   UtilsBitsUpdate.cpp
   ForwardUpdate.cpp
+  BackwardUpdate.cpp
 
   DEPENDS
   DynamaticTransformsPassIncGen
