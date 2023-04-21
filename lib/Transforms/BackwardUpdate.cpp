@@ -11,9 +11,26 @@
 #include "mlir/Dialect/Arith/IR/Arith.h"
 
 namespace backward {
-  void constructFuncMap(DenseMap<StringRef, std::function<unsigned (mlir::Operation::result_range vecResults)>> 
-                     &mapOpNameWidth)
+
+  void constructFuncMap(DenseMap<StringRef, 
+                        std::function<unsigned (Operation::result_range vecResults)>> 
+                        &mapOpNameWidth)
   {
+    mapOpNameWidth[StringRef("arith.addi")] = [](Operation::result_range vecResults)
+    {
+      return std::min(cpp_max_width, 
+                      vecResults[0].getType().getIntOrFloatBitWidth());
+    };
+
+    mapOpNameWidth[StringRef("arith.subi")] = mapOpNameWidth[StringRef("arith.addi")];
+
+    mapOpNameWidth[StringRef("arith.muli")] = mapOpNameWidth[StringRef("arith.addi")];
+
+    mapOpNameWidth[StringRef("arith.andi")] = mapOpNameWidth[StringRef("arith.addi")];
+
+    mapOpNameWidth[StringRef("arith.ori")] = mapOpNameWidth[StringRef("arith.addi")];
+
+    mapOpNameWidth[StringRef("arith.xori")] = mapOpNameWidth[StringRef("arith.addi")];
 
   }
 
@@ -134,7 +151,7 @@ namespace backward {
       if (isa<handshake::DynamaticLoadOp>(newResult) ||
       isa<handshake::DynamaticStoreOp>(newResult)) {
         isLdSt = true;
-        unsigned opWidth = cpp_max_width;
+        opWidth = cpp_max_width;
       }
 
       for (unsigned int i = startInd; i < newResult->getNumOperands(); ++i) {

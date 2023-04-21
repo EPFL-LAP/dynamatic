@@ -10,6 +10,11 @@
 #include "dynamatic/Transforms/UtilsBitsUpdate.h"
 
 namespace forward {
+  
+  void constructFuncMap(DenseMap<StringRef, 
+                        std::function<unsigned (Operation::operand_range vecOperands)>> 
+                        &mapOpNameWidth);
 
+  bool passType(Operation *op);
 }
 #endif // DYNAMATIC_TRANSFORMS_FORWARDUPDATE_H

@@ -165,18 +165,6 @@ void constructFuncMap(DenseMap<StringRef,
   };
 
   mapOpNameWidth[StringRef("arith.shrui")] = mapOpNameWidth[StringRef("arith.shrsi")];
-
-   mapOpNameWidth[StringRef("arith.cmpi")] = [](Operation::operand_range vecOperands)
-  {
-    if (isa<NoneType>(vecOperands[0].getType()))
-      return unsigned(0);
-    unsigned min_width = cpp_max_width;
-    for (auto oprand : vecOperands)
-      if (!isa<IndexType>(oprand.getType()) && 
-          oprand.getType().getIntOrFloatBitWidth() < min_width)
-        min_width = oprand.getType().getIntOrFloatBitWidth();
-    return std::min(cpp_max_width, min_width);
-  };
   
   mapOpNameWidth[StringRef("handshake.mux")] = [](Operation::operand_range vecOperands)
   {
@@ -189,6 +177,8 @@ void constructFuncMap(DenseMap<StringRef,
         max_width = oprand.getType().getIntOrFloatBitWidth();
     return std::min(cpp_max_width, max_width);
   };
+
+  mapOpNameWidth[StringRef("arith.cmpi")] = mapOpNameWidth[StringRef("handshake.mux")];
 
   mapOpNameWidth[StringRef("handshake.merge")] = mapOpNameWidth[StringRef("handshake.mux")];
 

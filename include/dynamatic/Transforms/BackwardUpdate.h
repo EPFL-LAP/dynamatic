@@ -12,7 +12,7 @@
 namespace backward {
 
 void constructFuncMap(DenseMap<StringRef, 
-                     std::function<unsigned (Operation::operand_range vecOperands)>> 
+                     std::function<unsigned (Operation::result_range vecResults)>> 
                      &mapOpNameWidth);
 
 void setUpdateFlag(Operation *newResult, 
