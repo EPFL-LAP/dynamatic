@@ -23,30 +23,6 @@ IntegerType getNewType(Value opType,
   return IntegerType::get(opType.getContext(), bitswidth,ifSign);
 }
 
-void setUserType (Operation *newOp, 
-                 Type newType,
-                 SmallVector<int> vecIndex)
-{
-    for (int i : vecIndex){
-      if (newOp->getResult(i).getType() == newType)
-        continue;
-      newOp->getResult(i).setType(newType);
-    }                       
-}
-
-
-void setDefOpType (Operation *newOp, 
-                   Type newType,
-                   SmallVector<int> vecIndex)
-{
-  for (int i : vecIndex) {
-    if (newOp->getOperand(i).getType() == newType)
-      continue;
-    newOp->getOperand(i).setType(newType);
-  }  
-} 
-
-
 // specify which value to extend
 std::optional<Operation *> insertWidthMatchOp (Operation *newOp, 
                                                int opInd, 
@@ -55,7 +31,7 @@ std::optional<Operation *> insertWidthMatchOp (Operation *newOp,
 {
   OpBuilder builder(ctx);
   Value opVal = newOp->getOperand(opInd);
-
+  
   unsigned int opWidth;
   if (isa<IndexType>(opVal.getType()))
     opWidth = 64;
@@ -66,13 +42,13 @@ std::optional<Operation *> insertWidthMatchOp (Operation *newOp,
     // insert Truncation operation to match the opresult width
     if (opWidth > newType.getIntOrFloatBitWidth()){
       builder.setInsertionPoint(newOp);
-      auto extOp = builder.create<mlir::arith::TruncIOp>(newOp->getLoc(), 
+      auto truncOp = builder.create<mlir::arith::TruncIOp>(newOp->getLoc(), 
                                                         newType,
                                                         opVal); 
       if (!isa<IndexType>(opVal.getType()))
-        newOp->setOperand(opInd, extOp.getResult());
+        newOp->setOperand(opInd, truncOp.getResult());
         
-      return extOp;
+      return truncOp;
     } 
 
     // insert Extension operation to match the opresult width
@@ -81,6 +57,7 @@ std::optional<Operation *> insertWidthMatchOp (Operation *newOp,
       auto extOp = builder.create<mlir::arith::ExtSIOp>(newOp->getLoc(),
                                           newType,
                                           opVal); 
+      
       if (!isa<IndexType>(opVal.getType())) 
         newOp->setOperand(opInd, extOp.getResult());
       
@@ -94,295 +71,324 @@ std::optional<Operation *> insertWidthMatchOp (Operation *newOp,
 namespace update {
 
 void constructFuncMap(DenseMap<StringRef, 
-                     std::function<unsigned (Operation::operand_range vecOperands)>> 
+                     std::function<std::vector<std::vector<unsigned int>> 
+                                  (Operation::operand_range vecOperands, 
+                                  Operation::result_range vecResults)>> 
                      &mapOpNameWidth){
-                      
-  mapOpNameWidth[StringRef("arith.addi")] = [](Operation::operand_range vecOperands)
-  {
-    return std::min(cpp_max_width,
-                std::max(vecOperands[0].getType().getIntOrFloatBitWidth(), 
-                        vecOperands[1].getType().getIntOrFloatBitWidth())+1);
-  };
+  
+  mapOpNameWidth[StringRef("arith.addi")] = 
+    [&] (Operation::operand_range vecOperands,
+         Operation::result_range vecResults) {
+      std::vector<std::vector<unsigned>> widths; 
+      
+      unsigned int maxOpWidth = std::max(vecOperands[0].getType().getIntOrFloatBitWidth(), 
+                                         vecOperands[1].getType().getIntOrFloatBitWidth());
+                                
+      unsigned int width = std::min(vecResults[0].getType().getIntOrFloatBitWidth(),
+                           maxOpWidth+1);
+
+      width = std::min(cpp_max_width, width);
+      widths.push_back({width, width}); //matched widths for operators
+      widths.push_back({width}); //matched widths for result
+      
+      return widths;
+    };
 
   mapOpNameWidth[StringRef("arith.subi")] = mapOpNameWidth[StringRef("arith.addi")];
+   
+  mapOpNameWidth[StringRef("arith.muli")] = 
+    [&] (Operation::operand_range vecOperands,
+         Operation::result_range vecResults) {
+      std::vector<std::vector<unsigned>> widths; 
+      
+      unsigned int maxOpWidth = vecOperands[0].getType().getIntOrFloatBitWidth() + 
+                                vecOperands[1].getType().getIntOrFloatBitWidth();
+                                
+      unsigned int width = std::min(vecResults[0].getType().getIntOrFloatBitWidth(),
+                           maxOpWidth);
+      
+      width = std::min(cpp_max_width, width);
 
-  mapOpNameWidth[StringRef("arith.muli")] = [](Operation::operand_range vecOperands)
-  {
-    return std::min(cpp_max_width,
-                vecOperands[0].getType().getIntOrFloatBitWidth() + 
-                  vecOperands[1].getType().getIntOrFloatBitWidth());
-  };
+      widths.push_back({width, width}); //matched widths for operators
+      widths.push_back({width}); //matched widths for result
+      
+      return widths;
+    };
 
-  mapOpNameWidth[StringRef("arith.ceildivsi")] = [](Operation::operand_range vecOperands)
-  {
-    return std::min(cpp_max_width,
-                vecOperands[0].getType().getIntOrFloatBitWidth() + 1);
-  };
+    mapOpNameWidth[StringRef("arith.ceildivsi")] = 
+    [&] (Operation::operand_range vecOperands,
+         Operation::result_range vecResults) {
+      std::vector<std::vector<unsigned>> widths; 
+      
+      unsigned int maxOpWidth = vecOperands[0].getType().getIntOrFloatBitWidth();
+                                
+      unsigned int width = std::min(vecResults[0].getType().getIntOrFloatBitWidth(),
+                           maxOpWidth+1);
+      
+      width = std::min(cpp_max_width, width);
 
-  // mapOpNameWidth[StringRef("arith.ceil
+      widths.push_back({width, width}); //matched widths for operators
+      widths.push_back({width}); //matched widths for result
+      
+      return widths;
+    };
 
-  mapOpNameWidth[StringRef("arith.andi")] = [](Operation::operand_range vecOperands)
-  {
-    return std::min(cpp_max_width,
-                std::min(vecOperands[0].getType().getIntOrFloatBitWidth(),
-                      vecOperands[1].getType().getIntOrFloatBitWidth()));
-  };
+    mapOpNameWidth[StringRef("arith.ceildivusi")] = mapOpNameWidth[StringRef("arith.ceildivsi")];
 
-  mapOpNameWidth[StringRef("arith.ori")] = [](Operation::operand_range vecOperands)
-  {
-    return std::min(cpp_max_width,
-                std::max(vecOperands[0].getType().getIntOrFloatBitWidth(),
-                      vecOperands[1].getType().getIntOrFloatBitWidth()));
-  };
+    mapOpNameWidth[StringRef("arith.cmpi")] = 
+      [&] (Operation::operand_range vecOperands,
+         Operation::result_range vecResults) {
+      std::vector<std::vector<unsigned>> widths; 
+      
+      unsigned int maxOpWidth = std::max(vecOperands[0].getType().getIntOrFloatBitWidth(), 
+                                         vecOperands[1].getType().getIntOrFloatBitWidth());
+      
+      unsigned int width = std::min(cpp_max_width, width);
 
-  mapOpNameWidth[StringRef("arith.xori")] = mapOpNameWidth[StringRef("arith.ori")];
+      widths.push_back({width, width}); //matched widths for operators
+      widths.push_back({unsigned(1)}); //matched widths for result
+      
+      return widths;
+    };
 
+    mapOpNameWidth[StringRef("handshake.mux")] = 
+      [&] (Operation::operand_range vecOperands,
+         Operation::result_range vecResults) {
 
-  mapOpNameWidth[StringRef("arith.shli")] = [](Operation::operand_range vecOperands)
-  {
-    int shift_bit = 0;
-    if (auto defOp = vecOperands[1].getDefiningOp(); isa<handshake::ConstantOp>(defOp)){
-      if (handshake::ConstantOp cstOp = dyn_cast<handshake::ConstantOp>(defOp))
-        if (auto IntAttr = cstOp.getValue().dyn_cast<mlir::IntegerAttr>())
-          shift_bit = IntAttr.getValue().getZExtValue();
-      return std::min(cpp_max_width,
-                vecOperands[0].getType().getIntOrFloatBitWidth() + shift_bit);
-    }
-    return cpp_max_width;
-  };
+      std::vector<std::vector<unsigned>> widths; 
+      unsigned maxOpWidth = 2;
 
-  mapOpNameWidth[StringRef("arith.shrsi")] = [](Operation::operand_range vecOperands)
-  {
-    int shift_bit = 0;
-    if (auto defOp = vecOperands[1].getDefiningOp(); isa<handshake::ConstantOp>(defOp))
-      if (handshake::ConstantOp cstOp = dyn_cast<handshake::ConstantOp>(defOp))
-        if (auto IntAttr = cstOp.getValue().dyn_cast<mlir::IntegerAttr>())
-          shift_bit = IntAttr.getValue().getZExtValue();
+      unsigned ind = 0; // record number of operators
 
-    return std::min(cpp_max_width,
-              vecOperands[0].getType().getIntOrFloatBitWidth() - shift_bit);
+      for (auto oprand : vecOperands) {
+        ind++;
+        if (!isa<NoneType>(oprand.getType()))
+          if (!isa<IndexType>(oprand.getType()) && 
+              oprand.getType().getIntOrFloatBitWidth() > maxOpWidth)
+            maxOpWidth = oprand.getType().getIntOrFloatBitWidth();
+      }
+      unsigned indexWidth;
+      if (ind>0)
+        indexWidth = log2(ind-1)+2;
+      else
+        indexWidth = 2;
+      widths.push_back({indexWidth}); // the bit width for the mux index result;
 
-  };
+      if (isa<NoneType>(vecOperands[0].getType())) {
+        widths.push_back({});
+        return widths;
+      }
 
-  mapOpNameWidth[StringRef("arith.shrui")] = mapOpNameWidth[StringRef("arith.shrsi")];
-  
-  mapOpNameWidth[StringRef("handshake.mux")] = [](Operation::operand_range vecOperands)
-  {
-    if (isa<NoneType>(vecOperands[0].getType()))
-      return unsigned(0);
-    unsigned max_width = 2;
-    for (auto oprand : vecOperands)
-      if (!isa<IndexType>(oprand.getType()) && 
-          oprand.getType().getIntOrFloatBitWidth() > max_width)
-        max_width = oprand.getType().getIntOrFloatBitWidth();
-    return std::min(cpp_max_width, max_width);
-  };
+      unsigned int width = std::min(cpp_max_width, maxOpWidth);
+      // 1st operand is the index; rest of (ind -1) operands set to width
+      std::vector<unsigned> opwidths(ind-1, width); 
 
-  mapOpNameWidth[StringRef("arith.cmpi")] = mapOpNameWidth[StringRef("handshake.mux")];
+      widths[0].insert(widths[0].end(), opwidths.begin(), opwidths.end()); //matched widths for operators
+      widths.push_back({width}); //matched widths for result
+      
+      return widths;
+    };
 
-  mapOpNameWidth[StringRef("handshake.merge")] = mapOpNameWidth[StringRef("handshake.mux")];
+     mapOpNameWidth[StringRef("handshake.merge")] = 
+      [&] (Operation::operand_range vecOperands,
+         Operation::result_range vecResults) {
 
-  mapOpNameWidth[StringRef("handshake.cond_br")] = [](Operation::operand_range vecOperands)
-  {
-    if (isa<NoneType>(vecOperands[1].getType()))
-      return unsigned(0);
-    return vecOperands[1].getType().getIntOrFloatBitWidth();
-  };
+      std::vector<std::vector<unsigned>> widths; 
+      unsigned maxOpWidth = 2;
 
-  mapOpNameWidth[StringRef("handshake.d_return")] = [](Operation::operand_range vecOperands)
-  {
-    return address_width;
-  };
+      unsigned ind = 0; // record number of operators
+
+      for (auto oprand : vecOperands) {
+        ind++;
+        if (!isa<NoneType>(vecOperands[0].getType()))
+          if (!isa<IndexType>(oprand.getType()) && 
+              oprand.getType().getIntOrFloatBitWidth() > maxOpWidth)
+            maxOpWidth = oprand.getType().getIntOrFloatBitWidth();
+      }
+
+      if (isa<NoneType>(vecOperands[0].getType())) {
+        widths.push_back({});
+        widths.push_back({});
+        return widths;
+      }
+
+      unsigned int width = std::min(cpp_max_width, maxOpWidth);
+      std::vector<unsigned> opwidths(ind, width);
+
+      widths.push_back(opwidths); //matched widths for operators
+      widths.push_back({width}); //matched widths for result
+      
+      return widths;
+    };
+
+    mapOpNameWidth[StringRef("handshake.d_return")] = 
+      [&] (Operation::operand_range vecOperands,
+         Operation::result_range vecResults) {
+
+          std::vector<std::vector<unsigned>> widths; 
+          widths.push_back({address_width});
+          widths.push_back({address_width});
+          return widths;
+    };
+
+    mapOpNameWidth[StringRef("handshake.d_load")] = 
+      [&] (Operation::operand_range vecOperands,
+         Operation::result_range vecResults) {
+
+          std::vector<std::vector<unsigned>> widths; 
+          widths.push_back({cpp_max_width, address_width});
+          widths.push_back({cpp_max_width, address_width});
+          return widths;
+    };
+
+    mapOpNameWidth[StringRef("handshake.d_store")] = mapOpNameWidth[StringRef("handshake.d_load")];
 
 };
 
-// TODO: consider a universal method
-void setUpdateFlag(Operation *newResult, 
-                  bool &passType, 
-                  bool &oprAdapt, 
-                  bool &resAdapter, 
-                  bool &deleteOp, 
-                  bool &lessThanRes,
-                  SmallVector<int> &vecIndex)
-{
-  
-  passType = false;
-  oprAdapt = false;
-  resAdapter = false;
-  deleteOp = false;
-  lessThanRes = false;
+  void setValidateType(Operation *Op,
+                       bool &pass,
+                       bool &match,
+                       bool &revert) {
 
-  if (isa<handshake::BranchOp>(newResult)) {
-    passType = true;
-    vecIndex = {0};
-  } 
-  else if (isa<handshake::ConditionalBranchOp>(newResult)) {
-    passType = true;
-    vecIndex = {0, 1};
-  }
-  else if (isa<handshake::MuxOp>(newResult)) {
-    resAdapter = true;
-    oprAdapt = true;
-    lessThanRes = true;
-  }
-  else if (isa<handshake::MergeOp>(newResult)) {
-    resAdapter = true;
-    oprAdapt = true;
-  }
-  else if (isa<handshake::DynamaticStoreOp>(newResult)) {
-    resAdapter = true;
-    oprAdapt = true;
-  }
-  else if (isa<handshake::DynamaticLoadOp>(newResult)) {
-    resAdapter = true;
-    oprAdapt = true;
-  }
-  else if (isa<handshake::DynamaticReturnOp>(newResult)) {
-    oprAdapt = true;
-  }
-  else if (isa<mlir::arith::CmpIOp>(newResult)) {
-    oprAdapt = true;
-  }
-  else if (isa<mlir::arith::AddIOp>(newResult)) {
-    resAdapter = true;
-    oprAdapt = true;
-    lessThanRes = true;
-  }
-  else if (isa<mlir::arith::MulIOp>(newResult)) {
-    resAdapter = true;
-    oprAdapt = true;
-    lessThanRes = true;
-  }
-  else if (isa<mlir::arith::ShRSIOp>(newResult)) {
-    resAdapter = true;
-    oprAdapt = true;
-    lessThanRes = true;
-  }
-  else if (isa<mlir::arith::ExtSIOp>(newResult) &&
-          newResult->getResult(0).getType().getIntOrFloatBitWidth() <= newResult->getOperand(0).getType().getIntOrFloatBitWidth()) 
-    deleteOp = true;
-  
-  else if (isa<mlir::arith::TruncIOp>(newResult) &&
-          newResult->getResult(0).getType().getIntOrFloatBitWidth() >= newResult->getOperand(0).getType().getIntOrFloatBitWidth() ) 
-    deleteOp = true;
-          
-}
+    pass   = false;
+    match  = false;
+    revert = false;
+ 
+    if (isa<handshake::BranchOp>(*Op) ||
+        isa<handshake::ConditionalBranchOp>(*Op))
+        pass = true;
 
-void updateUserType(Operation *newResult, 
-                    Type newType, 
-                    SmallVector<Operation *> &vecOp,
-                    MLIRContext *ctx)
-{
-  // if the operation has been processed, return
-  if (std::find(vecOp.begin(), vecOp.end(), newResult) != vecOp.end()){
-    return;
-  }
-    
-  vecOp.push_back(newResult);
-  OpBuilder builder(ctx);
-  DenseMap<StringRef, std::function<unsigned (mlir::Operation::operand_range vecOperands)>>  mapOpNameWidth;
+    if (isa<mlir::arith::AddIOp>(*Op)  ||
+        isa<mlir::arith::SubIOp>(*Op)  ||
+        isa<mlir::arith::MulIOp>(*Op)  ||
+        isa<mlir::arith::DivSIOp>(*Op) ||
+        isa<mlir::arith::DivUIOp>(*Op) ||
+        isa<mlir::arith::CmpIOp>(*Op)  ||
+        isa<handshake::MuxOp>(*Op)     ||
+        isa<handshake::MergeOp>(*Op)   ||
+        isa<handshake::DynamaticLoadOp>(*Op) ||
+        isa<handshake::DynamaticStoreOp>(*Op) ||
+        isa<handshake::DynamaticReturnOp>(*Op) )
+      match = true;  
 
-  constructFuncMap(mapOpNameWidth); 
-  SmallVector<int> vecIndex;
-
-  // bit width of the operand should not exceeds the result width
-  bool lessThanRes = false;
-  // only update the resultOp recursively with updated UserType : newType
-  bool passType = false; 
-  // insert extOp|truncOp to make the multiple operands have the same width
-  bool oprAdapt = false; 
-  // set the OpResult type to make the result have the same width as the operands
-  bool resAdapt = false; 
-  // delete the extOp|TruncIOp when the width of its result and operand are not consistent
-  bool deleteOp = false;
-  bool isLdSt = false;
-  
-  // TODO : functions for determine the four flags : passType, oprAdapt, resAdapter, deleteOp
-  setUpdateFlag(newResult, 
-                passType, 
-                oprAdapt, 
-                resAdapt, 
-                deleteOp, 
-                lessThanRes,
-                vecIndex);
-
-  if (passType) {
-    setUserType(newResult, newType, vecIndex);
-
-    for(auto &user : newResult->getResult(0).getUses()) 
-      updateUserType(user.getOwner(), newType, vecOp, ctx);
+    if (isa<mlir::arith::TruncIOp>(*Op) ||
+        isa<mlir::arith::ExtSIOp>(*Op) ||
+        isa<mlir::arith::ExtUIOp>(*Op))
+      revert = true;  
   }
 
-  // unsigned opWidth;setUserType
-  if (oprAdapt) {
-    unsigned int startInd = 0;
-    unsigned opWidth;
-    
-    // start from the second operand (i=1), as the first one is the select index
-    if (isa<handshake::MuxOp>(newResult) || 
-        isa<handshake::ConditionalBranchOp>(newResult))
-      startInd = 1; 
+  bool propType(Operation *op) {
 
-    if (isa<handshake::DynamaticLoadOp>(newResult) ||
-      isa<handshake::DynamaticStoreOp>(newResult)) {
-        isLdSt = true;
-        opWidth = cpp_max_width;
-      }
-    else {
-      opWidth = mapOpNameWidth[newResult->getName().getStringRef()](newResult->getOperands());
-      if (lessThanRes)
-        opWidth = std::min(opWidth,
-                          newResult->getResult(0).getType().getIntOrFloatBitWidth());
+    if (isa<handshake::ConditionalBranchOp>(*op)) {
+      for (auto resOp : op->getResults())
+        resOp.setType(op->getOperand(1).getType());
+      return true;
     }
 
-    for (unsigned int i = startInd; i < newResult->getNumOperands(); ++i) {
-      // width of data operand for Load and Store op 
-      if (isLdSt && i==1)
-        opWidth = address_width;
+    if (isa<handshake::BranchOp>(*op)) {
+      op->getResult(0).setType(op->getOperand(0).getType());
+      return true;
+    }
+    return false;
+  }
 
-      // opWidth = 0 indicates the operand is none type operand, skip matched width insertion
-      if (auto Operand = newResult->getOperand(i) ; opWidth != 0){
-        auto insertOp = insertWidthMatchOp(newResult, 
-                                          i, 
-                                          getNewType(Operand, opWidth, false), 
-                                          ctx);
-        if (insertOp.has_value())
-          vecOp.push_back(insertOp.value());
+  void revertTruncOrExt(Operation *Op, MLIRContext *ctx) {
+    OpBuilder builder(ctx);
+    // if width(res) == width(opr) : delte the operand;
+    if (Op->getResult(0).getType().getIntOrFloatBitWidth() ==
+        Op->getOperand(0).getType().getIntOrFloatBitWidth()) {
+      for(auto user : Op->getResult(0).getUsers()) 
+        user->replaceUsesOfWith(Op->getResult(0), Op->getOperand(0));
+      Op->erase();
+    }
+
+    // if for extension operation width(res) < width(opr),
+    // change it to truncation operation
+    if (isa<mlir::arith::ExtSIOp>(*Op) || isa<mlir::arith::ExtUIOp>(*Op))
+      if (Op->getResult(0).getType().getIntOrFloatBitWidth() <
+          Op->getOperand(0).getType().getIntOrFloatBitWidth()) {
+
+        builder.setInsertionPoint(Op);
+        Type newType = getNewType(Op->getResult(0), 
+                                  Op->getResult(0).getType().getIntOrFloatBitWidth(), 
+                                  false);
+        auto truncOp = builder.create
+                      <mlir::arith::TruncIOp>(Op->getLoc(), 
+                                              newType,
+                                              Op->getOperand(0));
+        Op->getResult(0).replaceAllUsesWith(truncOp.getResult());
+        Op->erase();
+      }
+
+    // if for truncation operation width(res) > width(opr),
+    // change it to extension operation
+    if (isa<mlir::arith::TruncIOp>(*Op))
+      if (Op->getResult(0).getType().getIntOrFloatBitWidth() >
+          Op->getOperand(0).getType().getIntOrFloatBitWidth()) {
+            
+        builder.setInsertionPoint(Op);
+        Type newType = getNewType(Op->getResult(0), 
+                                  Op->getResult(0).getType().getIntOrFloatBitWidth(), 
+                                  false);
+        auto truncOp = builder.create
+                      <mlir::arith::ExtSIOp>(Op->getLoc(), 
+                                              newType,
+                                              Op->getOperand(0));
+        Op->getResult(0).replaceAllUsesWith(truncOp.getResult());
+        Op->erase();
+      }
+  }
+
+  void matchOpResWidth (Operation *Op, MLIRContext *ctx) {
+
+    DenseMap<mlir::StringRef,
+               std::function<std::vector<std::vector<unsigned int>> 
+                  (Operation::operand_range vecOperands, 
+                   Operation::result_range vecResults)>> mapOpNameWidth;
+
+    constructFuncMap(mapOpNameWidth);
+
+    std::vector<std::vector<unsigned int> > OprsWidth = 
+                                   mapOpNameWidth[Op->getName().getStringRef()]
+                                   (Op->getOperands(), Op->getResults());
+    // make operator matched the width
+
+    for (unsigned int i = 0; i < OprsWidth[0].size(); ++i) {
+      llvm::errs() <<  i << "\n";
+      if (auto Operand = Op->getOperand(i); 
+          Operand.getType().getIntOrFloatBitWidth() != OprsWidth[0][i])
+        auto insertOp = insertWidthMatchOp(Op, 
+                                           i, 
+                                           getNewType(Operand, OprsWidth[0][i], false), 
+                                           ctx);
+    }
+    // make result matched the width
+    for (unsigned int i = 0; i < OprsWidth[1].size(); ++i) {
+      llvm::errs() <<  Op->getResult(i) << "adapted to " << OprsWidth[1][i] << "\n";
+      if (auto OpRes = Op->getResult(i); 
+          OpRes.getType().getIntOrFloatBitWidth() != OprsWidth[1][i]) {
+        Type newType = getNewType(OpRes, OprsWidth[1][i], false);
+        Op->getResult(i).setType(newType) ;
       }
     }
   }
 
-  if (resAdapt) {
-    unsigned opWidth;
-    if (isLdSt)
-      opWidth = cpp_max_width;
-    else {
-      opWidth = mapOpNameWidth[newResult->getName().getStringRef()](newResult->getOperands());
-      if (lessThanRes)
-        opWidth = std::min(opWidth,
-                          newResult->getResult(0).getType().getIntOrFloatBitWidth());
-      }
-    
-    for (unsigned int i = 0; i < newResult->getNumResults(); ++i){
+  void validateOp(Operation *Op, MLIRContext *ctx) {
+    // the operations can be divided to three types to make it validated
+    // passType: branch, conditionalbranch
+    // c <= op(a,b): addi, subi, mux, etc. where both a,b,c needed to be verified
+    // need to be reverted or deleted : truncIOp, extIOp
+    bool pass, match, revert;
+    setValidateType(Op, pass, match, revert);
 
-      if (OpResult resultOp = newResult->getResult(i)){
-        if (isLdSt && i==1)
-          opWidth = address_width;
-        // update the passed newType w.r.t. the resultOp
-        newType = getNewType(resultOp, opWidth, false);
-        setUserType(newResult, newType, {static_cast<int>(i)});
+    if (pass)
+      bool res = propType(Op);
 
-        // update the user type recursively
-        for(auto &user : resultOp.getUses()) 
-          updateUserType(user.getOwner(), newType, vecOp, ctx);
-      }
-    }
+    if (match)
+      matchOpResWidth(Op, ctx);
+
+    if (revert) 
+      revertTruncOrExt(Op, ctx);
+      
   }
-
-  if (deleteOp) {
-    for(auto user : newResult->getResult(0).getUsers()) 
-      user->replaceUsesOfWith(newResult->getResult(0), newResult->getOperand(0));
-    newResult->erase();
-  }
-}
 }
