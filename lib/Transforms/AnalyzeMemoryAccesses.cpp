@@ -29,17 +29,21 @@ using namespace circt::handshake;
 using MemAccesses = llvm::MapVector<Value, SmallVector<Operation *>>;
 using OpDependencies = DenseMap<Operation *, SmallVector<MemDependenceAttr>>;
 
+/// Determines whether an operation is akin to a load.
+static bool isLoadLike(Operation *op) {
+  return isa<memref::LoadOp, AffineLoadOp>(op);
+}
+
 // Determines whether there are dependences between the source and destination
 // affine memory accesses at all loop depth that make sense. If such
 // dependencies exist, add them to source operation's list of dependencies.
 // Fails if a dependence check between the two operations fails; succeeds
 // otherwise.
 static LogicalResult checkAffineAccessPair(Operation *srcOp, Operation *dstOp,
-                                           OpBuilder &builder,
-                                           OpDependencies &opDeps) {
+                                           OpDependencies &opDeps,
+                                           MLIRContext *ctx) {
 
   MemRefAccess srcAccess(srcOp), dstAccess(dstOp);
-  MLIRContext *ctx = builder.getContext();
   unsigned numCommonLoops = getNumCommonSurroundingLoops(*srcOp, *dstOp);
   for (unsigned loopDepth = 1; loopDepth <= numCommonLoops + 1; ++loopDepth) {
     FlatAffineValueConstraints constraints;
@@ -49,20 +53,41 @@ static LogicalResult checkAffineAccessPair(Operation *srcOp, Operation *dstOp,
     if (result.value == DependenceResult::HasDependence) {
       // Add the dependence to the list of dependencies attached to the
       // source operation
-      auto toAccessName = dstOp->getAttrOfType<MemAccessNameAttr>(
+      auto dstAccessName = dstOp->getAttrOfType<MemAccessNameAttr>(
           MemAccessNameAttr::getMnemonic());
-      assert(toAccessName && "dstOp must have access name");
+      assert(dstAccessName && "dstOp must have access name");
       opDeps[srcOp].push_back(MemDependenceAttr::get(
-          ctx, toAccessName.getName().strref(), loopDepth, components));
+          ctx, dstAccessName.getName(), loopDepth, components));
     } else if (result.value == DependenceResult::Failure) {
-      auto toAccessName = dstOp->getAttrOfType<MemAccessNameAttr>(
+      auto dstAccessName = dstOp->getAttrOfType<MemAccessNameAttr>(
           MemAccessNameAttr::getMnemonic());
-      assert(toAccessName && "dstOp must have access name");
+      assert(dstAccessName && "dstOp must have access name");
       return srcOp->emitError()
              << "dependence check failed with memory access '"
-             << toAccessName.getName() << "'";
+             << dstAccessName.getName() << "'";
     }
   }
+  return success();
+}
+
+/// Creates a dependency between two memory accesses, unless the accesses are
+/// the same or both load-like.
+static LogicalResult checkNonAffineAccessPair(Operation *srcOp,
+                                              Operation *dstOp,
+                                              OpDependencies &opDeps,
+                                              MLIRContext *ctx) {
+
+  // We don't care about self-dependencies or RAR dependencies
+  if ((srcOp == dstOp) || (isLoadLike(srcOp) && isLoadLike(dstOp)))
+    return success();
+
+  // Add a dependence from the source operation to the destination operation
+  auto dstAccessName =
+      dstOp->getAttrOfType<MemAccessNameAttr>(MemAccessNameAttr::getMnemonic());
+  assert(dstAccessName && "dstOp must have access name");
+  opDeps[srcOp].push_back(MemDependenceAttr::get(
+      ctx, dstAccessName.getName(), 0, ArrayRef<mlir::DependenceComponent>{}));
+
   return success();
 }
 
@@ -73,7 +98,7 @@ static LogicalResult checkAffineAccessPair(Operation *srcOp, Operation *dstOp,
 /// otherwise.
 static LogicalResult analyzeMemAccesses(func::FuncOp funcOp, MLIRContext *ctx) {
 
-  MemAccesses affineAccesses, memrefAccesses;
+  MemAccesses affineAccesses, nonAffineAccesses;
   LogicalResult allMemOpsValid = success();
   auto accessNameAttr = MemAccessNameAttr::getMnemonic();
 
@@ -83,7 +108,7 @@ static LogicalResult analyzeMemAccesses(func::FuncOp funcOp, MLIRContext *ctx) {
         llvm::TypeSwitch<Operation *, bool>(op)
             .Case<memref::LoadOp, memref::StoreOp>([&](auto memrefOp) {
               auto memref = memrefOp.getMemRef();
-              memrefAccesses[memref].push_back(op);
+              nonAffineAccesses[memref].push_back(op);
               return true;
             })
             .Case<AffineLoadOp, AffineStoreOp>([&](auto) {
@@ -111,16 +136,38 @@ static LogicalResult analyzeMemAccesses(func::FuncOp funcOp, MLIRContext *ctx) {
               "before this one to give a "
               "unique name to each memory operation";
 
-  OpBuilder builder(ctx);
   OpDependencies opDeps;
 
   // Collect dependencies between affine accesses
   for (auto &[memref, accesses] : affineAccesses)
-    for (unsigned i = 0, e = accesses.size(); i < e; ++i)
-      for (unsigned j = 0; j < e; ++j)
-        if (failed(checkAffineAccessPair(accesses[i], accesses[j], builder,
-                                         opDeps)))
+    for (size_t i = 0, e = accesses.size(); i < e; ++i)
+      for (size_t j = 0; j < e; ++j)
+        if (failed(
+                checkAffineAccessPair(accesses[i], accesses[j], opDeps, ctx)))
           return failure();
+
+  // Collect dependencies involving at least one non-affine access
+  for (auto &[memref, accesses] : nonAffineAccesses) {
+    SmallVector<Operation *> affAcc;
+    if (affineAccesses.contains(memref))
+      affAcc = affineAccesses[memref];
+
+    for (size_t i = 0, e = accesses.size(); i < e; ++i) {
+      // Pairs of non-affine access
+      for (size_t j = 0; j < e; ++j)
+        if (failed(checkNonAffineAccessPair(accesses[i], accesses[j], opDeps,
+                                            ctx)))
+          return failure();
+
+      // Pairs made up of one affine access and one non-affine access
+      for (size_t j = 0, f = affAcc.size(); j < f; ++j)
+        if (failed(checkNonAffineAccessPair(accesses[i], affAcc[j], opDeps,
+                                            ctx)) ||
+            failed(
+                checkNonAffineAccessPair(affAcc[j], accesses[i], opDeps, ctx)))
+          return failure();
+    }
+  }
 
   // Set list of dependencies for each memory operation
   for (auto &[op, deps] : opDeps)
