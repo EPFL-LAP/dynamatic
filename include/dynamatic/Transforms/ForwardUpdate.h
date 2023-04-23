@@ -15,6 +15,5 @@ namespace forward {
                         std::function<unsigned (Operation::operand_range vecOperands)>> 
                         &mapOpNameWidth);
 
-  bool passType(Operation *op);
 }
 #endif // DYNAMATIC_TRANSFORMS_FORWARDUPDATE_H

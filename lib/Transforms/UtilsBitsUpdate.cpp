@@ -115,7 +115,7 @@ void constructFuncMap(DenseMap<StringRef,
       return widths;
     };
 
-    mapOpNameWidth[StringRef("arith.ceildivsi")] = 
+    mapOpNameWidth[StringRef("arith.divsi")] = 
     [&] (Operation::operand_range vecOperands,
          Operation::result_range vecResults) {
       std::vector<std::vector<unsigned>> widths; 
@@ -133,7 +133,29 @@ void constructFuncMap(DenseMap<StringRef,
       return widths;
     };
 
-    mapOpNameWidth[StringRef("arith.ceildivusi")] = mapOpNameWidth[StringRef("arith.ceildivsi")];
+    mapOpNameWidth[StringRef("arith.divusi")] = mapOpNameWidth[StringRef("arith.ceildivsi")];
+
+    mapOpNameWidth[StringRef("arith.shrsi")] = 
+    [&](Operation::operand_range vecOperands,
+         Operation::result_range vecResults) {
+      std::vector<std::vector<unsigned>> widths; 
+      unsigned shift_bit = 0;
+      if (auto defOp = vecOperands[1].getDefiningOp(); isa<handshake::ConstantOp>(defOp))
+        if (handshake::ConstantOp cstOp = dyn_cast<handshake::ConstantOp>(defOp))
+          if (auto IntAttr = cstOp.getValue().dyn_cast<mlir::IntegerAttr>())
+            shift_bit = IntAttr.getValue().getZExtValue();
+                                
+      unsigned int width = std::min(cpp_max_width,
+                                  vecOperands[0].getType().getIntOrFloatBitWidth() - shift_bit);
+
+      width = std::min(cpp_max_width, width);
+      widths.push_back({width, width}); //matched widths for operators
+      widths.push_back({width}); //matched widths for result
+
+      return widths;
+    };
+
+    mapOpNameWidth[StringRef("arith.shrui")] = mapOpNameWidth[StringRef("arith.shrsi")];
 
     mapOpNameWidth[StringRef("arith.cmpi")] = 
       [&] (Operation::operand_range vecOperands,
@@ -143,7 +165,7 @@ void constructFuncMap(DenseMap<StringRef,
       unsigned int maxOpWidth = std::max(vecOperands[0].getType().getIntOrFloatBitWidth(), 
                                          vecOperands[1].getType().getIntOrFloatBitWidth());
       
-      unsigned int width = std::min(cpp_max_width, width);
+      unsigned int width = std::min(cpp_max_width, maxOpWidth);
 
       widths.push_back({width, width}); //matched widths for operators
       widths.push_back({unsigned(1)}); //matched widths for result
@@ -162,24 +184,27 @@ void constructFuncMap(DenseMap<StringRef,
 
       for (auto oprand : vecOperands) {
         ind++;
+        if (ind==0)
+          continue; // skip the width of the index 
+        
         if (!isa<NoneType>(oprand.getType()))
           if (!isa<IndexType>(oprand.getType()) && 
               oprand.getType().getIntOrFloatBitWidth() > maxOpWidth)
             maxOpWidth = oprand.getType().getIntOrFloatBitWidth();
       }
-      unsigned indexWidth;
-      if (ind>0)
-        indexWidth = log2(ind-1)+2;
-      else
-        indexWidth = 2;
+      unsigned indexWidth=2;
+      if (ind>2)
+        indexWidth = log2(ind-2)+2;
+
       widths.push_back({indexWidth}); // the bit width for the mux index result;
 
-      if (isa<NoneType>(vecOperands[0].getType())) {
+      if (isa<NoneType>(vecResults[0].getType())) {
         widths.push_back({});
         return widths;
       }
 
-      unsigned int width = std::min(cpp_max_width, maxOpWidth);
+      unsigned int width = std::min(vecResults[0].getType().getIntOrFloatBitWidth(),
+                                    std::min(cpp_max_width, maxOpWidth));
       // 1st operand is the index; rest of (ind -1) operands set to width
       std::vector<unsigned> opwidths(ind-1, width); 
 
@@ -227,7 +252,10 @@ void constructFuncMap(DenseMap<StringRef,
 
           std::vector<std::vector<unsigned>> widths; 
           widths.push_back({address_width});
-          widths.push_back({address_width});
+          if (!isa<NoneType>(vecResults[0].getType()))
+            widths.push_back({address_width});
+          else 
+            widths.push_back({});
           return widths;
     };
 
@@ -264,6 +292,7 @@ void constructFuncMap(DenseMap<StringRef,
         isa<mlir::arith::DivSIOp>(*Op) ||
         isa<mlir::arith::DivUIOp>(*Op) ||
         isa<mlir::arith::CmpIOp>(*Op)  ||
+        isa<mlir::arith::ShRSIOp>(*Op) ||
         isa<handshake::MuxOp>(*Op)     ||
         isa<handshake::MergeOp>(*Op)   ||
         isa<handshake::DynamaticLoadOp>(*Op) ||
@@ -292,13 +321,37 @@ void constructFuncMap(DenseMap<StringRef,
     return false;
   }
 
+  void replaceWithSuccessor(Operation *Op) {
+    Operation *sucNode = Op->getOperand(0).getDefiningOp();
+      // llvm::errs() << "successor" << *sucNode << "\n";
+
+      unsigned ind = 0;
+      for (auto Val : sucNode->getResults()) {
+
+        if (Val==Op->getOperand(0))
+          break;
+        ind++;
+      }
+      // llvm::errs() << "before revertTruncOrExt " << *Op << "\n";
+      SmallVector<Operation *> vecUsers;
+      for (auto user : Op->getResult(0).getUsers())
+        vecUsers.push_back(user);
+      
+      for (auto user : vecUsers)
+        user->replaceUsesOfWith(Op->getResult(0), sucNode->getResult(ind));
+      // Op->getResult(0).replaceAllUsesWith(sucNode->getResult(ind));
+      // llvm::errs() << "after revertTruncOrExt " << *Op << "\n";
+
+  }
+
   void revertTruncOrExt(Operation *Op, MLIRContext *ctx) {
     OpBuilder builder(ctx);
     // if width(res) == width(opr) : delte the operand;
+
     if (Op->getResult(0).getType().getIntOrFloatBitWidth() ==
         Op->getOperand(0).getType().getIntOrFloatBitWidth()) {
-      for(auto user : Op->getResult(0).getUsers()) 
-        user->replaceUsesOfWith(Op->getResult(0), Op->getOperand(0));
+
+      replaceWithSuccessor(Op);
       Op->erase();
     }
 
@@ -354,17 +407,19 @@ void constructFuncMap(DenseMap<StringRef,
     // make operator matched the width
 
     for (unsigned int i = 0; i < OprsWidth[0].size(); ++i) {
-      llvm::errs() <<  i << "\n";
-      if (auto Operand = Op->getOperand(i); 
-          Operand.getType().getIntOrFloatBitWidth() != OprsWidth[0][i])
+      // llvm::errs() << "validate operator " << i << " : " << OprsWidth[0][i] << "\n";
+      if (auto Operand = Op->getOperand(i); !isa<NoneType>(Operand.getType()) &&
+          Operand.getType().getIntOrFloatBitWidth() != OprsWidth[0][i]) 
+        {
         auto insertOp = insertWidthMatchOp(Op, 
                                            i, 
                                            getNewType(Operand, OprsWidth[0][i], false), 
-                                           ctx);
+                                           ctx); 
+        }
+        
     }
     // make result matched the width
     for (unsigned int i = 0; i < OprsWidth[1].size(); ++i) {
-      llvm::errs() <<  Op->getResult(i) << "adapted to " << OprsWidth[1][i] << "\n";
       if (auto OpRes = Op->getResult(i); 
           OpRes.getType().getIntOrFloatBitWidth() != OprsWidth[1][i]) {
         Type newType = getNewType(OpRes, OprsWidth[1][i], false);
@@ -378,7 +433,10 @@ void constructFuncMap(DenseMap<StringRef,
     // passType: branch, conditionalbranch
     // c <= op(a,b): addi, subi, mux, etc. where both a,b,c needed to be verified
     // need to be reverted or deleted : truncIOp, extIOp
-    bool pass, match, revert;
+    bool pass   = false;
+    bool match  = false;
+    bool revert = false;
+
     setValidateType(Op, pass, match, revert);
 
     if (pass)

@@ -18,7 +18,6 @@
 #include "mlir/Support/IndentedOstream.h"
 
 static LogicalResult initCstOpBitsWidth(handshake::FuncOp funcOp,
-                        //  ConversionPatternRewriter &rewriter){
                         MLIRContext *ctx)  {
   OpBuilder builder(ctx);
   SmallVector<handshake::ConstantOp> cstOps;
@@ -45,40 +44,56 @@ static LogicalResult initCstOpBitsWidth(handshake::FuncOp funcOp,
         cstBitWidth = 2;
     }
       
-    // Get the new type of calculated bitwidth
-    Type newType = getNewType(op.getResult(), cstBitWidth, ifSign);
+    if (cstBitWidth < op.getResult().getType().getIntOrFloatBitWidth()) {
+      // Get the new type of calculated bitwidth
+      Type newType = getNewType(op.getResult(), cstBitWidth, ifSign);
 
-    // Update the constant operator for both ValueAttr and result Type
-    builder.setInsertionPointAfter(op);
-    handshake::ConstantOp newResult = builder.create<handshake::ConstantOp>(op.getLoc(), 
-                                                      newType,
-                                                      op.getValue(),
-                                                      op.getCtrl());
+      // Update the constant operator for both ValueAttr and result Type
+      builder.setInsertionPointAfter(op);
+      handshake::ConstantOp newCstOp = builder.create<handshake::ConstantOp>(op.getLoc(), 
+                                                        newType,
+                                                        op.getValue(),
+                                                        op.getCtrl());
 
-    // Determine the proper representation of the constant value
-    int intVal = op.getValue().cast<IntegerAttr>().getInt();
-    intVal = ((1 << op.getValue().getType().getIntOrFloatBitWidth())-1 + intVal);
-    newResult.setValueAttr(IntegerAttr::get(newType, intVal));
-    // save the original bb
-    newResult->setAttr("bb", op->getAttr("bb")); 
+      // Determine the proper representation of the constant value
+      int intVal = op.getValue().cast<IntegerAttr>().getInt();
+      intVal = ((1 << op.getValue().getType().getIntOrFloatBitWidth())-1 + intVal);
+      newCstOp.setValueAttr(IntegerAttr::get(newType, intVal));
+      // save the original bb
+      newCstOp->setAttr("bb", op->getAttr("bb")); 
 
-    // recursively replace the uses of the old constant operation with the new one
-    op->replaceAllUsesWith(newResult);
+      // recursively replace the uses of the old constant operation with the new one
+      // Value opVal = op.getResult();
+      auto extOp = builder.create<mlir::arith::ExtSIOp>(newCstOp.getLoc(),
+                                                        op.getResult().getType(),
+                                                        newCstOp.getResult()); 
 
-    SmallVector<Operation *> userOps;
-    for (auto &user : newResult.getResult().getUses())
-      userOps.push_back(user.getOwner());
+      // replace the constant operation (default width) 
+      // with new constant operation (optimized width)
+      op->replaceAllUsesWith(newCstOp);
 
-    SmallVector<Operation *> vecOp;
-    for (auto updateOp : userOps){
-      vecOp.insert(vecOp.end(), newResult);
-      update::updateUserType(updateOp, newType, vecOp, ctx);
-      vecOp.clear();
+      // update the user of constant operation 
+      SmallVector<Operation *> userOps;
+      for (auto &user : newCstOp.getResult().getUses())
+          userOps.push_back(user.getOwner());
+
+      for (auto updateOp : userOps)
+        if (!isa<mlir::arith::ExtSIOp>(*updateOp))
+          updateOp->replaceUsesOfWith(newCstOp.getResult(), extOp->getResult(0));
+        
+
+      builder.clearInsertionPoint();
+      op->erase();
     }
-      // llvm::errs() <<"\n\n";
+    
 
-    op->erase();
   }
+
+  // for (auto &op : funcOp.getOps()) {
+  //   llvm::errs() << "op after constant initialization " << op <<'\n';
+  //   // update::validateOp(&op, ctx);
+  //   // llvm::errs() << "op after validation " << op <<"\n\n";
+  // }
   
   return success();
 }

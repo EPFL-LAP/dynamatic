@@ -33,147 +33,98 @@ static LogicalResult rewriteBitsWidths(handshake::FuncOp funcOp, MLIRContext *ct
   using forward_func  = std::function<unsigned (mlir::Operation::operand_range vecOperands)>;
   using backward_func = std::function<unsigned (mlir::Operation::result_range vecResults)>;
   
-  
   SmallVector<Operation *> containerOps;
   
 
   bool changed = true;
   while (changed) {
+    // init 
     changed = false;
+    containerOps.clear();
 
+    for (auto &op : funcOp.getOps())
+      containerOps.push_back(&op);
+    
     // Forward process
     DenseMap<StringRef, forward_func> forMapOpNameWidth;
     forward::constructFuncMap(forMapOpNameWidth);
+    for (auto opPointer=containerOps.begin(); opPointer!=containerOps.end(); ++opPointer){
+      
+      auto op = *opPointer;
 
-    for (auto &op : funcOp.getOps()){
-
-      if (isa<handshake::ConstantOp>(op))
-        continue;
-      // store the operations in a container for backward process
-      // containerOps.insert(containerOps.end(), &op);
-      containerOps.push_back(&op);
-
-      // propogate the type from operators to result 
-      if (forward::passType(&op))
+      if (isa<handshake::ConstantOp>(*op))
         continue;
 
-      // get the new bit width of the result operator
-      const auto opName = op.getName().getStringRef();
+      if (isa<mlir::arith::ExtSIOp>(op) || isa<mlir::arith::ExtUIOp>(op)) {
+        update::replaceWithSuccessor(op);
+        op->erase();
+        continue;
+      }
+
+      const auto opName = op->getName().getStringRef();
       unsigned int newWidth = 0;
       if (forMapOpNameWidth.find(opName) != forMapOpNameWidth.end())
-        newWidth = forMapOpNameWidth[opName](op.getOperands());
+        newWidth = forMapOpNameWidth[opName](op->getOperands());
 
-      if (newWidth==0)
-        continue;
       // if the new type can be optimized, update the type
-      if(Type newOpResultType = getNewType(op.getResult(0), newWidth, true);  
-          newWidth < op.getResult(0).getType().getIntOrFloatBitWidth() && newWidth > 0){
+      if (newWidth>0)
+        if(Type newOpResultType = getNewType(op->getResult(0), newWidth, true);  
+            newWidth < op->getResult(0).getType().getIntOrFloatBitWidth() ){  
           changed |= true;
-          op.getResult(0).setType(newOpResultType);
-      }
-      
+          op->getResult(0).setType(newOpResultType);
 
-      // TODO: Insert operation to pass the verification
-      // forward::match
-      if (isa<handshake::DynamaticLoadOp>(op) || 
-          isa<handshake::DynamaticStoreOp>(op) || 
-          isa<mlir::arith::MulIOp>(op) ||
-          isa<mlir::arith::AddIOp>(op) ||
-          isa<mlir::arith::CmpIOp>(op))  {
-        bool isLdSt = isa<handshake::DynamaticLoadOp>(op) || 
-                      isa<handshake::DynamaticStoreOp>(op);
-        
-        unsigned opWidth = cpp_max_width;
-
-        // TODO: change it to backward function map
-        if (!isLdSt)
-          opWidth = op.getResult(0).getType().getIntOrFloatBitWidth();
-        if (isa<mlir::arith::CmpIOp>(op))
-          opWidth = std::max(op.getOperand(0).getType().getIntOrFloatBitWidth(),
-                             op.getOperand(1).getType().getIntOrFloatBitWidth());
-        
-        for (unsigned int i = 0; i < op.getNumOperands(); ++i) {
-          // width of data operand for Load and Store op 
-          if (isLdSt && i==1)
-            opWidth = address_width;
-
-          // opWidth = 0 indicates the operand is none type operand, skip matched width insertion
-          if (auto Operand = op.getOperand(i) ; opWidth != 0){
-            auto insertOp = insertWidthMatchOp(&op, 
-                                                i, 
-                                                getNewType(Operand, opWidth, false), 
-                                                ctx);
-            // if (insertOp.has_value())
-            // op.getOperand(i).replaceAllUsesWith(insertOp.value()->getResult(0));
-          }
         }
-      }
     }
 
+    // for (auto &op : funcOp.getOps())
+    //   llvm::errs() << op <<"\n";
+
     // Backward Process
-    // all operations width are matched for verification, 
-    // backward only update the trunc operation
-    SmallVector<Operation *> truncOps;
     DenseMap<StringRef, backward_func> backMapOpNameWidth;
     backward::constructFuncMap(backMapOpNameWidth);
 
-    for (auto op=containerOps.rbegin(); op!=containerOps.rend(); ++op) {
-    //  if ((*op)->getNumResults() > 0 && !isa<N'oneType>((*op)->getResult(0).getType()))
-      if (isa<mlir::arith::TruncIOp>(*op)) {
-          changed |= true;
-        llvm::errs() << (*op)->getResult(0) <<"\n";
-        truncOps.push_back(*op);
-        SmallVector<Operation *> vecOp;
-        vecOp.insert(vecOp.end(), *op);
+    for (auto opPointer=containerOps.rbegin(); opPointer!=containerOps.rend(); ++opPointer) {
+      auto op = *opPointer;
 
-        backward::updateDefOpType((*op)->getOperand(0).getDefiningOp(),
-                                  (*op)->getResult(0).getType(),
-                                  vecOp,
-                                  ctx);
-        (*op)->getResult(0).replaceAllUsesWith((*op)->getOperand(0));
-      }
-
-      if (isa<handshake::ConstantOp>(**op))
+      if (isa<handshake::ConstantOp>(*op))
         continue;
       
-      if (isa<handshake::ConditionalBranchOp>(**op))
-        (*op)->getOperand(1).setType((*op)->getResult(0).getType());
+     if (isa<mlir::arith::TruncIOp>(*op)) {
+        update::replaceWithSuccessor(op);
+        op->erase();
+        continue;
+      }
 
-      if (isa<handshake::BranchOp>(**op))
-        (*op)->getOperand(0).setType((*op)->getResult(0).getType());
-
-      const auto opName = (*op)->getName().getStringRef();
+      const auto opName = op->getName().getStringRef();
 
       unsigned int newWidth = 0;
       // get the new bit width of the result operator
       if (backMapOpNameWidth.find(opName) != backMapOpNameWidth.end())
-        newWidth = backMapOpNameWidth[opName]((*op)->getResults());
+        newWidth = backMapOpNameWidth[opName](op->getResults());
 
-      if (newWidth==0)
-        continue;
-      // if the new type can be optimized, update the type
-      if(Type newOpResultType = getNewType((*op)->getOperand(0), newWidth, true);  
-          newWidth < (*op)->getOperand(0).getType().getIntOrFloatBitWidth() && newWidth > 0){
-        changed |= true;
-        llvm::errs() << "backward : " << (*op)->getResult(0) <<"\n";
-        for (unsigned i=0;i<(*op)->getNumOperands();++i)
-          (*op)->getOperand(i).setType(newOpResultType);
-      }
+      if (newWidth>0)
+        // if the new type can be optimized, update the type
+        if(Type newOpResultType = getNewType(op->getOperand(0), newWidth, true);  
+            newWidth < op->getOperand(0).getType().getIntOrFloatBitWidth()){
+          changed |= true;
+          // llvm::errs() << "backward op " << *op << "\n";
+          for (unsigned i=0;i<op->getNumOperands();++i)
+            if (newWidth < op->getOperand(i).getType().getIntOrFloatBitWidth())
+              op->getOperand(i).setType(newOpResultType);
+        }
       
     }
 
     llvm::errs() << "-----------------end one round-----------------\n";
-    // remove truncOps
-    for (auto op : truncOps)
-      op->erase();
 
-    // clear the operations
-    containerOps.clear();
-    
   }
 
-  // for (auto &op : funcOp.getOps())
-  //     llvm::errs() << op <<"\n";
+  for (auto &op : funcOp.getOps()) {
+      // llvm::errs() <<"before validation : " << op <<"\n";
+      update::validateOp(&op, ctx);
+      // llvm::errs() <<"after validation : " << op <<"\n\n";
+
+  }
     
 
   

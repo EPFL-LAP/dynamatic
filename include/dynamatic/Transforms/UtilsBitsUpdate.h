@@ -34,32 +34,20 @@ std::optional<Operation *> insertWidthMatchOp (Operation *newOp,
                                                int opInd, 
                                                Type newType, 
                                                MLIRContext *ctx);
-
-// void setUserType (Operation *newOp, 
-//                   Type newType,
-//                   SmallVector<int> vecIndex);
-
-// void setDefOpType (Operation *newOp, 
-//                    Type newType,
-//                    SmallVector<int> vecIndex);
                   
 namespace update {
 
   void constructFuncMap(DenseMap<mlir::StringRef, 
                       std::function<unsigned (Operation::operand_range vecOperands)>> 
                       &mapOpNameWidth);
-
-  // void setUpdateFlag(Operation *newResult,
-  //                   bool &passType, 
-  //                   bool &oprAdapt, 
-  //                   bool &resAdapter, 
-  //                   bool &deleteOp);
   
   void validateOp(Operation *Op, MLIRContext *ctx);
 
   bool propType(Operation *Op);
 
   void matchOpResWidth (Operation *Op, MLIRContext *ctx);
+
+  void replaceWithSuccessor(Operation *Op);
 
   void revertTruncOrExt(Operation *Op, MLIRContext *ctx);
 

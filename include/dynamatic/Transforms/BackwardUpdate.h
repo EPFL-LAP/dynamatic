@@ -15,16 +15,16 @@ void constructFuncMap(DenseMap<StringRef,
                      std::function<unsigned (Operation::result_range vecResults)>> 
                      &mapOpNameWidth);
 
-void setUpdateFlag(Operation *newResult, 
-                  bool &passType, 
-                  bool &oprAdapt, 
-                  bool &resAdapter, 
-                  bool &deleteOp);
+// void setUpdateFlag(Operation *newResult, 
+//                   bool &passType, 
+//                   bool &oprAdapt, 
+//                   bool &resAdapter, 
+//                   bool &deleteOp);
                   
-void updateDefOpType(Operation *newResult, 
-                    Type newType, 
-                    SmallVector<Operation *> &vecOp, 
-                    MLIRContext *ctx);
+// void updateDefOpType(Operation *newResult, 
+//                     Type newType, 
+//                     SmallVector<Operation *> &vecOp, 
+//                     MLIRContext *ctx);
 
 }
 #endif // DYNAMATIC_TRANSFORMS_BACKWARDUPDATE_H

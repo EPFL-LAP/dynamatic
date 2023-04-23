@@ -88,22 +88,15 @@ namespace forward {
     return unsigned(1);
   };
 
+  mapOpNameWidth[StringRef("arith.extsi")] = [](Operation::operand_range vecOperands)
+  {
+    return vecOperands[0].getType().getIntOrFloatBitWidth();
   };
 
-  bool passType(Operation *op) {
+  mapOpNameWidth[StringRef("arith.extui")] = mapOpNameWidth[StringRef("arith.extsi")];
 
-    if (isa<handshake::ConditionalBranchOp>(*op)) {
-      for (auto resOp : op->getResults())
-        resOp.setType(op->getOperand(1).getType());
-      return true;
-    }
+  };
 
-    if (isa<handshake::BranchOp>(*op)) {
-      op->getResult(0).setType(op->getOperand(0).getType());
-      return true;
-    }
-    return false;
-  }
 
 
 }
