@@ -410,9 +410,9 @@ static std::string getInputForMC(handshake::MemoryControllerOp op) {
 static std::string getOutputForMC(handshake::MemoryControllerOp op) {
   MemPortsData ports;
   for (auto [idx, res] : llvm::enumerate(op->getResults().drop_back(1)))
-    ports.push_back((std::make_tuple("in" + std::to_string(idx + 1), res,
+    ports.push_back((std::make_tuple("out" + std::to_string(idx + 1), res,
                                      "l" + std::to_string(idx) + "d")));
-  ports.push_back((std::make_tuple("in" + std::to_string(op.getNumResults()),
+  ports.push_back((std::make_tuple("out" + std::to_string(op.getNumResults()),
                                    op->getResults().back(), "e")));
   return getIOFromPorts(ports);
 }
@@ -638,7 +638,7 @@ static void annotateNode(mlir::raw_indented_ostream &os, Operation *op) {
             std::stringstream stream;
             stream << "0x" << std::setfill('0') << std::setw(length) << std::hex
                    << value;
-            info.stringAttr["constant"] = stream.str();
+            info.stringAttr["value"] = stream.str();
             info.stringAttr["delay"] =
                 "0.000 0.000 0.000 100.000 100.000 100.000 100.000 100.000";
             return info;
@@ -732,8 +732,9 @@ static void annotateNode(mlir::raw_indented_ostream &os, Operation *op) {
       info.stringAttr["out"] = getIOFromValues(op->getResults(), "out");
   }
 
-  // Add default latency if not specified
-  if (info.intAttr.find("latency") == info.intAttr.end())
+  // Add default latency for operators if not specified
+  if (info.intAttr.find("latency") == info.intAttr.end() &&
+      info.type == "Operator")
     info.intAttr["latency"] = 0;
 
   // II is 1 for all operators
@@ -906,7 +907,7 @@ static std::string dotPrintNode(mlir::raw_indented_ostream &outfile,
              .Case<arith::XOrIOp>([&](auto) { return "^"; })
              .Case<arith::MulIOp, arith::MulFOp>([&](auto) { return "*"; })
              .Case<arith::DivUIOp, arith::DivSIOp, arith::DivFOp>(
-                 [&](auto) { return "/"; })
+                 [&](auto) { return "div"; })
              .Case<arith::ShRSIOp, arith::ShRUIOp>([&](auto) { return ">>"; })
              .Case<arith::ShLIOp>([&](auto) { return "<<"; })
              .Case<arith::CmpIOp>([&](arith::CmpIOp op) {
