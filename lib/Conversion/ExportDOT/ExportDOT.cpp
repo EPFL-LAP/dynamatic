@@ -30,6 +30,8 @@ using namespace dynamatic;
 namespace {
 struct ExportDOTPass : public ExportDOTBase<ExportDOTPass> {
 
+  ExportDOTPass(bool legacy) { this->legacy = legacy; }
+
   void runOnOperation() override {
     ModuleOp mod = getOperation();
     markAllAnalysesPreserved();
@@ -55,7 +57,11 @@ struct ExportDOTPass : public ExportDOTBase<ExportDOTPass> {
     os.indent();
     os << "splines=spline;\n";
     os << "compound=true; // Allow edges between clusters\n";
-    dotPrint(os, funcOp);
+    if (failed(printFunc(os, funcOp))) {
+      funcOp.emitOpError() << "failed to export to DOT";
+      outfile.close();
+      return signalPassFailure();
+    }
     os.unindent();
     os << "}\n";
 
@@ -72,13 +78,19 @@ private:
   DenseMap<Operation *, std::string> opNameMap;
 
   /// Prints an instance of a handshake.func to the graph.
-  void dotPrint(mlir::raw_indented_ostream &os, handshake::FuncOp f);
+  LogicalResult printFunc(mlir::raw_indented_ostream &os, handshake::FuncOp f);
 
-  /// Returns the name of the vertex representing the operation.
+  /// Returns the name of the node representing the operation.
   std::string getNodeName(Operation *op);
 
+  /// Prints a node corresponding to an operation and, on success, returns a
+  /// unique name for the operation in the outName argument.
+  LogicalResult printNode(mlir::raw_indented_ostream &os, Operation *op,
+                          unsigned opID, std::string &outName);
+
   /// Prints an edge between a source and destination operation, which are
-  /// linked by a result of the source that the destination uses as an operand.
+  /// linked by a result of the source that the destination uses as an
+  /// operand.
   template <typename Stream>
   void printEdge(Stream &os, Operation *src, Operation *dst, Value val);
 
@@ -89,13 +101,7 @@ private:
   /// Closes a subgraph in the DOT file.
   void closeSubgraph(mlir::raw_indented_ostream &os);
 };
-} // namespace
 
-// ============================================================================
-// Legacy node/edge attributes
-// ============================================================================
-
-namespace {
 /// Holds information about data attributes for a DOT node.
 struct NodeInfo {
   /// The node's type.
@@ -166,14 +172,21 @@ using MemPortsData = std::vector<std::tuple<std::string, Value, std::string>>;
 
 } // namespace
 
+// ============================================================================
+// Legacy node/edge attributes
+// ============================================================================
+
 /// Maps name of arithmetic operation to "op" attribute.
 static std::unordered_map<std::string, std::string> arithNameToOpName{
-    {"arith.addi", "add_op"},   {"arith.addf", "fadd_op"},
-    {"arith.subi", "sub_op"},   {"arith.subf", "fsub_op"},
-    {"arith.andi", "and_op"},   {"arith.ori", "or_op"},
-    {"arith.xori", "xor_op"},   {"arith.muli", "mul_op"},
-    {"arith.mulf", "fmul_op"},  {"arith.divui", "udiv_op"},
-    {"arith.divsi", "sdiv_op"}, {"arith.divf", "fdiv_op"}};
+    {"arith.addi", "add_op"},      {"arith.addf", "fadd_op"},
+    {"arith.subi", "sub_op"},      {"arith.subf", "fsub_op"},
+    {"arith.andi", "and_op"},      {"arith.ori", "or_op"},
+    {"arith.xori", "xor_op"},      {"arith.muli", "mul_op"},
+    {"arith.mulf", "fmul_op"},     {"arith.divui", "udiv_op"},
+    {"arith.divsi", "sdiv_op"},    {"arith.divf", "fdiv_op"},
+    {"arith.sitofp", "sitofp_op"}, {"arith.remsi", "urem_op"},
+    {"arith.sext", "sext_op"},     {"arith.extui", "zext_op"},
+    {"arith.trunci", "trunc_op"},  {"arith.shrsi", "ashr_op"}};
 
 /// Delay information for arith.addi and arith.subi operations.
 static const std::string DELAY_ADD_SUB =
@@ -187,6 +200,12 @@ static const std::string DELAY_SUBF_MULF =
 /// Delay information for arith.andi, arith.ori, and arith.xori operations.
 static const std::string DELAY_LOGIC_OP =
     "1.397 1.397 1.400 1.409 100.000 100.000 100.000 100.000";
+/// Delay information for arith.sitofp and arith.remsi operations.
+static const std::string DELAY_SITOFP_REMSI =
+    "1.412 1.397 0.000 1.412 1.397 1.412 100.000 100.000";
+/// Delay information for extension and truncation operations.
+static const std::string DELAY_EXT_TRUNC =
+    "0.672 0.672 1.397 1.397 100.000 100.000 100.000 100.000";
 
 /// Maps name of arithmetic operation to "delay" attribute.
 static std::unordered_map<std::string, std::string> arithNameToDelay{
@@ -202,7 +221,12 @@ static std::unordered_map<std::string, std::string> arithNameToDelay{
     {"arith.andi", DELAY_LOGIC_OP},
     {"arith.ori", DELAY_LOGIC_OP},
     {"arith.xori", DELAY_LOGIC_OP},
-};
+    {"arith.sitofp", DELAY_SITOFP_REMSI},
+    {"arith.remsi", DELAY_SITOFP_REMSI},
+    {"arith.sext", DELAY_EXT_TRUNC},
+    {"arith.extui", DELAY_EXT_TRUNC},
+    {"arith.trunci", DELAY_EXT_TRUNC},
+    {"arith.shrsi", DELAY_EXT_TRUNC}};
 
 /// Maps name of integer comparison type to "op" attribute.
 static std::unordered_map<arith::CmpIPredicate, std::string> cmpINameToOpName{
@@ -310,6 +334,7 @@ static std::string getInputForCondBranch(handshake::ConditionalBranchOp op) {
   ports.push_back(std::make_pair("in2?", op.getConditionOperand()));
   return getIOFromPorts(ports);
 }
+
 /// Produces the "out" attribute value of a handshake::ConditionalBranchOp.
 static std::string getOutputForCondBranch(handshake::ConditionalBranchOp op) {
   PortsData ports;
@@ -536,7 +561,8 @@ static size_t fixPortNumber(Operation *op, Value val, size_t idx,
 /// prints them to the output stream; it is the responsibility of the caller of
 /// this method to insert an opening bracket before the call and a closing
 /// bracket after the call.
-static void annotateNode(mlir::raw_indented_ostream &os, Operation *op) {
+static LogicalResult annotateNode(mlir::raw_indented_ostream &os,
+                                  Operation *op) {
   auto info =
       llvm::TypeSwitch<Operation *, NodeInfo>(op)
           .Case<handshake::MergeOp>([&](auto) {
@@ -669,7 +695,8 @@ static void annotateNode(mlir::raw_indented_ostream &os, Operation *op) {
           .Case<arith::AddIOp, arith::AddFOp, arith::SubIOp, arith::SubFOp,
                 arith::AndIOp, arith::OrIOp, arith::XOrIOp, arith::MulIOp,
                 arith::MulFOp, arith::DivUIOp, arith::DivSIOp, arith::DivFOp,
-                arith::ShRSIOp, arith::ShRUIOp, arith::ShLIOp>([&](auto) {
+                arith::SIToFPOp, arith::RemSIOp, arith::ExtSIOp, arith::ExtUIOp,
+                arith::TruncIOp, arith::ShRSIOp>([&](auto) {
             auto info = NodeInfo("Operator");
             auto opName = op->getName().getStringRef().str();
             info.stringAttr["op"] = arithNameToOpName[opName];
@@ -707,11 +734,13 @@ static void annotateNode(mlir::raw_indented_ostream &os, Operation *op) {
           .Case<arith::IndexCastOp>([&](auto) {
             auto info = NodeInfo("Operator");
             info.stringAttr["op"] = "zext_op";
-            info.stringAttr["delay"] =
-                "0.672 0.672 1.397 1.397 100.000 100.000 100.000 100.000";
+            info.stringAttr["delay"] = DELAY_EXT_TRUNC;
             return info;
           })
-          .Default([&](auto) { return NodeInfo("unknown"); });
+          .Default([&](auto) { return NodeInfo(""); });
+
+  if (info.type.empty())
+    return op->emitOpError("unsupported in legacy mode");
 
   assert((info.type != "Operator" ||
           info.stringAttr.find("op") != info.stringAttr.end()) &&
@@ -743,6 +772,7 @@ static void annotateNode(mlir::raw_indented_ostream &os, Operation *op) {
 
   // Print to output
   info.print(os);
+  return success();
 }
 
 /// Computes all data attributes of a function argument for use in legacy
@@ -817,171 +847,166 @@ static std::string getStyleOfValue(Value result) {
   return isa<NoneType>(result.getType()) ? "style=" + CONTROL_STYLE + ", " : "";
 }
 
-/// Prints an operation to the output stream and returns the unique name for the
-/// operation within the graph.
-static std::string dotPrintNode(mlir::raw_indented_ostream &outfile,
-                                Operation *op,
-                                DenseMap<Operation *, unsigned> &opIDs) {
+LogicalResult ExportDOTPass::printNode(mlir::raw_indented_ostream &os,
+                                       Operation *op, unsigned opID,
+                                       std::string &outName) {
 
-  // Determine node name. We use "." to distinguish hierarchy in the dot file,
-  // but an op by default prints using "." between the dialect name and the op
-  // name. Replace uses of "." with "_".
-  std::string opDialectName = op->getName().getStringRef().str();
-  std::replace(opDialectName.begin(), opDialectName.end(), '.', '_');
-  std::string opName = opDialectName + std::to_string(opIDs[op]);
-  outfile << "\"" << opName << "\""
-          << " [";
+  // Determine node name
+  std::string opFullName = op->getName().getStringRef().str();
+  std::replace(opFullName.begin(), opFullName.end(), '.', '_');
+  std::string opName = opFullName + std::to_string(opID);
+  os << "\"" << opName << "\""
+     << " [";
 
   // Determine fill color
-  outfile << "fillcolor=";
-  outfile << llvm::TypeSwitch<Operation *, std::string>(op)
-                 .Case<handshake::ForkOp, handshake::LazyForkOp,
-                       handshake::MuxOp, handshake::JoinOp>(
-                     [&](auto) { return "lavender"; })
-                 .Case<handshake::BufferOp>([&](auto) { return "lightgreen"; })
-                 .Case<handshake::DynamaticReturnOp, handshake::EndOp>(
-                     [&](auto) { return "gold"; })
-                 .Case<handshake::SinkOp, handshake::ConstantOp>(
-                     [&](auto) { return "gainsboro"; })
-                 .Case<handshake::MemoryControllerOp,
-                       handshake::DynamaticLoadOp, handshake::DynamaticStoreOp>(
-                     [&](auto) { return "coral"; })
-                 .Case<handshake::MergeOp, handshake::ControlMergeOp,
-                       handshake::BranchOp, handshake::ConditionalBranchOp>(
-                     [&](auto) { return "lightblue"; })
-                 .Default([&](auto) { return "moccasin"; });
+  os << "fillcolor=";
+  os << llvm::TypeSwitch<Operation *, std::string>(op)
+            .Case<handshake::ForkOp, handshake::LazyForkOp, handshake::MuxOp,
+                  handshake::JoinOp>([&](auto) { return "lavender"; })
+            .Case<handshake::BufferOp>([&](auto) { return "lightgreen"; })
+            .Case<handshake::DynamaticReturnOp, handshake::EndOp>(
+                [&](auto) { return "gold"; })
+            .Case<handshake::SinkOp, handshake::ConstantOp>(
+                [&](auto) { return "gainsboro"; })
+            .Case<handshake::MemoryControllerOp, handshake::DynamaticLoadOp,
+                  handshake::DynamaticStoreOp>([&](auto) { return "coral"; })
+            .Case<handshake::MergeOp, handshake::ControlMergeOp,
+                  handshake::BranchOp, handshake::ConditionalBranchOp>(
+                [&](auto) { return "lightblue"; })
+            .Default([&](auto) { return "moccasin"; });
 
   // Determine shape
-  outfile << ", shape=";
+  os << ", shape=";
   if (op->getDialect()->getNamespace() == "handshake")
-    outfile << "box";
+    os << "box";
   else
-    outfile << "oval";
+    os << "oval";
 
   // Determine label
-  outfile << ", label=\"";
-  outfile
-      << llvm::TypeSwitch<Operation *, std::string>(op)
-             // handshake operations
-             .Case<handshake::ConstantOp>([&](auto op) {
-               // Try to get the constant value as an integer
-               if (mlir::BoolAttr boolAttr =
-                       op->template getAttrOfType<mlir::BoolAttr>("value");
-                   boolAttr)
-                 return std::to_string(boolAttr.getValue());
+  os << ", label=\"";
+  os << llvm::TypeSwitch<Operation *, std::string>(op)
+            // handshake operations
+            .Case<handshake::ConstantOp>([&](auto op) {
+              // Try to get the constant value as an integer
+              if (mlir::BoolAttr boolAttr =
+                      op->template getAttrOfType<mlir::BoolAttr>("value");
+                  boolAttr)
+                return std::to_string(boolAttr.getValue());
 
-               // Try to get the constant value as an integer
-               if (mlir::IntegerAttr intAttr =
-                       op->template getAttrOfType<mlir::IntegerAttr>("value");
-                   intAttr)
-                 return std::to_string(intAttr.getValue().getSExtValue());
+              // Try to get the constant value as an integer
+              if (mlir::IntegerAttr intAttr =
+                      op->template getAttrOfType<mlir::IntegerAttr>("value");
+                  intAttr)
+                return std::to_string(intAttr.getValue().getSExtValue());
 
-               // Try to get the constant value as floating point
-               if (mlir::FloatAttr floatAttr =
-                       op->template getAttrOfType<mlir::FloatAttr>("value");
-                   floatAttr)
-                 return std::to_string(floatAttr.getValue().convertToFloat());
+              // Try to get the constant value as floating point
+              if (mlir::FloatAttr floatAttr =
+                      op->template getAttrOfType<mlir::FloatAttr>("value");
+                  floatAttr)
+                return std::to_string(floatAttr.getValue().convertToFloat());
 
-               // Fallback on a generic string
-               return std::string("constant");
-             })
-             .Case<handshake::ControlMergeOp>([&](auto) { return "cmerge"; })
-             .Case<handshake::ConditionalBranchOp>(
-                 [&](auto) { return "cbranch"; })
-             .Case<handshake::BufferOp>([&](auto op) {
-               std::string n = "buffer ";
-               n += stringifyEnum(op.getBufferType());
-               return n;
-             })
-             .Case<handshake::BranchOp>([&](auto) { return "branch"; })
-             // handshake operations (dynamatic)
-             .Case<handshake::DynamaticLoadOp>([&](auto) { return "load"; })
-             .Case<handshake::DynamaticStoreOp>([&](auto) { return "store"; })
-             .Case<handshake::MemoryControllerOp>([&](auto) { return "MC"; })
-             .Case<handshake::DynamaticReturnOp>([&](auto) { return "return"; })
-             // arith operations
-             .Case<arith::AddIOp, arith::AddFOp>([&](auto) { return "+"; })
-             .Case<arith::SubIOp, arith::SubFOp>([&](auto) { return "-"; })
-             .Case<arith::AndIOp>([&](auto) { return "&"; })
-             .Case<arith::OrIOp>([&](auto) { return "|"; })
-             .Case<arith::XOrIOp>([&](auto) { return "^"; })
-             .Case<arith::MulIOp, arith::MulFOp>([&](auto) { return "*"; })
-             .Case<arith::DivUIOp, arith::DivSIOp, arith::DivFOp>(
-                 [&](auto) { return "div"; })
-             .Case<arith::ShRSIOp, arith::ShRUIOp>([&](auto) { return ">>"; })
-             .Case<arith::ShLIOp>([&](auto) { return "<<"; })
-             .Case<arith::CmpIOp>([&](arith::CmpIOp op) {
-               switch (op.getPredicate()) {
-               case arith::CmpIPredicate::eq:
-                 return "==";
-               case arith::CmpIPredicate::ne:
-                 return "!=";
-               case arith::CmpIPredicate::uge:
-               case arith::CmpIPredicate::sge:
-                 return ">=";
-               case arith::CmpIPredicate::ugt:
-               case arith::CmpIPredicate::sgt:
-                 return ">";
-               case arith::CmpIPredicate::ule:
-               case arith::CmpIPredicate::sle:
-                 return "<=";
-               case arith::CmpIPredicate::ult:
-               case arith::CmpIPredicate::slt:
-                 return "<";
-               }
-               llvm_unreachable("unhandled cmpi predicate");
-             })
-             .Case<arith::CmpFOp>([&](arith::CmpFOp op) {
-               switch (op.getPredicate()) {
-               case arith::CmpFPredicate::OEQ:
-               case arith::CmpFPredicate::UEQ:
-                 return "==";
-               case arith::CmpFPredicate::ONE:
-               case arith::CmpFPredicate::UNE:
-                 return "!=";
-               case arith::CmpFPredicate::OGE:
-               case arith::CmpFPredicate::UGE:
-                 return ">=";
-               case arith::CmpFPredicate::OGT:
-               case arith::CmpFPredicate::UGT:
-                 return ">";
-               case arith::CmpFPredicate::OLE:
-               case arith::CmpFPredicate::ULE:
-                 return "<=";
-               case arith::CmpFPredicate::OLT:
-               case arith::CmpFPredicate::ULT:
-                 return "<";
-               case arith::CmpFPredicate::ORD:
-                 return "ordered?";
-               case arith::CmpFPredicate::UNO:
-                 return "unordered?";
-               case arith::CmpFPredicate::AlwaysFalse:
-                 return "cmp-false";
-               case arith::CmpFPredicate::AlwaysTrue:
-                 return "cmp-true";
-               }
-               llvm_unreachable("unhandled cmpf predicate");
-             })
-             .Default([&](auto op) {
-               auto opDialect = op->getDialect()->getNamespace();
-               std::string label = op->getName().getStringRef().str();
-               if (opDialect == "handshake")
-                 label.erase(0, StringLiteral("handshake.").size());
+              // Fallback on a generic string
+              return std::string("constant");
+            })
+            .Case<handshake::ControlMergeOp>([&](auto) { return "cmerge"; })
+            .Case<handshake::ConditionalBranchOp>(
+                [&](auto) { return "cbranch"; })
+            .Case<handshake::BufferOp>([&](auto op) {
+              std::string n = "buffer ";
+              n += stringifyEnum(op.getBufferType());
+              return n;
+            })
+            .Case<handshake::BranchOp>([&](auto) { return "branch"; })
+            // handshake operations (dynamatic)
+            .Case<handshake::DynamaticLoadOp>([&](auto) { return "load"; })
+            .Case<handshake::DynamaticStoreOp>([&](auto) { return "store"; })
+            .Case<handshake::MemoryControllerOp>([&](auto) { return "MC"; })
+            .Case<handshake::DynamaticReturnOp>([&](auto) { return "return"; })
+            // arith operations
+            .Case<arith::AddIOp, arith::AddFOp>([&](auto) { return "+"; })
+            .Case<arith::SubIOp, arith::SubFOp>([&](auto) { return "-"; })
+            .Case<arith::AndIOp>([&](auto) { return "&"; })
+            .Case<arith::OrIOp>([&](auto) { return "|"; })
+            .Case<arith::XOrIOp>([&](auto) { return "^"; })
+            .Case<arith::MulIOp, arith::MulFOp>([&](auto) { return "*"; })
+            .Case<arith::DivUIOp, arith::DivSIOp, arith::DivFOp>(
+                [&](auto) { return "div"; })
+            .Case<arith::ShRSIOp, arith::ShRUIOp>([&](auto) { return ">>"; })
+            .Case<arith::ShLIOp>([&](auto) { return "<<"; })
+            .Case<arith::CmpIOp>([&](arith::CmpIOp op) {
+              switch (op.getPredicate()) {
+              case arith::CmpIPredicate::eq:
+                return "==";
+              case arith::CmpIPredicate::ne:
+                return "!=";
+              case arith::CmpIPredicate::uge:
+              case arith::CmpIPredicate::sge:
+                return ">=";
+              case arith::CmpIPredicate::ugt:
+              case arith::CmpIPredicate::sgt:
+                return ">";
+              case arith::CmpIPredicate::ule:
+              case arith::CmpIPredicate::sle:
+                return "<=";
+              case arith::CmpIPredicate::ult:
+              case arith::CmpIPredicate::slt:
+                return "<";
+              }
+              llvm_unreachable("unhandled cmpi predicate");
+            })
+            .Case<arith::CmpFOp>([&](arith::CmpFOp op) {
+              switch (op.getPredicate()) {
+              case arith::CmpFPredicate::OEQ:
+              case arith::CmpFPredicate::UEQ:
+                return "==";
+              case arith::CmpFPredicate::ONE:
+              case arith::CmpFPredicate::UNE:
+                return "!=";
+              case arith::CmpFPredicate::OGE:
+              case arith::CmpFPredicate::UGE:
+                return ">=";
+              case arith::CmpFPredicate::OGT:
+              case arith::CmpFPredicate::UGT:
+                return ">";
+              case arith::CmpFPredicate::OLE:
+              case arith::CmpFPredicate::ULE:
+                return "<=";
+              case arith::CmpFPredicate::OLT:
+              case arith::CmpFPredicate::ULT:
+                return "<";
+              case arith::CmpFPredicate::ORD:
+                return "ordered?";
+              case arith::CmpFPredicate::UNO:
+                return "unordered?";
+              case arith::CmpFPredicate::AlwaysFalse:
+                return "cmp-false";
+              case arith::CmpFPredicate::AlwaysTrue:
+                return "cmp-true";
+              }
+              llvm_unreachable("unhandled cmpf predicate");
+            })
+            .Default([&](auto op) {
+              auto opDialect = op->getDialect()->getNamespace();
+              std::string label = op->getName().getStringRef().str();
+              if (opDialect == "handshake")
+                label.erase(0, StringLiteral("handshake.").size());
 
-               return label;
-             });
-  outfile << "\"";
+              return label;
+            });
+  os << "\"";
 
   // Determine style
-  outfile << ", style=\"filled";
+  os << ", style=\"filled";
   if (auto controlInterface = dyn_cast<handshake::ControlInterface>(op);
       controlInterface && controlInterface.isControl())
-    outfile << ", " + CONTROL_STYLE;
-  outfile << "\", ";
-  annotateNode(outfile, op);
-  outfile << "]\n";
+    os << ", " + CONTROL_STYLE;
+  os << "\", ";
+  if (legacy && failed(annotateNode(os, op)))
+    return failure();
+  os << "]\n";
 
-  return opName;
+  outName = opName;
+  return success();
 }
 
 std::string ExportDOTPass::getNodeName(Operation *op) {
@@ -996,7 +1021,8 @@ void ExportDOTPass::printEdge(Stream &stream, Operation *src, Operation *dst,
                               Value val) {
   stream << "\"" << getNodeName(src) << "\" -> \"" << getNodeName(dst) << "\" ["
          << getStyleOfValue(val);
-  annotateEdge(stream, src, dst, val);
+  if (legacy)
+    annotateEdge(stream, src, dst, val);
   stream << "]\n";
 }
 
@@ -1012,8 +1038,8 @@ void ExportDOTPass::closeSubgraph(mlir::raw_indented_ostream &os) {
   os << "}\n";
 }
 
-void ExportDOTPass::dotPrint(mlir::raw_indented_ostream &os,
-                             handshake::FuncOp funcOp) {
+LogicalResult ExportDOTPass::printFunc(mlir::raw_indented_ostream &os,
+                                       handshake::FuncOp funcOp) {
   std::map<std::string, unsigned> opTypeCntrs;
   DenseMap<Operation *, unsigned> opIDs;
 
@@ -1035,7 +1061,8 @@ void ExportDOTPass::dotPrint(mlir::raw_indented_ostream &os,
     auto argLabel = funcOp.getArgName(arg.index()).getValue().str();
     os << "\"" << argLabel << "\" [shape=diamond, "
        << getStyleOfValue(arg.value()) << "label=\"" << argLabel << "\", ";
-    annotateArgument(os, arg.value());
+    if (legacy)
+      annotateArgument(os, arg.value());
     os << "]\n";
   }
 
@@ -1044,9 +1071,12 @@ void ExportDOTPass::dotPrint(mlir::raw_indented_ostream &os,
   for (auto &op : funcOp.getOps())
     if (auto instOp = dyn_cast<handshake::InstanceOp>(op); instOp)
       assert(false && "multiple functions are not supported");
-    else
-      opNameMap[&op] = dotPrintNode(os, &op, opIDs);
-
+    else {
+      std::string name;
+      if (failed(printNode(os, &op, opIDs[&op], name)))
+        return failure();
+      opNameMap[&op] = name;
+    }
   // Get function's "blocks". These leverage the "bb" attributes attached to
   // operations in handshake functions to display operations belonging to the
   // same original basic block together
@@ -1100,7 +1130,8 @@ void ExportDOTPass::dotPrint(mlir::raw_indented_ostream &os,
           for (auto user : arg.getUsers()) {
             os << "\"" << funcOp.getArgName(idx).getValue().str() << "\" -> \""
                << getNodeName(user) << "\" [" << getStyleOfValue(arg);
-            annotateArgumentEdge(os, arg, user);
+            if (legacy)
+              annotateArgumentEdge(os, arg, user);
             os << "]\n";
           }
 
@@ -1121,9 +1152,11 @@ void ExportDOTPass::dotPrint(mlir::raw_indented_ostream &os,
     for (auto res : op->getResults())
       for (auto &use : res.getUses())
         printEdge(os, op, use.getOwner(), res);
+
+  return success();
 }
 
 std::unique_ptr<mlir::OperationPass<mlir::ModuleOp>>
-dynamatic::createExportDOTPass() {
-  return std::make_unique<ExportDOTPass>();
+dynamatic::createExportDOTPass(bool legacy) {
+  return std::make_unique<ExportDOTPass>(legacy);
 }

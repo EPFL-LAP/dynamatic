@@ -52,13 +52,22 @@ def StandardToHandshakeFPGA18 : Pass<"lower-std-to-handshake-fpga18", "mlir::Mod
 def ExportDOT : Pass<"export-dot", "mlir::ModuleOp"> {
   let summary = "Emit the handshake-level IR to a DOT file";
   let description = [{
-    This pass analyses a handshake::FuncOp operation and exports a .dot graph
-    that corresponds to it. If multiple functions are present in the IR, the top
-    level function will be printed, and called functions will be subgraphs
-    within themain graph.
+    Exports a DOT graph corresponding to the module for visualization and
+    legacy-compatibility purposes. The pass only supports exporting the graph of
+    a single Handshake function at the moment, and will fail if there is more
+    than one Handhsake function in the module.
   }];
   let constructor = "dynamatic::createExportDOTPass()";
   let dependentDialects = ["circt::handshake::HandshakeDialect"];
+  let options =
+    [Option<"legacy", "legacy", "bool", "false",
+            "If true, the exported DOT file will be made compatible with "
+            "legacy Dynamatic (i.e. the file will be parsable by legacy "
+            "Dynamatic's post-processing passes). Enabling this option adds "
+            "some constraints on the input IR, which must also be compatible "
+            "with legacy Dynamatic's elastic circuits. In general, it is "
+            "therefore required to run the --prepare-for-legacy pass before "
+            "exporting a legacy-compatible DOT.">];
 }
 
 //===----------------------------------------------------------------------===//
