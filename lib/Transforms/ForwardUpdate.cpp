@@ -95,6 +95,23 @@ namespace forward {
 
   mapOpNameWidth[StringRef("arith.extui")] = mapOpNameWidth[StringRef("arith.extsi")];
 
+  mapOpNameWidth[StringRef("handshake.control_merge")] = [](Operation::operand_range vecOperands)
+  {
+    unsigned ind = 0; // record number of operators
+
+    for (auto oprand : vecOperands) 
+      ind++;
+
+    unsigned indexWidth=2;
+    if (ind>2)
+      indexWidth = log2(ind-2)+2;
+
+    return indexWidth;
+  };
+
+  // mapOpNameWidth[StringRef("handshake.control_merge")] = mapOpNameWidth[StringRef("handshake.mux")];
+
+
   };
 
 

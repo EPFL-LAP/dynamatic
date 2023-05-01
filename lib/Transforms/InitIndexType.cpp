@@ -65,7 +65,7 @@ static LogicalResult initIndexType(handshake::FuncOp funcOp, MLIRContext *ctx){
 
     // set type for other operations
     else {
-      for (int i=0; i<op.getNumResults(); ++i)
+      for (unsigned int i=0; i<op.getNumResults(); ++i)
         if (OpResult result = op.getResult(i); isa<IndexType>(result.getType())){
           result.setType(IntegerType::get(ctx, indexWidth));
 

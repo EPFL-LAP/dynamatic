@@ -14,7 +14,6 @@
 #include "mlir/Dialect/Arith/IR/Arith.h"
 
 #include "mlir/IR/OperationSupport.h"
-#include "mlir/Support/LogicalResult.h"
 #include "mlir/Support/IndentedOstream.h"
 
 static LogicalResult initCstOpBitsWidth(handshake::FuncOp funcOp,

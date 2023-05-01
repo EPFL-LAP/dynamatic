@@ -41,13 +41,21 @@ namespace update {
                       std::function<unsigned (Operation::operand_range vecOperands)>> 
                       &mapOpNameWidth);
   
-  void validateOp(Operation *Op, MLIRContext *ctx);
+  void validateOp(Operation *Op, 
+                  MLIRContext *ctx,
+                  SmallVector<Operation *> &newMatchedOps);
 
   bool propType(Operation *Op);
 
-  void matchOpResWidth (Operation *Op, MLIRContext *ctx);
+  void matchOpResWidth (Operation *Op, 
+                        MLIRContext *ctx,
+                        SmallVector<Operation *> &newMatchedOps);
 
   void replaceWithSuccessor(Operation *Op);
+
+  void replaceWithSuccessor(Operation *Op, 
+                            Type resType);
+
 
   void revertTruncOrExt(Operation *Op, MLIRContext *ctx);
 
@@ -55,11 +63,6 @@ namespace update {
                        bool &passtype,
                        bool &match,
                        bool &revert);
-                    
-  // void updateUserType(Operation *newResult, 
-  //                   Type newType, 
-  //                   SmallVector<Operation *> &vecOp, 
-  //                   MLIRContext *ctx);
 
 }
 

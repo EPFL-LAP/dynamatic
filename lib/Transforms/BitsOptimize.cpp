@@ -37,6 +37,7 @@ static LogicalResult rewriteBitsWidths(handshake::FuncOp funcOp, MLIRContext *ct
   
 
   bool changed = true;
+  int savedBits = 0;
   while (changed) {
     // init 
     changed = false;
@@ -55,6 +56,9 @@ static LogicalResult rewriteBitsWidths(handshake::FuncOp funcOp, MLIRContext *ct
       if (isa<handshake::ConstantOp>(*op))
         continue;
 
+      if (update::propType(op))
+        continue;
+
       if (isa<mlir::arith::ExtSIOp>(op) || isa<mlir::arith::ExtUIOp>(op)) {
         update::replaceWithSuccessor(op);
         op->erase();
@@ -62,16 +66,20 @@ static LogicalResult rewriteBitsWidths(handshake::FuncOp funcOp, MLIRContext *ct
       }
 
       const auto opName = op->getName().getStringRef();
-      unsigned int newWidth = 0;
+      unsigned int newWidth = 0, resInd=0;
       if (forMapOpNameWidth.find(opName) != forMapOpNameWidth.end())
         newWidth = forMapOpNameWidth[opName](op->getOperands());
 
+
+      if (isa<handshake::ControlMergeOp>(op))
+        resInd = 1; 
       // if the new type can be optimized, update the type
       if (newWidth>0)
-        if(Type newOpResultType = getNewType(op->getResult(0), newWidth, true);  
-            newWidth < op->getResult(0).getType().getIntOrFloatBitWidth() ){  
+        if(Type newOpResultType = getNewType(op->getResult(resInd), newWidth, true);  
+            newWidth < op->getResult(resInd).getType().getIntOrFloatBitWidth() ){  
           changed |= true;
-          op->getResult(0).setType(newOpResultType);
+          savedBits += op->getResult(resInd).getType().getIntOrFloatBitWidth()-newWidth;
+          op->getResult(resInd).setType(newOpResultType);
 
         }
     }
@@ -90,7 +98,8 @@ static LogicalResult rewriteBitsWidths(handshake::FuncOp funcOp, MLIRContext *ct
         continue;
       
      if (isa<mlir::arith::TruncIOp>(*op)) {
-        update::replaceWithSuccessor(op);
+        // op->getOperand(0).setType(op->getResult(0).getType());
+        update::replaceWithSuccessor(op, op->getResult(0).getType());
         op->erase();
         continue;
       }
@@ -109,8 +118,10 @@ static LogicalResult rewriteBitsWidths(handshake::FuncOp funcOp, MLIRContext *ct
           changed |= true;
           // llvm::errs() << "backward op " << *op << "\n";
           for (unsigned i=0;i<op->getNumOperands();++i)
-            if (newWidth < op->getOperand(i).getType().getIntOrFloatBitWidth())
+            if (newWidth < op->getOperand(i).getType().getIntOrFloatBitWidth()) {
+              savedBits += op->getOperand(i).getType().getIntOrFloatBitWidth()-newWidth;
               op->getOperand(i).setType(newOpResultType);
+            }
         }
       
     }
@@ -118,17 +129,21 @@ static LogicalResult rewriteBitsWidths(handshake::FuncOp funcOp, MLIRContext *ct
     llvm::errs() << "-----------------end one round-----------------\n";
 
   }
-
+  // Store new inserted truncation or extension operation during validation
+  SmallVector<Operation *> OpTruncExt;
   for (auto &op : funcOp.getOps()) {
       // llvm::errs() <<"before validation : " << op <<"\n";
-      update::validateOp(&op, ctx);
+      update::validateOp(&op, ctx, OpTruncExt);
       // llvm::errs() <<"after validation : " << op <<"\n\n";
-
   }
-    
 
+  // Validate the new inserted operation
+  for (auto op : OpTruncExt)
+    update::validateOp(op, ctx, OpTruncExt);
+
+  llvm::errs() << "Total saved bits " << savedBits << "\n";
   
-    return success();
+  return success();
 }
 
 struct HandshakeBitsOptimizePass

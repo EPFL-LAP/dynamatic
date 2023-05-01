@@ -1,6 +1,7 @@
 #include "dynamatic/Transforms/UtilsBitsUpdate.h"
 #include "mlir/Dialect/Arith/IR/Arith.h"
 #include "mlir/Support/IndentedOstream.h"
+#include "mlir/IR/Dialect.h"
 
 
 IntegerType getNewType(Value opType, 
@@ -214,7 +215,7 @@ void constructFuncMap(DenseMap<StringRef,
       return widths;
     };
 
-     mapOpNameWidth[StringRef("handshake.merge")] = 
+    mapOpNameWidth[StringRef("handshake.merge")] = 
       [&] (Operation::operand_range vecOperands,
          Operation::result_range vecResults) {
 
@@ -237,12 +238,101 @@ void constructFuncMap(DenseMap<StringRef,
         return widths;
       }
 
-      unsigned int width = std::min(cpp_max_width, maxOpWidth);
+      unsigned int width = std::min(vecResults[0].getType().getIntOrFloatBitWidth(),
+                                    std::min(cpp_max_width, maxOpWidth));
       std::vector<unsigned> opwidths(ind, width);
 
       widths.push_back(opwidths); //matched widths for operators
       widths.push_back({width}); //matched widths for result
       
+      return widths;
+    };
+
+    mapOpNameWidth[StringRef("handshake.constant")] = 
+      [&] (Operation::operand_range vecOperands,
+         Operation::result_range vecResults) {
+
+          std::vector<std::vector<unsigned>> widths; 
+          // Do not set the width of the input
+          widths.push_back({});
+          Operation* Op = vecResults[0].getDefiningOp();
+          if (handshake::ConstantOp cstOp = dyn_cast<handshake::ConstantOp>(*Op))
+            if (auto IntAttr = cstOp.getValueAttr().dyn_cast<mlir::IntegerAttr>())
+              if (auto IntType = dyn_cast<IntegerType>(IntAttr.getType())){
+                widths.push_back({IntType.getWidth()});
+                return widths;
+              }
+            
+          widths.push_back({});
+          return widths;
+    };
+
+    mapOpNameWidth[StringRef("handshake.control_merge")] = 
+      [&] (Operation::operand_range vecOperands,
+         Operation::result_range vecResults) {
+
+      std::vector<std::vector<unsigned>> widths; 
+      unsigned maxOpWidth = 2;
+
+      unsigned ind = 0; // record number of operators
+
+      for (auto oprand : vecOperands) {
+        ind++;
+        if (!isa<NoneType>(oprand.getType()))
+          if (!isa<IndexType>(oprand.getType()) && 
+              oprand.getType().getIntOrFloatBitWidth() > maxOpWidth)
+            maxOpWidth = oprand.getType().getIntOrFloatBitWidth();
+      }
+
+      unsigned indexWidth=2;
+      if (ind>2)
+        indexWidth = log2(ind-2)+2;
+
+      if (isa<NoneType>(vecOperands[0].getType())) {
+        widths.push_back({});
+        widths.push_back({0, indexWidth});
+        return widths;
+      }
+
+      unsigned int width = std::min(cpp_max_width, maxOpWidth);
+      std::vector<unsigned> opwidths(ind, width);
+
+      widths.push_back(opwidths); //matched widths for operators
+      widths.push_back({indexWidth}); //matched widths for result
+      
+      return widths;
+    };
+
+    mapOpNameWidth[StringRef("handshake.select")] = 
+        [&] (Operation::operand_range vecOperands,
+         Operation::result_range vecResults) {
+
+      std::vector<std::vector<unsigned>> widths;
+      
+      unsigned ind=0, maxOpWidth=2 ;
+
+      for (auto oprand : vecOperands) {
+        ind++;
+        if (ind==0)
+          continue; // skip the width of the index 
+        
+        if (!isa<NoneType>(oprand.getType()))
+          if (!isa<IndexType>(oprand.getType()) && 
+              oprand.getType().getIntOrFloatBitWidth() > maxOpWidth)
+            maxOpWidth = oprand.getType().getIntOrFloatBitWidth();
+      }
+
+      widths.push_back({1}); // bool like condition
+      if (isa<NoneType>(vecOperands[1].getType())) {
+        widths.push_back({});
+        return widths;
+      }
+
+      std::vector<unsigned> opwidths(ind-1, maxOpWidth);
+
+      widths[0].insert(widths[0].end(), opwidths.begin(), opwidths.end()); //matched widths for operators
+      widths.push_back({maxOpWidth}); //matched widths for result
+
       return widths;
     };
 
@@ -295,8 +385,11 @@ void constructFuncMap(DenseMap<StringRef,
         isa<mlir::arith::ShRSIOp>(*Op) ||
         isa<handshake::MuxOp>(*Op)     ||
         isa<handshake::MergeOp>(*Op)   ||
+        isa<handshake::SelectOp>(*Op)  ||
+        isa<handshake::ConstantOp>(*Op)||
         isa<handshake::DynamaticLoadOp>(*Op) ||
-        isa<handshake::DynamaticStoreOp>(*Op) ||
+        isa<handshake::DynamaticStoreOp>(*Op)||
+        isa<handshake::ControlMergeOp>(*Op)  ||
         isa<handshake::DynamaticReturnOp>(*Op) )
       match = true;  
 
@@ -325,6 +418,7 @@ void constructFuncMap(DenseMap<StringRef,
     Operation *sucNode = Op->getOperand(0).getDefiningOp();
       // llvm::errs() << "successor" << *sucNode << "\n";
 
+      // find the index of result in vec_results
       unsigned ind = 0;
       for (auto Val : sucNode->getResults()) {
 
@@ -332,17 +426,42 @@ void constructFuncMap(DenseMap<StringRef,
           break;
         ind++;
       }
-      // llvm::errs() << "before revertTruncOrExt " << *Op << "\n";
+
       SmallVector<Operation *> vecUsers;
       for (auto user : Op->getResult(0).getUsers())
         vecUsers.push_back(user);
       
       for (auto user : vecUsers)
         user->replaceUsesOfWith(Op->getResult(0), sucNode->getResult(ind));
-      // Op->getResult(0).replaceAllUsesWith(sucNode->getResult(ind));
-      // llvm::errs() << "after revertTruncOrExt " << *Op << "\n";
 
   }
+
+  void replaceWithSuccessor(Operation *Op, 
+                            Type resType) {
+    Operation *sucNode = Op->getOperand(0).getDefiningOp();
+
+      // find the index of result in vec_results
+      unsigned ind = 0;
+      for (auto Val : sucNode->getResults()) {
+
+        if (Val==Op->getOperand(0)){
+          Val.setType(resType);
+          break;
+        }
+          
+        ind++;
+      }
+      // llvm::errs() << "successor" << *sucNode << "\n";
+
+      SmallVector<Operation *> vecUsers;
+      for (auto user : Op->getResult(0).getUsers())
+        vecUsers.push_back(user);
+      
+      for (auto user : vecUsers)
+        user->replaceUsesOfWith(Op->getResult(0), sucNode->getResult(ind));
+
+  }
+
 
   void revertTruncOrExt(Operation *Op, MLIRContext *ctx) {
     OpBuilder builder(ctx);
@@ -353,6 +472,7 @@ void constructFuncMap(DenseMap<StringRef,
 
       replaceWithSuccessor(Op);
       Op->erase();
+      return;
     }
 
     // if for extension operation width(res) < width(opr),
@@ -371,6 +491,8 @@ void constructFuncMap(DenseMap<StringRef,
                                               Op->getOperand(0));
         Op->getResult(0).replaceAllUsesWith(truncOp.getResult());
         Op->erase();
+        return;
+
       }
 
     // if for truncation operation width(res) > width(opr),
@@ -392,7 +514,9 @@ void constructFuncMap(DenseMap<StringRef,
       }
   }
 
-  void matchOpResWidth (Operation *Op, MLIRContext *ctx) {
+  void matchOpResWidth (Operation *Op, 
+                        MLIRContext *ctx, 
+                        SmallVector<Operation *> &newMatchedOps) {
 
     DenseMap<mlir::StringRef,
                std::function<std::vector<std::vector<unsigned int>> 
@@ -405,8 +529,7 @@ void constructFuncMap(DenseMap<StringRef,
                                    mapOpNameWidth[Op->getName().getStringRef()]
                                    (Op->getOperands(), Op->getResults());
     // make operator matched the width
-
-    for (unsigned int i = 0; i < OprsWidth[0].size(); ++i) {
+    for (size_t i = 0; i < OprsWidth[0].size(); ++i) {
       // llvm::errs() << "validate operator " << i << " : " << OprsWidth[0][i] << "\n";
       if (auto Operand = Op->getOperand(i); !isa<NoneType>(Operand.getType()) &&
           Operand.getType().getIntOrFloatBitWidth() != OprsWidth[0][i]) 
@@ -415,12 +538,15 @@ void constructFuncMap(DenseMap<StringRef,
                                            i, 
                                            getNewType(Operand, OprsWidth[0][i], false), 
                                            ctx); 
+        if (insertOp.has_value())
+          newMatchedOps.push_back(insertOp.value());
         }
         
     }
     // make result matched the width
-    for (unsigned int i = 0; i < OprsWidth[1].size(); ++i) {
-      if (auto OpRes = Op->getResult(i); 
+    for (size_t i = 0; i < OprsWidth[1].size(); ++i) {
+      // llvm::errs() << "validate result operator " << i << " : " << OprsWidth[1][i] << "\n";
+      if (auto OpRes = Op->getResult(i); OprsWidth[1][i]!=0 &&
           OpRes.getType().getIntOrFloatBitWidth() != OprsWidth[1][i]) {
         Type newType = getNewType(OpRes, OprsWidth[1][i], false);
         Op->getResult(i).setType(newType) ;
@@ -428,7 +554,9 @@ void constructFuncMap(DenseMap<StringRef,
     }
   }
 
-  void validateOp(Operation *Op, MLIRContext *ctx) {
+  void validateOp(Operation *Op, 
+                  MLIRContext *ctx,
+                  SmallVector<Operation *> &newMatchedOps) {
     // the operations can be divided to three types to make it validated
     // passType: branch, conditionalbranch
     // c <= op(a,b): addi, subi, mux, etc. where both a,b,c needed to be verified
@@ -443,10 +571,12 @@ void constructFuncMap(DenseMap<StringRef,
       bool res = propType(Op);
 
     if (match)
-      matchOpResWidth(Op, ctx);
+      matchOpResWidth(Op, ctx, newMatchedOps);
 
     if (revert) 
       revertTruncOrExt(Op, ctx);
-      
+
+
+    
   }
 }
