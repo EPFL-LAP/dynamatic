@@ -77,8 +77,8 @@ private:
   /// A mapping between operations and their unique name in the .dot file.
   DenseMap<Operation *, std::string> opNameMap;
 
-  /// Prints an instance of a handshake.func to the graph.
-  LogicalResult printFunc(mlir::raw_indented_ostream &os, handshake::FuncOp f);
+  /// Returns the name of a function's argument given its index.
+  std::string getArgumentName(handshake::FuncOp funcOp, size_t idx);
 
   /// Returns the name of the node representing the operation.
   std::string getNodeName(Operation *op);
@@ -87,6 +87,10 @@ private:
   /// unique name for the operation in the outName argument.
   LogicalResult printNode(mlir::raw_indented_ostream &os, Operation *op,
                           unsigned opID, std::string &outName);
+
+  /// Prints an instance of a handshake.func to the graph.
+  LogicalResult printFunc(mlir::raw_indented_ostream &os,
+                          handshake::FuncOp funcOp);
 
   /// Prints an edge between a source and destination operation, which are
   /// linked by a result of the source that the destination uses as an
@@ -321,10 +325,8 @@ static std::string getInputForMux(handshake::MuxOp op) {
 
 /// Produces the "out" attribute value of a handshake::ControlMergeOp.
 static std::string getOutputForControlMerge(handshake::ControlMergeOp op) {
-  PortsData ports;
-  ports.push_back(std::make_pair("out1", op.getResult()));
-  ports.push_back(std::make_pair("out2?", op.getIndex()));
-  return getIOFromPorts(ports);
+  // Legacy Dynamatic always forces the index output to have a width of 1
+  return "out1:" + std::to_string(getWidth(op.getResult())) + " out2?:" + "1";
 }
 
 /// Produces the "in" attribute value of a handshake::ConditionalBranchOp.
@@ -503,58 +505,73 @@ findValueInGroups(SmallVector<SmallVector<Value>> &groups, Value val) {
 /// operand ordering of legacy Dynamatic.
 static size_t fixPortNumber(Operation *op, Value val, size_t idx,
                             bool isSrcOp) {
-  if (isa<handshake::ConditionalBranchOp>(op) && !isSrcOp)
-    // Legacy Dynamatic has the data operand before the condition operand
-    return (idx == 1) ? 0 : 1;
-  if (isa<handshake::DynamaticLoadOp, handshake::DynamaticStoreOp>(op))
-    // Legacy Dynamatic has the data operand/result before the address
-    // operand/result
-    return (idx == 1) ? 0 : 1;
-  if (auto memOp = dyn_cast<handshake::MemoryControllerOp>(op);
-      memOp && !isSrcOp) {
-    // Legacy Dynamatic puts all control operands before all data operands,
-    // whereas for us each control operand appears just before the data inputs
-    // of the block it corresponds to
-    auto groups = memOp.groupInputsByBB();
+  return llvm::TypeSwitch<Operation *, size_t>(op)
+      .Case<handshake::ConditionalBranchOp>([&](auto) {
+        if (isSrcOp)
+          return idx;
+        // Legacy Dynamatic has the data operand before the condition operand
+        return (idx == 1) ? (size_t)0 : (size_t)1;
+      })
+      .Case<handshake::EndOp>([&](handshake::EndOp endOp) {
+        // Legacy Dynamatic has the memory controls before the return values
+        auto numReturnValues = endOp.getReturnValues().size();
+        auto numMemoryControls = endOp.getMemoryControls().size();
+        return (idx < numReturnValues) ? idx + numMemoryControls
+                                       : idx - numReturnValues;
+      })
+      .Case<handshake::DynamaticLoadOp, handshake::DynamaticStoreOp>([&](auto) {
+        // Legacy Dynamatic has the data operand/result before the address
+        // operand/result
+        return (idx == 1) ? 0 : 1;
+      })
+      .Case<handshake::MemoryControllerOp>(
+          [&](handshake::MemoryControllerOp memOp) {
+            if (isSrcOp)
+              return idx;
 
-    // Determine total number of control operands
-    unsigned ctrlCount = 0;
-    for (size_t i = 0, e = groups.size(); i < e; i++)
-      if (memOp.bbHasControl(i))
-        ctrlCount++;
+            // Legacy Dynamatic puts all control operands before all data
+            // operands, whereas for us each control operand appears just before
+            // the data inputs of the block it corresponds to
+            auto groups = memOp.groupInputsByBB();
 
-    // Figure out where the value lies
-    auto [groupIdx, opIdx] = findValueInGroups(groups, val);
+            // Determine total number of control operands
+            unsigned ctrlCount = 0;
+            for (size_t i = 0, e = groups.size(); i < e; i++)
+              if (memOp.bbHasControl(i))
+                ctrlCount++;
 
-    // Figure out at which index the value would be in legacy Dynamatic's
-    // interface
-    bool valGroupHasControl = memOp.bbHasControl(groupIdx);
-    if (opIdx == 0 && valGroupHasControl) {
-      // Value is a control input
-      size_t fixedIdx = 0;
-      for (size_t i = 0; i < groupIdx; i++)
-        if (memOp.bbHasControl(i))
-          fixedIdx++;
-      return fixedIdx;
-    }
+            // Figure out where the value lies
+            auto [groupIdx, opIdx] = findValueInGroups(groups, val);
 
-    // Value is a data input
-    size_t fixedIdx = ctrlCount;
-    for (size_t i = 0; i < groupIdx; i++)
-      // Add number of data inputs corresponding to the block
-      if (memOp.bbHasControl(i))
-        fixedIdx += groups[i].size() - 1;
-      else
-        fixedIdx += groups[i].size();
+            // Figure out at which index the value would be in legacy
+            // Dynamatic's interface
+            bool valGroupHasControl = memOp.bbHasControl(groupIdx);
+            if (opIdx == 0 && valGroupHasControl) {
+              // Value is a control input
+              size_t fixedIdx = 0;
+              for (size_t i = 0; i < groupIdx; i++)
+                if (memOp.bbHasControl(i))
+                  fixedIdx++;
+              return fixedIdx;
+            }
 
-    // Add index offset in the group the value belongs to
-    if (valGroupHasControl)
-      fixedIdx += opIdx - 1;
-    else
-      fixedIdx += opIdx;
-    return fixedIdx;
-  }
-  return idx;
+            // Value is a data input
+            size_t fixedIdx = ctrlCount;
+            for (size_t i = 0; i < groupIdx; i++)
+              // Add number of data inputs corresponding to the block
+              if (memOp.bbHasControl(i))
+                fixedIdx += groups[i].size() - 1;
+              else
+                fixedIdx += groups[i].size();
+
+            // Add index offset in the group the value belongs to
+            if (valGroupHasControl)
+              fixedIdx += opIdx - 1;
+            else
+              fixedIdx += opIdx;
+            return fixedIdx;
+          })
+      .Default([&](auto) { return idx; });
 }
 
 /// Computes all data attributes of an operation for use in legacy Dynamatic and
@@ -594,15 +611,32 @@ static LogicalResult annotateNode(mlir::raw_indented_ostream &os,
                     "0.000 1.409 1.411 1.412 1.400 1.412 100.000 100.000";
                 return info;
               })
+          .Case<handshake::BufferOp>([&](handshake::BufferOp bufOp) {
+            auto info = NodeInfo("Buffer");
+            info.intAttr["slots"] = bufOp.getNumSlots();
+            info.stringAttr["tansparent"] =
+                bufOp.getBufferType() == BufferTypeEnum::fifo ? "true"
+                                                              : "false";
+            return info;
+          })
           .Case<handshake::MemoryControllerOp>(
-              [&](handshake::MemoryControllerOp op) {
+              [&](handshake::MemoryControllerOp memOp) {
                 auto info = NodeInfo("MC");
-                info.stringAttr["in"] = getInputForMC(op);
-                info.stringAttr["out"] = getOutputForMC(op);
-                info.stringAttr["memory"] = "mem" + std::to_string(op.getId());
-                info.intAttr["bbcount"] = op.getBBCount();
-                info.intAttr["ldcount"] = op.getLdCount();
-                info.intAttr["stcount"] = op.getStCount();
+                info.stringAttr["in"] = getInputForMC(memOp);
+                info.stringAttr["out"] = getOutputForMC(memOp);
+                info.stringAttr["memory"] =
+                    "mem" + std::to_string(memOp.getId());
+
+                // Compute the number of basic blocks with a control signal to
+                // the MC
+                unsigned numControls = 0;
+                for (size_t i = 0, e = memOp.getBBCount(); i < e; ++i)
+                  if (memOp.bbHasControl(i))
+                    ++numControls;
+
+                info.intAttr["bbcount"] = numControls;
+                info.intAttr["ldcount"] = memOp.getLdCount();
+                info.intAttr["stcount"] = memOp.getStCount();
                 return info;
               })
           .Case<handshake::DynamaticLoadOp>([&](handshake::DynamaticLoadOp op) {
@@ -664,6 +698,12 @@ static LogicalResult annotateNode(mlir::raw_indented_ostream &os,
             std::stringstream stream;
             stream << "0x" << std::setfill('0') << std::setw(length) << std::hex
                    << value;
+
+            // Legacy Dynamatic uses the output width of the operations also as
+            // input width for some reason, make it so
+            info.stringAttr["in"] = getIOFromValues(op->getResults(), "in");
+            info.stringAttr["out"] = getIOFromValues(op->getResults(), "out");
+
             info.stringAttr["value"] = stream.str();
             info.stringAttr["delay"] =
                 "0.000 0.000 0.000 100.000 100.000 100.000 100.000 100.000";
@@ -687,7 +727,14 @@ static LogicalResult annotateNode(mlir::raw_indented_ostream &os,
           .Case<handshake::EndOp>([&](handshake::EndOp op) {
             auto info = NodeInfo("Exit");
             info.stringAttr["in"] = getInputForEnd(op);
-            info.stringAttr["out"] = "out1:0";
+
+            // Output ports of end node are determined by function result types
+            std::stringstream stream;
+            auto funcOp = op->getParentOfType<handshake::FuncOp>();
+            for (auto [idx, res] : llvm::enumerate(funcOp.getResultTypes()))
+              stream << "out" << (idx + 1) << ":" << getWidth(res);
+            info.stringAttr["out"] = stream.str();
+
             info.stringAttr["delay"] =
                 "1.397 0.000 1.397 1.409 100.000 100.000 100.000 100.000";
             return info;
@@ -845,6 +892,24 @@ static const std::string CONTROL_STYLE = "dashed";
 /// Determines the style attribute of a value.
 static std::string getStyleOfValue(Value result) {
   return isa<NoneType>(result.getType()) ? "style=" + CONTROL_STYLE + ", " : "";
+}
+
+std::string ExportDOTPass::getNodeName(Operation *op) {
+  auto opNameIt = opNameMap.find(op);
+  assert(opNameIt != opNameMap.end() &&
+         "No name registered for the operation!");
+  return opNameIt->second;
+}
+
+std::string ExportDOTPass::getArgumentName(handshake::FuncOp funcOp,
+                                           size_t idx) {
+  auto numArgs = funcOp.getNumArguments();
+  assert(idx < numArgs && "argument index too high");
+  if (idx == numArgs - 1 && legacy)
+    // Legacy Dynamatic expects the start signal to be called start_0
+    return "start_0";
+  else
+    return funcOp.getArgName(idx).getValue().str();
 }
 
 LogicalResult ExportDOTPass::printNode(mlir::raw_indented_ostream &os,
@@ -1009,13 +1074,6 @@ LogicalResult ExportDOTPass::printNode(mlir::raw_indented_ostream &os,
   return success();
 }
 
-std::string ExportDOTPass::getNodeName(Operation *op) {
-  auto opNameIt = opNameMap.find(op);
-  assert(opNameIt != opNameMap.end() &&
-         "No name registered for the operation!");
-  return opNameIt->second;
-}
-
 template <typename Stream>
 void ExportDOTPass::printEdge(Stream &stream, Operation *src, Operation *dst,
                               Value val) {
@@ -1058,7 +1116,7 @@ LogicalResult ExportDOTPass::printFunc(mlir::raw_indented_ostream &os,
       // inside the function so they are not displayed
       continue;
 
-    auto argLabel = funcOp.getArgName(arg.index()).getValue().str();
+    auto argLabel = getArgumentName(funcOp, arg.index());
     os << "\"" << argLabel << "\" [shape=diamond, "
        << getStyleOfValue(arg.value()) << "label=\"" << argLabel << "\", ";
     if (legacy)
@@ -1128,8 +1186,9 @@ LogicalResult ExportDOTPass::printFunc(mlir::raw_indented_ostream &os,
       for (auto [idx, arg] : llvm::enumerate(funcOp.getArguments()))
         if (!isa<MemRefType>(arg.getType()))
           for (auto user : arg.getUsers()) {
-            os << "\"" << funcOp.getArgName(idx).getValue().str() << "\" -> \""
-               << getNodeName(user) << "\" [" << getStyleOfValue(arg);
+            auto argLabel = getArgumentName(funcOp, idx);
+            os << "\"" << argLabel << "\" -> \"" << getNodeName(user) << "\" ["
+               << getStyleOfValue(arg);
             if (legacy)
               annotateArgumentEdge(os, arg, user);
             os << "]\n";
