@@ -51,11 +51,11 @@ static void createNewBranches(ArrayRef<handshake::BranchOp> branches,
 
 /// Converts all unconditional branches of a function into conditional branches
 /// with a constant true condition input.
-static LogicalResult convertBranches(handshake::FuncOp funcOp,
-                                     ConversionPatternRewriter &rewriter) {
+static void convertBranches(handshake::FuncOp funcOp,
+                            ConversionPatternRewriter &rewriter) {
   auto branches = funcOp.getOps<handshake::BranchOp>();
   if (branches.empty())
-    return success();
+    return;
 
   auto handshakeBlocks = getHandshakeBlocks(funcOp);
 
@@ -116,54 +116,20 @@ static LogicalResult convertBranches(handshake::FuncOp funcOp,
   // Delete all unconditional branches
   for (auto op : funcOp.getOps<handshake::BranchOp>())
     rewriter.eraseOp(op);
-
-  return success();
 }
 
 namespace {
-
-/// Custom conversion target used to mark functions dynamically legal after
-/// we've applied the conversion pattern to them.
-class PrepareForLegacyTarget : public ConversionTarget {
-public:
-  explicit PrepareForLegacyTarget(MLIRContext &context)
-      : ConversionTarget(context) {
-    addLegalDialect<handshake::HandshakeDialect>();
-    addLegalDialect<mlir::arith::ArithDialect>();
-    addLegalDialect<mlir::memref::MemRefDialect>();
-    addIllegalOp<handshake::BranchOp>();
-    addDynamicallyLegalOp<handshake::FuncOp>(
-        [&](const auto &op) { return convertedFuncOps.contains(op); });
-  }
-  SmallPtrSet<Operation *, 4> convertedFuncOps;
-};
 
 /// Converts simple branches to conditional branches with constant condition.
 struct ConvertSimpleBranches : public OpConversionPattern<handshake::FuncOp> {
   using OpConversionPattern::OpConversionPattern;
 
-  ConvertSimpleBranches(PrepareForLegacyTarget &target, MLIRContext *ctx)
-      : OpConversionPattern<handshake::FuncOp>(ctx), target(target) {}
-
   LogicalResult
   matchAndRewrite(handshake::FuncOp op, OpAdaptor /*adaptor*/,
                   ConversionPatternRewriter &rewriter) const override {
-
-    // Convert simple branches to conditional branches
-    LogicalResult res = failure();
-    rewriter.updateRootInPlace(op,
-                               [&] { res = convertBranches(op, rewriter); });
-
-    // Mark the function legal
-    target.convertedFuncOps.insert(op);
-
-    return res;
+    rewriter.updateRootInPlace(op, [&] { convertBranches(op, rewriter); });
+    return success();
   }
-
-private:
-  /// Reference to the conversion target so that we can mark the operation legal
-  /// once we are done converting branches.
-  PrepareForLegacyTarget &target;
 };
 
 /// Simple driver for prepare for legacy pass. Runs a partial conversion by
@@ -175,9 +141,9 @@ struct HandshakePrepareForLegacyPass
   void runOnOperation() override {
     auto *ctx = &getContext();
 
-    PrepareForLegacyTarget target(*ctx);
     RewritePatternSet patterns{ctx};
-    patterns.add<ConvertSimpleBranches>(target, ctx);
+    patterns.add<ConvertSimpleBranches>(ctx);
+    ConversionTarget target(*ctx);
 
     if (failed(applyPartialConversion(getOperation(), target,
                                       std::move(patterns))))
