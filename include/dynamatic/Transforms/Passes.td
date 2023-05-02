@@ -31,10 +31,10 @@ def HandshakePrepareForLegacy : Pass<"handshake-prepare-for-legacy", "mlir::Modu
   let description = [{
     This pass transforms the circuit to make it follow conventions set by legacy
     Dynamatic. It should be ran before DOT export in order to generate a .dot
-    file that will be compatible with legacy passes. At the moment, this pass
-    only turns unconditional branches (which legacy Dynamatic never generates)
-    into conditional branches with a constant condition input and a sinked false
-    output.  
+    file that will be compatible with legacy passes. Concretely, this pass (1)
+    turns unconditional branches (which legacy Dynamatic never generates) into
+    conditional branches with a constant condition input and a sinked false
+    output and (2) downgraded cmerges to simple merges when possible.  
   }];
   let constructor = "dynamatic::createHandshakePrepareForLegacy()";
 }
