@@ -67,7 +67,12 @@ def ExportDOT : Pass<"export-dot", "mlir::ModuleOp"> {
             "some constraints on the input IR, which must also be compatible "
             "with legacy Dynamatic's elastic circuits. In general, it is "
             "therefore required to run the --prepare-for-legacy pass before "
-            "exporting a legacy-compatible DOT.">];
+            "exporting a legacy-compatible DOT.">,
+    Option<"prettyPrint", "pretty-print", "bool", "true",
+            "If true, the exported DOT file will be pretty-printed, making its "
+            "visualization easier to look at but harder to debug with. For "
+            "example, node names will be shortened (and not uniqued) when "
+            "pretty-printing.">];
 }
 
 //===----------------------------------------------------------------------===//

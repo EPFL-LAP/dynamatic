@@ -104,7 +104,10 @@ struct EdgeInfo {
 /// Driver for the ExportDOT pass.
 struct ExportDOTPass : public ExportDOTBase<ExportDOTPass> {
 
-  ExportDOTPass(bool legacy) { this->legacy = legacy; }
+  ExportDOTPass(bool legacy, bool prettyPrint) {
+    this->legacy = legacy;
+    this->prettyPrint = prettyPrint;
+  }
 
   void runOnOperation() override {
     ModuleOp mod = getOperation();
@@ -1082,6 +1085,118 @@ static std::string getStyleOfValue(Value result) {
   return isa<NoneType>(result.getType()) ? "style=" + CONTROL_STYLE + ", " : "";
 }
 
+/// Determines the pretty-printed version of a node label.
+static std::string getPrettyPrintedNodeLabel(Operation *op) {
+  return llvm::TypeSwitch<Operation *, std::string>(op)
+      // handshake operations
+      .Case<handshake::ConstantOp>([&](auto op) {
+        // Try to get the constant value as an integer
+        if (mlir::BoolAttr boolAttr =
+                op->template getAttrOfType<mlir::BoolAttr>("value");
+            boolAttr)
+          return std::to_string(boolAttr.getValue());
+
+        // Try to get the constant value as an integer
+        if (mlir::IntegerAttr intAttr =
+                op->template getAttrOfType<mlir::IntegerAttr>("value");
+            intAttr)
+          return std::to_string(intAttr.getValue().getSExtValue());
+
+        // Try to get the constant value as floating point
+        if (mlir::FloatAttr floatAttr =
+                op->template getAttrOfType<mlir::FloatAttr>("value");
+            floatAttr)
+          return std::to_string(floatAttr.getValue().convertToFloat());
+
+        // Fallback on a generic string
+        return std::string("constant");
+      })
+      .Case<handshake::ControlMergeOp>([&](auto) { return "cmerge"; })
+      .Case<handshake::ConditionalBranchOp>([&](auto) { return "cbranch"; })
+      .Case<handshake::BufferOp>([&](auto op) {
+        std::string n = "buffer ";
+        n += stringifyEnum(op.getBufferType());
+        return n;
+      })
+      .Case<handshake::BranchOp>([&](auto) { return "branch"; })
+      // handshake operations (dynamatic)
+      .Case<handshake::DynamaticLoadOp>([&](auto) { return "load"; })
+      .Case<handshake::DynamaticStoreOp>([&](auto) { return "store"; })
+      .Case<handshake::MemoryControllerOp>([&](auto) { return "MC"; })
+      .Case<handshake::DynamaticReturnOp>([&](auto) { return "return"; })
+      // arith operations
+      .Case<arith::AddIOp, arith::AddFOp>([&](auto) { return "+"; })
+      .Case<arith::SubIOp, arith::SubFOp>([&](auto) { return "-"; })
+      .Case<arith::AndIOp>([&](auto) { return "&"; })
+      .Case<arith::OrIOp>([&](auto) { return "|"; })
+      .Case<arith::XOrIOp>([&](auto) { return "^"; })
+      .Case<arith::MulIOp, arith::MulFOp>([&](auto) { return "*"; })
+      .Case<arith::DivUIOp, arith::DivSIOp, arith::DivFOp>(
+          [&](auto) { return "div"; })
+      .Case<arith::ShRSIOp, arith::ShRUIOp>([&](auto) { return ">>"; })
+      .Case<arith::ShLIOp>([&](auto) { return "<<"; })
+      .Case<arith::CmpIOp>([&](arith::CmpIOp op) {
+        switch (op.getPredicate()) {
+        case arith::CmpIPredicate::eq:
+          return "==";
+        case arith::CmpIPredicate::ne:
+          return "!=";
+        case arith::CmpIPredicate::uge:
+        case arith::CmpIPredicate::sge:
+          return ">=";
+        case arith::CmpIPredicate::ugt:
+        case arith::CmpIPredicate::sgt:
+          return ">";
+        case arith::CmpIPredicate::ule:
+        case arith::CmpIPredicate::sle:
+          return "<=";
+        case arith::CmpIPredicate::ult:
+        case arith::CmpIPredicate::slt:
+          return "<";
+        }
+        llvm_unreachable("unhandled cmpi predicate");
+      })
+      .Case<arith::CmpFOp>([&](arith::CmpFOp op) {
+        switch (op.getPredicate()) {
+        case arith::CmpFPredicate::OEQ:
+        case arith::CmpFPredicate::UEQ:
+          return "==";
+        case arith::CmpFPredicate::ONE:
+        case arith::CmpFPredicate::UNE:
+          return "!=";
+        case arith::CmpFPredicate::OGE:
+        case arith::CmpFPredicate::UGE:
+          return ">=";
+        case arith::CmpFPredicate::OGT:
+        case arith::CmpFPredicate::UGT:
+          return ">";
+        case arith::CmpFPredicate::OLE:
+        case arith::CmpFPredicate::ULE:
+          return "<=";
+        case arith::CmpFPredicate::OLT:
+        case arith::CmpFPredicate::ULT:
+          return "<";
+        case arith::CmpFPredicate::ORD:
+          return "ordered?";
+        case arith::CmpFPredicate::UNO:
+          return "unordered?";
+        case arith::CmpFPredicate::AlwaysFalse:
+          return "cmp-false";
+        case arith::CmpFPredicate::AlwaysTrue:
+          return "cmp-true";
+        }
+        llvm_unreachable("unhandled cmpf predicate");
+      })
+      .Default([&](auto op) {
+        auto opDialect = op->getDialect()->getNamespace();
+        std::string label = op->getName().getStringRef().str();
+        if (opDialect == "handshake")
+          label.erase(0, StringLiteral("handshake.").size());
+
+        return label;
+      });
+}
+
 std::string ExportDOTPass::getNodeName(Operation *op) {
   auto opNameIt = opNameMap.find(op);
   assert(opNameIt != opNameMap.end() &&
@@ -1116,7 +1231,8 @@ LogicalResult ExportDOTPass::printNode(mlir::raw_indented_ostream &os,
                                        Operation *op) {
 
   // Print node name
-  os << "\"" << opNameMap[op] << "\""
+  auto opName = opNameMap[op];
+  os << "\"" << opName << "\""
      << " [";
 
   // Determine fill color
@@ -1145,115 +1261,13 @@ LogicalResult ExportDOTPass::printNode(mlir::raw_indented_ostream &os,
 
   // Determine label
   os << ", label=\"";
-  os << llvm::TypeSwitch<Operation *, std::string>(op)
-            // handshake operations
-            .Case<handshake::ConstantOp>([&](auto op) {
-              // Try to get the constant value as an integer
-              if (mlir::BoolAttr boolAttr =
-                      op->template getAttrOfType<mlir::BoolAttr>("value");
-                  boolAttr)
-                return std::to_string(boolAttr.getValue());
-
-              // Try to get the constant value as an integer
-              if (mlir::IntegerAttr intAttr =
-                      op->template getAttrOfType<mlir::IntegerAttr>("value");
-                  intAttr)
-                return std::to_string(intAttr.getValue().getSExtValue());
-
-              // Try to get the constant value as floating point
-              if (mlir::FloatAttr floatAttr =
-                      op->template getAttrOfType<mlir::FloatAttr>("value");
-                  floatAttr)
-                return std::to_string(floatAttr.getValue().convertToFloat());
-
-              // Fallback on a generic string
-              return std::string("constant");
-            })
-            .Case<handshake::ControlMergeOp>([&](auto) { return "cmerge"; })
-            .Case<handshake::ConditionalBranchOp>(
-                [&](auto) { return "cbranch"; })
-            .Case<handshake::BufferOp>([&](auto op) {
-              std::string n = "buffer ";
-              n += stringifyEnum(op.getBufferType());
-              return n;
-            })
-            .Case<handshake::BranchOp>([&](auto) { return "branch"; })
-            // handshake operations (dynamatic)
-            .Case<handshake::DynamaticLoadOp>([&](auto) { return "load"; })
-            .Case<handshake::DynamaticStoreOp>([&](auto) { return "store"; })
-            .Case<handshake::MemoryControllerOp>([&](auto) { return "MC"; })
-            .Case<handshake::DynamaticReturnOp>([&](auto) { return "return"; })
-            // arith operations
-            .Case<arith::AddIOp, arith::AddFOp>([&](auto) { return "+"; })
-            .Case<arith::SubIOp, arith::SubFOp>([&](auto) { return "-"; })
-            .Case<arith::AndIOp>([&](auto) { return "&"; })
-            .Case<arith::OrIOp>([&](auto) { return "|"; })
-            .Case<arith::XOrIOp>([&](auto) { return "^"; })
-            .Case<arith::MulIOp, arith::MulFOp>([&](auto) { return "*"; })
-            .Case<arith::DivUIOp, arith::DivSIOp, arith::DivFOp>(
-                [&](auto) { return "div"; })
-            .Case<arith::ShRSIOp, arith::ShRUIOp>([&](auto) { return ">>"; })
-            .Case<arith::ShLIOp>([&](auto) { return "<<"; })
-            .Case<arith::CmpIOp>([&](arith::CmpIOp op) {
-              switch (op.getPredicate()) {
-              case arith::CmpIPredicate::eq:
-                return "==";
-              case arith::CmpIPredicate::ne:
-                return "!=";
-              case arith::CmpIPredicate::uge:
-              case arith::CmpIPredicate::sge:
-                return ">=";
-              case arith::CmpIPredicate::ugt:
-              case arith::CmpIPredicate::sgt:
-                return ">";
-              case arith::CmpIPredicate::ule:
-              case arith::CmpIPredicate::sle:
-                return "<=";
-              case arith::CmpIPredicate::ult:
-              case arith::CmpIPredicate::slt:
-                return "<";
-              }
-              llvm_unreachable("unhandled cmpi predicate");
-            })
-            .Case<arith::CmpFOp>([&](arith::CmpFOp op) {
-              switch (op.getPredicate()) {
-              case arith::CmpFPredicate::OEQ:
-              case arith::CmpFPredicate::UEQ:
-                return "==";
-              case arith::CmpFPredicate::ONE:
-              case arith::CmpFPredicate::UNE:
-                return "!=";
-              case arith::CmpFPredicate::OGE:
-              case arith::CmpFPredicate::UGE:
-                return ">=";
-              case arith::CmpFPredicate::OGT:
-              case arith::CmpFPredicate::UGT:
-                return ">";
-              case arith::CmpFPredicate::OLE:
-              case arith::CmpFPredicate::ULE:
-                return "<=";
-              case arith::CmpFPredicate::OLT:
-              case arith::CmpFPredicate::ULT:
-                return "<";
-              case arith::CmpFPredicate::ORD:
-                return "ordered?";
-              case arith::CmpFPredicate::UNO:
-                return "unordered?";
-              case arith::CmpFPredicate::AlwaysFalse:
-                return "cmp-false";
-              case arith::CmpFPredicate::AlwaysTrue:
-                return "cmp-true";
-              }
-              llvm_unreachable("unhandled cmpf predicate");
-            })
-            .Default([&](auto op) {
-              auto opDialect = op->getDialect()->getNamespace();
-              std::string label = op->getName().getStringRef().str();
-              if (opDialect == "handshake")
-                label.erase(0, StringLiteral("handshake.").size());
-
-              return label;
-            });
+  if (prettyPrint)
+    os << getPrettyPrintedNodeLabel(op);
+  else {
+    // Take out dialect prefix from opName when possible
+    auto split = opName.find("_");
+    os << ((split != std::string::npos) ? opName.substr(split + 1) : opName);
+  }
   os << "\"";
 
   // Determine style
@@ -1411,6 +1425,6 @@ LogicalResult ExportDOTPass::printFunc(mlir::raw_indented_ostream &os,
 }
 
 std::unique_ptr<mlir::OperationPass<mlir::ModuleOp>>
-dynamatic::createExportDOTPass(bool legacy) {
-  return std::make_unique<ExportDOTPass>(legacy);
+dynamatic::createExportDOTPass(bool legacy, bool prettyPrint) {
+  return std::make_unique<ExportDOTPass>(legacy, prettyPrint);
 }

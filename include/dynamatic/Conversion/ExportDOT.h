@@ -12,7 +12,7 @@
 namespace dynamatic {
 
 std::unique_ptr<mlir::OperationPass<mlir::ModuleOp>>
-createExportDOTPass(bool legacy = false);
+createExportDOTPass(bool legacy = false, bool prettyPrint = true);
 
 } // namespace dynamatic
 
