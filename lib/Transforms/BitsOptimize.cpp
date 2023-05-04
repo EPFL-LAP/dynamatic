@@ -72,7 +72,7 @@ static LogicalResult rewriteBitsWidths(handshake::FuncOp funcOp, MLIRContext *ct
 
       
       if (isa<handshake::ControlMergeOp>(op))
-        resInd = 1; //ceil log2 of the number of inputs}
+        resInd = 1; // the second result is the one that needs to be updated
       // if the new type can be optimized, update the type
       if (newWidth>0)
         if(Type newOpResultType = getNewType(op->getResult(resInd), newWidth, true);  
@@ -126,11 +126,9 @@ static LogicalResult rewriteBitsWidths(handshake::FuncOp funcOp, MLIRContext *ct
 
   // Store new inserted truncation or extension operation during validation
   SmallVector<Operation *> OpTruncExt;
-  for (auto &op : funcOp.getOps()) {
-      // llvm::errs() <<"before validation : " << op <<"\n";
+  for (auto &op : funcOp.getOps()) 
       update::validateOp(&op, ctx, OpTruncExt);
-      // llvm::errs() <<"after validation : " << op <<"\n\n";
-  }
+  
 
   // Validate the new inserted operation
   for (auto op : OpTruncExt)
