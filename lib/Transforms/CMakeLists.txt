@@ -1,6 +1,8 @@
 add_dynamatic_library(DynamaticTransforms
+  AnalyzeMemoryAccesses.cpp
   HandshakePrepareForLegacy.cpp
   HandshakeInferBasicBlocks.cpp
+  NameMemoryOps.cpp
   PushConstants.cpp
   BitsOptimize.cpp
   InitIndexType.cpp

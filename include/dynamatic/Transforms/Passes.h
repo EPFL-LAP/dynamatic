@@ -8,6 +8,7 @@
 #define DYNAMATIC_TRANSFORMS_PASSES_H
 
 #include "dynamatic/Support/LLVM.h"
+#include "dynamatic/Transforms/AnalyzeMemoryAccesses.h"
 #include "dynamatic/Transforms/HandshakeInferBasicBlocks.h"
 #include "dynamatic/Transforms/HandshakePrepareForLegacy.h"
 #include "dynamatic/Transforms/PushConstants.h" 
@@ -15,6 +16,8 @@
 #include "dynamatic/Transforms/InitCstWidth.h"
 #include "dynamatic/Transforms/BitsOptimize.h"
 #include "mlir/IR/DialectRegistry.h"
+#include "dynamatic/Transforms/NameMemoryOps.h"
+#include "dynamatic/Transforms/PushConstants.h"
 #include "mlir/Pass/Pass.h"
 #include "mlir/Pass/PassRegistry.h"
 
