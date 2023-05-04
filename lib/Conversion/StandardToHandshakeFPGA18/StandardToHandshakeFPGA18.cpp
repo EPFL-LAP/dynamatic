@@ -15,6 +15,7 @@
 #include "mlir/Dialect/Affine/IR/AffineOps.h"
 #include "mlir/Dialect/Affine/Utils.h"
 #include "mlir/Dialect/Func/IR/FuncOps.h"
+#include "mlir/Dialect/LLVMIR/LLVMDialect.h"
 #include "mlir/Dialect/MemRef/IR/MemRef.h"
 #include "mlir/Dialect/SCF/IR/SCF.h"
 #include "mlir/Support/LogicalResult.h"
@@ -360,6 +361,36 @@ HandshakeLoweringFPGA18::connectToMemory(ConversionPatternRewriter &rewriter,
   return success();
 }
 
+LogicalResult HandshakeLoweringFPGA18::replaceUndefinedValues(
+    ConversionPatternRewriter &rewriter) {
+  for (auto &block : r) {
+    for (auto undefOp : block.getOps<mlir::LLVM::UndefOp>()) {
+      // Create an attribute of the appropriate type for the constant
+      auto resType = undefOp.getRes().getType();
+      TypedAttr cstAttr = llvm::TypeSwitch<Type, TypedAttr>(resType)
+                              .Case<IndexType>([&](auto type) {
+                                return rewriter.getIndexAttr(0);
+                              })
+                              .Case<IntegerType>([&](auto type) {
+                                return rewriter.getIntegerAttr(type, 0);
+                              })
+                              .Case<FloatType>([&](auto type) {
+                                return rewriter.getFloatAttr(type, 0.0);
+                              })
+                              .Default([&](auto type) { return nullptr; });
+      if (!cstAttr)
+        return undefOp->emitError() << "operation has unsupported result type";
+
+      // Create a constant with a default value and replace the undefined value
+      rewriter.setInsertionPoint(undefOp);
+      auto cstOp = rewriter.create<handshake::ConstantOp>(
+          undefOp.getLoc(), resType, cstAttr, getBlockEntryControl(&block));
+      rewriter.replaceOp(undefOp, cstOp.getResult());
+    }
+  }
+  return success();
+}
+
 LogicalResult
 HandshakeLoweringFPGA18::idBasicBlocks(ConversionPatternRewriter &rewriter) {
   for (auto indexAndBlock : llvm::enumerate(r))
@@ -580,6 +611,10 @@ static LogicalResult lowerRegion(HandshakeLoweringFPGA18 &hl,
 
   if (failed(runPartialLowering(hl, &HandshakeLoweringFPGA18::connectToMemory,
                                 memInfo)))
+    return failure();
+
+  if (failed(runPartialLowering(
+          hl, &HandshakeLoweringFPGA18::replaceUndefinedValues)))
     return failure();
 
   if (idBasicBlocks &&
