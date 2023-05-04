@@ -134,7 +134,27 @@ void constructFuncMap(DenseMap<StringRef,
       return widths;
     };
 
-    mapOpNameWidth[StringRef("arith.divusi")] = mapOpNameWidth[StringRef("arith.ceildivsi")];
+    mapOpNameWidth[StringRef("arith.divui")] = mapOpNameWidth[StringRef("arith.divsi")];
+
+    mapOpNameWidth[StringRef("arith.shli")] = 
+    [&](Operation::operand_range vecOperands,
+         Operation::result_range vecResults) {
+      std::vector<std::vector<unsigned>> widths; 
+      unsigned shift_bit = 0;
+      if (auto defOp = vecOperands[1].getDefiningOp(); isa<handshake::ConstantOp>(defOp))
+        if (handshake::ConstantOp cstOp = dyn_cast<handshake::ConstantOp>(defOp))
+          if (auto IntAttr = cstOp.getValue().dyn_cast<mlir::IntegerAttr>())
+            shift_bit = IntAttr.getValue().getZExtValue();
+                                
+      unsigned int width = std::min(std::min(cpp_max_width, vecResults[0].getType().getIntOrFloatBitWidth()), 
+                                  vecOperands[0].getType().getIntOrFloatBitWidth() + shift_bit);
+
+      width = std::min(cpp_max_width, width);
+      widths.push_back({width, width}); //matched widths for operators
+      widths.push_back({width}); //matched widths for result
+
+      return widths;
+    };
 
     mapOpNameWidth[StringRef("arith.shrsi")] = 
     [&](Operation::operand_range vecOperands,
@@ -146,7 +166,7 @@ void constructFuncMap(DenseMap<StringRef,
           if (auto IntAttr = cstOp.getValue().dyn_cast<mlir::IntegerAttr>())
             shift_bit = IntAttr.getValue().getZExtValue();
                                 
-      unsigned int width = std::min(cpp_max_width,
+      unsigned int width = std::min(std::min(cpp_max_width, vecResults[0].getType().getIntOrFloatBitWidth()),
                                   vecOperands[0].getType().getIntOrFloatBitWidth() - shift_bit);
 
       width = std::min(cpp_max_width, width);
@@ -379,6 +399,9 @@ void constructFuncMap(DenseMap<StringRef,
     if (isa<mlir::arith::AddIOp>(*Op)  ||
         isa<mlir::arith::SubIOp>(*Op)  ||
         isa<mlir::arith::MulIOp>(*Op)  ||
+        isa<mlir::arith::ShLIOp>(*Op)  ||
+        isa<mlir::arith::ShRSIOp>(*Op) ||
+        isa<mlir::arith::ShRUIOp>(*Op) ||
         isa<mlir::arith::DivSIOp>(*Op) ||
         isa<mlir::arith::DivUIOp>(*Op) ||
         isa<mlir::arith::CmpIOp>(*Op)  ||

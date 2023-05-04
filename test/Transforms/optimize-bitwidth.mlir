@@ -27,7 +27,7 @@ handshake.func @optimizeAdd(%arg0: none) -> i32 {
 }
 
 // CHECK-LABEL:   handshake.func @optimizeBackwardSub(
-// CHECK-SAME:                                        %[[VAL_0:.*]]: none, ...) -> i12 attributes {argNames = ["arg0"], resNames = ["out0"]} {
+// CHECK-SAME:                                        %[[VAL_0:.*]]: none, ...) -> i8 attributes {argNames = ["arg0"], resNames = ["out0"]} {
 // CHECK:           %[[VAL_1:.*]] = merge %[[VAL_0]] {bb = 0 : ui32} : none
 // CHECK:           %[[VAL_2:.*]] = constant %[[VAL_1]] {bb = 0 : ui32, value = 999 : i11} : i11
 // CHECK:           %[[VAL_3:.*]] = constant %[[VAL_1]] {bb = 0 : ui32, value = 5 : i4} : i4
@@ -36,7 +36,8 @@ handshake.func @optimizeAdd(%arg0: none) -> i32 {
 // CHECK:           %[[VAL_6:.*]] = arith.subi %[[VAL_4]], %[[VAL_5]] {bb = 0 : ui32} : i8
 // CHECK:           end
 // CHECK:         }
-handshake.func @optimizeBackwardSub(%arg0: none) -> i12 {
+
+handshake.func @optimizeBackwardSub(%arg0: none) -> i8 {
   %0 = merge %arg0 {bb = 0 : ui32} : none
   %1 = constant %0 {bb = 0 : ui32, value = 999 : i11} : i11
   %2 = arith.extsi %1 {bb = 0 : ui32} : i11 to i32
@@ -47,3 +48,89 @@ handshake.func @optimizeBackwardSub(%arg0: none) -> i12 {
   end
 }
 
+// CHECK-LABEL:   handshake.func @optimizeBackwardMuL(
+// CHECK-SAME:                                        %[[VAL_0:.*]]: none, ...) -> i8 attributes {argNames = ["arg0"], resNames = ["out0"]} {
+// CHECK:           %[[VAL_1:.*]] = merge %[[VAL_0]] {bb = 0 : ui32} : none
+// CHECK:           %[[VAL_2:.*]] = constant %[[VAL_1]] {bb = 0 : ui32, value = 999 : i11} : i11
+// CHECK:           %[[VAL_3:.*]] = constant %[[VAL_1]] {bb = 0 : ui32, value = 20 : i6} : i6
+// CHECK:           %[[VAL_4:.*]] = arith.extsi %[[VAL_2]] : i11 to i16
+// CHECK:           %[[VAL_5:.*]] = arith.extsi %[[VAL_3]] : i6 to i16
+// CHECK:           %[[VAL_6:.*]] = arith.muli %[[VAL_4]], %[[VAL_5]] {bb = 0 : ui32} : i16
+// CHECK:           end
+// CHECK:         }
+
+handshake.func @optimizeBackwardMuL(%arg0: none) -> i8 {
+  %0 = merge %arg0 {bb = 0 : ui32} : none
+  %1 = constant %0 {bb = 0 : ui32, value = 999 : i11} : i11
+  %2 = arith.extsi %1 {bb = 0 : ui32} : i11 to i32
+  %3 = constant %0 {bb = 0 : ui32, value = 20 : i6} : i6
+  %4 = arith.extsi %3 {bb = 0 : ui32} : i6 to i32
+  %5 = arith.muli %2, %4 {bb = 0 : ui32} : i32
+  %6 = arith.trunci %5 {bb = 0 : ui32} : i32 to i16
+  end
+}
+
+// CHECK-LABEL:   handshake.func @optimizeBackwardDiV(
+// CHECK-SAME:                                        %[[VAL_0:.*]]: none, ...) -> i8 attributes {argNames = ["arg0"], resNames = ["out0"]} {
+// CHECK:           %[[VAL_1:.*]] = merge %[[VAL_0]] {bb = 0 : ui32} : none
+// CHECK:           %[[VAL_2:.*]] = constant %[[VAL_1]] {bb = 0 : ui32, value = 999 : i11} : i11
+// CHECK:           %[[VAL_3:.*]] = constant %[[VAL_1]] {bb = 0 : ui32, value = 20 : i6} : i6
+// CHECK:           %[[VAL_4:.*]] = arith.extsi %[[VAL_2]] : i11 to i12
+// CHECK:           %[[VAL_5:.*]] = arith.extsi %[[VAL_3]] : i6 to i12
+// CHECK:           %[[VAL_6:.*]] = arith.divui %[[VAL_4]], %[[VAL_5]] {bb = 0 : ui32} : i12
+// CHECK:           end
+// CHECK:         }
+
+handshake.func @optimizeBackwardDiV(%arg0: none) -> i8 {
+  %0 = merge %arg0 {bb = 0 : ui32} : none
+  %1 = constant %0 {bb = 0 : ui32, value = 999 : i11} : i11
+  %2 = arith.extsi %1 {bb = 0 : ui32} : i11 to i32
+  %3 = constant %0 {bb = 0 : ui32, value = 20 : i6} : i6
+  %4 = arith.extsi %3 {bb = 0 : ui32} : i6 to i32
+  %5 = arith.divui %2, %4 {bb = 0 : ui32} : i32
+  %6 = arith.trunci %5 {bb = 0 : ui32} : i32 to i16
+  end
+}
+
+// CHECK-LABEL:   handshake.func @optimizeBackwardShL(
+// CHECK-SAME:                                        %[[VAL_0:.*]]: none, ...) -> i8 attributes {argNames = ["arg0"], resNames = ["out0"]} {
+// CHECK:           %[[VAL_1:.*]] = merge %[[VAL_0]] {bb = 0 : ui32} : none
+// CHECK:           %[[VAL_2:.*]] = constant %[[VAL_1]] {bb = 0 : ui32, value = 999 : i11} : i11
+// CHECK:           %[[VAL_3:.*]] = constant %[[VAL_1]] {bb = 0 : ui32, value = 2 : i4} : i4
+// CHECK:           %[[VAL_4:.*]] = arith.extsi %[[VAL_2]] : i11 to i13
+// CHECK:           %[[VAL_5:.*]] = arith.extsi %[[VAL_3]] : i4 to i13
+// CHECK:           %[[VAL_6:.*]] = arith.shli %[[VAL_4]], %[[VAL_5]] {bb = 0 : ui32} : i13
+// CHECK:           end
+// CHECK:         }
+
+handshake.func @optimizeBackwardShL(%arg0: none) -> i8 {
+  %0 = merge %arg0 {bb = 0 : ui32} : none
+  %1 = constant %0 {bb = 0 : ui32, value = 999 : i11} : i11
+  %2 = arith.extsi %1 {bb = 0 : ui32} : i11 to i32
+  %3 = constant %0 {bb = 0 : ui32, value = 2 : i4} : i4
+  %4 = arith.extsi %3 {bb = 0 : ui32} : i4 to i32
+  %5 = arith.shli %2, %4 {bb = 0 : ui32} : i32
+  %6 = arith.trunci %5 {bb = 0 : ui32} : i32 to i16
+  end
+}
+
+// CHECK-LABEL:   handshake.func @optimizeBackwardShR(
+// CHECK-SAME:                                        %[[VAL_0:.*]]: none, ...) -> i8 attributes {argNames = ["arg0"], resNames = ["out0"]} {
+// CHECK:           %[[VAL_1:.*]] = merge %[[VAL_0]] {bb = 0 : ui32} : none
+// CHECK:           %[[VAL_2:.*]] = constant %[[VAL_1]] {bb = 0 : ui32, value = 999 : i11} : i11
+// CHECK:           %[[VAL_3:.*]] = constant %[[VAL_1]] {bb = 0 : ui32, value = 2 : i4} : i4
+// CHECK:           %[[VAL_4:.*]] = arith.trunci %[[VAL_2]] : i11 to i8
+// CHECK:           %[[VAL_5:.*]] = arith.extsi %[[VAL_3]] : i4 to i8
+// CHECK:           %[[VAL_6:.*]] = arith.shrui %[[VAL_4]], %[[VAL_5]] {bb = 0 : ui32} : i8
+// CHECK:           end
+// CHECK:         }
+handshake.func @optimizeBackwardShR(%arg0: none) -> i8 {
+  %0 = merge %arg0 {bb = 0 : ui32} : none
+  %1 = constant %0 {bb = 0 : ui32, value = 999 : i11} : i11
+  %2 = arith.extsi %1 {bb = 0 : ui32} : i11 to i32
+  %3 = constant %0 {bb = 0 : ui32, value = 2 : i4} : i4
+  %4 = arith.extsi %3 {bb = 0 : ui32} : i4 to i32
+  %5 = arith.shrui %2, %4 {bb = 0 : ui32} : i32
+  %6 = arith.trunci %5 {bb = 0 : ui32} : i32 to i8
+  end
+}

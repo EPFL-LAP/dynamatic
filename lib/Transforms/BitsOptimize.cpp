@@ -70,9 +70,9 @@ static LogicalResult rewriteBitsWidths(handshake::FuncOp funcOp, MLIRContext *ct
       if (forMapOpNameWidth.find(opName) != forMapOpNameWidth.end())
         newWidth = forMapOpNameWidth[opName](op->getOperands());
 
-
+      
       if (isa<handshake::ControlMergeOp>(op))
-        resInd = 1; 
+        resInd = 1; //ceil log2 of the number of inputs}
       // if the new type can be optimized, update the type
       if (newWidth>0)
         if(Type newOpResultType = getNewType(op->getResult(resInd), newWidth, true);  
@@ -83,9 +83,6 @@ static LogicalResult rewriteBitsWidths(handshake::FuncOp funcOp, MLIRContext *ct
 
         }
     }
-
-    // for (auto &op : funcOp.getOps())
-    //   llvm::errs() << op <<"\n";
 
     // Backward Process
     DenseMap<StringRef, backward_func> backMapOpNameWidth;
@@ -98,7 +95,6 @@ static LogicalResult rewriteBitsWidths(handshake::FuncOp funcOp, MLIRContext *ct
         continue;
       
      if (isa<mlir::arith::TruncIOp>(*op)) {
-        // op->getOperand(0).setType(op->getResult(0).getType());
         update::replaceWithSuccessor(op, op->getResult(0).getType());
         op->erase();
         continue;
@@ -116,7 +112,7 @@ static LogicalResult rewriteBitsWidths(handshake::FuncOp funcOp, MLIRContext *ct
         if(Type newOpResultType = getNewType(op->getOperand(0), newWidth, true);  
             newWidth < op->getOperand(0).getType().getIntOrFloatBitWidth()){
           changed |= true;
-          // llvm::errs() << "backward op " << *op << "\n";
+
           for (unsigned i=0;i<op->getNumOperands();++i)
             if (newWidth < op->getOperand(i).getType().getIntOrFloatBitWidth()) {
               savedBits += op->getOperand(i).getType().getIntOrFloatBitWidth()-newWidth;
@@ -126,9 +122,8 @@ static LogicalResult rewriteBitsWidths(handshake::FuncOp funcOp, MLIRContext *ct
       
     }
 
-    llvm::errs() << "-----------------end one round-----------------\n";
-
   }
+
   // Store new inserted truncation or extension operation during validation
   SmallVector<Operation *> OpTruncExt;
   for (auto &op : funcOp.getOps()) {
@@ -139,9 +134,9 @@ static LogicalResult rewriteBitsWidths(handshake::FuncOp funcOp, MLIRContext *ct
 
   // Validate the new inserted operation
   for (auto op : OpTruncExt)
-    update::validateOp(op, ctx, OpTruncExt);
+    update::revertTruncOrExt(op, ctx); 
 
-  llvm::errs() << "Total saved bits " << savedBits << "\n";
+  llvm::errs() << "Forward-Backward saved bits " << savedBits << "\n";
   
   return success();
 }

@@ -32,11 +32,12 @@ namespace forward {
                   vecOperands[1].getType().getIntOrFloatBitWidth());
   };
 
-  mapOpNameWidth[StringRef("arith.ceildivsi")] = [](Operation::operand_range vecOperands)
+  mapOpNameWidth[StringRef("arith.divui")] = [](Operation::operand_range vecOperands)
   {
     return std::min(cpp_max_width,
                 vecOperands[0].getType().getIntOrFloatBitWidth() + 1);
   };
+  mapOpNameWidth[StringRef("arith.divsi")] = mapOpNameWidth[StringRef("arith.divui")];
 
   mapOpNameWidth[StringRef("arith.andi")] = [](Operation::operand_range vecOperands)
   {

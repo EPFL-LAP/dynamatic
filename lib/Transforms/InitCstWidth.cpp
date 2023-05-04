@@ -25,6 +25,8 @@ static LogicalResult initCstOpBitsWidth(handshake::FuncOp funcOp,
     cstOps.push_back(constOp);
   }
 
+  int savedBits = 0;
+
   for (auto op : cstOps){
     unsigned cstBitWidth = cpp_max_width;
      IntegerType::SignednessSemantics ifSign = IntegerType::SignednessSemantics::Signless;
@@ -63,6 +65,7 @@ static LogicalResult initCstOpBitsWidth(handshake::FuncOp funcOp,
 
       // recursively replace the uses of the old constant operation with the new one
       // Value opVal = op.getResult();
+      savedBits += op.getResult().getType().getIntOrFloatBitWidth() - cstBitWidth;
       auto extOp = builder.create<mlir::arith::ExtSIOp>(newCstOp.getLoc(),
                                                         op.getResult().getType(),
                                                         newCstOp.getResult()); 
@@ -87,12 +90,7 @@ static LogicalResult initCstOpBitsWidth(handshake::FuncOp funcOp,
     
 
   }
-
-  // for (auto &op : funcOp.getOps()) {
-  //   llvm::errs() << "op after constant initialization " << op <<'\n';
-  //   // update::validateOp(&op, ctx);
-  //   // llvm::errs() << "op after validation " << op <<"\n\n";
-  // }
+  llvm::errs() << "Constant saved bits " << savedBits << "\n";
   
   return success();
 }
