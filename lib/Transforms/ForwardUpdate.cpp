@@ -103,9 +103,9 @@ namespace forward {
     for (auto oprand : vecOperands) 
       ind++;
 
-    unsigned indexWidth=2;
-    if (ind>2)
-      indexWidth = log2(ind-2)+2;
+    unsigned indexWidth=1;
+    if (ind>1)
+      indexWidth = ceil(log2(ind));
 
     return indexWidth;
   };
