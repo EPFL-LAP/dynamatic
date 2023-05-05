@@ -41,3 +41,8 @@ bin/
 
 # legacy-dynamatic repo
 legacy-dynamatic
+
+# CMakeFiles
+include/dynamatic/Transforms/CMakeCache.txt
+include/dynamatic/Transforms/CMakeFiles/*
+
