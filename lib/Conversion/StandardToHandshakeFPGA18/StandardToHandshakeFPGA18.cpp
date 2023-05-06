@@ -707,11 +707,6 @@ struct StandardToHandshakeFPGA18Pass
     for (auto funcOp : llvm::make_early_inc_range(m.getOps<func::FuncOp>()))
       if (failed(lowerFuncOp(funcOp, &getContext(), idBasicBlocks)))
         return signalPassFailure();
-
-    // Legalize the resulting functions by performing any simple conversion
-    for (auto handshakeFunc : m.getOps<handshake::FuncOp>())
-      if (failed(postDataflowConvert(handshakeFunc)))
-        return signalPassFailure();
   }
 };
 } // namespace
