@@ -264,7 +264,8 @@ static std::unordered_map<std::string, std::string> arithNameToOpName{
     {"arith.divsi", "sdiv_op"},    {"arith.divf", "fdiv_op"},
     {"arith.sitofp", "sitofp_op"}, {"arith.remsi", "urem_op"},
     {"arith.extsi", "sext_op"},    {"arith.extui", "zext_op"},
-    {"arith.trunci", "trunc_op"},  {"arith.shrsi", "ashr_op"}};
+    {"arith.trunci", "trunc_op"},  {"arith.shrsi", "ashr_op"},
+    {"arith.shli", "shl_op"},      {"arith.select", "select_op"}};
 
 /// Delay information for arith.addi and arith.subi operations.
 static const std::string DELAY_ADD_SUB =
@@ -302,9 +303,12 @@ static std::unordered_map<std::string, std::string> arithNameToDelay{
     {"arith.sitofp", DELAY_SITOFP_REMSI},
     {"arith.remsi", DELAY_SITOFP_REMSI},
     {"arith.sext", DELAY_EXT_TRUNC},
+    {"arith.extsi", DELAY_EXT_TRUNC},
     {"arith.extui", DELAY_EXT_TRUNC},
     {"arith.trunci", DELAY_EXT_TRUNC},
-    {"arith.shrsi", DELAY_EXT_TRUNC}};
+    {"arith.shrsi", DELAY_EXT_TRUNC},
+    {"arith.shli", DELAY_EXT_TRUNC},
+    {"arith.select", ""}};
 
 /// Maps name of integer comparison type to "op" attribute.
 static std::unordered_map<arith::CmpIPredicate, std::string> cmpINameToOpName{
@@ -399,8 +403,8 @@ static std::string getInputForMux(handshake::MuxOp op) {
 
 /// Produces the "out" attribute value of a handshake::ControlMergeOp.
 static std::string getOutputForControlMerge(handshake::ControlMergeOp op) {
-  // Legacy Dynamatic always forces the index output to have a width of 1
-  return "out1:" + std::to_string(getWidth(op.getResult())) + " out2?:" + "1";
+  return "out1:" + std::to_string(getWidth(op.getResult())) +
+         " out2?:" + std::to_string((int)ceil(log2(op->getNumOperands())));
 }
 
 /// Produces the "in" attribute value of a handshake::ConditionalBranchOp.
@@ -584,7 +588,7 @@ static size_t fixPortNumber(Operation *op, Value val, size_t idx,
         if (isSrcOp)
           return idx;
         // Legacy Dynamatic has the data operand before the condition operand
-        return (idx == 1) ? (size_t)0 : (size_t)1;
+        return 1 - idx;
       })
       .Case<handshake::EndOp>([&](handshake::EndOp endOp) {
         // Legacy Dynamatic has the memory controls before the return values
@@ -596,7 +600,7 @@ static size_t fixPortNumber(Operation *op, Value val, size_t idx,
       .Case<handshake::DynamaticLoadOp, handshake::DynamaticStoreOp>([&](auto) {
         // Legacy Dynamatic has the data operand/result before the address
         // operand/result
-        return (idx == 1) ? 0 : 1;
+        return 1 - idx;
       })
       .Case<handshake::MemoryControllerOp>(
           [&](handshake::MemoryControllerOp memOp) {
@@ -651,7 +655,7 @@ static size_t fixPortNumber(Operation *op, Value val, size_t idx,
 /// Derives a raw port from a port string in the format
 /// "<port_name>:<port_width>". Uses the name passed as argument to derive a
 /// globally unique name for the returned raw port.
-static RawPort splitPortStr(std::string portStr, std::string &nodeNme) {
+static RawPort splitPortStr(std::string portStr, std::string &nodeName) {
   auto colonIdx = portStr.find(":");
   assert(colonIdx != std::string::npos && "port string has incorrect format");
 
@@ -662,34 +666,38 @@ static RawPort splitPortStr(std::string portStr, std::string &nodeNme) {
     portName = portName.substr(0, colonIdx - 1);
 
   auto width = (unsigned)std::stoul(portStr.substr(colonIdx + 1));
-  return std::make_pair(nodeNme + "_" + portName, width);
+  return std::make_pair(nodeName + "_" + portName, width);
 }
 
 /// Extracts a list of raw ports from the "in" or "out" attribute of a node in
 /// the graph. Each returned raw port is uniquely named globally using the name
 /// passed as argument.
 static SmallVector<RawPort> extractPortsFromString(std::string &portsInfo,
-                                                   std::string &nodeNme) {
+                                                   std::string &nodeName) {
   SmallVector<RawPort> ports;
+  if (portsInfo.empty())
+    return ports;
+
   size_t last = 0, next = 0;
   while ((next = portsInfo.find(" ", last)) != std::string::npos) {
-    ports.push_back(splitPortStr(portsInfo.substr(last, next - last), nodeNme));
+    ports.push_back(
+        splitPortStr(portsInfo.substr(last, next - last), nodeName));
     last = next + 1;
   }
-  ports.push_back(splitPortStr(portsInfo.substr(last), nodeNme));
+  ports.push_back(splitPortStr(portsInfo.substr(last), nodeName));
   return ports;
 }
 
 LogicalResult ExportDOTPass::legacyRegisterPorts(NodeInfo &info,
-                                                 std::string &nodeNme,
+                                                 std::string &nodeName,
                                                  bool skipInputs,
                                                  bool skipOutputs) {
   if (!skipInputs && info.stringAttr.find("in") != info.stringAttr.end())
-    for (auto &in : extractPortsFromString(info.stringAttr["in"], nodeNme))
+    for (auto &in : extractPortsFromString(info.stringAttr["in"], nodeName))
       if (auto [_, newPort] = legacyPorts.insert(in); !newPort)
         return failure();
   if (!skipOutputs && info.stringAttr.find("out") != info.stringAttr.end())
-    for (auto &out : extractPortsFromString(info.stringAttr["out"], nodeNme))
+    for (auto &out : extractPortsFromString(info.stringAttr["out"], nodeName))
       if (auto [_, newPort] = legacyPorts.insert(out); !newPort)
         return failure();
   return success();
@@ -788,7 +796,7 @@ LogicalResult ExportDOTPass::annotateNode(mlir::raw_indented_ostream &os,
           .Case<handshake::BufferOp>([&](handshake::BufferOp bufOp) {
             auto info = NodeInfo("Buffer");
             info.intAttr["slots"] = bufOp.getNumSlots();
-            info.stringAttr["tansparent"] =
+            info.stringAttr["transparent"] =
                 bufOp.getBufferType() == BufferTypeEnum::fifo ? "true"
                                                               : "false";
             return info;
@@ -917,7 +925,8 @@ LogicalResult ExportDOTPass::annotateNode(mlir::raw_indented_ostream &os,
                 arith::AndIOp, arith::OrIOp, arith::XOrIOp, arith::MulIOp,
                 arith::MulFOp, arith::DivUIOp, arith::DivSIOp, arith::DivFOp,
                 arith::SIToFPOp, arith::RemSIOp, arith::ExtSIOp, arith::ExtUIOp,
-                arith::TruncIOp, arith::ShRSIOp>([&](auto) {
+                arith::TruncIOp, arith::ShRSIOp, arith::ShLIOp,
+                arith::SelectOp>([&](auto) {
             auto info = NodeInfo("Operator");
             auto opName = op->getName().getStringRef().str();
             info.stringAttr["op"] = arithNameToOpName[opName];
@@ -1238,18 +1247,20 @@ LogicalResult ExportDOTPass::printNode(mlir::raw_indented_ostream &os,
   // Determine fill color
   os << "fillcolor=";
   os << llvm::TypeSwitch<Operation *, std::string>(op)
-            .Case<handshake::ForkOp, handshake::LazyForkOp, handshake::MuxOp,
-                  handshake::JoinOp>([&](auto) { return "lavender"; })
+            .Case<handshake::ForkOp, handshake::LazyForkOp, handshake::JoinOp>(
+                [&](auto) { return "lavender"; })
             .Case<handshake::BufferOp>([&](auto) { return "lightgreen"; })
             .Case<handshake::DynamaticReturnOp, handshake::EndOp>(
                 [&](auto) { return "gold"; })
-            .Case<handshake::SinkOp, handshake::ConstantOp>(
+            .Case<handshake::SourceOp, handshake::SinkOp>(
                 [&](auto) { return "gainsboro"; })
+            .Case<handshake::ConstantOp>([&](auto) { return "plum"; })
             .Case<handshake::MemoryControllerOp, handshake::DynamaticLoadOp,
                   handshake::DynamaticStoreOp>([&](auto) { return "coral"; })
             .Case<handshake::MergeOp, handshake::ControlMergeOp,
-                  handshake::BranchOp, handshake::ConditionalBranchOp>(
-                [&](auto) { return "lightblue"; })
+                  handshake::MuxOp>([&](auto) { return "lightblue"; })
+            .Case<handshake::BranchOp, handshake::ConditionalBranchOp>(
+                [&](auto) { return "tan2"; })
             .Default([&](auto) { return "moccasin"; });
 
   // Determine shape
@@ -1302,7 +1313,11 @@ LogicalResult ExportDOTPass::printFunc(mlir::raw_indented_ostream &os,
   // Sequentially scan across the operations in the function and assign
   // instance IDs to each operation
   for (auto &op : funcOp.getOps())
-    opIDs[&op] = opTypeCntrs[op.getName().getStringRef().str()]++;
+    if (auto memOp = dyn_cast<handshake::MemoryControllerOp>(op))
+      // Memories already have unique IDs, so make their name match it
+      opIDs[&op] = memOp.getId();
+    else
+      opIDs[&op] = opTypeCntrs[op.getName().getStringRef().str()]++;
 
   os << "node [shape=box, style=filled, fillcolor=\"white\"]\n";
 
