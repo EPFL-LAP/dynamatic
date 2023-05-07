@@ -7,10 +7,10 @@
 //
 //===----------------------------------------------------------------------===//
 
+#include "dynamatic/Conversion/ExportDOT.h"
 #include "circt/Dialect/Handshake/HandshakeOps.h"
 #include "circt/Dialect/Handshake/HandshakePasses.h"
 #include "dynamatic/Conversion/PassDetails.h"
-#include "dynamatic/Conversion/Passes.h"
 #include "dynamatic/Conversion/StandardToHandshakeFPGA18.h"
 #include "mlir/Dialect/Arith/IR/Arith.h"
 #include "mlir/IR/BuiltinTypes.h"
