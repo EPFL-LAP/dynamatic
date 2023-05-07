@@ -424,11 +424,11 @@ static std::string getOutputForCondBranch(handshake::ConditionalBranchOp op) {
 }
 
 /// Produces the "in" attribute value of a handshake::SelectOp.
-static std::string getInputForSelect(handshake::SelectOp op) {
+static std::string getInputForSelect(arith::SelectOp op) {
   PortsData ports;
-  ports.push_back(std::make_pair("in1?", op.getCondOperand()));
-  ports.push_back(std::make_pair("in2+", op.getTrueOperand()));
-  ports.push_back(std::make_pair("in3-", op.getFalseOperand()));
+  ports.push_back(std::make_pair("in1?", op.getCondition()));
+  ports.push_back(std::make_pair("in2+", op.getTrueValue()));
+  ports.push_back(std::make_pair("in3-", op.getFalseValue()));
   return getIOFromPorts(ports);
 }
 
@@ -891,14 +891,6 @@ LogicalResult ExportDOTPass::annotateNode(mlir::raw_indented_ostream &os,
                 "0.000 0.000 0.000 100.000 100.000 100.000 100.000 100.000";
             return info;
           })
-          .Case<handshake::SelectOp>([&](handshake::SelectOp op) {
-            auto info = NodeInfo("Operator");
-            info.stringAttr["op"] = "select_op";
-            info.stringAttr["in"] = getInputForSelect(op);
-            info.stringAttr["delay"] =
-                "1.397 1.397 1.412 2.061 100.000 100.000 100.000 100.000";
-            return info;
-          })
           .Case<handshake::DynamaticReturnOp>([&](auto) {
             auto info = NodeInfo("Operator");
             info.stringAttr["op"] = "ret_op";
@@ -919,6 +911,14 @@ LogicalResult ExportDOTPass::annotateNode(mlir::raw_indented_ostream &os,
 
             info.stringAttr["delay"] =
                 "1.397 0.000 1.397 1.409 100.000 100.000 100.000 100.000";
+            return info;
+          })
+          .Case<arith::SelectOp>([&](arith::SelectOp op) {
+            auto info = NodeInfo("Operator");
+            info.stringAttr["op"] = "select_op";
+            info.stringAttr["in"] = getInputForSelect(op);
+            info.stringAttr["delay"] =
+                "1.397 1.397 1.412 2.061 100.000 100.000 100.000 100.000";
             return info;
           })
           .Case<arith::AddIOp, arith::AddFOp, arith::SubIOp, arith::SubFOp,

@@ -245,7 +245,8 @@ static std::string getExtModuleName(Operation *oldOp) {
 /// Checks whether a module with the same name has been created elsewhere in the
 /// top level module. Returns the matched module operation if true, otherwise
 /// returns nullptr.
-static Operation *findModule(mlir::ModuleOp parentModule, StringRef modName) {
+static hw::HWModuleLike findModule(mlir::ModuleOp parentModule,
+                                   StringRef modName) {
   if (auto mod = parentModule.lookupSymbol<HWModuleOp>(modName))
     return mod;
   if (auto mod = parentModule.lookupSymbol<HWModuleExternOp>(modName))
@@ -764,7 +765,6 @@ public:
         ExtModuleConversionPattern<handshake::MergeOp>,
         ExtModuleConversionPattern<handshake::ControlMergeOp>,
         ExtModuleConversionPattern<handshake::MuxOp>,
-        ExtModuleConversionPattern<handshake::SelectOp>,
         ExtModuleConversionPattern<handshake::SourceOp>,
         ExtModuleConversionPattern<handshake::ConstantOp>,
         ExtModuleConversionPattern<handshake::SinkOp>,

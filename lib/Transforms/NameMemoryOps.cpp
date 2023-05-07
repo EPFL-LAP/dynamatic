@@ -37,7 +37,7 @@ struct AccessNameUniquer {
   /// operation is passed on multiple calls, it will receive a different unique
   /// name each time.
   std::string addOp(Operation *op) {
-    if (isa<AffineLoadOp, memref::LoadOp>(op))
+    if (isa<affine::AffineLoadOp, memref::LoadOp>(op))
       return name + "_load" + std::to_string(numLoads++);
     return name + "_store" + std::to_string(numStores++);
   }
@@ -61,8 +61,8 @@ static LogicalResult getMemrefOfMemoryOp(Operation *op, Value &out) {
         out = memrefOp.getMemRef();
         return success();
       })
-      .Case<AffineLoadOp, AffineStoreOp>([&](auto) {
-        MemRefAccess access(op);
+      .Case<affine::AffineLoadOp, affine::AffineStoreOp>([&](auto) {
+        affine::MemRefAccess access(op);
         out = access.memref;
         return success();
       })

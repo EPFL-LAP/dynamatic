@@ -25,6 +25,7 @@
 
 using namespace mlir;
 using namespace mlir::func;
+using namespace mlir::affine;
 using namespace mlir::memref;
 using namespace dynamatic;
 
@@ -38,8 +39,8 @@ using namespace dynamatic;
 
 /// Determines whether an operation is akin to a load or store memory operation.
 static bool isMemoryOp(Operation *op) {
-  return isa<memref::LoadOp, memref::StoreOp, mlir::AffineReadOpInterface,
-             mlir::AffineWriteOpInterface>(op);
+  return isa<memref::LoadOp, memref::StoreOp, AffineReadOpInterface,
+             AffineWriteOpInterface>(op);
 }
 
 /// Determines whether an operation is akin to a memory allocation operation.
@@ -66,8 +67,8 @@ static LogicalResult getOpMemRef(Operation *op, Value &out) {
     out = memOp.getMemRef();
   else if (auto memOp = dyn_cast<memref::StoreOp>(op))
     out = memOp.getMemRef();
-  else if (isa<mlir::AffineReadOpInterface, mlir::AffineWriteOpInterface>(op)) {
-    MemRefAccess access(op);
+  else if (isa<AffineReadOpInterface, AffineWriteOpInterface>(op)) {
+    affine::MemRefAccess access(op);
     out = access.memref;
   }
   if (out != Value())
@@ -493,7 +494,7 @@ public:
     addLegalDialect<func::FuncDialect>();
     addLegalDialect<arith::ArithDialect>();
     addIllegalDialect<scf::SCFDialect>();
-    addIllegalDialect<mlir::AffineDialect>();
+    addIllegalDialect<affine::AffineDialect>();
 
     // The root operation to be replaced is marked dynamically legal based on
     // the lowering status of the given operation, see PartialLowerOp. This is

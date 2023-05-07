@@ -14,6 +14,11 @@
 #include "mlir/Pass/Pass.h"
 
 namespace mlir {
+
+namespace affine {
+class AffineDialect;
+} // namespace affine
+
 namespace arith {
 class ArithDialect;
 } // namespace arith
