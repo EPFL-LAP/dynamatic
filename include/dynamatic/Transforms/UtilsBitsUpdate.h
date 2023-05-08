@@ -1,4 +1,4 @@
-//===- UtilsBitsUpdate.h ---------*- C++ -*-===//
+//===- UtilsBitsUpdate.h - Utils support bits optimization ------*- C++ -*-===//
 //
 // This file declares basic functions for type updates for --optimize-bits pass.
 //
@@ -18,9 +18,8 @@ using namespace circt::handshake;
 using namespace dynamatic;
 
 
-const unsigned cpp_max_width = 64;
-// const unsigned arith_max_width = 32;
-const unsigned address_width = 32;
+const unsigned CPP_MAX_WIDTH = 64;
+const unsigned ADDRESS_WIDTH = 32;
 
 IntegerType getNewType (Value opType, 
                         unsigned bitswidth, 
@@ -35,11 +34,22 @@ std::optional<Operation *> insertWidthMatchOp (Operation *newOp,
                                                Type newType, 
                                                MLIRContext *ctx);
                   
-namespace update {
+namespace dynamatic::update {
 
-  void constructFuncMap(DenseMap<mlir::StringRef, 
+  void constructUpdateFuncMap(DenseMap<mlir::StringRef, 
                       std::function<unsigned (Operation::operand_range vecOperands)>> 
                       &mapOpNameWidth);
+
+  void constructBackwardFuncMap(
+    DenseMap<StringRef,
+             std::function<unsigned(Operation::result_range vecResults)>>
+        &mapOpNameWidth);
+
+  void constructForwardFuncMap(
+    DenseMap<StringRef,
+             std::function<unsigned(Operation::operand_range vecOperands)>>
+        &mapOpNameWidth);
+                    
   
   void validateOp(Operation *Op, 
                   MLIRContext *ctx,

@@ -1,4 +1,4 @@
-//===- InitIndexType.h - Transform the Index Type to IntegerType with system bit width  ---------*- C++ -*-===//
+//===- InitIndexType.h - Transform IndexType to IntegerType -----*- C++ -*-===//
 //
 // This file declares the --init-indextype pass.
 //
@@ -8,7 +8,6 @@
 #define DYNAMATIC_TRANSFORMS_INITINDEXTYPE_H
 
 #include "dynamatic/Support/LLVM.h"
-
 
 namespace dynamatic {
 

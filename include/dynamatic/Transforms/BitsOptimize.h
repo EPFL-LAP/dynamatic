@@ -1,4 +1,4 @@
-//===- BitsOptimize.h - Optimize bits width  ---------*- C++ -*-===//
+//===- BitsOptimize.h - Optimize bits widths --------------------*- C++ -*-===//
 //
 // This file declares the --optimize-bits pass.
 //

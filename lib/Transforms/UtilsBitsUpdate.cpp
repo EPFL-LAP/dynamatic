@@ -71,7 +71,130 @@ std::optional<Operation *> insertWidthMatchOp (Operation *newOp,
 
 namespace update {
 
-void constructFuncMap(DenseMap<StringRef, 
+void constructForwardFuncMap(DenseMap<StringRef, 
+                     std::function<unsigned (Operation::operand_range vecOperands)>> 
+                     &mapOpNameWidth){
+                      
+  mapOpNameWidth[StringRef("arith.addi")] = [](Operation::operand_range vecOperands)
+  {
+    return std::min(CPP_MAX_WIDTH,
+                std::max(vecOperands[0].getType().getIntOrFloatBitWidth(), 
+                        vecOperands[1].getType().getIntOrFloatBitWidth())+1);
+  };
+
+  mapOpNameWidth[StringRef("arith.subi")] = mapOpNameWidth[StringRef("arith.addi")];
+
+  mapOpNameWidth[StringRef("arith.muli")] = [](Operation::operand_range vecOperands)
+  {
+    return std::min(CPP_MAX_WIDTH,
+                vecOperands[0].getType().getIntOrFloatBitWidth() + 
+                  vecOperands[1].getType().getIntOrFloatBitWidth());
+  };
+
+  mapOpNameWidth[StringRef("arith.divui")] = [](Operation::operand_range vecOperands)
+  {
+    return std::min(CPP_MAX_WIDTH,
+                vecOperands[0].getType().getIntOrFloatBitWidth() + 1);
+  };
+  mapOpNameWidth[StringRef("arith.divsi")] = mapOpNameWidth[StringRef("arith.divui")];
+
+  mapOpNameWidth[StringRef("arith.andi")] = [](Operation::operand_range vecOperands)
+  {
+    return std::min(CPP_MAX_WIDTH,
+                std::min(vecOperands[0].getType().getIntOrFloatBitWidth(),
+                      vecOperands[1].getType().getIntOrFloatBitWidth()));
+  };
+
+  mapOpNameWidth[StringRef("arith.ori")] = [](Operation::operand_range vecOperands)
+  {
+    return std::min(CPP_MAX_WIDTH,
+                std::max(vecOperands[0].getType().getIntOrFloatBitWidth(),
+                      vecOperands[1].getType().getIntOrFloatBitWidth()));
+  };
+
+  mapOpNameWidth[StringRef("arith.xori")] = mapOpNameWidth[StringRef("arith.ori")];
+
+
+  mapOpNameWidth[StringRef("arith.shli")] = [](Operation::operand_range vecOperands)
+  {
+    int shift_bit = 0;
+    if (auto defOp = vecOperands[1].getDefiningOp(); isa<handshake::ConstantOp>(defOp)){
+      if (handshake::ConstantOp cstOp = dyn_cast<handshake::ConstantOp>(defOp))
+        if (auto IntAttr = cstOp.getValue().dyn_cast<mlir::IntegerAttr>())
+          shift_bit = IntAttr.getValue().getZExtValue();
+      return std::min(CPP_MAX_WIDTH,
+                vecOperands[0].getType().getIntOrFloatBitWidth() + shift_bit);
+    }
+    return CPP_MAX_WIDTH;
+  };
+
+  mapOpNameWidth[StringRef("arith.shrsi")] = [](Operation::operand_range vecOperands)
+  {
+    int shift_bit = 0;
+    if (auto defOp = vecOperands[1].getDefiningOp(); isa<handshake::ConstantOp>(defOp))
+      if (handshake::ConstantOp cstOp = dyn_cast<handshake::ConstantOp>(defOp))
+        if (auto IntAttr = cstOp.getValue().dyn_cast<mlir::IntegerAttr>())
+          shift_bit = IntAttr.getValue().getZExtValue();
+
+    return std::min(CPP_MAX_WIDTH,
+              vecOperands[0].getType().getIntOrFloatBitWidth() - shift_bit);
+
+  };
+
+  mapOpNameWidth[StringRef("arith.shrui")] = mapOpNameWidth[StringRef("arith.shrsi")];
+
+  mapOpNameWidth[StringRef("arith.cmpi")] = [](Operation::operand_range vecOperands)
+  {
+    return unsigned(1);
+  };
+
+  mapOpNameWidth[StringRef("arith.extsi")] = [](Operation::operand_range vecOperands)
+  {
+    return vecOperands[0].getType().getIntOrFloatBitWidth();
+  };
+
+  mapOpNameWidth[StringRef("arith.extui")] = mapOpNameWidth[StringRef("arith.extsi")];
+
+  mapOpNameWidth[StringRef("handshake.control_merge")] = [](Operation::operand_range vecOperands)
+  {
+    unsigned ind = 0; // record number of operators
+
+    for (auto oprand : vecOperands) 
+      ind++;
+
+    unsigned indexWidth=1;
+    if (ind>1)
+      indexWidth = ceil(log2(ind));
+
+    return indexWidth;
+  };
+
+};
+
+void constructBackwardFuncMap(DenseMap<StringRef, 
+                        std::function<unsigned (Operation::result_range vecResults)>> 
+                        &mapOpNameWidth)
+  {
+    mapOpNameWidth[StringRef("arith.addi")] = [](Operation::result_range vecResults)
+    {
+      return std::min(CPP_MAX_WIDTH, 
+                      vecResults[0].getType().getIntOrFloatBitWidth());
+    };
+
+    mapOpNameWidth[StringRef("arith.subi")] = mapOpNameWidth[StringRef("arith.addi")];
+
+    mapOpNameWidth[StringRef("arith.muli")] = mapOpNameWidth[StringRef("arith.addi")];
+
+    mapOpNameWidth[StringRef("arith.andi")] = mapOpNameWidth[StringRef("arith.addi")];
+
+    mapOpNameWidth[StringRef("arith.ori")] = mapOpNameWidth[StringRef("arith.addi")];
+
+    mapOpNameWidth[StringRef("arith.xori")] = mapOpNameWidth[StringRef("arith.addi")];
+
+
+  }
+
+void constructUpdateFuncMap(DenseMap<StringRef, 
                      std::function<std::vector<std::vector<unsigned int>> 
                                   (Operation::operand_range vecOperands, 
                                   Operation::result_range vecResults)>> 
@@ -88,7 +211,7 @@ void constructFuncMap(DenseMap<StringRef,
       unsigned int width = std::min(vecResults[0].getType().getIntOrFloatBitWidth(),
                            maxOpWidth+1);
 
-      width = std::min(cpp_max_width, width);
+      width = std::min(CPP_MAX_WIDTH, width);
       widths.push_back({width, width}); //matched widths for operators
       widths.push_back({width}); //matched widths for result
       
@@ -108,7 +231,7 @@ void constructFuncMap(DenseMap<StringRef,
       unsigned int width = std::min(vecResults[0].getType().getIntOrFloatBitWidth(),
                            maxOpWidth);
       
-      width = std::min(cpp_max_width, width);
+      width = std::min(CPP_MAX_WIDTH, width);
 
       widths.push_back({width, width}); //matched widths for operators
       widths.push_back({width}); //matched widths for result
@@ -126,7 +249,7 @@ void constructFuncMap(DenseMap<StringRef,
       unsigned int width = std::min(vecResults[0].getType().getIntOrFloatBitWidth(),
                            maxOpWidth+1);
       
-      width = std::min(cpp_max_width, width);
+      width = std::min(CPP_MAX_WIDTH, width);
 
       widths.push_back({width, width}); //matched widths for operators
       widths.push_back({width}); //matched widths for result
@@ -146,10 +269,10 @@ void constructFuncMap(DenseMap<StringRef,
           if (auto IntAttr = cstOp.getValue().dyn_cast<mlir::IntegerAttr>())
             shift_bit = IntAttr.getValue().getZExtValue();
                                 
-      unsigned int width = std::min(std::min(cpp_max_width, vecResults[0].getType().getIntOrFloatBitWidth()), 
+      unsigned int width = std::min(std::min(CPP_MAX_WIDTH, vecResults[0].getType().getIntOrFloatBitWidth()), 
                                   vecOperands[0].getType().getIntOrFloatBitWidth() + shift_bit);
 
-      width = std::min(cpp_max_width, width);
+      width = std::min(CPP_MAX_WIDTH, width);
       widths.push_back({width, width}); //matched widths for operators
       widths.push_back({width}); //matched widths for result
 
@@ -166,10 +289,10 @@ void constructFuncMap(DenseMap<StringRef,
           if (auto IntAttr = cstOp.getValue().dyn_cast<mlir::IntegerAttr>())
             shift_bit = IntAttr.getValue().getZExtValue();
                                 
-      unsigned int width = std::min(std::min(cpp_max_width, vecResults[0].getType().getIntOrFloatBitWidth()),
+      unsigned int width = std::min(std::min(CPP_MAX_WIDTH, vecResults[0].getType().getIntOrFloatBitWidth()),
                                   vecOperands[0].getType().getIntOrFloatBitWidth() - shift_bit);
 
-      width = std::min(cpp_max_width, width);
+      width = std::min(CPP_MAX_WIDTH, width);
       widths.push_back({width, width}); //matched widths for operators
       widths.push_back({width}); //matched widths for result
 
@@ -186,7 +309,7 @@ void constructFuncMap(DenseMap<StringRef,
       unsigned int maxOpWidth = std::max(vecOperands[0].getType().getIntOrFloatBitWidth(), 
                                          vecOperands[1].getType().getIntOrFloatBitWidth());
       
-      unsigned int width = std::min(cpp_max_width, maxOpWidth);
+      unsigned int width = std::min(CPP_MAX_WIDTH, maxOpWidth);
 
       widths.push_back({width, width}); //matched widths for operators
       widths.push_back({unsigned(1)}); //matched widths for result
@@ -225,7 +348,7 @@ void constructFuncMap(DenseMap<StringRef,
       }
 
       unsigned int width = std::min(vecResults[0].getType().getIntOrFloatBitWidth(),
-                                    std::min(cpp_max_width, maxOpWidth));
+                                    std::min(CPP_MAX_WIDTH, maxOpWidth));
       // 1st operand is the index; rest of (ind -1) operands set to width
       std::vector<unsigned> opwidths(ind-1, width); 
 
@@ -259,7 +382,7 @@ void constructFuncMap(DenseMap<StringRef,
       }
 
       unsigned int width = std::min(vecResults[0].getType().getIntOrFloatBitWidth(),
-                                    std::min(cpp_max_width, maxOpWidth));
+                                    std::min(CPP_MAX_WIDTH, maxOpWidth));
       std::vector<unsigned> opwidths(ind, width);
 
       widths.push_back(opwidths); //matched widths for operators
@@ -314,7 +437,7 @@ void constructFuncMap(DenseMap<StringRef,
         return widths;
       }
 
-      unsigned int width = std::min(cpp_max_width, maxOpWidth);
+      unsigned int width = std::min(CPP_MAX_WIDTH, maxOpWidth);
       std::vector<unsigned> opwidths(ind, width);
 
       widths.push_back(opwidths); //matched widths for operators
@@ -361,9 +484,9 @@ void constructFuncMap(DenseMap<StringRef,
          Operation::result_range vecResults) {
 
           std::vector<std::vector<unsigned>> widths; 
-          widths.push_back({address_width});
+          widths.push_back({ADDRESS_WIDTH});
           if (!isa<NoneType>(vecResults[0].getType()))
-            widths.push_back({address_width});
+            widths.push_back({ADDRESS_WIDTH});
           else 
             widths.push_back({});
           return widths;
@@ -374,8 +497,8 @@ void constructFuncMap(DenseMap<StringRef,
          Operation::result_range vecResults) {
 
           std::vector<std::vector<unsigned>> widths; 
-          widths.push_back({cpp_max_width, address_width});
-          widths.push_back({cpp_max_width, address_width});
+          widths.push_back({CPP_MAX_WIDTH, ADDRESS_WIDTH});
+          widths.push_back({CPP_MAX_WIDTH, ADDRESS_WIDTH});
           return widths;
     };
 
@@ -546,7 +669,7 @@ void constructFuncMap(DenseMap<StringRef,
                   (Operation::operand_range vecOperands, 
                    Operation::result_range vecResults)>> mapOpNameWidth;
 
-    constructFuncMap(mapOpNameWidth);
+    constructUpdateFuncMap(mapOpNameWidth);
 
     std::vector<std::vector<unsigned int> > OprsWidth = 
                                    mapOpNameWidth[Op->getName().getStringRef()]

@@ -1,4 +1,4 @@
-//===- InitCstWidth.cpp - Reduce the constant bits width -------*- C++ -*-===//
+//===- InitCstWidth.cpp - Reduce the constant bits width --------*- C++ -*-===//
 //
 // This file contains the implementation of the init-cstwidth pass.
 //
@@ -28,7 +28,7 @@ static LogicalResult initCstOpBitsWidth(handshake::FuncOp funcOp,
   int savedBits = 0;
 
   for (auto op : cstOps){
-    unsigned cstBitWidth = cpp_max_width;
+    unsigned cstBitWidth = CPP_MAX_WIDTH;
      IntegerType::SignednessSemantics ifSign = IntegerType::SignednessSemantics::Signless;
     // skip the bool value constant operation
     if (auto ValAttr = op.getValue(); isa<BoolAttr>(ValAttr))

@@ -6,8 +6,6 @@
 
 #include "dynamatic/Transforms/BitsOptimize.h"
 #include "dynamatic/Transforms/UtilsBitsUpdate.h"
-#include "dynamatic/Transforms/ForwardUpdate.h"
-#include "dynamatic/Transforms/BackwardUpdate.h"
 #include "dynamatic/Transforms/PassDetails.h"
 #include "dynamatic/Transforms/Passes.h"
 #include "circt/Dialect/Handshake/HandshakeOps.h"
@@ -48,7 +46,7 @@ static LogicalResult rewriteBitsWidths(handshake::FuncOp funcOp, MLIRContext *ct
     
     // Forward process
     DenseMap<StringRef, forward_func> forMapOpNameWidth;
-    forward::constructFuncMap(forMapOpNameWidth);
+    update::constructForwardFuncMap(forMapOpNameWidth);
     for (auto opPointer=containerOps.begin(); opPointer!=containerOps.end(); ++opPointer){
       
       auto op = *opPointer;
@@ -86,7 +84,7 @@ static LogicalResult rewriteBitsWidths(handshake::FuncOp funcOp, MLIRContext *ct
 
     // Backward Process
     DenseMap<StringRef, backward_func> backMapOpNameWidth;
-    backward::constructFuncMap(backMapOpNameWidth);
+    update::constructBackwardFuncMap(backMapOpNameWidth);
 
     for (auto opPointer=containerOps.rbegin(); opPointer!=containerOps.rend(); ++opPointer) {
       auto op = *opPointer;
