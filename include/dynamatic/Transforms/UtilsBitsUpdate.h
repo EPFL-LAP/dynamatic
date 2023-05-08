@@ -11,7 +11,6 @@
 #include "circt/Dialect/Handshake/HandshakeOps.h"
 #include "dynamatic/Support/LLVM.h"
 
-
 using namespace mlir;
 using namespace circt;
 using namespace circt::handshake;

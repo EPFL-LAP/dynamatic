@@ -69,7 +69,7 @@ std::optional<Operation *> insertWidthMatchOp (Operation *newOp,
 
 }
 
-namespace update {
+namespace dynamatic::update {
 
 void constructForwardFuncMap(DenseMap<StringRef, 
                      std::function<unsigned (Operation::operand_range vecOperands)>> 

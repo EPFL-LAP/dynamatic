@@ -7,7 +7,8 @@
 #ifndef DYNAMATIC_TRANSFORMS_INITCSTWIDTH_H
 #define DYNAMATIC_TRANSFORMS_INITCSTWIDTH_H
 
-#include "dynamatic/Support/LLVM.h"
+#include "dynamatic/Transforms/UtilsBitsUpdate.h"
+
 
 namespace dynamatic {
 

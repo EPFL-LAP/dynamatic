@@ -5,7 +5,6 @@
 //===----------------------------------------------------------------------===//
 
 #include "dynamatic/Transforms/InitIndexType.h"
-#include "dynamatic/Transforms/UtilsBitsUpdate.h"
 #include "dynamatic/Transforms/PassDetails.h"
 #include "circt/Dialect/Handshake/HandshakeOps.h"
 #include "mlir/Dialect/Func/IR/FuncOps.h"

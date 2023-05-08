@@ -5,7 +5,6 @@
 //===----------------------------------------------------------------------===//
 
 #include "dynamatic/Transforms/BitsOptimize.h"
-#include "dynamatic/Transforms/UtilsBitsUpdate.h"
 #include "dynamatic/Transforms/PassDetails.h"
 #include "dynamatic/Transforms/Passes.h"
 #include "circt/Dialect/Handshake/HandshakeOps.h"
