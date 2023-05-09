@@ -34,3 +34,4 @@
 # Build-related directories
 build/
 bin/
+.cache/
