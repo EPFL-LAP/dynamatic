@@ -4,16 +4,16 @@
 //
 //===----------------------------------------------------------------------===//
 
-#ifndef DYNAMATIC_TRANSFORMS_BITSOPTIMIZE_H
-#define DYNAMATIC_TRANSFORMS_BITSOPTIMIZE_H
+#ifndef DYNAMATIC_TRANSFORMS_OPTIMIZEBITS_H
+#define DYNAMATIC_TRANSFORMS_OPTIMIZEBITS_H
 
 #include "dynamatic/Transforms/UtilsBitsUpdate.h"
 
 namespace dynamatic {
 
 std::unique_ptr<mlir::OperationPass<mlir::ModuleOp>>
-createBitsOptimizationPass();
+createOptimizeBitsPass();
 
 } // namespace dynamatic
 
-#endif // DYNAMATIC_TRANSFORMS_BITSOPTIMIZE_H
+#endif // DYNAMATIC_TRANSFORMS_OPTIMIZEBITS_H

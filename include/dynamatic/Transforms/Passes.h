@@ -9,7 +9,7 @@
 
 #include "dynamatic/Support/LLVM.h"
 #include "dynamatic/Transforms/AnalyzeMemoryAccesses.h"
-#include "dynamatic/Transforms/BitsOptimize.h"
+#include "dynamatic/Transforms/OptimizeBits.h"
 #include "dynamatic/Transforms/HandshakeInferBasicBlocks.h"
 #include "dynamatic/Transforms/HandshakePrepareForLegacy.h"
 #include "dynamatic/Transforms/InitCstWidth.h"

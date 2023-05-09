@@ -1,6 +1,6 @@
 //===- UtilsBitsUpdate.h - Utils support bits optimization ------*- C++ -*-===//
 //
-// This file declares basic functions for type updates for --optimize-bits pass.
+// This file declares supports for --optimize-bits pass.
 //
 //===----------------------------------------------------------------------===//
 

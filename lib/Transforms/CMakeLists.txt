@@ -5,7 +5,7 @@ add_dynamatic_library(DynamaticTransforms
   NameMemoryOps.cpp
   PushConstants.cpp
   UtilsBitsUpdate.cpp
-  BitsOptimize.cpp
+  OptimizeBits.cpp
   InitIndexType.cpp
   InitCstWidth.cpp
 

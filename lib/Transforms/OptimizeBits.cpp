@@ -1,10 +1,10 @@
-//===- BitsOptimize.cpp -  Optimize bits width -------*- C++ -*-===//
+//===- BitsOptimize.cpp -  Optimize bits width ------------------*- C++ -*-===//
 //
 // This file contains the implementation of the bits optimization pass.
 //
 //===----------------------------------------------------------------------===//
 
-#include "dynamatic/Transforms/BitsOptimize.h"
+#include "dynamatic/Transforms/OptimizeBits.h"
 #include "dynamatic/Transforms/PassDetails.h"
 #include "dynamatic/Transforms/Passes.h"
 #include "circt/Dialect/Handshake/HandshakeOps.h"
@@ -19,8 +19,6 @@ using namespace circt;
 using namespace circt::handshake;
 using namespace mlir;
 using namespace dynamatic;
-
-using namespace mlir::detail;
 
 
 static LogicalResult rewriteBitsWidths(handshake::FuncOp funcOp, MLIRContext *ctx) {
@@ -46,9 +44,7 @@ static LogicalResult rewriteBitsWidths(handshake::FuncOp funcOp, MLIRContext *ct
     // Forward process
     DenseMap<StringRef, forward_func> forMapOpNameWidth;
     update::constructForwardFuncMap(forMapOpNameWidth);
-    for (auto opPointer=containerOps.begin(); opPointer!=containerOps.end(); ++opPointer){
-      
-      auto op = *opPointer;
+    for (auto &op : containerOps){
 
       if (isa<handshake::ConstantOp>(*op))
         continue;
@@ -136,8 +132,8 @@ static LogicalResult rewriteBitsWidths(handshake::FuncOp funcOp, MLIRContext *ct
   return success();
 }
 
-struct HandshakeBitsOptimizePass
-    : public HandshakeBitsOptimizeBase<HandshakeBitsOptimizePass> {
+struct HandshakeOptimizeBitsPass
+    : public HandshakeOptimizeBitsBase<HandshakeOptimizeBitsPass> {
 
   void runOnOperation() override {
     auto *ctx = &getContext();
@@ -154,6 +150,6 @@ struct HandshakeBitsOptimizePass
 };
 
 std::unique_ptr<mlir::OperationPass<mlir::ModuleOp>>
-dynamatic::createBitsOptimizationPass() {
-  return std::make_unique<HandshakeBitsOptimizePass>();
+dynamatic::createOptimizeBitsPass() {
+  return std::make_unique<HandshakeOptimizeBitsPass>();
 }

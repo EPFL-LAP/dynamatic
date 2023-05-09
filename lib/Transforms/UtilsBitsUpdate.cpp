@@ -1,3 +1,9 @@
+//===- UtilsBitsUpdate.cpp - Utils support bits optimization ----*- C++ -*-===//
+//
+// This file contains basic functions for type updates for --optimize-bits pass.
+//
+//===----------------------------------------------------------------------===//
+
 #include "dynamatic/Transforms/UtilsBitsUpdate.h"
 #include "mlir/Dialect/Arith/IR/Arith.h"
 #include "mlir/Support/IndentedOstream.h"

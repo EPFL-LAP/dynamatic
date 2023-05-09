@@ -1,4 +1,4 @@
-//===- InitIndexType.cpp -  Transform the Index Type to IntegerType with system bit width -------*- C++ -*-===//
+//===- InitIndexType.cpp - Change IndexType to IntegerType ------*- C++ -*-===//
 //
 // This file contains the implementation of the init-indextype optimization pass.
 //
