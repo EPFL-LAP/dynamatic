@@ -20,24 +20,20 @@ static LogicalResult initCstOpBitsWidth(handshake::FuncOp funcOp,
   OpBuilder builder(ctx);
   SmallVector<handshake::ConstantOp> cstOps;
 
-  for (auto constOp : funcOp.getOps<handshake::ConstantOp>()) {
-    cstOps.push_back(constOp);
-  }
-
   int savedBits = 0;
 
-  for (auto op : cstOps){
+  for (auto op : llvm::make_early_inc_range(funcOp.getOps<handshake::ConstantOp>())) {
     unsigned cstBitWidth = CPP_MAX_WIDTH;
      IntegerType::SignednessSemantics ifSign = IntegerType::SignednessSemantics::Signless;
     // skip the bool value constant operation
-    if (auto ValAttr = op.getValue(); isa<BoolAttr>(ValAttr))
+    if (isa<BoolAttr>(op.getValue()))
       continue;
 
     // get the attribute value
-    if (auto IntAttr = op.getValue().dyn_cast<mlir::IntegerAttr>()){
-      if (int cstVal = IntAttr.getValue().getZExtValue() ; cstVal>0)
+    if (auto intAttr = dyn_cast<mlir::IntegerAttr>(op.getValue())){
+      if (int cstVal = intAttr.getValue().getZExtValue() ; cstVal>0)
         cstBitWidth = log2(cstVal)+2;
-      else if (int cstVal = IntAttr.getValue().getZExtValue() ; cstVal<0){
+      else if (int cstVal = intAttr.getValue().getZExtValue() ; cstVal<0){
         cstBitWidth = log2(-cstVal)+2;
       }
       else

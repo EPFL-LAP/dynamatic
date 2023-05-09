@@ -28,7 +28,7 @@ static LogicalResult initIndexType(handshake::FuncOp funcOp, MLIRContext *ctx){
   OpBuilder builder(ctx);
   SmallVector<Operation *> indexCastOps;
 
-  for (Operation &op : funcOp.getOps()){
+  for (auto &op : funcOp.getOps()){
     // insert trunc|extsi operation for index_cast operation
     if (isa<mlir::arith::IndexCastOp>(op)){
       indexCastOps.push_back(&op);
@@ -86,8 +86,8 @@ static LogicalResult initIndexType(handshake::FuncOp funcOp, MLIRContext *ctx){
 
 namespace{
 
-struct HandshakeInitIndexTypePass
-    : public HandshakeInitIndexTypeBase<HandshakeInitIndexTypePass> {
+struct HandshakeInitIndTypePass
+    : public HandshakeInitIndTypeBase<HandshakeInitIndTypePass> {
 
   void runOnOperation() override {
     auto *ctx = &getContext();
@@ -102,6 +102,6 @@ struct HandshakeInitIndexTypePass
 };
 
 std::unique_ptr<mlir::OperationPass<mlir::ModuleOp>>
-dynamatic::createInitIndexTypePass() {
-  return std::make_unique<HandshakeInitIndexTypePass>();
+dynamatic::createInitIndTypePass() {
+  return std::make_unique<HandshakeInitIndTypePass>();
 }

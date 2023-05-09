@@ -41,7 +41,7 @@ std::optional<Operation *> insertWidthMatchOp (Operation *newOp,
   
   unsigned int opWidth;
   if (isa<IndexType>(opVal.getType()))
-    opWidth = 64;
+    opWidth = IndexType::kInternalStorageBitWidth;
   else
     opWidth = opVal.getType().getIntOrFloatBitWidth();
   
@@ -521,33 +521,33 @@ void constructUpdateFuncMap(DenseMap<StringRef,
     match  = false;
     revert = false;
  
-    if (isa<handshake::BranchOp>(*Op) ||
-        isa<handshake::ConditionalBranchOp>(*Op))
+    if (isa<handshake::BranchOp,
+            handshake::ConditionalBranchOp>(*Op))
         pass = true;
 
-    if (isa<mlir::arith::AddIOp>(*Op)  ||
-        isa<mlir::arith::SubIOp>(*Op)  ||
-        isa<mlir::arith::MulIOp>(*Op)  ||
-        isa<mlir::arith::ShLIOp>(*Op)  ||
-        isa<mlir::arith::ShRSIOp>(*Op) ||
-        isa<mlir::arith::ShRUIOp>(*Op) ||
-        isa<mlir::arith::DivSIOp>(*Op) ||
-        isa<mlir::arith::DivUIOp>(*Op) ||
-        isa<mlir::arith::CmpIOp>(*Op)  ||
-        isa<mlir::arith::ShRSIOp>(*Op) ||
-        isa<handshake::MuxOp>(*Op)     ||
-        isa<handshake::MergeOp>(*Op)   ||
-        isa<handshake::SelectOp>(*Op)  ||
-        isa<handshake::ConstantOp>(*Op)||
-        isa<handshake::DynamaticLoadOp>(*Op) ||
-        isa<handshake::DynamaticStoreOp>(*Op)||
-        isa<handshake::ControlMergeOp>(*Op)  ||
-        isa<handshake::DynamaticReturnOp>(*Op) )
+    if (isa<mlir::arith::AddIOp, 
+            mlir::arith::SubIOp, 
+            mlir::arith::MulIOp, 
+            mlir::arith::ShLIOp, 
+            mlir::arith::ShRSIOp, 
+            mlir::arith::ShRUIOp, 
+            mlir::arith::DivSIOp, 
+            mlir::arith::DivUIOp, 
+            mlir::arith::CmpIOp, 
+            mlir::arith::ShRSIOp, 
+            handshake::MuxOp, 
+            handshake::MergeOp, 
+            handshake::SelectOp, 
+            handshake::ConstantOp, 
+            handshake::DynamaticLoadOp, 
+            handshake::DynamaticStoreOp, 
+            handshake::ControlMergeOp, 
+            handshake::DynamaticReturnOp>(*Op) )
       match = true;  
 
-    if (isa<mlir::arith::TruncIOp>(*Op) ||
-        isa<mlir::arith::ExtSIOp>(*Op) ||
-        isa<mlir::arith::ExtUIOp>(*Op))
+    if (isa<mlir::arith::TruncIOp, 
+            mlir::arith::ExtSIOp,
+            mlir::arith::ExtUIOp>(*Op))
       revert = true;  
   }
 
@@ -568,7 +568,6 @@ void constructUpdateFuncMap(DenseMap<StringRef,
 
   void replaceWithSuccessor(Operation *Op) {
     Operation *sucNode = Op->getOperand(0).getDefiningOp();
-      // llvm::errs() << "successor" << *sucNode << "\n";
 
       // find the index of result in vec_results
       unsigned ind = 0;
@@ -603,7 +602,6 @@ void constructUpdateFuncMap(DenseMap<StringRef,
           
         ind++;
       }
-      // llvm::errs() << "successor" << *sucNode << "\n";
 
       SmallVector<Operation *> vecUsers;
       for (auto user : Op->getResult(0).getUsers())

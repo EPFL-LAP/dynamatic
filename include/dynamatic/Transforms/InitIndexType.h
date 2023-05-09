@@ -4,15 +4,15 @@
 //
 //===----------------------------------------------------------------------===//
 
-#ifndef DYNAMATIC_TRANSFORMS_INITINDEXTYPE_H
-#define DYNAMATIC_TRANSFORMS_INITINDEXTYPE_H
+#ifndef DYNAMATIC_TRANSFORMS_INITINDTYPE_H
+#define DYNAMATIC_TRANSFORMS_INITINDTYPE_H
 
 #include "dynamatic/Transforms/UtilsBitsUpdate.h"
 
 namespace dynamatic {
 
-std::unique_ptr<mlir::OperationPass<mlir::ModuleOp>> createInitIndexTypePass();
+std::unique_ptr<mlir::OperationPass<mlir::ModuleOp>> createInitIndTypePass();
 
 } // namespace dynamatic
 
-#endif // DYNAMATIC_TRANSFORMS_INITINDEXTYPE_H
+#endif // DYNAMATIC_TRANSFORMS_INITINDTYPE_H
