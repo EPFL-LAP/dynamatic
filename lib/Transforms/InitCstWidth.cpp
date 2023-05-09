@@ -83,7 +83,7 @@ static LogicalResult initCstOpBitsWidth(handshake::FuncOp funcOp,
       op->erase();
     }
   }
-  llvm::errs() << "Constant saved bits " << savedBits << "\n";
+  // llvm::errs() << "Constant saved bits " << savedBits << "\n";
 
   return success();
 }
