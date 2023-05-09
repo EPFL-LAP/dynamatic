@@ -5,46 +5,47 @@
 //===----------------------------------------------------------------------===//
 
 #include "dynamatic/Transforms/OptimizeBits.h"
+#include "circt/Dialect/Handshake/HandshakeOps.h"
 #include "dynamatic/Transforms/PassDetails.h"
 #include "dynamatic/Transforms/Passes.h"
-#include "circt/Dialect/Handshake/HandshakeOps.h"
-#include "mlir/Dialect/MemRef/IR/MemRef.h"
 #include "mlir/Dialect/Arith/IR/Arith.h"
+#include "mlir/Dialect/MemRef/IR/MemRef.h"
 
 #include "mlir/IR/OperationSupport.h"
-#include "mlir/Support/LogicalResult.h"
 #include "mlir/Support/IndentedOstream.h"
+#include "mlir/Support/LogicalResult.h"
 
 using namespace circt;
 using namespace circt::handshake;
 using namespace mlir;
 using namespace dynamatic;
 
-
-static LogicalResult rewriteBitsWidths(handshake::FuncOp funcOp, MLIRContext *ctx) {
+static LogicalResult rewriteBitsWidths(handshake::FuncOp funcOp,
+                                       MLIRContext *ctx) {
   OpBuilder builder(ctx);
   SmallVector<Operation *> vecOp;
 
-  using forward_func  = std::function<unsigned (mlir::Operation::operand_range vecOperands)>;
-  using backward_func = std::function<unsigned (mlir::Operation::result_range vecResults)>;
-  
+  using forward_func =
+      std::function<unsigned(mlir::Operation::operand_range vecOperands)>;
+  using backward_func =
+      std::function<unsigned(mlir::Operation::result_range vecResults)>;
+
   SmallVector<Operation *> containerOps;
-  
 
   bool changed = true;
   int savedBits = 0;
   while (changed) {
-    // init 
+    // init
     changed = false;
     containerOps.clear();
 
     for (auto &op : funcOp.getOps())
       containerOps.push_back(&op);
-    
+
     // Forward process
     DenseMap<StringRef, forward_func> forMapOpNameWidth;
     update::constructForwardFuncMap(forMapOpNameWidth);
-    for (auto &op : containerOps){
+    for (auto &op : containerOps) {
 
       if (isa<handshake::ConstantOp>(*op))
         continue;
@@ -59,21 +60,22 @@ static LogicalResult rewriteBitsWidths(handshake::FuncOp funcOp, MLIRContext *ct
       }
 
       const auto opName = op->getName().getStringRef();
-      unsigned int newWidth = 0, resInd=0;
+      unsigned int newWidth = 0, resInd = 0;
       if (forMapOpNameWidth.find(opName) != forMapOpNameWidth.end())
         newWidth = forMapOpNameWidth[opName](op->getOperands());
 
-      
       if (isa<handshake::ControlMergeOp>(op))
         resInd = 1; // the second result is the one that needs to be updated
       // if the new type can be optimized, update the type
-      if (newWidth>0)
-        if(Type newOpResultType = getNewType(op->getResult(resInd), newWidth, true);  
-            newWidth < op->getResult(resInd).getType().getIntOrFloatBitWidth() ){  
+      if (newWidth > 0)
+        if (Type newOpResultType =
+                getNewType(op->getResult(resInd), newWidth, true);
+            newWidth <
+            op->getResult(resInd).getType().getIntOrFloatBitWidth()) {
           changed |= true;
-          savedBits += op->getResult(resInd).getType().getIntOrFloatBitWidth()-newWidth;
+          savedBits += op->getResult(resInd).getType().getIntOrFloatBitWidth() -
+                       newWidth;
           op->getResult(resInd).setType(newOpResultType);
-
         }
     }
 
@@ -81,13 +83,14 @@ static LogicalResult rewriteBitsWidths(handshake::FuncOp funcOp, MLIRContext *ct
     DenseMap<StringRef, backward_func> backMapOpNameWidth;
     update::constructBackwardFuncMap(backMapOpNameWidth);
 
-    for (auto opPointer=containerOps.rbegin(); opPointer!=containerOps.rend(); ++opPointer) {
+    for (auto opPointer = containerOps.rbegin();
+         opPointer != containerOps.rend(); ++opPointer) {
       auto op = *opPointer;
 
       if (isa<handshake::ConstantOp>(*op))
         continue;
-      
-     if (isa<mlir::arith::TruncIOp>(*op)) {
+
+      if (isa<mlir::arith::TruncIOp>(*op)) {
         update::replaceWithSuccessor(op, op->getResult(0).getType());
         op->erase();
         continue;
@@ -100,35 +103,35 @@ static LogicalResult rewriteBitsWidths(handshake::FuncOp funcOp, MLIRContext *ct
       if (backMapOpNameWidth.find(opName) != backMapOpNameWidth.end())
         newWidth = backMapOpNameWidth[opName](op->getResults());
 
-      if (newWidth>0)
+      if (newWidth > 0)
         // if the new type can be optimized, update the type
-        if(Type newOpResultType = getNewType(op->getOperand(0), newWidth, true);  
-            newWidth < op->getOperand(0).getType().getIntOrFloatBitWidth()){
+        if (Type newOpResultType =
+                getNewType(op->getOperand(0), newWidth, true);
+            newWidth < op->getOperand(0).getType().getIntOrFloatBitWidth()) {
           changed |= true;
 
-          for (unsigned i=0;i<op->getNumOperands();++i)
-            if (newWidth < op->getOperand(i).getType().getIntOrFloatBitWidth()) {
-              savedBits += op->getOperand(i).getType().getIntOrFloatBitWidth()-newWidth;
+          for (unsigned i = 0; i < op->getNumOperands(); ++i)
+            if (newWidth <
+                op->getOperand(i).getType().getIntOrFloatBitWidth()) {
+              savedBits += op->getOperand(i).getType().getIntOrFloatBitWidth() -
+                           newWidth;
               op->getOperand(i).setType(newOpResultType);
             }
         }
-      
     }
-
   }
 
   // Store new inserted truncation or extension operation during validation
   SmallVector<Operation *> OpTruncExt;
-  for (auto &op : funcOp.getOps()) 
-      update::validateOp(&op, ctx, OpTruncExt);
-  
+  for (auto &op : funcOp.getOps())
+    update::validateOp(&op, ctx, OpTruncExt);
 
   // Validate the new inserted operation
   for (auto op : OpTruncExt)
-    update::revertTruncOrExt(op, ctx); 
+    update::revertTruncOrExt(op, ctx);
 
   llvm::errs() << "Forward-Backward saved bits " << savedBits << "\n";
-  
+
   return success();
 }
 
@@ -141,12 +144,9 @@ struct HandshakeOptimizeBitsPass
     ModuleOp m = getOperation();
 
     for (auto funcOp : m.getOps<handshake::FuncOp>())
-      if(failed(rewriteBitsWidths(funcOp, ctx)))
+      if (failed(rewriteBitsWidths(funcOp, ctx)))
         return signalPassFailure();
-
-
   };
-
 };
 
 std::unique_ptr<mlir::OperationPass<mlir::ModuleOp>>
