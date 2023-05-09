@@ -9,11 +9,10 @@
 
 #include "dynamatic/Transforms/UtilsBitsUpdate.h"
 
-
 namespace dynamatic {
 
 std::unique_ptr<mlir::OperationPass<mlir::ModuleOp>> createInitCstWidthPass();
 
 } // namespace dynamatic
 
-#endif // DYNAMATIC_TRANSFORMS_PUSHCONSTANTS_H
+#endif // DYNAMATIC_TRANSFORMS_INITCSTWIDTH_H

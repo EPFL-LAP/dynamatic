@@ -11,8 +11,7 @@
 
 namespace dynamatic {
 
-std::unique_ptr<mlir::OperationPass<mlir::ModuleOp>>
-createOptimizeBitsPass();
+std::unique_ptr<mlir::OperationPass<mlir::ModuleOp>> createOptimizeBitsPass();
 
 } // namespace dynamatic
 
