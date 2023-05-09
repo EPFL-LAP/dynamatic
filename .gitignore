@@ -35,16 +35,3 @@
 build/
 bin/
 .cache/
-
-# Editors relate
-.editorconfig
-
-# legacy-dynamatic repo
-legacy-dynamatic
-
-# CMakeFiles
-include/dynamatic/Transforms/CMakeCache.txt
-include/dynamatic/Transforms/CMakeFiles/*
-
-# vscode dependency
-.vscode/*
