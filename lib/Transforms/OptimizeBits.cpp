@@ -130,7 +130,7 @@ static LogicalResult rewriteBitsWidths(handshake::FuncOp funcOp,
   for (auto op : OpTruncExt)
     update::revertTruncOrExt(op, ctx);
 
-  llvm::errs() << "Forward-Backward saved bits " << savedBits << "\n";
+  // llvm::errs() << "Forward-Backward saved bits " << savedBits << "\n";
 
   return success();
 }
