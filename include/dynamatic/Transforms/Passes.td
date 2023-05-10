@@ -70,6 +70,18 @@ def AnalyzeMemoryAccesses : Pass<"analyze-memory-accesses", "mlir::ModuleOp"> {
   let dependentDialects = ["circt::handshake::HandshakeDialect"];
 }
 
+def FlattenMemRefRowMajor : Pass<"flatten-memref-row-major", "::mlir::ModuleOp"> {
+  let summary = "Flatten memrefs (row-major order)";
+  let description = [{
+    Flattens multidimensional memories and accesses to them into
+    single-dimensional memories using row-major indexing. This pass is almost
+    copied as is from CIRCT's FlattenMemRef, but uses row-major indexing instead
+    of column-major indexing when converting multidimensional load/store
+    operations.}];
+  let constructor = "dynamatic::createFlattenMemRefRowMajorPass()";
+  let dependentDialects = ["mlir::memref::MemRefDialect"];
+}
+
 def NameMemoryOps : Pass<"name-memory-ops", "mlir::ModuleOp"> {
   let summary = "Give a unique name to each memory operation.";
   let description = [{

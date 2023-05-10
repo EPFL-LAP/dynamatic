@@ -18,6 +18,10 @@ namespace mlir {
 namespace arith {
 class ArithDialect;
 } // namespace arith
+
+namespace memref {
+class MemRefDialect;
+} // namespace memref
 } // namespace mlir
 
 namespace circt {

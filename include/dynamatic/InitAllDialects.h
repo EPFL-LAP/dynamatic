@@ -21,7 +21,7 @@
 namespace dynamatic {
 
 inline void registerAllDialects(mlir::DialectRegistry &registry) {
-  registry.insert<mlir::LLVM::LLVMDialect, mlir::AffineDialect,
+  registry.insert<mlir::LLVM::LLVMDialect, mlir::affine::AffineDialect,
                   mlir::memref::MemRefDialect, mlir::func::FuncDialect,
                   mlir::arith::ArithDialect, mlir::cf::ControlFlowDialect,
                   mlir::scf::SCFDialect, circt::handshake::HandshakeDialect>();

@@ -1,5 +1,7 @@
 add_dynamatic_library(DynamaticTransforms
+  ArithOptimizeArea.cpp
   AnalyzeMemoryAccesses.cpp
+  FlattenMemRefRowMajor.cpp
   HandshakePrepareForLegacy.cpp
   HandshakeInferBasicBlocks.cpp
   NameMemoryOps.cpp

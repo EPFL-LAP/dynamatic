@@ -22,6 +22,7 @@
 #include "llvm/Support/raw_ostream.h"
 
 using namespace mlir;
+using namespace mlir::affine;
 using namespace dynamatic;
 using namespace circt;
 using namespace circt::handshake;
@@ -43,7 +44,7 @@ static LogicalResult checkAffineAccessPair(Operation *srcOp, Operation *dstOp,
                                            OpDependencies &opDeps,
                                            MLIRContext *ctx) {
 
-  MemRefAccess srcAccess(srcOp), dstAccess(dstOp);
+  affine::MemRefAccess srcAccess(srcOp), dstAccess(dstOp);
   unsigned numCommonLoops = getNumCommonSurroundingLoops(*srcOp, *dstOp);
   for (unsigned loopDepth = 1; loopDepth <= numCommonLoops + 1; ++loopDepth) {
     FlatAffineValueConstraints constraints;
@@ -85,8 +86,9 @@ static LogicalResult checkNonAffineAccessPair(Operation *srcOp,
   auto dstAccessName =
       dstOp->getAttrOfType<MemAccessNameAttr>(MemAccessNameAttr::getMnemonic());
   assert(dstAccessName && "dstOp must have access name");
-  opDeps[srcOp].push_back(MemDependenceAttr::get(
-      ctx, dstAccessName.getName(), 0, ArrayRef<mlir::DependenceComponent>{}));
+  opDeps[srcOp].push_back(
+      MemDependenceAttr::get(ctx, dstAccessName.getName(), 0,
+                             ArrayRef<affine::DependenceComponent>{}));
 
   return success();
 }
@@ -112,7 +114,7 @@ static LogicalResult analyzeMemAccesses(func::FuncOp funcOp, MLIRContext *ctx) {
               return true;
             })
             .Case<AffineLoadOp, AffineStoreOp>([&](auto) {
-              MemRefAccess access(op);
+              affine::MemRefAccess access(op);
               affineAccesses[access.memref].push_back(op);
               return true;
             })

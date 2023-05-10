@@ -58,6 +58,10 @@ public:
   LogicalResult connectToMemory(ConversionPatternRewriter &rewriter,
                                 MemInterfacesInfo &memInfo);
 
+  /// Replaces undefined operations (mlir::LLVM::UndefOp) with a default "0"
+  /// constant triggered by the enclosing block's control merge.
+  LogicalResult replaceUndefinedValues(ConversionPatternRewriter &rewriter);
+
   /// Sets an integer "bb" attribute on each operation to identify the basic
   /// block from which the operation originates in the std-level IR.
   LogicalResult idBasicBlocks(ConversionPatternRewriter &rewriter);

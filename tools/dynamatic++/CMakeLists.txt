@@ -17,7 +17,6 @@ target_link_libraries(dynamatic++
   CIRCTFIRRTLToHW
   CIRCTFIRRTLTransforms
   CIRCTHandshake
-  CIRCTHandshakeToFIRRTL
   CIRCTHandshakeToHW
   CIRCTHandshakeTransforms
   CIRCTHW

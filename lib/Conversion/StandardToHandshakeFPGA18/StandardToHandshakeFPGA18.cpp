@@ -15,6 +15,7 @@
 #include "mlir/Dialect/Affine/IR/AffineOps.h"
 #include "mlir/Dialect/Affine/Utils.h"
 #include "mlir/Dialect/Func/IR/FuncOps.h"
+#include "mlir/Dialect/LLVMIR/LLVMDialect.h"
 #include "mlir/Dialect/MemRef/IR/MemRef.h"
 #include "mlir/Dialect/SCF/IR/SCF.h"
 #include "mlir/Support/LogicalResult.h"
@@ -24,6 +25,7 @@
 
 using namespace mlir;
 using namespace mlir::func;
+using namespace mlir::affine;
 using namespace mlir::memref;
 using namespace dynamatic;
 
@@ -37,8 +39,8 @@ using namespace dynamatic;
 
 /// Determines whether an operation is akin to a load or store memory operation.
 static bool isMemoryOp(Operation *op) {
-  return isa<memref::LoadOp, memref::StoreOp, mlir::AffineReadOpInterface,
-             mlir::AffineWriteOpInterface>(op);
+  return isa<memref::LoadOp, memref::StoreOp, AffineReadOpInterface,
+             AffineWriteOpInterface>(op);
 }
 
 /// Determines whether an operation is akin to a memory allocation operation.
@@ -65,8 +67,8 @@ static LogicalResult getOpMemRef(Operation *op, Value &out) {
     out = memOp.getMemRef();
   else if (auto memOp = dyn_cast<memref::StoreOp>(op))
     out = memOp.getMemRef();
-  else if (isa<mlir::AffineReadOpInterface, mlir::AffineWriteOpInterface>(op)) {
-    MemRefAccess access(op);
+  else if (isa<AffineReadOpInterface, AffineWriteOpInterface>(op)) {
+    affine::MemRefAccess access(op);
     out = access.memref;
   }
   if (out != Value())
@@ -360,6 +362,36 @@ HandshakeLoweringFPGA18::connectToMemory(ConversionPatternRewriter &rewriter,
   return success();
 }
 
+LogicalResult HandshakeLoweringFPGA18::replaceUndefinedValues(
+    ConversionPatternRewriter &rewriter) {
+  for (auto &block : r) {
+    for (auto undefOp : block.getOps<mlir::LLVM::UndefOp>()) {
+      // Create an attribute of the appropriate type for the constant
+      auto resType = undefOp.getRes().getType();
+      TypedAttr cstAttr = llvm::TypeSwitch<Type, TypedAttr>(resType)
+                              .Case<IndexType>([&](auto type) {
+                                return rewriter.getIndexAttr(0);
+                              })
+                              .Case<IntegerType>([&](auto type) {
+                                return rewriter.getIntegerAttr(type, 0);
+                              })
+                              .Case<FloatType>([&](auto type) {
+                                return rewriter.getFloatAttr(type, 0.0);
+                              })
+                              .Default([&](auto type) { return nullptr; });
+      if (!cstAttr)
+        return undefOp->emitError() << "operation has unsupported result type";
+
+      // Create a constant with a default value and replace the undefined value
+      rewriter.setInsertionPoint(undefOp);
+      auto cstOp = rewriter.create<handshake::ConstantOp>(
+          undefOp.getLoc(), resType, cstAttr, getBlockEntryControl(&block));
+      rewriter.replaceOp(undefOp, cstOp.getResult());
+    }
+  }
+  return success();
+}
+
 LogicalResult
 HandshakeLoweringFPGA18::idBasicBlocks(ConversionPatternRewriter &rewriter) {
   for (auto indexAndBlock : llvm::enumerate(r))
@@ -462,7 +494,7 @@ public:
     addLegalDialect<func::FuncDialect>();
     addLegalDialect<arith::ArithDialect>();
     addIllegalDialect<scf::SCFDialect>();
-    addIllegalDialect<mlir::AffineDialect>();
+    addIllegalDialect<affine::AffineDialect>();
 
     // The root operation to be replaced is marked dynamically legal based on
     // the lowering status of the given operation, see PartialLowerOp. This is
@@ -582,6 +614,10 @@ static LogicalResult lowerRegion(HandshakeLoweringFPGA18 &hl,
                                 memInfo)))
     return failure();
 
+  if (failed(runPartialLowering(
+          hl, &HandshakeLoweringFPGA18::replaceUndefinedValues)))
+    return failure();
+
   if (idBasicBlocks &&
       failed(runPartialLowering(hl, &HandshakeLoweringFPGA18::idBasicBlocks)))
     return failure();
@@ -671,11 +707,6 @@ struct StandardToHandshakeFPGA18Pass
     // Lower every function individually
     for (auto funcOp : llvm::make_early_inc_range(m.getOps<func::FuncOp>()))
       if (failed(lowerFuncOp(funcOp, &getContext(), idBasicBlocks)))
-        return signalPassFailure();
-
-    // Legalize the resulting functions by performing any simple conversion
-    for (auto handshakeFunc : m.getOps<handshake::FuncOp>())
-      if (failed(postDataflowConvert(handshakeFunc)))
         return signalPassFailure();
   }
 };

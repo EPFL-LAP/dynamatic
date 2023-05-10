@@ -46,6 +46,21 @@ def StandardToHandshakeFPGA18 : Pass<"lower-std-to-handshake-fpga18", "mlir::Mod
 }
 
 //===----------------------------------------------------------------------===//
+// StandardToHandshakeFPGA18
+//===----------------------------------------------------------------------===//
+
+def ExportCFG : Pass<"export-cfg", "mlir::ModuleOp"> {
+  let summary = "Exports the CFG of a standard-level function";
+  let description = [{
+    Exports a CFG graph corresponding to the function present in the module. The
+    pass only supports one function at the moment and will fail if more than one
+    function exists in the module.
+  }];
+  let constructor = "dynamatic::createExportCFGPass()";
+}
+
+
+//===----------------------------------------------------------------------===//
 // ExportDOT
 //===----------------------------------------------------------------------===//
 
@@ -58,7 +73,6 @@ def ExportDOT : Pass<"export-dot", "mlir::ModuleOp"> {
     than one Handhsake function in the module.
   }];
   let constructor = "dynamatic::createExportDOTPass()";
-  let dependentDialects = ["circt::handshake::HandshakeDialect"];
   let options =
     [Option<"legacy", "legacy", "bool", "false",
             "If true, the exported DOT file will be made compatible with "

@@ -29,6 +29,7 @@
 
 using namespace mlir;
 using namespace mlir::vector;
+using namespace mlir::affine;
 using namespace circt;
 using namespace circt::handshake;
 using namespace dynamatic;
