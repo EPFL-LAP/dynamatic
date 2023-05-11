@@ -469,7 +469,7 @@ void constructUpdateFuncMap(
         return widths;
       };
 
-  mapOpNameWidth[StringRef("handshake.select")] =
+  mapOpNameWidth[StringRef("arith.select")] =
       [&](Operation::operand_range vecOperands,
           Operation::result_range vecResults) {
         std::vector<std::vector<unsigned>> widths;
@@ -540,7 +540,7 @@ void setValidateType(Operation *Op, bool &pass, bool &match, bool &revert) {
           mlir::arith::ShLIOp, mlir::arith::ShRSIOp, mlir::arith::ShRUIOp,
           mlir::arith::DivSIOp, mlir::arith::DivUIOp, mlir::arith::CmpIOp,
           mlir::arith::ShRSIOp, handshake::MuxOp, handshake::MergeOp,
-          handshake::SelectOp, handshake::ConstantOp,
+          mlir::arith::SelectOp, handshake::ConstantOp,
           handshake::DynamaticLoadOp, handshake::DynamaticStoreOp,
           handshake::ControlMergeOp, handshake::DynamaticReturnOp>(*Op))
     match = true;
@@ -668,6 +668,7 @@ void matchOpResWidth(Operation *Op, MLIRContext *ctx,
   std::vector<std::vector<unsigned int>> OprsWidth =
       mapOpNameWidth[Op->getName().getStringRef()](Op->getOperands(),
                                                    Op->getResults());
+
   // make operator matched the width
   for (size_t i = 0; i < OprsWidth[0].size(); ++i) {
     if (auto Operand = Op->getOperand(i);
@@ -681,8 +682,6 @@ void matchOpResWidth(Operation *Op, MLIRContext *ctx,
   }
   // make result matched the width
   for (size_t i = 0; i < OprsWidth[1].size(); ++i) {
-    // llvm::errs() << "validate result operator " << i << " : " <<
-    // OprsWidth[1][i] << "\n";
     if (auto OpRes = Op->getResult(i);
         OprsWidth[1][i] != 0 &&
         OpRes.getType().getIntOrFloatBitWidth() != OprsWidth[1][i]) {
