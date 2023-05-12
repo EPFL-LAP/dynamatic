@@ -11,9 +11,11 @@
 #include "mlir/Dialect/Func/IR/FuncOps.h"
 #include "mlir/IR/Dialect.h"
 #include "mlir/Support/LogicalResult.h"
-
 #include "mlir/IR/OperationSupport.h"
 #include "mlir/Support/IndentedOstream.h"
+#include "llvm/Support/Debug.h"
+#include "llvm/Support/raw_ostream.h"
+
 
 static LogicalResult initCstOpBitsWidth(handshake::FuncOp funcOp,
                                         MLIRContext *ctx) {
@@ -28,7 +30,7 @@ static LogicalResult initCstOpBitsWidth(handshake::FuncOp funcOp,
     IntegerType::SignednessSemantics ifSign =
         IntegerType::SignednessSemantics::Signless;
     // skip the bool value constant operation
-    if (isa<BoolAttr>(op.getValue()))
+    if (!isa<mlir::IntegerAttr>(op.getValue()))
       continue;
 
     // get the attribute value
@@ -78,12 +80,10 @@ static LogicalResult initCstOpBitsWidth(handshake::FuncOp funcOp,
         if (!isa<mlir::arith::ExtSIOp>(*updateOp))
           updateOp->replaceUsesOfWith(newCstOp.getResult(),
                                       extOp->getResult(0));
-
-      builder.clearInsertionPoint();
-      op->erase();
     }
   }
-  // llvm::errs() << "Constant saved bits " << savedBits << "\n";
+
+  // LLVM_DEBUG(llvm::dbgs() << "Number of saved bits is " << savedBits << "\n");
 
   return success();
 }

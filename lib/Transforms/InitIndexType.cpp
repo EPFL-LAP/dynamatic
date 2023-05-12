@@ -22,14 +22,14 @@ using namespace circt::handshake;
 using namespace mlir;
 using namespace dynamatic;
 
-unsigned indexWidth = IndexType::kInternalStorageBitWidth;
+static const int INDEXWIDTH = IndexType::kInternalStorageBitWidth;
 
 // Adapt the Index type to the Integer type
 static LogicalResult initIndexType(handshake::FuncOp funcOp, MLIRContext *ctx) {
   OpBuilder builder(ctx);
   SmallVector<Operation *> indexCastOps;
 
-  for (auto &op : funcOp.getOps()) {
+  for (auto &op : llvm::make_early_inc_range(funcOp.getOps())) {
     // insert trunc|extsi operation for index_cast operation
     if (isa<mlir::arith::IndexCastOp>(op)) {
       indexCastOps.push_back(&op);
@@ -39,8 +39,8 @@ static LogicalResult initIndexType(handshake::FuncOp funcOp, MLIRContext *ctx) {
 
       // if cast index to integer type
       if (!isResIndType) {
-        if (indexCastOp.getResult().getType().getIntOrFloatBitWidth() ==
-            indexCastOp.getOperand().getType().getIntOrFloatBitWidth())
+        if (indexCastOp.getResult().getType().getIntOrFloatBitWidth() == 
+            INDEXWIDTH)
           indexCastOp.getResult().replaceAllUsesWith(indexCastOp.getOperand());
         else {
           auto newOp =
@@ -53,12 +53,12 @@ static LogicalResult initIndexType(handshake::FuncOp funcOp, MLIRContext *ctx) {
       // if cast integer to index type
       if (isResIndType && !isOpIndType) {
         if (indexCastOp.getOperand().getType().getIntOrFloatBitWidth() ==
-            indexWidth)
+            INDEXWIDTH)
           indexCastOp.getResult().replaceAllUsesWith(indexCastOp.getOperand());
         else {
           builder.setInsertionPoint(&op);
           auto extOp = builder.create<mlir::arith::ExtSIOp>(
-              op.getLoc(), IntegerType::get(ctx, indexWidth),
+              op.getLoc(), IntegerType::get(ctx, INDEXWIDTH),
               indexCastOp.getOperand());
           op.replaceAllUsesWith(extOp);
         }
@@ -67,17 +67,22 @@ static LogicalResult initIndexType(handshake::FuncOp funcOp, MLIRContext *ctx) {
 
     // set type for other operations
     else {
+      for (unsigned int i = 0; i < op.getNumOperands(); ++i)
+        if (auto operand = op.getOperand(i);
+            isa<IndexType>(operand.getType())) 
+          operand.setType(IntegerType::get(ctx, INDEXWIDTH));
+
       for (unsigned int i = 0; i < op.getNumResults(); ++i)
         if (OpResult result = op.getResult(i);
             isa<IndexType>(result.getType())) {
-          result.setType(IntegerType::get(ctx, indexWidth));
+          result.setType(IntegerType::get(ctx, INDEXWIDTH));
 
           // For constant operation, change the value attribute to match the new
           // type
           if (isa<handshake::ConstantOp>(op)) {
             handshake::ConstantOp cstOp = dyn_cast<handshake::ConstantOp>(op);
             cstOp.setValueAttr(IntegerAttr::get(
-                IntegerType::get(ctx, indexWidth),
+                IntegerType::get(ctx, INDEXWIDTH),
                 cstOp.getValue().cast<IntegerAttr>().getInt()));
           }
         }
