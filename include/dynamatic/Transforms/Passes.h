@@ -12,6 +12,7 @@
 #include "dynamatic/Transforms/FlattenMemRefRowMajor.h"
 #include "dynamatic/Transforms/HandshakeInferBasicBlocks.h"
 #include "dynamatic/Transforms/HandshakePrepareForLegacy.h"
+#include "dynamatic/Transforms/HandshakePlaceBuffers.h"
 #include "dynamatic/Transforms/NameMemoryOps.h"
 #include "dynamatic/Transforms/PushConstants.h"
 #include "mlir/Pass/Pass.h"

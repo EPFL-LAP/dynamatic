@@ -1,0 +1,19 @@
+//===- HandshakePlaceBuffers.h - Place buffers in DFG -----------*- C++ -*-===//
+//
+// This file declares the --place-buffers pass.
+//
+//===----------------------------------------------------------------------===//
+
+#ifndef DYNAMATIC_TRANSFORMS_PLACEBUFFERS_H
+#define DYNAMATIC_TRANSFORMS_PLACEBUFFERS_H
+
+#include "dynamatic/Support/LLVM.h"
+
+namespace dynamatic {
+
+std::unique_ptr<mlir::OperationPass<mlir::ModuleOp>>
+createHandshakePlaceBuffersPass();
+
+} // namespace dynamatic
+
+#endif // DYNAMATIC_TRANSFORMS_PLACEBUFFERS_H

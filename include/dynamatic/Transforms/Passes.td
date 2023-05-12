@@ -113,4 +113,12 @@ def PushConstants : Pass<"push-constants", "mlir::ModuleOp"> {
   let constructor = "dynamatic::createPushConstantsPass()";
 }
 
+def PlaceBuffers : Pass<"place-buffers", "mlir::ModuleOp"> {
+  let summary = "Insert Buffers in Data flow graphs.";
+  let description = [{
+   
+  }];
+  let constructor = "dynamatic::createHandshakePlaceBuffersPass()";
+}
+
 #endif // DYNAMATIC_TRANSFORMS_PASSES_TD
