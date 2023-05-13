@@ -58,7 +58,7 @@ static LogicalResult rewriteBitsWidths(handshake::FuncOp funcOp,
         continue;
 
       if (isa<mlir::arith::ExtSIOp>(op) || isa<mlir::arith::ExtUIOp>(op)) {
-        bitwidth::replaceWithSuccessor(op);
+        bitwidth::replaceWithPredecessor(op);
         // op->erase();
         continue;
       }
@@ -85,15 +85,12 @@ static LogicalResult rewriteBitsWidths(handshake::FuncOp funcOp,
     }
 
     // Backward Process
-    for (auto opPointer = containerOps.rbegin();
-         opPointer != containerOps.rend(); ++opPointer) {
-      auto op = *opPointer;
-
+    for (auto op : llvm::reverse(containerOps)) {
       if (isa<handshake::ConstantOp>(*op))
         continue;
 
       if (isa<mlir::arith::TruncIOp>(*op)) {
-        bitwidth::replaceWithSuccessor(op, op->getResult(0).getType());
+        bitwidth::replaceWithPredecessor(op, op->getResult(0).getType());
         // op->erase();
         continue;
       }
@@ -125,11 +122,12 @@ static LogicalResult rewriteBitsWidths(handshake::FuncOp funcOp,
 
   // Store new inserted truncation or extension operation during validation
   SmallVector<Operation *> OpTruncExt;
-  for (auto &op : llvm::make_early_inc_range(funcOp.getOps()))
+  for (auto &op : llvm::make_early_inc_range(funcOp.getOps())) {
+    // llvm::errs() << "op: " << op << "\n";
     bitwidth::validateOp(&op, ctx, OpTruncExt);
-  
+  }
   // Validate the new inserted operation
-  for (auto op : OpTruncExt)
+  for (auto op : OpTruncExt) 
     bitwidth::revertTruncOrExt(op, ctx);
 
   llvm::errs() << "Forward-Backward saved bits " << savedBits << "\n";

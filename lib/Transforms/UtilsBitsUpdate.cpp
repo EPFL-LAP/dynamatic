@@ -571,46 +571,21 @@ bool propType(Operation *op) {
 }
 
 void replaceWithPredecessor(Operation *op) {
-  Operation *sucNode = op->getOperand(0).getDefiningOp();
-
-  // find the index of result in vec_results
-  unsigned ind = 0;
-  for (auto Val : sucNode->getResults()) {
-
-    if (Val == op->getOperand(0))
-      break;
-    ind++;
-  }
-
-  SmallVector<Operation *> vecUsers;
-  for (auto user : op->getResult(0).getUsers())
-    vecUsers.push_back(user);
-
-  for (auto user : vecUsers)
-    user->replaceUsesOfWith(op->getResult(0), sucNode->getResult(ind));
+  op->getResult(0).replaceAllUsesWith(op->getOperand(0));
 }
 
 void replaceWithPredecessor(Operation *op, Type resType) {
   Operation *sucNode = op->getOperand(0).getDefiningOp();
 
   // find the index of result in vec_results
-  unsigned ind = 0;
   for (auto Val : sucNode->getResults()) {
-
     if (Val == op->getOperand(0)) {
       Val.setType(resType);
       break;
     }
-
-    ind++;
   }
 
-  SmallVector<Operation *> vecUsers;
-  for (auto user : op->getResult(0).getUsers())
-    vecUsers.push_back(user);
-
-  for (auto user : vecUsers)
-    user->replaceUsesOfWith(op->getResult(0), sucNode->getResult(ind));
+  op->getResult(0).replaceAllUsesWith(op->getOperand(0));
 }
 
 void revertTruncOrExt(Operation *op , MLIRContext *ctx) {
