@@ -58,19 +58,24 @@ void matchOpResWidth(Operation *Op, MLIRContext *ctx,
                      SmallVector<Operation *> &newMatchedOps);
 
 /// Replace the operation's operand with the its successor.
-void replaceWithSuccessor(Operation *Op);
+void replaceWithPredecessor(Operation *op);
 
 /// Replace the operation's operand with the its successor, and set the operation's
 /// resultOp according to its successor's resultOp type.
-void replaceWithSuccessor(Operation *Op, Type resType);
+void replaceWithPredecessor(Operation *op, Type resType);
 
 // Validate the truncation and extension operation in case its operand and
 // result operand width are not consistent by reverting or deleting the
 // operations.
 void revertTruncOrExt(Operation *Op, MLIRContext *ctx);
 
-/// Set the validation method flags to validate the operations.
-void setValidateType(Operation *Op, bool &passtype, bool &match, bool &revert);
+/// Set the pass, match, and revert flags to choose the methods that validate 
+/// the operations.
+static bool setPassFlag(Operation *op);
+
+static bool setMatchFlag(Operation *op);
+
+static bool setRevertFlag(Operation *op);
 
 /// Validate the operations after bits optimization to generate .mlir file.
 void validateOp(Operation *Op, MLIRContext *ctx,

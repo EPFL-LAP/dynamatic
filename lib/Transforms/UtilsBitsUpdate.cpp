@@ -8,20 +8,21 @@
 #include "mlir/Dialect/Arith/IR/Arith.h"
 #include "mlir/IR/Dialect.h"
 #include "mlir/Support/IndentedOstream.h"
+#include "llvm/ADT/TypeSwitch.h"
 
-IntegerType getNewType(Value opType, unsigned bitswidth, bool signless) {
+IntegerType getNewType(Value opVal, unsigned bitswidth, bool signless) {
   IntegerType::SignednessSemantics ifSign =
       IntegerType::SignednessSemantics::Signless;
   if (!signless)
-    if (auto validType = opType.getType(); isa<IntegerType>(validType))
-      ifSign = dyn_cast<IntegerType>(validType).getSignedness();
+    if (auto validType = dyn_cast<IntegerType>(opVal.getType()))
+      ifSign = validType.getSignedness();
 
-  return IntegerType::get(opType.getContext(), bitswidth, ifSign);
+  return IntegerType::get(opVal.getContext(), bitswidth, ifSign);
 }
 
-IntegerType getNewType(Value opType, unsigned bitswidth,
+IntegerType getNewType(Value opVal, unsigned bitswidth,
                        IntegerType::SignednessSemantics ifSign) {
-  return IntegerType::get(opType.getContext(), bitswidth, ifSign);
+  return IntegerType::get(opVal.getContext(), bitswidth, ifSign);
 }
 
 // specify which value to extend
@@ -30,20 +31,22 @@ std::optional<Operation *> insertWidthMatchOp(Operation *newOp, int opInd,
   OpBuilder builder(ctx);
   Value opVal = newOp->getOperand(opInd);
 
+  if (!isa<IndexType, IntegerType>(opVal.getType()))
+    assert(false && "Only supported width matching for Integer/Index Type!");
+
   unsigned int opWidth;
   if (isa<IndexType>(opVal.getType()))
     opWidth = IndexType::kInternalStorageBitWidth;
   else
     opWidth = opVal.getType().getIntOrFloatBitWidth();
 
-  if (isa<IntegerType>(opVal.getType()) || isa<IndexType>(opVal.getType())) {
+  if (isa<IntegerType, IndexType>(opVal.getType())) {
     // insert Truncation operation to match the opresult width
     if (opWidth > newType.getIntOrFloatBitWidth()) {
       builder.setInsertionPoint(newOp);
       auto truncOp = builder.create<mlir::arith::TruncIOp>(newOp->getLoc(),
                                                            newType, opVal);
-      if (!isa<IndexType>(opVal.getType()))
-        newOp->setOperand(opInd, truncOp.getResult());
+      newOp->setOperand(opInd, truncOp.getResult());
 
       return truncOp;
     }
@@ -53,9 +56,7 @@ std::optional<Operation *> insertWidthMatchOp(Operation *newOp, int opInd,
       builder.setInsertionPoint(newOp);
       auto extOp =
           builder.create<mlir::arith::ExtSIOp>(newOp->getLoc(), newType, opVal);
-
-      if (!isa<IndexType>(opVal.getType()))
-        newOp->setOperand(opInd, extOp.getResult());
+      newOp->setOperand(opInd, extOp.getResult());
 
       return extOp;
     }
@@ -63,14 +64,14 @@ std::optional<Operation *> insertWidthMatchOp(Operation *newOp, int opInd,
   return {};
 }
 
-namespace dynamatic::update {
+namespace dynamatic::bitwidth {
 
 void constructForwardFuncMap(
     DenseMap<StringRef,
              std::function<unsigned(Operation::operand_range vecOperands)>>
         &mapOpNameWidth) {
 
-  mapOpNameWidth[StringRef("arith.addi")] =
+  mapOpNameWidth[mlir::arith::AddIOp::getOperationName()] =
       [](Operation::operand_range vecOperands) {
         return std::min(
             CPP_MAX_WIDTH,
@@ -79,25 +80,25 @@ void constructForwardFuncMap(
                 1);
       };
 
-  mapOpNameWidth[StringRef("arith.subi")] =
-      mapOpNameWidth[StringRef("arith.addi")];
+  mapOpNameWidth[mlir::arith::SubIOp::getOperationName()] =
+      mapOpNameWidth[mlir::arith::AddIOp::getOperationName()];
 
-  mapOpNameWidth[StringRef("arith.muli")] =
+  mapOpNameWidth[mlir::arith::MulIOp::getOperationName()] =
       [](Operation::operand_range vecOperands) {
         return std::min(CPP_MAX_WIDTH,
                         vecOperands[0].getType().getIntOrFloatBitWidth() +
                             vecOperands[1].getType().getIntOrFloatBitWidth());
       };
 
-  mapOpNameWidth[StringRef("arith.divui")] =
+  mapOpNameWidth[mlir::arith::DivUIOp::getOperationName()] =
       [](Operation::operand_range vecOperands) {
         return std::min(CPP_MAX_WIDTH,
                         vecOperands[0].getType().getIntOrFloatBitWidth() + 1);
       };
-  mapOpNameWidth[StringRef("arith.divsi")] =
-      mapOpNameWidth[StringRef("arith.divui")];
+  mapOpNameWidth[mlir::arith::DivSIOp::getOperationName()] =
+      mapOpNameWidth[mlir::arith::DivUIOp::getOperationName()];
 
-  mapOpNameWidth[StringRef("arith.andi")] =
+  mapOpNameWidth[mlir::arith::AndIOp::getOperationName()] =
       [](Operation::operand_range vecOperands) {
         return std::min(
             CPP_MAX_WIDTH,
@@ -105,7 +106,7 @@ void constructForwardFuncMap(
                      vecOperands[1].getType().getIntOrFloatBitWidth()));
       };
 
-  mapOpNameWidth[StringRef("arith.ori")] =
+  mapOpNameWidth[mlir::arith::OrIOp::getOperationName()] =
       [](Operation::operand_range vecOperands) {
         return std::min(
             CPP_MAX_WIDTH,
@@ -113,10 +114,10 @@ void constructForwardFuncMap(
                      vecOperands[1].getType().getIntOrFloatBitWidth()));
       };
 
-  mapOpNameWidth[StringRef("arith.xori")] =
-      mapOpNameWidth[StringRef("arith.ori")];
+  mapOpNameWidth[mlir::arith::XOrIOp::getOperationName()] =
+      mapOpNameWidth[mlir::arith::OrIOp::getOperationName()];
 
-  mapOpNameWidth[StringRef("arith.shli")] =
+  mapOpNameWidth[mlir::arith::ShLIOp::getOperationName()] =
       [](Operation::operand_range vecOperands) {
         int shift_bit = 0;
         if (auto defOp = vecOperands[1].getDefiningOp();
@@ -132,34 +133,34 @@ void constructForwardFuncMap(
         return CPP_MAX_WIDTH;
       };
 
-  mapOpNameWidth[StringRef("arith.shrsi")] =
+  mapOpNameWidth[mlir::arith::ShRSIOp::getOperationName()] =
       [](Operation::operand_range vecOperands) {
-        int shift_bit = 0;
+        int shiftBit = 0;
         if (auto defOp = vecOperands[1].getDefiningOp();
             isa<handshake::ConstantOp>(defOp))
           if (handshake::ConstantOp cstOp =
                   dyn_cast<handshake::ConstantOp>(defOp))
             if (auto IntAttr = cstOp.getValue().dyn_cast<mlir::IntegerAttr>())
-              shift_bit = IntAttr.getValue().getZExtValue();
+              shiftBit = IntAttr.getValue().getZExtValue();
 
         return std::min(CPP_MAX_WIDTH,
                         vecOperands[0].getType().getIntOrFloatBitWidth() -
-                            shift_bit);
+                            shiftBit);
       };
 
-  mapOpNameWidth[StringRef("arith.shrui")] =
-      mapOpNameWidth[StringRef("arith.shrsi")];
+  mapOpNameWidth[mlir::arith::ShRUIOp::getOperationName()] =
+      mapOpNameWidth[mlir::arith::ShRSIOp::getOperationName()];
 
-  mapOpNameWidth[StringRef("arith.cmpi")] =
+  mapOpNameWidth[mlir::arith::CmpIOp::getOperationName()] =
       [](Operation::operand_range vecOperands) { return unsigned(1); };
 
-  mapOpNameWidth[StringRef("arith.extsi")] =
+  mapOpNameWidth[mlir::arith::ExtSIOp::getOperationName()] =
       [](Operation::operand_range vecOperands) {
         return vecOperands[0].getType().getIntOrFloatBitWidth();
       };
 
-  mapOpNameWidth[StringRef("arith.extui")] =
-      mapOpNameWidth[StringRef("arith.extsi")];
+  mapOpNameWidth[mlir::arith::ExtUIOp::getOperationName()] =
+      mapOpNameWidth[mlir::arith::ExtSIOp::getOperationName()];
 
   mapOpNameWidth[StringRef("handshake.control_merge")] =
       [](Operation::operand_range vecOperands) {
@@ -180,26 +181,26 @@ void constructBackwardFuncMap(
     DenseMap<StringRef,
              std::function<unsigned(Operation::result_range vecResults)>>
         &mapOpNameWidth) {
-  mapOpNameWidth[StringRef("arith.addi")] =
+  mapOpNameWidth[mlir::arith::AddIOp::getOperationName()] =
       [](Operation::result_range vecResults) {
         return std::min(CPP_MAX_WIDTH,
                         vecResults[0].getType().getIntOrFloatBitWidth());
       };
 
-  mapOpNameWidth[StringRef("arith.subi")] =
-      mapOpNameWidth[StringRef("arith.addi")];
+  mapOpNameWidth[mlir::arith::SubIOp::getOperationName()] =
+      mapOpNameWidth[mlir::arith::AddIOp::getOperationName()];
 
-  mapOpNameWidth[StringRef("arith.muli")] =
-      mapOpNameWidth[StringRef("arith.addi")];
+  mapOpNameWidth[mlir::arith::MulIOp::getOperationName()] =
+      mapOpNameWidth[mlir::arith::AddIOp::getOperationName()];
 
-  mapOpNameWidth[StringRef("arith.andi")] =
-      mapOpNameWidth[StringRef("arith.addi")];
+  mapOpNameWidth[mlir::arith::AndIOp::getOperationName()] =
+      mapOpNameWidth[mlir::arith::AddIOp::getOperationName()];
 
-  mapOpNameWidth[StringRef("arith.ori")] =
-      mapOpNameWidth[StringRef("arith.addi")];
+  mapOpNameWidth[mlir::arith::OrIOp::getOperationName()] =
+      mapOpNameWidth[mlir::arith::AddIOp::getOperationName()];
 
-  mapOpNameWidth[StringRef("arith.xori")] =
-      mapOpNameWidth[StringRef("arith.addi")];
+  mapOpNameWidth[mlir::arith::XOrIOp::getOperationName()] =
+      mapOpNameWidth[mlir::arith::AddIOp::getOperationName()];
 }
 
 void constructUpdateFuncMap(
@@ -208,7 +209,7 @@ void constructUpdateFuncMap(
                             Operation::result_range vecResults)>>
         &mapOpNameWidth) {
 
-  mapOpNameWidth[StringRef("arith.addi")] =
+  mapOpNameWidth[mlir::arith::AddIOp::getOperationName()] =
       [&](Operation::operand_range vecOperands,
           Operation::result_range vecResults) {
         std::vector<std::vector<unsigned>> widths;
@@ -227,10 +228,10 @@ void constructUpdateFuncMap(
         return widths;
       };
 
-  mapOpNameWidth[StringRef("arith.subi")] =
-      mapOpNameWidth[StringRef("arith.addi")];
+  mapOpNameWidth[mlir::arith::SubIOp::getOperationName()] =
+      mapOpNameWidth[mlir::arith::AddIOp::getOperationName()];
 
-  mapOpNameWidth[StringRef("arith.muli")] =
+  mapOpNameWidth[mlir::arith::MulIOp::getOperationName()] =
       [&](Operation::operand_range vecOperands,
           Operation::result_range vecResults) {
         std::vector<std::vector<unsigned>> widths;
@@ -250,7 +251,7 @@ void constructUpdateFuncMap(
         return widths;
       };
 
-  mapOpNameWidth[StringRef("arith.divsi")] =
+  mapOpNameWidth[mlir::arith::DivSIOp::getOperationName()] =
       [&](Operation::operand_range vecOperands,
           Operation::result_range vecResults) {
         std::vector<std::vector<unsigned>> widths;
@@ -269,25 +270,25 @@ void constructUpdateFuncMap(
         return widths;
       };
 
-  mapOpNameWidth[StringRef("arith.divui")] =
-      mapOpNameWidth[StringRef("arith.divsi")];
+  mapOpNameWidth[mlir::arith::DivSIOp::getOperationName()] =
+      mapOpNameWidth[mlir::arith::DivSIOp::getOperationName()];
 
-  mapOpNameWidth[StringRef("arith.shli")] =
+  mapOpNameWidth[mlir::arith::ShLIOp::getOperationName()] =
       [&](Operation::operand_range vecOperands,
           Operation::result_range vecResults) {
         std::vector<std::vector<unsigned>> widths;
-        unsigned shift_bit = 0;
+        unsigned shiftBit = 0;
         if (auto defOp = vecOperands[1].getDefiningOp();
             isa<handshake::ConstantOp>(defOp))
           if (handshake::ConstantOp cstOp =
                   dyn_cast<handshake::ConstantOp>(defOp))
             if (auto IntAttr = cstOp.getValue().dyn_cast<mlir::IntegerAttr>())
-              shift_bit = IntAttr.getValue().getZExtValue();
+              shiftBit = IntAttr.getValue().getZExtValue();
 
         unsigned int width = std::min(
             std::min(CPP_MAX_WIDTH,
                      vecResults[0].getType().getIntOrFloatBitWidth()),
-            vecOperands[0].getType().getIntOrFloatBitWidth() + shift_bit);
+            vecOperands[0].getType().getIntOrFloatBitWidth() + shiftBit);
 
         width = std::min(CPP_MAX_WIDTH, width);
         widths.push_back({width, width}); // matched widths for operators
@@ -296,22 +297,22 @@ void constructUpdateFuncMap(
         return widths;
       };
 
-  mapOpNameWidth[StringRef("arith.shrsi")] =
+  mapOpNameWidth[mlir::arith::ShRSIOp::getOperationName()] =
       [&](Operation::operand_range vecOperands,
           Operation::result_range vecResults) {
         std::vector<std::vector<unsigned>> widths;
-        unsigned shift_bit = 0;
+        unsigned shiftBit = 0;
         if (auto defOp = vecOperands[1].getDefiningOp();
             isa<handshake::ConstantOp>(defOp))
           if (handshake::ConstantOp cstOp =
                   dyn_cast<handshake::ConstantOp>(defOp))
             if (auto IntAttr = cstOp.getValue().dyn_cast<mlir::IntegerAttr>())
-              shift_bit = IntAttr.getValue().getZExtValue();
+              shiftBit = IntAttr.getValue().getZExtValue();
 
         unsigned int width = std::min(
             std::min(CPP_MAX_WIDTH,
                      vecResults[0].getType().getIntOrFloatBitWidth()),
-            vecOperands[0].getType().getIntOrFloatBitWidth() - shift_bit);
+            vecOperands[0].getType().getIntOrFloatBitWidth() - shiftBit);
 
         width = std::min(CPP_MAX_WIDTH, width);
         widths.push_back({width, width}); // matched widths for operators
@@ -320,10 +321,10 @@ void constructUpdateFuncMap(
         return widths;
       };
 
-  mapOpNameWidth[StringRef("arith.shrui")] =
-      mapOpNameWidth[StringRef("arith.shrsi")];
+  mapOpNameWidth[mlir::arith::ShRUIOp::getOperationName()] =
+      mapOpNameWidth[mlir::arith::ShRSIOp::getOperationName()];
 
-  mapOpNameWidth[StringRef("arith.cmpi")] =
+  mapOpNameWidth[mlir::arith::CmpIOp::getOperationName()] =
       [&](Operation::operand_range vecOperands,
           Operation::result_range vecResults) {
         std::vector<std::vector<unsigned>> widths;
@@ -469,7 +470,7 @@ void constructUpdateFuncMap(
         return widths;
       };
 
-  mapOpNameWidth[StringRef("arith.select")] =
+  mapOpNameWidth[mlir::arith::SelectOp::getOperationName()] =
       [&](Operation::operand_range vecOperands,
           Operation::result_range vecResults) {
         std::vector<std::vector<unsigned>> widths;
@@ -527,27 +528,31 @@ void constructUpdateFuncMap(
       mapOpNameWidth[StringRef("handshake.d_load")];
 };
 
-void setValidateType(Operation *Op, bool &pass, bool &match, bool &revert) {
+static bool setPassFlag(Operation *op) {
+  return llvm::TypeSwitch<Operation *, bool>(op)
+    .Case<handshake::BranchOp, handshake::ConditionalBranchOp>(
+        [](Operation *op) { return true; })
+    .Default([&](auto) { return false; });
+}
 
-  pass = false;
-  match = false;
-  revert = false;
-
-  if (isa<handshake::BranchOp, handshake::ConditionalBranchOp>(*Op))
-    pass = true;
-
-  if (isa<mlir::arith::AddIOp, mlir::arith::SubIOp, mlir::arith::MulIOp,
+static bool setMatchFlag(Operation *op) {
+  return llvm::TypeSwitch<Operation *, bool>(op)
+    .Case<mlir::arith::AddIOp, mlir::arith::SubIOp, mlir::arith::MulIOp,
           mlir::arith::ShLIOp, mlir::arith::ShRSIOp, mlir::arith::ShRUIOp,
           mlir::arith::DivSIOp, mlir::arith::DivUIOp, mlir::arith::CmpIOp,
           mlir::arith::ShRSIOp, handshake::MuxOp, handshake::MergeOp,
           mlir::arith::SelectOp, handshake::ConstantOp,
           handshake::DynamaticLoadOp, handshake::DynamaticStoreOp,
-          handshake::ControlMergeOp, handshake::DynamaticReturnOp>(*Op))
-    match = true;
+          handshake::ControlMergeOp, handshake::DynamaticReturnOp>(
+        [](Operation *op) { return true; })
+    .Default([&](auto) { return false; });
+}
 
-  if (isa<mlir::arith::TruncIOp, mlir::arith::ExtSIOp, mlir::arith::ExtUIOp>(
-          *Op))
-    revert = true;
+static bool setRevertFlag(Operation *op) {
+  return llvm::TypeSwitch<Operation *, bool>(op)
+    .Case<mlir::arith::TruncIOp, mlir::arith::ExtSIOp, mlir::arith::ExtUIOp>(
+        [](Operation *op) { return true; })
+    .Default([&](auto) { return false; });
 }
 
 bool propType(Operation *op) {
@@ -565,34 +570,34 @@ bool propType(Operation *op) {
   return false;
 }
 
-void replaceWithSuccessor(Operation *Op) {
-  Operation *sucNode = Op->getOperand(0).getDefiningOp();
+void replaceWithPredecessor(Operation *op) {
+  Operation *sucNode = op->getOperand(0).getDefiningOp();
 
   // find the index of result in vec_results
   unsigned ind = 0;
   for (auto Val : sucNode->getResults()) {
 
-    if (Val == Op->getOperand(0))
+    if (Val == op->getOperand(0))
       break;
     ind++;
   }
 
   SmallVector<Operation *> vecUsers;
-  for (auto user : Op->getResult(0).getUsers())
+  for (auto user : op->getResult(0).getUsers())
     vecUsers.push_back(user);
 
   for (auto user : vecUsers)
-    user->replaceUsesOfWith(Op->getResult(0), sucNode->getResult(ind));
+    user->replaceUsesOfWith(op->getResult(0), sucNode->getResult(ind));
 }
 
-void replaceWithSuccessor(Operation *Op, Type resType) {
-  Operation *sucNode = Op->getOperand(0).getDefiningOp();
+void replaceWithPredecessor(Operation *op, Type resType) {
+  Operation *sucNode = op->getOperand(0).getDefiningOp();
 
   // find the index of result in vec_results
   unsigned ind = 0;
   for (auto Val : sucNode->getResults()) {
 
-    if (Val == Op->getOperand(0)) {
+    if (Val == op->getOperand(0)) {
       Val.setType(resType);
       break;
     }
@@ -601,56 +606,56 @@ void replaceWithSuccessor(Operation *Op, Type resType) {
   }
 
   SmallVector<Operation *> vecUsers;
-  for (auto user : Op->getResult(0).getUsers())
+  for (auto user : op->getResult(0).getUsers())
     vecUsers.push_back(user);
 
   for (auto user : vecUsers)
-    user->replaceUsesOfWith(Op->getResult(0), sucNode->getResult(ind));
+    user->replaceUsesOfWith(op->getResult(0), sucNode->getResult(ind));
 }
 
-void revertTruncOrExt(Operation *Op, MLIRContext *ctx) {
+void revertTruncOrExt(Operation *op , MLIRContext *ctx) {
   OpBuilder builder(ctx);
   // if width(res) == width(opr) : delte the operand;
 
-  if (Op->getResult(0).getType().getIntOrFloatBitWidth() ==
-      Op->getOperand(0).getType().getIntOrFloatBitWidth()) {
+  if (op ->getResult(0).getType().getIntOrFloatBitWidth() ==
+      op ->getOperand(0).getType().getIntOrFloatBitWidth()) {
 
-    replaceWithSuccessor(Op);
-    Op->erase();
+    replaceWithPredecessor(op );
+    op ->erase();
     return;
   }
 
   // if for extension operation width(res) < width(opr),
   // change it to truncation operation
-  if (isa<mlir::arith::ExtSIOp>(*Op) || isa<mlir::arith::ExtUIOp>(*Op))
-    if (Op->getResult(0).getType().getIntOrFloatBitWidth() <
-        Op->getOperand(0).getType().getIntOrFloatBitWidth()) {
+  if (isa<mlir::arith::ExtSIOp>(*op ) || isa<mlir::arith::ExtUIOp>(*op ))
+    if (op ->getResult(0).getType().getIntOrFloatBitWidth() <
+        op ->getOperand(0).getType().getIntOrFloatBitWidth()) {
 
-      builder.setInsertionPoint(Op);
+      builder.setInsertionPoint(op);
       Type newType =
-          getNewType(Op->getResult(0),
-                     Op->getResult(0).getType().getIntOrFloatBitWidth(), false);
+          getNewType(op->getResult(0),
+                     op->getResult(0).getType().getIntOrFloatBitWidth(), false);
       auto truncOp = builder.create<mlir::arith::TruncIOp>(
-          Op->getLoc(), newType, Op->getOperand(0));
-      Op->getResult(0).replaceAllUsesWith(truncOp.getResult());
-      Op->erase();
+          op->getLoc(), newType, op->getOperand(0));
+      op->getResult(0).replaceAllUsesWith(truncOp.getResult());
+      op->erase();
       return;
     }
 
   // if for truncation operation width(res) > width(opr),
   // change it to extension operation
-  if (isa<mlir::arith::TruncIOp>(*Op))
-    if (Op->getResult(0).getType().getIntOrFloatBitWidth() >
-        Op->getOperand(0).getType().getIntOrFloatBitWidth()) {
+  if (isa<mlir::arith::TruncIOp>(*op))
+    if (op->getResult(0).getType().getIntOrFloatBitWidth() >
+        op->getOperand(0).getType().getIntOrFloatBitWidth()) {
 
-      builder.setInsertionPoint(Op);
+      builder.setInsertionPoint(op);
       Type newType =
-          getNewType(Op->getResult(0),
-                     Op->getResult(0).getType().getIntOrFloatBitWidth(), false);
-      auto truncOp = builder.create<mlir::arith::ExtSIOp>(Op->getLoc(), newType,
-                                                          Op->getOperand(0));
-      Op->getResult(0).replaceAllUsesWith(truncOp.getResult());
-      Op->erase();
+          getNewType(op->getResult(0),
+                     op->getResult(0).getType().getIntOrFloatBitWidth(), false);
+      auto truncOp = builder.create<mlir::arith::ExtSIOp>(op->getLoc(), newType,
+                                                          op->getOperand(0));
+      op->getResult(0).replaceAllUsesWith(truncOp.getResult());
+      op->erase();
     }
 }
 
@@ -665,51 +670,49 @@ void matchOpResWidth(Operation *Op, MLIRContext *ctx,
 
   constructUpdateFuncMap(mapOpNameWidth);
 
-  std::vector<std::vector<unsigned int>> OprsWidth =
+  std::vector<std::vector<unsigned int>> oprsWidth =
       mapOpNameWidth[Op->getName().getStringRef()](Op->getOperands(),
                                                    Op->getResults());
 
   // make operator matched the width
-  for (size_t i = 0; i < OprsWidth[0].size(); ++i) {
+  for (size_t i = 0; i < oprsWidth[0].size(); ++i) {
     if (auto Operand = Op->getOperand(i);
         !isa<NoneType>(Operand.getType()) &&
-        Operand.getType().getIntOrFloatBitWidth() != OprsWidth[0][i]) {
+        Operand.getType().getIntOrFloatBitWidth() != oprsWidth[0][i]) {
       auto insertOp = insertWidthMatchOp(
-          Op, i, getNewType(Operand, OprsWidth[0][i], false), ctx);
+          Op, i, getNewType(Operand, oprsWidth[0][i], false), ctx);
       if (insertOp.has_value())
         newMatchedOps.push_back(insertOp.value());
     }
   }
   // make result matched the width
-  for (size_t i = 0; i < OprsWidth[1].size(); ++i) {
+  for (size_t i = 0; i < oprsWidth[1].size(); ++i) {
     if (auto OpRes = Op->getResult(i);
-        OprsWidth[1][i] != 0 &&
-        OpRes.getType().getIntOrFloatBitWidth() != OprsWidth[1][i]) {
-      Type newType = getNewType(OpRes, OprsWidth[1][i], false);
+        oprsWidth[1][i] != 0 &&
+        OpRes.getType().getIntOrFloatBitWidth() != oprsWidth[1][i]) {
+      Type newType = getNewType(OpRes, oprsWidth[1][i], false);
       Op->getResult(i).setType(newType);
     }
   }
 }
 
-void validateOp(Operation *Op, MLIRContext *ctx,
+void validateOp(Operation *op, MLIRContext *ctx,
                 SmallVector<Operation *> &newMatchedOps) {
   // the operations can be divided to three types to make it validated
   // passType: branch, conditionalbranch
   // c <= op(a,b): addi, subi, mux, etc. where both a,b,c needed to be verified
   // need to be reverted or deleted : truncIOp, extIOp
-  bool pass = false;
-  bool match = false;
-  bool revert = false;
-
-  setValidateType(Op, pass, match, revert);
+  bool pass = setPassFlag(op);
+  bool match = setMatchFlag(op);
+  bool revert = setRevertFlag(op);
 
   if (pass)
-    bool res = propType(Op);
+    bool res = propType(op);
 
   if (match)
-    matchOpResWidth(Op, ctx, newMatchedOps);
+    matchOpResWidth(op, ctx, newMatchedOps);
 
   if (revert)
-    revertTruncOrExt(Op, ctx);
+    revertTruncOrExt(op, ctx);
 }
 } // namespace dynamatic::update
