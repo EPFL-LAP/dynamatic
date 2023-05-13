@@ -54,7 +54,7 @@ bool propType(Operation *Op);
 
 /// Insert width match operations (extension or truncation) for the operands and
 /// the results.
-void matchOpResWidth(Operation *Op, MLIRContext *ctx,
+void matchOpResWidth(Operation *op, MLIRContext *ctx,
                      SmallVector<Operation *> &newMatchedOps);
 
 /// Replace the operation's operand with the its successor.
@@ -67,7 +67,7 @@ void replaceWithPredecessor(Operation *op, Type resType);
 // Validate the truncation and extension operation in case its operand and
 // result operand width are not consistent by reverting or deleting the
 // operations.
-void revertTruncOrExt(Operation *Op, MLIRContext *ctx);
+void revertTruncOrExt(Operation *op, MLIRContext *ctx);
 
 /// Set the pass, match, and revert flags to choose the methods that validate 
 /// the operations.
@@ -78,7 +78,7 @@ static bool setMatchFlag(Operation *op);
 static bool setRevertFlag(Operation *op);
 
 /// Validate the operations after bits optimization to generate .mlir file.
-void validateOp(Operation *Op, MLIRContext *ctx,
+void validateOp(Operation *op, MLIRContext *ctx,
                 SmallVector<Operation *> &newMatchedOps);
 } // namespace bitwidth
 } // namespace dynamatic

@@ -634,7 +634,7 @@ void revertTruncOrExt(Operation *op , MLIRContext *ctx) {
     }
 }
 
-void matchOpResWidth(Operation *Op, MLIRContext *ctx,
+void matchOpResWidth(Operation *op, MLIRContext *ctx,
                      SmallVector<Operation *> &newMatchedOps) {
 
   DenseMap<mlir::StringRef,
@@ -646,27 +646,27 @@ void matchOpResWidth(Operation *Op, MLIRContext *ctx,
   constructUpdateFuncMap(mapOpNameWidth);
 
   std::vector<std::vector<unsigned int>> oprsWidth =
-      mapOpNameWidth[Op->getName().getStringRef()](Op->getOperands(),
-                                                   Op->getResults());
+      mapOpNameWidth[op->getName().getStringRef()](op->getOperands(),
+                                                   op->getResults());
 
   // make operator matched the width
   for (size_t i = 0; i < oprsWidth[0].size(); ++i) {
-    if (auto Operand = Op->getOperand(i);
+    if (auto Operand = op->getOperand(i);
         !isa<NoneType>(Operand.getType()) &&
         Operand.getType().getIntOrFloatBitWidth() != oprsWidth[0][i]) {
       auto insertOp = insertWidthMatchOp(
-          Op, i, getNewType(Operand, oprsWidth[0][i], false), ctx);
+          op, i, getNewType(Operand, oprsWidth[0][i], false), ctx);
       if (insertOp.has_value())
         newMatchedOps.push_back(insertOp.value());
     }
   }
   // make result matched the width
   for (size_t i = 0; i < oprsWidth[1].size(); ++i) {
-    if (auto OpRes = Op->getResult(i);
+    if (auto OpRes = op->getResult(i);
         oprsWidth[1][i] != 0 &&
         OpRes.getType().getIntOrFloatBitWidth() != oprsWidth[1][i]) {
       Type newType = getNewType(OpRes, oprsWidth[1][i], false);
-      Op->getResult(i).setType(newType);
+      op->getResult(i).setType(newType);
     }
   }
 }
