@@ -89,17 +89,17 @@ buffer::findSameSrcOpStrings(const std::string &inputString,
 void buffer::extractMarkedGraphBB(std::vector<basicBlock *> &bbList) {
 
   // try{
-    GRBEnv env = GRBEnv(true);
+    // GRBEnv env = GRBEnv(true);
     // env.set("LogFile", "mip1.log");
     // env.start();
-    GRBModel modelMILP = GRBModel(env);
+    // GRBModel modelMILP = GRBModel(env);
     // Define variables
-    // std::map<std::string, GRBVar> sBB;
-    // std::map<std::string, GRBVar> sArc;
-    // std::map<std::string, GRBVar> nArc;
+    std::map<std::string, GRBVar> sBB;
+    std::map<std::string, GRBVar> sArc;
+    std::map<std::string, GRBVar> nArc;
     // std::vector<std::string> ArcVarNames;
 
-    // unsigned cstMaxN = 0;
+    unsigned cstMaxN = 0;
 
     // for (auto bb : bbList) {
     //   std::string valBB = "bb" + std::to_string(bb->index);
