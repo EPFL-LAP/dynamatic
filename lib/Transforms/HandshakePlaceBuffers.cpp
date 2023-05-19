@@ -6,7 +6,6 @@
 //===----------------------------------------------------------------------===//
 
 #include "dynamatic/Transforms/HandshakePlaceBuffers.h"
-#include "dynamatic/Transforms/UtilsForPlaceBuffers.h"
 #include "circt/Dialect/Handshake/HandshakeOps.h"
 #include "dynamatic/Transforms/PassDetails.h"
 #include "mlir/Dialect/Arith/IR/Arith.h"

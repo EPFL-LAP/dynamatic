@@ -11,7 +11,7 @@
 #include "mlir/Dialect/Func/IR/FuncOps.h"
 #include "mlir/IR/BuiltinTypes.h"
 #include "circt/Dialect/Handshake/HandshakeOps.h"
-#include <gurobi_c++.h>
+#include <optional>
 
 using namespace circt;
 using namespace circt::handshake;
@@ -82,22 +82,22 @@ namespace buffer {
             
   void printBBConnectivity(std::vector<basicBlock *> &bbList);
 
-  // MILP description functions
-  arch *findArcWithVarName(std::string varName,
-                         std::vector<basicBlock *> &bbList);
+  // // MILP description functions
+  // arch *findArcWithVarName(std::string varName,
+  //                        std::vector<basicBlock *> &bbList);
 
-  std::vector<std::string>
-  findSameDstOpStrings(const std::string &inputString,
-                      const std::vector<std::string> &stringList,
-                      std::vector<basicBlock *> &bbList);
+  // std::vector<std::string>
+  // findSameDstOpStrings(const std::string &inputString,
+  //                     const std::vector<std::string> &stringList,
+  //                     std::vector<basicBlock *> &bbList);
 
-  std::vector<std::string>
-  findSameSrcOpStrings(const std::string &inputString,
-                     const std::vector<std::string> &stringList,
-                     std::vector<basicBlock *> &bbList);
+  // std::vector<std::string>
+  // findSameSrcOpStrings(const std::string &inputString,
+  //                    const std::vector<std::string> &stringList,
+  //                    std::vector<basicBlock *> &bbList);
 
 
-  void extractMarkedGraphBB(std::vector<basicBlock *> &bbList);
+  // void extractMarkedGraphBB(std::vector<basicBlock *> bbList);
 } // namespace buffer
 } // namespace dynamatic
 

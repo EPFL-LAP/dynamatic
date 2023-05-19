@@ -8,6 +8,8 @@
 #define DYNAMATIC_TRANSFORMS_PLACEBUFFERS_H
 
 #include "dynamatic/Support/LLVM.h"
+#include "dynamatic/Transforms/UtilsForPlaceBuffers.h"
+#include "dynamatic/Transforms/UtilsForMILPSolver.h"
 
 namespace dynamatic {
 
