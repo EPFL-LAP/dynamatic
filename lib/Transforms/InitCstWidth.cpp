@@ -16,7 +16,6 @@
 #include "llvm/Support/Debug.h"
 #include "llvm/Support/raw_ostream.h"
 
-
 static LogicalResult initCstOpBitsWidth(handshake::FuncOp funcOp,
                                         MLIRContext *ctx) {
   OpBuilder builder(ctx);
@@ -68,18 +67,8 @@ static LogicalResult initCstOpBitsWidth(handshake::FuncOp funcOp,
           newCstOp.getLoc(), op.getResult().getType(), newCstOp.getResult());
 
       // replace the constant operation (default width)
-      // with new constant operation (optimized width)
-      op->replaceAllUsesWith(newCstOp);
-
-      // update the user of constant operation
-      SmallVector<Operation *> userOps;
-      for (auto &user : newCstOp.getResult().getUses())
-        userOps.push_back(user.getOwner());
-
-      for (auto updateOp : userOps)
-        if (!isa<mlir::arith::ExtSIOp>(*updateOp))
-          updateOp->replaceUsesOfWith(newCstOp.getResult(),
-                                      extOp->getResult(0));
+      // with the extension of new constant operation (optimized width)
+      op->replaceAllUsesWith(extOp);
     }
   }
 
