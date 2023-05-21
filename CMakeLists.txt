@@ -92,10 +92,18 @@ function(add_dynamatic_dialect_library name)
 endfunction()
 
 #-------------------------------------------------------------------------------
-# Directory setup
+# Directory configuration
 #-------------------------------------------------------------------------------
 
 add_subdirectory(${DYNAMATIC_INCLUDE_DIR}/dynamatic)
 add_subdirectory(${DYNAMATIC_SOURCE_DIR}/lib)
 add_subdirectory(${DYNAMATIC_SOURCE_DIR}/test)
 add_subdirectory(${DYNAMATIC_SOURCE_DIR}/tools)
+
+#-------------------------------------------------------------------------------
+# Gurobi setup
+#-------------------------------------------------------------------------------
+
+list(APPEND CMAKE_MODULE_PATH "${CMAKE_SOURCE_DIR}/build/cmake/modules")
+
+find_package(GUROBI REQUIRED)

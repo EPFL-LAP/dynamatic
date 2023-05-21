@@ -88,85 +88,77 @@ buffer::findSameSrcOpStrings(const std::string &inputString,
 
 void buffer::extractMarkedGraphBB(std::vector<basicBlock *> &bbList) {
 
-  // try{
-    // GRBEnv env = GRBEnv(true);
-    // env.set("LogFile", "mip1.log");
-    // env.start();
-    // GRBModel modelMILP = GRBModel(env);
+    GRBEnv env = GRBEnv(true);
+    env.set("LogFile", "mip1.log");
+    env.start();
+    GRBModel modelMILP = GRBModel(env);
     // Define variables
     std::map<std::string, GRBVar> sBB;
     std::map<std::string, GRBVar> sArc;
     std::map<std::string, GRBVar> nArc;
-    // std::vector<std::string> ArcVarNames;
+    std::vector<std::string> ArcVarNames;
 
     unsigned cstMaxN = 0;
 
-    // for (auto bb : bbList) {
-    //   std::string valBB = "bb" + std::to_string(bb->index);
-    //   sBB[valBB] = modelMILP.addVar(0, 1, 0.0, GRB_BINARY, valBB);
+    for (auto bb : bbList) {
+      std::string valBB = "bb" + std::to_string(bb->index);
+      sBB[valBB] = modelMILP.addVar(0, 1, 0.0, GRB_BINARY, valBB);
 
-    //   // define out archs
-    //   for (int i = 0; i < bb->outArcs.size(); ++i) {
-    //     auto arc = bb->outArcs[i];
-    //     std::string valArcSel = "bb" + std::to_string(arc->bbSrc->index) + "_e" +
-    //                             std::to_string(i) + "_bb" +
-    //                             std::to_string(arc->bbDst->index);
-    //     ArcVarNames.push_back(valArcSel);
-    //     sArc[valArcSel] = modelMILP.addVar(0, 1, 0.0, GRB_BINARY, valArcSel);
+      // define out archs
+      for (int i = 0; i < bb->outArcs.size(); ++i) {
+        auto arc = bb->outArcs[i];
+        std::string valArcSel = "bb" + std::to_string(arc->bbSrc->index) + "_e" +
+                                std::to_string(i) + "_bb" +
+                                std::to_string(arc->bbDst->index);
+        ArcVarNames.push_back(valArcSel);
+        sArc[valArcSel] = modelMILP.addVar(0, 1, 0.0, GRB_BINARY, valArcSel);
 
-    //     std::string valArcN = "bb" + std::to_string(arc->bbSrc->index) + "_e" +
-    //                           std::to_string(i) + "_bb" +
-    //                           std::to_string(arc->bbDst->index);
-    //     nArc[valArcN] = modelMILP.addVar(0, arc->freq, 0.0, GRB_CONTINUOUS, valArcN);
-    //     // ArcVarNames.push_back(valArcN);
+        std::string valArcN = "bb" + std::to_string(arc->bbSrc->index) + "_e" +
+                              std::to_string(i) + "_bb" +
+                              std::to_string(arc->bbDst->index);
+        nArc[valArcN] = modelMILP.addVar(0, arc->freq, 0.0, GRB_CONTINUOUS, valArcN);
+        // ArcVarNames.push_back(valArcN);
 
-    //     cstMaxN = std::max(cstMaxN, arc->freq);
-    //   }
-    // }
-    // GRBVar valExecN = modelMILP.addVar(0, cstMaxN, 0.0, GRB_INTEGER, "valExecN");
+        cstMaxN = std::max(cstMaxN, arc->freq);
+      }
+    }
+    GRBVar valExecN = modelMILP.addVar(0, cstMaxN, 0.0, GRB_INTEGER, "valExecN");
 
-    // // Define constraints
-    // int constrInd = 0;
-    // // All in archs to the same dst op equals to 1
-    // for (auto valInArc : ArcVarNames) {
-    //   std::vector<std::string> sameDstArcs =
-    //       findSameDstOpStrings(valInArc, ArcVarNames, bbList);
+    // Define constraints
+    int constrInd = 0;
+    // All in archs to the same dst op equals to 1
+    for (auto valInArc : ArcVarNames) {
+      std::vector<std::string> sameDstArcs =
+          findSameDstOpStrings(valInArc, ArcVarNames, bbList);
       
-    //   GRBLinExpr constraintExpr;
-    //   for (const std::string& result : sameDstArcs) {
-    //       if (sArc.count(result) > 0) {
-    //           constraintExpr += sArc[result];
-    //       }
-    //   }
-    //   modelMILP.addConstr(constraintExpr == 1, "cin"+std::to_string(constrInd));
-    //   ++constrInd;
-    // }
-  // } catch(GRBException e) {
-  //   std::cout << "Error code = " << e.getErrorCode() << "\n";
-  //   std::cout << e.getMessage() << "\n";
-  // } catch(...) {
-  //   std::cout << "Exception during optimization" <<"\n";
-  // }
-  
+      GRBLinExpr constraintExpr;
+      for (const std::string& result : sameDstArcs) {
+          if (sArc.count(result) > 0) {
+              constraintExpr += sArc[result];
+          }
+      }
+      modelMILP.addConstr(constraintExpr == 1, "cin"+std::to_string(constrInd));
+      ++constrInd;
+    }
 
 
-  // constrInd = 0;
-  // // All out archs from the same src op equals to 1
-  // for (auto valInArc : ArcVarNames) {
-  //   std::vector<std::string> sameSrcArcs =
-  //       findSameSrcOpStrings(valInArc, ArcVarNames, bbList);
+  constrInd = 0;
+  // All out archs from the same src op equals to 1
+  for (auto valInArc : ArcVarNames) {
+    std::vector<std::string> sameSrcArcs =
+        findSameSrcOpStrings(valInArc, ArcVarNames, bbList);
     
-  //   GRBLinExpr constraintExpr;
-  //   for (const std::string& result : sameSrcArcs) {
-  //       if (sArc.count(result) > 0) {
-  //           constraintExpr += sArc[result];
-  //       }
-  //   }
-  //   modelMILP.addConstr(constraintExpr == 1, "cout"+std::to_string(constrInd));
-  //   ++constrInd;
-  // }
+    GRBLinExpr constraintExpr;
+    for (const std::string& result : sameSrcArcs) {
+        if (sArc.count(result) > 0) {
+            constraintExpr += sArc[result];
+        }
+    }
+    modelMILP.addConstr(constraintExpr == 1, "cout"+std::to_string(constrInd));
+    ++constrInd;
+  }
 
-  // modelMILP.write("/home/yuxuan/Projects/dynamatic-utils/compile/debug.lp");
+  modelMILP.write("/home/yuxuan/Projects/dynamatic-utils/compile/debug.lp");
   
   // int numConstraints = modelMILP.get(GRB_IntAttr_NumConstrs);
   // GRBConstr* constraints = modelMILP.getConstrs();
