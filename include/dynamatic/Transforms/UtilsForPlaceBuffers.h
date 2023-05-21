@@ -19,6 +19,7 @@ using namespace circt::handshake;
 namespace dynamatic {
 namespace buffer {  
   struct arch;
+  struct channel;
 
   struct basicBlock {
     unsigned index = UINT_MAX;
@@ -26,14 +27,16 @@ namespace buffer {
     bool selBB = false;
     bool isEntryBB = false;
     bool isExitBB = false;
-    std::vector<arch *> inArcs;
-    std::vector<arch *> outArcs;
+    std::vector<arch *> inArchs;
+    std::vector<arch *> outArchs;
+    std::vector<channel *> inChannels;
+    std::vector<channel *> outChannels;
   };
 
   struct arch {
     unsigned freq;
     basicBlock *bbSrc, *bbDst;
-    std::optional<Operation *> opSrc, opDst;
+
     bool selArc = false;
     bool isBackEdge = false;
 
@@ -50,7 +53,15 @@ namespace buffer {
         : freq(freq), bbSrc(bbSrc), bbDst(bbDst) {}
   };
 
-  basicBlock* findExistsBB(unsigned bbInd, std::vector<basicBlock *> &bbList);
+  struct channel : arch {
+    std::optional<Operation *> opSrc, opDst;
+    
+  };
+
+  basicBlock *findExistsBB(unsigned bbInd, std::vector<basicBlock *> &bbList);
+
+  arch *findExistsArch(basicBlock *bbSrc, basicBlock *bbDst,
+                              std::vector<arch *> &archList);
 
   struct dataFlowGraphBB {
     std::vector<arch> archList;
@@ -70,7 +81,7 @@ namespace buffer {
 
   bool isBackEdge(Operation *opSrc, Operation *opDst);
 
-  void linkNextBB(Operation *opSrc, Operation *opDst, unsigned newbbInd,
+  void linkBBViaChannel(Operation *opSrc, Operation *opDst, unsigned newbbInd,
                   basicBlock *curBB, std::vector<basicBlock *> &bbList);
 
   void dfsBBGraphs(Operation *opNode, std::vector<Operation *> &visited,
@@ -79,7 +90,7 @@ namespace buffer {
   void dfsBB(basicBlock *bb, std::vector<basicBlock *> &bbList,
              std::vector<unsigned> &bbIndexList,
              std::vector<Operation *> &visitedOpList);
-            
+
   void printBBConnectivity(std::vector<basicBlock *> &bbList);
 
   // // MILP description functions

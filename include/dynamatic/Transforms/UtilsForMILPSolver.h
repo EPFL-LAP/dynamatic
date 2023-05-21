@@ -13,7 +13,7 @@
 namespace dynamatic {
 namespace buffer {
     // MILP description functions
-  arch *findArcWithVarName(std::string varName,
+  channel *findChannelWithVarName(std::string varName,
                          std::vector<basicBlock *> &bbList);
 
   static bool toSameDstOp(std::string var1, std::string var2,

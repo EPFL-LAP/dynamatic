@@ -21,7 +21,6 @@ using namespace circt::handshake;
 using namespace mlir;
 using namespace dynamatic;
 using namespace dynamatic::buffer;
-
 static LogicalResult insertBuffers(handshake::FuncOp funcOp, MLIRContext *ctx) {
   std::vector<Operation *> visitedOpList;
   std::vector<unsigned> bbIndexList;
@@ -55,12 +54,14 @@ static LogicalResult insertBuffers(handshake::FuncOp funcOp, MLIRContext *ctx) {
   dfsBB(entryBB, bbList, bbIndexList, visitedOpList);
   assert(bbIndexList.size() == maxBBInd + 1 &&
          "Disconnected basic blocks exist!");
+
   printBBConnectivity(bbList);
 
   extractMarkedGraphBB(bbList);
 
   return success();
 }
+
 
 namespace {
 

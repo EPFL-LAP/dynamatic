@@ -42,8 +42,8 @@ unsigned buffer::getBBIndex(Operation *op) {
 }
 
 bool buffer::isConnected(basicBlock *bb, Operation *op) {
-  for (auto arch : bb->outArcs) {
-    if (auto connectOp = (arch->opDst).value(); connectOp == op) {
+  for (auto channel : bb->outChannels) {
+    if (auto connectOp = (channel->opDst).value(); connectOp == op) {
       return true;
     }
   }
@@ -69,6 +69,14 @@ bool buffer::isBackEdge(Operation *opSrc, Operation *opDst) {
   return false;
 }
 
+arch *buffer::findExistsArch(basicBlock *bbSrc, basicBlock *bbDst,
+                             std::vector<arch *> &archList) {
+  for (auto arch : archList)
+    if (arch->bbSrc == bbSrc && arch->bbDst == bbDst)
+      return arch;
+  return nullptr;
+}
+
 basicBlock *buffer::findExistsBB(unsigned bbInd,
                                     std::vector<basicBlock *> &bbList) {
   for (auto bb : bbList)
@@ -77,25 +85,25 @@ basicBlock *buffer::findExistsBB(unsigned bbInd,
   return nullptr;
 }
 
-void buffer::linkNextBB(Operation *opSrc, Operation *opDst, unsigned newbbInd,
+// link the basic blocks via channel between operations
+void buffer::linkBBViaChannel(Operation *opSrc, Operation *opDst, unsigned newbbInd,
                 basicBlock *curBB, std::vector<basicBlock *> &bbList) {
-  arch *outArc = new arch();
-  outArc->freq = 1;
-  outArc->opSrc = opSrc;
-  outArc->opDst = opDst;
-  outArc->isOutEdge = true;
-  outArc->bbSrc = curBB;
+  auto *outChannel = new channel();
+  outChannel->opSrc = opSrc;
+  outChannel->opDst = opDst;
+  outChannel->isOutEdge = true;
+  outChannel->bbSrc = curBB;
   if (auto bbDst = findExistsBB(newbbInd, bbList); bbDst != nullptr) {
-    outArc->bbDst = bbDst;
+    outChannel->bbDst = bbDst;
     if (bbDst->index <= curBB->index)
-      outArc->isBackEdge = true;
+      outChannel->isBackEdge = true;
   } else {
     basicBlock *bb = new basicBlock();
     bb->index = newbbInd;
-    outArc->bbDst = bb;
+    outChannel->bbDst = bb;
     bbList.push_back(bb);
   }
-  curBB->outArcs.push_back(outArc);
+  curBB->outChannels.push_back(outChannel);
   return;
 }
 
@@ -126,19 +134,19 @@ void buffer::dfsBBGraphs(Operation *opNode, std::vector<Operation *> &visited,
 
     if (bbInd != getBBIndex(opNode)) {
       // if not in the same basic block, link via out arc
-      linkNextBB(opNode, sucOp, bbInd, curBB, bbList);
+      linkBBViaChannel(opNode, sucOp, bbInd, curBB, bbList);
       // stop tranversing nodes not in the same basic block
       continue;
     } else if (isBackEdge(opNode, sucOp)) {
       // need to determine whether is a back edge in a same block
-      linkNextBB(opNode, sucOp, bbInd, curBB, bbList);
+      linkBBViaChannel(opNode, sucOp, bbInd, curBB, bbList);
     }
 
     dfsBBGraphs(sucOp, visited, curBB, bbList);
   }
 }
 
-// visit the basic block via link
+// visit the basic block via channel between operations
 void buffer::dfsBB(basicBlock *bb, std::vector<basicBlock *> &bbList,
                 std::vector<unsigned> &bbIndexList,
                 std::vector<Operation *> &visitedOpList) {
@@ -150,12 +158,28 @@ void buffer::dfsBB(basicBlock *bb, std::vector<basicBlock *> &bbList,
   bbIndexList.push_back(bb->index);
 
   basicBlock *nextBB;
-  for (auto outArch : bb->outArcs) {
-    nextBB = outArch->bbDst;
-    nextBB->inArcs.push_back(outArch);
+  for (auto outChannel : bb->outChannels) {
+    nextBB = outChannel->bbDst;
+    nextBB->inChannels.push_back(outChannel);
 
-    if (outArch->opDst.has_value()) {
-      if (Operation *op = outArch->opDst.value();
+    // if the identical arch does not exist, add it to the list
+    if (findExistsArch(outChannel->bbSrc, outChannel->bbDst, nextBB->inArchs) ==
+        nullptr) {
+          // link the basic blocks via arch
+          arch *newArch = new arch();
+          newArch->bbSrc = outChannel->bbSrc;
+          newArch->bbDst = outChannel->bbDst;
+          newArch->freq = 1;
+          if (isBackEdge((outChannel->opSrc).value(), (outChannel->opDst).value())) {
+            newArch->isBackEdge = true;
+            newArch->freq = 100;
+          }
+          nextBB->inArchs.push_back(newArch);
+          bb->outArchs.push_back(newArch);
+    }
+
+    if (outChannel->opDst.has_value()) {
+      if (Operation *op = outChannel->opDst.value();
           isa<handshake::ControlMergeOp, handshake::MergeOp>(*op))
         // DFS curBB from the entry port
         dfsBBGraphs(op, visitedOpList, nextBB, bbList);
@@ -170,22 +194,20 @@ void buffer::printBBConnectivity(std::vector<basicBlock *> &bbList) {
     llvm::errs() << "is entry BB? " << bb->isEntryBB << "\n";
     llvm::errs() << "is exit BB? " << bb->isExitBB << "\n";
     llvm::errs() << "inArcs: \n";
-    for (auto arch : bb->inArcs) {
-      llvm::errs() << "--------From bb" << arch->bbSrc->index
-                   << "(port: " << *(arch->opSrc.value()) << ")\n";
-      llvm::errs() << "--------To bb" << arch->bbDst->index
-                   << "(port: " << *(arch->opDst.value()) << ")\n";
-      llvm::errs() << "--------isBackEdge: " << arch->isBackEdge << "\n";
-      llvm::errs() << "--------frequency: " << arch->freq << "\n\n";
+    for(auto arc : bb->inArchs) {
+      // arch *selArch = bb->inArc;
+      llvm::errs() << "--------From bb" << arc->bbSrc->index << " ";
+      llvm::errs() << "To bb" << arc->bbDst->index << "\n";
+      llvm::errs() << "--------isBackEdge: " << arc->isBackEdge << "\n";
+      llvm::errs() << "--------frequency: " << arc->freq << "\n\n";
     }
+    
     llvm::errs() << "outArcs: \n";
-    for (auto arch : bb->outArcs) {
-      llvm::errs() << "--------From bb" << arch->bbSrc->index
-                   << "(port: " << *(arch->opSrc.value()) << ")\n";
-      llvm::errs() << "--------To bb" << arch->bbDst->index
-                   << "(port: " << *(arch->opDst.value()) << ")\n";
-      llvm::errs() << "--------isBackEdge: " << arch->isBackEdge << "\n";
-      llvm::errs() << "--------frequency: " << arch->freq << "\n\n";
+    for(auto arc : bb->outArchs) {
+      llvm::errs() << "--------From bb" << arc->bbSrc->index << " ";
+      llvm::errs() << "To bb" << arc->bbDst->index << "\n";
+      llvm::errs() << "--------isBackEdge: " << arc->isBackEdge << "\n";
+      llvm::errs() << "--------frequency: " << arc->freq << "\n\n";
     }
     llvm::errs() << "=========================================\n";
   }

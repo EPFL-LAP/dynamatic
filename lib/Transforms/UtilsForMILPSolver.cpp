@@ -32,30 +32,30 @@ using namespace dynamatic::buffer;
 //   return var;
 // }
 
-arch *buffer::findArcWithVarName(std::string varName,
+channel *buffer::findChannelWithVarName(std::string varName,
                          std::vector<basicBlock *> &bbList) {
   unsigned srcBB = std::stoi(varName.substr(2, varName.find("_e") - 2));
-  unsigned arcInd = std::stoi(varName.substr(
+  unsigned channelInd = std::stoi(varName.substr(
       varName.find("_e") + 2, varName.find("_bb") - varName.find("_e") - 2));
 
-  return bbList[srcBB]->outArcs[arcInd];
+  return bbList[srcBB]->outChannels[channelInd];
 }
 
 
 static bool buffer::toSameDstOp(std::string var1, std::string var2,
                         std::vector<basicBlock *> &bbList) {
-  arch *arc1 = findArcWithVarName(var1, bbList);
-  arch *arc2 = findArcWithVarName(var2, bbList);
+  auto *channel1 = findChannelWithVarName(var1, bbList);
+  auto *channel2 = findChannelWithVarName(var2, bbList);
 
-  return (arc1->opDst).value() == (arc2->opDst).value();
+  return (channel1->opDst).value() == (channel2->opDst).value();
 }
 
 static bool buffer::fromSameSrcOp(std::string var1, std::string var2,
                           std::vector<basicBlock *> &bbList) {
-  arch *arc1 = findArcWithVarName(var1, bbList);
-  arch *arc2 = findArcWithVarName(var2, bbList);
+  auto *channel1 = findChannelWithVarName(var1, bbList);
+  auto *channel2 = findChannelWithVarName(var2, bbList);
 
-  return (arc1->opSrc).value() == (arc2->opSrc).value();
+  return (channel1->opSrc).value() == (channel2->opSrc).value();
 }
 
 std::vector<std::string>
@@ -86,6 +86,150 @@ buffer::findSameSrcOpStrings(const std::string &inputString,
   return resultStrings;
 }
 
+unsigned getSrcBBIndFromVarName(std::string varName) {
+  return std::stoi(varName.substr(2, varName.find("_e") - 2));
+}
+
+unsigned getDstBBIndFromVarName(std::string varName) {
+  size_t lastUnderscorePos = varName.rfind('bb');
+  return std::stoi(varName.substr(lastUnderscorePos + 1));
+}
+
+std::vector<std::vector<std::string>> getArchsFromSameBB(const std::map<std::string, GRBVar>& sArc) {
+    std::vector<std::vector<std::string>> result;
+
+    // Create a map to group strings by bb
+    std::map<std::string, std::vector<std::string>> bbMap;
+
+    // Iterate over the map sArc
+    for (const auto& pair : sArc) {
+        const std::string& str = pair.first;
+        const std::string bb = str.substr(0, str.find('_'));  // Extract the bb name
+
+        // Check if the bb exists in the map
+        if (bbMap.find(bb) == bbMap.end()) {
+            // If the bb doesn't exist, create a new vector and insert it into the map
+            std::vector<std::string> strings;
+            strings.push_back(str);
+            bbMap.insert({bb, strings});
+        } else {
+            // If the bb already exists, add the string to the existing vector
+            bbMap[bb].push_back(str);
+        }
+    }
+
+    // Convert the map values to a vector of vectors
+    for (const auto& pair : bbMap) {
+        result.push_back(pair.second);
+    }
+
+    return result;
+}
+
+std::vector<std::vector<std::string>> getArchsToSameBB(const std::map<std::string, GRBVar>& sArc) {
+  std::vector<std::vector<std::string>> result;
+
+  // Create a map to group strings by bb
+  std::map<std::string, std::vector<std::string>> bbMap;
+
+  // Iterate over the map sArc
+  for (const auto& pair : sArc) {
+      const std::string& str = pair.first;
+      const std::string bb = str.substr(str.find('_') + 1);  // Extract the bb name
+
+      // Check if the bb exists in the map
+      if (bbMap.find(bb) == bbMap.end()) {
+          // If the bb doesn't exist, create a new vector and insert it into the map
+          std::vector<std::string> strings;
+          strings.push_back(str);
+          bbMap.insert({bb, strings});
+      } else {
+          // If the bb already exists, add the string to the existing vector
+          bbMap[bb].push_back(str);
+      }
+  }
+
+  // Convert the map values to a vector of vectors
+  for (const auto& pair : bbMap) {
+      result.push_back(pair.second);
+  }
+
+  return result;
+}
+
+arch *findArchWithVarName(std::string varName,
+                          std::vector<basicBlock *> &bbList) {
+  unsigned srcBB = getSrcBBIndFromVarName(varName);
+  unsigned dstBB = getDstBBIndFromVarName(varName);
+
+  basicBlock *bbSrc = findExistsBB(srcBB, bbList);
+  basicBlock *bbDst = findExistsBB(dstBB, bbList);
+
+  return findExistsArch(bbSrc, bbDst, bbSrc->outArchs);
+}
+
+std::vector<std::string>
+getBackArchs(const std::map<std::string, GRBVar>& sArc,
+             std::vector<basicBlock *> &bbList) {
+    std::vector<std::string> result;
+
+    // Create a map to group strings by bb
+    std::map<std::string, std::vector<std::string>> bbMap;
+
+    // Iterate over the map sArc
+    for (const auto& pair : sArc) {
+        const std::string& varName = pair.first;
+        unsigned srcBB = getSrcBBIndFromVarName(varName);
+        unsigned dstBB = getDstBBIndFromVarName(varName);
+
+        basicBlock *bbSrc = findExistsBB(srcBB, bbList);
+
+        for (auto arch : bbSrc->outArchs) {
+            // llvm::errs() << "From: " << bbSrc->index << " To: " <<arch->bbDst->index<< "\n";
+            // llvm::errs() << "srcBB: " << srcBB << "---dstBB: " <<dstBB<< "\n\n";
+            if (arch->bbDst->index == dstBB && arch->isBackEdge) {
+                // llvm::errs() << "back arch: " << varName << "\n";
+                result.push_back(pair.first);
+                break;
+            }
+        }
+    }
+
+    return result;
+}
+
+std::vector<std::string> getAllInArcNames(std::string varBBName,
+                                          const std::map<std::string, GRBVar>& sArc) {
+    std::vector<std::string> result;
+
+    unsigned bbDstInd = stoi(varBBName.substr(2)); //named after bbi
+    // Iterate over the map sArc
+    for (const auto& pair : sArc) {
+        const std::string& str = pair.first;
+        unsigned bbInd = getDstBBIndFromVarName(str);
+
+        if (bbInd == bbDstInd) 
+          result.push_back(pair.first);
+    }
+    return result;
+}
+
+std::vector<std::string> getAllOutArcNames(std::string varBBName,
+                                           const std::map<std::string, GRBVar>& sArc) {
+    std::vector<std::string> result;
+
+    unsigned bbDstInd = stoi(varBBName.substr(2)); //named after bbi
+    // Iterate over the map sArc
+    for (const auto& pair : sArc) {
+        const std::string& str = pair.first;
+        unsigned bbInd = getSrcBBIndFromVarName(str);
+
+        if (bbInd == bbDstInd) 
+          result.push_back(pair.first);
+    }
+    return result;
+}
+
 void buffer::extractMarkedGraphBB(std::vector<basicBlock *> &bbList) {
 
     GRBEnv env = GRBEnv(true);
@@ -95,83 +239,106 @@ void buffer::extractMarkedGraphBB(std::vector<basicBlock *> &bbList) {
     // Define variables
     std::map<std::string, GRBVar> sBB;
     std::map<std::string, GRBVar> sArc;
-    std::map<std::string, GRBVar> nArc;
-    std::vector<std::string> ArcVarNames;
 
     unsigned cstMaxN = 0;
 
     for (auto bb : bbList) {
+      // define basic block selection variables
       std::string valBB = "bb" + std::to_string(bb->index);
       sBB[valBB] = modelMILP.addVar(0, 1, 0.0, GRB_BINARY, valBB);
 
-      // define out archs
-      for (int i = 0; i < bb->outArcs.size(); ++i) {
-        auto arc = bb->outArcs[i];
+      // define edge selection variables
+      for (int i = 0; i < bb->outArchs.size(); ++i) {
+        auto arc = bb->outArchs[i];
         std::string valArcSel = "bb" + std::to_string(arc->bbSrc->index) + "_e" +
                                 std::to_string(i) + "_bb" +
                                 std::to_string(arc->bbDst->index);
-        ArcVarNames.push_back(valArcSel);
-        sArc[valArcSel] = modelMILP.addVar(0, 1, 0.0, GRB_BINARY, valArcSel);
 
-        std::string valArcN = "bb" + std::to_string(arc->bbSrc->index) + "_e" +
-                              std::to_string(i) + "_bb" +
-                              std::to_string(arc->bbDst->index);
-        nArc[valArcN] = modelMILP.addVar(0, arc->freq, 0.0, GRB_CONTINUOUS, valArcN);
-        // ArcVarNames.push_back(valArcN);
+        sArc[valArcSel] = modelMILP.addVar(0, 1, 0.0, GRB_BINARY, valArcSel);
 
         cstMaxN = std::max(cstMaxN, arc->freq);
       }
     }
+    // define maximum execution cycles variables
     GRBVar valExecN = modelMILP.addVar(0, cstMaxN, 0.0, GRB_INTEGER, "valExecN");
+
+    // Set objective
+    GRBLinExpr objExpr;
+    for (auto pair : sArc) {
+      auto arcEntity = findArchWithVarName(pair.first, bbList);
+      unsigned N_e = arcEntity->freq;
+      auto S_e = pair.second;
+      objExpr += N_e * S_e;
+    }
+    modelMILP.setObjective(objExpr, GRB_MAXIMIZE);
 
     // Define constraints
     int constrInd = 0;
-    // All in archs to the same dst op equals to 1
-    for (auto valInArc : ArcVarNames) {
-      std::vector<std::string> sameDstArcs =
-          findSameDstOpStrings(valInArc, ArcVarNames, bbList);
-      
-      GRBLinExpr constraintExpr;
-      for (const std::string& result : sameDstArcs) {
-          if (sArc.count(result) > 0) {
-              constraintExpr += sArc[result];
-          }
-      }
-      modelMILP.addConstr(constraintExpr == 1, "cin"+std::to_string(constrInd));
+
+    auto groupInArchs = getArchsFromSameBB(sArc);
+    auto groupOutArchs = getArchsToSameBB(sArc);
+
+    // for each edge e: N <= S_e x N_e + (1-S_e) x cstMaxN 
+    for (auto pair : sArc) {
+      auto arcEntity = findArchWithVarName(pair.first, bbList);
+      unsigned N_e = arcEntity->freq;
+      auto S_e = pair.second;
+      modelMILP.addConstr(valExecN <= S_e * N_e + (1 - S_e) * cstMaxN,
+                          "cN" + std::to_string(constrInd));
       ++constrInd;
     }
 
-
-  constrInd = 0;
-  // All out archs from the same src op equals to 1
-  for (auto valInArc : ArcVarNames) {
-    std::vector<std::string> sameSrcArcs =
-        findSameSrcOpStrings(valInArc, ArcVarNames, bbList);
-    
+    // Only select one back archs: 
+    // for each bb \in Back(CFG): sum(S_e) = 1
+    auto groupBackArchs = getBackArchs(sArc, bbList);
     GRBLinExpr constraintExpr;
-    for (const std::string& result : sameSrcArcs) {
-        if (sArc.count(result) > 0) {
-            constraintExpr += sArc[result];
-        }
+    for (auto arch : groupBackArchs)     
+      if (sArc.count(arch) > 0) 
+          constraintExpr += sArc[arch];
+        
+    modelMILP.addConstr(constraintExpr == 1, "cBack");
+
+    // If a bb is selected, 
+    // exactly one of its input and output archs is selected
+    constrInd = 0;
+    for (auto pair : sBB) {
+      // input archs
+      GRBLinExpr constraintInExpr;
+      auto inArcs = getAllInArcNames(pair.first, sArc);
+      for (auto arch : inArcs)     
+        if (sArc.count(arch) > 0) 
+            constraintInExpr += sArc[arch];
+
+      modelMILP.addConstr(constraintInExpr == pair.second, "cIn"+std::to_string(constrInd));
+    
+      // output archs
+      GRBLinExpr constraintOutExpr;
+      auto outArcs = getAllOutArcNames(pair.first, sArc);
+      for (auto arch : outArcs)       
+        if (sArc.count(arch) > 0) 
+            constraintOutExpr += sArc[arch];
+
+      modelMILP.addConstr(constraintOutExpr == pair.second, "cOut"+std::to_string(constrInd));
+      constrInd++;
     }
-    modelMILP.addConstr(constraintExpr == 1, "cout"+std::to_string(constrInd));
-    ++constrInd;
+
+  modelMILP.optimize();
+
+  if (modelMILP.get(GRB_IntAttr_Status) == GRB_OPTIMAL)
+    modelMILP.write("/home/yuxuan/Projects/dynamatic-utils/compile/debug.lp");
+  else
+    llvm::errs() << "No solution found\n";
+  // modelMILP.optimize();
+
+  for (auto pair : sArc) {
+    auto x = sArc[pair.first];
+    llvm::errs() << x.get(GRB_StringAttr_VarName) << " "
+         << x.get(GRB_DoubleAttr_X) << "\n";
   }
 
-  modelMILP.write("/home/yuxuan/Projects/dynamatic-utils/compile/debug.lp");
-  
-  // int numConstraints = modelMILP.get(GRB_IntAttr_NumConstrs);
-  // GRBConstr* constraints = modelMILP.getConstrs();
-
-  // for (int i = 0; i < numConstraints; i++) {
-  //     GRBConstr constr = constraints[i];
-  //     std::string constrName = constr.get(GRB_StringAttr_ConstrName);
-
-  //     // GRBConstr a = modelMILP.getConstrByName(constrName);
-  //     // constr.getExpr();
-
-  //     std::cout << "Constraint " << i << ": " << constrName << std::endl;
-  //     // std::cout << "   Expression: " << lhsExpr << " " << sense << " " << rhsValue << std::endl;
-  // }
-
+  for (auto pair : sBB) {
+    auto x = sBB[pair.first];
+    llvm::errs() << x.get(GRB_StringAttr_VarName) << " "
+         << x.get(GRB_DoubleAttr_X) << "\n";
+  }
 }
