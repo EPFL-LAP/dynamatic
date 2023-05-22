@@ -9,6 +9,7 @@
 
 #include "dynamatic/Support/LLVM.h"
 #include "dynamatic/Transforms/AnalyzeMemoryAccesses.h"
+#include "dynamatic/Transforms/ArithReduceArea.h"
 #include "dynamatic/Transforms/FlattenMemRefRowMajor.h"
 #include "dynamatic/Transforms/HandshakeInferBasicBlocks.h"
 #include "dynamatic/Transforms/HandshakePrepareForLegacy.h"
