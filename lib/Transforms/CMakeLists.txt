@@ -6,6 +6,10 @@ add_dynamatic_library(DynamaticTransforms
   HandshakeInferBasicBlocks.cpp
   NameMemoryOps.cpp
   PushConstants.cpp
+  UtilsBitsUpdate.cpp
+  OptimizeBits.cpp
+  InitIndexType.cpp
+  InitCstWidth.cpp
 
   DEPENDS
   DynamaticTransformsPassIncGen
