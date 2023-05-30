@@ -11,6 +11,19 @@ include "mlir/Pass/PassBase.td"
 
 
 //===----------------------------------------------------------------------===//
+// Arith passes
+//===----------------------------------------------------------------------===//
+
+def ArithReduceArea : Pass<"arith-reduce-area", "mlir::ModuleOp"> {
+  let summary = "Reduces area taken up by arithmetic operations.";
+  let description = [{
+    Optimizes arithmetic operations to reduce the total area taken up by the
+    circuit that will be generated for the module.
+  }];
+  let constructor = "dynamatic::createArithReduceArea()";
+}
+
+//===----------------------------------------------------------------------===//
 // Handshake passes
 //===----------------------------------------------------------------------===//
 
