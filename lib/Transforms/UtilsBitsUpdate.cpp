@@ -270,6 +270,9 @@ void constructUpdateFuncMap(
         return widths;
       };
 
+  mapOpNameWidth[mlir::arith::DivUIOp::getOperationName()] =
+      mapOpNameWidth[mlir::arith::DivSIOp::getOperationName()];
+
   mapOpNameWidth[mlir::arith::DivSIOp::getOperationName()] =
       mapOpNameWidth[mlir::arith::DivSIOp::getOperationName()];
 

@@ -123,7 +123,7 @@ static LogicalResult rewriteBitsWidths(handshake::FuncOp funcOp,
       }
     }
   }
-
+  
   // Store new inserted truncation or extension operation during validation
   SmallVector<Operation *> OpTruncExt;
   for (auto &op : llvm::make_early_inc_range(funcOp.getOps()))
