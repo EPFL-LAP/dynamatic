@@ -10,10 +10,12 @@
 #include "dynamatic/Transforms/Passes.h"
 #include "mlir/Dialect/Arith/IR/Arith.h"
 #include "mlir/Dialect/MemRef/IR/MemRef.h"
-
+#include "llvm/Support/Debug.h"
 #include "mlir/IR/OperationSupport.h"
 #include "mlir/Support/IndentedOstream.h"
 #include "mlir/Support/LogicalResult.h"
+
+#define DEBUG_TYPE "BITWIDTH" 
 
 using namespace circt;
 using namespace circt::handshake;
@@ -67,7 +69,8 @@ static LogicalResult rewriteBitsWidths(handshake::FuncOp funcOp,
       unsigned int newWidth = 0, resInd = 0;
       if (forMapOpNameWidth.find(opName) != forMapOpNameWidth.end())
         newWidth = forMapOpNameWidth[opName](op->getOperands());
-      else {continue;}
+      else 
+        continue;
 
       if (isa<handshake::ControlMergeOp>(op))
         resInd = 1; // the second result is the one that needs to be updated
@@ -101,7 +104,8 @@ static LogicalResult rewriteBitsWidths(handshake::FuncOp funcOp,
       // get the new bit width of the result operator
       if (backMapOpNameWidth.find(opName) != backMapOpNameWidth.end())
         newWidth = backMapOpNameWidth[opName](op->getResults());
-      else {continue;}
+      else 
+        continue;
 
       // if the new type can be optimized, update the type
       if (Type newOpResultType =
@@ -129,7 +133,7 @@ static LogicalResult rewriteBitsWidths(handshake::FuncOp funcOp,
   for (auto op : OpTruncExt) 
     bitwidth::revertTruncOrExt(op, ctx);
 
-  // LLVM_DEBUG(llvm::errs() << "Forward-Backward saved bits " << savedBits << "\n");
+  LLVM_DEBUG(llvm::errs() << "Forward-Backward saved bits " << savedBits << "\n");
 
   return success();
 }

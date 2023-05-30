@@ -16,6 +16,8 @@
 #include "llvm/Support/Debug.h"
 #include "llvm/Support/raw_ostream.h"
 
+#define DEBUG_TYPE "BITWIDTH" 
+
 static LogicalResult initCstOpBitsWidth(handshake::FuncOp funcOp,
                                         MLIRContext *ctx) {
   OpBuilder builder(ctx);
@@ -72,7 +74,7 @@ static LogicalResult initCstOpBitsWidth(handshake::FuncOp funcOp,
     }
   }
 
-  // LLVM_DEBUG(llvm::dbgs() << "Number of saved bits is " << savedBits << "\n");
+  LLVM_DEBUG(llvm::dbgs() << "Number of saved bits is " << savedBits << "\n");
 
   return success();
 }
