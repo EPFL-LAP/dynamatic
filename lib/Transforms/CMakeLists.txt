@@ -27,13 +27,6 @@ target_link_libraries(DynamaticTransforms PUBLIC
   ${GUROBI_CXX_LIBRARY}
 )
 
-# if(CXX)
-#  target_link_libraries(DynamaticTransforms PUBLIC 
-#  optimized ${GUROBI_CXX_LIBRARY}
-#  debug ${GUROBI_CXX_DEBUG_LIBRARY}
-#  )
-# endif()
-
 target_link_libraries(DynamaticTransforms PUBLIC 
   ${GUROBI_LIBRARY}
 )
