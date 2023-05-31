@@ -50,19 +50,19 @@ func.func @retunMultipleValues(%arg0 : i32, %arg1 : i1, %arg2 : index) -> (i32, 
 // CHECK-SAME:                                    %[[VAL_1:.*]]: none, ...) -> i32 attributes {argNames = ["in0", "in1"], resNames = ["out0"]} {
 // CHECK:           %[[VAL_2:.*]] = merge %[[VAL_0]] : i1
 // CHECK:           %[[VAL_3:.*]] = merge %[[VAL_1]] : none
-// CHECK:           %[[VAL_5:.*]] = constant %[[VAL_3]] {value = 0 : i32} : i32
-// CHECK:           %[[VAL_7:.*]] = constant %[[VAL_3]] {value = 1 : i32} : i32
+// CHECK:           %[[VAL_4:.*]] = constant %[[VAL_3]] {value = 0 : i32} : i32
+// CHECK:           %[[VAL_5:.*]] = constant %[[VAL_3]] {value = 1 : i32} : i32
+// CHECK:           %[[VAL_6:.*]], %[[VAL_7:.*]] = cond_br %[[VAL_2]], %[[VAL_4]] : i32
 // CHECK:           %[[VAL_8:.*]], %[[VAL_9:.*]] = cond_br %[[VAL_2]], %[[VAL_3]] : none
 // CHECK:           %[[VAL_10:.*]], %[[VAL_11:.*]] = cond_br %[[VAL_2]], %[[VAL_5]] : i32
-// CHECK:           %[[VAL_12:.*]], %[[VAL_13:.*]] = cond_br %[[VAL_2]], %[[VAL_7]] : i32
-// CHECK:           %[[VAL_14:.*]] = merge %[[VAL_10]] : i32
-// CHECK:           %[[VAL_15:.*]], %[[VAL_16:.*]] = control_merge %[[VAL_8]] : none
-// CHECK:           %[[VAL_17:.*]] = d_return %[[VAL_14]] : i32
-// CHECK:           %[[VAL_18:.*]] = merge %[[VAL_13]] : i32
-// CHECK:           %[[VAL_19:.*]], %[[VAL_20:.*]] = control_merge %[[VAL_9]] : none
-// CHECK:           %[[VAL_21:.*]] = d_return %[[VAL_18]] : i32
-// CHECK:           %[[VAL_22:.*]] = merge %[[VAL_17]], %[[VAL_21]] : i32
-// CHECK:           end %[[VAL_22]] : i32
+// CHECK:           %[[VAL_12:.*]] = merge %[[VAL_6]] : i32
+// CHECK:           %[[VAL_13:.*]], %[[VAL_14:.*]] = control_merge %[[VAL_8]] : none, index
+// CHECK:           %[[VAL_15:.*]] = d_return %[[VAL_12]] : i32
+// CHECK:           %[[VAL_16:.*]] = merge %[[VAL_11]] : i32
+// CHECK:           %[[VAL_17:.*]], %[[VAL_18:.*]] = control_merge %[[VAL_9]] : none, index
+// CHECK:           %[[VAL_19:.*]] = d_return %[[VAL_16]] : i32
+// CHECK:           %[[VAL_20:.*]] = merge %[[VAL_15]], %[[VAL_19]] : i32
+// CHECK:           end %[[VAL_20]] : i32
 // CHECK:         }
 func.func @multipleReturns(%arg0 : i1) -> i32 {
   %c0 = arith.constant 0 : i32
@@ -86,14 +86,14 @@ func.func @multipleReturns(%arg0 : i1) -> i32 {
 // CHECK:           %[[VAL_7:.*]] = merge %[[VAL_3]] : none
 // CHECK:           %[[VAL_8:.*]] = constant %[[VAL_7]] {value = 0 : i32} : i32
 // CHECK:           %[[VAL_9:.*]] = constant %[[VAL_7]] {value = 1 : i32} : i32
-// CHECK:           %[[VAL_10:.*]], %[[VAL_11:.*]] = cond_br %[[VAL_6]], %[[VAL_7]] : none
-// CHECK:           %[[VAL_12:.*]], %[[VAL_13:.*]] = cond_br %[[VAL_6]], %[[VAL_8]] : i32
+// CHECK:           %[[VAL_10:.*]], %[[VAL_11:.*]] = cond_br %[[VAL_6]], %[[VAL_8]] : i32
+// CHECK:           %[[VAL_12:.*]], %[[VAL_13:.*]] = cond_br %[[VAL_6]], %[[VAL_7]] : none
 // CHECK:           %[[VAL_14:.*]], %[[VAL_15:.*]] = cond_br %[[VAL_6]], %[[VAL_9]] : i32
-// CHECK:           %[[VAL_16:.*]] = merge %[[VAL_12]] : i32
-// CHECK:           %[[VAL_17:.*]], %[[VAL_18:.*]] = control_merge %[[VAL_10]] : none
+// CHECK:           %[[VAL_16:.*]] = merge %[[VAL_10]] : i32
+// CHECK:           %[[VAL_17:.*]], %[[VAL_18:.*]] = control_merge %[[VAL_12]] : none, index
 // CHECK:           %[[VAL_19:.*]] = d_return %[[VAL_16]] : i32
 // CHECK:           %[[VAL_20:.*]] = merge %[[VAL_15]] : i32
-// CHECK:           %[[VAL_21:.*]], %[[VAL_22:.*]] = control_merge %[[VAL_11]] : none
+// CHECK:           %[[VAL_21:.*]], %[[VAL_22:.*]] = control_merge %[[VAL_13]] : none, index
 // CHECK:           %[[VAL_23:.*]] = d_return %[[VAL_20]] : i32
 // CHECK:           %[[VAL_24:.*]] = merge %[[VAL_19]], %[[VAL_23]] : i32
 // CHECK:           end %[[VAL_24]], %[[VAL_4]], %[[VAL_5]] : i32, none, none
