@@ -18,6 +18,7 @@
 #include "dynamatic/Transforms/InitIndexType.h"
 #include "dynamatic/Transforms/NameMemoryOps.h"
 #include "dynamatic/Transforms/PushConstants.h"
+#include "dynamatic/Transforms/ScfRotateForLoops.h"
 #include "mlir/Pass/Pass.h"
 
 namespace dynamatic {

@@ -10,6 +10,7 @@ add_dynamatic_library(DynamaticTransforms
   OptimizeBits.cpp
   InitIndexType.cpp
   InitCstWidth.cpp
+  ScfRotateForLoops.cpp
 
   DEPENDS
   DynamaticTransformsPassIncGen
