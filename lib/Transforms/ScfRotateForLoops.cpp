@@ -62,8 +62,9 @@ struct RotateLoop : public OpRewritePattern<scf::ForOp> {
 
     // Create a do-while that is equivalent to the loop
     ValueRange whileArgsRange(whileOpArgs);
-    auto whileOp = rewriter.create<scf::WhileOp>(
-        forOp.getLoc(), whileArgsRange.getTypes(), whileOpArgs);
+    auto whileOp =
+        rewriter.create<scf::WhileOp>(forOp.getLoc(), whileArgsRange.getTypes(),
+                                      whileOpArgs, nullptr, nullptr);
 
     // Move all operations from the for loop body to the "before" region of
     // the while loop
