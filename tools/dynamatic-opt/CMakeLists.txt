@@ -11,7 +11,6 @@ target_link_libraries(dynamatic-opt
   PRIVATE
   AffineToScf
   DynamaticStandardToHandshakeFPGA18
-  DynamaticExportCFG
   DynamaticExportDOT
   DynamaticHandshakeToNetlist
   DynamaticTransforms
