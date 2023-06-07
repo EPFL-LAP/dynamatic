@@ -235,8 +235,8 @@ void buffer::dataFlowCircuit::printCircuits() {
 }
 
 std::vector<std::vector<float>>
-buffer::dataFlowCircuit::readDelayInfoFromFile(const std::string &filename) {
-  std::vector<std::vector<float>> delayInfo;
+buffer::dataFlowCircuit::readInfoFromFile(const std::string &filename) {
+  std::vector<std::vector<float>> info;
 
   std::ifstream file(filename);
   assert(file.is_open() && "Error opening delay info file");
@@ -253,24 +253,38 @@ buffer::dataFlowCircuit::readDelayInfoFromFile(const std::string &filename) {
     }
 
     assert(!row.empty() && "Error reading delay info file");
-    delayInfo.push_back(row);
+    info.push_back(row);
   }
 
   file.close();
 
-  return delayInfo;
+  return info;
 }
 
-void buffer::dataFlowCircuit::initCombinationalUnitDelay() {
+void buffer::dataFlowCircuit::initUnitTimeInfo() {
   for (auto u : units) {
     Operation *op = u->op;
     std::string opName = op->getName().getStringRef().str();
     // ignore handshake name 
     // for example, "handshake.merge" -> "merge"
     size_t dotPos = opName.find_last_of(".");
-    int latInd = compNameToIndex[opName.substr(dotPos + 1)];
-    u->delay = delayInfo[latInd][0];
+    llvm::errs() << "opName: " << opName.substr(dotPos + 1) << "\n";
+    
+
+    if (compNameToIndex.count(opName.substr(dotPos + 1)) == 0) 
+      continue;
+    
+    int compInd = compNameToIndex[opName.substr(dotPos + 1)];
+    int bitInd = bitWidthToIndex[32];
+
+    Type resType = op->getResult(0).getType();
+    if (isa<IntegerType>(resType) &&
+        bitWidthToIndex.count(resType.getIntOrFloatBitWidth()) > 0)
+      bitInd = bitWidthToIndex[resType.getIntOrFloatBitWidth()];
+    u->delay = delayInfo[compInd][bitInd];
+    u->latency = latencyInfo[compInd][bitInd];
     llvm::errs() << *op << " delay: " << u->delay << "\n";
+    llvm::errs() << *op << " latency: " << u->latency << "\n";
   }
 }
 void buffer::dataFlowCircuit::insertSelBB(handshake::FuncOp funcOp,
@@ -354,7 +368,7 @@ LogicalResult buffer::dataFlowCircuit::initMLIPModelVars(
     std::vector<std::map<std::string, GRBVar>> &channelVars,
     std::vector<std::map<std::string, GRBVar>> &unitVars) {
 
-  initCombinationalUnitDelay();
+  initUnitTimeInfo();
 
   // init variables of the models
   varThrpt = milpModel.addVar(0, 1, 0.0, GRB_CONTINUOUS, "thrpt");
@@ -518,7 +532,7 @@ void buffer::dataFlowCircuit::insertBuffersInChannel
                                           // return true;
                                           return operand.getOwner() == opDst;
                                         });
-  llvm::errs() << "Inserted " << slots << " buffer: ";
+  // llvm::errs() << "Inserted " << slots << " buffer: ";
 }
 
 LogicalResult buffer::dataFlowCircuit::instantiateBuffers(
@@ -543,10 +557,10 @@ LogicalResult buffer::dataFlowCircuit::instantiateBuffers(
       insertBuffersInChannel(ctx, channels[i], false, N_c_int-1);
     }
 
-    if (R_c > 0) 
-        llvm::errs() << " : sequential\n";
-    else 
-        llvm::errs() << " : transparent\n";
+    // if (R_c > 0) 
+    //     llvm::errs() << " : sequential\n";
+    // else 
+    //     llvm::errs() << " : transparent\n";
   
   }
 

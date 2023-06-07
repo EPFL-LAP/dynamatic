@@ -50,7 +50,7 @@ static LogicalResult insertBuffers(handshake::FuncOp funcOp, MLIRContext *ctx) {
 
   basicBlock *prevBB = entryBB;
 
-  llvm::errs() << "---------------entry bb finished-------------\n";
+  // llvm::errs() << "---------------entry bb finished-------------\n";
 
   // DFS from the entryBB, the BB graph can be fully traversed
   // as every basic blocks are connected.
@@ -67,12 +67,16 @@ static LogicalResult insertBuffers(handshake::FuncOp funcOp, MLIRContext *ctx) {
       break;
     dataFlowCircuitList.push_back(markedGraph);
   }
+  
   // TODO: Optmize multiple CFDFCs
   llvm::errs() << dataFlowCircuitList.size() << " CFDFCs found\n";
 
   auto markedGraph = dataFlowCircuitList[0];
   markedGraph->delayInfo = 
-    markedGraph->readDelayInfoFromFile(markedGraph->delayFile);
+    markedGraph->readInfoFromFile(markedGraph->delayFile);
+
+  markedGraph->latencyInfo = 
+    markedGraph->readInfoFromFile(markedGraph->latencyFile);
 
   // Optimize the extracted marked graph
     GRBEnv env = GRBEnv(true);

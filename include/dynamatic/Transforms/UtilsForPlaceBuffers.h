@@ -78,35 +78,48 @@ struct unit {
 struct dataFlowCircuit {
 
   std::map<std::string, int> compNameToIndex = {
-      {"cmpi", 0},     {"add", 1},
-      {"sub", 2},      {"muli", 3},
-      {"extsi", 4},    {"load", 5},
-      {"store", 6},    {"LsqLoad", 7}, // d_load ?
-      {"LsqStore", 8},                 // d_store ?
-      {"merge", 9},    {"Getelementptr", 10},
+      {"cmpi", 0},     {"addi", 1},
+      {"subi", 2},      {"muli", 3},
+      {"extsi", 4},    
+      // {"load", 5}, {"store", 6},  ????
+      {"d_load", 5}, {"d_store", 6},  
+      {"LsqLoad", 7}, // ?
+      {"LsqStore", 8}, // ?
+      // {"merge", 9},    // ??
+      {"Getelementptr", 10},
       {"Addf", 11},    {"Subf", 12},
       {"Mulf", 13},    {"divu", 14},
       {"Divs", 15},    {"Divf", 16},
-      {"Cmpf", 17},    {"Phic", 18},
-      {"zdl", 19},     {"Fork", 20},
+      {"cmpf", 17},    
+      // {"Phic", 18}, // ---> merge & control merge
+      {"merge", 18}, {"control_merge", 18},
+      {"zdl", 19},     {"fork", 20},
       {"Ret", 21}, // handshake.return ?
-      {"Br", 22},      {"end", 23},
+      {"br", 22},      // conditional branch ??
+      {"end", 23},
       {"and", 24},     {"or", 25},
-      {"xor", 26},     {"Shl", 27},
+      {"xori", 26},     {"Shl", 27},
       {"Ashr", 28},    {"Lshr", 29},
-      {"Select", 30},  {"Mux", 31}};
+      {"select", 30},  {"mux", 31}};
+
+  std::map<int, int> bitWidthToIndex = {
+      {1, 0}, {2, 1}, {4, 2}, {8, 3}, 
+      {16, 4}, {32, 5}, {64, 6}};
 
   double targetCP, maxCP;
   std::vector<unit *> units;
   std::vector<channel *> channels;
   std::vector<basicBlock *> selBBs;
-  std::string delayFile = "/home/yuxuan/Projects/dynamatic/legacy-dynamatic/"
-                          "dhls/etc/dynamatic/data/targets/default_delay.dat";
+  std::string infoFielDefault = std::getenv("LEGACY_DYNAMATICPP");
+  std::string delayFile = infoFielDefault + "/data/targets/default_delay.dat";
+  std::string latencyFile = infoFielDefault + "data/targets/default_latency.dat";
+
   int execN = 0;
   std::vector<std::vector<float>> delayInfo;
+  std::vector<std::vector<float>> latencyInfo;
 
   std::vector<std::vector<float>>
-  readDelayInfoFromFile(const std::string &filename);
+  readInfoFromFile(const std::string &filename);
 
   void insertSelBB(handshake::FuncOp funcOp, basicBlock *bb);
 
@@ -159,7 +172,7 @@ struct dataFlowCircuit {
     return -1;
   }
 
-  void initCombinationalUnitDelay();
+  void initUnitTimeInfo();
 
   void insertBuffersInChannel(MLIRContext *ctx, channel *ch, bool fifo, int slots);
 
