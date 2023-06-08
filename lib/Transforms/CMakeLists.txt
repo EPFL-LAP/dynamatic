@@ -7,7 +7,6 @@ add_dynamatic_library(DynamaticTransforms
   HandshakePlaceBuffers.cpp
   NameMemoryOps.cpp
   PushConstants.cpp
-  UtilsForMILPSolver.cpp
   UtilsForPlaceBuffers.cpp
 
   DEPENDS

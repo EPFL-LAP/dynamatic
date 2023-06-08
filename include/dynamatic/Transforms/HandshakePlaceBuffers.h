@@ -9,7 +9,7 @@
 
 #include "dynamatic/Support/LLVM.h"
 #include "dynamatic/Transforms/UtilsForPlaceBuffers.h"
-#include "dynamatic/Transforms/UtilsForMILPSolver.h"
+// #include "dynamatic/Transforms/UtilsForMILPSolver.h"
 
 namespace dynamatic {
 
