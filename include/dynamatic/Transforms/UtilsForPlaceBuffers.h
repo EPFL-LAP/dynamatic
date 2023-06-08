@@ -50,30 +50,84 @@ struct arch {
 };
 
 struct channel : arch {
-  std::optional<Operation *> opSrc, opDst;
+  // std::optional<Operation *> opSrc, opDst;
+  channel () : arch() {};
 
-  // // If opDst and opSrc are not in the same basic blocks, and
-  // // if opDst's users are in the same basic blocks as opDst, it is an
-  // in-edge. bool isInEdge = false;
+  channel (Operation *opSrc, Operation *opDst, Value *valPort) : arch() {
+    this->opSrc = opSrc;
+    this->opDst = opDst;
+    this->valPort = valPort;
+  };
 
-  // // If opDst and opSrc are not in the same basic blocks, and
-  // // if opSrc's users are in the same basic blocks as opSrc, it is an
-  // out-edge. bool isOutEdge = false;
+  Operation *opSrc, *opDst;
+  Value *valPort;
+
   void print() {
-    llvm::errs() << "opSrc: " << *(opSrc.value()) << " ---> ";
-    llvm::errs() << "opDst: " << *(opDst.value()) << "\n";
+    llvm::errs() << "opSrc: " << *(opSrc) << " ---> ";
+    llvm::errs() << "opDst: " << *(opDst) << "\n";
   }
 };
 
+struct port {
+  port () : opVal(nullptr) {};
+  port (Value *opVal) : opVal(opVal) {};
+
+  double portLatency = 0.0;
+  Value *opVal;
+
+  SmallVector<channel *> cntChannels;
+};
+
 struct unit {
+  unit () : op(nullptr) {};
+  unit (Operation *op) : op(op) {};
+
   unsigned freq = 0;
   double latency = 0.0;
   double delay = 0.0;
   int ind = -1;
   Operation *op;
-  SmallVector<channel *> inChannels;
-  SmallVector<channel *> outChannels;
+  SmallVector<port *> inPorts;
+  SmallVector<port *> outPorts;
+  // SmallVector<channel *> inChannels;
+  // SmallVector<channel *> outChannels;
 };
+
+basicBlock *findExistsBB(unsigned bbInd, std::vector<basicBlock *> &bbList);
+
+arch *findExistsArch(basicBlock *bbSrc, basicBlock *bbDst,
+                     std::vector<arch *> &archList);
+
+// Graph build functions
+bool isEntryOp(Operation *op,
+               std::vector<Operation *> &visitedOp);
+
+unsigned getBBIndex(Operation *op);
+
+bool isConnected(basicBlock *bb, Operation *op);
+
+bool isBackEdge(Operation *opSrc, Operation *opDst);
+
+void linkBBViaChannel(Operation *opSrc, Operation *opDst, unsigned newbbInd,
+                      basicBlock *curBB, std::vector<basicBlock *> &bbList);
+
+unit *getUnitWithOp(Operation *op, std::vector<unit *> &unitList);
+
+void connectInChannel(unit *unitNode, channel *inChannel);
+
+// void createOutPort(unit *unitNode, channel *outChannel);
+
+void dfsHandshakeGraph(Operation *opNode, std::vector<unit *> &unitList,
+     std::vector<Operation *> &visited, channel *inChannel=nullptr);
+
+void dfsBBGraphs(Operation *opNode, std::vector<Operation *> &visited,
+                 basicBlock *curBB, std::vector<basicBlock *> &bbList);
+
+void dfsBB(basicBlock *bb, std::vector<basicBlock *> &bbList,
+           std::vector<unsigned> &bbIndexList,
+           std::vector<Operation *> &visitedOpList);
+
+void printBBConnectivity(std::vector<basicBlock *> &bbList);
 
 struct dataFlowCircuit {
 
@@ -200,50 +254,5 @@ struct dataFlowCircuit {
                                   std::vector<std::map<std::string, GRBVar>> &channelVars,
                                   std::vector<std::map<std::string, GRBVar>> &unitVars);
 };
-
-basicBlock *findExistsBB(unsigned bbInd, std::vector<basicBlock *> &bbList);
-
-arch *findExistsArch(basicBlock *bbSrc, basicBlock *bbDst,
-                     std::vector<arch *> &archList);
-
-// Graph build functions
-Operation *foundEntryOp(handshake::FuncOp funcOp,
-                        std::vector<Operation *> &visitedOp);
-
-unsigned getBBIndex(Operation *op);
-
-bool isConnected(basicBlock *bb, Operation *op);
-
-bool isBackEdge(Operation *opSrc, Operation *opDst);
-
-void linkBBViaChannel(Operation *opSrc, Operation *opDst, unsigned newbbInd,
-                      basicBlock *curBB, std::vector<basicBlock *> &bbList);
-
-void dfsBBGraphs(Operation *opNode, std::vector<Operation *> &visited,
-                 basicBlock *curBB, std::vector<basicBlock *> &bbList);
-
-void dfsBB(basicBlock *bb, std::vector<basicBlock *> &bbList,
-           std::vector<unsigned> &bbIndexList,
-           std::vector<Operation *> &visitedOpList);
-
-void printBBConnectivity(std::vector<basicBlock *> &bbList);
-
-// // MILP description functions
-// arch *findArcWithVarName(std::string varName,
-//                        std::vector<basicBlock *> &bbList);
-
-// std::vector<std::string>
-// findSameDstOpStrings(const std::string &inputString,
-//                     const std::vector<std::string> &stringList,
-//                     std::vector<basicBlock *> &bbList);
-
-// std::vector<std::string>
-// findSameSrcOpStrings(const std::string &inputString,
-//                    const std::vector<std::string> &stringList,
-//                    std::vector<basicBlock *> &bbList);
-
-// void extractMarkedGraphBB(std::vector<basicBlock *> bbList);
-} // namespace buffer
-} // namespace dynamatic
 
 #endif // DYNAMATIC_TRANSFORMS_UTILSFORPLACEBUFFERS_H

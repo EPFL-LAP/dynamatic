@@ -21,18 +21,17 @@ using namespace mlir;
 using namespace dynamatic;
 using namespace dynamatic::buffer;
 
-Operation *buffer::foundEntryOp(handshake::FuncOp funcOp,
-                                std::vector<Operation *> &visitedOp) {
-  for (auto &op : funcOp.getOps()) {
-    if (op.getAttrs().data()->getName() == "bb") {
-      if (op.getAttrOfType<IntegerAttr>("bb").getUInt() == 0 &&
+bool buffer::isEntryOp(Operation *op,
+                       std::vector<Operation *> &visitedOp) {
+    if (op->getAttrs().data()->getName() == "bb") {
+      if (op->getAttrOfType<IntegerAttr>("bb").getUInt() == 0 &&
           isa<MergeOp>(op)) {
-        return &op;
+        // visitedOp.push_back(op);
+        return true;
       }
-      visitedOp.push_back(&op);
-    }
+      
   }
-  return nullptr;
+  return false;
 }
 
 unsigned buffer::getBBIndex(Operation *op) {
@@ -41,24 +40,24 @@ unsigned buffer::getBBIndex(Operation *op) {
   return UINT_MAX;
 }
 
-bool buffer::isConnected(basicBlock *bb, Operation *op) {
-  for (auto channel : bb->outChannels) {
-    if (auto connectOp = (channel->opDst).value(); connectOp == op) {
-      return true;
-    }
-  }
-  return false;
-}
+// bool buffer::isConnected(basicBlock *bb, Operation *op) {
+//   for (auto channel : bb->outChannels) {
+//     if (auto connectOp = (channel->opDst).value(); connectOp == op) {
+//       return true;
+//     }
+//   }
+//   return false;
+// }
 
 bool buffer::isBackEdge(Operation *opSrc, Operation *opDst) {
-  unsigned bbSrcInd = getBBIndex(opSrc);
-  unsigned bbDstInd = getBBIndex(opDst);
-  if (bbSrcInd == UINT_MAX || bbDstInd == UINT_MAX ||
-      isa<handshake::EndOp>(*opDst))
-    return false;
+  // unsigned bbSrcInd = getBBIndex(opSrc);
+  // unsigned bbDstInd = getBBIndex(opDst);
+  // if (bbSrcInd == UINT_MAX || bbDstInd == UINT_MAX ||
+  //     isa<handshake::EndOp>(*opDst))
+  //   return false;
 
-  if (bbSrcInd > bbDstInd)
-    return true;
+  // if (bbSrcInd > bbDstInd)
+  //   return true;
 
   if (opDst->isProperAncestor(opSrc))
     return true;
@@ -105,464 +104,457 @@ void buffer::linkBBViaChannel(Operation *opSrc, Operation *opDst,
   return;
 }
 
-void buffer::dfsBBGraphs(Operation *opNode, std::vector<Operation *> &visited,
-                         basicBlock *curBB, std::vector<basicBlock *> &bbList) {
+unit *buffer::getUnitWithOp(Operation *op, std::vector<unit *> &unitList) {
+  for (auto u : unitList) {
+    if (u->op == op)
+      return u;
+  }
+  return nullptr;
+}
+
+void buffer::connectInChannel(unit *unitNode, channel *inChannel) {
+    port *inPort = new port(inChannel->valPort);
+    inPort->cntChannels.push_back(inChannel);
+    unitNode->inPorts.push_back(inPort);
+}
+
+// void buffer::createOutPort(unit *unitNode, channel *outChannel) {
+//     port *outPort = new port(outChannel->valPort);
+//     outPort->cntChannels.push_back(outChannel);
+//     unitNode->outPorts.push_back(outPort);
+// }
+
+void buffer::dfsHandshakeGraph(Operation *opNode, 
+                               std::vector<unit *> &unitList,
+                               std::vector<Operation *> &visited,
+                               channel *inChannel) {
+
+  // ensure inChannel is marked as connected to the unit
+  if (inChannel != nullptr)
+    if (unit *unitNode = getUnitWithOp(opNode, unitList);
+        unitNode != nullptr) {
+      connectInChannel(unitNode, inChannel);
+    }
+
   if (std::find(visited.begin(), visited.end(), opNode) != visited.end()) {
     return;
   }
+
   // marked as visited
   visited.push_back(opNode);
 
-  if (isa<handshake::EndOp>(*opNode)) {
-    curBB->isExitBB = true;
-    return;
+  // initialize the unit node 
+  unit *unitNode = new unit(opNode);
+  unitList.push_back(unitNode);
+  if (inChannel != nullptr)
+    connectInChannel(unitNode, inChannel);
+
+  // dfs the successor operation
+  for (auto resOperand : opNode->getResults()) {
+    // initialize the out port
+    port *outPort = new port(&resOperand);
+    for (auto sucOp : resOperand.getUsers()) {
+      // create the channel connected to the outport
+      channel *outChannel = new channel(opNode, sucOp, &resOperand);
+      outChannel->isBackEdge = isBackEdge(opNode, sucOp);
+      llvm::errs() << "creating channels .... \n";
+      outChannel->print();
+      outPort->cntChannels.push_back(outChannel);
+
+      // dfs the successor operation
+      dfsHandshakeGraph(sucOp, unitList, visited, outChannel);
+    } 
+    unitNode->outPorts.push_back(outPort);
   }
+  
 
-  // vectors to store successor operation
-  SmallVector<Operation *> sucOps;
-
-  for (auto sucOp : opNode->getResults().getUsers()) {
-    // llvm::errs() << "dfs graph " << *sucOp << "\n";
-    // get the index of the successor basic block
-    unsigned bbInd = getBBIndex(sucOp);
-
-    // not in a basic block
-    if (bbInd == UINT_MAX)
-      continue;
-
-    if (bbInd != getBBIndex(opNode)) {
-      // llvm::errs() << "linkBBVia " << *sucOp << "\n";
-      // if not in the same basic block, link via out arc
-      linkBBViaChannel(opNode, sucOp, bbInd, curBB, bbList);
-      // stop tranversing nodes not in the same basic block
-      continue;
-    } else if (isBackEdge(opNode, sucOp)) {
-      // llvm::errs() << "linkBBVia (backedge) " << *sucOp << "\n";
-      // need to determine whether is a back edge in a same block
-      linkBBViaChannel(opNode, sucOp, bbInd, curBB, bbList);
-    }
-
-    dfsBBGraphs(sucOp, visited, curBB, bbList);
-  }
-  // llvm::errs() << "dfs bb " << getBBIndex(opNode) << "\n";
 }
 
-// visit the basic block via channel between operations
-void buffer::dfsBB(basicBlock *bb, std::vector<basicBlock *> &bbList,
-                   std::vector<unsigned> &bbIndexList,
-                   std::vector<Operation *> &visitedOpList) {
-  // skip bb that marked as visited
-  // llvm::errs() << "cur BB: " << bb->index << "\n";
+// void buffer::dfsBBGraphs(Operation *opNode, std::vector<Operation *> &visited,
+//                          basicBlock *curBB, std::vector<basicBlock *> &bbList) {
+//   if (std::find(visited.begin(), visited.end(), opNode) != visited.end()) {
+//     return;
+//   }
+//   // marked as visited
+//   visited.push_back(opNode);
 
-  if (std::find(bbIndexList.begin(), bbIndexList.end(), bb->index) !=
-      bbIndexList.end())
-    return;
+//   if (isa<handshake::EndOp>(*opNode)) {
+//     curBB->isExitBB = true;
+//     return;
+//   }
 
-  bbIndexList.push_back(bb->index);
+//   // vectors to store successor operation
+//   SmallVector<Operation *> sucOps;
 
-  basicBlock *nextBB;
-  for (auto outChannel : bb->outChannels) {
-    nextBB = outChannel->bbDst;
-    nextBB->inChannels.push_back(outChannel);
+//   for (auto sucOp : opNode->getResults().getUsers()) {
+//     // llvm::errs() << "dfs graph " << *sucOp << "\n";
+//     // get the index of the successor basic block
+//     unsigned bbInd = getBBIndex(sucOp);
 
-    // llvm::errs() << "next BB: " << nextBB->index << "\n";
+//     // not in a basic block
+//     if (bbInd == UINT_MAX)
+//       continue;
 
-    // if the identical arch does not exist, add it to the list
-    if (findExistsArch(outChannel->bbSrc, outChannel->bbDst, nextBB->inArchs) ==
-        nullptr) {
-      // link the basic blocks via arch
-      arch *newArch = new arch();
-      newArch->bbSrc = outChannel->bbSrc;
-      newArch->bbDst = outChannel->bbDst;
-      newArch->freq = 1;
-      if (isBackEdge((outChannel->opSrc).value(),
-                     (outChannel->opDst).value())) {
-        newArch->isBackEdge = true;
-        newArch->freq = 100;
-      }
-      nextBB->inArchs.push_back(newArch);
-      bb->outArchs.push_back(newArch);
-    }
+//     if (bbInd != getBBIndex(opNode)) {
+//       // llvm::errs() << "linkBBVia " << *sucOp << "\n";
+//       // if not in the same basic block, link via out arc
+//       linkBBViaChannel(opNode, sucOp, bbInd, curBB, bbList);
+//       // stop tranversing nodes not in the same basic block
+//       continue;
+//     } else if (isBackEdge(opNode, sucOp)) {
+//       // llvm::errs() << "linkBBVia (backedge) " << *sucOp << "\n";
+//       // need to determine whether is a back edge in a same block
+//       linkBBViaChannel(opNode, sucOp, bbInd, curBB, bbList);
+//     }
 
-    if (outChannel->opDst.has_value()) {
-      // llvm::errs() << "op dst "<< *(outChannel->opDst.value()) <<"\n";
-      if (Operation *op = outChannel->opDst.value();
-          isa<handshake::ControlMergeOp, handshake::MergeOp, handshake::MuxOp>(
-              *op)) {
-        // DFS curBB from the entry port
-        dfsBBGraphs(op, visitedOpList, nextBB, bbList);
-      }
-    }
-    dfsBB(nextBB, bbList, bbIndexList, visitedOpList);
-  }
-}
+//     dfsBBGraphs(sucOp, visited, curBB, bbList);
+//   }
+//   // llvm::errs() << "dfs bb " << getBBIndex(opNode) << "\n";
+// }
 
-void buffer::printBBConnectivity(std::vector<basicBlock *> &bbList) {
-  for (auto bb : bbList) {
-    llvm::errs() << bb->index << "\n";
-    llvm::errs() << "is entry BB? " << bb->isEntryBB << "\n";
-    llvm::errs() << "is exit BB? " << bb->isExitBB << "\n";
-    llvm::errs() << "inArcs: \n";
-    for (auto arc : bb->inArchs) {
-      // arch *selArch = bb->inArc;
-      llvm::errs() << "--------From bb" << arc->bbSrc->index << " ";
-      llvm::errs() << "To bb" << arc->bbDst->index << "\n";
-      llvm::errs() << "--------isBackEdge: " << arc->isBackEdge << "\n";
-      llvm::errs() << "--------frequency: " << arc->freq << "\n\n";
-    }
 
-    llvm::errs() << "outArcs: \n";
-    for (auto arc : bb->outArchs) {
-      llvm::errs() << "--------From bb" << arc->bbSrc->index << " ";
-      llvm::errs() << "To bb" << arc->bbDst->index << "\n";
-      llvm::errs() << "--------isBackEdge: " << arc->isBackEdge << "\n";
-      llvm::errs() << "--------frequency: " << arc->freq << "\n\n";
-    }
-    llvm::errs() << "=========================================\n";
-  }
-}
 
-/// ================== dataFlowCircuit Function ================== ///
-void buffer::dataFlowCircuit::printCircuits() {
-  for (auto unit : units) {
-    llvm::errs() << "===========================\n";
-    llvm::errs() << "operation: " << *(unit->op) << "\n";
-    for (auto ch : unit->inChannels)
-      ch->print();
-    for (auto ch : unit->outChannels)
-      ch->print();
-  }
-}
+// /// ================== dataFlowCircuit Function ================== ///
+// void buffer::dataFlowCircuit::printCircuits() {
+//   for (auto unit : units) {
+//     llvm::errs() << "===========================\n";
+//     llvm::errs() << "operation: " << *(unit->op) << "\n";
+//     for (auto ch : unit->inChannels)
+//       ch->print();
+//     for (auto ch : unit->outChannels)
+//       ch->print();
+//   }
+// }
 
-std::vector<std::vector<float>>
-buffer::dataFlowCircuit::readInfoFromFile(const std::string &filename) {
-  std::vector<std::vector<float>> info;
+// std::vector<std::vector<float>>
+// buffer::dataFlowCircuit::readInfoFromFile(const std::string &filename) {
+//   std::vector<std::vector<float>> info;
 
-  std::ifstream file(filename);
-  assert(file.is_open() && "Error opening delay info file");
+//   std::ifstream file(filename);
+//   assert(file.is_open() && "Error opening delay info file");
 
-  std::string line;
-  while (std::getline(file, line)) {
-    std::vector<float> row;
-    std::istringstream iss(line);
-    std::string value;
+//   std::string line;
+//   while (std::getline(file, line)) {
+//     std::vector<float> row;
+//     std::istringstream iss(line);
+//     std::string value;
 
-    while (std::getline(iss, value, ',')) {
-      float num = std::stof(value);
-      row.push_back(num);
-    }
+//     while (std::getline(iss, value, ',')) {
+//       float num = std::stof(value);
+//       row.push_back(num);
+//     }
 
-    assert(!row.empty() && "Error reading delay info file");
-    info.push_back(row);
-  }
+//     assert(!row.empty() && "Error reading delay info file");
+//     info.push_back(row);
+//   }
 
-  file.close();
+//   file.close();
 
-  return info;
-}
+//   return info;
+// }
 
-void buffer::dataFlowCircuit::initUnitTimeInfo() {
-  for (auto u : units) {
-    Operation *op = u->op;
-    std::string opName = op->getName().getStringRef().str();
-    // ignore handshake name 
-    // for example, "handshake.merge" -> "merge"
-    size_t dotPos = opName.find_last_of(".");
-    llvm::errs() << "opName: " << opName.substr(dotPos + 1) << "\n";
+// void buffer::dataFlowCircuit::initUnitTimeInfo() {
+//   for (auto u : units) {
+//     Operation *op = u->op;
+//     std::string opName = op->getName().getStringRef().str();
+//     // ignore handshake name 
+//     // for example, "handshake.merge" -> "merge"
+//     size_t dotPos = opName.find_last_of(".");
+//     llvm::errs() << "opName: " << opName.substr(dotPos + 1) << "\n";
     
 
-    if (compNameToIndex.count(opName.substr(dotPos + 1)) == 0) 
-      continue;
+//     if (compNameToIndex.count(opName.substr(dotPos + 1)) == 0) 
+//       continue;
     
-    int compInd = compNameToIndex[opName.substr(dotPos + 1)];
-    int bitInd = bitWidthToIndex[32];
+//     int compInd = compNameToIndex[opName.substr(dotPos + 1)];
+//     int bitInd = bitWidthToIndex[32];
 
-    Type resType = op->getResult(0).getType();
-    if (isa<IntegerType>(resType) &&
-        bitWidthToIndex.count(resType.getIntOrFloatBitWidth()) > 0)
-      bitInd = bitWidthToIndex[resType.getIntOrFloatBitWidth()];
-    u->delay = delayInfo[compInd][bitInd];
-    u->latency = latencyInfo[compInd][bitInd];
-    llvm::errs() << *op << " delay: " << u->delay << "\n";
-    llvm::errs() << *op << " latency: " << u->latency << "\n";
-  }
-}
-void buffer::dataFlowCircuit::insertSelBB(handshake::FuncOp funcOp,
-                                          basicBlock *bb) {
+//     Type resType = op->getResult(0).getType();
+//     if (isa<IntegerType>(resType) &&
+//         bitWidthToIndex.count(resType.getIntOrFloatBitWidth()) > 0)
+//       bitInd = bitWidthToIndex[resType.getIntOrFloatBitWidth()];
+//     u->delay = delayInfo[compInd][bitInd];
+//     u->latency = latencyInfo[compInd][bitInd];
+//     llvm::errs() << *op << " delay: " << u->delay << "\n";
+//     llvm::errs() << *op << " latency: " << u->latency << "\n";
+//   }
+// }
+// void buffer::dataFlowCircuit::insertSelBB(handshake::FuncOp funcOp,
+//                                           basicBlock *bb) {
 
-  selBBs.push_back(bb);
+//   selBBs.push_back(bb);
 
-  unsigned bbInd = bb->index;
-  llvm::errs() << "==================================\n";
-  llvm::errs() << "create channels in BB " << bbInd << "\n";
+//   unsigned bbInd = bb->index;
+//   llvm::errs() << "==================================\n";
+//   llvm::errs() << "create channels in BB " << bbInd << "\n";
 
-  for (auto &op : funcOp.getOps()) {
-    // llvm::errs() << "------------op: " << op << "\n";
-    if (getBBIndex(&op) != bbInd)
-      continue;
-    // insert channels if op and its successor are in the same basic block
+//   for (auto &op : funcOp.getOps()) {
+//     // llvm::errs() << "------------op: " << op << "\n";
+//     if (getBBIndex(&op) != bbInd)
+//       continue;
+//     // insert channels if op and its successor are in the same basic block
 
-    // create units w.r.t op
-    if (!hasUnit(&op)) {
-      unit *unitInfo = new unit();
-      unitInfo->op = &op;
-      // units.insert(std::make_pair(&op, unitInfo));
-      units.push_back(unitInfo);
-    }
+//     // create units w.r.t op
+//     if (!hasUnit(&op)) {
+//       unit *unitInfo = new unit();
+//       unitInfo->op = &op;
+//       // units.insert(std::make_pair(&op, unitInfo));
+//       units.push_back(unitInfo);
+//     }
 
-    // llvm::errs() << "Try to create channels inner BB \n";
-    for (auto sucOp : op.getResults().getUsers()) {
-      if (!hasUnit(sucOp)) {
-        unit *sucUnitInfo = new unit();
-        sucUnitInfo->op = sucOp;
-        units.push_back(sucUnitInfo);
-      }
+//     // llvm::errs() << "Try to create channels inner BB \n";
+//     for (auto sucOp : op.getResults().getUsers()) {
+//       if (!hasUnit(sucOp)) {
+//         unit *sucUnitInfo = new unit();
+//         sucUnitInfo->op = sucOp;
+//         units.push_back(sucUnitInfo);
+//       }
 
-      // ignore backedges
-      if (isBackEdge(&op, sucOp))
-        continue;
+//       // ignore backedges
+//       if (isBackEdge(&op, sucOp))
+//         continue;
 
-      // create channels
-      if (getBBIndex(sucOp) == bbInd && !hasChannel(&op, sucOp)) {
-        // llvm::errs() << "creating channels inner BB " << bbInd << "\n";
-        auto *innerCh = new channel();
-        innerCh->opSrc = &op;
-        innerCh->opDst = sucOp;
-        innerCh->bbSrc = bb;
-        innerCh->bbDst = bb;
-        // innerCh->print();
-        channels.push_back(innerCh);
-        units[findUnitIndex(&op)]->outChannels.push_back(innerCh);
-        units[findUnitIndex(sucOp)]->inChannels.push_back(innerCh);
-      }
-    }
-  }
-}
+//       // create channels
+//       if (getBBIndex(sucOp) == bbInd && !hasChannel(&op, sucOp)) {
+//         // llvm::errs() << "creating channels inner BB " << bbInd << "\n";
+//         auto *innerCh = new channel();
+//         innerCh->opSrc = &op;
+//         innerCh->opDst = sucOp;
+//         innerCh->bbSrc = bb;
+//         innerCh->bbDst = bb;
+//         // innerCh->print();
+//         channels.push_back(innerCh);
+//         units[findUnitIndex(&op)]->outChannels.push_back(innerCh);
+//         units[findUnitIndex(sucOp)]->inChannels.push_back(innerCh);
+//       }
+//     }
+//   }
+// }
 
-void buffer::dataFlowCircuit::insertSelArc(arch *arc) {
-  // find channels in vector: outChannels w.r.t to the arch
-  basicBlock *bbSrc = arc->bbSrc;
-  basicBlock *bbDst = arc->bbDst;
+// void buffer::dataFlowCircuit::insertSelArc(arch *arc) {
+//   // find channels in vector: outChannels w.r.t to the arch
+//   basicBlock *bbSrc = arc->bbSrc;
+//   basicBlock *bbDst = arc->bbDst;
 
-  llvm::errs() << "==================================\n";
-  llvm::errs() << "create channels from BB " << arc->bbSrc->index << " to "
-               << arc->bbDst->index << "\n";
+//   llvm::errs() << "==================================\n";
+//   llvm::errs() << "create channels from BB " << arc->bbSrc->index << " to "
+//                << arc->bbDst->index << "\n";
 
-  for (channel *ch : bbSrc->outChannels)
-    if (ch->bbDst == bbDst) {
-      insertChannel(ch);
-      // ch->print();
-      Operation *opSrc = (ch->opSrc).value();
-      Operation *opDst = (ch->opDst).value();
-      assert(findUnitIndex(opSrc) != -1 && "Invalid Operation");
-      units[findUnitIndex(opSrc)]->outChannels.push_back(ch);
+//   for (channel *ch : bbSrc->outChannels)
+//     if (ch->bbDst == bbDst) {
+//       insertChannel(ch);
+//       // ch->print();
+//       Operation *opSrc = (ch->opSrc).value();
+//       Operation *opDst = (ch->opDst).value();
+//       assert(findUnitIndex(opSrc) != -1 && "Invalid Operation");
+//       units[findUnitIndex(opSrc)]->outChannels.push_back(ch);
 
-      assert(findUnitIndex(opDst) != -1 && "Invalid Operation");
-      units[findUnitIndex(opDst)]->inChannels.push_back(ch);
-    }
-}
+//       assert(findUnitIndex(opDst) != -1 && "Invalid Operation");
+//       units[findUnitIndex(opDst)]->inChannels.push_back(ch);
+//     }
+// }
 
-LogicalResult buffer::dataFlowCircuit::initMLIPModelVars(
-    GRBModel &milpModel,
-    GRBVar &varThrpt,
-    std::vector<std::map<std::string, GRBVar>> &channelVars,
-    std::vector<std::map<std::string, GRBVar>> &unitVars) {
+// LogicalResult buffer::dataFlowCircuit::initMLIPModelVars(
+//     GRBModel &milpModel,
+//     GRBVar &varThrpt,
+//     std::vector<std::map<std::string, GRBVar>> &channelVars,
+//     std::vector<std::map<std::string, GRBVar>> &unitVars) {
 
-  initUnitTimeInfo();
+//   initUnitTimeInfo();
 
-  // init variables of the models
-  varThrpt = milpModel.addVar(0, 1, 0.0, GRB_CONTINUOUS, "thrpt");
-  for (int i = 0; i < channels.size(); i++) {
-    std::map<std::string, GRBVar> chVar;
-    chVar["R_c" + std::to_string(i)] =
-        milpModel.addVar(0, 1, 0.0, GRB_BINARY, "R_c" + std::to_string(i));
-    chVar["N_c" + std::to_string(i)] = milpModel.addVar(
-        0, UINT32_MAX, 0.0, GRB_INTEGER, "N_c" + std::to_string(i));
+//   // init variables of the models
+//   varThrpt = milpModel.addVar(0, 1, 0.0, GRB_CONTINUOUS, "thrpt");
+//   for (int i = 0; i < channels.size(); i++) {
+//     std::map<std::string, GRBVar> chVar;
+//     chVar["R_c" + std::to_string(i)] =
+//         milpModel.addVar(0, 1, 0.0, GRB_BINARY, "R_c" + std::to_string(i));
+//     chVar["N_c" + std::to_string(i)] = milpModel.addVar(
+//         0, UINT32_MAX, 0.0, GRB_INTEGER, "N_c" + std::to_string(i));
 
-    std::string tInChannel = "t_c" + std::to_string(i);
-    chVar[tInChannel + "_in"] = milpModel.addVar(
-        0, GRB_INFINITY, 0.0, GRB_CONTINUOUS, tInChannel + "_in");
-    chVar[tInChannel + "_out"] = milpModel.addVar(
-        0, GRB_INFINITY, 0.0, GRB_CONTINUOUS, tInChannel + "_out");
+//     std::string tInChannel = "t_c" + std::to_string(i);
+//     chVar[tInChannel + "_in"] = milpModel.addVar(
+//         0, GRB_INFINITY, 0.0, GRB_CONTINUOUS, tInChannel + "_in");
+//     chVar[tInChannel + "_out"] = milpModel.addVar(
+//         0, GRB_INFINITY, 0.0, GRB_CONTINUOUS, tInChannel + "_out");
 
-    chVar["thrpt_tok_c" + std::to_string(i)] = milpModel.addVar(
-        0, 1, 0.0, GRB_CONTINUOUS, "thrpt_tok_c" + std::to_string(i));
-    chVar["thrpt_emp_c" + std::to_string(i)] = milpModel.addVar(
-        0, 1, 0.0, GRB_CONTINUOUS, "thrpt_emp_c" + std::to_string(i));
-    channelVars.push_back(chVar);
-  }
+//     chVar["thrpt_tok_c" + std::to_string(i)] = milpModel.addVar(
+//         0, 1, 0.0, GRB_CONTINUOUS, "thrpt_tok_c" + std::to_string(i));
+//     chVar["thrpt_emp_c" + std::to_string(i)] = milpModel.addVar(
+//         0, 1, 0.0, GRB_CONTINUOUS, "thrpt_emp_c" + std::to_string(i));
+//     channelVars.push_back(chVar);
+//   }
 
-  int i = 0;
-  for (auto unit : units) {
-    std::map<std::string, GRBVar> unitVar;
-    Operation *op = unit->op;
-    unitVar["r_u" + std::to_string(i)] =
-        milpModel.addVar(0, 1, 0.0, GRB_CONTINUOUS, "r_u" + std::to_string(i));
-    unit->ind = i++;
-    unitVars.push_back(unitVar);
-  }
+//   int i = 0;
+//   for (auto unit : units) {
+//     std::map<std::string, GRBVar> unitVar;
+//     Operation *op = unit->op;
+//     unitVar["r_u" + std::to_string(i)] =
+//         milpModel.addVar(0, 1, 0.0, GRB_CONTINUOUS, "r_u" + std::to_string(i));
+//     unit->ind = i++;
+//     unitVars.push_back(unitVar);
+//   }
 
-  return success();
-}
+//   return success();
+// }
 
-LogicalResult buffer::dataFlowCircuit::createMILPPathConstrs(
-    GRBModel &milpModel,
-    std::vector<std::map<std::string, GRBVar>> &channelVars,
-    std::vector<std::map<std::string, GRBVar>> &unitVars) {
+// LogicalResult buffer::dataFlowCircuit::createMILPPathConstrs(
+//     GRBModel &milpModel,
+//     std::vector<std::map<std::string, GRBVar>> &channelVars,
+//     std::vector<std::map<std::string, GRBVar>> &unitVars) {
 
-  for (int i=0; i<channelVars.size(); i++) {
-    std::string tInChannel = "t_c" + std::to_string(i) + "_in";
-    std::string tOutChannel = "t_c" + std::to_string(i) + "_out";
-    // milpModel.addConstr(channelVars[i][tOutChannel]
-    // t_c^{out} >= t_c^{in} + P_{max} R_c
-    milpModel.addConstr(channelVars[i][tOutChannel] >=
-                        channelVars[i][tInChannel] -
-                        maxCP *
-                        channelVars[i]["R_c" + std::to_string(i)]);
-  }
+//   for (int i=0; i<channelVars.size(); i++) {
+//     std::string tInChannel = "t_c" + std::to_string(i) + "_in";
+//     std::string tOutChannel = "t_c" + std::to_string(i) + "_out";
+//     // milpModel.addConstr(channelVars[i][tOutChannel]
+//     // t_c^{out} >= t_c^{in} + P_{max} R_c
+//     milpModel.addConstr(channelVars[i][tOutChannel] >=
+//                         channelVars[i][tInChannel] -
+//                         maxCP *
+//                         channelVars[i]["R_c" + std::to_string(i)]);
+//   }
 
  
-  for (int i=0; i<unitVars.size(); i++) {
-    std::string rUnit = "r_u" + std::to_string(i);
-    unit *u = units[i];
-    double delay = u->delay;
+//   for (int i=0; i<unitVars.size(); i++) {
+//     std::string rUnit = "r_u" + std::to_string(i);
+//     unit *u = units[i];
+//     double delay = u->delay;
 
-     // P >= t_{c2}^{in} & t_{c2}^{in} >= t_{c1}^{out} + D_u
-    for (auto ch1 : u->inChannels) {
-      size_t ch1Ind = findChannelIndex(ch1);
-      std::string tOutChannel = "t_c" + std::to_string(ch1Ind) + "_out";
-      for (auto ch2 : u->outChannels) {
-        size_t ch2Ind = findChannelIndex(ch2);
-        std::string tInChannel = "t_c" + std::to_string(ch2Ind) + "_in";
-        // P >= t_{c2}^{in} 
-        milpModel.addConstr(targetCP >=
-                            channelVars[ch2Ind][tInChannel]);
-        // t_{c2}^{in} >= t_{c1}^{out} + D_u
-        milpModel.addConstr(channelVars[ch2Ind][tInChannel] >=
-                            channelVars[ch1Ind][tOutChannel] + delay);
-      }
-    }
-    // llvm::errs() << "=========path constrs=========\n";
-    // llvm::errs() << "unit: " << *(u->op) << "\n";
-    // llvm::errs() << "inChannels: \n";
-    // for (auto ch : u->inChannels) {
-    //   ch->print();
-    // }
-    // llvm::errs() << "outChannels: \n";
-    //  for (auto ch : u->outChannels) {
-    //   ch->print();
-    // }
-  }
+//      // P >= t_{c2}^{in} & t_{c2}^{in} >= t_{c1}^{out} + D_u
+//     for (auto ch1 : u->inChannels) {
+//       size_t ch1Ind = findChannelIndex(ch1);
+//       std::string tOutChannel = "t_c" + std::to_string(ch1Ind) + "_out";
+//       for (auto ch2 : u->outChannels) {
+//         size_t ch2Ind = findChannelIndex(ch2);
+//         std::string tInChannel = "t_c" + std::to_string(ch2Ind) + "_in";
+//         // P >= t_{c2}^{in} 
+//         milpModel.addConstr(targetCP >=
+//                             channelVars[ch2Ind][tInChannel]);
+//         // t_{c2}^{in} >= t_{c1}^{out} + D_u
+//         milpModel.addConstr(channelVars[ch2Ind][tInChannel] >=
+//                             channelVars[ch1Ind][tOutChannel] + delay);
+//       }
+//     }
+//     // llvm::errs() << "=========path constrs=========\n";
+//     // llvm::errs() << "unit: " << *(u->op) << "\n";
+//     // llvm::errs() << "inChannels: \n";
+//     // for (auto ch : u->inChannels) {
+//     //   ch->print();
+//     // }
+//     // llvm::errs() << "outChannels: \n";
+//     //  for (auto ch : u->outChannels) {
+//     //   ch->print();
+//     // }
+//   }
 
-  return success();
-}
+//   return success();
+// }
 
-LogicalResult buffer::dataFlowCircuit::createMILPThroughputConstrs(
-    GRBModel &milpModel,
-    GRBVar &varThrpt,
-    std::vector<std::map<std::string, GRBVar>> &channelVars,
-    std::vector<std::map<std::string, GRBVar>> &unitVars) {
+// LogicalResult buffer::dataFlowCircuit::createMILPThroughputConstrs(
+//     GRBModel &milpModel,
+//     GRBVar &varThrpt,
+//     std::vector<std::map<std::string, GRBVar>> &channelVars,
+//     std::vector<std::map<std::string, GRBVar>> &unitVars) {
 
-  // GRBVar throughput = milpModel.getVarByName("thrpt");
+//   // GRBVar throughput = milpModel.getVarByName("thrpt");
 
-  for (int i=0; i<channelVars.size(); i++) {
-    std::string thrptTok = "thrpt_tok_c" + std::to_string(i);
-    int isbackedge = channels[i]->isBackEdge ? 1 : 0;
+//   for (int i=0; i<channelVars.size(); i++) {
+//     std::string thrptTok = "thrpt_tok_c" + std::to_string(i);
+//     int isbackedge = channels[i]->isBackEdge ? 1 : 0;
 
-    unit *uSrc = units[findUnitIndex((channels[i]->opSrc).value())];
-    unit *uDst = units[findUnitIndex((channels[i]->opSrc).value())];
+//     unit *uSrc = units[findUnitIndex((channels[i]->opSrc).value())];
+//     unit *uDst = units[findUnitIndex((channels[i]->opSrc).value())];
 
-    int uSrcInd = findUnitIndex((channels[i]->opSrc).value());
-    int uDstInd = findUnitIndex((channels[i]->opDst).value());
-    // \dot{throughput}_c = R_c + r_u^{src} - r_u^{dst}
-    milpModel.addConstr(channelVars[i][thrptTok] == 
-                        isbackedge + 
-                        unitVars[uSrcInd]["r_u" + std::to_string(uSrcInd)] -
-                        unitVars[uDstInd]["r_u" + std::to_string(uDstInd)]);
-    // throughput <= \dot{throughput}_c - R_c + 1
-    milpModel.addConstr(varThrpt <=
-                        channelVars[i][thrptTok] -
-                        channelVars[i]["R_c" + std::to_string(i)] + 1);
+//     int uSrcInd = findUnitIndex((channels[i]->opSrc).value());
+//     int uDstInd = findUnitIndex((channels[i]->opDst).value());
+//     // \dot{throughput}_c = R_c + r_u^{src} - r_u^{dst}
+//     milpModel.addConstr(channelVars[i][thrptTok] == 
+//                         isbackedge + 
+//                         unitVars[uSrcInd]["r_u" + std::to_string(uSrcInd)] -
+//                         unitVars[uDstInd]["r_u" + std::to_string(uDstInd)]);
+//     // throughput <= \dot{throughput}_c - R_c + 1
+//     milpModel.addConstr(varThrpt <=
+//                         channelVars[i][thrptTok] -
+//                         channelVars[i]["R_c" + std::to_string(i)] + 1);
 
-    milpModel.addConstr(channelVars[i]["N_c"+std::to_string(i)] >=
-                        channelVars[i]["R_c" + std::to_string(i)] + 1);
-  }    
+//     milpModel.addConstr(channelVars[i]["N_c"+std::to_string(i)] >=
+//                         channelVars[i]["R_c" + std::to_string(i)] + 1);
+//   }    
 
-  return success();
-}
+//   return success();
+// }
 
-LogicalResult buffer::dataFlowCircuit::defineCostFunction(
-    GRBModel &milpModel,
-    GRBVar &varThrpt,
-    std::vector<std::map<std::string, GRBVar>> &channelVars,
-    std::vector<std::map<std::string, GRBVar>> &unitVars) {
+// LogicalResult buffer::dataFlowCircuit::defineCostFunction(
+//     GRBModel &milpModel,
+//     GRBVar &varThrpt,
+//     std::vector<std::map<std::string, GRBVar>> &channelVars,
+//     std::vector<std::map<std::string, GRBVar>> &unitVars) {
 
-  GRBLinExpr objExpr = varThrpt; 
+//   GRBLinExpr objExpr = varThrpt; 
 
-  double lumbdaCoef = 1e-7;
-  for (int i=0; i<channelVars.size(); i++) {
-    objExpr -= lumbdaCoef * channelVars[i]["N_c" + std::to_string(i)];
-  }
+//   double lumbdaCoef = 1e-7;
+//   for (int i=0; i<channelVars.size(); i++) {
+//     objExpr -= lumbdaCoef * channelVars[i]["N_c" + std::to_string(i)];
+//   }
 
-  milpModel.setObjective(objExpr, GRB_MAXIMIZE);
-  return success();
+//   milpModel.setObjective(objExpr, GRB_MAXIMIZE);
+//   return success();
 
-}
+// }
 
-void buffer::dataFlowCircuit::insertBuffersInChannel
-  (MLIRContext *ctx, channel *ch, bool fifo, int slots) {
-  OpBuilder builder(ctx);
+// void buffer::dataFlowCircuit::insertBuffersInChannel
+//   (MLIRContext *ctx, channel *ch, bool fifo, int slots) {
+//   OpBuilder builder(ctx);
 
-  Operation *opSrc = ch->opSrc.value();
-  Operation *opDst = ch->opDst.value();
+//   Operation *opSrc = ch->opSrc.value();
+//   Operation *opDst = ch->opDst.value();
 
-  builder.setInsertionPointAfter(opSrc);
-  auto bufferOp = builder.create<handshake::BufferOp>
-                    (opSrc->getLoc(),
-                     opSrc->getResult(0).getType(),
-                     opSrc->getResult(0));
+//   builder.setInsertionPointAfter(opSrc);
+//   auto bufferOp = builder.create<handshake::BufferOp>
+//                     (opSrc->getLoc(),
+//                      opSrc->getResult(0).getType(),
+//                      opSrc->getResult(0));
 
-  if (fifo)
-    bufferOp.setBufferType(BufferTypeEnum::fifo);
-  else
-    bufferOp.setBufferType(BufferTypeEnum::seq);
-  bufferOp.setSlots(slots);
-  opSrc->getResult(0).replaceUsesWithIf(bufferOp.getResult(),
-                                        [&](OpOperand &operand) {
-                                          // return true;
-                                          return operand.getOwner() == opDst;
-                                        });
-  // llvm::errs() << "Inserted " << slots << " buffer: ";
-}
+//   if (fifo)
+//     bufferOp.setBufferType(BufferTypeEnum::fifo);
+//   else
+//     bufferOp.setBufferType(BufferTypeEnum::seq);
+//   bufferOp.setSlots(slots);
+//   opSrc->getResult(0).replaceUsesWithIf(bufferOp.getResult(),
+//                                         [&](OpOperand &operand) {
+//                                           // return true;
+//                                           return operand.getOwner() == opDst;
+//                                         });
+//   // llvm::errs() << "Inserted " << slots << " buffer: ";
+// }
 
-LogicalResult buffer::dataFlowCircuit::instantiateBuffers(
-  MLIRContext *ctx,
-  GRBModel &milpModel,
-  GRBVar &varThrpt,
-  std::vector<std::map<std::string, GRBVar>> &channelVars,
-  std::vector<std::map<std::string, GRBVar>> &unitVars) {
+// LogicalResult buffer::dataFlowCircuit::instantiateBuffers(
+//   MLIRContext *ctx,
+//   GRBModel &milpModel,
+//   GRBVar &varThrpt,
+//   std::vector<std::map<std::string, GRBVar>> &channelVars,
+//   std::vector<std::map<std::string, GRBVar>> &unitVars) {
 
-  double x = varThrpt.get(GRB_DoubleAttr_X);
-  llvm::errs() << "Thourghput: " << varThrpt.get(GRB_DoubleAttr_X) << "\n";
-  // varThrpt.get(GRB_DoubleAttr_X);
+//   double x = varThrpt.get(GRB_DoubleAttr_X);
+//   llvm::errs() << "Thourghput: " << varThrpt.get(GRB_DoubleAttr_X) << "\n";
+//   // varThrpt.get(GRB_DoubleAttr_X);
 
-  for (int i=0; i<channelVars.size(); i++) {
-    auto N_c = channelVars[i]["N_c" + std::to_string(i)].get(GRB_DoubleAttr_X);
-    int N_c_int = (int) N_c;
-    auto R_c = channelVars[i]["R_c" + std::to_string(i)].get(GRB_DoubleAttr_X);
-    if (N_c_int > 0 && R_c>0) 
-      insertBuffersInChannel(ctx, channels[i], true, N_c_int-1);
+//   for (int i=0; i<channelVars.size(); i++) {
+//     auto N_c = channelVars[i]["N_c" + std::to_string(i)].get(GRB_DoubleAttr_X);
+//     int N_c_int = (int) N_c;
+//     auto R_c = channelVars[i]["R_c" + std::to_string(i)].get(GRB_DoubleAttr_X);
+//     if (N_c_int > 0 && R_c>0) 
+//       insertBuffersInChannel(ctx, channels[i], true, N_c_int-1);
 
-    if (N_c_int > 1 && R_c ==0) {
-      insertBuffersInChannel(ctx, channels[i], false, N_c_int-1);
-    }
+//     if (N_c_int > 1 && R_c ==0) {
+//       insertBuffersInChannel(ctx, channels[i], false, N_c_int-1);
+//     }
 
-    // if (R_c > 0) 
-    //     llvm::errs() << " : sequential\n";
-    // else 
-    //     llvm::errs() << " : transparent\n";
+//     // if (R_c > 0) 
+//     //     llvm::errs() << " : sequential\n";
+//     // else 
+//     //     llvm::errs() << " : transparent\n";
   
-  }
+//   }
 
-    return success();
-}
+//     return success();
+// }
