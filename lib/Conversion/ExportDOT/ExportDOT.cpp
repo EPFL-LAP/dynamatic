@@ -482,13 +482,15 @@ static std::string getInputForMC(handshake::MemoryControllerOp op) {
   size_t operandIdx = 0;
   ValueRange inputs = op.getInputs();
 
-  for (auto [idx, blockAccesses] : llvm::enumerate(op.getAccesses())) {
-    // Add control signal if present
+  // Add all control signals first
+  for (auto [idx, blockAccesses] : llvm::enumerate(op.getAccesses()))
     if (op.bbHasControl(idx))
       allPorts.push_back(std::make_tuple("in" + std::to_string(inputIdx++),
                                          inputs[operandIdx++],
                                          "c" + std::to_string(ctrlIdx++)));
 
+  // Then all memory access signals
+  for (auto [idx, blockAccesses] : llvm::enumerate(op.getAccesses())) {
     // Add loads and stores, in program order
     for (auto &access : cast<mlir::ArrayAttr>(blockAccesses))
       if (cast<AccessTypeEnumAttr>(access).getValue() == AccessTypeEnum::Load)
@@ -1340,10 +1342,15 @@ LogicalResult ExportDOTPass::printFunc(mlir::raw_indented_ostream &os,
   // Print nodes corresponding to function operations
   os << "// Function operations\n";
   for (auto &op : funcOp.getOps()) {
-    // Give a unique name to each operation
+    // Give a unique name to each operation. Extract operation name without
+    // dialect prefix if possible and then append an ID unique to each operation
+    // type
     std::string opFullName = op.getName().getStringRef().str();
-    std::replace(opFullName.begin(), opFullName.end(), '.', '_');
-    opNameMap[&op] = opFullName + std::to_string(opIDs[&op]);
+    auto startIdx = opFullName.find('.');
+    if (startIdx == std::string::npos)
+      startIdx = 0;
+    auto opID = std::to_string(opIDs[&op]);
+    opNameMap[&op] = opFullName.substr(startIdx + 1) + opID;
 
     // Print the operation
     if (auto instOp = dyn_cast<handshake::InstanceOp>(op); instOp)

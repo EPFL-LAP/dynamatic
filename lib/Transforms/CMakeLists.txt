@@ -1,5 +1,6 @@
 add_dynamatic_library(DynamaticTransforms
   # ArithOptimizeArea.cpp
+  ArithReduceArea.cpp
   AnalyzeMemoryAccesses.cpp
   FlattenMemRefRowMajor.cpp
   HandshakePrepareForLegacy.cpp
@@ -8,6 +9,11 @@ add_dynamatic_library(DynamaticTransforms
   NameMemoryOps.cpp
   PushConstants.cpp
   UtilsForPlaceBuffers.cpp
+  UtilsBitsUpdate.cpp
+  OptimizeBits.cpp
+  InitIndexType.cpp
+  InitCstWidth.cpp
+  ScfRotateForLoops.cpp
 
   DEPENDS
   DynamaticTransformsPassIncGen

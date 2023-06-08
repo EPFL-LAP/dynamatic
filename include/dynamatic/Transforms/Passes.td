@@ -11,6 +11,34 @@ include "mlir/Pass/PassBase.td"
 
 
 //===----------------------------------------------------------------------===//
+// Arith passes
+//===----------------------------------------------------------------------===//
+
+def ArithReduceArea : Pass<"arith-reduce-area", "mlir::ModuleOp"> {
+  let summary = "Reduces area taken up by arithmetic operations.";
+  let description = [{
+    Optimizes arithmetic operations to reduce the total area taken up by the
+    circuit that will be generated for the module.
+  }];
+  let constructor = "dynamatic::createArithReduceArea()";
+}
+
+//===----------------------------------------------------------------------===//
+// SCF passes
+//===----------------------------------------------------------------------===//
+
+def ScfForLoopRotation : Pass<"scf-rotate-for-loops", "mlir::ModuleOp"> {
+  let summary = "Transforms eligible for loops into do-while's";
+  let description = [{
+    Rotates for loops, semantically transforming them into do-while's, whenever
+    it can be determined that they execute at least once. The resulting loop at
+    the std level usually has one less basic block than the original for loop
+    would have had, which ultimately reduces the area of the final circuit.  
+  }];
+  let constructor = "dynamatic::createScfRotateForLoops()";
+}
+
+//===----------------------------------------------------------------------===//
 // Handshake passes
 //===----------------------------------------------------------------------===//
 
@@ -119,6 +147,34 @@ def PlaceBuffers : Pass<"place-buffers", "mlir::ModuleOp"> {
    
   }];
   let constructor = "dynamatic::createHandshakePlaceBuffersPass()";
+}
+
+def HandshakeOptimizeBits : Pass<"optimize-bits" , "mlir::ModuleOp"> {
+  let summary = "Optimize bits width that can be reduced.";
+  let description = [{
+    This pass goes through all operations inside handshake levels, and optimize the bit width through the forward (from first operation to last), and backward(from last operation to first) loop process. 
+    The loop continues until no more optimization can be done.
+  }];
+  let constructor = "dynamatic::createOptimizeBitsPass()";
+  let dependentDialects = ["mlir::arith::ArithDialect"];
+}
+
+def HandshakeInitIndType : Pass<"init-indtype", "mlir::ModuleOp"> {
+  let summary = "Initialize the index type of the module.";
+  let description = [{
+    This pass change all the index type within operands and result operands to integer type with platform dependent bit width.
+  }];
+  let constructor = "dynamatic::createInitIndTypePass()";
+}
+
+def HandshakeInitCstWidth : Pass<"init-cstwidth", "mlir::ModuleOp"> {
+  let summary = "Initialize the constant bit witth of the module.";
+  let description = [{
+    This pass rewrites constant operation with the minimum required bit width according to the value of the constant. To ensure the consistency with the user of the constant operation, the pass inserts a extension operation if necessary. 
+  }];
+  let constructor = "dynamatic::createInitCstWidthPass()";
+  let dependentDialects = ["mlir::arith::ArithDialect"];
+
 }
 
 #endif // DYNAMATIC_TRANSFORMS_PASSES_TD
