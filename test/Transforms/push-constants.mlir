@@ -2,50 +2,59 @@
 // RUN: dynamatic-opt --push-constants %s --split-input-file | FileCheck %s
 
 // CHECK-LABEL:   func.func @doNothing(
-// CHECK-SAME:                         %[[VAL_0:.*]]: i1) {
-// CHECK:           cf.cond_br %[[VAL_0]], ^bb1, ^bb2
+// CHECK-SAME:                         %[[VAL_0:.*]]: i32) -> i32 {
+// CHECK:           %[[VAL_1:.*]] = arith.constant 10 : i32
+// CHECK:           %[[VAL_2:.*]] = arith.cmpi eq, %[[VAL_0]], %[[VAL_1]] : i32
+// CHECK:           cf.cond_br %[[VAL_2]], ^bb1, ^bb2
 // CHECK:         ^bb1:
-// CHECK:           return
+// CHECK:           %[[VAL_3:.*]] = arith.constant 1 : i32
+// CHECK:           return %[[VAL_3]] : i32
 // CHECK:         ^bb2:
-// CHECK:           return
+// CHECK:           %[[VAL_4:.*]] = arith.constant 0 : i32
+// CHECK:           return %[[VAL_4]] : i32
 // CHECK:         }
-func.func @doNothing(%arg0: i1) {
-  %c0 = arith.constant 0 : i32
-  cf.cond_br %arg0, ^bb1, ^bb2
+func.func @doNothing(%arg0: i32) -> i32 {
+  %c10 = arith.constant 10 : i32
+  %eq = arith.cmpi eq, %arg0, %c10 : i32
+  cf.cond_br %eq, ^bb1, ^bb2
 ^bb1:
   %c1 = arith.constant 1 : i32
-  return
+  return %c1 : i32
 ^bb2:
-  %c2 = arith.constant 2 : i32
-  return
+  %c0 = arith.constant 0 : i32
+  return %c0 : i32
 }
 
 // -----
 
 // CHECK-LABEL:   func.func @simplePush(
-// CHECK-SAME:                          %[[VAL_0:.*]]: i1) -> i32 {
-// CHECK:           cf.cond_br %[[VAL_0]], ^bb1, ^bb2
+// CHECK-SAME:                          %[[VAL_0:.*]]: i32) -> i32 {
+// CHECK:           %[[VAL_1:.*]] = arith.constant 10 : i32
+// CHECK:           %[[VAL_2:.*]] = arith.cmpi eq, %[[VAL_0]], %[[VAL_1]] : i32
+// CHECK:           cf.cond_br %[[VAL_2]], ^bb1, ^bb2
 // CHECK:         ^bb1:
-// CHECK:           %[[VAL_1:.*]] = arith.constant 0 : i32
-// CHECK:           return %[[VAL_1]] : i32
+// CHECK:           %[[VAL_3:.*]] = arith.constant 10 : i32
+// CHECK:           return %[[VAL_3]] : i32
 // CHECK:         ^bb2:
-// CHECK:           %[[VAL_2:.*]] = arith.constant 1 : i32
-// CHECK:           return %[[VAL_2]] : i32
+// CHECK:           %[[VAL_4:.*]] = arith.constant 10 : i32
+// CHECK:           %[[VAL_5:.*]] = arith.subi %[[VAL_4]], %[[VAL_4]] : i32
+// CHECK:           return %[[VAL_5]] : i32
 // CHECK:         }
-func.func @simplePush(%arg0: i1) -> i32 {
-  %c0 = arith.constant 0 : i32
-  %c1 = arith.constant 1 : i32  
-  cf.cond_br %arg0, ^bb1, ^bb2
+func.func @simplePush(%arg0: i32) -> i32 {
+  %c10 = arith.constant 10 : i32
+  %eq = arith.cmpi eq, %arg0, %c10 : i32
+  cf.cond_br %eq, ^bb1, ^bb2
 ^bb1:
-  return %c0 : i32
+  return %c10 : i32
 ^bb2:
-  return %c1 : i32
+  %sub = arith.subi %c10, %c10 : i32
+  return %sub : i32
 }
 
 // -----
 
-// CHECK-LABEL:   func.func @deleteOriginal(
-// CHECK-SAME:                              %[[VAL_0:.*]]: i1) -> i32 {
+// CHECK-LABEL:   func.func @pushAndDelete(
+// CHECK-SAME:                             %[[VAL_0:.*]]: i1) -> i32 {
 // CHECK:           cf.cond_br %[[VAL_0]], ^bb1, ^bb2
 // CHECK:         ^bb1:
 // CHECK:           %[[VAL_1:.*]] = arith.constant 0 : i32
@@ -54,7 +63,7 @@ func.func @simplePush(%arg0: i1) -> i32 {
 // CHECK:           %[[VAL_2:.*]] = arith.constant 1 : i32
 // CHECK:           return %[[VAL_2]] : i32
 // CHECK:         }
-func.func @deleteOriginal(%arg0: i1) -> i32 {
+func.func @pushAndDelete(%arg0: i1) -> i32 {
   %c0 = arith.constant 0 : i32
   %c1 = arith.constant 1 : i32
   cf.cond_br %arg0, ^bb1, ^bb2
@@ -63,4 +72,3 @@ func.func @deleteOriginal(%arg0: i1) -> i32 {
 ^bb2:
   return %c1 : i32
 }
-
