@@ -45,6 +45,10 @@ static LogicalResult insertBuffers(handshake::FuncOp funcOp,
   }
 
   // speficy by a flag, read the bb file 
+  if (ccfile=="")
+    llvm::errs() << "No bb file specified, use the default bb file\n";
+  else
+    llvm::errs() << "Use the bb file: " << ccfile << "\n";
 
   // extractCFDFCircuit(unitList, bbIndexList, maxBBInd);
   return success();
