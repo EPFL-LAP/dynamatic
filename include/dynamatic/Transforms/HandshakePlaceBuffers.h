@@ -14,7 +14,7 @@
 namespace dynamatic {
 
 std::unique_ptr<mlir::OperationPass<mlir::ModuleOp>>
-createHandshakePlaceBuffersPass();
+createHandshakePlaceBuffersPass(std::string ccfile = "");
 
 } // namespace dynamatic
 

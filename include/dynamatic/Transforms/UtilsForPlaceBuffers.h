@@ -16,11 +16,11 @@
 #include <map>
 #include <optional>
 
-using namespace circt;
-using namespace circt::handshake;
-
 namespace dynamatic {
 namespace buffer {
+
+using namespace circt;
+using namespace circt::handshake;
 
 struct arch;
 struct channel;
@@ -254,5 +254,8 @@ struct dataFlowCircuit {
                                   std::vector<std::map<std::string, GRBVar>> &channelVars,
                                   std::vector<std::map<std::string, GRBVar>> &unitVars);
 };
+
+} // namespace handshake
+} // namespace circt
 
 #endif // DYNAMATIC_TRANSFORMS_UTILSFORPLACEBUFFERS_H

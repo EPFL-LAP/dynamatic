@@ -23,11 +23,12 @@ using namespace mlir;
 using namespace dynamatic;
 using namespace dynamatic::buffer;
 
-static LogicalResult insertBuffers(handshake::FuncOp funcOp, MLIRContext *ctx) {
+static LogicalResult insertBuffers(handshake::FuncOp funcOp, 
+                                   MLIRContext *ctx,
+                                   std::string ccfile) {
 
   std::vector<Operation *> visitedOpList;
-  std::vector<unsigned> bbIndexList;
-  // std::vector<basicBlock *> bbList;
+  // std::vector<unsigned> bbIndexList;
   std::vector<unit *> unitList;
 
   unsigned maxBBInd = 0;
@@ -38,12 +39,14 @@ static LogicalResult insertBuffers(handshake::FuncOp funcOp, MLIRContext *ctx) {
   for (auto &op : funcOp.getOps()) {
     unsigned bbInd = getBBIndex(&op); 
     if (isEntryOp(&op, visitedOpList))
-      dfsHandshakeGraph(&op, visitedOpList, unitList);
+      dfsHandshakeGraph(&op, unitList, visitedOpList);
     if (bbInd != UINT_MAX && bbInd > maxBBInd)
       maxBBInd = bbInd;
   }
 
   // speficy by a flag, read the bb file 
+
+  // extractCFDFCircuit(unitList, bbIndexList, maxBBInd);
   return success();
 }
 
@@ -53,17 +56,21 @@ namespace {
 /// Simple driver for prepare for legacy pass.
 struct PlaceBuffersPass : public PlaceBuffersBase<PlaceBuffersPass> {
 
+  PlaceBuffersPass(std::string ccfile) {
+    this->ccfile = ccfile;
+  }
+  
   void runOnOperation() override {
     ModuleOp m = getOperation();
 
     for (auto funcOp : m.getOps<handshake::FuncOp>())
-      if (failed(insertBuffers(funcOp, &getContext())))
+      if (failed(insertBuffers(funcOp, &getContext(), ccfile)))
         return signalPassFailure();
   };
 };
 } // namespace
 
 std::unique_ptr<mlir::OperationPass<mlir::ModuleOp>>
-dynamatic::createHandshakePlaceBuffersPass() {
-  return std::make_unique<PlaceBuffersPass>();
+dynamatic::createHandshakePlaceBuffersPass(std::string ccfile) {
+  return std::make_unique<PlaceBuffersPass>(ccfile);
 }
