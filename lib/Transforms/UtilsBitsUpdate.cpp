@@ -171,16 +171,6 @@ void constructForwardFuncMap(
 
         return indexWidth;
       };
-
-  // mapOpNameWidth[handshake::BranchOp::getOperationName()] = 
-  //   [](Operation::operand_range vecOperands) {
-  //     return vecOperands[0].getType().getIntOrFloatBitWidth();
-  //   };
-
-  // mapOpNameWidth[handshake::ConditionalBranchOp::getOperationName()] = 
-  //   [](Operation::operand_range vecOperands) {
-  //     return vecOperands[1].getType().getIntOrFloatBitWidth();
-  //   };
 };
 
 void constructBackwardFuncMap(
@@ -393,7 +383,7 @@ void constructUpdateFuncMap(
         return widths;
       };
 
-  mapOpNameWidth[StringRef("handshake.merge")] =
+  mapOpNameWidth[handshake::MergeOp::getOperationName()] =
       [&](Operation::operand_range vecOperands,
           Operation::result_range vecResults) {
         std::vector<std::vector<unsigned>> widths;
@@ -426,7 +416,7 @@ void constructUpdateFuncMap(
         return widths;
       };
 
-  mapOpNameWidth[StringRef("handshake.constant")] =
+  mapOpNameWidth[handshake::ConstantOp::getOperationName()] =
       [&](Operation::operand_range vecOperands,
           Operation::result_range vecResults) {
         std::vector<std::vector<unsigned>> widths;
@@ -444,7 +434,7 @@ void constructUpdateFuncMap(
         return widths;
       };
 
-  mapOpNameWidth[StringRef("handshake.control_merge")] =
+  mapOpNameWidth[handshake::ControlMergeOp::getOperationName()] =
       [&](Operation::operand_range vecOperands,
           Operation::result_range vecResults) {
         std::vector<std::vector<unsigned>> widths;
@@ -512,7 +502,7 @@ void constructUpdateFuncMap(
         return widths;
       };
 
-  mapOpNameWidth[StringRef("handshake.d_return")] =
+  mapOpNameWidth[handshake::DynamaticReturnOp::getOperationName()] =
       [&](Operation::operand_range vecOperands,
           Operation::result_range vecResults) {
         std::vector<std::vector<unsigned>> widths;
@@ -524,7 +514,7 @@ void constructUpdateFuncMap(
         return widths;
       };
 
-  mapOpNameWidth[StringRef("handshake.d_load")] =
+  mapOpNameWidth[handshake::DynamaticLoadOp::getOperationName()] =
       [&](Operation::operand_range vecOperands,
           Operation::result_range vecResults) {
         std::vector<std::vector<unsigned>> widths;
@@ -533,8 +523,8 @@ void constructUpdateFuncMap(
         return widths;
       };
 
-  mapOpNameWidth[StringRef("handshake.d_store")] =
-      mapOpNameWidth[StringRef("handshake.d_load")];
+  mapOpNameWidth[handshake::DynamaticStoreOp::getOperationName()] =
+      mapOpNameWidth[handshake::DynamaticLoadOp::getOperationName()];
 };
 
 static bool setPassFlag(Operation *op) {
@@ -615,15 +605,13 @@ void revertTruncOrExt(Operation *op, MLIRContext *ctx) {
     if (op->getResult(0).getType().getIntOrFloatBitWidth() <
         op->getOperand(0).getType().getIntOrFloatBitWidth()) {
 
-      // builder.setInsertionPoint(op);
-      // Type newType =
-      //     getNewType(op->getResult(0),
-      //                op->getResult(0).getType().getIntOrFloatBitWidth(), false);
-      // auto truncOp = builder.create<mlir::arith::TruncIOp>(
-      //     op->getLoc(), newType, op->getOperand(0));
-      // op->getResult(0).replaceAllUsesWith(truncOp.getResult());
-      replaceWithPredecessor(op);
-
+      builder.setInsertionPoint(op);
+      Type newType =
+          getNewType(op->getResult(0),
+                     op->getResult(0).getType().getIntOrFloatBitWidth(), false);
+      auto truncOp = builder.create<mlir::arith::TruncIOp>(
+          op->getLoc(), newType, op->getOperand(0));
+      op->getResult(0).replaceAllUsesWith(truncOp.getResult());
       op->erase();
       return;
     }
@@ -634,15 +622,13 @@ void revertTruncOrExt(Operation *op, MLIRContext *ctx) {
     if (op->getResult(0).getType().getIntOrFloatBitWidth() >
         op->getOperand(0).getType().getIntOrFloatBitWidth()) {
 
-      // builder.setInsertionPoint(op);
-      // Type newType =
-      //     getNewType(op->getResult(0),
-      //                op->getResult(0).getType().getIntOrFloatBitWidth(), false);
-      // auto truncOp = builder.create<mlir::arith::ExtSIOp>(op->getLoc(), newType,
-      //                                                     op->getOperand(0));
-      // op->getResult(0).replaceAllUsesWith(truncOp.getResult());
-      replaceWithPredecessor(op);
-
+      builder.setInsertionPoint(op);
+      Type newType =
+          getNewType(op->getResult(0),
+                     op->getResult(0).getType().getIntOrFloatBitWidth(), false);
+      auto truncOp = builder.create<mlir::arith::ExtSIOp>(op->getLoc(), newType,
+                                                          op->getOperand(0));
+      op->getResult(0).replaceAllUsesWith(truncOp.getResult());
       op->erase();
     }
 }
