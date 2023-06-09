@@ -162,7 +162,7 @@ void constructForwardFuncMap(
   mapOpNameWidth[mlir::arith::ExtUIOp::getOperationName()] =
       mapOpNameWidth[mlir::arith::ExtSIOp::getOperationName()];
 
-  mapOpNameWidth[StringRef("handshake.control_merge")] =
+  mapOpNameWidth[handshake::ControlMergeOp::getOperationName()] =
       [](Operation::operand_range vecOperands) {
         unsigned ind = vecOperands.size(); // record number of operators
         unsigned indexWidth = 1;
@@ -171,6 +171,16 @@ void constructForwardFuncMap(
 
         return indexWidth;
       };
+
+  // mapOpNameWidth[handshake::BranchOp::getOperationName()] = 
+  //   [](Operation::operand_range vecOperands) {
+  //     return vecOperands[0].getType().getIntOrFloatBitWidth();
+  //   };
+
+  // mapOpNameWidth[handshake::ConditionalBranchOp::getOperationName()] = 
+  //   [](Operation::operand_range vecOperands) {
+  //     return vecOperands[1].getType().getIntOrFloatBitWidth();
+  //   };
 };
 
 void constructBackwardFuncMap(
@@ -340,7 +350,7 @@ void constructUpdateFuncMap(
         return widths;
       };
 
-  mapOpNameWidth[StringRef("handshake.mux")] =
+  mapOpNameWidth[handshake::MuxOp::getOperationName()] =
       [&](Operation::operand_range vecOperands,
           Operation::result_range vecResults) {
         std::vector<std::vector<unsigned>> widths;
@@ -605,13 +615,15 @@ void revertTruncOrExt(Operation *op, MLIRContext *ctx) {
     if (op->getResult(0).getType().getIntOrFloatBitWidth() <
         op->getOperand(0).getType().getIntOrFloatBitWidth()) {
 
-      builder.setInsertionPoint(op);
-      Type newType =
-          getNewType(op->getResult(0),
-                     op->getResult(0).getType().getIntOrFloatBitWidth(), false);
-      auto truncOp = builder.create<mlir::arith::TruncIOp>(
-          op->getLoc(), newType, op->getOperand(0));
-      op->getResult(0).replaceAllUsesWith(truncOp.getResult());
+      // builder.setInsertionPoint(op);
+      // Type newType =
+      //     getNewType(op->getResult(0),
+      //                op->getResult(0).getType().getIntOrFloatBitWidth(), false);
+      // auto truncOp = builder.create<mlir::arith::TruncIOp>(
+      //     op->getLoc(), newType, op->getOperand(0));
+      // op->getResult(0).replaceAllUsesWith(truncOp.getResult());
+      replaceWithPredecessor(op);
+
       op->erase();
       return;
     }
@@ -622,13 +634,15 @@ void revertTruncOrExt(Operation *op, MLIRContext *ctx) {
     if (op->getResult(0).getType().getIntOrFloatBitWidth() >
         op->getOperand(0).getType().getIntOrFloatBitWidth()) {
 
-      builder.setInsertionPoint(op);
-      Type newType =
-          getNewType(op->getResult(0),
-                     op->getResult(0).getType().getIntOrFloatBitWidth(), false);
-      auto truncOp = builder.create<mlir::arith::ExtSIOp>(op->getLoc(), newType,
-                                                          op->getOperand(0));
-      op->getResult(0).replaceAllUsesWith(truncOp.getResult());
+      // builder.setInsertionPoint(op);
+      // Type newType =
+      //     getNewType(op->getResult(0),
+      //                op->getResult(0).getType().getIntOrFloatBitWidth(), false);
+      // auto truncOp = builder.create<mlir::arith::ExtSIOp>(op->getLoc(), newType,
+      //                                                     op->getOperand(0));
+      // op->getResult(0).replaceAllUsesWith(truncOp.getResult());
+      replaceWithPredecessor(op);
+
       op->erase();
     }
 }
@@ -681,7 +695,11 @@ void validateOp(Operation *op, MLIRContext *ctx,
   bool revert = setRevertFlag(op);
 
   if (pass)
-    propType(op);
+    // Validate the successor operations 
+    // influenced by the bit width propagation 
+    if(propType(op))
+      for (auto resOp : op->getResults().getUsers())
+          validateOp(resOp, ctx, newMatchedOps);
 
   if (match)
     matchOpResWidth(op, ctx, newMatchedOps);

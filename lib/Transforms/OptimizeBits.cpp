@@ -127,7 +127,9 @@ static LogicalResult rewriteBitsWidths(handshake::FuncOp funcOp,
   // Store new inserted truncation or extension operation during validation
   SmallVector<Operation *> OpTruncExt;
   for (auto &op : llvm::make_early_inc_range(funcOp.getOps()))
+  {llvm::errs() << op << "\n";
     bitwidth::validateOp(&op, ctx, OpTruncExt);
+    }
   
   // Validate the new inserted operation
   for (auto op : OpTruncExt) 
@@ -135,6 +137,8 @@ static LogicalResult rewriteBitsWidths(handshake::FuncOp funcOp,
 
   LLVM_DEBUG(llvm::errs() << "Forward-Backward saved bits " << savedBits << "\n");
 
+  for (auto &op : funcOp.getOps()) 
+      llvm::errs() << op << "\n";
   return success();
 }
 
