@@ -46,21 +46,6 @@ def StandardToHandshakeFPGA18 : Pass<"lower-std-to-handshake-fpga18", "mlir::Mod
 }
 
 //===----------------------------------------------------------------------===//
-// StandardToHandshakeFPGA18
-//===----------------------------------------------------------------------===//
-
-def ExportCFG : Pass<"export-cfg", "mlir::ModuleOp"> {
-  let summary = "Exports the CFG of a standard-level function";
-  let description = [{
-    Exports a CFG graph corresponding to the function present in the module. The
-    pass only supports one function at the moment and will fail if more than one
-    function exists in the module.
-  }];
-  let constructor = "dynamatic::createExportCFGPass()";
-}
-
-
-//===----------------------------------------------------------------------===//
 // ExportDOT
 //===----------------------------------------------------------------------===//
 

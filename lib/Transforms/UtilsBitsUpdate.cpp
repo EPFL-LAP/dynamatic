@@ -164,11 +164,7 @@ void constructForwardFuncMap(
 
   mapOpNameWidth[StringRef("handshake.control_merge")] =
       [](Operation::operand_range vecOperands) {
-        unsigned ind = 0; // record number of operators
-
-        for (auto oprand : vecOperands)
-          ind++;
-
+        unsigned ind = vecOperands.size(); // record number of operators
         unsigned indexWidth = 1;
         if (ind > 1)
           indexWidth = ceil(log2(ind));
@@ -540,22 +536,22 @@ static bool setPassFlag(Operation *op) {
 
 static bool setMatchFlag(Operation *op) {
   return llvm::TypeSwitch<Operation *, bool>(op)
-    .Case<mlir::arith::AddIOp, mlir::arith::SubIOp, mlir::arith::MulIOp,
-          mlir::arith::ShLIOp, mlir::arith::ShRSIOp, mlir::arith::ShRUIOp,
-          mlir::arith::DivSIOp, mlir::arith::DivUIOp, mlir::arith::CmpIOp,
-          mlir::arith::ShRSIOp, handshake::MuxOp, handshake::MergeOp,
-          mlir::arith::SelectOp, handshake::ConstantOp,
-          handshake::DynamaticLoadOp, handshake::DynamaticStoreOp,
-          handshake::ControlMergeOp, handshake::DynamaticReturnOp>(
-        [](Operation *op) { return true; })
-    .Default([&](auto) { return false; });
+      .Case<mlir::arith::AddIOp, mlir::arith::SubIOp, mlir::arith::MulIOp,
+            mlir::arith::ShLIOp, mlir::arith::ShRSIOp, mlir::arith::ShRUIOp,
+            mlir::arith::DivSIOp, mlir::arith::DivUIOp, mlir::arith::CmpIOp,
+            mlir::arith::ShRSIOp, handshake::MuxOp, handshake::MergeOp,
+            mlir::arith::SelectOp, handshake::ConstantOp,
+            handshake::DynamaticLoadOp, handshake::DynamaticStoreOp,
+            handshake::ControlMergeOp, handshake::DynamaticReturnOp>(
+          [](Operation *op) { return true; })
+      .Default([&](auto) { return false; });
 }
 
 static bool setRevertFlag(Operation *op) {
   return llvm::TypeSwitch<Operation *, bool>(op)
-    .Case<mlir::arith::TruncIOp, mlir::arith::ExtSIOp, mlir::arith::ExtUIOp>(
-        [](Operation *op) { return true; })
-    .Default([&](auto) { return false; });
+      .Case<mlir::arith::TruncIOp, mlir::arith::ExtSIOp, mlir::arith::ExtUIOp>(
+          [](Operation *op) { return true; })
+      .Default([&](auto) { return false; });
 }
 
 bool propType(Operation *op) {
@@ -591,23 +587,23 @@ void replaceWithPredecessor(Operation *op, Type resType) {
   op->getResult(0).replaceAllUsesWith(op->getOperand(0));
 }
 
-void revertTruncOrExt(Operation *op , MLIRContext *ctx) {
+void revertTruncOrExt(Operation *op, MLIRContext *ctx) {
   OpBuilder builder(ctx);
   // if width(res) == width(opr) : delte the operand;
 
-  if (op ->getResult(0).getType().getIntOrFloatBitWidth() ==
-      op ->getOperand(0).getType().getIntOrFloatBitWidth()) {
+  if (op->getResult(0).getType().getIntOrFloatBitWidth() ==
+      op->getOperand(0).getType().getIntOrFloatBitWidth()) {
 
-    replaceWithPredecessor(op );
-    op ->erase();
+    replaceWithPredecessor(op);
+    op->erase();
     return;
   }
 
   // if for extension operation width(res) < width(opr),
   // change it to truncation operation
-  if (isa<mlir::arith::ExtSIOp>(*op ) || isa<mlir::arith::ExtUIOp>(*op ))
-    if (op ->getResult(0).getType().getIntOrFloatBitWidth() <
-        op ->getOperand(0).getType().getIntOrFloatBitWidth()) {
+  if (isa<mlir::arith::ExtSIOp>(*op) || isa<mlir::arith::ExtUIOp>(*op))
+    if (op->getResult(0).getType().getIntOrFloatBitWidth() <
+        op->getOperand(0).getType().getIntOrFloatBitWidth()) {
 
       builder.setInsertionPoint(op);
       Type newType =
@@ -685,7 +681,7 @@ void validateOp(Operation *op, MLIRContext *ctx,
   bool revert = setRevertFlag(op);
 
   if (pass)
-    bool res = propType(op);
+    propType(op);
 
   if (match)
     matchOpResWidth(op, ctx, newMatchedOps);
@@ -693,4 +689,4 @@ void validateOp(Operation *op, MLIRContext *ctx,
   if (revert)
     revertTruncOrExt(op, ctx);
 }
-} // namespace dynamatic::update
+} // namespace dynamatic::bitwidth

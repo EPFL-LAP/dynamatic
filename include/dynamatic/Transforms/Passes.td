@@ -11,6 +11,34 @@ include "mlir/Pass/PassBase.td"
 
 
 //===----------------------------------------------------------------------===//
+// Arith passes
+//===----------------------------------------------------------------------===//
+
+def ArithReduceArea : Pass<"arith-reduce-area", "mlir::ModuleOp"> {
+  let summary = "Reduces area taken up by arithmetic operations.";
+  let description = [{
+    Optimizes arithmetic operations to reduce the total area taken up by the
+    circuit that will be generated for the module.
+  }];
+  let constructor = "dynamatic::createArithReduceArea()";
+}
+
+//===----------------------------------------------------------------------===//
+// SCF passes
+//===----------------------------------------------------------------------===//
+
+def ScfForLoopRotation : Pass<"scf-rotate-for-loops", "mlir::ModuleOp"> {
+  let summary = "Transforms eligible for loops into do-while's";
+  let description = [{
+    Rotates for loops, semantically transforming them into do-while's, whenever
+    it can be determined that they execute at least once. The resulting loop at
+    the std level usually has one less basic block than the original for loop
+    would have had, which ultimately reduces the area of the final circuit.  
+  }];
+  let constructor = "dynamatic::createScfRotateForLoops()";
+}
+
+//===----------------------------------------------------------------------===//
 // Handshake passes
 //===----------------------------------------------------------------------===//
 

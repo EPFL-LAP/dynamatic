@@ -20,8 +20,7 @@ func.func @memInterfaceNoID(%arg0: memref<4xi32>, %arg1: index) -> i32 {
 // -----
 
 // CHECK-LABEL:   handshake.func @ifThenElse(
-// CHECK-SAME:                               %[[VAL_0:.*]]: i32,
-// CHECK-SAME:                               %[[VAL_1:.*]]: i1,
+// CHECK-SAME:                               %[[VAL_0:.*]]: i32, %[[VAL_1:.*]]: i1,
 // CHECK-SAME:                               %[[VAL_2:.*]]: none, ...) -> i32 attributes {argNames = ["in0", "in1", "in2"], resNames = ["out0"]} {
 // CHECK:           %[[VAL_3:.*]] = merge %[[VAL_0]] {bb = 0 : ui32} : i32
 // CHECK:           %[[VAL_4:.*]] = merge %[[VAL_1]] {bb = 0 : ui32} : i1
@@ -29,21 +28,21 @@ func.func @memInterfaceNoID(%arg0: memref<4xi32>, %arg1: index) -> i32 {
 // CHECK:           %[[VAL_6:.*]], %[[VAL_7:.*]] = cond_br %[[VAL_4]], %[[VAL_3]] {bb = 0 : ui32} : i32
 // CHECK:           %[[VAL_8:.*]], %[[VAL_9:.*]] = cond_br %[[VAL_4]], %[[VAL_5]] {bb = 0 : ui32} : none
 // CHECK:           %[[VAL_10:.*]] = merge %[[VAL_6]] {bb = 1 : ui32} : i32
-// CHECK:           %[[VAL_11:.*]], %[[VAL_12:.*]] = control_merge %[[VAL_8]] {bb = 1 : ui32} : none
-// CHECK:           %[[VAL_14:.*]] = constant %[[VAL_11]] {bb = 1 : ui32, value = 1 : i32} : i32
-// CHECK:           %[[VAL_15:.*]] = arith.addi %[[VAL_10]], %[[VAL_14]] {bb = 1 : ui32} : i32
+// CHECK:           %[[VAL_11:.*]], %[[VAL_12:.*]] = control_merge %[[VAL_8]] {bb = 1 : ui32} : none, index
+// CHECK:           %[[VAL_13:.*]] = constant %[[VAL_11]] {bb = 1 : ui32, value = 1 : i32} : i32
+// CHECK:           %[[VAL_14:.*]] = arith.addi %[[VAL_10]], %[[VAL_13]] {bb = 1 : ui32} : i32
+// CHECK:           %[[VAL_15:.*]] = br %[[VAL_14]] {bb = 1 : ui32} : i32
 // CHECK:           %[[VAL_16:.*]] = br %[[VAL_11]] {bb = 1 : ui32} : none
-// CHECK:           %[[VAL_17:.*]] = br %[[VAL_15]] {bb = 1 : ui32} : i32
-// CHECK:           %[[VAL_18:.*]] = merge %[[VAL_7]] {bb = 2 : ui32} : i32
-// CHECK:           %[[VAL_19:.*]], %[[VAL_20:.*]] = control_merge %[[VAL_9]] {bb = 2 : ui32} : none
-// CHECK:           %[[VAL_22:.*]] = constant %[[VAL_19]] {bb = 2 : ui32, value = 2 : i32} : i32
-// CHECK:           %[[VAL_23:.*]] = arith.addi %[[VAL_18]], %[[VAL_22]] {bb = 2 : ui32} : i32
-// CHECK:           %[[VAL_24:.*]] = br %[[VAL_19]] {bb = 2 : ui32} : none
-// CHECK:           %[[VAL_25:.*]] = br %[[VAL_23]] {bb = 2 : ui32} : i32
-// CHECK:           %[[VAL_26:.*]] = mux %[[VAL_27:.*]] {{\[}}%[[VAL_25]], %[[VAL_17]]] {bb = 3 : ui32} : index, i32
-// CHECK:           %[[VAL_28:.*]], %[[VAL_27]] = control_merge %[[VAL_24]], %[[VAL_16]] {bb = 3 : ui32} : none
-// CHECK:           %[[VAL_29:.*]] = d_return {bb = 3 : ui32} %[[VAL_26]] : i32
-// CHECK:           end {bb = 3 : ui32} %[[VAL_29]] : i32
+// CHECK:           %[[VAL_17:.*]] = merge %[[VAL_7]] {bb = 2 : ui32} : i32
+// CHECK:           %[[VAL_18:.*]], %[[VAL_19:.*]] = control_merge %[[VAL_9]] {bb = 2 : ui32} : none, index
+// CHECK:           %[[VAL_20:.*]] = constant %[[VAL_18]] {bb = 2 : ui32, value = 2 : i32} : i32
+// CHECK:           %[[VAL_21:.*]] = arith.addi %[[VAL_17]], %[[VAL_20]] {bb = 2 : ui32} : i32
+// CHECK:           %[[VAL_22:.*]] = br %[[VAL_21]] {bb = 2 : ui32} : i32
+// CHECK:           %[[VAL_23:.*]] = br %[[VAL_18]] {bb = 2 : ui32} : none
+// CHECK:           %[[VAL_24:.*]] = mux %[[VAL_25:.*]] {{\[}}%[[VAL_22]], %[[VAL_15]]] {bb = 3 : ui32} : index, i32
+// CHECK:           %[[VAL_26:.*]], %[[VAL_25]] = control_merge %[[VAL_23]], %[[VAL_16]] {bb = 3 : ui32} : none, index
+// CHECK:           %[[VAL_27:.*]] = d_return {bb = 3 : ui32} %[[VAL_24]] : i32
+// CHECK:           end {bb = 3 : ui32} %[[VAL_27]] : i32
 // CHECK:         }
 func.func @ifThenElse(%arg0: i32, %arg1: i1) -> i32 {
   cf.cond_br %arg1, ^bb1, ^bb2
@@ -62,8 +61,7 @@ func.func @ifThenElse(%arg0: i32, %arg1: i1) -> i32 {
 // -----
 
 // CHECK-LABEL:   handshake.func @multipleReturns(
-// CHECK-SAME:                                    %[[VAL_0:.*]]: i32,
-// CHECK-SAME:                                    %[[VAL_1:.*]]: i1,
+// CHECK-SAME:                                    %[[VAL_0:.*]]: i32, %[[VAL_1:.*]]: i1,
 // CHECK-SAME:                                    %[[VAL_2:.*]]: none, ...) -> i32 attributes {argNames = ["in0", "in1", "in2"], resNames = ["out0"]} {
 // CHECK:           %[[VAL_3:.*]] = merge %[[VAL_0]] {bb = 0 : ui32} : i32
 // CHECK:           %[[VAL_4:.*]] = merge %[[VAL_1]] {bb = 0 : ui32} : i1
@@ -71,17 +69,17 @@ func.func @ifThenElse(%arg0: i32, %arg1: i1) -> i32 {
 // CHECK:           %[[VAL_6:.*]], %[[VAL_7:.*]] = cond_br %[[VAL_4]], %[[VAL_3]] {bb = 0 : ui32} : i32
 // CHECK:           %[[VAL_8:.*]], %[[VAL_9:.*]] = cond_br %[[VAL_4]], %[[VAL_5]] {bb = 0 : ui32} : none
 // CHECK:           %[[VAL_10:.*]] = merge %[[VAL_6]] {bb = 1 : ui32} : i32
-// CHECK:           %[[VAL_11:.*]], %[[VAL_12:.*]] = control_merge %[[VAL_8]] {bb = 1 : ui32} : none
-// CHECK:           %[[VAL_14:.*]] = constant %[[VAL_11]] {bb = 1 : ui32, value = 1 : i32} : i32
-// CHECK:           %[[VAL_15:.*]] = arith.addi %[[VAL_10]], %[[VAL_14]] {bb = 1 : ui32} : i32
-// CHECK:           %[[VAL_16:.*]] = d_return {bb = 1 : ui32} %[[VAL_15]] : i32
-// CHECK:           %[[VAL_17:.*]] = merge %[[VAL_7]] {bb = 2 : ui32} : i32
-// CHECK:           %[[VAL_18:.*]], %[[VAL_19:.*]] = control_merge %[[VAL_9]] {bb = 2 : ui32} : none
-// CHECK:           %[[VAL_21:.*]] = constant %[[VAL_18]] {bb = 2 : ui32, value = 2 : i32} : i32
-// CHECK:           %[[VAL_22:.*]] = arith.addi %[[VAL_17]], %[[VAL_21]] {bb = 2 : ui32} : i32
-// CHECK:           %[[VAL_23:.*]] = d_return {bb = 2 : ui32} %[[VAL_22]] : i32
-// CHECK:           %[[VAL_24:.*]] = merge %[[VAL_16]], %[[VAL_23]] {bb = 3 : ui32} : i32
-// CHECK:           end {bb = 3 : ui32} %[[VAL_24]] : i32
+// CHECK:           %[[VAL_11:.*]], %[[VAL_12:.*]] = control_merge %[[VAL_8]] {bb = 1 : ui32} : none, index
+// CHECK:           %[[VAL_13:.*]] = constant %[[VAL_11]] {bb = 1 : ui32, value = 1 : i32} : i32
+// CHECK:           %[[VAL_14:.*]] = arith.addi %[[VAL_10]], %[[VAL_13]] {bb = 1 : ui32} : i32
+// CHECK:           %[[VAL_15:.*]] = d_return {bb = 1 : ui32} %[[VAL_14]] : i32
+// CHECK:           %[[VAL_16:.*]] = merge %[[VAL_7]] {bb = 2 : ui32} : i32
+// CHECK:           %[[VAL_17:.*]], %[[VAL_18:.*]] = control_merge %[[VAL_9]] {bb = 2 : ui32} : none, index
+// CHECK:           %[[VAL_19:.*]] = constant %[[VAL_17]] {bb = 2 : ui32, value = 2 : i32} : i32
+// CHECK:           %[[VAL_20:.*]] = arith.addi %[[VAL_16]], %[[VAL_19]] {bb = 2 : ui32} : i32
+// CHECK:           %[[VAL_21:.*]] = d_return {bb = 2 : ui32} %[[VAL_20]] : i32
+// CHECK:           %[[VAL_22:.*]] = merge %[[VAL_15]], %[[VAL_21]] {bb = 3 : ui32} : i32
+// CHECK:           end {bb = 3 : ui32} %[[VAL_22]] : i32
 // CHECK:         }
 func.func @multipleReturns(%arg0: i32, %arg1: i1) -> i32 {
   cf.cond_br %arg1, ^bb1, ^bb2
@@ -102,33 +100,33 @@ func.func @multipleReturns(%arg0: i32, %arg1: i1) -> i32 {
 // CHECK-SAME:                               %[[VAL_1:.*]]: none, ...) -> none attributes {argNames = ["in0", "in1"], resNames = ["out0"]} {
 // CHECK:           %[[VAL_2:.*]] = merge %[[VAL_0]] {bb = 0 : ui32} : index
 // CHECK:           %[[VAL_3:.*]] = merge %[[VAL_1]] {bb = 0 : ui32} : none
-// CHECK:           %[[VAL_5:.*]] = constant %[[VAL_3]] {bb = 0 : ui32, value = 0 : index} : index
-// CHECK:           %[[VAL_7:.*]] = constant %[[VAL_3]] {bb = 0 : ui32, value = 1 : index} : index
-// CHECK:           %[[VAL_8:.*]] = br %[[VAL_2]] {bb = 0 : ui32} : index
+// CHECK:           %[[VAL_4:.*]] = constant %[[VAL_3]] {bb = 0 : ui32, value = 0 : index} : index
+// CHECK:           %[[VAL_5:.*]] = constant %[[VAL_3]] {bb = 0 : ui32, value = 1 : index} : index
+// CHECK:           %[[VAL_6:.*]] = br %[[VAL_4]] {bb = 0 : ui32} : index
+// CHECK:           %[[VAL_7:.*]] = br %[[VAL_2]] {bb = 0 : ui32} : index
+// CHECK:           %[[VAL_8:.*]] = br %[[VAL_5]] {bb = 0 : ui32} : index
 // CHECK:           %[[VAL_9:.*]] = br %[[VAL_3]] {bb = 0 : ui32} : none
-// CHECK:           %[[VAL_10:.*]] = br %[[VAL_5]] {bb = 0 : ui32} : index
-// CHECK:           %[[VAL_11:.*]] = br %[[VAL_7]] {bb = 0 : ui32} : index
-// CHECK:           %[[VAL_12:.*]] = mux %[[VAL_13:.*]] {{\[}}%[[VAL_14:.*]], %[[VAL_10]]] {bb = 1 : ui32} : index, index
-// CHECK:           %[[VAL_15:.*]] = mux %[[VAL_13]] {{\[}}%[[VAL_16:.*]], %[[VAL_8]]] {bb = 1 : ui32} : index, index
-// CHECK:           %[[VAL_17:.*]] = mux %[[VAL_13]] {{\[}}%[[VAL_18:.*]], %[[VAL_11]]] {bb = 1 : ui32} : index, index
-// CHECK:           %[[VAL_19:.*]], %[[VAL_13]] = control_merge %[[VAL_20:.*]], %[[VAL_9]] {bb = 1 : ui32} : none
-// CHECK:           %[[VAL_21:.*]] = arith.cmpi slt, %[[VAL_12]], %[[VAL_15]] {bb = 1 : ui32} : index
-// CHECK:           %[[VAL_22:.*]], %[[VAL_23:.*]] = cond_br %[[VAL_21]], %[[VAL_12]] {bb = 1 : ui32} : index
-// CHECK:           %[[VAL_24:.*]], %[[VAL_25:.*]] = cond_br %[[VAL_21]], %[[VAL_15]] {bb = 1 : ui32} : index
-// CHECK:           %[[VAL_26:.*]], %[[VAL_27:.*]] = cond_br %[[VAL_21]], %[[VAL_17]] {bb = 1 : ui32} : index
-// CHECK:           %[[VAL_28:.*]], %[[VAL_29:.*]] = cond_br %[[VAL_21]], %[[VAL_19]] {bb = 1 : ui32} : none
+// CHECK:           %[[VAL_10:.*]] = mux %[[VAL_11:.*]] {{\[}}%[[VAL_12:.*]], %[[VAL_6]]] {bb = 1 : ui32} : index, index
+// CHECK:           %[[VAL_13:.*]] = mux %[[VAL_11]] {{\[}}%[[VAL_14:.*]], %[[VAL_7]]] {bb = 1 : ui32} : index, index
+// CHECK:           %[[VAL_15:.*]] = mux %[[VAL_11]] {{\[}}%[[VAL_16:.*]], %[[VAL_8]]] {bb = 1 : ui32} : index, index
+// CHECK:           %[[VAL_17:.*]], %[[VAL_11]] = control_merge %[[VAL_18:.*]], %[[VAL_9]] {bb = 1 : ui32} : none, index
+// CHECK:           %[[VAL_19:.*]] = arith.cmpi slt, %[[VAL_10]], %[[VAL_13]] {bb = 1 : ui32} : index
+// CHECK:           %[[VAL_20:.*]], %[[VAL_21:.*]] = cond_br %[[VAL_19]], %[[VAL_13]] {bb = 1 : ui32} : index
+// CHECK:           %[[VAL_22:.*]], %[[VAL_23:.*]] = cond_br %[[VAL_19]], %[[VAL_15]] {bb = 1 : ui32} : index
+// CHECK:           %[[VAL_24:.*]], %[[VAL_25:.*]] = cond_br %[[VAL_19]], %[[VAL_10]] {bb = 1 : ui32} : index
+// CHECK:           %[[VAL_26:.*]], %[[VAL_27:.*]] = cond_br %[[VAL_19]], %[[VAL_17]] {bb = 1 : ui32} : none
+// CHECK:           %[[VAL_28:.*]] = merge %[[VAL_20]] {bb = 2 : ui32} : index
+// CHECK:           %[[VAL_29:.*]] = merge %[[VAL_22]] {bb = 2 : ui32} : index
 // CHECK:           %[[VAL_30:.*]] = merge %[[VAL_24]] {bb = 2 : ui32} : index
-// CHECK:           %[[VAL_31:.*]] = merge %[[VAL_26]] {bb = 2 : ui32} : index
-// CHECK:           %[[VAL_32:.*]] = merge %[[VAL_22]] {bb = 2 : ui32} : index
-// CHECK:           %[[VAL_33:.*]], %[[VAL_34:.*]] = control_merge %[[VAL_28]] {bb = 2 : ui32} : none
-// CHECK:           %[[VAL_35:.*]] = arith.addi %[[VAL_32]], %[[VAL_31]] {bb = 2 : ui32} : index
-// CHECK:           %[[VAL_16]] = br %[[VAL_30]] {bb = 2 : ui32} : index
-// CHECK:           %[[VAL_18]] = br %[[VAL_31]] {bb = 2 : ui32} : index
-// CHECK:           %[[VAL_20]] = br %[[VAL_33]] {bb = 2 : ui32} : none
-// CHECK:           %[[VAL_14]] = br %[[VAL_35]] {bb = 2 : ui32} : index
-// CHECK:           %[[VAL_36:.*]], %[[VAL_37:.*]] = control_merge %[[VAL_29]] {bb = 3 : ui32} : none
-// CHECK:           %[[VAL_38:.*]] = d_return {bb = 3 : ui32} %[[VAL_36]] : none
-// CHECK:           end {bb = 3 : ui32} %[[VAL_38]] : none
+// CHECK:           %[[VAL_31:.*]], %[[VAL_32:.*]] = control_merge %[[VAL_26]] {bb = 2 : ui32} : none, index
+// CHECK:           %[[VAL_33:.*]] = arith.addi %[[VAL_30]], %[[VAL_29]] {bb = 2 : ui32} : index
+// CHECK:           %[[VAL_12]] = br %[[VAL_33]] {bb = 2 : ui32} : index
+// CHECK:           %[[VAL_14]] = br %[[VAL_28]] {bb = 2 : ui32} : index
+// CHECK:           %[[VAL_16]] = br %[[VAL_29]] {bb = 2 : ui32} : index
+// CHECK:           %[[VAL_18]] = br %[[VAL_31]] {bb = 2 : ui32} : none
+// CHECK:           %[[VAL_34:.*]], %[[VAL_35:.*]] = control_merge %[[VAL_27]] {bb = 3 : ui32} : none, index
+// CHECK:           %[[VAL_36:.*]] = d_return {bb = 3 : ui32} %[[VAL_34]] : none
+// CHECK:           end {bb = 3 : ui32} %[[VAL_36]] : none
 // CHECK:         }
 func.func @simpleLoop(%arg0: index) {
   %c0 = arith.constant 0 : index
