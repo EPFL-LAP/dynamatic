@@ -9,6 +9,7 @@ add_dynamatic_library(DynamaticTransforms
   NameMemoryOps.cpp
   PushConstants.cpp
   UtilsForPlaceBuffers.cpp
+  UtilsForExtractMG.cpp
   UtilsBitsUpdate.cpp
   OptimizeBits.cpp
   InitIndexType.cpp
@@ -25,8 +26,6 @@ add_dynamatic_library(DynamaticTransforms
   MLIRSupport
   MLIRTransformUtils
 )
-
-include_directories(${GUROBI_INCLUDE_DIRS})
 
 target_link_libraries(DynamaticTransforms PUBLIC 
   ${GUROBI_CXX_LIBRARY}

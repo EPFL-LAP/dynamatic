@@ -148,7 +148,7 @@ def PlaceBuffers : Pass<"place-buffers", "mlir::ModuleOp"> {
   }];
   let constructor = "dynamatic::createHandshakePlaceBuffersPass()";
   let options = [
-    Option<"ccfile", "ccfile", "std::string", "",
+    Option<"stdLevel", "std-level", "bool", "false",
     "if true, extract CFDFC from standard level simluation">];
 }
 

@@ -6,7 +6,6 @@
 
 #include "dynamatic/Transforms/UtilsForPlaceBuffers.h"
 #include "circt/Dialect/Handshake/HandshakeOps.h"
-#include "dynamatic/Transforms/PassDetails.h"
 #include "mlir/Dialect/Arith/IR/Arith.h"
 #include "mlir/Dialect/Func/IR/FuncOps.h"
 #include "mlir/IR/BuiltinTypes.h"
@@ -34,20 +33,11 @@ bool buffer::isEntryOp(Operation *op,
   return false;
 }
 
-unsigned buffer::getBBIndex(Operation *op) {
+int buffer::getBBIndex(Operation *op) {
   if (op->getAttrs().data()->getName() == "bb")
     return op->getAttrOfType<IntegerAttr>("bb").getUInt();
-  return UINT_MAX;
+  return -1;
 }
-
-// bool buffer::isConnected(basicBlock *bb, Operation *op) {
-//   for (auto channel : bb->outChannels) {
-//     if (auto connectOp = (channel->opDst).value(); connectOp == op) {
-//       return true;
-//     }
-//   }
-//   return false;
-// }
 
 bool buffer::isBackEdge(Operation *opSrc, Operation *opDst) {
   // unsigned bbSrcInd = getBBIndex(opSrc);
@@ -65,44 +55,6 @@ bool buffer::isBackEdge(Operation *opSrc, Operation *opDst) {
   return false;
 }
 
-arch *buffer::findExistsArch(basicBlock *bbSrc, basicBlock *bbDst,
-                             std::vector<arch *> &archList) {
-  for (auto arch : archList)
-    if (arch->bbSrc == bbSrc && arch->bbDst == bbDst)
-      return arch;
-  return nullptr;
-}
-
-basicBlock *buffer::findExistsBB(unsigned bbInd,
-                                 std::vector<basicBlock *> &bbList) {
-  for (auto bb : bbList)
-    if (bb->index == bbInd)
-      return bb;
-  return nullptr;
-}
-
-// link the basic blocks via channel between operations
-void buffer::linkBBViaChannel(Operation *opSrc, Operation *opDst,
-                              unsigned newbbInd, basicBlock *curBB,
-                              std::vector<basicBlock *> &bbList) {
-  auto *outChannel = new channel();
-  outChannel->opSrc = opSrc;
-  outChannel->opDst = opDst;
-  // outChannel->isOutEdge = true;
-  outChannel->bbSrc = curBB;
-  if (auto bbDst = findExistsBB(newbbInd, bbList); bbDst != nullptr) {
-    outChannel->bbDst = bbDst;
-    if (bbDst->index <= curBB->index)
-      outChannel->isBackEdge = true;
-  } else {
-    basicBlock *bb = new basicBlock();
-    bb->index = newbbInd;
-    outChannel->bbDst = bb;
-    bbList.push_back(bb);
-  }
-  curBB->outChannels.push_back(outChannel);
-  return;
-}
 
 unit *buffer::getUnitWithOp(Operation *op, std::vector<unit *> &unitList) {
   for (auto u : unitList) {
@@ -117,12 +69,6 @@ void buffer::connectInChannel(unit *unitNode, channel *inChannel) {
     inPort->cntChannels.push_back(inChannel);
     unitNode->inPorts.push_back(inPort);
 }
-
-// void buffer::createOutPort(unit *unitNode, channel *outChannel) {
-//     port *outPort = new port(outChannel->valPort);
-//     outPort->cntChannels.push_back(outChannel);
-//     unitNode->outPorts.push_back(outPort);
-// }
 
 void buffer::dfsHandshakeGraph(Operation *opNode, 
                                std::vector<unit *> &unitList,
@@ -157,8 +103,8 @@ void buffer::dfsHandshakeGraph(Operation *opNode,
       // create the channel connected to the outport
       channel *outChannel = new channel(opNode, sucOp, &resOperand);
       outChannel->isBackEdge = isBackEdge(opNode, sucOp);
-      llvm::errs() << "creating channels .... \n";
-      outChannel->print();
+      // llvm::errs() << "creating channels .... \n";
+      // outChannel->print();
       outPort->cntChannels.push_back(outChannel);
 
       // dfs the successor operation
@@ -169,6 +115,55 @@ void buffer::dfsHandshakeGraph(Operation *opNode,
   
 
 }
+
+
+// bool buffer::isConnected(basicBlock *bb, Operation *op) {
+//   for (auto channel : bb->outChannels) {
+//     if (auto connectOp = (channel->opDst).value(); connectOp == op) {
+//       return true;
+//     }
+//   }
+//   return false;
+// }
+
+// arch *buffer::findExistsArch(basicBlock *bbSrc, basicBlock *bbDst,
+//                              std::vector<arch *> &archList) {
+//   for (auto arch : archList)
+//     if (arch->bbSrc == bbSrc && arch->bbDst == bbDst)
+//       return arch;
+//   return nullptr;
+// }
+
+// basicBlock *buffer::findExistsBB(unsigned bbInd,
+//                                  std::vector<basicBlock *> &bbList) {
+//   for (auto bb : bbList)
+//     if (bb->index == bbInd)
+//       return bb;
+//   return nullptr;
+// }
+
+// // link the basic blocks via channel between operations
+// void buffer::linkBBViaChannel(Operation *opSrc, Operation *opDst,
+//                               unsigned newbbInd, basicBlock *curBB,
+//                               std::vector<basicBlock *> &bbList) {
+//   auto *outChannel = new channel();
+//   outChannel->opSrc = opSrc;
+//   outChannel->opDst = opDst;
+//   // outChannel->isOutEdge = true;
+//   outChannel->bbSrc = curBB;
+//   if (auto bbDst = findExistsBB(newbbInd, bbList); bbDst != nullptr) {
+//     outChannel->bbDst = bbDst;
+//     if (bbDst->index <= curBB->index)
+//       outChannel->isBackEdge = true;
+//   } else {
+//     basicBlock *bb = new basicBlock();
+//     bb->index = newbbInd;
+//     outChannel->bbDst = bb;
+//     bbList.push_back(bb);
+//   }
+//   curBB->outChannels.push_back(outChannel);
+//   return;
+// }
 
 // void buffer::dfsBBGraphs(Operation *opNode, std::vector<Operation *> &visited,
 //                          basicBlock *curBB, std::vector<basicBlock *> &bbList) {
@@ -214,17 +209,21 @@ void buffer::dfsHandshakeGraph(Operation *opNode,
 
 
 
-// /// ================== dataFlowCircuit Function ================== ///
-// void buffer::dataFlowCircuit::printCircuits() {
-//   for (auto unit : units) {
-//     llvm::errs() << "===========================\n";
-//     llvm::errs() << "operation: " << *(unit->op) << "\n";
-//     for (auto ch : unit->inChannels)
-//       ch->print();
-//     for (auto ch : unit->outChannels)
-//       ch->print();
-//   }
-// }
+/// ================== dataFlowCircuit Function ================== ///
+void buffer::dataFlowCircuit::printCircuits() {
+  for (auto unit : units) {
+    llvm::errs() << "===========================\n";
+    llvm::errs() << "operation: " << *(unit->op) << "\n";
+    llvm::errs() << "-------------inPorts: \n";
+    for (auto port : unit->outPorts)
+      for (auto ch : port->cntChannels)
+        ch->print();
+    llvm::errs() << "-------------outPorts: \n";
+    for (auto port : unit->inPorts)
+      for (auto ch : port->cntChannels)
+        ch->print();
+  }
+}
 
 // std::vector<std::vector<float>>
 // buffer::dataFlowCircuit::readInfoFromFile(const std::string &filename) {

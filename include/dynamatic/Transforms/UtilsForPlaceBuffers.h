@@ -14,7 +14,7 @@
 #include <fstream>
 #include <gurobi_c++.h>
 #include <map>
-#include <optional>
+// #include <optional>
 
 namespace dynamatic {
 namespace buffer {
@@ -25,28 +25,28 @@ using namespace circt::handshake;
 struct arch;
 struct channel;
 
-struct basicBlock {
-  unsigned index = UINT_MAX;
-  unsigned freq = UINT_MAX;
-  bool selBB = false;
-  bool isEntryBB = false;
-  bool isExitBB = false;
-  std::vector<arch *> inArchs;
-  std::vector<arch *> outArchs;
-  std::vector<channel *> inChannels;
-  std::vector<channel *> outChannels;
-};
+// struct basicBlock {
+//   unsigned index = UINT_MAX;
+//   unsigned freq = UINT_MAX;
+//   bool selBB = false;
+//   bool isEntryBB = false;
+//   bool isExitBB = false;
+//   std::vector<arch *> inArchs;
+//   std::vector<arch *> outArchs;
+//   std::vector<channel *> inChannels;
+//   std::vector<channel *> outChannels;
+// };
 
 struct arch {
   unsigned freq;
-  basicBlock *bbSrc, *bbDst;
+  // int *bbSrc, *bbDst;
 
-  bool selArc = false;
+  // bool selArc = false;
   bool isBackEdge = false;
 
-  arch() {}
-  arch(const unsigned freq, basicBlock *bbSrc, basicBlock *bbDst)
-      : freq(freq), bbSrc(bbSrc), bbDst(bbDst) {}
+  // arch() {}
+  // arch(const unsigned freq, basicBlock *bbSrc, basicBlock *bbDst)
+  //     : freq(freq), bbSrc(bbSrc), bbDst(bbDst) {}
 };
 
 struct channel : arch {
@@ -66,6 +66,7 @@ struct channel : arch {
     llvm::errs() << "opSrc: " << *(opSrc) << " ---> ";
     llvm::errs() << "opDst: " << *(opDst) << "\n";
   }
+
 };
 
 struct port {
@@ -93,41 +94,28 @@ struct unit {
   // SmallVector<channel *> outChannels;
 };
 
-basicBlock *findExistsBB(unsigned bbInd, std::vector<basicBlock *> &bbList);
+// basicBlock *findExistsBB(unsigned bbInd, std::vector<basicBlock *> &bbList);
 
-arch *findExistsArch(basicBlock *bbSrc, basicBlock *bbDst,
-                     std::vector<arch *> &archList);
+// arch *findExistsArch(basicBlock *bbSrc, basicBlock *bbDst,
+//                      std::vector<arch *> &archList);
+
+// void linkBBViaChannel(Operation *opSrc, Operation *opDst, unsigned newbbInd,
+//                       basicBlock *curBB, std::vector<basicBlock *> &bbList);
 
 // Graph build functions
 bool isEntryOp(Operation *op,
                std::vector<Operation *> &visitedOp);
 
-unsigned getBBIndex(Operation *op);
-
-bool isConnected(basicBlock *bb, Operation *op);
+int getBBIndex(Operation *op);
 
 bool isBackEdge(Operation *opSrc, Operation *opDst);
-
-void linkBBViaChannel(Operation *opSrc, Operation *opDst, unsigned newbbInd,
-                      basicBlock *curBB, std::vector<basicBlock *> &bbList);
 
 unit *getUnitWithOp(Operation *op, std::vector<unit *> &unitList);
 
 void connectInChannel(unit *unitNode, channel *inChannel);
 
-// void createOutPort(unit *unitNode, channel *outChannel);
-
 void dfsHandshakeGraph(Operation *opNode, std::vector<unit *> &unitList,
      std::vector<Operation *> &visited, channel *inChannel=nullptr);
-
-void dfsBBGraphs(Operation *opNode, std::vector<Operation *> &visited,
-                 basicBlock *curBB, std::vector<basicBlock *> &bbList);
-
-void dfsBB(basicBlock *bb, std::vector<basicBlock *> &bbList,
-           std::vector<unsigned> &bbIndexList,
-           std::vector<Operation *> &visitedOpList);
-
-void printBBConnectivity(std::vector<basicBlock *> &bbList);
 
 struct dataFlowCircuit {
 
@@ -163,7 +151,7 @@ struct dataFlowCircuit {
   double targetCP, maxCP;
   std::vector<unit *> units;
   std::vector<channel *> channels;
-  std::vector<basicBlock *> selBBs;
+  std::vector<int> selBBs;
   std::string infoFielDefault = std::getenv("LEGACY_DYNAMATICPP");
   std::string delayFile = infoFielDefault + "/data/targets/default_delay.dat";
   std::string latencyFile = infoFielDefault + "data/targets/default_latency.dat";
@@ -174,10 +162,6 @@ struct dataFlowCircuit {
 
   std::vector<std::vector<float>>
   readInfoFromFile(const std::string &filename);
-
-  void insertSelBB(handshake::FuncOp funcOp, basicBlock *bb);
-
-  void insertSelArc(arch *arc);
 
   void printCircuits();
 
