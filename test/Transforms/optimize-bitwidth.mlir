@@ -99,3 +99,30 @@ handshake.func @optimizeBackwardShR(%arg0: none) -> i8 {
   %6 = arith.trunci %5 : i32 to i8
   end
 }
+
+// -----
+
+// CHECK-LABEL:   handshake.func @optimizeBackwardDiV(
+// CHECK-SAME:                                        %[[VAL_0:.*]]: none, ...) -> i8 attributes {argNames = ["arg0"], resNames = ["out0"]} {
+// CHECK:           %[[VAL_1:.*]] = merge %[[VAL_0]] : none
+// CHECK:           %[[VAL_2:.*]] = constant %[[VAL_1]] {value = 999 : i11} : i11
+// CHECK:           %[[VAL_3:.*]] = arith.extsi %[[VAL_2]] : i11 to i32
+// CHECK:           %[[VAL_4:.*]] = constant %[[VAL_1]] {value = 20 : i6} : i6
+// CHECK:           %[[VAL_5:.*]] = arith.extsi %[[VAL_4]] : i6 to i32
+// CHECK:           %[[VAL_6:.*]] = arith.extsi %[[VAL_2]] : i11 to i12
+// CHECK:           %[[VAL_7:.*]] = arith.extsi %[[VAL_4]] : i6 to i12
+// CHECK:           %[[VAL_8:.*]] = arith.divsi %[[VAL_6]], %[[VAL_7]] : i12
+// CHECK:           end
+// CHECK:         }
+handshake.func @optimizeBackwardDiV(%arg0: none) -> i8 {
+  %0 = merge %arg0 : none
+  %1 = constant %0 {value = 999 : i11} : i11
+  %2 = arith.extsi %1 : i11 to i32
+  %3 = constant %0 {value = 20 : i6} : i6
+  %4 = arith.extsi %3 : i6 to i32
+  %5 = arith.divsi %2, %4 : i32
+  %6 = arith.trunci %5 : i32 to i16
+  end
+}
+
+// -----
