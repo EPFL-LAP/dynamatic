@@ -162,7 +162,7 @@ void constructForwardFuncMap(
   mapOpNameWidth[mlir::arith::ExtUIOp::getOperationName()] =
       mapOpNameWidth[mlir::arith::ExtSIOp::getOperationName()];
 
-  mapOpNameWidth[StringRef("handshake.control_merge")] =
+  mapOpNameWidth[handshake::ControlMergeOp::getOperationName()] =
       [](Operation::operand_range vecOperands) {
         unsigned ind = vecOperands.size(); // record number of operators
         unsigned indexWidth = 1;
@@ -340,7 +340,7 @@ void constructUpdateFuncMap(
         return widths;
       };
 
-  mapOpNameWidth[StringRef("handshake.mux")] =
+  mapOpNameWidth[handshake::MuxOp::getOperationName()] =
       [&](Operation::operand_range vecOperands,
           Operation::result_range vecResults) {
         std::vector<std::vector<unsigned>> widths;
@@ -383,7 +383,7 @@ void constructUpdateFuncMap(
         return widths;
       };
 
-  mapOpNameWidth[StringRef("handshake.merge")] =
+  mapOpNameWidth[handshake::MergeOp::getOperationName()] =
       [&](Operation::operand_range vecOperands,
           Operation::result_range vecResults) {
         std::vector<std::vector<unsigned>> widths;
@@ -416,7 +416,7 @@ void constructUpdateFuncMap(
         return widths;
       };
 
-  mapOpNameWidth[StringRef("handshake.constant")] =
+  mapOpNameWidth[handshake::ConstantOp::getOperationName()] =
       [&](Operation::operand_range vecOperands,
           Operation::result_range vecResults) {
         std::vector<std::vector<unsigned>> widths;
@@ -434,7 +434,7 @@ void constructUpdateFuncMap(
         return widths;
       };
 
-  mapOpNameWidth[StringRef("handshake.control_merge")] =
+  mapOpNameWidth[handshake::ControlMergeOp::getOperationName()] =
       [&](Operation::operand_range vecOperands,
           Operation::result_range vecResults) {
         std::vector<std::vector<unsigned>> widths;
@@ -502,7 +502,7 @@ void constructUpdateFuncMap(
         return widths;
       };
 
-  mapOpNameWidth[StringRef("handshake.d_return")] =
+  mapOpNameWidth[handshake::DynamaticReturnOp::getOperationName()] =
       [&](Operation::operand_range vecOperands,
           Operation::result_range vecResults) {
         std::vector<std::vector<unsigned>> widths;
@@ -514,7 +514,7 @@ void constructUpdateFuncMap(
         return widths;
       };
 
-  mapOpNameWidth[StringRef("handshake.d_load")] =
+  mapOpNameWidth[handshake::DynamaticLoadOp::getOperationName()] =
       [&](Operation::operand_range vecOperands,
           Operation::result_range vecResults) {
         std::vector<std::vector<unsigned>> widths;
@@ -523,15 +523,15 @@ void constructUpdateFuncMap(
         return widths;
       };
 
-  mapOpNameWidth[StringRef("handshake.d_store")] =
-      mapOpNameWidth[StringRef("handshake.d_load")];
+  mapOpNameWidth[handshake::DynamaticStoreOp::getOperationName()] =
+      mapOpNameWidth[handshake::DynamaticLoadOp::getOperationName()];
 };
 
 static bool setPassFlag(Operation *op) {
   return llvm::TypeSwitch<Operation *, bool>(op)
-      .Case<handshake::BranchOp, handshake::ConditionalBranchOp>(
-          [](Operation *op) { return true; })
-      .Default([&](auto) { return false; });
+    .Case<handshake::BranchOp, handshake::ConditionalBranchOp>(
+        [](Operation *op) { return true; })
+    .Default([&](auto) { return false; });
 }
 
 static bool setMatchFlag(Operation *op) {
@@ -681,7 +681,11 @@ void validateOp(Operation *op, MLIRContext *ctx,
   bool revert = setRevertFlag(op);
 
   if (pass)
-    propType(op);
+    // Validate the successor operations 
+    // influenced by the bit width propagation 
+    if(propType(op))
+      for (auto resOp : op->getResults().getUsers())
+          validateOp(resOp, ctx, newMatchedOps);
 
   if (match)
     matchOpResWidth(op, ctx, newMatchedOps);
