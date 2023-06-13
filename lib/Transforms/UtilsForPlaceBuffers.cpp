@@ -29,8 +29,10 @@ bool buffer::isEntryOp(Operation *op,
 }
 
 int buffer::getBBIndex(Operation *op) {
-  if (op->getAttrs().data()->getName() == "bb")
-    return op->getAttrOfType<IntegerAttr>("bb").getUInt();
+  for (auto attr : op->getAttrs()) {
+    if (attr.getName()=="bb")
+      return dyn_cast<IntegerAttr>(attr.getValue()).getValue().getZExtValue();
+  }
   return -1;
 }
 

@@ -44,7 +44,6 @@ static LogicalResult insertBuffers(handshake::FuncOp funcOp,
     readSimulateFile(stdLevelInfo, archs, bbs);
     int execNum = buffer::extractCFDFCircuit(archs, bbs);
     while (execNum > 0) {
-      llvm::errs() << "extracting....\n";
       dataFlowCircuitList.push_back(createCFDFCircuit(unitList, archs, bbs));
       execNum = buffer::extractCFDFCircuit(archs, bbs);
     }

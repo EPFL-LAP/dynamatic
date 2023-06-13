@@ -242,7 +242,7 @@ int buffer::extractCFDFCircuit(std::map<archBB*, int> &archs,
   for (auto pair : bbs) {
     bbNames.push_back(pair.first);
   }
-  printCircuit(archs, bbs);
+  // printCircuit(archs, bbs);
   // Create MILP model for CFDFCircuit extraction
   // Init a gurobi model
   GRBEnv env = GRBEnv(true);
@@ -261,7 +261,6 @@ int buffer::extractCFDFCircuit(std::map<archBB*, int> &archs,
   modelMILP.optimize();
 
   llvm::errs() << "status: " << modelMILP.get(GRB_IntAttr_Status) << "\n";
-  llvm::errs() << "exec times: " << sArc["valExecN"].get(GRB_DoubleAttr_X) << "\n";
   if (modelMILP.get(GRB_IntAttr_Status) != GRB_OPTIMAL ||
       sArc["valExecN"].get(GRB_DoubleAttr_X) <= 0)
     return -1;
@@ -281,6 +280,7 @@ int buffer::extractCFDFCircuit(std::map<archBB*, int> &archs,
     archs[arch] = pair.second.get(GRB_DoubleAttr_X) > 0 ? 1 : 0;
   }
 
+  llvm::errs() << "exec times: " << sArc["valExecN"].get(GRB_DoubleAttr_X) << "\n";
   printCFDFCircuit(archs, bbs);
   // update the connection information after CFDFC extraction    
   for (auto pair: sArc) {
@@ -300,15 +300,14 @@ dataFlowCircuit *buffer::createCFDFCircuit(std::vector<unit *> &unitList,
 
   dataFlowCircuit *circuit = new dataFlowCircuit();
   for (auto unit : unitList) {
-    llvm::errs() << "unit: " << *(unit->op);
+    // llvm::errs() << "unit: " << *(unit->op);
     int bbIndex = getBBIndex(unit->op);
-    llvm::errs() << "; bb: " << bbIndex <<  "\n";
+    // llvm::errs() << "; bb: " << bbIndex <<  "\n";
     
     // insert units in the selected basic blocks
     if (bbs.count(bbIndex)>0 && bbs[bbIndex] > 0) {
       circuit->units.push_back(unit);
       // insert channels if it is selected
-      llvm::errs() << "insert unit successfully\n";
       for (auto ports : unit->outPorts) 
         for (auto ch : ports->cntChannels) 
           if (isSelect(archs, ch)) 
