@@ -92,13 +92,6 @@ static LogicalResult rewriteBitsWidths(handshake::FuncOp funcOp,
       if (isa<handshake::ConstantOp>(*op))
         continue;
 
-<<<<<<< HEAD
-      if (isa<mlir::arith::TruncIOp>(*op) &&
-          op->getResult(0).getType().getIntOrFloatBitWidth() <
-          op->getOperand(0).getType().getIntOrFloatBitWidth()) {
-        bitwidth::replaceWithPredecessor(op, op->getResult(0).getType());
-        continue;
-=======
       if (isa<mlir::arith::TruncIOp>(*op)) {
         auto resType = op->getResult(0).getType();
         if (resType.getIntOrFloatBitWidth() <
@@ -106,7 +99,6 @@ static LogicalResult rewriteBitsWidths(handshake::FuncOp funcOp,
           bitwidth::replaceWithPredecessor(op, op->getResult(0).getType());
           continue;
         }
->>>>>>> 3dab7836f82a223f4e5d8a8327367597e87c6e0e
       }
 
       const auto opName = op->getName().getStringRef();
