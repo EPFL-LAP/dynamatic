@@ -22,31 +22,9 @@ namespace buffer {
 using namespace circt;
 using namespace circt::handshake;
 
-struct arch;
-struct channel;
-
-// struct basicBlock {
-//   unsigned index = UINT_MAX;
-//   unsigned freq = UINT_MAX;
-//   bool selBB = false;
-//   bool isEntryBB = false;
-//   bool isExitBB = false;
-//   std::vector<arch *> inArchs;
-//   std::vector<arch *> outArchs;
-//   std::vector<channel *> inChannels;
-//   std::vector<channel *> outChannels;
-// };
-
 struct arch {
   unsigned freq;
-  // int *bbSrc, *bbDst;
-
-  // bool selArc = false;
   bool isBackEdge = false;
-
-  // arch() {}
-  // arch(const unsigned freq, basicBlock *bbSrc, basicBlock *bbDst)
-  //     : freq(freq), bbSrc(bbSrc), bbDst(bbDst) {}
 };
 
 struct channel : arch {
@@ -66,7 +44,6 @@ struct channel : arch {
     llvm::errs() << "opSrc: " << *(opSrc) << " ---> ";
     llvm::errs() << "opDst: " << *(opDst) << "\n";
   }
-
 };
 
 struct port {
@@ -90,8 +67,6 @@ struct unit {
   Operation *op;
   SmallVector<port *> inPorts;
   SmallVector<port *> outPorts;
-  // SmallVector<channel *> inChannels;
-  // SmallVector<channel *> outChannels;
 };
 
 // basicBlock *findExistsBB(unsigned bbInd, std::vector<basicBlock *> &bbList);
@@ -160,83 +135,84 @@ struct dataFlowCircuit {
   std::vector<std::vector<float>> delayInfo;
   std::vector<std::vector<float>> latencyInfo;
 
-  std::vector<std::vector<float>>
-  readInfoFromFile(const std::string &filename);
-
   void printCircuits();
 
-  void insertChannel(channel *ch) {
-    if (!hasChannel(ch))
-      channels.push_back(ch);
-  }
+  // std::vector<std::vector<float>>
+  // readInfoFromFile(const std::string &filename);
 
-  int findChannelIndex(channel *ch) {
-    for (int i = 0; i < channels.size(); i++)
-      if (channels[i]->opSrc == ch->opSrc && channels[i]->opDst == ch->opDst)
-        return i;
 
-    return -1;
-  }
+  // void insertChannel(channel *ch) {
+  //   if (!hasChannel(ch))
+  //     channels.push_back(ch);
+  // }
 
-  bool hasChannel(channel *ch) {
-    for (auto channel : channels)
-      if (channel->opSrc == ch->opSrc && channel->opSrc == ch->opSrc)
-        return true;
+  // int findChannelIndex(channel *ch) {
+  //   for (int i = 0; i < channels.size(); i++)
+  //     if (channels[i]->opSrc == ch->opSrc && channels[i]->opDst == ch->opDst)
+  //       return i;
 
-    return false;
-  }
+  //   return -1;
+  // }
 
-  bool hasChannel(Operation *srcOp, Operation *dstOp) {
-    for (auto channel : channels)
-      if (channel->opSrc == srcOp && channel->opDst == dstOp)
-        return true;
+  // bool hasChannel(channel *ch) {
+  //   for (auto channel : channels)
+  //     if (channel->opSrc == ch->opSrc && channel->opSrc == ch->opSrc)
+  //       return true;
 
-    return false;
-  }
+  //   return false;
+  // }
 
-  bool hasUnit(Operation *op) {
-    for (auto unit : units)
-      if (unit->op == op)
-        return true;
+  // bool hasChannel(Operation *srcOp, Operation *dstOp) {
+  //   for (auto channel : channels)
+  //     if (channel->opSrc == srcOp && channel->opDst == dstOp)
+  //       return true;
 
-    return false;
-  }
+  //   return false;
+  // }
 
-  int findUnitIndex(Operation *op) {
-    for (int i = 0; i < units.size(); i++)
-      if (units[i]->op == op)
-        return i;
+  // bool hasUnit(Operation *op) {
+  //   for (auto unit : units)
+  //     if (unit->op == op)
+  //       return true;
 
-    return -1;
-  }
+  //   return false;
+  // }
 
-  void initUnitTimeInfo();
+  // int findUnitIndex(Operation *op) {
+  //   for (int i = 0; i < units.size(); i++)
+  //     if (units[i]->op == op)
+  //       return i;
 
-  void insertBuffersInChannel(MLIRContext *ctx, channel *ch, bool fifo, int slots);
+  //   return -1;
+  // }
 
-  LogicalResult initMLIPModelVars(GRBModel& milpModel,
-                                  GRBVar &varThrpt,
-                                  std::vector<std::map<std::string, GRBVar>> &channelVars,
-                                  std::vector<std::map<std::string, GRBVar>> &unitVars);
+  // void initUnitTimeInfo();
 
-  LogicalResult createMILPPathConstrs(GRBModel &milpModel,
-                                    std::vector<std::map<std::string, GRBVar>> &channelVars,
-                                    std::vector<std::map<std::string, GRBVar>> &unitVars);
+  // void insertBuffersInChannel(MLIRContext *ctx, channel *ch, bool fifo, int slots);
+
+  // LogicalResult initMLIPModelVars(GRBModel& milpModel,
+  //                                 GRBVar &varThrpt,
+  //                                 std::vector<std::map<std::string, GRBVar>> &channelVars,
+  //                                 std::vector<std::map<std::string, GRBVar>> &unitVars);
+
+  // LogicalResult createMILPPathConstrs(GRBModel &milpModel,
+  //                                   std::vector<std::map<std::string, GRBVar>> &channelVars,
+  //                                   std::vector<std::map<std::string, GRBVar>> &unitVars);
   
-  LogicalResult createMILPThroughputConstrs(GRBModel &milpModel,
-                                    GRBVar &varThrpt,
-                                    std::vector<std::map<std::string, GRBVar>> &channelVars,
-                                    std::vector<std::map<std::string, GRBVar>> &unitVars);
+  // LogicalResult createMILPThroughputConstrs(GRBModel &milpModel,
+  //                                   GRBVar &varThrpt,
+  //                                   std::vector<std::map<std::string, GRBVar>> &channelVars,
+  //                                   std::vector<std::map<std::string, GRBVar>> &unitVars);
   
-  LogicalResult defineCostFunction(GRBModel &milpModel,
-                                  GRBVar &varThrpt,
-                                  std::vector<std::map<std::string, GRBVar>> &channelVars,
-                                  std::vector<std::map<std::string, GRBVar>> &unitVars);
-  LogicalResult instantiateBuffers(MLIRContext *ctx,
-                                  GRBModel &milpModel,
-                                  GRBVar &varThrpt,
-                                  std::vector<std::map<std::string, GRBVar>> &channelVars,
-                                  std::vector<std::map<std::string, GRBVar>> &unitVars);
+  // LogicalResult defineCostFunction(GRBModel &milpModel,
+  //                                 GRBVar &varThrpt,
+  //                                 std::vector<std::map<std::string, GRBVar>> &channelVars,
+  //                                 std::vector<std::map<std::string, GRBVar>> &unitVars);
+  // LogicalResult instantiateBuffers(MLIRContext *ctx,
+  //                                 GRBModel &milpModel,
+  //                                 GRBVar &varThrpt,
+  //                                 std::vector<std::map<std::string, GRBVar>> &channelVars,
+  //                                 std::vector<std::map<std::string, GRBVar>> &unitVars);
 };
 
 } // namespace handshake

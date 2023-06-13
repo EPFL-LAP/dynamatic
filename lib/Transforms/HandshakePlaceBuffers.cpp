@@ -34,9 +34,10 @@ static LogicalResult insertBuffers(handshake::FuncOp funcOp,
   for (auto &op : funcOp.getOps())
     if (isEntryOp(&op, visitedOpList))
       dfsHandshakeGraph(&op, unitList, visitedOpList);
-  
+
+  // create CFDFC circuits
   std::vector<dataFlowCircuit *> dataFlowCircuitList;
-  // speficy by a flag, read the bb file 
+  // speficy by a flag, whether read the bb file from std level
   if (stdLevelInfo!=""){
     std::map<archBB*, int> archs;
     std::map<int, int> bbs;
@@ -48,7 +49,7 @@ static LogicalResult insertBuffers(handshake::FuncOp funcOp,
       execNum = buffer::extractCFDFCircuit(archs, bbs);
     }
   }
-
+  
   return success();
 }
 

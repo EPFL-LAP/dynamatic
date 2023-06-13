@@ -45,14 +45,11 @@ void buffer::readSimulateFile(const std::string & fileName,
     std::getline(iss, token, ',');
     arch->execFreq = std::stoi(token);
 
-    if (!std::getline(iss, token, ',')) {
+    if (!std::getline(iss, token, ',')) 
       arch->isBackEdge = arch->srcBB >= arch->dstBB ? true : false;
-      // llvm::errs() << "Back Edge is not specified, set to default: " 
-      //               << arch.isBackEdge << "\n";
-    } else {
+    else 
       arch->isBackEdge = std::stoi(token) == 1 ? true : false;
-    }
-
+    
     archs[arch] = false;
     if (bbs.count(arch->srcBB) == 0)
       bbs[arch->srcBB] = false;
@@ -260,7 +257,6 @@ int buffer::extractCFDFCircuit(std::map<archBB*, int> &archs,
   setBBConstrs(modelMILP, sBB, sArc, archNames);
   modelMILP.optimize();
 
-  llvm::errs() << "status: " << modelMILP.get(GRB_IntAttr_Status) << "\n";
   if (modelMILP.get(GRB_IntAttr_Status) != GRB_OPTIMAL ||
       sArc["valExecN"].get(GRB_DoubleAttr_X) <= 0)
     return -1;
@@ -280,8 +276,8 @@ int buffer::extractCFDFCircuit(std::map<archBB*, int> &archs,
     archs[arch] = pair.second.get(GRB_DoubleAttr_X) > 0 ? 1 : 0;
   }
 
-  llvm::errs() << "exec times: " << sArc["valExecN"].get(GRB_DoubleAttr_X) << "\n";
-  printCFDFCircuit(archs, bbs);
+  // llvm::errs() << "exec times: " << sArc["valExecN"].get(GRB_DoubleAttr_X) << "\n";
+  // printCFDFCircuit(archs, bbs);
   // update the connection information after CFDFC extraction    
   for (auto pair: sArc) {
     if (pair.first == "valExecN")
@@ -300,9 +296,7 @@ dataFlowCircuit *buffer::createCFDFCircuit(std::vector<unit *> &unitList,
 
   dataFlowCircuit *circuit = new dataFlowCircuit();
   for (auto unit : unitList) {
-    // llvm::errs() << "unit: " << *(unit->op);
     int bbIndex = getBBIndex(unit->op);
-    // llvm::errs() << "; bb: " << bbIndex <<  "\n";
     
     // insert units in the selected basic blocks
     if (bbs.count(bbIndex)>0 && bbs[bbIndex] > 0) {
