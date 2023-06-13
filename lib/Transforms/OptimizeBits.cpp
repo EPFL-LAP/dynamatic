@@ -60,16 +60,10 @@ static LogicalResult rewriteBitsWidths(handshake::FuncOp funcOp,
 
       if (isa<mlir::arith::ExtSIOp>(op) || isa<mlir::arith::ExtUIOp>(op)) {
         if (op->getResult(0).getType().getIntOrFloatBitWidth() >
-<<<<<<< HEAD
-          op->getOperand(0).getType().getIntOrFloatBitWidth())
-          bitwidth::replaceWithPredecessor(op);
-          continue;
-=======
             op->getOperand(0).getType().getIntOrFloatBitWidth()) {
           bitwidth::replaceWithPredecessor(op);
           continue;
         }
->>>>>>> 3dab7836f82a223f4e5d8a8327367597e87c6e0e
       }
 
       const auto opName = op->getName().getStringRef();
