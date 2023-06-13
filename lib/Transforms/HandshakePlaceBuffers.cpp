@@ -25,46 +25,29 @@ using namespace dynamatic::buffer;
 
 static LogicalResult insertBuffers(handshake::FuncOp funcOp, 
                                    MLIRContext *ctx,
-                                   bool stdLevel) {
+                                   std::string stdLevelInfo) {
 
   std::vector<Operation *> visitedOpList;
-  // std::vector<unsigned> bbIndexList;
   std::vector<unit *> unitList;
 
-  unsigned maxBBInd = 0;
-  // unsigned numOps;
-
-  // entry operations for DFS 
-  SmallVector<Operation *> entryOps;
-  // build the dataflowCircuit from the handshake level
-  for (auto &op : funcOp.getOps()) {
-    unsigned bbInd = getBBIndex(&op); 
+  // DFS build the dataflowCircuit from the handshake level
+  for (auto &op : funcOp.getOps())
     if (isEntryOp(&op, visitedOpList))
       dfsHandshakeGraph(&op, unitList, visitedOpList);
-    if (bbInd != UINT_MAX && bbInd > maxBBInd)
-      maxBBInd = bbInd;
-  }
-
+  
   std::vector<dataFlowCircuit *> dataFlowCircuitList;
   // speficy by a flag, read the bb file 
-  if (stdLevel){
-    std::string folder = 
-      "/home/yuxuan/Projects/dynamatic-utils/benchmarks/FPL22/";
-    std::string fileName = folder + funcOp.getName().str() + 
-                           "/dynamatic/comp/std_bb.dat";
+  if (stdLevelInfo!=""){
     std::map<archBB*, int> archs;
     std::map<int, int> bbs;
 
-    readSimulateFile(fileName, archs, bbs);
-
+    readSimulateFile(stdLevelInfo, archs, bbs);
     int execNum = buffer::extractCFDFCircuit(archs, bbs);
     while (execNum > 0) {
-      printCFDFCircuit(archs, bbs);
-      auto circuit = createCFDFCircuit(unitList, archs, bbs);
-      dataFlowCircuitList.push_back(circuit);
+      llvm::errs() << "extracting....\n";
+      dataFlowCircuitList.push_back(createCFDFCircuit(unitList, archs, bbs));
       execNum = buffer::extractCFDFCircuit(archs, bbs);
     }
-    
   }
 
   return success();
@@ -76,21 +59,21 @@ namespace {
 /// Simple driver for prepare for legacy pass.
 struct PlaceBuffersPass : public PlaceBuffersBase<PlaceBuffersPass> {
 
-  PlaceBuffersPass(bool stdLevel) {
-    this->stdLevel = stdLevel;
+  PlaceBuffersPass(std::string stdLevelInfo) {
+    this->stdLevelInfo = stdLevelInfo;
   }
   
   void runOnOperation() override {
     ModuleOp m = getOperation();
 
     for (auto funcOp : m.getOps<handshake::FuncOp>())
-      if (failed(insertBuffers(funcOp, &getContext(), stdLevel)))
+      if (failed(insertBuffers(funcOp, &getContext(), stdLevelInfo)))
         return signalPassFailure();
   };
 };
 } // namespace
 
 std::unique_ptr<mlir::OperationPass<mlir::ModuleOp>>
-dynamatic::createHandshakePlaceBuffersPass(bool stdLevel) {
-  return std::make_unique<PlaceBuffersPass>(stdLevel);
+dynamatic::createHandshakePlaceBuffersPass(std::string stdLevelInfo) {
+  return std::make_unique<PlaceBuffersPass>(stdLevelInfo);
 }

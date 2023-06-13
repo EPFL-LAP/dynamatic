@@ -46,7 +46,7 @@ void buffer::readSimulateFile(const std::string & fileName,
     arch->execFreq = std::stoi(token);
 
     if (!std::getline(iss, token, ',')) {
-      arch->isBackEdge = arch->execFreq > 1 ? true : false;
+      arch->isBackEdge = arch->srcBB >= arch->dstBB ? true : false;
       // llvm::errs() << "Back Edge is not specified, set to default: " 
       //               << arch.isBackEdge << "\n";
     } else {
@@ -61,19 +61,9 @@ void buffer::readSimulateFile(const std::string & fileName,
   }
 }
 
-
-void buffer::printBBWithArchs(int bb, std::map<archBB*, int> &archs) {
-  llvm::errs() << "BB: " << bb << "\n"; 
-  for (auto arch : archs) 
-    if (arch.first->srcBB == bb) 
-      llvm::errs() << "  " << arch.first->srcBB << " -> " << arch.first->dstBB 
-                    << " : " << "(freq " << arch.first->execFreq << " ; back edge  " 
-                    << arch.first->isBackEdge << ")\n";
-}
-
-void buffer::printCFDFCircuit(std::map<archBB*, int> &archs, 
+static void printCFDFCircuit(std::map<archBB*, int> &archs, 
                               std::map<int, int> &bbs) {
-  llvm::errs() << "==========CFDFCircuit:============\n";
+  llvm::errs() << "CFDFCircuit:\n";
   for (auto bb : bbs) 
     if (bb.second > 0) {
       llvm::errs() << "BB: " << bb.first << "\n"; 
@@ -83,7 +73,19 @@ void buffer::printCFDFCircuit(std::map<archBB*, int> &archs,
                         << " : " << "(freq " << arch.first->execFreq << " ; back edge  " 
                         << arch.first->isBackEdge << ")\n";
     }
-  
+}
+
+static void printCircuit(std::map<archBB*, int> &archs, 
+                              std::map<int, int> &bbs) {
+  llvm::errs() << "==========Circuit:============\n";
+  for (auto bb : bbs) {
+      llvm::errs() << "BB: " << bb.first << "\n"; 
+      for (auto arch : archs) 
+        if (arch.first->srcBB == bb.first) 
+          llvm::errs() << "  " << arch.first->srcBB << " -> " << arch.first->dstBB 
+                        << " : " << "(freq " << arch.first->execFreq << " ; back edge  " 
+                        << arch.first->isBackEdge << ")\n";
+    }
 }
 
 static int initVarInMILP(GRBModel &modelMILP, 
@@ -123,11 +125,9 @@ static void setObjective(GRBModel &modelMILP,
 
 static archBB* findArchWithVarName(const std::string &varName, 
                                   std::vector<archBB*> &archs) {
-  // llvm::errs() << "varName: " << varName << "\n";
   for (auto arch : archs) {
     std::string arcName = "sArc_" + std::to_string(arch->srcBB) + 
                           "_" + std::to_string(arch->dstBB);
-    // llvm::errs() << "arcName: " << arcName << "\n";
     if (arcName == varName)
       return arch;
   }
@@ -229,21 +229,20 @@ static bool isSelect(std::map<archBB*, int> &archs, channel *ch) {
   }
   return false;
 }
-  
-
 
 int buffer::extractCFDFCircuit(std::map<archBB*, int> &archs,
-                                std::map<int, int> &bbs) {
+                               std::map<int, int> &bbs) {
   // store variable names
   std::vector<archBB*> archNames;
   std::vector<int> bbNames;
+
   for (auto pair : archs) {
     archNames.push_back(pair.first);
   }
   for (auto pair : bbs) {
     bbNames.push_back(pair.first);
   }
-
+  printCircuit(archs, bbs);
   // Create MILP model for CFDFCircuit extraction
   // Init a gurobi model
   GRBEnv env = GRBEnv(true);
@@ -254,38 +253,45 @@ int buffer::extractCFDFCircuit(std::map<archBB*, int> &archs,
   // Define variables
   std::map<std::string, GRBVar> sArc;
   std::map<int, GRBVar> sBB;
-
+  
   int cstMaxN = initVarInMILP(modelMILP, sBB, sArc, archNames, bbNames);
   setObjective(modelMILP, sArc);
   setEdgeConstrs(modelMILP, cstMaxN, sArc, archNames);
   setBBConstrs(modelMILP, sBB, sArc, archNames);
   modelMILP.optimize();
 
-  if (sArc["valExecN"].get(GRB_DoubleAttr_X) <= 0)
+  llvm::errs() << "status: " << modelMILP.get(GRB_IntAttr_Status) << "\n";
+  llvm::errs() << "exec times: " << sArc["valExecN"].get(GRB_DoubleAttr_X) << "\n";
+  if (modelMILP.get(GRB_IntAttr_Status) != GRB_OPTIMAL ||
+      sArc["valExecN"].get(GRB_DoubleAttr_X) <= 0)
     return -1;
-  else
-    modelMILP.write("/home/yuxuan/Projects/dynamatic-utils/compile/debug.lp");
 
-  // load answer to the map
+  // load answer to the bb map
+  for (auto pair : sBB) 
+    if (bbs.count(pair.first) > 0)
+      bbs[pair.first] = pair.second.get(GRB_DoubleAttr_X) > 0 ? 1 : 0;
+  
   int execN = static_cast<int>(sArc["valExecN"].get(GRB_DoubleAttr_X));
+  // load answer to the arch map
   for (auto pair : sArc) {
-    if (pair.first == "valExecN") {
-      // llvm::errs() << "valExecN : " << execN << "\n";
+    if (pair.first == "valExecN") 
       continue;
-    }
+    
     auto arch = findArchWithVarName(pair.first, archNames);
-    arch->execFreq -= execN;
     archs[arch] = pair.second.get(GRB_DoubleAttr_X) > 0 ? 1 : 0;
-    // llvm::errs() << pair.first << " : " 
-    //              << sArc[pair.first].get(GRB_DoubleAttr_X) << "\n";
   }
-  for (auto pair : sBB) {
-    bbs[pair.first] = pair.second.get(GRB_DoubleAttr_X) > 0 ? 1 : 0;
-    // llvm::errs() << pair.first << " : " 
-    //              << sBB[pair.first].get(GRB_DoubleAttr_X) << "\n";
+
+  printCFDFCircuit(archs, bbs);
+  // update the connection information after CFDFC extraction    
+  for (auto pair: sArc) {
+    if (pair.first == "valExecN")
+      continue;
+    auto arch = findArchWithVarName(pair.first, archNames);
+    if (archs[arch] > 0) 
+      arch->execFreq -= execN;
   }
+
   return execN;
-  // return -1;
 }
 
 dataFlowCircuit *buffer::createCFDFCircuit(std::vector<unit *> &unitList,
@@ -294,11 +300,15 @@ dataFlowCircuit *buffer::createCFDFCircuit(std::vector<unit *> &unitList,
 
   dataFlowCircuit *circuit = new dataFlowCircuit();
   for (auto unit : unitList) {
+    llvm::errs() << "unit: " << *(unit->op);
     int bbIndex = getBBIndex(unit->op);
+    llvm::errs() << "; bb: " << bbIndex <<  "\n";
+    
     // insert units in the selected basic blocks
-    if (bbs[bbIndex] > 0) {
+    if (bbs.count(bbIndex)>0 && bbs[bbIndex] > 0) {
       circuit->units.push_back(unit);
       // insert channels if it is selected
+      llvm::errs() << "insert unit successfully\n";
       for (auto ports : unit->outPorts) 
         for (auto ch : ports->cntChannels) 
           if (isSelect(archs, ch)) 

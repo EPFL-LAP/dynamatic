@@ -144,11 +144,11 @@ def PushConstants : Pass<"push-constants", "mlir::ModuleOp"> {
 def PlaceBuffers : Pass<"place-buffers", "mlir::ModuleOp"> {
   let summary = "Insert Buffers in Data flow graphs.";
   let description = [{
-   
+    This pass insert buffers in the data flow graph.
   }];
   let constructor = "dynamatic::createHandshakePlaceBuffersPass()";
   let options = [
-    Option<"stdLevel", "std-level", "bool", "false",
+    Option<"stdLevelInfo", "std-level-info", "std::string", "",
     "if true, extract CFDFC from standard level simluation">];
 }
 

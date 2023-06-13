@@ -22,14 +22,9 @@ using namespace dynamatic::buffer;
 
 bool buffer::isEntryOp(Operation *op,
                        std::vector<Operation *> &visitedOp) {
-    if (op->getAttrs().data()->getName() == "bb") {
-      if (op->getAttrOfType<IntegerAttr>("bb").getUInt() == 0 &&
-          isa<MergeOp>(op)) {
-        // visitedOp.push_back(op);
-        return true;
-      }
-      
-  }
+  for (auto operand : op->getOperands()) 
+    if (!operand.getDefiningOp())
+      return true;
   return false;
 }
 
@@ -40,21 +35,11 @@ int buffer::getBBIndex(Operation *op) {
 }
 
 bool buffer::isBackEdge(Operation *opSrc, Operation *opDst) {
-  // unsigned bbSrcInd = getBBIndex(opSrc);
-  // unsigned bbDstInd = getBBIndex(opDst);
-  // if (bbSrcInd == UINT_MAX || bbDstInd == UINT_MAX ||
-  //     isa<handshake::EndOp>(*opDst))
-  //   return false;
-
-  // if (bbSrcInd > bbDstInd)
-  //   return true;
-
   if (opDst->isProperAncestor(opSrc))
     return true;
 
   return false;
 }
-
 
 unit *buffer::getUnitWithOp(Operation *op, std::vector<unit *> &unitList) {
   for (auto u : unitList) {
@@ -103,8 +88,6 @@ void buffer::dfsHandshakeGraph(Operation *opNode,
       // create the channel connected to the outport
       channel *outChannel = new channel(opNode, sucOp, &resOperand);
       outChannel->isBackEdge = isBackEdge(opNode, sucOp);
-      // llvm::errs() << "creating channels .... \n";
-      // outChannel->print();
       outPort->cntChannels.push_back(outChannel);
 
       // dfs the successor operation
@@ -112,8 +95,22 @@ void buffer::dfsHandshakeGraph(Operation *opNode,
     } 
     unitNode->outPorts.push_back(outPort);
   }
-  
+}
 
+/// ================== dataFlowCircuit Function ================== ///
+void buffer::dataFlowCircuit::printCircuits() {
+  for (auto unit : units) {
+    llvm::errs() << "===========================\n";
+    llvm::errs() << "operation: " << *(unit->op) << "\n";
+    llvm::errs() << "-------------inPorts: \n";
+    for (auto port : unit->outPorts)
+      for (auto ch : port->cntChannels)
+        ch->print();
+    llvm::errs() << "-------------outPorts: \n";
+    for (auto port : unit->inPorts)
+      for (auto ch : port->cntChannels)
+        ch->print();
+  }
 }
 
 
@@ -208,22 +205,6 @@ void buffer::dfsHandshakeGraph(Operation *opNode,
 // }
 
 
-
-/// ================== dataFlowCircuit Function ================== ///
-void buffer::dataFlowCircuit::printCircuits() {
-  for (auto unit : units) {
-    llvm::errs() << "===========================\n";
-    llvm::errs() << "operation: " << *(unit->op) << "\n";
-    llvm::errs() << "-------------inPorts: \n";
-    for (auto port : unit->outPorts)
-      for (auto ch : port->cntChannels)
-        ch->print();
-    llvm::errs() << "-------------outPorts: \n";
-    for (auto port : unit->inPorts)
-      for (auto ch : port->cntChannels)
-        ch->print();
-  }
-}
 
 // std::vector<std::vector<float>>
 // buffer::dataFlowCircuit::readInfoFromFile(const std::string &filename) {

@@ -31,11 +31,6 @@ dataFlowCircuit *createCFDFCircuit(std::vector<unit *> &unitList,
                        std::map<archBB*, int> &archs,
                        std::map<int, int> &bbs);
 
-void printBBWithArchs(int bb, std::map<archBB*, int> &archs);
-
-void printCFDFCircuit(std::map<archBB*, int> &archs, 
-                      std::map<int, int> &bbs);
-
 void readSimulateFile(const std::string & fileName, 
                       std::map<archBB* , int> &archs, 
                       std::map<int, int> &bbs);
