@@ -28,7 +28,6 @@ else ()
   set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -fno-exceptions -fno-rtti")
 endif ()
 
-
 #-------------------------------------------------------------------------------
 # Gurobi setup
 #-------------------------------------------------------------------------------
@@ -36,7 +35,6 @@ endif ()
 list(APPEND CMAKE_MODULE_PATH "${CMAKE_SOURCE_DIR}/build/cmake/modules")
 find_package(GUROBI REQUIRED)
 include_directories(${GUROBI_INCLUDE_DIRS})
-
 
 #-------------------------------------------------------------------------------
 # CIRCT/MLIR/LLVM configuration
@@ -102,7 +100,7 @@ function(add_dynamatic_dialect_library name)
 endfunction()
 
 #-------------------------------------------------------------------------------
-# Directory configuration
+# Directory setup
 #-------------------------------------------------------------------------------
 
 add_subdirectory(${DYNAMATIC_INCLUDE_DIR}/dynamatic)

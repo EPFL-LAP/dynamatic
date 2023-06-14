@@ -22,7 +22,7 @@ namespace buffer {
 using namespace circt;
 using namespace circt::handshake;
 
-/// An arch stores the basic information (execution frequency, isBackEdge) 
+/// An arch stores the basic information (execution frequency, isBackEdge)
 /// of an arch  between basic blocks.
 struct arch {
   int srcBB, dstBB;
@@ -30,12 +30,12 @@ struct arch {
   bool isBackEdge = false;
 };
 
-/// A channel is the entity of the connections between units; 
-/// A channel is identified by its port and the connection units.  
+/// A channel is the entity of the connections between units;
+/// A channel is identified by its port and the connection units.
 struct channel : arch {
-  channel () : arch() {};
+  channel() : arch(){};
 
-  channel (Operation *opSrc, Operation *opDst, Value *valPort) : arch() {
+  channel(Operation *opSrc, Operation *opDst, Value *valPort) : arch() {
     this->opSrc = opSrc;
     this->opDst = opDst;
     this->valPort = valPort;
@@ -52,8 +52,8 @@ struct channel : arch {
 
 /// A port is the entity of the connections between units;
 struct port {
-  port () : opVal(nullptr) {};
-  port (Value *opVal) : opVal(opVal) {};
+  port() : opVal(nullptr){};
+  port(Value *opVal) : opVal(opVal){};
 
   double portLatency = 0.0;
   Value *opVal;
@@ -63,8 +63,8 @@ struct port {
 
 /// A unit is the entity of the operations in the graph;
 struct unit {
-  unit () : op(nullptr) {};
-  unit (Operation *op) : op(op) {};
+  unit() : op(nullptr){};
+  unit(Operation *op) : op(op){};
 
   unsigned freq = 0;
   double latency = 0.0;
@@ -76,8 +76,7 @@ struct unit {
 };
 
 /// Identify whether an operation is a start point of the fucntion block.
-bool isEntryOp(Operation *op,
-               std::vector<Operation *> &visitedOp);
+bool isEntryOp(Operation *op, std::vector<Operation *> &visitedOp);
 
 /// Ger the index of the basic block of an operation.
 int getBBIndex(Operation *op);
@@ -94,7 +93,8 @@ void connectInChannel(unit *unitNode, channel *inChannel);
 
 /// Deep first search the handshake file to get the units connection graph.
 void dfsHandshakeGraph(Operation *opNode, std::vector<unit *> &unitList,
-     std::vector<Operation *> &visited, channel *inChannel=nullptr);
+                       std::vector<Operation *> &visited,
+                       channel *inChannel = nullptr);
 
 struct dataFlowCircuit {
   double targetCP, maxCP;
@@ -109,7 +109,7 @@ struct dataFlowCircuit {
   void printCircuits();
 };
 
-} // namespace handshake
-} // namespace circt
+} // namespace buffer
+} // namespace dynamatic
 
 #endif // DYNAMATIC_TRANSFORMS_UTILSFORPLACEBUFFERS_H

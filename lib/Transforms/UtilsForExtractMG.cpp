@@ -18,8 +18,8 @@ using namespace mlir;
 using namespace dynamatic;
 using namespace dynamatic::buffer;
 
-void buffer::readSimulateFile(const std::string & fileName, 
-                              std::map<archBB*, int> &archs, 
+void buffer::readSimulateFile(const std::string &fileName,
+                              std::map<archBB *, int> &archs,
                               std::map<int, int> &bbs) {
   std::ifstream inFile(fileName);
 
@@ -45,11 +45,11 @@ void buffer::readSimulateFile(const std::string & fileName,
     std::getline(iss, token, ',');
     arch->execFreq = std::stoi(token);
 
-    if (!std::getline(iss, token, ',')) 
+    if (!std::getline(iss, token, ','))
       arch->isBackEdge = arch->srcBB >= arch->dstBB ? true : false;
-    else 
+    else
       arch->isBackEdge = std::stoi(token) == 1 ? true : false;
-    
+
     archs[arch] = false;
     if (bbs.count(arch->srcBB) == 0)
       bbs[arch->srcBB] = false;
@@ -58,19 +58,19 @@ void buffer::readSimulateFile(const std::string & fileName,
   }
 }
 
-static int initVarInMILP(GRBModel &modelMILP, 
-                          std::map<int, GRBVar> &sBB, 
-                          std::map<std::string, GRBVar> &sArc, 
-                          std::vector<archBB*> &archNames, 
-                          std::vector<int> &bbNames) {
+static int initVarInMILP(GRBModel &modelMILP, std::map<int, GRBVar> &sBB,
+                         std::map<std::string, GRBVar> &sArc,
+                         std::vector<archBB *> &archNames,
+                         std::vector<int> &bbNames) {
   int cstMaxN = 0;
-  
+
   for (auto bb : bbNames) {
-    sBB[bb] = modelMILP.addVar(0.0, 1, 0.0, GRB_BINARY, "sBB_" + std::to_string(bb));
+    sBB[bb] =
+        modelMILP.addVar(0.0, 1, 0.0, GRB_BINARY, "sBB_" + std::to_string(bb));
     for (auto arch : archNames)
       if (arch->srcBB == bb) {
-        std::string arcName = "sArc_" + std::to_string(arch->srcBB) + 
-                              "_" + std::to_string(arch->dstBB);
+        std::string arcName = "sArc_" + std::to_string(arch->srcBB) + "_" +
+                              std::to_string(arch->dstBB);
         sArc[arcName] = modelMILP.addVar(0.0, 1, 0.0, GRB_BINARY, arcName);
         cstMaxN = std::max(cstMaxN, arch->execFreq);
       }
@@ -81,8 +81,8 @@ static int initVarInMILP(GRBModel &modelMILP,
   return cstMaxN;
 }
 
-static void setObjective(GRBModel &modelMILP, 
-                          std::map<std::string, GRBVar> &sArc) {
+static void setObjective(GRBModel &modelMILP,
+                         std::map<std::string, GRBVar> &sArc) {
   GRBQuadExpr objExpr;
   for (auto pair : sArc) {
     if (pair.first == "valExecN")
@@ -93,20 +93,20 @@ static void setObjective(GRBModel &modelMILP,
   modelMILP.setObjective(objExpr, GRB_MAXIMIZE);
 }
 
-static archBB* findArchWithVarName(const std::string &varName, 
-                                  std::vector<archBB*> &archs) {
+static archBB *findArchWithVarName(const std::string &varName,
+                                   std::vector<archBB *> &archs) {
   for (auto arch : archs) {
-    std::string arcName = "sArc_" + std::to_string(arch->srcBB) + 
-                          "_" + std::to_string(arch->dstBB);
+    std::string arcName = "sArc_" + std::to_string(arch->srcBB) + "_" +
+                          std::to_string(arch->dstBB);
     if (arcName == varName)
       return arch;
   }
   assert(false && "Cannot find arch with var name");
 }
 
-static std::vector<std::string> getBBsInArcVars(int bb, 
-                                                std::map<std::string, GRBVar> &sArc,
-                                                std::vector<archBB*> &archs) {
+static std::vector<std::string>
+getBBsInArcVars(int bb, std::map<std::string, GRBVar> &sArc,
+                std::vector<archBB *> &archs) {
   std::vector<std::string> varNames;
   for (auto pair : sArc) {
     if (pair.first == "valExecN")
@@ -119,9 +119,9 @@ static std::vector<std::string> getBBsInArcVars(int bb,
   return varNames;
 }
 
-static std::vector<std::string> getBBsOutArcVars(int bb, 
-                                                std::map<std::string, GRBVar> &sArc,
-                                                std::vector<archBB*> &archs) {
+static std::vector<std::string>
+getBBsOutArcVars(int bb, std::map<std::string, GRBVar> &sArc,
+                 std::vector<archBB *> &archs) {
   std::vector<std::string> varNames;
   for (auto pair : sArc) {
     if (pair.first == "valExecN")
@@ -134,10 +134,9 @@ static std::vector<std::string> getBBsOutArcVars(int bb,
   return varNames;
 }
 
-static void setEdgeConstrs(GRBModel &modelMILP, 
-                          int cstMaxN,
-                          std::map<std::string, GRBVar> &sArc,
-                          std::vector<archBB*> &archs) {
+static void setEdgeConstrs(GRBModel &modelMILP, int cstMaxN,
+                           std::map<std::string, GRBVar> &sArc,
+                           std::vector<archBB *> &archs) {
 
   auto valExecN = sArc["valExecN"];
   GRBLinExpr backEdgeConstr;
@@ -161,10 +160,9 @@ static void setEdgeConstrs(GRBModel &modelMILP,
   modelMILP.addConstr(backEdgeConstr == 1, "cBack");
 }
 
-static void setBBConstrs(GRBModel &modelMILP, 
-                         std::map<int, GRBVar> &sBB,
+static void setBBConstrs(GRBModel &modelMILP, std::map<int, GRBVar> &sBB,
                          std::map<std::string, GRBVar> &sArc,
-                         std::vector<archBB*> &archs) {
+                         std::vector<archBB *> &archs) {
 
   int constrInd = 0;
   for (auto pair : sBB) {
@@ -189,10 +187,9 @@ static void setBBConstrs(GRBModel &modelMILP,
                         "cOut" + std::to_string(constrInd));
     ++constrInd;
   }
-
 };
 
-static bool isSelect(std::map<archBB*, int> &archs, channel *ch) {
+static bool isSelect(std::map<archBB *, int> &archs, channel *ch) {
   int srcBB = getBBIndex(ch->opSrc);
   int dstBB = getBBIndex(ch->opDst);
   for (auto pair : archs) {
@@ -202,10 +199,10 @@ static bool isSelect(std::map<archBB*, int> &archs, channel *ch) {
   return false;
 }
 
-int buffer::extractCFDFCircuit(std::map<archBB*, int> &archs,
+int buffer::extractCFDFCircuit(std::map<archBB *, int> &archs,
                                std::map<int, int> &bbs) {
   // store variable names
-  std::vector<archBB*> archNames;
+  std::vector<archBB *> archNames;
   std::vector<int> bbNames;
 
   for (auto pair : archs) {
@@ -225,7 +222,7 @@ int buffer::extractCFDFCircuit(std::map<archBB*, int> &archs,
   // Define variables
   std::map<std::string, GRBVar> sArc;
   std::map<int, GRBVar> sBB;
-  
+
   int cstMaxN = initVarInMILP(modelMILP, sBB, sArc, archNames, bbNames);
   setObjective(modelMILP, sArc);
   setEdgeConstrs(modelMILP, cstMaxN, sArc, archNames);
@@ -237,41 +234,41 @@ int buffer::extractCFDFCircuit(std::map<archBB*, int> &archs,
     return -1;
 
   // load answer to the bb map
-  for (auto pair : sBB) 
+  for (auto pair : sBB)
     if (bbs.count(pair.first) > 0)
       bbs[pair.first] = pair.second.get(GRB_DoubleAttr_X) > 0 ? 1 : 0;
-  
+
   int execN = static_cast<int>(sArc["valExecN"].get(GRB_DoubleAttr_X));
 
   // load answer to the arch map
   for (auto pair : sArc) {
-    if (pair.first == "valExecN") 
+    if (pair.first == "valExecN")
       continue;
     auto arch = findArchWithVarName(pair.first, archNames);
     archs[arch] = pair.second.get(GRB_DoubleAttr_X) > 0 ? 1 : 0;
-  // update the connection information after CFDFC extraction    
-    if (archs[arch] > 0) 
+    // update the connection information after CFDFC extraction
+    if (archs[arch] > 0)
       arch->execFreq -= execN;
   }
   return execN;
 }
 
 dataFlowCircuit *buffer::createCFDFCircuit(std::vector<unit *> &unitList,
-                       std::map<archBB*, int> &archs,
-                       std::map<int, int> &bbs) {
+                                           std::map<archBB *, int> &archs,
+                                           std::map<int, int> &bbs) {
 
   dataFlowCircuit *circuit = new dataFlowCircuit();
   for (auto unit : unitList) {
     int bbIndex = getBBIndex(unit->op);
-    
+
     // insert units in the selected basic blocks
-    if (bbs.count(bbIndex)>0 && bbs[bbIndex] > 0) {
+    if (bbs.count(bbIndex) > 0 && bbs[bbIndex] > 0) {
       circuit->units.push_back(unit);
       // insert channels if it is selected
-      for (auto ports : unit->outPorts) 
-        for (auto ch : ports->cntChannels) 
-          if (isSelect(archs, ch)) 
-            circuit->channels.push_back(ch);    
+      for (auto ports : unit->outPorts)
+        for (auto ch : ports->cntChannels)
+          if (isSelect(archs, ch))
+            circuit->channels.push_back(ch);
     }
   }
   return circuit;

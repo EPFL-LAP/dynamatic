@@ -6,8 +6,8 @@
 //===----------------------------------------------------------------------===//
 
 #include "dynamatic/Transforms/HandshakePlaceBuffers.h"
-#include "circt/Dialect/Handshake/HandshakeOps.h"
 #include "circt/Dialect/Handshake/HandshakeDialect.h"
+#include "circt/Dialect/Handshake/HandshakeOps.h"
 #include "dynamatic/Transforms/PassDetails.h"
 #include "mlir/Dialect/Arith/IR/Arith.h"
 #include "mlir/Dialect/Func/IR/FuncOps.h"
@@ -23,10 +23,8 @@ using namespace mlir;
 using namespace dynamatic;
 using namespace dynamatic::buffer;
 
-static LogicalResult insertBuffers(handshake::FuncOp funcOp, 
-                                   MLIRContext *ctx,
-                                   bool firstMG,
-                                   std::string stdLevelInfo) {
+static LogicalResult insertBuffers(handshake::FuncOp funcOp, MLIRContext *ctx,
+                                   bool firstMG, std::string stdLevelInfo) {
 
   std::vector<Operation *> visitedOpList;
   std::vector<unit *> unitList;
@@ -39,8 +37,8 @@ static LogicalResult insertBuffers(handshake::FuncOp funcOp,
   // create CFDFC circuits
   std::vector<dataFlowCircuit *> dataFlowCircuitList;
   // speficy by a flag, whether read the bb file from std level
-  if (stdLevelInfo!=""){
-    std::map<archBB*, int> archs;
+  if (stdLevelInfo != "") {
+    std::map<archBB *, int> archs;
     std::map<int, int> bbs;
 
     readSimulateFile(stdLevelInfo, archs, bbs);
@@ -55,10 +53,9 @@ static LogicalResult insertBuffers(handshake::FuncOp funcOp,
       execNum = buffer::extractCFDFCircuit(archs, bbs);
     }
   }
-  
+
   return success();
 }
-
 
 namespace {
 /// Simple driver for prepare for legacy pass.
@@ -68,7 +65,7 @@ struct PlaceBuffersPass : public PlaceBuffersBase<PlaceBuffersPass> {
     this->firstMG = firstMG;
     this->stdLevelInfo = stdLevelInfo;
   }
-  
+
   void runOnOperation() override {
     ModuleOp m = getOperation();
 
@@ -80,6 +77,7 @@ struct PlaceBuffersPass : public PlaceBuffersBase<PlaceBuffersPass> {
 } // namespace
 
 std::unique_ptr<mlir::OperationPass<mlir::ModuleOp>>
-dynamatic::createHandshakePlaceBuffersPass(bool firstMG, std::string stdLevelInfo) {
+dynamatic::createHandshakePlaceBuffersPass(bool firstMG,
+                                           std::string stdLevelInfo) {
   return std::make_unique<PlaceBuffersPass>(firstMG, stdLevelInfo);
 }

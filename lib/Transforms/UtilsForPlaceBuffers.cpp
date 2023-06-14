@@ -5,8 +5,8 @@
 //===----------------------------------------------------------------------===//
 
 #include "dynamatic/Transforms/UtilsForPlaceBuffers.h"
-#include "dynamatic/Conversion/StandardToHandshakeFPGA18.h"
 #include "circt/Dialect/Handshake/HandshakeOps.h"
+#include "dynamatic/Conversion/StandardToHandshakeFPGA18.h"
 #include "mlir/Dialect/Arith/IR/Arith.h"
 #include "mlir/Dialect/Func/IR/FuncOps.h"
 #include "mlir/IR/BuiltinTypes.h"
@@ -21,9 +21,8 @@ using namespace mlir;
 using namespace dynamatic;
 using namespace dynamatic::buffer;
 
-bool buffer::isEntryOp(Operation *op,
-                       std::vector<Operation *> &visitedOp) {
-  for (auto operand : op->getOperands()) 
+bool buffer::isEntryOp(Operation *op, std::vector<Operation *> &visitedOp) {
+  for (auto operand : op->getOperands())
     if (!operand.getDefiningOp())
       return true;
   return false;
@@ -53,20 +52,18 @@ unit *buffer::getUnitWithOp(Operation *op, std::vector<unit *> &unitList) {
 }
 
 void buffer::connectInChannel(unit *unitNode, channel *inChannel) {
-    port *inPort = new port(inChannel->valPort);
-    inPort->cntChannels.push_back(inChannel);
-    unitNode->inPorts.push_back(inPort);
+  port *inPort = new port(inChannel->valPort);
+  inPort->cntChannels.push_back(inChannel);
+  unitNode->inPorts.push_back(inPort);
 }
 
-void buffer::dfsHandshakeGraph(Operation *opNode, 
-                               std::vector<unit *> &unitList,
+void buffer::dfsHandshakeGraph(Operation *opNode, std::vector<unit *> &unitList,
                                std::vector<Operation *> &visited,
                                channel *inChannel) {
 
   // ensure inChannel is marked as connected to the unit
   if (inChannel != nullptr)
-    if (unit *unitNode = getUnitWithOp(opNode, unitList);
-        unitNode != nullptr) {
+    if (unit *unitNode = getUnitWithOp(opNode, unitList); unitNode != nullptr) {
       connectInChannel(unitNode, inChannel);
     }
 
@@ -77,7 +74,7 @@ void buffer::dfsHandshakeGraph(Operation *opNode,
   // marked as visited
   visited.push_back(opNode);
 
-  // initialize the unit node 
+  // initialize the unit node
   unit *unitNode = new unit(opNode);
   unitList.push_back(unitNode);
   if (inChannel != nullptr)
@@ -95,7 +92,7 @@ void buffer::dfsHandshakeGraph(Operation *opNode,
 
       // dfs the successor operation
       dfsHandshakeGraph(sucOp, unitList, visited, outChannel);
-    } 
+    }
     unitNode->outPorts.push_back(outPort);
   }
 }

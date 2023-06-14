@@ -34,6 +34,3 @@ target_link_libraries(DynamaticTransforms PUBLIC
 target_link_libraries(DynamaticTransforms PUBLIC 
   ${GUROBI_LIBRARY}
 )
-
-
-
