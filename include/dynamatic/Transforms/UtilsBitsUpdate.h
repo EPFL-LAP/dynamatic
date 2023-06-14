@@ -8,6 +8,7 @@
 #define DYNAMATIC_TRANSFORMS_UTILSBITSUPDATE_H
 
 #include "circt/Dialect/Handshake/HandshakeOps.h"
+#include "dynamatic/Conversion/StandardToHandshakeFPGA18.h"
 #include "dynamatic/Support/LLVM.h"
 #include <optional>
 
@@ -26,6 +27,9 @@ IntegerType getNewType(Value opVal, unsigned bitswidth,
 
 std::optional<Operation *> insertWidthMatchOp(Operation *newOp, int opInd,
                                               Type newType, MLIRContext *ctx);
+
+
+LogicalResult containsAttr(Operation *op, std::string attrName);
 
 namespace dynamatic {
 namespace bitwidth {

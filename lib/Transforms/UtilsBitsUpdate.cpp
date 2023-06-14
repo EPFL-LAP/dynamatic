@@ -47,7 +47,8 @@ std::optional<Operation *> insertWidthMatchOp(Operation *newOp, int opInd,
       auto truncOp = builder.create<mlir::arith::TruncIOp>(newOp->getLoc(),
                                                            newType, opVal);
       newOp->setOperand(opInd, truncOp.getResult());
-
+      if (succeeded(containsAttr(newOp, BB_ATTR)))   
+        truncOp->setAttr(BB_ATTR, newOp->getAttr(BB_ATTR));
       return truncOp;
     }
 
@@ -57,11 +58,19 @@ std::optional<Operation *> insertWidthMatchOp(Operation *newOp, int opInd,
       auto extOp =
           builder.create<mlir::arith::ExtSIOp>(newOp->getLoc(), newType, opVal);
       newOp->setOperand(opInd, extOp.getResult());
-
+      if (succeeded(containsAttr(newOp, BB_ATTR))) 
+        extOp->setAttr(BB_ATTR, newOp->getAttr(BB_ATTR));
       return extOp;
     }
   }
   return {};
+}
+
+LogicalResult containsAttr(Operation *op, std::string attrName) {
+  for (auto attr : op->getAttrs())
+    if (attr.getName() == attrName)
+      return success();
+  return failure();
 }
 
 namespace dynamatic::bitwidth {
