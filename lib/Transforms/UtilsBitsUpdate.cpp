@@ -644,7 +644,7 @@ void revertTruncOrExt(Operation *op, MLIRContext *ctx) {
     }
 }
 
-LogicalResult matchOpResWidth(Operation *op, MLIRContext *ctx,
+void matchOpResWidth(Operation *op, MLIRContext *ctx,
                      SmallVector<Operation *> &newMatchedOps) {
 
   DenseMap<mlir::StringRef,
@@ -668,8 +668,6 @@ LogicalResult matchOpResWidth(Operation *op, MLIRContext *ctx,
           op, i, getNewType(Operand, oprsWidth[0][i], false), ctx);
       if (insertOp.has_value())
         newMatchedOps.push_back(insertOp.value());
-      else
-        return failure();
     }
   }
   // make result matched the width
@@ -681,11 +679,9 @@ LogicalResult matchOpResWidth(Operation *op, MLIRContext *ctx,
       op->getResult(i).setType(newType);
     }
   }
-
-  return success();
 }
 
-LogicalResult validateOp(Operation *op, MLIRContext *ctx,
+void validateOp(Operation *op, MLIRContext *ctx,
                 SmallVector<Operation *> &newMatchedOps) {
   // the operations can be divided to three types to make it validated
   // passType: branch, conditionalbranch
@@ -703,12 +699,10 @@ LogicalResult validateOp(Operation *op, MLIRContext *ctx,
           validateOp(resOp, ctx, newMatchedOps);
 
   if (match)
-    if (failed(matchOpResWidth(op, ctx, newMatchedOps)))
-      return failure();
+    matchOpResWidth(op, ctx, newMatchedOps);
 
   if (revert)
     revertTruncOrExt(op, ctx);
 
-  return success();
 }
 } // namespace dynamatic::bitwidth
