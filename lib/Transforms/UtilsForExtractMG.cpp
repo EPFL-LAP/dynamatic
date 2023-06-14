@@ -65,10 +65,12 @@ static int initVarInMILP(GRBModel &modelMILP, std::map<int, GRBVar> &sBB,
   int cstMaxN = 0;
 
   for (auto bb : bbNames) {
+    // define variables for basic blocks selection
     sBB[bb] =
         modelMILP.addVar(0.0, 1, 0.0, GRB_BINARY, "sBB_" + std::to_string(bb));
     for (auto arch : archNames)
       if (arch->srcBB == bb) {
+        // define variables for edges selection
         std::string arcName = "sArc_" + std::to_string(arch->srcBB) + "_" +
                               std::to_string(arch->dstBB);
         sArc[arcName] = modelMILP.addVar(0.0, 1, 0.0, GRB_BINARY, arcName);
@@ -84,6 +86,7 @@ static int initVarInMILP(GRBModel &modelMILP, std::map<int, GRBVar> &sBB,
 static void setObjective(GRBModel &modelMILP,
                          std::map<std::string, GRBVar> &sArc) {
   GRBQuadExpr objExpr;
+  // cost function: max: \sum_{e \in E} s_e * execFreq_e
   for (auto pair : sArc) {
     if (pair.first == "valExecN")
       continue;
