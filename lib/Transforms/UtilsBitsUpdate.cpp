@@ -47,9 +47,8 @@ std::optional<Operation *> insertWidthMatchOp(Operation *newOp, int opInd,
       auto truncOp = builder.create<mlir::arith::TruncIOp>(newOp->getLoc(),
                                                            newType, opVal);
       newOp->setOperand(opInd, truncOp.getResult());
-      if (failed(containsAttr(newOp, BB_ATTR)))
-        return nullptr;   
-      truncOp->setAttr(BB_ATTR, newOp->getAttr(BB_ATTR));
+      if (succeeded(containsAttr(newOp, BB_ATTR)))   
+        truncOp->setAttr(BB_ATTR, newOp->getAttr(BB_ATTR));
       return truncOp;
     }
 
@@ -59,9 +58,8 @@ std::optional<Operation *> insertWidthMatchOp(Operation *newOp, int opInd,
       auto extOp =
           builder.create<mlir::arith::ExtSIOp>(newOp->getLoc(), newType, opVal);
       newOp->setOperand(opInd, extOp.getResult());
-      if (failed(containsAttr(newOp, BB_ATTR)))
-        return nullptr;   
-      extOp->setAttr(BB_ATTR, newOp->getAttr(BB_ATTR));
+      if (succeeded(containsAttr(newOp, BB_ATTR))) 
+        extOp->setAttr(BB_ATTR, newOp->getAttr(BB_ATTR));
       return extOp;
     }
   }
