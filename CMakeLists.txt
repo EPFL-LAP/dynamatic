@@ -96,6 +96,7 @@ endfunction()
 #-------------------------------------------------------------------------------
 
 add_subdirectory(${DYNAMATIC_INCLUDE_DIR}/dynamatic)
+add_subdirectory(${DYNAMATIC_SOURCE_DIR}/experimental)
 add_subdirectory(${DYNAMATIC_SOURCE_DIR}/lib)
 add_subdirectory(${DYNAMATIC_SOURCE_DIR}/test)
 add_subdirectory(${DYNAMATIC_SOURCE_DIR}/tools)

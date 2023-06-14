@@ -26,6 +26,7 @@ This section is intended to give an overview of the project's directory structur
 │           ├── dynamatic # Compiled TableGen headers (*.h.inc)
 ├── circt # CIRCT repository (submodule)
 ├── docs # Documentation and tutorials, where this file lies
+├── experimental # Experimental passes and tools
 ├── include
 │   ├── dynamatic # All header files (*.h)
 ├── lib # Implementation of compiler passes (*.cpp)
