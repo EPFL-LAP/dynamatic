@@ -48,7 +48,7 @@ static LogicalResult insertBuffers(handshake::FuncOp funcOp,
     while (execNum > 0) {
       // write the execution frequency to the dataflowCircuit
       auto circuit = createCFDFCircuit(unitList, archs, bbs);
-      circuit->execNum = execNum;
+      circuit->execN = execNum;
       dataFlowCircuitList.push_back(circuit);
       if (firstMG)
         break;
