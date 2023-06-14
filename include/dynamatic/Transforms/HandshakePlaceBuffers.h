@@ -17,28 +17,18 @@ std::unique_ptr<mlir::OperationPass<mlir::ModuleOp>>
 createHandshakePlaceBuffersPass(bool firstMG=false, std::string stdLevelInfo="");
 
 namespace buffer {
-/// Strategy class to control the contraints over CFDFC optimization.
-/// The class exposes overridable filter functions to allow dynamatically selct
-/// addtional constraints over the  CFDFC optimization.
-class constrStrategy {
+
+class BufferPlacementStrategy {
 public:
-  int maxBufSize = INT_MAX;
-  int minBufSize = -1;
-  /// Determine whether a specific port type should be constrained (i.e.,
-  /// For port definition op is mux or merge that have multiple input ports)
-  /// port constraint should be added. 
-  virtual bool placeOneBufferOnPort (Value *valPort) {return false;};
+  std::optional<int> minSlots = {}; // min number of slots (none means no minimum value)
+  std::optional<int> maxSlots = {}; // max number of slots (none means no maximum value)
+  bool transparentAllowed = true; // allowed to place transparent buffers?
+  bool nonTransparentAllowed = true; // allowed to place non-transparent buffers?
+  bool bufferizable = true; // allowed to place a buffer at all?
 
-  /// Whether set constraints on maximum buffer size. 
-  virtual bool constrainMaxBufSize () {return false;};
+  virtual void getChannelConstraints(Value *valPort);
 
-  /// Whether set constraints on minimum buffer size.
-  virtual bool constrainMinBufSize () {return false;};
-
-  /// Whether adopt constraints published on FPL22.
-  virtual bool constrainOnFPL22 () {return false;};
-
-  virtual ~constrStrategy() = default;
+  virtual ~BufferPlacementStrategy() = default;
 };
 
 } // namespace buffer
