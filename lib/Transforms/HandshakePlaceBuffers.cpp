@@ -46,7 +46,10 @@ static LogicalResult insertBuffers(handshake::FuncOp funcOp,
     readSimulateFile(stdLevelInfo, archs, bbs);
     int execNum = buffer::extractCFDFCircuit(archs, bbs);
     while (execNum > 0) {
-      dataFlowCircuitList.push_back(createCFDFCircuit(unitList, archs, bbs));
+      // write the execution frequency to the dataflowCircuit
+      auto circuit = createCFDFCircuit(unitList, archs, bbs);
+      circuit->execNum = execNum;
+      dataFlowCircuitList.push_back(circuit);
       if (firstMG)
         break;
       execNum = buffer::extractCFDFCircuit(archs, bbs);
