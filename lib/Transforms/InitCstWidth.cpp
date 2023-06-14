@@ -67,6 +67,10 @@ static LogicalResult initCstOpBitsWidth(handshake::FuncOp funcOp,
           op.getResult().getType().getIntOrFloatBitWidth() - cstBitWidth;
       auto extOp = builder.create<mlir::arith::ExtSIOp>(
           newCstOp.getLoc(), op.getResult().getType(), newCstOp.getResult());
+      auto a = op->getAttrs();
+
+      if (failed(containsAttr(op, BB_ATTR)))
+        return failure();        
       extOp->setAttr("bb", op->getAttr("bb"));
 
       // replace the constant operation (default width)

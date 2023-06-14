@@ -8,6 +8,7 @@
 #define DYNAMATIC_TRANSFORMS_UTILSBITSUPDATE_H
 
 #include "circt/Dialect/Handshake/HandshakeOps.h"
+#include "dynamatic/Conversion/StandardToHandshakeFPGA18.h"
 #include "dynamatic/Support/LLVM.h"
 #include <optional>
 
@@ -26,6 +27,9 @@ IntegerType getNewType(Value opVal, unsigned bitswidth,
 
 std::optional<Operation *> insertWidthMatchOp(Operation *newOp, int opInd,
                                               Type newType, MLIRContext *ctx);
+
+
+LogicalResult containsAttr(Operation *op, std::string attrName);
 
 namespace dynamatic {
 namespace bitwidth {
@@ -54,7 +58,7 @@ bool propType(Operation *Op);
 
 /// Insert width match operations (extension or truncation) for the operands and
 /// the results.
-void matchOpResWidth(Operation *op, MLIRContext *ctx,
+LogicalResult matchOpResWidth(Operation *op, MLIRContext *ctx,
                      SmallVector<Operation *> &newMatchedOps);
 
 /// Replace the operation's operand with the its successor.
@@ -70,7 +74,7 @@ void replaceWithPredecessor(Operation *op, Type resType);
 void revertTruncOrExt(Operation *op, MLIRContext *ctx);
 
 /// Validate the operations after bits optimization to generate .mlir file.
-void validateOp(Operation *op, MLIRContext *ctx,
+LogicalResult validateOp(Operation *op, MLIRContext *ctx,
                 SmallVector<Operation *> &newMatchedOps);
 } // namespace bitwidth
 } // namespace dynamatic

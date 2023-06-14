@@ -47,7 +47,9 @@ std::optional<Operation *> insertWidthMatchOp(Operation *newOp, int opInd,
       auto truncOp = builder.create<mlir::arith::TruncIOp>(newOp->getLoc(),
                                                            newType, opVal);
       newOp->setOperand(opInd, truncOp.getResult());
-      truncOp->setAttr("bb", newOp->getAttr("bb"));
+      if (failed(containsAttr(newOp, BB_ATTR)))
+        return nullptr;   
+      truncOp->setAttr(BB_ATTR, newOp->getAttr(BB_ATTR));
       return truncOp;
     }
 
@@ -57,11 +59,20 @@ std::optional<Operation *> insertWidthMatchOp(Operation *newOp, int opInd,
       auto extOp =
           builder.create<mlir::arith::ExtSIOp>(newOp->getLoc(), newType, opVal);
       newOp->setOperand(opInd, extOp.getResult());
-      extOp->setAttr("bb", newOp->getAttr("bb"));
+      if (failed(containsAttr(newOp, BB_ATTR)))
+        return nullptr;   
+      extOp->setAttr(BB_ATTR, newOp->getAttr(BB_ATTR));
       return extOp;
     }
   }
   return {};
+}
+
+LogicalResult containsAttr(Operation *op, std::string attrName) {
+  for (auto attr : op->getAttrs())
+    if (attr.getName() == attrName)
+      return success();
+  return failure();
 }
 
 namespace dynamatic::bitwidth {
@@ -633,7 +644,7 @@ void revertTruncOrExt(Operation *op, MLIRContext *ctx) {
     }
 }
 
-void matchOpResWidth(Operation *op, MLIRContext *ctx,
+LogicalResult matchOpResWidth(Operation *op, MLIRContext *ctx,
                      SmallVector<Operation *> &newMatchedOps) {
 
   DenseMap<mlir::StringRef,
@@ -657,6 +668,8 @@ void matchOpResWidth(Operation *op, MLIRContext *ctx,
           op, i, getNewType(Operand, oprsWidth[0][i], false), ctx);
       if (insertOp.has_value())
         newMatchedOps.push_back(insertOp.value());
+      else
+        return failure();
     }
   }
   // make result matched the width
@@ -668,9 +681,11 @@ void matchOpResWidth(Operation *op, MLIRContext *ctx,
       op->getResult(i).setType(newType);
     }
   }
+
+  return success();
 }
 
-void validateOp(Operation *op, MLIRContext *ctx,
+LogicalResult validateOp(Operation *op, MLIRContext *ctx,
                 SmallVector<Operation *> &newMatchedOps) {
   // the operations can be divided to three types to make it validated
   // passType: branch, conditionalbranch
@@ -688,9 +703,12 @@ void validateOp(Operation *op, MLIRContext *ctx,
           validateOp(resOp, ctx, newMatchedOps);
 
   if (match)
-    matchOpResWidth(op, ctx, newMatchedOps);
+    if (failed(matchOpResWidth(op, ctx, newMatchedOps)))
+      return failure();
 
   if (revert)
     revertTruncOrExt(op, ctx);
+
+  return success();
 }
 } // namespace dynamatic::bitwidth
