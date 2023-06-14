@@ -12,7 +12,9 @@
         "${workspaceFolder}/circt/llvm/llvm/include/",
         "${workspaceFolder}/circt/llvm/mlir/include/",
         "${workspaceFolder}/circt/llvm/build/include/",
-        "${workspaceFolder}/circt/llvm/build/tools/mlir/include/"
+        "${workspaceFolder}/circt/llvm/build/tools/mlir/include/",
+        // GUROBI
+        "/opt/gurobi1001/linux64/include/"
       ],
       "intelliSenseMode": "linux-clang-x64",
       "compilerPath": "/usr/bin/clang",

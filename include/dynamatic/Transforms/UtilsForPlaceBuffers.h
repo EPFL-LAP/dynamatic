@@ -123,6 +123,9 @@ struct dataFlowCircuit {
       {1, 0}, {2, 1}, {4, 2}, {8, 3}, 
       {16, 4}, {32, 5}, {64, 6}};
 
+  std::vector<std::vector<float>>
+  readInfoFromFile(const std::string &filename);
+
   double targetCP, maxCP;
   std::vector<unit *> units;
   std::vector<channel *> channels;

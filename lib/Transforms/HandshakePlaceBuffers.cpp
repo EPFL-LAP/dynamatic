@@ -52,6 +52,9 @@ static LogicalResult insertBuffers(handshake::FuncOp funcOp,
       execNum = buffer::extractCFDFCircuit(archs, bbs);
     }
   }
+
+  // for (auto dfc : dataFlowCircuitList)
+  //   dfc->optimizeMILPModel();
   
   return success();
 }
@@ -69,6 +72,7 @@ struct PlaceBuffersPass : public PlaceBuffersBase<PlaceBuffersPass> {
   void runOnOperation() override {
     ModuleOp m = getOperation();
 
+    // bufferConstrStrategy strategy;
     for (auto funcOp : m.getOps<handshake::FuncOp>())
       if (failed(insertBuffers(funcOp, &getContext(), firstMG, stdLevelInfo)))
         return signalPassFailure();

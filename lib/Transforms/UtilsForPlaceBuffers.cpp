@@ -115,3 +115,30 @@ void buffer::dataFlowCircuit::printCircuits() {
         ch->print();
   }
 }
+
+std::vector<std::vector<float>>
+buffer::dataFlowCircuit::readInfoFromFile(const std::string &filename) {
+  std::vector<std::vector<float>> info;
+
+  std::ifstream file(filename);
+  assert(file.is_open() && "Error opening delay info file");
+
+  std::string line;
+  while (std::getline(file, line)) {
+    std::vector<float> row;
+    std::istringstream iss(line);
+    std::string value;
+
+    while (std::getline(iss, value, ',')) {
+      float num = std::stof(value);
+      row.push_back(num);
+    }
+
+    assert(!row.empty() && "Error reading delay info file");
+    info.push_back(row);
+  }
+
+  file.close();
+
+  return info;
+}
