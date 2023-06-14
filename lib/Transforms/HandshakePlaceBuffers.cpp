@@ -25,6 +25,7 @@ using namespace dynamatic::buffer;
 
 static LogicalResult insertBuffers(handshake::FuncOp funcOp, 
                                    MLIRContext *ctx,
+                                   bool firstMG,
                                    std::string stdLevelInfo) {
 
   std::vector<Operation *> visitedOpList;
@@ -46,6 +47,8 @@ static LogicalResult insertBuffers(handshake::FuncOp funcOp,
     int execNum = buffer::extractCFDFCircuit(archs, bbs);
     while (execNum > 0) {
       dataFlowCircuitList.push_back(createCFDFCircuit(unitList, archs, bbs));
+      if (firstMG)
+        break;
       execNum = buffer::extractCFDFCircuit(archs, bbs);
     }
   }
@@ -55,11 +58,11 @@ static LogicalResult insertBuffers(handshake::FuncOp funcOp,
 
 
 namespace {
-
 /// Simple driver for prepare for legacy pass.
 struct PlaceBuffersPass : public PlaceBuffersBase<PlaceBuffersPass> {
 
-  PlaceBuffersPass(std::string stdLevelInfo) {
+  PlaceBuffersPass(bool firstMG, std::string stdLevelInfo) {
+    this->firstMG = firstMG;
     this->stdLevelInfo = stdLevelInfo;
   }
   
@@ -67,13 +70,13 @@ struct PlaceBuffersPass : public PlaceBuffersBase<PlaceBuffersPass> {
     ModuleOp m = getOperation();
 
     for (auto funcOp : m.getOps<handshake::FuncOp>())
-      if (failed(insertBuffers(funcOp, &getContext(), stdLevelInfo)))
+      if (failed(insertBuffers(funcOp, &getContext(), firstMG, stdLevelInfo)))
         return signalPassFailure();
   };
 };
 } // namespace
 
 std::unique_ptr<mlir::OperationPass<mlir::ModuleOp>>
-dynamatic::createHandshakePlaceBuffersPass(std::string stdLevelInfo) {
-  return std::make_unique<PlaceBuffersPass>(stdLevelInfo);
+dynamatic::createHandshakePlaceBuffersPass(bool firstMG, std::string stdLevelInfo) {
+  return std::make_unique<PlaceBuffersPass>(firstMG, stdLevelInfo);
 }

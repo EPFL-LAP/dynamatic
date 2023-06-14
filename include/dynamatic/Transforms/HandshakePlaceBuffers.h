@@ -15,7 +15,7 @@
 namespace dynamatic {
 
 std::unique_ptr<mlir::OperationPass<mlir::ModuleOp>>
-createHandshakePlaceBuffersPass(std::string stdLevelInfo="");
+createHandshakePlaceBuffersPass(bool firstMG=false, std::string stdLevelInfo="");
 
 } // namespace dynamatic
 

@@ -148,6 +148,8 @@ def PlaceBuffers : Pass<"place-buffers", "mlir::ModuleOp"> {
   }];
   let constructor = "dynamatic::createHandshakePlaceBuffersPass()";
   let options = [
+    Option<"firstMG", "firstMG", "bool", "false",
+    "if true, only extract the first MG from the input file">,
     Option<"stdLevelInfo", "std-level-info", "std::string", "",
     "if true, extract CFDFC from standard level simluation">];
 }

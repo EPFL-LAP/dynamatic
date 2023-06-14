@@ -5,6 +5,7 @@
 //===----------------------------------------------------------------------===//
 
 #include "dynamatic/Transforms/UtilsForPlaceBuffers.h"
+#include "dynamatic/Conversion/StandardToHandshakeFPGA18.h"
 #include "circt/Dialect/Handshake/HandshakeOps.h"
 #include "mlir/Dialect/Arith/IR/Arith.h"
 #include "mlir/Dialect/Func/IR/FuncOps.h"
@@ -30,7 +31,7 @@ bool buffer::isEntryOp(Operation *op,
 
 int buffer::getBBIndex(Operation *op) {
   for (auto attr : op->getAttrs()) {
-    if (attr.getName()=="bb")
+    if (attr.getName() == BB_ATTR)
       return dyn_cast<IntegerAttr>(attr.getValue()).getValue().getZExtValue();
   }
   return -1;
