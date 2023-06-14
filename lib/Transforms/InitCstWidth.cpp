@@ -59,7 +59,7 @@ static LogicalResult initCstOpBitsWidth(handshake::FuncOp funcOp,
           ((1 << op.getValue().getType().getIntOrFloatBitWidth()) - 1 + intVal);
       newCstOp.setValueAttr(IntegerAttr::get(newType, intVal));
       // save the original bb
-      newCstOp->setAttr("bb", op->getAttr("bb"));
+      newCstOp->setAttr(BB_ATTR, op->getAttr(BB_ATTR));
 
       // recursively replace the uses of the old constant operation with the new
       // one Value opVal = op.getResult();
@@ -71,7 +71,7 @@ static LogicalResult initCstOpBitsWidth(handshake::FuncOp funcOp,
 
       if (failed(containsAttr(op, BB_ATTR)))
         return failure();        
-      extOp->setAttr("bb", op->getAttr("bb"));
+      extOp->setAttr(BB_ATTR, op->getAttr(BB_ATTR));
 
       // replace the constant operation (default width)
       // with the extension of new constant operation (optimized width)
