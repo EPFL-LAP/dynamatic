@@ -58,7 +58,10 @@ static LogicalResult initCstOpBitsWidth(handshake::FuncOp funcOp,
       intVal =
           ((1 << op.getValue().getType().getIntOrFloatBitWidth()) - 1 + intVal);
       newCstOp.setValueAttr(IntegerAttr::get(newType, intVal));
-      // save the original bb
+      // check whether bb attributes exists, and save the original bb
+      if (failed(containsAttr(op, BB_ATTR)))
+        return failure();  
+
       newCstOp->setAttr(BB_ATTR, op->getAttr(BB_ATTR));
 
       // recursively replace the uses of the old constant operation with the new
@@ -66,11 +69,7 @@ static LogicalResult initCstOpBitsWidth(handshake::FuncOp funcOp,
       savedBits +=
           op.getResult().getType().getIntOrFloatBitWidth() - cstBitWidth;
       auto extOp = builder.create<mlir::arith::ExtSIOp>(
-          newCstOp.getLoc(), op.getResult().getType(), newCstOp.getResult());
-      auto a = op->getAttrs();
-
-      if (failed(containsAttr(op, BB_ATTR)))
-        return failure();        
+          newCstOp.getLoc(), op.getResult().getType(), newCstOp.getResult());            
       extOp->setAttr(BB_ATTR, op->getAttr(BB_ATTR));
 
       // replace the constant operation (default width)
