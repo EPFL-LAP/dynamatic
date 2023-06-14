@@ -58,33 +58,6 @@ void buffer::readSimulateFile(const std::string & fileName,
   }
 }
 
-static void printCFDFCircuit(std::map<archBB*, int> &archs, 
-                              std::map<int, int> &bbs) {
-  llvm::errs() << "CFDFCircuit:\n";
-  for (auto bb : bbs) 
-    if (bb.second > 0) {
-      llvm::errs() << "BB: " << bb.first << "\n"; 
-      for (auto arch : archs) 
-        if (arch.first->srcBB == bb.first && arch.second > 0) 
-          llvm::errs() << "  " << arch.first->srcBB << " -> " << arch.first->dstBB 
-                        << " : " << "(freq " << arch.first->execFreq << " ; back edge  " 
-                        << arch.first->isBackEdge << ")\n";
-    }
-}
-
-static void printCircuit(std::map<archBB*, int> &archs, 
-                              std::map<int, int> &bbs) {
-  llvm::errs() << "==========Circuit:============\n";
-  for (auto bb : bbs) {
-      llvm::errs() << "BB: " << bb.first << "\n"; 
-      for (auto arch : archs) 
-        if (arch.first->srcBB == bb.first) 
-          llvm::errs() << "  " << arch.first->srcBB << " -> " << arch.first->dstBB 
-                        << " : " << "(freq " << arch.first->execFreq << " ; back edge  " 
-                        << arch.first->isBackEdge << ")\n";
-    }
-}
-
 static int initVarInMILP(GRBModel &modelMILP, 
                           std::map<int, GRBVar> &sBB, 
                           std::map<std::string, GRBVar> &sArc, 
@@ -195,7 +168,8 @@ static void setBBConstrs(GRBModel &modelMILP,
 
   int constrInd = 0;
   for (auto pair : sBB) {
-    // input archs
+    // only 1 input arch if bb is selected;
+    // no input arch if bb is not selected
     GRBLinExpr constraintInExpr;
     auto inArcs = getBBsInArcVars(pair.first, sArc, archs);
     for (auto arch : inArcs)
@@ -204,7 +178,8 @@ static void setBBConstrs(GRBModel &modelMILP,
     modelMILP.addConstr(constraintInExpr == pair.second,
                         "cIn" + std::to_string(constrInd));
 
-    // output archs
+    // only 1 output arch if bb is selected;
+    // no output arch if bb is not selected
     GRBLinExpr constraintOutExpr;
     auto outArcs = getBBsOutArcVars(pair.first, sArc, archs);
     for (auto arch : outArcs)
@@ -239,7 +214,7 @@ int buffer::extractCFDFCircuit(std::map<archBB*, int> &archs,
   for (auto pair : bbs) {
     bbNames.push_back(pair.first);
   }
-  // printCircuit(archs, bbs);
+
   // Create MILP model for CFDFCircuit extraction
   // Init a gurobi model
   GRBEnv env = GRBEnv(true);
@@ -267,26 +242,17 @@ int buffer::extractCFDFCircuit(std::map<archBB*, int> &archs,
       bbs[pair.first] = pair.second.get(GRB_DoubleAttr_X) > 0 ? 1 : 0;
   
   int execN = static_cast<int>(sArc["valExecN"].get(GRB_DoubleAttr_X));
+
   // load answer to the arch map
   for (auto pair : sArc) {
     if (pair.first == "valExecN") 
       continue;
-    
     auto arch = findArchWithVarName(pair.first, archNames);
     archs[arch] = pair.second.get(GRB_DoubleAttr_X) > 0 ? 1 : 0;
-  }
-
-  // llvm::errs() << "exec times: " << sArc["valExecN"].get(GRB_DoubleAttr_X) << "\n";
-  // printCFDFCircuit(archs, bbs);
   // update the connection information after CFDFC extraction    
-  for (auto pair: sArc) {
-    if (pair.first == "valExecN")
-      continue;
-    auto arch = findArchWithVarName(pair.first, archNames);
     if (archs[arch] > 0) 
       arch->execFreq -= execN;
   }
-
   return execN;
 }
 
@@ -308,6 +274,5 @@ dataFlowCircuit *buffer::createCFDFCircuit(std::vector<unit *> &unitList,
             circuit->channels.push_back(ch);    
     }
   }
-  // circuit->printCircuits();
   return circuit;
 }
