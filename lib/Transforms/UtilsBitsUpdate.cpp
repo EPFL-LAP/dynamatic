@@ -701,6 +701,5 @@ void validateOp(Operation *op, MLIRContext *ctx,
 
   if (revert)
     revertTruncOrExt(op, ctx);
-
 }
 } // namespace dynamatic::bitwidth
