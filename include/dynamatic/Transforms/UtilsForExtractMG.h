@@ -7,9 +7,9 @@
 #ifndef DYNAMATIC_TRANSFORMS_UTILSFOREXTRACTMG_H
 #define DYNAMATIC_TRANSFORMS_UTILSFOREXTRACTMG_H
 
-#include "dynamatic/Transforms/UtilsForPlaceBuffers.h"
 #include "circt/Dialect/Handshake/HandshakeOps.h"
 #include "dynamatic/Support/LLVM.h"
+#include "dynamatic/Transforms/UtilsForPlaceBuffers.h"
 #include "mlir/Dialect/Func/IR/FuncOps.h"
 #include "mlir/IR/BuiltinTypes.h"
 #include <fstream>
@@ -25,22 +25,20 @@ struct archBB {
 };
 
 /// Define the MILP CFDFC extraction models, and write the optimization results
-/// to the map. 
-int extractCFDFCircuit(std::map<archBB*, int> &archs,
-                        std::map<int, int> &bbs);
+/// to the map.
+int extractCFDFCircuit(std::map<archBB *, int> &archs, std::map<int, int> &bbs);
 
-/// Create the CFDFCircuit from the unitList(the DFS operations graph), 
+/// Create the CFDFCircuit from the unitList(the DFS operations graph),
 /// and archs, and bbs that store the CFDFC extraction results indicating
 /// selected (1) or not (0).
 dataFlowCircuit *createCFDFCircuit(std::vector<unit *> &unitList,
-                       std::map<archBB*, int> &archs,
-                       std::map<int, int> &bbs);
+                                   std::map<archBB *, int> &archs,
+                                   std::map<int, int> &bbs);
 
-/// Read the simulation file of standard level execution and store the results 
+/// Read the simulation file of standard level execution and store the results
 /// in the map.
-void readSimulateFile(const std::string & fileName, 
-                      std::map<archBB* , int> &archs, 
-                      std::map<int, int> &bbs);
+void readSimulateFile(const std::string &fileName,
+                      std::map<archBB *, int> &archs, std::map<int, int> &bbs);
 } // namespace buffer
 } // namespace dynamatic
 
