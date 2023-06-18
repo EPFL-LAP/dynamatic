@@ -220,11 +220,13 @@ void buffer::dataFlowCircuit::createMILPVars(GRBModel &modelMILP,
   // create throughput variables for the channels
   for(int i = 0; i < channels.size(); i++) {
     channel *channel = channels[i];
-    unit *src = channel->opSrc;
-    unit *dst = channel->opDst;
+    int srcIndex = findUnitIndex(channel->unitSrc->op);
+    int dstIndex = findUnitIndex(channel->unitDst->op);
+    assert((srcIndex != -1 && dstIndex != -1) && "Error finding unit index");
+
     std::string varName = std::to_string(i) + 
-                          "_u" + findUnitIndex(src->op) + 
-                          "_u" + findUnitIndex(dst->op);
+                          "_u" + std::to_string(srcIndex) + 
+                          "_u" + std::to_string(dstIndex);
     thrptVars["thTokens_" + varName] =
         modelMILP.addVar(0.0, 1.0, 0.0, GRB_CONTINUOUS);
     thrptVars["thBubbles_" + varName] =
@@ -242,44 +244,104 @@ void buffer::dataFlowCircuit::createMILPVars(GRBModel &modelMILP,
   }
 }
 
-static unit* findUnitOfVarName(std::vector<unit *> units, std::string varName) {
-  size_t underscorePos1 = varName.find('_');
-  size_t underscorePos2 = varName.find('_', underscorePos1 + 1);
-  
-  // Extract the substrings containing i and j
-  std::string unitInd = varName.substr(underscorePos1 + 1, underscorePos2 - underscorePos1 - 1);
-
-  return units[std::stoi(unitInd)];
-}
-
-static port* getSrcPort(channel *ch, std::vector<unit *> unitList ) {
-  unit *srcUnit = getUnitWithOp(ch->opSrc, unitList);
-  for (auto p : srcUnit->outPorts) 
-    for (auto cntCh : p->cntChannels)
-      if (cntCh == ch) 
-        return p;
+static port* getSrcPort(channel *ch, unit * unitNode ) {
+  for (auto p : unitNode->outPorts) 
+    if (p->opVal == ch->valPort) 
+      return p;
     
   return nullptr;
 }
 
-// static port* getDstPort(channel *ch, )
+static int getUnitIndex(unit *unitNode, std::vector<unit *> &unitList) {
+  for (int i = 0; i < unitList.size(); i++) {
+    if (unitList[i] == unitNode)
+      return i;
+  }
+  return -1;
+}
+
+static int getPortIndex(Value *val, std::vector<port *> &portList) {
+  for (int i = 0; i < portList.size(); i++) {
+    if (portList[i]->opVal == val)
+      return i;
+  }
+  return -1;
+}
+
+static bool hasConectedChannels(port *p, std::vector<channel *> &channels) {
+  for (auto ch : channels) 
+    if (ch->valPort == p->opVal)
+      return true;
+  
+  return false;
+}
 
 
 void buffer::dataFlowCircuit::createPathConstraints(GRBModel &modelMILP, 
                                   std::map<std::string, GRBVar> &timeVars,
-                                  std::map<std::string, GRBVar> &bufferVars,
-                                  double period) {
-  // create the constraints for the path
-  for (auto ch : channels) {
-    // get srcPort val
-    port *srcPort = getSrcPort(ch, this->units);
+                                  std::map<std::string, GRBVar> &bufferVars) {
+  // create constraints in the path alongside the channels
+  for (size_t i = 0; i < channels.size(); i++) {
+    channel *ch = channels[i];
+    int srcIndex = getUnitIndex(ch->unitSrc, this->units);
+    int j = getPortIndex(ch->valPort, ch->unitSrc->outPorts);
+
+    assert((srcIndex != -1 && j != -1) && "Unit or port not found in the list");
+    GRBVar &timeIn = timeVars["timeOut_" + std::to_string(srcIndex) + "_" + std::to_string(j)];
+    // timeIn <= period
+    modelMILP.addConstr(timeIn <= this->targetCP);
+
+    int dstIndex = getUnitIndex(ch->unitDst, this->units);
+    j = getPortIndex(ch->valPort, ch->unitDst->inPorts);
+    assert((dstIndex != -1 && j != -1) && "Unit or port not found in the list");
+    GRBVar &timeOut = timeVars["timeIn_" + std::to_string(dstIndex) + "_" + std::to_string(j)];
+    // timeOut <= period
+    modelMILP.addConstr(timeOut <= this->targetCP);
+
+    std::string varName = std::to_string(i) + 
+                          "_u" + std::to_string(srcIndex) + 
+                          "_u" + std::to_string(dstIndex);
+    GRBVar &R_flop = bufferVars["bufferFlop_" + varName];
+    // v2 >= v1 - 2*period*R
+    modelMILP.addConstr(timeOut >= timeIn - 2 * this->targetCP * R_flop);
+
+    // v2 >= Buffer Delay
+    modelMILP.addConstr(timeOut >= this->bufferDelay);
   }
-  // for (auto const &timeVar : timeVars) {
-  //   // Find the positions of the src units
-  //   unit *srcUnit = findUnitOfVarName(units, timeVar.first);
-  //   varName = timeVar.first;
-  //       std::string outPortInd = varName.substr(underscorePos2 + 1);
-  // }
+
+  // create constraints for the units
+  for (size_t i = 0; i < units.size(); i++) {
+    unit *uNode = units[i];
+    assert (uNode->delay <= this->targetCP 
+            && "Unit delay is greater than the target period");
+    
+    for (size_t j = 0; j < uNode->inPorts.size(); j++) 
+      // get the input port(if used) of the unit
+      if (hasConectedChannels(uNode->inPorts[j], this->channels)) {
+        GRBVar &timeIn = timeVars["timeIn_" + std::to_string(i) + "_" + std::to_string(j)];
+        for (size_t k = 0; k < uNode->outPorts.size(); k++) 
+          // get the output port(if used) of the unit
+          if (hasConectedChannels(uNode->outPorts[k], this->channels)) {
+            GRBVar &timeOut = timeVars["timeOut_" + std::to_string(i) + "_" + std::to_string(k)];
+
+            // define time constraints for combinational units
+            // tIn |--> input port -> units -> output port --> |tOut
+            // t_out >= t_in + d_in + d + d_out
+            if (uNode->latency == 0.0) 
+              modelMILP.addConstr(timeOut >= timeIn + 
+                                          uNode->inPorts[j]->portDelay + uNode->delay + 
+                                          uNode->outPorts[k]->portDelay);
+            // define time constraints for sequential units
+            else {
+              // t_out = d_out
+              modelMILP.addConstr(timeOut == uNode->outPorts[k]->portDelay);
+              // t_in + d_in <= period
+              modelMILP.addConstr(timeIn + uNode->inPorts[j]->portDelay <= this->targetCP);
+            }
+          }
+      }
+  }  
+
 }
 
 void buffer::dataFlowCircuit::createMILPModel(BufferPlacementStrategy &strategy,
@@ -289,7 +351,7 @@ void buffer::dataFlowCircuit::createMILPModel(BufferPlacementStrategy &strategy,
   env.start();
   GRBModel modelMILP = GRBModel(env);
 
-  double period = strategy.period;
+  // double period = strategy.period;
   // double periodMax = strategy.periodMax;
 
   // internal variables
@@ -302,7 +364,7 @@ void buffer::dataFlowCircuit::createMILPModel(BufferPlacementStrategy &strategy,
   createMILPVars(modelMILP, this->units, this->channels, this->ports, 
                  timeVars, elasticVars, thrptVars, bufferVars, retimeVars, outputVars);
 
-  createPathConstraints(modelMILP, timeVars, bufferVars, period);
+  createPathConstraints(modelMILP, timeVars, bufferVars);
 
   // create the variables
 }

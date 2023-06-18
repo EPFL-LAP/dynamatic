@@ -23,8 +23,20 @@ using namespace mlir;
 using namespace dynamatic;
 using namespace dynamatic::buffer;
 
+ChannelConstraints
+buffer::BufferPlacementStrategy::getChannelConstraints(channel *ch) {
+  ChannelConstraints constraints;
+  // set the channel constraints according to the global constraints
+  constraints.minSlots = this->minSlots;
+  constraints.maxSlots = this->maxSlots;
+  constraints.transparentAllowed = true;
+  constraints.nonTransparentAllowed = true;
+  constraints.bufferizable = true;
+  return constraints;
+}
+
 static LogicalResult insertBuffers(handshake::FuncOp funcOp, MLIRContext *ctx,
-                                  //  BufferPlacementStrategy &strategy,
+                                   BufferPlacementStrategy &strategy,
                                    bool firstMG, std::string stdLevelInfo) {
 
   std::vector<Operation *> visitedOpList;
@@ -55,16 +67,21 @@ static LogicalResult insertBuffers(handshake::FuncOp funcOp, MLIRContext *ctx,
     }
   }
 
-  // for (auto dfc : dataFlowCircuitList)
-  //   dfc->optimizeMILPModel();
-  
+  for (auto dfc : dataFlowCircuitList) {
+    // store the output results
+    std::map<std::string, GRBVar> resVars;
+    dfc->createMILPModel(strategy, resVars);
+  }
+
+  // Insert buffers in the remaining dataflowCircuit
+
   return success();
 }
 
 namespace {
 /// Simple driver for prepare for legacy pass.
 class customBufferPlaceStrategy : public BufferPlacementStrategy {
-  public:
+public:
   ChannelConstraints getChannelConstraints(channel *ch) override {
     ChannelConstraints constraints;
     // set the channel constraints according to the global constraints
@@ -74,7 +91,7 @@ class customBufferPlaceStrategy : public BufferPlacementStrategy {
     constraints.nonTransparentAllowed = true;
     constraints.bufferizable = true;
 
-    if (isa<handshake::MergeOp, handshake::MuxOp>(ch->opSrc)) {
+    if (isa<handshake::MergeOp, handshake::MuxOp>(ch->unitSrc->op)) {
       constraints.minSlots = 1;
       constraints.transparentAllowed = true;
       constraints.nonTransparentAllowed = true;
@@ -93,10 +110,10 @@ struct PlaceBuffersPass : public PlaceBuffersBase<PlaceBuffersPass> {
   void runOnOperation() override {
     ModuleOp m = getOperation();
 
-    // bufferConstrStrategy strategy;
-    // customBufferPlaceStrategy strategy;
+    customBufferPlaceStrategy strategy;
     for (auto funcOp : m.getOps<handshake::FuncOp>())
-      if (failed(insertBuffers(funcOp, &getContext(), firstMG, stdLevelInfo)))
+      if (failed(insertBuffers(funcOp, &getContext(), strategy, firstMG,
+                               stdLevelInfo)))
         return signalPassFailure();
   };
 };

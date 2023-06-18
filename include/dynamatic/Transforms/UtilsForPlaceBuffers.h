@@ -54,10 +54,10 @@ struct port {
   port() : opVal(nullptr){};
   port(Value *opVal) : opVal(opVal){};
 
-  double portLatency = 0.0;
+  double portDelay = 0.0;
   Value *opVal;
 
-  SmallVector<channel *> cntChannels;
+  std::vector<channel *> cntChannels;
 };
 
 /// A unit is the entity of the operations in the graph;
@@ -70,8 +70,8 @@ struct unit {
   double delay = 0.0;
   int ind = -1;
   Operation *op;
-  SmallVector<port *> inPorts;
-  SmallVector<port *> outPorts;
+  std::vector<port *> inPorts;
+  std::vector<port *> outPorts;
 };
 
 struct ChannelConstraints {
@@ -154,6 +154,7 @@ struct dataFlowCircuit {
   readInfoFromFile(const std::string &filename);
 
   double targetCP, maxCP;
+  double bufferDelay = 0.0;
   std::vector<unit *> units;
   std::vector<port *> ports;
   std::vector<channel *> channels;
@@ -179,8 +180,7 @@ struct dataFlowCircuit {
   
   void createPathConstraints(GRBModel &modelMILP, 
                             std::map<std::string, GRBVar> &timeVars,
-                            std::map<std::string, GRBVar> &bufferVars,
-                            double period);
+                            std::map<std::string, GRBVar> &bufferVars);
   void printCircuits();
 
   int findUnitIndex(Operation *op) {
