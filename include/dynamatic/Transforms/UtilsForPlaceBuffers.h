@@ -30,24 +30,23 @@ struct arch {
   bool isBackEdge = false;
 };
 
+struct unit;
+
 /// A channel is the entity of the connections between units;
 /// A channel is identified by its port and the connection units.
 struct channel : arch {
   channel() : arch(){};
 
-  channel(Operation *opSrc, Operation *opDst, Value *valPort) : arch() {
-    this->opSrc = opSrc;
-    this->opDst = opDst;
+  channel(unit *unitSrc, unit *unitDst, Value *valPort) : arch() {
+    this->unitSrc = unitSrc;
+    this->unitDst = unitDst;
     this->valPort = valPort;
   };
 
-  Operation *opSrc, *opDst;
+  unit *unitSrc, *unitDst;
   Value *valPort;
 
-  void print() {
-    llvm::errs() << "opSrc: " << *(opSrc) << " ---> ";
-    llvm::errs() << "opDst: " << *(opDst) << "\n";
-  }
+  void print();
 };
 
 /// A port is the entity of the connections between units;
