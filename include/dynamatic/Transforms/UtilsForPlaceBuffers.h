@@ -75,6 +75,30 @@ struct unit {
   SmallVector<port *> outPorts;
 };
 
+struct ChannelConstraints {
+    std::optional<int> minSlots = {}; // min number of slots (none means no minimum value)
+    std::optional<int> maxSlots = {}; // max number of slots (none means no maximum value)
+    bool transparentAllowed = true; // allowed to place transparent buffers?
+    bool nonTransparentAllowed = true; // allowed to place non-transparent buffers?
+    bool bufferizable = true; // allowed to place a buffer at all?
+};
+
+
+class BufferPlacementStrategy {
+public:
+  // global circuits constraints
+  double period; // period of the circuit
+  int minSlots = -1; // min number of slots (none means no minimum value)
+  int maxSlots = INT_MAX; // max number of slots (none means no maximum value)
+  bool transparentAllowed = true; // allowed to place transparent buffers?
+  bool nonTransparentAllowed = true; // allowed to place non-transparent buffers?
+  bool bufferizable = true; // allowed to place a buffer at all?
+
+  virtual ChannelConstraints getChannelConstraints(channel *ch) ;
+
+  virtual ~BufferPlacementStrategy() = default;
+};
+
 /// Identify whether an operation is a start point of the fucntion block.
 bool isEntryOp(Operation *op, std::vector<Operation *> &visitedOp);
 
@@ -132,6 +156,7 @@ struct dataFlowCircuit {
 
   double targetCP, maxCP;
   std::vector<unit *> units;
+  std::vector<port *> ports;
   std::vector<channel *> channels;
   std::vector<int> selBBs;
 
@@ -139,7 +164,33 @@ struct dataFlowCircuit {
   std::vector<std::vector<float>> delayInfo;
   std::vector<std::vector<float>> latencyInfo;
 
+  void createMILPModel(BufferPlacementStrategy &strategy,
+                      std::map<std::string, GRBVar> &thrptVars);
+
+  void createMILPVars(GRBModel &modelMILP, 
+                          std::vector<unit *> &units,
+                          std::vector<channel *> &channels,
+                          std::vector<port *> &ports,
+                          std::map<std::string, GRBVar> &timeVars,
+                          std::map<std::string, GRBVar> &elasticVars,
+                          std::map<std::string, GRBVar> &thrptVars,
+                          std::map<std::string, GRBVar> &bufferVars,
+                          std::map<std::string, GRBVar> &retimeVars,
+                          std::map<std::string, GRBVar> &outputVars);
+  
+  void createPathConstraints(GRBModel &modelMILP, 
+                            std::map<std::string, GRBVar> &timeVars,
+                            std::map<std::string, GRBVar> &bufferVars,
+                            double period);
   void printCircuits();
+
+  int findUnitIndex(Operation *op) {
+    for (int i = 0; i < units.size(); i++) 
+      if (units[i]->op == op) 
+        return i;
+      
+    return -1;
+  }
 };
 
 } // namespace buffer

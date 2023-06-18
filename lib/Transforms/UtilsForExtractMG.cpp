@@ -267,11 +267,23 @@ dataFlowCircuit *buffer::createCFDFCircuit(std::vector<unit *> &unitList,
     // insert units in the selected basic blocks
     if (bbs.count(bbIndex) > 0 && bbs[bbIndex] > 0) {
       circuit->units.push_back(unit);
+      llvm::errs() << "insert unit: " << *(unit->op) << "\n";
+      llvm::errs() << "number of output ports: " << unit->outPorts.size()
+                   << "\n";
+      llvm::errs() << "number of input ports: " << unit->inPorts.size() << "\n";
       // insert channels if it is selected
-      for (auto ports : unit->outPorts)
-        for (auto ch : ports->cntChannels)
-          if (isSelect(archs, ch))
+      for (auto port : unit->outPorts)
+        for (auto ch : port->cntChannels)
+          if (isSelect(archs, ch)) {
             circuit->channels.push_back(ch);
+            circuit->ports.push_back(port);
+          }
+      
+      for (auto port : unit->inPorts)
+        for (auto ch : port->cntChannels)
+          if (isSelect(archs, ch)) 
+            circuit->ports.push_back(port);
+          
     }
   }
   return circuit;

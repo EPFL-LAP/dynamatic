@@ -139,3 +139,154 @@ buffer::dataFlowCircuit::readInfoFromFile(const std::string &filename) {
 
   return info;
 }
+
+void buffer::dataFlowCircuit::createMILPVars(GRBModel &modelMILP, 
+                          std::vector<unit *> &units,
+                          std::vector<channel *> &channels,
+                          std::vector<port *> &ports,
+                          std::map<std::string, GRBVar> &timeVars,
+                          std::map<std::string, GRBVar> &elasticVars,
+                          std::map<std::string, GRBVar> &thrptVars,
+                          std::map<std::string, GRBVar> &bufferVars,
+                          std::map<std::string, GRBVar> &retimeVars,
+                          std::map<std::string, GRBVar> &outputVars) {
+  // clear the variables
+  timeVars.clear();
+  thrptVars.clear();
+  bufferVars.clear();
+  retimeVars.clear();
+  // create the the circuit throuput variables
+  thrptVars["thrpt"] = modelMILP.addVar(0.0, 1.0, 0.0, GRB_CONTINUOUS);
+
+  for (size_t i = 0; i < units.size(); i++) {
+    unit *unit = units[i];
+    // create the retiming variables for the throughput
+    retimeVars["retimeIn_" + std::to_string(i)] =
+        modelMILP.addVar(0.0, 1.0, 0.0, GRB_CONTINUOUS);
+    retimeVars["retimeOut_" + std::to_string(i)] =
+        modelMILP.addVar(0.0, 1.0, 0.0, GRB_CONTINUOUS);
+    retimeVars["retimeBubble_" + std::to_string(i)] =
+        modelMILP.addVar(0.0, 1.0, 0.0, GRB_CONTINUOUS);
+
+    // time path defined in input port
+    for (size_t j = 0; j < unit->inPorts.size(); j++) {
+      port *inP = unit->inPorts[j];
+      if (std::find(ports.begin(), ports.end(), inP) != ports.end()) {
+        timeVars["timeIn_" + std::to_string(i) + "_" + std::to_string(j)] =
+            modelMILP.addVar(0.0, INFINITY, 0.0, GRB_CONTINUOUS);
+        timeVars["timeInValid_" + std::to_string(i) + "_" + std::to_string(j)] =
+            modelMILP.addVar(0.0, INFINITY, 0.0, GRB_CONTINUOUS);
+        timeVars["timeInReady_" + std::to_string(i) + "_" + std::to_string(j)] =
+            modelMILP.addVar(0.0, INFINITY, 0.0, GRB_CONTINUOUS);
+        elasticVars["timeInElastic_" + std::to_string(i) + "_" + std::to_string(j)] =
+            modelMILP.addVar(0.0, INFINITY, 0.0, GRB_CONTINUOUS);
+      }
+    }
+
+    // time path defined in output port 
+    for (size_t j = 0; j < unit->outPorts.size(); j++) {
+      port *outP = unit->outPorts[j];
+      // if the port is in the path, create time path variables
+      if (std::find(ports.begin(), ports.end(), outP) != ports.end()) {
+        timeVars["timeOut_" + std::to_string(i) + "_" + std::to_string(j)] =
+            modelMILP.addVar(0.0, INFINITY, 0.0, GRB_CONTINUOUS);
+        timeVars["timeOutValid_" + std::to_string(i) + "_" + std::to_string(j)] =
+            modelMILP.addVar(0.0, INFINITY, 0.0, GRB_CONTINUOUS);
+        timeVars["timeOutReady_" + std::to_string(i) + "_" + std::to_string(j)] =
+            modelMILP.addVar(0.0, INFINITY, 0.0, GRB_CONTINUOUS);
+        elasticVars["timeOutElastic_" + std::to_string(i) + "_" + std::to_string(j)] =
+            modelMILP.addVar(0.0, INFINITY, 0.0, GRB_CONTINUOUS);
+      }
+    }
+
+  }
+
+  // create throughput variables for the channels
+  for(int i = 0; i < channels.size(); i++) {
+    channel *channel = channels[i];
+    unit *src = channel->opSrc;
+    unit *dst = channel->opDst;
+    std::string varName = std::to_string(i) + 
+                          "_u" + findUnitIndex(src->op) + 
+                          "_u" + findUnitIndex(dst->op);
+    thrptVars["thTokens_" + varName] =
+        modelMILP.addVar(0.0, 1.0, 0.0, GRB_CONTINUOUS);
+    thrptVars["thBubbles_" + varName] =
+        modelMILP.addVar(0.0, 1.0, 0.0, GRB_CONTINUOUS);
+    thrptVars["bufferFlopValid_" + varName] =
+        modelMILP.addVar(0.0, 1.0, 0.0, GRB_BINARY);
+    thrptVars["bufferFlopReady_" + varName] =
+        modelMILP.addVar(0.0, 1.0, 0.0, GRB_BINARY);
+    outputVars["bufferFlop_" + varName] =
+        modelMILP.addVar(0.0, 1.0, 0.0, GRB_BINARY);
+    outputVars["bufferSlots_" + varName] =
+        modelMILP.addVar(0.0, INFINITY, 0.0, GRB_INTEGER);
+    outputVars["hasBuffer_" + varName] =
+        modelMILP.addVar(0.0, 1.0, 0.0, GRB_BINARY);
+  }
+}
+
+static unit* findUnitOfVarName(std::vector<unit *> units, std::string varName) {
+  size_t underscorePos1 = varName.find('_');
+  size_t underscorePos2 = varName.find('_', underscorePos1 + 1);
+  
+  // Extract the substrings containing i and j
+  std::string unitInd = varName.substr(underscorePos1 + 1, underscorePos2 - underscorePos1 - 1);
+
+  return units[std::stoi(unitInd)];
+}
+
+static port* getSrcPort(channel *ch, std::vector<unit *> unitList ) {
+  unit *srcUnit = getUnitWithOp(ch->opSrc, unitList);
+  for (auto p : srcUnit->outPorts) 
+    for (auto cntCh : p->cntChannels)
+      if (cntCh == ch) 
+        return p;
+    
+  return nullptr;
+}
+
+// static port* getDstPort(channel *ch, )
+
+
+void buffer::dataFlowCircuit::createPathConstraints(GRBModel &modelMILP, 
+                                  std::map<std::string, GRBVar> &timeVars,
+                                  std::map<std::string, GRBVar> &bufferVars,
+                                  double period) {
+  // create the constraints for the path
+  for (auto ch : channels) {
+    // get srcPort val
+    port *srcPort = getSrcPort(ch, this->units);
+  }
+  // for (auto const &timeVar : timeVars) {
+  //   // Find the positions of the src units
+  //   unit *srcUnit = findUnitOfVarName(units, timeVar.first);
+  //   varName = timeVar.first;
+  //       std::string outPortInd = varName.substr(underscorePos2 + 1);
+  // }
+}
+
+void buffer::dataFlowCircuit::createMILPModel(BufferPlacementStrategy &strategy,
+                          std::map<std::string, GRBVar> &outputVars) {
+  // init the model
+  GRBEnv env = GRBEnv(true);
+  env.start();
+  GRBModel modelMILP = GRBModel(env);
+
+  double period = strategy.period;
+  // double periodMax = strategy.periodMax;
+
+  // internal variables
+  std::map<std::string, GRBVar> timeVars;
+  std::map<std::string, GRBVar> elasticVars;
+  std::map<std::string, GRBVar> bufferVars;
+  std::map<std::string, GRBVar> retimeVars;
+  std::map<std::string, GRBVar> thrptVars;
+
+  createMILPVars(modelMILP, this->units, this->channels, this->ports, 
+                 timeVars, elasticVars, thrptVars, bufferVars, retimeVars, outputVars);
+
+  createPathConstraints(modelMILP, timeVars, bufferVars, period);
+
+  // create the variables
+}
