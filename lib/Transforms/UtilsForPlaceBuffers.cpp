@@ -21,6 +21,11 @@ using namespace mlir;
 using namespace dynamatic;
 using namespace dynamatic::buffer;
 
+void buffer::channel::print() {
+  llvm::errs() << "opSrc: " << *(unitSrc->op) << " ---> ";
+  llvm::errs() << "opDst: " << *(unitDst->op) << "\n";
+}
+
 bool buffer::isEntryOp(Operation *op, std::vector<Operation *> &visitedOp) {
   for (auto operand : op->getOperands())
     if (!operand.getDefiningOp())
@@ -74,9 +79,14 @@ void buffer::dfsHandshakeGraph(Operation *opNode, std::vector<unit *> &unitList,
   // marked as visited
   visited.push_back(opNode);
 
-  // initialize the unit node
-  unit *unitNode = new unit(opNode);
-  unitList.push_back(unitNode);
+  // initialize the unit, if the unit is initialized by its predecessor,
+  // get from the list. Otherwise, create a new unit and add to the list
+  unit *unitNode = getUnitWithOp(opNode, unitList);
+  if (!unitNode) {
+    unitNode = new unit(opNode);
+    unitList.push_back(unitNode);
+  }
+
   if (inChannel != nullptr)
     connectInChannel(unitNode, inChannel);
 
@@ -86,7 +96,13 @@ void buffer::dfsHandshakeGraph(Operation *opNode, std::vector<unit *> &unitList,
     port *outPort = new port(&resOperand);
     for (auto sucOp : resOperand.getUsers()) {
       // create the channel connected to the outport
-      channel *outChannel = new channel(opNode, sucOp, &resOperand);
+      unit *sucUnit  = getUnitWithOp(sucOp, unitList);
+      // if the successor unit not exists, create a new one
+      if (!sucUnit) {
+        sucUnit = new unit(sucOp);
+        unitList.push_back(sucUnit);
+      }
+      channel *outChannel = new channel(unitNode, sucUnit, &resOperand);
       outChannel->isBackEdge = isBackEdge(opNode, sucOp);
       outPort->cntChannels.push_back(outChannel);
 

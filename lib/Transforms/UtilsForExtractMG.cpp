@@ -193,8 +193,8 @@ static void setBBConstrs(GRBModel &modelMILP, std::map<int, GRBVar> &sBB,
 };
 
 static bool isSelect(std::map<archBB *, int> &archs, channel *ch) {
-  int srcBB = getBBIndex(ch->opSrc);
-  int dstBB = getBBIndex(ch->opDst);
+  int srcBB = getBBIndex(ch->unitSrc->op);
+  int dstBB = getBBIndex(ch->unitDst->op);
   for (auto pair : archs) {
     if (pair.first->srcBB == srcBB && pair.first->dstBB == dstBB)
       return true;
