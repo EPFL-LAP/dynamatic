@@ -68,6 +68,7 @@ struct unit {
   unsigned freq = 0;
   double latency = 0.0;
   double delay = 0.0;
+  int II = 1;
   int ind = -1;
   Operation *op;
   std::vector<port *> inPorts;
@@ -75,25 +76,28 @@ struct unit {
 };
 
 struct ChannelConstraints {
-    std::optional<int> minSlots = {}; // min number of slots (none means no minimum value)
-    std::optional<int> maxSlots = {}; // max number of slots (none means no maximum value)
-    bool transparentAllowed = true; // allowed to place transparent buffers?
-    bool nonTransparentAllowed = true; // allowed to place non-transparent buffers?
-    bool bufferizable = true; // allowed to place a buffer at all?
+  std::optional<int> minSlots =
+      {}; // min number of slots (none means no minimum value)
+  std::optional<int> maxSlots =
+      {}; // max number of slots (none means no maximum value)
+  bool transparentAllowed = true; // allowed to place transparent buffers?
+  bool nonTransparentAllowed =
+      true;                 // allowed to place non-transparent buffers?
+  bool bufferizable = true; // allowed to place a buffer at all?
 };
-
 
 class BufferPlacementStrategy {
 public:
   // global circuits constraints
-  double period; // period of the circuit
-  int minSlots = -1; // min number of slots (none means no minimum value)
+  double period;          // period of the circuit
+  int minSlots = -1;      // min number of slots (none means no minimum value)
   int maxSlots = INT_MAX; // max number of slots (none means no maximum value)
   bool transparentAllowed = true; // allowed to place transparent buffers?
-  bool nonTransparentAllowed = true; // allowed to place non-transparent buffers?
+  bool nonTransparentAllowed =
+      true;                 // allowed to place non-transparent buffers?
   bool bufferizable = true; // allowed to place a buffer at all?
 
-  virtual ChannelConstraints getChannelConstraints(channel *ch) ;
+  virtual ChannelConstraints getChannelConstraints(channel *ch);
 
   virtual ~BufferPlacementStrategy() = default;
 };
@@ -122,36 +126,46 @@ void dfsHandshakeGraph(Operation *opNode, std::vector<unit *> &unitList,
 struct dataFlowCircuit {
 
   std::map<std::string, int> compNameToIndex = {
-      {"cmpi", 0},     {"addi", 1},
-      {"subi", 2},      {"muli", 3},
-      {"extsi", 4},    
+      {"cmpi", 0},
+      {"addi", 1},
+      {"subi", 2},
+      {"muli", 3},
+      {"extsi", 4},
       // {"load", 5}, {"store", 6},  ????
-      {"d_load", 5}, {"d_store", 6},  
-      {"LsqLoad", 7}, // ?
+      {"d_load", 5},
+      {"d_store", 6},
+      {"LsqLoad", 7},  // ?
       {"LsqStore", 8}, // ?
       // {"merge", 9},    // ??
       {"Getelementptr", 10},
-      {"Addf", 11},    {"Subf", 12},
-      {"Mulf", 13},    {"divu", 14},
-      {"Divs", 15},    {"Divf", 16},
-      {"cmpf", 17},    
+      {"Addf", 11},
+      {"Subf", 12},
+      {"Mulf", 13},
+      {"divu", 14},
+      {"Divs", 15},
+      {"Divf", 16},
+      {"cmpf", 17},
       // {"Phic", 18}, // ---> merge & control merge
-      {"merge", 18}, {"control_merge", 18},
-      {"zdl", 19},     {"fork", 20},
+      {"merge", 18},
+      {"control_merge", 18},
+      {"zdl", 19},
+      {"fork", 20},
       {"Ret", 21}, // handshake.return ?
-      {"br", 22},      // conditional branch ??
+      {"br", 22},  // conditional branch ??
       {"end", 23},
-      {"and", 24},     {"or", 25},
-      {"xori", 26},     {"Shl", 27},
-      {"Ashr", 28},    {"Lshr", 29},
-      {"select", 30},  {"mux", 31}};
+      {"and", 24},
+      {"or", 25},
+      {"xori", 26},
+      {"Shl", 27},
+      {"Ashr", 28},
+      {"Lshr", 29},
+      {"select", 30},
+      {"mux", 31}};
 
-  std::map<int, int> bitWidthToIndex = {
-      {1, 0}, {2, 1}, {4, 2}, {8, 3}, 
-      {16, 4}, {32, 5}, {64, 6}};
+  std::map<int, int> bitWidthToIndex = {{1, 0},  {2, 1},  {4, 2}, {8, 3},
+                                        {16, 4}, {32, 5}, {64, 6}};
 
-  std::vector<std::vector<float>>
-  readInfoFromFile(const std::string &filename);
+  std::vector<std::vector<float>> readInfoFromFile(const std::string &filename);
 
   double targetCP, maxCP;
   double bufferDelay = 0.0;
@@ -165,35 +179,44 @@ struct dataFlowCircuit {
   std::vector<std::vector<float>> latencyInfo;
 
   void createMILPModel(BufferPlacementStrategy &strategy,
-                      std::map<std::string, GRBVar> &thrptVars);
+                       std::map<std::string, GRBVar> &thrptVars);
 
-  void createMILPVars(GRBModel &modelMILP, 
-                          std::vector<unit *> &units,
-                          std::vector<channel *> &channels,
-                          std::vector<port *> &ports,
-                          std::map<std::string, GRBVar> &timeVars,
-                          std::map<std::string, GRBVar> &elasticVars,
+  void createMILPVars(GRBModel &modelMILP, std::vector<unit *> &units,
+                      std::vector<channel *> &channels,
+                      std::vector<port *> &ports,
+                      std::map<std::string, GRBVar> &timeVars,
+                      std::map<std::string, GRBVar> &elasticVars,
+                      std::map<std::string, GRBVar> &thrptVars,
+                      std::map<std::string, GRBVar> &bufferVars,
+                      std::map<std::string, GRBVar> &retimeVars,
+                      std::map<std::string, GRBVar> &outputVars);
+
+  void createPathConstraints(GRBModel &modelMILP,
+                             std::map<std::string, GRBVar> &timeVars,
+                             std::map<std::string, GRBVar> &bufferVars);
+
+  void createElasticityConstraints(GRBModel &modelMILP,
+                                   std::map<std::string, GRBVar> &elasticVars,
+                                   std::map<std::string, GRBVar> &bufferVars,
+                                   BufferPlacementStrategy &strategy);
+
+  void createThroughputConstraints(GRBModel &modelMILP,
+                                   std::map<std::string, GRBVar> &thrptVars,
+                                   std::map<std::string, GRBVar> &bufferVars,
+                                   std::map<std::string, GRBVar> &retimeVars,
+                                   BufferPlacementStrategy &strategy);
+
+  void createCostFunction(GRBModel &modelMILP,
                           std::map<std::string, GRBVar> &thrptVars,
-                          std::map<std::string, GRBVar> &bufferVars,
-                          std::map<std::string, GRBVar> &retimeVars,
-                          std::map<std::string, GRBVar> &outputVars);
-  
-  void createPathConstraints(GRBModel &modelMILP, 
-                            std::map<std::string, GRBVar> &timeVars,
-                            std::map<std::string, GRBVar> &bufferVars);
-
-  void createElasticityConstraints(GRBModel &modelMILP, 
-                            std::map<std::string, GRBVar> &elasticVars,
-                            std::map<std::string, GRBVar> &bufferVars,
-                            BufferPlacementStrategy &strategy);
+                          std::map<std::string, GRBVar> &bufferVars);
 
   void printCircuits();
 
   int findUnitIndex(Operation *op) {
-    for (int i = 0; i < units.size(); i++) 
-      if (units[i]->op == op) 
+    for (int i = 0; i < units.size(); i++)
+      if (units[i]->op == op)
         return i;
-      
+
     return -1;
   }
 };
