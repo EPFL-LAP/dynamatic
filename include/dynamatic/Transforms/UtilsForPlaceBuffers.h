@@ -181,6 +181,12 @@ struct dataFlowCircuit {
   void createPathConstraints(GRBModel &modelMILP, 
                             std::map<std::string, GRBVar> &timeVars,
                             std::map<std::string, GRBVar> &bufferVars);
+
+  void createElasticityConstraints(GRBModel &modelMILP, 
+                            std::map<std::string, GRBVar> &elasticVars,
+                            std::map<std::string, GRBVar> &bufferVars,
+                            BufferPlacementStrategy &strategy);
+
   void printCircuits();
 
   int findUnitIndex(Operation *op) {

@@ -276,6 +276,22 @@ static bool hasConectedChannels(port *p, std::vector<channel *> &channels) {
   return false;
 }
 
+static std::string getOutPortVarName(std::string prefix, channel *ch, std::vector<unit *> &unitList) {
+  int srcIndex = getUnitIndex(ch->unitSrc, unitList);
+  int j = getPortIndex(ch->valPort, ch->unitSrc->outPorts);
+
+  assert((srcIndex != -1 && j != -1) && "Unit or port not found in the list");
+  return prefix + std::to_string(srcIndex) + "_" + std::to_string(j);
+}
+
+static std::string getInPortVarName(std::string prefix, channel *ch, std::vector<unit *> &unitList) {
+  int dstIndex = getUnitIndex(ch->unitDst, unitList);
+  int j = getPortIndex(ch->valPort, ch->unitDst->inPorts);
+
+  assert((dstIndex != -1 && j != -1) && "Unit or port not found in the list");
+  return prefix + std::to_string(dstIndex) + "_" + std::to_string(j);
+}
+
 
 void buffer::dataFlowCircuit::createPathConstraints(GRBModel &modelMILP, 
                                   std::map<std::string, GRBVar> &timeVars,
@@ -283,18 +299,13 @@ void buffer::dataFlowCircuit::createPathConstraints(GRBModel &modelMILP,
   // create constraints in the path alongside the channels
   for (size_t i = 0; i < channels.size(); i++) {
     channel *ch = channels[i];
-    int srcIndex = getUnitIndex(ch->unitSrc, this->units);
-    int j = getPortIndex(ch->valPort, ch->unitSrc->outPorts);
-
-    assert((srcIndex != -1 && j != -1) && "Unit or port not found in the list");
-    GRBVar &timeIn = timeVars["timeOut_" + std::to_string(srcIndex) + "_" + std::to_string(j)];
+    std::string outPortName = getOutPortVarName("timeIn_", ch, this->units);
+    GRBVar &timeIn = timeVars[outPortName];
     // timeIn <= period
     modelMILP.addConstr(timeIn <= this->targetCP);
 
-    int dstIndex = getUnitIndex(ch->unitDst, this->units);
-    j = getPortIndex(ch->valPort, ch->unitDst->inPorts);
-    assert((dstIndex != -1 && j != -1) && "Unit or port not found in the list");
-    GRBVar &timeOut = timeVars["timeIn_" + std::to_string(dstIndex) + "_" + std::to_string(j)];
+    std::string inPortName = getInPortVarName("timeOut_", ch, this->units);
+    GRBVar &timeOut = timeVars[inPortName];
     // timeOut <= period
     modelMILP.addConstr(timeOut <= this->targetCP);
 
@@ -344,6 +355,18 @@ void buffer::dataFlowCircuit::createPathConstraints(GRBModel &modelMILP,
 
 }
 
+void buffer::dataFlowCircuit::createElasticityConstraints(GRBModel &modelMILP, 
+                            std::map<std::string, GRBVar> &elasticVars,
+                            std::map<std::string, GRBVar> &bufferVars,
+                            BufferPlacementStrategy &strategy) {
+  // create constraints in the path alongside the channels
+  for (size_t i = 0; i < channels.size(); i++) {
+    channel *ch = channels[i];
+    // skip channels that are not bufferizable
+    if (!strategy.getChannelConstraints(ch).bufferizable) continue;
+  }
+                            }
+
 void buffer::dataFlowCircuit::createMILPModel(BufferPlacementStrategy &strategy,
                           std::map<std::string, GRBVar> &outputVars) {
   // init the model
@@ -365,6 +388,8 @@ void buffer::dataFlowCircuit::createMILPModel(BufferPlacementStrategy &strategy,
                  timeVars, elasticVars, thrptVars, bufferVars, retimeVars, outputVars);
 
   createPathConstraints(modelMILP, timeVars, bufferVars);
+
+  createElasticityConstraints(modelMILP, elasticVars, bufferVars, strategy);
 
   // create the variables
 }

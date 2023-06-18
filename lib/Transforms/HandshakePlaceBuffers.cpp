@@ -96,6 +96,11 @@ public:
       constraints.transparentAllowed = true;
       constraints.nonTransparentAllowed = true;
     }
+
+    if (isa<handshake::ControlMergeOp>(ch->unitSrc->op) ||
+        isa<handshake::ControlMergeOp>(ch->unitDst->op) ) {
+      constraints.bufferizable = false;
+    }
     return constraints;
   }
 };
