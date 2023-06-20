@@ -14,6 +14,7 @@ target_link_libraries(dynamatic-opt
   DynamaticExportDOT
   DynamaticHandshakeToNetlist
   DynamaticTransforms
+  DynamaticTutorialsCreatingPasses
 
   CIRCTHandshake
   CIRCTHandshakeTransforms

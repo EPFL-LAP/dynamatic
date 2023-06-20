@@ -9,6 +9,9 @@
         // Dynamatic (experimental) 
         "${workspaceFolder}/experimental/include/",
         "${workspaceFolder}/build/experimental/include/",
+        // Dynamatic (tutorials) 
+        "${workspaceFolder}/tutorials/include/",
+        "${workspaceFolder}/build/tutorials/include/",
         // CIRCT
         "${workspaceFolder}/circt/include/",
         "${workspaceFolder}/circt/build/include/",

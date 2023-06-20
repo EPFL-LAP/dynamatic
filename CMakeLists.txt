@@ -59,7 +59,7 @@ include_directories(${CIRCT_INCLUDE_DIRS})
 option(LLVM_BUILD_TOOLS "Build the LLVM tools. If OFF, just generate build targets." ON)
 
 #-------------------------------------------------------------------------------
-# Dynamatic configuration
+# Dynamatic configuration 
 #-------------------------------------------------------------------------------
 
 set(DYNAMATIC_SOURCE_DIR ${CMAKE_SOURCE_DIR})
@@ -71,6 +71,8 @@ set(DYNAMATIC_BIN_INCLUDE_DIR ${DYNAMATIC_BINARY_DIR}/include)
 
 include_directories(${DYNAMATIC_INCLUDE_DIR})
 include_directories(${DYNAMATIC_BIN_INCLUDE_DIR})
+include_directories(${DYNAMATIC_SOURCE_DIR}/tutorials/include)
+include_directories(${DYNAMATIC_BINARY_DIR}/tutorials/include)
 
 add_custom_target(dynamatic-headers)
 set_target_properties(dynamatic-headers PROPERTIES FOLDER "Misc")
@@ -100,3 +102,4 @@ add_subdirectory(${DYNAMATIC_SOURCE_DIR}/experimental)
 add_subdirectory(${DYNAMATIC_SOURCE_DIR}/lib)
 add_subdirectory(${DYNAMATIC_SOURCE_DIR}/test)
 add_subdirectory(${DYNAMATIC_SOURCE_DIR}/tools)
+add_subdirectory(${DYNAMATIC_SOURCE_DIR}/tutorials)
