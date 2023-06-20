@@ -174,7 +174,8 @@ void buffer::dataFlowCircuit::createMILPVars(
   thrptVars["thrpt"] = modelMILP.addVar(0.0, 1.0, 0.0, GRB_CONTINUOUS);
 
   for (size_t i = 0; i < units.size(); i++) {
-    unit *unit = units[i];
+    unit *uNode = units[i];
+    llvm::errs()  << "unit: " << *(uNode->op) << "\n";
     // create the retiming variables for the throughput
     retimeVars["retimeIn_" + std::to_string(i)] =
         modelMILP.addVar(0.0, 1.0, 0.0, GRB_CONTINUOUS);
@@ -184,9 +185,11 @@ void buffer::dataFlowCircuit::createMILPVars(
         modelMILP.addVar(0.0, 1.0, 0.0, GRB_CONTINUOUS);
 
     // time path defined in input port
-    for (size_t j = 0; j < unit->inPorts.size(); j++) {
-      port *inP = unit->inPorts[j];
-      if (std::find(ports.begin(), ports.end(), inP) != ports.end()) {
+    for (size_t j = 0; j < uNode->inPorts.size(); j++) {
+      port *inP = uNode->inPorts[j];
+      // if (std::find(ports.begin(), ports.end(), inP) != ports.end()) {
+        llvm::errs() << "creating " << "timeIn_" + std::to_string(i) + "_" +
+                            std::to_string(j) << "\n";
         timeVars["timeIn_" + std::to_string(i) + "_" + std::to_string(j)] =
             modelMILP.addVar(0.0, INFINITY, 0.0, GRB_CONTINUOUS);
         timeVars["timeInValid_" + std::to_string(i) + "_" + std::to_string(j)] =
@@ -196,14 +199,16 @@ void buffer::dataFlowCircuit::createMILPVars(
         elasticVars["timeInElastic_" + std::to_string(i) + "_" +
                     std::to_string(j)] =
             modelMILP.addVar(0.0, INFINITY, 0.0, GRB_CONTINUOUS);
-      }
+      // }
     }
 
     // time path defined in output port
-    for (size_t j = 0; j < unit->outPorts.size(); j++) {
-      port *outP = unit->outPorts[j];
+    for (size_t j = 0; j < uNode->outPorts.size(); j++) {
+      port *outP = uNode->outPorts[j];
+      llvm::errs() << "creating " << "timeOut_" + std::to_string(i) + "_" +
+                            std::to_string(j) << "\n";
       // if the port is in the path, create time path variables
-      if (std::find(ports.begin(), ports.end(), outP) != ports.end()) {
+      // if (std::find(ports.begin(), ports.end(), outP) != ports.end()) {
         timeVars["timeOut_" + std::to_string(i) + "_" + std::to_string(j)] =
             modelMILP.addVar(0.0, INFINITY, 0.0, GRB_CONTINUOUS);
         timeVars["timeOutValid_" + std::to_string(i) + "_" +
@@ -215,7 +220,7 @@ void buffer::dataFlowCircuit::createMILPVars(
         elasticVars["timeOutElastic_" + std::to_string(i) + "_" +
                     std::to_string(j)] =
             modelMILP.addVar(0.0, INFINITY, 0.0, GRB_CONTINUOUS);
-      }
+      // }
     }
   }
 
@@ -224,6 +229,7 @@ void buffer::dataFlowCircuit::createMILPVars(
     channel *channel = channels[i];
     int srcIndex = findUnitIndex(channel->unitSrc->op);
     int dstIndex = findUnitIndex(channel->unitDst->op);
+    // channel->print();
     assert((srcIndex != -1 && dstIndex != -1) && "Error finding unit index");
 
     std::string varName = std::to_string(i) + "_u" + std::to_string(srcIndex) +
@@ -279,7 +285,9 @@ static bool hasConectedChannels(port *p, std::vector<channel *> &channels) {
 
 static std::string getOutPortVarName(std::string prefix, channel *ch,
                                      std::vector<unit *> &unitList) {
+  ch->print();
   int srcIndex = getUnitIndex(ch->unitSrc, unitList);
+  llvm::errs() << "srcUnit " << *(unitList[srcIndex]->op) << "\n"; 
   int j = getPortIndex(ch->valPort, ch->unitSrc->outPorts);
 
   assert((srcIndex != -1 && j != -1) && "Unit or port not found in the list");
@@ -313,17 +321,20 @@ void buffer::dataFlowCircuit::createPathConstraints(
   // create constraints in the path alongside the channels
   for (size_t i = 0; i < channels.size(); i++) {
     channel *ch = channels[i];
-    std::string outPortName = getOutPortVarName("timeIn_", ch, this->units);
+    std::string outPortName = getOutPortVarName("timeOut_", ch, this->units);
+    llvm::errs() << "outPortName: " << outPortName << "\n";
     GRBVar &timeIn = timeVars[outPortName];
     // timeIn <= period
     modelMILP.addConstr(timeIn <= this->targetCP);
 
-    std::string inPortName = getInPortVarName("timeOut_", ch, this->units);
+    std::string inPortName = getInPortVarName("timeIn_", ch, this->units);
+    llvm::errs() << "inPortName: " << inPortName << "\n";
     GRBVar &timeOut = timeVars[inPortName];
     // timeOut <= period
     modelMILP.addConstr(timeOut <= this->targetCP);
 
     std::string varName = getBufferVarName("bufferFlop_", ch, this->units);
+    llvm::errs() << "varName: " << varName << "\n";
     GRBVar &R_flop = bufferVars[varName];
     // v2 >= v1 - 2*period*R
     modelMILP.addConstr(timeOut >= timeIn - 2 * this->targetCP * R_flop);
@@ -522,13 +533,17 @@ void buffer::dataFlowCircuit::createMILPModel(
   std::map<std::string, GRBVar> retimeVars;
   std::map<std::string, GRBVar> thrptVars;
 
+  llvm::errs() << "Creating MILP variables\n";
   createMILPVars(modelMILP, this->units, this->channels, this->ports, timeVars,
                  elasticVars, thrptVars, bufferVars, retimeVars, outputVars);
 
+  llvm::errs() << "Creating path constraints\n";
   createPathConstraints(modelMILP, timeVars, bufferVars);
 
+  llvm::errs() << "Creating elasticity constraints\n";
   createElasticityConstraints(modelMILP, elasticVars, bufferVars, strategy);
 
+  llvm::errs() << "Creating throughput constraints\n";
   createThroughputConstraints(modelMILP, thrptVars, bufferVars, retimeVars, strategy);
 
   createCostFunction(modelMILP, thrptVars, elasticVars);

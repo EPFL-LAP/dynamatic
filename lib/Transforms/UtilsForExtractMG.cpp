@@ -196,9 +196,18 @@ static bool isSelect(std::map<archBB *, int> &archs, channel *ch) {
   int srcBB = getBBIndex(ch->unitSrc->op);
   int dstBB = getBBIndex(ch->unitDst->op);
   for (auto pair : archs) {
-    if (pair.first->srcBB == srcBB && pair.first->dstBB == dstBB)
+    if (pair.first->srcBB == srcBB && pair.first->dstBB == dstBB &&
+        pair.second == 1)
       return true;
   }
+  return false;
+}
+
+static bool isSelect(std::map<int, int> &bbs, channel *ch) {
+  int srcBB = getBBIndex(ch->unitSrc->op);
+  int dstBB = getBBIndex(ch->unitDst->op);
+  if (!ch->isBackEdge && srcBB == dstBB && bbs[srcBB] == 1)
+    return true;
   return false;
 }
 
@@ -267,14 +276,14 @@ dataFlowCircuit *buffer::createCFDFCircuit(std::vector<unit *> &unitList,
     // insert units in the selected basic blocks
     if (bbs.count(bbIndex) > 0 && bbs[bbIndex] > 0) {
       circuit->units.push_back(unit);
-      llvm::errs() << "insert unit: " << *(unit->op) << "\n";
-      llvm::errs() << "number of output ports: " << unit->outPorts.size()
-                   << "\n";
-      llvm::errs() << "number of input ports: " << unit->inPorts.size() << "\n";
+      // llvm::errs() << "insert unit: " << *(unit->op) << "\n";
+      // llvm::errs() << "number of output ports: " << unit->outPorts.size()
+      //              << "\n";
+      // llvm::errs() << "number of input ports: " << unit->inPorts.size() << "\n";
       // insert channels if it is selected
       for (auto port : unit->outPorts)
         for (auto ch : port->cntChannels)
-          if (isSelect(archs, ch)) {
+          if (isSelect(archs, ch) || isSelect(bbs, ch)) {
             circuit->channels.push_back(ch);
             circuit->ports.push_back(port);
           }
