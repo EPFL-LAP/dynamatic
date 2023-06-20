@@ -9,6 +9,7 @@
 
 #include "dynamatic/Support/LLVM.h"
 #include "mlir/Pass/Pass.h"
+#include "tutorials/CreatingPasses/Transforms/GreedySimplifyMergeLike.h"
 #include "tutorials/CreatingPasses/Transforms/SimplifyMergeLike.h"
 
 namespace dynamatic {

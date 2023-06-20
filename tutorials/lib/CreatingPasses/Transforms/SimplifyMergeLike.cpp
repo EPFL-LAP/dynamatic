@@ -13,8 +13,8 @@ using namespace mlir;
 using namespace circt;
 
 /// Performs the simple transformation on the provided Handshake function,
-/// deleting merges with a single input and replacing control merges with an
-/// unused index result into simple merges.
+/// deleting merges with a single input and downgrades control merges with an
+/// unused index result into simpler merges.
 static LogicalResult performSimplification(handshake::FuncOp funcOp,
                                            MLIRContext *ctx) {
   // Create an operation builder to allow us to create and insert new operation
@@ -71,8 +71,9 @@ static LogicalResult performSimplification(handshake::FuncOp funcOp,
 
 namespace {
 
-/// Simple pass driver for our simple transformation. It will apply the
-/// transformation on each function present in the matched MLIR module.
+/// Simple pass driver for our merge-like simplification transformation. It will
+/// apply the transformation on each function present in the matched MLIR
+/// module.
 struct SimplifyMergeLikePass
     : public dynamatic::tutorials::impl::SimplifyMergeLikeBase<
           SimplifyMergeLikePass> {

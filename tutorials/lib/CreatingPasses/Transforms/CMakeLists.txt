@@ -1,4 +1,5 @@
 add_dynamatic_library(DynamaticTutorialsCreatingPasses
+  GreedySimplifyMergeLike.cpp
   SimplifyMergeLike.cpp
 
   DEPENDS

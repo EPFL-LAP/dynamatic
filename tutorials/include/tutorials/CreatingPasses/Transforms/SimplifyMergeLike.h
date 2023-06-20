@@ -4,8 +4,8 @@
 //
 //===----------------------------------------------------------------------===//
 
-#ifndef TUTORIALS_CREATINGPASSES_TRANSFORMS_SIMPLETRANSFORM_H
-#define TUTORIALS_CREATINGPASSES_TRANSFORMS_SIMPLETRANSFORM_H
+#ifndef TUTORIALS_CREATINGPASSES_TRANSFORMS_SIMPLIFYMERGELIKE_H
+#define TUTORIALS_CREATINGPASSES_TRANSFORMS_SIMPLIFYMERGELIKE_H
 
 #include "dynamatic/Support/LLVM.h"
 #include "mlir/Pass/Pass.h"
@@ -22,4 +22,4 @@ createSimplifyMergeLikePass();
 } // namespace tutorials
 } // namespace dynamatic
 
-#endif // TUTORIALS_CREATINGPASSES_TRANSFORMS_SIMPLETRANSFORM_H
+#endif // TUTORIALS_CREATINGPASSES_TRANSFORMS_SIMPLIFYMERGELIKE_H
