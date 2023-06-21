@@ -49,10 +49,10 @@ void buffer::DataflowCircuit::printCircuits() {
   }
 }
 
-buffer::DataflowCircuit buffer::createCFDFCircuit(std::vector<Operation *> &unitList,
-                                           std::map<ArchBB *, unsigned> &archs,
-                                           std::map<int, bool> &bbs) {
-  buffer::DataflowCircuit circuit = buffer::DataflowCircuit();
+DataflowCircuit buffer::createCFDFCircuit(std::vector<Operation *> &unitList,
+                                           std::map<ArchBB *, bool> &archs,
+                                           std::map<unsigned, bool> &bbs) {
+  DataflowCircuit circuit = DataflowCircuit();
   for (auto unit : unitList) {
     int bbIndex = getBBIndex(unit);
 
@@ -85,17 +85,15 @@ static LogicalResult insertBuffers(handshake::FuncOp funcOp, MLIRContext *ctx,
       dfsHandshakeGraph(&op, visitedOpList);
 
   // create CFDFC circuits
-  std::vector<buffer::DataflowCircuit *> DataflowCircuitList;
+  std::vector<DataflowCircuit *> DataflowCircuitList;
 
   // read the bb file from std level
-  std::map<ArchBB *, unsigned> archs;
-  std::map<int, bool> bbs;
+  std::map<ArchBB *, bool> archs;
+  std::map<unsigned, bool> bbs;
   if (failed(readSimulateFile(stdLevelInfo, archs, bbs)))
     return failure();
 
-  llvm::errs() << "stdLevelInfo: " << stdLevelInfo << "\n";
-
-  int execNum = buffer::extractCFDFCircuit(archs, bbs);
+  int execNum = extractCFDFCircuit(archs, bbs);
   while (execNum > 0) {
     // write the execution frequency to the DataflowCircuit
     llvm::errs() << "execNum: " << execNum << "\n";
@@ -104,7 +102,7 @@ static LogicalResult insertBuffers(handshake::FuncOp funcOp, MLIRContext *ctx,
     DataflowCircuitList.push_back(&circuit);
     if (firstMG)
       break;
-    execNum = buffer::extractCFDFCircuit(archs, bbs);
+    execNum = extractCFDFCircuit(archs, bbs);
   }
   
   return success();

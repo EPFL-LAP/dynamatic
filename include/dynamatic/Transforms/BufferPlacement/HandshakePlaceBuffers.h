@@ -42,8 +42,8 @@ struct DataflowCircuit {
 /// and archs, and bbs that store the CFDFC extraction results indicating
 /// selected (1) or not (0).
 DataflowCircuit createCFDFCircuit(std::vector<Operation *> &unitList,
-                                   std::map<ArchBB *, unsigned> &archs,
-                                   std::map<int, bool> &bbs);
+                                   std::map<ArchBB *, bool> &archs,
+                                   std::map<unsigned, bool> &bbs);
 } // namespace buffer
 
 std::unique_ptr<mlir::OperationPass<mlir::ModuleOp>>
