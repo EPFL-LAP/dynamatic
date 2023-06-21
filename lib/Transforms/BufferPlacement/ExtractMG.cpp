@@ -4,13 +4,15 @@
 //
 //===----------------------------------------------------------------------===//
 
-#include "dynamatic/Transforms/UtilsForExtractMG.h"
+#include "dynamatic/Transforms/BufferPlacement/ExtractMG.h"
+#include "dynamatic/Conversion/StandardToHandshakeFPGA18.h"
 #include "circt/Dialect/Handshake/HandshakeOps.h"
 #include "mlir/Dialect/Arith/IR/Arith.h"
 #include "mlir/Dialect/Func/IR/FuncOps.h"
 #include "mlir/IR/BuiltinTypes.h"
 #include "mlir/IR/OperationSupport.h"
 #include "mlir/Support/IndentedOstream.h"
+#include "gurobi_c++.h"
 
 using namespace circt;
 using namespace circt::handshake;
@@ -18,13 +20,41 @@ using namespace mlir;
 using namespace dynamatic;
 using namespace dynamatic::buffer;
 
-void buffer::readSimulateFile(const std::string &fileName,
-                              std::map<archBB *, int> &archs,
-                              std::map<int, int> &bbs) {
+static bool isNumber(const std::string &str) {
+  for (char c : str)
+    if (!isdigit(c) && c != ' ')
+      return false;
+  return true;
+}
+
+int buffer::getBBIndex(Operation *op) {
+  for (auto attr : op->getAttrs()) {
+    if (attr.getName() == BB_ATTR)
+      return dyn_cast<IntegerAttr>(attr.getValue()).getValue().getZExtValue();
+  }
+  return -1;
+}
+
+bool buffer::isEntryOp(Operation *op) {
+  for (auto operand : op->getOperands())
+    if (!operand.getDefiningOp())
+      return true;
+  return false;
+}
+
+bool buffer::isBackEdge(Operation *opSrc, Operation *opDst) {
+  if (opDst->isProperAncestor(opSrc))
+    return true;
+  return false;
+}
+
+LogicalResult buffer::readSimulateFile(const std::string &fileName,
+                              std::map<ArchBB *, unsigned> &archs,
+                              std::map<int, bool> &bbs) {
   std::ifstream inFile(fileName);
 
   if (!inFile)
-    assert(false && "Cannot open the file\n");
+    return failure();
 
   std::string line;
 
@@ -33,38 +63,47 @@ void buffer::readSimulateFile(const std::string &fileName,
 
   while (std::getline(inFile, line)) {
     std::istringstream iss(line);
-    archBB *arch = new archBB();
+    ArchBB *arch = new ArchBB();
+    ArchBB *pArch = arch;
 
     std::string token;
     std::getline(iss, token, ',');
+
+    if(!isNumber(token))
+      return failure();
     arch->srcBB = std::stoi(token);
+    
+    std::getline(iss, token, ',');
+    if(!isNumber(token))
+      return failure();
+    arch->dstBB  = std::stoi(token);
+    
+    std::getline(iss, token, ',');
+    if(!isNumber(token))
+      return failure();
+    arch->execFreq  = std::stoi(token);
 
     std::getline(iss, token, ',');
-    arch->dstBB = std::stoi(token);
+    if(!isNumber(token))
+      return failure();
+    arch->isBackEdge = std::stoi(token) == 1 ? true : false;
 
-    std::getline(iss, token, ',');
-    arch->execFreq = std::stoi(token);
-
-    if (!std::getline(iss, token, ','))
-      arch->isBackEdge = arch->srcBB >= arch->dstBB ? true : false;
-    else
-      arch->isBackEdge = std::stoi(token) == 1 ? true : false;
-
-    archs[arch] = false;
+    archs[pArch] = false;
     if (bbs.count(arch->srcBB) == 0)
       bbs[arch->srcBB] = false;
     if (bbs.count(arch->dstBB) == 0)
       bbs[arch->dstBB] = false;
   }
+  return success();
 }
 
 static int initVarInMILP(GRBModel &modelMILP, std::map<int, GRBVar> &sBB,
                          std::map<std::string, GRBVar> &sArc,
-                         std::vector<archBB *> &archNames,
-                         std::vector<int> &bbNames) {
+                         std::vector<ArchBB *> &archNames,
+                         std::vector<unsigned> &bbNames) {
   int cstMaxN = 0;
 
-  for (auto bb : bbNames) {
+  for (unsigned bb : bbNames) {
     // define variables for basic blocks selection
     sBB[bb] =
         modelMILP.addVar(0.0, 1, 0.0, GRB_BINARY, "sBB_" + std::to_string(bb));
@@ -90,85 +129,86 @@ static void setObjective(GRBModel &modelMILP,
   for (auto pair : sArc) {
     if (pair.first == "valExecN")
       continue;
-    auto S_e = pair.second;
-    objExpr += sArc["valExecN"] * S_e;
+    auto sE = pair.second;
+    objExpr += sArc["valExecN"] * sE;
   }
   modelMILP.setObjective(objExpr, GRB_MAXIMIZE);
 }
 
-static archBB *findArchWithVarName(const std::string &varName,
-                                   std::vector<archBB *> &archs) {
+static ArchBB *findArchWithVarName(const std::string &varName,
+                                   std::vector<ArchBB *> &archs) {
   for (auto arch : archs) {
     std::string arcName = "sArc_" + std::to_string(arch->srcBB) + "_" +
                           std::to_string(arch->dstBB);
     if (arcName == varName)
       return arch;
   }
-  assert(false && "Cannot find arch with var name");
+  return nullptr;
 }
 
 static std::vector<std::string>
 getBBsInArcVars(int bb, std::map<std::string, GRBVar> &sArc,
-                std::vector<archBB *> &archs) {
+                std::vector<ArchBB *> &archs) {
   std::vector<std::string> varNames;
+
   for (auto pair : sArc) {
     if (pair.first == "valExecN")
       continue;
     auto arch = findArchWithVarName(pair.first, archs);
-    if (arch->srcBB == bb) {
+    if (arch && arch->srcBB == bb) 
       varNames.push_back(pair.first);
-    }
+    
   }
   return varNames;
 }
 
 static std::vector<std::string>
 getBBsOutArcVars(int bb, std::map<std::string, GRBVar> &sArc,
-                 std::vector<archBB *> &archs) {
+                 std::vector<ArchBB *> &archs) {
   std::vector<std::string> varNames;
   for (auto pair : sArc) {
     if (pair.first == "valExecN")
       continue;
     auto arch = findArchWithVarName(pair.first, archs);
-    if (arch->dstBB == bb) {
+    if (arch && arch->dstBB == bb) 
       varNames.push_back(pair.first);
-    }
+    
   }
   return varNames;
 }
 
-static void setEdgeConstrs(GRBModel &modelMILP, int cstMaxN,
+static LogicalResult setEdgeConstrs(GRBModel &modelMILP, int cstMaxN,
                            std::map<std::string, GRBVar> &sArc,
-                           std::vector<archBB *> &archs) {
+                           std::vector<ArchBB *> &archs) {
 
   auto valExecN = sArc["valExecN"];
   GRBLinExpr backEdgeConstr;
 
-  int constrInd = 0;
-  for (auto pair : sArc) {
+  for (auto [constrInd, pair] : llvm::enumerate(sArc)) {
     if (pair.first == "valExecN")
       continue;
     auto arcEntity = findArchWithVarName(pair.first, archs);
+    if (!arcEntity)
+      return failure();
     unsigned N_e = arcEntity->execFreq;
     auto S_e = pair.second;
     // for each edge e: N <= S_e x N_e + (1-S_e) x cstMaxN
     modelMILP.addConstr(valExecN <= S_e * N_e + (1 - S_e) * cstMaxN,
                         "cN" + std::to_string(constrInd));
-    ++constrInd;
     // Only select one back archs: for each bb \in Back(CFG): sum(S_e) = 1
-    if (arcEntity->isBackEdge) {
+    if (arcEntity->isBackEdge) 
       backEdgeConstr += S_e;
-    }
+    
   }
   modelMILP.addConstr(backEdgeConstr == 1, "cBack");
+  return success();
 }
 
 static void setBBConstrs(GRBModel &modelMILP, std::map<int, GRBVar> &sBB,
                          std::map<std::string, GRBVar> &sArc,
-                         std::vector<archBB *> &archs) {
+                         std::vector<ArchBB *> &archs) {
 
-  int constrInd = 0;
-  for (auto pair : sBB) {
+  for (auto [constrInd, pair] : llvm::enumerate(sBB)) {
     // only 1 input arch if bb is selected;
     // no input arch if bb is not selected
     GRBLinExpr constraintInExpr;
@@ -188,27 +228,47 @@ static void setBBConstrs(GRBModel &modelMILP, std::map<int, GRBVar> &sBB,
         constraintOutExpr += sArc[arch];
     modelMILP.addConstr(constraintOutExpr == pair.second,
                         "cOut" + std::to_string(constrInd));
-    ++constrInd;
   }
 };
 
-static bool isSelect(std::map<archBB *, int> &archs, channel *ch) {
-  int srcBB = getBBIndex(ch->unitSrc->op);
-  int dstBB = getBBIndex(ch->unitDst->op);
-  for (auto pair : archs) {
-    if (pair.first->srcBB == srcBB && pair.first->dstBB == dstBB)
-      return true;
-  }
+bool buffer::isSelect(std::map<int, bool> &bbs, Value *val) {
+  Operation *srcOp = val->getDefiningOp();
+  Operation * dstOp;
+  for (auto user : val->getUsers())
+    dstOp = user;
+
+  unsigned srcBB = getBBIndex(srcOp);
+  unsigned dstBB = getBBIndex(dstOp);
+
+  // if srcOp and dstOp are in the same BB, and the edge is not backedge
+  // then the edge is selected depends on the BB
+  if (srcBB == dstBB && bbs.count(srcBB) > 0)
+    if (!isBackEdge(srcOp, dstOp))
+      return bbs[srcBB];
   return false;
 }
 
-int buffer::extractCFDFCircuit(std::map<archBB *, int> &archs,
-                               std::map<int, int> &bbs) {
+bool buffer::isSelect(std::map<ArchBB *, unsigned> &archs, Value *val) {
+  Operation *srcOp = val->getDefiningOp();
+  Operation *dstOp = val->getDefiningOp();
+
+  unsigned srcBB = getBBIndex(srcOp);
+  unsigned dstBB = getBBIndex(dstOp);
+
+  for (auto pair : archs) 
+    if (pair.first->srcBB == srcBB && pair.first->dstBB == dstBB && pair.second > 0)
+      return true;
+  return false;
+}
+
+int buffer::extractCFDFCircuit(std::map<ArchBB *, unsigned> &archs,
+                               std::map<int, bool> &bbs) {
   // store variable names
-  std::vector<archBB *> archNames;
-  std::vector<int> bbNames;
+  std::vector<ArchBB *> archNames;
+  std::vector<unsigned> bbNames;
 
   for (auto pair : archs) {
+    // pair.first->print();
     archNames.push_back(pair.first);
   }
   for (auto pair : bbs) {
@@ -228,8 +288,11 @@ int buffer::extractCFDFCircuit(std::map<archBB *, int> &archs,
 
   int cstMaxN = initVarInMILP(modelMILP, sBB, sArc, archNames, bbNames);
   setObjective(modelMILP, sArc);
-  setEdgeConstrs(modelMILP, cstMaxN, sArc, archNames);
+  if (failed(setEdgeConstrs(modelMILP, cstMaxN, sArc, archNames)))
+    return -1;
+  
   setBBConstrs(modelMILP, sBB, sArc, archNames);
+
   modelMILP.optimize();
 
   if (modelMILP.get(GRB_IntAttr_Status) != GRB_OPTIMAL ||
@@ -238,8 +301,8 @@ int buffer::extractCFDFCircuit(std::map<archBB *, int> &archs,
 
   // load answer to the bb map
   for (auto pair : sBB)
-    if (bbs.count(pair.first) > 0)
-      bbs[pair.first] = pair.second.get(GRB_DoubleAttr_X) > 0 ? 1 : 0;
+    if (bbs.count(pair.first) > 0) 
+      bbs[pair.first] = pair.second.get(GRB_DoubleAttr_X) > 0 ? true : false;
 
   int execN = static_cast<int>(sArc["valExecN"].get(GRB_DoubleAttr_X));
 
@@ -256,23 +319,3 @@ int buffer::extractCFDFCircuit(std::map<archBB *, int> &archs,
   return execN;
 }
 
-dataFlowCircuit *buffer::createCFDFCircuit(std::vector<unit *> &unitList,
-                                           std::map<archBB *, int> &archs,
-                                           std::map<int, int> &bbs) {
-
-  dataFlowCircuit *circuit = new dataFlowCircuit();
-  for (auto unit : unitList) {
-    int bbIndex = getBBIndex(unit->op);
-
-    // insert units in the selected basic blocks
-    if (bbs.count(bbIndex) > 0 && bbs[bbIndex] > 0) {
-      circuit->units.push_back(unit);
-      // insert channels if it is selected
-      for (auto ports : unit->outPorts)
-        for (auto ch : ports->cntChannels)
-          if (isSelect(archs, ch))
-            circuit->channels.push_back(ch);
-    }
-  }
-  return circuit;
-}

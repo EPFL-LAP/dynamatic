@@ -5,16 +5,16 @@ add_dynamatic_library(DynamaticTransforms
   FlattenMemRefRowMajor.cpp
   HandshakePrepareForLegacy.cpp
   HandshakeInferBasicBlocks.cpp
-  HandshakePlaceBuffers.cpp
   NameMemoryOps.cpp
   PushConstants.cpp
-  UtilsForPlaceBuffers.cpp
-  UtilsForExtractMG.cpp
   UtilsBitsUpdate.cpp
   OptimizeBits.cpp
   InitIndexType.cpp
   InitCstWidth.cpp
   ScfRotateForLoops.cpp
+
+  BufferPlacement/HandshakePlaceBuffers.cpp
+  BufferPlacement/ExtractMG.cpp
 
   DEPENDS
   DynamaticTransformsPassIncGen
