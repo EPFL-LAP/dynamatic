@@ -5,7 +5,7 @@ module {
     end %returnVal : none
   }
 
-  handshake.func @downgradeIndexlessControlMerge(%arg0: i32, %arg1: i32, %start: none) -> i32 attributes {argNames = ["arg0", "arg1", "start"], resNames = ["out0"]} {
+  handshake.func @downgradeIndexLessControlMerge(%arg0: i32, %arg1: i32, %start: none) -> i32 attributes {argNames = ["arg0", "arg1", "start"], resNames = ["out0"]} {
     %cmergeRes, %cmergeIdx = control_merge %arg0, %arg1 : i32, index
     %returnVal = d_return %cmergeRes : i32
     end %returnVal : i32
