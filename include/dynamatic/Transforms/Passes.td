@@ -151,12 +151,14 @@ def HandshakeOptimizeBits : Pass<"optimize-bits" , "mlir::ModuleOp"> {
   let dependentDialects = ["mlir::arith::ArithDialect"];
 }
 
-def HandshakeInitIndType : Pass<"init-indtype", "mlir::ModuleOp"> {
-  let summary = "Initialize the index type of the module.";
+def HandshakeConcretizeIndexType : Pass<"handshake-concretize-index-type", "mlir::ModuleOp"> {
+  let summary = "Concretizes the IndexType to an IntegerType of machine-specific width.";
   let description = [{
-    This pass change all the index type within operands and result operands to integer type with platform dependent bit width.
+    Replaces any IndexType throughout the Handhsake-level IR with an IntegerType
+    of machine-specific width. In particular, all SSA values of type IndexType
+    have their type changed to IntegerType.
   }];
-  let constructor = "dynamatic::createInitIndTypePass()";
+  let constructor = "dynamatic::createHandshakeConcretizeIndexType()";
 }
 
 def HandshakeInitCstWidth : Pass<"init-cstwidth", "mlir::ModuleOp"> {

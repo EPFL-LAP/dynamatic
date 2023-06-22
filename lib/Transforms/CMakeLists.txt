@@ -2,13 +2,13 @@ add_dynamatic_library(DynamaticTransforms
   ArithReduceArea.cpp
   AnalyzeMemoryAccesses.cpp
   FlattenMemRefRowMajor.cpp
+  HandshakeConcretizeIndexType.cpp
   HandshakePrepareForLegacy.cpp
   HandshakeInferBasicBlocks.cpp
   NameMemoryOps.cpp
   PushConstants.cpp
   UtilsBitsUpdate.cpp
   OptimizeBits.cpp
-  InitIndexType.cpp
   InitCstWidth.cpp
   ScfRotateForLoops.cpp
 
