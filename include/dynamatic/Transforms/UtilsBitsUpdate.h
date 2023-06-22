@@ -28,7 +28,6 @@ IntegerType getNewType(Value opVal, unsigned bitswidth,
 std::optional<Operation *> insertWidthMatchOp(Operation *newOp, int opInd,
                                               Type newType, MLIRContext *ctx);
 
-
 LogicalResult containsAttr(Operation *op, std::string attrName);
 
 namespace dynamatic {
