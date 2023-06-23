@@ -15,6 +15,7 @@ add_dynamatic_library(DynamaticTransforms
 
   BufferPlacement/HandshakePlaceBuffers.cpp
   BufferPlacement/ExtractMG.cpp
+  BufferPlacement/OptimizeMILP.cpp
 
   DEPENDS
   DynamaticTransformsPassIncGen
