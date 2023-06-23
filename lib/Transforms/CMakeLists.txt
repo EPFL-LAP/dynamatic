@@ -21,4 +21,5 @@ add_dynamatic_library(DynamaticTransforms
   MLIRFuncDialect
   MLIRSupport
   MLIRTransformUtils
+  DynamaticSupport
 )

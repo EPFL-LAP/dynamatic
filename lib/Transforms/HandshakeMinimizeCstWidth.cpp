@@ -9,11 +9,9 @@
 
 #include "dynamatic/Transforms/HandshakeMinimizeCstWidth.h"
 #include "circt/Dialect/Handshake/HandshakeOps.h"
+#include "dynamatic/Support/LogicBB.h"
 #include "dynamatic/Transforms/PassDetails.h"
 #include "mlir/Dialect/Arith/IR/Arith.h"
-#include "mlir/Dialect/Func/IR/FuncOps.h"
-#include "mlir/IR/Dialect.h"
-#include "mlir/IR/OperationSupport.h"
 #include "mlir/Transforms/GreedyPatternRewriteDriver.h"
 #include "llvm/Support/Debug.h"
 
@@ -80,11 +78,10 @@ struct MinimizeConstantBitwidth
 
     // Insert an extension operation to keep the same type for users of the
     // constant's result
-    rewriter.setInsertionPoint(cstOp);
+    rewriter.setInsertionPointAfter(cstOp);
     Operation *extOp = rewriter.create<mlir::arith::ExtSIOp>(
         cstOp.getLoc(), oldType, cstOp.getResult());
-    if (succeeded(containsAttr(cstOp, BB_ATTR)))
-      extOp->setAttr(BB_ATTR, cstOp->getAttr(BB_ATTR));
+    inheritBB(cstOp, extOp);
 
     // Replace uses of the constant result with the extension op's result
     for (auto *user : cstOp->getUsers())

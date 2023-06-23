@@ -10,6 +10,7 @@
 
 #include "dynamatic/Transforms/HandshakeConcretizeIndexType.h"
 #include "circt/Dialect/Handshake/HandshakeOps.h"
+#include "dynamatic/Support/LogicBB.h"
 #include "dynamatic/Transforms/PassDetails.h"
 #include "mlir/Dialect/Arith/IR/Arith.h"
 #include "mlir/Transforms/GreedyPatternRewriteDriver.h"
@@ -22,13 +23,16 @@ using namespace dynamatic;
 /// Is the type not an index type?
 static bool isNotIndexType(Type type) { return !isa<IndexType>(type); };
 
-/// Is the type an index type?
+/// Returns the provided type if it isn't an IndexType, otherwise returns an
+/// IntegerType of machine-specific width.
 static Type sameOrIndexToInt(Type type) {
   if (isNotIndexType(type))
     return type;
   return IntegerType::get(type.getContext(),
                           IndexType::kInternalStorageBitWidth);
 }
+
+namespace {
 
 /// Replaces all IndexType arguments/results in a handshake function's
 /// signature.
@@ -90,6 +94,7 @@ struct ReplaceIndexCast : public OpRewritePattern<Op> {
         castOp = rewriter.create<arith::TruncIOp>(indexCastOp.getLoc(),
                                                   toVal.getType(), fromVal);
       rewriter.replaceOp(indexCastOp, castOp->getResult(0));
+      inheritBB(indexCastOp, castOp);
     }
 
     return success();
@@ -112,8 +117,6 @@ struct ReplaceConstantOpAttr : public OpRewritePattern<handshake::ConstantOp> {
   }
 };
 
-namespace {
-
 /// Driver for the IndexType concretization pass. First, the type of all SSA
 /// values whose type is IndexType is modified to an IntegerType of
 /// machine-specific width. Secondly, a greedy pattern rewriter handles
@@ -132,8 +135,6 @@ struct HandshakeConcretizeIndexTypePass
       for (Value operand : op->getOperands())
         if (isa<IndexType>(operand.getType()))
           operand.setType(indexWidthInt);
-
-      // Change type of all results
       for (OpResult result : op->getResults())
         if (isa<IndexType>(result.getType()))
           result.setType(indexWidthInt);

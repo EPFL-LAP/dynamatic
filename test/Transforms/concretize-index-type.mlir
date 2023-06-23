@@ -91,3 +91,18 @@ handshake.func @intToIdxToTrucInt(%arg0: i64, %start: none) -> i32 {
   end %returnVal : i32
 }
 
+// -----
+
+// CHECK-LABEL:   handshake.func @inheritBB(
+// CHECK-SAME:                              %[[VAL_0:.*]]: i64,
+// CHECK-SAME:                              %[[VAL_1:.*]]: none, ...) -> i32 attributes {argNames = ["arg0", "start"], resNames = ["out0"]} {
+// CHECK:           %[[VAL_2:.*]] = arith.trunci %[[VAL_0]] {bb = 0 : ui32} : i64 to i32
+// CHECK:           %[[VAL_3:.*]] = d_return %[[VAL_2]] : i32
+// CHECK:           end %[[VAL_3]] : i32
+// CHECK:         }
+handshake.func @inheritBB(%arg0: index, %start: none) -> i32 {
+  %cast = arith.index_cast %arg0 {bb = 0 : ui32} : index to i32
+  %returnVal = d_return %cast : i32
+  end %returnVal : i32
+}
+

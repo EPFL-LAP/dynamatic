@@ -16,4 +16,5 @@ add_dynamatic_library(DynamaticStandardToHandshakeFPGA18
   MLIRSupport
   MLIRTransforms
   MLIRAffineToStandard
+  DynamaticSupport
   )

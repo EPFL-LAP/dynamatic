@@ -7,7 +7,7 @@
 
 #include "dynamatic/Transforms/HandshakePrepareForLegacy.h"
 #include "circt/Dialect/Handshake/HandshakeOps.h"
-#include "dynamatic/Conversion/StandardToHandshakeFPGA18.h"
+#include "dynamatic/Support/LogicBB.h"
 #include "dynamatic/Transforms/PassDetails.h"
 #include "dynamatic/Transforms/Passes.h"
 #include "mlir/Dialect/Arith/IR/Arith.h"
@@ -21,14 +21,6 @@ using namespace circt;
 using namespace circt::handshake;
 using namespace mlir;
 using namespace dynamatic;
-
-/// Transfers the "bb" attribute from a source operation to a destination
-/// operation if it exists. TODO: this should probably be a publicly visible
-/// function, make it so when we have better support for "logical basic blocks"
-static void inheritBB(Operation *src, Operation *dst) {
-  if (auto bb = src->getAttr(BB_ATTR))
-    dst->setAttr(BB_ATTR, bb);
-}
 
 /// Creates a corresponding conditional branch for each unconditional branch.
 /// The data input of corresponding branches is the same. A constant true
@@ -67,7 +59,7 @@ static void convertBranches(handshake::FuncOp funcOp, OpBuilder &builder) {
   if (branches.empty())
     return;
 
-  auto handshakeBlocks = getHandshakeBlocks(funcOp);
+  auto handshakeBlocks = getLogicBBs(funcOp);
 
   // Iterate over all identified handshake blocks to identify unconditional
   // branches and convert them

@@ -97,7 +97,6 @@ def HandshakeMinimizeCstWidth : Pass<"handshake-minimize-cst-width", "mlir::Modu
   }];
   let constructor = "dynamatic::createHandshakeMinimizeCstWidth()";
   let dependentDialects = ["mlir::arith::ArithDialect"];
-
 }
 
 //===----------------------------------------------------------------------===//
