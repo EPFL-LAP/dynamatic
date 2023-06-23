@@ -12,6 +12,7 @@
 #include "mlir/Pass/PassRegistry.h"
 #include "mlir/Tools/mlir-opt/MlirOptMain.h"
 #include "mlir/Transforms/Passes.h"
+#include "tutorials/InitAllPasses.h"
 
 int main(int argc, char **argv) {
   mlir::DialectRegistry registry;
@@ -19,6 +20,7 @@ int main(int argc, char **argv) {
   // Register specific dialects and passes we want
   dynamatic::registerAllDialects(registry);
   dynamatic::registerAllPasses();
+  dynamatic::tutorials::registerAllPasses();
 
   // Register the standard passes we want
   mlir::registerCSEPass();

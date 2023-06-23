@@ -67,6 +67,38 @@ def HandshakePrepareForLegacy : Pass<"handshake-prepare-for-legacy", "mlir::Modu
   let constructor = "dynamatic::createHandshakePrepareForLegacy()";
 }
 
+
+def HandshakeOptimizeBits : Pass<"optimize-bits" , "mlir::ModuleOp"> {
+  let summary = "Optimize bits width that can be reduced.";
+  let description = [{
+    This pass goes through all operations inside handshake levels, and optimize the bit width through the forward (from first operation to last), and backward(from last operation to first) loop process. 
+    The loop continues until no more optimization can be done.
+  }];
+  let constructor = "dynamatic::createOptimizeBitsPass()";
+  let dependentDialects = ["mlir::arith::ArithDialect"];
+}
+
+def HandshakeConcretizeIndexType : Pass<"handshake-concretize-index-type", "mlir::ModuleOp"> {
+  let summary = "Concretizes the IndexType to an IntegerType of machine-specific width.";
+  let description = [{
+    Replaces any IndexType throughout the Handhsake-level IR with an IntegerType
+    of machine-specific width. In particular, all SSA values of type IndexType
+    have their type changed to IntegerType.
+  }];
+  let constructor = "dynamatic::createHandshakeConcretizeIndexType()";
+}
+
+def HandshakeMinimizeCstWidth : Pass<"handshake-minimize-cst-width", "mlir::ModuleOp"> {
+  let summary = "Minimizes the bitwidth of all Handshake constants.";
+  let description = [{
+    Rewrites constant operations with the minimum required bitwidth to support
+    the constants' values. The pass inserts extension operations as needed to
+    ensure consistency with users of constant operations. 
+  }];
+  let constructor = "dynamatic::createHandshakeMinimizeCstWidth()";
+  let dependentDialects = ["mlir::arith::ArithDialect"];
+}
+
 //===----------------------------------------------------------------------===//
 // Other passes
 //===----------------------------------------------------------------------===//
@@ -152,34 +184,6 @@ def PlaceBuffers : Pass<"place-buffers", "mlir::ModuleOp"> {
     "if true, only extract the first MG from the input file">,
     Option<"stdLevelInfo", "std-level-info", "std::string", "",
     "if true, extract CFDFC from standard level simluation">];
-}
-
-def HandshakeOptimizeBits : Pass<"optimize-bits" , "mlir::ModuleOp"> {
-  let summary = "Optimize bits width that can be reduced.";
-  let description = [{
-    This pass goes through all operations inside handshake levels, and optimize the bit width through the forward (from first operation to last), and backward(from last operation to first) loop process. 
-    The loop continues until no more optimization can be done.
-  }];
-  let constructor = "dynamatic::createOptimizeBitsPass()";
-  let dependentDialects = ["mlir::arith::ArithDialect"];
-}
-
-def HandshakeInitIndType : Pass<"init-indtype", "mlir::ModuleOp"> {
-  let summary = "Initialize the index type of the module.";
-  let description = [{
-    This pass change all the index type within operands and result operands to integer type with platform dependent bit width.
-  }];
-  let constructor = "dynamatic::createInitIndTypePass()";
-}
-
-def HandshakeInitCstWidth : Pass<"init-cstwidth", "mlir::ModuleOp"> {
-  let summary = "Initialize the constant bit witth of the module.";
-  let description = [{
-    This pass rewrites constant operation with the minimum required bit width according to the value of the constant. To ensure the consistency with the user of the constant operation, the pass inserts a extension operation if necessary. 
-  }];
-  let constructor = "dynamatic::createInitCstWidthPass()";
-  let dependentDialects = ["mlir::arith::ArithDialect"];
-
 }
 
 #endif // DYNAMATIC_TRANSFORMS_PASSES_TD

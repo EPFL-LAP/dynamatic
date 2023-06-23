@@ -20,10 +20,6 @@ using namespace circt::handshake;
 
 namespace dynamatic {
 
-/// Operation attribute to identify the basic block the operation originated
-/// from in the std-level IR.
-const std::string BB_ATTR = "bb";
-
 // This class is used to inherit from CIRCT's standard-to-handshake lowering
 // infrastructure and implementation while providing us a way to
 // change/add/remove/reorder specific conversion steps to match FPGA18's elastic
@@ -77,20 +73,6 @@ public:
 
 std::unique_ptr<mlir::OperationPass<mlir::ModuleOp>>
 createStandardToHandshakeFPGA18Pass(bool idBasicBlocks = false);
-
-/// This struct groups the operations of a handshake::FuncOp in "blocks" based
-/// on the "bb" attribute potentially attached to each operation.
-struct HandshakeBlocks {
-  /// Maps each block ID to the operations (in program order) that are tagged
-  /// with it.
-  DenseMap<unsigned, SmallVector<Operation *>> blocks;
-  /// List of operations (in program order) that do not belong to any block.
-  SmallVector<Operation *> outOfBlocks;
-};
-
-/// Groups the operations of a function into "blocks" based on the "bb"
-/// attribute of each operation.
-HandshakeBlocks getHandshakeBlocks(handshake::FuncOp funcOp);
 
 } // namespace dynamatic
 

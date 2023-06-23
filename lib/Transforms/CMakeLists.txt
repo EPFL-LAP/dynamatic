@@ -3,14 +3,14 @@ add_dynamatic_library(DynamaticTransforms
   ArithReduceArea.cpp
   AnalyzeMemoryAccesses.cpp
   FlattenMemRefRowMajor.cpp
+  HandshakeConcretizeIndexType.cpp
+  HandshakeMinimizeCstWidth.cpp
   HandshakePrepareForLegacy.cpp
   HandshakeInferBasicBlocks.cpp
   NameMemoryOps.cpp
   PushConstants.cpp
   UtilsBitsUpdate.cpp
   OptimizeBits.cpp
-  InitIndexType.cpp
-  InitCstWidth.cpp
   ScfRotateForLoops.cpp
 
   BufferPlacement/HandshakePlaceBuffers.cpp
@@ -25,6 +25,7 @@ add_dynamatic_library(DynamaticTransforms
   MLIRFuncDialect
   MLIRSupport
   MLIRTransformUtils
+  DynamaticSupport
 )
 
 target_link_libraries(DynamaticTransforms PUBLIC 

@@ -6,9 +6,11 @@ Welcome to the Dynamatic++ project!
 
 This project is the natural successor of [Dynamatic](https://github.com/lana555/dynamatic) (often referred to as *legacy Dynamatic* throughout this repository), an academic, open-source high-level synthesis compiler based on LLVM IR that produces synthesizable synchronous dynamically-scheduled circuits (*elastic circuits*) from C/C++ code. Dynamatic enabled [numerous scientific publications](https://dynamatic.epfl.ch/) in top conferences over the years and is actively being used by many researchers in various research groups. Dynamatic++ aims to achieve the same goals (and more!) but uses the more recent and powerful MLIR ecosystem instead of LLVM IR. Furthermore, this project puts a lot more emphasis on code quality, reliability, and interoperability, while remaining as user-friendly as possible.
 
+The project [welcomes contributions](#contributing) from the open-source community. In addition, given its academic nature, Dynamatic++ also aims to include technical contributions from students as part of academic projects. As students may be at various levels of study and have varying degrees of expertise with compiler technology, Dynamatic++ provides support to them in the form of high-level design documentation (this document and others in `docs`), [tutorials](Tutorials/Tutorials.md), and the possibility of [commiting *experimental* work](#experimental-work) to the repository.
+
 ## Building the project
 
-We use the [CMake](https://cmake.org/) build system to build and test Dynamatic++. You can find detailed instructions on how to build the project, including its software dependencies, in the `README.md` file at the top level of the repository.
+We use the [CMake](https://cmake.org/) build system to build and test Dynamatic++. You can find detailed instructions on how to build the project, including its software dependencies, in the [`README.md`](../README.md) file at the top level of the repository.
 
 # Software architecture
 
@@ -37,6 +39,7 @@ This section is intended to give an overview of the project's directory structur
 ├── tools # Implementation of executables generated during build
 │   ├── dynamatic-opt # Dynamatic++ optimizer
 ├── build.sh # Build script to build the entire project
+├── tutorials # Source code for tutorials (e.g., how to create passes)
 └── CMakeLists.txt # Top level CMake file for building the superproject
 ```
 
@@ -73,11 +76,25 @@ At this point, Dynamatic++ only features unit tests (integration tests to come i
 
 # Contributing 
 
-**TODO**
+Dynamatic++ welcomes contributions from the open-source community and from students as part of academic projects. We generally follow the LLVM and MLIR community practices, and currently use [GitHub issues and pull requests](#github-issues--pull-requests) to handle bug reports/design proposals and code contributions, respectively. Here are some high-level guidelines (inspired from CIRCT's guidelines):
+- Please use `clang-format` in the LLVM style to format the code (see [`.clang-format`](../.clang-format)). There are good plugins for common editors like [VSCode](https://marketplace.visualstudio.com/items?itemName=ms-vscode.cpptools&ssr=false) that can be set up to format each file on save, or you can run it manually. This makes code easier to read and understand, and more uniform throuhgout the codebase.
+- Please pay attention to warnings from `clang-tidy` (see [`.clang-tidy`](../.clang-tidy)). Not all necessarily need to be acted upon, but in the majority of cases they help in identifying code-smells. 
+- Please follow the [LLVM Coding Standards](https://llvm.org/docs/CodingStandards.html).
+- Please practice [*incremental development*](https://llvm.org/docs/DeveloperPolicy.html#incremental-development), preferring to send a small series of incremental patches rather than large patches. There are other policies in the LLVM Developer Policy document that are worth skimming.
+- Please create an issue if you run into a a bug or problem with Dynamatic++.
+- Please create a PR to get a code review. For reviewers, it is good to look at the primary author of the code you are touching to make sure they are at least CC'd on the PR.
 
-## Issues & Pull requests
+## GitHub Issues & Pull requests
+
+The project uses [GitHub issues](https://github.com/features/issues) and [pull requests (PRs)](https://docs.github.com/en/pull-requests/collaborating-with-pull-requests/proposing-changes-to-your-work-with-pull-requests/about-pull-requests) to handle contributions from the community. If you are unfamiliar with those, here are some guidelines on how to use them productively:
+- Use meaningful titles and descriptions for issues and PRs you create. Titles should be short yet specific and descriptions should give a good sense of what you are bringing forward, be it a bug report or code contribution.  
+- If you intend to contribute a large chunk of code to the project, it may be a good idea to first open a GitHub issue to describe the high-level design of your contribution there and leave it up for discussion. This can only increase the likelihood of your work eventually being merged, as the community will have had a chance to discuss the design before you propose your implementation in a PR (e.g., if the contribution is deemed to large, the community may advise to split it up in several incremental patches). This is especially advisable to first-time contributors to open-source projects and/or compiler development beginners.
+- Use "Squash and Merge" in PRs when they are approved - we don't need the intra-change history in the repository history.
 
 ## Experimental work
 
-## GitHub CI/CD
+One of Dynamatic++'s priority is to keep the repository's `main` branch stable at all times, with a high code quality throughout the project. At the same time, as an academic project we also receive regular code contributions from students with widely different backgrounds and field expertises. These contributions are often part of research-oriented academic projects, and are thus very "experimental" in nature. They will generally result in code that doesn't quite match the standard of quality (less tested, reliable, interoperable) that we expect in the repository. Yet, we still want to keep track of these efforts on the `main` branch to make them visible to and usable by the community, and encourage future contributions to the more experimental parts of the codebase.
 
+To achieve these dual and slightly conflicting goals, Dynamatic++ supports *experimental* contributions to the repository. These will still have to go through a PR but will be merged more easily (i.e., with slightly less regards to code quality) compared to *non-experimental* contributions. We offer this possibility as a way to push for the integration of research work inside the project, with the ultimate goal of having these contributions graduate to full *non-experimental* work. Obviously, we strongly encourage developers to make their submitted code contributions as clean and reliable as possible regardless of whether they are classified as experimental. It can only increase their chance of acceptance.
+
+To clearly separate them from the rest, all *experimental* contributions should exist within the `experimental` directory which is located at the top level of the repository. The latter's internal structure is identical to the one at the top level (see the [repository's structure](#directory-structure)) with an `include` folder for all headers, a `lib` folder for pass implementations, etc. All public code entities defined within experimental work should live under the `dynamatic::experimental` C++ namespace for clear separation with *non-experimental* publicly defined entities. 
