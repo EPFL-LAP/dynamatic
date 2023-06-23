@@ -70,6 +70,8 @@ CheckOptions:
     value:           CamelCase
   - key:             readability-identifier-naming.VariableCase
     value:           camelBack
+  - key:             readability-identifier-naming.GlobalConstantCase
+    value:           UPPER_CASE
   - key:             readability-identifier-naming.IgnoreMainLikeFunctions
     value:           1
   - key:             readability-redundant-member-init.IgnoreBaseInCopyConstructors
