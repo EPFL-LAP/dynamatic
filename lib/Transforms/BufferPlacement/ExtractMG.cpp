@@ -48,6 +48,12 @@ bool buffer::isBackEdge(Operation *opSrc, Operation *opDst) {
   return false;
 }
 
+bool buffer::isBackEdge(Value *val) {
+  Operation *op = val->getDefiningOp();
+  for (auto sucOp : val->getUsers())
+    return isBackEdge(op, sucOp);
+}
+
 LogicalResult buffer::readSimulateFile(const std::string &fileName,
                               std::map<ArchBB *, bool> &archs,
                               std::map<unsigned, bool> &bbs) {
@@ -240,7 +246,9 @@ int buffer::extractCFDFCircuit(std::map<ArchBB *, bool> &archs,
   // Create MILP model for CFDFCircuit extraction
   // Init a gurobi model
   GRBEnv env = GRBEnv(true);
-  env.set("LogFile", "mip1.log");
+  env.set(GRB_IntParam_LogToConsole, false);
+  env.set(GRB_IntParam_OutputFlag, 0);
+  // env.set("LogFile", "mip1.log");
   env.start();
   GRBModel modelMILP = GRBModel(env);
 

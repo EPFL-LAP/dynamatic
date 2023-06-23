@@ -4,8 +4,8 @@
 //
 //===----------------------------------------------------------------------===//
 
-#ifndef DYNAMATIC_TRANSFORMS_EXTRACTMG_H
-#define DYNAMATIC_TRANSFORMS_EXTRACTMG_H
+#ifndef DYNAMATIC_TRANSFORMS_BUFFERPLACEMENT_EXTRACTMG_H
+#define DYNAMATIC_TRANSFORMS_BUFFERPLACEMENT_EXTRACTMG_H
 
 #include "circt/Dialect/Handshake/HandshakeOps.h"
 #include "dynamatic/Support/LLVM.h"
@@ -48,6 +48,8 @@ bool isEntryOp(Operation *op);
 /// the destination operation is a back edge.
 bool isBackEdge(Operation *opSrc, Operation *opDst);
 
+bool isBackEdge(Value *val);
+
 /// Read the simulation file of standard level execution and store the results
 /// in the map.
 LogicalResult readSimulateFile(const std::string &fileName,
@@ -55,4 +57,4 @@ LogicalResult readSimulateFile(const std::string &fileName,
 } // namespace buffer
 } // namespace dynamatic
 
-#endif // DYNAMATIC_TRANSFORMS_EXTRACTMG_H
+#endif // DYNAMATIC_TRANSFORMS_BUFFERPLACEMENT_EXTRACTMG_H
