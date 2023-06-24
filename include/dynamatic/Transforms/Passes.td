@@ -174,9 +174,10 @@ def PushConstants : Pass<"push-constants", "mlir::ModuleOp"> {
 }
 
 def PlaceBuffers : Pass<"place-buffers", "mlir::ModuleOp"> {
-  let summary = "Insert Buffers in Data flow graphs.";
+  let summary = "Insert buffers in dataflow graphs.";
   let description = [{
-    This pass insert buffers in the data flow graph.
+    The pass analyzes the circuit's channel prerequisites. Based the channel
+    prerequisite, the pass optimize the circuit performance by inserting buffers.
   }];
   let constructor = "dynamatic::createHandshakePlaceBuffersPass()";
   let options = [
