@@ -1,5 +1,5 @@
 add_dynamatic_library(DynamaticTransforms
-  # ArithOptimizeArea.cpp
+  ArithOptimizeArea.cpp
   ArithReduceArea.cpp
   AnalyzeMemoryAccesses.cpp
   FlattenMemRefRowMajor.cpp
