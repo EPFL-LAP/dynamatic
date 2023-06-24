@@ -41,9 +41,6 @@ bool isSelect(std::map<unsigned, bool> &bbs, Value *val);
 /// Identify whether the channel is in selected archs between the basic block.
 bool isSelect(std::map<ArchBB *, bool> &archs, Value *val);
 
-/// Identify whether an operation is a start point of the function block.
-bool isEntryOp(Operation *op);
-
 /// Identify whether the connection between the source operation and
 /// the destination operation is a back edge.
 bool isBackEdge(Operation *opSrc, Operation *opDst);

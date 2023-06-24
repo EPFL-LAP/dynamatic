@@ -18,28 +18,10 @@
 #include "mlir/Support/IndentedOstream.h"
 #include <optional>
 
-using namespace circt;
-using namespace circt::handshake;
+
 using namespace mlir;
 using namespace dynamatic;
 using namespace dynamatic::buffer;
-
-
-
-
-void buffer::dfsHandshakeGraph(Operation *opNode, 
-                               std::vector<Operation *> &visited) {
-
-  if (std::find(visited.begin(), visited.end(), opNode) != visited.end()) {
-    return;
-  }
-  // marked as visited
-  visited.push_back(opNode);
-  // dfs the successor operation
-  for (auto sucOp : opNode->getUsers()) 
-    if (!sucOp->getUsers().empty())
-      dfsHandshakeGraph(sucOp, visited);
-}
 
 /// ================== dataFlowCircuit Function ================== ///
 void buffer::DataflowCircuit::printCircuits() {
@@ -49,18 +31,18 @@ void buffer::DataflowCircuit::printCircuits() {
   }
 }
 
-DataflowCircuit buffer::createCFDFCircuit(std::vector<Operation *> &unitList,
-                                           std::map<ArchBB *, bool> &archs,
-                                           std::map<unsigned, bool> &bbs) {
+DataflowCircuit buffer::createCFDFCircuit(handshake::FuncOp funcOp,
+                                          std::map<ArchBB *, bool> &archs,
+                                          std::map<unsigned, bool> &bbs) {
   DataflowCircuit circuit = DataflowCircuit();
-  for (auto unit : unitList) {
-    int bbIndex = getBBIndex(unit);
+  for (auto &op : funcOp.getOps()) {
+    int bbIndex = getBBIndex(&op);
 
     // insert units in the selected basic blocks
     if (bbs.count(bbIndex) > 0 && bbs[bbIndex]) {
-      circuit.units.push_back(unit);
+      circuit.units.push_back(&op);
       // insert channels if it is selected
-      for (auto port : unit->getResults())
+      for (auto port : op.getResults())
         if (isSelect(archs, &port) || isSelect(bbs, &port))
           circuit.channels.push_back(&port);
     }
@@ -77,13 +59,6 @@ static LogicalResult insertBuffers(handshake::FuncOp funcOp, MLIRContext *ctx,
     return failure(); // or do something that makes sense in the context
   }
 
-  std::vector<Operation *> visitedOpList;
-
-  // DFS build the DataflowCircuit from the handshake level
-  for (auto &op : funcOp.getOps())
-    if (isEntryOp(&op))
-      dfsHandshakeGraph(&op, visitedOpList);
-
   // create CFDFC circuits
   std::vector<DataflowCircuit *> DataflowCircuitList;
 
@@ -97,7 +72,7 @@ static LogicalResult insertBuffers(handshake::FuncOp funcOp, MLIRContext *ctx,
   while (execNum > 0) {
     // write the execution frequency to the DataflowCircuit
     llvm::errs() << "execNum: " << execNum << "\n";
-    auto circuit = createCFDFCircuit(visitedOpList, archs, bbs);
+    auto circuit = createCFDFCircuit(funcOp, archs, bbs);
     circuit.execN = execNum;
     DataflowCircuitList.push_back(&circuit);
     if (firstMG)

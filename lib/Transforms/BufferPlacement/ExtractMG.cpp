@@ -5,7 +5,7 @@
 //===----------------------------------------------------------------------===//
 
 #include "dynamatic/Transforms/BufferPlacement/ExtractMG.h"
-#include "dynamatic/Conversion/StandardToHandshakeFPGA18.h"
+#include "dynamatic/Support/LogicBB.h"
 #include "circt/Dialect/Handshake/HandshakeOps.h"
 #include "mlir/Dialect/Arith/IR/Arith.h"
 #include "mlir/Dialect/Func/IR/FuncOps.h"
@@ -33,13 +33,6 @@ int buffer::getBBIndex(Operation *op) {
       return dyn_cast<IntegerAttr>(attr.getValue()).getValue().getZExtValue();
   }
   return -1;
-}
-
-bool buffer::isEntryOp(Operation *op) {
-  for (auto operand : op->getOperands())
-    if (!operand.getDefiningOp())
-      return true;
-  return false;
 }
 
 bool buffer::isBackEdge(Operation *opSrc, Operation *opDst) {
@@ -93,7 +86,10 @@ LogicalResult buffer::readSimulateFile(const std::string &fileName,
       bbs[arch->srcBB] = false;
     if (bbs.count(arch->dstBB) == 0)
       bbs[arch->dstBB] = false;
+    
+    arch->print();
   }
+
   return success();
 }
 
@@ -241,6 +237,7 @@ int buffer::extractCFDFCircuit(std::map<ArchBB *, bool> &archs,
   // Init a gurobi model
   GRBEnv env = GRBEnv(true);
   env.set("LogFile", "mip1.log");
+  env.set(GRB_IntParam_OutputFlag, 0);
   env.start();
   GRBModel modelMILP = GRBModel(env);
 

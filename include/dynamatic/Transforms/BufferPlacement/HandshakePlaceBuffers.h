@@ -9,10 +9,13 @@
 
 #include "dynamatic/Support/LLVM.h"
 #include "dynamatic/Transforms/BufferPlacement/ExtractMG.h"
+#include "mlir/Dialect/Func/IR/FuncOps.h"
 
 namespace dynamatic {
-  
 namespace buffer {
+
+using namespace circt;
+using namespace circt::handshake;
 
 /// An arch stores the basic information (execution frequency, isBackEdge)
 /// of an arch  between basic blocks.
@@ -21,11 +24,6 @@ struct arch {
   unsigned freq;
   bool isBackEdge = false;
 };
-
-
-/// Deep first search the handshake file to get the units connection graph.
-void dfsHandshakeGraph(Operation *opNode, 
-                       std::vector<Operation *> &visited);
 
 struct DataflowCircuit {
   double targetCP, maxCP;
@@ -41,9 +39,9 @@ struct DataflowCircuit {
 /// Create the CFDFCircuit from the unitList(the DFS operations graph),
 /// and archs, and bbs that store the CFDFC extraction results indicating
 /// selected (1) or not (0).
-DataflowCircuit createCFDFCircuit(std::vector<Operation *> &unitList,
-                                   std::map<ArchBB *, bool> &archs,
-                                   std::map<unsigned, bool> &bbs);
+DataflowCircuit createCFDFCircuit(handshake::FuncOp funcOp,
+                                  std::map<ArchBB *, bool> &archs,
+                                  std::map<unsigned, bool> &bbs);
 } // namespace buffer
 
 std::unique_ptr<mlir::OperationPass<mlir::ModuleOp>>
