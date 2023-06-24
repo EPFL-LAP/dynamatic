@@ -14,9 +14,6 @@
 namespace dynamatic {
 namespace buffer {
 
-using namespace circt;
-using namespace circt::handshake;
-
 /// An arch stores the basic information (execution frequency, isBackEdge)
 /// of an arch  between basic blocks.
 struct arch {
@@ -31,17 +28,9 @@ struct DataflowCircuit {
   std::vector<Value *> channels;
   std::vector<int> selBBs;
 
-  int execN = 0;
-
-  void printCircuits();
+  unsigned execN = 0;
 };
 
-/// Create the CFDFCircuit from the unitList(the DFS operations graph),
-/// and archs, and bbs that store the CFDFC extraction results indicating
-/// selected (1) or not (0).
-DataflowCircuit createCFDFCircuit(handshake::FuncOp funcOp,
-                                  std::map<ArchBB *, bool> &archs,
-                                  std::map<unsigned, bool> &bbs);
 } // namespace buffer
 
 std::unique_ptr<mlir::OperationPass<mlir::ModuleOp>>

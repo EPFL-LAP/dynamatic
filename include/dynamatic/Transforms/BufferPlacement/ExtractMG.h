@@ -17,25 +17,25 @@ namespace dynamatic {
 namespace buffer {
 
 struct ArchBB {
-  unsigned srcBB, dstBB;
-  int execFreq = -1;
+  unsigned srcBB, dstBB, execFreq;
   bool isBackEdge;
-  void print() {
-    llvm::errs() << "srcBB: " << srcBB << ", dstBB: " << dstBB
-                 << ", execFreq: " << execFreq << ", isBackEdge: " << isBackEdge
-                 << "\n";
-  }
 };
+
+/// Read the simulation file of standard level execution and store the results
+/// in the map.
+LogicalResult readSimulateFile(const std::string &fileName,
+                               std::map<ArchBB *, bool> &archs,
+                               std::map<unsigned, bool> &bbs);
 
 /// Define the MILP CFDFC extraction models, and write the optimization results
 /// to the map.
-int extractCFDFCircuit(std::map<ArchBB *, bool> &archs, std::map<unsigned, bool> &bbs);
-
+unsigned extractCFDFCircuit(std::map<ArchBB *, bool> &archs,
+                            std::map<unsigned, bool> &bbs);
 
 /// Get the index of the basic block of an operation.
 int getBBIndex(Operation *op);
 
-///Identify whether the channel is in selected the basic block.
+/// Identify whether the channel is in selected the basic block.
 bool isSelect(std::map<unsigned, bool> &bbs, Value *val);
 
 /// Identify whether the channel is in selected archs between the basic block.
@@ -45,10 +45,6 @@ bool isSelect(std::map<ArchBB *, bool> &archs, Value *val);
 /// the destination operation is a back edge.
 bool isBackEdge(Operation *opSrc, Operation *opDst);
 
-/// Read the simulation file of standard level execution and store the results
-/// in the map.
-LogicalResult readSimulateFile(const std::string &fileName,
-                      std::map<ArchBB *, bool> &archs, std::map<unsigned, bool> &bbs);
 } // namespace buffer
 } // namespace dynamatic
 

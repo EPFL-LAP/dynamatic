@@ -18,22 +18,16 @@
 #include "mlir/Support/IndentedOstream.h"
 #include <optional>
 
-
+using namespace circt;
+using namespace circt::handshake;
 using namespace mlir;
 using namespace dynamatic;
 using namespace dynamatic::buffer;
 
-/// ================== dataFlowCircuit Function ================== ///
-void buffer::DataflowCircuit::printCircuits() {
-  llvm::errs() << "===========================\n";
-  for (auto unit : units) {
-    llvm::errs() << "operation: " << *(unit) << "\n";
-  }
-}
-
-DataflowCircuit buffer::createCFDFCircuit(handshake::FuncOp funcOp,
-                                          std::map<ArchBB *, bool> &archs,
-                                          std::map<unsigned, bool> &bbs) {
+/// Create the CFDFCircuit based on the extraction results
+static DataflowCircuit createCFDFCircuit(handshake::FuncOp funcOp,
+                                         std::map<ArchBB *, bool> &archs,
+                                         std::map<unsigned, bool> &bbs) {
   DataflowCircuit circuit = DataflowCircuit();
   for (auto &op : funcOp.getOps()) {
     int bbIndex = getBBIndex(&op);
@@ -47,7 +41,6 @@ DataflowCircuit buffer::createCFDFCircuit(handshake::FuncOp funcOp,
           circuit.channels.push_back(&port);
     }
   }
-  circuit.printCircuits();
   return circuit;
 }
 
@@ -56,13 +49,15 @@ static LogicalResult insertBuffers(handshake::FuncOp funcOp, MLIRContext *ctx,
 
   if (failed(verifyAllValuesHasOneUse(funcOp))) {
     funcOp.emitOpError() << "not all values are used exactly once";
-    return failure(); // or do something that makes sense in the context
+    return failure();
   }
 
-  // create CFDFC circuits
+  // vectors to store CFDFC circuits
   std::vector<DataflowCircuit *> DataflowCircuitList;
 
-  // read the bb file from std level
+  // read the simulation file from std level, create map to indicate whether 
+  // the bb is selected, and whether the arch between bbs is selected in each 
+  // round of extraction
   std::map<ArchBB *, bool> archs;
   std::map<unsigned, bool> bbs;
   if (failed(readSimulateFile(stdLevelInfo, archs, bbs)))
@@ -71,7 +66,6 @@ static LogicalResult insertBuffers(handshake::FuncOp funcOp, MLIRContext *ctx,
   int execNum = extractCFDFCircuit(archs, bbs);
   while (execNum > 0) {
     // write the execution frequency to the DataflowCircuit
-    llvm::errs() << "execNum: " << execNum << "\n";
     auto circuit = createCFDFCircuit(funcOp, archs, bbs);
     circuit.execN = execNum;
     DataflowCircuitList.push_back(&circuit);
@@ -79,7 +73,7 @@ static LogicalResult insertBuffers(handshake::FuncOp funcOp, MLIRContext *ctx,
       break;
     execNum = extractCFDFCircuit(archs, bbs);
   }
-  
+
   return success();
 }
 
