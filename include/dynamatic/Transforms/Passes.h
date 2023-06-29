@@ -10,6 +10,7 @@
 #include "dynamatic/Support/LLVM.h"
 #include "dynamatic/Transforms/AnalyzeMemoryAccesses.h"
 #include "dynamatic/Transforms/ArithReduceArea.h"
+#include "dynamatic/Transforms/BufferPlacement/HandshakePlaceBuffers.h"
 #include "dynamatic/Transforms/FlattenMemRefRowMajor.h"
 #include "dynamatic/Transforms/HandshakeConcretizeIndexType.h"
 #include "dynamatic/Transforms/HandshakeInferBasicBlocks.h"
@@ -20,7 +21,6 @@
 #include "dynamatic/Transforms/PushConstants.h"
 #include "dynamatic/Transforms/ScfRotateForLoops.h"
 #include "mlir/Pass/Pass.h"
-#include "dynamatic/Transforms/BufferPlacement/HandshakePlaceBuffers.h"
 
 namespace dynamatic {
 

@@ -11,7 +11,6 @@
 #include "dynamatic/Support/LLVM.h"
 #include "mlir/Dialect/Func/IR/FuncOps.h"
 #include "mlir/IR/BuiltinTypes.h"
-#include <fstream>
 
 namespace dynamatic {
 namespace buffer {
@@ -29,8 +28,8 @@ LogicalResult readSimulateFile(const std::string &fileName,
 
 /// Define the MILP CFDFC extraction models, and write the optimization results
 /// to the map.
-unsigned extractCFDFCircuit(std::map<ArchBB *, bool> &archs,
-                            std::map<unsigned, bool> &bbs);
+LogicalResult extractCFDFCircuit(std::map<ArchBB *, bool> &archs,
+                                 std::map<unsigned, bool> &bbs, unsigned &freq);
 
 /// Get the index of the basic block of an operation.
 int getBBIndex(Operation *op);

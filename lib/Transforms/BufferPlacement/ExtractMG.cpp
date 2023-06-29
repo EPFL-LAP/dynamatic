@@ -7,12 +7,16 @@
 #include "dynamatic/Transforms/BufferPlacement/ExtractMG.h"
 #include "circt/Dialect/Handshake/HandshakeOps.h"
 #include "dynamatic/Support/LogicBB.h"
-#include "gurobi_c++.h"
 #include "mlir/Dialect/Arith/IR/Arith.h"
 #include "mlir/Dialect/Func/IR/FuncOps.h"
 #include "mlir/IR/BuiltinTypes.h"
 #include "mlir/IR/OperationSupport.h"
 #include "mlir/Support/IndentedOstream.h"
+#include <fstream>
+
+#ifndef DYNAMATIC_GUROBI_NOT_INSTALLED
+#include "gurobi_c++.h"
+#endif // DYNAMATIC_GUROBI_NOT_INSTALLED
 
 using namespace circt;
 using namespace circt::handshake;
@@ -38,58 +42,7 @@ static bool parseAndValidateToken(std::istringstream &iss, std::string &token,
   return true;
 }
 
-LogicalResult buffer::readSimulateFile(const std::string &fileName,
-                                       std::map<ArchBB *, bool> &archs,
-                                       std::map<unsigned, bool> &bbs) {
-  std::ifstream inFile(fileName);
-
-  if (!inFile)
-    return failure();
-
-  std::string line;
-  // Skip the header line
-  std::getline(inFile, line);
-
-  while (std::getline(inFile, line)) {
-    std::istringstream iss(line);
-    ArchBB *arch = new ArchBB();
-    ArchBB *pArch = arch;
-
-    std::string token;
-    if (!parseAndValidateToken(iss, token, arch->srcBB))
-      return failure();
-
-    if (!parseAndValidateToken(iss, token, arch->dstBB))
-      return failure();
-
-    if (!parseAndValidateToken(iss, token, arch->execFreq))
-      return failure();
-
-    unsigned backEdge;
-    if (!parseAndValidateToken(iss, token, backEdge))
-      return failure();
-    arch->isBackEdge = (backEdge == 1);
-
-    archs[pArch] = false;
-    bbs[arch->srcBB] = false;
-    bbs[arch->dstBB] = false;
-  }
-  return success();
-}
-
-int buffer::getBBIndex(Operation *op) {
-  for (auto attr : op->getAttrs()) {
-    if (attr.getName() == BB_ATTR)
-      return dyn_cast<IntegerAttr>(attr.getValue()).getValue().getZExtValue();
-  }
-  return -1;
-}
-
-bool buffer::isBackEdge(Operation *opSrc, Operation *opDst) {
-  if (opDst->isProperAncestor(opSrc))
-    return true;
-  return false;
-}
+#ifndef DYNAMATIC_GUROBI_NOT_INSTALLED
 
 /// Initialize the variables in the extract CFDFC MILP model
 static int initVarInMILP(GRBModel &modelMILP, std::map<ArchBB *, GRBVar> &sArc,
@@ -190,6 +143,61 @@ static void setBBConstrs(GRBModel &modelMILP, std::map<unsigned, GRBVar> &sBB,
   }
 };
 
+#endif // DYNAMATIC_GUROBI_NOT_INSTALLED
+
+LogicalResult buffer::readSimulateFile(const std::string &fileName,
+                                       std::map<ArchBB *, bool> &archs,
+                                       std::map<unsigned, bool> &bbs) {
+  std::ifstream inFile(fileName);
+
+  if (!inFile)
+    return failure();
+
+  std::string line;
+  // Skip the header line
+  std::getline(inFile, line);
+
+  while (std::getline(inFile, line)) {
+    std::istringstream iss(line);
+    ArchBB *arch = new ArchBB();
+    ArchBB *pArch = arch;
+
+    std::string token;
+    if (!parseAndValidateToken(iss, token, arch->srcBB))
+      return failure();
+
+    if (!parseAndValidateToken(iss, token, arch->dstBB))
+      return failure();
+
+    if (!parseAndValidateToken(iss, token, arch->execFreq))
+      return failure();
+
+    unsigned backEdge;
+    if (!parseAndValidateToken(iss, token, backEdge))
+      return failure();
+    arch->isBackEdge = (backEdge == 1);
+
+    archs[pArch] = false;
+    bbs[arch->srcBB] = false;
+    bbs[arch->dstBB] = false;
+  }
+  return success();
+}
+
+int buffer::getBBIndex(Operation *op) {
+  for (auto attr : op->getAttrs()) {
+    if (attr.getName() == BB_ATTR)
+      return dyn_cast<IntegerAttr>(attr.getValue()).getValue().getZExtValue();
+  }
+  return -1;
+}
+
+bool buffer::isBackEdge(Operation *opSrc, Operation *opDst) {
+  if (opDst->isProperAncestor(opSrc))
+    return true;
+  return false;
+}
+
 bool buffer::isSelect(std::map<unsigned, bool> &bbs, Value *val) {
   Operation *srcOp = val->getDefiningOp();
   Operation *dstOp;
@@ -220,8 +228,15 @@ bool buffer::isSelect(std::map<ArchBB *, bool> &archs, Value *val) {
   return false;
 }
 
-unsigned buffer::extractCFDFCircuit(std::map<ArchBB *, bool> &archs,
-                                    std::map<unsigned, bool> &bbs) {
+LogicalResult buffer::extractCFDFCircuit(std::map<ArchBB *, bool> &archs,
+                                         std::map<unsigned, bool> &bbs,
+                                         unsigned &freq) {
+
+#ifdef DYNAMATIC_GUROBI_NOT_INSTALLED
+  llvm::errs() << "Project was built without Gurobi installed, can't run "
+                  "CFDFC extraction\n";
+  return failure();
+#else
 
   // Create MILP model for CFDFCircuit extraction
   // Init a gurobi model
@@ -246,15 +261,17 @@ unsigned buffer::extractCFDFCircuit(std::map<ArchBB *, bool> &archs,
   modelMILP.optimize();
 
   if (modelMILP.get(GRB_IntAttr_Status) != GRB_OPTIMAL ||
-      valExecN.get(GRB_DoubleAttr_X) <= 0)
-    return 0;
+      valExecN.get(GRB_DoubleAttr_X) <= 0) {
+    freq = 0;
+    return success();
+  }
 
   // load answer to the bb map
   for (auto pair : sBB)
     if (bbs.count(pair.first) > 0)
       bbs[pair.first] = pair.second.get(GRB_DoubleAttr_X) > 0 ? true : false;
 
-  int execN = static_cast<int>(valExecN.get(GRB_DoubleAttr_X));
+  freq = static_cast<unsigned>(valExecN.get(GRB_DoubleAttr_X));
 
   // load answer to the arch map
   for (auto pair : sArc) {
@@ -262,7 +279,10 @@ unsigned buffer::extractCFDFCircuit(std::map<ArchBB *, bool> &archs,
     archs[arch] = pair.second.get(GRB_DoubleAttr_X) > 0 ? true : false;
     // update the connection information after CFDFC extraction
     if (archs[arch] > 0)
-      arch->execFreq -= execN;
+      arch->execFreq -= freq;
   }
-  return execN;
+
+  return success();
+
+#endif // DYNAMATIC_GUROBI_NOT_INSTALLED
 }

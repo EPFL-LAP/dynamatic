@@ -1,6 +1,6 @@
 //===- HandshakePlaceBuffers.h - Place buffers in DFG -----------*- C++ -*-===//
 //
-// This file declares the --place-buffers pass.
+// This file declares the --handshake-place-buffers pass.
 //
 //===----------------------------------------------------------------------===//
 

@@ -55,32 +55,36 @@ static LogicalResult insertBuffers(handshake::FuncOp funcOp, MLIRContext *ctx,
   // vectors to store CFDFC circuits
   std::vector<DataflowCircuit *> DataflowCircuitList;
 
-  // read the simulation file from std level, create map to indicate whether 
-  // the bb is selected, and whether the arch between bbs is selected in each 
+  // read the simulation file from std level, create map to indicate whether
+  // the bb is selected, and whether the arch between bbs is selected in each
   // round of extraction
   std::map<ArchBB *, bool> archs;
   std::map<unsigned, bool> bbs;
   if (failed(readSimulateFile(stdLevelInfo, archs, bbs)))
     return failure();
 
-  int execNum = extractCFDFCircuit(archs, bbs);
-  while (execNum > 0) {
+  unsigned freq;
+  if (failed(extractCFDFCircuit(archs, bbs, freq)))
+    return failure();
+  while (freq > 0) {
     // write the execution frequency to the DataflowCircuit
     auto circuit = createCFDFCircuit(funcOp, archs, bbs);
-    circuit.execN = execNum;
+    circuit.execN = freq;
     DataflowCircuitList.push_back(&circuit);
     if (firstMG)
       break;
-    execNum = extractCFDFCircuit(archs, bbs);
+    if (failed(extractCFDFCircuit(archs, bbs, freq)))
+      return failure();
   }
 
   return success();
 }
 
 namespace {
-struct PlaceBuffersPass : public PlaceBuffersBase<PlaceBuffersPass> {
+struct HandshakePlaceBuffersPass
+    : public HandshakePlaceBuffersBase<HandshakePlaceBuffersPass> {
 
-  PlaceBuffersPass(bool firstMG, std::string stdLevelInfo) {
+  HandshakePlaceBuffersPass(bool firstMG, std::string stdLevelInfo) {
     this->firstMG = firstMG;
     this->stdLevelInfo = stdLevelInfo;
   }
@@ -98,5 +102,5 @@ struct PlaceBuffersPass : public PlaceBuffersBase<PlaceBuffersPass> {
 std::unique_ptr<mlir::OperationPass<mlir::ModuleOp>>
 dynamatic::createHandshakePlaceBuffersPass(bool firstMG,
                                            std::string stdLevelInfo) {
-  return std::make_unique<PlaceBuffersPass>(firstMG, stdLevelInfo);
+  return std::make_unique<HandshakePlaceBuffersPass>(firstMG, stdLevelInfo);
 }

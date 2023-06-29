@@ -67,7 +67,6 @@ def HandshakePrepareForLegacy : Pass<"handshake-prepare-for-legacy", "mlir::Modu
   let constructor = "dynamatic::createHandshakePrepareForLegacy()";
 }
 
-
 def HandshakeOptimizeBits : Pass<"optimize-bits" , "mlir::ModuleOp"> {
   let summary = "Optimize bits width that can be reduced.";
   let description = [{
@@ -97,6 +96,20 @@ def HandshakeMinimizeCstWidth : Pass<"handshake-minimize-cst-width", "mlir::Modu
   }];
   let constructor = "dynamatic::createHandshakeMinimizeCstWidth()";
   let dependentDialects = ["mlir::arith::ArithDialect"];
+}
+
+def HandshakePlaceBuffers : Pass<"handshake-place-buffers", "mlir::ModuleOp"> {
+  let summary = "Insert buffers in dataflow graphs.";
+  let description = [{
+    The pass analyzes the circuit's channel prerequisites. Based the channel
+    prerequisite, the pass optimize the circuit performance by inserting buffers.
+  }];
+  let constructor = "dynamatic::createHandshakePlaceBuffersPass()";
+  let options = [
+    Option<"firstMG", "firstMG", "bool", "false",
+    "if true, only extract the first MG from the input file">,
+    Option<"stdLevelInfo", "std-level-info", "std::string", "",
+    "if true, extract CFDFC from standard level simluation">];
 }
 
 //===----------------------------------------------------------------------===//
@@ -171,20 +184,6 @@ def PushConstants : Pass<"push-constants", "mlir::ModuleOp"> {
     delete the original operation if it is not used within its defining block.
   }];
   let constructor = "dynamatic::createPushConstantsPass()";
-}
-
-def PlaceBuffers : Pass<"place-buffers", "mlir::ModuleOp"> {
-  let summary = "Insert buffers in dataflow graphs.";
-  let description = [{
-    The pass analyzes the circuit's channel prerequisites. Based the channel
-    prerequisite, the pass optimize the circuit performance by inserting buffers.
-  }];
-  let constructor = "dynamatic::createHandshakePlaceBuffersPass()";
-  let options = [
-    Option<"firstMG", "firstMG", "bool", "false",
-    "if true, only extract the first MG from the input file">,
-    Option<"stdLevelInfo", "std-level-info", "std::string", "",
-    "if true, extract CFDFC from standard level simluation">];
 }
 
 #endif // DYNAMATIC_TRANSFORMS_PASSES_TD

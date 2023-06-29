@@ -1,5 +1,4 @@
 add_dynamatic_library(DynamaticTransforms
-  ArithOptimizeArea.cpp
   ArithReduceArea.cpp
   AnalyzeMemoryAccesses.cpp
   FlattenMemRefRowMajor.cpp
@@ -13,9 +12,6 @@ add_dynamatic_library(DynamaticTransforms
   OptimizeBits.cpp
   ScfRotateForLoops.cpp
 
-  BufferPlacement/HandshakePlaceBuffers.cpp
-  BufferPlacement/ExtractMG.cpp
-
   DEPENDS
   DynamaticTransformsPassIncGen
 
@@ -28,10 +24,4 @@ add_dynamatic_library(DynamaticTransforms
   DynamaticSupport
 )
 
-target_link_libraries(DynamaticTransforms PUBLIC 
-  ${GUROBI_CXX_LIBRARY}
-)
-
-target_link_libraries(DynamaticTransforms PUBLIC 
-  ${GUROBI_LIBRARY}
-)
+add_subdirectory(BufferPlacement)
