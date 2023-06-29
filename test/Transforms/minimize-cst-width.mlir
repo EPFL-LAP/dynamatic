@@ -133,6 +133,25 @@ handshake.func @minNegVal(%start: none) -> i64 {
 
 // -----
 
+// CHECK-LABEL:   handshake.func @multipleUsers(
+// CHECK-SAME:                                  %[[VAL_0:.*]]: none, ...) -> i32 attributes {argNames = ["start"], resNames = ["out0"]} {
+// CHECK:           %[[VAL_1:.*]] = constant %[[VAL_0]] {value = 32 : i7} : i7
+// CHECK:           %[[VAL_2:.*]] = arith.extsi %[[VAL_1]] : i7 to i32
+// CHECK:           %[[VAL_3:.*]] = arith.addi %[[VAL_2]], %[[VAL_2]] : i32
+// CHECK:           %[[VAL_4:.*]] = arith.addi %[[VAL_3]], %[[VAL_2]] : i32
+// CHECK:           %[[VAL_5:.*]] = d_return %[[VAL_4]] : i32
+// CHECK:           end %[[VAL_5]] : i32
+// CHECK:         }
+handshake.func @multipleUsers(%start: none) -> i32 {
+  %cst = constant %start {value = 32 : i32} : i32
+  %add = arith.addi %cst, %cst : i32
+  %add2 = arith.addi %add, %cst : i32
+  %returnVal = d_return %add2 : i32
+  end %returnVal : i32
+}
+
+// -----
+
 // CHECK-LABEL:   handshake.func @inheritBB(
 // CHECK-SAME:                              %[[VAL_0:.*]]: none, ...) -> i32 attributes {argNames = ["start"], resNames = ["out0"]} {
 // CHECK:           %[[VAL_1:.*]] = constant %[[VAL_0]] {bb = 0 : i32, value = 32 : i7} : i7

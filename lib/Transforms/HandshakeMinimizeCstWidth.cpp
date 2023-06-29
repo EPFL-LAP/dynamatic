@@ -79,14 +79,14 @@ struct MinimizeConstantBitwidth
     // Insert an extension operation to keep the same type for users of the
     // constant's result
     rewriter.setInsertionPointAfter(cstOp);
-    Operation *extOp = rewriter.create<mlir::arith::ExtSIOp>(
-        cstOp.getLoc(), oldType, cstOp.getResult());
+    auto extOp = rewriter.create<mlir::arith::ExtSIOp>(cstOp.getLoc(), oldType,
+                                                       cstOp.getResult());
     inheritBB(cstOp, extOp);
 
     // Replace uses of the constant result with the extension op's result
-    for (auto *user : cstOp->getUsers())
+    for (auto *user : llvm::make_early_inc_range(cstOp->getUsers()))
       if (user != extOp)
-        user->replaceUsesOfWith(cstOp.getResult(), extOp->getResult(0));
+        user->replaceUsesOfWith(cstOp.getResult(), extOp.getResult());
 
     // Accumulate the number of bits saved by the pass and return
     savedBits += oldType.getWidth() - newBitwidth;
