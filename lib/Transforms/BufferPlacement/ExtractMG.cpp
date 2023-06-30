@@ -51,16 +51,13 @@ static int initVarInMILP(GRBModel &modelMILP, std::map<ArchBB *, GRBVar> &sArc,
                          std::map<unsigned, bool> &bbs) {
   unsigned cstMaxN = 0;
 
-  for (auto pair : bbs) {
+  for (auto &[bbInd, _] : bbs)
     // define variables for basic blocks selection
-    unsigned bbInd = pair.first;
     sBB[bbInd] = modelMILP.addVar(0.0, 1, 0.0, GRB_BINARY,
                                   "sBB_" + std::to_string(bbInd));
-  }
 
   // define variables for edges selection
-  for (auto archPair : archs) {
-    ArchBB *arch = archPair.first;
+  for (auto &[arch, _] : archs) {
     std::string arcName = "sArc_" + std::to_string(arch->srcBB) + "_" +
                           std::to_string(arch->dstBB);
     sArc[arch] = modelMILP.addVar(0.0, 1, 0.0, GRB_BINARY, arcName);
@@ -107,9 +104,9 @@ static void setEdgeConstrs(GRBModel &modelMILP, int cstMaxN,
 
   for (auto [constrInd, pair] : llvm::enumerate(sArc)) {
     auto &[arcEntity, varSE] = pair; // pair = [ArchBB*, GRBVar]
-    unsigned varNE = arcEntity->execFreq;
+    unsigned cstNE = arcEntity->execFreq;
     // for each edge e: N <= S_e x N_e + (1-S_e) x cstMaxN
-    modelMILP.addConstr(valExecN <= varSE * varNE + (1 - varSE) * cstMaxN,
+    modelMILP.addConstr(valExecN <= varSE * cstNE + (1 - varSE) * cstMaxN,
                         "cN" + std::to_string(constrInd));
     // Only select one back archs: for each bb \in Back(CFG): sum(S_e) = 1
     if (arcEntity->isBackEdge)

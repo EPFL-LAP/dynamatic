@@ -15,6 +15,11 @@
 namespace dynamatic {
 namespace buffer {
 
+/// Data structure for archs between the two basic blocks
+/// srcBB: index of the source basic block;
+/// dstBB: index of the destination basic block;
+/// execFreq: execution frequency of the arch;
+/// isBackEdge: whether the arch is a back edge.
 struct ArchBB {
   unsigned srcBB, dstBB, execFreq;
   bool isBackEdge;

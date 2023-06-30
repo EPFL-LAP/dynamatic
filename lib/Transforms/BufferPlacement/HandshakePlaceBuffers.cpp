@@ -38,7 +38,7 @@ static CFDFC createCFDFCircuit(handshake::FuncOp funcOp,
       // insert channels if it is selected
       for (auto port : op.getResults())
         if (isSelect(archs, port) || isSelect(bbs, port))
-          circuit.channels.push_back(&port);
+          circuit.channels.push_back(port);
     }
   }
   return circuit;
@@ -53,7 +53,7 @@ static LogicalResult insertBuffers(handshake::FuncOp funcOp, MLIRContext *ctx,
   }
 
   // vectors to store CFDFC circuits
-  std::vector<CFDFC *> CFDFCList;
+  std::vector<CFDFC> CFDFCList;
 
   // read the simulation file from std level, create map to indicate whether
   // the bb is selected, and whether the arch between bbs is selected in each
@@ -70,13 +70,12 @@ static LogicalResult insertBuffers(handshake::FuncOp funcOp, MLIRContext *ctx,
     // write the execution frequency to the CFDFC
     auto circuit = createCFDFCircuit(funcOp, archs, bbs);
     circuit.execN = freq;
-    CFDFCList.push_back(&circuit);
+    CFDFCList.push_back(circuit);
     if (firstMG)
       break;
     if (failed(extractCFDFCircuit(archs, bbs, freq)))
       return failure();
   }
-
   return success();
 }
 
