@@ -35,10 +35,10 @@ LogicalResult extractCFDFCircuit(std::map<ArchBB *, bool> &archs,
 int getBBIndex(Operation *op);
 
 /// Identify whether the channel is in selected the basic block.
-bool isSelect(std::map<unsigned, bool> &bbs, Value *val);
+bool isSelect(std::map<unsigned, bool> &bbs, Value val);
 
 /// Identify whether the channel is in selected archs between the basic block.
-bool isSelect(std::map<ArchBB *, bool> &archs, Value *val);
+bool isSelect(std::map<ArchBB *, bool> &archs, Value val);
 
 /// Identify whether the connection between the source operation and
 /// the destination operation is a back edge.

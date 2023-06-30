@@ -74,10 +74,9 @@ static void setObjective(GRBModel &modelMILP, std::map<ArchBB *, GRBVar> &sArc,
                          GRBVar &valExecN) {
   GRBQuadExpr objExpr;
   // cost function: max: \sum_{e \in E} s_e * execFreq_e
-  for (auto pair : sArc) {
-    auto sE = pair.second;
-    objExpr += valExecN * sE;
-  }
+  for (auto &[_, var] : sArc)
+    objExpr += valExecN * var;
+
   modelMILP.setObjective(objExpr, GRB_MAXIMIZE);
 }
 
@@ -85,9 +84,9 @@ static void setObjective(GRBModel &modelMILP, std::map<ArchBB *, GRBVar> &sArc,
 static std::vector<ArchBB *> getBBsInArcVars(unsigned bb,
                                              std::map<ArchBB *, GRBVar> &sArc) {
   std::vector<ArchBB *> varNames;
-  for (auto pair : sArc)
-    if (pair.first->dstBB == bb)
-      varNames.push_back(pair.first);
+  for (auto &[arch, _] : sArc)
+    if (arch->dstBB == bb)
+      varNames.push_back(arch);
   return varNames;
 }
 
@@ -95,9 +94,9 @@ static std::vector<ArchBB *> getBBsInArcVars(unsigned bb,
 static std::vector<ArchBB *>
 getBBsOutArcVars(unsigned bb, std::map<ArchBB *, GRBVar> &sArc) {
   std::vector<ArchBB *> varNames;
-  for (auto pair : sArc)
-    if (pair.first->srcBB == bb)
-      varNames.push_back(pair.first);
+  for (auto &[arch, _] : sArc)
+    if (arch->srcBB == bb)
+      varNames.push_back(arch);
   return varNames;
 }
 
@@ -107,15 +106,14 @@ static void setEdgeConstrs(GRBModel &modelMILP, int cstMaxN,
   GRBLinExpr backEdgeConstr;
 
   for (auto [constrInd, pair] : llvm::enumerate(sArc)) {
-    auto arcEntity = pair.first;
-    unsigned N_e = arcEntity->execFreq;
-    auto S_e = pair.second;
+    auto &[arcEntity, varSE] = pair; // pair = [ArchBB*, GRBVar]
+    unsigned varNE = arcEntity->execFreq;
     // for each edge e: N <= S_e x N_e + (1-S_e) x cstMaxN
-    modelMILP.addConstr(valExecN <= S_e * N_e + (1 - S_e) * cstMaxN,
+    modelMILP.addConstr(valExecN <= varSE * varNE + (1 - varSE) * cstMaxN,
                         "cN" + std::to_string(constrInd));
     // Only select one back archs: for each bb \in Back(CFG): sum(S_e) = 1
     if (arcEntity->isBackEdge)
-      backEdgeConstr += S_e;
+      backEdgeConstr += varSE;
   }
   modelMILP.addConstr(backEdgeConstr == 1, "cBack");
 }
@@ -123,23 +121,23 @@ static void setEdgeConstrs(GRBModel &modelMILP, int cstMaxN,
 static void setBBConstrs(GRBModel &modelMILP, std::map<unsigned, GRBVar> &sBB,
                          std::map<ArchBB *, GRBVar> &sArc) {
 
-  for (auto [constrInd, pair] : llvm::enumerate(sBB)) {
+  for (auto &[bbInd, varBB] : sBB) {
     // only 1 input arch if bb is selected;
     // no input arch if bb is not selected
     GRBLinExpr constraintInExpr;
-    auto inArcs = getBBsInArcVars(pair.first, sArc);
+    auto inArcs = getBBsInArcVars(bbInd, sArc);
     for (auto arch : inArcs)
       constraintInExpr += sArc[arch];
-    modelMILP.addConstr(constraintInExpr == pair.second,
-                        "cIn" + std::to_string(constrInd));
+    modelMILP.addConstr(constraintInExpr == varBB,
+                        "cIn" + std::to_string(bbInd));
     // only 1 output arch if bb is selected;
     // no output arch if bb is not selected
     GRBLinExpr constraintOutExpr;
-    auto outArcs = getBBsOutArcVars(pair.first, sArc);
+    auto outArcs = getBBsOutArcVars(bbInd, sArc);
     for (auto arch : outArcs)
       constraintOutExpr += sArc[arch];
-    modelMILP.addConstr(constraintOutExpr == pair.second,
-                        "cOut" + std::to_string(constrInd));
+    modelMILP.addConstr(constraintOutExpr == varBB,
+                        "cOut" + std::to_string(bbInd));
   }
 };
 
@@ -198,11 +196,15 @@ bool buffer::isBackEdge(Operation *opSrc, Operation *opDst) {
   return false;
 }
 
-bool buffer::isSelect(std::map<unsigned, bool> &bbs, Value *val) {
-  Operation *srcOp = val->getDefiningOp();
-  Operation *dstOp;
-  for (auto user : val->getUsers())
-    dstOp = user;
+bool buffer::isSelect(std::map<unsigned, bool> &bbs, Value val) {
+  Operation *srcOp = val.getDefiningOp();
+  auto firstUser = val.getUsers().begin();
+  assert(firstUser != val.getUsers().end() &&
+         "value has no uses, run fork/sink materialization before extracting "
+         "CFDFCs");
+  Operation *dstOp = *firstUser;
+  // for (auto user : val->getUsers())
+  //   dstOp = user;
 
   unsigned srcBB = getBBIndex(srcOp);
   unsigned dstBB = getBBIndex(dstOp);
@@ -215,16 +217,20 @@ bool buffer::isSelect(std::map<unsigned, bool> &bbs, Value *val) {
   return false;
 }
 
-bool buffer::isSelect(std::map<ArchBB *, bool> &archs, Value *val) {
-  Operation *srcOp = val->getDefiningOp();
-  Operation *dstOp = val->getDefiningOp();
+bool buffer::isSelect(std::map<ArchBB *, bool> &archs, Value val) {
+  Operation *srcOp = val.getDefiningOp();
+  auto firstUser = val.getUsers().begin();
+  assert(firstUser != val.getUsers().end() &&
+         "value has no uses, run fork/sink materialization before extracting "
+         "CFDFCs");
+  Operation *dstOp = *firstUser;
 
   unsigned srcBB = getBBIndex(srcOp);
   unsigned dstBB = getBBIndex(dstOp);
 
-  for (auto pair : archs)
-    if (pair.first->srcBB == srcBB && pair.first->dstBB == dstBB)
-      return pair.second;
+  for (auto &[arch, varSelArch] : archs)
+    if (arch->srcBB == srcBB && arch->dstBB == dstBB)
+      return varSelArch;
   return false;
 }
 
@@ -267,19 +273,22 @@ LogicalResult buffer::extractCFDFCircuit(std::map<ArchBB *, bool> &archs,
   }
 
   // load answer to the bb map
-  for (auto pair : sBB)
-    if (bbs.count(pair.first) > 0)
-      bbs[pair.first] = pair.second.get(GRB_DoubleAttr_X) > 0 ? true : false;
+  for (auto &[bbInd, varBB] : sBB)
+    if (bbs.count(bbInd) > 0 && varBB.get(GRB_DoubleAttr_X) > 0)
+      bbs[bbInd] = true;
+    else
+      bbs[bbInd] = false;
 
   freq = static_cast<unsigned>(valExecN.get(GRB_DoubleAttr_X));
 
   // load answer to the arch map
-  for (auto pair : sArc) {
-    auto arch = pair.first;
-    archs[arch] = pair.second.get(GRB_DoubleAttr_X) > 0 ? true : false;
-    // update the connection information after CFDFC extraction
-    if (archs[arch] > 0)
+  for (auto &[arch, varArc] : sArc) {
+    if (archs.count(arch) > 0 && varArc.get(GRB_DoubleAttr_X) > 0) {
+      archs[arch] = true;
+      // update the connection information after CFDFC extraction
       arch->execFreq -= freq;
+    } else
+      archs[arch] = false;
   }
 
   return success();

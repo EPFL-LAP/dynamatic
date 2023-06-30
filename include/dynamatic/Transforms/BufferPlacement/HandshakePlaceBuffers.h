@@ -13,16 +13,7 @@
 
 namespace dynamatic {
 namespace buffer {
-
-/// An arch stores the basic information (execution frequency, isBackEdge)
-/// of an arch  between basic blocks.
-struct arch {
-  int srcBB, dstBB;
-  unsigned freq;
-  bool isBackEdge = false;
-};
-
-struct DataflowCircuit {
+struct CFDFC {
   double targetCP, maxCP;
   std::vector<Operation *> units;
   std::vector<Value *> channels;

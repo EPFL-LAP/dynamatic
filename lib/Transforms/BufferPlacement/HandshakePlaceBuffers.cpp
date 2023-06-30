@@ -25,10 +25,10 @@ using namespace dynamatic;
 using namespace dynamatic::buffer;
 
 /// Create the CFDFCircuit based on the extraction results
-static DataflowCircuit createCFDFCircuit(handshake::FuncOp funcOp,
-                                         std::map<ArchBB *, bool> &archs,
-                                         std::map<unsigned, bool> &bbs) {
-  DataflowCircuit circuit = DataflowCircuit();
+static CFDFC createCFDFCircuit(handshake::FuncOp funcOp,
+                               std::map<ArchBB *, bool> &archs,
+                               std::map<unsigned, bool> &bbs) {
+  CFDFC circuit = CFDFC();
   for (auto &op : funcOp.getOps()) {
     int bbIndex = getBBIndex(&op);
 
@@ -37,7 +37,7 @@ static DataflowCircuit createCFDFCircuit(handshake::FuncOp funcOp,
       circuit.units.push_back(&op);
       // insert channels if it is selected
       for (auto port : op.getResults())
-        if (isSelect(archs, &port) || isSelect(bbs, &port))
+        if (isSelect(archs, port) || isSelect(bbs, port))
           circuit.channels.push_back(&port);
     }
   }
@@ -53,7 +53,7 @@ static LogicalResult insertBuffers(handshake::FuncOp funcOp, MLIRContext *ctx,
   }
 
   // vectors to store CFDFC circuits
-  std::vector<DataflowCircuit *> DataflowCircuitList;
+  std::vector<CFDFC *> CFDFCList;
 
   // read the simulation file from std level, create map to indicate whether
   // the bb is selected, and whether the arch between bbs is selected in each
@@ -67,10 +67,10 @@ static LogicalResult insertBuffers(handshake::FuncOp funcOp, MLIRContext *ctx,
   if (failed(extractCFDFCircuit(archs, bbs, freq)))
     return failure();
   while (freq > 0) {
-    // write the execution frequency to the DataflowCircuit
+    // write the execution frequency to the CFDFC
     auto circuit = createCFDFCircuit(funcOp, archs, bbs);
     circuit.execN = freq;
-    DataflowCircuitList.push_back(&circuit);
+    CFDFCList.push_back(&circuit);
     if (firstMG)
       break;
     if (failed(extractCFDFCircuit(archs, bbs, freq)))
