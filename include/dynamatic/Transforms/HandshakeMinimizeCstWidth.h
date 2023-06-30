@@ -11,6 +11,13 @@
 
 namespace dynamatic {
 
+#define GEN_PASS_DECL_HANDSHAKEMINIMIZECSTWIDTH
+#define GEN_PASS_DEF_HANDSHAKEMINIMIZECSTWIDTH
+#include "dynamatic/Transforms/Passes.h.inc"
+
+/// Computes the minimum required bitwidth needed to store the provided integer.
+unsigned computeRequiredBitwidth(APInt val);
+
 std::unique_ptr<mlir::OperationPass<mlir::ModuleOp>>
 createHandshakeMinimizeCstWidth();
 

@@ -85,6 +85,14 @@ def HandshakeConcretizeIndexType : Pass<"handshake-concretize-index-type", "mlir
     have their type changed to IntegerType.
   }];
   let constructor = "dynamatic::createHandshakeConcretizeIndexType()";
+  let options =
+    [Option<"width", "width", "unsigned", "64",
+            "The explicit bitwidth with which to concretize IndexType's. "
+            "Defaults to 64 since most machines have a 64-bit architecture. If "
+            "this value is such that a Handshake constant with an IndexType "
+            "result cannot fit its value in the new explicit bitwidth anymore, "
+            "the pass will fail.">];
+
 }
 
 def HandshakeMinimizeCstWidth : Pass<"handshake-minimize-cst-width", "mlir::ModuleOp"> {

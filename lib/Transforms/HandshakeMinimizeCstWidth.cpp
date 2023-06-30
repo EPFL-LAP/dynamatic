@@ -10,7 +10,6 @@
 #include "dynamatic/Transforms/HandshakeMinimizeCstWidth.h"
 #include "circt/Dialect/Handshake/HandshakeOps.h"
 #include "dynamatic/Support/LogicBB.h"
-#include "dynamatic/Transforms/PassDetails.h"
 #include "mlir/Dialect/Arith/IR/Arith.h"
 #include "mlir/Transforms/GreedyPatternRewriteDriver.h"
 #include "llvm/Support/Debug.h"
@@ -19,8 +18,7 @@
 
 STATISTIC(savedBits, "Number of saved bits");
 
-/// Computes the minimum required bitwidth needed to store the provided value.
-static unsigned computeRequiredWidth(APInt val) {
+unsigned dynamatic::computeRequiredBitwidth(APInt val) {
   bool isNegative = false;
   if (val.isNegative()) {
     isNegative = true;
@@ -61,7 +59,7 @@ struct MinimizeConstantBitwidth
       return failure();
 
     // Check if we can reduce the bitwidth
-    unsigned newBitwidth = computeRequiredWidth(val);
+    unsigned newBitwidth = computeRequiredBitwidth(val);
     if (newBitwidth >= oldType.getWidth())
       return failure();
 
@@ -79,14 +77,14 @@ struct MinimizeConstantBitwidth
     // Insert an extension operation to keep the same type for users of the
     // constant's result
     rewriter.setInsertionPointAfter(cstOp);
-    Operation *extOp = rewriter.create<mlir::arith::ExtSIOp>(
-        cstOp.getLoc(), oldType, cstOp.getResult());
+    auto extOp = rewriter.create<mlir::arith::ExtSIOp>(cstOp.getLoc(), oldType,
+                                                       cstOp.getResult());
     inheritBB(cstOp, extOp);
 
     // Replace uses of the constant result with the extension op's result
-    for (auto *user : cstOp->getUsers())
+    for (auto *user : llvm::make_early_inc_range(cstOp->getUsers()))
       if (user != extOp)
-        user->replaceUsesOfWith(cstOp.getResult(), extOp->getResult(0));
+        user->replaceUsesOfWith(cstOp.getResult(), extOp.getResult());
 
     // Accumulate the number of bits saved by the pass and return
     savedBits += oldType.getWidth() - newBitwidth;
@@ -97,7 +95,8 @@ struct MinimizeConstantBitwidth
 /// Driver for the constant bitwidth reduction pass. A greedy pattern rewriter
 /// matches on all Handshake constants and minimizes their bitwidth.
 struct HandshakeMinimizeCstWidthPass
-    : public HandshakeMinimizeCstWidthBase<HandshakeMinimizeCstWidthPass> {
+    : public dynamatic::impl::HandshakeMinimizeCstWidthBase<
+          HandshakeMinimizeCstWidthPass> {
 
   void runOnOperation() override {
     auto *ctx = &getContext();

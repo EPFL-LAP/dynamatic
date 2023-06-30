@@ -12,8 +12,12 @@
 
 namespace dynamatic {
 
+#define GEN_PASS_DECL_HANDSHAKECONCRETIZEINDEXTYPE
+#define GEN_PASS_DEF_HANDSHAKECONCRETIZEINDEXTYPE
+#include "dynamatic/Transforms/Passes.h.inc"
+
 std::unique_ptr<mlir::OperationPass<mlir::ModuleOp>>
-createHandshakeConcretizeIndexType();
+createHandshakeConcretizeIndexType(unsigned width = 64);
 
 } // namespace dynamatic
 
