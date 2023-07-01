@@ -100,7 +100,7 @@ namespace tutorials {
 
 /// Returns a unique pointer to an operation pass that matches MLIR modules. In
 /// our case, this is simply an instance of our unparameterized
-/// SimpleTransformPass driver.
+/// SimplifyMergeLikePass driver.
 std::unique_ptr<mlir::OperationPass<mlir::ModuleOp>>
 createSimplifyMergeLikePass() {
   return std::make_unique<SimplifyMergeLikePass>();

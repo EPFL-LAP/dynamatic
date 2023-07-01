@@ -13,6 +13,7 @@
 namespace dynamatic {
 namespace tutorials {
 
+#define GEN_PASS_DECL_SIMPLIFYMERGELIKE
 #define GEN_PASS_DEF_SIMPLIFYMERGELIKE
 #include "tutorials/CreatingPasses/Transforms/Passes.h.inc"
 
