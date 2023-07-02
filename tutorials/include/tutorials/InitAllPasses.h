@@ -13,7 +13,9 @@
 namespace dynamatic {
 namespace tutorials {
 
-inline void registerAllPasses() { dynamatic::tutorials::registerPasses(); }
+inline void registerAllPasses() {
+  dynamatic::tutorials::CreatingPasses::registerPasses();
+}
 
 } // namespace tutorials
 } // namespace dynamatic

@@ -55,7 +55,7 @@ struct DowngradeIndexlessControlMerge
                                 PatternRewriter &rewriter) const override {
     // Get the control merge's index result (second result).
     // Equivalently, we could have written:
-    //  auto indexResult = cmergeOp->getResults()[1];
+    //  auto indexResult = cmergeOp->getResult(1);
     // but using getIndex() is more readable and maintainable
     Value indexResult = cmergeOp.getIndex();
 
@@ -115,7 +115,7 @@ struct GreedySimplifyMergeLikePass
     // Apply our two patterns recursively on all operations in the input module
     if (failed(applyPatternsAndFoldGreedily(mod, std::move(patterns), config)))
       signalPassFailure();
-  };
+  }
 };
 } // namespace
 

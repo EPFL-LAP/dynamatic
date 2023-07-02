@@ -14,10 +14,15 @@
 
 namespace dynamatic {
 namespace tutorials {
+
+namespace CreatingPasses {
+
 /// Generate the code for registering passes.
 #define GEN_PASS_REGISTRATION
 #include "tutorials/CreatingPasses/Transforms/Passes.h.inc"
 
+} // namespace CreatingPasses
 } // namespace tutorials
 } // namespace dynamatic
+
 #endif // TUTORIALS_CREATINGAPASSES_TRANSFORMS_PASSES_H
