@@ -23,48 +23,28 @@ using namespace mlir;
 using namespace dynamatic;
 using namespace dynamatic::buffer;
 
-void buffer::dfsHandshakeGraph(Operation *opNode, 
-                               std::vector<Operation *> &visited) {
-
-  if (std::find(visited.begin(), visited.end(), opNode) != visited.end()) {
-    return;
-  }
-  // marked as visited
-  visited.push_back(opNode);
-  // dfs the successor operation
-  for (auto sucOp : opNode->getUsers()) 
-    if (!sucOp->getUsers().empty())
-      dfsHandshakeGraph(sucOp, visited);
-}
-
-/// Create the CFDFCircuit from the unitList(the DFS operations graph),
-/// and archs, and bbs that store the CFDFC extraction results indicating
-/// selected (1) or not (0).
-static DataflowCircuit createCFDFCircuit(std::vector<Operation *> &unitList,
-                                           std::map<ArchBB *, bool> &archs,
-                                           std::map<unsigned, bool> &bbs) {
-  DataflowCircuit circuit = DataflowCircuit();
-  for (auto unit : unitList) {
-    int bbIndex = getBBIndex(unit);
+/// Create the CFDFCircuit based on the extraction results
+static CFDFC createCFDFCircuit(handshake::FuncOp funcOp,
+                               std::map<ArchBB *, bool> &archs,
+                               std::map<unsigned, bool> &bbs) {
+  CFDFC circuit = CFDFC();
+  for (auto &op : funcOp.getOps()) {
+    int bbIndex = getBBIndex(&op);
 
     // insert units in the selected basic blocks
     if (bbs.count(bbIndex) > 0 && bbs[bbIndex]) {
-      // llvm::errs() << "insert unit: " << *unit << "\n";
-      circuit.units.push_back(unit);
+      circuit.units.push_back(&op);
       // insert channels if it is selected
-      for (auto port : unit->getResults())
-        if (isSelect(archs, &port) || isSelect(bbs, &port)){
+      for (auto port : op.getResults())
+        if (isSelect(archs, port) || isSelect(bbs, port))
           circuit.channels.push_back(port);
-          // llvm::errs() << "insert channel: " << port << "\n";
-        }
     }
   }
-  circuit.printCircuits();
   return circuit;
 }
 
 static LogicalResult instantiateBuffers(std::map<Value *, Result> &res,
-    MLIRContext *ctx) {
+                                        MLIRContext *ctx) {
   OpBuilder builder(ctx);
   for (auto pair : res) {
     llvm::errs() << "insert buffer for: " << pair.second.numSlots << "\n";
@@ -72,21 +52,19 @@ static LogicalResult instantiateBuffers(std::map<Value *, Result> &res,
       Operation *opSrc = pair.first->getDefiningOp();
       Operation *opDst = getUserOp(pair.first);
       builder.setInsertionPointAfter(opSrc);
-      auto bufferOp = builder.create<handshake::BufferOp>
-                        (opSrc->getLoc(),
-                        opSrc->getResult(0).getType(),
-                        opSrc->getResult(0));
+      auto bufferOp = builder.create<handshake::BufferOp>(
+          opSrc->getLoc(), opSrc->getResult(0).getType(), opSrc->getResult(0));
 
       if (pair.second.transparent)
         bufferOp.setBufferType(BufferTypeEnum::fifo);
       else
         bufferOp.setBufferType(BufferTypeEnum::seq);
       bufferOp.setSlots(pair.second.numSlots);
-      opSrc->getResult(0).replaceUsesWithIf(bufferOp.getResult(),
-                                            [&](OpOperand &operand) {
-                                              // return true;
-                                              return operand.getOwner() == opDst;
-                                            });
+      opSrc->getResult(0).replaceUsesWithIf(
+          bufferOp.getResult(), [&](OpOperand &operand) {
+            // return true;
+            return operand.getOwner() == opDst;
+          });
     }
   }
   return success();
@@ -98,80 +76,41 @@ static LogicalResult insertBuffers(handshake::FuncOp funcOp, MLIRContext *ctx,
 
   if (failed(verifyAllValuesHasOneUse(funcOp))) {
     funcOp.emitOpError() << "not all values are used exactly once";
-    return failure(); // or do something that makes sense in the context
+    return failure();
   }
 
-  std::vector<Operation *> visitedOpList;
+  // vectors to store CFDFC circuits
+  std::vector<CFDFC> CFDFCList;
 
-  // DFS build the DataflowCircuit from the handshake level
-  for (auto &op : funcOp.getOps())
-    if (isEntryOp(&op))
-      dfsHandshakeGraph(&op, visitedOpList);
-
-  // create CFDFC circuits
-  std::vector<DataflowCircuit > dataflowCircuitList;
-
-  // read the bb file from std level
+  // read the simulation file from std level, create map to indicate whether
+  // the bb is selected, and whether the arch between bbs is selected in each
+  // round of extraction
   std::map<ArchBB *, bool> archs;
   std::map<unsigned, bool> bbs;
   if (failed(readSimulateFile(stdLevelInfo, archs, bbs)))
     return failure();
 
-  int execNum = extractCFDFCircuit(archs, bbs);
-  while (execNum > 0) {
-    // write the execution frequency to the DataflowCircuit
-    llvm::errs() << "execNum: " << execNum << "\n";
-    auto circuit = createCFDFCircuit(visitedOpList, archs, bbs);
-    circuit.execN = execNum;
-    circuit.targetCP = 3.0;
-    dataflowCircuitList.push_back(circuit);
+  unsigned freq;
+  if (failed(extractCFDFCircuit(archs, bbs, freq)))
+    return failure();
+  while (freq > 0) {
+    // write the execution frequency to the CFDFC
+    auto circuit = createCFDFCircuit(funcOp, archs, bbs);
+    circuit.execN = freq;
+    CFDFCList.push_back(circuit);
     if (firstMG)
       break;
-    execNum = extractCFDFCircuit(archs, bbs);
+    if (failed(extractCFDFCircuit(archs, bbs, freq)))
+      return failure();
   }
-
-  for (auto dataflowCirct : dataflowCircuitList) {
-    std::map<Value *, Result> res;
-    dataflowCirct.createMILPModel(strategy, res);
-    instantiateBuffers(res, ctx);
-  }
-  
   return success();
 }
 
 namespace {
-class customBufferPlaceStrategy : public BufferPlacementStrategy {
-  public:
-    ChannelConstraints getChannelConstraints(Value *val) override {
-      ChannelConstraints constraints;
-      // set the channel constraints according to the global constraints
-      constraints = this->globalConstraints;
+struct HandshakePlaceBuffersPass
+    : public HandshakePlaceBuffersBase<HandshakePlaceBuffersPass> {
 
-      Operation *dstOp;
-      for (auto user : val->getUsers()) {
-        dstOp = user;
-        break;
-      }
-      
-      if (isa<handshake::MergeOp, handshake::MuxOp>(val->getDefiningOp())) {
-        constraints.minSlots = 1;
-        constraints.maxSlots = 1;
-        constraints.bufferizable = true;
-        constraints.transparentAllowed = true;
-        constraints.nonTransparentAllowed = false;
-      }
-
-      if (isa<handshake::ControlMergeOp>(val->getDefiningOp()) ||
-          isa<handshake::ControlMergeOp>(dstOp) ) {
-        constraints.bufferizable = false;
-      }
-      return constraints;
-    }
-};
-
-struct PlaceBuffersPass : public PlaceBuffersBase<PlaceBuffersPass> {
-
-  PlaceBuffersPass(bool firstMG, std::string stdLevelInfo) {
+  HandshakePlaceBuffersPass(bool firstMG, std::string stdLevelInfo) {
     this->firstMG = firstMG;
     this->stdLevelInfo = stdLevelInfo;
   }
@@ -181,7 +120,8 @@ struct PlaceBuffersPass : public PlaceBuffersBase<PlaceBuffersPass> {
 
     customBufferPlaceStrategy strategy;
     for (auto funcOp : m.getOps<handshake::FuncOp>())
-      if (failed(insertBuffers(funcOp, &getContext(), strategy, firstMG, stdLevelInfo)))
+      if (failed(insertBuffers(funcOp, &getContext(), strategy, firstMG,
+                               stdLevelInfo)))
         return signalPassFailure();
   };
 };
@@ -190,5 +130,5 @@ struct PlaceBuffersPass : public PlaceBuffersBase<PlaceBuffersPass> {
 std::unique_ptr<mlir::OperationPass<mlir::ModuleOp>>
 dynamatic::createHandshakePlaceBuffersPass(bool firstMG,
                                            std::string stdLevelInfo) {
-  return std::make_unique<PlaceBuffersPass>(firstMG, stdLevelInfo);
+  return std::make_unique<HandshakePlaceBuffersPass>(firstMG, stdLevelInfo);
 }

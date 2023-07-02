@@ -8,7 +8,6 @@
 #define DYNAMATIC_TRANSFORMS_UTILSBITSUPDATE_H
 
 #include "circt/Dialect/Handshake/HandshakeOps.h"
-#include "dynamatic/Conversion/StandardToHandshakeFPGA18.h"
 #include "dynamatic/Support/LLVM.h"
 #include <optional>
 
@@ -16,9 +15,6 @@ using namespace mlir;
 using namespace circt;
 using namespace circt::handshake;
 using namespace dynamatic;
-
-const unsigned CPP_MAX_WIDTH = 64;
-const unsigned ADDRESS_WIDTH = 32;
 
 IntegerType getNewType(Value opVal, unsigned bitswidth, bool signless = false);
 
@@ -28,11 +24,13 @@ IntegerType getNewType(Value opVal, unsigned bitswidth,
 std::optional<Operation *> insertWidthMatchOp(Operation *newOp, int opInd,
                                               Type newType, MLIRContext *ctx);
 
-
 LogicalResult containsAttr(Operation *op, std::string attrName);
 
 namespace dynamatic {
 namespace bitwidth {
+
+const unsigned CPP_MAX_WIDTH = 64;
+const unsigned ADDRESS_WIDTH = 32;
 
 /// Construct the functions w.r.t. the operation name in the forward process.
 void constructForwardFuncMap(
@@ -54,7 +52,7 @@ void constructUpdateFuncMap(
 
 /// For branch and conditional branch operations, propagate the bits width of
 /// the operands to the result.
-bool propType(Operation *Op);
+bool propType(Operation *op);
 
 /// Insert width match operations (extension or truncation) for the operands and
 /// the results.

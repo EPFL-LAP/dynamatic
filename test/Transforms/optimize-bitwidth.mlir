@@ -5,14 +5,12 @@
 // CHECK-SAME:                                %[[VAL_0:.*]]: none, ...) -> i32 attributes {argNames = ["arg0"], resNames = ["out0"]} {
 // CHECK:           %[[VAL_1:.*]] = merge %[[VAL_0]] : none
 // CHECK:           %[[VAL_2:.*]] = constant %[[VAL_1]] {value = 999 : i11} : i11
-// CHECK:           %[[VAL_3:.*]] = arith.extsi %[[VAL_2]] : i11 to i32
-// CHECK:           %[[VAL_4:.*]] = constant %[[VAL_1]] {value = -2 : i2} : i2
-// CHECK:           %[[VAL_5:.*]] = arith.extsi %[[VAL_4]] : i2 to i32
-// CHECK:           %[[VAL_6:.*]] = arith.extsi %[[VAL_2]] : i11 to i12
-// CHECK:           %[[VAL_7:.*]] = arith.extsi %[[VAL_4]] : i2 to i12
-// CHECK:           %[[VAL_8:.*]] = arith.addi %[[VAL_6]], %[[VAL_7]] : i12
-// CHECK:           %[[VAL_9:.*]] = arith.extsi %[[VAL_8]] : i12 to i32
-// CHECK:           %[[VAL_10:.*]] = d_return %[[VAL_9]] : i32
+// CHECK:           %[[VAL_3:.*]] = constant %[[VAL_1]] {value = -2 : i2} : i2
+// CHECK:           %[[VAL_4:.*]] = arith.extsi %[[VAL_2]] : i11 to i12
+// CHECK:           %[[VAL_5:.*]] = arith.extsi %[[VAL_3]] : i2 to i12
+// CHECK:           %[[VAL_6:.*]] = arith.addi %[[VAL_4]], %[[VAL_5]] : i12
+// CHECK:           %[[VAL_7:.*]] = arith.extsi %[[VAL_6]] : i12 to i32
+// CHECK:           %[[VAL_8:.*]] = d_return %[[VAL_7]] : i32
 // CHECK:           end
 // CHECK:         }
 handshake.func @optimizeAdd(%arg0: none) -> i32 {
@@ -31,12 +29,10 @@ handshake.func @optimizeAdd(%arg0: none) -> i32 {
 // CHECK-SAME:                                        %[[VAL_0:.*]]: none, ...) -> i8 attributes {argNames = ["arg0"], resNames = ["out0"]} {
 // CHECK:           %[[VAL_1:.*]] = merge %[[VAL_0]] : none
 // CHECK:           %[[VAL_2:.*]] = constant %[[VAL_1]] {value = 999 : i11} : i11
-// CHECK:           %[[VAL_3:.*]] = arith.extsi %[[VAL_2]] : i11 to i32
-// CHECK:           %[[VAL_4:.*]] = constant %[[VAL_1]] {value = 5 : i4} : i4
-// CHECK:           %[[VAL_5:.*]] = arith.extsi %[[VAL_4]] : i4 to i32
-// CHECK:           %[[VAL_6:.*]] = arith.trunci %[[VAL_2]] : i11 to i8
-// CHECK:           %[[VAL_7:.*]] = arith.extsi %[[VAL_4]] : i4 to i8
-// CHECK:           %[[VAL_8:.*]] = arith.subi %[[VAL_6]], %[[VAL_7]] : i8
+// CHECK:           %[[VAL_3:.*]] = constant %[[VAL_1]] {value = 5 : i4} : i4
+// CHECK:           %[[VAL_4:.*]] = arith.trunci %[[VAL_2]] : i11 to i8
+// CHECK:           %[[VAL_5:.*]] = arith.extsi %[[VAL_3]] : i4 to i8
+// CHECK:           %[[VAL_6:.*]] = arith.subi %[[VAL_4]], %[[VAL_5]] : i8
 // CHECK:           end
 // CHECK:         }
 handshake.func @optimizeBackwardSub(%arg0: none) -> i8 {
@@ -56,12 +52,10 @@ handshake.func @optimizeBackwardSub(%arg0: none) -> i8 {
 // CHECK-SAME:                                        %[[VAL_0:.*]]: none, ...) -> i8 attributes {argNames = ["arg0"], resNames = ["out0"]} {
 // CHECK:           %[[VAL_1:.*]] = merge %[[VAL_0]] : none
 // CHECK:           %[[VAL_2:.*]] = constant %[[VAL_1]] {value = 999 : i11} : i11
-// CHECK:           %[[VAL_3:.*]] = arith.extsi %[[VAL_2]] : i11 to i32
-// CHECK:           %[[VAL_4:.*]] = constant %[[VAL_1]] {value = 20 : i6} : i6
-// CHECK:           %[[VAL_5:.*]] = arith.extsi %[[VAL_4]] : i6 to i32
-// CHECK:           %[[VAL_6:.*]] = arith.extsi %[[VAL_2]] : i11 to i16
-// CHECK:           %[[VAL_7:.*]] = arith.extsi %[[VAL_4]] : i6 to i16
-// CHECK:           %[[VAL_8:.*]] = arith.muli %[[VAL_6]], %[[VAL_7]] : i16
+// CHECK:           %[[VAL_3:.*]] = constant %[[VAL_1]] {value = 20 : i6} : i6
+// CHECK:           %[[VAL_4:.*]] = arith.extsi %[[VAL_2]] : i11 to i16
+// CHECK:           %[[VAL_5:.*]] = arith.extsi %[[VAL_3]] : i6 to i16
+// CHECK:           %[[VAL_6:.*]] = arith.muli %[[VAL_4]], %[[VAL_5]] : i16
 // CHECK:           end
 // CHECK:         }
 handshake.func @optimizeBackwardMuL(%arg0: none) -> i8 {
@@ -81,12 +75,10 @@ handshake.func @optimizeBackwardMuL(%arg0: none) -> i8 {
 // CHECK-SAME:                                        %[[VAL_0:.*]]: none, ...) -> i8 attributes {argNames = ["arg0"], resNames = ["out0"]} {
 // CHECK:           %[[VAL_1:.*]] = merge %[[VAL_0]] : none
 // CHECK:           %[[VAL_2:.*]] = constant %[[VAL_1]] {value = 999 : i11} : i11
-// CHECK:           %[[VAL_3:.*]] = arith.extsi %[[VAL_2]] : i11 to i32
-// CHECK:           %[[VAL_4:.*]] = constant %[[VAL_1]] {value = 2 : i4} : i4
-// CHECK:           %[[VAL_5:.*]] = arith.extsi %[[VAL_4]] : i4 to i32
-// CHECK:           %[[VAL_6:.*]] = arith.trunci %[[VAL_2]] : i11 to i8
-// CHECK:           %[[VAL_7:.*]] = arith.extsi %[[VAL_4]] : i4 to i8
-// CHECK:           %[[VAL_8:.*]] = arith.shrui %[[VAL_6]], %[[VAL_7]] : i8
+// CHECK:           %[[VAL_3:.*]] = constant %[[VAL_1]] {value = 2 : i4} : i4
+// CHECK:           %[[VAL_4:.*]] = arith.trunci %[[VAL_2]] : i11 to i8
+// CHECK:           %[[VAL_5:.*]] = arith.extsi %[[VAL_3]] : i4 to i8
+// CHECK:           %[[VAL_6:.*]] = arith.shrui %[[VAL_4]], %[[VAL_5]] : i8
 // CHECK:           end
 // CHECK:         }
 handshake.func @optimizeBackwardShR(%arg0: none) -> i8 {
@@ -106,12 +98,10 @@ handshake.func @optimizeBackwardShR(%arg0: none) -> i8 {
 // CHECK-SAME:                                        %[[VAL_0:.*]]: none, ...) -> i8 attributes {argNames = ["arg0"], resNames = ["out0"]} {
 // CHECK:           %[[VAL_1:.*]] = merge %[[VAL_0]] : none
 // CHECK:           %[[VAL_2:.*]] = constant %[[VAL_1]] {value = 999 : i11} : i11
-// CHECK:           %[[VAL_3:.*]] = arith.extsi %[[VAL_2]] : i11 to i32
-// CHECK:           %[[VAL_4:.*]] = constant %[[VAL_1]] {value = 20 : i6} : i6
-// CHECK:           %[[VAL_5:.*]] = arith.extsi %[[VAL_4]] : i6 to i32
-// CHECK:           %[[VAL_6:.*]] = arith.extsi %[[VAL_2]] : i11 to i12
-// CHECK:           %[[VAL_7:.*]] = arith.extsi %[[VAL_4]] : i6 to i12
-// CHECK:           %[[VAL_8:.*]] = arith.divsi %[[VAL_6]], %[[VAL_7]] : i12
+// CHECK:           %[[VAL_3:.*]] = constant %[[VAL_1]] {value = 20 : i6} : i6
+// CHECK:           %[[VAL_4:.*]] = arith.extsi %[[VAL_2]] : i11 to i12
+// CHECK:           %[[VAL_5:.*]] = arith.extsi %[[VAL_3]] : i6 to i12
+// CHECK:           %[[VAL_6:.*]] = arith.divsi %[[VAL_4]], %[[VAL_5]] : i12
 // CHECK:           end
 // CHECK:         }
 handshake.func @optimizeBackwardDiV(%arg0: none) -> i8 {
@@ -124,5 +114,3 @@ handshake.func @optimizeBackwardDiV(%arg0: none) -> i8 {
   %6 = arith.trunci %5 : i32 to i16
   end
 }
-
-// -----

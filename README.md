@@ -38,9 +38,9 @@ The following instructions can be used to setup Dynamatic from source.
     $ ./build.sh
     ```
 
-    The build script creates `build` folders in the root directory (i.e., `dynamatic`) and in each submodule to run the build tasks from. All files generated during build (libraries, executable binaries, intermediate compilation files) are placed in these folders, which the repository is configured to not track. Additionally, the build script creates a `bin` folder in the root directory that contains symbolic links to a number of executable binaries built by the superproject and subprojects that Dynamatic users may especially care about.
+    The build script creates `build` folders in the top level directory and in each submodule to run the build tasks from. All files generated during build (libraries, executable binaries, intermediate compilation files) are placed in these folders, which the repository is configured to not track. Additionally, the build script creates a `bin` folder in the top level directory that contains symbolic links to a number of executable binaries built by the superproject and subprojects that Dynamatic users may especially care about.
 
-4. **Run the Dynamatic test-suite.** After building the project, or at any time during development, regression-tests for Dynamatic can be run from the top-level `build` folder using `ninja`.
+4. **Run the Dynamatic test-suite.** After building the project, or at any time during development, regression-tests for Dynamatic can be ran from the top level `build` folder using `ninja`.
 
     ```sh
     $ cd dynamatic/build

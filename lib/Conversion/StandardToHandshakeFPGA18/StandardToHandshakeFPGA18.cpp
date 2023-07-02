@@ -11,6 +11,7 @@
 #include "dynamatic/Conversion/StandardToHandshakeFPGA18.h"
 #include "circt/Dialect/Handshake/HandshakeOps.h"
 #include "dynamatic/Conversion/PassDetails.h"
+#include "dynamatic/Support/LogicBB.h"
 #include "mlir/Dialect/Affine/Analysis/AffineAnalysis.h"
 #include "mlir/Dialect/Affine/IR/AffineOps.h"
 #include "mlir/Dialect/Affine/Utils.h"
@@ -711,17 +712,6 @@ struct StandardToHandshakeFPGA18Pass
   }
 };
 } // namespace
-
-dynamatic::HandshakeBlocks
-dynamatic::getHandshakeBlocks(handshake::FuncOp funcOp) {
-  dynamatic::HandshakeBlocks handshakeBlocks;
-  for (auto &op : funcOp.getOps())
-    if (auto bbAttr = op.getAttrOfType<mlir::IntegerAttr>(BB_ATTR); bbAttr)
-      handshakeBlocks.blocks[bbAttr.getValue().getZExtValue()].push_back(&op);
-    else
-      handshakeBlocks.outOfBlocks.push_back(&op);
-  return handshakeBlocks;
-}
 
 std::unique_ptr<mlir::OperationPass<mlir::ModuleOp>>
 dynamatic::createStandardToHandshakeFPGA18Pass(bool idBasicBlocks) {

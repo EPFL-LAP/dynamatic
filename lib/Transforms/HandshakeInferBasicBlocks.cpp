@@ -6,10 +6,11 @@
 
 #include "dynamatic/Transforms/HandshakeInferBasicBlocks.h"
 #include "circt/Dialect/Handshake/HandshakeOps.h"
-#include "dynamatic/Conversion/StandardToHandshakeFPGA18.h"
+#include "dynamatic/Support/LogicBB.h"
 #include "dynamatic/Transforms/PassDetails.h"
 #include "dynamatic/Transforms/Passes.h"
 #include "mlir/Support/LogicalResult.h"
+#include "mlir/Transforms/DialectConversion.h"
 #include "llvm/Support/raw_ostream.h"
 
 using namespace circt;

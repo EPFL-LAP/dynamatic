@@ -11,7 +11,7 @@
 #include "circt/Dialect/Handshake/HandshakeOps.h"
 #include "circt/Dialect/Handshake/HandshakePasses.h"
 #include "dynamatic/Conversion/PassDetails.h"
-#include "dynamatic/Conversion/StandardToHandshakeFPGA18.h"
+#include "dynamatic/Support/LogicBB.h"
 #include "mlir/Dialect/Arith/IR/Arith.h"
 #include "mlir/IR/BuiltinTypes.h"
 #include "mlir/IR/OperationSupport.h"
@@ -93,7 +93,8 @@ struct EdgeInfo {
   /// doesn't insert [brackets] around the attributes; it is the responsibility
   /// of the caller of this method to insert an opening bracket before the call
   /// and a closing bracket after the call.
-  template <typename Stream> void print(Stream &stream) {
+  template <typename Stream>
+  void print(Stream &stream) {
     stream << "from=\"out" << from << "\", to=\"in" << to << "\"";
     if (memAddress.has_value())
       stream << ", mem_address=\"" << (memAddress.value() ? "true" : "false")
@@ -288,8 +289,8 @@ static const std::string DELAY_EXT_TRUNC =
 
 /// Maps name of arithmetic operation to "delay" attribute.
 static std::unordered_map<std::string, std::string> arithNameToDelay{
-    {"arith.addi", DELAY_ADD_SUB},
     {"arith.subi", DELAY_ADD_SUB},
+    {"arith.addi", DELAY_ADD_SUB},
     {"arith.muli", DELAY_MUL_DIV},
     {"arith.addf", "0.000,0.000,0.000,100.000,100.000,100.000,100.000,100.000"},
     {"arith.subf", DELAY_SUBF_MULF},
@@ -308,7 +309,8 @@ static std::unordered_map<std::string, std::string> arithNameToDelay{
     {"arith.trunci", DELAY_EXT_TRUNC},
     {"arith.shrsi", DELAY_EXT_TRUNC},
     {"arith.shli", DELAY_EXT_TRUNC},
-    {"arith.select", ""}};
+    {"arith.select",
+     "1.397 1.397 1.412 2.061 100.000 100.000 100.000 100.000"}};
 
 /// Maps name of integer comparison type to "op" attribute.
 static std::unordered_map<arith::CmpIPredicate, std::string> cmpINameToOpName{
@@ -917,18 +919,17 @@ LogicalResult ExportDOTPass::annotateNode(mlir::raw_indented_ostream &os,
           })
           .Case<arith::SelectOp>([&](arith::SelectOp op) {
             auto info = NodeInfo("Operator");
-            info.stringAttr["op"] = "select_op";
+            auto opName = op->getName().getStringRef().str();
+            info.stringAttr["op"] = arithNameToOpName[opName];
+            info.stringAttr["delay"] = arithNameToDelay[opName];
             info.stringAttr["in"] = getInputForSelect(op);
-            info.stringAttr["delay"] =
-                "1.397 1.397 1.412 2.061 100.000 100.000 100.000 100.000";
             return info;
           })
           .Case<arith::AddIOp, arith::AddFOp, arith::SubIOp, arith::SubFOp,
                 arith::AndIOp, arith::OrIOp, arith::XOrIOp, arith::MulIOp,
                 arith::MulFOp, arith::DivUIOp, arith::DivSIOp, arith::DivFOp,
                 arith::SIToFPOp, arith::RemSIOp, arith::ExtSIOp, arith::ExtUIOp,
-                arith::TruncIOp, arith::ShRSIOp, arith::ShLIOp,
-                arith::SelectOp>([&](auto) {
+                arith::TruncIOp, arith::ShRSIOp, arith::ShLIOp>([&](auto) {
             auto info = NodeInfo("Operator");
             auto opName = op->getName().getStringRef().str();
             info.stringAttr["op"] = arithNameToOpName[opName];
@@ -1362,7 +1363,7 @@ LogicalResult ExportDOTPass::printFunc(mlir::raw_indented_ostream &os,
   // Get function's "blocks". These leverage the "bb" attributes attached to
   // operations in handshake functions to display operations belonging to the
   // same original basic block together
-  auto handshakeBlocks = getHandshakeBlocks(funcOp);
+  auto handshakeBlocks = getLogicBBs(funcOp);
 
   // Print all edges incoming from operations in a block
   for (auto &[blockID, ops] : handshakeBlocks.blocks) {

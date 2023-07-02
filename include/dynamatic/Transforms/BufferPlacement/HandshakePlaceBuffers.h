@@ -1,6 +1,6 @@
 //===- HandshakePlaceBuffers.h - Place buffers in DFG -----------*- C++ -*-===//
 //
-// This file declares the --place-buffers pass.
+// This file declares the --handshake-place-buffers pass.
 //
 //===----------------------------------------------------------------------===//
 
@@ -9,23 +9,21 @@
 
 #include "dynamatic/Support/LLVM.h"
 #include "dynamatic/Transforms/BufferPlacement/ExtractMG.h"
-#include "dynamatic/Transforms/BufferPlacement/OptimizeMILP.h"
+#include "mlir/Dialect/Func/IR/FuncOps.h"
 
 namespace dynamatic {
 namespace buffer {
+/// Data structure for control-free dataflow circuits which
+/// stores the units and channels inside it.
+/// The CFDFC has properties for the buffer placement optimization, including
+/// the target period, and maximum period.
+struct CFDFC {
+  double targetCP, maxCP;
+  std::vector<Operation *> units;
+  std::vector<Value> channels;
 
-/// An arch stores the basic information (execution frequency, isBackEdge)
-/// of an arch  between basic blocks.
-struct arch {
-  int srcBB, dstBB;
-  unsigned freq;
-  bool isBackEdge = false;
+  unsigned execN = 0; // execution times of CFDFC
 };
-
-
-/// Deep first search the handshake file to get the units connection graph.
-void dfsHandshakeGraph(Operation *opNode, 
-                       std::vector<Operation *> &visited);
 
 } // namespace buffer
 

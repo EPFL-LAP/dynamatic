@@ -5,6 +5,7 @@
 //===----------------------------------------------------------------------===//
 
 #include "dynamatic/Transforms/UtilsBitsUpdate.h"
+#include "dynamatic/Support/LogicBB.h"
 #include "mlir/Dialect/Arith/IR/Arith.h"
 #include "mlir/IR/Dialect.h"
 #include "mlir/Support/IndentedOstream.h"
@@ -47,8 +48,7 @@ std::optional<Operation *> insertWidthMatchOp(Operation *newOp, int opInd,
       auto truncOp = builder.create<mlir::arith::TruncIOp>(newOp->getLoc(),
                                                            newType, opVal);
       newOp->setOperand(opInd, truncOp.getResult());
-      if (succeeded(containsAttr(newOp, BB_ATTR)))   
-        truncOp->setAttr(BB_ATTR, newOp->getAttr(BB_ATTR));
+      inheritBB(newOp, truncOp);
       return truncOp;
     }
 
@@ -58,8 +58,7 @@ std::optional<Operation *> insertWidthMatchOp(Operation *newOp, int opInd,
       auto extOp =
           builder.create<mlir::arith::ExtSIOp>(newOp->getLoc(), newType, opVal);
       newOp->setOperand(opInd, extOp.getResult());
-      if (succeeded(containsAttr(newOp, BB_ATTR))) 
-        extOp->setAttr(BB_ATTR, newOp->getAttr(BB_ATTR));
+      inheritBB(newOp, extOp);
       return extOp;
     }
   }
@@ -538,9 +537,9 @@ void constructUpdateFuncMap(
 
 static bool setPassFlag(Operation *op) {
   return llvm::TypeSwitch<Operation *, bool>(op)
-    .Case<handshake::BranchOp, handshake::ConditionalBranchOp>(
-        [](Operation *op) { return true; })
-    .Default([&](auto) { return false; });
+      .Case<handshake::BranchOp, handshake::ConditionalBranchOp>(
+          [](Operation *op) { return true; })
+      .Default([&](auto) { return false; });
 }
 
 static bool setMatchFlag(Operation *op) {
@@ -690,11 +689,11 @@ void validateOp(Operation *op, MLIRContext *ctx,
   bool revert = setRevertFlag(op);
 
   if (pass)
-    // Validate the successor operations 
-    // influenced by the bit width propagation 
-    if(propType(op))
+    // Validate the successor operations
+    // influenced by the bit width propagation
+    if (propType(op))
       for (auto resOp : op->getResults().getUsers())
-          validateOp(resOp, ctx, newMatchedOps);
+        validateOp(resOp, ctx, newMatchedOps);
 
   if (match)
     matchOpResWidth(op, ctx, newMatchedOps);
