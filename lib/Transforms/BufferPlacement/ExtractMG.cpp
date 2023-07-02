@@ -155,7 +155,6 @@ LogicalResult buffer::readSimulateFile(const std::string &fileName,
   while (std::getline(inFile, line)) {
     std::istringstream iss(line);
     ArchBB *arch = new ArchBB();
-    ArchBB *pArch = arch;
 
     std::string token;
     if (!parseAndValidateToken(iss, token, arch->srcBB))
@@ -172,7 +171,7 @@ LogicalResult buffer::readSimulateFile(const std::string &fileName,
       return failure();
     arch->isBackEdge = (backEdge == 1);
 
-    archs[pArch] = false;
+    archs[arch] = false;
     bbs[arch->srcBB] = false;
     bbs[arch->dstBB] = false;
   }
