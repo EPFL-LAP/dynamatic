@@ -5,10 +5,10 @@
 //===----------------------------------------------------------------------===//
 
 #include "dynamatic/Transforms/BufferPlacement/OptimizeMILP.h"
-#include "dynamatic/Transforms/BufferPlacement/ExtractMG.h"
 #include "circt/Dialect/Handshake/HandshakeDialect.h"
 #include "circt/Dialect/Handshake/HandshakeOps.h"
 #include "circt/Dialect/Handshake/HandshakePasses.h"
+#include "dynamatic/Transforms/BufferPlacement/ParseCircuitJson.h"
 #include "dynamatic/Transforms/PassDetails.h"
 #include "mlir/Dialect/Arith/IR/Arith.h"
 #include "mlir/Dialect/Func/IR/FuncOps.h"
@@ -16,8 +16,12 @@
 #include "mlir/IR/OperationSupport.h"
 #include "mlir/IR/PatternMatch.h"
 #include "mlir/Support/IndentedOstream.h"
-#include "gurobi_c++.h"
 #include <fstream>
+#include <iostream>
+
+#ifndef DYNAMATIC_GUROBI_NOT_INSTALLED
+#include "gurobi_c++.h"
+#endif // DYNAMATIC_GUROBI_NOT_INSTALLED
 
 using namespace circt;
 using namespace circt::handshake;
@@ -25,227 +29,309 @@ using namespace mlir;
 using namespace dynamatic;
 using namespace dynamatic::buffer;
 
-void buffer::DataflowCircuit::printCircuits() {
-  llvm::errs() << "===========================\n";
-  for (auto unit : units) {
-    llvm::errs() << "operation: " << *(unit) << "\n";
-  }
-}
+/// Read timing info for units and channels in CFDFC.
+/// The units delay and latency are determined by the units type
+/// The channels timing info are described by the input ports and output
+/// ports timing characteristics
+static LogicalResult readUnitInfo(std::string timefile,
+                                  std::map<std::string, UnitInfo> &unitInfo) {
+  std::ifstream file(timefile);
+  if (file.is_open()) {
+    std::string line;
+    std::string jsonString;
 
-std::vector<std::vector<float>>
-buffer::DataflowCircuit::readInfoFromFile(const std::string &filename) {
-  std::vector<std::vector<float>> info;
-
-  std::ifstream file(filename);
-  assert(file.is_open() && "Error opening delay info file");
-
-  std::string line;
-  while (std::getline(file, line)) {
-    std::vector<float> row;
-    std::istringstream iss(line);
-    std::string value;
-
-    while (std::getline(iss, value, ',')) {
-      float num = std::stof(value);
-      row.push_back(num);
+    while (std::getline(file, line)) {
+      jsonString += trim(line);
     }
 
-    assert(!row.empty() && "Error reading delay info file");
-    info.push_back(row);
-  }
+    file.close();
+    // Parse the JSON string
+    parseJson(jsonString, unitInfo);
 
-  file.close();
+    // Perform operations with the extracted data...
+  } else
+    return failure();
 
-  return info;
+  return success();
 }
 
-double buffer::DataflowCircuit::getTimeInfo(Operation *op, std::string infoName) {
-  std::string opName = op->getName().getStringRef().str();
-  size_t dotPos = opName.find('.');
-  std::string opType = opName.substr(dotPos+1);
-  // llvm::errs() << "opType: " << opType << 
-  //   "delay : " << this->delayInfo[compNameToIndex[opType]][0] << "\n";
-  if (infoName == "delay")
-    return this->delayInfo[compNameToIndex[opType]][0];
-  return this->latencyInfo[compNameToIndex[opType]][1];
-}
-
-static void initVarsInMILP(GRBModel &modelBuf,
-                           std::vector<Operation *> &units,
+static void initVarsInMILP(GRBModel &modelBuf, std::vector<Operation *> &units,
                            std::vector<Value> &channels,
-                           std::map<Operation *, UnitVar> &unitVars, 
+                           std::map<Operation *, UnitVar> &unitVars,
                            std::map<Value *, ChannelVar> &channelVars) {
   // create variables
 
   for (auto [ind, unit] : llvm::enumerate(units)) {
     // create variables for each unit
-    llvm::errs() << "unit: " << *unit << "\n";
 
     UnitVar unitVar;
-    unitVar.retIn = modelBuf.addVar(0.0, 1.0, 0.0, GRB_CONTINUOUS, "retIn"+std::to_string(ind));
-    unitVar.retOut = modelBuf.addVar(0.0, 1.0, 0.0, GRB_CONTINUOUS, "retOut"+std::to_string(ind));
-    unitVar.tElasIn = modelBuf.addVar(0.0, GRB_INFINITY, 0.0, GRB_CONTINUOUS, "tElasIn"+std::to_string(ind));
-    unitVar.tElasOut = modelBuf.addVar(0.0, GRB_INFINITY, 0.0, GRB_CONTINUOUS, "tElasOut"+std::to_string(ind));
+    unitVar.retIn = modelBuf.addVar(0.0, 1.0, 0.0, GRB_CONTINUOUS,
+                                    "retIn" + std::to_string(ind));
+    unitVar.retOut = modelBuf.addVar(0.0, 1.0, 0.0, GRB_CONTINUOUS,
+                                     "retOut" + std::to_string(ind));
     unitVars[unit] = unitVar;
   }
 
   for (auto [ind, val] : llvm::enumerate(channels)) {
-    llvm::errs() << "channel: " << val << "\n";
+
     ChannelVar channelVar;
-    channelVar.tIn = modelBuf.addVar(0.0, GRB_INFINITY, 0.0, GRB_CONTINUOUS, "tIn"+std::to_string(ind));
-    channelVar.tOut = modelBuf.addVar(0.0, GRB_INFINITY, 0.0, GRB_CONTINUOUS, "tOut"+std::to_string(ind));
-    channelVar.thrptTok = modelBuf.addVar(0.0, 1.0, 0.0, GRB_CONTINUOUS, "thrpt"+std::to_string(ind));
-    channelVar.bufFlop = modelBuf.addVar(0.0, 1.0, 0.0, GRB_BINARY, "bufFlop"+std::to_string(ind));
-    channelVar.bufNSlots = modelBuf.addVar(0.0, GRB_INFINITY, 0.0, GRB_INTEGER, "bufNSlots"+std::to_string(ind));
-    channelVar.hasBuf = modelBuf.addVar(0.0, 1.0, 0.0, GRB_BINARY, "hasBuf"+std::to_string(ind));
-    
+    channelVar.tDataIn = modelBuf.addVar(0.0, GRB_INFINITY, 0.0, GRB_CONTINUOUS,
+                                         "tDataIn" + std::to_string(ind));
+    channelVar.tDataOut =
+        modelBuf.addVar(0.0, GRB_INFINITY, 0.0, GRB_CONTINUOUS,
+                        "tDataOut" + std::to_string(ind));
+    channelVar.tElasIn = modelBuf.addVar(0.0, GRB_INFINITY, 0.0, GRB_CONTINUOUS,
+                                         "tElasIn" + std::to_string(ind));
+    channelVar.tElasOut =
+        modelBuf.addVar(0.0, GRB_INFINITY, 0.0, GRB_CONTINUOUS,
+                        "tElasOut" + std::to_string(ind));
+    channelVar.tValidIn =
+        modelBuf.addVar(0.0, GRB_INFINITY, 0.0, GRB_CONTINUOUS,
+                        "tValidIn" + std::to_string(ind));
+    channelVar.tValidOut =
+        modelBuf.addVar(0.0, GRB_INFINITY, 0.0, GRB_CONTINUOUS,
+                        "tValidOut" + std::to_string(ind));
+    channelVar.tReadyIn =
+        modelBuf.addVar(0.0, GRB_INFINITY, 0.0, GRB_CONTINUOUS,
+                        "tReadyIn" + std::to_string(ind));
+    channelVar.tReadyOut =
+        modelBuf.addVar(0.0, GRB_INFINITY, 0.0, GRB_CONTINUOUS,
+                        "tReadyOut" + std::to_string(ind));
+    channelVar.thrptTok = modelBuf.addVar(0.0, 1.0, 0.0, GRB_CONTINUOUS,
+                                          "thrpt" + std::to_string(ind));
+    channelVar.bufIsOp = modelBuf.addVar(0.0, 1.0, 0.0, GRB_BINARY,
+                                         "bufIsOp" + std::to_string(ind));
+    channelVar.valbufIsOp = modelBuf.addVar(0.0, 1.0, 0.0, GRB_BINARY,
+                                            "valbufIsOp" + std::to_string(ind));
+    channelVar.readybufIsOp = modelBuf.addVar(
+        0.0, 1.0, 0.0, GRB_BINARY, "readybufIsOp" + std::to_string(ind));
+    channelVar.bufNSlots = modelBuf.addVar(0.0, GRB_INFINITY, 0.0, GRB_INTEGER,
+                                           "bufNSlots" + std::to_string(ind));
+    channelVar.hasBuf = modelBuf.addVar(0.0, 1.0, 0.0, GRB_BINARY,
+                                        "hasBuf" + std::to_string(ind));
+
     channelVars[&val] = channelVar;
   }
 }
 
-static void createPathConstrs(GRBModel &modelBuf,
-                              GRBVar &t1, GRBVar &t2, GRBVar &bufFlop,
-                              double period,
-                              unsigned constrInd) {
-  modelBuf.addConstr(t1 <= period, "chStart"+std::to_string(constrInd));
-  modelBuf.addConstr(t2 <= period, "chEnd"+std::to_string(constrInd));
-  modelBuf.addConstr(t2>= t1 - 2*period*bufFlop, "path"+std::to_string(constrInd));
+// Data path constratins for a channel
+// t1, t2 are the time stamps in the source and destination of the channel
+// bufOp: whether the inserted buffer in a channel is opaque or not;
+// bufRdyOp: whether the inserted buffer in a channel for the handshake ready
+// signal is opaque or not;
+// period: circuit period
+// constrInd: index of the constraint
+// bufDelay: delay of the inserted buffer in the channel
+// ctrlBufDelay: delay of the inserted buffer for the handshake ready signal
+static void createDataPathConstrs(GRBModel &modelBuf, GRBVar &t1, GRBVar &t2,
+                                  GRBVar &bufOp, GRBVar &bufRdyOp,
+                                  double period, unsigned constrInd,
+                                  double bufDelay = 0.0,
+                                  double ctrlBufDelay = 0.1) {
+  modelBuf.addConstr(t1 <= period, "dataChStart" + std::to_string(constrInd));
+  modelBuf.addConstr(t2 <= period, "dataChEnd" + std::to_string(constrInd));
+  modelBuf.addConstr(t2 >= t1 - 2 * period * bufOp + ctrlBufDelay * bufRdyOp,
+                     "dataChPath" + std::to_string(constrInd));
+  modelBuf.addConstr(t2 >= bufDelay,
+                     "dataPathBuf1" + std::to_string(constrInd));
+  modelBuf.addConstr(t2 >= ctrlBufDelay * bufRdyOp,
+                     "dataPathBuf2" + std::to_string(constrInd));
 }
 
-static void createPathConstrs(GRBModel &modelBuf,
-                             GRBVar &tIn, GRBVar &tOut,
-                              double delay, double latency, double period,
-                              unsigned constrInd) {
+// Data path constratins for a channel
+static void createDataPathConstrs(GRBModel &modelBuf, GRBVar &tIn, GRBVar &tOut,
+                                  double delay, double latency, double period,
+                                  unsigned constrInd, double inPortDelay = 0.0,
+                                  double outPortDelay = 0.0) {
   if (latency == 0.0)
-    modelBuf.addConstr(tOut >= delay + tIn, "unitPath"+std::to_string(constrInd));
-  else
-    modelBuf.addConstr(tIn <= period, "unitPath"+std::to_string(constrInd));
-
-  
+    modelBuf.addConstr(tOut >= delay + tIn,
+                       "unitDataPath" + std::to_string(constrInd));
+  else {
+    modelBuf.addConstr(tIn <= period - inPortDelay,
+                       "unitDataPath" + std::to_string(constrInd));
+    modelBuf.addConstr(tOut <= outPortDelay,
+                       "unitDataPath" + std::to_string(constrInd));
+  }
 }
 
-static void createElasticityConstrs(GRBModel &modelBuf,
-                              GRBVar &tIn, GRBVar &tOut, 
-                              double delay, double latency, double period,
-                              unsigned constrInd) {
-  modelBuf.addConstr(tOut >= 1 + tIn, "unitElas"+std::to_string(constrInd));
+static void createReadyPathConstrs(GRBModel &modelBuf, GRBVar &t1, GRBVar &t2,
+                                   GRBVar &bufOp, GRBVar &bufRdyOp,
+                                   double period, unsigned constrInd,
+                                   double bufDelay = 0.0,
+                                   double ctrlBufDelay = 0.1) {
+  modelBuf.addConstr(t1 <= period, "readyChStart" + std::to_string(constrInd));
+  modelBuf.addConstr(t2 <= period, "readyChEnd" + std::to_string(constrInd));
+  modelBuf.addConstr(t2 >= t1 - 2 * period * bufRdyOp + ctrlBufDelay * bufOp,
+                     "readyChPath" + std::to_string(constrInd));
+  modelBuf.addConstr(t2 >= bufDelay,
+                     "readyPathBuf1" + std::to_string(constrInd));
+  modelBuf.addConstr(t2 >= ctrlBufDelay * bufOp,
+                     "readyPathBuf2" + std::to_string(constrInd));
 }
 
-static void createElasticityConstrs(GRBModel &modelBuf,
-                              GRBVar &t1, GRBVar &t2, GRBVar &bufFlop,
-                              GRBVar &bufNSlots, GRBVar &hasBuf,
-                              unsigned cstCoef, double period, unsigned constrInd) {
-  modelBuf.addConstr(t2 >= t1 - cstCoef*bufFlop, "chElas"+std::to_string(constrInd));
-  modelBuf.addConstr(bufNSlots >= bufFlop, "bufNSlots"+std::to_string(constrInd));
-  modelBuf.addConstr(hasBuf >= 0.01*bufNSlots, "hasBuf"+std::to_string(constrInd));
+static void createValidPathConstrs(GRBModel &modelBuf, GRBVar &t1, GRBVar &t2,
+                                   GRBVar &bufValOp, GRBVar &bufRdyOp,
+                                   GRBVar &bufOp, GRBVar &bufNSlots,
+                                   double period, unsigned constrInd,
+                                   double bufDelay = 0.0,
+                                   double ctrlBufDelay = 0.1) {
+  modelBuf.addConstr(t1 <= period, "validChStart" + std::to_string(constrInd));
+  modelBuf.addConstr(t2 <= period, "validChEnd" + std::to_string(constrInd));
+  modelBuf.addConstr(t2 >= t1 - 2 * period * bufValOp + ctrlBufDelay * bufRdyOp,
+                     "validChPath" + std::to_string(constrInd));
+  modelBuf.addConstr(t2 >= bufDelay,
+                     "validPathBuf1" + std::to_string(constrInd));
+  modelBuf.addConstr(t2 >= ctrlBufDelay * bufRdyOp,
+                     "validPathBuf2" + std::to_string(constrInd));
+  //  buffer consistency constraints
+  modelBuf.addConstr(bufValOp == bufOp,
+                     "validBufConsist" + std::to_string(constrInd));
+  modelBuf.addConstr(bufNSlots >= bufOp + bufValOp,
+                     "validBufConsist" + std::to_string(constrInd));
 }
 
-static void createThroughputConstrs(GRBModel &modelBuf,
-    GRBVar &retSrc, GRBVar &retDst, GRBVar &thrptTok, GRBVar &thrpt,
-    GRBVar &hasFlop, GRBVar &bufNSlots,
-    const int tok, unsigned constrInd) {
-    modelBuf.addConstr(retSrc - retDst + thrptTok == tok,
-        "ret"+std::to_string(constrInd)+"_1");
-    modelBuf.addConstr(thrpt + hasFlop - thrptTok <= 1, 
-        "ret"+std::to_string(constrInd)+"_2");
-    modelBuf.addConstr(thrptTok + thrpt + hasFlop - bufNSlots <= 1, 
-        "ret"+std::to_string(constrInd)+"_3");
-    modelBuf.addConstr(thrptTok - bufNSlots <= 0, 
-        "ret"+std::to_string(constrInd)+"_4");
+// create valid path constraints through a unit
+static void createCtrlPathConstrs(GRBModel &modelBuf, GRBVar &t1, GRBVar &t2,
+                                  double delayValid, unsigned constrInd) {
+  modelBuf.addConstr(t2 >= t1 + delayValid,
+                     "validPath" + std::to_string(constrInd));
 }
 
-static void createThroughputConstrs(GRBModel &modelBuf,
-    GRBVar &retSrc, GRBVar &retDst, GRBVar &thrpt,
-    double latency,  unsigned constrInd) {
+// create elasticity constraints w.r.t channels
+static void createElasticityConstrs(GRBModel &modelBuf, GRBVar &t1, GRBVar &t2,
+                                    GRBVar &bufOp, GRBVar &bufNSlots,
+                                    GRBVar &hasBuf, unsigned cstCoef,
+                                    double period, unsigned constrInd) {
+  modelBuf.addConstr(t2 >= t1 - cstCoef * bufOp,
+                     "chElas" + std::to_string(constrInd));
+  modelBuf.addConstr(bufNSlots >= bufOp,
+                     "bufNSlots" + std::to_string(constrInd));
+  modelBuf.addConstr(hasBuf >= 0.01 * bufNSlots,
+                     "hasBuf" + std::to_string(constrInd));
+}
+
+// create elasticity constraints w.r.t units
+static void createElasticityConstrs(GRBModel &modelBuf, GRBVar &tIn,
+                                    GRBVar &tOut, double delay, double latency,
+                                    double period, unsigned constrInd) {
+  modelBuf.addConstr(tOut >= 1 + tIn, "unitElas" + std::to_string(constrInd));
+}
+
+static void createThroughputConstrs(GRBModel &modelBuf, GRBVar &retSrc,
+                                    GRBVar &retDst, GRBVar &thrptTok,
+                                    GRBVar &thrpt, GRBVar &hasFlop,
+                                    GRBVar &bufNSlots, const int tok,
+                                    unsigned constrInd) {
+  modelBuf.addConstr(retSrc - retDst + thrptTok == tok,
+                     "ret" + std::to_string(constrInd) + "_1");
+  modelBuf.addConstr(thrpt + hasFlop - thrptTok <= 1,
+                     "ret" + std::to_string(constrInd) + "_2");
+  modelBuf.addConstr(thrptTok + thrpt + hasFlop - bufNSlots <= 1,
+                     "ret" + std::to_string(constrInd) + "_3");
+  modelBuf.addConstr(thrptTok - bufNSlots <= 0,
+                     "ret" + std::to_string(constrInd) + "_4");
+}
+
+static void createThroughputConstrs(GRBModel &modelBuf, GRBVar &retSrc,
+                                    GRBVar &retDst, GRBVar &thrpt,
+                                    double latency, unsigned constrInd) {
   if (latency != 0.0)
-    modelBuf.addConstr(retDst - retSrc == thrpt, 
-        "ret"+std::to_string(constrInd)+"_5");
+    modelBuf.addConstr(retDst - retSrc == thrpt,
+                       "ret" + std::to_string(constrInd) + "_5");
 }
 
-static void createStrategyConstrs(GRBModel &modelBuf,
-          ChannelConstraints &outConstr, 
-          ChannelVar &channelVar,
-          unsigned constrInd) {
-  if (!outConstr.bufferizable) {
-    modelBuf.addConstr(channelVar.hasBuf == 0,
-       "customConstr" + std::to_string(constrInd) + "_0");
-    return;
-  }
-  if (outConstr.minSlots.has_value()) {
-    // llvm::errs() << "force insert buf\n";
-    modelBuf.addConstr(channelVar.hasBuf >= 1,
-        "customConstr" + std::to_string(constrInd) + "_1");
-    modelBuf.addConstr(channelVar.bufNSlots >= outConstr.minSlots.value(),
-        "customConstr" + std::to_string(constrInd) + "_2");
-  }
-  if (outConstr.maxSlots.has_value()) {
-    modelBuf.addConstr(channelVar.bufNSlots <= outConstr.maxSlots.value(),
-        "customConstr" + std::to_string(constrInd) + "_3");
-  }
-  if (!outConstr.nonTransparentAllowed) {
-    modelBuf.addConstr(channelVar.bufFlop==1, 
-      "customConstr"+ std::to_string(constrInd) + "_4");
-  }
-}
+static LogicalResult
+createModelConstraints(GRBModel &modelBuf, GRBVar &thrpt, double targetCP,
+                       std::map<Operation *, UnitVar> &unitVars,
+                       std::map<Value *, ChannelVar> &channelVars,
+                       std::map<std::string, UnitInfo> unitInfo) {
+  for (auto [ind, chVarMap] : llvm::enumerate(channelVars)) {
+    auto &[ch, chVars] = chVarMap;
+    // llvm::errs() << *ch << "\n";
 
-LogicalResult buffer::DataflowCircuit::
-createModelConstraints(BufferPlacementStrategy &strategy,
-  GRBModel &modelBuf, GRBVar &thrpt,
-  std::map<Operation *, UnitVar> &unitVars,
-  std::map<Value *, ChannelVar> &channelVars) {
-  // create constraints
-  for (auto [ind, chPair] : llvm::enumerate(channelVars)) {
-      Operation *srcOp = chPair.first->getDefiningOp();
-      Operation *dstOp = getUserOp(chPair.first);
+    // update the model to get the lower bound and upper bound of the vars
+    modelBuf.update();
 
-      GRBVar &t1 = chPair.second.tOut;
-      GRBVar &t2 = chPair.second.tIn;
-      GRBVar &bufFlop = chPair.second.bufFlop;
-      GRBVar &bufNSlots = chPair.second.bufNSlots;
-      GRBVar &hasBuf = chPair.second.hasBuf;
-      GRBVar &thrptTok = chPair.second.thrptTok;
+    auto bufForbid = chVars.bufNSlots.get(GRB_DoubleAttr_UB);
+    if (bufForbid <= 0)
+      continue;
+    Operation *srcOp = ch->getDefiningOp();
+    Operation *dstOp = *(ch->getUsers().begin());
+    GRBVar &t1 = chVars.tDataIn;
+    GRBVar &t2 = chVars.tDataOut;
+    GRBVar &tValid1 = chVars.tValidIn;
+    GRBVar &tValid2 = chVars.tValidOut;
+    GRBVar &tReady1 = chVars.tReadyIn;
+    GRBVar &tReady2 = chVars.tReadyOut;
 
-      GRBVar &retSrc = unitVars[srcOp].retOut;
+    GRBVar &bufOp = chVars.bufIsOp;
+    GRBVar &bufValOp = chVars.valbufIsOp;
+    GRBVar &bufRdyOp = chVars.readybufIsOp;
 
-      int tok = isBackEdge(chPair.first) ? 1 : 0;
-      createPathConstrs(modelBuf, t1, t2, bufFlop, this->targetCP, ind);
-      createElasticityConstrs(modelBuf, t1, t2, bufFlop, bufNSlots, hasBuf, 
-          this->units.size()+1, this->targetCP, ind);
-      if (unitVars.count(dstOp) > 0) {
-        GRBVar &retDst = unitVars[dstOp].retIn;
-        createThroughputConstrs(modelBuf, retSrc, retDst, thrptTok, thrpt,
-            bufFlop, bufNSlots, tok, ind);
+    GRBVar &bufNSlots = chVars.bufNSlots;
+    GRBVar &hasBuf = chVars.hasBuf;
+    GRBVar &thrptTok = chVars.thrptTok;
 
-      }
-      ChannelConstraints constr = strategy.getChannelConstraints(chPair.first);
-      createStrategyConstrs(modelBuf, constr, chPair.second, ind);
+    GRBVar &retSrc = unitVars[srcOp].retOut;
 
+    int tok = isBackEdge(srcOp, dstOp) ? 1 : 0;
+    createDataPathConstrs(modelBuf, t1, t2, bufOp, bufRdyOp, targetCP, ind);
+    // ready signal is ooposite to the channel direction
+    createReadyPathConstrs(modelBuf, tReady2, tReady1, bufOp, bufRdyOp,
+                           targetCP, ind);
+    createValidPathConstrs(modelBuf, tValid1, tValid2, bufValOp, bufRdyOp,
+                           bufOp, bufNSlots, targetCP, ind);
+    createElasticityConstrs(modelBuf, t1, t2, bufOp, bufNSlots, hasBuf,
+                            unitVars.size() + 1, targetCP, ind);
+    if (unitVars.count(dstOp) > 0) {
+      GRBVar &retDst = unitVars[dstOp].retIn;
+      createThroughputConstrs(modelBuf, retSrc, retDst, thrptTok, thrpt, bufOp,
+                              bufNSlots, tok, ind);
+    }
   }
 
-  for (auto [ind, uPair] : llvm::enumerate(unitVars)) {
-    double delay = getTimeInfo(uPair.first, "delay");
-    double latency = getTimeInfo(uPair.first, "latency");
+  for (auto [ind, uVarMap] : llvm::enumerate(unitVars)) {
+    auto &[op, unitVar] = uVarMap;
+    llvm::errs() << "unit: " << *op << "\n";
 
-    GRBVar &ret1 = uPair.second.retOut;
-    for (auto Oprand : uPair.first->getOperands()) {
+    double delayData = getCombinationalDelay(op, unitInfo, "data");
+    llvm::errs() << "get data combination delay " << delayData << " success\n";
+    double delayValid = getCombinationalDelay(op, unitInfo, "valid");
+    double delayReady = getCombinationalDelay(op, unitInfo, "ready");
+    double latency = getUnitLatency(op, unitInfo);
 
-      // check all the input channels
-      if (channelVars.count(&Oprand) > 0) {
-        Operation *sucOp = getUserOp(Oprand);
-        GRBVar &ret2 = unitVars[sucOp].retIn;
+    GRBVar &ret1 = unitVar.retOut;
 
-        GRBVar &tIn = channelVars[&Oprand].tOut;
-        GRBVar &tElasIn = uPair.second.tElasIn;
-        for (auto result : uPair.first->getResults()) 
+    // iterate over all paths throughout the units
+    // temporally iterate all input port to all output port for a unit
+    for (auto inCh : op->getOperands()) {
+      // only check the selected input channels
+      if (channelVars.count(&inCh) > 0) {
+        double inPortDelay = getPortDelay(inCh, unitInfo, "out");
+        GRBVar &ret2 = unitVars[op].retIn;
+
+        GRBVar &tIn = channelVars[&inCh].tDataOut;
+        GRBVar &tValidIn = channelVars[&inCh].tValidOut;
+        GRBVar &tReadyIn = channelVars[&inCh].tReadyOut;
+        GRBVar &tElasIn = channelVars[&inCh].tElasIn;
+
+        for (auto outCh : op->getResults())
           // check all the output channels
-          if (channelVars.count(&result) > 0) {
-            llvm::errs() << "unit " << *uPair.first <<"\n";
-            GRBVar &tOut = channelVars[&result].tIn;
-            GRBVar &tElasOut = uPair.second.tElasOut;
-            createPathConstrs(modelBuf, tIn, tOut, 
-                            delay, latency, this->targetCP, ind);
-            createElasticityConstrs(modelBuf, tElasIn, tElasOut, 
-                            delay, latency, this->targetCP, ind);
+          if (channelVars.count(&outCh) > 0) {
+            double outPortDelay = getPortDelay(inCh, unitInfo, "in");
+
+            GRBVar &tOut = channelVars[&outCh].tDataIn;
+            GRBVar &tValidOut = channelVars[&outCh].tValidIn;
+            GRBVar &tReadyOut = channelVars[&outCh].tReadyIn;
+            GRBVar &tElasOut = channelVars[&outCh].tElasIn;
+            createDataPathConstrs(modelBuf, tIn, tOut, delayData, latency,
+                                  targetCP, ind, inPortDelay, outPortDelay);
+            createCtrlPathConstrs(modelBuf, tValidIn, tValidOut, delayValid,
+                                  ind);
+            createCtrlPathConstrs(modelBuf, tReadyOut, tReadyIn, delayReady,
+                                  ind);
+            createElasticityConstrs(modelBuf, tElasIn, tElasOut, delayData,
+                                    latency, targetCP, ind);
             createThroughputConstrs(modelBuf, ret1, ret2, thrpt, latency, ind);
           }
       }
@@ -254,9 +340,80 @@ createModelConstraints(BufferPlacementStrategy &strategy,
   return success();
 }
 
+static LogicalResult
+setCustomizedConstraints(GRBModel &modelBuf,
+                         std::map<Value *, ChannelVar> channelVars,
+                         std::map<Value *, ChannelBufProps> &channelBufProps) {
+  for (auto [ind, chVarMap] : llvm::enumerate(channelVars)) {
+    auto &[ch, chVars] = chVarMap;
+    channelVars[ch].bufNSlots.set(GRB_DoubleAttr_LB, 0);
+    channelVars[ch].bufNSlots.set(GRB_DoubleAttr_UB, 1e3);
+    // set min value of the buffer
+    if (channelBufProps[ch].minNonTrans > 0) {
+      channelVars[ch].valbufIsOp.set(GRB_DoubleAttr_LB, 1);
+      channelVars[ch].bufNSlots.set(GRB_DoubleAttr_LB,
+                                    channelBufProps[ch].minNonTrans);
+    } else if (channelBufProps[ch].minTrans > 0) {
+      channelVars[ch].valbufIsOp.set(GRB_DoubleAttr_UB, 0);
+      channelVars[ch].bufNSlots.set(GRB_DoubleAttr_LB,
+                                    channelBufProps[ch].minTrans);
+    }
+
+    // set max value of the buffer
+    if (channelBufProps[ch].maxNonTrans.has_value())
+      channelVars[ch].bufNSlots.set(GRB_DoubleAttr_UB,
+                                    channelBufProps[ch].maxNonTrans.value());
+
+    if (channelBufProps[ch].maxTrans.has_value())
+      channelVars[ch].bufNSlots.set(GRB_DoubleAttr_UB,
+                                    channelBufProps[ch].maxNonTrans.value());
+
+    // TODO: set the maximum ChannelProps
+  }
+  return success();
+}
+
+static LogicalResult
+setChannelBufProps(std::vector<Value> &channels,
+                   std::map<Value *, ChannelBufProps> &ChannelBufProps,
+                   std::map<std::string, UnitInfo> &unitInfo) {
+  for (auto &ch : channels) {
+    Operation *srcOp = ch.getDefiningOp();
+    Operation *dstOp = *(ch.getUsers().begin());
+
+    std::string srcName = getOperationShortStrName(srcOp);
+    std::string dstName = getOperationShortStrName(dstOp);
+    // set merge with multiple input to have at least one transparent buffer
+    if (isa<handshake::MergeOp>(srcOp) && srcOp->getNumOperands() > 1) {
+      ChannelBufProps[&ch].minTrans = 1;
+    }
+
+    // TODO: set selectOp always select the frequent input
+    if (isa<arith::SelectOp>(srcOp))
+      if (srcOp->getOperand(0) == ch) {
+        ChannelBufProps[&ch].maxTrans = 0;
+        ChannelBufProps[&ch].maxNonTrans = 0;
+      }
+
+    // set channel buffer properties w.r.t to input file
+    if (unitInfo.count(srcName) > 0) {
+      ChannelBufProps[&ch].minTrans = unitInfo[srcName].outPortTransBuf;
+      ChannelBufProps[&ch].minNonTrans = unitInfo[srcName].outPortOpBuf;
+    }
+    if (unitInfo.count(dstName) > 0) {
+      ChannelBufProps[&ch].minTrans += unitInfo[dstName].inPortTransBuf;
+      ChannelBufProps[&ch].minNonTrans += unitInfo[dstName].inPortOpBuf;
+    }
+    if (ChannelBufProps[&ch].minTrans > 0 &&
+        ChannelBufProps[&ch].minNonTrans > 0)
+      return failure(); // cannot satisfy the constraint
+  }
+  return success();
+}
+
 static void createModelObjective(GRBModel &modelBuf, GRBVar &thrpt,
-    std::map<Value *, ChannelVar> channelVars){
-  GRBLinExpr objExpr = thrpt; 
+                                 std::map<Value *, ChannelVar> channelVars) {
+  GRBLinExpr objExpr = thrpt;
 
   double lumbdaCoef = 1e-7;
   for (auto pair : channelVars) {
@@ -264,65 +421,82 @@ static void createModelObjective(GRBModel &modelBuf, GRBVar &thrpt,
   }
 
   modelBuf.setObjective(objExpr, GRB_MAXIMIZE);
-  }
+}
 
-LogicalResult 
-buffer::DataflowCircuit::createMILPModel(BufferPlacementStrategy &strategy,
-  std::map<Value *, Result> &res) {
+LogicalResult buffer::placeBufferInCFDFCircuit(CFDFC &CFDFCircuit,
+                                               std::map<Value *, Result> &res) {
+  std::vector<double> delayData, delayValid, delayReady;
+  std::string timefile = "/home/yuxuan/Downloads/default.json";
+
+  std::map<std::string, UnitInfo> unitInfo;
+  std::map<Value *, ChannelBufProps> ChannelBufProps;
+
+  readUnitInfo(timefile, unitInfo);
+  for (auto &[key, time] : unitInfo) {
+    llvm::errs() << key << "================\n";
+    time.print();
+  }
+  // load the buffer information of the units to channel
+  if (failed(
+          setChannelBufProps(CFDFCircuit.channels, ChannelBufProps, unitInfo)))
+    return failure();
+
   // create a Gurobi environment
   GRBEnv env = GRBEnv();
-  env.set(GRB_IntParam_LogToConsole, false);
   env.set(GRB_IntParam_OutputFlag, 0);
-  // env.set("LogFile", "mip1.log");
+  env.set("LogFile", "mip1.log");
   env.start();
   GRBModel modelBuf = GRBModel(env);
-
-  this->delayInfo = 
-    this->readInfoFromFile(this->delayFile);
-
-  this->latencyInfo = 
-    this->readInfoFromFile(this->latencyFile);
 
   // create variables
   std::map<Operation *, UnitVar> unitVars;
   std::map<Value *, ChannelVar> channelVars;
 
+  // create the variable to noate the overall circuit throughput
   GRBVar circtThrpt = modelBuf.addVar(0.0, 1.0, 0.0, GRB_CONTINUOUS, "thrpt");
 
-  // initialize variables
-  initVarsInMILP(modelBuf, this->units, this->channels, 
-                 unitVars, channelVars);
-  createModelConstraints(strategy, modelBuf, circtThrpt, unitVars, channelVars);
+  // // initialize variables
+  initVarsInMILP(modelBuf, CFDFCircuit.units, CFDFCircuit.channels, unitVars,
+                 channelVars);
+  llvm::errs() << "init variables successfully!\n";
+  //  define customized constraints
+  setCustomizedConstraints(modelBuf, channelVars, ChannelBufProps);
+  llvm::errs() << "set customized constraints successfully!\n";
+  //  create constraints
+  double targetCP = 4.0;
+  createModelConstraints(modelBuf, circtThrpt, targetCP, unitVars, channelVars,
+                         unitInfo);
+  llvm::errs() << "create constraints successfully!\n";
+
   createModelObjective(modelBuf, circtThrpt, channelVars);
 
   modelBuf.optimize();
   if (modelBuf.get(GRB_IntAttr_Status) != GRB_OPTIMAL ||
-      circtThrpt.get(GRB_DoubleAttr_X) <= 0) 
-      llvm::errs() << "No optimal sulotion found" << "\n";   
+      circtThrpt.get(GRB_DoubleAttr_X) <= 0)
+    llvm::errs() << "No optimal sulotion found"
+                 << "\n";
 
   // load answer to the result
-  for (auto chPair : channelVars) {
-    llvm::errs() << *chPair.first << " " <<
-      chPair.second.hasBuf.get(GRB_DoubleAttr_X) << "\n";
-    if (chPair.second.hasBuf.get(GRB_DoubleAttr_X) > 0) {
+  for (auto &[ch, chVarMap] : channelVars) {
+    llvm::errs() << *ch << " " << chVarMap.hasBuf.get(GRB_DoubleAttr_X) << "\n";
+    if (chVarMap.hasBuf.get(GRB_DoubleAttr_X) > 0) {
       Result result;
-      result.numSlots = static_cast<int>
-            (chPair.second.bufNSlots.get(GRB_DoubleAttr_X));
-      if (chPair.second.bufFlop.get(GRB_DoubleAttr_X) > 0) {
+      result.numSlots =
+          static_cast<int>(chVarMap.bufNSlots.get(GRB_DoubleAttr_X));
+      if (chVarMap.bufIsOp.get(GRB_DoubleAttr_X) > 0) {
         // llvm::errs() << *chPair.first << " insert " <<
-        // "transparent " << chPair.second.bufNSlots.get(GRB_DoubleAttr_X);
-        result.transparent = true;
-        
-        
-      }
-      else if (chPair.second.bufNSlots.get(GRB_DoubleAttr_X) > 0) {
+        // "transparent " << chVarMap.bufNSlots.get(GRB_DoubleAttr_X);
+        result.opaque = true;
+
+      } else if (chVarMap.bufNSlots.get(GRB_DoubleAttr_X) > 0) {
         // llvm::errs() << *chPair.first << " insert " <<
-        // "nontransparent " << chPair.second.bufNSlots.get(GRB_DoubleAttr_X);
-        result.transparent = false;
+        // "nontransparent " << chVarMap.bufNSlots.get(GRB_DoubleAttr_X);
+        result.opaque = false;
         // res[chPair.first] = result;
       }
-      res[chPair.first] = result;
+      res[ch] = result;
     }
   }
+
   return success();
 }

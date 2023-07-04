@@ -4,11 +4,10 @@
 //
 //===----------------------------------------------------------------------===//
 
-#ifndef DYNAMATIC_TRANSFORMS_BUFFERPLACEMENT_PLACEBUFFERS_H
-#define DYNAMATIC_TRANSFORMS_BUFFERPLACEMENT_PLACEBUFFERS_H
+#ifndef DYNAMATIC_TRANSFORMS_PLACEBUFFERS_H
+#define DYNAMATIC_TRANSFORMS_PLACEBUFFERS_H
 
 #include "dynamatic/Support/LLVM.h"
-#include "dynamatic/Transforms/BufferPlacement/ExtractMG.h"
 #include "mlir/Dialect/Func/IR/FuncOps.h"
 
 namespace dynamatic {
@@ -18,4 +17,4 @@ createHandshakePlaceBuffersPass(bool firstMG = false,
                                 std::string stdLevelInfo = "");
 
 } // namespace dynamatic
-#endif // DYNAMATIC_TRANSFORMS_BUFFERPLACEMENT_PLACEBUFFERS_H
+#endif // DYNAMATIC_TRANSFORMS_PLACEBUFFERS_H

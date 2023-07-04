@@ -10,6 +10,7 @@
 #include "circt/Dialect/Handshake/HandshakeOps.h"
 #include "circt/Dialect/Handshake/HandshakePasses.h"
 #include "dynamatic/Transforms/BufferPlacement/ExtractMG.h"
+#include "dynamatic/Transforms/BufferPlacement/OptimizeMILP.h"
 #include "dynamatic/Transforms/PassDetails.h"
 #include "mlir/Dialect/Arith/IR/Arith.h"
 #include "mlir/Dialect/Func/IR/FuncOps.h"
@@ -47,20 +48,21 @@ static CFDFC createCFDFCircuit(handshake::FuncOp funcOp,
 static LogicalResult instantiateBuffers(std::map<Value *, Result> &res,
                                         MLIRContext *ctx) {
   OpBuilder builder(ctx);
-  for (auto pair : res) {
-    llvm::errs() << "insert buffer for: " << pair.second.numSlots << "\n";
-    if (pair.second.numSlots > 0) {
-      Operation *opSrc = pair.first->getDefiningOp();
-      Operation *opDst = getUserOp(pair.first);
+  for (auto &[channel, result] : res) {
+
+    if (result.numSlots > 0) {
+      llvm::errs() << "insert buffer for: " << *channel << "\n";
+      Operation *opSrc = channel->getDefiningOp();
+      Operation *opDst = getUserOp(*channel);
       builder.setInsertionPointAfter(opSrc);
       auto bufferOp = builder.create<handshake::BufferOp>(
           opSrc->getLoc(), opSrc->getResult(0).getType(), opSrc->getResult(0));
 
-      if (pair.second.transparent)
-        bufferOp.setBufferType(BufferTypeEnum::fifo);
-      else
+      if (result.opaque)
         bufferOp.setBufferType(BufferTypeEnum::seq);
-      bufferOp.setSlots(pair.second.numSlots);
+      else
+        bufferOp.setBufferType(BufferTypeEnum::fifo);
+      bufferOp.setSlots(result.numSlots);
       opSrc->getResult(0).replaceUsesWithIf(
           bufferOp.getResult(), [&](OpOperand &operand) {
             // return true;
@@ -68,12 +70,13 @@ static LogicalResult instantiateBuffers(std::map<Value *, Result> &res,
           });
     }
   }
+
   return success();
 }
 
 static LogicalResult insertBuffers(handshake::FuncOp funcOp, MLIRContext *ctx,
-                                   BufferPlacementStrategy &strategy,
-                                   bool firstMG, std::string stdLevelInfo) {
+                                   ChannelBufProps &strategy, bool firstMG,
+                                   std::string stdLevelInfo) {
 
   if (failed(verifyAllValuesHasOneUse(funcOp))) {
     funcOp.emitOpError() << "not all values are used exactly once";
@@ -104,6 +107,12 @@ static LogicalResult insertBuffers(handshake::FuncOp funcOp, MLIRContext *ctx,
     if (failed(extractCFDFCircuit(archs, bbs, freq)))
       return failure();
   }
+
+  for (auto dataflowCirct : CFDFCList) {
+    std::map<Value *, Result> insertBufResult;
+    placeBufferInCFDFCircuit(CFDFCList[0], insertBufResult);
+    instantiateBuffers(insertBufResult, ctx);
+  }
   return success();
 }
 
@@ -119,7 +128,7 @@ struct HandshakePlaceBuffersPass
   void runOnOperation() override {
     ModuleOp m = getOperation();
 
-    customBufferPlaceStrategy strategy;
+    ChannelBufProps strategy;
     for (auto funcOp : m.getOps<handshake::FuncOp>())
       if (failed(insertBuffers(funcOp, &getContext(), strategy, firstMG,
                                stdLevelInfo)))
