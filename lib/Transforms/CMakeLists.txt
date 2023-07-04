@@ -23,3 +23,5 @@ add_dynamatic_library(DynamaticTransforms
   MLIRTransformUtils
   DynamaticSupport
 )
+
+add_subdirectory(BufferPlacement)

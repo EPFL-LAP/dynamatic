@@ -28,6 +28,8 @@ else ()
   set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -fno-exceptions -fno-rtti")
 endif ()
 
+include(FindPackageHandleStandardArgs)
+
 #-------------------------------------------------------------------------------
 # CIRCT/MLIR/LLVM configuration
 #-------------------------------------------------------------------------------
@@ -62,13 +64,17 @@ option(LLVM_BUILD_TOOLS "Build the LLVM tools. If OFF, just generate build targe
 # Dynamatic configuration 
 #-------------------------------------------------------------------------------
 
+# Define some variables for Dynamatic
 set(DYNAMATIC_SOURCE_DIR ${CMAKE_SOURCE_DIR})
 set(DYNAMATIC_INCLUDE_DIR ${DYNAMATIC_SOURCE_DIR}/include)
-
 set(DYNAMATIC_BINARY_DIR ${CMAKE_BINARY_DIR})
 set(DYNAMATIC_TOOLS_DIR ${DYNAMATIC_BINARY_DIR}/bin)
 set(DYNAMATIC_BIN_INCLUDE_DIR ${DYNAMATIC_BINARY_DIR}/include)
 
+# Add our own directory to the list of search paths for CMake modules 
+list(APPEND CMAKE_MODULE_PATH "${CMAKE_CURRENT_SOURCE_DIR}/cmake/modules")
+
+# Dynamatic include directories
 include_directories(${DYNAMATIC_INCLUDE_DIR})
 include_directories(${DYNAMATIC_BIN_INCLUDE_DIR})
 include_directories(${DYNAMATIC_SOURCE_DIR}/tutorials/include)
@@ -92,6 +98,25 @@ function(add_dynamatic_dialect_library name)
   set_property(GLOBAL APPEND PROPERTY DYNAMATIC_DIALECT_LIBS ${name})
   add_dynamatic_library(${ARGV} DEPENDS dynamatic-headers)
 endfunction()
+
+#-------------------------------------------------------------------------------
+# Gurobi setup
+#-------------------------------------------------------------------------------
+
+find_package(GUROBI)
+if (GUROBI_FOUND)
+  message(STATUS "Found Gurobi")
+  message(STATUS "${GUROBI_LIBRARY}")
+  message(STATUS "${GUROBI_CXX_LIBRARY}")
+
+  include_directories(${GUROBI_INCLUDE_DIRS})
+else()
+  message(WARNING "Gurobi wasn't found, the buffer placement infrastructure \
+                   that requires solving an MILP will not be built with the \
+                   project.")
+endif()
+
+include_directories(${GUROBI_INCLUDE_DIRS})
 
 #-------------------------------------------------------------------------------
 # Directory setup
