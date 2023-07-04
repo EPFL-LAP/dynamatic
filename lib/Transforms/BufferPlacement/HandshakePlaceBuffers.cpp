@@ -74,6 +74,13 @@ static LogicalResult instantiateBuffers(std::map<Value *, Result> &res,
   return success();
 }
 
+static void deleleArchMap(std::map<ArchBB *, bool> &archs) {
+  for (auto it = archs.begin(); it != archs.end(); ++it)
+    delete it->first;
+  // Clear the map
+  archs.clear();
+}
+
 static LogicalResult insertBuffers(handshake::FuncOp funcOp, MLIRContext *ctx,
                                    ChannelBufProps &strategy, bool firstMG,
                                    std::string stdLevelInfo) {
@@ -84,7 +91,7 @@ static LogicalResult insertBuffers(handshake::FuncOp funcOp, MLIRContext *ctx,
   }
 
   // vectors to store CFDFC circuits
-  std::vector<CFDFC> CFDFCList;
+  std::vector<CFDFC> cfdfcList;
 
   // read the simulation file from std level, create map to indicate whether
   // the bb is selected, and whether the arch between bbs is selected in each
@@ -95,24 +102,31 @@ static LogicalResult insertBuffers(handshake::FuncOp funcOp, MLIRContext *ctx,
     return failure();
 
   unsigned freq;
-  if (failed(extractCFDFCircuit(archs, bbs, freq)))
+  if (failed(extractCFDFCircuit(archs, bbs, freq))) {
+    deleleArchMap(archs);
     return failure();
+  }
   while (freq > 0) {
     // write the execution frequency to the CFDFC
     auto circuit = createCFDFCircuit(funcOp, archs, bbs);
     circuit.execN = freq;
-    CFDFCList.push_back(circuit);
+    cfdfcList.push_back(circuit);
     if (firstMG)
       break;
-    if (failed(extractCFDFCircuit(archs, bbs, freq)))
+    if (failed(extractCFDFCircuit(archs, bbs, freq))) {
+      deleleArchMap(archs);
       return failure();
+    }
   }
 
-  for (auto dataflowCirct : CFDFCList) {
+  deleleArchMap(archs);
+
+  for (auto dataflowCirct : cfdfcList) {
     std::map<Value *, Result> insertBufResult;
-    placeBufferInCFDFCircuit(CFDFCList[0], insertBufResult);
+    placeBufferInCFDFCircuit(cfdfcList[0], insertBufResult);
     instantiateBuffers(insertBufResult, ctx);
   }
+
   return success();
 }
 
