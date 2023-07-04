@@ -199,8 +199,6 @@ bool buffer::isSelect(std::map<unsigned, bool> &bbs, Value val) {
          "value has no uses, run fork/sink materialization before extracting "
          "CFDFCs");
   Operation *dstOp = *firstUser;
-  // for (auto user : val->getUsers())
-  //   dstOp = user;
 
   unsigned srcBB = getBBIndex(srcOp);
   unsigned dstBB = getBBIndex(dstOp);
