@@ -6,8 +6,8 @@ To encourage contributions to the project, we aim to support newcomers to the wo
 
 ## [The MLIR Primer](MLIRPrimer.md)
 
-***To Come...***
+This tutorial, heavily based on [MLIR's official language reference](https://mlir.llvm.org/docs/LangRef/), is meant as a quick introduction to MLIR and its core constructs. C++ code snippets are peperred through the tutorial in an attempt to ease newcomers to the framework's C++ API and provide some initial code guidance. 
 
-## [Creating Compiler Passes](CreatingPasses/CreatingPasses.md)
+## [Creating compiler passes](CreatingPasses/CreatingPasses.md)
 
 This tutorial goes through the creation of a simple compiler transformation pass that operates on *Handshake*-level IR (i.e., on dataflow circuits modeled in MLIR). It goes into details into all the code that one needs to write to declare a pass in the codebase, implement it, and then run it on some input code using the `dynamatic-opt` tool. It then touches on different ways to write the same pass as to give an idea of MLIR's code transformation capabilities.  

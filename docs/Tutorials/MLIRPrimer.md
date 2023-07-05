@@ -8,13 +8,14 @@ This tutorial will introduce you to MLIR and its core constructs. It is intended
 - [Traversing the IR](#traversing-the-ir) | How does one traverse the recursive IR top-to-bottom and bottom-to-top?
 - [Values](#values) | What are values and how are they used by operations?
 - [Operations](#operations) | What are operations and how does one manipulate them?
-- [Regions](#regions) | What are regions?
-- [Blocks](#blocks) | What are blocks?
-- [Attributes](#attributes) | What are attributes and how does one manipulate them?
+- [Regions](#regions) | What are regions and what kind of abstraction can they map to?
+- [Blocks](#blocks) | What are blocks and block arguments?
+- [Attributes](#attributes) | What are attributes and what are they used for?
 - [Dialects](#dialects) | What are MLIR dialects?
+- [Printing to the console](#printing-to-the-console) | What are the various ways of printing to the console?
 ## [High-level structure](https://mlir.llvm.org/docs/LangRef/#high-level-structure)
 
-The [MLIR language reference](https://mlir.llvm.org/docs/LangRef) has a very good description of the high-level data-structures that are core to the framework.
+From the [language reference](https://mlir.llvm.org/docs/LangRef):
 
 > MLIR is fundamentally based on a graph-like data structure of nodes, called `Operation`s, and edges, called `Value`s. Each `Value` is the result of exactly one `Operation` or `BlockArgument`, and has a `Value` `Type` defined by the type system. Operations are contained in `Block`s and `Block`s are contained in `Region`s. `Operation`s are also ordered within their containing block and `Block`s are ordered in their containing region, although this order may or may not be semantically meaningful in a given kind of region). Operations may also contain regions, enabling hierarchical structures to be represented.
 
@@ -42,12 +43,13 @@ void traverseIRFromOperation(mlir::Operation *op) {
 MLIR also exposes the [`walk` method](https://mlir.llvm.org/docs/Tutorials/UnderstandingTheIRStructure/#walkers) on the `Operation`, `Region`, and `block` types. `walk` takes as single argument a callback method that will be invoked recursively for all operations recursively nested under the receiving entity.
 
 ```cpp
-void traverseAllOperationsInBlock(mlir::Block &block) {
-  block.walk([&](mlir::Operation *op) {
-    llvm::outs() << "Traversing operation " << op << "\n";
-    // Do something on the traversed operation here
-  });
-}
+// Let block be a Block&
+mlir::Block &block = ...;
+
+// Walk all operations nested in the block
+block.walk([&](mlir::Operation *op) {
+  llvm::outs() << "Traversing operation " << op << "\n";
+});
 ```
 
 ### From bottom to top
@@ -83,7 +85,7 @@ assert(parentOp == regionParentOp);
 
 ## Values
 
-Values are the edges of the graph-like structure that MLIR models. Their corresponding C++ type is `mlir::Value`. All values are typed using either a built-in type or a custom user-defined type (the type of a value is itself a C++ type called `Type`), which may change at runtime but is subject to verification constraints imposed by the context in which the value is used. Values are either produced by [operations](#operations) as operation results (`mlir::OpResult`, which is a subtype of `mlir::Value`) or are defined by blocks as part of their block arguments (`mlir::BlockArgument`, also a subtype of `mlir::Value`). They are consumed by [operations](#operations) as operation operands. A value may have 0 or more uses, but should have exactly one producer (an operation or a block).
+Values are the edges of the graph-like structure that MLIR models. Their corresponding C++ type is `mlir::Value`. All values are typed using either a built-in type or a custom user-defined type (the type of a value is itself a C++ type called `Type`), which may change at runtime but is subject to verification constraints imposed by the context in which the value is used. Values are either produced by [operations](#operations) as operation results (`mlir::OpResult`, which is a subtype of `mlir::Value`) or are defined by [blocks](#blocks) as part of their block arguments (`mlir::BlockArgument`, also a subtype of `mlir::Value`). They are consumed by [operations](#operations) as operation operands. A value may have 0 or more uses, but should have exactly one producer (an operation or a block).
 
 The following C++ snippet shows how to identify the type and producer of a value and prints the index of the producer's operation result/block argument that the value corresponds to.
 
@@ -236,31 +238,117 @@ mlir::Value rhs = addO.getRhs();
 assert(secondOperand == rhs);
 ```
 
-## Regions
-
-<!-- One may also use the `getOps<OpTy>` method to only iterate over operations of a specific type (the `OpTy` type). The following function recursively traverses all integer additions (`mlir::arith::AddIOp`) nested within a provided operation.
+When iterating over the operations inside a region or block, it's possible to only iterate over operations of a specific type using the `getOps<OpTy>` method.
 
 ```cpp
-void traverseIntAddFromOperation(mlir::Operation *op) {
-  for (mlir::Region &region : op->getRegions())
-    for (mlir::Block &block : region.getBlocks())
-      for (mlir::arith::AddIOp addOp : block.getOps<mlir::arith::AddIOp>())
-        traverseIntAddFromOperation(addOp);
-}
+// Let region be a Region&
+mlir::Region &region = ...;
+
+// Iterate over all integer additions inside the region's blocks
+for (mlir::arith::AddIOp addOp : region.getOps<mlir::arith::AddIOp>())
+  llvm::outs() << "Found an integer operation!\n";
+
+// Equivalently, we can first iterate over blocks, then operations
+for (Block &block : region.getBlocks())
+  for (mlir::arith::AddIOp addOp : block.getOps<mlir::arith::AddIOp>())
+    llvm::outs() << "Found an integer operation!\n";
+
+// Equivalently, without using getOps<OpTy>
+for (Block &block : region.getBlocks())
+  for (Operation* op : block.getOperations())
+    if (mlir::arith::AddIOp addOp = mlir::dyn_cast<mlir::arith::AddIOp>(op))
+      llvm::outs() << "Found an integer operation!\n";
 ```
 
-As before, it's also possible to only iterate over a specific type of operation by providing an explicit operation type in the callback.
+The `walk` method similarly allows one to specify a type of operation to recursively iterate on inside the callback's signature.
 
 ```cpp
-void traverseAllIntAddInBlock(mlir::Block &block) {
-  block.walk([&](mlir::arith::AddIOp addOp) {
-    // Do something on the traversed operation here
-  });
-}
-``` -->
+// Let block be a Block&
+mlir::Block &block = ...;
 
-## Blocks
+// Walk all integer additions nested in the block
+block.walk([&](mlir::arith::AddIOp op) {
+  llvm::outs() << "Found an integer operation!\n";
+});
 
-## Attributes
+// Equivalently, without using the operation type in the callback's signature 
+block.walk([&](Operation *op) {
+  if (mlir::isa<mlir::arith::AddIOp>(op))
+    llvm::outs() << "Found an integer operation!\n";
+});
+```
 
-## Dialects
+## [Regions](https://mlir.llvm.org/docs/LangRef/#regions)
+
+From the [language reference](https://mlir.llvm.org/docs/LangRef/#regions):
+
+> A region is an ordered list of MLIR blocks. The semantics within a region is not imposed by the IR. Instead, the containing operation defines the semantics of the regions it contains. MLIR currently defines two kinds of regions: SSACFG regions, which describe control flow between blocks, and Graph regions, which do not require control flow between blocks.
+
+The first block in a region, called the *entry block*, is special; its arguments also serve as the region's arguments. The source of these arguments is defined by the semantics of the parent operation. When control flow enters a region, it always begins in the *entry block*. Regions may also produce a list of values when control flow leaves the region. Again, the parent operation defines the relation between the region results and its own results. All values defined within a region are not visible from outside the region (they are [encapsulated](https://mlir.llvm.org/docs/LangRef/#value-scoping)). However, by default, a region can reference values defined outside of itself if these values would have been usable by the region's parent operation operands.  
+
+A function body (i.e., the region inside a `mlir::func::FuncOp` operation) is an  example of an SSACFG region, where each block represents a control-free sequence of operations that executes sequentially. The last operation of each block, called the *terminator operation* (see the [next sextion](#blocks)), identifies where control flow goes next; either to another block, called a *successor block* in this context, inside the function body (in the case of a *branch*-like operation) or back to the parent operation (in the case of a *return*-like operation).
+
+Graph regions, on the other hand, can only contain a single basic block and are appropriate to represent concurrent semantics without control flow. This makes them the perfect representation for dataflow circuits which have no notion of sequential execution. In particular (from the [language reference](https://mlir.llvm.org/docs/LangRef/#graph-regions))
+
+> All values defined in the [graph] region as results of operations are in scope within the region and can be accessed by any other operation in the region. In graph regions, the order of operations within a block and the order of blocks in a region is not semantically meaningful and non-terminator operations may be freely reordered.
+
+
+## [Blocks](https://mlir.llvm.org/docs/LangRef/#blocks)
+
+A block is an ordered list of MLIR operations. The last operation in a block must be a terminator operation, unless it is the single block of a region whose parent operation has the `NoTerminator` trait (`mlir::ModuleOp` is such an operation). 
+
+As mentioned in the [prior section on MLIR values](#values), blocks may have block arguments. From the [language reference](https://mlir.llvm.org/docs/LangRef/#blocks):
+
+> Blocks in MLIR take a list of block arguments, notated in a function-like way. Block arguments are bound to values specified by the semantics of individual operations. Block arguments of the entry block of a region are also arguments to the region and the values bound to these arguments are determined by the semantics of the parent operation. Block arguments of other blocks are determined by the semantics of terminator operations (e.g., branch-like operations) which have the block as a successor.
+
+In SSACFG regions, these block arguments often implicitly represent the passage of control-flow dependent values. They remove the need for [*PHI* nodes](https://en.wikipedia.org/wiki/Static_single-assignment_form#Converting_to_SSA) that many other SSA IRs employ (like LLVM IR).
+
+## [Attributes](https://mlir.llvm.org/docs/LangRef/#attributes)
+
+For this section, you are simply invited to read [the relevant part of the language reference](https://mlir.llvm.org/docs/LangRef/#attributes), which is very short.
+
+In summary, attributes are used to attach data/information to operations that cannot be expressed using a value operand. Additionally, attributes allow us to propagate meta-information about operations down the lowering pipeline. This is useful whenever, for example, some analysis can only be performed at a "high IR level" but its results only become relevant at a "low IR level". In these situations, the analysis's results would be attached to relevant operations using attributes, and these attributes would then be propagated through lowering passes until the IR reaches the level where the information must be acted upon.    
+
+
+## [Dialects](https://mlir.llvm.org/docs/LangRef/#dialects)
+
+For this section, you are also simply invited to read [the relevant part of the language reference](https://mlir.llvm.org/docs/LangRef/#dialects), which is very short.
+
+The *Handshake* dialect, defined in the `circt::handshake` namespace, is core to Dynamatic++. *Handshake* allows us to represent dataflow circuits inside [graph regions](#regions). Throughout the repository, whenever we mention "*Handshake*-level IR", we are referring to an IR that contains *Handshake* operations (i.e., dataflow components), which together make up a dataflow circuit. 
+
+## Printing to the console
+
+### Printing to stdout and stderr
+
+LLVM/MLIR has wrappers around the standard program output streams that you should use whenever you would like something displayed on the console. These are `llvm::outs()` (for stdout) and `llvm::errs()` (for stderr),see their usage below.
+
+```cpp
+// Let op be an Operation*
+Operation *op = ...;
+
+// Print to standard output (stdout)
+llvm::outs() << "This will be printed on stdout!\n";
+
+// Print to standard error (stderr)
+llvm::errs() << "This will be printed on stderr!\n"
+             << "As with std::cout and std::cerr, entities to print can be "
+             << "piped using the '<<' C++ operator as long as they are "
+             << "convertible to std::string, like the integer " << 10
+             << " or an MLIR operation " << op << "\n";
+```
+
+### Printing information related to an operation
+
+You will regularly want to print a message to stdout/stderr and attach it to a specific operation that it relates to. While you could just use `llvm::outs()` or `llvm::errs()` and pipe the operation in question after the message (as shown above), MLIR has very convenient methods that allow you to achieve the same task more elegantly in code and with automatic output formatting; the operation instance will be (pretty-)printed with your custom message next to it.
+
+```cpp
+// Let op be an Operation*
+Operation *op = ...;
+
+// Report an error on the operation
+op->emitError() << "My error message";
+// Report a warning on the operation
+op->emitWarning() << "My warning message";
+// Report a remark on the operation
+op->emitRemark() << "My remark message";
+```
