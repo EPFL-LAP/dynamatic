@@ -18,6 +18,9 @@ List of options:
   --disable-build-opt | -o    : don't use clang/lld/ccache to speed up builds
   --force-cmake | -f          : force cmake reconfiguration in each (sub)project 
   --release | -r              : build in \"Release\" mode (default is \"Debug\")
+  --threads | -t              : number of concurrent threads to build on with
+                                ninja (by default, ninja spawns one thread per
+                                logical core on the host machine)
   --check | -c                : run tests during build
   --help | -h                 : display this help message
 "
@@ -44,7 +47,8 @@ exit_on_fail() {
         if [[ ! -z $1 ]]; then
             echo -e "\n$1"
         fi
-        echo_section "Build failed!"
+        echo ""
+        echo_subsection "Build failed!"
         exit 1
     fi
 }
@@ -79,6 +83,16 @@ should_run_cmake() {
   return 0
 }
 
+# Run ninja using the number of threads provided as argument, if any. Otherwise,
+# let ninja pick the number of threads to use  
+run_ninja() {
+  if [[ $NUM_THREADS -eq 0 ]]; then
+    ninja
+  else
+    ninja -j "$NUM_THREADS"
+  fi 
+}
+
 #### Parse arguments ####
 
 # Loop over command line arguments and update script variables
@@ -87,31 +101,41 @@ CMAKE_FLAGS_SUPER="-DCMAKE_C_COMPILER=clang -DCMAKE_CXX_COMPILER=clang++ \
 CMAKE_FLAGS_LLVM="$CMAKE_FLAGS_SUPER -DLLVM_CCACHE_BUILD=ON" 
 ENABLE_TESTS=0
 FORCE_CMAKE=0
+PARSE_NUM_THREADS=0
+NUM_THREADS=0
 BUILD_TYPE="Debug"
 for arg in "$@"; 
 do
-    case "$arg" in 
-        "--disable-build-opt" | "-o")
-            CMAKE_FLAGS_LLVM=""
-            CMAKE_FLAGS_SUPER=""
-            ;;
-        "--force-cmake" | "-f")
-            FORCE_CMAKE=1
-            ;;
-        "--release" | "-r")
-            BUILD_TYPE="Release"
-            ;;
-        "--check" | "-c")
-            ENABLE_TESTS=1
-            ;;
-        "--help" | "-h")
-            print_help_and_exit
-            ;;
-        *)
-            echo "Unknown argument \"$arg\", printing help and aborting"
-            print_help_and_exit
-            ;;
-    esac
+    if [[ $PARSE_NUM_THREADS -eq 1 ]]; then
+      NUM_THREADS=$arg
+      PARSE_NUM_THREADS=0
+    else
+      case "$arg" in 
+          "--disable-build-opt" | "-o")
+              CMAKE_FLAGS_LLVM=""
+              CMAKE_FLAGS_SUPER=""
+              ;;
+          "--force-cmake" | "-f")
+              FORCE_CMAKE=1
+              ;;
+          "--release" | "-r")
+              BUILD_TYPE="Release"
+              ;;
+          "--threads" | "-t")
+              PARSE_NUM_THREADS=1
+              ;;
+          "--check" | "-c")
+              ENABLE_TESTS=1
+              ;;
+          "--help" | "-h")
+              print_help_and_exit
+              ;;
+          *)
+              echo "Unknown argument \"$arg\", printing help and aborting"
+              print_help_and_exit
+              ;;
+      esac
+    fi
 done
 
 # Path to build directories
@@ -145,7 +169,7 @@ if should_run_cmake ; then
 fi
 
 # Build
-ninja
+run_ninja
 exit_on_fail "Failed to build polygeist/llvm-project"
 if [[ ENABLE_TESTS -eq 1 ]]; then
     ninja check-mlir
@@ -171,7 +195,7 @@ if should_run_cmake ; then
 fi
 
 # Build
-ninja
+run_ninja
 exit_on_fail "Failed to build polygeist"
 if [[ ENABLE_TESTS -eq 1 ]]; then
     ninja check-polygeist-opt
@@ -198,7 +222,7 @@ if should_run_cmake ; then
 fi
 
 # Build
-ninja
+run_ninja
 exit_on_fail "Failed to build circt-llvm"
 if [[ ENABLE_TESTS -eq 1 ]]; then
     ninja check-mlir
@@ -235,7 +259,7 @@ if should_run_cmake ; then
 fi
 
 # Build
-ninja
+run_ninja
 exit_on_fail "Failed to build circt"
 if [[ ENABLE_TESTS -eq 1 ]]; then
     ninja check-circt
@@ -261,7 +285,7 @@ if should_run_cmake ; then
 fi
 
 # Build
-ninja
+run_ninja
 exit_on_fail "Failed to build dynamatic"
 if [[ ENABLE_TESTS -eq 1 ]]; then
     ninja check-dynamatic
@@ -281,4 +305,5 @@ create_symlink circt/build/bin/circt-opt
 create_symlink build/bin/dynamatic-opt
 create_symlink build/bin/exp-frequency-profiler
 
-echo_section "Build successful!"
+echo ""
+echo_subsection "Build successful!"
