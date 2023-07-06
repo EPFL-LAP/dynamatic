@@ -8,6 +8,10 @@
 #include "dynamatic/Transforms/UtilsBitsUpdate.h"
 #include <fstream>
 #include <iostream>
+#include <nlohmann/json.hpp>
+
+// for convenience
+using json = nlohmann::json;
 
 using namespace dynamatic;
 using namespace dynamatic::buffer;
@@ -55,7 +59,8 @@ double buffer::getPortDelay(Value channel,
 
   } else if (direction == "out") {
     auto dstOp = channel.getUsers().begin();
-    assert(dstOp == channel.getUsers().end() && "There are multiple users!");
+    // TODO: handle multiple users
+    // assert(dstOp == channel.getUsers().end() && "There are multiple users!");
     opName = getOperationShortStrName(*dstOp);
     unsigned portBitWidth = getPortWidth(channel);
     if (unitInfo.find(opName) != unitInfo.end())
@@ -85,7 +90,7 @@ double buffer::getUnitDelay(Operation *op,
     delay = unitInfo[opName].validDelay;
   else if (type == "ready")
     delay = unitInfo[opName].readyDelay;
-  llvm::errs() << opName << " : " << delay << "\n";
+  // llvm::errs() << opName << " : " << delay << "\n";
   return delay;
 }
 
@@ -161,7 +166,7 @@ static size_t parseElement(const std::string &vecString, std::string opName,
     std::size_t colonPos = token.find(':');
     std::string keyString = token.substr(1, colonPos - 2);
     std::string valString = token.substr(colonPos + 1);
-    llvm::errs() << "key " << keyString << " value " << valString << "end\n";
+    // llvm::errs() << "key " << keyString << " value " << valString << "end\n";
     unsigned key = std::stoi(keyString);
     double value = std::stod(valString);
 
@@ -262,9 +267,17 @@ static size_t parsePort(const std::string &portString, std::string opName,
   return portString.size();
 };
 
+static void parseBitWidthPair(json jsonData,
+                              std::vector<std::pair<unsigned, double>> &data) {
+  for (auto it = jsonData.begin(); it != jsonData.end(); ++it) {
+    auto key = stoi(it.key());
+    double value = it.value();
+    data.emplace_back(key, value);
+  }
+}
 // Function to parse the JSON string and extract the required data
-void buffer::parseJson(const std::string &jsonString,
-                       std::map<std::string, UnitInfo> &unitInfo) {
+LogicalResult buffer::parseJson(const std::string &jsonFile,
+                                std::map<std::string, UnitInfo> &unitInfo) {
 
   // reserve for read buffers information to be used in the channel
   // constraints
@@ -278,40 +291,91 @@ void buffer::parseJson(const std::string &jsonString,
       "shrui",         "select",  "mux"};
   std::string opName;
 
-  while (jsonString.find("\"", pos) < jsonString.size()) {
-    pos = jsonString.find("\"", pos);
-
-    std::string key;
-    key = jsonString.substr(pos + 1, jsonString.find("\"", pos + 1) - pos - 1);
-
-    if (std::find(opNames.begin(), opNames.end(), key) != opNames.end()) {
-      llvm::errs() << "\n=========opName: " << key << "\n";
-      opName = key;
-    }
-    pos = jsonString.find(":", pos + 1);
-
-    // parse latency
-    if (key == "latency") {
-      pos += parseElement(
-          jsonString.substr(pos, jsonString.find(']', pos) - pos + 1), opName,
-          unitInfo[opName].latency);
-    }
-
-    // unit delay
-    if (key == "delay")
-      // parse contents inside delay
-      pos += parseDelay(
-          jsonString.substr(pos, jsonString.find('}', pos) - pos + 1), opName,
-          unitInfo);
-
-    if (key == "inport")
-      pos += parsePort(
-          jsonString.substr(pos, jsonString.find("}}", pos) - pos + 1), opName,
-          unitInfo, true, false);
-
-    if (key == "outport")
-      pos += parsePort(
-          jsonString.substr(pos, jsonString.find("}}", pos) - pos + 1), opName,
-          unitInfo, false, true);
+  std::ifstream file(jsonFile);
+  if (!file.is_open()) {
+    llvm::errs() << "Failed to open file.\n";
   }
+
+  // Read the file contents into a string
+  json data;
+  file >> data;
+  for (auto op : opNames) {
+    auto unitInfoJson = data[op];
+    auto latencyJson = unitInfoJson["latency"];
+    // parse the bitwidth and its corresponding latency
+    parseBitWidthPair(unitInfoJson["latency"], unitInfo[op].latency);
+    parseBitWidthPair(unitInfoJson["delay"]["data"], unitInfo[op].dataDelay);
+    parseBitWidthPair(unitInfoJson["inport"]["delay"]["data"],
+                      unitInfo[op].inPortDataDelay);
+    parseBitWidthPair(unitInfoJson["outport"]["delay"]["data"],
+                      unitInfo[op].outPortDataDelay);
+    unitInfo[op].validDelay = unitInfoJson["delay"]["valid"]["1"];
+    unitInfo[op].readyDelay = unitInfoJson["delay"]["ready"]["1"];
+
+    unitInfo[op].inPortValidDelay =
+        unitInfoJson["inport"]["delay"]["valid"]["1"];
+    unitInfo[op].inPortReadyDelay =
+        unitInfoJson["inport"]["delay"]["ready"]["1"];
+
+    unitInfo[op].outPortValidDelay =
+        unitInfoJson["outport"]["delay"]["valid"]["1"];
+    unitInfo[op].outPortReadyDelay =
+        unitInfoJson["outport"]["delay"]["ready"]["1"];
+
+    unitInfo[op].inPortTransBuf = unitInfoJson["inport"]["transparentBuffer"];
+    unitInfo[op].inPortReadyDelay = unitInfoJson["inport"]["opaqueBuffer"];
+
+    unitInfo[op].inPortTransBuf = unitInfoJson["outport"]["transparentBuffer"];
+    unitInfo[op].outPortReadyDelay = unitInfoJson["outport"]["opaqueBuffer"];
+
+    if (unitInfoJson.is_discarded())
+      return failure();
+  }
+
+  return success();
+  // for (auto op : opNames) {
+  //   UnitInfo info = UnitInfo();
+  //   for (auto val : data[op]["latency"])
+
+  //     llvm::errs() << val.get<std::string>() << "\n";
+  //   // unitInfo[op].latency
+  // }
+
+  // while (jsonString.find("\"", pos) < jsonString.size()) {
+  //   pos = jsonString.find("\"", pos);
+
+  //   std::string key;
+  //   key = jsonString.substr(pos + 1, jsonString.find("\"", pos + 1) - pos -
+  //   1);
+
+  //   if (std::find(opNames.begin(), opNames.end(), key) != opNames.end()) {
+  //     llvm::errs() << "\n=========opName: " << key << "\n";
+  //     opName = key;
+  //   }
+  //   pos = jsonString.find(":", pos + 1);
+
+  //   // parse latency
+  //   if (key == "latency") {
+  //     pos += parseElement(
+  //         jsonString.substr(pos, jsonString.find(']', pos) - pos + 1),
+  //         opName, unitInfo[opName].latency);
+  //   }
+
+  //   // unit delay
+  //   if (key == "delay")
+  //     // parse contents inside delay
+  //     pos += parseDelay(
+  //         jsonString.substr(pos, jsonString.find('}', pos) - pos + 1),
+  //         opName, unitInfo);
+
+  //   if (key == "inport")
+  //     pos += parsePort(
+  //         jsonString.substr(pos, jsonString.find("}}", pos) - pos + 1),
+  //         opName, unitInfo, true, false);
+
+  //   if (key == "outport")
+  //     pos += parsePort(
+  //         jsonString.substr(pos, jsonString.find("}}", pos) - pos + 1),
+  //         opName, unitInfo, false, true);
+  // }
 }

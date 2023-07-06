@@ -25,15 +25,13 @@ using namespace handshake;
 
 inline Operation *getUserOp(Value val) {
   auto dstOp = val.getUsers().begin();
-  llvm::errs() << "first user: " << *dstOp << "\n";
+  // llvm::errs() << "first user: " << *dstOp << "\n";
   unsigned numUsers = 0;
   for (auto c : val.getUsers()) {
     numUsers++;
   }
-  llvm::errs() << "user number: " << numUsers << "\n";
-  // llvm::errs() << "last user:" << *(val.getUses()) << "\n";
-  if (!isa<handshake::ForkOp>(*dstOp))
-    assert(dstOp == val.getUsers().end() && "There are multiple users!");
+
+  assert(numUsers <= 1 && "There are multiple users!");
   return *dstOp;
 }
 

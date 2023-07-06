@@ -241,7 +241,6 @@ LogicalResult buffer::extractCFDFCircuit(std::map<ArchBB *, bool> &archs,
   // Create MILP model for CFDFCircuit extraction
   // Init a gurobi model
   GRBEnv env = GRBEnv(true);
-  env.set("LogFile", "mip1.log");
   // cancel the printout output
   env.set(GRB_IntParam_OutputFlag, 0);
   env.start();
