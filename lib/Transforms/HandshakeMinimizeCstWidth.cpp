@@ -18,6 +18,64 @@
 
 STATISTIC(savedBits, "Number of saved bits");
 
+/// Inserts an extension op after the constant op that extends the constant's
+/// integer result to a provided destination type. The function assumes that it
+/// makes sense to extend the former type into the latter type.
+static void insertExtOp(handshake::ConstantOp cstOp, Type dstType,
+                        PatternRewriter &rewriter) {
+  // Insert an extension operation to keep the same type for users of the
+  // constant's result
+  rewriter.setInsertionPointAfter(cstOp);
+  auto extOp = rewriter.create<arith::ExtSIOp>(cstOp.getLoc(), dstType,
+                                               cstOp.getResult());
+  inheritBB(cstOp, extOp);
+
+  // Replace uses of the constant result with the extension op's result
+  rewriter.replaceAllUsesExcept(cstOp.getResult(), extOp.getResult(), extOp);
+}
+
+// Checks whether the bitwidth minimization process of a constant op (with the
+// resulting value attribute passed as argument) resulted in a duplicated
+// constant (with same control and same value attribute). If so, erases the
+// duplicated constant and makes the circuit use another equivalent constant
+// instead.
+static LogicalResult checkForDuplicateCst(handshake::ConstantOp cstOp,
+                                          IntegerAttr cstAttr,
+                                          PatternRewriter &rewriter) {
+  auto funcOp = cstOp->getParentOfType<handshake::FuncOp>();
+  assert(funcOp && "constant should have parent function");
+
+  for (auto otherCstOp : funcOp.getOps<handshake::ConstantOp>()) {
+    if (cstOp == otherCstOp)
+      continue;
+
+    // The constant operation needs to have the same value attribute and the
+    // same control
+    auto otherIntAttr = dyn_cast<IntegerAttr>(otherCstOp.getValue());
+    if (!otherIntAttr)
+      continue;
+    if (otherIntAttr != cstAttr || otherCstOp.getCtrl() != cstOp.getCtrl())
+      continue;
+
+    // Try to find an extension operation whose result matches our constant's
+    // original result type
+    Type cstResType = cstOp.getResult().getType();
+    for (auto *otherCstUser : otherCstOp->getUsers()) {
+      if (auto extOp = dyn_cast<arith::ExtSIOp>(otherCstUser))
+        if (cstResType == extOp.getResult().getType()) {
+          rewriter.updateRootInPlace(
+              cstOp, [&] { rewriter.replaceOp(cstOp, extOp.getResult()); });
+          return success();
+        }
+    }
+
+    // Insert an extension operation to compensate for bitwidth minimization
+    insertExtOp(otherCstOp, cstResType, rewriter);
+    return success();
+  }
+  return failure();
+}
+
 unsigned dynamatic::computeRequiredBitwidth(APInt val) {
   bool isNegative = false;
   if (val.isNegative()) {
@@ -63,28 +121,27 @@ struct MinimizeConstantBitwidth
     if (newBitwidth >= oldType.getWidth())
       return failure();
 
-    // Update the constant's result and attribute type
+    // Create the new constant attribute
     IntegerType newType = IntegerType::get(cstOp.getContext(), newBitwidth,
                                            oldType.getSignedness());
+    IntegerAttr newAttr;
+    if (oldType.isUnsigned())
+      newAttr = IntegerAttr::get(newType, val.getZExtValue());
+    else
+      newAttr = IntegerAttr::get(newType, val.getSExtValue());
+
+    // Check whether bitwidth minimization created a duplicated constant
+    if (succeeded(checkForDuplicateCst(cstOp, newAttr, rewriter)))
+      return success();
+
+    // Update the constant's result and attribute type
     rewriter.updateRootInPlace(cstOp, [&] {
       cstOp.getResult().setType(newType);
-      if (oldType.isUnsigned())
-        cstOp.setValueAttr(IntegerAttr::get(newType, val.getZExtValue()));
-      else
-        cstOp.setValueAttr(IntegerAttr::get(newType, val.getSExtValue()));
+      cstOp.setValueAttr(newAttr);
     });
 
-    // Insert an extension operation to keep the same type for users of the
-    // constant's result
-    rewriter.setInsertionPointAfter(cstOp);
-    auto extOp = rewriter.create<mlir::arith::ExtSIOp>(cstOp.getLoc(), oldType,
-                                                       cstOp.getResult());
-    inheritBB(cstOp, extOp);
-
-    // Replace uses of the constant result with the extension op's result
-    for (auto *user : llvm::make_early_inc_range(cstOp->getUsers()))
-      if (user != extOp)
-        user->replaceUsesOfWith(cstOp.getResult(), extOp.getResult());
+    // Insert an extension operation to compensate for bitwidth minimization
+    insertExtOp(cstOp, oldType, rewriter);
 
     // Accumulate the number of bits saved by the pass and return
     savedBits += oldType.getWidth() - newBitwidth;
@@ -100,14 +157,14 @@ struct HandshakeMinimizeCstWidthPass
 
   void runOnOperation() override {
     auto *ctx = &getContext();
+    mlir::ModuleOp mod = getOperation();
 
     mlir::GreedyRewriteConfig config;
     config.useTopDownTraversal = true;
     config.enableRegionSimplification = false;
     RewritePatternSet patterns{ctx};
     patterns.add<MinimizeConstantBitwidth>(ctx);
-    if (failed(applyPatternsAndFoldGreedily(getOperation(), std::move(patterns),
-                                            config)))
+    if (failed(applyPatternsAndFoldGreedily(mod, std::move(patterns), config)))
       return signalPassFailure();
 
     LLVM_DEBUG(llvm::dbgs() << "Number of saved bits is " << savedBits << "\n");

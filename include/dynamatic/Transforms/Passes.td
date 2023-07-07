@@ -92,7 +92,6 @@ def HandshakeConcretizeIndexType : Pass<"handshake-concretize-index-type", "mlir
             "this value is such that a Handshake constant with an IndexType "
             "result cannot fit its value in the new explicit bitwidth anymore, "
             "the pass will fail.">];
-
 }
 
 def HandshakeMinimizeCstWidth : Pass<"handshake-minimize-cst-width", "mlir::ModuleOp"> {
@@ -100,7 +99,9 @@ def HandshakeMinimizeCstWidth : Pass<"handshake-minimize-cst-width", "mlir::Modu
   let description = [{
     Rewrites constant operations with the minimum required bitwidth to support
     the constants' values. The pass inserts extension operations as needed to
-    ensure consistency with users of constant operations. 
+    ensure consistency with users of constant operations. The pass also pays
+    attention to not create duplicated constants indirectly due to the
+    minimization process.
   }];
   let constructor = "dynamatic::createHandshakeMinimizeCstWidth()";
   let dependentDialects = ["mlir::arith::ArithDialect"];
