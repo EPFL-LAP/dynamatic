@@ -61,7 +61,7 @@ public:
                  << "transBuf " << inPortTransBuf << " opBuf " << inPortOpBuf
                  << "}\n";
     llvm::errs() << "outport{ "
-                 << "transBuf " << outPortTransBuf << " opBuf " << inPortOpBuf
+                 << "transBuf " << outPortTransBuf << " opBuf " << outPortOpBuf
                  << "}\n";
   }
 };
@@ -84,8 +84,10 @@ double getPortDelay(Value channel,
                     std::map<std::string, buffer::UnitInfo> &unitInfo,
                     std::string type = "in");
 
-std::string trim(const std::string &str);
-
+/// Read timing info for units and channels in CFDFC from the input json.
+/// The units delay and latency are determined by the units type
+/// The channels timing info are described by the input ports and output
+/// ports timing characteristics
 LogicalResult parseJson(const std::string &jsonString,
                         std::map<std::string, UnitInfo> &unitInfo);
 

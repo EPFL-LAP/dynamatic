@@ -74,6 +74,7 @@ static LogicalResult instantiateBuffers(std::map<Value *, Result> &res,
   return success();
 }
 
+/// Delete the created archs map for MG extraction to avoid memory leak
 static void deleleArchMap(std::map<ArchBB *, bool> &archs) {
   for (auto it = archs.begin(); it != archs.end(); ++it)
     delete it->first;
@@ -121,10 +122,14 @@ static LogicalResult insertBuffers(handshake::FuncOp funcOp, MLIRContext *ctx,
 
   deleleArchMap(archs);
 
+  // Create the MILP model of buffer placement, and write the results of the
+  // model to insertBufResult.
+  // Instantiate the buffers according to the results.
   for (auto dataflowCirct : cfdfcList) {
     std::map<Value *, Result> insertBufResult;
     placeBufferInCFDFCircuit(cfdfcList[0], insertBufResult);
     instantiateBuffers(insertBufResult, ctx);
+    break;
   }
 
   return success();
