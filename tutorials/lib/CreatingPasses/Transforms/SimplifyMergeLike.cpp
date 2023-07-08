@@ -40,7 +40,7 @@ static LogicalResult performSimplification(handshake::FuncOp funcOp,
 
     // Get the control merge's index result (second result).
     // Equivalently, we could have written:
-    //  auto indexResult = cmergeOp->getResults()[1];
+    //  auto indexResult = cmergeOp->getResult(1);
     // but using getIndex() is more readable and maintainable
     Value indexResult = cmergeOp.getIndex();
 
@@ -91,7 +91,7 @@ struct SimplifyMergeLikePass
       // be considered failed
       if (failed(performSimplification(funcOp, ctx)))
         return signalPassFailure();
-  };
+  }
 };
 } // namespace
 
@@ -100,7 +100,7 @@ namespace tutorials {
 
 /// Returns a unique pointer to an operation pass that matches MLIR modules. In
 /// our case, this is simply an instance of our unparameterized
-/// SimpleTransformPass driver.
+/// SimplifyMergeLikePass driver.
 std::unique_ptr<mlir::OperationPass<mlir::ModuleOp>>
 createSimplifyMergeLikePass() {
   return std::make_unique<SimplifyMergeLikePass>();

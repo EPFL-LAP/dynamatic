@@ -106,9 +106,6 @@ endfunction()
 find_package(GUROBI)
 if (GUROBI_FOUND)
   message(STATUS "Found Gurobi")
-  message(STATUS "${GUROBI_LIBRARY}")
-  message(STATUS "${GUROBI_CXX_LIBRARY}")
-
   include_directories(${GUROBI_INCLUDE_DIRS})
 else()
   message(WARNING "Gurobi wasn't found, the buffer placement infrastructure \

@@ -18,6 +18,7 @@
 #include "mlir/IR/OperationSupport.h"
 #include "mlir/IR/PatternMatch.h"
 #include "mlir/Support/IndentedOstream.h"
+#include <optional>
 
 using namespace circt;
 using namespace circt::handshake;
