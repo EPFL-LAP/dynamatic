@@ -24,6 +24,8 @@ std::string buffer::getOperationShortStrName(Operation *op) {
 
 static inline unsigned getPortWidth(Value channel) {
   unsigned portBitWidth = bitwidth::CPP_MAX_WIDTH;
+  if (isa<NoneType>(channel.getType()))
+    return 0;
   if (isa<IntegerType>(channel.getType()))
     portBitWidth = channel.getType().getIntOrFloatBitWidth();
   return portBitWidth;

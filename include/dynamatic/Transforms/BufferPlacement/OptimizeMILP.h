@@ -50,11 +50,15 @@ public:
 
 struct Result {
   bool opaque;
+  bool transparent;
   unsigned numSlots;
 };
 
 LogicalResult placeBufferInCFDFCircuit(CFDFC &CFDFCircuit,
-                                       std::map<Value *, Result> &res);
+                                       std::map<Value *, Result> &res,
+                                       double targetCP);
+
+unsigned getPortInd(Operation *op, Value val);
 
 } // namespace buffer
 } // namespace dynamatic
