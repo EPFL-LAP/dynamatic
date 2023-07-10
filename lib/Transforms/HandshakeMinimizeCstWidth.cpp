@@ -21,59 +21,36 @@ STATISTIC(savedBits, "Number of saved bits");
 /// Inserts an extension op after the constant op that extends the constant's
 /// integer result to a provided destination type. The function assumes that it
 /// makes sense to extend the former type into the latter type.
-static void insertExtOp(handshake::ConstantOp cstOp, Type dstType,
+static void insertExtOp(handshake::ConstantOp toExtend,
+                        handshake::ConstantOp toReplace, Type dstType,
                         PatternRewriter &rewriter) {
-  // Insert an extension operation to keep the same type for users of the
-  // constant's result
-  rewriter.setInsertionPointAfter(cstOp);
-  auto extOp = rewriter.create<arith::ExtSIOp>(cstOp.getLoc(), dstType,
-                                               cstOp.getResult());
-  inheritBB(cstOp, extOp);
-
-  // Replace uses of the constant result with the extension op's result
-  rewriter.replaceAllUsesExcept(cstOp.getResult(), extOp.getResult(), extOp);
+  rewriter.setInsertionPointAfter(toExtend);
+  auto extOp = rewriter.create<arith::ExtSIOp>(toExtend.getLoc(), dstType,
+                                               toExtend.getResult());
+  inheritBB(toExtend, extOp);
+  rewriter.replaceAllUsesExcept(toReplace.getResult(), extOp.getResult(),
+                                extOp);
 }
 
-// Checks whether the bitwidth minimization process of a constant op (with the
-// resulting value attribute passed as argument) resulted in a duplicated
-// constant (with same control and same value attribute). If so, erases the
-// duplicated constant and makes the circuit use another equivalent constant
-// instead.
-static LogicalResult checkForDuplicateCst(handshake::ConstantOp cstOp,
-                                          IntegerAttr cstAttr,
-                                          PatternRewriter &rewriter) {
+handshake::ConstantOp
+dynamatic::findEquivalentCst(handshake::ConstantOp cstOp) {
+  auto cstAttr = cstOp.getValue();
   auto funcOp = cstOp->getParentOfType<handshake::FuncOp>();
   assert(funcOp && "constant should have parent function");
 
   for (auto otherCstOp : funcOp.getOps<handshake::ConstantOp>()) {
+    // Don't match ourself
     if (cstOp == otherCstOp)
       continue;
 
     // The constant operation needs to have the same value attribute and the
     // same control
-    auto otherIntAttr = dyn_cast<IntegerAttr>(otherCstOp.getValue());
-    if (!otherIntAttr)
-      continue;
-    if (otherIntAttr != cstAttr || otherCstOp.getCtrl() != cstOp.getCtrl())
-      continue;
-
-    // Try to find an extension operation whose result matches our constant's
-    // original result type
-    Type cstResType = cstOp.getResult().getType();
-    for (auto *otherCstUser : otherCstOp->getUsers()) {
-      if (auto extOp = dyn_cast<arith::ExtSIOp>(otherCstUser))
-        if (cstResType == extOp.getResult().getType()) {
-          rewriter.updateRootInPlace(
-              cstOp, [&] { rewriter.replaceOp(cstOp, extOp.getResult()); });
-          return success();
-        }
-    }
-
-    // Insert an extension operation to compensate for bitwidth minimization
-    insertExtOp(otherCstOp, cstResType, rewriter);
-    return success();
+    auto otherCstAttr = otherCstOp.getValue();
+    if (otherCstAttr == cstAttr && otherCstOp.getCtrl() == cstOp.getCtrl())
+      return otherCstOp;
   }
-  return failure();
+
+  return nullptr;
 }
 
 unsigned dynamatic::computeRequiredBitwidth(APInt val) {
@@ -130,22 +107,64 @@ struct MinimizeConstantBitwidth
     else
       newAttr = IntegerAttr::get(newType, val.getSExtValue());
 
-    // Check whether bitwidth minimization created a duplicated constant
-    if (succeeded(checkForDuplicateCst(cstOp, newAttr, rewriter)))
-      return success();
-
     // Update the constant's result and attribute type
     rewriter.updateRootInPlace(cstOp, [&] {
       cstOp.getResult().setType(newType);
       cstOp.setValueAttr(newAttr);
     });
 
-    // Insert an extension operation to compensate for bitwidth minimization
-    insertExtOp(cstOp, oldType, rewriter);
+    // Check whether bitwidth minimization created a duplicated constant
+    if (auto otherCstOp = findEquivalentCst(cstOp)) {
+      // Insert an extension operation to compensate for bitwidth minimization
+      insertExtOp(otherCstOp, cstOp, oldType, rewriter);
+      savedBits += oldType.getWidth();
+      return success();
+    }
 
-    // Accumulate the number of bits saved by the pass and return
+    // Insert an extension operation to compensate for bitwidth minimization
+    insertExtOp(cstOp, cstOp, oldType, rewriter);
     savedBits += oldType.getWidth() - newBitwidth;
     return success();
+  }
+};
+
+/// Erases redundant extension operations (ones that have the same operand and
+/// destination type as another extension operation). This pattern explicitly
+/// restricts itself to extension operations that are being fed by constants.
+/// Its goal is just to make sure that this pass doesn't create extraneous
+/// useless extensions.
+struct EraseRedundantExtension : public OpRewritePattern<arith::ExtSIOp> {
+  using OpRewritePattern<arith::ExtSIOp>::OpRewritePattern;
+
+  LogicalResult matchAndRewrite(arith::ExtSIOp extOp,
+                                PatternRewriter &rewriter) const override {
+    // Only match on extension operations that extend constants
+    Value extOperand = extOp.getIn();
+    Operation *defOp = extOperand.getDefiningOp();
+    if (!defOp || !isa<handshake::ConstantOp>(defOp))
+      return failure();
+
+    // Get the enclosing function
+    auto funcOp = extOp->getParentOfType<handshake::FuncOp>();
+    assert(funcOp && "extension operation should have parent function");
+
+    // Try to find an equivalent extension operation
+    Type extDstType = extOp.getOut().getType();
+    for (auto otherExtOp : funcOp.getOps<arith::ExtSIOp>()) {
+      // Don't match ourself
+      if (extOp == otherExtOp)
+        continue;
+
+      if (extOperand == otherExtOp.getIn() &&
+          extDstType == otherExtOp.getOut().getType()) {
+        // Replace uses of the current extension with the equivalent one (same
+        // operand and same result type) we found
+        rewriter.replaceOp(extOp, otherExtOp.getOut());
+        return success();
+      }
+    }
+
+    return failure();
   }
 };
 
@@ -163,7 +182,7 @@ struct HandshakeMinimizeCstWidthPass
     config.useTopDownTraversal = true;
     config.enableRegionSimplification = false;
     RewritePatternSet patterns{ctx};
-    patterns.add<MinimizeConstantBitwidth>(ctx);
+    patterns.add<MinimizeConstantBitwidth, EraseRedundantExtension>(ctx);
     if (failed(applyPatternsAndFoldGreedily(mod, std::move(patterns), config)))
       return signalPassFailure();
 
