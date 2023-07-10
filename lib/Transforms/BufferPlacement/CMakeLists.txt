@@ -18,8 +18,10 @@ add_dynamatic_library(DynamaticBufferPlacement
   DynamaticSupport
 )
 
-target_link_libraries(DynamaticBufferPlacement
-  PUBLIC
-  ${GUROBI_CXX_LIBRARY}
-  ${GUROBI_LIBRARY}
-)
+if (GUROBI_FOUND)
+  target_link_libraries(DynamaticBufferPlacement
+    PUBLIC
+    ${GUROBI_CXX_LIBRARY}
+    ${GUROBI_LIBRARY}
+  )
+endif()
