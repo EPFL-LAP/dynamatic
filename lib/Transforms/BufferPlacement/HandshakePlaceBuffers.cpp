@@ -60,10 +60,10 @@ static LogicalResult instantiateBuffers(std::map<Value *, Result> &res,
 
       if (result.opaque) {
         numOp = 1;
-        numTrans = 1;
+        // numTrans = 1;
       }
-      if (result.transparent)
-        numTrans = 1;
+      // if (result.transparent)
+      //   numTrans = 1;
 
       if (int numBuf = result.numSlots - numOp - numTrans; numBuf > 0)
         numTrans += numBuf;
@@ -85,17 +85,18 @@ static LogicalResult instantiateBuffers(std::map<Value *, Result> &res,
         bufferOp.setBufferType(BufferTypeEnum::seq);
         bufferOp.setSlots(numOp);
 
-        auto bufferTrans = builder.create<handshake::BufferOp>(
-            bufferOp->getLoc(), bufferOp->getResult(0).getType(),
-            bufferOp->getResult(0));
-        bufferTrans.setSlots(numTrans);
-        bufferTrans.setBufferType(BufferTypeEnum::fifo);
+        // auto bufferTrans = builder.create<handshake::BufferOp>(
+        //     bufferOp->getLoc(), bufferOp->getResult(0).getType(),
+        //     bufferOp->getResult(0));
+        // bufferTrans.setSlots(numTrans);
+        // bufferTrans.setBufferType(BufferTypeEnum::fifo);
         opSrc->getResult(indVal).replaceUsesWithIf(
-            bufferTrans.getResult(), [&](OpOperand &operand) {
+            bufferOp.getResult(), [&](OpOperand &operand) {
               // return true;
               return operand.getOwner() == opDst;
             });
-      } else if (numTrans > 0) {
+      }
+      if (numTrans > 0) {
         auto bufferTrans = builder.create<handshake::BufferOp>(
             opDst->getLoc(), opSrc->getResult(indVal).getType(),
             opSrc->getResult(indVal));

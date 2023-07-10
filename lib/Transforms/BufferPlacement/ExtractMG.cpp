@@ -205,9 +205,9 @@ bool buffer::isSelect(std::map<unsigned, bool> &bbs, Value val) {
 
   // if srcOp and dstOp are in the same BB, and the edge is not backedge
   // then the edge is selected depends on the BB
-  if (srcBB == dstBB && bbs.count(srcBB) > 0)
+  if (bbs.count(dstBB) > 0 || bbs.count(srcBB) > 0)
     if (!isBackEdge(srcOp, dstOp))
-      return bbs[srcBB];
+      return bbs[srcBB] || bbs.count(dstBB);
   return false;
 }
 
