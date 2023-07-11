@@ -33,9 +33,11 @@ static CFDFC createCFDFCircuit(handshake::FuncOp funcOp,
   CFDFC circuit = CFDFC();
   for (auto &op : funcOp.getOps()) {
     int bbIndex = getBBIndex(&op);
+    if (bbIndex < 0)
+      continue;
 
     // insert units in the selected basic blocks
-    if (bbs.count(bbIndex) > 0 && bbs[bbIndex]) {
+    if (bbs[bbIndex]) {
       circuit.units.push_back(&op);
       // insert channels if it is selected
       for (auto port : op.getResults())
@@ -49,7 +51,9 @@ static CFDFC createCFDFCircuit(handshake::FuncOp funcOp,
 static LogicalResult instantiateBuffers(std::map<Value *, Result> &res,
                                         MLIRContext *ctx) {
   OpBuilder builder(ctx);
+  llvm::errs() << res.size() << "\n";
   for (auto &[channel, result] : res) {
+    llvm::errs() << "insert buffer for: " << *channel;
 
     if (result.numSlots > 0) {
       Operation *opSrc = channel->getDefiningOp();
@@ -74,8 +78,10 @@ static LogicalResult instantiateBuffers(std::map<Value *, Result> &res,
       if (indVal == UINT_MAX)
         continue;
 
-      llvm::errs() << "insert buffer for: " << *channel << "opque: " << numOp
-                   << "; transparent: " << numTrans << "\n";
+      llvm::errs() << "insertion\n";
+
+      llvm::errs() << "opque: " << numOp << "; transparent: " << numTrans
+                   << "\n";
 
       if (numOp > 0) {
         // insert opque buffer
@@ -85,18 +91,26 @@ static LogicalResult instantiateBuffers(std::map<Value *, Result> &res,
         bufferOp.setBufferType(BufferTypeEnum::seq);
         bufferOp.setSlots(numOp);
 
-        // auto bufferTrans = builder.create<handshake::BufferOp>(
-        //     bufferOp->getLoc(), bufferOp->getResult(0).getType(),
-        //     bufferOp->getResult(0));
-        // bufferTrans.setSlots(numTrans);
-        // bufferTrans.setBufferType(BufferTypeEnum::fifo);
-        opSrc->getResult(indVal).replaceUsesWithIf(
-            bufferOp.getResult(), [&](OpOperand &operand) {
-              // return true;
-              return operand.getOwner() == opDst;
-            });
+        if (numTrans > 0) {
+          auto bufferTrans = builder.create<handshake::BufferOp>(
+              bufferOp->getLoc(), bufferOp->getResult(0).getType(),
+              bufferOp->getResult(0));
+          bufferTrans.setSlots(numTrans);
+          bufferTrans.setBufferType(BufferTypeEnum::fifo);
+          opSrc->getResult(indVal).replaceUsesWithIf(
+              bufferTrans.getResult(), [&](OpOperand &operand) {
+                // return true;
+                return operand.getOwner() == opDst;
+              });
+        } else {
+          opSrc->getResult(indVal).replaceUsesWithIf(
+              bufferOp.getResult(), [&](OpOperand &operand) {
+                // return true;
+                return operand.getOwner() == opDst;
+              });
+        }
       }
-      if (numTrans > 0) {
+      if (numTrans > 0 && numOp == 0) {
         auto bufferTrans = builder.create<handshake::BufferOp>(
             opDst->getLoc(), opSrc->getResult(indVal).getType(),
             opSrc->getResult(indVal));
@@ -160,16 +174,22 @@ static LogicalResult insertBuffers(handshake::FuncOp funcOp, MLIRContext *ctx,
     }
   }
 
+  std::vector<Value> allChannels;
   deleleArchMap(archs);
+  for (auto &op : funcOp.getOps())
+    for (auto resOp : op.getResults())
+      allChannels.push_back(resOp);
 
   // Create the MILP model of buffer placement, and write the results of the
   // model to insertBufResult.
   // Instantiate the buffers according to the results.
+  std::map<Value *, Result> insertBufResult;
+
   for (auto dataflowCirct : cfdfcList) {
-    std::map<Value *, Result> insertBufResult;
-    placeBufferInCFDFCircuit(dataflowCirct, insertBufResult, targetCP);
-    instantiateBuffers(insertBufResult, ctx);
+    placeBufferInCFDFCircuit(funcOp, allChannels, dataflowCirct,
+                             insertBufResult, targetCP);
   }
+  instantiateBuffers(insertBufResult, ctx);
 
   return success();
 }

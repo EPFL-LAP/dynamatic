@@ -128,7 +128,6 @@ double
 buffer::getUnitLatency(Operation *op,
                        std::map<std::string, buffer::UnitInfo> &unitInfo) {
   std::string opName = getOperationShortStrName(op);
-  llvm::errs() << "opName: " << opName << "\n";
   if (unitInfo.find(opName) == unitInfo.end())
     return 0.0;
 
@@ -136,7 +135,6 @@ buffer::getUnitLatency(Operation *op,
 
   double latency =
       getBitWidthMatchedTimeInfo(unitBitWidth, unitInfo[opName].latency);
-  llvm::errs() << "opName: " << unitBitWidth << "\n";
 
   return latency;
 }

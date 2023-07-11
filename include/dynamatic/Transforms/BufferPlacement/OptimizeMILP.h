@@ -37,11 +37,13 @@ inline Operation *getUserOp(Value val) {
 
 struct UnitVar {
 public:
+  bool select;
   GRBVar retIn, retOut;
 };
 
 struct ChannelVar {
 public:
+  bool select;
   GRBVar tDataIn, tDataOut, tElasIn, tElasOut;
   GRBVar tValidIn, tValidOut, tReadyIn, tReadyOut;
   GRBVar thrptTok, bufIsOp, bufNSlots, hasBuf;
@@ -52,9 +54,19 @@ struct Result {
   bool opaque;
   bool transparent;
   unsigned numSlots;
+
+  Result operator+(const Result &other) const {
+    Result result;
+    result.opaque = this->opaque + other.opaque;
+    // result.transparent = this->transparent + other.transparent;
+    result.numSlots = this->numSlots + other.numSlots;
+    return result;
+  }
 };
 
-LogicalResult placeBufferInCFDFCircuit(CFDFC &CFDFCircuit,
+LogicalResult placeBufferInCFDFCircuit(handshake::FuncOp funcOp,
+                                       std::vector<Value> allChannels,
+                                       CFDFC &CFDFCircuit,
                                        std::map<Value *, Result> &res,
                                        double targetCP);
 
