@@ -760,6 +760,7 @@ public:
     patterns.insert<FuncOpConversionPattern>(&ctx, ls);
     patterns.insert<
         // Handshake operations
+        ExtModuleConversionPattern<handshake::BufferOp>,
         ExtModuleConversionPattern<handshake::ConditionalBranchOp>,
         ExtModuleConversionPattern<handshake::BranchOp>,
         ExtModuleConversionPattern<handshake::MergeOp>,
@@ -799,6 +800,7 @@ public:
         ExtModuleConversionPattern<arith::RemFOp>,
         ExtModuleConversionPattern<arith::RemSIOp>,
         ExtModuleConversionPattern<arith::RemUIOp>,
+        ExtModuleConversionPattern<arith::SelectOp>,
         ExtModuleConversionPattern<arith::SIToFPOp>,
         ExtModuleConversionPattern<arith::ShLIOp>,
         ExtModuleConversionPattern<arith::ShRSIOp>,

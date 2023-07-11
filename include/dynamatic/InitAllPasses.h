@@ -9,6 +9,7 @@
 #define DYNAMATIC_INITALLPASSES_H
 
 #include "circt/Conversion/Passes.h"
+#include "circt/Dialect/ESI/ESIPasses.h"
 #include "circt/Dialect/Handshake/HandshakePasses.h"
 #include "circt/Transforms/Passes.h"
 #include "dynamatic/Conversion/Passes.h"
@@ -25,6 +26,7 @@ inline void registerAllPasses() {
   circt::registerStandardToHandshake();
   circt::registerFlattenMemRef();
   circt::registerFlattenMemRefCalls();
+  circt::esi::registerPasses();
   handshake::registerPasses();
 }
 
