@@ -29,20 +29,22 @@ func.func @memInterfaceNoID(%arg0: memref<4xi32>, %arg1: index) -> i32 {
 // CHECK:           %[[VAL_8:.*]], %[[VAL_9:.*]] = cond_br %[[VAL_4]], %[[VAL_5]] {bb = 0 : ui32} : none
 // CHECK:           %[[VAL_10:.*]] = merge %[[VAL_6]] {bb = 1 : ui32} : i32
 // CHECK:           %[[VAL_11:.*]], %[[VAL_12:.*]] = control_merge %[[VAL_8]] {bb = 1 : ui32} : none, index
-// CHECK:           %[[VAL_13:.*]] = constant %[[VAL_11]] {bb = 1 : ui32, value = 1 : i32} : i32
-// CHECK:           %[[VAL_14:.*]] = arith.addi %[[VAL_10]], %[[VAL_13]] {bb = 1 : ui32} : i32
-// CHECK:           %[[VAL_15:.*]] = br %[[VAL_14]] {bb = 1 : ui32} : i32
-// CHECK:           %[[VAL_16:.*]] = br %[[VAL_11]] {bb = 1 : ui32} : none
-// CHECK:           %[[VAL_17:.*]] = merge %[[VAL_7]] {bb = 2 : ui32} : i32
-// CHECK:           %[[VAL_18:.*]], %[[VAL_19:.*]] = control_merge %[[VAL_9]] {bb = 2 : ui32} : none, index
-// CHECK:           %[[VAL_20:.*]] = constant %[[VAL_18]] {bb = 2 : ui32, value = 2 : i32} : i32
-// CHECK:           %[[VAL_21:.*]] = arith.addi %[[VAL_17]], %[[VAL_20]] {bb = 2 : ui32} : i32
-// CHECK:           %[[VAL_22:.*]] = br %[[VAL_21]] {bb = 2 : ui32} : i32
-// CHECK:           %[[VAL_23:.*]] = br %[[VAL_18]] {bb = 2 : ui32} : none
-// CHECK:           %[[VAL_24:.*]] = mux %[[VAL_25:.*]] {{\[}}%[[VAL_22]], %[[VAL_15]]] {bb = 3 : ui32} : index, i32
-// CHECK:           %[[VAL_26:.*]], %[[VAL_25]] = control_merge %[[VAL_23]], %[[VAL_16]] {bb = 3 : ui32} : none, index
-// CHECK:           %[[VAL_27:.*]] = d_return {bb = 3 : ui32} %[[VAL_24]] : i32
-// CHECK:           end {bb = 3 : ui32} %[[VAL_27]] : i32
+// CHECK:           %[[VAL_13:.*]] = source {bb = 1 : ui32}
+// CHECK:           %[[VAL_14:.*]] = constant %[[VAL_13]] {bb = 1 : ui32, value = 1 : i32} : i32
+// CHECK:           %[[VAL_15:.*]] = arith.addi %[[VAL_10]], %[[VAL_14]] {bb = 1 : ui32} : i32
+// CHECK:           %[[VAL_16:.*]] = br %[[VAL_15]] {bb = 1 : ui32} : i32
+// CHECK:           %[[VAL_17:.*]] = br %[[VAL_11]] {bb = 1 : ui32} : none
+// CHECK:           %[[VAL_18:.*]] = merge %[[VAL_7]] {bb = 2 : ui32} : i32
+// CHECK:           %[[VAL_19:.*]], %[[VAL_20:.*]] = control_merge %[[VAL_9]] {bb = 2 : ui32} : none, index
+// CHECK:           %[[VAL_21:.*]] = source {bb = 2 : ui32}
+// CHECK:           %[[VAL_22:.*]] = constant %[[VAL_21]] {bb = 2 : ui32, value = 2 : i32} : i32
+// CHECK:           %[[VAL_23:.*]] = arith.addi %[[VAL_18]], %[[VAL_22]] {bb = 2 : ui32} : i32
+// CHECK:           %[[VAL_24:.*]] = br %[[VAL_23]] {bb = 2 : ui32} : i32
+// CHECK:           %[[VAL_25:.*]] = br %[[VAL_19]] {bb = 2 : ui32} : none
+// CHECK:           %[[VAL_26:.*]] = mux %[[VAL_27:.*]] {{\[}}%[[VAL_24]], %[[VAL_16]]] {bb = 3 : ui32} : index, i32
+// CHECK:           %[[VAL_28:.*]], %[[VAL_27]] = control_merge %[[VAL_25]], %[[VAL_17]] {bb = 3 : ui32} : none, index
+// CHECK:           %[[VAL_29:.*]] = d_return {bb = 3 : ui32} %[[VAL_26]] : i32
+// CHECK:           end {bb = 3 : ui32} %[[VAL_29]] : i32
 // CHECK:         }
 func.func @ifThenElse(%arg0: i32, %arg1: i1) -> i32 {
   cf.cond_br %arg1, ^bb1, ^bb2
@@ -70,16 +72,18 @@ func.func @ifThenElse(%arg0: i32, %arg1: i1) -> i32 {
 // CHECK:           %[[VAL_8:.*]], %[[VAL_9:.*]] = cond_br %[[VAL_4]], %[[VAL_5]] {bb = 0 : ui32} : none
 // CHECK:           %[[VAL_10:.*]] = merge %[[VAL_6]] {bb = 1 : ui32} : i32
 // CHECK:           %[[VAL_11:.*]], %[[VAL_12:.*]] = control_merge %[[VAL_8]] {bb = 1 : ui32} : none, index
-// CHECK:           %[[VAL_13:.*]] = constant %[[VAL_11]] {bb = 1 : ui32, value = 1 : i32} : i32
-// CHECK:           %[[VAL_14:.*]] = arith.addi %[[VAL_10]], %[[VAL_13]] {bb = 1 : ui32} : i32
-// CHECK:           %[[VAL_15:.*]] = d_return {bb = 1 : ui32} %[[VAL_14]] : i32
-// CHECK:           %[[VAL_16:.*]] = merge %[[VAL_7]] {bb = 2 : ui32} : i32
-// CHECK:           %[[VAL_17:.*]], %[[VAL_18:.*]] = control_merge %[[VAL_9]] {bb = 2 : ui32} : none, index
-// CHECK:           %[[VAL_19:.*]] = constant %[[VAL_17]] {bb = 2 : ui32, value = 2 : i32} : i32
-// CHECK:           %[[VAL_20:.*]] = arith.addi %[[VAL_16]], %[[VAL_19]] {bb = 2 : ui32} : i32
-// CHECK:           %[[VAL_21:.*]] = d_return {bb = 2 : ui32} %[[VAL_20]] : i32
-// CHECK:           %[[VAL_22:.*]] = merge %[[VAL_15]], %[[VAL_21]] {bb = 3 : ui32} : i32
-// CHECK:           end {bb = 3 : ui32} %[[VAL_22]] : i32
+// CHECK:           %[[VAL_13:.*]] = source {bb = 1 : ui32}
+// CHECK:           %[[VAL_14:.*]] = constant %[[VAL_13]] {bb = 1 : ui32, value = 1 : i32} : i32
+// CHECK:           %[[VAL_15:.*]] = arith.addi %[[VAL_10]], %[[VAL_14]] {bb = 1 : ui32} : i32
+// CHECK:           %[[VAL_16:.*]] = d_return {bb = 1 : ui32} %[[VAL_15]] : i32
+// CHECK:           %[[VAL_17:.*]] = merge %[[VAL_7]] {bb = 2 : ui32} : i32
+// CHECK:           %[[VAL_18:.*]], %[[VAL_19:.*]] = control_merge %[[VAL_9]] {bb = 2 : ui32} : none, index
+// CHECK:           %[[VAL_20:.*]] = source {bb = 2 : ui32}
+// CHECK:           %[[VAL_21:.*]] = constant %[[VAL_20]] {bb = 2 : ui32, value = 2 : i32} : i32
+// CHECK:           %[[VAL_22:.*]] = arith.addi %[[VAL_17]], %[[VAL_21]] {bb = 2 : ui32} : i32
+// CHECK:           %[[VAL_23:.*]] = d_return {bb = 2 : ui32} %[[VAL_22]] : i32
+// CHECK:           %[[VAL_24:.*]] = merge %[[VAL_16]], %[[VAL_23]] {bb = 3 : ui32} : i32
+// CHECK:           end {bb = 3 : ui32} %[[VAL_24]] : i32
 // CHECK:         }
 func.func @multipleReturns(%arg0: i32, %arg1: i1) -> i32 {
   cf.cond_br %arg1, ^bb1, ^bb2

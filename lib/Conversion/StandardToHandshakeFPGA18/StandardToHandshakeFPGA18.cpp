@@ -190,6 +190,13 @@ static SmallVector<Value, 8> getFunctionEndControls(Region &r) {
   return controls;
 }
 
+/// Determines whether a user of a constant makes the constant un-sourcable.
+static bool cstUserIsSourcable(Operation *cstUser) {
+  return !isa<handshake::BranchOp, handshake::ConditionalBranchOp,
+              handshake::ReturnOp, handshake::DynamaticLoadOp,
+              handshake::DynamaticStoreOp>(cstUser);
+}
+
 // ============================================================================
 // Concrete lowering steps
 // ============================================================================
@@ -293,6 +300,28 @@ LogicalResult HandshakeLoweringFPGA18::replaceMemoryOps(
     rewriter.eraseOp(op);
   }
 
+  return success();
+}
+
+LogicalResult
+HandshakeLoweringFPGA18::connectConstants(ConversionPatternRewriter &rewriter) {
+
+  for (auto cstOp :
+       llvm::make_early_inc_range(r.getOps<mlir::arith::ConstantOp>())) {
+
+    rewriter.setInsertionPointAfter(cstOp);
+    auto cstVal = cstOp.getValue();
+
+    if (llvm::all_of(cstOp->getUsers(), cstUserIsSourcable))
+      rewriter.replaceOpWithNewOp<handshake::ConstantOp>(
+          cstOp, cstVal.getType(), cstVal,
+          rewriter.create<handshake::SourceOp>(cstOp.getLoc(),
+                                               rewriter.getNoneType()));
+    else
+      rewriter.replaceOpWithNewOp<handshake::ConstantOp>(
+          cstOp, cstVal.getType(), cstVal,
+          getBlockEntryControl(cstOp->getBlock()));
+  }
   return success();
 }
 
@@ -605,14 +634,12 @@ static LogicalResult lowerRegion(HandshakeLoweringFPGA18 &hl,
   if (failed(runPartialLowering(baseHl, &HandshakeLowering::addBranchOps)))
     return failure();
 
-  bool sourceConstants = false;
-  if (failed(runPartialLowering(baseHl,
-                                &HandshakeLowering::connectConstantsToControl,
-                                sourceConstants)))
-    return failure();
-
   if (failed(runPartialLowering(hl, &HandshakeLoweringFPGA18::connectToMemory,
                                 memInfo)))
+    return failure();
+
+  if (failed(
+          runPartialLowering(hl, &HandshakeLoweringFPGA18::connectConstants)))
     return failure();
 
   if (failed(runPartialLowering(
