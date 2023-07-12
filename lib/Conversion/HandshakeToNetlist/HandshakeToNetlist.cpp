@@ -620,7 +620,7 @@ void FuncOpConversionPattern::bufferInputs(
         rewriter.getStringAttr("handshake_start" + std::to_string(argIdx++)),
         operands);
 
-    arg.replaceAllUsesWith(instanceOp.getResult(0));
+    rewriter.replaceAllUsesExcept(arg, instanceOp.getResult(0), instanceOp);
   }
 }
 
