@@ -1,4 +1,4 @@
-add_dynamatic_library(DynamaticSupportExperimental
+add_dynamatic_library(DynamaticExperimentalSupport
   CDGAnalysis.cpp
 
   LINK_LIBS PUBLIC
