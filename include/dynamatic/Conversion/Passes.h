@@ -8,7 +8,6 @@
 #define DYNAMATIC_CONVERSION_PASSES_H
 
 #include "dynamatic/Conversion/AffineToScf.h"
-#include "dynamatic/Conversion/ExportDOT.h"
 #include "dynamatic/Conversion/HandshakeToNetlist.h"
 #include "dynamatic/Conversion/StandardToHandshakeFPGA18.h"
 #include "mlir/IR/DialectRegistry.h"

@@ -1,13 +1,12 @@
-//===- ExportDOT.cpp - Export handshake to DOT pass -------------*- C++ -*-===//
+//===- DOTPrinter.cpp - Print DOT to standard output ------------*- C++ -*-===//
 //
-// This file contains the implementation of the export to DOT pass. It
-// produces a .dot file (in the DOT language) parsable by Graphviz and
-// containing the graph representation of the input handshake-level IR. The pass
-// leaves the actual handshake-level IR unchanged.
+// This file contains the implementation of the DOT printer. The printer
+// produces, on standard output, Graphviz-formatted output which contains the
+// graph representation of the input handshake-level IR.
 //
 //===----------------------------------------------------------------------===//
 
-#include "dynamatic/Conversion/ExportDOT.h"
+#include "dynamatic/Support/DOTPrinter.h"
 #include "circt/Dialect/Handshake/HandshakeOps.h"
 #include "circt/Dialect/Handshake/HandshakePasses.h"
 #include "dynamatic/Conversion/PassDetails.h"
@@ -16,18 +15,13 @@
 #include "mlir/IR/BuiltinTypes.h"
 #include "mlir/IR/OperationSupport.h"
 #include "mlir/IR/PatternMatch.h"
-#include "mlir/Support/IndentedOstream.h"
 #include "llvm/ADT/TypeSwitch.h"
-#include "llvm/Support/raw_ostream.h"
 #include <iomanip>
-#include <string>
 
 using namespace circt;
 using namespace circt::handshake;
 using namespace mlir;
 using namespace dynamatic;
-
-class ExportDotPass;
 
 namespace {
 
@@ -38,216 +32,6 @@ using PortsData = std::vector<std::pair<std::string, Value>>;
 using MemPortsData = std::vector<std::tuple<std::string, Value, std::string>>;
 /// In legacy mode, a port represented with a unique name and a bitwidth
 using RawPort = std::pair<std::string, unsigned>;
-
-/// Holds information about data attributes for a DOT node.
-struct NodeInfo {
-  /// The node's type.
-  std::string type;
-  /// A mapping between attribute name and value (printed between "").
-  std::map<std::string, std::string> stringAttr;
-  /// A mapping between attribute name and value (printed without "").
-  std::map<std::string, int> intAttr;
-
-  /// Constructs a NodeInfo with a specific type.
-  NodeInfo(std::string type) : type(type){};
-
-  /// Prints all stored data attributes on the output stream. The function
-  /// doesn't insert [brackets] around the attributes; it is the responsibility
-  /// of the caller of this method to insert an opening bracket before the call
-  /// and a closing bracket after the call.
-  void print(mlir::raw_indented_ostream &os) {
-    // Print type
-    os << "type=\"" << type << "\"";
-    if (!stringAttr.empty() || !intAttr.empty())
-      os << ", ";
-
-    // Print all attributes
-    for (auto [idx, attr] : llvm::enumerate(stringAttr)) {
-      auto &[name, value] = attr;
-      os << name << "=\"" << value << "\"";
-      if (idx != stringAttr.size() - 1)
-        os << ", ";
-    }
-    if (!intAttr.empty())
-      os << ", ";
-    for (auto [idx, attr] : llvm::enumerate(intAttr)) {
-      auto &[name, value] = attr;
-      os << name << "=" << value;
-      if (idx != intAttr.size() - 1)
-        os << ", ";
-    }
-  }
-};
-
-/// Holds information about data attributes for a DOT edge.
-struct EdgeInfo {
-  /// The port number of the edge's source node.
-  size_t from;
-  /// The port number of the edge's destination node.
-  size_t to;
-  /// If the edge is between a memory operation and a memory interface,
-  /// indicates whether the edge represents an address or a data value.
-  std::optional<bool> memAddress;
-
-  /// Prints all stored data attributes on the output stream. The function
-  /// doesn't insert [brackets] around the attributes; it is the responsibility
-  /// of the caller of this method to insert an opening bracket before the call
-  /// and a closing bracket after the call.
-  template <typename Stream>
-  void print(Stream &stream) {
-    stream << "from=\"out" << from << "\", to=\"in" << to << "\"";
-    if (memAddress.has_value())
-      stream << ", mem_address=\"" << (memAddress.value() ? "true" : "false")
-             << "\"";
-  }
-};
-
-/// Driver for the ExportDOT pass.
-struct ExportDOTPass : public ExportDOTBase<ExportDOTPass> {
-
-  ExportDOTPass(bool legacy, bool prettyPrint) {
-    this->legacy = legacy;
-    this->prettyPrint = prettyPrint;
-  }
-
-  void runOnOperation() override {
-    ModuleOp mod = getOperation();
-    markAllAnalysesPreserved();
-
-    // We support at most one function per module
-    auto funcs = mod.getOps<handshake::FuncOp>();
-    if (funcs.empty())
-      return;
-    if (++funcs.begin() != funcs.end()) {
-      mod->emitOpError()
-          << "we currently only support one handshake function per module";
-      return signalPassFailure();
-    }
-    handshake::FuncOp funcOp = *funcs.begin();
-
-    // Create the file to store the graph
-    std::error_code ec;
-    llvm::raw_fd_ostream outfile(funcOp.getNameAttr().str() + ".dot", ec);
-    mlir::raw_indented_ostream os(outfile);
-
-    // Print the graph
-    os << "Digraph G {\n";
-    os.indent();
-    os << "splines=spline;\n";
-    os << "compound=true; // Allow edges between clusters\n";
-    if (failed(printFunc(os, funcOp))) {
-      outfile.close();
-      return signalPassFailure();
-    }
-    os.unindent();
-    os << "}\n";
-
-    outfile.close();
-  };
-
-private:
-  /// Maintain a mapping of module names and the number of times one of those
-  /// modules have been instantiated in the design. This is used to generate
-  /// unique names in the output graph.
-  std::map<std::string, unsigned> instanceIdMap;
-
-  /// A mapping between operations and their unique name in the .dot file.
-  DenseMap<Operation *, std::string> opNameMap;
-
-  /// In legacy mode, holds the set of all ports in the .dot file, represented
-  /// by a unique name. Each port name is mapped to its width.
-  std::unordered_map<std::string, unsigned> legacyPorts;
-
-  /// In legacy mode, holds the set of all channels in the .dot file,
-  /// represented by a pair of uniquely named ports. The first name represents
-  /// the source port (out port of a module) while the second name represents
-  /// the destination port (in port of a module).
-  std::set<std::pair<std::string, std::string>> legacyChannels;
-
-  /// Returns the name of a function's argument given its index.
-  std::string getArgumentName(handshake::FuncOp funcOp, size_t idx);
-
-  /// Computes all data attributes of a function argument (indicated by its
-  /// index) for use in legacy Dynamatic and prints them to the output stream;
-  /// it is the responsibility of the caller of this method to insert an opening
-  /// bracket before the call and a closing bracket after the call.
-  LogicalResult annotateArgumentNode(mlir::raw_indented_ostream &os,
-                                     handshake::FuncOp funcOp, size_t idx);
-
-  /// Computes all data attributes of an edge between a function argument
-  /// (indicated by its index) and an operation for use in legacy Dynamatic and
-  /// prints them to the output stream; it is the responsibility of the caller
-  /// of this method to insert an opening bracket before the call and a closing
-  /// bracket after the call.
-  LogicalResult annotateArgumentEdge(mlir::raw_indented_ostream &os,
-                                     handshake::FuncOp funcOp, size_t idx,
-                                     Operation *dst);
-
-  /// Returns the name of the node representing the operation.
-  std::string getNodeName(Operation *op);
-
-  /// Computes all data attributes of an operation for use in legacy Dynamatic
-  /// and prints them to the output stream; it is the responsibility of the
-  /// caller of this method to insert an opening bracket before the call and a
-  /// closing bracket after the call.
-  LogicalResult annotateNode(mlir::raw_indented_ostream &os, Operation *op);
-
-  /// Prints a node corresponding to an operation and, on success, returns a
-  /// unique name for the operation in the outName argument.
-  LogicalResult printNode(mlir::raw_indented_ostream &os, Operation *op);
-
-  /// Computes all data attributes of an edge for use in legacy Dynamatic and
-  /// prints them to the output stream; it is the responsibility of the caller
-  /// of this method to insert an opening bracket before the call and a closing
-  /// bracket after the call.
-  template <typename Stream>
-  LogicalResult annotateEdge(Stream &os, Operation *src, Operation *dst,
-                             Value val);
-
-  /// Prints an edge between a source and destination operation, which are
-  /// linked by a result of the source that the destination uses as an
-  /// operand.
-  template <typename Stream>
-  LogicalResult printEdge(Stream &os, Operation *src, Operation *dst,
-                          Value val);
-
-  /// Prints an instance of a handshake.func to the graph.
-  LogicalResult printFunc(mlir::raw_indented_ostream &os,
-                          handshake::FuncOp funcOp);
-
-  /// Opens a subgraph in the DOT file using the provided name and label.
-  void openSubgraph(mlir::raw_indented_ostream &os, std::string name,
-                    std::string label);
-
-  /// Closes a subgraph in the DOT file.
-  void closeSubgraph(mlir::raw_indented_ostream &os);
-
-  /// In legacy mode, registers inputs and outputs of a node for later DOT
-  /// verification. Input and output ports can be skipped (useful for function
-  /// arguments and end node) using their respective flags. Each registered node
-  /// is named using the node name passed as argument as a prefix. As a
-  /// consequence, a specific node name must never be used in more than one call
-  /// to the method. Fails if a port with the same name as an existing port is
-  /// generated.
-  LogicalResult legacyRegisterPorts(NodeInfo &info, std::string &nodeName,
-                                    bool skipInputs = false,
-                                    bool skipOutputs = false);
-
-  /// In legacy mode, registers a channel between two ports for later DOT
-  /// verification. The edge is named using the source and destination node
-  /// names passed as arguments. Fails if a channel with the same name as an
-  /// existing channel is generated.
-  LogicalResult legacyRegisterChannel(EdgeInfo &info, std::string &srcName,
-                                      std::string &dstName);
-
-  /// In legacy mode, verifies that all registered ports are part of a unique
-  /// registered channel and that no port is undriven. Additionally, if the flag
-  /// is set, verifies that ports linked by a channel have the same bitwidth
-  /// (which is not true in general in DOTs produced by legacy Dynamatic). Fails
-  /// if one of the above DOT invariants is broken.
-  LogicalResult verifyDOT(handshake::FuncOp funcOp,
-                          bool failOnWidthMismatch = false);
-};
 
 } // namespace
 
@@ -387,7 +171,7 @@ static std::string getIOFromPorts(MemPortsData ports) {
 
 /// Creates the "in" or "out" attribute of a node from a list of values and a
 /// port name (used as prefix to derive numbered port names for all values).
-static std::string getIOFromValues(ValueRange values, std::string portType) {
+static std::string getIOFromValues(ValueRange values, std::string &&portType) {
   PortsData ports;
   for (auto [idx, val] : llvm::enumerate(values))
     ports.push_back(std::make_pair(portType + std::to_string(idx + 1), val));
@@ -531,12 +315,14 @@ static std::string getOutputForMC(handshake::MemoryControllerOp op) {
 static unsigned findMemoryPort(Value addressToMem) {
   // Find the memory interface that the address goes to (should be the only use)
   auto users = addressToMem.getUsers();
-  assert(!users.empty() && (++users.begin() == users.end()) &&
-         "address should only have one use");
+  assert(!users.empty() && "address should have exactly one use");
+  if (++users.begin() != users.end())
+    assert(false && "address should have exactly one use");
   auto memOp = dyn_cast<handshake::MemoryControllerOp>(*users.begin());
   assert(memOp && "address user must be MemoryControllerOp");
 
-  // Iterate over memory accesses to find the one that matches the address value
+  // Iterate over memory accesses to find the one that matches the address
+  // value
   size_t inputIdx = 0;
   auto memInputs = memOp.getInputs();
   auto accesses = memOp.getAccesses();
@@ -551,7 +337,8 @@ static unsigned findMemoryPort(Value addressToMem) {
       if (memInputs[inputIdx] == addressToMem)
         return portIdx;
 
-      // Go to the index corresponding to the next memory operation in the block
+      // Go to the index corresponding to the next memory operation in the
+      // block
       if (cast<AccessTypeEnumAttr>(access).getValue() == AccessTypeEnum::Load)
         inputIdx++;
       else
@@ -571,8 +358,8 @@ static size_t findIndexInRange(ValueRange range, Value val) {
   return 0;
 }
 
-/// Finds the position (group index and operand index) of a value in the inputs
-/// of a memory interface.
+/// Finds the position (group index and operand index) of a value in the
+/// inputs of a memory interface.
 static std::pair<size_t, size_t>
 findValueInGroups(SmallVector<SmallVector<Value>> &groups, Value val) {
   for (auto [groupIdx, bbOperands] : llvm::enumerate(groups))
@@ -612,8 +399,8 @@ static size_t fixPortNumber(Operation *op, Value val, size_t idx,
               return idx;
 
             // Legacy Dynamatic puts all control operands before all data
-            // operands, whereas for us each control operand appears just before
-            // the data inputs of the block it corresponds to
+            // operands, whereas for us each control operand appears just
+            // before the data inputs of the block it corresponds to
             auto groups = memOp.groupInputsByBB();
 
             // Determine total number of control operands
@@ -659,7 +446,7 @@ static size_t fixPortNumber(Operation *op, Value val, size_t idx,
 /// Derives a raw port from a port string in the format
 /// "<port_name>:<port_width>". Uses the name passed as argument to derive a
 /// globally unique name for the returned raw port.
-static RawPort splitPortStr(std::string portStr, std::string &nodeName) {
+static RawPort splitPortStr(std::string &portStr, std::string &nodeName) {
   auto colonIdx = portStr.find(":");
   assert(colonIdx != std::string::npos && "port string has incorrect format");
 
@@ -674,8 +461,8 @@ static RawPort splitPortStr(std::string portStr, std::string &nodeName) {
 }
 
 /// Extracts a list of raw ports from the "in" or "out" attribute of a node in
-/// the graph. Each returned raw port is uniquely named globally using the name
-/// passed as argument.
+/// the graph. Each returned raw port is uniquely named globally using the
+/// name passed as argument.
 static SmallVector<RawPort> extractPortsFromString(std::string &portsInfo,
                                                    std::string &nodeName) {
   SmallVector<RawPort> ports;
@@ -684,18 +471,19 @@ static SmallVector<RawPort> extractPortsFromString(std::string &portsInfo,
 
   size_t last = 0, next = 0;
   while ((next = portsInfo.find(" ", last)) != std::string::npos) {
-    ports.push_back(
-        splitPortStr(portsInfo.substr(last, next - last), nodeName));
+    std::string subPorts = portsInfo.substr(last, next - last);
+    ports.push_back(splitPortStr(subPorts, nodeName));
     last = next + 1;
   }
-  ports.push_back(splitPortStr(portsInfo.substr(last), nodeName));
+  std::string subPorts = portsInfo.substr(last);
+  ports.push_back(splitPortStr(subPorts, nodeName));
   return ports;
 }
 
-LogicalResult ExportDOTPass::legacyRegisterPorts(NodeInfo &info,
-                                                 std::string &nodeName,
-                                                 bool skipInputs,
-                                                 bool skipOutputs) {
+LogicalResult DOTPrinter::legacyRegisterPorts(NodeInfo &info,
+                                              std::string &nodeName,
+                                              bool skipInputs,
+                                              bool skipOutputs) {
   if (!skipInputs && info.stringAttr.find("in") != info.stringAttr.end())
     for (auto &in : extractPortsFromString(info.stringAttr["in"], nodeName))
       if (auto [_, newPort] = legacyPorts.insert(in); !newPort)
@@ -707,9 +495,9 @@ LogicalResult ExportDOTPass::legacyRegisterPorts(NodeInfo &info,
   return success();
 }
 
-LogicalResult ExportDOTPass::legacyRegisterChannel(EdgeInfo &info,
-                                                   std::string &srcName,
-                                                   std::string &dstName) {
+LogicalResult DOTPrinter::legacyRegisterChannel(EdgeInfo &info,
+                                                std::string &srcName,
+                                                std::string &dstName) {
   auto srcPort = srcName + "_out" + std::to_string(info.from);
   auto dstPort = dstName + "_in" + std::to_string(info.to);
   if (auto [_, newChannel] =
@@ -719,11 +507,11 @@ LogicalResult ExportDOTPass::legacyRegisterChannel(EdgeInfo &info,
   return success();
 }
 
-LogicalResult ExportDOTPass::verifyDOT(handshake::FuncOp funcOp,
-                                       bool failOnWidthMismatch) {
+LogicalResult DOTPrinter::verifyDOT(handshake::FuncOp funcOp,
+                                    bool failOnWidthMismatch) {
 
-  // Create a set of all port names to keep track of the ones that haven't been
-  // matched so far
+  // Create a set of all port names to keep track of the ones that haven't
+  // been matched so far
   std::set<std::string> unmatchedPorts;
   for (auto &[name, _] : legacyPorts)
     unmatchedPorts.insert(name);
@@ -764,8 +552,7 @@ LogicalResult ExportDOTPass::verifyDOT(handshake::FuncOp funcOp,
   return success();
 }
 
-LogicalResult ExportDOTPass::annotateNode(mlir::raw_indented_ostream &os,
-                                          Operation *op) {
+LogicalResult DOTPrinter::annotateNode(Operation *op) {
   auto info =
       llvm::TypeSwitch<Operation *, NodeInfo>(op)
           .Case<handshake::MergeOp>([&](auto) {
@@ -885,8 +672,8 @@ LogicalResult ExportDOTPass::annotateNode(mlir::raw_indented_ostream &os,
             stream << "0x" << std::setfill('0') << std::setw(length) << std::hex
                    << value;
 
-            // Legacy Dynamatic uses the output width of the operations also as
-            // input width for some reason, make it so
+            // Legacy Dynamatic uses the output width of the operations also
+            // as input width for some reason, make it so
             info.stringAttr["in"] = getIOFromValues(op->getResults(), "in");
             info.stringAttr["out"] = getIOFromValues(op->getResults(), "out");
 
@@ -906,7 +693,8 @@ LogicalResult ExportDOTPass::annotateNode(mlir::raw_indented_ostream &os,
             auto info = NodeInfo("Exit");
             info.stringAttr["in"] = getInputForEnd(op);
 
-            // Output ports of end node are determined by function result types
+            // Output ports of end node are determined by function result
+            // types
             std::stringstream stream;
             auto funcOp = op->getParentOfType<handshake::FuncOp>();
             for (auto [idx, res] : llvm::enumerate(funcOp.getResultTypes()))
@@ -1011,9 +799,8 @@ LogicalResult ExportDOTPass::annotateNode(mlir::raw_indented_ostream &os,
   return success();
 }
 
-LogicalResult
-ExportDOTPass::annotateArgumentNode(mlir::raw_indented_ostream &os,
-                                    handshake::FuncOp funcOp, size_t idx) {
+LogicalResult DOTPrinter::annotateArgumentNode(handshake::FuncOp funcOp,
+                                               size_t idx) {
   BlockArgument arg = funcOp.getArgument(idx);
   NodeInfo info("Entry");
   info.stringAttr["in"] = getIOFromValues(ValueRange(arg), "in");
@@ -1030,9 +817,8 @@ ExportDOTPass::annotateArgumentNode(mlir::raw_indented_ostream &os,
   return success();
 }
 
-template <typename Stream>
-LogicalResult ExportDOTPass::annotateEdge(Stream &os, Operation *src,
-                                          Operation *dst, Value val) {
+LogicalResult DOTPrinter::annotateEdge(Operation *src, Operation *dst,
+                                       Value val) {
   EdgeInfo info;
 
   // Locate value in source results and destination operands
@@ -1061,10 +847,8 @@ LogicalResult ExportDOTPass::annotateEdge(Stream &os, Operation *src,
   return success();
 }
 
-LogicalResult
-ExportDOTPass::annotateArgumentEdge(mlir::raw_indented_ostream &os,
-                                    handshake::FuncOp funcOp, size_t idx,
-                                    Operation *dst) {
+LogicalResult DOTPrinter::annotateArgumentEdge(handshake::FuncOp funcOp,
+                                               size_t idx, Operation *dst) {
   BlockArgument arg = funcOp.getArgument(idx);
   EdgeInfo info;
 
@@ -1086,7 +870,7 @@ ExportDOTPass::annotateArgumentEdge(mlir::raw_indented_ostream &os,
 }
 
 // ============================================================================
-// DOT export
+// Printing
 // ============================================================================
 
 /// Style attribute value for control nodes/edges.
@@ -1209,38 +993,55 @@ static std::string getPrettyPrintedNodeLabel(Operation *op) {
       });
 }
 
-std::string ExportDOTPass::getNodeName(Operation *op) {
+DOTPrinter::DOTPrinter(bool legacy, bool debug)
+    : legacy(legacy), debug(debug), os(llvm::outs()){};
+
+LogicalResult DOTPrinter::printDOT(mlir::ModuleOp mod) {
+  // We support at most one function per module
+  auto funcs = mod.getOps<handshake::FuncOp>();
+  if (funcs.empty())
+    return success();
+  if (++funcs.begin() != funcs.end()) {
+    mod->emitOpError()
+        << "we currently only support one handshake function per module";
+    return failure();
+  }
+  handshake::FuncOp funcOp = *funcs.begin();
+
+  mlir::raw_indented_ostream os(llvm::outs());
+
+  // Print the graph
+  return printFunc(funcOp);
+}
+
+std::string DOTPrinter::getNodeName(Operation *op) {
   auto opNameIt = opNameMap.find(op);
   assert(opNameIt != opNameMap.end() &&
          "No name registered for the operation!");
   return opNameIt->second;
 }
 
-std::string ExportDOTPass::getArgumentName(handshake::FuncOp funcOp,
-                                           size_t idx) {
+std::string DOTPrinter::getArgumentName(handshake::FuncOp funcOp, size_t idx) {
   auto numArgs = funcOp.getNumArguments();
   assert(idx < numArgs && "argument index too high");
   if (idx == numArgs - 1 && legacy)
     // Legacy Dynamatic expects the start signal to be called start_0
     return "start_0";
-  else
-    return funcOp.getArgName(idx).getValue().str();
+  return funcOp.getArgName(idx).getValue().str();
 }
 
-void ExportDOTPass::openSubgraph(mlir::raw_indented_ostream &os,
-                                 std::string name, std::string label) {
+void DOTPrinter::openSubgraph(std::string &name, std::string &label) {
   os << "subgraph \"" << name << "\" {\n";
   os.indent();
   os << "label=\"" << label << "\"\n";
 }
 
-void ExportDOTPass::closeSubgraph(mlir::raw_indented_ostream &os) {
+void DOTPrinter::closeSubgraph() {
   os.unindent();
   os << "}\n";
 }
 
-LogicalResult ExportDOTPass::printNode(mlir::raw_indented_ostream &os,
-                                       Operation *op) {
+LogicalResult DOTPrinter::printNode(Operation *op) {
 
   // Print node name
   auto opName = opNameMap[op];
@@ -1275,7 +1076,7 @@ LogicalResult ExportDOTPass::printNode(mlir::raw_indented_ostream &os,
 
   // Determine label
   os << ", label=\"";
-  if (prettyPrint)
+  if (!debug)
     os << getPrettyPrintedNodeLabel(op);
   else {
     // Take out dialect prefix from opName when possible
@@ -1290,28 +1091,30 @@ LogicalResult ExportDOTPass::printNode(mlir::raw_indented_ostream &os,
       controlInterface && controlInterface.isControl())
     os << ", " + CONTROL_STYLE;
   os << "\", ";
-  if (legacy && failed(annotateNode(os, op)))
+  if (legacy && failed(annotateNode(op)))
     return failure();
   os << "]\n";
 
   return success();
 }
 
-template <typename Stream>
-LogicalResult ExportDOTPass::printEdge(Stream &stream, Operation *src,
-                                       Operation *dst, Value val) {
-  stream << "\"" << getNodeName(src) << "\" -> \"" << getNodeName(dst) << "\" ["
-         << getStyleOfValue(val);
-  if (legacy && failed(annotateEdge(stream, src, dst, val)))
+LogicalResult DOTPrinter::printEdge(Operation *src, Operation *dst, Value val) {
+  os << "\"" << getNodeName(src) << "\" -> \"" << getNodeName(dst) << "\" ["
+     << getStyleOfValue(val);
+  if (legacy && failed(annotateEdge(src, dst, val)))
     return failure();
-  stream << "]\n";
+  os << "]\n";
   return success();
 }
 
-LogicalResult ExportDOTPass::printFunc(mlir::raw_indented_ostream &os,
-                                       handshake::FuncOp funcOp) {
+LogicalResult DOTPrinter::printFunc(handshake::FuncOp funcOp) {
   std::map<std::string, unsigned> opTypeCntrs;
   DenseMap<Operation *, unsigned> opIDs;
+
+  os << "Digraph G {\n";
+  os.indent();
+  os << "splines=spline;\n";
+  os << "compound=true; // Allow edges between clusters\n";
 
   // Sequentially scan across the operations in the function and assign
   // instance IDs to each operation
@@ -1335,7 +1138,7 @@ LogicalResult ExportDOTPass::printFunc(mlir::raw_indented_ostream &os,
     auto argLabel = getArgumentName(funcOp, arg.index());
     os << "\"" << argLabel << "\" [shape=diamond, "
        << getStyleOfValue(arg.value()) << "label=\"" << argLabel << "\", ";
-    if (legacy && failed(annotateArgumentNode(os, funcOp, arg.index())))
+    if (legacy && failed(annotateArgumentNode(funcOp, arg.index())))
       return failure();
     os << "]\n";
   }
@@ -1344,8 +1147,8 @@ LogicalResult ExportDOTPass::printFunc(mlir::raw_indented_ostream &os,
   os << "// Function operations\n";
   for (auto &op : funcOp.getOps()) {
     // Give a unique name to each operation. Extract operation name without
-    // dialect prefix if possible and then append an ID unique to each operation
-    // type
+    // dialect prefix if possible and then append an ID unique to each
+    // operation type
     std::string opFullName = op.getName().getStringRef().str();
     auto startIdx = opFullName.find('.');
     if (startIdx == std::string::npos)
@@ -1356,7 +1159,7 @@ LogicalResult ExportDOTPass::printFunc(mlir::raw_indented_ostream &os,
     // Print the operation
     if (auto instOp = dyn_cast<handshake::InstanceOp>(op); instOp)
       assert(false && "multiple functions are not supported");
-    else if (failed(printNode(os, &op)))
+    else if (failed(printNode(&op)))
       return failure();
   }
 
@@ -1372,10 +1175,12 @@ LogicalResult ExportDOTPass::printFunc(mlir::raw_indented_ostream &os,
     // operations of that block
     auto blockStrID = std::to_string(blockID);
     os << "// Edges within basic block " << blockStrID << "\n";
-    openSubgraph(os, "cluster" + blockStrID, "block" + blockStrID);
+    std::string graphName = "cluster" + blockStrID;
+    std::string graphLabel = "block" + blockStrID;
+    openSubgraph(graphName, graphLabel);
 
     // Collect all edges leaving the block and print them after the subgraph
-    std::vector<std::string> outgoingEdges;
+    std::vector<std::tuple<Operation *, Operation *, OpResult>> outgoingEdges;
 
     // Determines whether an edge to a destination operation should be inside
     // of the source operation's basic block
@@ -1390,20 +1195,17 @@ LogicalResult ExportDOTPass::printFunc(mlir::raw_indented_ostream &os,
 
     // Iterate over all uses of all results of all operations inside the
     // block
-    for (auto op : ops) {
+    for (auto *op : ops) {
       for (auto res : op->getResults())
         for (auto &use : res.getUses()) {
           // Add edge to subgraph or outgoing edges depending on the block of
           // the operation using the result
           Operation *useOp = use.getOwner();
           if (isEdgeInSubgraph(useOp, blockID)) {
-            if (failed(printEdge(os, op, useOp, res)))
+            if (failed(printEdge(op, useOp, res)))
               return failure();
           } else {
-            std::stringstream edge;
-            if (failed(printEdge(edge, op, useOp, res)))
-              return failure();
-            outgoingEdges.push_back(edge.str());
+            outgoingEdges.emplace_back(op, useOp, res);
           }
         }
     }
@@ -1412,42 +1214,70 @@ LogicalResult ExportDOTPass::printFunc(mlir::raw_indented_ostream &os,
     if (blockID == 0)
       for (auto [idx, arg] : llvm::enumerate(funcOp.getArguments()))
         if (!isa<MemRefType>(arg.getType()))
-          for (auto user : arg.getUsers()) {
+          for (auto *user : arg.getUsers()) {
             auto argLabel = getArgumentName(funcOp, idx);
             os << "\"" << argLabel << "\" -> \"" << getNodeName(user) << "\" ["
                << getStyleOfValue(arg);
-            if (legacy && failed(annotateArgumentEdge(os, funcOp, idx, user)))
+            if (legacy && failed(annotateArgumentEdge(funcOp, idx, user)))
               return failure();
             os << "]\n";
           }
 
     // Close the subgraph
-    closeSubgraph(os);
+    closeSubgraph();
 
     // Print outgoing edges for this block
     if (!outgoingEdges.empty())
       os << "// Edges outgoing of basic block " << blockStrID << "\n";
-    for (auto &edge : outgoingEdges)
-      os << edge;
+    for (auto &[op, useOp, res] : outgoingEdges)
+      if (failed(printEdge(op, useOp, res)))
+        return failure();
   }
 
   // Print all edges incoming from operations not belonging to any block
   // outside of all subgraphs
   os << "// Edges outside of all basic blocks\n";
-  for (auto op : handshakeBlocks.outOfBlocks)
+  for (auto *op : handshakeBlocks.outOfBlocks)
     for (auto res : op->getResults())
       for (auto &use : res.getUses())
-        if (failed(printEdge(os, op, use.getOwner(), res)))
+        if (failed(printEdge(op, use.getOwner(), res)))
           return failure();
 
   // Verify that annotations are valid in legacy mode
   if (legacy && failed(verifyDOT(funcOp)))
     return failure();
 
+  os.unindent();
+  os << "}\n";
+
   return success();
 }
 
-std::unique_ptr<mlir::OperationPass<mlir::ModuleOp>>
-dynamatic::createExportDOTPass(bool legacy, bool prettyPrint) {
-  return std::make_unique<ExportDOTPass>(legacy, prettyPrint);
+void NodeInfo::print(mlir::raw_indented_ostream &os) {
+  // Print type
+  os << "type=\"" << type << "\"";
+  if (!stringAttr.empty() || !intAttr.empty())
+    os << ", ";
+
+  // Print all attributes
+  for (auto [idx, attr] : llvm::enumerate(stringAttr)) {
+    auto &[name, value] = attr;
+    os << name << "=\"" << value << "\"";
+    if (idx != stringAttr.size() - 1)
+      os << ", ";
+  }
+  if (!intAttr.empty())
+    os << ", ";
+  for (auto [idx, attr] : llvm::enumerate(intAttr)) {
+    auto &[name, value] = attr;
+    os << name << "=" << value;
+    if (idx != intAttr.size() - 1)
+      os << ", ";
+  }
+}
+
+void EdgeInfo::print(mlir::raw_indented_ostream &os) {
+  os << "from=\"out" << from << "\", to=\"in" << to << "\"";
+  if (memAddress.has_value())
+    os << ", mem_address=\"" << (memAddress.value() ? "true" : "false") << "\"";
 }

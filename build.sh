@@ -303,6 +303,7 @@ create_symlink polygeist/build/bin/polygeist-opt
 create_symlink polygeist/llvm-project/build/bin/mlir-opt
 create_symlink circt/build/bin/circt-opt
 create_symlink build/bin/dynamatic-opt
+create_symlink build/bin/export-dot
 create_symlink build/bin/exp-frequency-profiler
 
 echo ""
