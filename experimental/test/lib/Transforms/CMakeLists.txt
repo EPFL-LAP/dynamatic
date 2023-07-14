@@ -8,4 +8,5 @@ add_dynamatic_library(DynamaticExperimentalTestTransforms
   MLIRSupport
   MLIRTransformUtils
   DynamaticSupport
+  DynamaticSupportExperimental
 )

@@ -8,10 +8,15 @@
 #include "dynamatic/Support/LLVM.h"
 #include "mlir/IR/Builders.h"
 #include "mlir/IR/BuiltinOps.h"
+#include "mlir/IR/MLIRContext.h"
 #include "mlir/Pass/Pass.h"
+#include "mlir/Dialect/Func/IR/FuncOps.h"
+
+#include "experimental/Support/CDGAnalysis.h"
 
 using namespace mlir;
 using namespace dynamatic;
+using namespace dynamatic::experimental;
 
 namespace {
 struct TestCDGAnalysisPass
@@ -24,9 +29,17 @@ struct TestCDGAnalysisPass
   }
 
   void runOnOperation() override {
+    // Get the MLIR context for the current operation
+    MLIRContext *ctx = &getContext();
+    // Get the operation (the top level module)
     ModuleOp mod = getOperation();
 
-    llvm::outs() << "Your test pass starts here!\n";
+    // Iterate over all functions in the module
+    for (func::FuncOp funcOp : mod.getOps<func::FuncOp>())
+      if (failed(CDGAnalysis(funcOp, ctx)))
+        return signalPassFailure();
+
+    hello();
   }
 };
 } // namespace
