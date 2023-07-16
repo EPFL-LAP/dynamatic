@@ -35,4 +35,7 @@ LogicBBs getLogicBBs(circt::handshake::FuncOp funcOp);
 /// operation part of the same BB and returns true; otherwise return false.
 bool inheritBB(Operation *srcOp, Operation *dstOp);
 
+/// Thin wrapper around an attribute access to the "bb" attribute.
+std::optional<unsigned> getLogicBB(Operation *op);
+
 } // namespace dynamatic

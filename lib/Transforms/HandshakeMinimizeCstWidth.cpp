@@ -9,6 +9,7 @@
 
 #include "dynamatic/Transforms/HandshakeMinimizeCstWidth.h"
 #include "circt/Dialect/Handshake/HandshakeOps.h"
+#include "dynamatic/Analysis/ConstantAnalysis.h"
 #include "dynamatic/Support/LogicBB.h"
 #include "mlir/Dialect/Arith/IR/Arith.h"
 #include "mlir/Transforms/GreedyPatternRewriteDriver.h"
@@ -30,27 +31,6 @@ static void insertExtOp(handshake::ConstantOp toExtend,
   inheritBB(toExtend, extOp);
   rewriter.replaceAllUsesExcept(toReplace.getResult(), extOp.getResult(),
                                 extOp);
-}
-
-handshake::ConstantOp
-dynamatic::findEquivalentCst(handshake::ConstantOp cstOp) {
-  auto cstAttr = cstOp.getValue();
-  auto funcOp = cstOp->getParentOfType<handshake::FuncOp>();
-  assert(funcOp && "constant should have parent function");
-
-  for (auto otherCstOp : funcOp.getOps<handshake::ConstantOp>()) {
-    // Don't match ourself
-    if (cstOp == otherCstOp)
-      continue;
-
-    // The constant operation needs to have the same value attribute and the
-    // same control
-    auto otherCstAttr = otherCstOp.getValue();
-    if (otherCstAttr == cstAttr && otherCstOp.getCtrl() == cstOp.getCtrl())
-      return otherCstOp;
-  }
-
-  return nullptr;
 }
 
 unsigned dynamatic::computeRequiredBitwidth(APInt val) {

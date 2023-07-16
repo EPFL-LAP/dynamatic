@@ -10,6 +10,7 @@
 
 #include "dynamatic/Transforms/HandshakeConcretizeIndexType.h"
 #include "circt/Dialect/Handshake/HandshakeOps.h"
+#include "dynamatic/Analysis/ConstantAnalysis.h"
 #include "dynamatic/Support/LogicBB.h"
 #include "dynamatic/Transforms/HandshakeMinimizeCstWidth.h"
 #include "mlir/Dialect/Arith/IR/Arith.h"
