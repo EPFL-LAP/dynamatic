@@ -931,6 +931,14 @@ static std::string getPrettyPrintedNodeLabel(Operation *op) {
           [&](auto) { return "div"; })
       .Case<arith::ShRSIOp, arith::ShRUIOp>([&](auto) { return ">>"; })
       .Case<arith::ShLIOp>([&](auto) { return "<<"; })
+      .Case<arith::ExtSIOp, arith::ExtFOp, arith::TruncIOp, arith::TruncFOp>(
+          [&](auto) {
+            unsigned opWidth =
+                op->getOperand(0).getType().getIntOrFloatBitWidth();
+            unsigned resWidth =
+                op->getResult(0).getType().getIntOrFloatBitWidth();
+            return std::to_string(opWidth) + "..." + std::to_string(resWidth);
+          })
       .Case<arith::CmpIOp>([&](arith::CmpIOp op) {
         switch (op.getPredicate()) {
         case arith::CmpIPredicate::eq:
@@ -977,9 +985,9 @@ static std::string getPrettyPrintedNodeLabel(Operation *op) {
         case arith::CmpFPredicate::UNO:
           return "unordered?";
         case arith::CmpFPredicate::AlwaysFalse:
-          return "cmp-false";
+          return "false";
         case arith::CmpFPredicate::AlwaysTrue:
-          return "cmp-true";
+          return "true";
         }
         llvm_unreachable("unhandled cmpf predicate");
       })
@@ -1043,10 +1051,15 @@ void DOTPrinter::closeSubgraph() {
 
 LogicalResult DOTPrinter::printNode(Operation *op) {
 
+  std::string prettyLabel = getPrettyPrintedNodeLabel(op);
+  std::string canonicalName =
+      op->getName().getStringRef().str() +
+      (isa<arith::CmpIOp, arith::CmpFOp>(op) ? prettyLabel : "");
+
   // Print node name
   auto opName = opNameMap[op];
   os << "\"" << opName << "\""
-     << " [";
+     << " [mlir_op=\"" << canonicalName << "\", ";
 
   // Determine fill color
   os << "fillcolor=";
@@ -1077,7 +1090,7 @@ LogicalResult DOTPrinter::printNode(Operation *op) {
   // Determine label
   os << ", label=\"";
   if (!debug)
-    os << getPrettyPrintedNodeLabel(op);
+    os << prettyLabel;
   else {
     // Take out dialect prefix from opName when possible
     auto split = opName.find("_");
@@ -1136,7 +1149,7 @@ LogicalResult DOTPrinter::printFunc(handshake::FuncOp funcOp) {
       continue;
 
     auto argLabel = getArgumentName(funcOp, arg.index());
-    os << "\"" << argLabel << "\" [shape=diamond, "
+    os << "\"" << argLabel << R"(" [mlir_op="handshake.arg", shape=diamond, )"
        << getStyleOfValue(arg.value()) << "label=\"" << argLabel << "\", ";
     if (legacy && failed(annotateArgumentNode(funcOp, arg.index())))
       return failure();
