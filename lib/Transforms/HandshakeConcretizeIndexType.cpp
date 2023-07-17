@@ -10,6 +10,7 @@
 
 #include "dynamatic/Transforms/HandshakeConcretizeIndexType.h"
 #include "circt/Dialect/Handshake/HandshakeOps.h"
+#include "dynamatic/Analysis/ConstantAnalysis.h"
 #include "dynamatic/Support/LogicBB.h"
 #include "dynamatic/Transforms/HandshakeMinimizeCstWidth.h"
 #include "mlir/Dialect/Arith/IR/Arith.h"
@@ -116,13 +117,20 @@ struct ReplaceConstantOpAttr : public OpRewritePattern<handshake::ConstantOp> {
 
   LogicalResult matchAndRewrite(handshake::ConstantOp cstOp,
                                 PatternRewriter &rewriter) const override {
-    if (isa<IndexType>(cstOp.getValueAttr().getType())) {
-      cstOp.setValueAttr(
-          IntegerAttr::get(IntegerType::get(getContext(), width),
-                           cstOp.getValue().cast<IntegerAttr>().getInt()));
-      return success();
-    }
-    return failure();
+    if (!isa<IndexType>(cstOp.getValueAttr().getType()))
+      return failure();
+
+    auto newAttr =
+        IntegerAttr::get(IntegerType::get(getContext(), width),
+                         cstOp.getValue().cast<IntegerAttr>().getInt());
+    cstOp.setValueAttr(newAttr);
+
+    // Check whether index concretization created a duplicated constant; if so,
+    // delete the duplicate
+    if (auto otherCstOp = findEquivalentCst(cstOp))
+      rewriter.replaceOp(cstOp, otherCstOp.getResult());
+
+    return success();
   }
 
 private:
@@ -145,8 +153,7 @@ struct HandshakeConcretizeIndexTypePass
     Type indexWidthInt = IntegerType::get(ctx, width);
 
     // Change the type of all SSA values with an IndexType
-    LogicalResult allCstConvertible = success();
-    getOperation().walk([&](Operation *op) {
+    WalkResult walkRes = getOperation().walk([&](Operation *op) {
       for (Value operand : op->getOperands())
         if (isa<IndexType>(operand.getType()))
           operand.setType(indexWidthInt);
@@ -159,17 +166,19 @@ struct HandshakeConcretizeIndexTypePass
           // Constants must still be able to fit their value in the new width
           unsigned requiredWidth = computeRequiredBitwidth(intAttr.getValue());
           if (requiredWidth > width) {
-            allCstConvertible =
-                cstOp.emitError()
+            cstOp.emitError()
                 << "constant value " << intAttr.getValue().getZExtValue()
                 << " does not fit on " << width << " bits (requires at least "
                 << requiredWidth << ")";
-            return;
+            return WalkResult::interrupt();
           }
         }
       }
+
+      return WalkResult::advance();
     });
-    if (failed(allCstConvertible))
+
+    if (walkRes.wasInterrupted())
       return signalPassFailure();
 
     // Some operations need additional transformation

@@ -1,4 +1,3 @@
 add_subdirectory(AffineToScf)
-add_subdirectory(ExportDOT)
 add_subdirectory(HandshakeToNetlist)
 add_subdirectory(StandardToHandshakeFPGA18)

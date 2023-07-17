@@ -81,12 +81,13 @@ func.func @storeMulBlocks(%arg0 : i1, %arg1 : index, %arg2 : memref<4xi32>) {
 // CHECK:           %[[VAL_13:.*]], %[[VAL_14:.*]] = cond_br %[[VAL_7]], %[[VAL_9]] : none
 // CHECK:           %[[VAL_15:.*]] = merge %[[VAL_11]] : i32
 // CHECK:           %[[VAL_16:.*]], %[[VAL_17:.*]] = control_merge %[[VAL_13]] : none, index
-// CHECK:           %[[VAL_18:.*]] = constant %[[VAL_16]] {value = 1 : i32} : i32
-// CHECK:           %[[VAL_19:.*]] = arith.addi %[[VAL_15]], %[[VAL_18]] : i32
-// CHECK:           %[[VAL_20:.*]] = br %[[VAL_16]] : none
-// CHECK:           %[[VAL_21:.*]], %[[VAL_22:.*]] = control_merge %[[VAL_20]], %[[VAL_14]] : none, index
-// CHECK:           %[[VAL_23:.*]] = d_return %[[VAL_21]] : none
-// CHECK:           end %[[VAL_23]], %[[VAL_5]] : none, none
+// CHECK:           %[[VAL_18:.*]] = source
+// CHECK:           %[[VAL_19:.*]] = constant %[[VAL_18]] {value = 1 : i32} : i32
+// CHECK:           %[[VAL_20:.*]] = arith.addi %[[VAL_15]], %[[VAL_19]] : i32
+// CHECK:           %[[VAL_21:.*]] = br %[[VAL_16]] : none
+// CHECK:           %[[VAL_22:.*]], %[[VAL_23:.*]] = control_merge %[[VAL_21]], %[[VAL_14]] : none, index
+// CHECK:           %[[VAL_24:.*]] = d_return %[[VAL_22]] : none
+// CHECK:           end %[[VAL_24]], %[[VAL_5]] : none, none
 // CHECK:         }
 func.func @forwardLoadToBB(%arg0 : i1, %arg1 : index, %arg2: memref<4xi32>) {
   %0 = memref.load %arg2[%arg1] : memref<4xi32>

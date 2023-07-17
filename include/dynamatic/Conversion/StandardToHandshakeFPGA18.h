@@ -54,6 +54,11 @@ public:
   LogicalResult connectToMemory(ConversionPatternRewriter &rewriter,
                                 MemInterfacesInfo &memInfo);
 
+  /// Connect constants to the rest of the circuit. Constants are triggered by a
+  /// source if their successor is not a branch/return or memory operation.
+  /// Otherwise they are triggered by the control-only network.
+  LogicalResult connectConstants(ConversionPatternRewriter &rewriter);
+
   /// Replaces undefined operations (mlir::LLVM::UndefOp) with a default "0"
   /// constant triggered by the enclosing block's control merge.
   LogicalResult replaceUndefinedValues(ConversionPatternRewriter &rewriter);

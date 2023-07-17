@@ -620,7 +620,7 @@ void FuncOpConversionPattern::bufferInputs(
         rewriter.getStringAttr("handshake_start" + std::to_string(argIdx++)),
         operands);
 
-    arg.replaceAllUsesWith(instanceOp.getResult(0));
+    rewriter.replaceAllUsesExcept(arg, instanceOp.getResult(0), instanceOp);
   }
 }
 
@@ -760,6 +760,7 @@ public:
     patterns.insert<FuncOpConversionPattern>(&ctx, ls);
     patterns.insert<
         // Handshake operations
+        ExtModuleConversionPattern<handshake::BufferOp>,
         ExtModuleConversionPattern<handshake::ConditionalBranchOp>,
         ExtModuleConversionPattern<handshake::BranchOp>,
         ExtModuleConversionPattern<handshake::MergeOp>,
@@ -799,6 +800,7 @@ public:
         ExtModuleConversionPattern<arith::RemFOp>,
         ExtModuleConversionPattern<arith::RemSIOp>,
         ExtModuleConversionPattern<arith::RemUIOp>,
+        ExtModuleConversionPattern<arith::SelectOp>,
         ExtModuleConversionPattern<arith::SIToFPOp>,
         ExtModuleConversionPattern<arith::ShLIOp>,
         ExtModuleConversionPattern<arith::ShRSIOp>,

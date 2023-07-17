@@ -26,3 +26,9 @@ bool dynamatic::inheritBB(Operation *srcOp, Operation *dstOp) {
   }
   return false;
 }
+
+std::optional<unsigned> dynamatic::getLogicBB(Operation *op) {
+  if (auto bb = op->getAttrOfType<mlir::IntegerAttr>(BB_ATTR))
+    return bb.getUInt();
+  return {};
+}
