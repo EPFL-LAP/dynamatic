@@ -38,8 +38,6 @@ struct TestCDGAnalysisPass
     for (func::FuncOp funcOp : mod.getOps<func::FuncOp>())
       if (failed(CDGAnalysis(funcOp, ctx)))
         return signalPassFailure();
-
-    hello();
   }
 };
 } // namespace

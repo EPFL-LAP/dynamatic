@@ -30,8 +30,8 @@ static void PostDomTreeTraversal(DominanceInfoNode *node, unsigned level) {
 
 // Traversal of the CFG that creates set of graph edges (A,B) so A is NOT
 // post-dominated by B.
-static void CFGTraversal(Block *rootBlock, std::set<Block *> *visitedSet,
-                         std::set<Edge *> *edgeSet,
+static void CFGTraversal(Block *rootBlock, std::set<Block *> *visitedSet, 
+                         std::set<CFGEdge *> *edgeSet,
                          PostDominanceInfo *postDomInfo,
                          llvm::DominatorTreeBase<Block, true> &postDomTree) {
   if (!rootBlock) {
@@ -60,7 +60,7 @@ static void CFGTraversal(Block *rootBlock, std::set<Block *> *visitedSet,
     DominanceInfoNode *succPostDomNode = postDomTree.getNode(successor);
     DominanceInfoNode *currPostDomNode = postDomTree.getNode(curr);
 
-    Edge *edge = new Edge(currPostDomNode, succPostDomNode);
+    CFGEdge *edge = new CFGEdge(currPostDomNode, succPostDomNode);
     edgeSet->insert(edge);
 
     curr->print(llvm::outs());
@@ -71,10 +71,10 @@ static void CFGTraversal(Block *rootBlock, std::set<Block *> *visitedSet,
   }
 }
 
-Edge::Edge(DominanceInfoNode *from, DominanceInfoNode *to)
+CFGEdge::CFGEdge(DominanceInfoNode *from, DominanceInfoNode *to)
     : from(from), to(to){};
 
-DominanceInfoNode *Edge::findLowestCommonAncestor() {
+DominanceInfoNode *CFGEdge::findLCAInPostDomTree() {
   std::set<DominanceInfoNode *> ancestorsA;
   unsigned level;
 
@@ -126,14 +126,15 @@ LogicalResult dynamatic::experimental::CDGAnalysis(func::FuncOp funcOp,
 
   // Find set of CFG edges (A,B) so A is NOT post-dominated by B.
   std::set<Block *> visitedSet;
-  std::set<Edge *> edgeSet;
+  std::set<CFGEdge *> edgeSet;
   // Memory for edges is allocated on the heap.
   CFGTraversal(&rootBlockCFG, &visitedSet, &edgeSet, &postDomInfo, postDomTree);
 
   // Process each edge from the set.
-  for (Edge *edge : edgeSet) {
-    // Find the least common ancesstor of A and B for each edge (A,B)
-    DominanceInfoNode *LCA = edge->findLowestCommonAncestor();
+  for (CFGEdge *edge : edgeSet) {
+    // Find the least common ancesstor (LCA) in post-dominator tree 
+    // of A and B for each CFG edge (A,B).
+    DominanceInfoNode *LCA = edge->findLCAInPostDomTree();
 
     LCA->getBlock()->print(llvm::outs());
     llvm::outs() << "Edge processed.\n";
@@ -154,5 +155,3 @@ LogicalResult dynamatic::experimental::CDGAnalysis(func::FuncOp funcOp,
   llvm::outs() << "End of CDG analysis for FuncOp.\n";
   return success();
 }
-
-void dynamatic::experimental::hello() { llvm::outs() << "hello world\n"; }

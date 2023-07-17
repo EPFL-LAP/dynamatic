@@ -21,16 +21,17 @@ using namespace mlir;
 namespace dynamatic {
 namespace experimental {
 
-struct Edge {
+// Helper struct for CDG analysis that represents the edge (A,B) in CFG.
+struct CFGEdge {
   DominanceInfoNode *from; // A
   DominanceInfoNode *to;   // B
 
-  Edge(DominanceInfoNode *from, DominanceInfoNode *to);
+  CFGEdge(DominanceInfoNode *from, DominanceInfoNode *to);
 
-  DominanceInfoNode *findLowestCommonAncestor();
+  // Finds the least common ancesstor (LCA) in post-dominator tree 
+  // for nodes A and B of a CFG edge (A,B).
+  DominanceInfoNode *findLCAInPostDomTree();
 };
-
-void hello();
 
 // CDG analysis function
 LogicalResult CDGAnalysis(func::FuncOp funcOp, MLIRContext *ctx);
