@@ -1,11 +1,12 @@
-//===- ArithReduceArea.cpp - Reduce area of arith operations ----*- C++ -*-===//
+//===- ArithReduceStrength.cpp - Reduce stregnth of arith ops ---*- C++ -*-===//
 //
-// Implements the --arith-reduce-area pass, which tranforms arithmetic
-// computations to take up less area on generated circuits.
+// Implements the --arith-reduce-strength pass, which greedily applies rewrite
+// patterns to arithmetic operations to reduce their strength, improving
+// performance and/or area.
 //
 //===----------------------------------------------------------------------===//
 
-#include "dynamatic/Transforms/ArithReduceArea.h"
+#include "dynamatic/Transforms/ArithReduceStrength.h"
 #include "circt/Dialect/Handshake/HandshakeOps.h"
 #include "dynamatic/Transforms/PassDetails.h"
 #include "mlir/Dialect/Arith/IR/Arith.h"
@@ -51,9 +52,9 @@ namespace {
 struct ReplaceMulAddWithSub : public OpRewritePattern<arith::AddIOp> {
   using OpRewritePattern<arith::AddIOp>::OpRewritePattern;
 
-  LogicalResult matchAndRewrite(arith::AddIOp op,
+  LogicalResult matchAndRewrite(arith::AddIOp addOp,
                                 PatternRewriter &rewriter) const override {
-    auto addOperands = op->getOperands();
+    auto addOperands = addOp->getOperands();
     auto add0 = addOperands[0], add1 = addOperands[1];
 
     // Check whether any operand of the addition is the result of a
@@ -61,13 +62,16 @@ struct ReplaceMulAddWithSub : public OpRewritePattern<arith::AddIOp> {
     // equivalent substraction
     if (auto newOperand = isMulTimesNegOne(add0)) {
       rewriter.replaceOp(
-          op, rewriter.create<arith::SubIOp>(op->getLoc(), add1, newOperand)
-                  ->getResults());
+          addOp,
+          rewriter.create<arith::SubIOp>(addOp->getLoc(), add1, newOperand)
+              ->getResults());
       return success();
-    } else if (auto newOperand = isMulTimesNegOne(add1)) {
+    }
+    if (auto newOperand = isMulTimesNegOne(add1)) {
       rewriter.replaceOp(
-          op, rewriter.create<arith::SubIOp>(op->getLoc(), add0, newOperand)
-                  ->getResults());
+          addOp,
+          rewriter.create<arith::SubIOp>(addOp->getLoc(), add0, newOperand)
+              ->getResults());
       return success();
     }
 
@@ -75,8 +79,9 @@ struct ReplaceMulAddWithSub : public OpRewritePattern<arith::AddIOp> {
   }
 };
 
-/// Simple greedy pattern rewrite driver for arith area reduction pass.
-struct ArithReduceAreaPass : public ArithReduceAreaBase<ArithReduceAreaPass> {
+/// Simple greedy pattern rewrite driver for arithmetic strength reduction pass.
+struct ArithReduceStrengthPass
+    : public ArithReduceStrengthBase<ArithReduceStrengthPass> {
 
   void runOnOperation() override {
     auto *ctx = &getContext();
@@ -96,7 +101,8 @@ struct ArithReduceAreaPass : public ArithReduceAreaBase<ArithReduceAreaPass> {
 } // namespace
 
 namespace dynamatic {
-std::unique_ptr<mlir::OperationPass<mlir::ModuleOp>> createArithReduceArea() {
-  return std::make_unique<ArithReduceAreaPass>();
+std::unique_ptr<mlir::OperationPass<mlir::ModuleOp>>
+createArithReduceStrength() {
+  return std::make_unique<ArithReduceStrengthPass>();
 }
 } // namespace dynamatic
