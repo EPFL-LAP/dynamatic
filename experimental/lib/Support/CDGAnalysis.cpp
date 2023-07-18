@@ -2,6 +2,16 @@
 
 using namespace dynamatic::experimental;
 
+template <class NodeT> 
+CDGNode<NodeT>::CDGNode(NodeT* BB) {
+  this->BB = BB;
+}
+
+template <class NodeT>
+NodeT* CDGNode<NodeT>::getBB() {
+  return BB;
+}
+
 // Preorder post-dominance tree traversal
 static void PostDomTreeTraversal(DominanceInfoNode *node, unsigned level) {
   if (!node || level < 0)
@@ -45,14 +55,16 @@ static void CFGTraversal(Block *rootBlock, std::set<Block *> *visitedSet,
   // end visit
 
   for (Block *successor : curr->getSuccessors()) {
-    // Check if successor is visited.
-    if (visitedSet->find(successor) != visitedSet->end()) {
-      // Node is already visited.
-      continue;
-    }
+    // llvm::outs() << "----- Edge:\n";
+    // curr->print(llvm::outs());
+    // successor->print(llvm::outs());
+    // llvm::outs() << "-----------\n";
 
     // Check if curr is not post-dominated by his successor.
     if (postDomInfo->properlyPostDominates(successor, curr)) {
+      // Every node must be marked as visited for the CDG construction purposes.
+      // We will use this set to easly traverse each node and create corresponing CDGNode object.
+      visitedSet->insert(successor);
       continue;
     }
 
@@ -63,9 +75,16 @@ static void CFGTraversal(Block *rootBlock, std::set<Block *> *visitedSet,
     CFGEdge *edge = new CFGEdge(currPostDomNode, succPostDomNode);
     edgeSet->insert(edge);
 
+    llvm::outs() << "----- Edge added to the set:\n";
     curr->print(llvm::outs());
     successor->print(llvm::outs());
-    llvm::outs() << "Edge added to the set.\n";
+    llvm::outs() << "----------------------------\n";
+
+    // Check if successor is visited.
+    if (visitedSet->find(successor) != visitedSet->end()) {
+      // Node is already visited.
+      continue;
+    }
 
     CFGTraversal(successor, visitedSet, edgeSet, postDomInfo, postDomTree);
   }
@@ -96,6 +115,40 @@ DominanceInfoNode *CFGEdge::findLCAInPostDomTree() {
   }
 
   return nullptr;
+}
+
+// CDG traversal function
+static void CDGTraversal(CDGNode<Block> *node, std::set<Block*> &visitedSet) {
+  if (!node) return;
+
+  // visit node
+  visitedSet.insert(node->getBB());
+
+  llvm::outs() << "--------- CDGNode:\n";
+  if (node->getBB()) {
+    node->getBB()->print(llvm::outs());
+  }
+  else {
+    llvm::outs() << "<entry node>\n";
+  }
+  for (auto it = node->beginSucc(); it != node->endSucc(); ++it) {
+    CDGNode<Block>* successor = *it;
+
+    llvm::outs() << "\t---- Child:";
+    successor->getBB()->print(llvm::outs());
+  }
+  // end visit
+  
+  for (auto it = node->beginSucc(); it != node->endSucc(); ++it) {
+    CDGNode<Block>* successor = *it;
+    
+    if (visitedSet.find(successor->getBB()) != visitedSet.end()) {
+      // Successor is already visited.
+      continue;
+    }
+
+    CDGTraversal(successor, visitedSet);
+  }
 }
 
 // CDG analysis function
@@ -130,6 +183,11 @@ LogicalResult dynamatic::experimental::CDGAnalysis(func::FuncOp funcOp,
   // Memory for edges is allocated on the heap.
   CFGTraversal(&rootBlockCFG, &visitedSet, &edgeSet, &postDomInfo, postDomTree);
 
+  std::unordered_map<Block*, CDGNode<Block>*> blockToCDGNodeMap;
+  for (Block* block : visitedSet) {
+    blockToCDGNodeMap[block] = new CDGNode<Block>(block);
+  }
+
   // Process each edge from the set.
   for (CFGEdge *edge : edgeSet) {
     // Find the least common ancesstor (LCA) in post-dominator tree 
@@ -139,19 +197,54 @@ LogicalResult dynamatic::experimental::CDGAnalysis(func::FuncOp funcOp,
     LCA->getBlock()->print(llvm::outs());
     llvm::outs() << "Edge processed.\n";
 
-    if (LCA == edge->from->getIDom()) {
-      // LCA is the parent of A node.
-      // TO DO: (LCA, B] nodes are control dependent on A.
+    Block *controlBlock = edge->from->getBlock(); /*A*/
+    CDGNode<Block>* controlNode = blockToCDGNodeMap[controlBlock];
 
-    } else if (LCA == edge->from) {
+    //if (LCA == edge->from->getIDom()) {
+    // LCA is the parent of A node.
+    // All nodes on the path (LCA, B] are control dependant on A.
+
+    for (DominanceInfoNode* curr = edge->to /*B*/; curr != LCA; curr = curr->getIDom() /*parent*/) {
+      Block* dependantBlock = curr->getBlock();
+      CDGNode<Block>* dependantNode = blockToCDGNodeMap[dependantBlock];
+
+      dependantNode->addPredecessor(controlNode);
+      controlNode->addSuccessor(dependantNode);
+    } // for end
+
+    //}
+    if (LCA == edge->from) {
       // LCA is the A node.
-      // TO DO: [A,B] nodes are control dependent on A. (?)
+      // All nodes on the path [LCA, B] are control dependent on A.
+      // Note that A can be control dependent on itself (loop dependency).
 
-    } else {
-      llvm::outs() << "Error in post-dominance tree.\n";
+      // TO DO (?)
+    }
+  } // process edge end
+
+  // Deallocate memory for CFGEdge objects.
+  for (auto edge : edgeSet) {
+      delete edge;
+  }
+  edgeSet.clear();
+
+  // Entry point in the CDG.
+  CDGNode<Block>* entryCDGNode = new CDGNode<Block>(nullptr);
+  // Connect all detached root CDG nodes to the entry CDG node.
+  for (auto const& pair : blockToCDGNodeMap) {
+    Block* key = pair.first;
+    CDGNode<Block>* node = pair.second;
+    
+    if (node->isRoot()) {
+      entryCDGNode->addSuccessor(node);
+      node->addPredecessor(entryCDGNode);
     }
   }
 
+  // Print the CDG.
+  visitedSet.clear();
+  CDGTraversal(entryCDGNode, visitedSet);
+
   llvm::outs() << "End of CDG analysis for FuncOp.\n";
   return success();
-}
+} // CDGAnalysis end
