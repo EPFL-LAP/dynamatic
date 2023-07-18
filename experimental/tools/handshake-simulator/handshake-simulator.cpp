@@ -1,4 +1,4 @@
-//===- handshake-runner.cpp -----------------------------------------------===//
+//===- handshake-simulator.cpp - Simulate Handshake-level code --*- C++ -*-===//
 //
 // Part of the LLVM Project, under the Apache License v2.0 with LLVM Exceptions.
 // See https://llvm.org/LICENSE.txt for license information.
@@ -6,8 +6,8 @@
 //
 //===----------------------------------------------------------------------===//
 //
-// Tool which executes a restricted form of the standard dialect, and
-// the handshake dialect.
+// Tool inherited from CIRCT which executes a restricted form of Handshake-level
+// IR.
 //
 //===----------------------------------------------------------------------===//
 
@@ -20,7 +20,6 @@
 #include "mlir/Parser/Parser.h"
 #include "llvm/Support/InitLLVM.h"
 #include "llvm/Support/SourceMgr.h"
-
 #include "circt/Dialect/Handshake/HandshakeOps.h"
 #include "circt/Dialect/Handshake/Simulation.h"
 

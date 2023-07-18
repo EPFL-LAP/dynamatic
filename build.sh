@@ -304,6 +304,7 @@ create_symlink polygeist/llvm-project/build/bin/mlir-opt
 create_symlink circt/build/bin/circt-opt
 create_symlink build/bin/dynamatic-opt
 create_symlink build/bin/exp-frequency-profiler
+create_symlink build/bin/handshake-simulator
 
 echo ""
 echo_subsection "Build successful!"
