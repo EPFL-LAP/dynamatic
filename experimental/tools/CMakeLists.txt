@@ -1,1 +1,2 @@
 add_subdirectory(FrequencyProfiler)
+add_subdirectory(handshake-simulator)
