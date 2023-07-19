@@ -33,7 +33,6 @@ struct CFGEdge {
   DominanceInfoNode *findLCAInPostDomTree();
 };
 
-
 // Class that represents a node of the Control Dependency Graph.
 // Should be used as a wrapper for type mlir::Block.
 template <class NodeT> 
@@ -48,7 +47,7 @@ class CDGNode {
 
 public:
   CDGNode(NodeT* BB);
-  NodeT* getBB();
+  NodeT* getBB() { return BB; }
 
   using iterator = typename SmallVector<CDGNode *, 4>::iterator;
   // predecessor iterator
@@ -58,15 +57,8 @@ public:
   iterator beginSucc() { return successors.begin(); }
   iterator endSucc() { return successors.end(); }
 
-  void addPredecessor(
-      CDGNode* p) {
-    predecessors.push_back(p);
-  }
-
-  void addSuccessor(
-      CDGNode* s) {
-    successors.push_back(s);
-  }
+  void addPredecessor(CDGNode* p) { predecessors.push_back(p); }
+  void addSuccessor(CDGNode* s) { successors.push_back(s); }
 
   bool isLeaf() const { return successors.empty(); }
   bool isRoot() const { return predecessors.empty(); }
@@ -78,7 +70,8 @@ public:
 };
 
 // CDG analysis function
-LogicalResult CDGAnalysis(func::FuncOp funcOp, MLIRContext *ctx);
+// Function should return a pointer to the Entry node in CDG, returns nullptr if errror occurs.
+CDGNode<Block>* CDGAnalysis(func::FuncOp funcOp, MLIRContext *ctx);
 
 } // namespace experimental
 } // namespace dynamatic

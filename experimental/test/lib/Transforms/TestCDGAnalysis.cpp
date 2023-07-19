@@ -35,9 +35,12 @@ struct TestCDGAnalysisPass
     ModuleOp mod = getOperation();
 
     // Iterate over all functions in the module
-    for (func::FuncOp funcOp : mod.getOps<func::FuncOp>())
-      if (failed(CDGAnalysis(funcOp, ctx)))
+    for (func::FuncOp funcOp : mod.getOps<func::FuncOp>()) {
+      CDGNode<Block>* entryCDGNode = CDGAnalysis(funcOp, ctx);
+      if (!entryCDGNode) {
         return signalPassFailure();
+      }
+    }
   }
 };
 } // namespace
