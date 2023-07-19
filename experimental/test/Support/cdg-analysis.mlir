@@ -7,7 +7,7 @@ func.func @test1(%arg0: i1, %arg1: i32) {
     cf.br ^bb4
   ^bb2(%1: i32):
     cf.br ^bb3
-  ^bb3():
+  ^bb3:
     cf.br ^bb4
   ^bb4:
     return

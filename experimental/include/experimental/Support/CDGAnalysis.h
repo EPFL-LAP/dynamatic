@@ -21,18 +21,6 @@ using namespace mlir;
 namespace dynamatic {
 namespace experimental {
 
-// Helper struct for CDG analysis that represents the edge (A,B) in CFG.
-struct CFGEdge {
-  DominanceInfoNode *from; // A
-  DominanceInfoNode *to;   // B
-
-  CFGEdge(DominanceInfoNode *from, DominanceInfoNode *to);
-
-  // Finds the least common ancesstor (LCA) in post-dominator tree 
-  // for nodes A and B of a CFG edge (A,B).
-  DominanceInfoNode *findLCAInPostDomTree();
-};
-
 // Class that represents a node of the Control Dependency Graph.
 // Should be used as a wrapper for type mlir::Block.
 template <class NodeT> 
@@ -46,7 +34,9 @@ class CDGNode {
   SmallVector<CDGNode *, 4> successors;
 
 public:
-  CDGNode(NodeT* BB);
+  CDGNode(NodeT* BB)
+  : BB(BB) {}
+  
   NodeT* getBB() { return BB; }
 
   using iterator = typename SmallVector<CDGNode *, 4>::iterator;
