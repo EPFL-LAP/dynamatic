@@ -99,12 +99,43 @@ static void CFGTraversal(Block *rootBlock, std::set<Block *> *visitedSet,
   }
 }
 
+static std::string toString(Block* block) {
+  std::string result;
+  llvm::raw_string_ostream ss(result);
+  block->printAsOperand(ss);
+  return ss.str();
+}
+
 // CDG traversal function
 static void CDGTraversal(CDGNode<Block> *node, std::set<Block*> &visitedSet) {
   if (!node) return;
 
   // visit node
   visitedSet.insert(node->getBB());
+
+  std::string result;
+  llvm::raw_string_ostream ss(result);
+
+  ss << "CDG Node: ";
+  if (node->getBB()) {
+   node->getBB()->printAsOperand(ss);
+  }
+  else {
+    ss << "<<entry>>";
+  }
+  ss << " Successors: [";
+  for (auto it = node->beginSucc(); it != node->endSucc(); ++it) {
+    CDGNode<Block>* successor = *it;
+    successor->getBB()->printAsOperand(ss);
+    ss << " ";
+  }
+  ss << "]\n";
+
+  if (node->getBB()) {
+    Operation* termOp = node->getBB()->getTerminator();
+    OpBuilder builder(termOp->getContext());
+    termOp->setAttr("CD", builder.getStringAttr(ss.str()));
+  }
 
   // end visit
   
@@ -187,6 +218,10 @@ CDGNode<Block>* dynamatic::experimental::CDGAnalysis(func::FuncOp funcOp,
       node->addPredecessor(entryCDGNode);
     }
   }
+
+  // Attach attributes to each BB terminator Operation, needed for testing.
+  visitedSet.clear();
+  CDGTraversal(entryCDGNode, visitedSet);
 
   return entryCDGNode;
 } // CDGAnalysis end
