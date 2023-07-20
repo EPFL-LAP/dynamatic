@@ -23,6 +23,12 @@ def ArithReduceStrength : Pass<"arith-reduce-strength", "mlir::ModuleOp"> {
     operations present in the circuit.
   }];
   let constructor = "dynamatic::createArithReduceStrength()";
+  let options =
+    [Option<"maxAdderDepthMul", "max-adder-depth-mul", "unsigned", "3",
+            "The maximum number of adders that can be chained one after the "
+            "other when replacing a multiplication with a tree of adders. "
+            "Above this number, we consider that there would be no desirable "
+            "performance/area advantage to replace the multiplication.">];
 }
 
 //===----------------------------------------------------------------------===//
