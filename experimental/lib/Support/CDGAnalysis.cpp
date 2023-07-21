@@ -44,7 +44,7 @@ struct CFGEdge {
 // Traversal of the CFG that creates set of graph edges (A,B) so A is NOT
 // post-dominated by B.
 static void CFGTraversal(Block *rootBlock, std::set<Block *> *visitedSet,
-                         std::set<CFGEdge *> *edgeSet,
+                         std::queue<CFGEdge *> *edgeSet,
                          PostDominanceInfo *postDomInfo,
                          llvm::DominatorTreeBase<Block, true> &postDomTree) {
   if (!rootBlock) {
@@ -72,7 +72,7 @@ static void CFGTraversal(Block *rootBlock, std::set<Block *> *visitedSet,
     DominanceInfoNode *currPostDomNode = postDomTree.getNode(curr);
 
     CFGEdge *edge = new CFGEdge(currPostDomNode, succPostDomNode);
-    edgeSet->insert(edge);
+    edgeSet->push(edge);
 
     // Check if successor is visited.
     if (visitedSet->find(successor) != visitedSet->end()) {
@@ -148,17 +148,19 @@ CDGNode<Block> *dynamatic::experimental::CDGAnalysis(func::FuncOp funcOp,
 
   // Find set of CFG edges (A,B) so A is NOT post-dominated by B.
   std::set<Block *> visitedSet;
-  std::set<CFGEdge *> edgeSet;
+  std::queue<CFGEdge *> edgeSet;
   // Memory for edges is allocated on the heap.
   CFGTraversal(&rootBlockCFG, &visitedSet, &edgeSet, &postDomInfo, postDomTree);
 
-  std::unordered_map<Block *, CDGNode<Block> *> blockToCDGNodeMap;
+  std::map<Block *, CDGNode<Block> *> blockToCDGNodeMap;
   for (Block *block : visitedSet) {
     blockToCDGNodeMap[block] = new CDGNode<Block>(block);
   }
 
   // Process each edge from the set.
-  for (CFGEdge *edge : edgeSet) {
+  while (!edgeSet.empty()) {
+    CFGEdge *edge = edgeSet.front();
+    edgeSet.pop();
     // Find the least common ancesstor (LCA) in post-dominator tree
     // of A and B for each CFG edge (A,B).
     DominanceInfoNode *LCA = edge->findLCAInPostDomTree();
@@ -177,13 +179,10 @@ CDGNode<Block> *dynamatic::experimental::CDGAnalysis(func::FuncOp funcOp,
       dependantNode->addPredecessor(controlNode);
       controlNode->addSuccessor(dependantNode);
     } // for end
-  }   // process edge end
 
-  // Deallocate memory for CFGEdge objects.
-  for (auto edge : edgeSet) {
+    // Deallocate memory for CFGEdge objects.
     delete edge;
-  }
-  edgeSet.clear();
+  } // process edge end
 
   // Entry point in the CDG.
   CDGNode<Block> *entryCDGNode = new CDGNode<Block>(nullptr);

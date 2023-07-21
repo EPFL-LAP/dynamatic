@@ -29,11 +29,11 @@ func.func @test1(%arg0: i1, %arg1: i32) {
 
 // CHECK-LABEL:   func.func @test2(
 // CHECK-SAME:                     %[[VAL_0:.*]]: i1, %[[VAL_1:.*]]: i1, %[[VAL_2:.*]]: i1) {
-// CHECK:           cf.cond_br %[[VAL_0]], ^bb1, ^bb2 {CD = "^bb0 [^bb2 ^bb5 ^bb1 ]"}
+// CHECK:           cf.cond_br %[[VAL_0]], ^bb1, ^bb2 {CD = "^bb0 [^bb1 ^bb2 ^bb5 ]"}
 // CHECK:         ^bb1:
 // CHECK:           cf.br ^bb6 {CD = "^bb1 []"}
 // CHECK:         ^bb2:
-// CHECK:           cf.cond_br %[[VAL_1]], ^bb3, ^bb4 {CD = "^bb2 [^bb4 ^bb3 ]"}
+// CHECK:           cf.cond_br %[[VAL_1]], ^bb3, ^bb4 {CD = "^bb2 [^bb3 ^bb4 ]"}
 // CHECK:         ^bb3:
 // CHECK:           cf.cond_br %[[VAL_1]], ^bb5, ^bb4 {CD = "^bb3 [^bb4 ]"}
 // CHECK:         ^bb4:
@@ -65,7 +65,7 @@ func.func @test2(%c0: i1, %c2: i1, %c3: i1) {
 // CHECK-SAME:                     %[[VAL_0:.*]]: i1, %[[VAL_1:.*]]: i1, %[[VAL_2:.*]]: i1) {
 // CHECK:           cf.cond_br %[[VAL_0]], ^bb1, ^bb2 {CD = "^bb0 [^bb1 ^bb5 ^bb2 ]"}
 // CHECK:         ^bb1:
-// CHECK:           cf.cond_br %[[VAL_1]], ^bb3, ^bb4 {CD = "^bb1 [^bb4 ^bb3 ]"}
+// CHECK:           cf.cond_br %[[VAL_1]], ^bb3, ^bb4 {CD = "^bb1 [^bb3 ^bb4 ]"}
 // CHECK:         ^bb2:
 // CHECK:           cf.cond_br %[[VAL_2]], ^bb4, ^bb6 {CD = "^bb2 [^bb4 ^bb5 ]"}
 // CHECK:         ^bb3:

@@ -14,6 +14,7 @@
 #include "mlir/IR/MLIRContext.h"
 #include "mlir/IR/Region.h"
 #include "mlir/Pass/Pass.h"
+#include <queue>
 #include <set>
 
 using namespace mlir;
