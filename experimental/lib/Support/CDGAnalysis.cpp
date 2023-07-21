@@ -41,22 +41,6 @@ namespace {
 
 }
 
-// Preorder post-dominance tree traversal
-static void PostDomTreeTraversal(DominanceInfoNode *node, unsigned level) {
-  if (!node || level < 0)
-    return;
-
-  // visit
-
-  // end of visit
-
-  for (typename DominanceInfoNode::iterator i = node->begin(),
-                                            end = node->end();
-       i != end; ++i) {
-    PostDomTreeTraversal(*i, level + 1);
-  }
-}
-
 // Traversal of the CFG that creates set of graph edges (A,B) so A is NOT
 // post-dominated by B.
 static void CFGTraversal(Block *rootBlock, std::set<Block *> *visitedSet, 
@@ -99,13 +83,6 @@ static void CFGTraversal(Block *rootBlock, std::set<Block *> *visitedSet,
   }
 }
 
-static std::string toString(Block* block) {
-  std::string result;
-  llvm::raw_string_ostream ss(result);
-  block->printAsOperand(ss);
-  return ss.str();
-}
-
 // CDG traversal function
 static void CDGTraversal(CDGNode<Block> *node, std::set<Block*> &visitedSet) {
   if (!node) return;
@@ -116,14 +93,13 @@ static void CDGTraversal(CDGNode<Block> *node, std::set<Block*> &visitedSet) {
   std::string result;
   llvm::raw_string_ostream ss(result);
 
-  ss << "CDG Node: ";
   if (node->getBB()) {
    node->getBB()->printAsOperand(ss);
   }
   else {
-    ss << "<<entry>>";
+    ss << "^entry";
   }
-  ss << " Successors: [";
+  ss << " [";
   for (auto it = node->beginSucc(); it != node->endSucc(); ++it) {
     CDGNode<Block>* successor = *it;
     successor->getBB()->printAsOperand(ss);
@@ -210,7 +186,6 @@ CDGNode<Block>* dynamatic::experimental::CDGAnalysis(func::FuncOp funcOp,
   CDGNode<Block>* entryCDGNode = new CDGNode<Block>(nullptr);
   // Connect all detached root CDG nodes to the entry CDG node.
   for (auto const& pair : blockToCDGNodeMap) {
-    Block* key = pair.first;
     CDGNode<Block>* node = pair.second;
     
     if (node->isRoot()) {
