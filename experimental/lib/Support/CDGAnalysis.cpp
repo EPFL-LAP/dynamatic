@@ -85,7 +85,8 @@ static void CFGTraversal(Block *rootBlock, std::set<Block *> *visitedSet,
 }
 
 // CDG traversal function
-static void CDGTraversal(CDGNode<Block> *node, std::set<Block *> &visitedSet) {
+void dynamatic::experimental::CDGTraversal(CDGNode<Block> *node,
+                                           std::set<Block *> &visitedSet) {
   if (!node)
     return;
 
@@ -96,9 +97,8 @@ static void CDGTraversal(CDGNode<Block> *node, std::set<Block *> &visitedSet) {
   llvm::raw_string_ostream ss(result);
 
   if (node->getBB()) {
-   node->getBB()->printAsOperand(ss);
-  }
-  else {
+    node->getBB()->printAsOperand(ss);
+  } else {
     ss << "^entry";
   }
   ss << " [";
@@ -125,7 +125,7 @@ static void CDGTraversal(CDGNode<Block> *node, std::set<Block *> &visitedSet) {
       continue;
     }
 
-    CDGTraversal(successor, visitedSet);
+    dynamatic::experimental::CDGTraversal(successor, visitedSet);
   }
 }
 
@@ -188,18 +188,14 @@ CDGNode<Block> *dynamatic::experimental::CDGAnalysis(func::FuncOp funcOp,
   // Entry point in the CDG.
   CDGNode<Block> *entryCDGNode = new CDGNode<Block>(nullptr);
   // Connect all detached root CDG nodes to the entry CDG node.
-  for (auto const& pair : blockToCDGNodeMap) {
-    CDGNode<Block>* node = pair.second;
-    
+  for (auto const &pair : blockToCDGNodeMap) {
+    CDGNode<Block> *node = pair.second;
+
     if (node->isRoot()) {
       entryCDGNode->addSuccessor(node);
       node->addPredecessor(entryCDGNode);
     }
   }
-
-  // Attach attributes to each BB terminator Operation, needed for testing.
-  visitedSet.clear();
-  CDGTraversal(entryCDGNode, visitedSet);
 
   return entryCDGNode;
 } // CDGAnalysis end

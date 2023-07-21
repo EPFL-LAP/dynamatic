@@ -6,11 +6,11 @@
 //===----------------------------------------------------------------------===//
 
 #include "dynamatic/Support/LLVM.h"
+#include "mlir/Dialect/Func/IR/FuncOps.h"
 #include "mlir/IR/Builders.h"
 #include "mlir/IR/BuiltinOps.h"
 #include "mlir/IR/MLIRContext.h"
 #include "mlir/Pass/Pass.h"
-#include "mlir/Dialect/Func/IR/FuncOps.h"
 
 #include "experimental/Support/CDGAnalysis.h"
 
@@ -36,10 +36,15 @@ struct TestCDGAnalysisPass
 
     // Iterate over all functions in the module
     for (func::FuncOp funcOp : mod.getOps<func::FuncOp>()) {
-      CDGNode<Block>* entryCDGNode = CDGAnalysis(funcOp, ctx);
+      CDGNode<Block> *entryCDGNode = CDGAnalysis(funcOp, ctx);
+
       if (!entryCDGNode) {
         return signalPassFailure();
       }
+
+      // Attach attributes to each BB terminator Operation, needed for testing.
+      std::set<Block *> visitedSet;
+      CDGTraversal(entryCDGNode, visitedSet);
     }
   }
 };

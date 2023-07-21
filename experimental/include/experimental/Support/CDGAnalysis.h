@@ -23,9 +23,9 @@ namespace experimental {
 
 // Class that represents a node of the Control Dependency Graph.
 // Should be used as a wrapper for type mlir::Block.
-template <class NodeT> 
+template <class NodeT>
 class CDGNode {
-  NodeT* BB;
+  NodeT *BB;
 
   // This CDGNode is control dependent on its predecessors.
   SmallVector<CDGNode *, 4> predecessors;
@@ -34,10 +34,9 @@ class CDGNode {
   SmallVector<CDGNode *, 4> successors;
 
 public:
-  CDGNode(NodeT* BB)
-  : BB(BB) {}
-  
-  NodeT* getBB() { return BB; }
+  CDGNode(NodeT *BB) : BB(BB) {}
+
+  NodeT *getBB() { return BB; }
 
   using iterator = typename SmallVector<CDGNode *, 4>::iterator;
   // predecessor iterator
@@ -47,8 +46,8 @@ public:
   iterator beginSucc() { return successors.begin(); }
   iterator endSucc() { return successors.end(); }
 
-  void addPredecessor(CDGNode* p) { predecessors.push_back(p); }
-  void addSuccessor(CDGNode* s) { successors.push_back(s); }
+  void addPredecessor(CDGNode *p) { predecessors.push_back(p); }
+  void addSuccessor(CDGNode *s) { successors.push_back(s); }
 
   bool isLeaf() const { return successors.empty(); }
   bool isRoot() const { return predecessors.empty(); }
@@ -60,8 +59,12 @@ public:
 };
 
 // CDG analysis function
-// Function should return a pointer to the Entry node in CDG, returns nullptr if errror occurs.
-CDGNode<Block>* CDGAnalysis(func::FuncOp funcOp, MLIRContext *ctx);
+// Function should return a pointer to the Entry node in CDG, returns nullptr if
+// errror occurs.
+CDGNode<Block> *CDGAnalysis(func::FuncOp funcOp, MLIRContext *ctx);
+
+// Attach attributes to each BB terminator Operation, needed for testing.
+void CDGTraversal(CDGNode<Block> *node, std::set<Block *> &visitedSet);
 
 } // namespace experimental
 } // namespace dynamatic
