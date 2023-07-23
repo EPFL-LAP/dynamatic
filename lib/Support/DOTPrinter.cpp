@@ -11,6 +11,7 @@
 #include "circt/Dialect/Handshake/HandshakePasses.h"
 #include "dynamatic/Conversion/PassDetails.h"
 #include "dynamatic/Support/LogicBB.h"
+#include "dynamatic/Transforms/HandshakeConcretizeIndexType.h"
 #include "mlir/Dialect/Arith/IR/Arith.h"
 #include "mlir/IR/BuiltinTypes.h"
 #include "mlir/IR/OperationSupport.h"
@@ -133,10 +134,9 @@ static std::unordered_map<arith::CmpFPredicate, std::string> cmpFNameToOpName{
 /// Returns the width of a "handshake type" (i.e., width of data signal). In
 /// particular, returns 0 for NoneType's.
 static unsigned getWidth(Type dataType) {
-  return llvm::TypeSwitch<Type, unsigned>(dataType)
-      .Case<NoneType>([&](auto) { return 0; })
-      .Case<IndexType>([&](auto) { return 32; })
-      .Default([&](auto) { return dataType.getIntOrFloatBitWidth(); });
+  if (isa<NoneType>(dataType))
+    return 0;
+  return dataType.getIntOrFloatBitWidth();
 }
 
 /// Returns the width of a handshake value (i.e., width of data signal). In
@@ -1015,6 +1015,24 @@ LogicalResult DOTPrinter::printDOT(mlir::ModuleOp mod) {
     return failure();
   }
   handshake::FuncOp funcOp = *funcs.begin();
+
+  if (legacy) {
+    // In legacy mode, the IR must respect certain additional constraints for it
+    // to be compatible with legacy Dynamatic.
+
+    if (failed(verifyAllValuesHasOneUse(funcOp)))
+      return funcOp.emitOpError()
+             << "In legacy mode, all values in the IR must have exactly one "
+                "use to ensure that the DOT is compatible with legacy "
+                "Dynamatic. Run the --handshake-materialize-forks-sinks pass "
+                "before to insert forks and sinks in the IR and make every "
+                "value used exactly once.";
+    if (failed(verifyAllIndexConcretized(funcOp)))
+      return funcOp.emitOpError()
+             << "In legacy mode, all index types in the IR must be concretized "
+                "to ensure that the DOT is compatible with legacy Dynamatic. "
+             << ERR_RUN_CONCRETIZATION;
+  }
 
   mlir::raw_indented_ostream os(llvm::outs());
 

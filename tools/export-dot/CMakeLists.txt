@@ -10,8 +10,10 @@ llvm_update_compile_flags(export-dot)
 target_link_libraries(export-dot
   PRIVATE
   DynamaticSupport
-  
+  DynamaticTransforms
+
   CIRCTHandshake
+  CIRCTHandshakeTransforms
 
   MLIRIR
   MLIRParser
