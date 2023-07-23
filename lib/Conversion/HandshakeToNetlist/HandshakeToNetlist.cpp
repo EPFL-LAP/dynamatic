@@ -13,6 +13,7 @@
 #include "circt/Dialect/Handshake/HandshakeOps.h"
 #include "circt/Dialect/Handshake/HandshakePasses.h"
 #include "dynamatic/Conversion/PassDetails.h"
+#include "dynamatic/Transforms/HandshakeConcretizeIndexType.h"
 #include "mlir/Dialect/Arith/IR/Arith.h"
 #include "mlir/Dialect/MemRef/IR/MemRef.h"
 #include "mlir/IR/BuiltinTypes.h"
@@ -737,10 +738,20 @@ public:
     }
     handshake::FuncOp funcOp = *functions.begin();
 
-    // Lowering to HW requires that every value is used exactly once.
-    // Check whether this precondition is met, and if not, exit
+    // Check that some preconditions are met before doing anything
     if (failed(verifyAllValuesHasOneUse(funcOp))) {
-      funcOp.emitOpError() << "not all values are used exactly once";
+      funcOp.emitOpError()
+          << "Lowering to netlist requires that all values in the IR are used "
+             "exactly once. Run the --handshake-materialize-forks-sinks pass "
+             "before to insert forks and sinks in the IR and make every "
+             "value used exactly once.";
+      return signalPassFailure();
+    }
+    if (failed(verifyAllIndexConcretized(funcOp))) {
+      funcOp.emitOpError()
+          << "Lowering to netlist requires that all index types in the IR have "
+             "been concretized."
+          << ERR_RUN_CONCRETIZATION;
       return signalPassFailure();
     }
 
