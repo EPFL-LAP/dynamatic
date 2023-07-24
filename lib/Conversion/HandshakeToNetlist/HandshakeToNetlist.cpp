@@ -304,7 +304,6 @@ static std::string getExtModuleName(Operation *oldOp) {
           extModName += getTypeName(outType, loc);
       })
       .Case<handshake::MemoryControllerOp> ([&](handshake::MemoryControllerOp op) {
-        auto [inTypesMem, outTypesMem] = getDiscriminatingParameters(op);
         auto [ctrlWidth, addrWidth, dataWidth] = op.getBitwidths();
         // data bitwidth
         extModName += '_' + std::to_string(dataWidth);
