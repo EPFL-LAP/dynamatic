@@ -171,10 +171,10 @@ static std::string getTypeName(Type type, Location loc) {
   // Integer-like types
   if (type.isIntOrIndex()) {
     if (auto indexType = type.dyn_cast<IndexType>())
-      return "_ui" + std::to_string(indexType.kInternalStorageBitWidth);
+      return "_i" + std::to_string(indexType.kInternalStorageBitWidth);
     if (type.isSignedInteger())
-      return "_si" + std::to_string(type.getIntOrFloatBitWidth());
-    return "_ui" + std::to_string(type.getIntOrFloatBitWidth());
+      return "_i" + std::to_string(type.getIntOrFloatBitWidth());
+    return "_i" + std::to_string(type.getIntOrFloatBitWidth());
   }
 
   // Float type
@@ -203,67 +203,71 @@ static std::string getTypeName(Type type, Location loc) {
 static std::string getExtModuleName(Operation *oldOp) {
   
   std::string extModName = getBareExtModuleName(oldOp);
-  auto [inTypes, outTypes] = getDiscriminatingParameters(oldOp);
+  auto types = getDiscriminatingParameters(oldOp);
+  mlir::Location loc = oldOp->getLoc();
+  SmallVector<Type> &inTypes = types.first;
+  SmallVector<Type> &outTypes = types.second;
 
   llvm::TypeSwitch<Operation *>(oldOp)
       .Case<handshake::BufferOp>([&](auto) {
-        // bitwidth:
-        extModName += getTypeName(*outTypes.begin(), oldOp->getLoc());
-        // buffer type:
+        // bitwidth
+        extModName += getTypeName(outTypes[0], loc);
+        // buffer type
         auto bufferOp = dyn_cast<handshake::BufferOp>(oldOp);
         if (bufferOp.isSequential())
           extModName += "_seq";
         else
           extModName += "_fifo";
-        //number of slots
+        // number of slots
         extModName += "_" + std::to_string(bufferOp.getNumSlots());
       })
       .Case<handshake::ForkOp, handshake::LazyForkOp> ([&](auto) {
-        // number of outputs:
+        // number of outputs
         extModName += "_" + std::to_string(outTypes.size());
-        // bitwidth:
-        extModName += getTypeName(*outTypes.begin(), oldOp->getLoc());
+        // bitwidth
+        extModName += getTypeName(outTypes[0], loc);
       })
       .Case<handshake::MuxOp> ([&](auto) {
-        // number of inputs (without select param):
+        // number of inputs (without select param)
         extModName += "_" + std::to_string(inTypes.size() - 1);
-        // bitwidth:
-        extModName += getTypeName(*(inTypes.begin() + 1), oldOp->getLoc());
-        // select bitwidth:
-        extModName += getTypeName(*(inTypes.begin()), oldOp->getLoc());
+        // bitwidth
+        extModName += getTypeName(inTypes[1], loc);
+        // select bitwidth
+        extModName += getTypeName(inTypes[0], loc);
       })
       .Case<handshake::ControlMergeOp> ([&](auto) {
         // number of inputs
         extModName += "_" + std::to_string(inTypes.size());
-        // bitwidth:
-        extModName += getTypeName(*inTypes.begin(), oldOp->getLoc());
-        // index result bitwidth:
-        extModName += getTypeName(*(outTypes.end() - 1), oldOp->getLoc());
+        // bitwidth
+        extModName += getTypeName(inTypes[0], loc);
+        // index result bitwidth
+        extModName += getTypeName(outTypes[outTypes.size() - 1], loc);
       })
       .Case<handshake::MergeOp> ([&](auto) {
         // number of inputs
         extModName += "_" + std::to_string(inTypes.size());
-        // bitwidth:
-        extModName += getTypeName(*inTypes.begin(), oldOp->getLoc());
+        // bitwidth
+        extModName += getTypeName(inTypes[0], loc);
       })
       .Case<handshake::ConditionalBranchOp> ([&](auto) {
-        extModName += getTypeName(*(inTypes.begin() + 1), oldOp->getLoc());
+        // bitwidth
+        extModName += getTypeName(inTypes[1], loc);
       })
       .Case<handshake::BranchOp, handshake::SinkOp, handshake::SourceOp> ([&](auto) {
-        // bitwidth:
+        // bitwidth
         if (!inTypes.empty())
-          extModName += getTypeName(*inTypes.begin(), oldOp->getLoc());
+          extModName += getTypeName(inTypes[0], loc);
         else
-          extModName += getTypeName(*outTypes.begin(), oldOp->getLoc());
+          extModName += getTypeName(outTypes[0], loc);
       })
       .Case<handshake::DynamaticLoadOp, handshake::DynamaticStoreOp> ([&](auto) {
-        // data bitwidth:
-        extModName += getTypeName(*inTypes.begin(), oldOp->getLoc());
-        // adress bitwidth:
-        extModName += getTypeName(*(inTypes.begin() + 1), oldOp->getLoc());
+        // data bitwidth
+        extModName += getTypeName(inTypes[0], loc);
+        // address bitwidth
+        extModName += getTypeName(inTypes[1], loc);
       })
       .Case<handshake::ConstantOp> ([&](auto) {
-        // constant value:
+        // constant value
         if (auto constOp = dyn_cast<handshake::ConstantOp>(oldOp)) {
           if (auto intAttr = constOp.getValue().dyn_cast<IntegerAttr>()) {
             auto intType = intAttr.getType();
@@ -280,48 +284,47 @@ static std::string getExtModuleName(Operation *oldOp) {
           else
             oldOp->emitError("unsupported constant type");
         }
-        // bitwidth:
-        extModName += getTypeName(*inTypes.begin(), oldOp->getLoc());
+        // bitwidth
+        extModName += getTypeName(inTypes[0], loc);
       })
       .Case<handshake::JoinOp, handshake::SyncOp> ([&](auto) {
-        // array of bitwidths:
+        // array of bitwidths
         for (auto inType : inTypes)
-          extModName += getTypeName(inType, oldOp->getLoc());
+          extModName += getTypeName(inType, loc);
       })
       .Case<handshake::DynamaticReturnOp, handshake::EndOp> ([&](auto) {
         extModName += "_in";
-        // array of input bitwidths:
+        // array of input bitwidths
         for (auto inType : inTypes)
-        extModName += getTypeName(inType, oldOp->getLoc());
+        extModName += getTypeName(inType, loc);
         extModName += "_out";
-        // array of output bitwidths:
+        // array of output bitwidths
         for (auto outType : outTypes)
-          extModName += getTypeName(outType, oldOp->getLoc());
+          extModName += getTypeName(outType, loc);
       })
       .Case<handshake::MemoryControllerOp> ([&](handshake::MemoryControllerOp op) {
         auto [inTypesMem, outTypesMem] = getDiscriminatingParameters(op);
-        // data bitwidth:
-        extModName += getTypeName(*inTypesMem.begin(), op->getLoc());
-        // address bitwidth:
+        // data bitwidth
+        extModName += getTypeName(inTypesMem[0], op->getLoc());
+
         auto [ctrlWidth, addrWidth, dataWidth] = op.getBitwidths();
-        // ctrl bitwith:
-        if (ctrlWidth.has_value()) {
+        // ctrl bitwith
+        if (ctrlWidth.has_value())
           extModName += '_' + std::to_string(ctrlWidth.value());
-        } else {
+        else
           extModName += "_0";
-        }
-        // address bitwidth:
+  
+        // address bitwidth
         extModName += '_' + std::to_string(addrWidth);
         
-        // array of loads&stores arrays:
+        // array of loads&stores arrays
         for (auto [idx, blockAccesses] : llvm::enumerate(op.getAccesses())) {
           extModName += "_";
           for (auto &access : cast<mlir::ArrayAttr>(blockAccesses))
             if (cast<AccessTypeEnumAttr>(access).getValue() == AccessTypeEnum::Load)
               extModName += "L";
-            else {
+            else
               extModName += "S";
-            }
         }
       })
       .Case<arith::AddFOp, arith::AddIOp, arith::AndIOp, arith::BitcastOp,
@@ -332,28 +335,28 @@ static std::string getExtModuleName(Operation *oldOp) {
       arith::RemFOp, arith::RemSIOp, arith::RemUIOp, arith::ShLIOp,
       arith::ShRSIOp, arith::ShRUIOp, arith::SubFOp, arith::SubIOp,
       arith::XOrIOp, arith::SelectOp>([&](auto) {
-        // bitwidth:
-        extModName += getTypeName(*inTypes.begin(), oldOp->getLoc());
+        // bitwidth
+        extModName += getTypeName(inTypes[0], loc);
       })
       .Case<arith::CmpFOp, arith::CmpIOp> ([&](auto) {
-        // predicate:
+        // predicate
         if (auto cmpOp = dyn_cast<mlir::arith::CmpIOp>(oldOp))
           extModName += "_" + stringifyEnum(cmpOp.getPredicate()).str();
-        if (auto cmpOp = dyn_cast<mlir::arith::CmpFOp>(oldOp))
+        else if (auto cmpOp = dyn_cast<mlir::arith::CmpFOp>(oldOp))
           extModName += "_" + stringifyEnum(cmpOp.getPredicate()).str();
-        // bitwidth:
-        extModName += getTypeName(*inTypes.begin(), oldOp->getLoc()); 
+        // bitwidth
+        extModName += getTypeName(inTypes[0], loc); 
       })
       .Case<arith::ExtFOp, arith::ExtSIOp, arith::ExtUIOp, arith::FPToSIOp,
       arith::FPToUIOp, arith::SIToFPOp, arith::TruncFOp, arith::TruncIOp,
       arith::UIToFPOp> ([&](auto) {
-        // input bitwidth:
-        extModName += getTypeName(*inTypes.begin(), oldOp->getLoc());;
-        // output bitwidth:
-        extModName += getTypeName(*outTypes.begin(), oldOp->getLoc());;
+        // input bitwidth
+        extModName += getTypeName(inTypes[0], loc);
+        // output bitwidth
+        extModName += getTypeName(outTypes[0], loc);
       })
       .Default([&](auto) {
-        llvm::errs() << "The component" << extModName << " is not recognized!\n";
+        oldOp->emitError() << "No matching component for operation";
       });
 
   return extModName;
