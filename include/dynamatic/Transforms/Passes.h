@@ -9,7 +9,7 @@
 
 #include "dynamatic/Support/LLVM.h"
 #include "dynamatic/Transforms/AnalyzeMemoryAccesses.h"
-#include "dynamatic/Transforms/ArithReduceArea.h"
+#include "dynamatic/Transforms/ArithReduceStrength.h"
 #include "dynamatic/Transforms/BufferPlacement/HandshakePlaceBuffers.h"
 #include "dynamatic/Transforms/FlattenMemRefRowMajor.h"
 #include "dynamatic/Transforms/HandshakeConcretizeIndexType.h"

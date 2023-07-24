@@ -14,13 +14,21 @@ include "mlir/Pass/PassBase.td"
 // Arith passes
 //===----------------------------------------------------------------------===//
 
-def ArithReduceArea : Pass<"arith-reduce-area", "mlir::ModuleOp"> {
-  let summary = "Reduces area taken up by arithmetic operations.";
+def ArithReduceStrength : Pass<"arith-reduce-strength", "mlir::ModuleOp"> {
+  let summary = "Strength reduction of arithmetic operations";
   let description = [{
-    Optimizes arithmetic operations to reduce the total area taken up by the
-    circuit that will be generated for the module.
+    Performs strength reduction on arithmetic operations in the context of
+    dataflow circuits implemented on FPGAs. The goal of the pass is to increase
+    circuit performance and reduce the area corresponding to arithmetic
+    operations present in the circuit.
   }];
-  let constructor = "dynamatic::createArithReduceArea()";
+  let constructor = "dynamatic::createArithReduceStrength()";
+  let options =
+    [Option<"maxAdderDepthMul", "max-adder-depth-mul", "unsigned", "3",
+            "The maximum number of adders that can be chained one after the "
+            "other when replacing a multiplication with a tree of adders. "
+            "Above this number, we consider that there would be no desirable "
+            "performance/area advantage to replace the multiplication.">];
 }
 
 //===----------------------------------------------------------------------===//

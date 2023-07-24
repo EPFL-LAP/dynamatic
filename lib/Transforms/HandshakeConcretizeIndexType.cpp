@@ -9,7 +9,6 @@
 //===----------------------------------------------------------------------===//
 
 #include "dynamatic/Transforms/HandshakeConcretizeIndexType.h"
-#include "circt/Dialect/Handshake/HandshakeOps.h"
 #include "dynamatic/Analysis/ConstantAnalysis.h"
 #include "dynamatic/Support/LogicBB.h"
 #include "dynamatic/Transforms/HandshakeMinimizeCstWidth.h"
@@ -30,6 +29,44 @@ static Type sameOrIndexToInt(Type type, unsigned width) {
   if (isNotIndexType(type))
     return type;
   return IntegerType::get(type.getContext(), width);
+}
+
+LogicalResult dynamatic::verifyAllIndexConcretized(Operation *op) {
+  if (!llvm::all_of(op->getOperandTypes(), isNotIndexType) ||
+      !llvm::all_of(op->getResultTypes(), isNotIndexType))
+    return op->emitError()
+           << "Operation has at least one index-typed operand or result.";
+  return success();
+}
+
+LogicalResult dynamatic::verifyAllIndexConcretized(handshake::FuncOp funcOp) {
+  // Check the function signature
+  if (!llvm::all_of(funcOp.getArgumentTypes(), isNotIndexType) ||
+      !llvm::all_of(funcOp.getResultTypes(), isNotIndexType))
+    return funcOp.emitError()
+           << "Function has at least one index-typed argument or result.";
+
+  // Check all operations inside the function
+  // NOTE: (lucas) Using a for loop instead of llvm::all_of here as the fact
+  // that verifyAllIndexConcretized is overloaded trips out type inference and
+  // fails to compile the latter
+  // NOLINTNEXTLINE(readability-use-anyofallof)
+  for (Operation &op : funcOp.getOps())
+    if (failed(verifyAllIndexConcretized(&op)))
+      return failure();
+  return success();
+}
+
+LogicalResult dynamatic::verifyAllIndexConcretized(ModuleOp modOp) {
+  // Check all functions inside the module
+  // NOTE: (lucas) Using a for loop instead of llvm::all_of here as the fact
+  // that verifyAllIndexConcretized is overloaded trips out type inference and
+  // fails to compile the latter
+  // NOLINTNEXTLINE(readability-use-anyofallof)
+  for (auto funcOp : modOp.getOps<handshake::FuncOp>())
+    if (failed(verifyAllIndexConcretized(funcOp)))
+      return failure();
+  return success();
 }
 
 namespace {
@@ -90,8 +127,8 @@ struct ReplaceIndexCast : public OpRewritePattern<Op> {
       // Simply bypass the cast operation if widths match
       rewriter.replaceOp(indexCastOp, fromVal);
     else {
-      // Insert an explicit truncation/extension operation to replace the index
-      // cast
+      // Insert an explicit truncation/extension operation to replace the
+      // index cast
       rewriter.setInsertionPoint(indexCastOp);
       Operation *castOp;
       if (fromWidth < toWidth)
@@ -125,8 +162,8 @@ struct ReplaceConstantOpAttr : public OpRewritePattern<handshake::ConstantOp> {
                          cstOp.getValue().cast<IntegerAttr>().getInt());
     cstOp.setValueAttr(newAttr);
 
-    // Check whether index concretization created a duplicated constant; if so,
-    // delete the duplicate
+    // Check whether index concretization created a duplicated constant; if
+    // so, delete the duplicate
     if (auto otherCstOp = findEquivalentCst(cstOp))
       rewriter.replaceOp(cstOp, otherCstOp.getResult());
 
