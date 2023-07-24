@@ -172,10 +172,10 @@ static std::string getTypeName(Type type, Location loc) {
   // Integer-like types
   if (type.isIntOrIndex()) {
     if (auto indexType = type.dyn_cast<IndexType>())
-      return "_i" + std::to_string(indexType.kInternalStorageBitWidth);
+      return "_" + std::to_string(indexType.kInternalStorageBitWidth);
     if (type.isSignedInteger())
-      return "_i" + std::to_string(type.getIntOrFloatBitWidth());
-    return "_i" + std::to_string(type.getIntOrFloatBitWidth());
+      return "_" + std::to_string(type.getIntOrFloatBitWidth());
+    return "_" + std::to_string(type.getIntOrFloatBitWidth());
   }
 
   // Float type
@@ -305,16 +305,11 @@ static std::string getExtModuleName(Operation *oldOp) {
       })
       .Case<handshake::MemoryControllerOp> ([&](handshake::MemoryControllerOp op) {
         auto [inTypesMem, outTypesMem] = getDiscriminatingParameters(op);
-        // data bitwidth
-        extModName += getTypeName(inTypesMem[0], op->getLoc());
-
         auto [ctrlWidth, addrWidth, dataWidth] = op.getBitwidths();
+        // data bitwidth
+        extModName += '_' + std::to_string(dataWidth);
         // ctrl bitwith
-        if (ctrlWidth.has_value())
-          extModName += '_' + std::to_string(ctrlWidth.value());
-        else
-          extModName += "_0";
-  
+        extModName += '_' + std::to_string(ctrlWidth);
         // address bitwidth
         extModName += '_' + std::to_string(addrWidth);
         
