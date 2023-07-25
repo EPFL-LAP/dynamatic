@@ -170,13 +170,8 @@ static DiscriminatingTypes getDiscriminatingParameters(Operation *op) {
 /// location if the type isn't supported.
 static std::string getTypeName(Type type, Location loc) {
   // Integer-like types
-  if (type.isIntOrIndex()) {
-    if (auto indexType = type.dyn_cast<IndexType>())
-      return "_" + std::to_string(indexType.kInternalStorageBitWidth);
-    if (type.isSignedInteger())
-      return "_" + std::to_string(type.getIntOrFloatBitWidth());
+  if (type.isIntOrIndex())
     return "_" + std::to_string(type.getIntOrFloatBitWidth());
-  }
 
   // Float type
   if (isa<FloatType>(type))
@@ -297,7 +292,7 @@ static std::string getExtModuleName(Operation *oldOp) {
         extModName += "_in";
         // array of input bitwidths
         for (auto inType : inTypes)
-        extModName += getTypeName(inType, loc);
+          extModName += getTypeName(inType, loc);
         extModName += "_out";
         // array of output bitwidths
         for (auto outType : outTypes)
