@@ -252,7 +252,7 @@ createModelConstraints(GRBModel &modelBuf, GRBVar &thrpt, double targetCP,
     double delayReady = getCombinationalDelay(op, unitInfo, "ready");
     double latency = getUnitLatency(op, unitInfo);
 
-    GRBVar &retIn = unitVars[op].retIn;
+    GRBVar &retIn = unitVar.retIn;
     GRBVar &retOut = unitVar.retOut;
 
     if (unitVar.select)
