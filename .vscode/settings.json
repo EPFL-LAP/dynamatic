@@ -23,6 +23,7 @@
     "-DLLVM_ENABLE_LLD=ON",
   ],
   "files.associations": {
-    "*.inc": "cpp"
+    "*.inc": "cpp",
+    "list": "cpp"
   }
 }

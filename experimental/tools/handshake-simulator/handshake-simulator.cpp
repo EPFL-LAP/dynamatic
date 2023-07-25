@@ -11,23 +11,30 @@
 //
 //===----------------------------------------------------------------------===//
 
+#include "circt/Dialect/Handshake/HandshakeOps.h"
+#include "circt/Support/JSON.h"
 #include "circt/Support/Version.h"
+#include "experimental/tools/handshake-simulator/Simulation.h"
+#include "llvm/Support/InitLLVM.h"
+#include "llvm/Support/SourceMgr.h"
 #include "mlir/Dialect/Func/IR/FuncOps.h"
 #include "mlir/Dialect/LLVMIR/LLVMDialect.h"
 #include "mlir/Dialect/MemRef/IR/MemRef.h"
 #include "mlir/IR/BuiltinOps.h"
 #include "mlir/IR/MLIRContext.h"
 #include "mlir/Parser/Parser.h"
-#include "llvm/Support/InitLLVM.h"
-#include "llvm/Support/SourceMgr.h"
-#include "circt/Dialect/Handshake/HandshakeOps.h"
-#include "circt/Dialect/Handshake/Simulation.h"
+
+#include <fstream>
+
+#define CONFIG_PATH                                                            \
+  "../experimental/tools/handshake-simulator/model-configuration.json"
 
 using namespace llvm;
 using namespace mlir;
 using namespace circt;
 
 static cl::OptionCategory mainCategory("Application options");
+static cl::OptionCategory configCategory("Configuration options");
 
 static cl::opt<std::string> inputFileName(cl::Positional,
                                           cl::desc("<input file>"),
@@ -40,6 +47,13 @@ static cl::opt<std::string>
     toplevelFunction("top-level-function", cl::Optional,
                      cl::desc("The top-level function to execute"),
                      cl::init("main"), cl::cat(mainCategory));
+
+static cl::list<std::string>
+    modelConfiguration("change-model",
+                       cl::desc("Change execution model function "
+                                "(--change-model <OpName> <ExecFunction>)"),
+                       cl::multi_val(2), cl::ZeroOrMore, cl::Optional,
+                       cl::cat(configCategory));
 
 int main(int argc, char **argv) {
   InitLLVM y(argc, argv);
@@ -55,6 +69,54 @@ int main(int argc, char **argv) {
       "Arguments to the function are passed on the command line and\n"
       "results are returned on stdout.\n"
       "Memref types are specified as a comma-separated list of values.\n");
+
+  // Load JSON model configuration
+  std::ifstream f;
+  f.open(CONFIG_PATH); 
+
+  std::stringstream buffer;
+  buffer << f.rdbuf(); 
+  std::string jsonStr = buffer.str(); 
+
+  auto jsonConfig = llvm::json::parse(StringRef(jsonStr));
+
+  if (!jsonConfig) {
+    errs() << "Configuration JSON could not be parsed" << "\n";
+    return 1;
+  }
+
+  if (!jsonConfig->getAsObject()) {
+    errs() << "Configuration JSON is not a valid JSON" << "\n";
+    return 1;
+  }
+
+  // Change the JSON model configuration if required
+  if (modelConfiguration.getNumOccurrences() > 0) {
+    llvm::json::Object* jsonObjectPtr = jsonConfig->getAsObject();
+    std::string opToChange = modelConfiguration[0];
+    std::string modelName = modelConfiguration[1];
+
+    if (!jsonObjectPtr->getString(opToChange)) {
+      errs() << opToChange << " : OP could not be found" << "\n";
+      return 1;
+    }
+    
+    std::error_code errorCode;
+    llvm::raw_fd_ostream jsonOs(CONFIG_PATH, errorCode);
+    if (errorCode) {
+      errs() << "Configuration JSON could not be loaded : " 
+             << errorCode.message() << "\n";
+      return 1;
+    }
+
+    (*jsonObjectPtr)[opToChange] = modelName;
+    jsonOs << json::Value(std::move(*jsonObjectPtr));
+    jsonOs.close();
+    errs() << opToChange << " execution model changed to '" << modelName 
+           << "'\n";
+
+    return 1;
+  }
 
   auto file_or_err = MemoryBuffer::getFileOrSTDIN(inputFileName.c_str());
   if (std::error_code error = file_or_err.getError()) {
@@ -88,5 +150,6 @@ int main(int argc, char **argv) {
     return 1;
   }
 
-  return handshake::simulate(toplevelFunction, inputArgs, module, context);
+  return dynamatic::experimental::simulate(toplevelFunction, inputArgs, module, 
+                                           context, jsonConfig.get());
 }

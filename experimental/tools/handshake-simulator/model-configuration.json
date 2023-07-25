@@ -1,0 +1,16 @@
+{
+  "Fork": "defaultFork",
+  "Merge": "defaultMerge",
+  "Mux": "defaultMux",
+  "ControlMerge": "defaultControlMerge",
+  "Branch": "defaultBranch",
+  "ConditionalBranch": "defaultConditionalMerge",
+  "Sink": "defaultSink",
+  "Buffer": "defaultBuffer",
+  "Constant": "defaultConstant",
+  "DynamaticLoad": "defaultDynamaticLoad",
+  "DynamaticStore": "defaultDynamaticStore",
+  "MemoryController": "defaultMemoryController",
+  "DynamaticReturn": "defaultDynamaticReturn",
+  "End": "defaultEnd"
+}
