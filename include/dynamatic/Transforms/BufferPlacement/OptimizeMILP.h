@@ -23,9 +23,10 @@ namespace buffer {
 using namespace circt;
 using namespace handshake;
 
+/// Get user of a value, which should be a single user as the value indicating a
+/// channel should be connected to only one unit.
 inline Operation *getUserOp(Value val) {
   auto dstOp = val.getUsers().begin();
-  // llvm::errs() << "first user: " << *dstOp << "\n";
   unsigned numUsers = 0;
   for (auto c : val.getUsers()) {
     numUsers++;
@@ -35,12 +36,17 @@ inline Operation *getUserOp(Value val) {
   return *dstOp;
 }
 
+/// Data structure to store the variables w.r.t to a unit(operation), including
+/// whether it belongs to a CFDFC, and its retime variables.
 struct UnitVar {
 public:
   bool select;
   GRBVar retIn, retOut;
 };
 
+/// Data structure to store the variables w.r.t to a channel(value), including
+/// whether it belongs to a CFDFC, and its time, throughput, and buffer
+/// placement decision.
 struct ChannelVar {
 public:
   bool select;
@@ -50,6 +56,8 @@ public:
   GRBVar valbufIsOp, rdybufIsTr;
 };
 
+/// Data structure to store the results of buffer placement, including the
+/// property and the total slots of the channel
 struct Result {
   bool opaque;
   bool transparent;
@@ -58,18 +66,21 @@ struct Result {
   Result operator+(const Result &other) const {
     Result result;
     result.opaque = this->opaque + other.opaque;
-    // result.transparent = this->transparent + other.transparent;
     result.numSlots = this->numSlots + other.numSlots;
     return result;
   }
 };
 
+/// Build and solve the MILP model for buffer placement, the funcOp and
+/// allChannels stores all the units and channels relate to the circuits. The
+/// results are solved and store to res w.r.t to each channel.
 LogicalResult placeBufferInCFDFCircuit(handshake::FuncOp funcOp,
                                        std::vector<Value> &allChannels,
                                        CFDFC &CFDFCircuit,
                                        std::map<Value *, Result> &res,
                                        double targetCP);
 
+/// Get the port index of a unit
 unsigned getPortInd(Operation *op, Value val);
 
 } // namespace buffer
