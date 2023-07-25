@@ -78,7 +78,7 @@ LogicalResult placeBufferInCFDFCircuit(handshake::FuncOp funcOp,
                                        std::vector<Value> &allChannels,
                                        CFDFC &CFDFCircuit,
                                        std::map<Value *, Result> &res,
-                                       double targetCP);
+                                       double targetCP, std::string timefile);
 
 /// Get the port index of a unit
 unsigned getPortInd(Operation *op, Value val);

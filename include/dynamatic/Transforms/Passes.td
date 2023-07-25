@@ -126,7 +126,9 @@ def HandshakePlaceBuffers : Pass<"handshake-place-buffers", "mlir::ModuleOp"> {
     Option<"firstMG", "firstMG", "bool", "false",
     "if true, only extract the first MG from the input file">,
     Option<"stdLevelInfo", "std-level-info", "std::string", "",
-    "if true, extract CFDFC from standard level simluation">,
+    "if provided, extract CFDFC from standard level simluation">,
+    Option<"timefile", "time-file", "std::string", "",
+    "required, file provide the time and buffer prerequisite information ">,
     Option<"targetCP", "target-period", "double", "",
     "target clock period for the CFDFC">];
 }

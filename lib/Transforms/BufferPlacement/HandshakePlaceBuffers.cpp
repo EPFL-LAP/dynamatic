@@ -48,13 +48,11 @@ static CFDFC createCFDFCircuit(handshake::FuncOp funcOp,
   return circuit;
 }
 
+/// Instantiate the buffers based on the results of the MILP
 static LogicalResult instantiateBuffers(std::map<Value *, Result> &res,
                                         MLIRContext *ctx) {
   OpBuilder builder(ctx);
-  llvm::errs() << res.size() << "\n";
   for (auto &[channel, result] : res) {
-    llvm::errs() << "insert buffer for: " << *channel;
-
     if (result.numSlots > 0) {
       Operation *opSrc = channel->getDefiningOp();
       Operation *opDst = getUserOp(*channel);
@@ -62,12 +60,11 @@ static LogicalResult instantiateBuffers(std::map<Value *, Result> &res,
       unsigned numOp = 0;
       unsigned numTrans = 0;
 
-      if (result.opaque) {
+      if (result.opaque)
         numOp = 1;
-        // numTrans = 1;
-      }
-      // if (result.transparent)
-      //   numTrans = 1;
+
+      if (result.transparent)
+        numTrans = 1;
 
       if (int numBuf = result.numSlots - numOp - numTrans; numBuf > 0)
         numTrans += numBuf;
@@ -78,11 +75,6 @@ static LogicalResult instantiateBuffers(std::map<Value *, Result> &res,
       if (indVal == UINT_MAX)
         continue;
 
-      llvm::errs() << "insertion\n";
-
-      llvm::errs() << "opque: " << numOp << "; transparent: " << numTrans
-                   << "\n";
-
       if (numOp > 0) {
         // insert opque buffer
         auto bufferOp = builder.create<handshake::BufferOp>(
@@ -92,24 +84,23 @@ static LogicalResult instantiateBuffers(std::map<Value *, Result> &res,
         bufferOp.setSlots(numOp);
 
         if (numTrans > 0) {
+          // insert transparent buffers followed by opaque buffer
           auto bufferTrans = builder.create<handshake::BufferOp>(
               bufferOp->getLoc(), bufferOp->getResult(0).getType(),
               bufferOp->getResult(0));
           bufferTrans.setSlots(numTrans);
           bufferTrans.setBufferType(BufferTypeEnum::fifo);
           opSrc->getResult(indVal).replaceUsesWithIf(
-              bufferTrans.getResult(), [&](OpOperand &operand) {
-                // return true;
-                return operand.getOwner() == opDst;
-              });
+              bufferTrans.getResult(),
+              [&](OpOperand &operand) { return operand.getOwner() == opDst; });
         } else {
           opSrc->getResult(indVal).replaceUsesWithIf(
-              bufferOp.getResult(), [&](OpOperand &operand) {
-                // return true;
-                return operand.getOwner() == opDst;
-              });
+              bufferOp.getResult(),
+              [&](OpOperand &operand) { return operand.getOwner() == opDst; });
         }
       }
+
+      // insert all transparent buffers
       if (numTrans > 0 && numOp == 0) {
         auto bufferTrans = builder.create<handshake::BufferOp>(
             opDst->getLoc(), opSrc->getResult(indVal).getType(),
@@ -117,10 +108,8 @@ static LogicalResult instantiateBuffers(std::map<Value *, Result> &res,
         bufferTrans.setSlots(numTrans);
         bufferTrans.setBufferType(BufferTypeEnum::fifo);
         opSrc->getResult(indVal).replaceUsesWithIf(
-            bufferTrans.getResult(), [&](OpOperand &operand) {
-              // return true;
-              return operand.getOwner() == opDst;
-            });
+            bufferTrans.getResult(),
+            [&](OpOperand &operand) { return operand.getOwner() == opDst; });
       }
     }
   }
@@ -138,7 +127,8 @@ static void deleleArchMap(std::map<ArchBB *, bool> &archs) {
 
 static LogicalResult insertBuffers(handshake::FuncOp funcOp, MLIRContext *ctx,
                                    ChannelBufProps &strategy, bool firstMG,
-                                   std::string stdLevelInfo, double targetCP) {
+                                   std::string stdLevelInfo,
+                                   std::string timefile, double targetCP) {
 
   if (failed(verifyAllValuesHasOneUse(funcOp))) {
     funcOp.emitOpError() << "not all values are used exactly once";
@@ -174,8 +164,11 @@ static LogicalResult insertBuffers(handshake::FuncOp funcOp, MLIRContext *ctx,
     }
   }
 
-  std::vector<Value> allChannels;
+  // Delete the CFDFC related results
   deleleArchMap(archs);
+
+  // Instantiate all the channels of MILP model in different CFDFC
+  std::vector<Value> allChannels;
   for (auto &op : funcOp.getOps())
     for (auto resOp : op.getResults())
       allChannels.push_back(resOp);
@@ -185,10 +178,11 @@ static LogicalResult insertBuffers(handshake::FuncOp funcOp, MLIRContext *ctx,
   // Instantiate the buffers according to the results.
   std::map<Value *, Result> insertBufResult;
 
-  for (auto dataflowCirct : cfdfcList) {
-    placeBufferInCFDFCircuit(funcOp, allChannels, dataflowCirct,
-                             insertBufResult, targetCP);
-  }
+  for (auto dataflowCirct : cfdfcList)
+    if (failed(placeBufferInCFDFCircuit(funcOp, allChannels, dataflowCirct,
+                                        insertBufResult, targetCP, timefile)))
+      break;
+
   instantiateBuffers(insertBufResult, ctx);
 
   return success();
@@ -199,9 +193,10 @@ struct HandshakePlaceBuffersPass
     : public HandshakePlaceBuffersBase<HandshakePlaceBuffersPass> {
 
   HandshakePlaceBuffersPass(bool firstMG, std::string stdLevelInfo,
-                            double targetCP) {
+                            std::string timefile, double targetCP) {
     this->firstMG = firstMG;
     this->stdLevelInfo = stdLevelInfo;
+    this->timefile = timefile;
     this->targetCP = targetCP;
   }
 
@@ -211,7 +206,7 @@ struct HandshakePlaceBuffersPass
     ChannelBufProps strategy;
     for (auto funcOp : m.getOps<handshake::FuncOp>())
       if (failed(insertBuffers(funcOp, &getContext(), strategy, firstMG,
-                               stdLevelInfo, targetCP)))
+                               stdLevelInfo, timefile, targetCP)))
         return signalPassFailure();
   };
 };
@@ -220,7 +215,8 @@ struct HandshakePlaceBuffersPass
 std::unique_ptr<mlir::OperationPass<mlir::ModuleOp>>
 dynamatic::createHandshakePlaceBuffersPass(bool firstMG,
                                            std::string stdLevelInfo,
+                                           std::string timefile,
                                            double targetCP) {
   return std::make_unique<HandshakePlaceBuffersPass>(firstMG, stdLevelInfo,
-                                                     targetCP);
+                                                     timefile, targetCP);
 }
