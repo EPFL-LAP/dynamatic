@@ -10,7 +10,6 @@
 #include <iostream>
 #include <nlohmann/json.hpp>
 
-// for convenience
 using json = nlohmann::json;
 
 using namespace dynamatic;
@@ -22,6 +21,8 @@ std::string buffer::getOperationShortStrName(Operation *op) {
   return fullName.substr(pos + 1);
 }
 
+/// For a channel, indicated by a value, get its port width if exists,
+/// otherwise, return CPP_MAX_WIDTH
 static inline unsigned getPortWidth(Value channel) {
   unsigned portBitWidth = bitwidth::CPP_MAX_WIDTH;
   if (isa<NoneType>(channel.getType()))
@@ -31,6 +32,8 @@ static inline unsigned getPortWidth(Value channel) {
   return portBitWidth;
 }
 
+/// Get the precise time information w.r.t to the bitwidth from a vector store
+/// the {bitwidth, time} info.
 static double
 getBitWidthMatchedTimeInfo(unsigned bitWidth,
                            std::vector<std::pair<unsigned, double>> &timeInfo) {
@@ -78,10 +81,8 @@ double buffer::getUnitDelay(Operation *op,
   double delay;
   std::string opName = getOperationShortStrName(op);
   // check whether delay information exists
-  if (unitInfo.find(opName) == unitInfo.end()) {
-    llvm::errs() << "Cannot find " << opName << " in unitInfo\n";
+  if (unitInfo.find(opName) == unitInfo.end())
     return 0.0;
-  }
 
   // get delay w.r.t to bitwidth
   unsigned unitBitWidth = getPortWidth(op->getOperand(0));
@@ -92,7 +93,6 @@ double buffer::getUnitDelay(Operation *op,
     delay = unitInfo[opName].validDelay;
   else if (type == "ready")
     delay = unitInfo[opName].readyDelay;
-  // llvm::errs() << opName << " : " << delay << "\n";
   return delay;
 }
 
@@ -139,6 +139,7 @@ buffer::getUnitLatency(Operation *op,
   return latency;
 }
 
+/// Parse the JSON data to a vector of pair {bitwidth, info}
 static void parseBitWidthPair(json jsonData,
                               std::vector<std::pair<unsigned, double>> &data) {
   for (auto it = jsonData.begin(); it != jsonData.end(); ++it) {
@@ -148,12 +149,10 @@ static void parseBitWidthPair(json jsonData,
   }
 }
 
-// Function to parse the JSON string and extract the required data
 LogicalResult buffer::parseJson(const std::string &jsonFile,
                                 std::map<std::string, UnitInfo> &unitInfo) {
 
-  // reserve for read buffers information to be used in the channel
-  // constraints
+  // Operations that is supported to use its time information.
   size_t pos = 0;
   std::vector<std::string> opNames = {
       "cmpi",          "addi",    "subi",   "muli",    "extsi",
@@ -167,6 +166,7 @@ LogicalResult buffer::parseJson(const std::string &jsonFile,
   std::ifstream file(jsonFile);
   if (!file.is_open()) {
     llvm::errs() << "Failed to open file.\n";
+    return failure();
   }
 
   // Read the file contents into a string
@@ -175,7 +175,7 @@ LogicalResult buffer::parseJson(const std::string &jsonFile,
   for (auto op : opNames) {
     auto unitInfoJson = data[op];
     auto latencyJson = unitInfoJson["latency"];
-    // parse the bitwidth and its corresponding latency
+    // parse the bitwidth and its corresponding latency for data
     parseBitWidthPair(unitInfoJson["latency"], unitInfo[op].latency);
     parseBitWidthPair(unitInfoJson["delay"]["data"], unitInfo[op].dataDelay);
     parseBitWidthPair(unitInfoJson["inport"]["delay"]["data"],
@@ -183,16 +183,16 @@ LogicalResult buffer::parseJson(const std::string &jsonFile,
     parseBitWidthPair(unitInfoJson["outport"]["delay"]["data"],
                       unitInfo[op].outPortDataDelay);
 
+    // parse the bitwidth and its corresponding latency for valid and ready
+    // The valid and ready signal is 1 bit
     double validDelay = unitInfoJson["delay"]["valid"]["1"];
     unitInfo[op].validDelay = validDelay;
     double readyDelay = unitInfoJson["delay"]["ready"]["1"];
     unitInfo[op].readyDelay = readyDelay;
-
     unitInfo[op].inPortValidDelay =
         unitInfoJson["inport"]["delay"]["valid"]["1"];
     unitInfo[op].inPortReadyDelay =
         unitInfoJson["inport"]["delay"]["ready"]["1"];
-
     unitInfo[op].outPortValidDelay =
         unitInfoJson["outport"]["delay"]["valid"]["1"];
     unitInfo[op].outPortReadyDelay =

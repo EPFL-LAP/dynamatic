@@ -10,6 +10,13 @@
 namespace dynamatic {
 namespace buffer {
 
+/// Data structure to store the information of a unit.
+/// The information include the timing information and the buffer placement
+/// prerequisite of the connected channels. The timing information include the
+/// latency and data delay of the unit, as well as the data, valid, ready delay
+/// information of the input and output ports. The buffer placement prerequisite
+/// specify the transparent buffer and the opaque buffer connected to the input
+/// and output ports.
 struct UnitInfo {
 public:
   std::vector<std::pair<unsigned, double>> latency;
@@ -22,64 +29,28 @@ public:
 
   unsigned inPortTransBuf = 0, inPortOpBuf = 0;
   unsigned outPortTransBuf = 0, outPortOpBuf = 0;
-
-  template <typename T1, typename T2>
-  void printPairs(const std::vector<std::pair<T1, T2>> &pairs) {
-    for (const auto &pair : pairs) {
-      llvm::errs() << pair.first << ", " << pair.second << "\n";
-      ;
-    }
-  }
-  void print() {
-    // Printing the contents of the vectors
-    llvm::errs() << "Contents of latency:"
-                 << "\n";
-    printPairs(latency);
-
-    llvm::errs() << "Contents of dataDelay:"
-                 << "\n";
-    printPairs(dataDelay);
-
-    llvm::errs() << "Contents of inPortDataDelay:"
-                 << "\n";
-    printPairs(inPortDataDelay);
-
-    llvm::errs() << "Contents of outPortDataDelay:"
-                 << "\n";
-    printPairs(outPortDataDelay);
-
-    llvm::errs() << "validDelay" << validDelay << "\n";
-    llvm::errs() << "readyDelay" << readyDelay << "\n";
-
-    llvm::errs() << "inportValidDelay" << inPortValidDelay << "\n";
-    llvm::errs() << "inportReadyDelay" << inPortReadyDelay << "\n";
-
-    llvm::errs() << "outPortValidDelay" << outPortValidDelay << "\n";
-    llvm::errs() << "outPortReadyDelay" << outPortReadyDelay << "\n";
-
-    llvm::errs() << "inport{ "
-                 << "transBuf " << inPortTransBuf << " opBuf " << inPortOpBuf
-                 << "}\n";
-    llvm::errs() << "outport{ "
-                 << "transBuf " << outPortTransBuf << " opBuf " << outPortOpBuf
-                 << "}\n";
-  }
 };
 
-// double getTimeInfo(Operation *op, std::map<std::string, UnitInfo> &unitInfo);
+/// Get the short name of the operation, e.g., "add" for "handshake.add".
 std::string getOperationShortStrName(Operation *op);
 
+/// Get the unit delay with respect to the operation type, including data, valid
+/// and ready.
 double getUnitDelay(Operation *op,
                     std::map<std::string, buffer::UnitInfo> &unitInfo,
                     std::string type = "data");
 
+/// Get the unit(op) latency.
 double getUnitLatency(Operation *op,
                       std::map<std::string, buffer::UnitInfo> &unitInfo);
 
+/// Get the combinational delay of the operation, including its input port
+/// delay, unit delay, and output port delay.
 double getCombinationalDelay(Operation *op,
                              std::map<std::string, buffer::UnitInfo> &unitInfo,
                              std::string type = "data");
 
+/// Get the delay of a port(in, out) connected to a channel.
 double getPortDelay(Value channel,
                     std::map<std::string, buffer::UnitInfo> &unitInfo,
                     std::string type = "in");
