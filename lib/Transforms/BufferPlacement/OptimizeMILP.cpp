@@ -140,7 +140,7 @@ static void initVarsInMILP(handshake::FuncOp funcOp, GRBModel &modelBuf,
 /// Create time path constraints over channels.
 /// t1 is the input time of the channel, t2 is the output time of the channel.
 static void createPathConstrs(GRBModel &modelBuf, GRBVar &t1, GRBVar &t2,
-                              GRBVar &bufOp, double period, unsigned constrInd,
+                              GRBVar &bufOp, double period,
                               double bufDelay = 0.0) {
   modelBuf.addConstr(t1 <= period);
   modelBuf.addConstr(t2 <= period);
@@ -152,7 +152,7 @@ static void createPathConstrs(GRBModel &modelBuf, GRBVar &t1, GRBVar &t2,
 /// t1 is the input time of the unit, t2 is the output time of the unit.
 static void createPathConstrs(GRBModel &modelBuf, GRBVar &tIn, GRBVar &tOut,
                               double delay, double latency, double period,
-                              std::string constrInd, double inPortDelay = 0.0,
+                              double inPortDelay = 0.0,
                               double outPortDelay = 0.0) {
   // if the unit is combinational
   if (latency == 0.0)
@@ -168,7 +168,7 @@ static void createPathConstrs(GRBModel &modelBuf, GRBVar &tIn, GRBVar &tOut,
 static void createElasticityConstrs(GRBModel &modelBuf, GRBVar &t1, GRBVar &t2,
                                     GRBVar &bufOp, GRBVar &bufNSlots,
                                     GRBVar &hasBuf, unsigned cstCoef,
-                                    double period, unsigned constrInd) {
+                                    double period) {
   modelBuf.addConstr(t2 >= t1 - cstCoef * bufOp);
   modelBuf.addConstr(bufNSlots >= bufOp);
   modelBuf.addConstr(hasBuf >= 0.01 * bufNSlots);
@@ -177,7 +177,7 @@ static void createElasticityConstrs(GRBModel &modelBuf, GRBVar &t1, GRBVar &t2,
 // create elasticity constraints w.r.t units
 static void createElasticityConstrs(GRBModel &modelBuf, GRBVar &tIn,
                                     GRBVar &tOut, double delay, double latency,
-                                    double period, std::string constrInd) {
+                                    double period) {
   modelBuf.addConstr(tOut >= 1 + tIn);
 }
 
@@ -185,8 +185,7 @@ static void createElasticityConstrs(GRBModel &modelBuf, GRBVar &tIn,
 static void createThroughputConstrs(GRBModel &modelBuf, GRBVar &retSrc,
                                     GRBVar &retDst, GRBVar &thrptTok,
                                     GRBVar &thrpt, GRBVar &isOp,
-                                    GRBVar &bufNSlots, const int tok,
-                                    unsigned constrInd) {
+                                    GRBVar &bufNSlots, const int tok) {
   modelBuf.addConstr(retSrc - retDst + thrptTok == tok);
   modelBuf.addConstr(thrpt + isOp - thrptTok <= 1);
   modelBuf.addConstr(thrptTok + thrpt + isOp - bufNSlots <= 1);
@@ -197,8 +196,8 @@ static void createThroughputConstrs(GRBModel &modelBuf, GRBVar &retSrc,
 /// retiming values
 static void createThroughputConstrs(GRBModel &modelBuf, GRBVar &retIn,
                                     GRBVar &retout, GRBVar &thrpt,
-                                    double latency, unsigned constrInd) {
-  if (latency > 0.1)
+                                    double latency) {
+  if (latency > 0)
     modelBuf.addConstr(retout - retIn == latency * thrpt);
 }
 
@@ -209,9 +208,7 @@ createModelConstraints(GRBModel &modelBuf, GRBVar &thrpt, double targetCP,
                        std::map<Value *, ChannelVar> &channelVars,
                        std::map<std::string, UnitInfo> unitInfo) {
   // Channel constraints
-  for (auto [ind, chVarMap] : llvm::enumerate(channelVars)) {
-    auto &[ch, chVars] = chVarMap;
-
+  for (auto [ch, chVars] : channelVars) {
     // update the model to get the lower bound and upper bound of the vars
     modelBuf.update();
 
@@ -236,22 +233,20 @@ createModelConstraints(GRBModel &modelBuf, GRBVar &thrpt, double targetCP,
     GRBVar &retSrc = unitVars[srcOp].retOut;
 
     int tok = isBackEdge(srcOp, dstOp) ? 1 : 0;
-    createPathConstrs(modelBuf, t1, t2, bufOp, targetCP, ind);
+    createPathConstrs(modelBuf, t1, t2, bufOp, targetCP);
     createElasticityConstrs(modelBuf, tElas1, tElas2, bufOp, bufNSlots, hasBuf,
-                            unitVars.size() + 1, targetCP, ind);
+                            unitVars.size() + 1, targetCP);
 
     if (chVars.select && chVars.bufNSlots.get(GRB_DoubleAttr_UB) > 0)
       if (unitVars.count(dstOp) > 0) {
         GRBVar &retDst = unitVars[dstOp].retIn;
         createThroughputConstrs(modelBuf, retSrc, retDst, thrptTok, thrpt,
-                                bufOp, bufNSlots, tok, ind);
+                                bufOp, bufNSlots, tok);
       }
   }
 
   // Units constraints
-  for (auto [ind, uVarMap] : llvm::enumerate(unitVars)) {
-    auto &[op, unitVar] = uVarMap;
-
+  for (auto [op, unitVar] : unitVars) {
     double delayData = getCombinationalDelay(op, unitInfo, "data");
     double delayValid = getCombinationalDelay(op, unitInfo, "valid");
     double delayReady = getCombinationalDelay(op, unitInfo, "ready");
@@ -261,7 +256,7 @@ createModelConstraints(GRBModel &modelBuf, GRBVar &thrpt, double targetCP,
     GRBVar &retOut = unitVar.retOut;
 
     if (unitVar.select)
-      createThroughputConstrs(modelBuf, retIn, retOut, thrpt, latency, ind);
+      createThroughputConstrs(modelBuf, retIn, retOut, thrpt, latency);
 
     // iterate all input port to all output port for a unit
     for (auto inChVal : op->getOperands()) {
@@ -289,13 +284,10 @@ createModelConstraints(GRBModel &modelBuf, GRBVar &thrpt, double targetCP,
             GRBVar &tOut = channelVars[outCh].tDataIn;
             GRBVar &tElasOut = channelVars[outCh].tElasIn;
 
-            std::string constrName =
-                std::to_string(ind) + "_" + std::to_string(channelInd);
-            channelInd++;
-            createPathConstrs(modelBuf, tIn, tOut, delayData, latency, targetCP,
-                              constrName);
+            createPathConstrs(modelBuf, tIn, tOut, delayData, latency,
+                              targetCP);
             createElasticityConstrs(modelBuf, tElasIn, tElasOut, delayData,
-                                    latency, targetCP, constrName);
+                                    latency, targetCP);
           }
       }
     }
