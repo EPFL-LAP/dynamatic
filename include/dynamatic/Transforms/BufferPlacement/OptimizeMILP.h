@@ -47,7 +47,7 @@ public:
   GRBVar tDataIn, tDataOut, tElasIn, tElasOut;
   GRBVar tValidIn, tValidOut, tReadyIn, tReadyOut;
   GRBVar thrptTok, bufIsOp, bufNSlots, hasBuf;
-  GRBVar valbufIsOp, readybufIsOp;
+  GRBVar valbufIsOp, rdybufIsTr;
 };
 
 struct Result {
@@ -65,7 +65,7 @@ struct Result {
 };
 
 LogicalResult placeBufferInCFDFCircuit(handshake::FuncOp funcOp,
-                                       std::vector<Value> allChannels,
+                                       std::vector<Value> &allChannels,
                                        CFDFC &CFDFCircuit,
                                        std::map<Value *, Result> &res,
                                        double targetCP);
