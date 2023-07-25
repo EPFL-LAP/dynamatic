@@ -275,8 +275,6 @@ createModelConstraints(GRBModel &modelBuf, GRBVar &thrpt, double targetCP,
         // Define variables w.r.t to input port
         double inPortDelay = getPortDelay(inChVal, unitInfo, "out");
         GRBVar &tIn = channelVars[inCh].tDataOut;
-        GRBVar &tValidIn = channelVars[inCh].tValidOut;
-        GRBVar &tReadyIn = channelVars[inCh].tReadyIn;
         GRBVar &tElasIn = channelVars[inCh].tElasOut;
 
         for (auto outChVal : op->getResults())
@@ -289,8 +287,6 @@ createModelConstraints(GRBModel &modelBuf, GRBVar &thrpt, double targetCP,
             // Define variables w.r.t to output port
             double outPortDelay = getPortDelay(outChVal, unitInfo, "in");
             GRBVar &tOut = channelVars[outCh].tDataIn;
-            GRBVar &tValidOut = channelVars[outCh].tValidIn;
-            GRBVar &tReadyOut = channelVars[outCh].tReadyOut;
             GRBVar &tElasOut = channelVars[outCh].tElasIn;
 
             std::string constrName =

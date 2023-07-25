@@ -51,9 +51,7 @@ struct ChannelVar {
 public:
   bool select;
   GRBVar tDataIn, tDataOut, tElasIn, tElasOut;
-  GRBVar tValidIn, tValidOut, tReadyIn, tReadyOut;
   GRBVar thrptTok, bufIsOp, bufNSlots, hasBuf;
-  GRBVar valbufIsOp, rdybufIsTr;
 };
 
 /// Data structure to store the results of buffer placement, including the
