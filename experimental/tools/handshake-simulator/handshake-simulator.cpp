@@ -127,11 +127,16 @@ int main(int argc, char **argv) {
     for (int i = 0; i < nbChangedPair; i += 2) {
       std::string opToChange = modelConfiguration[i];
       std::string modelName = modelConfiguration[i + 1];
+      if (!modelConfigMap.count(opToChange)) {
+        errs() << opToChange << " operation could not be found";
+        return 1;
+      }
+
       modelConfigMap[opToChange] = modelName;
       errs() << opToChange << " execution model changed to '" << modelName 
              << "'\n";
     }
-    
+
     // Return if the command is entered alone
     if (inputFileName.getNumOccurrences() == 0)
       return 1;
