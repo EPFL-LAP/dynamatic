@@ -385,8 +385,7 @@ setChannelBufProps(std::vector<Value> &channels,
 
     // set channel buffer properties w.r.t to input file
     if (unitInfo.count(srcName) > 0) {
-      ChannelBufProps[&ch].minTrans += ChannelBufProps[&ch].minTrans,
-          unitInfo[srcName].outPortTransBuf;
+      ChannelBufProps[&ch].minTrans += unitInfo[srcName].outPortTransBuf;
       ChannelBufProps[&ch].minNonTrans += unitInfo[srcName].outPortOpBuf;
     }
 
