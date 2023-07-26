@@ -131,7 +131,10 @@ int main(int argc, char **argv) {
       errs() << opToChange << " execution model changed to '" << modelName 
              << "'\n";
     }
-    return 1;
+    
+    // Return if the command is entered alone
+    if (inputFileName.getNumOccurrences() == 0)
+      return 1;
   }
 
   auto fileOrErr = MemoryBuffer::getFileOrSTDIN(inputFileName.c_str());
