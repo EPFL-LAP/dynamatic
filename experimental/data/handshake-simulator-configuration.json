@@ -8,10 +8,10 @@
   "handshake.sink":"defaultSink",
   "handshake.constant":"defaultConstant",
   "handshake.buffer":"defaultBuffer",
-  "DynamaticLoad":"defaultDynamaticLoad",
-  "DynamaticReturn":"defaultDynamaticReturn",
-  "DynamaticStore":"defaultDynamaticStore",
-  "End":"defaultEnd",
-  "MemoryController":"defaultMemoryController"
+  "handshake.load":"defaultDynamaticLoad",
+  "handshake.store":"defaultDynamaticStore",
+  "handshake.return":"defaultDynamaticReturn",
+  "handshake.end":"defaultEnd",
+  "handshake.memory_controller":"defaultMemoryController"
 }
 

@@ -11,10 +11,10 @@
 //
 //===----------------------------------------------------------------------===//
 
-#include "experimental/tools/handshake-simulator/Simulation.h"
 #include "circt/Dialect/Handshake/HandshakeOps.h"
 #include "circt/Support/JSON.h"
 #include "circt/Support/Version.h"
+#include "experimental/tools/handshake-simulator/Simulation.h"
 #include "mlir/Dialect/Func/IR/FuncOps.h"
 #include "mlir/Dialect/LLVMIR/LLVMDialect.h"
 #include "mlir/Dialect/MemRef/IR/MemRef.h"
@@ -25,10 +25,9 @@
 #include "llvm/Support/InitLLVM.h"
 #include "llvm/Support/SourceMgr.h"
 
-
 #include <fstream>
 
-#define DEFAULT_CONFIG_PATH                                                            \
+#define DEFAULT_CONFIG_PATH                                                    \
   "../experimental/data/handshake-simulator-configuration.json"
 
 using namespace llvm;
@@ -58,7 +57,7 @@ static cl::list<std::string>
                        cl::multi_val(2), cl::ZeroOrMore, cl::Optional,
                        cl::cat(configCategory));
 
-static cl::opt<std::string> 
+static cl::opt<std::string>
     jsonSelection("config",
                   cl::desc("Change the configuration file path.\n"
                            "Must be a relative path."),
@@ -84,30 +83,28 @@ int main(int argc, char **argv) {
   if (jsonSelection.getNumOccurrences() == 1) {
     configPath = jsonSelection.getValue();
     errs() << " configuration file changed to " << configPath << "\n";
-
-    // Return if the command is entered alone
-    if (inputFileName.getNumOccurrences() == 0)
-      return 1;
   }
 
   // Load JSON model configuration
   std::ifstream f;
-  f.open(configPath); 
+  f.open(configPath);
 
   std::stringstream buffer;
-  buffer << f.rdbuf(); 
-  std::string jsonStr = buffer.str(); 
+  buffer << f.rdbuf();
+  std::string jsonStr = buffer.str();
   f.close();
 
   auto jsonConfig = llvm::json::parse(StringRef(jsonStr));
 
   if (!jsonConfig) {
-    errs() << "Configuration JSON could not be parsed" << "\n";
+    errs() << "Configuration JSON could not be parsed"
+           << "\n";
     return 1;
   }
 
   if (!jsonConfig->getAsObject()) {
-    errs() << "Configuration JSON is not a valid JSON" << "\n";
+    errs() << "Configuration JSON is not a valid JSON"
+           << "\n";
     return 1;
   }
 
@@ -115,16 +112,14 @@ int main(int argc, char **argv) {
   llvm::StringMap<std::string> modelConfigMap;
   for (auto item : *jsonConfig->getAsObject()) {
     modelConfigMap.insert(std::make_pair(
-      item.getFirst().str(),
-      item.getSecond().getAsString().value().str()
-    ));
+        item.getFirst().str(), item.getSecond().getAsString().value().str()));
   }
 
   // Change the model configuration if the command is entered,
   // without changing the JSON file
-  int nbChangedPair = modelConfiguration.getNumOccurrences() * 2;
+  size_t nbChangedPair = modelConfiguration.getNumOccurrences() * 2;
   if (nbChangedPair > 0) {
-    for (int i = 0; i < nbChangedPair; i += 2) {
+    for (size_t i = 0; i < nbChangedPair; i += 2) {
       std::string opToChange = modelConfiguration[i];
       std::string modelName = modelConfiguration[i + 1];
       if (!modelConfigMap.count(opToChange)) {
@@ -133,13 +128,9 @@ int main(int argc, char **argv) {
       }
 
       modelConfigMap[opToChange] = modelName;
-      errs() << opToChange << " execution model changed to '" << modelName 
+      outs() << opToChange << " execution model changed to '" << modelName
              << "'\n";
     }
-
-    // Return if the command is entered alone
-    if (inputFileName.getNumOccurrences() == 0)
-      return 1;
   }
 
   auto fileOrErr = MemoryBuffer::getFileOrSTDIN(inputFileName.c_str());
@@ -174,6 +165,6 @@ int main(int argc, char **argv) {
     return 1;
   }
 
-  return dynamatic::experimental::simulate(toplevelFunction, inputArgs, module, 
+  return dynamatic::experimental::simulate(toplevelFunction, inputArgs, module,
                                            context, modelConfigMap);
 }
