@@ -11,17 +11,18 @@
 //
 //===----------------------------------------------------------------------===//
 
+#include "experimental/tools/handshake-simulator/Simulation.h"
 #include "circt/Dialect/Handshake/HandshakeOps.h"
 #include "circt/Support/JSON.h"
-#include "experimental/tools/handshake-simulator/Simulation.h"
-#include "llvm/ADT/STLExtras.h"
-#include "llvm/ADT/TypeSwitch.h"
-#include "llvm/Support/Debug.h"
 #include "mlir/Dialect/Arith/IR/Arith.h"
 #include "mlir/Dialect/ControlFlow/IR/ControlFlowOps.h"
 #include "mlir/Dialect/Func/IR/FuncOps.h"
 #include "mlir/Dialect/MemRef/IR/MemRef.h"
 #include "mlir/IR/BuiltinTypes.h"
+#include "llvm/ADT/STLExtras.h"
+#include "llvm/ADT/StringMap.h"
+#include "llvm/ADT/TypeSwitch.h"
+#include "llvm/Support/Debug.h"
 
 #include <list>
 
@@ -921,7 +922,7 @@ HandshakeExecuter::HandshakeExecuter(
 
 bool simulate(StringRef toplevelFunction, ArrayRef<std::string> inputArgs,
               mlir::OwningOpRef<mlir::ModuleOp> &module, mlir::MLIRContext &,
-              llvm::json::Value &config) {
+              llvm::StringMap<std::string> &config) {
   // The store associates each allocation in the program
   // (represented by a int) with a vector of values which can be
   // accessed by it.  Currently values are assumed to be an integer.

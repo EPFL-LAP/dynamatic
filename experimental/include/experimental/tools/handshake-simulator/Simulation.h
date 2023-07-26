@@ -17,6 +17,7 @@
 #include "circt/Support/JSON.h"
 #include "mlir/IR/BuiltinOps.h"
 #include "mlir/IR/MLIRContext.h"
+#include "llvm/ADT/StringMap.h"
 #include <string>
 
 namespace dynamatic {
@@ -26,7 +27,7 @@ bool simulate(llvm::StringRef toplevelFunction,
               llvm::ArrayRef<std::string> inputArgs,
               mlir::OwningOpRef<mlir::ModuleOp> &module,
               mlir::MLIRContext &context,
-              llvm::json::Value &config);
+              llvm::StringMap<std::string> &config);
 } // namespace dynamatic
 } // namespace experimental
 

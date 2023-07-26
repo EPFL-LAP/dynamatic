@@ -11,23 +11,25 @@
 //
 //===----------------------------------------------------------------------===//
 
+#include "experimental/tools/handshake-simulator/Simulation.h"
 #include "circt/Dialect/Handshake/HandshakeOps.h"
 #include "circt/Support/JSON.h"
 #include "circt/Support/Version.h"
-#include "experimental/tools/handshake-simulator/Simulation.h"
-#include "llvm/Support/InitLLVM.h"
-#include "llvm/Support/SourceMgr.h"
 #include "mlir/Dialect/Func/IR/FuncOps.h"
 #include "mlir/Dialect/LLVMIR/LLVMDialect.h"
 #include "mlir/Dialect/MemRef/IR/MemRef.h"
 #include "mlir/IR/BuiltinOps.h"
 #include "mlir/IR/MLIRContext.h"
 #include "mlir/Parser/Parser.h"
+#include "llvm/ADT/StringMap.h"
+#include "llvm/Support/InitLLVM.h"
+#include "llvm/Support/SourceMgr.h"
+
 
 #include <fstream>
 
 #define CONFIG_PATH                                                            \
-  "../experimental/tools/handshake-simulator/model-configuration.json"
+  "../experimental/data/handshake-simulator-configuration.json"
 
 using namespace llvm;
 using namespace mlir;
@@ -51,7 +53,8 @@ static cl::opt<std::string>
 static cl::list<std::string>
     modelConfiguration("change-model",
                        cl::desc("Change execution model function "
-                                "(--change-model <OpName> <ExecFunction>)"),
+                                "(--change-model <op name> <struct name>).\n"
+                                "This does not affect the configuration file."),
                        cl::multi_val(2), cl::ZeroOrMore, cl::Optional,
                        cl::cat(configCategory));
 
@@ -77,6 +80,7 @@ int main(int argc, char **argv) {
   std::stringstream buffer;
   buffer << f.rdbuf(); 
   std::string jsonStr = buffer.str(); 
+  f.close();
 
   auto jsonConfig = llvm::json::parse(StringRef(jsonStr));
 
@@ -90,36 +94,31 @@ int main(int argc, char **argv) {
     return 1;
   }
 
-  // Change the JSON model configuration if required
-  if (modelConfiguration.getNumOccurrences() > 0) {
-    llvm::json::Object* jsonObjectPtr = jsonConfig->getAsObject();
-    std::string opToChange = modelConfiguration[0];
-    std::string modelName = modelConfiguration[1];
+  // JSON to map conversion
+  llvm::StringMap<std::string> modelConfigMap;
+  for (auto item : *jsonConfig->getAsObject()) {
+    modelConfigMap.insert(std::make_pair(
+      item.getFirst().str(),
+      item.getSecond().getAsString().value().str()
+    ));
+  }
 
-    if (!jsonObjectPtr->getString(opToChange)) {
-      errs() << opToChange << " : OP could not be found" << "\n";
-      return 1;
+  // Change the model configuration if the command is entered,
+  // without changing the JSON file
+  int nbChangedPair = modelConfiguration.getNumOccurrences() * 2;
+  if (nbChangedPair > 0) {
+    for (int i = 0; i < nbChangedPair; i += 2) {
+      std::string opToChange = modelConfiguration[i];
+      std::string modelName = modelConfiguration[i + 1];
+      modelConfigMap[opToChange] = modelName;
+      errs() << opToChange << " execution model changed to '" << modelName 
+             << "'\n";
     }
-    
-    std::error_code errorCode;
-    llvm::raw_fd_ostream jsonOs(CONFIG_PATH, errorCode);
-    if (errorCode) {
-      errs() << "Configuration JSON could not be loaded : " 
-             << errorCode.message() << "\n";
-      return 1;
-    }
-
-    (*jsonObjectPtr)[opToChange] = modelName;
-    jsonOs << json::Value(std::move(*jsonObjectPtr));
-    jsonOs.close();
-    errs() << opToChange << " execution model changed to '" << modelName 
-           << "'\n";
-
     return 1;
   }
 
-  auto file_or_err = MemoryBuffer::getFileOrSTDIN(inputFileName.c_str());
-  if (std::error_code error = file_or_err.getError()) {
+  auto fileOrErr = MemoryBuffer::getFileOrSTDIN(inputFileName.c_str());
+  if (std::error_code error = fileOrErr.getError()) {
     errs() << argv[0] << ": could not open input file '" << inputFileName
            << "': " << error.message() << "\n";
     return 1;
@@ -135,10 +134,10 @@ int main(int argc, char **argv) {
   // cases.
   context.allowUnregisteredDialects();
 
-  SourceMgr source_mgr;
-  source_mgr.AddNewSourceBuffer(std::move(*file_or_err), SMLoc());
+  SourceMgr sourceMgr;
+  sourceMgr.AddNewSourceBuffer(std::move(*fileOrErr), SMLoc());
   mlir::OwningOpRef<mlir::ModuleOp> module(
-      mlir::parseSourceFile<ModuleOp>(source_mgr, &context));
+      mlir::parseSourceFile<ModuleOp>(sourceMgr, &context));
   if (!module)
     return 1;
 
@@ -151,5 +150,5 @@ int main(int argc, char **argv) {
   }
 
   return dynamatic::experimental::simulate(toplevelFunction, inputArgs, module, 
-                                           context, jsonConfig.get());
+                                           context, modelConfigMap);
 }
