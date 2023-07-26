@@ -23,55 +23,28 @@ using namespace dynamatic::experimental;
 
 namespace {
 
-/// @brief CDG traversal function.
-///
 /// Traverses the control-dependence graph (CDG) and attaches attributes to each
 /// basic block's terminator Operation. These attributes are needed for testing
 /// purposes.
-void cdgTraversal(DenseMap<Block *, BlockNeighbors *> &cdg, MLIRContext &ctx) {
+void cdgTraversal(DenseMap<Block *, BlockNeighbors> &cdg, MLIRContext &ctx) {
 
-  std::set<Block *> visitedSet;
-  std::stack<Block *> blockStack;
-
-  for (auto &[block, blockNeighbours] : cdg)
-    // Push the blocks with no predecessor to the stack.
-    if (blockNeighbours->predecessors.empty())
-      blockStack.push(block);
-
-  while (!blockStack.empty()) {
-    Block *currBlock = blockStack.top();
-    blockStack.pop();
-
-    // visit node
-
-    visitedSet.insert(currBlock);
-
+  for (auto &[block, blockNeighbors] : cdg) {
     std::string result;
     llvm::raw_string_ostream ss(result);
 
-    currBlock->printAsOperand(ss);
+    block->printAsOperand(ss);
 
     ss << " [";
-    for (Block *successor : cdg[currBlock]->successors) {
+    for (Block *successor : blockNeighbors.successors) {
       successor->printAsOperand(ss);
       ss << " ";
     }
     ss << "]";
 
-    Operation *termOp = currBlock->getTerminator();
+    Operation *termOp = block->getTerminator();
     OpBuilder builder(&ctx);
     termOp->setAttr("CD", builder.getStringAttr(ss.str()));
-
-    // end visit
-
-    for (Block *successor : cdg[currBlock]->successors) {
-      // Check if successor is already visited.
-      if (visitedSet.find(successor) != visitedSet.end())
-        continue;
-      // Push unvisited successors to the stack.
-      blockStack.push(successor);
-    }
-  } // end while
+  }
 }
 
 struct TestCDGAnalysisPass
@@ -91,10 +64,10 @@ struct TestCDGAnalysisPass
 
     // Iterate over all functions in the module
     for (func::FuncOp funcOp : mod.getOps<func::FuncOp>()) {
-      DenseMap<Block *, BlockNeighbors *> *cdg = cdgAnalysis(funcOp, *ctx);
+      DenseMap<Block *, BlockNeighbors> cdg = cdgAnalysis(funcOp, *ctx);
 
       // Attach attributes to each BB terminator Operation, needed for testing.
-      cdgTraversal(*cdg, *ctx);
+      cdgTraversal(cdg, *ctx);
     }
   }
 };

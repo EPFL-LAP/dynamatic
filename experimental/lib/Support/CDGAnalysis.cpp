@@ -1,6 +1,12 @@
-#include <queue>
+//===- CDGAnalysis.cpp - Exp. support for CDG analysis -----*- C++ -*-===//
+//
+// This file contains the function for CDG analysis.
+//
+//===-----------------------------------------------------------------===//
+
 #include <set>
 #include <stack>
+#include <vector>
 
 #include "experimental/Support/CDGAnalysis.h"
 
@@ -8,7 +14,7 @@ using namespace dynamatic::experimental;
 
 namespace {
 
-/// @brief Helper struct for Control Dependence Graph (CDG) analysis that
+/// Helper struct for Control Dependence Graph (CDG) analysis that
 /// represents a directed edge (A, B) in the Control Flow Graph (CFG).
 struct CFGEdge {
   /// Node A of the CFG edge (A, B).
@@ -18,11 +24,8 @@ struct CFGEdge {
 
   CFGEdge(DominanceInfoNode *a, DominanceInfoNode *b) : a(a), b(b) {}
 
-  /// @brief Finds the Least Common Ancestor (LCA) in the Post-Dominator Tree
+  /// Finds the Least Common Ancestor (LCA) in the Post-Dominator Tree
   /// for nodes A and B of a CFG edge (A, B).
-  ///
-  /// @return The Lowest Common Ancestor (LCA) in the Post-Dominator Tree for
-  /// nodes A and B, or nullptr if no common ancestor is found.
   DominanceInfoNode *findLCAInPostDomTree() {
     std::set<DominanceInfoNode *> ancestorsA;
 
@@ -44,9 +47,9 @@ struct CFGEdge {
   }
 };
 
-/// @brief Traversal of the Control Flow Graph (CFG) that creates a set of graph
+/// Traversal of the Control Flow Graph (CFG) that creates a set of graph
 /// edges (A, B) where A is NOT post-dominated by B.
-void cfgTraversal(Block &rootBlock, std::queue<CFGEdge *> &edgeSet,
+void cfgTraversal(Block &rootBlock, std::vector<CFGEdge> &edges,
                   PostDominanceInfo &postDomInfo,
                   llvm::DominatorTreeBase<Block, true> &postDomTree) {
   std::set<Block *> visitedSet;
@@ -66,9 +69,7 @@ void cfgTraversal(Block &rootBlock, std::queue<CFGEdge *> &edgeSet,
     for (Block *successor : currBlock->getSuccessors()) {
       // Check if curr is not post-dominated by his successor.
       if (postDomInfo.properlyPostDominates(successor, currBlock)) {
-        // Every node must be marked as visited for the CDG construction
-        // purposes. We will use this set to easly traverse each node and create
-        // corresponing CDGNode object.
+        // Every node must be marked as visited for the CDG construction.
         visitedSet.insert(successor);
         continue;
       }
@@ -77,8 +78,8 @@ void cfgTraversal(Block &rootBlock, std::queue<CFGEdge *> &edgeSet,
       DominanceInfoNode *succPostDomNode = postDomTree.getNode(successor);
       DominanceInfoNode *currPostDomNode = postDomTree.getNode(currBlock);
 
-      CFGEdge *edge = new CFGEdge(currPostDomNode, succPostDomNode);
-      edgeSet.push(edge);
+      CFGEdge edge(currPostDomNode, succPostDomNode);
+      edges.push_back(edge);
 
       // Check if successor is already visited.
       if (visitedSet.find(successor) != visitedSet.end())
@@ -91,18 +92,18 @@ void cfgTraversal(Block &rootBlock, std::queue<CFGEdge *> &edgeSet,
 
 } // namespace
 
-DenseMap<Block *, BlockNeighbors *> *
+DenseMap<Block *, BlockNeighbors>
 dynamatic::experimental::cdgAnalysis(func::FuncOp &funcOp, MLIRContext &ctx) {
-  DenseMap<Block *, BlockNeighbors *> *cdg =
-      new DenseMap<Block *, BlockNeighbors *>();
+  DenseMap<Block *, BlockNeighbors> cdg;
 
   Region &funcReg = funcOp.getRegion();
 
-  for (Block &block : funcReg.getBlocks())
-    cdg->insert(std::make_pair(&block, new BlockNeighbors()));
+  for (Block &block : funcReg.getBlocks()) {
+    BlockNeighbors bn;
+    cdg.insert(std::make_pair(&block, bn));
+  }
 
-  // Handling single block regions,
-  // cannot get DomTree for single block regions.
+  // Handling single block regions, cannot get DomTree for single block regions.
   if (funcReg.hasOneBlock())
     return cdg;
 
@@ -113,34 +114,26 @@ dynamatic::experimental::cdgAnalysis(func::FuncOp &funcOp, MLIRContext &ctx) {
       postDomInfo.getDomTree(&funcReg);
 
   // Find set of CFG edges (A,B) so A is NOT post-dominated by B.
-  // Memory for edges is allocated on the heap.
-  std::queue<CFGEdge *> edgeSet;
-  cfgTraversal(rootBlockCFG, edgeSet, postDomInfo, postDomTree);
+  std::vector<CFGEdge> edges;
+  cfgTraversal(rootBlockCFG, edges, postDomInfo, postDomTree);
 
-  // Process each edge from the set.
-  while (!edgeSet.empty()) {
-    CFGEdge *edge = edgeSet.front();
-    edgeSet.pop();
-    // Find the least common ancesstor (LCA) in post-dominator tree
-    // of A and B for each CFG edge (A,B).
-    DominanceInfoNode *lca = edge->findLCAInPostDomTree();
+  for (CFGEdge &edge : edges) {
+    // Find the least common ancesstor (LCA) in post-dominator tree of A and B
+    // for each CFG edge (A,B).
+    DominanceInfoNode *lca = edge.findLCAInPostDomTree();
 
-    Block *controlBlock = edge->a->getBlock();
+    Block *controlBlock = edge.a->getBlock();
 
     // LCA = parent(A) or LCA = A.
     // All nodes on the path (LCA, B] are control dependent on A.
-
-    for (DominanceInfoNode *curr = edge->b; curr != lca;
+    for (DominanceInfoNode *curr = edge.b; curr != lca;
          curr = curr->getIDom()) {
       Block *dependentBlock = curr->getBlock();
 
-      (*cdg)[controlBlock]->successors.push_back(dependentBlock);
-      (*cdg)[dependentBlock]->predecessors.push_back(controlBlock);
-    } // for end
-
-    // Deallocate memory for CFGEdge objects.
-    delete edge;
-  } // process edge end
+      cdg[controlBlock].successors.push_back(dependentBlock);
+      cdg[dependentBlock].predecessors.push_back(controlBlock);
+    }
+  }
 
   return cdg;
 } // CDGAnalysis end
