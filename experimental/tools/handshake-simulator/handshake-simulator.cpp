@@ -28,7 +28,7 @@
 
 #include <fstream>
 
-#define CONFIG_PATH                                                            \
+#define DEFAULT_CONFIG_PATH                                                            \
   "../experimental/data/handshake-simulator-configuration.json"
 
 using namespace llvm;
@@ -58,6 +58,12 @@ static cl::list<std::string>
                        cl::multi_val(2), cl::ZeroOrMore, cl::Optional,
                        cl::cat(configCategory));
 
+static cl::opt<std::string> 
+    jsonSelection("config",
+                  cl::desc("Change the configuration file path.\n"
+                           "Must be a relative path."),
+                  cl::Optional, cl::cat(configCategory));
+
 int main(int argc, char **argv) {
   InitLLVM y(argc, argv);
 
@@ -73,9 +79,20 @@ int main(int argc, char **argv) {
       "results are returned on stdout.\n"
       "Memref types are specified as a comma-separated list of values.\n");
 
+  // Change JSON path if needed
+  std::string configPath = DEFAULT_CONFIG_PATH;
+  if (jsonSelection.getNumOccurrences() == 1) {
+    configPath = jsonSelection.getValue();
+    errs() << " configuration file changed to " << configPath << "\n";
+
+    // Return if the command is entered alone
+    if (inputFileName.getNumOccurrences() == 0)
+      return 1;
+  }
+
   // Load JSON model configuration
   std::ifstream f;
-  f.open(CONFIG_PATH); 
+  f.open(configPath); 
 
   std::stringstream buffer;
   buffer << f.rdbuf(); 
