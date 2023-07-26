@@ -155,11 +155,11 @@ LogicalResult buffer::parseJson(const std::string &jsonFile,
   // Operations that is supported to use its time information.
   size_t pos = 0;
   std::vector<std::string> opNames = {
-      "cmpi",          "addi",    "subi",   "muli",    "extsi",
-      "d_load",        "d_store", "merge",  "addf",    "subf",
-      "mulf",          "divui",   "divsi",  "divf",    "cmpf",
-      "control_merge", "fork",    "return", "cond_br", "end",
-      "andi",          "ori",     "xori",   "shli",    "shrsi",
+      "cmpi",          "addi",    "subi",     "muli",    "extsi",
+      "d_load",        "d_store", "merge",    "addf",    "subf",
+      "mulf",          "divui",   "divsi",    "divf",    "cmpf",
+      "control_merge", "fork",    "d_return", "cond_br", "end",
+      "andi",          "ori",     "xori",     "shli",    "shrsi",
       "shrui",         "select",  "mux"};
   std::string opName;
 
