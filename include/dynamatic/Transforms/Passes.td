@@ -129,7 +129,7 @@ def HandshakePlaceBuffers : Pass<"handshake-place-buffers", "mlir::ModuleOp"> {
     "if provided, extract CFDFC from standard level simluation">,
     Option<"timefile", "time-file", "std::string", "",
     "required, file provide the time and buffer prerequisite information ">,
-    Option<"targetCP", "target-period", "double", "",
+    Option<"targetCP", "target-period", "double", "4.0",
     "target clock period for the CFDFC">];
 }
 

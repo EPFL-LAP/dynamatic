@@ -1,6 +1,6 @@
 //===- OptimizeMILP.h - optimize MILP model over CFDFC  ---------*- C++ -*-===//
 //
-// This file declaresfunction the functions of MILP solver for buffer placement.
+// This file declares functions of MILP solver for buffer placement.
 //
 //===----------------------------------------------------------------------===//
 
@@ -26,14 +26,8 @@ using namespace handshake;
 /// Get user of a value, which should be a single user as the value indicating a
 /// channel should be connected to only one unit.
 inline Operation *getUserOp(Value val) {
-  auto dstOp = val.getUsers().begin();
-  unsigned numUsers = 0;
-  for (auto c : val.getUsers()) {
-    numUsers++;
-  }
-
-  assert(numUsers <= 1 && "There are multiple users!");
-  return *dstOp;
+  auto *dstOp = *val.getUsers().begin();
+  return dstOp;
 }
 
 /// Data structure to store the variables w.r.t to a unit(operation), including
@@ -63,7 +57,7 @@ struct Result {
 
   Result operator+(const Result &other) const {
     Result result;
-    result.opaque = this->opaque + other.opaque;
+    result.opaque = this->opaque || other.opaque;
     result.numSlots = this->numSlots + other.numSlots;
     return result;
   }

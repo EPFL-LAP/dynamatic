@@ -8,6 +8,7 @@
 #define DYNAMATIC_TRANSFORMS_PLACEBUFFERS_H
 
 #include "dynamatic/Support/LLVM.h"
+#include "dynamatic/Transforms/BufferPlacement/ExtractMG.h"
 #include "mlir/Dialect/Func/IR/FuncOps.h"
 
 namespace dynamatic {

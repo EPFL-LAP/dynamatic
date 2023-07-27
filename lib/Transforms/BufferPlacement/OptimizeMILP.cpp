@@ -117,12 +117,10 @@ static void initVarsInMILP(handshake::FuncOp funcOp, GRBModel &modelBuf,
         modelBuf.addVar(-GRB_INFINITY, GRB_INFINITY, 0.0, GRB_CONTINUOUS,
                         "timePathOut_" + chName);
 
-    channelVar.tElasIn =
-        modelBuf.addVar(-GRB_INFINITY, GRB_INFINITY, 0.0, GRB_CONTINUOUS,
-                        "timeElasticIn_" + chName);
-    channelVar.tElasOut =
-        modelBuf.addVar(-GRB_INFINITY, GRB_INFINITY, 0.0, GRB_CONTINUOUS,
-                        "timeElasticOut_" + chName);
+    channelVar.tElasIn = modelBuf.addVar(0, GRB_INFINITY, 0.0, GRB_CONTINUOUS,
+                                         "timeElasticIn_" + chName);
+    channelVar.tElasOut = modelBuf.addVar(0, GRB_INFINITY, 0.0, GRB_CONTINUOUS,
+                                          "timeElasticOut_" + chName);
 
     channelVar.bufNSlots = modelBuf.addVar(0, GRB_INFINITY, 0.0, GRB_INTEGER,
                                            chName + "_bufNSlots");
@@ -145,7 +143,6 @@ static void createPathConstrs(GRBModel &modelBuf, GRBVar &t1, GRBVar &t2,
   modelBuf.addConstr(t1 <= period);
   modelBuf.addConstr(t2 <= period);
   modelBuf.addConstr(t2 >= t1 - 2 * period * bufOp);
-  modelBuf.addConstr(t2 >= bufDelay);
 }
 
 /// Create time path constraints over units.
@@ -155,7 +152,7 @@ static void createPathConstrs(GRBModel &modelBuf, GRBVar &tIn, GRBVar &tOut,
                               double inPortDelay = 0.0,
                               double outPortDelay = 0.0) {
   // if the unit is combinational
-  if (latency == 0.0)
+  if (latency == 0)
     modelBuf.addConstr(tOut >= delay + tIn);
   else {
     // if the unit is pipelined
@@ -264,8 +261,6 @@ createModelConstraints(GRBModel &modelBuf, GRBVar &thrpt, double targetCP,
       unsigned channelInd = 0;
       if (auto inCh = inChannelMap(channelVars, inChVal).value();
           inCh != nullptr) {
-        if (channelVars[inCh].bufNSlots.get(GRB_DoubleAttr_UB) <= 0)
-          continue;
 
         // Define variables w.r.t to input port
         double inPortDelay = getPortDelay(inChVal, unitInfo, "out");
@@ -276,8 +271,6 @@ createModelConstraints(GRBModel &modelBuf, GRBVar &thrpt, double targetCP,
           // check all the output channels
           if (auto outCh = inChannelMap(channelVars, outChVal).value();
               outCh != nullptr) {
-            if (channelVars[outCh].bufNSlots.get(GRB_DoubleAttr_UB) <= 0)
-              continue;
 
             // Define variables w.r.t to output port
             double outPortDelay = getPortDelay(outChVal, unitInfo, "in");
@@ -310,9 +303,6 @@ setCustomizedConstraints(GRBModel &modelBuf,
     } else if (channelBufProps[ch].minTrans > 0) {
       modelBuf.addConstr(chVars.bufNSlots >= channelBufProps[ch].minTrans);
       modelBuf.addConstr(chVars.bufIsOp <= 0);
-      // channelVars[ch].bufIsOp.set(GRB_DoubleAttr_UB, 0);
-      // channelVars[ch].bufNSlots.set(GRB_DoubleAttr_LB,
-      //                               channelBufProps[ch].minTrans);
     }
 
     // set max value of the buffer
@@ -322,14 +312,11 @@ setCustomizedConstraints(GRBModel &modelBuf,
 
     if (channelBufProps[ch].maxTrans.has_value())
       channelVars[ch].bufNSlots.set(GRB_DoubleAttr_UB,
-                                    channelBufProps[ch].maxNonTrans.value());
+                                    channelBufProps[ch].maxTrans.value());
   }
   for (auto &[ch, result] : res) {
     modelBuf.addConstr(channelVars[ch].bufNSlots >= res[ch].numSlots);
     modelBuf.addConstr(channelVars[ch].bufIsOp >= res[ch].opaque);
-
-    // channelVars[ch].bufIsOp.set(GRB_DoubleAttr_LB, res[ch].opaque);
-    // channelVars[ch].bufIsOp.set(GRB_DoubleAttr_UB, res[ch].opaque);
   }
 
   return success();
@@ -340,8 +327,8 @@ static void createModelObjective(GRBModel &modelBuf, GRBVar &thrpt,
                                  std::map<Value *, ChannelVar> channelVars) {
   GRBLinExpr objExpr = thrpt;
 
-  double lumbdaCoef1 = 9.58 * 1e-5;
-  double lumbdaCoef2 = 9.58 * 1e-6;
+  double lumbdaCoef1 = 9.98546 * 1e-5;
+  double lumbdaCoef2 = 9.98546 * 1e-6;
   for (auto &[_, chVar] : channelVars) {
     objExpr -= lumbdaCoef1 * chVar.hasBuf + lumbdaCoef2 * chVar.bufNSlots;
   }
@@ -374,7 +361,7 @@ setChannelBufProps(std::vector<Value> &channels,
     if (isa<arith::SelectOp>(srcOp))
       if (srcOp->getOperand(0) == ch) {
         ChannelBufProps[&ch].maxTrans = 0;
-        ChannelBufProps[&ch].maxNonTrans = 1;
+        ChannelBufProps[&ch].maxNonTrans = 0;
       }
 
     if (isa<handshake::MemoryControllerOp>(srcOp) ||
@@ -452,7 +439,6 @@ LogicalResult buffer::placeBufferInCFDFCircuit(handshake::FuncOp funcOp,
   createModelObjective(modelBuf, circtThrpt, channelVars);
 
   modelBuf.optimize();
-  modelBuf.write("/home/yuxuan/Downloads/model.lp");
 
   if (modelBuf.get(GRB_IntAttr_Status) != GRB_OPTIMAL ||
       circtThrpt.get(GRB_DoubleAttr_X) <= 0) {

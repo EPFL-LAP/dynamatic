@@ -1,4 +1,4 @@
-//===- ParseCircuitJson.h -Parse circuit json file  -----------*- C++ -*-===//
+//===- ParseCircuitJson.h -Parse circuit json file  -------------*- C++ -*-===//
 //
 // This file declares functions to parse the elements in the circuit json file.
 //

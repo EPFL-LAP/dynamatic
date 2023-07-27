@@ -15,19 +15,25 @@ using json = nlohmann::json;
 using namespace dynamatic;
 using namespace dynamatic::buffer;
 
-std::string buffer::getOperationShortStrName(Operation *op) {
+/// Get the full operation name
+static std::string getOperationFullName(Operation *op) {
   std::string fullName = op->getName().getStringRef().str();
+  return fullName;
+}
+
+std::string buffer::getOperationShortStrName(Operation *op) {
+  std::string fullName = getOperationFullName(op);
   size_t pos = fullName.find('.');
   return fullName.substr(pos + 1);
 }
 
 /// For a channel, indicated by a value, get its port width if exists,
 /// otherwise, return CPP_MAX_WIDTH
-static inline unsigned getPortWidth(Value channel) {
+static unsigned getPortWidth(Value channel) {
   unsigned portBitWidth = bitwidth::CPP_MAX_WIDTH;
   if (isa<NoneType>(channel.getType()))
     return 0;
-  if (isa<IntegerType>(channel.getType()))
+  if (isa<IntegerType, FloatType>(channel.getType()))
     portBitWidth = channel.getType().getIntOrFloatBitWidth();
   return portBitWidth;
 }
@@ -56,7 +62,7 @@ double buffer::getPortDelay(Value channel,
                             std::string direction) {
   std::string opName;
   if (direction == "in") {
-    opName = getOperationShortStrName(channel.getDefiningOp());
+    opName = getOperationFullName(channel.getDefiningOp());
     unsigned portBitWidth = getPortWidth(channel);
     if (unitInfo.find(opName) != unitInfo.end())
       return getBitWidthMatchedTimeInfo(portBitWidth,
@@ -64,9 +70,7 @@ double buffer::getPortDelay(Value channel,
 
   } else if (direction == "out") {
     auto dstOp = channel.getUsers().begin();
-    // TODO: handle multiple users
-    // assert(dstOp == channel.getUsers().end() && "There are multiple users!");
-    opName = getOperationShortStrName(*dstOp);
+    opName = getOperationFullName(*dstOp);
     unsigned portBitWidth = getPortWidth(channel);
     if (unitInfo.find(opName) != unitInfo.end())
       return getBitWidthMatchedTimeInfo(portBitWidth,
@@ -79,7 +83,7 @@ double buffer::getUnitDelay(Operation *op,
                             std::map<std::string, buffer::UnitInfo> &unitInfo,
                             std::string type) {
   double delay;
-  std::string opName = getOperationShortStrName(op);
+  std::string opName = getOperationFullName(op);
   // check whether delay information exists
   if (unitInfo.find(opName) == unitInfo.end())
     return 0.0;
@@ -100,8 +104,8 @@ double
 buffer::getCombinationalDelay(Operation *op,
                               std::map<std::string, buffer::UnitInfo> &unitInfo,
                               std::string type) {
-  std::string opName = getOperationShortStrName(op);
-  if (unitInfo.find(getOperationShortStrName(op)) == unitInfo.end())
+  std::string opName = getOperationFullName(op);
+  if (unitInfo.find(getOperationFullName(op)) == unitInfo.end())
     return 0.0;
 
   double inPortDelay, outPortDelay;
@@ -127,7 +131,7 @@ buffer::getCombinationalDelay(Operation *op,
 double
 buffer::getUnitLatency(Operation *op,
                        std::map<std::string, buffer::UnitInfo> &unitInfo) {
-  std::string opName = getOperationShortStrName(op);
+  std::string opName = getOperationFullName(op);
   if (unitInfo.find(opName) == unitInfo.end())
     return 0.0;
 
@@ -155,12 +159,20 @@ LogicalResult buffer::parseJson(const std::string &jsonFile,
   // Operations that is supported to use its time information.
   size_t pos = 0;
   std::vector<std::string> opNames = {
-      "cmpi",          "addi",    "subi",     "muli",    "extsi",
-      "d_load",        "d_store", "merge",    "addf",    "subf",
-      "mulf",          "divui",   "divsi",    "divf",    "cmpf",
-      "control_merge", "fork",    "d_return", "cond_br", "end",
-      "andi",          "ori",     "xori",     "shli",    "shrsi",
-      "shrui",         "select",  "mux"};
+      "arith.cmpi",        "arith.addi",
+      "arith.subi",        "arith.muli",
+      "arith.extsi",       "handshake.d_load",
+      "handshake.d_store", "handshake.merge",
+      "arith.addf",        "arith.subf",
+      "arith.mulf",        "arith.divui",
+      "arith.divsi",       "arith.divf",
+      "arith.cmpf",        "handshake.control_merge",
+      "handshake.fork",    "handshake.d_return",
+      "handshake.cond_br", "handshake.end",
+      "arith.andi",        "arith.ori",
+      "arith.xori",        "arith.shli",
+      "arith.shrsi",       "arith.shrui",
+      "arith.select",      "handshake.mux"};
   std::string opName;
 
   std::ifstream file(jsonFile);
@@ -172,7 +184,7 @@ LogicalResult buffer::parseJson(const std::string &jsonFile,
   // Read the file contents into a string
   json data;
   file >> data;
-  for (auto op : opNames) {
+  for (std::string &op : opNames) {
     auto unitInfoJson = data[op];
     auto latencyJson = unitInfoJson["latency"];
     // parse the bitwidth and its corresponding latency for data
