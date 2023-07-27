@@ -124,14 +124,14 @@ static void initVarsInMILP(handshake::FuncOp funcOp, GRBModel &modelBuf,
         modelBuf.addVar(-GRB_INFINITY, GRB_INFINITY, 0.0, GRB_CONTINUOUS,
                         "timeElasticOut_" + chName);
 
-    channelVar.bufNSlots = modelBuf.addVar(-GRB_INFINITY, GRB_INFINITY, 0.0,
-                                           GRB_INTEGER, chName + "_bufNSlots");
+    channelVar.bufNSlots = modelBuf.addVar(0, GRB_INFINITY, 0.0, GRB_INTEGER,
+                                           chName + "_bufNSlots");
     channelVar.thrptTok = modelBuf.addVar(-GRB_INFINITY, GRB_INFINITY, 0.0,
                                           GRB_CONTINUOUS, "thrpt_" + chName);
-    channelVar.hasBuf = modelBuf.addVar(-GRB_INFINITY, GRB_INFINITY, 0.0,
-                                        GRB_BINARY, chName + "_hasBuf");
-    channelVar.bufIsOp = modelBuf.addVar(-GRB_INFINITY, GRB_INFINITY, 0.0,
-                                         GRB_BINARY, chName + "_bufIsOp");
+    channelVar.hasBuf =
+        modelBuf.addVar(0, GRB_INFINITY, 0.0, GRB_BINARY, chName + "_hasBuf");
+    channelVar.bufIsOp =
+        modelBuf.addVar(0, GRB_INFINITY, 0.0, GRB_BINARY, chName + "_bufIsOp");
     channelVars[&val] = channelVar;
     modelBuf.update();
   }
@@ -303,18 +303,16 @@ setCustomizedConstraints(GRBModel &modelBuf,
                          std::map<Value *, Result> &res) {
   for (auto chVarMap : channelVars) {
     auto &[ch, chVars] = chVarMap;
-    channelVars[ch].bufNSlots.set(GRB_DoubleAttr_LB, 0);
-    channelVars[ch].bufNSlots.set(GRB_DoubleAttr_UB, 1e10);
     // set min value of the buffer
     if (channelBufProps[ch].minNonTrans > 0) {
-      channelVars[ch].bufIsOp.set(GRB_DoubleAttr_LB, 1);
-      channelVars[ch].bufNSlots.set(GRB_DoubleAttr_LB,
-                                    channelBufProps[ch].minNonTrans);
+      modelBuf.addConstr(chVars.bufNSlots >= channelBufProps[ch].minNonTrans);
+      modelBuf.addConstr(chVars.bufIsOp >= 0);
     } else if (channelBufProps[ch].minTrans > 0) {
-
-      channelVars[ch].bufIsOp.set(GRB_DoubleAttr_UB, 0);
-      channelVars[ch].bufNSlots.set(GRB_DoubleAttr_LB,
-                                    channelBufProps[ch].minTrans);
+      modelBuf.addConstr(chVars.bufNSlots >= channelBufProps[ch].minTrans);
+      modelBuf.addConstr(chVars.bufIsOp <= 0);
+      // channelVars[ch].bufIsOp.set(GRB_DoubleAttr_UB, 0);
+      // channelVars[ch].bufNSlots.set(GRB_DoubleAttr_LB,
+      //                               channelBufProps[ch].minTrans);
     }
 
     // set max value of the buffer
@@ -327,9 +325,11 @@ setCustomizedConstraints(GRBModel &modelBuf,
                                     channelBufProps[ch].maxNonTrans.value());
   }
   for (auto &[ch, result] : res) {
-    channelVars[ch].bufNSlots.set(GRB_DoubleAttr_LB, res[ch].numSlots);
-    channelVars[ch].bufIsOp.set(GRB_DoubleAttr_LB, res[ch].opaque);
-    channelVars[ch].bufIsOp.set(GRB_DoubleAttr_UB, res[ch].opaque);
+    modelBuf.addConstr(channelVars[ch].bufNSlots >= res[ch].numSlots);
+    modelBuf.addConstr(channelVars[ch].bufIsOp >= res[ch].opaque);
+
+    // channelVars[ch].bufIsOp.set(GRB_DoubleAttr_LB, res[ch].opaque);
+    // channelVars[ch].bufIsOp.set(GRB_DoubleAttr_UB, res[ch].opaque);
   }
 
   return success();
@@ -340,8 +340,8 @@ static void createModelObjective(GRBModel &modelBuf, GRBVar &thrpt,
                                  std::map<Value *, ChannelVar> channelVars) {
   GRBLinExpr objExpr = thrpt;
 
-  double lumbdaCoef1 = 1e-5;
-  double lumbdaCoef2 = 1e-6;
+  double lumbdaCoef1 = 9.58 * 1e-5;
+  double lumbdaCoef2 = 9.58 * 1e-6;
   for (auto &[_, chVar] : channelVars) {
     objExpr -= lumbdaCoef1 * chVar.hasBuf + lumbdaCoef2 * chVar.bufNSlots;
   }
@@ -367,8 +367,8 @@ setChannelBufProps(std::vector<Value> &channels,
         ChannelBufProps[&ch].minTrans = 1;
     }
 
-    if (isa<handshake::MuxOp>(srcOp))
-      ChannelBufProps[&ch].minTrans = 1;
+    // if (isa<handshake::MuxOp>(srcOp))
+    //   ChannelBufProps[&ch].minTrans = 1;
 
     // TODO: set selectOp always select the frequent input
     if (isa<arith::SelectOp>(srcOp))
@@ -452,10 +452,13 @@ LogicalResult buffer::placeBufferInCFDFCircuit(handshake::FuncOp funcOp,
   createModelObjective(modelBuf, circtThrpt, channelVars);
 
   modelBuf.optimize();
+  modelBuf.write("/home/yuxuan/Downloads/model.lp");
 
   if (modelBuf.get(GRB_IntAttr_Status) != GRB_OPTIMAL ||
-      circtThrpt.get(GRB_DoubleAttr_X) <= 0)
+      circtThrpt.get(GRB_DoubleAttr_X) <= 0) {
+    llvm::errs() << "no optimal sol\n";
     return failure();
+  }
 
   // load answer to the result
   for (auto &[ch, chVarMap] : channelVars) {
