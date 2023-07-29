@@ -1,4 +1,4 @@
-//===- ParseCircuitJson.cpp -Parse circuit json file  -----------*- C++ -*-===//
+//===- ParseCircuitJson.cpp - Parse circuit json file  ----------*- C++ -*-===//
 //
 // This file contains functions to parse the elements in the circuit json file.
 //
@@ -141,6 +141,54 @@ buffer::getUnitLatency(Operation *op,
       getBitWidthMatchedTimeInfo(unitBitWidth, unitInfo[opName].latency);
 
   return latency;
+}
+
+LogicalResult
+buffer::setChannelBufProps(std::vector<Value> &channels,
+                           DenseMap<Value, ChannelBufProps> &ChannelBufProps,
+                           std::map<std::string, UnitInfo> &unitInfo) {
+  for (auto &ch : channels) {
+    Operation *srcOp = ch.getDefiningOp();
+    Operation *dstOp = *(ch.getUsers().begin());
+
+    // skip the channel that is the block argument
+    if (!srcOp || !dstOp)
+      continue;
+
+    std::string srcName = srcOp->getName().getStringRef().str();
+    std::string dstName = dstOp->getName().getStringRef().str();
+    // set merge with multiple input to have at least one transparent buffer
+    if (isa<handshake::MergeOp>(srcOp) && srcOp->getNumOperands() > 1)
+      ChannelBufProps[ch].minTrans = 1;
+
+    // TODO: set selectOp always select the frequent input
+    if (isa<arith::SelectOp>(srcOp))
+      if (srcOp->getResult(0) == ch) {
+        ChannelBufProps[ch].maxTrans = 0;
+        ChannelBufProps[ch].maxNonTrans = 0;
+      }
+
+    if (isa<handshake::MemoryControllerOp>(srcOp) ||
+        isa<handshake::MemoryControllerOp>(dstOp)) {
+      ChannelBufProps[ch].maxNonTrans = 0;
+      ChannelBufProps[ch].maxTrans = 0;
+    }
+
+    // set channel buffer properties w.r.t to input file
+    if (unitInfo.count(srcName) > 0) {
+      ChannelBufProps[ch].minTrans += unitInfo[srcName].outPortTransBuf;
+      ChannelBufProps[ch].minNonTrans += unitInfo[srcName].outPortOpBuf;
+    }
+
+    if (unitInfo.count(dstName) > 0) {
+      ChannelBufProps[ch].minTrans += unitInfo[dstName].inPortTransBuf;
+      ChannelBufProps[ch].minNonTrans += unitInfo[dstName].inPortOpBuf;
+    }
+
+    if (ChannelBufProps[ch].minTrans > 0 && ChannelBufProps[ch].minNonTrans > 0)
+      return failure(); // cannot satisfy the constraint
+  }
+  return success();
 }
 
 /// Parse the JSON data to a vector of pair {bitwidth, info}

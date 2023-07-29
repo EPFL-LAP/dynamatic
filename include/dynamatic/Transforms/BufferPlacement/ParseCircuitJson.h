@@ -3,9 +3,9 @@
 // This file declares functions to parse the elements in the circuit json file.
 //
 //===----------------------------------------------------------------------===//
+#include "circt/Dialect/Handshake/HandshakeOps.h"
 #include "dynamatic/Support/LLVM.h"
 #include "mlir/Dialect/Func/IR/FuncOps.h"
-// #include "dynamatic/Transforms/BufferPlacement/ExtractMG.h"
 
 namespace dynamatic {
 namespace buffer {
@@ -54,6 +54,12 @@ double getCombinationalDelay(Operation *op,
 double getPortDelay(Value channel,
                     std::map<std::string, buffer::UnitInfo> &unitInfo,
                     std::string type = "in");
+
+/// Parse the buffer placement requirement w.r.t to each channel
+LogicalResult
+setChannelBufProps(std::vector<Value> &channels,
+                   DenseMap<Value, ChannelBufProps> &ChannelBufProps,
+                   std::map<std::string, UnitInfo> &unitInfo);
 
 /// Read timing info for units and channels in CFDFC from the input json.
 /// The units delay and latency are determined by the units type

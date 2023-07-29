@@ -8,7 +8,6 @@
 #include "circt/Dialect/Handshake/HandshakeDialect.h"
 #include "circt/Dialect/Handshake/HandshakeOps.h"
 #include "circt/Dialect/Handshake/HandshakePasses.h"
-#include "dynamatic/Transforms/BufferPlacement/ParseCircuitJson.h"
 #include "dynamatic/Transforms/PassDetails.h"
 #include "mlir/Dialect/Arith/IR/Arith.h"
 #include "mlir/Dialect/Func/IR/FuncOps.h"
@@ -30,12 +29,10 @@ using namespace dynamatic;
 using namespace dynamatic::buffer;
 
 unsigned buffer::getPortInd(Operation *op, Value val) {
-  unsigned indVal = 0;
-  for (auto port : op->getResults()) {
+  for (auto [indVal, port] : llvm::enumerate(op->getResults())) {
     if (port == val) {
       return indVal;
     }
-    indVal++;
   }
   return UINT_MAX;
 }
@@ -56,8 +53,8 @@ static void initVarsInMILP(handshake::FuncOp funcOp, GRBModel &modelBuf,
                            std::vector<Operation *> &units,
                            std::vector<Value> &channels,
                            std::vector<Value> &allChannels,
-                           std::map<Operation *, UnitVar> &unitVars,
-                           std::map<Value *, ChannelVar> &channelVars,
+                           DenseMap<Operation *, UnitVar> &unitVars,
+                           DenseMap<Value, ChannelVar> &channelVars,
                            std::map<std::string, UnitInfo> unitInfo) {
   // create variables
   unsigned unitInd = 0;
@@ -90,15 +87,19 @@ static void initVarsInMILP(handshake::FuncOp funcOp, GRBModel &modelBuf,
     Operation *srcOp = val.getDefiningOp();
     Operation *dstOp = getUserOp(val);
 
-    if (srcOp == nullptr || dstOp == nullptr)
+    if (!srcOp && !dstOp)
       continue;
 
-    // Define the channel variable names w.r.t to its connected units
-    std::string srcOpVarName =
-        unitVars[srcOp].retIn.get(GRB_StringAttr_VarName);
+    std::string srcOpVarName = "arg_start";
+    std::string dstOpVarName = "arg_end";
+
+    if (srcOp)
+      // Define the channel variable names w.r.t to its connected units
+      srcOpVarName = unitVars[srcOp].retIn.get(GRB_StringAttr_VarName);
+    if (dstOp)
+      dstOpVarName = unitVars[dstOp].retIn.get(GRB_StringAttr_VarName);
+
     std::string srcOpName = srcOpVarName.substr(srcOpVarName.find('_', 0) + 1);
-    std::string dstOpVarName =
-        unitVars[dstOp].retIn.get(GRB_StringAttr_VarName);
     std::string dstOpName = dstOpVarName.substr(dstOpVarName.find('_', 0) + 1);
 
     // create channel variable
@@ -130,7 +131,7 @@ static void initVarsInMILP(handshake::FuncOp funcOp, GRBModel &modelBuf,
         modelBuf.addVar(0, GRB_INFINITY, 0.0, GRB_BINARY, chName + "_hasBuf");
     channelVar.bufIsOp =
         modelBuf.addVar(0, GRB_INFINITY, 0.0, GRB_BINARY, chName + "_bufIsOp");
-    channelVars[&val] = channelVar;
+    channelVars[val] = channelVar;
     modelBuf.update();
   }
 }
@@ -201,8 +202,8 @@ static void createThroughputConstrs(GRBModel &modelBuf, GRBVar &retIn,
 /// Create constraints that describe the circuits behavior
 static LogicalResult
 createModelConstraints(GRBModel &modelBuf, GRBVar &thrpt, double targetCP,
-                       std::map<Operation *, UnitVar> &unitVars,
-                       std::map<Value *, ChannelVar> &channelVars,
+                       DenseMap<Operation *, UnitVar> &unitVars,
+                       DenseMap<Value, ChannelVar> &channelVars,
                        std::map<std::string, UnitInfo> unitInfo) {
   // Channel constraints
   for (auto [ch, chVars] : channelVars) {
@@ -214,8 +215,8 @@ createModelConstraints(GRBModel &modelBuf, GRBVar &thrpt, double targetCP,
     if (chVars.bufNSlots.get(GRB_DoubleAttr_UB) <= 0)
       continue;
 
-    Operation *srcOp = ch->getDefiningOp();
-    Operation *dstOp = *(ch->getUsers().begin());
+    Operation *srcOp = ch.getDefiningOp();
+    Operation *dstOp = *(ch.getUsers().begin());
     GRBVar &t1 = chVars.tDataIn;
     GRBVar &t2 = chVars.tDataOut;
 
@@ -225,17 +226,16 @@ createModelConstraints(GRBModel &modelBuf, GRBVar &thrpt, double targetCP,
     GRBVar &bufOp = chVars.bufIsOp;
     GRBVar &bufNSlots = chVars.bufNSlots;
     GRBVar &hasBuf = chVars.hasBuf;
-    GRBVar &thrptTok = chVars.thrptTok;
 
-    GRBVar &retSrc = unitVars[srcOp].retOut;
-
-    int tok = isBackEdge(srcOp, dstOp) ? 1 : 0;
     createPathConstrs(modelBuf, t1, t2, bufOp, targetCP);
     createElasticityConstrs(modelBuf, tElas1, tElas2, bufOp, bufNSlots, hasBuf,
                             unitVars.size() + 1, targetCP);
 
     if (chVars.select && chVars.bufNSlots.get(GRB_DoubleAttr_UB) > 0)
       if (unitVars.count(dstOp) > 0) {
+        GRBVar &thrptTok = chVars.thrptTok;
+        int tok = isBackEdge(srcOp, dstOp) ? 1 : 0;
+        GRBVar &retSrc = unitVars[srcOp].retOut;
         GRBVar &retDst = unitVars[dstOp].retIn;
         createThroughputConstrs(modelBuf, retSrc, retDst, thrptTok, thrpt,
                                 bufOp, bufNSlots, tok);
@@ -257,31 +257,27 @@ createModelConstraints(GRBModel &modelBuf, GRBVar &thrpt, double targetCP,
 
     // iterate all input port to all output port for a unit
     for (auto inChVal : op->getOperands()) {
-      // only check the selected input channels
-      unsigned channelInd = 0;
-      if (auto inCh = inChannelMap(channelVars, inChVal).value();
-          inCh != nullptr) {
+      // Define variables w.r.t to input port
+      double inPortDelay = getPortDelay(inChVal, unitInfo, "out");
+      if (channelVars.contains(inChVal) == false)
+        continue;
 
-        // Define variables w.r.t to input port
-        double inPortDelay = getPortDelay(inChVal, unitInfo, "out");
-        GRBVar &tIn = channelVars[inCh].tDataOut;
-        GRBVar &tElasIn = channelVars[inCh].tElasOut;
+      GRBVar &tIn = channelVars[inChVal].tDataOut;
+      GRBVar &tElasIn = channelVars[inChVal].tElasOut;
 
-        for (auto outChVal : op->getResults())
-          // check all the output channels
-          if (auto outCh = inChannelMap(channelVars, outChVal).value();
-              outCh != nullptr) {
+      for (auto outChVal : op->getResults()) {
+        // Define variables w.r.t to output port
+        double outPortDelay = getPortDelay(outChVal, unitInfo, "in");
 
-            // Define variables w.r.t to output port
-            double outPortDelay = getPortDelay(outChVal, unitInfo, "in");
-            GRBVar &tOut = channelVars[outCh].tDataIn;
-            GRBVar &tElasOut = channelVars[outCh].tElasIn;
+        if (channelVars.contains(outChVal) == false)
+          continue;
 
-            createPathConstrs(modelBuf, tIn, tOut, delayData, latency,
-                              targetCP);
-            createElasticityConstrs(modelBuf, tElasIn, tElasOut, delayData,
-                                    latency, targetCP);
-          }
+        GRBVar &tOut = channelVars[outChVal].tDataIn;
+        GRBVar &tElasOut = channelVars[outChVal].tElasIn;
+
+        createPathConstrs(modelBuf, tIn, tOut, delayData, latency, targetCP);
+        createElasticityConstrs(modelBuf, tElasIn, tElasOut, delayData, latency,
+                                targetCP);
       }
     }
   }
@@ -291,9 +287,9 @@ createModelConstraints(GRBModel &modelBuf, GRBVar &thrpt, double targetCP,
 /// Create constraints that is prerequisite for buffer placement
 static LogicalResult
 setCustomizedConstraints(GRBModel &modelBuf,
-                         std::map<Value *, ChannelVar> channelVars,
-                         std::map<Value *, ChannelBufProps> &channelBufProps,
-                         std::map<Value *, Result> &res) {
+                         DenseMap<Value, ChannelVar> channelVars,
+                         DenseMap<Value, ChannelBufProps> &channelBufProps,
+                         DenseMap<Value, Result> &res) {
   for (auto chVarMap : channelVars) {
     auto &[ch, chVars] = chVarMap;
     // set min value of the buffer
@@ -324,7 +320,7 @@ setCustomizedConstraints(GRBModel &modelBuf,
 
 // Create MILP cost function
 static void createModelObjective(GRBModel &modelBuf, GRBVar &thrpt,
-                                 std::map<Value *, ChannelVar> channelVars) {
+                                 DenseMap<Value, ChannelVar> channelVars) {
   GRBLinExpr objExpr = thrpt;
 
   double lumbdaCoef1 = 9.98546 * 1e-5;
@@ -337,73 +333,11 @@ static void createModelObjective(GRBModel &modelBuf, GRBVar &thrpt,
 }
 #endif // DYNAMATIC_GUROBI_NOT_INSTALLED
 
-/// Set the buffer placement requirement w.r.t to each channel
-static LogicalResult
-setChannelBufProps(std::vector<Value> &channels,
-                   std::map<Value *, ChannelBufProps> &ChannelBufProps,
-                   std::map<std::string, UnitInfo> &unitInfo) {
-  for (auto &ch : channels) {
-    Operation *srcOp = ch.getDefiningOp();
-    Operation *dstOp = *(ch.getUsers().begin());
-
-    std::string srcName = getOperationShortStrName(srcOp);
-    std::string dstName = getOperationShortStrName(dstOp);
-    // set merge with multiple input to have at least one transparent buffer
-    if (isa<handshake::MergeOp>(srcOp) && srcOp->getNumOperands() > 1) {
-      if (getPortInd(srcOp, ch) == 1)
-        ChannelBufProps[&ch].minTrans = 1;
-    }
-
-    // if (isa<handshake::MuxOp>(srcOp))
-    //   ChannelBufProps[&ch].minTrans = 1;
-
-    // TODO: set selectOp always select the frequent input
-    if (isa<arith::SelectOp>(srcOp))
-      if (srcOp->getOperand(0) == ch) {
-        ChannelBufProps[&ch].maxTrans = 0;
-        ChannelBufProps[&ch].maxNonTrans = 0;
-      }
-
-    if (isa<handshake::MemoryControllerOp>(srcOp) ||
-        isa<handshake::MemoryControllerOp>(dstOp)) {
-      ChannelBufProps[&ch].maxNonTrans = 0;
-      ChannelBufProps[&ch].maxTrans = 0;
-    }
-
-    // set channel buffer properties w.r.t to input file
-    if (unitInfo.count(srcName) > 0) {
-      ChannelBufProps[&ch].minTrans += unitInfo[srcName].outPortTransBuf;
-      ChannelBufProps[&ch].minNonTrans += unitInfo[srcName].outPortOpBuf;
-    }
-
-    if (unitInfo.count(dstName) > 0) {
-      ChannelBufProps[&ch].minTrans += unitInfo[dstName].inPortTransBuf;
-      ChannelBufProps[&ch].minNonTrans += unitInfo[dstName].inPortOpBuf;
-    }
-
-    if (ChannelBufProps[&ch].minTrans > 0 &&
-        ChannelBufProps[&ch].minNonTrans > 0)
-      return failure(); // cannot satisfy the constraint
-  }
-  return success();
-}
-
-LogicalResult buffer::placeBufferInCFDFCircuit(handshake::FuncOp funcOp,
-                                               std::vector<Value> &allChannels,
-                                               CFDFC &CFDFCircuit,
-                                               std::map<Value *, Result> &res,
-                                               double targetCP,
-                                               std::string timefile) {
-  std::vector<double> delayData, delayValid, delayReady;
-
-  std::map<std::string, UnitInfo> unitInfo;
-  std::map<Value *, ChannelBufProps> ChannelBufProps;
-
-  parseJson(timefile, unitInfo);
-
-  // load the buffer information of the units to channel
-  if (failed(setChannelBufProps(allChannels, ChannelBufProps, unitInfo)))
-    return failure();
+LogicalResult buffer::placeBufferInCFDFCircuit(
+    handshake::FuncOp funcOp, std::vector<Value> &allChannels,
+    CFDFC &cfdfcCircuit, DenseMap<Value, Result> &res, double targetCP,
+    std::map<std::string, UnitInfo> unitInfo,
+    DenseMap<Value, ChannelBufProps> channelBufProps) {
 
 #ifdef DYNAMATIC_GUROBI_NOT_INSTALLED
   llvm::errs() << "Project was built without Gurobi installed, can't run "
@@ -418,18 +352,18 @@ LogicalResult buffer::placeBufferInCFDFCircuit(handshake::FuncOp funcOp,
   GRBModel modelBuf = GRBModel(env);
 
   // create variables
-  std::map<Operation *, UnitVar> unitVars;
-  std::map<Value *, ChannelVar> channelVars;
+  DenseMap<Operation *, UnitVar> unitVars;
+  DenseMap<Value, ChannelVar> channelVars;
 
   // create the variable to noate the overall circuit throughput
   GRBVar circtThrpt = modelBuf.addVar(0.0, 1.0, 0.0, GRB_CONTINUOUS, "thrpt");
 
   // initialize variables
-  initVarsInMILP(funcOp, modelBuf, CFDFCircuit.units, CFDFCircuit.channels,
+  initVarsInMILP(funcOp, modelBuf, cfdfcCircuit.units, cfdfcCircuit.channels,
                  allChannels, unitVars, channelVars, unitInfo);
 
   // define customized constraints
-  setCustomizedConstraints(modelBuf, channelVars, ChannelBufProps, res);
+  setCustomizedConstraints(modelBuf, channelVars, channelBufProps, res);
 
   // create circuits constraints
   createModelConstraints(modelBuf, circtThrpt, targetCP, unitVars, channelVars,
@@ -439,6 +373,7 @@ LogicalResult buffer::placeBufferInCFDFCircuit(handshake::FuncOp funcOp,
   createModelObjective(modelBuf, circtThrpt, channelVars);
 
   modelBuf.optimize();
+  modelBuf.write("/home/yuxuan/Downloads/model.lp");
 
   if (modelBuf.get(GRB_IntAttr_Status) != GRB_OPTIMAL ||
       circtThrpt.get(GRB_DoubleAttr_X) <= 0) {
@@ -448,9 +383,6 @@ LogicalResult buffer::placeBufferInCFDFCircuit(handshake::FuncOp funcOp,
 
   // load answer to the result
   for (auto &[ch, chVarMap] : channelVars) {
-    auto srcOp = ch->getDefiningOp();
-    auto dstOp = getUserOp(*ch);
-
     if (chVarMap.hasBuf.get(GRB_DoubleAttr_X) > 0) {
       Result result;
       result.numSlots =

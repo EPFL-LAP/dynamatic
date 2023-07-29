@@ -10,6 +10,7 @@
 #include "dynamatic/Support/BufferingStrategy.h"
 #include "dynamatic/Support/LLVM.h"
 #include "dynamatic/Transforms/BufferPlacement/ExtractMG.h"
+#include "dynamatic/Transforms/BufferPlacement/ParseCircuitJson.h"
 #include "mlir/Dialect/Func/IR/FuncOps.h"
 #include "mlir/IR/BuiltinTypes.h"
 
@@ -66,11 +67,12 @@ struct Result {
 /// Build and solve the MILP model for buffer placement, the funcOp and
 /// allChannels stores all the units and channels relate to the circuits. The
 /// results are solved and store to res w.r.t to each channel.
-LogicalResult placeBufferInCFDFCircuit(handshake::FuncOp funcOp,
-                                       std::vector<Value> &allChannels,
-                                       CFDFC &CFDFCircuit,
-                                       std::map<Value *, Result> &res,
-                                       double targetCP, std::string timefile);
+LogicalResult
+placeBufferInCFDFCircuit(handshake::FuncOp funcOp,
+                         std::vector<Value> &allChannels, CFDFC &cfdfcCircuit,
+                         DenseMap<Value, Result> &res, double targetCP,
+                         std::map<std::string, UnitInfo> unitInfo,
+                         DenseMap<Value, ChannelBufProps> channelBufProps);
 
 /// Get the port index of a unit
 unsigned getPortInd(Operation *op, Value val);

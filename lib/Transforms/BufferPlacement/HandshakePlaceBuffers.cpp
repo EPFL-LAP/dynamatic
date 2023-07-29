@@ -48,14 +48,14 @@ static CFDFC createCFDFCircuit(handshake::FuncOp funcOp,
 }
 
 /// Instantiate the buffers based on the results of the MILP
-static LogicalResult instantiateBuffers(std::map<Value *, Result> &res,
+static LogicalResult instantiateBuffers(DenseMap<Value, Result> &res,
                                         MLIRContext *ctx) {
   OpBuilder builder(ctx);
   for (auto &[channel, result] : res) {
     if (result.numSlots == 0)
       continue;
-    Operation *opSrc = channel->getDefiningOp();
-    Operation *opDst = getUserOp(*channel);
+    Operation *opSrc = channel.getDefiningOp();
+    Operation *opDst = getUserOp(channel);
 
     unsigned numOpque = 0;
     unsigned numTrans = 0;
@@ -66,7 +66,7 @@ static LogicalResult instantiateBuffers(std::map<Value *, Result> &res,
       numTrans = result.numSlots;
 
     builder.setInsertionPointAfter(opSrc);
-    unsigned indVal = getPortInd(opSrc, *channel);
+    unsigned indVal = getPortInd(opSrc, channel);
     assert(indVal != UINT_MAX && "Insert buffers in non exsiting channels");
 
     if (numOpque > 0) {
@@ -182,14 +182,29 @@ LogicalResult HandshakePlaceBuffersPass::insertBuffers(FuncOp &funcOp,
     for (auto resOp : op.getResults())
       allChannels.push_back(resOp);
 
+  for (auto barg : funcOp.front().getArguments())
+    for (auto op : barg.getUsers())
+      for (auto opr : op->getOperands())
+        allChannels.push_back(opr);
+
   // Create the MILP model of buffer placement, and write the results of the
   // model to insertBufResult.
-  // Instantiate the buffers according to the results.
-  std::map<Value *, Result> insertBufResult;
+
+  std::map<std::string, UnitInfo> unitInfo;
+  DenseMap<Value, ChannelBufProps> channelBufProps;
+
+  parseJson(timefile, unitInfo);
+
+  // load the buffer information of the units to channel
+  if (failed(setChannelBufProps(allChannels, channelBufProps, unitInfo)))
+    return failure();
+
+  DenseMap<Value, Result> insertBufResult;
 
   for (CFDFC &dataflowCirct : cfdfcList)
     if (failed(placeBufferInCFDFCircuit(funcOp, allChannels, dataflowCirct,
-                                        insertBufResult, targetCP, timefile)))
+                                        insertBufResult, targetCP, unitInfo,
+                                        channelBufProps)))
       break;
 
   instantiateBuffers(insertBufResult, ctx);
