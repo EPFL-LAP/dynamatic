@@ -373,7 +373,6 @@ LogicalResult buffer::placeBufferInCFDFCircuit(
   createModelObjective(modelBuf, circtThrpt, channelVars);
 
   modelBuf.optimize();
-  modelBuf.write("/home/yuxuan/Downloads/model.lp");
 
   if (modelBuf.get(GRB_IntAttr_Status) != GRB_OPTIMAL ||
       circtThrpt.get(GRB_DoubleAttr_X) <= 0) {
