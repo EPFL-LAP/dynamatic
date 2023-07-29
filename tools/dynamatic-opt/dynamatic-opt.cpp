@@ -14,6 +14,15 @@
 #include "mlir/Transforms/Passes.h"
 #include "tutorials/InitAllPasses.h"
 
+// Defined in the test directory, no public header.
+namespace experimental {
+namespace test {
+void registerTestCDGAnalysisPass();
+} // namespace test
+} // namespace experimental
+
+void registerTestPasses() { experimental::test::registerTestCDGAnalysisPass(); }
+
 int main(int argc, char **argv) {
   mlir::DialectRegistry registry;
 
@@ -21,6 +30,7 @@ int main(int argc, char **argv) {
   dynamatic::registerAllDialects(registry);
   dynamatic::registerAllPasses();
   dynamatic::tutorials::registerAllPasses();
+  registerTestPasses();
 
   // Register the standard passes we want
   mlir::registerCSEPass();
