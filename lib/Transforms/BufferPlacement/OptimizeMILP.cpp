@@ -293,8 +293,8 @@ setCustomizedConstraints(GRBModel &modelBuf,
   for (auto chVarMap : channelVars) {
     auto &[ch, chVars] = chVarMap;
     // set min value of the buffer
-    if (channelBufProps[ch].minNonTrans > 0) {
-      modelBuf.addConstr(chVars.bufNSlots >= channelBufProps[ch].minNonTrans);
+    if (channelBufProps[ch].minOpaque > 0) {
+      modelBuf.addConstr(chVars.bufNSlots >= channelBufProps[ch].minOpaque);
       modelBuf.addConstr(chVars.bufIsOp >= 0);
     } else if (channelBufProps[ch].minTrans > 0) {
       modelBuf.addConstr(chVars.bufNSlots >= channelBufProps[ch].minTrans);
@@ -302,9 +302,9 @@ setCustomizedConstraints(GRBModel &modelBuf,
     }
 
     // set max value of the buffer
-    if (channelBufProps[ch].maxNonTrans.has_value())
+    if (channelBufProps[ch].maxOpaque.has_value())
       channelVars[ch].bufNSlots.set(GRB_DoubleAttr_UB,
-                                    channelBufProps[ch].maxNonTrans.value());
+                                    channelBufProps[ch].maxOpaque.value());
 
     if (channelBufProps[ch].maxTrans.has_value())
       channelVars[ch].bufNSlots.set(GRB_DoubleAttr_UB,

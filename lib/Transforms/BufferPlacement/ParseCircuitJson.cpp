@@ -165,27 +165,27 @@ buffer::setChannelBufProps(std::vector<Value> &channels,
     if (isa<arith::SelectOp>(srcOp))
       if (srcOp->getResult(0) == ch) {
         ChannelBufProps[ch].maxTrans = 0;
-        ChannelBufProps[ch].maxNonTrans = 0;
+        ChannelBufProps[ch].minOpaque = 0;
       }
 
     if (isa<handshake::MemoryControllerOp>(srcOp) ||
         isa<handshake::MemoryControllerOp>(dstOp)) {
-      ChannelBufProps[ch].maxNonTrans = 0;
+      ChannelBufProps[ch].minOpaque = 0;
       ChannelBufProps[ch].maxTrans = 0;
     }
 
     // set channel buffer properties w.r.t to input file
     if (unitInfo.count(srcName) > 0) {
       ChannelBufProps[ch].minTrans += unitInfo[srcName].outPortTransBuf;
-      ChannelBufProps[ch].minNonTrans += unitInfo[srcName].outPortOpBuf;
+      ChannelBufProps[ch].minOpaque += unitInfo[srcName].outPortOpBuf;
     }
 
     if (unitInfo.count(dstName) > 0) {
       ChannelBufProps[ch].minTrans += unitInfo[dstName].inPortTransBuf;
-      ChannelBufProps[ch].minNonTrans += unitInfo[dstName].inPortOpBuf;
+      ChannelBufProps[ch].minOpaque += unitInfo[dstName].inPortOpBuf;
     }
 
-    if (ChannelBufProps[ch].minTrans > 0 && ChannelBufProps[ch].minNonTrans > 0)
+    if (ChannelBufProps[ch].minTrans > 0 && ChannelBufProps[ch].minOpaque > 0)
       return failure(); // cannot satisfy the constraint
   }
   return success();
