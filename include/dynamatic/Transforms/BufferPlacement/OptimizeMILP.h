@@ -46,7 +46,7 @@ struct ChannelVar {
 public:
   bool select;
   GRBVar tDataIn, tDataOut, tElasIn, tElasOut;
-  GRBVar thrptTok, bufIsOp, bufNSlots, hasBuf;
+  GRBVar bufIsOp, bufNSlots, hasBuf;
 };
 
 /// Data structure to store the results of buffer placement, including the
@@ -68,9 +68,10 @@ struct Result {
 /// allChannels stores all the units and channels relate to the circuits. The
 /// results are solved and store to res w.r.t to each channel.
 LogicalResult
-placeBufferInCFDFCircuit(handshake::FuncOp funcOp,
-                         std::vector<Value> &allChannels, CFDFC &cfdfcCircuit,
-                         DenseMap<Value, Result> &res, double targetCP,
+placeBufferInCFDFCircuit(DenseMap<Value, Result> &res, handshake::FuncOp funcOp,
+                         std::vector<Value> &allChannels,
+                         std::vector<CFDFC> cfdfcList, unsigned cfdfcInd,
+                         double targetCP,
                          std::map<std::string, UnitInfo> unitInfo,
                          DenseMap<Value, ChannelBufProps> channelBufProps);
 

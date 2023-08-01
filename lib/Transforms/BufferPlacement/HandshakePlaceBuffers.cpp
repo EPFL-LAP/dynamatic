@@ -201,11 +201,11 @@ LogicalResult HandshakePlaceBuffersPass::insertBuffers(FuncOp &funcOp,
 
   DenseMap<Value, Result> insertBufResult;
 
-  for (CFDFC &dataflowCirct : cfdfcList)
-    if (failed(placeBufferInCFDFCircuit(funcOp, allChannels, dataflowCirct,
-                                        insertBufResult, targetCP, unitInfo,
-                                        channelBufProps)))
-      break;
+  // for (auto [ind, _] : llvm::enumerate(cfdfcList))
+  if (failed(placeBufferInCFDFCircuit(insertBufResult, funcOp, allChannels,
+                                      cfdfcList, 0, targetCP, unitInfo,
+                                      channelBufProps)))
+    return failure();
 
   instantiateBuffers(insertBufResult, ctx);
 
