@@ -75,6 +75,19 @@ def HandshakePrepareForLegacy : Pass<"handshake-prepare-for-legacy", "mlir::Modu
   let constructor = "dynamatic::createHandshakePrepareForLegacy()";
 }
 
+def HandshakeOptimizeBitwidths : Pass<"handshake-optimize-bitwidths",
+                                      "mlir::ModuleOp"> {
+  let summary = "Optimize bitwidths of all channels.";
+  let description = [{
+    Reduces the bitwidths of channels wherever possible. Uses a standard
+    forward-backward iterative process to identify opportunities for bitwidth
+    reduction, considering the specific semantics of all operations present at
+    the Handhsake level.
+  }];
+  let constructor = "dynamatic::createHandshakeOptimizeBitwidths()";
+  let dependentDialects = ["mlir::arith::ArithDialect"];
+}
+
 def HandshakeOptimizeBits : Pass<"optimize-bits" , "mlir::ModuleOp"> {
   let summary = "Optimize bits width that can be reduced.";
   let description = [{

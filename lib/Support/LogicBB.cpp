@@ -8,6 +8,7 @@
 #include "dynamatic/Support/LogicBB.h"
 
 using namespace circt;
+using namespace dynamatic;
 
 dynamatic::LogicBBs dynamatic::getLogicBBs(handshake::FuncOp funcOp) {
   dynamatic::LogicBBs logicBBs;
@@ -25,6 +26,14 @@ bool dynamatic::inheritBB(Operation *srcOp, Operation *dstOp) {
     return true;
   }
   return false;
+}
+
+bool dynamatic::inheritBBFromValue(Value val, Operation *dstOp) {
+  if (Operation *defOp = val.getDefiningOp())
+    return inheritBB(defOp, dstOp);
+  dstOp->setAttr(BB_ATTR,
+                 OpBuilder(val.getContext()).getUI32IntegerAttr(ENTRY_BB));
+  return true;
 }
 
 std::optional<unsigned> dynamatic::getLogicBB(Operation *op) {
