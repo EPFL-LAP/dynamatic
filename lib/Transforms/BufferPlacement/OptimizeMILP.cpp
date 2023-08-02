@@ -360,10 +360,7 @@ static void createModelThrptConstraints(
     std::vector<DenseMap<Operation *, UnitVar>> &unitVars,
     std::map<std::string, UnitInfo> &unitInfo) {
   for (auto [ind, subMG] : llvm::enumerate(chThrptToks)) {
-    llvm::errs() << "yuxuan: test\n\n";
     for (auto &[ch, thrptTok] : subMG) {
-      llvm::errs() << channelVars[ch].hasBuf.get(GRB_StringAttr_VarName)
-                   << "\n";
       Operation *srcOp = ch.getDefiningOp();
       Operation *dstOp = *(ch.getUsers().begin());
       int tok = isBackEdge(srcOp, dstOp) ? 1 : 0;
