@@ -175,7 +175,7 @@ static std::string getTypeName(Type type, Location loc) {
 
   // Float type
   if (isa<FloatType>(type))
-    return "_f" + std::to_string(type.getIntOrFloatBitWidth());
+    return "_" + std::to_string(type.getIntOrFloatBitWidth());
 
   // Tuple type
   if (auto tupleType = type.dyn_cast<TupleType>()) {
@@ -269,14 +269,14 @@ static std::string getExtModuleName(Operation *oldOp) {
             auto intType = intAttr.getType();
 
             if (intType.isSignedInteger())
-              extModName += "_c" + std::to_string(intAttr.getSInt());
+              extModName += "_" + std::to_string(intAttr.getSInt());
             else if (intType.isUnsignedInteger())
-              extModName += "_c" + std::to_string(intAttr.getUInt());
+              extModName += "_" + std::to_string(intAttr.getUInt());
             else
-              extModName += "_c" + std::to_string((uint64_t)intAttr.getInt());
+              extModName += "_" + std::to_string((uint64_t)intAttr.getInt());
           } else if (auto floatAttr = constOp.getValue().dyn_cast<FloatAttr>())
             extModName +=
-                "_c" + std::to_string(floatAttr.getValue().convertToFloat());
+                "_" + std::to_string(floatAttr.getValue().convertToFloat());
           else
             oldOp->emitError("unsupported constant type");
         }
