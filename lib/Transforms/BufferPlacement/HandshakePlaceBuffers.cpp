@@ -156,13 +156,13 @@ LogicalResult HandshakePlaceBuffersPass::insertBuffers(FuncOp &funcOp,
     return failure();
 
   unsigned freq;
+
   if (failed(extractCFDFCircuit(archs, bbs, freq))) {
     deleleArchMap(archs);
     return failure();
   }
   while (freq > 0) {
     // write the execution frequency to the CFDFC
-    llvm::errs() << "create CFDFC\n";
     auto circuit = createCFDFCircuit(funcOp, archs, bbs);
     circuit.execN = freq;
     cfdfcList.push_back(circuit);

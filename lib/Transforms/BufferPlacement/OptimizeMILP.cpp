@@ -116,14 +116,12 @@ initVarsInMILP(handshake::FuncOp funcOp, GRBModel &modelBuf,
     if (!srcOp || !dstOp)
       continue;
 
-    std::string srcOpName = "arg_start";
+    std::string srcOpName = "arg_input";
     std::string dstOpName = "arg_end";
 
-    // if (srcOp && dstOp) {
     // Define the channel variable names w.r.t to its connected units
     srcOpName = getOperationShortStrName(srcOp);
     dstOpName = getOperationShortStrName(dstOp);
-    // }
 
     // create channel variable
     ChannelVar channelVar;
@@ -134,12 +132,10 @@ initVarsInMILP(handshake::FuncOp funcOp, GRBModel &modelBuf,
     if (std::find(channels.begin(), channels.end(), val) != channels.end())
       channelVar.select = true;
 
-    channelVar.tDataIn =
-        modelBuf.addVar(-GRB_INFINITY, GRB_INFINITY, 0.0, GRB_CONTINUOUS,
-                        "timePathIn_" + chName);
-    channelVar.tDataOut =
-        modelBuf.addVar(-GRB_INFINITY, GRB_INFINITY, 0.0, GRB_CONTINUOUS,
-                        "timePathOut_" + chName);
+    channelVar.tDataIn = modelBuf.addVar(0, GRB_INFINITY, 0.0, GRB_CONTINUOUS,
+                                         "timePathIn_" + chName);
+    channelVar.tDataOut = modelBuf.addVar(0, GRB_INFINITY, 0.0, GRB_CONTINUOUS,
+                                          "timePathOut_" + chName);
 
     channelVar.tElasIn = modelBuf.addVar(0, GRB_INFINITY, 0.0, GRB_CONTINUOUS,
                                          "timeElasticIn_" + chName);
@@ -196,8 +192,7 @@ static void createElasticityConstrs(GRBModel &modelBuf, GRBVar &t1, GRBVar &t2,
 
 // create elasticity constraints w.r.t units
 static void createElasticityConstrs(GRBModel &modelBuf, GRBVar &tIn,
-                                    GRBVar &tOut, double delay, double latency,
-                                    double period) {
+                                    GRBVar &tOut) {
   modelBuf.addConstr(tOut >= 1 + tIn);
 }
 
@@ -230,9 +225,6 @@ createModelPathConstraints(GRBModel &modelBuf, double targetCP, FuncOp &funcOp,
     GRBVar &t1 = chVars.tDataIn;
     GRBVar &t2 = chVars.tDataOut;
 
-    // GRBVar &tElas1 = chVars.tElasIn;
-    // GRBVar &tElas2 = chVars.tElasOut;
-
     GRBVar &bufOp = chVars.bufIsOp;
     GRBVar &bufNSlots = chVars.bufNSlots;
     GRBVar &hasBuf = chVars.hasBuf;
@@ -243,36 +235,29 @@ createModelPathConstraints(GRBModel &modelBuf, double targetCP, FuncOp &funcOp,
   // Units constraints
   for (auto &op : funcOp.getOps()) {
     double delayData = getCombinationalDelay(&op, unitInfo, "data");
-    double delayValid = getCombinationalDelay(&op, unitInfo, "valid");
-    double delayReady = getCombinationalDelay(&op, unitInfo, "ready");
     double latency = getUnitLatency(&op, unitInfo);
-
     // iterate all input port to all output port for a unit
     if (latency == 0)
       for (auto inChVal : op.getOperands()) {
         // Define variables w.r.t to input port
-        double inPortDelay = getPortDelay(inChVal, unitInfo, "out");
-        if (channelVars.contains(inChVal) == false)
+        if (!channelVars.contains(inChVal))
           continue;
 
         GRBVar &tIn = channelVars[inChVal].tDataOut;
         // GRBVar &tElasIn = channelVars[inChVal].tElasOut;
         for (auto outChVal : op.getResults()) {
-          // Define variables w.r.t to output port
-          double outPortDelay = getPortDelay(outChVal, unitInfo, "in");
-
-          if (channelVars.contains(outChVal) == false)
+          if (!channelVars.contains(outChVal))
             continue;
 
+          // Define variables w.r.t to output port
           GRBVar &tOut = channelVars[outChVal].tDataIn;
-          // GRBVar &tElasOut = channelVars[outChVal].tElasIn;
           modelBuf.addConstr(tOut >= delayData + tIn);
         }
       }
     else {
       for (auto inChVal : op.getOperands()) {
         double inPortDelay = getPortDelay(inChVal, unitInfo, "out");
-        if (channelVars.contains(inChVal) == false)
+        if (!channelVars.contains(inChVal))
           continue;
 
         GRBVar &tIn = channelVars[inChVal].tDataOut;
@@ -283,7 +268,7 @@ createModelPathConstraints(GRBModel &modelBuf, double targetCP, FuncOp &funcOp,
         // Define variables w.r.t to output port
         double outPortDelay = getPortDelay(outChVal, unitInfo, "in");
 
-        if (channelVars.contains(outChVal) == false)
+        if (!channelVars.contains(outChVal))
           continue;
 
         GRBVar &tOut = channelVars[outChVal].tDataIn;
@@ -323,13 +308,7 @@ createModelElasticityConstraints(GRBModel &modelBuf, double targetCP,
 
   // Units constraints
   for (auto &op : funcOp.getOps()) {
-    double delayData = getCombinationalDelay(&op, unitInfo, "data");
-    double delayValid = getCombinationalDelay(&op, unitInfo, "valid");
-    double delayReady = getCombinationalDelay(&op, unitInfo, "ready");
-    double latency = getUnitLatency(&op, unitInfo);
-
     // iterate all input port to all output port for a unit
-
     for (auto inChVal : op.getOperands()) {
       // Define variables w.r.t to input port
       double inPortDelay = getPortDelay(inChVal, unitInfo, "out");
@@ -345,8 +324,7 @@ createModelElasticityConstraints(GRBModel &modelBuf, double targetCP,
           continue;
 
         GRBVar &tElasOut = channelVars[outChVal].tElasIn;
-        createElasticityConstrs(modelBuf, tElasIn, tElasOut, delayData, latency,
-                                targetCP);
+        createElasticityConstrs(modelBuf, tElasIn, tElasOut);
       }
     }
   }
@@ -482,6 +460,7 @@ LogicalResult buffer::placeBufferInCFDFCircuit(
   }
 
   // initialize variables
+
   initVarsInMILP(funcOp, modelBuf, cfdfcList, cfdfcInd, allChannels, unitVars,
                  chThrptToks, channelVars, unitInfo);
 
