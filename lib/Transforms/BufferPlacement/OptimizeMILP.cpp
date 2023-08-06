@@ -51,7 +51,7 @@ inChannelMap(const std::map<Value *, ChannelVar> &channelVars, Value ch) {
 /// Initialize the variables in the MILP model
 static void
 initVarsInMILP(handshake::FuncOp funcOp, GRBModel &modelBuf,
-               std::vector<CFDFC> cfdfcList, unsigned cfdfcInd,
+               std::vector<CFDFC> cfdfcList, std::vector<unsigned> cfdfcInds,
                std::vector<Value> &allChannels,
                std::vector<DenseMap<Operation *, UnitVar>> &unitVars,
                std::vector<DenseMap<Value, GRBVar>> &chThrptToks,
@@ -59,19 +59,12 @@ initVarsInMILP(handshake::FuncOp funcOp, GRBModel &modelBuf,
                std::map<std::string, UnitInfo> unitInfo) {
   // create variables
   unsigned unitInd = 0;
-  std::vector<Operation *> units = cfdfcList[cfdfcInd].units;
-  std::vector<Value> channels = cfdfcList[cfdfcInd].channels;
 
   for (auto [ind, cfdfc] : llvm::enumerate(cfdfcList)) {
     unitVars.push_back(DenseMap<Operation *, UnitVar>());
     chThrptToks.push_back(DenseMap<Value, GRBVar>());
     for (auto [unitInd, unit] : llvm::enumerate(cfdfc.units)) {
       UnitVar unitVar;
-      unitVar.select = false;
-
-      // If in the CFDFC, set select to true
-      if (std::find(units.begin(), units.end(), unit) != units.end())
-        unitVar.select = true;
 
       // init unit variables
       std::string unitName = getOperationShortStrName(unit);
@@ -89,6 +82,9 @@ initVarsInMILP(handshake::FuncOp funcOp, GRBModel &modelBuf,
       unitVars[ind][unit] = unitVar;
     }
 
+    // init channel variables w.r.t the optimized CFDFC
+    if (std::find(cfdfcInds.begin(), cfdfcInds.end(), ind) == cfdfcInds.end())
+      continue;
     for (auto [chInd, channel] : llvm::enumerate(cfdfc.channels)) {
       std::string srcName = "arg_start";
       std::string dstName = "arg_end";
@@ -127,10 +123,6 @@ initVarsInMILP(handshake::FuncOp funcOp, GRBModel &modelBuf,
     ChannelVar channelVar;
     std::string chName =
         srcOpName + "_" + dstOpName + "_" + std::to_string(ind);
-
-    channelVar.select = false;
-    if (std::find(channels.begin(), channels.end(), val) != channels.end())
-      channelVar.select = true;
 
     channelVar.tDataIn = modelBuf.addVar(0, GRB_INFINITY, 0.0, GRB_CONTINUOUS,
                                          "timePathIn_" + chName);
@@ -429,7 +421,7 @@ static void createModelObjective(GRBModel &modelBuf,
 LogicalResult buffer::placeBufferInCFDFCircuit(
     DenseMap<Value, Result> &res, handshake::FuncOp funcOp,
     std::vector<Value> &allChannels, std::vector<CFDFC> cfdfcList,
-    unsigned cfdfcInd, double targetCP,
+    std::vector<unsigned> cfdfcInds, double targetCP,
     std::map<std::string, UnitInfo> unitInfo,
     DenseMap<Value, ChannelBufProps> channelBufProps) {
 
@@ -461,7 +453,7 @@ LogicalResult buffer::placeBufferInCFDFCircuit(
 
   // initialize variables
 
-  initVarsInMILP(funcOp, modelBuf, cfdfcList, cfdfcInd, allChannels, unitVars,
+  initVarsInMILP(funcOp, modelBuf, cfdfcList, cfdfcInds, allChannels, unitVars,
                  chThrptToks, channelVars, unitInfo);
 
   // define customized constraints
@@ -486,7 +478,7 @@ LogicalResult buffer::placeBufferInCFDFCircuit(
   modelBuf.optimize();
 
   if (modelBuf.get(GRB_IntAttr_Status) != GRB_OPTIMAL ||
-      circtThrpts[cfdfcInd].get(GRB_DoubleAttr_X) <= 0) {
+      circtThrpts[cfdfcInds[0]].get(GRB_DoubleAttr_X) <= 0) {
     llvm::errs() << "no optimal sol\n";
     return failure();
   }

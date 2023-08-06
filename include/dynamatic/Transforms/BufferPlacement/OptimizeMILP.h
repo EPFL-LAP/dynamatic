@@ -70,8 +70,8 @@ struct Result {
 LogicalResult
 placeBufferInCFDFCircuit(DenseMap<Value, Result> &res, handshake::FuncOp funcOp,
                          std::vector<Value> &allChannels,
-                         std::vector<CFDFC> cfdfcList, unsigned cfdfcInd,
-                         double targetCP,
+                         std::vector<CFDFC> cfdfcList,
+                         std::vector<unsigned> cfdfcInds, double targetCP,
                          std::map<std::string, UnitInfo> unitInfo,
                          DenseMap<Value, ChannelBufProps> channelBufProps);
 

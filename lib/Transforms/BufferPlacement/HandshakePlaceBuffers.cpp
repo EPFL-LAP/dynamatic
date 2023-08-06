@@ -161,9 +161,14 @@ LogicalResult HandshakePlaceBuffersPass::insertBuffers(FuncOp &funcOp,
     deleleArchMap(archs);
     return failure();
   }
+
+  // Create the CFDFC index list that will be optimized
+  std::vector<unsigned> cfdfcInds;
+  unsigned cfdfcInd = 0;
   while (freq > 0) {
     // write the execution frequency to the CFDFC
     auto circuit = createCFDFCircuit(funcOp, archs, bbs);
+    cfdfcInds.push_back(cfdfcInd++);
     circuit.execN = freq;
     cfdfcList.push_back(circuit);
     if (firstMG)
@@ -202,9 +207,8 @@ LogicalResult HandshakePlaceBuffersPass::insertBuffers(FuncOp &funcOp,
 
   DenseMap<Value, Result> insertBufResult;
 
-  // for (auto [ind, _] : llvm::enumerate(cfdfcList))
   if (failed(placeBufferInCFDFCircuit(insertBufResult, funcOp, allChannels,
-                                      cfdfcList, 0, targetCP, unitInfo,
+                                      cfdfcList, cfdfcInds, targetCP, unitInfo,
                                       channelBufProps)))
     return failure();
 
