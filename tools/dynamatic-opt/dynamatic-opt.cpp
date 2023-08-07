@@ -13,7 +13,7 @@
 #include "mlir/Tools/mlir-opt/MlirOptMain.h"
 #include "mlir/Transforms/Passes.h"
 #include "tutorials/InitAllPasses.h"
-//#include "experimental/InitAllPasses.h" // TODO: fix linking error
+#include "experimental/InitAllPasses.h" // TODO: fix linking error
 
 // Defined in the test directory, no public header.
 namespace experimental {
@@ -32,7 +32,7 @@ int main(int argc, char **argv) {
   dynamatic::registerAllPasses();
   dynamatic::tutorials::registerAllPasses();
   registerTestPasses();
-  //experimental::registerAllExpPasses(); // TODO: fix linking error
+  experimental::registerAllExpPasses(); // TODO: fix linking error
 
   // Register the standard passes we want
   mlir::registerCSEPass();
