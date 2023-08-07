@@ -186,6 +186,26 @@ int buffer::getBBIndex(Operation *op) {
   return -1;
 }
 
+unsigned buffer::getChannelFreq(Value channel, std::vector<CFDFC> &cfdfcList) {
+  Operation *srcOp = channel.getDefiningOp();
+  Operation *dstOp = *channel.getUsers().begin();
+
+  unsigned freq = 1;
+  if (!srcOp || !dstOp)
+    return freq;
+
+  // srcOp and dstOp in a same BB, the execution times equals to the sum over
+  // all CFDFCs
+  if (getBBIndex(srcOp) == getBBIndex(dstOp))
+    freq = 0;
+  for (auto cfdfc : cfdfcList)
+    if (std::find(cfdfc.channels.begin(), cfdfc.channels.end(), channel) !=
+        cfdfc.channels.end())
+      freq = cfdfc.execN;
+
+  return freq;
+}
+
 bool buffer::isBackEdge(Operation *opSrc, Operation *opDst) {
   if (opDst->isProperAncestor(opSrc))
     return true;

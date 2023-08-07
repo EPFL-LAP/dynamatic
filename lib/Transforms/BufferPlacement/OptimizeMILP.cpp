@@ -69,14 +69,14 @@ initVarsInMILP(handshake::FuncOp funcOp, GRBModel &modelBuf,
       // init unit variables
       std::string unitName = getOperationShortStrName(unit);
       unitVar.retIn =
-          modelBuf.addVar(-GRB_INFINITY, GRB_INFINITY, 0.0, GRB_CONTINUOUS,
+          modelBuf.addVar(0, GRB_INFINITY, 0.0, GRB_CONTINUOUS,
                           "mg" + std::to_string(ind) + "_inRetimeTok_" +
                               unitName + std::to_string(unitInd));
       if (getUnitLatency(unit, unitInfo) < 1e-10)
         unitVar.retOut = unitVar.retIn;
       else
         unitVar.retOut =
-            modelBuf.addVar(-GRB_INFINITY, GRB_INFINITY, 0.0, GRB_CONTINUOUS,
+            modelBuf.addVar(0, GRB_INFINITY, 0.0, GRB_CONTINUOUS,
                             "mg" + std::to_string(ind) + "_outRetimeTok_" +
                                 unitName + std::to_string(unitInd));
       unitVars[ind][unit] = unitVar;
@@ -99,7 +99,7 @@ initVarsInMILP(handshake::FuncOp funcOp, GRBModel &modelBuf,
       std::string chName = "mg" + std::to_string(ind) + "_" + srcName + "_" +
                            dstName + "_" + std::to_string(chInd);
       chThrptToks[ind][channel] = modelBuf.addVar(
-          -GRB_INFINITY, GRB_INFINITY, 0.0, GRB_CONTINUOUS, "thrpt_" + chName);
+          0, GRB_INFINITY, 0.0, GRB_CONTINUOUS, "thrpt_" + chName);
     }
   }
   modelBuf.update();
@@ -121,6 +121,7 @@ initVarsInMILP(handshake::FuncOp funcOp, GRBModel &modelBuf,
 
     // create channel variable
     ChannelVar channelVar;
+
     std::string chName =
         srcOpName + "_" + dstOpName + "_" + std::to_string(ind);
 
@@ -398,8 +399,9 @@ static void createModelObjective(GRBModel &modelBuf,
 
   double totalFreq = 0.0;
   double highest_coef = 0.0;
-  for (auto &cfdfc : cfdfcList)
-    totalFreq += static_cast<double>(cfdfc.execN) * cfdfc.channels.size();
+  for (auto [channel, _] : channelVars)
+    totalFreq += static_cast<double>(getChannelFreq(channel, cfdfcList));
+  // static_cast<double>(cfdfc.execN) * cfdfc.channels.size();
 
   for (auto [ind, thrpt] : llvm::enumerate(circtThrpts)) {
     double coef =
@@ -445,9 +447,8 @@ LogicalResult buffer::placeBufferInCFDFCircuit(
 
   // create the variable to noate the overall circuit throughput
   for (auto [ind, _] : llvm::enumerate(cfdfcList)) {
-    GRBVar circtThrpt =
-        modelBuf.addVar(-GRB_CONTINUOUS, GRB_CONTINUOUS, 0.0, GRB_CONTINUOUS,
-                        "thrpt" + std::to_string(ind));
+    GRBVar circtThrpt = modelBuf.addVar(0, GRB_CONTINUOUS, 0.0, GRB_CONTINUOUS,
+                                        "thrpt" + std::to_string(ind));
     circtThrpts.push_back(circtThrpt);
   }
 
