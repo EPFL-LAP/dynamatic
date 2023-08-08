@@ -987,6 +987,8 @@ struct HandshakeOptimizeBitwidthsPass
     : public dynamatic::impl::HandshakeOptimizeBitwidthsBase<
           HandshakeOptimizeBitwidthsPass> {
 
+  HandshakeOptimizeBitwidthsPass(bool legacy) { this->legacy = legacy; }
+
   void runOnOperation() override {
     auto *ctx = &getContext();
     mlir::ModuleOp modOp = getOperation();
@@ -996,11 +998,13 @@ struct HandshakeOptimizeBitwidthsPass
     config.useTopDownTraversal = true;
     config.enableRegionSimplification = false;
 
-    // Some optimizations do not need to be applied iteratively.
+    // Some optimizations do not need to be applied iteratively
     RewritePatternSet patterns{ctx};
-    patterns.add<HandshakeMuxSelect, HandshakeCMergeIndex, HandshakeMCAddress,
-                 HandshakeMemPortAddress<handshake::DynamaticLoadOp>,
-                 HandshakeMemPortAddress<handshake::DynamaticStoreOp>>(ctx);
+    patterns.add<HandshakeMuxSelect, HandshakeCMergeIndex>(ctx);
+    if (!legacy)
+      patterns.add<HandshakeMCAddress,
+                   HandshakeMemPortAddress<handshake::DynamaticLoadOp>,
+                   HandshakeMemPortAddress<handshake::DynamaticStoreOp>>(ctx);
     if (failed(
             applyPatternsAndFoldGreedily(modOp, std::move(patterns), config)))
       return signalPassFailure();
@@ -1106,6 +1110,6 @@ void HandshakeOptimizeBitwidthsPass::addBackwardPatterns(
 } // namespace
 
 std::unique_ptr<mlir::OperationPass<mlir::ModuleOp>>
-dynamatic::createHandshakeOptimizeBitwidths() {
-  return std::make_unique<HandshakeOptimizeBitwidthsPass>();
+dynamatic::createHandshakeOptimizeBitwidths(bool legacy) {
+  return std::make_unique<HandshakeOptimizeBitwidthsPass>(legacy);
 }

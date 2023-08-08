@@ -86,6 +86,10 @@ def HandshakeOptimizeBitwidths : Pass<"handshake-optimize-bitwidths",
   }];
   let constructor = "dynamatic::createHandshakeOptimizeBitwidths()";
   let dependentDialects = ["mlir::arith::ArithDialect"];
+  let options = [Option<"legacy", "legacy", "bool", "false",
+    "When legacy mode is enabled, disables bitwidth optimization of memory "
+    "address channels since they sometime make the legacy dot2vhdl tool "
+    "fail.">];
 }
 
 def HandshakeOptimizeBits : Pass<"optimize-bits" , "mlir::ModuleOp"> {
