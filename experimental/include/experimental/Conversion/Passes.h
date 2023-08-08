@@ -7,10 +7,10 @@
 #ifndef EXPERIMENTAL_CONVERSION_PASSES_H
 #define EXPERIMENTAL_CONVERSION_PASSES_H
 
-#include "experimental/Conversion/StandardToHandshakeFPL22.h"
 #include "mlir/IR/DialectRegistry.h"
 #include "mlir/Pass/Pass.h"
 #include "mlir/Pass/PassRegistry.h"
+#include "experimental/Conversion/StandardToHandshakeFPL22.h"
 
 namespace dynamatic {
 namespace experimental {
