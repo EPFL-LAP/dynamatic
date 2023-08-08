@@ -27,7 +27,7 @@ bool simulate(llvm::StringRef toplevelFunction,
               llvm::ArrayRef<std::string> inputArgs,
               mlir::OwningOpRef<mlir::ModuleOp> &module,
               mlir::MLIRContext &context,
-              llvm::StringMap<std::string> &config);
+              llvm::StringMap<std::string> &funcMap);
 } // namespace dynamatic
 } // namespace experimental
 

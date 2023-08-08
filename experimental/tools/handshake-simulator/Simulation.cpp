@@ -14,6 +14,7 @@
 #include "experimental/tools/handshake-simulator/Simulation.h"
 #include "circt/Dialect/Handshake/HandshakeOps.h"
 #include "circt/Support/JSON.h"
+#include "experimental/tools/handshake-simulator/ExecModels.h"
 #include "mlir/Dialect/Arith/IR/Arith.h"
 #include "mlir/Dialect/ControlFlow/IR/ControlFlowOps.h"
 #include "mlir/Dialect/Func/IR/FuncOps.h"
@@ -23,6 +24,8 @@
 #include "llvm/ADT/StringMap.h"
 #include "llvm/ADT/TypeSwitch.h"
 #include "llvm/Support/Debug.h"
+
+#include "llvm/ADT/DenseMap.h"
 
 #include <list>
 
@@ -36,12 +39,75 @@ STATISTIC(simulatedTime, "Simulated Time");
 using namespace llvm;
 using namespace mlir;
 
+using ModelMap =
+    std::map<std::string,
+             std::unique_ptr<dynamatic::experimental::ExecutableModel>>;
+
 namespace dynamatic {
 namespace experimental {
+
+// This maps mlir instructions to the configurated execution model structure
+ModelMap models;
 
 //===----------------------------------------------------------------------===//
 // Utility functions
 //===----------------------------------------------------------------------===//
+
+namespace {
+// Initialises models maps based on Json and manual configuration
+/* MAYBE REMOVE THIS COMM, CURRENTLY HERE TO CLARIFY PR
+  - 'modelStructuresMap' stores all known models and identifies each structure
+      a string name -> any exec model structure
+  - 'funcMap' stores the entered configuration, parsed json + --change-model cmd
+      mlir operation name -> string name correspond to a exec model struct
+  - 'models' links both maps, so the configuration and all known models
+      mlir operation name -> configurated exec model structure
+
+  This allows user to change its models by command or configuration file,
+  with the only re-compilation being the one when he adds the structure
+  and inserts it in the modelStructuresMap. There could be a better way to do it
+  but this one allows dynamic changes.
+
+  modelStructuresMap is the only piece of code the user needs to touch here.
+*/
+bool initialiseMap(llvm::StringMap<std::string> &funcMap) {
+  // This maps the configuration file / command string name to it's 
+  // corresponding structure
+  ModelMap modelStructuresMap;
+  // ------------------------------------------------------------------------ //
+  //   ADD YOUR STRUCT TO THE BELOW MAP IF YOU WANT TO ADD EXECUTION MODELS   //  
+  // ------------------------------------------------------------------------ //
+  modelStructuresMap["defaultFork"] =
+      std::unique_ptr<ExecutableModel>(new DefaultFork);
+  modelStructuresMap["defaultMerge"] =
+      std::unique_ptr<ExecutableModel>(new DefaultMerge);
+  modelStructuresMap["defaultControlMerge"] =
+      std::unique_ptr<ExecutableModel>(new DefaultControlMerge);
+  modelStructuresMap["defaultMux"] =
+      std::unique_ptr<ExecutableModel>(new DefaultMux);
+  modelStructuresMap["defaultBranch"] =
+      std::unique_ptr<ExecutableModel>(new DefaultBranch);
+  modelStructuresMap["defaultConditionalBranch"] =
+      std::unique_ptr<ExecutableModel>(new DefaultConditionalBranch);
+  modelStructuresMap["defaultSink"] =
+      std::unique_ptr<ExecutableModel>(new DefaultSink);
+  modelStructuresMap["defaultConstant"] =
+      std::unique_ptr<ExecutableModel>(new DefaultConstant);
+  modelStructuresMap["defaultBuffer"] =
+      std::unique_ptr<ExecutableModel>(new DefaultBuffer);
+  // ------------------------------------------------------------------------ //
+  //   ADD YOUR STRUCT TO THE ABOVE MAP IF YOU WANT TO ADD EXECUTION MODELS   //  
+  // ------------------------------------------------------------------------ //
+
+  // Fill the map containing the final execution models structures
+  for(auto& elem : funcMap) {
+    auto& chosenStruct = modelStructuresMap[elem.getValue()];
+    //if (!chosenStruct)  
+    //  return false;
+    models[elem.getKey().str()] = std::move(chosenStruct);
+  }
+  return true;
+}
 
 template <typename T>
 static void fatalValueError(StringRef reason, T &value) {
@@ -61,14 +127,6 @@ void debugArg(const std::string &head, mlir::Value op, const APInt &value,
   LLVM_DEBUG(dbgs() << "  " << head << ":  " << op << " = " << value
                     << " (APInt<" << value.getBitWidth() << ">) @" << time
                     << "\n");
-}
-
-void debugArg(const std::string &head, mlir::Value op, const APFloat &value,
-              double time) {
-  LLVM_DEBUG(dbgs() << "  " << head << ":  " << op << " = ";
-             value.print(dbgs()); dbgs() << " ("
-                                         << "float"
-                                         << ") @" << time << "\n");
 }
 
 void debugArg(const std::string &head, mlir::Value op, const Any &value,
@@ -210,6 +268,7 @@ unsigned allocateMemRef(mlir::MemRefType type, std::vector<Any> &in,
   }
   return ptr;
 }
+}
 
 //===----------------------------------------------------------------------===//
 // Handshake executer
@@ -226,13 +285,13 @@ public:
                     std::vector<double> &storeTimes);
 
   /// Entry point for circt::handshake::FuncOp top-level functions
-  HandshakeExecuter(circt::handshake::FuncOp &func,
-                    llvm::DenseMap<mlir::Value, Any> &valueMap,
-                    llvm::DenseMap<mlir::Value, double> &timeMap,
-                    std::vector<Any> &results, std::vector<double> &resultTimes,
-                    std::vector<std::vector<Any>> &store,
-                    std::vector<double> &storeTimes,
-                    mlir::OwningOpRef<mlir::ModuleOp> &module);
+  HandshakeExecuter(
+      circt::handshake::FuncOp &func,
+      llvm::DenseMap<mlir::Value, Any> &valueMap,
+      llvm::DenseMap<mlir::Value, double> &timeMap, std::vector<Any> &results,
+      std::vector<double> &resultTimes, std::vector<std::vector<Any>> &store,
+      std::vector<double> &storeTimes,
+      mlir::OwningOpRef<mlir::ModuleOp> &module);
 
   bool succeeded() const { return successFlag; }
 
@@ -621,9 +680,9 @@ LogicalResult HandshakeExecuter::execute(mlir::CallOpInterface callOp,
   return success();
 }
 
-LogicalResult HandshakeExecuter::execute(circt::handshake::InstanceOp instanceOp,
-                                         std::vector<Any> &in,
-                                         std::vector<Any> &out) {
+LogicalResult
+HandshakeExecuter::execute(circt::handshake::InstanceOp instanceOp,
+                           std::vector<Any> &in, std::vector<Any> &out) {
   // Execute the instance op and create associations in the current
   // scope's value and time maps for the returned values.
 
@@ -663,7 +722,7 @@ LogicalResult HandshakeExecuter::execute(circt::handshake::InstanceOp instanceOp
 
       // Go execute!
       HandshakeExecuter(func, scopeValueMap, scopeTimeMap, nestedResults,
-                        nestedResTimes, store, storeTimes, *module);
+                     nestedResTimes, store, storeTimes, *module);
 
       // Place the output arguments in the caller scope.
       for (auto nestedRes : enumerate(nestedResults)) {
@@ -739,6 +798,7 @@ HandshakeExecuter::HandshakeExecuter(
             })
             .Case<func::ReturnOp>([&](auto op) {
               strat = ExecuteStrategy::Return;
+              // TODO : Change to exec model return
               return execute(op, inValues, outValues);
             })
             .Default([](auto op) {
@@ -766,6 +826,8 @@ HandshakeExecuter::HandshakeExecuter(
   }
 }
 
+using TryToExecuteFunc = std::function<void()>;
+
 HandshakeExecuter::HandshakeExecuter(
     circt::handshake::FuncOp &func, llvm::DenseMap<mlir::Value, Any> &valueMap,
     llvm::DenseMap<mlir::Value, double> &timeMap, std::vector<Any> &results,
@@ -785,7 +847,8 @@ HandshakeExecuter::HandshakeExecuter(
 
   // Pre-allocate memory
   func.walk([&](Operation *op) {
-    if (auto handshakeMemoryOp = dyn_cast<circt::handshake::MemoryOpInterface>(op))
+    if (auto handshakeMemoryOp =
+            dyn_cast<circt::handshake::MemoryOpInterface>(op))
       if (!handshakeMemoryOp.allocateMemory(memoryMap, store, storeTimes))
         llvm_unreachable("Memory op does not have unique ID!\n");
   });
@@ -822,18 +885,14 @@ HandshakeExecuter::HandshakeExecuter(
     mlir::Operation &op = *readyList.front();
     readyList.pop_front();
 
-    // TODO : Choose wether or not the ExecutableOP comes from the interface
-    //        or from a user-specified model
-    // Execute handshake ops through ExecutableOpInterface
-
-    
-
-    if (auto handshakeOp = dyn_cast<circt::handshake::ExecutableOpInterface>(op)) {
+    auto opName = op.getName().getStringRef().str();
+    auto& execModel = models[opName];
+    // Execute handshake operations
+    if (execModel) {
       std::vector<mlir::Value> scheduleList;
-      if (!handshakeOp.tryExecute(valueMap, memoryMap, timeMap, store,
-                                  scheduleList))
+      if (!execModel.get()->tryExecute(valueMap, memoryMap, timeMap, store, scheduleList, models, op)) {
         readyList.push_back(&op);
-      else {
+      } else {
         LLVM_DEBUG({
           dbgs() << "EXECUTED: " << op << "\n";
           for (auto out : op.getResults()) {
@@ -843,10 +902,11 @@ HandshakeExecuter::HandshakeExecuter(
           }
         });
       }
+
       for (mlir::Value out : scheduleList)
         scheduleUses(readyList, valueMap, out);
       continue;
-    }
+    } 
 
     int64_t i = 0;
     std::vector<Any> inValues(op.getNumOperands());
@@ -870,10 +930,11 @@ HandshakeExecuter::HandshakeExecuter(
       readyList.push_back(&op);
       continue;
     }
+
     // Consume the inputs.
     for (mlir::Value in : op.getOperands())
       valueMap.erase(in);
-
+      
     ExecuteStrategy strat = ExecuteStrategy::Default;
     LogicalResult res =
         llvm::TypeSwitch<Operation *, LogicalResult>(&op)
@@ -884,19 +945,22 @@ HandshakeExecuter::HandshakeExecuter(
                   mlir::arith::DivSIOp, mlir::arith::DivUIOp,
                   mlir::arith::DivFOp, mlir::arith::IndexCastOp,
                   mlir::arith::ExtSIOp, mlir::arith::ExtUIOp,
-                  mlir::arith::XOrIOp, circt::handshake::InstanceOp>([&](auto op) {
-              strat = ExecuteStrategy::Default;
-              return execute(op, inValues, outValues);
-            })
+                  mlir::arith::XOrIOp, circt::handshake::InstanceOp>(
+                [&](auto op) {
+                  strat = ExecuteStrategy::Default;
+                  return execute(op, inValues, outValues);
+                })
             .Case<circt::handshake::ReturnOp>([&](auto op) {
               strat = ExecuteStrategy::Return;
+              // TODO : CHANGE RETURN HERE WHEN NOT BORED ANYMORE
               return execute(op, inValues, outValues);
             })
-            .Default([](auto op) {
+            .Default([&](auto op) {
               return op->emitOpError() << "Unknown operation";
             });
     LLVM_DEBUG(dbgs() << "EXECUTED: " << op << "\n");
 
+    // fail on custom op ... ? 
     if (res.failed()) {
       successFlag = false;
       return;
@@ -922,7 +986,7 @@ HandshakeExecuter::HandshakeExecuter(
 
 bool simulate(StringRef toplevelFunction, ArrayRef<std::string> inputArgs,
               mlir::OwningOpRef<mlir::ModuleOp> &module, mlir::MLIRContext &,
-              llvm::StringMap<std::string> &config) {
+              llvm::StringMap<std::string> &funcMap) {
   // The store associates each allocation in the program
   // (represented by a int) with a vector of values which can be
   // accessed by it.  Currently values are assumed to be an integer.
@@ -952,6 +1016,10 @@ bool simulate(StringRef toplevelFunction, ArrayRef<std::string> inputArgs,
   unsigned realInputs;
   unsigned realOutputs;
 
+  // Fill the model map with instancied model structures
+  if (!initialiseMap(funcMap))
+    return true;
+
   if (mlir::func::FuncOp toplevel =
           module->lookupSymbol<mlir::func::FuncOp>(toplevelFunction)) {
     ftype = toplevel.getFunctionType();
@@ -964,7 +1032,8 @@ bool simulate(StringRef toplevelFunction, ArrayRef<std::string> inputArgs,
     outputs = toplevel.getNumResults();
     realOutputs = outputs;
   } else if (circt::handshake::FuncOp toplevel =
-                 module->lookupSymbol<circt::handshake::FuncOp>(toplevelFunction)) {
+                 module->lookupSymbol<circt::handshake::FuncOp>(
+                     toplevelFunction)) {
     ftype = toplevel.getFunctionType();
     mlir::Block &entryBlock = toplevel.getBody().front();
     blockArgs = entryBlock.getArguments();
@@ -977,12 +1046,12 @@ bool simulate(StringRef toplevelFunction, ArrayRef<std::string> inputArgs,
     if (inputs == 0) {
       errs() << "Function " << toplevelFunction << " is expected to have "
              << "at least one dummy argument.\n";
-      return 1;
+      return true;
     }
     if (outputs == 0) {
       errs() << "Function " << toplevelFunction << " is expected to have "
              << "at least one dummy result.\n";
-      return 1;
+      return true;
     }
     // Implicit none argument
     APInt apnonearg(1, 0);
@@ -995,7 +1064,7 @@ bool simulate(StringRef toplevelFunction, ArrayRef<std::string> inputArgs,
     errs() << "Toplevel function " << toplevelFunction << " has " << realInputs
            << " actual arguments, but " << inputArgs.size()
            << " arguments were provided on the command line.\n";
-    return 1;
+    return true;
   }
 
   for (unsigned i = 0; i < realInputs; ++i) {
@@ -1030,14 +1099,16 @@ bool simulate(StringRef toplevelFunction, ArrayRef<std::string> inputArgs,
                                   resultTimes, store, storeTimes)
                     .succeeded();
   } else if (circt::handshake::FuncOp toplevel =
-                 module->lookupSymbol<circt::handshake::FuncOp>(toplevelFunction)) {
-    succeeded = HandshakeExecuter(toplevel, valueMap, timeMap, results,
-                                  resultTimes, store, storeTimes, module)
-                    .succeeded();
+                 module->lookupSymbol<circt::handshake::FuncOp>(
+                     toplevelFunction)) {
+    succeeded =
+        HandshakeExecuter(toplevel, valueMap, timeMap, results, resultTimes,
+                          store, storeTimes, module)
+            .succeeded();
   }
 
   if (!succeeded)
-    return 1;
+    return true;
 
   double time = 0.0;
   for (unsigned i = 0; i < results.size(); ++i) {
@@ -1066,7 +1137,7 @@ bool simulate(StringRef toplevelFunction, ArrayRef<std::string> inputArgs,
 
   simulatedTime += (int)time;
 
-  return 0;
+  return false;
 }
 
 } // namespace experimental
