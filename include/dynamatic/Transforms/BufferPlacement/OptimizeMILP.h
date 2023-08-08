@@ -67,13 +67,12 @@ struct Result {
 /// Build and solve the MILP model for buffer placement, the funcOp and
 /// allChannels stores all the units and channels relate to the circuits. The
 /// results are solved and store to res w.r.t to each channel.
-LogicalResult
-placeBufferInCFDFCircuit(DenseMap<Value, Result> &res, handshake::FuncOp funcOp,
-                         std::vector<Value> &allChannels,
-                         std::vector<CFDFC> cfdfcList,
-                         std::vector<unsigned> cfdfcInds, double targetCP,
-                         std::map<std::string, UnitInfo> unitInfo,
-                         DenseMap<Value, ChannelBufProps> channelBufProps);
+LogicalResult placeBufferInCFDFCircuit(
+    DenseMap<Value, Result> &res, handshake::FuncOp &funcOp,
+    std::vector<Value> &allChannels, std::vector<CFDFC> &cfdfcList,
+    std::vector<unsigned> &cfdfcInds, double targetCP,
+    std::map<std::string, UnitInfo> &unitInfo,
+    DenseMap<Value, ChannelBufProps> &channelBufProps);
 
 /// Get the port index of a unit
 unsigned getPortInd(Operation *op, Value val);

@@ -162,8 +162,8 @@ buffer::setChannelBufProps(std::vector<Value> &channels,
       ChannelBufProps[ch].minTrans = 1;
 
     // TODO: set selectOp always select the frequent input
-    if (isa<arith::SelectOp>(srcOp))
-      if (srcOp->getResult(0) == ch) {
+    if (isa<arith::SelectOp>(dstOp))
+      if (dstOp->getOperand(2) == ch) {
         ChannelBufProps[ch].maxTrans = 0;
         ChannelBufProps[ch].minOpaque = 0;
       }

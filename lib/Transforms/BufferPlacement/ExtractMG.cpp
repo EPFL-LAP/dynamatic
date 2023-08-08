@@ -190,18 +190,21 @@ unsigned buffer::getChannelFreq(Value channel, std::vector<CFDFC> &cfdfcList) {
   Operation *srcOp = channel.getDefiningOp();
   Operation *dstOp = *channel.getUsers().begin();
 
-  unsigned freq = 1;
+  // if is a start node or end node, return 1
   if (!srcOp || !dstOp)
-    return freq;
+    return 1;
 
-  // srcOp and dstOp in a same BB, the execution times equals to the sum over
-  // all CFDFCs
-  if (getBBIndex(srcOp) == getBBIndex(dstOp))
+  if (isa<SinkOp, MemoryControllerOp>(dstOp) || isa<MemoryControllerOp>(srcOp))
+    return 0;
+
+  unsigned freq = 1;
+  if (isBackEdge(srcOp, dstOp))
     freq = 0;
+  //  execution times equals to the sum over all CFDFCs
   for (auto cfdfc : cfdfcList)
     if (std::find(cfdfc.channels.begin(), cfdfc.channels.end(), channel) !=
         cfdfc.channels.end())
-      freq = cfdfc.execN;
+      freq += cfdfc.execN;
 
   return freq;
 }

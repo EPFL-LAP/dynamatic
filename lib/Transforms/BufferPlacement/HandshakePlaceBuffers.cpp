@@ -184,14 +184,14 @@ LogicalResult HandshakePlaceBuffersPass::insertBuffers(FuncOp &funcOp,
 
   // Instantiate all the channels of MILP model in different CFDFC
   std::vector<Value> allChannels;
+  auto startNode = *(funcOp.front().getArguments().end() - 1);
+  for (auto op : startNode.getUsers())
+    for (auto opr : op->getOperands())
+      allChannels.push_back(opr);
+
   for (auto &op : funcOp.getOps())
     for (auto resOp : op.getResults())
       allChannels.push_back(resOp);
-
-  for (auto barg : funcOp.front().getArguments())
-    for (auto op : barg.getUsers())
-      for (auto opr : op->getOperands())
-        allChannels.push_back(opr);
 
   // Create the MILP model of buffer placement, and write the results of the
   // model to insertBufResult.
