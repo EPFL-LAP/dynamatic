@@ -13,6 +13,7 @@
 #include "circt/Dialect/Handshake/HandshakeOps.h"
 #include "circt/Dialect/Handshake/HandshakePasses.h"
 #include "dynamatic/Conversion/PassDetails.h"
+#include "dynamatic/Transforms/HandshakeConcretizeIndexType.h"
 #include "mlir/Dialect/Arith/IR/Arith.h"
 #include "mlir/Dialect/MemRef/IR/MemRef.h"
 #include "mlir/IR/BuiltinTypes.h"
@@ -156,7 +157,7 @@ static Type getOperandDataType(Value val) {
 /// The first element of the returned pair represents the discriminating input
 /// types, while the second element represents the discriminating output types.
 using DiscriminatingTypes = std::pair<SmallVector<Type>, SmallVector<Type>>;
-static DiscriminatingTypes getDiscriminatingTypes(Operation *op) {
+static DiscriminatingTypes getDiscriminatingParameters(Operation *op) {
   SmallVector<Type> inTypes, outTypes;
   llvm::transform(op->getOperands(), std::back_inserter(inTypes),
                   getOperandDataType);
@@ -169,13 +170,8 @@ static DiscriminatingTypes getDiscriminatingTypes(Operation *op) {
 /// location if the type isn't supported.
 static std::string getTypeName(Type type, Location loc) {
   // Integer-like types
-  if (type.isIntOrIndex()) {
-    if (auto indexType = type.dyn_cast<IndexType>())
-      return "_ui" + std::to_string(indexType.kInternalStorageBitWidth);
-    if (type.isSignedInteger())
-      return "_si" + std::to_string(type.getIntOrFloatBitWidth());
-    return "_ui" + std::to_string(type.getIntOrFloatBitWidth());
-  }
+  if (type.isIntOrIndex())
+    return "_" + std::to_string(type.getIntOrFloatBitWidth());
 
   // Float type
   if (isa<FloatType>(type))
@@ -191,7 +187,7 @@ static std::string getTypeName(Type type, Location loc) {
 
   // NoneType (dataless channel)
   if (isa<NoneType>(type))
-    return "_none";
+    return "_0";
 
   emitError(loc) << "data type \"" << type << "\" not supported";
   return "";
@@ -199,45 +195,163 @@ static std::string getTypeName(Type type, Location loc) {
 
 /// Constructs an external module name corresponding to an operation. The
 /// returned name is unique with respect to the operation's discriminating
-/// types.
+/// parameters.
 static std::string getExtModuleName(Operation *oldOp) {
+
   std::string extModName = getBareExtModuleName(oldOp);
+  auto types = getDiscriminatingParameters(oldOp);
+  mlir::Location loc = oldOp->getLoc();
+  SmallVector<Type> &inTypes = types.first;
+  SmallVector<Type> &outTypes = types.second;
 
-  // Add value of the constant operation
-  if (auto constOp = dyn_cast<handshake::ConstantOp>(oldOp)) {
-    if (auto intAttr = constOp.getValue().dyn_cast<IntegerAttr>()) {
-      auto intType = intAttr.getType();
+  llvm::TypeSwitch<Operation *>(oldOp)
+      .Case<handshake::BufferOp>([&](auto) {
+        // bitwidth
+        extModName += getTypeName(outTypes[0], loc);
+        // buffer type
+        auto bufferOp = dyn_cast<handshake::BufferOp>(oldOp);
+        if (bufferOp.isSequential())
+          extModName += "_seq";
+        else
+          extModName += "_fifo";
+        // number of slots
+        extModName += "_" + std::to_string(bufferOp.getNumSlots());
+      })
+      .Case<handshake::ForkOp, handshake::LazyForkOp>([&](auto) {
+        // number of outputs
+        extModName += "_" + std::to_string(outTypes.size());
+        // bitwidth
+        extModName += getTypeName(outTypes[0], loc);
+      })
+      .Case<handshake::MuxOp>([&](auto) {
+        // number of inputs (without select param)
+        extModName += "_" + std::to_string(inTypes.size() - 1);
+        // bitwidth
+        extModName += getTypeName(inTypes[1], loc);
+        // select bitwidth
+        extModName += getTypeName(inTypes[0], loc);
+      })
+      .Case<handshake::ControlMergeOp>([&](auto) {
+        // number of inputs
+        extModName += "_" + std::to_string(inTypes.size());
+        // bitwidth
+        extModName += getTypeName(inTypes[0], loc);
+        // index result bitwidth
+        extModName += getTypeName(outTypes[outTypes.size() - 1], loc);
+      })
+      .Case<handshake::MergeOp>([&](auto) {
+        // number of inputs
+        extModName += "_" + std::to_string(inTypes.size());
+        // bitwidth
+        extModName += getTypeName(inTypes[0], loc);
+      })
+      .Case<handshake::ConditionalBranchOp>([&](auto) {
+        // bitwidth
+        extModName += getTypeName(inTypes[1], loc);
+      })
+      .Case<handshake::BranchOp, handshake::SinkOp, handshake::SourceOp>(
+          [&](auto) {
+            // bitwidth
+            if (!inTypes.empty())
+              extModName += getTypeName(inTypes[0], loc);
+            else
+              extModName += getTypeName(outTypes[0], loc);
+          })
+      .Case<handshake::DynamaticLoadOp, handshake::DynamaticStoreOp>([&](auto) {
+        // data bitwidth
+        extModName += getTypeName(inTypes[0], loc);
+        // address bitwidth
+        extModName += getTypeName(inTypes[1], loc);
+      })
+      .Case<handshake::ConstantOp>([&](auto) {
+        // constant value
+        if (auto constOp = dyn_cast<handshake::ConstantOp>(oldOp)) {
+          if (auto intAttr = constOp.getValue().dyn_cast<IntegerAttr>()) {
+            auto intType = intAttr.getType();
 
-      if (intType.isSignedInteger())
-        extModName += "_c" + std::to_string(intAttr.getSInt());
-      else if (intType.isUnsignedInteger())
-        extModName += "_c" + std::to_string(intAttr.getUInt());
-      else
-        extModName += "_c" + std::to_string((uint64_t)intAttr.getInt());
-    } else if (auto floatAttr = constOp.getValue().dyn_cast<FloatAttr>())
-      extModName +=
-          "_c" + std::to_string(floatAttr.getValue().convertToFloat());
-    else
-      oldOp->emitError("unsupported constant type");
-  }
+            if (intType.isSignedInteger())
+              extModName += "_c" + std::to_string(intAttr.getSInt());
+            else if (intType.isUnsignedInteger())
+              extModName += "_c" + std::to_string(intAttr.getUInt());
+            else
+              extModName += "_c" + std::to_string((uint64_t)intAttr.getInt());
+          } else if (auto floatAttr = constOp.getValue().dyn_cast<FloatAttr>())
+            extModName +=
+                "_c" + std::to_string(floatAttr.getValue().convertToFloat());
+          else
+            oldOp->emitError("unsupported constant type");
+        }
+        // bitwidth
+        extModName += getTypeName(inTypes[0], loc);
+      })
+      .Case<handshake::JoinOp, handshake::SyncOp>([&](auto) {
+        // array of bitwidths
+        for (auto inType : inTypes)
+          extModName += getTypeName(inType, loc);
+      })
+      .Case<handshake::DynamaticReturnOp, handshake::EndOp>([&](auto) {
+        extModName += "_in";
+        // array of input bitwidths
+        for (auto inType : inTypes)
+          extModName += getTypeName(inType, loc);
+        extModName += "_out";
+        // array of output bitwidths
+        for (auto outType : outTypes)
+          extModName += getTypeName(outType, loc);
+      })
+      .Case<handshake::MemoryControllerOp>(
+          [&](handshake::MemoryControllerOp op) {
+            auto [ctrlWidth, addrWidth, dataWidth] = op.getBitwidths();
+            // data bitwidth
+            extModName += '_' + std::to_string(dataWidth);
+            // ctrl bitwith
+            extModName += '_' + std::to_string(ctrlWidth);
+            // address bitwidth
+            extModName += '_' + std::to_string(addrWidth);
 
-  // Add discriminating input and output types
-  auto [inTypes, outTypes] = getDiscriminatingTypes(oldOp);
-  if (!inTypes.empty())
-    extModName += "_in";
-  for (auto inType : inTypes)
-    extModName += getTypeName(inType, oldOp->getLoc());
-
-  if (!outTypes.empty())
-    extModName += "_out";
-  for (auto outType : outTypes)
-    extModName += getTypeName(outType, oldOp->getLoc());
-
-  // Add comparison type for comparison operations
-  if (auto cmpOp = dyn_cast<mlir::arith::CmpIOp>(oldOp))
-    extModName += "_" + stringifyEnum(cmpOp.getPredicate()).str();
-  if (auto cmpOp = dyn_cast<mlir::arith::CmpFOp>(oldOp))
-    extModName += "_" + stringifyEnum(cmpOp.getPredicate()).str();
+            // array of loads&stores arrays
+            for (auto [idx, blockAccesses] :
+                 llvm::enumerate(op.getAccesses())) {
+              extModName += "_";
+              for (auto &access : cast<mlir::ArrayAttr>(blockAccesses))
+                if (cast<AccessTypeEnumAttr>(access).getValue() ==
+                    AccessTypeEnum::Load)
+                  extModName += "L";
+                else
+                  extModName += "S";
+            }
+          })
+      .Case<arith::AddFOp, arith::AddIOp, arith::AndIOp, arith::BitcastOp,
+            arith::CeilDivSIOp, arith::CeilDivUIOp, arith::DivFOp,
+            arith::DivSIOp, arith::DivUIOp, arith::FloorDivSIOp, arith::MaxFOp,
+            arith::MaxSIOp, arith::MaxUIOp, arith::MinFOp, arith::MinSIOp,
+            arith::MinUIOp, arith::MulFOp, arith::MulIOp, arith::NegFOp,
+            arith::OrIOp, arith::RemFOp, arith::RemSIOp, arith::RemUIOp,
+            arith::ShLIOp, arith::ShRSIOp, arith::ShRUIOp, arith::SubFOp,
+            arith::SubIOp, arith::XOrIOp, arith::SelectOp>([&](auto) {
+        // bitwidth
+        extModName += getTypeName(inTypes[0], loc);
+      })
+      .Case<arith::CmpFOp, arith::CmpIOp>([&](auto) {
+        // predicate
+        if (auto cmpOp = dyn_cast<mlir::arith::CmpIOp>(oldOp))
+          extModName += "_" + stringifyEnum(cmpOp.getPredicate()).str();
+        else if (auto cmpOp = dyn_cast<mlir::arith::CmpFOp>(oldOp))
+          extModName += "_" + stringifyEnum(cmpOp.getPredicate()).str();
+        // bitwidth
+        extModName += getTypeName(inTypes[0], loc);
+      })
+      .Case<arith::ExtFOp, arith::ExtSIOp, arith::ExtUIOp, arith::FPToSIOp,
+            arith::FPToUIOp, arith::SIToFPOp, arith::TruncFOp, arith::TruncIOp,
+            arith::UIToFPOp>([&](auto) {
+        // input bitwidth
+        extModName += getTypeName(inTypes[0], loc);
+        // output bitwidth
+        extModName += getTypeName(outTypes[0], loc);
+      })
+      .Default([&](auto) {
+        oldOp->emitError() << "No matching component for operation";
+      });
 
   return extModName;
 }
@@ -620,7 +734,7 @@ void FuncOpConversionPattern::bufferInputs(
         rewriter.getStringAttr("handshake_start" + std::to_string(argIdx++)),
         operands);
 
-    arg.replaceAllUsesWith(instanceOp.getResult(0));
+    rewriter.replaceAllUsesExcept(arg, instanceOp.getResult(0), instanceOp);
   }
 }
 
@@ -737,10 +851,20 @@ public:
     }
     handshake::FuncOp funcOp = *functions.begin();
 
-    // Lowering to HW requires that every value is used exactly once.
-    // Check whether this precondition is met, and if not, exit
+    // Check that some preconditions are met before doing anything
     if (failed(verifyAllValuesHasOneUse(funcOp))) {
-      funcOp.emitOpError() << "not all values are used exactly once";
+      funcOp.emitOpError()
+          << "Lowering to netlist requires that all values in the IR are used "
+             "exactly once. Run the --handshake-materialize-forks-sinks pass "
+             "before to insert forks and sinks in the IR and make every "
+             "value used exactly once.";
+      return signalPassFailure();
+    }
+    if (failed(verifyAllIndexConcretized(funcOp))) {
+      funcOp.emitOpError()
+          << "Lowering to netlist requires that all index types in the IR have "
+             "been concretized."
+          << ERR_RUN_CONCRETIZATION;
       return signalPassFailure();
     }
 
@@ -760,6 +884,7 @@ public:
     patterns.insert<FuncOpConversionPattern>(&ctx, ls);
     patterns.insert<
         // Handshake operations
+        ExtModuleConversionPattern<handshake::BufferOp>,
         ExtModuleConversionPattern<handshake::ConditionalBranchOp>,
         ExtModuleConversionPattern<handshake::BranchOp>,
         ExtModuleConversionPattern<handshake::MergeOp>,
@@ -799,6 +924,7 @@ public:
         ExtModuleConversionPattern<arith::RemFOp>,
         ExtModuleConversionPattern<arith::RemSIOp>,
         ExtModuleConversionPattern<arith::RemUIOp>,
+        ExtModuleConversionPattern<arith::SelectOp>,
         ExtModuleConversionPattern<arith::SIToFPOp>,
         ExtModuleConversionPattern<arith::ShLIOp>,
         ExtModuleConversionPattern<arith::ShRSIOp>,

@@ -1,9 +1,10 @@
 add_dynamatic_library(DynamaticTransforms
-  ArithReduceArea.cpp
+  ArithReduceStrength.cpp
   AnalyzeMemoryAccesses.cpp
   FlattenMemRefRowMajor.cpp
   HandshakeConcretizeIndexType.cpp
   HandshakeMinimizeCstWidth.cpp
+  HandshakeOptimizeBitwidths.cpp
   HandshakePrepareForLegacy.cpp
   HandshakeInferBasicBlocks.cpp
   NameMemoryOps.cpp
@@ -22,4 +23,7 @@ add_dynamatic_library(DynamaticTransforms
   MLIRSupport
   MLIRTransformUtils
   DynamaticSupport
+  DynamaticAnalysis
 )
+
+add_subdirectory(BufferPlacement)

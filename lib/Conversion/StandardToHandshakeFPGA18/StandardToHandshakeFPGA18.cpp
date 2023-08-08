@@ -10,6 +10,7 @@
 
 #include "dynamatic/Conversion/StandardToHandshakeFPGA18.h"
 #include "circt/Dialect/Handshake/HandshakeOps.h"
+#include "dynamatic/Analysis/ConstantAnalysis.h"
 #include "dynamatic/Conversion/PassDetails.h"
 #include "dynamatic/Support/LogicBB.h"
 #include "mlir/Dialect/Affine/Analysis/AffineAnalysis.h"
@@ -264,7 +265,7 @@ LogicalResult HandshakeLoweringFPGA18::replaceMemoryOps(
           auto indices = loadOp.getIndices();
           assert(indices.size() == 1 && "load must be unidimensional");
           newOp = rewriter.create<handshake::DynamaticLoadOp>(
-              op.getLoc(), memref, indices[0]);
+              op.getLoc(), cast<MemRefType>(memref.getType()), indices[0]);
 
           // Replace uses of old load result with data result of new load
           op.getResult(0).replaceAllUsesWith(
@@ -274,7 +275,7 @@ LogicalResult HandshakeLoweringFPGA18::replaceMemoryOps(
           auto indices = storeOp.getIndices();
           assert(indices.size() == 1 && "load must be unidimensional");
           newOp = rewriter.create<handshake::DynamaticStoreOp>(
-              op.getLoc(), storeOp.getValueToStore(), indices[0]);
+              op.getLoc(), indices[0], storeOp.getValueToStore());
         })
         .Default([&](auto) {
           return op.emitOpError("Load/store operation cannot be handled.");
@@ -293,6 +294,28 @@ LogicalResult HandshakeLoweringFPGA18::replaceMemoryOps(
     rewriter.eraseOp(op);
   }
 
+  return success();
+}
+
+LogicalResult
+HandshakeLoweringFPGA18::connectConstants(ConversionPatternRewriter &rewriter) {
+
+  for (auto cstOp :
+       llvm::make_early_inc_range(r.getOps<mlir::arith::ConstantOp>())) {
+
+    rewriter.setInsertionPointAfter(cstOp);
+    auto cstVal = cstOp.getValue();
+
+    if (isCstSourcable(cstOp))
+      rewriter.replaceOpWithNewOp<handshake::ConstantOp>(
+          cstOp, cstVal.getType(), cstVal,
+          rewriter.create<handshake::SourceOp>(cstOp.getLoc(),
+                                               rewriter.getNoneType()));
+    else
+      rewriter.replaceOpWithNewOp<handshake::ConstantOp>(
+          cstOp, cstVal.getType(), cstVal,
+          getBlockEntryControl(cstOp->getBlock()));
+  }
   return success();
 }
 
@@ -605,14 +628,12 @@ static LogicalResult lowerRegion(HandshakeLoweringFPGA18 &hl,
   if (failed(runPartialLowering(baseHl, &HandshakeLowering::addBranchOps)))
     return failure();
 
-  bool sourceConstants = false;
-  if (failed(runPartialLowering(baseHl,
-                                &HandshakeLowering::connectConstantsToControl,
-                                sourceConstants)))
-    return failure();
-
   if (failed(runPartialLowering(hl, &HandshakeLoweringFPGA18::connectToMemory,
                                 memInfo)))
+    return failure();
+
+  if (failed(
+          runPartialLowering(hl, &HandshakeLoweringFPGA18::connectConstants)))
     return failure();
 
   if (failed(runPartialLowering(

@@ -1,0 +1,17 @@
+{
+  "handshake.fork":"defaultFork",
+  "handshake.merge":"defaultMerge",
+  "handshake.control_merge":"defaultControlMerge",
+  "handshake.mux":"defaultMux",
+  "handshake.br":"defaultBranch",
+  "handshake.cond_br":"defaultConditionalMerge",
+  "handshake.sink":"defaultSink",
+  "handshake.constant":"defaultConstant",
+  "handshake.buffer":"defaultBuffer",
+  "handshake.load":"defaultDynamaticLoad",
+  "handshake.store":"defaultDynamaticStore",
+  "handshake.return":"defaultDynamaticReturn",
+  "handshake.end":"defaultEnd",
+  "handshake.memory_controller":"defaultMemoryController"
+}
+

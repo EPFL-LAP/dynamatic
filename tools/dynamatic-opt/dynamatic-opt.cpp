@@ -9,20 +9,24 @@
 
 #include "dynamatic/InitAllDialects.h"
 #include "dynamatic/InitAllPasses.h"
+#include "experimental/InitAllPasses.h" // TODO: fix linking error
 #include "mlir/Pass/PassRegistry.h"
 #include "mlir/Tools/mlir-opt/MlirOptMain.h"
 #include "mlir/Transforms/Passes.h"
 #include "tutorials/InitAllPasses.h"
-#include "experimental/InitAllPasses.h" // TODO: fix linking error
 
 // Defined in the test directory, no public header.
+namespace dynamatic {
 namespace experimental {
 namespace test {
 void registerTestCDGAnalysisPass();
 } // namespace test
 } // namespace experimental
+} // namespace dynamatic
 
-void registerTestPasses() { experimental::test::registerTestCDGAnalysisPass(); }
+void registerTestPasses() {
+  dynamatic::experimental::test::registerTestCDGAnalysisPass();
+}
 
 int main(int argc, char **argv) {
   mlir::DialectRegistry registry;

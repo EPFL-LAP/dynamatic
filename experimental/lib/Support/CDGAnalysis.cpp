@@ -8,8 +8,6 @@
 #include <stack>
 #include <vector>
 
-#include "mlir/Analysis/CFGLoopInfo.h"
-
 #include "experimental/Support/CDGAnalysis.h"
 
 using namespace dynamatic::experimental;
@@ -92,71 +90,6 @@ void cfgTraversal(Block &rootBlock, std::vector<CFGEdge> &edges,
   } // end while
 }
 
-DenseMap<Block *, BlockLoopInfo> findLoopDetails(func::FuncOp &funcOp) {
-  DominanceInfo domInfo;
-  llvm::DominatorTreeBase<Block, false> &domTree =
-      domInfo.getDomTree(&funcOp.getRegion());
-  CFGLoopInfo li(domTree);
-
-  // Finding all loops.
-  std::vector<CFGLoop *> loops;
-  Region &funcReg = funcOp.getRegion();
-  for (auto &block : funcReg.getBlocks()) {
-    CFGLoop *loop = li.getLoopFor(&block);
-
-    while (loop) {
-      auto pos = std::find(loops.begin(), loops.end(), loop);
-      if (pos == loops.end()) {
-        llvm::outs() << "Found a loop!\n";
-        loops.push_back(loop);
-      }
-      loop = loop->getParentLoop();
-    }
-  }
-
-  // Iterating over BB of each loop, and attaching loop info.
-  DenseMap<Block *, BlockLoopInfo> blockToLoopInfoMap;
-  for (auto &block : funcReg.getBlocks()) {
-    BlockLoopInfo bli;
-    blockToLoopInfoMap.insert(std::make_pair(&block, bli));
-  }
-
-  for (auto &loop : loops) {
-    Block *loopHeader = loop->getHeader();
-    blockToLoopInfoMap[loopHeader].isHeader = true;
-    blockToLoopInfoMap[loopHeader].loop = loop;
-
-    llvm::outs() << "Loop header: ";
-    loopHeader->printAsOperand(llvm::outs());
-    llvm::outs() << "\n";
-
-    llvm::SmallVector<Block *> exitBlocks;
-    loop->getExitingBlocks(exitBlocks);
-    for (auto &block : exitBlocks) {
-      blockToLoopInfoMap[block].isExit = true;
-      blockToLoopInfoMap[block].loop = loop;
-
-      llvm::outs() << "Loop exit: ";
-      block->printAsOperand(llvm::outs());
-      llvm::outs() << "\n";
-    }
-
-    // A latch block is a block that contains a branch back to the header.
-    llvm::SmallVector<Block *> latchBlocks;
-    loop->getLoopLatches(latchBlocks);
-    for (auto &block : latchBlocks) {
-      blockToLoopInfoMap[block].isLatch = true;
-      blockToLoopInfoMap[block].loop = loop;
-
-      llvm::outs() << "Loop latch: ";
-      block->printAsOperand(llvm::outs());
-      llvm::outs() << "\n";
-    }
-  }
-
-  return blockToLoopInfoMap;
-}
-
 } // namespace
 
 DenseMap<Block *, BlockNeighbors>
@@ -201,8 +134,6 @@ dynamatic::experimental::cdgAnalysis(func::FuncOp &funcOp, MLIRContext &ctx) {
       cdg[dependentBlock].predecessors.push_back(controlBlock);
     }
   }
-
-  findLoopDetails(funcOp);
 
   return cdg;
 } // CDGAnalysis end

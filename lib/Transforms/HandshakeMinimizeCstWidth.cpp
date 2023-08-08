@@ -9,6 +9,7 @@
 
 #include "dynamatic/Transforms/HandshakeMinimizeCstWidth.h"
 #include "circt/Dialect/Handshake/HandshakeOps.h"
+#include "dynamatic/Analysis/ConstantAnalysis.h"
 #include "dynamatic/Support/LogicBB.h"
 #include "mlir/Dialect/Arith/IR/Arith.h"
 #include "mlir/Transforms/GreedyPatternRewriteDriver.h"
@@ -17,6 +18,20 @@
 #define DEBUG_TYPE "BITWIDTH"
 
 STATISTIC(savedBits, "Number of saved bits");
+
+/// Inserts an extension op after the constant op that extends the constant's
+/// integer result to a provided destination type. The function assumes that it
+/// makes sense to extend the former type into the latter type.
+static void insertExtOp(handshake::ConstantOp toExtend,
+                        handshake::ConstantOp toReplace, Type dstType,
+                        PatternRewriter &rewriter) {
+  rewriter.setInsertionPointAfter(toExtend);
+  auto extOp = rewriter.create<arith::ExtSIOp>(toExtend.getLoc(), dstType,
+                                               toExtend.getResult());
+  inheritBB(toExtend, extOp);
+  rewriter.replaceAllUsesExcept(toReplace.getResult(), extOp.getResult(),
+                                extOp);
+}
 
 unsigned dynamatic::computeRequiredBitwidth(APInt val) {
   bool isNegative = false;
@@ -63,32 +78,73 @@ struct MinimizeConstantBitwidth
     if (newBitwidth >= oldType.getWidth())
       return failure();
 
-    // Update the constant's result and attribute type
+    // Create the new constant attribute
     IntegerType newType = IntegerType::get(cstOp.getContext(), newBitwidth,
                                            oldType.getSignedness());
+    IntegerAttr newAttr;
+    if (oldType.isUnsigned())
+      newAttr = IntegerAttr::get(newType, val.getZExtValue());
+    else
+      newAttr = IntegerAttr::get(newType, val.getSExtValue());
+
+    // Update the constant's result and attribute type
     rewriter.updateRootInPlace(cstOp, [&] {
       cstOp.getResult().setType(newType);
-      if (oldType.isUnsigned())
-        cstOp.setValueAttr(IntegerAttr::get(newType, val.getZExtValue()));
-      else
-        cstOp.setValueAttr(IntegerAttr::get(newType, val.getSExtValue()));
+      cstOp.setValueAttr(newAttr);
     });
 
-    // Insert an extension operation to keep the same type for users of the
-    // constant's result
-    rewriter.setInsertionPointAfter(cstOp);
-    auto extOp = rewriter.create<mlir::arith::ExtSIOp>(cstOp.getLoc(), oldType,
-                                                       cstOp.getResult());
-    inheritBB(cstOp, extOp);
+    // Check whether bitwidth minimization created a duplicated constant
+    if (auto otherCstOp = findEquivalentCst(cstOp)) {
+      // Insert an extension operation to compensate for bitwidth minimization
+      insertExtOp(otherCstOp, cstOp, oldType, rewriter);
+      savedBits += oldType.getWidth();
+      return success();
+    }
 
-    // Replace uses of the constant result with the extension op's result
-    for (auto *user : llvm::make_early_inc_range(cstOp->getUsers()))
-      if (user != extOp)
-        user->replaceUsesOfWith(cstOp.getResult(), extOp.getResult());
-
-    // Accumulate the number of bits saved by the pass and return
+    // Insert an extension operation to compensate for bitwidth minimization
+    insertExtOp(cstOp, cstOp, oldType, rewriter);
     savedBits += oldType.getWidth() - newBitwidth;
     return success();
+  }
+};
+
+/// Erases redundant extension operations (ones that have the same operand and
+/// destination type as another extension operation). This pattern explicitly
+/// restricts itself to extension operations that are being fed by constants.
+/// Its goal is just to make sure that this pass doesn't create extraneous
+/// useless extensions.
+struct EraseRedundantExtension : public OpRewritePattern<arith::ExtSIOp> {
+  using OpRewritePattern<arith::ExtSIOp>::OpRewritePattern;
+
+  LogicalResult matchAndRewrite(arith::ExtSIOp extOp,
+                                PatternRewriter &rewriter) const override {
+    // Only match on extension operations that extend constants
+    Value extOperand = extOp.getIn();
+    Operation *defOp = extOperand.getDefiningOp();
+    if (!defOp || !isa<handshake::ConstantOp>(defOp))
+      return failure();
+
+    // Get the enclosing function
+    auto funcOp = extOp->getParentOfType<handshake::FuncOp>();
+    assert(funcOp && "extension operation should have parent function");
+
+    // Try to find an equivalent extension operation
+    Type extDstType = extOp.getOut().getType();
+    for (auto otherExtOp : funcOp.getOps<arith::ExtSIOp>()) {
+      // Don't match ourself
+      if (extOp == otherExtOp)
+        continue;
+
+      if (extOperand == otherExtOp.getIn() &&
+          extDstType == otherExtOp.getOut().getType()) {
+        // Replace uses of the current extension with the equivalent one (same
+        // operand and same result type) we found
+        rewriter.replaceOp(extOp, otherExtOp.getOut());
+        return success();
+      }
+    }
+
+    return failure();
   }
 };
 
@@ -100,14 +156,14 @@ struct HandshakeMinimizeCstWidthPass
 
   void runOnOperation() override {
     auto *ctx = &getContext();
+    mlir::ModuleOp mod = getOperation();
 
     mlir::GreedyRewriteConfig config;
     config.useTopDownTraversal = true;
     config.enableRegionSimplification = false;
     RewritePatternSet patterns{ctx};
-    patterns.add<MinimizeConstantBitwidth>(ctx);
-    if (failed(applyPatternsAndFoldGreedily(getOperation(), std::move(patterns),
-                                            config)))
+    patterns.add<MinimizeConstantBitwidth, EraseRedundantExtension>(ctx);
+    if (failed(applyPatternsAndFoldGreedily(mod, std::move(patterns), config)))
       return signalPassFailure();
 
     LLVM_DEBUG(llvm::dbgs() << "Number of saved bits is " << savedBits << "\n");

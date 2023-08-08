@@ -73,8 +73,10 @@ struct TestCDGAnalysisPass
 };
 } // namespace
 
+namespace dynamatic {
 namespace experimental {
 namespace test {
 void registerTestCDGAnalysisPass() { PassRegistration<TestCDGAnalysisPass>(); }
 } // namespace test
 } // namespace experimental
+} // namespace dynamatic

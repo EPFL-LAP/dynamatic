@@ -14,13 +14,21 @@ include "mlir/Pass/PassBase.td"
 // Arith passes
 //===----------------------------------------------------------------------===//
 
-def ArithReduceArea : Pass<"arith-reduce-area", "mlir::ModuleOp"> {
-  let summary = "Reduces area taken up by arithmetic operations.";
+def ArithReduceStrength : Pass<"arith-reduce-strength", "mlir::ModuleOp"> {
+  let summary = "Strength reduction of arithmetic operations";
   let description = [{
-    Optimizes arithmetic operations to reduce the total area taken up by the
-    circuit that will be generated for the module.
+    Performs strength reduction on arithmetic operations in the context of
+    dataflow circuits implemented on FPGAs. The goal of the pass is to increase
+    circuit performance and reduce the area corresponding to arithmetic
+    operations present in the circuit.
   }];
-  let constructor = "dynamatic::createArithReduceArea()";
+  let constructor = "dynamatic::createArithReduceStrength()";
+  let options =
+    [Option<"maxAdderDepthMul", "max-adder-depth-mul", "unsigned", "3",
+            "The maximum number of adders that can be chained one after the "
+            "other when replacing a multiplication with a tree of adders. "
+            "Above this number, we consider that there would be no desirable "
+            "performance/area advantage to replace the multiplication.">];
 }
 
 //===----------------------------------------------------------------------===//
@@ -67,6 +75,18 @@ def HandshakePrepareForLegacy : Pass<"handshake-prepare-for-legacy", "mlir::Modu
   let constructor = "dynamatic::createHandshakePrepareForLegacy()";
 }
 
+def HandshakeOptimizeBitwidths : Pass<"handshake-optimize-bitwidths",
+                                      "mlir::ModuleOp"> {
+  let summary = "Optimize bitwidths of all channels.";
+  let description = [{
+    Reduces the bitwidths of channels wherever possible. Uses a standard
+    forward-backward iterative process to identify opportunities for bitwidth
+    reduction, considering the specific semantics of all operations present at
+    the Handhsake level.
+  }];
+  let constructor = "dynamatic::createHandshakeOptimizeBitwidths()";
+  let dependentDialects = ["mlir::arith::ArithDialect"];
+}
 
 def HandshakeOptimizeBits : Pass<"optimize-bits" , "mlir::ModuleOp"> {
   let summary = "Optimize bits width that can be reduced.";
@@ -93,7 +113,6 @@ def HandshakeConcretizeIndexType : Pass<"handshake-concretize-index-type", "mlir
             "this value is such that a Handshake constant with an IndexType "
             "result cannot fit its value in the new explicit bitwidth anymore, "
             "the pass will fail.">];
-
 }
 
 def HandshakeMinimizeCstWidth : Pass<"handshake-minimize-cst-width", "mlir::ModuleOp"> {
@@ -101,10 +120,26 @@ def HandshakeMinimizeCstWidth : Pass<"handshake-minimize-cst-width", "mlir::Modu
   let description = [{
     Rewrites constant operations with the minimum required bitwidth to support
     the constants' values. The pass inserts extension operations as needed to
-    ensure consistency with users of constant operations. 
+    ensure consistency with users of constant operations. The pass also pays
+    attention to not create duplicated constants indirectly due to the
+    minimization process.
   }];
   let constructor = "dynamatic::createHandshakeMinimizeCstWidth()";
   let dependentDialects = ["mlir::arith::ArithDialect"];
+}
+
+def HandshakePlaceBuffers : Pass<"handshake-place-buffers", "mlir::ModuleOp"> {
+  let summary = "Insert buffers in dataflow graphs.";
+  let description = [{
+    The pass analyzes the circuit's channel prerequisites. Based the channel
+    prerequisite, the pass optimize the circuit performance by inserting buffers.
+  }];
+  let constructor = "dynamatic::createHandshakePlaceBuffersPass()";
+  let options = [
+    Option<"firstMG", "firstMG", "bool", "false",
+    "if true, only extract the first MG from the input file">,
+    Option<"stdLevelInfo", "std-level-info", "std::string", "",
+    "if true, extract CFDFC from standard level simluation">];
 }
 
 //===----------------------------------------------------------------------===//

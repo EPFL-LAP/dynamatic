@@ -164,3 +164,86 @@ handshake.func @inheritBB(%start: none) -> i32 {
   %returnVal = d_return %cst : i32
   end %returnVal : i32
 }
+
+// -----
+
+// CHECK-LABEL:   handshake.func @duplicateDoNothingDiff(
+// CHECK-SAME:                                       %[[VAL_0:.*]]: none, ...) -> i32 attributes {argNames = ["start"], resNames = ["out0"]} {
+// CHECK:           %[[VAL_1:.*]] = merge %[[VAL_0]] : none
+// CHECK:           %[[VAL_2:.*]] = constant %[[VAL_0]] {value = 3 : i3} : i3
+// CHECK:           %[[VAL_3:.*]] = arith.extsi %[[VAL_2]] : i3 to i32
+// CHECK:           %[[VAL_4:.*]] = constant %[[VAL_1]] {value = 3 : i3} : i3
+// CHECK:           %[[VAL_5:.*]] = arith.extsi %[[VAL_4]] : i3 to i32
+// CHECK:           %[[VAL_6:.*]] = constant %[[VAL_0]] {value = 2 : i3} : i3
+// CHECK:           %[[VAL_7:.*]] = arith.extsi %[[VAL_6]] : i3 to i32
+// CHECK:           %[[VAL_8:.*]] = arith.addi %[[VAL_3]], %[[VAL_5]] : i32
+// CHECK:           %[[VAL_9:.*]] = arith.addi %[[VAL_8]], %[[VAL_7]] : i32
+// CHECK:           %[[VAL_10:.*]] = d_return %[[VAL_9]] : i32
+// CHECK:           end %[[VAL_10]] : i32
+// CHECK:         }
+handshake.func @duplicateDoNothingDiff(%start: none) -> i32 {
+  %mergeStart = merge %start : none
+  %cst1 = constant %start {value = 3 : i32} : i32
+  %cst2 = constant %mergeStart {value = 3 : i32} : i32
+  %cst3 = constant %start {value = 2 : i32} : i32
+  %add1 = arith.addi %cst1, %cst2 : i32
+  %add2 = arith.addi %add1, %cst3 : i32
+  %returnVal = d_return %add2 : i32
+  end %returnVal : i32
+}
+
+// -----
+
+// CHECK-LABEL:   handshake.func @duplicateDoNothingPrevious(
+// CHECK-SAME:                                         %[[VAL_0:.*]]: none, ...) -> i7 attributes {argNames = ["start"], resNames = ["out0"]} {
+// CHECK:           %[[VAL_1:.*]] = constant %[[VAL_0]] {value = 32 : i7} : i7
+// CHECK:           %[[VAL_2:.*]] = constant %[[VAL_0]] {value = 32 : i7} : i7
+// CHECK:           %[[VAL_3:.*]] = arith.addi %[[VAL_1]], %[[VAL_2]] : i7
+// CHECK:           %[[VAL_4:.*]] = d_return %[[VAL_3]] : i7
+// CHECK:           end %[[VAL_4]] : i7
+// CHECK:         }
+handshake.func @duplicateDoNothingPrevious(%start: none) -> i7 {
+  %cst1 = constant %start {value = 32 : i7} : i7
+  %cst2 = constant %start {value = 32 : i7} : i7
+  %add = arith.addi %cst1, %cst2 : i7
+  %returnVal = d_return %add : i7
+  end %returnVal : i7
+}
+
+// -----
+
+// CHECK-LABEL:   handshake.func @deleteDuplicate(
+// CHECK-SAME:                                     %[[VAL_0:.*]]: none, ...) -> i32 attributes {argNames = ["start"], resNames = ["out0"]} {
+// CHECK:           %[[VAL_1:.*]] = constant %[[VAL_0]] {value = 32 : i7} : i7
+// CHECK:           %[[VAL_2:.*]] = arith.extsi %[[VAL_1]] : i7 to i32
+// CHECK:           %[[VAL_3:.*]] = arith.addi %[[VAL_2]], %[[VAL_2]] : i32
+// CHECK:           %[[VAL_4:.*]] = d_return %[[VAL_3]] : i32
+// CHECK:           end %[[VAL_4]] : i32
+// CHECK:         }
+handshake.func @deleteDuplicate(%start: none) -> i32 {
+  %cst1 = constant %start {value = 32 : i32} : i32
+  %cst2 = constant %start {value = 32 : i32} : i32
+  %add = arith.addi %cst1, %cst2 : i32
+  %returnVal = d_return %add : i32
+  end %returnVal : i32
+}
+
+
+// -----
+
+// CHECK-LABEL:   handshake.func @deleteDuplicateMatchExists(
+// CHECK-SAME:                                               %[[VAL_0:.*]]: none, ...) -> i32 attributes {argNames = ["start"], resNames = ["out0"]} {
+// CHECK:           %[[VAL_1:.*]] = constant %[[VAL_0]] {value = 32 : i7} : i7
+// CHECK:           %[[VAL_2:.*]] = arith.extsi %[[VAL_1]] : i7 to i32
+// CHECK:           %[[VAL_3:.*]] = arith.addi %[[VAL_2]], %[[VAL_2]] : i32
+// CHECK:           %[[VAL_4:.*]] = d_return %[[VAL_3]] : i32
+// CHECK:           end %[[VAL_4]] : i32
+// CHECK:         }
+handshake.func @deleteDuplicateMatchExists(%start: none) -> i32 {
+  %cst1 = constant %start {value = 32 : i7} : i7
+  %cst2 = constant %start {value = 32 : i32} : i32
+  %cst1ext = arith.extsi %cst1 : i7 to i32
+  %add = arith.addi %cst1ext, %cst2 : i32
+  %returnVal = d_return %add : i32
+  end %returnVal : i32
+}

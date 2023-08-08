@@ -46,35 +46,6 @@ def StandardToHandshakeFPGA18 : Pass<"lower-std-to-handshake-fpga18", "mlir::Mod
 }
 
 //===----------------------------------------------------------------------===//
-// ExportDOT
-//===----------------------------------------------------------------------===//
-
-def ExportDOT : Pass<"export-dot", "mlir::ModuleOp"> {
-  let summary = "Emit the handshake-level IR to a DOT file";
-  let description = [{
-    Exports a DOT graph corresponding to the module for visualization and
-    legacy-compatibility purposes. The pass only supports exporting the graph of
-    a single Handshake function at the moment, and will fail if there is more
-    than one Handhsake function in the module.
-  }];
-  let constructor = "dynamatic::createExportDOTPass()";
-  let options =
-    [Option<"legacy", "legacy", "bool", "false",
-            "If true, the exported DOT file will be made compatible with "
-            "legacy Dynamatic (i.e. the file will be parsable by legacy "
-            "Dynamatic's post-processing passes). Enabling this option adds "
-            "some constraints on the input IR, which must also be compatible "
-            "with legacy Dynamatic's elastic circuits. In general, it is "
-            "therefore required to run the --prepare-for-legacy pass before "
-            "exporting a legacy-compatible DOT.">,
-    Option<"prettyPrint", "pretty-print", "bool", "true",
-            "If true, the exported DOT file will be pretty-printed, making its "
-            "visualization easier to look at but harder to debug with. For "
-            "example, node names will be shortened (and not uniqued) when "
-            "pretty-printing.">];
-}
-
-//===----------------------------------------------------------------------===//
 // HandshakeToNetlist
 //===----------------------------------------------------------------------===//
 

@@ -8,7 +8,6 @@
 #define EXPERIMENTAL_SUPPORT_CDG_ANALYSIS_H
 
 #include "dynamatic/Support/LLVM.h"
-#include "mlir/Analysis/CFGLoopInfo.h"
 #include "mlir/Dialect/Func/IR/FuncOps.h"
 #include "mlir/IR/Block.h"
 #include "mlir/IR/Dominance.h"
@@ -26,14 +25,6 @@ namespace experimental {
 struct BlockNeighbors {
   SmallVector<Block *, 4> predecessors;
   SmallVector<Block *, 4> successors;
-};
-
-/// Structure that stores loop information of a Block.
-struct BlockLoopInfo {
-  CFGLoop *loop;
-  bool isHeader = false;
-  bool isExit = false;
-  bool isLatch = false;
 };
 
 /// Function to perform control-dependence graph (CDG) analysis on the given
