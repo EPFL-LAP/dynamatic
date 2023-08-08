@@ -15,13 +15,17 @@
 #include "tutorials/InitAllPasses.h"
 
 // Defined in the test directory, no public header.
+namespace dynamatic {
 namespace experimental {
 namespace test {
 void registerTestCDGAnalysisPass();
 } // namespace test
 } // namespace experimental
+} // namespace dynamatic
 
-void registerTestPasses() { experimental::test::registerTestCDGAnalysisPass(); }
+void registerTestPasses() {
+  dynamatic::experimental::test::registerTestCDGAnalysisPass();
+}
 
 int main(int argc, char **argv) {
   mlir::DialectRegistry registry;
