@@ -24,5 +24,8 @@
   ],
   "files.associations": {
     "*.inc": "cpp"
+  },
+  "[cpp]": {
+    "editor.defaultFormatter": "xaver.clang-format"
   }
 }

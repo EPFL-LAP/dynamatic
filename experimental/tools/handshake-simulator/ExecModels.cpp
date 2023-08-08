@@ -21,17 +21,17 @@ using namespace circt;
 
 /*
 PROBLEMS & TODO
-  - A bit of 'boileplate' and similar code (struct definition & declaration..)
+  - A bit of 'boileplate' and similar code (struct definition & declaration..)    
   - Some functions don't have an 'execute' functions, but removing the virtual
     status of it makes the struct without 'execute' abstract, so impossible
     to store in our map
-  - Boring dyn_cast, which is mandatory for correct overriding I think
+  - Boring dyn_cast, which is mandatory for correct overriding I think            
     (Maybe C++ polymorphism can be exploited better ?)
-  - Might want can get rid of the tryExecute+execute system which isn't very
+  - Might want can get rid of the tryExecute+execute system which isn't very      
     clear and modular-friendly (Have to redesign a bit more then!)
-  - Might want to centralize models map and structures so that users only
+  - Might want to centralize models map and structures so that users only         
     code in one file
-  - If configuration isn't found, maybe we can automaticaly substitude with
+  - If configuration isn't found, maybe we can automaticaly substitude with       
     the default configuration ?
 */
 
@@ -134,6 +134,271 @@ bool dynamatic::experimental::tryToExecute(
 
 namespace dynamatic {
 namespace experimental {
+
+// Default CIRCT fork
+void DefaultFork::execute(std::vector<llvm::Any> &ins,
+                          std::vector<llvm::Any> &outs,
+                          circt::Operation &op) {
+  for (auto &out : outs)
+    out = ins[0];
+}
+bool DefaultFork::tryExecute(
+    llvm::DenseMap<mlir::Value, llvm::Any> &valueMap,
+    llvm::DenseMap<unsigned, unsigned> &memoryMap,
+    llvm::DenseMap<mlir::Value, double> &timeMap,
+    std::vector<std::vector<llvm::Any>> &store,
+    std::vector<mlir::Value> &scheduleList,
+    std::map<std::string,
+             std::unique_ptr<dynamatic::experimental::ExecutableModel>> &models,
+    circt::Operation &opArg) {
+  auto op = dyn_cast<circt::handshake::ForkOp>(opArg);
+  return tryToExecute(op.getOperation(), valueMap, timeMap, scheduleList,
+                      models, 1);
+}
+
+// Default CIRCT merge
+void DefaultMerge::execute(std::vector<llvm::Any> &ins,
+                                  std::vector<llvm::Any> &outs,
+                                  circt::Operation &op) {
+  llvm::errs() << "no execution"
+               << "\n";
+}
+bool DefaultMerge::tryExecute(
+    llvm::DenseMap<mlir::Value, llvm::Any> &valueMap,
+    llvm::DenseMap<unsigned, unsigned> &memoryMap,
+    llvm::DenseMap<mlir::Value, double> &timeMap,
+    std::vector<std::vector<llvm::Any>> &store,
+    std::vector<mlir::Value> &scheduleList,
+    std::map<std::string,
+             std::unique_ptr<dynamatic::experimental::ExecutableModel>> &models,
+    circt::Operation &opArg) {
+  auto op = dyn_cast<circt::handshake::MergeOp>(opArg);
+  bool found = false;
+  for (mlir::Value in : op.getOperands()) {
+    if (valueMap.count(in) == 1) {
+      if (found)
+        op.emitOpError("More than one valid input to Merge!");
+      auto t = valueMap[in];
+
+      valueMap[op.getResult()] = t;
+      timeMap[op.getResult()] = timeMap[in];
+      // Consume the inputs.
+      valueMap.erase(in);
+      found = true;
+    }
+  }
+  if (!found)
+    op.emitOpError("No valid input to Merge!");
+  scheduleList.push_back(op.getResult());
+  return true;
+}
+
+// Default CIRCT control merge
+void DefaultControlMerge::execute(std::vector<llvm::Any> &ins,
+                                  std::vector<llvm::Any> &outs,
+                                  circt::Operation &op) {
+  llvm::errs() << "no execution"
+               << "\n";
+}
+bool DefaultControlMerge::tryExecute(
+    llvm::DenseMap<mlir::Value, llvm::Any> &valueMap,
+    llvm::DenseMap<unsigned, unsigned> &memoryMap,
+    llvm::DenseMap<mlir::Value, double> &timeMap,
+    std::vector<std::vector<llvm::Any>> &store,
+    std::vector<mlir::Value> &scheduleList,
+    std::map<std::string,
+             std::unique_ptr<dynamatic::experimental::ExecutableModel>> &models,
+    circt::Operation &opArg) {
+  auto op = dyn_cast<circt::handshake::ControlMergeOp>(opArg);
+  bool found = false;
+  for (auto in : llvm::enumerate(op.getOperands())) {
+    if (valueMap.count(in.value()) == 1) {
+      if (found)
+        op.emitOpError("More than one valid input to CMerge!");
+      valueMap[op.getResult()] = valueMap[in.value()];
+      timeMap[op.getResult()] = timeMap[in.value()];
+      valueMap[op.getIndex()] = APInt(INDEX_WIDTH, in.index());
+      timeMap[op.getIndex()] = timeMap[in.value()];
+
+      // Consume the inputs.
+      valueMap.erase(in.value());
+
+      found = true;
+    }
+  }
+  if (!found)
+    op.emitOpError("No valid input to CMerge!");
+  scheduleList = toVector(op.getResults());
+  return true;
+}
+
+// Default CIRCT mux
+void DefaultMux::execute(std::vector<llvm::Any> &ins,
+                         std::vector<llvm::Any> &outs,
+                         circt::Operation &op) {
+  llvm::errs() << "no execution"
+               << "\n";
+}
+bool DefaultMux::tryExecute(
+    llvm::DenseMap<mlir::Value, llvm::Any> &valueMap,
+    llvm::DenseMap<unsigned, unsigned> &memoryMap,
+    llvm::DenseMap<mlir::Value, double> &timeMap,
+    std::vector<std::vector<llvm::Any>> &store,
+    std::vector<mlir::Value> &scheduleList,
+    std::map<std::string,
+             std::unique_ptr<dynamatic::experimental::ExecutableModel>> &models,
+    circt::Operation &opArg) {
+  auto op = dyn_cast<circt::handshake::MuxOp>(opArg);
+  mlir::Value control = op.getSelectOperand();
+  if (valueMap.count(control) == 0)
+    return false;
+  auto controlValue = valueMap[control];
+  auto controlTime = timeMap[control];
+  auto opIdx = llvm::any_cast<APInt>(controlValue).getZExtValue();
+  assert(opIdx < op.getDataOperands().size() &&
+         "Trying to select a non-existing mux operand");
+
+  mlir::Value in = op.getDataOperands()[opIdx];
+  if (valueMap.count(in) == 0)
+    return false;
+  auto inValue = valueMap[in];
+  auto inTime = timeMap[in];
+  double time = std::max(controlTime, inTime);
+  valueMap[op.getResult()] = inValue;
+  timeMap[op.getResult()] = time;
+
+  // Consume the inputs.
+  valueMap.erase(control);
+  valueMap.erase(in);
+  scheduleList.push_back(op.getResult());
+  return true;
+}
+
+// Default CIRCT branch
+void DefaultBranch::execute(std::vector<llvm::Any> &ins,
+                            std::vector<llvm::Any> &outs,
+                            circt::Operation &op) {
+  outs[0] = ins[0];
+}
+bool DefaultBranch::tryExecute(
+    llvm::DenseMap<mlir::Value, llvm::Any> &valueMap,
+    llvm::DenseMap<unsigned, unsigned> &memoryMap,
+    llvm::DenseMap<mlir::Value, double> &timeMap,
+    std::vector<std::vector<llvm::Any>> &store,
+    std::vector<mlir::Value> &scheduleList,
+    std::map<std::string,
+             std::unique_ptr<dynamatic::experimental::ExecutableModel>> &models,
+    circt::Operation &opArg) { // FAUT TOUT RENAME AAAAA
   
+  llvm::errs() << "[EXECMODELS] in the DEFAULT branch" << "\n";
+  auto op = dyn_cast<circt::handshake::BranchOp>(opArg);
+  return tryToExecute(op.getOperation(), valueMap, timeMap, scheduleList,
+                      models, 0);
+}
+
+// Default CIRCT conditional branch
+void DefaultConditionalBranch::execute(std::vector<llvm::Any> &ins,
+                                       std::vector<llvm::Any> &outs,
+                                       circt::Operation &op) {
+  llvm::errs() << "no execution"
+               << "\n";
+}
+bool DefaultConditionalBranch::tryExecute(
+    llvm::DenseMap<mlir::Value, llvm::Any> &valueMap,
+    llvm::DenseMap<unsigned, unsigned> &memoryMap,
+    llvm::DenseMap<mlir::Value, double> &timeMap,
+    std::vector<std::vector<llvm::Any>> &store,
+    std::vector<mlir::Value> &scheduleList,
+    std::map<std::string,
+             std::unique_ptr<dynamatic::experimental::ExecutableModel>> &models,
+    circt::Operation &opArg) {
+  auto op = dyn_cast<circt::handshake::ConditionalBranchOp>(opArg);
+  mlir::Value control = op.getConditionOperand();
+  if (valueMap.count(control) == 0)
+    return false;
+  auto controlValue = valueMap[control];
+  auto controlTime = timeMap[control];
+  mlir::Value in = op.getDataOperand();
+  if (valueMap.count(in) == 0)
+    return false;
+  auto inValue = valueMap[in];
+  auto inTime = timeMap[in];
+  mlir::Value out = llvm::any_cast<APInt>(controlValue) != 0
+                        ? op.getTrueResult()
+                        : op.getFalseResult();
+  double time = std::max(controlTime, inTime);
+  valueMap[out] = inValue;
+  timeMap[out] = time;
+  scheduleList.push_back(out);
+
+  // Consume the inputs.
+  valueMap.erase(control);
+  valueMap.erase(in);
+  return true;
+}
+
+// Default CIRCT sink
+void DefaultSink::execute(std::vector<llvm::Any> &ins,
+                          std::vector<llvm::Any> &outs,
+                          circt::Operation &op) {
+  llvm::errs() << "no execution"
+               << "\n";
+}
+bool DefaultSink::tryExecute(
+    llvm::DenseMap<mlir::Value, llvm::Any> &valueMap,
+    llvm::DenseMap<unsigned, unsigned> &memoryMap,
+    llvm::DenseMap<mlir::Value, double> &timeMap,
+    std::vector<std::vector<llvm::Any>> &store,
+    std::vector<mlir::Value> &scheduleList,
+    std::map<std::string,
+             std::unique_ptr<dynamatic::experimental::ExecutableModel>> &models,
+    circt::Operation &opArg) {
+  auto op = dyn_cast<circt::handshake::SinkOp>(opArg);
+  valueMap.erase(op.getOperand());
+  return true;
+}
+
+// Default CIRCT constant
+void DefaultConstant::execute(std::vector<llvm::Any> &ins,
+                              std::vector<llvm::Any> &outs,
+                              circt::Operation &op) {
+  auto attr = op.getAttrOfType<mlir::IntegerAttr>("value");
+  outs[0] = attr.getValue();
+}
+bool DefaultConstant::tryExecute(
+    llvm::DenseMap<mlir::Value, llvm::Any> &valueMap,
+    llvm::DenseMap<unsigned, unsigned> &memoryMap,
+    llvm::DenseMap<mlir::Value, double> &timeMap,
+    std::vector<std::vector<llvm::Any>> &store,
+    std::vector<mlir::Value> &scheduleList,
+    std::map<std::string,
+             std::unique_ptr<dynamatic::experimental::ExecutableModel>> &models,
+    circt::Operation &opArg) {
+  auto op = dyn_cast<circt::handshake::ConstantOp>(opArg);
+  return tryToExecute(op.getOperation(), valueMap, timeMap, scheduleList, models, 0);
+}
+
+// Default CIRCT buffer
+void DefaultBuffer::execute(std::vector<llvm::Any> &ins,
+                              std::vector<llvm::Any> &outs,
+                              circt::Operation &op) {
+  outs[0] = ins[0];
+}
+bool DefaultBuffer::tryExecute(
+    llvm::DenseMap<mlir::Value, llvm::Any> &valueMap,
+    llvm::DenseMap<unsigned, unsigned> &memoryMap,
+    llvm::DenseMap<mlir::Value, double> &timeMap,
+    std::vector<std::vector<llvm::Any>> &store,
+    std::vector<mlir::Value> &scheduleList,
+    std::map<std::string,
+             std::unique_ptr<dynamatic::experimental::ExecutableModel>> &models,
+    circt::Operation &opArg) {
+  auto op = dyn_cast<circt::handshake::BufferOp>(opArg);
+  return tryToExecute(op.getOperation(), valueMap, timeMap, scheduleList,
+                      models, op.getNumSlots());
+}
+
+// TODO : Add dynamatic store/load/end
+
 } // namespace experimental
 } // namespace dynamatic
