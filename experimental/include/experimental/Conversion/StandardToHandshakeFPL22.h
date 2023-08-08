@@ -1,7 +1,7 @@
 //===- StandardToHandshakeFPL22.h - FPL22's elastic pass ------*- C++ -*-===//
 //
-// This file declares the --exp-lower-std-to-handshake-fpl22 conversion pass along
-// with a helper class for performing the lowering.
+// This file declares the --exp-lower-std-to-handshake-fpl22 conversion pass
+// along with a helper class for performing the lowering.
 //
 //===----------------------------------------------------------------------===//
 
@@ -11,6 +11,8 @@
 #include "circt/Conversion/StandardToHandshake.h"
 #include "circt/Dialect/Handshake/HandshakeOps.h"
 #include "dynamatic/Support/LLVM.h"
+#include "mlir/Analysis/CFGLoopInfo.h"
+#include "mlir/Dialect/Func/IR/FuncOps.h"
 #include "mlir/Pass/Pass.h"
 #include "mlir/Transforms/DialectConversion.h"
 
@@ -18,9 +20,21 @@
 
 using namespace circt;
 using namespace circt::handshake;
+using namespace mlir;
 
 namespace dynamatic {
 namespace experimental {
+
+/// Structure that stores loop information of a Block.
+struct BlockLoopInfo {
+  CFGLoop *loop;
+  bool isHeader = false;
+  bool isExit = false;
+  bool isLatch = false;
+};
+
+/// Function that runs a loop analysis on the funcOp Region.
+DenseMap<Block *, BlockLoopInfo> findLoopDetails(func::FuncOp &funcOp);
 
 // This class is used to inherit from CIRCT's standard-to-handshake lowering
 // infrastructure and implementation while providing us a way to
@@ -41,9 +55,9 @@ public:
   /// Constructor simply forwards its arguments to the parent class.
   explicit HandshakeLoweringFPL22(Region &r) : HandshakeLowering(r) {}
 
-  /// Creates the control-only network by adding a control-only argument to the
-  /// region's entry block and forwarding it through all basic blocks.
-  LogicalResult createControlOnlyNetwork(ConversionPatternRewriter &rewriter);
+  /// Adding a control-only argument to the region's entry block and connecting
+  /// the start control to all blocks.
+  LogicalResult createStartCtrl(ConversionPatternRewriter &rewriter);
 
   /// Identifies all memory interfaces and operations in the function, replaces
   /// all load/store-like operations by their handshake counterparts, and fills
@@ -72,8 +86,10 @@ public:
   LogicalResult createReturnNetwork(ConversionPatternRewriter &rewriter,
                                     bool idBasicBlocks);
 
-  // TODO: add missing descriptions
-  
+  // TODO: add missing descriptions, and discuss code organization with Lucas
+
+  LogicalResult handleTokenMissmatch(ConversionPatternRewriter &rewriter);
+
   MergeOpInfo insertMerge(Block *block, Value val, BackedgeBuilder &edgeBuilder,
                           ConversionPatternRewriter &rewriter);
 

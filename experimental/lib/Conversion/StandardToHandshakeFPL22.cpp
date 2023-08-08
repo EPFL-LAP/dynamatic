@@ -13,7 +13,6 @@
 #include "mlir/Dialect/Affine/IR/AffineOps.h"
 #include "mlir/Dialect/Affine/Utils.h"
 #include "mlir/Dialect/ControlFlow/IR/ControlFlowOps.h"
-#include "mlir/Dialect/Func/IR/FuncOps.h"
 #include "mlir/Dialect/LLVMIR/LLVMDialect.h"
 #include "mlir/Dialect/MemRef/IR/MemRef.h"
 #include "mlir/Dialect/SCF/IR/SCF.h"
@@ -194,8 +193,8 @@ static SmallVector<Value, 8> getFunctionEndControls(Region &r) {
 // Concrete lowering steps
 // ============================================================================
 
-LogicalResult HandshakeLoweringFPL22::createControlOnlyNetwork(
-    ConversionPatternRewriter &rewriter) {
+LogicalResult
+HandshakeLoweringFPL22::createStartCtrl(ConversionPatternRewriter &rewriter) {
 
   // Add start point of the control-only path to the entry block's arguments
   Block *entryBlock = &r.front();
@@ -204,7 +203,7 @@ LogicalResult HandshakeLoweringFPL22::createControlOnlyNetwork(
 
   // Connect each block to startCtrl
   for (auto &block : r.getBlocks())
-      setBlockEntryControl(&block, startCtrl);
+    setBlockEntryControl(&block, startCtrl);
 
   return success();
 }
@@ -288,7 +287,7 @@ LogicalResult HandshakeLoweringFPL22::replaceMemoryOps(
 
 LogicalResult
 HandshakeLoweringFPL22::connectToMemory(ConversionPatternRewriter &rewriter,
-                                         MemInterfacesInfo &memInfo) {
+                                        MemInterfacesInfo &memInfo) {
 
   // Connect memories (externally defined by memref block argument) to their
   // respective loads and stores
@@ -394,8 +393,9 @@ HandshakeLoweringFPL22::idBasicBlocks(ConversionPatternRewriter &rewriter) {
   return success();
 }
 
-LogicalResult HandshakeLoweringFPL22::createReturnNetwork(
-    ConversionPatternRewriter &rewriter, bool idBasicBlocks) {
+LogicalResult
+HandshakeLoweringFPL22::createReturnNetwork(ConversionPatternRewriter &rewriter,
+                                            bool idBasicBlocks) {
 
   auto *entryBlock = &r.front();
   auto &entryBlockOps = entryBlock->getOperations();
@@ -569,8 +569,6 @@ partiallyLowerOp(const PartialLowerFuncOp::PartialLoweringFunc &loweringFunc,
   return applyPartialConversion(op, target, std::move(patterns));
 }
 
-/**************************** fpl22 begin ************************/
-
 static void removeBlockOperands(Region &f) {
   // Remove all block arguments, they are no longer used
   // eraseArguments also removes corresponding branch operands
@@ -618,42 +616,76 @@ static unsigned getBlockPredecessorCount(Block *block) {
   return std::distance(predecessors.begin(), predecessors.end());
 }
 
+LogicalResult HandshakeLoweringFPL22::handleTokenMissmatch(
+    ConversionPatternRewriter &rewriter) {
+  // Each consumer Block should only contain one MergeOp for a Value produced in another Block.
+  DenseMap<Block *, DenseMap<Value, Value>> mapConsumerBlocks;
+
+  // Iterate through all producer-consumer pairs (traversing edges in DFG)
+  for (auto &block : r.getBlocks()) {
+    for (auto &producerOp : block.getOperations()) {
+      for (const auto &producerOpResult : producerOp.getResults()) {
+        for (const auto &consumerOp : producerOpResult.getUsers()) {
+          llvm::outs() << producerOp.getName();
+          llvm::outs() << " --> ";
+          llvm::outs() << consumerOp->getName();
+          llvm::outs() << "\n";
+
+          auto blockIt = mapConsumerBlocks.find(consumerOp->getBlock());
+          if (blockIt != mapConsumerBlocks.end()) {
+            auto &mapProducerResultToMergeOp = blockIt->second;
+
+            auto valueIt = mapProducerResultToMergeOp.find(producerOpResult);
+            if (valueIt != mapProducerResultToMergeOp.end()) {
+              llvm::outs() << "ALREADY VISITED\n";
+              // return valueIt->second;
+            } else {
+              llvm::outs() << "NOT VISITED\n";
+              Value v;
+              mapProducerResultToMergeOp[producerOpResult] = v;
+            }
+          } else {
+            llvm::outs() << "else\n";
+            DenseMap<Value, Value> dm;
+            mapConsumerBlocks[consumerOp->getBlock()] = dm;
+            Value v;
+            mapConsumerBlocks[consumerOp->getBlock()][producerOpResult] = v;
+          }
+        }
+      }
+    }
+  }
+
+  return success();
+}
+
 HandshakeLowering::MergeOpInfo
 HandshakeLoweringFPL22::insertMerge(Block *block, Value val,
-                               BackedgeBuilder &edgeBuilder,
-                               ConversionPatternRewriter &rewriter) {
+                                    BackedgeBuilder &edgeBuilder,
+                                    ConversionPatternRewriter &rewriter) {
   unsigned numPredecessors = getBlockPredecessorCount(block);
   auto insertLoc = block->front().getLoc();
   SmallVector<Backedge> dataEdges;
   SmallVector<Value> operands;
 
-  // Every block (except the entry block) needs to feed it's entry control into
-  // a control merge
+  // For consistency within the entry block, replace the latter's entry
+  // control with the output of a MergeOp that takes the control-only
+  // network's start point as input. This makes it so that only the
+  // MergeOp's output is used as a control within the entry block, instead
+  // of a combination of the MergeOp's output and the function/block control
+  // argument. Taking this step out should have no impact on functionality
+  // but would make the resulting IR less "regular"
   if (block == &r.front() && val == getBlockEntryControl(block)) {
-
     Operation *mergeOp;
-    // For consistency within the entry block, replace the latter's entry
-    // control with the output of a MergeOp that takes the control-only
-    // network's start point as input. This makes it so that only the
-    // MergeOp's output is used as a control within the entry block, instead
-    // of a combination of the MergeOp's output and the function/block control
-    // argument. Taking this step out should have no impact on functionality
-    // but would make the resulting IR less "regular"
+
     operands.push_back(val);
     mergeOp = rewriter.create<handshake::MergeOp>(insertLoc, operands);
-  
-    setBlockEntryControl(block, mergeOp->getResult(0));
+
     for (auto &block : r.getBlocks())
-      if (!block.isEntryBlock()) {
-        // BlockArgument ba = block.addArgument(startCtrl.getType(),rewriter.getUnknownLoc());
-        setBlockEntryControl(&block, mergeOp->getResult(0));
-    }
+      setBlockEntryControl(&block, mergeOp->getResult(0));
+
     return MergeOpInfo{mergeOp, val, dataEdges};
   }
-
-  // Every live-in value to a block is passed through a merge-like operation,
-  // even when it's not required for circuit correctness (useless merge-like
-  // operations are removed down the line during handshake canonicalization)
 
   // Insert "dummy" MergeOp's for blocks with less than two predecessors
   if (numPredecessors <= 1) {
@@ -673,24 +705,23 @@ HandshakeLoweringFPL22::insertMerge(Block *block, Value val,
     return MergeOpInfo{merge, val, dataEdges};
   }
 
-  // Create a backedge for the index operand, and another one for each data
-  // operand. The index operand will eventually resolve to the current block's
-  // control merge index output, while data operands will resolve to their
-  // respective values from each block predecessor
+  // Create a backedge for for each data operand. The index operand will
+  // eventually resolve to the current block's control merge index output, while
+  // data operands will resolve to their respective values from each block
+  // predecessor
   for (unsigned i = 0; i < numPredecessors; i++) {
     auto edge = edgeBuilder.get(val.getType());
     dataEdges.push_back(edge);
     operands.push_back(Value(edge));
   }
-  auto merge =
-      rewriter.create<handshake::MergeOp>(insertLoc, operands);
+  auto merge = rewriter.create<handshake::MergeOp>(insertLoc, operands);
   return MergeOpInfo{merge, val, dataEdges};
 }
 
 HandshakeLowering::BlockOps
 HandshakeLoweringFPL22::insertMergeOps(HandshakeLowering::ValueMap &mergePairs,
-                                  BackedgeBuilder &edgeBuilder,
-                                  ConversionPatternRewriter &rewriter) {
+                                       BackedgeBuilder &edgeBuilder,
+                                       ConversionPatternRewriter &rewriter) {
   HandshakeLowering::BlockOps blockMerges;
   for (Block &block : r) {
     rewriter.setInsertionPointToStart(&block);
@@ -702,7 +733,8 @@ HandshakeLoweringFPL22::insertMergeOps(HandshakeLowering::ValueMap &mergePairs,
       if (arg.getType().isa<mlir::MemRefType>())
         continue;
 
-      auto mergeInfo = HandshakeLoweringFPL22::insertMerge(&block, arg, edgeBuilder, rewriter);
+      auto mergeInfo = HandshakeLoweringFPL22::insertMerge(
+          &block, arg, edgeBuilder, rewriter);
       blockMerges[&block].push_back(mergeInfo);
       mergePairs[arg] = mergeInfo.op->getResult(0);
     }
@@ -742,38 +774,19 @@ static void reconnectMergeOps(Region &r,
     }
   }
 
-  // // Connect select operand of muxes to control merge's index result in all
-  // // blocks with more than one predecessor
-  // for (Block &block : r) {
-  //   if (getBlockPredecessorCount(&block) > 1) {
-  //     Operation *cntrlMg = getControlMerge(&block);
-  //     assert(cntrlMg != nullptr);
-
-  //     for (auto &mergeInfo : blockMerges[&block]) {
-  //       if (mergeInfo.op != cntrlMg) {
-  //         // If the block has multiple predecessors, merge-like operation that
-  //         // are not the block's control merge must have an index operand (at
-  //         // this point, an index backedge)
-  //         assert(mergeInfo.indexEdge.has_value());
-  //         (*mergeInfo.indexEdge).setValue(cntrlMg->getResult(1));
-  //       }
-  //     }
-  //   }
-  // }
-
   removeBlockOperands(r);
 }
 
-struct BlockValuePairHash {
-    size_t operator()(const std::pair<mlir::Block*, mlir::Value*>& p) const {
-        size_t blockHash = std::hash<mlir::Block*>()(p.first);
-        size_t valueHash = std::hash<mlir::Value*>()(p.second);
-        return blockHash ^ (valueHash << 1);  // Combine hashes using XOR
-    }
-};
-
 LogicalResult
 HandshakeLoweringFPL22::addMergeOps(ConversionPatternRewriter &rewriter) {
+
+  // Iterate through all producer-consumer pairs and see if a token
+  // missmatch occurs. One example of token missmatch is when a producers is
+  // outside the loop and consumer is inside. In that case token produced once
+  // needs to be consumed multiple times. This is solved by adding merge
+  // operations where merge result is also one of the input operands.
+  if (failed(handleTokenMissmatch(rewriter)))
+    return failure();
 
   // Stores mapping from each value that pass through a merge operation to the
   // first result of that merge operation
@@ -783,59 +796,16 @@ HandshakeLoweringFPL22::addMergeOps(ConversionPatternRewriter &rewriter) {
   // insertion and reconnection
   BackedgeBuilder edgeBuilder{rewriter, r.front().front().getLoc()};
 
-  // Handle token missmatch
-  DenseMap<Block *, DenseMap<Value, Value>> mapConsumerBlocks;
-  for (auto &block : r.getBlocks()) {
-    for (auto &producerOp : block.getOperations()) {
-      for (const auto &producerOpResult : producerOp.getResults()) {
-        for (const auto &consumerOp : producerOpResult.getUsers()) {
-          llvm::outs() << producerOp.getName();
-          llvm::outs() << " --> ";
-          llvm::outs() << consumerOp->getName();
-          llvm::outs() << "\n";
-
-          auto blockIt = mapConsumerBlocks.find(consumerOp->getBlock());
-          if (blockIt != mapConsumerBlocks.end()) {
-              auto &mapProducerResultToMergeOp = blockIt->second;
-              
-              auto valueIt = mapProducerResultToMergeOp.find(producerOpResult);
-              if (valueIt != mapProducerResultToMergeOp.end()) {
-                  llvm::outs() << "ALREADY VISITED\n";
-                  //return valueIt->second;
-              }
-              else {
-                  llvm::outs() << "NOT VISITED\n";
-                  Value v;
-                  mapProducerResultToMergeOp[producerOpResult] = v;
-              }
-          }
-          else {
-            llvm::outs() << "else\n";
-            DenseMap<Value, Value> dm;
-            mapConsumerBlocks[consumerOp->getBlock()] = dm;
-            Value v;
-            mapConsumerBlocks[consumerOp->getBlock()][producerOpResult] = v;
-          }
-
-        }
-      }
-    }
-  }
-
-
-
   // Insert merge operations (with backedges instead of actual operands)
-  BlockOps mergeOps = HandshakeLoweringFPL22::insertMergeOps(mergePairs, edgeBuilder, rewriter);
+  BlockOps mergeOps =
+      HandshakeLoweringFPL22::insertMergeOps(mergePairs, edgeBuilder, rewriter);
 
   // Reconnect merge operations with values incoming from predecessor blocks
   // and resolve all backedges that were created during merge insertion
   reconnectMergeOps(r, mergeOps, mergePairs);
 
-
   return success();
 }
-
-/**************************** fpl22 end ************************/
 
 /// Lowers the region referenced by the handshake lowering strategy following
 /// a fixed sequence of steps, some implemented in this file and some in
@@ -850,8 +820,7 @@ static LogicalResult lowerRegion(HandshakeLoweringFPL22 &hl,
                                 memInfo)))
     return failure();
 
-  if (failed(runPartialLowering(
-          hl, &HandshakeLoweringFPL22::createControlOnlyNetwork)))
+  if (failed(runPartialLowering(hl, &HandshakeLoweringFPL22::createStartCtrl)))
     return failure();
 
   if (failed(runPartialLowering(hl, &HandshakeLoweringFPL22::addMergeOps)))
@@ -936,10 +905,6 @@ static LogicalResult lowerFuncOp(func::FuncOp funcOp, MLIRContext *ctx,
   // Delete the original function
   funcOp->erase();
 
-  // Apply SSA maximization
-  // returnOnError(
-  //     partiallyLowerRegion(maximizeSSANoMem, ctx, newFuncOp.getBody()));
-
   if (!funcIsExternal) {
     // Lower the region inside the function
     HandshakeLoweringFPL22 hl(newFuncOp.getBody());
@@ -965,14 +930,83 @@ struct StandardToHandshakeFPL22Pass
     ModuleOp m = getOperation();
 
     // Lower every function individually
-    for (auto funcOp : llvm::make_early_inc_range(m.getOps<func::FuncOp>()))
+    for (auto funcOp : llvm::make_early_inc_range(m.getOps<func::FuncOp>())) {
+      dynamatic::experimental::findLoopDetails(funcOp);
+
       if (failed(lowerFuncOp(funcOp, &getContext(), idBasicBlocks)))
         return signalPassFailure();
+    }
   }
 };
 } // namespace
 
+DenseMap<Block *, BlockLoopInfo> dynamatic::experimental::findLoopDetails(func::FuncOp &funcOp) {
+  DominanceInfo domInfo;
+  llvm::DominatorTreeBase<Block, false> &domTree =
+      domInfo.getDomTree(&funcOp.getRegion());
+  CFGLoopInfo li(domTree);
+
+  // Finding all loops.
+  std::vector<CFGLoop *> loops;
+  Region &funcReg = funcOp.getRegion();
+  for (auto &block : funcReg.getBlocks()) {
+    CFGLoop *loop = li.getLoopFor(&block);
+
+    while (loop) {
+      auto pos = std::find(loops.begin(), loops.end(), loop);
+      if (pos == loops.end()) {
+        llvm::outs() << "Found a loop!\n";
+        loops.push_back(loop);
+      }
+      loop = loop->getParentLoop();
+    }
+  }
+
+  // Iterating over BB of each loop, and attaching loop info.
+  DenseMap<Block *, BlockLoopInfo> blockToLoopInfoMap;
+  for (auto &block : funcReg.getBlocks()) {
+    BlockLoopInfo bli;
+    blockToLoopInfoMap.insert(std::make_pair(&block, bli));
+  }
+
+  for (auto &loop : loops) {
+    Block *loopHeader = loop->getHeader();
+    blockToLoopInfoMap[loopHeader].isHeader = true;
+    blockToLoopInfoMap[loopHeader].loop = loop;
+
+    llvm::outs() << "Loop header: ";
+    loopHeader->printAsOperand(llvm::outs());
+    llvm::outs() << "\n";
+
+    llvm::SmallVector<Block *> exitBlocks;
+    loop->getExitingBlocks(exitBlocks);
+    for (auto &block : exitBlocks) {
+      blockToLoopInfoMap[block].isExit = true;
+      blockToLoopInfoMap[block].loop = loop;
+
+      llvm::outs() << "Loop exit: ";
+      block->printAsOperand(llvm::outs());
+      llvm::outs() << "\n";
+    }
+
+    // A latch block is a block that contains a branch back to the header.
+    llvm::SmallVector<Block *> latchBlocks;
+    loop->getLoopLatches(latchBlocks);
+    for (auto &block : latchBlocks) {
+      blockToLoopInfoMap[block].isLatch = true;
+      blockToLoopInfoMap[block].loop = loop;
+
+      llvm::outs() << "Loop latch: ";
+      block->printAsOperand(llvm::outs());
+      llvm::outs() << "\n";
+    }
+  }
+
+  return blockToLoopInfoMap;
+}
+
 std::unique_ptr<mlir::OperationPass<mlir::ModuleOp>>
-dynamatic::experimental::createStandardToHandshakeFPL22Pass(bool idBasicBlocks) {
+dynamatic::experimental::createStandardToHandshakeFPL22Pass(
+    bool idBasicBlocks) {
   return std::make_unique<StandardToHandshakeFPL22Pass>(idBasicBlocks);
 }
