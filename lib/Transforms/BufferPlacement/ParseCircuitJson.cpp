@@ -6,11 +6,9 @@
 
 #include "dynamatic/Transforms/BufferPlacement/ParseCircuitJson.h"
 #include "dynamatic/Transforms/UtilsBitsUpdate.h"
+#include "llvm/Support/JSON.h"
 #include <fstream>
 #include <iostream>
-#include <nlohmann/json.hpp>
-
-using json = nlohmann::json;
 
 using namespace dynamatic;
 using namespace dynamatic::buffer;
@@ -43,7 +41,6 @@ static unsigned getPortWidth(Value channel) {
 static double
 getBitWidthMatchedTimeInfo(unsigned bitWidth,
                            std::vector<std::pair<unsigned, double>> &timeInfo) {
-  double delay;
   // Sort the vector based on pair.first (unsigned)
   std::sort(
       timeInfo.begin(), timeInfo.end(),
@@ -97,6 +94,9 @@ double buffer::getUnitDelay(Operation *op,
     delay = unitInfo[opName].validDelay;
   else if (type == "ready")
     delay = unitInfo[opName].readyDelay;
+  else
+    delay = 0.0;
+
   return delay;
 }
 
@@ -108,7 +108,8 @@ buffer::getCombinationalDelay(Operation *op,
   if (unitInfo.find(getOperationFullName(op)) == unitInfo.end())
     return 0.0;
 
-  double inPortDelay, outPortDelay;
+  double inPortDelay = 0.0;
+  double outPortDelay = 0.0;
   double unitDelay = getUnitDelay(op, unitInfo, type);
 
   unsigned unitBitWidth = getPortWidth(op->getOperand(0));
@@ -125,6 +126,7 @@ buffer::getCombinationalDelay(Operation *op,
     inPortDelay = unitInfo[opName].inPortReadyDelay;
     outPortDelay = unitInfo[opName].outPortReadyDelay;
   }
+
   return unitDelay + inPortDelay + outPortDelay;
 }
 
@@ -192,12 +194,23 @@ buffer::setChannelBufProps(std::vector<Value> &channels,
 }
 
 /// Parse the JSON data to a vector of pair {bitwidth, info}
-static void parseBitWidthPair(json jsonData,
+// static void parseBitWidthPair(json jsonData,
+//                               std::vector<std::pair<unsigned, double>> &data)
+//                               {
+//   for (auto it = jsonData.begin(); it != jsonData.end(); ++it) {
+//     auto key = stoi(it.key());
+//     double value = it.value();
+//     data.emplace_back(key, value);
+//   }
+// }
+
+static void parseBitWidthPair(llvm::json::Object jsonData,
                               std::vector<std::pair<unsigned, double>> &data) {
-  for (auto it = jsonData.begin(); it != jsonData.end(); ++it) {
-    auto key = stoi(it.key());
-    double value = it.value();
-    data.emplace_back(key, value);
+  for (const auto &[bitWidth, value] : jsonData) {
+    llvm::StringRef bitKey(bitWidth);
+    unsigned key = std::stoi(bitKey.str());
+    double info = value.getAsNumber().value();
+    data.emplace_back(key, info);
   }
 }
 
@@ -205,7 +218,6 @@ LogicalResult buffer::parseJson(const std::string &jsonFile,
                                 std::map<std::string, UnitInfo> &unitInfo) {
 
   // Operations that is supported to use its time information.
-  size_t pos = 0;
   std::vector<std::string> opNames = {
       "arith.cmpi",        "arith.addi",
       "arith.subi",        "arith.muli",
@@ -223,49 +235,91 @@ LogicalResult buffer::parseJson(const std::string &jsonFile,
       "arith.select",      "handshake.mux"};
   std::string opName;
 
-  std::ifstream file(jsonFile);
-  if (!file.is_open()) {
+  std::ifstream inputFile(jsonFile);
+  if (!inputFile.is_open()) {
     llvm::errs() << "Failed to open file.\n";
     return failure();
   }
 
+  // Read the JSON content from the file
+  std::string jsonString;
+  std::string line;
+  while (std::getline(inputFile, line)) {
+    jsonString += line;
+  }
+
+  // Parse the JSON
+  llvm::Expected<llvm::json::Value> jsonValue = llvm::json::parse(jsonString);
+  if (!jsonValue)
+    return failure();
+
   // Read the file contents into a string
-  json data;
-  file >> data;
+  // json data;
+  // file >> data;
+
+  auto data = jsonValue->getAsObject();
   for (std::string &op : opNames) {
-    auto unitInfoJson = data[op];
-    auto latencyJson = unitInfoJson["latency"];
+    // if (!data->contains(op))
+    //   return failure();
+    auto unitInfoJson = data->getObject(op);
+    // auto unitInfoJson = data->get(op);
+    // auto latencyJson = unitInfoJson->getObject("latency");
     // parse the bitwidth and its corresponding latency for data
-    parseBitWidthPair(unitInfoJson["latency"], unitInfo[op].latency);
-    parseBitWidthPair(unitInfoJson["delay"]["data"], unitInfo[op].dataDelay);
-    parseBitWidthPair(unitInfoJson["inport"]["delay"]["data"],
-                      unitInfo[op].inPortDataDelay);
-    parseBitWidthPair(unitInfoJson["outport"]["delay"]["data"],
-                      unitInfo[op].outPortDataDelay);
+    parseBitWidthPair(*unitInfoJson->getObject("latency"),
+                      unitInfo[op].latency);
+    parseBitWidthPair(*unitInfoJson->getObject("delay")->getObject("data"),
+                      unitInfo[op].dataDelay);
+    parseBitWidthPair(
+        *unitInfoJson->getObject("inport")->getObject("delay")->getObject(
+            "data"),
+        unitInfo[op].inPortDataDelay);
+    parseBitWidthPair(
+        *unitInfoJson->getObject("outport")->getObject("delay")->getObject(
+            "data"),
+        unitInfo[op].outPortDataDelay);
 
     // parse the bitwidth and its corresponding latency for valid and ready
     // The valid and ready signal is 1 bit
-    double validDelay = unitInfoJson["delay"]["valid"]["1"];
-    unitInfo[op].validDelay = validDelay;
-    double readyDelay = unitInfoJson["delay"]["ready"]["1"];
-    unitInfo[op].readyDelay = readyDelay;
-    unitInfo[op].inPortValidDelay =
-        unitInfoJson["inport"]["delay"]["valid"]["1"];
-    unitInfo[op].inPortReadyDelay =
-        unitInfoJson["inport"]["delay"]["ready"]["1"];
-    unitInfo[op].outPortValidDelay =
-        unitInfoJson["outport"]["delay"]["valid"]["1"];
-    unitInfo[op].outPortReadyDelay =
-        unitInfoJson["outport"]["delay"]["ready"]["1"];
+    unitInfo[op].validDelay = unitInfoJson->getObject("delay")
+                                  ->getObject("valid")
+                                  ->getNumber("1")
+                                  .value();
+    unitInfo[op].readyDelay = unitInfoJson->getObject("delay")
+                                  ->getObject("ready")
+                                  ->getNumber("1")
+                                  .value();
+    unitInfo[op].inPortValidDelay = unitInfoJson->getObject("inport")
+                                        ->getObject("delay")
+                                        ->getObject("valid")
+                                        ->getNumber("1")
+                                        .value();
+    unitInfo[op].inPortReadyDelay = unitInfoJson->getObject("inport")
+                                        ->getObject("delay")
+                                        ->getObject("ready")
+                                        ->getNumber("1")
+                                        .value();
+    unitInfo[op].outPortValidDelay = unitInfoJson->getObject("outport")
+                                         ->getObject("delay")
+                                         ->getObject("valid")
+                                         ->getNumber("1")
+                                         .value();
+    unitInfo[op].outPortReadyDelay = unitInfoJson->getObject("outport")
+                                         ->getObject("delay")
+                                         ->getObject("ready")
+                                         ->getNumber("1")
+                                         .value();
 
-    unitInfo[op].inPortTransBuf = unitInfoJson["inport"]["transparentBuffer"];
-    unitInfo[op].inPortOpBuf = unitInfoJson["inport"]["opaqueBuffer"];
+    unitInfo[op].inPortTransBuf = unitInfoJson->getObject("inport")
+                                      ->getNumber("transparentBuffer")
+                                      .value();
+    unitInfo[op].inPortOpBuf =
+        unitInfoJson->getObject("inport")->getNumber("opaqueBuffer").value();
 
-    unitInfo[op].outPortTransBuf = unitInfoJson["outport"]["transparentBuffer"];
-    unitInfo[op].outPortOpBuf = unitInfoJson["outport"]["opaqueBuffer"];
-
-    if (unitInfoJson.is_discarded())
-      return failure();
+    unitInfo[op].outPortTransBuf = unitInfoJson->getObject("outport")
+                                       ->getNumber("transparentBuffer")
+                                       .value();
+    unitInfo[op].outPortOpBuf =
+        unitInfoJson->getObject("outport")->getNumber("opaqueBuffer").value();
   }
 
   return success();
