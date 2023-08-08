@@ -41,6 +41,26 @@ using namespace mlir;
 using namespace circt;
 using namespace dynamatic;
 
+namespace {
+/// Extension type. When backtracing through extension operations, serves to
+/// remember the type of any extension we may have encountered along the way.
+/// Then, when modifying a value's bitwidth, serves to guide the determination
+/// of which extension operation to use.
+/// - UNKNOWN when no extension has been encountered / when a value's signedness
+/// should determine its extension type.
+/// - LOGICAL when only logical extensions have been encountered / when a value
+/// should be logically extended.
+/// - ARITHMETIC when only arithmaric extensions have been encountered / when a
+/// value should be arithmetically extended.
+/// - CONFLICT when both logical and arithmetic extensions have been encountered
+/// when it's not possible to accurately determine what type of extension to
+/// use for a value.
+enum ExtType { UNKNOWN, LOGICAL, ARITHMETIC, CONFLICT };
+
+/// Shortcut for a value accompanied by its corresponding extension type.
+using ExtValue = std::pair<Value, ExtType>;
+} // namespace
+
 //===----------------------------------------------------------------------===//
 // Utility functions
 //===----------------------------------------------------------------------===//
@@ -54,21 +74,47 @@ static inline unsigned getOptAddrWidth(unsigned value) {
 }
 
 /// Backtracks through defining operations of the value as long as they are
-/// arithmetic extension operations. Returns the "minimal value", i.e., the
-/// potentially different value that represents the same number as the
-/// originally provided value but without all bits added by extension
-/// operations. During the forward pass, the returned value gives an indication
-/// of how many bits of the original value can be safely discarded.
-static Value getMinimalValue(Value val) { // NOLINT(misc-no-recursion)
+/// extension operations. Returns the "minimal value", i.e., the potentially
+/// different value that represents the same number as the originally provided
+/// value but without all bits added by extension operations. During the forward
+/// pass, the returned value gives an indication of how many bits of the
+/// original value can be safely discarded. If an extension type is provided and
+/// the function is able to backtrack through any extension operation, updates
+/// the extension type with respect to the latter.
+// NOLINTNEXTLINE(misc-no-recursion)
+static Value getMinimalValue(Value val, ExtType *ext = nullptr) {
+  // Ignore values whose type isn't optimizable
   Type type = val.getType();
   if (!isValidType(type))
     return val;
 
+  // Only backtracks through values that were produced by extension operations
   Operation *defOp = val.getDefiningOp();
   if (!defOp || !isa<arith::ExtSIOp, arith::ExtUIOp>(defOp))
     return val;
 
-  return getMinimalValue(defOp->getOperand(0));
+  if (!ext)
+    return getMinimalValue(defOp->getOperand(0));
+
+  // Update the extension type using the nature of the current extension
+  // operation and the current type
+  switch (*ext) {
+  case ExtType::UNKNOWN:
+    *ext = isa<arith::ExtSIOp>(defOp) ? ExtType::ARITHMETIC : ExtType::LOGICAL;
+    break;
+  case ExtType::LOGICAL:
+    if (isa<arith::ExtSIOp>(defOp))
+      *ext = ExtType::CONFLICT;
+    break;
+  case ExtType::ARITHMETIC:
+    if (isa<arith::ExtUIOp>(defOp))
+      *ext = ExtType::CONFLICT;
+    break;
+  default:
+    break;
+  }
+
+  return getMinimalValue(defOp->getOperand(0), ext);
 }
 
 /// Returns the maximum number of bits that are used by any of the value's
@@ -95,11 +141,13 @@ static unsigned getUsefulResultWidth(Value val) {
 /// Produces a value that matches the content of the passed value but whose
 /// bitwidth is modified to equal the target width. Inserts an extension or
 /// truncation operation in the IR after the original value if necessary. If an
-/// extension operation is required, logicExt forces the use of a logical
-/// extension operation, otherwise the signedness of the value is used to
-/// determine whether the extension should be logical or arithmetic.
-static Value modVal(Value val, unsigned targetWidth, bool logicExt,
+/// extension operation is required, the provided extension type determines
+/// which type of extension operation is inserted. If the extension type is
+/// unknown, the value's signedness  determines whether the extension should be
+/// logical or arithmetic.
+static Value modVal(ExtValue extVal, unsigned targetWidth,
                     PatternRewriter &rewriter) {
+  auto &[val, ext] = extVal;
   Type type = val.getType();
   assert(isValidType(type) && "value must be valid type");
 
@@ -107,7 +155,23 @@ static Value modVal(Value val, unsigned targetWidth, bool logicExt,
   Operation *newOp = nullptr;
   rewriter.setInsertionPointAfterValue(val);
   if (width < targetWidth) {
-    if (logicExt || type.isUnsignedInteger())
+    if (ext == ExtType::CONFLICT) {
+      // If the extension type is conflicting, just emit a warning and hope for
+      // the best
+      Operation *defOp = val.getDefiningOp();
+      std::string origin;
+      if (defOp)
+        origin = "operation result";
+      else {
+        defOp = val.getParentBlock()->getParentOp();
+        origin = "function argument";
+      }
+      defOp->emitWarning()
+          << "Conflicting extension type given for " << origin
+          << ", optimization result may change circuit semantics.";
+    }
+    if (ext == ExtType::LOGICAL ||
+        (ext == ExtType::UNKNOWN && type.isUnsignedInteger()))
       newOp = rewriter.create<arith::ExtUIOp>(
           val.getLoc(), rewriter.getIntegerType(targetWidth), val);
     else
@@ -127,22 +191,21 @@ static Value modVal(Value val, unsigned targetWidth, bool logicExt,
 /// or floating type with an operation of the same type but whose operands and
 /// result bitwidths have been modified to match the provided optimized
 /// bitwidth. Extension and truncation operations are inserted as necessary to
-/// satisfy the IR and bitwidth constraints. If an extension operation is
-/// required, logicExt forces the use of a logical extension operation.
+/// satisfy the IR and bitwidth constraints.
 template <typename Op>
-static void modArithOp(Op op, Value lhs, Value rhs, unsigned optWidth,
-                       bool logicExt, PatternRewriter &rewriter) {
+static void modArithOp(Op op, ExtValue lhs, ExtValue rhs, unsigned optWidth,
+                       ExtType extRes, PatternRewriter &rewriter) {
   Type resType = op->getResult(0).getType();
   assert(isValidType(resType) && "result must have valid type");
   unsigned resWidth = resType.getIntOrFloatBitWidth();
 
   // Create a new operation as well as appropriate bitwidth
   // modification operations to keep the IR valid
-  Value newLhs = modVal(lhs, optWidth, logicExt, rewriter);
-  Value newRhs = modVal(rhs, optWidth, logicExt, rewriter);
+  Value newLhs = modVal(lhs, optWidth, rewriter);
+  Value newRhs = modVal(rhs, optWidth, rewriter);
   rewriter.setInsertionPoint(op);
   auto newOp = rewriter.create<Op>(op.getLoc(), newLhs, newRhs);
-  Value newRes = modVal(newOp->getResult(0), resWidth, logicExt, rewriter);
+  Value newRes = modVal({newOp->getResult(0), extRes}, resWidth, rewriter);
   inheritBB(op, newOp);
 
   // Replace uses of the original operation's result with
@@ -209,57 +272,54 @@ public:
   /// getDataOperands.
   virtual SmallVector<Value> getDataResults() { return op->getResults(); }
 
-  /// Determines the list of operands that will be given to
-  /// the builder of the optimized operation from the
-  /// optimized data width and list of minimal data operands
-  /// of the original operations. The vector given as last
-  /// argument is filled with the new operands.
-  virtual void getNewOperands(unsigned optWidth,
+  /// Determines the list of operands that will be given to the builder of the
+  /// optimized operation from the optimized data width, extension type, and
+  /// list of minimal data operands of the original operation. The vector given
+  /// as last argument is filled with the new operands.
+  virtual void getNewOperands(unsigned optWidth, ExtType ext,
                               SmallVector<Value> &minDataOperands,
                               PatternRewriter &rewriter,
                               SmallVector<Value> &newOperands) {
-    llvm::transform(
-        minDataOperands, std::back_inserter(newOperands),
-        [&](Value val) { return modVal(val, optWidth, false, rewriter); });
+    llvm::transform(minDataOperands, std::back_inserter(newOperands),
+                    [&](Value val) {
+                      return modVal({val, ext}, optWidth, rewriter);
+                    });
   }
 
-  /// Determines the list of result types that will be given
-  /// to the builder of the optimized operation. The
-  /// dataType is the type shared by all data results. The
-  /// vector given as last argument is filled with the new
-  /// result types.
+  /// Determines the list of result types that will be given to the builder of
+  /// the optimized operation. The dataType is the type shared by all data
+  /// results. The vector given as last argument is filled with the new result
+  /// types.
   virtual void getResultTypes(Type dataType, SmallVector<Type> &newResTypes) {
     for (size_t i = 0, numResults = op->getNumResults(); i < numResults; ++i)
       newResTypes.push_back(dataType);
   }
 
-  /// Creates and returns the optimized operation from its
-  /// result types and operands. The default builder for the
-  /// operation must be available for the default
-  /// implementation of this function.
+  /// Creates and returns the optimized operation from its result types and
+  /// operands. The default builder for the operation must be available for the
+  /// default implementation of this function.
   virtual Op createOp(SmallVector<Type> &newResTypes,
                       SmallVector<Value> &newOperands,
                       PatternRewriter &rewriter) {
     return rewriter.create<Op>(op.getLoc(), newResTypes, newOperands);
   }
 
-  /// Determines the list of values that the original
-  /// operation will be replaced with. These are the results
-  /// of the newly inserted optimized operations whose
-  /// bitwidth is modified to match those of the original
-  /// operation. The width is the width that was shared by
-  /// all data operands in the original operation. The
-  /// vector given as last argument is filled with the new
+  /// Determines the list of values that the original operation will be replaced
+  /// with. These are the results of the newly inserted optimized operations
+  /// whose bitwidth is modified to match those of the original operation. The
+  /// width is the width that was shared by all data operands in the original
+  /// operation. The vector given as last argument is filled with the new
   /// values.
-  virtual void modResults(Op newOp, unsigned width, PatternRewriter &rewriter,
+  virtual void modResults(Op newOp, unsigned width, ExtType ext,
+                          PatternRewriter &rewriter,
                           SmallVector<Value> &newResults) {
-    llvm::transform(
-        newOp->getResults(), std::back_inserter(newResults),
-        [&](OpResult res) { return modVal(res, width, false, rewriter); });
+    llvm::transform(newOp->getResults(), std::back_inserter(newResults),
+                    [&](OpResult res) {
+                      return modVal({res, ext}, width, rewriter);
+                    });
   }
 
-  /// Default destructor declared virtual because of virtual
-  /// methods.
+  /// Default destructor declared virtual because of virtual methods.
   virtual ~OptDataConfig() = default;
 
 protected:
@@ -284,10 +344,10 @@ public:
     newResTypes.push_back(op.getIndex().getType());
   }
 
-  void modResults(handshake::ControlMergeOp newOp, unsigned width,
+  void modResults(handshake::ControlMergeOp newOp, unsigned width, ExtType ext,
                   PatternRewriter &rewriter,
                   SmallVector<Value> &newResults) override {
-    newResults.push_back(modVal(newOp.getResult(), width, false, rewriter));
+    newResults.push_back(modVal({newOp.getResult(), ext}, width, rewriter));
     newResults.push_back(newOp.getIndex());
   }
 };
@@ -300,13 +360,15 @@ public:
 
   SmallVector<Value> getDataOperands() override { return op.getDataOperands(); }
 
-  void getNewOperands(unsigned optWidth, SmallVector<Value> &minDataOperands,
+  void getNewOperands(unsigned optWidth, ExtType ext,
+                      SmallVector<Value> &minDataOperands,
                       PatternRewriter &rewriter,
                       SmallVector<Value> &newOperands) override {
     newOperands.push_back(op.getSelectOperand());
-    llvm::transform(
-        minDataOperands, std::back_inserter(newOperands),
-        [&](Value val) { return modVal(val, optWidth, false, rewriter); });
+    llvm::transform(minDataOperands, std::back_inserter(newOperands),
+                    [&](Value val) {
+                      return modVal({val, ext}, optWidth, rewriter);
+                    });
   }
 };
 
@@ -320,12 +382,13 @@ public:
     return SmallVector<Value>{op.getDataOperand()};
   }
 
-  void getNewOperands(unsigned optWidth, SmallVector<Value> &minDataOperands,
+  void getNewOperands(unsigned optWidth, ExtType ext,
+                      SmallVector<Value> &minDataOperands,
                       PatternRewriter &rewriter,
                       SmallVector<Value> &newOperands) override {
     newOperands.push_back(op.getConditionOperand());
     newOperands.push_back(
-        modVal(minDataOperands[0], optWidth, false, rewriter));
+        modVal({minDataOperands[0], ext}, optWidth, rewriter));
   }
 };
 
@@ -391,8 +454,9 @@ struct HandshakeOptData : public OpRewritePattern<Op> {
 
     // Get the operation's data operands actual widths
     SmallVector<Value> minDataOperands;
+    ExtType ext = ExtType::UNKNOWN;
     llvm::transform(dataOperands, std::back_inserter(minDataOperands),
-                    [&](Value val) { return getMinimalValue(val); });
+                    [&](Value val) { return getMinimalValue(val, &ext); });
 
     // Check whether we can reduce the bitwidth of the operation
     unsigned optWidth = 0;
@@ -411,12 +475,12 @@ struct HandshakeOptData : public OpRewritePattern<Op> {
     // operations to keep the IR valid
     SmallVector<Value> newOperands, newResults;
     SmallVector<Type> newResTypes;
-    cfg.getNewOperands(optWidth, minDataOperands, rewriter, newOperands);
+    cfg.getNewOperands(optWidth, ext, minDataOperands, rewriter, newOperands);
     cfg.getResultTypes(rewriter.getIntegerType(optWidth), newResTypes);
     rewriter.setInsertionPoint(op);
     Op newOp = cfg.createOp(newResTypes, newOperands, rewriter);
     inheritBB(op, newOp);
-    cfg.modResults(newOp, dataWidth, rewriter, newResults);
+    cfg.modResults(newOp, dataWidth, ext, rewriter, newResults);
 
     // Replace uses of the original operation's results with the results of the
     // optimized operation we just created
@@ -456,7 +520,8 @@ struct HandshakeMuxSelect : public OpRewritePattern<handshake::MuxOp> {
       return failure();
 
     // Replace the select operand with one with optimize bitwidth
-    Value newSelect = modVal(selectOperand, optWidth, true, rewriter);
+    Value newSelect =
+        modVal({selectOperand, ExtType::LOGICAL}, optWidth, rewriter);
     rewriter.updateRootInPlace(
         muxOp, [&] { muxOp->replaceUsesOfWith(selectOperand, newSelect); });
     return success();
@@ -493,7 +558,8 @@ struct HandshakeCMergeIndex
     auto newOp = rewriter.create<handshake::ControlMergeOp>(
         cmergeOp.getLoc(), resTypes, cmergeOp.getDataOperands());
     inheritBB(cmergeOp, newOp);
-    Value modIndex = modVal(newOp.getIndex(), indexWidth, true, rewriter);
+    Value modIndex =
+        modVal({newOp.getIndex(), ExtType::LOGICAL}, indexWidth, rewriter);
     rewriter.replaceOp(cmergeOp, ValueRange{newOp.getResult(), modIndex});
     return success();
   }
@@ -523,8 +589,8 @@ struct HandshakeMCAddress
     // Optimizes the bitwidth of the address channel currently being pointed to
     // by inputIdx, and increment inputIdx before returning the optimized value
     auto getOptAddrInput = [&] {
-      return modVal(getMinimalValue(inputs[inputIdx++]), optWidth, true,
-                    rewriter);
+      return modVal({getMinimalValue(inputs[inputIdx++]), ExtType::LOGICAL},
+                    optWidth, rewriter);
     };
 
     // Iterate over memory controller inputs to create the new inputs and the
@@ -581,42 +647,54 @@ struct HandshakeMemPortAddress : public OpRewritePattern<Op> {
       return failure();
 
     Value newAddr =
-        modVal(getMinimalValue(memOp.getAddress()), optWidth, true, rewriter);
+        modVal({getMinimalValue(memOp.getAddress()), ExtType::LOGICAL},
+               optWidth, rewriter);
     rewriter.setInsertionPoint(memOp);
     auto newOp = rewriter.create<Op>(memOp.getLoc(), newAddr.getType(),
                                      memOp.getDataResult().getType(), newAddr,
                                      memOp.getData());
-    Value newAddrRes =
-        modVal(newOp.getAddressResult(), addrWidth, true, rewriter);
+    Value newAddrRes = modVal({newOp.getAddressResult(), ExtType::LOGICAL},
+                              addrWidth, rewriter);
     inheritBB(memOp, newOp);
     rewriter.replaceOp(memOp, {newAddrRes, newOp.getDataResult()});
     return success();
   }
 };
 
+/// Shortcut for a value accompanied by its identified extension type.
+using ExtValue = std::pair<Value, ExtType>;
+
 /// Moves any extension operation feeding into a return operation past the
 /// latter to optimize the bitwidth occupied by the return operation itself.
 /// This is meant to be part of the forward pass.
-struct HandshakeReturnFW : public OpRewritePattern<handshake::ReturnOp> {
-  using OpRewritePattern<handshake::ReturnOp>::OpRewritePattern;
+/// NOTE: (lucas) This rewrite pattern is unused at the moment because applying
+/// it sucessfully makes the return operation's verification function fail
+/// (different return result types and enclosing function return types).
+/// When we eventually formalize and rework our circuit's interfaces, this may
+/// become useful, so here it stays.
+struct HandshakeReturnFW
+    : public OpRewritePattern<handshake::DynamaticReturnOp> {
+  using OpRewritePattern<handshake::DynamaticReturnOp>::OpRewritePattern;
 
-  LogicalResult matchAndRewrite(handshake::ReturnOp retOp,
+  LogicalResult matchAndRewrite(handshake::DynamaticReturnOp retOp,
                                 PatternRewriter &rewriter) const override {
 
     // Try to move potential extension operations after the return
     SmallVector<Value> newOperands;
+    SmallVector<ExtType> extTypes;
     bool changed = false;
-    auto tryToMinimize = [&](Value opr) {
+    for (Value opr : retOp->getOperands()) {
       Type oprType = opr.getType();
-      if (!isValidType(oprType))
-        return opr;
-      Value minVal = getMinimalValue(opr);
-      changed |= minVal.getType().getIntOrFloatBitWidth() <
-                 oprType.getIntOrFloatBitWidth();
-      return minVal;
-    };
-    llvm::transform(retOp->getOperands(), std::back_inserter(newOperands),
-                    tryToMinimize);
+      ExtType ext = ExtType::UNKNOWN;
+      Value minVal = opr;
+      if (isValidType(oprType)) {
+        minVal = getMinimalValue(opr, &ext);
+        changed |= minVal.getType().getIntOrFloatBitWidth() <
+                   oprType.getIntOrFloatBitWidth();
+      }
+      newOperands.push_back(minVal);
+      extTypes.push_back(ext);
+    }
 
     // Check whether the transformation would change anything
     if (!changed)
@@ -625,18 +703,21 @@ struct HandshakeReturnFW : public OpRewritePattern<handshake::ReturnOp> {
     // Insert an optimized return operation that moves eventual value extensions
     // after itself
     rewriter.setInsertionPoint(retOp);
-    auto newOp =
-        rewriter.create<handshake::ReturnOp>(retOp->getLoc(), newOperands);
-    SmallVector<Value> newResults;
-    for (auto [newRes, ogResType] :
-         llvm::zip_equal(newOp->getResults(), retOp->getResultTypes())) {
-      if (!isValidType(ogResType))
-        newResults.push_back(newRes);
-      else
-        newResults.push_back(
-            modVal(newRes, ogResType.getIntOrFloatBitWidth(), false, rewriter));
-    }
+    auto newOp = rewriter.create<handshake::DynamaticReturnOp>(retOp->getLoc(),
+                                                               newOperands);
     inheritBB(retOp, newOp);
+
+    // Create required extension operations on the new return's results so that
+    // the rest of the IR stays valid
+    SmallVector<Value> newResults;
+    for (auto [newRes, ogResType, ext] : llvm::zip_equal(
+             newOp->getResults(), retOp->getResultTypes(), extTypes)) {
+      if (isValidType(ogResType))
+        newResults.push_back(
+            modVal({newRes, ext}, ogResType.getIntOrFloatBitWidth(), rewriter));
+      else
+        newResults.push_back(newRes);
+    }
     rewriter.replaceOp(retOp, newResults);
     return success();
   }
@@ -680,8 +761,9 @@ struct ArithSingleType : public OpRewritePattern<Op> {
       return failure();
 
     // Check whether we can reduce the bitwidth of the operation
-    Value minLhs = getMinimalValue(op->getOperand(0));
-    Value minRhs = getMinimalValue(op->getOperand(1));
+    ExtType extLhs = ExtType::UNKNOWN, extRhs = ExtType::UNKNOWN;
+    Value minLhs = getMinimalValue(op->getOperand(0), &extLhs);
+    Value minRhs = getMinimalValue(op->getOperand(1), &extRhs);
     unsigned optWidth;
     if (forward)
       optWidth = fTransfer(minLhs.getType().getIntOrFloatBitWidth(),
@@ -692,10 +774,17 @@ struct ArithSingleType : public OpRewritePattern<Op> {
     if (optWidth >= resWidth)
       return failure();
 
-    // For bitwise logical operations, extension must also be logical
-    bool logicExt =
-        isa<arith::AndIOp, arith::OrIOp, arith::XOrIOp>((Operation *)op);
-    modArithOp(op, minLhs, minRhs, optWidth, logicExt, rewriter);
+    // Result extension is always logical for bitwise logical operations and
+    // explicitly unsigned operations, othweise it is determined byt the
+    // result's type
+    ExtType extRes;
+    if (isa<arith::AndIOp, arith::OrIOp, arith::XOrIOp, arith::DivUIOp,
+            arith::RemUIOp>((Operation *)op))
+      extRes = ExtType::LOGICAL;
+    else
+      extRes = ExtType::UNKNOWN;
+    modArithOp(op, {minLhs, extLhs}, {minRhs, extRhs}, optWidth, extRes,
+               rewriter);
     return success();
   }
 
@@ -723,8 +812,9 @@ struct ArithSelect : public OpRewritePattern<arith::SelectOp> {
       return failure();
 
     // Check whether we can reduce the bitwidth of the operation
-    Value minLhs = getMinimalValue(selectOp.getTrueValue());
-    Value minRhs = getMinimalValue(selectOp.getFalseValue());
+    ExtType extLhs = ExtType::UNKNOWN, extRhs = ExtType::UNKNOWN;
+    Value minLhs = getMinimalValue(selectOp.getTrueValue(), &extLhs);
+    Value minRhs = getMinimalValue(selectOp.getFalseValue(), &extRhs);
     unsigned optWidth;
     if (forward)
       optWidth = std::max(minLhs.getType().getIntOrFloatBitWidth(),
@@ -735,14 +825,20 @@ struct ArithSelect : public OpRewritePattern<arith::SelectOp> {
     if (optWidth >= resWidth)
       return failure();
 
+    // Different operand extension types mean that we don't know how to extend
+    // the operation's result, so it cannot be optimized
+    if ((extLhs == ExtType::LOGICAL && extRhs == ExtType::ARITHMETIC) ||
+        (extLhs == ExtType::ARITHMETIC && extRhs == ExtType::LOGICAL))
+      return failure();
+
     // Create a new operation as well as appropriate bitwidth modification
     // operations to keep the IR valid
-    Value newLhs = modVal(minLhs, optWidth, false, rewriter);
-    Value newRhs = modVal(minRhs, optWidth, false, rewriter);
+    Value newLhs = modVal({minLhs, extLhs}, optWidth, rewriter);
+    Value newRhs = modVal({minRhs, extRhs}, optWidth, rewriter);
     rewriter.setInsertionPoint(selectOp);
     auto newOp = rewriter.create<arith::SelectOp>(
         selectOp.getLoc(), selectOp.getCondition(), newLhs, newRhs);
-    Value newRes = modVal(newOp->getResult(0), resWidth, false, rewriter);
+    Value newRes = modVal({newOp->getResult(0), extLhs}, resWidth, rewriter);
     inheritBB(selectOp, newOp);
 
     // Replace uses of the original operation's result with the result of the
@@ -772,7 +868,8 @@ struct ArithShift : public OpRewritePattern<Op> {
                                 PatternRewriter &rewriter) const override {
     Value toShift = op->getOperand(0);
     Value shiftBy = op->getOperand(1);
-    Value minToShift = getMinimalValue(toShift);
+    ExtType extToShift = ExtType::UNKNOWN;
+    Value minToShift = getMinimalValue(toShift, &extToShift);
     Value minShiftBy = getMinimalValue(shiftBy);
     bool isRightShift = isa<arith::ShRSIOp, arith::ShRUIOp>((Operation *)op);
 
@@ -796,24 +893,22 @@ struct ArithShift : public OpRewritePattern<Op> {
     if (optWidth >= resWidth)
       return failure();
 
-    // For logical shifts, extension must also be logical
-    bool logicExt = isa<arith::ShLIOp>(op) || isa<arith::ShRUIOp>(op);
-
     if (forward) {
       // Create a new operation as well as appropriate bitwidth modification
       // operations to keep the IR valid
-      Value newLhs = modVal(minToShift, optWidth, logicExt, rewriter);
-      Value newRhs = modVal(minShiftBy, optWidth, logicExt, rewriter);
+      Value newToShift = modVal({minToShift, extToShift}, optWidth, rewriter);
+      Value newShifyBy =
+          modVal({minShiftBy, ExtType::LOGICAL}, optWidth, rewriter);
       rewriter.setInsertionPoint(op);
-      auto newOp = rewriter.create<Op>(op.getLoc(), newLhs, newRhs);
+      auto newOp = rewriter.create<Op>(op.getLoc(), newToShift, newShifyBy);
       Value newRes = newOp->getResult(0);
       if (isRightShift)
         // In the case of a right shift, we first truncate the result of the
         // newly inserted shift operation to discard high-significance bits that
         // we know are 0s, then extend the result back to satisfy the users of
         // the original operation's result
-        newRes = modVal(newRes, optWidth - cstVal, logicExt, rewriter);
-      Value modRes = modVal(newRes, resWidth, logicExt, rewriter);
+        newRes = modVal({newRes, extToShift}, optWidth - cstVal, rewriter);
+      Value modRes = modVal({newRes, extToShift}, resWidth, rewriter);
       inheritBB(op, newOp);
 
       // Replace uses of the original operation's result with the result of the
@@ -827,9 +922,10 @@ struct ArithShift : public OpRewritePattern<Op> {
         // then extend back to satisfy the users of the original integer
         unsigned requiredToShiftWidth = optWidth - std::min(cstVal, optWidth);
         modToShift =
-            modVal(minToShift, requiredToShiftWidth, logicExt, rewriter);
+            modVal({minToShift, extToShift}, requiredToShiftWidth, rewriter);
       }
-      modArithOp(op, modToShift, minShiftBy, optWidth, logicExt, rewriter);
+      modArithOp(op, {modToShift, extToShift}, {minShiftBy, ExtType::LOGICAL},
+                 optWidth, extToShift, rewriter);
     }
     return success();
   }
@@ -850,8 +946,9 @@ struct ArithCmpFW : public OpRewritePattern<arith::CmpIOp> {
     // Check whether we can reduce the bitwidth of the operation
     Value lhs = cmpOp.getLhs();
     Value rhs = cmpOp.getRhs();
-    Value minLhs = getMinimalValue(lhs);
-    Value minRhs = getMinimalValue(rhs);
+    ExtType extLhs = ExtType::UNKNOWN, extRhs = ExtType::UNKNOWN;
+    Value minLhs = getMinimalValue(lhs, &extLhs);
+    Value minRhs = getMinimalValue(rhs, &extRhs);
     unsigned optWidth = std::max(minLhs.getType().getIntOrFloatBitWidth(),
                                  minRhs.getType().getIntOrFloatBitWidth());
     unsigned actualWidth = lhs.getType().getIntOrFloatBitWidth();
@@ -860,8 +957,8 @@ struct ArithCmpFW : public OpRewritePattern<arith::CmpIOp> {
 
     // Create a new operation as well as appropriate bitwidth modification
     // operations to keep the IR valid
-    Value newLhs = modVal(minLhs, optWidth, false, rewriter);
-    Value newRhs = modVal(minRhs, optWidth, false, rewriter);
+    Value newLhs = modVal({minLhs, extLhs}, optWidth, rewriter);
+    Value newRhs = modVal({minRhs, extRhs}, optWidth, rewriter);
     rewriter.setInsertionPoint(cmpOp);
     auto newOp = rewriter.create<arith::CmpIOp>(
         cmpOp.getLoc(), cmpOp.getPredicate(), newLhs, newRhs);
@@ -990,7 +1087,6 @@ void HandshakeOptimizeBitwidthsPass::addForwardPatterns(
 
   // Handshake operations
   addHandshakeDataPatterns(fwPatterns, true);
-  fwPatterns.add<HandshakeReturnFW>(ctx);
 
   // arith operations
   addArithPatterns(fwPatterns, true);

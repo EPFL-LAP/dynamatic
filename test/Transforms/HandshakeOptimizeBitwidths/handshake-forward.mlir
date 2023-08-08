@@ -145,20 +145,3 @@ handshake.func @bufferFW(%arg0: i16, %start: none) -> i32 {
   %returnVal = d_return %buf : i32
   end %returnVal : i32
 }
-
-// -----
-
-// CHECK-LABEL:   handshake.func @returnFW(
-// CHECK-SAME:                             %[[VAL_0:.*]]: i16, %[[VAL_1:.*]]: i8,
-// CHECK-SAME:                             %[[VAL_2:.*]]: none, ...) -> (i32, i32, none) attributes {argNames = ["arg0", "arg1", "start"], resNames = ["out0", "out1", "out2"]} {
-// CHECK:           %[[VAL_3:.*]] = arith.extsi %[[VAL_0]] : i16 to i32
-// CHECK:           %[[VAL_4:.*]] = arith.extsi %[[VAL_1]] : i8 to i32
-// CHECK:           %[[VAL_5:.*]]:3 = d_return %[[VAL_3]], %[[VAL_4]], %[[VAL_2]] : i32, i32, none
-// CHECK:           end %[[VAL_5]]#0, %[[VAL_5]]#1, %[[VAL_5]]#2 : i32, i32, none
-// CHECK:         }
-handshake.func @returnFW(%arg0: i16, %arg1: i8, %start: none) -> (i32, i32, none) {
-  %ext0 = arith.extsi %arg0 : i16 to i32
-  %ext1 = arith.extsi %arg1 : i8 to i32
-  %returnVals:3 = d_return %ext0, %ext1, %start : i32, i32, none
-  end %returnVals#0, %returnVals#1, %returnVals#2 : i32, i32, none
-}

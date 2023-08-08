@@ -129,7 +129,7 @@ handshake.func @xoriBW(%arg0: i8, %arg1: i32, %start: none) -> i16 {
 // CHECK-SAME:                           %[[VAL_0:.*]]: i32,
 // CHECK-SAME:                           %[[VAL_1:.*]]: none, ...) -> i16 attributes {argNames = ["arg0", "start"], resNames = ["out0"]} {
 // CHECK:           %[[VAL_2:.*]] = arith.trunci %[[VAL_0]] {bb = 0 : ui32} : i32 to i12
-// CHECK:           %[[VAL_3:.*]] = arith.extui %[[VAL_2]] {bb = 0 : ui32} : i12 to i16
+// CHECK:           %[[VAL_3:.*]] = arith.extsi %[[VAL_2]] {bb = 0 : ui32} : i12 to i16
 // CHECK:           %[[VAL_4:.*]] = constant %[[VAL_1]] {value = 4 : i32} : i32
 // CHECK:           %[[VAL_5:.*]] = arith.trunci %[[VAL_4]] : i32 to i16
 // CHECK:           %[[VAL_6:.*]] = arith.shli %[[VAL_3]], %[[VAL_5]] : i16
