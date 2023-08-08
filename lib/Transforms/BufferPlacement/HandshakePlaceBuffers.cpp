@@ -199,7 +199,8 @@ LogicalResult HandshakePlaceBuffersPass::insertBuffers(FuncOp &funcOp,
   std::map<std::string, UnitInfo> unitInfo;
   DenseMap<Value, ChannelBufProps> channelBufProps;
 
-  parseJson(timefile, unitInfo);
+  if (failed(parseJson(timefile, unitInfo)))
+    return failure();
 
   // load the buffer information of the units to channel
   if (failed(setChannelBufProps(allChannels, channelBufProps, unitInfo)))
@@ -212,7 +213,8 @@ LogicalResult HandshakePlaceBuffersPass::insertBuffers(FuncOp &funcOp,
                                       channelBufProps)))
     return failure();
 
-  instantiateBuffers(insertBufResult, ctx);
+  if (failed(instantiateBuffers(insertBufResult, ctx)))
+    return failure();
 
   return success();
 }
