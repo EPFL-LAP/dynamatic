@@ -1,4 +1,4 @@
-add_dynamatic_library(DynamaticExperimentalConversion
+add_dynamatic_library(DynamaticExperimentalStandardToHandshakeFPL22
   StandardToHandshakeFPL22.cpp
 
   DEPENDS

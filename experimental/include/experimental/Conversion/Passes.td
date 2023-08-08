@@ -13,8 +13,7 @@ def StandardToHandshakeFPL22 : Pass< "exp-lower-std-to-handshake-fpl22",
                                 "mlir::ModuleOp"> {
   let summary = "Lower Standard MLIR into Handshake IR following elastic pass described in FPL22";
   let constructor = "dynamatic::experimental::createStandardToHandshakeFPL22Pass()";
-  // TODO: when this is uncommented the build error occurs
-  // let dependentDialects = ["circt::handshake::HandshakeDialect"];
+  let dependentDialects = ["circt::handshake::HandshakeDialect"];
   let options =
     [Option<"idBasicBlocks", "id-basic-blocks", "bool", "false",
             "If true, will attach a 'bb' attribute to each operation in the "

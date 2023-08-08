@@ -13,9 +13,7 @@ struct StandardToHandshakeFPL22Pass
     : public dynamatic::experimental::impl::StandardToHandshakeFPL22Base<
           StandardToHandshakeFPL22Pass> {
 
-  void runOnOperation() override {
-    llvm::outs() << "My pass is running!\n";
-  };
+  void runOnOperation() override { llvm::outs() << "My pass is running!\n"; };
 };
 } // namespace
 

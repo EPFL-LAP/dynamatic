@@ -35,8 +35,8 @@ int main(int argc, char **argv) {
   dynamatic::registerAllDialects(registry);
   dynamatic::registerAllPasses();
   dynamatic::tutorials::registerAllPasses();
+  dynamatic::experimental::registerAllPasses();
   registerTestPasses();
-  experimental::registerAllExpPasses(); // TODO: fix linking error
 
   // Register the standard passes we want
   mlir::registerCSEPass();

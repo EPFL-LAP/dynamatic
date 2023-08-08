@@ -3,8 +3,10 @@
 #ifndef EXPERIMENTAL_CONVERSION_STANDARDTOHANDSHAKEFPL22_H
 #define EXPERIMENTAL_CONVERSION_STANDARDTOHANDSHAKEFPL22_H
 
+#include "circt/Dialect/Handshake/HandshakeOps.h"
 #include "dynamatic/Support/LLVM.h"
 #include "mlir/Pass/Pass.h"
+#include "mlir/Transforms/DialectConversion.h"
 
 namespace dynamatic {
 namespace experimental {

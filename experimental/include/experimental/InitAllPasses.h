@@ -1,6 +1,7 @@
 //===- InitAllPasses.h - Tutorials passes registration -----------*- C++-*-===//
 //
-// This file defines a helper to trigger the registration of all experimental passes.
+// This file defines a helper to trigger the registration of all experimental
+// passes.
 //
 //===----------------------------------------------------------------------===//
 
@@ -12,9 +13,7 @@
 namespace dynamatic {
 namespace experimental {
 
-inline void registerAllExpPasses() {
-  dynamatic::experimental::registerPasses();
-}
+inline void registerAllPasses() { registerConversionPasses(); }
 
 } // namespace experimental
 } // namespace dynamatic
