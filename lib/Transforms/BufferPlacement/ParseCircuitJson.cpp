@@ -193,17 +193,6 @@ buffer::setChannelBufProps(std::vector<Value> &channels,
   return success();
 }
 
-/// Parse the JSON data to a vector of pair {bitwidth, info}
-// static void parseBitWidthPair(json jsonData,
-//                               std::vector<std::pair<unsigned, double>> &data)
-//                               {
-//   for (auto it = jsonData.begin(); it != jsonData.end(); ++it) {
-//     auto key = stoi(it.key());
-//     double value = it.value();
-//     data.emplace_back(key, value);
-//   }
-// }
-
 static void parseBitWidthPair(llvm::json::Object jsonData,
                               std::vector<std::pair<unsigned, double>> &data) {
   for (const auto &[bitWidth, value] : jsonData) {
@@ -253,17 +242,9 @@ LogicalResult buffer::parseJson(const std::string &jsonFile,
   if (!jsonValue)
     return failure();
 
-  // Read the file contents into a string
-  // json data;
-  // file >> data;
-
   auto data = jsonValue->getAsObject();
   for (std::string &op : opNames) {
-    // if (!data->contains(op))
-    //   return failure();
     auto unitInfoJson = data->getObject(op);
-    // auto unitInfoJson = data->get(op);
-    // auto latencyJson = unitInfoJson->getObject("latency");
     // parse the bitwidth and its corresponding latency for data
     parseBitWidthPair(*unitInfoJson->getObject("latency"),
                       unitInfo[op].latency);
