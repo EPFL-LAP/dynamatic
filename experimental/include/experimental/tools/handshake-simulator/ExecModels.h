@@ -24,29 +24,26 @@ namespace experimental {
 
 struct ExecutableModel;
 
-// TODO : I think this is a bad practice in c++
 using ModelMap =
     std::map<std::string,
              std::unique_ptr<dynamatic::experimental::ExecutableModel>>;
 
+/// Initialises the mapping from operations to the configurated structure
+/// ADD YOUR STRUCT TO THE CORRESPONDING MAP IN THIS METHOD
 bool initialiseMap(llvm::StringMap<std::string> &funcMap, ModelMap &models);
 
 /// Data structure to hold functions to execute each components
 struct ExecutableModel {
   /// A wrapper function to do all the utility stuff in order to simulate
   /// the execution correctly
-  virtual bool
-  tryExecute(llvm::DenseMap<mlir::Value, llvm::Any> &valueMap,
-             llvm::DenseMap<unsigned, unsigned> &memoryMap,
-             llvm::DenseMap<mlir::Value, double> &timeMap,
-             std::vector<std::vector<llvm::Any>> &store,
-             std::vector<mlir::Value> &scheduleList,
-             std::map<std::string,
-                      std::unique_ptr<dynamatic::experimental::ExecutableModel>>
-                 &models,
-             circt::Operation &op) = 0;
+  virtual bool tryExecute(llvm::DenseMap<mlir::Value, llvm::Any> &valueMap,
+                          llvm::DenseMap<unsigned, unsigned> &memoryMap,
+                          llvm::DenseMap<mlir::Value, double> &timeMap,
+                          std::vector<std::vector<llvm::Any>> &store,
+                          std::vector<mlir::Value> &scheduleList,
+                          ModelMap &models, circt::Operation &op) = 0;
 
-  virtual ~ExecutableModel() {};
+  virtual ~ExecutableModel(){};
 };
 
 //----------------------------------------------------------------------------//
@@ -56,120 +53,84 @@ struct ExecutableModel {
 //--- Default CIRCT models ---------------------------------------------------//
 
 struct DefaultFork : public ExecutableModel {
-  virtual bool
-  tryExecute(llvm::DenseMap<mlir::Value, llvm::Any> &valueMap,
-             llvm::DenseMap<unsigned, unsigned> &memoryMap,
-             llvm::DenseMap<mlir::Value, double> &timeMap,
-             std::vector<std::vector<llvm::Any>> &store,
-             std::vector<mlir::Value> &scheduleList,
-             std::map<std::string,
-                      std::unique_ptr<dynamatic::experimental::ExecutableModel>>
-                 &models,
-             circt::Operation &op) override;
+  virtual bool tryExecute(llvm::DenseMap<mlir::Value, llvm::Any> &valueMap,
+                          llvm::DenseMap<unsigned, unsigned> &memoryMap,
+                          llvm::DenseMap<mlir::Value, double> &timeMap,
+                          std::vector<std::vector<llvm::Any>> &store,
+                          std::vector<mlir::Value> &scheduleList,
+                          ModelMap &models, circt::Operation &op) override;
 };
 
 struct DefaultMerge : public ExecutableModel {
-  bool
-  tryExecute(llvm::DenseMap<mlir::Value, llvm::Any> &valueMap,
-             llvm::DenseMap<unsigned, unsigned> &memoryMap,
-             llvm::DenseMap<mlir::Value, double> &timeMap,
-             std::vector<std::vector<llvm::Any>> &store,
-             std::vector<mlir::Value> &scheduleList,
-             std::map<std::string,
-                      std::unique_ptr<dynamatic::experimental::ExecutableModel>>
-                 &models,
-             circt::Operation &op) override;
+  bool tryExecute(llvm::DenseMap<mlir::Value, llvm::Any> &valueMap,
+                  llvm::DenseMap<unsigned, unsigned> &memoryMap,
+                  llvm::DenseMap<mlir::Value, double> &timeMap,
+                  std::vector<std::vector<llvm::Any>> &store,
+                  std::vector<mlir::Value> &scheduleList, ModelMap &models,
+                  circt::Operation &op) override;
 };
 
 struct DefaultControlMerge : public ExecutableModel {
-  bool
-  tryExecute(llvm::DenseMap<mlir::Value, llvm::Any> &valueMap,
-             llvm::DenseMap<unsigned, unsigned> &memoryMap,
-             llvm::DenseMap<mlir::Value, double> &timeMap,
-             std::vector<std::vector<llvm::Any>> &store,
-             std::vector<mlir::Value> &scheduleList,
-             std::map<std::string,
-                      std::unique_ptr<dynamatic::experimental::ExecutableModel>>
-                 &models,
-             circt::Operation &op) override;
+  bool tryExecute(llvm::DenseMap<mlir::Value, llvm::Any> &valueMap,
+                  llvm::DenseMap<unsigned, unsigned> &memoryMap,
+                  llvm::DenseMap<mlir::Value, double> &timeMap,
+                  std::vector<std::vector<llvm::Any>> &store,
+                  std::vector<mlir::Value> &scheduleList, ModelMap &models,
+                  circt::Operation &op) override;
 };
 
 struct DefaultMux : public ExecutableModel {
-  bool
-  tryExecute(llvm::DenseMap<mlir::Value, llvm::Any> &valueMap,
-             llvm::DenseMap<unsigned, unsigned> &memoryMap,
-             llvm::DenseMap<mlir::Value, double> &timeMap,
-             std::vector<std::vector<llvm::Any>> &store,
-             std::vector<mlir::Value> &scheduleList,
-             std::map<std::string,
-                      std::unique_ptr<dynamatic::experimental::ExecutableModel>>
-                 &models,
-             circt::Operation &op) override;
+  bool tryExecute(llvm::DenseMap<mlir::Value, llvm::Any> &valueMap,
+                  llvm::DenseMap<unsigned, unsigned> &memoryMap,
+                  llvm::DenseMap<mlir::Value, double> &timeMap,
+                  std::vector<std::vector<llvm::Any>> &store,
+                  std::vector<mlir::Value> &scheduleList, ModelMap &models,
+                  circt::Operation &op) override;
 };
 
 struct DefaultBranch : public ExecutableModel {
-  bool
-  tryExecute(llvm::DenseMap<mlir::Value, llvm::Any> &valueMap,
-             llvm::DenseMap<unsigned, unsigned> &memoryMap,
-             llvm::DenseMap<mlir::Value, double> &timeMap,
-             std::vector<std::vector<llvm::Any>> &store,
-             std::vector<mlir::Value> &scheduleList,
-             std::map<std::string,
-                      std::unique_ptr<dynamatic::experimental::ExecutableModel>>
-                 &models,
-             circt::Operation &op) override;
+  bool tryExecute(llvm::DenseMap<mlir::Value, llvm::Any> &valueMap,
+                  llvm::DenseMap<unsigned, unsigned> &memoryMap,
+                  llvm::DenseMap<mlir::Value, double> &timeMap,
+                  std::vector<std::vector<llvm::Any>> &store,
+                  std::vector<mlir::Value> &scheduleList, ModelMap &models,
+                  circt::Operation &op) override;
 };
 
 struct DefaultConditionalBranch : public ExecutableModel {
-  bool
-  tryExecute(llvm::DenseMap<mlir::Value, llvm::Any> &valueMap,
-             llvm::DenseMap<unsigned, unsigned> &memoryMap,
-             llvm::DenseMap<mlir::Value, double> &timeMap,
-             std::vector<std::vector<llvm::Any>> &store,
-             std::vector<mlir::Value> &scheduleList,
-             std::map<std::string,
-                      std::unique_ptr<dynamatic::experimental::ExecutableModel>>
-                 &models,
-             circt::Operation &op) override;
+  bool tryExecute(llvm::DenseMap<mlir::Value, llvm::Any> &valueMap,
+                  llvm::DenseMap<unsigned, unsigned> &memoryMap,
+                  llvm::DenseMap<mlir::Value, double> &timeMap,
+                  std::vector<std::vector<llvm::Any>> &store,
+                  std::vector<mlir::Value> &scheduleList, ModelMap &models,
+                  circt::Operation &op) override;
 };
 
 struct DefaultSink : public ExecutableModel {
-  bool
-  tryExecute(llvm::DenseMap<mlir::Value, llvm::Any> &valueMap,
-             llvm::DenseMap<unsigned, unsigned> &memoryMap,
-             llvm::DenseMap<mlir::Value, double> &timeMap,
-             std::vector<std::vector<llvm::Any>> &store,
-             std::vector<mlir::Value> &scheduleList,
-             std::map<std::string,
-                      std::unique_ptr<dynamatic::experimental::ExecutableModel>>
-                 &models,
-             circt::Operation &op) override;
+  bool tryExecute(llvm::DenseMap<mlir::Value, llvm::Any> &valueMap,
+                  llvm::DenseMap<unsigned, unsigned> &memoryMap,
+                  llvm::DenseMap<mlir::Value, double> &timeMap,
+                  std::vector<std::vector<llvm::Any>> &store,
+                  std::vector<mlir::Value> &scheduleList, ModelMap &models,
+                  circt::Operation &op) override;
 };
 
 struct DefaultConstant : public ExecutableModel {
-  bool
-  tryExecute(llvm::DenseMap<mlir::Value, llvm::Any> &valueMap,
-             llvm::DenseMap<unsigned, unsigned> &memoryMap,
-             llvm::DenseMap<mlir::Value, double> &timeMap,
-             std::vector<std::vector<llvm::Any>> &store,
-             std::vector<mlir::Value> &scheduleList,
-             std::map<std::string,
-                      std::unique_ptr<dynamatic::experimental::ExecutableModel>>
-                 &models,
-             circt::Operation &op) override;
+  bool tryExecute(llvm::DenseMap<mlir::Value, llvm::Any> &valueMap,
+                  llvm::DenseMap<unsigned, unsigned> &memoryMap,
+                  llvm::DenseMap<mlir::Value, double> &timeMap,
+                  std::vector<std::vector<llvm::Any>> &store,
+                  std::vector<mlir::Value> &scheduleList, ModelMap &models,
+                  circt::Operation &op) override;
 };
 
 struct DefaultBuffer : public ExecutableModel {
-  bool
-  tryExecute(llvm::DenseMap<mlir::Value, llvm::Any> &valueMap,
-             llvm::DenseMap<unsigned, unsigned> &memoryMap,
-             llvm::DenseMap<mlir::Value, double> &timeMap,
-             std::vector<std::vector<llvm::Any>> &store,
-             std::vector<mlir::Value> &scheduleList,
-             std::map<std::string,
-                      std::unique_ptr<dynamatic::experimental::ExecutableModel>>
-                 &models,
-             circt::Operation &op) override;
+  bool tryExecute(llvm::DenseMap<mlir::Value, llvm::Any> &valueMap,
+                  llvm::DenseMap<unsigned, unsigned> &memoryMap,
+                  llvm::DenseMap<mlir::Value, double> &timeMap,
+                  std::vector<std::vector<llvm::Any>> &store,
+                  std::vector<mlir::Value> &scheduleList, ModelMap &models,
+                  circt::Operation &op) override;
 };
 
 //--- Custom models ----------------------------------------------------------//
