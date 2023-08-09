@@ -100,33 +100,7 @@ void updateTime(ArrayRef<mlir::Value> ins, ArrayRef<mlir::Value> outs,
     timeMap[out] = time;
 }
 
-bool tryToExecute(
-    circt::Operation *op, llvm::DenseMap<mlir::Value, llvm::Any> &valueMap,
-    llvm::DenseMap<mlir::Value, double> &timeMap,
-    std::vector<mlir::Value> &scheduleList,
-    std::map<std::string,
-             std::unique_ptr<dynamatic::experimental::ExecutableModel>> &models,
-    double latency) {
-  auto ins = toVector(op->getOperands());
-  auto outs = toVector(op->getResults());
 
-  if (isReadyToExecute(ins, outs, valueMap)) {
-    auto in = fetchValues(ins, valueMap);
-    std::vector<llvm::Any> out(outs.size());
-
-    auto opName = op->getName().getStringRef().str();
-    auto &execModel = models[opName];
-    if (!execModel)
-      op->emitOpError("Undefined execution for the current op");
-
-    models[opName].get()->execute(in, out, *op);
-    storeValues(out, outs, valueMap);
-    updateTime(ins, outs, timeMap, latency);
-    scheduleList = outs;
-    return true;
-  }
-  return false;
-}
 } // namespace
 
 /* MAYBE REMOVE THIS COMM, CURRENTLY HERE TO CLARIFY PR
@@ -191,12 +165,34 @@ bool dynamatic::experimental::initialiseMap(
 namespace dynamatic {
 namespace experimental {
 
-// Default CIRCT fork
-void DefaultFork::execute(std::vector<llvm::Any> &ins,
-                          std::vector<llvm::Any> &outs, circt::Operation &op) {
-  for (auto &out : outs)
-    out = ins[0];
+/// Wrapper method for constant simple operations that just update the output
+/// and do not modify the timeMap or valueMap in a very specific way
+// TODO : this is weird maybe we should clarify it in some way
+bool tryToExecute(
+    circt::Operation *op, llvm::DenseMap<mlir::Value, llvm::Any> &valueMap,
+    llvm::DenseMap<mlir::Value, double> &timeMap,
+    std::vector<mlir::Value> &scheduleList,
+    std::map<std::string,
+             std::unique_ptr<dynamatic::experimental::ExecutableModel>> &models,
+    const std::function<void(std::vector<llvm::Any>&, std::vector<llvm::Any>&,
+                       circt::Operation&)> &executeFunc,
+    double latency) {
+  auto ins = toVector(op->getOperands());
+  auto outs = toVector(op->getResults());
+
+  if (isReadyToExecute(ins, outs, valueMap)) {
+    auto in = fetchValues(ins, valueMap);
+    std::vector<llvm::Any> out(outs.size());
+    executeFunc(in, out, *op);
+    storeValues(out, outs, valueMap);
+    updateTime(ins, outs, timeMap, latency);
+    scheduleList = outs;
+    return true;
+  }
+  return false;
 }
+
+// Default CIRCT fork
 bool DefaultFork::tryExecute(
     llvm::DenseMap<mlir::Value, llvm::Any> &valueMap,
     llvm::DenseMap<unsigned, unsigned> &memoryMap,
@@ -206,9 +202,15 @@ bool DefaultFork::tryExecute(
     std::map<std::string,
              std::unique_ptr<dynamatic::experimental::ExecutableModel>> &models,
     circt::Operation &opArg) {
+
   auto op = dyn_cast<circt::handshake::ForkOp>(opArg);
+  auto executeFunc = [](std::vector<llvm::Any> &ins, std::vector<llvm::Any> &outs,
+                    circt::Operation &op) {
+    for (auto &out : outs)
+      out = ins[0];
+  };
   return tryToExecute(op.getOperation(), valueMap, timeMap, scheduleList,
-                      models, 1);
+                      models, executeFunc, 1);
 }
 
 // Default CIRCT merge
@@ -312,11 +314,6 @@ bool DefaultMux::tryExecute(
 }
 
 // Default CIRCT branch
-void DefaultBranch::execute(std::vector<llvm::Any> &ins,
-                            std::vector<llvm::Any> &outs,
-                            circt::Operation &op) {
-  outs[0] = ins[0];
-}
 bool DefaultBranch::tryExecute(
     llvm::DenseMap<mlir::Value, llvm::Any> &valueMap,
     llvm::DenseMap<unsigned, unsigned> &memoryMap,
@@ -330,8 +327,12 @@ bool DefaultBranch::tryExecute(
   llvm::errs() << "[EXECMODELS] in the DEFAULT branch"
                << "\n";
   auto op = dyn_cast<circt::handshake::BranchOp>(opArg);
+  auto executeFunc = [](std::vector<llvm::Any> &ins, std::vector<llvm::Any> &outs,
+                    circt::Operation &op) {
+    outs[0] = ins[0];
+  };
   return tryToExecute(op.getOperation(), valueMap, timeMap, scheduleList,
-                      models, 0);
+                      models, executeFunc, 0);
 }
 
 // Default CIRCT conditional branch
@@ -385,12 +386,6 @@ bool DefaultSink::tryExecute(
 }
 
 // Default CIRCT constant
-void DefaultConstant::execute(std::vector<llvm::Any> &ins,
-                              std::vector<llvm::Any> &outs,
-                              circt::Operation &op) {
-  auto attr = op.getAttrOfType<mlir::IntegerAttr>("value");
-  outs[0] = attr.getValue();
-}
 bool DefaultConstant::tryExecute(
     llvm::DenseMap<mlir::Value, llvm::Any> &valueMap,
     llvm::DenseMap<unsigned, unsigned> &memoryMap,
@@ -401,16 +396,16 @@ bool DefaultConstant::tryExecute(
              std::unique_ptr<dynamatic::experimental::ExecutableModel>> &models,
     circt::Operation &opArg) {
   auto op = dyn_cast<circt::handshake::ConstantOp>(opArg);
+  auto executeFunc = [](std::vector<llvm::Any> &ins, std::vector<llvm::Any> &outs,
+                    circt::Operation &op) {
+    auto attr = op.getAttrOfType<mlir::IntegerAttr>("value");
+    outs[0] = attr.getValue();
+  };
   return tryToExecute(op.getOperation(), valueMap, timeMap, scheduleList,
-                      models, 0);
+                      models, executeFunc, 0);
 }
 
 // Default CIRCT buffer
-void DefaultBuffer::execute(std::vector<llvm::Any> &ins,
-                            std::vector<llvm::Any> &outs,
-                            circt::Operation &op) {
-  outs[0] = ins[0];
-}
 bool DefaultBuffer::tryExecute(
     llvm::DenseMap<mlir::Value, llvm::Any> &valueMap,
     llvm::DenseMap<unsigned, unsigned> &memoryMap,
@@ -421,8 +416,12 @@ bool DefaultBuffer::tryExecute(
              std::unique_ptr<dynamatic::experimental::ExecutableModel>> &models,
     circt::Operation &opArg) {
   auto op = dyn_cast<circt::handshake::BufferOp>(opArg);
+  auto executeFunc = [](std::vector<llvm::Any> &ins, std::vector<llvm::Any> &outs,
+                    circt::Operation &op) {
+    outs[0] = ins[0];
+  };
   return tryToExecute(op.getOperation(), valueMap, timeMap, scheduleList,
-                      models, op.getNumSlots());
+                      models, executeFunc, op.getNumSlots());
 }
 
 // TODO : Add dynamatic store/load/end

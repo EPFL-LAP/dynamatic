@@ -11,10 +11,10 @@
 //
 //===----------------------------------------------------------------------===//
 
+#include "experimental/tools/handshake-simulator/ExecModels.h"
 #include "experimental/tools/handshake-simulator/Simulation.h"
 #include "circt/Dialect/Handshake/HandshakeOps.h"
 #include "circt/Support/JSON.h"
-#include "experimental/tools/handshake-simulator/ExecModels.h"
 #include "mlir/Dialect/Arith/IR/Arith.h"
 #include "mlir/Dialect/ControlFlow/IR/ControlFlowOps.h"
 #include "mlir/Dialect/Func/IR/FuncOps.h"
@@ -24,13 +24,11 @@
 #include "llvm/ADT/StringMap.h"
 #include "llvm/ADT/TypeSwitch.h"
 #include "llvm/Support/Debug.h"
-
 #include "llvm/ADT/DenseMap.h"
 
 #include <list>
 
 #define DEBUG_TYPE "runner"
-
 #define INDEX_WIDTH 32
 
 STATISTIC(instructionsExecuted, "Instructions Executed");
@@ -53,67 +51,11 @@ ModelMap models;
 // Utility functions
 //===----------------------------------------------------------------------===//
 
+// TODO : big anon namespace i think
 namespace {
-// Initialises models maps based on Json and manual configuration
-/* MAYBE REMOVE THIS COMM, CURRENTLY HERE TO CLARIFY PR
-  - 'modelStructuresMap' stores all known models and identifies each structure
-      a string name -> any exec model structure
-  - 'funcMap' stores the entered configuration, parsed json + --change-model cmd
-      mlir operation name -> string name correspond to a exec model struct
-  - 'models' links both maps, so the configuration and all known models
-      mlir operation name -> configurated exec model structure
-
-  This allows user to change its models by command or configuration file,
-  with the only re-compilation being the one when he adds the structure
-  and inserts it in the modelStructuresMap. There could be a better way to do it
-  but this one allows dynamic changes.
-
-  modelStructuresMap is the only piece of code the user needs to touch here.
-*/
-
-/*
-bool initialiseMap(llvm::StringMap<std::string> &funcMap) {
-  // This maps the configuration file / command string name to it's 
-  // corresponding structure
-  ModelMap modelStructuresMap;
-  // ------------------------------------------------------------------------ //
-  //   ADD YOUR STRUCT TO THE BELOW MAP IF YOU WANT TO ADD EXECUTION MODELS   //  
-  // ------------------------------------------------------------------------ //
-  modelStructuresMap["defaultFork"] =
-      std::unique_ptr<ExecutableModel>(new DefaultFork);
-  modelStructuresMap["defaultMerge"] =
-      std::unique_ptr<ExecutableModel>(new DefaultMerge);
-  modelStructuresMap["defaultControlMerge"] =
-      std::unique_ptr<ExecutableModel>(new DefaultControlMerge);
-  modelStructuresMap["defaultMux"] =
-      std::unique_ptr<ExecutableModel>(new DefaultMux);
-  modelStructuresMap["defaultBranch"] =
-      std::unique_ptr<ExecutableModel>(new DefaultBranch);
-  modelStructuresMap["defaultConditionalBranch"] =
-      std::unique_ptr<ExecutableModel>(new DefaultConditionalBranch);
-  modelStructuresMap["defaultSink"] =
-      std::unique_ptr<ExecutableModel>(new DefaultSink);
-  modelStructuresMap["defaultConstant"] =
-      std::unique_ptr<ExecutableModel>(new DefaultConstant);
-  modelStructuresMap["defaultBuffer"] =
-      std::unique_ptr<ExecutableModel>(new DefaultBuffer);
-  // ------------------------------------------------------------------------ //
-  //   ADD YOUR STRUCT TO THE ABOVE MAP IF YOU WANT TO ADD EXECUTION MODELS   //  
-  // ------------------------------------------------------------------------ //
-
-  // Fill the map containing the final execution models structures
-  for(auto& elem : funcMap) {
-    auto& chosenStruct = modelStructuresMap[elem.getValue()];
-    //if (!chosenStruct)  
-    //  return false;
-    models[elem.getKey().str()] = std::move(chosenStruct);
-  }
-  return true;
-}
-*/
 
 template <typename T>
-static void fatalValueError(StringRef reason, T &value) {
+void fatalValueError(StringRef reason, T &value) {
   std::string err;
   llvm::raw_string_ostream os(err);
   os << reason << " ('";
@@ -228,6 +170,7 @@ void scheduleIfNeeded(std::list<mlir::Operation *> &readyList,
     readyList.push_back(op);
   }
 }
+
 void scheduleUses(std::list<mlir::Operation *> &readyList,
                   llvm::DenseMap<mlir::Value, Any> &valueMap,
                   mlir::Value value) {
@@ -271,7 +214,7 @@ unsigned allocateMemRef(mlir::MemRefType type, std::vector<Any> &in,
   }
   return ptr;
 }
-}
+} // namespace
 
 //===----------------------------------------------------------------------===//
 // Handshake executer
@@ -288,13 +231,13 @@ public:
                     std::vector<double> &storeTimes);
 
   /// Entry point for circt::handshake::FuncOp top-level functions
-  HandshakeExecuter(
-      circt::handshake::FuncOp &func,
-      llvm::DenseMap<mlir::Value, Any> &valueMap,
-      llvm::DenseMap<mlir::Value, double> &timeMap, std::vector<Any> &results,
-      std::vector<double> &resultTimes, std::vector<std::vector<Any>> &store,
-      std::vector<double> &storeTimes,
-      mlir::OwningOpRef<mlir::ModuleOp> &module);
+  HandshakeExecuter(circt::handshake::FuncOp &func,
+                    llvm::DenseMap<mlir::Value, Any> &valueMap,
+                    llvm::DenseMap<mlir::Value, double> &timeMap,
+                    std::vector<Any> &results, std::vector<double> &resultTimes,
+                    std::vector<std::vector<Any>> &store,
+                    std::vector<double> &storeTimes,
+                    mlir::OwningOpRef<mlir::ModuleOp> &module);
 
   bool succeeded() const { return successFlag; }
 
@@ -652,7 +595,7 @@ LogicalResult HandshakeExecuter::execute(mlir::CallOpInterface callOp,
                                          std::vector<Any> &in,
                                          std::vector<Any> &) {
   // implement function calls.
-  auto op = callOp.getOperation();
+  auto *op = callOp.getOperation();
   mlir::Operation *calledOp = callOp.resolveCallable();
   if (auto funcOp = dyn_cast<mlir::func::FuncOp>(calledOp)) {
     unsigned outputs = funcOp.getNumResults();
@@ -688,7 +631,6 @@ HandshakeExecuter::execute(circt::handshake::InstanceOp instanceOp,
                            std::vector<Any> &in, std::vector<Any> &out) {
   // Execute the instance op and create associations in the current
   // scope's value and time maps for the returned values.
-
   if (auto funcSym = instanceOp->getAttr("module").cast<SymbolRefAttr>()) {
     if (circt::handshake::FuncOp func =
             (*module)->lookupSymbol<circt::handshake::FuncOp>(funcSym)) {
@@ -725,7 +667,7 @@ HandshakeExecuter::execute(circt::handshake::InstanceOp instanceOp,
 
       // Go execute!
       HandshakeExecuter(func, scopeValueMap, scopeTimeMap, nestedResults,
-                     nestedResTimes, store, storeTimes, *module);
+                        nestedResTimes, store, storeTimes, *module);
 
       // Place the output arguments in the caller scope.
       for (auto nestedRes : enumerate(nestedResults)) {
@@ -829,8 +771,6 @@ HandshakeExecuter::HandshakeExecuter(
   }
 }
 
-using TryToExecuteFunc = std::function<void()>;
-
 HandshakeExecuter::HandshakeExecuter(
     circt::handshake::FuncOp &func, llvm::DenseMap<mlir::Value, Any> &valueMap,
     llvm::DenseMap<mlir::Value, double> &timeMap, std::vector<Any> &results,
@@ -889,11 +829,12 @@ HandshakeExecuter::HandshakeExecuter(
     readyList.pop_front();
 
     auto opName = op.getName().getStringRef().str();
-    auto& execModel = models[opName];
+    auto &execModel = models[opName];
     // Execute handshake operations
     if (execModel) {
       std::vector<mlir::Value> scheduleList;
-      if (!execModel.get()->tryExecute(valueMap, memoryMap, timeMap, store, scheduleList, models, op)) {
+      if (!execModel.get()->tryExecute(valueMap, memoryMap, timeMap, store,
+                                       scheduleList, models, op)) {
         readyList.push_back(&op);
       } else {
         LLVM_DEBUG({
@@ -909,7 +850,7 @@ HandshakeExecuter::HandshakeExecuter(
       for (mlir::Value out : scheduleList)
         scheduleUses(readyList, valueMap, out);
       continue;
-    } 
+    }
 
     int64_t i = 0;
     std::vector<Any> inValues(op.getNumOperands());
@@ -937,7 +878,7 @@ HandshakeExecuter::HandshakeExecuter(
     // Consume the inputs.
     for (mlir::Value in : op.getOperands())
       valueMap.erase(in);
-      
+
     ExecuteStrategy strat = ExecuteStrategy::Default;
     LogicalResult res =
         llvm::TypeSwitch<Operation *, LogicalResult>(&op)
@@ -963,7 +904,7 @@ HandshakeExecuter::HandshakeExecuter(
             });
     LLVM_DEBUG(dbgs() << "EXECUTED: " << op << "\n");
 
-    // fail on custom op ... ? 
+    // fail on custom op ... ?
     if (res.failed()) {
       successFlag = false;
       return;
@@ -1020,7 +961,7 @@ bool simulate(StringRef toplevelFunction, ArrayRef<std::string> inputArgs,
   unsigned realOutputs;
 
   // Fill the model map with instancied model structures
-  //initialiseMapp
+  // initialiseMapp
   if (!initialiseMap(funcMap, models))
     return true;
 
@@ -1105,10 +1046,9 @@ bool simulate(StringRef toplevelFunction, ArrayRef<std::string> inputArgs,
   } else if (circt::handshake::FuncOp toplevel =
                  module->lookupSymbol<circt::handshake::FuncOp>(
                      toplevelFunction)) {
-    succeeded =
-        HandshakeExecuter(toplevel, valueMap, timeMap, results, resultTimes,
-                          store, storeTimes, module)
-            .succeeded();
+    succeeded = HandshakeExecuter(toplevel, valueMap, timeMap, results,
+                                  resultTimes, store, storeTimes, module)
+                    .succeeded();
   }
 
   if (!succeeded)

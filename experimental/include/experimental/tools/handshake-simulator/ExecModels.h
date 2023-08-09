@@ -35,20 +35,16 @@ bool initialiseMap(llvm::StringMap<std::string> &funcMap, ModelMap &models);
 struct ExecutableModel {
   /// A wrapper function to do all the utility stuff in order to simulate
   /// the execution correctly
-  virtual bool tryExecute(llvm::DenseMap<mlir::Value, llvm::Any> &valueMap,
-                  llvm::DenseMap<unsigned, unsigned> &memoryMap,
-                  llvm::DenseMap<mlir::Value, double> &timeMap,
-                  std::vector<std::vector<llvm::Any>> &store,
-                  std::vector<mlir::Value> &scheduleList,
-                  std::map<std::string, std::unique_ptr<dynamatic::experimental::ExecutableModel>> &models,
-                  circt::Operation &op) = 0;
-
-  /// The pure execution of the operation
-  virtual void execute(std::vector<llvm::Any> &ins,
-                       std::vector<llvm::Any> &outs,
-                       circt::Operation &op) {
-    llvm::errs() << "No execution found\n";
-  }
+  virtual bool
+  tryExecute(llvm::DenseMap<mlir::Value, llvm::Any> &valueMap,
+             llvm::DenseMap<unsigned, unsigned> &memoryMap,
+             llvm::DenseMap<mlir::Value, double> &timeMap,
+             std::vector<std::vector<llvm::Any>> &store,
+             std::vector<mlir::Value> &scheduleList,
+             std::map<std::string,
+                      std::unique_ptr<dynamatic::experimental::ExecutableModel>>
+                 &models,
+             circt::Operation &op) = 0;
 
   virtual ~ExecutableModel() {};
 };
@@ -60,7 +56,7 @@ struct ExecutableModel {
 //--- Default CIRCT models ---------------------------------------------------//
 
 struct DefaultFork : public ExecutableModel {
-  bool
+  virtual bool
   tryExecute(llvm::DenseMap<mlir::Value, llvm::Any> &valueMap,
              llvm::DenseMap<unsigned, unsigned> &memoryMap,
              llvm::DenseMap<mlir::Value, double> &timeMap,
@@ -70,9 +66,6 @@ struct DefaultFork : public ExecutableModel {
                       std::unique_ptr<dynamatic::experimental::ExecutableModel>>
                  &models,
              circt::Operation &op) override;
-  void execute(std::vector<llvm::Any> &ins,
-               std::vector<llvm::Any> &outs,
-               circt::Operation &op) override;
 };
 
 struct DefaultMerge : public ExecutableModel {
@@ -125,9 +118,6 @@ struct DefaultBranch : public ExecutableModel {
                       std::unique_ptr<dynamatic::experimental::ExecutableModel>>
                  &models,
              circt::Operation &op) override;
-  void execute(std::vector<llvm::Any> &ins,
-               std::vector<llvm::Any> &outs,
-               circt::Operation &op) override;
 };
 
 struct DefaultConditionalBranch : public ExecutableModel {
@@ -167,9 +157,6 @@ struct DefaultConstant : public ExecutableModel {
                       std::unique_ptr<dynamatic::experimental::ExecutableModel>>
                  &models,
              circt::Operation &op) override;
-  void execute(std::vector<llvm::Any> &ins,
-               std::vector<llvm::Any> &outs,
-               circt::Operation &op) override;
 };
 
 struct DefaultBuffer : public ExecutableModel {
@@ -183,9 +170,6 @@ struct DefaultBuffer : public ExecutableModel {
                       std::unique_ptr<dynamatic::experimental::ExecutableModel>>
                  &models,
              circt::Operation &op) override;
-  void execute(std::vector<llvm::Any> &ins,
-               std::vector<llvm::Any> &outs,
-               circt::Operation &op) override;
 };
 
 //--- Custom models ----------------------------------------------------------//
