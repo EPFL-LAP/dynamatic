@@ -618,39 +618,60 @@ static unsigned getBlockPredecessorCount(Block *block) {
 
 LogicalResult HandshakeLoweringFPL22::handleTokenMissmatch(
     ConversionPatternRewriter &rewriter) {
-  // Each consumer Block should only contain one MergeOp for a Value produced in another Block.
-  DenseMap<Block *, DenseMap<Value, Value>> mapConsumerBlocks;
+  // Each consumer Block should only contain one MergeOp for a Value produced in
+  // another Block.
+  DenseMap<Block *, DenseMap<Value, handshake::MergeOp>> mapConsumerBlocks;
+
+  // Run loop analysis
+  DominanceInfo domInfo;
+  llvm::DominatorTreeBase<Block, false> &domTree = domInfo.getDomTree(&r);
+  // CFGLoop nodes become invalid after CFGLoopInfo is destroyed.
+  CFGLoopInfo li(domTree);
+  DenseMap<Block *, BlockLoopInfo> blockToLoopInfoMap = findLoopDetails(li, r);
 
   // Iterate through all producer-consumer pairs (traversing edges in DFG)
   for (auto &block : r.getBlocks()) {
     for (auto &producerOp : block.getOperations()) {
       for (const auto &producerOpResult : producerOp.getResults()) {
         for (const auto &consumerOp : producerOpResult.getUsers()) {
-          llvm::outs() << producerOp.getName();
-          llvm::outs() << " --> ";
-          llvm::outs() << consumerOp->getName();
-          llvm::outs() << "\n";
+          // llvm::outs() << producerOp.getName();
+          // llvm::outs() << " --> ";
+          // llvm::outs() << consumerOp->getName();
+          // llvm::outs() << "\n";
 
+          // Check if consumer Block is already added to the map
           auto blockIt = mapConsumerBlocks.find(consumerOp->getBlock());
-          if (blockIt != mapConsumerBlocks.end()) {
-            auto &mapProducerResultToMergeOp = blockIt->second;
-
-            auto valueIt = mapProducerResultToMergeOp.find(producerOpResult);
-            if (valueIt != mapProducerResultToMergeOp.end()) {
-              llvm::outs() << "ALREADY VISITED\n";
-              // return valueIt->second;
-            } else {
-              llvm::outs() << "NOT VISITED\n";
-              Value v;
-              mapProducerResultToMergeOp[producerOpResult] = v;
-            }
-          } else {
-            llvm::outs() << "else\n";
-            DenseMap<Value, Value> dm;
+          if (blockIt == mapConsumerBlocks.end()) {
+            DenseMap<Value, handshake::MergeOp> dm;
             mapConsumerBlocks[consumerOp->getBlock()] = dm;
-            Value v;
-            mapConsumerBlocks[consumerOp->getBlock()][producerOpResult] = v;
           }
+
+          // Check if merge for producers result is already inserted at the
+          // beginning of the consumer's block
+          auto valueIt =
+              mapConsumerBlocks[consumerOp->getBlock()].find(producerOpResult);
+          if (valueIt != mapConsumerBlocks[consumerOp->getBlock()].end())
+            continue;
+
+          // Find common loop for producer's and consumer's blocks
+          CFGLoop *producersInnermostLoop =
+              blockToLoopInfoMap[producerOp.getBlock()].loop;
+          CFGLoop *consumersInnermostLoop =
+              blockToLoopInfoMap[consumerOp->getBlock()].loop;
+          CFGLoop *commonLoop =
+              findLCALoop(producersInnermostLoop, consumersInnermostLoop);
+
+          int commonLoopDepth = commonLoop ? commonLoop->getLoopDepth() : 0;
+          int consumerLoopDepth = consumersInnermostLoop
+                                      ? consumersInnermostLoop->getLoopDepth()
+                                      : 0;
+
+          int numOfMerges = consumerLoopDepth - commonLoopDepth;
+
+          if (numOfMerges <= 0)
+            // There is no need to insert merge operation(s) because there is no
+            // token missmatch
+            continue;
         }
       }
     }
@@ -930,42 +951,33 @@ struct StandardToHandshakeFPL22Pass
     ModuleOp m = getOperation();
 
     // Lower every function individually
-    for (auto funcOp : llvm::make_early_inc_range(m.getOps<func::FuncOp>())) {
-      dynamatic::experimental::findLoopDetails(funcOp);
-
+    for (auto funcOp : llvm::make_early_inc_range(m.getOps<func::FuncOp>()))
       if (failed(lowerFuncOp(funcOp, &getContext(), idBasicBlocks)))
         return signalPassFailure();
-    }
   }
 };
 } // namespace
 
-DenseMap<Block *, BlockLoopInfo> dynamatic::experimental::findLoopDetails(func::FuncOp &funcOp) {
-  DominanceInfo domInfo;
-  llvm::DominatorTreeBase<Block, false> &domTree =
-      domInfo.getDomTree(&funcOp.getRegion());
-  CFGLoopInfo li(domTree);
-
+DenseMap<Block *, BlockLoopInfo>
+dynamatic::experimental::findLoopDetails(CFGLoopInfo &li, Region &funcReg) {
   // Finding all loops.
   std::vector<CFGLoop *> loops;
-  Region &funcReg = funcOp.getRegion();
   for (auto &block : funcReg.getBlocks()) {
     CFGLoop *loop = li.getLoopFor(&block);
 
     while (loop) {
       auto pos = std::find(loops.begin(), loops.end(), loop);
-      if (pos == loops.end()) {
-        llvm::outs() << "Found a loop!\n";
+      if (pos == loops.end())
         loops.push_back(loop);
-      }
       loop = loop->getParentLoop();
     }
   }
 
-  // Iterating over BB of each loop, and attaching loop info.
+  // Iterating over blocks of each loop, and attaching loop info.
   DenseMap<Block *, BlockLoopInfo> blockToLoopInfoMap;
   for (auto &block : funcReg.getBlocks()) {
     BlockLoopInfo bli;
+
     blockToLoopInfoMap.insert(std::make_pair(&block, bli));
   }
 
@@ -974,19 +986,11 @@ DenseMap<Block *, BlockLoopInfo> dynamatic::experimental::findLoopDetails(func::
     blockToLoopInfoMap[loopHeader].isHeader = true;
     blockToLoopInfoMap[loopHeader].loop = loop;
 
-    llvm::outs() << "Loop header: ";
-    loopHeader->printAsOperand(llvm::outs());
-    llvm::outs() << "\n";
-
     llvm::SmallVector<Block *> exitBlocks;
     loop->getExitingBlocks(exitBlocks);
     for (auto &block : exitBlocks) {
       blockToLoopInfoMap[block].isExit = true;
       blockToLoopInfoMap[block].loop = loop;
-
-      llvm::outs() << "Loop exit: ";
-      block->printAsOperand(llvm::outs());
-      llvm::outs() << "\n";
     }
 
     // A latch block is a block that contains a branch back to the header.
@@ -995,14 +999,30 @@ DenseMap<Block *, BlockLoopInfo> dynamatic::experimental::findLoopDetails(func::
     for (auto &block : latchBlocks) {
       blockToLoopInfoMap[block].isLatch = true;
       blockToLoopInfoMap[block].loop = loop;
-
-      llvm::outs() << "Loop latch: ";
-      block->printAsOperand(llvm::outs());
-      llvm::outs() << "\n";
     }
   }
 
   return blockToLoopInfoMap;
+}
+
+CFGLoop *dynamatic::experimental::findLCALoop(CFGLoop *innermostLoopOfBB1,
+                                              CFGLoop *innermostLoopOfBB2) {
+  std::set<CFGLoop *> loopsOfB1;
+
+  // Traverse upwards from block 1 innermost loop and store the loop ancestors
+  // in the set.
+  for (CFGLoop *currLoop = innermostLoopOfBB1; currLoop;
+       currLoop = currLoop->getParentLoop())
+    loopsOfB1.insert(currLoop);
+
+  // // Traverse upwards from block 2 innermost loop until a common loop is
+  // found.
+  for (CFGLoop *currLoop = innermostLoopOfBB2; currLoop != nullptr;
+       currLoop = currLoop->getParentLoop())
+    if (loopsOfB1.find(currLoop) != loopsOfB1.end())
+      return currLoop;
+
+  return nullptr;
 }
 
 std::unique_ptr<mlir::OperationPass<mlir::ModuleOp>>

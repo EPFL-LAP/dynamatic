@@ -27,14 +27,19 @@ namespace experimental {
 
 /// Structure that stores loop information of a Block.
 struct BlockLoopInfo {
-  CFGLoop *loop;
+  CFGLoop *loop = nullptr;
   bool isHeader = false;
   bool isExit = false;
   bool isLatch = false;
 };
 
-/// Function that runs a loop analysis on the funcOp Region.
-DenseMap<Block *, BlockLoopInfo> findLoopDetails(func::FuncOp &funcOp);
+/// Function that runs loop analysis on the funcOp Region.
+DenseMap<Block *, BlockLoopInfo> findLoopDetails(CFGLoopInfo &li,
+                                                 Region &funcReg);
+
+/// Find CFGLoop which is the least common ancestor loop. If not found, nullptr
+/// is returned.
+CFGLoop *findLCALoop(CFGLoop *innermostLoopOfBB1, CFGLoop *innermostLoopOfBB2);
 
 // This class is used to inherit from CIRCT's standard-to-handshake lowering
 // infrastructure and implementation while providing us a way to
