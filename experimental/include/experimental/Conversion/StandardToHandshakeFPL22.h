@@ -93,7 +93,7 @@ public:
 
   // TODO: add missing descriptions, and discuss code organization with Lucas
 
-  LogicalResult handleTokenMissmatch(ConversionPatternRewriter &rewriter);
+  LogicalResult handleTokenMissmatch(BackedgeBuilder &edgeBuilder, ConversionPatternRewriter &rewriter);
 
   MergeOpInfo insertMerge(Block *block, Value val, BackedgeBuilder &edgeBuilder,
                           ConversionPatternRewriter &rewriter);

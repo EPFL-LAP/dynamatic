@@ -617,7 +617,7 @@ static unsigned getBlockPredecessorCount(Block *block) {
 }
 
 LogicalResult HandshakeLoweringFPL22::handleTokenMissmatch(
-    ConversionPatternRewriter &rewriter) {
+    BackedgeBuilder &edgeBuilder, ConversionPatternRewriter &rewriter) {
   // Each consumer Block should only contain one MergeOp for a Value produced in
   // another Block.
   DenseMap<Block *, DenseMap<Value, handshake::MergeOp>> mapConsumerBlocks;
@@ -672,6 +672,26 @@ LogicalResult HandshakeLoweringFPL22::handleTokenMissmatch(
             // There is no need to insert merge operation(s) because there is no
             // token missmatch
             continue;
+
+          rewriter.setInsertionPointToStart(consumerOp->getBlock());
+          auto insertLoc = consumerOp->getBlock()->front().getLoc();
+          SmallVector<Value> operands;
+          operands.push_back(producerOpResult);
+
+          // Merge should take its own output as one of the inputs
+          auto backedge = edgeBuilder.get(producerOpResult.getType());
+          operands.push_back(Value(backedge));
+
+          // Create MergeOp and resolve the backedge
+          Operation *mergeOp = rewriter.create<handshake::MergeOp>(insertLoc, operands);
+          backedge.setValue(mergeOp->getResult(0));
+
+          // // Replace uses of producer's operation result in consumer's block
+          // // with the merge output
+          // for (Operation &opp : *(consumerOp->getBlock()))
+          //   if (!isa<MergeLikeOpInterface>(opp)) {
+          //     opp.replaceUsesOfWith(producerOpResult, mergeOp->getResult(0));
+          //   }
         }
       }
     }
@@ -800,15 +820,6 @@ static void reconnectMergeOps(Region &r,
 
 LogicalResult
 HandshakeLoweringFPL22::addMergeOps(ConversionPatternRewriter &rewriter) {
-
-  // Iterate through all producer-consumer pairs and see if a token
-  // missmatch occurs. One example of token missmatch is when a producers is
-  // outside the loop and consumer is inside. In that case token produced once
-  // needs to be consumed multiple times. This is solved by adding merge
-  // operations where merge result is also one of the input operands.
-  if (failed(handleTokenMissmatch(rewriter)))
-    return failure();
-
   // Stores mapping from each value that pass through a merge operation to the
   // first result of that merge operation
   ValueMap mergePairs;
@@ -816,6 +827,14 @@ HandshakeLoweringFPL22::addMergeOps(ConversionPatternRewriter &rewriter) {
   // Create backedge builder to manage operands of merge operations between
   // insertion and reconnection
   BackedgeBuilder edgeBuilder{rewriter, r.front().front().getLoc()};
+
+  // Iterate through all producer-consumer pairs and see if a token
+  // missmatch occurs. One example of token missmatch is when a producers is
+  // outside the loop and consumer is inside. In that case token produced once
+  // needs to be consumed multiple times. This is solved by adding merge
+  // operations where merge result is also one of the input operands.
+  if (failed(handleTokenMissmatch(edgeBuilder, rewriter)))
+    return failure();
 
   // Insert merge operations (with backedges instead of actual operands)
   BlockOps mergeOps =
