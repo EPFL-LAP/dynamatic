@@ -70,6 +70,8 @@ namespace {
 
   modelStructuresMap is the only piece of code the user needs to touch here.
 */
+
+/*
 bool initialiseMap(llvm::StringMap<std::string> &funcMap) {
   // This maps the configuration file / command string name to it's 
   // corresponding structure
@@ -108,6 +110,7 @@ bool initialiseMap(llvm::StringMap<std::string> &funcMap) {
   }
   return true;
 }
+*/
 
 template <typename T>
 static void fatalValueError(StringRef reason, T &value) {
@@ -1017,7 +1020,8 @@ bool simulate(StringRef toplevelFunction, ArrayRef<std::string> inputArgs,
   unsigned realOutputs;
 
   // Fill the model map with instancied model structures
-  if (!initialiseMap(funcMap))
+  //initialiseMapp
+  if (!initialiseMap(funcMap, models))
     return true;
 
   if (mlir::func::FuncOp toplevel =

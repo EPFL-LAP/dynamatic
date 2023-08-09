@@ -18,21 +18,23 @@
 #include "llvm/Support/Debug.h"
 
 using namespace circt;
+using namespace dynamatic::experimental;
 
 /*
 PROBLEMS & TODO
-  - A bit of 'boileplate' and similar code (struct definition & declaration..)    
-  - Some functions don't have an 'execute' functions, but removing the virtual
+  - A bit of 'boileplate' and similar code (struct definition & declaration..)
+  - (DONE) Some functions don't have an 'execute' functions, but removing the virtual
     status of it makes the struct without 'execute' abstract, so impossible
     to store in our map
-  - Boring dyn_cast, which is mandatory for correct overriding I think            
+  - Boring dyn_cast, which is mandatory for correct overriding I think
     (Maybe C++ polymorphism can be exploited better ?)
-  - Might want can get rid of the tryExecute+execute system which isn't very      
+  - Might want can get rid of the tryExecute+execute system which isn't very
     clear and modular-friendly (Have to redesign a bit more then!)
-  - Might want to centralize models map and structures so that users only         
+  - Might want to centralize models map and structures so that users only
     code in one file
-  - If configuration isn't found, maybe we can automaticaly substitude with       
+  - If configuration isn't found, maybe we can automaticaly substitude with
     the default configuration ?
+  - ModelMap type in .cpp but not in .h which is weird
 */
 
 #define INDEX_WIDTH 32
@@ -100,6 +102,61 @@ void updateTime(ArrayRef<mlir::Value> ins, ArrayRef<mlir::Value> outs,
 
 } // namespace
 
+/* MAYBE REMOVE THIS COMM, CURRENTLY HERE TO CLARIFY PR
+  - 'modelStructuresMap' stores all known models and identifies each structure
+      a string name -> any exec model structure
+  - 'funcMap' stores the entered configuration, parsed json + --change-model cmd
+      mlir operation name -> string name correspond to a exec model struct
+  - 'models' links both maps, so the configuration and all known models
+      mlir operation name -> configurated exec model structure
+
+  This allows user to change its models by command or configuration file,
+  with the only re-compilation being the one when he adds the structure
+  and inserts it in the modelStructuresMap. There could be a better way to do it
+  but this one allows dynamic changes.
+
+  modelStructuresMap is the only piece of code the user needs to touch here.
+*/
+bool dynamatic::experimental::initialiseMap(
+    llvm::StringMap<std::string> &funcMap, ModelMap &models) {
+  // This maps the configuration file / command string name to it's
+  // corresponding structure
+  ModelMap modelStructuresMap;
+  // ------------------------------------------------------------------------ //
+  //   ADD YOUR STRUCT TO THE BELOW MAP IF YOU WANT TO ADD EXECUTION MODELS   //
+  // ------------------------------------------------------------------------ //
+  modelStructuresMap["defaultFork"] =
+      std::unique_ptr<ExecutableModel>(new DefaultFork);
+  modelStructuresMap["defaultMerge"] =
+      std::unique_ptr<ExecutableModel>(new DefaultMerge);
+  modelStructuresMap["defaultControlMerge"] =
+      std::unique_ptr<ExecutableModel>(new DefaultControlMerge);
+  modelStructuresMap["defaultMux"] =
+      std::unique_ptr<ExecutableModel>(new DefaultMux);
+  modelStructuresMap["defaultBranch"] =
+      std::unique_ptr<ExecutableModel>(new DefaultBranch);
+  modelStructuresMap["defaultConditionalBranch"] =
+      std::unique_ptr<ExecutableModel>(new DefaultConditionalBranch);
+  modelStructuresMap["defaultSink"] =
+      std::unique_ptr<ExecutableModel>(new DefaultSink);
+  modelStructuresMap["defaultConstant"] =
+      std::unique_ptr<ExecutableModel>(new DefaultConstant);
+  modelStructuresMap["defaultBuffer"] =
+      std::unique_ptr<ExecutableModel>(new DefaultBuffer);
+  // ------------------------------------------------------------------------ //
+  //   ADD YOUR STRUCT TO THE ABOVE MAP IF YOU WANT TO ADD EXECUTION MODELS   //
+  // ------------------------------------------------------------------------ //
+
+  // Fill the map containing the final execution models structures
+  for (auto &elem : funcMap) {
+    auto &chosenStruct = modelStructuresMap[elem.getValue()];
+    // if (!chosenStruct)
+    //   return false;
+    models[elem.getKey().str()] = std::move(chosenStruct);
+  }
+  return true;
+}
+
 bool dynamatic::experimental::tryToExecute(
     circt::Operation *op, llvm::DenseMap<mlir::Value, llvm::Any> &valueMap,
     llvm::DenseMap<mlir::Value, double> &timeMap,
@@ -129,7 +186,7 @@ bool dynamatic::experimental::tryToExecute(
 }
 
 //===----------------------------------------------------------------------===//
-//                     Execution models definitions                           //
+//                     Execution models definitions
 //===----------------------------------------------------------------------===//
 
 namespace dynamatic {
@@ -137,8 +194,7 @@ namespace experimental {
 
 // Default CIRCT fork
 void DefaultFork::execute(std::vector<llvm::Any> &ins,
-                          std::vector<llvm::Any> &outs,
-                          circt::Operation &op) {
+                          std::vector<llvm::Any> &outs, circt::Operation &op) {
   for (auto &out : outs)
     out = ins[0];
 }
@@ -271,8 +327,8 @@ bool DefaultBranch::tryExecute(
     std::map<std::string,
              std::unique_ptr<dynamatic::experimental::ExecutableModel>> &models,
     circt::Operation &opArg) { // FAUT TOUT RENAME AAAAA
-  
-  //llvm::errs() << "[EXECMODELS] in the DEFAULT branch" << "\n";
+
+  llvm::errs() << "[EXECMODELS] in the DEFAULT branch" << "\n";
   auto op = dyn_cast<circt::handshake::BranchOp>(opArg);
   return tryToExecute(op.getOperation(), valueMap, timeMap, scheduleList,
                       models, 0);
@@ -345,13 +401,14 @@ bool DefaultConstant::tryExecute(
              std::unique_ptr<dynamatic::experimental::ExecutableModel>> &models,
     circt::Operation &opArg) {
   auto op = dyn_cast<circt::handshake::ConstantOp>(opArg);
-  return tryToExecute(op.getOperation(), valueMap, timeMap, scheduleList, models, 0);
+  return tryToExecute(op.getOperation(), valueMap, timeMap, scheduleList,
+                      models, 0);
 }
 
 // Default CIRCT buffer
 void DefaultBuffer::execute(std::vector<llvm::Any> &ins,
-                              std::vector<llvm::Any> &outs,
-                              circt::Operation &op) {
+                            std::vector<llvm::Any> &outs,
+                            circt::Operation &op) {
   outs[0] = ins[0];
 }
 bool DefaultBuffer::tryExecute(

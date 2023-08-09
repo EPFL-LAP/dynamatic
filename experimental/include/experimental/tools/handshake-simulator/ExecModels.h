@@ -24,6 +24,12 @@ namespace experimental {
 
 struct ExecutableModel;
 
+using ModelMap =
+    std::map<std::string,
+             std::unique_ptr<dynamatic::experimental::ExecutableModel>>;
+
+bool initialiseMap(llvm::StringMap<std::string> &funcMap, ModelMap &models);
+
 bool tryToExecute(circt::Operation *op,
                   llvm::DenseMap<mlir::Value, llvm::Any> &valueMap,
                   llvm::DenseMap<mlir::Value, double> &timeMap,
