@@ -48,7 +48,9 @@ struct ExecutableModel {
   /// The pure execution of the operation
   virtual void execute(std::vector<llvm::Any> &ins,
                        std::vector<llvm::Any> &outs,
-                       circt::Operation &op) = 0;
+                       circt::Operation &op) {
+    llvm::errs() << "No execution found\n";
+  }
 
   virtual ~ExecutableModel() {};
 };
@@ -86,9 +88,6 @@ struct DefaultMerge : public ExecutableModel {
                       std::unique_ptr<dynamatic::experimental::ExecutableModel>>
                  &models,
              circt::Operation &op) override;
-  void execute(std::vector<llvm::Any> &ins,
-               std::vector<llvm::Any> &outs,
-               circt::Operation &op) override;
 };
 
 struct DefaultControlMerge : public ExecutableModel {
@@ -102,9 +101,6 @@ struct DefaultControlMerge : public ExecutableModel {
                       std::unique_ptr<dynamatic::experimental::ExecutableModel>>
                  &models,
              circt::Operation &op) override;
-  void execute(std::vector<llvm::Any> &ins,
-               std::vector<llvm::Any> &outs,
-               circt::Operation &op) override;
 };
 
 struct DefaultMux : public ExecutableModel {
@@ -118,9 +114,6 @@ struct DefaultMux : public ExecutableModel {
                       std::unique_ptr<dynamatic::experimental::ExecutableModel>>
                  &models,
              circt::Operation &op) override;
-  void execute(std::vector<llvm::Any> &ins,
-               std::vector<llvm::Any> &outs,
-               circt::Operation &op) override;
 };
 
 struct DefaultBranch : public ExecutableModel {
@@ -150,9 +143,6 @@ struct DefaultConditionalBranch : public ExecutableModel {
                       std::unique_ptr<dynamatic::experimental::ExecutableModel>>
                  &models,
              circt::Operation &op) override;
-  void execute(std::vector<llvm::Any> &ins,
-               std::vector<llvm::Any> &outs,
-               circt::Operation &op) override;
 };
 
 struct DefaultSink : public ExecutableModel {
@@ -166,9 +156,6 @@ struct DefaultSink : public ExecutableModel {
                       std::unique_ptr<dynamatic::experimental::ExecutableModel>>
                  &models,
              circt::Operation &op) override;
-  void execute(std::vector<llvm::Any> &ins,
-               std::vector<llvm::Any> &outs,
-               circt::Operation &op) override;
 };
 
 struct DefaultConstant : public ExecutableModel {

@@ -157,12 +157,6 @@ bool DefaultFork::tryExecute(
 }
 
 // Default CIRCT merge
-void DefaultMerge::execute(std::vector<llvm::Any> &ins,
-                                  std::vector<llvm::Any> &outs,
-                                  circt::Operation &op) {
-  llvm::errs() << "no execution"
-               << "\n";
-}
 bool DefaultMerge::tryExecute(
     llvm::DenseMap<mlir::Value, llvm::Any> &valueMap,
     llvm::DenseMap<unsigned, unsigned> &memoryMap,
@@ -194,12 +188,6 @@ bool DefaultMerge::tryExecute(
 }
 
 // Default CIRCT control merge
-void DefaultControlMerge::execute(std::vector<llvm::Any> &ins,
-                                  std::vector<llvm::Any> &outs,
-                                  circt::Operation &op) {
-  llvm::errs() << "no execution"
-               << "\n";
-}
 bool DefaultControlMerge::tryExecute(
     llvm::DenseMap<mlir::Value, llvm::Any> &valueMap,
     llvm::DenseMap<unsigned, unsigned> &memoryMap,
@@ -233,12 +221,6 @@ bool DefaultControlMerge::tryExecute(
 }
 
 // Default CIRCT mux
-void DefaultMux::execute(std::vector<llvm::Any> &ins,
-                         std::vector<llvm::Any> &outs,
-                         circt::Operation &op) {
-  llvm::errs() << "no execution"
-               << "\n";
-}
 bool DefaultMux::tryExecute(
     llvm::DenseMap<mlir::Value, llvm::Any> &valueMap,
     llvm::DenseMap<unsigned, unsigned> &memoryMap,
@@ -290,19 +272,13 @@ bool DefaultBranch::tryExecute(
              std::unique_ptr<dynamatic::experimental::ExecutableModel>> &models,
     circt::Operation &opArg) { // FAUT TOUT RENAME AAAAA
   
-  llvm::errs() << "[EXECMODELS] in the DEFAULT branch" << "\n";
+  //llvm::errs() << "[EXECMODELS] in the DEFAULT branch" << "\n";
   auto op = dyn_cast<circt::handshake::BranchOp>(opArg);
   return tryToExecute(op.getOperation(), valueMap, timeMap, scheduleList,
                       models, 0);
 }
 
 // Default CIRCT conditional branch
-void DefaultConditionalBranch::execute(std::vector<llvm::Any> &ins,
-                                       std::vector<llvm::Any> &outs,
-                                       circt::Operation &op) {
-  llvm::errs() << "no execution"
-               << "\n";
-}
 bool DefaultConditionalBranch::tryExecute(
     llvm::DenseMap<mlir::Value, llvm::Any> &valueMap,
     llvm::DenseMap<unsigned, unsigned> &memoryMap,
@@ -338,12 +314,6 @@ bool DefaultConditionalBranch::tryExecute(
 }
 
 // Default CIRCT sink
-void DefaultSink::execute(std::vector<llvm::Any> &ins,
-                          std::vector<llvm::Any> &outs,
-                          circt::Operation &op) {
-  llvm::errs() << "no execution"
-               << "\n";
-}
 bool DefaultSink::tryExecute(
     llvm::DenseMap<mlir::Value, llvm::Any> &valueMap,
     llvm::DenseMap<unsigned, unsigned> &memoryMap,
