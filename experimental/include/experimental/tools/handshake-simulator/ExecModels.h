@@ -24,18 +24,12 @@ namespace experimental {
 
 struct ExecutableModel;
 
+// TODO : I think this is a bad practice in c++
 using ModelMap =
     std::map<std::string,
              std::unique_ptr<dynamatic::experimental::ExecutableModel>>;
 
 bool initialiseMap(llvm::StringMap<std::string> &funcMap, ModelMap &models);
-
-bool tryToExecute(circt::Operation *op,
-                  llvm::DenseMap<mlir::Value, llvm::Any> &valueMap,
-                  llvm::DenseMap<mlir::Value, double> &timeMap,
-                  std::vector<mlir::Value> &scheduleList,
-                  std::map<std::string, std::unique_ptr<ExecutableModel>> &models,
-                  double latency);
 
 /// Data structure to hold functions to execute each components
 struct ExecutableModel {
@@ -47,9 +41,7 @@ struct ExecutableModel {
                   std::vector<std::vector<llvm::Any>> &store,
                   std::vector<mlir::Value> &scheduleList,
                   std::map<std::string, std::unique_ptr<dynamatic::experimental::ExecutableModel>> &models,
-                  circt::Operation &op) {
-    return tryToExecute(&op, valueMap, timeMap, scheduleList, models, 0);
-  };
+                  circt::Operation &op) = 0;
 
   /// The pure execution of the operation
   virtual void execute(std::vector<llvm::Any> &ins,

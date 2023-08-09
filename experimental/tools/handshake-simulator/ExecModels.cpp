@@ -23,8 +23,8 @@ using namespace dynamatic::experimental;
 /*
 PROBLEMS & TODO
   - A bit of 'boileplate' and similar code (struct definition & declaration..)
-  - (DONE) Some functions don't have an 'execute' functions, but removing the virtual
-    status of it makes the struct without 'execute' abstract, so impossible
+  - (DONE) Some functions don't have an 'execute' functions, but removing the
+virtual status of it makes the struct without 'execute' abstract, so impossible
     to store in our map
   - Boring dyn_cast, which is mandatory for correct overriding I think
     (Maybe C++ polymorphism can be exploited better ?)
@@ -100,6 +100,33 @@ void updateTime(ArrayRef<mlir::Value> ins, ArrayRef<mlir::Value> outs,
     timeMap[out] = time;
 }
 
+bool tryToExecute(
+    circt::Operation *op, llvm::DenseMap<mlir::Value, llvm::Any> &valueMap,
+    llvm::DenseMap<mlir::Value, double> &timeMap,
+    std::vector<mlir::Value> &scheduleList,
+    std::map<std::string,
+             std::unique_ptr<dynamatic::experimental::ExecutableModel>> &models,
+    double latency) {
+  auto ins = toVector(op->getOperands());
+  auto outs = toVector(op->getResults());
+
+  if (isReadyToExecute(ins, outs, valueMap)) {
+    auto in = fetchValues(ins, valueMap);
+    std::vector<llvm::Any> out(outs.size());
+
+    auto opName = op->getName().getStringRef().str();
+    auto &execModel = models[opName];
+    if (!execModel)
+      op->emitOpError("Undefined execution for the current op");
+
+    models[opName].get()->execute(in, out, *op);
+    storeValues(out, outs, valueMap);
+    updateTime(ins, outs, timeMap, latency);
+    scheduleList = outs;
+    return true;
+  }
+  return false;
+}
 } // namespace
 
 /* MAYBE REMOVE THIS COMM, CURRENTLY HERE TO CLARIFY PR
@@ -155,34 +182,6 @@ bool dynamatic::experimental::initialiseMap(
     models[elem.getKey().str()] = std::move(chosenStruct);
   }
   return true;
-}
-
-bool dynamatic::experimental::tryToExecute(
-    circt::Operation *op, llvm::DenseMap<mlir::Value, llvm::Any> &valueMap,
-    llvm::DenseMap<mlir::Value, double> &timeMap,
-    std::vector<mlir::Value> &scheduleList,
-    std::map<std::string,
-             std::unique_ptr<dynamatic::experimental::ExecutableModel>> &models,
-    double latency) {
-  auto ins = toVector(op->getOperands());
-  auto outs = toVector(op->getResults());
-
-  if (isReadyToExecute(ins, outs, valueMap)) {
-    auto in = fetchValues(ins, valueMap);
-    std::vector<llvm::Any> out(outs.size());
-
-    auto opName = op->getName().getStringRef().str();
-    auto &execModel = models[opName];
-    if (!execModel)
-      op->emitOpError("Undefined execution for the current op");
-
-    models[opName].get()->execute(in, out, *op);
-    storeValues(out, outs, valueMap);
-    updateTime(ins, outs, timeMap, latency);
-    scheduleList = outs;
-    return true;
-  }
-  return false;
 }
 
 //===----------------------------------------------------------------------===//
@@ -328,7 +327,8 @@ bool DefaultBranch::tryExecute(
              std::unique_ptr<dynamatic::experimental::ExecutableModel>> &models,
     circt::Operation &opArg) { // FAUT TOUT RENAME AAAAA
 
-  llvm::errs() << "[EXECMODELS] in the DEFAULT branch" << "\n";
+  llvm::errs() << "[EXECMODELS] in the DEFAULT branch"
+               << "\n";
   auto op = dyn_cast<circt::handshake::BranchOp>(opArg);
   return tryToExecute(op.getOperation(), valueMap, timeMap, scheduleList,
                       models, 0);
