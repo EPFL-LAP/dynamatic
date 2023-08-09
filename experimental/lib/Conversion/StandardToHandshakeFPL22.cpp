@@ -620,7 +620,7 @@ LogicalResult HandshakeLoweringFPL22::handleTokenMissmatch(
     BackedgeBuilder &edgeBuilder, ConversionPatternRewriter &rewriter) {
   // Each consumer Block should only contain one MergeOp for a Value produced in
   // another Block.
-  DenseMap<Block *, DenseMap<Value, handshake::MergeOp>> mapConsumerBlocks;
+  DenseMap<Block *, DenseMap<Value, Operation *>> mapConsumerBlocks;
 
   // Run loop analysis
   DominanceInfo domInfo;
@@ -634,15 +634,11 @@ LogicalResult HandshakeLoweringFPL22::handleTokenMissmatch(
     for (auto &producerOp : block.getOperations()) {
       for (const auto &producerOpResult : producerOp.getResults()) {
         for (const auto &consumerOp : producerOpResult.getUsers()) {
-          // llvm::outs() << producerOp.getName();
-          // llvm::outs() << " --> ";
-          // llvm::outs() << consumerOp->getName();
-          // llvm::outs() << "\n";
-
+          
           // Check if consumer Block is already added to the map
           auto blockIt = mapConsumerBlocks.find(consumerOp->getBlock());
           if (blockIt == mapConsumerBlocks.end()) {
-            DenseMap<Value, handshake::MergeOp> dm;
+            DenseMap<Value, Operation *> dm;
             mapConsumerBlocks[consumerOp->getBlock()] = dm;
           }
 
@@ -685,13 +681,14 @@ LogicalResult HandshakeLoweringFPL22::handleTokenMissmatch(
           // Create MergeOp and resolve the backedge
           Operation *mergeOp = rewriter.create<handshake::MergeOp>(insertLoc, operands);
           backedge.setValue(mergeOp->getResult(0));
+          mapConsumerBlocks[consumerOp->getBlock()][producerOpResult] = mergeOp;
 
-          // // Replace uses of producer's operation result in consumer's block
-          // // with the merge output
-          // for (Operation &opp : *(consumerOp->getBlock()))
-          //   if (!isa<MergeLikeOpInterface>(opp)) {
-          //     opp.replaceUsesOfWith(producerOpResult, mergeOp->getResult(0));
-          //   }
+          // Replace uses of producer's operation result in consumer's block
+          // with the merge output
+          for (Operation &opp : *(consumerOp->getBlock()))
+            if (!isa<MergeLikeOpInterface>(opp)) {
+              opp.replaceUsesOfWith(producerOpResult, mergeOp->getResult(0));
+            }
         }
       }
     }
