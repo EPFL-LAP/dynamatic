@@ -51,7 +51,6 @@ ModelMap models;
 // Utility functions
 //===----------------------------------------------------------------------===//
 
-// TODO : big anon namespace i think
 namespace {
 
 template <typename T>
@@ -743,7 +742,6 @@ HandshakeExecuter::HandshakeExecuter(
             })
             .Case<func::ReturnOp>([&](auto op) {
               strat = ExecuteStrategy::Return;
-              // TODO : Change to exec model return
               return execute(op, inValues, outValues);
             })
             .Default([](auto op) {
@@ -896,7 +894,6 @@ HandshakeExecuter::HandshakeExecuter(
                 })
             .Case<circt::handshake::ReturnOp>([&](auto op) {
               strat = ExecuteStrategy::Return;
-              // TODO : CHANGE RETURN HERE WHEN NOT BORED ANYMORE
               return execute(op, inValues, outValues);
             })
             .Default([&](auto op) {
@@ -904,7 +901,6 @@ HandshakeExecuter::HandshakeExecuter(
             });
     LLVM_DEBUG(dbgs() << "EXECUTED: " << op << "\n");
 
-    // fail on custom op ... ?
     if (res.failed()) {
       successFlag = false;
       return;

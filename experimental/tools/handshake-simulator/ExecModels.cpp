@@ -20,23 +20,6 @@
 using namespace circt;
 using namespace dynamatic::experimental;
 
-/*
-PROBLEMS & TODO
-  - A bit of 'boileplate' and similar code (struct definition & declaration..)
-  - (DONE) Some functions don't have an 'execute' functions, but removing the
-virtual status of it makes the struct without 'execute' abstract, so impossible
-    to store in our map
-  - Boring dyn_cast, which is mandatory for correct overriding I think
-    (Maybe C++ polymorphism can be exploited better ?)
-  - Might want can get rid of the tryExecute+execute system which isn't very
-    clear and modular-friendly (Have to redesign a bit more then!)
-  - Might want to centralize models map and structures so that users only
-    code in one file
-  - If configuration isn't found, maybe we can automaticaly substitude with
-    the default configuration ?
-  - ModelMap type in .cpp but not in .h which is weird
-*/
-
 #define INDEX_WIDTH 32
 
 using ModelMap =
@@ -423,8 +406,6 @@ bool DefaultBuffer::tryExecute(
   return tryToExecute(op.getOperation(), valueMap, timeMap, scheduleList,
                       models, executeFunc, op.getNumSlots());
 }
-
-// TODO : Add dynamatic store/load/end
 
 } // namespace experimental
 } // namespace dynamatic
