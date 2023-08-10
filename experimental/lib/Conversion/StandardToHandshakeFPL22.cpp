@@ -632,6 +632,11 @@ LogicalResult HandshakeLoweringFPL22::handleTokenMissmatch(
   // Iterate through all producer-consumer pairs (traversing edges in DFG)
   for (auto &block : r.getBlocks()) {
     // TODO: treat block arguments as produced values
+
+    /////////////////////////////////////////////////////////////////////////
+
+    // TODO: tidy duplicated code fragment
+
     for (auto &producerOpResult : block.getArguments()) {
       for (const auto &consumerOp : producerOpResult.getUsers()) {
           if (isa<MergeLikeOpInterface>(*consumerOp))
