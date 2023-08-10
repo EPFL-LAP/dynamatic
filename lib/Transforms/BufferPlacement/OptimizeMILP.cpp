@@ -87,7 +87,7 @@ initVarsInMILP(handshake::FuncOp funcOp, GRBModel &modelBuf,
       std::string chName = "mg" + std::to_string(ind) + "_" + srcName + "_" +
                            dstName + "_" + std::to_string(chInd);
       chThrptToks[ind][channel] = modelBuf.addVar(
-          -GRB_INFINITY, GRB_INFINITY, 0.0, GRB_CONTINUOUS, "thrpt_" + chName);
+          0, GRB_INFINITY, 0.0, GRB_CONTINUOUS, "thrpt_" + chName);
     }
   }
   modelBuf.update();
@@ -169,15 +169,18 @@ static void createThroughputConstrs(GRBModel &modelBuf, GRBVar &retSrc,
 }
 
 /// Create constraints that describe the circuits behavior
-static void
-createModelPathConstraints(GRBModel &modelBuf, double targetCP, FuncOp &funcOp,
-                           DenseMap<Value, ChannelVar> &channelVars,
-                           std::map<std::string, UnitInfo> unitInfo) {
+static void createModelPathConstraints(
+    GRBModel &modelBuf, double targetCP, handshake::FuncOp &funcOp,
+    std::vector<Value> &allChannels, DenseMap<Value, ChannelVar> &channelVars,
+    std::map<std::string, UnitInfo> unitInfo) {
   // Channel constraints
-  for (auto [ch, chVars] : channelVars) {
+  for (Value ch : allChannels) {
     // update the model to get the lower bound and upper bound of the vars
     modelBuf.update();
+    if (!channelVars.contains(ch))
+      continue;
 
+    auto chVars = channelVars[ch];
     // place buffers if maxinum buffer slots is larger then 0 and the channel
     // is selected
     if (chVars.bufNSlots.get(GRB_DoubleAttr_UB) <= 0)
@@ -239,16 +242,19 @@ createModelPathConstraints(GRBModel &modelBuf, double targetCP, FuncOp &funcOp,
 }
 
 /// Create constraints that describe the circuits behavior
-static void
-createModelElasticityConstraints(GRBModel &modelBuf, double targetCP,
-                                 FuncOp &funcOp, unsigned unitNum,
-                                 DenseMap<Value, ChannelVar> &channelVars,
-                                 std::map<std::string, UnitInfo> unitInfo) {
+static void createModelElasticityConstraints(
+    GRBModel &modelBuf, double targetCP, FuncOp &funcOp,
+    std::vector<Value> &allChannels, unsigned unitNum,
+    DenseMap<Value, ChannelVar> &channelVars,
+    std::map<std::string, UnitInfo> unitInfo) {
   // Channel constraints
-  for (auto [ch, chVars] : channelVars) {
+  for (Value ch : allChannels) {
     // update the model to get the lower bound and upper bound of the vars
     modelBuf.update();
+    if (!channelVars.contains(ch))
+      continue;
 
+    auto chVars = channelVars[ch];
     // place buffers if maxinum buffer slots is larger then 0 and the channel
     // is selected
     if (chVars.bufNSlots.get(GRB_DoubleAttr_UB) <= 0)
@@ -289,13 +295,20 @@ createModelElasticityConstraints(GRBModel &modelBuf, double targetCP,
 static void createModelThrptConstraints(
     GRBModel &modelBuf, std::vector<GRBVar> &circtThrpt,
     std::vector<DenseMap<Value, GRBVar>> &chThrptToks,
-    DenseMap<Value, ChannelVar> &channelVars,
+    std::vector<Value> &allChannels, DenseMap<Value, ChannelVar> &channelVars,
     std::vector<DenseMap<Operation *, UnitVar>> &unitVars,
     std::map<std::string, UnitInfo> &unitInfo) {
   for (auto [ind, subMG] : llvm::enumerate(chThrptToks)) {
     for (auto &[ch, thrptTok] : subMG) {
+
+      // for (Value ch : allChannels) {
+      // if (!subMG.contains(ch))
+      //   continue;
+
       Operation *srcOp = ch.getDefiningOp();
       Operation *dstOp = *(ch.getUsers().begin());
+
+      // GRBVar &thrptTok = subMG[ch];
       int tok = isBackEdge(srcOp, dstOp) ? 1 : 0;
       GRBVar &retSrc = unitVars[ind][srcOp].retOut;
       GRBVar &retDst = unitVars[ind][dstOp].retIn;
@@ -319,7 +332,7 @@ static void createModelThrptConstraints(
 /// Create constraints that is prerequisite for buffer placement
 static void
 setCustomizedConstraints(GRBModel &modelBuf,
-                         DenseMap<Value, ChannelVar> channelVars,
+                         DenseMap<Value, ChannelVar> &channelVars,
                          DenseMap<Value, ChannelBufProps> &channelBufProps,
                          DenseMap<Value, Result> &res) {
   for (auto chVarMap : channelVars) {
@@ -352,7 +365,7 @@ setCustomizedConstraints(GRBModel &modelBuf,
 static void createModelObjective(GRBModel &modelBuf,
                                  std::vector<GRBVar> &circtThrpts,
                                  std::vector<CFDFC> &cfdfcList,
-                                 DenseMap<Value, ChannelVar> channelVars) {
+                                 DenseMap<Value, ChannelVar> &channelVars) {
   GRBLinExpr objExpr;
   double lumbdaCoef1 = 1e-4;
   double lumbdaCoef2 = 1e-5;
@@ -424,13 +437,14 @@ LogicalResult buffer::placeBufferInCFDFCircuit(
   setCustomizedConstraints(modelBuf, channelVars, channelBufProps, res);
 
   // create circuits constraints
-  createModelPathConstraints(modelBuf, targetCP, funcOp, channelVars, unitInfo);
+  createModelPathConstraints(modelBuf, targetCP, funcOp, allChannels,
+                             channelVars, unitInfo);
 
-  createModelElasticityConstraints(modelBuf, targetCP, funcOp, unitNum,
-                                   channelVars, unitInfo);
+  createModelElasticityConstraints(modelBuf, targetCP, funcOp, allChannels,
+                                   unitNum, channelVars, unitInfo);
 
-  createModelThrptConstraints(modelBuf, circtThrpts, chThrptToks, channelVars,
-                              unitVars, unitInfo);
+  createModelThrptConstraints(modelBuf, circtThrpts, chThrptToks, allChannels,
+                              channelVars, unitVars, unitInfo);
 
   // create cost function
   createModelObjective(modelBuf, circtThrpts, cfdfcList, channelVars);
