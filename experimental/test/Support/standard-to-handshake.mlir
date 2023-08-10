@@ -77,7 +77,7 @@
 //     return
 // }
 
-func.func @test6 () {
+func.func @test6 (%arg0 : i32) {
 	%b = arith.constant 0 : i1
   %n = arith.constant 378 : i32
 	cf.br ^bb1
@@ -86,7 +86,7 @@ func.func @test6 () {
   %b1 = arith.constant 0 : i1
 	cf.cond_br %b1, ^bb2(%n : i32), ^bb4
 ^bb2(%n2 : i32):
-  %add = arith.addi %n, %n2 : i32
+  %add = arith.addi %n, %arg0 : i32
   %add2 = arith.addi %n, %n2 : i32
   %b2 = arith.constant 0 : i1
 	cf.cond_br %b2, ^bb3(%add: i32), ^bb2(%add2: i32)
