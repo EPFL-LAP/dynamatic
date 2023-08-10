@@ -47,7 +47,7 @@ func.func @test4 () {
   %add2 = arith.addi %n, %n2 : i32
 	cf.cond_br %b, ^bb3(%add: i32), ^bb4
 ^bb3(%y : i32):
-	cf.br ^bb2(%y : i32)
+	cf.br ^bb2(%n : i32)
 ^bb4:
 	return
 }
