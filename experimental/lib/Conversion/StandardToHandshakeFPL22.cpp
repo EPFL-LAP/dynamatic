@@ -657,16 +657,16 @@ LogicalResult HandshakeLoweringFPL22::handleTokenMissmatch(
                                       : 0;
 
           int numOfMerges = consumerLoopDepth - commonLoopDepth;
+          
+          llvm::outs() << " --> ";
+          llvm::outs() << consumerOp->getName();
+          llvm::outs() << "\n";
 
           if (numOfMerges <= 0)
             // There is no need to insert merge operation(s) because there is no
             // token missmatch
             continue;
 
-          // llvm::outs() << producerOp.getName();
-          // llvm::outs() << " --> ";
-          // llvm::outs() << consumerOp->getName();
-          // llvm::outs() << "\n";
 
           SmallVector<Backedge, 2> prevMergeInputBackedges;
           for (CFGLoop *currLoop = consumersInnermostLoop; currLoop != nullptr;

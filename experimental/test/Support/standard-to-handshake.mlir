@@ -16,7 +16,7 @@
 // ^bb2(%y : i32):
 // 	%add2 = arith.addi %y, %cst : i32
 //   %cst2 = arith.constant 38 : i32
-//   %add3 = arith.addi %y, %cst2 : i32
+//   %add3 = arith.addi %cst2, %cst2 : i32
 // 	cf.br ^bb1(%add2 : i32)
 // ^bb3:
 // 	return
@@ -95,3 +95,26 @@ func.func @test6 (%arg0 : i32) {
 ^bb4:
 	return
 }
+
+// func.func @test7 () {
+// 	%cst = arith.constant 1 : i32
+// 	cf.br ^bb1(%cst : i32)
+// ^bb1(%x : i32):
+//   %b = arith.constant 1 : i1
+// 	cf.cond_br %b, ^bb2(%x: i32), ^bb3
+// ^bb2(%y : i32):
+// 	%add2 = arith.addi %x, %x : i32
+// 	cf.br ^bb1(%x : i32)
+// ^bb3:
+// 	return
+// }
+
+// func.func @test8 () {
+// 	%cst = arith.constant 1 : i32
+// 	cf.br ^bb1(%cst : i32)
+// ^bb1(%x : i32):
+// 	cf.br ^bb2(%x: i32)
+// ^bb2(%y : i32):
+// 	%add2 = arith.addi %x, %x : i32
+// 	return
+// }
