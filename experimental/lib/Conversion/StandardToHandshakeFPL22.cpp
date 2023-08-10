@@ -631,9 +631,14 @@ LogicalResult HandshakeLoweringFPL22::handleTokenMissmatch(
 
   // Iterate through all producer-consumer pairs (traversing edges in DFG)
   for (auto &block : r.getBlocks())
-    for (auto &producerOp : block.getOperations())
+    for (auto &producerOp : block.getOperations()) {
+      if (isa<MergeLikeOpInterface>(producerOp))
+        continue;
+
       for (const auto &producerOpResult : producerOp.getResults())
         for (const auto &consumerOp : producerOpResult.getUsers()) {
+          if (isa<MergeLikeOpInterface>(*consumerOp))
+            continue;
 
           // Find common loop for producer's and consumer's blocks
           CFGLoop *producersInnermostLoop =
@@ -656,9 +661,16 @@ LogicalResult HandshakeLoweringFPL22::handleTokenMissmatch(
             // token missmatch
             continue;
 
+          // llvm::outs() << producerOp.getName();
+          // llvm::outs() << " --> ";
+          // llvm::outs() << consumerOp->getName();
+          // llvm::outs() << "\n";
+
           SmallVector<Backedge, 2> prevMergeInputBackedges;
           for (CFGLoop *currLoop = consumersInnermostLoop; currLoop != nullptr;
                currLoop = currLoop->getParentLoop()) {
+
+            // llvm::outs() << "NEW LOOP ITERATION\n";
 
             Block *loopHeader = currLoop->getHeader();
 
@@ -718,18 +730,18 @@ LogicalResult HandshakeLoweringFPL22::handleTokenMissmatch(
             if (prevMergeInputBackedges.size() > 1) {
               Backedge &backedge = prevMergeInputBackedges.front();
               backedge.setValue(mergeOp->getResult(0));
-              prevMergeInputBackedges.pop_back();
+              prevMergeInputBackedges.erase(&backedge);
             }
           }
 
           // Connect producer to last added merge
-          if (prevMergeInputBackedges.size() > 0) {
+          if (!prevMergeInputBackedges.empty()) {
             Backedge &backedge = prevMergeInputBackedges.front();
             backedge.setValue(producerOpResult);
-            prevMergeInputBackedges.pop_back();
+            prevMergeInputBackedges.erase(&backedge);
           }
         }
-
+    }
   return success();
 }
 

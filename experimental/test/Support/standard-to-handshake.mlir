@@ -35,22 +35,22 @@
 // }
 
 
-func.func @test4 () {
-	%b = arith.constant 0 : i1
-  %n = arith.constant 378 : i32
-  %n1 = arith.constant 121378 : i32
-	cf.br ^bb1
-^bb1:
-	cf.br ^bb2(%n : i32)
-^bb2(%n2 : i32):
-  %add = arith.addi %n, %n2 : i32
-  %add2 = arith.addi %n, %n2 : i32
-	cf.cond_br %b, ^bb3(%add: i32), ^bb4
-^bb3(%y : i32):
-	cf.br ^bb2(%n : i32)
-^bb4:
-	return
-}
+// func.func @test4 () {
+// 	%b = arith.constant 0 : i1
+//   %n = arith.constant 378 : i32
+//   %n1 = arith.constant 121378 : i32
+// 	cf.br ^bb1
+// ^bb1:
+// 	cf.br ^bb2(%n : i32)
+// ^bb2(%n2 : i32):
+//   %add = arith.addi %n, %n2 : i32
+//   %add2 = arith.addi %n, %n2 : i32
+// 	cf.cond_br %b, ^bb3(%add: i32), ^bb4
+// ^bb3(%y : i32):
+// 	cf.br ^bb2(%n : i32)
+// ^bb4:
+// 	return
+// }
 
 // func.func @test5() {
 //   // Declare and initialize variables
@@ -76,3 +76,22 @@ func.func @test4 () {
 //     %y_res = arith.addi %y, %z : i32
 //     return
 // }
+
+func.func @test6 () {
+	%b = arith.constant 0 : i1
+  %n = arith.constant 378 : i32
+	cf.br ^bb1
+^bb1:
+  %n1 = arith.constant 121378 : i32
+  %b1 = arith.constant 0 : i1
+	cf.cond_br %b1, ^bb2(%n : i32), ^bb4
+^bb2(%n2 : i32):
+  %add = arith.addi %n, %n2 : i32
+  %add2 = arith.addi %n, %n2 : i32
+  %b2 = arith.constant 0 : i1
+	cf.cond_br %b2, ^bb3(%add: i32), ^bb2(%add2: i32)
+^bb3(%y : i32):
+	cf.br ^bb1
+^bb4:
+	return
+}
