@@ -830,7 +830,7 @@ HandshakeExecuter::HandshakeExecuter(
     auto &execModel = models[opName];
     // Execute handshake operations
     if (execModel) {
-      std::vector<mlir::Value> scheduleList;
+      llvm::SmallVector<mlir::Value> scheduleList;
       if (!execModel.get()->tryExecute(valueMap, memoryMap, timeMap, store,
                                        scheduleList, models, op)) {
         readyList.push_back(&op);

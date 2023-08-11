@@ -32,9 +32,8 @@ using ModelMap =
 
 namespace {
 
-// Convert ValueRange to vectors
-std::vector<Value> toVector(ValueRange range) {
-  return std::vector<Value>(range.begin(), range.end());
+SmallVector<Value> toVector(ValueRange range) {
+  return SmallVector<Value>(range.begin(), range.end());
 }
 
 // Returns whether the precondition holds for a general op to execute
@@ -52,9 +51,8 @@ bool isReadyToExecute(ArrayRef<Value> ins, ArrayRef<Value> outs,
 }
 
 // Fetch values from the value map and consume them
-std::vector<llvm::Any>
-fetchValues(ArrayRef<Value> values,
-            llvm::DenseMap<Value, llvm::Any> &valueMap) {
+std::vector<llvm::Any> fetchValues(ArrayRef<Value> values,
+                                   llvm::DenseMap<Value, llvm::Any> &valueMap) {
   std::vector<llvm::Any> ins;
   for (auto &value : values) {
     assert(valueMap[value].has_value());
@@ -87,8 +85,8 @@ void updateTime(ArrayRef<Value> ins, ArrayRef<Value> outs,
 /// output and do not modify the timeMap or valueMap in a very specific way
 bool tryToExecute(
     circt::Operation *op, llvm::DenseMap<Value, llvm::Any> &valueMap,
-    llvm::DenseMap<Value, double> &timeMap,
-    std::vector<Value> &scheduleList, ModelMap &models,
+    llvm::DenseMap<Value, double> &timeMap, SmallVector<Value> &scheduleList,
+    ModelMap &models,
     const std::function<void(std::vector<llvm::Any> &, std::vector<llvm::Any> &,
                              circt::Operation &)> &executeFunc,
     double latency) {
@@ -102,6 +100,8 @@ bool tryToExecute(
     storeValues(out, outs, valueMap);
     updateTime(ins, outs, timeMap, latency);
     scheduleList = outs;
+    // scheduleList.
+
     return true;
   }
   return false;
@@ -109,7 +109,7 @@ bool tryToExecute(
 
 } // namespace
 
-/* 
+/*
   - 'modelStructuresMap' stores all known models and identifies each structure
       a string name -> any exec model structure
   - 'funcMap' stores the entered configuration, parsed json + --change-model cmd
@@ -162,8 +162,8 @@ bool DefaultFork::tryExecute(llvm::DenseMap<Value, llvm::Any> &valueMap,
                              llvm::DenseMap<unsigned, unsigned> &memoryMap,
                              llvm::DenseMap<Value, double> &timeMap,
                              std::vector<std::vector<llvm::Any>> &store,
-                             std::vector<Value> &scheduleList,
-                             ModelMap &models, circt::Operation &opArg) {
+                             SmallVector<Value> &scheduleList, ModelMap &models,
+                             circt::Operation &opArg) {
 
   auto op = dyn_cast<circt::handshake::ForkOp>(opArg);
   auto executeFunc = [](std::vector<llvm::Any> &ins,
@@ -180,7 +180,7 @@ bool DefaultMerge::tryExecute(llvm::DenseMap<Value, llvm::Any> &valueMap,
                               llvm::DenseMap<unsigned, unsigned> &memoryMap,
                               llvm::DenseMap<Value, double> &timeMap,
                               std::vector<std::vector<llvm::Any>> &store,
-                              std::vector<Value> &scheduleList,
+                              SmallVector<Value> &scheduleList,
                               ModelMap &models, circt::Operation &opArg) {
   auto op = dyn_cast<circt::handshake::MergeOp>(opArg);
   bool found = false;
@@ -209,7 +209,7 @@ bool DefaultControlMerge::tryExecute(
     llvm::DenseMap<unsigned, unsigned> &memoryMap,
     llvm::DenseMap<Value, double> &timeMap,
     std::vector<std::vector<llvm::Any>> &store,
-    std::vector<Value> &scheduleList, ModelMap &models,
+    SmallVector<Value> &scheduleList, ModelMap &models,
     circt::Operation &opArg) {
   auto op = dyn_cast<circt::handshake::ControlMergeOp>(opArg);
   bool found = false;
@@ -239,8 +239,8 @@ bool DefaultMux::tryExecute(llvm::DenseMap<Value, llvm::Any> &valueMap,
                             llvm::DenseMap<unsigned, unsigned> &memoryMap,
                             llvm::DenseMap<Value, double> &timeMap,
                             std::vector<std::vector<llvm::Any>> &store,
-                            std::vector<Value> &scheduleList,
-                            ModelMap &models, circt::Operation &opArg) {
+                            SmallVector<Value> &scheduleList, ModelMap &models,
+                            circt::Operation &opArg) {
   auto op = dyn_cast<circt::handshake::MuxOp>(opArg);
   Value control = op.getSelectOperand();
   if (valueMap.count(control) == 0)
@@ -268,14 +268,12 @@ bool DefaultMux::tryExecute(llvm::DenseMap<Value, llvm::Any> &valueMap,
 }
 
 // Default CIRCT branch
-bool DefaultBranch::tryExecute(
-    llvm::DenseMap<Value, llvm::Any> &valueMap,
-    llvm::DenseMap<unsigned, unsigned> &memoryMap,
-    llvm::DenseMap<Value, double> &timeMap,
-    std::vector<std::vector<llvm::Any>> &store,
-    std::vector<Value> &scheduleList, ModelMap &models,
-    circt::Operation &opArg) { // FAUT TOUT RENAME AAAAA
-
+bool DefaultBranch::tryExecute(llvm::DenseMap<Value, llvm::Any> &valueMap,
+                               llvm::DenseMap<unsigned, unsigned> &memoryMap,
+                               llvm::DenseMap<Value, double> &timeMap,
+                               std::vector<std::vector<llvm::Any>> &store,
+                               SmallVector<Value> &scheduleList,
+                               ModelMap &models, circt::Operation &opArg) {
   llvm::errs() << "[EXECMODELS] in the DEFAULT branch"
                << "\n";
   auto op = dyn_cast<circt::handshake::BranchOp>(opArg);
@@ -292,7 +290,7 @@ bool DefaultConditionalBranch::tryExecute(
     llvm::DenseMap<unsigned, unsigned> &memoryMap,
     llvm::DenseMap<Value, double> &timeMap,
     std::vector<std::vector<llvm::Any>> &store,
-    std::vector<Value> &scheduleList, ModelMap &models,
+    SmallVector<Value> &scheduleList, ModelMap &models,
     circt::Operation &opArg) {
   auto op = dyn_cast<circt::handshake::ConditionalBranchOp>(opArg);
   Value control = op.getConditionOperand();
@@ -305,9 +303,8 @@ bool DefaultConditionalBranch::tryExecute(
     return false;
   auto inValue = valueMap[in];
   auto inTime = timeMap[in];
-  Value out = llvm::any_cast<APInt>(controlValue) != 0
-                        ? op.getTrueResult()
-                        : op.getFalseResult();
+  Value out = llvm::any_cast<APInt>(controlValue) != 0 ? op.getTrueResult()
+                                                       : op.getFalseResult();
   double time = std::max(controlTime, inTime);
   valueMap[out] = inValue;
   timeMap[out] = time;
@@ -324,21 +321,20 @@ bool DefaultSink::tryExecute(llvm::DenseMap<Value, llvm::Any> &valueMap,
                              llvm::DenseMap<unsigned, unsigned> &memoryMap,
                              llvm::DenseMap<Value, double> &timeMap,
                              std::vector<std::vector<llvm::Any>> &store,
-                             std::vector<Value> &scheduleList,
-                             ModelMap &models, circt::Operation &opArg) {
+                             SmallVector<Value> &scheduleList, ModelMap &models,
+                             circt::Operation &opArg) {
   auto op = dyn_cast<circt::handshake::SinkOp>(opArg);
   valueMap.erase(op.getOperand());
   return true;
 }
 
 // Default CIRCT constant
-bool DefaultConstant::tryExecute(
-    llvm::DenseMap<Value, llvm::Any> &valueMap,
-    llvm::DenseMap<unsigned, unsigned> &memoryMap,
-    llvm::DenseMap<Value, double> &timeMap,
-    std::vector<std::vector<llvm::Any>> &store,
-    std::vector<Value> &scheduleList, ModelMap &models,
-    circt::Operation &opArg) {
+bool DefaultConstant::tryExecute(llvm::DenseMap<Value, llvm::Any> &valueMap,
+                                 llvm::DenseMap<unsigned, unsigned> &memoryMap,
+                                 llvm::DenseMap<Value, double> &timeMap,
+                                 std::vector<std::vector<llvm::Any>> &store,
+                                 SmallVector<Value> &scheduleList,
+                                 ModelMap &models, circt::Operation &opArg) {
   auto op = dyn_cast<circt::handshake::ConstantOp>(opArg);
   auto executeFunc = [](std::vector<llvm::Any> &ins,
                         std::vector<llvm::Any> &outs, circt::Operation &op) {
@@ -354,7 +350,7 @@ bool DefaultBuffer::tryExecute(llvm::DenseMap<Value, llvm::Any> &valueMap,
                                llvm::DenseMap<unsigned, unsigned> &memoryMap,
                                llvm::DenseMap<Value, double> &timeMap,
                                std::vector<std::vector<llvm::Any>> &store,
-                               std::vector<Value> &scheduleList,
+                               SmallVector<Value> &scheduleList,
                                ModelMap &models, circt::Operation &opArg) {
   auto op = dyn_cast<circt::handshake::BufferOp>(opArg);
   auto executeFunc = [](std::vector<llvm::Any> &ins,

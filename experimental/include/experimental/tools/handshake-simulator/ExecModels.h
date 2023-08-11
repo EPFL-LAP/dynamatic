@@ -40,7 +40,7 @@ struct ExecutableModel {
                           llvm::DenseMap<unsigned, unsigned> &memoryMap,
                           llvm::DenseMap<mlir::Value, double> &timeMap,
                           std::vector<std::vector<llvm::Any>> &store,
-                          std::vector<mlir::Value> &scheduleList,
+                          llvm::SmallVector<mlir::Value> &scheduleList,
                           ModelMap &models, circt::Operation &op) = 0;
 
   virtual ~ExecutableModel(){};
@@ -57,7 +57,7 @@ struct DefaultFork : public ExecutableModel {
                           llvm::DenseMap<unsigned, unsigned> &memoryMap,
                           llvm::DenseMap<mlir::Value, double> &timeMap,
                           std::vector<std::vector<llvm::Any>> &store,
-                          std::vector<mlir::Value> &scheduleList,
+                          llvm::SmallVector<mlir::Value> &scheduleList,
                           ModelMap &models, circt::Operation &op) override;
 };
 
@@ -66,7 +66,7 @@ struct DefaultMerge : public ExecutableModel {
                   llvm::DenseMap<unsigned, unsigned> &memoryMap,
                   llvm::DenseMap<mlir::Value, double> &timeMap,
                   std::vector<std::vector<llvm::Any>> &store,
-                  std::vector<mlir::Value> &scheduleList, ModelMap &models,
+                  llvm::SmallVector<mlir::Value> &scheduleList, ModelMap &models,
                   circt::Operation &op) override;
 };
 
@@ -75,7 +75,7 @@ struct DefaultControlMerge : public ExecutableModel {
                   llvm::DenseMap<unsigned, unsigned> &memoryMap,
                   llvm::DenseMap<mlir::Value, double> &timeMap,
                   std::vector<std::vector<llvm::Any>> &store,
-                  std::vector<mlir::Value> &scheduleList, ModelMap &models,
+                  llvm::SmallVector<mlir::Value> &scheduleList, ModelMap &models,
                   circt::Operation &op) override;
 };
 
@@ -84,7 +84,7 @@ struct DefaultMux : public ExecutableModel {
                   llvm::DenseMap<unsigned, unsigned> &memoryMap,
                   llvm::DenseMap<mlir::Value, double> &timeMap,
                   std::vector<std::vector<llvm::Any>> &store,
-                  std::vector<mlir::Value> &scheduleList, ModelMap &models,
+                  llvm::SmallVector<mlir::Value> &scheduleList, ModelMap &models,
                   circt::Operation &op) override;
 };
 
@@ -93,7 +93,7 @@ struct DefaultBranch : public ExecutableModel {
                   llvm::DenseMap<unsigned, unsigned> &memoryMap,
                   llvm::DenseMap<mlir::Value, double> &timeMap,
                   std::vector<std::vector<llvm::Any>> &store,
-                  std::vector<mlir::Value> &scheduleList, ModelMap &models,
+                  llvm::SmallVector<mlir::Value> &scheduleList, ModelMap &models,
                   circt::Operation &op) override;
 };
 
@@ -102,7 +102,7 @@ struct DefaultConditionalBranch : public ExecutableModel {
                   llvm::DenseMap<unsigned, unsigned> &memoryMap,
                   llvm::DenseMap<mlir::Value, double> &timeMap,
                   std::vector<std::vector<llvm::Any>> &store,
-                  std::vector<mlir::Value> &scheduleList, ModelMap &models,
+                  llvm::SmallVector<mlir::Value> &scheduleList, ModelMap &models,
                   circt::Operation &op) override;
 };
 
@@ -111,7 +111,7 @@ struct DefaultSink : public ExecutableModel {
                   llvm::DenseMap<unsigned, unsigned> &memoryMap,
                   llvm::DenseMap<mlir::Value, double> &timeMap,
                   std::vector<std::vector<llvm::Any>> &store,
-                  std::vector<mlir::Value> &scheduleList, ModelMap &models,
+                  llvm::SmallVector<mlir::Value> &scheduleList, ModelMap &models,
                   circt::Operation &op) override;
 };
 
@@ -120,7 +120,7 @@ struct DefaultConstant : public ExecutableModel {
                   llvm::DenseMap<unsigned, unsigned> &memoryMap,
                   llvm::DenseMap<mlir::Value, double> &timeMap,
                   std::vector<std::vector<llvm::Any>> &store,
-                  std::vector<mlir::Value> &scheduleList, ModelMap &models,
+                  llvm::SmallVector<mlir::Value> &scheduleList, ModelMap &models,
                   circt::Operation &op) override;
 };
 
@@ -129,7 +129,7 @@ struct DefaultBuffer : public ExecutableModel {
                   llvm::DenseMap<unsigned, unsigned> &memoryMap,
                   llvm::DenseMap<mlir::Value, double> &timeMap,
                   std::vector<std::vector<llvm::Any>> &store,
-                  std::vector<mlir::Value> &scheduleList, ModelMap &models,
+                  llvm::SmallVector<mlir::Value> &scheduleList, ModelMap &models,
                   circt::Operation &op) override;
 };
 
