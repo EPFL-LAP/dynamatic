@@ -17,6 +17,7 @@
 #include "llvm/ADT/Any.h"
 #include "llvm/Support/Debug.h"
 
+using namespace mlir;
 using namespace circt;
 using namespace dynamatic::experimental;
 
@@ -32,13 +33,13 @@ using ModelMap =
 namespace {
 
 // Convert ValueRange to vectors
-std::vector<mlir::Value> toVector(mlir::ValueRange range) {
-  return std::vector<mlir::Value>(range.begin(), range.end());
+std::vector<Value> toVector(ValueRange range) {
+  return std::vector<Value>(range.begin(), range.end());
 }
 
 // Returns whether the precondition holds for a general op to execute
-bool isReadyToExecute(ArrayRef<mlir::Value> ins, ArrayRef<mlir::Value> outs,
-                      llvm::DenseMap<mlir::Value, llvm::Any> &valueMap) {
+bool isReadyToExecute(ArrayRef<Value> ins, ArrayRef<Value> outs,
+                      llvm::DenseMap<Value, llvm::Any> &valueMap) {
   for (auto in : ins)
     if (valueMap.count(in) == 0)
       return false;
@@ -52,8 +53,8 @@ bool isReadyToExecute(ArrayRef<mlir::Value> ins, ArrayRef<mlir::Value> outs,
 
 // Fetch values from the value map and consume them
 std::vector<llvm::Any>
-fetchValues(ArrayRef<mlir::Value> values,
-            llvm::DenseMap<mlir::Value, llvm::Any> &valueMap) {
+fetchValues(ArrayRef<Value> values,
+            llvm::DenseMap<Value, llvm::Any> &valueMap) {
   std::vector<llvm::Any> ins;
   for (auto &value : values) {
     assert(valueMap[value].has_value());
@@ -64,16 +65,16 @@ fetchValues(ArrayRef<mlir::Value> values,
 }
 
 // Store values to the value map
-void storeValues(std::vector<llvm::Any> &values, ArrayRef<mlir::Value> outs,
-                 llvm::DenseMap<mlir::Value, llvm::Any> &valueMap) {
+void storeValues(std::vector<llvm::Any> &values, ArrayRef<Value> outs,
+                 llvm::DenseMap<Value, llvm::Any> &valueMap) {
   assert(values.size() == outs.size());
   for (unsigned long i = 0; i < outs.size(); ++i)
     valueMap[outs[i]] = values[i];
 }
 
 // Update the time map after the execution
-void updateTime(ArrayRef<mlir::Value> ins, ArrayRef<mlir::Value> outs,
-                llvm::DenseMap<mlir::Value, double> &timeMap, double latency) {
+void updateTime(ArrayRef<Value> ins, ArrayRef<Value> outs,
+                llvm::DenseMap<Value, double> &timeMap, double latency) {
   double time = 0;
   for (auto &in : ins)
     time = std::max(time, timeMap[in]);
@@ -85,9 +86,9 @@ void updateTime(ArrayRef<mlir::Value> ins, ArrayRef<mlir::Value> outs,
 /// Wrapper method for constant time simple operations that just update the
 /// output and do not modify the timeMap or valueMap in a very specific way
 bool tryToExecute(
-    circt::Operation *op, llvm::DenseMap<mlir::Value, llvm::Any> &valueMap,
-    llvm::DenseMap<mlir::Value, double> &timeMap,
-    std::vector<mlir::Value> &scheduleList, ModelMap &models,
+    circt::Operation *op, llvm::DenseMap<Value, llvm::Any> &valueMap,
+    llvm::DenseMap<Value, double> &timeMap,
+    std::vector<Value> &scheduleList, ModelMap &models,
     const std::function<void(std::vector<llvm::Any> &, std::vector<llvm::Any> &,
                              circt::Operation &)> &executeFunc,
     double latency) {
@@ -108,20 +109,13 @@ bool tryToExecute(
 
 } // namespace
 
-/* MAYBE REMOVE THIS COMM, CURRENTLY HERE TO CLARIFY PR
+/* 
   - 'modelStructuresMap' stores all known models and identifies each structure
       a string name -> any exec model structure
   - 'funcMap' stores the entered configuration, parsed json + --change-model cmd
       mlir operation name -> string name correspond to a exec model struct
   - 'models' links both maps, so the configuration and all known models
       mlir operation name -> configurated exec model structure
-
-  This allows user to change its models by command or configuration file,
-  with the only re-compilation being the one when he adds the structure
-  and inserts it in the modelStructuresMap. There could be a better way to do it
-  but this one allows dynamic changes.
-
-  modelStructuresMap is the only piece of code the user needs to touch here.
 */
 bool dynamatic::experimental::initialiseMap(
     llvm::StringMap<std::string> &funcMap, ModelMap &models) {
@@ -131,24 +125,17 @@ bool dynamatic::experimental::initialiseMap(
   // ------------------------------------------------------------------------ //
   //   ADD YOUR STRUCT TO THE BELOW MAP IF YOU WANT TO ADD EXECUTION MODELS   //
   // ------------------------------------------------------------------------ //
-  modelStructuresMap["defaultFork"] =
-      std::unique_ptr<ExecutableModel>(new DefaultFork);
-  modelStructuresMap["defaultMerge"] =
-      std::unique_ptr<ExecutableModel>(new DefaultMerge);
-  modelStructuresMap["defaultControlMerge"] =
-      std::unique_ptr<ExecutableModel>(new DefaultControlMerge);
-  modelStructuresMap["defaultMux"] =
-      std::unique_ptr<ExecutableModel>(new DefaultMux);
-  modelStructuresMap["defaultBranch"] =
-      std::unique_ptr<ExecutableModel>(new DefaultBranch);
+  modelStructuresMap["defaultFork"] = std::make_unique<DefaultFork>();
+  modelStructuresMap["defaultMerge"] = std::make_unique<DefaultMerge>();
+  modelStructuresMap["defaultMux"] = std::make_unique<DefaultMux>();
+  modelStructuresMap["defaultBranch"] = std::make_unique<DefaultBranch>();
+  modelStructuresMap["defaultSink"] = std::make_unique<DefaultSink>();
+  modelStructuresMap["defaultConstant"] = std::make_unique<DefaultConstant>();
+  modelStructuresMap["defaultBuffer"] = std::make_unique<DefaultBuffer>();
   modelStructuresMap["defaultConditionalBranch"] =
-      std::unique_ptr<ExecutableModel>(new DefaultConditionalBranch);
-  modelStructuresMap["defaultSink"] =
-      std::unique_ptr<ExecutableModel>(new DefaultSink);
-  modelStructuresMap["defaultConstant"] =
-      std::unique_ptr<ExecutableModel>(new DefaultConstant);
-  modelStructuresMap["defaultBuffer"] =
-      std::unique_ptr<ExecutableModel>(new DefaultBuffer);
+      std::make_unique<DefaultConditionalBranch>();
+  modelStructuresMap["defaultControlMerge"] =
+      std::make_unique<DefaultControlMerge>();
   // ------------------------------------------------------------------------ //
   //   ADD YOUR STRUCT TO THE ABOVE MAP IF YOU WANT TO ADD EXECUTION MODELS   //
   // ------------------------------------------------------------------------ //
@@ -171,11 +158,11 @@ namespace dynamatic {
 namespace experimental {
 
 // Default CIRCT fork
-bool DefaultFork::tryExecute(llvm::DenseMap<mlir::Value, llvm::Any> &valueMap,
+bool DefaultFork::tryExecute(llvm::DenseMap<Value, llvm::Any> &valueMap,
                              llvm::DenseMap<unsigned, unsigned> &memoryMap,
-                             llvm::DenseMap<mlir::Value, double> &timeMap,
+                             llvm::DenseMap<Value, double> &timeMap,
                              std::vector<std::vector<llvm::Any>> &store,
-                             std::vector<mlir::Value> &scheduleList,
+                             std::vector<Value> &scheduleList,
                              ModelMap &models, circt::Operation &opArg) {
 
   auto op = dyn_cast<circt::handshake::ForkOp>(opArg);
@@ -189,15 +176,15 @@ bool DefaultFork::tryExecute(llvm::DenseMap<mlir::Value, llvm::Any> &valueMap,
 }
 
 // Default CIRCT merge
-bool DefaultMerge::tryExecute(llvm::DenseMap<mlir::Value, llvm::Any> &valueMap,
+bool DefaultMerge::tryExecute(llvm::DenseMap<Value, llvm::Any> &valueMap,
                               llvm::DenseMap<unsigned, unsigned> &memoryMap,
-                              llvm::DenseMap<mlir::Value, double> &timeMap,
+                              llvm::DenseMap<Value, double> &timeMap,
                               std::vector<std::vector<llvm::Any>> &store,
-                              std::vector<mlir::Value> &scheduleList,
+                              std::vector<Value> &scheduleList,
                               ModelMap &models, circt::Operation &opArg) {
   auto op = dyn_cast<circt::handshake::MergeOp>(opArg);
   bool found = false;
-  for (mlir::Value in : op.getOperands()) {
+  for (Value in : op.getOperands()) {
     if (valueMap.count(in) == 1) {
       if (found)
         op.emitOpError("More than one valid input to Merge!");
@@ -218,11 +205,11 @@ bool DefaultMerge::tryExecute(llvm::DenseMap<mlir::Value, llvm::Any> &valueMap,
 
 // Default CIRCT control merge
 bool DefaultControlMerge::tryExecute(
-    llvm::DenseMap<mlir::Value, llvm::Any> &valueMap,
+    llvm::DenseMap<Value, llvm::Any> &valueMap,
     llvm::DenseMap<unsigned, unsigned> &memoryMap,
-    llvm::DenseMap<mlir::Value, double> &timeMap,
+    llvm::DenseMap<Value, double> &timeMap,
     std::vector<std::vector<llvm::Any>> &store,
-    std::vector<mlir::Value> &scheduleList, ModelMap &models,
+    std::vector<Value> &scheduleList, ModelMap &models,
     circt::Operation &opArg) {
   auto op = dyn_cast<circt::handshake::ControlMergeOp>(opArg);
   bool found = false;
@@ -248,14 +235,14 @@ bool DefaultControlMerge::tryExecute(
 }
 
 // Default CIRCT mux
-bool DefaultMux::tryExecute(llvm::DenseMap<mlir::Value, llvm::Any> &valueMap,
+bool DefaultMux::tryExecute(llvm::DenseMap<Value, llvm::Any> &valueMap,
                             llvm::DenseMap<unsigned, unsigned> &memoryMap,
-                            llvm::DenseMap<mlir::Value, double> &timeMap,
+                            llvm::DenseMap<Value, double> &timeMap,
                             std::vector<std::vector<llvm::Any>> &store,
-                            std::vector<mlir::Value> &scheduleList,
+                            std::vector<Value> &scheduleList,
                             ModelMap &models, circt::Operation &opArg) {
   auto op = dyn_cast<circt::handshake::MuxOp>(opArg);
-  mlir::Value control = op.getSelectOperand();
+  Value control = op.getSelectOperand();
   if (valueMap.count(control) == 0)
     return false;
   auto controlValue = valueMap[control];
@@ -264,7 +251,7 @@ bool DefaultMux::tryExecute(llvm::DenseMap<mlir::Value, llvm::Any> &valueMap,
   assert(opIdx < op.getDataOperands().size() &&
          "Trying to select a non-existing mux operand");
 
-  mlir::Value in = op.getDataOperands()[opIdx];
+  Value in = op.getDataOperands()[opIdx];
   if (valueMap.count(in) == 0)
     return false;
   auto inValue = valueMap[in];
@@ -282,11 +269,11 @@ bool DefaultMux::tryExecute(llvm::DenseMap<mlir::Value, llvm::Any> &valueMap,
 
 // Default CIRCT branch
 bool DefaultBranch::tryExecute(
-    llvm::DenseMap<mlir::Value, llvm::Any> &valueMap,
+    llvm::DenseMap<Value, llvm::Any> &valueMap,
     llvm::DenseMap<unsigned, unsigned> &memoryMap,
-    llvm::DenseMap<mlir::Value, double> &timeMap,
+    llvm::DenseMap<Value, double> &timeMap,
     std::vector<std::vector<llvm::Any>> &store,
-    std::vector<mlir::Value> &scheduleList, ModelMap &models,
+    std::vector<Value> &scheduleList, ModelMap &models,
     circt::Operation &opArg) { // FAUT TOUT RENAME AAAAA
 
   llvm::errs() << "[EXECMODELS] in the DEFAULT branch"
@@ -301,24 +288,24 @@ bool DefaultBranch::tryExecute(
 
 // Default CIRCT conditional branch
 bool DefaultConditionalBranch::tryExecute(
-    llvm::DenseMap<mlir::Value, llvm::Any> &valueMap,
+    llvm::DenseMap<Value, llvm::Any> &valueMap,
     llvm::DenseMap<unsigned, unsigned> &memoryMap,
-    llvm::DenseMap<mlir::Value, double> &timeMap,
+    llvm::DenseMap<Value, double> &timeMap,
     std::vector<std::vector<llvm::Any>> &store,
-    std::vector<mlir::Value> &scheduleList, ModelMap &models,
+    std::vector<Value> &scheduleList, ModelMap &models,
     circt::Operation &opArg) {
   auto op = dyn_cast<circt::handshake::ConditionalBranchOp>(opArg);
-  mlir::Value control = op.getConditionOperand();
+  Value control = op.getConditionOperand();
   if (valueMap.count(control) == 0)
     return false;
   auto controlValue = valueMap[control];
   auto controlTime = timeMap[control];
-  mlir::Value in = op.getDataOperand();
+  Value in = op.getDataOperand();
   if (valueMap.count(in) == 0)
     return false;
   auto inValue = valueMap[in];
   auto inTime = timeMap[in];
-  mlir::Value out = llvm::any_cast<APInt>(controlValue) != 0
+  Value out = llvm::any_cast<APInt>(controlValue) != 0
                         ? op.getTrueResult()
                         : op.getFalseResult();
   double time = std::max(controlTime, inTime);
@@ -333,11 +320,11 @@ bool DefaultConditionalBranch::tryExecute(
 }
 
 // Default CIRCT sink
-bool DefaultSink::tryExecute(llvm::DenseMap<mlir::Value, llvm::Any> &valueMap,
+bool DefaultSink::tryExecute(llvm::DenseMap<Value, llvm::Any> &valueMap,
                              llvm::DenseMap<unsigned, unsigned> &memoryMap,
-                             llvm::DenseMap<mlir::Value, double> &timeMap,
+                             llvm::DenseMap<Value, double> &timeMap,
                              std::vector<std::vector<llvm::Any>> &store,
-                             std::vector<mlir::Value> &scheduleList,
+                             std::vector<Value> &scheduleList,
                              ModelMap &models, circt::Operation &opArg) {
   auto op = dyn_cast<circt::handshake::SinkOp>(opArg);
   valueMap.erase(op.getOperand());
@@ -346,16 +333,16 @@ bool DefaultSink::tryExecute(llvm::DenseMap<mlir::Value, llvm::Any> &valueMap,
 
 // Default CIRCT constant
 bool DefaultConstant::tryExecute(
-    llvm::DenseMap<mlir::Value, llvm::Any> &valueMap,
+    llvm::DenseMap<Value, llvm::Any> &valueMap,
     llvm::DenseMap<unsigned, unsigned> &memoryMap,
-    llvm::DenseMap<mlir::Value, double> &timeMap,
+    llvm::DenseMap<Value, double> &timeMap,
     std::vector<std::vector<llvm::Any>> &store,
-    std::vector<mlir::Value> &scheduleList, ModelMap &models,
+    std::vector<Value> &scheduleList, ModelMap &models,
     circt::Operation &opArg) {
   auto op = dyn_cast<circt::handshake::ConstantOp>(opArg);
   auto executeFunc = [](std::vector<llvm::Any> &ins,
                         std::vector<llvm::Any> &outs, circt::Operation &op) {
-    auto attr = op.getAttrOfType<mlir::IntegerAttr>("value");
+    auto attr = op.getAttrOfType<IntegerAttr>("value");
     outs[0] = attr.getValue();
   };
   return tryToExecute(op.getOperation(), valueMap, timeMap, scheduleList,
@@ -363,11 +350,11 @@ bool DefaultConstant::tryExecute(
 }
 
 // Default CIRCT buffer
-bool DefaultBuffer::tryExecute(llvm::DenseMap<mlir::Value, llvm::Any> &valueMap,
+bool DefaultBuffer::tryExecute(llvm::DenseMap<Value, llvm::Any> &valueMap,
                                llvm::DenseMap<unsigned, unsigned> &memoryMap,
-                               llvm::DenseMap<mlir::Value, double> &timeMap,
+                               llvm::DenseMap<Value, double> &timeMap,
                                std::vector<std::vector<llvm::Any>> &store,
-                               std::vector<mlir::Value> &scheduleList,
+                               std::vector<Value> &scheduleList,
                                ModelMap &models, circt::Operation &opArg) {
   auto op = dyn_cast<circt::handshake::BufferOp>(opArg);
   auto executeFunc = [](std::vector<llvm::Any> &ins,
