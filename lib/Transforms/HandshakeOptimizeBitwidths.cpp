@@ -32,6 +32,7 @@
 #include "dynamatic/Transforms/HandshakeOptimizeBitwidths.h"
 #include "circt/Dialect/Handshake/HandshakeOps.h"
 #include "dynamatic/Support/LogicBB.h"
+#include "dynamatic/Transforms/HandshakeMinimizeCstWidth.h"
 #include "mlir/Dialect/Arith/IR/Arith.h"
 #include "mlir/IR/MLIRContext.h"
 #include "mlir/Transforms/GreedyPatternRewriteDriver.h"
@@ -971,6 +972,122 @@ struct ArithCmpFW : public OpRewritePattern<arith::CmpIOp> {
   }
 };
 
+/// Optimizes an IR pattern where a comparison between a number and a constant
+/// is used to make a control flow decision. Depending on the branch outcome, it
+/// is possible to truncate one of the Handshake::ConditionalBranchOp's output
+/// to the bitwidth required by the constant involved in the comparison. This is
+/// a pattern present in loops whose exist condition is a comparison with a
+/// constant, and allows to reduce the bitwidth of the loop iterator in those
+/// cases.
+/// NOTE: behavior will likely be incorrect when the number that is being
+/// compared with the constant can be negative
+struct BoundOptimization
+    : public OpRewritePattern<handshake::ConditionalBranchOp> {
+  using OpRewritePattern<handshake::ConditionalBranchOp>::OpRewritePattern;
+
+  LogicalResult matchAndRewrite(handshake::ConditionalBranchOp condOp,
+                                PatternRewriter &rewriter) const override {
+    // The data type must be optimizable
+    Value dataOperand = condOp.getDataOperand();
+    if (!isValidType(dataOperand.getType()))
+      return failure();
+
+    // The condition operand must originate from a comparison operation
+    Value condOperand = condOp.getConditionOperand();
+    Operation *condDefOp = condOperand.getDefiningOp();
+    if (!condDefOp)
+      return failure();
+    arith::CmpIOp cmpOp = dyn_cast<arith::CmpIOp>(condDefOp);
+    if (!cmpOp)
+      return failure();
+
+    // One of the operands to the comparison must be a constant
+    auto checkCmpOperand = [&](Value value) -> std::optional<int64_t> {
+      if (Operation *defOp = value.getDefiningOp())
+        if (auto cstOp = dyn_cast<handshake::ConstantOp>(defOp))
+          return cast<IntegerAttr>(cstOp.getValue()).getInt();
+      return std::nullopt;
+    };
+    bool isConstantLhs = false;
+    int64_t cstValue;
+    Value otherCmpValue;
+    Value minLhs = getMinimalValue(cmpOp.getLhs());
+    Value minRhs = getMinimalValue(cmpOp.getRhs());
+    if (auto lhsCst = checkCmpOperand(minLhs); lhsCst.has_value()) {
+      isConstantLhs = true;
+      cstValue = lhsCst.value();
+      otherCmpValue = minRhs;
+    } else if (auto rhsCst = checkCmpOperand(minRhs); rhsCst.has_value()) {
+      cstValue = rhsCst.value();
+      otherCmpValue = cmpOp.getLhs();
+    } else
+      return failure();
+
+    // The other comparison operand must match the data input to the branch
+    if (dataOperand != otherCmpValue)
+      return failure();
+
+    Value branchOpt;
+    unsigned optWidth;
+    APInt cst(64, cstValue, true);
+    APInt cstDec(64, cstValue - 1, true);
+    Value falseRes = condOp.getFalseResult(), trueRes = condOp.getTrueResult();
+
+    // Identify which branch can be optimized and by how much with respect to
+    // the comparison op and side of the constant
+    switch (cmpOp.getPredicate()) {
+    case arith::CmpIPredicate::eq:
+      // C == X
+      branchOpt = trueRes;
+      optWidth = computeRequiredBitwidth(cst);
+      break;
+    case arith::CmpIPredicate::ne:
+      // C != X
+      branchOpt = falseRes;
+      optWidth = computeRequiredBitwidth(cst);
+      break;
+    case arith::CmpIPredicate::slt:
+    case arith::CmpIPredicate::ult:
+      // CST < X / X < CST
+      branchOpt = isConstantLhs ? falseRes : trueRes;
+      optWidth = computeRequiredBitwidth(isConstantLhs ? cst : cstDec);
+      break;
+    case arith::CmpIPredicate::sle:
+    case arith::CmpIPredicate::ule:
+      // CST <= X / X <= CST
+      branchOpt = isConstantLhs ? falseRes : trueRes;
+      optWidth = computeRequiredBitwidth(isConstantLhs ? cstDec : cst);
+      break;
+    case arith::CmpIPredicate::sgt:
+    case arith::CmpIPredicate::ugt:
+      // CST > X / X > CST
+      branchOpt = isConstantLhs ? trueRes : falseRes;
+      optWidth = computeRequiredBitwidth(isConstantLhs ? cstDec : cst);
+      break;
+    case arith::CmpIPredicate::sge:
+    case arith::CmpIPredicate::uge:
+      // CST >= X / X >= CST
+      branchOpt = isConstantLhs ? trueRes : falseRes;
+      optWidth = computeRequiredBitwidth(isConstantLhs ? cst : cstDec);
+      break;
+    }
+
+    // Check whether we will get any benefit from the optimization
+    unsigned dataWidth = getUsefulResultWidth(branchOpt);
+    if (optWidth >= dataWidth)
+      return failure();
+
+    // Insert a truncation operation and an extension between the result branch
+    // to optimize and its users, to let the rest of the rewrite patterns know
+    // that some bits of the value can be safely discarded
+    rewriter.setInsertionPointAfter(condOp);
+    Value truncVal = modVal({branchOpt, ExtType::UNKNOWN}, optWidth, rewriter);
+    Value extVal = modVal({truncVal, ExtType::UNKNOWN}, dataWidth, rewriter);
+    rewriter.replaceAllUsesExcept(branchOpt, extVal, truncVal.getDefiningOp());
+    return success();
+  }
+};
+
 } // namespace
 
 //===----------------------------------------------------------------------===//
@@ -1098,7 +1215,7 @@ void HandshakeOptimizeBitwidthsPass::addForwardPatterns(
       .add<ArithSingleType<arith::DivUIOp>, ArithSingleType<arith::DivSIOp>,
            ArithSingleType<arith::RemUIOp>, ArithSingleType<arith::RemSIOp>>(
           true, divWidth, ctx);
-  fwPatterns.add<ArithCmpFW>(ctx);
+  fwPatterns.add<ArithCmpFW, BoundOptimization>(ctx);
 }
 
 void HandshakeOptimizeBitwidthsPass::addBackwardPatterns(
