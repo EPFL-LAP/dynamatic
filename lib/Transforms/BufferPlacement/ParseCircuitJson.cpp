@@ -51,7 +51,7 @@ getBitWidthMatchedTimeInfo(unsigned bitWidth,
       return opDelay;
 
   // return the delay of the largest bitwidth
-  return timeInfo.end()->second;
+  return (timeInfo.end() - 1)->second;
 }
 
 double buffer::getPortDelay(Value channel,
@@ -112,7 +112,9 @@ buffer::getCombinationalDelay(Operation *op,
   double outPortDelay = 0.0;
   double unitDelay = getUnitDelay(op, unitInfo, type);
 
-  unsigned unitBitWidth = getPortWidth(op->getOperand(0));
+  unsigned unitBitWidth = 1;
+  for (auto operand : op->getOperands())
+    unitBitWidth = std::max(unitBitWidth, getPortWidth(operand));
 
   if (type == "data") {
     inPortDelay = getBitWidthMatchedTimeInfo(unitBitWidth,
@@ -172,7 +174,7 @@ buffer::setChannelBufProps(std::vector<Value> &channels,
 
     if (isa<handshake::MemoryControllerOp>(srcOp) ||
         isa<handshake::MemoryControllerOp>(dstOp)) {
-      ChannelBufProps[ch].minOpaque = 0;
+      ChannelBufProps[ch].maxOpaque = 0;
       ChannelBufProps[ch].maxTrans = 0;
     }
 

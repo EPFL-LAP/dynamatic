@@ -37,6 +37,20 @@ unsigned buffer::getPortInd(Operation *op, Value val) {
   return UINT_MAX;
 }
 
+/// Whether the path is considered to be covered in path and elasticity
+/// constraints. Current version only consider mem_controller, future version
+/// should take account of lsq and more operations.
+static bool coverPath(Value channel) {
+  Operation *srcOp = channel.getDefiningOp();
+  Operation *dstOp = *(channel.getUsers().begin());
+  // If both src operation and dst operation exist, and neither of them is
+  // memory controller unit, the channel is covered.
+  if (srcOp && dstOp)
+    if (isa<MemoryControllerOp>(srcOp) || isa<MemoryControllerOp>(dstOp))
+      return false;
+  return true;
+}
+
 #ifndef DYNAMATIC_GUROBI_NOT_INSTALLED
 /// Initialize the variables in the MILP model
 static void
@@ -177,14 +191,10 @@ static void createModelPathConstraints(
   for (Value ch : allChannels) {
     // update the model to get the lower bound and upper bound of the vars
     modelBuf.update();
-    if (!channelVars.contains(ch))
+    if (!channelVars.contains(ch) || !coverPath(ch))
       continue;
 
     auto chVars = channelVars[ch];
-    // place buffers if maxinum buffer slots is larger then 0 and the channel
-    // is selected
-    if (chVars.bufNSlots.get(GRB_DoubleAttr_UB) <= 0)
-      continue;
 
     GRBVar &t1 = chVars.tDataIn;
     GRBVar &t2 = chVars.tDataOut;
@@ -196,6 +206,7 @@ static void createModelPathConstraints(
   // Units constraints
   for (auto &op : funcOp.getOps()) {
     double delayData = getCombinationalDelay(&op, unitInfo, "data");
+
     double latency = getUnitLatency(&op, unitInfo);
     if (latency == 0)
       // iterate all input port to all output port for a unit
@@ -251,14 +262,10 @@ static void createModelElasticityConstraints(
   for (Value ch : allChannels) {
     // update the model to get the lower bound and upper bound of the vars
     modelBuf.update();
-    if (!channelVars.contains(ch))
+    if (!channelVars.contains(ch) || !coverPath(ch))
       continue;
 
     auto chVars = channelVars[ch];
-    // place buffers if maxinum buffer slots is larger then 0 and the channel
-    // is selected
-    if (chVars.bufNSlots.get(GRB_DoubleAttr_UB) <= 0)
-      continue;
 
     GRBVar &tElas1 = chVars.tElasIn;
     GRBVar &tElas2 = chVars.tElasOut;
@@ -295,20 +302,19 @@ static void createModelElasticityConstraints(
 static void createModelThrptConstraints(
     GRBModel &modelBuf, std::vector<GRBVar> &circtThrpt,
     std::vector<DenseMap<Value, GRBVar>> &chThrptToks,
-    std::vector<Value> &allChannels, DenseMap<Value, ChannelVar> &channelVars,
+    std::vector<CFDFC> &cfdfcList, DenseMap<Value, ChannelVar> &channelVars,
     std::vector<DenseMap<Operation *, UnitVar>> &unitVars,
     std::map<std::string, UnitInfo> &unitInfo) {
   for (auto [ind, subMG] : llvm::enumerate(chThrptToks)) {
-    for (auto &[ch, thrptTok] : subMG) {
+    for (auto ch : cfdfcList[ind].channels) {
 
-      // for (Value ch : allChannels) {
-      // if (!subMG.contains(ch))
-      //   continue;
+      if (!subMG.contains(ch))
+        continue;
 
       Operation *srcOp = ch.getDefiningOp();
       Operation *dstOp = *(ch.getUsers().begin());
 
-      // GRBVar &thrptTok = subMG[ch];
+      GRBVar &thrptTok = subMG[ch];
       int tok = isBackEdge(srcOp, dstOp) ? 1 : 0;
       GRBVar &retSrc = unitVars[ind][srcOp].retOut;
       GRBVar &retDst = unitVars[ind][dstOp].retIn;
@@ -343,17 +349,17 @@ setCustomizedConstraints(GRBModel &modelBuf,
       modelBuf.addConstr(chVars.bufIsOp >= 0);
     } else if (channelBufProps[ch].minTrans > 0) {
       modelBuf.addConstr(chVars.bufNSlots >= channelBufProps[ch].minTrans);
-      modelBuf.addConstr(chVars.bufIsOp <= 0);
+      // modelBuf.addConstr(chVars.bufIsOp <= 0);
     }
 
     // set max value of the buffer
     if (channelBufProps[ch].maxOpaque.has_value())
-      channelVars[ch].bufNSlots.set(GRB_DoubleAttr_UB,
-                                    channelBufProps[ch].maxOpaque.value());
+      modelBuf.addConstr(chVars.bufNSlots <=
+                         channelBufProps[ch].maxOpaque.value());
 
     if (channelBufProps[ch].maxTrans.has_value())
-      channelVars[ch].bufNSlots.set(GRB_DoubleAttr_UB,
-                                    channelBufProps[ch].maxTrans.value());
+      modelBuf.addConstr(chVars.bufNSlots <=
+                         channelBufProps[ch].maxTrans.value());
   }
   for (auto &[ch, result] : res) {
     modelBuf.addConstr(channelVars[ch].bufNSlots >= res[ch].numSlots);
@@ -394,8 +400,8 @@ static void createModelObjective(GRBModel &modelBuf,
 LogicalResult buffer::placeBufferInCFDFCircuit(
     DenseMap<Value, Result> &res, handshake::FuncOp &funcOp,
     std::vector<Value> &allChannels, std::vector<CFDFC> &cfdfcList,
-    std::vector<unsigned> &cfdfcInds, double targetCP,
-    std::map<std::string, UnitInfo> &unitInfo,
+    std::vector<unsigned> &cfdfcInds, double targetCP, int timeLimit,
+    bool setCustom, std::map<std::string, UnitInfo> &unitInfo,
     DenseMap<Value, ChannelBufProps> &channelBufProps) {
 
 #ifdef DYNAMATIC_GUROBI_NOT_INSTALLED
@@ -434,7 +440,8 @@ LogicalResult buffer::placeBufferInCFDFCircuit(
                  chThrptToks, channelVars, unitInfo);
 
   // define customized constraints
-  setCustomizedConstraints(modelBuf, channelVars, channelBufProps, res);
+  if (setCustom)
+    setCustomizedConstraints(modelBuf, channelVars, channelBufProps, res);
 
   // create circuits constraints
   createModelPathConstraints(modelBuf, targetCP, funcOp, allChannels,
@@ -443,16 +450,22 @@ LogicalResult buffer::placeBufferInCFDFCircuit(
   createModelElasticityConstraints(modelBuf, targetCP, funcOp, allChannels,
                                    unitNum, channelVars, unitInfo);
 
-  createModelThrptConstraints(modelBuf, circtThrpts, chThrptToks, allChannels,
+  createModelThrptConstraints(modelBuf, circtThrpts, chThrptToks, cfdfcList,
                               channelVars, unitVars, unitInfo);
 
   // create cost function
   createModelObjective(modelBuf, circtThrpts, cfdfcList, channelVars);
 
+  modelBuf.getEnv().set(GRB_DoubleParam_TimeLimit, timeLimit);
   modelBuf.optimize();
 
-  if (modelBuf.get(GRB_IntAttr_Status) != GRB_OPTIMAL ||
-      circtThrpts[cfdfcInds[0]].get(GRB_DoubleAttr_X) <= 0) {
+  //  The result is optimal if the model is solved to optimality or the time
+  //  limit and obtain position throughput
+  bool isOptimal = (modelBuf.get(GRB_IntAttr_Status) == GRB_OPTIMAL) ||
+                   (modelBuf.get(GRB_IntAttr_Status) == GRB_TIME_LIMIT &&
+                    modelBuf.get(GRB_DoubleAttr_ObjVal) > 0);
+
+  if (!isOptimal) {
     llvm::errs() << "no optimal sol\n";
     return failure();
   }

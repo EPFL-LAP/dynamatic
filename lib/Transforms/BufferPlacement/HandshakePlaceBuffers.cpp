@@ -116,11 +116,14 @@ struct HandshakePlaceBuffersPass
     : public HandshakePlaceBuffersBase<HandshakePlaceBuffersPass> {
 
   HandshakePlaceBuffersPass(bool firstMG, std::string stdLevelInfo,
-                            std::string timefile, double targetCP) {
+                            std::string timefile, double targetCP,
+                            int timeLimit, bool setCustom) {
     this->firstMG = firstMG;
     this->stdLevelInfo = stdLevelInfo;
     this->timefile = timefile;
     this->targetCP = targetCP;
+    this->timeLimit = timeLimit;
+    this->setCustom = setCustom;
   }
 
   void runOnOperation() override {
@@ -209,8 +212,8 @@ LogicalResult HandshakePlaceBuffersPass::insertBuffers(FuncOp &funcOp,
   DenseMap<Value, Result> insertBufResult;
 
   if (failed(placeBufferInCFDFCircuit(insertBufResult, funcOp, allChannels,
-                                      cfdfcList, cfdfcInds, targetCP, unitInfo,
-                                      channelBufProps)))
+                                      cfdfcList, cfdfcInds, targetCP, timeLimit,
+                                      setCustom, unitInfo, channelBufProps)))
     return failure();
 
   if (failed(instantiateBuffers(insertBufResult, ctx)))
@@ -224,7 +227,8 @@ std::unique_ptr<mlir::OperationPass<mlir::ModuleOp>>
 dynamatic::createHandshakePlaceBuffersPass(bool firstMG,
                                            std::string stdLevelInfo,
                                            std::string timefile,
-                                           double targetCP) {
-  return std::make_unique<HandshakePlaceBuffersPass>(firstMG, stdLevelInfo,
-                                                     timefile, targetCP);
+                                           double targetCP, int timeLimit,
+                                           bool setCustom) {
+  return std::make_unique<HandshakePlaceBuffersPass>(
+      firstMG, stdLevelInfo, timefile, targetCP, timeLimit, setCustom);
 }

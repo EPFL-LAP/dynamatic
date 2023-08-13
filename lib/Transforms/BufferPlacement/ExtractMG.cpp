@@ -214,7 +214,8 @@ bool buffer::isBackEdge(Operation *opSrc, Operation *opDst) {
     return true;
   if (isa<BranchOp, ConditionalBranchOp>(opSrc) &&
       isa<MuxOp, MergeOp, ControlMergeOp>(opDst))
-    return true;
+    return getBBIndex(opSrc) >= getBBIndex(opDst);
+
   return false;
 }
 

@@ -130,7 +130,11 @@ def HandshakePlaceBuffers : Pass<"handshake-place-buffers", "mlir::ModuleOp"> {
     Option<"timefile", "time-file", "std::string", "",
     "required, file provide the time and buffer prerequisite information ">,
     Option<"targetCP", "target-period", "double", "4.0",
-    "target clock period for the CFDFC">];
+    "target clock period for the CFDFC">,
+    Option<"timeLimit", "time-limit", "int", "180",
+    "maximum time limit for MILP solver">,
+     Option<"setCustom", "set-custom", "bool", "true",
+    "set customized constraints from dataflow">];
 }
 
 //===----------------------------------------------------------------------===//
