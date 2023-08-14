@@ -20,6 +20,7 @@
 using namespace mlir;
 using namespace circt;
 using namespace dynamatic::experimental;
+using namespace llvm;
 
 //===----------------------------------------------------------------------===//
 // Utility functions
@@ -137,8 +138,8 @@ bool dynamatic::experimental::initialiseMap(
   for (auto &elem : funcMap) {
     auto &chosenStruct = modelStructuresMap[elem.getValue()];
     // Stop the program if the corresponding struct wasn't found
-    if (!chosenStruct)
-       return false;
+    // if (!chosenStruct)
+    //  return false;
     models[elem.getKey().str()] = std::move(chosenStruct);
   }
   return true;
@@ -352,18 +353,6 @@ bool DefaultBuffer::tryExecute(llvm::DenseMap<Value, llvm::Any> &valueMap,
   return tryToExecute(op.getOperation(), valueMap, timeMap, scheduleList,
                       models, executeFunc, op.getNumSlots());
 }
-
-enum MCRequestType {
-  LOAD,
-  STORE
-};
-
-// EXPERIMENTAL
-void memoryController(MCRequestType request) {
-
-}
-
-
 
 } // namespace experimental
 } // namespace dynamatic

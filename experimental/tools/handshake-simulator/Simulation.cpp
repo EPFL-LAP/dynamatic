@@ -11,20 +11,20 @@
 //
 //===----------------------------------------------------------------------===//
 
-#include "experimental/tools/handshake-simulator/ExecModels.h"
 #include "experimental/tools/handshake-simulator/Simulation.h"
 #include "circt/Dialect/Handshake/HandshakeOps.h"
 #include "circt/Support/JSON.h"
+#include "experimental/tools/handshake-simulator/ExecModels.h"
 #include "mlir/Dialect/Arith/IR/Arith.h"
 #include "mlir/Dialect/ControlFlow/IR/ControlFlowOps.h"
 #include "mlir/Dialect/Func/IR/FuncOps.h"
 #include "mlir/Dialect/MemRef/IR/MemRef.h"
 #include "mlir/IR/BuiltinTypes.h"
+#include "llvm/ADT/DenseMap.h"
 #include "llvm/ADT/STLExtras.h"
 #include "llvm/ADT/StringMap.h"
 #include "llvm/ADT/TypeSwitch.h"
 #include "llvm/Support/Debug.h"
-#include "llvm/ADT/DenseMap.h"
 
 #include <list>
 
@@ -476,7 +476,7 @@ LogicalResult HandshakeExecuter::execute(mlir::memref::LoadOp op,
     return op.emitOpError()
            << "Out-of-bounds access to memory '" << ptr << "'. Memory has "
            << ref.size() << " elements but requested element " << address;
-    
+
   Any result = ref[address];
   out[0] = result;
 
