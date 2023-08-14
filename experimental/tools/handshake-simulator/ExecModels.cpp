@@ -20,7 +20,6 @@
 using namespace mlir;
 using namespace circt;
 using namespace dynamatic::experimental;
-using namespace llvm;
 
 //===----------------------------------------------------------------------===//
 // Utility functions
