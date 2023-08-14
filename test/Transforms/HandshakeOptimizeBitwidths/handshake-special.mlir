@@ -51,3 +51,53 @@ handshake.func @memAddrOpt(%mem: memref<1000xi32>, %start: none) -> i32 {
   %returnVal = d_return %ldVal : i32
   end %returnVal, %done : i32, none
 }
+
+// -----
+
+// CHECK-LABEL:   handshake.func @simpleCycle(
+// CHECK-SAME:                                %[[VAL_0:.*]]: i8, %[[VAL_1:.*]]: i1, %[[VAL_2:.*]]: i1,
+// CHECK-SAME:                                %[[VAL_3:.*]]: none, ...) -> i32 attributes {argNames = ["arg0", "index", "cond", "start"], resNames = ["out0"]} {
+// CHECK:           %[[VAL_4:.*]] = mux %[[VAL_1]] {{\[}}%[[VAL_0]], %[[VAL_5:.*]]] : i1, i8
+// CHECK:           %[[VAL_5]], %[[VAL_6:.*]] = cond_br %[[VAL_2]], %[[VAL_4]] : i8
+// CHECK:           %[[VAL_7:.*]] = arith.extsi %[[VAL_6]] : i8 to i32
+// CHECK:           %[[VAL_8:.*]] = d_return %[[VAL_7]] : i32
+// CHECK:           end %[[VAL_8]] : i32
+// CHECK:         }
+handshake.func @simpleCycle(%arg0: i8, %index: i1, %cond: i1, %start: none) -> i32 {
+  %ext = arith.extsi %arg0 : i8 to i32
+  %muxOut = mux %index [%ext, %true] : i1, i32
+  %true, %false = cond_br %cond, %muxOut : i32
+  %returnVal = d_return %false : i32
+  end %returnVal : i32
+}
+
+// -----
+
+// CHECK-LABEL:   handshake.func @complexCycle(
+// CHECK-SAME:                                 %[[VAL_0:.*]]: i8, %[[VAL_1:.*]]: i16, %[[VAL_2:.*]]: i24, %[[VAL_3:.*]]: i2, %[[VAL_4:.*]]: i1, %[[VAL_5:.*]]: i1,
+// CHECK-SAME:                                 %[[VAL_6:.*]]: none, ...) -> i32 attributes {argNames = ["arg0", "arg1", "arg2", "bigIndex", "index", "cond", "start"], resNames = ["out0"]} {
+// CHECK:           %[[VAL_7:.*]] = arith.extsi %[[VAL_1]] {bb = 0 : ui32} : i16 to i24
+// CHECK:           %[[VAL_8:.*]] = arith.extsi %[[VAL_0]] {bb = 0 : ui32} : i8 to i24
+// CHECK:           %[[VAL_9:.*]] = mux %[[VAL_3]] {{\[}}%[[VAL_8]], %[[VAL_10:.*]], %[[VAL_11:.*]], %[[VAL_12:.*]]] : i2, i24
+// CHECK:           %[[VAL_10]], %[[VAL_13:.*]] = cond_br %[[VAL_5]], %[[VAL_9]] : i24
+// CHECK:           %[[VAL_14:.*]] = mux %[[VAL_4]] {{\[}}%[[VAL_7]], %[[VAL_13]]] : i1, i24
+// CHECK:           %[[VAL_11]], %[[VAL_15:.*]] = cond_br %[[VAL_5]], %[[VAL_14]] : i24
+// CHECK:           %[[VAL_16:.*]] = mux %[[VAL_4]] {{\[}}%[[VAL_2]], %[[VAL_15]]] : i1, i24
+// CHECK:           %[[VAL_12]], %[[VAL_17:.*]] = cond_br %[[VAL_5]], %[[VAL_16]] : i24
+// CHECK:           %[[VAL_18:.*]] = arith.extsi %[[VAL_17]] : i24 to i32
+// CHECK:           %[[VAL_19:.*]] = d_return %[[VAL_18]] : i32
+// CHECK:           end %[[VAL_19]] : i32
+// CHECK:         }
+handshake.func @complexCycle(%arg0: i8, %arg1: i16, %arg2: i24, %bigIndex: i2, %index: i1, %cond: i1, %start: none) -> i32 {
+  %ext0 = arith.extsi %arg0 : i8 to i32
+  %ext1 = arith.extsi %arg1 : i16 to i32
+  %ext2 = arith.extsi %arg2 : i24 to i32
+  %mux0 = mux %bigIndex [%ext0, %condTrue0, %condTrue1, %condTrue2] : i2, i32
+  %condTrue0, %condFalse0 = cond_br %cond, %mux0 : i32
+  %mux1 = mux %index [%ext1, %condFalse0] : i1, i32
+  %condTrue1, %condFalse1 = cond_br %cond, %mux1 : i32
+  %mux2 = mux %index [%ext2, %condFalse1] : i1, i32
+  %condTrue2, %condFalse2 = cond_br %cond, %mux2 : i32
+  %returnVal = d_return %condFalse2 : i32
+  end %returnVal : i32
+}
