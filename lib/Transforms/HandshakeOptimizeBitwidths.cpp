@@ -10,7 +10,7 @@
 // Handhshake level.
 //
 // Note on shift operation handling (forward and backward): the logic of
-// truncing a value only to extend it again immediately may seem unnecessary,
+// truncating a value only to extend it again immediately may seem unnecessary,
 // but it in fact allows the rest of the rewrite patterns to understand that
 // a value fits on less bits than what the original value suggests. This is
 // slightly convoluted but we are forced to do this like that since shift
@@ -77,7 +77,7 @@ static inline unsigned getOptAddrWidth(unsigned value) {
 /// Backtracks through defining operations of the value as long as they are
 /// extension operations. Returns the "minimal value", i.e., the potentially
 /// different value that represents the same number as the originally provided
-/// value but without all bits added by extension operations. During the forward
+/// one but without all bits added by extension operations. During the forward
 /// pass, the returned value gives an indication of how many bits of the
 /// original value can be safely discarded. If an extension type is provided and
 /// the function is able to backtrack through any extension operation, updates
@@ -89,7 +89,7 @@ static Value getMinimalValue(Value val, ExtType *ext = nullptr) {
   if (!isValidType(type))
     return val;
 
-  // Only backtracks through values that were produced by extension operations
+  // Only backtrack through values that were produced by extension operations
   Operation *defOp = val.getDefiningOp();
   if (!defOp || !isa<arith::ExtSIOp, arith::ExtUIOp>(defOp))
     return val;
@@ -152,7 +152,13 @@ static Value modVal(ExtValue extVal, unsigned targetWidth,
   Type type = val.getType();
   assert(isValidType(type) && "value must be valid type");
 
+  // Return the original value when it already has the target width
   unsigned width = type.getIntOrFloatBitWidth();
+  if (width == targetWidth)
+    return val;
+
+  // Otherwise, insert a bitwidth modification operation to create a value of
+  // the target width
   Operation *newOp = nullptr;
   rewriter.setInsertionPointAfterValue(val);
   if (width < targetWidth) {
@@ -178,14 +184,81 @@ static Value modVal(ExtValue extVal, unsigned targetWidth,
     else
       newOp = rewriter.create<arith::ExtSIOp>(
           val.getLoc(), rewriter.getIntegerType(targetWidth), val);
-  } else if (width > targetWidth)
+  } else
     newOp = rewriter.create<arith::TruncIOp>(
         val.getLoc(), rewriter.getIntegerType(targetWidth), val);
-  if (newOp) {
-    inheritBBFromValue(val, newOp);
-    return newOp->getResult(0);
+
+  inheritBBFromValue(val, newOp);
+  return newOp->getResult(0);
+}
+
+/// Recursive version of isOperandInCycle which includes an additional
+/// parameter to keep track of which operations were already visited during
+/// backtracking to avoid looping forever. See overload's documentation for more
+/// details.
+/// NOLINTNEXTLINE(misc-no-recursion)
+static bool isOperandInCycle(Value val, OpResult res,
+                             DenseSet<Value> &mergedValues,
+                             DenseSet<Operation *> &visitedOps) {
+  // Stop when we've reached the result of the merge-like operation
+  if (val == res)
+    return true;
+
+  // Stop when reaching function arguments
+  Operation *defOp = val.getDefiningOp();
+  if (!defOp)
+    return false;
+
+  // Stop when reaching an operation that was already getMinimalValed through
+  if (auto [_, isNewOp] = visitedOps.insert(defOp); !isNewOp)
+    return false;
+
+  // getMinimalVal through operations that end up "forwarding" one of their
+  // inputs to the output
+  if (isa<handshake::BufferOp, handshake::ForkOp, handshake::LazyForkOp,
+          handshake::BranchOp>(defOp))
+    return isOperandInCycle(defOp->getOperand(0), res, mergedValues,
+                            visitedOps);
+  if (auto condOp = dyn_cast<handshake::ConditionalBranchOp>(defOp))
+    return isOperandInCycle(condOp.getDataOperand(), res, mergedValues,
+                            visitedOps);
+  if (auto mergeLikeOp = dyn_cast<MergeLikeOpInterface>(defOp)) {
+    // Recursively explore data operands of merge-like operations to find cycles
+    bool oneOprInCycle = false;
+    SmallVector<Value> mergeOperands;
+    for (Value mergeLikeOpr : mergeLikeOp.getDataOperands()) {
+      DenseSet<Operation *> nestedVisitedOps(visitedOps);
+      if (isOperandInCycle(mergeLikeOpr, res, mergedValues, nestedVisitedOps))
+        oneOprInCycle = true;
+      else
+        mergeOperands.push_back(mergeLikeOpr);
+    }
+
+    // If the merge-like operation is part of the cycle through one of its data
+    // operands, add other data operands not port of the cycle to the merged
+    // values
+    if (oneOprInCycle)
+      for (auto outOfCycleOpr : mergeOperands)
+        mergedValues.insert(outOfCycleOpr);
+    return oneOprInCycle;
   }
-  return val;
+
+  return false;
+}
+
+/// Determines whether it is possible to backtrack the value to the result by
+/// only going through defining Handshake operations that act as "data
+/// forwarders" i.e, operations that forward one of their data inputs to one of
+/// their outputs without modification. If yes, then we say the value and result
+/// are in the same cycle and the function returns true; otherwise, the function
+/// returns false. When the function returns true, mergedValues represents the
+/// set of values that are fed inside the cycle through operands of merge-like
+/// operations that are on the path between value and result. When the function
+/// returns false, the value of mergedValues is undefined.
+static bool isOperandInCycle(Value val, OpResult res,
+                             DenseSet<Value> &mergedValues) {
+  DenseSet<Operation *> visitedOps;
+  return isOperandInCycle(val, res, mergedValues, visitedOps);
 }
 
 /// Replaces an operation with two operands and one result of the same integer
@@ -394,10 +467,22 @@ public:
 };
 
 /// Special configuration for buffers required because of the buffer type
-/// attribute.
+/// attribute and custom builder.
 class BufferDataConfig : public OptDataConfig<handshake::BufferOp> {
 public:
   BufferDataConfig(handshake::BufferOp op) : OptDataConfig(op){};
+
+  SmallVector<Value> getDataOperands() override {
+    return SmallVector<Value>{op.getOperand()};
+  }
+
+  void getNewOperands(unsigned optWidth, ExtType ext,
+                      SmallVector<Value> &minDataOperands,
+                      PatternRewriter &rewriter,
+                      SmallVector<Value> &newOperands) override {
+    newOperands.push_back(
+        modVal({minDataOperands[0], ext}, optWidth, rewriter));
+  }
 
   handshake::BufferOp createOp(SmallVector<Type> &newResTypes,
                                SmallVector<Value> &newOperands,
@@ -723,6 +808,96 @@ struct HandshakeReturnFW
     return success();
   }
 };
+
+/// Optimizes the bitwidth of channels contained inside "forwarding cycles".
+/// These are values that generally circulate between branch-like and merge-like
+/// operations without modification (i.e., in a block that branches to itself).
+/// These require special treatment to be optimized as the rest of the rewrite
+/// patterns only look at the operation they are matched on when optimizing,
+/// whereas this pattern attempts to backtracks through operands of merge-like
+/// operations to identify whether it was produced by the operation itself. If
+/// an operand is identified as being part of a cycle, all other out-of-cycle
+/// merged values incoming to the cycle through merge-like operation operands
+/// are considered to determine the optimized width that can be given to the
+/// in-cycle operand.
+///
+/// The first template parameter is meant to be a merge-like operation i.e., a
+/// Handhsake operation implementing the MergeLikeOpInterface trait on which to
+/// apply the rewrite pattern. The second template parameter is meant to hold a
+/// subclass of OptDataConfig (or the class itself) that specifies how the
+/// transformation may be performed on that specific operation type.
+template <typename Op, typename Cfg>
+struct ForwardCycleOpt : public OpRewritePattern<Op> {
+  using OpRewritePattern<Op>::OpRewritePattern;
+
+  LogicalResult matchAndRewrite(Op op,
+                                PatternRewriter &rewriter) const override {
+    // This pattern only works for merge-like operations with a valid data type
+    auto mergeLikeOp = dyn_cast<MergeLikeOpInterface>((Operation *)op);
+    if (!mergeLikeOp)
+      return failure();
+    OpResult dataRes = op->getResult(0);
+    if (!isValidType(dataRes.getType()))
+      return failure();
+
+    // For each operand, determine whether it is in a forwarding cycle. If yes,
+    // keep track of other values coming in the cycle through merge-like ops
+    OperandRange dataOperands = mergeLikeOp.getDataOperands();
+    SmallVector<bool> operandInCycle;
+    DenseSet<Value> allMergedValues;
+    DenseSet<Value> mergedValues;
+    for (auto opr : dataOperands) {
+      mergedValues.clear();
+      bool inCycle = isOperandInCycle(opr, dataRes, mergedValues);
+      operandInCycle.push_back(inCycle);
+      if (inCycle)
+        for (Value &val : mergedValues)
+          allMergedValues.insert(val);
+      else
+        allMergedValues.insert(opr);
+    }
+
+    // Determine the achievable optimized width for operands inside the cycle
+    unsigned optWidth = 0;
+    ExtType ext = ExtType::UNKNOWN;
+    for (Value mergedVal : allMergedValues)
+      optWidth = std::max(
+          optWidth,
+          getMinimalValue(mergedVal, &ext).getType().getIntOrFloatBitWidth());
+
+    // Check whether we managed to optimize anything
+    unsigned dataWidth = dataRes.getType().getIntOrFloatBitWidth();
+    if (optWidth >= dataWidth)
+      return failure();
+
+    // getMinimalVal all data operands
+    SmallVector<Value> minDataOperands;
+    for (auto opr : dataOperands)
+      minDataOperands.push_back(getMinimalValue(opr));
+
+    // Create a new operation as well as appropriate bitwidth modification
+    // operations to keep the IR valid
+    Cfg cfg(op);
+    SmallVector<Value> newOperands, newResults;
+    SmallVector<Type> newResTypes;
+    cfg.getNewOperands(optWidth, ext, minDataOperands, rewriter, newOperands);
+    cfg.getResultTypes(rewriter.getIntegerType(optWidth), newResTypes);
+    rewriter.setInsertionPoint(op);
+    Op newOp = cfg.createOp(newResTypes, newOperands, rewriter);
+    inheritBB(op, newOp);
+    cfg.modResults(newOp, dataWidth, ext, rewriter, newResults);
+
+    // Replace uses of the original operation's results with the results of the
+    // optimized operation we just created
+    rewriter.replaceOp(op, newResults);
+    return success();
+  }
+};
+
+/// Template specialization of forward cycle optimization rewrite pattern for
+/// Handshake operations that do not require a specific configuration.
+template <typename Op>
+using ForwardCycleOptNoCfg = ForwardCycleOpt<Op, OptDataConfig<Op>>;
 
 } // namespace
 
@@ -1208,6 +1383,10 @@ void HandshakeOptimizeBitwidthsPass::addForwardPatterns(
 
   // Handshake operations
   addHandshakeDataPatterns(fwPatterns, true);
+  fwPatterns.add<ForwardCycleOptNoCfg<handshake::MergeOp>,
+                 ForwardCycleOpt<handshake::MuxOp, MuxDataConfig>,
+                 ForwardCycleOpt<handshake::ControlMergeOp, CMergeDataConfig>>(
+      ctx);
 
   // arith operations
   addArithPatterns(fwPatterns, true);
