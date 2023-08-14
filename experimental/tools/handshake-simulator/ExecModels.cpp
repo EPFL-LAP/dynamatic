@@ -21,11 +21,6 @@ using namespace mlir;
 using namespace circt;
 using namespace dynamatic::experimental;
 
-#define INDEX_WIDTH 32
-/*
-using ModelMap =
-    ModelMap;
-*/
 //===----------------------------------------------------------------------===//
 // Utility functions
 //===----------------------------------------------------------------------===//
@@ -100,8 +95,6 @@ bool tryToExecute(
     storeValues(out, outs, valueMap);
     updateTime(ins, outs, timeMap, latency);
     scheduleList = outs;
-    // scheduleList.
-
     return true;
   }
   return false;
@@ -143,8 +136,9 @@ bool dynamatic::experimental::initialiseMap(
   // Fill the map containing the final execution models structures
   for (auto &elem : funcMap) {
     auto &chosenStruct = modelStructuresMap[elem.getValue()];
-    // if (!chosenStruct)
-    //   return false;
+    // Stop the program if the corresponding struct wasn't found
+    if (!chosenStruct)
+       return false;
     models[elem.getKey().str()] = std::move(chosenStruct);
   }
   return true;
@@ -219,7 +213,8 @@ bool DefaultControlMerge::tryExecute(
         op.emitOpError("More than one valid input to CMerge!");
       valueMap[op.getResult()] = valueMap[in.value()];
       timeMap[op.getResult()] = timeMap[in.value()];
-      valueMap[op.getIndex()] = APInt(INDEX_WIDTH, in.index());
+      valueMap[op.getIndex()] =
+          APInt(IndexType::kInternalStorageBitWidth, in.index());
       timeMap[op.getIndex()] = timeMap[in.value()];
 
       // Consume the inputs.
