@@ -616,6 +616,104 @@ static unsigned getBlockPredecessorCount(Block *block) {
   return std::distance(predecessors.begin(), predecessors.end());
 }
 
+static void processProducedValues(
+    Value &producedValue, BackedgeBuilder &edgeBuilder,
+    ConversionPatternRewriter &rewriter,
+    DenseMap<Block *, BlockLoopInfo> blockToLoopInfoMap,
+    DenseMap<Block *, DenseMap<Value, Operation *>> &mapLoopHeaderBlocks) {
+
+  for (const auto &consumerOp : producedValue.getUsers()) {
+    if (isa<MergeLikeOpInterface>(*consumerOp))
+      continue;
+
+    // Find common loop for producer's and consumer's blocks
+    CFGLoop *producersInnermostLoop =
+        blockToLoopInfoMap[producedValue.getParentBlock()].loop;
+    CFGLoop *consumersInnermostLoop =
+        blockToLoopInfoMap[consumerOp->getBlock()].loop;
+    CFGLoop *commonLoop =
+        findLCALoop(producersInnermostLoop, consumersInnermostLoop);
+
+    int commonLoopDepth = commonLoop ? commonLoop->getLoopDepth() : 0;
+    int consumerLoopDepth =
+        consumersInnermostLoop ? consumersInnermostLoop->getLoopDepth() : 0;
+
+    int numOfMerges = consumerLoopDepth - commonLoopDepth;
+
+    if (numOfMerges <= 0)
+      // There is no need to insert merge operation(s) because there is no
+      // token missmatch
+      continue;
+
+    SmallVector<Backedge, 2> prevMergeInputBackedges;
+    for (CFGLoop *currLoop = consumersInnermostLoop; currLoop != commonLoop;
+         currLoop = currLoop->getParentLoop()) {
+
+      Block *loopHeader = currLoop->getHeader();
+
+      // Check if consumer Block is already added to the map
+      auto blockIt = mapLoopHeaderBlocks.find(loopHeader);
+      if (blockIt == mapLoopHeaderBlocks.end()) {
+        DenseMap<Value, Operation *> dm;
+        mapLoopHeaderBlocks[loopHeader] = dm;
+      }
+
+      // Check if merge for producers result is already inserted at the
+      // beginning of the consumer's block
+      auto valueIt = mapLoopHeaderBlocks[loopHeader].find(producedValue);
+      if (valueIt != mapLoopHeaderBlocks[loopHeader].end())
+        continue;
+
+      rewriter.setInsertionPointToStart(loopHeader);
+      auto insertLoc = loopHeader->front().getLoc();
+      SmallVector<Value> operands;
+
+      // Creating a backedge to first input, that might be a
+      // producedValue or an output of the mergeOp from outer loop
+      auto firstInputBackedge = edgeBuilder.get(producedValue.getType());
+      prevMergeInputBackedges.push_back(firstInputBackedge);
+      operands.push_back(Value(firstInputBackedge));
+
+      // Merge should take its own output as one of the inputs
+      auto secondInputBackedge = edgeBuilder.get(producedValue.getType());
+      operands.push_back(Value(secondInputBackedge));
+
+      // Create MergeOp and resolve the backedge
+      Operation *mergeOp =
+          rewriter.create<handshake::MergeOp>(insertLoc, operands);
+      secondInputBackedge.setValue(mergeOp->getResult(0));
+      mapLoopHeaderBlocks[loopHeader][producedValue] = mergeOp;
+
+      // Replace uses of producer's operation result in all loop blocks
+      // with the merge output
+      for (Block *block : currLoop->getBlocks()) {
+        if (blockToLoopInfoMap[block].loop != currLoop)
+          continue;
+        for (Operation &opp : block->getOperations())
+          if (!isa<MergeLikeOpInterface>(opp)) {
+            opp.replaceUsesOfWith(producedValue, mergeOp->getResult(0));
+          }
+      }
+
+      // Connect new merge to previous merge, if exists.
+      // Note that prevMergeInputBackedges containes backedge from current
+      // merge, and optionally the one from the previous merge.
+      if (prevMergeInputBackedges.size() > 1) {
+        Backedge &backedge = prevMergeInputBackedges.front();
+        backedge.setValue(mergeOp->getResult(0));
+        prevMergeInputBackedges.erase(&backedge);
+      }
+    }
+
+    // Connect producer to last added merge
+    if (!prevMergeInputBackedges.empty()) {
+      Backedge &backedge = prevMergeInputBackedges.front();
+      backedge.setValue(producedValue);
+      prevMergeInputBackedges.erase(&backedge);
+    }
+  }
+}
+
 LogicalResult HandshakeLoweringFPL22::handleTokenMissmatch(
     BackedgeBuilder &edgeBuilder, ConversionPatternRewriter &rewriter) {
   // Each loop header Block should only contain one MergeOp for a Value produced
@@ -631,232 +729,19 @@ LogicalResult HandshakeLoweringFPL22::handleTokenMissmatch(
 
   // Iterate through all producer-consumer pairs (traversing edges in DFG)
   for (auto &block : r.getBlocks()) {
-    // TODO: treat block arguments as produced values
+    // Process Block arguments
+    for (auto &blockArg : block.getArguments())
+      processProducedValues(blockArg, edgeBuilder, rewriter, blockToLoopInfoMap,
+                            mapLoopHeaderBlocks);
 
-    /////////////////////////////////////////////////////////////////////////
-
-    // TODO: tidy duplicated code fragment
-
-    for (auto &producerOpResult : block.getArguments()) {
-      for (const auto &consumerOp : producerOpResult.getUsers()) {
-          if (isa<MergeLikeOpInterface>(*consumerOp))
-            continue;
-
-          // Find common loop for producer's and consumer's blocks
-          CFGLoop *producersInnermostLoop =
-              blockToLoopInfoMap[&block].loop;
-          CFGLoop *consumersInnermostLoop =
-              blockToLoopInfoMap[consumerOp->getBlock()].loop;
-          CFGLoop *commonLoop =
-              findLCALoop(producersInnermostLoop, consumersInnermostLoop);
-
-          // TODO: remove numOfMerges if stmt
-          int commonLoopDepth = commonLoop ? commonLoop->getLoopDepth() : 0;
-          int consumerLoopDepth = consumersInnermostLoop
-                                      ? consumersInnermostLoop->getLoopDepth()
-                                      : 0;
-
-          int numOfMerges = consumerLoopDepth - commonLoopDepth;
-          
-          llvm::outs() << " --> ";
-          llvm::outs() << consumerOp->getName();
-          llvm::outs() << "\n";
-
-          if (numOfMerges <= 0)
-            // There is no need to insert merge operation(s) because there is no
-            // token missmatch
-            continue;
-
-
-          SmallVector<Backedge, 2> prevMergeInputBackedges;
-          for (CFGLoop *currLoop = consumersInnermostLoop; currLoop != nullptr;
-               currLoop = currLoop->getParentLoop()) {
-
-            // llvm::outs() << "NEW LOOP ITERATION\n";
-
-            Block *loopHeader = currLoop->getHeader();
-
-            // Check if consumer Block is already added to the map
-            auto blockIt = mapLoopHeaderBlocks.find(loopHeader);
-            if (blockIt == mapLoopHeaderBlocks.end()) {
-              DenseMap<Value, Operation *> dm;
-              mapLoopHeaderBlocks[loopHeader] = dm;
-            }
-
-            // Check if merge for producers result is already inserted at the
-            // beginning of the consumer's block
-            auto valueIt =
-                mapLoopHeaderBlocks[loopHeader].find(producerOpResult);
-            if (valueIt != mapLoopHeaderBlocks[loopHeader].end()) {
-              // TODO: check if we should set prevMergeOp
-              continue;
-            }
-
-            rewriter.setInsertionPointToStart(loopHeader);
-            auto insertLoc = loopHeader->front().getLoc();
-            SmallVector<Value> operands;
-
-            // Creating a backedge to first input, that might be a
-            // producerOpResult or an output of the mergeOp from outer loop
-            auto firstInputBackedge =
-                edgeBuilder.get(producerOpResult.getType());
-            prevMergeInputBackedges.push_back(firstInputBackedge);
-            operands.push_back(Value(firstInputBackedge));
-
-            // Merge should take its own output as one of the inputs
-            auto secondInputBackedge =
-                edgeBuilder.get(producerOpResult.getType());
-            operands.push_back(Value(secondInputBackedge));
-
-            // Create MergeOp and resolve the backedge
-            Operation *mergeOp =
-                rewriter.create<handshake::MergeOp>(insertLoc, operands);
-            secondInputBackedge.setValue(mergeOp->getResult(0));
-            mapLoopHeaderBlocks[loopHeader][producerOpResult] = mergeOp;
-
-            // Replace uses of producer's operation result in all loop blocks
-            // with the merge output
-            for (Block *block : currLoop->getBlocks()) {
-              if (blockToLoopInfoMap[block].loop != currLoop)
-                continue;
-              for (Operation &opp : block->getOperations())
-                if (!isa<MergeLikeOpInterface>(opp)) {
-                  opp.replaceUsesOfWith(producerOpResult,
-                                        mergeOp->getResult(0));
-                }
-            }
-
-            // Connect new merge to previous merge, if exists.
-            // Note that prevMergeInputBackedges containes backedge from current
-            // merge, and optionally the one from the previous merge.
-            if (prevMergeInputBackedges.size() > 1) {
-              Backedge &backedge = prevMergeInputBackedges.front();
-              backedge.setValue(mergeOp->getResult(0));
-              prevMergeInputBackedges.erase(&backedge);
-            }
-          }
-
-          // Connect producer to last added merge
-          if (!prevMergeInputBackedges.empty()) {
-            Backedge &backedge = prevMergeInputBackedges.front();
-            backedge.setValue(producerOpResult);
-            prevMergeInputBackedges.erase(&backedge);
-          }
-        }
-    }
-
-    ///////////////////////////////////////////////////////////////////
-
+    // Process Values produced in Operations
     for (auto &producerOp : block.getOperations()) {
       if (isa<MergeLikeOpInterface>(producerOp))
         continue;
 
       for (const auto &producerOpResult : producerOp.getResults())
-        for (const auto &consumerOp : producerOpResult.getUsers()) {
-          if (isa<MergeLikeOpInterface>(*consumerOp))
-            continue;
-
-          // Find common loop for producer's and consumer's blocks
-          CFGLoop *producersInnermostLoop =
-              blockToLoopInfoMap[producerOp.getBlock()].loop;
-          CFGLoop *consumersInnermostLoop =
-              blockToLoopInfoMap[consumerOp->getBlock()].loop;
-          CFGLoop *commonLoop =
-              findLCALoop(producersInnermostLoop, consumersInnermostLoop);
-
-          // TODO: remove numOfMerges if stmt
-          int commonLoopDepth = commonLoop ? commonLoop->getLoopDepth() : 0;
-          int consumerLoopDepth = consumersInnermostLoop
-                                      ? consumersInnermostLoop->getLoopDepth()
-                                      : 0;
-
-          int numOfMerges = consumerLoopDepth - commonLoopDepth;
-
-          if (numOfMerges <= 0)
-            // There is no need to insert merge operation(s) because there is no
-            // token missmatch
-            continue;
-
-          // llvm::outs() << producerOp.getName();
-          // llvm::outs() << " --> ";
-          // llvm::outs() << consumerOp->getName();
-          // llvm::outs() << "\n";
-
-          SmallVector<Backedge, 2> prevMergeInputBackedges;
-          for (CFGLoop *currLoop = consumersInnermostLoop; currLoop != nullptr;
-               currLoop = currLoop->getParentLoop()) {
-
-            // llvm::outs() << "NEW LOOP ITERATION\n";
-
-            Block *loopHeader = currLoop->getHeader();
-
-            // Check if consumer Block is already added to the map
-            auto blockIt = mapLoopHeaderBlocks.find(loopHeader);
-            if (blockIt == mapLoopHeaderBlocks.end()) {
-              DenseMap<Value, Operation *> dm;
-              mapLoopHeaderBlocks[loopHeader] = dm;
-            }
-
-            // Check if merge for producers result is already inserted at the
-            // beginning of the consumer's block
-            auto valueIt =
-                mapLoopHeaderBlocks[loopHeader].find(producerOpResult);
-            if (valueIt != mapLoopHeaderBlocks[loopHeader].end()) {
-              // TODO: check if we should set prevMergeOp
-              continue;
-            }
-
-            rewriter.setInsertionPointToStart(loopHeader);
-            auto insertLoc = loopHeader->front().getLoc();
-            SmallVector<Value> operands;
-
-            // Creating a backedge to first input, that might be a
-            // producerOpResult or an output of the mergeOp from outer loop
-            auto firstInputBackedge =
-                edgeBuilder.get(producerOpResult.getType());
-            prevMergeInputBackedges.push_back(firstInputBackedge);
-            operands.push_back(Value(firstInputBackedge));
-
-            // Merge should take its own output as one of the inputs
-            auto secondInputBackedge =
-                edgeBuilder.get(producerOpResult.getType());
-            operands.push_back(Value(secondInputBackedge));
-
-            // Create MergeOp and resolve the backedge
-            Operation *mergeOp =
-                rewriter.create<handshake::MergeOp>(insertLoc, operands);
-            secondInputBackedge.setValue(mergeOp->getResult(0));
-            mapLoopHeaderBlocks[loopHeader][producerOpResult] = mergeOp;
-
-            // Replace uses of producer's operation result in all loop blocks
-            // with the merge output
-            for (Block *block : currLoop->getBlocks()) {
-              if (blockToLoopInfoMap[block].loop != currLoop)
-                continue;
-              for (Operation &opp : block->getOperations())
-                if (!isa<MergeLikeOpInterface>(opp)) {
-                  opp.replaceUsesOfWith(producerOpResult,
-                                        mergeOp->getResult(0));
-                }
-            }
-
-            // Connect new merge to previous merge, if exists.
-            // Note that prevMergeInputBackedges containes backedge from current
-            // merge, and optionally the one from the previous merge.
-            if (prevMergeInputBackedges.size() > 1) {
-              Backedge &backedge = prevMergeInputBackedges.front();
-              backedge.setValue(mergeOp->getResult(0));
-              prevMergeInputBackedges.erase(&backedge);
-            }
-          }
-
-          // Connect producer to last added merge
-          if (!prevMergeInputBackedges.empty()) {
-            Backedge &backedge = prevMergeInputBackedges.front();
-            backedge.setValue(producerOpResult);
-            prevMergeInputBackedges.erase(&backedge);
-          }
-        }
+        processProducedValues(producerOpResult, edgeBuilder, rewriter,
+                              blockToLoopInfoMap, mapLoopHeaderBlocks);
     }
   }
   return success();
@@ -878,7 +763,8 @@ HandshakeLoweringFPL22::insertMerge(Block *block, Value val,
     // be resolved immediately
     operands.push_back(val);
 
-    Operation* mergeOp = rewriter.create<handshake::MergeOp>(insertLoc, operands);
+    Operation *mergeOp =
+        rewriter.create<handshake::MergeOp>(insertLoc, operands);
 
     // For consistency within the entry block, replace the latter's entry
     // control with the output of a MergeOp that takes the control-only
@@ -897,9 +783,9 @@ HandshakeLoweringFPL22::insertMerge(Block *block, Value val,
         for (Operation &opp : b)
           if (isa<MergeLikeOpInterface>(opp))
             opp.replaceUsesOfWith(val, mergeOp->getResult(0));
-    
+
     return MergeOpInfo{mergeOp, val, dataEdges};
-  } 
+  }
   if (numPredecessors == 1) {
     // The value incoming from the single block predecessor will be resolved
     // later during merge reconnection
@@ -1042,7 +928,6 @@ static LogicalResult lowerRegion(HandshakeLoweringFPL22 &hl,
 
   if (failed(runPartialLowering(baseHl, &HandshakeLowering::addBranchOps)))
     return failure();
-
 
   if (failed(runPartialLowering(hl, &HandshakeLoweringFPL22::connectToMemory,
                                 memInfo)))
