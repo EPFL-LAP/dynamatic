@@ -476,7 +476,7 @@ LogicalResult HandshakeExecuter::execute(mlir::memref::LoadOp op,
     return op.emitOpError()
            << "Out-of-bounds access to memory '" << ptr << "'. Memory has "
            << ref.size() << " elements but requested element " << address;
-           
+    
   Any result = ref[address];
   out[0] = result;
 

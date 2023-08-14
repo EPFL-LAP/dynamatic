@@ -269,8 +269,6 @@ bool DefaultBranch::tryExecute(llvm::DenseMap<Value, llvm::Any> &valueMap,
                                std::vector<std::vector<llvm::Any>> &store,
                                SmallVector<Value> &scheduleList,
                                ModelMap &models, circt::Operation &opArg) {
-  llvm::errs() << "[EXECMODELS] in the DEFAULT branch"
-               << "\n";
   auto op = dyn_cast<circt::handshake::BranchOp>(opArg);
   auto executeFunc = [](std::vector<llvm::Any> &ins,
                         std::vector<llvm::Any> &outs,
@@ -354,6 +352,18 @@ bool DefaultBuffer::tryExecute(llvm::DenseMap<Value, llvm::Any> &valueMap,
   return tryToExecute(op.getOperation(), valueMap, timeMap, scheduleList,
                       models, executeFunc, op.getNumSlots());
 }
+
+enum MCRequestType {
+  LOAD,
+  STORE
+};
+
+// EXPERIMENTAL
+void memoryController(MCRequestType request) {
+
+}
+
+
 
 } // namespace experimental
 } // namespace dynamatic
