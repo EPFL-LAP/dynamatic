@@ -15,7 +15,10 @@ namespace dynamatic {
 
 std::unique_ptr<mlir::OperationPass<mlir::ModuleOp>>
 createHandshakePlaceBuffersPass(bool firstMG = false,
-                                std::string stdLevelInfo = "");
+                                std::string stdLevelInfo = "",
+                                std::string timefile = "",
+                                double targetCP = 4.0, int timeLimit = 180,
+                                bool setCustom = true);
 
 } // namespace dynamatic
 #endif // DYNAMATIC_TRANSFORMS_PLACEBUFFERS_H

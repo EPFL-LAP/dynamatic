@@ -4,8 +4,8 @@
 //
 //===----------------------------------------------------------------------===//
 
-#ifndef DYNAMATIC_TRANSFORMS_EXTRACTMG_H
-#define DYNAMATIC_TRANSFORMS_EXTRACTMG_H
+#ifndef DYNAMATIC_TRANSFORMS_BUFFERPLACEMENT_EXTRACTMG_H
+#define DYNAMATIC_TRANSFORMS_BUFFERPLACEMENT_EXTRACTMG_H
 
 #include "circt/Dialect/Handshake/HandshakeOps.h"
 #include "dynamatic/Support/LLVM.h"
@@ -61,6 +61,8 @@ bool isSelect(std::map<ArchBB *, bool> &archs, Value val);
 /// the destination operation is a back edge.
 bool isBackEdge(Operation *opSrc, Operation *opDst);
 
+/// Get the total execution frequency of a channel in the circuit
+unsigned getChannelFreq(Value channel, std::vector<CFDFC> &cfdFCs);
 } // namespace buffer
 } // namespace dynamatic
 

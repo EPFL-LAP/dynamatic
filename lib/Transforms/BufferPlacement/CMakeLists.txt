@@ -5,6 +5,8 @@ endif()
 add_dynamatic_library(DynamaticBufferPlacement
   ExtractMG.cpp
   HandshakePlaceBuffers.cpp
+  OptimizeMILP.cpp
+  ParseCircuitJson.cpp
 
   DEPENDS
   DynamaticTransformsPassIncGen

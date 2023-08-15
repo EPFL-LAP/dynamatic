@@ -186,9 +186,36 @@ int buffer::getBBIndex(Operation *op) {
   return -1;
 }
 
+unsigned buffer::getChannelFreq(Value channel, std::vector<CFDFC> &cfdfcList) {
+  Operation *srcOp = channel.getDefiningOp();
+  Operation *dstOp = *channel.getUsers().begin();
+
+  // if is a start node or end node, return 1
+  if (!srcOp || !dstOp)
+    return 1;
+
+  if (isa<SinkOp, MemoryControllerOp>(dstOp) || isa<MemoryControllerOp>(srcOp))
+    return 0;
+
+  unsigned freq = 1;
+  if (isBackEdge(srcOp, dstOp))
+    freq = 0;
+  //  execution times equals to the sum over all CFDFCs
+  for (auto cfdfc : cfdfcList)
+    if (std::find(cfdfc.channels.begin(), cfdfc.channels.end(), channel) !=
+        cfdfc.channels.end())
+      freq += cfdfc.execN;
+
+  return freq;
+}
+
 bool buffer::isBackEdge(Operation *opSrc, Operation *opDst) {
   if (opDst->isProperAncestor(opSrc))
     return true;
+  if (isa<BranchOp, ConditionalBranchOp>(opSrc) &&
+      isa<MuxOp, MergeOp, ControlMergeOp>(opDst))
+    return getBBIndex(opSrc) >= getBBIndex(opDst);
+
   return false;
 }
 
@@ -205,7 +232,7 @@ bool buffer::isSelect(std::map<unsigned, bool> &bbs, Value val) {
 
   // if srcOp and dstOp are in the same BB, and the edge is not backedge
   // then the edge is selected depends on the BB
-  if (srcBB == dstBB && bbs.count(srcBB) > 0)
+  if (bbs.count(dstBB) > 0 && srcBB == dstBB)
     if (!isBackEdge(srcOp, dstOp))
       return bbs[srcBB];
   return false;
@@ -225,6 +252,7 @@ bool buffer::isSelect(std::map<ArchBB *, bool> &archs, Value val) {
   for (auto &[arch, varSelArch] : archs)
     if (arch->srcBB == srcBB && arch->dstBB == dstBB)
       return varSelArch;
+
   return false;
 }
 
@@ -241,7 +269,6 @@ LogicalResult buffer::extractCFDFCircuit(std::map<ArchBB *, bool> &archs,
   // Create MILP model for CFDFCircuit extraction
   // Init a gurobi model
   GRBEnv env = GRBEnv(true);
-  env.set("LogFile", "mip1.log");
   // cancel the printout output
   env.set(GRB_IntParam_OutputFlag, 0);
   env.start();
