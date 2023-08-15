@@ -37,6 +37,27 @@ unsigned buffer::getPortInd(Operation *op, Value val) {
   return UINT_MAX;
 }
 
+#ifndef DYNAMATIC_GUROBI_NOT_INSTALLED
+
+namespace {
+/// Data structure to store the variables w.r.t to a unit(operation), including
+/// whether it belongs to a CFDFC, and its retime variables.
+struct UnitVar {
+  bool select;
+  GRBVar retIn, retOut;
+};
+
+/// Data structure to store the variables w.r.t to a channel(value), including
+/// whether it belongs to a CFDFC, and its time, throughput, and buffer
+/// placement decision.
+struct ChannelVar {
+  bool select;
+  GRBVar tDataIn, tDataOut, tElasIn, tElasOut;
+  GRBVar bufIsOp, bufNSlots, hasBuf;
+};
+
+} // namespace
+
 /// Whether the path is considered to be covered in path and elasticity
 /// constraints. Current version only consider mem_controller, future version
 /// should take account of lsq and more operations.
@@ -51,7 +72,6 @@ static bool coverPath(Value channel) {
   return true;
 }
 
-#ifndef DYNAMATIC_GUROBI_NOT_INSTALLED
 /// Initialize the variables in the MILP model
 static void
 initVarsInMILP(handshake::FuncOp funcOp, GRBModel &modelBuf,
@@ -63,8 +83,8 @@ initVarsInMILP(handshake::FuncOp funcOp, GRBModel &modelBuf,
                std::map<std::string, UnitInfo> unitInfo) {
   // create variables
   for (auto [ind, cfdfc] : llvm::enumerate(cfdfcList)) {
-    unitVars.push_back(DenseMap<Operation *, UnitVar>());
-    chThrptToks.push_back(DenseMap<Value, GRBVar>());
+    unitVars.emplace_back();
+    chThrptToks.emplace_back();
     for (auto [unitInd, unit] : llvm::enumerate(cfdfc.units)) {
       UnitVar unitVar;
 
@@ -91,7 +111,7 @@ initVarsInMILP(handshake::FuncOp funcOp, GRBModel &modelBuf,
       std::string srcName = "arg_start";
       std::string dstName = "arg_end";
       Operation *srcOp = channel.getDefiningOp();
-      Operation *dstOp = getUserOp(channel);
+      Operation *dstOp = *channel.getUsers().begin();
       // Define the channel variable names w.r.t to its connected units
       if (srcOp)
         srcName = getOperationShortStrName(srcOp);
@@ -109,7 +129,7 @@ initVarsInMILP(handshake::FuncOp funcOp, GRBModel &modelBuf,
   // create channel vars
   for (auto [ind, val] : llvm::enumerate(allChannels)) {
     Operation *srcOp = val.getDefiningOp();
-    Operation *dstOp = getUserOp(val);
+    Operation *dstOp = *val.getUsers().begin();
 
     if (!srcOp && !dstOp)
       continue;
@@ -230,7 +250,8 @@ static void createModelPathConstraints(
     else {
       // Define constraints w.r.t to input port
       for (auto inChVal : op.getOperands()) {
-        double inPortDelay = getPortDelay(inChVal, unitInfo, "out");
+        std::string out = "out";
+        double inPortDelay = getPortDelay(inChVal, unitInfo, out);
         if (!channelVars.contains(inChVal))
           continue;
 
@@ -240,7 +261,8 @@ static void createModelPathConstraints(
 
       // Define constraints w.r.t to output port
       for (auto outChVal : op.getResults()) {
-        double outPortDelay = getPortDelay(outChVal, unitInfo, "in");
+        std::string in = "in";
+        double outPortDelay = getPortDelay(outChVal, unitInfo, in);
 
         if (!channelVars.contains(outChVal))
           continue;
@@ -257,7 +279,7 @@ static void createModelElasticityConstraints(
     GRBModel &modelBuf, double targetCP, FuncOp &funcOp,
     std::vector<Value> &allChannels, unsigned unitNum,
     DenseMap<Value, ChannelVar> &channelVars,
-    std::map<std::string, UnitInfo> unitInfo) {
+    std::map<std::string, UnitInfo> &unitInfo) {
   // Channel constraints
   for (Value ch : allChannels) {
     // update the model to get the lower bound and upper bound of the vars
@@ -341,8 +363,7 @@ setCustomizedConstraints(GRBModel &modelBuf,
                          DenseMap<Value, ChannelVar> &channelVars,
                          DenseMap<Value, ChannelBufProps> &channelBufProps,
                          DenseMap<Value, Result> &res) {
-  for (auto chVarMap : channelVars) {
-    auto &[ch, chVars] = chVarMap;
+  for (auto &[ch, chVars] : channelVars) {
     // set min value of the buffer
     if (channelBufProps[ch].minOpaque > 0) {
       modelBuf.addConstr(chVars.bufNSlots >= channelBufProps[ch].minOpaque);
@@ -377,19 +398,19 @@ static void createModelObjective(GRBModel &modelBuf,
   double lumbdaCoef2 = 1e-5;
 
   double totalFreq = 0.0;
-  double highest_coef = 0.0;
+  double highestCoef = 0.0;
   for (auto [channel, _] : channelVars)
     totalFreq += static_cast<double>(getChannelFreq(channel, cfdfcList));
 
   for (auto [ind, thrpt] : llvm::enumerate(circtThrpts)) {
     double coef =
         cfdfcList[ind].channels.size() * cfdfcList[ind].execN / totalFreq;
-    highest_coef = std::max(coef, highest_coef);
+    highestCoef = std::max(coef, highestCoef);
     objExpr += coef * thrpt;
   }
 
   for (auto &[_, chVar] : channelVars) {
-    objExpr -= highest_coef *
+    objExpr -= highestCoef *
                (lumbdaCoef1 * chVar.hasBuf + lumbdaCoef2 * chVar.bufNSlots);
   }
 
@@ -406,7 +427,7 @@ LogicalResult buffer::placeBufferInCFDFCircuit(
 
 #ifdef DYNAMATIC_GUROBI_NOT_INSTALLED
   llvm::errs() << "Project was built without Gurobi installed, can't run "
-                  "CFDFC extraction\n";
+                  "buffer placement\n";
   return failure();
 #else
   // create a Gurobi environment
@@ -429,11 +450,10 @@ LogicalResult buffer::placeBufferInCFDFCircuit(
     circtThrpts.push_back(circtThrpt);
   }
 
-  //  Compute the total numbers of units in the circuit as a coef for elasticity
-  //  constraints
-  unsigned unitNum = 0;
-  for (auto &op : funcOp.getOps())
-    unitNum++;
+  // Compute the total numbers of units in the circuit as a coef for elasticity
+  // constraints
+  unsigned unitNum =
+      std::distance(funcOp.getOps().begin(), funcOp.getOps().end());
 
   // initialize variables
   initVarsInMILP(funcOp, modelBuf, cfdfcList, cfdfcInds, allChannels, unitVars,

@@ -62,7 +62,7 @@ bool isSelect(std::map<ArchBB *, bool> &archs, Value val);
 bool isBackEdge(Operation *opSrc, Operation *opDst);
 
 /// Get the total execution frequency of a channel in the circuit
-unsigned getChannelFreq(Value channel, std::vector<CFDFC> &cfdFCs);
+unsigned getChannelFreq(Value channel, std::vector<CFDFC> &cfdfcList);
 } // namespace buffer
 } // namespace dynamatic
 

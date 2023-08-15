@@ -14,40 +14,11 @@
 #include "mlir/Dialect/Func/IR/FuncOps.h"
 #include "mlir/IR/BuiltinTypes.h"
 
-#ifndef DYNAMATIC_GUROBI_NOT_INSTALLED
-#include "gurobi_c++.h"
-#endif // DYNAMATIC_GUROBI_NOT_INSTALLED
-
 namespace dynamatic {
 namespace buffer {
 
 using namespace circt;
 using namespace handshake;
-
-/// Get user of a value, which should be a single user as the value indicating a
-/// channel should be connected to only one unit.
-inline Operation *getUserOp(Value val) {
-  auto *dstOp = *val.getUsers().begin();
-  return dstOp;
-}
-
-/// Data structure to store the variables w.r.t to a unit(operation), including
-/// whether it belongs to a CFDFC, and its retime variables.
-struct UnitVar {
-public:
-  bool select;
-  GRBVar retIn, retOut;
-};
-
-/// Data structure to store the variables w.r.t to a channel(value), including
-/// whether it belongs to a CFDFC, and its time, throughput, and buffer
-/// placement decision.
-struct ChannelVar {
-public:
-  bool select;
-  GRBVar tDataIn, tDataOut, tElasIn, tElasOut;
-  GRBVar bufIsOp, bufNSlots, hasBuf;
-};
 
 /// Data structure to store the results of buffer placement, including the
 /// property and the total slots of the channel

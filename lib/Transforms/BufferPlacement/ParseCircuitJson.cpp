@@ -56,7 +56,7 @@ getBitWidthMatchedTimeInfo(unsigned bitWidth,
 
 double buffer::getPortDelay(Value channel,
                             std::map<std::string, buffer::UnitInfo> &unitInfo,
-                            std::string direction) {
+                            std::string &direction) {
   std::string opName;
   if (direction == "in") {
     opName = getOperationFullName(channel.getDefiningOp());
@@ -78,7 +78,7 @@ double buffer::getPortDelay(Value channel,
 
 double buffer::getUnitDelay(Operation *op,
                             std::map<std::string, buffer::UnitInfo> &unitInfo,
-                            std::string type) {
+                            std::string &type) {
   double delay;
   std::string opName = getOperationFullName(op);
   // check whether delay information exists
@@ -149,7 +149,7 @@ buffer::getUnitLatency(Operation *op,
 
 LogicalResult
 buffer::setChannelBufProps(std::vector<Value> &channels,
-                           DenseMap<Value, ChannelBufProps> &ChannelBufProps,
+                           DenseMap<Value, ChannelBufProps> &channelBufProps,
                            std::map<std::string, UnitInfo> &unitInfo) {
   for (auto &ch : channels) {
     Operation *srcOp = ch.getDefiningOp();
@@ -163,39 +163,39 @@ buffer::setChannelBufProps(std::vector<Value> &channels,
     std::string dstName = dstOp->getName().getStringRef().str();
     // set merge with multiple input to have at least one transparent buffer
     if (isa<handshake::MergeOp>(srcOp) && srcOp->getNumOperands() > 1)
-      ChannelBufProps[ch].minTrans = 1;
+      channelBufProps[ch].minTrans = 1;
 
     // TODO: set selectOp always select the frequent input
     if (isa<arith::SelectOp>(dstOp))
       if (dstOp->getOperand(2) == ch) {
-        ChannelBufProps[ch].maxTrans = 0;
-        ChannelBufProps[ch].minOpaque = 0;
+        channelBufProps[ch].maxTrans = 0;
+        channelBufProps[ch].minOpaque = 0;
       }
 
     if (isa<handshake::MemoryControllerOp>(srcOp) ||
         isa<handshake::MemoryControllerOp>(dstOp)) {
-      ChannelBufProps[ch].maxOpaque = 0;
-      ChannelBufProps[ch].maxTrans = 0;
+      channelBufProps[ch].maxOpaque = 0;
+      channelBufProps[ch].maxTrans = 0;
     }
 
     // set channel buffer properties w.r.t to input file
     if (unitInfo.count(srcName) > 0) {
-      ChannelBufProps[ch].minTrans += unitInfo[srcName].outPortTransBuf;
-      ChannelBufProps[ch].minOpaque += unitInfo[srcName].outPortOpBuf;
+      channelBufProps[ch].minTrans += unitInfo[srcName].outPortTransBuf;
+      channelBufProps[ch].minOpaque += unitInfo[srcName].outPortOpBuf;
     }
 
     if (unitInfo.count(dstName) > 0) {
-      ChannelBufProps[ch].minTrans += unitInfo[dstName].inPortTransBuf;
-      ChannelBufProps[ch].minOpaque += unitInfo[dstName].inPortOpBuf;
+      channelBufProps[ch].minTrans += unitInfo[dstName].inPortTransBuf;
+      channelBufProps[ch].minOpaque += unitInfo[dstName].inPortOpBuf;
     }
 
-    if (ChannelBufProps[ch].minTrans > 0 && ChannelBufProps[ch].minOpaque > 0)
+    if (channelBufProps[ch].minTrans > 0 && channelBufProps[ch].minOpaque > 0)
       return failure(); // cannot satisfy the constraint
   }
   return success();
 }
 
-static void parseBitWidthPair(llvm::json::Object jsonData,
+static void parseBitWidthPair(llvm::json::Object &jsonData,
                               std::vector<std::pair<unsigned, double>> &data) {
   for (const auto &[bitWidth, value] : jsonData) {
     llvm::StringRef bitKey(bitWidth);
@@ -244,9 +244,9 @@ LogicalResult buffer::parseJson(const std::string &jsonFile,
   if (!jsonValue)
     return failure();
 
-  auto data = jsonValue->getAsObject();
+  llvm::json::Object *data = jsonValue->getAsObject();
   for (std::string &op : opNames) {
-    auto unitInfoJson = data->getObject(op);
+    llvm::json::Object *unitInfoJson = data->getObject(op);
     // parse the bitwidth and its corresponding latency for data
     parseBitWidthPair(*unitInfoJson->getObject("latency"),
                       unitInfo[op].latency);

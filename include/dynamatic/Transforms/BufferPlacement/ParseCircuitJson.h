@@ -38,7 +38,7 @@ std::string getOperationShortStrName(Operation *op);
 /// and ready.
 double getUnitDelay(Operation *op,
                     std::map<std::string, buffer::UnitInfo> &unitInfo,
-                    std::string type = "data");
+                    std::string &type);
 
 /// Get the unit(op) latency.
 double getUnitLatency(Operation *op,
@@ -53,19 +53,19 @@ double getCombinationalDelay(Operation *op,
 /// Get the delay of a port(in, out) connected to a channel.
 double getPortDelay(Value channel,
                     std::map<std::string, buffer::UnitInfo> &unitInfo,
-                    std::string type = "in");
+                    std::string &direction);
 
 /// Parse the buffer placement requirement w.r.t to each channel
 LogicalResult
 setChannelBufProps(std::vector<Value> &channels,
-                   DenseMap<Value, ChannelBufProps> &ChannelBufProps,
+                   DenseMap<Value, ChannelBufProps> &channelBufProps,
                    std::map<std::string, UnitInfo> &unitInfo);
 
 /// Read timing info for units and channels in CFDFC from the input json.
 /// The units delay and latency are determined by the units type
 /// The channels timing info are described by the input ports and output
 /// ports timing characteristics
-LogicalResult parseJson(const std::string &jsonString,
+LogicalResult parseJson(const std::string &jsonFile,
                         std::map<std::string, UnitInfo> &unitInfo);
 
 } // namespace buffer

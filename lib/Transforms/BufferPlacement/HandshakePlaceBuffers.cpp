@@ -55,7 +55,7 @@ static LogicalResult instantiateBuffers(DenseMap<Value, Result> &res,
     if (result.numSlots == 0)
       continue;
     Operation *opSrc = channel.getDefiningOp();
-    Operation *opDst = getUserOp(channel);
+    Operation *opDst = *channel.getUsers().begin();
 
     unsigned numOpque = 0;
     unsigned numTrans = 0;
@@ -104,8 +104,8 @@ static LogicalResult instantiateBuffers(DenseMap<Value, Result> &res,
 
 /// Delete the created archs map for MG extraction to avoid memory leak
 static void deleleArchMap(std::map<ArchBB *, bool> &archs) {
-  for (auto it = archs.begin(); it != archs.end(); ++it)
-    delete it->first;
+  for (auto &[arch, _] : archs)
+    delete arch;
   // Clear the map
   archs.clear();
 }
@@ -115,8 +115,8 @@ namespace {
 struct HandshakePlaceBuffersPass
     : public HandshakePlaceBuffersBase<HandshakePlaceBuffersPass> {
 
-  HandshakePlaceBuffersPass(bool firstMG, std::string stdLevelInfo,
-                            std::string timefile, double targetCP,
+  HandshakePlaceBuffersPass(bool firstMG, std::string &stdLevelInfo,
+                            std::string &timefile, double targetCP,
                             int timeLimit, bool setCustom) {
     this->firstMG = firstMG;
     this->stdLevelInfo = stdLevelInfo;
@@ -128,6 +128,12 @@ struct HandshakePlaceBuffersPass
 
   void runOnOperation() override {
     ModuleOp m = getOperation();
+
+#ifdef DYNAMATIC_GUROBI_NOT_INSTALLED
+    m.emitError() << "Project was built without Gurobi installed, can't "
+                     "run smart buffer placement pass\n";
+    return signalPassFailure();
+#endif // DYNAMATIC_GUROBI_NOT_INSTALLED
 
     ChannelBufProps strategy;
     for (auto funcOp : m.getOps<handshake::FuncOp>())
@@ -188,11 +194,11 @@ LogicalResult HandshakePlaceBuffersPass::insertBuffers(FuncOp &funcOp,
   // Instantiate all the channels of MILP model in different CFDFC
   std::vector<Value> allChannels;
   auto startNode = *(funcOp.front().getArguments().end() - 1);
-  for (auto op : startNode.getUsers())
+  for (Operation *op : startNode.getUsers())
     for (auto opr : op->getOperands())
       allChannels.push_back(opr);
 
-  for (auto &op : funcOp.getOps())
+  for (Operation &op : funcOp.getOps())
     for (auto resOp : op.getResults())
       allChannels.push_back(resOp);
 

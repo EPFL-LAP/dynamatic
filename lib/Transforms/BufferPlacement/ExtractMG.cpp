@@ -26,10 +26,8 @@ using namespace dynamatic::buffer;
 
 /// Determine whether a string is a valid number from the simulation file
 static bool isNumber(const std::string &str) {
-  for (char c : str)
-    if (!isdigit(c) && c != ' ')
-      return false;
-  return true;
+  return std::all_of(str.begin(), str.end(),
+                     [](char c) { return isdigit(c) || c == ' '; });
 }
 
 /// Parse the token from the simulation file and write the value if it is valid
@@ -123,7 +121,7 @@ static void setBBConstrs(GRBModel &modelMILP, std::map<unsigned, GRBVar> &sBB,
     // no input arch if bb is not selected
     GRBLinExpr constraintInExpr;
     auto inArcs = getBBsInArcVars(bbInd, sArc);
-    for (auto arch : inArcs)
+    for (ArchBB *arch : inArcs)
       constraintInExpr += sArc[arch];
     modelMILP.addConstr(constraintInExpr == varBB,
                         "cIn" + std::to_string(bbInd));
@@ -131,7 +129,7 @@ static void setBBConstrs(GRBModel &modelMILP, std::map<unsigned, GRBVar> &sBB,
     // no output arch if bb is not selected
     GRBLinExpr constraintOutExpr;
     auto outArcs = getBBsOutArcVars(bbInd, sArc);
-    for (auto arch : outArcs)
+    for (ArchBB *arch : outArcs)
       constraintOutExpr += sArc[arch];
     modelMILP.addConstr(constraintOutExpr == varBB,
                         "cOut" + std::to_string(bbInd));
