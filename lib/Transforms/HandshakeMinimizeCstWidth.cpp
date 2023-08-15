@@ -73,6 +73,10 @@ struct MinimizeConstantBitwidth
         !val.isSingleWord())
       return failure();
 
+    // Do not optimize negative values
+    if (val.isNegative())
+      return failure();
+
     // Check if we can reduce the bitwidth
     unsigned newBitwidth = computeRequiredBitwidth(val);
     if (newBitwidth >= oldType.getWidth())
