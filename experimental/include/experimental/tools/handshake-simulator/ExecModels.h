@@ -10,8 +10,8 @@
 //
 //===----------------------------------------------------------------------===//
 
-#ifndef EXEC_MODELS_H
-#define EXEC_MODELS_H
+#ifndef EXPERIMENTAL_TOOLS_HANDSHAKESIMULATOR_EXECMODELS_H
+#define EXPERIMENTAL_TOOLS_HANDSHAKESIMULATOR_EXECMODELS_H
 
 #include "circt/Dialect/Handshake/HandshakeOps.h"
 #include "mlir/IR/Value.h"
@@ -30,7 +30,8 @@ using ModelMap =
 
 /// Initialises the mapping from operations to the configurated structure
 /// ADD YOUR STRUCT TO THE CORRESPONDING MAP IN THIS METHOD
-bool initialiseMap(llvm::StringMap<std::string> &funcMap, ModelMap &models);
+mlir::LogicalResult initialiseMap(llvm::StringMap<std::string> &funcMap,
+                            ModelMap &models);
 
 /// Data structure to hold functions to execute each components
 struct ExecutableModel {
@@ -138,4 +139,4 @@ struct DefaultBuffer : public ExecutableModel {
 } // namespace experimental
 } // namespace dynamatic
 
-#endif
+#endif // EXPERIMENTAL_TOOLS_HANDSHAKESIMULATOR_EXECMODELS_H

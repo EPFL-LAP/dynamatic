@@ -25,14 +25,12 @@ using namespace dynamatic::experimental;
 // Utility functions
 //===----------------------------------------------------------------------===//
 
-namespace {
-
-SmallVector<Value> toVector(ValueRange range) {
+static SmallVector<Value> toVector(ValueRange range) {
   return SmallVector<Value>(range.begin(), range.end());
 }
 
-// Returns whether the precondition holds for a general op to execute
-bool isReadyToExecute(ArrayRef<Value> ins, ArrayRef<Value> outs,
+/// Returns whether the precondition holds for a general op to execute
+static bool isReadyToExecute(ArrayRef<Value> ins, ArrayRef<Value> outs,
                       llvm::DenseMap<Value, llvm::Any> &valueMap) {
   for (auto in : ins)
     if (valueMap.count(in) == 0)
@@ -45,8 +43,8 @@ bool isReadyToExecute(ArrayRef<Value> ins, ArrayRef<Value> outs,
   return true;
 }
 
-// Fetch values from the value map and consume them
-std::vector<llvm::Any> fetchValues(ArrayRef<Value> values,
+/// Fetch values from the value map and consume them
+static std::vector<llvm::Any> fetchValues(ArrayRef<Value> values,
                                    llvm::DenseMap<Value, llvm::Any> &valueMap) {
   std::vector<llvm::Any> ins;
   for (auto &value : values) {
@@ -57,16 +55,16 @@ std::vector<llvm::Any> fetchValues(ArrayRef<Value> values,
   return ins;
 }
 
-// Store values to the value map
-void storeValues(std::vector<llvm::Any> &values, ArrayRef<Value> outs,
+/// Store values to the value map
+static void storeValues(std::vector<llvm::Any> &values, ArrayRef<Value> outs,
                  llvm::DenseMap<Value, llvm::Any> &valueMap) {
   assert(values.size() == outs.size());
   for (unsigned long i = 0; i < outs.size(); ++i)
     valueMap[outs[i]] = values[i];
 }
 
-// Update the time map after the execution
-void updateTime(ArrayRef<Value> ins, ArrayRef<Value> outs,
+/// Update the time map after the execution
+static void updateTime(ArrayRef<Value> ins, ArrayRef<Value> outs,
                 llvm::DenseMap<Value, double> &timeMap, double latency) {
   double time = 0;
   for (auto &in : ins)
@@ -78,7 +76,7 @@ void updateTime(ArrayRef<Value> ins, ArrayRef<Value> outs,
 
 /// Wrapper method for constant time simple operations that just update the
 /// output and do not modify the timeMap or valueMap in a very specific way
-bool tryToExecute(
+static bool tryToExecute(
     circt::Operation *op, llvm::DenseMap<Value, llvm::Any> &valueMap,
     llvm::DenseMap<Value, double> &timeMap, SmallVector<Value> &scheduleList,
     ModelMap &models,
@@ -88,19 +86,16 @@ bool tryToExecute(
   auto ins = toVector(op->getOperands());
   auto outs = toVector(op->getResults());
 
-  if (isReadyToExecute(ins, outs, valueMap)) {
-    auto in = fetchValues(ins, valueMap);
-    std::vector<llvm::Any> out(outs.size());
-    executeFunc(in, out, *op);
-    storeValues(out, outs, valueMap);
-    updateTime(ins, outs, timeMap, latency);
-    scheduleList = outs;
-    return true;
-  }
-  return false;
+  if (!isReadyToExecute(ins, outs, valueMap))
+    return false;
+  auto in = fetchValues(ins, valueMap);
+  std::vector<llvm::Any> out(outs.size());
+  executeFunc(in, out, *op);
+  storeValues(out, outs, valueMap);
+  updateTime(ins, outs, timeMap, latency);
+  scheduleList = outs;
+  return true;
 }
-
-} // namespace
 
 /*
   - 'modelStructuresMap' stores all known models and identifies each structure
@@ -110,7 +105,7 @@ bool tryToExecute(
   - 'models' links both maps, so the configuration and all known models
       mlir operation name -> configurated exec model structure
 */
-bool dynamatic::experimental::initialiseMap(
+LogicalResult dynamatic::experimental::initialiseMap(
     llvm::StringMap<std::string> &funcMap, ModelMap &models) {
   // This maps the configuration file / command string name to it's
   // corresponding structure
@@ -118,30 +113,46 @@ bool dynamatic::experimental::initialiseMap(
   // ------------------------------------------------------------------------ //
   //   ADD YOUR STRUCT TO THE BELOW MAP IF YOU WANT TO ADD EXECUTION MODELS   //
   // ------------------------------------------------------------------------ //
-  modelStructuresMap["defaultFork"] = std::make_unique<DefaultFork>();
-  modelStructuresMap["defaultMerge"] = std::make_unique<DefaultMerge>();
-  modelStructuresMap["defaultMux"] = std::make_unique<DefaultMux>();
-  modelStructuresMap["defaultBranch"] = std::make_unique<DefaultBranch>();
-  modelStructuresMap["defaultSink"] = std::make_unique<DefaultSink>();
-  modelStructuresMap["defaultConstant"] = std::make_unique<DefaultConstant>();
-  modelStructuresMap["defaultBuffer"] = std::make_unique<DefaultBuffer>();
-  modelStructuresMap["defaultConditionalBranch"] =
+  modelStructuresMap[std::string("default.") +
+                     handshake::ForkOp::getOperationName().str()] =
+      std::make_unique<DefaultFork>();
+  modelStructuresMap[std::string("default.") +
+                     handshake::MergeOp::getOperationName().str()] =
+      std::make_unique<DefaultMerge>();
+  modelStructuresMap[std::string("default.") +
+                     handshake::MuxOp::getOperationName().str()] =
+      std::make_unique<DefaultMux>();
+  modelStructuresMap[std::string("default.") +
+                     handshake::BranchOp::getOperationName().str()] =
+      std::make_unique<DefaultBranch>();
+  modelStructuresMap[std::string("default.") +
+                     handshake::SinkOp::getOperationName().str()] =
+      std::make_unique<DefaultSink>();
+  modelStructuresMap[std::string("default.") +
+                     handshake::ConstantOp::getOperationName().str()] =
+      std::make_unique<DefaultConstant>();
+  modelStructuresMap[std::string("default.") +
+                     handshake::BufferOp::getOperationName().str()] =
+      std::make_unique<DefaultBuffer>();
+  modelStructuresMap[std::string("default.") +
+                     handshake::ConditionalBranchOp::getOperationName().str()] =
       std::make_unique<DefaultConditionalBranch>();
-  modelStructuresMap["defaultControlMerge"] =
+  modelStructuresMap[std::string("default.") +
+                     handshake::ControlMergeOp::getOperationName().str()] =
       std::make_unique<DefaultControlMerge>();
   // ------------------------------------------------------------------------ //
   //   ADD YOUR STRUCT TO THE ABOVE MAP IF YOU WANT TO ADD EXECUTION MODELS   //
   // ------------------------------------------------------------------------ //
 
   // Fill the map containing the final execution models structures
-  for (auto &elem : funcMap) {
-    auto &chosenStruct = modelStructuresMap[elem.getValue()];
+  for (auto &[opName, modelName] : funcMap) {
+    auto &chosenStruct = modelStructuresMap[modelName];
     // Stop the program if the corresponding struct wasn't found
-    // if (!chosenStruct)
-    //  return false;
-    models[elem.getKey().str()] = std::move(chosenStruct);
+    if (!chosenStruct)
+      return failure();
+    models[opName.str()] = std::move(chosenStruct);
   }
-  return true;
+  return success();
 }
 
 //===----------------------------------------------------------------------===//
@@ -151,7 +162,7 @@ bool dynamatic::experimental::initialiseMap(
 namespace dynamatic {
 namespace experimental {
 
-// Default CIRCT fork
+/// Default CIRCT fork
 bool DefaultFork::tryExecute(llvm::DenseMap<Value, llvm::Any> &valueMap,
                              llvm::DenseMap<unsigned, unsigned> &memoryMap,
                              llvm::DenseMap<Value, double> &timeMap,
@@ -169,7 +180,7 @@ bool DefaultFork::tryExecute(llvm::DenseMap<Value, llvm::Any> &valueMap,
                       models, executeFunc, 1);
 }
 
-// Default CIRCT merge
+/// Default CIRCT merge
 bool DefaultMerge::tryExecute(llvm::DenseMap<Value, llvm::Any> &valueMap,
                               llvm::DenseMap<unsigned, unsigned> &memoryMap,
                               llvm::DenseMap<Value, double> &timeMap,
@@ -197,7 +208,7 @@ bool DefaultMerge::tryExecute(llvm::DenseMap<Value, llvm::Any> &valueMap,
   return true;
 }
 
-// Default CIRCT control merge
+/// Default CIRCT control merge
 bool DefaultControlMerge::tryExecute(
     llvm::DenseMap<Value, llvm::Any> &valueMap,
     llvm::DenseMap<unsigned, unsigned> &memoryMap,
@@ -229,7 +240,7 @@ bool DefaultControlMerge::tryExecute(
   return true;
 }
 
-// Default CIRCT mux
+/// Default CIRCT mux
 bool DefaultMux::tryExecute(llvm::DenseMap<Value, llvm::Any> &valueMap,
                             llvm::DenseMap<unsigned, unsigned> &memoryMap,
                             llvm::DenseMap<Value, double> &timeMap,
@@ -262,7 +273,7 @@ bool DefaultMux::tryExecute(llvm::DenseMap<Value, llvm::Any> &valueMap,
   return true;
 }
 
-// Default CIRCT branch
+/// Default CIRCT branch
 bool DefaultBranch::tryExecute(llvm::DenseMap<Value, llvm::Any> &valueMap,
                                llvm::DenseMap<unsigned, unsigned> &memoryMap,
                                llvm::DenseMap<Value, double> &timeMap,
@@ -277,7 +288,7 @@ bool DefaultBranch::tryExecute(llvm::DenseMap<Value, llvm::Any> &valueMap,
                       models, executeFunc, 0);
 }
 
-// Default CIRCT conditional branch
+/// Default CIRCT conditional branch
 bool DefaultConditionalBranch::tryExecute(
     llvm::DenseMap<Value, llvm::Any> &valueMap,
     llvm::DenseMap<unsigned, unsigned> &memoryMap,
@@ -309,7 +320,7 @@ bool DefaultConditionalBranch::tryExecute(
   return true;
 }
 
-// Default CIRCT sink
+/// Default CIRCT sink
 bool DefaultSink::tryExecute(llvm::DenseMap<Value, llvm::Any> &valueMap,
                              llvm::DenseMap<unsigned, unsigned> &memoryMap,
                              llvm::DenseMap<Value, double> &timeMap,
@@ -321,7 +332,7 @@ bool DefaultSink::tryExecute(llvm::DenseMap<Value, llvm::Any> &valueMap,
   return true;
 }
 
-// Default CIRCT constant
+/// Default CIRCT constant
 bool DefaultConstant::tryExecute(llvm::DenseMap<Value, llvm::Any> &valueMap,
                                  llvm::DenseMap<unsigned, unsigned> &memoryMap,
                                  llvm::DenseMap<Value, double> &timeMap,
@@ -338,7 +349,7 @@ bool DefaultConstant::tryExecute(llvm::DenseMap<Value, llvm::Any> &valueMap,
                       models, executeFunc, 0);
 }
 
-// Default CIRCT buffer
+/// Default CIRCT buffer
 bool DefaultBuffer::tryExecute(llvm::DenseMap<Value, llvm::Any> &valueMap,
                                llvm::DenseMap<unsigned, unsigned> &memoryMap,
                                llvm::DenseMap<Value, double> &timeMap,

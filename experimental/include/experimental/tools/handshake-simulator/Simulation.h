@@ -23,7 +23,7 @@
 namespace dynamatic {
 namespace experimental {
 
-bool simulate(llvm::StringRef toplevelFunction,
+mlir::LogicalResult simulate(llvm::StringRef toplevelFunction,
               llvm::ArrayRef<std::string> inputArgs,
               mlir::OwningOpRef<mlir::ModuleOp> &module,
               mlir::MLIRContext &context,
