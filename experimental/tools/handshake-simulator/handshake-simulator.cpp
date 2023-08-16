@@ -165,6 +165,6 @@ int main(int argc, char **argv) {
     return 1;
   }
 
-  return dynamatic::experimental::simulate(toplevelFunction, inputArgs, module,
-                                           context, modelConfigMap);
+  return int(failed(dynamatic::experimental::simulate(toplevelFunction, inputArgs, module,
+                                           context, modelConfigMap)));
 }
