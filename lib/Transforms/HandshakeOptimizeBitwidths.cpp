@@ -60,6 +60,9 @@ enum ExtType { UNKNOWN, LOGICAL, ARITHMETIC, CONFLICT };
 
 /// Shortcut for a value accompanied by its corresponding extension type.
 using ExtValue = std::pair<Value, ExtType>;
+
+/// Holds a set of operations that were already visisted during backtracking.
+using VisitedOps = SmallPtrSet<Operation *, 4>;
 } // namespace
 
 //===----------------------------------------------------------------------===//
@@ -90,32 +93,67 @@ static Value getMinimalValue(Value val, ExtType *ext = nullptr) {
     return val;
 
   // Only backtrack through values that were produced by extension operations
-  Operation *defOp = val.getDefiningOp();
-  if (!defOp || !isa<arith::ExtSIOp, arith::ExtUIOp>(defOp))
-    return val;
+  while (Operation *defOp = val.getDefiningOp()) {
+    if (!isa<arith::ExtSIOp, arith::ExtUIOp>(defOp))
+      return val;
 
-  if (!ext)
-    return getMinimalValue(defOp->getOperand(0));
-
-  // Update the extension type using the nature of the current extension
-  // operation and the current type
-  switch (*ext) {
-  case ExtType::UNKNOWN:
-    *ext = isa<arith::ExtSIOp>(defOp) ? ExtType::ARITHMETIC : ExtType::LOGICAL;
-    break;
-  case ExtType::LOGICAL:
-    if (isa<arith::ExtSIOp>(defOp))
-      *ext = ExtType::CONFLICT;
-    break;
-  case ExtType::ARITHMETIC:
-    if (isa<arith::ExtUIOp>(defOp))
-      *ext = ExtType::CONFLICT;
-    break;
-  default:
-    break;
+    // Update the extension type using the nature of the current extension
+    // operation and the current type
+    if (ext) {
+      switch (*ext) {
+      case ExtType::UNKNOWN:
+        *ext =
+            isa<arith::ExtSIOp>(defOp) ? ExtType::ARITHMETIC : ExtType::LOGICAL;
+        break;
+      case ExtType::LOGICAL:
+        if (isa<arith::ExtSIOp>(defOp))
+          *ext = ExtType::CONFLICT;
+        break;
+      case ExtType::ARITHMETIC:
+        if (isa<arith::ExtUIOp>(defOp))
+          *ext = ExtType::CONFLICT;
+        break;
+      default:
+        break;
+      }
+    }
+    // Backtrack through the extension operation
+    val = defOp->getOperand(0);
   }
 
-  return getMinimalValue(defOp->getOperand(0), ext);
+  return val;
+}
+
+// Backtracks through defining operations of the given value as long as they are
+// "single data input data-forwarders" (i.e., Handshake operations which forward
+// one their single "data input" to one of their outputs).
+static Value backtrack(Value val) {
+  VisitedOps visitedOps;
+  while (Operation *defOp = val.getDefiningOp()) {
+    // Stop when reaching an operation that was already backtracked through
+    if (auto [_, isNewOp] = visitedOps.insert(defOp); !isNewOp)
+      return val;
+
+    if (isa<handshake::BufferOp, handshake::ForkOp, handshake::LazyForkOp,
+            handshake::BranchOp>(defOp))
+      val = defOp->getOperand(0);
+    else if (auto mergeLikeOp =
+                 dyn_cast<handshake::MergeLikeOpInterface>(defOp)) {
+      if (auto dataOpr = mergeLikeOp.getDataOperands(); dataOpr.size() == 1)
+        val = dataOpr[0];
+    } else
+      return val;
+  }
+
+  // Stop backtracking when reaching function arguments
+  return val;
+}
+
+static Value backtrackToMinimalValue(Value val, ExtType *ext = nullptr) {
+  Value newVal;
+  while ((newVal = getMinimalValue(backtrack(val), ext)) != val)
+    val = newVal;
+  return newVal;
 }
 
 /// Returns the maximum number of bits that are used by any of the value's
@@ -130,6 +168,9 @@ static unsigned getUsefulResultWidth(Value val) {
   // the amount of bits of the value that can be safely discarded
   std::optional<unsigned> maxWidth;
   for (Operation *user : val.getUsers()) {
+    // Ignore sinks, since they do not actually use their operand for anything
+    if (isa<handshake::SinkOp>(user))
+      continue;
     if (!isa<arith::TruncIOp>(user))
       return resType.getIntOrFloatBitWidth();
     unsigned truncWidth = user->getResult(0).getType().getIntOrFloatBitWidth();
@@ -199,7 +240,7 @@ static Value modVal(ExtValue extVal, unsigned targetWidth,
 /// NOLINTNEXTLINE(misc-no-recursion)
 static bool isOperandInCycle(Value val, OpResult res,
                              DenseSet<Value> &mergedValues,
-                             DenseSet<Operation *> &visitedOps) {
+                             VisitedOps &visitedOps) {
   // Stop when we've reached the result of the merge-like operation
   if (val == res)
     return true;
@@ -209,11 +250,11 @@ static bool isOperandInCycle(Value val, OpResult res,
   if (!defOp)
     return false;
 
-  // Stop when reaching an operation that was already getMinimalValed through
+  // Stop when reaching an operation that was already backtracked through
   if (auto [_, isNewOp] = visitedOps.insert(defOp); !isNewOp)
     return false;
 
-  // getMinimalVal through operations that end up "forwarding" one of their
+  // Backtrack through operations that end up "forwarding" one of their
   // inputs to the output
   if (isa<handshake::BufferOp, handshake::ForkOp, handshake::LazyForkOp,
           handshake::BranchOp>(defOp))
@@ -227,7 +268,7 @@ static bool isOperandInCycle(Value val, OpResult res,
     bool oneOprInCycle = false;
     SmallVector<Value> mergeOperands;
     for (Value mergeLikeOpr : mergeLikeOp.getDataOperands()) {
-      DenseSet<Operation *> nestedVisitedOps(visitedOps);
+      VisitedOps nestedVisitedOps(visitedOps);
       if (isOperandInCycle(mergeLikeOpr, res, mergedValues, nestedVisitedOps))
         oneOprInCycle = true;
       else
@@ -257,7 +298,7 @@ static bool isOperandInCycle(Value val, OpResult res,
 /// returns false, the value of mergedValues is undefined.
 static bool isOperandInCycle(Value val, OpResult res,
                              DenseSet<Value> &mergedValues) {
-  DenseSet<Operation *> visitedOps;
+  VisitedOps visitedOps;
   return isOperandInCycle(val, res, mergedValues, visitedOps);
 }
 
@@ -1046,7 +1087,7 @@ struct ArithShift : public OpRewritePattern<Op> {
     Value shiftBy = op->getOperand(1);
     ExtType extToShift = ExtType::UNKNOWN;
     Value minToShift = getMinimalValue(toShift, &extToShift);
-    Value minShiftBy = getMinimalValue(shiftBy);
+    Value minShiftBy = backtrackToMinimalValue(shiftBy);
     bool isRightShift = isa<arith::ShRSIOp, arith::ShRUIOp>((Operation *)op);
 
     // Check whether we can reduce the bitwidth of the operation
@@ -1156,19 +1197,19 @@ struct ArithCmpFW : public OpRewritePattern<arith::CmpIOp> {
 /// cases.
 /// NOTE: behavior will likely be incorrect when the number that is being
 /// compared with the constant can be negative
-struct BoundOptimization
+struct ArithBoundOptimization
     : public OpRewritePattern<handshake::ConditionalBranchOp> {
   using OpRewritePattern<handshake::ConditionalBranchOp>::OpRewritePattern;
 
   LogicalResult matchAndRewrite(handshake::ConditionalBranchOp condOp,
                                 PatternRewriter &rewriter) const override {
     // The data type must be optimizable
-    Value dataOperand = condOp.getDataOperand();
+    Value dataOperand = backtrackToMinimalValue(condOp.getDataOperand());
     if (!isValidType(dataOperand.getType()))
       return failure();
 
     // The condition operand must originate from a comparison operation
-    Value condOperand = condOp.getConditionOperand();
+    Value condOperand = backtrackToMinimalValue(condOp.getConditionOperand());
     Operation *condDefOp = condOperand.getDefiningOp();
     if (!condDefOp)
       return failure();
@@ -1186,15 +1227,15 @@ struct BoundOptimization
     bool isConstantLhs = false;
     int64_t cstValue;
     Value otherCmpValue;
-    Value minLhs = getMinimalValue(cmpOp.getLhs());
-    Value minRhs = getMinimalValue(cmpOp.getRhs());
+    Value minLhs = backtrackToMinimalValue(cmpOp.getLhs());
+    Value minRhs = backtrackToMinimalValue(cmpOp.getRhs());
     if (auto lhsCst = checkCmpOperand(minLhs); lhsCst.has_value()) {
       isConstantLhs = true;
       cstValue = lhsCst.value();
       otherCmpValue = minRhs;
     } else if (auto rhsCst = checkCmpOperand(minRhs); rhsCst.has_value()) {
       cstValue = rhsCst.value();
-      otherCmpValue = cmpOp.getLhs();
+      otherCmpValue = minLhs;
     } else
       return failure();
 
@@ -1394,7 +1435,7 @@ void HandshakeOptimizeBitwidthsPass::addForwardPatterns(
       .add<ArithSingleType<arith::DivUIOp>, ArithSingleType<arith::DivSIOp>,
            ArithSingleType<arith::RemUIOp>, ArithSingleType<arith::RemSIOp>>(
           true, divWidth, ctx);
-  fwPatterns.add<ArithCmpFW, BoundOptimization>(ctx);
+  fwPatterns.add<ArithCmpFW, ArithBoundOptimization>(ctx);
 }
 
 void HandshakeOptimizeBitwidthsPass::addBackwardPatterns(
