@@ -42,7 +42,7 @@ static cl::opt<bool> legacy(
 static cl::opt<bool> dotDebug(
     "dot-debug", cl::Optional,
     cl::desc(
-        "If fase, the exported DOT file will be pretty-printed, making its "
+        "If false, the exported DOT file will be pretty-printed, making its "
         "visualization easier to look at but harder to debug with. For "
         "example, node names will be shortened (and not uniqued) when "
         "pretty-printing."),
