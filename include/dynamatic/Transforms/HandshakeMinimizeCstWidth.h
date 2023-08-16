@@ -19,7 +19,7 @@ namespace dynamatic {
 unsigned computeRequiredBitwidth(APInt val);
 
 std::unique_ptr<mlir::OperationPass<mlir::ModuleOp>>
-createHandshakeMinimizeCstWidth();
+createHandshakeMinimizeCstWidth(bool optNegatives = false);
 
 } // namespace dynamatic
 

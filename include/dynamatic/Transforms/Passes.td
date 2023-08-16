@@ -130,6 +130,9 @@ def HandshakeMinimizeCstWidth : Pass<"handshake-minimize-cst-width", "mlir::Modu
   }];
   let constructor = "dynamatic::createHandshakeMinimizeCstWidth()";
   let dependentDialects = ["mlir::arith::ArithDialect"];
+   let options =
+    [Option<"optNegatives", "opt-negatives", "bool", "false",
+            "If true, allows bitwidth optimization of negative values.">];
 }
 
 def HandshakePlaceBuffers : Pass<"handshake-place-buffers", "mlir::ModuleOp"> {
