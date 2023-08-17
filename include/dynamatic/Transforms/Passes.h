@@ -15,6 +15,7 @@
 #include "dynamatic/Transforms/HandshakeConcretizeIndexType.h"
 #include "dynamatic/Transforms/HandshakeInferBasicBlocks.h"
 #include "dynamatic/Transforms/HandshakeMinimizeCstWidth.h"
+#include "dynamatic/Transforms/HandshakeOptimizeBitwidths.h"
 #include "dynamatic/Transforms/HandshakePrepareForLegacy.h"
 #include "dynamatic/Transforms/NameMemoryOps.h"
 #include "dynamatic/Transforms/OptimizeBits.h"

@@ -26,10 +26,8 @@ using namespace dynamatic::buffer;
 
 /// Determine whether a string is a valid number from the simulation file
 static bool isNumber(const std::string &str) {
-  for (char c : str)
-    if (!isdigit(c) && c != ' ')
-      return false;
-  return true;
+  return std::all_of(str.begin(), str.end(),
+                     [](char c) { return isdigit(c) || c == ' '; });
 }
 
 /// Parse the token from the simulation file and write the value if it is valid
@@ -123,7 +121,7 @@ static void setBBConstrs(GRBModel &modelMILP, std::map<unsigned, GRBVar> &sBB,
     // no input arch if bb is not selected
     GRBLinExpr constraintInExpr;
     auto inArcs = getBBsInArcVars(bbInd, sArc);
-    for (auto arch : inArcs)
+    for (ArchBB *arch : inArcs)
       constraintInExpr += sArc[arch];
     modelMILP.addConstr(constraintInExpr == varBB,
                         "cIn" + std::to_string(bbInd));
@@ -131,7 +129,7 @@ static void setBBConstrs(GRBModel &modelMILP, std::map<unsigned, GRBVar> &sBB,
     // no output arch if bb is not selected
     GRBLinExpr constraintOutExpr;
     auto outArcs = getBBsOutArcVars(bbInd, sArc);
-    for (auto arch : outArcs)
+    for (ArchBB *arch : outArcs)
       constraintOutExpr += sArc[arch];
     modelMILP.addConstr(constraintOutExpr == varBB,
                         "cOut" + std::to_string(bbInd));
@@ -186,9 +184,36 @@ int buffer::getBBIndex(Operation *op) {
   return -1;
 }
 
+unsigned buffer::getChannelFreq(Value channel, std::vector<CFDFC> &cfdfcList) {
+  Operation *srcOp = channel.getDefiningOp();
+  Operation *dstOp = *channel.getUsers().begin();
+
+  // if is a start node or end node, return 1
+  if (!srcOp || !dstOp)
+    return 1;
+
+  if (isa<SinkOp, MemoryControllerOp>(dstOp) || isa<MemoryControllerOp>(srcOp))
+    return 0;
+
+  unsigned freq = 1;
+  if (isBackEdge(srcOp, dstOp))
+    freq = 0;
+  //  execution times equals to the sum over all CFDFCs
+  for (auto cfdfc : cfdfcList)
+    if (std::find(cfdfc.channels.begin(), cfdfc.channels.end(), channel) !=
+        cfdfc.channels.end())
+      freq += cfdfc.execN;
+
+  return freq;
+}
+
 bool buffer::isBackEdge(Operation *opSrc, Operation *opDst) {
   if (opDst->isProperAncestor(opSrc))
     return true;
+  if (isa<BranchOp, ConditionalBranchOp>(opSrc) &&
+      isa<MuxOp, MergeOp, ControlMergeOp>(opDst))
+    return getBBIndex(opSrc) >= getBBIndex(opDst);
+
   return false;
 }
 
@@ -205,7 +230,7 @@ bool buffer::isSelect(std::map<unsigned, bool> &bbs, Value val) {
 
   // if srcOp and dstOp are in the same BB, and the edge is not backedge
   // then the edge is selected depends on the BB
-  if (srcBB == dstBB && bbs.count(srcBB) > 0)
+  if (bbs.count(dstBB) > 0 && srcBB == dstBB)
     if (!isBackEdge(srcOp, dstOp))
       return bbs[srcBB];
   return false;
@@ -225,6 +250,7 @@ bool buffer::isSelect(std::map<ArchBB *, bool> &archs, Value val) {
   for (auto &[arch, varSelArch] : archs)
     if (arch->srcBB == srcBB && arch->dstBB == dstBB)
       return varSelArch;
+
   return false;
 }
 
@@ -241,7 +267,6 @@ LogicalResult buffer::extractCFDFCircuit(std::map<ArchBB *, bool> &archs,
   // Create MILP model for CFDFCircuit extraction
   // Init a gurobi model
   GRBEnv env = GRBEnv(true);
-  env.set("LogFile", "mip1.log");
   // cancel the printout output
   env.set(GRB_IntParam_OutputFlag, 0);
   env.start();

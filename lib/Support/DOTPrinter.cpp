@@ -480,6 +480,57 @@ static SmallVector<RawPort> extractPortsFromString(std::string &portsInfo,
   return ports;
 }
 
+/// Determines whether a bitwidth modification operation (extension or
+/// truncation) is located "between two blocks" (i.e., it is after a branch-like
+/// operation or before a merge-like operation). Such bitwidth modifiers trip up
+/// legacy Dynamatic and should thus be ignore in the DOT.
+static bool isBitModBetweenBlocks(Operation *op) {
+  if (isa<arith::ExtSIOp, arith::ExtUIOp, arith::TruncIOp>(op)) {
+    Operation *srcOp = op->getOperand(0).getDefiningOp();
+    Operation *dstOp = *op->getResult(0).getUsers().begin();
+    return (srcOp && dstOp) &&
+           (isa<handshake::BranchOp, handshake::ConditionalBranchOp>(srcOp) ||
+            isa<handshake::MergeOp, handshake::ControlMergeOp,
+                handshake::MuxOp>(dstOp));
+  }
+  return false;
+}
+
+/// Performs some very hacky transformations in the function to satisfy legacy
+/// Dynamatic's toolchain.
+static void patchUpIRForLegacy(handshake::FuncOp funcOp) {
+  // Remove the BB attribute of all forks "between basic blocks"
+  for (auto forkOp : funcOp.getOps<handshake::ForkOp>()) {
+    // Only operate on forks which belong to a basic block
+    std::optional<unsigned> optForkBB = getLogicBB(forkOp);
+    if (!optForkBB.has_value())
+      continue;
+    unsigned forkBB = optForkBB.value();
+
+    // Backtrack through extension operations
+    Value val = forkOp.getOperand();
+    while (Operation *defOp = val.getDefiningOp())
+      if (isa<arith::ExtSIOp, arith::ExtUIOp>(defOp))
+        val = defOp->getOperand(0);
+      else
+        break;
+
+    // Check whether any of the result's users is a merge-like operation in a
+    // different block
+    auto isMergeInDiffBlock = [&](OpResult res) {
+      Operation *user = *res.getUsers().begin();
+      return isa<handshake::MergeLikeOpInterface>(user) &&
+             getLogicBB(user).has_value() && getLogicBB(user).value() != forkBB;
+    };
+
+    if (isa_and_nonnull<handshake::ConditionalBranchOp>(val.getDefiningOp()) ||
+        llvm::any_of(forkOp->getResults(), isMergeInDiffBlock))
+      // Fork is located after a branch in the same block or before a merge-like
+      // operation in a different block
+      forkOp->removeAttr(BB_ATTR);
+  }
+}
+
 LogicalResult DOTPrinter::legacyRegisterPorts(NodeInfo &info,
                                               std::string &nodeName,
                                               bool skipInputs,
@@ -819,15 +870,28 @@ LogicalResult DOTPrinter::annotateArgumentNode(handshake::FuncOp funcOp,
 
 LogicalResult DOTPrinter::annotateEdge(Operation *src, Operation *dst,
                                        Value val) {
+  // In legacy mode, skip edges from branch-like operations to bitwidth
+  // modifiers in between blocks
+  if (legacy && isBitModBetweenBlocks(dst))
+    return success();
+
   EdgeInfo info;
 
+  // "Jump over" bitwidth modification operations that go to a merge-like
+  // operation in a different block
+  Value srcVal = val;
+  if (legacy && isBitModBetweenBlocks(src)) {
+    srcVal = src->getOperand(0);
+    src = srcVal.getDefiningOp();
+  }
+
   // Locate value in source results and destination operands
-  auto resIdx = findIndexInRange(src->getResults(), val);
+  auto resIdx = findIndexInRange(src->getResults(), srcVal);
   auto argIdx = findIndexInRange(dst->getOperands(), val);
 
   // Handle to and from attributes (with special cases). Also add 1 to each
   // index since first ports are called in1/out1
-  info.from = fixPortNumber(src, val, resIdx, true) + 1;
+  info.from = fixPortNumber(src, srcVal, resIdx, true) + 1;
   info.to = fixPortNumber(dst, val, argIdx, false) + 1;
 
   // Handle the mem_address optional attribute
@@ -931,14 +995,14 @@ static std::string getPrettyPrintedNodeLabel(Operation *op) {
           [&](auto) { return "div"; })
       .Case<arith::ShRSIOp, arith::ShRUIOp>([&](auto) { return ">>"; })
       .Case<arith::ShLIOp>([&](auto) { return "<<"; })
-      .Case<arith::ExtSIOp, arith::ExtFOp, arith::TruncIOp, arith::TruncFOp>(
-          [&](auto) {
-            unsigned opWidth =
-                op->getOperand(0).getType().getIntOrFloatBitWidth();
-            unsigned resWidth =
-                op->getResult(0).getType().getIntOrFloatBitWidth();
-            return std::to_string(opWidth) + "..." + std::to_string(resWidth);
-          })
+      .Case<arith::ExtSIOp, arith::ExtUIOp, arith::ExtFOp, arith::TruncIOp,
+            arith::TruncFOp>([&](auto) {
+        unsigned opWidth = op->getOperand(0).getType().getIntOrFloatBitWidth();
+        unsigned resWidth = op->getResult(0).getType().getIntOrFloatBitWidth();
+        return "[" + std::to_string(opWidth) + "..." +
+               std::to_string(resWidth) + "]";
+      })
+      .Case<arith::SelectOp>([&](auto) { return "select"; })
       .Case<arith::CmpIOp>([&](arith::CmpIOp op) {
         switch (op.getPredicate()) {
         case arith::CmpIPredicate::eq:
@@ -1018,8 +1082,7 @@ LogicalResult DOTPrinter::printDOT(mlir::ModuleOp mod) {
 
   if (legacy) {
     // In legacy mode, the IR must respect certain additional constraints for it
-    // to be compatible with legacy Dynamatic.
-
+    // to be compatible with legacy Dynamatic
     if (failed(verifyAllValuesHasOneUse(funcOp)))
       return funcOp.emitOpError()
              << "In legacy mode, all values in the IR must have exactly one "
@@ -1032,6 +1095,8 @@ LogicalResult DOTPrinter::printDOT(mlir::ModuleOp mod) {
              << "In legacy mode, all index types in the IR must be concretized "
                 "to ensure that the DOT is compatible with legacy Dynamatic. "
              << ERR_RUN_CONCRETIZATION;
+
+    patchUpIRForLegacy(funcOp);
   }
 
   mlir::raw_indented_ostream os(llvm::outs());
@@ -1110,9 +1175,7 @@ LogicalResult DOTPrinter::printNode(Operation *op) {
   if (!debug)
     os << prettyLabel;
   else {
-    // Take out dialect prefix from opName when possible
-    auto split = opName.find("_");
-    os << ((split != std::string::npos) ? opName.substr(split + 1) : opName);
+    os << opName;
   }
   os << "\"";
 
@@ -1130,7 +1193,20 @@ LogicalResult DOTPrinter::printNode(Operation *op) {
 }
 
 LogicalResult DOTPrinter::printEdge(Operation *src, Operation *dst, Value val) {
-  os << "\"" << getNodeName(src) << "\" -> \"" << getNodeName(dst) << "\" ["
+
+  // In legacy mode, skip edges from branch-like operations to bitwidth
+  // modifiers in between blocks
+  if (legacy && isBitModBetweenBlocks(dst))
+    return success();
+
+  // "Jump over" bitwidth modification operations that go to a merge-like
+  // operation in a different block
+  std::string srcNodeName =
+      legacy && isBitModBetweenBlocks(src)
+          ? getNodeName(src->getOperand(0).getDefiningOp())
+          : getNodeName(src);
+
+  os << "\"" << srcNodeName << "\" -> \"" << getNodeName(dst) << "\" ["
      << getStyleOfValue(val);
   if (legacy && failed(annotateEdge(src, dst, val)))
     return failure();
@@ -1187,10 +1263,13 @@ LogicalResult DOTPrinter::printFunc(handshake::FuncOp funcOp) {
     auto opID = std::to_string(opIDs[&op]);
     opNameMap[&op] = opFullName.substr(startIdx + 1) + opID;
 
+    // In legacy mode, do not print bitwidth modification operation between
+    // branch-like and merge-like operations
+    if (legacy && isBitModBetweenBlocks(&op))
+      continue;
+
     // Print the operation
-    if (auto instOp = dyn_cast<handshake::InstanceOp>(op); instOp)
-      assert(false && "multiple functions are not supported");
-    else if (failed(printNode(&op)))
+    if (failed(printNode(&op)))
       return failure();
   }
 

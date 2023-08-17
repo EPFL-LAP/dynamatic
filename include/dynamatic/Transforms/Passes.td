@@ -75,6 +75,23 @@ def HandshakePrepareForLegacy : Pass<"handshake-prepare-for-legacy", "mlir::Modu
   let constructor = "dynamatic::createHandshakePrepareForLegacy()";
 }
 
+def HandshakeOptimizeBitwidths : Pass<"handshake-optimize-bitwidths",
+                                      "mlir::ModuleOp"> {
+  let summary = "Optimize bitwidths of all channels.";
+  let description = [{
+    Reduces the bitwidths of channels wherever possible. Uses a standard
+    forward-backward iterative process to identify opportunities for bitwidth
+    reduction, considering the specific semantics of all operations present at
+    the Handhsake level.
+  }];
+  let constructor = "dynamatic::createHandshakeOptimizeBitwidths()";
+  let dependentDialects = ["mlir::arith::ArithDialect"];
+  let options = [Option<"legacy", "legacy", "bool", "false",
+    "When legacy mode is enabled, disables bitwidth optimization of memory "
+    "address channels since they sometime make the legacy dot2vhdl tool "
+    "fail.">];
+}
+
 def HandshakeOptimizeBits : Pass<"optimize-bits" , "mlir::ModuleOp"> {
   let summary = "Optimize bits width that can be reduced.";
   let description = [{
@@ -113,6 +130,9 @@ def HandshakeMinimizeCstWidth : Pass<"handshake-minimize-cst-width", "mlir::Modu
   }];
   let constructor = "dynamatic::createHandshakeMinimizeCstWidth()";
   let dependentDialects = ["mlir::arith::ArithDialect"];
+   let options =
+    [Option<"optNegatives", "opt-negatives", "bool", "false",
+            "If true, allows bitwidth optimization of negative values.">];
 }
 
 def HandshakePlaceBuffers : Pass<"handshake-place-buffers", "mlir::ModuleOp"> {
@@ -126,7 +146,15 @@ def HandshakePlaceBuffers : Pass<"handshake-place-buffers", "mlir::ModuleOp"> {
     Option<"firstMG", "firstMG", "bool", "false",
     "if true, only extract the first MG from the input file">,
     Option<"stdLevelInfo", "std-level-info", "std::string", "",
-    "if true, extract CFDFC from standard level simluation">];
+    "if provided, extract CFDFC from standard level simluation">,
+    Option<"timefile", "time-file", "std::string", "",
+    "required, file provide the time and buffer prerequisite information ">,
+    Option<"targetCP", "target-period", "double", "4.0",
+    "target clock period for the CFDFC">,
+    Option<"timeLimit", "time-limit", "int", "180",
+    "maximum time limit for MILP solver">,
+     Option<"setCustom", "set-custom", "bool", "true",
+    "set customized constraints from dataflow">];
 }
 
 //===----------------------------------------------------------------------===//

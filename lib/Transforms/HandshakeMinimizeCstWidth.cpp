@@ -59,6 +59,10 @@ struct MinimizeConstantBitwidth
     : public OpRewritePattern<handshake::ConstantOp> {
   using OpRewritePattern<handshake::ConstantOp>::OpRewritePattern;
 
+  MinimizeConstantBitwidth(bool optNegatives, MLIRContext *ctx)
+      : OpRewritePattern<handshake::ConstantOp>(ctx),
+        optNegatives(optNegatives){};
+
   LogicalResult matchAndRewrite(handshake::ConstantOp cstOp,
                                 PatternRewriter &rewriter) const override {
     // Only consider integer attributes
@@ -71,6 +75,10 @@ struct MinimizeConstantBitwidth
     APInt val = intAttr.getValue();
     if (oldType.getSignedness() != IntegerType::SignednessSemantics::Signless ||
         !val.isSingleWord())
+      return failure();
+
+    // Do not optimize negative values
+    if (val.isNegative() && !optNegatives)
       return failure();
 
     // Check if we can reduce the bitwidth
@@ -106,6 +114,10 @@ struct MinimizeConstantBitwidth
     savedBits += oldType.getWidth() - newBitwidth;
     return success();
   }
+
+private:
+  /// Whether to allow optimization of negative values.
+  bool optNegatives;
 };
 
 /// Erases redundant extension operations (ones that have the same operand and
@@ -154,6 +166,10 @@ struct HandshakeMinimizeCstWidthPass
     : public dynamatic::impl::HandshakeMinimizeCstWidthBase<
           HandshakeMinimizeCstWidthPass> {
 
+  HandshakeMinimizeCstWidthPass(bool optNegatives) {
+    this->optNegatives = optNegatives;
+  }
+
   void runOnOperation() override {
     auto *ctx = &getContext();
     mlir::ModuleOp mod = getOperation();
@@ -162,7 +178,8 @@ struct HandshakeMinimizeCstWidthPass
     config.useTopDownTraversal = true;
     config.enableRegionSimplification = false;
     RewritePatternSet patterns{ctx};
-    patterns.add<MinimizeConstantBitwidth, EraseRedundantExtension>(ctx);
+    patterns.add<MinimizeConstantBitwidth>(optNegatives, ctx);
+    patterns.add<EraseRedundantExtension>(ctx);
     if (failed(applyPatternsAndFoldGreedily(mod, std::move(patterns), config)))
       return signalPassFailure();
 
@@ -173,6 +190,6 @@ struct HandshakeMinimizeCstWidthPass
 } // namespace
 
 std::unique_ptr<mlir::OperationPass<mlir::ModuleOp>>
-dynamatic::createHandshakeMinimizeCstWidth() {
-  return std::make_unique<HandshakeMinimizeCstWidthPass>();
+dynamatic::createHandshakeMinimizeCstWidth(bool optNegatives) {
+  return std::make_unique<HandshakeMinimizeCstWidthPass>(optNegatives);
 }

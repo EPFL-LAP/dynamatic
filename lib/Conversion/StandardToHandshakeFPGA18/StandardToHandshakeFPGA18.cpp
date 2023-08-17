@@ -265,7 +265,7 @@ LogicalResult HandshakeLoweringFPGA18::replaceMemoryOps(
           auto indices = loadOp.getIndices();
           assert(indices.size() == 1 && "load must be unidimensional");
           newOp = rewriter.create<handshake::DynamaticLoadOp>(
-              op.getLoc(), memref, indices[0]);
+              op.getLoc(), cast<MemRefType>(memref.getType()), indices[0]);
 
           // Replace uses of old load result with data result of new load
           op.getResult(0).replaceAllUsesWith(
@@ -275,7 +275,7 @@ LogicalResult HandshakeLoweringFPGA18::replaceMemoryOps(
           auto indices = storeOp.getIndices();
           assert(indices.size() == 1 && "load must be unidimensional");
           newOp = rewriter.create<handshake::DynamaticStoreOp>(
-              op.getLoc(), storeOp.getValueToStore(), indices[0]);
+              op.getLoc(), indices[0], storeOp.getValueToStore());
         })
         .Default([&](auto) {
           return op.emitOpError("Load/store operation cannot be handled.");

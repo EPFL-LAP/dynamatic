@@ -4,6 +4,7 @@ add_dynamatic_library(DynamaticTransforms
   FlattenMemRefRowMajor.cpp
   HandshakeConcretizeIndexType.cpp
   HandshakeMinimizeCstWidth.cpp
+  HandshakeOptimizeBitwidths.cpp
   HandshakePrepareForLegacy.cpp
   HandshakeInferBasicBlocks.cpp
   NameMemoryOps.cpp

@@ -17,6 +17,9 @@ namespace dynamatic {
 /// from in the std-level IR.
 const std::string BB_ATTR = "bb";
 
+/// ID of entry basic block of every Handshake function.
+const unsigned ENTRY_BB = 0;
+
 /// This struct groups the operations of a handshake::FuncOp in "blocks" based
 /// on the "bb" attribute potentially attached to each operation.
 struct LogicBBs {
@@ -34,6 +37,12 @@ LogicBBs getLogicBBs(circt::handshake::FuncOp funcOp);
 /// If the source operation belongs to a logical BB, makes the destination
 /// operation part of the same BB and returns true; otherwise return false.
 bool inheritBB(Operation *srcOp, Operation *dstOp);
+
+/// If the source value is the result of an operation that belongs to a logical
+/// BB, makes the destination operation part of the same BB and returns true;
+/// otherwise return false. If the source value is a block argument, make the
+/// destination operation part of the entry BB.
+bool inheritBBFromValue(Value val, Operation *dstOp);
 
 /// Thin wrapper around an attribute access to the "bb" attribute.
 std::optional<unsigned> getLogicBB(Operation *op);
