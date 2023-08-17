@@ -617,7 +617,7 @@ static unsigned getBlockPredecessorCount(Block *block) {
 }
 
 static void processProducedValues(
-    Value &producedValue, BackedgeBuilder &edgeBuilder,
+    Value producedValue, BackedgeBuilder &edgeBuilder,
     ConversionPatternRewriter &rewriter,
     DenseMap<Block *, BlockLoopInfo> blockToLoopInfoMap,
     DenseMap<Block *, DenseMap<Value, Operation *>> &mapLoopHeaderBlocks) {
@@ -640,10 +640,13 @@ static void processProducedValues(
 
     int numOfMerges = consumerLoopDepth - commonLoopDepth;
 
-    if (numOfMerges <= 0)
-      // There is no need to insert merge operation(s) because there is no
-      // token missmatch
+    if (numOfMerges < 0)
+      // Token missmatch when token produced multiple times needs to be consumed once
       continue;
+
+    llvm::outs() << " --> ";
+    llvm::outs() << consumerOp->getName();
+    llvm::outs() << "\n";
 
     SmallVector<Backedge, 2> prevMergeInputBackedges;
     for (CFGLoop *currLoop = consumersInnermostLoop; currLoop != commonLoop;
@@ -731,8 +734,9 @@ LogicalResult HandshakeLoweringFPL22::handleTokenMissmatch(
   for (auto &block : r.getBlocks()) {
     // Process Block arguments
     for (auto &blockArg : block.getArguments())
-      processProducedValues(blockArg, edgeBuilder, rewriter, blockToLoopInfoMap,
-                            mapLoopHeaderBlocks);
+      if (blockArg.isUsedOutsideOfBlock(&block))
+        processProducedValues(blockArg, edgeBuilder, rewriter, blockToLoopInfoMap,
+                              mapLoopHeaderBlocks);
 
     // Process Values produced in Operations
     for (auto &producerOp : block.getOperations()) {

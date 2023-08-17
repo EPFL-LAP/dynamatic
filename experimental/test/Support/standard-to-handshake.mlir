@@ -89,7 +89,7 @@ func.func @test6 (%arg0 : i32) {
   %add = arith.addi %n, %arg0 : i32
   %add2 = arith.addi %n, %n2 : i32
   %b2 = arith.constant 0 : i1
-	cf.cond_br %b2, ^bb3(%add: i32), ^bb2(%add2: i32)
+	cf.cond_br %b, ^bb3(%add: i32), ^bb2(%add2: i32)
 ^bb3(%y : i32):
 	cf.br ^bb1
 ^bb4:
@@ -101,10 +101,10 @@ func.func @test6 (%arg0 : i32) {
 // 	cf.br ^bb1(%cst : i32)
 // ^bb1(%x : i32):
 //   %b = arith.constant 1 : i1
-// 	cf.cond_br %b, ^bb2(%x: i32), ^bb3
+// 	cf.cond_br %b, ^bb2(%cst: i32), ^bb3
 // ^bb2(%y : i32):
 // 	%add2 = arith.addi %x, %x : i32
-// 	cf.br ^bb1(%x : i32)
+// 	cf.br ^bb2(%add2 : i32)
 // ^bb3:
 // 	return
 // }
