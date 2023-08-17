@@ -1,5 +1,5 @@
 {
-  "handshake.br": {
+  "handshake.cond_br": {
     "path": "experimental/data/vhdl/handshake/br.vhd",
     "concretization_method": "GENERIC",
     "parameters": [
@@ -78,11 +78,7 @@
     "concretization_method": "GENERIC",
     "parameters": [
       {
-        "name": "INPUT_BITWIDTH",
-        "type": "integer"
-      },
-      {
-        "name": "OUTPUT_BITWIDTH",
+        "name": "BITWIDTH",
         "type": "integer"
       }
     ]
