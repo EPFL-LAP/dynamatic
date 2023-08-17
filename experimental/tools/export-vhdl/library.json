@@ -1,0 +1,292 @@
+{
+  "handshake.br": {
+    "path": "experimental/data/vhdl/handshake/br.vhd",
+    "concretization_method": "GENERIC",
+    "parameters": [
+      {
+        "name": "BITWIDTH",
+        "type": "integer"
+      }
+    ]
+  },
+  "handshake.buffer": {
+    "path": "experimental/data/vhdl/handshake/buffer.vhd",
+    "concretization_method": "GENERIC",
+    "parameters": [
+      {
+        "name": "BITWIDTH",
+        "type": "integer"
+      },
+      {
+        "name": "BUFFER_TYPE",
+        "type": "string"
+      },
+      {
+        "name": "NUM_OF_SLOTS",
+        "type": "integer"
+      }
+    ]
+  },
+  "handshake.constant": {
+    "path": "experimental/data/vhdl/handshake/constant.vhd",
+    "concretization_method": "GENERIC",
+    "parameters": [
+      {
+        "name": "CONST_VALUE",
+        "type": "integer"
+      },
+      {
+        "name": "BITWIDTH",
+        "type": "integer"
+      }
+    ]
+  },
+  "handshake.control_merge": {
+    "path": "experimental/data/vhdl/handshake/control_merge.vhd",
+    "concretization_method": "GENERIC",
+    "parameters": [
+      {
+        "name": "INPUTS",
+        "type": "integer"
+      },
+      {
+        "name": "BITWIDTH",
+        "type": "integer"
+      },
+      {
+        "name": "COND_BITWIDTH",
+        "type": "integer"
+      }
+    ]
+  },
+  "handshake.d_load": {
+    "path": "experimental/data/vhdl/handshake/d_load.vhd",
+    "concretization_method": "GENERIC",
+    "parameters": [
+      {
+        "name": "DATA_BITWIDTH",
+        "type": "integer"
+      },
+      {
+        "name": "ADDR_BITWIDTH",
+        "type": "integer"
+      }
+    ]
+  },
+  "handshake.d_return": {
+    "path": "experimental/data/vhdl/handshake/d_return.vhd",
+    "concretization_method": "GENERIC",
+    "parameters": [
+      {
+        "name": "INPUT_BITWIDTH",
+        "type": "integer"
+      },
+      {
+        "name": "OUTPUT_BITWIDTH",
+        "type": "integer"
+      }
+    ]
+  },
+  "handshake.d_store": {
+    "path": "experimental/data/vhdl/handshake/d_store.vhd",
+    "concretization_method": "GENERIC",
+    "parameters": [
+      {
+        "name": "DATA_BITWIDTH",
+        "type": "integer"
+      },
+      {
+        "name": "ADDR_BITWIDTH",
+        "type": "integer"
+      }
+    ]
+  },
+  "handshake.end": {
+    "path": "experimental/data/vhdl/handshake/end.vhd",
+    "concretization_method": "GENERIC",
+    "parameters": [
+      {
+        "name": "MEM_INPUTS",
+        "type": "integer"
+      },
+      {
+        "name": "BITWIDTH",
+        "type": "integer"
+      }
+    ]
+  },
+  "handshake.fork": {
+    "path": "experimental/data/vhdl/handshake/fork.vhd",
+    "concretization_method": "GENERIC",
+    "parameters": [
+      {
+        "name": "OUTPUTS",
+        "type": "integer"
+      },
+      {
+        "name": "BITWIDTH",
+        "type": "integer"
+      }
+    ]
+  },
+  "handshake.lazy_fork": {
+    "path": "experimental/data/vhdl/handshake/lazy_fork.vhd",
+    "concretization_method": "GENERIC",
+    "parameters": [
+      {
+        "name": "OUTPUTS",
+        "type": "integer"
+      },
+      {
+        "name": "BITWIDTH",
+        "type": "integer"
+      }
+    ]
+  },
+  "handshake.mem_controller": {
+    "path": "experimental/data/vhdl/handshake/mem_controller.vhd",
+    "concretization_method": "GENERIC",
+    "parameters": [
+      {
+        "name": "DATA_BITWIDTH",
+        "type": "integer"
+      },
+      {
+        "name": "CTRL_BITWIDTH",
+        "type": "integer"
+      },
+      {
+        "name": "ADDR_BITWIDTH",
+        "type": "integer"
+      },
+      {
+        "name": "LOAD_COUNT",
+        "type": "integer"
+      },
+      {
+        "name": "STORE_COUNT",
+        "type": "integer"
+      },
+      {
+        "name": "LOAD_STORE_ARRAYS",
+        "type": "string_arr"
+      }
+    ]
+  },
+  "handshake.merge": {
+    "path": "experimental/data/vhdl/handshake/merge.vhd",
+    "concretization_method": "GENERIC",
+    "parameters": [
+      {
+        "name": "INPUTS",
+        "type": "integer"
+      },
+      {
+        "name": "BITWIDTH",
+        "type": "integer"
+      }
+    ]
+  },
+  "handshake.mux": {
+    "path": "experimental/data/vhdl/handshake/mux.vhd",
+    "concretization_method": "GENERIC",
+    "parameters": [
+      {
+        "name": "INPUTS",
+        "type": "integer"
+      },
+      {
+        "name": "BITWIDTH",
+        "type": "integer"
+      },
+      {
+        "name": "COND_BITWIDTH",
+        "type": "integer"
+      }
+    ]
+  },
+  "handshake.sink": {
+    "path": "experimental/data/vhdl/handshake/sink.vhd",
+    "concretization_method": "GENERIC",
+    "parameters": [
+      {
+        "name": "BITWIDTH",
+        "type": "integer"
+      }
+    ]
+  },
+  "handshake.source": {
+    "path": "experimental/data/vhdl/handshake/source.vhd",
+    "concretization_method": "GENERIC",
+    "parameters": [
+      {
+        "name": "BITWIDTH",
+        "type": "integer"
+      }
+    ]
+  },
+  "handshake.start": {
+    "path": "experimental/data/vhdl/handshake/start.vhd",
+    "concretization_method": "GENERIC",
+    "parameters": [
+      {
+        "name": "BITWIDTH",
+        "type": "integer"
+      }
+    ]
+  },
+
+
+  "arith.cmpf": {
+    "path": "experimental/data/vhdl/arithmetic/cmpf",
+    "concretization_method": "GENERIC",
+    "parameters": [
+      {
+        "name": "PREDICATE",
+        "type": "integer"
+      },
+      {
+        "name": "BITWIDTH",
+        "type": "integer"
+      }
+    ]
+  },
+  "arith.cmpi": {
+    "path": "experimental/data/vhdl/arithmetic/cmpi",
+    "concretization_method": "GENERIC",
+    "parameters": [
+      {
+        "name": "PREDICATE",
+        "type": "integer"
+      },
+      {
+        "name": "BITWIDTH",
+        "type": "integer"
+      }
+    ]
+  },
+  "arith.addf": {
+    "path": "experimental/data/vhdl/arithmetic/addf.vhd",
+    "concretization_method": "GENERIC",
+    "parameters": [
+      {
+        "name": "BITWIDTH",
+        "type": "integer"
+      }
+    ]
+  },
+  "arith.extsi": {
+    "path": "experimental/data/vhdl/arithmetic/extsi.vhd",
+    "concretization_method": "GENERIC",
+    "parameters": [
+      {
+        "name": "INPUT_BITWIDTH",
+        "type": "integer"
+      },
+      {
+        "name": "OUTPUT_BITWIDTH",
+        "type": "integer"
+      }
+    ]
+  }
+}
