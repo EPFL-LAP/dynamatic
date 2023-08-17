@@ -9,12 +9,12 @@ use work.customTypes.all;
 
 entity d_return is
 Generic (
-  INPUT_BITWIDTH: integer; OUTPUT_BITWIDTH: integer
+  BITWIDTH: integer
 );
 port(
   clk, rst : in std_logic; 
-  dataInArray : in data_array (0 downto 0)(INPUT_BITWIDTH-1 downto 0); 
-  dataOutArray : out data_array (0 downto 0)(OUTPUT_BITWIDTH-1 downto 0);      
+  dataInArray : in data_array (0 downto 0)(BITWIDTH-1 downto 0); 
+  dataOutArray : out data_array (0 downto 0)(BITWIDTH-1 downto 0);      
   pValidArray : in std_logic_vector(0 downto 0);
   nReadyArray : in std_logic_vector(0 downto 0);
   validArray : out std_logic_vector(0 downto 0);
@@ -25,7 +25,7 @@ architecture arch of d_return is
 
 begin 
 
-tehb: entity work.TEHB(arch) generic map (INPUT_BITWIDTH)
+tehb: entity work.TEHB(arch) generic map (BITWIDTH)
         port map (
         --inputs
             clk => clk, 
