@@ -21,40 +21,109 @@ using namespace mlir;
 using namespace dynamatic;
 using namespace circt::handshake;
 
-/// Determines whether the defining operation of a value is a constant -1.
-static bool isConstantNegOne(Value val) {
-  if (auto cstOp = val.getDefiningOp<arith::ConstantOp>())
-    if (auto cstAttr = dyn_cast<IntegerAttr>(cstOp.getValue()))
-      return cstAttr.getValue().getSExtValue() == -1;
-  return false;
+//===----------------------------------------------------------------------===//
+// OpTree implementation
+//===----------------------------------------------------------------------===//
+
+OpTree::OpTree(OpType opType, OpTreeOperand left, OpTreeOperand right)
+    : opType(opType), left(left), right(right),
+      depth(std::max(getOperandDepth(left), getOperandDepth(right)) + 1),
+      adderDepth(std::max(getOperandDepth(left), getOperandDepth(right)) +
+                 ((opType == OpType::ADD || OpType::SUB) ? 1U : 0U)),
+      numNodes(getOperandNumNodes(left) + getOperandNumNodes(right) + 1) {}
+
+unsigned OpTree::getOperandDepth(OpTreeOperand &operand) {
+  if (auto *tree = std::get_if<std::shared_ptr<OpTree>>(&operand))
+    return (*tree)->depth;
+  return 0U;
 }
 
-/// Determines whether the defining operation of a value is a multiplication
-/// with a constant -1.
-static Value isMulTimesNegOne(Value val) {
-  if (auto mulOp = val.getDefiningOp<arith::MulIOp>()) {
-    // Check whether one of the two operands is a constant -1 value. If yes,
-    // return the other operand
-    auto mulOperands = mulOp->getOperands();
-    auto mul0 = mulOperands[0], mul1 = mulOperands[1];
-    if (isConstantNegOne(mul0))
-      return mul1;
-    if (isConstantNegOne(mul1))
-      return mul0;
+unsigned OpTree::getOperandAdderDepth(OpTreeOperand &operand) {
+  if (auto *tree = std::get_if<std::shared_ptr<OpTree>>(&operand))
+    return (*tree)->adderDepth;
+  return 0U;
+}
+
+unsigned OpTree::getOperandNumNodes(OpTreeOperand &operand) {
+  if (auto *tree = std::get_if<std::shared_ptr<OpTree>>(&operand))
+    return (*tree)->numNodes;
+  return 0U;
+}
+
+// NOLINTBEGIN(misc-no-recursion)
+Value OpTree::buildTreeRecursive(
+    Operation *op, PatternRewriter &rewriter,
+    std::unordered_map<size_t, Value> &cstCache,
+    std::unordered_map<std::shared_ptr<OpTree>, Value> &resultCache) {
+
+  // Builds the tree corresponding to an operand of the current tree and returns
+  // the value associated with it
+  auto buildTreeOperand = [&](OpTreeOperand operand) -> Value {
+    if (auto *tree = std::get_if<std::shared_ptr<OpTree>>(&operand)) {
+      // Build the operand tree recursively, unless it was already computed
+      if (auto valIt = resultCache.find(*tree); valIt != resultCache.end()) {
+        return valIt->second;
+      }
+      Value res =
+          (*tree)->buildTreeRecursive(op, rewriter, cstCache, resultCache);
+      resultCache[*tree] = res;
+      return res;
+    }
+    if (auto *value = std::get_if<size_t>(&operand)) {
+      // Create a constant operation, unless an identical one was already
+      // created
+      if (auto valIt = cstCache.find(*value); valIt != cstCache.end()) {
+        return valIt->second;
+      }
+      auto cstResult =
+          rewriter
+              .create<arith::ConstantOp>(
+                  op->getLoc(),
+                  rewriter.getIntegerAttr(op->getResult(0).getType(), *value))
+              .getResult();
+      cstCache[*value] = cstResult;
+      return cstResult;
+    }
+
+    // Just return the value-type operand
+    Value *val = std::get_if<Value>(&operand);
+    assert(val && "variant type is illegal");
+    return *val;
+  };
+
+  // Build the tree of each operand and combine their results by creating an
+  // airthmetic operation of the correct type
+  Value leftVal = buildTreeOperand(left);
+  Value rightVal = buildTreeOperand(right);
+  Value result;
+  switch (opType) {
+  case OpType::ADD:
+    result = rewriter.create<arith::AddIOp>(op->getLoc(), leftVal, rightVal)
+                 .getResult();
+    break;
+  case OpType::SUB:
+    result = rewriter.create<arith::SubIOp>(op->getLoc(), leftVal, rightVal)
+                 .getResult();
+    break;
+  case OpType::SHIFT_LEFT:
+    result = rewriter.create<arith::ShLIOp>(op->getLoc(), leftVal, rightVal)
+                 .getResult();
+    break;
   }
-  return nullptr;
+  return result;
+}
+// NOLINTEND(misc-no-recursion)
+
+Value OpTree::buildTree(Operation *op, PatternRewriter &rewriter) {
+  std::unordered_map<size_t, Value> cstCache;
+  std::unordered_map<std::shared_ptr<OpTree>, Value> resultCache;
+  rewriter.setInsertionPoint(op);
+  return buildTreeRecursive(op, rewriter, cstCache, resultCache);
 }
 
-/// Returns the list of positions where the binary representation of the input
-/// value has a 1-bit (the LSB has position 0, the MSB has position 63).
-/// Positions are stored in the vector in increasing order.
-static SmallVector<size_t, 8> getOneBitPositions(uint64_t value) {
-  SmallVector<size_t, 8> positions;
-  for (size_t pos = 0; value != 0; ++pos, value >>= 1)
-    if ((value & 1) != 0)
-      positions.push_back(pos);
-  return positions;
-}
+//===----------------------------------------------------------------------===//
+// Rewrite patterns
+//===----------------------------------------------------------------------===//
 
 namespace {
 
@@ -90,8 +159,35 @@ struct ReplaceMulAddWithSub : public OpRewritePattern<arith::AddIOp> {
 
     return failure();
   }
+
+private:
+  /// Determines whether the defining operation of a value is a multiplication
+  /// with a constant -1.
+  Value isMulTimesNegOne(Value val) const;
 };
 } // namespace
+
+/// Determines whether the defining operation of a value is a constant -1.
+static bool isConstantNegOne(Value val) {
+  if (auto cstOp = val.getDefiningOp<arith::ConstantOp>())
+    if (auto cstAttr = dyn_cast<IntegerAttr>(cstOp.getValue()))
+      return cstAttr.getValue().getSExtValue() == -1;
+  return false;
+}
+
+Value ReplaceMulAddWithSub::isMulTimesNegOne(Value val) const {
+  if (auto mulOp = val.getDefiningOp<arith::MulIOp>()) {
+    // Check whether one of the two operands is a constant -1 value. If yes,
+    // return the other operand
+    auto mulOperands = mulOp->getOperands();
+    auto mul0 = mulOperands[0], mul1 = mulOperands[1];
+    if (isConstantNegOne(mul0))
+      return mul1;
+    if (isConstantNegOne(mul1))
+      return mul0;
+  }
+  return nullptr;
+}
 
 namespace {
 
@@ -131,6 +227,11 @@ private:
   /// Maximum number of adders that are allowed to be chained together.
   unsigned maxAdderDepth;
 
+  /// Returns the list of positions where the binary representation of the input
+  /// value has a 1-bit (the LSB has position 0, the MSB has position 63).
+  /// Positions are stored in the vector in increasing order.
+  SmallVector<size_t, 8> getOneBitPositions(uint64_t value) const;
+
   /// If the passed value was produced by an arithmetic constan holding a
   /// strictly positive integer, returns the corersponding APInt; otherwise
   /// returns an empty option.
@@ -146,6 +247,15 @@ private:
 };
 
 } // namespace
+
+SmallVector<size_t, 8>
+MulReduceStrength::getOneBitPositions(uint64_t value) const {
+  SmallVector<size_t, 8> positions;
+  for (size_t pos = 0; value != 0; ++pos, value >>= 1)
+    if ((value & 1) != 0)
+      positions.push_back(pos);
+  return positions;
+}
 
 std::optional<APInt>
 MulReduceStrength::getPosConstantOperand(Value mulOperand) const {
@@ -257,9 +367,9 @@ struct ArithReduceStrengthPass
 
     RewritePatternSet patterns{ctx};
     patterns.add<ReplaceMulAddWithSub>(ctx);
-    /// TODO: (lucas) Any provided value is somewhat arbitrary here. Ultimately,
-    /// this should be driven by models of component delays (same as for buffer
-    /// placement) as well as a general optimization strategy (area,
+    /// TODO: (RamirezLucas) Any provided value is somewhat arbitrary here.
+    /// Ultimately, this should be driven by models of component delays (same as
+    /// for buffer placement) as well as a general optimization strategy (area,
     /// performance, mixed)
     patterns.add<MulReduceStrength>(maxAdderDepthMul, ctx);
 
@@ -269,102 +379,6 @@ struct ArithReduceStrengthPass
   };
 };
 } // namespace
-
-OpTree::OpTree(OpType opType, OpTreeOperand left, OpTreeOperand right)
-    : opType(opType), left(left), right(right),
-      depth(std::max(getOperandDepth(left), getOperandDepth(right)) + 1),
-      adderDepth(std::max(getOperandDepth(left), getOperandDepth(right)) +
-                 ((opType == OpType::ADD || OpType::SUB) ? 1U : 0U)),
-      numNodes(getOperandNumNodes(left) + getOperandNumNodes(right) + 1) {}
-
-unsigned OpTree::getOperandDepth(OpTreeOperand &operand) {
-  if (auto *tree = std::get_if<std::shared_ptr<OpTree>>(&operand))
-    return (*tree)->depth;
-  return 0U;
-}
-
-unsigned OpTree::getOperandAdderDepth(OpTreeOperand &operand) {
-  if (auto *tree = std::get_if<std::shared_ptr<OpTree>>(&operand))
-    return (*tree)->adderDepth;
-  return 0U;
-}
-
-unsigned OpTree::getOperandNumNodes(OpTreeOperand &operand) {
-  if (auto *tree = std::get_if<std::shared_ptr<OpTree>>(&operand))
-    return (*tree)->numNodes;
-  return 0U;
-}
-
-// NOLINTBEGIN(misc-no-recursion)
-Value OpTree::buildTreeRecursive(
-    Operation *op, PatternRewriter &rewriter,
-    std::unordered_map<size_t, Value> &cstCache,
-    std::unordered_map<std::shared_ptr<OpTree>, Value> &resultCache) {
-
-  // Builds the tree corresponding to an operand of the current tree and returns
-  // the value associated with it
-  auto buildTreeOperand = [&](OpTreeOperand operand) -> Value {
-    if (auto *tree = std::get_if<std::shared_ptr<OpTree>>(&operand)) {
-      // Build the operand tree recursively, unless it was already computed
-      if (auto valIt = resultCache.find(*tree); valIt != resultCache.end()) {
-        return valIt->second;
-      }
-      Value res =
-          (*tree)->buildTreeRecursive(op, rewriter, cstCache, resultCache);
-      resultCache[*tree] = res;
-      return res;
-    }
-    if (auto *value = std::get_if<size_t>(&operand)) {
-      // Create a constant operation, unless an identical one was already
-      // created
-      if (auto valIt = cstCache.find(*value); valIt != cstCache.end()) {
-        return valIt->second;
-      }
-      auto cstResult =
-          rewriter
-              .create<arith::ConstantOp>(
-                  op->getLoc(),
-                  rewriter.getIntegerAttr(op->getResult(0).getType(), *value))
-              .getResult();
-      cstCache[*value] = cstResult;
-      return cstResult;
-    }
-
-    // Just return the value-type operand
-    Value *val = std::get_if<Value>(&operand);
-    assert(val && "variant type is illegal");
-    return *val;
-  };
-
-  // Build the tree of each operand and combine their results by creating an
-  // airthmetic operation of the correct type
-  Value leftVal = buildTreeOperand(left);
-  Value rightVal = buildTreeOperand(right);
-  Value result;
-  switch (opType) {
-  case OpType::ADD:
-    result = rewriter.create<arith::AddIOp>(op->getLoc(), leftVal, rightVal)
-                 .getResult();
-    break;
-  case OpType::SUB:
-    result = rewriter.create<arith::SubIOp>(op->getLoc(), leftVal, rightVal)
-                 .getResult();
-    break;
-  case OpType::SHIFT_LEFT:
-    result = rewriter.create<arith::ShLIOp>(op->getLoc(), leftVal, rightVal)
-                 .getResult();
-    break;
-  }
-  return result;
-}
-// NOLINTEND(misc-no-recursion)
-
-Value OpTree::buildTree(Operation *op, PatternRewriter &rewriter) {
-  std::unordered_map<size_t, Value> cstCache;
-  std::unordered_map<std::shared_ptr<OpTree>, Value> resultCache;
-  rewriter.setInsertionPoint(op);
-  return buildTreeRecursive(op, rewriter, cstCache, resultCache);
-}
 
 std::unique_ptr<mlir::OperationPass<mlir::ModuleOp>>
 dynamatic::createArithReduceStrength(unsigned maxAdderDepthMul) {
