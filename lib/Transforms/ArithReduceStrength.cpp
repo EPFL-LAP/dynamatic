@@ -350,6 +350,47 @@ MulReduceStrength::getBitwiseAdderTree(APInt &cst, Value mulOperand) const {
 }
 
 namespace {
+/// Promotes signed integer comparisons between IndexType operands to
+/// corresponding unsigned integer comparisons. It is important to have explicit
+/// unsigned comparisons as much as possible as it lets the bitwidth
+/// optimization pass apply its critical bound optimization pattern, which
+/// usually reduces the bitwidth of many operations significantly.
+struct PromoteSignedCmp : public OpRewritePattern<arith::CmpIOp> {
+  using OpRewritePattern<arith::CmpIOp>::OpRewritePattern;
+
+  LogicalResult matchAndRewrite(arith::CmpIOp cmpOp,
+                                PatternRewriter &rewriter) const override {
+    arith::CmpIPredicate newPredicate;
+    // Only operate on signed comparisons
+    switch (cmpOp.getPredicate()) {
+    case arith::CmpIPredicate::slt:
+      newPredicate = arith::CmpIPredicate::ult;
+      break;
+    case arith::CmpIPredicate::sle:
+      newPredicate = arith::CmpIPredicate::ule;
+      break;
+    case arith::CmpIPredicate::sgt:
+      newPredicate = arith::CmpIPredicate::ugt;
+      break;
+    case arith::CmpIPredicate::sge:
+      newPredicate = arith::CmpIPredicate::uge;
+      break;
+    default:
+      return failure();
+    }
+
+    // Only operate on comparisons with index type operands
+    if (!isa<IndexType>(cmpOp.getLhs().getType()))
+      return failure();
+
+    // Promote the signed comparison to an equivalent unsigned one
+    rewriter.updateRootInPlace(cmpOp,
+                               [&]() { cmpOp.setPredicate(newPredicate); });
+    return success();
+  }
+};
+} // namespace
+namespace {
 /// Simple greedy pattern rewrite driver for arithmetic strength reduction pass.
 struct ArithReduceStrengthPass
     : public ArithReduceStrengthBase<ArithReduceStrengthPass> {
@@ -366,7 +407,7 @@ struct ArithReduceStrengthPass
     config.enableRegionSimplification = false;
 
     RewritePatternSet patterns{ctx};
-    patterns.add<ReplaceMulAddWithSub>(ctx);
+    patterns.add<ReplaceMulAddWithSub, PromoteSignedCmp>(ctx);
     /// TODO: (RamirezLucas) Any provided value is somewhat arbitrary here.
     /// Ultimately, this should be driven by models of component delays (same as
     /// for buffer placement) as well as a general optimization strategy (area,
