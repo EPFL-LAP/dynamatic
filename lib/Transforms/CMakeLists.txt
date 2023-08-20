@@ -12,6 +12,7 @@ add_dynamatic_library(DynamaticTransforms
   UtilsBitsUpdate.cpp
   OptimizeBits.cpp
   ScfRotateForLoops.cpp
+  ScfSimpleIfToSelect.cpp
 
   DEPENDS
   DynamaticTransformsPassIncGen
