@@ -84,7 +84,7 @@ func.func @reduceStrengthMul30(%arg0: i32) -> i32 {
   return %mul : i32
 }
 
-// ----
+// -----
 
 // CHECK-LABEL:   func.func @reduceStrengthMulTooDeep(
 // CHECK-SAME:                                        %[[VAL_0:.*]]: i32) -> i32 {
@@ -98,7 +98,7 @@ func.func @reduceStrengthMulTooDeep(%arg0: i32) -> i32 {
   return %mul : i32
 }
 
-// ----
+// -----
 
 // CHECK-LABEL:   func.func @reduceStrengthMulPowTwo(
 // CHECK-SAME:                                       %[[VAL_0:.*]]: i32) -> i32 {
@@ -112,7 +112,7 @@ func.func @reduceStrengthMulPowTwo(%arg0: i32) -> i32 {
   return %mul : i32
 }
 
-// ----
+// -----
 
 // CHECK-LABEL:   func.func @promoteCmpWrongType(
 // CHECK-SAME:                                   %[[VAL_0:.*]]: i32,
@@ -125,7 +125,7 @@ func.func @promoteCmpWrongType(%arg0: i32, %arg1: i32) -> i1 {
   return %cmp : i1
 }
 
-// ----
+// -----
 
 // CHECK-LABEL:   func.func @promoteCmpWrongPred(
 // CHECK-SAME:                                   %[[VAL_0:.*]]: index,
@@ -135,18 +135,5 @@ func.func @promoteCmpWrongType(%arg0: i32, %arg1: i32) -> i1 {
 // CHECK:         }
 func.func @promoteCmpWrongPred(%arg0: index, %arg1: index) -> i1 {
   %cmp = arith.cmpi eq, %arg0, %arg1 : index
-  return %cmp : i1
-}
-
-// ----
-
-// CHECK-LABEL:   func.func @promoteCmp(
-// CHECK-SAME:                          %[[VAL_0:.*]]: index,
-// CHECK-SAME:                          %[[VAL_1:.*]]: index) -> i1 {
-// CHECK:           %[[VAL_2:.*]] = arith.cmpi ult, %[[VAL_0]], %[[VAL_1]] : index
-// CHECK:           return %[[VAL_2]] : i1
-// CHECK:         }
-func.func @promoteCmp(%arg0: index, %arg1: index) -> i1 {
-  %cmp = arith.cmpi slt, %arg0, %arg1 : index
   return %cmp : i1
 }

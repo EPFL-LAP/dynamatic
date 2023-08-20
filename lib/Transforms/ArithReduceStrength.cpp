@@ -8,7 +8,6 @@
 
 #include "dynamatic/Transforms/ArithReduceStrength.h"
 #include "circt/Dialect/Handshake/HandshakeOps.h"
-#include "dynamatic/Transforms/PassDetails.h"
 #include "mlir/Dialect/Arith/IR/Arith.h"
 #include "mlir/Dialect/Func/IR/FuncOps.h"
 #include "mlir/Dialect/MemRef/IR/MemRef.h"
@@ -350,7 +349,7 @@ MulReduceStrength::getBitwiseAdderTree(APInt &cst, Value mulOperand) const {
 }
 
 namespace {
-/// Promotes signed integer comparisons between IndexType operands to
+/// Promotes signed integer comparisons with provably positive operands into
 /// corresponding unsigned integer comparisons. It is important to have explicit
 /// unsigned comparisons as much as possible as it lets the bitwidth
 /// optimization pass apply its critical bound optimization pattern, which
@@ -379,21 +378,37 @@ struct PromoteSignedCmp : public OpRewritePattern<arith::CmpIOp> {
       return failure();
     }
 
-    // Only operate on comparisons with index type operands
-    if (!isa<IndexType>(cmpOp.getLhs().getType()))
+    // Promote the signed comparison to an equivalent unsigned one if possible
+    if (!isPromotionPossible(cmpOp))
       return failure();
-
-    // Promote the signed comparison to an equivalent unsigned one
     rewriter.updateRootInPlace(cmpOp,
                                [&]() { cmpOp.setPredicate(newPredicate); });
     return success();
   }
+
+private:
+  /// Determines whether it is possible to promote the comparison operation to
+  /// an unsined one by trying to prove that both of its operands are positive
+  /// integers.
+  /// NOTE: (RamirezLucas) The function always returns false for now. It was
+  /// initially though that having IndexType operands was enough to ensure that
+  /// they were always positive but MLIR/Polygeist does allow negative values to
+  /// be represented as IndexType's as it turns out. Therefore, more complicated
+  /// analysis is required to be able to promote comparisons. This isn't a
+  /// priority right now, hence why we have the function return a constant
+  /// false.
+  bool isPromotionPossible(arith::CmpIOp cmpOp) const;
 };
 } // namespace
+
+bool PromoteSignedCmp::isPromotionPossible(arith::CmpIOp cmpOp) const {
+  return false;
+}
+
 namespace {
 /// Simple greedy pattern rewrite driver for arithmetic strength reduction pass.
 struct ArithReduceStrengthPass
-    : public ArithReduceStrengthBase<ArithReduceStrengthPass> {
+    : public dynamatic::impl::ArithReduceStrengthBase<ArithReduceStrengthPass> {
 
   ArithReduceStrengthPass(unsigned maxAdderDepthMul) {
     this->maxAdderDepthMul = maxAdderDepthMul;
