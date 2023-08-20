@@ -1279,6 +1279,22 @@ LogicalResult DOTPrinter::printFunc(handshake::FuncOp funcOp) {
   auto handshakeBlocks = getLogicBBs(funcOp);
 
   // Print all edges incoming from operations in a block
+  bool argEdgesAdded = false;
+  auto addArgEdges = [&]() -> LogicalResult {
+    argEdgesAdded = true;
+    for (auto [idx, arg] : llvm::enumerate(funcOp.getArguments()))
+      if (!isa<MemRefType>(arg.getType()))
+        for (auto *user : arg.getUsers()) {
+          auto argLabel = getArgumentName(funcOp, idx);
+          os << "\"" << argLabel << "\" -> \"" << getNodeName(user) << "\" ["
+             << getStyleOfValue(arg);
+          if (legacy && failed(annotateArgumentEdge(funcOp, idx, user)))
+            return failure();
+          os << "]\n";
+        }
+    return success();
+  };
+
   for (auto &[blockID, ops] : handshakeBlocks.blocks) {
 
     // For each block, we create a subgraph to contain all edges between two
@@ -1321,17 +1337,8 @@ LogicalResult DOTPrinter::printFunc(handshake::FuncOp funcOp) {
     }
 
     // For entry block, also add all edges incoming from function arguments
-    if (blockID == 0)
-      for (auto [idx, arg] : llvm::enumerate(funcOp.getArguments()))
-        if (!isa<MemRefType>(arg.getType()))
-          for (auto *user : arg.getUsers()) {
-            auto argLabel = getArgumentName(funcOp, idx);
-            os << "\"" << argLabel << "\" -> \"" << getNodeName(user) << "\" ["
-               << getStyleOfValue(arg);
-            if (legacy && failed(annotateArgumentEdge(funcOp, idx, user)))
-              return failure();
-            os << "]\n";
-          }
+    if (blockID == 0 && failed(addArgEdges()))
+      return failure();
 
     // Close the subgraph
     closeSubgraph();
@@ -1347,6 +1354,9 @@ LogicalResult DOTPrinter::printFunc(handshake::FuncOp funcOp) {
   // Print all edges incoming from operations not belonging to any block
   // outside of all subgraphs
   os << "// Edges outside of all basic blocks\n";
+  // Print edges coming from function arguments if they haven't been so far
+  if (!argEdgesAdded && failed(addArgEdges()))
+    return failure();
   for (auto *op : handshakeBlocks.outOfBlocks)
     for (auto res : op->getResults())
       for (auto &use : res.getUses())
