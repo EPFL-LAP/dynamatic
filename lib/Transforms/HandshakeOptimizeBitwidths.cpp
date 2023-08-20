@@ -18,14 +18,6 @@
 // would have a Handshake version of shift operations that accept varrying
 // bitwidths between its operands and result.
 //
-// Note on logical/arithmetic extension selection: the logic as is is incorrect
-// and may lead to incorrect extensions in certain cases. For example, when
-// moving an extension from an operation's operand to an operation's result we
-// should keep track of the original extension type and use that same one after
-// the operation. An orthogonal problem is that Polygeist doesn't seem to
-// translate unsigned C/C++ variables to a ui<width> type in MLIR, instead using
-// the signless i<width> type, which means we cannot know which values are
-// logically unsigned and for which extensions should always be logical.
 //
 //===----------------------------------------------------------------------===//
 
@@ -56,7 +48,7 @@ namespace {
 /// - CONFLICT when both logical and arithmetic extensions have been encountered
 /// when it's not possible to accurately determine what type of extension to
 /// use for a value.
-enum ExtType { UNKNOWN, LOGICAL, ARITHMETIC, CONFLICT };
+enum class ExtType { UNKNOWN, LOGICAL, ARITHMETIC, CONFLICT };
 
 /// Shortcut for a value accompanied by its corresponding extension type.
 using ExtValue = std::pair<Value, ExtType>;
@@ -885,8 +877,7 @@ struct ForwardCycleOpt : public OpRewritePattern<Op> {
     // keep track of other values coming in the cycle through merge-like ops
     OperandRange dataOperands = mergeLikeOp.getDataOperands();
     SmallVector<bool> operandInCycle;
-    DenseSet<Value> allMergedValues;
-    DenseSet<Value> mergedValues;
+    DenseSet<Value> allMergedValues, mergedValues;
     for (auto opr : dataOperands) {
       mergedValues.clear();
       bool inCycle = isOperandInCycle(opr, dataRes, mergedValues);
@@ -902,9 +893,9 @@ struct ForwardCycleOpt : public OpRewritePattern<Op> {
     unsigned optWidth = 0;
     ExtType ext = ExtType::UNKNOWN;
     for (Value mergedVal : allMergedValues)
-      optWidth = std::max(
-          optWidth,
-          getMinimalValue(mergedVal, &ext).getType().getIntOrFloatBitWidth());
+      optWidth = std::max(optWidth, backtrackToMinimalValue(mergedVal, &ext)
+                                        .getType()
+                                        .getIntOrFloatBitWidth());
 
     // Check whether we managed to optimize anything
     unsigned dataWidth = dataRes.getType().getIntOrFloatBitWidth();
@@ -994,7 +985,7 @@ struct ArithSingleType : public OpRewritePattern<Op> {
     // Result extension is always logical for bitwise logical operations and
     // explicitly unsigned operations, othweise it is determined byt the
     // result's type
-    ExtType extRes;
+    ExtType extRes = ExtType::UNKNOWN;
     if (isa<arith::AndIOp, arith::OrIOp, arith::XOrIOp, arith::DivUIOp,
             arith::RemUIOp>((Operation *)op))
       extRes = ExtType::LOGICAL;
@@ -1188,6 +1179,31 @@ struct ArithCmpFW : public OpRewritePattern<arith::CmpIOp> {
   }
 };
 
+/// Removes truncation operations whose operand is produced by any sequence of
+/// extension operations with the same type (logical or arithmetic).
+struct ArithExtToTruncOpt : public OpRewritePattern<arith::TruncIOp> {
+  using OpRewritePattern<arith::TruncIOp>::OpRewritePattern;
+
+  LogicalResult matchAndRewrite(arith::TruncIOp truncOp,
+                                PatternRewriter &rewriter) const override {
+    // Operand must be produced by an extension operation
+    ExtType extType = ExtType::UNKNOWN;
+    Value minVal = getMinimalValue(truncOp.getOperand(), &extType);
+    if (extType == ExtType::UNKNOWN || extType == ExtType::CONFLICT)
+      return failure();
+
+    unsigned finalWidth = truncOp.getResult().getType().getIntOrFloatBitWidth();
+    if (finalWidth == minVal.getType().getIntOrFloatBitWidth())
+      return failure();
+
+    // Bypass all extensions and truncation operation and replace it with a
+    // single bitwidth modification operation
+    auto newExtRes = modVal({minVal, extType}, finalWidth, rewriter);
+    rewriter.replaceOp(truncOp, {newExtRes});
+    return success();
+  }
+};
+
 /// Optimizes an IR pattern where a comparison between a number and a constant
 /// is used to make a control flow decision. Depending on the branch outcome, it
 /// is possible to truncate one of the Handshake::ConditionalBranchOp's output
@@ -1195,10 +1211,7 @@ struct ArithCmpFW : public OpRewritePattern<arith::CmpIOp> {
 /// a pattern present in loops whose exist condition is a comparison with a
 /// constant, and allows to reduce the bitwidth of the loop iterator in those
 /// cases.
-/// NOTE: behavior will likely be incorrect when the number that is being
-/// compared with the constant can be negative
-struct ArithBoundOptimization
-    : public OpRewritePattern<handshake::ConditionalBranchOp> {
+struct ArithBoundOpt : public OpRewritePattern<handshake::ConditionalBranchOp> {
   using OpRewritePattern<handshake::ConditionalBranchOp>::OpRewritePattern;
 
   LogicalResult matchAndRewrite(handshake::ConditionalBranchOp condOp,
@@ -1208,103 +1221,202 @@ struct ArithBoundOptimization
     if (!isValidType(dataOperand.getType()))
       return failure();
 
-    // The condition operand must originate from a comparison operation
-    Value condOperand = backtrackToMinimalValue(condOp.getConditionOperand());
-    Operation *condDefOp = condOperand.getDefiningOp();
-    if (!condDefOp)
-      return failure();
-    arith::CmpIOp cmpOp = dyn_cast<arith::CmpIOp>(condDefOp);
-    if (!cmpOp)
-      return failure();
+    // Find all comparison operations whose result is used in a logical and to
+    // determine the condition operand and which have the data operand as one of
+    // their inputs; then determine which comparison gives the tighest bound on
+    // each branch outcome
+    Value trueRes = condOp.getTrueResult(), falseRes = condOp.getFalseResult();
+    std::optional<std::pair<unsigned, ExtType>> trueBranch, falseBranch;
+    for (arith::CmpIOp cmpOp : getCmpOps(condOp.getConditionOperand())) {
+      ExtType extLhs = ExtType::UNKNOWN, extRhs = ExtType::UNKNOWN;
+      Value minLhs = backtrackToMinimalValue(cmpOp.getLhs(), &extLhs);
+      Value minRhs = backtrackToMinimalValue(cmpOp.getRhs(), &extRhs);
 
-    // One of the operands to the comparison must be a constant
-    auto checkCmpOperand = [&](Value value) -> std::optional<int64_t> {
-      if (Operation *defOp = value.getDefiningOp())
-        if (auto cstOp = dyn_cast<handshake::ConstantOp>(defOp))
-          return cast<IntegerAttr>(cstOp.getValue()).getInt();
-      return std::nullopt;
-    };
-    bool isConstantLhs = false;
-    int64_t cstValue;
-    Value otherCmpValue;
-    Value minLhs = backtrackToMinimalValue(cmpOp.getLhs());
-    Value minRhs = backtrackToMinimalValue(cmpOp.getRhs());
-    if (auto lhsCst = checkCmpOperand(minLhs); lhsCst.has_value()) {
-      isConstantLhs = true;
-      cstValue = lhsCst.value();
-      otherCmpValue = minRhs;
-    } else if (auto rhsCst = checkCmpOperand(minRhs); rhsCst.has_value()) {
-      cstValue = rhsCst.value();
-      otherCmpValue = minLhs;
-    } else
-      return failure();
+      // One of the two comparison operands must be the data input
+      unsigned width;
+      bool isDataLhs;
+      ExtType branchExt;
+      if (dataOperand == minLhs) {
+        width = minRhs.getType().getIntOrFloatBitWidth();
+        isDataLhs = true;
+        branchExt = extLhs;
+      } else if (dataOperand == minRhs) {
+        width = minLhs.getType().getIntOrFloatBitWidth();
+        isDataLhs = false;
+        branchExt = extRhs;
+      } else
+        continue;
 
-    // The other comparison operand must match the data input to the branch
-    if (dataOperand != otherCmpValue)
-      return failure();
+      // Determine whether one of the branches can be optimized and by how much
+      Value branch = getBranchToOptimize(condOp, cmpOp, isDataLhs);
+      if (!branch)
+        continue;
+      if (isBoundTight(isDataLhs ? minRhs : minLhs))
+        width = getRealOptWidth(cmpOp, width, isDataLhs);
 
-    Value branchOpt;
-    unsigned optWidth;
-    APInt cst(64, cstValue, true);
-    APInt cstDec(64, cstValue - 1, true);
-    Value falseRes = condOp.getFalseResult(), trueRes = condOp.getTrueResult();
-
-    // Identify which branch can be optimized and by how much with respect to
-    // the comparison op and side of the constant
-    switch (cmpOp.getPredicate()) {
-    case arith::CmpIPredicate::eq:
-      // C == X
-      branchOpt = trueRes;
-      optWidth = computeRequiredBitwidth(cst);
-      break;
-    case arith::CmpIPredicate::ne:
-      // C != X
-      branchOpt = falseRes;
-      optWidth = computeRequiredBitwidth(cst);
-      break;
-    case arith::CmpIPredicate::slt:
-    case arith::CmpIPredicate::ult:
-      // CST < X / X < CST
-      branchOpt = isConstantLhs ? falseRes : trueRes;
-      optWidth = computeRequiredBitwidth(isConstantLhs ? cst : cstDec);
-      break;
-    case arith::CmpIPredicate::sle:
-    case arith::CmpIPredicate::ule:
-      // CST <= X / X <= CST
-      branchOpt = isConstantLhs ? falseRes : trueRes;
-      optWidth = computeRequiredBitwidth(isConstantLhs ? cstDec : cst);
-      break;
-    case arith::CmpIPredicate::sgt:
-    case arith::CmpIPredicate::ugt:
-      // CST > X / X > CST
-      branchOpt = isConstantLhs ? trueRes : falseRes;
-      optWidth = computeRequiredBitwidth(isConstantLhs ? cstDec : cst);
-      break;
-    case arith::CmpIPredicate::sge:
-    case arith::CmpIPredicate::uge:
-      // CST >= X / X >= CST
-      branchOpt = isConstantLhs ? trueRes : falseRes;
-      optWidth = computeRequiredBitwidth(isConstantLhs ? cst : cstDec);
-      break;
+      // Keep track of the best optimization opportunity found so far for the
+      // branch
+      if (branch == trueRes) {
+        if (!trueBranch.has_value() || width < trueBranch.value().first)
+          trueBranch = std::make_pair(width, branchExt);
+      } else if (!falseBranch.has_value() || width < falseBranch.value().first)
+        falseBranch = std::make_pair(width, branchExt);
     }
 
-    // Check whether we will get any benefit from the optimization
-    unsigned dataWidth = getUsefulResultWidth(branchOpt);
-    if (optWidth >= dataWidth)
-      return failure();
-
-    // Insert a truncation operation and an extension between the result branch
-    // to optimize and its users, to let the rest of the rewrite patterns know
-    // that some bits of the value can be safely discarded
+    // Optimize both branches if possible (in non-degenerate code, only one
+    // branch should ever be optimized at a time, since a bound on one side
+    // means no bound on the other side)
     rewriter.setInsertionPointAfter(condOp);
-    Value truncVal = modVal({branchOpt, ExtType::UNKNOWN}, optWidth, rewriter);
-    Value extVal = modVal({truncVal, ExtType::UNKNOWN}, dataWidth, rewriter);
-    rewriter.replaceAllUsesExcept(branchOpt, extVal, truncVal.getDefiningOp());
-    return success();
+    bool anyOptPerformed = false;
+    if (trueBranch.has_value())
+      anyOptPerformed |= optBranchIfPossible(trueRes, trueBranch->first,
+                                             trueBranch->second, rewriter);
+    if (falseBranch.has_value())
+      anyOptPerformed |= optBranchIfPossible(falseRes, falseBranch->first,
+                                             falseBranch->second, rewriter);
+
+    return success(anyOptPerformed);
   }
+
+private:
+  /// Returns the list of comparison operations involved in the computation of
+  /// the given conditional value (which must have i1 type). All of the
+  /// comparisons' respective result are ANDed to compute the given value.
+  SmallVector<arith::CmpIOp> getCmpOps(Value condVal) const;
+
+  /// Determines whether the bound that the data operand is compared with is
+  /// tight, i.e. whether being strictly closer to 0 than it means we can
+  /// represent the number using one less bit than the bound itself.
+  bool isBoundTight(Value bound) const;
+
+  /// Determines which branch may be optimized based on the nature of the
+  /// comparison and the side of the data operand to the conditional branch.
+  Value getBranchToOptimize(handshake::ConditionalBranchOp condOp,
+                            arith::CmpIOp cmpOp, bool isDataLhs) const;
+
+  /// Returns the real optimized bitwidth assuming that the bound against which
+  /// the comparison is performed is provably tight. The real optimized bitwidth
+  /// may be one less than the one passed as argument or identical.
+  unsigned getRealOptWidth(arith::CmpIOp cmpOp, unsigned optWidth,
+                           bool isDataLhs) const;
+
+  /// Optimizes the branch output provided as argument to the given bitwidth is
+  /// there is any benefit in doing so. Returns true if any optimization is
+  /// performed; otherwise returns false;
+  bool optBranchIfPossible(Value optBranch, unsigned optWidth, ExtType ext,
+                           PatternRewriter &rewriter) const;
 };
 
 } // namespace
+
+/// NOLINTNEXTLINE(misc-no-recursion)
+SmallVector<arith::CmpIOp> ArithBoundOpt::getCmpOps(Value condVal) const {
+  Value minVal = backtrackToMinimalValue(condVal);
+
+  // Stop when reaching function arguments
+  Operation *defOp = minVal.getDefiningOp();
+  if (!defOp)
+    return {};
+
+  // If we have reached a comparison operation, return it
+  if (arith::CmpIOp cmpOp = dyn_cast<arith::CmpIOp>(defOp))
+    return {cmpOp};
+
+  // If we have reached a logical and, backtrack through both its operands as it
+  // means the branch condition will be more restrictive than the comparison
+  // itself, which doesn't invalidate our optimization
+  if (arith::AndIOp andOp = dyn_cast<arith::AndIOp>(defOp)) {
+    SmallVector<arith::CmpIOp> cmpOps;
+    llvm::copy(getCmpOps(andOp.getLhs()), std::back_inserter(cmpOps));
+    llvm::copy(getCmpOps(andOp.getRhs()), std::back_inserter(cmpOps));
+    return cmpOps;
+  }
+
+  return {};
+}
+
+bool ArithBoundOpt::isBoundTight(Value bound) const {
+  // Bound must be a constant
+  auto cstOp =
+      dyn_cast_if_present<handshake::ConstantOp>(bound.getDefiningOp());
+  if (!cstOp)
+    return false;
+
+  // Constant must have an integer attribute
+  auto intAttr = cast<IntegerAttr>(cstOp.getValue());
+  if (!intAttr)
+    return false;
+
+  // Check whether incrementing/decrementing the value toward 0 changes the
+  // number of bits required to represent it.
+  APInt val = intAttr.getValue();
+  APInt centVal =
+      val.isNegative()
+          ? APInt(APInt::APINT_BITS_PER_WORD, val.getSExtValue() + 1)
+          : APInt(APInt::APINT_BITS_PER_WORD, val.getZExtValue() - 1);
+  return computeRequiredBitwidth(val) == computeRequiredBitwidth(centVal) + 1;
+}
+
+Value ArithBoundOpt::getBranchToOptimize(handshake::ConditionalBranchOp condOp,
+                                         arith::CmpIOp cmpOp,
+                                         bool isDataLhs) const {
+  Value falseRes = condOp.getFalseResult(), trueRes = condOp.getTrueResult();
+  switch (cmpOp.getPredicate()) {
+  case arith::CmpIPredicate::eq:
+    // x == BOUND
+    return trueRes;
+  case arith::CmpIPredicate::ne:
+    // x != BOUND
+    return falseRes;
+  case arith::CmpIPredicate::ult:
+  case arith::CmpIPredicate::ule:
+    // x < BOUND / BOUND < x
+    // x <= BOUND / BOUND <= x
+    return isDataLhs ? trueRes : falseRes;
+  case arith::CmpIPredicate::ugt:
+  case arith::CmpIPredicate::uge:
+    // x > BOUND / BOUND > x
+    // x >= BOUND / BOUND >= x
+    return isDataLhs ? falseRes : trueRes;
+  default:
+    return nullptr;
+  }
+}
+
+unsigned ArithBoundOpt::getRealOptWidth(arith::CmpIOp cmpOp, unsigned optWidth,
+                                        bool isDataLhs) const {
+  switch (cmpOp.getPredicate()) {
+  case arith::CmpIPredicate::ult:
+    // x < BOUND / BOUND < x
+  case arith::CmpIPredicate::uge:
+    // x >= BOUND / BOUND >= x
+    return isDataLhs ? optWidth - 1 : optWidth;
+  case arith::CmpIPredicate::ule:
+    // x <= BOUND / BOUND <= x
+  case arith::CmpIPredicate::ugt:
+    // x > BOUND / BOUND > x
+    return isDataLhs ? optWidth : optWidth - 1;
+  default:
+    return optWidth;
+  }
+}
+
+bool ArithBoundOpt::optBranchIfPossible(Value optBranch, unsigned optWidth,
+                                        ExtType ext,
+                                        PatternRewriter &rewriter) const {
+  // Check whether we will get any benefit from the optimization
+  unsigned dataWidth = getUsefulResultWidth(optBranch);
+  if (optWidth >= dataWidth)
+    return false;
+
+  // Insert a truncation operation and an extension between the result branch
+  // to optimize and its users, to let the rest of the rewrite patterns know
+  // that some bits of the value can be safely discarded
+  Value truncVal = modVal({optBranch, ext}, optWidth, rewriter);
+  Value extVal = modVal({truncVal, ext}, dataWidth, rewriter);
+  rewriter.replaceAllUsesExcept(optBranch, extVal, truncVal.getDefiningOp());
+  return true;
+}
 
 //===----------------------------------------------------------------------===//
 // Pass driver
@@ -1398,6 +1510,7 @@ void HandshakeOptimizeBitwidthsPass::addArithPatterns(
       true, orWidth, ctx);
   patterns.add<ArithShift<arith::ShLIOp>, ArithShift<arith::ShRSIOp>,
                ArithShift<arith::ShRUIOp>, ArithSelect>(forward, ctx);
+  patterns.add<ArithExtToTruncOpt>(ctx);
 }
 
 void HandshakeOptimizeBitwidthsPass::addHandshakeDataPatterns(
@@ -1435,7 +1548,7 @@ void HandshakeOptimizeBitwidthsPass::addForwardPatterns(
       .add<ArithSingleType<arith::DivUIOp>, ArithSingleType<arith::DivSIOp>,
            ArithSingleType<arith::RemUIOp>, ArithSingleType<arith::RemSIOp>>(
           true, divWidth, ctx);
-  fwPatterns.add<ArithCmpFW, ArithBoundOptimization>(ctx);
+  fwPatterns.add<ArithCmpFW, ArithBoundOpt>(ctx);
 }
 
 void HandshakeOptimizeBitwidthsPass::addBackwardPatterns(
