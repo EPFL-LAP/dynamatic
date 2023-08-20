@@ -129,6 +129,8 @@ static Value backtrack(Value val) {
     if (isa<handshake::BufferOp, handshake::ForkOp, handshake::LazyForkOp,
             handshake::BranchOp>(defOp))
       val = defOp->getOperand(0);
+    if (auto condOp = dyn_cast<handshake::ConditionalBranchOp>(defOp))
+      val = condOp.getDataOperand();
     else if (auto mergeLikeOp =
                  dyn_cast<handshake::MergeLikeOpInterface>(defOp)) {
       if (auto dataOpr = mergeLikeOp.getDataOperands(); dataOpr.size() == 1)
@@ -244,22 +246,23 @@ static bool isOperandInCycle(Value val, OpResult res,
 
   // Stop when reaching an operation that was already backtracked through
   if (auto [_, isNewOp] = visitedOps.insert(defOp); !isNewOp)
-    return false;
+    return true;
 
   // Backtrack through operations that end up "forwarding" one of their
   // inputs to the output
   if (isa<handshake::BufferOp, handshake::ForkOp, handshake::LazyForkOp,
-          handshake::BranchOp>(defOp))
+          handshake::BranchOp, arith::ExtSIOp, arith::ExtUIOp>(defOp))
     return isOperandInCycle(defOp->getOperand(0), res, mergedValues,
                             visitedOps);
   if (auto condOp = dyn_cast<handshake::ConditionalBranchOp>(defOp))
     return isOperandInCycle(condOp.getDataOperand(), res, mergedValues,
                             visitedOps);
-  if (auto mergeLikeOp = dyn_cast<MergeLikeOpInterface>(defOp)) {
-    // Recursively explore data operands of merge-like operations to find cycles
+
+  // NOLINTNEXTLINE(misc-no-recursion)
+  auto recurseMergeLike = [&](ValueRange dataOperands) -> bool {
     bool oneOprInCycle = false;
     SmallVector<Value> mergeOperands;
-    for (Value mergeLikeOpr : mergeLikeOp.getDataOperands()) {
+    for (Value mergeLikeOpr : dataOperands) {
       VisitedOps nestedVisitedOps(visitedOps);
       if (isOperandInCycle(mergeLikeOpr, res, mergedValues, nestedVisitedOps))
         oneOprInCycle = true;
@@ -268,13 +271,20 @@ static bool isOperandInCycle(Value val, OpResult res,
     }
 
     // If the merge-like operation is part of the cycle through one of its data
-    // operands, add other data operands not port of the cycle to the merged
+    // operands, add other data operands not part of the cycle to the merged
     // values
     if (oneOprInCycle)
-      for (auto outOfCycleOpr : mergeOperands)
+      for (Value &outOfCycleOpr : mergeOperands)
         mergedValues.insert(outOfCycleOpr);
     return oneOprInCycle;
-  }
+  };
+
+  // Recursively explore data operands of merge-like operations to find cycles
+  if (auto mergeLikeOp = dyn_cast<MergeLikeOpInterface>(defOp))
+    return recurseMergeLike(mergeLikeOp.getDataOperands());
+  if (auto selectOp = dyn_cast<arith::SelectOp>(defOp))
+    return recurseMergeLike(
+        ValueRange{selectOp.getTrueValue(), selectOp.getFalseValue()});
 
   return false;
 }
