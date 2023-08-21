@@ -1,4 +1,4 @@
-//===- FrequencyProfiler.cpp - Profile std-level code -----------*- C++ -*-===//
+//===- frequency-profiler.cpp - Profile std-level code ----------*- C++ -*-===//
 //
 // Part of the LLVM Project, under the Apache License v2.0 with LLVM Exceptions.
 // See https://llvm.org/LICENSE.txt for license information.
@@ -15,7 +15,7 @@
 //
 //===----------------------------------------------------------------------===//
 
-#include "experimental/tools/FrequencyProfiler/Simulator.h"
+#include "experimental/tools/frequency-profiler/Simulator.h"
 #include "mlir/Dialect/Func/IR/FuncOps.h"
 #include "mlir/Dialect/LLVMIR/LLVMDialect.h"
 #include "mlir/Dialect/MemRef/IR/MemRef.h"

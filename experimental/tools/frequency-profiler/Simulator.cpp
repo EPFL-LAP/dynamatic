@@ -12,7 +12,7 @@
 //
 //===----------------------------------------------------------------------===//
 
-#include "experimental/tools/FrequencyProfiler/Simulator.h"
+#include "experimental/tools/frequency-profiler/Simulator.h"
 #include "mlir/Dialect/Arith/IR/Arith.h"
 #include "mlir/Dialect/ControlFlow/IR/ControlFlowOps.h"
 #include "mlir/Dialect/Func/IR/FuncOps.h"
