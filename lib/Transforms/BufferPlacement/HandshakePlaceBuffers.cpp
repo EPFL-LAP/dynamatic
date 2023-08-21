@@ -11,6 +11,7 @@
 #include "circt/Dialect/Handshake/HandshakePasses.h"
 #include "dynamatic/Transforms/BufferPlacement/OptimizeMILP.h"
 #include "dynamatic/Transforms/PassDetails.h"
+#include "experimental/Support/StdProfiler.h"
 #include "mlir/Dialect/Arith/IR/Arith.h"
 #include "mlir/Dialect/Func/IR/FuncOps.h"
 #include "mlir/IR/BuiltinTypes.h"
@@ -24,11 +25,11 @@ using namespace circt::handshake;
 using namespace mlir;
 using namespace dynamatic;
 using namespace dynamatic::buffer;
+using namespace dynamatic::experimental;
 
 /// Create the CFDFCircuit based on the extraction results
-static CFDFC createCFDFCircuit(handshake::FuncOp funcOp,
-                               std::map<ArchBB *, bool> &archs,
-                               std::map<unsigned, bool> &bbs) {
+static CFDFC createCFDFCircuit(handshake::FuncOp funcOp, SelectedArchs &archs,
+                               SelectedBBs &bbs) {
   CFDFC circuit = CFDFC();
   for (auto &op : funcOp.getOps()) {
     int bbIndex = getBBIndex(&op);
@@ -102,14 +103,6 @@ static LogicalResult instantiateBuffers(DenseMap<Value, Result> &res,
   return success();
 }
 
-/// Delete the created archs map for CFDFC extraction to avoid memory leak
-static void deleleArchMap(std::map<ArchBB *, bool> &archs) {
-  for (auto &[arch, _] : archs)
-    delete arch;
-  // Clear the map
-  archs.clear();
-}
-
 namespace {
 
 struct HandshakePlaceBuffersPass
@@ -127,31 +120,33 @@ struct HandshakePlaceBuffersPass
   }
 
   void runOnOperation() override {
-    ModuleOp m = getOperation();
+    ModuleOp mod = getOperation();
 
 #ifdef DYNAMATIC_GUROBI_NOT_INSTALLED
-    m.emitError() << "Project was built without Gurobi installed, can't "
-                     "run smart buffer placement pass\n";
+    mod.emitError() << "Project was built without Gurobi installed, can't "
+                       "run smart buffer placement pass\n";
     return signalPassFailure();
 #endif // DYNAMATIC_GUROBI_NOT_INSTALLED
 
-    ChannelBufProps strategy;
-    for (auto funcOp : m.getOps<handshake::FuncOp>())
-      if (failed(insertBuffers(funcOp, &getContext())))
+    // Buffer placement requires that all values are used exactly once in the IR
+    for (auto funcOp : mod.getOps<handshake::FuncOp>())
+      if (failed(verifyAllValuesHasOneUse(funcOp))) {
+        funcOp.emitOpError() << "not all values are used exactly once";
+        return signalPassFailure();
+      }
+
+    // Place buffers in each function
+    for (auto funcOp : mod.getOps<handshake::FuncOp>())
+      if (failed(insertBuffers(funcOp)))
         return signalPassFailure();
   };
 
 private:
-  LogicalResult insertBuffers(FuncOp &funcOp, MLIRContext *ctx);
+  LogicalResult insertBuffers(FuncOp funcOp);
 };
+} // namespace
 
-LogicalResult HandshakePlaceBuffersPass::insertBuffers(FuncOp &funcOp,
-                                                       MLIRContext *ctx) {
-
-  if (failed(verifyAllValuesHasOneUse(funcOp))) {
-    funcOp.emitOpError() << "not all values are used exactly once";
-    return failure();
-  }
+LogicalResult HandshakePlaceBuffersPass::insertBuffers(FuncOp funcOp) {
 
   // vectors to store CFDFC circuits
   std::vector<CFDFC> cfdfcList;
@@ -159,15 +154,29 @@ LogicalResult HandshakePlaceBuffersPass::insertBuffers(FuncOp &funcOp,
   // read the simulation file from std level, create map to indicate whether
   // the bb is selected, and whether the arch between bbs is selected in each
   // round of extraction
-  std::map<ArchBB *, bool> archs;
-  std::map<unsigned, bool> bbs;
-  if (failed(readSimulateFile(stdLevelInfo, archs, bbs)))
+
+  // Read the CSV containing arch information (number of transitions between
+  // pair of basic blocks)
+  SmallVector<ArchBB> archList;
+  if (failed(StdProfiler::readCSV(stdLevelInfo, archList)))
     return failure();
 
-  unsigned freq;
+  // Map each arch to a boolean that indicates whether it is selected in each
+  // CFDFC extraction round. We use a pointer to each arch as the key type to
+  // allow us to modify their frequencies during CFDFC extractions without
+  // messing up key hashes
+  SelectedArchs archs;
+  // Similarly, map each basic block ID to a boolean to indicate whether it is
+  // selected in each CFDFC extraction round.
+  SelectedBBs bbs;
+  for (ArchBB &arch : archList) {
+    archs.insert(std::make_pair(&arch, false));
+    bbs.insert(std::make_pair(arch.srcBB, false));
+    bbs.insert(std::make_pair(arch.dstBB, false));
+  }
 
-  if (failed(extractCFDFCircuit(archs, bbs, freq))) {
-    deleleArchMap(archs);
+  unsigned freq;
+  if (failed(extractCFDFC(archs, bbs, freq))) {
     return failure();
   }
 
@@ -182,14 +191,10 @@ LogicalResult HandshakePlaceBuffersPass::insertBuffers(FuncOp &funcOp,
     cfdfcList.push_back(circuit);
     if (firstCFDFC)
       break;
-    if (failed(extractCFDFCircuit(archs, bbs, freq))) {
-      deleleArchMap(archs);
+    if (failed(extractCFDFC(archs, bbs, freq))) {
       return failure();
     }
   }
-
-  // Delete the CFDFC related results
-  deleleArchMap(archs);
 
   // Instantiate all the channels of MILP model in different CFDFC
   std::vector<Value> allChannels;
@@ -222,12 +227,11 @@ LogicalResult HandshakePlaceBuffersPass::insertBuffers(FuncOp &funcOp,
                                       setCustom, unitInfo, channelBufProps)))
     return failure();
 
-  if (failed(instantiateBuffers(insertBufResult, ctx)))
+  if (failed(instantiateBuffers(insertBufResult, &getContext())))
     return failure();
 
   return success();
 }
-} // namespace
 
 std::unique_ptr<mlir::OperationPass<mlir::ModuleOp>>
 dynamatic::createHandshakePlaceBuffersPass(bool firstCFDFC,

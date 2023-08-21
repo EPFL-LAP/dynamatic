@@ -18,7 +18,8 @@ add_dynamatic_library(DynamaticBufferPlacement
   MLIRSupport
   MLIRTransformUtils
   DynamaticSupport
-)
+  DynamaticExperimentalSupport
+  )
 
 if (GUROBI_FOUND)
   target_link_libraries(DynamaticBufferPlacement
