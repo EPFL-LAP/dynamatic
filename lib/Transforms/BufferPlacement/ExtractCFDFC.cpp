@@ -1,10 +1,10 @@
-//===- UtilsForExtractMG.cpp - Extract MG for optimization* C++ ---------*-===//
+//===- ExtractCFDFC.cpp - Extract CFDFCs from dataflow circuits -*- C++ -*-===//
 //
 // This file implements function supports for CFDFCircuit extraction.
 //
 //===----------------------------------------------------------------------===//
 
-#include "dynamatic/Transforms/BufferPlacement/ExtractMG.h"
+#include "dynamatic/Transforms/BufferPlacement/ExtractCFDFC.h"
 #include "circt/Dialect/Handshake/HandshakeOps.h"
 #include "dynamatic/Support/LogicBB.h"
 #include "mlir/Dialect/Arith/IR/Arith.h"

@@ -102,7 +102,7 @@ static LogicalResult instantiateBuffers(DenseMap<Value, Result> &res,
   return success();
 }
 
-/// Delete the created archs map for MG extraction to avoid memory leak
+/// Delete the created archs map for CFDFC extraction to avoid memory leak
 static void deleleArchMap(std::map<ArchBB *, bool> &archs) {
   for (auto &[arch, _] : archs)
     delete arch;
@@ -115,10 +115,10 @@ namespace {
 struct HandshakePlaceBuffersPass
     : public HandshakePlaceBuffersBase<HandshakePlaceBuffersPass> {
 
-  HandshakePlaceBuffersPass(bool firstMG, std::string &stdLevelInfo,
+  HandshakePlaceBuffersPass(bool firstCFDFC, std::string &stdLevelInfo,
                             std::string &timefile, double targetCP,
                             int timeLimit, bool setCustom) {
-    this->firstMG = firstMG;
+    this->firstCFDFC = firstCFDFC;
     this->stdLevelInfo = stdLevelInfo;
     this->timefile = timefile;
     this->targetCP = targetCP;
@@ -180,7 +180,7 @@ LogicalResult HandshakePlaceBuffersPass::insertBuffers(FuncOp &funcOp,
     cfdfcInds.push_back(cfdfcInd++);
     circuit.execN = freq;
     cfdfcList.push_back(circuit);
-    if (firstMG)
+    if (firstCFDFC)
       break;
     if (failed(extractCFDFCircuit(archs, bbs, freq))) {
       deleleArchMap(archs);
@@ -230,11 +230,11 @@ LogicalResult HandshakePlaceBuffersPass::insertBuffers(FuncOp &funcOp,
 } // namespace
 
 std::unique_ptr<mlir::OperationPass<mlir::ModuleOp>>
-dynamatic::createHandshakePlaceBuffersPass(bool firstMG,
+dynamatic::createHandshakePlaceBuffersPass(bool firstCFDFC,
                                            std::string stdLevelInfo,
                                            std::string timefile,
                                            double targetCP, int timeLimit,
                                            bool setCustom) {
   return std::make_unique<HandshakePlaceBuffersPass>(
-      firstMG, stdLevelInfo, timefile, targetCP, timeLimit, setCustom);
+      firstCFDFC, stdLevelInfo, timefile, targetCP, timeLimit, setCustom);
 }

@@ -3,7 +3,7 @@ if (NOT GUROBI_FOUND)
 endif()
 
 add_dynamatic_library(DynamaticBufferPlacement
-  ExtractMG.cpp
+  ExtractCFDFC.cpp
   HandshakePlaceBuffers.cpp
   OptimizeMILP.cpp
   ParseCircuitJson.cpp

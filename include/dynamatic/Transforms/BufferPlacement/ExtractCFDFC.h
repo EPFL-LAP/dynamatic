@@ -1,11 +1,11 @@
-//===- UtilsForExtractMG.h - utils for extracting marked graph *- C++ ---*-===//
+//===- ExtractCFDFC.h - Extract CFDFCs from dataflow circuits ---*- C++ -*-===//
 //
 // This file declaresfunction supports for CFDFCircuit extraction.
 //
 //===----------------------------------------------------------------------===//
 
-#ifndef DYNAMATIC_TRANSFORMS_BUFFERPLACEMENT_EXTRACTMG_H
-#define DYNAMATIC_TRANSFORMS_BUFFERPLACEMENT_EXTRACTMG_H
+#ifndef DYNAMATIC_TRANSFORMS_BUFFERPLACEMENT_EXTRACTCFDFC_H
+#define DYNAMATIC_TRANSFORMS_BUFFERPLACEMENT_EXTRACTCFDFC_H
 
 #include "circt/Dialect/Handshake/HandshakeOps.h"
 #include "dynamatic/Support/LLVM.h"
@@ -66,4 +66,4 @@ unsigned getChannelFreq(Value channel, std::vector<CFDFC> &cfdfcList);
 } // namespace buffer
 } // namespace dynamatic
 
-#endif // DYNAMATIC_TRANSFORMS_EXTRACTMG_H
+#endif // DYNAMATIC_TRANSFORMS_BUFFERPLACEMENT_EXTRACTCFDFC_H

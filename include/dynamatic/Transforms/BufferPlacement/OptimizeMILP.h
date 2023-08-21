@@ -9,7 +9,7 @@
 
 #include "dynamatic/Support/BufferingStrategy.h"
 #include "dynamatic/Support/LLVM.h"
-#include "dynamatic/Transforms/BufferPlacement/ExtractMG.h"
+#include "dynamatic/Transforms/BufferPlacement/ExtractCFDFC.h"
 #include "dynamatic/Transforms/BufferPlacement/ParseCircuitJson.h"
 #include "mlir/Dialect/Func/IR/FuncOps.h"
 #include "mlir/IR/BuiltinTypes.h"
