@@ -147,54 +147,6 @@ buffer::getUnitLatency(Operation *op,
   return latency;
 }
 
-LogicalResult
-buffer::setChannelBufProps(std::vector<Value> &channels,
-                           DenseMap<Value, ChannelBufProps> &channelBufProps,
-                           std::map<std::string, UnitInfo> &unitInfo) {
-  for (auto &ch : channels) {
-    Operation *srcOp = ch.getDefiningOp();
-    Operation *dstOp = *(ch.getUsers().begin());
-
-    // skip the channel that is the block argument
-    if (!srcOp || !dstOp)
-      continue;
-
-    std::string srcName = srcOp->getName().getStringRef().str();
-    std::string dstName = dstOp->getName().getStringRef().str();
-    // set merge with multiple input to have at least one transparent buffer
-    if (isa<handshake::MergeOp>(srcOp) && srcOp->getNumOperands() > 1)
-      channelBufProps[ch].minTrans = 1;
-
-    // TODO: set selectOp always select the frequent input
-    if (isa<arith::SelectOp>(dstOp))
-      if (dstOp->getOperand(2) == ch) {
-        channelBufProps[ch].maxTrans = 0;
-        channelBufProps[ch].minOpaque = 0;
-      }
-
-    if (isa<handshake::MemoryControllerOp>(srcOp) ||
-        isa<handshake::MemoryControllerOp>(dstOp)) {
-      channelBufProps[ch].maxOpaque = 0;
-      channelBufProps[ch].maxTrans = 0;
-    }
-
-    // set channel buffer properties w.r.t to input file
-    if (unitInfo.count(srcName) > 0) {
-      channelBufProps[ch].minTrans += unitInfo[srcName].outPortTransBuf;
-      channelBufProps[ch].minOpaque += unitInfo[srcName].outPortOpBuf;
-    }
-
-    if (unitInfo.count(dstName) > 0) {
-      channelBufProps[ch].minTrans += unitInfo[dstName].inPortTransBuf;
-      channelBufProps[ch].minOpaque += unitInfo[dstName].inPortOpBuf;
-    }
-
-    if (channelBufProps[ch].minTrans > 0 && channelBufProps[ch].minOpaque > 0)
-      return failure(); // cannot satisfy the constraint
-  }
-  return success();
-}
-
 static void parseBitWidthPair(llvm::json::Object &jsonData,
                               std::vector<std::pair<unsigned, double>> &data) {
   for (const auto &[bitWidth, value] : jsonData) {

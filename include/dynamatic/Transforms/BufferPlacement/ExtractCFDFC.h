@@ -51,13 +51,13 @@ bool isBackEdge(Operation *src, Operation *dst);
 /// described by the provided archs and basic blocks. The function internally
 /// expresses the CFDFC extraction problem as an MILP that is solved bu Gurobi
 /// (hence building the project with Gurobi is required to use this function).
-/// On success, returns a strictly positive integer indicating the number of
-/// executions of the extracted CFDFC and fills in the last two arguments with
-/// the set of archs and basic blocks, respectively, that are included in the
-/// extracted CFDFC. Returns 0 on failure (if there are no CFDFC left to extract
-/// or if Gurobi failed to solve the MILP).
-unsigned extractCFDFC(ArchSet &archs, BBSet &bbs, ArchSet &selectedArchs,
-                      BBSet &selectedBBs);
+/// On successfull extraction, succeeds and sets the last three argument with,
+/// respectively, the set of archs and basic blocks that are included in the
+/// extracted CFDFC and the number of executions of the latter. When no CFDFC
+/// could be extracted, succeeds but sets the number of executions to 0.
+LogicalResult extractCFDFC(circt::handshake::FuncOp funcOp, ArchSet &archs,
+                           BBSet &bbs, ArchSet &selectedArchs,
+                           BBSet &selectedBBs, unsigned &numExec);
 
 } // namespace buffer
 } // namespace dynamatic

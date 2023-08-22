@@ -12,6 +12,7 @@
 #include "mlir/IR/BuiltinTypes.h"
 #include "mlir/IR/OperationSupport.h"
 #include "mlir/Support/IndentedOstream.h"
+#include "mlir/Support/LogicalResult.h"
 #include <fstream>
 
 using namespace circt;
@@ -198,13 +199,14 @@ bool dynamatic::buffer::isBackEdge(Operation *src, Operation *dst) {
   return false;
 }
 
-unsigned dynamatic::buffer::extractCFDFC(ArchSet &archs, BBSet &bbs,
-                                         ArchSet &selectedArchs,
-                                         BBSet &selectedBBs) {
+LogicalResult dynamatic::buffer::extractCFDFC(handshake::FuncOp funcOp,
+                                              ArchSet &archs, BBSet &bbs,
+                                              ArchSet &selectedArchs,
+                                              BBSet &selectedBBs,
+                                              unsigned &numExec) {
 #ifdef DYNAMATIC_GUROBI_NOT_INSTALLED
-  llvm::errs() << "Project was built without Gurobi installed, can't run "
-                  "CFDFC extraction\n";
-  return failure();
+  return funcOp->emitError() << "Project was built without Gurobi, can't run "
+                                "CFDFC extraction";
 #else
   // Create Gurobi MILP model for CFDFC extraction, suppressing stdout
   GRBEnv env = GRBEnv(true);
@@ -212,7 +214,7 @@ unsigned dynamatic::buffer::extractCFDFC(ArchSet &archs, BBSet &bbs,
   env.start();
   GRBModel model = GRBModel(env);
 
-  // Create MILP variables map them to out archs and BBs
+  // Create all MILP variables we need
   MILPVars vars;
   unsigned maxTrans = initMILPVariables(model, archs, bbs, vars);
 
@@ -225,21 +227,22 @@ unsigned dynamatic::buffer::extractCFDFC(ArchSet &archs, BBSet &bbs,
   setEdgeConstraints(model, vars, varMaxTrans);
   setBBConstraints(model, vars);
   model.optimize();
-
   if (model.get(GRB_IntAttr_Status) != GRB_OPTIMAL ||
-      varMaxTrans.get(GRB_DoubleAttr_X) <= 0)
-    // Failed to find a solution to the MILP, return 0 to indicate a failure
-    return 0;
+      varMaxTrans.get(GRB_DoubleAttr_X) < 0)
+    return funcOp.emitError()
+           << "Gurobi failed to find optimal solution to CFDFC extraction MILP";
 
   // Retrieve the maximum number of transitions identified by the MILP solution
-  unsigned numTrans = static_cast<unsigned>(varMaxTrans.get(GRB_DoubleAttr_X));
+  numExec = static_cast<unsigned>(varMaxTrans.get(GRB_DoubleAttr_X));
+  if (numExec == 0)
+    return success();
 
   // Fill in the set of selected archs and decrease their associated number of
   // transitions
   for (auto &[arch, var] : vars.archs) {
     if (archs.count(arch) > 0 && var.get(GRB_DoubleAttr_X) > 0) {
       archs.insert(arch);
-      arch->numTrans -= numTrans;
+      arch->numTrans -= numExec;
     }
   }
 
@@ -248,6 +251,6 @@ unsigned dynamatic::buffer::extractCFDFC(ArchSet &archs, BBSet &bbs,
     if (bbs.count(bb) > 0 && var.get(GRB_DoubleAttr_X) > 0)
       selectedBBs.insert(bb);
 
-  return numTrans;
+  return success();
 #endif // DYNAMATIC_GUROBI_NOT_INSTALLED
 }
