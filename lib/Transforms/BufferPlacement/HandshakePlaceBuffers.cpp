@@ -27,25 +27,13 @@ using namespace dynamatic;
 using namespace dynamatic::buffer;
 using namespace dynamatic::experimental;
 
-/// Create the CFDFCircuit based on the extraction results
-static CFDFC createCFDFCircuit(handshake::FuncOp funcOp, SelectedArchs &archs,
-                               SelectedBBs &bbs) {
-  CFDFC circuit = CFDFC();
-  for (auto &op : funcOp.getOps()) {
-    int bbIndex = getBBIndex(&op);
-    if (bbIndex < 0)
-      continue;
-
-    // insert units in the selected basic blocks
-    if (bbs[bbIndex]) {
-      circuit.units.push_back(&op);
-      // insert channels if it is selected
-      for (auto port : op.getResults())
-        if (isSelect(archs, port) || isSelect(bbs, port))
-          circuit.channels.push_back(port);
+static unsigned getPortInd(Operation *op, Value val) {
+  for (auto [indVal, port] : llvm::enumerate(op->getResults())) {
+    if (port == val) {
+      return indVal;
     }
   }
-  return circuit;
+  return UINT_MAX;
 }
 
 /// Instantiate the buffers based on the results of the MILP
@@ -121,13 +109,11 @@ struct HandshakePlaceBuffersPass
 
   void runOnOperation() override {
     ModuleOp mod = getOperation();
-
 #ifdef DYNAMATIC_GUROBI_NOT_INSTALLED
     mod.emitError() << "Project was built without Gurobi installed, can't "
                        "run smart buffer placement pass\n";
     return signalPassFailure();
-#endif // DYNAMATIC_GUROBI_NOT_INSTALLED
-
+#else
     // Buffer placement requires that all values are used exactly once in the IR
     for (auto funcOp : mod.getOps<handshake::FuncOp>())
       if (failed(verifyAllValuesHasOneUse(funcOp))) {
@@ -139,6 +125,7 @@ struct HandshakePlaceBuffersPass
     for (auto funcOp : mod.getOps<handshake::FuncOp>())
       if (failed(insertBuffers(funcOp)))
         return signalPassFailure();
+#endif // DYNAMATIC_GUROBI_NOT_INSTALLED
   };
 
 private:
@@ -147,54 +134,47 @@ private:
 } // namespace
 
 LogicalResult HandshakePlaceBuffersPass::insertBuffers(FuncOp funcOp) {
-
-  // vectors to store CFDFC circuits
-  std::vector<CFDFC> cfdfcList;
-
-  // read the simulation file from std level, create map to indicate whether
-  // the bb is selected, and whether the arch between bbs is selected in each
-  // round of extraction
-
   // Read the CSV containing arch information (number of transitions between
   // pair of basic blocks)
   SmallVector<ArchBB> archList;
   if (failed(StdProfiler::readCSV(stdLevelInfo, archList)))
     return failure();
 
-  // Map each arch to a boolean that indicates whether it is selected in each
-  // CFDFC extraction round. We use a pointer to each arch as the key type to
+  // Store all archs in a set. We use a pointer to each arch as the key type to
   // allow us to modify their frequencies during CFDFC extractions without
   // messing up key hashes
-  SelectedArchs archs;
-  // Similarly, map each basic block ID to a boolean to indicate whether it is
-  // selected in each CFDFC extraction round.
-  SelectedBBs bbs;
+  ArchSet archs;
+  // Similarly, store all block IDs in a set.
+  BBSet bbs;
   for (ArchBB &arch : archList) {
-    archs.insert(std::make_pair(&arch, false));
-    bbs.insert(std::make_pair(arch.srcBB, false));
-    bbs.insert(std::make_pair(arch.dstBB, false));
+    archs.insert(&arch);
+    bbs.insert(arch.srcBB);
+    bbs.insert(arch.dstBB);
   }
 
-  unsigned freq;
-  if (failed(extractCFDFC(archs, bbs, freq))) {
-    return failure();
-  }
+  // List of CFDFCs extracted from the function
+  std::vector<CFDFC> cfdfcs;
 
   // Create the CFDFC index list that will be optimized
   std::vector<unsigned> cfdfcInds;
   unsigned cfdfcInd = 0;
-  while (freq > 0) {
-    // write the execution frequency to the CFDFC
-    auto circuit = createCFDFCircuit(funcOp, archs, bbs);
-    cfdfcInds.push_back(cfdfcInd++);
-    circuit.execN = freq;
-    cfdfcList.push_back(circuit);
-    if (firstCFDFC)
+
+  ArchSet selectedArchs;
+  BBSet selectedBBs;
+  do {
+    // Clear the sets of selected archs and BBs
+    selectedArchs.clear();
+    selectedBBs.clear();
+
+    // Try to extract the next CFDFC
+    unsigned numTrans = extractCFDFC(archs, bbs, selectedArchs, selectedBBs);
+    if (numTrans == 0)
       break;
-    if (failed(extractCFDFC(archs, bbs, freq))) {
-      return failure();
-    }
-  }
+
+    // Create the CFDFC from the set of selected archs and BBs
+    cfdfcs.emplace_back(funcOp, selectedArchs, selectedBBs, numTrans);
+    cfdfcInds.push_back(cfdfcInd++);
+  } while (firstCFDFC);
 
   // Instantiate all the channels of MILP model in different CFDFC
   std::vector<Value> allChannels;
@@ -209,7 +189,6 @@ LogicalResult HandshakePlaceBuffersPass::insertBuffers(FuncOp funcOp) {
 
   // Create the MILP model of buffer placement, and write the results of the
   // model to insertBufResult.
-
   std::map<std::string, UnitInfo> unitInfo;
   DenseMap<Value, ChannelBufProps> channelBufProps;
 
@@ -223,7 +202,7 @@ LogicalResult HandshakePlaceBuffersPass::insertBuffers(FuncOp funcOp) {
   DenseMap<Value, Result> insertBufResult;
 
   if (failed(placeBufferInCFDFCircuit(insertBufResult, funcOp, allChannels,
-                                      cfdfcList, cfdfcInds, targetCP, timeLimit,
+                                      cfdfcs, cfdfcInds, targetCP, timeLimit,
                                       setCustom, unitInfo, channelBufProps)))
     return failure();
 

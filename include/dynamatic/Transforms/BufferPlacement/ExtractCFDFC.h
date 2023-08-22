@@ -1,54 +1,64 @@
 //===- ExtractCFDFC.h - Extract CFDFCs from dataflow circuits ---*- C++ -*-===//
 //
-// This file declaresfunction supports for CFDFCircuit extraction.
+// Declares data structures and functions to extract and create CFDFCs
+// (Choice-Free DataFlow Circuits) from a description of a Handshake function's
+// archs and basic blocks.
+//
+// In this context, an arch is understood as an "edge" between two basic blocks.
+// There exists an arch in a function between basic block X and Y if and only if
+// there exists an operation in X that returns a result used by an operation in
+// Y.
 //
 //===----------------------------------------------------------------------===//
 
 #ifndef DYNAMATIC_TRANSFORMS_BUFFERPLACEMENT_EXTRACTCFDFC_H
 #define DYNAMATIC_TRANSFORMS_BUFFERPLACEMENT_EXTRACTCFDFC_H
 
+#include "circt/Dialect/Handshake/HandshakeOps.h"
 #include "dynamatic/Support/LLVM.h"
 #include "experimental/Support/StdProfiler.h"
-#include <map>
 
 namespace dynamatic {
 namespace buffer {
 
-/// Data structure for control-free dataflow circuits which
-/// stores the units and channels inside it.
-/// The CFDFC has properties for the buffer placement optimization, including
-/// the target period, and maximum period.
-struct CFDFC {
-  double targetCP, maxCP;
-  std::vector<Operation *> units;
-  std::vector<Value> channels;
+/// A set of ArchBB's pointers with a deterministic iteration order.
+using ArchSet = mlir::SetVector<dynamatic::experimental::ArchBB *>;
+/// A set of basic block IDs with a deterministic iteration order.
+using BBSet = mlir::SetVector<unsigned>;
 
-  unsigned execN = 0; // execution times of CFDFC
+/// Represents a CFDFC i.e., a set of control-free units and channels from a
+/// dataflow circuit accompanied by the number of times it was executed.
+struct CFDFC {
+  /// Units (i.e., MLIR operations) in the CFDFC.
+  mlir::SetVector<Operation *> units;
+  /// Channels (i.e., MLIR values) in the CFDFC.
+  mlir::SetVector<Value> channels;
+  /// Number of executions of the CFDFC.
+  unsigned numExec = 0;
+
+  /// Constructs a CFDFC from a set of selected archs and basic blocks in the
+  /// function. Assumes that every value in the function is used exactly once.
+  CFDFC(circt::handshake::FuncOp funcOp, ArchSet &archs, BBSet &bbs,
+        unsigned numExec);
 };
 
-using SelectedArchs = DenseMap<dynamatic::experimental::ArchBB *, bool>;
-using SelectedBBs = DenseMap<unsigned, bool>;
+/// Determines whether the edge between a source and destination operation is a
+/// backedge in the context of buffer placement. The function assumes that the
+/// source operation produces a value that the destination operation consumes.
+bool isBackEdge(Operation *src, Operation *dst);
 
-/// Define the MILP CFDFC extraction models, and write the optimization results
-/// to the map.
-LogicalResult extractCFDFC(SelectedArchs &archs, SelectedBBs &bbs,
-                           unsigned &freq);
+/// Extracts the most frequently executed CFDFC from the Handshake function
+/// described by the provided archs and basic blocks. The function internally
+/// expresses the CFDFC extraction problem as an MILP that is solved bu Gurobi
+/// (hence building the project with Gurobi is required to use this function).
+/// On success, returns a strictly positive integer indicating the number of
+/// executions of the extracted CFDFC and fills in the last two arguments with
+/// the set of archs and basic blocks, respectively, that are included in the
+/// extracted CFDFC. Returns 0 on failure (if there are no CFDFC left to extract
+/// or if Gurobi failed to solve the MILP).
+unsigned extractCFDFC(ArchSet &archs, BBSet &bbs, ArchSet &selectedArchs,
+                      BBSet &selectedBBs);
 
-/// Get the index of the basic block of an operation.
-int getBBIndex(Operation *op);
-
-/// Identify whether the channel is in selected the basic block.
-bool isSelect(SelectedBBs &bbs, Value val);
-
-/// Identify whether the channel is in selected archs between the basic block.
-bool isSelect(SelectedArchs &archs, Value val);
-
-/// Identify whether the connection between the source operation and
-/// the destination operation is a back edge.
-bool isBackEdge(Operation *opSrc, Operation *opDst);
-
-/// Get the total execution frequency of a channel in the circuit
-unsigned getChannelFreq(Value channel, std::vector<CFDFC> &cfdfcList);
 } // namespace buffer
 } // namespace dynamatic
 

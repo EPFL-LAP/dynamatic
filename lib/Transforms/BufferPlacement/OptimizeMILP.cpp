@@ -28,13 +28,27 @@ using namespace mlir;
 using namespace dynamatic;
 using namespace dynamatic::buffer;
 
-unsigned buffer::getPortInd(Operation *op, Value val) {
-  for (auto [indVal, port] : llvm::enumerate(op->getResults())) {
-    if (port == val) {
-      return indVal;
-    }
-  }
-  return UINT_MAX;
+static unsigned getChannelFreq(Value channel, std::vector<CFDFC> &cfdfcList) {
+  Operation *srcOp = channel.getDefiningOp();
+  Operation *dstOp = *channel.getUsers().begin();
+
+  // if is a start node or end node, return 1
+  if (!srcOp || !dstOp)
+    return 1;
+
+  if (isa<SinkOp, MemoryControllerOp>(dstOp) || isa<MemoryControllerOp>(srcOp))
+    return 0;
+
+  unsigned freq = 1;
+  if (isBackEdge(srcOp, dstOp))
+    freq = 0;
+  //  execution times equals to the sum over all CFDFCs
+  for (auto cfdfc : cfdfcList)
+    if (std::find(cfdfc.channels.begin(), cfdfc.channels.end(), channel) !=
+        cfdfc.channels.end())
+      freq += cfdfc.numExec;
+
+  return freq;
 }
 
 #ifndef DYNAMATIC_GUROBI_NOT_INSTALLED
@@ -404,7 +418,7 @@ static void createModelObjective(GRBModel &modelBuf,
 
   for (auto [ind, thrpt] : llvm::enumerate(circtThrpts)) {
     double coef =
-        cfdfcList[ind].channels.size() * cfdfcList[ind].execN / totalFreq;
+        cfdfcList[ind].channels.size() * cfdfcList[ind].numExec / totalFreq;
     highestCoef = std::max(coef, highestCoef);
     objExpr += coef * thrpt;
   }

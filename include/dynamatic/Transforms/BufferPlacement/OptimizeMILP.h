@@ -45,9 +45,6 @@ LogicalResult placeBufferInCFDFCircuit(
     bool setCustom, std::map<std::string, UnitInfo> &unitInfo,
     DenseMap<Value, ChannelBufProps> &channelBufProps);
 
-/// Get the port index of a unit
-unsigned getPortInd(Operation *op, Value val);
-
 } // namespace buffer
 } // namespace dynamatic
 
