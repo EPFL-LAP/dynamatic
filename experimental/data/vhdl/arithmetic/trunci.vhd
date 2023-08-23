@@ -1,59 +1,56 @@
--------------------
---trunci
-----------------
-
-Library IEEE;
+library IEEE;
 use IEEE.std_logic_1164.all;
 use ieee.numeric_std.all;
 use work.customTypes.all;
 
 entity trunci is
-    Generic (
-     INPUT_BITWIDTH: integer; OUTPUT_BITWIDTH: integer
-    );
-    port (
-      clk : IN STD_LOGIC;
-      rst : IN STD_LOGIC;
-      pValidArray : IN std_logic_vector(0 downto 0);
-      nReadyArray : in std_logic_vector(0 downto 0);
-      validArray : out std_logic_vector(0 downto 0);
-      readyArray : OUT std_logic_vector(0 downto 0);
-      dataInArray : in data_array (0 downto 0)(INPUT_BITWIDTH-1 downto 0); 
-      dataOutArray : out data_array (0 downto 0)(OUTPUT_BITWIDTH-1 downto 0));
+  generic (
+    INPUT_BITWIDTH  : integer;
+    OUTPUT_BITWIDTH : integer
+  );
+  port (
+    clk          : in std_logic;
+    rst          : in std_logic;
+    pValid       : in std_logic;
+    nReady       : in std_logic;
+    valid        : out std_logic;
+    ready        : out std_logic;
+    dataInArray  : in std_logic_vector(INPUT_BITWIDTH - 1 downto 0);
+    dataOutArray : out std_logic_vector(OUTPUT_BITWIDTH - 1 downto 0));
 end entity;
-    
+
 architecture arch of trunci is
 
-    component my_trunc is
-        port (
-            ap_clk : IN STD_LOGIC;
-            ap_rst : IN STD_LOGIC;
-            ap_start : IN STD_LOGIC;
-            ap_done : OUT STD_LOGIC;
-            ap_idle : OUT STD_LOGIC;
-            ap_ready : OUT STD_LOGIC;
-            din : IN STD_LOGIC_VECTOR (31 downto 0);
-            ap_return : OUT STD_LOGIC_VECTOR (31 downto 0) 
-        );
-    end component;
+  component my_trunc is
+    port (
+      ap_clk    : in std_logic;
+      ap_rst    : in std_logic;
+      ap_start  : in std_logic;
+      ap_done   : out std_logic;
+      ap_idle   : out std_logic;
+      ap_ready  : out std_logic;
+      din       : in std_logic_vector (31 downto 0);
+      ap_return : out std_logic_vector (31 downto 0)
+    );
+  end component;
 
-    signal idle : std_logic;
-    signal component_ready : std_logic;
+  signal idle            : std_logic;
+  signal component_ready : std_logic;
 
-begin 
+begin
 
-    my_trunc_U1 : component my_trunc
+  my_trunc_U1 : component my_trunc
     port map(
-        ap_clk => clk,
-        ap_rst => rst,
-        ap_start => pValidArray(0),
-        ap_done => validArray(0),
-        ap_idle => idle,
-        ap_ready => component_ready,
-        din => dataInArray(0),
-        ap_return => dataOutArray(0) 
+      ap_clk    => clk,
+      ap_rst    => rst,
+      ap_start  => pValid,
+      ap_done   => valid,
+      ap_idle   => idle,
+      ap_ready  => component_ready,
+      din       => dataInArray,
+      ap_return => dataOutArray
     );
 
-    readyArray(0) <= idle and nReadyArray(0);
-        
-end architecture;
+    ready <= idle and nReady;
+
+  end architecture;

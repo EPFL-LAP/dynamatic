@@ -1,27 +1,24 @@
---------------------------------------------------------------  sink
----------------------------------------------------------------------
 library IEEE;
-USE IEEE.STD_LOGIC_1164.ALL;
-USE IEEE.NUMERIC_STD.ALL;
- use work.customTypes.all;
+use IEEE.STD_LOGIC_1164.all;
+use IEEE.NUMERIC_STD.all;
+use work.customTypes.all;
 entity sink is
 
-  Generic (
-    BITWIDTH:integer
+  generic (
+    BITWIDTH : integer
   );
- 
-  Port ( 
-    clk, rst : in std_logic;  
-    dataInArray : in data_array (0 downto 0)(BITWIDTH-1 downto 0);
-    readyArray : out std_logic_vector(0 downto 0);
-    pValidArray : in std_logic_vector(0 downto 0)
+
+  port (
+    clk, rst : in std_logic;
+    ready    : out std_logic;
+    pValid   : in std_logic
   );
 end sink;
- 
-architecture arch of sink is 
+
+architecture arch of sink is
 
 begin
- 
-readyArray(0) <= '1';
+
+  ready <= '1';
 
 end arch;

@@ -1,27 +1,24 @@
---------------------------------------------------------------  source
-----------------------------------------------------------------------
 library IEEE;
-USE IEEE.STD_LOGIC_1164.ALL;
-USE IEEE.NUMERIC_STD.ALL;
- use work.customTypes.all;
+use IEEE.STD_LOGIC_1164.all;
+use IEEE.NUMERIC_STD.all;
+use work.customTypes.all;
 entity source is
 
-  Generic (
-    BITWIDTH:integer
+  generic (
+    BITWIDTH : integer
   );
- 
-  Port ( 
-    clk, rst : in std_logic;  
-    dataOutArray : out data_array (0 downto 0)(BITWIDTH-1 downto 0);
-    validArray : out std_logic_vector(0 downto 0);
-    nReadyArray : in std_logic_vector(0 downto 0)
+
+  port (
+    clk, rst : in std_logic;
+    valid    : out std_logic;
+    nReady   : in std_logic
   );
 end source;
 
-
-
-architecture arch of source is 
+architecture arch of source is
 
 begin
- 
-validArray(0) <= '1';
+
+  valid <= '1';
+
+end arch;
