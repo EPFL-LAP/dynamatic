@@ -1,24 +1,16 @@
-//===- Simulator.h - std-level simulator ------------------------*- C++ -*-===//
+//===- StdProfiler.h - std-level profiler -----------------------*- C++ -*-===//
 //
-// Part of the LLVM Project, under the Apache License v2.0 with LLVM Exceptions.
-// See https://llvm.org/LICENSE.txt for license information.
-// SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
-//
-//===----------------------------------------------------------------------===//
-//
-// Declarations of profiler and top level simulator function that executes a
-// restricted form of the standard dialect (inherited from CIRCT).
+// Declaration of std-level profiler that works in tandem with the std-level
+// simulator to collect statistics during simulation.
 //
 //===----------------------------------------------------------------------===//
 
-#ifndef EXPERIMENTAL_TOOLS_FREQUENCYPROFILER_H
-#define EXPERIMENTAL_TOOLS_FREQUENCYPROFILER_H
+#ifndef EXPERIMENTAL_SUPPORT_STDPROFILER_H
+#define EXPERIMENTAL_SUPPORT_STDPROFILER_H
 
+#include "dynamatic/Support/LLVM.h"
 #include "mlir/Dialect/Func/IR/FuncOps.h"
-#include "mlir/IR/BuiltinOps.h"
-#include "mlir/IR/MLIRContext.h"
 #include "mlir/Support/IndentedOstream.h"
-#include "mlir/Support/LogicalResult.h"
 
 namespace mlir {
 namespace func {
@@ -29,14 +21,31 @@ class FuncOp;
 namespace dynamatic {
 namespace experimental {
 
+/// Represents an arch between two basic blocks that is traversed a specific
+/// number of times during simulation. This is used to read back the profiler's
+/// CSV formatted results into memory.
+struct ArchBB {
+  /// Source basic block ID.
+  unsigned srcBB;
+  /// Destination basic block ID.
+  unsigned dstBB;
+  /// Number of transitions recoded between the two blocks.
+  unsigned numTrans;
+  /// Is the arch a backedge?
+  bool isBackEdge;
+
+  /// Simple field-by-field constructor.
+  ArchBB(unsigned srcBB, unsigned dstBB, unsigned numTrans, bool isBackEdge);
+};
+
 /// Data structure to hold information about the simulation.
-struct Profiler {
+struct StdProfiler {
 
   /// Holds the number of transitions between each block pair.
   mlir::DenseMap<std::pair<mlir::Block *, mlir::Block *>, unsigned> transitions;
 
   /// Constructs a profiler on a given function.
-  Profiler(mlir::func::FuncOp funcOp);
+  StdProfiler(mlir::func::FuncOp funcOp);
 
   /// Prints gathered statistics on standard output.
   void writeStats(bool printDOT);
@@ -48,6 +57,11 @@ struct Profiler {
   /// Prints statistics on an output stream as a CSV formatted output compatible
   /// with Dynamatic++'s smart buffer placement pass.
   void writeCSV(mlir::raw_indented_ostream &os);
+
+  /// Reads the profiler's CSV formatted output and stores its content into an
+  /// in-memory data-structure (one vector element per CSV line).
+  static mlir::LogicalResult readCSV(std::string &filename,
+                                     mlir::SmallVector<ArchBB> &archs);
 
 private:
   /// The function being profiled.
@@ -63,12 +77,7 @@ private:
   std::string getCSVTransitionString(unsigned srcBlock, unsigned dstBlock,
                                      unsigned freq, bool isBackedge);
 };
-
-/// Simulates a std-level function on a specific set of inputs.
-mlir::LogicalResult simulate(mlir::func::FuncOp funcOp,
-                             mlir::ArrayRef<std::string> inputArgs,
-                             Profiler &prof);
 } // namespace experimental
 } // namespace dynamatic
 
-#endif // EXPERIMENTAL_TOOLS_FREQUENCYPROFILER_H
+#endif // EXPERIMENTAL_SUPPORT_STDPROFILER_H

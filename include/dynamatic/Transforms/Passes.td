@@ -46,6 +46,29 @@ def ScfForLoopRotation : Pass<"scf-rotate-for-loops", "mlir::ModuleOp"> {
   let constructor = "dynamatic::createScfRotateForLoops()";
 }
 
+def ScfSimpleIfToSelect : Pass<"scf-simple-if-to-select", "mlir::ModuleOp"> {
+  let summary = "Transforms if's with simple bodies into select's.";
+  let description = [{
+    Transforms scf::IfOp operations with one result and a specific internal
+    struture into an equivalent combination of a single arith::SelectOp and
+    (potentially) an arithmetic operation present in at least one of its
+    branches.
+  
+    The pass transforms scf::IfOp operations with the following properties.
+    (1) The operation must have exactly one integer-like result.
+    (2) Each branch must be made up of a single yield or of a supported
+        two-operands arithmetic operation whose single result is yielded. If
+        both branches have an arithmetic operation, they must be of the same
+        type.
+    (3) Both branches, whatever their content (constrained by the point above),
+        must use an identical value. This could either be the yielded value or,
+        if applicable, the value used as one of the operands of the arithmetic
+        operation.
+  }];
+  let constructor = "dynamatic::createScfSimpleIfToSelect()";
+  let dependentDialects = ["mlir::arith::ArithDialect"];
+}
+
 //===----------------------------------------------------------------------===//
 // Handshake passes
 //===----------------------------------------------------------------------===//
@@ -143,8 +166,8 @@ def HandshakePlaceBuffers : Pass<"handshake-place-buffers", "mlir::ModuleOp"> {
   }];
   let constructor = "dynamatic::createHandshakePlaceBuffersPass()";
   let options = [
-    Option<"firstMG", "firstMG", "bool", "false",
-    "if true, only extract the first MG from the input file">,
+    Option<"firstCFDFC", "firstCFDFC", "bool", "false",
+    "if true, only extract the first CFDFC from the input file">,
     Option<"stdLevelInfo", "std-level-info", "std::string", "",
     "if provided, extract CFDFC from standard level simluation">,
     Option<"timefile", "time-file", "std::string", "",

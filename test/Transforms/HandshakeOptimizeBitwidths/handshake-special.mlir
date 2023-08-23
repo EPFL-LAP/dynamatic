@@ -76,11 +76,11 @@ handshake.func @simpleCycle(%arg0: i8, %index: i1, %cond: i1, %start: none) -> i
 // CHECK-LABEL:   handshake.func @complexCycle(
 // CHECK-SAME:                                 %[[VAL_0:.*]]: i8, %[[VAL_1:.*]]: i16, %[[VAL_2:.*]]: i24, %[[VAL_3:.*]]: i2, %[[VAL_4:.*]]: i1, %[[VAL_5:.*]]: i1,
 // CHECK-SAME:                                 %[[VAL_6:.*]]: none, ...) -> i32 attributes {argNames = ["arg0", "arg1", "arg2", "bigIndex", "index", "cond", "start"], resNames = ["out0"]} {
-// CHECK:           %[[VAL_7:.*]] = arith.extsi %[[VAL_1]] {bb = 0 : ui32} : i16 to i24
-// CHECK:           %[[VAL_8:.*]] = arith.extsi %[[VAL_0]] {bb = 0 : ui32} : i8 to i24
-// CHECK:           %[[VAL_9:.*]] = mux %[[VAL_3]] {{\[}}%[[VAL_8]], %[[VAL_10:.*]], %[[VAL_11:.*]], %[[VAL_12:.*]]] : i2, i24
+// CHECK:           %[[VAL_7:.*]] = arith.extsi %[[VAL_0]] {bb = 0 : ui32} : i8 to i24
+// CHECK:           %[[VAL_8:.*]] = arith.extsi %[[VAL_1]] {bb = 0 : ui32} : i16 to i24
+// CHECK:           %[[VAL_9:.*]] = mux %[[VAL_3]] {{\[}}%[[VAL_7]], %[[VAL_10:.*]], %[[VAL_11:.*]], %[[VAL_12:.*]]] : i2, i24
 // CHECK:           %[[VAL_10]], %[[VAL_13:.*]] = cond_br %[[VAL_5]], %[[VAL_9]] : i24
-// CHECK:           %[[VAL_14:.*]] = mux %[[VAL_4]] {{\[}}%[[VAL_7]], %[[VAL_13]]] : i1, i24
+// CHECK:           %[[VAL_14:.*]] = mux %[[VAL_4]] {{\[}}%[[VAL_8]], %[[VAL_13]]] : i1, i24
 // CHECK:           %[[VAL_11]], %[[VAL_15:.*]] = cond_br %[[VAL_5]], %[[VAL_14]] : i24
 // CHECK:           %[[VAL_16:.*]] = mux %[[VAL_4]] {{\[}}%[[VAL_2]], %[[VAL_15]]] : i1, i24
 // CHECK:           %[[VAL_12]], %[[VAL_17:.*]] = cond_br %[[VAL_5]], %[[VAL_16]] : i24

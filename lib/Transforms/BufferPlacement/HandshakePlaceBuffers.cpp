@@ -9,8 +9,10 @@
 #include "circt/Dialect/Handshake/HandshakeDialect.h"
 #include "circt/Dialect/Handshake/HandshakeOps.h"
 #include "circt/Dialect/Handshake/HandshakePasses.h"
+#include "dynamatic/Transforms/BufferPlacement/ExtractCFDFC.h"
 #include "dynamatic/Transforms/BufferPlacement/OptimizeMILP.h"
 #include "dynamatic/Transforms/PassDetails.h"
+#include "experimental/Support/StdProfiler.h"
 #include "mlir/Dialect/Arith/IR/Arith.h"
 #include "mlir/Dialect/Func/IR/FuncOps.h"
 #include "mlir/IR/BuiltinTypes.h"
@@ -24,101 +26,16 @@ using namespace circt::handshake;
 using namespace mlir;
 using namespace dynamatic;
 using namespace dynamatic::buffer;
-
-/// Create the CFDFCircuit based on the extraction results
-static CFDFC createCFDFCircuit(handshake::FuncOp funcOp,
-                               std::map<ArchBB *, bool> &archs,
-                               std::map<unsigned, bool> &bbs) {
-  CFDFC circuit = CFDFC();
-  for (auto &op : funcOp.getOps()) {
-    int bbIndex = getBBIndex(&op);
-    if (bbIndex < 0)
-      continue;
-
-    // insert units in the selected basic blocks
-    if (bbs[bbIndex]) {
-      circuit.units.push_back(&op);
-      // insert channels if it is selected
-      for (auto port : op.getResults())
-        if (isSelect(archs, port) || isSelect(bbs, port))
-          circuit.channels.push_back(port);
-    }
-  }
-  return circuit;
-}
-
-/// Instantiate the buffers based on the results of the MILP
-static LogicalResult instantiateBuffers(DenseMap<Value, Result> &res,
-                                        MLIRContext *ctx) {
-  OpBuilder builder(ctx);
-  for (auto &[channel, result] : res) {
-    if (result.numSlots == 0)
-      continue;
-    Operation *opSrc = channel.getDefiningOp();
-    Operation *opDst = *channel.getUsers().begin();
-
-    unsigned numOpque = 0;
-    unsigned numTrans = 0;
-
-    if (result.opaque)
-      numOpque = result.numSlots;
-    else
-      numTrans = result.numSlots;
-
-    builder.setInsertionPointAfter(opSrc);
-    unsigned indVal = getPortInd(opSrc, channel);
-    assert(indVal != UINT_MAX && "Insert buffers in non exsiting channels");
-
-    if (numOpque > 0) {
-      // insert opque buffer
-      Value bufferOperand = opSrc->getResult(indVal);
-      Value bufferRes =
-          builder
-              .create<handshake::BufferOp>(opSrc->getLoc(), bufferOperand,
-                                           numOpque, BufferTypeEnum::seq)
-              .getResult();
-      if (numTrans > 0)
-        bufferRes =
-            builder
-                .create<handshake::BufferOp>(opSrc->getLoc(), bufferRes,
-                                             numTrans, BufferTypeEnum::fifo)
-                .getResult();
-
-      opDst->replaceUsesOfWith(bufferOperand, bufferRes);
-    }
-
-    // insert all transparent buffers
-    if (numTrans > 0 && numOpque == 0) {
-      Value bufferOperand = opSrc->getResult(indVal);
-      Value bufferRes =
-          builder
-              .create<handshake::BufferOp>(opSrc->getLoc(), bufferOperand,
-                                           numTrans, BufferTypeEnum::fifo)
-              .getResult();
-      opDst->replaceUsesOfWith(bufferOperand, bufferRes);
-    }
-  }
-
-  return success();
-}
-
-/// Delete the created archs map for MG extraction to avoid memory leak
-static void deleleArchMap(std::map<ArchBB *, bool> &archs) {
-  for (auto &[arch, _] : archs)
-    delete arch;
-  // Clear the map
-  archs.clear();
-}
+using namespace dynamatic::experimental;
 
 namespace {
-
 struct HandshakePlaceBuffersPass
     : public HandshakePlaceBuffersBase<HandshakePlaceBuffersPass> {
 
-  HandshakePlaceBuffersPass(bool firstMG, std::string &stdLevelInfo,
+  HandshakePlaceBuffersPass(bool firstCFDFC, std::string &stdLevelInfo,
                             std::string &timefile, double targetCP,
                             int timeLimit, bool setCustom) {
-    this->firstMG = firstMG;
+    this->firstCFDFC = firstCFDFC;
     this->stdLevelInfo = stdLevelInfo;
     this->timefile = timefile;
     this->targetCP = targetCP;
@@ -126,115 +43,187 @@ struct HandshakePlaceBuffersPass
     this->setCustom = setCustom;
   }
 
-  void runOnOperation() override {
-    ModuleOp m = getOperation();
-
 #ifdef DYNAMATIC_GUROBI_NOT_INSTALLED
-    m.emitError() << "Project was built without Gurobi installed, can't "
-                     "run smart buffer placement pass\n";
+  void runOnOperation() override {
+    ModuleOp mod = getOperation();
+    mod.emitError() << "Project was built without Gurobi installed, can't "
+                       "run smart buffer placement pass\n";
     return signalPassFailure();
-#endif // DYNAMATIC_GUROBI_NOT_INSTALLED
+  }
+#else
+  void runOnOperation() override {
+    ModuleOp mod = getOperation();
 
-    ChannelBufProps strategy;
-    for (auto funcOp : m.getOps<handshake::FuncOp>())
-      if (failed(insertBuffers(funcOp, &getContext())))
+    // Buffer placement requires that all values are used exactly once in the IR
+    for (handshake::FuncOp funcOp : mod.getOps<handshake::FuncOp>()) {
+      if (failed(verifyAllValuesHasOneUse(funcOp))) {
+        funcOp.emitOpError() << "not all values are used exactly once";
         return signalPassFailure();
+      }
+    }
+
+    std::map<std::string, UnitInfo> unitInfo;
+    if (failed(parseJson(timefile, unitInfo)))
+      return signalPassFailure();
+
+    // Place buffers in each function
+    for (handshake::FuncOp funcOp : mod.getOps<handshake::FuncOp>()) {
+      // Get CFDFCs from the function
+      SmallVector<CFDFC> cfdfcs;
+      if (failed(getCFDFCs(funcOp, cfdfcs)))
+        return signalPassFailure();
+
+      // Solve the MILP to obtain a buffer placement
+      DenseMap<Value, PlacementResult> placement;
+      if (failed(getBufferPlacement(funcOp, cfdfcs, unitInfo, placement)))
+        return signalPassFailure();
+
+      if (failed(instantiateBuffers(placement)))
+        return signalPassFailure();
+    }
   };
 
 private:
-  LogicalResult insertBuffers(FuncOp &funcOp, MLIRContext *ctx);
+  LogicalResult getCFDFCs(FuncOp funcOp, SmallVector<CFDFC> &cfdfcs);
+
+  LogicalResult getBufferPlacement(FuncOp funcOp, SmallVector<CFDFC> &cfdfcs,
+                                   std::map<std::string, UnitInfo> &unitInfo,
+                                   DenseMap<Value, PlacementResult> &placement);
+
+  LogicalResult instantiateBuffers(DenseMap<Value, PlacementResult> &res);
+#endif
 };
+} // namespace
 
-LogicalResult HandshakePlaceBuffersPass::insertBuffers(FuncOp &funcOp,
-                                                       MLIRContext *ctx) {
+#ifndef DYNAMATIC_GUROBI_NOT_INSTALLED
+LogicalResult HandshakePlaceBuffersPass::getCFDFCs(FuncOp funcOp,
+                                                   SmallVector<CFDFC> &cfdfcs) {
 
-  if (failed(verifyAllValuesHasOneUse(funcOp))) {
-    funcOp.emitOpError() << "not all values are used exactly once";
-    return failure();
+  // Read the CSV containing arch information (number of transitions between
+  // pairs of basic blocks)
+  SmallVector<ArchBB> archList;
+  if (failed(StdProfiler::readCSV(stdLevelInfo, archList)))
+    return funcOp->emitError()
+           << "Failed to reaf profiling information from CSV";
+
+  // Store all archs in a set. We use a pointer to each arch as the key type to
+  // allow us to modify their frequencies during CFDFC extractions without
+  // messing up key hashes
+  ArchSet archs;
+  // Similarly, store all block IDs in a set.
+  BBSet bbs;
+  for (ArchBB &arch : archList) {
+    archs.insert(&arch);
+    bbs.insert(arch.srcBB);
+    bbs.insert(arch.dstBB);
   }
 
-  // vectors to store CFDFC circuits
-  std::vector<CFDFC> cfdfcList;
+  // Set of selected archs
+  ArchSet selectedArchs;
+  // Set of selected basic blocks
+  BBSet selectedBBs;
+  // Number of executions
+  unsigned numExec;
+  do {
+    // Clear the sets of selected archs and BBs
+    selectedArchs.clear();
+    selectedBBs.clear();
 
-  // read the simulation file from std level, create map to indicate whether
-  // the bb is selected, and whether the arch between bbs is selected in each
-  // round of extraction
-  std::map<ArchBB *, bool> archs;
-  std::map<unsigned, bool> bbs;
-  if (failed(readSimulateFile(stdLevelInfo, archs, bbs)))
-    return failure();
-
-  unsigned freq;
-
-  if (failed(extractCFDFCircuit(archs, bbs, freq))) {
-    deleleArchMap(archs);
-    return failure();
-  }
-
-  // Create the CFDFC index list that will be optimized
-  std::vector<unsigned> cfdfcInds;
-  unsigned cfdfcInd = 0;
-  while (freq > 0) {
-    // write the execution frequency to the CFDFC
-    auto circuit = createCFDFCircuit(funcOp, archs, bbs);
-    cfdfcInds.push_back(cfdfcInd++);
-    circuit.execN = freq;
-    cfdfcList.push_back(circuit);
-    if (firstMG)
-      break;
-    if (failed(extractCFDFCircuit(archs, bbs, freq))) {
-      deleleArchMap(archs);
+    // Try to extract the next CFDFC
+    if (failed(extractCFDFC(funcOp, archs, bbs, selectedArchs, selectedBBs,
+                            numExec)))
       return failure();
-    }
-  }
+    if (numExec == 0)
+      break;
 
-  // Delete the CFDFC related results
-  deleleArchMap(archs);
-
-  // Instantiate all the channels of MILP model in different CFDFC
-  std::vector<Value> allChannels;
-  auto startNode = *(funcOp.front().getArguments().end() - 1);
-  for (Operation *op : startNode.getUsers())
-    for (auto opr : op->getOperands())
-      allChannels.push_back(opr);
-
-  for (Operation &op : funcOp.getOps())
-    for (auto resOp : op.getResults())
-      allChannels.push_back(resOp);
-
-  // Create the MILP model of buffer placement, and write the results of the
-  // model to insertBufResult.
-
-  std::map<std::string, UnitInfo> unitInfo;
-  DenseMap<Value, ChannelBufProps> channelBufProps;
-
-  if (failed(parseJson(timefile, unitInfo)))
-    return failure();
-
-  // load the buffer information of the units to channel
-  if (failed(setChannelBufProps(allChannels, channelBufProps, unitInfo)))
-    return failure();
-
-  DenseMap<Value, Result> insertBufResult;
-
-  if (failed(placeBufferInCFDFCircuit(insertBufResult, funcOp, allChannels,
-                                      cfdfcList, cfdfcInds, targetCP, timeLimit,
-                                      setCustom, unitInfo, channelBufProps)))
-    return failure();
-
-  if (failed(instantiateBuffers(insertBufResult, ctx)))
-    return failure();
+    // Create the CFDFC from the set of selected archs and BBs
+    cfdfcs.emplace_back(funcOp, selectedArchs, selectedBBs, numExec);
+  } while (firstCFDFC);
 
   return success();
 }
-} // namespace
+
+LogicalResult HandshakePlaceBuffersPass::getBufferPlacement(
+    FuncOp funcOp, SmallVector<CFDFC> &cfdfcs,
+    std::map<std::string, UnitInfo> &unitInfo,
+    DenseMap<Value, PlacementResult> &placement) {
+  // All CFDFCs must be optimized
+  llvm::MapVector<CFDFC *, bool> cfdfcsOpt;
+  for (CFDFC &cd : cfdfcs)
+    cfdfcsOpt[&cd] = true;
+
+  // Create Gurobi environment
+  GRBEnv env = GRBEnv(true);
+  env.set(GRB_IntParam_OutputFlag, 0);
+  env.start();
+
+  // Create and solve the MILP
+  BufferPlacementMILP milp(funcOp, cfdfcsOpt, unitInfo, targetCP, env,
+                           timeLimit);
+  if (failed(milp.optimize(placement)))
+    return funcOp.emitError() << "Failed to solve MILP";
+  return success();
+}
+
+LogicalResult HandshakePlaceBuffersPass::instantiateBuffers(
+    DenseMap<Value, PlacementResult> &res) {
+
+  OpBuilder builder(&getContext());
+  for (auto &[channel, result] : res) {
+    if (result.numSlots == 0)
+      continue;
+    Operation *opSrc = channel.getDefiningOp();
+    Operation *opDst = *channel.getUsers().begin();
+
+    unsigned numOpaque = 0;
+    unsigned numTransparent = 0;
+
+    if (result.opaque)
+      numOpaque = result.numSlots;
+    else
+      numTransparent = result.numSlots;
+
+    builder.setInsertionPointAfter(opSrc);
+
+    if (numOpaque > 0) {
+      // Insert an opaque buffer
+      Value bufferOperand = channel;
+      Value bufferRes =
+          builder
+              .create<handshake::BufferOp>(channel.getLoc(), bufferOperand,
+                                           numOpaque, BufferTypeEnum::seq)
+              .getResult();
+      if (numTransparent > 0)
+        bufferRes = builder
+                        .create<handshake::BufferOp>(channel.getLoc(),
+                                                     bufferRes, numTransparent,
+                                                     BufferTypeEnum::fifo)
+                        .getResult();
+
+      opDst->replaceUsesOfWith(bufferOperand, bufferRes);
+    }
+
+    if (numTransparent > 0 && numOpaque == 0) {
+      // Insert a transparent buffer
+      Value bufferOperand = channel;
+      Value bufferRes =
+          builder
+              .create<handshake::BufferOp>(channel.getLoc(), bufferOperand,
+                                           numTransparent, BufferTypeEnum::fifo)
+              .getResult();
+      opDst->replaceUsesOfWith(bufferOperand, bufferRes);
+    }
+  }
+  return success();
+}
+#endif
 
 std::unique_ptr<mlir::OperationPass<mlir::ModuleOp>>
-dynamatic::createHandshakePlaceBuffersPass(bool firstMG,
+dynamatic::createHandshakePlaceBuffersPass(bool firstCFDFC,
                                            std::string stdLevelInfo,
                                            std::string timefile,
                                            double targetCP, int timeLimit,
                                            bool setCustom) {
   return std::make_unique<HandshakePlaceBuffersPass>(
-      firstMG, stdLevelInfo, timefile, targetCP, timeLimit, setCustom);
+      firstCFDFC, stdLevelInfo, timefile, targetCP, timeLimit, setCustom);
 }
