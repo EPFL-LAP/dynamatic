@@ -1,2 +1,3 @@
+add_subdirectory(export-vhdl)
 add_subdirectory(FrequencyProfiler)
 add_subdirectory(handshake-simulator)

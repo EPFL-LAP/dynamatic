@@ -1,25 +1,25 @@
 library ieee;
 use ieee.std_logic_1164.all;
 use ieee.numeric_std.all;
-USE work.customTypes.all;
+use work.customTypes.all;
 
 entity constant is
-Generic (
-  BITWIDTH: Integer 
-);
-port(
-    clk, rst : in std_logic;  
-    dataInArray : in data_array (0 downto 0)(BITWIDTH-1 downto 0);
-    dataOutArray : out data_array (0 downto 0)(BITWIDTH-1 downto 0);
-    ReadyArray : out std_logic_vector(0 downto 0);
-    ValidArray : out std_logic_vector(0 downto 0);
-    nReadyArray : in std_logic_vector(0 downto 0);
-    pValidArray : in std_logic_vector(0 downto 0));
+  generic (
+    BITWIDTH : integer
+  );
+  port (
+    clk, rst : in std_logic;
+    --dataInArray  : in std_logic_vector(BITWIDTH - 1 downto 0);
+    dataOutArray : out std_logic_vector(BITWIDTH - 1 downto 0);
+    ready        : out std_logic;
+    valid        : out std_logic;
+    nReady       : in std_logic;
+    pValid       : in std_logic);
 end constant;
 
 architecture arch of constant is
 begin
-dataOutArray <= dataInArray;
-validArray <= pValidArray;
-readyArray <= nReadyArray; 
+  dataOutArray <= #CST_VALUE#;
+  valid        <= pValid;
+  ready        <= nReady;
 end architecture;

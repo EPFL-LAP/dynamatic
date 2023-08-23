@@ -3,11 +3,11 @@ use ieee.std_logic_1164.all;
 use work.customTypes.all;
 use ieee.numeric_std.all;
 
-entity merge is
+entity merge_notehb is
 
   generic (
     INPUTS   : integer;
-    BITWIDTH : integer
+    BITWIDTH : integer;
   );
   port (
     clk, rst     : in std_logic;
@@ -17,9 +17,9 @@ entity merge is
     nReady       : in std_logic;
     valid        : out std_logic;
     readyArray   : out std_logic_vector(INPUTS - 1 downto 0));
-end merge;
+end merge_notehb;
 
-architecture arch of merge is
+architecture arch of merge_notehb is
   signal tehb_data_in : std_logic_vector(BITWIDTH - 1 downto 0);
   signal tehb_pvalid  : std_logic;
   signal tehb_ready   : std_logic;
@@ -51,17 +51,8 @@ begin
     end loop;
   end process;
 
-  tehb1 : entity work.TEHB(arch) generic map (BITWIDTH)
-    port map(
-      --inputspValidArray
-      clk            => clk,
-      rst            => rst,
-      pValidArray(0) => tehb_pvalid,
-      nReady         => nReady,
-      valid          => valid,
-      --outputs
-      readyArray(0)  => tehb_ready,
-      dataInArray(0) => tehb_data_in,
-      dataOutArray   => dataOutArray
-    );
-end architecture;
+  tehb_ready   <= nReady;
+  valid        <= tehb_pvalid;
+  dataOutArray <= tehb_data_in;
+
+end arch;
