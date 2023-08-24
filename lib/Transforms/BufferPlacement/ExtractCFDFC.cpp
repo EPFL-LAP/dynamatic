@@ -57,6 +57,9 @@ static unsigned initMILPVariables(GRBModel &model, ArchSet &archs, BBSet &bbs,
     maxNumTrans = std::max(maxNumTrans, arch->numTrans);
   }
 
+  // Update the model before returning so that these variables can be referenced
+  // safely during the rest of model creation
+  model.update();
   return maxNumTrans;
 }
 
@@ -169,7 +172,7 @@ CFDFC::CFDFC(circt::handshake::FuncOp funcOp, ArchSet &archs, BBSet &bbs,
 
       // The channel is in the CFDFC if its producer/consumer belong to the same
       // basic block and the channel isn't a backedge
-      if (srcBB == dstBB && !isBackEdge(&op, user))
+      if (srcBB == dstBB && !isBackedge(&op, user))
         channels.insert(channel);
 
       // The channel is in the CFDFC if its producer/consumer belong to a
@@ -184,7 +187,7 @@ CFDFC::CFDFC(circt::handshake::FuncOp funcOp, ArchSet &archs, BBSet &bbs,
   }
 }
 
-bool dynamatic::buffer::isBackEdge(Operation *src, Operation *dst) {
+bool dynamatic::buffer::isBackedge(Operation *src, Operation *dst) {
   if (dst->isProperAncestor(src))
     return true;
   if (isa<BranchOp, ConditionalBranchOp>(src) &&

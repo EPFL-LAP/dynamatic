@@ -45,7 +45,7 @@ struct CFDFC {
 /// Determines whether the edge between a source and destination operation is a
 /// backedge in the context of buffer placement. The function assumes that the
 /// source operation produces a value that the destination operation consumes.
-bool isBackEdge(Operation *src, Operation *dst);
+bool isBackedge(Operation *src, Operation *dst);
 
 /// Extracts the most frequently executed CFDFC from the Handshake function
 /// described by the provided archs and basic blocks. The function internally

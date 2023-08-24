@@ -158,11 +158,10 @@ LogicalResult HandshakePlaceBuffersPass::getBufferPlacement(
   env.start();
 
   // Create and solve the MILP
-  BufferPlacementMILP milp(funcOp, cfdfcsOpt, unitInfo, targetCP, env,
-                           timeLimit);
-  if (failed(milp.optimize(placement)))
-    return funcOp.emitError() << "Failed to solve MILP";
-  return success();
+  BufferPlacementMILP milp(funcOp, cfdfcsOpt, unitInfo, targetCP,
+                           targetCP * 2.0, env, timeLimit);
+  return success(milp.arePlacementConstraintsSatisfiable() &&
+                 !failed(milp.setup()) && !failed(milp.optimize(placement)));
 }
 
 LogicalResult HandshakePlaceBuffersPass::instantiateBuffers(
