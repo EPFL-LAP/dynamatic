@@ -1,11 +1,11 @@
-//===- BufferingStrategy.cpp - Buffer placement strategy ---------- C++ -*-===//
+//===- BufferingProperties.cpp - Buffer placement properties ----*- C++ -*-===//
 //
 // Implements the infrastructure for specifying and manipulating buffering
-// strategies.
+// properties.
 //
 //===----------------------------------------------------------------------===//
 
-#include "dynamatic/Support/BufferingStrategy.h"
+#include "dynamatic/Transforms/BufferPlacement/BufferingProperties.h"
 #include "mlir/Support/LogicalResult.h"
 #include "llvm/Support/ErrorHandling.h"
 
@@ -22,7 +22,8 @@ static size_t getResIdx(Operation *op, OpResult res) {
   llvm_unreachable("result does not exist");
 }
 
-DenseMap<OpResult, ChannelBufProps> dynamatic::getOpBufProps(Operation *op) {
+DenseMap<OpResult, ChannelBufProps>
+dynamatic::buffer::getOpBufProps(Operation *op) {
   DenseMap<OpResult, ChannelBufProps> props;
 
   // Check if the attribute containing the properties is defined
@@ -39,7 +40,7 @@ DenseMap<OpResult, ChannelBufProps> dynamatic::getOpBufProps(Operation *op) {
   return props;
 }
 
-void dynamatic::clearBufProps(Operation *op) {
+void dynamatic::buffer::clearBufProps(Operation *op) {
   // Check if the attribute containing the properties is defined
   if (!op->hasAttrOfType<OpBufPropsAttr>(BUF_PROPS_ATTR))
     return;
@@ -47,8 +48,9 @@ void dynamatic::clearBufProps(Operation *op) {
   op->removeAttr(BUF_PROPS_ATTR);
 }
 
-LogicalResult dynamatic::addChannelBufProps(OpResult res,
-                                            ChannelBufProps channelProps) {
+LogicalResult
+dynamatic::buffer::addChannelBufProps(OpResult res,
+                                      ChannelBufProps channelProps) {
   Operation *op = res.getDefiningOp();
   size_t resIdx = getResIdx(op, res);
   SmallVector<std::pair<size_t, ChannelBufProps>, 4> allChannelProps;
@@ -74,8 +76,8 @@ LogicalResult dynamatic::addChannelBufProps(OpResult res,
   return success();
 }
 
-bool dynamatic::replaceChannelBufProps(OpResult res,
-                                       ChannelBufProps channelProps) {
+bool dynamatic::buffer::replaceChannelBufProps(OpResult res,
+                                               ChannelBufProps channelProps) {
   Operation *op = res.getDefiningOp();
   size_t resIdx = getResIdx(op, res);
   SmallVector<std::pair<size_t, ChannelBufProps>, 4> allChannelProps;

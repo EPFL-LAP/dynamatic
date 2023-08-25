@@ -7,8 +7,8 @@
 #ifndef DYNAMATIC_TRANSFORMS_BUFFERPLACEMENT_OPTIMIZEMILP_H
 #define DYNAMATIC_TRANSFORMS_BUFFERPLACEMENT_OPTIMIZEMILP_H
 
-#include "dynamatic/Support/BufferingStrategy.h"
 #include "dynamatic/Support/LLVM.h"
+#include "dynamatic/Transforms/BufferPlacement/BufferingProperties.h"
 #include "dynamatic/Transforms/BufferPlacement/ExtractCFDFC.h"
 #include "dynamatic/Transforms/BufferPlacement/ParseCircuitJson.h"
 #include "mlir/Dialect/Func/IR/FuncOps.h"

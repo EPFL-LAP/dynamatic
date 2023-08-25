@@ -1,6 +1,6 @@
-//===- BufferingStrategy.h - Buffer placement strategy ----------*- C++ -*-===//
+//===- BufferingProperties.h - Buffer placement properties ------*- C++ -*-===//
 //
-// Infrastructure for specifying and manipulating buffering strategies, which
+// Infrastructure for specifying and manipulating buffering properties, which
 // are used by the buffer placement logic to constrain the nature and
 // positions of buffers in elastic circuits.
 //
@@ -12,10 +12,14 @@
 //
 //===----------------------------------------------------------------------===//
 
+#ifndef DYNAMATIC_TRANSFORMS_BUFFERPLACEMENT_BUFFERINGPROPERTIES_H
+#define DYNAMATIC_TRANSFORMS_BUFFERPLACEMENT_BUFFERINGPROPERTIES_H
+
 #include "circt/Dialect/Handshake/HandshakeOps.h"
 #include "dynamatic/Support/LLVM.h"
 
 namespace dynamatic {
+namespace buffer {
 
 // Attribute name under which buffering properties for an operation's output
 // channels are expected to be stored.
@@ -40,4 +44,7 @@ LogicalResult addChannelBufProps(OpResult res, ChannelBufProps channelProps);
 /// false, otherwise returns true.
 bool replaceChannelBufProps(OpResult res, ChannelBufProps channelProps);
 
+} // namespace buffer
 } // namespace dynamatic
+
+#endif // DYNAMATIC_TRANSFORMS_BUFFERPLACEMENT_BUFFERINGPROPERTIES_H
