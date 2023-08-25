@@ -10,13 +10,14 @@ entity merge_notehb is
     BITWIDTH : integer;
   );
   port (
-    clk, rst     : in std_logic;
-    dataInArray  : in data_array(INPUTS - 1 downto 0)(BITWIDTH - 1 downto 0);
-    dataOutArray : out std_logic_vector(BITWIDTH - 1 downto 0);
-    pValidArray  : in std_logic_vector(INPUTS - 1 downto 0);
-    nReady       : in std_logic;
-    valid        : out std_logic;
-    readyArray   : out std_logic_vector(INPUTS - 1 downto 0));
+    clk        : in std_logic;
+    rst        : in std_logic;
+    ins        : in data_array(INPUTS - 1 downto 0)(BITWIDTH - 1 downto 0);
+    outs       : out std_logic_vector(BITWIDTH - 1 downto 0);
+    ins_valid  : in std_logic_vector(INPUTS - 1 downto 0);
+    outs_ready : in std_logic;
+    outs_valid : out std_logic;
+    ins_ready  : out std_logic_vector(INPUTS - 1 downto 0));
 end merge_notehb;
 
 architecture arch of merge_notehb is
@@ -26,16 +27,16 @@ architecture arch of merge_notehb is
 
 begin
 
-  process (pValidArray, dataInArray)
+  process (ins_valid, ins)
     variable tmp_data_out  : unsigned(BITWIDTH - 1 downto 0);
     variable tmp_valid_out : std_logic;
   begin
-    tmp_data_out  := unsigned(dataInArray(0));
+    tmp_data_out  := unsigned(ins(0));
     tmp_valid_out := '0';
     for I in INPUTS - 1 downto 0 loop
-      if (pValidArray(I) = '1') then
-        tmp_data_out  := unsigned(dataInArray(I));
-        tmp_valid_out := pValidArray(I);
+      if (ins_valid(I) = '1') then
+        tmp_data_out  := unsigned(ins(I));
+        tmp_valid_out := ins_valid(I);
       end if;
     end loop;
 
@@ -47,12 +48,12 @@ begin
   process (tehb_ready)
   begin
     for I in 0 to INPUTS - 1 loop
-      readyArray(I) <= tehb_ready;
+      ins_ready(I) <= tehb_ready;
     end loop;
   end process;
 
-  tehb_ready   <= nReady;
-  valid        <= tehb_pvalid;
-  dataOutArray <= tehb_data_in;
+  tehb_ready <= outs_ready;
+  outs_valid <= tehb_pvalid;
+  outs       <= tehb_data_in;
 
 end arch;

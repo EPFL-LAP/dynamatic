@@ -8,13 +8,16 @@ entity buffer is
     BITWIDTH : integer
   );
   port (
-    clk, rst     : in std_logic;
-    dataInArray  : in std_logic_vector(BITWIDTH - 1 downto 0);
-    dataOutArray : out std_logic_vector(BITWIDTH - 1 downto 0);
-    ready        : out std_logic;
-    valid        : out std_logic;
-    nReady       : in std_logic;
-    pValid       : in std_logic);
+    -- inputs
+    ins        : in std_logic_vector(BITWIDTH - 1 downto 0);
+    ins_valid  : in std_logic;
+    clk        : in std_logic;
+    rst        : in std_logic;
+    outs_ready : in std_logic;
+    -- outputs
+    ins_ready  : out std_logic;
+    outs       : out std_logic_vector(BITWIDTH - 1 downto 0);
+    outs_valid : out std_logic);
 end buffer;
 
 architecture arch of buffer is
@@ -26,34 +29,33 @@ begin
 
   tehb1 : entity work.TEHB(arch) generic map (BITWIDTH)
     port map(
-      --inputspValid
-      clk    => clk,
-      rst    => rst,
-      pValid => pValid, -- real or speculatef condition (determined by merge1)
-      nReady => oehb1_ready,
-      valid  => tehb1_valid,
-      --outputs
-      ready        => tehb1_ready,
-      dataInArray  => dataInArray,
-      dataOutArray => tehb1_dataOut
+      clk        => clk,
+      rst        => rst,
+      ins_valid  => ins_valid,
+      outs_ready => oehb1_ready,
+      outs_valid => tehb1_valid,
+
+      ins_ready => tehb1_ready,
+      ins       => ins,
+      outs      => tehb1_dataOut
     );
 
   oehb1 : entity work.OEHB(arch) generic map (BITWIDTH)
     port map(
-      --inputspValid
-      clk    => clk,
-      rst    => rst,
-      pValid => tehb1_valid, -- real or speculatef condition (determined by merge1)
-      nReady => nReady,
-      valid  => oehb1_valid,
-      --outputs
-      ready        => oehb1_ready,
-      dataInArray  => tehb1_dataOut,
-      dataOutArray => oehb1_dataOut
+
+      clk        => clk,
+      rst        => rst,
+      ins_valid  => tehb1_valid,
+      outs_ready => outs_ready,
+      outs_valid => oehb1_valid,
+
+      ins_ready => oehb1_ready,
+      ins       => tehb1_dataOut,
+      outs      => oehb1_dataOut
     );
 
-  dataOutArray <= oehb1_dataOut;
-  valid        <= oehb1_valid;
-  ready        <= tehb1_ready;
+  outs       <= oehb1_dataOut;
+  outs_valid <= oehb1_valid;
+  ins_ready  <= tehb1_ready;
 
 end arch;

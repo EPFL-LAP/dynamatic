@@ -8,13 +8,14 @@ entity OEHB is
     BITWIDTH : integer
   );
   port (
-    clk, rst     : in std_logic;
-    dataInArray  : in std_logic_vector(BITWIDTH - 1 downto 0);
-    dataOutArray : out std_logic_vector(BITWIDTH - 1 downto 0);
-    pValid       : in std_logic;
-    nReady       : in std_logic;
-    valid        : out std_logic;
-    ready        : out std_logic);
+    clk        : in std_logic;
+    rst        : in std_logic;
+    ins        : in std_logic_vector(BITWIDTH - 1 downto 0);
+    outs       : out std_logic_vector(BITWIDTH - 1 downto 0);
+    ins_valid  : in std_logic;
+    outs_ready : in std_logic;
+    outs_valid : out std_logic;
+    ins_ready  : out std_logic);
 end OEHB;
 
 architecture arch of OEHB is
@@ -26,10 +27,10 @@ begin
 
   begin
     if (rst = '1') then
-      valid <= '0';
+      outs_valid <= '0';
 
     elsif (rising_edge(clk)) then
-      valid <= pValid or not ready;
+      outs_valid <= ins_valid or not ins_ready;
 
     end if;
   end process;
@@ -42,13 +43,13 @@ begin
 
     elsif (rising_edge(clk)) then
       if (reg_en) then
-        data_reg <= dataInArray;
+        data_reg <= ins;
       end if;
 
     end if;
   end process;
-  ready        <= not valid or nReady;
-  reg_en       <= ready and pValid;
-  dataOutArray <= data_reg;
+  ins_ready <= not outs_valid or outs_ready;
+  reg_en    <= ins_ready and ins_valid;
+  outs      <= data_reg;
 
 end arch;

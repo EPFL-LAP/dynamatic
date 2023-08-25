@@ -2,25 +2,27 @@ library IEEE;
 use IEEE.std_logic_1164.all;
 use IEEE.numeric_std.all;
 use work.customTypes.all;
+
 entity d_load is generic (
   ADDR_BITWIDTH : integer;
   DATA_BITWIDTH : integer);
 port (
-  rst : in std_logic;
-  clk : in std_logic;
-
-  --- interface to previous
-  pValidArray : in std_logic_vector(1 downto 0);
-  readyArray  : out std_logic_vector(1 downto 0);
-  dataInArray : in std_logic_vector(DATA_BITWIDTH - 1 downto 0);
-  input_addr  : in std_logic_vector(ADDR_BITWIDTH - 1 downto 0);
-
-  ---interface to next
-  nReadyArray  : in std_logic_vector(1 downto 0);
-  validArray   : out std_logic_vector(1 downto 0);
-  dataOutArray : out std_logic_vector(DATA_BITWIDTH - 1 downto 0);
-  output_addr  : out std_logic_vector(ADDR_BITWIDTH - 1 downto 0)
-);
+  -- inputs
+  clk               : in std_logic;
+  rst               : in std_logic;
+  addrIn            : in std_logic_vector(ADDR_BITWIDTH - 1 downto 0);
+  addrIn_valid      : in std_logic;
+  dataFromMem       : in std_logic_vector(DATA_BITWIDTH - 1 downto 0);
+  dataFromMem_valid : in std_logic;
+  addrOut_ready     : in std_logic;
+  dataOut_ready     : in std_logic;
+  -- outputs
+  addrIn_ready      : out std_logic;
+  dataFromMem_ready : out std_logic;
+  addrOut           : out std_logic_vector(ADDR_BITWIDTH - 1 downto 0);
+  addrOut_valid     : out std_logic;
+  dataOut           : out std_logic_vector(DATA_BITWIDTH - 1 downto 0);
+  dataOut_valid     : out std_logic);
 
 end entity;
 
@@ -51,46 +53,46 @@ architecture arch of d_load is
 
 begin
 
-  addr_from_circuit       <= input_addr;
-  addr_from_circuit_valid <= pValidArray(1);
-  readyArray(1)           <= Buffer_1_readyArray_0;
+  addr_from_circuit       <= addrIn;
+  addr_from_circuit_valid <= addrIn_valid;
+  addrIn_ready            <= Buffer_1_readyArray_0;
 
   Buffer_1 : entity work.TEHB(arch) generic map (ADDR_BITWIDTH)
     port map(
-      clk            => clk,
-      rst            => rst,
-      dataInArray    => addr_from_circuit,
-      pValidArray(0) => addr_from_circuit_valid,
-      readyArray(0)  => Buffer_1_readyArray_0,
-      nReadyArray(0) => addr_to_lsq_ready,
-      validArray(0)  => Buffer_1_validArray_0,
-      dataOutArray   => Buffer_1_dataOutArray_0
+      clk        => clk,
+      rst        => rst,
+      ins        => addr_from_circuit,
+      ins_valid  => addr_from_circuit_valid,
+      ins_ready  => Buffer_1_readyArray_0,
+      outs_ready => addr_to_lsq_ready,
+      outs_valid => Buffer_1_validArray_0,
+      outs       => Buffer_1_dataOutArray_0
     );
   addr_to_lsq       <= Buffer_1_dataOutArray_0;
   addr_to_lsq_valid <= Buffer_1_validArray_0;
-  addr_to_lsq_ready <= nReadyArray(1);
+  addr_to_lsq_ready <= addrOut_ready;
 
-  output_addr   <= addr_to_lsq; -- address request goes to LSQ
-  validArray(1) <= addr_to_lsq_valid;
+  addrOut       <= addr_to_lsq;
+  addrOut_valid <= addr_to_lsq_valid;
 
-  readyArray(0) <= data_from_lsq_ready;
+  dataFromMem_ready <= data_from_lsq_ready;
 
-  data_from_lsq       <= dataInArray;
-  data_from_lsq_valid <= pValidArray(0);
+  data_from_lsq       <= dataFromMem;
+  data_from_lsq_valid <= dataFromMem_valid;
   data_from_lsq_ready <= Buffer_2_readyArray_0;
 
-  dataOutArray  <= Buffer_2_dataOutArray_0; -- data from LSQ to load output
-  validArray(0) <= Buffer_2_validArray_0;
+  dataOut       <= Buffer_2_dataOutArray_0;
+  dataOut_valid <= Buffer_2_validArray_0;
 
   Buffer_2 : entity work.TEHB(arch) generic map (DATA_BITWIDTH)
     port map(
-      clk            => clk,
-      rst            => rst,
-      dataInArray    => data_from_lsq,
-      pValidArray(0) => data_from_lsq_valid,
-      readyArray(0)  => Buffer_2_readyArray_0,
-      nReadyArray(0) => nReadyArray(0),
-      validArray(0)  => Buffer_2_validArray_0,
-      dataOutArray   => Buffer_2_dataOutArray_0
+      clk        => clk,
+      rst        => rst,
+      ins        => data_from_lsq,
+      ins_valid  => data_from_lsq_valid,
+      ins_ready  => Buffer_2_readyArray_0,
+      outs_ready => dataOut_ready,
+      outs_valid => Buffer_2_validArray_0,
+      outs       => Buffer_2_dataOutArray_0
     );
 end architecture;

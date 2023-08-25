@@ -36,5 +36,4 @@ begin
       readyArray(i) <= (singlePValid(i) and nReady);
     end loop;
   end process;
-
 end architecture;

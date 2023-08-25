@@ -9,15 +9,19 @@ entity cmpi_#NAME# is
     BITWIDTH : integer
   );
   port (
-    clk, rst : in std_logic;
-    -- dataInArray
-    inToShift    : in std_logic_vector(BITWIDTH - 1 downto 0);
-    inShiftBy    : in std_logic_vector(BITWIDTH - 1 downto 0);
-    dataOutArray : out std_logic_vector(BITWIDTH - 1 downto 0);
-    pValidArray  : in std_logic_vector(1 downto 0);
-    nReady       : in std_logic;
-    valid        : out std_logic;
-    readyArray   : out std_logic_vector(1 downto 0));
+    -- inputs
+    clk          : in std_logic;
+    rst          : in std_logic;
+    lhs          : in std_logic_vector(BITWIDTH - 1 downto 0);
+    lhs_valid    : in std_logic;
+    rhs          : in std_logic_vector(BITWIDTH - 1 downto 0);
+    rhs_valid    : in std_logic;
+    result_ready : in std_logic;
+    -- outputs
+    lhs_ready    : out std_logic;
+    rhs_ready    : out std_logic;
+    result       : out std_logic_vector(BITWIDTH - 1 downto 0);
+    result_valid : out std_logic);
 end entity;
 
 architecture arch of cmpi_#NAME# is
@@ -28,13 +32,15 @@ begin
 
   join_write_temp : entity work.join(arch) generic map(2)
     port map(
-      pValidArray, --pValidArray
-      nReady,      --nready                    
-      join_valid,  --valid          
-      readyArray); --readyarray 
+    (lhs_valid,
+      rhs_valid),
+      result_ready,
+      join_valid,
+      (lhs_ready,
+      rhs_ready));
 
-  dataOutArray <= one when (unsigned(inToShift) #TYPEOP# unsigned(inShiftBy)) else
+  result <= one when (unsigned(lhs) #TYPEOP# unsigned(rhs)) else
     zero;
-  valid <= join_valid;
+  result_valid <= join_valid;
 
 end architecture;

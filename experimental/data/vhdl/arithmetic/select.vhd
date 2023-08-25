@@ -7,20 +7,24 @@ entity select is
   generic (
     BITWIDTH : integer
   );
-  -- llvm select: operand(0) is condition, operand(1) is true, operand(2) is false
-  -- here, dataInArray(0) is true, dataInArray(1) is false operand
+
   port (
-    clk, rst : in std_logic;
-    --dataInArray
-    inToShift    : in std_logic_vector(BITWIDTH - 1 downto 0);
-    inShiftBy    : in std_logic_vector(BITWIDTH - 1 downto 0);
-    dataOutArray : out std_logic_vector(BITWIDTH - 1 downto 0);
-    pValidArray  : in std_logic_vector(2 downto 0);
-    nReady       : in std_logic;
-    valid        : out std_logic;
-    readyArray   : out std_logic_vector(2 downto 0);
-    condition    : in std_logic;
-  );
+    -- inputs
+    clk               : in std_logic;
+    rst               : in std_logic;
+    condition         : in std_logic;
+    condition_valid   : in std_logic;
+    true_value        : in std_logic_vector(BITWIDTH - 1 downto 0);
+    true_value_valid  : in std_logic;
+    false_value       : in std_logic_vector(BITWIDTH - 1 downto 0);
+    false_value_valid : in std_logic;
+    result_ready      : in std_logic;
+    -- outputs
+    condition_ready   : out std_logic;
+    true_value_ready  : out std_logic;
+    false_value_ready : out std_logic;
+    result            : out std_logic_vector(BITWIDTH - 1 downto 0);
+    result_valid      : out std_logic);
 
 end select;
 
@@ -31,24 +35,24 @@ architecture arch of select is
   signal g0, g1            : std_logic;
 begin
 
-  ee            <= pValidArray(0) and ((not condition and pValidArray(2)) or (condition and pValidArray(1))); --condition and one input
-  validInternal <= ee and not antitokenStop;                                                                  -- propagate ee if not stopped by antitoken
+  ee            <= condition_valid and ((not condition and false_value_valid) or (condition and true_value_valid)); --condition and one input
+  validInternal <= ee and not antitokenStop;                                                                        -- propagate ee if not stopped by antitoken
 
-  g0 <= not pValidArray(1) and validInternal and nReady;
-  g1 <= not pValidArray(2) and validInternal and nReady;
+  g0 <= not true_value_valid and validInternal and result_ready;
+  g1 <= not false_value_valid and validInternal and result_ready;
 
-  valid         <= validInternal;
-  readyArray(1) <= (not pValidArray(1)) or (validInternal and nReady) or kill0; -- normal join or antitoken
-  readyArray(2) <= (not pValidArray(2)) or (validInternal and nReady) or kill1; --normal join or antitoken
-  readyArray(0) <= (not pValidArray(0)) or (validInternal and nReady);          --like normal join
+  result_valid      <= validInternal;
+  true_value_ready  <= (not true_value_valid) or (validInternal and result_ready) or kill0;  -- normal join or antitoken
+  false_value_ready <= (not false_value_valid) or (validInternal and result_ready) or kill1; --normal join or antitoken
+  condition_ready   <= (not condition_valid) or (validInternal and result_ready);            --like normal join
 
-  dataOutArray <= inShiftBy when (condition = '0') else
-    inToShift;
+  result <= false_value when (condition = '0') else
+    true_value;
 
   Antitokens : entity work.antitokens
     port map(
       clk, rst,
-      pValidArray(2), pValidArray(1),
+      false_value_valid, true_value_valid,
       kill1, kill0,
       g1, g0,
       antitokenStop);

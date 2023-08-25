@@ -2,10 +2,8 @@ library IEEE;
 use IEEE.std_logic_1164.all;
 use ieee.numeric_std.all;
 use work.customTypes.all;
--- NAME = eq, ne
--- CONDTRUE = one, zero, 
--- CONDFALSE = zero, one
-entity cmpi_#NAME# is
+
+entity shrui is
   generic (
     BITWIDTH : integer
   );
@@ -25,23 +23,20 @@ entity cmpi_#NAME# is
     result_valid : out std_logic);
 end entity;
 
-architecture arch of cmpi_#NAME# is
+architecture arch of shrui is
+
   signal join_valid : std_logic;
-  signal one        : std_logic := "1";
-  signal zero       : std_logic := "0";
 
 begin
 
   join_write_temp : entity work.join(arch) generic map(2)
     port map(
-    (lhs_valid,
-      rhs_valid),
+      lhs_valid,
+      rhs_valid,
       result_ready,
       join_valid,
-      (lhs_ready,
-      rhs_ready));
-
-  result <= #CONDTRUE# when (lhs = rhs) else
-    #CONDFALSE#;
+      lhs_ready,
+      rhs_ready);
+  result       <= std_logic_vector(shift_right(unsigned(lhs), to_integer(unsigned('0' & rhs(BITWIDTH - 2 downto 0)))));
   result_valid <= join_valid;
 end architecture;

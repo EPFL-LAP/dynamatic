@@ -9,16 +9,18 @@ entity sink is
   );
 
   port (
-    clk, rst : in std_logic;
-    ready    : out std_logic;
-    pValid   : in std_logic
-  );
+    -- inputs
+    clk       : in std_logic;
+    rst       : in std_logic;
+    ins_valid : in std_logic;
+    -- outputs
+    ins_ready : out std_logic);
 end sink;
 
 architecture arch of sink is
 
 begin
 
-  ready <= '1';
+  ins_ready <= '1';
 
 end arch;

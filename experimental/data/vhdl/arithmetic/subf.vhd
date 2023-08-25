@@ -3,7 +3,7 @@ use IEEE.std_logic_1164.all;
 use ieee.numeric_std.all;
 use work.customTypes.all;
 
-entity divf is
+entity subf is
   generic (
     BITWIDTH : integer
   );
@@ -23,13 +23,12 @@ entity divf is
     result_valid : out std_logic);
 end entity;
 
-architecture arch of divf is
+architecture arch of subf is
 
-  -- Interface to Vivado component
-  component array_RAM_fdiv_32ns_32ns_32_30_1 is
+  component array_RAM_subf_32bkb is
     generic (
       ID         : integer := 1;
-      NUM_STAGE  : integer := 30;
+      NUM_STAGE  : integer := 10;
       din0_WIDTH : integer := 32;
       din1_WIDTH : integer := 32;
       dout_WIDTH : integer := 32
@@ -44,13 +43,13 @@ architecture arch of divf is
     );
   end component;
 
-  signal join_valid                         : std_logic;
+  signal join_valid : std_logic;
+
   signal buff_valid, oehb_valid, oehb_ready : std_logic;
   signal oehb_dataOut, oehb_datain          : std_logic;
 
 begin
-
-  join_write_temp : entity work.join(arch) generic map(2)
+  join : entity work.join(arch) generic map(2)
     port map(
     (lhs_valid,
       rhs_valid),
@@ -58,28 +57,28 @@ begin
       join_valid,
       (lhs_ready,
       rhs_ready));
-  buff : entity work.delay_buffer(arch)
-    generic map(28)
+
+  buff : entity work.delay_buffer(arch) generic map(8)
     port map(
       clk,
       rst,
       join_valid,
       oehb_ready,
       buff_valid);
+
   oehb : entity work.OEHB(arch) generic map (1)
     port map(
       clk        => clk,
       rst        => rst,
-      ins_valid  => buff_valid, -- real or speculatef condition (determined by merge1)
+      ins_valid  => buff_valid,
       outs_ready => result_ready,
       outs_valid => result_valid,
-      --outputs
-      ins_ready => oehb_ready,
-      ins       => oehb_datain,
-      outs      => oehb_dataOut
+      ins_ready  => oehb_ready,
+      ins        => oehb_datain,
+      outs       => oehb_dataOut
     );
 
-  array_RAM_fdiv_32ns_32ns_32_30_1_U1 : component array_RAM_fdiv_32ns_32ns_32_30_1
+  array_RAM_fsub_32ns_32ns_32_10_full_dsp_1_U1 : component array_RAM_subf_32bkb
     port map(
       clk   => clk,
       reset => rst,
@@ -87,4 +86,5 @@ begin
       din0  => lhs,
       din1  => rhs,
       dout  => result);
+
   end architecture;

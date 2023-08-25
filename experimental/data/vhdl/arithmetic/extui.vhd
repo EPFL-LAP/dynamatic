@@ -3,7 +3,7 @@ use IEEE.std_logic_1164.all;
 use ieee.numeric_std.all;
 use work.customTypes.all;
 
-entity trunci is
+entity extui is
   generic (
     INPUT_BITWIDTH  : integer;
     OUTPUT_BITWIDTH : integer
@@ -21,9 +21,14 @@ entity trunci is
     outs_valid : out std_logic);
 end entity;
 
-architecture arch of trunci is
+architecture arch of extui is
+
+  signal join_valid : std_logic;
+
 begin
-  outs       <= std_logic_vector(OUTPUT_BITWIDTH - 1 downto 0);
+
+  outs       <= std_logic_vector(IEEE.numeric_std.resize(unsigned(ins), OUTPUT_BITWIDTH));
   outs_valid <= ins_valid;
   ins_ready  <= not ins_valid or (ins_valid and outs_ready);
+
 end architecture;

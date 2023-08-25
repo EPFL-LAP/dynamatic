@@ -39,12 +39,11 @@ begin
     end if;
   end process reg1;
 
-  reg_in0    <= not pvalid0 and (generate_at0 or reg_out0);
-  reg_in1    <= not pvalid1 and (generate_at1 or reg_out1);
+  reg_in0 <= not pvalid0 and (generate_at0 or reg_out0);
+  reg_in1 <= not pvalid1 and (generate_at1 or reg_out1);
 
   stop_valid <= reg_out0 or reg_out1;
 
-  kill0      <= generate_at0 or reg_out0;
-  kill1      <= generate_at1 or reg_out1;
-
+  kill0 <= generate_at0 or reg_out0;
+  kill1 <= generate_at1 or reg_out1;
 end arch;

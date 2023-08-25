@@ -8,22 +8,25 @@ entity mulf is
     BITWIDTH : integer
   );
   port (
-    clk         : in std_logic;
-    rst         : in std_logic;
-    pValidArray : in std_logic_vector(1 downto 0);
-    nReady      : in std_logic;
-    valid       : out std_logic;
-    readyArray  : out std_logic_vector(1 downto 0);
-    --dataInArray
-    inToShift    : in std_logic_vector(BITWIDTH - 1 downto 0);
-    inShiftBy    : in std_logic_vector(BITWIDTH - 1 downto 0);
-    dataOutArray : out std_logic_vector(BITWIDTH - 1 downto 0));
+    -- inputs
+    clk          : in std_logic;
+    rst          : in std_logic;
+    lhs          : in std_logic_vector(BITWIDTH - 1 downto 0);
+    lhs_valid    : in std_logic;
+    rhs          : in std_logic_vector(BITWIDTH - 1 downto 0);
+    rhs_valid    : in std_logic;
+    result_ready : in std_logic;
+    -- outputs
+    lhs_ready    : out std_logic;
+    rhs_ready    : out std_logic;
+    result       : out std_logic_vector(BITWIDTH - 1 downto 0);
+    result_valid : out std_logic);
 end entity;
 
 architecture arch of mulf is
 
   -- Interface to Vivado component
-  component array_RAM_mulf_32cud is
+  component array_RAM_fmul_32cud is
     generic (
       ID         : integer := 1;
       NUM_STAGE  : integer := 6;
@@ -50,10 +53,12 @@ begin
 
   join : entity work.join(arch) generic map(2)
     port map(
-      pValidArray,
+    (lhs_valid,
+      rhs_valid),
       oehb_ready,
       join_valid,
-      readyArray);
+      (lhs_ready,
+      rhs_ready));
 
   buff : entity work.delay_buffer(arch) generic map(4)
     port map(
@@ -65,25 +70,23 @@ begin
 
   oehb : entity work.OEHB(arch) generic map (1)
     port map(
-      --inputspValidArray
-      clk            => clk,
-      rst            => rst,
-      pValidArray(0) => buff_valid, -- real or speculatef condition (determined by merge1)
-      nReady         => nReady,
-      valid          => valid,
-      --outputs
-      readyArray(0) => oehb_ready,
-      inToShift     => oehb_datain,
-      dataOutArray  => oehb_dataOut
+      clk        => clk,
+      rst        => rst,
+      ins_valid  => buff_valid,
+      outs_ready => result_ready,
+      outs_valid => result_valid,
+      ins_ready  => oehb_ready,
+      ins        => oehb_datain,
+      outs       => oehb_dataOut
     );
 
-  array_RAM_mulf_32ns_32ns_32_6_max_dsp_1_U1 : component array_RAM_mulf_32cud
+  array_RAM_fmul_32ns_32ns_32_6_max_dsp_1_U1 : component array_RAM_fmul_32cud
     port map(
       clk   => clk,
       reset => rst,
       ce    => oehb_ready,
-      din0  => inToShift,
-      din1  => inShiftBy,
-      dout  => dataOutArray);
+      din0  => lhs,
+      din1  => rhs,
+      dout  => result);
 
   end architecture;

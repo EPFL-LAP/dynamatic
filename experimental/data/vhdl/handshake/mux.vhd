@@ -11,16 +11,17 @@ entity mux is
     COND_BITWIDTH : integer
   );
   port (
-    clk, rst     : in std_logic;
-    dataInArray  : in data_array(INPUTS - 2 downto 0)(BITWIDTH - 1 downto 0);
-    dataOutArray : out std_logic_vector(BITWIDTH - 1 downto 0);
-    pValidArray  : in std_logic_vector(INPUTS - 1 downto 0);
-    nReady       : in std_logic;
-    valid        : out std_logic;
-    readyArray   : out std_logic_vector(INPUTS - 1 downto 0);
-    condition    : in std_logic_vector(CONDITION - 1 downto 0) ----(integer(ceil(log2(real(INPUTS)))) - 1 downto 0);
-
-  );
+    -- inputs
+    clk        : in std_logic;
+    rst        : in std_logic;
+    condition  : in std_logic_vector(COND_BITWIDTH - 1 downto 0);
+    ins        : in data_array(INPUTS - 2 downto 0)(BITWIDTH - 1 downto 0);
+    ins_valid  : in std_logic_vector(INPUTS - 1 downto 0);
+    outs_ready : in std_logic;
+    -- outputs
+    ins_ready  : out std_logic_vector(INPUTS - 1 downto 0);
+    outs       : out std_logic_vector(BITWIDTH - 1 downto 0);
+    outs_valid : out std_logic);
 end mux;
 
 architecture arch of mux is
@@ -30,46 +31,43 @@ architecture arch of mux is
   signal tehb_ready   : std_logic;
 
 begin
-  process (dataInArray, pValidArray, nReady, condition, tehb_ready)
+  process (ins, ins_valid, outs_ready, condition, tehb_ready)
     variable tmp_data_out  : unsigned(BITWIDTH - 1 downto 0);
     variable tmp_valid_out : std_logic;
   begin
-    tmp_data_out  := unsigned(dataInArray(0));
+    tmp_data_out  := unsigned(ins(0));
     tmp_valid_out := '0';
     for I in INPUTS - 2 downto 0 loop
-      -- if (the condition refers the Ith data input, condition is valid, and the Ith input is valid), assign input data to output and set the output valid high
-      if (unsigned(condition) = to_unsigned(I, condition'length) and pValidArray(0) = '1' and pValidArray(I + 1) = '1') then
-        tmp_data_out  := unsigned(dataInArray(I));
+      if (unsigned(condition) = to_unsigned(I, condition'length) and ins_valid(0) = '1' and ins_valid(I + 1) = '1') then
+        tmp_data_out  := unsigned(ins(I));
         tmp_valid_out := '1';
       end if;
-      -- set the readyOutArray
-      if ((unsigned(condition) = to_unsigned(I, condition'length) and pValidArray(0) = '1' and tehb_ready = '1' and pValidArray(I + 1) = '1') or pValidArray(I + 1) = '0') then
-        readyArray(I + 1) <= '1';
+
+      if ((unsigned(condition) = to_unsigned(I, condition'length) and ins_valid(0) = '1' and tehb_ready = '1' and ins_valid(I + 1) = '1') or ins_valid(I + 1) = '0') then
+        ins_ready(I + 1) <= '1';
       else
-        readyArray(I + 1) <= '0';
+        ins_ready(I + 1) <= '0';
       end if;
     end loop;
-    -- set the condtionReady
-    if (pValidArray(0) = '0' or (tmp_valid_out = '1' and tehb_ready = '1')) then
-      readyArray(0) <= '1';
+
+    if (ins_valid(0) = '0' or (tmp_valid_out = '1' and tehb_ready = '1')) then
+      ins_ready(0) <= '1';
     else
-      readyArray(0) <= '0';
+      ins_ready(0) <= '0';
     end if;
-    --Assign dataout and validout
+
     tehb_data_in <= std_logic_vector(resize(tmp_data_out, BITWIDTH));
     tehb_pvalid  <= tmp_valid_out;
   end process;
   tehb1 : entity work.TEHB(arch) generic map (BITWIDTH)
     port map(
-      --inputspValidArray
-      clk            => clk,
-      rst            => rst,
-      pValidArray(0) => tehb_pvalid,
-      nReady         => nReady,
-      valid          => valid,
-      --outputs
-      readyArray(0)  => tehb_ready,
-      dataInArray(0) => tehb_data_in,
-      dataOutArray   => dataOutArray
+      clk        => clk,
+      rst        => rst,
+      ins_valid  => tehb_pvalid,
+      outs_ready => outs_ready,
+      outs_valid => outs_valid,
+      ins_ready  => tehb_ready,
+      ins        => tehb_data_in,
+      outs       => outs
     );
 end arch;

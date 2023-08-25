@@ -7,19 +7,22 @@ entity d_store is generic (
   ADDR_BITWIDTH : integer;
   DATA_BITWIDTH : integer);
 port (
-  clk, rst    : in std_logic;
-  input_addr  : in std_logic_vector(ADDR_BITWIDTH - 1 downto 0);
-  dataInArray : in std_logic_vector(DATA_BITWIDTH - 1 downto 0);
-
-  --- interface to previous
-  pValidArray : in std_logic_vector(1 downto 0);
-  readyArray  : out std_logic_vector(1 downto 0);
-
-  ---interface to next
-  dataOutArray : out std_logic_vector(DATA_BITWIDTH - 1 downto 0);
-  output_addr  : out std_logic_vector(ADDR_BITWIDTH - 1 downto 0);
-  nReadyArray  : in std_logic_vector(1 downto 0);
-  validArray   : out std_logic_vector(1 downto 0));
+  -- inputs
+  clk             : in std_logic;
+  rst             : in std_logic;
+  addrIn          : in std_logic_vector(ADDR_BITWIDTH - 1 downto 0);
+  addrIn_valid    : in std_logic;
+  dataIn          : in std_logic_vector(DATA_BITWIDTH - 1 downto 0);
+  dataIn_valid    : in std_logic;
+  addrOut_ready   : in std_logic;
+  dataToMem_ready : in std_logic;
+  -- outputs
+  addrIn_ready    : out std_logic;
+  dataIn_ready    : out std_logic;
+  addrOut         : out std_logic_vector(ADDR_BITWIDTH - 1 downto 0);
+  addrOut_valid   : out std_logic;
+  dataToMem       : out std_logic_vector(DATA_BITWIDTH - 1 downto 0);
+  dataToMem_valid : out std_logic);
 
 end entity;
 
@@ -31,13 +34,15 @@ begin
 
   join_write : entity work.join(arch) generic map(2)
     port map(
-      pValidArray,    --pValidArray
-      nReadyArray(0), --nready
-      join_valid,     --valid
-      ReadyArray);    --readyarray
+    (addrIn_valid,
+      dataIn_valid),
+      addrIn_ready,
+      join_valid,
+      (addrOut_ready,
+      dataToMem_ready));
 
-  dataOutArray  <= dataInArray; -- data to LSQ
-  validArray(0) <= join_valid;
-  output_addr   <= input_addr; -- address to LSQ
-  validArray(1) <= join_valid;
+  dataToMem       <= dataIn;
+  addrOut_valid   <= join_valid;
+  addrOut         <= addrIn;
+  dataToMem_valid <= join_valid;
 end architecture;

@@ -2,24 +2,26 @@ library ieee;
 use ieee.std_logic_1164.all;
 use ieee.numeric_std.all;
 use work.customTypes.all;
-
+-- #CST_VALUE#
 entity constant is
   generic (
     BITWIDTH : integer
   );
   port (
-    clk, rst : in std_logic;
-    --dataInArray  : in std_logic_vector(BITWIDTH - 1 downto 0);
-    dataOutArray : out std_logic_vector(BITWIDTH - 1 downto 0);
-    ready        : out std_logic;
-    valid        : out std_logic;
-    nReady       : in std_logic;
-    pValid       : in std_logic);
+    -- inputs
+    clk          : in std_logic;
+    rst          : in std_logic;
+    ctrl_valid   : in std_logic;
+    result_ready : in std_logic;
+    -- outputs
+    ctrl_ready   : out std_logic;
+    result       : out std_logic_vector(BITWIDTH - 1 downto 0);
+    result_valid : out std_logic);
 end constant;
 
 architecture arch of constant is
 begin
-  dataOutArray <= #CST_VALUE#;
-  valid        <= pValid;
-  ready        <= nReady;
+  result       <= #CST_VALUE#;
+  result_valid <= ctrl_valid;
+  ctrl_ready   <= result_ready;
 end architecture;

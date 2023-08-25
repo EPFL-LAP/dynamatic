@@ -31,5 +31,4 @@ begin
       end if;
     end if;
   end process reg;
-
 end arch;

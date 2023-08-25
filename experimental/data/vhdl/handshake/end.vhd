@@ -10,15 +10,18 @@ entity end_node is
   );
 
   port (
-    clk, rst     : in std_logic;
-    dataInArray  : in std_logic_vector(BITWIDTH - 1 downto 0);
-    dataOutArray : out std_logic_vector(BITWIDTH - 1 downto 0);
-    ready        : out std_logic;
-    valid        : out std_logic;
-    nReady       : in std_logic;
-    pValid       : in std_logic;
-    eReadyArray  : out std_logic_vector(MEM_INPUTS - 1 downto 0);
-    eValidArray  : in std_logic_vector(MEM_INPUTS - 1 downto 0) := (others => '1'));
+    -- inputs
+    ins         : in std_logic_vector(BITWIDTH - 1 downto 0);
+    ins_valid   : in std_logic;
+    eValidArray : in std_logic_vector(MEM_INPUTS - 1 downto 0) := (others => '1');
+    clk         : in std_logic;
+    rst         : in std_logic;
+    outs_ready  : in std_logic;
+    -- outputs
+    ins_ready   : out std_logic;
+    eReadyArray : out std_logic_vector(MEM_INPUTS - 1 downto 0);
+    outs        : out std_logic_vector(BITWIDTH - 1 downto 0);
+    outs_valid  : out std_logic);
 end end_node;
 
 architecture arch of end_node is
@@ -30,46 +33,36 @@ architecture arch of end_node is
   signal joinReady : std_logic;
 
 begin
-
-  -- process for the return data
-  -- there may be multiple return points, check if any is valid and output its data
-  process (pValid, dataInArray)
+  process (pValid, ins)
     variable tmp_data_out  : unsigned(BITWIDTH - 1 downto 0);
     variable tmp_valid_out : std_logic;
 
   begin
-    tmp_data_out  := unsigned(dataInArray);
+    tmp_data_out  := unsigned(ins);
     tmp_valid_out := '0';
 
     if (pValid = '1') then
-      tmp_data_out  := unsigned(dataInArray);
-      tmp_valid_out := pValid;
+      tmp_data_out  := unsigned(ins);
+      tmp_valid_out := ins_valid;
     end if;
 
-    dataOutArray <= std_logic_vector(resize(tmp_data_out, BITWIDTH));
-    valid        <= tmp_valid_out;
+    outs  <= std_logic_vector(resize(tmp_data_out, BITWIDTH));
+    valid <= tmp_valid_out;
   end process;
 
-  -- check if all mem controllers are done (and of all valids from memory)
   mem_and : entity work.andN(vanilla) generic map (MEM_INPUTS)
     port map(eValidArray, mem_valid);
 
-  -- join for return data and memory--we exit only in case the first process gets
-  -- a single valid and if the AND of all memories is set
   j : entity work.join(arch) generic map(2)
     port map(
     (valid, mem_valid),
-      nReady,
+      outs_ready,
       joinValid,
-      joinReady);
+      (nReady, joinReady));
+  outs_valid <= joinValid;
 
-  -- valid to successor (set by join)
-  valid <= joinValid;
-
-  -- join sends ready to predecessors
-  -- not needed for eReady (because memory never reads it)
   process (joinReady)
   begin
-    ready <= joinReady;
+    ins_ready <= joinReady;
   end process;
 end architecture;

@@ -2,10 +2,8 @@ library IEEE;
 use IEEE.std_logic_1164.all;
 use ieee.numeric_std.all;
 use work.customTypes.all;
--- NAME = eq, ne
--- CONDTRUE = one, zero, 
--- CONDFALSE = zero, one
-entity cmpi_#NAME# is
+
+entity addi is
   generic (
     BITWIDTH : integer
   );
@@ -25,10 +23,9 @@ entity cmpi_#NAME# is
     result_valid : out std_logic);
 end entity;
 
-architecture arch of cmpi_#NAME# is
+architecture arch of addi is
+
   signal join_valid : std_logic;
-  signal one        : std_logic := "1";
-  signal zero       : std_logic := "0";
 
 begin
 
@@ -40,8 +37,6 @@ begin
       join_valid,
       (lhs_ready,
       rhs_ready));
-
-  result <= #CONDTRUE# when (lhs = rhs) else
-    #CONDFALSE#;
+  result       <= std_logic_vector(unsigned(lhs) #TYPEOP# unsigned (rhs));
   result_valid <= join_valid;
 end architecture;

@@ -4,31 +4,28 @@ use IEEE.numeric_std.all;
 
 entity mul_4_stage is
   generic (
-    INPUTS        : integer;
-    OUTPUTS       : integer;
-    DATA_SIZE_IN  : integer;
-    DATA_SIZE_OUT : integer
+    BITWIDTH : integer
   );
   port (
     clk : in std_logic;
     ce  : in std_logic;
-    a   : in std_logic_vector(DATA_SIZE_IN - 1 downto 0);
-    b   : in std_logic_vector(DATA_SIZE_IN - 1 downto 0);
-    p   : out std_logic_vector(DATA_SIZE_OUT - 1 downto 0));
+    a   : in std_logic_vector(BITWIDTH - 1 downto 0);
+    b   : in std_logic_vector(BITWIDTH - 1 downto 0);
+    p   : out std_logic_vector(BITWIDTH - 1 downto 0));
 end entity;
 
 architecture behav of mul_4_stage is
 
-  signal a_reg : std_logic_vector(DATA_SIZE_OUT - 1 downto 0);
-  signal b_reg : std_logic_vector(DATA_SIZE_OUT - 1 downto 0);
-  signal q0    : std_logic_vector(DATA_SIZE_OUT - 1 downto 0);
-  signal q1    : std_logic_vector(DATA_SIZE_OUT - 1 downto 0);
-  signal q2    : std_logic_vector(DATA_SIZE_OUT - 1 downto 0);
-  signal mul   : std_logic_vector(DATA_SIZE_OUT - 1 downto 0);
+  signal a_reg : std_logic_vector(BITWIDTH - 1 downto 0);
+  signal b_reg : std_logic_vector(BITWIDTH - 1 downto 0);
+  signal q0    : std_logic_vector(BITWIDTH - 1 downto 0);
+  signal q1    : std_logic_vector(BITWIDTH - 1 downto 0);
+  signal q2    : std_logic_vector(BITWIDTH - 1 downto 0);
+  signal mul   : std_logic_vector(BITWIDTH - 1 downto 0);
 
 begin
 
-  mul <= std_logic_vector(resize(unsigned(std_logic_vector(signed(a_reg) * signed(b_reg))), DATA_SIZE_OUT));
+  mul <= std_logic_vector(resize(unsigned(std_logic_vector(signed(a_reg) * signed(b_reg))), BITWIDTH));
 
   process (clk)
   begin

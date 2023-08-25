@@ -4,41 +4,49 @@ use work.customTypes.all;
 
 entity cond_br is generic (BITWIDTH : integer);
 port (
-  clk, rst    : in std_logic;
-  pValidArray : in std_logic_vector(1 downto 0);
-  condition   : in std_logic;
-  dataInArray : in std_logic_vector(BITWIDTH - 1 downto 0);
-  -- dataOutArray
-  outToShift : out std_logic_vector(BITWIDTH - 1 downto 0);
-  outShiftBy : out std_logic_vector(BITWIDTH - 1 downto 0);
-  --
-  nReadyArray : in std_logic_vector(1 downto 0);   -- (br1, br0)
-  validArray  : out std_logic_vector(1 downto 0);  -- (br1, br0)
-  readyArray  : out std_logic_vector(1 downto 0)); -- (data, condition)
+  -- inputs
+  clk                : in std_logic;
+  rst                : in std_logic;
+  condition          : in std_logic;
+  condition_valid    : in std_logic;
+  data               : in std_logic_vector(BITWIDTH - 1 downto 0);
+  data_valid         : in std_logic;
+  true_result_ready  : in std_logic;
+  false_result_ready : in std_logic;
+  -- outputs
+  condition_ready    : out std_logic;
+  data_ready         : out std_logic;
+  true_result        : out std_logic_vector(BITWIDTH - 1 downto 0);
+  true_result_valid  : out std_logic;
+  false_result       : out std_logic_vector(BITWIDTH - 1 downto 0);
+  false_result_valid : out std_logic);
+
 end cond_br;
 architecture arch of cond_br is
   signal joinValid, brReady : std_logic;
-  --signal dataOut0, dataOut1 : std_logic_vector(31 downto 0);
 begin
 
   j : entity work.join(arch) generic map(2)
     port map(
-    (pValidArray(1), pValidArray(0)),
+    (data_valid, condition_valid),
       brReady,
       joinValid,
-      readyArray);
+      (data_ready, condition_ready));
+
   cond_br : entity work.branchSimple(arch)
     port map(
       condition,
       joinValid,
-      nReadyArray,
-      validArray,
+      true_result_ready,
+      false_result_ready,
+      true_result_valid,
+      false_result_valid,
       brReady);
 
-  process (dataInArray)
+  process (data)
   begin
-    outToShift <= dataInArray;
-    outShiftBy <= dataInArray;
+    true_result  <= data;
+    false_result <= data;
   end process;
 
 end architecture;

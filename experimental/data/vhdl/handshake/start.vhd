@@ -9,14 +9,16 @@ entity start_node is
   );
 
   port (
-    clk, rst     : in std_logic;
-    dataInArray  : in std_logic_vector(BITWIDTH - 1 downto 0);
-    dataOutArray : out std_logic_vector(BITWIDTH - 1 downto 0);
-    ready        : out std_logic;
-    valid        : out std_logic;
-    nReady       : in std_logic;
-    pValid       : in std_logic
-  );
+    -- inputs
+    ins        : in std_logic_vector(BITWIDTH - 1 downto 0);
+    ins_valid  : in std_logic;
+    clk        : in std_logic;
+    rst        : in std_logic;
+    outs_ready : in std_logic;
+    -- outputs
+    ins_ready  : out std_logic;
+    outs       : out std_logic_vector(BITWIDTH - 1 downto 0);
+    outs_valid : out std_logic);
 end start_node;
 
 architecture arch of start_node is
@@ -46,22 +48,20 @@ begin
     end if;
   end process;
 
-  startBuff : entity work.elasticBuffer(arch) generic map (BITWIDTH)
+  startBuff : entity work.buffer(arch) generic map (BITWIDTH)
     port map(
-      --inputs
-      clk         => clk,            --clk
-      rst         => rst,            --rst
-      dataInArray => dataInArray,    ----dataInArray
-      pValid      => start_internal, --pValid
-      nReady      => nReady,         --nReady
-      --outputs
-      dataOutArray => startBuff_dataOutArray, ----dataOutArray
-      ready        => startBuff_readyArray,   --readyArray
-      valid        => startBuff_validArray    --validArray
+      clk        => clk,
+      rst        => rst,
+      ins        => ins,
+      ins_valid  => start_internal,
+      outs_ready => outs_ready,
+      outs       => startBuff_dataOutArray,
+      ins_ready  => startBuff_readyArray,
+      outs_valid => startBuff_validArray
     );
 
-  valid        <= startBuff_validArray;
-  dataOutArray <= startBuff_dataOutArray;
-  ready        <= startBuff_readyArray;
+  outs_valid <= startBuff_validArray;
+  outs       <= startBuff_dataOutArray;
+  ins_ready  <= startBuff_readyArray;
 
 end arch;

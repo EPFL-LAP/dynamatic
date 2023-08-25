@@ -2,43 +2,40 @@ library IEEE;
 use IEEE.std_logic_1164.all;
 use IEEE.numeric_std.all;
 use work.customTypes.all;
+
 entity mem_controller is generic (
   DATA_BITWIDTH : natural;
   ADDR_BITWIDTH : natural;
   LOAD_COUNT    : natural;
   STORE_COUNT   : natural);
 port (
-  rst             : in std_logic;
+  -- inputs
+  io_inLoadData   : in std_logic_vector(31 downto 0);
+  io_ctrl         : in std_logic_vector(31 downto 0);
+  io_ctrl_valid   : in std_logic;
+  io_ldAddr       : in data_array (LOAD_COUNT - 1 downto 0)(ADDR_BITWIDTH - 1 downto 0);
+  io_ldAddr_valid : in std_logic_vector(LOAD_COUNT - 1 downto 0);
+  io_stAddr       : in data_array (STORE_COUNT - 1 downto 0)(ADDR_BITWIDTH - 1 downto 0);
+  io_stAddr_valid : in std_logic_vector(STORE_COUNT - 1 downto 0);
+  io_stData       : in data_array (STORE_COUNT - 1 downto 0)(DATA_BITWIDTH - 1 downto 0);
+  io_stData_valid : in std_logic_vector(STORE_COUNT - 1 downto 0);
   clk             : in std_logic;
-  io_storeDataOut : out std_logic_vector(31 downto 0);
-  io_storeAddrOut : out std_logic_vector(31 downto 0);
-  io_storeEnable  : out std_logic;
-  io_loadDataIn   : in std_logic_vector(31 downto 0);
-  io_loadAddrOut  : out std_logic_vector(31 downto 0);
-  io_loadEnable   : out std_logic;
-
-  io_bbpValids       : in std_logic;
-  io_bb_stCountArray : in std_logic_vector(31 downto 0);
-  io_bbReadyToPrevs  : out std_logic;
-
-  io_Empty_Valid : out std_logic;
-  io_Empty_Ready : in std_logic;
-
-  io_rdPortsPrev_valid : in std_logic_vector(LOAD_COUNT - 1 downto 0);
-  io_rdPortsPrev_bits  : in data_array (LOAD_COUNT - 1 downto 0)(ADDR_BITWIDTH - 1 downto 0);
-  io_rdPortsPrev_ready : out std_logic_vector(LOAD_COUNT - 1 downto 0);
-
-  io_rdPortsNext_bits  : out data_array (LOAD_COUNT - 1 downto 0)(DATA_BITWIDTH - 1 downto 0);
-  io_rdPortsNext_valid : out std_logic_vector(LOAD_COUNT - 1 downto 0);
-  io_rdPortsNext_ready : in std_logic_vector(LOAD_COUNT - 1 downto 0);
-
-  io_wrAddrPorts_valid : in std_logic_vector(STORE_COUNT - 1 downto 0);
-  io_wrAddrPorts_bits  : in data_array (STORE_COUNT - 1 downto 0)(ADDR_BITWIDTH - 1 downto 0);
-  io_wrAddrPorts_ready : out std_logic_vector(STORE_COUNT - 1 downto 0);
-
-  io_wrDataPorts_valid : in std_logic_vector(STORE_COUNT - 1 downto 0);
-  io_wrDataPorts_bits  : in data_array (STORE_COUNT - 1 downto 0)(DATA_BITWIDTH - 1 downto 0);
-  io_wrDataPorts_ready : out std_logic_vector(STORE_COUNT - 1 downto 0)
+  rst             : in std_logic;
+  io_ldData_ready : in std_logic_vector(LOAD_COUNT - 1 downto 0);
+  io_done_ready   : in std_logic;
+  -- outputs
+  io_bbReadyToPrevs : out std_logic;
+  io_ldAddr_ready   : out std_logic_vector(LOAD_COUNT - 1 downto 0);
+  io_stAddr_ready   : out std_logic_vector(STORE_COUNT - 1 downto 0);
+  io_stData_ready   : out std_logic_vector(STORE_COUNT - 1 downto 0)
+  io_ldData         : out data_array (LOAD_COUNT - 1 downto 0)(DATA_BITWIDTH - 1 downto 0);
+  io_ldData_valid   : out std_logic_vector(LOAD_COUNT - 1 downto 0);
+  io_done_valid     : out std_logic;
+  io_loadEnable     : out std_logic;
+  io_loadAddrOut    : out std_logic_vector(31 downto 0);
+  io_storeEnable    : out std_logic;
+  io_storeAddrOut   : out std_logic_vector(31 downto 0);
+  io_storeDataOut   : out std_logic_vector(31 downto 0);
 );
 
 end entity;
@@ -53,11 +50,11 @@ architecture arch of mem_controller is
   signal mcLoadAddrOut  : std_logic_vector(ADDR_BITWIDTH - 1 downto 0);
 
 begin
-  io_wrDataPorts_ready <= io_wrAddrPorts_ready;
+  io_stData_ready <= io_stAddr_ready;
 
   io_storeDataOut <= std_logic_vector (resize(unsigned(mcStoreDataOut), io_storeDataOut'length));
   io_storeAddrOut <= std_logic_vector (resize(unsigned(mcStoreAddrOut), io_storeDataOut'length));
-  mcLoadDataIn    <= std_logic_vector (resize(unsigned(io_loadDataIn), mcLoadDataIn'length));
+  mcLoadDataIn    <= std_logic_vector (resize(unsigned(io_inLoadData), mcLoadDataIn'length));
   io_loadAddrOut  <= std_logic_vector (resize(unsigned(mcLoadAddrOut), io_loadAddrOut'length));
 
   read_arbiter : entity work.read_memory_arbiter
@@ -69,12 +66,12 @@ begin
     port map(
       rst              => rst,
       clk              => clk,
-      pValid           => io_rdPortsPrev_valid,
-      ready            => io_rdPortsPrev_ready,
-      address_in       => io_rdPortsPrev_bits, -- if two address lines are presented change this to corresponding one.
-      nReady           => io_rdPortsNext_ready,
-      valid            => io_rdPortsNext_valid,
-      data_out         => io_rdPortsNext_bits,
+      pValid           => io_ldAddr_valid,
+      ready            => io_ldAddr_ready,
+      address_in       => io_ldAddr,
+      nReady           => io_ldData_ready,
+      valid            => io_ldData_valid,
+      data_out         => io_ldData,
       read_enable      => io_loadEnable,
       read_address     => mcLoadAddrOut,
       data_from_memory => mcLoadDataIn
@@ -87,16 +84,15 @@ begin
       DATA_WIDTH   => DATA_BITWIDTH
     )
     port map(
-      rst          => rst,
-      clk          => clk,
-      pValid       => io_wrAddrPorts_valid,
-      ready        => io_wrAddrPorts_ready,
-      address_in   => io_wrAddrPorts_bits, -- if two address lines are presented change this to corresponding one.
-      data_in      => io_wrDataPorts_bits,
-      nReady => (others => '1'), --for now, setting as always ready
-      valid        => valid_WR,  -- unconnected
-      write_enable => io_storeEnable,
-      --enable         => io_storeEnable,
+      rst            => rst,
+      clk            => clk,
+      pValid         => io_stAddr_valid,
+      ready          => io_stAddr_ready,
+      address_in     => io_stAddr,
+      data_in        => io_stData,
+      nReady => (others => '1'),
+      valid          => valid_WR,
+      write_enable   => io_storeEnable,
       write_address  => mcStoreAddrOut,
       data_to_memory => mcStoreDataOut
     );
@@ -108,12 +104,9 @@ begin
       counter := (31 downto 0 => '0');
 
     elsif rising_edge(CLK) then
-      -- increment counter by number of stores in BB
-      if (io_bbpValids(I) = '1') then
-        counter := std_logic_vector(unsigned(counter) + unsigned(io_bb_stCountArray));
+      if (io_ctrl_valid(I) = '1') then
+        counter := std_logic_vector(unsigned(counter) + unsigned(io_ctrl));
       end if;
-
-      -- decrement counter whenever store issued to memory
       if (io_StoreEnable = '1') then
         counter := std_logic_vector(unsigned(counter) - 1);
       end if;
@@ -122,12 +115,9 @@ begin
     end if;
 
   end process;
-
-  -- check if there are any outstanding store requests
-  -- if not, program can terminate
-  io_Empty_Valid <= '1' when (counter1 = (31 downto 0 => '0') and (io_bbpValids(0 downto 0) = zero)) else
+  io_done_valid <= '1' when (counter1 = (31 downto 0 => '0') and (io_ctrl_valid(0 downto 0) = zero)) else
     '0';
 
-  io_bbReadyToPrevs <= (others => '1'); -- always ready to increment counter;
+  io_bbReadyToPrevs <= (others => '1');
 
 end architecture;

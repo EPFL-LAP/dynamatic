@@ -8,13 +8,14 @@ entity TEHB is
     BITWIDTH : integer
   );
   port (
-    clk, rst     : in std_logic;
-    dataInArray  : in std_logic_vector(BITWIDTH - 1 downto 0);
-    dataOutArray : out std_logic_vector(BITWIDTH - 1 downto 0);
-    pValid       : in std_logic;
-    nReady       : in std_logic;
-    valid        : out std_logic;
-    ready        : out std_logic);
+    clk        : in std_logic;
+    rst        : in std_logic;
+    ins        : in std_logic_vector(BITWIDTH - 1 downto 0);
+    outs       : out std_logic_vector(BITWIDTH - 1 downto 0);
+    ins_valid  : in std_logic;
+    outs_ready : in std_logic;
+    outs_valid : out std_logic;
+    ins_ready  : out std_logic);
 end TEHB;
 
 architecture arch of TEHB is
@@ -29,7 +30,7 @@ begin
       full_reg <= '0';
 
     elsif (rising_edge(clk)) then
-      full_reg <= valid and not nReady;
+      full_reg <= outs_valid and not outs_ready;
 
     end if;
   end process;
@@ -42,22 +43,22 @@ begin
 
     elsif (rising_edge(clk)) then
       if (reg_en) then
-        data_reg <= dataInArray;
+        data_reg <= ins;
       end if;
 
     end if;
   end process;
 
-  process (mux_sel, data_reg, dataInArray) is
+  process (mux_sel, data_reg, ins) is
   begin
     if (mux_sel = '1') then
-      dataOutArray <= data_reg;
+      outs <= data_reg;
     else
-      dataOutArray <= dataInArray;
+      outs <= ins;
     end if;
   end process;
-  valid   <= pValid or full_reg;
-  ready   <= not full_reg;
-  reg_en  <= ready and pValid and not nReady;
-  mux_sel <= full_reg;
+  outs_valid <= ins_valid or full_reg;
+  ins_ready  <= not full_reg;
+  reg_en     <= ins_ready and ins_valid and not outs_ready;
+  mux_sel    <= full_reg;
 end arch;

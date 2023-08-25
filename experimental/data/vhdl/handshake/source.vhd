@@ -9,16 +9,18 @@ entity source is
   );
 
   port (
-    clk, rst : in std_logic;
-    valid    : out std_logic;
-    nReady   : in std_logic
-  );
+    -- inputs
+    clk        : in std_logic;
+    rst        : in std_logic;
+    outs_ready : in std_logic;
+    -- outputs
+    outs_valid : out std_logic);
 end source;
 
 architecture arch of source is
 
 begin
 
-  valid <= '1';
+  outs_valid <= '1';
 
 end arch;

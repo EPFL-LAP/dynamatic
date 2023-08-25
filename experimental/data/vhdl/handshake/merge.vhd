@@ -10,13 +10,16 @@ entity merge is
     BITWIDTH : integer
   );
   port (
-    clk, rst     : in std_logic;
-    dataInArray  : in data_array(INPUTS - 1 downto 0)(BITWIDTH - 1 downto 0);
-    dataOutArray : out std_logic_vector(BITWIDTH - 1 downto 0);
-    pValidArray  : in std_logic_vector(INPUTS - 1 downto 0);
-    nReady       : in std_logic;
-    valid        : out std_logic;
-    readyArray   : out std_logic_vector(INPUTS - 1 downto 0));
+    -- inputs
+    ins        : in data_array (INPUTS - 1 downto 0)(BITWIDTH - 1 downto 0);
+    ins_valid  : in std_logic_vector(INPUTS - 1 downto 0);
+    clk        : in std_logic;
+    rst        : in std_logic;
+    outs_ready : in std_logic;
+    -- outputs
+    ins_ready  : out std_logic_vector(INPUTS - 1 downto 0);
+    outs       : out std_logic_vector(BITWIDTH - 1 downto 0);
+    outs_valid : out std_logic);
 end merge;
 
 architecture arch of merge is
@@ -26,16 +29,16 @@ architecture arch of merge is
 
 begin
 
-  process (pValidArray, dataInArray)
+  process (ins_valid, ins)
     variable tmp_data_out  : unsigned(BITWIDTH - 1 downto 0);
     variable tmp_valid_out : std_logic;
   begin
-    tmp_data_out  := unsigned(dataInArray(0));
+    tmp_data_out  := unsigned(ins(0));
     tmp_valid_out := '0';
     for I in INPUTS - 1 downto 0 loop
-      if (pValidArray(I) = '1') then
-        tmp_data_out  := unsigned(dataInArray(I));
-        tmp_valid_out := pValidArray(I);
+      if (ins_valid(I) = '1') then
+        tmp_data_out  := unsigned(ins(I));
+        tmp_valid_out := ins_valid(I);
       end if;
     end loop;
 
@@ -47,21 +50,19 @@ begin
   process (tehb_ready)
   begin
     for I in 0 to INPUTS - 1 loop
-      readyArray(I) <= tehb_ready;
+      ins_ready(I) <= tehb_ready;
     end loop;
   end process;
 
   tehb1 : entity work.TEHB(arch) generic map (BITWIDTH)
     port map(
-      --inputspValidArray
-      clk            => clk,
-      rst            => rst,
-      pValidArray(0) => tehb_pvalid,
-      nReady         => nReady,
-      valid          => valid,
-      --outputs
-      readyArray(0)  => tehb_ready,
-      dataInArray(0) => tehb_data_in,
-      dataOutArray   => dataOutArray
+      clk        => clk,
+      rst        => rst,
+      ins_valid  => tehb_pvalid,
+      outs_ready => outs_ready,
+      outs_valid => outs_valid,
+      ins_ready  => tehb_ready,
+      ins        => tehb_data_in,
+      outs       => outs
     );
 end architecture;

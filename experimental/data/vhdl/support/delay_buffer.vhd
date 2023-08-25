@@ -46,5 +46,4 @@ begin
   end generate gen_assignements;
 
   valid_out <= regs(SIZE - 1);
-
 end architecture;

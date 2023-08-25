@@ -7,13 +7,16 @@ entity negf is
     BITWIDTH : integer
   );
   port (
-    clk, rst     : in std_logic;
-    dataInArray  : in std_logic_vector(BITWIDTH - 1 downto 0);
-    dataOutArray : out std_logic_vector(BITWIDTH - 1 downto 0);
-    pValid       : in std_logic;
-    nReady       : in std_logic;
-    valid        : out std_logic;
-    ready        : out std_logic);
+    -- inputs
+    clk        : in std_logic;
+    rst        : in std_logic;
+    ins        : in std_logic_vector(INPUT_BITWIDTH - 1 downto 0);
+    ins_valid  : in std_logic;
+    outs_ready : in std_logic;
+    -- outputs
+    ins_ready  : out std_logic;
+    outs       : out std_logic_vector(OUTPUT_BITWIDTH - 1 downto 0);
+    outs_valid : out std_logic);
 end entity;
 
 architecture arch of negf is
@@ -22,7 +25,7 @@ architecture arch of negf is
 
 begin
 
-  dataOutArray <= dataInArray xor msb_mask;
-  valid        <= pValid;
-  ready        <= nReady;
+  outs       <= ins xor msb_mask;
+  outs_valid <= ins_valid;
+  ins_ready  <= outs_ready;
 end architecture;

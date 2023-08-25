@@ -1,15 +1,10 @@
-//===- cmpi.cpp - Fulfill a cmpi generator ------*- C++ -*-===//
+//===- cmpi.cpp - Fulfill a cmpi generator ----------------------*- C++ -*-===//
 //
 // Experimental tool that realizes a generator for integer comparison component
 // (cmpi)
 //
 //===----------------------------------------------------------------------===//
 
-#include "circt/Dialect/ESI/ESIOps.h"
-#include "circt/Dialect/HW/HWOps.h"
-#include "circt/Dialect/Handshake/HandshakeOps.h"
-#include "circt/Support/JSON.h"
-#include "dynamatic/Transforms/HandshakeConcretizeIndexType.h"
 #include "mlir/IR/BuiltinOps.h"
 #include "mlir/IR/MLIRContext.h"
 #include "mlir/Parser/Parser.h"
@@ -32,8 +27,6 @@
 #include <vector>
 
 using namespace llvm;
-using namespace mlir;
-using namespace circt;
 
 int main(int argc, char **argv) {
   // no predicate provided
@@ -56,11 +49,7 @@ int main(int argc, char **argv) {
   auto it = comparison.find(predicateName);
   if (it == comparison.end()) {
     auto jt = equality.find(predicateName);
-    if (jt == equality.end()) {
-      // wrong predicate
-      llvm::errs() << "Wrong predicate\n";
-      return 1;
-    } else {
+    if (jt != equality.end()) {
       // ne, eq
       file.open("experimental/data/vhdl/arithmetic/cmpi/equality.vhd");
       buffer << file.rdbuf();
@@ -80,6 +69,10 @@ int main(int argc, char **argv) {
         else
           modText += jt->getValue().second;
       }
+    } else {
+      // wrong predicate
+      llvm::errs() << "Wrong predicate\n";
+      return 1;
     }
   } else {
     // sge, sgt, sle, slt, uge, ugt, ule, ult
