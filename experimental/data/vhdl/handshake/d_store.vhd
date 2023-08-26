@@ -4,8 +4,8 @@ use IEEE.numeric_std.all;
 use work.customTypes.all;
 
 entity d_store is generic (
-  ADDR_BITWIDTH : integer;
-  DATA_BITWIDTH : integer);
+  DATA_BITWIDTH : integer;
+  ADDR_BITWIDTH : integer);
 port (
   -- inputs
   clk             : in std_logic;

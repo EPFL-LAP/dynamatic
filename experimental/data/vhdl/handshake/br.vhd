@@ -5,7 +5,8 @@ use work.customTypes.all;
 entity br is generic (BITWIDTH : integer);
 port (
   -- inputs
-  clk, rst  : in std_logic;
+  clk       : in std_logic;
+  rst       : in std_logic;
   ins       : in std_logic_vector(BITWIDTH - 1 downto 0);
   ins_valid : in std_logic;
   ins_ready : out std_logic
