@@ -6,3 +6,4 @@ target_link_libraries(exp-constant PRIVATE
   MLIRParser
   MLIRSupport
   )
+  
