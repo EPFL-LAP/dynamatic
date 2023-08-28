@@ -1,6 +1,3 @@
-add_llvm_executable(exp-cmpi cmpi.cpp)
-
-llvm_update_compile_flags(exp-cmpi)
-target_link_libraries(exp-cmpi PRIVATE
-  MLIRSupport
-  )
+add_subdirectory(cmpf)
+add_subdirectory(cmpi)
+add_subdirectory(constant)

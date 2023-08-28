@@ -20,9 +20,10 @@ entity mux is
     ins_valid        : in std_logic_vector(NUM_INPUTS downto 0);
     outs_ready       : in std_logic;
     -- outputs
-    ins_ready  : out std_logic_vector(NUM_INPUTS downto 0);
-    outs       : out std_logic_vector(BITWIDTH - 1 downto 0);
-    outs_valid : out std_logic);
+    select_ind_ready : in std_logic;
+    ins_ready        : out std_logic_vector(NUM_INPUTS - 1 downto 0);
+    outs             : out std_logic_vector(BITWIDTH - 1 downto 0);
+    outs_valid       : out std_logic);
 end mux;
 
 architecture arch of mux is
@@ -52,9 +53,9 @@ begin
     end loop;
 
     if (select_ind_valid = '0' or (tmp_valid_out = '1' and tehb_ready = '1')) then
-      ins_ready(0) <= '1';
+      select_ind_ready <= '1';
     else
-      ins_ready(0) <= '0';
+      select_ind_ready <= '0';
     end if;
 
     tehb_data_in <= std_logic_vector(resize(tmp_data_out, BITWIDTH));

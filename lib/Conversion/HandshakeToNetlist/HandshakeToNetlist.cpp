@@ -295,12 +295,18 @@ static std::string getExtModuleName(Operation *oldOp) {
           extModName += getTypeName(inType, loc);
       })
       .Case<handshake::EndOp>([&](auto) {
+        if (outTypes.size() > 1)
+          oldOp->emitError()
+              << "Number of outputs > 1 is not supported by VHDL";
         // mem_inputs
         extModName += "_" + std::to_string(inTypes.size() - 1);
         // bitwidth
         extModName += getTypeName(inTypes[0], loc);
       })
       .Case<handshake::DynamaticReturnOp>([&](auto) {
+        if (outTypes.size() > 1)
+          oldOp->emitError()
+              << "Number of outputs > 1 is not supported by VHDL";
         // bitwidth
         extModName += getTypeName(inTypes[0], loc);
       })
@@ -309,8 +315,6 @@ static std::string getExtModuleName(Operation *oldOp) {
             auto [ctrlWidth, addrWidth, dataWidth] = op.getBitwidths();
             // data bitwidth
             extModName += '_' + std::to_string(dataWidth);
-            // ctrl bitwith
-            extModName += '_' + std::to_string(ctrlWidth);
             // address bitwidth
             extModName += '_' + std::to_string(addrWidth);
             std::string temporaryName{};
@@ -333,6 +337,8 @@ static std::string getExtModuleName(Operation *oldOp) {
             extModName += '_' + std::to_string(lc);
             // store_count
             extModName += '_' + std::to_string(sc);
+            // ctrl bitwith
+            extModName += '_' + std::to_string(ctrlWidth);
             // array of loads&stores arrays
             extModName += temporaryName;
           })

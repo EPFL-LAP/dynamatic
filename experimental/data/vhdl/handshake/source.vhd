@@ -14,7 +14,6 @@ entity source is
     rst        : in std_logic;
     outs_ready : in std_logic;
     -- outputs
-    outs       : in std_logic_vector(BITWIDTH - 1 downto 0);
     outs_valid : out std_logic);
 end source;
 

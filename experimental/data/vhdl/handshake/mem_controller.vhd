@@ -24,18 +24,18 @@ port (
   ldData_ready : in std_logic_vector(LOAD_COUNT - 1 downto 0);
   done_ready   : in std_logic;
   -- outputs
-  bbReadyToPrevs : out std_logic;
-  ldAddr_ready   : out std_logic_vector(LOAD_COUNT - 1 downto 0);
-  stAddr_ready   : out std_logic_vector(STORE_COUNT - 1 downto 0);
-  stData_ready   : out std_logic_vector(STORE_COUNT - 1 downto 0)
-  ldData         : out data_array (LOAD_COUNT - 1 downto 0)(DATA_BITWIDTH - 1 downto 0);
-  ldData_valid   : out std_logic_vector(LOAD_COUNT - 1 downto 0);
-  done_valid     : out std_logic;
-  loadEnable     : out std_logic;
-  loadAddrOut    : out std_logic_vector(31 downto 0);
-  storeEnable    : out std_logic;
-  storeAddrOut   : out std_logic_vector(31 downto 0);
-  storeDataOut   : out std_logic_vector(31 downto 0));
+  ctrl_ready   : out std_logic;
+  ldAddr_ready : out std_logic_vector(LOAD_COUNT - 1 downto 0);
+  stAddr_ready : out std_logic_vector(STORE_COUNT - 1 downto 0);
+  stData_ready : out std_logic_vector(STORE_COUNT - 1 downto 0)
+  ldData       : out data_array (LOAD_COUNT - 1 downto 0)(DATA_BITWIDTH - 1 downto 0);
+  ldData_valid : out std_logic_vector(LOAD_COUNT - 1 downto 0);
+  done_valid   : out std_logic;
+  loadEnable   : out std_logic;
+  loadAddrOut  : out std_logic_vector(31 downto 0);
+  storeEnable  : out std_logic;
+  storeAddrOut : out std_logic_vector(31 downto 0);
+  storeDataOut : out std_logic_vector(31 downto 0));
 
 end entity;
 architecture arch of mem_controller is
@@ -117,6 +117,6 @@ begin
   done_valid <= '1' when (counter1 = (31 downto 0 => '0') and (ctrl_valid(0 downto 0) = zero)) else
     '0';
 
-  bbReadyToPrevs <= (others => '1');
+  ctrl_ready <= (others => '1');
 
 end architecture;

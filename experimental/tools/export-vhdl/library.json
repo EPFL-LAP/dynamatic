@@ -1,1401 +1,716 @@
 {
-  "arith.addf": {
-    "path": "experimental/data/vhdl/arithmetic/addf.vhd",
-    "concretization_method": "GENERIC",
-    "parameters": [
-      {
-        "name": "BITWIDTH",
-        "type": "integer",
-        "status": "major"
-      }
-    ],
-    "ports": {
-      "in": [
-        {
-          "name": "lhs",
-          "type": "dataflow"
-        },
-        {
-          "name": "rhs",
-          "type": "dataflow"
-        }
-      ],
-      "out": [
-        {
-          "name": "result",
-          "type": "dataflow"
-        }
-      ]
-    }
-  },
 
-  "arith.addi": {
-    "path": "experimental/data/vhdl/arithmetic/addi.vhd",
-    "concretization_method": "GENERIC",
-    "parameters": [
-      {
-        "name": "BITWIDTH",
-        "type": "integer",
-        "status": "major"
-      }
-    ],
-    "ports": {
-      "in": [
+  "arith": [
+    {
+      "components": [
         {
-          "name": "lhs",
-          "type": "dataflow"
+          "name": "addf",
+          "path": "experimental/data/vhdl/arithmetic/addf.vhd"
         },
         {
-          "name": "rhs",
-          "type": "dataflow"
+          "name": "addi",
+          "path": "experimental/data/vhdl/arithmetic/addi.vhd"
+        },
+        {
+          "name": "andi",
+          "path": "experimental/data/vhdl/arithmetic/andi.vhd"
+        },
+        {
+          "name": "divf",
+          "path": "experimental/data/vhdl/arithmetic/divf.vhd"
+        },
+        {
+          "name": "divsi",
+          "path": "experimental/data/vhdl/arithmetic/divsi.vhd"
+        },
+        {
+          "name": "divui",
+          "path": "experimental/data/vhdl/arithmetic/divui.vhd"
+        },
+        {
+          "name": "maxf",
+          "path": "experimental/data/vhdl/arithmetic/maxf.vhd"
+        },
+        {
+          "name": "minf",
+          "path": "experimental/data/vhdl/arithmetic/minf.vhd"
+        },
+        {
+          "name": "mulf",
+          "path": "experimental/data/vhdl/arithmetic/mulf.vhd"
+        },
+        {
+          "name": "muli",
+          "path": "experimental/data/vhdl/arithmetic/muli.vhd"
+        },
+        {
+          "name": "ori",
+          "path": "experimental/data/vhdl/arithmetic/ori.vhd"
+        },
+        {
+          "name": "shli",
+          "path": "experimental/data/vhdl/arithmetic/shli.vhd"
+        },
+        {
+          "name": "shrsi",
+          "path": "experimental/data/vhdl/arithmetic/shrsi.vhd"
+        },
+        {
+          "name": "shrui",
+          "path": "experimental/data/vhdl/arithmetic/shrui.vhd"
+        },
+        {
+          "name": "subf",
+          "path": "experimental/data/vhdl/arithmetic/subf.vhd"
+        },
+        {
+          "name": "subi",
+          "path": "experimental/data/vhdl/arithmetic/subi.vhd"
+        },
+        {
+          "name": "xori",
+          "path": "experimental/data/vhdl/arithmetic/xori.vhd"
         }
       ],
-      "out": [
-        {
-          "name": "result",
-          "type": "dataflow"
-        }
-      ]
-    }
-  },
+      "concretization_method": "GENERIC",
+      "generators": [],
+      "generics": ["BITWIDTH"],
+      "extra": [],
+      "ports": {
+        "in": [
+          {
+            "name": "lhs",
+            "type": "dataflow"
+          },
+          {
+            "name": "rhs",
+            "type": "dataflow"
+          }
+        ],
+        "out": [
+          {
+            "name": "result",
+            "type": "dataflow"
+          }
+        ]
+      }
+    },
 
-  "arith.andi": {
-    "path": "experimental/data/vhdl/arithmetic/andi.vhd",
-    "concretization_method": "GENERIC",
-    "parameters": [
-      {
-        "name": "BITWIDTH",
-        "type": "integer",
-        "status": "major"
-      }
-    ],
-    "ports": {
-      "in": [
+    {
+      "components": [
         {
-          "name": "lhs",
-          "type": "dataflow"
+          "name": "cmpf",
+          "path": "./build/bin/exp-cmpf"
         },
         {
-          "name": "rhs",
-          "type": "dataflow"
+          "name": "cmpi",
+          "path": "./build/bin/exp-cmpi"
         }
       ],
-      "out": [
-        {
-          "name": "result",
-          "type": "dataflow"
-        }
-      ]
-    }
-  },
+      "concretization_method": "GENERATOR",
+      "generators": ["PREDICATE"],
+      "generics": ["BITWIDTH"],
+      "extra": [],
+      "ports": {
+        "in": [
+          {
+            "name": "lhs",
+            "type": "dataflow"
+          },
+          {
+            "name": "rhs",
+            "type": "dataflow"
+          }
+        ],
+        "out": [
+          {
+            "name": "result",
+            "type": "dataflow"
+          }
+        ]
+      }
+    },
 
-  "arith.cmpf": {
-    "path": "experimental/data/vhdl/arithmetic/cmpf.vhd",
-    "concretization_method": "TEXT",
-    "parameters": [
-      {
-        "name": "PREDICATE",
-        "type": "string",
-        "status": "minor"
-      },
-      {
-        "name": "BITWIDTH",
-        "type": "integer",
-        "status": "major"
-      }
-    ],
-    "ports": {
-      "in": [
+    {
+      "components": [
         {
-          "name": "lhs",
-          "type": "dataflow"
+          "name": "extsi",
+          "path": "experimental/data/vhdl/arithmetic/extsi.vhd"
         },
         {
-          "name": "rhs",
-          "type": "dataflow"
+          "name": "extui",
+          "path": "experimental/data/vhdl/arithmetic/extui.vhd"
+        },
+        {
+          "name": "trunci",
+          "path": "experimental/data/vhdl/arithmetic/trunci.vhd"
         }
       ],
-      "out": [
-        {
-          "name": "result",
-          "type": "dataflow"
-        }
-      ]
-    }
-  },
+      "concretization_method": "GENERIC",
+      "generators": [],
+      "generics": ["INPUT_BITWIDTH", "OUTPUT_BITWIDTH"],
+      "extra": [],
+      "ports": {
+        "in": [
+          {
+            "name": "ins",
+            "type": "dataflow"
+          }
+        ],
+        "out": [
+          {
+            "name": "outs",
+            "type": "dataflow"
+          }
+        ]
+      }
+    },
 
-  "arith.cmpi": {
-    "path": "experimental/tools/export-vhdl/generators/cmpi.cpp",
-    "concretization_method": "GENERATOR",
-    "parameters": [
-      {
-        "name": "PREDICATE",
-        "type": "string",
-        "status": "minor"
-      },
-      {
-        "name": "BITWIDTH",
-        "type": "integer",
-        "status": "major"
-      }
-    ],
-    "ports": {
-      "in": [
+    {
+      "components": [
         {
-          "name": "lhs",
-          "type": "dataflow"
-        },
-        {
-          "name": "rhs",
-          "type": "dataflow"
+          "name": "negf",
+          "path": "experimental/data/vhdl/arithmetic/negf.vhd"
         }
       ],
-      "out": [
-        {
-          "name": "result",
-          "type": "dataflow"
-        }
-      ]
-    }
-  },
+      "concretization_method": "GENERIC",
+      "generators": [],
+      "generics": ["BITWIDTH"],
+      "extra": [],
+      "ports": {
+        "in": [
+          {
+            "name": "ins",
+            "type": "dataflow"
+          }
+        ],
+        "out": [
+          {
+            "name": "outs",
+            "type": "dataflow"
+          }
+        ]
+      }
+    },
 
-  "arith.divf": {
-    "path": "experimental/data/vhdl/arithmetic/divf.vhd",
-    "concretization_method": "GENERIC",
-    "parameters": [
-      {
-        "name": "BITWIDTH",
-        "type": "integer",
-        "status": "major"
-      }
-    ],
-    "ports": {
-      "in": [
+    {
+      "components": [
         {
-          "name": "lhs",
-          "type": "dataflow"
-        },
-        {
-          "name": "rhs",
-          "type": "dataflow"
+          "name": "select",
+          "path": "experimental/data/vhdl/arithmetic/select.vhd"
         }
       ],
-      "out": [
-        {
-          "name": "result",
-          "type": "dataflow"
-        }
-      ]
+      "concretization_method": "GENERIC",
+      "generators": [],
+      "generics": ["BITWIDTH"],
+      "extra": [],
+      "ports": {
+        "in": [
+          {
+            "name": "condition",
+            "type": "dataflow"
+          },
+          {
+            "name": "true_value",
+            "type": "dataflow"
+          },
+          {
+            "name": "false_value",
+            "type": "dataflow"
+          }
+        ],
+        "out": [
+          {
+            "name": "result",
+            "type": "dataflow"
+          }
+        ]
+      }
     }
-  },
+  ],
 
-  "arith.divsi": {
-    "path": "experimental/data/vhdl/arithmetic/divsi.vhd",
-    "concretization_method": "GENERIC",
-    "parameters": [
-      {
-        "name": "BITWIDTH",
-        "type": "integer",
-        "status": "major"
-      }
-    ],
-    "ports": {
-      "in": [
+  "handshake": [
+    {
+      "components": [
         {
-          "name": "lhs",
-          "type": "dataflow"
+          "name": "br",
+          "path": "experimental/data/vhdl/handshake/br.vhd"
         },
         {
-          "name": "rhs",
-          "type": "dataflow"
+          "name": "d_return",
+          "path": "experimental/data/vhdl/handshake/d_return.vhd"
+        },
+        {
+          "name": "start_node",
+          "path": "experimental/data/vhdl/handshake/start_node.vhd"
         }
       ],
-      "out": [
-        {
-          "name": "result",
-          "type": "dataflow"
-        }
-      ]
-    }
-  },
+      "concretization_method": "GENERIC",
+      "generators": [],
+      "generics": ["BITWIDTH"],
+      "extra": [],
+      "ports": {
+        "in": [
+          {
+            "name": "ins",
+            "type": "dataflow"
+          }
+        ],
+        "out": [
+          {
+            "name": "outs",
+            "type": "dataflow"
+          }
+        ]
+      }
+    },
 
-  "arith.divui": {
-    "path": "experimental/data/vhdl/arithmetic/divui.vhd",
-    "concretization_method": "GENERIC",
-    "parameters": [
-      {
-        "name": "BITWIDTH",
-        "type": "integer",
-        "status": "major"
-      }
-    ],
-    "ports": {
-      "in": [
+    {
+      "components": [
         {
-          "name": "lhs",
-          "type": "dataflow"
-        },
-        {
-          "name": "rhs",
-          "type": "dataflow"
+          "name": "buffer",
+          "path": "experimental/data/vhdl/handshake/buffer.vhd"
         }
       ],
-      "out": [
-        {
-          "name": "result",
-          "type": "dataflow"
-        }
-      ]
-    }
-  },
+      "concretization_method": "GENERIC",
+      "generators": [],
+      "generics": ["BITWIDTH"],
+      "extra": ["BUFFER_TYPE", "NUM_OF_SLOTS"],
+      "ports": {
+        "in": [
+          {
+            "name": "ins",
+            "type": "dataflow"
+          }
+        ],
+        "out": [
+          {
+            "name": "outs",
+            "type": "dataflow"
+          }
+        ]
+      }
+    },
 
-  "arith.extsi": {
-    "path": "experimental/data/vhdl/arithmetic/extsi.vhd",
-    "concretization_method": "GENERIC",
-    "parameters": [
-      {
-        "name": "INPUT_BITWIDTH",
-        "type": "integer",
-        "status": "major"
-      },
-      {
-        "name": "OUTPUT_BITWIDTH",
-        "type": "integer",
-        "status": "major"
-      }
-    ],
-    "ports": {
-      "in": [
+    {
+      "components": [
         {
-          "name": "ins",
-          "type": "dataflow"
+          "name": "cond_br",
+          "path": "experimental/data/vhdl/handshake/cond_br.vhd"
         }
       ],
-      "out": [
-        {
-          "name": "outs",
-          "type": "dataflow"
-        }
-      ]
-    }
-  },
+      "concretization_method": "GENERIC",
+      "generators": [],
+      "generics": ["BITWIDTH"],
+      "extra": [],
+      "ports": {
+        "in": [
+          {
+            "name": "condition",
+            "type": "dataflow"
+          },
+          {
+            "name": "data",
+            "type": "dataflow"
+          }
+        ],
+        "out": [
+          {
+            "name": "true_result",
+            "type": "dataflow"
+          },
+          {
+            "name": "false_result",
+            "type": "dataflow"
+          }
+        ]
+      }
+    },
 
-  "arith.extui": {
-    "path": "experimental/data/vhdl/arithmetic/extui.vhd",
-    "concretization_method": "GENERIC",
-    "parameters": [
-      {
-        "name": "INPUT_BITWIDTH",
-        "type": "integer",
-        "status": "major"
-      },
-      {
-        "name": "OUTPUT_BITWIDTH",
-        "type": "integer",
-        "status": "major"
-      }
-    ],
-    "ports": {
-      "in": [
+    {
+      "components": [
         {
-          "name": "ins",
-          "type": "dataflow"
+          "name": "constant",
+          "path": "./build/bin/exp-constant"
         }
       ],
-      "out": [
-        {
-          "name": "outs",
-          "type": "dataflow"
-        }
-      ]
-    }
-  },
+      "concretization_method": "GENERATOR",
+      "generators": ["CONST_VALUE"],
+      "generics": ["BITWIDTH"],
+      "extra": [],
+      "ports": {
+        "in": [
+          {
+            "name": "ctrl",
+            "type": "control"
+          }
+        ],
+        "out": [
+          {
+            "name": "result",
+            "type": "dataflow"
+          }
+        ]
+      }
+    },
 
-  "arith.maxf": {
-    "path": "experimental/data/vhdl/arithmetic/maxf.vhd",
-    "concretization_method": "GENERIC",
-    "parameters": [
-      {
-        "name": "BITWIDTH",
-        "type": "integer",
-        "status": "major"
-      }
-    ],
-    "ports": {
-      "in": [
+    {
+      "components": [
         {
-          "name": "lhs",
-          "type": "dataflow"
-        },
-        {
-          "name": "rhs",
-          "type": "dataflow"
+          "name": "control_merge",
+          "path": "experimental/data/vhdl/handshake/control_merge.vhd"
         }
       ],
-      "out": [
-        {
-          "name": "result",
-          "type": "dataflow"
-        }
-      ]
-    }
-  },
+      "concretization_method": "GENERIC",
+      "generators": [],
+      "generics": ["INPUTS", "BITWIDTH", "COND_BITWIDTH"],
+      "extra": [],
+      "ports": {
+        "in": [
+          {
+            "name": "ins",
+            "type": "dataflow"
+          }
+        ],
+        "out": [
+          {
+            "name": "outs",
+            "type": "dataflow"
+          },
+          {
+            "name": "condition",
+            "type": "dataflow"
+          }
+        ]
+      }
+    },
 
-  "arith.minf": {
-    "path": "experimental/data/vhdl/arithmetic/minf.vhd",
-    "concretization_method": "GENERIC",
-    "parameters": [
-      {
-        "name": "BITWIDTH",
-        "type": "integer",
-        "status": "major"
-      }
-    ],
-    "ports": {
-      "in": [
+    {
+      "components": [
         {
-          "name": "lhs",
-          "type": "dataflow"
-        },
-        {
-          "name": "rhs",
-          "type": "dataflow"
+          "name": "d_load",
+          "path": "experimental/data/vhdl/handshake/d_load.vhd"
         }
       ],
-      "out": [
-        {
-          "name": "result",
-          "type": "dataflow"
-        }
-      ]
-    }
-  },
+      "concretization_method": "GENERIC",
+      "generators": [],
+      "generics": ["DATA_BITWIDTH", "ADDR_BITWIDTH"],
+      "extra": [],
+      "ports": {
+        "in": [
+          {
+            "name": "addrIn",
+            "type": "dataflow"
+          },
+          {
+            "name": "dataFromMem",
+            "type": "dataflow"
+          }
+        ],
+        "out": [
+          {
+            "name": "addrOut",
+            "type": "dataflow"
+          },
+          {
+            "name": "dataOut",
+            "type": "dataflow"
+          }
+        ]
+      }
+    },
 
-  "arith.mulf": {
-    "path": "experimental/data/vhdl/arithmetic/mulf.vhd",
-    "concretization_method": "GENERIC",
-    "parameters": [
-      {
-        "name": "BITWIDTH",
-        "type": "integer",
-        "status": "major"
-      }
-    ],
-    "ports": {
-      "in": [
+    {
+      "components": [
         {
-          "name": "lhs",
-          "type": "dataflow"
-        },
-        {
-          "name": "rhs",
-          "type": "dataflow"
+          "name": "d_store",
+          "path": "experimental/data/vhdl/handshake/d_store.vhd"
         }
       ],
-      "out": [
-        {
-          "name": "result",
-          "type": "dataflow"
-        }
-      ]
-    }
-  },
+      "concretization_method": "GENERIC",
+      "generators": [],
+      "generics": ["DATA_BITWIDTH", "ADDR_BITWIDTH"],
+      "extra": [],
+      "ports": {
+        "in": [
+          {
+            "name": "addrIn",
+            "type": "dataflow"
+          },
+          {
+            "name": "dataIn",
+            "type": "dataflow"
+          }
+        ],
+        "out": [
+          {
+            "name": "addrOut",
+            "type": "dataflow"
+          },
+          {
+            "name": "dataToMem",
+            "type": "dataflow"
+          }
+        ]
+      }
+    },
 
-  "arith.muli": {
-    "path": "experimental/data/vhdl/arithmetic/muli.vhd",
-    "concretization_method": "GENERIC",
-    "parameters": [
-      {
-        "name": "BITWIDTH",
-        "type": "integer",
-        "status": "major"
-      }
-    ],
-    "ports": {
-      "in": [
+    {
+      "components": [
         {
-          "name": "lhs",
-          "type": "dataflow"
-        },
-        {
-          "name": "rhs",
-          "type": "dataflow"
+          "name": "end_node",
+          "path": "experimental/data/vhdl/handshake/end_node.vhd"
         }
       ],
-      "out": [
-        {
-          "name": "result",
-          "type": "dataflow"
-        }
-      ]
-    }
-  },
+      "concretization_method": "GENERIC",
+      "generators": [],
+      "generics": ["MEM_INPUTS", "BITWIDTH"],
+      "extra": [],
+      "ports": {
+        "in": [
+          {
+            "name": "ins",
+            "type": "dataflow"
+          },
+          {
+            "name": "mems_done",
+            "type": "control"
+          }
+        ],
+        "out": [
+          {
+            "name": "outs",
+            "type": "dataflow"
+          }
+        ]
+      }
+    },
 
-  "arith.negf": {
-    "path": "experimental/data/vhdl/arithmetic/negf.vhd",
-    "concretization_method": "GENERIC",
-    "parameters": [
-      {
-        "name": "BITWIDTH",
-        "type": "integer",
-        "status": "major"
-      }
-    ],
-    "ports": {
-      "in": [
+    {
+      "components": [
         {
-          "name": "ins",
-          "type": "dataflow"
+          "name": "fork",
+          "path": "experimental/data/vhdl/handshake/fork.vhd"
+        },
+        {
+          "name": "lazy_fork",
+          "path": "experimental/data/vhdl/handshake/lazy_fork.vhd"
         }
       ],
-      "out": [
-        {
-          "name": "outs",
-          "type": "dataflow"
-        }
-      ]
-    }
-  },
+      "concretization_method": "GENERIC",
+      "generators": [],
+      "generics": ["OUTPUTS", "BITWIDTH"],
+      "extra": [],
+      "ports": {
+        "in": [
+          {
+            "name": "ins",
+            "type": "dataflow"
+          }
+        ],
+        "out": [
+          {
+            "name": "outs",
+            "type": "dataflow"
+          }
+        ]
+      }
+    },
 
-  "arith.ori": {
-    "path": "experimental/data/vhdl/arithmetic/ori.vhd",
-    "concretization_method": "GENERIC",
-    "parameters": [
-      {
-        "name": "BITWIDTH",
-        "type": "integer",
-        "status": "major"
-      }
-    ],
-    "ports": {
-      "in": [
+    {
+      "components": [
         {
-          "name": "lhs",
-          "type": "dataflow"
-        },
-        {
-          "name": "rhs",
-          "type": "dataflow"
+          "name": "join",
+          "path": "experimental/data/vhdl/handshake/join.vhd"
         }
       ],
-      "out": [
-        {
-          "name": "result",
-          "type": "dataflow"
-        }
-      ]
-    }
-  },
+      "concretization_method": "GENERIC",
+      "generators": [],
+      "generics": ["BITWIDTH"],
+      "extra": [],
+      "ports": {
+        "in": [
+          {
+            "name": "ins",
+            "type": "control"
+          }
+        ],
+        "out": [
+          {
+            "name": "outs",
+            "type": "control"
+          }
+        ]
+      }
+    },
 
-  "arith.select": {
-    "path": "experimental/data/vhdl/arithmetic/select.vhd",
-    "concretization_method": "GENERIC",
-    "parameters": [
-      {
-        "name": "BITWIDTH",
-        "type": "integer",
-        "status": "major"
-      }
-    ],
-    "ports": {
-      "in": [
+    {
+      "components": [
         {
-          "name": "condition",
-          "type": "dataflow"
-        },
-        {
-          "name": "true_value",
-          "type": "dataflow"
-        },
-        {
-          "name": "false_value",
-          "type": "dataflow"
+          "name": "mem_controller",
+          "path": "experimental/data/vhdl/handshake/mem_controller.vhd"
         }
       ],
-      "out": [
-        {
-          "name": "result",
-          "type": "dataflow"
-        }
-      ]
-    }
-  },
+      "concretization_method": "GENERIC",
+      "generators": [],
+      "generics": ["DATA_BITWIDTH", "ADDR_BITWIDTH", "LOAD_COUNT", "STORE_COUNT"],
+      "extra": ["CTRL_BITWIDTH", "LOAD_STORE_ARRAYS"],
+      "ports": {
+        "in": [
+          {
+            "name": "inLoadData",
+            "type": "signal"
+          },
+          {
+            "name": "ctrl",
+            "type": "dataflow"
+          },
+          {
+            "name": "ldAddr",
+            "type": "dataflow"
+          },
+          {
+            "name": "stAddr",
+            "type": "dataflow"
+          },
+          {
+            "name": "stData",
+            "type": "dataflow"
+          }
+        ],
+        "out": [
+          {
+            "name": "ldData",
+            "type": "dataflow"
+          },
+          {
+            "name": "done",
+            "type": "control"
+          },
+          {
+            "name": "loadEnable",
+            "type": "signal"
+          },
+          {
+            "name": "loadAddrOut",
+            "type": "signal"
+          },
+          {
+            "name": "storeEnable",
+            "type": "signal"
+          },
+          {
+            "name": "storeAddrOut",
+            "type": "signal"
+          },
+          {
+            "name": "storeDataOut",
+            "type": "signal"
+          }
+        ]
+      }
+    },
 
-  "arith.shli": {
-    "path": "experimental/data/vhdl/arithmetic/shli.vhd",
-    "concretization_method": "GENERIC",
-    "parameters": [
-      {
-        "name": "BITWIDTH",
-        "type": "integer",
-        "status": "major"
-      }
-    ],
-    "ports": {
-      "in": [
+    {
+      "components": [
         {
-          "name": "lhs",
-          "type": "dataflow"
-        },
-        {
-          "name": "rhs",
-          "type": "dataflow"
+          "name": "merge",
+          "path": "experimental/data/vhdl/handshake/merge.vhd"
         }
       ],
-      "out": [
-        {
-          "name": "result",
-          "type": "dataflow"
-        }
-      ]
-    }
-  },
+      "concretization_method": "GENERIC",
+      "generators": [],
+      "generics": ["INPUTS", "BITWIDTH"],
+      "extra": [],
+      "ports": {
+        "in": [
+          {
+            "name": "ins",
+            "type": "dataflow"
+          }
+        ],
+        "out": [
+          {
+            "name": "outs",
+            "type": "dataflow"
+          }
+        ]
+      }
+    },
 
-  "arith.shrsi": {
-    "path": "experimental/data/vhdl/arithmetic/shrsi.vhd",
-    "concretization_method": "GENERIC",
-    "parameters": [
-      {
-        "name": "BITWIDTH",
-        "type": "integer",
-        "status": "major"
-      }
-    ],
-    "ports": {
-      "in": [
+    {
+      "components": [
         {
-          "name": "lhs",
-          "type": "dataflow"
-        },
-        {
-          "name": "rhs",
-          "type": "dataflow"
+          "name": "mux",
+          "path": "experimental/data/vhdl/handshake/mux.vhd"
         }
       ],
-      "out": [
-        {
-          "name": "result",
-          "type": "dataflow"
-        }
-      ]
-    }
-  },
+      "concretization_method": "GENERIC",
+      "generators": [],
+      "generics": ["INPUTS", "BITWIDTH", "COND_BITWIDTH"],
+      "extra": [],
+      "ports": {
+        "in": [
+          {
+            "name": "select_ind",
+            "type": "dataflow"
+          },
+          {
+            "name": "ins",
+            "type": "dataflow"
+          }
+        ],
+        "out": [
+          {
+            "name": "outs",
+            "type": "dataflow"
+          }
+        ]
+      }
+    },
 
-  "arith.shrui": {
-    "path": "experimental/data/vhdl/arithmetic/shrui.vhd",
-    "concretization_method": "GENERIC",
-    "parameters": [
-      {
-        "name": "BITWIDTH",
-        "type": "integer",
-        "status": "major"
-      }
-    ],
-    "ports": {
-      "in": [
+    {
+      "components": [
         {
-          "name": "lhs",
-          "type": "dataflow"
-        },
-        {
-          "name": "rhs",
-          "type": "dataflow"
+          "name": "sink",
+          "path": "experimental/data/vhdl/handshake/sink.vhd"
         }
       ],
-      "out": [
-        {
-          "name": "result",
-          "type": "dataflow"
-        }
-      ]
-    }
-  },
-
-  "arith.subf": {
-    "path": "experimental/data/vhdl/arithmetic/subf.vhd",
-    "concretization_method": "GENERIC",
-    "parameters": [
-      {
-        "name": "BITWIDTH",
-        "type": "integer",
-        "status": "major"
+      "concretization_method": "GENERIC",
+      "generators": [],
+      "generics": ["BITWIDTH"],
+      "extra": [],
+      "ports": {
+        "in": [
+          {
+            "name": "ins",
+            "type": "dataflow"
+          }
+        ],
+        "out": []
       }
-    ],
-    "ports": {
-      "in": [
+    },
+    
+    {
+      "components": [
         {
-          "name": "lhs",
-          "type": "dataflow"
-        },
-        {
-          "name": "rhs",
-          "type": "dataflow"
+          "name": "source",
+          "path": "experimental/data/vhdl/handshake/source.vhd"
         }
       ],
-      "out": [
-        {
-          "name": "result",
-          "type": "dataflow"
-        }
-      ]
-    }
-  },
-
-  "arith.subi": {
-    "path": "experimental/data/vhdl/arithmetic/subi.vhd",
-    "concretization_method": "GENERIC",
-    "parameters": [
-      {
-        "name": "BITWIDTH",
-        "type": "integer",
-        "status": "major"
+      "concretization_method": "GENERIC",
+      "generators": [],
+      "generics": ["BITWIDTH"],
+      "extra": [],
+      "ports": {
+        "in": [],
+        "out": [
+          {
+            "name": "outs",
+            "type": "control"
+          }
+        ]
       }
-    ],
-    "ports": {
-      "in": [
-        {
-          "name": "lhs",
-          "type": "dataflow"
-        },
-        {
-          "name": "rhs",
-          "type": "dataflow"
-        }
-      ],
-      "out": [
-        {
-          "name": "result",
-          "type": "dataflow"
-        }
-      ]
     }
-  },
-
-  "arith.trunci": {
-    "path": "experimental/data/vhdl/arithmetic/trunci.vhd",
-    "concretization_method": "GENERIC",
-    "parameters": [
-      {
-        "name": "INPUT_BITWIDTH",
-        "type": "integer",
-        "status": "major"
-      },
-      {
-        "name": "OUTPUT_BITWIDTH",
-        "type": "integer",
-        "status": "major"
-      }
-    ],
-    "ports": {
-      "in": [
-        {
-          "name": "ins",
-          "type": "dataflow"
-        }
-      ],
-      "out": [
-        {
-          "name": "outs",
-          "type": "dataflow"
-        }
-      ]
-    }
-  },
-
-  "arith.xori": {
-    "path": "experimental/data/vhdl/arithmetic/xori.vhd",
-    "concretization_method": "GENERIC",
-    "parameters": [
-      {
-        "name": "BITWIDTH",
-        "type": "integer",
-        "status": "major"
-      }
-    ],
-    "ports": {
-      "in": [
-        {
-          "name": "lhs",
-          "type": "dataflow"
-        },
-        {
-          "name": "rhs",
-          "type": "dataflow"
-        }
-      ],
-      "out": [
-        {
-          "name": "result",
-          "type": "dataflow"
-        }
-      ]
-    }
-  },
-
-  "handshake.br": {
-    "path": "experimental/data/vhdl/handshake/br.vhd",
-    "concretization_method": "GENERIC",
-    "parameters": [
-      {
-        "name": "BITWIDTH",
-        "type": "integer",
-        "status": "major"
-      }
-    ],
-    "ports": {
-      "in": [
-        {
-          "name": "ins",
-          "type": "dataflow"
-        }
-      ],
-      "out": [
-        {
-          "name": "outs",
-          "type": "dataflow"
-        }
-      ]
-    }
-  },
-
-  "handshake.buffer": {
-    "path": "experimental/data/vhdl/handshake/buffer.vhd",
-    "concretization_method": "GENERIC",
-    "parameters": [
-      {
-        "name": "BITWIDTH",
-        "type": "integer",
-        "status": "major"
-      },
-      {
-        "name": "BUFFER_TYPE",
-        "type": "string",
-        "status": "minor"
-      },
-      {
-        "name": "NUM_OF_SLOTS",
-        "type": "integer",
-        "status": "minor"
-      }
-    ],
-    "ports": {
-      "in": [
-        {
-          "name": "ins",
-          "type": "dataflow"
-        }
-      ],
-      "out": [
-        {
-          "name": "outs",
-          "type": "dataflow"
-        }
-      ]
-    }
-  },
-
-  "handshake.cond_br": {
-    "path": "experimental/data/vhdl/handshake/cond_br.vhd",
-    "concretization_method": "GENERIC",
-    "parameters": [
-      {
-        "name": "BITWIDTH",
-        "type": "integer",
-        "status": "major"
-      }
-    ],
-    "ports": {
-      "in": [
-        {
-          "name": "condition",
-          "type": "dataflow"
-        },
-        {
-          "name": "data",
-          "type": "dataflow"
-        }
-      ],
-      "out": [
-        {
-          "name": "true_result",
-          "type": "dataflow"
-        },
-        {
-          "name": "false_result",
-          "type": "dataflow"
-        }
-      ]
-    }
-  },
-  
-  "handshake.constant": {
-    "path": "experimental/data/vhdl/handshake/constant.vhd",
-    "concretization_method": "TEXT",
-    "parameters": [
-      {
-        "name": "CONST_VALUE",
-        "type": "integer",
-        "status": "minor"
-      },
-      {
-        "name": "BITWIDTH",
-        "type": "integer",
-        "status": "major"
-      }
-    ],
-    "ports": {
-      "in": [
-        {
-          "name": "ctrl_valid",
-          "type": "control"
-        }
-      ],
-      "out": [
-        {
-          "name": "ctrl_ready",
-          "type": "control"
-        },
-        {
-          "name": "result",
-          "type": "dataflow"
-        }
-      ]
-    }
-  },
-
-  "handshake.control_merge": {
-    "path": "experimental/data/vhdl/handshake/control_merge.vhd",
-    "concretization_method": "GENERIC",
-    "parameters": [
-      {
-        "name": "INPUTS",
-        "type": "integer",
-        "status": "major"
-      },
-      {
-        "name": "BITWIDTH",
-        "type": "integer",
-        "status": "major"
-      },
-      {
-        "name": "COND_BITWIDTH",
-        "type": "integer",
-        "status": "major"
-      }
-    ],
-    "ports": {
-      "in": [
-        {
-          "name": "ins",
-          "type": "dataflow"
-        }
-      ],
-      "out": [
-        {
-          "name": "outs",
-          "type": "dataflow"
-        },
-        {
-          "name": "condition",
-          "type": "dataflow"
-        }
-      ]
-    }
-  },
-
-  "handshake.d_load": {
-    "path": "experimental/data/vhdl/handshake/d_load.vhd",
-    "concretization_method": "GENERIC",
-    "parameters": [
-      {
-        "name": "DATA_BITWIDTH",
-        "type": "integer",
-        "status": "major"
-      },
-      {
-        "name": "ADDR_BITWIDTH",
-        "type": "integer",
-        "status": "major"
-      }
-    ],
-    "ports": {
-      "in": [
-        {
-          "name": "addrIn",
-          "type": "dataflow"
-        },
-        {
-          "name": "dataFromMem",
-          "type": "dataflow"
-        }
-      ],
-      "out": [
-        {
-          "name": "addrOut",
-          "type": "dataflow"
-        },
-        {
-          "name": "dataOut",
-          "type": "dataflow"
-        }
-      ]
-    }
-  },
-
-  "handshake.d_return": {
-    "path": "experimental/data/vhdl/handshake/d_return.vhd",
-    "concretization_method": "GENERIC",
-    "parameters": [
-      {
-        "name": "BITWIDTH",
-        "type": "integer",
-        "status": "major"
-      }
-    ],
-    "ports": {
-      "in": [
-        {
-          "name": "ins",
-          "type": "dataflow"
-        }
-      ],
-      "out": [
-        {
-          "name": "outs",
-          "type": "dataflow"
-        }
-      ]
-    }
-  },
-
-
-  "handshake.d_store": {
-    "path": "experimental/data/vhdl/handshake/d_store.vhd",
-    "concretization_method": "GENERIC",
-    "parameters": [
-      {
-        "name": "DATA_BITWIDTH",
-        "type": "integer",
-        "status": "major"
-      },
-      {
-        "name": "ADDR_BITWIDTH",
-        "type": "integer",
-        "status": "major"
-      }
-    ],
-    "ports": {
-      "in": [
-        {
-          "name": "addrIn",
-          "type": "dataflow"
-        },
-        {
-          "name": "dataIn",
-          "type": "dataflow"
-        }
-      ],
-      "out": [
-        {
-          "name": "addrOut",
-          "type": "dataflow"
-        },
-        {
-          "name": "dataToMem",
-          "type": "dataflow"
-        }
-      ]
-    }
-  },
-
-  "handshake.end_node": {
-    "path": "experimental/data/vhdl/handshake/end_node.vhd",
-    "concretization_method": "GENERIC",
-    "parameters": [
-      {
-        "name": "MEM_INPUTS",
-        "type": "integer",
-        "status": "major"
-      },
-      {
-        "name": "BITWIDTH",
-        "type": "integer",
-        "status": "major"
-      }
-    ],
-    "ports": {
-      "in": [
-        {
-          "name": "ins",
-          "type": "dataflow"
-        },
-        {
-          "name": "eValidArray",
-          "type": "control"
-        }
-      ],
-      "out": [
-        {
-          "name": "eReadyArray",
-          "type": "control"
-        },
-        {
-          "name": "outs",
-          "type": "dataflow"
-        }
-      ]
-    }
-  },
-
-  "handshake.fork": {
-    "path": "experimental/data/vhdl/handshake/fork.vhd",
-    "concretization_method": "GENERIC",
-    "parameters": [
-      {
-        "name": "OUTPUTS",
-        "type": "integer",
-        "status": "major"
-      },
-      {
-        "name": "BITWIDTH",
-        "type": "integer",
-        "status": "major"
-      }
-    ],
-    "ports": {
-      "in": [
-        {
-          "name": "ins",
-          "type": "dataflow"
-        }
-      ],
-      "out": [
-        {
-          "name": "outs",
-          "type": "dataflow"
-        }
-      ]
-    }
-  },
-
-  "handshake.join": {
-    "path": "experimental/data/vhdl/handshake/join.vhd",
-    "concretization_method": "GENERIC",
-    "parameters": [
-      {
-        "name": "BITWIDTH",
-        "type": "integer",
-        "status": "major"
-      }
-    ],
-    "ports": {
-      "in": [
-        {
-          "name": "pValidArray",
-          "type": "control"
-        },
-        {
-          "name": "nReady",
-          "type": "control"
-        }
-      ],
-      "out": [
-        {
-          "name": "valid",
-          "type": "control"
-        },
-        {
-          "name": "readyArray",
-          "type": "dataflow"
-        }
-      ]
-    }
-  },
-
-  "handshake.lazy_fork": {
-    "path": "experimental/data/vhdl/handshake/lazy_fork.vhd",
-    "concretization_method": "GENERIC",
-    "parameters": [
-      {
-        "name": "OUTPUTS",
-        "type": "integer",
-        "status": "major"
-      },
-      {
-        "name": "BITWIDTH",
-        "type": "integer",
-        "status": "major"
-      }
-    ],
-    "ports": {
-      "in": [
-        {
-          "name": "ins",
-          "type": "dataflow"
-        }
-      ],
-      "out": [
-        {
-          "name": "outs",
-          "type": "dataflow"
-        }
-      ]
-    }
-  },
-
-  "handshake.mem_controller": {
-    "path": "experimental/data/vhdl/handshake/mem_controller.vhd",
-    "concretization_method": "GENERIC",
-    "parameters": [
-      {
-        "name": "DATA_BITWIDTH",
-        "type": "integer",
-        "status": "major"
-      },
-      {
-        "name": "CTRL_BITWIDTH",
-        "type": "integer",
-        "status": "minor"
-      },
-      {
-        "name": "ADDR_BITWIDTH",
-        "type": "integer",
-        "status": "major"
-      },
-      {
-        "name": "LOAD_COUNT",
-        "type": "integer",
-        "status": "major"
-      },
-      {
-        "name": "STORE_COUNT",
-        "type": "integer",
-        "status": "major"
-      },
-      {
-        "name": "LOAD_STORE_ARRAYS",
-        "type": "string_arr",
-        "status": "minor"
-      }
-    ],
-    "ports": {
-      "in": [
-        {
-          "name": "io_inLoadData",
-          "type": "control"
-        },
-        {
-          "name": "io_ctrl",
-          "type": "control"
-        },
-        {
-          "name": "io_ctrl_valid",
-          "type": "control"
-        },
-        {
-          "name": "io_ldAddr",
-          "type": "dataflow"
-        },
-        {
-          "name": "io_stAddr",
-          "type": "dataflow"
-        },
-        {
-          "name": "io_stData",
-          "type": "dataflow"
-        },
-        {
-          "name": "io_done_ready",
-          "type": "control"
-        }
-      ],
-      "out": [
-        {
-          "name": "io_bbReadyToPrevs",
-          "type": "control"
-        },
-        {
-          "name": "io_ldData",
-          "type": "dataflow"
-        },
-        {
-          "name": "io_done_valid",
-          "type": "control"
-        },
-        {
-          "name": "io_done_valid",
-          "type": "control"
-        },
-        {
-          "name": "io_loadEnable",
-          "type": "control"
-        },
-        {
-          "name": "io_loadAddrOut",
-          "type": "control"
-        },
-        {
-          "name": "io_storeEnable",
-          "type": "control"
-        },
-        {
-          "name": "io_storeAddrOut",
-          "type": "control"
-        },
-        {
-          "name": "io_storeDataOut",
-          "type": "control"
-        }
-      ]
-    }
-  },
-
-  "handshake.merge": {
-    "path": "experimental/data/vhdl/handshake/merge.vhd",
-    "concretization_method": "GENERIC",
-    "parameters": [
-      {
-        "name": "INPUTS",
-        "type": "integer",
-        "status": "major"
-      },
-      {
-        "name": "BITWIDTH",
-        "type": "integer",
-        "status": "major"
-      }
-    ],
-    "ports": {
-      "in": [
-        {
-          "name": "ins",
-          "type": "dataflow"
-        }
-      ],
-      "out": [
-        {
-          "name": "outs",
-          "type": "dataflow"
-        }
-      ]
-    }
-  },
-
-  "handshake.mux": {
-    "path": "experimental/data/vhdl/handshake/mux.vhd",
-    "concretization_method": "GENERIC",
-    "parameters": [
-      {
-        "name": "INPUTS",
-        "type": "integer",
-        "status": "major"
-      },
-      {
-        "name": "BITWIDTH",
-        "type": "integer",
-        "status": "major"
-      },
-      {
-        "name": "COND_BITWIDTH",
-        "type": "integer",
-        "status": "major"
-      }
-    ],
-    "ports": {
-      "in": [
-        {
-          "name": "condition",
-          "type": "control"
-        },
-        {
-          "name": "ins",
-          "type": "dataflow"
-        }
-      ],
-      "out": [
-        {
-          "name": "outs",
-          "type": "dataflow"
-        }
-      ]
-    }
-  },
-
-  "handshake.sink": {
-    "path": "experimental/data/vhdl/handshake/sink.vhd",
-    "concretization_method": "GENERIC",
-    "parameters": [
-      {
-        "name": "BITWIDTH",
-        "type": "integer",
-        "status": "major"
-      }
-    ],
-    "ports": {
-      "in": [
-        {
-          "name": "ins_valid",
-          "type": "control"
-        }
-      ],
-      "out": [
-        {
-          "name": "ins_ready",
-          "type": "control"
-        }
-      ]
-    }
-  },
-
-  "handshake.source": {
-    "path": "experimental/data/vhdl/handshake/source.vhd",
-    "concretization_method": "GENERIC",
-    "parameters": [
-      {
-        "name": "BITWIDTH",
-        "type": "integer",
-        "status": "major"
-      }
-    ],
-    "ports": {
-      "in": [
-        {
-          "name": "outs_ready",
-          "type": "control"
-        }
-      ],
-      "out": [
-        {
-          "name": "outs_valid",
-          "type": "control"
-        }
-      ]
-    }
-  },
-
-  "handshake.start_node": {
-    "path": "experimental/data/vhdl/handshake/start_node.vhd",
-    "concretization_method": "GENERIC",
-    "parameters": [
-      {
-        "name": "BITWIDTH",
-        "type": "integer",
-        "status": "major"
-      }
-    ],
-    "ports": {
-      "in": [
-        {
-          "name": "ins",
-          "type": "dataflow"
-        }
-      ],
-      "out": [
-        {
-          "name": "outs",
-          "type": "dataflow"
-        }
-      ]
-    }
-  }
+  ]
 }
