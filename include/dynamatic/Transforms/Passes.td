@@ -158,7 +158,7 @@ def HandshakeMinimizeCstWidth : Pass<"handshake-minimize-cst-width", "mlir::Modu
             "If true, allows bitwidth optimization of negative values.">];
 }
 
-def HandshakeSetBufferingProperties : 
+def HandshakeSetBufferingProperties :
   Pass<"handshake-set-buffering-properties", "mlir::ModuleOp"> {
   let summary = "Attach buffering properties to specifc channels in the IR";
   let description = [{
@@ -166,9 +166,10 @@ def HandshakeSetBufferingProperties :
     annotated and how is determined by the pass's parameter. This pass is
     especially useful to run prior to running our smart buffer placement pass,
     as the latter reads these properties and ensures that the buffer placement
-    it yields honors them.   
+    it yields honors them.
   }];
-  let constructor = "dynamatic::buffer::createHandshakeSetBufferingProperties()";
+  let constructor =
+    "dynamatic::buffer::createHandshakeSetBufferingProperties()"; 
   let dependentDialects = ["circt::handshake::HandshakeDialect"];
   let options =
     [Option<"version", "version", "std::string", "\"fpga20\"",
