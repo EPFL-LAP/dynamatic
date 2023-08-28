@@ -91,9 +91,12 @@ public:
   LogicalResult createReturnNetwork(ConversionPatternRewriter &rewriter,
                                     bool idBasicBlocks);
 
-  // TODO: add missing descriptions, and discuss code organization with Lucas
+  // TODO: add missing descriptions
 
-  LogicalResult handleTokenMissmatch(BackedgeBuilder &edgeBuilder, ConversionPatternRewriter &rewriter);
+  LogicalResult handleTokenMissmatch(
+      DenseMap<Value, std::set<Block *>> &valueIsConsumedInBlocksMap,
+      std::set<Operation *> &preventTokenMissmatchMerges,
+      BackedgeBuilder &edgeBuilder, ConversionPatternRewriter &rewriter);
 
   MergeOpInfo insertMerge(Block *block, Value val, BackedgeBuilder &edgeBuilder,
                           ConversionPatternRewriter &rewriter);
