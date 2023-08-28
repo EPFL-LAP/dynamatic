@@ -28,6 +28,9 @@ using namespace dynamatic;
 using namespace dynamatic::buffer;
 using namespace dynamatic::experimental;
 
+Channel::Channel(Value val, Operation &producer, Operation &consumer)
+    : value(val), producer(producer), consumer(consumer), props(val){};
+
 namespace {
 struct HandshakePlaceBuffersPass
     : public HandshakePlaceBuffersBase<HandshakePlaceBuffersPass> {
@@ -218,11 +221,9 @@ LogicalResult HandshakePlaceBuffersPass::instantiateBuffers(
 #endif
 
 std::unique_ptr<mlir::OperationPass<mlir::ModuleOp>>
-dynamatic::createHandshakePlaceBuffersPass(bool firstCFDFC,
-                                           std::string stdLevelInfo,
-                                           std::string timefile,
-                                           double targetCP, int timeLimit,
-                                           bool setCustom) {
+dynamatic::buffer::createHandshakePlaceBuffersPass(
+    bool firstCFDFC, std::string stdLevelInfo, std::string timefile,
+    double targetCP, int timeLimit, bool setCustom) {
   return std::make_unique<HandshakePlaceBuffersPass>(
       firstCFDFC, stdLevelInfo, timefile, targetCP, timeLimit, setCustom);
 }

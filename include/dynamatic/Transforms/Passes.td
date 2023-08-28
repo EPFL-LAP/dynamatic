@@ -153,9 +153,27 @@ def HandshakeMinimizeCstWidth : Pass<"handshake-minimize-cst-width", "mlir::Modu
   }];
   let constructor = "dynamatic::createHandshakeMinimizeCstWidth()";
   let dependentDialects = ["mlir::arith::ArithDialect"];
-   let options =
+  let options =
     [Option<"optNegatives", "opt-negatives", "bool", "false",
             "If true, allows bitwidth optimization of negative values.">];
+}
+
+def HandshakeSetBufferingProperties : 
+  Pass<"handshake-set-buffering-properties", "mlir::ModuleOp"> {
+  let summary = "Attach buffering properties to specifc channels in the IR";
+  let description = [{
+    Adds buffering properties to specific channels in the IR. Which channels are
+    annotated and how is determined by the pass's parameter. This pass is
+    especially useful to run prior to running our smart buffer placement pass,
+    as the latter reads these properties and ensures that the buffer placement
+    it yields honors them.   
+  }];
+  let constructor = "dynamatic::buffer::createHandshakeSetBufferingProperties()";
+  let dependentDialects = ["circt::handshake::HandshakeDialect"];
+  let options =
+    [Option<"version", "version", "std::string", "\"fpga20\"",
+            "Set of buffering properties to apply. Options are: fpga20 "
+            "(default).">];
 }
 
 def HandshakePlaceBuffers : Pass<"handshake-place-buffers", "mlir::ModuleOp"> {
@@ -164,7 +182,7 @@ def HandshakePlaceBuffers : Pass<"handshake-place-buffers", "mlir::ModuleOp"> {
     The pass analyzes the circuit's channel prerequisites. Based the channel
     prerequisite, the pass optimize the circuit performance by inserting buffers.
   }];
-  let constructor = "dynamatic::createHandshakePlaceBuffersPass()";
+  let constructor = "dynamatic::buffer::createHandshakePlaceBuffersPass()";
   let options = [
     Option<"firstCFDFC", "firstCFDFC", "bool", "false",
     "if true, only extract the first CFDFC from the input file">,
