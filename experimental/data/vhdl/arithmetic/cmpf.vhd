@@ -2,9 +2,9 @@ library IEEE;
 use IEEE.std_logic_1164.all;
 use ieee.numeric_std.all;
 use work.customTypes.all;
--- #NAME# = oeq, ogt, oge, olt, ole, one, ord, ueq, ugt, uge, ult, ule, une, uno
+-- #PREDICATE# = oeq, ogt, oge, olt, ole, one, ord, ueq, ugt, uge, ult, ule, une, uno
 -- #CONST# = 00001, 00010, 00011, 00100, 00101, 00110, 00111, 01000, 01001, 01010, 01011, 01100, 01101, 01110 
-entity cmpf_#NAME# is
+entity cmpf_#PREDICATE# is
   generic (
     BITWIDTH : integer
   );
@@ -24,7 +24,7 @@ entity cmpf_#NAME# is
     result_valid : out std_logic);
 end entity;
 
-architecture arch of cmpf_#NAME# is
+architecture arch of cmpf_#PREDICATE# is
 
   component array_RAM_fcmp_32cud is
     generic (

@@ -37,6 +37,6 @@ begin
       join_valid,
       (lhs_ready,
       rhs_ready));
-  result       <= std_logic_vector(unsigned(lhs) #TYPEOP# unsigned (rhs));
+  result       <= std_logic_vector(unsigned(lhs) - unsigned (rhs));
   result_valid <= join_valid;
 end architecture;

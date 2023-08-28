@@ -1,7 +1,6 @@
 library IEEE;
 use IEEE.std_logic_1164.all;
 use ieee.numeric_std.all;
-use work.customTypes.all;
 
 entity addi is
   generic (
@@ -37,6 +36,6 @@ begin
       join_valid,
       (lhs_ready,
       rhs_ready));
-  result       <= std_logic_vector(unsigned(lhs) #TYPEOP# unsigned (rhs));
+  result       <= std_logic_vector(unsigned(lhs) + unsigned(rhs));
   result_valid <= join_valid;
 end architecture;

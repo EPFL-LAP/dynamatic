@@ -7,8 +7,7 @@ entity merge_notehb is
 
   generic (
     INPUTS   : integer;
-    BITWIDTH : integer;
-  );
+    BITWIDTH : integer);
   port (
     clk        : in std_logic;
     rst        : in std_logic;

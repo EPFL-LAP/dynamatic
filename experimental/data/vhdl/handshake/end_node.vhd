@@ -11,17 +11,17 @@ entity end_node is
 
   port (
     -- inputs
-    ins         : in std_logic_vector(BITWIDTH - 1 downto 0);
-    ins_valid   : in std_logic;
-    eValidArray : in std_logic_vector(MEM_INPUTS - 1 downto 0) := (others => '1');
-    clk         : in std_logic;
-    rst         : in std_logic;
-    outs_ready  : in std_logic;
+    ins             : in std_logic_vector(BITWIDTH - 1 downto 0);
+    ins_valid       : in std_logic;
+    mems_done_valid : in std_logic_vector(MEM_INPUTS - 1 downto 0) := (others => '1');
+    clk             : in std_logic;
+    rst             : in std_logic;
+    outs_ready      : in std_logic;
     -- outputs
-    ins_ready   : out std_logic;
-    eReadyArray : out std_logic_vector(MEM_INPUTS - 1 downto 0);
-    outs        : out std_logic_vector(BITWIDTH - 1 downto 0);
-    outs_valid  : out std_logic);
+    ins_ready       : out std_logic;
+    mems_done_ready : out std_logic_vector(MEM_INPUTS - 1 downto 0);
+    outs            : out std_logic_vector(BITWIDTH - 1 downto 0);
+    outs_valid      : out std_logic);
 end end_node;
 
 architecture arch of end_node is
@@ -51,7 +51,7 @@ begin
   end process;
 
   mem_and : entity work.andN(vanilla) generic map (MEM_INPUTS)
-    port map(eValidArray, mem_valid);
+    port map(mems_done_valid, mem_valid);
 
   j : entity work.join(arch) generic map(2)
     port map(

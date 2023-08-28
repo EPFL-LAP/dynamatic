@@ -2,9 +2,9 @@ library IEEE;
 use IEEE.std_logic_1164.all;
 use ieee.numeric_std.all;
 use work.customTypes.all;
--- NAME = sge, sgt, sle, slt
--- TYPEOP = >=, >, <=, <
-entity cmpi_#NAME# is
+-- #PREDICATE# = sge, sgt, sle, slt
+-- #TYPEOP# = >=, >, <=, <
+entity cmpi_#PREDICATE# is
   generic (
     BITWIDTH : integer
   );
@@ -24,7 +24,7 @@ entity cmpi_#NAME# is
     result_valid : out std_logic);
 end entity;
 
-architecture arch of cmpi_#NAME# is
+architecture arch of cmpi_#PREDICATE# is
   signal join_valid : std_logic;
   signal one        : std_logic := "1";
   signal zero       : std_logic := "0";

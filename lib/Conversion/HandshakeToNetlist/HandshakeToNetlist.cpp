@@ -229,8 +229,8 @@ static std::string getExtModuleName(Operation *oldOp) {
         extModName += getTypeName(outTypes[0], loc);
       })
       .Case<handshake::MuxOp>([&](auto) {
-        // number of inputs
-        extModName += "_" + std::to_string(inTypes.size());
+        // number of inputs (without select param)
+        extModName += "_" + std::to_string(inTypes.size() - 1);
         // bitwidth
         extModName += getTypeName(inTypes[1], loc);
         // select bitwidth

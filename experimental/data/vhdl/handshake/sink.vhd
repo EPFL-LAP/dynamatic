@@ -13,6 +13,7 @@ entity sink is
     clk       : in std_logic;
     rst       : in std_logic;
     ins_valid : in std_logic;
+    ins       : in std_logic_vector(BITWIDTH - 1 downto 0);
     -- outputs
     ins_ready : out std_logic);
 end sink;

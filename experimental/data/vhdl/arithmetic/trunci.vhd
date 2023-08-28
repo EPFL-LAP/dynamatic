@@ -23,7 +23,7 @@ end entity;
 
 architecture arch of trunci is
 begin
-  outs       <= std_logic_vector(OUTPUT_BITWIDTH - 1 downto 0);
+  outs       <= ins(OUTPUT_BITWIDTH - 1 downto 0);
   outs_valid <= ins_valid;
   ins_ready  <= not ins_valid or (ins_valid and outs_ready);
 end architecture;

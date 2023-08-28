@@ -14,7 +14,7 @@ port (
   outs       : out std_logic_vector(BITWIDTH - 1 downto 0);
   outs_valid : out std_logic;
   outs_ready : in std_logic);
-end branch;
+end br;
 
 architecture arch of br is
 begin
