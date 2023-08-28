@@ -10,6 +10,7 @@
 
 #include "circt/Conversion/StandardToHandshake.h"
 #include "circt/Dialect/Handshake/HandshakeOps.h"
+#include "dynamatic/Conversion/StandardToHandshakeFPGA18.h"
 #include "dynamatic/Support/LLVM.h"
 #include "mlir/Analysis/CFGLoopInfo.h"
 #include "mlir/Dialect/Func/IR/FuncOps.h"
@@ -41,69 +42,35 @@ DenseMap<Block *, BlockLoopInfo> findLoopDetails(CFGLoopInfo &li,
 /// is returned.
 CFGLoop *findLCALoop(CFGLoop *innermostLoopOfBB1, CFGLoop *innermostLoopOfBB2);
 
-// This class is used to inherit from CIRCT's standard-to-handshake lowering
+// This class is used to inherit from FPGA18's standard-to-handshake lowering
 // infrastructure and implementation while providing us a way to
 // change/add/remove/reorder specific conversion steps to match FPL22's elastic
 // pass.
-class HandshakeLoweringFPL22 : public HandshakeLowering {
+class HandshakeLoweringFPL22 : public HandshakeLoweringFPGA18 {
 public:
-  /// Used to store a list of operations grouped by their parent basic block.
-  /// Defined with a SmallVector instead of a DenseMap to ensure deterministic
-  /// iteration order.
-  using MemBlockOps = SmallVector<std::pair<Block *, std::vector<Operation *>>>;
-
-  /// Used to store a "mapping" between memrefs and the set of operations
-  /// referencing them, grouped by their parent block. Defined with a
-  /// SmallVector instead of a DenseMap to ensure deterministic iteration order.
-  using MemInterfacesInfo = SmallVector<std::pair<Value, MemBlockOps>>;
-
   /// Constructor simply forwards its arguments to the parent class.
-  explicit HandshakeLoweringFPL22(Region &r) : HandshakeLowering(r) {}
+  explicit HandshakeLoweringFPL22(Region &r) : HandshakeLoweringFPGA18(r) {}
 
   /// Adding a control-only argument to the region's entry block and connecting
   /// the start control to all blocks.
   LogicalResult createStartCtrl(ConversionPatternRewriter &rewriter);
 
-  /// Identifies all memory interfaces and operations in the function, replaces
-  /// all load/store-like operations by their handshake counterparts, and fills
-  /// memInfo with information about which operations use which interface.
-  LogicalResult replaceMemoryOps(ConversionPatternRewriter &rewriter,
-                                 MemInterfacesInfo &memInfo);
-
-  /// Instantiates all memory interfaces and connects them to their respective
-  /// load/store operations.
-  LogicalResult connectToMemory(ConversionPatternRewriter &rewriter,
-                                MemInterfacesInfo &memInfo);
-
-  /// Replaces undefined operations (mlir::LLVM::UndefOp) with a default "0"
-  /// constant triggered by the enclosing block's control merge.
-  LogicalResult replaceUndefinedValues(ConversionPatternRewriter &rewriter);
-
-  /// Sets an integer "bb" attribute on each operation to identify the basic
-  /// block from which the operation originates in the std-level IR.
-  LogicalResult idBasicBlocks(ConversionPatternRewriter &rewriter);
-
-  /// Creates the region's return network by sequentially moving all blocks'
-  /// operations to the entry block, replacing func::ReturnOp's with
-  /// handshake::ReturnOp's, deleting all block terminators and non-entry
-  /// blocks, merging the results of all return statements, and creating the
-  /// region's end operation.
-  LogicalResult createReturnNetwork(ConversionPatternRewriter &rewriter,
-                                    bool idBasicBlocks);
-
-  // TODO: add missing descriptions
-
+  /// Preventing a token missmatch by adding additional merges to the loop
+  /// header block.
   LogicalResult handleTokenMissmatch(
       DenseMap<Value, std::set<Block *>> &valueIsConsumedInBlocksMap,
       std::set<Operation *> &preventTokenMissmatchMerges,
       BackedgeBuilder &edgeBuilder, ConversionPatternRewriter &rewriter);
 
+  /// Inserts a merge for a block argument.
   MergeOpInfo insertMerge(Block *block, Value val, BackedgeBuilder &edgeBuilder,
                           ConversionPatternRewriter &rewriter);
 
+  /// Inserts SSA merges for all block arguments.
   BlockOps insertMergeOps(ValueMap &mergePairs, BackedgeBuilder &edgeBuilder,
                           ConversionPatternRewriter &rewriter);
 
+  /// Adding both SSA merges and merges used to prevent token missmatch.
   LogicalResult addMergeOps(ConversionPatternRewriter &rewriter);
 };
 
