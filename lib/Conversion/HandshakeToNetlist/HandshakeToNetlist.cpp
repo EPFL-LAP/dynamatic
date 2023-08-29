@@ -295,6 +295,7 @@ static std::string getExtModuleName(Operation *oldOp) {
           extModName += getTypeName(inType, loc);
       })
       .Case<handshake::EndOp>([&](auto) {
+        extModName += "_node";
         if (outTypes.size() > 1)
           oldOp->emitError()
               << "Number of outputs > 1 is not supported by VHDL";
@@ -740,7 +741,7 @@ void FuncOpConversionPattern::bufferInputs(
 
     // Check whether we need to create a new external module
     auto argLoc = arg.getLoc();
-    std::string modName = "handshake_start";
+    std::string modName = "handshake_start_node";
     if (auto channelType = argType.dyn_cast<esi::ChannelType>())
       modName += getTypeName(channelType.getInner(), argLoc);
 
@@ -752,7 +753,8 @@ void FuncOpConversionPattern::bufferInputs(
     addClkAndRstOperands(operands, mod);
     auto instanceOp = rewriter.create<hw::InstanceOp>(
         argLoc, extModule,
-        rewriter.getStringAttr("handshake_start" + std::to_string(argIdx++)),
+        rewriter.getStringAttr("handshake_start_node" +
+                               std::to_string(argIdx++)),
         operands);
 
     rewriter.replaceAllUsesExcept(arg, instanceOp.getResult(0), instanceOp);

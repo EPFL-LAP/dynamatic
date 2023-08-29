@@ -75,7 +75,7 @@
       "concretization_method": "GENERIC",
       "generators": [],
       "generics": ["BITWIDTH"],
-      "extra": [],
+      "extras": [],
       "ports": {
         "in": [
           {
@@ -110,7 +110,7 @@
       "concretization_method": "GENERATOR",
       "generators": ["PREDICATE"],
       "generics": ["BITWIDTH"],
-      "extra": [],
+      "extras": [],
       "ports": {
         "in": [
           {
@@ -149,7 +149,7 @@
       "concretization_method": "GENERIC",
       "generators": [],
       "generics": ["INPUT_BITWIDTH", "OUTPUT_BITWIDTH"],
-      "extra": [],
+      "extras": [],
       "ports": {
         "in": [
           {
@@ -176,7 +176,7 @@
       "concretization_method": "GENERIC",
       "generators": [],
       "generics": ["BITWIDTH"],
-      "extra": [],
+      "extras": [],
       "ports": {
         "in": [
           {
@@ -203,7 +203,7 @@
       "concretization_method": "GENERIC",
       "generators": [],
       "generics": ["BITWIDTH"],
-      "extra": [],
+      "extras": [],
       "ports": {
         "in": [
           {
@@ -248,7 +248,7 @@
       "concretization_method": "GENERIC",
       "generators": [],
       "generics": ["BITWIDTH"],
-      "extra": [],
+      "extras": [],
       "ports": {
         "in": [
           {
@@ -275,7 +275,7 @@
       "concretization_method": "GENERIC",
       "generators": [],
       "generics": ["BITWIDTH"],
-      "extra": ["BUFFER_TYPE", "NUM_OF_SLOTS"],
+      "extras": ["BUFFER_TYPE", "NUM_OF_SLOTS"],
       "ports": {
         "in": [
           {
@@ -302,7 +302,7 @@
       "concretization_method": "GENERIC",
       "generators": [],
       "generics": ["BITWIDTH"],
-      "extra": [],
+      "extras": [],
       "ports": {
         "in": [
           {
@@ -337,7 +337,7 @@
       "concretization_method": "GENERATOR",
       "generators": ["CONST_VALUE"],
       "generics": ["BITWIDTH"],
-      "extra": [],
+      "extras": [],
       "ports": {
         "in": [
           {
@@ -364,12 +364,13 @@
       "concretization_method": "GENERIC",
       "generators": [],
       "generics": ["INPUTS", "BITWIDTH", "COND_BITWIDTH"],
-      "extra": [],
+      "extras": [],
       "ports": {
         "in": [
           {
             "name": "ins",
-            "type": "dataflow"
+            "type": "dataflow",
+            "size": "INPUTS"
           }
         ],
         "out": [
@@ -395,7 +396,7 @@
       "concretization_method": "GENERIC",
       "generators": [],
       "generics": ["DATA_BITWIDTH", "ADDR_BITWIDTH"],
-      "extra": [],
+      "extras": [],
       "ports": {
         "in": [
           {
@@ -430,7 +431,7 @@
       "concretization_method": "GENERIC",
       "generators": [],
       "generics": ["DATA_BITWIDTH", "ADDR_BITWIDTH"],
-      "extra": [],
+      "extras": [],
       "ports": {
         "in": [
           {
@@ -465,7 +466,7 @@
       "concretization_method": "GENERIC",
       "generators": [],
       "generics": ["MEM_INPUTS", "BITWIDTH"],
-      "extra": [],
+      "extras": [],
       "ports": {
         "in": [
           {
@@ -474,7 +475,8 @@
           },
           {
             "name": "mems_done",
-            "type": "control"
+            "type": "control",
+            "size": "MEM_INPUTS"
           }
         ],
         "out": [
@@ -500,7 +502,7 @@
       "concretization_method": "GENERIC",
       "generators": [],
       "generics": ["OUTPUTS", "BITWIDTH"],
-      "extra": [],
+      "extras": [],
       "ports": {
         "in": [
           {
@@ -511,7 +513,8 @@
         "out": [
           {
             "name": "outs",
-            "type": "dataflow"
+            "type": "dataflow",
+            "size": "OUTPUTS"
           }
         ]
       }
@@ -527,7 +530,7 @@
       "concretization_method": "GENERIC",
       "generators": [],
       "generics": ["BITWIDTH"],
-      "extra": [],
+      "extras": [],
       "ports": {
         "in": [
           {
@@ -554,7 +557,7 @@
       "concretization_method": "GENERIC",
       "generators": [],
       "generics": ["DATA_BITWIDTH", "ADDR_BITWIDTH", "LOAD_COUNT", "STORE_COUNT"],
-      "extra": ["CTRL_BITWIDTH", "LOAD_STORE_ARRAYS"],
+      "extras": ["CTRL_BITWIDTH", "LOAD_STORE_ARRAYS"],
       "ports": {
         "in": [
           {
@@ -567,21 +570,25 @@
           },
           {
             "name": "ldAddr",
-            "type": "dataflow"
+            "type": "dataflow",
+            "size": "LOAD_COUNT"
           },
           {
             "name": "stAddr",
-            "type": "dataflow"
+            "type": "dataflow",
+            "size": "STORE_COUNT"
           },
           {
             "name": "stData",
-            "type": "dataflow"
+            "type": "dataflow",
+            "size": "STORE_COUNT"
           }
         ],
         "out": [
           {
             "name": "ldData",
-            "type": "dataflow"
+            "type": "dataflow",
+            "size": "LOAD_COUNT"
           },
           {
             "name": "done",
@@ -621,12 +628,13 @@
       "concretization_method": "GENERIC",
       "generators": [],
       "generics": ["INPUTS", "BITWIDTH"],
-      "extra": [],
+      "extras": [],
       "ports": {
         "in": [
           {
             "name": "ins",
-            "type": "dataflow"
+            "type": "dataflow",
+            "size": "INPUTS"
           }
         ],
         "out": [
@@ -647,8 +655,8 @@
       ],
       "concretization_method": "GENERIC",
       "generators": [],
-      "generics": ["INPUTS", "BITWIDTH", "COND_BITWIDTH"],
-      "extra": [],
+      "generics": ["NUM_INPUTS", "BITWIDTH", "COND_BITWIDTH"],
+      "extras": [],
       "ports": {
         "in": [
           {
@@ -657,7 +665,8 @@
           },
           {
             "name": "ins",
-            "type": "dataflow"
+            "type": "dataflow",
+            "size": "NUM_INPUTS"
           }
         ],
         "out": [
@@ -679,7 +688,7 @@
       "concretization_method": "GENERIC",
       "generators": [],
       "generics": ["BITWIDTH"],
-      "extra": [],
+      "extras": [],
       "ports": {
         "in": [
           {
@@ -701,7 +710,7 @@
       "concretization_method": "GENERIC",
       "generators": [],
       "generics": ["BITWIDTH"],
-      "extra": [],
+      "extras": [],
       "ports": {
         "in": [],
         "out": [
