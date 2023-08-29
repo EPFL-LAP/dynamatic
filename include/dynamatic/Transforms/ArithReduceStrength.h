@@ -11,6 +11,7 @@
 
 #include "dynamatic/Support/LLVM.h"
 #include "mlir/IR/Value.h"
+#include "mlir/Pass/Pass.h"
 #include <variant>
 
 namespace dynamatic {
@@ -82,6 +83,13 @@ private:
 std::unique_ptr<mlir::OperationPass<mlir::ModuleOp>>
 createArithReduceStrength(unsigned maxAdderDepthMul = 3);
 
+<<<<<<< HEAD
+=======
+#define GEN_PASS_DECL_ARITHREDUCESTRENGTH
+#define GEN_PASS_DEF_ARITHREDUCESTRENGTH
+#include "dynamatic/Transforms/Passes.h.inc"
+
+>>>>>>> e1c16f39755d6dad7e801e9cdce6994b43e529ad
 } // namespace dynamatic
 
 #endif // DYNAMATIC_TRANSFORMS_ARITHREDUCESTRENGTH_H

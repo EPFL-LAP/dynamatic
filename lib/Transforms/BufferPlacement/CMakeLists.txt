@@ -3,8 +3,12 @@ if (NOT GUROBI_FOUND)
 endif()
 
 add_dynamatic_library(DynamaticBufferPlacement
-  ExtractMG.cpp
+  BufferingProperties.cpp
+  ExtractCFDFC.cpp
   HandshakePlaceBuffers.cpp
+  HandshakeSetBufferingProperties.cpp
+  OptimizeMILP.cpp
+  ParseCircuitJson.cpp
 
   DEPENDS
   DynamaticTransformsPassIncGen
@@ -15,8 +19,10 @@ add_dynamatic_library(DynamaticBufferPlacement
   MLIRFuncDialect
   MLIRSupport
   MLIRTransformUtils
+  CIRCTHandshake
   DynamaticSupport
-)
+  DynamaticExperimentalSupport
+  )
 
 if (GUROBI_FOUND)
   target_link_libraries(DynamaticBufferPlacement

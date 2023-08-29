@@ -46,6 +46,29 @@ def ScfForLoopRotation : Pass<"scf-rotate-for-loops", "mlir::ModuleOp"> {
   let constructor = "dynamatic::createScfRotateForLoops()";
 }
 
+def ScfSimpleIfToSelect : Pass<"scf-simple-if-to-select", "mlir::ModuleOp"> {
+  let summary = "Transforms if's with simple bodies into select's.";
+  let description = [{
+    Transforms scf::IfOp operations with one result and a specific internal
+    struture into an equivalent combination of a single arith::SelectOp and
+    (potentially) an arithmetic operation present in at least one of its
+    branches.
+  
+    The pass transforms scf::IfOp operations with the following properties.
+    (1) The operation must have exactly one integer-like result.
+    (2) Each branch must be made up of a single yield or of a supported
+        two-operands arithmetic operation whose single result is yielded. If
+        both branches have an arithmetic operation, they must be of the same
+        type.
+    (3) Both branches, whatever their content (constrained by the point above),
+        must use an identical value. This could either be the yielded value or,
+        if applicable, the value used as one of the operands of the arithmetic
+        operation.
+  }];
+  let constructor = "dynamatic::createScfSimpleIfToSelect()";
+  let dependentDialects = ["mlir::arith::ArithDialect"];
+}
+
 //===----------------------------------------------------------------------===//
 // Handshake passes
 //===----------------------------------------------------------------------===//
@@ -86,6 +109,10 @@ def HandshakeOptimizeBitwidths : Pass<"handshake-optimize-bitwidths",
   }];
   let constructor = "dynamatic::createHandshakeOptimizeBitwidths()";
   let dependentDialects = ["mlir::arith::ArithDialect"];
+  let options = [Option<"legacy", "legacy", "bool", "false",
+    "When legacy mode is enabled, disables bitwidth optimization of memory "
+    "address channels since they sometime make the legacy dot2vhdl tool "
+    "fail.">];
 }
 
 def HandshakeOptimizeBits : Pass<"optimize-bits" , "mlir::ModuleOp"> {
@@ -126,6 +153,50 @@ def HandshakeMinimizeCstWidth : Pass<"handshake-minimize-cst-width", "mlir::Modu
   }];
   let constructor = "dynamatic::createHandshakeMinimizeCstWidth()";
   let dependentDialects = ["mlir::arith::ArithDialect"];
+  let options =
+    [Option<"optNegatives", "opt-negatives", "bool", "false",
+            "If true, allows bitwidth optimization of negative values.">];
+}
+
+def HandshakeSetBufferingProperties :
+  Pass<"handshake-set-buffering-properties", "mlir::ModuleOp"> {
+  let summary = "Attach buffering properties to specifc channels in the IR";
+  let description = [{
+    Adds buffering properties to specific channels in the IR. Which channels are
+    annotated and how is determined by the pass's parameter. This pass is
+    especially useful to run prior to running our smart buffer placement pass,
+    as the latter reads these properties and ensures that the buffer placement
+    it yields honors them.
+  }];
+  let constructor =
+    "dynamatic::buffer::createHandshakeSetBufferingProperties()"; 
+  let dependentDialects = ["circt::handshake::HandshakeDialect"];
+  let options =
+    [Option<"version", "version", "std::string", "\"fpga20\"",
+            "Set of buffering properties to apply. Options are: fpga20 "
+            "(default).">];
+}
+
+def HandshakePlaceBuffers : Pass<"handshake-place-buffers", "mlir::ModuleOp"> {
+  let summary = "Insert buffers in dataflow graphs.";
+  let description = [{
+    The pass analyzes the circuit's channel prerequisites. Based the channel
+    prerequisite, the pass optimize the circuit performance by inserting buffers.
+  }];
+  let constructor = "dynamatic::buffer::createHandshakePlaceBuffersPass()";
+  let options = [
+    Option<"firstCFDFC", "firstCFDFC", "bool", "false",
+    "if true, only extract the first CFDFC from the input file">,
+    Option<"stdLevelInfo", "std-level-info", "std::string", "",
+    "if provided, extract CFDFC from standard level simluation">,
+    Option<"timefile", "time-file", "std::string", "",
+    "required, file provide the time and buffer prerequisite information ">,
+    Option<"targetCP", "target-period", "double", "4.0",
+    "target clock period for the CFDFC">,
+    Option<"timeLimit", "time-limit", "int", "180",
+    "maximum time limit for MILP solver">,
+     Option<"setCustom", "set-custom", "bool", "true",
+    "set customized constraints from dataflow">];
 }
 
 def HandshakePlaceBuffers : Pass<"handshake-place-buffers", "mlir::ModuleOp"> {

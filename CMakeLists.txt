@@ -69,6 +69,7 @@ set(DYNAMATIC_SOURCE_DIR ${CMAKE_SOURCE_DIR})
 set(DYNAMATIC_INCLUDE_DIR ${DYNAMATIC_SOURCE_DIR}/include)
 set(DYNAMATIC_BINARY_DIR ${CMAKE_BINARY_DIR})
 set(DYNAMATIC_TOOLS_DIR ${DYNAMATIC_BINARY_DIR}/bin)
+set(DYNAMATIC_EXPERIMENTAL_DIR ${DYNAMATIC_SOURCE_DIR}/experimental)
 set(DYNAMATIC_BIN_INCLUDE_DIR ${DYNAMATIC_BINARY_DIR}/include)
 
 # Add our own directory to the list of search paths for CMake modules 
@@ -81,6 +82,8 @@ include_directories(${DYNAMATIC_SOURCE_DIR}/experimental/include)
 include_directories(${DYNAMATIC_BINARY_DIR}/experimental/include)
 include_directories(${DYNAMATIC_SOURCE_DIR}/tutorials/include)
 include_directories(${DYNAMATIC_BINARY_DIR}/tutorials/include)
+include_directories(${DYNAMATIC_EXPERIMENTAL_DIR}/include)
+include_directories(${DYNAMATIC_BINARY_DIR}/experimental/include)
 
 add_custom_target(dynamatic-headers)
 set_target_properties(dynamatic-headers PROPERTIES FOLDER "Misc")

@@ -6,13 +6,11 @@
 //
 //===----------------------------------------------------------------------===//
 //
-// Implements a simulator that executes a restricted form of the std dialect as
-// well as a function profiler used (at this point) to generate block transition
-// frequencies for smart buffer placement.
+// Implements a simulator that executes a restricted form of the std dialect.
 //
 //===----------------------------------------------------------------------===//
 
-#include "experimental/tools/FrequencyProfiler/Simulator.h"
+#include "experimental/Support/StdProfiler.h"
 #include "mlir/Dialect/Arith/IR/Arith.h"
 #include "mlir/Dialect/ControlFlow/IR/ControlFlowOps.h"
 #include "mlir/Dialect/Func/IR/FuncOps.h"
@@ -35,6 +33,7 @@ STATISTIC(instructionsExecuted, "Instructions Executed");
 
 using namespace llvm;
 using namespace mlir;
+using namespace dynamatic;
 using namespace dynamatic::experimental;
 
 namespace {
@@ -46,7 +45,7 @@ public:
               llvm::DenseMap<mlir::Value, double> &timeMap,
               std::vector<Any> &results, std::vector<double> &resultTimes,
               std::vector<std::vector<Any>> &store,
-              std::vector<double> &storeTimes, Profiler &prof);
+              std::vector<double> &storeTimes, StdProfiler &prof);
 
   LogicalResult succeeded() const {
     return successFlag ? success() : failure();
@@ -127,7 +126,7 @@ private:
   double time;
 
   /// Profiler to gather statistics.
-  Profiler &prof;
+  StdProfiler &prof;
 
   /// Flag indicating whether execution was successful.
   bool successFlag = true;
@@ -631,7 +630,7 @@ StdExecuter::StdExecuter(mlir::func::FuncOp &toplevel,
                          std::vector<Any> &results,
                          std::vector<double> &resultTimes,
                          std::vector<std::vector<Any>> &store,
-                         std::vector<double> &storeTimes, Profiler &prof)
+                         std::vector<double> &storeTimes, StdProfiler &prof)
     : valueMap(valueMap), timeMap(timeMap), results(results),
       resultTimes(resultTimes), store(store), storeTimes(storeTimes),
       prof(prof) {
@@ -705,92 +704,8 @@ StdExecuter::StdExecuter(mlir::func::FuncOp &toplevel,
   }
 }
 
-namespace dynamatic {
-namespace experimental {
-
-Profiler::Profiler(mlir::func::FuncOp funcOp) : funcOp(funcOp){};
-
-void Profiler::writeStats(bool printDOT) {
-  mlir::raw_indented_ostream os(llvm::outs());
-  if (printDOT)
-    writeDOT(os);
-  else
-    writeCSV(os);
-}
-
-void Profiler::writeDOT(mlir::raw_indented_ostream &os) {
-  // Print the graph
-  os << "Digraph G {\n";
-  os.indent();
-  os << "splines=spline;\n";
-
-  // Assign a unique name and create a DOT node for each block
-  mlir::DenseMap<Block *, std::string> blockNames;
-  for (auto [idx, block] : llvm::enumerate(funcOp.getBody())) {
-    auto name = "block" + std::to_string(idx + 1);
-    blockNames[&block] = name;
-    os << "\"" << name << "\" [shape=box]\n";
-  }
-
-  for (auto &[blockPair, numTrans] : transitions)
-    os << getDOTTransitionString(blockNames[blockPair.first],
-                                 blockNames[blockPair.second], numTrans);
-
-  // Assign a frequency of 0 to block transitions that never occured in the
-  // input data
-  for (auto &block : funcOp.getBody())
-    for (auto *succ : block.getSuccessors())
-      if (!transitions.contains(std::make_pair(&block, succ)))
-        os << getDOTTransitionString(blockNames[&block], blockNames[succ], 0);
-
-  os.unindent();
-  os << "}\n";
-}
-
-void Profiler::writeCSV(mlir::raw_indented_ostream &os) {
-  // Print column names
-  os << "srcBlock,dstBlock,numTransitions,is_backedge\n";
-
-  // Assign a unique id to each block based on their order of appearance in
-  // the function
-  mlir::DenseMap<Block *, unsigned> blockIDs;
-  for (auto [idx, block] : llvm::enumerate(funcOp.getBody()))
-    blockIDs[&block] = idx;
-
-  // A block and its successor a backedge if the destination block dominates
-  // the source block
-  DominanceInfo domInfo(funcOp);
-
-  for (auto &[blockPair, numTrans] : transitions)
-    os << getCSVTransitionString(
-        blockIDs[blockPair.first], blockIDs[blockPair.second], numTrans,
-        domInfo.dominates(blockPair.second, blockPair.first));
-
-  // Assign a frequency of 0 to block transitions that never occured in the
-  // input data
-  for (auto &block : funcOp.getBody())
-    for (auto *succ : block.getSuccessors())
-      if (!transitions.contains(std::make_pair(&block, succ)))
-        os << getCSVTransitionString(blockIDs[&block], blockIDs[succ], 0,
-                                     domInfo.dominates(succ, &block));
-}
-
-std::string Profiler::getDOTTransitionString(std::string &srcBlock,
-                                             std::string &dstBlock,
-                                             unsigned freq) {
-  return "\"" + srcBlock + "\" -> \"" + dstBlock +
-         "\" [freq = " + std::to_string(freq) + "]\n";
-}
-
-std::string Profiler::getCSVTransitionString(unsigned srcBlock,
-                                             unsigned dstBlock, unsigned freq,
-                                             bool isBackedge) {
-  return std::to_string(srcBlock) + "," + std::to_string(dstBlock) + "," +
-         std::to_string(freq) + "," + (isBackedge ? "1" : "0") + "\n";
-}
-
 LogicalResult simulate(func::FuncOp funcOp, ArrayRef<std::string> inputArgs,
-                       Profiler &prof) {
+                       StdProfiler &prof) {
   // The store associates each allocation in the program
   // (represented by a int) with a vector of values which can be
   // accessed by it.   Currently values are assumed to be an integer.
@@ -854,6 +769,3 @@ LogicalResult simulate(func::FuncOp funcOp, ArrayRef<std::string> inputArgs,
                      storeTimes, prof)
       .succeeded();
 }
-
-} // namespace experimental
-} // namespace dynamatic

@@ -71,7 +71,7 @@ handshake.func @muliFW(%arg0: i8, %arg1: i16, %start: none) -> i32 {
 // CHECK:           %[[VAL_3:.*]] = arith.trunci %[[VAL_1]] {bb = 0 : ui32} : i16 to i9
 // CHECK:           %[[VAL_4:.*]] = arith.extsi %[[VAL_0]] {bb = 0 : ui32} : i8 to i9
 // CHECK:           %[[VAL_5:.*]] = arith.divui %[[VAL_4]], %[[VAL_3]] : i9
-// CHECK:           %[[VAL_6:.*]] = arith.extsi %[[VAL_5]] : i9 to i32
+// CHECK:           %[[VAL_6:.*]] = arith.extui %[[VAL_5]] : i9 to i32
 // CHECK:           %[[VAL_7:.*]] = d_return %[[VAL_6]] : i32
 // CHECK:           end %[[VAL_7]] : i32
 // CHECK:         }
@@ -113,7 +113,11 @@ handshake.func @divsiFW(%arg0: i8, %arg1: i16, %start: none) -> i32 {
 // CHECK:           %[[VAL_3:.*]] = arith.trunci %[[VAL_1]] {bb = 0 : ui32} : i16 to i9
 // CHECK:           %[[VAL_4:.*]] = arith.extsi %[[VAL_0]] {bb = 0 : ui32} : i8 to i9
 // CHECK:           %[[VAL_5:.*]] = arith.remui %[[VAL_4]], %[[VAL_3]] : i9
+<<<<<<< HEAD
 // CHECK:           %[[VAL_6:.*]] = arith.extsi %[[VAL_5]] : i9 to i32
+=======
+// CHECK:           %[[VAL_6:.*]] = arith.extui %[[VAL_5]] : i9 to i32
+>>>>>>> e1c16f39755d6dad7e801e9cdce6994b43e529ad
 // CHECK:           %[[VAL_7:.*]] = d_return %[[VAL_6]] : i32
 // CHECK:           end %[[VAL_7]] : i32
 // CHECK:         }
@@ -211,11 +215,19 @@ handshake.func @xoriFW(%arg0: i8, %arg1: i16, %start: none) -> i32 {
 // CHECK-LABEL:   handshake.func @shliFW(
 // CHECK-SAME:                           %[[VAL_0:.*]]: i16,
 // CHECK-SAME:                           %[[VAL_1:.*]]: none, ...) -> i32 attributes {argNames = ["arg0", "start"], resNames = ["out0"]} {
+<<<<<<< HEAD
 // CHECK:           %[[VAL_2:.*]] = arith.extui %[[VAL_0]] {bb = 0 : ui32} : i16 to i20
 // CHECK:           %[[VAL_3:.*]] = constant %[[VAL_1]] {value = 4 : i4} : i4
 // CHECK:           %[[VAL_4:.*]] = arith.extui %[[VAL_3]] : i4 to i20
 // CHECK:           %[[VAL_5:.*]] = arith.shli %[[VAL_2]], %[[VAL_4]] : i20
 // CHECK:           %[[VAL_6:.*]] = arith.extui %[[VAL_5]] : i20 to i32
+=======
+// CHECK:           %[[VAL_2:.*]] = arith.extsi %[[VAL_0]] {bb = 0 : ui32} : i16 to i20
+// CHECK:           %[[VAL_3:.*]] = constant %[[VAL_1]] {value = 4 : i4} : i4
+// CHECK:           %[[VAL_4:.*]] = arith.extui %[[VAL_3]] : i4 to i20
+// CHECK:           %[[VAL_5:.*]] = arith.shli %[[VAL_2]], %[[VAL_4]] : i20
+// CHECK:           %[[VAL_6:.*]] = arith.extsi %[[VAL_5]] : i20 to i32
+>>>>>>> e1c16f39755d6dad7e801e9cdce6994b43e529ad
 // CHECK:           %[[VAL_7:.*]] = d_return %[[VAL_6]] : i32
 // CHECK:           end %[[VAL_7]] : i32
 // CHECK:         }
@@ -234,7 +246,11 @@ handshake.func @shliFW(%arg0: i16, %start: none) -> i32 {
 // CHECK-SAME:                            %[[VAL_0:.*]]: i16,
 // CHECK-SAME:                            %[[VAL_1:.*]]: none, ...) -> i32 attributes {argNames = ["arg0", "start"], resNames = ["out0"]} {
 // CHECK:           %[[VAL_2:.*]] = constant %[[VAL_1]] {value = 4 : i4} : i4
+<<<<<<< HEAD
 // CHECK:           %[[VAL_3:.*]] = arith.extsi %[[VAL_2]] : i4 to i16
+=======
+// CHECK:           %[[VAL_3:.*]] = arith.extui %[[VAL_2]] : i4 to i16
+>>>>>>> e1c16f39755d6dad7e801e9cdce6994b43e529ad
 // CHECK:           %[[VAL_4:.*]] = arith.shrsi %[[VAL_0]], %[[VAL_3]] : i16
 // CHECK:           %[[VAL_5:.*]] = arith.trunci %[[VAL_4]] : i16 to i12
 // CHECK:           %[[VAL_6:.*]] = arith.extsi %[[VAL_5]] : i12 to i32
@@ -259,7 +275,11 @@ handshake.func @shrsiFW(%arg0: i16, %start: none) -> i32 {
 // CHECK:           %[[VAL_3:.*]] = arith.extui %[[VAL_2]] : i4 to i16
 // CHECK:           %[[VAL_4:.*]] = arith.shrui %[[VAL_0]], %[[VAL_3]] : i16
 // CHECK:           %[[VAL_5:.*]] = arith.trunci %[[VAL_4]] : i16 to i12
+<<<<<<< HEAD
 // CHECK:           %[[VAL_6:.*]] = arith.extui %[[VAL_5]] : i12 to i32
+=======
+// CHECK:           %[[VAL_6:.*]] = arith.extsi %[[VAL_5]] : i12 to i32
+>>>>>>> e1c16f39755d6dad7e801e9cdce6994b43e529ad
 // CHECK:           %[[VAL_7:.*]] = d_return %[[VAL_6]] : i32
 // CHECK:           end %[[VAL_7]] : i32
 // CHECK:         }

@@ -1,17 +1,17 @@
 {
-  "handshake.fork":"defaultFork",
-  "handshake.merge":"defaultMerge",
-  "handshake.control_merge":"defaultControlMerge",
-  "handshake.mux":"defaultMux",
-  "handshake.br":"defaultBranch",
-  "handshake.cond_br":"defaultConditionalMerge",
-  "handshake.sink":"defaultSink",
-  "handshake.constant":"defaultConstant",
-  "handshake.buffer":"defaultBuffer",
-  "handshake.load":"defaultDynamaticLoad",
-  "handshake.store":"defaultDynamaticStore",
-  "handshake.return":"defaultDynamaticReturn",
-  "handshake.end":"defaultEnd",
-  "handshake.memory_controller":"defaultMemoryController"
+  "handshake.fork":"default.handshake.fork",
+  "handshake.merge":"default.handshake.merge",
+  "handshake.control_merge":"default.handshake.control_merge",
+  "handshake.mux":"default.handshake.mux",
+  "handshake.br":"default.handshake.br",
+  "handshake.cond_br":"default.handshake.cond_br",
+  "handshake.sink":"default.handshake.sink",
+  "handshake.constant":"default.handshake.constant",
+  "handshake.buffer":"default.handshake.buffer",
+  "handshake.load":"default.handshake.load",
+  "handshake.store":"default.handshake.store",
+  "handshake.return":"default.handshake.return",
+  "handshake.end":"default.handshake.end",
+  "handshake.memory_controller":"default.handshake.memory_controller"
 }
 

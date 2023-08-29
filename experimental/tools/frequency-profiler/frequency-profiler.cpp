@@ -1,4 +1,4 @@
-//===- FrequencyProfiler.cpp - Profile std-level code -----------*- C++ -*-===//
+//===- frequency-profiler.cpp - Profile std-level code ----------*- C++ -*-===//
 //
 // Part of the LLVM Project, under the Apache License v2.0 with LLVM Exceptions.
 // See https://llvm.org/LICENSE.txt for license information.
@@ -15,7 +15,7 @@
 //
 //===----------------------------------------------------------------------===//
 
-#include "experimental/tools/FrequencyProfiler/Simulator.h"
+#include "experimental/Support/StdProfiler.h"
 #include "mlir/Dialect/Func/IR/FuncOps.h"
 #include "mlir/Dialect/LLVMIR/LLVMDialect.h"
 #include "mlir/Dialect/MemRef/IR/MemRef.h"
@@ -32,6 +32,13 @@
 
 using namespace llvm;
 using namespace mlir;
+using namespace dynamatic;
+using namespace dynamatic::experimental;
+
+/// Simulates a std-level function on a specific set of inputs.
+mlir::LogicalResult simulate(func::FuncOp funcOp,
+                             ArrayRef<std::string> inputArgs,
+                             StdProfiler &prof);
 
 static cl::OptionCategory mainCategory("Application options");
 
@@ -128,13 +135,12 @@ int main(int argc, char **argv) {
   }
 
   // Run the std-level simulator
-  dynamatic::experimental::Profiler prof(funcOp);
+  dynamatic::experimental::StdProfiler prof(funcOp);
   bool simFailed = false;
   if (fileArgs.empty())
-    simFailed = failed(dynamatic::experimental::simulate(funcOp, clArgs, prof));
+    simFailed = failed(simulate(funcOp, clArgs, prof));
   else
-    simFailed = failed(
-        dynamatic::experimental::simulate(funcOp, fetchArgsFromFile(), prof));
+    simFailed = failed(simulate(funcOp, fetchArgsFromFile(), prof));
 
   // Print statistics to stdout and return
   if (!simFailed)

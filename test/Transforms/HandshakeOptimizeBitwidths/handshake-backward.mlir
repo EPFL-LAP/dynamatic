@@ -80,10 +80,16 @@ handshake.func @branchBW(%arg0: i32, %start: none) -> i16 {
 // CHECK:           %[[VAL_3:.*]] = arith.trunci %[[VAL_1]] {bb = 0 : ui32} : i32 to i16
 // CHECK:           %[[VAL_4:.*]] = arith.trunci %[[VAL_0]] {bb = 0 : ui32} : i32 to i16
 // CHECK:           %[[VAL_5:.*]], %[[VAL_6:.*]] = control_merge %[[VAL_4]], %[[VAL_3]] : i16, i1
+<<<<<<< HEAD
 // CHECK:           %[[VAL_7:.*]] = arith.extui %[[VAL_6]] : i1 to i32
 // CHECK:           %[[VAL_8:.*]] = arith.trunci %[[VAL_7]] : i32 to i16
 // CHECK:           %[[VAL_9:.*]]:2 = d_return %[[VAL_5]], %[[VAL_8]] : i16, i16
 // CHECK:           end %[[VAL_9]]#0, %[[VAL_9]]#1 : i16, i16
+=======
+// CHECK:           %[[VAL_7:.*]] = arith.extui %[[VAL_6]] : i1 to i16
+// CHECK:           %[[VAL_8:.*]]:2 = d_return %[[VAL_5]], %[[VAL_7]] : i16, i16
+// CHECK:           end %[[VAL_8]]#0, %[[VAL_8]]#1 : i16, i16
+>>>>>>> e1c16f39755d6dad7e801e9cdce6994b43e529ad
 // CHECK:         }
 handshake.func @cmergeBW(%arg0: i32, %arg1: i32, %start: none) -> (i16, i16) {
   %merge, %index = control_merge %arg0, %arg1 : i32, i32

@@ -59,6 +59,10 @@ struct MinimizeConstantBitwidth
     : public OpRewritePattern<handshake::ConstantOp> {
   using OpRewritePattern<handshake::ConstantOp>::OpRewritePattern;
 
+  MinimizeConstantBitwidth(bool optNegatives, MLIRContext *ctx)
+      : OpRewritePattern<handshake::ConstantOp>(ctx),
+        optNegatives(optNegatives){};
+
   LogicalResult matchAndRewrite(handshake::ConstantOp cstOp,
                                 PatternRewriter &rewriter) const override {
     // Only consider integer attributes
@@ -71,6 +75,10 @@ struct MinimizeConstantBitwidth
     APInt val = intAttr.getValue();
     if (oldType.getSignedness() != IntegerType::SignednessSemantics::Signless ||
         !val.isSingleWord())
+      return failure();
+
+    // Do not optimize negative values
+    if (val.isNegative() && !optNegatives)
       return failure();
 
     // Check if we can reduce the bitwidth
@@ -105,6 +113,50 @@ struct MinimizeConstantBitwidth
     insertExtOp(cstOp, cstOp, oldType, rewriter);
     savedBits += oldType.getWidth() - newBitwidth;
     return success();
+  }
+
+private:
+  /// Whether to allow optimization of negative values.
+  bool optNegatives;
+};
+
+/// Erases redundant extension operations (ones that have the same operand and
+/// destination type as another extension operation). This pattern explicitly
+/// restricts itself to extension operations that are being fed by constants.
+/// Its goal is just to make sure that this pass doesn't create extraneous
+/// useless extensions.
+struct EraseRedundantExtension : public OpRewritePattern<arith::ExtSIOp> {
+  using OpRewritePattern<arith::ExtSIOp>::OpRewritePattern;
+
+  LogicalResult matchAndRewrite(arith::ExtSIOp extOp,
+                                PatternRewriter &rewriter) const override {
+    // Only match on extension operations that extend constants
+    Value extOperand = extOp.getIn();
+    Operation *defOp = extOperand.getDefiningOp();
+    if (!defOp || !isa<handshake::ConstantOp>(defOp))
+      return failure();
+
+    // Get the enclosing function
+    auto funcOp = extOp->getParentOfType<handshake::FuncOp>();
+    assert(funcOp && "extension operation should have parent function");
+
+    // Try to find an equivalent extension operation
+    Type extDstType = extOp.getOut().getType();
+    for (auto otherExtOp : funcOp.getOps<arith::ExtSIOp>()) {
+      // Don't match ourself
+      if (extOp == otherExtOp)
+        continue;
+
+      if (extOperand == otherExtOp.getIn() &&
+          extDstType == otherExtOp.getOut().getType()) {
+        // Replace uses of the current extension with the equivalent one (same
+        // operand and same result type) we found
+        rewriter.replaceOp(extOp, otherExtOp.getOut());
+        return success();
+      }
+    }
+
+    return failure();
   }
 };
 
@@ -154,6 +206,10 @@ struct HandshakeMinimizeCstWidthPass
     : public dynamatic::impl::HandshakeMinimizeCstWidthBase<
           HandshakeMinimizeCstWidthPass> {
 
+  HandshakeMinimizeCstWidthPass(bool optNegatives) {
+    this->optNegatives = optNegatives;
+  }
+
   void runOnOperation() override {
     auto *ctx = &getContext();
     mlir::ModuleOp mod = getOperation();
@@ -162,7 +218,8 @@ struct HandshakeMinimizeCstWidthPass
     config.useTopDownTraversal = true;
     config.enableRegionSimplification = false;
     RewritePatternSet patterns{ctx};
-    patterns.add<MinimizeConstantBitwidth, EraseRedundantExtension>(ctx);
+    patterns.add<MinimizeConstantBitwidth>(optNegatives, ctx);
+    patterns.add<EraseRedundantExtension>(ctx);
     if (failed(applyPatternsAndFoldGreedily(mod, std::move(patterns), config)))
       return signalPassFailure();
 
@@ -173,6 +230,6 @@ struct HandshakeMinimizeCstWidthPass
 } // namespace
 
 std::unique_ptr<mlir::OperationPass<mlir::ModuleOp>>
-dynamatic::createHandshakeMinimizeCstWidth() {
-  return std::make_unique<HandshakeMinimizeCstWidthPass>();
+dynamatic::createHandshakeMinimizeCstWidth(bool optNegatives) {
+  return std::make_unique<HandshakeMinimizeCstWidthPass>(optNegatives);
 }

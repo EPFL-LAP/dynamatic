@@ -68,10 +68,9 @@ handshake.func @muliBW(%arg0: i8, %arg1: i32, %start: none) -> i16 {
 // CHECK-SAME:                           %[[VAL_2:.*]]: none, ...) -> i16 attributes {argNames = ["arg0", "arg1", "start"], resNames = ["out0"]} {
 // CHECK:           %[[VAL_3:.*]] = arith.trunci %[[VAL_1]] {bb = 0 : ui32} : i32 to i8
 // CHECK:           %[[VAL_4:.*]] = arith.andi %[[VAL_0]], %[[VAL_3]] : i8
-// CHECK:           %[[VAL_5:.*]] = arith.extui %[[VAL_4]] : i8 to i32
-// CHECK:           %[[VAL_6:.*]] = arith.trunci %[[VAL_5]] : i32 to i16
-// CHECK:           %[[VAL_7:.*]] = d_return %[[VAL_6]] : i16
-// CHECK:           end %[[VAL_7]] : i16
+// CHECK:           %[[VAL_5:.*]] = arith.extui %[[VAL_4]] : i8 to i16
+// CHECK:           %[[VAL_6:.*]] = d_return %[[VAL_5]] : i16
+// CHECK:           end %[[VAL_6]] : i16
 // CHECK:         }
 handshake.func @andiBW(%arg0: i8, %arg1: i32, %start: none) -> i16 {
   %ext0 = arith.extui %arg0 : i8 to i32
@@ -129,7 +128,11 @@ handshake.func @xoriBW(%arg0: i8, %arg1: i32, %start: none) -> i16 {
 // CHECK-SAME:                           %[[VAL_0:.*]]: i32,
 // CHECK-SAME:                           %[[VAL_1:.*]]: none, ...) -> i16 attributes {argNames = ["arg0", "start"], resNames = ["out0"]} {
 // CHECK:           %[[VAL_2:.*]] = arith.trunci %[[VAL_0]] {bb = 0 : ui32} : i32 to i12
+<<<<<<< HEAD
 // CHECK:           %[[VAL_3:.*]] = arith.extui %[[VAL_2]] {bb = 0 : ui32} : i12 to i16
+=======
+// CHECK:           %[[VAL_3:.*]] = arith.extsi %[[VAL_2]] {bb = 0 : ui32} : i12 to i16
+>>>>>>> e1c16f39755d6dad7e801e9cdce6994b43e529ad
 // CHECK:           %[[VAL_4:.*]] = constant %[[VAL_1]] {value = 4 : i32} : i32
 // CHECK:           %[[VAL_5:.*]] = arith.trunci %[[VAL_4]] : i32 to i16
 // CHECK:           %[[VAL_6:.*]] = arith.shli %[[VAL_3]], %[[VAL_5]] : i16

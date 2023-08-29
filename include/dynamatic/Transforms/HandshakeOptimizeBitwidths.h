@@ -19,7 +19,7 @@ namespace dynamatic {
 #include "dynamatic/Transforms/Passes.h.inc"
 
 std::unique_ptr<mlir::OperationPass<mlir::ModuleOp>>
-createHandshakeOptimizeBitwidths();
+createHandshakeOptimizeBitwidths(bool legacy = false);
 
 } // namespace dynamatic
 
