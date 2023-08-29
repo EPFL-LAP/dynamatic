@@ -41,14 +41,17 @@ namespace buffer {
 /// In situations where one may want to offer easy access to a channel's
 /// buffering properties without fetching the attribute from the IR if not
 /// necessary, this class enables lazily-loading the attribute on the first
-/// access though the -> or * operators. If the attribute is accessed and
-/// modified, the channel's buffering properties are automatically updated
-/// on object destruction.
+/// access though the -> or * operators.
+///
+/// If the attribute is accessed and modified, and the object was created with
+/// the updateOnDestruction flag set, the channel's buffering properties are
+/// automatically updated in the IR on object destruction.
 class LazyChannelBufProps {
 public:
   /// Constructs an instance from the channel whose buffering properties will be
   /// managed by the object.
-  LazyChannelBufProps(Value val);
+  inline LazyChannelBufProps(Value val, bool updateOnDestruction = false)
+      : val(val), updateOnDestruction(updateOnDestruction){};
 
   /// Returns the underlying channel the object was created with.
   inline mlir::Value getChannel() { return val; }
@@ -80,6 +83,9 @@ public:
 private:
   /// Channel that the buffering properties refer to.
   Value val;
+  /// Whether to update the IR on object destruction when the properties were
+  /// modifed.
+  bool updateOnDestruction;
   /// Lazily-loaded buffering properties (std::nullopt by default, initialized
   /// on first read), which are given reference/pointer access to by the class's
   /// -> and * operators.
@@ -98,6 +104,64 @@ private:
   /// If the channel's buffering properties were modified, updates them in the
   /// IR. Returns true if any update was necessary.
   bool updateIRIfNecessary();
+};
+
+/// Returns the producer of the channel (in the buffer placement sense), or
+/// nullptr if the channel has no producer in this context. If idx is not
+/// nullptr, it is filled with the definition index of the channel in its
+/// producer.
+Operation *getChannelProducer(Value channel, size_t *idx = nullptr);
+
+/// Stores information related to a channel (in the buffer placement sense)
+/// i.e., an SSA value along with its producer (an operation) and its unique
+/// consumer (another operation). This struct is just a way to aggregate data;
+/// it performs no internal verification that the producer/comsumer are
+/// associated to the value in any meaningful sense. Semantically, it is
+/// expected that the consumer is one of the value's users (though it may not be
+/// the only one i.e., one does not need to have a materialized IR to use this
+/// struct) and that the producer is either (1) the value's defining operation
+/// if it is an OpResult or (2) a handshake::FuncOp instance if it is a
+/// BlockArgument. Additionally, the struct allows one to lazily access the
+/// channel's buffering properties that may be stored in the IR.
+struct Channel {
+  /// SSA value representing the channel.
+  Value value;
+  /// Channel's producer.
+  Operation &producer;
+  /// Channel's consumer.
+  Operation &consumer;
+  /// Lazily-loaded channel-specific buffering properties.
+  /// NOTE: Modifying these properties will cause the IR to be updated.
+  LazyChannelBufProps props;
+
+  /// Constructs a channel from its assoicated SSA value, the value's producer,
+  /// and one of its comsumers. To maximize flexibility, the constructor doesn't
+  /// check in any way that the provided producer and consumer correspond to the
+  /// SSA value.
+  inline Channel(Value value, Operation &producer, Operation &consumer,
+                 bool updateProps = false)
+      : value(value), producer(producer), consumer(consumer),
+        props(value, updateProps){};
+
+  /// Constructs a channel from its associated SSA value alone. Fails if the
+  /// value's producer is invalid or if does not have at least one consumer. Use
+  /// at your own risk.
+  inline Channel(Value value, bool updateProps = false)
+      : value(value), producer(*getChannelProducer(value)),
+        consumer(**value.getUsers().begin()), props(value, updateProps){};
+
+  /// The lazily-loaded channel buffering properties cannot be safely copied, so
+  /// neither can the channel.
+  Channel(const Channel &) = delete;
+
+  /// The lazily-loaded channel buffering properties cannot be safely copied, so
+  /// neither can the channel.
+  Channel &operator=(const Channel &) = delete;
+
+  /// Determines whether the channel represents a function's argument.
+  inline bool isFunArg() const {
+    return isa<circt::handshake::FuncOp>(producer);
+  }
 };
 
 // Attribute name under which buffering properties for an operation's output

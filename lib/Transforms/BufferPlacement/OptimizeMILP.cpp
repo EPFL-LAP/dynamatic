@@ -10,6 +10,7 @@
 #include "circt/Dialect/Handshake/HandshakeDialect.h"
 #include "circt/Dialect/Handshake/HandshakeOps.h"
 #include "circt/Dialect/Handshake/HandshakePasses.h"
+#include "dynamatic/Transforms/BufferPlacement/BufferingProperties.h"
 #include "dynamatic/Transforms/BufferPlacement/OptimizeMILP.h"
 #include "dynamatic/Transforms/PassDetails.h"
 #include "mlir/Dialect/Arith/IR/Arith.h"
@@ -57,14 +58,6 @@ static unsigned getTotalNumExecs(Value channel,
   return numExec;
 }
 
-/// Determines whether a channel is connected to a memory interface.
-static bool connectToMemoryInterface(Value channel) {
-  Operation *srcOp = channel.getDefiningOp();
-  Operation *dstOp = *(channel.getUsers().begin());
-  return (isa_and_nonnull<handshake::MemoryControllerOp>(srcOp)) ||
-         isa<handshake::MemoryControllerOp>(dstOp);
-}
-
 BufferPlacementMILP::BufferPlacementMILP(
     handshake::FuncOp funcOp, llvm::MapVector<CFDFC *, bool> &cfdfcs,
     std::map<std::string, UnitInfo> &unitInfo, double targetPeriod,
@@ -76,30 +69,41 @@ BufferPlacementMILP::BufferPlacementMILP(
   // Set a time limit for the MILP
   model.getEnv().set(GRB_DoubleParam_TimeLimit, timeLimit);
 
-  auto addChannelWithProps = [&](Value channel) -> LogicalResult {
-    ChannelBufProps props;
-    if (failed(getFPGA20BufProps(channel, props))) {
-      unsatisfiable = true;
-      return failure();
+  // Combines any channel-specific buffering properties coming from IR
+  // annotations to internal buffer specifications and stores the combined
+  // properties into the channel map. Fails and marks the MILP unsatisfiable if
+  // any of those combined buffering properties become unsatisfiable.
+  auto deriveBufferingProperties = [&](Channel &channel) -> LogicalResult {
+    // Increase the minimum number of slots if internal buffers are present, and
+    // check for satisfiability
+    unsatisfiable = failed(addInternalBuffers(channel));
+    if (!unsatisfiable) {
+      std::stringstream stream;
+      stream << "Including internal component buffers into buffering "
+                "properties of outgoing channel made them unsatisfiable. "
+                "Properties are "
+             << *channel.props;
+      return channel.producer.emitError() << stream.str();
     }
-    channels[channel] = props;
-    return success();
+    channels[channel.value] = *channel.props;
+    return failure(unsatisfiable);
   };
 
-  /// NOTE: what do we do with the other function arguments? Should we add their
-  /// respective channels to? It would make some of the code down the line
-  /// simpler.
+  // Add channels originating from function arguments to the channel map
+  for (auto [idx, arg] : llvm::enumerate(funcOp.getArguments())) {
+    Channel channel(arg, *funcOp, **arg.getUsers().begin());
+    if (failed(deriveBufferingProperties(channel)))
+      return;
+  }
 
-  Value start = funcOp.front().getArguments().back();
-  assert(start && "last function argument must be start");
-  for (Operation *op : start.getUsers())
-    for (Value opr : op->getOperands())
-      if (failed(addChannelWithProps(opr)))
+  // Add channels originating from operations' results to the channel map
+  for (Operation &op : funcOp.getOps()) {
+    for (auto [idx, res] : llvm::enumerate(op.getResults())) {
+      Channel channel(res, op, **res.getUsers().begin());
+      if (failed(deriveBufferingProperties(channel)))
         return;
-  for (Operation &op : funcOp.getOps())
-    for (OpResult res : op.getResults())
-      if (failed(addChannelWithProps(res)))
-        return;
+    }
+  }
 }
 
 bool BufferPlacementMILP::arePlacementConstraintsSatisfiable() {
@@ -108,24 +112,17 @@ bool BufferPlacementMILP::arePlacementConstraintsSatisfiable() {
 
 LogicalResult BufferPlacementMILP::setup() {
   createVars();
-  addCustomChannelConstraints();
 
-  /// NOTE: I don't think that filtering out channels connecting to memory
-  /// interfaces should be necessary here, as the fact that these channels are
-  /// unbufferizable should already be encoded in the specific buffering
-  /// properties of these channels
-
-  // Add path constraints over the entire circuit (all channels and units)
+  // All constraints apply over all channels and units
   std::vector<Value> allChannels(channels.size());
   for (auto &[channel, _] : channels)
-    if (!connectToMemoryInterface(channel))
-      allChannels.push_back(channel);
+    allChannels.push_back(channel);
   std::vector<Operation *> allUnits;
   for (Operation &op : funcOp.getOps())
     allUnits.push_back(&op);
-  addPathConstraints(allChannels, allUnits);
 
-  // Add elasticity constraints over the enture circuit (all channels and units)
+  addCustomChannelConstraints(allChannels);
+  addPathConstraints(allChannels, allUnits);
   addElasticityConstraints(allChannels, allUnits);
 
   // Add throughput constraints over each CFDFC that was marked to be optimized
@@ -155,13 +152,34 @@ BufferPlacementMILP::optimize(DenseMap<Value, PlacementResult> &placement) {
            << "Failed to optimize the buffer placement MILP.";
 
   // Fill in placement information
-  for (auto &[ch, chVarMap] : vars.channels) {
-    if (chVarMap.bufPresent.get(GRB_DoubleAttr_X) > 0) {
+  for (auto &[value, channelVars] : vars.channels) {
+    if (channelVars.bufPresent.get(GRB_DoubleAttr_X) > 0) {
+      unsigned numSlotsToPlace = static_cast<unsigned>(
+          channelVars.bufNumSlots.get(GRB_DoubleAttr_X) + 0.5);
+      bool placeOpaque = channelVars.bufIsOpaque.get(GRB_DoubleAttr_X) > 0;
+
+      ChannelBufProps &props = channels[value];
       PlacementResult result;
-      result.numSlots = static_cast<unsigned>(
-          chVarMap.bufNumSlots.get(GRB_DoubleAttr_X) + 0.5);
-      result.opaque = chVarMap.bufIsOpaque.get(GRB_DoubleAttr_X) > 0;
-      placement[ch] = result;
+
+      if (placeOpaque && numSlotsToPlace > 0) {
+        // We want as many slots as possible to be transparent and at least one
+        // opaque slot, while satisfying all buffering constraints
+        unsigned actualMinOpaque = std::max(1U, props.minOpaque);
+        if (props.maxTrans.has_value() &&
+            (props.maxTrans.value() < numSlotsToPlace - actualMinOpaque)) {
+          result.numTrans = props.maxTrans.value();
+          result.numOpaque = numSlotsToPlace - result.numTrans;
+        } else {
+          result.numOpaque = actualMinOpaque;
+          result.numTrans = numSlotsToPlace - result.numOpaque;
+        }
+      } else
+        // All slots should be transparent
+        result.numTrans = numSlotsToPlace;
+
+      Channel channel(value);
+      deductInternalBuffers(channel, result);
+      placement[value] = result;
     }
   }
   return success();
@@ -257,23 +275,46 @@ void BufferPlacementMILP::createChannelVars() {
   }
 }
 
-void BufferPlacementMILP::addCustomChannelConstraints() {
-  for (auto &[channel, chVars] : vars.channels) {
-    if (channels[channel].minOpaque > 0) {
-      // Set a minimum number of slots to be placed
-      model.addConstr(chVars.bufNumSlots >= channels[channel].minOpaque);
-      model.addConstr(chVars.bufIsOpaque >= 0);
-    } else if (channels[channel].minTrans > 0) {
-      model.addConstr(chVars.bufNumSlots >= channels[channel].minTrans);
-      // model.addConstr(chVars.bufIsOp <= 0);
-    }
+void BufferPlacementMILP::addCustomChannelConstraints(
+    ValueRange customChannels) {
+  for (Value channel : customChannels) {
+    ChannelVars &chVars = vars.channels[channel];
+    ChannelBufProps &props = channels[channel];
+
+    // If the properties ask for both opaque and transaprent slots, let opaque
+    // slots take over. Transparents slots will be placed "manually" from the
+    // total number of slots indicated by the MILP's result
+    if (props.minTrans > 0 && props.minOpaque > 0) {
+      Operation *producer = getChannelProducer(channel);
+      assert(producer && "channel producer must exist");
+      producer->emitWarning()
+          << "Outgoing channel requests placement of at least one transparent "
+             "and at least one opaque slot on the channel, which the MILP does "
+             "not formally support. To honor the properties, the MILP will be "
+             "configured to only place opaque slots, some of which will be "
+             "converted to transparent slots when parsing the MILP's solution.";
+      unsigned minTotalSlots = props.minOpaque + props.minTrans;
+      model.addConstr(chVars.bufNumSlots >= minTotalSlots);
+      model.addConstr(chVars.bufIsOpaque == 1);
+
+    } else if (props.minOpaque > 0) {
+      // Force the MILP to place a minimum number of opaque slots
+      model.addConstr(chVars.bufNumSlots >= props.minOpaque);
+      model.addConstr(chVars.bufIsOpaque == 1);
+    } else if (props.minTrans > 0)
+      // Force the MILP to place a minimum number of transparent slots
+      model.addConstr(chVars.bufNumSlots >= props.minTrans);
 
     // Set a maximum number of slots to be placed
-    if (channels[channel].maxOpaque.has_value())
-      model.addConstr(chVars.bufNumSlots <=
-                      channels[channel].maxOpaque.value());
-    if (channels[channel].maxTrans.has_value())
-      model.addConstr(chVars.bufNumSlots <= channels[channel].maxTrans.value());
+    if (props.maxOpaque.has_value()) {
+      if (*props.maxOpaque == 0)
+        // Force the MILP to use transparent slots
+        model.addConstr(chVars.bufIsOpaque == 1);
+      if (props.maxTrans.has_value())
+        // Force the MILP to use a maximum number of slots
+        model.addConstr(chVars.bufNumSlots <=
+                        *props.maxTrans + *props.maxOpaque);
+    }
   }
 }
 
@@ -462,57 +503,49 @@ void BufferPlacementMILP::addObjective() {
   model.setObjective(objective, GRB_MAXIMIZE);
 }
 
-LogicalResult BufferPlacementMILP::getFPGA20BufProps(Value channel,
-                                                     ChannelBufProps &props) {
-  Operation *srcOp = channel.getDefiningOp();
-  // Skip channels from function arguments
-  if (!srcOp)
-    return success();
-
-  Operation *dstOp = *(channel.getUsers().begin());
-
-  // Merges with more than one input should have at least a transparent slot at
-  // their output
-  if (isa<handshake::MergeOp>(srcOp) && srcOp->getNumOperands() > 1)
-    props.minTrans = 1;
-
-  /// TODO: make the least frequently executed input data channel of select
-  /// operations unbufferizable, now it's just ethe false input by default.
-  if (auto selectOp = dyn_cast<arith::SelectOp>(dstOp)) {
-    if (selectOp.getFalseValue() == channel) {
-      props.maxTrans = 0;
-      props.minOpaque = 0;
-    }
-  }
-
-  // Channels connected to memory interfaces are not bufferizable
-  if (isa<handshake::MemoryControllerOp>(srcOp) ||
-      isa<handshake::MemoryControllerOp>(dstOp)) {
-    props.maxOpaque = 0;
-    props.maxTrans = 0;
-  }
-
-  // Combine channel-specific rules to description of internal unit buffers
-  std::string srcName = srcOp->getName().getStringRef().str();
-  std::string dstName = dstOp->getName().getStringRef().str();
+LogicalResult BufferPlacementMILP::addInternalBuffers(Channel &channel) {
+  // Add slots present at the source unit's output port
+  std::string srcName = channel.producer.getName().getStringRef().str();
   if (unitInfo.count(srcName) > 0) {
-    props.minTrans += unitInfo[srcName].outPortTransBuf;
-    props.minOpaque += unitInfo[srcName].outPortOpBuf;
-  }
-  if (unitInfo.count(dstName) > 0) {
-    props.minTrans += unitInfo[dstName].inPortTransBuf;
-    props.minOpaque += unitInfo[dstName].inPortOpBuf;
+    channel.props->minTrans += unitInfo[srcName].outPortTransBuf;
+    channel.props->minOpaque += unitInfo[srcName].outPortOpBuf;
   }
 
-  /// TODO: this verification is at the very least incomplete. We need to check
-  /// whether the maximum number of allowed slots of each type isn't strictly
-  /// lower than the number of slots inside the unit's IO port that the channel
-  /// connects to. The logic also seems weird, but may be due to the fact that
-  /// the MILP cannot represent a channel where X transparent slots and Y opaque
-  /// slots must be placed
-  if (props.minTrans > 0 && props.minOpaque > 0)
-    return failure(); // cannot satisfy the constraint
-  return success();
+  // Add slots present at the destination unit's input port
+  std::string dstName = channel.consumer.getName().getStringRef().str();
+  if (unitInfo.count(dstName) > 0) {
+    channel.props->minTrans += unitInfo[dstName].inPortTransBuf;
+    channel.props->minOpaque += unitInfo[dstName].inPortOpBuf;
+  }
+
+  return success(channel.props->isSatisfiable());
+}
+
+void BufferPlacementMILP::deductInternalBuffers(Channel &channel,
+                                                PlacementResult &result) {
+  std::string srcName = channel.producer.getName().getStringRef().str();
+  std::string dstName = channel.consumer.getName().getStringRef().str();
+  unsigned numTransToDeduct = 0, numOpaqueToDeduct = 0;
+
+  // Remove slots present at the source unit's output port
+  if (unitInfo.count(srcName) > 0) {
+    numTransToDeduct += unitInfo[srcName].outPortTransBuf;
+    numOpaqueToDeduct += unitInfo[srcName].outPortOpBuf;
+  }
+  // Remove slots present at the destination unit's input port
+  if (unitInfo.count(dstName) > 0) {
+    numTransToDeduct += unitInfo[dstName].inPortTransBuf;
+    numOpaqueToDeduct += unitInfo[dstName].inPortOpBuf;
+  }
+
+  assert(numTransToDeduct > result.numTrans &&
+         "not enough transparent slots were placed, the MILP was likely "
+         "incorrectly configured");
+  assert(numOpaqueToDeduct > result.numOpaque &&
+         "not enough opaque slots were placed, the MILP was likely "
+         "incorrectly configured");
+  result.numTrans -= numTransToDeduct;
+  result.numOpaque -= numOpaqueToDeduct;
 }
 
 void BufferPlacementMILP::forEachIOPair(

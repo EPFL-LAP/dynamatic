@@ -19,19 +19,13 @@
 namespace dynamatic {
 namespace buffer {
 
-/// Data structure to store the results of buffer placement, including the
-/// property and the total slots of the channel
+/// Holds information about what type of buffer should be placed on a specific
+/// channel.
 struct PlacementResult {
-  bool opaque;
-  bool transparent;
-  unsigned numSlots;
-
-  PlacementResult operator+(const PlacementResult &other) const {
-    PlacementResult result;
-    result.opaque = this->opaque || other.opaque;
-    result.numSlots = this->numSlots + other.numSlots;
-    return result;
-  }
+  /// The number of transparent buffer slots that should be placed.
+  unsigned numTrans = 0;
+  /// The number of opaque buffer slots that should be placed.
+  unsigned numOpaque = 0;
 };
 
 /// Holds MILP variables associated to every CFDFC unit. Note that a unit may
@@ -168,7 +162,7 @@ protected:
 
   /// Adds channel-specific buffering constraints that were parsed from IR
   /// annotations to the Gurobi model.
-  void addCustomChannelConstraints();
+  void addCustomChannelConstraints(ValueRange customChannels);
 
   /// Adds path constraints for all provided channels and units to the Gurobi
   /// model. All channels and units must be part of the Handshake function under
@@ -189,17 +183,28 @@ protected:
   /// Adds the objective to the Gurobi model.
   void addObjective();
 
+  /// Adds pre-existing buffers that may exist as part of the units the channel
+  /// connects to to the buffering properties. These are added to the minimum
+  /// numbers of transparent and opaque slots so that the MILP is forced to
+  /// place at least a certain quantity of slots on the channel and can take
+  /// them into account in its constraints. Fails when buffering properties
+  /// become unsatisfiable due to an increase in the minimum number of slots;
+  /// succeeds otherwise.
+  LogicalResult addInternalBuffers(Channel &channel);
+
+  /// Removes pre-existing buffers that may exist as part of the units the
+  /// channel connects to from the placement results. These are deducted from
+  /// the numbers of transparent and opaque slots stored in the placement
+  /// results. The latter are expected to specify more slots than what is going
+  /// to be deducted (which should be guaranteed by the MILP constraints).
+  void deductInternalBuffers(Channel &channel, PlacementResult &result);
+
 private:
   /// Whether the MILP is unsatisfiable due to a conflict between user-defined
   /// channel properties and buffers internal to units (e.g., a channel declares
   /// that it should not be buffered yet the unit's IO which it connects to has
   /// a one-slot transparent buffer). Set by the class constructor.
   bool unsatisfiable = false;
-
-  /// Temporary (and far from ideal) solution to hardcode channel-specific
-  /// buffering properties as part of instance construction. Will be gone in the
-  /// near future.
-  LogicalResult getFPGA20BufProps(Value channel, ChannelBufProps &props);
 
   /// Helper method to run a closure on each input/output port pair of the
   /// provided operation.

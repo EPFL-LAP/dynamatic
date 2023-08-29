@@ -39,35 +39,14 @@ static inline ChannelBufProps toBufProps(const NamedAttribute &attr) {
   return attr.getValue().cast<ChannelBufPropsAttr>().getProps();
 }
 
-/// If the channel is an operation's result or a function argument, saves its
-/// index and producing operation. Fails otherwise, in which case the
-/// index is undefined and op points to the channel's parent operation.
-static LogicalResult getChannelOpAndIdx(Value channel, Operation *&op,
-                                        size_t &idx) {
-  if (OpResult res = dyn_cast<OpResult>(channel)) {
-    op = channel.getDefiningOp();
-    idx = res.getResultNumber();
-    return success();
-  }
-
-  // Channel must be a block argument. In this case we only support buffering
-  // properties the channel maps to a Handshake function argument
-  BlockArgument arg = cast<BlockArgument>(channel);
-  op = dyn_cast<handshake::FuncOp>(arg.getParentBlock()->getParentOp());
-  if (!op)
-    return failure();
-  idx = arg.getArgNumber();
-  return success();
-}
-
 /// Returns buffering properties associated to a channel, if any are defined.
 /// Additionally, if validChannel is not nullptr, sets it to false if the
 /// channel cannot have buffering properties attached to it.
 static std::optional<ChannelBufProps> getProps(Value channel,
                                                bool *validChannel = nullptr) {
-  Operation *op = nullptr;
   size_t idx = 0;
-  if (failed(getChannelOpAndIdx(channel, op, idx))) {
+  Operation *op = getChannelProducer(channel, &idx);
+  if (!op) {
     if (validChannel)
       *validChannel = false;
     return {};
@@ -93,9 +72,9 @@ static std::optional<ChannelBufProps> getProps(Value channel,
 /// nullptr and buffering properties already exist for the channel
 static LogicalResult setProps(Value channel, ChannelBufProps &props,
                               bool stopOnOverwrite, bool *replaced = nullptr) {
-  Operation *op = nullptr;
   size_t idx = 0;
-  if (failed(getChannelOpAndIdx(channel, op, idx)))
+  Operation *op = getChannelProducer(channel, &idx);
+  if (!op)
     return op->emitError() << "expected block argument's parent operation "
                               "to be Handshake function";
 
@@ -128,10 +107,8 @@ static LogicalResult setProps(Value channel, ChannelBufProps &props,
 }
 
 //===----------------------------------------------------------------------===//
-// LazyBufProps implementation
+// Method definitions
 //===----------------------------------------------------------------------===//
-
-LazyChannelBufProps::LazyChannelBufProps(Value val) : val(val){};
 
 bool LazyChannelBufProps::updateIR() {
   bool updated = updateIRIfNecessary();
@@ -153,7 +130,10 @@ ChannelBufProps *LazyChannelBufProps::operator->() {
   return &props.value();
 }
 
-LazyChannelBufProps::~LazyChannelBufProps() { updateIRIfNecessary(); }
+LazyChannelBufProps::~LazyChannelBufProps() {
+  if (updateOnDestruction)
+    updateIRIfNecessary();
+}
 
 void LazyChannelBufProps::readAttribute() {
   bool validChannel = true;
@@ -177,6 +157,24 @@ bool LazyChannelBufProps::updateIRIfNecessary() {
 //===----------------------------------------------------------------------===//
 // Public functions to manipulate channel buffering properties
 //===----------------------------------------------------------------------===//
+
+Operation *dynamatic::buffer::getChannelProducer(Value channel, size_t *idx) {
+  if (OpResult res = dyn_cast<OpResult>(channel)) {
+    if (idx)
+      *idx = res.getResultNumber();
+    return channel.getDefiningOp();
+  }
+  // Channel must be a block argument. In this case we only support buffering
+  // properties the channel maps to a Handshake function argument
+  BlockArgument arg = cast<BlockArgument>(channel);
+  Operation *op = arg.getParentBlock()->getParentOp();
+  if (isa<handshake::FuncOp>(op)) {
+    if (idx)
+      *idx = arg.getArgNumber();
+    return op;
+  }
+  return nullptr;
+}
 
 DenseMap<Value, ChannelBufProps>
 dynamatic::buffer::getAllBufProps(Operation *op) {

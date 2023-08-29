@@ -44,14 +44,14 @@ static void callOnAllChannels(handshake::FuncOp funcOp,
                               void (*callback)(Channel &)) {
   for (BlockArgument arg : funcOp.getArguments())
     for (Operation *user : arg.getUsers()) {
-      Channel channel(arg, *funcOp, *user);
+      Channel channel(arg, *funcOp, *user, true);
       callback(channel);
     }
 
   for (Operation &op : funcOp.getOps())
     for (OpResult res : op.getResults())
       for (Operation *user : res.getUsers()) {
-        Channel channel(res, op, *user);
+        Channel channel(res, op, *user, true);
         callback(channel);
       }
 }

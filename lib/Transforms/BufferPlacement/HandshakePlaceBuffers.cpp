@@ -28,9 +28,6 @@ using namespace dynamatic;
 using namespace dynamatic::buffer;
 using namespace dynamatic::experimental;
 
-Channel::Channel(Value val, Operation &producer, Operation &consumer)
-    : value(val), producer(producer), consumer(consumer), props(val){};
-
 namespace {
 struct HandshakePlaceBuffersPass
     : public HandshakePlaceBuffersBase<HandshakePlaceBuffersPass> {
@@ -169,51 +166,31 @@ LogicalResult HandshakePlaceBuffersPass::getBufferPlacement(
 
 LogicalResult HandshakePlaceBuffersPass::instantiateBuffers(
     DenseMap<Value, PlacementResult> &res) {
-
   OpBuilder builder(&getContext());
-  for (auto &[channel, result] : res) {
-    if (result.numSlots == 0)
-      continue;
+  for (auto &[channel, placement] : res) {
     Operation *opSrc = channel.getDefiningOp();
     Operation *opDst = *channel.getUsers().begin();
-
-    unsigned numOpaque = 0;
-    unsigned numTransparent = 0;
-
-    if (result.opaque)
-      numOpaque = result.numSlots;
-    else
-      numTransparent = result.numSlots;
-
     builder.setInsertionPointAfter(opSrc);
 
-    if (numOpaque > 0) {
+    Value bufferIn = channel;
+    if (placement.numOpaque > 0) {
       // Insert an opaque buffer
-      Value bufferOperand = channel;
-      Value bufferRes =
-          builder
-              .create<handshake::BufferOp>(channel.getLoc(), bufferOperand,
-                                           numOpaque, BufferTypeEnum::seq)
-              .getResult();
-      if (numTransparent > 0)
-        bufferRes = builder
-                        .create<handshake::BufferOp>(channel.getLoc(),
-                                                     bufferRes, numTransparent,
-                                                     BufferTypeEnum::fifo)
-                        .getResult();
-
-      opDst->replaceUsesOfWith(bufferOperand, bufferRes);
+      Value bufferRes = builder
+                            .create<handshake::BufferOp>(
+                                channel.getLoc(), bufferIn, placement.numOpaque,
+                                BufferTypeEnum::seq)
+                            .getResult();
+      opDst->replaceUsesOfWith(bufferIn, bufferRes);
+      bufferIn = bufferRes;
     }
-
-    if (numTransparent > 0 && numOpaque == 0) {
-      // Insert a transparent buffer
-      Value bufferOperand = channel;
-      Value bufferRes =
-          builder
-              .create<handshake::BufferOp>(channel.getLoc(), bufferOperand,
-                                           numTransparent, BufferTypeEnum::fifo)
-              .getResult();
-      opDst->replaceUsesOfWith(bufferOperand, bufferRes);
+    if (placement.numTrans > 0) {
+      // Insert a transparent buffer, potentially after an opaque buffer
+      Value bufferRes = builder
+                            .create<handshake::BufferOp>(
+                                channel.getLoc(), bufferIn, placement.numTrans,
+                                BufferTypeEnum::fifo)
+                            .getResult();
+      opDst->replaceUsesOfWith(bufferIn, bufferRes);
     }
   }
   return success();
