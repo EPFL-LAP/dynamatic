@@ -9,6 +9,7 @@
 
 #include "dynamatic/InitAllDialects.h"
 #include "dynamatic/InitAllPasses.h"
+#include "experimental/InitAllPasses.h"
 #include "mlir/Pass/PassRegistry.h"
 #include "mlir/Tools/mlir-opt/MlirOptMain.h"
 #include "mlir/Transforms/Passes.h"
