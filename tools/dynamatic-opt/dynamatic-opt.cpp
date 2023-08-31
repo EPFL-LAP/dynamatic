@@ -34,6 +34,7 @@ int main(int argc, char **argv) {
   dynamatic::registerAllDialects(registry);
   dynamatic::registerAllPasses();
   dynamatic::tutorials::registerAllPasses();
+  dynamatic::experimental::registerAllPasses();
   registerTestPasses();
 
   // Register the standard passes we want
