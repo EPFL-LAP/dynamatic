@@ -222,30 +222,24 @@ static void producedValueDataflowAnalysis(
           }
 
           // Get block arguments of a true dest block
-          size_t idx = 0;
-          for (Value operand : condBranchOp.getTrueDestOperands()) {
+          for (size_t idx = 0; idx < condBranchOp.getTrueDestOperands().size(); idx++) {
             BlockArgument argOperand =
                 condBranchOp.getTrueDest()->getArgument(idx);
             if (argOperand)
               producedValues.push_back(argOperand);
-            idx++;
           }
           // Get block arguments of a false dest block
-          idx = 0;
-          for (Value operand : condBranchOp.getFalseDestOperands()) {
+          for (size_t idx = 0; idx < condBranchOp.getFalseDestOperands().size(); idx++) {
             BlockArgument argOperand =
                 condBranchOp.getFalseDest()->getArgument(idx);
             if (argOperand)
               producedValues.push_back(argOperand);
-            idx++;
           }
         } else if (auto branchOp = dyn_cast<mlir::cf::BranchOp>(consumerOp)) {
-          size_t idx = 0;
-          for (Value operand : branchOp.getOperands()) {
+          for (size_t idx = 0; idx < branchOp.getOperands().size(); idx++) {
             BlockArgument argOperand = branchOp.getDest()->getArgument(idx);
             if (argOperand)
               producedValues.push_back(argOperand);
-            idx++;
           }
         }
       } else if (!isa<BranchOpInterface>(*consumerOp)) {
