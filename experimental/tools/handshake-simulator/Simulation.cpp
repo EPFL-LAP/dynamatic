@@ -1021,7 +1021,7 @@ LogicalResult simulate(StringRef toplevelFunction,
     toplevel.walk([&](Operation *op) {
       if (auto handshakeEndOp = dyn_cast<circt::handshake::EndOp>(op)) {
         double finalTime = any_cast<double>(stateMap[op]);
-        outs() << "FINAL TIME : " << finalTime << "\n";
+        outs() << "Finished execution in " << (int)finalTime << " cycles\n";
       }
     });
   }
@@ -1029,6 +1029,13 @@ LogicalResult simulate(StringRef toplevelFunction,
   if (!succeeded)
     return failure();
 
+  double time = 0.0;
+  for (unsigned i = 0; i < results.size(); ++i) {
+    mlir::Type t = ftype.getResult(i);
+    printAnyValueWithType(outs(), t, results[i]);
+    outs() << " ";
+    time = std::max(resultTimes[i], time);
+  }
   // Go back through the arguments and output any memrefs.
   for (unsigned i = 0; i < realInputs; ++i) {
     mlir::Type type = ftype.getInput(i);
