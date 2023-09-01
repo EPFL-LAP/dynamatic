@@ -28,7 +28,8 @@
 
 using namespace llvm;
 
-#define CONSTANT_PATH "experimental/data/vhdl/handshake/constant.vhd"
+static const std::string CONSTANT_PATH =
+    "experimental/data/vhdl/handshake/constant.vhd";
 
 int main(int argc, char **argv) {
   // no value provided
