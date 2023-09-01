@@ -10,6 +10,7 @@
 #include "circt/Dialect/HW/HWOpInterfaces.h"
 #include "circt/Dialect/HW/HWOps.h"
 #include "circt/Dialect/HW/HWTypes.h"
+#include "circt/Dialect/Handshake/HandshakeDialect.h"
 #include "circt/Dialect/Handshake/HandshakeOps.h"
 #include "circt/Dialect/Handshake/HandshakePasses.h"
 #include "dynamatic/Conversion/PassDetails.h"
@@ -19,7 +20,7 @@
 #include "mlir/IR/BuiltinTypes.h"
 #include "mlir/Support/LogicalResult.h"
 #include "mlir/Transforms/DialectConversion.h"
-#include "llvm/Support/raw_ostream.h"
+#include "mlir/Transforms/GreedyPatternRewriteDriver.h"
 
 using namespace mlir;
 using namespace circt;
@@ -170,12 +171,17 @@ static DiscriminatingTypes getDiscriminatingParameters(Operation *op) {
 /// location if the type isn't supported.
 static std::string getTypeName(Type type, Location loc) {
   // Integer-like types
-  if (type.isIntOrIndex())
-    return "_" + std::to_string(type.getIntOrFloatBitWidth());
+  if (type.isIntOrIndex()) {
+    if (auto indexType = type.dyn_cast<IndexType>())
+      return std::to_string(indexType.kInternalStorageBitWidth);
+    if (type.isSignedInteger())
+      return std::to_string(type.getIntOrFloatBitWidth());
+    return std::to_string(type.getIntOrFloatBitWidth());
+  }
 
   // Float type
   if (isa<FloatType>(type))
-    return "_f" + std::to_string(type.getIntOrFloatBitWidth());
+    return std::to_string(type.getIntOrFloatBitWidth());
 
   // Tuple type
   if (auto tupleType = type.dyn_cast<TupleType>()) {
@@ -187,7 +193,7 @@ static std::string getTypeName(Type type, Location loc) {
 
   // NoneType (dataless channel)
   if (isa<NoneType>(type))
-    return "_0";
+    return "0";
 
   emitError(loc) << "data type \"" << type << "\" not supported";
   return "";
@@ -197,53 +203,49 @@ static std::string getTypeName(Type type, Location loc) {
 /// returned name is unique with respect to the operation's discriminating
 /// parameters.
 static std::string getExtModuleName(Operation *oldOp) {
-
   std::string extModName = getBareExtModuleName(oldOp);
+  if (extModName != "handshake_end")
+    extModName += ".";
   auto types = getDiscriminatingParameters(oldOp);
   mlir::Location loc = oldOp->getLoc();
   SmallVector<Type> &inTypes = types.first;
   SmallVector<Type> &outTypes = types.second;
 
   llvm::TypeSwitch<Operation *>(oldOp)
-      .Case<handshake::BufferOp>([&](auto) {
-        // bitwidth
-        extModName += getTypeName(outTypes[0], loc);
+      .Case<handshake::BufferOp>([&](handshake::BufferOp bufOp) {
         // buffer type
-        auto bufferOp = dyn_cast<handshake::BufferOp>(oldOp);
-        if (bufferOp.isSequential())
-          extModName += "_seq";
-        else
-          extModName += "_fifo";
-        // number of slots
-        extModName += "_" + std::to_string(bufferOp.getNumSlots());
+        extModName +=
+            bufOp.getBufferType() == BufferTypeEnum::seq ? "seq" : "fifo";
+        // bitwidth
+        extModName += "_" + getTypeName(outTypes[0], loc);
       })
       .Case<handshake::ForkOp, handshake::LazyForkOp>([&](auto) {
         // number of outputs
-        extModName += "_" + std::to_string(outTypes.size());
+        extModName += std::to_string(outTypes.size());
         // bitwidth
-        extModName += getTypeName(outTypes[0], loc);
+        extModName += "_" + getTypeName(outTypes[0], loc);
       })
       .Case<handshake::MuxOp>([&](auto) {
         // number of inputs (without select param)
-        extModName += "_" + std::to_string(inTypes.size() - 1);
+        extModName += std::to_string(inTypes.size() - 1);
         // bitwidth
-        extModName += getTypeName(inTypes[1], loc);
+        extModName += "_" + getTypeName(inTypes[1], loc);
         // select bitwidth
-        extModName += getTypeName(inTypes[0], loc);
+        extModName += "_" + getTypeName(inTypes[0], loc);
       })
       .Case<handshake::ControlMergeOp>([&](auto) {
         // number of inputs
-        extModName += "_" + std::to_string(inTypes.size());
+        extModName += std::to_string(inTypes.size());
         // bitwidth
-        extModName += getTypeName(inTypes[0], loc);
+        extModName += "_" + getTypeName(inTypes[0], loc);
         // index result bitwidth
-        extModName += getTypeName(outTypes[outTypes.size() - 1], loc);
+        extModName += "_" + getTypeName(outTypes[outTypes.size() - 1], loc);
       })
       .Case<handshake::MergeOp>([&](auto) {
         // number of inputs
-        extModName += "_" + std::to_string(inTypes.size());
+        extModName += std::to_string(inTypes.size());
         // bitwidth
-        extModName += getTypeName(inTypes[0], loc);
+        extModName += "_" + getTypeName(inTypes[0], loc);
       })
       .Case<handshake::ConditionalBranchOp>([&](auto) {
         // bitwidth
@@ -261,65 +263,73 @@ static std::string getExtModuleName(Operation *oldOp) {
         // data bitwidth
         extModName += getTypeName(inTypes[0], loc);
         // address bitwidth
-        extModName += getTypeName(inTypes[1], loc);
+        extModName += "_" + getTypeName(inTypes[1], loc);
       })
       .Case<handshake::ConstantOp>([&](auto) {
         // constant value
         if (auto constOp = dyn_cast<handshake::ConstantOp>(oldOp)) {
           if (auto intAttr = constOp.getValue().dyn_cast<IntegerAttr>()) {
-            auto intType = intAttr.getType();
-
-            if (intType.isSignedInteger())
-              extModName += "_c" + std::to_string(intAttr.getSInt());
-            else if (intType.isUnsignedInteger())
-              extModName += "_c" + std::to_string(intAttr.getUInt());
+            APInt val = intAttr.getValue();
+            if (val.isNegative())
+              extModName += std::to_string(val.getSExtValue());
             else
-              extModName += "_c" + std::to_string((uint64_t)intAttr.getInt());
+              extModName += std::to_string(val.getZExtValue());
           } else if (auto floatAttr = constOp.getValue().dyn_cast<FloatAttr>())
-            extModName +=
-                "_c" + std::to_string(floatAttr.getValue().convertToFloat());
+            extModName += std::to_string(floatAttr.getValue().convertToFloat());
           else
-            oldOp->emitError("unsupported constant type");
+            llvm_unreachable("unsupported constant type");
         }
         // bitwidth
-        extModName += getTypeName(inTypes[0], loc);
+        extModName += "_" + getTypeName(inTypes[0], loc);
       })
       .Case<handshake::JoinOp, handshake::SyncOp>([&](auto) {
         // array of bitwidths
         for (auto inType : inTypes)
-          extModName += getTypeName(inType, loc);
+          extModName += getTypeName(inType, loc) + "_";
+        extModName = extModName.substr(0, extModName.size() - 1);
       })
-      .Case<handshake::DynamaticReturnOp, handshake::EndOp>([&](auto) {
-        extModName += "_in";
-        // array of input bitwidths
-        for (auto inType : inTypes)
-          extModName += getTypeName(inType, loc);
-        extModName += "_out";
-        // array of output bitwidths
-        for (auto outType : outTypes)
-          extModName += getTypeName(outType, loc);
+      .Case<handshake::EndOp>([&](auto) {
+        extModName += "_node.";
+        // mem_inputs
+        extModName += std::to_string(inTypes.size() - 1);
+        // bitwidth
+        extModName += "_" + getTypeName(inTypes[0], loc);
+      })
+      .Case<handshake::DynamaticReturnOp>([&](auto) {
+        // bitwidth
+        extModName += getTypeName(inTypes[0], loc);
       })
       .Case<handshake::MemoryControllerOp>(
           [&](handshake::MemoryControllerOp op) {
             auto [ctrlWidth, addrWidth, dataWidth] = op.getBitwidths();
             // data bitwidth
-            extModName += '_' + std::to_string(dataWidth);
-            // ctrl bitwith
-            extModName += '_' + std::to_string(ctrlWidth);
+            extModName += std::to_string(dataWidth);
             // address bitwidth
             extModName += '_' + std::to_string(addrWidth);
+            std::string temporaryName;
 
-            // array of loads&stores arrays
+            size_t lc = 0, sc = 0;
             for (auto [idx, blockAccesses] :
                  llvm::enumerate(op.getAccesses())) {
-              extModName += "_";
+              temporaryName += "_";
               for (auto &access : cast<mlir::ArrayAttr>(blockAccesses))
                 if (cast<AccessTypeEnumAttr>(access).getValue() ==
-                    AccessTypeEnum::Load)
-                  extModName += "L";
-                else
-                  extModName += "S";
+                    AccessTypeEnum::Load) {
+                  temporaryName += "L";
+                  lc++;
+                } else {
+                  temporaryName += "S";
+                  sc++;
+                }
             }
+            // load_count
+            extModName += '_' + std::to_string(lc);
+            // store_count
+            extModName += '_' + std::to_string(sc);
+            // ctrl bitwith
+            extModName += '_' + std::to_string(ctrlWidth);
+            // array of loads&stores arrays
+            extModName += temporaryName;
           })
       .Case<arith::AddFOp, arith::AddIOp, arith::AndIOp, arith::BitcastOp,
             arith::CeilDivSIOp, arith::CeilDivUIOp, arith::DivFOp,
@@ -335,11 +345,11 @@ static std::string getExtModuleName(Operation *oldOp) {
       .Case<arith::CmpFOp, arith::CmpIOp>([&](auto) {
         // predicate
         if (auto cmpOp = dyn_cast<mlir::arith::CmpIOp>(oldOp))
-          extModName += "_" + stringifyEnum(cmpOp.getPredicate()).str();
+          extModName += stringifyEnum(cmpOp.getPredicate()).str();
         else if (auto cmpOp = dyn_cast<mlir::arith::CmpFOp>(oldOp))
-          extModName += "_" + stringifyEnum(cmpOp.getPredicate()).str();
+          extModName += stringifyEnum(cmpOp.getPredicate()).str();
         // bitwidth
-        extModName += getTypeName(inTypes[0], loc);
+        extModName += "_" + getTypeName(inTypes[0], loc);
       })
       .Case<arith::ExtFOp, arith::ExtSIOp, arith::ExtUIOp, arith::FPToSIOp,
             arith::FPToUIOp, arith::SIToFPOp, arith::TruncFOp, arith::TruncIOp,
@@ -347,7 +357,7 @@ static std::string getExtModuleName(Operation *oldOp) {
         // input bitwidth
         extModName += getTypeName(inTypes[0], loc);
         // output bitwidth
-        extModName += getTypeName(outTypes[0], loc);
+        extModName += "_" + getTypeName(outTypes[0], loc);
       })
       .Default([&](auto) {
         oldOp->emitError() << "No matching component for operation";
@@ -411,7 +421,7 @@ static void addClkAndRstOperands(SmallVector<Value> &operands,
                                  hw::HWModuleOp mod) {
   auto numArguments = mod.getNumArguments();
   assert(numArguments >= 2 &&
-         "module should have at least a clocl and reset arguments");
+         "module should have at least a clock and reset arguments");
   auto ports = mod.getPorts();
   assert(ports.inputs[numArguments - 2].getName() == CLK_PORT &&
          "second to last module port should be clock");
@@ -719,9 +729,9 @@ void FuncOpConversionPattern::bufferInputs(
 
     // Check whether we need to create a new external module
     auto argLoc = arg.getLoc();
-    std::string modName = "handshake_start";
+    std::string modName = "handshake_start_node";
     if (auto channelType = argType.dyn_cast<esi::ChannelType>())
-      modName += getTypeName(channelType.getInner(), argLoc);
+      modName += "." + getTypeName(channelType.getInner(), argLoc);
 
     hw::HWModuleLike extModule = getModule(ls, modName, ports, argLoc);
 
@@ -731,7 +741,8 @@ void FuncOpConversionPattern::bufferInputs(
     addClkAndRstOperands(operands, mod);
     auto instanceOp = rewriter.create<hw::InstanceOp>(
         argLoc, extModule,
-        rewriter.getStringAttr("handshake_start" + std::to_string(argIdx++)),
+        rewriter.getStringAttr("handshake_start_node" +
+                               std::to_string(argIdx++)),
         operands);
 
     rewriter.replaceAllUsesExcept(arg, instanceOp.getResult(0), instanceOp);
@@ -830,7 +841,78 @@ void FuncOpConversionPattern::setModuleOutputs(
   outputOp->setOperands(newOperands);
 }
 
+/// Verifies that all the operations inside the function, which may be more
+/// general than what we can turn into an RTL design, will be successfully
+/// exportable to an RTL design. Fails if at least one operation inside the
+/// function is not exportable to RTL.
+static LogicalResult verifyExportToRTL(handshake::FuncOp funcOp) {
+  for (Operation &op : funcOp.getOps()) {
+    LogicalResult res =
+        llvm::TypeSwitch<Operation *, LogicalResult>(&op)
+            .Case<handshake::ConstantOp>(
+                [&](handshake::ConstantOp cstOp) -> LogicalResult {
+                  if (!cstOp.getValue().isa<IntegerAttr, FloatAttr>())
+                    return cstOp->emitError()
+                           << "Incompatible attribute type, our VHDL component "
+                              "only supports integer and floating-point types";
+                  return success();
+                })
+            .Case<handshake::ReturnOp>(
+                [&](handshake::ReturnOp retOp) -> LogicalResult {
+                  if (retOp->getNumOperands() != 1)
+                    return retOp.emitError()
+                           << "Incompatible number of return values, our VHDL "
+                              "component only supports a single return value";
+                  return success();
+                })
+            .Case<handshake::EndOp>(
+                [&](handshake::EndOp endOp) -> LogicalResult {
+                  if (endOp.getReturnValues().size() != 1)
+                    return endOp.emitError()
+                           << "Incompatible number of return values, our VHDL "
+                              "component only supports a single return value";
+                  return success();
+                })
+            .Default([](auto) { return success(); });
+    if (failed(res))
+      return failure();
+  }
+  return success();
+}
+
 namespace {
+
+/// Unpack buffers with more that one slot into an equivalent sequence of
+/// multiple one-slot buffers. Our RTL buffer components cannot be parameterized
+/// with a number of slots (they are all 1-slot) so we have to do this unpacking
+/// prior to running the conversion pass.
+struct UnpackBufferSlots : public OpRewritePattern<handshake::BufferOp> {
+  using OpRewritePattern<handshake::BufferOp>::OpRewritePattern;
+
+  LogicalResult matchAndRewrite(handshake::BufferOp bufOp,
+                                PatternRewriter &rewriter) const override {
+    // Only operate on buffers with strictly more than one slots
+    unsigned numSlots = bufOp.getSlots();
+    if (numSlots == 1)
+      return failure();
+
+    rewriter.setInsertionPoint(bufOp);
+
+    // Create a sequence of one-slot buffers
+    BufferTypeEnum bufType = bufOp.getBufferType();
+    Value bufVal = bufOp.getOperand();
+    for (size_t idx = 0; idx < numSlots; ++idx)
+      bufVal =
+          rewriter
+              .create<handshake::BufferOp>(bufOp.getLoc(), bufVal, 1, bufType)
+              .getResult();
+
+    // Replace the original multi-slots buffer with the output of the last
+    // buffer in the sequence
+    rewriter.replaceOp(bufOp, bufVal);
+    return success();
+  }
+};
 
 /// Handshake to netlist conversion pass. The conversion only works on modules
 /// containing a single handshake function (handshake::FuncOp) at the moment.
@@ -841,6 +923,7 @@ class HandshakeToNetListPass
 public:
   void runOnOperation() override {
     mlir::ModuleOp mod = getOperation();
+    MLIRContext &ctx = getContext();
 
     // We only support one function per module
     auto functions = mod.getOps<handshake::FuncOp>();
@@ -867,6 +950,15 @@ public:
           << ERR_RUN_CONCRETIZATION;
       return signalPassFailure();
     }
+    if (failed(verifyExportToRTL(funcOp)))
+      return signalPassFailure();
+
+    // Run a pre-processing pass on the IR
+    if (failed(preprocessMod())) {
+      mod->emitError()
+          << "Failed to pre-process IR to make it valid for netlist conversion";
+      return signalPassFailure();
+    }
 
     // Create helper struct for lowering
     std::map<std::string, unsigned> instanceNameCntr;
@@ -874,11 +966,10 @@ public:
       std::string instName = getBareExtModuleName(op);
       return instName + std::to_string(instanceNameCntr[instName]++);
     };
-    auto ls = HandshakeLoweringState{mod, instanceUniquer};
+    HandshakeLoweringState ls(mod, instanceUniquer);
 
     // Create pattern set
     ESITypeConverter typeConverter;
-    MLIRContext &ctx = getContext();
     RewritePatternSet patterns(&ctx);
     ConversionTarget target(ctx);
     patterns.insert<FuncOpConversionPattern>(&ctx, ls);
@@ -946,7 +1037,27 @@ public:
     if (failed(applyPartialConversion(funcOp, target, std::move(patterns))))
       return signalPassFailure();
   }
+
+private:
+  /// Perfoms some simple transformations on the module to make the netlist that
+  /// will result from the conversion able to be turned into an RTL design.
+  /// NOTE: (RamirezLucas) Ideally, this should be moved to a separate
+  /// pre-processing pass.
+  LogicalResult preprocessMod();
 };
+
+LogicalResult HandshakeToNetListPass::preprocessMod() {
+  mlir::ModuleOp modOp = getOperation();
+  MLIRContext *ctx = &getContext();
+  mlir::GreedyRewriteConfig config;
+  config.useTopDownTraversal = true;
+  config.enableRegionSimplification = false;
+  RewritePatternSet preprocessPatterns(ctx);
+  preprocessPatterns.add<UnpackBufferSlots>(ctx);
+  return applyPatternsAndFoldGreedily(modOp, std::move(preprocessPatterns),
+                                      config);
+}
+
 } // end anonymous namespace
 
 std::unique_ptr<mlir::OperationPass<mlir::ModuleOp>>
