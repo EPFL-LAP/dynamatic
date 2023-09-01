@@ -43,6 +43,11 @@ namespace experimental {
 // This maps mlir instructions to the configurated execution model structure
 ModelMap models;
 
+// A temporary memory map to store internal operations states. Used to make it
+// possible for operations to communicate between themselves without using
+// the store map and operands.
+llvm::DenseMap<circt::Operation*, llvm::Any> stateMap;
+
 //===----------------------------------------------------------------------===//
 // Utility functions
 //===----------------------------------------------------------------------===//
@@ -60,6 +65,41 @@ void fatalValueError(StringRef reason, T &value) {
   value.print(os);
   os << "')\n";
   llvm::report_fatal_error(err.c_str());
+}
+
+bool allocateMemory(circt::handshake::MemoryControllerOp &op,
+                    llvm::DenseMap<unsigned, unsigned> &memoryMap,
+                    std::vector<std::vector<llvm::Any>> &store,
+                    std::vector<double> &storeTimes) {
+  if (memoryMap.count(op.getId()))
+    return false;
+
+  auto type = op.getMemRefType();
+  std::vector<llvm::Any> in;
+
+  ArrayRef<int64_t> shape = type.getShape();
+  // Dynamatic only uses standard 1-dimension arrays for memory
+  int allocationSize = shape[0];
+
+  unsigned ptr = store.size();
+  store.resize(ptr + 1);
+  storeTimes.resize(ptr + 1);
+  store[ptr].resize(allocationSize);
+  storeTimes[ptr] = 0.0;
+  mlir::Type elementType = type.getElementType();
+  int width = elementType.getIntOrFloatBitWidth();
+  for (int i = 0; i < allocationSize; i++) {
+    if (elementType.isa<mlir::IntegerType>()) {
+      store[ptr][i] = APInt(width, 0);
+    } else if (elementType.isa<mlir::FloatType>()) {
+      store[ptr][i] = APFloat(0.0);
+    } else {
+      llvm_unreachable("Unknown result type!\n");
+    }
+  }
+
+  memoryMap[op.getId()] = ptr;
+  return true;
 }
 
 void debugArg(const std::string &head, mlir::Value op, const APInt &value,
@@ -158,6 +198,7 @@ void printAnyValueWithType(llvm::raw_ostream &out, mlir::Type type,
   }
 }
 
+/// Schedules an operation if not already scheduled.
 void scheduleIfNeeded(std::list<mlir::Operation *> &readyList,
                       llvm::DenseMap<mlir::Value, Any> & /*valueMap*/,
                       mlir::Operation *op) {
@@ -166,6 +207,7 @@ void scheduleIfNeeded(std::list<mlir::Operation *> &readyList,
   }
 }
 
+/// Schedules all operations that can be done with the entered value.
 void scheduleUses(std::list<mlir::Operation *> &readyList,
                   llvm::DenseMap<mlir::Value, Any> &valueMap,
                   mlir::Value value) {
@@ -174,14 +216,14 @@ void scheduleUses(std::list<mlir::Operation *> &readyList,
   }
 }
 
-// Allocate a new matrix with dimensions given by the type, in the
-// given store.  Return the pseudo-pointer to the new matrix in the
-// store (i.e. the first dimension index).
+/// Allocate a new matrix with dimensions given by the type, in the
+/// given store.  Return the pseudo-pointer to the new matrix in the
+/// store (i.e. the first dimension index).
 unsigned allocateMemRef(mlir::MemRefType type, std::vector<Any> &in,
                         std::vector<std::vector<Any>> &store,
                         std::vector<double> &storeTimes) {
   ArrayRef<int64_t> shape = type.getShape();
-  int64_t allocationSize = 1;
+  int64_t allocationSize = shape[0];
   unsigned count = 0;
   for (int64_t dim : shape) {
     if (dim > 0)
@@ -711,13 +753,19 @@ HandshakeExecuter::HandshakeExecuter(
   std::list<mlir::Operation *> readyList;
   // A map of memory ops
   llvm::DenseMap<unsigned, unsigned> memoryMap;
-
-  // Pre-allocate memory
+  
   func.walk([&](Operation *op) {
-    if (auto handshakeMemoryOp =
-            dyn_cast<circt::handshake::MemoryOpInterface>(op))
-      if (!handshakeMemoryOp.allocateMemory(memoryMap, store, storeTimes))
+    // Pre-allocate memory
+    if (auto handshakeMemoryOp = dyn_cast<circt::handshake::MemoryControllerOp>(op)) {
+      if (!allocateMemory(handshakeMemoryOp, memoryMap, store, storeTimes))
         llvm_unreachable("Memory op does not have unique ID!\n");
+    // Set all return flags to false
+    } else if (auto handshakeReturnOp = dyn_cast<circt::handshake::DynamaticReturnOp>(op)) {
+      stateMap[op] = false;
+    // Push the end op, as it contains no operands so never appears in readyList
+    } else if (auto handshakeEndOp = dyn_cast<circt::handshake::EndOp>(op)) {
+      readyList.push_back(op);
+    }
   });
 
   // Initialize the value map for buffers with initial values.
@@ -757,8 +805,10 @@ HandshakeExecuter::HandshakeExecuter(
     // Execute handshake operations
     if (execModel) {
       llvm::SmallVector<mlir::Value> scheduleList;
-      if (!execModel.get()->tryExecute(valueMap, memoryMap, timeMap, store,
-                                       scheduleList, models, op)) {
+      ExecutableData execData = {valueMap, memoryMap,    timeMap,
+                                 store,    scheduleList, models,
+                                 stateMap};
+      if (!execModel.get()->tryExecute(execData, op)) {
         readyList.push_back(&op);
       } else {
         LLVM_DEBUG({
@@ -773,6 +823,11 @@ HandshakeExecuter::HandshakeExecuter(
 
       for (mlir::Value out : scheduleList)
         scheduleUses(readyList, valueMap, out);
+
+      // If no value is left and we are and the end, leave
+      if (readyList.empty() && dyn_cast<circt::handshake::EndOp>(op))
+        return;
+      
       continue;
     }
 
@@ -818,10 +873,6 @@ HandshakeExecuter::HandshakeExecuter(
                   strat = ExecuteStrategy::Default;
                   return execute(op, inValues, outValues);
                 })
-            .Case<circt::handshake::ReturnOp>([&](auto op) {
-              strat = ExecuteStrategy::Return;
-              return execute(op, inValues, outValues);
-            })
             .Default([&](auto op) {
               return op->emitOpError() << "Unknown operation";
             });
@@ -831,9 +882,6 @@ HandshakeExecuter::HandshakeExecuter(
       successFlag = false;
       return;
     }
-
-    if (strat & ExecuteStrategy::Return)
-      return;
 
     for (auto out : enumerate(op.getResults())) {
       LLVM_DEBUG(debugArg("OUT", out.value(), outValues[out.index()], time));
@@ -894,7 +942,6 @@ LogicalResult simulate(StringRef toplevelFunction,
     ftype = toplevel.getFunctionType();
     mlir::Block &entryBlock = toplevel.getBody().front();
     blockArgs = entryBlock.getArguments();
-
     // Get the primary inputs of toplevel off the command line.
     inputs = toplevel.getNumArguments();
     realInputs = inputs;
@@ -946,11 +993,12 @@ LogicalResult simulate(StringRef toplevelFunction,
       unsigned buffer = allocateMemRef(memreftype, nothing, store, storeTimes);
       valueMap[blockArgs[i]] = buffer;
       timeMap[blockArgs[i]] = 0.0;
-      int64_t i = 0;
+      // TODO : PR sur CIRCT... LOL
+      int64_t pos = 0;
       std::stringstream arg(inputArgs[i]);
       while (!arg.eof()) {
         getline(arg, x, ',');
-        store[buffer][i++] = readValueWithType(memreftype.getElementType(), x);
+        store[buffer][pos++] = readValueWithType(memreftype.getElementType(), x);
       }
     } else {
       Any value = readValueWithType(type, inputArgs[i]);
@@ -962,30 +1010,25 @@ LogicalResult simulate(StringRef toplevelFunction,
   std::vector<Any> results(realOutputs);
   std::vector<double> resultTimes(realOutputs);
   bool succeeded = false;
-  if (mlir::func::FuncOp toplevel =
-          module->lookupSymbol<mlir::func::FuncOp>(toplevelFunction)) {
-    succeeded = HandshakeExecuter(toplevel, valueMap, timeMap, results,
-                                  resultTimes, store, storeTimes)
-                    .succeeded();
-  } else if (circt::handshake::FuncOp toplevel =
+  if (circt::handshake::FuncOp toplevel =
                  module->lookupSymbol<circt::handshake::FuncOp>(
                      toplevelFunction)) {
     succeeded =
         HandshakeExecuter(toplevel, valueMap, timeMap, results, resultTimes,
                           store, storeTimes, module, models)
             .succeeded();
+    // Final time
+    toplevel.walk([&](Operation *op) {
+      if (auto handshakeEndOp = dyn_cast<circt::handshake::EndOp>(op)) {
+        double finalTime = any_cast<double>(stateMap[op]);
+        outs() << "FINAL TIME : " << finalTime << "\n";
+      }
+    });
   }
 
   if (!succeeded)
     return failure();
 
-  double time = 0.0;
-  for (unsigned i = 0; i < results.size(); ++i) {
-    mlir::Type t = ftype.getResult(i);
-    printAnyValueWithType(outs(), t, results[i]);
-    outs() << " ";
-    time = std::max(resultTimes[i], time);
-  }
   // Go back through the arguments and output any memrefs.
   for (unsigned i = 0; i < realInputs; ++i) {
     mlir::Type type = ftype.getInput(i);
