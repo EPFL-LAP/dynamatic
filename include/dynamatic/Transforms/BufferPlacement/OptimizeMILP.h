@@ -8,9 +8,9 @@
 #define DYNAMATIC_TRANSFORMS_BUFFERPLACEMENT_OPTIMIZEMILP_H
 
 #include "dynamatic/Support/LLVM.h"
+#include "dynamatic/Support/TimingCharacterization.h"
 #include "dynamatic/Transforms/BufferPlacement/BufferingProperties.h"
 #include "dynamatic/Transforms/BufferPlacement/ExtractCFDFC.h"
-#include "dynamatic/Transforms/BufferPlacement/ParseCircuitJson.h"
 #include "mlir/Dialect/Func/IR/FuncOps.h"
 #include "mlir/IR/BuiltinTypes.h"
 

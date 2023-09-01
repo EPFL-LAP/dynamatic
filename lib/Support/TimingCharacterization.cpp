@@ -1,17 +1,16 @@
-//===- ParseCircuitJson.cpp - Parse circuit json file  ----------*- C++ -*-===//
+//===- TimingCharacterization.cpp - Parse circuit json file -----*- C++ -*-===//
 //
 // This file contains functions to parse the elements in the circuit json file.
 //
 //===----------------------------------------------------------------------===//
 
-#include "dynamatic/Transforms/BufferPlacement/ParseCircuitJson.h"
+#include "dynamatic/Support/TimingCharacterization.h"
 #include "dynamatic/Transforms/UtilsBitsUpdate.h"
 #include "llvm/Support/JSON.h"
 #include <fstream>
 #include <iostream>
 
 using namespace dynamatic;
-using namespace dynamatic::buffer;
 
 /// Get the full operation name
 static std::string getOperationFullName(Operation *op) {
@@ -19,7 +18,7 @@ static std::string getOperationFullName(Operation *op) {
   return fullName;
 }
 
-std::string buffer::getOperationShortStrName(Operation *op) {
+std::string dynamatic::getOperationShortStrName(Operation *op) {
   std::string fullName = getOperationFullName(op);
   size_t pos = fullName.find('.');
   return fullName.substr(pos + 1);
@@ -54,9 +53,9 @@ getBitWidthMatchedTimeInfo(unsigned bitWidth,
   return (timeInfo.end() - 1)->second;
 }
 
-double buffer::getPortDelay(Value channel,
-                            std::map<std::string, buffer::UnitInfo> &unitInfo,
-                            std::string &direction) {
+double dynamatic::getPortDelay(Value channel,
+                               std::map<std::string, UnitInfo> &unitInfo,
+                               std::string &direction) {
   std::string opName;
   if (direction == "in") {
     opName = getOperationFullName(channel.getDefiningOp());
@@ -76,9 +75,9 @@ double buffer::getPortDelay(Value channel,
   return 0.0;
 }
 
-double buffer::getUnitDelay(Operation *op,
-                            std::map<std::string, buffer::UnitInfo> &unitInfo,
-                            std::string &type) {
+double dynamatic::getUnitDelay(Operation *op,
+                               std::map<std::string, UnitInfo> &unitInfo,
+                               std::string &type) {
   double delay;
   std::string opName = getOperationFullName(op);
   // check whether delay information exists
@@ -101,9 +100,9 @@ double buffer::getUnitDelay(Operation *op,
 }
 
 double
-buffer::getCombinationalDelay(Operation *op,
-                              std::map<std::string, buffer::UnitInfo> &unitInfo,
-                              std::string type) {
+dynamatic::getCombinationalDelay(Operation *op,
+                                 std::map<std::string, UnitInfo> &unitInfo,
+                                 std::string type) {
   std::string opName = getOperationFullName(op);
   if (unitInfo.find(getOperationFullName(op)) == unitInfo.end())
     return 0.0;
@@ -132,9 +131,8 @@ buffer::getCombinationalDelay(Operation *op,
   return unitDelay + inPortDelay + outPortDelay;
 }
 
-double
-buffer::getUnitLatency(Operation *op,
-                       std::map<std::string, buffer::UnitInfo> &unitInfo) {
+double dynamatic::getUnitLatency(Operation *op,
+                                 std::map<std::string, UnitInfo> &unitInfo) {
   std::string opName = getOperationFullName(op);
   if (unitInfo.find(opName) == unitInfo.end())
     return 0.0;
@@ -157,8 +155,8 @@ static void parseBitWidthPair(llvm::json::Object &jsonData,
   }
 }
 
-LogicalResult buffer::parseJson(const std::string &jsonFile,
-                                std::map<std::string, UnitInfo> &unitInfo) {
+LogicalResult dynamatic::parseJson(const std::string &jsonFile,
+                                   std::map<std::string, UnitInfo> &unitInfo) {
 
   // Operations that is supported to use its time information.
   std::vector<std::string> opNames = {

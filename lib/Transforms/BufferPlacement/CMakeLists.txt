@@ -8,7 +8,6 @@ add_dynamatic_library(DynamaticBufferPlacement
   HandshakePlaceBuffers.cpp
   HandshakeSetBufferingProperties.cpp
   OptimizeMILP.cpp
-  ParseCircuitJson.cpp
 
   DEPENDS
   DynamaticTransformsPassIncGen

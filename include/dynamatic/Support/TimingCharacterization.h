@@ -1,4 +1,4 @@
-//===- ParseCircuitJson.h -Parse circuit json file  -------------*- C++ -*-===//
+//===- TimingCharacterization.h - Parse circuit json file -------*- C++ -*-===//
 //
 // This file declares functions to parse the elements in the circuit json file.
 //
@@ -8,7 +8,6 @@
 #include "mlir/Dialect/Func/IR/FuncOps.h"
 
 namespace dynamatic {
-namespace buffer {
 
 /// Data structure to store the information of a unit.
 /// The information include the timing information and the buffer placement
@@ -36,23 +35,20 @@ std::string getOperationShortStrName(Operation *op);
 
 /// Get the unit delay with respect to the operation type, including data, valid
 /// and ready.
-double getUnitDelay(Operation *op,
-                    std::map<std::string, buffer::UnitInfo> &unitInfo,
+double getUnitDelay(Operation *op, std::map<std::string, UnitInfo> &unitInfo,
                     std::string &type);
 
 /// Get the unit(op) latency.
-double getUnitLatency(Operation *op,
-                      std::map<std::string, buffer::UnitInfo> &unitInfo);
+double getUnitLatency(Operation *op, std::map<std::string, UnitInfo> &unitInfo);
 
 /// Get the combinational delay of the operation, including its input port
 /// delay, unit delay, and output port delay.
 double getCombinationalDelay(Operation *op,
-                             std::map<std::string, buffer::UnitInfo> &unitInfo,
+                             std::map<std::string, UnitInfo> &unitInfo,
                              std::string type = "data");
 
 /// Get the delay of a port(in, out) connected to a channel.
-double getPortDelay(Value channel,
-                    std::map<std::string, buffer::UnitInfo> &unitInfo,
+double getPortDelay(Value channel, std::map<std::string, UnitInfo> &unitInfo,
                     std::string &direction);
 
 /// Read timing info for units and channels in CFDFC from the input json.
@@ -62,5 +58,4 @@ double getPortDelay(Value channel,
 LogicalResult parseJson(const std::string &jsonFile,
                         std::map<std::string, UnitInfo> &unitInfo);
 
-} // namespace buffer
 } // namespace dynamatic
