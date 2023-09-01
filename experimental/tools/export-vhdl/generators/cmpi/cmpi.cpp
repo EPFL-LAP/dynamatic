@@ -28,6 +28,10 @@
 
 using namespace llvm;
 
+#define EQUALITY_PATH "experimental/data/vhdl/arithmetic/cmpi/equality.vhd"
+#define SIGNED_PATH "experimental/data/vhdl/arithmetic/cmpi/signed.vhd"
+#define UNSIGNED_PATH "experimental/data/vhdl/arithmetic/cmpi/unsigned.vhd"
+
 int main(int argc, char **argv) {
   // no predicate provided
   if (argc < 2) {
@@ -41,67 +45,7 @@ int main(int argc, char **argv) {
       {"sge", ">="}, {"sgt", ">"}, {"sle", "<="}, {"slt", "<"},
       {"uge", ">="}, {"ugt", ">"}, {"ule", "<="}, {"ult", "<"}};
 
-  // necessary files
-  std::string equality_file =
-      "library IEEE;\nuse IEEE.std_logic_1164.all;\nuse "
-      "ieee.numeric_std.all;\nuse work.customTypes.all;\n\nentity "
-      "cmpi_#PREDICATE# is\n  generic (\n    BITWIDTH : integer\n  );\n  port "
-      "(\n    -- inputs\n    clk          : in std_logic;\n    rst          : "
-      "in std_logic;\n    lhs          : in std_logic_vector(BITWIDTH - 1 "
-      "downto 0);\n    lhs_valid    : in std_logic;\n    rhs          : in "
-      "std_logic_vector(BITWIDTH - 1 downto 0);\n    rhs_valid    : in "
-      "std_logic;\n    result_ready : in std_logic;\n    -- outputs\n    "
-      "lhs_ready    : out std_logic;\n    rhs_ready    : out std_logic;\n    "
-      "result       : out std_logic_vector(BITWIDTH - 1 downto 0);\n    "
-      "result_valid : out std_logic);\nend entity;\n\narchitecture arch of "
-      "cmpi_#PREDICATE# is\n  signal join_valid : std_logic;\n  signal one     "
-      "   : std_logic := \"1\";\n  signal zero       : std_logic := "
-      "\"0\";\n\nbegin\n\n  join_write_temp : entity work.join(arch) generic "
-      "map(2)\n    port map(\n    (lhs_valid,\n      rhs_valid),\n      "
-      "result_ready,\n      join_valid,\n      (lhs_ready,\n      "
-      "rhs_ready));\n\n  result <= #CONDTRUE# when (lhs = rhs) else\n    "
-      "#CONDFALSE#;\n  result_valid <= join_valid;\nend architecture;\n";
-  std::string signed_file =
-      "library IEEE;\nuse IEEE.std_logic_1164.all;\nuse "
-      "ieee.numeric_std.all;\nuse work.customTypes.all;\n\nentity "
-      "cmpi_#PREDICATE# is\n "
-      " generic (\n    BITWIDTH : integer\n  );\n  port (\n    -- inputs\n    "
-      "clk          : in std_logic;\n    rst          : in std_logic;\n    lhs "
-      "         : in std_logic_vector(BITWIDTH - 1 downto 0);\n    lhs_valid   "
-      " : in std_logic;\n    rhs          : in std_logic_vector(BITWIDTH - 1 "
-      "downto 0);\n    rhs_valid    : in std_logic;\n    result_ready : in "
-      "std_logic;\n    -- outputs\n    lhs_ready    : out std_logic;\n    "
-      "rhs_ready    : out std_logic;\n    result       : out "
-      "std_logic_vector(BITWIDTH - 1 downto 0);\n    result_valid : out "
-      "std_logic);\nend entity;\n\narchitecture arch of cmpi_#PREDICATE# is\n  "
-      "signal join_valid : std_logic;\n  signal one        : std_logic := "
-      "\"1\";\n  signal zero       : std_logic := \"0\";\nbegin\n\n  "
-      "join_write_temp : entity work.join(arch) generic map(2)\n    port "
-      "map(\n    (lhs_valid,\n      rhs_valid),\n      result_ready,\n      "
-      "join_valid,\n      (lhs_ready,\n      rhs_ready));\n\n  result <= one "
-      "when (signed(lhs) #TYPEOP# signed(rhs)) else\n    zero;\n  result_valid "
-      "<= join_valid;\n\nend architecture;\n";
-  std::string unsigned_file =
-      "library IEEE;\nuse IEEE.std_logic_1164.all;\nuse "
-      "ieee.numeric_std.all;\nuse work.customTypes.all;\n\nentity "
-      "cmpi_#PREDICATE# is\n "
-      " generic (\n    BITWIDTH : integer\n  );\n  port (\n    -- inputs\n    "
-      "clk          : in std_logic;\n    rst          : in std_logic;\n    lhs "
-      "         : in std_logic_vector(BITWIDTH - 1 downto 0);\n    lhs_valid   "
-      " : in std_logic;\n    rhs          : in std_logic_vector(BITWIDTH - 1 "
-      "downto 0);\n    rhs_valid    : in std_logic;\n    result_ready : in "
-      "std_logic;\n    -- outputs\n    lhs_ready    : out std_logic;\n    "
-      "rhs_ready    : out std_logic;\n    result       : out "
-      "std_logic_vector(BITWIDTH - 1 downto 0);\n    result_valid : out "
-      "std_logic);\nend entity;\n\narchitecture arch of cmpi_#PREDICATE# is\n  "
-      "signal join_valid : std_logic;\n  signal one        : std_logic := "
-      "\"1\";\n  signal zero       : std_logic := \"0\";\nbegin\n\n  "
-      "join_write_temp : entity work.join(arch) generic map(2)\n    port "
-      "map(\n    (lhs_valid,\n      rhs_valid),\n      result_ready,\n      "
-      "join_valid,\n      (lhs_ready,\n      rhs_ready));\n\n  result <= one "
-      "when (unsigned(lhs) #TYPEOP# unsigned(rhs)) else\n    zero;\n  "
-      "result_valid <= join_valid;\n\nend architecture;\n";
-
+  std::ifstream file;
   // get the predicate name from command line options
   std::string predicateName(argv[1]);
   std::stringstream buffer;
@@ -111,8 +55,13 @@ int main(int argc, char **argv) {
     auto jt = equality.find(predicateName);
     if (jt != equality.end()) {
       // ne, eq
-      buffer << equality_file;
-      std::string temp{};
+      file.open(EQUALITY_PATH);
+      if (!file.is_open()) {
+        llvm::errs() << "Filepath is uncorrect\n";
+        return 1;
+      }
+      buffer << file.rdbuf();
+      std::string temp;
       // replace all #---# sequences
       while (buffer.good()) {
         std::getline(buffer, temp, '#');
@@ -137,10 +86,21 @@ int main(int argc, char **argv) {
     // sge, sgt, sle, slt, uge, ugt, ule, ult
     if (predicateName == "sge" || predicateName == "sgt" ||
         predicateName == "sle" || predicateName == "slt") {
-      buffer << signed_file;
-    } else
-      buffer << unsigned_file;
-    std::string temp{};
+      file.open(SIGNED_PATH);
+      if (!file.is_open()) {
+        llvm::errs() << "Filepath is uncorrect\n";
+        return 1;
+      }
+      buffer << file.rdbuf();
+    } else {
+      file.open(UNSIGNED_PATH);
+      if (!file.is_open()) {
+        llvm::errs() << "Filepath is uncorrect\n";
+        return 1;
+      }
+      buffer << file.rdbuf();
+    }
+    std::string temp;
     // replace all #---# sequences
     while (buffer.good()) {
       std::getline(buffer, temp, '#');

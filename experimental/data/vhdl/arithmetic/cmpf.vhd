@@ -20,7 +20,7 @@ entity cmpf_#PREDICATE# is
     -- outputs
     lhs_ready    : out std_logic;
     rhs_ready    : out std_logic;
-    result       : out std_logic_vector(BITWIDTH - 1 downto 0);
+    result       : out std_logic;
     result_valid : out std_logic);
 end entity;
 
@@ -50,7 +50,7 @@ architecture arch of cmpf_#PREDICATE# is
 
 begin
 
-  result(BITWIDTH - 1 downto 1) <= (others => '0');
+  result <= '0';
 
   array_RAM_fcmp_32ns_32ns_1_2_1_u1 : component array_RAM_fcmp_32cud
     generic map(
@@ -66,7 +66,7 @@ begin
       din1    => rhs,
       ce      => result_ready,
       opcode  => alu_opcode,
-      dout(0) => result(0));
+      dout(0) => result);
 
     join_write_temp : entity work.join(arch) generic map(2)
       port map(

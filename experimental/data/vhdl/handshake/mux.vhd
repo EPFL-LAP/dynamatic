@@ -20,7 +20,7 @@ entity mux is
     ins_valid        : in std_logic_vector(NUM_INPUTS downto 0);
     outs_ready       : in std_logic;
     -- outputs
-    select_ind_ready : in std_logic;
+    select_ind_ready : out std_logic;
     ins_ready        : out std_logic_vector(NUM_INPUTS - 1 downto 0);
     outs             : out std_logic_vector(BITWIDTH - 1 downto 0);
     outs_valid       : out std_logic);

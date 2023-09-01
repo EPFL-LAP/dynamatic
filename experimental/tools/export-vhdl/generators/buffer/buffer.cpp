@@ -1,7 +1,7 @@
-//===- constant.cpp - Fulfill a constant generator --------------*- C++ -*-===//
+//===- buffer.cpp - Fulfill a constant generator --------------*- C++ -*-===//
 //
-// Experimental tool that realizes a generator for constant component
-// (handshake.constant)
+// Experimental tool that realizes a generator for buffer component
+// (handshake.buffer)
 //
 //===----------------------------------------------------------------------===//
 
@@ -28,7 +28,8 @@
 
 using namespace llvm;
 
-#define CONSTANT_PATH "experimental/data/vhdl/handshake/constant.vhd"
+#define SEQ_PATH "experimental/data/vhdl/handshake/buffer/seq.vhd"
+#define FIFO_PATH "experimental/data/vhdl/handshake/buffer/fifo.vhd"
 
 int main(int argc, char **argv) {
   // no value provided
@@ -36,33 +37,35 @@ int main(int argc, char **argv) {
     llvm::errs() << "Too few arguments in generator call\n";
     return 1;
   }
-
-  // read as file
   std::ifstream file;
-  file.open(CONSTANT_PATH);
-
-  if (!file.is_open()) {
-    llvm::errs() << "Filepath is uncorrect\n";
-    return 1;
-  }
 
   // get the predicate name from command line options
   std::string predicateName(argv[1]);
   std::stringstream buffer;
   std::string modText;
-  buffer << file.rdbuf();
-  std::string temp;
-  // replace all #---# sequences
-  while (buffer.good()) {
-    std::getline(buffer, temp, '#');
-    modText += temp;
-    if (!buffer.good())
-      break;
 
-    std::getline(buffer, temp, '#');
-    if (temp == "CST_VALUE")
-      modText += predicateName;
+  if (predicateName == "fifo") {
+    // fifo
+    file.open(FIFO_PATH);
+    if (!file.is_open()) {
+      llvm::errs() << "Filepath is uncorrect\n";
+      return 1;
+    }
+  } else if (predicateName == "seq") {
+    // seq
+    file.open(SEQ_PATH);
+    if (!file.is_open()) {
+      llvm::errs() << "Filepath is uncorrect\n";
+      return 1;
+    }
+  } else {
+    // wrong predicate
+    llvm::errs() << "Wrong predicate\n";
+    return 1;
   }
+
+  buffer << file.rdbuf();
+  modText = buffer.str();
 
   // print the result module text to std output
   llvm::outs() << modText;
