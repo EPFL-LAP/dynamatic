@@ -269,13 +269,13 @@
       "components": [
         {
           "name": "buffer",
-          "path": "experimental/data/vhdl/handshake/buffer.vhd"
+          "path": "./build/bin/exp-buffer"
         }
       ],
-      "concretization_method": "GENERIC",
-      "generators": [],
+      "concretization_method": "GENERATOR",
+      "generators": ["BUFFER_TYPE"],
       "generics": ["BITWIDTH"],
-      "extras": ["BUFFER_TYPE", "NUM_OF_SLOTS"],
+      "extras": [],
       "ports": {
         "in": [
           {
@@ -562,7 +562,7 @@
         "in": [
           {
             "name": "inLoadData",
-            "type": "signal"
+            "type": "data"
           },
           {
             "name": "ctrl",
@@ -596,23 +596,23 @@
           },
           {
             "name": "loadEnable",
-            "type": "signal"
+            "type": "data"
           },
           {
             "name": "loadAddrOut",
-            "type": "signal"
+            "type": "data"
           },
           {
             "name": "storeEnable",
-            "type": "signal"
+            "type": "data"
           },
           {
             "name": "storeAddrOut",
-            "type": "signal"
+            "type": "data"
           },
           {
             "name": "storeDataOut",
-            "type": "signal"
+            "type": "data"
           }
         ]
       }

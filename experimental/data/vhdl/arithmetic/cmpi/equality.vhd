@@ -21,7 +21,7 @@ entity cmpi_#PREDICATE# is
     -- outputs
     lhs_ready    : out std_logic;
     rhs_ready    : out std_logic;
-    result       : out std_logic_vector(BITWIDTH - 1 downto 0);
+    result       : out std_logic;
     result_valid : out std_logic);
 end entity;
 
