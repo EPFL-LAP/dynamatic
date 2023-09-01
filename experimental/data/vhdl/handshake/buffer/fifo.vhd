@@ -3,7 +3,7 @@ use ieee.std_logic_1164.all;
 use ieee.numeric_std.all;
 use work.customTypes.all;
 
-entity TEHB is
+entity buffer_fifo is
   generic (
     BITWIDTH : integer
   );
@@ -18,9 +18,9 @@ entity TEHB is
     ins_ready  : out std_logic;
     outs       : out std_logic_vector(BITWIDTH - 1 downto 0);
     outs_valid : out std_logic);
-end TEHB;
+end buffer_fifo;
 
-architecture arch of TEHB is
+architecture arch of buffer_fifo is
   signal full_reg, reg_en, mux_sel : std_logic;
   signal data_reg                  : std_logic_vector(BITWIDTH - 1 downto 0);
 begin

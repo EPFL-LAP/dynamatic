@@ -28,8 +28,10 @@
 
 using namespace llvm;
 
-#define SEQ_PATH "experimental/data/vhdl/handshake/buffer/seq.vhd"
-#define FIFO_PATH "experimental/data/vhdl/handshake/buffer/fifo.vhd"
+static const std::string seq_path =
+    "experimental/data/vhdl/handshake/buffer/seq.vhd";
+static const std::string fifo_path =
+    "experimental/data/vhdl/handshake/buffer/fifo.vhd";
 
 int main(int argc, char **argv) {
   // no value provided
@@ -46,14 +48,14 @@ int main(int argc, char **argv) {
 
   if (predicateName == "fifo") {
     // fifo
-    file.open(FIFO_PATH);
+    file.open(fifo_path);
     if (!file.is_open()) {
       llvm::errs() << "Filepath is uncorrect\n";
       return 1;
     }
   } else if (predicateName == "seq") {
     // seq
-    file.open(SEQ_PATH);
+    file.open(seq_path);
     if (!file.is_open()) {
       llvm::errs() << "Filepath is uncorrect\n";
       return 1;

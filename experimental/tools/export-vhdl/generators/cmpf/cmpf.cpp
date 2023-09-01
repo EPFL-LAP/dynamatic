@@ -28,7 +28,8 @@
 
 using namespace llvm;
 
-#define CMPF_PATH "experimental/data/vhdl/arithmetic/cmpf.vhd"
+static const std::string cmpf_path =
+    "experimental/data/vhdl/arithmetic/cmpf.vhd";
 
 int main(int argc, char **argv) {
   // no predicate provided
@@ -45,7 +46,7 @@ int main(int argc, char **argv) {
 
   // read as file
   std::ifstream file;
-  file.open(CMPF_PATH);
+  file.open(cmpf_path);
 
   if (!file.is_open()) {
     llvm::errs() << "Filepath is uncorrect\n";

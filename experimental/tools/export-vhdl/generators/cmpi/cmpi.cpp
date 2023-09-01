@@ -28,9 +28,12 @@
 
 using namespace llvm;
 
-#define EQUALITY_PATH "experimental/data/vhdl/arithmetic/cmpi/equality.vhd"
-#define SIGNED_PATH "experimental/data/vhdl/arithmetic/cmpi/signed.vhd"
-#define UNSIGNED_PATH "experimental/data/vhdl/arithmetic/cmpi/unsigned.vhd"
+static const std::string equality_path =
+    "experimental/data/vhdl/arithmetic/cmpi/equality.vhd";
+static const std::string signed_path =
+    "experimental/data/vhdl/arithmetic/cmpi/signed.vhd";
+static const std::string unsigned_path =
+    "experimental/data/vhdl/arithmetic/cmpi/unsigned.vhd";
 
 int main(int argc, char **argv) {
   // no predicate provided
@@ -55,7 +58,7 @@ int main(int argc, char **argv) {
     auto jt = equality.find(predicateName);
     if (jt != equality.end()) {
       // ne, eq
-      file.open(EQUALITY_PATH);
+      file.open(equality_path);
       if (!file.is_open()) {
         llvm::errs() << "Filepath is uncorrect\n";
         return 1;
@@ -86,14 +89,14 @@ int main(int argc, char **argv) {
     // sge, sgt, sle, slt, uge, ugt, ule, ult
     if (predicateName == "sge" || predicateName == "sgt" ||
         predicateName == "sle" || predicateName == "slt") {
-      file.open(SIGNED_PATH);
+      file.open(signed_path);
       if (!file.is_open()) {
         llvm::errs() << "Filepath is uncorrect\n";
         return 1;
       }
       buffer << file.rdbuf();
     } else {
-      file.open(UNSIGNED_PATH);
+      file.open(unsigned_path);
       if (!file.is_open()) {
         llvm::errs() << "Filepath is uncorrect\n";
         return 1;
