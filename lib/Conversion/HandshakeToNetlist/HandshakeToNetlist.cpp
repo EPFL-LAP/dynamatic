@@ -10,6 +10,7 @@
 #include "circt/Dialect/HW/HWOpInterfaces.h"
 #include "circt/Dialect/HW/HWOps.h"
 #include "circt/Dialect/HW/HWTypes.h"
+#include "circt/Dialect/Handshake/HandshakeDialect.h"
 #include "circt/Dialect/Handshake/HandshakeOps.h"
 #include "circt/Dialect/Handshake/HandshakePasses.h"
 #include "dynamatic/Conversion/PassDetails.h"
@@ -19,7 +20,7 @@
 #include "mlir/IR/BuiltinTypes.h"
 #include "mlir/Support/LogicalResult.h"
 #include "mlir/Transforms/DialectConversion.h"
-#include "llvm/Support/raw_ostream.h"
+#include "mlir/Transforms/GreedyPatternRewriteDriver.h"
 
 using namespace mlir;
 using namespace circt;
@@ -210,17 +211,12 @@ static std::string getExtModuleName(Operation *oldOp) {
   SmallVector<Type> &outTypes = types.second;
 
   llvm::TypeSwitch<Operation *>(oldOp)
-      .Case<handshake::BufferOp>([&](auto) {
+      .Case<handshake::BufferOp>([&](handshake::BufferOp bufOp) {
+        // buffer type
+        extModName +=
+            bufOp.getBufferType() == BufferTypeEnum::seq ? "_seq" : "_fifo";
         // bitwidth
         extModName += getTypeName(outTypes[0], loc);
-        // buffer type
-        auto bufferOp = dyn_cast<handshake::BufferOp>(oldOp);
-        if (bufferOp.isSequential())
-          extModName += "_seq";
-        else
-          extModName += "_fifo";
-        // number of slots
-        extModName += "_" + std::to_string(bufferOp.getNumSlots());
       })
       .Case<handshake::ForkOp, handshake::LazyForkOp>([&](auto) {
         // number of outputs
@@ -272,19 +268,16 @@ static std::string getExtModuleName(Operation *oldOp) {
         // constant value
         if (auto constOp = dyn_cast<handshake::ConstantOp>(oldOp)) {
           if (auto intAttr = constOp.getValue().dyn_cast<IntegerAttr>()) {
-            auto intType = intAttr.getType();
-
-            if (intType.isSignedInteger())
-              extModName += "_" + std::to_string(intAttr.getSInt());
-            else if (intType.isUnsignedInteger())
-              extModName += "_" + std::to_string(intAttr.getUInt());
+            APInt val = intAttr.getValue();
+            if (val.isNegative())
+              extModName += "_" + std::to_string(val.getSExtValue());
             else
-              extModName += "_" + std::to_string((uint64_t)intAttr.getInt());
+              extModName += "_" + std::to_string(val.getZExtValue());
           } else if (auto floatAttr = constOp.getValue().dyn_cast<FloatAttr>())
             extModName +=
                 "_" + std::to_string(floatAttr.getValue().convertToFloat());
           else
-            oldOp->emitError("unsupported constant type");
+            llvm_unreachable("unsupported constant type");
         }
         // bitwidth
         extModName += getTypeName(inTypes[0], loc);
@@ -296,18 +289,12 @@ static std::string getExtModuleName(Operation *oldOp) {
       })
       .Case<handshake::EndOp>([&](auto) {
         extModName += "_node";
-        if (outTypes.size() > 1)
-          oldOp->emitError()
-              << "Number of outputs > 1 is not supported by VHDL";
         // mem_inputs
         extModName += "_" + std::to_string(inTypes.size() - 1);
         // bitwidth
         extModName += getTypeName(inTypes[0], loc);
       })
       .Case<handshake::DynamaticReturnOp>([&](auto) {
-        if (outTypes.size() > 1)
-          oldOp->emitError()
-              << "Number of outputs > 1 is not supported by VHDL";
         // bitwidth
         extModName += getTypeName(inTypes[0], loc);
       })
@@ -318,9 +305,9 @@ static std::string getExtModuleName(Operation *oldOp) {
             extModName += '_' + std::to_string(dataWidth);
             // address bitwidth
             extModName += '_' + std::to_string(addrWidth);
-            std::string temporaryName{};
+            std::string temporaryName;
 
-            size_t lc{}, sc{};
+            size_t lc = 0, sc = 0;
             for (auto [idx, blockAccesses] :
                  llvm::enumerate(op.getAccesses())) {
               temporaryName += "_";
@@ -853,7 +840,78 @@ void FuncOpConversionPattern::setModuleOutputs(
   outputOp->setOperands(newOperands);
 }
 
+/// Verifies that all the operations inside the function, which may be more
+/// general than what we can turn into an RTL design, will be successfully
+/// exportable to an RTL design. Fails if at least one operation inside the
+/// function is not exportable to RTL.
+static LogicalResult verifyExportToRTL(handshake::FuncOp funcOp) {
+  for (Operation &op : funcOp.getOps()) {
+    LogicalResult res =
+        llvm::TypeSwitch<Operation *, LogicalResult>(&op)
+            .Case<handshake::ConstantOp>(
+                [&](handshake::ConstantOp cstOp) -> LogicalResult {
+                  if (!cstOp.getValue().isa<IntegerAttr, FloatAttr>())
+                    return cstOp->emitError()
+                           << "Incompatible attribute type, our VHDL component "
+                              "only supports integer and floating-point types";
+                  return success();
+                })
+            .Case<handshake::ReturnOp>(
+                [&](handshake::ReturnOp retOp) -> LogicalResult {
+                  if (retOp->getNumOperands() != 1)
+                    return retOp.emitError()
+                           << "Incompatible number of return values, our VHDL "
+                              "component only supports a single return value";
+                  return success();
+                })
+            .Case<handshake::EndOp>(
+                [&](handshake::EndOp endOp) -> LogicalResult {
+                  if (endOp.getReturnValues().size() != 1)
+                    return endOp.emitError()
+                           << "Incompatible number of return values, our VHDL "
+                              "component only supports a single return value";
+                  return success();
+                })
+            .Default([](auto) { return success(); });
+    if (failed(res))
+      return failure();
+  }
+  return success();
+}
+
 namespace {
+
+/// Unpack buffers with more that one slot into an equivalent sequence of
+/// multiple one-slot buffers. Our RTL buffer components cannot be parameterized
+/// with a number of slots (they are all 1-slot) so we have to do this unpacking
+/// prior to running the conversion pass.
+struct UnpackBufferSlots : public OpRewritePattern<handshake::BufferOp> {
+  using OpRewritePattern<handshake::BufferOp>::OpRewritePattern;
+
+  LogicalResult matchAndRewrite(handshake::BufferOp bufOp,
+                                PatternRewriter &rewriter) const override {
+    // Only operate on buffers with strictly more than one slots
+    unsigned numSlots = bufOp.getSlots();
+    if (numSlots == 1)
+      return failure();
+
+    rewriter.setInsertionPoint(bufOp);
+
+    // Create a sequence of one-slot buffers
+    BufferTypeEnum bufType = bufOp.getBufferType();
+    Value bufVal = bufOp.getOperand();
+    for (size_t idx = 0; idx < numSlots; ++idx)
+      bufVal =
+          rewriter
+              .create<handshake::BufferOp>(bufOp.getLoc(), bufVal, 1, bufType)
+              .getResult();
+
+    // Replace the original multi-slots buffer with the output of the last
+    // buffer in the sequence
+    rewriter.replaceOp(bufOp, bufVal);
+    return success();
+  }
+};
 
 /// Handshake to netlist conversion pass. The conversion only works on modules
 /// containing a single handshake function (handshake::FuncOp) at the moment.
@@ -864,6 +922,7 @@ class HandshakeToNetListPass
 public:
   void runOnOperation() override {
     mlir::ModuleOp mod = getOperation();
+    MLIRContext &ctx = getContext();
 
     // We only support one function per module
     auto functions = mod.getOps<handshake::FuncOp>();
@@ -890,6 +949,15 @@ public:
           << ERR_RUN_CONCRETIZATION;
       return signalPassFailure();
     }
+    if (failed(verifyExportToRTL(funcOp)))
+      return signalPassFailure();
+
+    // Run a pre-processing pass on the IR
+    if (failed(preprocessMod())) {
+      mod->emitError()
+          << "Failed to pre-process IR to make it valid for netlist conversion";
+      return signalPassFailure();
+    }
 
     // Create helper struct for lowering
     std::map<std::string, unsigned> instanceNameCntr;
@@ -897,11 +965,10 @@ public:
       std::string instName = getBareExtModuleName(op);
       return instName + std::to_string(instanceNameCntr[instName]++);
     };
-    auto ls = HandshakeLoweringState{mod, instanceUniquer};
+    HandshakeLoweringState ls(mod, instanceUniquer);
 
     // Create pattern set
     ESITypeConverter typeConverter;
-    MLIRContext &ctx = getContext();
     RewritePatternSet patterns(&ctx);
     ConversionTarget target(ctx);
     patterns.insert<FuncOpConversionPattern>(&ctx, ls);
@@ -969,7 +1036,27 @@ public:
     if (failed(applyPartialConversion(funcOp, target, std::move(patterns))))
       return signalPassFailure();
   }
+
+private:
+  /// Perfoms some simple transformations on the module to make the netlist that
+  /// will result from the conversion able to be turned into an RTL design.
+  /// NOTE: (RamirezLucas) Ideally, this should be moved to a separate
+  /// pre-processing pass.
+  LogicalResult preprocessMod();
 };
+
+LogicalResult HandshakeToNetListPass::preprocessMod() {
+  mlir::ModuleOp modOp = getOperation();
+  MLIRContext *ctx = &getContext();
+  mlir::GreedyRewriteConfig config;
+  config.useTopDownTraversal = true;
+  config.enableRegionSimplification = false;
+  RewritePatternSet preprocessPatterns(ctx);
+  preprocessPatterns.add<UnpackBufferSlots>(ctx);
+  return applyPatternsAndFoldGreedily(modOp, std::move(preprocessPatterns),
+                                      config);
+}
+
 } // end anonymous namespace
 
 std::unique_ptr<mlir::OperationPass<mlir::ModuleOp>>
