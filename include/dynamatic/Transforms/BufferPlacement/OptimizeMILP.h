@@ -8,7 +8,7 @@
 #define DYNAMATIC_TRANSFORMS_BUFFERPLACEMENT_OPTIMIZEMILP_H
 
 #include "dynamatic/Support/LLVM.h"
-#include "dynamatic/Support/TimingCharacterization.h"
+#include "dynamatic/Support/TimingModels.h"
 #include "dynamatic/Transforms/BufferPlacement/BufferingProperties.h"
 #include "dynamatic/Transforms/BufferPlacement/ExtractCFDFC.h"
 #include "mlir/Dialect/Func/IR/FuncOps.h"
@@ -98,9 +98,8 @@ public:
   /// extracted from the passed function.
   BufferPlacementMILP(circt::handshake::FuncOp funcOp,
                       llvm::MapVector<CFDFC *, bool> &cfdfcs,
-                      std::map<std::string, UnitInfo> &unitInfo,
-                      double targetPeriod, double maxPeriod, GRBEnv &env,
-                      double timeLimit);
+                      TimingDatabase &timingDB, double targetPeriod,
+                      double maxPeriod, GRBEnv &env, double timeLimit);
 
   /// Returns whether the custom buffer placement constraints derived from
   /// custom channel buffering properties attached to IR operations are
@@ -134,8 +133,9 @@ protected:
   /// be optimized. The CFDFCs must be included inside the Handshake function
   /// that was provide to the constructor.
   llvm::MapVector<CFDFC *, bool> &cfdfcs;
-  /// Units characterization.
-  std::map<std::string, UnitInfo> &unitInfo;
+  /// Contains timing characterizations for dataflow components required to
+  /// create the MILP constraints.
+  TimingDatabase &timingDB;
   /// After construction, maps all channels (i.e, values) defined in the
   /// function to their specific channel buffering properties (unconstraining
   /// properties if none were explicitly specified).
@@ -148,40 +148,40 @@ protected:
   MILPVars vars;
 
   /// Adds all variables used in the MILP to the Gurobi model.
-  void createVars();
+  LogicalResult createVars();
 
   /// Adds all variables related to the passed CFDFC to the Gurobi model. Each
   /// time this method is called, it must be with a different uid which is used
   /// to unique the name of each created variable. The CFDFC must be part of
   /// those that were provided to the constructor.
-  void createCFDFCVars(CFDFC &cfdfc, unsigned uid);
+  LogicalResult createCFDFCVars(CFDFC &cfdfc, unsigned uid);
 
   /// Adds all variables related to all channels (regardless of whether they are
   /// part of a CFDFC) to the Gurobi model.
-  void createChannelVars();
+  LogicalResult createChannelVars();
 
   /// Adds channel-specific buffering constraints that were parsed from IR
   /// annotations to the Gurobi model.
-  void addCustomChannelConstraints(ValueRange customChannels);
+  LogicalResult addCustomChannelConstraints(ValueRange customChannels);
 
   /// Adds path constraints for all provided channels and units to the Gurobi
   /// model. All channels and units must be part of the Handshake function under
   /// consideration.
-  void addPathConstraints(ValueRange pathChannels,
-                          ArrayRef<Operation *> pathUnits);
+  LogicalResult addPathConstraints(ValueRange pathChannels,
+                                   ArrayRef<Operation *> pathUnits);
 
   /// Adds elasticity constraints for all provided channels and units to the
   /// Gurobi model. All channels and units must be part of the Handshake
   /// function under consideration.
-  void addElasticityConstraints(ValueRange elasticChannels,
-                                ArrayRef<Operation *> elasticUnits);
+  LogicalResult addElasticityConstraints(ValueRange elasticChannels,
+                                         ArrayRef<Operation *> elasticUnits);
 
   /// Adds throughput constraints for the provided CFDFC to the Gurobi model.
   /// The CFDFC must be part of those that were provided to the constructor.
-  void addThroughputConstraints(CFDFC &cfdfc);
+  LogicalResult addThroughputConstraints(CFDFC &cfdfc);
 
   /// Adds the objective to the Gurobi model.
-  void addObjective();
+  LogicalResult addObjective();
 
   /// Adds pre-existing buffers that may exist as part of the units the channel
   /// connects to to the buffering properties. These are added to the minimum

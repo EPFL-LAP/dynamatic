@@ -34,6 +34,12 @@ using namespace mlir;
 using namespace dynamatic;
 using namespace dynamatic::buffer;
 
+/// Returns the short name of an operation to be used as part of the name for a
+/// Gurobi variable.
+static inline std::string getVarName(Operation *op) {
+  return op ? op->getName().stripDialect().str() : "arg";
+}
+
 static unsigned getTotalNumExecs(Value channel,
                                  llvm::MapVector<CFDFC *, bool> &cfdfcs) {
   Operation *srcOp = channel.getDefiningOp();
@@ -58,12 +64,13 @@ static unsigned getTotalNumExecs(Value channel,
   return numExec;
 }
 
-BufferPlacementMILP::BufferPlacementMILP(
-    handshake::FuncOp funcOp, llvm::MapVector<CFDFC *, bool> &cfdfcs,
-    std::map<std::string, UnitInfo> &unitInfo, double targetPeriod,
-    double maxPeriod, GRBEnv &env, double timeLimit)
+BufferPlacementMILP::BufferPlacementMILP(handshake::FuncOp funcOp,
+                                         llvm::MapVector<CFDFC *, bool> &cfdfcs,
+                                         TimingDatabase &timingDB,
+                                         double targetPeriod, double maxPeriod,
+                                         GRBEnv &env, double timeLimit)
     : targetPeriod(targetPeriod), maxPeriod(maxPeriod), funcOp(funcOp),
-      cfdfcs(cfdfcs), unitInfo(unitInfo),
+      cfdfcs(cfdfcs), timingDB(timingDB),
       numUnits(std::distance(funcOp.getOps().begin(), funcOp.getOps().end())),
       model(GRBModel(env)) {
   // Set a time limit for the MILP
@@ -111,7 +118,8 @@ bool BufferPlacementMILP::arePlacementConstraintsSatisfiable() {
 }
 
 LogicalResult BufferPlacementMILP::setup() {
-  createVars();
+  if (failed(createVars()))
+    return failure();
 
   // All constraints apply over all channels and units
   std::vector<Value> allChannels(channels.size());
@@ -121,18 +129,19 @@ LogicalResult BufferPlacementMILP::setup() {
   for (Operation &op : funcOp.getOps())
     allUnits.push_back(&op);
 
-  addCustomChannelConstraints(allChannels);
-  addPathConstraints(allChannels, allUnits);
-  addElasticityConstraints(allChannels, allUnits);
+  if (failed(addCustomChannelConstraints(allChannels)) ||
+      failed(addPathConstraints(allChannels, allUnits)) ||
+      failed(addElasticityConstraints(allChannels, allUnits)))
+    return failure();
 
   // Add throughput constraints over each CFDFC that was marked to be optimized
   for (auto &[cfdfc, _] : vars.cfdfcs)
     if (cfdfcs[cfdfc])
-      addThroughputConstraints(*cfdfc);
+      if (failed(addThroughputConstraints(*cfdfc)))
+        return failure();
 
   // Finally, add the MILP objective
-  addObjective();
-  return success();
+  return addObjective();
 }
 
 LogicalResult
@@ -185,17 +194,20 @@ BufferPlacementMILP::optimize(DenseMap<Value, PlacementResult> &placement) {
   return success();
 }
 
-void BufferPlacementMILP::createVars() {
+LogicalResult BufferPlacementMILP::createVars() {
   for (auto [idx, cfdfcAndOpt] : llvm::enumerate(cfdfcs))
-    createCFDFCVars(*cfdfcAndOpt.first, idx);
-  createChannelVars();
+    if (failed(createCFDFCVars(*cfdfcAndOpt.first, idx)))
+      return failure();
+  if (failed(createChannelVars()))
+    return failure();
 
   // Update the model before returning so that these variables can be referenced
   // safely during the rest of model creation
   model.update();
+  return success();
 }
 
-void BufferPlacementMILP::createCFDFCVars(CFDFC &cfdfc, unsigned uid) {
+LogicalResult BufferPlacementMILP::createCFDFCVars(CFDFC &cfdfc, unsigned uid) {
   std::string cfdfcID = std::to_string(uid);
   CFDFCVars cfdfcVars;
 
@@ -205,11 +217,17 @@ void BufferPlacementMILP::createCFDFCVars(CFDFC &cfdfc, unsigned uid) {
 
     // Create the two unit variables
     UnitVars unitVar;
-    std::string unitName = getOperationShortStrName(unit);
+    std::string unitName = getVarName(unit);
     unitVar.retIn =
         model.addVar(0, GRB_INFINITY, 0.0, GRB_CONTINUOUS,
                      "mg" + cfdfcID + "_inRetimeTok_" + unitName + unitID);
-    if (getUnitLatency(unit, unitInfo) == 0.0)
+
+    // If the component is combinational (i.e., 0 latency) its output fluid
+    // retiming equals its input fluid retiming, otherwise it is different
+    double latency;
+    if (failed(timingDB.getLatency(unit, latency)))
+      return failure();
+    if (latency == 0.0)
       unitVar.retOut = unitVar.retIn;
     else
       unitVar.retOut =
@@ -224,10 +242,8 @@ void BufferPlacementMILP::createCFDFCVars(CFDFC &cfdfc, unsigned uid) {
     // Construct a name for the variable
     Operation *srcOp = channel.getDefiningOp();
     Operation *dstOp = *channel.getUsers().begin();
-    std::string srcName = srcOp ? getOperationShortStrName(srcOp) : "arg";
-    std::string dstName = getOperationShortStrName(dstOp);
-    std::string varName = "mg" + cfdfcID + "_" + srcName + "_" + dstName + "_" +
-                          std::to_string(idx);
+    std::string varName = "mg" + cfdfcID + "_" + getVarName(srcOp) + "_" +
+                          getVarName(dstOp) + "_" + std::to_string(idx);
     // Add a variable for the channel's throughput
     cfdfcVars.channelThroughputs[channel] = model.addVar(
         0, GRB_INFINITY, 0.0, GRB_CONTINUOUS, "throughput_" + varName);
@@ -239,9 +255,10 @@ void BufferPlacementMILP::createCFDFCVars(CFDFC &cfdfc, unsigned uid) {
 
   // Add the CFDFC variables to the global set of variables
   vars.cfdfcs[&cfdfc] = cfdfcVars;
+  return success();
 }
 
-void BufferPlacementMILP::createChannelVars() {
+LogicalResult BufferPlacementMILP::createChannelVars() {
   // Create a set of variables for each channel in the circuit
   for (auto [idx, channelAndProps] : llvm::enumerate(channels)) {
     auto &channel = channelAndProps.first;
@@ -249,10 +266,8 @@ void BufferPlacementMILP::createChannelVars() {
     // Construct a suffix for all variable names
     Operation *srcOp = channel.getDefiningOp();
     Operation *dstOp = *channel.getUsers().begin();
-    std::string srcOpName = srcOp ? getOperationShortStrName(srcOp) : "arg";
-    std::string dstOpName = getOperationShortStrName(dstOp);
-    std::string suffix =
-        "_" + srcOpName + "_" + dstOpName + "_" + std::to_string(idx);
+    std::string suffix = "_" + getVarName(srcOp) + "_" + getVarName(dstOp) +
+                         "_" + std::to_string(idx);
 
     // Create the set of variables for the channel
     ChannelVars channelVar;
@@ -273,10 +288,11 @@ void BufferPlacementMILP::createChannelVars() {
 
     vars.channels[channel] = channelVar;
   }
+  return success();
 }
 
-void BufferPlacementMILP::addCustomChannelConstraints(
-    ValueRange customChannels) {
+LogicalResult
+BufferPlacementMILP::addCustomChannelConstraints(ValueRange customChannels) {
   for (Value channel : customChannels) {
     ChannelVars &chVars = vars.channels[channel];
     ChannelBufProps &props = channels[channel];
@@ -316,10 +332,12 @@ void BufferPlacementMILP::addCustomChannelConstraints(
                         *props.maxTrans + *props.maxOpaque);
     }
   }
+  return success();
 }
 
-void BufferPlacementMILP::addPathConstraints(ValueRange pathChannels,
-                                             ArrayRef<Operation *> pathUnits) {
+LogicalResult
+BufferPlacementMILP::addPathConstraints(ValueRange pathChannels,
+                                        ArrayRef<Operation *> pathUnits) {
   // Add path constraints for channels
   for (Value channel : pathChannels) {
     ChannelVars &chVars = vars.channels[channel];
@@ -336,8 +354,12 @@ void BufferPlacementMILP::addPathConstraints(ValueRange pathChannels,
 
   // Add path constraints for units
   for (Operation *op : pathUnits) {
-    double unitDelay = getCombinationalDelay(op, unitInfo, "data");
-    if (getUnitLatency(op, unitInfo) == 0.0) {
+    double latency, dataDelay;
+    if (failed(timingDB.getTotalDelay(op, SignalType::DATA, dataDelay)) ||
+        failed(timingDB.getLatency(op, latency)))
+      return failure();
+
+    if (latency == 0.0) {
       // The unit is not pipelined, add a path constraint for each input/output
       // port pair in the unit
       forEachIOPair(op, [&](Value in, Value out) {
@@ -345,7 +367,7 @@ void BufferPlacementMILP::addPathConstraints(ValueRange pathChannels,
         GRBVar &tOutPort = vars.channels[out].tPathIn;
         // Arrival time at unit's output port must be greater than arrival time
         // at unit's input port + the unit's combinational delay
-        model.addConstr(tOutPort >= tInPort + unitDelay);
+        model.addConstr(tOutPort >= tInPort + dataDelay);
       });
     } else {
       // The unit is pipelined, add a constraint for every of the unit's inputs
@@ -356,8 +378,11 @@ void BufferPlacementMILP::addPathConstraints(ValueRange pathChannels,
         if (!vars.channels.contains(inChannel))
           continue;
 
-        std::string out = "out";
-        double inPortDelay = getPortDelay(inChannel, unitInfo, out);
+        double inPortDelay;
+        if (failed(timingDB.getPortDelay(op, SignalType::DATA, PortType::IN,
+                                         inPortDelay)))
+          return failure();
+
         GRBVar &tInPort = vars.channels[inChannel].tPathOut;
         // Arrival time at unit's input port + input port delay must be less
         // than the target clock period
@@ -369,17 +394,21 @@ void BufferPlacementMILP::addPathConstraints(ValueRange pathChannels,
         if (!vars.channels.contains(outChannel))
           continue;
 
-        std::string in = "in";
-        double outPortDelay = getPortDelay(outChannel, unitInfo, in);
+        double outPortDelay;
+        if (failed(timingDB.getPortDelay(op, SignalType::DATA, PortType::OUT,
+                                         outPortDelay)))
+          return failure();
+
         GRBVar &tOutPort = vars.channels[outChannel].tPathIn;
         // Arrival time at unit's output port is equal to the output port delay
         model.addConstr(tOutPort == outPortDelay);
       }
     }
   }
+  return success();
 }
 
-void BufferPlacementMILP::addElasticityConstraints(
+LogicalResult BufferPlacementMILP::addElasticityConstraints(
     ValueRange elasticChannels, ArrayRef<Operation *> elasticUnits) {
   // Add elasticity constraints for channels
   for (Value channel : elasticChannels) {
@@ -413,9 +442,10 @@ void BufferPlacementMILP::addElasticityConstraints(
       model.addConstr(tOutPort >= 1 + tInPort);
     });
   }
+  return success();
 }
 
-void BufferPlacementMILP::addThroughputConstraints(CFDFC &cfdfc) {
+LogicalResult BufferPlacementMILP::addThroughputConstraints(CFDFC &cfdfc) {
   CFDFCVars &cfdfcVars = vars.cfdfcs[&cfdfc];
 
   // Add a set of constraints for each CFDFC channel
@@ -455,7 +485,10 @@ void BufferPlacementMILP::addThroughputConstraints(CFDFC &cfdfc) {
 
   // Add a constraint for each pipelined CFDFC unit
   for (auto &[op, unitVars] : cfdfcVars.units) {
-    if (double latency = getUnitLatency(op, unitInfo); latency != 0.0) {
+    double latency;
+    if (failed(timingDB.getLatency(op, latency)))
+      return failure();
+    if (latency != 0.0) {
       GRBVar &retIn = unitVars.retIn;
       GRBVar &retOut = unitVars.retOut;
       GRBVar &throughput = cfdfcVars.thoughput;
@@ -464,9 +497,10 @@ void BufferPlacementMILP::addThroughputConstraints(CFDFC &cfdfc) {
       model.addConstr(throughput * latency == retOut - retIn);
     }
   }
+  return success();
 }
 
-void BufferPlacementMILP::addObjective() {
+LogicalResult BufferPlacementMILP::addObjective() {
   // Compute the total number of executions over all channels
   unsigned totalExecs = 0;
   for (auto &[channel, _] : vars.channels)
@@ -501,21 +535,22 @@ void BufferPlacementMILP::addObjective() {
 
   // Finally, set the MILP objective
   model.setObjective(objective, GRB_MAXIMIZE);
+  return success();
 }
 
 LogicalResult BufferPlacementMILP::addInternalBuffers(Channel &channel) {
-  // Add slots present at the source unit's output port
+  // Add slots present at the source unit's output ports
   std::string srcName = channel.producer.getName().getStringRef().str();
-  if (unitInfo.count(srcName) > 0) {
-    channel.props->minTrans += unitInfo[srcName].outPortTransBuf;
-    channel.props->minOpaque += unitInfo[srcName].outPortOpBuf;
+  if (const TimingModel *model = timingDB.getModel(&channel.producer)) {
+    channel.props->minTrans += model->outputModel.transparentSlots;
+    channel.props->minOpaque += model->outputModel.opaqueSlots;
   }
 
-  // Add slots present at the destination unit's input port
+  // Add slots present at the destination unit's input ports
   std::string dstName = channel.consumer.getName().getStringRef().str();
-  if (unitInfo.count(dstName) > 0) {
-    channel.props->minTrans += unitInfo[dstName].inPortTransBuf;
-    channel.props->minOpaque += unitInfo[dstName].inPortOpBuf;
+  if (const TimingModel *model = timingDB.getModel(&channel.consumer)) {
+    channel.props->minTrans += model->inputModel.transparentSlots;
+    channel.props->minOpaque += model->inputModel.opaqueSlots;
   }
 
   return success(channel.props->isSatisfiable());
@@ -527,15 +562,15 @@ void BufferPlacementMILP::deductInternalBuffers(Channel &channel,
   std::string dstName = channel.consumer.getName().getStringRef().str();
   unsigned numTransToDeduct = 0, numOpaqueToDeduct = 0;
 
-  // Remove slots present at the source unit's output port
-  if (unitInfo.count(srcName) > 0) {
-    numTransToDeduct += unitInfo[srcName].outPortTransBuf;
-    numOpaqueToDeduct += unitInfo[srcName].outPortOpBuf;
+  // Remove slots present at the source unit's output ports
+  if (const TimingModel *model = timingDB.getModel(&channel.producer)) {
+    numTransToDeduct += model->outputModel.transparentSlots;
+    numOpaqueToDeduct += model->outputModel.opaqueSlots;
   }
-  // Remove slots present at the destination unit's input port
-  if (unitInfo.count(dstName) > 0) {
-    numTransToDeduct += unitInfo[dstName].inPortTransBuf;
-    numOpaqueToDeduct += unitInfo[dstName].inPortOpBuf;
+  // Remove slots present at the destination unit's input ports
+  if (const TimingModel *model = timingDB.getModel(&channel.consumer)) {
+    numTransToDeduct += model->inputModel.transparentSlots;
+    numOpaqueToDeduct += model->inputModel.opaqueSlots;
   }
 
   assert(numTransToDeduct > result.numTrans &&

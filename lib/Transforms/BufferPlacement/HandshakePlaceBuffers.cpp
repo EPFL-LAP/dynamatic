@@ -62,8 +62,9 @@ struct HandshakePlaceBuffersPass
       }
     }
 
-    std::map<std::string, UnitInfo> unitInfo;
-    if (failed(parseJson(timefile, unitInfo)))
+    // Read the operations' timing models from disk
+    TimingDatabase timingDB(&getContext());
+    if (failed(TimingDatabase::readFromJSON(timefile, timingDB)))
       return signalPassFailure();
 
     // Place buffers in each function
@@ -75,7 +76,7 @@ struct HandshakePlaceBuffersPass
 
       // Solve the MILP to obtain a buffer placement
       DenseMap<Value, PlacementResult> placement;
-      if (failed(getBufferPlacement(funcOp, cfdfcs, unitInfo, placement)))
+      if (failed(getBufferPlacement(funcOp, cfdfcs, timingDB, placement)))
         return signalPassFailure();
 
       if (failed(instantiateBuffers(placement)))
@@ -87,7 +88,7 @@ private:
   LogicalResult getCFDFCs(FuncOp funcOp, SmallVector<CFDFC> &cfdfcs);
 
   LogicalResult getBufferPlacement(FuncOp funcOp, SmallVector<CFDFC> &cfdfcs,
-                                   std::map<std::string, UnitInfo> &unitInfo,
+                                   TimingDatabase &timingDB,
                                    DenseMap<Value, PlacementResult> &placement);
 
   LogicalResult instantiateBuffers(DenseMap<Value, PlacementResult> &res);
@@ -144,8 +145,7 @@ LogicalResult HandshakePlaceBuffersPass::getCFDFCs(FuncOp funcOp,
 }
 
 LogicalResult HandshakePlaceBuffersPass::getBufferPlacement(
-    FuncOp funcOp, SmallVector<CFDFC> &cfdfcs,
-    std::map<std::string, UnitInfo> &unitInfo,
+    FuncOp funcOp, SmallVector<CFDFC> &cfdfcs, TimingDatabase &timingDB,
     DenseMap<Value, PlacementResult> &placement) {
   // All CFDFCs must be optimized
   llvm::MapVector<CFDFC *, bool> cfdfcsOpt;
@@ -158,7 +158,7 @@ LogicalResult HandshakePlaceBuffersPass::getBufferPlacement(
   env.start();
 
   // Create and solve the MILP
-  BufferPlacementMILP milp(funcOp, cfdfcsOpt, unitInfo, targetCP,
+  BufferPlacementMILP milp(funcOp, cfdfcsOpt, timingDB, targetCP,
                            targetCP * 2.0, env, timeLimit);
   return success(milp.arePlacementConstraintsSatisfiable() &&
                  !failed(milp.setup()) && !failed(milp.optimize(placement)));
