@@ -48,6 +48,14 @@ CFGLoop *findLCALoop(CFGLoop *innermostLoopOfBB1, CFGLoop *innermostLoopOfBB2);
 // pass.
 class HandshakeLoweringFPL22 : public HandshakeLoweringFPGA18 {
 public:
+  struct TokenMissmatchMergeOp {
+    Operation *mergeOp;
+    Backedge mergeBackedge;
+    CFGLoop *loop;
+  };
+
+  using TokenMissmatchMergeOps = std::vector<TokenMissmatchMergeOp>;
+
   /// Constructor simply forwards its arguments to the parent class.
   explicit HandshakeLoweringFPL22(Region &r) : HandshakeLoweringFPGA18(r) {}
 
@@ -57,9 +65,9 @@ public:
 
   /// Preventing a token missmatch by adding additional merges to the loop
   /// header block.
-  LogicalResult handleTokenMissmatch(
+  TokenMissmatchMergeOps handleTokenMissmatch(
       DenseMap<Value, std::set<Block *>> &valueIsConsumedInBlocksMap,
-      std::set<Operation *> &preventTokenMissmatchMerges,
+      DenseMap<Block *, BlockLoopInfo> &blockToLoopInfoMap,
       BackedgeBuilder &edgeBuilder, ConversionPatternRewriter &rewriter);
 
   /// Inserts a merge for a block argument.
@@ -71,7 +79,16 @@ public:
                           ConversionPatternRewriter &rewriter);
 
   /// Adding both SSA merges and merges used to prevent token missmatch.
-  LogicalResult addMergeOps(ConversionPatternRewriter &rewriter);
+  /// For each token missmatch merge, handshake level branch is inserted to
+  /// prevent connecting the merge output directly to its input.
+  LogicalResult
+  addMergeOps(ConversionPatternRewriter &rewriter,
+              DenseMap<Value, std::set<Block *>> &valueIsConsumedInBlocksMap);
+
+  /// Lower std level branch operations to handshake level.
+  LogicalResult lowerBranchesToHandshake(
+      ConversionPatternRewriter &rewriter,
+      DenseMap<Value, std::set<Block *>> &valueIsConsumedInBlocksMap);
 };
 
 #define GEN_PASS_DECL_STANDARDTOHANDSHAKEFPL22

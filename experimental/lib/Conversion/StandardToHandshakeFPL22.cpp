@@ -33,6 +33,46 @@ using namespace dynamatic::experimental;
   if (failed(logicalResult))                                                   \
     return failure();
 
+using TokenMissmatchMergeOps =
+    std::vector<HandshakeLoweringFPL22::TokenMissmatchMergeOp>;
+
+// ============================================================================
+// Helper functions
+// ============================================================================
+
+static Value
+getResultForStayingInLoop(mlir::cf::CondBranchOp loopExitBranchOp,
+                          handshake::ConditionalBranchOp condBranch,
+                          CFGLoop *loop) {
+  if (loop->contains(loopExitBranchOp.getTrueDest()))
+    return condBranch.getTrueResult();
+  assert(loop->contains(loopExitBranchOp.getFalseDest()));
+  return condBranch.getFalseResult();
+}
+
+static OperandRange getBranchOperands(Operation *termOp) {
+  if (auto condBranchOp = dyn_cast<mlir::cf::CondBranchOp>(termOp))
+    return condBranchOp.getOperands().drop_front();
+  assert(isa<mlir::cf::BranchOp>(termOp) && "unsupported block terminator");
+  return termOp->getOperands();
+}
+
+// Return the appropriate branch result based on successor block which uses it
+static Value getSuccResult(Operation *termOp, Operation *newOp,
+                           Block *succBlock) {
+  // For conditional block, check if result goes to true or to false successor
+  if (auto condBranchOp = dyn_cast<mlir::cf::CondBranchOp>(termOp)) {
+    if (condBranchOp.getTrueDest() == succBlock)
+      return dyn_cast<handshake::ConditionalBranchOp>(newOp).getTrueResult();
+    else {
+      assert(condBranchOp.getFalseDest() == succBlock);
+      return dyn_cast<handshake::ConditionalBranchOp>(newOp).getFalseResult();
+    }
+  }
+  // If the block is unconditional, newOp has only one result
+  return newOp->getResult(0);
+}
+
 // ============================================================================
 // Concrete lowering steps
 // ============================================================================
@@ -222,14 +262,16 @@ static void producedValueDataflowAnalysis(
           }
 
           // Get block arguments of a true dest block
-          for (size_t idx = 0; idx < condBranchOp.getTrueDestOperands().size(); idx++) {
+          for (size_t idx = 0; idx < condBranchOp.getTrueDestOperands().size();
+               idx++) {
             BlockArgument argOperand =
                 condBranchOp.getTrueDest()->getArgument(idx);
             if (argOperand)
               producedValues.push_back(argOperand);
           }
           // Get block arguments of a false dest block
-          for (size_t idx = 0; idx < condBranchOp.getFalseDestOperands().size(); idx++) {
+          for (size_t idx = 0; idx < condBranchOp.getFalseDestOperands().size();
+               idx++) {
             BlockArgument argOperand =
                 condBranchOp.getFalseDest()->getArgument(idx);
             if (argOperand)
@@ -273,10 +315,41 @@ static DenseMap<Value, std::set<Block *>> runDataflowAnalysis(Region &r) {
   return valueIsConsumedInBlocksMap;
 }
 
+// Inserting a branch for a token missmatch prevention merge, and connecting the
+// branch output to the merge input.
+static void
+resolveMergeBackedges(TokenMissmatchMergeOps &preventTokenMissmatchMerges,
+                      ConversionPatternRewriter &rewriter) {
+
+  for (auto &m : preventTokenMissmatchMerges) {
+    rewriter.setInsertionPointAfter(m.mergeOp);
+    auto insertLoc = m.mergeOp->getLoc();
+
+    // Branch condition is the exit condition of the loop. Current
+    // implementation supports loop with only one exit.
+    Block *exitBlock = m.loop->getExitingBlock();
+
+    Operation *loopExitBranchOp = exitBlock->getTerminator();
+    Value condValue = nullptr;
+    if (auto condBranchOp = dyn_cast<mlir::cf::CondBranchOp>(loopExitBranchOp))
+      condValue = condBranchOp.getCondition();
+    else
+      continue;
+
+    auto condBranch = rewriter.create<handshake::ConditionalBranchOp>(
+        insertLoc, condValue, m.mergeOp->getResult(0));
+
+    // Resolve the backedge
+    m.mergeBackedge.setValue(getResultForStayingInLoop(
+        dyn_cast<mlir::cf::CondBranchOp>(loopExitBranchOp), condBranch,
+        m.loop));
+  }
+}
+
 static void processProducedValues(
     Value producedValue,
     DenseMap<Value, std::set<Block *>> &valueIsConsumedInBlocksMap,
-    std::set<Operation *> &preventTokenMissmatchMerges,
+    TokenMissmatchMergeOps &preventTokenMissmatchMerges,
     BackedgeBuilder &edgeBuilder, ConversionPatternRewriter &rewriter,
     DenseMap<Block *, BlockLoopInfo> blockToLoopInfoMap,
     DenseMap<Block *, DenseMap<Value, Operation *>> &mapLoopHeaderBlocks) {
@@ -354,16 +427,19 @@ static void processProducedValues(
       prevMergeInputBackedges.push_back(firstInputBackedge);
       operands.push_back(Value(firstInputBackedge));
 
-      // Merge should take its own output as one of the inputs
+      // This backedge needs to be set to a branch output that will be inserted
+      // in a separate backedge resolving step.
       auto secondInputBackedge = edgeBuilder.get(producedValue.getType());
       operands.push_back(Value(secondInputBackedge));
 
-      // Create MergeOp and resolve the backedge
+      // Create MergeOp
       Operation *mergeOp =
           rewriter.create<handshake::MergeOp>(insertLoc, operands);
-      secondInputBackedge.setValue(mergeOp->getResult(0));
       mapLoopHeaderBlocks[loopHeader][producedValue] = mergeOp;
-      preventTokenMissmatchMerges.insert(mergeOp);
+
+      preventTokenMissmatchMerges.push_back(
+          HandshakeLoweringFPL22::TokenMissmatchMergeOp{
+              mergeOp, secondInputBackedge, currLoop});
 
       // Replace uses of producer's operation result in all loop blocks
       // with the merge output
@@ -395,26 +471,24 @@ static void processProducedValues(
   }
 }
 
-LogicalResult HandshakeLoweringFPL22::handleTokenMissmatch(
+TokenMissmatchMergeOps HandshakeLoweringFPL22::handleTokenMissmatch(
     DenseMap<Value, std::set<Block *>> &valueIsConsumedInBlocksMap,
-    std::set<Operation *> &preventTokenMissmatchMerges,
+    DenseMap<Block *, BlockLoopInfo> &blockToLoopInfoMap,
     BackedgeBuilder &edgeBuilder, ConversionPatternRewriter &rewriter) {
+
+  TokenMissmatchMergeOps preventTokenMissmatchMerges;
+
   // Each loop header Block should only contain one MergeOp for a Value produced
   // in another Block outside the loop.
   DenseMap<Block *, DenseMap<Value, Operation *>> mapLoopHeaderBlocks;
-
-  // Run loop analysis
-  DominanceInfo domInfo;
-  llvm::DominatorTreeBase<Block, false> &domTree = domInfo.getDomTree(&r);
-  // CFGLoop nodes become invalid after CFGLoopInfo is destroyed.
-  CFGLoopInfo li(domTree);
-  DenseMap<Block *, BlockLoopInfo> blockToLoopInfoMap = findLoopDetails(li, r);
 
   // Iterate through all producer-consumer pairs (traversing edges in DFG)
   for (auto &block : r.getBlocks()) {
     // Process Block arguments
     for (auto &blockArg : block.getArguments())
-      if (blockArg.isUsedOutsideOfBlock(&block))
+      // MemRef values are handled separately
+      if (blockArg.isUsedOutsideOfBlock(&block) &&
+          !blockArg.getType().isa<mlir::MemRefType>())
         processProducedValues(
             blockArg, valueIsConsumedInBlocksMap, preventTokenMissmatchMerges,
             edgeBuilder, rewriter, blockToLoopInfoMap, mapLoopHeaderBlocks);
@@ -425,13 +499,16 @@ LogicalResult HandshakeLoweringFPL22::handleTokenMissmatch(
         continue;
 
       for (const auto &producerOpResult : producerOp.getResults())
-        processProducedValues(producerOpResult, valueIsConsumedInBlocksMap,
-                              preventTokenMissmatchMerges, edgeBuilder,
-                              rewriter, blockToLoopInfoMap,
-                              mapLoopHeaderBlocks);
+        // MemRef values are handled separately
+        if (!producerOpResult.getType().isa<mlir::MemRefType>())
+          processProducedValues(producerOpResult, valueIsConsumedInBlocksMap,
+                                preventTokenMissmatchMerges, edgeBuilder,
+                                rewriter, blockToLoopInfoMap,
+                                mapLoopHeaderBlocks);
     }
   }
-  return success();
+
+  return preventTokenMissmatchMerges;
 }
 
 HandshakeLowering::MergeOpInfo
@@ -520,10 +597,19 @@ HandshakeLoweringFPL22::insertMergeOps(HandshakeLowering::ValueMap &mergePairs,
   return blockMerges;
 }
 
+static bool
+isTokenMissmatchMergeOp(TokenMissmatchMergeOps &preventTokenMissmatchMerges,
+                        Operation *opp) {
+  for (const auto &mergeOpInfo : preventTokenMissmatchMerges)
+    if (mergeOpInfo.mergeOp == opp)
+      return true;
+  return false;
+}
+
 static void
-reconnectMergeOps(Region &r, HandshakeLowering::BlockOps blockMerges,
-                  HandshakeLowering::ValueMap &mergePairs,
-                  std::set<Operation *> &preventTokenMissmatchMerges) {
+reconnectSSAMergeOps(Region &r, HandshakeLowering::BlockOps blockMerges,
+                     HandshakeLowering::ValueMap &mergePairs,
+                     TokenMissmatchMergeOps &preventTokenMissmatchMerges) {
   // At this point all merge-like operations have backedges as operands.
   // We here replace all backedge values with appropriate value from
   // predecessor block. The predecessor can either be a merge, the original
@@ -549,8 +635,7 @@ reconnectMergeOps(Region &r, HandshakeLowering::BlockOps blockMerges,
       for (Block &b : r)
         for (Operation &opp : b)
           if (!isa<MergeLikeOpInterface>(opp) ||
-              preventTokenMissmatchMerges.find(&opp) !=
-                  preventTokenMissmatchMerges.end())
+              isTokenMissmatchMergeOp(preventTokenMissmatchMerges, &opp))
             opp.replaceUsesOfWith(mergeInfo.val, mergeInfo.op->getResult(0));
     }
   }
@@ -558,32 +643,40 @@ reconnectMergeOps(Region &r, HandshakeLowering::BlockOps blockMerges,
   removeBlockOperands(r);
 }
 
-LogicalResult
-HandshakeLoweringFPL22::addMergeOps(ConversionPatternRewriter &rewriter) {
-  // Stores mapping from each value that pass through a merge operation to the
-  // first result of that merge operation
-  ValueMap mergePairs;
+LogicalResult HandshakeLoweringFPL22::addMergeOps(
+    ConversionPatternRewriter &rewriter,
+    DenseMap<Value, std::set<Block *>> &valueIsConsumedInBlocksMap) {
+
+  // Merge operations added for token missmatch prevention. Backedges will be
+  // resolved during the branch insertion for token missmarch prevention merges.
+  TokenMissmatchMergeOps preventTokenMissmatchMerges;
 
   // Create backedge builder to manage operands of merge operations between
   // insertion and reconnection
   BackedgeBuilder edgeBuilder{rewriter, r.front().front().getLoc()};
 
-  // Remember merge operations added for token missmatch prevention
-  std::set<Operation *> preventTokenMissmatchMerges;
-
-  // Run dataflow analysis
-  DenseMap<Value, std::set<Block *>> valueIsConsumedInBlocksMap =
-      runDataflowAnalysis(r);
+  // Run loop analysis
+  DominanceInfo domInfo;
+  llvm::DominatorTreeBase<Block, false> &domTree = domInfo.getDomTree(&r);
+  // CFGLoop nodes become invalid after CFGLoopInfo is destroyed.
+  CFGLoopInfo li(domTree);
+  DenseMap<Block *, BlockLoopInfo> blockToLoopInfoMap = findLoopDetails(li, r);
 
   // Iterate through all producer-consumer pairs and see if a token
   // missmatch occurs. One example of token missmatch is when a producers is
   // outside the loop and consumer is inside. In that case token produced once
   // needs to be consumed multiple times. This is solved by adding merge
   // operations where merge result is also one of the input operands.
-  if (failed(handleTokenMissmatch(valueIsConsumedInBlocksMap,
-                                  preventTokenMissmatchMerges, edgeBuilder,
-                                  rewriter)))
-    return failure();
+  preventTokenMissmatchMerges = handleTokenMissmatch(
+      valueIsConsumedInBlocksMap, blockToLoopInfoMap, edgeBuilder, rewriter);
+
+  // Inserting a branch for a token missmatch prevention merge, and connecting
+  // the branch output to the merge input.
+  resolveMergeBackedges(preventTokenMissmatchMerges, rewriter);
+
+  // Stores mapping from each value that pass through a merge operation to the
+  // first result of that merge operation
+  ValueMap mergePairs;
 
   // Insert merge operations (with backedges instead of actual operands)
   BlockOps mergeOps =
@@ -591,7 +684,66 @@ HandshakeLoweringFPL22::addMergeOps(ConversionPatternRewriter &rewriter) {
 
   // Reconnect merge operations with values incoming from predecessor blocks
   // and resolve all backedges that were created during merge insertion
-  reconnectMergeOps(r, mergeOps, mergePairs, preventTokenMissmatchMerges);
+  reconnectSSAMergeOps(r, mergeOps, mergePairs, preventTokenMissmatchMerges);
+
+  return success();
+}
+
+LogicalResult HandshakeLoweringFPL22::lowerBranchesToHandshake(
+    ConversionPatternRewriter &rewriter,
+    DenseMap<Value, std::set<Block *>> &valueIsConsumedInBlocksMap) {
+
+  for (Block &block : r) {
+    Operation *termOp = block.getTerminator();
+    rewriter.setInsertionPoint(termOp);
+
+    Value condValue = nullptr;
+    if (auto condBranchOp = dyn_cast<mlir::cf::CondBranchOp>(termOp))
+      condValue = condBranchOp.getCondition();
+    else if (isa<mlir::func::ReturnOp>(termOp))
+      continue;
+
+    // Insert a branch-like operation for every branch operand that will be
+    // passed as a block argument and replace the original branch operand value
+    // in successor blocks with the result(s) of the new operation
+    DenseMap<Value, Operation *> branches;
+    for (Value val : getBranchOperands(termOp)) {
+
+      // If producedValue is not used in block, don't insert the branch
+      if (valueIsConsumedInBlocksMap[val].find(&block) ==
+          valueIsConsumedInBlocksMap[val].end())
+        continue;
+
+      // Create a branch-like operation for the branch operand, or re-use one
+      // created earlier for that same value
+      Operation *newOp = nullptr;
+      if (auto branchOp = branches.find(val); branchOp != branches.end())
+        newOp = branchOp->getSecond();
+      else {
+        if (condValue)
+          newOp = rewriter.create<handshake::ConditionalBranchOp>(
+              termOp->getLoc(), condValue, val);
+        else
+          newOp = rewriter.create<handshake::BranchOp>(termOp->getLoc(), val);
+        branches.insert(std::make_pair(val, newOp));
+      }
+
+      for (int j = 0, e = block.getNumSuccessors(); j < e; ++j) {
+        Block *succ = block.getSuccessor(j);
+
+        // Look for the merge-like operation in the successor block that takes
+        // as input the original branch operand, and replace the latter with a
+        // result of the newly inserted branch operation
+        for (auto *user : val.getUsers()) {
+          if (user->getBlock() == succ &&
+              isa<handshake::MergeLikeOpInterface>(user)) {
+            user->replaceUsesOfWith(val, getSuccResult(termOp, newOp, succ));
+            break;
+          }
+        }
+      }
+    }
+  }
 
   return success();
 }
@@ -619,14 +771,21 @@ static LogicalResult lowerRegion(HandshakeLoweringFPL22 &hl,
                                 sourceConstants)))
     return failure();
 
-  if (failed(runPartialLowering(hl, &HandshakeLoweringFPL22::addMergeOps)))
+  // Run dataflow analysis
+  DenseMap<Value, std::set<Block *>> valueIsConsumedInBlocksMap =
+      runDataflowAnalysis(hl.getRegion());
+
+  if (failed(runPartialLowering(hl, &HandshakeLoweringFPL22::addMergeOps,
+                                valueIsConsumedInBlocksMap)))
     return failure();
 
   if (failed(runPartialLowering(baseHl, &HandshakeLowering::replaceCallOps)))
     return failure();
 
-  // if (failed(runPartialLowering(baseHl, &HandshakeLowering::addBranchOps)))
-  //   return failure();
+  if (failed(runPartialLowering(
+          hl, &HandshakeLoweringFPL22::lowerBranchesToHandshake,
+          valueIsConsumedInBlocksMap)))
+    return failure();
 
   if (failed(runPartialLowering(
           fpga18Hl, &HandshakeLoweringFPGA18::connectToMemory, memInfo)))
