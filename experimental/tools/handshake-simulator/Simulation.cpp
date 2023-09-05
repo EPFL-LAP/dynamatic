@@ -60,7 +60,7 @@ void fatalValueError(StringRef reason, T &value) {
   llvm::raw_string_ostream os(err);
   os << reason << " ('";
   // Explicitly use ::print instead of << due to possibl operator resolution
-  // error between i.e., mlir::Operation::<< and operator<<(OStream &&OS, const
+  // error between i.e., circt::Operation::<< and operator<<(OStream &&OS, const
   // T &Value)
   value.print(os);
   os << "')\n";
@@ -80,6 +80,8 @@ bool allocateMemory(circt::handshake::MemoryControllerOp &op,
   ArrayRef<int64_t> shape = type.getShape();
   // Dynamatic only uses standard 1-dimension arrays for memory
   int allocationSize = shape[0];
+  if (shape.size() != 1)
+    return false;
 
   unsigned ptr = store.size();
   store.resize(ptr + 1);
@@ -87,15 +89,14 @@ bool allocateMemory(circt::handshake::MemoryControllerOp &op,
   store[ptr].resize(allocationSize);
   storeTimes[ptr] = 0.0;
   mlir::Type elementType = type.getElementType();
-  int width = elementType.getIntOrFloatBitWidth();
-  for (int i = 0; i < allocationSize; i++) {
-    if (elementType.isa<mlir::IntegerType>()) {
+  unsigned width = elementType.getIntOrFloatBitWidth();
+  for (size_t i = 0; i < allocationSize; i++) {
+    if (elementType.isa<mlir::IntegerType>()) 
       store[ptr][i] = APInt(width, 0);
-    } else if (elementType.isa<mlir::FloatType>()) {
+    else if (elementType.isa<mlir::FloatType>()) 
       store[ptr][i] = APFloat(0.0);
-    } else {
+    else 
       llvm_unreachable("Unknown result type!\n");
-    }
   }
 
   memoryMap[op.getId()] = ptr;
@@ -199,16 +200,16 @@ void printAnyValueWithType(llvm::raw_ostream &out, mlir::Type type,
 }
 
 /// Schedules an operation if not already scheduled.
-void scheduleIfNeeded(std::list<mlir::Operation *> &readyList,
+void scheduleIfNeeded(std::list<circt::Operation *> &readyList,
                       llvm::DenseMap<mlir::Value, Any> & /*valueMap*/,
-                      mlir::Operation *op) {
+                      circt::Operation *op) {
   if (std::find(readyList.begin(), readyList.end(), op) == readyList.end()) {
     readyList.push_back(op);
   }
 }
 
 /// Schedules all operations that can be done with the entered value.
-void scheduleUses(std::list<mlir::Operation *> &readyList,
+void scheduleUses(std::list<circt::Operation *> &readyList,
                   llvm::DenseMap<mlir::Value, Any> &valueMap,
                   mlir::Value value) {
   for (auto &use : value.getUses()) {
@@ -217,22 +218,18 @@ void scheduleUses(std::list<mlir::Operation *> &readyList,
 }
 
 /// Allocate a new matrix with dimensions given by the type, in the
-/// given store.  Return the pseudo-pointer to the new matrix in the
-/// store (i.e. the first dimension index).
-unsigned allocateMemRef(mlir::MemRefType type, std::vector<Any> &in,
+/// given store. Puts the pseudo-pointer to the new matrix in the
+/// store in memRefOffset (i.e. the first dimension index)
+/// Returns a failed result if the shape isn't uni-dimensional
+LogicalResult allocateMemRef(mlir::MemRefType type, std::vector<Any> &in,
                         std::vector<std::vector<Any>> &store,
-                        std::vector<double> &storeTimes) {
+                        std::vector<double> &storeTimes,
+                        unsigned &memRefOffset) {
   ArrayRef<int64_t> shape = type.getShape();
+  if (shape.size() != 1)
+    return failure();
   int64_t allocationSize = shape[0];
-  unsigned count = 0;
-  for (int64_t dim : shape) {
-    if (dim > 0)
-      allocationSize *= dim;
-    else {
-      assert(count < in.size());
-      allocationSize *= any_cast<APInt>(in[count++]).getSExtValue();
-    }
-  }
+
   unsigned ptr = store.size();
   store.resize(ptr + 1);
   storeTimes.resize(ptr + 1);
@@ -249,7 +246,8 @@ unsigned allocateMemRef(mlir::MemRefType type, std::vector<Any> &in,
       fatalValueError("Unknown result type!\n", elementType);
     }
   }
-  return ptr;
+  memRefOffset = ptr;
+  return success();
 }
 } // namespace
 
@@ -332,7 +330,7 @@ private:
                         std::vector<Any> &);
                         
 private:
-  /// Execution context variables
+  /// Execution context variables, documented in ExecModels.h
   llvm::DenseMap<mlir::Value, Any> &valueMap;
   llvm::DenseMap<mlir::Value, double> &timeMap;
   std::vector<Any> &results;
@@ -552,7 +550,10 @@ LogicalResult HandshakeExecuter::execute(mlir::memref::StoreOp op,
 LogicalResult HandshakeExecuter::execute(mlir::memref::AllocOp op,
                                          std::vector<Any> &in,
                                          std::vector<Any> &out) {
-  out[0] = allocateMemRef(op.getType(), in, store, storeTimes);
+  unsigned memRef;
+  if (allocateMemRef(op.getType(), in, store, storeTimes, memRef).failed())
+    return failure();
+  out[0] = memRef;
   unsigned ptr = any_cast<unsigned>(out[0]);
   storeTimes[ptr] = time;
   return success();
@@ -631,7 +632,7 @@ LogicalResult HandshakeExecuter::execute(mlir::CallOpInterface callOp,
                                          std::vector<Any> &) {
   // implement function calls.
   auto *op = callOp.getOperation();
-  mlir::Operation *calledOp = callOp.resolveCallable();
+  circt::Operation *calledOp = callOp.resolveCallable();
   if (auto funcOp = dyn_cast<mlir::func::FuncOp>(calledOp)) {
     unsigned outputs = funcOp.getNumResults();
     llvm::DenseMap<mlir::Value, Any> newValueMap;
@@ -677,7 +678,7 @@ HandshakeExecuter::HandshakeExecuter(
   // Main executive loop.  Start at the first instruction of the entry
   // block.  Fetch and execute instructions until we hit a terminator.
   while (true) {
-    mlir::Operation &op = *instIter;
+    circt::Operation &op = *instIter;
     std::vector<Any> inValues(op.getNumOperands());
     std::vector<Any> outValues(op.getNumResults());
     LLVM_DEBUG(dbgs() << "OP:  " << op.getName() << "\n");
@@ -750,7 +751,7 @@ HandshakeExecuter::HandshakeExecuter(
   // The arguments of the entry block.
   mlir::Block::BlockArgListType blockArgs = entryBlock.getArguments();
   // A list of operations which might be ready to execute.
-  std::list<mlir::Operation *> readyList;
+  std::list<circt::Operation *> readyList;
   // A map of memory ops
   llvm::DenseMap<unsigned, unsigned> memoryMap;
   
@@ -760,10 +761,10 @@ HandshakeExecuter::HandshakeExecuter(
       if (!allocateMemory(handshakeMemoryOp, memoryMap, store, storeTimes))
         llvm_unreachable("Memory op does not have unique ID!\n");
     // Set all return flags to false
-    } else if (auto handshakeReturnOp = dyn_cast<circt::handshake::DynamaticReturnOp>(op)) {
+    } else if (isa<circt::handshake::DynamaticReturnOp>(op)) {
       stateMap[op] = false;
     // Push the end op, as it contains no operands so never appears in readyList
-    } else if (auto handshakeEndOp = dyn_cast<circt::handshake::EndOp>(op)) {
+    } else if (isa<circt::handshake::EndOp>(op)) {
       readyList.push_back(op);
     }
   });
@@ -797,15 +798,16 @@ HandshakeExecuter::HandshakeExecuter(
 #endif
     assert(readyList.size() > 0 &&
            "Expected some instruction to be ready for execution");
-    mlir::Operation &op = *readyList.front();
+    circt::Operation &op = *readyList.front();
     readyList.pop_front();
 
     auto opName = op.getName().getStringRef().str();
     auto &execModel = models[opName];
+    errs() << "Trying to execute: " << opName << "\n";
     // Execute handshake operations
     if (execModel) {
       llvm::SmallVector<mlir::Value> scheduleList;
-      ExecutableData execData = {valueMap, memoryMap,    timeMap,
+      ExecutableData execData {valueMap, memoryMap,    timeMap,
                                  store,    scheduleList, models,
                                  stateMap};
       if (!execModel.get()->tryExecute(execData, op)) {
@@ -825,7 +827,7 @@ HandshakeExecuter::HandshakeExecuter(
         scheduleUses(readyList, valueMap, out);
 
       // If no value is left and we are and the end, leave
-      if (readyList.empty() && dyn_cast<circt::handshake::EndOp>(op))
+      if (readyList.empty() && isa<circt::handshake::EndOp>(op))
         return;
       
       continue;
@@ -990,7 +992,9 @@ LogicalResult simulate(StringRef toplevelFunction,
       auto memreftype = type.dyn_cast<mlir::MemRefType>();
       std::vector<Any> nothing;
       std::string x;
-      unsigned buffer = allocateMemRef(memreftype, nothing, store, storeTimes);
+      unsigned buffer;
+      if (allocateMemRef(memreftype, nothing, store, storeTimes, buffer).failed())
+        return failure();
       valueMap[blockArgs[i]] = buffer;
       timeMap[blockArgs[i]] = 0.0;
       // TODO : PR sur CIRCT... LOL
@@ -1017,13 +1021,12 @@ LogicalResult simulate(StringRef toplevelFunction,
         HandshakeExecuter(toplevel, valueMap, timeMap, results, resultTimes,
                           store, storeTimes, module, models)
             .succeeded();
-    // Final time
-    toplevel.walk([&](Operation *op) {
-      if (auto handshakeEndOp = dyn_cast<circt::handshake::EndOp>(op)) {
-        double finalTime = any_cast<double>(stateMap[op]);
-        outs() << "Finished execution in " << (int)finalTime << " cycles\n";
-      }
-    });
+
+    //  Final time
+    circt::handshake::EndOp endOp = *toplevel.getOps<circt::handshake::EndOp>().begin();
+    assert(endOp && "expected function to terminate with end operation");
+    double finalTime = any_cast<double>(stateMap[endOp]);
+    outs() << "Finished execution in " << (int)finalTime << " cycles\n";
   }
 
   if (!succeeded)

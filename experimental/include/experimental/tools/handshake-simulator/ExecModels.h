@@ -35,7 +35,8 @@ using StateMap = llvm::DenseMap<circt::Operation*, llvm::Any>;
 
 /// Data structure to hold memory controllers internal state
 struct MemoryControllerState {
-  llvm::SmallVector<AccessTypeEnum> accesses; // might be useless
+  /// Stores the accesses type in order
+  llvm::SmallVector<AccessTypeEnum> accesses;
   /// Stores the index of the operands containing stores addr
   llvm::SmallVector<unsigned> storesAddr;
   /// Stores the index of the operands containing stores data
@@ -46,12 +47,22 @@ struct MemoryControllerState {
 
 /// Data structure to hold informations passed to tryExecute functions
 struct ExecutableData {
+  /// Maps value (usually operands) to something to store
+  /// (comparable to RAM)
   llvm::DenseMap<mlir::Value, llvm::Any> &valueMap;
+  /// Maps memory controller ID to their offset value in store
+  /// (store[memoryMap[SOME_ID]] is the begenning of the allocated memory
+  /// area for this memory controller)
   llvm::DenseMap<unsigned, unsigned> &memoryMap;
+  /// Maps value (usually operands) to the clock cycle they were executed at
   llvm::DenseMap<mlir::Value, double> &timeMap;
+  /// Program's memory. Accessed via loads and stores
   std::vector<std::vector<llvm::Any>> &store;
+  /// List of scheduled operations
   llvm::SmallVector<mlir::Value> &scheduleList;
+  /// Maps execution model name to their corresponding structure
   ModelMap &models;
+  /// Maps operations to their corresponding internal state
   StateMap &stateMap;
 };
 

@@ -35,21 +35,6 @@ cycle clearly noted somewhere I think, but for now I have these two constants.
 // State tracking
 //===----------------------------------------------------------------------===//
 
-/* NOTE PR :
-We could completely remove theses methods but I let them here because I thought
-the internal state management was not really clear. You had to pass operations
-pointers to a map, use dyn cast ... It was redondant and not friendly for users.
-I like the idea of managing the states with very clear code and well-named 
-methods. Makes the code more readable too.
-
-On the other side, it is incoherent because the simulator already has tons of
-map to play with... Maybe this could be a refactoring idea for future udpates
-(using clear methods for these weirds maps) ?
-
-Can be removed in 30 seconds if we decide not to keep these methods, it's ok.
-I'll add them to the .h otherwise.
-*/
-
 /// Returns true if an internal state exists for the operation
 static inline bool internalStateExists(circt::Operation &opArg,
                                        StateMap &stateMap) {
@@ -158,11 +143,11 @@ MemoryControllerState
 parseOperandIndex(circt::handshake::MemoryControllerOp &op) {
   MemoryControllerState memControllerData;
   unsigned operandIndex = 1; // ignores memref operand
-  unsigned bbIndex = 0;
+  //unsigned bbIndex = 0;
 
   // Parses the operand list
   auto accessesPerBB = op.getAccesses();
-  for (auto &accesses : accessesPerBB) {
+  for (auto [bbIndex, accesses] : llvm::enumerate(accessesPerBB)) { 
     auto accessesArray = accesses.dyn_cast<ArrayAttr>();
 
     if (op.bbHasControl(bbIndex))
@@ -194,11 +179,13 @@ void memoryTransfer(Value from, Value to, ExecutableData &data) {
   data.valueMap.erase(from);
 }
 
-/* NOTE PR :
-Might be a way to avoid having 'std::string("default.") +
-                     handshake::OPERATION::getOperationName().str()'
-at every line.
-*/
+/// Adds execution models to the map using the default.OPNAME name format
+template <typename Op, typename Model>
+void addDefault(ModelMap &modelStructuresMap) {
+  modelStructuresMap[std::string("default.") + Op::getOperationName().str()] =
+      std::make_unique<Model>();
+}
+
 LogicalResult
 dynamatic::experimental::initialiseMap(llvm::StringMap<std::string> &funcMap,
                                        ModelMap &models) {
@@ -215,55 +202,35 @@ dynamatic::experimental::initialiseMap(llvm::StringMap<std::string> &funcMap,
   // corresponding structure
   ModelMap modelStructuresMap;
   // ------------------------------------------------------------------------ //
-  //   ADD YOUR STRUCT TO THE BELOW MAP IF YOU WANT TO ADD EXECUTION MODELS   //
+  //   ADD YOUR STRUCT TO THE ABOVE MAP IF YOU WANT TO ADD EXECUTION MODELS   //
+  //                                                                          //
+  //   You only have to map a name, the one found in the configuration, to a  //
+  //   unique_ptr of your structure. See an example in the addDefault method  //
   // ------------------------------------------------------------------------ //
+
   // Default operations
-  modelStructuresMap[std::string("default.") +
-                     handshake::ForkOp::getOperationName().str()] =
-      std::make_unique<DefaultFork>();
-  modelStructuresMap[std::string("default.") +
-                     handshake::MergeOp::getOperationName().str()] =
-      std::make_unique<DefaultMerge>();
-  modelStructuresMap[std::string("default.") +
-                     handshake::MuxOp::getOperationName().str()] =
-      std::make_unique<DefaultMux>();
-  modelStructuresMap[std::string("default.") +
-                     handshake::BranchOp::getOperationName().str()] =
-      std::make_unique<DefaultBranch>();
-  modelStructuresMap[std::string("default.") +
-                     handshake::SinkOp::getOperationName().str()] =
-      std::make_unique<DefaultSink>();
-  modelStructuresMap[std::string("default.") +
-                     handshake::ConstantOp::getOperationName().str()] =
-      std::make_unique<DefaultConstant>();
-  modelStructuresMap[std::string("default.") +
-                     handshake::BufferOp::getOperationName().str()] =
-      std::make_unique<DefaultBuffer>();
-  modelStructuresMap[std::string("default.") +
-                     handshake::ConditionalBranchOp::getOperationName().str()] =
-      std::make_unique<DefaultConditionalBranch>();
-  modelStructuresMap[std::string("default.") +
-                     handshake::ControlMergeOp::getOperationName().str()] =
-      std::make_unique<DefaultControlMerge>();
+  addDefault<handshake::ForkOp, DefaultFork>(modelStructuresMap);
+  addDefault<handshake::MergeOp, DefaultMerge>(modelStructuresMap);
+  addDefault<handshake::MuxOp, DefaultMux>(modelStructuresMap);
+  addDefault<handshake::BranchOp, DefaultBranch>(modelStructuresMap);
+  addDefault<handshake::SinkOp, DefaultSink>(modelStructuresMap);
+  addDefault<handshake::ConstantOp, DefaultConstant>(modelStructuresMap);
+  addDefault<handshake::BufferOp, DefaultBuffer>(modelStructuresMap);
+  addDefault<handshake::ConditionalBranchOp, DefaultConditionalBranch>(modelStructuresMap);
+  addDefault<handshake::ControlMergeOp, DefaultControlMerge>(modelStructuresMap);
 
   // Dynamatic operations
-  modelStructuresMap[std::string("default.") +
-                     handshake::MemoryControllerOp::getOperationName().str()] =
-      std::make_unique<DynamaticMemController>();
-  modelStructuresMap[std::string("default.") +
-                     handshake::DynamaticLoadOp::getOperationName().str()] =
-      std::make_unique<DynamaticLoad>();
-  modelStructuresMap[std::string("default.") +
-                     handshake::DynamaticStoreOp::getOperationName().str()] =
-      std::make_unique<DynamaticStore>();
-  modelStructuresMap[std::string("default.") +
-                     handshake::DynamaticReturnOp::getOperationName().str()] =
-      std::make_unique<DynamaticReturn>();
-  modelStructuresMap[std::string("default.") +
-                     handshake::EndOp::getOperationName().str()] =
-      std::make_unique<DynamaticEnd>();
+  addDefault<handshake::MemoryControllerOp, DynamaticMemController>(modelStructuresMap);
+  addDefault<handshake::DynamaticLoadOp, DynamaticLoad>(modelStructuresMap);
+  addDefault<handshake::DynamaticStoreOp, DynamaticStore>(modelStructuresMap);
+  addDefault<handshake::DynamaticReturnOp, DynamaticReturn>(modelStructuresMap);
+  addDefault<handshake::EndOp, DynamaticEnd>(modelStructuresMap);
+
   // ------------------------------------------------------------------------ //
   //   ADD YOUR STRUCT TO THE ABOVE MAP IF YOU WANT TO ADD EXECUTION MODELS   //
+  //                                                                          //
+  //   You only have to map a name, the one found in the configuration, to a  //
+  //   unique_ptr of your structure. See an example in the addDefault method  //
   // ------------------------------------------------------------------------ //
 
   // Fill the map containing the final execution models structures
@@ -413,7 +380,8 @@ bool DefaultSink::tryExecute(ExecutableData &data, circt::Operation &opArg) {
   return true;
 }
 
-bool DefaultConstant::tryExecute(ExecutableData &data, circt::Operation &opArg) {
+bool DefaultConstant::tryExecute(ExecutableData &data,
+                                 circt::Operation &opArg) {
   auto op = dyn_cast<circt::handshake::ConstantOp>(opArg);
   auto executeFunc = [](std::vector<llvm::Any> &ins,
                         std::vector<llvm::Any> &outs, circt::Operation &op) {
@@ -444,11 +412,10 @@ bool DynamaticMemController::tryExecute(ExecutableData &data,
       llvm::any_cast<unsigned>(data.valueMap[op.getMemref()]);
 
   // Add an internal state to keep track of completed load/store requests
-  if (!internalStateExists(opArg, data.stateMap)) {
+  if (!internalStateExists(opArg, data.stateMap))
     setInternalState<MemoryControllerState>(opArg, parseOperandIndex(op),
                                             data.stateMap);
-  }
-
+  
   MemoryControllerState mcData;
   getInternalState<MemoryControllerState>(opArg, mcData, data.stateMap);
 
@@ -479,7 +446,7 @@ bool DynamaticMemController::tryExecute(ExecutableData &data,
     double time = std::max(dataTime, addressTime) + CYCLE_TIME_STORE_OP;
     data.timeMap[address] = time;
     data.timeMap[dataOperand] = time;
-    
+
     mcData.storesAddr.erase(mcData.storesAddr.begin() + i);
     mcData.storesData.erase(mcData.storesData.begin() + i);
     data.stateMap[&opArg] = mcData;
@@ -522,10 +489,9 @@ bool DynamaticLoad::tryExecute(ExecutableData &data, circt::Operation &opArg) {
   auto op = dyn_cast<circt::handshake::DynamaticLoadOp>(opArg);
 
   // Send address to mem controller if available
-  if (!data.valueMap.count(op.getAddressResult())) {
+  if (!data.valueMap.count(op.getAddressResult()))
     memoryTransfer(op.getAddress(), op.getAddressResult(), data);
-  }
-
+  
   // Send data to successor if available
   if (data.valueMap.count(op.getData())) {
     memoryTransfer(op.getData(), op.getDataResult(), data);
@@ -540,41 +506,37 @@ bool DynamaticStore::tryExecute(ExecutableData &data, circt::Operation &opArg) {
 
   // Add internal state to verify if the other operand has been sent
   // Not necessary but avoids some code duplication
-  if (!internalStateExists(opArg, data.stateMap)) {
+  if (!internalStateExists(opArg, data.stateMap))
     setInternalState<bool>(opArg, false, data.stateMap);
-  }
 
-  // NOTE PR : very duplicated code, not sure I should make a function for it
+  // Sends some data to memory and memorize that the data was sent
+  auto sendIfAvailable = [&](Value from, Value to) -> bool { 
+    bool otherOperand = false;
+    if (data.valueMap.count(from)) {
+      memoryTransfer(from, to, data);
+      // Verify that the other operand was sent to the mem controller, in which
+      // case we have to reschedule the operation or not
+      getInternalState(opArg, otherOperand, data.stateMap);
+      setInternalState(opArg, true, data.stateMap);
+    }
+    return otherOperand;
+  };
 
   // Send address to mem controller if available
-  if (data.valueMap.count(op.getAddress())) {
-    memoryTransfer(op.getAddress(), op.getAddressResult(), data);
-
-    bool otherOperand;
-    getInternalState(opArg, otherOperand, data.stateMap);
-    if (otherOperand)
-      return true;
-    setInternalState(opArg, true, data.stateMap);
-  }
-
+  if (sendIfAvailable(op.getAddress(), op.getAddressResult()))
+    return true;
   // Send data to mem controller if available
-  if (data.valueMap.count(op.getData())) {
-    memoryTransfer(op.getData(), op.getDataResult(), data);
-
-    bool otherOperand;
-    getInternalState(opArg, otherOperand, data.stateMap);
-    if (otherOperand)
-      return true;
-    setInternalState(opArg, true, data.stateMap);
-  }
+  if (sendIfAvailable(op.getData(), op.getDataResult()))
+    return true;
 
   return false;
 }
 
-bool DynamaticReturn::tryExecute(ExecutableData &data, circt::Operation &opArg) {
+bool DynamaticReturn::tryExecute(ExecutableData &data,
+                                 circt::Operation &opArg) {
   auto op = dyn_cast<circt::handshake::DynamaticReturnOp>(opArg);
   auto executeFunc = [&](std::vector<llvm::Any> &ins,
-                        std::vector<llvm::Any> &outs, circt::Operation &op) {
+                         std::vector<llvm::Any> &outs, circt::Operation &op) {
     for (unsigned i = 0; i < op.getNumOperands(); ++i)
       outs[i] = ins[i];
     data.stateMap[&op] = true;
@@ -587,15 +549,16 @@ bool DynamaticEnd::tryExecute(ExecutableData &data, circt::Operation &opArg) {
   double time = 0.0;
   for (auto &[opKey, state] : data.stateMap) {
     // Verify that all returns have been completed
-    if (auto returnOp = dyn_cast<circt::handshake::DynamaticReturnOp>(opKey)) {
+    if (isa<circt::handshake::DynamaticReturnOp>(opKey)) {
       bool completed = llvm::any_cast<bool>(state);
-      if (!completed) return false;
-      
+      if (!completed)
+        return false;
+
       for (unsigned i = 0; i < opKey->getNumResults(); ++i)
         time = std::max(time, data.timeMap[opKey->getResult(i)]);
-    } 
+    }
     // Verify all memory controllers are finished
-    if (auto memoryCtrlOp = dyn_cast<circt::handshake::MemoryControllerOp>(opKey)) {
+    if (isa<circt::handshake::MemoryControllerOp>(opKey)) {
       auto mcData = llvm::any_cast<MemoryControllerState>(state);
       if (!mcData.loadsAddr.empty())
         return false;
