@@ -64,10 +64,8 @@ static Value getSuccResult(Operation *termOp, Operation *newOp,
   if (auto condBranchOp = dyn_cast<mlir::cf::CondBranchOp>(termOp)) {
     if (condBranchOp.getTrueDest() == succBlock)
       return dyn_cast<handshake::ConditionalBranchOp>(newOp).getTrueResult();
-    else {
-      assert(condBranchOp.getFalseDest() == succBlock);
-      return dyn_cast<handshake::ConditionalBranchOp>(newOp).getFalseResult();
-    }
+    assert(condBranchOp.getFalseDest() == succBlock);
+    return dyn_cast<handshake::ConditionalBranchOp>(newOp).getFalseResult();
   }
   // If the block is unconditional, newOp has only one result
   return newOp->getResult(0);
