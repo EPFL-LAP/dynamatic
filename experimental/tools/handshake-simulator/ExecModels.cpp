@@ -22,12 +22,8 @@ using namespace mlir;
 using namespace circt;
 using namespace dynamatic::experimental;
 
-/* NOTE PR :
-a path for improvement would be to have a very nice and clear system for time.
-For now I'm pretty sure it is quite time inaccurate for some components
-(store, load mostly!). So the idea would be to have a simple system with every
-cycle clearly noted somewhere I think, but for now I have these two constants.
-*/
+/// Cycles it take for corresponding operations to execute
+/// Will be subject to changes in the future.
 #define CYCLE_TIME_LOAD_OP 4
 #define CYCLE_TIME_STORE_OP 2
 
@@ -139,15 +135,14 @@ static bool tryToExecute(
 
 /// Parses mem_controller operation operands and puts the corresponding index
 /// inside vectors to track each operand
-MemoryControllerState
+static MemoryControllerState
 parseOperandIndex(circt::handshake::MemoryControllerOp &op) {
   MemoryControllerState memControllerData;
-  unsigned operandIndex = 1; // ignores memref operand
-  //unsigned bbIndex = 0;
+  unsigned operandIndex = 1; // ignores memref operand (at index 0)
 
   // Parses the operand list
   auto accessesPerBB = op.getAccesses();
-  for (auto [bbIndex, accesses] : llvm::enumerate(accessesPerBB)) { 
+  for (auto [bbIndex, accesses] : llvm::enumerate(accessesPerBB)) {
     auto accessesArray = accesses.dyn_cast<ArrayAttr>();
 
     if (op.bbHasControl(bbIndex))
@@ -171,7 +166,7 @@ parseOperandIndex(circt::handshake::MemoryControllerOp &op) {
 }
 
 /// Transfers time and data between to stored element
-void memoryTransfer(Value from, Value to, ExecutableData &data) {
+static void memoryTransfer(Value from, Value to, ExecutableData &data) {
   data.valueMap[to] = data.valueMap[from];
   data.timeMap[to] = data.timeMap[from];
   // Tells all operations the data is available
@@ -181,7 +176,7 @@ void memoryTransfer(Value from, Value to, ExecutableData &data) {
 
 /// Adds execution models to the map using the default.OPNAME name format
 template <typename Op, typename Model>
-void addDefault(ModelMap &modelStructuresMap) {
+static void addDefault(ModelMap &modelStructuresMap) {
   modelStructuresMap[std::string("default.") + Op::getOperationName().str()] =
       std::make_unique<Model>();
 }

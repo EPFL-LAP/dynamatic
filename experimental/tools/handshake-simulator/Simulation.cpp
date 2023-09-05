@@ -52,10 +52,9 @@ llvm::DenseMap<circt::Operation*, llvm::Any> stateMap;
 // Utility functions
 //===----------------------------------------------------------------------===//
 
-namespace {
-
+/// Prettier printing for fatal errors
 template <typename T>
-void fatalValueError(StringRef reason, T &value) {
+static void fatalValueError(StringRef reason, T &value) {
   std::string err;
   llvm::raw_string_ostream os(err);
   os << reason << " ('";
@@ -67,50 +66,16 @@ void fatalValueError(StringRef reason, T &value) {
   llvm::report_fatal_error(err.c_str());
 }
 
-bool allocateMemory(circt::handshake::MemoryControllerOp &op,
-                    llvm::DenseMap<unsigned, unsigned> &memoryMap,
-                    std::vector<std::vector<llvm::Any>> &store,
-                    std::vector<double> &storeTimes) {
-  if (memoryMap.count(op.getId()))
-    return false;
-
-  auto type = op.getMemRefType();
-  std::vector<llvm::Any> in;
-
-  ArrayRef<int64_t> shape = type.getShape();
-  // Dynamatic only uses standard 1-dimension arrays for memory
-  int allocationSize = shape[0];
-  if (shape.size() != 1)
-    return false;
-
-  unsigned ptr = store.size();
-  store.resize(ptr + 1);
-  storeTimes.resize(ptr + 1);
-  store[ptr].resize(allocationSize);
-  storeTimes[ptr] = 0.0;
-  mlir::Type elementType = type.getElementType();
-  unsigned width = elementType.getIntOrFloatBitWidth();
-  for (size_t i = 0; i < allocationSize; i++) {
-    if (elementType.isa<mlir::IntegerType>()) 
-      store[ptr][i] = APInt(width, 0);
-    else if (elementType.isa<mlir::FloatType>()) 
-      store[ptr][i] = APFloat(0.0);
-    else 
-      llvm_unreachable("Unknown result type!\n");
-  }
-
-  memoryMap[op.getId()] = ptr;
-  return true;
-}
-
-void debugArg(const std::string &head, mlir::Value op, const APInt &value,
+/// Debug APInt type MLIR value
+static void debugArg(const std::string &head, mlir::Value op, const APInt &value,
               double time) {
   LLVM_DEBUG(dbgs() << "  " << head << ":  " << op << " = " << value
                     << " (APInt<" << value.getBitWidth() << ">) @" << time
                     << "\n");
 }
 
-void debugArg(const std::string &head, mlir::Value op, const Any &value,
+/// Debug MLIR value
+static void debugArg(const std::string &head, mlir::Value op, const Any &value,
               double time) {
   if (auto *val = any_cast<APInt>(&value)) {
     debugArg(head, op, *val, time);
@@ -125,7 +90,8 @@ void debugArg(const std::string &head, mlir::Value op, const Any &value,
   }
 }
 
-Any readValueWithType(mlir::Type type, std::stringstream &arg) {
+/// Read a MLIR value from a stringstream and returns a casted version
+static Any readValueWithType(mlir::Type type, std::stringstream &arg) {
   if (type.isIndex()) {
     int64_t x;
     arg >> x;
@@ -172,12 +138,14 @@ Any readValueWithType(mlir::Type type, std::stringstream &arg) {
   }
 }
 
-Any readValueWithType(mlir::Type type, std::string in) {
+/// readValueWithType overload to output content to a string
+static Any readValueWithType(mlir::Type type, std::string in) {
   std::stringstream stream(in);
   return readValueWithType(type, stream);
 }
 
-void printAnyValueWithType(llvm::raw_ostream &out, mlir::Type type,
+/// Print MLIR value according to it's type
+static void printAnyValueWithType(llvm::raw_ostream &out, mlir::Type type,
                            Any &value) {
   if (type.isa<mlir::IntegerType>() || type.isa<mlir::IndexType>()) {
     out << any_cast<APInt>(value).getSExtValue();
@@ -200,7 +168,7 @@ void printAnyValueWithType(llvm::raw_ostream &out, mlir::Type type,
 }
 
 /// Schedules an operation if not already scheduled.
-void scheduleIfNeeded(std::list<circt::Operation *> &readyList,
+static void scheduleIfNeeded(std::list<circt::Operation *> &readyList,
                       llvm::DenseMap<mlir::Value, Any> & /*valueMap*/,
                       circt::Operation *op) {
   if (std::find(readyList.begin(), readyList.end(), op) == readyList.end()) {
@@ -209,7 +177,7 @@ void scheduleIfNeeded(std::list<circt::Operation *> &readyList,
 }
 
 /// Schedules all operations that can be done with the entered value.
-void scheduleUses(std::list<circt::Operation *> &readyList,
+static void scheduleUses(std::list<circt::Operation *> &readyList,
                   llvm::DenseMap<mlir::Value, Any> &valueMap,
                   mlir::Value value) {
   for (auto &use : value.getUses()) {
@@ -221,7 +189,7 @@ void scheduleUses(std::list<circt::Operation *> &readyList,
 /// given store. Puts the pseudo-pointer to the new matrix in the
 /// store in memRefOffset (i.e. the first dimension index)
 /// Returns a failed result if the shape isn't uni-dimensional
-LogicalResult allocateMemRef(mlir::MemRefType type, std::vector<Any> &in,
+static LogicalResult allocateMemRef(mlir::MemRefType type, std::vector<Any> &in,
                         std::vector<std::vector<Any>> &store,
                         std::vector<double> &storeTimes,
                         unsigned &memRefOffset) {
@@ -249,7 +217,6 @@ LogicalResult allocateMemRef(mlir::MemRefType type, std::vector<Any> &in,
   memRefOffset = ptr;
   return success();
 }
-} // namespace
 
 //===----------------------------------------------------------------------===//
 // Handshake executer
@@ -756,12 +723,8 @@ HandshakeExecuter::HandshakeExecuter(
   llvm::DenseMap<unsigned, unsigned> memoryMap;
   
   func.walk([&](Operation *op) {
-    // Pre-allocate memory
-    if (auto handshakeMemoryOp = dyn_cast<circt::handshake::MemoryControllerOp>(op)) {
-      if (!allocateMemory(handshakeMemoryOp, memoryMap, store, storeTimes))
-        llvm_unreachable("Memory op does not have unique ID!\n");
     // Set all return flags to false
-    } else if (isa<circt::handshake::DynamaticReturnOp>(op)) {
+    if (isa<circt::handshake::DynamaticReturnOp>(op)) {
       stateMap[op] = false;
     // Push the end op, as it contains no operands so never appears in readyList
     } else if (isa<circt::handshake::EndOp>(op)) {
