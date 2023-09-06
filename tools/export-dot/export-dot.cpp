@@ -11,6 +11,7 @@
 //===----------------------------------------------------------------------===//
 
 #include "dynamatic/Support/DOTPrinter.h"
+#include "dynamatic/Support/TimingModels.h"
 #include "mlir/Dialect/Func/IR/FuncOps.h"
 #include "mlir/Dialect/LLVMIR/LLVMDialect.h"
 #include "mlir/Dialect/MemRef/IR/MemRef.h"
@@ -23,12 +24,24 @@
 
 using namespace llvm;
 using namespace mlir;
+using namespace dynamatic;
 
 static cl::OptionCategory mainCategory("Application options");
 
 static cl::opt<std::string> inputFileName(cl::Positional,
                                           cl::desc("<input file>"),
                                           cl::cat(mainCategory));
+
+static cl::opt<std::string> timingDBFilepath(
+    "timing-models", cl::Optional,
+    cl::desc(
+        "Relative path to JSON-formatted file containing timing "
+        "models for dataflow components. The tool only tries to "
+        "read from this file if it is ran in legacy mode, where "
+        "timing annotations are given to all nodes in the graph. By default, "
+        "contains the relative path (from the project's top-level directory) "
+        "to the file defining the default timing models in Dynamatic++."),
+    cl::init("data/components.json"), cl::cat(mainCategory));
 
 static cl::opt<bool> legacy(
     "legacy", cl::Optional,
@@ -82,6 +95,19 @@ int main(int argc, char **argv) {
   if (!module)
     return 1;
 
-  dynamatic::DOTPrinter printer(legacy, dotDebug);
+  if (legacy) {
+    // In legacy mode, read timing models for dataflow components from a
+    // JSON-formatted database
+    TimingDatabase timingDB(&context);
+    if (failed(TimingDatabase::readFromJSON(timingDBFilepath, timingDB))) {
+      llvm::errs() << "Failed to read timing database at \"" << timingDBFilepath
+                   << "\"\n";
+      return 1;
+    }
+    DOTPrinter printer(legacy, dotDebug, &timingDB);
+    return failed(printer.printDOT(*module));
+  }
+
+  DOTPrinter printer(legacy, dotDebug);
   return failed(printer.printDOT(*module));
 }
