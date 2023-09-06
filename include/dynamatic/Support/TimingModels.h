@@ -10,6 +10,9 @@
 //
 //===----------------------------------------------------------------------===//
 
+#ifndef DYNAMATIC_SUPPORT_TIMINGMODELS_H
+#define DYNAMATIC_SUPPORT_TIMINGMODELS_H
+
 #include "circt/Dialect/Handshake/HandshakeOps.h"
 #include "dynamatic/Support/LLVM.h"
 #include "mlir/Dialect/Func/IR/FuncOps.h"
@@ -60,9 +63,8 @@ bool fromJSON(const llvm::json::Value &value, BitwidthDepMetric<double> &metric,
 /// file. It stores the operation's (datawidth-dependent) latencies,
 /// (datawidth-dependent) data delays, valid wire delay, and ready wire delay.
 /// It also stores that same information for the operation's input ports (as a
-/// whole) and output ports (as a whole), acoompanied by a number of
-/// transparent/opaque buffer slots that may be present at the operation's
-/// ports.
+/// whole) and output ports (as a whole), accompanied by a number of transparent
+/// and opaque buffer slots that may be present at the operation's ports.
 struct TimingModel {
 public:
   struct PortModel {
@@ -91,6 +93,17 @@ public:
   PortModel inputModel;
   /// Output ports' timing model.
   PortModel outputModel;
+
+  /// Combinational delay from any valid input to a ready output pin.
+  double validToReady = 0.0;
+  /// Combinational delay from the condition input pin  to any valid output pin.
+  double condToValid = 0.0;
+  /// Combinational delay from the condition input pin to any ready output pin.
+  double condToReady = 0.0;
+  /// Combinational delay from any valid input pin to the condition output pin.
+  double validToCond = 0.0;
+  /// Combinational delay from any valid input to any data output.
+  double validToData = 0.0;
 };
 
 /// Deserializes a JSON value into a TimingModel. See ::llvm::json::Value's
@@ -170,3 +183,5 @@ bool fromJSON(const llvm::json::Value &value, unsigned &number,
               llvm::json::Path path);
 } // namespace json
 } // namespace llvm
+
+#endif // DYNAMATIC_SUPPORT_TIMINGMODELS_H

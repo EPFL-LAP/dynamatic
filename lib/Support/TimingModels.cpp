@@ -26,9 +26,6 @@ using namespace dynamatic;
 // TimingDatabse definitions
 //===----------------------------------------------------------------------===//
 
-/// Error string when no timing model can be found for an operation.
-static const std::string ERR_NO_MODEL = "No timing model found for operation";
-
 /// Returns the width of a type which must either be a NoneType, IntegerType, or
 /// FloatType.
 static unsigned getTypeWidth(Type type) {
@@ -54,9 +51,11 @@ static unsigned getOpDatawidth(Operation *op) {
   // Handshake operations have various semantics and must be handled on a
   // case-by-case basis
   return llvm::TypeSwitch<Operation *, unsigned>(op)
-      .Case<handshake::SOSTInterface>([&](handshake::SOSTInterface sostOp) {
-        return getTypeWidth(sostOp.getDataType());
-      })
+      .Case<handshake::MergeLikeOpInterface>(
+          [&](handshake::MergeLikeOpInterface mergeLikeOp) {
+            return getTypeWidth(
+                mergeLikeOp.getDataOperands().front().getType());
+          })
       .Case<handshake::BufferOp, handshake::ForkOp, handshake::LazyForkOp,
             handshake::BranchOp, handshake::SinkOp>(
           [&](auto) { return getTypeWidth(op->getOperand(0).getType()); })
@@ -66,14 +65,14 @@ static unsigned getOpDatawidth(Operation *op) {
           })
       .Case<handshake::SourceOp, handshake::ConstantOp>(
           [&](auto) { return getTypeWidth(op->getResult(0).getType()); })
-      .Case<handshake::ReturnOp, handshake::EndOp, handshake::JoinOp>(
+      .Case<handshake::DynamaticReturnOp, handshake::EndOp, handshake::JoinOp>(
           [&](auto) {
             unsigned maxWidth = 0;
             for (Type ty : op->getOperandTypes())
               maxWidth = std::max(maxWidth, getTypeWidth(ty));
             return maxWidth;
           })
-      .Case<handshake::LoadOp, handshake::StoreOp>([&](auto) {
+      .Case<handshake::DynamaticLoadOp, handshake::DynamaticStoreOp>([&](auto) {
         return std::max(getTypeWidth(op->getOperand(0).getType()),
                         getTypeWidth(op->getOperand(1).getType()));
       })
@@ -86,7 +85,7 @@ static unsigned getOpDatawidth(Operation *op) {
           })
       .Default([&](auto) {
         op->emitError() << "Operation is unsupported in timing model";
-        assert(false);
+        assert(false && "unsupported operation");
         return dynamatic::MAX_DATAWIDTH;
       });
 }
@@ -134,24 +133,19 @@ LogicalResult TimingDatabase::getLatency(Operation *op, double &latency) {
   const TimingModel *model = getModel(op);
   if (!model)
     return failure();
-  if (failed(model->latency.getCeilMetric(op, latency)))
-    return op->emitError()
-           << "Can't get latency from model with wide enough datawidth";
-  return success();
+
+  return model->latency.getCeilMetric(op, latency);
 }
 
 LogicalResult TimingDatabase::getInternalDelay(Operation *op, SignalType type,
                                                double &delay) {
   const TimingModel *model = getModel(op);
   if (!model)
-    return op->emitError() << ERR_NO_MODEL;
+    return failure();
 
   switch (type) {
   case SignalType::DATA:
-    if (failed(model->dataDelay.getCeilMetric(op, delay)))
-      return op->emitError() << "Can't get internal delay from model with wide "
-                                "enough datawidth";
-    return success();
+    return model->dataDelay.getCeilMetric(op, delay);
   case SignalType::VALID:
     delay = model->validDelay;
     return success();
@@ -165,17 +159,14 @@ LogicalResult TimingDatabase::getPortDelay(Operation *op, SignalType signalType,
                                            PortType portType, double &delay) {
   const TimingModel *model = getModel(op);
   if (!model)
-    return op->emitError() << ERR_NO_MODEL;
+    return failure();
 
   const TimingModel::PortModel &portModel =
       portType == PortType::IN ? model->inputModel : model->outputModel;
 
   switch (signalType) {
   case SignalType::DATA:
-    if (failed(portModel.dataDelay.getCeilMetric(op, delay)))
-      return op->emitError()
-             << "Can't get port delay from model with wide enough datawidth";
-    return success();
+    return portModel.dataDelay.getCeilMetric(op, delay);
   case SignalType::VALID:
     delay = portModel.validDelay;
     return success();
@@ -189,7 +180,7 @@ LogicalResult TimingDatabase::getTotalDelay(Operation *op, SignalType type,
                                             double &delay) {
   const TimingModel *model = getModel(op);
   if (!model)
-    return op->emitError() << ERR_NO_MODEL;
+    return failure();
 
   double unitDelay, inPortDelay, outPortDelay;
   if (failed(getInternalDelay(op, type, unitDelay)) ||
@@ -310,6 +301,11 @@ static const std::string DELAY_VALID[] = {"delay", "valid", "1"};
 static const std::string DELAY_READY[] = {"delay", "ready", "1"};
 static const std::string BUF_TRANS[] = {"transparentBuffer"};
 static const std::string BUF_OPAQUE[] = {"opaqueBuffer"};
+static const std::string DELAY_VR[] = {"delay", "VR"};
+static const std::string DELAY_CV[] = {"delay", "CV"};
+static const std::string DELAY_CR[] = {"delay", "CR"};
+static const std::string DELAY_VC[] = {"delay", "VC"};
+static const std::string DELAY_VD[] = {"delay", "VD"};
 
 bool dynamatic::fromJSON(const json::Value &value,
                          TimingModel::PortModel &model, json::Path path) {
@@ -320,7 +316,7 @@ bool dynamatic::fromJSON(const json::Value &value,
   }
 
   // Deserialize the data delays
-  FW_FALSE(deserializeNested(DELAY, object, model.validDelay, path));
+  FW_FALSE(deserializeNested(DELAY, object, model.dataDelay, path));
   // Deserialize the valid/ready delays
   FW_FALSE(deserializeNested(DELAY_VALID, object, model.validDelay, path));
   FW_FALSE(deserializeNested(DELAY_READY, object, model.readyDelay, path));
@@ -346,6 +342,13 @@ bool dynamatic::fromJSON(const json::Value &value, TimingModel &model,
   // Deserialize the valid/ready delay
   FW_FALSE(deserializeNested(DELAY_VALID, object, model.validDelay, path));
   FW_FALSE(deserializeNested(DELAY_READY, object, model.readyDelay, path));
+
+  // Deserialize the wire-to-wire delays
+  FW_FALSE(deserializeNested(DELAY_VR, object, model.validToReady, path));
+  FW_FALSE(deserializeNested(DELAY_CV, object, model.condToValid, path));
+  FW_FALSE(deserializeNested(DELAY_CR, object, model.condToReady, path));
+  FW_FALSE(deserializeNested(DELAY_VC, object, model.validToCond, path));
+  FW_FALSE(deserializeNested(DELAY_VD, object, model.validToData, path));
 
   // Deserialize the input ports' model
   if (const json::Value *value = object->get("inport")) {
