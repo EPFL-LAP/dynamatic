@@ -48,19 +48,19 @@ func.func @test1(%arg0 : i32, %arg1: i1) {
 // CHECK:           %[[VAL_23:.*]] = d_return %[[VAL_5]] : none
 // CHECK:           end %[[VAL_23]] : none
 // CHECK:         }
-func.func @test2 (%arg0 : i32, %arg1 : i1) {
-        %cst = arith.constant 1 : i32
-        %add = arith.addi %arg0, %cst : i32
-        cf.br ^bb1(%add : i32)
+func.func @test2(%arg0 : i32, %arg1 : i1) {
+  %cst = arith.constant 1 : i32
+  %add = arith.addi %arg0, %cst : i32
+  cf.br ^bb1(%add : i32)
 ^bb1(%x : i32):
-        cf.cond_br %arg1, ^bb2(%x: i32), ^bb3
+  cf.cond_br %arg1, ^bb2(%x: i32), ^bb3
 ^bb2(%y : i32):
-        %add2 = arith.addi %y, %cst : i32
+  %add2 = arith.addi %y, %cst : i32
   %cst2 = arith.constant 38 : i32
   %add3 = arith.addi %cst2, %cst2 : i32
-        cf.br ^bb1(%add2 : i32)
+  cf.br ^bb1(%add2 : i32)
 ^bb3:
-        return
+  return
 }
 
 // -----
@@ -82,21 +82,21 @@ func.func @test2 (%arg0 : i32, %arg1 : i1) {
 // CHECK:           %[[VAL_15:.*]] = d_return %[[VAL_1]] : none
 // CHECK:           end %[[VAL_15]] : none
 // CHECK:         }
-func.func @test3 () {
-        %b = arith.constant 0 : i1
+func.func @test3() {
+  %b = arith.constant 0 : i1
   %n = arith.constant 378 : i32
   %n1 = arith.constant 121378 : i32
-        cf.br ^bb1
+  cf.br ^bb1
 ^bb1:
-        cf.br ^bb2(%n : i32)
+  cf.br ^bb2(%n : i32)
 ^bb2(%n2 : i32):
   %add = arith.addi %n, %n2 : i32
   %add2 = arith.addi %n, %n2 : i32
-        cf.cond_br %b, ^bb3(%add: i32), ^bb4
+  cf.cond_br %b, ^bb3(%add: i32), ^bb4
 ^bb3(%y : i32):
-        cf.br ^bb2(%n : i32)
+  cf.br ^bb2(%n : i32)
 ^bb4:
-        return
+  return
 }
 
 // -----
@@ -130,29 +130,28 @@ func.func @test3 () {
 // CHECK:           %[[VAL_34:.*]] = arith.addi %[[VAL_22]], %[[VAL_31]] : i32
 // CHECK:           %[[VAL_35:.*]] = arith.addi %[[VAL_22]], %[[VAL_20]] : i32
 // CHECK:           %[[VAL_36:.*]] = constant %[[VAL_28]] {value = false} : i1
-// CHECK:           %[[VAL_37:.*]], %[[VAL_38:.*]] = cond_br %[[VAL_25]], %[[VAL_34]] : i32
-// CHECK:           %[[VAL_39:.*]], %[[VAL_21]] = cond_br %[[VAL_25]], %[[VAL_35]] : i32
-// CHECK:           %[[VAL_40:.*]] = merge %[[VAL_37]] : i32
-// CHECK:           %[[VAL_41:.*]] = d_return %[[VAL_3]] : none
-// CHECK:           end %[[VAL_41]] : none
+// CHECK:           %[[VAL_37:.*]], %[[VAL_21]] = cond_br %[[VAL_25]], %[[VAL_35]] : i32
+// CHECK:           %[[VAL_38:.*]] = merge %[[VAL_34]] : i32
+// CHECK:           %[[VAL_39:.*]] = d_return %[[VAL_3]] : none
+// CHECK:           end %[[VAL_39]] : none
 // CHECK:         }
-func.func @test4 (%arg0 : i32) {
-        %b = arith.constant 0 : i1
+func.func @test4(%arg0 : i32) {
+  %b = arith.constant 0 : i1
   %n = arith.constant 378 : i32
-        cf.br ^bb1
+  cf.br ^bb1
 ^bb1:
   %n1 = arith.constant 121378 : i32
   %b1 = arith.constant 0 : i1
-        cf.cond_br %b1, ^bb2(%n : i32), ^bb4
+  cf.cond_br %b1, ^bb2(%n : i32), ^bb4
 ^bb2(%n2 : i32):
   %add = arith.addi %n, %arg0 : i32
   %add2 = arith.addi %n, %n2 : i32
   %b2 = arith.constant 0 : i1
-        cf.cond_br %b, ^bb3(%add: i32), ^bb2(%add2: i32)
+  cf.cond_br %b, ^bb3(%add: i32), ^bb2(%add2: i32)
 ^bb3(%y : i32):
-        cf.br ^bb1
+  cf.br ^bb1
 ^bb4:
-        return
+  return
 }
 
 // -----
@@ -167,14 +166,14 @@ func.func @test4 (%arg0 : i32) {
 // CHECK:           %[[VAL_6:.*]] = d_return %[[VAL_1]] : none
 // CHECK:           end %[[VAL_6]] : none
 // CHECK:         }
-func.func @test5 () {
-        %cst = arith.constant 1 : i32
-        cf.br ^bb1(%cst : i32)
+func.func @test5() {
+  %cst = arith.constant 1 : i32
+  cf.br ^bb1(%cst : i32)
 ^bb1(%x : i32):
-        cf.br ^bb2(%cst: i32)
+  cf.br ^bb2(%cst: i32)
 ^bb2(%y : i32):
-        %add2 = arith.addi %y, %x : i32
-        return
+  %add2 = arith.addi %y, %x : i32
+  return
 }
 
 // -----
@@ -198,7 +197,7 @@ func.func @test5 () {
 // CHECK:           %[[VAL_17:.*]] = d_return %[[VAL_3]] : none
 // CHECK:           end %[[VAL_17]] : none
 // CHECK:         }
-func.func @test6 (%arg0 : i32) {
+func.func @test6(%arg0 : i32) {
   %cst = arith.constant 7776343 : i32
   cf.br ^bb1
 ^bb1:
@@ -231,7 +230,7 @@ func.func @test6 (%arg0 : i32) {
 // CHECK:           %[[VAL_15:.*]] = d_return %[[VAL_1]] : none
 // CHECK:           end %[[VAL_15]] : none
 // CHECK:         }
-func.func @test7 () {
+func.func @test7() {
   %b = arith.constant 1 : i1
   cf.br ^bb1
 ^bb1:
@@ -270,19 +269,19 @@ func.func @test7 () {
 // CHECK:           %[[VAL_22:.*]] = d_return %[[VAL_1]] : none
 // CHECK:           end %[[VAL_22]] : none
 // CHECK:         }
-func.func @test8 () {
+func.func @test8() {
   %n = arith.constant 378 : i32
-        cf.br ^bb1
+  cf.br ^bb1
 ^bb1:
   %n1 = arith.constant 133378 : i32
   %b1 = arith.constant 0 : i1
-        cf.cond_br %b1, ^bb2(%n : i32), ^bb4
+  cf.cond_br %b1, ^bb2(%n : i32), ^bb4
 ^bb2(%x2 : i32):
   %add2 = arith.addi %n, %x2 : i32
   %b2 = arith.constant 0 : i1
-        cf.cond_br %b2, ^bb3, ^bb2(%add2: i32)
+  cf.cond_br %b2, ^bb3, ^bb2(%add2: i32)
 ^bb3:
-        cf.br ^bb1
+  cf.br ^bb1
 ^bb4:
-        return
+  return
 }

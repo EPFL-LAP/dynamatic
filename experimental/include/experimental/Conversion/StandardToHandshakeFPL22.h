@@ -40,21 +40,21 @@ DenseMap<Block *, BlockLoopInfo> findLoopDetails(CFGLoopInfo &li,
 
 /// Find CFGLoop which is the least common ancestor loop. If not found, nullptr
 /// is returned.
-CFGLoop *findLCALoop(CFGLoop *innermostLoopOfBB1, CFGLoop *innermostLoopOfBB2);
+CFGLoop *findLCALoop(CFGLoop *loop, CFGLoop *otherLoop);
 
-// This class is used to inherit from FPGA18's standard-to-handshake lowering
-// infrastructure and implementation while providing us a way to
-// change/add/remove/reorder specific conversion steps to match FPL22's elastic
-// pass.
+/// This class is used to inherit from FPGA18's standard-to-handshake lowering
+/// infrastructure and implementation while providing us a way to
+/// change/add/remove/reorder specific conversion steps to match FPL22's elastic
+/// pass.
 class HandshakeLoweringFPL22 : public HandshakeLoweringFPGA18 {
 public:
-  struct TokenMissmatchMergeOp {
+  struct TokenMismatchMergeOp {
     Operation *mergeOp;
     Backedge mergeBackedge;
     CFGLoop *loop;
   };
 
-  using TokenMissmatchMergeOps = std::vector<TokenMissmatchMergeOp>;
+  using TokenMismatchMergeOps = std::vector<TokenMismatchMergeOp>;
 
   /// Constructor simply forwards its arguments to the parent class.
   explicit HandshakeLoweringFPL22(Region &r) : HandshakeLoweringFPGA18(r) {}
@@ -63,12 +63,13 @@ public:
   /// the start control to all blocks.
   LogicalResult createStartCtrl(ConversionPatternRewriter &rewriter);
 
-  /// Preventing a token missmatch by adding additional merges to the loop
+  /// Preventing a token mismatch by adding additional merges to the loop
   /// header block.
-  TokenMissmatchMergeOps handleTokenMissmatch(
-      DenseMap<Value, std::set<Block *>> &valueIsConsumedInBlocksMap,
-      DenseMap<Block *, BlockLoopInfo> &blockToLoopInfoMap,
-      BackedgeBuilder &edgeBuilder, ConversionPatternRewriter &rewriter);
+  TokenMismatchMergeOps
+  handleTokenMismatch(DenseMap<Value, mlir::DenseSet<Block *>> &valueConsumers,
+                      DenseMap<Block *, BlockLoopInfo> &blockToLoopInfoMap,
+                      BackedgeBuilder &edgeBuilder,
+                      ConversionPatternRewriter &rewriter);
 
   /// Inserts a merge for a block argument.
   MergeOpInfo insertMerge(Block *block, Value val, BackedgeBuilder &edgeBuilder,
@@ -78,17 +79,16 @@ public:
   BlockOps insertMergeOps(ValueMap &mergePairs, BackedgeBuilder &edgeBuilder,
                           ConversionPatternRewriter &rewriter);
 
-  /// Adding both SSA merges and merges used to prevent token missmatch.
-  /// For each token missmatch merge, handshake level branch is inserted to
+  /// Adding both SSA merges and merges used to prevent token mismatch.
+  /// For each token mismatch merge, handshake level branch is inserted to
   /// prevent connecting the merge output directly to its input.
-  LogicalResult
-  addMergeOps(ConversionPatternRewriter &rewriter,
-              DenseMap<Value, std::set<Block *>> &valueIsConsumedInBlocksMap);
+  LogicalResult addMergeOps(ConversionPatternRewriter &rewriter,
+                            DenseMap<Value, mlir::DenseSet<Block *>> &valueConsumers);
 
   /// Lower std level branch operations to handshake level.
-  LogicalResult lowerBranchesToHandshake(
-      ConversionPatternRewriter &rewriter,
-      DenseMap<Value, std::set<Block *>> &valueIsConsumedInBlocksMap);
+  LogicalResult
+  lowerBranchesToHandshake(ConversionPatternRewriter &rewriter,
+                           DenseMap<Value, mlir::DenseSet<Block *>> &valueConsumers);
 };
 
 #define GEN_PASS_DECL_STANDARDTOHANDSHAKEFPL22

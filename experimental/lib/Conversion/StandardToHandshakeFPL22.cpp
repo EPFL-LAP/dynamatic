@@ -33,8 +33,8 @@ using namespace dynamatic::experimental;
   if (failed(logicalResult))                                                   \
     return failure();
 
-using TokenMissmatchMergeOps =
-    std::vector<HandshakeLoweringFPL22::TokenMissmatchMergeOp>;
+using TokenMismatchMergeOps =
+    std::vector<HandshakeLoweringFPL22::TokenMismatchMergeOp>;
 
 // ============================================================================
 // Helper functions
@@ -69,25 +69,6 @@ static Value getSuccResult(Operation *termOp, Operation *newOp,
   }
   // If the block is unconditional, newOp has only one result
   return newOp->getResult(0);
-}
-
-// ============================================================================
-// Concrete lowering steps
-// ============================================================================
-
-LogicalResult
-HandshakeLoweringFPL22::createStartCtrl(ConversionPatternRewriter &rewriter) {
-
-  // Add start point of the control-only path to the entry block's arguments
-  Block *entryBlock = &r.front();
-  startCtrl =
-      entryBlock->addArgument(rewriter.getNoneType(), rewriter.getUnknownLoc());
-
-  // Connect each block to startCtrl
-  for (auto &block : r.getBlocks())
-    setBlockEntryControl(&block, startCtrl);
-
-  return success();
 }
 
 // ============================================================================
@@ -167,6 +148,21 @@ partiallyLowerOp(const PartialLowerFuncOp::PartialLoweringFunc &loweringFunc,
   return applyPartialConversion(op, target, std::move(patterns));
 }
 
+LogicalResult
+HandshakeLoweringFPL22::createStartCtrl(ConversionPatternRewriter &rewriter) {
+
+  // Add start point of the control-only path to the entry block's arguments
+  Block *entryBlock = &r.front();
+  startCtrl =
+      entryBlock->addArgument(rewriter.getNoneType(), rewriter.getUnknownLoc());
+
+  // Connect each block to startCtrl
+  for (auto &block : r.getBlocks())
+    setBlockEntryControl(&block, startCtrl);
+
+  return success();
+}
+
 static void removeBlockOperands(Region &f) {
   // Remove all block arguments, they are no longer used
   // eraseArguments also removes corresponding branch operands
@@ -214,24 +210,27 @@ static unsigned getBlockPredecessorCount(Block *block) {
   return std::distance(predecessors.begin(), predecessors.end());
 }
 
+// This function tracks the usage of a producedValue within multiple blocks. If
+// value is passed as a block argument and the block argument is used within
+// that block, producedValue is also considered used in the corresponing block.
+// Note that value can be passed through multiple blocks and not be used in any
+// of these blocks until the last one in the block lists, so this analysis help
+// us to avoid uneccessary placement of branches for those kind of values in
+// blocks where they are not used.
 static void producedValueDataflowAnalysis(
-    Value producedValue,
-    DenseMap<Value, std::set<Block *>> &valueIsConsumedInBlocksMap) {
-  std::set<Block *> visitedBlocks;
+    Value producedValue, DenseMap<Value, mlir::DenseSet<Block *>> &valueConsumers) {
+  mlir::SmallPtrSet<Block *, 4> visitedBlocks;
   SmallVector<Value, 4> producedValues;
   producedValues.push_back(producedValue);
 
-  // Check if Value is already added to the map
-  if (valueIsConsumedInBlocksMap.find(producedValue) ==
-      valueIsConsumedInBlocksMap.end()) {
-    std::set<Block *> blockSet;
-    valueIsConsumedInBlocksMap[producedValue] = blockSet;
-  }
+  // Add value to the map
+  mlir::DenseSet<Block *> vcSet;
+  valueConsumers[producedValue] = vcSet;
 
   while (!producedValues.empty()) {
     Value &val = producedValues.front();
 
-    std::set<Operation *> visitedUserOps;
+    mlir::SmallPtrSet<Operation *, 4> visitedUserOps;
     for (const auto &consumerOp : val.getUsers()) {
       if (visitedUserOps.find(consumerOp) != visitedUserOps.end())
         // If user operation is already visited
@@ -242,10 +241,11 @@ static void producedValueDataflowAnalysis(
       // Check if consumer operation is branch and the Value is not used
       // in any other operation of that block. Note that branch operation
       // is always the terminator operation of a block.
+      Block *consumerBlock = consumerOp->getBlock();
       if (isa<BranchOpInterface>(*consumerOp) &&
-          visitedBlocks.find(consumerOp->getBlock()) == visitedBlocks.end()) {
+          visitedBlocks.find(consumerBlock) == visitedBlocks.end()) {
 
-        visitedBlocks.insert(consumerOp->getBlock());
+        visitedBlocks.insert(consumerBlock);
 
         // Values are passed through a branch to successor blocks.
         // Therefore, the op operands are mapped to the coresponding block
@@ -254,39 +254,33 @@ static void producedValueDataflowAnalysis(
           // If Value is used as a condition of a CondBranchOp, it is
           // considered used in the block.
           if (condBranchOp.getCondition() == val) {
-            valueIsConsumedInBlocksMap[producedValue].insert(
-                consumerOp->getBlock());
+            valueConsumers[producedValue].insert(consumerBlock);
             continue;
           }
 
           // Get block arguments of a true dest block
-          for (size_t idx = 0; idx < condBranchOp.getTrueDestOperands().size();
-               idx++) {
-            BlockArgument argOperand =
-                condBranchOp.getTrueDest()->getArgument(idx);
-            if (argOperand)
-              producedValues.push_back(argOperand);
-          }
+          for (auto [brOpr, blockArg] :
+               llvm::zip_equal(condBranchOp.getTrueDestOperands(),
+                               condBranchOp.getTrueDest()->getArguments()))
+            if (brOpr == val)
+              producedValues.push_back(blockArg);
           // Get block arguments of a false dest block
-          for (size_t idx = 0; idx < condBranchOp.getFalseDestOperands().size();
-               idx++) {
-            BlockArgument argOperand =
-                condBranchOp.getFalseDest()->getArgument(idx);
-            if (argOperand)
-              producedValues.push_back(argOperand);
-          }
-        } else if (auto branchOp = dyn_cast<mlir::cf::BranchOp>(consumerOp)) {
-          for (size_t idx = 0; idx < branchOp.getOperands().size(); idx++) {
-            BlockArgument argOperand = branchOp.getDest()->getArgument(idx);
-            if (argOperand)
-              producedValues.push_back(argOperand);
-          }
-        }
+          for (auto [brOpr, blockArg] :
+               llvm::zip_equal(condBranchOp.getFalseDestOperands(),
+                               condBranchOp.getFalseDest()->getArguments()))
+            if (brOpr == val)
+              producedValues.push_back(blockArg);
+
+        } else if (auto branchOp = dyn_cast<mlir::cf::BranchOp>(consumerOp))
+          for (auto [brOpr, blockArg] : llvm::zip_equal(
+                   branchOp.getOperands(), branchOp.getDest()->getArguments()))
+            if (brOpr == val)
+              producedValues.push_back(blockArg);
+
       } else if (!isa<BranchOpInterface>(*consumerOp)) {
         // Value is used by a non-branch Operation, so it is used in the
         // Operation's parent Block
-        valueIsConsumedInBlocksMap[producedValue].insert(
-            consumerOp->getBlock());
+        valueConsumers[producedValue].insert(consumerOp->getBlock());
       }
     }
 
@@ -296,30 +290,28 @@ static void producedValueDataflowAnalysis(
 
 // Analysis that returns a data structure that maps each Value to the Blocks
 // where it is actually consumed.
-static DenseMap<Value, std::set<Block *>> runDataflowAnalysis(Region &r) {
-  DenseMap<Value, std::set<Block *>> valueIsConsumedInBlocksMap;
+static DenseMap<Value, mlir::DenseSet<Block *>> runDataflowAnalysis(Region &r) {
+  DenseMap<Value, mlir::DenseSet<Block *>> valueConsumers;
 
   // Traversing entry block arguments
   for (auto &blockArg : r.getBlocks().front().getArguments())
-    producedValueDataflowAnalysis(blockArg, valueIsConsumedInBlocksMap);
+    producedValueDataflowAnalysis(blockArg, valueConsumers);
 
   // Traverse operation result values
   for (auto &block : r.getBlocks())
     for (auto &producerOp : block.getOperations())
       for (const auto &producerOpResult : producerOp.getResults())
-        producedValueDataflowAnalysis(producerOpResult,
-                                      valueIsConsumedInBlocksMap);
+        producedValueDataflowAnalysis(producerOpResult, valueConsumers);
 
-  return valueIsConsumedInBlocksMap;
+  return valueConsumers;
 }
 
-// Inserting a branch for a token missmatch prevention merge, and connecting the
+// Inserting a branch for a token mismatch prevention merge, and connecting the
 // branch output to the merge input.
-static void
-resolveMergeBackedges(TokenMissmatchMergeOps &preventTokenMissmatchMerges,
-                      ConversionPatternRewriter &rewriter) {
+static void resolveMergeBackedges(TokenMismatchMergeOps &mismatchMerges,
+                                  ConversionPatternRewriter &rewriter) {
 
-  for (auto &m : preventTokenMissmatchMerges) {
+  for (auto &m : mismatchMerges) {
     rewriter.setInsertionPointAfter(m.mergeOp);
     auto insertLoc = m.mergeOp->getLoc();
 
@@ -345,15 +337,14 @@ resolveMergeBackedges(TokenMissmatchMergeOps &preventTokenMissmatchMerges,
 }
 
 static void processProducedValues(
-    Value producedValue,
-    DenseMap<Value, std::set<Block *>> &valueIsConsumedInBlocksMap,
-    TokenMissmatchMergeOps &preventTokenMissmatchMerges,
-    BackedgeBuilder &edgeBuilder, ConversionPatternRewriter &rewriter,
+    Value producedValue, DenseMap<Value, mlir::DenseSet<Block *>> &valueConsumers,
+    TokenMismatchMergeOps &mismatchMerges, BackedgeBuilder &edgeBuilder,
+    ConversionPatternRewriter &rewriter,
     DenseMap<Block *, BlockLoopInfo> blockToLoopInfoMap,
     DenseMap<Block *, DenseMap<Value, Operation *>> &mapLoopHeaderBlocks) {
 
   // Saving all producedValue user operations before any merge insertion
-  std::set<Operation *> opSet;
+  mlir::DenseSet<Operation *> opSet;
   for (const auto &consumerOp : producedValue.getUsers())
     opSet.insert(consumerOp);
 
@@ -363,9 +354,8 @@ static void processProducedValues(
 
     // If producedValue is not used in consumerOp's block, don't insert
     // the merge
-    if (valueIsConsumedInBlocksMap[producedValue].find(
-            consumerOp->getBlock()) ==
-        valueIsConsumedInBlocksMap[producedValue].end())
+    if (valueConsumers[producedValue].find(consumerOp->getBlock()) ==
+        valueConsumers[producedValue].end())
       continue;
 
     // Find common loop for producer's and consumer's blocks
@@ -376,15 +366,13 @@ static void processProducedValues(
     CFGLoop *commonLoop =
         findLCALoop(producersInnermostLoop, consumersInnermostLoop);
 
-    int commonLoopDepth = commonLoop ? commonLoop->getLoopDepth() : 0;
-    int consumerLoopDepth =
+    unsigned consumerLoopDepth =
         consumersInnermostLoop ? consumersInnermostLoop->getLoopDepth() : 0;
+    unsigned producerLoopDepth =
+        producersInnermostLoop ? producersInnermostLoop->getLoopDepth() : 0;
 
-    int numOfMerges = consumerLoopDepth - commonLoopDepth;
-
-    if (numOfMerges < 0)
-      // Token missmatch when token produced multiple times needs to be consumed
-      // once
+    if (producerLoopDepth > consumerLoopDepth)
+      // Token produced multiple times is consumed once.
       continue;
 
     SmallVector<Backedge, 2> prevMergeInputBackedges;
@@ -395,10 +383,8 @@ static void processProducedValues(
 
       // Check if consumer Block is already added to the map
       auto blockIt = mapLoopHeaderBlocks.find(loopHeader);
-      if (blockIt == mapLoopHeaderBlocks.end()) {
-        DenseMap<Value, Operation *> dm;
-        mapLoopHeaderBlocks[loopHeader] = dm;
-      }
+      if (blockIt == mapLoopHeaderBlocks.end())
+        mapLoopHeaderBlocks[loopHeader] = DenseMap<Value, Operation *>{};
 
       // Check if merge for producers result is already inserted at the
       // beginning of the consumer's block
@@ -435,9 +421,8 @@ static void processProducedValues(
           rewriter.create<handshake::MergeOp>(insertLoc, operands);
       mapLoopHeaderBlocks[loopHeader][producedValue] = mergeOp;
 
-      preventTokenMissmatchMerges.push_back(
-          HandshakeLoweringFPL22::TokenMissmatchMergeOp{
-              mergeOp, secondInputBackedge, currLoop});
+      mismatchMerges.push_back(HandshakeLoweringFPL22::TokenMismatchMergeOp{
+          mergeOp, secondInputBackedge, currLoop});
 
       // Replace uses of producer's operation result in all loop blocks
       // with the merge output
@@ -469,12 +454,12 @@ static void processProducedValues(
   }
 }
 
-TokenMissmatchMergeOps HandshakeLoweringFPL22::handleTokenMissmatch(
-    DenseMap<Value, std::set<Block *>> &valueIsConsumedInBlocksMap,
+TokenMismatchMergeOps HandshakeLoweringFPL22::handleTokenMismatch(
+    DenseMap<Value, mlir::DenseSet<Block *>> &valueConsumers,
     DenseMap<Block *, BlockLoopInfo> &blockToLoopInfoMap,
     BackedgeBuilder &edgeBuilder, ConversionPatternRewriter &rewriter) {
 
-  TokenMissmatchMergeOps preventTokenMissmatchMerges;
+  TokenMismatchMergeOps mismatchMerges;
 
   // Each loop header Block should only contain one MergeOp for a Value produced
   // in another Block outside the loop.
@@ -487,9 +472,9 @@ TokenMissmatchMergeOps HandshakeLoweringFPL22::handleTokenMissmatch(
       // MemRef values are handled separately
       if (blockArg.isUsedOutsideOfBlock(&block) &&
           !blockArg.getType().isa<mlir::MemRefType>())
-        processProducedValues(
-            blockArg, valueIsConsumedInBlocksMap, preventTokenMissmatchMerges,
-            edgeBuilder, rewriter, blockToLoopInfoMap, mapLoopHeaderBlocks);
+        processProducedValues(blockArg, valueConsumers, mismatchMerges,
+                              edgeBuilder, rewriter, blockToLoopInfoMap,
+                              mapLoopHeaderBlocks);
 
     // Process Values produced in Operations
     for (auto &producerOp : block.getOperations()) {
@@ -499,14 +484,13 @@ TokenMissmatchMergeOps HandshakeLoweringFPL22::handleTokenMissmatch(
       for (const auto &producerOpResult : producerOp.getResults())
         // MemRef values are handled separately
         if (!producerOpResult.getType().isa<mlir::MemRefType>())
-          processProducedValues(producerOpResult, valueIsConsumedInBlocksMap,
-                                preventTokenMissmatchMerges, edgeBuilder,
-                                rewriter, blockToLoopInfoMap,
-                                mapLoopHeaderBlocks);
+          processProducedValues(producerOpResult, valueConsumers,
+                                mismatchMerges, edgeBuilder, rewriter,
+                                blockToLoopInfoMap, mapLoopHeaderBlocks);
     }
   }
 
-  return preventTokenMissmatchMerges;
+  return mismatchMerges;
 }
 
 HandshakeLowering::MergeOpInfo
@@ -559,10 +543,8 @@ HandshakeLoweringFPL22::insertMerge(Block *block, Value val,
     return MergeOpInfo{merge, val, dataEdges};
   }
 
-  // Create a backedge for for each data operand. The index operand will
-  // eventually resolve to the current block's control merge index output, while
-  // data operands will resolve to their respective values from each block
-  // predecessor
+  // Create a backedge for for each data operand. Data operands will resolve to
+  // their respective values from each block predecessor
   for (unsigned i = 0; i < numPredecessors; i++) {
     auto edge = edgeBuilder.get(val.getType());
     dataEdges.push_back(edge);
@@ -595,19 +577,18 @@ HandshakeLoweringFPL22::insertMergeOps(HandshakeLowering::ValueMap &mergePairs,
   return blockMerges;
 }
 
-static bool
-isTokenMissmatchMergeOp(TokenMissmatchMergeOps &preventTokenMissmatchMerges,
-                        Operation *opp) {
-  for (const auto &mergeOpInfo : preventTokenMissmatchMerges)
+static bool isTokenMismatchMergeOp(TokenMismatchMergeOps &mismatchMerges,
+                                   Operation *opp) {
+  for (const auto &mergeOpInfo : mismatchMerges)
     if (mergeOpInfo.mergeOp == opp)
       return true;
   return false;
 }
 
-static void
-reconnectSSAMergeOps(Region &r, HandshakeLowering::BlockOps blockMerges,
-                     HandshakeLowering::ValueMap &mergePairs,
-                     TokenMissmatchMergeOps &preventTokenMissmatchMerges) {
+static void reconnectSSAMergeOps(Region &r,
+                                 HandshakeLowering::BlockOps blockMerges,
+                                 HandshakeLowering::ValueMap &mergePairs,
+                                 TokenMismatchMergeOps &mismatchMerges) {
   // At this point all merge-like operations have backedges as operands.
   // We here replace all backedge values with appropriate value from
   // predecessor block. The predecessor can either be a merge, the original
@@ -633,7 +614,7 @@ reconnectSSAMergeOps(Region &r, HandshakeLowering::BlockOps blockMerges,
       for (Block &b : r)
         for (Operation &opp : b)
           if (!isa<MergeLikeOpInterface>(opp) ||
-              isTokenMissmatchMergeOp(preventTokenMissmatchMerges, &opp))
+              isTokenMismatchMergeOp(mismatchMerges, &opp))
             opp.replaceUsesOfWith(mergeInfo.val, mergeInfo.op->getResult(0));
     }
   }
@@ -643,11 +624,11 @@ reconnectSSAMergeOps(Region &r, HandshakeLowering::BlockOps blockMerges,
 
 LogicalResult HandshakeLoweringFPL22::addMergeOps(
     ConversionPatternRewriter &rewriter,
-    DenseMap<Value, std::set<Block *>> &valueIsConsumedInBlocksMap) {
+    DenseMap<Value, mlir::DenseSet<Block *>> &valueConsumers) {
 
-  // Merge operations added for token missmatch prevention. Backedges will be
+  // Merge operations added for token mismatch prevention. Backedges will be
   // resolved during the branch insertion for token missmarch prevention merges.
-  TokenMissmatchMergeOps preventTokenMissmatchMerges;
+  TokenMismatchMergeOps mismatchMerges;
 
   // Create backedge builder to manage operands of merge operations between
   // insertion and reconnection
@@ -661,16 +642,16 @@ LogicalResult HandshakeLoweringFPL22::addMergeOps(
   DenseMap<Block *, BlockLoopInfo> blockToLoopInfoMap = findLoopDetails(li, r);
 
   // Iterate through all producer-consumer pairs and see if a token
-  // missmatch occurs. One example of token missmatch is when a producers is
+  // mismatch occurs. One example of token mismatch is when a producers is
   // outside the loop and consumer is inside. In that case token produced once
   // needs to be consumed multiple times. This is solved by adding merge
   // operations where merge result is also one of the input operands.
-  preventTokenMissmatchMerges = handleTokenMissmatch(
-      valueIsConsumedInBlocksMap, blockToLoopInfoMap, edgeBuilder, rewriter);
+  mismatchMerges = handleTokenMismatch(valueConsumers, blockToLoopInfoMap,
+                                       edgeBuilder, rewriter);
 
-  // Inserting a branch for a token missmatch prevention merge, and connecting
+  // Inserting a branch for a token mismatch prevention merge, and connecting
   // the branch output to the merge input.
-  resolveMergeBackedges(preventTokenMissmatchMerges, rewriter);
+  resolveMergeBackedges(mismatchMerges, rewriter);
 
   // Stores mapping from each value that pass through a merge operation to the
   // first result of that merge operation
@@ -682,14 +663,14 @@ LogicalResult HandshakeLoweringFPL22::addMergeOps(
 
   // Reconnect merge operations with values incoming from predecessor blocks
   // and resolve all backedges that were created during merge insertion
-  reconnectSSAMergeOps(r, mergeOps, mergePairs, preventTokenMissmatchMerges);
+  reconnectSSAMergeOps(r, mergeOps, mergePairs, mismatchMerges);
 
   return success();
 }
 
 LogicalResult HandshakeLoweringFPL22::lowerBranchesToHandshake(
     ConversionPatternRewriter &rewriter,
-    DenseMap<Value, std::set<Block *>> &valueIsConsumedInBlocksMap) {
+    DenseMap<Value, mlir::DenseSet<Block *>> &valueConsumers) {
 
   for (Block &block : r) {
     Operation *termOp = block.getTerminator();
@@ -708,8 +689,7 @@ LogicalResult HandshakeLoweringFPL22::lowerBranchesToHandshake(
     for (Value val : getBranchOperands(termOp)) {
 
       // If producedValue is not used in block, don't insert the branch
-      if (valueIsConsumedInBlocksMap[val].find(&block) ==
-          valueIsConsumedInBlocksMap[val].end())
+      if (valueConsumers[val].find(&block) == valueConsumers[val].end())
         continue;
 
       // Create a branch-like operation for the branch operand, or re-use one
@@ -770,11 +750,11 @@ static LogicalResult lowerRegion(HandshakeLoweringFPL22 &hl,
     return failure();
 
   // Run dataflow analysis
-  DenseMap<Value, std::set<Block *>> valueIsConsumedInBlocksMap =
+  DenseMap<Value, mlir::DenseSet<Block *>> valueConsumers =
       runDataflowAnalysis(hl.getRegion());
 
   if (failed(runPartialLowering(hl, &HandshakeLoweringFPL22::addMergeOps,
-                                valueIsConsumedInBlocksMap)))
+                                valueConsumers)))
     return failure();
 
   if (failed(runPartialLowering(baseHl, &HandshakeLowering::replaceCallOps)))
@@ -782,7 +762,7 @@ static LogicalResult lowerRegion(HandshakeLoweringFPL22 &hl,
 
   if (failed(runPartialLowering(
           hl, &HandshakeLoweringFPL22::lowerBranchesToHandshake,
-          valueIsConsumedInBlocksMap)))
+          valueConsumers)))
     return failure();
 
   if (failed(runPartialLowering(
@@ -888,25 +868,19 @@ struct StandardToHandshakeFPL22Pass
 DenseMap<Block *, BlockLoopInfo>
 dynamatic::experimental::findLoopDetails(CFGLoopInfo &li, Region &funcReg) {
   // Finding all loops.
-  std::vector<CFGLoop *> loops;
+  std::set<CFGLoop *> loops;
   for (auto &block : funcReg.getBlocks()) {
     CFGLoop *loop = li.getLoopFor(&block);
-
     while (loop) {
-      auto pos = std::find(loops.begin(), loops.end(), loop);
-      if (pos == loops.end())
-        loops.push_back(loop);
+      loops.insert(loop);
       loop = loop->getParentLoop();
     }
   }
 
   // Iterating over blocks of each loop, and attaching loop info.
   DenseMap<Block *, BlockLoopInfo> blockToLoopInfoMap;
-  for (auto &block : funcReg.getBlocks()) {
-    BlockLoopInfo bli;
-
-    blockToLoopInfoMap.insert(std::make_pair(&block, bli));
-  }
+  for (auto &block : funcReg.getBlocks())
+    blockToLoopInfoMap.insert(std::make_pair(&block, BlockLoopInfo{}));
 
   for (auto &loop : loops) {
     Block *loopHeader = loop->getHeader();
@@ -932,19 +906,18 @@ dynamatic::experimental::findLoopDetails(CFGLoopInfo &li, Region &funcReg) {
   return blockToLoopInfoMap;
 }
 
-CFGLoop *dynamatic::experimental::findLCALoop(CFGLoop *innermostLoopOfBB1,
-                                              CFGLoop *innermostLoopOfBB2) {
+CFGLoop *dynamatic::experimental::findLCALoop(CFGLoop *loop,
+                                              CFGLoop *otherLoop) {
   std::set<CFGLoop *> loopsOfB1;
 
   // Traverse upwards from block 1 innermost loop and store the loop ancestors
   // in the set.
-  for (CFGLoop *currLoop = innermostLoopOfBB1; currLoop;
-       currLoop = currLoop->getParentLoop())
+  for (CFGLoop *currLoop = loop; currLoop; currLoop = currLoop->getParentLoop())
     loopsOfB1.insert(currLoop);
 
   // // Traverse upwards from block 2 innermost loop until a common loop is
   // found.
-  for (CFGLoop *currLoop = innermostLoopOfBB2; currLoop != nullptr;
+  for (CFGLoop *currLoop = otherLoop; currLoop != nullptr;
        currLoop = currLoop->getParentLoop())
     if (loopsOfB1.find(currLoop) != loopsOfB1.end())
       return currLoop;

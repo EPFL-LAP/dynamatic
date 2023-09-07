@@ -12,9 +12,5 @@ add_dynamatic_library(DynamaticExperimentalStandardToHandshakeFPL22
   MLIRPass
   MLIRArithDialect
   MLIRControlFlowDialect
-  MLIRFuncDialect
-  MLIRSupport
-  MLIRTransforms
-  MLIRAffineToStandard
   DynamaticSupport
 )
