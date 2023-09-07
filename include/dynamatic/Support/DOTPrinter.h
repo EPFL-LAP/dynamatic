@@ -32,8 +32,9 @@ struct EdgeInfo;
 class DOTPrinter {
 public:
   /// Constructs a DOTPrinter whose printing behavior is controlled by a couple
-  /// flags, plus a path to a file containing timing models for use in legacy
-  /// mode.
+  /// flags, plus a pointer to a timing database that must be valid in legacy
+  /// mode (when building Dynamatic++ in debug mode, the constructor will assert
+  /// if the `legacy` flag is true and the timing database is nullptr).
   DOTPrinter(bool legacy, bool debug, TimingDatabase *timingDB = nullptr);
 
   /// Prints Handshake-level IR to standard output.
