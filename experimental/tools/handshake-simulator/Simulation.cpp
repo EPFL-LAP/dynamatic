@@ -46,7 +46,7 @@ ModelMap models;
 // A temporary memory map to store internal operations states. Used to make it
 // possible for operations to communicate between themselves without using
 // the store map and operands.
-llvm::DenseMap<circt::Operation*, llvm::Any> stateMap;
+StateMap stateMap;
 
 //===----------------------------------------------------------------------===//
 // Utility functions
@@ -989,19 +989,13 @@ LogicalResult simulate(StringRef toplevelFunction,
     circt::handshake::EndOp endOp = *toplevel.getOps<circt::handshake::EndOp>().begin();
     assert(endOp && "expected function to terminate with end operation");
     double finalTime = any_cast<double>(stateMap[endOp]);
+    simulatedTime += finalTime; // LLVM statistics
     outs() << "Finished execution in " << (int)finalTime << " cycles\n";
   }
 
   if (!succeeded)
     return failure();
 
-  double time = 0.0;
-  for (unsigned i = 0; i < results.size(); ++i) {
-    mlir::Type t = ftype.getResult(i);
-    printAnyValueWithType(outs(), t, results[i]);
-    outs() << " ";
-    time = std::max(resultTimes[i], time);
-  }
   // Go back through the arguments and output any memrefs.
   for (unsigned i = 0; i < realInputs; ++i) {
     mlir::Type type = ftype.getInput(i);
@@ -1019,8 +1013,6 @@ LogicalResult simulate(StringRef toplevelFunction,
     }
   }
   outs() << "\n";
-
-  simulatedTime += (int)time;
 
   return success();
 }
