@@ -18,6 +18,7 @@
 #include "mlir/IR/PatternMatch.h"
 #include "llvm/ADT/TypeSwitch.h"
 #include <iomanip>
+#include <string>
 
 using namespace circt;
 using namespace circt::handshake;
@@ -52,50 +53,6 @@ static std::unordered_map<std::string, std::string> arithNameToOpName{
     {"arith.extsi", "sext_op"},    {"arith.extui", "zext_op"},
     {"arith.trunci", "trunc_op"},  {"arith.shrsi", "ashr_op"},
     {"arith.shli", "shl_op"},      {"arith.select", "select_op"}};
-
-/// Delay information for arith.addi and arith.subi operations.
-static const std::string DELAY_ADD_SUB =
-    "2.287 1.397 1.400 1.409 100.000 100.000 100.000 100.000";
-/// Delay information for arith.muli and arith.divi operations.
-static const std::string DELAY_MUL_DIV =
-    "2.287 1.397 1.400 1.409 100.000 100.000 100.000 100.000";
-/// Delay information for arith.subf and arith.mulf operations.
-static const std::string DELAY_SUBF_MULF =
-    "0.000 0.000 1.400 1.411 100.000 100.000 100.000 100.000";
-/// Delay information for arith.andi, arith.ori, and arith.xori operations.
-static const std::string DELAY_LOGIC_OP =
-    "1.397 1.397 1.400 1.409 100.000 100.000 100.000 100.000";
-/// Delay information for arith.sitofp and arith.remsi operations.
-static const std::string DELAY_SITOFP_REMSI =
-    "1.412 1.397 0.000 1.412 1.397 1.412 100.000 100.000";
-/// Delay information for extension and truncation operations.
-static const std::string DELAY_EXT_TRUNC =
-    "0.672 0.672 1.397 1.397 100.000 100.000 100.000 100.000";
-
-/// Maps name of arithmetic operation to "delay" attribute.
-static std::unordered_map<std::string, std::string> arithNameToDelay{
-    {"arith.subi", DELAY_ADD_SUB},
-    {"arith.addi", DELAY_ADD_SUB},
-    {"arith.muli", DELAY_MUL_DIV},
-    {"arith.addf", "0.000,0.000,0.000,100.000,100.000,100.000,100.000,100.000"},
-    {"arith.subf", DELAY_SUBF_MULF},
-    {"arith.mulf", DELAY_SUBF_MULF},
-    {"arith.divui", DELAY_MUL_DIV},
-    {"arith.divsi", DELAY_MUL_DIV},
-    {"arith.divf", "0.000 0.000 1.400 100.000 100.000 100.000 100.000 100.000"},
-    {"arith.andi", DELAY_LOGIC_OP},
-    {"arith.ori", DELAY_LOGIC_OP},
-    {"arith.xori", DELAY_LOGIC_OP},
-    {"arith.sitofp", DELAY_SITOFP_REMSI},
-    {"arith.remsi", DELAY_SITOFP_REMSI},
-    {"arith.sext", DELAY_EXT_TRUNC},
-    {"arith.extsi", DELAY_EXT_TRUNC},
-    {"arith.extui", DELAY_EXT_TRUNC},
-    {"arith.trunci", DELAY_EXT_TRUNC},
-    {"arith.shrsi", DELAY_EXT_TRUNC},
-    {"arith.shli", DELAY_EXT_TRUNC},
-    {"arith.select",
-     "1.397 1.397 1.412 2.061 100.000 100.000 100.000 100.000"}};
 
 /// Maps name of integer comparison type to "op" attribute.
 static std::unordered_map<arith::CmpIPredicate, std::string> cmpINameToOpName{
@@ -606,24 +563,15 @@ LogicalResult DOTPrinter::verifyDOT(handshake::FuncOp funcOp,
 LogicalResult DOTPrinter::annotateNode(Operation *op) {
   auto info =
       llvm::TypeSwitch<Operation *, NodeInfo>(op)
-          .Case<handshake::MergeOp>([&](auto) {
-            auto info = NodeInfo("Merge");
-            info.stringAttr["delay"] =
-                "1.397 1.412 0.000 100.000 100.000 100.000 100.000 100.000";
-            return info;
-          })
+          .Case<handshake::MergeOp>([&](auto) { return NodeInfo("Merge"); })
           .Case<handshake::MuxOp>([&](handshake::MuxOp op) {
             auto info = NodeInfo("Mux");
             info.stringAttr["in"] = getInputForMux(op);
-            info.stringAttr["delay"] =
-                "1.412 1.397 0.000 1.412 1.397 1.412 100.000 100.000";
             return info;
           })
           .Case<handshake::ControlMergeOp>([&](handshake::ControlMergeOp op) {
             auto info = NodeInfo("CntrlMerge");
             info.stringAttr["out"] = getOutputForControlMerge(op);
-            info.stringAttr["delay"] =
-                "0.000 1.397 0.000 100.000 100.000 100.000 100.000 100.000";
             return info;
           })
           .Case<handshake::ConditionalBranchOp>(
@@ -631,8 +579,6 @@ LogicalResult DOTPrinter::annotateNode(Operation *op) {
                 auto info = NodeInfo("Branch");
                 info.stringAttr["in"] = getInputForCondBranch(op);
                 info.stringAttr["out"] = getOutputForCondBranch(op);
-                info.stringAttr["delay"] =
-                    "0.000 1.409 1.411 1.412 1.400 1.412 100.000 100.000";
                 return info;
               })
           .Case<handshake::BufferOp>([&](handshake::BufferOp bufOp) {
@@ -669,9 +615,6 @@ LogicalResult DOTPrinter::annotateNode(Operation *op) {
             info.stringAttr["in"] = getInputForLoadOp(op);
             info.stringAttr["out"] = getOutputForLoadOp(op);
             info.intAttr["portId"] = findMemoryPort(op.getAddressResult());
-            info.intAttr["latency"] = 2;
-            info.stringAttr["delay"] =
-                "1.412 1.409 0.000 100.000 100.000 100.000 100.000 100.000";
             return info;
           })
           .Case<handshake::DynamaticStoreOp>(
@@ -681,16 +624,9 @@ LogicalResult DOTPrinter::annotateNode(Operation *op) {
                 info.stringAttr["in"] = getInputForStoreOp(op);
                 info.stringAttr["out"] = getOutputForStoreOp(op);
                 info.intAttr["portId"] = findMemoryPort(op.getAddressResult());
-                info.stringAttr["delay"] =
-                    "0.672 1.397 1.400 1.409 100.000 100.000 100.000 100.000";
                 return info;
               })
-          .Case<handshake::ForkOp>([&](auto) {
-            auto info = NodeInfo("Fork");
-            info.stringAttr["delay"] =
-                "0.000 0.100 0.100 100.000 100.000 100.000 100.000 100.000";
-            return info;
-          })
+          .Case<handshake::ForkOp>([&](auto) { return NodeInfo("Fork"); })
           .Case<handshake::SourceOp>([&](auto) {
             auto info = NodeInfo("Source");
             info.stringAttr["out"] = getIOFromValues(op->getResults(), "out");
@@ -729,15 +665,11 @@ LogicalResult DOTPrinter::annotateNode(Operation *op) {
             info.stringAttr["out"] = getIOFromValues(op->getResults(), "out");
 
             info.stringAttr["value"] = stream.str();
-            info.stringAttr["delay"] =
-                "0.000 0.000 0.000 100.000 100.000 100.000 100.000 100.000";
             return info;
           })
           .Case<handshake::DynamaticReturnOp>([&](auto) {
             auto info = NodeInfo("Operator");
             info.stringAttr["op"] = "ret_op";
-            info.stringAttr["delay"] =
-                "1.412 1.409 0.000 100.000 100.000 100.000 100.000 100.000";
             return info;
           })
           .Case<handshake::EndOp>([&](handshake::EndOp op) {
@@ -751,16 +683,12 @@ LogicalResult DOTPrinter::annotateNode(Operation *op) {
             for (auto [idx, res] : llvm::enumerate(funcOp.getResultTypes()))
               stream << "out" << (idx + 1) << ":" << getWidth(res);
             info.stringAttr["out"] = stream.str();
-
-            info.stringAttr["delay"] =
-                "1.397 0.000 1.397 1.409 100.000 100.000 100.000 100.000";
             return info;
           })
           .Case<arith::SelectOp>([&](arith::SelectOp op) {
             auto info = NodeInfo("Operator");
             auto opName = op->getName().getStringRef().str();
             info.stringAttr["op"] = arithNameToOpName[opName];
-            info.stringAttr["delay"] = arithNameToDelay[opName];
             info.stringAttr["in"] = getInputForSelect(op);
             return info;
           })
@@ -772,41 +700,21 @@ LogicalResult DOTPrinter::annotateNode(Operation *op) {
             auto info = NodeInfo("Operator");
             auto opName = op->getName().getStringRef().str();
             info.stringAttr["op"] = arithNameToOpName[opName];
-            info.stringAttr["delay"] = arithNameToDelay[opName];
-
-            // Set non-zero latencies
-            if (opName == "arith.divui" || opName == "arith.divsi")
-              info.intAttr["latency"] = 36;
-            else if (opName == "arith.muli")
-              info.intAttr["latency"] = 4;
-            else if (opName == "arith.fadd" || opName == "arith.fsub")
-              info.intAttr["latency"] = 10;
-            else if (opName == "arith.divf")
-              info.intAttr["latency"] = 30;
-            else if (opName == "arith.mulf")
-              info.intAttr["latency"] = 6;
-
             return info;
           })
           .Case<arith::CmpIOp>([&](arith::CmpIOp op) {
             auto info = NodeInfo("Operator");
             info.stringAttr["op"] = cmpINameToOpName[op.getPredicate()];
-            info.stringAttr["delay"] =
-                "1.907 1.397 1.400 1.409 100.000 100.000 100.000 100.000";
             return info;
           })
           .Case<arith::CmpFOp>([&](arith::CmpFOp op) {
             auto info = NodeInfo("Operator");
             info.stringAttr["op"] = cmpFNameToOpName[op.getPredicate()];
-            info.intAttr["latency"] = 2;
-            info.stringAttr["latency"] =
-                "1.895 1.397 1.406 1.411 100.000 100.000 100.000 100.000";
             return info;
           })
           .Case<arith::IndexCastOp>([&](auto) {
             auto info = NodeInfo("Operator");
             info.stringAttr["op"] = "zext_op";
-            info.stringAttr["delay"] = DELAY_EXT_TRUNC;
             return info;
           })
           .Default([&](auto) { return NodeInfo(""); });
@@ -834,9 +742,9 @@ LogicalResult DOTPrinter::annotateNode(Operation *op) {
   }
 
   // Add default latency for operators if not specified
-  if (info.intAttr.find("latency") == info.intAttr.end() &&
-      info.type == "Operator")
-    info.intAttr["latency"] = 0;
+  info.stringAttr["delay"] = getNodeDelayAttr(op);
+  if (info.type == "Operator")
+    info.stringAttr["latency"] = getNodeLatencyAttr(op);
 
   // II is 1 for all operators
   if (info.type == "Operator")
@@ -933,6 +841,31 @@ LogicalResult DOTPrinter::annotateArgumentEdge(handshake::FuncOp funcOp,
   return success();
 }
 
+std::string DOTPrinter::getNodeDelayAttr(Operation *op) {
+  const TimingModel *model = timingDB->getModel(op);
+  if (!model)
+    return "0.000 0.000 0.000 0.000 0.000 0.000 0.000 0.000";
+
+  double dataDelay;
+  if (failed(model->dataDelay.getCeilMetric(op, dataDelay)))
+    dataDelay = 0.0;
+
+  std::stringstream stream;
+  stream << std::fixed << std::setprecision(3) << dataDelay << " "
+         << model->validDelay << " " << model->readyDelay << " "
+         << model->validToReady << " " << model->condToValid << " "
+         << model->condToReady << " " << model->validToCond << " "
+         << model->validToData;
+  return stream.str();
+}
+
+std::string DOTPrinter::getNodeLatencyAttr(Operation *op) {
+  double latency;
+  if (failed(timingDB->getLatency(op, latency)))
+    return "0";
+  return std::to_string(static_cast<unsigned>(latency));
+}
+
 // ============================================================================
 // Printing
 // ============================================================================
@@ -973,10 +906,9 @@ static std::string getPrettyPrintedNodeLabel(Operation *op) {
       })
       .Case<handshake::ControlMergeOp>([&](auto) { return "cmerge"; })
       .Case<handshake::ConditionalBranchOp>([&](auto) { return "cbranch"; })
-      .Case<handshake::BufferOp>([&](auto op) {
-        std::string n = "buffer ";
-        n += stringifyEnum(op.getBufferType());
-        return n;
+      .Case<handshake::BufferOp>([&](handshake::BufferOp bufOp) {
+        return stringifyEnum(bufOp.getBufferType()).str() + " [" +
+               std::to_string(bufOp.getNumSlots()) + "]";
       })
       .Case<handshake::BranchOp>([&](auto) { return "branch"; })
       // handshake operations (dynamatic)
@@ -1065,8 +997,10 @@ static std::string getPrettyPrintedNodeLabel(Operation *op) {
       });
 }
 
-DOTPrinter::DOTPrinter(bool legacy, bool debug)
-    : legacy(legacy), debug(debug), os(llvm::outs()){};
+DOTPrinter::DOTPrinter(bool legacy, bool debug, TimingDatabase *timingDB)
+    : legacy(legacy), debug(debug), timingDB(timingDB), os(llvm::outs()) {
+  assert(!legacy || timingDB && "timing database must exist in legacy mode");
+};
 
 LogicalResult DOTPrinter::printDOT(mlir::ModuleOp mod) {
   // We support at most one function per module

@@ -6,8 +6,12 @@
 //
 //===----------------------------------------------------------------------===//
 
+#ifndef DYNAMATIC_SUPPORT_DOTPRINTER_H
+#define DYNAMATIC_SUPPORT_DOTPRINTER_H
+
 #include "circt/Dialect/Handshake/HandshakeOps.h"
 #include "dynamatic/Support/LLVM.h"
+#include "dynamatic/Support/TimingModels.h"
 #include "mlir/Support/IndentedOstream.h"
 #include <map>
 #include <set>
@@ -23,13 +27,15 @@ struct EdgeInfo;
 
 /// Implements the logic to convert Handshake-level IR to a DOT. The only public
 /// method of this class, printDOT, converts an MLIR module containing a single
-/// Handshake function into an equivalent DOT graph. In legacy mode, the
-/// resulting DOT can be used with legacy Dynamatic.
+/// Handshake function into an equivalent DOT graph printed on stdout. In legacy
+/// mode, the resulting DOT can be used with legacy Dynamatic.
 class DOTPrinter {
 public:
   /// Constructs a DOTPrinter whose printing behavior is controlled by a couple
-  /// flags.
-  DOTPrinter(bool legacy, bool debug);
+  /// flags, plus a pointer to a timing database that must be valid in legacy
+  /// mode (when building Dynamatic++ in debug mode, the constructor will assert
+  /// if the `legacy` flag is true and the timing database is nullptr).
+  DOTPrinter(bool legacy, bool debug, TimingDatabase *timingDB = nullptr);
 
   /// Prints Handshake-level IR to standard output.
   LogicalResult printDOT(mlir::ModuleOp mod);
@@ -37,10 +43,11 @@ public:
 private:
   /// Whether to export a legacy-compatible DOT.
   bool legacy;
-
   /// Whether to pretty-print the exported DOT (pretty-print if false).
   bool debug;
-
+  /// Timing models for dataflow components (required in legacy mode, can safely
+  /// be nullptr when not in legacy mode).
+  TimingDatabase *timingDB;
   /// The stream to output to.
   mlir::raw_indented_ostream os;
 
@@ -81,6 +88,16 @@ private:
 
   /// Returns the name of the node representing the operation.
   std::string getNodeName(Operation *op);
+
+  /// Returns the content of the "delay" attribute associated to every graph
+  /// node in legacy mode. Requires that `timingDB` points to a valid memory
+  /// location.
+  std::string getNodeDelayAttr(Operation *op);
+
+  /// Returns the content of the "latency" attribute associated to every graph
+  /// node in legacy mode. Requires that `timingDB` points to a valid memory
+  /// location.
+  std::string getNodeLatencyAttr(Operation *op);
 
   /// Computes all data attributes of an operation for use in legacy Dynamatic
   /// and prints them to the output stream; it is the responsibility of the
@@ -176,3 +193,5 @@ struct EdgeInfo {
 };
 
 } // namespace dynamatic
+
+#endif // DYNAMATIC_SUPPORT_DOTPRINTER_H
