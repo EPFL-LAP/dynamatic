@@ -1,6 +1,13 @@
 //===- HandshakeInferBasicBlocks.cpp - Infer ops basic blocks ---*- C++ -*-===//
 //
-// This file contains the implementation of the basic block inference pass.
+// The basic block inference pass is implemented as a single operation
+// conversion pattern that iterates over all operations in a function repeatedly
+// until no more inferences can be performed, at which point it succeeds.
+//
+// A local inference heuristic is applied on each operation eligible for
+// inference. The locality of the heuristic may require the pass to run the
+// inference logic on eligible operations multiple times in order to let
+// inference results propagate incrementally to their immediate graph neighbors.
 //
 //===----------------------------------------------------------------------===//
 
@@ -11,80 +18,86 @@
 #include "dynamatic/Transforms/Passes.h"
 #include "mlir/Support/LogicalResult.h"
 #include "mlir/Transforms/DialectConversion.h"
-#include "llvm/Support/raw_ostream.h"
 
 using namespace circt;
-using namespace circt::handshake;
 using namespace mlir;
 using namespace dynamatic;
-
-std::optional<unsigned> dynamatic::inferOpBasicBlock(Operation *op) {
-  assert(op->getParentOp() && isa<handshake::FuncOp>(op->getParentOp()) &&
-         "operation must have a handshake::FuncOp as immediate parent");
-
-  std::optional<unsigned> infBB;
-
-  // For each operand of the operation, try to backtrack through parent
-  // operations till we reach one with a known basic block or a function
-  // argument
-  for (auto operand : op->getOperands()) {
-    Value val = operand;
-    std::optional<unsigned> infOperandBB;
-    do {
-      auto defOp = val.getDefiningOp();
-
-      if (!defOp)
-        // Value originates from function argument i.e., from the first "block"
-        // in the function
-        infOperandBB = 0;
-      else if (isa<handshake::BranchOp, handshake::ConditionalBranchOp>(defOp))
-        // Don't backtrack through branches, which usually mark the end of a
-        // block
-        break;
-      else if (auto opBB = defOp->getAttrOfType<mlir::IntegerAttr>(BB_ATTR);
-               opBB)
-        // We have backtracked to an operation with a known basic block, so
-        // we can infer the original operation is from the same block
-        infOperandBB = opBB.getValue().getZExtValue();
-      else if (defOp->getNumOperands() == 1 &&
-               !isa<handshake::MergeLikeOpInterface>(defOp))
-        // Continue backtracking to the dataflow predecessor
-        val = defOp->getOperand(0);
-      else
-        break;
-
-    } while (!infOperandBB.has_value());
-
-    // Determine whether the inferred basic block for the operand is compatible
-    // with a potential previously inferred block
-    if (!infOperandBB.has_value())
-      return {};
-
-    if (infBB.has_value()) {
-      if (infBB.value() != infOperandBB.value())
-        return {};
-    } else
-      infBB = infOperandBB.value();
-  }
-
-  return infBB;
-}
 
 /// Determines if the pass should attempt to infer the basic block of the
 /// operation if it is missing.
 static bool isLegalForInference(Operation *op) {
-  return !isa<MemoryControllerOp>(op);
+  return !isa<MemoryControllerOp, SinkOp>(op);
 }
 
 /// Iterates over all operations legal for inference that do not have a "bb"
 /// attribute and tries to infer it.
-static void inferBasicBlocks(handshake::FuncOp funcOp,
-                             PatternRewriter &rewriter) {
-  for (auto &op : funcOp.getOps())
-    if (isLegalForInference(&op))
-      if (auto bb = op.getAttrOfType<mlir::IntegerAttr>(BB_ATTR); !bb)
-        if (auto infBB = inferOpBasicBlock(&op); infBB.has_value())
-          op.setAttr(BB_ATTR, rewriter.getUI32IntegerAttr(infBB.value()));
+static bool inferBasicBlocks(Operation *op, PatternRewriter &rewriter) {
+  // Check whether we even need to run inference for the operation
+  if (!isLegalForInference(op))
+    return false;
+  if (std::optional<unsigned> bb = getLogicBB(op); bb.has_value())
+    return false;
+
+  // Run the inference logic
+  unsigned infBB;
+  if (succeeded(inferLogicBB(op, infBB))) {
+    op->setAttr(BB_ATTR, rewriter.getUI32IntegerAttr(infBB));
+    return true;
+  }
+  return false;
+}
+
+LogicalResult dynamatic::inferLogicBB(Operation *op, unsigned &logicBB) {
+  std::optional<unsigned> infBB;
+
+  auto mergeInferredBB = [&](std::optional<unsigned> otherBB) -> LogicalResult {
+    if (!otherBB.has_value() || (infBB.has_value() && *infBB != *otherBB)) {
+      infBB = std::nullopt;
+      return failure();
+    }
+    infBB = *otherBB;
+    return success();
+  };
+
+  // First, try to infer the basic block of the current operation by looking at
+  // its successors (i.e., users of its results). If they all belong to the same
+  // basic block, then we can safely say that the current operation also belongs
+  // to it
+  for (OpResult res : op->getResults()) {
+    bool conflict = false;
+    for (Operation *user : res.getUsers())
+      if (failed(mergeInferredBB(getLogicBB(user)))) {
+        conflict = true;
+        break;
+      }
+    if (conflict)
+      break;
+  }
+
+  // If the successor analysis successfully inferred a basic block, return this
+  // one; otherwise, run the predecessor analysis.
+  if (infBB.has_value()) {
+    logicBB = *infBB;
+    return success();
+  }
+
+  // Second, try to infer the basic block of the current operation by looking at
+  // its predecessors (i.e., producers of its operarands). If they all belong to
+  // the same basic block, then we can safely say that the current operation
+  // also belongs to it
+  for (Value opr : op->getOperands()) {
+    Operation *defOp = opr.getDefiningOp();
+    std::optional<unsigned> oprBB = defOp ? getLogicBB(defOp) : ENTRY_BB;
+    if (failed(mergeInferredBB(oprBB))) {
+      return failure();
+    }
+  }
+
+  if (infBB.has_value()) {
+    logicBB = *infBB;
+    return success();
+  }
+  return failure();
 }
 
 namespace {
@@ -97,8 +110,14 @@ struct FuncOpInferBasicBlocks : public OpConversionPattern<handshake::FuncOp> {
   LogicalResult
   matchAndRewrite(handshake::FuncOp funcOp, OpAdaptor /*adaptor*/,
                   ConversionPatternRewriter &rewriter) const override {
-    rewriter.updateRootInPlace(funcOp,
-                               [&] { inferBasicBlocks(funcOp, rewriter); });
+    rewriter.updateRootInPlace(funcOp, [&] {
+      bool progress = false;
+      do {
+        progress = false;
+        for (Operation &op : funcOp.getOps())
+          progress |= inferBasicBlocks(&op, rewriter);
+      } while (progress);
+    });
     return success();
   }
 };
@@ -110,8 +129,7 @@ struct HandshakeInferBasicBlocksPass
     : public HandshakeInferBasicBlocksBase<HandshakeInferBasicBlocksPass> {
 
   void runOnOperation() override {
-    auto *ctx = &getContext();
-
+    MLIRContext *ctx = &getContext();
     RewritePatternSet patterns{ctx};
     patterns.add<FuncOpInferBasicBlocks>(ctx);
     ConversionTarget target(*ctx);

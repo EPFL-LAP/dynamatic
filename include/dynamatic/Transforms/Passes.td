@@ -76,11 +76,13 @@ def ScfSimpleIfToSelect : Pass<"scf-simple-if-to-select", "mlir::ModuleOp"> {
 def HandshakeInferBasicBlocks : Pass<"handshake-infer-basic-blocks", "mlir::ModuleOp"> {
   let summary = "Try to infer the basic block of untagged operations.";
   let description = [{
-    This pass goes through all operations inside handshake::FuncOp's that do not
-    have a 'bb' attribute and tries to infer its value based on the operation's
-    dataflow predecessors. When the pass's heuristic manages to infer the value,
-    the 'bb' attribute is added to the operation. This pass never fails, even
-    when it does not manage to infer the basic block of all operations.
+    Attempts to infer the logical basic block of all operations inside
+    handshake::FuncOp's that are not attached to a logical basic block. The
+    inference logic is conservative and relies on the operation's successors and
+    predecessors to determine the operation's basic block. When the pass's
+    heuristics manage to infer an operation's block, the pass sets the
+    `dynamatic::BB_ATTR` on the operation. This pass does not fail, even when it
+    does not manage to infer the basic block of all operations.
   }];
   let constructor = "dynamatic::createHandshakeInferBasicBlocksPass()";
 }
