@@ -133,25 +133,27 @@ public:
 
   /// Returns a const pointer to the timing model corresponding to the
   /// operation, if any exists.
-  const TimingModel *getModel(Operation *op);
+  const TimingModel *getModel(Operation *op) const;
 
   /// Attempts to get an operation's latency. On success, sets the last argument
   /// to the requested latency.
-  LogicalResult getLatency(Operation *op, double &latency);
+  LogicalResult getLatency(Operation *op, double &latency) const;
 
   /// Attempts to get an operation's internal delay for a specific signal type.
   /// On success, sets the last argument to the requested delay.
-  LogicalResult getInternalDelay(Operation *op, SignalType type, double &delay);
+  LogicalResult getInternalDelay(Operation *op, SignalType type,
+                                 double &delay) const;
 
   /// Attempts to get an operation's port delay for a specific signal and port
   /// type. On success, sets the last argument to the requested delay.
   LogicalResult getPortDelay(Operation *op, SignalType signalType,
-                             PortType portType, double &delay);
+                             PortType portType, double &delay) const;
 
   /// Attempts to get an operation's total delay (internal delay + input delay +
   /// output delay) for a specific signal type. On success, sets the last
   /// argument to the requested delay.
-  LogicalResult getTotalDelay(Operation *op, SignalType type, double &delay);
+  LogicalResult getTotalDelay(Operation *op, SignalType type,
+                              double &delay) const;
 
   /// Parses a JSON file whose path is given as argument and adds all the timing
   /// models it contains to the passed timing database.

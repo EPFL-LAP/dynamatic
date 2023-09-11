@@ -29,35 +29,33 @@ using BBSet = mlir::SetVector<unsigned>;
 /// Represents a CFDFC i.e., a set of control-free units and channels from a
 /// dataflow circuit accompanied by the number of times it was executed.
 struct CFDFC {
+  /// The list of basic blocks that make up the CFDFC.
+  mlir::SetVector<unsigned> cycle;
   /// Units (i.e., MLIR operations) in the CFDFC.
   mlir::SetVector<Operation *> units;
   /// Channels (i.e., MLIR values) in the CFDFC.
   mlir::SetVector<Value> channels;
+  /// Backedges in the CFDFC.
+  mlir::SetVector<Value> backedges;
   /// Number of executions of the CFDFC.
-  unsigned numExec = 0;
+  unsigned numExecs;
 
   /// Constructs a CFDFC from a set of selected archs and basic blocks in the
   /// function. Assumes that every value in the function is used exactly once.
-  CFDFC(circt::handshake::FuncOp funcOp, ArchSet &archs, BBSet &bbs,
-        unsigned numExec);
+  CFDFC(circt::handshake::FuncOp funcOp, ArchSet &archs, unsigned numExec);
 };
-
-/// Determines whether the edge between a source and destination operation is a
-/// backedge in the context of buffer placement. The function assumes that the
-/// source operation produces a value that the destination operation consumes.
-bool isBackedge(Operation *src, Operation *dst);
 
 /// Extracts the most frequently executed CFDFC from the Handshake function
 /// described by the provided archs and basic blocks. The function internally
 /// expresses the CFDFC extraction problem as an MILP that is solved bu Gurobi
 /// (hence building the project with Gurobi is required to use this function).
-/// On successfull extraction, succeeds and sets the last three argument with,
-/// respectively, the set of archs and basic blocks that are included in the
-/// extracted CFDFC and the number of executions of the latter. When no CFDFC
-/// could be extracted, succeeds but sets the number of executions to 0.
+/// On successfull extraction, succeeds and sets the last two arguments with,
+/// respectively, the set of archs included in the extracted CFDFC and the
+/// number of executions of the latter. When no CFDFC could be extracted,
+/// succeeds but sets the number of executions to 0.
 LogicalResult extractCFDFC(circt::handshake::FuncOp funcOp, ArchSet &archs,
                            BBSet &bbs, ArchSet &selectedArchs,
-                           BBSet &selectedBBs, unsigned &numExec);
+                           unsigned &numExec);
 
 } // namespace buffer
 } // namespace dynamatic

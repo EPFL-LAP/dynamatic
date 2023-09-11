@@ -20,8 +20,7 @@ std::unique_ptr<mlir::OperationPass<mlir::ModuleOp>>
 createHandshakePlaceBuffersPass(bool firstCFDFC = false,
                                 std::string stdLevelInfo = "",
                                 std::string timefile = "",
-                                double targetCP = 4.0, int timeLimit = 180,
-                                bool setCustom = true);
+                                double targetCP = 4.0);
 
 } // namespace buffer
 } // namespace dynamatic

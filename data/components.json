@@ -1867,7 +1867,7 @@
       }
     },
     "outport": {
-      "transparentBuffer": 1,
+      "transparentBuffer": 0,
       "opaqueBuffer": 0,
       "delay": {
         "data": {
