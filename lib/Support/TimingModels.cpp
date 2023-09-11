@@ -122,14 +122,14 @@ bool TimingDatabase::insertTimingModel(StringRef name, TimingModel &model) {
   return models.insert(std::make_pair(OperationName(name, ctx), model)).second;
 }
 
-const TimingModel *TimingDatabase::getModel(Operation *op) {
+const TimingModel *TimingDatabase::getModel(Operation *op) const {
   auto it = models.find(op->getName());
   if (it == models.end())
     return nullptr;
   return &it->second;
 }
 
-LogicalResult TimingDatabase::getLatency(Operation *op, double &latency) {
+LogicalResult TimingDatabase::getLatency(Operation *op, double &latency) const {
   const TimingModel *model = getModel(op);
   if (!model)
     return failure();
@@ -138,7 +138,7 @@ LogicalResult TimingDatabase::getLatency(Operation *op, double &latency) {
 }
 
 LogicalResult TimingDatabase::getInternalDelay(Operation *op, SignalType type,
-                                               double &delay) {
+                                               double &delay) const {
   const TimingModel *model = getModel(op);
   if (!model)
     return failure();
@@ -156,7 +156,8 @@ LogicalResult TimingDatabase::getInternalDelay(Operation *op, SignalType type,
 }
 
 LogicalResult TimingDatabase::getPortDelay(Operation *op, SignalType signalType,
-                                           PortType portType, double &delay) {
+                                           PortType portType,
+                                           double &delay) const {
   const TimingModel *model = getModel(op);
   if (!model)
     return failure();
@@ -177,7 +178,7 @@ LogicalResult TimingDatabase::getPortDelay(Operation *op, SignalType signalType,
 }
 
 LogicalResult TimingDatabase::getTotalDelay(Operation *op, SignalType type,
-                                            double &delay) {
+                                            double &delay) const {
   const TimingModel *model = getModel(op);
   if (!model)
     return failure();

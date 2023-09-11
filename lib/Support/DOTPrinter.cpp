@@ -1144,6 +1144,8 @@ LogicalResult DOTPrinter::printEdge(Operation *src, Operation *dst, Value val) {
      << getStyleOfValue(val);
   if (legacy && failed(annotateEdge(src, dst, val)))
     return failure();
+  if (isBackedge(val, dst))
+    os << (legacy ? ", " : "") << " color=\"blue\"";
   os << "]\n";
   return success();
 }

@@ -13,6 +13,7 @@
 #include "mlir/IR/OperationSupport.h"
 #include "mlir/Support/IndentedOstream.h"
 #include "mlir/Support/LogicalResult.h"
+#include "llvm/ADT/SmallSet.h"
 #include <fstream>
 
 using namespace circt;
@@ -33,16 +34,18 @@ struct MILPVars {
   std::map<ArchBB *, GRBVar> archs;
   /// Mapping between each basic block and Gurobi variable.
   std::map<unsigned, GRBVar> bbs;
+  /// Holds the maximum number of executions achievable.
+  GRBVar numExecs;
 };
 } // namespace
 
 /// Initializes all variables in the MILP, one per arch and per basic block.
 /// Fills in the last argument with mappings between archs/BBs and their
 /// associated Gurobi variable.
-static unsigned initMILPVariables(GRBModel &model, ArchSet &archs, BBSet &bbs,
-                                  MILPVars &vars) {
+static void initMILPVariables(GRBModel &model, ArchSet &archs, BBSet &bbs,
+                              MILPVars &vars) {
   // Keep track of the maximum number of transitions in any arch
-  unsigned maxNumTrans = 0;
+  unsigned maxTrans = 0;
 
   // Create a variable for each basic block
   for (unsigned bb : bbs)
@@ -54,48 +57,50 @@ static unsigned initMILPVariables(GRBModel &model, ArchSet &archs, BBSet &bbs,
     std::string arcName = "sArc_" + std::to_string(arch->srcBB) + "_" +
                           std::to_string(arch->dstBB);
     vars.archs[arch] = model.addVar(0.0, 1, 0.0, GRB_BINARY, arcName);
-    maxNumTrans = std::max(maxNumTrans, arch->numTrans);
+    maxTrans = std::max(maxTrans, arch->numTrans);
   }
+
+  // Create a variable to hold the maximum number of CFDFC executions
+  vars.numExecs = model.addVar(0, maxTrans, 0.0, GRB_INTEGER, "varMaxExecs");
 
   // Update the model before returning so that these variables can be referenced
   // safely during the rest of model creation
   model.update();
-  return maxNumTrans;
 }
 
 /// Sets the MILP objective, which is to maximize the sum over all archs of
 /// sArc_<srcBB>_<dstBB> * varMaxTrans.
-static void setObjective(GRBModel &model, MILPVars &vars, GRBVar &varMaxTrans) {
+static void setObjective(GRBModel &model, MILPVars &vars) {
   GRBQuadExpr objExpr;
   for (auto &[_, var] : vars.archs)
-    objExpr += varMaxTrans * var;
+    objExpr += vars.numExecs * var;
   model.setObjective(objExpr, GRB_MAXIMIZE);
 }
 
 /// Sets the MILP's edge constraints, one per arch to limit the number of times
 /// it can be taken plus one to force the number of selected backedges to be 1.
-static void setEdgeConstraints(GRBModel &model, MILPVars &vars,
-                               GRBVar &varMaxTrans) {
-  GRBLinExpr backEdgeConstr;
+static void setEdgeConstraints(GRBModel &model, MILPVars &vars) {
+  GRBLinExpr backedgeConstraint;
 
   // Add a constraint for each arch
-  for (auto [constrInd, archVar] : llvm::enumerate(vars.archs)) {
-    auto &[arch, var] = archVar;
+  for (auto &[arch, var] : vars.archs) {
     // For each arch, limit the output number of transitions to, if it is
     // selected, the arch's number of transitions, or, if it is not selected, to
     // the maximum number of transitions
-    model.addConstr(varMaxTrans <= var * arch->numTrans +
-                                       (1 - var) * (unsigned)varMaxTrans.get(
-                                                       GRB_DoubleAttr_UB),
-                    "cN" + std::to_string(constrInd));
+    unsigned maxExecsUB =
+        static_cast<unsigned>(vars.numExecs.get(GRB_DoubleAttr_UB));
+    std::string name = "arch_" + std::to_string(arch->srcBB) + "_" +
+                       std::to_string(arch->dstBB);
+    model.addConstr(
+        vars.numExecs <= var * arch->numTrans + (1 - var) * maxExecsUB, name);
 
     // Only select one backedge
     if (arch->isBackEdge)
-      backEdgeConstr += var;
+      backedgeConstraint += var;
   }
 
   // Finally, the backedge constraint
-  model.addConstr(backEdgeConstr == 1, "cBack");
+  model.addConstr(backedgeConstraint == 1, "oneBackedge");
 }
 
 /// Get all variables corresponding to "predecessor archs" i.e., archs from
@@ -124,89 +129,109 @@ static SmallVector<GRBVar> getSuccArchvars(unsigned bb, MILPVars &vars) {
 /// selected.
 static void setBBConstraints(GRBModel &model, MILPVars &vars) {
   // Add two constraints for each arch
-  for (auto &[bbInd, varBB] : vars.bbs) {
+  for (auto &[bb, varBB] : vars.bbs) {
     // Set constraint for predecessor archs
     GRBLinExpr predArchsConstr;
-    for (GRBVar &var : getPredArchVars(bbInd, vars))
+    for (GRBVar &var : getPredArchVars(bb, vars))
       predArchsConstr += var;
-    model.addConstr(predArchsConstr == varBB, "cIn" + std::to_string(bbInd));
+    model.addConstr(predArchsConstr == varBB, "in" + std::to_string(bb));
 
     // Set constraint for successor archs
     GRBLinExpr succArchsConstr;
-    for (GRBVar &var : getSuccArchvars(bbInd, vars))
+    for (GRBVar &var : getSuccArchvars(bb, vars))
       succArchsConstr += var;
-    model.addConstr(succArchsConstr == varBB, "cOut" + std::to_string(bbInd));
+    model.addConstr(succArchsConstr == varBB, "out" + std::to_string(bb));
   }
 };
 #endif // DYNAMATIC_GUROBI_NOT_INSTALLED
 
-CFDFC::CFDFC(circt::handshake::FuncOp funcOp, ArchSet &archs, BBSet &bbs,
-             unsigned numExec)
-    : numExec(numExec) {
+CFDFC::CFDFC(circt::handshake::FuncOp funcOp, ArchSet &archs, unsigned numExec)
+    : numExecs(numExec) {
+
+  // Identify the block that starts the CFDFC; it's the only one that is both
+  // the source of an arch and the destination of another
+  std::optional<unsigned> startBB;
+  llvm::SmallSet<unsigned, 4> uniqueBlocks;
+  for (ArchBB *arch : archs) {
+    if (auto [_, inserted] = uniqueBlocks.insert(arch->srcBB); !inserted) {
+      startBB = arch->srcBB;
+      break;
+    }
+    if (auto [_, inserted] = uniqueBlocks.insert(arch->dstBB); !inserted) {
+      startBB = arch->dstBB;
+      break;
+    }
+  }
+  assert(startBB.has_value() && "failed to identify start of CFDFC");
+
+  // Form the cycle by stupidly iterating over the archs
+  cycle.insert(*startBB);
+  unsigned currentBB = *startBB;
+  for (size_t i = 0; i < archs.size() - 1; ++i) {
+    for (ArchBB *arch : archs) {
+      if (arch->srcBB == currentBB) {
+        currentBB = arch->dstBB;
+        cycle.insert(currentBB);
+        break;
+      }
+    }
+  }
+
   for (Operation &op : funcOp.getOps()) {
     // Get operation's basic block
     unsigned srcBB;
     if (auto optBB = getLogicBB(&op); !optBB.has_value())
       continue;
     else
-      srcBB = optBB.value();
+      srcBB = *optBB;
 
     // The basic block the operation belongs to must be selected
-    if (!bbs.contains(srcBB))
+    if (!cycle.contains(srcBB))
       continue;
 
     // Add the unit and valid outgoing channels to the CFDFC
     units.insert(&op);
-    for (OpResult channel : op.getResults()) {
-      assert(std::distance(channel.getUsers().begin(),
-                           channel.getUsers().end()) == 1 &&
+    for (OpResult val : op.getResults()) {
+      assert(std::distance(val.getUsers().begin(), val.getUsers().end()) == 1 &&
              "value must have unique user");
 
       // Get the value's unique user and its basic block
-      Operation *user = *channel.getUsers().begin();
+      Operation *user = *val.getUsers().begin();
       unsigned dstBB;
-      if (auto optBB = getLogicBB(user); !optBB.has_value())
+      if (std::optional<unsigned> optBB = getLogicBB(user); !optBB.has_value())
         continue;
       else
-        dstBB = optBB.value();
+        dstBB = *optBB;
 
-      // The channel is in the CFDFC if its producer/consumer belong to the same
-      // basic block and the channel isn't a backedge
-      if (srcBB == dstBB && !isBackedge(&op, user))
-        channels.insert(channel);
-
-      // The channel is in the CFDFC if its producer/consumer belong to a
-      // selected arch between two basic blocks
-      for (ArchBB *arch : archs) {
-        if (arch->srcBB == srcBB && arch->dstBB == dstBB) {
-          channels.insert(channel);
-          break;
+      if (srcBB != dstBB) {
+        // The channel is in the CFDFC if it belongs belong to a selected arch
+        // between two basic blocks
+        for (size_t i = 0; i < cycle.size(); ++i) {
+          unsigned nextBB = i == cycle.size() - 1 ? 0 : i + 1;
+          if (srcBB == cycle[i] && dstBB == cycle[nextBB]) {
+            channels.insert(val);
+            if (isBackedge(val))
+              backedges.insert(val);
+          }
         }
-      }
+      } else if (cycle.size() == 1) {
+        // The channel is in the CFDFC if its producer/consumer belong to the
+        // same basic block and the CFDFC is just a block looping to itself
+        channels.insert(val);
+        if (isBackedge(val))
+          backedges.insert(val);
+      } else if (!isBackedge(val))
+        // The channel is in the CFDFC if its producer/consumer belong to the
+        // same basic block and the channel is not a backedge
+        channels.insert(val);
     }
   }
-}
-
-bool dynamatic::buffer::isBackedge(Operation *src, Operation *dst) {
-  if (dst->isProperAncestor(src))
-    return true;
-  if (isa<BranchOp, ConditionalBranchOp>(src) &&
-      isa<MergeLikeOpInterface>(dst)) {
-    std::optional<unsigned> srcBB = getLogicBB(src);
-    std::optional<unsigned> dstBB = getLogicBB(dst);
-    assert(srcBB.has_value() && dstBB.has_value() &&
-           "cannot determine backedge on operations that do not belong to any "
-           "block");
-    return srcBB.value() >= dstBB.value();
-  }
-  return false;
 }
 
 LogicalResult dynamatic::buffer::extractCFDFC(handshake::FuncOp funcOp,
                                               ArchSet &archs, BBSet &bbs,
                                               ArchSet &selectedArchs,
-                                              BBSet &selectedBBs,
-                                              unsigned &numExec) {
+                                              unsigned &numExecs) {
 #ifdef DYNAMATIC_GUROBI_NOT_INSTALLED
   return funcOp->emitError() << "Project was built without Gurobi, can't run "
                                 "CFDFC extraction";
@@ -219,40 +244,29 @@ LogicalResult dynamatic::buffer::extractCFDFC(handshake::FuncOp funcOp,
 
   // Create all MILP variables we need
   MILPVars vars;
-  unsigned maxTrans = initMILPVariables(model, archs, bbs, vars);
-
-  // Define variable to hold the maximum number of transitions achievable
-  GRBVar varMaxTrans =
-      model.addVar(0, maxTrans, 0.0, GRB_INTEGER, "varMaxTrans");
+  initMILPVariables(model, archs, bbs, vars);
 
   // Set up the MILP and solve it
-  setObjective(model, vars, varMaxTrans);
-  setEdgeConstraints(model, vars, varMaxTrans);
+  setObjective(model, vars);
+  setEdgeConstraints(model, vars);
   setBBConstraints(model, vars);
   model.optimize();
-  if (model.get(GRB_IntAttr_Status) != GRB_OPTIMAL ||
-      varMaxTrans.get(GRB_DoubleAttr_X) < 0)
-    return funcOp.emitError()
-           << "Gurobi failed to find optimal solution to CFDFC extraction MILP";
+  if (int status = model.get(GRB_IntAttr_Status) != GRB_OPTIMAL)
+    return funcOp.emitError() << "Gurobi failed with status code " << status;
 
   // Retrieve the maximum number of transitions identified by the MILP solution
-  numExec = static_cast<unsigned>(varMaxTrans.get(GRB_DoubleAttr_X));
-  if (numExec == 0)
+  numExecs = static_cast<unsigned>(vars.numExecs.get(GRB_DoubleAttr_X));
+  if (numExecs == 0)
     return success();
 
   // Fill in the set of selected archs and decrease their associated number of
   // transitions
   for (auto &[arch, var] : vars.archs) {
     if (archs.count(arch) > 0 && var.get(GRB_DoubleAttr_X) > 0) {
-      archs.insert(arch);
-      arch->numTrans -= numExec;
+      selectedArchs.insert(arch);
+      arch->numTrans -= numExecs;
     }
   }
-
-  // Fill in the set of selected basic blocks
-  for (auto &[bb, var] : vars.bbs)
-    if (bbs.count(bb) > 0 && var.get(GRB_DoubleAttr_X) > 0)
-      selectedBBs.insert(bb);
 
   return success();
 #endif // DYNAMATIC_GUROBI_NOT_INSTALLED
