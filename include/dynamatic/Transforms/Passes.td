@@ -73,6 +73,17 @@ def ScfSimpleIfToSelect : Pass<"scf-simple-if-to-select", "mlir::ModuleOp"> {
 // Handshake passes
 //===----------------------------------------------------------------------===//
 
+def HandshakeCanonicalize : Pass<"handshake-canonicalize", "mlir::ModuleOp"> {
+  let summary = "Canonicalize Handshake operations.";
+  let description = [{
+    Canonicalizes and folds all Handshake operations in the module using a
+    greedy pattern rewriter. The pass preserves the circuit's materialization
+    status i.e., it inserts forks and sinks as needed to compensate for changes
+    made to the IR.
+  }];
+  let constructor = "dynamatic::createHandshakeCanonicalize()";
+}
+
 def HandshakeInferBasicBlocks : Pass<"handshake-infer-basic-blocks", "mlir::ModuleOp"> {
   let summary = "Try to infer the basic block of untagged operations.";
   let description = [{

@@ -13,6 +13,7 @@
 #include "dynamatic/Transforms/BufferPlacement/HandshakePlaceBuffers.h"
 #include "dynamatic/Transforms/BufferPlacement/HandshakeSetBufferingProperties.h"
 #include "dynamatic/Transforms/FlattenMemRefRowMajor.h"
+#include "dynamatic/Transforms/HandshakeCanonicalize.h"
 #include "dynamatic/Transforms/HandshakeConcretizeIndexType.h"
 #include "dynamatic/Transforms/HandshakeInferBasicBlocks.h"
 #include "dynamatic/Transforms/HandshakeMinimizeCstWidth.h"
