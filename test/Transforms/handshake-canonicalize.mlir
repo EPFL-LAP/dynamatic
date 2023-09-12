@@ -15,8 +15,7 @@ handshake.func @eraseUnconditionalBranches(%start: none) -> none {
 // -----
 
 // CHECK-LABEL:   handshake.func @eraseSingleInputMerges(
-// CHECK-SAME:                                           %[[VAL_0:.*]]: i32,
-// CHECK-SAME:                                           %[[VAL_1:.*]]: i32,
+// CHECK-SAME:                                           %[[VAL_0:.*]]: i32, %[[VAL_1:.*]]: i32,
 // CHECK-SAME:                                           %[[VAL_2:.*]]: none, ...) -> i32 attributes {argNames = ["arg0", "arg1", "start"], resNames = ["out0"]} {
 // CHECK:           %[[VAL_3:.*]] = merge %[[VAL_0]], %[[VAL_1]] : i32
 // CHECK:           %[[VAL_4:.*]] = arith.addi %[[VAL_0]], %[[VAL_3]] : i32
@@ -34,9 +33,7 @@ handshake.func @eraseSingleInputMerges(%arg0: i32, %arg1: i32, %start: none) -> 
 // -----
 
 // CHECK-LABEL:   handshake.func @eraseSingleInputMuxes(
-// CHECK-SAME:                                          %[[VAL_0:.*]]: i32,
-// CHECK-SAME:                                          %[[VAL_1:.*]]: i32,
-// CHECK-SAME:                                          %[[VAL_2:.*]]: i1,
+// CHECK-SAME:                                          %[[VAL_0:.*]]: i32, %[[VAL_1:.*]]: i32, %[[VAL_2:.*]]: i1,
 // CHECK-SAME:                                          %[[VAL_3:.*]]: none, ...) -> i32 attributes {argNames = ["arg0", "arg1", "cond", "start"], resNames = ["out0"]} {
 // CHECK:           sink %[[VAL_2]] : i1
 // CHECK:           %[[VAL_4:.*]] = mux %[[VAL_2]] {{\[}}%[[VAL_0]], %[[VAL_1]]] {bb = 0 : ui32} : i1, i32
@@ -55,8 +52,7 @@ handshake.func @eraseSingleInputMuxes(%arg0: i32, %arg1: i32, %cond: i1, %start:
 // -----
 
 // CHECK-LABEL:   handshake.func @eraseSingleControlMerges(
-// CHECK-SAME:                                             %[[VAL_0:.*]]: i32,
-// CHECK-SAME:                                             %[[VAL_1:.*]]: i32,
+// CHECK-SAME:                                             %[[VAL_0:.*]]: i32, %[[VAL_1:.*]]: i32,
 // CHECK-SAME:                                             %[[VAL_2:.*]]: none, ...) -> i32 attributes {argNames = ["arg0", "arg1", "start"], resNames = ["out0"]} {
 // CHECK:           %[[VAL_3:.*]] = source {bb = 0 : ui32}
 // CHECK:           %[[VAL_4:.*]] = constant %[[VAL_3]] {bb = 0 : ui32, value = 0 : i32} : i32
@@ -83,8 +79,7 @@ handshake.func @eraseSingleControlMerges(%arg0: i32, %arg1: i32, %start: none) -
 // -----
 
 // CHECK-LABEL:   handshake.func @downgradeIndexlessControlMerge(
-// CHECK-SAME:                                                   %[[VAL_0:.*]]: i32,
-// CHECK-SAME:                                                   %[[VAL_1:.*]]: i32,
+// CHECK-SAME:                                                   %[[VAL_0:.*]]: i32, %[[VAL_1:.*]]: i32,
 // CHECK-SAME:                                                   %[[VAL_2:.*]]: none, ...) -> i32 attributes {argNames = ["arg0", "arg1", "start"], resNames = ["out0"]} {
 // CHECK:           %[[VAL_3:.*]] = merge %[[VAL_0]], %[[VAL_1]] {bb = 0 : ui32} : i32
 // CHECK:           %[[VAL_4:.*]] = d_return %[[VAL_3]] : i32
