@@ -18,6 +18,32 @@ handshake.func @cmergeToMuxIndexOpt(%arg0: i32, %arg1: i32, %start: none) -> (i3
 
 // -----
 
+// CHECK-LABEL:   handshake.func @cmergeToMuxIndexOpt(
+// CHECK-SAME:                                        %[[VAL_0:.*]]: i32, %[[VAL_1:.*]]: i32,
+// CHECK-SAME:                                        %[[VAL_2:.*]]: none, ...) -> i32 attributes {argNames = ["arg0", "arg1", "start"], resNames = ["out0"]} {
+// CHECK:           %[[VAL_3:.*]] = merge %[[VAL_0]] : i32
+// CHECK:           %[[VAL_4:.*]] = source
+// CHECK:           %[[VAL_5:.*]] = constant %[[VAL_4]] {value = 0 : i0} : i0
+// CHECK:           %[[VAL_6:.*]] = merge %[[VAL_1]] : i32
+// CHECK:           %[[VAL_7:.*]] = arith.extui %[[VAL_5]] : i0 to i32
+// CHECK:           %[[VAL_8:.*]] = arith.addi %[[VAL_6]], %[[VAL_7]] : i32
+// CHECK:           %[[VAL_9:.*]] = arith.addi %[[VAL_8]], %[[VAL_3]] : i32
+// CHECK:           %[[VAL_10:.*]] = d_return %[[VAL_9]] : i32
+// CHECK:           end %[[VAL_10]] : i32
+// CHECK:         }
+
+handshake.func @cmergeToMuxIndexOpt(%arg0: i32, %arg1: i32, %start: none) -> i32 {
+  %result, %index = control_merge %arg0 : i32, i32
+  %mux = mux %index [%arg1] : i32, i32
+  %otherResult, %otherIndex = control_merge %arg1 : i32, i32
+  %add1 = arith.addi %otherResult, %otherIndex : i32
+  %add2 = arith.addi %add1, %result : i32
+  %ret = d_return %add2 : i32
+  end %ret : i32
+}
+
+// -----
+
 // CHECK-LABEL:   handshake.func @memAddrOpt(
 // CHECK-SAME:                               %[[VAL_0:.*]]: memref<1000xi32>,
 // CHECK-SAME:                               %[[VAL_1:.*]]: none, ...) -> i32 attributes {argNames = ["mem", "start"], resNames = ["out0"]} {

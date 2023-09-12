@@ -888,13 +888,16 @@ static std::string getPrettyPrintedNodeLabel(Operation *op) {
                 op->template getAttrOfType<mlir::BoolAttr>("value");
             boolAttr)
           return std::to_string(boolAttr.getValue());
-
         // Try to get the constant value as an integer
         if (mlir::IntegerAttr intAttr =
                 op->template getAttrOfType<mlir::IntegerAttr>("value");
-            intAttr)
-          return std::to_string(intAttr.getValue().getSExtValue());
-
+            intAttr) {
+          if (intAttr.getType().getIntOrFloatBitWidth() == 0)
+            return std::string("null");
+          APInt ap = intAttr.getValue();
+          return ap.isNegative() ? std::to_string(ap.getSExtValue())
+                                 : std::to_string(ap.getZExtValue());
+        }
         // Try to get the constant value as floating point
         if (mlir::FloatAttr floatAttr =
                 op->template getAttrOfType<mlir::FloatAttr>("value");
