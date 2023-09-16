@@ -397,8 +397,8 @@ private:
 
 bool PromoteSignedCmp::isPromotionPossible(arith::CmpIOp cmpOp) const {
   NumericAnalysis analysis;
-  return analysis.getRange(cmpOp->getOperand(0)).isPositive() &&
-         analysis.getRange(cmpOp->getOperand(1)).isPositive();
+  return analysis.getRange(cmpOp.getLhs()).isPositive() &&
+         analysis.getRange(cmpOp.getRhs()).isPositive();
 }
 
 namespace {
