@@ -41,7 +41,7 @@ def ScfForLoopRotation : Pass<"scf-rotate-for-loops", "mlir::ModuleOp"> {
     Rotates for loops, semantically transforming them into do-while's, whenever
     it can be determined that they execute at least once. The resulting loop at
     the std level usually has one less basic block than the original for loop
-    would have had, which ultimately reduces the area of the final circuit.  
+    would have had, which ultimately reduces the area of the final circuit.
   }];
   let constructor = "dynamatic::createScfRotateForLoops()";
 }
