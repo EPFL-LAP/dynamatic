@@ -400,43 +400,6 @@ static size_t fixPortNumber(Operation *op, Value val, size_t idx,
       .Default([&](auto) { return idx; });
 }
 
-/// Derives a raw port from a port string in the format
-/// "<port_name>:<port_width>". Uses the name passed as argument to derive a
-/// globally unique name for the returned raw port.
-static RawPort splitPortStr(std::string &portStr, std::string &nodeName) {
-  auto colonIdx = portStr.find(":");
-  assert(colonIdx != std::string::npos && "port string has incorrect format");
-
-  // Take out last special character from the port name if present
-  auto portName = portStr.substr(0, colonIdx);
-  auto lastChar = portName[colonIdx - 1];
-  if (lastChar == '?' || lastChar == '+' || lastChar == '-')
-    portName = portName.substr(0, colonIdx - 1);
-
-  auto width = (unsigned)std::stoul(portStr.substr(colonIdx + 1));
-  return std::make_pair(nodeName + "_" + portName, width);
-}
-
-/// Extracts a list of raw ports from the "in" or "out" attribute of a node in
-/// the graph. Each returned raw port is uniquely named globally using the
-/// name passed as argument.
-static SmallVector<RawPort> extractPortsFromString(std::string &portsInfo,
-                                                   std::string &nodeName) {
-  SmallVector<RawPort> ports;
-  if (portsInfo.empty())
-    return ports;
-
-  size_t last = 0, next = 0;
-  while ((next = portsInfo.find(" ", last)) != std::string::npos) {
-    std::string subPorts = portsInfo.substr(last, next - last);
-    ports.push_back(splitPortStr(subPorts, nodeName));
-    last = next + 1;
-  }
-  std::string subPorts = portsInfo.substr(last);
-  ports.push_back(splitPortStr(subPorts, nodeName));
-  return ports;
-}
-
 /// Determines whether a bitwidth modification operation (extension or
 /// truncation) is located "between two blocks" (i.e., it is after a branch-like
 /// operation or before a merge-like operation). Such bitwidth modifiers trip up
@@ -454,8 +417,8 @@ static bool isBitModBetweenBlocks(Operation *op) {
 }
 
 /// Performs some very hacky transformations in the function to satisfy legacy
-/// Dynamatic's toolchain.
-static void patchUpIRForLegacy(handshake::FuncOp funcOp) {
+/// Dynamatic's buffer placement tool.
+static void patchUpIRForLegacyBuffers(handshake::FuncOp funcOp) {
   // Remove the BB attribute of all forks "between basic blocks"
   for (auto forkOp : funcOp.getOps<handshake::ForkOp>()) {
     // Only operate on forks which belong to a basic block
@@ -486,78 +449,6 @@ static void patchUpIRForLegacy(handshake::FuncOp funcOp) {
       // operation in a different block
       forkOp->removeAttr(BB_ATTR);
   }
-}
-
-LogicalResult DOTPrinter::legacyRegisterPorts(NodeInfo &info,
-                                              std::string &nodeName,
-                                              bool skipInputs,
-                                              bool skipOutputs) {
-  if (!skipInputs && info.stringAttr.find("in") != info.stringAttr.end())
-    for (auto &in : extractPortsFromString(info.stringAttr["in"], nodeName))
-      if (auto [_, newPort] = legacyPorts.insert(in); !newPort)
-        return failure();
-  if (!skipOutputs && info.stringAttr.find("out") != info.stringAttr.end())
-    for (auto &out : extractPortsFromString(info.stringAttr["out"], nodeName))
-      if (auto [_, newPort] = legacyPorts.insert(out); !newPort)
-        return failure();
-  return success();
-}
-
-LogicalResult DOTPrinter::legacyRegisterChannel(EdgeInfo &info,
-                                                std::string &srcName,
-                                                std::string &dstName) {
-  auto srcPort = srcName + "_out" + std::to_string(info.from);
-  auto dstPort = dstName + "_in" + std::to_string(info.to);
-  if (auto [_, newChannel] =
-          legacyChannels.insert(std::make_pair(srcPort, dstPort));
-      !newChannel)
-    return failure();
-  return success();
-}
-
-LogicalResult DOTPrinter::verifyDOT(handshake::FuncOp funcOp,
-                                    bool failOnWidthMismatch) {
-
-  // Create a set of all port names to keep track of the ones that haven't
-  // been matched so far
-  std::set<std::string> unmatchedPorts;
-  for (auto &[name, _] : legacyPorts)
-    unmatchedPorts.insert(name);
-
-  // Iterate over channels and check for correctness
-  for (auto &channel : legacyChannels) {
-    // Both ports must exist
-    auto srcPortIt = unmatchedPorts.find(channel.first);
-    if (srcPortIt == unmatchedPorts.end())
-      return funcOp->emitError()
-             << "port " << channel.first
-             << " is referenced by channel but does not exist\n";
-    auto dstPortIt = unmatchedPorts.find(channel.second);
-    if (dstPortIt == unmatchedPorts.end())
-      return funcOp->emitError()
-             << "port " << channel.second
-             << " is referenced by channel but does not exist\n";
-
-    auto srcPort = *srcPortIt, dstPort = *dstPortIt;
-
-    // Port widths must match
-    if (failOnWidthMismatch)
-      if (legacyPorts[srcPort] != legacyPorts[dstPort])
-        return funcOp->emitError()
-               << "port widths do not match between " << srcPort << " and "
-               << dstPort << " (" << legacyPorts[srcPort]
-               << " != " << legacyPorts[dstPort] << ")\n";
-
-    // Remove ports from set of unmatched ports
-    unmatchedPorts.erase(srcPort);
-    unmatchedPorts.erase(dstPort);
-  }
-
-  for (auto &name : unmatchedPorts)
-    return funcOp.emitError()
-           << "port " << name << " isn't wired to any other port\n";
-
-  return success();
 }
 
 LogicalResult DOTPrinter::annotateNode(Operation *op) {
@@ -750,10 +641,6 @@ LogicalResult DOTPrinter::annotateNode(Operation *op) {
   if (info.type == "Operator")
     info.intAttr["II"] = 1;
 
-  bool skipOutputs = isa<handshake::EndOp>(op);
-  if (failed(legacyRegisterPorts(info, opNameMap[op], false, skipOutputs)))
-    return op->emitError()
-           << "failed to register node due to duplicated port name";
   info.print(os);
   return success();
 }
@@ -768,19 +655,16 @@ LogicalResult DOTPrinter::annotateArgumentNode(handshake::FuncOp funcOp,
   if (isa<NoneType>(arg.getType()))
     info.stringAttr["control"] = "true";
 
-  auto argName = getArgumentName(funcOp, idx);
-  if (failed(legacyRegisterPorts(info, argName, true, false)))
-    return funcOp.emitError() << "failed to register argument node " << idx
-                              << " due to duplicated port name";
   info.print(os);
   return success();
 }
 
 LogicalResult DOTPrinter::annotateEdge(Operation *src, Operation *dst,
                                        Value val) {
-  // In legacy mode, skip edges from branch-like operations to bitwidth
+  bool legacyBuffers = mode == Mode::LEGACY_BUFFERS;
+  // In legacy-buffers mode, skip edges from branch-like operations to bitwidth
   // modifiers in between blocks
-  if (legacy && isBitModBetweenBlocks(dst))
+  if (legacyBuffers && isBitModBetweenBlocks(dst))
     return success();
 
   EdgeInfo info;
@@ -788,7 +672,7 @@ LogicalResult DOTPrinter::annotateEdge(Operation *src, Operation *dst,
   // "Jump over" bitwidth modification operations that go to a merge-like
   // operation in a different block
   Value srcVal = val;
-  if (legacy && isBitModBetweenBlocks(src)) {
+  if (legacyBuffers && isBitModBetweenBlocks(src)) {
     srcVal = src->getOperand(0);
     src = srcVal.getDefiningOp();
   }
@@ -811,10 +695,6 @@ LogicalResult DOTPrinter::annotateEdge(Operation *src, Operation *dst,
       // Is val the address result of the memory operation?
       info.memAddress = val == src->getResult(0);
 
-  if (failed(legacyRegisterChannel(info, opNameMap[src], opNameMap[dst])))
-    return src->emitError()
-           << "failed to register channel to destination node "
-           << opNameMap[dst] << " due to duplicated channel name";
   info.print(os);
   return success();
 }
@@ -833,10 +713,6 @@ LogicalResult DOTPrinter::annotateArgumentEdge(handshake::FuncOp funcOp,
   info.to = fixPortNumber(dst, arg, argIdx, false) + 1;
 
   auto argName = getArgumentName(funcOp, idx);
-  if (failed(legacyRegisterChannel(info, argName, opNameMap[dst])))
-    return funcOp.emitError()
-           << "failed to register channel from argument node " << idx << " to "
-           << opNameMap[dst] << " due to duplicated channel name";
   info.print(os);
   return success();
 }
@@ -1000,9 +876,10 @@ static std::string getPrettyPrintedNodeLabel(Operation *op) {
       });
 }
 
-DOTPrinter::DOTPrinter(bool legacy, bool debug, TimingDatabase *timingDB)
-    : legacy(legacy), debug(debug), timingDB(timingDB), os(llvm::outs()) {
-  assert(!legacy || timingDB && "timing database must exist in legacy mode");
+DOTPrinter::DOTPrinter(Mode mode, EdgeStyle edgeStyle, TimingDatabase *timingDB)
+    : mode(mode), edgeStyle(edgeStyle), timingDB(timingDB), os(llvm::outs()) {
+  assert(!inLegacyMode() ||
+         timingDB && "timing database must exist in legacy mode");
 };
 
 LogicalResult DOTPrinter::printDOT(mlir::ModuleOp mod) {
@@ -1017,7 +894,7 @@ LogicalResult DOTPrinter::printDOT(mlir::ModuleOp mod) {
   }
   handshake::FuncOp funcOp = *funcs.begin();
 
-  if (legacy) {
+  if (inLegacyMode()) {
     // In legacy mode, the IR must respect certain additional constraints for it
     // to be compatible with legacy Dynamatic
     if (failed(verifyAllValuesHasOneUse(funcOp)))
@@ -1033,7 +910,8 @@ LogicalResult DOTPrinter::printDOT(mlir::ModuleOp mod) {
                 "to ensure that the DOT is compatible with legacy Dynamatic. "
              << ERR_RUN_CONCRETIZATION;
 
-    patchUpIRForLegacy(funcOp);
+    if (mode == Mode::LEGACY_BUFFERS)
+      patchUpIRForLegacyBuffers(funcOp);
   }
 
   mlir::raw_indented_ostream os(llvm::outs());
@@ -1052,7 +930,7 @@ std::string DOTPrinter::getNodeName(Operation *op) {
 std::string DOTPrinter::getArgumentName(handshake::FuncOp funcOp, size_t idx) {
   auto numArgs = funcOp.getNumArguments();
   assert(idx < numArgs && "argument index too high");
-  if (idx == numArgs - 1 && legacy)
+  if (idx == numArgs - 1 && inLegacyMode())
     // Legacy Dynamatic expects the start signal to be called start_0
     return "start_0";
   return funcOp.getArgName(idx).getValue().str();
@@ -1108,13 +986,7 @@ LogicalResult DOTPrinter::printNode(Operation *op) {
     os << "oval";
 
   // Determine label
-  os << ", label=\"";
-  if (!debug)
-    os << prettyLabel;
-  else {
-    os << opName;
-  }
-  os << "\"";
+  os << ", label=\"" << (inLegacyMode() ? opName : prettyLabel) << "\"";
 
   // Determine style
   os << ", style=\"filled";
@@ -1122,7 +994,7 @@ LogicalResult DOTPrinter::printNode(Operation *op) {
       controlInterface && controlInterface.isControl())
     os << ", " + CONTROL_STYLE;
   os << "\", ";
-  if (legacy && failed(annotateNode(op)))
+  if (inLegacyMode() && failed(annotateNode(op)))
     return failure();
   os << "]\n";
 
@@ -1130,16 +1002,17 @@ LogicalResult DOTPrinter::printNode(Operation *op) {
 }
 
 LogicalResult DOTPrinter::printEdge(Operation *src, Operation *dst, Value val) {
-
-  // In legacy mode, skip edges from branch-like operations to bitwidth
+  bool legacyBuffers = mode == Mode::LEGACY_BUFFERS;
+  // In legacy-buffers mode, skip edges from branch-like operations to bitwidth
   // modifiers in between blocks
-  if (legacy && isBitModBetweenBlocks(dst))
+  if (legacyBuffers && isBitModBetweenBlocks(dst))
     return success();
 
   // "Jump over" bitwidth modification operations that go to a merge-like
   // operation in a different block
+  bool legacy = inLegacyMode();
   std::string srcNodeName =
-      legacy && isBitModBetweenBlocks(src)
+      legacyBuffers && isBitModBetweenBlocks(src)
           ? getNodeName(src->getOperand(0).getDefiningOp())
           : getNodeName(src);
 
@@ -1156,10 +1029,17 @@ LogicalResult DOTPrinter::printEdge(Operation *src, Operation *dst, Value val) {
 LogicalResult DOTPrinter::printFunc(handshake::FuncOp funcOp) {
   std::map<std::string, unsigned> opTypeCntrs;
   DenseMap<Operation *, unsigned> opIDs;
+  bool legacy = inLegacyMode();
+
+  std::string splines;
+  if (edgeStyle == EdgeStyle::SPLINE)
+    splines = "spline";
+  else
+    splines = "ortho";
 
   os << "Digraph G {\n";
   os.indent();
-  os << "splines=spline;\n";
+  os << "splines=" << splines << ";\n";
   os << "compound=true; // Allow edges between clusters\n";
 
   // Sequentially scan across the operations in the function and assign
@@ -1202,9 +1082,9 @@ LogicalResult DOTPrinter::printFunc(handshake::FuncOp funcOp) {
     auto opID = std::to_string(opIDs[&op]);
     opNameMap[&op] = opFullName.substr(startIdx + 1) + opID;
 
-    // In legacy mode, do not print bitwidth modification operation between
-    // branch-like and merge-like operations
-    if (legacy && isBitModBetweenBlocks(&op))
+    // In legacy-buffers mode, do not print bitwidth modification operation
+    // between branch-like and merge-like operations
+    if (mode == Mode::LEGACY_BUFFERS && isBitModBetweenBlocks(&op))
       continue;
 
     // Print the operation
@@ -1301,10 +1181,6 @@ LogicalResult DOTPrinter::printFunc(handshake::FuncOp funcOp) {
       for (auto &use : res.getUses())
         if (failed(printEdge(op, use.getOwner(), res)))
           return failure();
-
-  // Verify that annotations are valid in legacy mode
-  if (legacy && failed(verifyDOT(funcOp)))
-    return failure();
 
   os.unindent();
   os << "}\n";
