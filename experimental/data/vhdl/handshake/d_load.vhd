@@ -3,7 +3,7 @@ use IEEE.std_logic_1164.all;
 use IEEE.numeric_std.all;
 use work.customTypes.all;
 
-entity d_load is generic (
+entity d_load_node is generic (
   DATA_BITWIDTH : integer;
   ADDR_BITWIDTH : integer);
 port (
@@ -26,7 +26,7 @@ port (
 
 end entity;
 
-architecture arch of d_load is
+architecture arch of d_load_node is
   signal Buffer_1_readyArray_0   : std_logic;
   signal Buffer_1_validArray_0   : std_logic;
   signal Buffer_1_dataOutArray_0 : std_logic_vector(ADDR_BITWIDTH - 1 downto 0);

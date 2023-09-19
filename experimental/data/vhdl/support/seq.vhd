@@ -3,7 +3,7 @@ use ieee.std_logic_1164.all;
 use ieee.numeric_std.all;
 use work.customTypes.all;
 
-entity buffer_node_seq is
+entity buffer_seq is
   generic (
     BITWIDTH : integer
   );
@@ -18,9 +18,9 @@ entity buffer_node_seq is
     ins_ready  : out std_logic;
     outs       : out std_logic_vector(BITWIDTH - 1 downto 0);
     outs_valid : out std_logic);
-end entity;
+end buffer_seq;
 
-architecture arch of buffer_node_seq is
+architecture arch of buffer_seq is
 
   signal tehb1_valid, tehb1_ready     : std_logic;
   signal oehb1_valid, oehb1_ready     : std_logic;

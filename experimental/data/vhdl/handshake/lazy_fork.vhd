@@ -2,7 +2,7 @@ library ieee;
 use ieee.std_logic_1164.all;
 use work.customTypes.all;
 
-entity lazy_fork is generic (
+entity lazy_fork_node is generic (
   OUTPUTS  : integer;
   BITWIDTH : integer);
 port (
@@ -18,9 +18,9 @@ port (
   outs_valid : out std_logic_vector(OUTPUTS - 1 downto 0)
 );
 
-end lazy_fork;
+end entity;
 
-architecture arch of lazy_fork is
+architecture arch of lazy_fork_node is
   signal allnReady : std_logic;
 begin
 

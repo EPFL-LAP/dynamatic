@@ -3,7 +3,7 @@ use IEEE.std_logic_1164.all;
 use ieee.numeric_std.all;
 use work.customTypes.all;
 
-entity addf is
+entity addf_node is
   generic (
     BITWIDTH : integer
   );
@@ -23,7 +23,7 @@ entity addf is
     result_valid : out std_logic);
 end entity;
 
-architecture arch of addf is
+architecture arch of addf_node is
 
   component array_RAM_addf_32bkb is
     generic (
@@ -44,19 +44,21 @@ architecture arch of addf is
   end component;
 
   signal join_valid : std_logic;
+  signal out_array  : std_logic_vector(1 downto 0);
 
   signal buff_valid, oehb_valid, oehb_ready : std_logic;
   signal oehb_dataOut, oehb_datain          : std_logic;
 
 begin
+  out_array(0) <= lhs_ready;
+  out_array(1) <= rhs_ready;
   join : entity work.join(arch) generic map(2)
     port map(
     (lhs_valid,
       rhs_valid),
       oehb_ready,
       join_valid,
-      (lhs_ready,
-      rhs_ready));
+      out_array);
 
   buff : entity work.delay_buffer(arch) generic map(8)
     port map(

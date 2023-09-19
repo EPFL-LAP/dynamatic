@@ -49,6 +49,9 @@ int main(int argc, char **argv) {
 
   // get the predicate name from command line options
   std::string predicateName(argv[1]);
+  size_t num = std::atoi(predicateName.c_str());
+  std::stringstream toHex;
+  toHex << std::hex << num;
   std::stringstream buffer;
   std::string modText;
   buffer << file.rdbuf();
@@ -62,7 +65,9 @@ int main(int argc, char **argv) {
 
     std::getline(buffer, temp, '#');
     if (temp == "CST_VALUE")
-      modText += predicateName;
+      modText += "x\"" + toHex.str() + "\"";
+    else if (temp == "CST_NAME")
+      modText += toHex.str();
   }
 
   // print the result module text to std output

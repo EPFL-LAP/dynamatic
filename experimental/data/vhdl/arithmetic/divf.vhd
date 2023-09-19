@@ -3,7 +3,7 @@ use IEEE.std_logic_1164.all;
 use ieee.numeric_std.all;
 use work.customTypes.all;
 
-entity divf is
+entity divf_node is
   generic (
     BITWIDTH : integer
   );
@@ -23,7 +23,7 @@ entity divf is
     result_valid : out std_logic);
 end entity;
 
-architecture arch of divf is
+architecture arch of divf_node is
 
   -- Interface to Vivado component
   component array_RAM_fdiv_32ns_32ns_32_30_1 is
@@ -47,8 +47,11 @@ architecture arch of divf is
   signal join_valid                         : std_logic;
   signal buff_valid, oehb_valid, oehb_ready : std_logic;
   signal oehb_dataOut, oehb_datain          : std_logic;
+  signal out_array                          : std_logic_vector(1 downto 0);
 
 begin
+  out_array(0) <= lhs_ready;
+  out_array(1) <= rhs_ready;
 
   join_write_temp : entity work.join(arch) generic map(2)
     port map(
@@ -56,8 +59,7 @@ begin
       rhs_valid),
       oehb_ready,
       join_valid,
-      (lhs_ready,
-      rhs_ready));
+      out_array);
   buff : entity work.delay_buffer(arch)
     generic map(28)
     port map(

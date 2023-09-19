@@ -204,8 +204,7 @@ static std::string getTypeName(Type type, Location loc) {
 /// parameters.
 static std::string getExtModuleName(Operation *oldOp) {
   std::string extModName = getBareExtModuleName(oldOp);
-  if (extModName != "handshake_end")
-    extModName += ".";
+  extModName += "_node.";
   auto types = getDiscriminatingParameters(oldOp);
   mlir::Location loc = oldOp->getLoc();
   SmallVector<Type> &inTypes = types.first;
@@ -271,7 +270,7 @@ static std::string getExtModuleName(Operation *oldOp) {
           if (auto intAttr = constOp.getValue().dyn_cast<IntegerAttr>()) {
             APInt val = intAttr.getValue();
             if (val.isNegative())
-              extModName += std::to_string(val.getSExtValue());
+              extModName += std::to_string(val.getZExtValue());
             else
               extModName += std::to_string(val.getZExtValue());
           } else if (auto floatAttr = constOp.getValue().dyn_cast<FloatAttr>())
@@ -280,7 +279,7 @@ static std::string getExtModuleName(Operation *oldOp) {
             llvm_unreachable("unsupported constant type");
         }
         // bitwidth
-        extModName += "_" + getTypeName(inTypes[0], loc);
+        extModName += "_" + getTypeName(outTypes[0], loc);
       })
       .Case<handshake::JoinOp, handshake::SyncOp>([&](auto) {
         // array of bitwidths
@@ -289,7 +288,6 @@ static std::string getExtModuleName(Operation *oldOp) {
         extModName = extModName.substr(0, extModName.size() - 1);
       })
       .Case<handshake::EndOp>([&](auto) {
-        extModName += "_node.";
         // mem_inputs
         extModName += std::to_string(inTypes.size() - 1);
         // bitwidth
@@ -308,10 +306,11 @@ static std::string getExtModuleName(Operation *oldOp) {
             extModName += '_' + std::to_string(addrWidth);
             std::string temporaryName;
 
-            size_t lc = 0, sc = 0;
+            size_t lc = 0, sc = 0, ctrlCount = 0;
             for (auto [idx, blockAccesses] :
                  llvm::enumerate(op.getAccesses())) {
               temporaryName += "_";
+              size_t flag = 0;
               for (auto &access : cast<mlir::ArrayAttr>(blockAccesses))
                 if (cast<AccessTypeEnumAttr>(access).getValue() ==
                     AccessTypeEnum::Load) {
@@ -319,17 +318,17 @@ static std::string getExtModuleName(Operation *oldOp) {
                   lc++;
                 } else {
                   temporaryName += "S";
+                  flag = 1;
                   sc++;
                 }
+              ctrlCount += flag;
             }
             // load_count
             extModName += '_' + std::to_string(lc);
             // store_count
             extModName += '_' + std::to_string(sc);
-            // ctrl bitwith
-            extModName += '_' + std::to_string(ctrlWidth);
-            // array of loads&stores arrays
-            extModName += temporaryName;
+            // ctrl_count
+            extModName += '_' + std::to_string(ctrlCount);
           })
       .Case<arith::AddFOp, arith::AddIOp, arith::AndIOp, arith::BitcastOp,
             arith::CeilDivSIOp, arith::CeilDivUIOp, arith::DivFOp,
@@ -338,9 +337,13 @@ static std::string getExtModuleName(Operation *oldOp) {
             arith::MinUIOp, arith::MulFOp, arith::MulIOp, arith::NegFOp,
             arith::OrIOp, arith::RemFOp, arith::RemSIOp, arith::RemUIOp,
             arith::ShLIOp, arith::ShRSIOp, arith::ShRUIOp, arith::SubFOp,
-            arith::SubIOp, arith::XOrIOp, arith::SelectOp>([&](auto) {
+            arith::SubIOp, arith::XOrIOp>([&](auto) {
         // bitwidth
         extModName += getTypeName(inTypes[0], loc);
+      })
+      .Case<arith::SelectOp>([&](auto) {
+        // bitwidth
+        extModName += getTypeName(outTypes[0], loc);
       })
       .Case<arith::CmpFOp, arith::CmpIOp>([&](auto) {
         // predicate

@@ -4,14 +4,14 @@ use work.customTypes.all;
 use ieee.numeric_std.all;
 use IEEE.math_real.all;
 
-entity mux is
+entity mux_node is
   generic (
     NUM_INPUTS    : integer;
     BITWIDTH      : integer;
     COND_BITWIDTH : integer
   );
   port (
-    -- NUM_INPUTS
+    -- inputs
     clk              : in std_logic;
     rst              : in std_logic;
     select_ind       : in std_logic_vector(COND_BITWIDTH - 1 downto 0);
@@ -24,9 +24,9 @@ entity mux is
     ins_ready        : out std_logic_vector(NUM_INPUTS - 1 downto 0);
     outs             : out std_logic_vector(BITWIDTH - 1 downto 0);
     outs_valid       : out std_logic);
-end mux;
+end entity;
 
-architecture arch of mux is
+architecture arch of mux_node is
 
   signal tehb_data_in : std_logic_vector(BITWIDTH - 1 downto 0);
   signal tehb_pvalid  : std_logic;

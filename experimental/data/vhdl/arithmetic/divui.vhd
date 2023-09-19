@@ -3,7 +3,7 @@ use IEEE.std_logic_1164.all;
 use ieee.numeric_std.all;
 use work.customTypes.all;
 
-entity divui is
+entity divui_node is
   generic (
     BITWIDTH : integer
   );
@@ -23,7 +23,7 @@ entity divui is
     result_valid : out std_logic);
 end entity;
 
-architecture arch of divui is
+architecture arch of divui_node is
 
   component array_RAM_udiv_32ns_32ns_32_36_1 is
     generic (
@@ -42,8 +42,11 @@ architecture arch of divui is
   end component;
 
   signal join_valid : std_logic;
+  signal out_array  : std_logic_vector(1 downto 0);
 
 begin
+  out_array(0) <= lhs_ready;
+  out_array(1) <= rhs_ready;
   array_RAM_udiv_32ns_32ns_32_36_1_U1 : component array_RAM_udiv_32ns_32ns_32_36_1
     generic map(
       ID         => 1,
@@ -65,8 +68,7 @@ begin
         rhs_valid),
         result_ready,
         join_valid,
-        (lhs_ready,
-        rhs_ready));
+        out_array);
 
     buff : entity work.delay_buffer(arch)
       generic map(35)
