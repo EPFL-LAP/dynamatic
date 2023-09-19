@@ -211,14 +211,14 @@ handshake.func @simpleLoop(%start: none) -> i32 {
 // CHECK:           %[[VAL_44:.*]] = source
 // CHECK:           %[[VAL_45:.*]] = constant %[[VAL_44]] {value = 10 : i5} : i5
 // CHECK:           %[[VAL_46:.*]] = arith.extsi %[[VAL_45]] : i5 to i32
-// CHECK:           %[[VAL_47:.*]], %[[VAL_48:.*]] = control_merge %[[VAL_43]] : none, i0
-// CHECK:           %[[VAL_49:.*]] = merge %[[VAL_42]] : i32
-// CHECK:           %[[VAL_50:.*]] = arith.addi %[[VAL_49]], %[[VAL_46]] : i32
-// CHECK:           %[[VAL_37]] = br %[[VAL_50]] : i32
+// CHECK:           %[[VAL_47:.*]] = merge %[[VAL_43]] : none
+// CHECK:           %[[VAL_48:.*]] = merge %[[VAL_42]] : i32
+// CHECK:           %[[VAL_49:.*]] = arith.addi %[[VAL_48]], %[[VAL_46]] : i32
+// CHECK:           %[[VAL_37]] = br %[[VAL_49]] : i32
 // CHECK:           %[[VAL_32]] = br %[[VAL_47]] : none
-// CHECK:           %[[VAL_51:.*]] = merge %[[VAL_21]] : i32
-// CHECK:           %[[VAL_52:.*]] = d_return %[[VAL_51]] : i32
-// CHECK:           end %[[VAL_52]] : i32
+// CHECK:           %[[VAL_50:.*]] = merge %[[VAL_21]] : i32
+// CHECK:           %[[VAL_51:.*]] = d_return %[[VAL_50]] : i32
+// CHECK:           end %[[VAL_51]] : i32
 // CHECK:         }
 handshake.func @nestedLoop(%start: none) -> i32 {
 // ^^entry outer loop:

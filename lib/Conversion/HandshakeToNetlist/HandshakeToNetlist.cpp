@@ -204,7 +204,6 @@ static std::string getTypeName(Type type, Location loc) {
 /// parameters.
 static std::string getExtModuleName(Operation *oldOp) {
   std::string extModName = getBareExtModuleName(oldOp);
-  extModName += "_node.";
   auto types = getDiscriminatingParameters(oldOp);
   mlir::Location loc = oldOp->getLoc();
   SmallVector<Type> &inTypes = types.first;
@@ -268,9 +267,12 @@ static std::string getExtModuleName(Operation *oldOp) {
         // constant value
         if (auto constOp = dyn_cast<handshake::ConstantOp>(oldOp)) {
           if (auto intAttr = constOp.getValue().dyn_cast<IntegerAttr>()) {
-            APInt val = intAttr.getValue();
-            if (val.isNegative())
-              extModName += std::to_string(val.getZExtValue());
+            auto intType = intAttr.getType();
+
+            if (intType.isSignedInteger())
+              extModName += "_c" + std::to_string(intAttr.getSInt());
+            else if (intType.isUnsignedInteger())
+              extModName += "_c" + std::to_string(intAttr.getUInt());
             else
               extModName += std::to_string(val.getZExtValue());
           } else if (auto floatAttr = constOp.getValue().dyn_cast<FloatAttr>())
@@ -279,7 +281,7 @@ static std::string getExtModuleName(Operation *oldOp) {
             llvm_unreachable("unsupported constant type");
         }
         // bitwidth
-        extModName += "_" + getTypeName(outTypes[0], loc);
+        extModName += getTypeName(inTypes[0], loc);
       })
       .Case<handshake::JoinOp, handshake::SyncOp>([&](auto) {
         // array of bitwidths
@@ -287,15 +289,15 @@ static std::string getExtModuleName(Operation *oldOp) {
           extModName += getTypeName(inType, loc) + "_";
         extModName = extModName.substr(0, extModName.size() - 1);
       })
-      .Case<handshake::EndOp>([&](auto) {
-        // mem_inputs
-        extModName += std::to_string(inTypes.size() - 1);
-        // bitwidth
-        extModName += "_" + getTypeName(inTypes[0], loc);
-      })
-      .Case<handshake::DynamaticReturnOp>([&](auto) {
-        // bitwidth
-        extModName += getTypeName(inTypes[0], loc);
+      .Case<handshake::DynamaticReturnOp, handshake::EndOp>([&](auto) {
+        extModName += "_in";
+        // array of input bitwidths
+        for (auto inType : inTypes)
+          extModName += getTypeName(inType, loc);
+        extModName += "_out";
+        // array of output bitwidths
+        for (auto outType : outTypes)
+          extModName += getTypeName(outType, loc);
       })
       .Case<handshake::MemoryControllerOp>(
           [&](handshake::MemoryControllerOp op) {
@@ -306,29 +308,17 @@ static std::string getExtModuleName(Operation *oldOp) {
             extModName += '_' + std::to_string(addrWidth);
             std::string temporaryName;
 
-            size_t lc = 0, sc = 0, ctrlCount = 0;
+            // array of loads&stores arrays
             for (auto [idx, blockAccesses] :
                  llvm::enumerate(op.getAccesses())) {
-              temporaryName += "_";
-              size_t flag = 0;
+              extModName += "_";
               for (auto &access : cast<mlir::ArrayAttr>(blockAccesses))
                 if (cast<AccessTypeEnumAttr>(access).getValue() ==
-                    AccessTypeEnum::Load) {
-                  temporaryName += "L";
-                  lc++;
-                } else {
-                  temporaryName += "S";
-                  flag = 1;
-                  sc++;
-                }
-              ctrlCount += flag;
+                    AccessTypeEnum::Load)
+                  extModName += "L";
+                else
+                  extModName += "S";
             }
-            // load_count
-            extModName += '_' + std::to_string(lc);
-            // store_count
-            extModName += '_' + std::to_string(sc);
-            // ctrl_count
-            extModName += '_' + std::to_string(ctrlCount);
           })
       .Case<arith::AddFOp, arith::AddIOp, arith::AndIOp, arith::BitcastOp,
             arith::CeilDivSIOp, arith::CeilDivUIOp, arith::DivFOp,

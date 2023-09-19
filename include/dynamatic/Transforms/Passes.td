@@ -41,7 +41,7 @@ def ScfForLoopRotation : Pass<"scf-rotate-for-loops", "mlir::ModuleOp"> {
     Rotates for loops, semantically transforming them into do-while's, whenever
     it can be determined that they execute at least once. The resulting loop at
     the std level usually has one less basic block than the original for loop
-    would have had, which ultimately reduces the area of the final circuit.  
+    would have had, which ultimately reduces the area of the final circuit.
   }];
   let constructor = "dynamatic::createScfRotateForLoops()";
 }
@@ -73,14 +73,27 @@ def ScfSimpleIfToSelect : Pass<"scf-simple-if-to-select", "mlir::ModuleOp"> {
 // Handshake passes
 //===----------------------------------------------------------------------===//
 
+def HandshakeCanonicalize : Pass<"handshake-canonicalize", "mlir::ModuleOp"> {
+  let summary = "Canonicalize Handshake operations.";
+  let description = [{
+    Canonicalizes and folds all Handshake operations in the module using a
+    greedy pattern rewriter. The pass preserves the circuit's materialization
+    status i.e., it inserts forks and sinks as needed to compensate for changes
+    made to the IR.
+  }];
+  let constructor = "dynamatic::createHandshakeCanonicalize()";
+}
+
 def HandshakeInferBasicBlocks : Pass<"handshake-infer-basic-blocks", "mlir::ModuleOp"> {
   let summary = "Try to infer the basic block of untagged operations.";
   let description = [{
-    This pass goes through all operations inside handshake::FuncOp's that do not
-    have a 'bb' attribute and tries to infer its value based on the operation's
-    dataflow predecessors. When the pass's heuristic manages to infer the value,
-    the 'bb' attribute is added to the operation. This pass never fails, even
-    when it does not manage to infer the basic block of all operations.
+    Attempts to infer the logical basic block of all operations inside
+    handshake::FuncOp's that are not attached to a logical basic block. The
+    inference logic is conservative and relies on the operation's successors and
+    predecessors to determine the operation's basic block. When the pass's
+    heuristics manage to infer an operation's block, the pass sets the
+    `dynamatic::BB_ATTR` on the operation. This pass does not fail, even when it
+    does not manage to infer the basic block of all operations.
   }];
   let constructor = "dynamatic::createHandshakeInferBasicBlocksPass()";
 }
@@ -153,9 +166,28 @@ def HandshakeMinimizeCstWidth : Pass<"handshake-minimize-cst-width", "mlir::Modu
   }];
   let constructor = "dynamatic::createHandshakeMinimizeCstWidth()";
   let dependentDialects = ["mlir::arith::ArithDialect"];
-   let options =
+  let options =
     [Option<"optNegatives", "opt-negatives", "bool", "false",
             "If true, allows bitwidth optimization of negative values.">];
+}
+
+def HandshakeSetBufferingProperties :
+  Pass<"handshake-set-buffering-properties", "mlir::ModuleOp"> {
+  let summary = "Attach buffering properties to specifc channels in the IR";
+  let description = [{
+    Adds buffering properties to specific channels in the IR. Which channels are
+    annotated and how is determined by the pass's parameter. This pass is
+    especially useful to run prior to running our smart buffer placement pass,
+    as the latter reads these properties and ensures that the buffer placement
+    it yields honors them.
+  }];
+  let constructor =
+    "dynamatic::buffer::createHandshakeSetBufferingProperties()"; 
+  let dependentDialects = ["circt::handshake::HandshakeDialect"];
+  let options =
+    [Option<"version", "version", "std::string", "\"fpga20\"",
+            "Set of buffering properties to apply. Options are: fpga20 "
+            "(default).">];
 }
 
 def HandshakePlaceBuffers : Pass<"handshake-place-buffers", "mlir::ModuleOp"> {
@@ -164,7 +196,7 @@ def HandshakePlaceBuffers : Pass<"handshake-place-buffers", "mlir::ModuleOp"> {
     The pass analyzes the circuit's channel prerequisites. Based the channel
     prerequisite, the pass optimize the circuit performance by inserting buffers.
   }];
-  let constructor = "dynamatic::createHandshakePlaceBuffersPass()";
+  let constructor = "dynamatic::buffer::createHandshakePlaceBuffersPass()";
   let options = [
     Option<"firstCFDFC", "firstCFDFC", "bool", "false",
     "if true, only extract the first CFDFC from the input file">,
@@ -173,11 +205,7 @@ def HandshakePlaceBuffers : Pass<"handshake-place-buffers", "mlir::ModuleOp"> {
     Option<"timefile", "time-file", "std::string", "",
     "required, file provide the time and buffer prerequisite information ">,
     Option<"targetCP", "target-period", "double", "4.0",
-    "target clock period for the CFDFC">,
-    Option<"timeLimit", "time-limit", "int", "180",
-    "maximum time limit for MILP solver">,
-     Option<"setCustom", "set-custom", "bool", "true",
-    "set customized constraints from dataflow">];
+    "target clock period for the CFDFC">];
 }
 
 //===----------------------------------------------------------------------===//

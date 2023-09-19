@@ -6,8 +6,12 @@
 //
 //===----------------------------------------------------------------------===//
 
+#ifndef DYNAMATIC_SUPPORT_DOTPRINTER_H
+#define DYNAMATIC_SUPPORT_DOTPRINTER_H
+
 #include "circt/Dialect/Handshake/HandshakeOps.h"
 #include "dynamatic/Support/LLVM.h"
+#include "dynamatic/Support/TimingModels.h"
 #include "mlir/Support/IndentedOstream.h"
 #include <map>
 #include <set>
@@ -23,24 +27,33 @@ struct EdgeInfo;
 
 /// Implements the logic to convert Handshake-level IR to a DOT. The only public
 /// method of this class, printDOT, converts an MLIR module containing a single
-/// Handshake function into an equivalent DOT graph. In legacy mode, the
-/// resulting DOT can be used with legacy Dynamatic.
+/// Handshake function into an equivalent DOT graph printed on stdout. In legacy
+/// mode, the resulting DOT can be used with legacy Dynamatic.
 class DOTPrinter {
 public:
+  /// Printing mode, dictating the structure and content of the printed DOTs.
+  enum class Mode { VISUAL, LEGACY, LEGACY_BUFFERS };
+  /// Style in which to render edges in the printed DOTs.
+  enum class EdgeStyle { SPLINE, ORTHO };
+
   /// Constructs a DOTPrinter whose printing behavior is controlled by a couple
-  /// flags.
-  DOTPrinter(bool legacy, bool debug);
+  /// flags, plus a pointer to a timing database that must be valid in legacy
+  /// mode (when building Dynamatic++ in debug mode, the constructor will assert
+  /// if the `legacy` flag is true and the timing database is nullptr).
+  DOTPrinter(Mode mode, EdgeStyle edgeStyle,
+             TimingDatabase *timingDB = nullptr);
 
   /// Prints Handshake-level IR to standard output.
   LogicalResult printDOT(mlir::ModuleOp mod);
 
 private:
-  /// Whether to export a legacy-compatible DOT.
-  bool legacy;
-
-  /// Whether to pretty-print the exported DOT (pretty-print if false).
-  bool debug;
-
+  /// Printing mode (e.g., compatible with legacy tools or not).
+  Mode mode;
+  /// Style of edges in the resulting DOTs.
+  EdgeStyle edgeStyle;
+  /// Timing models for dataflow components (required in legacy mode, can safely
+  /// be nullptr when not in legacy mode).
+  TimingDatabase *timingDB;
   /// The stream to output to.
   mlir::raw_indented_ostream os;
 
@@ -82,6 +95,16 @@ private:
   /// Returns the name of the node representing the operation.
   std::string getNodeName(Operation *op);
 
+  /// Returns the content of the "delay" attribute associated to every graph
+  /// node in legacy mode. Requires that `timingDB` points to a valid memory
+  /// location.
+  std::string getNodeDelayAttr(Operation *op);
+
+  /// Returns the content of the "latency" attribute associated to every graph
+  /// node in legacy mode. Requires that `timingDB` points to a valid memory
+  /// location.
+  std::string getNodeLatencyAttr(Operation *op);
+
   /// Computes all data attributes of an operation for use in legacy Dynamatic
   /// and prints them to the output stream; it is the responsibility of the
   /// caller of this method to insert an opening bracket before the call and a
@@ -112,31 +135,10 @@ private:
   /// Closes a subgraph in the DOT file.
   void closeSubgraph();
 
-  /// In legacy mode, registers inputs and outputs of a node for later DOT
-  /// verification. Input and output ports can be skipped (useful for function
-  /// arguments and end node) using their respective flags. Each registered node
-  /// is named using the node name passed as argument as a prefix. As a
-  /// consequence, a specific node name must never be used in more than one call
-  /// to the method. Fails if a port with the same name as an existing port is
-  /// generated.
-  LogicalResult legacyRegisterPorts(NodeInfo &info, std::string &nodeName,
-                                    bool skipInputs = false,
-                                    bool skipOutputs = false);
-
-  /// In legacy mode, registers a channel between two ports for later DOT
-  /// verification. The edge is named using the source and destination node
-  /// names passed as arguments. Fails if a channel with the same name as an
-  /// existing channel is generated.
-  LogicalResult legacyRegisterChannel(EdgeInfo &info, std::string &srcName,
-                                      std::string &dstName);
-
-  /// In legacy mode, verifies that all registered ports are part of a unique
-  /// registered channel and that no port is undriven. Additionally, if the flag
-  /// is set, verifies that ports linked by a channel have the same bitwidth
-  /// (which is not true in general in DOTs produced by legacy Dynamatic). Fails
-  /// if one of the above DOT invariants is broken.
-  LogicalResult verifyDOT(handshake::FuncOp funcOp,
-                          bool failOnWidthMismatch = false);
+  /// Returns whether the DOT printer was setup in a legacy-compatible mode.
+  inline bool inLegacyMode() {
+    return mode == Mode::LEGACY || mode == Mode::LEGACY_BUFFERS;
+  }
 };
 
 /// Holds information about data attributes for a DOT node.
@@ -176,3 +178,5 @@ struct EdgeInfo {
 };
 
 } // namespace dynamatic
+
+#endif // DYNAMATIC_SUPPORT_DOTPRINTER_H

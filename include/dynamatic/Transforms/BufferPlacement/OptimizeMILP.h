@@ -8,30 +8,26 @@
 #define DYNAMATIC_TRANSFORMS_BUFFERPLACEMENT_OPTIMIZEMILP_H
 
 #include "dynamatic/Support/LLVM.h"
+#include "dynamatic/Support/TimingModels.h"
 #include "dynamatic/Transforms/BufferPlacement/BufferingProperties.h"
 #include "dynamatic/Transforms/BufferPlacement/ExtractCFDFC.h"
-#include "dynamatic/Transforms/BufferPlacement/ParseCircuitJson.h"
+#include "experimental/Support/StdProfiler.h"
 #include "mlir/Dialect/Func/IR/FuncOps.h"
 #include "mlir/IR/BuiltinTypes.h"
+#include "llvm/ADT/MapVector.h"
 
 #ifndef DYNAMATIC_GUROBI_NOT_INSTALLED
 #include "gurobi_c++.h"
 namespace dynamatic {
 namespace buffer {
 
-/// Data structure to store the results of buffer placement, including the
-/// property and the total slots of the channel
+/// Holds information about what type of buffer should be placed on a specific
+/// channel.
 struct PlacementResult {
-  bool opaque;
-  bool transparent;
-  unsigned numSlots;
-
-  PlacementResult operator+(const PlacementResult &other) const {
-    PlacementResult result;
-    result.opaque = this->opaque || other.opaque;
-    result.numSlots = this->numSlots + other.numSlots;
-    return result;
-  }
+  /// The number of transparent buffer slots that should be placed.
+  unsigned numTrans = 0;
+  /// The number of opaque buffer slots that should be placed.
+  unsigned numOpaque = 0;
 };
 
 /// Holds MILP variables associated to every CFDFC unit. Note that a unit may
@@ -67,11 +63,11 @@ struct ChannelVars {
 /// the CFDFC, and a CFDFC throughput varriable.
 struct CFDFCVars {
   /// Maps each CFDFC unit to its retiming variables.
-  DenseMap<Operation *, UnitVars> units;
+  llvm::MapVector<Operation *, UnitVars> units;
   /// Channel throughput variables  (real).
-  DenseMap<Value, GRBVar> channelThroughputs;
+  llvm::MapVector<Value, GRBVar> channelThroughputs;
   /// CFDFC throughput (real).
-  GRBVar thoughput;
+  GRBVar throughput;
 };
 
 /// Holds all variables that may be used in the MILP. These are a set of
@@ -79,9 +75,25 @@ struct CFDFCVars {
 /// function.
 struct MILPVars {
   /// Mapping between each CFDFC and their related variables.
-  DenseMap<CFDFC *, CFDFCVars> cfdfcs;
+  llvm::MapVector<CFDFC *, CFDFCVars> cfdfcs;
   /// Mapping between each circuit channel and their related variables.
-  DenseMap<Value, ChannelVars> channels;
+  llvm::MapVector<Value, ChannelVars> channels;
+};
+
+/// Helper datatype for buffer placement. Simply aggregates all the information
+/// related to the Handshake function under optimization.
+struct FuncInfo {
+  /// The Handshake function in which to place buffers.
+  circt::handshake::FuncOp funcOp;
+  /// The list of archs in the function (i.e., transitions between basic
+  /// blocks).
+  SmallVector<experimental::ArchBB> archs;
+  /// Maps each CFDFC in the function to a boolean indicating whether it should
+  /// be optimized.
+  llvm::MapVector<CFDFC *, bool> cfdfcs;
+  /// Constructs an instance from the function it refers to. Other struct
+  /// members start empty.
+  FuncInfo(circt::handshake::FuncOp funcOp) : funcOp(funcOp){};
 };
 
 /// Holds the bulk of the logic for the smart buffer placement pass, which
@@ -95,18 +107,18 @@ struct MILPVars {
 /// MILP.
 class BufferPlacementMILP {
 public:
+  /// Contains timing characterizations for dataflow components required to
+  /// create the MILP constraints.
+  const TimingDatabase &timingDB;
   /// Target clock period.
   const double targetPeriod;
   /// Maximum clock period.
   const double maxPeriod;
 
-  /// Assumes that every value is used exactly once. Assumes that CFDFCs were
-  /// extracted from the passed function.
-  BufferPlacementMILP(circt::handshake::FuncOp funcOp,
-                      llvm::MapVector<CFDFC *, bool> &cfdfcs,
-                      std::map<std::string, UnitInfo> &unitInfo,
-                      double targetPeriod, double maxPeriod, GRBEnv &env,
-                      double timeLimit);
+  /// Constructs the buffer placement MILP. All arguments passed by reference
+  /// must outlive the created instance, which maintains reference internally.
+  BufferPlacementMILP(FuncInfo &funcInfo, const TimingDatabase &timingDB,
+                      double targetPeriod, double maxPeriod, GRBEnv &env);
 
   /// Returns whether the custom buffer placement constraints derived from
   /// custom channel buffering properties attached to IR operations are
@@ -134,60 +146,75 @@ public:
   BufferPlacementMILP &operator=(const BufferPlacementMILP &) = delete;
 
 protected:
-  /// The Handshake function in which to place buffers.
-  circt::handshake::FuncOp funcOp;
-  /// Maps each CFDFC in the function to a boolean indicating whether it should
-  /// be optimized. The CFDFCs must be included inside the Handshake function
-  /// that was provide to the constructor.
-  llvm::MapVector<CFDFC *, bool> &cfdfcs;
-  /// Units characterization.
-  std::map<std::string, UnitInfo> &unitInfo;
+  /// Aggregates all data members that related to the Handshake function under
+  /// optimization.
+  FuncInfo &funcInfo;
   /// After construction, maps all channels (i.e, values) defined in the
   /// function to their specific channel buffering properties (unconstraining
   /// properties if none were explicitly specified).
-  DenseMap<Value, ChannelBufProps> channels;
-  /// Number of units (i.e., operations) in the function.
-  unsigned numUnits;
+  llvm::MapVector<Value, ChannelBufProps> channels;
   /// Gurobi model for creating/solving the MILP.
   GRBModel model;
   /// Contains all the variables used in the MILP.
   MILPVars vars;
+  /// Holds a unique name for each operation in the function.
+  DenseMap<Operation *, std::string> nameUniquer;
 
   /// Adds all variables used in the MILP to the Gurobi model.
-  void createVars();
+  LogicalResult createVars();
 
   /// Adds all variables related to the passed CFDFC to the Gurobi model. Each
   /// time this method is called, it must be with a different uid which is used
   /// to unique the name of each created variable. The CFDFC must be part of
   /// those that were provided to the constructor.
-  void createCFDFCVars(CFDFC &cfdfc, unsigned uid);
+  LogicalResult createCFDFCVars(CFDFC &cfdfc, unsigned uid);
 
   /// Adds all variables related to all channels (regardless of whether they are
   /// part of a CFDFC) to the Gurobi model.
-  void createChannelVars();
+  LogicalResult createChannelVars();
 
   /// Adds channel-specific buffering constraints that were parsed from IR
   /// annotations to the Gurobi model.
-  void addCustomChannelConstraints();
+  LogicalResult addCustomChannelConstraints(ValueRange customChannels);
 
   /// Adds path constraints for all provided channels and units to the Gurobi
   /// model. All channels and units must be part of the Handshake function under
   /// consideration.
-  void addPathConstraints(ValueRange pathChannels,
-                          ArrayRef<Operation *> pathUnits);
+  LogicalResult addPathConstraints(ValueRange pathChannels,
+                                   ArrayRef<Operation *> pathUnits);
 
   /// Adds elasticity constraints for all provided channels and units to the
   /// Gurobi model. All channels and units must be part of the Handshake
   /// function under consideration.
-  void addElasticityConstraints(ValueRange elasticChannels,
-                                ArrayRef<Operation *> elasticUnits);
+  LogicalResult addElasticityConstraints(ValueRange elasticChannels,
+                                         ArrayRef<Operation *> elasticUnits);
 
   /// Adds throughput constraints for the provided CFDFC to the Gurobi model.
   /// The CFDFC must be part of those that were provided to the constructor.
-  void addThroughputConstraints(CFDFC &cfdfc);
+  LogicalResult addThroughputConstraints(CFDFC &cfdfc);
 
   /// Adds the objective to the Gurobi model.
-  void addObjective();
+  LogicalResult addObjective();
+
+  /// Adds pre-existing buffers that may exist as part of the units the channel
+  /// connects to to the buffering properties. These are added to the minimum
+  /// numbers of transparent and opaque slots so that the MILP is forced to
+  /// place at least a certain quantity of slots on the channel and can take
+  /// them into account in its constraints. Fails when buffering properties
+  /// become unsatisfiable due to an increase in the minimum number of slots;
+  /// succeeds otherwise.
+  LogicalResult addInternalBuffers(Channel &channel);
+
+  /// Removes pre-existing buffers that may exist as part of the units the
+  /// channel connects to from the placement results. These are deducted from
+  /// the numbers of transparent and opaque slots stored in the placement
+  /// results. The latter are expected to specify more slots than what is going
+  /// to be deducted (which should be guaranteed by the MILP constraints).
+  void deductInternalBuffers(Channel &channel, PlacementResult &result);
+
+  /// Returns a unique name for the channel that corresponds to the passed MLIR
+  /// Value (useful for uniquely naming MILP variables).
+  std::string getChannelName(Value channel);
 
 private:
   /// Whether the MILP is unsatisfiable due to a conflict between user-defined
@@ -196,15 +223,14 @@ private:
   /// a one-slot transparent buffer). Set by the class constructor.
   bool unsatisfiable = false;
 
-  /// Temporary (and far from ideal) solution to hardcode channel-specific
-  /// buffering properties as part of instance construction. Will be gone in the
-  /// near future.
-  LogicalResult getFPGA20BufProps(Value channel, ChannelBufProps &props);
-
   /// Helper method to run a closure on each input/output port pair of the
-  /// provided operation.
+  /// provided operation, unless one of the ports has type `mlir::MemRefType`.
   void forEachIOPair(Operation *op,
                      const std::function<void(Value, Value)> &callback);
+
+  /// Returns an estimation of the number of times a token will traverse the
+  /// input channel. The estimation is based on the extracted function's CFDFCs.
+  unsigned getChannelNumExecs(Value channel);
 };
 
 } // namespace buffer

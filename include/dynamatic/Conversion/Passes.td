@@ -31,6 +31,24 @@ def AffineToScf : Pass<"lower-affine-to-scf", "mlir::ModuleOp"> {
 }
 
 //===----------------------------------------------------------------------===//
+// ScfToCf
+//===----------------------------------------------------------------------===//
+
+def ScfToCf : Pass<"lower-scf-to-cf", "mlir::ModuleOp"> {
+  let summary = "Lower scf dialect to unstructured control flow (cf)";
+  let description = [{
+    Very close analog to the SCFToControlFlow pass from MLIR that replaces the
+    structured for loop lowering pattern with an almost identical one that
+    additionally attempts to insert an unsigned comparison (ult) in the IR
+    instead of a signed one (lt) if the loop's iterator can be proven to be
+    always positive.
+  }];
+  let constructor = "dynamatic::createLowerScfToCf()";
+  let dependentDialects = [
+    "mlir::cf::ControlFlowDialect", "mlir::arith::ArithDialect"];
+}
+
+//===----------------------------------------------------------------------===//
 // StandardToHandshakeFPGA18
 //===----------------------------------------------------------------------===//
 

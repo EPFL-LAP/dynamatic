@@ -657,9 +657,28 @@ struct HandshakeMuxSelect : public OpRewritePattern<handshake::MuxOp> {
   }
 };
 
+/// Downgrades muxes with a single input into simpler yet equivalent merges.
+struct DowngradeSingleInputMuxes : public OpRewritePattern<handshake::MuxOp> {
+  using OpRewritePattern<handshake::MuxOp>::OpRewritePattern;
+
+  LogicalResult matchAndRewrite(handshake::MuxOp muxOp,
+                                PatternRewriter &rewriter) const override {
+    ValueRange dataOperands = muxOp.getDataOperands();
+    if (dataOperands.size() != 1)
+      return failure();
+
+    rewriter.setInsertionPoint(muxOp);
+    handshake::MergeOp mergeOp =
+        rewriter.create<handshake::MergeOp>(muxOp.getLoc(), dataOperands);
+    inheritBB(muxOp, mergeOp);
+    rewriter.replaceOp(muxOp, mergeOp.getResult());
+    return success();
+  }
+};
+
 /// Optimizes the bitwidth of control merges' index result so that it can just
-/// support the number of data operands.This pattern can be applied as part of a
-/// single greedy rewriting pass and doesn't need to be part of the
+/// support the number of data operands. This pattern can be applied as part of
+/// a single greedy rewriting pass and doesn't need to be part of the
 /// forward/backward process.
 struct HandshakeCMergeIndex
     : public OpRewritePattern<handshake::ControlMergeOp> {
@@ -690,6 +709,47 @@ struct HandshakeCMergeIndex
     Value modIndex =
         modVal({newOp.getIndex(), ExtType::LOGICAL}, indexWidth, rewriter);
     rewriter.replaceOp(cmergeOp, ValueRange{newOp.getResult(), modIndex});
+    return success();
+  }
+};
+
+/// Downgrades control merges with a single input into simpler yet equivalent
+/// merges. If necessary, inserts a sourced 0 constant to replace any real uses
+/// of the index result of erased control merges.
+struct DowngradeSingleInputControlMerges
+    : public OpRewritePattern<handshake::ControlMergeOp> {
+  using OpRewritePattern<handshake::ControlMergeOp>::OpRewritePattern;
+
+  LogicalResult matchAndRewrite(handshake::ControlMergeOp cmergeOp,
+                                PatternRewriter &rewriter) const override {
+    ValueRange dataOperands = cmergeOp.getDataOperands();
+    if (dataOperands.size() != 1)
+      return failure();
+
+    rewriter.setInsertionPoint(cmergeOp);
+    Value indexRes = cmergeOp.getIndex();
+    if (!indexRes.use_empty()) {
+      // If the index has uses, create a sourced 0 constant to replace it
+      handshake::SourceOp srcOp = rewriter.create<handshake::SourceOp>(
+          cmergeOp->getLoc(), rewriter.getNoneType());
+      inheritBB(cmergeOp, srcOp);
+
+      // Build the attribute for the constant
+      Type indexResType = indexRes.getType();
+      handshake::ConstantOp cstOp = rewriter.create<handshake::ConstantOp>(
+          cmergeOp.getLoc(), indexResType,
+          rewriter.getIntegerAttr(indexResType, 0), srcOp.getResult());
+      inheritBB(cmergeOp, cstOp);
+
+      // Replace the cmerge's index result with a constant 0
+      rewriter.replaceAllUsesWith(indexRes, cstOp.getResult());
+    }
+
+    handshake::MergeOp mergeOp =
+        rewriter.create<handshake::MergeOp>(cmergeOp.getLoc(), dataOperands);
+    inheritBB(cmergeOp, mergeOp);
+    rewriter.replaceAllUsesWith(cmergeOp.getResult(), mergeOp.getResult());
+    rewriter.eraseOp(cmergeOp);
     return success();
   }
 };
@@ -912,7 +972,7 @@ struct ForwardCycleOpt : public OpRewritePattern<Op> {
     if (optWidth >= dataWidth)
       return failure();
 
-    // getMinimalVal all data operands
+    // Get the minimal valuue of all data operands
     SmallVector<Value> minDataOperands;
     for (auto opr : dataOperands)
       minDataOperands.push_back(getMinimalValue(opr));
@@ -1453,9 +1513,15 @@ struct HandshakeOptimizeBitwidthsPass
     config.useTopDownTraversal = true;
     config.enableRegionSimplification = false;
 
-    // Some optimizations do not need to be applied iteratively
+    // Some optimizations do not need to be applied iteratively. We include
+    // patterns to downgrade control merges and muxes with useless indices into
+    // simpler merges to avoid having i0 types in the IR. We downgrade instead
+    // of erasing these operations entirely (which would be semantically
+    // correct) because it is not this pass's job to perform this kind of
+    // optimization, which down-the-line passes may be sensitive to.
     RewritePatternSet patterns{ctx};
-    patterns.add<HandshakeMuxSelect, HandshakeCMergeIndex>(ctx);
+    patterns.add<HandshakeMuxSelect, DowngradeSingleInputMuxes,
+                 HandshakeCMergeIndex, DowngradeSingleInputControlMerges>(ctx);
     if (!legacy)
       patterns.add<HandshakeMCAddress,
                    HandshakeMemPortAddress<handshake::DynamaticLoadOp>,

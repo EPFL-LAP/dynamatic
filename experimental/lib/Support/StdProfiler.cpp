@@ -106,7 +106,7 @@ LogicalResult StdProfiler::readCSV(std::string &filename,
     std::getline(iss, token, ',');
     if (!isUnsigned(token))
       return failure();
-    value = std::stoi(token) != 1;
+    value = std::stoi(token);
     return success();
   };
 

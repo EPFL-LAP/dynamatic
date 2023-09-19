@@ -8,10 +8,10 @@
   "handshake.sink":"default.handshake.sink",
   "handshake.constant":"default.handshake.constant",
   "handshake.buffer":"default.handshake.buffer",
-  "handshake.load":"default.handshake.load",
-  "handshake.store":"default.handshake.store",
-  "handshake.return":"default.handshake.return",
+  "handshake.d_load":"default.handshake.d_load",
+  "handshake.d_store":"default.handshake.d_store",
+  "handshake.d_return":"default.handshake.d_return",
   "handshake.end":"default.handshake.end",
-  "handshake.memory_controller":"default.handshake.memory_controller"
+  "handshake.mem_controller":"default.handshake.mem_controller"
 }
 
