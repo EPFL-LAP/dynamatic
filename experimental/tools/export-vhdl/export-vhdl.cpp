@@ -448,13 +448,19 @@ VHDLModule VHDLModuleDescription::concretize(std::string modName,
     // In case of the generator we're looking for binary
     std::string commandLineArguments;
     auto i = modParametersVec.begin();
-    size_t k = generators.size();
+    size_t k = generators.size() + generics.size();
+    size_t m = generators.size();
     // Collecting discriminating params for command line
     while (k > 0) {
       commandLineArguments += " " + (*i);
-      modName += "_" + (*i);
       ++i;
       --k;
+    }
+    i = modParametersVec.begin();
+    while (m > 0) {
+      modName += "_" + (*i);
+      ++i;
+      --m;
     }
     // Create a temporary text.txt
     std::string resultPath = path + commandLineArguments + " > test.txt";

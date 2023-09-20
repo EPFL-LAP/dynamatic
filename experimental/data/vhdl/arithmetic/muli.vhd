@@ -61,7 +61,7 @@ begin
       oehb_ready,
       buff_valid);
 
-  oehb : entity work.OEHB(arch) generic map (1)
+  oehb : entity work.OEHB(arch) generic map (BITWIDTH)
     port map(
       clk        => clk,
       rst        => rst,

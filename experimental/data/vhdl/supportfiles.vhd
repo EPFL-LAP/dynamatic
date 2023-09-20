@@ -6,6 +6,25 @@ package customTypes is
 
 end package;
 
+library IEEE;
+use ieee.std_logic_1164.all;
+use work.customTypes.all;
+
+entity andN is
+  generic (n : integer := 4);
+  port (
+    x   : in std_logic_vector(n - 1 downto 0);
+    res : out std_logic);
+end andN;
+
+architecture vanilla of andn is
+  signal dummy : std_logic_vector(n - 1 downto 0);
+begin
+  dummy <= (others => '1');
+  res   <= '1' when x = dummy else
+    '0';
+end vanilla;
+
 library ieee;
 use ieee.std_logic_1164.all;
 
@@ -52,24 +71,127 @@ begin
   end process;
 end architecture;
 
-library IEEE;
+library ieee;
 use ieee.std_logic_1164.all;
+use ieee.numeric_std.all;
 use work.customTypes.all;
 
-entity andN is
-  generic (n : integer := 4);
+entity TEHB is
+  generic (
+    BITWIDTH : integer
+  );
   port (
-    x   : in std_logic_vector(n - 1 downto 0);
-    res : out std_logic);
-end andN;
+    clk        : in std_logic;
+    rst        : in std_logic;
+    ins        : in std_logic_vector(BITWIDTH - 1 downto 0);
+    outs       : out std_logic_vector(BITWIDTH - 1 downto 0);
+    ins_valid  : in std_logic;
+    outs_ready : in std_logic;
+    outs_valid : out std_logic;
+    ins_ready  : out std_logic);
+end TEHB;
 
-architecture vanilla of andn is
-  signal dummy : std_logic_vector(n - 1 downto 0);
+architecture arch of TEHB is
+  signal full_reg, reg_en, mux_sel : std_logic;
+  signal data_reg                  : std_logic_vector(BITWIDTH - 1 downto 0);
 begin
-  dummy <= (others => '1');
-  res   <= '1' when x = dummy else
-    '0';
-end vanilla;
+
+  process (clk, rst) is
+
+  begin
+    if (rst = '1') then
+      full_reg <= '0';
+
+    elsif (rising_edge(clk)) then
+      full_reg <= outs_valid and not outs_ready;
+
+    end if;
+  end process;
+
+  process (clk, rst) is
+
+  begin
+    if (rst = '1') then
+      data_reg <= (others => '0');
+
+    elsif (rising_edge(clk)) then
+      if (reg_en) then
+        data_reg <= ins;
+      end if;
+
+    end if;
+  end process;
+
+  process (mux_sel, data_reg, ins) is
+  begin
+    if (mux_sel = '1') then
+      outs <= data_reg;
+    else
+      outs <= ins;
+    end if;
+  end process;
+  outs_valid <= ins_valid or full_reg;
+  ins_ready  <= not full_reg;
+  reg_en     <= ins_ready and ins_valid and not outs_ready;
+  mux_sel    <= full_reg;
+end arch;
+
+library ieee;
+use ieee.std_logic_1164.all;
+use ieee.numeric_std.all;
+use work.customTypes.all;
+
+entity OEHB is
+  generic (
+    BITWIDTH : integer
+  );
+  port (
+    clk        : in std_logic;
+    rst        : in std_logic;
+    ins        : in std_logic_vector(BITWIDTH - 1 downto 0);
+    outs       : out std_logic_vector(BITWIDTH - 1 downto 0);
+    ins_valid  : in std_logic;
+    outs_ready : in std_logic;
+    outs_valid : out std_logic;
+    ins_ready  : out std_logic);
+end OEHB;
+
+architecture arch of OEHB is
+  signal full_reg, reg_en, mux_sel : std_logic;
+  signal data_reg                  : std_logic_vector(BITWIDTH - 1 downto 0);
+begin
+
+  process (clk, rst) is
+
+  begin
+    if (rst = '1') then
+      outs_valid <= '0';
+
+    elsif (rising_edge(clk)) then
+      outs_valid <= ins_valid or not ins_ready;
+
+    end if;
+  end process;
+
+  process (clk, rst) is
+
+  begin
+    if (rst = '1') then
+      data_reg <= (others => '0');
+
+    elsif (rising_edge(clk)) then
+      if (reg_en) then
+        data_reg <= ins;
+      end if;
+
+    end if;
+  end process;
+  ins_ready <= not outs_valid or outs_ready;
+  reg_en    <= ins_ready and ins_valid;
+  outs      <= data_reg;
+
+end arch;
+
 library ieee;
 use ieee.std_logic_1164.all;
 use ieee.numeric_std.all;
@@ -254,6 +376,73 @@ begin
   ReadyArray(0) <= nReadyArray(0);
 
 end arch;
+
+library ieee;
+use ieee.std_logic_1164.all;
+use ieee.numeric_std.all;
+use work.customTypes.all;
+
+entity buffer_fifo is
+  generic (
+    BITWIDTH : integer
+  );
+  port (
+    -- inputs
+    ins        : in std_logic_vector(BITWIDTH - 1 downto 0);
+    ins_valid  : in std_logic;
+    clk        : in std_logic;
+    rst        : in std_logic;
+    outs_ready : in std_logic;
+    -- outputs
+    ins_ready  : out std_logic;
+    outs       : out std_logic_vector(BITWIDTH - 1 downto 0);
+    outs_valid : out std_logic);
+end buffer_fifo;
+
+architecture arch of buffer_fifo is
+  signal full_reg, reg_en, mux_sel : std_logic;
+  signal data_reg                  : std_logic_vector(BITWIDTH - 1 downto 0);
+begin
+
+  process (clk, rst) is
+
+  begin
+    if (rst = '1') then
+      full_reg <= '0';
+
+    elsif (rising_edge(clk)) then
+      full_reg <= outs_valid and not outs_ready;
+
+    end if;
+  end process;
+
+  process (clk, rst) is
+
+  begin
+    if (rst = '1') then
+      data_reg <= (others => '0');
+
+    elsif (rising_edge(clk)) then
+      if (reg_en) then
+        data_reg <= ins;
+      end if;
+
+    end if;
+  end process;
+
+  process (mux_sel, data_reg, ins) is
+  begin
+    if (mux_sel = '1') then
+      outs <= data_reg;
+    else
+      outs <= ins;
+    end if;
+  end process;
+  outs_valid <= ins_valid or full_reg;
+  ins_ready  <= not full_reg;
+  reg_en     <= ins_ready and ins_valid and not outs_ready;
+  mux_sel    <= full_reg;
+end arch;
 library ieee;
 use ieee.std_logic_1164.all;
 use work.customTypes.all;
@@ -397,61 +586,7 @@ begin
     '1';
   res <= not orRes;
 end arch;
-library ieee;
-use ieee.std_logic_1164.all;
-use ieee.numeric_std.all;
-use work.customTypes.all;
 
-entity OEHB is
-  generic (
-    BITWIDTH : integer
-  );
-  port (
-    clk        : in std_logic;
-    rst        : in std_logic;
-    ins        : in std_logic_vector(BITWIDTH - 1 downto 0);
-    outs       : out std_logic_vector(BITWIDTH - 1 downto 0);
-    ins_valid  : in std_logic;
-    outs_ready : in std_logic;
-    outs_valid : out std_logic;
-    ins_ready  : out std_logic);
-end OEHB;
-
-architecture arch of OEHB is
-  signal full_reg, reg_en, mux_sel : std_logic;
-  signal data_reg                  : std_logic_vector(BITWIDTH - 1 downto 0);
-begin
-
-  process (clk, rst) is
-
-  begin
-    if (rst = '1') then
-      outs_valid <= '0';
-
-    elsif (rising_edge(clk)) then
-      outs_valid <= ins_valid or not ins_ready;
-
-    end if;
-  end process;
-
-  process (clk, rst) is
-
-  begin
-    if (rst = '1') then
-      data_reg <= (others => '0');
-
-    elsif (rising_edge(clk)) then
-      if (reg_en) then
-        data_reg <= ins;
-      end if;
-
-    end if;
-  end process;
-  ins_ready <= not outs_valid or outs_ready;
-  reg_en    <= ins_ready and ins_valid;
-  outs      <= data_reg;
-
-end arch;
 library IEEE;
 use ieee.std_logic_1164.all;
 use work.customTypes.all;
@@ -765,69 +900,67 @@ begin
     end loop;
   end process;
 end architecture;
+
 library ieee;
 use ieee.std_logic_1164.all;
 use ieee.numeric_std.all;
 use work.customTypes.all;
 
-entity TEHB is
+entity buffer_seq is
   generic (
     BITWIDTH : integer
   );
   port (
+    -- inputs
+    ins        : in std_logic_vector(BITWIDTH - 1 downto 0);
+    ins_valid  : in std_logic;
     clk        : in std_logic;
     rst        : in std_logic;
-    ins        : in std_logic_vector(BITWIDTH - 1 downto 0);
-    outs       : out std_logic_vector(BITWIDTH - 1 downto 0);
-    ins_valid  : in std_logic;
     outs_ready : in std_logic;
-    outs_valid : out std_logic;
-    ins_ready  : out std_logic);
-end TEHB;
+    -- outputs
+    ins_ready  : out std_logic;
+    outs       : out std_logic_vector(BITWIDTH - 1 downto 0);
+    outs_valid : out std_logic);
+end buffer_seq;
 
-architecture arch of TEHB is
-  signal full_reg, reg_en, mux_sel : std_logic;
-  signal data_reg                  : std_logic_vector(BITWIDTH - 1 downto 0);
+architecture arch of buffer_seq is
+
+  signal tehb1_valid, tehb1_ready     : std_logic;
+  signal oehb1_valid, oehb1_ready     : std_logic;
+  signal tehb1_dataOut, oehb1_dataOut : std_logic_vector(BITWIDTH - 1 downto 0);
 begin
 
-  process (clk, rst) is
+  tehb1 : entity work.TEHB(arch) generic map (BITWIDTH)
+    port map(
+      clk        => clk,
+      rst        => rst,
+      ins_valid  => ins_valid,
+      outs_ready => oehb1_ready,
+      outs_valid => tehb1_valid,
 
-  begin
-    if (rst = '1') then
-      full_reg <= '0';
+      ins_ready => tehb1_ready,
+      ins       => ins,
+      outs      => tehb1_dataOut
+    );
 
-    elsif (rising_edge(clk)) then
-      full_reg <= outs_valid and not outs_ready;
+  oehb1 : entity work.OEHB(arch) generic map (BITWIDTH)
+    port map(
 
-    end if;
-  end process;
+      clk        => clk,
+      rst        => rst,
+      ins_valid  => tehb1_valid,
+      outs_ready => outs_ready,
+      outs_valid => oehb1_valid,
 
-  process (clk, rst) is
+      ins_ready => oehb1_ready,
+      ins       => tehb1_dataOut,
+      outs      => oehb1_dataOut
+    );
 
-  begin
-    if (rst = '1') then
-      data_reg <= (others => '0');
+  outs       <= oehb1_dataOut;
+  outs_valid <= oehb1_valid;
+  ins_ready  <= tehb1_ready;
 
-    elsif (rising_edge(clk)) then
-      if (reg_en) then
-        data_reg <= ins;
-      end if;
-
-    end if;
-  end process;
-
-  process (mux_sel, data_reg, ins) is
-  begin
-    if (mux_sel = '1') then
-      outs <= data_reg;
-    else
-      outs <= ins;
-    end if;
-  end process;
-  outs_valid <= ins_valid or full_reg;
-  ins_ready  <= not full_reg;
-  reg_en     <= ins_ready and ins_valid and not outs_ready;
-  mux_sel    <= full_reg;
 end arch;
 library IEEE;
 use IEEE.std_logic_1164.all;
