@@ -43,6 +43,13 @@ struct CFDFC {
   /// Constructs a CFDFC from a set of selected archs and basic blocks in the
   /// function. Assumes that every value in the function is used exactly once.
   CFDFC(circt::handshake::FuncOp funcOp, ArchSet &archs, unsigned numExec);
+
+private:
+  // Determines whether the value is a "CFDFC backedge" i.e., a backedge with a
+  // branch-like source component. The distinction is important for the buffer
+  // placement MILP, which uses backedges to determine where to insert "tokens"
+  // in the circuit.
+  bool isCFDFCBackedge(Value val);
 };
 
 /// Extracts the most frequently executed CFDFC from the Handshake function

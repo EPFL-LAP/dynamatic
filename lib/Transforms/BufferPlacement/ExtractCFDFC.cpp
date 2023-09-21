@@ -210,7 +210,7 @@ CFDFC::CFDFC(circt::handshake::FuncOp funcOp, ArchSet &archs, unsigned numExec)
           unsigned nextBB = i == cycle.size() - 1 ? 0 : i + 1;
           if (srcBB == cycle[i] && dstBB == cycle[nextBB]) {
             channels.insert(val);
-            if (isBackedge(val))
+            if (isCFDFCBackedge(val))
               backedges.insert(val);
           }
         }
@@ -218,7 +218,7 @@ CFDFC::CFDFC(circt::handshake::FuncOp funcOp, ArchSet &archs, unsigned numExec)
         // The channel is in the CFDFC if its producer/consumer belong to the
         // same basic block and the CFDFC is just a block looping to itself
         channels.insert(val);
-        if (isBackedge(val))
+        if (isCFDFCBackedge(val))
           backedges.insert(val);
       } else if (!isBackedge(val))
         // The channel is in the CFDFC if its producer/consumer belong to the
@@ -226,6 +226,12 @@ CFDFC::CFDFC(circt::handshake::FuncOp funcOp, ArchSet &archs, unsigned numExec)
         channels.insert(val);
     }
   }
+}
+
+bool CFDFC::isCFDFCBackedge(Value val) {
+  return isBackedge(val) &&
+         isa<handshake::BranchOp, handshake::ConditionalBranchOp>(
+             val.getDefiningOp());
 }
 
 LogicalResult dynamatic::buffer::extractCFDFC(handshake::FuncOp funcOp,
