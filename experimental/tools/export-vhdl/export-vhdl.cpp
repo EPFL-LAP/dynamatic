@@ -419,15 +419,12 @@ VHDLModule VHDLModuleDescription::concretize(std::string modName,
   // Template names - parameters that are contained in generators and generics
   // arrays
   llvm::StringMap<std::string> generatorsMap, genericsMap;
-  std::string *it = modParametersVec.begin();
-  for (const std::string &i : generators) {
-    generatorsMap.insert(std::pair(i, *it));
-    ++it;
-  }
-  for (const VHDLGenericParam &i : generics) {
-    genericsMap.insert(std::pair(i.name, *it));
-    ++it;
-  }
+  auto *paramValIter = modParametersVec.begin();
+  for (const std::string &paramName : generators)
+    generatorsMap[paramName] = *(paramValIter++);
+  for (const VHDLGenericParam &param : generics)
+    genericsMap[param.name] = *(paramValIter++);
+
   // Future VHDLModule inputs
   llvm::SmallVector<VHDLModParameter> inputs =
       getConcretizedPorts(inputPorts, genericsMap);
@@ -1140,11 +1137,10 @@ static VHDLComponentLibrary parseJSON() {
 }
 
 /// Get modules from extern operations in the input IR
-static VHDLModuleLibrary
-parseExternOps(mlir::OwningOpRef<mlir::ModuleOp> &module,
-               VHDLComponentLibrary &m) {
+static VHDLModuleLibrary parseExternOps(mlir::ModuleOp modOp,
+                                        VHDLComponentLibrary &m) {
   VHDLModuleLibrary modLib;
-  for (hw::HWModuleExternOp modOp : module->getOps<hw::HWModuleExternOp>()) {
+  for (hw::HWModuleExternOp modOp : modOp.getOps<hw::HWModuleExternOp>()) {
     StringRef extName = modOp.getName();
     VHDLModule i = getMod(extName, m);
     modLib.insert(std::pair(extName, i));
@@ -1170,86 +1166,75 @@ parseInstanceOps(mlir::OwningOpRef<mlir::ModuleOp> &module,
 
 /// Get the description of the head instance, "hw.module"
 static std::pair<Operation *, VHDLInstance>
-parseModule(mlir::OwningOpRef<mlir::ModuleOp> &module) {
-  Operation *op;
+parseModule(hw::HWModuleOp hwModOp) {
   std::string iName;
-  llvm::SmallVector<VHDLInstParameter> tInputs, tOutputs;
-  for (hw::HWModuleOp modOp : module->getOps<hw::HWModuleOp>()) {
-    auto inputs = modOp.getPorts().inputs;
-    auto outputs = modOp.getPorts().outputs;
-    SmallVector<VHDLInstParameter> ins;
-    for (auto i : inputs) {
-      mlir::Type t = i.type;
-      std::string name = i.getName().str();
-      std::string type = extractType(t).first;
-      VHDLInstParameter::Type eType;
-      if (type == VALUE_STR)
-        eType = VHDLInstParameter::Type::VALUE;
-      else if (type == CHANNEL_STR)
-        eType = VHDLInstParameter::Type::CHANNEL;
-      else {
-        llvm::errs() << "Wrong type: it must be either value, or channel.\n";
-        exit(1);
-      }
-      size_t bitwidth = extractType(t).second;
-      if (name != CLOCK_STR && name != RESET_STR)
-        ins.push_back(VHDLInstParameter({}, name, eType, bitwidth));
+  llvm::SmallVector<VHDLInstParameter> ins, outs;
+  auto inputs = hwModOp.getPorts().inputs;
+  auto outputs = hwModOp.getPorts().outputs;
+  for (auto i : inputs) {
+    mlir::Type t = i.type;
+    std::string name = i.getName().str();
+    std::string type = extractType(t).first;
+    VHDLInstParameter::Type eType;
+    if (type == VALUE_STR)
+      eType = VHDLInstParameter::Type::VALUE;
+    else if (type == CHANNEL_STR)
+      eType = VHDLInstParameter::Type::CHANNEL;
+    else {
+      llvm::errs() << "Wrong type: it must be either value, or channel.\n";
+      exit(1);
     }
-    SmallVector<VHDLInstParameter> outs;
-    for (auto &i : outputs) {
-      mlir::Type t = i.type;
-      std::string name = i.getName().str();
-      std::string type = extractType(t).first;
-      VHDLInstParameter::Type eType;
-      if (type == VALUE_STR)
-        eType = VHDLInstParameter::Type::VALUE;
-      else if (type == CHANNEL_STR)
-        eType = VHDLInstParameter::Type::CHANNEL;
-      else {
-        llvm::errs() << "Wrong type: it must be either value, or channel.\n";
-        exit(1);
-      }
-      size_t bitwidth = extractType(t).second;
-      outs.push_back(VHDLInstParameter({}, name, eType, bitwidth));
-    }
-    op = modOp;
-    iName = modOp.getName().str();
-    tInputs = ins;
-    tOutputs = outs;
+    size_t bitwidth = extractType(t).second;
+    if (name != CLOCK_STR && name != RESET_STR)
+      ins.push_back(VHDLInstParameter({}, name, eType, bitwidth));
   }
-  return std::pair(op, VHDLInstance(iName, {}, tInputs, tOutputs, {}));
+  for (auto &i : outputs) {
+    mlir::Type t = i.type;
+    std::string name = i.getName().str();
+    std::string type = extractType(t).first;
+    VHDLInstParameter::Type eType;
+    if (type == VALUE_STR)
+      eType = VHDLInstParameter::Type::VALUE;
+    else if (type == CHANNEL_STR)
+      eType = VHDLInstParameter::Type::CHANNEL;
+    else {
+      llvm::errs() << "Wrong type: it must be either value, or channel.\n";
+      exit(1);
+    }
+    size_t bitwidth = extractType(t).second;
+    outs.push_back(VHDLInstParameter({}, name, eType, bitwidth));
+  }
+  iName = hwModOp.getName().str();
+  return std::pair(hwModOp, VHDLInstance(iName, {}, ins, outs, {}));
 }
 
 /// Get the description of the output instance, "hw.output".
 /// Names are obtained from hw.module
-static std::pair<Operation *, VHDLInstance>
-parseOut(mlir::OwningOpRef<mlir::ModuleOp> &module) {
+static std::pair<Operation *, VHDLInstance> parseOut(hw::HWModuleOp hwModOp) {
   Operation *outOp;
   std::string iName;
   llvm::SmallVector<VHDLInstParameter> tInputs, tOutputs;
-  for (circt::hw::HWModuleOp modOp : module->getOps<hw::HWModuleOp>()) {
-    auto outputs = modOp.getPorts().outputs;
-    SmallVector<VHDLInstParameter> outs;
-    for (circt::hw::PortInfo &i : outputs) {
-      mlir::Type t = i.type;
-      std::string name = i.getName().str();
-      std::string type = extractType(t).first;
-      VHDLInstParameter::Type eType;
-      if (type == VALUE_STR)
-        eType = VHDLInstParameter::Type::VALUE;
-      else if (type == CHANNEL_STR)
-        eType = VHDLInstParameter::Type::CHANNEL;
-      else {
-        llvm::errs() << "Wrong type: it must be either value, or channel.\n";
-        exit(1);
-      }
-      size_t bitwidth = extractType(t).second;
-      outs.push_back(VHDLInstParameter({}, name, eType, bitwidth));
+  auto outputs = hwModOp.getPorts().outputs;
+  SmallVector<VHDLInstParameter> outs;
+  for (circt::hw::PortInfo &i : outputs) {
+    mlir::Type t = i.type;
+    std::string name = i.getName().str();
+    std::string type = extractType(t).first;
+    VHDLInstParameter::Type eType;
+    if (type == VALUE_STR)
+      eType = VHDLInstParameter::Type::VALUE;
+    else if (type == CHANNEL_STR)
+      eType = VHDLInstParameter::Type::CHANNEL;
+    else {
+      llvm::errs() << "Wrong type: it must be either value, or channel.\n";
+      exit(1);
     }
-    outOp = cast<hw::OutputOp>(modOp.getBodyBlock()->getTerminator());
-    iName = modOp.getName().str();
-    tOutputs = outs;
+    size_t bitwidth = extractType(t).second;
+    outs.push_back(VHDLInstParameter({}, name, eType, bitwidth));
   }
+  outOp = cast<hw::OutputOp>(hwModOp.getBodyBlock()->getTerminator());
+  iName = hwModOp.getName().str();
+  tOutputs = outs;
   return std::pair(outOp, VHDLInstance(iName, {}, tOutputs, {}, {}));
 }
 
@@ -1536,24 +1521,24 @@ int main(int argc, char **argv) {
       mlir::parseSourceFile<ModuleOp>(sourceMgr, &context));
   if (!module)
     return 1;
+  mlir::ModuleOp modOp = *module;
 
-  // Get all necessary structures
-  VHDLComponentLibrary m = parseJSON();
-  VHDLModuleLibrary modLib = parseExternOps(module, m);
-  VHDLInstanceLibrary instanceLib = parseInstanceOps(module, modLib);
-  std::pair<mlir::Operation *, VHDLInstance> hwOut = parseOut(module);
-  std::pair<mlir::Operation *, VHDLInstance> hwMod = parseModule(module);
-
-  // Here auto is fine because the return type is horrific
-  auto ops = module->getOps<hw::HWModuleOp>();
+  // We only support one HW module per MLIR module
+  auto ops = modOp.getOps<hw::HWModuleOp>();
   if (std::distance(ops.begin(), ops.end()) != 1) {
     llvm::errs() << "The tool only supports a single top-level module in the "
                     "netlist.\n";
     return 1;
   }
+  hw::HWModuleOp hwModOp = *ops.begin();
+  std::string hwModName = hwModOp.getName().str();
 
-  // Obtain the module name
-  std::string modName = (*ops.begin()).getName().str();
+  // Get all necessary structures
+  VHDLComponentLibrary m = parseJSON();
+  VHDLModuleLibrary modLib = parseExternOps(modOp, m);
+  VHDLInstanceLibrary instanceLib = parseInstanceOps(module, modLib);
+  std::pair<mlir::Operation *, VHDLInstance> hwOut = parseOut(hwModOp);
+  std::pair<mlir::Operation *, VHDLInstance> hwMod = parseModule(hwModOp);
 
   // Generate VHDL
   getSupportFiles();
@@ -1566,10 +1551,10 @@ int main(int argc, char **argv) {
                   "IEEE.numeric_std.all;\n use work.customTypes.all;\n-- "
                   "============================================================"
                   "==\nentity "
-               << modName << " is\nport (\n";
+               << hwModName << " is\nport (\n";
   getEntityDeclaration(hwMod);
   llvm::outs() << "end;\n\n";
-  llvm::outs() << "architecture behavioral of " << modName << " is\n\n";
+  llvm::outs() << "architecture behavioral of " << hwModName << " is\n\n";
   getComponentsDeclaration(modLib);
   llvm::outs() << "\n";
   getSignalsDeclaration(instanceLib);
