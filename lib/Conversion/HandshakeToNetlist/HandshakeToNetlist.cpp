@@ -269,10 +269,7 @@ static std::string getExtModuleName(Operation *oldOp) {
         if (auto constOp = dyn_cast<handshake::ConstantOp>(oldOp)) {
           if (auto intAttr = constOp.getValue().dyn_cast<IntegerAttr>()) {
             APInt val = intAttr.getValue();
-            if (val.isNegative())
-              extModName += std::to_string(val.getZExtValue());
-            else
-              extModName += std::to_string(val.getZExtValue());
+            extModName += std::to_string(val.getZExtValue());
           } else if (auto floatAttr = constOp.getValue().dyn_cast<FloatAttr>())
             extModName += std::to_string(floatAttr.getValue().convertToFloat());
           else
@@ -310,7 +307,7 @@ static std::string getExtModuleName(Operation *oldOp) {
             for (auto [idx, blockAccesses] :
                  llvm::enumerate(op.getAccesses())) {
               temporaryName += "_";
-              size_t flag = 0;
+              bool blockHasStores = false;
               for (auto &access : cast<mlir::ArrayAttr>(blockAccesses))
                 if (cast<AccessTypeEnumAttr>(access).getValue() ==
                     AccessTypeEnum::Load) {
@@ -318,10 +315,10 @@ static std::string getExtModuleName(Operation *oldOp) {
                   lc++;
                 } else {
                   temporaryName += "S";
-                  flag = 1;
+                  blockHasStores = true;
                   sc++;
                 }
-              ctrlCount += flag;
+              ctrlCount += blockHasStores ? 1 : 0;
             }
             // load_count
             extModName += '_' + std::to_string(lc);
