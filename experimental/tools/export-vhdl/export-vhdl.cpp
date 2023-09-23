@@ -481,7 +481,7 @@ VHDLModule VHDLModuleDescription::concretize(std::string modName,
 }
 
 /// Support function that declares input / output ports
-void declarePorts(const llvm::SmallVector<VHDLDescParameter> &ports,
+void declarePorts(bool p, const llvm::SmallVector<VHDLDescParameter> &ports,
                   std::string &result) {
   // explore inputPorts / outputPorts
   for (const VHDLDescParameter &i : ports) {
@@ -534,19 +534,26 @@ void declarePorts(const llvm::SmallVector<VHDLDescParameter> &ports,
       resultControlType = STD_LOGIC_STR;
       resultSize = "(" + s + " downto 0)";
     }
-
+    std::string portMain, portContr;
+    if (p) {
+      portMain = "in";
+      portContr = "out";
+    } else {
+      portMain = "out";
+      portContr = "in";
+    }
     if (i.type == VHDLDescParameter::Type::DATAFLOW ||
         i.type == VHDLDescParameter::Type::DATA) {
-      result +=
-          i.name + " : in " + resultType + resultSize + resultBitwidth + ";\n";
+      result += i.name + " : " + portMain + " " + resultType + resultSize +
+                resultBitwidth + ";\n";
     }
     // control signals if we need them
     if (i.type == VHDLDescParameter::Type::DATAFLOW ||
         i.type == VHDLDescParameter::Type::CONTROL) {
-      result +=
-          i.name + "_valid : in " + resultControlType + resultSize + ";\n";
-      result +=
-          i.name + "_ready : out " + resultControlType + resultSize + ";\n";
+      result += i.name + "_valid : " + portMain + " " + resultControlType +
+                resultSize + ";\n";
+      result += i.name + "_ready : " + portContr + " " + resultControlType +
+                resultSize + ";\n";
     }
   }
 }
@@ -561,9 +568,9 @@ std::string VHDLModuleDescription::declare() const {
   result[result.size() - 1] = ';';
   result += "\nport(\nclk : in std_logic;\nrst : in std_logic;\n";
   // explore inputPorts
-  declarePorts(inputPorts, result);
+  declarePorts(true, inputPorts, result);
   // explore outputPorts
-  declarePorts(outputPorts, result);
+  declarePorts(false, outputPorts, result);
   result[result.size() - 2] = ')';
   result[result.size() - 1] = ';';
   result += "\nend component;\n";
