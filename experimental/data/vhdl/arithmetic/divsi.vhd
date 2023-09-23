@@ -45,8 +45,8 @@ architecture arch of divsi_node is
   signal out_array  : std_logic_vector(1 downto 0);
 
 begin
-  out_array(0) <= lhs_ready;
-  out_array(1) <= rhs_ready;
+  lhs_ready <= out_array(0);
+  rhs_ready <= out_array(1);
   array_RAM_sdiv_32ns_32ns_32_36_1_U1 : component array_RAM_sdiv_32ns_32ns_32_36_1
     generic map(
       ID         => 1,

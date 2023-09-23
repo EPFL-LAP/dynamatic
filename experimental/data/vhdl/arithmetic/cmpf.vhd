@@ -50,8 +50,8 @@ architecture arch of cmpf_node_#PREDICATE# is
   signal out_array    : std_logic_vector(1 downto 0);
 
 begin
-  out_array(0) <= lhs_ready;
-  out_array(1) <= rhs_ready;
+  lhs_ready <= out_array(0);
+  rhs_ready <= out_array(1);
 
   result <= '0';
 

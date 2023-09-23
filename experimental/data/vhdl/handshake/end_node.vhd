@@ -35,8 +35,8 @@ architecture arch of end_node is
   signal out_array : std_logic_vector(1 downto 0);
 
 begin
-  out_array(0) <= nReady;
-  out_array(1) <= joinReady;
+  nReady <= out_array(0);
+  joinReady <= out_array(1);
   process (ins_valid, ins)
     variable tmp_data_out  : unsigned(BITWIDTH - 1 downto 0);
     variable tmp_valid_out : std_logic;

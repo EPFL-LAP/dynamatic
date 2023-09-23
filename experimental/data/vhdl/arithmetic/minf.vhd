@@ -38,8 +38,8 @@ architecture arch of minf_node is
   signal out_array  : std_logic_vector(1 downto 0);
 
 begin
-  out_array(0) <= lhs_ready;
-  out_array(1) <= rhs_ready;
+  lhs_ready <= out_array(0);
+  rhs_ready <= out_array(1);
 
   my_trunc_U1 : component my_minf
     port map(

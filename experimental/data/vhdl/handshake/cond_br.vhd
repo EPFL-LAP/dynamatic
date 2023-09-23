@@ -28,10 +28,10 @@ architecture arch of cond_br_node is
   signal out2_array         : std_logic_vector(1 downto 0);
 
 begin
-  out_array(0)  <= data_ready;
-  out_array(1)  <= condition_ready;
-  out2_array(0) <= true_result_valid;
-  out2_array(1) <= false_result_valid;
+  data_ready <= out_array(0);
+  condition_ready <= out_array(1);
+  true_result_valid <= out2_array(0);
+  false_result_valid <= out2_array(1);
 
   j : entity work.join(arch) generic map(2)
     port map(
