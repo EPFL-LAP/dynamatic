@@ -319,9 +319,6 @@ struct VHDLModuleDescription {
   /// exact values (BITWIDTH, SIZE and so on). It uses modParameters string,
   /// obtained from processing the input IR, to get all required information.
   VHDLModule concretize(std::string modName, std::string modParameters) const;
-  /// Function that declares all the components (i.e. gets "component" in VHDL
-  /// syntax)
-  std::string declare() const;
 };
 
 /// VHDL module, that is VHDLModuleDescription + extern module operations from
@@ -350,11 +347,6 @@ struct VHDLModule {
   llvm::SmallVector<VHDLModParameter> concrOutputs;
   /// Reference to the corresponding template in VHDLComponentLibrary
   const VHDLModuleDescription &modDesc;
-  /// Function that obtains declaration of components inside entities.
-  std::string getComponentsDeclaration() {
-    std::string res = "component " + modName + " " + modDesc.declare();
-    return res;
-  }
   /// Function that instantiates a module component, that is gets an instance
   /// with an exact number. It uses innerOp operation, obtained from processing
   /// the input IR, to get all required information.
@@ -480,103 +472,6 @@ VHDLModule VHDLModuleDescription::concretize(std::string modName,
   return VHDLModule(modName, modText, resultParamArr, inputs, outputs, *this);
 }
 
-/// Support function that declares input / output ports
-void declarePorts(bool p, const llvm::SmallVector<VHDLDescParameter> &ports,
-                  std::string &result) {
-  // explore inputPorts / outputPorts
-  for (const VHDLDescParameter &i : ports) {
-    std::string resultType;
-    std::string resultControlType;
-    std::string resultSize;
-    std::string resultBitwidth;
-    std::string modAmount;
-    // get the description of the input / output, types of its size and
-    // bitwidth...
-    if (i.getSize() != NONE_VALUE) {
-      modAmount = ARRAY_STR;
-    } else {
-      modAmount = VALUE_STR;
-    }
-    std::string modType;
-    if (i.getBitwidth() == NONE_VALUE) {
-      modType = STD_LOGIC_STR;
-    } else {
-      modType = STD_LOGIC_VECTOR_STR;
-    }
-    // ... and corresponding actual values
-    std::string s, b;
-    if (isNumber(i.getSize())) {
-      s = std::to_string(std::atoi(i.getSize().c_str()) - 1);
-    } else {
-      s = i.getSize() + " - 1";
-    }
-    if (isNumber(i.getBitwidth())) {
-      b = std::to_string(std::atoi(i.getBitwidth().c_str()) - 1);
-    } else {
-      b = i.getBitwidth() + " - 1";
-    }
-    // According to previous investigation construct the input's / output's
-    // declaration
-    if (modAmount == ARRAY_STR && modType == STD_LOGIC_VECTOR_STR) {
-      resultType = DATA_ARRAY_STR;
-      resultControlType = STD_LOGIC_VECTOR_STR;
-      resultSize = "(" + s + " downto 0)";
-      resultBitwidth = "(" + b + " downto 0)";
-    } else if (modAmount == VALUE_STR && modType == STD_LOGIC_STR) {
-      resultType = STD_LOGIC_STR;
-      resultControlType = STD_LOGIC_STR;
-    } else if (modAmount == VALUE_STR && modType == STD_LOGIC_VECTOR_STR) {
-      resultType = STD_LOGIC_VECTOR_STR;
-      resultControlType = STD_LOGIC_STR;
-      resultBitwidth = "(" + b + " downto 0)";
-    } else {
-      resultType = STD_LOGIC_VECTOR_STR;
-      resultControlType = STD_LOGIC_STR;
-      resultSize = "(" + s + " downto 0)";
-    }
-    std::string portMain, portContr;
-    if (p) {
-      portMain = "in";
-      portContr = "out";
-    } else {
-      portMain = "out";
-      portContr = "in";
-    }
-    if (i.type == VHDLDescParameter::Type::DATAFLOW ||
-        i.type == VHDLDescParameter::Type::DATA) {
-      result += i.name + " : " + portMain + " " + resultType + resultSize +
-                resultBitwidth + ";\n";
-    }
-    // control signals if we need them
-    if (i.type == VHDLDescParameter::Type::DATAFLOW ||
-        i.type == VHDLDescParameter::Type::CONTROL) {
-      result += i.name + "_valid : " + portMain + " " + resultControlType +
-                resultSize + ";\n";
-      result += i.name + "_ready : " + portContr + " " + resultControlType +
-                resultSize + ";\n";
-    }
-  }
-}
-
-std::string VHDLModuleDescription::declare() const {
-  std::string result;
-  result += " is\ngeneric(\n";
-  for (const VHDLGenericParam &i : generics) {
-    result += i.name + " : " + i.type + ";\n";
-  }
-  result[result.size() - 2] = ')';
-  result[result.size() - 1] = ';';
-  result += "\nport(\nclk : in std_logic;\nrst : in std_logic;\n";
-  // explore inputPorts
-  declarePorts(true, inputPorts, result);
-  // explore outputPorts
-  declarePorts(false, outputPorts, result);
-  result[result.size() - 2] = ')';
-  result[result.size() - 1] = ';';
-  result += "\nend component;\n";
-  return result;
-}
-
 /// VHDL instance, that is VHDLModule + inner module operations from
 /// the input IR
 struct VHDLInstance {
@@ -650,7 +545,8 @@ VHDLInstance VHDLModule::instantiate(std::string instName,
   }
 
   std::string compName = modName.substr(0, modName.find("."));
-  std::string instText = instName + " : " + compName + " generic map(";
+  std::string instText =
+      instName + " : entity work." + compName + "(arch) generic map(";
   // "0", i.e. none, types are not allowed, so always replace them with 1
   for (const std::string &i : modParameters)
     if (i == "0")
@@ -1312,17 +1208,6 @@ static void getEntityDeclaration(std::pair<Operation *, VHDLInstance> &hwmod) {
   llvm::outs() << res;
 }
 
-/// Get the declaration of other components
-static void getComponentsDeclaration(VHDLModuleLibrary &modLib) {
-  llvm::StringMap<std::string> componentsDeclaration;
-  for (auto &i : modLib) {
-    if (!componentsDeclaration.contains(i.getValue().modName)) {
-      componentsDeclaration.insert(std::pair(i.getValue().modName, ""));
-      llvm::outs() << i.getValue().getComponentsDeclaration() << "\n";
-    }
-  }
-}
-
 /// Support function for signals declaration that prints input / output signals
 void getSignalsPorts(llvm::SmallVector<VHDLModParameter> &concrPorts,
                      const VHDLInstParameter *portsIt, VHDLInstance &mod) {
@@ -1562,8 +1447,7 @@ int main(int argc, char **argv) {
   getEntityDeclaration(hwMod);
   llvm::outs() << "end;\n\n";
   llvm::outs() << "architecture behavioral of " << hwModName << " is\n\n";
-  getComponentsDeclaration(modLib);
-  llvm::outs() << "\n";
+
   getSignalsDeclaration(instanceLib);
   llvm::outs() << "\nbegin\n\n";
   getWiring(instanceLib, hwOut);

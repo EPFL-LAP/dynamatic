@@ -22,24 +22,6 @@ entity start_node is
 end start_node;
 
 architecture arch of start_node is
-
-  component buffer_seq is
-    generic (
-      BITWIDTH : integer
-    );
-    port (
-      -- inputs
-      ins        : in std_logic_vector(BITWIDTH - 1 downto 0);
-      ins_valid  : in std_logic;
-      clk        : in std_logic;
-      rst        : in std_logic;
-      outs_ready : in std_logic;
-      -- outputs
-      ins_ready  : out std_logic;
-      outs       : out std_logic_vector(BITWIDTH - 1 downto 0);
-      outs_valid : out std_logic);
-  end component;
-
   signal set                    : std_logic;
   signal start_internal         : std_logic;
   signal startBuff_readyArray   : std_logic;
@@ -65,7 +47,7 @@ begin
     end if;
   end process;
 
-  startBuff : buffer_seq generic map(BITWIDTH)
+  startBuff : entity work.buffer_seq(arch) generic map(BITWIDTH)
   port map(
     clk        => clk,
     rst        => rst,
