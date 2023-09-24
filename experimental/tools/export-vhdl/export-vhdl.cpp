@@ -811,7 +811,7 @@ VHDLInstance VHDLModule::instantiate(std::string instName,
       }
     } else {
       // If the output doesn't exist among signals in the input IR it's empty
-      std::string extraSignalName = instName + "_y" + descName;
+      std::string extraSignalName = instName + "_x" + descName;
       if (channelType == VHDLDescParameter::Type::DATAFLOW ||
           channelType == VHDLDescParameter::Type::DATA)
         instText += descName + "(0) => " + extraSignalName + ",\n";

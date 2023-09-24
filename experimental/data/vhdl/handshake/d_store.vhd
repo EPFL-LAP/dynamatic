@@ -32,8 +32,8 @@ architecture arch of d_store_node is
   signal out_array    : std_logic_vector(1 downto 0);
 
 begin
-  addrOut_ready <= out_array(0);
-  dataToMem_ready <= out_array(1);
+  addrIn_ready <= out_array(0);
+  dataIn_ready <= out_array(1);
 
   join_write : entity work.join(arch) generic map(2)
     port map(
