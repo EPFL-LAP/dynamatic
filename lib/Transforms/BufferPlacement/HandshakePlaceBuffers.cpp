@@ -9,6 +9,7 @@
 #include "circt/Dialect/Handshake/HandshakeDialect.h"
 #include "circt/Dialect/Handshake/HandshakeOps.h"
 #include "circt/Dialect/Handshake/HandshakePasses.h"
+#include "dynamatic/Support/Logging.h"
 #include "dynamatic/Support/LogicBB.h"
 #include "dynamatic/Transforms/BufferPlacement/ExtractCFDFC.h"
 #include "dynamatic/Transforms/BufferPlacement/OptimizeMILP.h"
@@ -20,10 +21,6 @@
 #include "mlir/IR/OperationSupport.h"
 #include "mlir/IR/PatternMatch.h"
 #include "mlir/Support/IndentedOstream.h"
-#include "llvm/Support/Debug.h"
-#include <optional>
-
-#define DEBUG_TYPE "BUFFER_PLACEMENT"
 
 using namespace circt;
 using namespace circt::handshake;
@@ -33,15 +30,88 @@ using namespace dynamatic::buffer;
 using namespace dynamatic::experimental;
 
 namespace {
+
+/// Thin wrapper around a `Logger` that allows to conditionally create the
+/// resources to write to the file based on a flag provided during objet
+/// creation. This enables us to use RAII to deallocate the logger only if it
+/// was created.
+class BufferLogger {
+public:
+  /// Optionally allocates a logger based on whether the `dumpLogs` flag is set.
+  /// If it is, the log file's location is determined based om the provided
+  /// function's name. On error, `ec` will contain a non-zero error code
+  /// and the logger should not be used.
+  BufferLogger(handshake::FuncOp funcOp, bool dumpLogs, std::error_code &ec) {
+    if (!dumpLogs)
+      return;
+
+    std::string sep = llvm::sys::path::get_separator().str();
+    std::string filepath = "buffer-placement" + sep + funcOp.getName().str() +
+                           sep + "placement.log";
+    ;
+    log = new Logger(filepath, ec);
+  }
+
+  /// Returns the underlying logger, which may be nullptr.
+  Logger *operator*() { return log; }
+  /// Returns the underlying indented wrtier stream to the log file. Requires
+  /// the object to have been created with the `dumpLogs` flag set to true.
+  mlir::raw_indented_ostream &getStream() {
+    assert(log && "logger was not allocated");
+    return **log;
+  }
+
+  BufferLogger(const BufferLogger *) = delete;
+  BufferLogger operator=(const BufferLogger *) = delete;
+
+  /// Deletes the underlying logger object if it was allocated.
+  ~BufferLogger() {
+    if (log)
+      delete log;
+  }
+
+private:
+  /// The underlying logger object, which may remain nullptr.
+  Logger *log = nullptr;
+};
+
+} // namespace
+
+/// Logs CFDFC information (sequence of basic blocks, number of executions,
+/// channels, units) to the logger.
+static void logCFDFCInfo(SmallVector<CFDFC> &cfdfcs, Logger &log) {
+  mlir::raw_indented_ostream &os = *log;
+
+  os << "# ================ #\n";
+  os << "# Extracted CFDFCs #\n";
+  os << "# ================ #\n\n";
+
+  for (auto [idx, cf] : llvm::enumerate(cfdfcs)) {
+    os << "CFDFC #" << idx << ": ";
+    for (size_t i = 0, e = cf.cycle.size() - 1; i < e; ++i)
+      os << cf.cycle[i] << " -> ";
+    os << cf.cycle.back() << "\n";
+    os.indent();
+    os << "- Number of executions: " << cf.numExecs << "\n";
+    os << "- Number of units: " << cf.units.size() << "\n";
+    os << "- Number of channels: " << cf.channels.size() << "\n";
+    os << "- Number of backedges: " << cf.backedges.size() << "\n\n";
+    os.unindent();
+  }
+}
+
+namespace {
 struct HandshakePlaceBuffersPass
     : public HandshakePlaceBuffersBase<HandshakePlaceBuffersPass> {
 
   HandshakePlaceBuffersPass(bool firstCFDFC, std::string &stdLevelInfo,
-                            std::string &timefile, double targetCP) {
+                            std::string &timefile, double targetCP,
+                            bool dumpLogs) {
     this->firstCFDFC = firstCFDFC;
     this->stdLevelInfo = stdLevelInfo;
     this->timefile = timefile;
     this->targetCP = targetCP;
+    this->dumpLogs = dumpLogs;
   }
 
 #ifdef DYNAMATIC_GUROBI_NOT_INSTALLED
@@ -72,6 +142,16 @@ struct HandshakePlaceBuffersPass
     for (handshake::FuncOp funcOp : mod.getOps<handshake::FuncOp>()) {
       FuncInfo funcInfo(funcOp);
 
+      // Use a wrapper around a logger to benefit from RAII
+      std::error_code ec;
+      BufferLogger logger(funcOp, dumpLogs, ec);
+      if (ec.value() != 0) {
+        funcOp->emitError() << "Failed to create logger for function "
+                            << funcOp.getName() << "\n"
+                            << ec.message();
+        return signalPassFailure();
+      }
+
       // Read the CSV containing arch information (number of transitions between
       // pairs of basic blocks) from disk
       SmallVector<ArchBB> archs;
@@ -82,7 +162,7 @@ struct HandshakePlaceBuffersPass
 
       // Get CFDFCs from the function
       SmallVector<CFDFC> cfdfcs;
-      if (failed(getCFDFCs(funcInfo, cfdfcs)))
+      if (failed(getCFDFCs(funcInfo, cfdfcs, logger)))
         return signalPassFailure();
 
       // All extracted CFDFCs must be optimized
@@ -91,7 +171,7 @@ struct HandshakePlaceBuffersPass
 
       // Solve the MILP to obtain a buffer placement
       DenseMap<Value, PlacementResult> placement;
-      if (failed(getBufferPlacement(funcInfo, timingDB, placement)))
+      if (failed(getBufferPlacement(funcInfo, timingDB, placement, logger)))
         return signalPassFailure();
 
       if (failed(instantiateBuffers(placement)))
@@ -100,10 +180,12 @@ struct HandshakePlaceBuffersPass
   };
 
 private:
-  LogicalResult getCFDFCs(FuncInfo &funcInfo, SmallVector<CFDFC> &cfdfcs);
+  LogicalResult getCFDFCs(FuncInfo &funcInfo, SmallVector<CFDFC> &cfdfcs,
+                          BufferLogger &logger);
 
   LogicalResult getBufferPlacement(FuncInfo &funcInfo, TimingDatabase &timingDB,
-                                   DenseMap<Value, PlacementResult> &placement);
+                                   DenseMap<Value, PlacementResult> &placement,
+                                   BufferLogger &logger);
 
   LogicalResult instantiateBuffers(DenseMap<Value, PlacementResult> &res);
 #endif
@@ -112,7 +194,8 @@ private:
 
 #ifndef DYNAMATIC_GUROBI_NOT_INSTALLED
 LogicalResult HandshakePlaceBuffersPass::getCFDFCs(FuncInfo &funcInfo,
-                                                   SmallVector<CFDFC> &cfdfcs) {
+                                                   SmallVector<CFDFC> &cfdfcs,
+                                                   BufferLogger &logger) {
   SmallVector<ArchBB> archsCopy(funcInfo.archs);
 
   // Store all archs in a set. We use a pointer to each arch as the key type to
@@ -144,34 +227,28 @@ LogicalResult HandshakePlaceBuffersPass::getCFDFCs(FuncInfo &funcInfo,
 
     // Create the CFDFC from the set of selected archs and BBs
     cfdfcs.emplace_back(funcInfo.funcOp, selectedArchs, numExecs);
-    // Print the CFDFC that was identified
-    LLVM_DEBUG({
-      CFDFC &cfdfc = cfdfcs.back();
-      llvm::errs() << "Identified CFDFC with " << cfdfc.numExecs
-                   << " executions, " << cfdfc.units.size() << " units, and "
-                   << cfdfc.channels.size()
-                   << " channels: " << selectedArchs.front()->srcBB;
-      for (ArchBB *arch : selectedArchs) {
-        llvm::errs() << " -> " << arch->dstBB;
-      }
-      llvm::errs() << "\n";
-    });
   } while (!firstCFDFC);
+
+  if (dumpLogs)
+    logCFDFCInfo(cfdfcs, **logger);
 
   return success();
 }
 
 LogicalResult HandshakePlaceBuffersPass::getBufferPlacement(
     FuncInfo &funcInfo, TimingDatabase &timingDB,
-    DenseMap<Value, PlacementResult> &placement) {
+    DenseMap<Value, PlacementResult> &placement, BufferLogger &log) {
 
   // Create Gurobi environment
   GRBEnv env = GRBEnv(true);
   env.set(GRB_IntParam_OutputFlag, 0);
   env.start();
 
+  Logger *milpLog = dumpLogs ? *log : nullptr;
+
   // Create and solve the MILP
-  BufferPlacementMILP milp(funcInfo, timingDB, targetCP, targetCP * 2.0, env);
+  BufferPlacementMILP milp(funcInfo, timingDB, targetCP, targetCP * 2.0, env,
+                           milpLog);
   return success(milp.arePlacementConstraintsSatisfiable() &&
                  !failed(milp.setup()) && !failed(milp.optimize(placement)));
 }
@@ -212,7 +289,8 @@ std::unique_ptr<mlir::OperationPass<mlir::ModuleOp>>
 dynamatic::buffer::createHandshakePlaceBuffersPass(bool firstCFDFC,
                                                    std::string stdLevelInfo,
                                                    std::string timefile,
-                                                   double targetCP) {
-  return std::make_unique<HandshakePlaceBuffersPass>(firstCFDFC, stdLevelInfo,
-                                                     timefile, targetCP);
+                                                   double targetCP,
+                                                   bool dumpLogs) {
+  return std::make_unique<HandshakePlaceBuffersPass>(
+      firstCFDFC, stdLevelInfo, timefile, targetCP, dumpLogs);
 }

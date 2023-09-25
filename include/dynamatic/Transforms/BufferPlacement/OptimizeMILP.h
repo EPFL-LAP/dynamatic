@@ -8,6 +8,7 @@
 #define DYNAMATIC_TRANSFORMS_BUFFERPLACEMENT_OPTIMIZEMILP_H
 
 #include "dynamatic/Support/LLVM.h"
+#include "dynamatic/Support/Logging.h"
 #include "dynamatic/Support/TimingModels.h"
 #include "dynamatic/Transforms/BufferPlacement/BufferingProperties.h"
 #include "dynamatic/Transforms/BufferPlacement/ExtractCFDFC.h"
@@ -118,7 +119,8 @@ public:
   /// Constructs the buffer placement MILP. All arguments passed by reference
   /// must outlive the created instance, which maintains reference internally.
   BufferPlacementMILP(FuncInfo &funcInfo, const TimingDatabase &timingDB,
-                      double targetPeriod, double maxPeriod, GRBEnv &env);
+                      double targetPeriod, double maxPeriod, GRBEnv &env,
+                      Logger *log = nullptr);
 
   /// Returns whether the custom buffer placement constraints derived from
   /// custom channel buffering properties attached to IR operations are
@@ -159,6 +161,8 @@ protected:
   MILPVars vars;
   /// Holds a unique name for each operation in the function.
   DenseMap<Operation *, std::string> nameUniquer;
+  /// Logger; if not null the class will log setup and results information.
+  Logger *logger;
 
   /// Adds all variables used in the MILP to the Gurobi model.
   LogicalResult createVars();
@@ -231,6 +235,10 @@ private:
   /// Returns an estimation of the number of times a token will traverse the
   /// input channel. The estimation is based on the extracted function's CFDFCs.
   unsigned getChannelNumExecs(Value channel);
+
+  /// Logs placement decisisons and achieved throuhgputs after MILP
+  /// optimization. Asserts if the logger is nullptr.
+  void logResults(const DenseMap<Value, PlacementResult> &placement);
 };
 
 } // namespace buffer

@@ -205,7 +205,11 @@ def HandshakePlaceBuffers : Pass<"handshake-place-buffers", "mlir::ModuleOp"> {
     Option<"timefile", "time-file", "std::string", "",
     "required, file provide the time and buffer prerequisite information ">,
     Option<"targetCP", "target-period", "double", "4.0",
-    "target clock period for the CFDFC">];
+    "target clock period for the CFDFC">,
+    Option<"dumpLogs", "dump-logs", "bool", "false",
+    "If true, dump debugging information (identified CFDFCs, MILP "
+    "placement decisions, solution summaries) into a directory named "
+    "'buffer-placement' at the binary's location.">];
 }
 
 //===----------------------------------------------------------------------===//

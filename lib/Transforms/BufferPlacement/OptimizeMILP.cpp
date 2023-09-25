@@ -26,12 +26,6 @@
 #include "llvm/ADT/SmallVector.h"
 #include "llvm/ADT/iterator_range.h"
 #include "llvm/Support/Casting.h"
-#include "llvm/Support/Debug.h"
-#include <fstream>
-#include <functional>
-#include <iostream>
-
-#define DEBUG_TYPE "BUFFER_PLACEMENT"
 
 using namespace circt;
 using namespace mlir;
@@ -41,9 +35,9 @@ using namespace dynamatic::buffer;
 BufferPlacementMILP::BufferPlacementMILP(FuncInfo &funcInfo,
                                          const TimingDatabase &timingDB,
                                          double targetPeriod, double maxPeriod,
-                                         GRBEnv &env)
+                                         GRBEnv &env, Logger *logger)
     : timingDB(timingDB), targetPeriod(targetPeriod), maxPeriod(maxPeriod),
-      funcInfo(funcInfo), model(GRBModel(env)) {
+      funcInfo(funcInfo), model(GRBModel(env)), logger(logger) {
   // Set a 3-minutes time limit for the MILP
   model.getEnv().set(GRB_DoubleParam_TimeLimit, 180);
 
@@ -177,23 +171,13 @@ BufferPlacementMILP::optimize(DenseMap<Value, PlacementResult> &placement) {
       // All slots should be transparent
       result.numTrans = numSlotsToPlace;
 
-    // Print the placement decision
-    LLVM_DEBUG(std::stringstream propsStr; propsStr << props;
-               llvm::errs()
-               << "=== PLACEMENT DECISION ===\nThe MILP determined that "
-               << numSlotsToPlace << " "
-               << (placeOpaque ? "opaque" : "transparent")
-               << " slots should be placed on channel\n"
-               << getChannelName(value) << ", which has buffering properties: "
-               << propsStr.str() << ".\n"
-               << "Returned placement specifies " << result.numTrans
-               << " transparent slots and " << result.numOpaque
-               << " opaque slots.\n";);
-
     Channel channel(value);
     deductInternalBuffers(channel, result);
     placement[value] = result;
   }
+
+  if (logger)
+    logResults(placement);
 
   return success();
 }
@@ -523,8 +507,6 @@ LogicalResult BufferPlacementMILP::addObjective() {
   unsigned totalExecs = 0;
   for (auto &[channel, _] : vars.channels)
     totalExecs += getChannelNumExecs(channel);
-  LLVM_DEBUG(llvm::errs() << "Total number of channel executions is "
-                          << totalExecs << "\n";);
 
   // Create the expression for the MILP objective
   GRBLinExpr objective;
@@ -670,6 +652,71 @@ unsigned BufferPlacementMILP::getChannelNumExecs(Value channel) {
     if (arch.srcBB == srcBB)
       numExec += arch.numTrans;
   return numExec;
+}
+
+void BufferPlacementMILP::logResults(
+    const DenseMap<Value, PlacementResult> &placement) {
+  assert(logger && "no logger was provided");
+  mlir::raw_indented_ostream &os = **logger;
+
+  os << "# ========================== #\n";
+  os << "# Buffer Placement Decisions #\n";
+  os << "# ========================== #\n\n";
+
+  for (auto &[value, channelVars] : vars.channels) {
+    if (channelVars.bufPresent.get(GRB_DoubleAttr_X) == 0)
+      continue;
+
+    // Extract number and type of slots
+    unsigned numSlotsToPlace = static_cast<unsigned>(
+        channelVars.bufNumSlots.get(GRB_DoubleAttr_X) + 0.5);
+    bool placeOpaque = channelVars.bufIsOpaque.get(GRB_DoubleAttr_X) > 0;
+
+    PlacementResult result;
+    ChannelBufProps &props = channels[value];
+
+    // Log placement decision
+    os << getChannelName(value) << ":\n";
+    os.indent();
+    std::stringstream propsStr;
+    propsStr << props;
+    os << "- Buffering constraints: " << propsStr.str() << "\n";
+    os << "- MILP decisison: " << numSlotsToPlace << " "
+       << (placeOpaque ? "opaque" : "transparent") << " slot(s)\n";
+    os << "- Placement decision: " << result.numTrans
+       << " transparent slot(s) and " << result.numOpaque
+       << " opaque slot(s)\n";
+    os.unindent();
+    os << "\n";
+  }
+
+  os << "# ================= #\n";
+  os << "# CFDFC Throughputs #\n";
+  os << "# ================= #\n\n";
+
+  // Log global CFDFC throuhgputs
+  for (auto [idx, cfdfcWithVars] : llvm::enumerate(vars.cfdfcs)) {
+    auto [cf, cfVars] = cfdfcWithVars;
+    double throughput = cfVars.throughput.get(GRB_DoubleAttr_X);
+    os << "Throughput of CFDFC #" << idx << ": " << throughput << "\n";
+  }
+
+  os << "\n# =================== #\n";
+  os << "# Channel Throughputs #\n";
+  os << "# =================== #\n\n";
+
+  // Log throughput of all channels in all CFDFCs
+  for (auto [idx, cfdfcWithVars] : llvm::enumerate(vars.cfdfcs)) {
+    auto [cf, cfVars] = cfdfcWithVars;
+    os << "Per-channel throughputs of CFDFC #" << idx << ":\n";
+    os.indent();
+    for (auto [val, channelTh] : cfVars.channelThroughputs) {
+      os << getChannelName(val) << ": " << channelTh.get(GRB_DoubleAttr_X)
+         << "\n";
+    }
+    os.unindent();
+    os << "\n";
+  }
 }
 
 #endif // DYNAMATIC_GUROBI_NOT_INSTALLED
