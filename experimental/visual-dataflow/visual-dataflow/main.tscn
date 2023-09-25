@@ -1,0 +1,11 @@
+[gd_scene load_steps=3 format=3 uid="uid://ridjgqca7ygu"]
+
+[ext_resource type="Texture2D" uid="uid://wnv3i73ote6r" path="res://icon.svg" id="1_kgvs8"]
+[ext_resource type="Script" path="res://test.gd" id="2_mfqi7"]
+
+[node name="Node2D" type="Node2D"]
+
+[node name="VisualDataflow" type="VisualDataflow" parent="."]
+position = Vector2(11.781, 3.9393)
+texture = ExtResource("1_kgvs8")
+script = ExtResource("2_mfqi7")
