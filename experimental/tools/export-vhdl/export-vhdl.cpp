@@ -32,7 +32,6 @@
 #include "llvm/Support/raw_ostream.h"
 
 #include <algorithm>
-#include <cassert>
 #include <cctype>
 #include <cstddef>
 #include <cstdlib>
@@ -49,10 +48,22 @@
 #include <iostream>
 #include <memory>
 
-#define assertm(exp, msg) assert(((void)(msg), exp))
+using namespace llvm;
+using namespace mlir;
+using namespace circt;
 
-const static std::string JSON_LIBRARY =
-    "experimental/tools/export-vhdl/library.json";
+static cl::OptionCategory mainCategory("Application options");
+
+static cl::opt<std::string> inputFileName(cl::Positional,
+                                          cl::desc("<input file>"),
+                                          cl::cat(mainCategory));
+static cl::opt<std::string>
+    jsonLibrary("json-library-path", cl::Optional,
+                cl::desc("Relative path to JSON-formatted file containing "
+                         "library with components' descriptions\n"),
+                cl::init("experimental/tools/export-vhdl/library.json"),
+                cl::cat(mainCategory));
+
 static const std::string CONCRET_METHOD_STR = "concretization_method",
                          COMPS_STR = "components",
                          GENERATORS_STR = "generators",
@@ -67,16 +78,12 @@ static const std::string CONCRET_METHOD_STR = "concretization_method",
                          TYPE_STR = "type", SIZE_STR = "size",
                          BITWIDTH_STR = "bitwidth", PATH_STR = "path";
 
-using namespace llvm;
-using namespace mlir;
-using namespace circt;
-
 // ============================================================================
 // Helper functions
 // ============================================================================
 
 /// Execute binary file
-std::string exec(const char *cmd) {
+static std::string exec(const char *cmd) {
   std::array<char, 128> buffer;
   std::string result;
   std::unique_ptr<FILE, decltype(&pclose)> pipe(popen(cmd, "r"), pclose);
@@ -91,8 +98,18 @@ std::string exec(const char *cmd) {
 }
 
 /// Assert condition: if object doesn't contain the field s, return false
-bool checkObj(json::Object *&obj, const std::string &s) {
+static bool checkObj(json::Object *&obj, const std::string &s) {
   return obj->find(s) != obj->end();
+}
+
+/// Error checker for objects
+static bool errorObjCheck(json::Object *&obj, const std::string &cond,
+                          const std::string &msg) {
+  if (!checkObj(obj, COMPS_STR)) {
+    llvm::outs() << msg << "\n";
+    return false;
+  }
+  return true;
 }
 
 /// Split the string with discriminating parameters into string vector for
@@ -123,12 +140,12 @@ static std::pair<std::string, size_t> extractType(mlir::Type &t) {
   if (t.isIntOrFloat()) {
     size_t type = t.getIntOrFloatBitWidth();
     p = std::pair(VALUE_STR, std::max(type, 1UL));
-  } else if (auto ch = t.dyn_cast<esi::ChannelType>()) {
+  } else if (auto ch = t.dyn_cast<esi::ChannelType>())
     // In case of !esi.channel<i...>
     p = std::pair(CHANNEL_STR, ch.getInner().getIntOrFloatBitWidth());
-  } else {
+  else
     llvm_unreachable("Unsupported type");
-  }
+
   return p;
 }
 
@@ -147,9 +164,6 @@ static std::pair<std::string, std::string> splitExtName(StringRef extName) {
 // ============================================================================
 namespace {
 
-struct VHDLDescParameter;
-struct VHDLModParameter;
-struct VHDLInstParameter;
 struct VHDLModuleDescription;
 struct VHDLModule;
 struct VHDLInstance;
@@ -204,24 +218,12 @@ struct VHDLDescParameter {
   /// Size of the parameter, that is the length of the corresponding array. It
   /// can be either a string ("LOAD_COUNT"), which will be updated with exact
   /// data later, or a number ("32") in case it is always the same
-  std::string getSize() const {
-    std::string temp;
-    if (size.empty())
-      temp = NONE_VALUE;
-    else
-      temp = size;
-    return temp;
-  }
+  std::string getSize() const { return size.empty() ? NONE_VALUE : size; }
   /// Bitwidth of the parameter. It can be either a string (bitwidthStr), which
   /// will be updated with exact data later, or a number ("32") in case it is
   /// always the same
   std::string getBitwidth() const {
-    std::string temp;
-    if (bitwidth.empty())
-      temp = NONE_VALUE;
-    else
-      temp = bitwidth;
-    return temp;
+    return bitwidth.empty() ? NONE_VALUE : bitwidth;
   }
 
 private:
@@ -354,7 +356,33 @@ struct VHDLModule {
                            circt::hw::InstanceOp &innerOp) const;
 };
 
-llvm::SmallVector<VHDLModParameter>
+/// VHDL instance, that is VHDLModule + inner module operations from
+/// the input IR
+struct VHDLInstance {
+  VHDLInstance(std::string tempInstanceName, std::string tempItext,
+               llvm::SmallVector<VHDLInstParameter> tempInputs,
+               llvm::SmallVector<VHDLInstParameter> tempOutputs,
+               const VHDLModule &tempMod)
+      : instanceName(std::move(tempInstanceName)),
+        instanceText(std::move(tempItext)), inputs(std::move(tempInputs)),
+        outputs(std::move(tempOutputs)), mod(tempMod) {}
+  /// Instance name, for instance "fork0"
+  std::string instanceName;
+  /// Instantiation of the component, i.e. "port mapping", assighnment between
+  /// template component's inputs / outputs and other signals
+  std::string instanceText;
+  /// Instance inputs, i.e. signals
+  llvm::SmallVector<VHDLInstParameter> inputs;
+  /// Instance outputs, i.e. signals
+  llvm::SmallVector<VHDLInstParameter> outputs;
+  /// Reference to the corresponding module in VHDLModuleLibrary
+  const VHDLModule &mod;
+};
+
+} // namespace
+
+/// Function that obtains module input / output ports
+static llvm::SmallVector<VHDLModParameter>
 getConcretizedPorts(const llvm::SmallVector<VHDLDescParameter> &descPorts,
                     llvm::StringMap<std::string> &genericsMap) {
   // Future VHDLModule inputs / outputs
@@ -472,77 +500,192 @@ VHDLModule VHDLModuleDescription::concretize(std::string modName,
   return VHDLModule(modName, modText, resultParamArr, inputs, outputs, *this);
 }
 
-/// VHDL instance, that is VHDLModule + inner module operations from
-/// the input IR
-struct VHDLInstance {
-  VHDLInstance(std::string tempInstanceName, std::string tempItext,
-               llvm::SmallVector<VHDLInstParameter> tempInputs,
-               llvm::SmallVector<VHDLInstParameter> tempOutputs,
-               const VHDLModule &tempMod)
-      : instanceName(std::move(tempInstanceName)),
-        instanceText(std::move(tempItext)), inputs(std::move(tempInputs)),
-        outputs(std::move(tempOutputs)), mod(tempMod) {}
-  /// Instance name, for instance "fork0"
-  std::string instanceName;
-  /// Instantiation of the component, i.e. "port mapping", assighnment between
-  /// template component's inputs / outputs and other signals
-  std::string instanceText;
-  /// Instance inputs, i.e. signals
-  llvm::SmallVector<VHDLInstParameter> inputs;
-  /// Instance outputs, i.e. signals
-  llvm::SmallVector<VHDLInstParameter> outputs;
-  /// Reference to the corresponding module in VHDLModuleLibrary
-  const VHDLModule &mod;
-};
+/// Function that obtains instance input / output ports
+static llvm::SmallVector<VHDLInstParameter>
+processInstancePorts(bool checker, std::string &instName,
+                     circt::hw::InstanceOp &innerOp) {
+  size_t num = 0;
+  // Process the input / output signal
+  llvm::SmallVector<VHDLInstParameter> ports;
+  for (Value opr : innerOp.getOperands()) {
+    std::string parameter;
+    if (!checker)
+      // input
+      parameter = innerOp.getArgumentName(num).str();
+    else
+      // output
+      parameter = innerOp.getResultName(num).str();
+    std::string name = instName + "_" + parameter;
+    mlir::Type t = opr.getType();
+    std::string type = extractType(t).first;
+    VHDLInstParameter::Type eType;
+    if (type == VALUE_STR)
+      eType = VHDLInstParameter::Type::VALUE;
+    else if (type == CHANNEL_STR)
+      eType = VHDLInstParameter::Type::CHANNEL;
+    else {
+      innerOp.emitError() << "Operand " << num << "has incompatible type";
+      exit(1);
+    }
+    size_t bitwidth = extractType(t).second;
+    // Both clock and reset always exist. There's no need in them among inputs.
+    if (parameter != CLOCK_STR && parameter != RESET_STR)
+      ports.push_back(VHDLInstParameter(opr, name, eType, bitwidth));
+    ++num;
+  }
+  return ports;
+}
+
+/// Function that gets wiring between architecture parameters and signals for
+/// inputs / outputs
+static void
+getPortsInstantiation(std::string &instText, std::string &instName,
+                      const llvm::SmallVector<VHDLModParameter> &concrPorts,
+                      const llvm::SmallVector<VHDLDescParameter> &descPorts,
+                      llvm::SmallVector<VHDLInstParameter> &instPorts) {
+  for (const auto [concrPort, descPort] : llvm::zip(concrPorts, descPorts)) {
+    VHDLInstParameter *portIt = instPorts.begin();
+    // We process the list of template inputPorts (inputs from library.json) and
+    // assign them to signals
+    std::string descName = descPort.name;
+    auto channelType = descPort.type;
+    if (concrPort.flag) {
+      // If not an empty signal
+      auto count = concrPort.amount;
+      auto bitLen = concrPort.type;
+      if (count == VHDLModParameter::Amount::VALUE &&
+          bitLen == VHDLModParameter::Type::STD_LOGIC) {
+        std::string insName = portIt->name;
+        // std_logic
+        if (channelType == VHDLDescParameter::Type::DATAFLOW ||
+            channelType == VHDLDescParameter::Type::DATA)
+          instText += descName + " => " + insName + ",\n";
+
+        if (channelType == VHDLDescParameter::Type::DATAFLOW ||
+            channelType == VHDLDescParameter::Type::CONTROL) {
+          instText += descName + "_valid => " + insName + "_valid,\n";
+          instText += descName + "_ready => " + insName + "_ready,\n";
+        }
+        ++portIt;
+      } else if (count == VHDLModParameter::Amount::ARRAY &&
+                 bitLen == VHDLModParameter::Type::STD_LOGIC) {
+        // std_logic_vector(COUNT)
+        VHDLInstParameter *prevIt = portIt;
+        for (size_t k = 0; k < concrPort.size; ++k) {
+          std::string insName = portIt->name;
+          if (channelType == VHDLDescParameter::Type::DATAFLOW ||
+              channelType == VHDLDescParameter::Type::DATA)
+            instText +=
+                descName + "(" + std::to_string(k) + ") => " + insName + ",\n";
+
+          ++portIt;
+        }
+        portIt = prevIt;
+        for (size_t k = 0; k < concrPort.size; ++k) {
+          std::string insName = portIt->name;
+          if (channelType == VHDLDescParameter::Type::DATAFLOW ||
+              channelType == VHDLDescParameter::Type::CONTROL)
+            instText += descName + "_valid(" + std::to_string(k) + ") => " +
+                        insName + "_valid,\n";
+
+          ++portIt;
+        }
+        // According to VHDL compiler's rules ports of the same logic should
+        // go in a row, so cycles for ready and valid signals are splitted up
+        portIt = prevIt;
+        for (size_t k = 0; k < concrPort.size; ++k) {
+          std::string insName = portIt->name;
+          if (channelType == VHDLDescParameter::Type::DATAFLOW ||
+              channelType == VHDLDescParameter::Type::CONTROL)
+            instText += descName + "_ready(" + std::to_string(k) + ") => " +
+                        insName + "_ready,\n";
+
+          ++portIt;
+        }
+      } else if (count == VHDLModParameter::Amount::VALUE &&
+                 bitLen == VHDLModParameter::Type::STD_LOGIC_VECTOR) {
+        // std_logic_vector(BITWIDTH)
+        std::string insName = portIt->name;
+        std::string z;
+        // This if is for wiring between parameters with (0 downto 0) and
+        // std_logic types. (0 downto 0) automatically get (0) index.
+        if (concrPort.bitwidth <= 1)
+          z = "(0)";
+
+        if (channelType == VHDLDescParameter::Type::DATAFLOW ||
+            channelType == VHDLDescParameter::Type::DATA)
+          instText += descName + z + " => " + insName + ",\n";
+
+        if (channelType == VHDLDescParameter::Type::DATAFLOW ||
+            channelType == VHDLDescParameter::Type::CONTROL) {
+          instText += descName + "_valid" + " => " + insName + "_valid,\n";
+          instText += descName + "_ready" + " => " + insName + "_ready,\n";
+        }
+        ++portIt;
+      } else if (count == VHDLModParameter::Amount::ARRAY &&
+                 bitLen == VHDLModParameter::Type::STD_LOGIC_VECTOR) {
+        // data_array(BITWIDTH)(COUNT)
+        VHDLInstParameter *prevIt = portIt;
+        // This if is for wiring between parameters with (0 downto 0) and
+        // std_logic types. (0 downto 0) automatically get (0) index.
+        for (size_t k = 0; k < concrPort.size; ++k) {
+          std::string insName = portIt->name;
+          std::string z;
+          if (concrPort.bitwidth <= 1)
+            z = "(0)";
+          if (channelType == VHDLDescParameter::Type::DATAFLOW ||
+              channelType == VHDLDescParameter::Type::DATA)
+            instText += descName + "(" + std::to_string(k) + ")" + z + " => " +
+                        insName + ",\n";
+          ++portIt;
+        }
+        portIt = prevIt;
+        for (size_t k = 0; k < concrPort.size; ++k) {
+          std::string insName = portIt->name;
+          if (channelType == VHDLDescParameter::Type::DATAFLOW ||
+              channelType == VHDLDescParameter::Type::CONTROL)
+            instText += descName + "_valid(" + std::to_string(k) + ")" +
+                        " => " + insName + "_valid,\n";
+          ++portIt;
+        }
+        // The same about order of valid and ready signals as above
+        portIt = prevIt;
+        for (size_t k = 0; k < concrPort.size; ++k) {
+          std::string insName = portIt->name;
+          if (channelType == VHDLDescParameter::Type::DATAFLOW ||
+              channelType == VHDLDescParameter::Type::CONTROL)
+            instText += descName + "_ready(" + std::to_string(k) + ")" +
+                        " => " + insName + "_ready,\n";
+          ++portIt;
+        }
+      }
+    } else {
+      // If the input / output doesn't exist among signals in the input IR it's
+      // empty
+      std::string extraSignalName = instName + "_x" + descName;
+      if (channelType == VHDLDescParameter::Type::DATAFLOW ||
+          channelType == VHDLDescParameter::Type::DATA)
+        instText += descName + "(0) => " + extraSignalName + ",\n";
+      if (channelType == VHDLDescParameter::Type::DATAFLOW ||
+          channelType == VHDLDescParameter::Type::CONTROL) {
+        instText += descName + "_valid(0) => " + extraSignalName + "_valid,\n";
+        instText += descName + "_ready(0) => " + extraSignalName + "_ready,\n";
+      }
+    }
+  }
+}
 
 VHDLInstance VHDLModule::instantiate(std::string instName,
                                      circt::hw::InstanceOp &innerOp) const {
   // Shorten the name
   instName = instName.substr(instName.find('_') + 1);
-  // Counter for innerOp argumentss or results array
-  size_t num = 0;
+
   // Process the input signal
-  llvm::SmallVector<VHDLInstParameter> inputs;
-  for (Value opr : innerOp.getOperands()) {
-    std::string name = instName + "_" + innerOp.getArgumentName(num).str();
-    mlir::Type t = opr.getType();
-    std::string type = extractType(t).first;
-    VHDLInstParameter::Type eType;
-    if (type == VALUE_STR)
-      eType = VHDLInstParameter::Type::VALUE;
-    else if (type == CHANNEL_STR)
-      eType = VHDLInstParameter::Type::CHANNEL;
-    else {
-      llvm::errs() << "Wrong type: it must be either value, or channel.\n";
-      exit(1);
-    }
-    size_t bitwidth = extractType(t).second;
-    // Both clock and reset always exist. There's no need in them among inputs.
-    if (innerOp.getArgumentName(num).str() != CLOCK_STR &&
-        innerOp.getArgumentName(num).str() != RESET_STR)
-      inputs.push_back(VHDLInstParameter(opr, name, eType, bitwidth));
-    ++num;
-  }
-  num = 0;
+  llvm::SmallVector<VHDLInstParameter> inputs =
+      processInstancePorts(false, instName, innerOp);
   // Process the output signal
-  llvm::SmallVector<VHDLInstParameter> outputs;
-  for (Value opr : innerOp.getResults()) {
-    std::string name = instName + "_" + innerOp.getResultName(num).str();
-    mlir::Type t = opr.getType();
-    std::string type = extractType(t).first;
-    VHDLInstParameter::Type eType;
-    if (type == VALUE_STR)
-      eType = VHDLInstParameter::Type::VALUE;
-    else if (type == CHANNEL_STR)
-      eType = VHDLInstParameter::Type::CHANNEL;
-    else {
-      llvm::errs() << "Wrong type: it must be either value, or channel.\n";
-      exit(1);
-    }
-    size_t bitwidth = extractType(t).second;
-    outputs.push_back(VHDLInstParameter(opr, name, eType, bitwidth));
-    ++num;
-  }
+  llvm::SmallVector<VHDLInstParameter> outputs =
+      processInstancePorts(true, instName, innerOp);
 
   std::string compName = modName.substr(0, modName.find("."));
   std::string instText =
@@ -562,276 +705,19 @@ VHDLInstance VHDLModule::instantiate(std::string instName,
   // clock-reset instantiation
   instText += "clk  => " + instName + "_clk,\n";
   instText += "rst  => " + instName + "_rst,\n";
-  const VHDLModParameter *concrInpIt = concrInputs.begin();
-  VHDLInstParameter *inpIt = inputs.begin();
-  const VHDLDescParameter *descInpIt = modDesc.inputPorts.begin();
-  // We process the list of template inputPorts (inputs from library.json) and
-  // assign them to signals
-  while (descInpIt != modDesc.inputPorts.end()) {
-    std::string descName = descInpIt->name;
-    auto channelType = descInpIt->type;
-    if (concrInpIt->flag) {
-      // If not an empty signal
-      auto count = concrInpIt->amount;
-      auto bitLen = concrInpIt->type;
-      if (count == VHDLModParameter::Amount::VALUE &&
-          bitLen == VHDLModParameter::Type::STD_LOGIC) {
-        std::string insName = inpIt->name;
-        // std_logic
-        if (channelType == VHDLDescParameter::Type::DATAFLOW ||
-            channelType == VHDLDescParameter::Type::DATA)
-          instText += descName + " => " + insName + ",\n";
-
-        if (channelType == VHDLDescParameter::Type::DATAFLOW ||
-            channelType == VHDLDescParameter::Type::CONTROL) {
-          instText += descName + "_valid => " + insName + "_valid,\n";
-          instText += descName + "_ready => " + insName + "_ready,\n";
-        }
-        ++inpIt;
-      } else if (count == VHDLModParameter::Amount::ARRAY &&
-                 bitLen == VHDLModParameter::Type::STD_LOGIC) {
-        // std_logic_vector(COUNT)
-        VHDLInstParameter *prevIt = inpIt;
-        for (size_t k = 0; k < concrInpIt->size; ++k) {
-          std::string insName = inpIt->name;
-          if (channelType == VHDLDescParameter::Type::DATAFLOW ||
-              channelType == VHDLDescParameter::Type::DATA)
-            instText +=
-                descName + "(" + std::to_string(k) + ") => " + insName + ",\n";
-
-          ++inpIt;
-        }
-        inpIt = prevIt;
-        for (size_t k = 0; k < concrInpIt->size; ++k) {
-          std::string insName = inpIt->name;
-          if (channelType == VHDLDescParameter::Type::DATAFLOW ||
-              channelType == VHDLDescParameter::Type::CONTROL)
-            instText += descName + "_valid(" + std::to_string(k) + ") => " +
-                        insName + "_valid,\n";
-
-          ++inpIt;
-        }
-        // According to VHDL compiler's rules ports of the same logic should go
-        // in a row, so cycles for ready and valid signals are splitted up
-        inpIt = prevIt;
-        for (size_t k = 0; k < concrInpIt->size; ++k) {
-          std::string insName = inpIt->name;
-          if (channelType == VHDLDescParameter::Type::DATAFLOW ||
-              channelType == VHDLDescParameter::Type::CONTROL)
-            instText += descName + "_ready(" + std::to_string(k) + ") => " +
-                        insName + "_ready,\n";
-
-          ++inpIt;
-        }
-      } else if (count == VHDLModParameter::Amount::VALUE &&
-                 bitLen == VHDLModParameter::Type::STD_LOGIC_VECTOR) {
-        // std_logic_vector(BITWIDTH)
-        std::string insName = inpIt->name;
-        std::string z;
-        // This if is for wiring between parameters with (0 downto 0) and
-        // std_logic types. (0 downto 0) automatically get (0) index.
-        if (concrInpIt->bitwidth <= 1)
-          z = "(0)";
-
-        if (channelType == VHDLDescParameter::Type::DATAFLOW ||
-            channelType == VHDLDescParameter::Type::DATA)
-          instText += descName + z + " => " + insName + ",\n";
-
-        if (channelType == VHDLDescParameter::Type::DATAFLOW ||
-            channelType == VHDLDescParameter::Type::CONTROL) {
-          instText += descName + "_valid" + " => " + insName + "_valid,\n";
-          instText += descName + "_ready" + " => " + insName + "_ready,\n";
-        }
-        ++inpIt;
-      } else if (count == VHDLModParameter::Amount::ARRAY &&
-                 bitLen == VHDLModParameter::Type::STD_LOGIC_VECTOR) {
-        // data_array(BITWIDTH)(COUNT)
-        VHDLInstParameter *prevIt = inpIt;
-        // This if is for wiring between parameters with (0 downto 0) and
-        // std_logic types. (0 downto 0) automatically get (0) index.
-        for (size_t k = 0; k < concrInpIt->size; ++k) {
-          std::string insName = inpIt->name;
-          std::string z;
-          if (concrInpIt->bitwidth <= 1)
-            z = "(0)";
-          if (channelType == VHDLDescParameter::Type::DATAFLOW ||
-              channelType == VHDLDescParameter::Type::DATA)
-            instText += descName + "(" + std::to_string(k) + ")" + z + " => " +
-                        insName + ",\n";
-          ++inpIt;
-        }
-        inpIt = prevIt;
-        for (size_t k = 0; k < concrInpIt->size; ++k) {
-          std::string insName = inpIt->name;
-          if (channelType == VHDLDescParameter::Type::DATAFLOW ||
-              channelType == VHDLDescParameter::Type::CONTROL)
-            instText += descName + "_valid(" + std::to_string(k) + ")" +
-                        " => " + insName + "_valid,\n";
-          ++inpIt;
-        }
-        // The same about order of valid and ready signals as above
-        inpIt = prevIt;
-        for (size_t k = 0; k < concrInpIt->size; ++k) {
-          std::string insName = inpIt->name;
-          if (channelType == VHDLDescParameter::Type::DATAFLOW ||
-              channelType == VHDLDescParameter::Type::CONTROL)
-            instText += descName + "_ready(" + std::to_string(k) + ")" +
-                        " => " + insName + "_ready,\n";
-          ++inpIt;
-        }
-      }
-    } else {
-      // If the input doesn't exist among signals in the input IR it's empty
-      std::string extraSignalName = instName + "_x" + descName;
-      if (channelType == VHDLDescParameter::Type::DATAFLOW ||
-          channelType == VHDLDescParameter::Type::DATA)
-        instText += descName + "(0) => " + extraSignalName + ",\n";
-      if (channelType == VHDLDescParameter::Type::DATAFLOW ||
-          channelType == VHDLDescParameter::Type::CONTROL) {
-        instText += descName + "_valid(0) => " + extraSignalName + "_valid,\n";
-        instText += descName + "_ready(0) => " + extraSignalName + "_ready,\n";
-      }
-    }
-    ++concrInpIt;
-    ++descInpIt;
-  }
+  getPortsInstantiation(instText, instName, concrInputs, modDesc.inputPorts,
+                        inputs);
 
   // Outputs
-  const VHDLModParameter *concrOutpIt = concrOutputs.begin();
-  VHDLInstParameter *outpIt = outputs.begin();
-  const VHDLDescParameter *descOutpIt = modDesc.outputPorts.begin();
-  // We process the list of template inputPorts (inputs from library.json) and
-  // assign them to signals
-  while (descOutpIt != modDesc.outputPorts.end()) {
-    std::string descName = descOutpIt->name;
-    auto channelType = descOutpIt->type;
-    if (concrOutpIt->flag) {
-      // If not an empty signal
-      auto count = concrOutpIt->amount;
-      auto bitLen = concrOutpIt->type;
-      if (count == VHDLModParameter::Amount::VALUE &&
-          bitLen == VHDLModParameter::Type::STD_LOGIC) {
-        std::string insName = outpIt->name;
-        // std_logic
-        if (channelType == VHDLDescParameter::Type::DATAFLOW ||
-            channelType == VHDLDescParameter::Type::DATA)
-          instText += descName + " => " + insName + ",\n";
-        if (channelType == VHDLDescParameter::Type::DATAFLOW ||
-            channelType == VHDLDescParameter::Type::CONTROL) {
-          instText += descName + "_valid => " + insName + "_valid,\n";
-          instText += descName + "_ready => " + insName + "_ready,\n";
-        }
-        ++outpIt;
-      } else if (count == VHDLModParameter::Amount::ARRAY &&
-                 bitLen == VHDLModParameter::Type::STD_LOGIC) {
-        // std_logic_vector(COUNT)
-        VHDLInstParameter *prevIt = outpIt;
-        for (size_t k = 0; k < concrOutpIt->size; ++k) {
-          std::string insName = outpIt->name;
-          if (channelType == VHDLDescParameter::Type::DATAFLOW ||
-              channelType == VHDLDescParameter::Type::DATA)
-            instText +=
-                descName + "(" + std::to_string(k) + ") => " + insName + ",\n";
-          ++outpIt;
-        }
-        outpIt = prevIt;
-        for (size_t k = 0; k < concrOutpIt->size; ++k) {
-          std::string insName = outpIt->name;
-          if (channelType == VHDLDescParameter::Type::DATAFLOW ||
-              channelType == VHDLDescParameter::Type::CONTROL)
-            instText += descName + "_valid(" + std::to_string(k) + ") => " +
-                        insName + "_valid,\n";
-          ++outpIt;
-        }
-        // According to VHDL compiler's rules ports of the same logic should go
-        // in a row, so cycles for ready and valid signals are splitted up
-        outpIt = prevIt;
-        for (size_t k = 0; k < concrOutpIt->size; ++k) {
-          std::string insName = outpIt->name;
-          if (channelType == VHDLDescParameter::Type::DATAFLOW ||
-              channelType == VHDLDescParameter::Type::CONTROL)
-            instText += descName + "_ready(" + std::to_string(k) + ") => " +
-                        insName + "_ready,\n";
-          ++outpIt;
-        }
-      } else if (count == VHDLModParameter::Amount::VALUE &&
-                 bitLen == VHDLModParameter::Type::STD_LOGIC_VECTOR) {
-        // std_logic_vector(BITWIDTH)
-        std::string insName = outpIt->name;
-        std::string z;
-        // This if is for wiring between parameters with (0 downto 0) and
-        // std_logic types. (0 downto 0) automatically get (0) index.
-        if (concrOutpIt->bitwidth <= 1)
-          z = "(0)";
-        if (channelType == VHDLDescParameter::Type::DATAFLOW ||
-            channelType == VHDLDescParameter::Type::DATA)
-          instText += descName + z + " => " + insName + ",\n";
-        if (channelType == VHDLDescParameter::Type::DATAFLOW ||
-            channelType == VHDLDescParameter::Type::CONTROL) {
-          instText += descName + "_valid" + " => " + insName + "_valid,\n";
-          instText += descName + "_ready" + " => " + insName + "_ready,\n";
-        }
-        ++outpIt;
-      } else if (count == VHDLModParameter::Amount::ARRAY &&
-                 bitLen == VHDLModParameter::Type::STD_LOGIC_VECTOR) {
-        // data_array(BITWIDTH)(COUNT)
-        VHDLInstParameter *prevIt = outpIt;
-        // This if is for wiring between parameters with (0 downto 0) and
-        // std_logic types. (0 downto 0) automatically get (0) index.
-        for (size_t k = 0; k < concrOutpIt->size; ++k) {
-          std::string insName = outpIt->name;
-          std::string z;
-          if (concrOutpIt->bitwidth <= 1)
-            z = "(0)";
-          if (channelType == VHDLDescParameter::Type::DATAFLOW ||
-              channelType == VHDLDescParameter::Type::DATA)
-            instText += descName + "(" + std::to_string(k) + ")" + z + " => " +
-                        insName + ",\n";
-          ++outpIt;
-        }
-        outpIt = prevIt;
-        for (size_t k = 0; k < concrOutpIt->size; ++k) {
-          std::string insName = outpIt->name;
-          if (channelType == VHDLDescParameter::Type::DATAFLOW ||
-              channelType == VHDLDescParameter::Type::CONTROL)
-            instText += descName + "_valid(" + std::to_string(k) + ")" +
-                        " => " + insName + "_valid,\n";
-          ++outpIt;
-        }
-        outpIt = prevIt;
-        // The same about order of valid and ready signals as above
-        for (size_t k = 0; k < concrOutpIt->size; ++k) {
-          std::string insName = outpIt->name;
-          if (channelType == VHDLDescParameter::Type::DATAFLOW ||
-              channelType == VHDLDescParameter::Type::CONTROL)
-            instText += descName + "_ready(" + std::to_string(k) + ")" +
-                        " => " + insName + "_ready,\n";
-          ++outpIt;
-        }
-      }
-    } else {
-      // If the output doesn't exist among signals in the input IR it's empty
-      std::string extraSignalName = instName + "_x" + descName;
-      if (channelType == VHDLDescParameter::Type::DATAFLOW ||
-          channelType == VHDLDescParameter::Type::DATA)
-        instText += descName + "(0) => " + extraSignalName + ",\n";
-      if (channelType == VHDLDescParameter::Type::DATAFLOW ||
-          channelType == VHDLDescParameter::Type::CONTROL) {
-        instText += descName + "_valid(0) => " + extraSignalName + "_valid,\n";
-        instText += descName + "_ready(0) => " + extraSignalName + "_ready,\n";
-      }
-    }
-    ++concrOutpIt;
-    ++descOutpIt;
-  }
+  getPortsInstantiation(instText, instName, concrOutputs, modDesc.outputPorts,
+                        outputs);
+
   instText[instText.size() - 2] = ')';
   instText[instText.size() - 1] = ';';
   instText += "\n";
 
   return VHDLInstance(instName, instText, inputs, outputs, *this);
 }
-
-} // namespace
 
 // ============================================================================
 // Wrappers
@@ -862,7 +748,8 @@ static VHDLInstance getInstance(StringRef extName, StringRef name,
   // find external module in VHDLModuleLibrary
   StringMapIterator<VHDLModule> comp = modLib.find(extName);
   if (comp == modLib.end()) {
-    llvm::errs() << "Unable to find the element in the instances' library\n";
+    innerOp.emitError()
+        << "Unable to find the element in the instances' library\n";
     exit(1);
   }
   const VHDLModule &desc = (*comp).second;
@@ -878,7 +765,7 @@ static VHDLInstance getInstance(StringRef extName, StringRef name,
 /// VHDLComponentLibrary
 static VHDLComponentLibrary parseJSON() {
   // Load JSON library
-  std::ifstream lib(JSON_LIBRARY);
+  std::ifstream lib(jsonLibrary);
 
   VHDLComponentLibrary m;
   if (!lib.is_open()) {
@@ -894,7 +781,7 @@ static VHDLComponentLibrary parseJSON() {
   // Try to parse the string as a JSON
   llvm::Expected<json::Value> jsonLib = json::parse(jsonString);
   if (!jsonLib) {
-    llvm::errs() << "Failed to parse models in \"" << JSON_LIBRARY << "\"\n";
+    llvm::errs() << "Failed to parse models in \"" << jsonLibrary << "\"\n";
     exit(1);
   }
 
@@ -912,21 +799,25 @@ static VHDLComponentLibrary parseJSON() {
       // c is iterator, which points on a specific component's scheme inside
       // arith / handshake class
       json::Object *obj = c.getAsObject();
-      assertm(checkObj(obj, COMPS_STR),
-              "Error in library's \"components\" field.");
+      if (!errorObjCheck(obj, COMPS_STR,
+                         "Error in library's \"components\" field."))
+        exit(1);
       json::Array *jsonComponents = obj->get(COMPS_STR)->getAsArray();
-      assertm(checkObj(obj, CONCRET_METHOD_STR),
-              "Error in library's \"concretization_method\" field.");
+      if (!errorObjCheck(obj, CONCRET_METHOD_STR,
+                         "Error in library's \"concretization_method\" field."))
+        exit(1);
       auto jsonConcretizationMethod =
           obj->get(CONCRET_METHOD_STR)->getAsString();
-      if (jsonConcretizationMethod)
-        assertm(checkObj(obj, GENERATORS_STR),
-                "Error in library's \"generators\" field.");
+      if (!errorObjCheck(obj, GENERATORS_STR,
+                         "Error in library's \"generators\" field."))
+        exit(1);
       json::Array *jsonGenerators = obj->get(GENERATORS_STR)->getAsArray();
-      assertm(checkObj(obj, GENERICS_STR),
-              "Error in library's \"generics\" field.");
+      if (!errorObjCheck(obj, GENERICS_STR,
+                         "Error in library's \"generics\" field."))
+        exit(1);
       json::Array *jsonGenerics = obj->get(GENERICS_STR)->getAsArray();
-      assertm(checkObj(obj, PORTS_STR), "Error in library's \"ports\" field.");
+      if (!errorObjCheck(obj, PORTS_STR, "Error in library's \"ports\" field."))
+        exit(1);
       json::Object *jsonPorts = obj->get(PORTS_STR)->getAsObject();
       // Creating corresponding VHDLModuleDescription variables
       std::string concretizationMethod = jsonConcretizationMethod.value().str();
@@ -948,11 +839,13 @@ static VHDLComponentLibrary parseJSON() {
       llvm::SmallVector<VHDLGenericParam> generics;
       for (json::Value &jsonGeneric : *jsonGenerics) {
         json::Object *ob = jsonGeneric.getAsObject();
-        assertm(checkObj(ob, NAME_STR),
-                "Error in library's generic \"name\" field.");
+        if (!errorObjCheck(obj, NAME_STR,
+                           "Error in library's generic \"name\" field."))
+          exit(1);
         std::string name = ob->get(NAME_STR)->getAsString().value().str();
-        assertm(checkObj(ob, TYPE_STR),
-                "Error in library's generic \"type\" field.");
+        if (!errorObjCheck(obj, TYPE_STR,
+                           "Error in library's generic \"type\" field."))
+          exit(1);
         std::string type = ob->get(TYPE_STR)->getAsString().value().str();
         generics.push_back(VHDLGenericParam(name, type));
       }
@@ -961,11 +854,13 @@ static VHDLComponentLibrary parseJSON() {
       json::Array *jsonInputPorts = jsonPorts->get("in")->getAsArray();
       for (json::Value &jsonInputPort : *jsonInputPorts) {
         json::Object *ob = jsonInputPort.getAsObject();
-        assertm(checkObj(ob, NAME_STR),
-                "Error in library's input \"name\" field.");
+        if (!errorObjCheck(obj, NAME_STR,
+                           "Error in library's input \"name\" field."))
+          exit(1);
         std::string name = ob->get(NAME_STR)->getAsString().value().str();
-        assertm(checkObj(ob, TYPE_STR),
-                "Error in library's input \"type\" field.");
+        if (!errorObjCheck(obj, TYPE_STR,
+                           "Error in library's input \"type\" field."))
+          exit(1);
         std::string type = ob->get(TYPE_STR)->getAsString().value().str();
         VHDLDescParameter::Type eType;
         if (type == DATAFLOW_STR)
@@ -992,11 +887,13 @@ static VHDLComponentLibrary parseJSON() {
       json::Array *jsonOutputPorts = jsonPorts->get("out")->getAsArray();
       for (json::Value &jsonOutputPort : *jsonOutputPorts) {
         json::Object *ob = jsonOutputPort.getAsObject();
-        assertm(checkObj(ob, NAME_STR),
-                "Error in library's output \"name\" field.");
+        if (!errorObjCheck(obj, NAME_STR,
+                           "Error in library's output \"name\" field."))
+          exit(1);
         std::string name = ob->get(NAME_STR)->getAsString().value().str();
-        assertm(checkObj(ob, TYPE_STR),
-                "Error in library's output \"type\" field.");
+        if (!errorObjCheck(obj, TYPE_STR,
+                           "Error in library's output \"type\" field."))
+          exit(1);
         std::string type = ob->get(TYPE_STR)->getAsString().value().str();
         VHDLDescParameter::Type eType;
         if (type == DATAFLOW_STR)
@@ -1021,11 +918,13 @@ static VHDLComponentLibrary parseJSON() {
 
       for (json::Value &jsonComponent : *jsonComponents) {
         json::Object *ob = jsonComponent.getAsObject();
-        assertm(checkObj(ob, NAME_STR),
-                "Error in library's components \"name\" field.");
+        if (!errorObjCheck(obj, NAME_STR,
+                           "Error in library's components \"name\" field."))
+          exit(1);
         std::string name = ob->get(NAME_STR)->getAsString().value().str();
-        assertm(checkObj(ob, PATH_STR),
-                "Error in library's components\"path\" field.");
+        if (!errorObjCheck(obj, PATH_STR,
+                           "Error in library's components\"path\" field."))
+          exit(1);
         std::string path = ob->get(PATH_STR)->getAsString().value().str();
         std::string keyName = moduleName + "_" + name;
         // Inserting our component into library
@@ -1052,29 +951,23 @@ static VHDLModuleLibrary parseExternOps(mlir::ModuleOp modOp,
 }
 
 /// Get instances from extern operations in the input IR
-static VHDLInstanceLibrary
-parseInstanceOps(mlir::OwningOpRef<mlir::ModuleOp> &module,
-                 VHDLModuleLibrary &modLib) {
+static VHDLInstanceLibrary parseInstanceOps(mlir::ModuleOp &module,
+                                            VHDLModuleLibrary &modLib) {
   VHDLInstanceLibrary instLib;
-  for (hw::HWModuleOp modOp : module->getOps<hw::HWModuleOp>()) {
-    for (hw::InstanceOp innerOp : modOp.getOps<hw::InstanceOp>()) {
-      StringRef extName = innerOp.getReferencedModuleName();
-      StringRef name = innerOp.getInstanceName();
-      VHDLInstance i = getInstance(extName, name, modLib, innerOp);
-      instLib.insert(std::pair(innerOp.getOperation(), i));
-    }
+  for (hw::InstanceOp innerOp : module.getOps<hw::InstanceOp>()) {
+    StringRef extName = innerOp.getReferencedModuleName();
+    StringRef name = innerOp.getInstanceName();
+    VHDLInstance i = getInstance(extName, name, modLib, innerOp);
+    instLib.insert(std::pair(innerOp.getOperation(), i));
   }
   return instLib;
 }
 
-/// Get the description of the head instance, "hw.module"
-static std::pair<Operation *, VHDLInstance>
-parseModule(hw::HWModuleOp hwModOp) {
-  std::string iName;
-  llvm::SmallVector<VHDLInstParameter> ins, outs;
-  auto inputs = hwModOp.getPorts().inputs;
-  auto outputs = hwModOp.getPorts().outputs;
-  for (auto i : inputs) {
+/// Function that processes ports for parseModule function
+static void parseModulePorts(llvm::SmallVector<circt::hw::PortInfo> &ports,
+                             hw::HWModuleOp &hwModOp,
+                             llvm::SmallVector<VHDLInstParameter> &ps) {
+  for (auto i : ports) {
     mlir::Type t = i.type;
     std::string name = i.getName().str();
     std::string type = extractType(t).first;
@@ -1084,57 +977,38 @@ parseModule(hw::HWModuleOp hwModOp) {
     else if (type == CHANNEL_STR)
       eType = VHDLInstParameter::Type::CHANNEL;
     else {
-      llvm::errs() << "Wrong type: it must be either value, or channel.\n";
+      hwModOp.emitError()
+          << "Wrong type: it must be either value, or channel.\n";
       exit(1);
     }
     size_t bitwidth = extractType(t).second;
     if (name != CLOCK_STR && name != RESET_STR)
-      ins.push_back(VHDLInstParameter({}, name, eType, bitwidth));
+      ps.push_back(VHDLInstParameter({}, name, eType, bitwidth));
   }
-  for (auto &i : outputs) {
-    mlir::Type t = i.type;
-    std::string name = i.getName().str();
-    std::string type = extractType(t).first;
-    VHDLInstParameter::Type eType;
-    if (type == VALUE_STR)
-      eType = VHDLInstParameter::Type::VALUE;
-    else if (type == CHANNEL_STR)
-      eType = VHDLInstParameter::Type::CHANNEL;
-    else {
-      llvm::errs() << "Wrong type: it must be either value, or channel.\n";
-      exit(1);
-    }
-    size_t bitwidth = extractType(t).second;
-    outs.push_back(VHDLInstParameter({}, name, eType, bitwidth));
-  }
+}
+
+/// Get the description of the head instance, "hw.module"
+static std::pair<Operation *, VHDLInstance>
+parseModule(hw::HWModuleOp &hwModOp) {
+  std::string iName;
+  llvm::SmallVector<VHDLInstParameter> ins, outs;
+  auto inputs = hwModOp.getPorts().inputs;
+  auto outputs = hwModOp.getPorts().outputs;
+  parseModulePorts(inputs, hwModOp, ins);
+  parseModulePorts(outputs, hwModOp, outs);
   iName = hwModOp.getName().str();
   return std::pair(hwModOp, VHDLInstance(iName, {}, ins, outs, {}));
 }
 
 /// Get the description of the output instance, "hw.output".
 /// Names are obtained from hw.module
-static std::pair<Operation *, VHDLInstance> parseOut(hw::HWModuleOp hwModOp) {
+static std::pair<Operation *, VHDLInstance> parseOut(hw::HWModuleOp &hwModOp) {
   Operation *outOp;
   std::string iName;
   llvm::SmallVector<VHDLInstParameter> tInputs, tOutputs;
   auto outputs = hwModOp.getPorts().outputs;
   SmallVector<VHDLInstParameter> outs;
-  for (circt::hw::PortInfo &i : outputs) {
-    mlir::Type t = i.type;
-    std::string name = i.getName().str();
-    std::string type = extractType(t).first;
-    VHDLInstParameter::Type eType;
-    if (type == VALUE_STR)
-      eType = VHDLInstParameter::Type::VALUE;
-    else if (type == CHANNEL_STR)
-      eType = VHDLInstParameter::Type::CHANNEL;
-    else {
-      llvm::errs() << "Wrong type: it must be either value, or channel.\n";
-      exit(1);
-    }
-    size_t bitwidth = extractType(t).second;
-    outs.push_back(VHDLInstParameter({}, name, eType, bitwidth));
-  }
+  parseModulePorts(outputs, hwModOp, outs);
   outOp = cast<hw::OutputOp>(hwModOp.getBodyBlock()->getTerminator());
   iName = hwModOp.getName().str();
   tOutputs = outs;
@@ -1208,7 +1082,8 @@ static void getEntityDeclaration(std::pair<Operation *, VHDLInstance> &hwmod) {
   llvm::outs() << res;
 }
 
-/// Support function for signals declaration that prints input / output signals
+/// Support function for signals declaration that prints input / output
+/// signals
 void getSignalsPorts(llvm::SmallVector<VHDLModParameter> &concrPorts,
                      const VHDLInstParameter *portsIt, VHDLInstance &mod) {
   // inputs / outputs
@@ -1375,12 +1250,6 @@ static void getModulesInstantiation(VHDLInstanceLibrary &instanceLib) {
     llvm::outs() << mod.instanceText << "\n";
 }
 
-static cl::OptionCategory mainCategory("Application options");
-
-static cl::opt<std::string> inputFileName(cl::Positional,
-                                          cl::desc("<input file>"),
-                                          cl::cat(mainCategory));
-
 int main(int argc, char **argv) {
   // Initialize LLVM and parse command line arguments
   InitLLVM y(argc, argv);
@@ -1428,7 +1297,7 @@ int main(int argc, char **argv) {
   // Get all necessary structures
   VHDLComponentLibrary m = parseJSON();
   VHDLModuleLibrary modLib = parseExternOps(modOp, m);
-  VHDLInstanceLibrary instanceLib = parseInstanceOps(module, modLib);
+  VHDLInstanceLibrary instanceLib = parseInstanceOps(modOp, modLib);
   std::pair<mlir::Operation *, VHDLInstance> hwOut = parseOut(hwModOp);
   std::pair<mlir::Operation *, VHDLInstance> hwMod = parseModule(hwModOp);
 
