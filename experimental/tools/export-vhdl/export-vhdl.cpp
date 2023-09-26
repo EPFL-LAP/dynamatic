@@ -98,15 +98,15 @@ static std::string exec(const char *cmd) {
 }
 
 /// Assert condition: if object doesn't contain the field s, return false
-static bool checkObj(json::Object *&obj, const std::string &s) {
+static bool checkObj(json::Object *obj, const std::string &s) {
   return obj->find(s) != obj->end();
 }
 
 /// Error checker for objects
-static bool errorObjCheck(json::Object *&obj, const std::string &cond,
+static bool errorObjCheck(json::Object *obj, const std::string &cond,
                           const std::string &msg) {
   if (!checkObj(obj, COMPS_STR)) {
-    llvm::outs() << msg << "\n";
+    llvm::errs() << msg << "\n";
     return false;
   }
   return true;
@@ -420,12 +420,8 @@ getConcretizedPorts(const llvm::SmallVector<VHDLDescParameter> &descPorts,
       }
     }
     // If input doesn't exist among the signals (0 - size), it's an empty signal
-    if (modSize != 0)
-      ports.push_back(VHDLModParameter(true, i.name, modType, modAmount,
-                                       modSize, modBitwidth));
-    else
-      ports.push_back(VHDLModParameter(false, i.name, modType, modAmount,
-                                       modSize, modBitwidth));
+    ports.push_back(VHDLModParameter(modSize != 0, i.name, modType, modAmount,
+                                     modSize, modBitwidth));
   }
   return ports;
 };
@@ -502,14 +498,14 @@ VHDLModule VHDLModuleDescription::concretize(std::string modName,
 
 /// Function that obtains instance input / output ports
 static llvm::SmallVector<VHDLInstParameter>
-processInstancePorts(bool checker, std::string &instName,
+processInstancePorts(bool inOutChecker, std::string &instName,
                      circt::hw::InstanceOp &innerOp) {
   size_t num = 0;
   // Process the input / output signal
   llvm::SmallVector<VHDLInstParameter> ports;
   for (Value opr : innerOp.getOperands()) {
     std::string parameter;
-    if (!checker)
+    if (!inOutChecker)
       // input
       parameter = innerOp.getArgumentName(num).str();
     else
@@ -966,7 +962,7 @@ static VHDLInstanceLibrary parseInstanceOps(mlir::ModuleOp &module,
 /// Function that processes ports for parseModule function
 static void parseModulePorts(llvm::SmallVector<circt::hw::PortInfo> &ports,
                              hw::HWModuleOp &hwModOp,
-                             llvm::SmallVector<VHDLInstParameter> &ps) {
+                             llvm::SmallVector<VHDLInstParameter> &instPorts) {
   for (auto i : ports) {
     mlir::Type t = i.type;
     std::string name = i.getName().str();
@@ -983,7 +979,7 @@ static void parseModulePorts(llvm::SmallVector<circt::hw::PortInfo> &ports,
     }
     size_t bitwidth = extractType(t).second;
     if (name != CLOCK_STR && name != RESET_STR)
-      ps.push_back(VHDLInstParameter({}, name, eType, bitwidth));
+      instPorts.push_back(VHDLInstParameter({}, name, eType, bitwidth));
   }
 }
 
@@ -1160,8 +1156,8 @@ static void getSignalsDeclaration(VHDLInstanceLibrary &instanceLib) {
 }
 
 /// Get signals' wiring for instances from instanceLib
-static void processInstance(mlir::Operation *&op, mlir::Operation *&i,
-                            const VHDLInstParameter *&opIt,
+static void processInstance(mlir::Operation *op, mlir::Operation *i,
+                            const VHDLInstParameter &opIt,
                             VHDLInstanceLibrary::iterator &it,
                             llvm::StringMap<std::string> &d) {
   // The operation exists in instanceLib
@@ -1170,15 +1166,15 @@ static void processInstance(mlir::Operation *&op, mlir::Operation *&i,
   const VHDLInstParameter *acIt = inst.inputs.begin();
   for (Value opr : i->getOperands()) {
     Operation *defOp = opr.getDefiningOp();
-    if (defOp && defOp == op && opIt->value == acIt->value) {
+    if (defOp && defOp == op && opIt.value == acIt->value) {
       // If our initial operation is the predeccessor of an input of the
       // successor
-      d.insert(std::pair(acIt->name, opIt->name));
+      d.insert(std::pair(acIt->name, opIt.name));
       if (acIt->type == VHDLInstParameter::Type::CHANNEL) {
-        llvm::outs() << acIt->name << "_valid <= " << opIt->name << "_valid;\n";
-        llvm::outs() << opIt->name << "_ready <= " << acIt->name << "_ready;\n";
+        llvm::outs() << acIt->name << "_valid <= " << opIt.name << "_valid;\n";
+        llvm::outs() << opIt.name << "_ready <= " << acIt->name << "_ready;\n";
       }
-      llvm::outs() << acIt->name << " <= " << opIt->name << ";\n";
+      llvm::outs() << acIt->name << " <= " << opIt.name << ";\n";
 
       break;
     }
@@ -1187,8 +1183,8 @@ static void processInstance(mlir::Operation *&op, mlir::Operation *&i,
 }
 
 /// Get signals' wiring for the output
-static void processOutput(mlir::Operation *&op, mlir::Operation *&i,
-                          const VHDLInstParameter *&opIt,
+static void processOutput(mlir::Operation *op, mlir::Operation *i,
+                          const VHDLInstParameter &opIt,
                           std::pair<Operation *, VHDLInstance> &hwOut,
                           llvm::StringMap<std::string> &d) {
   // Output module
@@ -1200,14 +1196,14 @@ static void processOutput(mlir::Operation *&op, mlir::Operation *&i,
       // if our initial operation is the predeccessor of an input of the
       // successor
       if (d.find(acIt->name) == d.end()) {
-        d.insert(std::pair(acIt->name, opIt->name));
+        d.insert(std::pair(acIt->name, opIt.name));
         if (acIt->type == VHDLInstParameter::Type::CHANNEL) {
-          llvm::outs() << acIt->name << "_valid <= " << opIt->name
+          llvm::outs() << acIt->name << "_valid <= " << opIt.name
                        << "_valid;\n";
-          llvm::outs() << opIt->name << "_ready <= " << acIt->name
+          llvm::outs() << opIt.name << "_ready <= " << acIt->name
                        << "_ready;\n";
         }
-        llvm::outs() << acIt->name << " <= " << opIt->name << ";\n";
+        llvm::outs() << acIt->name << " <= " << opIt.name << ";\n";
         break;
       }
     }
@@ -1230,9 +1226,9 @@ static void getWiring(VHDLInstanceLibrary &instanceLib,
       // Get an operation - successor of the instance
       VHDLInstanceLibrary::iterator it = instanceLib.find(i);
       if (it != instanceLib.end())
-        processInstance(op, i, opIt, it, d);
+        processInstance(op, i, *opIt, it, d);
       else if (i == hwOut.first)
-        processOutput(op, i, opIt, hwOut, d);
+        processOutput(op, i, *opIt, hwOut, d);
       else {
         llvm::errs() << "Error in MLIR: it must be an output!\n";
         exit(1);
