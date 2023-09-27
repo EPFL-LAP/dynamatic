@@ -3,7 +3,7 @@ use IEEE.std_logic_1164.all;
 use ieee.numeric_std.all;
 use work.customTypes.all;
 
-entity select is
+entity select_node is
   generic (
     BITWIDTH : integer
   );
@@ -26,9 +26,9 @@ entity select is
     result            : out std_logic_vector(BITWIDTH - 1 downto 0);
     result_valid      : out std_logic);
 
-end select;
+end entity;
 
-architecture arch of select is
+architecture arch of select_node is
   signal ee, validInternal : std_logic;
   signal kill0, kill1      : std_logic;
   signal antitokenStop     : std_logic;

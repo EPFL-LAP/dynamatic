@@ -3,7 +3,7 @@ use ieee.std_logic_1164.all;
 use work.customTypes.all;
 use ieee.numeric_std.all;
 
-entity merge is
+entity merge_node is
 
   generic (
     INPUTS   : integer;
@@ -20,9 +20,9 @@ entity merge is
     ins_ready  : out std_logic_vector(INPUTS - 1 downto 0);
     outs       : out std_logic_vector(BITWIDTH - 1 downto 0);
     outs_valid : out std_logic);
-end merge;
+end entity;
 
-architecture arch of merge is
+architecture arch of merge_node is
   signal tehb_data_in : std_logic_vector(BITWIDTH - 1 downto 0);
   signal tehb_pvalid  : std_logic;
   signal tehb_ready   : std_logic;

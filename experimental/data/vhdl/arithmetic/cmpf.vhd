@@ -4,7 +4,7 @@ use ieee.numeric_std.all;
 use work.customTypes.all;
 -- #PREDICATE# = oeq, ogt, oge, olt, ole, one, ord, ueq, ugt, uge, ult, ule, une, uno
 -- #CONST# = 00001, 00010, 00011, 00100, 00101, 00110, 00111, 01000, 01001, 01010, 01011, 01100, 01101, 01110 
-entity cmpf_#PREDICATE# is
+entity cmpf_node_#PREDICATE# is
   generic (
     BITWIDTH : integer
   );
@@ -24,7 +24,7 @@ entity cmpf_#PREDICATE# is
     result_valid : out std_logic);
 end entity;
 
-architecture arch of cmpf_#PREDICATE# is
+architecture arch of cmpf_node_#PREDICATE# is
 
   component array_RAM_fcmp_32cud is
     generic (
@@ -47,8 +47,11 @@ architecture arch of cmpf_#PREDICATE# is
 
   signal join_valid   : std_logic;
   constant alu_opcode : std_logic_vector(4 downto 0) := "#CONST#";
+  signal out_array    : std_logic_vector(1 downto 0);
 
 begin
+  lhs_ready <= out_array(0);
+  rhs_ready <= out_array(1);
 
   result <= '0';
 
@@ -74,8 +77,7 @@ begin
         rhs_valid),
         result_ready,
         join_valid,
-        (lhs_ready,
-        rhs_ready));
+        out_array);
 
     buff : entity work.delay_buffer(arch)
       generic map(1)

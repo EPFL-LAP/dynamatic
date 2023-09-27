@@ -5,26 +5,16 @@
 //
 //===----------------------------------------------------------------------===//
 
-#include "mlir/IR/BuiltinOps.h"
-#include "mlir/IR/MLIRContext.h"
-#include "mlir/Parser/Parser.h"
-#include "llvm/ADT/DenseMap.h"
-#include "llvm/ADT/DenseMapInfo.h"
-#include "llvm/ADT/EpochTracker.h"
-#include "llvm/Support/AlignOf.h"
-#include "llvm/Support/CommandLine.h"
-#include "llvm/Support/Compiler.h"
-#include "llvm/Support/InitLLVM.h"
-#include "llvm/Support/MathExtras.h"
-#include "llvm/Support/MemAlloc.h"
-#include "llvm/Support/ReverseIteration.h"
 #include "llvm/Support/SourceMgr.h"
-#include "llvm/Support/type_traits.h"
+#include "llvm/Support/raw_ostream.h"
 
+#include <bitset>
+#include <cstddef>
+#include <cstdlib>
 #include <fstream>
 #include <iostream>
+#include <sstream>
 #include <string>
-#include <vector>
 
 using namespace llvm;
 
@@ -37,7 +27,6 @@ int main(int argc, char **argv) {
     llvm::errs() << "Too few arguments in generator call\n";
     return 1;
   }
-
   // read as file
   std::ifstream file;
   file.open(CONSTANT_PATH);
@@ -46,9 +35,12 @@ int main(int argc, char **argv) {
     llvm::errs() << "Filepath is uncorrect\n";
     return 1;
   }
-
-  // get the predicate name from command line options
-  std::string predicateName(argv[1]);
+  // get the constant value from command line options
+  std::string constantStr(argv[1]);
+  // get the bitwidth from command line options
+  std::string bitwidthStr(argv[2]);
+  size_t bitwidth = std::atoi(bitwidthStr.c_str());
+  size_t num = std::atoi(constantStr.c_str());
   std::stringstream buffer;
   std::string modText;
   buffer << file.rdbuf();
@@ -59,10 +51,15 @@ int main(int argc, char **argv) {
     modText += temp;
     if (!buffer.good())
       break;
-
     std::getline(buffer, temp, '#');
-    if (temp == "CST_VALUE")
-      modText += predicateName;
+    if (temp == "CST_VALUE") {
+      // convert to binary...
+      std::bitset<32> x(num);
+      auto toBinary = x.to_string();
+      // ... and make sure, that number of bits = bitwidth
+      modText += "\"" + toBinary.substr(32 - bitwidth) + "\"";
+    } else if (temp == "CST_NAME")
+      modText += constantStr.c_str();
   }
 
   // print the result module text to std output

@@ -5,7 +5,7 @@ use work.customTypes.all;
 -- #PREDICATE# = eq, ne
 -- #CONDTRUE# = one, zero, 
 -- #CONDFALSE# = zero, one
-entity cmpi_#PREDICATE# is
+entity cmpi_node_#PREDICATE# is
   generic (
     BITWIDTH : integer
   );
@@ -25,12 +25,15 @@ entity cmpi_#PREDICATE# is
     result_valid : out std_logic);
 end entity;
 
-architecture arch of cmpi_#PREDICATE# is
+architecture arch of cmpi_node_#PREDICATE# is
   signal join_valid : std_logic;
-  signal one        : std_logic := "1";
-  signal zero       : std_logic := "0";
+  signal one        : std_logic := '1';
+  signal zero       : std_logic := '0';
+  signal out_array  : std_logic_vector(1 downto 0);
 
 begin
+  lhs_ready <= out_array(0);
+  rhs_ready <= out_array(1);
 
   join_write_temp : entity work.join(arch) generic map(2)
     port map(
@@ -38,8 +41,7 @@ begin
       rhs_valid),
       result_ready,
       join_valid,
-      (lhs_ready,
-      rhs_ready));
+      out_array);
 
   result <= #CONDTRUE# when (lhs = rhs) else
     #CONDFALSE#;

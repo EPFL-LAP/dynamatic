@@ -4,29 +4,29 @@ use work.customTypes.all;
 use ieee.numeric_std.all;
 use IEEE.math_real.all;
 
-entity mux is
+entity mux_node is
   generic (
     NUM_INPUTS    : integer;
     BITWIDTH      : integer;
     COND_BITWIDTH : integer
   );
   port (
-    -- NUM_INPUTS
+    -- inputs
     clk              : in std_logic;
     rst              : in std_logic;
     select_ind       : in std_logic_vector(COND_BITWIDTH - 1 downto 0);
     select_ind_valid : in std_logic;
     ins              : in data_array(NUM_INPUTS - 1 downto 0)(BITWIDTH - 1 downto 0);
-    ins_valid        : in std_logic_vector(NUM_INPUTS downto 0);
+    ins_valid        : in std_logic_vector(NUM_INPUTS - 1 downto 0);
     outs_ready       : in std_logic;
     -- outputs
     select_ind_ready : out std_logic;
     ins_ready        : out std_logic_vector(NUM_INPUTS - 1 downto 0);
     outs             : out std_logic_vector(BITWIDTH - 1 downto 0);
     outs_valid       : out std_logic);
-end mux;
+end entity;
 
-architecture arch of mux is
+architecture arch of mux_node is
 
   signal tehb_data_in : std_logic_vector(BITWIDTH - 1 downto 0);
   signal tehb_pvalid  : std_logic;
@@ -40,15 +40,15 @@ begin
     tmp_data_out  := unsigned(ins(0));
     tmp_valid_out := '0';
     for I in NUM_INPUTS - 1 downto 0 loop
-      if (unsigned(select_ind) = to_unsigned(I, select_ind'length) and select_ind_valid = '1' and ins_valid(I + 1) = '1') then
+      if (unsigned(select_ind) = to_unsigned(I, select_ind'length) and select_ind_valid = '1' and ins_valid(I) = '1') then
         tmp_data_out  := unsigned(ins(I));
         tmp_valid_out := '1';
       end if;
 
-      if ((unsigned(select_ind) = to_unsigned(I, select_ind'length) and select_ind_valid = '1' and tehb_ready = '1' and ins_valid(I + 1) = '1') or ins_valid(I + 1) = '0') then
-        ins_ready(I + 1) <= '1';
+      if ((unsigned(select_ind) = to_unsigned(I, select_ind'length) and select_ind_valid = '1' and tehb_ready = '1' and ins_valid(I) = '1') or ins_valid(I) = '0') then
+        ins_ready(I) <= '1';
       else
-        ins_ready(I + 1) <= '0';
+        ins_ready(I) <= '0';
       end if;
     end loop;
 

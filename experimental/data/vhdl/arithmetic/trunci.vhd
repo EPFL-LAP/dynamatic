@@ -3,7 +3,7 @@ use IEEE.std_logic_1164.all;
 use ieee.numeric_std.all;
 use work.customTypes.all;
 
-entity trunci is
+entity trunci_node is
   generic (
     INPUT_BITWIDTH  : integer;
     OUTPUT_BITWIDTH : integer
@@ -21,7 +21,7 @@ entity trunci is
     outs_valid : out std_logic);
 end entity;
 
-architecture arch of trunci is
+architecture arch of trunci_node is
 begin
   outs       <= ins(OUTPUT_BITWIDTH - 1 downto 0);
   outs_valid <= ins_valid;

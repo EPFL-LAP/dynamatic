@@ -1,8 +1,9 @@
 library ieee;
 use ieee.std_logic_1164.all;
 use work.customTypes.all;
-
-entity control_merge is generic (
+use ieee.numeric_std.all;
+use IEEE.math_real.all;
+entity control_merge_node is generic (
   INPUTS        : integer;
   BITWIDTH      : integer;
   COND_BITWIDTH : integer
@@ -22,9 +23,9 @@ port (
   outs_valid      : out std_logic;
   condition       : out std_logic_vector(COND_BITWIDTH - 1 downto 0);
   condition_valid : out std_logic);
-end control_merge;
+end entity;
 
-architecture arch of control_merge is
+architecture arch of control_merge_node is
 
   signal phi_C1_readyArray   : std_logic_vector (INPUTS - 1 downto 0);
   signal phi_C1_validArray   : std_logic;
@@ -74,12 +75,12 @@ begin
       outs       => oehb1_dataOut
     );
 
-  fork_C1 : entity work.fork(arch) generic map (2, 1)
+  fork_C1 : entity work.fork_node(arch) generic map (2, 1)
     port map(
       clk           => clk,
       rst           => rst,
       ins_valid     => oehb1_valid,
-      ins(0)        => "1",
+      ins(0)        => '1',
       outs_ready(0) => outs_ready,
       outs_ready(1) => condition_ready,
       outs          => fork_C1_dataOutArray,

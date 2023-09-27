@@ -3,7 +3,7 @@ use IEEE.std_logic_1164.all;
 use IEEE.numeric_std.all;
 use work.customTypes.all;
 
-entity d_return is
+entity d_return_node is
   generic (
     BITWIDTH : integer
   );
@@ -15,12 +15,12 @@ entity d_return is
     ins_valid  : in std_logic;
     outs_ready : in std_logic;
     -- outputs
-    ins_ready  : out std_logic
+    ins_ready  : out std_logic;
     outs       : out std_logic_vector(BITWIDTH - 1 downto 0);
     outs_valid : out std_logic);
 end entity;
 
-architecture arch of d_return is
+architecture arch of d_return_node is
 
 begin
 

@@ -3,7 +3,7 @@ use IEEE.std_logic_1164.all;
 use ieee.numeric_std.all;
 use work.customTypes.all;
 
-entity extsi is
+entity extsi_node is
   generic (
     INPUT_BITWIDTH  : integer;
     OUTPUT_BITWIDTH : integer
@@ -21,7 +21,7 @@ entity extsi is
     outs_valid : out std_logic);
 end entity;
 
-architecture arch of extsi is
+architecture arch of extsi_node is
 
   signal join_valid : std_logic;
 

@@ -3,7 +3,7 @@ use IEEE.std_logic_1164.all;
 use ieee.numeric_std.all;
 use work.customTypes.all;
 
-entity muli is
+entity muli_node is
   generic (
     BITWIDTH : integer
   );
@@ -24,24 +24,26 @@ entity muli is
     result_ready : in std_logic);
 end entity;
 
-architecture arch of muli is
+architecture arch of muli_node is
 
   signal join_valid : std_logic;
 
   signal buff_valid, oehb_valid, oehb_ready : std_logic;
-  signal oehb_dataOut, oehb_datain          : std_logic;
+  signal oehb_dataOut, oehb_datain          : std_logic_vector(BITWIDTH - 1 downto 0);
 
   constant LATENCY : integer := 4;
+  signal out_array : std_logic_vector(1 downto 0);
 
 begin
+  lhs_ready <= out_array(0);
+  rhs_ready <= out_array(1);
   join : entity work.join(arch) generic map(2)
     port map(
     (lhs_valid,
       rhs_valid),
       oehb_ready,
       join_valid,
-      (lhs_ready,
-      rhs_ready));
+      out_array);
   multiply_unit : entity work.mul_4_stage(behav) generic map (BITWIDTH)
 
     port map(
@@ -59,7 +61,7 @@ begin
       oehb_ready,
       buff_valid);
 
-  oehb : entity work.OEHB(arch) generic map (1)
+  oehb : entity work.OEHB(arch) generic map (BITWIDTH)
     port map(
       clk        => clk,
       rst        => rst,

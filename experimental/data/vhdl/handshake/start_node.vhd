@@ -22,7 +22,6 @@ entity start_node is
 end start_node;
 
 architecture arch of start_node is
-
   signal set                    : std_logic;
   signal start_internal         : std_logic;
   signal startBuff_readyArray   : std_logic;
@@ -39,7 +38,7 @@ begin
       set            <= '0';
 
     elsif rising_edge(clk) then
-      if (pValid = '1' and set = '0') then
+      if (ins_valid = '1' and set = '0') then
         start_internal <= '1';
         set            <= '1';
       else
@@ -48,17 +47,17 @@ begin
     end if;
   end process;
 
-  startBuff : entity work.buffer(arch) generic map (BITWIDTH)
-    port map(
-      clk        => clk,
-      rst        => rst,
-      ins        => ins,
-      ins_valid  => start_internal,
-      outs_ready => outs_ready,
-      outs       => startBuff_dataOutArray,
-      ins_ready  => startBuff_readyArray,
-      outs_valid => startBuff_validArray
-    );
+  startBuff : entity work.buffer_seq(arch) generic map(BITWIDTH)
+  port map(
+    clk        => clk,
+    rst        => rst,
+    ins        => ins,
+    ins_valid  => start_internal,
+    outs_ready => outs_ready,
+    outs       => startBuff_dataOutArray,
+    ins_ready  => startBuff_readyArray,
+    outs_valid => startBuff_validArray
+  );
 
   outs_valid <= startBuff_validArray;
   outs       <= startBuff_dataOutArray;

@@ -32,8 +32,12 @@ architecture arch of end_node is
   signal joinValid : std_logic;
   signal joinReady : std_logic;
 
+  signal out_array : std_logic_vector(1 downto 0);
+
 begin
-  process (pValid, ins)
+  nReady <= out_array(0);
+  joinReady <= out_array(1);
+  process (ins_valid, ins)
     variable tmp_data_out  : unsigned(BITWIDTH - 1 downto 0);
     variable tmp_valid_out : std_logic;
 
@@ -41,7 +45,7 @@ begin
     tmp_data_out  := unsigned(ins);
     tmp_valid_out := '0';
 
-    if (pValid = '1') then
+    if (ins_valid = '1') then
       tmp_data_out  := unsigned(ins);
       tmp_valid_out := ins_valid;
     end if;
@@ -58,7 +62,7 @@ begin
     (valid, mem_valid),
       outs_ready,
       joinValid,
-      (nReady, joinReady));
+      out_array);
   outs_valid <= joinValid;
 
   process (joinReady)

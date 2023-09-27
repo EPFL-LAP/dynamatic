@@ -3,7 +3,7 @@ use IEEE.std_logic_1164.all;
 use IEEE.numeric_std.all;
 use work.customTypes.all;
 
-entity d_store is generic (
+entity d_store_node is generic (
   DATA_BITWIDTH : integer;
   ADDR_BITWIDTH : integer);
 port (
@@ -26,11 +26,14 @@ port (
 
 end entity;
 
-architecture arch of d_store is
+architecture arch of d_store_node is
   signal single_ready : std_logic;
   signal join_valid   : std_logic;
+  signal out_array    : std_logic_vector(1 downto 0);
 
 begin
+  addrIn_ready <= out_array(0);
+  dataIn_ready <= out_array(1);
 
   join_write : entity work.join(arch) generic map(2)
     port map(
@@ -38,8 +41,7 @@ begin
       dataIn_valid),
       addrIn_ready,
       join_valid,
-      (addrOut_ready,
-      dataToMem_ready));
+      out_array);
 
   dataToMem       <= dataIn;
   addrOut_valid   <= join_valid;

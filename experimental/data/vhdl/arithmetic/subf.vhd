@@ -3,7 +3,7 @@ use IEEE.std_logic_1164.all;
 use ieee.numeric_std.all;
 use work.customTypes.all;
 
-entity subf is
+entity subf_node is
   generic (
     BITWIDTH : integer
   );
@@ -23,7 +23,7 @@ entity subf is
     result_valid : out std_logic);
 end entity;
 
-architecture arch of subf is
+architecture arch of subf_node is
 
   component array_RAM_subf_32bkb is
     generic (
@@ -47,16 +47,18 @@ architecture arch of subf is
 
   signal buff_valid, oehb_valid, oehb_ready : std_logic;
   signal oehb_dataOut, oehb_datain          : std_logic;
+  signal out_array                          : std_logic_vector(1 downto 0);
 
 begin
+  lhs_ready <= out_array(0);
+  rhs_ready <= out_array(1);
   join : entity work.join(arch) generic map(2)
     port map(
     (lhs_valid,
       rhs_valid),
       oehb_ready,
       join_valid,
-      (lhs_ready,
-      rhs_ready));
+      out_array);
 
   buff : entity work.delay_buffer(arch) generic map(8)
     port map(
@@ -66,7 +68,7 @@ begin
       oehb_ready,
       buff_valid);
 
-  oehb : entity work.OEHB(arch) generic map (1)
+  oehb : entity work.OEHB(arch) generic map (BITWIDTH)
     port map(
       clk        => clk,
       rst        => rst,
