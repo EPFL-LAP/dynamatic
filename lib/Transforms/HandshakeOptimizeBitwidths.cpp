@@ -280,7 +280,7 @@ static bool isOperandInCycle(Value val, OpResult res,
   };
 
   // Recursively explore data operands of merge-like operations to find cycles
-  if (auto mergeLikeOp = dyn_cast<MergeLikeOpInterface>(defOp))
+  if (auto mergeLikeOp = dyn_cast<handshake::MergeLikeOpInterface>(defOp))
     return recurseMergeLike(mergeLikeOp.getDataOperands());
   if (auto selectOp = dyn_cast<arith::SelectOp>(defOp))
     return recurseMergeLike(
@@ -936,7 +936,8 @@ struct ForwardCycleOpt : public OpRewritePattern<Op> {
   LogicalResult matchAndRewrite(Op op,
                                 PatternRewriter &rewriter) const override {
     // This pattern only works for merge-like operations with a valid data type
-    auto mergeLikeOp = dyn_cast<MergeLikeOpInterface>((Operation *)op);
+    auto mergeLikeOp =
+        dyn_cast<handshake::MergeLikeOpInterface>((Operation *)op);
     if (!mergeLikeOp)
       return failure();
     OpResult dataRes = op->getResult(0);

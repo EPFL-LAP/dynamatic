@@ -8,7 +8,6 @@
 
 #include "dynamatic/Support/TimingModels.h"
 #include "circt/Dialect/Handshake/HandshakeOps.h"
-#include "dynamatic/Transforms/UtilsBitsUpdate.h"
 #include "mlir/Dialect/Arith/IR/Arith.h"
 #include "mlir/IR/Operation.h"
 #include "mlir/Support/LogicalResult.h"

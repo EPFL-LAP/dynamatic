@@ -7,7 +7,10 @@
 #ifndef DYNAMATIC_TRANSFORMS_HANDSHAKEMINIMIZECSTWIDTH_H
 #define DYNAMATIC_TRANSFORMS_HANDSHAKEMINIMIZECSTWIDTH_H
 
-#include "dynamatic/Transforms/UtilsBitsUpdate.h"
+#include "dynamatic/Support/LLVM.h"
+#include "mlir/Dialect/Arith/IR/Arith.h"
+#include "mlir/IR/DialectRegistry.h"
+#include "mlir/Pass/Pass.h"
 
 namespace dynamatic {
 

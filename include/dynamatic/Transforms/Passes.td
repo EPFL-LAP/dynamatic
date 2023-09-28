@@ -128,16 +128,6 @@ def HandshakeOptimizeBitwidths : Pass<"handshake-optimize-bitwidths",
     "fail.">];
 }
 
-def HandshakeOptimizeBits : Pass<"optimize-bits" , "mlir::ModuleOp"> {
-  let summary = "Optimize bits width that can be reduced.";
-  let description = [{
-    This pass goes through all operations inside handshake levels, and optimize the bit width through the forward (from first operation to last), and backward(from last operation to first) loop process. 
-    The loop continues until no more optimization can be done.
-  }];
-  let constructor = "dynamatic::createOptimizeBitsPass()";
-  let dependentDialects = ["mlir::arith::ArithDialect"];
-}
-
 def HandshakeConcretizeIndexType : Pass<"handshake-concretize-index-type", "mlir::ModuleOp"> {
   let summary = "Concretizes the IndexType to an IntegerType of machine-specific width.";
   let description = [{

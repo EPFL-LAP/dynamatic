@@ -26,7 +26,7 @@ using namespace dynamatic;
 /// Determines if the pass should attempt to infer the basic block of the
 /// operation if it is missing.
 static bool isLegalForInference(Operation *op) {
-  return !isa<MemoryControllerOp, SinkOp>(op);
+  return !isa<handshake::MemoryControllerOp, handshake::SinkOp>(op);
 }
 
 /// Iterates over all operations legal for inference that do not have a "bb"

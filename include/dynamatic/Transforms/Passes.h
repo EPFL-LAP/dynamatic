@@ -20,7 +20,6 @@
 #include "dynamatic/Transforms/HandshakeOptimizeBitwidths.h"
 #include "dynamatic/Transforms/HandshakePrepareForLegacy.h"
 #include "dynamatic/Transforms/NameMemoryOps.h"
-#include "dynamatic/Transforms/OptimizeBits.h"
 #include "dynamatic/Transforms/PushConstants.h"
 #include "dynamatic/Transforms/ScfRotateForLoops.h"
 #include "dynamatic/Transforms/ScfSimpleIfToSelect.h"

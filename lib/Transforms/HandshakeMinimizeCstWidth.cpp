@@ -19,6 +19,10 @@
 
 STATISTIC(savedBits, "Number of saved bits");
 
+using namespace mlir;
+using namespace circt;
+using namespace dynamatic;
+
 /// Inserts an extension op after the constant op that extends the constant's
 /// integer result to a provided destination type. The function assumes that it
 /// makes sense to extend the former type into the latter type.
