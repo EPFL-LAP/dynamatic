@@ -9,6 +9,7 @@
 
 #include "dynamatic/InitAllDialects.h"
 #include "dynamatic/InitAllPasses.h"
+#include "experimental/InitAllPasses.h"
 #include "mlir/Pass/PassRegistry.h"
 #include "mlir/Tools/mlir-opt/MlirOptMain.h"
 #include "mlir/Transforms/Passes.h"
@@ -34,6 +35,7 @@ int main(int argc, char **argv) {
   dynamatic::registerAllDialects(registry);
   dynamatic::registerAllPasses();
   dynamatic::tutorials::registerAllPasses();
+  dynamatic::experimental::registerAllPasses();
   registerTestPasses();
 
   // Register the standard passes we want
