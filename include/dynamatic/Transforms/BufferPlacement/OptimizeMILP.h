@@ -92,6 +92,11 @@ struct FuncInfo {
   /// Maps each CFDFC in the function to a boolean indicating whether it should
   /// be optimized.
   llvm::MapVector<CFDFC *, bool> cfdfcs;
+
+  /// Argument-less constructor so that we can use the struct as a value type
+  /// for maps.
+  FuncInfo() : funcOp(nullptr){};
+
   /// Constructs an instance from the function it refers to. Other struct
   /// members start empty.
   FuncInfo(circt::handshake::FuncOp funcOp) : funcOp(funcOp){};

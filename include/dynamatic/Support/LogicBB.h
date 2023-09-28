@@ -47,18 +47,27 @@ bool inheritBBFromValue(Value val, Operation *dstOp);
 /// Thin wrapper around an attribute access to the "bb" attribute.
 std::optional<unsigned> getLogicBB(Operation *op);
 
-/// Attempts to backtrack through forks and bitwidth modification operations
-/// till reaching a branch-like operation. On success, returns the branch-like
-/// operation that was backtracked to (or the passed operation if it was itself
-/// branch-like); otherwise, returns nullptr.
-Operation *backtrackToBranch(Operation *op);
+/// A pair of BB IDs to represent the blocks that a channel connects. In case of
+/// an inner channel, these blocks may be identical.
+struct BBEndpoints {
+  // The source/predecessor basic block.
+  unsigned srcBB;
+  // The destination/successor basic block.
+  unsigned dstBB;
+};
 
-/// Attempts to follow the def-use chains of all the operation's results through
-/// forks and bitwidth modification operations till reaching merge-like
-/// operations that all belong to the same basic block. On success, returns one
-/// of the merge-like operations reached by a def-use chain (or the passed
-/// operation if it was itself merge-like); otherwise, returns nullptr.
-Operation *followToMerge(Operation *op);
+/// Gets the basic block endpoints of a channel (represented as an MLIR value
+/// accompanied by one of its users). These are the blocks which operations
+/// "near" the value belong to (the source block which is reached by
+/// backtracking through the value's def-use chain and the destination block
+/// which is reached by following the value's uses). On successful
+/// identification of these blocks, the function returns true and the block
+/// endpoints are set, otherwise the function returns false.
+bool getBBEndpoints(Value val, Operation *user, BBEndpoints &endpoints);
+
+/// Determines the basic block endpoints of a value which must have a single
+/// user (see documentation of overriden function for more details).
+bool getBBEndpoints(Value val, BBEndpoints &endpoints);
 
 /// Determines whether the value is a backedge i.e., whether the channel
 /// corresponding to the value is located between a branch-like operation and a
@@ -67,10 +76,10 @@ Operation *followToMerge(Operation *op);
 /// identify backedges if the circuit's branches and merges are associated to
 /// basic blocks (otherwise it will always return false). `user` must be one of
 /// `val`'s users.
-bool isBackedge(Value val, Operation *user);
+bool isBackedge(Value val, Operation *user, BBEndpoints *endpoints = nullptr);
 
 /// Determines whether the value is a backedge. The value must have a single
 /// user (the function will assert if that is not the case).
-bool isBackedge(Value val);
+bool isBackedge(Value val, BBEndpoints *endpoints = nullptr);
 
 } // namespace dynamatic

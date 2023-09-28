@@ -167,7 +167,7 @@ CFDFC::CFDFC(circt::handshake::FuncOp funcOp, ArchSet &archs, unsigned numExec)
   // Form the cycle by stupidly iterating over the archs
   cycle.insert(*startBB);
   unsigned currentBB = *startBB;
-  for (size_t i = 0; i < archs.size() - 1; ++i) {
+  for (size_t i = 0, e = archs.size() - 1; i < e; ++i) {
     for (ArchBB *arch : archs) {
       if (arch->srcBB == currentBB) {
         currentBB = arch->dstBB;
@@ -176,6 +176,7 @@ CFDFC::CFDFC(circt::handshake::FuncOp funcOp, ArchSet &archs, unsigned numExec)
       }
     }
   }
+  assert(cycle.size() == archs.size() && "failed to construct cycle");
 
   for (Operation &op : funcOp.getOps()) {
     // Get operation's basic block
@@ -191,12 +192,12 @@ CFDFC::CFDFC(circt::handshake::FuncOp funcOp, ArchSet &archs, unsigned numExec)
 
     // Add the unit and valid outgoing channels to the CFDFC
     units.insert(&op);
-    for (OpResult val : op.getResults()) {
-      assert(std::distance(val.getUsers().begin(), val.getUsers().end()) == 1 &&
+    for (OpResult res : op.getResults()) {
+      assert(std::distance(res.getUsers().begin(), res.getUsers().end()) == 1 &&
              "value must have unique user");
 
       // Get the value's unique user and its basic block
-      Operation *user = *val.getUsers().begin();
+      Operation *user = *res.getUsers().begin();
       unsigned dstBB;
       if (std::optional<unsigned> optBB = getLogicBB(user); !optBB.has_value())
         continue;
@@ -209,29 +210,44 @@ CFDFC::CFDFC(circt::handshake::FuncOp funcOp, ArchSet &archs, unsigned numExec)
         for (size_t i = 0; i < cycle.size(); ++i) {
           unsigned nextBB = i == cycle.size() - 1 ? 0 : i + 1;
           if (srcBB == cycle[i] && dstBB == cycle[nextBB]) {
-            channels.insert(val);
-            if (isCFDFCBackedge(val))
-              backedges.insert(val);
+            channels.insert(res);
+            if (isCFDFCBackedge(res))
+              backedges.insert(res);
+            break;
           }
         }
       } else if (cycle.size() == 1) {
         // The channel is in the CFDFC if its producer/consumer belong to the
         // same basic block and the CFDFC is just a block looping to itself
-        channels.insert(val);
-        if (isCFDFCBackedge(val))
-          backedges.insert(val);
-      } else if (!isBackedge(val))
+        channels.insert(res);
+        if (isCFDFCBackedge(res))
+          backedges.insert(res);
+      } else if (!isBackedge(res)) {
         // The channel is in the CFDFC if its producer/consumer belong to the
         // same basic block and the channel is not a backedge
-        channels.insert(val);
+        channels.insert(res);
+      }
     }
   }
 }
 
 bool CFDFC::isCFDFCBackedge(Value val) {
-  return isBackedge(val) &&
-         isa<handshake::BranchOp, handshake::ConditionalBranchOp>(
-             val.getDefiningOp());
+  // A CFDFC backedge is a backedge
+  if (!isBackedge(val))
+    return false;
+
+  Operation *defOp = val.getDefiningOp();
+  std::optional<unsigned> srcBB = getLogicBB(defOp);
+  std::optional<unsigned> dstBB = getLogicBB(*val.getUsers().begin());
+
+  // If the edge is between operations in the same block, the source operation
+  // must be a conditional branch
+  if (srcBB.has_value() && dstBB.has_value() && *srcBB == *dstBB)
+    return isa<handshake::ConditionalBranchOp>(defOp);
+
+  // Otherwise the edge must be between different blocks, where the destination
+  // can be out of all blocks
+  return srcBB.has_value() && (!dstBB.has_value() || *srcBB != *dstBB);
 }
 
 LogicalResult dynamatic::buffer::extractCFDFC(handshake::FuncOp funcOp,

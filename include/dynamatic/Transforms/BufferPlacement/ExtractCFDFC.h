@@ -45,11 +45,11 @@ struct CFDFC {
   CFDFC(circt::handshake::FuncOp funcOp, ArchSet &archs, unsigned numExec);
 
 private:
-  // Determines whether the value is a "CFDFC backedge" i.e., a backedge with a
-  // branch-like source component. The distinction is important for the buffer
-  // placement MILP, which uses backedges to determine where to insert "tokens"
-  // in the circuit.
-  bool isCFDFCBackedge(Value val);
+  // Determines whether the channel is a "CFDFC backedge" i.e., the first
+  // channel along a sequence of backedges from a source block to a destination
+  // block. The distinction is important for the buffer placement MILP, which
+  // uses backedges to determine where to insert "tokens" in the circuit.
+  static bool isCFDFCBackedge(Value val);
 };
 
 /// Extracts the most frequently executed CFDFC from the Handshake function
