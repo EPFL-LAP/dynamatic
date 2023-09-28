@@ -129,9 +129,7 @@ BufferPlacementMILP::optimize(DenseMap<Value, PlacementResult> &placement) {
 
   // Optimize the model, then check whether we found an optimal solution or
   // whether we reached the time limit
-  model.write("model.lp");
   model.optimize();
-  model.write("solutions.json");
   int status = model.get(GRB_IntAttr_Status);
   if (status != GRB_OPTIMAL && status != GRB_TIME_LIMIT)
     return funcInfo.funcOp->emitError()
@@ -611,46 +609,18 @@ void BufferPlacementMILP::forEachIOPair(
 
 unsigned BufferPlacementMILP::getChannelNumExecs(Value channel) {
   Operation *srcOp = channel.getDefiningOp();
-  Operation *dstOp = *channel.getUsers().begin();
-  if ((srcOp && !getLogicBB(srcOp).has_value()) ||
-      !getLogicBB(dstOp).has_value())
-    // Channels to/from an operation outside basic blocks are "never executed"
-    return 0;
-
-  // A block is the exit if it has no successors
-  auto isExit = [&](unsigned bb) -> bool {
-    return llvm::all_of(funcInfo.archs, [&](experimental::ArchBB &arch) {
-      return arch.srcBB != bb;
-    });
-  };
+  if (!srcOp)
+    // A channel which originates from a function argument executes only once
+    return 1;
 
   // Iterate over all CFDFCs which contain the channel to determine its total
   // number of executions. Backedges are executed one less time than "forward
   // edges" since they are only taken between executions of the cycle the CFDFC
   // represents
-  unsigned srcBB = srcOp ? *getLogicBB(srcOp) : ENTRY_BB;
-  unsigned dstBB = *getLogicBB(dstOp);
-  if (llvm::isa_and_nonnull<handshake::BranchOp,
-                            handshake::ConditionalBranchOp>(srcOp) &&
-      isa<handshake::MergeLikeOpInterface>(dstOp)) {
-    for (experimental::ArchBB &arch : funcInfo.archs)
-      if (arch.srcBB == srcBB && arch.dstBB == dstBB)
-        return arch.numTrans;
-    llvm_unreachable("no arch corresponds to transition");
-  }
-
-  unsigned numExec = 0;
-  if (isExit(srcBB)) {
-    // Accumulate number of transitions from predecessors
-    for (experimental::ArchBB &arch : funcInfo.archs)
-      if (arch.dstBB == srcBB)
-        numExec += arch.numTrans;
-    return numExec;
-  }
-  // Accumulate number of transitions to successors
-  for (experimental::ArchBB &arch : funcInfo.archs)
-    if (arch.srcBB == srcBB)
-      numExec += arch.numTrans;
+  unsigned numExec = isBackedge(channel) ? 0 : 1;
+  for (auto &[cfdfc, _] : funcInfo.cfdfcs)
+    if (cfdfc->channels.contains(channel))
+      numExec += cfdfc->numExecs;
   return numExec;
 }
 
@@ -681,7 +651,7 @@ void BufferPlacementMILP::logResults(
     std::stringstream propsStr;
     propsStr << props;
     os << "- Buffering constraints: " << propsStr.str() << "\n";
-    os << "- MILP decisison: " << numSlotsToPlace << " "
+    os << "- MILP decision: " << numSlotsToPlace << " "
        << (placeOpaque ? "opaque" : "transparent") << " slot(s)\n";
     os << "- Placement decision: " << result.numTrans
        << " transparent slot(s) and " << result.numOpaque
