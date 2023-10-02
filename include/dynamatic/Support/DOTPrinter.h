@@ -38,7 +38,7 @@ public:
 
   /// Constructs a DOTPrinter whose printing behavior is controlled by a couple
   /// flags, plus a pointer to a timing database that must be valid in legacy
-  /// mode (when building Dynamatic++ in debug mode, the constructor will assert
+  /// mode (when building Dynamatic in debug mode, the constructor will assert
   /// if the `legacy` flag is true and the timing database is nullptr).
   DOTPrinter(Mode mode, EdgeStyle edgeStyle,
              TimingDatabase *timingDB = nullptr);

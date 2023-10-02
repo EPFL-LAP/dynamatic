@@ -55,7 +55,7 @@ struct StdProfiler {
   void writeDOT(mlir::raw_indented_ostream &os);
 
   /// Prints statistics on an output stream as a CSV formatted output compatible
-  /// with Dynamatic++'s smart buffer placement pass.
+  /// with Dynamatic's smart buffer placement pass.
   void writeCSV(mlir::raw_indented_ostream &os);
 
   /// Reads the profiler's CSV formatted output and stores its content into an

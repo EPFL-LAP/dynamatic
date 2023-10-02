@@ -5,7 +5,7 @@
 // may be configured so that its output is compatible with .dot files expected
 // by legacy Dynamatic, assuming the the inpur IR respects some constraints
 // imposed in legacy dataflow circuits. This tools enables the creation of a
-// bridge between Dynamatic++ and legacy Dynamatic, which is very useful in
+// bridge between Dynamatic and legacy Dynamatic, which is very useful in
 // practice.
 //
 //===----------------------------------------------------------------------===//
@@ -40,7 +40,7 @@ static cl::opt<std::string> timingDBFilepath(
         "is ran in one of the legacy-compatible modes, where timing "
         "annotations are given to all nodes in the graph. By default, contains "
         "the relative path (from the project's top-level directory) to the "
-        "file defining the default timing models in Dynamatic++."),
+        "file defining the default timing models in Dynamatic."),
     cl::init("data/components.json"), cl::cat(mainCategory));
 
 static cl::opt<std::string> modeArg(

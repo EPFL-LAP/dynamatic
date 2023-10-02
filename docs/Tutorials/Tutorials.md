@@ -1,8 +1,8 @@
 # Tutorials
 
-Welcome to the Dynamatic++ tutorials!
+Welcome to the Dynamatic tutorials!
 
-To encourage contributions to the project, we aim to support newcomers to the worlds of software development and compilers by providing development tutorials that can help them take their first steps inside the codebase. They are mostly aimed at people who have no or little compiler development experience, especially with the MLIR compiler infrastructure with which Dynamatic++ is deeply intertwined. Some prior knowledge of C++ (more generally, of object-oriented programming) and of the theory behind dataflow circuits is assumed.
+To encourage contributions to the project, we aim to support newcomers to the worlds of software development and compilers by providing development tutorials that can help them take their first steps inside the codebase. They are mostly aimed at people who have no or little compiler development experience, especially with the MLIR compiler infrastructure with which Dynamatic is deeply intertwined. Some prior knowledge of C++ (more generally, of object-oriented programming) and of the theory behind dataflow circuits is assumed.
 
 ## [The MLIR Primer](MLIRPrimer.md)
 

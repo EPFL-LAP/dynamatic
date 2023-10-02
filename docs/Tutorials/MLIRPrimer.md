@@ -1,6 +1,6 @@
 # An MLIR Primer
 
-This tutorial will introduce you to MLIR and its core constructs. It is intended as a short and very incomplete yet pragmatic first look into the framework for newcomers, and will provide you with valuable "day-0" information that you're likely to need as soon as you start developing in Dynamatic++. At many points, this tutorial will reference the official and definitely more complete [MLIR documentation](https://mlir.llvm.org/docs/), which you are invited to look up whenever you require more in-depth information about a particular concept. While this document is useful to get an initial idea of how MLIR works and of how to manipulate its data-structures, we strongly recommend the reader to follow a "learn by doing" philosophy. Reading documentation, especially of complex frameworks like MLIR, will only get you so far. Practice is the path toward actual understanding and mastering in the long run.
+This tutorial will introduce you to MLIR and its core constructs. It is intended as a short and very incomplete yet pragmatic first look into the framework for newcomers, and will provide you with valuable "day-0" information that you're likely to need as soon as you start developing in Dynamatic. At many points, this tutorial will reference the official and definitely more complete [MLIR documentation](https://mlir.llvm.org/docs/), which you are invited to look up whenever you require more in-depth information about a particular concept. While this document is useful to get an initial idea of how MLIR works and of how to manipulate its data-structures, we strongly recommend the reader to follow a "learn by doing" philosophy. Reading documentation, especially of complex frameworks like MLIR, will only get you so far. Practice is the path toward actual understanding and mastering in the long run.
 
 ## Table of contents
 
@@ -314,7 +314,7 @@ In summary, attributes are used to attach data/information to operations that ca
 
 For this section, you are also simply invited to read [the relevant part of the language reference](https://mlir.llvm.org/docs/LangRef/#dialects), which is very short.
 
-The *Handshake* dialect, defined in the `circt::handshake` namespace, is core to Dynamatic++. *Handshake* allows us to represent dataflow circuits inside [graph regions](#regions). Throughout the repository, whenever we mention "*Handshake*-level IR", we are referring to an IR that contains *Handshake* operations (i.e., dataflow components), which together make up a dataflow circuit. 
+The *Handshake* dialect, defined in the `circt::handshake` namespace, is core to Dynamatic. *Handshake* allows us to represent dataflow circuits inside [graph regions](#regions). Throughout the repository, whenever we mention "*Handshake*-level IR", we are referring to an IR that contains *Handshake* operations (i.e., dataflow components), which together make up a dataflow circuit. 
 
 ## Printing to the console
 
