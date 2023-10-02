@@ -62,7 +62,7 @@ private:
 /// succeeds but sets the number of executions to 0.
 LogicalResult extractCFDFC(circt::handshake::FuncOp funcOp, ArchSet &archs,
                            BBSet &bbs, ArchSet &selectedArchs,
-                           unsigned &numExec);
+                           unsigned &numExec, const std::string &logPath = "");
 
 } // namespace buffer
 } // namespace dynamatic

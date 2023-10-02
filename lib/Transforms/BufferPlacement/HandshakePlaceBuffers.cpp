@@ -21,7 +21,9 @@
 #include "mlir/IR/OperationSupport.h"
 #include "mlir/IR/PatternMatch.h"
 #include "mlir/Support/IndentedOstream.h"
+#include <string>
 
+using namespace llvm::sys;
 using namespace circt;
 using namespace circt::handshake;
 using namespace mlir;
@@ -37,13 +39,18 @@ namespace {
 /// was created.
 class BufferLogger {
 public:
+  /// The underlying logger object, which may remain nullptr.
+  Logger *log = nullptr;
+
   /// Optionally allocates a logger based on whether the `dumpLogs` flag is set.
   /// If it is, the log file's location is determined based om the provided
   /// function's name. On error, `ec` will contain a non-zero error code
   /// and the logger should not be used.
   BufferLogger(handshake::FuncOp funcOp, bool dumpLogs, std::error_code &ec);
+
   /// Returns the underlying logger, which may be nullptr.
   Logger *operator*() { return log; }
+
   /// Returns the underlying indented wrtier stream to the log file. Requires
   /// the object to have been created with the `dumpLogs` flag set to true.
   mlir::raw_indented_ostream &getStream() {
@@ -59,10 +66,6 @@ public:
     if (log)
       delete log;
   }
-
-private:
-  /// The underlying logger object, which may remain nullptr.
-  Logger *log = nullptr;
 };
 } // namespace
 
@@ -71,11 +74,9 @@ BufferLogger::BufferLogger(handshake::FuncOp funcOp, bool dumpLogs,
   if (!dumpLogs)
     return;
 
-  std::string sep = llvm::sys::path::get_separator().str();
-  std::string filepath =
-      "buffer-placement" + sep + funcOp.getName().str() + sep + "placement.log";
-  ;
-  log = new Logger(filepath, ec);
+  std::string sep = path::get_separator().str();
+  std::string fp = "buffer-placement" + sep + funcOp.getName().str() + sep;
+  log = new Logger(fp + "placement.log", ec);
 }
 
 /// Logs arch and CFDFC information (sequence of basic blocks, number of
@@ -287,8 +288,15 @@ LogicalResult HandshakePlaceBuffersPass::getCFDFCs(FuncInfo &info,
     // Clear the sets of selected archs and BBs
     selectedArchs.clear();
 
+    // Path where to dump the MILP model and solutions, if necessary
+    std::string logPath = "";
+    if (dumpLogs)
+      logPath = logger.log->getLogDir() + path::get_separator().str() +
+                "cfdfc" + std::to_string(cfdfcs.size());
+
     // Try to extract the next CFDFC
-    if (failed(extractCFDFC(info.funcOp, archs, bbs, selectedArchs, numExecs)))
+    if (failed(extractCFDFC(info.funcOp, archs, bbs, selectedArchs, numExecs,
+                            logPath)))
       return failure();
     if (numExecs == 0)
       break;

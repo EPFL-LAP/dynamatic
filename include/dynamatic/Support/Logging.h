@@ -27,6 +27,9 @@ public:
   /// and the logger should not be used.
   Logger(StringRef filepath, std::error_code &ec);
 
+  /// Returns the path to the directory in which the log file is created.
+  const std::string &getLogDir() { return logDir; }
+
   /// Returns a reference to an underlying indented writer stream to the log
   /// file.
   mlir::raw_indented_ostream &operator*() { return *logStream; }
@@ -39,6 +42,9 @@ public:
   ~Logger();
 
 private:
+  /// Output directory where the log file is created (without trailing
+  /// separator).
+  std::string logDir;
   /// Writer stream to the log file's descriptor.
   llvm::raw_fd_ostream *logFile = nullptr;
   /// Indented writer stream to the log file's descriptor.

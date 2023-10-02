@@ -19,7 +19,8 @@ Logger::Logger(StringRef filepath, std::error_code &ec) {
   }
 
   // Potentially create nested directories to create the logging file in
-  if (ec = fs::create_directories(path::parent_path(filepath)); ec.value() != 0)
+  logDir = path::parent_path(filepath);
+  if (ec = fs::create_directories(logDir); ec.value() != 0)
     return;
 
   // Create the log file and store its file descriptor for writing

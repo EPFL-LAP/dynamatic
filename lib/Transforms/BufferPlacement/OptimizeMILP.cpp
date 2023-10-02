@@ -27,6 +27,7 @@
 #include "llvm/ADT/iterator_range.h"
 #include "llvm/Support/Casting.h"
 
+using namespace llvm::sys;
 using namespace circt;
 using namespace mlir;
 using namespace dynamatic;
@@ -129,7 +130,15 @@ BufferPlacementMILP::optimize(DenseMap<Value, PlacementResult> &placement) {
 
   // Optimize the model, then check whether we found an optimal solution or
   // whether we reached the time limit
+
+  if (logger)
+    model.write(logger->getLogDir() + path::get_separator().str() +
+                "placement_model.lp");
   model.optimize();
+  if (logger)
+    model.write(logger->getLogDir() + path::get_separator().str() +
+                "placement_solutions.json");
+
   int status = model.get(GRB_IntAttr_Status);
   if (status != GRB_OPTIMAL && status != GRB_TIME_LIMIT)
     return funcInfo.funcOp->emitError()

@@ -253,7 +253,8 @@ bool CFDFC::isCFDFCBackedge(Value val) {
 LogicalResult dynamatic::buffer::extractCFDFC(handshake::FuncOp funcOp,
                                               ArchSet &archs, BBSet &bbs,
                                               ArchSet &selectedArchs,
-                                              unsigned &numExecs) {
+                                              unsigned &numExecs,
+                                              const std::string &logPath) {
 #ifdef DYNAMATIC_GUROBI_NOT_INSTALLED
   return funcOp->emitError() << "Project was built without Gurobi, can't run "
                                 "CFDFC extraction";
@@ -272,7 +273,13 @@ LogicalResult dynamatic::buffer::extractCFDFC(handshake::FuncOp funcOp,
   setObjective(model, vars);
   setEdgeConstraints(model, vars);
   setBBConstraints(model, vars);
+
+  if (!logPath.empty())
+    model.write(logPath + "_model.lp");
   model.optimize();
+  if (!logPath.empty())
+    model.write(logPath + "_solutions.json");
+
   if (int status = model.get(GRB_IntAttr_Status) != GRB_OPTIMAL)
     return funcOp.emitError() << "Gurobi failed with status code " << status;
 
