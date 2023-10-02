@@ -1,5 +1,11 @@
 //===- HandshakeInferBasicBlocks.cpp - Infer ops basic blocks ---*- C++ -*-===//
 //
+// Dynamatic is under the Apache License v2.0 with LLVM Exceptions.
+// See https://llvm.org/LICENSE.txt for license information.
+// SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
+//
+//===----------------------------------------------------------------------===//
+//
 // The basic block inference pass is implemented as a single operation
 // conversion pattern that iterates over all operations in a function repeatedly
 // until no more inferences can be performed, at which point it succeeds.

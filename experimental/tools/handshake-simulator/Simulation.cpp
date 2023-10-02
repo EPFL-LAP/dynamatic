@@ -1,6 +1,6 @@
 //===- Simulation.cpp - Handshake MLIR Operations -----------------------===//
 //
-// Part of the LLVM Project, under the Apache License v2.0 with LLVM Exceptions.
+// Dynamatic is under the Apache License v2.0 with LLVM Exceptions.
 // See https://llvm.org/LICENSE.txt for license information.
 // SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
 //
@@ -11,10 +11,10 @@
 //
 //===----------------------------------------------------------------------===//
 
-#include "experimental/tools/handshake-simulator/ExecModels.h"
 #include "experimental/tools/handshake-simulator/Simulation.h"
 #include "circt/Dialect/Handshake/HandshakeOps.h"
 #include "circt/Support/JSON.h"
+#include "experimental/tools/handshake-simulator/ExecModels.h"
 #include "mlir/Dialect/Arith/IR/Arith.h"
 #include "mlir/Dialect/ControlFlow/IR/ControlFlowOps.h"
 #include "mlir/Dialect/Func/IR/FuncOps.h"
@@ -67,8 +67,8 @@ static void fatalValueError(StringRef reason, T &value) {
 }
 
 /// Debug APInt type MLIR value
-static void debugArg(const std::string &head, mlir::Value op, const APInt &value,
-              double time) {
+static void debugArg(const std::string &head, mlir::Value op,
+                     const APInt &value, double time) {
   LLVM_DEBUG(dbgs() << "  " << head << ":  " << op << " = " << value
                     << " (APInt<" << value.getBitWidth() << ">) @" << time
                     << "\n");
@@ -76,7 +76,7 @@ static void debugArg(const std::string &head, mlir::Value op, const APInt &value
 
 /// Debug MLIR value
 static void debugArg(const std::string &head, mlir::Value op, const Any &value,
-              double time) {
+                     double time) {
   if (auto *val = any_cast<APInt>(&value)) {
     debugArg(head, op, *val, time);
   } else if (auto *val = any_cast<APFloat>(&value)) {
@@ -146,7 +146,7 @@ static Any readValueWithType(mlir::Type type, std::string in) {
 
 /// Print MLIR value according to it's type
 static void printAnyValueWithType(llvm::raw_ostream &out, mlir::Type type,
-                           Any &value) {
+                                  Any &value) {
   if (type.isa<mlir::IntegerType>() || type.isa<mlir::IndexType>()) {
     out << any_cast<APInt>(value).getSExtValue();
   } else if (type.isa<mlir::FloatType>()) {
@@ -169,8 +169,8 @@ static void printAnyValueWithType(llvm::raw_ostream &out, mlir::Type type,
 
 /// Schedules an operation if not already scheduled.
 static void scheduleIfNeeded(std::list<circt::Operation *> &readyList,
-                      llvm::DenseMap<mlir::Value, Any> & /*valueMap*/,
-                      circt::Operation *op) {
+                             llvm::DenseMap<mlir::Value, Any> & /*valueMap*/,
+                             circt::Operation *op) {
   if (std::find(readyList.begin(), readyList.end(), op) == readyList.end()) {
     readyList.push_back(op);
   }
@@ -178,8 +178,8 @@ static void scheduleIfNeeded(std::list<circt::Operation *> &readyList,
 
 /// Schedules all operations that can be done with the entered value.
 static void scheduleUses(std::list<circt::Operation *> &readyList,
-                  llvm::DenseMap<mlir::Value, Any> &valueMap,
-                  mlir::Value value) {
+                         llvm::DenseMap<mlir::Value, Any> &valueMap,
+                         mlir::Value value) {
   for (auto &use : value.getUses()) {
     scheduleIfNeeded(readyList, valueMap, use.getOwner());
   }
@@ -190,9 +190,9 @@ static void scheduleUses(std::list<circt::Operation *> &readyList,
 /// store in memRefOffset (i.e. the first dimension index)
 /// Returns a failed result if the shape isn't uni-dimensional
 static LogicalResult allocateMemRef(mlir::MemRefType type, std::vector<Any> &in,
-                        std::vector<std::vector<Any>> &store,
-                        std::vector<double> &storeTimes,
-                        unsigned &memRefOffset) {
+                                    std::vector<std::vector<Any>> &store,
+                                    std::vector<double> &storeTimes,
+                                    unsigned &memRefOffset) {
   ArrayRef<int64_t> shape = type.getShape();
   if (shape.size() != 1)
     return failure();
@@ -295,7 +295,7 @@ private:
                         std::vector<Any> &);
   LogicalResult execute(mlir::CallOpInterface, std::vector<Any> &,
                         std::vector<Any> &);
-                        
+
 private:
   /// Execution context variables, documented in ExecModels.h
   llvm::DenseMap<mlir::Value, Any> &valueMap;
@@ -721,12 +721,13 @@ HandshakeExecuter::HandshakeExecuter(
   std::list<circt::Operation *> readyList;
   // A map of memory ops
   llvm::DenseMap<unsigned, unsigned> memoryMap;
-  
+
   func.walk([&](Operation *op) {
     // Set all return flags to false
     if (isa<circt::handshake::DynamaticReturnOp>(op)) {
       stateMap[op] = false;
-    // Push the end op, as it contains no operands so never appears in readyList
+      // Push the end op, as it contains no operands so never appears in
+      // readyList
     } else if (isa<circt::handshake::EndOp>(op)) {
       readyList.push_back(op);
     }
@@ -770,9 +771,8 @@ HandshakeExecuter::HandshakeExecuter(
     // Execute handshake operations
     if (execModel) {
       llvm::SmallVector<mlir::Value> scheduleList;
-      ExecutableData execData {valueMap, memoryMap,    timeMap,
-                                 store,    scheduleList, models,
-                                 stateMap};
+      ExecutableData execData{valueMap,     memoryMap, timeMap, store,
+                              scheduleList, models,    stateMap};
       if (!execModel.get()->tryExecute(execData, op)) {
         readyList.push_back(&op);
       } else {
@@ -792,7 +792,7 @@ HandshakeExecuter::HandshakeExecuter(
       // If no value is left and we are and the end, leave
       if (readyList.empty() && isa<circt::handshake::EndOp>(op))
         return;
-      
+
       continue;
     }
 
@@ -833,11 +833,10 @@ HandshakeExecuter::HandshakeExecuter(
                   mlir::arith::DivSIOp, mlir::arith::DivUIOp,
                   mlir::arith::DivFOp, mlir::arith::IndexCastOp,
                   mlir::arith::ExtSIOp, mlir::arith::ExtUIOp,
-                  mlir::arith::XOrIOp>(
-                [&](auto op) {
-                  strat = ExecuteStrategy::Default;
-                  return execute(op, inValues, outValues);
-                })
+                  mlir::arith::XOrIOp>([&](auto op) {
+              strat = ExecuteStrategy::Default;
+              return execute(op, inValues, outValues);
+            })
             .Default([&](auto op) {
               return op->emitOpError() << "Unknown operation";
             });
@@ -956,7 +955,8 @@ LogicalResult simulate(StringRef toplevelFunction,
       std::vector<Any> nothing;
       std::string x;
       unsigned buffer;
-      if (allocateMemRef(memreftype, nothing, store, storeTimes, buffer).failed())
+      if (allocateMemRef(memreftype, nothing, store, storeTimes, buffer)
+              .failed())
         return failure();
       valueMap[blockArgs[i]] = buffer;
       timeMap[blockArgs[i]] = 0.0;
@@ -965,7 +965,8 @@ LogicalResult simulate(StringRef toplevelFunction,
       std::stringstream arg(inputArgs[i]);
       while (!arg.eof()) {
         getline(arg, x, ',');
-        store[buffer][pos++] = readValueWithType(memreftype.getElementType(), x);
+        store[buffer][pos++] =
+            readValueWithType(memreftype.getElementType(), x);
       }
     } else {
       Any value = readValueWithType(type, inputArgs[i]);
@@ -978,15 +979,15 @@ LogicalResult simulate(StringRef toplevelFunction,
   std::vector<double> resultTimes(realOutputs);
   bool succeeded = false;
   if (circt::handshake::FuncOp toplevel =
-                 module->lookupSymbol<circt::handshake::FuncOp>(
-                     toplevelFunction)) {
+          module->lookupSymbol<circt::handshake::FuncOp>(toplevelFunction)) {
     succeeded =
         HandshakeExecuter(toplevel, valueMap, timeMap, results, resultTimes,
                           store, storeTimes, module, models)
             .succeeded();
 
     //  Final time
-    circt::handshake::EndOp endOp = *toplevel.getOps<circt::handshake::EndOp>().begin();
+    circt::handshake::EndOp endOp =
+        *toplevel.getOps<circt::handshake::EndOp>().begin();
     assert(endOp && "expected function to terminate with end operation");
     double finalTime = any_cast<double>(stateMap[endOp]);
     simulatedTime += finalTime; // LLVM statistics

@@ -1,5 +1,11 @@
 //===- HandshakePlaceBuffers.cpp - Place buffers in DFG ---------*- C++ -*-===//
 //
+// Dynamatic is under the Apache License v2.0 with LLVM Exceptions.
+// See https://llvm.org/LICENSE.txt for license information.
+// SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
+//
+//===----------------------------------------------------------------------===//
+//
 // This file implements the --place-buffers pass for throughput optimization by
 // inserting buffers in the data flow graphs.
 //

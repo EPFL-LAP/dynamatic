@@ -1,5 +1,11 @@
 //===- dynamatic.cpp - Dynamatic frontend -----------------------*- C++ -*-===//
 //
+// Dynamatic is under the Apache License v2.0 with LLVM Exceptions.
+// See https://llvm.org/LICENSE.txt for license information.
+// SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
+//
+//===----------------------------------------------------------------------===//
+//
 // This tool implements a (barebone, at this point) shell/frontend for
 // Dynamatic, allowing users to go from C to VHDL using a simple command syntax.
 // See the sample scripts in samples/ to get an idea of the syntax, or type

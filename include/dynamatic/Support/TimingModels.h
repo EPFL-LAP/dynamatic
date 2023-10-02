@@ -1,5 +1,11 @@
 //===- TimingModels.h - Parse/Represent comp. timing models -----*- C++ -*-===//
 //
+// Dynamatic is under the Apache License v2.0 with LLVM Exceptions.
+// See https://llvm.org/LICENSE.txt for license information.
+// SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
+//
+//===----------------------------------------------------------------------===//
+//
 // This file declares the infrastrucure to parse, represent, and query timing
 // models for RTL components, here represented as MLIR operations. The component
 // timing characterizations that are at the source of our timing models, notably

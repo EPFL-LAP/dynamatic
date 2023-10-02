@@ -1,5 +1,11 @@
 //===- ScfRotateForLoops.cpp - Rotate for loops into do-while's -*- C++ -*-===//
 //
+// Dynamatic is under the Apache License v2.0 with LLVM Exceptions.
+// See https://llvm.org/LICENSE.txt for license information.
+// SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
+//
+//===----------------------------------------------------------------------===//
+//
 // Implements the --scf-rotate-for-loops pass, which tranforms for loops
 // provably executing at least once into equivalent do-while loops.
 //

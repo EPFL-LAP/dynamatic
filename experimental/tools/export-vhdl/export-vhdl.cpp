@@ -1,5 +1,11 @@
 //===- export-vhdl.cpp - Export VHDL from netlist-level IR ------*- C++ -*-===//
 //
+// Dynamatic is under the Apache License v2.0 with LLVM Exceptions.
+// See https://llvm.org/LICENSE.txt for license information.
+// SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
+//
+//===----------------------------------------------------------------------===//
+//
 // Experimental tool that exports VHDL from a netlist-level IR expressed in a
 // combination of the HW and ESI dialects. The result is produced on standart
 // llvm output.

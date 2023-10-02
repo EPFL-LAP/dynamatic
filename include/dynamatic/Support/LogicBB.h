@@ -1,5 +1,11 @@
 //===- LogicBB.h - Infrastructure for working with logical BBs --*- C++ -*-===//
 //
+// Dynamatic is under the Apache License v2.0 with LLVM Exceptions.
+// See https://llvm.org/LICENSE.txt for license information.
+// SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
+//
+//===----------------------------------------------------------------------===//
+//
 // This file declares the infrastructure useful for handling logical basic
 // blocks (logical BBs) in Handshake functions. These are not basic blocks in
 // the MLIR sense since Handshake function only have a single block. They

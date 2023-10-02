@@ -1,5 +1,11 @@
 //===- NumericAnalysis.cpp - Numeric analyis utilities ----------*- C++ -*-===//
 //
+// Dynamatic is under the Apache License v2.0 with LLVM Exceptions.
+// See https://llvm.org/LICENSE.txt for license information.
+// SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
+//
+//===----------------------------------------------------------------------===//
+//
 // Implementation of numeric analysis infrastructure. Right now, ranges are
 // estimated by "backtracking" values through their def-use chains, which has
 // strong limitations. In the future, a "forward analysis" may yield better

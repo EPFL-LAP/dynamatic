@@ -1,5 +1,11 @@
 //===- HandshakeSetBufferingProperties.h - Set buf. props. ------*- C++ -*-===//
 //
+// Dynamatic is under the Apache License v2.0 with LLVM Exceptions.
+// See https://llvm.org/LICENSE.txt for license information.
+// SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
+//
+//===----------------------------------------------------------------------===//
+//
 // This file declares the --handshake-set-buffering-properties pass, which is
 // useful to run before the buffer placement pass to make sure that all buffer
 // placement constraints that can be deduced from the IR structure alone are

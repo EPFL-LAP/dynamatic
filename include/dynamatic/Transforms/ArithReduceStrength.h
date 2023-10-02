@@ -1,5 +1,11 @@
 //===- ArithReduceStrength.h - Reduce strength of arith ops -----*- C++ -*-===//
 //
+// Dynamatic is under the Apache License v2.0 with LLVM Exceptions.
+// See https://llvm.org/LICENSE.txt for license information.
+// SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
+//
+//===----------------------------------------------------------------------===//
+//
 // This file declares the --arith-reduce-strength pass as well as some entities
 // to model a tree of operations (e.g., a tree of adders to replace a multiplier
 // with).

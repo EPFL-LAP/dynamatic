@@ -1,5 +1,11 @@
 //===-HandshakeCanonicalize.cpp - Canonicalize Handshake ops ----*- C++ -*-===//
 //
+// Dynamatic is under the Apache License v2.0 with LLVM Exceptions.
+// See https://llvm.org/LICENSE.txt for license information.
+// SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
+//
+//===----------------------------------------------------------------------===//
+//
 // Implements rewrite patterns for the Handshake canonicalization pass, whih are
 // greedily applied on the IR. These patterns do their best to attach newly
 // inserted operations to known basic blocks when enough BB information is

@@ -1,6 +1,6 @@
 //===- ExecModels.h - Handshake MLIR and Dynamatic Operations -------------===//
 //
-// Part of the LLVM Project, under the Apache License v2.0 with LLVM Exceptions.
+// Dynamatic is under the Apache License v2.0 with LLVM Exceptions.
 // See https://llvm.org/LICENSE.txt for license information.
 // SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
 //
@@ -31,7 +31,7 @@ using ModelMap =
              std::unique_ptr<dynamatic::experimental::ExecutableModel>>;
 
 /// Maps operations to an internal state everyone can access
-using StateMap = llvm::DenseMap<circt::Operation*, llvm::Any>;
+using StateMap = llvm::DenseMap<circt::Operation *, llvm::Any>;
 
 /// Data structure to hold memory controllers internal state
 struct MemoryControllerState {

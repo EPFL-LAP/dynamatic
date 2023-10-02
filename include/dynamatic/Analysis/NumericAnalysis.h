@@ -1,5 +1,11 @@
 //===- NumericAnalysis.h - Numeric analyis utilities ------------*- C++ -*-===//
 //
+// Dynamatic is under the Apache License v2.0 with LLVM Exceptions.
+// See https://llvm.org/LICENSE.txt for license information.
+// SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
+//
+//===----------------------------------------------------------------------===//
+//
 // Numeric analysis infrastructure. Its main purpose is to try to estimate the
 // numeric range in which integer-like or floating-like SSA values belong in scf
 // or cf-level IR.

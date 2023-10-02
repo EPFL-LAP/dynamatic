@@ -1,5 +1,11 @@
 //===- export-dot.cpp - Export Handshake-level IR to DOT --------*- C++ -*-===//
 //
+// Dynamatic is under the Apache License v2.0 with LLVM Exceptions.
+// See https://llvm.org/LICENSE.txt for license information.
+// SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
+//
+//===----------------------------------------------------------------------===//
+//
 // This file implements the export-dot tool, which outputs on stdout the
 // Graphviz-formatted representation on an input Handshake-level IR. The tool
 // may be configured so that its output is compatible with .dot files expected

@@ -1,5 +1,11 @@
 //===- CFDFC.h - Control-Free DataFlow Circuit ------------------*- C++ -*-===//
 //
+// Dynamatic is under the Apache License v2.0 with LLVM Exceptions.
+// See https://llvm.org/LICENSE.txt for license information.
+// SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
+//
+//===----------------------------------------------------------------------===//
+//
 // Declares data structures and functions to extract and create CFDFCs
 // (Choice-Free DataFlow Circuits) from a description of a Handshake function's
 // archs and basic blocks.

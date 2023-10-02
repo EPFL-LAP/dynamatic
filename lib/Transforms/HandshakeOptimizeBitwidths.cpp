@@ -1,5 +1,11 @@
 //===- HandshakeOptimizeBitwidths.cpp - Optimize channel widths -*- C++ -*-===//
 //
+// Dynamatic is under the Apache License v2.0 with LLVM Exceptions.
+// See https://llvm.org/LICENSE.txt for license information.
+// SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
+//
+//===----------------------------------------------------------------------===//
+//
 // Implements a fairly standard bitwidth optimization pass using two set of
 // rewrite patterns that are applied greedily and recursively on the IR until it
 // converges. In addition to classical arithmetic optimizations presented, for

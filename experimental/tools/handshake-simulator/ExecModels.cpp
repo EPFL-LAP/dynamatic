@@ -1,6 +1,6 @@
 //===- HandshakeExecutableOps.cpp - Handshake executable Operations -------===//
 //
-// Part of the LLVM Project, under the Apache License v2.0 with LLVM Exceptions.
+// Dynamatic is under the Apache License v2.0 with LLVM Exceptions.
 // See https://llvm.org/LICENSE.txt for license information.
 // SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
 //
@@ -211,11 +211,14 @@ dynamatic::experimental::initialiseMap(llvm::StringMap<std::string> &funcMap,
   addDefault<handshake::SinkOp, DefaultSink>(modelStructuresMap);
   addDefault<handshake::ConstantOp, DefaultConstant>(modelStructuresMap);
   addDefault<handshake::BufferOp, DefaultBuffer>(modelStructuresMap);
-  addDefault<handshake::ConditionalBranchOp, DefaultConditionalBranch>(modelStructuresMap);
-  addDefault<handshake::ControlMergeOp, DefaultControlMerge>(modelStructuresMap);
+  addDefault<handshake::ConditionalBranchOp, DefaultConditionalBranch>(
+      modelStructuresMap);
+  addDefault<handshake::ControlMergeOp, DefaultControlMerge>(
+      modelStructuresMap);
 
   // Dynamatic operations
-  addDefault<handshake::MemoryControllerOp, DynamaticMemController>(modelStructuresMap);
+  addDefault<handshake::MemoryControllerOp, DynamaticMemController>(
+      modelStructuresMap);
   addDefault<handshake::DynamaticLoadOp, DynamaticLoad>(modelStructuresMap);
   addDefault<handshake::DynamaticStoreOp, DynamaticStore>(modelStructuresMap);
   addDefault<handshake::DynamaticReturnOp, DynamaticReturn>(modelStructuresMap);
@@ -410,7 +413,7 @@ bool DynamaticMemController::tryExecute(ExecutableData &data,
   if (!internalStateExists(opArg, data.stateMap))
     setInternalState<MemoryControllerState>(opArg, parseOperandIndex(op),
                                             data.stateMap);
-  
+
   MemoryControllerState mcData;
   getInternalState<MemoryControllerState>(opArg, mcData, data.stateMap);
 
@@ -486,7 +489,7 @@ bool DynamaticLoad::tryExecute(ExecutableData &data, circt::Operation &opArg) {
   // Send address to mem controller if available
   if (!data.valueMap.count(op.getAddressResult()))
     memoryTransfer(op.getAddress(), op.getAddressResult(), data);
-  
+
   // Send data to successor if available
   if (data.valueMap.count(op.getData())) {
     memoryTransfer(op.getData(), op.getDataResult(), data);
@@ -505,7 +508,7 @@ bool DynamaticStore::tryExecute(ExecutableData &data, circt::Operation &opArg) {
     setInternalState<bool>(opArg, false, data.stateMap);
 
   // Sends some data to memory and memorize that the data was sent
-  auto sendIfAvailable = [&](Value from, Value to) -> bool { 
+  auto sendIfAvailable = [&](Value from, Value to) -> bool {
     bool otherOperand = false;
     if (data.valueMap.count(from)) {
       memoryTransfer(from, to, data);

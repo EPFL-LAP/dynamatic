@@ -1,6 +1,6 @@
 //===- Simulation.h - Handshake MLIR Operations ---------------------------===//
 //
-// Part of the LLVM Project, under the Apache License v2.0 with LLVM Exceptions.
+// Dynamatic is under the Apache License v2.0 with LLVM Exceptions.
 // See https://llvm.org/LICENSE.txt for license information.
 // SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
 //
@@ -24,12 +24,11 @@ namespace dynamatic {
 namespace experimental {
 
 mlir::LogicalResult simulate(llvm::StringRef toplevelFunction,
-              llvm::ArrayRef<std::string> inputArgs,
-              mlir::OwningOpRef<mlir::ModuleOp> &module,
-              mlir::MLIRContext &context,
-              llvm::StringMap<std::string> &funcMap);
-} // namespace dynamatic
+                             llvm::ArrayRef<std::string> inputArgs,
+                             mlir::OwningOpRef<mlir::ModuleOp> &module,
+                             mlir::MLIRContext &context,
+                             llvm::StringMap<std::string> &funcMap);
 } // namespace experimental
-
+} // namespace dynamatic
 
 #endif

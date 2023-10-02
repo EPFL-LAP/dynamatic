@@ -1,5 +1,11 @@
 //===- BufferingProperties.h - Buffer placement properties ------*- C++ -*-===//
 //
+// Dynamatic is under the Apache License v2.0 with LLVM Exceptions.
+// See https://llvm.org/LICENSE.txt for license information.
+// SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
+//
+//===----------------------------------------------------------------------===//
+//
 // Infrastructure for specifying and manipulating buffering properties, which
 // are used by the buffer placement logic to constrain the nature and
 // positions of buffers in dataflow circuits.

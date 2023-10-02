@@ -1,5 +1,11 @@
 //===- LLVM.h - Import and forward declare core LLVM types ------*- C++ -*-===//
 //
+// Dynamatic is under the Apache License v2.0 with LLVM Exceptions.
+// See https://llvm.org/LICENSE.txt for license information.
+// SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
+//
+//===----------------------------------------------------------------------===//
+//
 // This file forward declares and imports various common LLVM and MLIR datatypes
 // that we want to use unqualified.
 //
@@ -126,7 +132,8 @@ class Operation;
 class OpFoldResult;
 class OpOperand;
 class OpResult;
-template <typename OpTy> class OwningOpRef;
+template <typename OpTy>
+class OwningOpRef;
 class ParseResult;
 class Pass;
 class PatternRewriter;
@@ -158,10 +165,14 @@ struct MemRefAccess;
 struct OperationState;
 class OperationName;
 
-template <typename T> class FailureOr;
-template <typename SourceOp> class OpConversionPattern;
-template <typename T> class OperationPass;
-template <typename SourceOp> struct OpRewritePattern;
+template <typename T>
+class FailureOr;
+template <typename SourceOp>
+class OpConversionPattern;
+template <typename T>
+class OperationPass;
+template <typename SourceOp>
+struct OpRewritePattern;
 
 using DefaultTypeStorage = TypeStorage;
 using OpAsmSetValueNameFn = function_ref<void(Value, StringRef)>;

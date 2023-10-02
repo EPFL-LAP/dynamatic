@@ -1,5 +1,11 @@
 //===- TimingModels.cpp - Parse/Represent comp. timing models ---*- C++ -*-===//
 //
+// Dynamatic is under the Apache License v2.0 with LLVM Exceptions.
+// See https://llvm.org/LICENSE.txt for license information.
+// SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
+//
+//===----------------------------------------------------------------------===//
+//
 // Definitions for timing modeling infrastructure, including the LLVM-style
 // fromJSON functions that deserialize a JSON value into a specific object (see
 // advanced documentation in ::llvm::json::Value).
