@@ -10,9 +10,11 @@
 
 #define N 101
 
+typedef int in_int_t;
+
 /// Searches for a specific value inside an array and returns its index if it is
 /// found; otherwise returns -1.
 // NOLINTNEXTLINE(readability-identifier-naming)
-int binary_search(int search, int a[N]);
+int binary_search(in_int_t search, in_int_t a[N]);
 
 #endif // BINARY_SEARCH_BINARY_SEARCH_H

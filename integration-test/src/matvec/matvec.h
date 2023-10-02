@@ -9,8 +9,11 @@
 
 #define N 100
 
+typedef int in_int_t;
+typedef int out_int_t;
+
 /// Multiplies a matrix by a vector and store the result vector in the last
 /// argument.
-int matvec(int m[N][N], int v[N], int out[N]);
+int matvec(in_int_t m[N][N], in_int_t v[N], out_int_t out[N]);
 
 #endif // MATVEC_MATVEC_H

@@ -6,7 +6,7 @@
 
 #include "gcd.h"
 
-int gcd(int a, int b) {
+int gcd(in_int_t a, in_int_t b) {
   // Finding K, where K is the greatest power of 2 that divides both in0 and
   // in1. for (int k = 0; ((in0 | in1) & 1) == 0; ++k)
   unsigned k = 0;
@@ -33,4 +33,9 @@ int gcd(int a, int b) {
 
   // Restore common factors of 2
   return a << k;
+}
+
+int main(void) {
+  gcd(7966496, 314080416);
+  return 0;
 }

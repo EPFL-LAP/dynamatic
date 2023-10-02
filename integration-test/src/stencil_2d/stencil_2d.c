@@ -5,8 +5,9 @@
 //===----------------------------------------------------------------------===//
 
 #include "stencil_2d.h"
+#include "stdlib.h"
 
-int stencil_2d(int orig[N], int filter[M], int sol[N]) {
+int stencil_2d(in_int_t orig[N], in_int_t filter[M], out_int_t sol[N]) {
   int temp = 0;
   for (unsigned c = 0; c < 28; c++) {
     temp = 0;
@@ -16,4 +17,17 @@ int stencil_2d(int orig[N], int filter[M], int sol[N]) {
     sol[c] = temp;
   }
   return temp;
+}
+
+int main(void) {
+  in_int_t orig[900];
+  in_int_t filter[10];
+  out_int_t sol[900];
+
+  for (int j = 0; j < N; ++j)
+    orig[j] = rand() % 100;
+  for (int j = 0; j < M; ++j)
+    filter[j] = rand() % 100;
+
+  stencil_2d(orig, filter, sol);
 }

@@ -6,7 +6,7 @@
 
 #include "sobel.h"
 
-int sobel(int in[N], int gX[9], int gY[9], int out[N]) {
+int sobel(in_int_t in[N], in_int_t gX[9], in_int_t gY[9], out_int_t out[N]) {
   int sum = 0;
   for (unsigned y = 0; y < 15; y++) {
     for (unsigned x = 0; x < 15; x++) {
@@ -55,4 +55,22 @@ int sobel(int in[N], int gX[9], int gY[9], int out[N]) {
   }
 
   return sum;
+}
+
+int main(void) {
+  in_int_t in[N];
+  in_int_t gX[9];
+  in_int_t gY[9];
+  out_int_t out[N];
+
+  for (int j = 0; j < N; ++j) {
+    in[j] = j;
+    out[j] = j;
+  }
+  for (int j = 0; j < 9; ++j) {
+    gX[j] = j;
+    gY[j] = j;
+  }
+
+  sobel(in, gX, gY, out);
 }

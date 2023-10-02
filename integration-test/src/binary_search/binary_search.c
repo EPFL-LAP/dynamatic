@@ -6,7 +6,7 @@
 
 #include "binary_search.h"
 
-int binary_search(int search, int a[N]) {
+int binary_search(in_int_t search, in_int_t a[N]) {
   int evenIdx = -1;
   int oddIdx = -1;
 
@@ -31,4 +31,12 @@ int binary_search(int search, int a[N]) {
     done = oddIdx;
 
   return done;
+}
+
+int main(void) {
+  in_int_t mem0[N];
+  for (int i = 0; i < N; i++)
+    mem0[i] = i;
+  binary_search(55, mem0);
+  return 0;
 }

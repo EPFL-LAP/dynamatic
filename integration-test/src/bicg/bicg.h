@@ -10,8 +10,12 @@
 
 #define N 30
 
+typedef int in_int_t;
+typedef int inout_int_t;
+
 /// Computes the biconjugate gradient between a matruix and two vectors, and
 /// stores the result in the two last arrays.
-int bicg(int a[N][N], int s[N], int q[N], int p[N], int r[N]);
+int bicg(in_int_t a[N][N], inout_int_t s[N], inout_int_t q[N], in_int_t p[N],
+         in_int_t r[N]);
 
 #endif // BICG_BICG_H

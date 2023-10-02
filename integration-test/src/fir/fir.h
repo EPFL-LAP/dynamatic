@@ -11,7 +11,9 @@
 #define N 1000
 #define N_DEC 999 // = N - 1
 
+typedef int in_int_t;
+
 /// Computes the finite impulse response between two arrays.
-int fir(int di[N], int idx[N]);
+int fir(in_int_t di[N], in_int_t idx[N]);
 
 #endif // FIR_FIR_H

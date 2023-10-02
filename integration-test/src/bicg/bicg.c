@@ -8,8 +8,10 @@
 //===----------------------------------------------------------------------===//
 
 #include "bicg.h"
+#include "stdlib.h"
 
-int bicg(int a[N][N], int s[N], int q[N], int p[N], int r[N]) {
+int bicg(in_int_t a[N][N], inout_int_t s[N], inout_int_t q[N], in_int_t p[N],
+         in_int_t r[N]) {
   int tmp = 0;
   for (unsigned i = 0; i < N; i++) {
     tmp = q[i];
@@ -23,4 +25,25 @@ int bicg(int a[N][N], int s[N], int q[N], int p[N], int r[N]) {
     q[i] = tmp;
   }
   return tmp;
+}
+
+int main(void) {
+  in_int_t a[N][N];
+  inout_int_t s[N];
+  inout_int_t q[N];
+  in_int_t p[N];
+  in_int_t r[N];
+
+  for (int y = 0; y < N; ++y) {
+    s[y] = rand() % 100;
+    q[y] = rand() % 100;
+    p[y] = rand() % 100;
+    r[y] = rand() % 100;
+    for (int x = 0; x < N; ++x) {
+      a[y][x] = rand() % 100;
+    }
+  }
+
+  bicg(a, s, q, p, r);
+  return 0;
 }

@@ -6,7 +6,7 @@
 
 #include "polyn_mult.h"
 
-unsigned polyn_mult(uint32_t a[N], uint32_t b[N], uint32_t out[N]) {
+unsigned polyn_mult(in_int_t a[N], in_int_t b[N], out_int_t out[N]) {
   unsigned p = 0;
   for (unsigned k = 0; k < N; k++) {
     out[k] = 0;
@@ -18,4 +18,19 @@ unsigned polyn_mult(uint32_t a[N], uint32_t b[N], uint32_t out[N]) {
     p = i + k;
   }
   return p;
+}
+
+int main(void) {
+  in_int_t a[N];
+  in_int_t b[N];
+  out_int_t out[N];
+
+  for (int i = 0; i < N; i++) {
+    out[i] = 0;
+    a[i] = i % 10;
+    b[i] = (N - i) % 10;
+  }
+
+  polyn_mult(a, b, out);
+  return 0;
 }
