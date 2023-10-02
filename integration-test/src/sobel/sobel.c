@@ -13,7 +13,7 @@ int sobel(int in[N], int gX[9], int gY[9], int out[N]) {
       int sumX = 0;
       int sumY = 0;
 
-      bool t1, t2, c1, c2;
+      unsigned t1, t2, c1, c2, c3;
 
       /* image boundaries */
       t1 = y == 0;
@@ -26,7 +26,9 @@ int sobel(int in[N], int gX[9], int gY[9], int out[N]) {
       c2 = t1 || t2;
       c2 = !c2;
 
-      if (c2) {
+      c3 = 11 && c2;
+
+      if (c3) {
         for (int i = -1; i <= 1; i++) {
           for (int j = -1; j <= 1; j++) {
             sumX += in[x] * gX[3 * i + j + 4];
