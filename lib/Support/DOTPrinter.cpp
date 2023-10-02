@@ -16,6 +16,7 @@
 #include "mlir/IR/BuiltinTypes.h"
 #include "mlir/IR/OperationSupport.h"
 #include "mlir/IR/PatternMatch.h"
+#include "mlir/IR/Value.h"
 #include "llvm/ADT/TypeSwitch.h"
 #include <iomanip>
 #include <string>
@@ -485,8 +486,14 @@ LogicalResult DOTPrinter::annotateNode(Operation *op) {
                 auto info = NodeInfo("MC");
                 info.stringAttr["in"] = getInputForMC(memOp);
                 info.stringAttr["out"] = getOutputForMC(memOp);
+
+                // Set memory name
+                Value memref = memOp.getMemref();
+                size_t argIdx = cast<BlockArgument>(memref).getArgNumber();
                 info.stringAttr["memory"] =
-                    "mem" + std::to_string(memOp.getId());
+                    op->getParentOfType<handshake::FuncOp>()
+                        .getArgName(argIdx)
+                        .str();
 
                 // Compute the number of basic blocks with a control signal to
                 // the MC

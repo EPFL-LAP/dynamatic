@@ -9,6 +9,7 @@
 #define EXPERIMENTAL_TRANSFORMS_PASSES_H
 
 #include "dynamatic/Support/LLVM.h"
+#include "experimental/Transforms/HandshakeFixArgNames.h"
 #include "mlir/Pass/Pass.h"
 
 namespace dynamatic {
