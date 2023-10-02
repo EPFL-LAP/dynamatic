@@ -5,12 +5,11 @@
 //===----------------------------------------------------------------------===//
 
 #include "sobel.h"
-#include <cstddef>
 
 int sobel(int in[N], int gX[9], int gY[9], int out[N]) {
   int sum = 0;
-  for (size_t y = 0; y < 15; y++) {
-    for (size_t x = 0; x < 15; x++) {
+  for (unsigned y = 0; y < 15; y++) {
+    for (unsigned x = 0; x < 15; x++) {
       int sumX = 0;
       int sumY = 0;
 

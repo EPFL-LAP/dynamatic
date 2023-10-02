@@ -5,20 +5,19 @@
 //===----------------------------------------------------------------------===//
 
 #include "binary_search.h"
-#include <cstddef>
 
 int binary_search(int search, int a[N]) {
   int evenIdx = -1;
   int oddIdx = -1;
 
-  for (size_t i = 0; i < N; i += 2) {
+  for (unsigned i = 0; i < N; i += 2) {
     if (a[i] == search) {
       evenIdx = (int)i;
       break;
     }
   }
 
-  for (size_t i = 1; i < N; i += 2) {
+  for (unsigned i = 1; i < N; i += 2) {
     if (a[i] == search) {
       oddIdx = (int)i;
       break;
