@@ -79,6 +79,8 @@ BufferLogger::BufferLogger(handshake::FuncOp funcOp, bool dumpLogs,
   log = new Logger(fp + "placement.log", ec);
 }
 
+#ifndef DYNAMATIC_GUROBI_NOT_INSTALLED
+
 /// Logs arch and CFDFC information (sequence of basic blocks, number of
 /// executions, channels, units) to the logger.
 static void logFuncInfo(FuncInfo &info, Logger &log) {
@@ -154,6 +156,8 @@ static LogicalResult verifyFuncValidForPlacement(FuncInfo &info) {
   }
   return success();
 }
+
+#endif // DYNAMATIC_GUROBI_NOT_INSTALLED
 
 namespace {
 struct HandshakePlaceBuffersPass
