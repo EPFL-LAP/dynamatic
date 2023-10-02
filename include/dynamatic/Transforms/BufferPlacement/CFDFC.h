@@ -1,4 +1,4 @@
-//===- ExtractCFDFC.h - Extract CFDFCs from dataflow circuits ---*- C++ -*-===//
+//===- CFDFC.h - Control-Free DataFlow Circuit ------------------*- C++ -*-===//
 //
 // Declares data structures and functions to extract and create CFDFCs
 // (Choice-Free DataFlow Circuits) from a description of a Handshake function's
@@ -11,8 +11,8 @@
 //
 //===----------------------------------------------------------------------===//
 
-#ifndef DYNAMATIC_TRANSFORMS_BUFFERPLACEMENT_EXTRACTCFDFC_H
-#define DYNAMATIC_TRANSFORMS_BUFFERPLACEMENT_EXTRACTCFDFC_H
+#ifndef DYNAMATIC_TRANSFORMS_BUFFERPLACEMENT_CFDFC_H
+#define DYNAMATIC_TRANSFORMS_BUFFERPLACEMENT_CFDFC_H
 
 #include "circt/Dialect/Handshake/HandshakeOps.h"
 #include "dynamatic/Support/LLVM.h"
@@ -67,4 +67,4 @@ LogicalResult extractCFDFC(circt::handshake::FuncOp funcOp, ArchSet &archs,
 } // namespace buffer
 } // namespace dynamatic
 
-#endif // DYNAMATIC_TRANSFORMS_BUFFERPLACEMENT_EXTRACTCFDFC_H
+#endif // DYNAMATIC_TRANSFORMS_BUFFERPLACEMENT_CFDFC_H

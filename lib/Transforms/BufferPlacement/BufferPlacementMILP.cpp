@@ -1,6 +1,6 @@
-//===- OptimizeMILP.cpp - optimize MILP model over CFDFC  -------*- C++ -*-===//
+//===- BufferPlacementMILP.cpp - MILP-based buffer placement ----*- C++ -*-===//
 //
-// This file implements the MILP solver for buffer placement.
+// Implements MILP-based buffer placement (requires Gurobi).
 //
 //===----------------------------------------------------------------------===//
 
@@ -11,8 +11,8 @@
 #include "circt/Dialect/Handshake/HandshakeOps.h"
 #include "circt/Dialect/Handshake/HandshakePasses.h"
 #include "dynamatic/Support/LogicBB.h"
+#include "dynamatic/Transforms/BufferPlacement/BufferPlacementMILP.h"
 #include "dynamatic/Transforms/BufferPlacement/BufferingProperties.h"
-#include "dynamatic/Transforms/BufferPlacement/OptimizeMILP.h"
 #include "dynamatic/Transforms/PassDetails.h"
 #include "mlir/Dialect/Arith/IR/Arith.h"
 #include "mlir/Dialect/Func/IR/FuncOps.h"
@@ -39,8 +39,6 @@ BufferPlacementMILP::BufferPlacementMILP(FuncInfo &funcInfo,
                                          GRBEnv &env, Logger *logger)
     : timingDB(timingDB), targetPeriod(targetPeriod), maxPeriod(maxPeriod),
       funcInfo(funcInfo), model(GRBModel(env)), logger(logger) {
-  // Set a 3-minutes time limit for the MILP
-  model.getEnv().set(GRB_DoubleParam_TimeLimit, 180);
 
   // Give a unique name to each operation
   std::map<std::string, unsigned> instanceNameCntr;

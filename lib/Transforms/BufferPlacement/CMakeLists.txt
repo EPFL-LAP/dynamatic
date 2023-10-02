@@ -4,10 +4,10 @@ endif()
 
 add_dynamatic_library(DynamaticBufferPlacement
   BufferingProperties.cpp
-  ExtractCFDFC.cpp
+  BufferPlacementMILP.cpp
+  CFDFC.cpp
   HandshakePlaceBuffers.cpp
   HandshakeSetBufferingProperties.cpp
-  OptimizeMILP.cpp
 
   DEPENDS
   DynamaticTransformsPassIncGen

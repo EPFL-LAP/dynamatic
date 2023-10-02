@@ -11,8 +11,8 @@
 #include "circt/Dialect/Handshake/HandshakePasses.h"
 #include "dynamatic/Support/Logging.h"
 #include "dynamatic/Support/LogicBB.h"
-#include "dynamatic/Transforms/BufferPlacement/ExtractCFDFC.h"
-#include "dynamatic/Transforms/BufferPlacement/OptimizeMILP.h"
+#include "dynamatic/Transforms/BufferPlacement/BufferPlacementMILP.h"
+#include "dynamatic/Transforms/BufferPlacement/CFDFC.h"
 #include "dynamatic/Transforms/PassDetails.h"
 #include "experimental/Support/StdProfiler.h"
 #include "mlir/Dialect/Arith/IR/Arith.h"
@@ -159,13 +159,14 @@ namespace {
 struct HandshakePlaceBuffersPass
     : public HandshakePlaceBuffersBase<HandshakePlaceBuffersPass> {
 
-  HandshakePlaceBuffersPass(bool firstCFDFC, std::string &stdLevelInfo,
-                            std::string &timefile, double targetCP,
-                            bool dumpLogs) {
+  HandshakePlaceBuffersPass(const std::string &frequencies,
+                            const std::string &timingModels, bool firstCFDFC,
+                            double targetCP, unsigned timeout, bool dumpLogs) {
+    this->frequencies = frequencies;
+    this->timingModels = timingModels;
     this->firstCFDFC = firstCFDFC;
-    this->stdLevelInfo = stdLevelInfo;
-    this->timefile = timefile;
     this->targetCP = targetCP;
+    this->timeout = timeout;
     this->dumpLogs = dumpLogs;
   }
 
@@ -197,7 +198,7 @@ struct HandshakePlaceBuffersPass
       // Read the CSV containing arch information (number of transitions between
       // pairs of basic blocks) from disk
       SmallVector<ArchBB> archs;
-      if (failed(StdProfiler::readCSV(stdLevelInfo, info.archs))) {
+      if (failed(StdProfiler::readCSV(frequencies, info.archs))) {
         funcOp->emitError() << "Failed to read profiling information from CSV";
         return signalPassFailure();
       }
@@ -210,7 +211,7 @@ struct HandshakePlaceBuffersPass
 
     // Read the operations' timing models from disk
     TimingDatabase timingDB(&getContext());
-    if (failed(TimingDatabase::readFromJSON(timefile, timingDB)))
+    if (failed(TimingDatabase::readFromJSON(timingModels, timingDB)))
       return signalPassFailure();
 
     // Place buffers in each function
@@ -229,7 +230,7 @@ struct HandshakePlaceBuffersPass
 
       // Get CFDFCs from the function
       SmallVector<CFDFC> cfdfcs;
-      if (failed(getCFDFCs(info, cfdfcs, logger)))
+      if (failed(getCFDFCs(info, logger, cfdfcs)))
         return signalPassFailure();
 
       // All extracted CFDFCs must be optimized
@@ -241,7 +242,7 @@ struct HandshakePlaceBuffersPass
 
       // Solve the MILP to obtain a buffer placement
       DenseMap<Value, PlacementResult> placement;
-      if (failed(getBufferPlacement(info, timingDB, placement, logger)))
+      if (failed(getBufferPlacement(info, timingDB, logger, placement)))
         return signalPassFailure();
 
       if (failed(instantiateBuffers(placement)))
@@ -250,13 +251,19 @@ struct HandshakePlaceBuffersPass
   };
 
 private:
-  LogicalResult getCFDFCs(FuncInfo &info, SmallVector<CFDFC> &cfdfcs,
-                          BufferLogger &logger);
+  /// Identifes (using and MILP) and extract CFDFCs from the function using
+  /// estimated transition frequencies between blocks.
+  LogicalResult getCFDFCs(FuncInfo &info, BufferLogger &logger,
+                          SmallVector<CFDFC> &cfdfcs);
 
+  /// Computes an optimal buffer placement by solving a large MILP over the
+  /// entire dataflow circuit represented by the function.
   LogicalResult getBufferPlacement(FuncInfo &info, TimingDatabase &timingDB,
-                                   DenseMap<Value, PlacementResult> &placement,
-                                   BufferLogger &logger);
+                                   BufferLogger &logger,
+                                   DenseMap<Value, PlacementResult> &placement);
 
+  /// Instantiates buffers identified by the buffer placement MILP inside the
+  /// IR.
   LogicalResult instantiateBuffers(DenseMap<Value, PlacementResult> &res);
 #endif
 };
@@ -264,8 +271,8 @@ private:
 
 #ifndef DYNAMATIC_GUROBI_NOT_INSTALLED
 LogicalResult HandshakePlaceBuffersPass::getCFDFCs(FuncInfo &info,
-                                                   SmallVector<CFDFC> &cfdfcs,
-                                                   BufferLogger &logger) {
+                                                   BufferLogger &logger,
+                                                   SmallVector<CFDFC> &cfdfcs) {
   SmallVector<ArchBB> archsCopy(info.archs);
 
   // Store all archs in a set. We use a pointer to each arch as the key type to
@@ -309,12 +316,14 @@ LogicalResult HandshakePlaceBuffersPass::getCFDFCs(FuncInfo &info,
 }
 
 LogicalResult HandshakePlaceBuffersPass::getBufferPlacement(
-    FuncInfo &info, TimingDatabase &timingDB,
-    DenseMap<Value, PlacementResult> &placement, BufferLogger &log) {
+    FuncInfo &info, TimingDatabase &timingDB, BufferLogger &log,
+    DenseMap<Value, PlacementResult> &placement) {
 
   // Create Gurobi environment
   GRBEnv env = GRBEnv(true);
   env.set(GRB_IntParam_OutputFlag, 0);
+  if (timeout > 0)
+    env.set(GRB_DoubleParam_TimeLimit, timeout);
   env.start();
 
   Logger *milpLog = dumpLogs ? *log : nullptr;
@@ -359,11 +368,9 @@ LogicalResult HandshakePlaceBuffersPass::instantiateBuffers(
 #endif
 
 std::unique_ptr<mlir::OperationPass<mlir::ModuleOp>>
-dynamatic::buffer::createHandshakePlaceBuffersPass(bool firstCFDFC,
-                                                   std::string stdLevelInfo,
-                                                   std::string timefile,
-                                                   double targetCP,
-                                                   bool dumpLogs) {
+dynamatic::buffer::createHandshakePlaceBuffersPass(
+    const std::string &frequencies, const std::string &timingModels,
+    bool firstCFDFC, double targetCP, unsigned timeout, bool dumpLogs) {
   return std::make_unique<HandshakePlaceBuffersPass>(
-      firstCFDFC, stdLevelInfo, timefile, targetCP, dumpLogs);
+      frequencies, timingModels, firstCFDFC, targetCP, timeout, dumpLogs);
 }

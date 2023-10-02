@@ -188,14 +188,18 @@ def HandshakePlaceBuffers : Pass<"handshake-place-buffers", "mlir::ModuleOp"> {
   }];
   let constructor = "dynamatic::buffer::createHandshakePlaceBuffersPass()";
   let options = [
-    Option<"firstCFDFC", "firstCFDFC", "bool", "false",
-    "if true, only extract the first CFDFC from the input file">,
-    Option<"stdLevelInfo", "std-level-info", "std::string", "",
-    "if provided, extract CFDFC from standard level simluation">,
-    Option<"timefile", "time-file", "std::string", "",
-    "required, file provide the time and buffer prerequisite information ">,
+    Option<"frequencies", "frequencies", "std::string", "",
+    "Path to CSV-formatted file containing estimated transition frequencies "
+    "between basic blocks in the kernel.">,
+    Option<"timingModels", "timing-models", "std::string", "",
+    "Path to JSON-formatted file containing timing models for dataflow "
+    "components.">,
+    Option<"firstCFDFC", "first-cfdfc", "bool", "false",
+    "If true, only extract the first CFDFC from the input file">,
     Option<"targetCP", "target-period", "double", "4.0",
-    "target clock period for the CFDFC">,
+    "Target clock period for the buffer placement CFDFC">,
+    Option<"timeout", "timeout", "unsigned", "180",
+    "Timeout (in seconds) for the buffer placement MILP (0 for no timeout)">,
     Option<"dumpLogs", "dump-logs", "bool", "false",
     "If true, dump debugging information (identified CFDFCs, MILP "
     "placement decisions, solution summaries) into a directory named "

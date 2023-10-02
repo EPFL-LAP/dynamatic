@@ -1,17 +1,21 @@
-//===- OptimizeMILP.h - optimize MILP model over CFDFC  ---------*- C++ -*-===//
+//===- BufferPlacementMILP.h - MILP-based buffer placement ------*- C++ -*-===//
 //
-// This file declares functions of MILP solver for buffer placement.
+// Infrastructure for MILP-based buffer placement (requires Gurobi). This mainly
+// declares the BufferPlacementMILP class, which contains all the logic to
+// setup, optimize, and extract placement decisions from an MILP that represents
+// a buffer placement problem. The class is easily extensible, allowing users to
+// customize part of the MILP creation/optimization process.
 //
 //===----------------------------------------------------------------------===//
 
-#ifndef DYNAMATIC_TRANSFORMS_BUFFERPLACEMENT_OPTIMIZEMILP_H
-#define DYNAMATIC_TRANSFORMS_BUFFERPLACEMENT_OPTIMIZEMILP_H
+#ifndef DYNAMATIC_TRANSFORMS_BUFFERPLACEMENT_BUFFERPLACEMENTMILP_H
+#define DYNAMATIC_TRANSFORMS_BUFFERPLACEMENT_BUFFERPLACEMENTMILP_H
 
 #include "dynamatic/Support/LLVM.h"
 #include "dynamatic/Support/Logging.h"
 #include "dynamatic/Support/TimingModels.h"
 #include "dynamatic/Transforms/BufferPlacement/BufferingProperties.h"
-#include "dynamatic/Transforms/BufferPlacement/ExtractCFDFC.h"
+#include "dynamatic/Transforms/BufferPlacement/CFDFC.h"
 #include "experimental/Support/StdProfiler.h"
 #include "mlir/Dialect/Func/IR/FuncOps.h"
 #include "mlir/IR/BuiltinTypes.h"
@@ -250,4 +254,4 @@ private:
 } // namespace dynamatic
 #endif // DYNAMATIC_GUROBI_NOT_INSTALLED
 
-#endif // DYNAMATIC_TRANSFORMS_BUFFERPLACEMENT_OPTIMIZEMILP_H
+#endif // DYNAMATIC_TRANSFORMS_BUFFERPLACEMENT_BUFFERPLACEMENTMILP_H

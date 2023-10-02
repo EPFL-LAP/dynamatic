@@ -1,10 +1,10 @@
-//===- ExtractCFDFC.cpp - Extract CFDFCs from dataflow circuits -*- C++ -*-===//
+//===- CFDFC.cpp - Control-Free DataFlow Circuit ----------------*- C++ -*-===//
 //
 // This file implements functions related to CFDFC extraction and creation.
 //
 //===----------------------------------------------------------------------===//
 
-#include "dynamatic/Transforms/BufferPlacement/ExtractCFDFC.h"
+#include "dynamatic/Transforms/BufferPlacement/CFDFC.h"
 #include "circt/Dialect/Handshake/HandshakeOps.h"
 #include "dynamatic/Support/LogicBB.h"
 #include "mlir/Dialect/Arith/IR/Arith.h"
