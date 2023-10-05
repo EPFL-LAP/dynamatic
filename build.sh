@@ -162,7 +162,7 @@ if should_run_cmake ; then
   cmake -G Ninja ../llvm \
       -DLLVM_ENABLE_PROJECTS="mlir;clang" \
       -DLLVM_TARGETS_TO_BUILD="host" \
-      -DCMAKE_BUILD_TYPE=$BUILD_TYPE \
+      -DCMAKE_BUILD_TYPE=Release \
       -DLLVM_ENABLE_ASSERTIONS=ON \
       $CMAKE_FLAGS_LLVM
   exit_on_fail "Failed to cmake polygeist/llvm-project"
@@ -187,7 +187,7 @@ if should_run_cmake ; then
       -DMLIR_DIR=$PWD/../llvm-project/build/lib/cmake/mlir \
       -DCLANG_DIR=$PWD/../llvm-project/build/lib/cmake/clang \
       -DLLVM_TARGETS_TO_BUILD="host" \
-      -DCMAKE_BUILD_TYPE=$BUILD_TYPE \
+      -DCMAKE_BUILD_TYPE=Release \
       -DLLVM_ENABLE_ASSERTIONS=ON \
       -Wno-dev \
       $CMAKE_FLAGS_SUPER
