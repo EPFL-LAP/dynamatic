@@ -7,7 +7,7 @@
 #include <string>
 
 
-void processDotFile(const std::string& inputFileName, const std::string& outputFileName) {
+void putPosOnSameLine(const std::string& inputFileName, const std::string& outputFileName) {
     std::ifstream inputFile(inputFileName);
     std::ofstream outputFile(outputFileName);
     std::string line;
@@ -18,23 +18,18 @@ void processDotFile(const std::string& inputFileName, const std::string& outputF
 
     while (std::getline(inputFile, line)) {
         if (line.find("pos=") != std::string::npos && line.find('e') != std::string::npos) {
-            // Start of "pos=" block
             posBlock = line;
             isInPosBlock = true;
         } else if (isInPosBlock) {
-            // Continue adding lines to "pos=" block
             posBlock += ' ' + line;
 
             if (line.find("];") != std::string::npos) {
-                // End of "pos=" block
                 isInPosBlock = false;
                 outputFile << posBlock << '\n';
 
-                // Add the current line as well (line after "pos=" block)
                 outputFile << line << '\n';
             }
         } else {
-            // Line doesn't contain "pos="; write it as is
             outputFile << line << '\n';
         }
     }
@@ -42,7 +37,6 @@ void processDotFile(const std::string& inputFileName, const std::string& outputF
     inputFile.close();
     outputFile.close();
 
-//    std::cout << "Processed " << inputFileName << " and saved as " << outputFileName << std::endl;
 }
 
 
@@ -75,7 +69,6 @@ void insertNewlineBeforeStyle(const string& inputFileName, const string& outputF
     inputFile.close();
     outputFile.close();
 
-//    cout << "Modified file saved as " << outputFileName << endl;
 }
 
 
@@ -90,9 +83,7 @@ void removeBackslashWithSpaceFromPos(const string& inputFileName, const string& 
         size_t posPos = line.find("pos=");
         size_t backslashPos = line.find("\\ ");
 
-        // Check if "pos" and " \\" are on the same line
         if (posPos != string::npos && backslashPos != string::npos && posPos < backslashPos) {
-            // Remove the " \\" by copying the string without it
             string modifiedLine = line.substr(0, backslashPos) + line.substr(backslashPos + 2);
             outputFile << modifiedLine << endl;
         } else {
@@ -103,7 +94,6 @@ void removeBackslashWithSpaceFromPos(const string& inputFileName, const string& 
     inputFile.close();
     outputFile.close();
 
-//    cout << "Modified file saved as " << outputFileName << endl;
 }
 
 
@@ -118,7 +108,6 @@ void removeEverythingAfterApostropheComma(const std::string& inputFileName, cons
         size_t apostropheCommaPos = line.find("\",");
 
         if (posPos != std::string::npos && apostropheCommaPos != std::string::npos && posPos < apostropheCommaPos) {
-            // Truncate the line before the position of "\",\""
             line = line.substr(0, apostropheCommaPos+2);
         }
 
@@ -128,7 +117,6 @@ void removeEverythingAfterApostropheComma(const std::string& inputFileName, cons
     inputFile.close();
     outputFile.close();
 
-//    std::cout << "Processed " << inputFileName << " and saved as " << outputFileName << std::endl;
 }
 
 
@@ -145,7 +133,6 @@ void removeEverythingAfterCommaInStyle(const std::string& inputFileName, const s
         size_t commaPos = line.find(',');
 
         if (stylePos != std::string::npos && commaPos != std::string::npos && stylePos < commaPos) {
-            // Truncate the line before the position of the comma
             line = line.substr(0, commaPos);
         }
 
@@ -155,15 +142,15 @@ void removeEverythingAfterCommaInStyle(const std::string& inputFileName, const s
     inputFile.close();
     outputFile.close();
 
-//    std::cout << "Processed " << inputFileName << " and saved as " << outputFileName << std::endl;
+}
+
+void reformatDot(const std::string& inputFileName, const std::string& outputFileName) {
+    putPosOnSameLine(inputFileName, outputFileName);
+    insertNewlineBeforeStyle(outputFileName, outputFileName);
+    removeBackslashWithSpaceFromPos(outputFileName, outputFileName);
+    removeEverythingAfterCommaInStyle(outputFileName, outputFileName);
+    removeEverythingAfterCommaInStyle(outputFileName,outputFileName);
+
 }
 
 
-
-
-//
-//int main() {
-//    processDotFile();
-//    insertNewlineBeforeStyle("output.dot","output4.dot");
-//    removeBackslashWithSpaceFromPos("output4.dot", "outputFinal.dot");
-//}
