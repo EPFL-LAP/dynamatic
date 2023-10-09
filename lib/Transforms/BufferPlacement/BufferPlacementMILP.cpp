@@ -10,6 +10,7 @@
 //
 //===----------------------------------------------------------------------===//
 
+#include <algorithm>
 #ifndef DYNAMATIC_GUROBI_NOT_INSTALLED
 #include "gurobi_c++.h"
 
@@ -186,19 +187,29 @@ LogicalResult BufferPlacementMILP::setup() {
   if (failed(createVars()))
     return failure();
 
-  std::vector<Value> allChannels, allBufferizableChannels;
-  for (auto &[channel, _] : channels) {
-    allChannels.push_back(channel);
-    if (channels[channel].isBufferizable())
-      allBufferizableChannels.push_back(channel);
-  }
+  // Aggregate all units in a vector
   std::vector<Operation *> allUnits;
   for (Operation &op : funcInfo.funcOp.getOps())
     allUnits.push_back(&op);
 
+  // Aggregate all channels in a vector
+  std::vector<Value> allChannels;
+  for (auto &[channel, _] : channels)
+    allChannels.push_back(channel);
+
+  // Exclude channels that connect to memory interfaces for path and elasticity
+  // constraints
+  std::vector<Value> nonMemChannels;
+  llvm::copy_if(
+      allChannels, std::back_inserter(nonMemChannels), [&](Value val) {
+        return !val.getDefiningOp<handshake::MemoryControllerOp>() &&
+               !isa<handshake::MemoryControllerOp>(*val.getUsers().begin());
+      });
+
+  // Create custom, path, and elasticity constraints
   if (failed(addCustomChannelConstraints(allChannels)) ||
-      failed(addPathConstraints(allBufferizableChannels, allUnits)) ||
-      failed(addElasticityConstraints(allBufferizableChannels, allUnits)))
+      failed(addPathConstraints(nonMemChannels, allUnits)) ||
+      failed(addElasticityConstraints(nonMemChannels, allUnits)))
     return failure();
 
   // Add throughput constraints over each CFDFC that was marked to be optimized
