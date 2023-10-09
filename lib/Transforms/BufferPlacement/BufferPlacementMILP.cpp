@@ -62,7 +62,7 @@ BufferPlacementMILP::BufferPlacementMILP(FuncInfo &funcInfo,
     // Increase the minimum number of slots if internal buffers are present, and
     // check for satisfiability
     if (failed(addInternalBuffers(channel))) {
-      unsatisfiable = true;
+      status = MILPStatus::UNSAT_PROPERTIES;
       std::stringstream stream;
       stream << "Including internal component buffers into buffering "
                 "properties of outgoing channel made them unsatisfiable. "
@@ -89,10 +89,97 @@ BufferPlacementMILP::BufferPlacementMILP(FuncInfo &funcInfo,
         return;
     }
   }
+
+  if (failed(setup()))
+    status = MILPStatus::FAILED_TO_SETUP;
 }
 
-bool BufferPlacementMILP::arePlacementConstraintsSatisfiable() {
-  return !unsatisfiable;
+LogicalResult BufferPlacementMILP::optimize(int *milpStat) {
+  if (!isReadyForOptimization()) {
+    std::stringstream ss;
+    ss << status;
+    return funcInfo.funcOp->emitError()
+           << "The MILP is not ready for optimization (reason: " << ss.str()
+           << ").";
+  }
+
+  // Optimize the model
+  if (logger)
+    model.write(logger->getLogDir() + path::get_separator().str() +
+                "placement_model.lp");
+  model.optimize();
+  if (logger)
+    model.write(logger->getLogDir() + path::get_separator().str() +
+                "placement_solutions.json");
+
+  // Check whether we found an optimal solution or reached the time limit
+  int stat = model.get(GRB_IntAttr_Status);
+  if (milpStat)
+    *milpStat = stat;
+  if (stat != GRB_OPTIMAL && stat != GRB_TIME_LIMIT) {
+    status = MILPStatus::FAILED_TO_OPTIMIZE;
+    return funcInfo.funcOp->emitError()
+           << "Gurobi failed (status: " << stat << ")";
+  }
+  status = MILPStatus::OPTIMIZED;
+  return success();
+}
+
+LogicalResult
+BufferPlacementMILP::getPlacement(DenseMap<Value, PlacementResult> &placement,
+                                  bool legacyPlacement) {
+  if (status != MILPStatus::OPTIMIZED) {
+    std::stringstream ss;
+    ss << status;
+    return funcInfo.funcOp->emitError()
+           << "Buffer placements cannot be extracted from MILP (reason: "
+           << ss.str() << ").";
+  }
+
+  // Iterate over all channels in the circuit
+  for (auto &[value, channelVars] : vars.channels) {
+    if (channelVars.bufPresent.get(GRB_DoubleAttr_X) == 0)
+      continue;
+
+    // Extract number and type of slots from the MILP solution, as well as
+    // channel-specific buffering properties
+    unsigned numSlotsToPlace = static_cast<unsigned>(
+        channelVars.bufNumSlots.get(GRB_DoubleAttr_X) + 0.5);
+    bool placeOpaque = channelVars.bufIsOpaque.get(GRB_DoubleAttr_X) > 0;
+    ChannelBufProps &props = channels[value];
+
+    PlacementResult result;
+    if (placeOpaque && numSlotsToPlace > 0) {
+      if (legacyPlacement) {
+        // Satisfy the transparent slots requirement, all other slots are opaque
+        result.numTrans = props.minTrans;
+        result.numOpaque = numSlotsToPlace - props.minTrans;
+      } else {
+        // We want as many slots as possible to be transparent and at least one
+        // opaque slot, while satisfying all buffering constraints
+        unsigned actualMinOpaque = std::max(1U, props.minOpaque);
+        if (props.maxTrans.has_value() &&
+            (props.maxTrans.value() < numSlotsToPlace - actualMinOpaque)) {
+          result.numTrans = props.maxTrans.value();
+          result.numOpaque = numSlotsToPlace - result.numTrans;
+        } else {
+          result.numOpaque = actualMinOpaque;
+          result.numTrans = numSlotsToPlace - result.numOpaque;
+        }
+      }
+    } else {
+      // All slots should be transparent
+      result.numTrans = numSlotsToPlace;
+    }
+
+    Channel channel(value);
+    deductInternalBuffers(channel, result);
+    placement[value] = result;
+  }
+
+  if (logger)
+    logResults(placement);
+  return success();
 }
 
 LogicalResult BufferPlacementMILP::setup() {
@@ -122,75 +209,6 @@ LogicalResult BufferPlacementMILP::setup() {
 
   // Finally, add the MILP objective
   return addObjective();
-}
-
-LogicalResult
-BufferPlacementMILP::optimize(DenseMap<Value, PlacementResult> &placement) {
-  if (unsatisfiable)
-    return funcInfo.funcOp->emitError()
-           << "The MILP is unsatisfiable: customized "
-              "channel constraints are incompatible "
-              "with buffers included inside units.";
-
-  // Optimize the model, then check whether we found an optimal solution or
-  // whether we reached the time limit
-
-  if (logger)
-    model.write(logger->getLogDir() + path::get_separator().str() +
-                "placement_model.lp");
-  model.optimize();
-  if (logger)
-    model.write(logger->getLogDir() + path::get_separator().str() +
-                "placement_solutions.json");
-
-  int status = model.get(GRB_IntAttr_Status);
-  if (status != GRB_OPTIMAL && status != GRB_TIME_LIMIT)
-    return funcInfo.funcOp->emitError()
-           << "Gurobi failed with status code " << status;
-
-  // Fill in placement information
-  for (auto &[value, channelVars] : vars.channels) {
-    if (channelVars.bufPresent.get(GRB_DoubleAttr_X) == 0)
-      continue;
-
-    unsigned numSlotsToPlace = static_cast<unsigned>(
-        channelVars.bufNumSlots.get(GRB_DoubleAttr_X) + 0.5);
-    bool placeOpaque = channelVars.bufIsOpaque.get(GRB_DoubleAttr_X) > 0;
-
-    PlacementResult result;
-    ChannelBufProps &props = channels[value];
-
-    if (placeOpaque && numSlotsToPlace > 0) {
-      /// NOTE: This matches the behavior of the legacy buffer placement pass
-      /// However, a better placement may be achieved using the commented out
-      /// logic below.
-      result.numTrans = props.minTrans;
-      result.numOpaque = numSlotsToPlace - props.minTrans;
-
-      // We want as many slots as possible to be transparent and at least one
-      // opaque slot, while satisfying all buffering constraints
-      // unsigned actualMinOpaque = std::max(1U, props.minOpaque);
-      // if (props.maxTrans.has_value() &&
-      //     (props.maxTrans.value() < numSlotsToPlace - actualMinOpaque)) {
-      //   result.numTrans = props.maxTrans.value();
-      //   result.numOpaque = numSlotsToPlace - result.numTrans;
-      // } else {
-      //   result.numOpaque = actualMinOpaque;
-      //   result.numTrans = numSlotsToPlace - result.numOpaque;
-      // }
-    } else
-      // All slots should be transparent
-      result.numTrans = numSlotsToPlace;
-
-    Channel channel(value);
-    deductInternalBuffers(channel, result);
-    placement[value] = result;
-  }
-
-  if (logger)
-    logResults(placement);
-
-  return success();
 }
 
 LogicalResult BufferPlacementMILP::createVars() {
@@ -293,14 +311,6 @@ BufferPlacementMILP::addCustomChannelConstraints(ValueRange customChannels) {
         size_t idx;
         Operation *producer = getChannelProducer(channel, &idx);
         assert(producer && "channel producer must exist");
-        producer->emitWarning()
-            << "Outgoing channel " << idx
-            << " requests placement of at least one transparent and at least "
-               "one opaque slot on the channel, which the MILP does not "
-               "formally support. To honor the properties, the MILP will be "
-               "configured to only place opaque slots, some of which will be "
-               "converted to transparent slots when parsing the MILP's "
-               "solution.";
         unsigned minTotalSlots = props.minOpaque + props.minTrans;
         model.addConstr(chVars.bufNumSlots >= minTotalSlots,
                         "custom_minOpaqueAndTrans");

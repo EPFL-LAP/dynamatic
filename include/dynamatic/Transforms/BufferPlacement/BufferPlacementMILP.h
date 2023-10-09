@@ -25,6 +25,7 @@
 #include "experimental/Support/StdProfiler.h"
 #include "mlir/Dialect/Func/IR/FuncOps.h"
 #include "mlir/IR/BuiltinTypes.h"
+#include "mlir/Support/LLVM.h"
 #include "llvm/ADT/MapVector.h"
 
 #ifndef DYNAMATIC_GUROBI_NOT_INSTALLED
@@ -39,6 +40,9 @@ struct PlacementResult {
   unsigned numTrans = 0;
   /// The number of opaque buffer slots that should be placed.
   unsigned numOpaque = 0;
+  /// Whether opaque slots should be placed transparent slots for placement
+  /// results that include both.
+  bool opaqueBeforeTrans = true;
 };
 
 /// Holds MILP variables associated to every CFDFC unit. Note that a unit may
@@ -123,6 +127,14 @@ struct FuncInfo {
 /// MILP.
 class BufferPlacementMILP {
 public:
+  enum class MILPStatus {
+    UNSAT_PROPERTIES,
+    FAILED_TO_SETUP,
+    READY,
+    FAILED_TO_OPTIMIZE,
+    OPTIMIZED
+  };
+
   /// Contains timing characterizations for dataflow components required to
   /// create the MILP constraints.
   const TimingDatabase &timingDB;
@@ -137,22 +149,28 @@ public:
                       double targetPeriod, double maxPeriod, GRBEnv &env,
                       Logger *log = nullptr);
 
-  /// Returns whether the custom buffer placement constraints derived from
-  /// custom channel buffering properties attached to IR operations are
-  /// satisfiable with respect to the component descriptions that the MILP
-  /// constructor was called with.
-  bool arePlacementConstraintsSatisfiable();
+  /// Determines whether the MILP is in a valid state to be optimized. If this
+  /// returns true, optimize can be called to solve the MILP. Conversely, if
+  /// this returns false then a call to optimize will produce an error.
+  bool isReadyForOptimization() { return status == MILPStatus::READY; };
 
-  /// Setups the entire MILP, first creating all variables, the all constraints,
-  /// and finally setting the system's objective. After calling this function,
-  /// the MILP is ready to be optimized.
-  LogicalResult setup();
+  /// Optimizes the MILP. If a logger was provided at object creation, the MILP
+  /// model and its solution are stored in plain text in its associated
+  /// directory. If a valid pointer is provided, saves Gurobi's optimization
+  /// status code in it after optimization.
+  LogicalResult optimize(int *milpStat = nullptr);
 
-  /// Optimizes the MILP, which the function asssumes must have been setup
-  /// before. On success, fills in the provided map with the buffer placement
-  /// results, telling how each channel (equivalently, each MLIR value) must
-  /// be bufferized according to the MILP solution.
-  LogicalResult optimize(DenseMap<Value, PlacementResult> &placement);
+  /// Fills in the provided map with the buffer placement results after MILP
+  /// optimization, specifying how each channel (equivalently, each MLIR value)
+  /// must be bufferized according to the MILP solution. Setting the legacy
+  /// placement flag makes this method use the same placement policy as legacy
+  /// Dynamatic; non-legacy placement will yield faster circuits (some opaque
+  /// slots transformed into transparent slots).
+  LogicalResult getPlacement(DenseMap<Value, PlacementResult> &placement,
+                             bool legacyPlacement = true);
+
+  /// Returns the MILP's status.
+  MILPStatus getStatus() { return status; }
 
   /// The class manages a Gurobi model which should not be copied, hence the
   /// copy constructor is deleted.
@@ -178,6 +196,14 @@ protected:
   DenseMap<Operation *, std::string> nameUniquer;
   /// Logger; if not null the class will log setup and results information.
   Logger *logger;
+  /// MILP's status, which changes during the object's lifetime.
+  MILPStatus status = MILPStatus::READY;
+
+  /// Setups the entire MILP, first creating all variables, the all constraints,
+  /// and finally setting the system's objective. Called by the constructor in
+  /// the absence of prior failures, after which the MILP is ready to be
+  /// optimized.
+  LogicalResult setup();
 
   /// Adds all variables used in the MILP to the Gurobi model.
   LogicalResult createVars();
@@ -236,12 +262,6 @@ protected:
   std::string getChannelName(Value channel);
 
 private:
-  /// Whether the MILP is unsatisfiable due to a conflict between user-defined
-  /// channel properties and buffers internal to units (e.g., a channel declares
-  /// that it should not be buffered yet the unit's IO which it connects to has
-  /// a one-slot transparent buffer). Set by the class constructor.
-  bool unsatisfiable = false;
-
   /// Helper method to run a closure on each input/output port pair of the
   /// provided operation, unless one of the ports has type `mlir::MemRefType`.
   void forEachIOPair(Operation *op,
@@ -259,5 +279,34 @@ private:
 } // namespace buffer
 } // namespace dynamatic
 #endif // DYNAMATIC_GUROBI_NOT_INSTALLED
+
+/// Prints a description of the buffer placement MILP's current status to an
+/// output stream.
+template <typename T>
+T &operator<<(T &os,
+              dynamatic::buffer::BufferPlacementMILP::MILPStatus &status) {
+  switch (status) {
+  case dynamatic::buffer::BufferPlacementMILP::MILPStatus::UNSAT_PROPERTIES:
+    os << "the custom buffer placement constraints derived from custom channel "
+          "buffering properties attached to IR operations are unsatisfiable "
+          "with respect to the provided compoennt models";
+    break;
+  case dynamatic::buffer::BufferPlacementMILP::MILPStatus::FAILED_TO_SETUP:
+    os << "something went wrong during the creation of MILP constraints or "
+          "objective";
+    break;
+  case dynamatic::buffer::BufferPlacementMILP::MILPStatus::READY:
+    os << "the MILP is ready to be optimized";
+    break;
+  case dynamatic::buffer::BufferPlacementMILP::MILPStatus::FAILED_TO_OPTIMIZE:
+    os << "the MILP failed to be optimized, check Gurobi's return value for "
+          "more details on what went wrong";
+    break;
+  case dynamatic::buffer::BufferPlacementMILP::MILPStatus::OPTIMIZED:
+    os << "the MILP was successfully optimized";
+    break;
+  }
+  return os;
+}
 
 #endif // DYNAMATIC_TRANSFORMS_BUFFERPLACEMENT_BUFFERPLACEMENTMILP_H

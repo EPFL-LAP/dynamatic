@@ -341,8 +341,8 @@ LogicalResult HandshakePlaceBuffersPass::getBufferPlacement(
   // Create and solve the MILP
   BufferPlacementMILP milp(info, timingDB, targetCP, targetCP * 2.0, env,
                            milpLog);
-  return success(milp.arePlacementConstraintsSatisfiable() &&
-                 !failed(milp.setup()) && !failed(milp.optimize(placement)));
+  return success(!failed(milp.optimize()) &&
+                 !failed(milp.getPlacement(placement)));
 }
 
 LogicalResult HandshakePlaceBuffersPass::instantiateBuffers(
@@ -354,23 +354,26 @@ LogicalResult HandshakePlaceBuffersPass::instantiateBuffers(
     builder.setInsertionPointAfter(opSrc);
 
     Value bufferIn = channel;
-    if (placement.numOpaque > 0) {
+    auto placeBuffer = [&](BufferTypeEnum bufType, unsigned numSlots) {
+      if (numSlots == 0)
+        return;
+
       // Insert an opaque buffer
       auto bufOp = builder.create<handshake::BufferOp>(
-          channel.getLoc(), bufferIn, placement.numOpaque, BufferTypeEnum::seq);
+          bufferIn.getLoc(), bufferIn, numSlots, bufType);
       inheritBB(opSrc, bufOp);
       Value bufferRes = bufOp.getResult();
 
       opDst->replaceUsesOfWith(bufferIn, bufferRes);
       bufferIn = bufferRes;
-    }
-    if (placement.numTrans > 0) {
-      // Insert a transparent buffer, potentially after an opaque buffer
-      auto bufOp = builder.create<handshake::BufferOp>(
-          channel.getLoc(), bufferIn, placement.numTrans, BufferTypeEnum::fifo);
-      inheritBB(opSrc, bufOp);
-      Value bufferRes = bufOp.getResult();
-      opDst->replaceUsesOfWith(bufferIn, bufferRes);
+    };
+
+    if (placement.opaqueBeforeTrans) {
+      placeBuffer(BufferTypeEnum::seq, placement.numOpaque);
+      placeBuffer(BufferTypeEnum::fifo, placement.numTrans);
+    } else {
+      placeBuffer(BufferTypeEnum::fifo, placement.numTrans);
+      placeBuffer(BufferTypeEnum::seq, placement.numOpaque);
     }
   }
   return success();
