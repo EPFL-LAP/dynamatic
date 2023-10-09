@@ -14,7 +14,7 @@ struct Pos{
 struct Graph {
     std::vector<Edge*> edges;
     std::map<std::string, Node*> nodes;
-    std::map<CycleNb, std::map<EdgeId, State> > cycleEdgeStates;
+    std::map<CycleNb, std::map<EdgeId, State> > cycleState;
 };
 struct Edge {
     EdgeId id;
