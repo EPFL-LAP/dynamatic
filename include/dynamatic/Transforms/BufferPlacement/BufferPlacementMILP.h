@@ -19,6 +19,7 @@
 
 #include "dynamatic/Support/LLVM.h"
 #include "dynamatic/Support/Logging.h"
+#include "dynamatic/Support/NameUniquer.h"
 #include "dynamatic/Support/TimingModels.h"
 #include "dynamatic/Transforms/BufferPlacement/BufferingProperties.h"
 #include "dynamatic/Transforms/BufferPlacement/CFDFC.h"
@@ -192,8 +193,8 @@ protected:
   GRBModel model;
   /// Contains all the variables used in the MILP.
   MILPVars vars;
-  /// Holds a unique name for each operation in the function.
-  DenseMap<Operation *, std::string> nameUniquer;
+  /// Holds a unique name for each operation/operand in the function.
+  NameUniquer nameUniquer;
   /// Logger; if not null the class will log setup and results information.
   Logger *logger;
   /// MILP's status, which changes during the object's lifetime.
@@ -256,10 +257,6 @@ protected:
   /// results. The latter are expected to specify more slots than what is going
   /// to be deducted (which should be guaranteed by the MILP constraints).
   void deductInternalBuffers(Channel &channel, PlacementResult &result);
-
-  /// Returns a unique name for the channel that corresponds to the passed MLIR
-  /// Value (useful for uniquely naming MILP variables).
-  std::string getChannelName(Value channel);
 
 private:
   /// Helper method to run a closure on each input/output port pair of the

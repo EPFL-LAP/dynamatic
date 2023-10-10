@@ -45,15 +45,8 @@ BufferPlacementMILP::BufferPlacementMILP(FuncInfo &funcInfo,
                                          double targetPeriod, double maxPeriod,
                                          GRBEnv &env, Logger *logger)
     : timingDB(timingDB), targetPeriod(targetPeriod), maxPeriod(maxPeriod),
-      funcInfo(funcInfo), model(GRBModel(env)), logger(logger) {
-
-  // Give a unique name to each operation
-  std::map<std::string, unsigned> instanceNameCntr;
-  for (Operation &op : funcInfo.funcOp.getOps()) {
-    std::string shortName = op.getName().stripDialect().str();
-    nameUniquer[&op] =
-        shortName + std::to_string(instanceNameCntr[shortName]++);
-  }
+      funcInfo(funcInfo), model(GRBModel(env)), nameUniquer(funcInfo.funcOp),
+      logger(logger) {
 
   // Combines any channel-specific buffering properties coming from IR
   // annotations to internal buffer specifications and stores the combined
@@ -248,7 +241,8 @@ LogicalResult BufferPlacementMILP::createCFDFCVars(CFDFC &cfdfc, unsigned uid) {
   for (auto [idx, unit] : llvm::enumerate(cfdfc.units)) {
     // Create the two unit variables
     UnitVars unitVar;
-    std::string unitName = nameUniquer[unit] + std::to_string(idx);
+    std::string unitName =
+        nameUniquer.getName(*unit).str() + std::to_string(idx);
     std::string varName = prefix + "inRetimeTok_" + unitName;
     unitVar.retIn = createVar(varName);
 
@@ -268,7 +262,8 @@ LogicalResult BufferPlacementMILP::createCFDFCVars(CFDFC &cfdfc, unsigned uid) {
   // Create a variable to represent the throughput of each CFDFC channel
   for (auto [idx, channel] : llvm::enumerate(cfdfc.channels))
     cfdfcVars.channelThroughputs[channel] =
-        createVar(prefix + "throughput_" + getChannelName(channel));
+        createVar(prefix + "throughput_" +
+                  nameUniquer.getName(*channel.getUses().begin()).str());
 
   // Create a variable for the CFDFC's throughput
   cfdfcVars.throughput = createVar(prefix + "throughput");
@@ -284,7 +279,8 @@ LogicalResult BufferPlacementMILP::createChannelVars() {
     auto &channel = channelAndProps.first;
 
     // Construct a suffix for all variable names
-    std::string suffix = "_" + getChannelName(channel);
+    std::string suffix =
+        "_" + nameUniquer.getName(*channel.getUses().begin()).str();
 
     // Create a Gurobi variable of the given type and name
     auto createVar = [&](char type, const std::string &name) {
@@ -621,17 +617,6 @@ void BufferPlacementMILP::deductInternalBuffers(Channel &channel,
   result.numOpaque -= numOpaqueToDeduct;
 }
 
-std::string BufferPlacementMILP::getChannelName(Value channel) {
-  Operation *consumer = *channel.getUsers().begin();
-  if (BlockArgument arg = dyn_cast<BlockArgument>(channel)) {
-    return "arg" + std::to_string(arg.getArgNumber()) + "_" +
-           nameUniquer[consumer];
-  }
-  OpResult res = dyn_cast<OpResult>(channel);
-  return nameUniquer[res.getDefiningOp()] + "_" +
-         std::to_string(res.getResultNumber()) + "_" + nameUniquer[consumer];
-}
-
 void BufferPlacementMILP::forEachIOPair(
     Operation *op, const std::function<void(Value, Value)> &callback) {
   for (Value opr : op->getOperands())
@@ -680,7 +665,7 @@ void BufferPlacementMILP::logResults(
     ChannelBufProps &props = channels[value];
 
     // Log placement decision
-    os << getChannelName(value) << ":\n";
+    os << nameUniquer.getName(*value.getUses().begin()).str() << ":\n";
     os.indent();
     std::stringstream propsStr;
     propsStr << props;
@@ -715,8 +700,8 @@ void BufferPlacementMILP::logResults(
     os << "Per-channel throughputs of CFDFC #" << idx << ":\n";
     os.indent();
     for (auto [val, channelTh] : cfVars.channelThroughputs) {
-      os << getChannelName(val) << ": " << channelTh.get(GRB_DoubleAttr_X)
-         << "\n";
+      os << nameUniquer.getName(*val.getUses().begin()).str() << ": "
+         << channelTh.get(GRB_DoubleAttr_X) << "\n";
     }
     os.unindent();
     os << "\n";
