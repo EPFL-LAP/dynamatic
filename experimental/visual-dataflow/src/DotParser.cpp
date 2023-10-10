@@ -6,14 +6,12 @@
 #include <string>
 #include "graphComponents.h"
 #include "dotReformat.h"
-#include "dotparse.h"
 #include "errors.h"
 #include <iostream>
 #include <fstream>
 #include <vector>
 #include <sstream>
 #include <regex>
-#include "dotparse.h"
 
 
 static void processAll(std::ifstream &file, Graph *graph){
