@@ -75,7 +75,6 @@ void NameUniquer::registerFunc(
   // Give a unique name to each operation
   for (Operation &op : funcOp.getOps()) {
     opToName[&op] = getOpName(op) + std::to_string(opCounters[op.getName()]++);
-    llvm::errs() << "Op: " << opToName[&op] << "\n";
     nameToOp[opToName[&op]] = &op;
   }
 
@@ -85,7 +84,6 @@ void NameUniquer::registerFunc(
       Operation *user = oprd.getOwner();
       oprdToName[&oprd] = prefix.str() + SEP + opToName[user] + SEP +
                           getOperandName(*user, oprdIdx);
-      llvm::errs() << "Oprd: " << oprdToName[&oprd] << "\n";
       nameToOprd[oprdToName[&oprd]] = &oprd;
     }
   };
