@@ -71,16 +71,6 @@ private:
   /// A mapping between operations and their unique name in the .dot file.
   DenseMap<Operation *, std::string> opNameMap;
 
-  /// In legacy mode, holds the set of all ports in the .dot file, represented
-  /// by a unique name. Each port name is mapped to its width.
-  std::unordered_map<std::string, unsigned> legacyPorts;
-
-  /// In legacy mode, holds the set of all channels in the .dot file,
-  /// represented by a pair of uniquely named ports. The first name represents
-  /// the source port (out port of a module) while the second name represents
-  /// the destination port (in port of a module).
-  std::set<std::pair<std::string, std::string>> legacyChannels;
-
   /// Returns the name of a function's argument given its index.
   std::string getArgumentName(handshake::FuncOp funcOp, size_t idx);
 

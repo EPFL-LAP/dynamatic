@@ -138,16 +138,16 @@ static std::string getIOFromPorts(MemPortsData ports) {
 static std::string getIOFromValues(ValueRange values, std::string &&portType) {
   PortsData ports;
   for (auto [idx, val] : llvm::enumerate(values))
-    ports.push_back(std::make_pair(portType + std::to_string(idx + 1), val));
+    ports.emplace_back(portType + std::to_string(idx + 1), val);
   return getIOFromPorts(ports);
 }
 
 /// Produces the "in" attribute value of a handshake::MuxOp.
 static std::string getInputForMux(handshake::MuxOp op) {
   PortsData ports;
-  ports.push_back(std::make_pair("in1?", op.getSelectOperand()));
+  ports.emplace_back("in1?", op.getSelectOperand());
   for (auto [idx, val] : llvm::enumerate(op->getOperands().drop_front(1)))
-    ports.push_back(std::make_pair("in" + std::to_string(idx + 2), val));
+    ports.emplace_back("in" + std::to_string(idx + 2), val);
   return getIOFromPorts(ports);
 }
 
@@ -160,25 +160,25 @@ static std::string getOutputForControlMerge(handshake::ControlMergeOp op) {
 /// Produces the "in" attribute value of a handshake::ConditionalBranchOp.
 static std::string getInputForCondBranch(handshake::ConditionalBranchOp op) {
   PortsData ports;
-  ports.push_back(std::make_pair("in1", op.getDataOperand()));
-  ports.push_back(std::make_pair("in2?", op.getConditionOperand()));
+  ports.emplace_back("in1", op.getDataOperand());
+  ports.emplace_back("in2?", op.getConditionOperand());
   return getIOFromPorts(ports);
 }
 
 /// Produces the "out" attribute value of a handshake::ConditionalBranchOp.
 static std::string getOutputForCondBranch(handshake::ConditionalBranchOp op) {
   PortsData ports;
-  ports.push_back(std::make_pair("out1+", op.getTrueResult()));
-  ports.push_back(std::make_pair("out2-", op.getFalseResult()));
+  ports.emplace_back("out1+", op.getTrueResult());
+  ports.emplace_back("out2-", op.getFalseResult());
   return getIOFromPorts(ports);
 }
 
 /// Produces the "in" attribute value of a handshake::SelectOp.
 static std::string getInputForSelect(arith::SelectOp op) {
   PortsData ports;
-  ports.push_back(std::make_pair("in1?", op.getCondition()));
-  ports.push_back(std::make_pair("in2+", op.getTrueValue()));
-  ports.push_back(std::make_pair("in3-", op.getFalseValue()));
+  ports.emplace_back("in1?", op.getCondition());
+  ports.emplace_back("in2+", op.getTrueValue());
+  ports.emplace_back("in3-", op.getFalseValue());
   return getIOFromPorts(ports);
 }
 
@@ -187,41 +187,41 @@ static std::string getInputForEnd(handshake::EndOp op) {
   MemPortsData ports;
   unsigned idx = 1;
   for (auto val : op.getMemoryControls())
-    ports.push_back(std::make_tuple("in" + std::to_string(idx++), val, "e"));
+    ports.emplace_back("in" + std::to_string(idx++), val, "e");
   for (auto val : op.getReturnValues())
-    ports.push_back(std::make_tuple("in" + std::to_string(idx++), val, ""));
+    ports.emplace_back("in" + std::to_string(idx++), val, "");
   return getIOFromPorts(ports);
 }
 
 /// Produces the "in" attribute value of a handshake::DynamaticLoadOp.
 static std::string getInputForLoadOp(handshake::DynamaticLoadOp op) {
   PortsData ports;
-  ports.push_back(std::make_pair("in1", op.getData()));
-  ports.push_back(std::make_pair("in2", op.getAddress()));
+  ports.emplace_back("in1", op.getData());
+  ports.emplace_back("in2", op.getAddress());
   return getIOFromPorts(ports);
 }
 
 /// Produces the "out" attribute value of a handshake::DynamaticLoadOp.
 static std::string getOutputForLoadOp(handshake::DynamaticLoadOp op) {
   PortsData ports;
-  ports.push_back(std::make_pair("out1", op.getDataResult()));
-  ports.push_back(std::make_pair("out2", op.getAddressResult()));
+  ports.emplace_back("out1", op.getDataResult());
+  ports.emplace_back("out2", op.getAddressResult());
   return getIOFromPorts(ports);
 }
 
 /// Produces the "in" attribute value of a handshake::DynamaticStoreOp.
 static std::string getInputForStoreOp(handshake::DynamaticStoreOp op) {
   PortsData ports;
-  ports.push_back(std::make_pair("in1", op.getData()));
-  ports.push_back(std::make_pair("in2", op.getAddress()));
+  ports.emplace_back("in1", op.getData());
+  ports.emplace_back("in2", op.getAddress());
   return getIOFromPorts(ports);
 }
 
 /// Produces the "out" attribute value of a handshake::DynamaticStoreOp.
 static std::string getOutputForStoreOp(handshake::DynamaticStoreOp op) {
   PortsData ports;
-  ports.push_back(std::make_pair("out1", op.getDataResult()));
-  ports.push_back(std::make_pair("out2", op.getAddressResult()));
+  ports.emplace_back("out1", op.getDataResult());
+  ports.emplace_back("out2", op.getAddressResult());
   return getIOFromPorts(ports);
 }
 
@@ -235,26 +235,26 @@ static std::string getInputForMC(handshake::MemoryControllerOp op) {
   // Add all control signals first
   for (auto [idx, blockAccesses] : llvm::enumerate(op.getAccesses()))
     if (op.bbHasControl(idx))
-      allPorts.push_back(std::make_tuple("in" + std::to_string(inputIdx++),
-                                         inputs[operandIdx++],
-                                         "c" + std::to_string(ctrlIdx++)));
+      allPorts.emplace_back("in" + std::to_string(inputIdx++),
+                            inputs[operandIdx++],
+                            "c" + std::to_string(ctrlIdx++));
 
   // Then all memory access signals
   for (auto [idx, blockAccesses] : llvm::enumerate(op.getAccesses())) {
     // Add loads and stores, in program order
     for (auto &access : cast<mlir::ArrayAttr>(blockAccesses))
       if (cast<AccessTypeEnumAttr>(access).getValue() == AccessTypeEnum::Load)
-        dataPorts.push_back(std::make_tuple(
-            "in" + std::to_string(inputIdx++), inputs[operandIdx++],
-            "l" + std::to_string(ldIdx++) + "a"));
+        dataPorts.emplace_back("in" + std::to_string(inputIdx++),
+                               inputs[operandIdx++],
+                               "l" + std::to_string(ldIdx++) + "a");
       else {
         // Address signal first, then data signal
-        dataPorts.push_back(std::make_tuple("in" + std::to_string(inputIdx++),
-                                            inputs[operandIdx++],
-                                            "s" + std::to_string(stIdx) + "a"));
-        dataPorts.push_back(std::make_tuple(
-            "in" + std::to_string(inputIdx++), inputs[operandIdx++],
-            "s" + std::to_string(stIdx++) + "d"));
+        dataPorts.emplace_back("in" + std::to_string(inputIdx++),
+                               inputs[operandIdx++],
+                               "s" + std::to_string(stIdx) + "a");
+        dataPorts.emplace_back("in" + std::to_string(inputIdx++),
+                               inputs[operandIdx++],
+                               "s" + std::to_string(stIdx++) + "d");
       }
   }
 
@@ -267,10 +267,10 @@ static std::string getInputForMC(handshake::MemoryControllerOp op) {
 static std::string getOutputForMC(handshake::MemoryControllerOp op) {
   MemPortsData ports;
   for (auto [idx, res] : llvm::enumerate(op->getResults().drop_back(1)))
-    ports.push_back((std::make_tuple("out" + std::to_string(idx + 1), res,
-                                     "l" + std::to_string(idx) + "d")));
-  ports.push_back((std::make_tuple("out" + std::to_string(op.getNumResults()),
-                                   op->getResults().back(), "e")));
+    ports.emplace_back("out" + std::to_string(idx + 1), res,
+                       "l" + std::to_string(idx) + "d");
+  ports.emplace_back("out" + std::to_string(op.getNumResults()),
+                     op->getResults().back(), "e");
   return getIOFromPorts(ports);
 }
 
