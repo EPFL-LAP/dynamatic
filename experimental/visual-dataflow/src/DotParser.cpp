@@ -175,51 +175,47 @@ static void processAll(std::ifstream &file, Graph *graph){
 
 }
 
-//int main() {
-//
-//  processDotFile("gcd.dot","output.dot");
-//  insertNewlineBeforeStyle("output.dot","output4.dot");
-//  removeBackslashWithSpaceFromPos("output4.dot", "output5.dot");
-//  removeEverythingAfterApostropheComma("output5.dot","output6.dot");
-//  removeEverythingAfterCommaInStyle("output6.dot","outputFinal.dot");
-//
-//
-//  std::ifstream f;
-//  f.open("outputFinal.dot");
-//
-//  Graph* graph = new Graph;
-//
-//  std::string line;
-//
-//
-//  processAll(f,graph);
-//
-//
-//  // Iterate through the map and print each pair
-//  for (const auto& pair : graph->nodes) {
-//    std::string key = pair.first;
-//    const Node* nodePtr = pair.second;
-//
-//    std::cout << "NodeId: " << key << " " << nodePtr->id << ", Node label: " << nodePtr->label <<", Node pos: " << nodePtr->pos.x << " "<< nodePtr->pos.y  << ", Node in/out:" << nodePtr->inPorts.size() << " "<< nodePtr->outPorts.size() << std::endl;
-//  }
-//
-//  std::cout << " " << std::endl;
-//
-//  // Iterate through the map and print each pair
-//  for (const auto& pair : graph->edges) {
-//    const Edge* edgePtr = pair;
-//
-//    std::cout << "EdgeId: " << pair->id << ", src:"<< edgePtr->src->label << ", dst:" << edgePtr->dst->label << ", from:" << edgePtr->outPort << ", to:" << edgePtr->inPort << std::endl;
-//
-//    if (edgePtr) {
-//      for (const Pos& pos : edgePtr->pos) {
-//        std::cout << "  Pos(x=" << pos.x << ", y=" << pos.y << ")" << std::endl;
-//      }
-//    } else {
-//      std::cout << "  Edge is nullptr" << std::endl;
-//    }
-//  }
-//}
+int main() {
+
+ reformatDot("gcd.dot","outputFinal.dot");
+ 
+
+ std::ifstream f;
+ f.open("outputFinal.dot");
+
+ Graph* graph = new Graph;
+
+ std::string line;
+
+
+ processAll(f,graph);
+
+
+ // Iterate through the map and print each pair
+ for (const auto& pair : graph->nodes) {
+   std::string key = pair.first;
+   const Node* nodePtr = pair.second;
+
+   std::cout << "NodeId: " << key << " " << nodePtr->id << ", Node label: " << nodePtr->label <<", Node pos: " << nodePtr->pos.x << " "<< nodePtr->pos.y  << ", Node in/out:" << nodePtr->inPorts.size() << " "<< nodePtr->outPorts.size() << std::endl;
+ }
+
+ std::cout << " " << std::endl;
+
+ // Iterate through the map and print each pair
+ for (const auto& pair : graph->edges) {
+   const Edge* edgePtr = pair;
+
+   std::cout << "EdgeId: " << pair->id << ", src:"<< edgePtr->src->label << ", dst:" << edgePtr->dst->label << ", from:" << edgePtr->outPort << ", to:" << edgePtr->inPort << std::endl;
+
+   if (edgePtr) {
+     for (const Pos& pos : edgePtr->pos) {
+       std::cout << "  Pos(x=" << pos.x << ", y=" << pos.y << ")" << std::endl;
+     }
+   } else {
+     std::cout << "  Edge is nullptr" << std::endl;
+   }
+ }
+}
 
 
 

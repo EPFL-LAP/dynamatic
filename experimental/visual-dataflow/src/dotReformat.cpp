@@ -145,12 +145,15 @@ void removeEverythingAfterCommaInStyle(const std::string& inputFileName, const s
 }
 
 void reformatDot(const std::string& inputFileName, const std::string& outputFileName) {
-    putPosOnSameLine(inputFileName, outputFileName);
-    insertNewlineBeforeStyle(outputFileName, outputFileName);
-    removeBackslashWithSpaceFromPos(outputFileName, outputFileName);
-    removeEverythingAfterCommaInStyle(outputFileName, outputFileName);
-    removeEverythingAfterCommaInStyle(outputFileName,outputFileName);
-
+    putPosOnSameLine(inputFileName, "rd1");
+    insertNewlineBeforeStyle("rd1", "rd2");
+    removeBackslashWithSpaceFromPos("rd2", "rd3");
+    removeEverythingAfterCommaInStyle("rd3", "rd4");
+    removeEverythingAfterApostropheComma("rd4",outputFileName);
+    std::remove("rd1");
+    std::remove("rd2");
+    std::remove("rd3");
+    std::remove("rd4");
 }
 
 
