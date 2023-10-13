@@ -275,7 +275,6 @@ private:
 
 } // namespace buffer
 } // namespace dynamatic
-#endif // DYNAMATIC_GUROBI_NOT_INSTALLED
 
 /// Prints a description of the buffer placement MILP's current status to an
 /// output stream.
@@ -305,5 +304,6 @@ T &operator<<(T &os,
   }
   return os;
 }
+#endif // DYNAMATIC_GUROBI_NOT_INSTALLED
 
 #endif // DYNAMATIC_TRANSFORMS_BUFFERPLACEMENT_BUFFERPLACEMENTMILP_H
