@@ -1,6 +1,10 @@
 //
 // Created by Alice Potter on 05.10.2023.
 //
+
+#include "graphComponents.h"
+#include <iostream>
+
 /**
  * @brief This function transforms a state of type string into its corresponding state in type State.
  *
@@ -31,7 +35,7 @@ State findState(const std::string &state_string) {
  * index 4 : dst_port, index 5 : status.
  * @return The corresponding edge id.
  */
-EdgeID findEdgeInGraph(const Graph *graph, const std::vector<std::string> &edge_info) {
+EdgeId findEdgeInGraph(const Graph *graph, const std::vector<std::string> &edge_info) {
 
   for (Edge* edge : graph->edges) {
     if(edge_info[1] == edge->src->label && std::stoi(edge_info[2]) == edge->inPort
@@ -80,13 +84,13 @@ void processLine(const std::string &line, Graph *graph, size_t lineIndex) {
   if (lineIndex == 0 || lineIndex == 1 || line.empty()) return;
 
   CycleNb cycleNb = line[0] - '0';
-  //Creates an empty map if the key cycleNB is not found in the cycleState map
-  std::map<EdgeID, State> mapEdgeState = graph->cycleState[cycleNb];
+  //Creates an empty map if the key cycleNB is not found in the cycleEdgeStates map
+  std::map<EdgeId, State> mapEdgeState = (graph->cycleEdgeStates)[cycleNb];
 
   std::vector<std::string> edgeInfo = parseOneLine(line);
-  EdgeID edgeID = findEdgeInGraph(graph, edgeInfo);
+  EdgeId edgeID = findEdgeInGraph(graph, edgeInfo);
   mapEdgeState[edgeID] = findState(edgeInfo[5]);
-  graph->cycleState[cycleNb] = mapEdgeState;
+  graph->cycleEdgeStates[cycleNb] = mapEdgeState;
 }
 
 std::string printState(State state) {
@@ -105,7 +109,7 @@ std::string printState(State state) {
   }
 }
 
-void printMapEdgeState(const std::map<EdgeID, State> &map_edge_state) {
+void printMapEdgeState(const std::map<EdgeId, State> &map_edge_state) {
   for(const auto& pair : map_edge_state) {
     std::cout << "EdgeID: " << pair.first << ", State: " << printState(pair.second) << std::endl;
   }
@@ -113,7 +117,7 @@ void printMapEdgeState(const std::map<EdgeID, State> &map_edge_state) {
 
 void printMapCycle(Graph *graph) {
   if (graph == NULL) return;
-  for(const auto& pair : graph->cycleState) {
+  for(const auto& pair : graph->cycleEdgeStates) {
     std::cout << '\n' << "**** Cycle number : " << pair.first << " ****" << '\n' << std::endl;
     printMapEdgeState(pair.second);
   }
