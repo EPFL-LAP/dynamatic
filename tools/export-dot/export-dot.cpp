@@ -144,9 +144,9 @@ int main(int argc, char **argv) {
       return 1;
     }
     DOTPrinter printer(mode, edgeStyle, &timingDB);
-    return failed(printer.printDOT(*module));
+    return failed(printer.print(*module));
   }
 
   DOTPrinter printer(mode, edgeStyle);
-  return failed(printer.printDOT(*module));
+  return failed(printer.print(*module));
 }

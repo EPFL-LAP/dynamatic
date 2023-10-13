@@ -8,7 +8,7 @@
 //
 // Declarations for DOT-printing, which at the moment is only used as part of
 // the export-dot tool. Declares the DOTPrinter, which produces the
-// Graphviz-formatted representation of an MLIR module on stdout.
+// Graphviz-formatted representation of an MLIR module on an output stream.
 //
 //===----------------------------------------------------------------------===//
 
@@ -17,6 +17,7 @@
 
 #include "circt/Dialect/Handshake/HandshakeOps.h"
 #include "dynamatic/Support/LLVM.h"
+#include "dynamatic/Support/NameUniquer.h"
 #include "dynamatic/Support/TimingModels.h"
 #include "mlir/Support/IndentedOstream.h"
 #include <map>
@@ -32,44 +33,49 @@ struct NodeInfo;
 struct EdgeInfo;
 
 /// Implements the logic to convert Handshake-level IR to a DOT. The only public
-/// method of this class, printDOT, converts an MLIR module containing a single
-/// Handshake function into an equivalent DOT graph printed on stdout. In legacy
-/// mode, the resulting DOT can be used with legacy Dynamatic.
+/// method of this class, print, converts an MLIR module containing a single
+/// Handshake function into an equivalent DOT graph printed to a provided output
+/// stream. In any legacy mode, the resulting DOT can be used with legacy
+/// Dynamatic.
 class DOTPrinter {
 public:
   /// Printing mode, dictating the structure and content of the printed DOTs.
-  enum class Mode { VISUAL, LEGACY, LEGACY_BUFFERS };
+  enum class Mode {
+    /// Optimized for visualizing the circuit's structure (default).
+    VISUAL,
+    /// Compatible with legacy dot2vhdl tool.
+    LEGACY,
+    /// Compatible with legacy buffers and dot2vhdl tools.
+    LEGACY_BUFFERS
+  };
   /// Style in which to render edges in the printed DOTs.
-  enum class EdgeStyle { SPLINE, ORTHO };
+  enum class EdgeStyle {
+    /// Render edges as splines (default).
+    SPLINE,
+    /// Render edges as orthogonal lines.
+    ORTHO
+  };
 
-  /// Constructs a DOTPrinter whose printing behavior is controlled by a couple
-  /// flags, plus a pointer to a timing database that must be valid in legacy
-  /// mode (when building Dynamatic in debug mode, the constructor will assert
-  /// if the `legacy` flag is true and the timing database is nullptr).
-  DOTPrinter(Mode mode, EdgeStyle edgeStyle,
+  /// Constructs a DOTPrinter whose behavior is controlled by an overall
+  /// printing mode and an edge style. A valid pointer to a timing database must
+  /// be provided in any legacy-compatible mode to include node timing
+  /// annotations, otherwise the constructor will assert.
+  DOTPrinter(Mode mode = Mode::VISUAL, EdgeStyle edgeStyle = EdgeStyle::SPLINE,
              TimingDatabase *timingDB = nullptr);
 
-  /// Prints Handshake-level IR to standard output.
-  LogicalResult printDOT(mlir::ModuleOp mod);
+  /// Prints Handshake-level IR to the provided output stream (or to stdout if
+  /// `os` is nullptr).
+  LogicalResult print(mlir::ModuleOp mod,
+                      mlir::raw_indented_ostream *os = nullptr);
 
 private:
   /// Printing mode (e.g., compatible with legacy tools or not).
   Mode mode;
   /// Style of edges in the resulting DOTs.
   EdgeStyle edgeStyle;
-  /// Timing models for dataflow components (required in legacy mode, can safely
-  /// be nullptr when not in legacy mode).
-  TimingDatabase *timingDB;
-  /// The stream to output to.
-  mlir::raw_indented_ostream os;
-
-  /// Maintain a mapping of module names and the number of times one of those
-  /// modules have been instantiated in the design. This is used to generate
-  /// unique names in the output graph.
-  std::map<std::string, unsigned> instanceIdMap;
-
-  /// A mapping between operations and their unique name in the .dot file.
-  DenseMap<Operation *, std::string> opNameMap;
+  /// Timing models for dataflow components (required in any legacy-compatible
+  /// mode, can safely be nullptr when not in legacy mode).
+  TimingDatabase *timingDB = nullptr;
 
   /// Returns the name of a function's argument given its index.
   std::string getArgumentName(handshake::FuncOp funcOp, size_t idx);
@@ -78,7 +84,8 @@ private:
   /// index) for use in legacy Dynamatic and prints them to the output stream;
   /// it is the responsibility of the caller of this method to insert an opening
   /// bracket before the call and a closing bracket after the call.
-  LogicalResult annotateArgumentNode(handshake::FuncOp funcOp, size_t idx);
+  LogicalResult annotateArgumentNode(handshake::FuncOp funcOp, size_t idx,
+                                     mlir::raw_indented_ostream &os);
 
   /// Computes all data attributes of an edge between a function argument
   /// (indicated by its index) and an operation for use in legacy Dynamatic and
@@ -86,10 +93,8 @@ private:
   /// of this method to insert an opening bracket before the call and a closing
   /// bracket after the call.
   LogicalResult annotateArgumentEdge(handshake::FuncOp funcOp, size_t idx,
-                                     Operation *dst);
-
-  /// Returns the name of the node representing the operation.
-  std::string getNodeName(Operation *op);
+                                     Operation *dst,
+                                     mlir::raw_indented_ostream &os);
 
   /// Returns the content of the "delay" attribute associated to every graph
   /// node in legacy mode. Requires that `timingDB` points to a valid memory
@@ -105,31 +110,36 @@ private:
   /// and prints them to the output stream; it is the responsibility of the
   /// caller of this method to insert an opening bracket before the call and a
   /// closing bracket after the call.
-  LogicalResult annotateNode(Operation *op);
+  LogicalResult annotateNode(Operation *op, mlir::raw_indented_ostream &os);
 
   /// Prints a node corresponding to an operation and, on success, returns a
   /// unique name for the operation in the outName argument.
-  LogicalResult printNode(Operation *op);
+  LogicalResult printNode(Operation *op, NameUniquer &names,
+                          mlir::raw_indented_ostream &os);
 
   /// Computes all data attributes of an edge for use in legacy Dynamatic and
   /// prints them to the output; it is the responsibility of the caller
   /// of this method to insert an opening bracket before the call and a closing
   /// bracket after the call.
-  LogicalResult annotateEdge(Operation *src, Operation *dst, Value val);
+  LogicalResult annotateEdge(Operation *src, Operation *dst, Value val,
+                             mlir::raw_indented_ostream &os);
 
   /// Prints an edge between a source and destination operation, which are
   /// linked by a result of the source that the destination uses as an
   /// operand.
-  LogicalResult printEdge(Operation *src, Operation *dst, Value val);
+  LogicalResult printEdge(Operation *src, Operation *dst, Value val,
+                          NameUniquer &names, mlir::raw_indented_ostream &os);
 
   /// Prints an instance of a handshake.func to the graph.
-  LogicalResult printFunc(handshake::FuncOp funcOp);
+  LogicalResult printFunc(handshake::FuncOp funcOp,
+                          mlir::raw_indented_ostream &os);
 
   /// Opens a subgraph in the DOT file using the provided name and label.
-  void openSubgraph(std::string &name, std::string &label);
+  void openSubgraph(std::string &name, std::string &label,
+                    mlir::raw_indented_ostream &os);
 
   /// Closes a subgraph in the DOT file.
-  void closeSubgraph();
+  void closeSubgraph(mlir::raw_indented_ostream &os);
 
   /// Returns whether the DOT printer was setup in a legacy-compatible mode.
   inline bool inLegacyMode() {
