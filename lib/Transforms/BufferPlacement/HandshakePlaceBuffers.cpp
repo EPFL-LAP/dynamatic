@@ -19,7 +19,6 @@
 #include "dynamatic/Support/LogicBB.h"
 #include "dynamatic/Transforms/BufferPlacement/CFDFC.h"
 #include "dynamatic/Transforms/BufferPlacement/FPGA20Buffers.h"
-#include "dynamatic/Transforms/PassDetails.h"
 #include "experimental/Support/StdProfiler.h"
 #include "mlir/Dialect/Arith/IR/Arith.h"
 #include "mlir/Dialect/Func/IR/FuncOps.h"
@@ -167,13 +166,15 @@ static LogicalResult verifyFuncValidForPlacement(FuncInfo &info) {
 
 namespace {
 struct HandshakePlaceBuffersPass
-    : public HandshakePlaceBuffersBase<HandshakePlaceBuffersPass> {
+    : public dynamatic::buffer::impl::HandshakePlaceBuffersBase<
+          HandshakePlaceBuffersPass> {
 
-  HandshakePlaceBuffersPass(const std::string &frequencies,
-                            const std::string &timingModels, bool firstCFDFC,
+  HandshakePlaceBuffersPass(StringRef algorithm, StringRef frequencies,
+                            StringRef timingModels, bool firstCFDFC,
                             double targetCP, unsigned timeout, bool dumpLogs) {
-    this->frequencies = frequencies;
-    this->timingModels = timingModels;
+    this->algorithm = frequencies.str();
+    this->frequencies = frequencies.str();
+    this->timingModels = timingModels.str();
     this->firstCFDFC = firstCFDFC;
     this->targetCP = targetCP;
     this->timeout = timeout;
@@ -189,11 +190,19 @@ struct HandshakePlaceBuffersPass
   }
 #else
   void runOnOperation() override {
-    ModuleOp mod = getOperation();
+    ModuleOp modOp = getOperation();
     DenseMap<handshake::FuncOp, FuncInfo> funcToInfo;
 
+    // Check that the algorithm exists
+    if (algorithm != "fpga20" && algorithm != "fpga20-legacy") {
+      modOp->emitError()
+          << "Unknown algorithm '" << algorithm
+          << "', possible choices are 'fpga20', 'fpga20-legacy'.";
+      return signalPassFailure();
+    }
+
     // Verify that the IR is in a valid state for buffer placement
-    for (handshake::FuncOp funcOp : mod.getOps<handshake::FuncOp>()) {
+    for (handshake::FuncOp funcOp : modOp.getOps<handshake::FuncOp>()) {
       // Buffer placement requires that all values are used exactly once
       if (failed(verifyAllValuesHasOneUse(funcOp))) {
         funcOp.emitOpError() << "Not all values are used exactly once";
@@ -225,7 +234,7 @@ struct HandshakePlaceBuffersPass
       return signalPassFailure();
 
     // Place buffers in each function
-    for (handshake::FuncOp funcOp : mod.getOps<handshake::FuncOp>()) {
+    for (handshake::FuncOp funcOp : modOp.getOps<handshake::FuncOp>()) {
       FuncInfo &info = funcToInfo[funcOp];
 
       // Use a wrapper around a logger to benefit from RAII
@@ -339,10 +348,18 @@ LogicalResult HandshakePlaceBuffersPass::getBufferPlacement(
   Logger *milpLog = dumpLogs ? *log : nullptr;
 
   // Create and solve the MILP
-  fpga20::FPGA20Buffers milp(info, timingDB, env, milpLog, targetCP,
-                             targetCP * 2.0);
-  return success(!failed(milp.optimize()) &&
-                 !failed(milp.getPlacement(placement)));
+  BufferPlacementMILP *milp = nullptr;
+  if (algorithm == "fpga20")
+    milp = new fpga20::FPGA20Buffers(info, timingDB, env, milpLog, targetCP,
+                                     targetCP * 2.0, false);
+  else if (algorithm == "fpga20-legacy")
+    milp = new fpga20::FPGA20Buffers(info, timingDB, env, milpLog, targetCP,
+                                     targetCP * 2.0, true);
+  assert(milp && "unknown placement algorithm");
+  bool milpRet =
+      succeeded(milp->optimize()) && succeeded(milp->getPlacement(placement));
+  delete milp;
+  return success(milpRet);
 }
 
 LogicalResult HandshakePlaceBuffersPass::instantiateBuffers(
@@ -382,8 +399,9 @@ LogicalResult HandshakePlaceBuffersPass::instantiateBuffers(
 
 std::unique_ptr<mlir::OperationPass<mlir::ModuleOp>>
 dynamatic::buffer::createHandshakePlaceBuffersPass(
-    const std::string &frequencies, const std::string &timingModels,
+    StringRef algorithm, StringRef frequencies, StringRef timingModels,
     bool firstCFDFC, double targetCP, unsigned timeout, bool dumpLogs) {
   return std::make_unique<HandshakePlaceBuffersPass>(
-      frequencies, timingModels, firstCFDFC, targetCP, timeout, dumpLogs);
+      algorithm, frequencies, timingModels, firstCFDFC, targetCP, timeout,
+      dumpLogs);
 }

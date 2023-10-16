@@ -193,6 +193,11 @@ def HandshakePlaceBuffers : Pass<"handshake-place-buffers", "mlir::ModuleOp"> {
   }];
   let constructor = "dynamatic::buffer::createHandshakePlaceBuffersPass()";
   let options = [
+    Option<"algorithm", "algorithm", "std::string", "\"fpga20\"",
+    "Algorithm to use for buffer placement. Choices are: 'fpga20' (default), "
+    "'fpga20-legacy' (same as fpga-20 but interprets the MILP's results as "
+    "legacy Dynamatic would, placing at most a single buffer type on any given "
+    "channel)">,
     Option<"frequencies", "frequencies", "std::string", "",
     "Path to CSV-formatted file containing estimated transition frequencies "
     "between basic blocks in the kernel.">,

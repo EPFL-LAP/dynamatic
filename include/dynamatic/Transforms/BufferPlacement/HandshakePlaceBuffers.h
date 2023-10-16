@@ -23,10 +23,15 @@ namespace dynamatic {
 namespace buffer {
 
 std::unique_ptr<mlir::OperationPass<mlir::ModuleOp>>
-createHandshakePlaceBuffersPass(const std::string &frequencies = "",
-                                const std::string &timingModels = "",
+createHandshakePlaceBuffersPass(StringRef algorithm = "fpga20",
+                                StringRef frequencies = "",
+                                StringRef timingModels = "",
                                 bool firstCFDFC = false, double targetCP = 4.0,
                                 unsigned timeout = 180, bool dumpLogs = false);
+
+#define GEN_PASS_DECL_HANDSHAKEPLACEBUFFERS
+#define GEN_PASS_DEF_HANDSHAKEPLACEBUFFERS
+#include "dynamatic/Transforms/Passes.h.inc"
 
 } // namespace buffer
 } // namespace dynamatic
