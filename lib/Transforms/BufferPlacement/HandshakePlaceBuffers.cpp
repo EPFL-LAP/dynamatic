@@ -17,8 +17,8 @@
 #include "circt/Dialect/Handshake/HandshakePasses.h"
 #include "dynamatic/Support/Logging.h"
 #include "dynamatic/Support/LogicBB.h"
-#include "dynamatic/Transforms/BufferPlacement/BufferPlacementMILP.h"
 #include "dynamatic/Transforms/BufferPlacement/CFDFC.h"
+#include "dynamatic/Transforms/BufferPlacement/FPGA20Buffers.h"
 #include "dynamatic/Transforms/PassDetails.h"
 #include "experimental/Support/StdProfiler.h"
 #include "mlir/Dialect/Arith/IR/Arith.h"
@@ -339,8 +339,8 @@ LogicalResult HandshakePlaceBuffersPass::getBufferPlacement(
   Logger *milpLog = dumpLogs ? *log : nullptr;
 
   // Create and solve the MILP
-  BufferPlacementMILP milp(info, timingDB, targetCP, targetCP * 2.0, env,
-                           milpLog);
+  fpga20::FPGA20Buffers milp(info, timingDB, env, milpLog, targetCP,
+                             targetCP * 2.0);
   return success(!failed(milp.optimize()) &&
                  !failed(milp.getPlacement(placement)));
 }
