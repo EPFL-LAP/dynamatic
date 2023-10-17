@@ -1,15 +1,24 @@
 #ifndef VISUAL_DATAFLOW_VISUAL_DATAFLOW_H
 #define VISUAL_DATAFLOW_VISUAL_DATAFLOW_H
 
-#include "godot_cpp/classes/sprite2d.hpp"
+#include "godot_cpp/classes/control.hpp"
+#include <vector>
 
 namespace godot {
 
-class VisualDataflow : public Sprite2D {
-  GDCLASS(VisualDataflow, Sprite2D)
+class VisualDataflow : public Control {
+  GDCLASS(VisualDataflow, Control)
 
 private:
-  double timePassed;
+  struct Node {
+    double x;
+    double y;
+  };
+
+  int numberOfNodes = 3;
+  //std::vector<Node> nodes; 
+
+
 
 protected:
   static void _bind_methods();
@@ -17,11 +26,15 @@ protected:
 public:
   VisualDataflow();
 
-  unsigned getNumber();
-
   ~VisualDataflow() override = default;
 
-  void _process(double delta) override;
+  void my_process(double delta);
+
+  double getNodePosX(int index);
+  double getNodePosY(int index);
+
+  int getNumberOfNodes();
+
 };
 
 } // namespace godot

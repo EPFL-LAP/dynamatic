@@ -18,11 +18,29 @@ using namespace dynamatic;
 using namespace godot;
 
 void VisualDataflow::_bind_methods() {
-  ClassDB::bind_method(D_METHOD("getNumber"), &VisualDataflow::getNumber);
+  ClassDB::bind_method(D_METHOD("getNodePosX", "index"), &VisualDataflow::getNodePosX);
+  ClassDB::bind_method(D_METHOD("getNodePosY", "index"), &VisualDataflow::getNodePosY);
+  ClassDB::bind_method(D_METHOD("getNumberOfNodes"), &VisualDataflow::getNumberOfNodes);
 }
 
 VisualDataflow::VisualDataflow() {
-  timePassed = 0.0;
+
+  Node n1;
+  Node n2;
+  Node n3;
+
+  n1.x = 100.0;
+  n1.y = 200.0;
+
+  n2.x = 100.0;
+  n2.y = 600.0;
+
+  n3.x = 400.0;
+  n3.y = 800.0;
+
+  /*nodes[0] = n1;
+  nodes[1] = n2;
+  nodes[2] = n3;*/
 
   std::string filename = "test.mlir";
   auto fileOrErr = MemoryBuffer::getFileOrSTDIN(filename.c_str());
@@ -47,11 +65,9 @@ VisualDataflow::VisualDataflow() {
     return;
 }
 
-unsigned VisualDataflow::getNumber() { return 100; }
+double VisualDataflow::getNodePosX(int index) { return 100; }
+double VisualDataflow::getNodePosY(int index) { return 100; }
+int VisualDataflow::getNumberOfNodes() {return numberOfNodes;}
 
-void VisualDataflow::_process(double delta) {
-  timePassed += delta;
-  Vector2 newPos = Vector2(10.0 + (10.0 * sin(timePassed * 2.0)),
-                           10.0 + (10.0 * cos(timePassed * 1.5)));
-  set_position(newPos);
+void VisualDataflow::my_process(double delta) {
 }
