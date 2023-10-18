@@ -6,13 +6,15 @@
 
 #include "GraphNode.h"
 
+#include <utility>
+
 GraphNode::GraphNode(NodeId id, std::pair<int, int> position)
-    : id(id), position(position) {
+    : id(std::move(id)), position(position) {
   inPorts = std::vector<std::string>();
   outPorts = std::vector<std::string>();
 }
 
-void GraphNode::addPort(std::string port, bool isInputPort) {
+void GraphNode::addPort(std::string &port, bool isInputPort) {
   if (isInputPort)
     inPorts.push_back(port);
   else

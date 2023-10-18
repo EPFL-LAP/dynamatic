@@ -32,7 +32,7 @@ public:
   /// Adds the state of each edge for a given clock cycle
   void addCycleStates(CycleNb cycleNb, std::map<EdgeId, State> mapEdgeState);
   /// Retrieves a node based on a giver node identifier
-  GraphNode *getNode(NodeId id);
+  GraphNode *getNode(NodeId &id);
 
 private:
   /// Graph identifier

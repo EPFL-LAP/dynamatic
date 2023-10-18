@@ -20,7 +20,7 @@ public:
   /// Constructs a node
   GraphNode(NodeId id, std::pair<int, int> position);
   /// Adds a port to the Node
-  void addPort(std::string port, bool isInputPort);
+  void addPort(std::string &port, bool isInputPort);
   /// Returns the node identifier
   NodeId getNodeId();
 

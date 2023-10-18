@@ -5,6 +5,8 @@
 //===----------------------------------------------------------------------===//
 #include "Graph.h"
 
+#include <utility>
+
 Graph::Graph(GraphId id) : id(id) {
   edges = std::vector<GraphEdge *>();
   nodes = std::map<std::string, GraphNode *>();
@@ -19,7 +21,7 @@ void Graph::addNode(GraphNode *node) {
 
 void Graph::addCycleStates(CycleNb cycleNb,
                            std::map<EdgeId, State> mapEdgeState) {
-  cycleEdgeStates[cycleNb] = mapEdgeState;
+  cycleEdgeStates[cycleNb] = std::move(mapEdgeState);
 }
 
-GraphNode *Graph::getNode(NodeId id) { return nodes.at(id); }
+GraphNode *Graph::getNode(NodeId &id) { return nodes.at(id); }
