@@ -170,7 +170,7 @@ else
   "$DYNAMATIC_OPT_BIN" "$F_HANDSHAKE_TRANSFORMED" \
     --allow-unregistered-dialect \
     --handshake-set-buffering-properties="version=fpga20" \
-    --handshake-place-buffers="frequencies=$OUTPUT_DIR/frequencies.csv timing-models=$DYNAMATIC_DIR/data/components.json dump-logs" \
+    --handshake-place-buffers="algorithm=fpga20-legacy frequencies=$OUTPUT_DIR/frequencies.csv timing-models=$DYNAMATIC_DIR/data/components.json dump-logs" \
     > "$F_HANDSHAKE_BUFFERED"
   RET=$?
   mv buffer-placement "$OUTPUT_DIR" > /dev/null 2>&1 
