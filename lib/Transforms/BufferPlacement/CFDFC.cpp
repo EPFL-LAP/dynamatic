@@ -19,7 +19,9 @@
 #include "mlir/IR/OperationSupport.h"
 #include "mlir/Support/IndentedOstream.h"
 #include "mlir/Support/LogicalResult.h"
+#include "llvm/ADT/SetOperations.h"
 #include "llvm/ADT/SmallSet.h"
+#include "llvm/ADT/SmallVector.h"
 #include <fstream>
 
 using namespace circt;
@@ -256,6 +258,101 @@ bool CFDFC::isCFDFCBackedge(Value val) {
   return srcBB.has_value() && (!dstBB.has_value() || *srcBB != *dstBB);
 }
 
+CFDFCUnion::CFDFCUnion(ArrayRef<CFDFC *> cfdfcs) {
+  // Just do the union of everything
+  for (CFDFC *cf : cfdfcs) {
+    // Blocks
+    for (unsigned bb : cf->cycle)
+      blocks.insert(bb);
+    // Units
+    for (Operation *op : cf->units)
+      units.insert(op);
+    // Channels
+    for (Value val : cf->channels)
+      channels.insert(val);
+    // Backedges
+    for (Value val : cf->backedges)
+      backedges.insert(val);
+
+    this->cfdfcs.push_back(cf);
+  }
+}
+
+namespace {
+/// Disjoint-set data structure for storing information about a disjoint set.
+struct DisjointSetInfo {
+  /// The set's parent.
+  size_t parent;
+  /// The set's rank.
+  size_t rank;
+};
+} // namespace
+
+void dynamatic::buffer::getDisjointBlockUnions(
+    ArrayRef<CFDFC *> cfdfcs, std::vector<CFDFCUnion> &unions) {
+
+  SmallVector<DisjointSetInfo> sets;
+  size_t numCFDFC = cfdfcs.size();
+  for (size_t idx = 0; idx < numCFDFC; ++idx)
+    sets.emplace_back(DisjointSetInfo{idx, 0});
+
+  auto find = [&](size_t i) -> size_t {
+    while (sets[i].parent != i) {
+      size_t &parent = sets[i].parent;
+      parent = sets[parent].parent;
+      i = parent;
+    }
+    return i;
+  };
+
+  auto setUnion = [&](size_t i, size_t j) -> void {
+    // Replace nodes by roots
+    i = find(i);
+    j = find(j);
+    if (i == j)
+      // Already in the same set
+      return;
+
+    // Check that i has the bigger rank
+    size_t &iRank = sets[i].rank, &jRank = sets[j].rank;
+    if (iRank < jRank)
+      std::swap(i, j);
+
+    sets[j].parent = i;
+    // If both sets have the same rank, increment one
+    if (iRank == jRank)
+      ++iRank;
+  };
+
+  for (size_t i = 0; i < numCFDFC; ++i) {
+    for (size_t j = 0; j < i; ++j) {
+      std::set<unsigned> cycle, cycleRef;
+      for (unsigned bb : cfdfcs[i]->cycle)
+        cycle.insert(bb);
+      for (unsigned bb : cfdfcs[j]->cycle)
+        cycleRef.insert(bb);
+      llvm::set_intersect(cycle, cycleRef);
+      if (!cycle.empty())
+        // Non-empty intersection
+        setUnion(i, j);
+    }
+  }
+
+  // Collect all set indices
+  std::set<size_t> setIndices;
+  for (size_t idx = 0; idx < numCFDFC; ++idx)
+    setIndices.insert(find(idx));
+
+  // For each index, collect CFDFCs and create the union
+  for (size_t setIdx : setIndices) {
+    SmallVector<CFDFC *> cfUnion;
+    for (auto [idx, cf] : llvm::enumerate(cfdfcs))
+      if (find(idx) == setIdx)
+        cfUnion.push_back(cf);
+    unions.emplace_back(cfUnion);
+  }
+}
+
 LogicalResult dynamatic::buffer::extractCFDFC(handshake::FuncOp funcOp,
                                               ArchSet &archs, BBSet &bbs,
                                               ArchSet &selectedArchs,
@@ -289,7 +386,8 @@ LogicalResult dynamatic::buffer::extractCFDFC(handshake::FuncOp funcOp,
   if (int status = model.get(GRB_IntAttr_Status) != GRB_OPTIMAL)
     return funcOp.emitError() << "Gurobi failed with status code " << status;
 
-  // Retrieve the maximum number of transitions identified by the MILP solution
+  // Retrieve the maximum number of transitions identified by the MILP
+  // solution
   numExecs = static_cast<unsigned>(vars.numExecs.get(GRB_DoubleAttr_X));
   if (numExecs == 0)
     return success();
