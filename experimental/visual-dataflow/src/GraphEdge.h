@@ -12,6 +12,10 @@
 #include <string>
 #include <vector>
 
+namespace dynamatic {
+namespace experimental {
+namespace visual_dataflow {
+
 using EdgeId = int;
 
 /// Implements the logic to create an Edge
@@ -36,5 +40,9 @@ private:
   /// Positions of the edge in the graph
   std::vector<std::pair<float, float>> position;
 };
+
+} // namespace visual_dataflow
+} // namespace experimental
+} // namespace dynamatic
 
 #endif // VISUAL_DATAFLOW_GRAPHEDGE_H

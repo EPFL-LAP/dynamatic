@@ -3,10 +3,10 @@
 // This file contains the implementation of the a GraphNode.
 //
 //===----------------------------------------------------------------------===//
-
 #include "GraphNode.h"
-
 #include <utility>
+
+using namespace dynamatic::experimental::visual_dataflow;
 
 GraphNode::GraphNode(NodeId id, std::pair<int, int> position)
     : id(std::move(id)), position(position) {

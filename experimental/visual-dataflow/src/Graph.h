@@ -13,6 +13,10 @@
 #include <string>
 #include <vector>
 
+namespace dynamatic {
+namespace experimental {
+namespace visual_dataflow {
+
 using CycleNb = int;
 using GraphId = int;
 
@@ -44,5 +48,9 @@ private:
   /// State of each edge given a specific clock cycle
   std::map<CycleNb, std::map<EdgeId, State>> cycleEdgeStates;
 };
+
+} // namespace visual_dataflow
+} // namespace experimental
+} // namespace dynamatic
 
 #endif // VISUAL_DATAFLOW_GRAPH_H

@@ -11,6 +11,10 @@
 #include <string>
 #include <vector>
 
+namespace dynamatic {
+namespace experimental {
+namespace visual_dataflow {
+
 using NodeId = std::string;
 
 /// Implements the logic to create and update a Node
@@ -34,5 +38,9 @@ private:
   /// Position of the node in the Graph
   std::pair<float, float> position;
 };
+
+} // namespace visual_dataflow
+} // namespace experimental
+} // namespace dynamatic
 
 #endif // VISUAL_DATAFLOW_GRAPHNODE_H

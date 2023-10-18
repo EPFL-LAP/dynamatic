@@ -4,8 +4,9 @@
 //
 //===----------------------------------------------------------------------===//
 #include "Graph.h"
-
 #include <utility>
+
+using namespace dynamatic::experimental::visual_dataflow;
 
 Graph::Graph(GraphId id) : id(id) {
   edges = std::vector<GraphEdge *>();
