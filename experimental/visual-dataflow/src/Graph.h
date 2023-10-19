@@ -13,6 +13,7 @@
 #include "mlir/Support/LogicalResult.h"
 #include <map>
 #include <string>
+#include <utility>
 #include <vector>
 
 namespace dynamatic {

@@ -4,9 +4,6 @@
 //
 //===----------------------------------------------------------------------===//
 #include "Graph.h"
-#include "GraphNode.h"
-#include "mlir/Support/LogicalResult.h"
-#include <utility>
 
 using namespace dynamatic::experimental::visual_dataflow;
 
