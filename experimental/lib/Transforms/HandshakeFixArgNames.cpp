@@ -76,10 +76,8 @@ LogicalResult HandshakeFixArgNamesPass::fixArgNames(handshake::FuncOp funcOp,
     // spaces)
     size_t openIdx = idx + funName.size();
     for (size_t e = srcTxt.size(); openIdx < e; ++openIdx) {
-      if (std::isspace(srcTxt[openIdx])) {
-        openIdx++;
+      if (std::isspace(srcTxt[openIdx]))
         continue;
-      }
       if (srcTxt[openIdx] != '(')
         break;
 
