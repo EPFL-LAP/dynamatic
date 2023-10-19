@@ -56,4 +56,5 @@ void Graph::addEdgeState(CycleNb cycleNb, EdgeId edgeId, State state) {
   // cycleEdgeStates map
   std::map<EdgeId, State> mapEdgeState = cycleEdgeStates[cycleNb];
   mapEdgeState.insert(std::pair(edgeId, state));
+  cycleEdgeStates[cycleNb] = mapEdgeState;
 }
