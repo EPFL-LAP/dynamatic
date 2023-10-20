@@ -45,6 +45,9 @@ public:
             EdgeId &edgeId);
   /// Given a specific clock cycle, adds a pair (edge, state) to the map
   void addEdgeState(CycleNb cycle, EdgeId edgeId, State state);
+  // Add this member function to your Graph class in Graph.h
+  void iterateNodes(std::function<void(GraphNode*)> callback);
+
 
 private:
   /// Graph identifier

@@ -7,6 +7,7 @@
 #include "GraphNode.h"
 #include "mlir/Support/LogicalResult.h"
 #include <utility>
+#include <functional>
 
 using namespace dynamatic::experimental::visual_dataflow;
 
@@ -56,4 +57,12 @@ void Graph::addEdgeState(CycleNb cycleNb, EdgeId edgeId, State state) {
   // cycleEdgeStates map
   std::map<EdgeId, State> mapEdgeState = cycleEdgeStates[cycleNb];
   mapEdgeState.insert(std::pair(edgeId, state));
+}
+
+
+void Graph::iterateNodes(std::function<void(GraphNode*)> callback) {
+    for (const auto& pair : nodes) {
+        GraphNode* node = pair.second;
+        callback(node);
+    }
 }
