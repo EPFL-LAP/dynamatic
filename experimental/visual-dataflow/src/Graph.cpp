@@ -4,8 +4,8 @@
 //
 //===----------------------------------------------------------------------===//
 #include "Graph.h"
-#include <iostream>
 #include <functional>
+#include <iostream>
 
 using namespace dynamatic::experimental::visual_dataflow;
 
@@ -17,17 +17,15 @@ Graph::Graph(GraphId id) : id(id) {
                       EdgeId>();
 }
 
-void Graph::addEdge(GraphEdge *edge)
- {
+void Graph::addEdge(GraphEdge *edge) {
   edges.push_back(edge);
-  // std::cout<< "edgepush" << std::endl;
-  // std::pair<NodeId, int> srcInfo =
-  //     std::pair(edge->getSrcNode()->getNodeId(), edge->getOutPort());
-  // std::pair<NodeId, int> dstInfo =
-  //     std::pair(edge->getDstNode()->getNodeId(), edge->getInPort());
-  // std::pair<std::pair<NodeId, int>, std::pair<NodeId, int>> edgeInfo =
-  //     std::pair(srcInfo, dstInfo);
-  // mapEdges.insert(std::pair(edgeInfo, edge->getEdgeId()));
+  std::pair<NodeId, int> srcInfo =
+      std::pair(edge->getSrcNode()->getNodeId(), edge->getOutPort());
+  std::pair<NodeId, int> dstInfo =
+      std::pair(edge->getDstNode()->getNodeId(), edge->getInPort());
+  std::pair<std::pair<NodeId, int>, std::pair<NodeId, int>> edgeInfo =
+      std::pair(srcInfo, dstInfo);
+  mapEdges.insert(std::pair(edgeInfo, edge->getEdgeId()));
 }
 
 void Graph::addNode(GraphNode *node) {
@@ -60,6 +58,6 @@ void Graph::addEdgeState(CycleNb cycleNb, EdgeId edgeId, State state) {
   cycleEdgeStates[cycleNb] = mapEdgeState;
 }
 
-std::map<NodeId, GraphNode *> Graph::getNodes(){ return nodes; }
+std::map<NodeId, GraphNode *> Graph::getNodes() { return nodes; }
 
 std::vector<GraphEdge *> Graph::getEdges() { return edges; }
