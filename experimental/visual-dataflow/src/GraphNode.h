@@ -33,6 +33,11 @@ public:
   void addPort(std::string &port, bool isInputPort);
   /// Returns the node identifier
   NodeId getNodeId();
+  /// Return the position of the Node
+  std::pair<float, float> getPosition();
+  //Returns the in/out ports of the Node
+  std::vector<std::string> getPort(bool isInputPort);
+
 
 private:
   /// Node identifier

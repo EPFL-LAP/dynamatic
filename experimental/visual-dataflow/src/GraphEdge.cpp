@@ -18,7 +18,7 @@ GraphEdge::GraphEdge(){
 }
 
 void GraphEdge::setId(EdgeId id){
-  id = id;
+  this->id = id;
 }
 
 void GraphEdge::addPosition(std::pair<float, float> pos){
@@ -26,19 +26,19 @@ void GraphEdge::addPosition(std::pair<float, float> pos){
 }
 
 void GraphEdge::setSrc(GraphNode* src){
-  src = src;
+  this->src = src;
 }
 
 void GraphEdge::setDst(GraphNode* dst){
-  dst = dst;
+  this->dst = dst;
 }
 
 void GraphEdge::setInPort(int inPort){
-  inPort = inPort;
+  this->inPort = inPort;
 }
 
 void GraphEdge::setOutPort(int outPort){
-  outPort = outPort;
+  this->outPort = outPort;
 }
 
 GraphEdge::GraphEdge(EdgeId id, GraphNode *src, GraphNode *dst, int inPort,
@@ -53,3 +53,5 @@ int GraphEdge::getOutPort() { return outPort; }
 int GraphEdge::getInPort() { return inPort; }
 
 EdgeId GraphEdge::getEdgeId() { return id; }
+
+std::vector<std::pair<float, float>> GraphEdge::getPositions(){ return position; }

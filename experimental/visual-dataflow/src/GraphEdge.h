@@ -49,6 +49,8 @@ public:
   int getInPort();
   /// Returns the edge identifier
   EdgeId getEdgeId();
+  /// Returns the edge positions
+  std::vector<std::pair<float, float>> getPositions();
 
 private:
   /// Edge identifier
