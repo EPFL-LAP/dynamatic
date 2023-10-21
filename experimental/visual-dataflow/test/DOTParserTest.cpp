@@ -1,8 +1,8 @@
 #include "../src/DOTParser.h"
+#include "../src/DOTReformat.h"
 #include "../src/Graph.h"
 #include "../src/GraphEdge.h"
 #include "../src/GraphNode.h"
-#include "../src/dotReformat.h"
 #include "mlir/Support/LogicalResult.h"
 #include <fstream>
 #include <iostream>
