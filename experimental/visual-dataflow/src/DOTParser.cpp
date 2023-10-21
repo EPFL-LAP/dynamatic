@@ -51,7 +51,7 @@ LogicalResult DOTParser::processDOT(std::ifstream &file, Graph *graph) {
              line.find("type") == std::string::npos) {
       int occurrences = std::count(line.begin(), line.end(), ' ');
       if (occurrences != std::string::npos) {
-        for (int i = 1; i <= occurrences + 1; i++) {
+        for (size_t i = 1; i <= occurrences + 1; i++) {
           std::string portName = std::to_string(i);
           currentNode->addPort(portName, true);
         }
@@ -68,7 +68,7 @@ LogicalResult DOTParser::processDOT(std::ifstream &file, Graph *graph) {
              line.find("label") == std::string::npos) {
       int occurrences = std::count(line.begin(), line.end(), ' ');
       if (occurrences != std::string::npos) {
-        for (int i = 1; i <= occurrences + 1; i++) {
+        for (size_t i = 1; i <= occurrences + 1; i++) {
           std::string portName = std::to_string(i);
           currentNode->addPort(portName, false);
         }
