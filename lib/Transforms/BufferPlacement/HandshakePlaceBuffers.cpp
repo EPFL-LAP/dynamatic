@@ -36,54 +36,6 @@ using namespace dynamatic;
 using namespace dynamatic::buffer;
 using namespace dynamatic::experimental;
 
-namespace {
-
-/// Thin wrapper around a `Logger` that allows to conditionally create the
-/// resources to write to the file based on a flag provided during objet
-/// creation. This enables us to use RAII to deallocate the logger only if it
-/// was created.
-class BufferLogger {
-public:
-  /// The underlying logger object, which may remain nullptr.
-  Logger *log = nullptr;
-
-  /// Optionally allocates a logger based on whether the `dumpLogs` flag is set.
-  /// If it is, the log file's location is determined based om the provided
-  /// function's name. On error, `ec` will contain a non-zero error code
-  /// and the logger should not be used.
-  BufferLogger(handshake::FuncOp funcOp, bool dumpLogs, std::error_code &ec);
-
-  /// Returns the underlying logger, which may be nullptr.
-  Logger *operator*() { return log; }
-
-  /// Returns the underlying indented wrtier stream to the log file. Requires
-  /// the object to have been created with the `dumpLogs` flag set to true.
-  mlir::raw_indented_ostream &getStream() {
-    assert(log && "logger was not allocated");
-    return **log;
-  }
-
-  BufferLogger(const BufferLogger *) = delete;
-  BufferLogger operator=(const BufferLogger *) = delete;
-
-  /// Deletes the underlying logger object if it was allocated.
-  ~BufferLogger() {
-    if (log)
-      delete log;
-  }
-};
-} // namespace
-
-BufferLogger::BufferLogger(handshake::FuncOp funcOp, bool dumpLogs,
-                           std::error_code &ec) {
-  if (!dumpLogs)
-    return;
-
-  std::string sep = path::get_separator().str();
-  std::string fp = "buffer-placement" + sep + funcOp.getName().str() + sep;
-  log = new Logger(fp + "placement.log", ec);
-}
-
 #ifndef DYNAMATIC_GUROBI_NOT_INSTALLED
 
 /// Logs arch and CFDFC information (sequence of basic blocks, number of
@@ -119,6 +71,8 @@ static void logFuncInfo(FuncInfo &info, Logger &log) {
     os << "- Number of backedges: " << cf->backedges.size() << "\n\n";
     os.unindent();
   }
+
+  os.flush();
 }
 
 /// Performs a number of verifications to make sure that the Handshake function
@@ -165,6 +119,51 @@ static LogicalResult verifyFuncValidForPlacement(FuncInfo &info) {
 #endif // DYNAMATIC_GUROBI_NOT_INSTALLED
 
 namespace {
+
+/// Thin wrapper around a `Logger` that allows to conditionally create the
+/// resources to write to the file based on a flag provided during objet
+/// creation. This enables us to use RAII to deallocate the logger only if it
+/// was created.
+class BufferLogger {
+public:
+  /// The underlying logger object, which may remain nullptr.
+  Logger *log = nullptr;
+
+  /// Optionally allocates a logger based on whether the `dumpLogs` flag is set.
+  /// If it is, the log file's location is determined based om the provided
+  /// function's name. On error, `ec` will contain a non-zero error code
+  /// and the logger should not be used.
+  BufferLogger(handshake::FuncOp funcOp, bool dumpLogs, std::error_code &ec);
+
+  /// Returns the underlying logger, which may be nullptr.
+  Logger *operator*() { return log; }
+
+  /// Returns the underlying indented wrtier stream to the log file. Requires
+  /// the object to have been created with the `dumpLogs` flag set to true.
+  mlir::raw_indented_ostream &getStream() {
+    assert(log && "logger was not allocated");
+    return **log;
+  }
+
+  BufferLogger(const BufferLogger *) = delete;
+  BufferLogger operator=(const BufferLogger *) = delete;
+
+  /// Deletes the underlying logger object if it was allocated.
+  ~BufferLogger() {
+    if (log)
+      delete log;
+  }
+};
+
+BufferLogger::BufferLogger(handshake::FuncOp funcOp, bool dumpLogs,
+                           std::error_code &ec) {
+  if (!dumpLogs)
+    return;
+
+  std::string sep = path::get_separator().str();
+  std::string fp = "buffer-placement" + sep + funcOp.getName().str() + sep;
+  log = new Logger(fp + "placement.log", ec);
+}
 struct HandshakePlaceBuffersPass
     : public dynamatic::buffer::impl::HandshakePlaceBuffersBase<
           HandshakePlaceBuffersPass> {
@@ -216,7 +215,6 @@ struct HandshakePlaceBuffersPass
 
       // Read the CSV containing arch information (number of transitions between
       // pairs of basic blocks) from disk
-      SmallVector<ArchBB> archs;
       if (failed(StdProfiler::readCSV(frequencies, info.archs))) {
         funcOp->emitError() << "Failed to read profiling information from CSV";
         return signalPassFailure();
@@ -247,9 +245,10 @@ struct HandshakePlaceBuffersPass
         return signalPassFailure();
       }
 
-      // Get CFDFCs from the function
+      // Get CFDFCs from the function unless the functions has no archs (i.e.,
+      // it has a single block) in which case there are no CFDFCs
       SmallVector<CFDFC> cfdfcs;
-      if (failed(getCFDFCs(info, logger, cfdfcs)))
+      if (!info.archs.empty() && failed(getCFDFCs(info, logger, cfdfcs)))
         return signalPassFailure();
 
       // All extracted CFDFCs must be optimized
@@ -270,7 +269,7 @@ struct HandshakePlaceBuffersPass
   };
 
 private:
-  /// Identifes (using and MILP) and extract CFDFCs from the function using
+  /// Identifies (by solving MILPs) and extract CFDFCs from the function using
   /// estimated transition frequencies between blocks.
   LogicalResult getCFDFCs(FuncInfo &info, BufferLogger &logger,
                           SmallVector<CFDFC> &cfdfcs);
@@ -321,9 +320,12 @@ LogicalResult HandshakePlaceBuffersPass::getCFDFCs(FuncInfo &info,
                 "cfdfc" + std::to_string(cfdfcs.size());
 
     // Try to extract the next CFDFC
+    int milpStat;
     if (failed(extractCFDFC(info.funcOp, archs, bbs, selectedArchs, numExecs,
-                            logPath)))
-      return failure();
+                            logPath, &milpStat)))
+      return info.funcOp->emitError()
+             << "CFDFC extraction MILP failed with status " << milpStat << ". "
+             << getGurobiOptStatusDesc(milpStat);
     if (numExecs == 0)
       break;
 
@@ -356,10 +358,18 @@ LogicalResult HandshakePlaceBuffersPass::getBufferPlacement(
     milp = new fpga20::FPGA20Buffers(info, timingDB, env, milpLog, targetCP,
                                      targetCP * 2.0, true);
   assert(milp && "unknown placement algorithm");
-  bool milpRet =
-      succeeded(milp->optimize()) && succeeded(milp->getPlacement(placement));
+  int milpStat;
+  LogicalResult res = success();
+  if (failed(milp->optimize(&milpStat))) {
+    res = info.funcOp->emitError()
+          << "Buffer placement MILP failed with status " << milpStat
+          << ", reason:" << getGurobiOptStatusDesc(milpStat);
+  } else if (failed(milp->getPlacement(placement))) {
+    res = info.funcOp->emitError()
+          << "Failed to extract placement decisions from MILP's solution.";
+  }
   delete milp;
-  return success(milpRet);
+  return res;
 }
 
 LogicalResult HandshakePlaceBuffersPass::instantiateBuffers(
@@ -395,7 +405,34 @@ LogicalResult HandshakePlaceBuffersPass::instantiateBuffers(
   }
   return success();
 }
-#endif
+#endif // DYNAMATIC_GUROBI_NOT_INSTALLED
+
+std::string dynamatic::buffer::getGurobiOptStatusDesc(int status) {
+  switch (status) {
+  case 1:
+    return "Model is loaded, but no solution information is available.";
+  case 2:
+    return "Model was solved to optimality (subject to tolerances), and an "
+           "optimal solution is available.";
+  case 3:
+    return "Model was proven to be infeasible.";
+  case 4:
+    return "Model was proven to be either infeasible or unbounded. To obtain a "
+           "more definitive conclusion, set the DualReductions parameter to 0 "
+           "and reoptimize.";
+  case 5:
+    return "Model was proven to be unbounded.";
+  case 9:
+    return "Optimization terminated because the time expended exceeded the "
+           "value specified in the TimeLimit parameter.";
+  default:
+    return "No description available for optimization status code " +
+           std::to_string(status) +
+           ". Check "
+           "https://www.gurobi.com/documentation/current/refman/"
+           "optimization_status_codes.html for more details";
+  }
+}
 
 std::unique_ptr<mlir::OperationPass<mlir::ModuleOp>>
 dynamatic::buffer::createHandshakePlaceBuffersPass(

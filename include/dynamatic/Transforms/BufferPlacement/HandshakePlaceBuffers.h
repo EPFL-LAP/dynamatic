@@ -22,6 +22,11 @@
 namespace dynamatic {
 namespace buffer {
 
+/// Returns a string describing the meaning of the passed Gurobi optimization
+/// status code. Descriptions are taken from
+// https://www.gurobi.com/documentation/current/refman/optimization_status_codes.html
+std::string getGurobiOptStatusDesc(int status);
+
 std::unique_ptr<mlir::OperationPass<mlir::ModuleOp>>
 createHandshakePlaceBuffersPass(StringRef algorithm = "fpga20",
                                 StringRef frequencies = "",

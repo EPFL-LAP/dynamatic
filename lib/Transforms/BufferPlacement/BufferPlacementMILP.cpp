@@ -108,8 +108,7 @@ LogicalResult BufferPlacementMILP::optimize(int *milpStat) {
     *milpStat = stat;
   if (stat != GRB_OPTIMAL && stat != GRB_TIME_LIMIT) {
     status = MILPStatus::FAILED_TO_OPTIMIZE;
-    return funcInfo.funcOp->emitError()
-           << "Gurobi failed (status: " << stat << ")";
+    return failure();
   }
   status = MILPStatus::OPTIMIZED;
   return success();

@@ -94,10 +94,12 @@ void getDisjointBlockUnions(ArrayRef<CFDFC *> cfdfcs,
 /// On successfull extraction, succeeds and sets the last two arguments with,
 /// respectively, the set of archs included in the extracted CFDFC and the
 /// number of executions of the latter. When no CFDFC could be extracted,
-/// succeeds but sets the number of executions to 0.
+/// succeeds but sets the number of executions to 0. On failure, and if
+/// `milpStat` is not nullptr, the Gurobi status is saved in it.
 LogicalResult extractCFDFC(circt::handshake::FuncOp funcOp, ArchSet &archs,
                            BBSet &bbs, ArchSet &selectedArchs,
-                           unsigned &numExec, const std::string &logPath = "");
+                           unsigned &numExec, const std::string &logPath = "",
+                           int *milpStat = nullptr);
 
 } // namespace buffer
 } // namespace dynamatic

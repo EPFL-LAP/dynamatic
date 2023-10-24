@@ -357,7 +357,8 @@ LogicalResult dynamatic::buffer::extractCFDFC(handshake::FuncOp funcOp,
                                               ArchSet &archs, BBSet &bbs,
                                               ArchSet &selectedArchs,
                                               unsigned &numExecs,
-                                              const std::string &logPath) {
+                                              const std::string &logPath,
+                                              int *milpStat) {
 #ifdef DYNAMATIC_GUROBI_NOT_INSTALLED
   return funcOp->emitError() << "Project was built without Gurobi, can't run "
                                 "CFDFC extraction";
@@ -383,8 +384,11 @@ LogicalResult dynamatic::buffer::extractCFDFC(handshake::FuncOp funcOp,
   if (!logPath.empty())
     model.write(logPath + "_solutions.json");
 
+  int stat = model.get(GRB_IntAttr_Status);
+  if (milpStat)
+    *milpStat = stat;
   if (int status = model.get(GRB_IntAttr_Status) != GRB_OPTIMAL)
-    return funcOp.emitError() << "Gurobi failed with status code " << status;
+    return failure();
 
   // Retrieve the maximum number of transitions identified by the MILP
   // solution
