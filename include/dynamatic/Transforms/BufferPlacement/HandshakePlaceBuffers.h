@@ -6,15 +6,20 @@
 //
 //===----------------------------------------------------------------------===//
 //
-// This file declares the --handshake-place-buffers pass.
+// This file declares the --handshake-place-buffers pass, including the pass's
+// driver which may need to be inherited from by other passes that incorporate a
+// buffer placement step within their logic.
 //
 //===----------------------------------------------------------------------===//
 
-#ifndef DYNAMATIC_TRANSFORMS_PLACEBUFFERS_H
-#define DYNAMATIC_TRANSFORMS_PLACEBUFFERS_H
+#ifndef DYNAMATIC_TRANSFORMS_BUFFERPLACEMENT_PLACEBUFFERS_H
+#define DYNAMATIC_TRANSFORMS_BUFFERPLACEMENT_PLACEBUFFERS_H
 
 #include "circt/Dialect/Handshake/HandshakeOps.h"
 #include "dynamatic/Support/LLVM.h"
+#include "dynamatic/Support/Logging.h"
+#include "dynamatic/Support/TimingModels.h"
+#include "dynamatic/Transforms/BufferPlacement/BufferPlacementMILP.h"
 #include "dynamatic/Transforms/BufferPlacement/BufferingProperties.h"
 #include "dynamatic/Transforms/BufferPlacement/CFDFC.h"
 #include "mlir/Dialect/Func/IR/FuncOps.h"
@@ -28,17 +33,68 @@ namespace buffer {
 std::string getGurobiOptStatusDesc(int status);
 
 std::unique_ptr<mlir::OperationPass<mlir::ModuleOp>>
-createHandshakePlaceBuffersPass(StringRef algorithm = "fpga20",
-                                StringRef frequencies = "",
-                                StringRef timingModels = "",
-                                bool firstCFDFC = false, double targetCP = 4.0,
-                                unsigned timeout = 180, bool dumpLogs = false);
+createHandshakePlaceBuffers(StringRef algorithm = "fpga20",
+                            StringRef frequencies = "",
+                            StringRef timingModels = "",
+                            bool firstCFDFC = false, double targetCP = 4.0,
+                            unsigned timeout = 180, bool dumpLogs = false);
 
 #define GEN_PASS_DECL_HANDSHAKEPLACEBUFFERS
 #define GEN_PASS_DEF_HANDSHAKEPLACEBUFFERS
 #include "dynamatic/Transforms/Passes.h.inc"
 
+/// Public pass driver for the buffer placement pass. Unlike most other
+/// Dynamatic passes, users may wish to access the pass's internal state to
+/// derive insights useful for different kinds of IR processing. To facilitate
+/// users' workflow and minimize code duplication, this driver is public and
+/// exposes most of its behavior in protected virtual methods which may be
+/// overriden by sub-types of the pass.
+struct HandshakePlaceBuffersPass
+    : public dynamatic::buffer::impl::HandshakePlaceBuffersBase<
+          HandshakePlaceBuffersPass> {
+
+  /// Trivial field-by-field constructor.
+  HandshakePlaceBuffersPass(StringRef algorithm, StringRef frequencies,
+                            StringRef timingModels, bool firstCFDFC,
+                            double targetCP, unsigned timeout, bool dumpLogs);
+
+  /// Called on the MLIR module provided as input.
+  void runOnOperation() override;
+
+#ifndef DYNAMATIC_GUROBI_NOT_INSTALLED
+protected:
+  /// Checks a couple of invariants in the function that are required by our
+  /// buffer placement algorithm. Fails when the function does not satisfy at
+  /// least one invariant.
+  virtual LogicalResult checkFuncInvariants(FuncInfo &info);
+
+  /// Places buffers in the function, according to the logic dictated by the
+  /// algorithm the pass was instantiated with.
+  virtual LogicalResult placeBuffers(FuncInfo &info, TimingDatabase &timingDB);
+
+  /// Identifies and extracts all existing CFDFCs in the function using
+  /// estimated transition frequencies between its basic blocks. Fills the
+  /// `cfdfcs` vector with the extracted cycles. CFDFC identification works by
+  /// iteratively solving MILPs until the MILP solution indicates that no
+  /// "executable cycle" remains in the circuit.
+  virtual LogicalResult getCFDFCs(FuncInfo &info, Logger *logger,
+                                  SmallVector<CFDFC> &cfdfcs);
+
+  /// Computes an optimal buffer placement for a Handhsake function by solving
+  /// a large MILP over the entire dataflow circuit represented by the
+  /// function. Fills the `placement` map with placement decisions derived
+  /// from the MILP's solution.
+  virtual LogicalResult
+  getBufferPlacement(FuncInfo &info, TimingDatabase &timingDB, Logger *logger,
+                     DenseMap<Value, PlacementResult> &placement);
+
+  /// Instantiates buffers inside the IR, following placement decisions
+  /// determined by the buffer placement MILP.
+  virtual void instantiateBuffers(DenseMap<Value, PlacementResult> &placement);
+#endif
+};
+
 } // namespace buffer
 } // namespace dynamatic
 
-#endif // DYNAMATIC_TRANSFORMS_PLACEBUFFERS_H
+#endif // DYNAMATIC_TRANSFORMS_BUFFERPLACEMENT_PLACEBUFFERS_H

@@ -186,12 +186,18 @@ def HandshakeSetBufferingProperties :
 }
 
 def HandshakePlaceBuffers : Pass<"handshake-place-buffers", "mlir::ModuleOp"> {
-  let summary = "Insert buffers in dataflow graphs.";
+  let summary = 
+    "Places buffers in dataflow circuits for correctness and performance.";
   let description = [{
-    The pass analyzes the circuit's channel prerequisites. Based the channel
-    prerequisite, the pass optimize the circuit performance by inserting buffers.
+    Places buffers inside Handshake functions to ensure functional correctness
+    and meet performance targets dictated by the chosen buffer placement
+    algorithm. The currently available algorithms all rely on solving Mixed
+    Integer Linear Programs (MILPs) to extract CFDFCs from circuits and decide
+    where it makes sense to place buffers. To do so, we use the Gurobi C++ API
+    which needs to be setup separately from Dynamatic (and is under a different,
+    non-open-source licence).
   }];
-  let constructor = "dynamatic::buffer::createHandshakePlaceBuffersPass()";
+  let constructor = "dynamatic::buffer::createHandshakePlaceBuffers()";
   let options = [
     Option<"algorithm", "algorithm", "std::string", "\"fpga20\"",
     "Algorithm to use for buffer placement. Choices are: 'fpga20' (default), "
