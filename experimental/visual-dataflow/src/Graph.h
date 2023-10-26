@@ -47,6 +47,8 @@ public:
   /// Given a specific clock cycle, adds a pair (edge, state) to the map
   void addEdgeState(CycleNb cycle, EdgeId edgeId, State state);
 
+  std::map<CycleNb, std::map<EdgeId, State>> getCycleEdgeStates();
+
 private:
   /// Graph identifier
   GraphId id;

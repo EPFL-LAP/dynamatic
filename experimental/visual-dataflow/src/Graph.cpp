@@ -4,6 +4,7 @@
 //
 //===----------------------------------------------------------------------===//
 #include "Graph.h"
+#include <iostream>
 
 using namespace dynamatic::experimental::visual_dataflow;
 
@@ -54,4 +55,8 @@ void Graph::addEdgeState(CycleNb cycleNb, EdgeId edgeId, State state) {
   std::map<EdgeId, State> mapEdgeState = cycleEdgeStates[cycleNb];
   mapEdgeState.insert(std::pair(edgeId, state));
   cycleEdgeStates[cycleNb] = mapEdgeState;
+}
+
+std::map<CycleNb, std::map<EdgeId, State>> Graph::getCycleEdgeStates() {
+  return cycleEdgeStates;
 }
