@@ -11,10 +11,10 @@
 //
 //===----------------------------------------------------------------------===//
 
-#include "experimental/tools/handshake-simulator/ExecModels.h"
 #include "experimental/tools/handshake-simulator/Simulation.h"
 #include "circt/Dialect/Handshake/HandshakeOps.h"
 #include "circt/Support/JSON.h"
+#include "experimental/tools/handshake-simulator/ExecModels.h"
 #include "mlir/Dialect/Arith/IR/Arith.h"
 #include "mlir/Dialect/ControlFlow/IR/ControlFlowOps.h"
 #include "mlir/Dialect/Func/IR/FuncOps.h"
@@ -32,9 +32,6 @@
 
 #define DEBUG_TYPE "runner"
 #define INDEX_WIDTH 32
-
-STATISTIC(instructionsExecuted, "Instructions Executed");
-STATISTIC(simulatedTime, "Simulated Time");
 
 using namespace llvm;
 using namespace mlir;
@@ -66,30 +63,6 @@ static void fatalValueError(StringRef reason, T &value) {
   value.print(os);
   os << "')\n";
   llvm::report_fatal_error(err.c_str());
-}
-
-/// Debug APInt type MLIR value
-static void debugArg(const std::string &head, mlir::Value op, const APInt &value,
-              double time) {
-  LLVM_DEBUG(dbgs() << "  " << head << ":  " << op << " = " << value
-                    << " (APInt<" << value.getBitWidth() << ">) @" << time
-                    << "\n");
-}
-
-/// Debug MLIR value
-static void debugArg(const std::string &head, mlir::Value op, const Any &value,
-              double time) {
-  if (auto *val = any_cast<APInt>(&value)) {
-    debugArg(head, op, *val, time);
-  } else if (auto *val = any_cast<APFloat>(&value)) {
-    debugArg(head, op, val, time);
-  } else if (auto *val = any_cast<unsigned>(&value)) {
-    // Represents an allocated buffer.
-    LLVM_DEBUG(dbgs() << "  " << head << ":  " << op << " = Buffer " << *val
-                      << "\n");
-  } else {
-    llvm_unreachable("unknown type");
-  }
 }
 
 /// Read a MLIR value from a stringstream and returns a casted version
@@ -148,7 +121,7 @@ static Any readValueWithType(mlir::Type type, std::string in) {
 
 /// Print MLIR value according to it's type
 static void printAnyValueWithType(llvm::raw_ostream &out, mlir::Type type,
-                           Any &value) {
+                                  Any &value) {
   if (type.isa<mlir::IntegerType>() || type.isa<mlir::IndexType>()) {
     out << any_cast<APInt>(value).getSExtValue();
   } else if (type.isa<mlir::FloatType>()) {
@@ -174,8 +147,8 @@ static void printAnyValueWithType(llvm::raw_ostream &out, mlir::Type type,
 /// store in memRefOffset (i.e. the first dimension index)
 /// Returns a failed result if the shape isn't uni-dimensional
 static LogicalResult allocateMemRef(mlir::MemRefType type, std::vector<Any> &in,
-                        std::vector<std::vector<Any>> &store,
-                        unsigned &memRefOffset) {
+                                    std::vector<std::vector<Any>> &store,
+                                    unsigned &memRefOffset) {
   ArrayRef<int64_t> shape = type.getShape();
   if (shape.size() != 1)
     return failure();
@@ -214,12 +187,8 @@ public:
                     ModelMap &models);
 
   bool succeeded() const { return successFlag; }
-                   
+
 private:
-  /// Execution context variables, documented in ExecModels.h
-  llvm::DenseMap<mlir::Value, Any> &valueMap;
-  std::vector<Any> &results;
-  std::vector<std::vector<Any>> &store;
   /// Flag indicating whether execution was successful.
   bool successFlag = true;
 };
@@ -239,17 +208,15 @@ HandshakeExecuter::HandshakeExecuter(circt::handshake::FuncOp &func,
                                      std::vector<Any> &results,
                                      std::vector<std::vector<Any>> &store,
                                      mlir::OwningOpRef<mlir::ModuleOp> &module,
-                                     ModelMap &models)
-    : valueMap(valueMap), results(results), store(store) {
+                                     ModelMap &models) {
   successFlag = true;
   mlir::Block &entryBlock = func.getBody().front();
   // The arguments of the entry block.
-  mlir::Block::BlockArgListType blockArgs = entryBlock.getArguments();
   // A list of operations which might be ready to execute.
   std::list<circt::Operation *> readyList;
   // A map of memory ops
   llvm::DenseMap<unsigned, unsigned> memoryMap;
-  
+
   // Initialize some operations
   bool hasEnd = false;
   func.walk([&](Operation *op) {
@@ -281,7 +248,7 @@ HandshakeExecuter::HandshakeExecuter(circt::handshake::FuncOp &func,
   // Main simulation initilisation
   StateManager manager;
   manager.currentCycle = 0;
-  ExecutableData execData {valueMap, memoryMap,       store,
+  ExecutableData execData{valueMap, memoryMap,       store,
                           models,   internalDataMap, manager.currentCycle};
 
   // Main simulation loop
@@ -355,8 +322,7 @@ LogicalResult simulate(StringRef toplevelFunction,
     return failure();
 
   if (circt::handshake::FuncOp toplevel =
-                 module->lookupSymbol<circt::handshake::FuncOp>(
-                     toplevelFunction)) {
+          module->lookupSymbol<circt::handshake::FuncOp>(toplevelFunction)) {
     ftype = toplevel.getFunctionType();
     mlir::Block &entryBlock = toplevel.getBody().front();
     blockArgs = entryBlock.getArguments();
@@ -405,7 +371,8 @@ LogicalResult simulate(StringRef toplevelFunction,
       std::stringstream arg(inputArgs[i]);
       while (!arg.eof()) {
         getline(arg, x, ',');
-        store[buffer][pos++] = readValueWithType(memreftype.getElementType(), x);
+        store[buffer][pos++] =
+            readValueWithType(memreftype.getElementType(), x);
       }
     } else {
       Any value = readValueWithType(type, inputArgs[i]);
@@ -416,8 +383,7 @@ LogicalResult simulate(StringRef toplevelFunction,
   std::vector<Any> results(realOutputs);
   bool succeeded = false;
   if (circt::handshake::FuncOp toplevel =
-                 module->lookupSymbol<circt::handshake::FuncOp>(
-                     toplevelFunction)) {
+          module->lookupSymbol<circt::handshake::FuncOp>(toplevelFunction)) {
     succeeded =
         HandshakeExecuter(toplevel, valueMap, results, store, module, models)
             .succeeded();
