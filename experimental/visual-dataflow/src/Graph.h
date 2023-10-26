@@ -4,8 +4,8 @@
 // purpose of being displayed in Godot.
 //===----------------------------------------------------------------------===//
 
-#ifndef VISUAL_DATAFLOW_GRAPH_H
-#define VISUAL_DATAFLOW_GRAPH_H
+#ifndef DYNAMATIC_VISUAL_DATAFLOW_GRAPH_H
+#define DYNAMATIC_VISUAL_DATAFLOW_GRAPH_H
 
 #include "GraphEdge.h"
 #include "GraphNode.h"
@@ -65,4 +65,4 @@ private:
 } // namespace experimental
 } // namespace dynamatic
 
-#endif // VISUAL_DATAFLOW_GRAPH_H
+#endif // DYNAMATIC_VISUAL_DATAFLOW_GRAPH_H
