@@ -10,6 +10,7 @@ llvm_update_compile_flags(dynamatic-opt)
 target_link_libraries(dynamatic-opt
   PRIVATE
   AffineToScf
+  DynamaticLowerScfToCf
   DynamaticBufferPlacement
   DynamaticStandardToHandshakeFPGA18
   DynamaticHandshakeToNetlist
@@ -17,6 +18,7 @@ target_link_libraries(dynamatic-opt
   DynamaticTutorialsCreatingPasses
   DynamaticExperimentalTestTransforms
   DynamaticExperimentalSupport
+  DynamaticExperimentalTransforms
 
   CIRCTHandshake
   CIRCTHandshakeTransforms

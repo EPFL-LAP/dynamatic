@@ -110,7 +110,7 @@ From the top level of the repository, assuming you have already built the projec
 ```
 
 Let's break this command down, token by token:
-- `./build/bin/dynamatic-opt` runs any (sequence of) compiler pass(es) defined by Dynamatic++ on a source MLIR file passed as argument and prints the transformed IR on standard output.
+- `./build/bin/dynamatic-opt` runs any (sequence of) compiler pass(es) defined by Dynamatic on a source MLIR file passed as argument and prints the transformed IR on standard output.
 - `test/Transforms/example.mlir` indicates the file containing the IR you want to transform using the constant pushing pass.
 - `--push-constants` instructs the optimizer to run the constant pushing pass.
 - `--split-input-file` instructs the compiler to wrap each piece of code separated by a line containing only `// -----` into an MLIR module.
@@ -185,7 +185,7 @@ Once you are confident that the DUT's output is correct on the unit tests, you c
 
 ***Congratulations!*** You have now
 1. created good unit tests to make sure a part of the codebase works as intended and, 
-2. set up an easy way for you and future developers of Dynamatic++ to make sure it keeps working as we move forward! 
+2. set up an easy way for you and future developers of Dynamatic to make sure it keeps working as we move forward! 
 
 ### A known assertion generation bug
 

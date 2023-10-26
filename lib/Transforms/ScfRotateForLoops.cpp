@@ -1,5 +1,11 @@
 //===- ScfRotateForLoops.cpp - Rotate for loops into do-while's -*- C++ -*-===//
 //
+// Dynamatic is under the Apache License v2.0 with LLVM Exceptions.
+// See https://llvm.org/LICENSE.txt for license information.
+// SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
+//
+//===----------------------------------------------------------------------===//
+//
 // Implements the --scf-rotate-for-loops pass, which tranforms for loops
 // provably executing at least once into equivalent do-while loops.
 //
@@ -7,6 +13,7 @@
 
 #include "dynamatic/Transforms/ScfRotateForLoops.h"
 #include "circt/Dialect/Handshake/HandshakeOps.h"
+#include "dynamatic/Analysis/NumericAnalysis.h"
 #include "dynamatic/Transforms/PassDetails.h"
 #include "mlir/Dialect/Arith/IR/Arith.h"
 #include "mlir/Dialect/SCF/IR/SCF.h"
@@ -90,46 +97,28 @@ private:
 };
 } // namespace
 
-/// Determines whether the loop's lower bound added to the step value can be
-/// proved to be non-negative (0 or more).
-static bool isIteratorProvablyPositive(APInt &lb, Value step) {
-  if (!lb.isNegative())
-    return true;
-  auto stepCst = dyn_cast_if_present<arith::ConstantOp>(step.getDefiningOp());
-  if (!stepCst)
-    return false;
-  IntegerAttr stepVal = dyn_cast<IntegerAttr>(stepCst.getValue());
-  return lb.getSExtValue() + stepVal.getValue().getZExtValue() >= 0;
-}
-
 bool RotateLoop::isLegalForRotation(scf::ForOp forOp,
                                     arith::CmpIPredicate &pred) const {
-  // Check that both bounds are constant
-  auto lbCst = dyn_cast_if_present<arith::ConstantOp>(
-      forOp.getLowerBound().getDefiningOp());
-  auto ubCst = dyn_cast_if_present<arith::ConstantOp>(
-      forOp.getUpperBound().getDefiningOp());
-  if (!lbCst || !ubCst)
+  NumericAnalysis analysis;
+
+  // Get the ranges
+  NumericRange lbRange = analysis.getRange(forOp.getLowerBound());
+  NumericRange ubRange = analysis.getRange(forOp.getUpperBound());
+
+  // Check whether the loop will execute at least once
+  if (!(lbRange < ubRange))
     return false;
 
-  // Check whether the lower bound is strictly lower than the upper bound
-  IntegerAttr lbVal = dyn_cast<IntegerAttr>(lbCst.getValue());
-  IntegerAttr ubVal = dyn_cast<IntegerAttr>(ubCst.getValue());
-  APInt lb = lbVal.getValue();
-  APInt ub = ubVal.getValue();
-  if (lb.getSignificantBits() >= 64 || ub.getSignificantBits() >= 64)
-    return false;
-
-  // Determine comparison predicate to use when rotating the loop. We can insert
-  // an unsigned comparison only if the lower bound added to the (guaranteed
-  // positive) step can be guaranteed to be non-negative, since the first
-  // comparison will occur after the first iteration of the old for loop body /
-  // new do-while body
-  pred = isIteratorProvablyPositive(lb, forOp.getStep())
+  // Determine comparison predicate to use when rotating the loop. We can
+  // insert an unsigned comparison only if the lower bound added to the
+  // (guaranteed positive) step can be guaranteed to be non-negative, since
+  // the first comparison will occur after the first iteration of the old for
+  // loop body / new do-while body
+  NumericRange stepRange = analysis.getRange(forOp.getStep());
+  pred = NumericRange::add(lbRange, stepRange).isPositive()
              ? arith::CmpIPredicate::ult
              : arith::CmpIPredicate::slt;
-
-  return lb.getSExtValue() < ub.getSExtValue();
+  return true;
 }
 
 namespace {

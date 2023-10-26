@@ -1,6 +1,6 @@
 //===- frequency-profiler.cpp - Profile std-level code ----------*- C++ -*-===//
 //
-// Part of the LLVM Project, under the Apache License v2.0 with LLVM Exceptions.
+// Dynamatic is under the Apache License v2.0 with LLVM Exceptions.
 // See https://llvm.org/LICENSE.txt for license information.
 // SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
 //
@@ -10,7 +10,7 @@
 // dialect and profile the IR by counting the number of transitions between
 // basic blocks for a provided set of inputs. The tool prints transition
 // frequencies between basic blocks on standard output, either in a CSV (for
-// Dynamatic++ buffer placement) or DOT (for legacy Dynamatic buffer placement)
+// Dynamatic buffer placement) or DOT (for legacy Dynamatic buffer placement)
 // format.
 //
 //===----------------------------------------------------------------------===//

@@ -2,14 +2,14 @@
 // RUN: dynamatic-opt --handshake-infer-basic-blocks %s --split-input-file | FileCheck %s
 
 // CHECK-LABEL:   handshake.func @backtrackToArgument(
-// CHECK-SAME:                                        %[[VAL_0:.*]]: none, ...) attributes {argNames = ["arg0"], resNames = []} {
+// CHECK-SAME:                                        %[[VAL_0:.*]]: none, ...) attributes {argNames = ["start"], resNames = []} {
 // CHECK:           %[[VAL_1:.*]] = fork [1] %[[VAL_0]] {bb = 0 : ui32} : none
 // CHECK:           %[[VAL_2:.*]] = fork [1] %[[VAL_1]] {bb = 0 : ui32} : none
 // CHECK:           %[[VAL_3:.*]] = fork [1] %[[VAL_2]] {bb = 0 : ui32} : none
 // CHECK:           end
 // CHECK:         }
-handshake.func @backtrackToArgument(%arg0: none) {
-  %0 = fork [1] %arg0 : none
+handshake.func @backtrackToArgument(%start: none) {
+  %0 = fork [1] %start : none
   %1 = fork [1] %0 : none
   %2 = fork [1] %1 : none
   end
@@ -18,7 +18,7 @@ handshake.func @backtrackToArgument(%arg0: none) {
 // -----
 
 // CHECK-LABEL:   handshake.func @backtrackToKnownBB(
-// CHECK-SAME:                                       %[[VAL_0:.*]]: none, ...) attributes {argNames = ["arg0"], resNames = []} {
+// CHECK-SAME:                                       %[[VAL_0:.*]]: none, ...) attributes {argNames = ["start"], resNames = []} {
 // CHECK:           %[[VAL_1:.*]] = br %[[VAL_0]] {bb = 0 : ui32} : none
 // CHECK:           %[[VAL_2:.*]] = merge %[[VAL_1]] {bb = 1 : ui32} : none
 // CHECK:           %[[VAL_3:.*]]:2 = fork [2] %[[VAL_2]] {bb = 1 : ui32} : none
@@ -26,8 +26,8 @@ handshake.func @backtrackToArgument(%arg0: none) {
 // CHECK:           %[[VAL_5:.*]] = fork [1] %[[VAL_3]]#1 {bb = 1 : ui32} : none
 // CHECK:           end
 // CHECK:         }
-handshake.func @backtrackToKnownBB(%arg0: none) {
-  %0 = br %arg0 {bb = 0 : ui32} : none
+handshake.func @backtrackToKnownBB(%start: none) {
+  %0 = br %start {bb = 0 : ui32} : none
   %1 = merge %0 {bb = 1 : ui32} : none
   %2:2 = fork [2] %1 : none
   %3 = fork [1] %2#0 : none
@@ -37,50 +37,94 @@ handshake.func @backtrackToKnownBB(%arg0: none) {
 
 // -----
 
-// CHECK-LABEL:   handshake.func @backtrackToMerge(
-// CHECK-SAME:                                     %[[VAL_0:.*]]: none, ...) attributes {argNames = ["arg0"], resNames = []} {
+// CHECK-LABEL:   handshake.func @backtrackConflict(
+// CHECK-SAME:                                      %[[VAL_0:.*]]: none, ...) attributes {argNames = ["start"], resNames = []} {
 // CHECK:           %[[VAL_1:.*]] = br %[[VAL_0]] {bb = 0 : ui32} : none
-// CHECK:           %[[VAL_2:.*]] = merge %[[VAL_1]] {bb = 1 : ui32} : none
-// CHECK:           %[[VAL_3:.*]] = fork [1] %[[VAL_2]] {bb = 1 : ui32} : none
+// CHECK:           %[[VAL_2:.*]] = br %[[VAL_0]] {bb = 0 : ui32} : none
+// CHECK:           %[[VAL_3:.*]] = merge %[[VAL_1]] {bb = 1 : ui32} : none
+// CHECK:           %[[VAL_4:.*]] = merge %[[VAL_2]] {bb = 2 : ui32} : none
+// CHECK:           %[[VAL_5:.*]] = merge %[[VAL_3]], %[[VAL_4]] : none
 // CHECK:           end
 // CHECK:         }
-handshake.func @backtrackToMerge(%arg0: none) {
-  %0 = br %arg0 {bb = 0 : ui32} : none
-  %1 = merge %0 {bb = 1 : ui32} : none
-  %2 = fork [1] %1 : none
+handshake.func @backtrackConflict(%start: none) {
+  %0 = br %start {bb = 0 : ui32} : none
+  %1 = br %start {bb = 0 : ui32} : none
+  %2 = merge %0 {bb = 1 : ui32} : none
+  %3 = merge %1 {bb = 2 : ui32} : none
+  %4 = merge %2, %3 : none
   end
 }
 
 // -----
 
-// CHECK-LABEL:   handshake.func @dontBacktrackThroughBranch(
-// CHECK-SAME:                                               %[[VAL_0:.*]]: none, ...) attributes {argNames = ["arg0"], resNames = []} {
-// CHECK:           %[[VAL_1:.*]] = br %[[VAL_0]] {bb = 0 : ui32} : none
-// CHECK:           %[[VAL_2:.*]] = fork [1] %[[VAL_1]] : none
+// CHECK-LABEL:   handshake.func @forwardToKnownBB(
+// CHECK-SAME:                                     %[[VAL_0:.*]]: none, ...) attributes {argNames = ["start"], resNames = []} {
+// CHECK:           %[[VAL_1:.*]]:2 = fork [2] %[[VAL_0]] {bb = 1 : ui32} : none
+// CHECK:           %[[VAL_2:.*]] = merge %[[VAL_1]]#0 {bb = 1 : ui32} : none
+// CHECK:           %[[VAL_3:.*]] = merge %[[VAL_1]]#1 {bb = 1 : ui32} : none
 // CHECK:           end
 // CHECK:         }
-handshake.func @dontBacktrackThroughBranch(%arg0: none) {
-  %0 = br %arg0 {bb = 0 : ui32} : none
-  %1 = fork [1] %0 : none
+handshake.func @forwardToKnownBB(%start: none) {
+  %1:2 = fork [2] %start : none
+  %2 = merge %1#0 {bb = 1 : ui32} : none
+  %3 = merge %1#1 {bb = 1 : ui32} : none
   end
 }
 
 // -----
 
-// CHECK-LABEL:   handshake.func @conflictingInferences(
-// CHECK-SAME:                                          %[[VAL_0:.*]]: i32, %[[VAL_1:.*]]: i32, ...) attributes {argNames = ["arg0", "arg1"], resNames = []} {
-// CHECK:           %[[VAL_2:.*]] = br %[[VAL_0]] {bb = 0 : ui32} : i32
-// CHECK:           %[[VAL_3:.*]] = br %[[VAL_1]] {bb = 0 : ui32} : i32
-// CHECK:           %[[VAL_4:.*]] = merge %[[VAL_2]] {bb = 1 : ui32} : i32
-// CHECK:           %[[VAL_5:.*]] = merge %[[VAL_3]] {bb = 2 : ui32} : i32
-// CHECK:           %[[VAL_6:.*]] = arith.addi %[[VAL_4]], %[[VAL_5]] : i32
+// CHECK-LABEL:   handshake.func @forwardConflict(
+// CHECK-SAME:                                    %[[VAL_0:.*]]: none, ...) attributes {argNames = ["start"], resNames = []} {
+// CHECK:           %[[VAL_1:.*]] = merge %[[VAL_0]] {bb = 1 : ui32} : none
+// CHECK:           %[[VAL_2:.*]] = merge %[[VAL_0]] {bb = 2 : ui32} : none
+// CHECK:           %[[VAL_3:.*]] = merge %[[VAL_1]], %[[VAL_2]] : none
+// CHECK:           %[[VAL_4:.*]]:2 = fork [2] %[[VAL_3]] : none
+// CHECK:           %[[VAL_5:.*]] = merge %[[VAL_4]]#0 {bb = 1 : ui32} : none
+// CHECK:           %[[VAL_6:.*]] = merge %[[VAL_4]]#1 {bb = 2 : ui32} : none
 // CHECK:           end
 // CHECK:         }
-handshake.func @conflictingInferences(%arg0: i32, %arg1: i32) {
-  %0 = br %arg0 {bb = 0 : ui32} : i32
-  %1 = br %arg1 {bb = 0 : ui32} : i32
-  %2 = merge %0 {bb = 1 : ui32} : i32
-  %3 = merge %1 {bb = 2 : ui32} : i32
-  %4 = arith.addi %2, %3 : i32
+handshake.func @forwardConflict(%start: none) {
+  %0 = merge %start {bb = 1 : ui32} : none
+  %1 = merge %start {bb = 2 : ui32} : none
+  %2 = merge %0, %1 : none
+  %3:2 = fork [2] %2 : none
+  %4 = merge %3#0 {bb = 1 : ui32} : none
+  %5 = merge %3#1 {bb = 2 : ui32} : none
+  end
+}
+
+// -----
+
+// CHECK-LABEL:   handshake.func @forwardOverBackward(
+// CHECK-SAME:                                        %[[VAL_0:.*]]: none, ...) attributes {argNames = ["start"], resNames = []} {
+// CHECK:           %[[VAL_1:.*]] = br %[[VAL_0]] {bb = 1 : ui32} : none
+// CHECK:           %[[VAL_2:.*]]:2 = fork [2] %[[VAL_1]] {bb = 2 : ui32} : none
+// CHECK:           %[[VAL_3:.*]] = merge %[[VAL_2]]#0 {bb = 2 : ui32} : none
+// CHECK:           %[[VAL_4:.*]] = merge %[[VAL_2]]#1 {bb = 2 : ui32} : none
+// CHECK:           end
+// CHECK:         }
+handshake.func @forwardOverBackward(%start: none) {
+  %0 = br %start {bb = 1 : ui32} : none
+  %1:2 = fork [2] %0 : none
+  %2 = merge %1#0 {bb = 2 : ui32} : none
+  %3 = merge %1#1 {bb = 2 : ui32} : none
+  end
+}
+
+// -----
+
+// CHECK-LABEL:   handshake.func @backwardOverForward(
+// CHECK-SAME:                                        %[[VAL_0:.*]]: none, ...) attributes {argNames = ["start"], resNames = []} {
+// CHECK:           %[[VAL_1:.*]] = br %[[VAL_0]] {bb = 1 : ui32} : none
+// CHECK:           %[[VAL_2:.*]]:2 = fork [2] %[[VAL_1]] {bb = 1 : ui32} : none
+// CHECK:           %[[VAL_3:.*]] = merge %[[VAL_2]]#0 {bb = 2 : ui32} : none
+// CHECK:           %[[VAL_4:.*]] = merge %[[VAL_2]]#1 {bb = 3 : ui32} : none
+// CHECK:           end
+// CHECK:         }
+handshake.func @backwardOverForward(%start: none) {
+  %0 = br %start {bb = 1 : ui32} : none
+  %1:2 = fork [2] %0 : none
+  %2 = merge %1#0 {bb = 2 : ui32} : none
+  %3 = merge %1#1 {bb = 3 : ui32} : none
   end
 }

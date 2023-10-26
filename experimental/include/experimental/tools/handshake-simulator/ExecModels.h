@@ -1,6 +1,6 @@
 //===- ExecModels.h - Handshake MLIR and Dynamatic Operations -------------===//
 //
-// Part of the LLVM Project, under the Apache License v2.0 with LLVM Exceptions.
+// Dynamatic is under the Apache License v2.0 with LLVM Exceptions.
 // See https://llvm.org/LICENSE.txt for license information.
 // SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
 //
@@ -26,11 +26,11 @@ namespace experimental {
 struct ExecutableModel;
 
 /// Maps operations to an internal state everyone can access
-using InternalDataMap = llvm::DenseMap<circt::Operation*, llvm::Any>;
+using InternalDataMap = llvm::DenseMap<circt::Operation *, llvm::Any>;
 
 /// Type for operations that only modify outs and ins
-using ExecuteFunction = const std::function<void(std::vector<llvm::Any> &, std::vector<llvm::Any> &,
-                             circt::Operation &)>;
+using ExecuteFunction = const std::function<void(
+    std::vector<llvm::Any> &, std::vector<llvm::Any> &, circt::Operation &)>;
 
 //--- Execution Models -------------------------------------------------------//
 
@@ -61,7 +61,7 @@ struct ExecutableData {
 /// Data structure to hold functions to execute each components
 struct ExecutableModel {
   /// A wrapper function to do all the utility stuff in order to simulate
-  /// the execution correctly. 
+  /// the execution correctly.
   /// Returns false if nothing was done, true if some type of jobs were done
   virtual bool tryExecute(ExecutableData &data, circt::Operation &op) = 0;
 
@@ -75,12 +75,11 @@ struct ExecutableModel {
 mlir::LogicalResult initialiseMap(llvm::StringMap<std::string> &funcMap,
                                   ModelMap &models);
 
-
 //--- Memory controller ------------------------------------------------------//
 
 /// Data structure to hold informations about requests toward the mem controller
 struct MemoryRequest {
-  /// Whether a Load request or a Store request 
+  /// Whether a Load request or a Store request
   AccessTypeEnum type;
   /// Address index of related to the memory request in the mem controller op
   unsigned addressIdx;
@@ -103,13 +102,10 @@ struct MemoryControllerState {
   llvm::SmallVector<MemoryRequest> loadRequests;
 };
 
-
 //--- Simulation logging -----------------------------------------------------//
 
 /// All possible states
-enum class ChannelState {
-  NONE = 1, VALID = 2, READY = 3, VALID_READY = 4
-};
+enum class ChannelState { NONE = 1, VALID = 2, READY = 3, VALID_READY = 4 };
 
 /// Data structure to hold state of each value
 struct StateChange {

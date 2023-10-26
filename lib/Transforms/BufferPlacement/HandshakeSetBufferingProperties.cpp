@@ -1,5 +1,11 @@
 //===- HandshakeSetBufferingProperties.h - Set buf. props. ------*- C++ -*-===//
 //
+// Dynamatic is under the Apache License v2.0 with LLVM Exceptions.
+// See https://llvm.org/LICENSE.txt for license information.
+// SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
+//
+//===----------------------------------------------------------------------===//
+//
 // Implements the --handshake-set-buffering-properties pass. For now there is
 // only a single policy, but it is expected that more will be defined in the
 // future. Similarly to the default "fpga20", specifying a new policy amounts to

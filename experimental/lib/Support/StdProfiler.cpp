@@ -1,5 +1,11 @@
 //===- Simulator.cpp - std-level simulator ----------------------*- C++ -*-===//
 //
+// Dynamatic is under the Apache License v2.0 with LLVM Exceptions.
+// See https://llvm.org/LICENSE.txt for license information.
+// SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
+//
+//===----------------------------------------------------------------------===//
+//
 // Implements a function profiler used (at this point) to generate block
 // transition frequencies for smart buffer placement.
 //
@@ -106,7 +112,7 @@ LogicalResult StdProfiler::readCSV(std::string &filename,
     std::getline(iss, token, ',');
     if (!isUnsigned(token))
       return failure();
-    value = std::stoi(token) != 1;
+    value = std::stoi(token);
     return success();
   };
 

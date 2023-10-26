@@ -1,5 +1,11 @@
 //===- ScfSimpleIfToSelect.cpp - Transform if's into select's ---*- C++ -*-===//
 //
+// Dynamatic is under the Apache License v2.0 with LLVM Exceptions.
+// See https://llvm.org/LICENSE.txt for license information.
+// SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
+//
+//===----------------------------------------------------------------------===//
+//
 // Implements the scf-simple-if-to-select transformation pass using a single
 // rewrite pattern that matches scf::IfOp operations. To be transformed, matched
 // if operations must satisfy a number of structural constraints that allow us

@@ -1,5 +1,11 @@
 //===- dynamatic-opt.cpp - The dynamatic-opt driver -------------*- C++ -*-===//
 //
+// Dynamatic is under the Apache License v2.0 with LLVM Exceptions.
+// See https://llvm.org/LICENSE.txt for license information.
+// SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
+//
+//===----------------------------------------------------------------------===//
+//
 // This file implements the dynamatic-opt tool, which is the Dynamatic analog of
 // mlir-opt. It allows access to all compiler passes that Dynamatic users may
 // care about, that is all passes defined in the superproject as well as certain
@@ -9,6 +15,7 @@
 
 #include "dynamatic/InitAllDialects.h"
 #include "dynamatic/InitAllPasses.h"
+#include "experimental/InitAllPasses.h"
 #include "mlir/Pass/PassRegistry.h"
 #include "mlir/Tools/mlir-opt/MlirOptMain.h"
 #include "mlir/Transforms/Passes.h"
@@ -34,6 +41,7 @@ int main(int argc, char **argv) {
   dynamatic::registerAllDialects(registry);
   dynamatic::registerAllPasses();
   dynamatic::tutorials::registerAllPasses();
+  dynamatic::experimental::registerAllPasses();
   registerTestPasses();
 
   // Register the standard passes we want

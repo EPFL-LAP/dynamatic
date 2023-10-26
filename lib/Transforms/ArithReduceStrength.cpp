@@ -1,5 +1,11 @@
 //===- ArithReduceStrength.cpp - Reduce stregnth of arith ops ---*- C++ -*-===//
 //
+// Dynamatic is under the Apache License v2.0 with LLVM Exceptions.
+// See https://llvm.org/LICENSE.txt for license information.
+// SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
+//
+//===----------------------------------------------------------------------===//
+//
 // Implements the --arith-reduce-strength pass, which greedily applies rewrite
 // patterns to arithmetic operations to reduce their strength, improving
 // performance and/or area.
@@ -8,6 +14,7 @@
 
 #include "dynamatic/Transforms/ArithReduceStrength.h"
 #include "circt/Dialect/Handshake/HandshakeOps.h"
+#include "dynamatic/Analysis/NumericAnalysis.h"
 #include "mlir/Dialect/Arith/IR/Arith.h"
 #include "mlir/Dialect/Func/IR/FuncOps.h"
 #include "mlir/Dialect/MemRef/IR/MemRef.h"
@@ -388,21 +395,16 @@ struct PromoteSignedCmp : public OpRewritePattern<arith::CmpIOp> {
 
 private:
   /// Determines whether it is possible to promote the comparison operation to
-  /// an unsined one by trying to prove that both of its operands are positive
+  /// an unsigned one by trying to prove that both of its operands are positive
   /// integers.
-  /// NOTE: (RamirezLucas) The function always returns false for now. It was
-  /// initially though that having IndexType operands was enough to ensure that
-  /// they were always positive but MLIR/Polygeist does allow negative values to
-  /// be represented as IndexType's as it turns out. Therefore, more complicated
-  /// analysis is required to be able to promote comparisons. This isn't a
-  /// priority right now, hence why we have the function return a constant
-  /// false.
   bool isPromotionPossible(arith::CmpIOp cmpOp) const;
 };
 } // namespace
 
 bool PromoteSignedCmp::isPromotionPossible(arith::CmpIOp cmpOp) const {
-  return false;
+  NumericAnalysis analysis;
+  return analysis.getRange(cmpOp.getLhs()).isPositive() &&
+         analysis.getRange(cmpOp.getRhs()).isPositive();
 }
 
 namespace {

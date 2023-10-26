@@ -1,5 +1,10 @@
 //===- Passes.td - Transformation passes definition --------*- tablegen -*-===//
 //
+// Dynamatic is under the Apache License v2.0 with LLVM Exceptions.
+// See https://llvm.org/LICENSE.txt for license information.
+// SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
+//
+//===----------------------------------------------------------------------===//
 // This file contains definitions for transformation passes.
 //
 //===----------------------------------------------------------------------===//
@@ -41,7 +46,7 @@ def ScfForLoopRotation : Pass<"scf-rotate-for-loops", "mlir::ModuleOp"> {
     Rotates for loops, semantically transforming them into do-while's, whenever
     it can be determined that they execute at least once. The resulting loop at
     the std level usually has one less basic block than the original for loop
-    would have had, which ultimately reduces the area of the final circuit.  
+    would have had, which ultimately reduces the area of the final circuit.
   }];
   let constructor = "dynamatic::createScfRotateForLoops()";
 }
@@ -73,14 +78,27 @@ def ScfSimpleIfToSelect : Pass<"scf-simple-if-to-select", "mlir::ModuleOp"> {
 // Handshake passes
 //===----------------------------------------------------------------------===//
 
+def HandshakeCanonicalize : Pass<"handshake-canonicalize", "mlir::ModuleOp"> {
+  let summary = "Canonicalize Handshake operations.";
+  let description = [{
+    Canonicalizes and folds all Handshake operations in the module using a
+    greedy pattern rewriter. The pass preserves the circuit's materialization
+    status i.e., it inserts forks and sinks as needed to compensate for changes
+    made to the IR.
+  }];
+  let constructor = "dynamatic::createHandshakeCanonicalize()";
+}
+
 def HandshakeInferBasicBlocks : Pass<"handshake-infer-basic-blocks", "mlir::ModuleOp"> {
   let summary = "Try to infer the basic block of untagged operations.";
   let description = [{
-    This pass goes through all operations inside handshake::FuncOp's that do not
-    have a 'bb' attribute and tries to infer its value based on the operation's
-    dataflow predecessors. When the pass's heuristic manages to infer the value,
-    the 'bb' attribute is added to the operation. This pass never fails, even
-    when it does not manage to infer the basic block of all operations.
+    Attempts to infer the logical basic block of all operations inside
+    handshake::FuncOp's that are not attached to a logical basic block. The
+    inference logic is conservative and relies on the operation's successors and
+    predecessors to determine the operation's basic block. When the pass's
+    heuristics manage to infer an operation's block, the pass sets the
+    `dynamatic::BB_ATTR` on the operation. This pass does not fail, even when it
+    does not manage to infer the basic block of all operations.
   }];
   let constructor = "dynamatic::createHandshakeInferBasicBlocksPass()";
 }
@@ -113,16 +131,6 @@ def HandshakeOptimizeBitwidths : Pass<"handshake-optimize-bitwidths",
     "When legacy mode is enabled, disables bitwidth optimization of memory "
     "address channels since they sometime make the legacy dot2vhdl tool "
     "fail.">];
-}
-
-def HandshakeOptimizeBits : Pass<"optimize-bits" , "mlir::ModuleOp"> {
-  let summary = "Optimize bits width that can be reduced.";
-  let description = [{
-    This pass goes through all operations inside handshake levels, and optimize the bit width through the forward (from first operation to last), and backward(from last operation to first) loop process. 
-    The loop continues until no more optimization can be done.
-  }];
-  let constructor = "dynamatic::createOptimizeBitsPass()";
-  let dependentDialects = ["mlir::arith::ArithDialect"];
 }
 
 def HandshakeConcretizeIndexType : Pass<"handshake-concretize-index-type", "mlir::ModuleOp"> {
@@ -178,25 +186,40 @@ def HandshakeSetBufferingProperties :
 }
 
 def HandshakePlaceBuffers : Pass<"handshake-place-buffers", "mlir::ModuleOp"> {
-  let summary = "Insert buffers in dataflow graphs.";
+  let summary = 
+    "Places buffers in dataflow circuits for correctness and performance.";
   let description = [{
-    The pass analyzes the circuit's channel prerequisites. Based the channel
-    prerequisite, the pass optimize the circuit performance by inserting buffers.
+    Places buffers inside Handshake functions to ensure functional correctness
+    and meet performance targets dictated by the chosen buffer placement
+    algorithm. The currently available algorithms all rely on solving Mixed
+    Integer Linear Programs (MILPs) to extract CFDFCs from circuits and decide
+    where it makes sense to place buffers. To do so, we use the Gurobi C++ API
+    which needs to be setup separately from Dynamatic (and is under a different,
+    non-open-source licence).
   }];
-  let constructor = "dynamatic::buffer::createHandshakePlaceBuffersPass()";
+  let constructor = "dynamatic::buffer::createHandshakePlaceBuffers()";
   let options = [
-    Option<"firstCFDFC", "firstCFDFC", "bool", "false",
-    "if true, only extract the first CFDFC from the input file">,
-    Option<"stdLevelInfo", "std-level-info", "std::string", "",
-    "if provided, extract CFDFC from standard level simluation">,
-    Option<"timefile", "time-file", "std::string", "",
-    "required, file provide the time and buffer prerequisite information ">,
+    Option<"algorithm", "algorithm", "std::string", "\"fpga20\"",
+    "Algorithm to use for buffer placement. Choices are: 'fpga20' (default), "
+    "'fpga20-legacy' (same as fpga-20 but interprets the MILP's results as "
+    "legacy Dynamatic would, placing at most a single buffer type on any given "
+    "channel)">,
+    Option<"frequencies", "frequencies", "std::string", "",
+    "Path to CSV-formatted file containing estimated transition frequencies "
+    "between basic blocks in the kernel.">,
+    Option<"timingModels", "timing-models", "std::string", "",
+    "Path to JSON-formatted file containing timing models for dataflow "
+    "components.">,
+    Option<"firstCFDFC", "first-cfdfc", "bool", "false",
+    "If true, only extract the first CFDFC from the input file">,
     Option<"targetCP", "target-period", "double", "4.0",
-    "target clock period for the CFDFC">,
-    Option<"timeLimit", "time-limit", "int", "180",
-    "maximum time limit for MILP solver">,
-     Option<"setCustom", "set-custom", "bool", "true",
-    "set customized constraints from dataflow">];
+    "Target clock period for the buffer placement CFDFC">,
+    Option<"timeout", "timeout", "unsigned", "180",
+    "Timeout (in seconds) for the buffer placement MILP (0 for no timeout)">,
+    Option<"dumpLogs", "dump-logs", "bool", "false",
+    "If true, dump debugging information (identified CFDFCs, MILP "
+    "placement decisions, solution summaries) into a directory named "
+    "'buffer-placement' at the binary's location.">];
 }
 
 //===----------------------------------------------------------------------===//

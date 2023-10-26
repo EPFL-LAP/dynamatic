@@ -1,5 +1,11 @@
 //===- NameMemoryOps.cpp - Give a unique name to all memory ops -*- C++ -*-===//
 //
+// Dynamatic is under the Apache License v2.0 with LLVM Exceptions.
+// See https://llvm.org/LICENSE.txt for license information.
+// SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
+//
+//===----------------------------------------------------------------------===//
+//
 // Implements the --name-memory-ops pass, which sets a MemAccessNameAttr
 // attribute containing a unique access name on all supported memory operations
 // in a module (names are unique within the context of each function). This pass

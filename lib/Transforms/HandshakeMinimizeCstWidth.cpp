@@ -1,5 +1,11 @@
 //===- HandshakeMinimizeCstWidth.cpp - Min. constants bitwidth --*- C++ -*-===//
 //
+// Dynamatic is under the Apache License v2.0 with LLVM Exceptions.
+// See https://llvm.org/LICENSE.txt for license information.
+// SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
+//
+//===----------------------------------------------------------------------===//
+//
 // Implements the handshake-minimize-cst-width pass, which minimizes the
 // bitwidth of all constants. The pass matches on all Handshake constants in the
 // IR, determines the minimum bitwidth necessary to hold their value, and
@@ -18,6 +24,10 @@
 #define DEBUG_TYPE "BITWIDTH"
 
 STATISTIC(savedBits, "Number of saved bits");
+
+using namespace mlir;
+using namespace circt;
+using namespace dynamatic;
 
 /// Inserts an extension op after the constant op that extends the constant's
 /// integer result to a provided destination type. The function assumes that it

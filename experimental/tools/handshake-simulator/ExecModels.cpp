@@ -1,6 +1,6 @@
 //===- HandshakeExecutableOps.cpp - Handshake executable Operations -------===//
 //
-// Part of the LLVM Project, under the Apache License v2.0 with LLVM Exceptions.
+// Dynamatic is under the Apache License v2.0 with LLVM Exceptions.
 // See https://llvm.org/LICENSE.txt for license information.
 // SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
 //
@@ -70,7 +70,7 @@ static SmallVector<Value> toVector(ValueRange range) {
 static bool isReadyToExecute(ArrayRef<Value> ins, ArrayRef<Value> outs,
                              llvm::DenseMap<Value, llvm::Any> &valueMap) {
   for (auto in : ins)
-    if (valueMap.count(in) == 0) 
+    if (valueMap.count(in) == 0)
       return false;
 
   for (auto out : outs)
@@ -88,7 +88,7 @@ fetchValues(ArrayRef<Value> values,
   for (auto &value : values) {
     assert(valueMap[value].has_value());
     ins.push_back(valueMap[value]);
-    //valueMap.erase(value);
+    // valueMap.erase(value);
   }
   return ins;
 }
@@ -120,7 +120,7 @@ static bool tryToExecute(circt::Operation *op,
 /// Transfers data between to stored element
 static inline void memoryTransfer(Value from, Value to, ExecutableData &data) {
   data.valueMap[to] = data.valueMap[from];
-  //data.valueMap.erase(from);
+  // data.valueMap.erase(from);
 }
 
 /// Parses mem_controller operation operands and puts the corresponding index
@@ -200,11 +200,14 @@ dynamatic::experimental::initialiseMap(llvm::StringMap<std::string> &funcMap,
   addDefault<handshake::SinkOp, DefaultSink>(modelStructuresMap);
   addDefault<handshake::ConstantOp, DefaultConstant>(modelStructuresMap);
   addDefault<handshake::BufferOp, DefaultBuffer>(modelStructuresMap);
-  addDefault<handshake::ConditionalBranchOp, DefaultConditionalBranch>(modelStructuresMap);
-  addDefault<handshake::ControlMergeOp, DefaultControlMerge>(modelStructuresMap);
+  addDefault<handshake::ConditionalBranchOp, DefaultConditionalBranch>(
+      modelStructuresMap);
+  addDefault<handshake::ControlMergeOp, DefaultControlMerge>(
+      modelStructuresMap);
 
   // Dynamatic operations
-  addDefault<handshake::MemoryControllerOp, DynamaticMemController>(modelStructuresMap);
+  addDefault<handshake::MemoryControllerOp, DynamaticMemController>(
+      modelStructuresMap);
   addDefault<handshake::DynamaticLoadOp, DynamaticLoad>(modelStructuresMap);
   addDefault<handshake::DynamaticStoreOp, DynamaticStore>(modelStructuresMap);
   addDefault<handshake::DynamaticReturnOp, DynamaticReturn>(modelStructuresMap);
@@ -229,9 +232,9 @@ dynamatic::experimental::initialiseMap(llvm::StringMap<std::string> &funcMap,
   addDefault<mlir::arith::ExtSIOp, ExtSIOp>(modelStructuresMap);
 
   // Other operations
-  //addDefault<mlir::memref::AllocOp, AllocOp>(modelStructuresMap);
-  //addDefault<mlir::cf::BranchOp, BranchOp>(modelStructuresMap);
-  //addDefault<mlir::cf::CondBranchOp, CondBranchOp>(modelStructuresMap);
+  // addDefault<mlir::memref::AllocOp, AllocOp>(modelStructuresMap);
+  // addDefault<mlir::cf::BranchOp, BranchOp>(modelStructuresMap);
+  // addDefault<mlir::cf::CondBranchOp, CondBranchOp>(modelStructuresMap);
 
   // ------------------------------------------------------------------------ //
   //   ADD YOUR STRUCT TO THE ABOVE MAP IF YOU WANT TO ADD EXECUTION MODELS   //
@@ -398,15 +401,16 @@ bool DefaultBuffer::tryExecute(ExecutableData &data, circt::Operation &opArg) {
 bool DynamaticMemController::tryExecute(ExecutableData &data,
                                         circt::Operation &opArg) {
   auto op = dyn_cast<circt::handshake::MemoryControllerOp>(opArg);
-  bool hasDoneStuff = false; // This might be different for the mem controller but ok
+  bool hasDoneStuff =
+      false; // This might be different for the mem controller but ok
   unsigned bufferStart =
       llvm::any_cast<unsigned>(data.valueMap[op.getMemref()]);
 
   // Add an internal data to keep track of completed load/store requests
   if (!internalDataExists(opArg, data.internalDataMap))
-    setInternalData<MemoryControllerState>(opArg, parseOperandIndex(op, data.currentCycle),
-                                            data.internalDataMap);
-  
+    setInternalData<MemoryControllerState>(
+        opArg, parseOperandIndex(op, data.currentCycle), data.internalDataMap);
+
   MemoryControllerState mcData;
   getInternalData<MemoryControllerState>(opArg, mcData, data.internalDataMap);
 
@@ -429,7 +433,7 @@ bool DynamaticMemController::tryExecute(ExecutableData &data,
         --request.cyclesToComplete;
         data.internalDataMap[&opArg] = mcData;
       }
-      
+
       if (request.lastExecution == data.currentCycle)
         continue;
 
@@ -455,7 +459,6 @@ bool DynamaticMemController::tryExecute(ExecutableData &data,
       }
 
       data.internalDataMap[&opArg] = mcData;
-
     }
   }
 
@@ -467,7 +470,7 @@ bool DynamaticMemController::tryExecute(ExecutableData &data,
     Value dataOperand = op.getResult(i);
     // Verify if the operand is ready
     if (data.valueMap.count(address)) {
-      
+
       if (!request.isReady) {
         request.lastExecution = data.currentCycle;
         request.isReady = true;
@@ -477,7 +480,7 @@ bool DynamaticMemController::tryExecute(ExecutableData &data,
       }
 
       if (request.lastExecution == data.currentCycle)
-       continue;
+        continue;
 
       // Check if enough cycle passed (simulates the real circuit delay)
       if (request.cyclesToComplete == 0) {
@@ -511,7 +514,8 @@ bool DynamaticLoad::tryExecute(ExecutableData &data, circt::Operation &opArg) {
     hasDoneStuff = true;
   }
   // Send data to successor if available
-  if (data.valueMap.count(op.getData()) && !data.valueMap.count(op.getDataResult())) {
+  if (data.valueMap.count(op.getData()) &&
+      !data.valueMap.count(op.getDataResult())) {
     memoryTransfer(op.getData(), op.getDataResult(), data);
     hasDoneStuff = true;
   }
@@ -524,12 +528,14 @@ bool DynamaticStore::tryExecute(ExecutableData &data, circt::Operation &opArg) {
   bool hasDoneStuff = false;
 
   // Send address to mem controller if available
-  if (data.valueMap.count(op.getAddress()) && !data.valueMap.count(op.getAddressResult())) {
+  if (data.valueMap.count(op.getAddress()) &&
+      !data.valueMap.count(op.getAddressResult())) {
     memoryTransfer(op.getAddress(), op.getAddressResult(), data);
     hasDoneStuff = true;
   }
   // Send data to mem controller if available
-  if (data.valueMap.count(op.getData()) && !data.valueMap.count(op.getDataResult())) {
+  if (data.valueMap.count(op.getData()) &&
+      !data.valueMap.count(op.getDataResult())) {
     memoryTransfer(op.getData(), op.getDataResult(), data);
     hasDoneStuff = true;
   }
@@ -735,7 +741,8 @@ bool DivFOp::tryExecute(ExecutableData &data, circt::Operation &opArg) {
 bool IndexCastOp::tryExecute(ExecutableData &data, circt::Operation &opArg) {
   auto castedOp = dyn_cast<mlir::arith::IndexCastOp>(opArg);
   auto executeFunc = [&castedOp](std::vector<llvm::Any> &ins,
-                        std::vector<llvm::Any> &outs, circt::Operation &op) {
+                                 std::vector<llvm::Any> &outs,
+                                 circt::Operation &op) {
     Type outType = castedOp.getOut().getType();
     APInt inValue = llvm::any_cast<APInt>(ins[0]);
     APInt outValue;
@@ -757,7 +764,8 @@ bool IndexCastOp::tryExecute(ExecutableData &data, circt::Operation &opArg) {
 bool ExtSIOp::tryExecute(ExecutableData &data, circt::Operation &opArg) {
   auto castedOp = dyn_cast<mlir::arith::ExtSIOp>(opArg);
   auto executeFunc = [&castedOp](std::vector<llvm::Any> &ins,
-                        std::vector<llvm::Any> &outs, circt::Operation &op) {
+                                 std::vector<llvm::Any> &outs,
+                                 circt::Operation &op) {
     int64_t width = castedOp.getType().getIntOrFloatBitWidth();
     outs[0] = llvm::any_cast<APInt>(ins[0]).sext(width);
   };
@@ -768,7 +776,8 @@ bool ExtSIOp::tryExecute(ExecutableData &data, circt::Operation &opArg) {
 bool ExtUIOp::tryExecute(ExecutableData &data, circt::Operation &opArg) {
   auto castedOp = dyn_cast<mlir::arith::ExtUIOp>(opArg);
   auto executeFunc = [&castedOp](std::vector<llvm::Any> &ins,
-                        std::vector<llvm::Any> &outs, circt::Operation &op) {
+                                 std::vector<llvm::Any> &outs,
+                                 circt::Operation &op) {
     int64_t width = castedOp.getType().getIntOrFloatBitWidth();
     outs[0] = llvm::any_cast<APInt>(ins[0]).zext(width);
   };
@@ -779,7 +788,6 @@ bool ExtUIOp::tryExecute(ExecutableData &data, circt::Operation &opArg) {
 //===----------------------------------------------------------------------===//
 //                     CF/MEMREF IR execution models
 //===----------------------------------------------------------------------===//
-
 
 } // namespace experimental
 } // namespace dynamatic

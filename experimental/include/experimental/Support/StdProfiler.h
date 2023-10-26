@@ -1,5 +1,11 @@
 //===- StdProfiler.h - std-level profiler -----------------------*- C++ -*-===//
 //
+// Dynamatic is under the Apache License v2.0 with LLVM Exceptions.
+// See https://llvm.org/LICENSE.txt for license information.
+// SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
+//
+//===----------------------------------------------------------------------===//
+//
 // Declaration of std-level profiler that works in tandem with the std-level
 // simulator to collect statistics during simulation.
 //
@@ -55,7 +61,7 @@ struct StdProfiler {
   void writeDOT(mlir::raw_indented_ostream &os);
 
   /// Prints statistics on an output stream as a CSV formatted output compatible
-  /// with Dynamatic++'s smart buffer placement pass.
+  /// with Dynamatic's smart buffer placement pass.
   void writeCSV(mlir::raw_indented_ostream &os);
 
   /// Reads the profiler's CSV formatted output and stores its content into an

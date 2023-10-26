@@ -1,5 +1,11 @@
 //===- Passes.h - Conversion passes registration ---------------=*- C++ -*-===//
 //
+// Dynamatic is under the Apache License v2.0 with LLVM Exceptions.
+// See https://llvm.org/LICENSE.txt for license information.
+// SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
+//
+//===----------------------------------------------------------------------===//
+//
 // This file contains declarations to register all conversion passes.
 //
 //===----------------------------------------------------------------------===//
@@ -9,6 +15,7 @@
 
 #include "dynamatic/Conversion/AffineToScf.h"
 #include "dynamatic/Conversion/HandshakeToNetlist.h"
+#include "dynamatic/Conversion/ScfToCf.h"
 #include "dynamatic/Conversion/StandardToHandshakeFPGA18.h"
 #include "mlir/IR/DialectRegistry.h"
 #include "mlir/Pass/Pass.h"

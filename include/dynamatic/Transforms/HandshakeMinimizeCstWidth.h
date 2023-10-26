@@ -1,5 +1,11 @@
 //===- HandshakeMinimizeCstWidth.h - Min. constants bitwidth ----*- C++ -*-===//
 //
+// Dynamatic is under the Apache License v2.0 with LLVM Exceptions.
+// See https://llvm.org/LICENSE.txt for license information.
+// SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
+//
+//===----------------------------------------------------------------------===//
+//
 // This file declares the --handshake-minimize-cst-width pass.
 //
 //===----------------------------------------------------------------------===//
@@ -7,7 +13,10 @@
 #ifndef DYNAMATIC_TRANSFORMS_HANDSHAKEMINIMIZECSTWIDTH_H
 #define DYNAMATIC_TRANSFORMS_HANDSHAKEMINIMIZECSTWIDTH_H
 
-#include "dynamatic/Transforms/UtilsBitsUpdate.h"
+#include "dynamatic/Support/LLVM.h"
+#include "mlir/Dialect/Arith/IR/Arith.h"
+#include "mlir/IR/DialectRegistry.h"
+#include "mlir/Pass/Pass.h"
 
 namespace dynamatic {
 
