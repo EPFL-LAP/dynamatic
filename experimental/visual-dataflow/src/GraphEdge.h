@@ -22,9 +22,23 @@ using EdgeId = int;
 class GraphEdge {
 
 public:
+  /// Default Edge constructor
+  GraphEdge();
   /// Constructs an edge
   GraphEdge(EdgeId id, GraphNode *src, GraphNode *dst, int inPort, int outPort,
             std::vector<std::pair<float, float>> position);
+  /// Sets the EdgeId
+  void setId(EdgeId id);
+  /// Adds a position to the vector
+  void addPosition(std::pair<float, float> position);
+  /// Sets the source Node
+  void setSrc(GraphNode* src);
+  /// Sets the destination Node
+  void setDst(GraphNode* dst);
+  /// Sets inPort
+  void setInPort(int inPort);
+  /// Sets outPort
+  void setOutPort(int outPort);
   /// Returns the source node of the edge
   GraphNode *getSrcNode();
   /// Returns the desitnation node of the edge
@@ -35,6 +49,8 @@ public:
   int getInPort();
   /// Returns the edge identifier
   EdgeId getEdgeId();
+  /// Returns the edge positions
+  std::vector<std::pair<float, float>> getPositions();
 
 private:
   /// Edge identifier
