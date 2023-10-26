@@ -13,7 +13,9 @@
 #include "mlir/Support/LogicalResult.h"
 #include <map>
 #include <string>
+#include <utility>
 #include <vector>
+#include <functional>
 
 namespace dynamatic {
 namespace experimental {
@@ -45,6 +47,15 @@ public:
             EdgeId &edgeId);
   /// Given a specific clock cycle, adds a pair (edge, state) to the map
   void addEdgeState(CycleNb cycle, EdgeId edgeId, State state);
+  /// Returns all the Nodes in the Graph
+  std::map<NodeId, GraphNode *> getNodes();
+  /// Returns all the edges in the Graph
+  std::vector<GraphEdge *> getEdges();
+  
+
+
+
+  std::map<CycleNb, std::map<EdgeId, State>> getCycleEdgeStates();
 
 private:
   /// Graph identifier
