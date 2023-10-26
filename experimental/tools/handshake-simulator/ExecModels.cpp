@@ -24,9 +24,6 @@ using namespace mlir;
 using namespace circt;
 using namespace dynamatic::experimental;
 
-// NOTE PR : Like I said, we need very fast a system in the "API" to manage
-//            cycles of each operations. Does the job for now but will change
-//            in the upcoming PR.
 /// Cycles it take for corresponding operations to execute
 /// Will be subject to changes in the future.
 #define CYCLE_TIME_LOAD_OP 3
@@ -398,13 +395,6 @@ bool DefaultBuffer::tryExecute(ExecutableData &data, circt::Operation &opArg) {
 
 //--- Dynamatic models -------------------------------------------------------//
 
-/*
-  NOTE PR : I really dislike the way the mem controller works. In reality,
-            the mem controller is independant from store/load and just receive
-            requests. For now, it is very tied to them. Also, this causes to
-            have a lot of poor quality code and bad hacks, so I'll definitely
-            change it very quick after this PR.
-*/
 bool DynamaticMemController::tryExecute(ExecutableData &data,
                                         circt::Operation &opArg) {
   auto op = dyn_cast<circt::handshake::MemoryControllerOp>(opArg);
@@ -433,8 +423,6 @@ bool DynamaticMemController::tryExecute(ExecutableData &data,
 
       // If this is the cycle the request is made, register it to avoid
       // re-executing the operation
-      // NOTE PR : terrible hack, will disappear with the mem_controller rewrite
-      //           right after the PR
       if (!request.isReady) {
         request.lastExecution = data.currentCycle;
         request.isReady = true;
@@ -513,10 +501,6 @@ bool DynamaticMemController::tryExecute(ExecutableData &data,
   return hasDoneStuff;
 }
 
-
-// NOTE PR : Honestly cant find a good way to simplify the repetitive Load
-//          and store code. They are very similar but differ from conditions,
-//          and my lambda versions didn't look any better idk
 bool DynamaticLoad::tryExecute(ExecutableData &data, circt::Operation &opArg) {
   auto op = dyn_cast<circt::handshake::DynamaticLoadOp>(opArg);
   bool hasDoneStuff = false;

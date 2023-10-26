@@ -45,7 +45,7 @@ struct ExecutableData {
   /// (comparable to RAM)
   llvm::DenseMap<mlir::Value, llvm::Any> &valueMap;
   /// Maps memory controller ID to their offset value in store
-  /// (store[memoryMap[SOME_ID]] is the begenning of the allocated memory
+  /// (store[memoryMap[SOME_ID]] is the beginning of the allocated memory
   /// area for this memory controller)
   llvm::DenseMap<unsigned, unsigned> &memoryMap;
   /// Program's memory. Accessed via loads and stores
@@ -128,7 +128,7 @@ using ExecutionMap = llvm::DenseMap<mlir::Value, std::vector<StateChange>>;
 //--- Default CIRCT models ---------------------------------------------------//
 
 struct DefaultFork : public ExecutableModel {
-  virtual bool tryExecute(ExecutableData &data, circt::Operation &op) override;
+  bool tryExecute(ExecutableData &data, circt::Operation &op) override;
 };
 
 struct DefaultMerge : public ExecutableModel {

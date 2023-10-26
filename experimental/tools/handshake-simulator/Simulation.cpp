@@ -250,11 +250,6 @@ HandshakeExecuter::HandshakeExecuter(circt::handshake::FuncOp &func,
   // A map of memory ops
   llvm::DenseMap<unsigned, unsigned> memoryMap;
   
-  // NOTE PR : For a reason I still don't know, I can't merge these two walk
-  //          and loop (they do the same thing ; going through all operations)
-  //          because either the getOps fails (bad isa<>) or either the isa<>
-  //          directly fails. Need to look at this. Only an esthetic problem
-  //          for now.
   // Initialize some operations
   bool hasEnd = false;
   func.walk([&](Operation *op) {
@@ -266,10 +261,6 @@ HandshakeExecuter::HandshakeExecuter(circt::handshake::FuncOp &func,
     }
   });
 
-  // Pre-simulation check. Can't end in any way without and 'end' op
-  // NOTE PR : My tests shows that the 'parser' or whatever already check
-  //           for this (I think it is new?), but I might leave this here
-  //           as a safety check
   assert(
       hasEnd &&
       "At least one 'end' operation is required for the program to terminate.");
@@ -290,47 +281,37 @@ HandshakeExecuter::HandshakeExecuter(circt::handshake::FuncOp &func,
   // Main simulation initilisation
   StateManager manager;
   manager.currentCycle = 0;
-  manager.internalDataChanged = true; // Required to enter the loop
-
   ExecutableData execData {valueMap, memoryMap,       store,
                           models,   internalDataMap, manager.currentCycle};
-
-  // Keeps track of operations that takes multiples cycles to not execute them
-  llvm::DenseMap<circt::Operation*, bool> cycleInternalChanged;
 
   // Main simulation loop
   while (true) {
     // 1 cycle
-    while (manager.valueChangedThisCycle) {
+    do {
       manager.valueChangedThisCycle = false;
 
-      // Note PR : this iterates only over the entry block. I am not sure
-      //          how I should iterate over all operations without having
-      //          4 nested loop, and having an Operation &op reference like this
       for (Operation &op : entryBlock.getOperations()) {
         auto opName = op.getName().getStringRef().str();
+
         auto &execModel = models[opName];
-
-        if (execModel) {          
-          // Execute operation accordingly to its execution model
-          if (execModel.get()->tryExecute(execData, op)) {
-            // Update the cycle ; a value changed thus we need to keep cycling
-            manager.valueChangedThisCycle = true;
-            if (execModel.get()->isEndPoint()) {
-              successFlag = true;
-              return;
-            }
+        if (models.find(opName) == models.end()) {
+          successFlag = false;
+          return;
+        }
+        // Execute operation accordingly to its execution model
+        if (execModel.get()->tryExecute(execData, op)) {
+          // Update the cycle ; a value changed thus we need to keep cycling
+          manager.valueChangedThisCycle = true;
+          if (execModel.get()->isEndPoint()) {
+            successFlag = true;
+            return;
           }
+        }
 
-        } 
       } // for operations
-    } // while (manager.valueChanged)
+    } while (manager.valueChangedThisCycle);
 
-    // NOTE PR : We might want to have a MAX_CYCLE constant to avoid infinite
-    //          looping ?
     ++manager.currentCycle;
-    manager.valueChangedThisCycle = true;
-    cycleInternalChanged.clear();
   } // while (true)
 }
 
