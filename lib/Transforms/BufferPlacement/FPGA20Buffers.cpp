@@ -282,19 +282,58 @@ FPGA20Buffers::addCustomChannelConstraints(ValueRange customChannels) {
 LogicalResult
 FPGA20Buffers::addPathConstraints(ValueRange pathChannels,
                                   ArrayRef<Operation *> pathUnits) {
+  // Manually get the timing model for buffers
+  const TimingModel *bufModel = timingDB.getModel(OperationName(
+      handshake::BufferOp::getOperationName(), funcInfo.funcOp->getContext()));
+  double bigCst = targetPeriod * 10;
+
   // Add path constraints for channels
   for (Value channel : pathChannels) {
+
+    // Get delays for a buffer that would be placed on this channel
+    double inBufDelay = 0.0, outBufDelay = 0.0, dataBufDelay = 0.0;
+    if (bufModel) {
+      Type channelType = channel.getType();
+      unsigned bitwidth = 0;
+      if (isa<IntegerType, FloatType>(channelType))
+        bitwidth = channelType.getIntOrFloatBitWidth();
+      if (failed(bufModel->inputModel.dataDelay.getCeilMetric(bitwidth,
+                                                              inBufDelay)) ||
+          failed(bufModel->outputModel.dataDelay.getCeilMetric(bitwidth,
+                                                               outBufDelay)) ||
+          failed(bufModel->dataDelay.getCeilMetric(bitwidth, dataBufDelay)))
+        return failure();
+      // Add the input and output port delays to the total buffer delay
+      dataBufDelay += inBufDelay + outBufDelay;
+    }
+
     ChannelVars &chVars = vars.channels[channel];
+    ChannelBufProps &props = channels[channel];
     GRBVar &t1 = chVars.tPathIn;
     GRBVar &t2 = chVars.tPathOut;
+    GRBVar &present = chVars.bufPresent;
+    GRBVar &opaque = chVars.bufIsOpaque;
+
     // Arrival time at channel's input must be lower than target clock period
-    model.addConstr(t1 <= targetPeriod, "path_channelInPeriod");
+    model.addConstr(t1 + present * (props.inDelay + inBufDelay) <= targetPeriod,
+                    "path_channelInPeriod");
     // Arrival time at channel's output must be lower than target clock period
     model.addConstr(t2 <= targetPeriod, "path_channelOutPeriod");
-    // If there isn't an opaque buffer on the channel, arrival time at channel's
-    // output must be greater than at channel's input
-    model.addConstr(t2 >= t1 - maxPeriod * chVars.bufIsOpaque,
-                    "path_opaqueChannel");
+
+    // If there is an opaque buffer, arrival time at channel's output must be
+    // greater than the delay between the buffer's internal register and the
+    // post-buffer channel delay
+    double bufToOutDelay = outBufDelay + props.outDelay;
+    model.addConstr(opaque * bufToOutDelay <= t2, "path_opaqueChannel");
+    // If there is a transparent buffer, arrival time at channel's output must
+    // be greater than at channel's input (+ whole channel and buffer delay)
+    double inToOutDelay = props.inDelay + dataBufDelay + props.outDelay;
+    model.addConstr(t1 + inToOutDelay - bigCst * (opaque - present + 1) <= t2,
+                    "path_transparentChannel");
+    // If there are no buffers, arrival time at channel's output must be greater
+    // than at channel's input (+ channel delay)
+    model.addConstr(t1 + props.delay - bigCst * present <= t2,
+                    "path_unbufferedChannel");
   }
 
   // Add path constraints for units

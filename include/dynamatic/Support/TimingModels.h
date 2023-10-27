@@ -51,11 +51,16 @@ public:
   std::unordered_map<unsigned, M> data;
 
   /// Determines the value of the metric at the bitwidth that is closest and
-  /// greater than or equal to the operation's datawidth. Fails if the
-  /// operation's datawidth is strictly larger than the data point with largest
-  /// bitwidth; succeeds and sets the metric's value otherwise. For the returned
-  /// metric to make any sense, the metric must be monotonically increasing with
-  /// respec o the bitwidth.
+  /// greater than or equal to the passed bitwidth. Fails if the bitwidth is
+  /// strictly larger than the data point with largest bitwidth; succeeds and
+  /// sets the metric's value otherwise. For the returned metric to make any
+  /// sense, the metric must be monotonically increasing with respect to the
+  /// bitwidth.
+  LogicalResult getCeilMetric(unsigned bitwidth, M &metric) const;
+
+  /// Determines the value of the metric at the bitwidth that is closest and
+  /// greater than or equal to the passed operation's datawidth. See override's
+  /// documentation for more details.
   LogicalResult getCeilMetric(Operation *op, M &metric) const;
 };
 
@@ -110,6 +115,22 @@ public:
   double validToCond = 0.0;
   /// Combinational delay from any valid input to any data output.
   double validToData = 0.0;
+
+  /// Computes the total data delay (input + internal + output delays) for a
+  /// specific bitwidth. Fails if the provided bitwidth exceeds the highest data
+  /// bitwidth in the model. On success, sets the last argument to the data
+  /// delay.
+  LogicalResult getTotalDataDelay(unsigned bitwidth, double &delay) const;
+
+  /// Returns the total valid delay (input + internal + output delays).
+  double getTotalValidDelay() const {
+    return inputModel.validDelay + validDelay + outputModel.validDelay;
+  };
+
+  /// Returns the total ready delay (input + internal + output delays).
+  double getTotalReadyDelay() const {
+    return inputModel.readyDelay + readyDelay + outputModel.readyDelay;
+  };
 };
 
 /// Deserializes a JSON value into a TimingModel. See ::llvm::json::Value's
@@ -137,8 +158,11 @@ public:
   /// otherwise.
   bool insertTimingModel(StringRef name, TimingModel &model);
 
-  /// Returns a const pointer to the timing model corresponding to the
-  /// operation, if any exists.
+  /// Returns the timing model corresponding to the operation whose name is
+  /// passed as argument, if any exists.
+  const TimingModel *getModel(OperationName opName) const;
+
+  /// Returns the timing model corresponding to the operation, if any exists.
   const TimingModel *getModel(Operation *op) const;
 
   /// Attempts to get an operation's latency. On success, sets the last argument

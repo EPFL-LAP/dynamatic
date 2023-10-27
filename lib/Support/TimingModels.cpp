@@ -96,16 +96,15 @@ static unsigned getOpDatawidth(Operation *op) {
 }
 
 template <typename M>
-LogicalResult BitwidthDepMetric<M>::getCeilMetric(Operation *op,
+LogicalResult BitwidthDepMetric<M>::getCeilMetric(unsigned bitwidth,
                                                   M &metric) const {
-  unsigned opBitwidth = getOpDatawidth(op);
   std::optional<unsigned> widthCeil;
   M metricCeil = 0.0;
 
   // Iterate over the available bitwidths and determine which is the closest one
   // above the operation's bitwidth
   for (const auto &[width, metric] : data) {
-    if (width >= opBitwidth) {
+    if (width >= bitwidth) {
       if (!widthCeil.has_value() || *widthCeil > width) {
         widthCeil = width;
         metricCeil = metric;
@@ -123,15 +122,36 @@ LogicalResult BitwidthDepMetric<M>::getCeilMetric(Operation *op,
   return success();
 }
 
+template <typename M>
+LogicalResult BitwidthDepMetric<M>::getCeilMetric(Operation *op,
+                                                  M &metric) const {
+  return getCeilMetric(getOpDatawidth(op), metric);
+}
+
+LogicalResult TimingModel::getTotalDataDelay(unsigned bitwidth,
+                                             double &delay) const {
+  double unitDelay, inPortDelay, outPortDelay;
+  if (failed(dataDelay.getCeilMetric(bitwidth, unitDelay)) ||
+      failed(inputModel.dataDelay.getCeilMetric(bitwidth, inPortDelay)) ||
+      failed(outputModel.dataDelay.getCeilMetric(bitwidth, outPortDelay)))
+    return failure();
+  delay = unitDelay + inPortDelay + outPortDelay;
+  return success();
+}
+
 bool TimingDatabase::insertTimingModel(StringRef name, TimingModel &model) {
   return models.insert(std::make_pair(OperationName(name, ctx), model)).second;
 }
 
-const TimingModel *TimingDatabase::getModel(Operation *op) const {
-  auto it = models.find(op->getName());
+const TimingModel *TimingDatabase::getModel(OperationName opName) const {
+  auto it = models.find(opName);
   if (it == models.end())
     return nullptr;
   return &it->second;
+}
+
+const TimingModel *TimingDatabase::getModel(Operation *op) const {
+  return getModel(op->getName());
 }
 
 LogicalResult TimingDatabase::getLatency(Operation *op, double &latency) const {
@@ -187,14 +207,16 @@ LogicalResult TimingDatabase::getTotalDelay(Operation *op, SignalType type,
   const TimingModel *model = getModel(op);
   if (!model)
     return failure();
-
-  double unitDelay, inPortDelay, outPortDelay;
-  if (failed(getInternalDelay(op, type, unitDelay)) ||
-      failed(getPortDelay(op, type, PortType::IN, inPortDelay)) ||
-      failed(getPortDelay(op, type, PortType::OUT, outPortDelay)))
-    return failure();
-  delay = unitDelay + inPortDelay + outPortDelay;
-  return success();
+  switch (type) {
+  case SignalType::DATA:
+    return model->getTotalDataDelay(getOpDatawidth(op), delay);
+  case SignalType::VALID:
+    delay = model->getTotalValidDelay();
+    return success();
+  case SignalType::READY:
+    delay = model->getTotalReadyDelay();
+    return success();
+  }
 }
 
 LogicalResult TimingDatabase::readFromJSON(std::string &jsonpath,
