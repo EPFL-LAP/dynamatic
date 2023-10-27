@@ -352,9 +352,8 @@ void HandshakePlaceBuffersPass::instantiateBuffers(
     DenseMap<Value, PlacementResult> &placement) {
   OpBuilder builder(&getContext());
   for (auto &[channel, placeRes] : placement) {
-    Operation *opSrc = channel.getDefiningOp();
     Operation *opDst = *channel.getUsers().begin();
-    builder.setInsertionPointAfter(opSrc);
+    builder.setInsertionPoint(opDst);
 
     Value bufferIn = channel;
     auto placeBuffer = [&](BufferTypeEnum bufType, unsigned numSlots) {
@@ -364,7 +363,7 @@ void HandshakePlaceBuffersPass::instantiateBuffers(
       // Insert an opaque buffer
       auto bufOp = builder.create<handshake::BufferOp>(
           bufferIn.getLoc(), bufferIn, numSlots, bufType);
-      inheritBB(opSrc, bufOp);
+      inheritBB(opDst, bufOp);
       Value bufferRes = bufOp.getResult();
 
       opDst->replaceUsesOfWith(bufferIn, bufferRes);
