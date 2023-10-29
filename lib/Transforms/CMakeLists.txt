@@ -1,7 +1,6 @@
 add_dynamatic_library(DynamaticTransforms
   ArithReduceStrength.cpp
   AnalyzeMemoryAccesses.cpp
-  DynamaticPass.cpp
   FlattenMemRefRowMajor.cpp
   HandshakeCanonicalize.cpp
   HandshakeConcretizeIndexType.cpp
