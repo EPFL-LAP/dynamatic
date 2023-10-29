@@ -46,6 +46,30 @@ static std::string getOperandName(Operation *op, size_t oprdIdx) {
   return std::to_string(oprdIdx);
 }
 
+/// When getting the "producer part" of an operand's name and it is a block
+/// argument, we can only derive a name when it is a function's argument of some
+/// sort. Succeeds and sets the two strings, respectively, to the function's
+/// name and the argument's name when `val` is a function argument; fails
+/// otherwise.
+static LogicalResult getSourceNameFromFunc(Value val, std::string &defName,
+                                           std::string &resName) {
+  // If the parent is some kind of function, use the function name as the
+  // channel source name
+  BlockArgument arg = cast<BlockArgument>(val);
+  Operation *parentOp = arg.getParentBlock()->getParentOp();
+  if (auto funcOp = dyn_cast<handshake::FuncOp>(parentOp)) {
+    defName = funcOp.getNameAttr().str();
+    resName = funcOp.getArgName(arg.getArgNumber()).str();
+    return success();
+  }
+  if (auto funcOp = dyn_cast<func::FuncOp>(parentOp)) {
+    defName = funcOp.getNameAttr().str();
+    resName = std::to_string(arg.getArgNumber());
+    return success();
+  }
+  return failure();
+}
+
 LogicalResult NameAnalysis::getName(Operation *op, StringRef &name) {
   auto nameIt = opToName.find(op);
   if (nameIt == opToName.end())
@@ -54,7 +78,7 @@ LogicalResult NameAnalysis::getName(Operation *op, StringRef &name) {
   return success();
 }
 
-LogicalResult NameAnalysis::getName(OpOperand oprd, std::string &name) {
+LogicalResult NameAnalysis::getName(OpOperand &oprd, std::string &name) {
   // The defining operation must have a name (if the defining operation is a
   // Handshake function, the function symbol is used instead)
   std::string defName, resName;
@@ -66,19 +90,8 @@ LogicalResult NameAnalysis::getName(OpOperand oprd, std::string &name) {
     } else {
       return failure();
     }
-  } else {
-    // If the parent is some kind of function, use the function name as the
-    // channel source name
-    BlockArgument arg = cast<BlockArgument>(val);
-    Operation *parentOp = arg.getParentBlock()->getParentOp();
-    if (auto funcOp = dyn_cast<handshake::FuncOp>(parentOp)) {
-      defName = funcOp.getNameAttr().str();
-      resName = funcOp.getResName(arg.getArgNumber()).str();
-    }
-    if (auto funcOp = dyn_cast<func::FuncOp>(parentOp)) {
-      defName = funcOp.getNameAttr().str();
-      resName = std::to_string(arg.getArgNumber());
-    }
+  } else if (failed(getSourceNameFromFunc(val, defName, resName))) {
+    return failure();
   }
 
   // The user operation must have a name
@@ -113,6 +126,7 @@ StringRef NameAnalysis::setName(Operation *op) {
 LogicalResult NameAnalysis::setName(Operation *op, StringRef name,
                                     bool uniqueWhenTaken) {
   assert(namesValid && "analysis invariant is broken");
+  assert(!name.empty() && "name can't be empty");
   if (handshake::NameAttr attr = getNameAttr(op))
     // If the operation already has a name, this is a failure
     return failure();
@@ -214,16 +228,17 @@ LogicalResult NameAnalysis::walk(UnnamedBehavior onUnnamed) {
     }
 
     // Names must be unique
-    if (nameToOp.contains(name)) {
-      nestedOp->emitError() << "Operation has name '" << name
-                            << "' but another operation already has this name. "
-                               "Names must be unique.";
-      namesValid = false;
-      return;
+    if (auto opIt = nameToOp.find(name); opIt != nameToOp.end()) {
+      if (opIt->second != nestedOp) {
+        nestedOp->emitError() << "Operation has name '" << name
+                              << "' but another operation already has this "
+                                 "name. Names must be unique.";
+        namesValid = false;
+        return;
+      }
+    } else {
+      addMapping(nestedOp, name);
     }
-
-    // Store the bi-directional mapping and advance
-    addMapping(nestedOp, name);
   });
 
   return success(namesValid &&
@@ -246,4 +261,39 @@ std::string NameAnalysis::deriveUniqueName(StringRef base) {
     candidate = base.str() + std::to_string(counter++);
   } while (nameToOp.contains(candidate));
   return candidate;
+}
+
+std::string dynamatic::getUniqueName(Operation *op) {
+  if (handshake::NameAttr attr = getNameAttr(op))
+    return attr.getName().str();
+  return "";
+}
+
+std::string dynamatic::getUniqueName(OpOperand &oprd) {
+  // The defining operation must have a name (if the defining operation is a
+  // Handshake function, the function symbol is used instead)
+  std::string defName, resName;
+  Value val = oprd.get();
+  if (Operation *defOp = val.getDefiningOp()) {
+    if (handshake::NameAttr attr = getNameAttr(defOp)) {
+      defName = attr.getName().str();
+      resName = getResultName(defOp, cast<OpResult>(val).getResultNumber());
+    } else {
+      return "";
+    }
+  } else if (failed(getSourceNameFromFunc(val, defName, resName))) {
+    return "";
+  }
+
+  // The user operation must have a name
+  std::string userName, oprName;
+  Operation *userOp = oprd.getOwner();
+  if (handshake::NameAttr attr = getNameAttr(userOp)) {
+    userName = attr.getName().str();
+    oprName = getOperandName(userOp, oprd.getOperandNumber());
+  } else {
+    return "";
+  }
+
+  return defName + "_" + resName + "_" + oprName + "_" + userName;
 }

@@ -85,7 +85,7 @@ public:
   /// both of them need to be named, or a failure will be produced) as well as
   /// operation-specific result/operand names if available (if not, their
   /// respective index). On success, sets `name` to the derived name.
-  LogicalResult getName(OpOperand oprd, std::string &name);
+  LogicalResult getName(OpOperand &oprd, std::string &name);
 
   /// Return the operation that has this name, if it exists.
   Operation *getOp(StringRef name) { return nameToOp[name]; };
@@ -187,6 +187,15 @@ private:
     opToName[op] = name;
   }
 };
+
+/// Attemps to get the unique name of the operation. Returns an empty string if
+/// the operation does not have a unique name.
+std::string getUniqueName(Operation *op);
+
+/// Attemps to get the unique name of the operand, derived from its producer and
+/// consumer operation respective names. Returns an empty string if the producer
+/// or consumer operation does not have a name.
+std::string getUniqueName(OpOperand &oprd);
 
 } // namespace dynamatic
 
