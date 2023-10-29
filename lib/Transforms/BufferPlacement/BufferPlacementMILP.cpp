@@ -10,6 +10,8 @@
 //
 //===----------------------------------------------------------------------===//
 
+#include "dynamatic/Analysis/NameAnalysis.h"
+#include "mlir/IR/BuiltinOps.h"
 #ifndef DYNAMATIC_GUROBI_NOT_INSTALLED
 #include "gurobi_c++.h"
 
@@ -43,7 +45,7 @@ BufferPlacementMILP::BufferPlacementMILP(FuncInfo &funcInfo,
                                          const TimingDatabase &timingDB,
                                          GRBEnv &env, Logger *logger)
     : timingDB(timingDB), funcInfo(funcInfo), model(GRBModel(env)),
-      nameUniquer(funcInfo.funcOp), logger(logger) {
+      logger(logger) {
 
   // Combines any channel-specific buffering properties coming from IR
   // annotations to internal buffer specifications and stores the combined
@@ -55,10 +57,11 @@ BufferPlacementMILP::BufferPlacementMILP(FuncInfo &funcInfo,
     if (failed(addInternalBuffers(channel))) {
       status = MILPStatus::UNSAT_PROPERTIES;
       std::stringstream ss;
+      std::string channelName;
       ss << "Including internal component buffers into buffering "
-            "properties of channel "
-         << nameUniquer.getName(*channel.value.getUses().begin()).str()
-         << " made them unsatisfiable. Properties are " << *channel.props;
+            "properties of channel '"
+         << getUniqueName(*channel.value.getUses().begin())
+         << "' made them unsatisfiable. Properties are " << *channel.props;
       if (logger)
         **logger << ss.str();
       return channel.producer.emitError() << ss.str();

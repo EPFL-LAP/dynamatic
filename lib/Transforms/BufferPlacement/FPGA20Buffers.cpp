@@ -10,6 +10,7 @@
 //
 //===----------------------------------------------------------------------===//
 
+#include "dynamatic/Analysis/NameAnalysis.h"
 #ifndef DYNAMATIC_GUROBI_NOT_INSTALLED
 #include "gurobi_c++.h"
 
@@ -169,8 +170,7 @@ LogicalResult FPGA20Buffers::createCFDFCVars(CFDFC &cfdfc, unsigned uid) {
   for (auto [idx, unit] : llvm::enumerate(cfdfc.units)) {
     // Create the two unit variables
     UnitVars unitVar;
-    std::string unitName =
-        nameUniquer.getName(*unit).str() + std::to_string(idx);
+    std::string unitName = getUniqueName(unit) + std::to_string(idx);
     std::string varName = prefix + "inRetimeTok_" + unitName;
     unitVar.retIn = createVar(varName);
 
@@ -189,9 +189,8 @@ LogicalResult FPGA20Buffers::createCFDFCVars(CFDFC &cfdfc, unsigned uid) {
 
   // Create a variable to represent the throughput of each CFDFC channel
   for (auto [idx, channel] : llvm::enumerate(cfdfc.channels))
-    cfdfcVars.channelThroughputs[channel] =
-        createVar(prefix + "throughput_" +
-                  nameUniquer.getName(*channel.getUses().begin()).str());
+    cfdfcVars.channelThroughputs[channel] = createVar(
+        prefix + "throughput_" + getUniqueName(*channel.getUses().begin()));
 
   // Create a variable for the CFDFC's throughput
   cfdfcVars.throughput = createVar(prefix + "throughput");
@@ -207,8 +206,7 @@ LogicalResult FPGA20Buffers::createChannelVars() {
     auto &channel = channelAndProps.first;
 
     // Construct a suffix for all variable names
-    std::string suffix =
-        "_" + nameUniquer.getName(*channel.getUses().begin()).str();
+    std::string suffix = "_" + getUniqueName(*channel.getUses().begin());
 
     // Create a Gurobi variable of the given type and name
     auto createVar = [&](char type, const std::string &name) {
@@ -578,7 +576,7 @@ void FPGA20Buffers::logResults(DenseMap<Value, PlacementResult> &placement) {
     ChannelBufProps &props = channels[value];
 
     // Log placement decision
-    os << nameUniquer.getName(*value.getUses().begin()).str() << ":\n";
+    os << getUniqueName(*value.getUses().begin()) << ":\n";
     os.indent();
     std::stringstream propsStr;
     propsStr << props;
@@ -613,7 +611,7 @@ void FPGA20Buffers::logResults(DenseMap<Value, PlacementResult> &placement) {
     os << "Per-channel throughputs of CFDFC #" << idx << ":\n";
     os.indent();
     for (auto [val, channelTh] : cfVars.channelThroughputs) {
-      os << nameUniquer.getName(*val.getUses().begin()).str() << ": "
+      os << getUniqueName(*val.getUses().begin()) << ": "
          << channelTh.get(GRB_DoubleAttr_X) << "\n";
     }
     os.unindent();

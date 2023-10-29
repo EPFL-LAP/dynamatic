@@ -17,9 +17,9 @@
 #ifndef DYNAMATIC_TRANSFORMS_BUFFERPLACEMENT_BUFFERPLACEMENTMILP_H
 #define DYNAMATIC_TRANSFORMS_BUFFERPLACEMENT_BUFFERPLACEMENTMILP_H
 
+#include "dynamatic/Analysis/NameAnalysis.h"
 #include "dynamatic/Support/LLVM.h"
 #include "dynamatic/Support/Logging.h"
-#include "dynamatic/Support/NameUniquer.h"
 #include "dynamatic/Support/TimingModels.h"
 #include "dynamatic/Transforms/BufferPlacement/BufferingProperties.h"
 #include "dynamatic/Transforms/BufferPlacement/CFDFC.h"
@@ -153,8 +153,6 @@ protected:
   llvm::MapVector<Value, ChannelBufProps> channels;
   /// Gurobi model for creating/solving the MILP.
   GRBModel model;
-  /// Holds a unique name for each operation/operand in the function.
-  NameUniquer nameUniquer;
   /// Logger; if not null the class will log setup and results information.
   Logger *logger;
   /// MILP's status, which changes during the object's lifetime.

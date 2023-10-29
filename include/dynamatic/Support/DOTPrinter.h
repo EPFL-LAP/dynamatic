@@ -17,7 +17,6 @@
 
 #include "circt/Dialect/Handshake/HandshakeOps.h"
 #include "dynamatic/Support/LLVM.h"
-#include "dynamatic/Support/NameUniquer.h"
 #include "dynamatic/Support/TimingModels.h"
 #include "mlir/Support/IndentedOstream.h"
 #include <map>
@@ -114,8 +113,7 @@ private:
 
   /// Prints a node corresponding to an operation and, on success, returns a
   /// unique name for the operation in the outName argument.
-  LogicalResult printNode(Operation *op, NameUniquer &names,
-                          mlir::raw_indented_ostream &os);
+  LogicalResult printNode(Operation *op, mlir::raw_indented_ostream &os);
 
   /// Computes all data attributes of an edge for use in legacy Dynamatic and
   /// prints them to the output; it is the responsibility of the caller
@@ -128,7 +126,7 @@ private:
   /// linked by a result of the source that the destination uses as an
   /// operand.
   LogicalResult printEdge(Operation *src, Operation *dst, Value val,
-                          NameUniquer &names, mlir::raw_indented_ostream &os);
+                          mlir::raw_indented_ostream &os);
 
   /// Prints an instance of a handshake.func to the graph.
   LogicalResult printFunc(handshake::FuncOp funcOp,

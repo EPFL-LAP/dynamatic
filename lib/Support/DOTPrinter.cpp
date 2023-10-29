@@ -15,9 +15,9 @@
 #include "dynamatic/Support/DOTPrinter.h"
 #include "circt/Dialect/Handshake/HandshakeOps.h"
 #include "circt/Dialect/Handshake/HandshakePasses.h"
+#include "dynamatic/Analysis/NameAnalysis.h"
 #include "dynamatic/Conversion/PassDetails.h"
 #include "dynamatic/Support/LogicBB.h"
-#include "dynamatic/Support/NameUniquer.h"
 #include "dynamatic/Transforms/HandshakeConcretizeIndexType.h"
 #include "mlir/Dialect/Arith/IR/Arith.h"
 #include "mlir/IR/BuiltinTypes.h"
@@ -912,6 +912,12 @@ LogicalResult DOTPrinter::print(mlir::ModuleOp mod,
         << "we currently only support one handshake function per module";
     return failure();
   }
+
+  // Name all operations in the IR
+  NameAnalysis nameAnalysis = NameAnalysis(mod, true);
+  if (!nameAnalysis.areNamesValid())
+    return failure();
+
   handshake::FuncOp funcOp = *funcs.begin();
 
   if (inLegacyMode()) {
@@ -962,7 +968,7 @@ void DOTPrinter::closeSubgraph(mlir::raw_indented_ostream &os) {
   os << "}\n";
 }
 
-LogicalResult DOTPrinter::printNode(Operation *op, NameUniquer &names,
+LogicalResult DOTPrinter::printNode(Operation *op,
                                     mlir::raw_indented_ostream &os) {
 
   std::string prettyLabel = getPrettyPrintedNodeLabel(op);
@@ -971,7 +977,7 @@ LogicalResult DOTPrinter::printNode(Operation *op, NameUniquer &names,
       (isa<arith::CmpIOp, arith::CmpFOp>(op) ? prettyLabel : "");
 
   // Print node name
-  StringRef opName = names.getName(*op);
+  std::string opName = getUniqueName(op);
   os << "\"" << opName << "\""
      << " [mlir_op=\"" << canonicalName << "\", ";
 
@@ -1018,7 +1024,6 @@ LogicalResult DOTPrinter::printNode(Operation *op, NameUniquer &names,
 }
 
 LogicalResult DOTPrinter::printEdge(Operation *src, Operation *dst, Value val,
-                                    NameUniquer &names,
                                     mlir::raw_indented_ostream &os) {
   bool legacyBuffers = mode == Mode::LEGACY_BUFFERS;
   // In legacy-buffers mode, skip edges from branch-like operations to bitwidth
@@ -1029,12 +1034,12 @@ LogicalResult DOTPrinter::printEdge(Operation *src, Operation *dst, Value val,
   // "Jump over" bitwidth modification operations that go to a merge-like
   // operation in a different block
   bool legacy = inLegacyMode();
-  StringRef srcNodeName =
+  std::string srcNodeName =
       legacyBuffers && isBitModBetweenBlocks(src)
-          ? names.getName(*src->getOperand(0).getDefiningOp())
-          : names.getName(*src);
+          ? getUniqueName(src->getOperand(0).getDefiningOp())
+          : getUniqueName(src);
 
-  os << "\"" << srcNodeName << "\" -> \"" << names.getName(*dst) << "\" ["
+  os << "\"" << srcNodeName << "\" -> \"" << getUniqueName(dst) << "\" ["
      << getStyleOfValue(val);
   if (legacy && failed(annotateEdge(src, dst, val, os)))
     return failure();
@@ -1047,9 +1052,6 @@ LogicalResult DOTPrinter::printEdge(Operation *src, Operation *dst, Value val,
 LogicalResult DOTPrinter::printFunc(handshake::FuncOp funcOp,
                                     mlir::raw_indented_ostream &os) {
   bool legacy = inLegacyMode();
-
-  // Give a unique name to each operation and operand in the function
-  NameUniquer names(funcOp);
 
   std::string splines;
   if (edgeStyle == EdgeStyle::SPLINE)
@@ -1087,7 +1089,7 @@ LogicalResult DOTPrinter::printFunc(handshake::FuncOp funcOp,
       continue;
 
     // Print the operation
-    if (failed(printNode(&op, names, os)))
+    if (failed(printNode(&op, os)))
       return failure();
   }
 
@@ -1104,7 +1106,7 @@ LogicalResult DOTPrinter::printFunc(handshake::FuncOp funcOp,
       if (!isa<MemRefType>(arg.getType()))
         for (Operation *user : arg.getUsers()) {
           auto argLabel = getArgumentName(funcOp, idx);
-          os << "\"" << argLabel << "\" -> \"" << names.getName(*user) << "\" ["
+          os << "\"" << argLabel << "\" -> \"" << getUniqueName(user) << "\" ["
              << getStyleOfValue(arg);
           if (legacy && failed(annotateArgumentEdge(funcOp, idx, user, os)))
             return failure();
@@ -1146,7 +1148,7 @@ LogicalResult DOTPrinter::printFunc(handshake::FuncOp funcOp,
           // the operation using the result
           Operation *useOp = use.getOwner();
           if (isEdgeInSubgraph(useOp, blockID)) {
-            if (failed(printEdge(op, useOp, res, names, os)))
+            if (failed(printEdge(op, useOp, res, os)))
               return failure();
           } else {
             outgoingEdges.emplace_back(op, useOp, res);
@@ -1165,7 +1167,7 @@ LogicalResult DOTPrinter::printFunc(handshake::FuncOp funcOp,
     if (!outgoingEdges.empty())
       os << "// Edges outgoing of basic block " << blockStrID << "\n";
     for (auto &[op, useOp, res] : outgoingEdges)
-      if (failed(printEdge(op, useOp, res, names, os)))
+      if (failed(printEdge(op, useOp, res, os)))
         return failure();
   }
 
@@ -1178,7 +1180,7 @@ LogicalResult DOTPrinter::printFunc(handshake::FuncOp funcOp,
   for (auto *op : handshakeBlocks.outOfBlocks)
     for (auto res : op->getResults())
       for (auto &use : res.getUses())
-        if (failed(printEdge(op, use.getOwner(), res, names, os)))
+        if (failed(printEdge(op, use.getOwner(), res, os)))
           return failure();
 
   os.unindent();

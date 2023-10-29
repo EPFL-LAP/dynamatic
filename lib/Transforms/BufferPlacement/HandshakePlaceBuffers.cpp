@@ -16,6 +16,7 @@
 #include "circt/Dialect/Handshake/HandshakeDialect.h"
 #include "circt/Dialect/Handshake/HandshakeOps.h"
 #include "circt/Dialect/Handshake/HandshakePasses.h"
+#include "dynamatic/Analysis/NameAnalysis.h"
 #include "dynamatic/Support/Logging.h"
 #include "dynamatic/Support/LogicBB.h"
 #include "dynamatic/Transforms/BufferPlacement/CFDFC.h"
@@ -143,6 +144,16 @@ static void logFuncInfo(FuncInfo &info, Logger &log) {
 
 void HandshakePlaceBuffersPass::runOnOperation() {
   ModuleOp modOp = getOperation();
+
+  // Make sure that all operations in the IR are named (used to generate
+  // variable names in the MILP)
+  NameAnalysis &nameAnalysis = getAnalysis<NameAnalysis>();
+  if (!nameAnalysis.areNamesValid())
+    return signalPassFailure();
+  if (!nameAnalysis.areAllOpsNamed())
+    if (failed(nameAnalysis.walk(NameAnalysis::UnnamedBehavior::NAME)))
+      return signalPassFailure();
+  markAnalysesPreserved<NameAnalysis>();
 
   // Check that the algorithm exists
   if (algorithm != "fpga20" && algorithm != "fpga20-legacy") {
@@ -351,6 +362,7 @@ LogicalResult HandshakePlaceBuffersPass::getBufferPlacement(
 void HandshakePlaceBuffersPass::instantiateBuffers(
     DenseMap<Value, PlacementResult> &placement) {
   OpBuilder builder(&getContext());
+  NameAnalysis &nameAnalysis = getAnalysis<NameAnalysis>();
   for (auto &[channel, placeRes] : placement) {
     Operation *opDst = *channel.getUsers().begin();
     builder.setInsertionPoint(opDst);
@@ -364,6 +376,8 @@ void HandshakePlaceBuffersPass::instantiateBuffers(
       auto bufOp = builder.create<handshake::BufferOp>(
           bufferIn.getLoc(), bufferIn, numSlots, bufType);
       inheritBB(opDst, bufOp);
+      nameAnalysis.setName(bufOp);
+
       Value bufferRes = bufOp.getResult();
 
       opDst->replaceUsesOfWith(bufferIn, bufferRes);
