@@ -28,6 +28,7 @@
 #define DYNAMATIC_TRANSFORMS_BUFFERPLACEMENT_HANDSHAKESETBUFFERINGPROPERTIES_H
 
 #include "circt/Dialect/Handshake/HandshakeOps.h"
+#include "dynamatic/Support/DynamaticPass.h"
 #include "dynamatic/Support/LLVM.h"
 #include "dynamatic/Transforms/BufferPlacement/HandshakePlaceBuffers.h"
 #include "mlir/IR/DialectRegistry.h"
@@ -41,7 +42,7 @@ namespace buffer {
 /// https://www.epfl.ch/labs/lap/wp-content/uploads/2020/03/JosipovicFeb20_BuffePlacementAndSizingForHigh-PerformanceDataflowCircuits_FPGA20.pdf).
 void setFPGA20Properties(Channel &channel);
 
-std::unique_ptr<mlir::OperationPass<mlir::ModuleOp>>
+std::unique_ptr<dynamatic::DynamaticPass<false>>
 createHandshakeSetBufferingProperties(const std::string &version = "fpga20");
 
 #define GEN_PASS_DECL_HANDSHAKESETBUFFERINGPROPERTIES

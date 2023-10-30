@@ -31,7 +31,7 @@ struct HandshakeFixArgNamesPass
 
   HandshakeFixArgNamesPass(const std::string &source) { this->source = source; }
 
-  void runOnOperation() override {
+  void runDynamaticPass() override {
     mlir::ModuleOp modOp = getOperation();
 
     // Open the source file
@@ -134,7 +134,7 @@ LogicalResult HandshakeFixArgNamesPass::fixArgNames(handshake::FuncOp funcOp,
   return failure();
 }
 
-std::unique_ptr<mlir::OperationPass<mlir::ModuleOp>>
+std::unique_ptr<dynamatic::DynamaticPass<false>>
 dynamatic::experimental::createHandshakeFixArgNames(const std::string &source) {
   return std::make_unique<HandshakeFixArgNamesPass>(source);
 }

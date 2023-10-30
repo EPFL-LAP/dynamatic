@@ -127,7 +127,7 @@ namespace {
 struct ScfForLoopRotationPass
     : public ScfForLoopRotationBase<ScfForLoopRotationPass> {
 
-  void runOnOperation() override {
+  void runDynamaticPass() override {
     auto *ctx = &getContext();
     mlir::GreedyRewriteConfig config;
     config.useTopDownTraversal = true;
@@ -144,7 +144,7 @@ struct ScfForLoopRotationPass
 } // namespace
 
 namespace dynamatic {
-std::unique_ptr<mlir::OperationPass<mlir::ModuleOp>> createScfRotateForLoops() {
+std::unique_ptr<dynamatic::DynamaticPass<false>> createScfRotateForLoops() {
   return std::make_unique<ScfForLoopRotationPass>();
 }
 } // namespace dynamatic

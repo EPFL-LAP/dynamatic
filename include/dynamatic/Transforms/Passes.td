@@ -5,6 +5,7 @@
 // SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
 //
 //===----------------------------------------------------------------------===//
+//
 // This file contains definitions for transformation passes.
 //
 //===----------------------------------------------------------------------===//
@@ -13,13 +14,14 @@
 #define DYNAMATIC_TRANSFORMS_PASSES_TD
 
 include "mlir/Pass/PassBase.td"
+include "dynamatic/Support/Passes.td"
 
 
 //===----------------------------------------------------------------------===//
 // Arith passes
 //===----------------------------------------------------------------------===//
 
-def ArithReduceStrength : Pass<"arith-reduce-strength", "mlir::ModuleOp"> {
+def ArithReduceStrength : DynamaticPass<"arith-reduce-strength"> {
   let summary = "Strength reduction of arithmetic operations";
   let description = [{
     Performs strength reduction on arithmetic operations in the context of
@@ -40,7 +42,7 @@ def ArithReduceStrength : Pass<"arith-reduce-strength", "mlir::ModuleOp"> {
 // SCF passes
 //===----------------------------------------------------------------------===//
 
-def ScfForLoopRotation : Pass<"scf-rotate-for-loops", "mlir::ModuleOp"> {
+def ScfForLoopRotation : DynamaticPass<"scf-rotate-for-loops"> {
   let summary = "Transforms eligible for loops into do-while's";
   let description = [{
     Rotates for loops, semantically transforming them into do-while's, whenever
@@ -51,7 +53,7 @@ def ScfForLoopRotation : Pass<"scf-rotate-for-loops", "mlir::ModuleOp"> {
   let constructor = "dynamatic::createScfRotateForLoops()";
 }
 
-def ScfSimpleIfToSelect : Pass<"scf-simple-if-to-select", "mlir::ModuleOp"> {
+def ScfSimpleIfToSelect : DynamaticPass<"scf-simple-if-to-select"> {
   let summary = "Transforms if's with simple bodies into select's.";
   let description = [{
     Transforms scf::IfOp operations with one result and a specific internal
@@ -78,7 +80,7 @@ def ScfSimpleIfToSelect : Pass<"scf-simple-if-to-select", "mlir::ModuleOp"> {
 // Handshake passes
 //===----------------------------------------------------------------------===//
 
-def HandshakeCanonicalize : Pass<"handshake-canonicalize", "mlir::ModuleOp"> {
+def HandshakeCanonicalize : DynamaticPass<"handshake-canonicalize"> {
   let summary = "Canonicalize Handshake operations.";
   let description = [{
     Canonicalizes and folds all Handshake operations in the module using a
@@ -89,7 +91,7 @@ def HandshakeCanonicalize : Pass<"handshake-canonicalize", "mlir::ModuleOp"> {
   let constructor = "dynamatic::createHandshakeCanonicalize()";
 }
 
-def HandshakeInferBasicBlocks : Pass<"handshake-infer-basic-blocks", "mlir::ModuleOp"> {
+def HandshakeInferBasicBlocks : DynamaticPass<"handshake-infer-basic-blocks"> {
   let summary = "Try to infer the basic block of untagged operations.";
   let description = [{
     Attempts to infer the logical basic block of all operations inside
@@ -103,7 +105,7 @@ def HandshakeInferBasicBlocks : Pass<"handshake-infer-basic-blocks", "mlir::Modu
   let constructor = "dynamatic::createHandshakeInferBasicBlocksPass()";
 }
 
-def HandshakePrepareForLegacy : Pass<"handshake-prepare-for-legacy", "mlir::ModuleOp"> {
+def HandshakePrepareForLegacy : DynamaticPass<"handshake-prepare-for-legacy"> {
   let summary = "Prepare the IR for usage in legacy Dynamatic.";
   let description = [{
     This pass transforms the circuit to make it follow conventions set by legacy
@@ -116,8 +118,7 @@ def HandshakePrepareForLegacy : Pass<"handshake-prepare-for-legacy", "mlir::Modu
   let constructor = "dynamatic::createHandshakePrepareForLegacy()";
 }
 
-def HandshakeOptimizeBitwidths : Pass<"handshake-optimize-bitwidths",
-                                      "mlir::ModuleOp"> {
+def HandshakeOptimizeBitwidths : DynamaticPass<"handshake-optimize-bitwidths"> {
   let summary = "Optimize bitwidths of all channels.";
   let description = [{
     Reduces the bitwidths of channels wherever possible. Uses a standard
@@ -133,7 +134,7 @@ def HandshakeOptimizeBitwidths : Pass<"handshake-optimize-bitwidths",
     "fail.">];
 }
 
-def HandshakeConcretizeIndexType : Pass<"handshake-concretize-index-type", "mlir::ModuleOp"> {
+def HandshakeConcretizeIndexType : DynamaticPass<"handshake-concretize-index-type"> {
   let summary = "Concretizes the IndexType to an IntegerType of machine-specific width.";
   let description = [{
     Replaces any IndexType throughout the Handhsake-level IR with an IntegerType
@@ -150,7 +151,7 @@ def HandshakeConcretizeIndexType : Pass<"handshake-concretize-index-type", "mlir
             "the pass will fail.">];
 }
 
-def HandshakeMinimizeCstWidth : Pass<"handshake-minimize-cst-width", "mlir::ModuleOp"> {
+def HandshakeMinimizeCstWidth : DynamaticPass<"handshake-minimize-cst-width"> {
   let summary = "Minimizes the bitwidth of all Handshake constants.";
   let description = [{
     Rewrites constant operations with the minimum required bitwidth to support
@@ -167,7 +168,7 @@ def HandshakeMinimizeCstWidth : Pass<"handshake-minimize-cst-width", "mlir::Modu
 }
 
 def HandshakeSetBufferingProperties :
-  Pass<"handshake-set-buffering-properties", "mlir::ModuleOp"> {
+  DynamaticPass<"handshake-set-buffering-properties"> {
   let summary = "Attach buffering properties to specifc channels in the IR";
   let description = [{
     Adds buffering properties to specific channels in the IR. Which channels are
@@ -185,7 +186,7 @@ def HandshakeSetBufferingProperties :
             "(default).">];
 }
 
-def HandshakePlaceBuffers : Pass<"handshake-place-buffers", "mlir::ModuleOp"> {
+def HandshakePlaceBuffers : DynamaticPass<"handshake-place-buffers", "true"> {
   let summary = 
     "Places buffers in dataflow circuits for correctness and performance.";
   let description = [{
@@ -226,7 +227,7 @@ def HandshakePlaceBuffers : Pass<"handshake-place-buffers", "mlir::ModuleOp"> {
 // Other passes
 //===----------------------------------------------------------------------===//
 
-def AnalyzeMemoryAccesses : Pass<"analyze-memory-accesses", "mlir::ModuleOp"> {
+def AnalyzeMemoryAccesses : DynamaticPass<"analyze-memory-accesses"> {
   let summary = "Determine memory dependencies between different accesses.";
   let description = [{
     Analyzes memory accesses in each function in a module and identifies all
@@ -253,7 +254,7 @@ def AnalyzeMemoryAccesses : Pass<"analyze-memory-accesses", "mlir::ModuleOp"> {
   let dependentDialects = ["circt::handshake::HandshakeDialect"];
 }
 
-def FlattenMemRefRowMajor : Pass<"flatten-memref-row-major", "::mlir::ModuleOp"> {
+def FlattenMemRefRowMajor : DynamaticPass<"flatten-memref-row-major"> {
   let summary = "Flatten memrefs (row-major order)";
   let description = [{
     Flattens multidimensional memories and accesses to them into
@@ -265,7 +266,17 @@ def FlattenMemRefRowMajor : Pass<"flatten-memref-row-major", "::mlir::ModuleOp">
   let dependentDialects = ["mlir::memref::MemRefDialect"];
 }
 
-def NameMemoryOps : Pass<"name-memory-ops", "mlir::ModuleOp"> {
+def NameAllOperations : Pass<"name-all-operations", "mlir::ModuleOp"> {
+  let summary = "Gives a unique name to each operation in the IR.";
+  let description = [{
+    Uses our name analysis infrastructure to give a unique name to each
+    operation in the IR, which is attached as an attribute to each operation.
+  }];
+  let constructor = "dynamatic::createNameAllOperations()";
+  let dependentDialects = ["circt::handshake::HandshakeDialect"];
+}
+
+def NameMemoryOps : DynamaticPass<"name-memory-ops"> {
   let summary = "Give a unique name to each memory operation.";
   let description = [{
     Sets a MemAccessNameAttr attribute on each AffineLoadOp, AffineStoreOp,
@@ -284,7 +295,7 @@ def NameMemoryOps : Pass<"name-memory-ops", "mlir::ModuleOp"> {
   let dependentDialects = ["circt::handshake::HandshakeDialect"];
 }
 
-def PushConstants : Pass<"push-constants", "mlir::ModuleOp"> {
+def PushConstants : DynamaticPass<"push-constants"> {
   let summary = "Push constant definitions to blocks using them.";
   let description = [{
     This pass moves arith::ConstantOp operations to the block(s) using them,
@@ -294,6 +305,19 @@ def PushConstants : Pass<"push-constants", "mlir::ModuleOp"> {
     delete the original operation if it is not used within its defining block.
   }];
   let constructor = "dynamatic::createPushConstantsPass()";
+}
+
+def RemoveOperationNames : Pass<"remove-operation-names", "mlir::ModuleOp"> {
+  let summary = "Deletes the unique name of all operations in the IR.";
+  let description = [{
+    Opposite to the `NameAllOperations` pass in that it removes any attribute
+    containing a unique name for an operation. This is useful, for example, for
+    FileCheck unit tests, for which we do not care that operation names are
+    checked by the verifier (i.e., this pass may be ran after the pass under
+    test to remove all names).
+  }];
+  let constructor = "dynamatic::createRemoveOperationNames()";
+  let dependentDialects = ["circt::handshake::HandshakeDialect"];
 }
 
 #endif // DYNAMATIC_TRANSFORMS_PASSES_TD

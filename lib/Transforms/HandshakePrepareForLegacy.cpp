@@ -207,7 +207,7 @@ struct EraseEntryBlockMerges : public OpRewritePattern<handshake::MergeOp> {
 struct HandshakePrepareForLegacyPass
     : public HandshakePrepareForLegacyBase<HandshakePrepareForLegacyPass> {
 
-  void runOnOperation() override {
+  void runDynamaticPass() override {
     auto *ctx = &getContext();
     OpBuilder builder{ctx};
 
@@ -228,7 +228,7 @@ struct HandshakePrepareForLegacyPass
 };
 } // namespace
 
-std::unique_ptr<mlir::OperationPass<mlir::ModuleOp>>
+std::unique_ptr<dynamatic::DynamaticPass<false>>
 dynamatic::createHandshakePrepareForLegacy() {
   return std::make_unique<HandshakePrepareForLegacyPass>();
 }

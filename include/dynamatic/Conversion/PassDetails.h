@@ -15,6 +15,7 @@
 #ifndef DYNAMATIC_CONVERSION_PASSDETAILS_H
 #define DYNAMATIC_CONVERSION_PASSDETAILS_H
 
+#include "dynamatic/Support/DynamaticPass.h"
 #include "mlir/IR/BuiltinOps.h"
 #include "mlir/IR/DialectRegistry.h"
 #include "mlir/Pass/Pass.h"

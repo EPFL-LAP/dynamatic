@@ -191,7 +191,7 @@ struct HandshakeConcretizeIndexTypePass
 
   HandshakeConcretizeIndexTypePass(unsigned width) { this->width = width; }
 
-  void runOnOperation() override {
+  void runDynamaticPass() override {
     auto *ctx = &getContext();
     Type indexWidthInt = IntegerType::get(ctx, width);
 
@@ -239,7 +239,7 @@ struct HandshakeConcretizeIndexTypePass
 };
 }; // namespace
 
-std::unique_ptr<mlir::OperationPass<mlir::ModuleOp>>
+std::unique_ptr<dynamatic::DynamaticPass<false>>
 dynamatic::createHandshakeConcretizeIndexType(unsigned width) {
   return std::make_unique<HandshakeConcretizeIndexTypePass>(width);
 }

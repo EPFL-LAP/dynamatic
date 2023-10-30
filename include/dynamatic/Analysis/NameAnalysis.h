@@ -52,20 +52,18 @@ public:
   /// Constructor called automatically by `getAnalysis<NameAnalysis>()` if the
   /// analysis is not already cached. Simply stores the top-level pass operation
   /// it is passed and walks the IR to establish mappings between already named
-  /// operations and their names. If `nameAllOps` is true, unnamed operationss
-  /// are named along the way. Users should call the `areNamesValid` method
+  /// operations and their names. Users should call the `isAnalysisValid` method
   /// after the constructor returns to verify that the analysis's invariants
   /// are not violated by the operations nested under the passed operation.
-  NameAnalysis(Operation *op, bool nameAllOps = false) : topLevelOp(op) {
+  NameAnalysis(Operation *op) : topLevelOp(op) {
     // Explictly discard the result since we can't return anything from here
-    (void)walk(nameAllOps ? UnnamedBehavior::NAME
-                          : UnnamedBehavior::DO_NOTHING);
+    (void)walk(UnnamedBehavior::DO_NOTHING);
   };
 
   /// Whether the last walk through the IR revealed that one of the analysis's
   /// invariants is broken. Setting new operation names despite a broken
   /// invariant will lead to undefined behavior.
-  bool areNamesValid() { return namesValid; }
+  bool isAnalysisValid() { return namesValid; }
 
   /// Whether the last walk through the IR found no unnamed operation it did not
   /// name. If this returns true right after the analysis walked the IR, all
@@ -134,6 +132,15 @@ public:
   /// if the argument was `UnnamedBehavior::FAIL` and there exists ar least one
   /// unnamed operation in the IR.
   LogicalResult walk(UnnamedBehavior onUnnamed);
+
+  /// Equivalent to `analysis.walk(UnnamedBehavior::NAME)` but never produces an
+  /// error and asserts if some analysis invariant is broken. It is safe to call
+  /// it if the analysis was just checked to be valid with `isAnalysisValid` and
+  /// no operation name was set outside of the analysis since then.
+  void nameAllUnnamedOps() {
+    assert(succeeded(walk(UnnamedBehavior::NAME)) &&
+           "analysis invariant is broken");
+  }
 
   /// Invalidation hook to keep the analysis cached across passes. Returns true
   /// if the analysis should be invalidated and fully reconstructed the next

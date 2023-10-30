@@ -13,12 +13,12 @@
 #ifndef DYNAMATIC_TRANSFORMS_ANALYZEMEMORYACCESSES_H
 #define DYNAMATIC_TRANSFORMS_ANALYZEMEMORYACCESSES_H
 
+#include "dynamatic/Support/DynamaticPass.h"
 #include "dynamatic/Support/LLVM.h"
 
 namespace dynamatic {
 
-std::unique_ptr<mlir::OperationPass<mlir::ModuleOp>>
-createAnalyzeMemoryAccesses();
+std::unique_ptr<dynamatic::DynamaticPass<false>> createAnalyzeMemoryAccesses();
 
 } // namespace dynamatic
 

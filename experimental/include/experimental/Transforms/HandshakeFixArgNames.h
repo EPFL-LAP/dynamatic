@@ -13,6 +13,7 @@
 #ifndef EXPERIMENTAL_TRANSFORMS_HANDHSHAKEFIXARGNAMES_H
 #define EXPERIMENTAL_TRANSFORMS_HANDHSHAKEFIXARGNAMES_H
 
+#include "dynamatic/Support/DynamaticPass.h"
 #include "dynamatic/Support/LLVM.h"
 #include "mlir/IR/Value.h"
 #include "mlir/Pass/Pass.h"
@@ -20,7 +21,7 @@
 namespace dynamatic {
 namespace experimental {
 
-std::unique_ptr<mlir::OperationPass<mlir::ModuleOp>>
+std::unique_ptr<dynamatic::DynamaticPass<false>>
 createHandshakeFixArgNames(const std::string &source = "");
 
 #define GEN_PASS_DECL_HANDSHAKEFIXARGNAMES

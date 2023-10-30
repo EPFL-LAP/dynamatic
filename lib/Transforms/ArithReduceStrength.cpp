@@ -416,8 +416,8 @@ struct ArithReduceStrengthPass
     this->maxAdderDepthMul = maxAdderDepthMul;
   }
 
-  void runOnOperation() override {
-    auto *ctx = &getContext();
+  void runDynamaticPass() override {
+    MLIRContext *ctx = &getContext();
 
     mlir::GreedyRewriteConfig config;
     config.useTopDownTraversal = true;
@@ -426,9 +426,9 @@ struct ArithReduceStrengthPass
     RewritePatternSet patterns{ctx};
     patterns.add<ReplaceMulAddWithSub, PromoteSignedCmp>(ctx);
     /// TODO: (RamirezLucas) Any provided value is somewhat arbitrary here.
-    /// Ultimately, this should be driven by models of component delays (same as
-    /// for buffer placement) as well as a general optimization strategy (area,
-    /// performance, mixed)
+    /// Ultimately, this should be driven by models of component delays (same
+    /// as for buffer placement) as well as a general optimization strategy
+    /// (area, performance, mixed)
     patterns.add<MulReduceStrength>(maxAdderDepthMul, ctx);
 
     if (failed(applyPatternsAndFoldGreedily(getOperation(), std::move(patterns),
@@ -438,7 +438,7 @@ struct ArithReduceStrengthPass
 };
 } // namespace
 
-std::unique_ptr<mlir::OperationPass<mlir::ModuleOp>>
+std::unique_ptr<dynamatic::DynamaticPass<false>>
 dynamatic::createArithReduceStrength(unsigned maxAdderDepthMul) {
   return std::make_unique<ArithReduceStrengthPass>(maxAdderDepthMul);
 }

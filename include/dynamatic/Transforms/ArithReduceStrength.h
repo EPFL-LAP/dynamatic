@@ -15,6 +15,7 @@
 #ifndef DYNAMATIC_TRANSFORMS_ARITHREDUCESTRENGTH_H
 #define DYNAMATIC_TRANSFORMS_ARITHREDUCESTRENGTH_H
 
+#include "dynamatic/Support/DynamaticPass.h"
 #include "dynamatic/Support/LLVM.h"
 #include "mlir/IR/Value.h"
 #include "mlir/Pass/Pass.h"
@@ -86,7 +87,7 @@ private:
       std::unordered_map<std::shared_ptr<OpTree>, Value> &resultCache);
 };
 
-std::unique_ptr<mlir::OperationPass<mlir::ModuleOp>>
+std::unique_ptr<dynamatic::DynamaticPass<false>>
 createArithReduceStrength(unsigned maxAdderDepthMul = 3);
 
 #define GEN_PASS_DECL_ARITHREDUCESTRENGTH

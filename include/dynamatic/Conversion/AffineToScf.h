@@ -13,11 +13,12 @@
 #ifndef DYNAMATIC_CONVERSION_AFFINETOSCF_H
 #define DYNAMATIC_CONVERSION_AFFINETOSCF_H
 
+#include "dynamatic/Support/DynamaticPass.h"
 #include "dynamatic/Support/LLVM.h"
 
 namespace dynamatic {
 
-std::unique_ptr<Pass> createAffineToScfPass();
+std::unique_ptr<dynamatic::DynamaticPass<false>> createAffineToScfPass();
 
 } // namespace dynamatic
 

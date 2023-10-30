@@ -13,6 +13,7 @@
 #ifndef DYNAMATIC_TRANSFORMS_INFERBASICBLOCKS_H
 #define DYNAMATIC_TRANSFORMS_INFERBASICBLOCKS_H
 
+#include "dynamatic/Support/DynamaticPass.h"
 #include "dynamatic/Support/LLVM.h"
 
 namespace dynamatic {
@@ -28,7 +29,7 @@ namespace dynamatic {
 /// block attribute on the operation.
 LogicalResult inferLogicBB(Operation *op, unsigned &logicBB);
 
-std::unique_ptr<mlir::OperationPass<mlir::ModuleOp>>
+std::unique_ptr<dynamatic::DynamaticPass<false>>
 createHandshakeInferBasicBlocksPass();
 
 } // namespace dynamatic

@@ -16,6 +16,7 @@
 
 #include "circt/Conversion/StandardToHandshake.h"
 #include "circt/Dialect/Handshake/HandshakeOps.h"
+#include "dynamatic/Support/DynamaticPass.h"
 #include "dynamatic/Support/LLVM.h"
 #include "mlir/Transforms/DialectConversion.h"
 
@@ -82,7 +83,7 @@ public:
                                     bool idBasicBlocks);
 };
 
-std::unique_ptr<mlir::OperationPass<mlir::ModuleOp>>
+std::unique_ptr<dynamatic::DynamaticPass<false>>
 createStandardToHandshakeFPGA18Pass(bool idBasicBlocks = false);
 
 } // namespace dynamatic

@@ -729,7 +729,7 @@ struct StandardToHandshakeFPGA18Pass
     this->idBasicBlocks = idBasicBlocks;
   }
 
-  void runOnOperation() override {
+  void runDynamaticPass() override {
     ModuleOp m = getOperation();
 
     // Lower every function individually
@@ -740,7 +740,7 @@ struct StandardToHandshakeFPGA18Pass
 };
 } // namespace
 
-std::unique_ptr<mlir::OperationPass<mlir::ModuleOp>>
+std::unique_ptr<dynamatic::DynamaticPass<false>>
 dynamatic::createStandardToHandshakeFPGA18Pass(bool idBasicBlocks) {
   return std::make_unique<StandardToHandshakeFPGA18Pass>(idBasicBlocks);
 }

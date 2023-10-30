@@ -13,9 +13,10 @@
 #ifndef EXPERIMENTAL_TRANSFORMS_PASSES_TD
 #define EXPERIMENTAL_TRANSFORMS_PASSES_TD
 
+include "dynamatic/Support/Passes.td"
 include "mlir/Pass/PassBase.td"
 
-def HandshakeFixArgNames : Pass<"handshake-fix-arg-names", "mlir::ModuleOp"> {
+def HandshakeFixArgNames : DynamaticPass<"handshake-fix-arg-names"> {
   let summary = "Replace function argument names with original ones from C";
   let description = [{
     Extremely hacky pass that text parses the original source code from which

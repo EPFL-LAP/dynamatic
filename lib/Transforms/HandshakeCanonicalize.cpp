@@ -175,7 +175,7 @@ struct HandshakeCanonicalizePass
     : public dynamatic::impl::HandshakeCanonicalizeBase<
           HandshakeCanonicalizePass> {
 
-  void runOnOperation() override {
+  void runDynamaticPass() override {
     MLIRContext *ctx = &getContext();
     mlir::ModuleOp mod = getOperation();
 
@@ -192,7 +192,7 @@ struct HandshakeCanonicalizePass
 };
 }; // namespace
 
-std::unique_ptr<mlir::OperationPass<mlir::ModuleOp>>
+std::unique_ptr<dynamatic::DynamaticPass<false>>
 dynamatic::createHandshakeCanonicalize() {
   return std::make_unique<HandshakeCanonicalizePass>();
 }

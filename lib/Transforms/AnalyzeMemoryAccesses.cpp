@@ -194,7 +194,7 @@ namespace {
 struct AnalyzeMemoryAccessesPass
     : public AnalyzeMemoryAccessesBase<AnalyzeMemoryAccessesPass> {
 
-  void runOnOperation() override {
+  void runDynamaticPass() override {
     for (auto funcOp : getOperation().getOps<func::FuncOp>())
       if (failed(analyzeMemAccesses(funcOp, &getContext())))
         return signalPassFailure();
@@ -202,7 +202,7 @@ struct AnalyzeMemoryAccessesPass
 };
 } // namespace
 
-std::unique_ptr<mlir::OperationPass<mlir::ModuleOp>>
+std::unique_ptr<dynamatic::DynamaticPass<false>>
 dynamatic::createAnalyzeMemoryAccesses() {
   return std::make_unique<AnalyzeMemoryAccessesPass>();
 }

@@ -16,6 +16,7 @@
 #define DYNAMATIC_TRANSFORMS_BUFFERPLACEMENT_PLACEBUFFERS_H
 
 #include "circt/Dialect/Handshake/HandshakeOps.h"
+#include "dynamatic/Support/DynamaticPass.h"
 #include "dynamatic/Support/LLVM.h"
 #include "dynamatic/Support/Logging.h"
 #include "dynamatic/Support/TimingModels.h"
@@ -32,12 +33,10 @@ namespace buffer {
 // https://www.gurobi.com/documentation/current/refman/optimization_status_codes.html
 std::string getGurobiOptStatusDesc(int status);
 
-std::unique_ptr<mlir::OperationPass<mlir::ModuleOp>>
-createHandshakePlaceBuffers(StringRef algorithm = "fpga20",
-                            StringRef frequencies = "",
-                            StringRef timingModels = "",
-                            bool firstCFDFC = false, double targetCP = 4.0,
-                            unsigned timeout = 180, bool dumpLogs = false);
+std::unique_ptr<dynamatic::DynamaticPass<true>> createHandshakePlaceBuffers(
+    StringRef algorithm = "fpga20", StringRef frequencies = "",
+    StringRef timingModels = "", bool firstCFDFC = false, double targetCP = 4.0,
+    unsigned timeout = 180, bool dumpLogs = false);
 
 #define GEN_PASS_DECL_HANDSHAKEPLACEBUFFERS
 #define GEN_PASS_DEF_HANDSHAKEPLACEBUFFERS
@@ -59,7 +58,7 @@ struct HandshakePlaceBuffersPass
                             double targetCP, unsigned timeout, bool dumpLogs);
 
   /// Called on the MLIR module provided as input.
-  void runOnOperation() override;
+  void runDynamaticPass() override;
 
 #ifndef DYNAMATIC_GUROBI_NOT_INSTALLED
 protected:

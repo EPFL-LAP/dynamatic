@@ -13,6 +13,7 @@
 #ifndef DYNAMATIC_TRANSFORMS_SCFSIMPLEIFTOSELECT_H
 #define DYNAMATIC_TRANSFORMS_SCFSIMPLEIFTOSELECT_H
 
+#include "dynamatic/Support/DynamaticPass.h"
 #include "dynamatic/Support/LLVM.h"
 #include "mlir/Dialect/Arith/IR/Arith.h"
 #include "mlir/IR/DialectRegistry.h"
@@ -20,8 +21,7 @@
 
 namespace dynamatic {
 
-std::unique_ptr<mlir::OperationPass<mlir::ModuleOp>>
-createScfSimpleIfToSelect();
+std::unique_ptr<dynamatic::DynamaticPass<false>> createScfSimpleIfToSelect();
 
 #define GEN_PASS_DECL_SCFSIMPLEIFTOSELECT
 #define GEN_PASS_DEF_SCFSIMPLEIFTOSELECT

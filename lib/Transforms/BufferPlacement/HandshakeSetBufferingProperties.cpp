@@ -74,7 +74,7 @@ struct HandshakeSetBufferingPropertiesPass
     this->version = version;
   }
 
-  void runOnOperation() override {
+  void runDynamaticPass() override {
     mlir::ModuleOp modOp = getOperation();
     // Check that the provided version is valid
     if (version != "fpga20") {
@@ -91,7 +91,7 @@ struct HandshakeSetBufferingPropertiesPass
 
 } // namespace
 
-std::unique_ptr<mlir::OperationPass<mlir::ModuleOp>>
+std::unique_ptr<dynamatic::DynamaticPass<false>>
 dynamatic::buffer::createHandshakeSetBufferingProperties(
     const std::string &version) {
   return std::make_unique<HandshakeSetBufferingPropertiesPass>(version);

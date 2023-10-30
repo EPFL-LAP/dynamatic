@@ -20,6 +20,7 @@
 #ifndef DYNAMATIC_TRANSFORMS_HANDSHAKECANONICALIZE_H
 #define DYNAMATIC_TRANSFORMS_HANDSHAKECANONICALIZE_H
 
+#include "dynamatic/Support/DynamaticPass.h"
 #include "dynamatic/Support/LLVM.h"
 #include "mlir/Pass/Pass.h"
 
@@ -29,8 +30,7 @@ namespace dynamatic {
 #define GEN_PASS_DEF_HANDSHAKECANONICALIZE
 #include "dynamatic/Transforms/Passes.h.inc"
 
-std::unique_ptr<mlir::OperationPass<mlir::ModuleOp>>
-createHandshakeCanonicalize();
+std::unique_ptr<dynamatic::DynamaticPass<false>> createHandshakeCanonicalize();
 
 } // namespace dynamatic
 

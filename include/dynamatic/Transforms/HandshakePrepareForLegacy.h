@@ -13,11 +13,12 @@
 #ifndef DYNAMATIC_TRANSFORMS_HANDSHAKEPREPAREFORLEGACY_H
 #define DYNAMATIC_TRANSFORMS_HANDSHAKEPREPAREFORLEGACY_H
 
+#include "dynamatic/Support/DynamaticPass.h"
 #include "dynamatic/Support/LLVM.h"
 
 namespace dynamatic {
 
-std::unique_ptr<mlir::OperationPass<mlir::ModuleOp>>
+std::unique_ptr<dynamatic::DynamaticPass<false>>
 createHandshakePrepareForLegacy();
 
 } // namespace dynamatic

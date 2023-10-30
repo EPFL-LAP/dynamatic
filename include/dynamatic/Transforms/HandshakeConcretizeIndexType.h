@@ -14,6 +14,7 @@
 #define DYNAMATIC_TRANSFORMS_HANDSHAKECONCRETIZEINDEXTYPE_H
 
 #include "circt/Dialect/Handshake/HandshakeOps.h"
+#include "dynamatic/Support/DynamaticPass.h"
 #include "dynamatic/Support/LLVM.h"
 #include "mlir/Pass/Pass.h"
 
@@ -39,7 +40,7 @@ LogicalResult verifyAllIndexConcretized(circt::handshake::FuncOp funcOp);
 /// Handshake function has an IndexType operand or result.
 LogicalResult verifyAllIndexConcretized(mlir::ModuleOp modOp);
 
-std::unique_ptr<mlir::OperationPass<mlir::ModuleOp>>
+std::unique_ptr<dynamatic::DynamaticPass<false>>
 createHandshakeConcretizeIndexType(unsigned width = 64);
 
 } // namespace dynamatic

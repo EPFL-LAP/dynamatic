@@ -927,7 +927,7 @@ struct UnpackBufferSlots : public OpRewritePattern<handshake::BufferOp> {
 class HandshakeToNetListPass
     : public HandshakeToNetlistBase<HandshakeToNetListPass> {
 public:
-  void runOnOperation() override {
+  void runDynamaticPass() override {
     mlir::ModuleOp mod = getOperation();
     MLIRContext &ctx = getContext();
 
@@ -1066,7 +1066,7 @@ LogicalResult HandshakeToNetListPass::preprocessMod() {
 
 } // end anonymous namespace
 
-std::unique_ptr<mlir::OperationPass<mlir::ModuleOp>>
+std::unique_ptr<dynamatic::DynamaticPass<false>>
 dynamatic::createHandshakeToNetlistPass() {
   return std::make_unique<HandshakeToNetListPass>();
 }

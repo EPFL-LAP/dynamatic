@@ -63,7 +63,7 @@ namespace {
 /// for every function.
 struct PushConstantsPass : public PushConstantsBase<PushConstantsPass> {
 
-  void runOnOperation() override {
+  void runDynamaticPass() override {
     ModuleOp m = getOperation();
     // Process every function individually
     for (auto funcOp : m.getOps<func::FuncOp>())
@@ -73,7 +73,7 @@ struct PushConstantsPass : public PushConstantsBase<PushConstantsPass> {
 };
 } // namespace
 
-std::unique_ptr<mlir::OperationPass<mlir::ModuleOp>>
+std::unique_ptr<dynamatic::DynamaticPass<false>>
 dynamatic::createPushConstantsPass() {
   return std::make_unique<PushConstantsPass>();
 }

@@ -13,6 +13,7 @@
 #ifndef DYNAMATIC_TRANSFORMS_SCFTOCF_H
 #define DYNAMATIC_TRANSFORMS_SCFTOCF_H
 
+#include "dynamatic/Support/DynamaticPass.h"
 #include "dynamatic/Support/LLVM.h"
 #include "mlir/Dialect/Arith/IR/Arith.h"
 #include "mlir/Dialect/ControlFlow/IR/ControlFlowOps.h"
@@ -25,7 +26,7 @@ namespace dynamatic {
 #define GEN_PASS_DEF_SCFTOCF
 #include "dynamatic/Conversion/Passes.h.inc"
 
-std::unique_ptr<mlir::OperationPass<mlir::ModuleOp>> createLowerScfToCf();
+std::unique_ptr<dynamatic::DynamaticPass<false>> createLowerScfToCf();
 
 } // namespace dynamatic
 

@@ -112,7 +112,7 @@ struct ForLowering : public OpRewritePattern<scf::ForOp> {
 
 struct ScfToCfPass : public dynamatic::impl::ScfToCfBase<ScfToCfPass> {
 
-  void runOnOperation() override {
+  void runDynamaticPass() override {
     MLIRContext *ctx = &getContext();
     ModuleOp modOp = getOperation();
 
@@ -136,7 +136,7 @@ struct ScfToCfPass : public dynamatic::impl::ScfToCfBase<ScfToCfPass> {
 } // namespace
 
 namespace dynamatic {
-std::unique_ptr<mlir::OperationPass<mlir::ModuleOp>> createLowerScfToCf() {
+std::unique_ptr<dynamatic::DynamaticPass<false>> createLowerScfToCf() {
   return std::make_unique<ScfToCfPass>();
 }
 } // namespace dynamatic

@@ -1511,7 +1511,7 @@ struct HandshakeOptimizeBitwidthsPass
 
   HandshakeOptimizeBitwidthsPass(bool legacy) { this->legacy = legacy; }
 
-  void runOnOperation() override {
+  void runDynamaticPass() override {
     auto *ctx = &getContext();
     mlir::ModuleOp modOp = getOperation();
 
@@ -1642,7 +1642,7 @@ void HandshakeOptimizeBitwidthsPass::addBackwardPatterns(
 
 } // namespace
 
-std::unique_ptr<mlir::OperationPass<mlir::ModuleOp>>
+std::unique_ptr<dynamatic::DynamaticPass<false>>
 dynamatic::createHandshakeOptimizeBitwidths(bool legacy) {
   return std::make_unique<HandshakeOptimizeBitwidthsPass>(legacy);
 }

@@ -134,7 +134,7 @@ struct FuncOpInferBasicBlocks : public OpConversionPattern<handshake::FuncOp> {
 struct HandshakeInferBasicBlocksPass
     : public HandshakeInferBasicBlocksBase<HandshakeInferBasicBlocksPass> {
 
-  void runOnOperation() override {
+  void runDynamaticPass() override {
     MLIRContext *ctx = &getContext();
     RewritePatternSet patterns{ctx};
     patterns.add<FuncOpInferBasicBlocks>(ctx);
@@ -147,7 +147,7 @@ struct HandshakeInferBasicBlocksPass
 };
 } // namespace
 
-std::unique_ptr<mlir::OperationPass<mlir::ModuleOp>>
+std::unique_ptr<dynamatic::DynamaticPass<false>>
 dynamatic::createHandshakeInferBasicBlocksPass() {
   return std::make_unique<HandshakeInferBasicBlocksPass>();
 }

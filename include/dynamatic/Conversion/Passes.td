@@ -14,12 +14,13 @@
 #define DYNAMATIC_CONVERSION_PASSES_TD
 
 include "mlir/Pass/PassBase.td"
+include "dynamatic/Support/Passes.td"
 
 //===----------------------------------------------------------------------===//
 // AffineToScf
 //===----------------------------------------------------------------------===//
 
-def AffineToScf : Pass<"lower-affine-to-scf", "mlir::ModuleOp"> {
+def AffineToScf : DynamaticPass<"lower-affine-to-scf"> {
   let summary = "Lower affine operations to a mix of SCF and standard operations";
   let description = [{
     Very close analog to the AffineToStandard pass from MLIR that preserves the
@@ -40,7 +41,7 @@ def AffineToScf : Pass<"lower-affine-to-scf", "mlir::ModuleOp"> {
 // ScfToCf
 //===----------------------------------------------------------------------===//
 
-def ScfToCf : Pass<"lower-scf-to-cf", "mlir::ModuleOp"> {
+def ScfToCf : DynamaticPass<"lower-scf-to-cf"> {
   let summary = "Lower scf dialect to unstructured control flow (cf)";
   let description = [{
     Very close analog to the SCFToControlFlow pass from MLIR that replaces the
@@ -58,7 +59,7 @@ def ScfToCf : Pass<"lower-scf-to-cf", "mlir::ModuleOp"> {
 // StandardToHandshakeFPGA18
 //===----------------------------------------------------------------------===//
 
-def StandardToHandshakeFPGA18 : Pass<"lower-std-to-handshake-fpga18", "mlir::ModuleOp"> {
+def StandardToHandshakeFPGA18 : DynamaticPass<"lower-std-to-handshake-fpga18"> {
   let summary = "Lower Standard MLIR into Handshake IR following elastic pass described in FPGA18";
   let constructor = "dynamatic::createStandardToHandshakeFPGA18Pass()";
   let dependentDialects = ["circt::handshake::HandshakeDialect"];
@@ -73,7 +74,7 @@ def StandardToHandshakeFPGA18 : Pass<"lower-std-to-handshake-fpga18", "mlir::Mod
 // HandshakeToNetlist
 //===----------------------------------------------------------------------===//
 
-def HandshakeToNetlist : Pass<"lower-handshake-to-netlist", "mlir::ModuleOp"> {
+def HandshakeToNetlist : DynamaticPass<"lower-handshake-to-netlist"> {
   let summary = "Lower Handshake to ESI/HW (netlist)";
   let description = [{
     Lower Handshake IR into a "netlist-level" representation made up of HW

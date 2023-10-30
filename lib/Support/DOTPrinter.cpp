@@ -914,9 +914,10 @@ LogicalResult DOTPrinter::print(mlir::ModuleOp mod,
   }
 
   // Name all operations in the IR
-  NameAnalysis nameAnalysis = NameAnalysis(mod, true);
-  if (!nameAnalysis.areNamesValid())
+  NameAnalysis nameAnalysis = NameAnalysis(mod);
+  if (!nameAnalysis.isAnalysisValid())
     return failure();
+  nameAnalysis.nameAllUnnamedOps();
 
   handshake::FuncOp funcOp = *funcs.begin();
 

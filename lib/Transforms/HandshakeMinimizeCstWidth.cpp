@@ -180,7 +180,7 @@ struct HandshakeMinimizeCstWidthPass
     this->optNegatives = optNegatives;
   }
 
-  void runOnOperation() override {
+  void runDynamaticPass() override {
     auto *ctx = &getContext();
     mlir::ModuleOp mod = getOperation();
 
@@ -199,7 +199,7 @@ struct HandshakeMinimizeCstWidthPass
 
 } // namespace
 
-std::unique_ptr<mlir::OperationPass<mlir::ModuleOp>>
+std::unique_ptr<dynamatic::DynamaticPass<false>>
 dynamatic::createHandshakeMinimizeCstWidth(bool optNegatives) {
   return std::make_unique<HandshakeMinimizeCstWidthPass>(optNegatives);
 }

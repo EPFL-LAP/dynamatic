@@ -13,11 +13,12 @@
 #ifndef DYNAMATIC_TRANSFORMS_PUSHCONSTANTS_H
 #define DYNAMATIC_TRANSFORMS_PUSHCONSTANTS_H
 
+#include "dynamatic/Support/DynamaticPass.h"
 #include "dynamatic/Support/LLVM.h"
 
 namespace dynamatic {
 
-std::unique_ptr<mlir::OperationPass<mlir::ModuleOp>> createPushConstantsPass();
+std::unique_ptr<dynamatic::DynamaticPass<false>> createPushConstantsPass();
 
 } // namespace dynamatic
 

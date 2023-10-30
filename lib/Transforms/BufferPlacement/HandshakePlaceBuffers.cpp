@@ -98,7 +98,7 @@ HandshakePlaceBuffersPass::HandshakePlaceBuffersPass(
 }
 
 #ifdef DYNAMATIC_GUROBI_NOT_INSTALLED
-void HandshakePlaceBuffersPass::runOnOperation() {
+void HandshakePlaceBuffersPass::runDynamaticPass() {
   ModuleOp modOp = getOperation();
   modOp.emitError() << "Project was built without Gurobi installed, can't "
                        "run smart buffer placement pass\n";
@@ -142,13 +142,13 @@ static void logFuncInfo(FuncInfo &info, Logger &log) {
   os.flush();
 }
 
-void HandshakePlaceBuffersPass::runOnOperation() {
+void HandshakePlaceBuffersPass::runDynamaticPass() {
   ModuleOp modOp = getOperation();
 
   // Make sure that all operations in the IR are named (used to generate
   // variable names in the MILP)
   NameAnalysis &nameAnalysis = getAnalysis<NameAnalysis>();
-  if (!nameAnalysis.areNamesValid())
+  if (!nameAnalysis.isAnalysisValid())
     return signalPassFailure();
   if (!nameAnalysis.areAllOpsNamed())
     if (failed(nameAnalysis.walk(NameAnalysis::UnnamedBehavior::NAME)))
@@ -422,7 +422,7 @@ std::string dynamatic::buffer::getGurobiOptStatusDesc(int status) {
   }
 }
 
-std::unique_ptr<mlir::OperationPass<mlir::ModuleOp>>
+std::unique_ptr<dynamatic::DynamaticPass<true>>
 dynamatic::buffer::createHandshakePlaceBuffers(
     StringRef algorithm, StringRef frequencies, StringRef timingModels,
     bool firstCFDFC, double targetCP, unsigned timeout, bool dumpLogs) {

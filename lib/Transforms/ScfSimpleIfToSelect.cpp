@@ -278,7 +278,7 @@ namespace {
 struct ScfSimpleIfToSelectPass
     : public dynamatic::impl::ScfSimpleIfToSelectBase<ScfSimpleIfToSelectPass> {
 
-  void runOnOperation() override {
+  void runDynamaticPass() override {
     auto *ctx = &getContext();
     mlir::GreedyRewriteConfig config;
     config.useTopDownTraversal = true;
@@ -294,7 +294,7 @@ struct ScfSimpleIfToSelectPass
 };
 } // namespace
 
-std::unique_ptr<mlir::OperationPass<mlir::ModuleOp>>
+std::unique_ptr<dynamatic::DynamaticPass<false>>
 dynamatic::createScfSimpleIfToSelect() {
   return std::make_unique<ScfSimpleIfToSelectPass>();
 }

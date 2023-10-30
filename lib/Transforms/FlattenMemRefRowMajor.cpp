@@ -278,7 +278,7 @@ static void populateTypeConversionPatterns(TypeConverter &typeConverter) {
 struct FlattenMemRefRowMajorPass
     : public FlattenMemRefRowMajorBase<FlattenMemRefRowMajorPass> {
 public:
-  void runOnOperation() override {
+  void runDynamaticPass() override {
 
     auto *ctx = &getContext();
     TypeConverter typeConverter;
@@ -310,7 +310,7 @@ public:
 } // namespace
 
 namespace dynamatic {
-std::unique_ptr<mlir::OperationPass<mlir::ModuleOp>>
+std::unique_ptr<dynamatic::DynamaticPass<false>>
 createFlattenMemRefRowMajorPass() {
   return std::make_unique<FlattenMemRefRowMajorPass>();
 }

@@ -15,6 +15,7 @@
 
 #include "circt/Dialect/ESI/ESIOps.h"
 #include "circt/Dialect/HW/HWOps.h"
+#include "dynamatic/Support/DynamaticPass.h"
 #include "dynamatic/Support/LLVM.h"
 #include "mlir/Transforms/DialectConversion.h"
 
@@ -24,8 +25,7 @@ using namespace circt::esi;
 
 namespace dynamatic {
 
-std::unique_ptr<mlir::OperationPass<mlir::ModuleOp>>
-createHandshakeToNetlistPass();
+std::unique_ptr<dynamatic::DynamaticPass<false>> createHandshakeToNetlistPass();
 
 } // namespace dynamatic
 
