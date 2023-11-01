@@ -14,14 +14,14 @@
 
 using namespace dynamatic::experimental::visual_dataflow;
 
-LogicalResult DOTParser::processDOT(std::ifstream &file, Graph *graph) {
+LogicalResult dynamatic::experimental::visual_dataflow::processDOT(std::ifstream &file, Graph &graph) {
 
   std::string line;
 
   EdgeId currentEdgeID = 0;
-  GraphNode *currentNode;
+  GraphNode currentNode;
   bool insideNodeDefinition = false;
-  GraphEdge *currentEdge;
+  GraphEdge currentEdge;
   bool insideEdgeDefinition = false;
 
   std::regex positionRegex("e,\\s*([0-9]+),([0-9]+(\\.[0-9]+)?)");
@@ -33,14 +33,14 @@ LogicalResult DOTParser::processDOT(std::ifstream &file, Graph *graph) {
         line.find("node") == std::string::npos &&
         line.find("graph") == std::string::npos) {
 
-      currentNode = new GraphNode();
+      currentNode = GraphNode();
       insideNodeDefinition = true;
     }
 
     else if (line.find("->") != std::string::npos) {
-      currentEdge = new GraphEdge();
+      currentEdge = GraphEdge();
       insideEdgeDefinition = true;
-      currentEdge->setId(currentEdgeID);
+      currentEdge.setId(currentEdgeID);
     }
 
     else if (insideNodeDefinition && line.find("in") != std::string::npos &&
@@ -53,7 +53,7 @@ LogicalResult DOTParser::processDOT(std::ifstream &file, Graph *graph) {
       if (occurrences != std::string::npos) {
         for (size_t i = 1; i <= occurrences + 1; i++) {
           std::string portName = std::to_string(i);
-          currentNode->addPort(portName, true);
+          currentNode.addPort(portName, true);
         }
       }
     }
@@ -61,7 +61,7 @@ LogicalResult DOTParser::processDOT(std::ifstream &file, Graph *graph) {
     else if (insideNodeDefinition && line.find("label") != std::string::npos) {
       NodeId id =
           line.substr(line.find('=') + 1, line.find(',') - line.find('=') - 1);
-      currentNode->setId(id);
+      currentNode.setId(id);
     }
 
     else if (insideNodeDefinition && line.find("out") != std::string::npos &&
@@ -70,7 +70,7 @@ LogicalResult DOTParser::processDOT(std::ifstream &file, Graph *graph) {
       if (occurrences != std::string::npos) {
         for (size_t i = 1; i <= occurrences + 1; i++) {
           std::string portName = std::to_string(i);
-          currentNode->addPort(portName, false);
+          currentNode.addPort(portName, false);
         }
       }
     }
@@ -82,11 +82,11 @@ LogicalResult DOTParser::processDOT(std::ifstream &file, Graph *graph) {
       char comma;
       (iss >> x >> comma >> y);
       std::pair<float, float> position = std::make_pair(x, y);
-      currentNode->setPosition(position);
+      currentNode.setPosition(position);
     }
 
     else if (insideNodeDefinition && line.find(']') != std::string::npos) {
-      graph->addNode(currentNode);
+      graph.addNode(currentNode);
       insideNodeDefinition = false;
     }
 
@@ -128,7 +128,7 @@ LogicalResult DOTParser::processDOT(std::ifstream &file, Graph *graph) {
 
               // Check if the position is unique before adding it
               if (uniquePositions.insert(position).second) {
-                currentEdge->addPosition(position);
+                currentEdge.addPosition(position);
               }
             }
           }
@@ -152,30 +152,30 @@ LogicalResult DOTParser::processDOT(std::ifstream &file, Graph *graph) {
         rightPart.erase(0, rightPart.find_first_not_of(" \t\n\r\f\v"));
         rightPart.erase(rightPart.find_last_not_of(" \t\n\r\f\v") + 1);
 
-        GraphNode *src = nullptr;
-        LogicalResult tryGetSrc = graph->getNode(leftPart, src);
-        GraphNode *dst = nullptr;
-        LogicalResult tryGetDst = graph->getNode(rightPart, dst);
+        GraphNode src;
+        LogicalResult tryGetSrc = graph.getNode(leftPart, src);
+        GraphNode dst;
+        LogicalResult tryGetDst = graph.getNode(rightPart, dst);
 
-        currentEdge->setSrc(src);
-        currentEdge->setDst(dst);
+        currentEdge.setSrc(src);
+        currentEdge.setDst(dst);
       }
     }
 
     if (insideEdgeDefinition && line.find("from") != std::string::npos) {
       int out = std::stoi(line.substr(line.find("out") + 3, line.find(',')));
-      currentEdge->setOutPort(out);
+      currentEdge.setOutPort(out);
     }
 
     if (insideEdgeDefinition && line.find("to") != std::string::npos &&
         line.find("->") == std::string::npos) {
       int in = std::stoi(line.substr(line.find('n') + 1, line.find(',')));
-      currentEdge->setInPort(in);
+      currentEdge.setInPort(in);
     }
 
     if (insideEdgeDefinition && line.find(']') != std::string::npos) {
       insideEdgeDefinition = false;
-      graph->addEdge(currentEdge);
+      graph.addEdge(currentEdge);
       currentEdgeID += 1;
     }
   }

@@ -18,11 +18,7 @@ namespace visual_dataflow {
 
 
 
-// DOTParser.h
-class DOTParser {
-public:
-    static LogicalResult processDOT(std::ifstream &file, Graph *graph);
-};
+LogicalResult processDOT(std::ifstream &file, Graph &graph);
 
 
 }

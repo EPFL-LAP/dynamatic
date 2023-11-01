@@ -14,22 +14,22 @@ void GraphEdge::addPosition(std::pair<float, float> pos) {
   position.push_back(pos);
 }
 
-void GraphEdge::setSrc(GraphNode *src) { this->src = src; }
+void GraphEdge::setSrc(GraphNode src) { this->src = src; }
 
-void GraphEdge::setDst(GraphNode *dst) { this->dst = dst; }
+void GraphEdge::setDst(GraphNode dst) { this->dst = dst; }
 
 void GraphEdge::setInPort(unsigned inPort) { this->inPort = inPort; }
 
 void GraphEdge::setOutPort(unsigned outPort) { this->outPort = outPort; }
 
-GraphEdge::GraphEdge(EdgeId id, GraphNode *src, GraphNode *dst, unsigned inPort,
+GraphEdge::GraphEdge(EdgeId id, GraphNode src, GraphNode dst, unsigned inPort,
                      unsigned outPort,
                      std::vector<std::pair<float, float>> position)
     : id(id), src(src), dst(dst), inPort(inPort), outPort(outPort),
       position(std::move(position)) {}
 
-GraphNode *GraphEdge::getSrcNode() { return src; }
-GraphNode *GraphEdge::getDstNode() { return dst; }
+GraphNode GraphEdge::getSrcNode() { return src; }
+GraphNode GraphEdge::getDstNode() { return dst; }
 
 unsigned GraphEdge::getOutPort() { return outPort; }
 unsigned GraphEdge::getInPort() { return inPort; }

@@ -35,11 +35,11 @@ public:
   /// Constructs a graph
   Graph(GraphId id);
   /// Adds an edge to the graph
-  void addEdge(GraphEdge *edge);
+  void addEdge(GraphEdge edge);
   /// Adds a node to the graph
-  void addNode(GraphNode *node);
+  void addNode(GraphNode node);
   /// Retrieves a node based on a given node identifier
-  LogicalResult getNode(NodeId &id, GraphNode *&result);
+  LogicalResult getNode(NodeId &id, GraphNode &result);
   /// Based on information about an edge, retrieves the corresponding edge
   /// identifier
   LogicalResult
@@ -48,9 +48,9 @@ public:
   /// Given a specific clock cycle, adds a pair (edge, state) to the map
   void addEdgeState(CycleNb cycle, EdgeId edgeId, State state);
   /// Returns all the Nodes in the Graph
-  std::map<NodeId, GraphNode *> getNodes();
+  std::map<NodeId, GraphNode> getNodes();
   /// Returns all the edges in the Graph
-  std::vector<GraphEdge *> getEdges();
+  std::vector<GraphEdge> getEdges();
 
   std::map<CycleNb, std::map<EdgeId, State>> getCycleEdgeStates();
 
@@ -58,9 +58,9 @@ private:
   /// Graph identifier
   GraphId id;
   /// Edges of the graph
-  std::vector<GraphEdge *> edges;
+  std::vector<GraphEdge> edges;
   /// Nodes of the graph mapped with their corresponding node identifier
-  std::map<NodeId, GraphNode *> nodes;
+  std::map<NodeId, GraphNode> nodes;
   /// State of each edge given a specific clock cycle
   std::map<CycleNb, std::map<EdgeId, State>> cycleEdgeStates;
   /// Map of the edges of the graph :

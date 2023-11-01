@@ -11,22 +11,22 @@ using namespace dynamatic::experimental::visual_dataflow;
 
 Graph::Graph(GraphId id) : id(id) {}
 
-void Graph::addEdge(GraphEdge *edge) {
+void Graph::addEdge(GraphEdge edge) {
   edges.push_back(edge);
   std::pair<NodeId, int> srcInfo =
-      std::pair(edge->getSrcNode()->getNodeId(), edge->getOutPort());
+      std::pair(edge.getSrcNode().getNodeId(), edge.getOutPort());
   std::pair<NodeId, int> dstInfo =
-      std::pair(edge->getDstNode()->getNodeId(), edge->getInPort());
+      std::pair(edge.getDstNode().getNodeId(), edge.getInPort());
   std::pair<std::pair<NodeId, int>, std::pair<NodeId, int>> edgeInfo =
       std::pair(srcInfo, dstInfo);
-  mapEdges.insert(std::pair(edgeInfo, edge->getEdgeId()));
+  mapEdges.insert(std::pair(edgeInfo, edge.getEdgeId()));
 }
 
-void Graph::addNode(GraphNode *node) {
-  nodes.insert({node->getNodeId(), node});
+void Graph::addNode(GraphNode node) {
+  nodes.insert({node.getNodeId(), node});
 }
 
-LogicalResult Graph::getNode(NodeId &id, GraphNode *&result) {
+LogicalResult Graph::getNode(NodeId &id, GraphNode &result) {
   if (nodes.count(id)) {
     result = nodes.at(id);
     return success();
@@ -55,6 +55,6 @@ void Graph::addEdgeState(CycleNb cycleNb, EdgeId edgeId, State state) {
 std::map<CycleNb, std::map<EdgeId, State>> Graph::getCycleEdgeStates() {
   return cycleEdgeStates;
 }
-std::map<NodeId, GraphNode *> Graph::getNodes() { return nodes; }
+std::map<NodeId, GraphNode> Graph::getNodes() { return nodes; }
 
-std::vector<GraphEdge *> Graph::getEdges() { return edges; }
+std::vector<GraphEdge> Graph::getEdges() { return edges; }
