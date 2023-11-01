@@ -1,11 +1,27 @@
 #include <fstream>
 #include <string>
 #include <vector>
+#include "mlir/Support/LogicalResult.h"
+#include "DOTReformat.h"
 
-void reformatDot(const std::string &inputFileName,
+
+using namespace mlir;
+
+
+LogicalResult reformatDot(const std::string &inputFileName,
                  const std::string &outputFileName) {
   std::ifstream inputFile(inputFileName);
   std::ofstream outputFile(outputFileName);
+
+  // Check if the input file is open
+  if (!inputFile.is_open()) {
+    return failure();
+  }
+
+  // Check if the output file is open
+  if (!outputFile.is_open()) {
+    inputFile.close(); // Close the input file before exiting
+  }
 
   std::vector<std::string> lines;
   std::string line;
@@ -66,4 +82,6 @@ void reformatDot(const std::string &inputFileName,
   }
 
   outputFile.close();
+
+  return success();
 }
