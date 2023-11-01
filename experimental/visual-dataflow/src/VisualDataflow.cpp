@@ -1,4 +1,4 @@
-#include "visual_dataflow.h"
+#include "VisualDataflow.h"
 #include "dynamatic/Support/DOTPrinter.h"
 #include "dynamatic/Support/TimingModels.h"
 #include "godot_cpp/core/class_db.hpp"
@@ -18,9 +18,12 @@ using namespace dynamatic;
 using namespace godot;
 
 void VisualDataflow::_bind_methods() {
-  ClassDB::bind_method(D_METHOD("getNodePosX", "index"), &VisualDataflow::getNodePosX);
-  ClassDB::bind_method(D_METHOD("getNodePosY", "index"), &VisualDataflow::getNodePosY);
-  ClassDB::bind_method(D_METHOD("getNumberOfNodes"), &VisualDataflow::getNumberOfNodes);
+  ClassDB::bind_method(D_METHOD("getNodePosX", "index"),
+                       &VisualDataflow::getNodePosX);
+  ClassDB::bind_method(D_METHOD("getNodePosY", "index"),
+                       &VisualDataflow::getNodePosY);
+  ClassDB::bind_method(D_METHOD("getNumberOfNodes"),
+                       &VisualDataflow::getNumberOfNodes);
 }
 
 VisualDataflow::VisualDataflow() {
@@ -67,7 +70,6 @@ VisualDataflow::VisualDataflow() {
 
 double VisualDataflow::getNodePosX(int index) { return 100; }
 double VisualDataflow::getNodePosY(int index) { return 100; }
-int VisualDataflow::getNumberOfNodes() {return numberOfNodes;}
+int VisualDataflow::getNumberOfNodes() { return numberOfNodes; }
 
-void VisualDataflow::my_process(double delta) {
-}
+void VisualDataflow::my_process(double delta) {}
