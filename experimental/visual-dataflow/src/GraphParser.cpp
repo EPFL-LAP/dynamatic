@@ -33,7 +33,7 @@ LogicalResult GraphParser::parse(Graph *graph) {
 
   if (mFilePath.find(".csv") != std::string::npos) {
     while (std::getline(file, line)) {
-      // processLine(line, graph, lineIndex);
+      processCSVLine(line, lineIndex, *graph);
       lineIndex++;
     }
   } else if (mFilePath.find(".dot") != std::string::npos) {

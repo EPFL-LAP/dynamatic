@@ -70,8 +70,8 @@ std::string trim(const std::string &str) {
   return s;
 }
 
-LogicalResult processLine(const std::string &line, size_t lineIndex,
-                          Graph &graph) {
+LogicalResult processCSVLine(const std::string &line, size_t lineIndex,
+                             Graph &graph) {
 
   // Jump the first 2 lines and empty line (Not needed)
   if (lineIndex == 0 || lineIndex == 1 || line.empty())

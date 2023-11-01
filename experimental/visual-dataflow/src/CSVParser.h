@@ -4,8 +4,8 @@
 // graph for a given cycle .
 //===----------------------------------------------------------------------===//
 
-#ifndef VISUAL_DATAFLOW_CSVPARSER_H
-#define VISUAL_DATAFLOW_CSVPARSER_H
+#ifndef DYNAMATIC_VISUAL_DATAFLOW_CSVPARSER_H
+#define DYNAMATIC_VISUAL_DATAFLOW_CSVPARSER_H
 #include "Graph.h"
 #include "mlir/Support/LLVM.h"
 #include "mlir/Support/LogicalResult.h"
@@ -23,4 +23,4 @@ void processCSVLine(const std::string &line, size_t lineIndex, Graph &graph);
 } // namespace experimental
 } // namespace dynamatic
 
-#endif // VISUAL_DATAFLOW_CSVPARSER_H
+#endif // DYNAMATIC_VISUAL_DATAFLOW_CSVPARSER_H
