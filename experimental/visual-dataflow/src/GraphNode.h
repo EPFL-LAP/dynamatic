@@ -4,8 +4,8 @@
 // displayed in Godot.
 //===----------------------------------------------------------------------===//
 
-#ifndef VISUAL_DATAFLOW_GRAPHNODE_H
-#define VISUAL_DATAFLOW_GRAPHNODE_H
+#ifndef DYNAMATIC_VISUAL_DATAFLOW_GRAPHNODE_H
+#define DYNAMATIC_VISUAL_DATAFLOW_GRAPHNODE_H
 
 #include <map>
 #include <string>
@@ -54,4 +54,4 @@ private:
 } // namespace experimental
 } // namespace dynamatic
 
-#endif // VISUAL_DATAFLOW_GRAPHNODE_H
+#endif // DYNAMATIC_VISUAL_DATAFLOW_GRAPHNODE_H

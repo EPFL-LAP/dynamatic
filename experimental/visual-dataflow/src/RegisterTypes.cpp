@@ -1,7 +1,5 @@
-#include "register_types.h"
-
-#include "visual_dataflow.h"
-
+#include "RegisterTypes.h"
+#include "VisualDataflow.h"
 #include <gdextension_interface.h>
 #include <godot_cpp/core/class_db.hpp>
 #include <godot_cpp/core/defs.hpp>

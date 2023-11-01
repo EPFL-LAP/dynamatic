@@ -9,7 +9,8 @@
 #include "Graph.h"
 #include "mlir/Support/LLVM.h"
 #include "mlir/Support/LogicalResult.h"
-#include <iostream>
+#include <algorithm>
+#include <sstream>
 
 namespace dynamatic {
 namespace experimental {

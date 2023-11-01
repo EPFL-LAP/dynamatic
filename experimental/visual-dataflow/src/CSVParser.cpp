@@ -55,53 +55,79 @@ LogicalResult findEdgeInGraph(Graph *graph,
   return graph->getEdgeId(info, edgeId);
 }
 
-/// This function parses a line from a csv file.
-std::vector<std::string> parseOneLine(const std::string &line) {
+std::string trim(const std::string &str) {
+  std::string s = str;
 
-  // index 0 : cycle number, index 1 : src_component, index 2 : src_port, index
-  // 3 : dst_component, index 4 : dst_port, index 5 : status.
-  std::vector<std::string> edgeInfo(6);
+  s.erase(s.begin(), std::find_if(s.begin(), s.end(), [](unsigned char ch) {
+            return !std::isspace(ch);
+          }));
 
-  size_t startIndex = 0;
-  size_t commaIndex;
+  s.erase(std::find_if(s.rbegin(), s.rend(),
+                       [](unsigned char ch) { return !std::isspace(ch); })
+              .base(),
+          s.end());
 
-  for (int i = 0; i < 6; ++i) {
-
-    commaIndex = line.find(',', startIndex);
-
-    if (commaIndex == std::string::npos) {
-      // No comma found : it's the last part of the string
-      commaIndex = line.size();
-    }
-
-    edgeInfo[i] = line.substr(startIndex, commaIndex - startIndex);
-
-    startIndex =
-        commaIndex + 2; // +2 to skip the comma and the space after the comma
-  }
-
-  return edgeInfo;
+  return s;
 }
 
-void processLine(const std::string &line, Graph *graph, size_t lineIndex) {
+LogicalResult processLine(const std::string &line, Graph *graph,
+                          size_t lineIndex) {
 
   // Jump the first 2 lines and empty line (Not needed)
   if (lineIndex == 0 || lineIndex == 1 || line.empty())
-    return;
+    return success();
 
-  CycleNb cycleNb = line[0] - '0';
+  std::string token;
 
-  std::vector<std::string> edgeInfo = parseOneLine(line);
+  auto parseTokenString = [&](std::istringstream &iss,
+                              std::string &value) -> ParseResult {
+    std::getline(iss, token, ',');
+    if (token.empty())
+      return failure();
+    value = trim(token);
+    return success();
+  };
+
+  auto parseTokenInt = [&](std::istringstream &iss, int &value) -> ParseResult {
+    std::getline(iss, token, ',');
+    if (token.empty())
+      return failure();
+    value = std::stoi(token);
+    return success();
+  };
+
+  std::istringstream iss(line);
+
+  // Parse all 6 columns
+  int cycleNb, inPort, outPort;
+  std::string src, dst, stateString;
+
+  if (parseTokenInt(iss, cycleNb) || parseTokenString(iss, src) ||
+      parseTokenInt(iss, outPort) || parseTokenString(iss, dst) ||
+      parseTokenInt(iss, inPort) || parseTokenString(iss, stateString)) {
+    return failure();
+  }
+
+  std::pair<NodeId, int> srcInfo = std::pair(src, outPort);
+
+  std::pair<NodeId, int> dstInfo = std::pair(dst, inPort);
+
+  std::pair<std::pair<NodeId, int>, std::pair<NodeId, int>> info =
+      std::pair(srcInfo, dstInfo);
 
   EdgeId edgeId;
+
+  if (failed(graph->getEdgeId(info, edgeId))) {
+    return failure();
+  }
+
   State state;
 
-  if (failed(findEdgeInGraph(graph, edgeInfo, edgeId))) {
-    return;
-  }
-  if (failed(findState(edgeInfo[5], state))) {
-    return;
+  if (failed(findState(stateString, state))) {
+    return failure();
   }
 
   graph->addEdgeState(cycleNb, edgeId, state);
+
+  return success();
 }

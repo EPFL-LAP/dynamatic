@@ -58,6 +58,9 @@ void Graph::addEdgeState(CycleNb cycleNb, EdgeId edgeId, State state) {
   cycleEdgeStates[cycleNb] = mapEdgeState;
 }
 
+std::map<CycleNb, std::map<EdgeId, State>> Graph::getCycleEdgeStates() {
+  return cycleEdgeStates;
+}
 std::map<NodeId, GraphNode *> Graph::getNodes() { return nodes; }
 
 std::vector<GraphEdge *> Graph::getEdges() { return edges; }

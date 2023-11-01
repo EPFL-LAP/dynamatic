@@ -10,8 +10,8 @@ set(CMAKE_LIBRARY_OUTPUT_DIRECTORY "${CMAKE_CURRENT_SOURCE_DIR}/visual-dataflow/
 add_library(${GODOT_LIB_NAME}
   SHARED
 
-  src/visual_dataflow.cpp
-  src/register_types.cpp
+  src/VisualDataflow.cpp
+  src/RegisterTypes.cpp
 )
 target_link_libraries(${GODOT_LIB_NAME}
   PRIVATE

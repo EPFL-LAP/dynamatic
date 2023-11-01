@@ -16,9 +16,7 @@ private:
   };
 
   int numberOfNodes = 3;
-  //std::vector<Node> nodes; 
-
-
+  // std::vector<Node> nodes;
 
 protected:
   static void _bind_methods();
@@ -34,7 +32,6 @@ public:
   double getNodePosY(int index);
 
   int getNumberOfNodes();
-
 };
 
 } // namespace godot
