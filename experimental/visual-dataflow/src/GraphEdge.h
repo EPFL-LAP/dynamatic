@@ -22,31 +22,31 @@ using EdgeId = int;
 class GraphEdge {
 
 public:
-  /// Default Edge constructor
-  GraphEdge();
   /// Constructs an edge
-  GraphEdge(EdgeId id, GraphNode *src, GraphNode *dst, int inPort, int outPort,
-            std::vector<std::pair<float, float>> position);
+  GraphEdge(EdgeId id = -1, GraphNode *src = nullptr, GraphNode *dst = nullptr,
+            unsigned inPort = 0, unsigned outPort = 0,
+            std::vector<std::pair<float, float>> position =
+                std::vector<std::pair<float, float>>());
   /// Sets the EdgeId
   void setId(EdgeId id);
   /// Adds a position to the vector
   void addPosition(std::pair<float, float> position);
   /// Sets the source Node
-  void setSrc(GraphNode* src);
+  void setSrc(GraphNode *src);
   /// Sets the destination Node
-  void setDst(GraphNode* dst);
+  void setDst(GraphNode *dst);
   /// Sets inPort
-  void setInPort(int inPort);
+  void setInPort(unsigned inPort);
   /// Sets outPort
-  void setOutPort(int outPort);
+  void setOutPort(unsigned outPort);
   /// Returns the source node of the edge
   GraphNode *getSrcNode();
   /// Returns the desitnation node of the edge
   GraphNode *getDstNode();
   /// Returns the source out port of the edge
-  int getOutPort();
+  unsigned getOutPort();
   /// Returns the desitnation in port of the edge
-  int getInPort();
+  unsigned getInPort();
   /// Returns the edge identifier
   EdgeId getEdgeId();
   /// Returns the edge positions
@@ -60,9 +60,9 @@ private:
   /// Destination node
   GraphNode *dst;
   /// Port number of the destination node
-  int inPort;
+  unsigned inPort;
   /// Port number of the source node
-  int outPort;
+  unsigned outPort;
   /// Positions of the edge in the graph
   std::vector<std::pair<float, float>> position;
 };

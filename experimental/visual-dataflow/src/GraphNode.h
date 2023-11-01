@@ -35,9 +35,8 @@ public:
   NodeId getNodeId();
   /// Return the position of the Node
   std::pair<float, float> getPosition();
-  //Returns the in/out ports of the Node
-  std::vector<std::string> getPort(bool isInputPort);
-
+  // Returns the in/out ports of the Node
+  std::vector<std::string> getPorts(bool isInputPort);
 
 private:
   /// Node identifier

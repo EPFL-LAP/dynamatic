@@ -11,11 +11,11 @@
 #include "GraphNode.h"
 #include "mlir/Support/LLVM.h"
 #include "mlir/Support/LogicalResult.h"
+#include <functional>
 #include <map>
 #include <string>
 #include <utility>
 #include <vector>
-#include <functional>
 
 namespace dynamatic {
 namespace experimental {
@@ -38,7 +38,7 @@ public:
   void addEdge(GraphEdge *edge);
   /// Adds a node to the graph
   void addNode(GraphNode *node);
-  /// Retrieves a node based on a giver node identifier
+  /// Retrieves a node based on a given node identifier
   LogicalResult getNode(NodeId &id, GraphNode *&result);
   /// Based on information about an edge, retrieves the corresponding edge
   /// identifier
@@ -51,9 +51,6 @@ public:
   std::map<NodeId, GraphNode *> getNodes();
   /// Returns all the edges in the Graph
   std::vector<GraphEdge *> getEdges();
-  
-
-
 
   std::map<CycleNb, std::map<EdgeId, State>> getCycleEdgeStates();
 

@@ -17,7 +17,7 @@ namespace experimental {
 namespace visual_dataflow {
 
 /// This function reads and interprets a edge transition line form a csv file.
-void processCSVLine(const std::string &line, Graph *graph, size_t lineIndex);
+void processCSVLine(const std::string &line, size_t lineIndex, Graph &graph);
 
 } // namespace visual_dataflow
 } // namespace experimental

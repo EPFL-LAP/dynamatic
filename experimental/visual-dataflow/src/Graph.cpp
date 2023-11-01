@@ -9,13 +9,7 @@
 
 using namespace dynamatic::experimental::visual_dataflow;
 
-Graph::Graph(GraphId id) : id(id) {
-  edges = std::vector<GraphEdge *>();
-  nodes = std::map<std::string, GraphNode *>();
-  cycleEdgeStates = std::map<CycleNb, std::map<EdgeId, State>>();
-  mapEdges = std::map<std::pair<std::pair<NodeId, int>, std::pair<NodeId, int>>,
-                      EdgeId>();
-}
+Graph::Graph(GraphId id) : id(id) {}
 
 void Graph::addEdge(GraphEdge *edge) {
   edges.push_back(edge);
