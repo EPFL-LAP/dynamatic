@@ -14,7 +14,9 @@
 
 using namespace dynamatic::experimental::visual_dataflow;
 
-LogicalResult dynamatic::experimental::visual_dataflow::processDOT(std::ifstream &file, Graph &graph) {
+LogicalResult
+dynamatic::experimental::visual_dataflow::processDOT(std::ifstream &file,
+                                                     Graph &graph) {
 
   std::string line;
 
@@ -35,20 +37,18 @@ LogicalResult dynamatic::experimental::visual_dataflow::processDOT(std::ifstream
 
       currentNode = GraphNode();
       insideNodeDefinition = true;
-    }
 
-    else if (line.find("->") != std::string::npos) {
+    } else if (line.find("->") != std::string::npos) {
       currentEdge = GraphEdge();
       insideEdgeDefinition = true;
       currentEdge.setId(currentEdgeID);
-    }
 
-    else if (insideNodeDefinition && line.find("in") != std::string::npos &&
-             line.find("label") == std::string::npos &&
-             line.find("mlir_op") == std::string::npos &&
-             line.find('[') == std::string::npos &&
-             line.find("fillcolor") == std::string::npos &&
-             line.find("type") == std::string::npos) {
+    } else if (insideNodeDefinition && line.find("in") != std::string::npos &&
+               line.find("label") == std::string::npos &&
+               line.find("mlir_op") == std::string::npos &&
+               line.find('[') == std::string::npos &&
+               line.find("fillcolor") == std::string::npos &&
+               line.find("type") == std::string::npos) {
       int occurrences = std::count(line.begin(), line.end(), ' ');
       if (occurrences != std::string::npos) {
         for (size_t i = 1; i <= occurrences + 1; i++) {
@@ -56,16 +56,15 @@ LogicalResult dynamatic::experimental::visual_dataflow::processDOT(std::ifstream
           currentNode.addPort(portName, true);
         }
       }
-    }
 
-    else if (insideNodeDefinition && line.find("label") != std::string::npos) {
+    } else if (insideNodeDefinition &&
+               line.find("label") != std::string::npos) {
       NodeId id =
           line.substr(line.find('=') + 1, line.find(',') - line.find('=') - 1);
       currentNode.setId(id);
-    }
 
-    else if (insideNodeDefinition && line.find("out") != std::string::npos &&
-             line.find("label") == std::string::npos) {
+    } else if (insideNodeDefinition && line.find("out") != std::string::npos &&
+               line.find("label") == std::string::npos) {
       int occurrences = std::count(line.begin(), line.end(), ' ');
       if (occurrences != std::string::npos) {
         for (size_t i = 1; i <= occurrences + 1; i++) {
@@ -73,9 +72,8 @@ LogicalResult dynamatic::experimental::visual_dataflow::processDOT(std::ifstream
           currentNode.addPort(portName, false);
         }
       }
-    }
 
-    else if (insideNodeDefinition && line.find("pos") != std::string::npos) {
+    } else if (insideNodeDefinition && line.find("pos") != std::string::npos) {
       std::istringstream iss(line.substr(
           line.find('\"') + 1, line.rfind('\"') - line.find('\"') - 1));
       float x, y;
@@ -83,9 +81,8 @@ LogicalResult dynamatic::experimental::visual_dataflow::processDOT(std::ifstream
       (iss >> x >> comma >> y);
       std::pair<float, float> position = std::make_pair(x, y);
       currentNode.setPosition(position);
-    }
 
-    else if (insideNodeDefinition && line.find(']') != std::string::npos) {
+    } else if (insideNodeDefinition && line.find(']') != std::string::npos) {
       graph.addNode(currentNode);
       insideNodeDefinition = false;
     }
@@ -134,9 +131,8 @@ LogicalResult dynamatic::experimental::visual_dataflow::processDOT(std::ifstream
           }
         }
       }
-    }
 
-    else if (insideEdgeDefinition && line.find("->") != std::string::npos) {
+    } else if (insideEdgeDefinition && line.find("->") != std::string::npos) {
       size_t arrowPos = line.find("-> ");
 
       if (arrowPos != std::string::npos) {
