@@ -14,19 +14,26 @@
 
 using namespace dynamatic::experimental::visual_dataflow;
 
-int main() {
+int main(int argc, char *argv[]) {
+  if (argc != 3) {
+    std::cerr << "Usage: " << argv[0] << " <input_dot_file> <output_dot_file>"
+              << std::endl;
+    return 1;
+  }
 
-  reformatDot("experimental/visual-dataflow/src/gcd.dot", "outputFinal.dot");
+  const std::string inputDotFile = argv[1];
+  const std::string outputDotFile = argv[2];
+
+  reformatDot(inputDotFile, outputDotFile);
 
   std::ifstream f;
-  f.open("outputFinal.dot");
+  f.open(outputDotFile);
 
   Graph graph(1);
 
   LogicalResult result = DOTParser::processDOT(f, &graph);
 
   std::cout << "---------------------------------" << std::endl;
-
   for (const auto &pair : graph.getNodes()) {
     NodeId nodeId = pair.first;
     GraphNode *node = pair.second;
