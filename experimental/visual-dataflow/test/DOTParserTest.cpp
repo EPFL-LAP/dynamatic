@@ -41,8 +41,8 @@ int main(int argc, char *argv[]) {
     std::cout << "Node ID: " << nodeId << std::endl;
     std::cout << "Position: " << node->getPosition().first << " "
               << node->getPosition().second << std::endl;
-    std::cout << "InPorts: " << node->getPort(true).size()
-              << " OutPorts: " << node->getPort(false).size() << std::endl;
+    std::cout << "InPorts: " << node->getPorts(true).size()
+              << " OutPorts: " << node->getPorts(false).size() << std::endl;
 
     std::cout << "---------------------------------" << std::endl;
   }
