@@ -49,10 +49,10 @@ int main(int argc, char *argv[]) {
 
   std::cout << "---------------------------------" << std::endl;
 
-  std::vector<GraphEdge> edges = graph.getEdges(); // Get a copy of the edges
+  std::vector<GraphEdge> edges = graph.getEdges();
 
   for (size_t i = 0; i < edges.size(); ++i) {
-    GraphEdge edge = edges[i]; // Create a non-const copy of the edge
+    GraphEdge edge = edges[i];
 
     std::cout << "Edge ID: " << edge.getEdgeId() << std::endl;
     std::cout << "Positions: " << std::endl;
