@@ -22,9 +22,7 @@ void Graph::addEdge(GraphEdge edge) {
   mapEdges.insert(std::pair(edgeInfo, edge.getEdgeId()));
 }
 
-void Graph::addNode(GraphNode node) {
-  nodes.insert({node.getNodeId(), node});
-}
+void Graph::addNode(GraphNode node) { nodes.insert({node.getNodeId(), node}); }
 
 LogicalResult Graph::getNode(NodeId &id, GraphNode &result) {
   if (nodes.count(id)) {

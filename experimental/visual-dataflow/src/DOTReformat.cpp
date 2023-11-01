@@ -1,15 +1,13 @@
+#include "DOTReformat.h"
+#include "mlir/Support/LogicalResult.h"
 #include <fstream>
 #include <string>
 #include <vector>
-#include "mlir/Support/LogicalResult.h"
-#include "DOTReformat.h"
-
 
 using namespace mlir;
 
-
 LogicalResult reformatDot(const std::string &inputFileName,
-                 const std::string &outputFileName) {
+                          const std::string &outputFileName) {
   std::ifstream inputFile(inputFileName);
   std::ofstream outputFile(outputFileName);
 

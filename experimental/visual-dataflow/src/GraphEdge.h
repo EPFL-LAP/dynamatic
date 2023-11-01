@@ -23,8 +23,9 @@ class GraphEdge {
 
 public:
   /// Constructs an edge
-  GraphEdge(EdgeId id = -1, GraphNode src = GraphNode(), GraphNode dst = GraphNode(),
-            unsigned inPort = 0, unsigned outPort = 0,
+  GraphEdge(EdgeId id = -1, GraphNode src = GraphNode(),
+            GraphNode dst = GraphNode(), unsigned inPort = 0,
+            unsigned outPort = 0,
             std::vector<std::pair<float, float>> position =
                 std::vector<std::pair<float, float>>());
   /// Sets the EdgeId
