@@ -114,6 +114,7 @@ else()
   message(WARNING "Gurobi wasn't found, the buffer placement infrastructure \
                    that requires solving an MILP will not be built with the \
                    project.")
+  add_compile_definitions(DYNAMATIC_GUROBI_NOT_INSTALLED)
 endif()
 
 #-------------------------------------------------------------------------------
