@@ -37,13 +37,13 @@ using ExecuteFunction = const std::function<void(
 /// Represent the state in which each wire is
 enum class DataflowState {
   /// Not valid nor ready
-  NONE = 1, 
+  NONE = 1,
   /// Valid but not ready
-  VALID = 2, 
+  VALID = 2,
   /// Ready but not valid
-  READY = 3, 
+  READY = 3,
   /// Ready and valid
-  VALID_READY = 4 
+  VALID_READY = 4
 };
 
 /// Data structure to hold state of each value
@@ -57,18 +57,16 @@ struct ChannelState {
 /// Type for mapping channels to their state
 using ChannelMap = llvm::DenseMap<mlir::Value, ChannelState>;
 
-/// Store a value in a channel, and set its state to VALID
-static inline void storeValue(mlir::Value channel,
-                              std::optional<llvm::Any> data,
-                              ChannelMap &channelMap);
+/// Stores a value in a channel, and sets its state to VALID.
+void storeValue(mlir::Value channel, std::optional<llvm::Any> data,
+                ChannelMap &channelMap);
 
-/// Performs multiples storeValue at once
-static void storeValues(std::vector<llvm::Any> &values,
-                        llvm::ArrayRef<mlir::Value> outs,
-                        ChannelMap &channelMap);
+/// Performs multiples storeValue's at once.
+void storeValues(std::vector<llvm::Any> &values,
+                 llvm::ArrayRef<mlir::Value> outs, ChannelMap &channelMap);
 
-/// Remove a value from a channel, and set its state to NONE
-static inline void removeValue(mlir::Value channel, ChannelMap &channelMap);
+/// Removes a value from a channel, and sets its state to NONE.
+void removeValue(mlir::Value channel, ChannelMap &channelMap);
 
 //--- Execution Models -------------------------------------------------------//
 
@@ -102,7 +100,7 @@ struct ExecutableModel {
   /// Returns false if nothing was done, true if some type of jobs were done
   virtual bool tryExecute(ExecutableData &data, circt::Operation &op) = 0;
 
-  virtual ~ExecutableModel(){};
+  virtual ~ExecutableModel() = default;
 
   virtual bool isEndPoint() const { return false; };
 };

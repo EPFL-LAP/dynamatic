@@ -33,29 +33,26 @@ using namespace dynamatic::experimental;
 // Dataflow
 //===----------------------------------------------------------------------===//
 
-// NOTE PR : is it necessary to pass by reference channel and value ? just
-// wondering. If so, we could std::move data tho.
-static inline void
-dynamatic::experimental::storeValue(mlir::Value channel,
-                                    std::optional<llvm::Any> data,
-                                    ChannelMap &channelMap) {
+/// Stores a value in a channel, and sets its state to VALID.
+void dynamatic::experimental::storeValue(mlir::Value channel,
+                                         std::optional<llvm::Any> data,
+                                         ChannelMap &channelMap) {
   channelMap[channel].state = DataflowState::VALID;
-  channelMap[channel].data = data;
+  channelMap[channel].data = std::move(data);
 }
 
-/// Stores values to the value map for each output
-static void
-dynamatic::experimental::storeValues(std::vector<llvm::Any> &values,
-                                     llvm::ArrayRef<mlir::Value> outs,
-                                     ChannelMap &channelMap) {
+/// Performs multiples storeValue's at once.
+void dynamatic::experimental::storeValues(std::vector<llvm::Any> &values,
+                                          llvm::ArrayRef<mlir::Value> outs,
+                                          ChannelMap &channelMap) {
   assert(values.size() == outs.size());
   for (unsigned long i = 0; i < outs.size(); ++i)
     storeValue(outs[i], values[i], channelMap);
 }
 
-static inline void
-dynamatic::experimental::removeValue(mlir::Value channel,
-                                     ChannelMap &channelMap) {
+/// Removes a value from a channel, and sets its state to NONE.
+void dynamatic::experimental::removeValue(mlir::Value channel,
+                                          ChannelMap &channelMap) {
   channelMap[channel].state = DataflowState::NONE;
   channelMap[channel].data = std::nullopt;
 }
@@ -104,24 +101,22 @@ static bool isReadyToExecute(ArrayRef<Value> ins, ArrayRef<Value> outs,
   for (auto in : ins)
     if (channelMap[in].state == DataflowState::NONE)
       return false;
-  
+
   for (auto out : outs)
     if (channelMap[out].state == DataflowState::VALID)
       return false;
-      
+
   return true;
 }
 
 /// Fetches values from the value map and consume them
-static std::vector<llvm::Any>
-fetchValues(ArrayRef<Value> values,
-            ChannelMap &channelMap) {
+static std::vector<llvm::Any> fetchValues(ArrayRef<Value> values,
+                                          ChannelMap &channelMap) {
   std::vector<llvm::Any> ins;
   for (auto &value : values) {
     if (channelMap[value].state == DataflowState::VALID)
       ins.push_back(channelMap[value].data.value());
     // removeValue(value, channelMap);
-
   }
   return ins;
 }
@@ -325,8 +320,11 @@ bool DefaultControlMerge::tryExecute(ExecutableData &data,
     if (data.channelMap[in.value()].state == DataflowState::VALID) {
       if (found)
         op.emitOpError("More than one valid input to CMerge!");
-      storeValue(op.getResult(), data.channelMap[in.value()].data, data.channelMap);
-      storeValue(op.getIndex(), APInt(IndexType::kInternalStorageBitWidth, in.index()), data.channelMap);
+      storeValue(op.getResult(), data.channelMap[in.value()].data,
+                 data.channelMap);
+      storeValue(op.getIndex(),
+                 APInt(IndexType::kInternalStorageBitWidth, in.index()),
+                 data.channelMap);
       // Consume the inputs.
       removeValue(in.value(), data.channelMap);
       found = true;
