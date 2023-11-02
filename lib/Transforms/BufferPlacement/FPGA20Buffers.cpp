@@ -238,12 +238,9 @@ FPGA20Buffers::addCustomChannelConstraints(ValueRange customChannels) {
       // Force the MILP to use opaque slots
       model.addConstr(chVars.bufIsOpaque == 1, "custom_forceOpaque");
       if (props.minTrans > 0) {
-        // If the properties ask for both opaque and transaprent slots, let
+        // If the properties ask for both opaque and transparent slots, let
         // opaque slots take over. Transparents slots will be placed "manually"
         // from the total number of slots indicated by the MILP's result
-        size_t idx;
-        Operation *producer = getChannelProducer(channel, &idx);
-        assert(producer && "channel producer must exist");
         unsigned minTotalSlots = props.minOpaque + props.minTrans;
         model.addConstr(chVars.bufNumSlots >= minTotalSlots,
                         "custom_minOpaqueAndTrans");

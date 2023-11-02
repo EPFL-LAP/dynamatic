@@ -138,8 +138,8 @@ public:
   /// it if the analysis was just checked to be valid with `isAnalysisValid` and
   /// no operation name was set outside of the analysis since then.
   void nameAllUnnamedOps() {
-    assert(succeeded(walk(UnnamedBehavior::NAME)) &&
-           "analysis invariant is broken");
+    bool walkSuccess = succeeded(walk(UnnamedBehavior::NAME));
+    assert(walkSuccess && "analysis invariant is broken");
   }
 
   /// Invalidation hook to keep the analysis cached across passes. Returns true

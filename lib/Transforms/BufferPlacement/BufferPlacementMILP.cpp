@@ -10,8 +10,6 @@
 //
 //===----------------------------------------------------------------------===//
 
-#include "dynamatic/Analysis/NameAnalysis.h"
-#include "mlir/IR/BuiltinOps.h"
 #ifndef DYNAMATIC_GUROBI_NOT_INSTALLED
 #include "gurobi_c++.h"
 
@@ -64,7 +62,7 @@ BufferPlacementMILP::BufferPlacementMILP(FuncInfo &funcInfo,
          << "' made them unsatisfiable. Properties are " << *channel.props;
       if (logger)
         **logger << ss.str();
-      return channel.producer.emitError() << ss.str();
+      return channel.producer->emitError() << ss.str();
     }
     channels[channel.value] = *channel.props;
     return success();
@@ -72,7 +70,7 @@ BufferPlacementMILP::BufferPlacementMILP(FuncInfo &funcInfo,
 
   // Add channels originating from function arguments to the channel map
   for (auto [idx, arg] : llvm::enumerate(funcInfo.funcOp.getArguments())) {
-    Channel channel(arg, *funcInfo.funcOp, **arg.getUsers().begin());
+    Channel channel(arg, funcInfo.funcOp, *arg.getUsers().begin());
     if (failed(deriveBufferingProperties(channel)))
       return;
   }
@@ -80,7 +78,7 @@ BufferPlacementMILP::BufferPlacementMILP(FuncInfo &funcInfo,
   // Add channels originating from operations' results to the channel map
   for (Operation &op : funcInfo.funcOp.getOps()) {
     for (auto [idx, res] : llvm::enumerate(op.getResults())) {
-      Channel channel(res, op, **res.getUsers().begin());
+      Channel channel(res, &op, *res.getUsers().begin());
       if (failed(deriveBufferingProperties(channel)))
         return;
     }
@@ -119,15 +117,15 @@ LogicalResult BufferPlacementMILP::optimize(int *milpStat) {
 
 LogicalResult BufferPlacementMILP::addInternalBuffers(Channel &channel) {
   // Add slots present at the source unit's output ports
-  std::string srcName = channel.producer.getName().getStringRef().str();
-  if (const TimingModel *model = timingDB.getModel(&channel.producer)) {
+  std::string srcName = channel.producer->getName().getStringRef().str();
+  if (const TimingModel *model = timingDB.getModel(channel.producer)) {
     channel.props->minTrans += model->outputModel.transparentSlots;
     channel.props->minOpaque += model->outputModel.opaqueSlots;
   }
 
   // Add slots present at the destination unit's input ports
-  std::string dstName = channel.consumer.getName().getStringRef().str();
-  if (const TimingModel *model = timingDB.getModel(&channel.consumer)) {
+  std::string dstName = channel.consumer->getName().getStringRef().str();
+  if (const TimingModel *model = timingDB.getModel(channel.consumer)) {
     channel.props->minTrans += model->inputModel.transparentSlots;
     channel.props->minOpaque += model->inputModel.opaqueSlots;
   }
@@ -137,17 +135,17 @@ LogicalResult BufferPlacementMILP::addInternalBuffers(Channel &channel) {
 
 void BufferPlacementMILP::deductInternalBuffers(Channel &channel,
                                                 PlacementResult &result) {
-  std::string srcName = channel.producer.getName().getStringRef().str();
-  std::string dstName = channel.consumer.getName().getStringRef().str();
+  std::string srcName = channel.producer->getName().getStringRef().str();
+  std::string dstName = channel.consumer->getName().getStringRef().str();
   unsigned numTransToDeduct = 0, numOpaqueToDeduct = 0;
 
   // Remove slots present at the source unit's output ports
-  if (const TimingModel *model = timingDB.getModel(&channel.producer)) {
+  if (const TimingModel *model = timingDB.getModel(channel.producer)) {
     numTransToDeduct += model->outputModel.transparentSlots;
     numOpaqueToDeduct += model->outputModel.opaqueSlots;
   }
   // Remove slots present at the destination unit's input ports
-  if (const TimingModel *model = timingDB.getModel(&channel.consumer)) {
+  if (const TimingModel *model = timingDB.getModel(channel.consumer)) {
     numTransToDeduct += model->inputModel.transparentSlots;
     numOpaqueToDeduct += model->inputModel.opaqueSlots;
   }

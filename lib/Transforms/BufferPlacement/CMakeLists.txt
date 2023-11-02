@@ -1,7 +1,3 @@
-if (NOT GUROBI_FOUND)
-  add_compile_definitions(DYNAMATIC_GUROBI_NOT_INSTALLED)
-endif()
-
 add_dynamatic_library(DynamaticBufferPlacement
   BufferingProperties.cpp
   BufferPlacementMILP.cpp

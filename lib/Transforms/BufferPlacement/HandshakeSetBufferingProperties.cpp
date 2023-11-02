@@ -32,7 +32,7 @@ void dynamatic::buffer::setFPGA20Properties(Channel &channel) {
   // Merges with more than one input should have at least a transparent slot
   // at their output
   if (isa<handshake::MergeOp>(channel.producer) &&
-      channel.producer.getNumOperands() > 1)
+      channel.producer->getNumOperands() > 1)
     channel.props->minTrans = std::max(channel.props->minTrans, 1U);
 
   // Channels connected to memory interfaces are not bufferizable
@@ -50,14 +50,14 @@ static void callOnAllChannels(handshake::FuncOp funcOp,
                               void (*callback)(Channel &)) {
   for (BlockArgument arg : funcOp.getArguments())
     for (Operation *user : arg.getUsers()) {
-      Channel channel(arg, *funcOp, *user, true);
+      Channel channel(arg, funcOp, user, true);
       callback(channel);
     }
 
   for (Operation &op : funcOp.getOps())
     for (OpResult res : op.getResults())
       for (Operation *user : res.getUsers()) {
-        Channel channel(res, op, *user, true);
+        Channel channel(res, &op, user, true);
         callback(channel);
       }
 }
