@@ -7,3 +7,9 @@
 	url = git@github.com:EPFL-LAP/circt.git
 	branch = main
   shallow = true
+[submodule "experimental/visual-dataflow/godot-cpp"]
+	path = experimental/visual-dataflow/godot-cpp
+	url = https://github.com/godotengine/godot-cpp
+	branch = 4.1
+  shallow = true
+

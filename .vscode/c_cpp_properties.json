@@ -3,23 +3,21 @@
     {
       "name": "Linux",
       "includePath": [
-        // Dynamatic
         "${workspaceFolder}/include/",
         "${workspaceFolder}/build/include/",
-        // Dynamatic (experimental) 
         "${workspaceFolder}/experimental/include/",
         "${workspaceFolder}/build/experimental/include/",
-        // Dynamatic (tutorials) 
         "${workspaceFolder}/tutorials/include/",
         "${workspaceFolder}/build/tutorials/include/",
-        // CIRCT
         "${workspaceFolder}/circt/include/",
         "${workspaceFolder}/circt/build/include/",
         "${workspaceFolder}/circt/llvm/llvm/include/",
         "${workspaceFolder}/circt/llvm/mlir/include/",
         "${workspaceFolder}/circt/llvm/build/include/",
         "${workspaceFolder}/circt/llvm/build/tools/mlir/include/",
-        // Gurobi
+        "${workspaceFolder}/experimental/visual-dataflow/godot-cpp/include/",
+        "${workspaceFolder}/experimental/visual-dataflow/godot-cpp/gen/include/",
+        "${workspaceFolder}/experimental/visual-dataflow/godot-cpp/gdextension/",
         "${env:GUROBI_HOME}/include/"
       ],
       "intelliSenseMode": "linux-clang-x64",

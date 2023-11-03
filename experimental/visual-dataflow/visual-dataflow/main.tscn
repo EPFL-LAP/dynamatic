@@ -1,0 +1,8 @@
+[gd_scene load_steps=2 format=3 uid="uid://ridjgqca7ygu"]
+
+[ext_resource type="Script" path="res://main.gd" id="1_k08iy"]
+
+[node name="VisualDataflow" type="VisualDataflow"]
+offset_right = 40.0
+offset_bottom = 40.0
+script = ExtResource("1_k08iy")

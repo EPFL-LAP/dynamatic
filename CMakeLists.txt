@@ -64,6 +64,8 @@ option(LLVM_BUILD_TOOLS "Build the LLVM tools. If OFF, just generate build targe
 # Dynamatic configuration 
 #-------------------------------------------------------------------------------
 
+option(DYNAMATIC_BUILD_VISUALIZER "Disable the vivado synthesis tests." OFF)
+
 # Define some variables for Dynamatic
 set(DYNAMATIC_SOURCE_DIR ${CMAKE_SOURCE_DIR})
 set(DYNAMATIC_INCLUDE_DIR ${DYNAMATIC_SOURCE_DIR}/include)
