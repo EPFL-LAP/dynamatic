@@ -1,4 +1,10 @@
-//===- DOTParser.h - Parses a .dot file ------------------------*- C++ -*-===//
+//===- DOTParser.h - Parses a .dot file -------------------------*- C++ -*-===//
+//
+// Dynamatic is under the Apache License v2.0 with LLVM Exceptions.
+// See https://llvm.org/LICENSE.txt for license information.
+// SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
+//
+//===----------------------------------------------------------------------===//
 //
 // The DOTParser class represents a parsing tool used to create a Graph compon-
 // ent using a .dot file fed to the input.

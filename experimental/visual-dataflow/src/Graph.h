@@ -1,7 +1,14 @@
-//===- Graph.h - Represents a graph ------------*- C++ -*-===//
+//===- Graph.h - Represents a graph -----------------------------*- C++ -*-===//
+//
+// Dynamatic is under the Apache License v2.0 with LLVM Exceptions.
+// See https://llvm.org/LICENSE.txt for license information.
+// SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
+//
+//===----------------------------------------------------------------------===//
 //
 // The Graph class represents a graph composed of nodes and edges with the
 // purpose of being displayed in Godot.
+//
 //===----------------------------------------------------------------------===//
 
 #ifndef DYNAMATIC_VISUAL_DATAFLOW_GRAPH_H
@@ -9,7 +16,7 @@
 
 #include "GraphEdge.h"
 #include "GraphNode.h"
-#include "mlir/Support/LLVM.h"
+#include "dynamatic/Support/LLVM.h"
 #include "mlir/Support/LogicalResult.h"
 #include <functional>
 #include <map>
@@ -23,7 +30,6 @@ namespace visual_dataflow {
 
 using CycleNb = int;
 using GraphId = int;
-using namespace mlir;
 
 /// State of an edge of the graph
 enum State { UNDEFINED, READY, EMPTY, VALID, VALID_READY };
@@ -33,7 +39,7 @@ class Graph {
 
 public:
   /// Constructs a graph
-  Graph(GraphId id);
+  Graph() = default;
   /// Adds an edge to the graph
   void addEdge(GraphEdge edge);
   /// Adds a node to the graph
@@ -55,8 +61,6 @@ public:
   std::map<CycleNb, std::map<EdgeId, State>> getCycleEdgeStates();
 
 private:
-  /// Graph identifier
-  GraphId id;
   /// Edges of the graph
   std::vector<GraphEdge> edges;
   /// Nodes of the graph mapped with their corresponding node identifier

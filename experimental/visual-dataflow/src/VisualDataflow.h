@@ -1,3 +1,15 @@
+//===- VisualDataflow.h - Godot-visible types -------------------*- C++ -*-===//
+//
+// Dynamatic is under the Apache License v2.0 with LLVM Exceptions.
+// See https://llvm.org/LICENSE.txt for license information.
+// SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
+//
+//===----------------------------------------------------------------------===//
+//
+// Declares types that must be visible by Godot in the GDExtension.
+//
+//===----------------------------------------------------------------------===//
+
 #ifndef VISUAL_DATAFLOW_VISUAL_DATAFLOW_H
 #define VISUAL_DATAFLOW_VISUAL_DATAFLOW_H
 

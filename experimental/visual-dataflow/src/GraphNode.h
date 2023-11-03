@@ -1,7 +1,14 @@
-//===- GraphNode.h - Represents a node in a graph ------------*- C++ -*-===//
+//===- GraphNode.h - Represents a node in a graph ---------------*- C++ -*-===//
+//
+// Dynamatic is under the Apache License v2.0 with LLVM Exceptions.
+// See https://llvm.org/LICENSE.txt for license information.
+// SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
+//
+//===----------------------------------------------------------------------===//
 //
 // The GraphNode class represents a node in a graph with the purpose of being
 // displayed in Godot.
+//
 //===----------------------------------------------------------------------===//
 
 #ifndef DYNAMATIC_VISUAL_DATAFLOW_GRAPHNODE_H

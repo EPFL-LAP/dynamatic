@@ -1,9 +1,20 @@
+//===- DotParser.cpp - Parses a DOT file ------------------------*- C++ -*-===//
+//
+// Dynamatic is under the Apache License v2.0 with LLVM Exceptions.
+// See https://llvm.org/LICENSE.txt for license information.
+// SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
+//
+//===----------------------------------------------------------------------===//
+//
+// DOT parsing.
+//
+//===----------------------------------------------------------------------===//
+
 #include "DOTParser.h"
 #include "DOTReformat.h"
 #include "Graph.h"
 #include "GraphEdge.h"
 #include "GraphNode.h"
-#include "mlir/Support/LogicalResult.h"
 #include <fstream>
 #include <iostream>
 #include <regex>
@@ -13,6 +24,7 @@
 #include <vector>
 
 using namespace dynamatic::experimental::visual_dataflow;
+using namespace mlir;
 
 LogicalResult
 dynamatic::experimental::visual_dataflow::processDOT(std::ifstream &file,

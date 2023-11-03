@@ -30,7 +30,7 @@ int main(int argc, char *argv[]) {
   std::ifstream f;
   f.open(outputDotFile);
 
-  Graph graph(1);
+  Graph graph;
 
   if (failed(processDOT(f, graph)))
     return 1;

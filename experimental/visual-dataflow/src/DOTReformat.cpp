@@ -1,3 +1,15 @@
+//===- DOTReformat.cpp - Reformat DOT files before parsing ------*- C++ -*-===//
+//
+// Dynamatic is under the Apache License v2.0 with LLVM Exceptions.
+// See https://llvm.org/LICENSE.txt for license information.
+// SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
+//
+//===----------------------------------------------------------------------===//
+//
+// Reformat DOT files.
+//
+//===----------------------------------------------------------------------===//
+
 #include "DOTReformat.h"
 #include "mlir/Support/LogicalResult.h"
 #include <fstream>

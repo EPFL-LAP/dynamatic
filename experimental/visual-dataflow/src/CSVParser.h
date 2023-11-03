@@ -1,7 +1,14 @@
-//===- CSVParser.h - Parses a csv transition line ------------*- C++ -*-===//
+//===- CSVParser.h - Parses a csv transition line ---------------*- C++ -*-===//
+//
+// Dynamatic is under the Apache License v2.0 with LLVM Exceptions.
+// See https://llvm.org/LICENSE.txt for license information.
+// SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
+//
+//===----------------------------------------------------------------------===//
 //
 // The extracted data provides information about the state of an edge of the
-// graph for a given cycle .
+// graph for a given cycle.
+//
 //===----------------------------------------------------------------------===//
 
 #ifndef DYNAMATIC_VISUAL_DATAFLOW_CSVPARSER_H

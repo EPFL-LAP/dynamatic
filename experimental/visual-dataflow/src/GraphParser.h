@@ -1,3 +1,15 @@
+//===- GraphParser.h - Parse a dataflow graph -------------------*- C++ -*-===//
+//
+// Dynamatic is under the Apache License v2.0 with LLVM Exceptions.
+// See https://llvm.org/LICENSE.txt for license information.
+// SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
+//
+//===----------------------------------------------------------------------===//
+//
+// Graph parsing.
+//
+//===----------------------------------------------------------------------===//
+
 #ifndef DYNAMATIC_VISUAL_DATAFLOW_PARSER_H
 #define DYNAMATIC_VISUAL_DATAFLOW_PARSER_H
 
