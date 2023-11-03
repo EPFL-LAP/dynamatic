@@ -3,4 +3,6 @@ add_subdirectory(lib)
 add_subdirectory(test)
 add_subdirectory(tools)
 
-add_subdirectory(visual-dataflow)
+if (DYNAMATIC_BUILD_VISUALIZER)
+  add_subdirectory(visual-dataflow)
+endif()
