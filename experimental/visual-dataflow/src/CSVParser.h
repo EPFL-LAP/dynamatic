@@ -13,6 +13,7 @@
 
 #ifndef DYNAMATIC_VISUAL_DATAFLOW_CSVPARSER_H
 #define DYNAMATIC_VISUAL_DATAFLOW_CSVPARSER_H
+
 #include "Graph.h"
 #include "mlir/Support/LLVM.h"
 #include "mlir/Support/LogicalResult.h"
@@ -24,7 +25,8 @@ namespace experimental {
 namespace visual_dataflow {
 
 /// This function reads and interprets a edge transition line form a csv file.
-void processCSVLine(const std::string &line, size_t lineIndex, Graph &graph);
+LogicalResult processCSVLine(const std::string &line, size_t lineIndex,
+                             Graph &graph);
 
 } // namespace visual_dataflow
 } // namespace experimental

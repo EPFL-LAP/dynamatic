@@ -18,7 +18,7 @@ using namespace dynamatic::experimental::visual_dataflow;
 
 /// This function transforms a state of type 'string' into its corresponding
 /// state in type 'State'.
-LogicalResult findState(const std::string &stateString, State &state) {
+static LogicalResult findState(const std::string &stateString, State &state) {
   if (stateString == "undefined") {
     state = UNDEFINED;
     return success();
@@ -43,26 +43,7 @@ LogicalResult findState(const std::string &stateString, State &state) {
   return failure();
 }
 
-/// This function finds an edge in the graph thanks to given information about
-/// the edge.
-LogicalResult findEdgeInGraph(Graph *graph,
-                              const std::vector<std::string> &edgeInfo,
-                              EdgeId &edgeId) {
-
-  std::pair<NodeId, int> srcInfo =
-      std::pair(edgeInfo[1], std::stoi(edgeInfo[2]));
-
-  std::pair<NodeId, int> dstInfo =
-      std::pair(edgeInfo[3], std::stoi(edgeInfo[4]));
-
-  std::pair<std::pair<NodeId, int>, std::pair<NodeId, int>> info =
-      std::pair(srcInfo, dstInfo);
-
-  // Error : an edge defined in the csv file was not found in the graph.
-  return graph->getEdgeId(info, edgeId);
-}
-
-std::string trim(const std::string &str) {
+static std::string trim(const std::string &str) {
   std::string s = str;
 
   s.erase(s.begin(), std::find_if(s.begin(), s.end(), [](unsigned char ch) {
@@ -77,8 +58,8 @@ std::string trim(const std::string &str) {
   return s;
 }
 
-LogicalResult processCSVLine(const std::string &line, size_t lineIndex,
-                             Graph &graph) {
+LogicalResult dynamatic::experimental::visual_dataflow::processCSVLine(
+    const std::string &line, size_t lineIndex, Graph &graph) {
 
   // Jump the first 2 lines and empty line (Not needed)
   if (lineIndex == 0 || lineIndex == 1 || line.empty())
@@ -123,18 +104,12 @@ LogicalResult processCSVLine(const std::string &line, size_t lineIndex,
       std::pair(srcInfo, dstInfo);
 
   EdgeId edgeId;
-
-  if (failed(graph.getEdgeId(info, edgeId))) {
-    return failure();
-  }
-
   State state;
 
-  if (failed(findState(stateString, state))) {
+  if (failed(graph.getEdgeId(info, edgeId)) ||
+      failed(findState(stateString, state)))
     return failure();
-  }
 
   graph.addEdgeState(cycleNb, edgeId, state);
-
   return success();
 }

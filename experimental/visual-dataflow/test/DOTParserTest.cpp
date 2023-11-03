@@ -1,3 +1,16 @@
+//===- DOTParserTest.h - Executable test for DOT parser ---------*- C++ -*-===//
+//
+// Dynamatic is under the Apache License v2.0 with LLVM Exceptions.
+// See https://llvm.org/LICENSE.txt for license information.
+// SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
+//
+//===----------------------------------------------------------------------===//
+//
+// Run the DOT reformatter/parser on a valid input DOT to check whether it
+// manages to be transformed into a graph.
+//
+//===----------------------------------------------------------------------===//
+
 #include "../src/DOTParser.h"
 #include "../src/DOTReformat.h"
 #include "../src/Graph.h"
