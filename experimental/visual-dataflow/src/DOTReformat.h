@@ -4,9 +4,8 @@
 // onfully so it can be parsed correctly.
 //===----------------------------------------------------------------------===//
 
-#include <string>
 #include "mlir/Support/LogicalResult.h"
-
+#include <string>
 
 mlir::LogicalResult reformatDot(const std::string &inputFileName,
-                 const std::string &outputFileName);
+                                const std::string &outputFileName);

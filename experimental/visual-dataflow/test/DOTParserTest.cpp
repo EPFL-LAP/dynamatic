@@ -24,14 +24,16 @@ int main(int argc, char *argv[]) {
   const std::string inputDotFile = argv[1];
   const std::string outputDotFile = argv[2];
 
-  reformatDot(inputDotFile, outputDotFile);
+  if (failed(reformatDot(inputDotFile, outputDotFile)))
+    return 1;
 
   std::ifstream f;
   f.open(outputDotFile);
 
   Graph graph(1);
 
-  LogicalResult result = processDOT(f, graph);
+  if (failed(processDOT(f, graph)))
+    return 1;
 
   std::cout << "---------------------------------" << std::endl;
   for (const auto &pair : graph.getNodes()) {
@@ -49,11 +51,7 @@ int main(int argc, char *argv[]) {
 
   std::cout << "---------------------------------" << std::endl;
 
-  std::vector<GraphEdge> edges = graph.getEdges();
-
-  for (size_t i = 0; i < edges.size(); ++i) {
-    GraphEdge edge = edges[i];
-
+  for (GraphEdge &edge : graph.getEdges()) {
     std::cout << "Edge ID: " << edge.getEdgeId() << std::endl;
     std::cout << "Positions: " << std::endl;
     for (const auto &pos : edge.getPositions()) {

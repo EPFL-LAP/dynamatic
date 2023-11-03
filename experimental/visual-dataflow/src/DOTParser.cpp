@@ -49,7 +49,7 @@ dynamatic::experimental::visual_dataflow::processDOT(std::ifstream &file,
                line.find('[') == std::string::npos &&
                line.find("fillcolor") == std::string::npos &&
                line.find("type") == std::string::npos) {
-      int occurrences = std::count(line.begin(), line.end(), ' ');
+      size_t occurrences = std::count(line.begin(), line.end(), ' ');
       if (occurrences != std::string::npos) {
         for (size_t i = 1; i <= occurrences + 1; i++) {
           std::string portName = std::to_string(i);
@@ -65,7 +65,7 @@ dynamatic::experimental::visual_dataflow::processDOT(std::ifstream &file,
 
     } else if (insideNodeDefinition && line.find("out") != std::string::npos &&
                line.find("label") == std::string::npos) {
-      int occurrences = std::count(line.begin(), line.end(), ' ');
+      size_t occurrences = std::count(line.begin(), line.end(), ' ');
       if (occurrences != std::string::npos) {
         for (size_t i = 1; i <= occurrences + 1; i++) {
           std::string portName = std::to_string(i);
@@ -148,10 +148,10 @@ dynamatic::experimental::visual_dataflow::processDOT(std::ifstream &file,
         rightPart.erase(0, rightPart.find_first_not_of(" \t\n\r\f\v"));
         rightPart.erase(rightPart.find_last_not_of(" \t\n\r\f\v") + 1);
 
-        GraphNode src;
-        LogicalResult tryGetSrc = graph.getNode(leftPart, src);
-        GraphNode dst;
-        LogicalResult tryGetDst = graph.getNode(rightPart, dst);
+        GraphNode src, dst;
+        if (failed(graph.getNode(leftPart, src)) ||
+            failed(graph.getNode(rightPart, dst)))
+          return failure();
 
         currentEdge.setSrc(src);
         currentEdge.setDst(dst);

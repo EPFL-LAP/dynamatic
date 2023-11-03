@@ -21,7 +21,7 @@ GraphNode::GraphNode(NodeId id, std::pair<int, int> position)
   outPorts = std::vector<std::string>();
 }
 
-void GraphNode::setId(NodeId id) { this->id = id; }
+void GraphNode::setId(NodeId id) { this->id = std::move(id); }
 
 void GraphNode::setPosition(std::pair<float, float> position) {
   this->position = position;
@@ -41,6 +41,5 @@ std::pair<float, float> GraphNode::getPosition() { return position; }
 std::vector<std::string> GraphNode::getPorts(bool isInputPort) {
   if (isInputPort)
     return inPorts;
-  else
-    return outPorts;
+  return outPorts;
 }

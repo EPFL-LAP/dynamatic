@@ -1,6 +1,6 @@
 //===- CSVParser.cpp - Parses a csv transition line ------------*- C++ -*-===//
 //
-// This file implements the methids needed to extract data from a transition csv
+// This file implements the methods needed to extract data from a transition csv
 // file.
 //===----------------------------------------------------------------------===//
 

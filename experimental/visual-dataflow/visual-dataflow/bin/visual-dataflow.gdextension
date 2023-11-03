@@ -1,6 +1,6 @@
 [configuration]
 
-entry_symbol = "visual_dataflow_library_init"
+entry_symbol = "visualDataflowInit"
 compatibility_minimum = 4.1
 
 [libraries]

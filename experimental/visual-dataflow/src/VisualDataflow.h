@@ -19,6 +19,7 @@ private:
   // std::vector<Node> nodes;
 
 protected:
+  // NOLINTNEXTLINE(readability-identifier-naming)
   static void _bind_methods();
 
 public:
@@ -26,7 +27,7 @@ public:
 
   ~VisualDataflow() override = default;
 
-  void my_process(double delta);
+  void myProcess(double delta);
 
   double getNodePosX(int index);
   double getNodePosY(int index);

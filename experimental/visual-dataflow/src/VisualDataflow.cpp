@@ -72,4 +72,4 @@ double VisualDataflow::getNodePosX(int index) { return 100; }
 double VisualDataflow::getNodePosY(int index) { return 100; }
 int VisualDataflow::getNumberOfNodes() { return numberOfNodes; }
 
-void VisualDataflow::my_process(double delta) {}
+void VisualDataflow::myProcess(double delta) {}

@@ -18,7 +18,8 @@ namespace visual_dataflow {
 
 LogicalResult processDOT(std::ifstream &file, Graph &graph);
 
-}
+} // namespace visual_dataflow
 } // namespace experimental
 } // namespace dynamatic
+
 #endif // VISUAL_DATAFLOW_DOTPARSER_H
