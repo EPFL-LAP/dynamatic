@@ -21,25 +21,21 @@ using namespace mlir;
 LogicalResult reformatDot(const std::string &inputFileName,
                           const std::string &outputFileName) {
   std::ifstream inputFile(inputFileName);
-  std::ofstream outputFile(outputFileName);
-
-  // Check if the input file is open
-  if (!inputFile.is_open()) {
+  if (!inputFile.is_open())
     return failure();
-  }
 
-  // Check if the output file is open
+  std::ofstream outputFile(outputFileName);
   if (!outputFile.is_open()) {
-    inputFile.close(); // Close the input file before exiting
+    inputFile.close();
+    return failure();
   }
 
   std::vector<std::string> lines;
   std::string line;
 
   // Load entire file into memory (lines vector)
-  while (std::getline(inputFile, line)) {
+  while (std::getline(inputFile, line))
     lines.push_back(line);
-  }
   inputFile.close();
 
   // Single pass processing
