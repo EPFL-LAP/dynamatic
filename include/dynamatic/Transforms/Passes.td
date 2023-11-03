@@ -254,6 +254,23 @@ def AnalyzeMemoryAccesses : DynamaticPass<"analyze-memory-accesses"> {
   let dependentDialects = ["circt::handshake::HandshakeDialect"];
 }
 
+def BackAnnotate : DynamaticPass<"back-annotate"> {
+  let summary = "Back-annotates IR from JSON-formatted attributes";
+  let description = [{
+    Sets supported attributes on operations and operands based on
+    back-annotation information contained in an input JSON file. Operations
+    need to have a unique name (`circt::handshake::NameAttr` attribute) to be
+    able to be referenced by the back-annotation file. Fails if the
+    back-annotation file is badly formatted or if a referenced operation/operand
+    cannot be found in the IR.
+  }];
+  let constructor = "dynamatic::createBackAnnotate()";
+  let dependentDialects = ["circt::handshake::HandshakeDialect"];
+    let options =
+    [Option<"filepath", "filepath", "std::string", "\"\"",
+            "Path to JSON-formatted back-annotation file">];
+}
+
 def FlattenMemRefRowMajor : DynamaticPass<"flatten-memref-row-major"> {
   let summary = "Flatten memrefs (row-major order)";
   let description = [{
