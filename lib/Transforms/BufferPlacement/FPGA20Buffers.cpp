@@ -319,12 +319,15 @@ FPGA20Buffers::addPathConstraints(ValueRange pathChannels,
     // greater than the delay between the buffer's internal register and the
     // post-buffer channel delay
     double bufToOutDelay = outBufDelay + props.outDelay;
-    model.addConstr(opaque * bufToOutDelay <= t2, "path_opaqueChannel");
+    if (bufToOutDelay > 0)
+      model.addConstr(opaque * bufToOutDelay <= t2, "path_opaqueChannel");
+
     // If there is a transparent buffer, arrival time at channel's output must
     // be greater than at channel's input (+ whole channel and buffer delay)
     double inToOutDelay = props.inDelay + dataBufDelay + props.outDelay;
     model.addConstr(t1 + inToOutDelay - bigCst * (opaque - present + 1) <= t2,
                     "path_transparentChannel");
+
     // If there are no buffers, arrival time at channel's output must be greater
     // than at channel's input (+ channel delay)
     model.addConstr(t1 + props.delay - bigCst * present <= t2,
