@@ -22,6 +22,7 @@
 
 using namespace mlir;
 using namespace circt;
+using namespace dynamatic;
 using namespace dynamatic::experimental;
 
 /// Cycles it take for corresponding operations to execute
@@ -128,36 +129,29 @@ static inline void memoryTransfer(Value from, Value to, ExecutableData &data) {
 static MemoryControllerState
 parseOperandIndex(circt::handshake::MemoryControllerOp &op, unsigned cycle) {
   MemoryControllerState memControllerData;
-  unsigned operandIndex = 1; // ignores memref operand (at index 0)
-
   // Parses the operand list
-  auto accessesPerBB = op.getAccesses();
-  for (auto [bbIndex, accesses] : llvm::enumerate(accessesPerBB)) {
-    auto accessesArray = accesses.dyn_cast<ArrayAttr>();
-
-    if (op.bbHasControl(bbIndex))
-      operandIndex++; // Skip the %bbX
-
+  FuncMemoryPorts ports = op.getPorts();
+  for (BlockMemoryPorts blockPorts : ports.blocks) {
     MemoryRequest request;
-    for (auto &access : accessesArray) {
-      auto type = cast<circt::handshake::AccessTypeEnumAttr>(access).getValue();
-      request.type = type;
+    for (MemoryPort &port : blockPorts.accessPorts) {
       request.isReady = false;
       request.lastExecution = 0;
-      if (type == AccessTypeEnum::Store) {
-        request.addressIdx = operandIndex++;
-        request.dataIdx = operandIndex;
+      if (std::optional<StorePort> storePort = dyn_cast<StorePort>(port)) {
+        request.isLoad = true;
+        request.addressIdx = storePort->getAddrInputIdx();
+        request.dataIdx = storePort->getDataInputIdx();
         request.cyclesToComplete = CYCLE_TIME_STORE_OP;
         memControllerData.storeRequests.push_back(request);
       } else {
-        request.addressIdx = operandIndex;
-        request.dataIdx = 0;
+        std::optional<LoadPort> loadPort = dyn_cast<LoadPort>(port);
+        assert(loadPort && "port must be load or store");
+        request.isLoad = false;
+        request.addressIdx = loadPort->getAddrInputIdx();
+        request.dataIdx = loadPort->getDataResultIdx();
         request.cyclesToComplete = CYCLE_TIME_LOAD_OP;
         memControllerData.loadRequests.push_back(request);
       }
-      operandIndex++;
     }
-    bbIndex++;
   }
 
   return memControllerData;

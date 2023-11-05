@@ -773,41 +773,35 @@ struct HandshakeMCAddress
                                 PatternRewriter &rewriter) const override {
     unsigned optWidth =
         getOptAddrWidth(mcOp.getMemref().getType().getDimSize(0));
-    auto [_ctrlWidth, addrWidth, _dataWidth] = mcOp.getBitwidths();
 
-    if (addrWidth == 0 || optWidth >= addrWidth)
+    FuncMemoryPorts ports = mcOp.getPorts();
+    if (ports.addrWidth == 0 || optWidth >= ports.addrWidth)
       return failure();
 
     ValueRange inputs = mcOp.getInputs();
-    size_t inputIdx = 0;
-
     // Optimizes the bitwidth of the address channel currently being pointed to
     // by inputIdx, and increment inputIdx before returning the optimized value
-    auto getOptAddrInput = [&] {
-      return modVal({getMinimalValue(inputs[inputIdx++]), ExtType::LOGICAL},
+    auto getOptAddrInput = [&](unsigned inputIdx) {
+      return modVal({getMinimalValue(inputs[inputIdx]), ExtType::LOGICAL},
                     optWidth, rewriter);
     };
 
     // Iterate over memory controller inputs to create the new inputs and the
     // list of accesses
     SmallVector<Value> newInputs;
-    SmallVector<SmallVector<AccessTypeEnum>> newAccesses;
-    for (auto [blockIdx, accesses] : llvm::enumerate(mcOp.getAccesses())) {
-      auto blockAccesses = cast<ArrayAttr>(accesses);
-      if (mcOp.bbHasControl(blockIdx))
-        newInputs.push_back(inputs[inputIdx++]); // Control channel
+    for (BlockMemoryPorts &blockPorts : ports.blocks) {
+      // Handle eventual control input
+      if (blockPorts.hasControl())
+        newInputs.push_back(inputs[blockPorts.ctrlPort->getCtrlInputIdx()]);
 
-      newAccesses.push_back(SmallVector<AccessTypeEnum>());
-      auto &newBlockAccesses = newAccesses[newAccesses.size() - 1];
-      for (auto access : blockAccesses) {
-        auto accessType =
-            cast<handshake::AccessTypeEnumAttr>(access).getValue();
-        newBlockAccesses.push_back(accessType);
-        if (accessType == AccessTypeEnum::Load)
-          newInputs.push_back(getOptAddrInput());
-        else {
-          newInputs.push_back(getOptAddrInput());
-          newInputs.push_back(inputs[inputIdx++]); // Data channel
+      for (MemoryPort &port : blockPorts.accessPorts) {
+        if (std::optional<LoadPort> loadPort = dyn_cast<LoadPort>(port)) {
+          newInputs.push_back(getOptAddrInput(loadPort->getAddrInputIdx()));
+        } else {
+          std::optional<StorePort> storePort = dyn_cast<StorePort>(port);
+          assert(storePort && "port must be load or store");
+          newInputs.push_back(getOptAddrInput(storePort->getAddrInputIdx()));
+          newInputs.push_back(inputs[storePort->getDataInputIdx()]);
         }
       }
     }
@@ -815,7 +809,7 @@ struct HandshakeMCAddress
     // Replace the existing memory controller with the optimized one
     rewriter.setInsertionPoint(mcOp);
     auto newOp = rewriter.create<handshake::MemoryControllerOp>(
-        mcOp.getLoc(), mcOp.getMemref(), newInputs, newAccesses, mcOp.getId());
+        mcOp.getLoc(), mcOp.getMemref(), newInputs);
     inheritBB(mcOp, newOp);
     rewriter.replaceOp(mcOp, newOp.getResults());
     return success();

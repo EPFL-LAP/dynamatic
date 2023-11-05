@@ -134,7 +134,7 @@ exit_on_fail "Failed to apply Dynamatic transformations to cf" \
 
 # cf level -> handshake level
 "$DYNAMATIC_OPT_BIN" "$F_CF_DYN_TRANSFORMED" --allow-unregistered-dialect \
-  --lower-std-to-handshake-fpga18="id-basic-blocks" \
+  --lower-std-to-handshake-fpga18 \
   --handshake-fix-arg-names="source=$SRC_DIR/$KERNEL_NAME.c" \
   > "$F_HANDSHAKE"
 exit_on_fail "Failed to compile cf to handshake" "Compiled cf to handshake"

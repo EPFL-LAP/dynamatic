@@ -302,36 +302,19 @@ static std::string getExtModuleName(Operation *oldOp) {
       })
       .Case<handshake::MemoryControllerOp>(
           [&](handshake::MemoryControllerOp op) {
-            auto [ctrlWidth, addrWidth, dataWidth] = op.getBitwidths();
-            // data bitwidth
-            extModName += std::to_string(dataWidth);
-            // address bitwidth
-            extModName += '_' + std::to_string(addrWidth);
-            std::string temporaryName;
-
-            size_t lc = 0, sc = 0, ctrlCount = 0;
-            for (auto [idx, blockAccesses] :
-                 llvm::enumerate(op.getAccesses())) {
-              temporaryName += "_";
-              bool blockHasStores = false;
-              for (auto &access : cast<mlir::ArrayAttr>(blockAccesses))
-                if (cast<AccessTypeEnumAttr>(access).getValue() ==
-                    AccessTypeEnum::Load) {
-                  temporaryName += "L";
-                  lc++;
-                } else {
-                  temporaryName += "S";
-                  blockHasStores = true;
-                  sc++;
-                }
-              ctrlCount += blockHasStores ? 1 : 0;
-            }
-            // load_count
-            extModName += '_' + std::to_string(lc);
-            // store_count
-            extModName += '_' + std::to_string(sc);
-            // ctrl_count
-            extModName += '_' + std::to_string(ctrlCount);
+            FuncMemoryPorts ports = op.getPorts();
+            // Data bitwidth
+            extModName += std::to_string(ports.dataWidth);
+            // Address bitwidth
+            extModName += '_' + std::to_string(ports.addrWidth);
+            // Port counts
+            extModName +=
+                '_' +
+                std::to_string(ports.getNumPorts(MemoryPort::Kind::LOAD)) +
+                '_' +
+                std::to_string(ports.getNumPorts(MemoryPort::Kind::STORE)) +
+                '_' +
+                std::to_string(ports.getNumPorts(MemoryPort::Kind::CONTROL));
           })
       .Case<arith::AddFOp, arith::AddIOp, arith::AndIOp, arith::BitcastOp,
             arith::CeilDivSIOp, arith::CeilDivUIOp, arith::DivFOp,

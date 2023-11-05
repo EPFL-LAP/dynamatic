@@ -79,12 +79,11 @@ public:
   /// handshake::ReturnOp's, deleting all block terminators and non-entry
   /// blocks, merging the results of all return statements, and creating the
   /// region's end operation.
-  LogicalResult createReturnNetwork(ConversionPatternRewriter &rewriter,
-                                    bool idBasicBlocks);
+  LogicalResult createReturnNetwork(ConversionPatternRewriter &rewriter);
 };
 
 std::unique_ptr<dynamatic::DynamaticPass<false>>
-createStandardToHandshakeFPGA18Pass(bool idBasicBlocks = false);
+createStandardToHandshakeFPGA18Pass();
 
 } // namespace dynamatic
 

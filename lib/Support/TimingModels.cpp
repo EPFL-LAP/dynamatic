@@ -83,10 +83,9 @@ static unsigned getOpDatawidth(Operation *op) {
       })
       .Case<handshake::MemoryControllerOp>(
           [&](handshake::MemoryControllerOp memOp) {
-            auto bitwidths = memOp.getBitwidths();
-            return std::max(
-                std::get<0>(bitwidths),
-                std::max(std::get<1>(bitwidths), std::get<2>(bitwidths)));
+            FuncMemoryPorts ports = memOp.getPorts();
+            return std::max(ports.ctrlWidth,
+                            std::max(ports.addrWidth, ports.ctrlWidth));
           })
       .Default([&](auto) {
         op->emitError() << "Operation is unsupported in timing model";

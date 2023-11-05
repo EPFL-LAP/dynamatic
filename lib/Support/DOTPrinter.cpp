@@ -26,8 +26,10 @@
 #include "mlir/IR/Value.h"
 #include "mlir/Support/IndentedOstream.h"
 #include "llvm/ADT/TypeSwitch.h"
+#include "llvm/Support/ErrorHandling.h"
 #include <iomanip>
 #include <string>
+#include <utility>
 
 using namespace circt;
 using namespace circt::handshake;
@@ -231,33 +233,37 @@ static std::string getOutputForStoreOp(handshake::DynamaticStoreOp op) {
 static std::string getInputForMC(handshake::MemoryControllerOp op) {
   MemPortsData allPorts, dataPorts;
   unsigned ctrlIdx = 0, ldIdx = 0, stIdx = 0, inputIdx = 1;
-  size_t operandIdx = 0;
   ValueRange inputs = op.getInputs();
 
   // Add all control signals first
-  for (auto [idx, blockAccesses] : llvm::enumerate(op.getAccesses()))
-    if (op.bbHasControl(idx))
+  FuncMemoryPorts ports = op.getPorts();
+  for (BlockMemoryPorts &blockPorts : ports.blocks) {
+    if (blockPorts.hasControl())
       allPorts.emplace_back("in" + std::to_string(inputIdx++),
-                            inputs[operandIdx++],
+                            inputs[blockPorts.ctrlPort->getCtrlInputIdx()],
                             "c" + std::to_string(ctrlIdx++));
+  }
 
   // Then all memory access signals
-  for (auto [idx, blockAccesses] : llvm::enumerate(op.getAccesses())) {
+  for (BlockMemoryPorts &blockPorts : ports.blocks) {
     // Add loads and stores, in program order
-    for (auto &access : cast<mlir::ArrayAttr>(blockAccesses))
-      if (cast<AccessTypeEnumAttr>(access).getValue() == AccessTypeEnum::Load)
+    for (MemoryPort &port : blockPorts.accessPorts) {
+      if (std::optional<LoadPort> loadPort = dyn_cast<LoadPort>(port)) {
         dataPorts.emplace_back("in" + std::to_string(inputIdx++),
-                               inputs[operandIdx++],
+                               inputs[loadPort->getAddrInputIdx()],
                                "l" + std::to_string(ldIdx++) + "a");
-      else {
+      } else {
+        std::optional<StorePort> storePort = dyn_cast<StorePort>(port);
+        assert(storePort && "port must be load or store");
         // Address signal first, then data signal
         dataPorts.emplace_back("in" + std::to_string(inputIdx++),
-                               inputs[operandIdx++],
+                               inputs[storePort->getAddrInputIdx()],
                                "s" + std::to_string(stIdx) + "a");
         dataPorts.emplace_back("in" + std::to_string(inputIdx++),
-                               inputs[operandIdx++],
+                               inputs[storePort->getDataInputIdx()],
                                "s" + std::to_string(stIdx++) + "d");
       }
+    }
   }
 
   // Add data ports after control ports
@@ -289,51 +295,45 @@ static unsigned findMemoryPort(Value addressToMem) {
 
   // Iterate over memory accesses to find the one that matches the address
   // value
-  size_t inputIdx = 0;
-  auto memInputs = memOp.getInputs();
-  auto accesses = memOp.getAccesses();
-  for (auto [idx, bbAccesses] : llvm::enumerate(accesses)) {
-    if (memOp.bbHasControl(idx))
-      // Skip over the control value
-      inputIdx++;
-
-    for (auto [portIdx, access] :
-         llvm::enumerate(cast<mlir::ArrayAttr>(bbAccesses))) {
-      // Check whether this is our port
-      if (memInputs[inputIdx] == addressToMem)
-        return portIdx;
-
-      // Go to the index corresponding to the next memory operation in the
-      // block
-      if (cast<AccessTypeEnumAttr>(access).getValue() == AccessTypeEnum::Load)
-        inputIdx++;
-      else
-        inputIdx += 2;
+  ValueRange memInputs = memOp.getInputs();
+  FuncMemoryPorts ports = memOp.getPorts();
+  for (BlockMemoryPorts &blockPorts : ports.blocks) {
+    for (auto [portIdx, port] : llvm::enumerate(blockPorts.accessPorts)) {
+      if (std::optional<LoadPort> loadPort = dyn_cast<LoadPort>(port)) {
+        if (memInputs[loadPort->getAddrInputIdx()] == addressToMem)
+          return portIdx;
+      } else {
+        std::optional<StorePort> storePort = dyn_cast<StorePort>(port);
+        assert(storePort && "port must be load or store");
+        if (memInputs[storePort->getAddrInputIdx()] == addressToMem)
+          return portIdx;
+      }
     }
   }
 
-  assert(false && "can't determine memory port");
-  return 0;
+  llvm_unreachable("can't determine memory port");
 }
 
 static size_t findIndexInRange(ValueRange range, Value val) {
   for (auto [idx, res] : llvm::enumerate(range))
     if (res == val)
       return idx;
-  assert(false && "value should exist in range");
-  return 0;
+  llvm_unreachable("value should exist in range");
 }
 
 /// Finds the position (group index and operand index) of a value in the
 /// inputs of a memory interface.
-static std::pair<size_t, size_t>
-findValueInGroups(SmallVector<SmallVector<Value>> &groups, Value val) {
-  for (auto [groupIdx, bbOperands] : llvm::enumerate(groups))
-    for (auto [opIdx, operand] : llvm::enumerate(bbOperands))
-      if (val == operand)
-        return std::make_pair(groupIdx, opIdx);
-  assert(false && "value should be an operand to the memory interface");
-  return std::make_pair(0, 0);
+static std::pair<size_t, size_t> findValueInGroups(FuncMemoryPorts &ports,
+                                                   Value val) {
+  unsigned numBlocks = ports.getNumConnectedBlock();
+  for (size_t blockIdx = 0; blockIdx < numBlocks; ++blockIdx) {
+    for (auto [inputIdx, input] :
+         llvm::enumerate(ports.getBlockInputs(blockIdx))) {
+      if (input == val)
+        return std::make_pair(blockIdx, inputIdx);
+    }
+  }
+  llvm_unreachable("value should be an operand to the memory interface");
 }
 
 /// Transforms the port number associated to an edge endpoint to match the
@@ -367,25 +367,24 @@ static size_t fixPortNumber(Operation *op, Value val, size_t idx,
             // Legacy Dynamatic puts all control operands before all data
             // operands, whereas for us each control operand appears just
             // before the data inputs of the block it corresponds to
-            auto groups = memOp.groupInputsByBB();
+            FuncMemoryPorts ports = memOp.getPorts();
+
+            // auto groups = memOp.groupInputsByBB();
 
             // Determine total number of control operands
-            unsigned ctrlCount = 0;
-            for (size_t i = 0, e = groups.size(); i < e; i++)
-              if (memOp.bbHasControl(i))
-                ctrlCount++;
+            unsigned ctrlCount = ports.getNumPorts(MemoryPort::Kind::CONTROL);
 
             // Figure out where the value lies
-            auto [groupIdx, opIdx] = findValueInGroups(groups, val);
+            auto [groupIdx, opIdx] = findValueInGroups(ports, val);
 
             // Figure out at which index the value would be in legacy
             // Dynamatic's interface
-            bool valGroupHasControl = memOp.bbHasControl(groupIdx);
+            bool valGroupHasControl = ports.blocks[groupIdx].hasControl();
             if (opIdx == 0 && valGroupHasControl) {
               // Value is a control input
               size_t fixedIdx = 0;
               for (size_t i = 0; i < groupIdx; i++)
-                if (memOp.bbHasControl(i))
+                if (ports.blocks[i].hasControl())
                   fixedIdx++;
               return fixedIdx;
             }
@@ -394,10 +393,10 @@ static size_t fixPortNumber(Operation *op, Value val, size_t idx,
             size_t fixedIdx = ctrlCount;
             for (size_t i = 0; i < groupIdx; i++)
               // Add number of data inputs corresponding to the block
-              if (memOp.bbHasControl(i))
-                fixedIdx += groups[i].size() - 1;
+              if (ports.blocks[i].hasControl())
+                fixedIdx += ports.blocks[i].getNumInputs() - 1;
               else
-                fixedIdx += groups[i].size();
+                fixedIdx += ports.blocks[i].getNumInputs();
 
             // Add index offset in the group the value belongs to
             if (valGroupHasControl)
@@ -504,16 +503,13 @@ LogicalResult DOTPrinter::annotateNode(Operation *op,
                         .getArgName(argIdx)
                         .str();
 
-                // Compute the number of basic blocks with a control signal to
-                // the MC
-                unsigned numControls = 0;
-                for (size_t i = 0, e = memOp.getBBCount(); i < e; ++i)
-                  if (memOp.bbHasControl(i))
-                    ++numControls;
-
-                info.intAttr["bbcount"] = numControls;
-                info.intAttr["ldcount"] = memOp.getLdCount();
-                info.intAttr["stcount"] = memOp.getStCount();
+                FuncMemoryPorts ports = memOp.getPorts();
+                info.intAttr["bbcount"] =
+                    ports.getNumPorts(MemoryPort::Kind::CONTROL);
+                info.intAttr["ldcount"] =
+                    ports.getNumPorts(MemoryPort::Kind::LOAD);
+                info.intAttr["stcount"] =
+                    ports.getNumPorts(MemoryPort::Kind::STORE);
                 return info;
               })
           .Case<handshake::DynamaticLoadOp>([&](handshake::DynamaticLoadOp op) {
