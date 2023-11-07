@@ -82,15 +82,10 @@ static Value lowerAffineMapMin(OpBuilder &builder, Location loc, AffineMap map,
   return nullptr;
 }
 
-/// Copies attributes of interest to memref operation that replaces affine
-/// operation.
-static void copyAttributes(Operation *affineOp, Operation *memrefOp) {
-  auto accessName = MemAccessNameAttr::getMnemonic();
-  auto depsName = MemDependenceArrayAttr::getMnemonic();
-  if (auto attr = affineOp->getAttrOfType<MemAccessNameAttr>(accessName))
-    memrefOp->setAttr(accessName, attr);
-  if (auto attr = affineOp->getAttrOfType<MemDependenceArrayAttr>(depsName))
-    memrefOp->setAttr(depsName, attr);
+template <typename Attr>
+static inline void copyAttr(Operation *affineOp, Operation *memrefOp) {
+  if (auto attr = affineOp->getAttrOfType<Attr>(Attr::getMnemonic()))
+    memrefOp->setAttr(Attr::getMnemonic(), attr);
 }
 
 namespace {
@@ -356,7 +351,7 @@ public:
     auto loadOp = rewriter.replaceOpWithNewOp<memref::LoadOp>(
         op, op.getMemRef(), *resultOperands);
 
-    copyAttributes(op, loadOp);
+    copyAttr<handshake::MemDependenceArrayAttr>(op, loadOp);
     return success();
   }
 };
@@ -405,7 +400,7 @@ public:
     auto storeOp = rewriter.replaceOpWithNewOp<memref::StoreOp>(
         op, op.getValueToStore(), op.getMemRef(), *maybeExpandedMap);
 
-    copyAttributes(op, storeOp);
+    copyAttr<handshake::MemDependenceArrayAttr>(op, storeOp);
     return success();
   }
 };

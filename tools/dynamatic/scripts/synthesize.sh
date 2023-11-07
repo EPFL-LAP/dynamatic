@@ -106,8 +106,7 @@ exit_on_fail "Failed to compile source to affine" "Compiled source to affine"
     
 # affine level -> scf level
 "$DYNAMATIC_OPT_BIN" "$F_AFFINE" --allow-unregistered-dialect \
-  --name-memory-ops --analyze-memory-accesses --lower-affine-to-scf \
-  --scf-simple-if-to-select --scf-rotate-for-loops \
+  --lower-affine-to-scf --scf-simple-if-to-select --scf-rotate-for-loops \
   > "$F_SCF"
 exit_on_fail "Failed to compile affine to scf" "Compiled affine to scf"
 

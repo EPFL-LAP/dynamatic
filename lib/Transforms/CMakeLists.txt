@@ -10,7 +10,6 @@ add_dynamatic_library(DynamaticTransforms
   HandshakeOptimizeBitwidths.cpp
   HandshakePrepareForLegacy.cpp
   HandshakeInferBasicBlocks.cpp
-  NameMemoryOps.cpp
   OperationNames.cpp
   PushConstants.cpp
   ScfRotateForLoops.cpp
