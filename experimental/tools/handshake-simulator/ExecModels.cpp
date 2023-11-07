@@ -138,16 +138,16 @@ parseOperandIndex(circt::handshake::MemoryControllerOp &op, unsigned cycle) {
       request.lastExecution = 0;
       if (std::optional<StorePort> storePort = dyn_cast<StorePort>(port)) {
         request.isLoad = true;
-        request.addressIdx = storePort->getAddrInputIdx();
-        request.dataIdx = storePort->getDataInputIdx();
+        request.addressIdx = storePort->getAddrInputIndex();
+        request.dataIdx = storePort->getDataInputIndex();
         request.cyclesToComplete = CYCLE_TIME_STORE_OP;
         memControllerData.storeRequests.push_back(request);
       } else {
         std::optional<LoadPort> loadPort = dyn_cast<LoadPort>(port);
         assert(loadPort && "port must be load or store");
         request.isLoad = false;
-        request.addressIdx = loadPort->getAddrInputIdx();
-        request.dataIdx = loadPort->getDataResultIdx();
+        request.addressIdx = loadPort->getAddrInputIndex();
+        request.dataIdx = loadPort->getDataOutputIndex();
         request.cyclesToComplete = CYCLE_TIME_LOAD_OP;
         memControllerData.loadRequests.push_back(request);
       }

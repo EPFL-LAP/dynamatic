@@ -233,14 +233,14 @@ static std::string getOutputForStoreOp(handshake::DynamaticStoreOp op) {
 static std::string getInputForMC(handshake::MemoryControllerOp op) {
   MemPortsData allPorts, dataPorts;
   unsigned ctrlIdx = 0, ldIdx = 0, stIdx = 0, inputIdx = 1;
-  ValueRange inputs = op.getInputs();
+  ValueRange inputs = op.getMemInputs();
 
   // Add all control signals first
   FuncMemoryPorts ports = op.getPorts();
   for (BlockMemoryPorts &blockPorts : ports.blocks) {
     if (blockPorts.hasControl())
       allPorts.emplace_back("in" + std::to_string(inputIdx++),
-                            inputs[blockPorts.ctrlPort->getCtrlInputIdx()],
+                            inputs[blockPorts.ctrlPort->getCtrlInputIndex()],
                             "c" + std::to_string(ctrlIdx++));
   }
 
@@ -250,17 +250,17 @@ static std::string getInputForMC(handshake::MemoryControllerOp op) {
     for (MemoryPort &port : blockPorts.accessPorts) {
       if (std::optional<LoadPort> loadPort = dyn_cast<LoadPort>(port)) {
         dataPorts.emplace_back("in" + std::to_string(inputIdx++),
-                               inputs[loadPort->getAddrInputIdx()],
+                               inputs[loadPort->getAddrInputIndex()],
                                "l" + std::to_string(ldIdx++) + "a");
       } else {
         std::optional<StorePort> storePort = dyn_cast<StorePort>(port);
         assert(storePort && "port must be load or store");
         // Address signal first, then data signal
         dataPorts.emplace_back("in" + std::to_string(inputIdx++),
-                               inputs[storePort->getAddrInputIdx()],
+                               inputs[storePort->getAddrInputIndex()],
                                "s" + std::to_string(stIdx) + "a");
         dataPorts.emplace_back("in" + std::to_string(inputIdx++),
-                               inputs[storePort->getDataInputIdx()],
+                               inputs[storePort->getDataInputIndex()],
                                "s" + std::to_string(stIdx++) + "d");
       }
     }
@@ -295,17 +295,17 @@ static unsigned findMemoryPort(Value addressToMem) {
 
   // Iterate over memory accesses to find the one that matches the address
   // value
-  ValueRange memInputs = memOp.getInputs();
+  ValueRange memInputs = memOp.getMemInputs();
   FuncMemoryPorts ports = memOp.getPorts();
   for (BlockMemoryPorts &blockPorts : ports.blocks) {
     for (auto [portIdx, port] : llvm::enumerate(blockPorts.accessPorts)) {
       if (std::optional<LoadPort> loadPort = dyn_cast<LoadPort>(port)) {
-        if (memInputs[loadPort->getAddrInputIdx()] == addressToMem)
+        if (memInputs[loadPort->getAddrInputIndex()] == addressToMem)
           return portIdx;
       } else {
         std::optional<StorePort> storePort = dyn_cast<StorePort>(port);
         assert(storePort && "port must be load or store");
-        if (memInputs[storePort->getAddrInputIdx()] == addressToMem)
+        if (memInputs[storePort->getAddrInputIndex()] == addressToMem)
           return portIdx;
       }
     }

@@ -778,7 +778,7 @@ struct HandshakeMCAddress
     if (ports.addrWidth == 0 || optWidth >= ports.addrWidth)
       return failure();
 
-    ValueRange inputs = mcOp.getInputs();
+    ValueRange inputs = mcOp.getMemInputs();
     // Optimizes the bitwidth of the address channel currently being pointed to
     // by inputIdx, and increment inputIdx before returning the optimized value
     auto getOptAddrInput = [&](unsigned inputIdx) {
@@ -792,16 +792,16 @@ struct HandshakeMCAddress
     for (BlockMemoryPorts &blockPorts : ports.blocks) {
       // Handle eventual control input
       if (blockPorts.hasControl())
-        newInputs.push_back(inputs[blockPorts.ctrlPort->getCtrlInputIdx()]);
+        newInputs.push_back(inputs[blockPorts.ctrlPort->getCtrlInputIndex()]);
 
       for (MemoryPort &port : blockPorts.accessPorts) {
         if (std::optional<LoadPort> loadPort = dyn_cast<LoadPort>(port)) {
-          newInputs.push_back(getOptAddrInput(loadPort->getAddrInputIdx()));
+          newInputs.push_back(getOptAddrInput(loadPort->getAddrInputIndex()));
         } else {
           std::optional<StorePort> storePort = dyn_cast<StorePort>(port);
           assert(storePort && "port must be load or store");
-          newInputs.push_back(getOptAddrInput(storePort->getAddrInputIdx()));
-          newInputs.push_back(inputs[storePort->getDataInputIdx()]);
+          newInputs.push_back(getOptAddrInput(storePort->getAddrInputIndex()));
+          newInputs.push_back(inputs[storePort->getDataInputIndex()]);
         }
       }
     }
@@ -809,7 +809,8 @@ struct HandshakeMCAddress
     // Replace the existing memory controller with the optimized one
     rewriter.setInsertionPoint(mcOp);
     auto newOp = rewriter.create<handshake::MemoryControllerOp>(
-        mcOp.getLoc(), mcOp.getMemref(), newInputs);
+        mcOp.getLoc(), mcOp.getMemref(), newInputs,
+        mcOp.getPorts().getNumLoadPorts());
     inheritBB(mcOp, newOp);
     rewriter.replaceOp(mcOp, newOp.getResults());
     return success();

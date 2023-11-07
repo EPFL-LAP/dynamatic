@@ -471,7 +471,7 @@ static ModulePortInfo getMemPortInfo(handshake::MemoryControllerOp memOp,
   }
 
   // Add input ports corresponding to memory interface operands
-  for (auto [idx, arg] : llvm::enumerate(memOp.getInputs()))
+  for (auto [idx, arg] : llvm::enumerate(memOp.getMemInputs()))
     ports.inputs.push_back({StringAttr::get(ctx, memOp.getOperandName(idx + 1)),
                             hw::PortDirection::INPUT, esiWrapper(arg.getType()),
                             inPortIdx++, hw::InnerSymAttr{}});
@@ -764,8 +764,8 @@ SmallVector<hw::InstanceOp> FuncOpConversionPattern::convertMemories(
               e = portIndices.first + FuncModulePortInfo::NUM_MEM_INPUTS;
          i < e; i++)
       operands.push_back(mod.getArgument(i));
-    operands.insert(operands.end(), memOp.getInputs().begin(),
-                    memOp.getInputs().end());
+    operands.insert(operands.end(), memOp.getMemInputs().begin(),
+                    memOp.getMemInputs().end());
     addClkAndRstOperands(operands, mod);
 
     // Create instance of memory interface

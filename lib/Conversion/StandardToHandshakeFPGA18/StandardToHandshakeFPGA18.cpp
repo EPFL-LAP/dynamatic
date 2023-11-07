@@ -329,35 +329,37 @@ HandshakeLoweringFPGA18::connectToMemory(ConversionPatternRewriter &rewriter,
   // Connect memories (externally defined by memref block argument) to their
   // respective loads and stores
   for (auto &[memref, memBlockOps] : memInfo) {
-
     // Derive memory interface inputs from operations interacting with it
     SmallVector<Value> memInputs;
 
+    unsigned numLoads = 0;
     for (auto &[block, memOps] : memBlockOps) {
-
-      // Traverse the list of operations once to determine the ordering of loads
-      // and stores
-      unsigned stCount = 0;
-      for (auto *op : memOps) {
+      // Traverse the list of operations once to determine the number of stores
+      // (and accumulate the total number of loads)
+      unsigned numStores = 0;
+      for (Operation *op : memOps) {
         if (isa<handshake::DynamaticStoreOp>(op))
-          ++stCount;
+          ++numStores;
+        else
+          ++numLoads;
       }
 
-      if (stCount > 0) {
+      if (numStores > 0) {
         // Add control signal from block, fed through a constant indicating the
         // number of stores in the block (to eventually indicate block
         // completion to the end node)
-        auto blockCtrl = getBlockEntryControl(block);
+        Value blockCtrl = getBlockEntryControl(block);
         rewriter.setInsertionPointAfter(blockCtrl.getDefiningOp());
-        auto cstNumStore = rewriter.create<handshake::ConstantOp>(
-            blockCtrl.getLoc(), rewriter.getI32Type(),
-            rewriter.getI32IntegerAttr(stCount), blockCtrl);
+        handshake::ConstantOp cstNumStore =
+            rewriter.create<handshake::ConstantOp>(
+                blockCtrl.getLoc(), rewriter.getI32Type(),
+                rewriter.getI32IntegerAttr(numStores), blockCtrl);
         memInputs.push_back(cstNumStore.getResult());
       }
 
       // Traverse the list of operations once more and accumulate memory inputs
       // coming from the block
-      for (auto *op : memOps) {
+      for (Operation *op : memOps) {
         // Add results of memory operation to memory interface operands
         SmallVector<Value, 2> results = getResultsToMemory(op);
         memInputs.insert(memInputs.end(), results.begin(), results.end());
@@ -367,13 +369,14 @@ HandshakeLoweringFPGA18::connectToMemory(ConversionPatternRewriter &rewriter,
     // Create memory interface at the top of the function
     Block *entryBlock = &r.front();
     rewriter.setInsertionPointToStart(entryBlock);
-    auto memInterface = rewriter.create<handshake::MemoryControllerOp>(
-        entryBlock->front().getLoc(), memref, memInputs);
+    handshake::MemoryControllerOp memInterface =
+        rewriter.create<handshake::MemoryControllerOp>(
+            entryBlock->front().getLoc(), memref, memInputs, numLoads);
 
     // Add data result from memory to each load operation's operands
     unsigned memResultIdx = 0;
     for (auto &[block, memOps] : memBlockOps)
-      for (auto *op : memOps)
+      for (Operation *op : memOps)
         if (isa<handshake::DynamaticLoadOp>(op))
           addLoadDataOperand(op, memInterface->getResult(memResultIdx++));
   }
