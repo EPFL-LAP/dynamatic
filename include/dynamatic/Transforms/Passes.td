@@ -53,7 +53,8 @@ def ScfForLoopRotation : DynamaticPass<"scf-rotate-for-loops"> {
   let constructor = "dynamatic::createScfRotateForLoops()";
 }
 
-def ScfSimpleIfToSelect : DynamaticPass<"scf-simple-if-to-select"> {
+def ScfSimpleIfToSelect : DynamaticPass<"scf-simple-if-to-select", "false",
+                                        ["mlir::arith::ArithDialect"]> {
   let summary = "Transforms if's with simple bodies into select's.";
   let description = [{
     Transforms scf::IfOp operations with one result and a specific internal
@@ -73,7 +74,6 @@ def ScfSimpleIfToSelect : DynamaticPass<"scf-simple-if-to-select"> {
         operation.
   }];
   let constructor = "dynamatic::createScfSimpleIfToSelect()";
-  let dependentDialects = ["mlir::arith::ArithDialect"];
 }
 
 //===----------------------------------------------------------------------===//
@@ -118,7 +118,9 @@ def HandshakePrepareForLegacy : DynamaticPass<"handshake-prepare-for-legacy"> {
   let constructor = "dynamatic::createHandshakePrepareForLegacy()";
 }
 
-def HandshakeOptimizeBitwidths : DynamaticPass<"handshake-optimize-bitwidths"> {
+def HandshakeOptimizeBitwidths : DynamaticPass< "handshake-optimize-bitwidths", 
+                                                "false",
+                                                ["mlir::arith::ArithDialect"]> {
   let summary = "Optimize bitwidths of all channels.";
   let description = [{
     Reduces the bitwidths of channels wherever possible. Uses a standard
@@ -127,7 +129,6 @@ def HandshakeOptimizeBitwidths : DynamaticPass<"handshake-optimize-bitwidths"> {
     the Handhsake level.
   }];
   let constructor = "dynamatic::createHandshakeOptimizeBitwidths()";
-  let dependentDialects = ["mlir::arith::ArithDialect"];
   let options = [Option<"legacy", "legacy", "bool", "false",
     "When legacy mode is enabled, disables bitwidth optimization of memory "
     "address channels since they sometime make the legacy dot2vhdl tool "
@@ -151,7 +152,9 @@ def HandshakeConcretizeIndexType : DynamaticPass<"handshake-concretize-index-typ
             "the pass will fail.">];
 }
 
-def HandshakeMinimizeCstWidth : DynamaticPass<"handshake-minimize-cst-width"> {
+def HandshakeMinimizeCstWidth : DynamaticPass<"handshake-minimize-cst-width",
+                                              "false",
+                                              ["mlir::arith::ArithDialect"]> {
   let summary = "Minimizes the bitwidth of all Handshake constants.";
   let description = [{
     Rewrites constant operations with the minimum required bitwidth to support
@@ -161,7 +164,6 @@ def HandshakeMinimizeCstWidth : DynamaticPass<"handshake-minimize-cst-width"> {
     minimization process.
   }];
   let constructor = "dynamatic::createHandshakeMinimizeCstWidth()";
-  let dependentDialects = ["mlir::arith::ArithDialect"];
   let options =
     [Option<"optNegatives", "opt-negatives", "bool", "false",
             "If true, allows bitwidth optimization of negative values.">];
@@ -179,7 +181,6 @@ def HandshakeSetBufferingProperties :
   }];
   let constructor =
     "dynamatic::buffer::createHandshakeSetBufferingProperties()"; 
-  let dependentDialects = ["circt::handshake::HandshakeDialect"];
   let options =
     [Option<"version", "version", "std::string", "\"fpga20\"",
             "Set of buffering properties to apply. Options are: fpga20 "
@@ -251,7 +252,6 @@ def AnalyzeMemoryAccesses : DynamaticPass<"analyze-memory-accesses"> {
     between two affine accesses.
   }];
   let constructor = "dynamatic::createAnalyzeMemoryAccesses()";
-  let dependentDialects = ["circt::handshake::HandshakeDialect"];
 }
 
 def BackAnnotate : DynamaticPass<"back-annotate"> {
@@ -265,13 +265,13 @@ def BackAnnotate : DynamaticPass<"back-annotate"> {
     cannot be found in the IR.
   }];
   let constructor = "dynamatic::createBackAnnotate()";
-  let dependentDialects = ["circt::handshake::HandshakeDialect"];
     let options =
     [Option<"filepath", "filepath", "std::string", "\"\"",
             "Path to JSON-formatted back-annotation file">];
 }
 
-def FlattenMemRefRowMajor : DynamaticPass<"flatten-memref-row-major"> {
+def FlattenMemRefRowMajor : DynamaticPass<"flatten-memref-row-major", "false",
+                                          ["mlir::memref::MemRefDialect"]> {
   let summary = "Flatten memrefs (row-major order)";
   let description = [{
     Flattens multidimensional memories and accesses to them into
@@ -280,7 +280,6 @@ def FlattenMemRefRowMajor : DynamaticPass<"flatten-memref-row-major"> {
     of column-major indexing when converting multidimensional load/store
     operations.}];
   let constructor = "dynamatic::createFlattenMemRefRowMajorPass()";
-  let dependentDialects = ["mlir::memref::MemRefDialect"];
 }
 
 def ForceMemoryInterface : DynamaticPass<"force-memory-interface"> {
@@ -294,7 +293,6 @@ def ForceMemoryInterface : DynamaticPass<"force-memory-interface"> {
     be provided at the same time.
   }];
   let constructor = "dynamatic::createForceMemoryInterface()";
-  let dependentDialects = ["circt::handshake::HandshakeDialect"];
   let options = [
     Option<"forceLSQ", "force-lsq", "bool", "false",
       "Whether to force the placement of LSQs in the circuit after Handshake "
@@ -331,7 +329,6 @@ def NameMemoryOps : DynamaticPass<"name-memory-ops"> {
     has one such attribute.
   }];
   let constructor = "dynamatic::createNameMemoryOps()";
-  let dependentDialects = ["circt::handshake::HandshakeDialect"];
 }
 
 def PushConstants : DynamaticPass<"push-constants"> {
