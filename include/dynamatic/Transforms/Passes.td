@@ -283,6 +283,28 @@ def FlattenMemRefRowMajor : DynamaticPass<"flatten-memref-row-major"> {
   let dependentDialects = ["mlir::memref::MemRefDialect"];
 }
 
+def ForceMemoryInterface : DynamaticPass<"force-memory-interface"> {
+  let summary = "Forces the use of a single type of memory interface";
+  let description = [{
+    Forces the type of memory interface that will be placed for all memory
+    operations (i.e., operations that implement the `MemoryEffectOpInterface`)
+    when lowering to Handshake. Internally, this sets (force MCs) or removes
+    (force LSQs) the  `circt::handshake::NoLSQAttr` singleton attribute on/from
+    all memory operations in the IR. Exactly one of the two pass options should
+    be provided at the same time.
+  }];
+  let constructor = "dynamatic::createForceMemoryInterface()";
+  let dependentDialects = ["circt::handshake::HandshakeDialect"];
+  let options = [
+    Option<"forceLSQ", "force-lsq", "bool", "false",
+      "Whether to force the placement of LSQs in the circuit after Handshake "
+      "lowering (off by default, mutually exclusice with force-mc).">,
+    Option<"forceMC", "force-mc", "bool", "false",
+      "Whether to force the placement of MCs in the circuit after Handshake "
+      "lowering (off by default, mutually exclusice with force-lsq).">
+  ];
+}
+
 def NameAllOperations : Pass<"name-all-operations", "mlir::ModuleOp"> {
   let summary = "Gives a unique name to each operation in the IR.";
   let description = [{
