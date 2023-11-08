@@ -1,4 +1,4 @@
-//===- OperandAttribute.h - Attach attributes to operands -------*- C++ -*-===//
+//===- Attribute.h - Support for Dynamatic (operand) attributes -*- C++ -*-===//
 //
 // Dynamatic is under the Apache License v2.0 with LLVM Exceptions.
 // See https://llvm.org/LICENSE.txt for license information.
@@ -6,8 +6,8 @@
 //
 //===----------------------------------------------------------------------===//
 //
-// Infrastructure to work with attributes that are semantically set on IR
-// operands rather than operations.
+// Helpers to work with attributes in general but particulalry on attributes
+// that are semantically set on IR operands rather than operations.
 //
 // It is impossible to set attributes on MLIR SSA values directly, therefore
 // we opt to set "operand attributes" on the operation whose operands are being
@@ -69,19 +69,37 @@
 #include "mlir/IR/Operation.h"
 #include "mlir/IR/Value.h"
 
-namespace dynamatic {
-
 /// Converts the attribute's name to an unsigned number. Asserts if the
 /// attribute name doesn't represent a valid index (the verification function of
 /// operand container attributes should prevent this from happening, but a user
 /// may provide an incorrect attribute as template parameter to the get/set
 /// functions).
-static inline size_t toIdx(const NamedAttribute &attr) {
+static inline size_t toIdx(const mlir::NamedAttribute &attr) {
   std::string str = attr.getName().str();
   bool validNumber = std::all_of(str.begin(), str.end(),
                                  [](char c) { return std::isdigit(c); });
   assert(validNumber && "invalid index");
   return stoi(str);
+}
+
+namespace dynamatic {
+
+/// Copies an attribute of type `Attr` from the source operation to the
+/// destination operation, if one exists with the same name as the attribute
+/// type's mnemonic.
+template <typename Attr>
+static inline void copyAttr(Operation *srcOp, Operation *dstOp) {
+  if (auto attr = srcOp->getAttrOfType<Attr>(Attr::getMnemonic()))
+    dstOp->setAttr(Attr::getMnemonic(), attr);
+}
+
+/// Copies attributes of all provided template types from the source operation
+/// to the destination operation, if each exists with the same name as their
+/// attribute type mnemonic.
+template <typename FirstAttr, typename SecondAttr, typename... RestAttr>
+static inline void copyAttr(Operation *srcOp, Operation *dstOp) {
+  copyAttr<FirstAttr>(srcOp, dstOp);
+  copyAttr<SecondAttr, RestAttr...>(srcOp, dstOp);
 }
 
 /// Casts the attribute's value to the template attribute type.

@@ -31,7 +31,7 @@
 #include "dynamatic/Transforms/BackAnnotate.h"
 #include "circt/Dialect/Handshake/HandshakeOps.h"
 #include "dynamatic/Analysis/NameAnalysis.h"
-#include "dynamatic/Support/OperandAttribute.h"
+#include "dynamatic/Support/Attribute.h"
 #include "dynamatic/Support/TimingModels.h"
 #include "mlir/IR/Attributes.h"
 #include "mlir/IR/MLIRContext.h"

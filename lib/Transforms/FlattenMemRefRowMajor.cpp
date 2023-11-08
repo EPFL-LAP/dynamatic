@@ -13,6 +13,7 @@
 //===----------------------------------------------------------------------===//
 
 #include "dynamatic/Transforms/FlattenMemRefRowMajor.h"
+#include "dynamatic/Support/Attribute.h"
 #include "dynamatic/Transforms/PassDetails.h"
 #include "mlir/Conversion/LLVMCommon/ConversionTarget.h"
 #include "mlir/Conversion/LLVMCommon/Pattern.h"
@@ -29,9 +30,10 @@
 #include "llvm/Support/MathExtras.h"
 
 using namespace mlir;
+using namespace circt;
 using namespace dynamatic;
 
-bool isUniDimensional(MemRefType memref) {
+static inline bool isUniDimensional(MemRefType memref) {
   return memref.getShape().size() == 1;
 }
 
@@ -109,9 +111,10 @@ struct LoadOpConversion : public OpConversionPattern<memref::LoadOp> {
       return failure();
     Value finalIdx =
         flattenIndices(rewriter, op, adaptor.getIndices(), op.getMemRefType());
-    rewriter.replaceOpWithNewOp<memref::LoadOp>(op, adaptor.getMemref(),
-
-                                                SmallVector<Value>{finalIdx});
+    memref::LoadOp newLoadOp = rewriter.replaceOpWithNewOp<memref::LoadOp>(
+        op, adaptor.getMemref(), SmallVector<Value>{finalIdx});
+    copyAttr<handshake::MemDependenceArrayAttr, handshake::NoLSQAttr>(
+        op, newLoadOp);
     return success();
   }
 };
@@ -128,9 +131,11 @@ struct StoreOpConversion : public OpConversionPattern<memref::StoreOp> {
       return failure();
     Value finalIdx =
         flattenIndices(rewriter, op, adaptor.getIndices(), op.getMemRefType());
-    rewriter.replaceOpWithNewOp<memref::StoreOp>(op, adaptor.getValue(),
-                                                 adaptor.getMemref(),
-                                                 SmallVector<Value>{finalIdx});
+    memref::StoreOp newStoreOp = rewriter.replaceOpWithNewOp<memref::StoreOp>(
+        op, adaptor.getValue(), adaptor.getMemref(),
+        SmallVector<Value>{finalIdx});
+    copyAttr<handshake::MemDependenceArrayAttr, handshake::NoLSQAttr>(
+        op, newStoreOp);
     return success();
   }
 };

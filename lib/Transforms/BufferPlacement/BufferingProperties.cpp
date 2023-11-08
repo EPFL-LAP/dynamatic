@@ -13,7 +13,7 @@
 
 #include "dynamatic/Transforms/BufferPlacement/BufferingProperties.h"
 #include "circt/Dialect/Handshake/HandshakeOps.h"
-#include "dynamatic/Support/OperandAttribute.h"
+#include "dynamatic/Support/Attribute.h"
 #include "mlir/IR/Attributes.h"
 #include "mlir/IR/Value.h"
 #include "mlir/Support/LogicalResult.h"

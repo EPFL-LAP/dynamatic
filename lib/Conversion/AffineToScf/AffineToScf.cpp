@@ -15,6 +15,7 @@
 #include "dynamatic/Conversion/AffineToScf.h"
 #include "circt/Dialect/Handshake/HandshakeOps.h"
 #include "dynamatic/Conversion/PassDetails.h"
+#include "dynamatic/Support/Attribute.h"
 #include "dynamatic/Support/DynamaticPass.h"
 #include "mlir/Conversion/AffineToStandard/AffineToStandard.h"
 #include "mlir/Dialect/Affine/IR/AffineOps.h"
@@ -80,12 +81,6 @@ static Value lowerAffineMapMin(OpBuilder &builder, Location loc, AffineMap map,
     return buildMinMaxReductionSeq(loc, arith::CmpIPredicate::slt, *values,
                                    builder);
   return nullptr;
-}
-
-template <typename Attr>
-static inline void copyAttr(Operation *affineOp, Operation *memrefOp) {
-  if (auto attr = affineOp->getAttrOfType<Attr>(Attr::getMnemonic()))
-    memrefOp->setAttr(Attr::getMnemonic(), attr);
 }
 
 namespace {
@@ -351,7 +346,8 @@ public:
     auto loadOp = rewriter.replaceOpWithNewOp<memref::LoadOp>(
         op, op.getMemRef(), *resultOperands);
 
-    copyAttr<handshake::MemDependenceArrayAttr>(op, loadOp);
+    copyAttr<handshake::MemDependenceArrayAttr, handshake::NoLSQAttr>(op,
+                                                                      loadOp);
     return success();
   }
 };
@@ -400,7 +396,8 @@ public:
     auto storeOp = rewriter.replaceOpWithNewOp<memref::StoreOp>(
         op, op.getValueToStore(), op.getMemRef(), *maybeExpandedMap);
 
-    copyAttr<handshake::MemDependenceArrayAttr>(op, storeOp);
+    copyAttr<handshake::MemDependenceArrayAttr, handshake::NoLSQAttr>(op,
+                                                                      storeOp);
     return success();
   }
 };
