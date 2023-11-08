@@ -20,8 +20,6 @@
 #include "dynamatic/Support/LLVM.h"
 #include "mlir/Transforms/DialectConversion.h"
 
-#include <memory>
-
 using namespace circt;
 using namespace circt::handshake;
 
@@ -33,15 +31,13 @@ namespace dynamatic {
 // pass.
 class HandshakeLoweringFPGA18 : public HandshakeLowering {
 public:
-  /// Used to store a list of operations grouped by their parent basic block.
-  /// Defined with a SmallVector instead of a DenseMap to ensure deterministic
-  /// iteration order.
-  using MemBlockOps = SmallVector<std::pair<Block *, std::vector<Operation *>>>;
+  /// Stores a list of opeartions grouped by the basic block they belong to.
+  using MemBlockOps = llvm::MapVector<Block *, SmallVector<Operation *>>;
 
-  /// Used to store a "mapping" between memrefs and the set of operations
-  /// referencing them, grouped by their parent block. Defined with a
-  /// SmallVector instead of a DenseMap to ensure deterministic iteration order.
-  using MemInterfacesInfo = SmallVector<std::pair<Value, MemBlockOps>>;
+  /// Store a mapping between memory interfaces (identified by the function
+  /// argument they correspond to) and the set of memory operations referencing
+  /// them grouped by their owning block.
+  using MemInterfacesInfo = llvm::MapVector<Value, MemBlockOps>;
 
   /// Constructor simply forwards its arguments to the parent class.
   explicit HandshakeLoweringFPGA18(Region &r) : HandshakeLowering(r) {}

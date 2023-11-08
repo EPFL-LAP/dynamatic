@@ -81,45 +81,7 @@ static LogicalResult getOpMemRef(Operation *op, Value &out) {
   }
   if (out != Value())
     return success();
-  return op->emitOpError("Unknown Op type");
-}
-
-/// Adds a new operation (along with its parent block) to memory interfaces
-/// identified so far in the function. If the operation references a so far
-/// unencoutnered memory interface, the latter is added to the set of known
-/// interfaces first.
-static void
-addOpToMemInterfaces(HandshakeLoweringFPGA18::MemInterfacesInfo &memInfo,
-                     Value memref, Operation *op) {
-
-  Block *opBlock = op->getBlock();
-
-  // Search for the memory interface represented by memref
-  for (auto &[interface, blockOps] : memInfo)
-    if (memref == interface) {
-      // Search for the block the operation belongs to
-      for (auto &[block, ops] : blockOps)
-        if (opBlock == block) {
-          // Add the operation to the block
-          ops.push_back(op);
-          return;
-        }
-
-      // Add a new block to the memory interface, along with the memory
-      // operation within the block
-      std::vector<Operation *> newOps;
-      newOps.push_back(op);
-      blockOps.push_back(std::make_pair(opBlock, newOps));
-      return;
-    }
-
-  // Add a new memory interface, along with the new block and the memory
-  // operation within it
-  std::vector<Operation *> newOps;
-  newOps.push_back(op);
-  HandshakeLoweringFPGA18::MemBlockOps newBlock;
-  newBlock.push_back(std::make_pair(opBlock, newOps));
-  memInfo.push_back(std::make_pair(memref, newBlock));
+  return op->emitOpError() << "Unknown operation type.";
 }
 
 /// Returns load/store results which are to be given as operands to a
@@ -226,35 +188,30 @@ LogicalResult HandshakeLoweringFPGA18::createControlOnlyNetwork(
 LogicalResult HandshakeLoweringFPGA18::replaceMemoryOps(
     ConversionPatternRewriter &rewriter,
     HandshakeLoweringFPGA18::MemInterfacesInfo &memInfo) {
-  std::vector<Operation *> opsToErase;
 
   // Make sure to record external memories passed as function arguments, even if
   // they aren't used by any memory operation
-  for (auto arg : r.getArguments()) {
-    auto memrefType = dyn_cast<mlir::MemRefType>(arg.getType());
-    if (!memrefType)
-      continue;
-
-    // Ensure that this is a valid memref-typed value.
-    if (!isValidMemrefType(arg.getLoc(), memrefType))
-      return failure();
-
-    SmallVector<std::pair<Block *, std::vector<Operation *>>> emptyOps;
-    memInfo.push_back(std::make_pair(arg, emptyOps));
+  for (BlockArgument arg : r.getArguments()) {
+    if (mlir::MemRefType memref = dyn_cast<mlir::MemRefType>(arg.getType())) {
+      // Ensure that this is a valid memref-typed value.
+      if (!isValidMemrefType(arg.getLoc(), memref))
+        return failure();
+      memInfo[arg] = {};
+    }
   }
 
   // Replace load and store ops with the corresponding handshake ops
   // Need to traverse ops in blocks to store them in memRefOps in program
   // order
-  for (Operation &op : r.getOps()) {
+  for (Operation &op : llvm::make_early_inc_range(r.getOps())) {
     if (!isMemoryOp(&op))
       continue;
 
-    // For now, we don´t support memory allocations within the kernels
-    if (isAllocOp(&op)) {
-      op.emitOpError("allocation operations not supported");
-      return failure();
-    }
+    // For now we don´t support memory allocations within the kernels
+    if (isAllocOp(&op))
+      return op.emitOpError()
+             << "Allocation operations are not supported during "
+                "cf-to-handshake lowering.";
 
     rewriter.setInsertionPoint(&op);
     Value memref;
@@ -284,17 +241,10 @@ LogicalResult HandshakeLoweringFPGA18::replaceMemoryOps(
           return op.emitOpError("Load/store operation cannot be handled.");
         });
 
-    // Record operation along the memory interface it uses
-    addOpToMemInterfaces(memInfo, memref, newOp);
-
-    // Old memory operation should be erased
-    opsToErase.push_back(&op);
-  }
-
-  // Erase old memory operations
-  for (auto *op : opsToErase) {
-    op->eraseOperands(0, op->getNumOperands());
-    rewriter.eraseOp(op);
+    // Record new operation along the memory interface it uses and delete the
+    // now unused old operation
+    memInfo[memref][newOp->getBlock()].push_back(newOp);
+    rewriter.eraseOp(&op);
   }
 
   return success();
