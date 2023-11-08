@@ -48,13 +48,15 @@ struct ForceMemoryInterfacePass
     // Find all memory operations and set/remove the handshake::NoLSQAttr
     // attribute on/from them depending on the pass parameters
     MLIRContext *ctx = &getContext();
-    getOperation()->walk([&](MemoryEffectOpInterface memEffectOp) {
+    getOperation()->walk([&](Operation *op) {
+      if (!isa<memref::LoadOp, memref::StoreOp, affine::AffineLoadOp,
+               affine::AffineStoreOp>(op))
+        return;
       if (forceLSQ)
-        memEffectOp->removeAttr(handshake::NoLSQAttr::getMnemonic());
+        op->removeAttr(handshake::NoLSQAttr::getMnemonic());
       else
-        memEffectOp->setAttr(handshake::NoLSQAttr::getMnemonic(),
-                             handshake::NoLSQAttr::get(ctx));
-      ;
+        op->setAttr(handshake::NoLSQAttr::getMnemonic(),
+                    handshake::NoLSQAttr::get(ctx));
     });
   }
 };

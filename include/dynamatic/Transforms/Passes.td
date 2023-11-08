@@ -282,11 +282,11 @@ def ForceMemoryInterface : DynamaticPass<"force-memory-interface"> {
   let summary = "Forces the use of a single type of memory interface";
   let description = [{
     Forces the type of memory interface that will be placed for all memory
-    operations (i.e., operations that implement the `MemoryEffectOpInterface`)
-    when lowering to Handshake. Internally, this sets (force MCs) or removes
-    (force LSQs) the  `circt::handshake::NoLSQAttr` singleton attribute on/from
-    all memory operations in the IR. Exactly one of the two pass options should
-    be provided at the same time.
+    operations (from the affine or memref dialects) when lowering to Handshake.
+    Internally, this sets (force MCs) or removes (force LSQs) the 
+    `circt::handshake::NoLSQAttr` singleton attribute on/from all memory
+    operations in the IR. Exactly one of the two pass options should be provided
+    at the same time.
   }];
   let constructor = "dynamatic::createForceMemoryInterface()";
   let options = [
