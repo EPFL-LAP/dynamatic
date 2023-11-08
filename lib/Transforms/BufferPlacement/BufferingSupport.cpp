@@ -1,4 +1,4 @@
-//===- BufferingProperties.cpp - Buffer placement properties ----*- C++ -*-===//
+//===- BufferingSupport.cpp - Support for buffer placement ------*- C++ -*-===//
 //
 // Dynamatic is under the Apache License v2.0 with LLVM Exceptions.
 // See https://llvm.org/LICENSE.txt for license information.
@@ -6,12 +6,11 @@
 //
 //===----------------------------------------------------------------------===//
 //
-// Implements the infrastructure for specifying and manipulating
-// channel-specific buffering properties.
+// Infrastructure for working around the buffer placement pass.
 //
 //===----------------------------------------------------------------------===//
 
-#include "dynamatic/Transforms/BufferPlacement/BufferingProperties.h"
+#include "dynamatic/Transforms/BufferPlacement/BufferingSupport.h"
 #include "circt/Dialect/Handshake/HandshakeOps.h"
 #include "dynamatic/Support/Attribute.h"
 #include "mlir/IR/Attributes.h"

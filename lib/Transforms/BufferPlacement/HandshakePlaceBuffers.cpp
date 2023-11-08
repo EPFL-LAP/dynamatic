@@ -19,6 +19,7 @@
 #include "dynamatic/Analysis/NameAnalysis.h"
 #include "dynamatic/Support/Logging.h"
 #include "dynamatic/Support/LogicBB.h"
+#include "dynamatic/Transforms/BufferPlacement/BufferPlacementMILP.h"
 #include "dynamatic/Transforms/BufferPlacement/CFDFC.h"
 #include "dynamatic/Transforms/BufferPlacement/FPGA20Buffers.h"
 #include "experimental/Support/StdProfiler.h"
@@ -97,70 +98,52 @@ HandshakePlaceBuffersPass::HandshakePlaceBuffersPass(
   this->dumpLogs = dumpLogs;
 }
 
+void HandshakePlaceBuffersPass::runDynamaticPass() {
+  // Map algorithms to the function to call to execute them
+  llvm::MapVector<StringRef, LogicalResult (HandshakePlaceBuffersPass::*)()>
+      allAlgorithms;
+  allAlgorithms["on-merges"] =
+      &HandshakePlaceBuffersPass::placeWithoutUsingMILP;
+#ifndef DYNAMATIC_GUROBI_NOT_INSTALLED
+  allAlgorithms["fpga20"] = &HandshakePlaceBuffersPass::placeUsingMILP;
+  allAlgorithms["fpga20-legacy"] = &HandshakePlaceBuffersPass::placeUsingMILP;
+#endif // DYNAMATIC_GUROBI_NOT_INSTALLED
+
+  // Check that the algorithm exists
+  if (!allAlgorithms.contains(algorithm)) {
+    llvm::errs() << "Unknown algorithm '" << algorithm
+                 << "', possible choices are:\n";
+    for (auto &algo : allAlgorithms)
+      llvm::errs() << "\t- " << algo.first << "\n";
 #ifdef DYNAMATIC_GUROBI_NOT_INSTALLED
-void HandshakePlaceBuffersPass::runDynamaticPass() {
-  ModuleOp modOp = getOperation();
-  modOp.emitError() << "Project was built without Gurobi installed, can't "
-                       "run smart buffer placement pass\n";
-  return signalPassFailure();
-}
-#else
-/// Logs arch and CFDFC information (sequence of basic blocks, number of
-/// executions, channels, units) to the logger.
-static void logFuncInfo(FuncInfo &info, Logger &log) {
-  mlir::raw_indented_ostream &os = *log;
-  os << "# ===== #\n";
-  os << "# Archs #\n";
-  os << "# ===== #\n\n";
-
-  for (ArchBB &arch : info.archs) {
-    os << arch.srcBB << " -> " << arch.dstBB << " with " << arch.numTrans
-       << " executions";
-    if (arch.isBackEdge)
-      os << " (backedge)";
-    os << "\n";
+    llvm::errs()
+        << "\tYou cannot use any of the MILP-based placement algorithms "
+           "because CMake did not detect a Gurobi installation on your "
+           "machine. Install Gurobi and rebuild to make these options "
+           "available.\n";
+#endif // DYNAMATIC_GUROBI_NOT_INSTALLED
+    return signalPassFailure();
   }
 
-  os << "\n# ================ #\n";
-  os << "# Extracted CFDFCs #\n";
-  os << "# ================ #\n\n";
-
-  for (auto [idx, cfAndOpt] : llvm::enumerate(info.cfdfcs)) {
-    auto &[cf, _] = cfAndOpt;
-    os << "CFDFC #" << idx << ": ";
-    for (size_t i = 0, e = cf->cycle.size() - 1; i < e; ++i)
-      os << cf->cycle[i] << " -> ";
-    os << cf->cycle.back() << "\n";
-    os.indent();
-    os << "- Number of executions: " << cf->numExecs << "\n";
-    os << "- Number of units: " << cf->units.size() << "\n";
-    os << "- Number of channels: " << cf->channels.size() << "\n";
-    os << "- Number of backedges: " << cf->backedges.size() << "\n\n";
-    os.unindent();
-  }
-
-  os.flush();
+  // Call the right function
+  auto func = allAlgorithms[algorithm];
+  if (failed(((*this).*(func))()))
+    return signalPassFailure();
 }
 
-void HandshakePlaceBuffersPass::runDynamaticPass() {
-  ModuleOp modOp = getOperation();
-
+#ifndef DYNAMATIC_GUROBI_NOT_INSTALLED
+LogicalResult HandshakePlaceBuffersPass::placeUsingMILP() {
   // Make sure that all operations in the IR are named (used to generate
   // variable names in the MILP)
   NameAnalysis &nameAnalysis = getAnalysis<NameAnalysis>();
   if (!nameAnalysis.isAnalysisValid())
-    return signalPassFailure();
+    return failure();
   if (!nameAnalysis.areAllOpsNamed())
     if (failed(nameAnalysis.walk(NameAnalysis::UnnamedBehavior::NAME)))
-      return signalPassFailure();
+      return failure();
   markAnalysesPreserved<NameAnalysis>();
 
-  // Check that the algorithm exists
-  if (algorithm != "fpga20" && algorithm != "fpga20-legacy") {
-    modOp->emitError() << "Unknown algorithm '" << algorithm
-                       << "', possible choices are 'fpga20', 'fpga20-legacy'.";
-    return signalPassFailure();
-  }
+  mlir::ModuleOp modOp = getOperation();
 
   // Check IR invariants and parse basic block archs from disk
   DenseMap<handshake::FuncOp, FuncInfo> funcToInfo;
@@ -172,24 +155,24 @@ void HandshakePlaceBuffersPass::runDynamaticPass() {
     // pairs of basic blocks) from disk. While the rest of this pass works if
     // the module contains multiple functions, this only makes sense if the
     // module has a single function
-    if (failed(StdProfiler::readCSV(frequencies, info.archs))) {
-      funcOp->emitError() << "Failed to read profiling information from CSV";
-      return signalPassFailure();
-    }
+    if (failed(StdProfiler::readCSV(frequencies, info.archs)))
+      return funcOp->emitError()
+             << "Failed to read profiling information from CSV";
 
     if (failed(checkFuncInvariants(info)))
-      return signalPassFailure();
+      return failure();
   }
 
   // Read the operations' timing models from disk
   TimingDatabase timingDB(&getContext());
   if (failed(TimingDatabase::readFromJSON(timingModels, timingDB)))
-    return signalPassFailure();
+    return failure();
 
   // Place buffers in each function
   for (handshake::FuncOp funcOp : modOp.getOps<handshake::FuncOp>())
     if (failed(placeBuffers(funcToInfo[funcOp], timingDB)))
-      return signalPassFailure();
+      return failure();
+  return success();
 }
 
 LogicalResult HandshakePlaceBuffersPass::checkFuncInvariants(FuncInfo &info) {
@@ -239,6 +222,43 @@ LogicalResult HandshakePlaceBuffersPass::checkFuncInvariants(FuncInfo &info) {
     }
   }
   return success();
+}
+
+/// Logs arch and CFDFC information (sequence of basic blocks, number of
+/// executions, channels, units) to the logger.
+static void logFuncInfo(FuncInfo &info, Logger &log) {
+  mlir::raw_indented_ostream &os = *log;
+  os << "# ===== #\n";
+  os << "# Archs #\n";
+  os << "# ===== #\n\n";
+
+  for (ArchBB &arch : info.archs) {
+    os << arch.srcBB << " -> " << arch.dstBB << " with " << arch.numTrans
+       << " executions";
+    if (arch.isBackEdge)
+      os << " (backedge)";
+    os << "\n";
+  }
+
+  os << "\n# ================ #\n";
+  os << "# Extracted CFDFCs #\n";
+  os << "# ================ #\n\n";
+
+  for (auto [idx, cfAndOpt] : llvm::enumerate(info.cfdfcs)) {
+    auto &[cf, _] = cfAndOpt;
+    os << "CFDFC #" << idx << ": ";
+    for (size_t i = 0, e = cf->cycle.size() - 1; i < e; ++i)
+      os << cf->cycle[i] << " -> ";
+    os << cf->cycle.back() << "\n";
+    os.indent();
+    os << "- Number of executions: " << cf->numExecs << "\n";
+    os << "- Number of units: " << cf->units.size() << "\n";
+    os << "- Number of channels: " << cf->channels.size() << "\n";
+    os << "- Number of backedges: " << cf->backedges.size() << "\n\n";
+    os.unindent();
+  }
+
+  os.flush();
 }
 
 LogicalResult
@@ -358,6 +378,21 @@ LogicalResult HandshakePlaceBuffersPass::getBufferPlacement(
   delete milp;
   return res;
 }
+#endif // DYNAMATIC_GUROBI_NOT_INSTALLED
+
+LogicalResult HandshakePlaceBuffersPass::placeWithoutUsingMILP() {
+  // The only strategy at this point is to place buffers on the output channels
+  // of all merge-like operations
+  for (handshake::FuncOp funcOp : getOperation().getOps<handshake::FuncOp>()) {
+    DenseMap<Value, PlacementResult> placement;
+    for (auto mergeLikeOp : funcOp.getOps<MergeLikeOpInterface>()) {
+      for (OpResult res : mergeLikeOp->getResults())
+        placement[res] = PlacementResult{1, 1, true};
+    }
+    instantiateBuffers(placement);
+  }
+  return success();
+}
 
 void HandshakePlaceBuffersPass::instantiateBuffers(
     DenseMap<Value, PlacementResult> &placement) {
@@ -393,7 +428,6 @@ void HandshakePlaceBuffersPass::instantiateBuffers(
     }
   }
 }
-#endif // DYNAMATIC_GUROBI_NOT_INSTALLED
 
 std::string dynamatic::buffer::getGurobiOptStatusDesc(int status) {
   switch (status) {

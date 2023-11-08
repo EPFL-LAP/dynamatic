@@ -19,7 +19,7 @@
 
 #include "dynamatic/Transforms/BufferPlacement/HandshakeSetBufferingProperties.h"
 #include "circt/Dialect/Handshake/HandshakeOps.h"
-#include "dynamatic/Transforms/BufferPlacement/BufferingProperties.h"
+#include "dynamatic/Transforms/BufferPlacement/BufferingSupport.h"
 #include "dynamatic/Transforms/BufferPlacement/HandshakePlaceBuffers.h"
 #include "mlir/IR/Value.h"
 #include "llvm/ADT/STLExtras.h"

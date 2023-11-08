@@ -1,5 +1,5 @@
 add_dynamatic_library(DynamaticBufferPlacement
-  BufferingProperties.cpp
+  BufferingSupport.cpp
   BufferPlacementMILP.cpp
   CFDFC.cpp
   FPGA20Buffers.cpp

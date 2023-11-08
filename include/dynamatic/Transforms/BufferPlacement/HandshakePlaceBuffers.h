@@ -21,7 +21,7 @@
 #include "dynamatic/Support/Logging.h"
 #include "dynamatic/Support/TimingModels.h"
 #include "dynamatic/Transforms/BufferPlacement/BufferPlacementMILP.h"
-#include "dynamatic/Transforms/BufferPlacement/BufferingProperties.h"
+#include "dynamatic/Transforms/BufferPlacement/BufferingSupport.h"
 #include "dynamatic/Transforms/BufferPlacement/CFDFC.h"
 #include "mlir/Dialect/Func/IR/FuncOps.h"
 
@@ -34,7 +34,7 @@ namespace buffer {
 std::string getGurobiOptStatusDesc(int status);
 
 std::unique_ptr<dynamatic::DynamaticPass<true>> createHandshakePlaceBuffers(
-    StringRef algorithm = "fpga20", StringRef frequencies = "",
+    StringRef algorithm = "on-merges", StringRef frequencies = "",
     StringRef timingModels = "", bool firstCFDFC = false, double targetCP = 4.0,
     unsigned timeout = 180, bool dumpLogs = false);
 
@@ -60,8 +60,12 @@ struct HandshakePlaceBuffersPass
   /// Called on the MLIR module provided as input.
   void runDynamaticPass() override;
 
-#ifndef DYNAMATIC_GUROBI_NOT_INSTALLED
 protected:
+#ifndef DYNAMATIC_GUROBI_NOT_INSTALLED
+  /// Called for all buffer placement strategies that not require Gurobi to
+  /// be installed on the host system.
+  LogicalResult placeUsingMILP();
+
   /// Checks a couple of invariants in the function that are required by our
   /// buffer placement algorithm. Fails when the function does not satisfy at
   /// least one invariant.
@@ -86,11 +90,14 @@ protected:
   virtual LogicalResult
   getBufferPlacement(FuncInfo &info, TimingDatabase &timingDB, Logger *logger,
                      DenseMap<Value, PlacementResult> &placement);
+#endif
+  /// Called for all buffer placement strategies that do not require Gurobi to
+  /// be installed on the host system.
+  LogicalResult placeWithoutUsingMILP();
 
   /// Instantiates buffers inside the IR, following placement decisions
   /// determined by the buffer placement MILP.
   virtual void instantiateBuffers(DenseMap<Value, PlacementResult> &placement);
-#endif
 };
 
 } // namespace buffer

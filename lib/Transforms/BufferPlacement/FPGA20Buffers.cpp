@@ -10,16 +10,13 @@
 //
 //===----------------------------------------------------------------------===//
 
-#include "dynamatic/Analysis/NameAnalysis.h"
-#ifndef DYNAMATIC_GUROBI_NOT_INSTALLED
-#include "gurobi_c++.h"
-
+#include "dynamatic/Transforms/BufferPlacement/FPGA20Buffers.h"
 #include "circt/Dialect/Handshake/HandshakeDialect.h"
 #include "circt/Dialect/Handshake/HandshakeOps.h"
 #include "circt/Dialect/Handshake/HandshakePasses.h"
+#include "dynamatic/Analysis/NameAnalysis.h"
 #include "dynamatic/Support/LogicBB.h"
-#include "dynamatic/Transforms/BufferPlacement/BufferingProperties.h"
-#include "dynamatic/Transforms/BufferPlacement/FPGA20Buffers.h"
+#include "dynamatic/Transforms/BufferPlacement/BufferingSupport.h"
 #include "dynamatic/Transforms/PassDetails.h"
 #include "mlir/Dialect/Arith/IR/Arith.h"
 #include "mlir/Dialect/Func/IR/FuncOps.h"
@@ -29,6 +26,9 @@
 #include "mlir/IR/Value.h"
 #include "mlir/Support/IndentedOstream.h"
 #include "mlir/Support/LogicalResult.h"
+
+#ifndef DYNAMATIC_GUROBI_NOT_INSTALLED
+#include "gurobi_c++.h"
 
 using namespace llvm::sys;
 using namespace circt;

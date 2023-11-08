@@ -1,4 +1,4 @@
-//===- BufferingProperties.h - Buffer placement properties ------*- C++ -*-===//
+//===- BufferingSupport.h - Support for buffer placement --------*- C++ -*-===//
 //
 // Dynamatic is under the Apache License v2.0 with LLVM Exceptions.
 // See https://llvm.org/LICENSE.txt for license information.
@@ -6,20 +6,53 @@
 //
 //===----------------------------------------------------------------------===//
 //
-// Infrastructure for specifying and manipulating buffering properties, which
-// are used by the buffer placement logic to constrain the nature and
-// positions of buffers in dataflow circuits.
+// Infrastructure for working around the buffer placement pass.
 //
 //===----------------------------------------------------------------------===//
 
-#ifndef DYNAMATIC_TRANSFORMS_BUFFERPLACEMENT_BUFFERINGPROPERTIES_H
-#define DYNAMATIC_TRANSFORMS_BUFFERPLACEMENT_BUFFERINGPROPERTIES_H
+#ifndef DYNAMATIC_TRANSFORMS_BUFFERPLACEMENT_BUFFERINGSUPPORT_H
+#define DYNAMATIC_TRANSFORMS_BUFFERPLACEMENT_BUFFERINGSUPPORT_H
 
 #include "circt/Dialect/Handshake/HandshakeOps.h"
 #include "dynamatic/Support/LLVM.h"
+#include "dynamatic/Transforms/BufferPlacement/CFDFC.h"
+#include "experimental/Support/StdProfiler.h"
 
 namespace dynamatic {
 namespace buffer {
+
+/// Holds information about what type of buffer should be placed on a specific
+/// channel.
+struct PlacementResult {
+  /// The number of transparent buffer slots that should be placed.
+  unsigned numTrans = 0;
+  /// The number of opaque buffer slots that should be placed.
+  unsigned numOpaque = 0;
+  /// Whether opaque slots should be placed transparent slots for placement
+  /// results that include both.
+  bool opaqueBeforeTrans = true;
+};
+
+/// Helper datatype for buffer placement. Simply aggregates all the information
+/// related to the Handshake function under optimization.
+struct FuncInfo {
+  /// The Handshake function in which to place buffers.
+  circt::handshake::FuncOp funcOp;
+  /// The list of archs in the function (i.e., transitions between basic
+  /// blocks).
+  SmallVector<experimental::ArchBB> archs;
+  /// Maps CFDFCs of the function to a boolean indicating whether they each
+  /// should be optimized.
+  llvm::MapVector<CFDFC *, bool> cfdfcs;
+
+  /// Argument-less constructor so that we can use the struct as a value type
+  /// for maps.
+  FuncInfo() : funcOp(nullptr){};
+
+  /// Constructs an instance from the function it refers to. Other struct
+  /// members start empty.
+  FuncInfo(circt::handshake::FuncOp funcOp) : funcOp(funcOp){};
+};
 
 /// Acts as a "smart and lazy getter" around a channel's buffering properties.
 /// In situations where one may want to offer easy access to a channel's
@@ -147,4 +180,4 @@ struct Channel {
 } // namespace buffer
 } // namespace dynamatic
 
-#endif // DYNAMATIC_TRANSFORMS_BUFFERPLACEMENT_BUFFERINGPROPERTIES_H
+#endif // DYNAMATIC_TRANSFORMS_BUFFERPLACEMENT_BUFFERINGSUPPORT_H

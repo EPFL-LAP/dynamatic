@@ -152,8 +152,7 @@ if [[ $USE_SIMPLE_BUFFERS -ne 0 ]]; then
   # Simple buffer placement
   "$DYNAMATIC_OPT_BIN" "$F_HANDSHAKE_TRANSFORMED" \
     --allow-unregistered-dialect \
-    --handshake-insert-buffers="buffer-size=2 strategy=cycles" \
-    --handshake-infer-basic-blocks \
+    --handshake-place-buffers="algorithm=on-merges" \
     > "$F_HANDSHAKE_BUFFERED"
   exit_on_fail "Failed to place simple buffers" "Placed simple buffers"
 else
