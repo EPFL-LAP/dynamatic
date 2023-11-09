@@ -17,8 +17,6 @@
 
 #include "Graph.h"
 #include "GraphEdge.h"
-#include "circt/Dialect/Handshake/HandshakeOps.h"
-#include "dynamatic/Support/LLVM.h"
 #include "dynamatic/Support/TimingModels.h"
 
 using namespace mlir;
