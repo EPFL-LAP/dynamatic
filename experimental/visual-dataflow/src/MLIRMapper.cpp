@@ -55,19 +55,22 @@ size_t findIndexInRange(ValueRange range, Value val) {
 
 /// Finds the position (group index and operand index) of a value in the
 /// inputs of a memory interface.
-std::pair<size_t, size_t>
-findValueInGroups(SmallVector<SmallVector<Value>> &groups, Value val) {
-  for (auto [groupIdx, bbOperands] : llvm::enumerate(groups))
-    for (auto [opIdx, operand] : llvm::enumerate(bbOperands))
-      if (val == operand)
-        return std::make_pair(groupIdx, opIdx);
-  assert(false && "value should be an operand to the memory interface");
-  return std::make_pair(0, 0);
+std::pair<size_t, size_t> findValueInGroups(FuncMemoryPorts &ports, Value val) {
+  unsigned numBlocks = ports.getNumConnectedBlock();
+  for (size_t blockIdx = 0; blockIdx < numBlocks; ++blockIdx) {
+    for (auto [inputIdx, input] :
+         llvm::enumerate(ports.getBlockInputs(blockIdx))) {
+      if (input == val)
+        return std::make_pair(blockIdx, inputIdx);
+    }
+  }
+  llvm_unreachable("value should be an operand to the memory interface");
 }
 
 /// Transforms the port number associated to an edge endpoint to match the
 /// operand ordering of legacy Dynamatic.
-size_t fixPortNumber(Operation *op, Value val, size_t idx, bool isSrcOp) {
+static size_t fixPortNumber(Operation *op, Value val, size_t idx,
+                            bool isSrcOp) {
   return llvm::TypeSwitch<Operation *, size_t>(op)
       .Case<handshake::ConditionalBranchOp>([&](auto) {
         if (isSrcOp)
@@ -95,25 +98,24 @@ size_t fixPortNumber(Operation *op, Value val, size_t idx, bool isSrcOp) {
             // Legacy Dynamatic puts all control operands before all data
             // operands, whereas for us each control operand appears just
             // before the data inputs of the block it corresponds to
-            auto groups = memOp.groupInputsByBB();
+            FuncMemoryPorts ports = memOp.getPorts();
+
+            // auto groups = memOp.groupInputsByBB();
 
             // Determine total number of control operands
-            unsigned ctrlCount = 0;
-            for (size_t i = 0, e = groups.size(); i < e; i++)
-              if (memOp.bbHasControl(i))
-                ctrlCount++;
+            unsigned ctrlCount = ports.getNumPorts(MemoryPort::Kind::CONTROL);
 
             // Figure out where the value lies
-            auto [groupIdx, opIdx] = findValueInGroups(groups, val);
+            auto [groupIdx, opIdx] = findValueInGroups(ports, val);
 
             // Figure out at which index the value would be in legacy
             // Dynamatic's interface
-            bool valGroupHasControl = memOp.bbHasControl(groupIdx);
+            bool valGroupHasControl = ports.blocks[groupIdx].hasControl();
             if (opIdx == 0 && valGroupHasControl) {
               // Value is a control input
               size_t fixedIdx = 0;
               for (size_t i = 0; i < groupIdx; i++)
-                if (memOp.bbHasControl(i))
+                if (ports.blocks[i].hasControl())
                   fixedIdx++;
               return fixedIdx;
             }
@@ -122,10 +124,10 @@ size_t fixPortNumber(Operation *op, Value val, size_t idx, bool isSrcOp) {
             size_t fixedIdx = ctrlCount;
             for (size_t i = 0; i < groupIdx; i++)
               // Add number of data inputs corresponding to the block
-              if (memOp.bbHasControl(i))
-                fixedIdx += groups[i].size() - 1;
+              if (ports.blocks[i].hasControl())
+                fixedIdx += ports.blocks[i].getNumInputs() - 1;
               else
-                fixedIdx += groups[i].size();
+                fixedIdx += ports.blocks[i].getNumInputs();
 
             // Add index offset in the group the value belongs to
             if (valGroupHasControl)
@@ -157,11 +159,7 @@ LogicalResult MLIRMapper::mapMLIR(mlir::ModuleOp mod) {
   // Sequentially scan across the operations in the function and assign
   // instance IDs to each operation
   for (auto &op : funcOp.getOps())
-    if (auto memOp = dyn_cast<handshake::MemoryControllerOp>(op))
-      // Memories already have unique IDs, so make their name match it
-      opIDs[&op] = memOp.getId();
-    else
-      opIDs[&op] = opTypeCntrs[op.getName().getStringRef().str()]++;
+    opIDs[&op] = opTypeCntrs[op.getName().getStringRef().str()]++;
 
   for (auto &op : funcOp.getOps()) {
     // Give a unique name to each operation. Extract operation name without
@@ -218,7 +216,7 @@ LogicalResult MLIRMapper::mapNode(Operation *op) {
     node->addPort(outPort, false);
 
   // Add the node to the graph
-  graph->addNode(node);
+  graph->addNode(*node);
 
   return success();
 }
@@ -230,8 +228,8 @@ LogicalResult MLIRMapper::mapEdge(Operation *src, Operation *dst, Value val,
   std::string dstNodeName = getNodeName(dst);
   GraphNode *srcNodeIt;
   GraphNode *dstNodeIt;
-  if (failed(graph->getNode(srcNodeName, srcNodeIt)) ||
-      failed(graph->getNode(dstNodeName, dstNodeIt)))
+  if (failed(graph->getNode(srcNodeName, *srcNodeIt)) ||
+      failed(graph->getNode(dstNodeName, *dstNodeIt)))
     return failure();
 
   // Find the source value
@@ -247,10 +245,10 @@ LogicalResult MLIRMapper::mapEdge(Operation *src, Operation *dst, Value val,
 
   // Create the edge
   GraphEdge *edge =
-      new GraphEdge(*edgeId++, srcNodeIt, dstNodeIt, from, to, {});
+      new GraphEdge(*edgeId++, *srcNodeIt, *dstNodeIt, from, to, {});
 
   // Add the edge to the graph
-  graph->addEdge(edge);
+  graph->addEdge(*edge);
 
   return success();
 }
