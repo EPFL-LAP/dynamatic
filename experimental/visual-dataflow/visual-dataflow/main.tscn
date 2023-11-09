@@ -6,3 +6,29 @@
 offset_right = 40.0
 offset_bottom = 40.0
 script = ExtResource("1_k08iy")
+
+[node name="Camera2D" type="Camera2D" parent="."]
+
+[node name="CanvasLayer" type="CanvasLayer" parent="."]
+
+[node name="HBoxContainer" type="HBoxContainer" parent="CanvasLayer"]
+anchors_preset = 3
+anchor_left = 1.0
+anchor_top = 1.0
+anchor_right = 1.0
+anchor_bottom = 1.0
+offset_left = -182.0
+offset_top = -40.0
+grow_horizontal = 0
+grow_vertical = 0
+
+[node name="Prev" type="Button" parent="CanvasLayer/HBoxContainer"]
+layout_mode = 2
+text = "Prev Cycle"
+
+[node name="Next" type="Button" parent="CanvasLayer/HBoxContainer"]
+layout_mode = 2
+text = "Next Cycle"
+
+[connection signal="pressed" from="CanvasLayer/HBoxContainer/Prev" to="." method="_on_prev_pressed"]
+[connection signal="pressed" from="CanvasLayer/HBoxContainer/Next" to="." method="_on_next_pressed"]
