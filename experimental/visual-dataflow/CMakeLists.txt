@@ -19,6 +19,7 @@ add_library(${GODOT_LIB_NAME}
   src/GraphParser.cpp
   src/RegisterTypes.cpp
   src/VisualDataflow.cpp
+  src/MLIRMapper.cpp
 )
 target_link_libraries(${GODOT_LIB_NAME}
   PRIVATE
