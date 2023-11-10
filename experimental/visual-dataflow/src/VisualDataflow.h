@@ -31,7 +31,6 @@ private:
   // std::vector<Node> nodes;
 
 protected:
-  // NOLINTNEXTLINE(readability-identifier-naming)
   static void _bind_methods();
 
 public:
@@ -39,12 +38,9 @@ public:
 
   ~VisualDataflow() override = default;
 
-  void myProcess(double delta);
+  void my_process(double delta);
 
-  double getNodePosX(int index);
-  double getNodePosY(int index);
-
-  int getNumberOfNodes();
+  void addPanel();
 };
 
 } // namespace godot
