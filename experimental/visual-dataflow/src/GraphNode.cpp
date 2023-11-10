@@ -19,6 +19,7 @@ GraphNode::GraphNode() {
   position = std::make_pair(0, 0);
   inPorts = std::vector<std::string>();
   outPorts = std::vector<std::string>();
+  width = 0.0;
 }
 
 GraphNode::GraphNode(NodeId id, std::pair<int, int> position)
@@ -49,3 +50,11 @@ std::vector<std::string> GraphNode::getPorts(bool isInputPort) {
     return inPorts;
   return outPorts;
 }
+
+void GraphNode::setWidth(float width) { this->width = width; }
+
+float GraphNode::getWidth() { return width; }
+
+void GraphNode::setColor(Color color) { this->color = color; }
+
+Color GraphNode::getColor() { return color; }

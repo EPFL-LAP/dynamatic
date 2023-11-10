@@ -93,11 +93,20 @@ dynamatic::experimental::visual_dataflow::processDOT(std::ifstream &file,
       (iss >> x >> comma >> y);
       std::pair<float, float> position = std::make_pair(x, y);
       currentNode.setPosition(position);
+      
 
-    } else if (insideNodeDefinition && line.find(']') != std::string::npos) {
+    } else if (insideNodeDefinition && line.find("fillcolor") != std::string::npos){
+      Color color = line.substr(line.find("=") + 1, line.find(',') - line.find('=') - 1);
+      currentNode.setColor(color);
+
+    } else if (insideNodeDefinition && line.find("]") != std::string::npos) {
+      float width = std::stof(line.substr(line.find("=") + 1, line.find(']') - line.find('=') - 1));
+      currentNode.setWidth(width);
+
       graph.addNode(currentNode);
       insideNodeDefinition = false;
     }
+
 
     if (insideEdgeDefinition && line.find("pos") != std::string::npos) {
       size_t startPos = line.find('\"');
@@ -120,7 +129,7 @@ dynamatic::experimental::visual_dataflow::processDOT(std::ifstream &file,
           std::string token;
 
           std::set<std::pair<float, float>>
-              uniquePositions; // Use a set to store unique positions
+              uniquePositions; 
 
           while ((std::getline(iss, token, ' '))) {
             if (token.empty())
@@ -135,7 +144,6 @@ dynamatic::experimental::visual_dataflow::processDOT(std::ifstream &file,
               float y = std::stof(yStr);
               std::pair<float, float> position = std::make_pair(x, y);
 
-              // Check if the position is unique before adding it
               if (uniquePositions.insert(position).second) {
                 currentEdge.addPosition(position);
               }
