@@ -13,6 +13,7 @@
 #include "GraphParser.h"
 #include "CSVParser.h"
 #include "DOTParser.h"
+#include "DOTReformat.h"
 #include "MLIRMapper.h"
 #include "dynamatic/Support/TimingModels.h"
 #include "mlir/Dialect/Func/IR/FuncOps.h"
@@ -51,7 +52,15 @@ LogicalResult GraphParser::parse(Graph *graph) {
       lineIndex++;
     }
   } else if (mFilePath.find(".dot") != std::string::npos) {
-    if (failed(processDOT(file, *graph))) {
+    const std::string outputDotFile = "/tmp/graph.dot";
+
+    if (failed(reformatDot(mFilePath, outputDotFile)))
+      return failure();
+
+    std::ifstream f;
+    f.open(outputDotFile);
+
+    if (failed(processDOT(f, *graph))) {
       return failure();
     }
   } else if (mFilePath.find(".mlir") != std::string::npos) {

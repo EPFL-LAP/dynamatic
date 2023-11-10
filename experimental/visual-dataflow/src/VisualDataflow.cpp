@@ -44,15 +44,13 @@ VisualDataflow::VisualDataflow() = default;
 void VisualDataflow::my_process(double delta) {}
 
 void VisualDataflow::addPanel() {
-  Graph graphQuentin = Graph();
-  GraphParser parserQuentin =
+  Graph graph = Graph();
+  GraphParser parser =
       GraphParser("/home/qgross/Documents/dynamatic/experimental/"
-                  "visual-dataflow/test/bicg.mlir");
-  if (failed(parserQuentin.parse(&graphQuentin))) {
+                  "visual-dataflow/test/bicg.dot");
+  if (failed(parser.parse(&graph))) {
     return;
   }
-
-  Graph graphAlbert = Graph();
 
   Label graph_label = Label();
   graph_label.set_text("My first graph");
@@ -60,7 +58,7 @@ void VisualDataflow::addPanel() {
 
   size_t nodeCounter = 0;
 
-  for (auto &node : graphQuentin.getNodes()) {
+  for (auto &node : graph.getNodes()) {
     nodeCounter++;
     Panel *panel = memnew(Panel);
     panel->set_custom_minimum_size(Vector2(200, 100));
