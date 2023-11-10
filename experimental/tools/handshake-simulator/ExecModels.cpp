@@ -115,7 +115,7 @@ static std::vector<llvm::Any> fetchValues(ArrayRef<Value> values,
   std::vector<llvm::Any> ins;
   for (auto &value : values) {
     if (channelMap[value].state == DataflowState::VALID)
-      ins.push_back(channelMap[value].data.value());
+      ins.push_back(*(channelMap[value].data));
     // removeValue(value, channelMap);
   }
   return ins;
@@ -340,7 +340,7 @@ bool DefaultMux::tryExecute(ExecutableData &data, circt::Operation &opArg) {
   Value control = op.getSelectOperand();
   if (data.channelMap[control].state == DataflowState::NONE)
     return false;
-  auto controlValue = data.channelMap[control].data.value();
+  auto controlValue = *(data.channelMap[control].data);
   auto opIdx = llvm::any_cast<APInt>(controlValue).getZExtValue();
   assert(opIdx < op.getDataOperands().size() &&
          "Trying to select a non-existing mux operand");
@@ -372,7 +372,7 @@ bool DefaultConditionalBranch::tryExecute(ExecutableData &data,
   Value control = op.getConditionOperand();
   if (data.channelMap[control].state == DataflowState::NONE)
     return false;
-  auto controlValue = data.channelMap[control].data.value();
+  auto controlValue = *(data.channelMap[control].data);
   Value in = op.getDataOperand();
   if (data.channelMap[in].state == DataflowState::NONE)
     return false;
@@ -423,7 +423,7 @@ bool DynamaticMemController::tryExecute(ExecutableData &data,
   bool hasDoneStuff =
       false; // This might be different for the mem controller but ok
   unsigned bufferStart =
-      llvm::any_cast<unsigned>(data.channelMap[op.getMemref()].data.value());
+      llvm::any_cast<unsigned>(*(data.channelMap[op.getMemref()].data));
 
   // Add an internal data to keep track of completed load/store requests
   if (!internalDataExists(opArg, data.internalDataMap))
@@ -459,8 +459,8 @@ bool DynamaticMemController::tryExecute(ExecutableData &data,
       // Check if enough cycle passed (simulates the real circuit delay)
       if (request.cyclesToComplete == 0) {
         // Store the data accordingly
-        auto addressValue = data.channelMap[address].data.value();
-        auto dataValue = data.channelMap[dataOperand].data.value();
+        auto addressValue = *(data.channelMap[address].data);
+        auto dataValue = *(data.channelMap[dataOperand].data);
 
         assert(bufferStart < data.store.size());
         auto &mem = data.store[bufferStart];
@@ -504,7 +504,7 @@ bool DynamaticMemController::tryExecute(ExecutableData &data,
       // Check if enough cycle passed (simulates the real circuit delay)
       if (request.cyclesToComplete == 0) {
         // Load the data accordingly
-        auto addressValue = data.channelMap[address].data.value();
+        auto addressValue = *(data.channelMap[address].data);
         unsigned offset = llvm::any_cast<APInt>(addressValue).getZExtValue();
         auto &mem = data.store[bufferStart];
         assert(offset < mem.size());

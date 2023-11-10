@@ -57,16 +57,18 @@ struct ChannelState {
 /// Type for mapping channels to their state
 using ChannelMap = llvm::DenseMap<mlir::Value, ChannelState>;
 
-/// Stores a value in a channel, and sets its state to VALID.
-void storeValue(mlir::Value channel, std::optional<llvm::Any> data,
-                ChannelMap &channelMap);
+//struct CircuitState {
+  /// Stores a value in a channel, and sets its state to VALID.
+  void storeValue(mlir::Value channel, std::optional<llvm::Any> data,
+                  ChannelMap &channelMap);
 
-/// Performs multiples storeValue's at once.
-void storeValues(std::vector<llvm::Any> &values,
-                 llvm::ArrayRef<mlir::Value> outs, ChannelMap &channelMap);
+  /// Performs multiples storeValue's at once.
+  void storeValues(std::vector<llvm::Any> &values,
+                  llvm::ArrayRef<mlir::Value> outs, ChannelMap &channelMap);
 
-/// Removes a value from a channel, and sets its state to NONE.
-void removeValue(mlir::Value channel, ChannelMap &channelMap);
+  /// Removes a value from a channel, and sets its state to NONE.
+  void removeValue(mlir::Value channel, ChannelMap &channelMap);
+//}
 
 //--- Execution Models -------------------------------------------------------//
 

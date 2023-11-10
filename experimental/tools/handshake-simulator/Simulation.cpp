@@ -224,9 +224,9 @@ HandshakeExecuter::HandshakeExecuter(circt::handshake::FuncOp &func,
       hasEnd = true;
     }
     // Inititialize all channels 
-    for (auto value : op->getOperands()) {
+    for (auto value : op->getOperands()) 
       channelMap[value] = { DataflowState::NONE, std::nullopt };
-    }
+    
   });
 
   assert(
@@ -260,7 +260,6 @@ HandshakeExecuter::HandshakeExecuter(circt::handshake::FuncOp &func,
 
       for (Operation &op : entryBlock.getOperations()) {
         auto opName = op.getName().getStringRef().str();
-
         auto &execModel = models[opName];
         if (models.find(opName) == models.end()) {
           successFlag = false;
