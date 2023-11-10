@@ -94,10 +94,14 @@ dynamatic::experimental::visual_dataflow::processDOT(std::ifstream &file,
       std::pair<float, float> position = std::make_pair(x, y);
       currentNode.setPosition(position);
 
-    } else if (insideNodeDefinition && line.find(']') != std::string::npos) {
+    }else if (insideNodeDefinition && line.find("]") != std::string::npos) {
+      float width = std::stof(line.substr(line.find("=") + 1, line.find(']') - line.find('=') - 1));
+      currentNode.setWidth(width);
+
       graph.addNode(currentNode);
       insideNodeDefinition = false;
     }
+
 
     if (insideEdgeDefinition && line.find("pos") != std::string::npos) {
       size_t startPos = line.find('\"');

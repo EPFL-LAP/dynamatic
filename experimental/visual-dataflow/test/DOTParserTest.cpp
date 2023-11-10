@@ -58,6 +58,7 @@ int main(int argc, char *argv[]) {
               << node.getPosition().second << std::endl;
     std::cout << "InPorts: " << node.getPorts(true).size()
               << " OutPorts: " << node.getPorts(false).size() << std::endl;
+    std::cout << "Width: " << node.getWidth() << std::endl;
 
     std::cout << "---------------------------------" << std::endl;
   }

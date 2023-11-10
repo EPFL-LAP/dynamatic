@@ -44,6 +44,10 @@ public:
   std::pair<float, float> getPosition();
   // Returns the in/out ports of the Node
   std::vector<std::string> getPorts(bool isInputPort);
+  /// Sets the width of the Node
+  void setWidth(float width);
+  /// Returns the width of the Node
+  float getWidth();
 
 private:
   /// Node identifier
@@ -54,6 +58,8 @@ private:
   std::vector<std::string> outPorts;
   /// Position of the node in the Graph
   std::pair<float, float> position;
+  /// Width of the node
+  float width;
 };
 
 } // namespace visual_dataflow
