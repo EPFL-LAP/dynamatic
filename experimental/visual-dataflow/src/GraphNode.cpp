@@ -54,3 +54,7 @@ std::vector<std::string> GraphNode::getPorts(bool isInputPort) {
 void GraphNode::setWidth(float width) { this->width = width; }
 
 float GraphNode::getWidth() { return width; }
+
+void GraphNode::setColor(Color color) { this->color = color; }
+
+Color GraphNode::getColor() { return color; }
