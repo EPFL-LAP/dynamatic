@@ -13,6 +13,7 @@
 #ifndef DYNAMATIC_VISUAL_DATAFLOW_VISUAL_DATAFLOW_H
 #define DYNAMATIC_VISUAL_DATAFLOW_VISUAL_DATAFLOW_H
 
+#include "Graph.h"
 #include "godot_cpp/classes/control.hpp"
 #include <vector>
 
@@ -40,7 +41,7 @@ public:
 
   void my_process(double delta);
 
-  void addPanel();
+  void drawGraph();
 };
 
 } // namespace godot

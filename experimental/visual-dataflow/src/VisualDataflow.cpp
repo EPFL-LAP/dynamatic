@@ -11,11 +11,12 @@
 //===----------------------------------------------------------------------===//
 
 #include "VisualDataflow.h"
-#include "Graph.h"
 #include "GraphParser.h"
 #include "dynamatic/Support/DOTPrinter.h"
 #include "dynamatic/Support/TimingModels.h"
+#include "godot_cpp/classes/canvas_layer.hpp"
 #include "godot_cpp/classes/center_container.hpp"
+#include "godot_cpp/classes/color_rect.hpp"
 #include "godot_cpp/classes/control.hpp"
 #include "godot_cpp/classes/global_constants.hpp"
 #include "godot_cpp/classes/label.hpp"
@@ -23,6 +24,7 @@
 #include "godot_cpp/classes/node.hpp"
 #include "godot_cpp/classes/panel.hpp"
 #include "godot_cpp/classes/polygon2d.hpp"
+#include "godot_cpp/classes/style_box_flat.hpp"
 #include "godot_cpp/core/class_db.hpp"
 #include "godot_cpp/variant/packed_vector2_array.hpp"
 #include "mlir/Dialect/Func/IR/FuncOps.h"
@@ -45,14 +47,15 @@ using namespace dynamatic;
 using namespace dynamatic::experimental::visual_dataflow;
 
 void VisualDataflow::_bind_methods() {
-  ClassDB::bind_method(D_METHOD("addPanel"), &VisualDataflow::addPanel);
+  ClassDB::bind_method(D_METHOD("drawGraph"), &VisualDataflow::drawGraph);
 }
 
 VisualDataflow::VisualDataflow() = default;
 
 void VisualDataflow::my_process(double delta) {}
 
-void VisualDataflow::addPanel() {
+void VisualDataflow::drawGraph() {
+
   Graph graph = Graph();
   GraphParser parser = GraphParser(
       "/home/alicepotter/dynamatic/experimental/visual-dataflow/test/bicg.dot");
@@ -60,14 +63,31 @@ void VisualDataflow::addPanel() {
     return;
   }
 
-  size_t nodeCounter = 0;
+  std::map<std::string, Color> mapColor;
+  mapColor["lavender"] = Color(0.9, 0.9, 0.98, 1);
+  mapColor["plum"] = Color(0.867, 0.627, 0.867, 1);
+  mapColor["moccasin"] = Color(1.0, 0.894, 0.71, 1);
+  mapColor["lightblue"] = Color(0.68, 0.85, 1.0, 1);
+  mapColor["lightgreen"] = Color(0.56, 0.93, 0.56, 1);
+  mapColor["coral"] = Color(1.0, 0.5, 0.31, 1);
+  mapColor["gainsboro"] = Color(0.86, 0.86, 0.86, 1);
+  mapColor["blue"] = Color(0, 0, 1, 1);
+  mapColor["gold"] = Color(1.0, 0.843, 0.0, 1);
+  mapColor["tan2"] = Color(1.0, 0.65, 0.0, 1);
 
   for (auto &node : graph.getNodes()) {
-    nodeCounter++;
     Panel *panel = memnew(Panel);
-    panel->set_custom_minimum_size(Vector2(10, 10));
+    StyleBoxFlat *style = memnew(StyleBoxFlat);
+    if (mapColor.count(node.second.getColor()))
+      style->set_bg_color(mapColor.at(node.second.getColor()));
+    else
+      style->set_bg_color(Color(1, 1, 1, 1));
+    panel->add_theme_stylebox_override("panel", style);
+    panel->set_custom_minimum_size(
+        Vector2(node.second.getWidth() * 70, 0.5 * 70));
     std::pair<float, float> pos = node.second.getPosition();
-    panel->set_position(Vector2(pos.first, 2554 - pos.second));
+    panel->set_position(Vector2(pos.first - node.second.getWidth() * 35,
+                                2554 - pos.second - 0.5 * 35));
 
     // Create a center container to hold the label
     CenterContainer *center_container = memnew(CenterContainer);
@@ -80,6 +100,7 @@ void VisualDataflow::addPanel() {
     // Add the label to the center container
     Label *node_label = memnew(Label);
     node_label->set_text(node.second.getNodeId().c_str());
+    node_label->add_theme_color_override("node_label", Color(1, 1, 1, 1));
     node_label->set_horizontal_alignment(
         HorizontalAlignment::HORIZONTAL_ALIGNMENT_CENTER);
     node_label->set_autowrap_mode(TextServer::AUTOWRAP_WORD);
@@ -90,6 +111,7 @@ void VisualDataflow::addPanel() {
 
   for (auto &edge : graph.getEdges()) {
     Line2D *line = memnew(Line2D);
+    line->set_default_color(Color(0, 0, 0, 1));
     std::vector<std::pair<float, float>> positions = edge.getPositions();
     Vector2 prev =
         Vector2(positions.at(1).first, 2554 - positions.at(1).second);
@@ -103,45 +125,42 @@ void VisualDataflow::addPanel() {
     }
     Polygon2D *arrowHead = memnew(Polygon2D);
     PackedVector2Array points;
-    points.push_back(last);
     if (prev.x == last.x) {
+      points.push_back(Vector2(last.x - 8, last.y));
+      points.push_back(Vector2(last.x + 8, last.y));
       if (prev.y < last.y) {
-        points.push_back(Vector2(last.x - 10, last.y - 10));
-        points.push_back(Vector2(last.x + 10, last.y - 10));
+        // arrow pointing to the bottom
+        points.push_back(Vector2(last.x, last.y + 12));
       } else {
-        points.push_back(Vector2(last.x - 10, last.y + 10));
-        points.push_back(Vector2(last.x + 10, last.y + 10));
+        // arrow pointing to the top
+        points.push_back(Vector2(last.x, last.y - 12));
       }
 
     } else {
+      points.push_back(Vector2(last.x, last.y + 8));
+      points.push_back(Vector2(last.x, last.y - 8));
       if (prev.x < last.x) {
-        points.push_back(Vector2(last.x - 10, last.y + 10));
-        points.push_back(Vector2(last.x - 10, last.y - 10));
+        // arrow poiting to the right
+        points.push_back(Vector2(last.x + 12, last.y));
       } else {
-        points.push_back(Vector2(last.x + 10, last.y + 10));
-        points.push_back(Vector2(last.x + 10, last.y - 10));
+        // arrow pointing to the left
+        points.push_back(Vector2(last.x - 12, last.y));
       }
     }
     arrowHead->set_polygon(points);
+    arrowHead->set_color(Color(0, 0, 0, 1));
     line->add_child(arrowHead);
-    line->set_width(3);
+    line->set_width(2);
     add_child(line);
   }
 
-  Line2D *line = memnew(Line2D);
-  line->set_width(3);
-  Vector2 start = Vector2(0, 0);
-  Vector2 end = Vector2(0, 100);
-  line->add_point(start);
-  line->add_point(end);
-  Polygon2D *arrowHead = memnew(Polygon2D);
-  PackedVector2Array points;
-  points.push_back(end);
-  points.push_back(Vector2(-15, 80));
-  points.push_back(Vector2(15, 80));
-  arrowHead->set_polygon(points);
-  line->add_child(arrowHead);
-  add_child(line);
-
-  // arrow_head.set_polygon(const PackedVector2Array &polygon)
+  CanvasLayer *fixedPanel = memnew(CanvasLayer);
+  add_child(fixedPanel);
+  Panel *info = memnew(Panel);
+  fixedPanel->add_child(info);
+  info->set_size(Vector2(100, 100));
+  info->set_anchor(SIDE_TOP, 0);
+  info->set_anchor(SIDE_RIGHT, 1);
+  info->set_anchor(SIDE_LEFT, 1);
+  info->set_anchor(SIDE_BOTTOM, 0);
 }
