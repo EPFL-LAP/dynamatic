@@ -36,8 +36,8 @@ void dynamatic::buffer::setFPGA20Properties(Channel &channel) {
     channel.props->minTrans = std::max(channel.props->minTrans, 1U);
 
   // Channels connected to memory interfaces are not bufferizable
-  if ((isa<handshake::MemoryControllerOp>(channel.producer)) ||
-      isa<handshake::MemoryControllerOp>(channel.consumer)) {
+  if ((isa<handshake::MemoryOpInterface>(channel.producer)) ||
+      isa<handshake::MemoryOpInterface>(channel.consumer)) {
     channel.props->maxOpaque = 0;
     channel.props->maxTrans = 0;
   }

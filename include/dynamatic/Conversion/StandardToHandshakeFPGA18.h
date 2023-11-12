@@ -46,16 +46,40 @@ public:
   /// region's entry block and forwarding it through all basic blocks.
   LogicalResult createControlOnlyNetwork(ConversionPatternRewriter &rewriter);
 
-  /// Identifies all memory interfaces and operations in the function, replaces
-  /// all load/store-like operations by their handshake counterparts, and fills
-  /// memInfo with information about which operations use which interface.
+  /// Identifies all memory interfaces and their associated operations in the
+  /// function, replaces all load/store-like operations by their handshake
+  /// counterparts, and fills `memInfo` with information about which operations
+  /// use which interface.
   LogicalResult replaceMemoryOps(ConversionPatternRewriter &rewriter,
                                  MemInterfacesInfo &memInfo);
 
+  /// Creates the list(s) of inputs for the memory interface(s) associated with
+  /// a single memory region. Fills the two vectors with, respectively, the list
+  /// of inputs for a memory controller and the list of inputs for an LSQ. An
+  /// empty list of inputs should be interpreted by the caller as "there is no
+  /// need for such a memory interface for this memory region". If both lists of
+  /// inputs are returned non-empty, then both interfaces must be placed, and
+  /// channels between them must be added manually. Returns, in a pair, the
+  /// number of loads that should connect directly to the memory controller and
+  /// the number of loads that should connect directly to the LSQ.
+  std::pair<unsigned, unsigned> deriveMemInterfaceInputs(
+      MemBlockOps &allMemOps, ConversionPatternRewriter &rewriter,
+      SmallVector<Value> &mcInputs, SmallVector<Value> &lsqInputs);
+
   /// Instantiates all memory interfaces and connects them to their respective
-  /// load/store operations.
-  LogicalResult connectToMemory(ConversionPatternRewriter &rewriter,
-                                MemInterfacesInfo &memInfo);
+  /// load/store operations. To choose what type of interface to instantiate,
+  /// looks for the `handshake::NoLSQAttr` attribute on memory operations, which
+  /// indicates that a simple memory controller is enough for the access. For
+  /// any memory region:
+  /// - A single `handshake::MemoryControllerOp` will be instantiated if all of
+  /// its accesses have the `handshake::NoLSQAttr`.
+  /// - A single `handshake::LSQOp` will be instantiated if none of
+  /// its accesses have the `handshake::NoLSQAttr`.
+  /// - Both a `handhsake::MemoryControllerOp` and `handhsake::LSQOp` will be
+  /// instantiated if some but not all of its accesses have the
+  /// `handshake::NoLSQAttr`.
+  LogicalResult connectToMemInterfaces(ConversionPatternRewriter &rewriter,
+                                       MemInterfacesInfo &memInfo);
 
   /// Connect constants to the rest of the circuit. Constants are triggered by a
   /// source if their successor is not a branch/return or memory operation.

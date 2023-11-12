@@ -18,6 +18,7 @@
 #include "circt/Dialect/Handshake/HandshakeOps.h"
 #include "dynamatic/Analysis/ConstantAnalysis.h"
 #include "dynamatic/Conversion/PassDetails.h"
+#include "dynamatic/Support/Attribute.h"
 #include "dynamatic/Support/LogicBB.h"
 #include "mlir/Dialect/Affine/Analysis/AffineAnalysis.h"
 #include "mlir/Dialect/Affine/IR/AffineOps.h"
@@ -84,8 +85,8 @@ static LogicalResult getOpMemRef(Operation *op, Value &out) {
   return op->emitOpError() << "Unknown operation type.";
 }
 
-/// Returns load/store results which are to be given as operands to a
-/// handshake::MemoryControllerOp.
+/// Returns load/store results which are to be given as operands to a memory
+/// interface.
 static SmallVector<Value, 2> getResultsToMemory(Operation *op) {
 
   if (auto loadOp = dyn_cast<handshake::DynamaticLoadOp>(op)) {
@@ -147,12 +148,12 @@ mergeFunctionResults(Region &r, ConversionPatternRewriter &rewriter,
   return results;
 }
 
-/// Returns the control signals from memory controllers to be passed as operands
-/// to the handshake::EndOp of a handshake::FuncOp.
+/// Returns a vector of control signals, one from each memory interface in the
+/// circuit, to be passed as operands to the `handshake::EndOp` operation.
 static SmallVector<Value, 8> getFunctionEndControls(Region &r) {
   SmallVector<Value, 8> controls;
-  for (auto memOp : r.getOps<handshake::MemoryControllerOp>())
-    controls.push_back(memOp.getDone());
+  for (auto memOp : r.getOps<handshake::MemoryOpInterface>())
+    controls.push_back(memOp->getResults().back());
   return controls;
 }
 
@@ -200,9 +201,9 @@ LogicalResult HandshakeLoweringFPGA18::replaceMemoryOps(
     }
   }
 
-  // Replace load and store ops with the corresponding handshake ops
-  // Need to traverse ops in blocks to store them in memRefOps in program
-  // order
+  // Replace load and store operations with their corresponding Handshake
+  // equivalent. Traverse and store memory operations in program order (required
+  // by memory interface placement later)
   for (Operation &op : llvm::make_early_inc_range(r.getOps())) {
     if (!isMemoryOp(&op))
       continue;
@@ -213,6 +214,7 @@ LogicalResult HandshakeLoweringFPGA18::replaceMemoryOps(
              << "Allocation operations are not supported during "
                 "cf-to-handshake lowering.";
 
+    // Extract the reference to the memory region from the memory operation
     rewriter.setInsertionPoint(&op);
     Value memref;
     if (getOpMemRef(&op, memref).failed())
@@ -222,20 +224,21 @@ LogicalResult HandshakeLoweringFPGA18::replaceMemoryOps(
     // Replace memref operation with corresponding handshake operation
     llvm::TypeSwitch<Operation *>(&op)
         .Case<memref::LoadOp>([&](memref::LoadOp loadOp) {
-          auto indices = loadOp.getIndices();
+          OperandRange indices = loadOp.getIndices();
           assert(indices.size() == 1 && "load must be unidimensional");
           newOp = rewriter.create<handshake::DynamaticLoadOp>(
               op.getLoc(), cast<MemRefType>(memref.getType()), indices[0]);
-
+          copyAttr<handshake::NoLSQAttr>(loadOp, newOp);
           // Replace uses of old load result with data result of new load
           op.getResult(0).replaceAllUsesWith(
               dyn_cast<handshake::DynamaticLoadOp>(newOp).getDataResult());
         })
         .Case<memref::StoreOp>([&](memref::StoreOp storeOp) {
-          auto indices = storeOp.getIndices();
+          OperandRange indices = storeOp.getIndices();
           assert(indices.size() == 1 && "load must be unidimensional");
           newOp = rewriter.create<handshake::DynamaticStoreOp>(
               op.getLoc(), indices[0], storeOp.getValueToStore());
+          copyAttr<handshake::NoLSQAttr>(storeOp, newOp);
         })
         .Default([&](auto) {
           return op.emitOpError("Load/store operation cannot be handled.");
@@ -272,66 +275,174 @@ HandshakeLoweringFPGA18::connectConstants(ConversionPatternRewriter &rewriter) {
   return success();
 }
 
-LogicalResult
-HandshakeLoweringFPGA18::connectToMemory(ConversionPatternRewriter &rewriter,
-                                         MemInterfacesInfo &memInfo) {
+/// Determines whether this memory port should connect to an LSQ or a memory
+/// controller.
+static inline bool goesToLSQ(Operation *memOp) {
+  return !memOp->hasAttrOfType<handshake::NoLSQAttr>(
+      handshake::NoLSQAttr::getMnemonic());
+}
 
-  // Connect memories (externally defined by memref block argument) to their
-  // respective loads and stores
-  for (auto &[memref, memBlockOps] : memInfo) {
-    // Derive memory interface inputs from operations interacting with it
-    SmallVector<Value> memInputs;
+/// Determines whether we must place a memory controller for the provided memory
+/// accesses.
+static bool shouldPlaceMC(HandshakeLoweringFPGA18::MemBlockOps &allMemOps) {
+  for (auto &[_, blockMemoryOps] : allMemOps) {
+    for (Operation *memOp : blockMemoryOps) {
+      if (!goesToLSQ(memOp))
+        return true;
+    }
+  }
+  return false;
+}
 
-    unsigned numLoads = 0;
-    for (auto &[block, memOps] : memBlockOps) {
-      // Traverse the list of operations once to determine the number of stores
-      // (and accumulate the total number of loads)
-      unsigned numStores = 0;
-      for (Operation *op : memOps) {
-        if (isa<handshake::DynamaticStoreOp>(op))
-          ++numStores;
+std::pair<unsigned, unsigned> HandshakeLoweringFPGA18::deriveMemInterfaceInputs(
+    MemBlockOps &allMemOps, ConversionPatternRewriter &rewriter,
+    SmallVector<Value> &mcInputs, SmallVector<Value> &lsqInputs) {
+
+  // Figure out whether a simple memory controller is needed
+  bool placeMC = shouldPlaceMC(allMemOps);
+
+  unsigned numLoadsMC = 0, numLoadsLSQ = 0;
+  for (auto &[block, blockMemoryOps] : allMemOps) {
+    // Traverse the list of operations once to determine, for the block:
+    // - whether we need to connect an LSQ to at least one acceess of the
+    // block
+    // - the total number of stores in the block
+    // - the number of stores in the block that should go to an LSQ
+    // - the total number of loads in the function (accumulate)
+    unsigned numStores = 0, numStoresLSQ = 0;
+    for (Operation *memOp : blockMemoryOps) {
+      bool lsq = goesToLSQ(memOp);
+      if (isa<handshake::DynamaticStoreOp>(memOp)) {
+        ++numStores;
+        if (lsq)
+          ++numStoresLSQ;
+      } else {
+        if (lsq)
+          ++numLoadsLSQ;
         else
-          ++numLoads;
-      }
-
-      if (numStores > 0) {
-        // Add control signal from block, fed through a constant indicating the
-        // number of stores in the block (to eventually indicate block
-        // completion to the end node)
-        Value blockCtrl = getBlockEntryControl(block);
-        rewriter.setInsertionPointAfter(blockCtrl.getDefiningOp());
-        handshake::ConstantOp cstNumStore =
-            rewriter.create<handshake::ConstantOp>(
-                blockCtrl.getLoc(), rewriter.getI32Type(),
-                rewriter.getI32IntegerAttr(numStores), blockCtrl);
-        memInputs.push_back(cstNumStore.getResult());
-      }
-
-      // Traverse the list of operations once more and accumulate memory inputs
-      // coming from the block
-      for (Operation *op : memOps) {
-        // Add results of memory operation to memory interface operands
-        SmallVector<Value, 2> results = getResultsToMemory(op);
-        memInputs.insert(memInputs.end(), results.begin(), results.end());
+          ++numLoadsMC;
       }
     }
 
-    // Create memory interface at the top of the function
-    Block *entryBlock = &r.front();
-    rewriter.setInsertionPointToStart(entryBlock);
-    handshake::MemoryControllerOp memInterface =
-        rewriter.create<handshake::MemoryControllerOp>(
-            entryBlock->front().getLoc(), memref, memInputs, numLoads);
+    // Add a control signal if the block has at least one store
+    if (numStores > 0) {
+      Value blockCtrl = getBlockEntryControl(block);
 
-    // Add data result from memory to each load operation's operands
-    unsigned memResultIdx = 0;
-    for (auto &[block, memOps] : memBlockOps)
-      for (Operation *op : memOps)
-        if (isa<handshake::DynamaticLoadOp>(op))
-          addLoadDataOperand(op, memInterface->getResult(memResultIdx++));
+      // If there is at least one store to the LSQ in the block, add block
+      // control signal to the interface
+      if (numStoresLSQ > 0)
+        lsqInputs.push_back(blockCtrl);
+
+      if (placeMC) {
+        // For simple memory controllers the control signal is fed through a
+        // constant indicating the number of stores in the block (to
+        // eventually indicate block completion to the end node). That's true
+        // even if the stores all go through the LSQ before going to the MC
+        rewriter.setInsertionPointAfter(blockCtrl.getDefiningOp());
+        handshake::ConstantOp cstOp = rewriter.create<handshake::ConstantOp>(
+            blockCtrl.getLoc(), rewriter.getI32Type(),
+            rewriter.getI32IntegerAttr(numStores), blockCtrl);
+        mcInputs.push_back(cstOp.getResult());
+      }
+    }
+
+    // Traverse the list of memory operations in the block once more and
+    // accumulate memory inputs coming from the block for the correct
+    // interface
+    for (Operation *memOp : blockMemoryOps) {
+      SmallVector<Value, 2> results = getResultsToMemory(memOp);
+      // Add results of memory operation to operands of a memory interface
+      SmallVector<Value> &ifaceInputs = goesToLSQ(memOp) ? lsqInputs : mcInputs;
+      llvm::copy(results, std::back_inserter(ifaceInputs));
+    }
+  }
+  return std::make_pair(numLoadsMC, numLoadsLSQ);
+}
+
+LogicalResult HandshakeLoweringFPGA18::connectToMemInterfaces(
+    ConversionPatternRewriter &rewriter, MemInterfacesInfo &memInfo) {
+
+  // Connect memories (externally defined by memref block argument) to their
+  // respective loads and stores
+  for (auto &[memref, allMemOps] : memInfo) {
+    // Derive memory interface inputs from operations interacting with it
+    SmallVector<Value> mcInputs, lsqInputs;
+    auto [loadsMC, loadsLSQ] =
+        deriveMemInterfaceInputs(allMemOps, rewriter, mcInputs, lsqInputs);
+
+    // Check whether we need any interface at all
+    if (mcInputs.empty() && lsqInputs.empty())
+      continue;
+
+    // Prepare to insert memory interfaces
+    Block *entryBlock = &r.front();
+    Location loc = entryBlock->front().getLoc();
+    rewriter.setInsertionPointToStart(entryBlock);
+    handshake::MemoryControllerOp mcOp = nullptr;
+    handshake::LSQOp lsqOp = nullptr;
+
+    if (!mcInputs.empty() && lsqInputs.empty()) {
+      // We only need a memory controller
+      mcOp = rewriter.create<handshake::MemoryControllerOp>(loc, memref,
+                                                            mcInputs, loadsMC);
+    } else if (mcInputs.empty() && !lsqInputs.empty()) {
+      // We only need an LSQ
+      lsqOp = rewriter.create<handshake::LSQOp>(loc, memref, lsqInputs,
+                                                loadsLSQ, false);
+    } else {
+      // We need a MC and an LSQ. They need to be connected with 4 new channels
+      // so that the LSQ can forward its loads and stores to the MC. We need
+      // load address, store address, and store data channels from the LSQ to
+      // the MC and a load data channel from the MC to the LSQ
+      MemRefType memrefType = memref.getType().cast<MemRefType>();
+
+      // Create 3 backedges (load address, store address, store data) for the MC
+      // inputs that will eventually come from the LSQ.
+      BackedgeBuilder edgeBuilder(rewriter, loc);
+      Backedge ldAddr = edgeBuilder.get(rewriter.getIndexType());
+      Backedge stAddr = edgeBuilder.get(rewriter.getIndexType());
+      Backedge stData = edgeBuilder.get(memrefType.getElementType());
+      mcInputs.push_back(ldAddr);
+      mcInputs.push_back(stAddr);
+      mcInputs.push_back(stData);
+
+      // Create the memory controller, adding 1 to its load count so that it
+      // generates a load data result for the LSQ
+      mcOp = rewriter.create<handshake::MemoryControllerOp>(
+          loc, memref, mcInputs, loadsMC + 1);
+
+      // Add the MC's load data result to the LSQ's inputs and create the LSQ,
+      // passing a flag to the builder so that it generates the necessary
+      // outputs that will go to the MC
+      lsqInputs.push_back(mcOp.getMemOutputs().back());
+      lsqOp = rewriter.create<handshake::LSQOp>(loc, memref, lsqInputs,
+                                                loadsLSQ, true);
+
+      // Resolve the backedges to fully connect the MC and LSQ
+      ValueRange lsqMemResults = lsqOp.getMemOutputs().take_back(3);
+      ldAddr.setValue(lsqMemResults[0]);
+      stAddr.setValue(lsqMemResults[1]);
+      stData.setValue(lsqMemResults[2]);
+    }
+
+    // At this point, all load operations are missing their second operand
+    // which is the data value coming from a memory interface back to the port.
+    // These are the first results of each memory interface, in program order
+    unsigned mcResultIdx = 0, lsqResultIdx = 0;
+    for (auto &[_, blockMemoryOps] : allMemOps) {
+      for (Operation *memOp : blockMemoryOps) {
+        if (isa<handshake::DynamaticLoadOp>(memOp)) {
+          if (goesToLSQ(memOp))
+            addLoadDataOperand(memOp, lsqOp->getResult(lsqResultIdx++));
+          else
+            addLoadDataOperand(memOp, mcOp->getResult(mcResultIdx++));
+        }
+      }
+    }
   }
 
-  return success();
+  // If we added constant controls, they must be labeled with a basic block
+  return idBasicBlocks(rewriter);
 }
 
 LogicalResult HandshakeLoweringFPGA18::replaceUndefinedValues(
@@ -368,7 +479,7 @@ LogicalResult
 HandshakeLoweringFPGA18::idBasicBlocks(ConversionPatternRewriter &rewriter) {
   for (auto [blockID, block] : llvm::enumerate(r)) {
     for (Operation &op : block) {
-      if (!isa<handshake::MemoryControllerOp>(op)) {
+      if (!isa<handshake::MemoryOpInterface>(op)) {
         // Memory interfaces do not naturally belong to any block, so they do
         // not get an attribute
         op.setAttr(BB_ATTR, rewriter.getUI32IntegerAttr(blockID));
@@ -581,8 +692,8 @@ static LogicalResult lowerRegion(HandshakeLoweringFPGA18 &hl) {
   if (failed(runPartialLowering(hl, &HandshakeLoweringFPGA18::idBasicBlocks)))
     return failure();
 
-  if (failed(runPartialLowering(hl, &HandshakeLoweringFPGA18::connectToMemory,
-                                memInfo)))
+  if (failed(runPartialLowering(
+          hl, &HandshakeLoweringFPGA18::connectToMemInterfaces, memInfo)))
     return failure();
 
   if (failed(
