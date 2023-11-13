@@ -307,15 +307,15 @@ std::pair<unsigned, unsigned> HandshakeLoweringFPGA18::deriveMemInterfaceInputs(
     // - whether we need to connect an LSQ to at least one acceess of the
     // block
     // - the total number of stores in the block
-    // - the number of stores in the block that should go to an LSQ
-    // - the total number of loads in the function (accumulate)
-    unsigned numStores = 0, numStoresLSQ = 0;
+    // - the total number of loads in the function (accumulate) that go to an
+    //   MC/LSQ
+    unsigned numStores = 0;
+    bool blockHasLSQAccess = false;
     for (Operation *memOp : blockMemoryOps) {
       bool lsq = goesToLSQ(memOp);
+      blockHasLSQAccess |= lsq;
       if (isa<handshake::DynamaticStoreOp>(memOp)) {
         ++numStores;
-        if (lsq)
-          ++numStoresLSQ;
       } else {
         if (lsq)
           ++numLoadsLSQ;
@@ -324,26 +324,22 @@ std::pair<unsigned, unsigned> HandshakeLoweringFPGA18::deriveMemInterfaceInputs(
       }
     }
 
-    // Add a control signal if the block has at least one store
-    if (numStores > 0) {
-      Value blockCtrl = getBlockEntryControl(block);
+    Value blockCtrl = getBlockEntryControl(block);
+    // If there is at least one access to the LSQ in the block, add block
+    // control signal to the interface
+    if (blockHasLSQAccess)
+      lsqInputs.push_back(blockCtrl);
 
-      // If there is at least one store to the LSQ in the block, add block
-      // control signal to the interface
-      if (numStoresLSQ > 0)
-        lsqInputs.push_back(blockCtrl);
-
-      if (placeMC) {
-        // For simple memory controllers the control signal is fed through a
-        // constant indicating the number of stores in the block (to
-        // eventually indicate block completion to the end node). That's true
-        // even if the stores all go through the LSQ before going to the MC
-        rewriter.setInsertionPointAfter(blockCtrl.getDefiningOp());
-        handshake::ConstantOp cstOp = rewriter.create<handshake::ConstantOp>(
-            blockCtrl.getLoc(), rewriter.getI32Type(),
-            rewriter.getI32IntegerAttr(numStores), blockCtrl);
-        mcInputs.push_back(cstOp.getResult());
-      }
+    if (numStores > 0 && placeMC) {
+      // For simple memory controllers the control signal is fed through a
+      // constant indicating the number of stores in the block (to
+      // eventually indicate block completion to the end node). That's true
+      // even if the stores all go through the LSQ before going to the MC
+      rewriter.setInsertionPointAfter(blockCtrl.getDefiningOp());
+      handshake::ConstantOp cstOp = rewriter.create<handshake::ConstantOp>(
+          blockCtrl.getLoc(), rewriter.getI32Type(),
+          rewriter.getI32IntegerAttr(numStores), blockCtrl);
+      mcInputs.push_back(cstOp.getResult());
     }
 
     // Traverse the list of memory operations in the block once more and

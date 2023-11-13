@@ -588,9 +588,65 @@ static void patchUpIRForLegacyBuffers(handshake::FuncOp funcOp) {
   }
 }
 
+/// Converts an array of unsigned numbers to a string of the following format:
+/// "{array[0];array[1];...;array[size - 1];0;0;...;0}". The "0"w are generated
+/// dynamically to reach `length` elements based on size of the array; the
+/// latter of which cannot exceed the length.
+static std::string arrayToString(ArrayRef<unsigned> array, unsigned length) {
+  std::stringstream ss;
+  assert(array.size() <= length && "vector too large");
+  ss << "{";
+  if (!array.empty()) {
+    for (unsigned num : array.drop_back())
+      ss << num << ";";
+    ss << array.back();
+    for (size_t i = array.size(); i < length; ++i)
+      ss << ";0";
+  } else {
+    for (size_t i = 0; i < length - 1; ++i)
+      ss << "0;";
+    ss << "0";
+  }
+  ss << "}";
+  return ss.str();
+}
+
+/// Converts a bidimensional array of unsigned numbers to a string of the
+/// following format: "{biArray[0];biArray[1];...;biArray[size - 1]}" where each
+/// `biArray` element is represented using `arrayToString` with the provided
+/// length.
+static std::string biArrayToString(ArrayRef<SmallVector<unsigned>> biArray,
+                                   unsigned length) {
+  std::stringstream ss;
+  ss << "{";
+  if (!biArray.empty()) {
+    for (ArrayRef<unsigned> array : biArray.drop_back())
+      ss << arrayToString(array, length) << ";";
+    ss << arrayToString(biArray.back(), length);
+  }
+  ss << "}";
+  return ss.str();
+}
+
 LogicalResult DOTPrinter::annotateNode(Operation *op,
                                        mlir::raw_indented_ostream &os) {
-  auto info =
+  /// Set common attributes for memory interfaces
+  auto setMemInterfaceAttr = [&](NodeInfo &info, FuncMemoryPorts &ports,
+                                 Value memref) {
+    info.stringAttr["in"] = getInputForMemInterface(ports);
+    info.stringAttr["out"] = getOutputForMemInterface(ports);
+
+    // Set memory name
+    size_t argIdx = cast<BlockArgument>(memref).getArgNumber();
+    info.stringAttr["memory"] =
+        op->getParentOfType<handshake::FuncOp>().getArgName(argIdx).str();
+
+    info.intAttr["bbcount"] = ports.getNumPorts(MemoryPort::Kind::CONTROL);
+    info.intAttr["ldcount"] = ports.getNumPorts(MemoryPort::Kind::LOAD);
+    info.intAttr["stcount"] = ports.getNumPorts(MemoryPort::Kind::STORE);
+  };
+
+  NodeInfo info =
       llvm::TypeSwitch<Operation *, NodeInfo>(op)
           .Case<handshake::MergeOp>([&](auto) { return NodeInfo("Merge"); })
           .Case<handshake::MuxOp>([&](handshake::MuxOp op) {
@@ -619,42 +675,83 @@ LogicalResult DOTPrinter::annotateNode(Operation *op,
             return info;
           })
           .Case<handshake::MemoryControllerOp>(
-              [&](handshake::MemoryControllerOp memOp) {
+              [&](handshake::MemoryControllerOp mcOp) {
                 auto info = NodeInfo("MC");
-
-                MCPorts ports = memOp.getPorts();
-                info.stringAttr["in"] = getInputForMemInterface(ports);
-                info.stringAttr["out"] = getOutputForMemInterface(ports);
-
-                // Set memory name
-                Value memref = memOp.getMemref();
-                size_t argIdx = cast<BlockArgument>(memref).getArgNumber();
-                info.stringAttr["memory"] =
-                    op->getParentOfType<handshake::FuncOp>()
-                        .getArgName(argIdx)
-                        .str();
-
-                info.intAttr["bbcount"] =
-                    ports.getNumPorts(MemoryPort::Kind::CONTROL);
-                info.intAttr["ldcount"] =
-                    ports.getNumPorts(MemoryPort::Kind::LOAD);
-                info.intAttr["stcount"] =
-                    ports.getNumPorts(MemoryPort::Kind::STORE);
+                MCPorts ports = mcOp.getPorts();
+                setMemInterfaceAttr(info, ports, mcOp.getMemref());
                 return info;
               })
           .Case<handshake::LSQOp>([&](handshake::LSQOp lsqOp) {
             auto info = NodeInfo("LSQ");
-
             LSQPorts ports = lsqOp.getPorts();
-            info.stringAttr["in"] = getInputForMemInterface(ports);
-            info.stringAttr["out"] = getOutputForMemInterface(ports);
+            setMemInterfaceAttr(info, ports, lsqOp.getMemref());
+            unsigned depth = 16;
+            info.intAttr["fifoDepth"] = depth;
 
-            // Set memory name
-            Value memref = lsqOp.getMemref();
-            size_t argIdx = cast<BlockArgument>(memref).getArgNumber();
-            info.stringAttr["memory"] = op->getParentOfType<handshake::FuncOp>()
-                                            .getArgName(argIdx)
-                                            .str();
+            // Create port information for the LSQ generator
+
+            // Number of load and store ports per block
+            SmallVector<unsigned> numLoads, numStores;
+
+            // Offset and (block-relative) port indices for loads and stores.
+            // Note that the offsets are semantically undimensional vectors (one
+            // logical value per block); however, in legacy DOTs they are stored
+            // as bi-dimensional arrays therefore we use the same data-structure
+            // here
+            SmallVector<SmallVector<unsigned>> loadOffsets, storeOffsets,
+                loadPorts, storePorts;
+
+            unsigned loadIdx = 0, storeIdx = 0;
+            for (BlockMemoryPorts &blockPorts : ports.blocks) {
+              // Number of load and store ports per block
+              numLoads.push_back(
+                  blockPorts.getNumPorts(MemoryPort::Kind::LOAD));
+              numStores.push_back(
+                  blockPorts.getNumPorts(MemoryPort::Kind::STORE));
+
+              // Offsets of first load/store in the block and indices of each
+              // load/store port
+              std::optional<unsigned> firstLoadOffset, firstStoreOffset;
+              SmallVector<unsigned> blockLoadPorts, blockStorePorts;
+              for (auto [portIdx, accessPort] :
+                   llvm::enumerate(blockPorts.accessPorts)) {
+                if (isa<LoadPort>(accessPort)) {
+                  if (!firstLoadOffset)
+                    firstLoadOffset = portIdx;
+                  blockLoadPorts.push_back(loadIdx++);
+                } else {
+                  // This is a StorePort
+                  assert(isa<StorePort>(accessPort) &&
+                         "access port must be load or store");
+                  if (!firstStoreOffset)
+                    firstStoreOffset = portIdx;
+                  blockStorePorts.push_back(storeIdx++);
+                }
+              }
+
+              // If there are no loads or no stores in the block, set the
+              // corresponding offset to 0
+              loadOffsets.push_back(
+                  SmallVector<unsigned>{firstLoadOffset.value_or(0)});
+              storeOffsets.push_back(
+                  SmallVector<unsigned>{firstStoreOffset.value_or(0)});
+
+              loadPorts.push_back(blockLoadPorts);
+              storePorts.push_back(blockStorePorts);
+            }
+
+            // Set LSQ attributes
+            info.stringAttr["numLoads"] =
+                arrayToString(numLoads, numLoads.size());
+            info.stringAttr["numStores"] =
+                arrayToString(numStores, numStores.size());
+            info.stringAttr["loadOffsets"] =
+                biArrayToString(loadOffsets, depth);
+            info.stringAttr["storeOffsets"] =
+                biArrayToString(storeOffsets, depth);
+            info.stringAttr["loadPorts"] = biArrayToString(loadPorts, depth);
+            info.stringAttr["storePorts"] = biArrayToString(storePorts, depth);
+
             return info;
           })
           .Case<handshake::DynamaticLoadOp>([&](handshake::DynamaticLoadOp op) {
@@ -1136,6 +1233,11 @@ LogicalResult DOTPrinter::printNode(Operation *op,
 
   // Print node name
   std::string opName = getUniqueName(op);
+  if (inLegacyMode()) {
+    // LSQ must be capitalized in legacy modes for dot2vhdl to recognize it
+    if (size_t idx = opName.find("lsq"); idx != std::string::npos)
+      opName = "LSQ" + opName.substr(3);
+  }
   os << "\"" << opName << "\""
      << " [mlir_op=\"" << canonicalName << "\", ";
 
@@ -1196,8 +1298,16 @@ LogicalResult DOTPrinter::printEdge(Operation *src, Operation *dst, Value val,
       legacyBuffers && isBitModBetweenBlocks(src)
           ? getUniqueName(src->getOperand(0).getDefiningOp())
           : getUniqueName(src);
+  std::string dstNodeName = getUniqueName(dst);
+  if (inLegacyMode()) {
+    // LSQ must be capitalized in legacy modes for dot2vhdl to recognize it
+    if (size_t idx = srcNodeName.find("lsq"); idx != std::string::npos)
+      srcNodeName = "LSQ" + srcNodeName.substr(3);
+    if (size_t idx = dstNodeName.find("lsq"); idx != std::string::npos)
+      dstNodeName = "LSQ" + dstNodeName.substr(3);
+  }
 
-  os << "\"" << srcNodeName << "\" -> \"" << getUniqueName(dst) << "\" ["
+  os << "\"" << srcNodeName << "\" -> \"" << dstNodeName << "\" ["
      << getStyleOfValue(val);
   if (legacy && failed(annotateEdge(src, dst, val, os)))
     return failure();
