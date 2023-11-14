@@ -15,7 +15,6 @@ USE_SIMPLE_BUFFERS=$5
 POLYGEIST_PATH="$DYNAMATIC_DIR/polygeist/llvm-project/clang/lib/Headers/"
 POLYGEIST_CLANG_BIN="$DYNAMATIC_DIR/bin/cgeist"
 CLANGXX_BIN="$DYNAMATIC_DIR/bin/clang++"
-MLIR_OPT_BIN="$DYNAMATIC_DIR/bin/mlir-opt"
 DYNAMATIC_OPT_BIN="$DYNAMATIC_DIR/bin/dynamatic-opt"
 DYNAMATIC_PROFILER_BIN="$DYNAMATIC_DIR/bin/exp-frequency-profiler"
 DYNAMATIC_EXPORT_DOT_BIN="$DYNAMATIC_DIR/bin/export-dot"
@@ -119,7 +118,7 @@ exit_on_fail "Failed to compile affine to scf" "Compiled affine to scf"
 exit_on_fail "Failed to compile scf to cf" "Compiled scf to cf"
 
 # cf transformations (standard)
-"$MLIR_OPT_BIN" "$F_CF" --allow-unregistered-dialect --canonicalize --cse \
+"$DYNAMATIC_OPT_BIN" "$F_CF" --allow-unregistered-dialect --canonicalize --cse \
     --sccp --symbol-dce --control-flow-sink --loop-invariant-code-motion \
     --canonicalize \
     > "$F_CF_TRANFORMED"
