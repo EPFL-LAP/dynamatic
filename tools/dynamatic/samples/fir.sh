@@ -5,11 +5,12 @@
 set-dynamatic-path  .
 
 # Indicate the path the legacy Dynamatic's top-level directory here (required
-# for write-hdl)
+# for write-hdl and simulate)
 set-legacy-path     ../dynamatic-utils/legacy-dynamatic/dhls/etc/dynamatic
 
-# Set the source file to run
-set-src             integration-test/src/fir/fir.c
+# Set the source file to run (kernel must have the same name as the filename,
+# without the extension)
+set-src             integration-test/fir/fir.c
 
 # Synthesize (from source to Handshake/DOT)
 # Remove the flag to run smart buffer placement (requires Gurobi)

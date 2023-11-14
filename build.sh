@@ -307,6 +307,7 @@ cd "$SCRIPT_CWD" && mkdir -p bin
 create_symlink polygeist/build/bin/cgeist
 create_symlink polygeist/build/bin/polygeist-opt
 create_symlink polygeist/llvm-project/build/bin/mlir-opt
+create_symlink polygeist/llvm-project/build/bin/clang++
 create_symlink circt/build/bin/circt-opt
 create_symlink build/bin/dynamatic
 create_symlink build/bin/dynamatic-opt

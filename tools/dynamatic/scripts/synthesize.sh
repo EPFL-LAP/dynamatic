@@ -14,6 +14,7 @@ USE_SIMPLE_BUFFERS=$5
 # Binaries used during synthesis
 POLYGEIST_PATH="$DYNAMATIC_DIR/polygeist/llvm-project/clang/lib/Headers/"
 POLYGEIST_CLANG_BIN="$DYNAMATIC_DIR/bin/cgeist"
+CLANGXX_BIN="$DYNAMATIC_DIR/bin/clang++"
 MLIR_OPT_BIN="$DYNAMATIC_DIR/bin/mlir-opt"
 DYNAMATIC_OPT_BIN="$DYNAMATIC_DIR/bin/dynamatic-opt"
 DYNAMATIC_PROFILER_BIN="$DYNAMATIC_DIR/bin/exp-frequency-profiler"
@@ -25,6 +26,8 @@ F_SCF="$OUTPUT_DIR/scf.mlir"
 F_CF="$OUTPUT_DIR/std.mlir"
 F_CF_TRANFORMED="$OUTPUT_DIR/std_transformed.mlir"
 F_CF_DYN_TRANSFORMED="$OUTPUT_DIR/std_dyn_transformed.mlir"
+F_PROFILER_BIN="$OUTPUT_DIR/$KERNEL_NAME-profile"
+F_PROFILER_INPUTS="$OUTPUT_DIR/profiler-inputs.txt"
 F_HANDSHAKE="$OUTPUT_DIR/handshake.mlir"
 F_HANDSHAKE_TRANSFORMED="$OUTPUT_DIR/handshake_transformed.mlir"
 F_HANDSHAKE_BUFFERED="$OUTPUT_DIR/handshake_buffered.mlir"
@@ -126,7 +129,7 @@ exit_on_fail "Failed to apply standard transformations to cf" \
 # cf transformations (dynamatic) 
 "$DYNAMATIC_OPT_BIN" "$F_CF_TRANFORMED" --allow-unregistered-dialect \
   --flatten-memref-row-major --flatten-memref-calls --arith-reduce-strength \
-  --push-constants \
+  --push-constants --force-memory-interface="force-mc" \
   > "$F_CF_DYN_TRANSFORMED"
 exit_on_fail "Failed to apply Dynamatic transformations to cf" \
   "Applied Dynamatic transformations to cf"
@@ -156,10 +159,17 @@ if [[ $USE_SIMPLE_BUFFERS -ne 0 ]]; then
     > "$F_HANDSHAKE_BUFFERED"
   exit_on_fail "Failed to place simple buffers" "Placed simple buffers"
 else
+  # Compile kernel's main function to extract profiling information
+  "$CLANGXX_BIN" "$SRC_DIR/$KERNEL_NAME.c" -D PRINT_PROFILING_INFO \
+    -Wno-deprecated -o "$F_PROFILER_BIN"
+  exit_on_fail "Failed to build kernel for profiling" "Built kernel for profiling" 
+
+  "$F_PROFILER_BIN" > "$F_PROFILER_INPUTS"
+  exit_on_fail "Failed to kernel for profiling" "Ran kernel for profiling" 
+
   # cf-level profiler
   "$DYNAMATIC_PROFILER_BIN" "$F_CF_DYN_TRANSFORMED" \
-    --top-level-function="$KERNEL_NAME" \
-    --input-args-file="$SRC_DIR/inputs.txt" \
+    --top-level-function="$KERNEL_NAME" --input-args-file="$F_PROFILER_INPUTS" \
     > $F_FREQUENCIES 
   exit_on_fail "Failed to profile cf-level" "Profiled cf-level"
 
