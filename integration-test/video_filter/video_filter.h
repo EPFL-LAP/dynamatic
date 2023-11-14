@@ -12,6 +12,5 @@ typedef int inout_int_t;
 
 /// Applies a simple transformation (add offset, rescale, and shift) on each
 /// channel of pixels' color values. Arrays are updated in place.
-// NOLINTNEXTLINE(readability-identifier-naming)
 void video_filter(in_int_t offset, in_int_t scale, inout_int_t pixelR[N][N],
                   inout_int_t pixelG[N][N], inout_int_t pixelB[N][N]);
