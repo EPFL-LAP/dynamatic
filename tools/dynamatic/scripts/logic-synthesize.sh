@@ -46,6 +46,7 @@ rm -rf "$SYNTH_DIR" && mkdir -p "$SYNTH_DIR"
 # Copy all synthesizable components to specific folder for Vivado
 mkdir -p "$HDL_DIR"
 cp "$OUTPUT_DIR/$KERNEL_NAME.vhd" "$HDL_DIR"
+cp "$OUTPUT_DIR/"LSQ*.v "$HDL_DIR"
 cp "$LEGACY_DIR"/components/*.vhd "$HDL_DIR"
 
 # Generate synthesization scripts

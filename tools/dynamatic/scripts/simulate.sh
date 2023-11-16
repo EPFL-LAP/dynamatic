@@ -54,6 +54,7 @@ cp "$DYNAMATIC_DIR/integration-test/integration_utils.h" "$SIM_DIR"
 
 # Copy VHDL module and VHDL components to dedicated folder
 cp "$OUTPUT_DIR/$KERNEL_NAME.vhd" "$VHDL_SRC_DIR"
+cp "$OUTPUT_DIR/"LSQ*.v "$VHDL_SRC_DIR"
 cp "$LEGACY_DIR"/components/*.vhd "$VHDL_SRC_DIR"
 
 # Copy sources to dedicated folder
