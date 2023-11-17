@@ -10,6 +10,9 @@ var screen_start_position
 
 @onready var camera = $Camera2D
 
+func _ready():
+	drawAll()
+
 func zoom_at_point(zoom_change, point):
 	var target_zoom = camera.zoom * zoom_change
 	target_zoom = clamp(target_zoom, zoom_minimum, zoom_maximum)
@@ -42,18 +45,8 @@ func _input(event: InputEvent) -> void:
 	elif event is InputEventMouseMotion and dragging:
 		camera.position = Vector2(1/camera.zoom.x,1/camera.zoom.y) * (mouse_start_position - event.position) + screen_start_position
 
-# Called when the node enters the scene tree for the first time.
-func _ready():
-	print("Ready !")
-	drawGraph()
-
-# Called every frame. 'delta' is the elapsed time since the previous frame.
-func _process(delta):
-	pass
-	
-
 func _on_next_pressed():
-	print("Next Cycle")
+	nextCycle()
 
 func _on_prev_pressed():
-	print("Previous Cycle")
+	previousCycle()

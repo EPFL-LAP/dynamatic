@@ -33,12 +33,14 @@
 #include "mlir/IR/BuiltinOps.h"
 #include "mlir/IR/MLIRContext.h"
 #include "mlir/Parser/Parser.h"
+#include "mlir/Support/LogicalResult.h"
 #include "llvm/Support/CommandLine.h"
 #include "llvm/Support/InitLLVM.h"
 #include "llvm/Support/SourceMgr.h"
 #include <godot_cpp/classes/canvas_item.hpp>
 #include <godot_cpp/classes/control.hpp>
 #include <godot_cpp/core/memory.hpp>
+#include <godot_cpp/variant/utility_functions.hpp>
 #include <godot_cpp/variant/vector2.hpp>
 
 using namespace llvm;
@@ -48,27 +50,22 @@ using namespace dynamatic;
 using namespace dynamatic::experimental::visual_dataflow;
 
 void VisualDataflow::_bind_methods() {
-  ClassDB::bind_method(D_METHOD("drawGraph"), &VisualDataflow::drawGraph);
+  ClassDB::bind_method(D_METHOD("drawAll"), &VisualDataflow::drawAll);
+  ClassDB::bind_method(D_METHOD("nextCycle"), &VisualDataflow::nextCycle);
+  ClassDB::bind_method(D_METHOD("previousCycle"),
+                       &VisualDataflow::previousCycle);
 }
 
 VisualDataflow::VisualDataflow() = default;
 
-void VisualDataflow::_ready() {
-  CanvasItem canvas = CanvasItem();
-  Label cycleLabel = Label();
-  cycleLabel.set_text("Cycle: " + String::num_int64(cycle));
-  canvas.add_child(&cycleLabel);
-  add_child(&canvas);
-}
-
-void VisualDataflow::_process(double delta) {}
+void VisualDataflow::drawAll() { drawGraph(); }
 
 void VisualDataflow::drawGraph() {
-
   Graph graph = Graph();
-  GraphParser parser = GraphParser(
-      "/home/alicepotter/dynamatic/experimental/visual-dataflow/test/bicg.dot");
-  if (failed(parser.parse(&graph))) {
+  GraphParser parser = GraphParser(&graph);
+
+  if (failed(parser.parse("../test/bicg.dot"))) {
+    UtilityFunctions::printerr("Failed to parse graph");
     return;
   }
 
@@ -163,21 +160,24 @@ void VisualDataflow::drawGraph() {
     add_child(line);
   }
 
-  CanvasLayer *fixedPanel = memnew(CanvasLayer);
-  add_child(fixedPanel);
-  Panel *info = memnew(Panel);
-  fixedPanel->add_child(info);
-  info->set_size(Vector2(100, 100));
-  info->set_anchor(SIDE_TOP, 0);
-  info->set_anchor(SIDE_RIGHT, 1);
-  info->set_anchor(SIDE_LEFT, 1);
-  info->set_anchor(SIDE_BOTTOM, 0);
+  if (failed(parser.parse("../test/transitions.csv"))) {
+    UtilityFunctions::printerr("Failed to parse transitions");
+    return;
+  }
 }
 
-void VisualDataflow::nextCycle() { cycle++; }
+void VisualDataflow::nextCycle() {
+  cycle++;
+  Label *label =
+      (Label *)get_node_internal("CanvasLayer/VBoxContainer/CycleNumber");
+  label->set_text("Cycle: " + String::num_int64(cycle));
+}
 
 void VisualDataflow::previousCycle() {
   if (cycle > 0) {
     cycle--;
+    Label *label =
+        (Label *)get_node_internal("CanvasLayer/VBoxContainer/CycleNumber");
+    label->set_text("Cycle: " + String::num_int64(cycle));
   }
 }

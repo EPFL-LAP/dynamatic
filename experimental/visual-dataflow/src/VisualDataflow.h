@@ -15,6 +15,7 @@
 
 #include "Graph.h"
 #include "godot_cpp/classes/control.hpp"
+#include <godot_cpp/classes/label.hpp>
 #include <vector>
 
 namespace godot {
@@ -23,15 +24,10 @@ class VisualDataflow : public Control {
   GDCLASS(VisualDataflow, Control)
 
 private:
-  struct Node {
-    double x;
-    double y;
-  };
-
-  int numberOfNodes = 3;
-  // std::vector<Node> nodes;
-
   int cycle = 0;
+
+  void drawCycleNumber();
+  void drawGraph();
 
 protected:
   static void _bind_methods();
@@ -41,11 +37,7 @@ public:
 
   ~VisualDataflow() override = default;
 
-  void _ready() override;
-
-  void _process(double delta) override;
-
-  void drawGraph();
+  void drawAll();
   void nextCycle();
   void previousCycle();
 };
