@@ -24,7 +24,7 @@ class GraphParser {
 public:
   GraphParser(Graph *graph);
 
-  LogicalResult parse(std::string filePath);
+  LogicalResult parse(std::string &filePath);
 
 private:
   Graph *mGraph;

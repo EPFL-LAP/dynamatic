@@ -35,7 +35,7 @@ using namespace dynamatic::experimental::visual_dataflow;
 
 GraphParser::GraphParser(Graph *graph) : mGraph(graph) {}
 
-LogicalResult GraphParser::parse(std::string filePath) {
+LogicalResult GraphParser::parse(std::string &filePath) {
   std::ifstream file(filePath);
   if (!file.is_open()) {
     return failure();
