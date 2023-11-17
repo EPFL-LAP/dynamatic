@@ -57,18 +57,29 @@ struct ChannelState {
 /// Type for mapping channels to their state
 using ChannelMap = llvm::DenseMap<mlir::Value, ChannelState>;
 
-//struct CircuitState {
+struct CircuitState {
+  /// Maps each value to a state
+  ChannelMap channelMap;
+
   /// Stores a value in a channel, and sets its state to VALID.
-  void storeValue(mlir::Value channel, std::optional<llvm::Any> data,
-                  ChannelMap &channelMap);
+  void storeValue(mlir::Value channel, std::optional<llvm::Any> data);
 
   /// Performs multiples storeValue's at once.
   void storeValues(std::vector<llvm::Any> &values,
-                  llvm::ArrayRef<mlir::Value> outs, ChannelMap &channelMap);
+                  llvm::ArrayRef<mlir::Value> outs);
 
   /// Removes a value from a channel, and sets its state to NONE.
-  void removeValue(mlir::Value channel, ChannelMap &channelMap);
-//}
+  void removeValue(mlir::Value channel);
+
+  /// Unwraps the option containing the data for a channel
+  inline std::optional<llvm::Any> getDataOpt(mlir::Value channel);
+
+  /// Unwraps the option containing the data for a channel
+  inline llvm::Any getData(mlir::Value channel);
+
+  /// Returns the DataflowState of the channel
+  DataflowState getState(mlir::Value channel);
+};
 
 //--- Execution Models -------------------------------------------------------//
 
@@ -79,8 +90,8 @@ using ModelMap =
 
 /// Data structure to hold informations passed to tryExecute functions
 struct ExecutableData {
-  /// Maps channels to their state and their data
-  ChannelMap &channelMap;
+  /// Handler for circuit state management
+  CircuitState circuitState;
   /// Maps memory controller ID to their offset value in store
   /// (store[memoryMap[SOME_ID]] is the beginning of the allocated memory
   /// area for this memory controller)

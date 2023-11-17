@@ -178,7 +178,7 @@ class HandshakeExecuter {
 public:
   /// Entry point for circt::handshake::FuncOp top-level functions
   HandshakeExecuter(circt::handshake::FuncOp &func,
-                    ChannelMap &channelMap,
+                    CircuitState &circuitState,
                     std::vector<Any> &results,
                     std::vector<std::vector<Any>> &store,
                     mlir::OwningOpRef<mlir::ModuleOp> &module,
@@ -201,7 +201,7 @@ struct StateManager {
 };
 
 HandshakeExecuter::HandshakeExecuter(circt::handshake::FuncOp &func,
-                                     ChannelMap &channelMap,
+                                     CircuitState &circuitState,
                                      std::vector<Any> &results,
                                      std::vector<std::vector<Any>> &store,
                                      mlir::OwningOpRef<mlir::ModuleOp> &module,
@@ -225,7 +225,7 @@ HandshakeExecuter::HandshakeExecuter(circt::handshake::FuncOp &func,
     }
     // Inititialize all channels 
     for (auto value : op->getOperands()) 
-      channelMap[value] = { DataflowState::NONE, std::nullopt };
+      circuitState.channelMap[value] = { DataflowState::NONE, std::nullopt };
     
   });
 
@@ -243,14 +243,14 @@ HandshakeExecuter::HandshakeExecuter(circt::handshake::FuncOp &func,
       Value bufferRes = bufferOp.getResult();
       APInt value = APInt(bufferRes.getType().getIntOrFloatBitWidth(),
                                   initValues.front());
-      storeValue(bufferRes, value, channelMap);
+      circuitState.storeValue(bufferRes, value);
     }
   }
 
   // Main simulation initilisation
   StateManager manager;
   manager.currentCycle = 0;
-  ExecutableData execData{channelMap, memoryMap,       store,
+  ExecutableData execData{circuitState, memoryMap,       store,
                           models,   internalDataMap, manager.currentCycle};
   // Main simulation loop
   while (true) {
@@ -296,8 +296,9 @@ LogicalResult simulate(StringRef toplevelFunction,
   // accessed by it.  Currently values are assumed to be an integer.
   std::vector<std::vector<Any>> store;
 
-  // A map of channels to their state and value
-  ChannelMap channelMap;
+  // Handler for circuit states
+  CircuitState circuitState;
+  circuitState.channelMap = ChannelMap{};
 
   // We need three things in a function-type independent way.
   // The type signature of the function.
@@ -342,7 +343,7 @@ LogicalResult simulate(StringRef toplevelFunction,
     }
     // Implicit none argument
     APInt apnonearg(1, 0);
-    storeValue(blockArgs[blockArgs.size() - 1], apnonearg, channelMap);
+    circuitState.storeValue(blockArgs[blockArgs.size() - 1], apnonearg);
   } else
     llvm::report_fatal_error("Function '" + toplevelFunction +
                              "' not supported");
@@ -364,7 +365,7 @@ LogicalResult simulate(StringRef toplevelFunction,
       unsigned buffer;
       if (allocateMemRef(memreftype, nothing, store, buffer).failed())
         return failure();
-      storeValue(blockArgs[i], buffer, channelMap);
+      circuitState.storeValue(blockArgs[i], buffer);
       int64_t pos = 0;
       std::stringstream arg(inputArgs[i]);
       while (!arg.eof()) {
@@ -374,7 +375,7 @@ LogicalResult simulate(StringRef toplevelFunction,
       }
     } else {
       Any value = readValueWithType(type, inputArgs[i]);
-      storeValue(blockArgs[i], value, channelMap);
+      circuitState.storeValue(blockArgs[i], value);
     }
   }
 
@@ -383,7 +384,7 @@ LogicalResult simulate(StringRef toplevelFunction,
   if (circt::handshake::FuncOp toplevel =
           module->lookupSymbol<circt::handshake::FuncOp>(toplevelFunction)) {
     succeeded =
-        HandshakeExecuter(toplevel, channelMap, results, store, module, models)
+        HandshakeExecuter(toplevel, circuitState, results, store, module, models)
             .succeeded();
 
     outs() << "Finished execution\n";
@@ -398,7 +399,7 @@ LogicalResult simulate(StringRef toplevelFunction,
     if (type.isa<mlir::MemRefType>()) {
       // We require this memref type to be fully specified.
       auto memreftype = type.dyn_cast<mlir::MemRefType>();
-      unsigned buffer = any_cast<unsigned>(channelMap[blockArgs[i]].data.value());
+      unsigned buffer = any_cast<unsigned>(circuitState.getData(blockArgs[i]));
       auto elementType = memreftype.getElementType();
       for (int j = 0; j < memreftype.getNumElements(); ++j) {
         if (j != 0)
