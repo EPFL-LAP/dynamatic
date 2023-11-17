@@ -11,14 +11,22 @@
 //===----------------------------------------------------------------------===//
 
 #include "VisualDataflow.h"
-#include "Graph.h"
 #include "GraphParser.h"
 #include "dynamatic/Support/DOTPrinter.h"
 #include "dynamatic/Support/TimingModels.h"
+#include "godot_cpp/classes/canvas_layer.hpp"
+#include "godot_cpp/classes/center_container.hpp"
+#include "godot_cpp/classes/color_rect.hpp"
+#include "godot_cpp/classes/control.hpp"
+#include "godot_cpp/classes/global_constants.hpp"
 #include "godot_cpp/classes/label.hpp"
+#include "godot_cpp/classes/line2d.hpp"
 #include "godot_cpp/classes/node.hpp"
 #include "godot_cpp/classes/panel.hpp"
+#include "godot_cpp/classes/polygon2d.hpp"
+#include "godot_cpp/classes/style_box_flat.hpp"
 #include "godot_cpp/core/class_db.hpp"
+#include "godot_cpp/variant/packed_vector2_array.hpp"
 #include "mlir/Dialect/Func/IR/FuncOps.h"
 #include "mlir/Dialect/LLVMIR/LLVMDialect.h"
 #include "mlir/Dialect/MemRef/IR/MemRef.h"
@@ -29,6 +37,9 @@
 #include "llvm/Support/InitLLVM.h"
 #include "llvm/Support/SourceMgr.h"
 #include <godot_cpp/classes/canvas_item.hpp>
+#include <godot_cpp/classes/control.hpp>
+#include <godot_cpp/core/memory.hpp>
+#include <godot_cpp/variant/vector2.hpp>
 
 using namespace llvm;
 using namespace mlir;
@@ -37,7 +48,7 @@ using namespace dynamatic;
 using namespace dynamatic::experimental::visual_dataflow;
 
 void VisualDataflow::_bind_methods() {
-  ClassDB::bind_method(D_METHOD("addPanel"), &VisualDataflow::addPanel);
+  ClassDB::bind_method(D_METHOD("drawGraph"), &VisualDataflow::drawGraph);
 }
 
 VisualDataflow::VisualDataflow() = default;
@@ -50,33 +61,117 @@ void VisualDataflow::_ready() {
   add_child(&canvas);
 }
 
-void VisualDataflow::my_process(double delta) {}
+void VisualDataflow::_process(double delta) {}
 
-void VisualDataflow::addPanel() {
+void VisualDataflow::drawGraph() {
+
   Graph graph = Graph();
-  GraphParser parser =
-      GraphParser("/home/qgross/Documents/dynamatic/experimental/"
-                  "visual-dataflow/test/bicg.dot");
+  GraphParser parser = GraphParser(
+      "/home/alicepotter/dynamatic/experimental/visual-dataflow/test/bicg.dot");
   if (failed(parser.parse(&graph))) {
     return;
   }
 
-  Label graph_label = Label();
-  graph_label.set_text("My first graph");
-  add_child(&graph_label);
-
-  size_t nodeCounter = 0;
+  std::map<std::string, Color> mapColor;
+  mapColor["lavender"] = Color(0.9, 0.9, 0.98, 1);
+  mapColor["plum"] = Color(0.867, 0.627, 0.867, 1);
+  mapColor["moccasin"] = Color(1.0, 0.894, 0.71, 1);
+  mapColor["lightblue"] = Color(0.68, 0.85, 1.0, 1);
+  mapColor["lightgreen"] = Color(0.56, 0.93, 0.56, 1);
+  mapColor["coral"] = Color(1.0, 0.5, 0.31, 1);
+  mapColor["gainsboro"] = Color(0.86, 0.86, 0.86, 1);
+  mapColor["blue"] = Color(0, 0, 1, 1);
+  mapColor["gold"] = Color(1.0, 0.843, 0.0, 1);
+  mapColor["tan2"] = Color(1.0, 0.65, 0.0, 1);
 
   for (auto &node : graph.getNodes()) {
-    nodeCounter++;
     Panel *panel = memnew(Panel);
-    panel->set_custom_minimum_size(Vector2(200, 100));
-    panel->set_position(Vector2(nodeCounter * 100, nodeCounter * 100));
-    Label node_label = Label();
-    node_label.set_text(node.second.getNodeId().c_str());
-    panel->add_child(&node_label);
+    StyleBoxFlat *style = memnew(StyleBoxFlat);
+    if (mapColor.count(node.second.getColor()))
+      style->set_bg_color(mapColor.at(node.second.getColor()));
+    else
+      style->set_bg_color(Color(1, 1, 1, 1));
+    panel->add_theme_stylebox_override("panel", style);
+    panel->set_custom_minimum_size(
+        Vector2(node.second.getWidth() * 70, 0.5 * 70));
+    std::pair<float, float> pos = node.second.getPosition();
+    panel->set_position(Vector2(pos.first - node.second.getWidth() * 35,
+                                2554 - pos.second - 0.5 * 35));
+
+    // Create a center container to hold the label
+    CenterContainer *center_container = memnew(CenterContainer);
+    center_container->set_anchor(SIDE_LEFT, ANCHOR_BEGIN);
+    center_container->set_anchor(SIDE_TOP, ANCHOR_BEGIN);
+    center_container->set_anchor(SIDE_RIGHT, ANCHOR_END);
+    center_container->set_anchor(SIDE_BOTTOM, ANCHOR_END);
+    panel->add_child(center_container);
+
+    // Add the label to the center container
+    Label *node_label = memnew(Label);
+    node_label->set_text(node.second.getNodeId().c_str());
+    node_label->add_theme_color_override("node_label", Color(1, 1, 1, 1));
+    node_label->set_horizontal_alignment(
+        HorizontalAlignment::HORIZONTAL_ALIGNMENT_CENTER);
+    node_label->set_autowrap_mode(TextServer::AUTOWRAP_WORD);
+    center_container->add_child(node_label);
+
     add_child(panel);
   }
+
+  for (auto &edge : graph.getEdges()) {
+    Line2D *line = memnew(Line2D);
+    line->set_default_color(Color(0, 0, 0, 1));
+    std::vector<std::pair<float, float>> positions = edge.getPositions();
+    Vector2 prev =
+        Vector2(positions.at(1).first, 2554 - positions.at(1).second);
+    Vector2 last = prev;
+    for (size_t i = 1; i < positions.size(); ++i) {
+      Vector2 point =
+          Vector2(positions.at(i).first, 2554 - positions.at(i).second);
+      line->add_point(point);
+      prev = last;
+      last = point;
+    }
+    Polygon2D *arrowHead = memnew(Polygon2D);
+    PackedVector2Array points;
+    if (prev.x == last.x) {
+      points.push_back(Vector2(last.x - 8, last.y));
+      points.push_back(Vector2(last.x + 8, last.y));
+      if (prev.y < last.y) {
+        // arrow pointing to the bottom
+        points.push_back(Vector2(last.x, last.y + 12));
+      } else {
+        // arrow pointing to the top
+        points.push_back(Vector2(last.x, last.y - 12));
+      }
+
+    } else {
+      points.push_back(Vector2(last.x, last.y + 8));
+      points.push_back(Vector2(last.x, last.y - 8));
+      if (prev.x < last.x) {
+        // arrow poiting to the right
+        points.push_back(Vector2(last.x + 12, last.y));
+      } else {
+        // arrow pointing to the left
+        points.push_back(Vector2(last.x - 12, last.y));
+      }
+    }
+    arrowHead->set_polygon(points);
+    arrowHead->set_color(Color(0, 0, 0, 1));
+    line->add_child(arrowHead);
+    line->set_width(2);
+    add_child(line);
+  }
+
+  CanvasLayer *fixedPanel = memnew(CanvasLayer);
+  add_child(fixedPanel);
+  Panel *info = memnew(Panel);
+  fixedPanel->add_child(info);
+  info->set_size(Vector2(100, 100));
+  info->set_anchor(SIDE_TOP, 0);
+  info->set_anchor(SIDE_RIGHT, 1);
+  info->set_anchor(SIDE_LEFT, 1);
+  info->set_anchor(SIDE_BOTTOM, 0);
 }
 
 void VisualDataflow::nextCycle() { cycle++; }

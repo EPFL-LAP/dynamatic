@@ -13,6 +13,7 @@
 #ifndef DYNAMATIC_VISUAL_DATAFLOW_VISUAL_DATAFLOW_H
 #define DYNAMATIC_VISUAL_DATAFLOW_VISUAL_DATAFLOW_H
 
+#include "Graph.h"
 #include "godot_cpp/classes/control.hpp"
 #include <vector>
 
@@ -42,10 +43,9 @@ public:
 
   void _ready() override;
 
-  void my_process(double delta);
+  void _process(double delta) override;
 
-  void addPanel();
-
+  void drawGraph();
   void nextCycle();
   void previousCycle();
 };
