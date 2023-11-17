@@ -13,6 +13,7 @@
 //===----------------------------------------------------------------------===//
 
 #include "dynamatic/Transforms/FlattenMemRefRowMajor.h"
+#include "circt/Dialect/Handshake/HandshakeOps.h"
 #include "dynamatic/Support/Attribute.h"
 #include "dynamatic/Transforms/PassDetails.h"
 #include "mlir/Conversion/LLVMCommon/ConversionTarget.h"
@@ -113,7 +114,7 @@ struct LoadOpConversion : public OpConversionPattern<memref::LoadOp> {
         flattenIndices(rewriter, op, adaptor.getIndices(), op.getMemRefType());
     memref::LoadOp newLoadOp = rewriter.replaceOpWithNewOp<memref::LoadOp>(
         op, adaptor.getMemref(), SmallVector<Value>{finalIdx});
-    copyAttr<handshake::MemDependenceArrayAttr, handshake::NoLSQAttr>(
+    copyAttr<handshake::MemDependenceArrayAttr, handshake::MemInterfaceAttr>(
         op, newLoadOp);
     return success();
   }
@@ -134,7 +135,7 @@ struct StoreOpConversion : public OpConversionPattern<memref::StoreOp> {
     memref::StoreOp newStoreOp = rewriter.replaceOpWithNewOp<memref::StoreOp>(
         op, adaptor.getValue(), adaptor.getMemref(),
         SmallVector<Value>{finalIdx});
-    copyAttr<handshake::MemDependenceArrayAttr, handshake::NoLSQAttr>(
+    copyAttr<handshake::MemDependenceArrayAttr, handshake::MemInterfaceAttr>(
         op, newStoreOp);
     return success();
   }

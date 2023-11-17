@@ -346,8 +346,8 @@ public:
     auto loadOp = rewriter.replaceOpWithNewOp<memref::LoadOp>(
         op, op.getMemRef(), *resultOperands);
 
-    copyAttr<handshake::MemDependenceArrayAttr, handshake::NoLSQAttr>(op,
-                                                                      loadOp);
+    copyAttr<handshake::MemDependenceArrayAttr, handshake::MemInterfaceAttr>(
+        op, loadOp);
     return success();
   }
 };
@@ -396,8 +396,8 @@ public:
     auto storeOp = rewriter.replaceOpWithNewOp<memref::StoreOp>(
         op, op.getValueToStore(), op.getMemRef(), *maybeExpandedMap);
 
-    copyAttr<handshake::MemDependenceArrayAttr, handshake::NoLSQAttr>(op,
-                                                                      storeOp);
+    copyAttr<handshake::MemDependenceArrayAttr, handshake::MemInterfaceAttr>(
+        op, storeOp);
     return success();
   }
 };

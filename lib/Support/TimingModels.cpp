@@ -83,8 +83,7 @@ static unsigned getOpDatawidth(Operation *op) {
       })
       .Case<handshake::MemoryOpInterface>(
           [&](handshake::MemoryOpInterface memOp) {
-            FuncMemoryPorts ports(memOp);
-            (void)getMemoryPorts(ports);
+            FuncMemoryPorts ports = getMemoryPorts(memOp);
             return std::max(ports.ctrlWidth,
                             std::max(ports.addrWidth, ports.ctrlWidth));
           })

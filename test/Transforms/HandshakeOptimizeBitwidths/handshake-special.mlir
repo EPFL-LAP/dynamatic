@@ -47,7 +47,7 @@ handshake.func @cmergeToMuxIndexOpt(%arg0: i32, %arg1: i32, %start: none) -> i32
 // CHECK-LABEL:   handshake.func @memAddrOpt(
 // CHECK-SAME:                               %[[VAL_0:.*]]: memref<1000xi32>,
 // CHECK-SAME:                               %[[VAL_1:.*]]: none, ...) -> i32 attributes {argNames = ["mem", "start"], resNames = ["out0"]} {
-// CHECK:           %[[VAL_2:.*]], %[[VAL_3:.*]] = mem_controller{{\[}}%[[VAL_0]] : memref<1000xi32>] (%[[VAL_4:.*]], %[[VAL_5:.*]], %[[VAL_6:.*]], %[[VAL_7:.*]], %[[VAL_8:.*]], %[[VAL_9:.*]]) : (i32, i10, i10, i32, i10, i32) -> (i32, none)
+// CHECK:           %[[VAL_2:.*]], %[[VAL_3:.*]] = mem_controller{{\[}}%[[VAL_0]] : memref<1000xi32>] (%[[VAL_4:.*]], %[[VAL_5:.*]], %[[VAL_6:.*]], %[[VAL_7:.*]], %[[VAL_8:.*]], %[[VAL_9:.*]]) {connectedBlocks = [0 : i32]} : (i32, i10, i10, i32, i10, i32) -> (i32, none)
 // CHECK:           %[[VAL_10:.*]] = constant %[[VAL_1]] {value = 0 : i8} : i8
 // CHECK:           %[[VAL_11:.*]] = arith.extui %[[VAL_10]] : i8 to i10
 // CHECK:           %[[VAL_12:.*]] = constant %[[VAL_1]] {value = 500 : i16} : i16
@@ -63,7 +63,7 @@ handshake.func @cmergeToMuxIndexOpt(%arg0: i32, %arg1: i32, %start: none) -> i32
 // CHECK:           end %[[VAL_18]], %[[VAL_3]] : i32, none
 // CHECK:         }
 handshake.func @memAddrOpt(%mem: memref<1000xi32>, %start: none) -> i32 {
-  %ldData1, %done = mem_controller[%mem : memref<1000xi32>] (%ctrl1, %ldAddr1, %stAddr1, %stData1, %stAddr2, %stData2) : (i32, i32, i32, i32, i32, i32) -> (i32, none)
+  %ldData1, %done = mem_controller[%mem : memref<1000xi32>] (%ctrl1, %ldAddr1, %stAddr1, %stData1, %stAddr2, %stData2) {connectedBlocks = [0 : i32]} : (i32, i32, i32, i32, i32, i32) -> (i32, none)
   %addr1 = handshake.constant %start {value = 0 : i8} : i8
   %addr2 = handshake.constant %start {value = 500 : i16}: i16
   %addr3 = handshake.constant %start {value = 999 : i32}: i32

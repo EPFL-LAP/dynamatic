@@ -46,13 +46,14 @@ rm -rf "$SYNTH_DIR" && mkdir -p "$SYNTH_DIR"
 # Copy all synthesizable components to specific folder for Vivado
 mkdir -p "$HDL_DIR"
 cp "$OUTPUT_DIR/$KERNEL_NAME.vhd" "$HDL_DIR"
-cp "$OUTPUT_DIR/"LSQ*.v "$HDL_DIR"
+cp "$OUTPUT_DIR/"LSQ*.v "$HDL_DIR" 2> /dev/null
 cp "$LEGACY_DIR"/components/*.vhd "$HDL_DIR"
 
 # Generate synthesization scripts
 echo -e \
 "set_param general.maxThreads 8
 read_vhdl -vhdl2008 [glob $SYNTH_DIR/hdl/*.vhd]
+read_verilog [glob $SYNTH_DIR/hdl/*.v]
 read_xdc "$F_PERIOD"
 synth_design -top $KERNEL_NAME -part xc7k160tfbg484-2 -no_iobuf -mode out_of_context
 report_utilization > $F_UTILIZATION_SYN

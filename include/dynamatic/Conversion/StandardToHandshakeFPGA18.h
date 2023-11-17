@@ -31,13 +31,29 @@ namespace dynamatic {
 // pass.
 class HandshakeLoweringFPGA18 : public HandshakeLowering {
 public:
-  /// Stores a list of opeartions grouped by the basic block they belong to.
-  using MemBlockOps = llvm::MapVector<Block *, SmallVector<Operation *>>;
+  struct MemAccesses {
+    llvm::MapVector<Block *, SmallVector<Operation *>> mcPorts;
+    llvm::MapVector<unsigned, SmallVector<Operation *>> lsqPorts;
+
+    MemAccesses() = default;
+  };
+
+  struct MemInputs {
+    SmallVector<Value> mcInputs;
+    SmallVector<unsigned> mcBlocks;
+    unsigned mcNumLoads;
+
+    SmallVector<Value> lsqInputs;
+    SmallVector<unsigned> lsqGroupSizes;
+    SmallVector<Operation *> lsqLoadOrder;
+    unsigned lsqNumLoads;
+  };
 
   /// Store a mapping between memory interfaces (identified by the function
   /// argument they correspond to) and the set of memory operations referencing
-  /// them grouped by their owning block.
-  using MemInterfacesInfo = llvm::MapVector<Value, MemBlockOps>;
+  /// them.
+  using MemInterfacesInfo = llvm::MapVector<Value, MemAccesses>;
+  using MemInterfacesInputs = llvm::MapVector<Value, MemInputs>;
 
   /// Constructor simply forwards its arguments to the parent class.
   explicit HandshakeLoweringFPGA18(Region &r) : HandshakeLowering(r) {}
@@ -53,33 +69,36 @@ public:
   LogicalResult replaceMemoryOps(ConversionPatternRewriter &rewriter,
                                  MemInterfacesInfo &memInfo);
 
-  /// Creates the list(s) of inputs for the memory interface(s) associated with
-  /// a single memory region. Fills the two vectors with, respectively, the list
-  /// of inputs for a memory controller and the list of inputs for an LSQ. An
-  /// empty list of inputs should be interpreted by the caller as "there is no
-  /// need for such a memory interface for this memory region". If both lists of
-  /// inputs are returned non-empty, then both interfaces must be placed, and
-  /// channels between them must be added manually. Returns, in a pair, the
-  /// number of loads that should connect directly to the memory controller and
-  /// the number of loads that should connect directly to the LSQ.
-  std::pair<unsigned, unsigned> deriveMemInterfaceInputs(
-      MemBlockOps &allMemOps, ConversionPatternRewriter &rewriter,
-      SmallVector<Value> &mcInputs, SmallVector<Value> &lsqInputs);
+  /// Derive input information for all LSQs in the function (stores it in
+  /// `memInputs`), while verifying that the LSQ groups derived from input IR
+  /// annotations make sense (check for linear dominance property within each
+  /// group and cross-group control signal compatibility). Fails if the
+  /// definition of an LSQ group is invalid; succeeds otherwise.
+  LogicalResult verifyAndCreateLSQGroups(ConversionPatternRewriter &rewriter,
+                                         MemInterfacesInfo &memInfo,
+                                         MemInterfacesInputs &memInputs);
+
+  /// Derive input information for all memory controllers in the function
+  /// (stores it in `memInputs`). These include potential additional control
+  /// signals that must be fed to an MC due to the presence of an LSQ on the
+  /// same memory interface. This cannot produce a failure (it returns a
+  /// `LogicalResult` to comply with our lowering step infrastructure).
+  LogicalResult createMCBlocks(ConversionPatternRewriter &rewriter,
+                               MemInterfacesInfo &memInfo,
+                               MemInterfacesInputs &memInputs);
 
   /// Instantiates all memory interfaces and connects them to their respective
-  /// load/store operations. To choose what type of interface to instantiate,
-  /// looks for the `handshake::NoLSQAttr` attribute on memory operations, which
-  /// indicates that a simple memory controller is enough for the access. For
-  /// any memory region:
+  /// load/store operations. For each memory region:
   /// - A single `handshake::MemoryControllerOp` will be instantiated if all of
-  /// its accesses have the `handshake::NoLSQAttr`.
+  /// its accesses indicate that they should connect to an MC.
   /// - A single `handshake::LSQOp` will be instantiated if none of
-  /// its accesses have the `handshake::NoLSQAttr`.
+  /// its accesses indicate that they should connect to an LSQ.
   /// - Both a `handhsake::MemoryControllerOp` and `handhsake::LSQOp` will be
-  /// instantiated if some but not all of its accesses have the
-  /// `handshake::NoLSQAttr`.
+  /// instantiated if some but not all of its accesses indicate that they should
+  /// connect to an LSQ.
   LogicalResult connectToMemInterfaces(ConversionPatternRewriter &rewriter,
-                                       MemInterfacesInfo &memInfo);
+                                       MemInterfacesInfo &memInfo,
+                                       MemInterfacesInputs &memInputs);
 
   /// Connect constants to the rest of the circuit. Constants are triggered by a
   /// source if their successor is not a branch/return or memory operation.
@@ -100,6 +119,8 @@ public:
   /// blocks, merging the results of all return statements, and creating the
   /// region's end operation.
   LogicalResult createReturnNetwork(ConversionPatternRewriter &rewriter);
+
+private:
 };
 
 std::unique_ptr<dynamatic::DynamaticPass<false>>
