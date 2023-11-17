@@ -28,6 +28,7 @@
 #include "llvm/Support/CommandLine.h"
 #include "llvm/Support/InitLLVM.h"
 #include "llvm/Support/SourceMgr.h"
+#include <godot_cpp/classes/canvas_item.hpp>
 
 using namespace llvm;
 using namespace mlir;
@@ -40,6 +41,14 @@ void VisualDataflow::_bind_methods() {
 }
 
 VisualDataflow::VisualDataflow() = default;
+
+void VisualDataflow::_ready() {
+  CanvasItem canvas = CanvasItem();
+  Label cycleLabel = Label();
+  cycleLabel.set_text("Cycle: " + String::num_int64(cycle));
+  canvas.add_child(&cycleLabel);
+  add_child(&canvas);
+}
 
 void VisualDataflow::my_process(double delta) {}
 
@@ -67,5 +76,13 @@ void VisualDataflow::addPanel() {
     node_label.set_text(node.second.getNodeId().c_str());
     panel->add_child(&node_label);
     add_child(panel);
+  }
+}
+
+void VisualDataflow::nextCycle() { cycle++; }
+
+void VisualDataflow::previousCycle() {
+  if (cycle > 0) {
+    cycle--;
   }
 }

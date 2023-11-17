@@ -30,6 +30,8 @@ private:
   int numberOfNodes = 3;
   // std::vector<Node> nodes;
 
+  int cycle = 0;
+
 protected:
   static void _bind_methods();
 
@@ -38,9 +40,14 @@ public:
 
   ~VisualDataflow() override = default;
 
+  void _ready() override;
+
   void my_process(double delta);
 
   void addPanel();
+
+  void nextCycle();
+  void previousCycle();
 };
 
 } // namespace godot
