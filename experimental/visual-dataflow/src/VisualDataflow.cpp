@@ -64,7 +64,10 @@ void VisualDataflow::drawGraph() {
   Graph graph = Graph();
   GraphParser parser = GraphParser(&graph);
 
-  if (failed(parser.parse("../test/bicg.dot"))) {
+  std::string inputDOTFile = "../test/bicg.dot";
+  std::string inputCSVFile = "../test/bicg.csv";
+
+  if (failed(parser.parse(inputDOTFile))) {
     UtilityFunctions::printerr("Failed to parse graph");
     return;
   }
@@ -160,7 +163,7 @@ void VisualDataflow::drawGraph() {
     add_child(line);
   }
 
-  if (failed(parser.parse("../test/transitions.csv"))) {
+  if (failed(parser.parse(inputCSVFile))) {
     UtilityFunctions::printerr("Failed to parse transitions");
     return;
   }
