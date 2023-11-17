@@ -5,7 +5,7 @@
 // CHECK-SAME:                                    %[[VAL_0:.*]]: index,
 // CHECK-SAME:                                    %[[VAL_1:.*]]: memref<4xi32>,
 // CHECK-SAME:                                    %[[VAL_2:.*]]: none, ...) -> none attributes {argNames = ["in0", "in1", "in2"], resNames = ["out0"]} {
-// CHECK:           %[[VAL_3:.*]], %[[VAL_4:.*]] = mem_controller{{\[}}%[[VAL_1]] : memref<4xi32>] (%[[VAL_5:.*]], %[[VAL_6:.*]], %[[VAL_7:.*]], %[[VAL_8:.*]]) : (i32, index, i32, index) -> (i32, none)
+// CHECK:           %[[VAL_3:.*]], %[[VAL_4:.*]] = mem_controller{{\[}}%[[VAL_1]] : memref<4xi32>] (%[[VAL_5:.*]], %[[VAL_6:.*]], %[[VAL_7:.*]], %[[VAL_8:.*]]) {connectedBlocks = [0 : i32]} : (i32, index, i32, index) -> (i32, none)
 // CHECK:           %[[VAL_9:.*]] = merge %[[VAL_0]] {bb = 0 : ui32} : index
 // CHECK:           %[[VAL_10:.*]] = merge %[[VAL_2]] {bb = 0 : ui32} : none
 // CHECK:           %[[VAL_5]] = constant %[[VAL_10]] {bb = 0 : ui32, value = 1 : i32} : i32
@@ -17,8 +17,8 @@
 // CHECK:         }
 func.func @simpleLoadStore(%arg0 : index, %arg1 : memref<4xi32>) {
   %c1 = arith.constant 1 : i32
-  memref.store %c1, %arg1[%arg0] : memref<4xi32>
-  %0 = memref.load %arg1[%arg0] : memref<4xi32>
+  memref.store %c1, %arg1[%arg0] {mem_interface = #handshake.mem_interface<MC>} : memref<4xi32>
+  %0 = memref.load %arg1[%arg0] {mem_interface = #handshake.mem_interface<MC>} : memref<4xi32>
   return
 }
 
@@ -29,7 +29,7 @@ func.func @simpleLoadStore(%arg0 : index, %arg1 : memref<4xi32>) {
 // CHECK-SAME:                                   %[[VAL_1:.*]]: index,
 // CHECK-SAME:                                   %[[VAL_2:.*]]: memref<4xi32>,
 // CHECK-SAME:                                   %[[VAL_3:.*]]: none, ...) -> none attributes {argNames = ["in0", "in1", "in2", "in3"], resNames = ["out0"]} {
-// CHECK:           %[[VAL_4:.*]] = mem_controller{{\[}}%[[VAL_2]] : memref<4xi32>] (%[[VAL_5:.*]], %[[VAL_6:.*]], %[[VAL_7:.*]], %[[VAL_8:.*]], %[[VAL_9:.*]], %[[VAL_10:.*]]) : (i32, index, i32, i32, index, i32) -> none
+// CHECK:           %[[VAL_4:.*]] = mem_controller{{\[}}%[[VAL_2]] : memref<4xi32>] (%[[VAL_5:.*]], %[[VAL_6:.*]], %[[VAL_7:.*]], %[[VAL_8:.*]], %[[VAL_9:.*]], %[[VAL_10:.*]]) {connectedBlocks = [1 : i32, 2 : i32]} : (i32, index, i32, i32, index, i32) -> none
 // CHECK:           %[[VAL_11:.*]] = merge %[[VAL_0]] {bb = 0 : ui32} : i1
 // CHECK:           %[[VAL_12:.*]] = merge %[[VAL_1]] {bb = 0 : ui32} : index
 // CHECK:           %[[VAL_13:.*]] = merge %[[VAL_3]] {bb = 0 : ui32} : none
@@ -57,11 +57,11 @@ func.func @storeMulBlocks(%arg0 : i1, %arg1 : index, %arg2 : memref<4xi32>) {
   cf.cond_br %arg0, ^bb1, ^bb2
 ^bb1:
   %c1 = arith.constant 1 : i32
-  memref.store %c1, %arg2[%arg1] : memref<4xi32>
+  memref.store %c1, %arg2[%arg1] {mem_interface = #handshake.mem_interface<MC>} : memref<4xi32>
   cf.br ^bb3
 ^bb2:
   %c2 = arith.constant 2 : i32
-  memref.store %c2, %arg2[%arg1] : memref<4xi32>
+  memref.store %c2, %arg2[%arg1] {mem_interface = #handshake.mem_interface<MC>} : memref<4xi32>
   cf.br ^bb3
 ^bb3:
   return
@@ -74,7 +74,7 @@ func.func @storeMulBlocks(%arg0 : i1, %arg1 : index, %arg2 : memref<4xi32>) {
 // CHECK-SAME:                                    %[[VAL_1:.*]]: index,
 // CHECK-SAME:                                    %[[VAL_2:.*]]: memref<4xi32>,
 // CHECK-SAME:                                    %[[VAL_3:.*]]: none, ...) -> none attributes {argNames = ["in0", "in1", "in2", "in3"], resNames = ["out0"]} {
-// CHECK:           %[[VAL_4:.*]], %[[VAL_5:.*]] = mem_controller{{\[}}%[[VAL_2]] : memref<4xi32>] (%[[VAL_6:.*]]) : (index) -> (i32, none)
+// CHECK:           %[[VAL_4:.*]], %[[VAL_5:.*]] = mem_controller{{\[}}%[[VAL_2]] : memref<4xi32>] (%[[VAL_6:.*]]) {connectedBlocks = [0 : i32]} : (index) -> (i32, none)
 // CHECK:           %[[VAL_7:.*]] = merge %[[VAL_0]] {bb = 0 : ui32} : i1
 // CHECK:           %[[VAL_8:.*]] = merge %[[VAL_1]] {bb = 0 : ui32} : index
 // CHECK:           %[[VAL_9:.*]] = merge %[[VAL_3]] {bb = 0 : ui32} : none
@@ -93,7 +93,7 @@ func.func @storeMulBlocks(%arg0 : i1, %arg1 : index, %arg2 : memref<4xi32>) {
 // CHECK:           end {bb = 2 : ui32} %[[VAL_26]], %[[VAL_5]] : none, none
 // CHECK:         }
 func.func @forwardLoadToBB(%arg0 : i1, %arg1 : index, %arg2: memref<4xi32>) {
-  %0 = memref.load %arg2[%arg1] : memref<4xi32>
+  %0 = memref.load %arg2[%arg1] {mem_interface = #handshake.mem_interface<MC>} : memref<4xi32>
   cf.cond_br %arg0, ^bb1, ^bb2
 ^bb1:
   %c1 = arith.constant 1 : i32
@@ -109,8 +109,8 @@ func.func @forwardLoadToBB(%arg0 : i1, %arg1 : index, %arg2: memref<4xi32>) {
 // CHECK-SAME:                                     %[[VAL_0:.*]]: i1,
 // CHECK-SAME:                                     %[[VAL_1:.*]]: memref<4xi32>, %[[VAL_2:.*]]: memref<4xi32>,
 // CHECK-SAME:                                     %[[VAL_3:.*]]: none, ...) -> none attributes {argNames = ["in0", "in1", "in2", "in3"], resNames = ["out0"]} {
-// CHECK:           %[[VAL_4:.*]], %[[VAL_5:.*]] = mem_controller{{\[}}%[[VAL_2]] : memref<4xi32>] (%[[VAL_6:.*]], %[[VAL_7:.*]], %[[VAL_8:.*]], %[[VAL_9:.*]]) : (index, i32, index, i32) -> (i32, none)
-// CHECK:           %[[VAL_10:.*]], %[[VAL_11:.*]] = mem_controller{{\[}}%[[VAL_1]] : memref<4xi32>] (%[[VAL_12:.*]], %[[VAL_13:.*]], %[[VAL_14:.*]], %[[VAL_15:.*]]) : (i32, index, i32, index) -> (i32, none)
+// CHECK:           %[[VAL_4:.*]], %[[VAL_5:.*]] = mem_controller{{\[}}%[[VAL_2]] : memref<4xi32>] (%[[VAL_6:.*]], %[[VAL_7:.*]], %[[VAL_8:.*]], %[[VAL_9:.*]]) {connectedBlocks = [1 : i32, 2 : i32]} : (index, i32, index, i32) -> (i32, none)
+// CHECK:           %[[VAL_10:.*]], %[[VAL_11:.*]] = mem_controller{{\[}}%[[VAL_1]] : memref<4xi32>] (%[[VAL_12:.*]], %[[VAL_13:.*]], %[[VAL_14:.*]], %[[VAL_15:.*]]) {connectedBlocks = [1 : i32, 2 : i32]} : (i32, index, i32, index) -> (i32, none)
 // CHECK:           %[[VAL_16:.*]] = merge %[[VAL_0]] {bb = 0 : ui32} : i1
 // CHECK:           %[[VAL_17:.*]] = merge %[[VAL_3]] {bb = 0 : ui32} : none
 // CHECK:           %[[VAL_18:.*]] = constant %[[VAL_17]] {bb = 0 : ui32, value = 0 : index} : index
@@ -139,11 +139,11 @@ func.func @multipleMemories(%arg0 : i1, %arg1: memref<4xi32>, %arg2: memref<4xi3
   %c1 = arith.constant 0 : index
   cf.cond_br %arg0, ^bb1, ^bb2
 ^bb1:
-  %1 = memref.load %arg2[%c0] : memref<4xi32>
-  memref.store %1, %arg1[%c0] : memref<4xi32>
+  %1 = memref.load %arg2[%c0] {mem_interface = #handshake.mem_interface<MC>} : memref<4xi32>
+  memref.store %1, %arg1[%c0] {mem_interface = #handshake.mem_interface<MC>} : memref<4xi32>
   return
 ^bb2:
-  %2 = memref.load %arg1[%c1] : memref<4xi32>
-  memref.store %2, %arg2[%c1] : memref<4xi32>
+  %2 = memref.load %arg1[%c1] {mem_interface = #handshake.mem_interface<MC>} : memref<4xi32>
+  memref.store %2, %arg2[%c1] {mem_interface = #handshake.mem_interface<MC>} : memref<4xi32>
   return
 }

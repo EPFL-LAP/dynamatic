@@ -124,8 +124,8 @@ LogicalResult FPGA20Buffers::setup() {
   std::vector<Value> nonMemChannels;
   llvm::copy_if(
       allChannels, std::back_inserter(nonMemChannels), [&](Value val) {
-        return !val.getDefiningOp<handshake::MemoryControllerOp>() &&
-               !isa<handshake::MemoryControllerOp>(*val.getUsers().begin());
+        return !val.getDefiningOp<handshake::MemoryOpInterface>() &&
+               !isa<handshake::MemoryOpInterface>(*val.getUsers().begin());
       });
 
   // Create custom, path, and elasticity constraints

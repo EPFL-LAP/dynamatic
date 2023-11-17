@@ -88,15 +88,18 @@ const static std::string CMD_EXIT = "exit";
 namespace {
 
 struct FrontendState {
-  std::string dynamaticPath = ".";
+  std::string cwd;
+  std::string dynamaticPath;
   std::optional<std::string> legacyPath = std::nullopt;
   std::optional<std::string> sourcePath = std::nullopt;
 
-  FrontendState() = default;
+  FrontendState(StringRef cwd) : cwd(cwd), dynamaticPath(cwd){};
 
   bool sourcePathIsSet(StringRef keyword);
 
   bool legacyPathIsSet(StringRef keyword);
+
+  std::string makeAbsolutePath(StringRef path);
 };
 
 struct Argument {
@@ -263,6 +266,13 @@ public:
 };
 } // namespace
 
+std::string FrontendState::makeAbsolutePath(StringRef path) {
+  SmallString<128> str;
+  path::append(str, path);
+  fs::make_absolute(cwd, str);
+  return str.str().str();
+}
+
 bool FrontendState::sourcePathIsSet(StringRef keyword) {
   if (!sourcePath.has_value()) {
     llvm::outs() << ERR
@@ -395,7 +405,7 @@ CommandResult SetDynamaticPath::decode(SmallVector<std::string> &tokens) {
     return CommandResult::FAIL;
   }
 
-  state.dynamaticPath = dynamaticPath;
+  state.dynamaticPath = state.makeAbsolutePath(dynamaticPath);
   return CommandResult::SUCCESS;
 }
 
@@ -418,7 +428,7 @@ CommandResult SetLegacyPath::decode(SmallVector<std::string> &tokens) {
     return CommandResult::FAIL;
   }
 
-  state.legacyPath = legacyPath;
+  state.legacyPath = state.makeAbsolutePath(legacyPath);
   return CommandResult::SUCCESS;
 }
 
@@ -441,7 +451,7 @@ CommandResult SetSrc::decode(SmallVector<std::string> &tokens) {
     return CommandResult::FAIL;
   }
 
-  state.sourcePath = sourcePath;
+  state.sourcePath = state.makeAbsolutePath(sourcePath);
   return CommandResult::SUCCESS;
 }
 
@@ -528,8 +538,9 @@ CommandResult Simulate::decode(SmallVector<std::string> &tokens) {
 
   // Create and execute the command
   std::stringstream exec;
-  exec << "./tools/dynamatic/scripts/simulate.sh " << *state.legacyPath << " "
-       << kernelDir << " " << outputDir << " " << kernelName;
+  exec << "./tools/dynamatic/scripts/simulate.sh " << state.dynamaticPath << " "
+       << *state.legacyPath << " " << kernelDir << " " << outputDir << " "
+       << kernelName;
   if (int ret = std::system(exec.str().c_str()); ret != 0)
     return CommandResult::FAIL;
 
@@ -606,8 +617,15 @@ int main(int argc, char **argv) {
   InitLLVM y(argc, argv);
   cl::ParseCommandLineOptions(argc, argv, "Dynamatic Frontend");
 
+  // Get current working directory
+  SmallString<128> cwd;
+  if (std::error_code ec = fs::current_path(cwd); ec.value() != 0) {
+    llvm::errs() << "Failed to read current working directory.\n";
+    return 1;
+  }
+
   // Set up the frontend end and available commands
-  FrontendState state;
+  FrontendState state(cwd.str());
   FrontendCommands commands;
   commands.add<SetDynamaticPath>(state);
   commands.add<SetLegacyPath>(state);

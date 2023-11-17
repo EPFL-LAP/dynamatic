@@ -25,6 +25,10 @@ target_link_libraries(dynamatic-opt
   CIRCTStandardToHandshake
 
   MLIRIR
+  MLIRAffineTransforms
+  MLIRArithTransforms
+  MLIRSCFTransforms
+  MLIRMemRefTransforms
   MLIRLLVMDialect
   MLIRMemRefDialect
   MLIROptLib

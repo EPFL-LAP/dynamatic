@@ -131,7 +131,7 @@ parseOperandIndex(circt::handshake::MemoryControllerOp &op, unsigned cycle) {
   MemoryControllerState memControllerData;
   // Parses the operand list
   FuncMemoryPorts ports = op.getPorts();
-  for (BlockMemoryPorts blockPorts : ports.blocks) {
+  for (GroupMemoryPorts blockPorts : ports.groups) {
     MemoryRequest request;
     for (MemoryPort &port : blockPorts.accessPorts) {
       request.isReady = false;
@@ -398,7 +398,7 @@ bool DynamaticMemController::tryExecute(ExecutableData &data,
   bool hasDoneStuff =
       false; // This might be different for the mem controller but ok
   unsigned bufferStart =
-      llvm::any_cast<unsigned>(data.valueMap[op.getMemref()]);
+      llvm::any_cast<unsigned>(data.valueMap[op.getMemRef()]);
 
   // Add an internal data to keep track of completed load/store requests
   if (!internalDataExists(opArg, data.internalDataMap))

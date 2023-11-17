@@ -772,7 +772,7 @@ struct HandshakeMCAddress
   LogicalResult matchAndRewrite(handshake::MemoryControllerOp mcOp,
                                 PatternRewriter &rewriter) const override {
     unsigned optWidth =
-        getOptAddrWidth(mcOp.getMemref().getType().getDimSize(0));
+        getOptAddrWidth(mcOp.getMemRef().getType().getDimSize(0));
 
     FuncMemoryPorts ports = mcOp.getPorts();
     if (ports.addrWidth == 0 || optWidth >= ports.addrWidth)
@@ -789,7 +789,7 @@ struct HandshakeMCAddress
     // Iterate over memory controller inputs to create the new inputs and the
     // list of accesses
     SmallVector<Value> newInputs;
-    for (BlockMemoryPorts &blockPorts : ports.blocks) {
+    for (GroupMemoryPorts &blockPorts : ports.groups) {
       // Handle eventual control input
       if (blockPorts.hasControl())
         newInputs.push_back(inputs[blockPorts.ctrlPort->getCtrlInputIndex()]);
@@ -809,7 +809,7 @@ struct HandshakeMCAddress
     // Replace the existing memory controller with the optimized one
     rewriter.setInsertionPoint(mcOp);
     auto newOp = rewriter.create<handshake::MemoryControllerOp>(
-        mcOp.getLoc(), mcOp.getMemref(), newInputs,
+        mcOp.getLoc(), mcOp.getMemRef(), newInputs, mcOp.getMCBlocks(),
         mcOp.getPorts().getNumLoadPorts());
     inheritBB(mcOp, newOp);
     rewriter.replaceOp(mcOp, newOp.getResults());
