@@ -85,7 +85,6 @@ private:
 LogicalResult
 AnalyzeMemoryAccessesPass::analyzeMemAccesses(func::FuncOp funcOp) {
   MemAccesses affineAccesses, nonAffineAccesses;
-  NameAnalysis &namer = getAnalysis<NameAnalysis>();
 
   // Identify all memory accesses in the function
   funcOp->walk([&](MemoryEffectOpInterface memEffectOp) {
@@ -98,10 +97,6 @@ AnalyzeMemoryAccessesPass::analyzeMemAccesses(func::FuncOp funcOp) {
           affine::MemRefAccess access(memEffectOp);
           affineAccesses[access.memref].push_back(memEffectOp);
         });
-
-    // Make sure that the memory operation has a unique name, otherwise name it
-    if (!namer.hasName(memEffectOp))
-      namer.setName(memEffectOp);
   });
 
   OpDependencies opDeps;
@@ -159,8 +154,7 @@ LogicalResult AnalyzeMemoryAccessesPass::checkAffineAccessPair(
     SmallVector<DependenceComponent, 2> components;
     DependenceResult result = checkMemrefAccessDependence(
         srcAccess, dstAccess, loopDepth, &constraints, &components);
-    StringRef dstName;
-    (void)namer.getName(dstOp, dstName);
+    StringRef dstName = namer.getName(dstOp);
     if (result.value == DependenceResult::HasDependence) {
       // Add the dependence to the list of dependencies attached to the source
       // operation
@@ -184,9 +178,7 @@ LogicalResult AnalyzeMemoryAccessesPass::checkNonAffineAccessPair(
   // By construction we know that all operations we wish to know the name of are
   // named so we can safely discard the LogicalResult returned by `getName`
   NameAnalysis &namer = getAnalysis<NameAnalysis>();
-  StringRef dstName;
-  (void)namer.getName(dstOp, dstName);
-
+  StringRef dstName = namer.getName(dstOp);
   opDeps[srcOp].push_back(MemDependenceAttr::get(
       &getContext(), dstName, 0, ArrayRef<affine::DependenceComponent>{}));
 
