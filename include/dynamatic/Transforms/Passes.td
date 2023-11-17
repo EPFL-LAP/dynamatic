@@ -53,7 +53,8 @@ def ScfForLoopRotation : DynamaticPass<"scf-rotate-for-loops"> {
   let constructor = "dynamatic::createScfRotateForLoops()";
 }
 
-def ScfSimpleIfToSelect : DynamaticPass<"scf-simple-if-to-select"> {
+def ScfSimpleIfToSelect : DynamaticPass<"scf-simple-if-to-select", "false",
+                                        ["mlir::arith::ArithDialect"]> {
   let summary = "Transforms if's with simple bodies into select's.";
   let description = [{
     Transforms scf::IfOp operations with one result and a specific internal
@@ -73,7 +74,6 @@ def ScfSimpleIfToSelect : DynamaticPass<"scf-simple-if-to-select"> {
         operation.
   }];
   let constructor = "dynamatic::createScfSimpleIfToSelect()";
-  let dependentDialects = ["mlir::arith::ArithDialect"];
 }
 
 //===----------------------------------------------------------------------===//
@@ -118,7 +118,9 @@ def HandshakePrepareForLegacy : DynamaticPass<"handshake-prepare-for-legacy"> {
   let constructor = "dynamatic::createHandshakePrepareForLegacy()";
 }
 
-def HandshakeOptimizeBitwidths : DynamaticPass<"handshake-optimize-bitwidths"> {
+def HandshakeOptimizeBitwidths : DynamaticPass< "handshake-optimize-bitwidths", 
+                                                "false",
+                                                ["mlir::arith::ArithDialect"]> {
   let summary = "Optimize bitwidths of all channels.";
   let description = [{
     Reduces the bitwidths of channels wherever possible. Uses a standard
@@ -127,7 +129,6 @@ def HandshakeOptimizeBitwidths : DynamaticPass<"handshake-optimize-bitwidths"> {
     the Handhsake level.
   }];
   let constructor = "dynamatic::createHandshakeOptimizeBitwidths()";
-  let dependentDialects = ["mlir::arith::ArithDialect"];
   let options = [Option<"legacy", "legacy", "bool", "false",
     "When legacy mode is enabled, disables bitwidth optimization of memory "
     "address channels since they sometime make the legacy dot2vhdl tool "
@@ -151,7 +152,9 @@ def HandshakeConcretizeIndexType : DynamaticPass<"handshake-concretize-index-typ
             "the pass will fail.">];
 }
 
-def HandshakeMinimizeCstWidth : DynamaticPass<"handshake-minimize-cst-width"> {
+def HandshakeMinimizeCstWidth : DynamaticPass<"handshake-minimize-cst-width",
+                                              "false",
+                                              ["mlir::arith::ArithDialect"]> {
   let summary = "Minimizes the bitwidth of all Handshake constants.";
   let description = [{
     Rewrites constant operations with the minimum required bitwidth to support
@@ -161,7 +164,6 @@ def HandshakeMinimizeCstWidth : DynamaticPass<"handshake-minimize-cst-width"> {
     minimization process.
   }];
   let constructor = "dynamatic::createHandshakeMinimizeCstWidth()";
-  let dependentDialects = ["mlir::arith::ArithDialect"];
   let options =
     [Option<"optNegatives", "opt-negatives", "bool", "false",
             "If true, allows bitwidth optimization of negative values.">];
@@ -179,7 +181,6 @@ def HandshakeSetBufferingProperties :
   }];
   let constructor =
     "dynamatic::buffer::createHandshakeSetBufferingProperties()"; 
-  let dependentDialects = ["circt::handshake::HandshakeDialect"];
   let options =
     [Option<"version", "version", "std::string", "\"fpga20\"",
             "Set of buffering properties to apply. Options are: fpga20 "
@@ -201,10 +202,10 @@ def HandshakePlaceBuffers : DynamaticPass<"handshake-place-buffers", "true"> {
   let constructor = "dynamatic::buffer::createHandshakePlaceBuffers()";
   let options = [
     Option<"algorithm", "algorithm", "std::string", "\"fpga20\"",
-    "Algorithm to use for buffer placement. Choices are: 'fpga20' (default), "
-    "'fpga20-legacy' (same as fpga-20 but interprets the MILP's results as "
-    "legacy Dynamatic would, placing at most a single buffer type on any given "
-    "channel)">,
+    "Algorithm to use for buffer placement. Choices are: 'on-merges' (default, "
+    "does not require Gurobi) 'fpga20', 'fpga20-legacy' (same as fpga-20 but "
+    "interprets the MILP's results as legacy Dynamatic would, placing at most "
+    "a single buffer type on any given channel)">,
     Option<"frequencies", "frequencies", "std::string", "",
     "Path to CSV-formatted file containing estimated transition frequencies "
     "between basic blocks in the kernel.">,
@@ -232,29 +233,41 @@ def AnalyzeMemoryAccesses : DynamaticPass<"analyze-memory-accesses"> {
   let description = [{
     Analyzes memory accesses in each function in a module and identifies all
     dependencies between them. Stores information about these dependencies in a
-    MemDependenceArrayAttr attribute attached to each operation that is the
-    source of at least one dependence. The attribute belongs to the Handshake
-    dialect as it only becomes useful during the std-to-handshake lowering pass.
+    `circt::handshake::MemDependenceArrayAttr` attribute attached to each
+    operation that is the source of at least one dependence. The attribute
+    belongs to the Handshake dialect as it only becomes useful during the
+    std-to-handshake lowering pass.
 
-    The pass attempts to find dependencies between all AffineLoadOp's,
-    AffineStoreOp's, memref::LoadOp's and memref::StoreOp's. It uses MLIR's
-    polyhedral analysis infrastructure to identify complex dependencies between
-    pairs of affine accesses, and uses a pessimistic approach for pairs of
-    accesses that involve at least one non-affine access.
+    The pass attempts to find dependencies between all `affine::AffineLoadOp`,
+    `affine::AffineStoreOp`, `memref::LoadOp` and `memref::StoreOp` operations.
+    It uses MLIR's polyhedral analysis infrastructure to identify complex
+    dependencies between pairs of affine accesses, and uses a pessimistic
+    approach for pairs of accesses that involve at least one non-affine access.
 
-    The pass expects to see unique names attached to each memory access (and
-    stored in a MemAccessNameAttr) to allow operations to reference one another
-    in the attributes holding dependence information. As such, running the
-    NameMemoryOpsPass (--name-memory-ops) is a prerequisite to running this
-    pass, which will fail if a memory access is unnamed. The pass will also fail
-    if MLIR's polyhedral analysis infrastructure fails to check for a dependence
-    between two affine accesses.
+    The pass will fail if MLIR's polyhedral analysis infrastructure fails to
+    check for a dependence between two affine accesses.
   }];
   let constructor = "dynamatic::createAnalyzeMemoryAccesses()";
-  let dependentDialects = ["circt::handshake::HandshakeDialect"];
 }
 
-def FlattenMemRefRowMajor : DynamaticPass<"flatten-memref-row-major"> {
+def BackAnnotate : DynamaticPass<"back-annotate"> {
+  let summary = "Back-annotates IR from JSON-formatted attributes";
+  let description = [{
+    Sets supported attributes on operations and operands based on
+    back-annotation information contained in an input JSON file. Operations
+    need to have a unique name (`circt::handshake::NameAttr` attribute) to be
+    able to be referenced by the back-annotation file. Fails if the
+    back-annotation file is badly formatted or if a referenced operation/operand
+    cannot be found in the IR.
+  }];
+  let constructor = "dynamatic::createBackAnnotate()";
+    let options =
+    [Option<"filepath", "filepath", "std::string", "\"\"",
+            "Path to JSON-formatted back-annotation file">];
+}
+
+def FlattenMemRefRowMajor : DynamaticPass<"flatten-memref-row-major", "false",
+                                          ["mlir::memref::MemRefDialect"]> {
   let summary = "Flatten memrefs (row-major order)";
   let description = [{
     Flattens multidimensional memories and accesses to them into
@@ -263,7 +276,26 @@ def FlattenMemRefRowMajor : DynamaticPass<"flatten-memref-row-major"> {
     of column-major indexing when converting multidimensional load/store
     operations.}];
   let constructor = "dynamatic::createFlattenMemRefRowMajorPass()";
-  let dependentDialects = ["mlir::memref::MemRefDialect"];
+}
+
+def ForceMemoryInterface : DynamaticPass<"force-memory-interface"> {
+  let summary = "Forces the use of a single type of memory interface";
+  let description = [{
+    Forces the type of memory interface that will be placed for all memory
+    operations (from the affine or memref dialects) when lowering to Handshake.
+    Internally, adds/modifies the `circt::handshake::MemoryInterfaceAttr`
+    attribute on all memory operations in the IR. Exactly one of the two pass
+    options should be provided at the same time.
+  }];
+  let constructor = "dynamatic::createForceMemoryInterface()";
+  let options = [
+    Option<"forceLSQ", "force-lsq", "bool", "false",
+      "Whether to force the placement of LSQs in the circuit after Handshake "
+      "lowering (off by default, mutually exclusice with force-mc).">,
+    Option<"forceMC", "force-mc", "bool", "false",
+      "Whether to force the placement of MCs in the circuit after Handshake "
+      "lowering (off by default, mutually exclusice with force-lsq).">
+  ];
 }
 
 def NameAllOperations : Pass<"name-all-operations", "mlir::ModuleOp"> {
@@ -273,25 +305,6 @@ def NameAllOperations : Pass<"name-all-operations", "mlir::ModuleOp"> {
     operation in the IR, which is attached as an attribute to each operation.
   }];
   let constructor = "dynamatic::createNameAllOperations()";
-  let dependentDialects = ["circt::handshake::HandshakeDialect"];
-}
-
-def NameMemoryOps : DynamaticPass<"name-memory-ops"> {
-  let summary = "Give a unique name to each memory operation.";
-  let description = [{
-    Sets a MemAccessNameAttr attribute on each AffineLoadOp, AffineStoreOp,
-    memref::LoadOp, and memref::StoreOp instance in the module that holds a
-    unique name (within the context of the parent func::FuncOp) for the
-    operation. These names may be used later to express dependencies between
-    specific memory accesses (for example, in the AnalyzeMemoryAccessesPass).
-    The attribute belongs to the Handshake dialect (and is a simple wrapper
-    around a StringAttr) as it only becomes useful during the std-to-handshake
-    lowering pass.
-
-    The pass fails if one of the previously mentioned memory operation already
-    has one such attribute.
-  }];
-  let constructor = "dynamatic::createNameMemoryOps()";
   let dependentDialects = ["circt::handshake::HandshakeDialect"];
 }
 

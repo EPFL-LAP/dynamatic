@@ -10,16 +10,13 @@
 //
 //===----------------------------------------------------------------------===//
 
-#include "dynamatic/Analysis/NameAnalysis.h"
-#ifndef DYNAMATIC_GUROBI_NOT_INSTALLED
-#include "gurobi_c++.h"
-
+#include "dynamatic/Transforms/BufferPlacement/FPGA20Buffers.h"
 #include "circt/Dialect/Handshake/HandshakeDialect.h"
 #include "circt/Dialect/Handshake/HandshakeOps.h"
 #include "circt/Dialect/Handshake/HandshakePasses.h"
+#include "dynamatic/Analysis/NameAnalysis.h"
 #include "dynamatic/Support/LogicBB.h"
-#include "dynamatic/Transforms/BufferPlacement/BufferingProperties.h"
-#include "dynamatic/Transforms/BufferPlacement/FPGA20Buffers.h"
+#include "dynamatic/Transforms/BufferPlacement/BufferingSupport.h"
 #include "dynamatic/Transforms/PassDetails.h"
 #include "mlir/Dialect/Arith/IR/Arith.h"
 #include "mlir/Dialect/Func/IR/FuncOps.h"
@@ -29,6 +26,9 @@
 #include "mlir/IR/Value.h"
 #include "mlir/Support/IndentedOstream.h"
 #include "mlir/Support/LogicalResult.h"
+
+#ifndef DYNAMATIC_GUROBI_NOT_INSTALLED
+#include "gurobi_c++.h"
 
 using namespace llvm::sys;
 using namespace circt;
@@ -124,8 +124,8 @@ LogicalResult FPGA20Buffers::setup() {
   std::vector<Value> nonMemChannels;
   llvm::copy_if(
       allChannels, std::back_inserter(nonMemChannels), [&](Value val) {
-        return !val.getDefiningOp<handshake::MemoryControllerOp>() &&
-               !isa<handshake::MemoryControllerOp>(*val.getUsers().begin());
+        return !val.getDefiningOp<handshake::MemoryOpInterface>() &&
+               !isa<handshake::MemoryOpInterface>(*val.getUsers().begin());
       });
 
   // Create custom, path, and elasticity constraints
@@ -319,12 +319,15 @@ FPGA20Buffers::addPathConstraints(ValueRange pathChannels,
     // greater than the delay between the buffer's internal register and the
     // post-buffer channel delay
     double bufToOutDelay = outBufDelay + props.outDelay;
-    model.addConstr(opaque * bufToOutDelay <= t2, "path_opaqueChannel");
+    if (bufToOutDelay > 0)
+      model.addConstr(opaque * bufToOutDelay <= t2, "path_opaqueChannel");
+
     // If there is a transparent buffer, arrival time at channel's output must
     // be greater than at channel's input (+ whole channel and buffer delay)
     double inToOutDelay = props.inDelay + dataBufDelay + props.outDelay;
     model.addConstr(t1 + inToOutDelay - bigCst * (opaque - present + 1) <= t2,
                     "path_transparentChannel");
+
     // If there are no buffers, arrival time at channel's output must be greater
     // than at channel's input (+ channel delay)
     model.addConstr(t1 + props.delay - bigCst * present <= t2,

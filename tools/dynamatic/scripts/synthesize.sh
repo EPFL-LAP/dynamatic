@@ -14,7 +14,7 @@ USE_SIMPLE_BUFFERS=$5
 # Binaries used during synthesis
 POLYGEIST_PATH="$DYNAMATIC_DIR/polygeist/llvm-project/clang/lib/Headers/"
 POLYGEIST_CLANG_BIN="$DYNAMATIC_DIR/bin/cgeist"
-MLIR_OPT_BIN="$DYNAMATIC_DIR/bin/mlir-opt"
+CLANGXX_BIN="$DYNAMATIC_DIR/bin/clang++"
 DYNAMATIC_OPT_BIN="$DYNAMATIC_DIR/bin/dynamatic-opt"
 DYNAMATIC_PROFILER_BIN="$DYNAMATIC_DIR/bin/exp-frequency-profiler"
 DYNAMATIC_EXPORT_DOT_BIN="$DYNAMATIC_DIR/bin/export-dot"
@@ -25,6 +25,8 @@ F_SCF="$OUTPUT_DIR/scf.mlir"
 F_CF="$OUTPUT_DIR/std.mlir"
 F_CF_TRANFORMED="$OUTPUT_DIR/std_transformed.mlir"
 F_CF_DYN_TRANSFORMED="$OUTPUT_DIR/std_dyn_transformed.mlir"
+F_PROFILER_BIN="$OUTPUT_DIR/$KERNEL_NAME-profile"
+F_PROFILER_INPUTS="$OUTPUT_DIR/profiler-inputs.txt"
 F_HANDSHAKE="$OUTPUT_DIR/handshake.mlir"
 F_HANDSHAKE_TRANSFORMED="$OUTPUT_DIR/handshake_transformed.mlir"
 F_HANDSHAKE_BUFFERED="$OUTPUT_DIR/handshake_buffered.mlir"
@@ -106,8 +108,8 @@ exit_on_fail "Failed to compile source to affine" "Compiled source to affine"
     
 # affine level -> scf level
 "$DYNAMATIC_OPT_BIN" "$F_AFFINE" --allow-unregistered-dialect \
-  --name-memory-ops --analyze-memory-accesses --lower-affine-to-scf \
-  --scf-simple-if-to-select --scf-rotate-for-loops \
+  --lower-affine-to-scf --flatten-memref-row-major --scf-simple-if-to-select \
+  --scf-rotate-for-loops \
   > "$F_SCF"
 exit_on_fail "Failed to compile affine to scf" "Compiled affine to scf"
 
@@ -117,7 +119,7 @@ exit_on_fail "Failed to compile affine to scf" "Compiled affine to scf"
 exit_on_fail "Failed to compile scf to cf" "Compiled scf to cf"
 
 # cf transformations (standard)
-"$MLIR_OPT_BIN" "$F_CF" --allow-unregistered-dialect --canonicalize --cse \
+"$DYNAMATIC_OPT_BIN" "$F_CF" --allow-unregistered-dialect --canonicalize --cse \
     --sccp --symbol-dce --control-flow-sink --loop-invariant-code-motion \
     --canonicalize \
     > "$F_CF_TRANFORMED"
@@ -126,15 +128,16 @@ exit_on_fail "Failed to apply standard transformations to cf" \
 
 # cf transformations (dynamatic) 
 "$DYNAMATIC_OPT_BIN" "$F_CF_TRANFORMED" --allow-unregistered-dialect \
-  --flatten-memref-row-major --flatten-memref-calls --arith-reduce-strength \
-  --push-constants \
+  --flatten-memref-calls \
+  --arith-reduce-strength="max-adder-depth-mul=1" \
+  --push-constants --force-memory-interface="force-mc" \
   > "$F_CF_DYN_TRANSFORMED"
 exit_on_fail "Failed to apply Dynamatic transformations to cf" \
   "Applied Dynamatic transformations to cf"
 
 # cf level -> handshake level
 "$DYNAMATIC_OPT_BIN" "$F_CF_DYN_TRANSFORMED" --allow-unregistered-dialect \
-  --lower-std-to-handshake-fpga18="id-basic-blocks" \
+  --lower-std-to-handshake-fpga18 \
   --handshake-fix-arg-names="source=$SRC_DIR/$KERNEL_NAME.c" \
   > "$F_HANDSHAKE"
 exit_on_fail "Failed to compile cf to handshake" "Compiled cf to handshake"
@@ -153,15 +156,21 @@ if [[ $USE_SIMPLE_BUFFERS -ne 0 ]]; then
   # Simple buffer placement
   "$DYNAMATIC_OPT_BIN" "$F_HANDSHAKE_TRANSFORMED" \
     --allow-unregistered-dialect \
-    --handshake-insert-buffers="buffer-size=2 strategy=cycles" \
-    --handshake-infer-basic-blocks \
+    --handshake-place-buffers="algorithm=on-merges" \
     > "$F_HANDSHAKE_BUFFERED"
   exit_on_fail "Failed to place simple buffers" "Placed simple buffers"
 else
+  # Compile kernel's main function to extract profiling information
+  "$CLANGXX_BIN" "$SRC_DIR/$KERNEL_NAME.c" -D PRINT_PROFILING_INFO \
+    -Wno-deprecated -o "$F_PROFILER_BIN"
+  exit_on_fail "Failed to build kernel for profiling" "Built kernel for profiling" 
+
+  "$F_PROFILER_BIN" > "$F_PROFILER_INPUTS"
+  exit_on_fail "Failed to kernel for profiling" "Ran kernel for profiling" 
+
   # cf-level profiler
   "$DYNAMATIC_PROFILER_BIN" "$F_CF_DYN_TRANSFORMED" \
-    --top-level-function="$KERNEL_NAME" \
-    --input-args-file="$SRC_DIR/inputs.txt" \
+    --top-level-function="$KERNEL_NAME" --input-args-file="$F_PROFILER_INPUTS" \
     > $F_FREQUENCIES 
   exit_on_fail "Failed to profile cf-level" "Profiled cf-level"
 

@@ -22,6 +22,7 @@
 
 using namespace mlir;
 using namespace circt;
+using namespace dynamatic;
 using namespace dynamatic::experimental;
 
 /// Cycles it take for corresponding operations to execute
@@ -34,15 +35,15 @@ using namespace dynamatic::experimental;
 //===----------------------------------------------------------------------===//
 
 /// Stores a value in a channel, and sets its state to VALID.
-void dynamatic::experimental::CircuitState::storeValue(mlir::Value channel,
-                                         std::optional<llvm::Any> data) {
+void dynamatic::experimental::CircuitState::storeValue(
+    mlir::Value channel, std::optional<llvm::Any> data) {
   channelMap[channel].state = DataflowState::VALID;
   channelMap[channel].data = std::move(data);
 }
 
 /// Performs multiples storeValue's at once.
-void dynamatic::experimental::CircuitState::storeValues(std::vector<llvm::Any> &values,
-                                          llvm::ArrayRef<mlir::Value> outs) {
+void dynamatic::experimental::CircuitState::storeValues(
+    std::vector<llvm::Any> &values, llvm::ArrayRef<mlir::Value> outs) {
   assert(values.size() == outs.size());
   for (unsigned long i = 0; i < outs.size(); ++i)
     storeValue(outs[i], values[i]);
@@ -160,36 +161,29 @@ static inline void memoryTransfer(Value from, Value to, ExecutableData &data) {
 static MemoryControllerState
 parseOperandIndex(circt::handshake::MemoryControllerOp &op, unsigned cycle) {
   MemoryControllerState memControllerData;
-  unsigned operandIndex = 1; // ignores memref operand (at index 0)
-
   // Parses the operand list
-  auto accessesPerBB = op.getAccesses();
-  for (auto [bbIndex, accesses] : llvm::enumerate(accessesPerBB)) {
-    auto accessesArray = accesses.dyn_cast<ArrayAttr>();
-
-    if (op.bbHasControl(bbIndex))
-      operandIndex++; // Skip the %bbX
-
+  FuncMemoryPorts ports = op.getPorts();
+  for (GroupMemoryPorts blockPorts : ports.groups) {
     MemoryRequest request;
-    for (auto &access : accessesArray) {
-      auto type = cast<circt::handshake::AccessTypeEnumAttr>(access).getValue();
-      request.type = type;
+    for (MemoryPort &port : blockPorts.accessPorts) {
       request.isReady = false;
       request.lastExecution = 0;
-      if (type == AccessTypeEnum::Store) {
-        request.addressIdx = operandIndex++;
-        request.dataIdx = operandIndex;
+      if (std::optional<StorePort> storePort = dyn_cast<StorePort>(port)) {
+        request.isLoad = true;
+        request.addressIdx = storePort->getAddrInputIndex();
+        request.dataIdx = storePort->getDataInputIndex();
         request.cyclesToComplete = CYCLE_TIME_STORE_OP;
         memControllerData.storeRequests.push_back(request);
       } else {
-        request.addressIdx = operandIndex;
-        request.dataIdx = 0;
+        std::optional<LoadPort> loadPort = dyn_cast<LoadPort>(port);
+        assert(loadPort && "port must be load or store");
+        request.isLoad = false;
+        request.addressIdx = loadPort->getAddrInputIndex();
+        request.dataIdx = loadPort->getDataOutputIndex();
         request.cyclesToComplete = CYCLE_TIME_LOAD_OP;
         memControllerData.loadRequests.push_back(request);
       }
-      operandIndex++;
     }
-    bbIndex++;
   }
 
   return memControllerData;
@@ -333,9 +327,11 @@ bool DefaultControlMerge::tryExecute(ExecutableData &data,
     if (data.circuitState.getState(in.value()) == DataflowState::VALID) {
       if (found)
         op.emitOpError("More than one valid input to CMerge!");
-      data.circuitState.storeValue(op.getResult(), data.circuitState.getDataOpt(in.value()));
-      data.circuitState.storeValue(op.getIndex(),
-                 APInt(IndexType::kInternalStorageBitWidth, in.index()));
+      data.circuitState.storeValue(op.getResult(),
+                                   data.circuitState.getDataOpt(in.value()));
+      data.circuitState.storeValue(
+          op.getIndex(),
+          APInt(IndexType::kInternalStorageBitWidth, in.index()));
       // Consume the inputs.
       data.circuitState.removeValue(in.value());
       found = true;
@@ -434,7 +430,7 @@ bool DynamaticMemController::tryExecute(ExecutableData &data,
   bool hasDoneStuff =
       false; // This might be different for the mem controller but ok
   unsigned bufferStart =
-      llvm::any_cast<unsigned>(data.circuitState.getData(op.getMemref()));
+      llvm::any_cast<unsigned>(data.circuitState.getData(op.getMemRef()));
 
   // Add an internal data to keep track of completed load/store requests
   if (!internalDataExists(opArg, data.internalDataMap))
@@ -539,7 +535,8 @@ bool DynamaticLoad::tryExecute(ExecutableData &data, circt::Operation &opArg) {
   bool hasDoneStuff = false;
 
   // Send address to mem controller if available
-  if (data.circuitState.getState(op.getAddressResult()) == DataflowState::NONE) {
+  if (data.circuitState.getState(op.getAddressResult()) ==
+      DataflowState::NONE) {
     memoryTransfer(op.getAddress(), op.getAddressResult(), data);
     hasDoneStuff = true;
   }
@@ -559,7 +556,8 @@ bool DynamaticStore::tryExecute(ExecutableData &data, circt::Operation &opArg) {
 
   // Send address to mem controller if available
   if (data.circuitState.getState(op.getAddress()) == DataflowState::VALID &&
-      data.circuitState.getState(op.getAddressResult()) == DataflowState::NONE) {
+      data.circuitState.getState(op.getAddressResult()) ==
+          DataflowState::NONE) {
     memoryTransfer(op.getAddress(), op.getAddressResult(), data);
     hasDoneStuff = true;
   }

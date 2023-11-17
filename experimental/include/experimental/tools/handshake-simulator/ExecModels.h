@@ -127,8 +127,8 @@ mlir::LogicalResult initialiseMap(llvm::StringMap<std::string> &funcMap,
 
 /// Data structure to hold informations about requests toward the mem controller
 struct MemoryRequest {
-  /// Whether a Load request or a Store request
-  AccessTypeEnum type;
+  /// Whether a load request or a store request
+  bool isLoad;
   /// Address index of related to the memory request in the mem controller op
   unsigned addressIdx;
   /// Data index related to the memory request in the mem controller op

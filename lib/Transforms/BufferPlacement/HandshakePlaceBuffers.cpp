@@ -19,6 +19,7 @@
 #include "dynamatic/Analysis/NameAnalysis.h"
 #include "dynamatic/Support/Logging.h"
 #include "dynamatic/Support/LogicBB.h"
+#include "dynamatic/Transforms/BufferPlacement/BufferPlacementMILP.h"
 #include "dynamatic/Transforms/BufferPlacement/CFDFC.h"
 #include "dynamatic/Transforms/BufferPlacement/FPGA20Buffers.h"
 #include "experimental/Support/StdProfiler.h"
@@ -97,14 +98,132 @@ HandshakePlaceBuffersPass::HandshakePlaceBuffersPass(
   this->dumpLogs = dumpLogs;
 }
 
-#ifdef DYNAMATIC_GUROBI_NOT_INSTALLED
 void HandshakePlaceBuffersPass::runDynamaticPass() {
-  ModuleOp modOp = getOperation();
-  modOp.emitError() << "Project was built without Gurobi installed, can't "
-                       "run smart buffer placement pass\n";
-  return signalPassFailure();
+  // Map algorithms to the function to call to execute them
+  llvm::MapVector<StringRef, LogicalResult (HandshakePlaceBuffersPass::*)()>
+      allAlgorithms;
+  allAlgorithms["on-merges"] =
+      &HandshakePlaceBuffersPass::placeWithoutUsingMILP;
+#ifndef DYNAMATIC_GUROBI_NOT_INSTALLED
+  allAlgorithms["fpga20"] = &HandshakePlaceBuffersPass::placeUsingMILP;
+  allAlgorithms["fpga20-legacy"] = &HandshakePlaceBuffersPass::placeUsingMILP;
+#endif // DYNAMATIC_GUROBI_NOT_INSTALLED
+
+  // Check that the algorithm exists
+  if (!allAlgorithms.contains(algorithm)) {
+    llvm::errs() << "Unknown algorithm '" << algorithm
+                 << "', possible choices are:\n";
+    for (auto &algo : allAlgorithms)
+      llvm::errs() << "\t- " << algo.first << "\n";
+#ifdef DYNAMATIC_GUROBI_NOT_INSTALLED
+    llvm::errs()
+        << "\tYou cannot use any of the MILP-based placement algorithms "
+           "because CMake did not detect a Gurobi installation on your "
+           "machine. Install Gurobi and rebuild to make these options "
+           "available.\n";
+#endif // DYNAMATIC_GUROBI_NOT_INSTALLED
+    return signalPassFailure();
+  }
+
+  // Call the right function
+  auto func = allAlgorithms[algorithm];
+  if (failed(((*this).*(func))()))
+    return signalPassFailure();
 }
-#else
+
+#ifndef DYNAMATIC_GUROBI_NOT_INSTALLED
+LogicalResult HandshakePlaceBuffersPass::placeUsingMILP() {
+  // Make sure that all operations in the IR are named (used to generate
+  // variable names in the MILP)
+  NameAnalysis &nameAnalysis = getAnalysis<NameAnalysis>();
+  if (!nameAnalysis.isAnalysisValid())
+    return failure();
+  if (!nameAnalysis.areAllOpsNamed())
+    if (failed(nameAnalysis.walk(NameAnalysis::UnnamedBehavior::NAME)))
+      return failure();
+  markAnalysesPreserved<NameAnalysis>();
+
+  mlir::ModuleOp modOp = getOperation();
+
+  // Check IR invariants and parse basic block archs from disk
+  DenseMap<handshake::FuncOp, FuncInfo> funcToInfo;
+  for (handshake::FuncOp funcOp : modOp.getOps<handshake::FuncOp>()) {
+    funcToInfo.insert(std::make_pair(funcOp, FuncInfo(funcOp)));
+    FuncInfo &info = funcToInfo[funcOp];
+
+    // Read the CSV containing arch information (number of transitions between
+    // pairs of basic blocks) from disk. While the rest of this pass works if
+    // the module contains multiple functions, this only makes sense if the
+    // module has a single function
+    if (failed(StdProfiler::readCSV(frequencies, info.archs)))
+      return funcOp->emitError()
+             << "Failed to read profiling information from CSV";
+
+    if (failed(checkFuncInvariants(info)))
+      return failure();
+  }
+
+  // Read the operations' timing models from disk
+  TimingDatabase timingDB(&getContext());
+  if (failed(TimingDatabase::readFromJSON(timingModels, timingDB)))
+    return failure();
+
+  // Place buffers in each function
+  for (handshake::FuncOp funcOp : modOp.getOps<handshake::FuncOp>())
+    if (failed(placeBuffers(funcToInfo[funcOp], timingDB)))
+      return failure();
+  return success();
+}
+
+LogicalResult HandshakePlaceBuffersPass::checkFuncInvariants(FuncInfo &info) {
+  handshake::FuncOp funcOp = info.funcOp;
+
+  // Verify that the IR is in a valid state for buffer placement
+  // Buffer placement requires that all values are used exactly once
+  if (failed(verifyAllValuesHasOneUse(funcOp)))
+    return funcOp.emitOpError() << "Not all values are used exactly once";
+
+  // Perform a number of verifications to make sure that the Handshake function
+  // whose information is passed as argument is valid for buffer placement
+
+  // Store all archs in a map for fast query time
+  DenseMap<unsigned, llvm::SmallDenseSet<unsigned, 2>> transitions;
+  for (ArchBB &arch : info.archs)
+    transitions[arch.srcBB].insert(arch.dstBB);
+
+  // Store the BB to which each block belongs for quick access later
+  DenseMap<Operation *, std::optional<unsigned>> opBlocks;
+  for (Operation &op : info.funcOp.getOps())
+    opBlocks[&op] = getLogicBB(&op);
+
+  for (Operation &op : info.funcOp.getOps()) {
+    // Most operations should belong to a basic block for buffer placement to
+    // work correctly. Don't outright fail in case one operation is outside of
+    // all blocks but warn the user
+    if (!isa<handshake::SinkOp, handshake::MemoryOpInterface>(&op))
+      if (!getLogicBB(&op).has_value())
+        op.emitWarning() << "Operation does not belong to any block, MILP "
+                            "behavior may be suboptimal or incorrect.";
+
+    std::optional<unsigned> srcBB = opBlocks[&op];
+    for (OpResult res : op.getResults()) {
+      Operation *user = *res.getUsers().begin();
+      std::optional<unsigned> dstBB = opBlocks[user];
+
+      // All transitions between blocks must exist in the original CFG
+      if (srcBB.has_value() && dstBB.has_value() && *srcBB != *dstBB &&
+          !transitions[*srcBB].contains(*dstBB))
+        return op.emitError()
+               << "Result " << res.getResultNumber() << " defined in block "
+               << *srcBB << " is used in block " << *dstBB
+               << ". This connection does not exist according to the CFG "
+                  "graph. Solving the buffer placement MILP would yield an "
+                  "incorrect placement.";
+    }
+  }
+  return success();
+}
+
 /// Logs arch and CFDFC information (sequence of basic blocks, number of
 /// executions, channels, units) to the logger.
 static void logFuncInfo(FuncInfo &info, Logger &log) {
@@ -140,105 +259,6 @@ static void logFuncInfo(FuncInfo &info, Logger &log) {
   }
 
   os.flush();
-}
-
-void HandshakePlaceBuffersPass::runDynamaticPass() {
-  ModuleOp modOp = getOperation();
-
-  // Make sure that all operations in the IR are named (used to generate
-  // variable names in the MILP)
-  NameAnalysis &nameAnalysis = getAnalysis<NameAnalysis>();
-  if (!nameAnalysis.isAnalysisValid())
-    return signalPassFailure();
-  if (!nameAnalysis.areAllOpsNamed())
-    if (failed(nameAnalysis.walk(NameAnalysis::UnnamedBehavior::NAME)))
-      return signalPassFailure();
-  markAnalysesPreserved<NameAnalysis>();
-
-  // Check that the algorithm exists
-  if (algorithm != "fpga20" && algorithm != "fpga20-legacy") {
-    modOp->emitError() << "Unknown algorithm '" << algorithm
-                       << "', possible choices are 'fpga20', 'fpga20-legacy'.";
-    return signalPassFailure();
-  }
-
-  // Check IR invariants and parse basic block archs from disk
-  DenseMap<handshake::FuncOp, FuncInfo> funcToInfo;
-  for (handshake::FuncOp funcOp : modOp.getOps<handshake::FuncOp>()) {
-    funcToInfo.insert(std::make_pair(funcOp, FuncInfo(funcOp)));
-    FuncInfo &info = funcToInfo[funcOp];
-
-    // Read the CSV containing arch information (number of transitions between
-    // pairs of basic blocks) from disk. While the rest of this pass works if
-    // the module contains multiple functions, this only makes sense if the
-    // module has a single function
-    if (failed(StdProfiler::readCSV(frequencies, info.archs))) {
-      funcOp->emitError() << "Failed to read profiling information from CSV";
-      return signalPassFailure();
-    }
-
-    if (failed(checkFuncInvariants(info)))
-      return signalPassFailure();
-  }
-
-  // Read the operations' timing models from disk
-  TimingDatabase timingDB(&getContext());
-  if (failed(TimingDatabase::readFromJSON(timingModels, timingDB)))
-    return signalPassFailure();
-
-  // Place buffers in each function
-  for (handshake::FuncOp funcOp : modOp.getOps<handshake::FuncOp>())
-    if (failed(placeBuffers(funcToInfo[funcOp], timingDB)))
-      return signalPassFailure();
-}
-
-LogicalResult HandshakePlaceBuffersPass::checkFuncInvariants(FuncInfo &info) {
-  handshake::FuncOp funcOp = info.funcOp;
-
-  // Verify that the IR is in a valid state for buffer placement
-  // Buffer placement requires that all values are used exactly once
-  if (failed(verifyAllValuesHasOneUse(funcOp)))
-    return funcOp.emitOpError() << "Not all values are used exactly once";
-
-  // Perform a number of verifications to make sure that the Handshake function
-  // whose information is passed as argument is valid for buffer placement
-
-  // Store all archs in a map for fast query time
-  DenseMap<unsigned, llvm::SmallDenseSet<unsigned, 2>> transitions;
-  for (ArchBB &arch : info.archs)
-    transitions[arch.srcBB].insert(arch.dstBB);
-
-  // Store the BB to which each block belongs for quick access later
-  DenseMap<Operation *, std::optional<unsigned>> opBlocks;
-  for (Operation &op : info.funcOp.getOps())
-    opBlocks[&op] = getLogicBB(&op);
-
-  for (Operation &op : info.funcOp.getOps()) {
-    // Most operations should belong to a basic block for buffer placement to
-    // work correctly. Don't outright fail in case one operation is outside of
-    // all blocks but warn the user
-    if (!isa<handshake::SinkOp, handshake::MemoryControllerOp>(&op))
-      if (!getLogicBB(&op).has_value())
-        op.emitWarning() << "Operation does not belong to any block, MILP "
-                            "behavior may be suboptimal or incorrect.";
-
-    std::optional<unsigned> srcBB = opBlocks[&op];
-    for (OpResult res : op.getResults()) {
-      Operation *user = *res.getUsers().begin();
-      std::optional<unsigned> dstBB = opBlocks[user];
-
-      // All transitions between blocks must exist in the original CFG
-      if (srcBB.has_value() && dstBB.has_value() && *srcBB != *dstBB &&
-          !transitions[*srcBB].contains(*dstBB))
-        return op.emitError()
-               << "Result " << res.getResultNumber() << " defined in block "
-               << *srcBB << " is used in block " << *dstBB
-               << ". This connection does not exist according to the CFG "
-                  "graph. Solving the buffer placement MILP would yield an "
-                  "incorrect placement.";
-    }
-  }
-  return success();
 }
 
 LogicalResult
@@ -358,6 +378,21 @@ LogicalResult HandshakePlaceBuffersPass::getBufferPlacement(
   delete milp;
   return res;
 }
+#endif // DYNAMATIC_GUROBI_NOT_INSTALLED
+
+LogicalResult HandshakePlaceBuffersPass::placeWithoutUsingMILP() {
+  // The only strategy at this point is to place buffers on the output channels
+  // of all merge-like operations
+  for (handshake::FuncOp funcOp : getOperation().getOps<handshake::FuncOp>()) {
+    DenseMap<Value, PlacementResult> placement;
+    for (auto mergeLikeOp : funcOp.getOps<MergeLikeOpInterface>()) {
+      for (OpResult res : mergeLikeOp->getResults())
+        placement[res] = PlacementResult{1, 1, true};
+    }
+    instantiateBuffers(placement);
+  }
+  return success();
+}
 
 void HandshakePlaceBuffersPass::instantiateBuffers(
     DenseMap<Value, PlacementResult> &placement) {
@@ -393,7 +428,6 @@ void HandshakePlaceBuffersPass::instantiateBuffers(
     }
   }
 }
-#endif // DYNAMATIC_GUROBI_NOT_INSTALLED
 
 std::string dynamatic::buffer::getGurobiOptStatusDesc(int status) {
   switch (status) {

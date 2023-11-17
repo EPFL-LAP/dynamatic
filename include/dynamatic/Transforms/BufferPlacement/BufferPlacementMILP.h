@@ -21,9 +21,8 @@
 #include "dynamatic/Support/LLVM.h"
 #include "dynamatic/Support/Logging.h"
 #include "dynamatic/Support/TimingModels.h"
-#include "dynamatic/Transforms/BufferPlacement/BufferingProperties.h"
+#include "dynamatic/Transforms/BufferPlacement/BufferingSupport.h"
 #include "dynamatic/Transforms/BufferPlacement/CFDFC.h"
-#include "experimental/Support/StdProfiler.h"
 #include "mlir/Dialect/Func/IR/FuncOps.h"
 #include "mlir/IR/BuiltinTypes.h"
 #include "mlir/Support/LLVM.h"
@@ -33,39 +32,6 @@
 #include "gurobi_c++.h"
 namespace dynamatic {
 namespace buffer {
-
-/// Holds information about what type of buffer should be placed on a specific
-/// channel.
-struct PlacementResult {
-  /// The number of transparent buffer slots that should be placed.
-  unsigned numTrans = 0;
-  /// The number of opaque buffer slots that should be placed.
-  unsigned numOpaque = 0;
-  /// Whether opaque slots should be placed transparent slots for placement
-  /// results that include both.
-  bool opaqueBeforeTrans = true;
-};
-
-/// Helper datatype for buffer placement. Simply aggregates all the information
-/// related to the Handshake function under optimization.
-struct FuncInfo {
-  /// The Handshake function in which to place buffers.
-  circt::handshake::FuncOp funcOp;
-  /// The list of archs in the function (i.e., transitions between basic
-  /// blocks).
-  SmallVector<experimental::ArchBB> archs;
-  /// Maps CFDFCs of the function to a boolean indicating whether they each
-  /// should be optimized.
-  llvm::MapVector<CFDFC *, bool> cfdfcs;
-
-  /// Argument-less constructor so that we can use the struct as a value type
-  /// for maps.
-  FuncInfo() : funcOp(nullptr){};
-
-  /// Constructs an instance from the function it refers to. Other struct
-  /// members start empty.
-  FuncInfo(circt::handshake::FuncOp funcOp) : funcOp(funcOp){};
-};
 
 /// Abstract class holding the basic logic for the smart buffer placement pass,
 /// which expresses the buffer placement problem in dataflow circuits as an MILP

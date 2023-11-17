@@ -15,9 +15,14 @@
 
 #include "dynamatic/Support/DynamaticPass.h"
 #include "dynamatic/Support/LLVM.h"
+#include "mlir/IR/DialectRegistry.h"
+#include "mlir/Pass/Pass.h"
 
 namespace dynamatic {
 
+#define GEN_PASS_DECL_ANALYZEMEMORYACCESSES
+#define GEN_PASS_DEF_ANALYZEMEMORYACCESSES
+#include "dynamatic/Transforms/Passes.h.inc"
 std::unique_ptr<dynamatic::DynamaticPass<false>> createAnalyzeMemoryAccesses();
 
 } // namespace dynamatic
