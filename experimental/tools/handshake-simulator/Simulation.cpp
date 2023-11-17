@@ -399,7 +399,8 @@ LogicalResult simulate(StringRef toplevelFunction,
     if (type.isa<mlir::MemRefType>()) {
       // We require this memref type to be fully specified.
       auto memreftype = type.dyn_cast<mlir::MemRefType>();
-      unsigned buffer = any_cast<unsigned>(circuitState.getData(blockArgs[i]));
+      unsigned buffer =
+          any_cast<unsigned>(*(circuitState.channelMap[blockArgs[i]].data));
       auto elementType = memreftype.getElementType();
       for (int j = 0; j < memreftype.getNumElements(); ++j) {
         if (j != 0)
