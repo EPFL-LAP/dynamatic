@@ -1,6 +1,5 @@
 add_dynamatic_library(DynamaticTransforms
   ArithReduceStrength.cpp
-  AnalyzeMemoryAccesses.cpp
   BackAnnotate.cpp
   FlattenMemRefRowMajor.cpp
   ForceMemoryInterface.cpp
@@ -10,6 +9,7 @@ add_dynamatic_library(DynamaticTransforms
   HandshakeOptimizeBitwidths.cpp
   HandshakePrepareForLegacy.cpp
   HandshakeInferBasicBlocks.cpp
+  MarkMemoryDependencies.cpp
   OperationNames.cpp
   PushConstants.cpp
   RemovePolygeistAttributes.cpp

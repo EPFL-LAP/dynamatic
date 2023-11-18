@@ -14,7 +14,6 @@
 #define DYNAMATIC_TRANSFORMS_PASSES_H
 
 #include "dynamatic/Support/LLVM.h"
-#include "dynamatic/Transforms/AnalyzeMemoryAccesses.h"
 #include "dynamatic/Transforms/ArithReduceStrength.h"
 #include "dynamatic/Transforms/BackAnnotate.h"
 #include "dynamatic/Transforms/BufferPlacement/HandshakePlaceBuffers.h"
@@ -27,6 +26,7 @@
 #include "dynamatic/Transforms/HandshakeMinimizeCstWidth.h"
 #include "dynamatic/Transforms/HandshakeOptimizeBitwidths.h"
 #include "dynamatic/Transforms/HandshakePrepareForLegacy.h"
+#include "dynamatic/Transforms/MarkMemoryDependencies.h"
 #include "dynamatic/Transforms/OperationNames.h"
 #include "dynamatic/Transforms/PushConstants.h"
 #include "dynamatic/Transforms/RemovePolygeistAttributes.h"

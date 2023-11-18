@@ -1,4 +1,4 @@
-//===- AnalyzeMemoryAccesses.h - Analyze memory accesses --------*- C++ -*-===//
+//===- MarkMemoryDependencies.h - Mark mem. deps. in the IR -----*- C++ -*-===//
 //
 // Dynamatic is under the Apache License v2.0 with LLVM Exceptions.
 // See https://llvm.org/LICENSE.txt for license information.
@@ -6,12 +6,12 @@
 //
 //===----------------------------------------------------------------------===//
 //
-// This file declares the --analyze-memory-accesses pass.
+// This file declares the --mark-memory-dependencies pass.
 //
 //===----------------------------------------------------------------------===//
 
-#ifndef DYNAMATIC_TRANSFORMS_ANALYZEMEMORYACCESSES_H
-#define DYNAMATIC_TRANSFORMS_ANALYZEMEMORYACCESSES_H
+#ifndef DYNAMATIC_TRANSFORMS_MARK_MEMORY_DEPENDENCIES
+#define DYNAMATIC_TRANSFORMS_MARK_MEMORY_DEPENDENCIES
 
 #include "dynamatic/Support/DynamaticPass.h"
 #include "dynamatic/Support/LLVM.h"
@@ -20,11 +20,11 @@
 
 namespace dynamatic {
 
-#define GEN_PASS_DECL_ANALYZEMEMORYACCESSES
-#define GEN_PASS_DEF_ANALYZEMEMORYACCESSES
+#define GEN_PASS_DECL_MARKMEMORYDEPENDENCIES
+#define GEN_PASS_DEF_MARKMEMORYDEPENDENCIES
 #include "dynamatic/Transforms/Passes.h.inc"
-std::unique_ptr<dynamatic::DynamaticPass<false>> createAnalyzeMemoryAccesses();
+std::unique_ptr<dynamatic::DynamaticPass<false>> createMarkMemoryDependencies();
 
 } // namespace dynamatic
 
-#endif // DYNAMATIC_TRANSFORMS_ANALYZEMEMORYACCESSES_H
+#endif // DYNAMATIC_TRANSFORMS_MARK_MEMORY_DEPENDENCIES

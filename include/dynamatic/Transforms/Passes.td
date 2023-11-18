@@ -228,28 +228,6 @@ def HandshakePlaceBuffers : DynamaticPass<"handshake-place-buffers", "true"> {
 // Other passes
 //===----------------------------------------------------------------------===//
 
-def AnalyzeMemoryAccesses : DynamaticPass<"analyze-memory-accesses"> {
-  let summary = "Determine memory dependencies between different accesses.";
-  let description = [{
-    Analyzes memory accesses in each function in a module and identifies all
-    dependencies between them. Stores information about these dependencies in a
-    `circt::handshake::MemDependenceArrayAttr` attribute attached to each
-    operation that is the source of at least one dependence. The attribute
-    belongs to the Handshake dialect as it only becomes useful during the
-    std-to-handshake lowering pass.
-
-    The pass attempts to find dependencies between all `affine::AffineLoadOp`,
-    `affine::AffineStoreOp`, `memref::LoadOp` and `memref::StoreOp` operations.
-    It uses MLIR's polyhedral analysis infrastructure to identify complex
-    dependencies between pairs of affine accesses, and uses a pessimistic
-    approach for pairs of accesses that involve at least one non-affine access.
-
-    The pass will fail if MLIR's polyhedral analysis infrastructure fails to
-    check for a dependence between two affine accesses.
-  }];
-  let constructor = "dynamatic::createAnalyzeMemoryAccesses()";
-}
-
 def BackAnnotate : DynamaticPass<"back-annotate"> {
   let summary = "Back-annotates IR from JSON-formatted attributes";
   let description = [{
@@ -296,6 +274,29 @@ def ForceMemoryInterface : DynamaticPass<"force-memory-interface"> {
       "Whether to force the placement of MCs in the circuit after Handshake "
       "lowering (off by default, mutually exclusice with force-lsq).">
   ];
+}
+
+def MarkMemoryDependencies : DynamaticPass<"mark-memory-dependencies"> {
+  let summary = "Mark all memory dependencies in the IR.";
+  let description = [{
+    Analyzes memory accesses in each function in a module and identifies all
+    dependencies between them. Stores information about these dependencies in a
+    `circt::handshake::MemDependenceArrayAttr` attribute attached to each
+    operation that is the source of at least one dependency.
+
+    The pass attempts to find dependencies between all `affine::AffineLoadOp`,
+    `affine::AffineStoreOp`, `memref::LoadOp` and `memref::StoreOp` operations.
+    It uses MLIR's polyhedral analysis infrastructure to identify complex
+    dependencies between pairs of affine accesses, and uses a pessimistic
+    approach for pairs of accesses that involve at least one non-affine access.
+    While this pass can be ran at any point before conversion to Handshake, it
+    makes the most sense to run it as early as possible since affine analysis 
+    relies on very high-level information.
+
+    The pass will fail if MLIR's polyhedral analysis infrastructure fails to
+    check for a dependence between two affine accesses.
+  }];
+  let constructor = "dynamatic::createMarkMemoryDependencies()";
 }
 
 def NameAllOperations : Pass<"name-all-operations", "mlir::ModuleOp"> {
