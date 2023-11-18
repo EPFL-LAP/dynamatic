@@ -21,6 +21,7 @@ DYNAMATIC_EXPORT_DOT_BIN="$DYNAMATIC_DIR/bin/export-dot"
 
 # Generated files
 F_AFFINE="$OUTPUT_DIR/affine.mlir"
+F_AFFINE_MEM="$OUTPUT_DIR/affine_mem.mlir"
 F_SCF="$OUTPUT_DIR/scf.mlir"
 F_CF="$OUTPUT_DIR/std.mlir"
 F_CF_TRANFORMED="$OUTPUT_DIR/std_transformed.mlir"
@@ -105,30 +106,33 @@ rm -rf "$OUTPUT_DIR" && mkdir -p "$OUTPUT_DIR"
   -S -O3 --memref-fullrank --raise-scf-to-affine \
   > "$F_AFFINE" 2>/dev/null
 exit_on_fail "Failed to compile source to affine" "Compiled source to affine"
-    
-# affine level -> scf level
+
+# affine level -> pre-processing and memory analysis
 "$DYNAMATIC_OPT_BIN" "$F_AFFINE" --allow-unregistered-dialect \
-  --lower-affine-to-scf --flatten-memref-row-major --scf-simple-if-to-select \
+  --remove-polygeist-attributes --analyze-memory-accesses \
+  > "$F_AFFINE_MEM"
+exit_on_fail "Failed to run memory analysis" "Ran memory analysis"
+
+# affine level -> scf level
+"$DYNAMATIC_OPT_BIN" "$F_AFFINE_MEM" --lower-affine-to-scf \
+  --flatten-memref-row-major --scf-simple-if-to-select \
   --scf-rotate-for-loops \
   > "$F_SCF"
 exit_on_fail "Failed to compile affine to scf" "Compiled affine to scf"
 
 # scf level -> cf level
-"$DYNAMATIC_OPT_BIN" "$F_SCF" --allow-unregistered-dialect \
-  --lower-scf-to-cf > "$F_CF"
+"$DYNAMATIC_OPT_BIN" "$F_SCF" --lower-scf-to-cf > "$F_CF"
 exit_on_fail "Failed to compile scf to cf" "Compiled scf to cf"
 
 # cf transformations (standard)
-"$DYNAMATIC_OPT_BIN" "$F_CF" --allow-unregistered-dialect --canonicalize --cse \
-    --sccp --symbol-dce --control-flow-sink --loop-invariant-code-motion \
-    --canonicalize \
+"$DYNAMATIC_OPT_BIN" "$F_CF" --canonicalize --cse --sccp --symbol-dce \
+    --control-flow-sink --loop-invariant-code-motion --canonicalize \
     > "$F_CF_TRANFORMED"
 exit_on_fail "Failed to apply standard transformations to cf" \
   "Applied standard transformations to cf"
 
 # cf transformations (dynamatic) 
-"$DYNAMATIC_OPT_BIN" "$F_CF_TRANFORMED" --allow-unregistered-dialect \
-  --flatten-memref-calls \
+"$DYNAMATIC_OPT_BIN" "$F_CF_TRANFORMED" --flatten-memref-calls \
   --arith-reduce-strength="max-adder-depth-mul=1" \
   --push-constants --force-memory-interface="force-mc" \
   > "$F_CF_DYN_TRANSFORMED"
@@ -136,14 +140,13 @@ exit_on_fail "Failed to apply Dynamatic transformations to cf" \
   "Applied Dynamatic transformations to cf"
 
 # cf level -> handshake level
-"$DYNAMATIC_OPT_BIN" "$F_CF_DYN_TRANSFORMED" --allow-unregistered-dialect \
-  --lower-std-to-handshake-fpga18 \
+"$DYNAMATIC_OPT_BIN" "$F_CF_DYN_TRANSFORMED" --lower-std-to-handshake-fpga18 \
   --handshake-fix-arg-names="source=$SRC_DIR/$KERNEL_NAME.c" \
   > "$F_HANDSHAKE"
 exit_on_fail "Failed to compile cf to handshake" "Compiled cf to handshake"
 
 # handshake transformations
-"$DYNAMATIC_OPT_BIN" "$F_HANDSHAKE" --allow-unregistered-dialect \
+"$DYNAMATIC_OPT_BIN" "$F_HANDSHAKE" \
   --handshake-concretize-index-type="width=32" \
   --handshake-minimize-cst-width --handshake-optimize-bitwidths="legacy" \
   --handshake-materialize-forks-sinks --handshake-infer-basic-blocks \
@@ -155,7 +158,6 @@ exit_on_fail "Failed to apply transformations to handshake" \
 if [[ $USE_SIMPLE_BUFFERS -ne 0 ]]; then
   # Simple buffer placement
   "$DYNAMATIC_OPT_BIN" "$F_HANDSHAKE_TRANSFORMED" \
-    --allow-unregistered-dialect \
     --handshake-place-buffers="algorithm=on-merges" \
     > "$F_HANDSHAKE_BUFFERED"
   exit_on_fail "Failed to place simple buffers" "Placed simple buffers"
@@ -177,7 +179,6 @@ else
   # Smart buffer placement
   echo_info "Running smart buffer placement"
   "$DYNAMATIC_OPT_BIN" "$F_HANDSHAKE_TRANSFORMED" \
-    --allow-unregistered-dialect \
     --handshake-set-buffering-properties="version=fpga20" \
     --handshake-place-buffers="algorithm=fpga20-legacy frequencies=$OUTPUT_DIR/frequencies.csv timing-models=$DYNAMATIC_DIR/data/components.json dump-logs" \
     > "$F_HANDSHAKE_BUFFERED"
@@ -191,8 +192,7 @@ else
 fi
 
 # handshake canonicalization
-"$DYNAMATIC_OPT_BIN" "$F_HANDSHAKE_BUFFERED" \
-  --allow-unregistered-dialect --handshake-canonicalize \
+"$DYNAMATIC_OPT_BIN" "$F_HANDSHAKE_BUFFERED" --handshake-canonicalize \
   > "$F_HANDSHAKE_EXPORT"
 exit_on_fail "Failed to canonicalize Handshake" "Canonicalized handshake"
 

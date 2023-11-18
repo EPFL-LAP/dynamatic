@@ -29,6 +29,7 @@
 #include "dynamatic/Transforms/HandshakePrepareForLegacy.h"
 #include "dynamatic/Transforms/OperationNames.h"
 #include "dynamatic/Transforms/PushConstants.h"
+#include "dynamatic/Transforms/RemovePolygeistAttributes.h"
 #include "dynamatic/Transforms/ScfRotateForLoops.h"
 #include "dynamatic/Transforms/ScfSimpleIfToSelect.h"
 #include "mlir/Pass/Pass.h"

@@ -333,4 +333,15 @@ def RemoveOperationNames : Pass<"remove-operation-names", "mlir::ModuleOp"> {
   let dependentDialects = ["circt::handshake::HandshakeDialect"];
 }
 
+def RemovePolygeistAttributes : DynamaticPass<"remove-polygeist-attributes"> {
+  let summary = "Removes useless module and function attributes set by Polygeist.";
+  let description = [{
+    Polygeist sets a couple attributes belonging to the `dlti` and `llvm`
+    dialects on the top-level MLIR module and on functions that we do not care
+    about. This simply removes them (avoid having to pass the
+    --allow-unregistered-dialect flag to all optimizer invokations).
+  }];
+  let constructor = "dynamatic::createRemovePolygeistAttributes()";
+}
+
 #endif // DYNAMATIC_TRANSFORMS_PASSES_TD
