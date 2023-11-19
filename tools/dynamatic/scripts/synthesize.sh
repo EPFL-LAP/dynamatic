@@ -109,7 +109,7 @@ exit_on_fail "Failed to compile source to affine" "Compiled source to affine"
 
 # affine level -> pre-processing and memory analysis
 "$DYNAMATIC_OPT_BIN" "$F_AFFINE" --allow-unregistered-dialect \
-  --remove-polygeist-attributes --analyze-memory-accesses \
+  --remove-polygeist-attributes --mark-memory-dependencies \
   > "$F_AFFINE_MEM"
 exit_on_fail "Failed to run memory analysis" "Ran memory analysis"
 
@@ -180,7 +180,7 @@ else
   echo_info "Running smart buffer placement"
   "$DYNAMATIC_OPT_BIN" "$F_HANDSHAKE_TRANSFORMED" \
     --handshake-set-buffering-properties="version=fpga20" \
-    --handshake-place-buffers="algorithm=fpga20-legacy frequencies=$OUTPUT_DIR/frequencies.csv timing-models=$DYNAMATIC_DIR/data/components.json dump-logs" \
+    --handshake-place-buffers="algorithm=fpga20-legacy frequencies=$OUTPUT_DIR/frequencies.csv timing-models=$DYNAMATIC_DIR/data/components.json timeout=300 dump-logs" \
     > "$F_HANDSHAKE_BUFFERED"
   RET=$?
   mv buffer-placement "$OUTPUT_DIR" > /dev/null 2>&1 
