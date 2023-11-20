@@ -299,6 +299,24 @@ def MarkMemoryDependencies : DynamaticPass<"mark-memory-dependencies"> {
   let constructor = "dynamatic::createMarkMemoryDependencies()";
 }
 
+def MarkMemoryInterfaces : DynamaticPass<"mark-memory-interfaces"> {
+  let summary = "Mark memory accesses with the interface they should connect to.";
+  let description = [{
+    Annotates all memory accesses in the IR with a
+    `circt::handshake::MemInterfaceAttr` attribute indicating the kind of
+    memory interface they should eventually connect to. It uses memory
+    dependencies derived during polyhedral analysis to determine the type of
+    interface necessary for each memory port. As such this pass should typically
+    be ran after the `--mark-memory-dependencies` pass.
+
+    Internally, it uses `circt::handshake::MemDependenceArrayAttr` attributes
+    attached to memory operations to determine whether any memory access depends
+    on any other. If no such attributes are present it is assumed that there are
+    no memory dependencies.  
+  }];
+  let constructor = "dynamatic::createMarkMemoryInterfaces()";
+}
+
 def NameAllOperations : Pass<"name-all-operations", "mlir::ModuleOp"> {
   let summary = "Gives a unique name to each operation in the IR.";
   let description = [{

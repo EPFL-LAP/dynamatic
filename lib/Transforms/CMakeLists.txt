@@ -10,6 +10,7 @@ add_dynamatic_library(DynamaticTransforms
   HandshakePrepareForLegacy.cpp
   HandshakeInferBasicBlocks.cpp
   MarkMemoryDependencies.cpp
+  MarkMemoryInterfaces.cpp
   OperationNames.cpp
   PushConstants.cpp
   RemovePolygeistAttributes.cpp
