@@ -1,16 +1,19 @@
 #!/bin/bash
 
+source "$1"/tools/dynamatic/scripts/utils.sh
+
 # ============================================================================ #
 # Variable definitions
 # ============================================================================ #
 
-# Script variables
+# Script arguments
 DYNAMATIC_DIR=$1
 LEGACY_DIR=$2
 SRC_DIR=$3
 OUTPUT_DIR=$4
 KERNEL_NAME=$5
 
+COMP_DIR="$OUTPUT_DIR/comp"
 HLS_VERIFIER="$LEGACY_DIR/Regression_test/hls_verifier/HlsVerifier/build/hlsverifier"
 
 # Generated directories/files
@@ -21,22 +24,6 @@ VHDL_SRC_DIR="$SIM_DIR/VHDL_SRC"
 VHDL_OUT_DIR="$SIM_DIR/VHDL_OUT"
 INPUT_VECTORS_DIR="$SIM_DIR/INPUT_VECTORS"
 HLS_VERIFY_DIR="$SIM_DIR/HLS_VERIFY"
-
-# ============================================================================ #
-# Helper funtions
-# ============================================================================ #
-
-# Prints some information to stdout.
-#   $1: the text to print
-echo_info() {
-    echo "[INFO] $1"
-}
-
-# Prints a fatal error message to stdout.
-#   $1: the text to print
-echo_fatal() {
-    echo "[FATAL] $1"
-}
 
 # ============================================================================ #
 # Simulation flow
@@ -53,8 +40,8 @@ mkdir -p "$C_SRC_DIR" "$C_OUT_DIR" "$VHDL_SRC_DIR" "$VHDL_OUT_DIR" \
 cp "$DYNAMATIC_DIR/integration-test/integration_utils.h" "$SIM_DIR"
 
 # Copy VHDL module and VHDL components to dedicated folder
-cp "$OUTPUT_DIR/$KERNEL_NAME.vhd" "$VHDL_SRC_DIR"
-cp "$OUTPUT_DIR/"LSQ*.v "$VHDL_SRC_DIR" 2> /dev/null
+cp "$COMP_DIR/$KERNEL_NAME.vhd" "$VHDL_SRC_DIR"
+cp "$COMP_DIR/"LSQ*.v "$VHDL_SRC_DIR" 2> /dev/null
 cp "$LEGACY_DIR"/components/*.vhd "$VHDL_SRC_DIR"
 
 # Copy sources to dedicated folder
@@ -67,11 +54,4 @@ cd "$HLS_VERIFY_DIR"
 "$HLS_VERIFIER" cover -aw32 "../C_SRC/$KERNEL_NAME.c" \
   "../C_SRC/$KERNEL_NAME.c" "$KERNEL_NAME" \
   > "../report.txt"
-if [[ $? -ne 0 ]]; then
-    echo_fatal "Simulation failed"
-    exit 1
-fi
-echo_info "Simulation succeeded"
-
-echo_info "All done!"
-echo ""
+exit_on_fail "Simulation failed" "Simulation succeeded"

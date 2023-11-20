@@ -12,9 +12,9 @@ set-legacy-path     ../dynamatic-utils/legacy-dynamatic/dhls/etc/dynamatic
 # without the extension)
 set-src             integration-test/fir/fir.c
 
-# Synthesize (from source to Handshake/DOT)
+# Compile (from source to Handshake IR/DOT)
 # Remove the flag to run smart buffer placement (requires Gurobi)
-synthesize          --simple-buffers
+compile             --simple-buffers
 
 # Generate the VHDL for the dataflow circuit
 write-hdl
@@ -23,7 +23,7 @@ write-hdl
 simulate
 
 # Synthesize using Vivado
-logic-synthesize
+synthesize
 
 # Exit the frontend
 exit

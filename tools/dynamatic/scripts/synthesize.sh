@@ -1,204 +1,76 @@
 #!/bin/bash
 
+source "$1"/tools/dynamatic/scripts/utils.sh
+
 # ============================================================================ #
 # Variable definitions
 # ============================================================================ #
 
-# Script variables
+# Script arguments
 DYNAMATIC_DIR=$1
-SRC_DIR=$2
+LEGACY_DIR=$2
 OUTPUT_DIR=$3
 KERNEL_NAME=$4
-USE_SIMPLE_BUFFERS=$5
 
-# Binaries used during synthesis
-POLYGEIST_PATH="$DYNAMATIC_DIR/polygeist/llvm-project/clang/lib/Headers/"
-POLYGEIST_CLANG_BIN="$DYNAMATIC_DIR/bin/cgeist"
-CLANGXX_BIN="$DYNAMATIC_DIR/bin/clang++"
-DYNAMATIC_OPT_BIN="$DYNAMATIC_DIR/bin/dynamatic-opt"
-DYNAMATIC_PROFILER_BIN="$DYNAMATIC_DIR/bin/exp-frequency-profiler"
-DYNAMATIC_EXPORT_DOT_BIN="$DYNAMATIC_DIR/bin/export-dot"
+COMP_DIR="$OUTPUT_DIR/comp"
 
-# Generated files
-F_AFFINE="$OUTPUT_DIR/affine.mlir"
-F_AFFINE_MEM="$OUTPUT_DIR/affine_mem.mlir"
-F_SCF="$OUTPUT_DIR/scf.mlir"
-F_CF="$OUTPUT_DIR/std.mlir"
-F_CF_TRANFORMED="$OUTPUT_DIR/std_transformed.mlir"
-F_CF_DYN_TRANSFORMED="$OUTPUT_DIR/std_dyn_transformed.mlir"
-F_PROFILER_BIN="$OUTPUT_DIR/$KERNEL_NAME-profile"
-F_PROFILER_INPUTS="$OUTPUT_DIR/profiler-inputs.txt"
-F_HANDSHAKE="$OUTPUT_DIR/handshake.mlir"
-F_HANDSHAKE_TRANSFORMED="$OUTPUT_DIR/handshake_transformed.mlir"
-F_HANDSHAKE_BUFFERED="$OUTPUT_DIR/handshake_buffered.mlir"
-F_HANDSHAKE_EXPORT="$OUTPUT_DIR/handshake_export.mlir"
-F_FREQUENCIES="$OUTPUT_DIR/frequencies.csv"
-
-# ============================================================================ #
-# Helper funtions
-# ============================================================================ #
-
-# Prints some information to stdout.
-#   $1: the text to print
-echo_info() {
-    echo "[INFO] $1"
-}
-
-# Prints a fatal error message to stdout.
-#   $1: the text to print
-echo_fatal() {
-    echo "[FATAL] $1"
-}
-
-
-# Exits the script with a fatal error message if the last command that was
-# called before this function failed, otherwise optionally prints an information
-# message.
-#   $1: fatal error message
-#   $2: [optional] information message
-exit_on_fail() {
-    if [[ $? -ne 0 ]]; then
-        if [[ ! -z $1 ]]; then
-            echo_fatal "$1"
-            exit 1
-        fi
-        echo_fatal "Failed!"
-        exit 1
-    else
-        if [[ ! -z $2 ]]; then
-            echo_info "$2"
-        fi
-    fi
-}
-
-# Exports Handshake-level IR to DOT using Dynamatic, then converts the DOT to
-# a PNG using dot.
-#   $1: mode to run the tool in; options are "visual", "legacy", "legacy-buffers"
-#   $2: output filename, without extension (will use .dot and .png)
-export_dot() {
-  local mode=$1
-  local f_dot="$OUTPUT_DIR/$2.dot"
-  local f_png="$OUTPUT_DIR/$2.png"
-
-  # Export to DOT
-  "$DYNAMATIC_EXPORT_DOT_BIN" "$F_HANDSHAKE_EXPORT" "--mode=$mode" \
-      "--edge-style=spline" \
-      "--timing-models=$DYNAMATIC_DIR/data/components.json" \
-      > "$f_dot"
-  exit_on_fail "Failed to create $2 DOT" "Created $2 DOT"
-
-  # Convert DOT graph to PNG
-  dot -Tpng "$f_dot" > "$f_png"
-  exit_on_fail "Failed to convert $2 DOT to PNG" "Converted $2 DOT to PNG"
-  return 0
-}
+# Generated directories/files
+SYNTH_DIR="$OUTPUT_DIR/synth"
+HDL_DIR="$SYNTH_DIR/hdl"
+F_REPORT="$SYNTH_DIR/report.txt"
+F_SCRIPT="$SYNTH_DIR/synthesize.tcl"
+F_PERIOD="$SYNTH_DIR/period_4.xdc"
+F_UTILIZATION_SYN="$SYNTH_DIR/utilization_post_syn.rpt"
+F_TIMING_SYN="$SYNTH_DIR/timing_post_syn.rpt"
+F_UTILIZATION_PR="$SYNTH_DIR/utilization_post_pr.rpt"
+F_TIMING_PR="$SYNTH_DIR/timing_post_pr.rpt"
 
 # ============================================================================ #
 # Synthesis flow
 # ============================================================================ #
 
-# Reset output directory
-rm -rf "$OUTPUT_DIR" && mkdir -p "$OUTPUT_DIR"
+# Reset simulation directory
+rm -rf "$SYNTH_DIR" && mkdir -p "$SYNTH_DIR"
 
-# source -> affine level
-"$POLYGEIST_CLANG_BIN" "$SRC_DIR/$KERNEL_NAME.c" -I \
-  "$POLYGEIST_PATH/llvm-project/clang/lib/Headers/" --function="$KERNEL_NAME" \
-  -S -O3 --memref-fullrank --raise-scf-to-affine \
-  > "$F_AFFINE" 2>/dev/null
-exit_on_fail "Failed to compile source to affine" "Compiled source to affine"
+# Copy all synthesizable components to specific folder for Vivado
+mkdir -p "$HDL_DIR"
+cp "$COMP_DIR/$KERNEL_NAME.vhd" "$HDL_DIR"
+cp "$LEGACY_DIR"/components/*.vhd "$HDL_DIR"
 
-# affine level -> pre-processing and memory analysis
-"$DYNAMATIC_OPT_BIN" "$F_AFFINE" --allow-unregistered-dialect \
-  --remove-polygeist-attributes --mark-memory-dependencies \
-  --mark-memory-interfaces \
-  > "$F_AFFINE_MEM"
-exit_on_fail "Failed to run memory analysis" "Ran memory analysis"
-
-# affine level -> scf level
-"$DYNAMATIC_OPT_BIN" "$F_AFFINE_MEM" --lower-affine-to-scf \
-  --flatten-memref-row-major --scf-simple-if-to-select \
-  --scf-rotate-for-loops \
-  > "$F_SCF"
-exit_on_fail "Failed to compile affine to scf" "Compiled affine to scf"
-
-# scf level -> cf level
-"$DYNAMATIC_OPT_BIN" "$F_SCF" --lower-scf-to-cf > "$F_CF"
-exit_on_fail "Failed to compile scf to cf" "Compiled scf to cf"
-
-# cf transformations (standard)
-"$DYNAMATIC_OPT_BIN" "$F_CF" --canonicalize --cse --sccp --symbol-dce \
-    --control-flow-sink --loop-invariant-code-motion --canonicalize \
-    > "$F_CF_TRANFORMED"
-exit_on_fail "Failed to apply standard transformations to cf" \
-  "Applied standard transformations to cf"
-
-# cf transformations (dynamatic) 
-"$DYNAMATIC_OPT_BIN" "$F_CF_TRANFORMED" --flatten-memref-calls \
-  --arith-reduce-strength="max-adder-depth-mul=1" --push-constants \
-  > "$F_CF_DYN_TRANSFORMED"
-exit_on_fail "Failed to apply Dynamatic transformations to cf" \
-  "Applied Dynamatic transformations to cf"
-
-# cf level -> handshake level
-"$DYNAMATIC_OPT_BIN" "$F_CF_DYN_TRANSFORMED" --lower-std-to-handshake-fpga18 \
-  --handshake-fix-arg-names="source=$SRC_DIR/$KERNEL_NAME.c" \
-  > "$F_HANDSHAKE"
-exit_on_fail "Failed to compile cf to handshake" "Compiled cf to handshake"
-
-# handshake transformations
-"$DYNAMATIC_OPT_BIN" "$F_HANDSHAKE" \
-  --handshake-concretize-index-type="width=32" \
-  --handshake-minimize-cst-width --handshake-optimize-bitwidths="legacy" \
-  --handshake-materialize-forks-sinks --handshake-infer-basic-blocks \
-  > "$F_HANDSHAKE_TRANSFORMED"    
-exit_on_fail "Failed to apply transformations to handshake" \
-  "Applied transformations to handshake"
-
-# Buffer placement
-if [[ $USE_SIMPLE_BUFFERS -ne 0 ]]; then
-  # Simple buffer placement
-  "$DYNAMATIC_OPT_BIN" "$F_HANDSHAKE_TRANSFORMED" \
-    --handshake-place-buffers="algorithm=on-merges" \
-    > "$F_HANDSHAKE_BUFFERED"
-  exit_on_fail "Failed to place simple buffers" "Placed simple buffers"
-else
-  # Compile kernel's main function to extract profiling information
-  "$CLANGXX_BIN" "$SRC_DIR/$KERNEL_NAME.c" -D PRINT_PROFILING_INFO \
-    -Wno-deprecated -o "$F_PROFILER_BIN"
-  exit_on_fail "Failed to build kernel for profiling" "Built kernel for profiling" 
-
-  "$F_PROFILER_BIN" > "$F_PROFILER_INPUTS"
-  exit_on_fail "Failed to kernel for profiling" "Ran kernel for profiling" 
-
-  # cf-level profiler
-  "$DYNAMATIC_PROFILER_BIN" "$F_CF_DYN_TRANSFORMED" \
-    --top-level-function="$KERNEL_NAME" --input-args-file="$F_PROFILER_INPUTS" \
-    > $F_FREQUENCIES 
-  exit_on_fail "Failed to profile cf-level" "Profiled cf-level"
-
-  # Smart buffer placement
-  echo_info "Running smart buffer placement"
-  "$DYNAMATIC_OPT_BIN" "$F_HANDSHAKE_TRANSFORMED" \
-    --handshake-set-buffering-properties="version=fpga20" \
-    --handshake-place-buffers="algorithm=fpga20-legacy frequencies=$OUTPUT_DIR/frequencies.csv timing-models=$DYNAMATIC_DIR/data/components.json timeout=300 dump-logs" \
-    > "$F_HANDSHAKE_BUFFERED"
-  RET=$?
-  mv buffer-placement "$OUTPUT_DIR" > /dev/null 2>&1 
-  if [[ $RET -ne 0 ]]; then
-      echo_fatal "Failed to place smart buffers"
-      exit 1
-  fi
-  echo_info "Placed smart buffers"
+# See if we should include any LSQ in the synthesis script
+READ_VERILOG=""
+if ls "$COMP_DIR"/LSQ*.v 1> /dev/null 2>&1; then
+  cp "$COMP_DIR/"LSQ*.v "$HDL_DIR"
+  READ_VERILOG="read_verilog [glob $SYNTH_DIR/hdl/*.v]"
 fi
 
-# handshake canonicalization
-"$DYNAMATIC_OPT_BIN" "$F_HANDSHAKE_BUFFERED" --handshake-canonicalize \
-  > "$F_HANDSHAKE_EXPORT"
-exit_on_fail "Failed to canonicalize Handshake" "Canonicalized handshake"
+# Generate synthesis script
+echo -e \
+"set_param general.maxThreads 8
+read_vhdl -vhdl2008 [glob $SYNTH_DIR/hdl/*.vhd]
+$READ_VERILOG
+read_xdc "$F_PERIOD"
+synth_design -top $KERNEL_NAME -part xc7k160tfbg484-2 -no_iobuf -mode out_of_context
+report_utilization > $F_UTILIZATION_SYN
+report_timing > $F_TIMING_SYN
+opt_design
+place_design
+phys_opt_design
+route_design
+phys_opt_design
+report_utilization > $F_UTILIZATION_PR
+report_timing > $F_TIMING_PR
+exit" > "$F_SCRIPT"
 
-# Export to DOT (one clean for viewing and one compatible with legacy)
-export_dot "visual" "visual"
-export_dot "legacy" "$KERNEL_NAME"
+echo -e \
+"create_clock -name clk -period 4.000 -waveform {0.000 2.000} [get_ports clk]
+set_property HD.CLK_SRC BUFGCTRL_X0Y0 [get_ports clk]
 
-echo_info "All done!"
-echo ""
+#set_input_delay 0 -clock CLK  [all_inputs]
+#set_output_delay 0 -clock CLK [all_outputs]" > "$F_PERIOD"
+
+echo_info "Created synthesization scripts"
+echo_info "Launching Vivado synthesis"
+cd "$SYNTH_DIR"
+vivado -mode tcl -source "$F_SCRIPT" > "$F_REPORT"
+exit_on_fail "Logic synthesis failed" "Logic synthesis succeeded"
