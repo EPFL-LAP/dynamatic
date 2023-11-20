@@ -18,8 +18,7 @@
 
 namespace dynamatic {
 
-std::unique_ptr<dynamatic::DynamaticPass<false>>
-createHandshakePrepareForLegacy();
+std::unique_ptr<dynamatic::DynamaticPass> createHandshakePrepareForLegacy();
 
 } // namespace dynamatic
 

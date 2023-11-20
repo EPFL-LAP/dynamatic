@@ -27,17 +27,12 @@ namespace dynamatic {
 /// pass pre/post-conditions verification on demand around a user-implemented
 /// pass hook that is called on the top-level `mlir::ModuleOp` operation. This
 /// pass is meant to factor in common invariant checks and analysis steps that
-/// most Dynamatic passes care about (e.g., naming analysis). Template
-/// parameters allow implementors to control which invariants are checked in the
-/// input/output IR (failing the pass if one is broken ).
-/// - `RequireNames`: every operation in the input IR must have a unique name
-/// (according to the `dynamatic::NameAnalysis` analysis infrastructure)
+/// most Dynamatic passes care about (e.g., naming analysis).
 ///
 /// Implementors should override the `runDynamaticPass` method instead of the
 /// standard `runOnOperation` method to implement their pass's logic; the latter
 /// is defined by this class and performs invariant checking around the call to
 /// `runDynamaticPass`.
-template <bool RequireNames>
 class DynamaticPass : public mlir::OperationPass<mlir::ModuleOp> {
 protected:
   /// Simply forwards the pass's type ID to the parent `mlir::OperationPass`.
@@ -54,13 +49,6 @@ protected:
     NameAnalysis &nameAnalysis = getAnalysis<NameAnalysis>();
     if (!nameAnalysis.isAnalysisValid())
       return signalPassFailure();
-    if (!nameAnalysis.areAllOpsNamed()) {
-      if (RequireNames) {
-        getOperation().emitError() << "Not all IR operations are named, which "
-                                      "is a precondition to the pass.";
-        return signalPassFailure();
-      }
-    }
 
     // Run the actual pass
     runDynamaticPass();

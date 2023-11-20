@@ -190,7 +190,7 @@ LogicalResult MarkMemoryDependenciesPass::checkNonAffineAccessPair(
   return success();
 }
 
-std::unique_ptr<dynamatic::DynamaticPass<false>>
+std::unique_ptr<dynamatic::DynamaticPass>
 dynamatic::createMarkMemoryDependencies() {
   return std::make_unique<MarkMemoryDependenciesPass>();
 }

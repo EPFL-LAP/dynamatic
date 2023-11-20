@@ -41,7 +41,7 @@ struct RemovePolygeistAttributesPass
 
 } // namespace
 
-std::unique_ptr<dynamatic::DynamaticPass<false>>
+std::unique_ptr<dynamatic::DynamaticPass>
 dynamatic::createRemovePolygeistAttributes() {
   return std::make_unique<RemovePolygeistAttributesPass>();
 }

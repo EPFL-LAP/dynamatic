@@ -316,8 +316,7 @@ public:
 } // namespace
 
 namespace dynamatic {
-std::unique_ptr<dynamatic::DynamaticPass<false>>
-createFlattenMemRefRowMajorPass() {
+std::unique_ptr<dynamatic::DynamaticPass> createFlattenMemRefRowMajorPass() {
   return std::make_unique<FlattenMemRefRowMajorPass>();
 }
 } // namespace dynamatic

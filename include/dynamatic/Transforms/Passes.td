@@ -53,7 +53,7 @@ def ScfForLoopRotation : DynamaticPass<"scf-rotate-for-loops"> {
   let constructor = "dynamatic::createScfRotateForLoops()";
 }
 
-def ScfSimpleIfToSelect : DynamaticPass<"scf-simple-if-to-select", "false",
+def ScfSimpleIfToSelect : DynamaticPass<"scf-simple-if-to-select",
                                         ["mlir::arith::ArithDialect"]> {
   let summary = "Transforms if's with simple bodies into select's.";
   let description = [{
@@ -119,7 +119,6 @@ def HandshakePrepareForLegacy : DynamaticPass<"handshake-prepare-for-legacy"> {
 }
 
 def HandshakeOptimizeBitwidths : DynamaticPass< "handshake-optimize-bitwidths", 
-                                                "false",
                                                 ["mlir::arith::ArithDialect"]> {
   let summary = "Optimize bitwidths of all channels.";
   let description = [{
@@ -153,7 +152,6 @@ def HandshakeConcretizeIndexType : DynamaticPass<"handshake-concretize-index-typ
 }
 
 def HandshakeMinimizeCstWidth : DynamaticPass<"handshake-minimize-cst-width",
-                                              "false",
                                               ["mlir::arith::ArithDialect"]> {
   let summary = "Minimizes the bitwidth of all Handshake constants.";
   let description = [{
@@ -187,7 +185,7 @@ def HandshakeSetBufferingProperties :
             "(default).">];
 }
 
-def HandshakePlaceBuffers : DynamaticPass<"handshake-place-buffers", "true"> {
+def HandshakePlaceBuffers : DynamaticPass<"handshake-place-buffers"> {
   let summary = 
     "Places buffers in dataflow circuits for correctness and performance.";
   let description = [{
@@ -244,7 +242,7 @@ def BackAnnotate : DynamaticPass<"back-annotate"> {
             "Path to JSON-formatted back-annotation file">];
 }
 
-def FlattenMemRefRowMajor : DynamaticPass<"flatten-memref-row-major", "false",
+def FlattenMemRefRowMajor : DynamaticPass<"flatten-memref-row-major",
                                           ["mlir::memref::MemRefDialect"]> {
   let summary = "Flatten memrefs (row-major order)";
   let description = [{

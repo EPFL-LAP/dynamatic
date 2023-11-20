@@ -73,7 +73,6 @@ struct PushConstantsPass : public PushConstantsBase<PushConstantsPass> {
 };
 } // namespace
 
-std::unique_ptr<dynamatic::DynamaticPass<false>>
-dynamatic::createPushConstantsPass() {
+std::unique_ptr<dynamatic::DynamaticPass> dynamatic::createPushConstantsPass() {
   return std::make_unique<PushConstantsPass>();
 }

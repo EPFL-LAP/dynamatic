@@ -21,7 +21,7 @@
 namespace dynamatic {
 namespace experimental {
 
-std::unique_ptr<dynamatic::DynamaticPass<false>>
+std::unique_ptr<dynamatic::DynamaticPass>
 createHandshakeFixArgNames(const std::string &source = "");
 
 #define GEN_PASS_DECL_HANDSHAKEFIXARGNAMES

@@ -294,7 +294,7 @@ struct ScfSimpleIfToSelectPass
 };
 } // namespace
 
-std::unique_ptr<dynamatic::DynamaticPass<false>>
+std::unique_ptr<dynamatic::DynamaticPass>
 dynamatic::createScfSimpleIfToSelect() {
   return std::make_unique<ScfSimpleIfToSelectPass>();
 }

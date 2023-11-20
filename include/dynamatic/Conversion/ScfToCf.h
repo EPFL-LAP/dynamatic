@@ -26,7 +26,7 @@ namespace dynamatic {
 #define GEN_PASS_DEF_SCFTOCF
 #include "dynamatic/Conversion/Passes.h.inc"
 
-std::unique_ptr<dynamatic::DynamaticPass<false>> createLowerScfToCf();
+std::unique_ptr<dynamatic::DynamaticPass> createLowerScfToCf();
 
 } // namespace dynamatic
 

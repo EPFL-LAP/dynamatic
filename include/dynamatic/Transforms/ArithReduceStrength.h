@@ -87,7 +87,7 @@ private:
       std::unordered_map<std::shared_ptr<OpTree>, Value> &resultCache);
 };
 
-std::unique_ptr<dynamatic::DynamaticPass<false>>
+std::unique_ptr<dynamatic::DynamaticPass>
 createArithReduceStrength(unsigned maxAdderDepthMul = 3);
 
 #define GEN_PASS_DECL_ARITHREDUCESTRENGTH

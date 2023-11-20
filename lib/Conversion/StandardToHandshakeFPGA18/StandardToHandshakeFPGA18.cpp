@@ -942,7 +942,7 @@ struct StandardToHandshakeFPGA18Pass
 };
 } // namespace
 
-std::unique_ptr<dynamatic::DynamaticPass<false>>
+std::unique_ptr<dynamatic::DynamaticPass>
 dynamatic::createStandardToHandshakeFPGA18Pass() {
   return std::make_unique<StandardToHandshakeFPGA18Pass>();
 }

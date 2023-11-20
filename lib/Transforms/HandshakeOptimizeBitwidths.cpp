@@ -1637,7 +1637,7 @@ void HandshakeOptimizeBitwidthsPass::addBackwardPatterns(
 
 } // namespace
 
-std::unique_ptr<dynamatic::DynamaticPass<false>>
+std::unique_ptr<dynamatic::DynamaticPass>
 dynamatic::createHandshakeOptimizeBitwidths(bool legacy) {
   return std::make_unique<HandshakeOptimizeBitwidthsPass>(legacy);
 }

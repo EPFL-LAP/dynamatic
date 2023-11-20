@@ -125,6 +125,11 @@ void HandshakePlaceBuffersPass::runDynamaticPass() {
     return signalPassFailure();
   }
 
+  // Make sure all operations are named (used to generate unique MILP variable
+  // names).
+  NameAnalysis &namer = getAnalysis<NameAnalysis>();
+  namer.nameAllUnnamedOps();
+
   // Call the right function
   auto func = allAlgorithms[algorithm];
   if (failed(((*this).*(func))()))
@@ -456,7 +461,7 @@ std::string dynamatic::buffer::getGurobiOptStatusDesc(int status) {
   }
 }
 
-std::unique_ptr<dynamatic::DynamaticPass<true>>
+std::unique_ptr<dynamatic::DynamaticPass>
 dynamatic::buffer::createHandshakePlaceBuffers(
     StringRef algorithm, StringRef frequencies, StringRef timingModels,
     bool firstCFDFC, double targetCP, unsigned timeout, bool dumpLogs) {

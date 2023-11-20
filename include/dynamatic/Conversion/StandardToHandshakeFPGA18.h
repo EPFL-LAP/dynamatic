@@ -123,8 +123,7 @@ public:
 private:
 };
 
-std::unique_ptr<dynamatic::DynamaticPass<false>>
-createStandardToHandshakeFPGA18Pass();
+std::unique_ptr<dynamatic::DynamaticPass> createStandardToHandshakeFPGA18Pass();
 
 } // namespace dynamatic
 

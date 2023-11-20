@@ -42,7 +42,7 @@ namespace buffer {
 /// https://www.epfl.ch/labs/lap/wp-content/uploads/2020/03/JosipovicFeb20_BuffePlacementAndSizingForHigh-PerformanceDataflowCircuits_FPGA20.pdf).
 void setFPGA20Properties(Channel &channel);
 
-std::unique_ptr<dynamatic::DynamaticPass<false>>
+std::unique_ptr<dynamatic::DynamaticPass>
 createHandshakeSetBufferingProperties(const std::string &version = "fpga20");
 
 #define GEN_PASS_DECL_HANDSHAKESETBUFFERINGPROPERTIES

@@ -40,7 +40,7 @@ LogicalResult verifyAllIndexConcretized(circt::handshake::FuncOp funcOp);
 /// Handshake function has an IndexType operand or result.
 LogicalResult verifyAllIndexConcretized(mlir::ModuleOp modOp);
 
-std::unique_ptr<dynamatic::DynamaticPass<false>>
+std::unique_ptr<dynamatic::DynamaticPass>
 createHandshakeConcretizeIndexType(unsigned width = 64);
 
 } // namespace dynamatic

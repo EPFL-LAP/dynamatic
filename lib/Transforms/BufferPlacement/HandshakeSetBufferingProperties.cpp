@@ -91,7 +91,7 @@ struct HandshakeSetBufferingPropertiesPass
 
 } // namespace
 
-std::unique_ptr<dynamatic::DynamaticPass<false>>
+std::unique_ptr<dynamatic::DynamaticPass>
 dynamatic::buffer::createHandshakeSetBufferingProperties(
     const std::string &version) {
   return std::make_unique<HandshakeSetBufferingPropertiesPass>(version);

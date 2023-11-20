@@ -33,7 +33,7 @@ namespace buffer {
 // https://www.gurobi.com/documentation/current/refman/optimization_status_codes.html
 std::string getGurobiOptStatusDesc(int status);
 
-std::unique_ptr<dynamatic::DynamaticPass<true>> createHandshakePlaceBuffers(
+std::unique_ptr<dynamatic::DynamaticPass> createHandshakePlaceBuffers(
     StringRef algorithm = "on-merges", StringRef frequencies = "",
     StringRef timingModels = "", bool firstCFDFC = false, double targetCP = 4.0,
     unsigned timeout = 180, bool dumpLogs = false);

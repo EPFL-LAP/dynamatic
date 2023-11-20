@@ -23,7 +23,7 @@ namespace dynamatic {
 #define GEN_PASS_DECL_MARKMEMORYINTERFACES
 #define GEN_PASS_DEF_MARKMEMORYINTERFACES
 #include "dynamatic/Transforms/Passes.h.inc"
-std::unique_ptr<dynamatic::DynamaticPass<false>> createMarkMemoryInterfaces();
+std::unique_ptr<dynamatic::DynamaticPass> createMarkMemoryInterfaces();
 
 } // namespace dynamatic
 

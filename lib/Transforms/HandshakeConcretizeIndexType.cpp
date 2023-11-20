@@ -239,7 +239,7 @@ struct HandshakeConcretizeIndexTypePass
 };
 }; // namespace
 
-std::unique_ptr<dynamatic::DynamaticPass<false>>
+std::unique_ptr<dynamatic::DynamaticPass>
 dynamatic::createHandshakeConcretizeIndexType(unsigned width) {
   return std::make_unique<HandshakeConcretizeIndexTypePass>(width);
 }

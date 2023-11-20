@@ -192,7 +192,7 @@ struct HandshakeCanonicalizePass
 };
 }; // namespace
 
-std::unique_ptr<dynamatic::DynamaticPass<false>>
+std::unique_ptr<dynamatic::DynamaticPass>
 dynamatic::createHandshakeCanonicalize() {
   return std::make_unique<HandshakeCanonicalizePass>();
 }
