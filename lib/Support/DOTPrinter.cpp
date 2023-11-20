@@ -637,9 +637,12 @@ LogicalResult DOTPrinter::annotateNode(Operation *op,
     info.stringAttr["memory"] =
         op->getParentOfType<handshake::FuncOp>().getArgName(argIdx).str();
 
+    unsigned lsqLdSt = ports.getNumPorts(MemoryPort::Kind::LSQ_LOAD_STORE);
     info.intAttr["bbcount"] = ports.getNumPorts(MemoryPort::Kind::CONTROL);
-    info.intAttr["ldcount"] = ports.getNumPorts(MemoryPort::Kind::LOAD);
-    info.intAttr["stcount"] = ports.getNumPorts(MemoryPort::Kind::STORE);
+    info.intAttr["ldcount"] =
+        ports.getNumPorts(MemoryPort::Kind::LOAD) + lsqLdSt;
+    info.intAttr["stcount"] =
+        ports.getNumPorts(MemoryPort::Kind::STORE) + lsqLdSt;
   };
 
   NodeInfo info =
