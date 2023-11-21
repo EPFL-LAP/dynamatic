@@ -14,9 +14,13 @@
 #define DYNAMATIC_VISUAL_DATAFLOW_VISUAL_DATAFLOW_H
 
 #include "Graph.h"
+#include "GraphEdge.h"
 #include "godot_cpp/classes/control.hpp"
 #include <godot_cpp/classes/label.hpp>
+#include <godot_cpp/classes/line2d.hpp>
 #include <vector>
+
+using namespace dynamatic::experimental::visual_dataflow;
 
 namespace godot {
 
@@ -24,10 +28,15 @@ class VisualDataflow : public Control {
   GDCLASS(VisualDataflow, Control)
 
 private:
-  int cycle = 0;
+  Graph graph;
+  CycleNb cycle = 0;
+  std::map<EdgeId, Line2D *> edgeIdToLine2D;
 
+  void createGraph();
   void drawCycleNumber();
   void drawGraph();
+  void changeCycle(int64_t cycleNb);
+  void setEdgeColor(State state, Line2D *line);
 
 protected:
   static void _bind_methods();
@@ -37,7 +46,7 @@ public:
 
   ~VisualDataflow() override = default;
 
-  void drawAll();
+  void start();
   void nextCycle();
   void previousCycle();
 };

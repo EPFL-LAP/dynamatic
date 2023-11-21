@@ -91,9 +91,9 @@ void saveTransitionsToFile(Graph *graph) {
 
 int main() {
   std::string inputDOT = "../../../experimental/"
-                         "visual-dataflow/test/bicg.dot";
+                         "visual-dataflow/test/sobel.dot";
   std::string inputTransitions = "../../../experimental/visual-dataflow/test/"
-                                 "transitions.csv";
+                                 "sobel.csv";
 
   Graph graph = Graph();
   GraphParser parser(&graph);

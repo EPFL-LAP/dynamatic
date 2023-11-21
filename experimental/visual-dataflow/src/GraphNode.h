@@ -38,13 +38,13 @@ public:
   /// Sets the positon of the Node
   void setPosition(std::pair<float, float> pos);
   /// Adds a port to the Node
-  void addPort(std::string &port, bool isInputPort);
+  void addPort(size_t port, bool isInputPort);
   /// Returns the node identifier
   NodeId getNodeId();
   /// Return the position of the Node
   std::pair<float, float> getPosition();
   // Returns the in/out ports of the Node
-  std::vector<std::string> getPorts(bool isInputPort);
+  std::vector<size_t> getPorts(bool isInputPort);
   /// Sets the width of the Node
   void setWidth(float width);
   /// Returns the width of the Node
@@ -58,9 +58,9 @@ private:
   /// Node identifier
   NodeId id;
   /// List of all the input ports of the node
-  std::vector<std::string> inPorts;
+  std::vector<size_t> inPorts;
   /// List of all the output ports of the node
-  std::vector<std::string> outPorts;
+  std::vector<size_t> outPorts;
   /// Position of the node in the Graph
   std::pair<float, float> position;
   /// Width of the node

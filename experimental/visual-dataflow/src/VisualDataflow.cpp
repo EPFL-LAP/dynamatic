@@ -11,6 +11,7 @@
 //===----------------------------------------------------------------------===//
 
 #include "VisualDataflow.h"
+#include "Graph.h"
 #include "GraphParser.h"
 #include "dynamatic/Support/DOTPrinter.h"
 #include "dynamatic/Support/TimingModels.h"
@@ -40,6 +41,7 @@
 #include <godot_cpp/classes/canvas_item.hpp>
 #include <godot_cpp/classes/control.hpp>
 #include <godot_cpp/core/memory.hpp>
+#include <godot_cpp/variant/color.hpp>
 #include <godot_cpp/variant/utility_functions.hpp>
 #include <godot_cpp/variant/vector2.hpp>
 
@@ -50,7 +52,7 @@ using namespace dynamatic;
 using namespace dynamatic::experimental::visual_dataflow;
 
 void VisualDataflow::_bind_methods() {
-  ClassDB::bind_method(D_METHOD("drawAll"), &VisualDataflow::drawAll);
+  ClassDB::bind_method(D_METHOD("start"), &VisualDataflow::start);
   ClassDB::bind_method(D_METHOD("nextCycle"), &VisualDataflow::nextCycle);
   ClassDB::bind_method(D_METHOD("previousCycle"),
                        &VisualDataflow::previousCycle);
@@ -58,10 +60,12 @@ void VisualDataflow::_bind_methods() {
 
 VisualDataflow::VisualDataflow() = default;
 
-void VisualDataflow::drawAll() { drawGraph(); }
+void VisualDataflow::start() {
+  createGraph();
+  drawGraph();
+}
 
-void VisualDataflow::drawGraph() {
-  Graph graph = Graph();
+void VisualDataflow::createGraph() {
   GraphParser parser = GraphParser(&graph);
 
   std::string inputDOTFile = "../test/bicg.dot";
@@ -72,6 +76,13 @@ void VisualDataflow::drawGraph() {
     return;
   }
 
+  if (failed(parser.parse(inputCSVFile))) {
+    UtilityFunctions::printerr("Failed to parse transitions");
+    return;
+  }
+}
+
+void VisualDataflow::drawGraph() {
   std::map<std::string, Color> mapColor;
   mapColor["lavender"] = Color(0.9, 0.9, 0.98, 1);
   mapColor["plum"] = Color(0.867, 0.627, 0.867, 1);
@@ -161,26 +172,60 @@ void VisualDataflow::drawGraph() {
     line->add_child(arrowHead);
     line->set_width(2);
     add_child(line);
-  }
-
-  if (failed(parser.parse(inputCSVFile))) {
-    UtilityFunctions::printerr("Failed to parse transitions");
-    return;
+    edgeIdToLine2D[edge.getEdgeId()] = line;
   }
 }
 
 void VisualDataflow::nextCycle() {
   cycle++;
-  Label *label =
-      (Label *)get_node_internal("CanvasLayer/VBoxContainer/CycleNumber");
-  label->set_text("Cycle: " + String::num_int64(cycle));
+  changeCycle(cycle);
 }
 
 void VisualDataflow::previousCycle() {
   if (cycle > 0) {
     cycle--;
-    Label *label =
-        (Label *)get_node_internal("CanvasLayer/VBoxContainer/CycleNumber");
-    label->set_text("Cycle: " + String::num_int64(cycle));
+    changeCycle(cycle);
+  }
+}
+
+void VisualDataflow::changeCycle(int64_t cycleNb) {
+  cycle = cycleNb;
+  Label *label =
+      (Label *)get_node_internal("CanvasLayer/VBoxContainer/CycleNumber");
+  label->set_text("Cycle: " + String::num_int64(cycle));
+
+  if (graph.getCycleEdgeStates().count(cycle)) {
+    std::map<EdgeId, State> edgeStates = graph.getCycleEdgeStates().at(cycle);
+    for (auto &edgeState : edgeStates) {
+      EdgeId edgeId = edgeState.first;
+      State state = edgeState.second;
+      Line2D *line = edgeIdToLine2D[edgeId];
+      setEdgeColor(state, line);
+    }
+  } else {
+    UtilityFunctions::printerr("Cycle not found");
+  }
+}
+
+void VisualDataflow::setEdgeColor(State state, Line2D *line) {
+  Color color = Color(0, 0, 0, 1);
+  if (state == UNDEFINED) {
+    color = Color(0.8, 0, 0, 1);
+  } else if (state == READY) {
+    color = Color(0, 0, 0.8, 1);
+  } else if (state == EMPTY) {
+    color = Color(0, 0, 0, 1);
+  } else if (state == VALID) {
+    color = Color(0, 0.8, 0, 1);
+  } else if (state == VALID_READY) {
+    color = Color(0, 0.8, 0.8, 1);
+  }
+  line->set_default_color(color);
+  for (int i = 0; i < line->get_child_count(); ++i) {
+    Node *child = line->get_child(i);
+    if (child->get_class() == "Polygon2D") {
+      Polygon2D *arrowHead = (Polygon2D *)child;
+      arrowHead->set_color(color);
+    }
   }
 }

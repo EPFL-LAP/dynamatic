@@ -12,6 +12,7 @@
 //===----------------------------------------------------------------------===//
 
 #include "CSVParser.h"
+#include <iostream>
 
 using namespace mlir;
 using namespace dynamatic::experimental::visual_dataflow;
@@ -35,7 +36,7 @@ static LogicalResult findState(const std::string &stateString, State &state) {
     state = VALID;
     return success();
   }
-  if (stateString == "valid_ready") {
+  if (stateString == "valid+ready") {
     state = VALID_READY;
     return success();
   }
@@ -96,20 +97,22 @@ LogicalResult dynamatic::experimental::visual_dataflow::processCSVLine(
     return failure();
   }
 
-  std::pair<NodeId, int> srcInfo = std::pair(src, outPort);
+  std::pair<NodeId, size_t> srcInfo = std::pair(src, ++outPort);
 
-  std::pair<NodeId, int> dstInfo = std::pair(dst, inPort);
+  std::pair<NodeId, size_t> dstInfo = std::pair(dst, ++inPort);
 
-  std::pair<std::pair<NodeId, int>, std::pair<NodeId, int>> info =
+  std::pair<std::pair<NodeId, size_t>, std::pair<NodeId, size_t>> info =
       std::pair(srcInfo, dstInfo);
 
   EdgeId edgeId;
   State state;
 
   if (failed(graph.getEdgeId(info, edgeId)) ||
-      failed(findState(stateString, state)))
+      failed(findState(stateString, state))) {
     return failure();
+  }
 
   graph.addEdgeState(cycleNb, edgeId, state);
+
   return success();
 }

@@ -48,9 +48,9 @@ public:
   LogicalResult getNode(NodeId &id, GraphNode &result);
   /// Based on information about an edge, retrieves the corresponding edge
   /// identifier
-  LogicalResult
-  getEdgeId(std::pair<std::pair<NodeId, int>, std::pair<NodeId, int>> &edgeInfo,
-            EdgeId &edgeId);
+  LogicalResult getEdgeId(
+      std::pair<std::pair<NodeId, size_t>, std::pair<NodeId, size_t>> &edgeInfo,
+      EdgeId &edgeId);
   /// Given a specific clock cycle, adds a pair (edge, state) to the map
   void addEdgeState(CycleNb cycle, EdgeId edgeId, State state);
   /// Returns all the Nodes in the Graph
@@ -69,7 +69,8 @@ private:
   std::map<CycleNb, std::map<EdgeId, State>> cycleEdgeStates;
   /// Map of the edges of the graph :
   /// ((src node id, outPort number), (dest node id, inPort number)) -> edge id
-  std::map<std::pair<std::pair<NodeId, int>, std::pair<NodeId, int>>, EdgeId>
+  std::map<std::pair<std::pair<NodeId, size_t>, std::pair<NodeId, size_t>>,
+           EdgeId>
       mapEdges;
 };
 

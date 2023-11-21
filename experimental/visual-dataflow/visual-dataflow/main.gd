@@ -11,7 +11,7 @@ var screen_start_position
 @onready var camera = $Camera2D
 
 func _ready():
-	drawAll()
+	start()
 
 func zoom_at_point(zoom_change, point):
 	var target_zoom = camera.zoom * zoom_change
@@ -42,9 +42,14 @@ func _input(event: InputEvent) -> void:
 			dragging = true
 		else:
 			dragging = false
-	elif event is InputEventMouseMotion and dragging:
+	if event is InputEventMouseMotion and dragging:
 		camera.position = Vector2(1/camera.zoom.x,1/camera.zoom.y) * (mouse_start_position - event.position) + screen_start_position
-
+	
+	if event.is_action_pressed("ui_right"):
+		_on_next_pressed()
+	if event.is_action_pressed("ui_left"):
+		_on_prev_pressed()
+		
 func _on_next_pressed():
 	nextCycle()
 

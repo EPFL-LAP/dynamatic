@@ -64,8 +64,7 @@ dynamatic::experimental::visual_dataflow::processDOT(std::ifstream &file,
       size_t occurrences = std::count(line.begin(), line.end(), ' ');
       if (occurrences != std::string::npos) {
         for (size_t i = 1; i <= occurrences + 1; i++) {
-          std::string portName = std::to_string(i);
-          currentNode.addPort(portName, true);
+          currentNode.addPort(i, true);
         }
       }
 
@@ -80,8 +79,7 @@ dynamatic::experimental::visual_dataflow::processDOT(std::ifstream &file,
       size_t occurrences = std::count(line.begin(), line.end(), ' ');
       if (occurrences != std::string::npos) {
         for (size_t i = 1; i <= occurrences + 1; i++) {
-          std::string portName = std::to_string(i);
-          currentNode.addPort(portName, false);
+          currentNode.addPort(i, false);
         }
       }
 
@@ -93,20 +91,21 @@ dynamatic::experimental::visual_dataflow::processDOT(std::ifstream &file,
       (iss >> x >> comma >> y);
       std::pair<float, float> position = std::make_pair(x, y);
       currentNode.setPosition(position);
-      
 
-    } else if (insideNodeDefinition && line.find("fillcolor") != std::string::npos){
-      Color color = line.substr(line.find("=") + 1, line.find(',') - line.find('=') - 1);
+    } else if (insideNodeDefinition &&
+               line.find("fillcolor") != std::string::npos) {
+      Color color =
+          line.substr(line.find("=") + 1, line.find(',') - line.find('=') - 1);
       currentNode.setColor(color);
 
     } else if (insideNodeDefinition && line.find("]") != std::string::npos) {
-      float width = std::stof(line.substr(line.find("=") + 1, line.find(']') - line.find('=') - 1));
+      float width = std::stof(
+          line.substr(line.find("=") + 1, line.find(']') - line.find('=') - 1));
       currentNode.setWidth(width);
 
       graph.addNode(currentNode);
       insideNodeDefinition = false;
     }
-
 
     if (insideEdgeDefinition && line.find("pos") != std::string::npos) {
       size_t startPos = line.find('\"');
@@ -128,8 +127,7 @@ dynamatic::experimental::visual_dataflow::processDOT(std::ifstream &file,
           std::istringstream iss(positionString);
           std::string token;
 
-          std::set<std::pair<float, float>>
-              uniquePositions; 
+          std::set<std::pair<float, float>> uniquePositions;
 
           while ((std::getline(iss, token, ' '))) {
             if (token.empty())

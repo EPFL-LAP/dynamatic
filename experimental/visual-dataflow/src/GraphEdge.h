@@ -30,8 +30,7 @@ class GraphEdge {
 public:
   /// Constructs an edge
   GraphEdge(EdgeId id = -1, GraphNode src = GraphNode(),
-            GraphNode dst = GraphNode(), unsigned inPort = 0,
-            unsigned outPort = 0,
+            GraphNode dst = GraphNode(), size_t inPort = 0, size_t outPort = 0,
             std::vector<std::pair<float, float>> position =
                 std::vector<std::pair<float, float>>());
   /// Sets the EdgeId
@@ -43,17 +42,17 @@ public:
   /// Sets the destination Node
   void setDst(GraphNode dst);
   /// Sets inPort
-  void setInPort(unsigned inPort);
+  void setInPort(size_t inPort);
   /// Sets outPort
-  void setOutPort(unsigned outPort);
+  void setOutPort(size_t outPort);
   /// Returns the source node of the edge
   GraphNode getSrcNode();
   /// Returns the desitnation node of the edge
   GraphNode getDstNode();
   /// Returns the source out port of the edge
-  unsigned getOutPort();
+  size_t getOutPort();
   /// Returns the desitnation in port of the edge
-  unsigned getInPort();
+  size_t getInPort();
   /// Returns the edge identifier
   EdgeId getEdgeId();
   /// Returns the edge positions
@@ -67,9 +66,9 @@ private:
   /// Destination node
   GraphNode dst;
   /// Port number of the destination node
-  unsigned inPort;
+  size_t inPort;
   /// Port number of the source node
-  unsigned outPort;
+  size_t outPort;
   /// Positions of the edge in the graph
   std::vector<std::pair<float, float>> position;
 };
