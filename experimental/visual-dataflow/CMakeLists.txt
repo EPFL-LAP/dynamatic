@@ -50,3 +50,42 @@ target_link_libraries(${GODOT_LIB_NAME}
 
   godot::cpp
 )
+
+add_executable(main
+  test/main.cpp
+  src/CSVParser.cpp
+  src/DOTParser.cpp
+  src/DOTReformat.cpp
+  src/Graph.cpp
+  src/GraphEdge.cpp
+  src/GraphNode.cpp
+  src/GraphParser.cpp
+  src/MLIRMapper.cpp
+)
+target_link_libraries(main
+  PRIVATE
+ 
+  AffineToScf
+  DynamaticLowerScfToCf
+  DynamaticBufferPlacement
+  DynamaticStandardToHandshakeFPGA18
+  DynamaticHandshakeToNetlist
+  DynamaticTransforms
+  DynamaticTutorialsCreatingPasses
+  DynamaticExperimentalTestTransforms
+  DynamaticExperimentalSupport
+
+  CIRCTHandshake
+  CIRCTHandshakeTransforms
+  CIRCTStandardToHandshake
+
+  MLIRIR
+  MLIRLLVMDialect
+  MLIRMemRefDialect
+  MLIROptLib
+  MLIRParser
+  MLIRFuncDialect
+  MLIRSupport
+  MLIRTransforms
+  MLIRSCFDialect
+)
