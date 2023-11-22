@@ -2,8 +2,8 @@
 #include "../integration_utils.h"
 #include <stdlib.h>
 
-void test_memory_10(int a[N], int n) {
-  for (int i = 0; i < n; i++)
+void test_memory_10(inout_int_t a[N], in_int_t n) {
+  for (int i = 0; i < n - 1; i++)
     a[i] = a[i] + a[i + 1] + 5;
 }
 

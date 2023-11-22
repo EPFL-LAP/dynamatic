@@ -3,7 +3,7 @@
 #include <stdlib.h>
 
 void test_memory_2(inout_int_t a[N], in_int_t n) {
-  for (int i = 0; i < n; i++)
+  for (int i = 0; i < n - 1; i++)
     a[i] = a[i + 1] + N;
 }
 

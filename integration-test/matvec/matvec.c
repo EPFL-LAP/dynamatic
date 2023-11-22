@@ -7,7 +7,6 @@
 #include "matvec.h"
 #include "../integration_utils.h"
 #include "stdlib.h"
-#include <array>
 
 int matvec(in_int_t m[N][N], in_int_t v[N], out_int_t out[N]) {
   int tmp = 0;
