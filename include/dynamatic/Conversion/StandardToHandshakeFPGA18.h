@@ -45,7 +45,7 @@ public:
 
     SmallVector<Value> lsqInputs;
     SmallVector<unsigned> lsqGroupSizes;
-    SmallVector<Operation *> lsqLoadOrder;
+    SmallVector<LSQLoadOp> lsqLoadOrder;
     unsigned lsqNumLoads;
   };
 

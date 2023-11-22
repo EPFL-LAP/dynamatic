@@ -810,7 +810,7 @@ struct HandshakeMCAddress
     rewriter.setInsertionPoint(mcOp);
     auto newOp = rewriter.create<handshake::MemoryControllerOp>(
         mcOp.getLoc(), mcOp.getMemRef(), newInputs, mcOp.getMCBlocks(),
-        mcOp.getPorts().getNumLoadPorts());
+        mcOp.getPorts().getNumPorts<LoadPort, LSQLoadStorePort>());
     inheritBB(mcOp, newOp);
     rewriter.replaceOp(mcOp, newOp.getResults());
     return success();
@@ -820,7 +820,7 @@ struct HandshakeMCAddress
 /// Optimizes the bitwidth of memory ports's address-carrying channels so that
 /// they can just support indexing into the memory region these ports ultimately
 /// talk to. The first template parameter is meant to be either
-/// handshake::DynamaticLoadOp or handshake::DynamaticStoreOp. This pattern can
+/// handshake::LoadOpInterface or handshake::StoreOpInterface. This pattern can
 /// be applied as part of a single greedy rewriting pass and doesn't need to be
 /// part of the forward/backward process.
 template <typename Op>
@@ -1525,9 +1525,11 @@ struct HandshakeOptimizeBitwidthsPass
     patterns.add<HandshakeMuxSelect, DowngradeSingleInputMuxes,
                  HandshakeCMergeIndex, DowngradeSingleInputControlMerges>(ctx);
     if (!legacy)
-      patterns.add<HandshakeMCAddress,
-                   HandshakeMemPortAddress<handshake::DynamaticLoadOp>,
-                   HandshakeMemPortAddress<handshake::DynamaticStoreOp>>(ctx);
+      patterns
+          .add<HandshakeMCAddress, HandshakeMemPortAddress<handshake::MCLoadOp>,
+               HandshakeMemPortAddress<handshake::LSQLoadOp>,
+               HandshakeMemPortAddress<handshake::MCStoreOp>,
+               HandshakeMemPortAddress<handshake::LSQStoreOp>>(ctx);
     if (failed(
             applyPatternsAndFoldGreedily(modOp, std::move(patterns), config)))
       return signalPassFailure();

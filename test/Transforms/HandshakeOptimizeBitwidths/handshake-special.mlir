@@ -56,9 +56,9 @@ handshake.func @cmergeToMuxIndexOpt(%arg0: i32, %arg1: i32, %start: none) -> i32
 // CHECK:           %[[VAL_15:.*]] = arith.trunci %[[VAL_14]] : i32 to i10
 // CHECK:           %[[VAL_16:.*]] = constant %[[VAL_1]] {value = 42 : i32} : i32
 // CHECK:           %[[VAL_4]] = constant %[[VAL_1]] {bb = 0 : ui32, value = 2 : i32} : i32
-// CHECK:           %[[VAL_5]], %[[VAL_17:.*]] = d_load{{\[}}%[[VAL_11]]] %[[VAL_2]] {bb = 0 : ui32} : i10, i32
-// CHECK:           %[[VAL_6]], %[[VAL_7]] = d_store{{\[}}%[[VAL_13]]] %[[VAL_16]] {bb = 0 : ui32} : i32, i10
-// CHECK:           %[[VAL_8]], %[[VAL_9]] = d_store{{\[}}%[[VAL_15]]] %[[VAL_16]] {bb = 0 : ui32} : i32, i10
+// CHECK:           %[[VAL_5]], %[[VAL_17:.*]] = mc_load{{\[}}%[[VAL_11]]] %[[VAL_2]] {bb = 0 : ui32} : i10, i32
+// CHECK:           %[[VAL_6]], %[[VAL_7]] = mc_store{{\[}}%[[VAL_13]]] %[[VAL_16]] {bb = 0 : ui32} : i32, i10
+// CHECK:           %[[VAL_8]], %[[VAL_9]] = mc_store{{\[}}%[[VAL_15]]] %[[VAL_16]] {bb = 0 : ui32} : i32, i10
 // CHECK:           %[[VAL_18:.*]] = d_return %[[VAL_17]] : i32
 // CHECK:           end %[[VAL_18]], %[[VAL_3]] : i32, none
 // CHECK:         }
@@ -71,9 +71,9 @@ handshake.func @memAddrOpt(%mem: memref<1000xi32>, %start: none) -> i32 {
   %ctrl1 = handshake.constant %start {value = 2 : i32, bb = 0 : ui32}: i32
   %addr1Ext = arith.extui %addr1 : i8 to i32
   %addr2Ext = arith.extui %addr2 : i16 to i32
-  %ldAddr1, %ldVal = d_load[%addr1Ext] %ldData1 {bb = 0 : ui32} : i32, i32
-  %stAddr1, %stData1 = d_store[%addr2Ext] %dataStore {bb = 0 : ui32} : i32, i32
-  %stAddr2, %stData2 = d_store[%addr3] %dataStore {bb = 0 : ui32} : i32, i32
+  %ldAddr1, %ldVal = mc_load[%addr1Ext] %ldData1 {bb = 0 : ui32} : i32, i32
+  %stAddr1, %stData1 = mc_store[%addr2Ext] %dataStore {bb = 0 : ui32} : i32, i32
+  %stAddr2, %stData2 = mc_store[%addr3] %dataStore {bb = 0 : ui32} : i32, i32
   %returnVal = d_return %ldVal : i32
   end %returnVal, %done : i32, none
 }

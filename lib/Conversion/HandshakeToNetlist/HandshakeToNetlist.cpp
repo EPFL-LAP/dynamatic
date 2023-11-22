@@ -264,7 +264,7 @@ static std::string getExtModuleName(Operation *oldOp) {
             else
               extModName += getTypeName(outTypes[0], loc);
           })
-      .Case<handshake::DynamaticLoadOp, handshake::DynamaticStoreOp>([&](auto) {
+      .Case<handshake::LoadOpInterface, handshake::StoreOpInterface>([&](auto) {
         // data bitwidth
         extModName += getTypeName(inTypes[0], loc);
         // address bitwidth
@@ -308,13 +308,10 @@ static std::string getExtModuleName(Operation *oldOp) {
             // Address bitwidth
             extModName += '_' + std::to_string(ports.addrWidth);
             // Port counts
-            extModName +=
-                '_' +
-                std::to_string(ports.getNumPorts(MemoryPort::Kind::LOAD)) +
-                '_' +
-                std::to_string(ports.getNumPorts(MemoryPort::Kind::STORE)) +
-                '_' +
-                std::to_string(ports.getNumPorts(MemoryPort::Kind::CONTROL));
+            extModName += '_' + std::to_string(ports.getNumPorts<LoadPort>()) +
+                          '_' + std::to_string(ports.getNumPorts<StorePort>()) +
+                          '_' +
+                          std::to_string(ports.getNumPorts<ControlPort>());
           })
       .Case<arith::AddFOp, arith::AddIOp, arith::AndIOp, arith::BitcastOp,
             arith::CeilDivSIOp, arith::CeilDivUIOp, arith::DivFOp,
@@ -975,8 +972,10 @@ public:
         ExtModuleConversionPattern<handshake::SinkOp>,
         ExtModuleConversionPattern<handshake::ForkOp>,
         ExtModuleConversionPattern<handshake::DynamaticReturnOp>,
-        ExtModuleConversionPattern<handshake::DynamaticLoadOp>,
-        ExtModuleConversionPattern<handshake::DynamaticStoreOp>,
+        ExtModuleConversionPattern<handshake::MCLoadOp>,
+        ExtModuleConversionPattern<handshake::LSQLoadOp>,
+        ExtModuleConversionPattern<handshake::MCStoreOp>,
+        ExtModuleConversionPattern<handshake::LSQStoreOp>,
         // Arith operations
         ExtModuleConversionPattern<arith::AddFOp>,
         ExtModuleConversionPattern<arith::AddIOp>,

@@ -197,35 +197,35 @@ static std::string getInputForEnd(handshake::EndOp op) {
   return getIOFromPorts(ports);
 }
 
-/// Produces the "in" attribute value of a handshake::DynamaticLoadOp.
-static std::string getInputForLoadOp(handshake::DynamaticLoadOp op) {
+/// Produces the "in" attribute value of a handshake::LoadOpInterface.
+static std::string getInputForLoadOp(handshake::LoadOpInterface op) {
   PortsData ports;
-  ports.emplace_back("in1", op.getData());
-  ports.emplace_back("in2", op.getAddress());
+  ports.emplace_back("in1", op.getDataInput());
+  ports.emplace_back("in2", op.getAddressInput());
   return getIOFromPorts(ports);
 }
 
-/// Produces the "out" attribute value of a handshake::DynamaticLoadOp.
-static std::string getOutputForLoadOp(handshake::DynamaticLoadOp op) {
+/// Produces the "out" attribute value of a handshake::LoadOpInterface.
+static std::string getOutputForLoadOp(handshake::LoadOpInterface op) {
   PortsData ports;
-  ports.emplace_back("out1", op.getDataResult());
-  ports.emplace_back("out2", op.getAddressResult());
+  ports.emplace_back("out1", op.getDataOutput());
+  ports.emplace_back("out2", op.getAddressOutput());
   return getIOFromPorts(ports);
 }
 
-/// Produces the "in" attribute value of a handshake::DynamaticStoreOp.
-static std::string getInputForStoreOp(handshake::DynamaticStoreOp op) {
+/// Produces the "in" attribute value of a handshake::StoreOpInterface.
+static std::string getInputForStoreOp(handshake::StoreOpInterface op) {
   PortsData ports;
-  ports.emplace_back("in1", op.getData());
-  ports.emplace_back("in2", op.getAddress());
+  ports.emplace_back("in1", op.getDataInput());
+  ports.emplace_back("in2", op.getAddressInput());
   return getIOFromPorts(ports);
 }
 
-/// Produces the "out" attribute value of a handshake::DynamaticStoreOp.
-static std::string getOutputForStoreOp(handshake::DynamaticStoreOp op) {
+/// Produces the "out" attribute value of a handshake::StoreOpInterface.
+static std::string getOutputForStoreOp(handshake::StoreOpInterface op) {
   PortsData ports;
-  ports.emplace_back("out1", op.getDataResult());
-  ports.emplace_back("out2", op.getAddressResult());
+  ports.emplace_back("out1", op.getDataOutput());
+  ports.emplace_back("out2", op.getAddressOutput());
   return getIOFromPorts(ports);
 }
 
@@ -434,7 +434,7 @@ static size_t fixOutputPortNumber(Operation *op, size_t idx) {
         return (idx < numReturnValues) ? idx + numMemoryControls
                                        : idx - numReturnValues;
       })
-      .Case<handshake::DynamaticLoadOp, handshake::DynamaticStoreOp>([&](auto) {
+      .Case<handshake::LoadOpInterface, handshake::StoreOpInterface>([&](auto) {
         // Legacy Dynamatic has the data operand/result before the address
         // operand/result
         return 1 - idx;
@@ -443,7 +443,7 @@ static size_t fixOutputPortNumber(Operation *op, size_t idx) {
         // Legacy Dynamatic places the end control signal before the signals
         // going to the MC, if one is connected
         LSQPorts lsqPorts = lsqOp.getPorts();
-        if (!lsqPorts.hasAnyPort(MemoryPort::Kind::MC_LOAD_STORE))
+        if (!lsqPorts.hasAnyPort<MCLoadStorePort>())
           return idx;
 
         // End control signal succeeded by laad address, store address, store
@@ -452,7 +452,7 @@ static size_t fixOutputPortNumber(Operation *op, size_t idx) {
           return idx - 3;
 
         // Signals to MC preceeded by end control signal
-        unsigned numLoads = lsqPorts.getNumPorts(MemoryPort::Kind::LOAD);
+        unsigned numLoads = lsqPorts.getNumPorts<LSQLoadPort>();
         if (idx >= numLoads)
           return idx + 1;
         return idx;
@@ -475,7 +475,7 @@ static size_t fixInputPortNumber(Operation *op, size_t idx) {
         return (idx < numReturnValues) ? idx + numMemoryControls
                                        : idx - numReturnValues;
       })
-      .Case<handshake::DynamaticLoadOp, handshake::DynamaticStoreOp>([&](auto) {
+      .Case<handshake::LoadOpInterface, handshake::StoreOpInterface>([&](auto) {
         // Legacy Dynamatic has the data operand/result before the address
         // operand/result
         return 1 - idx;
@@ -490,7 +490,7 @@ static size_t fixInputPortNumber(Operation *op, size_t idx) {
             FuncMemoryPorts ports = getMemoryPorts(memOp);
 
             // Determine total number of control operands
-            unsigned ctrlCount = ports.getNumPorts(MemoryPort::Kind::CONTROL);
+            unsigned ctrlCount = ports.getNumPorts<ControlPort>();
 
             // Figure out where the value lies
             auto [groupIDx, opIdx] = findValueInGroups(ports, val);
@@ -628,7 +628,7 @@ LogicalResult DOTPrinter::annotateNode(Operation *op,
                                        mlir::raw_indented_ostream &os) {
   /// Set common attributes for memory interfaces
   auto setMemInterfaceAttr = [&](NodeInfo &info, FuncMemoryPorts &ports,
-                                 Value memref) {
+                                 Value memref) -> void {
     info.stringAttr["in"] = getInputForMemInterface(ports);
     info.stringAttr["out"] = getOutputForMemInterface(ports);
 
@@ -637,12 +637,24 @@ LogicalResult DOTPrinter::annotateNode(Operation *op,
     info.stringAttr["memory"] =
         op->getParentOfType<handshake::FuncOp>().getArgName(argIdx).str();
 
-    unsigned lsqLdSt = ports.getNumPorts(MemoryPort::Kind::LSQ_LOAD_STORE);
-    info.intAttr["bbcount"] = ports.getNumPorts(MemoryPort::Kind::CONTROL);
-    info.intAttr["ldcount"] =
-        ports.getNumPorts(MemoryPort::Kind::LOAD) + lsqLdSt;
-    info.intAttr["stcount"] =
-        ports.getNumPorts(MemoryPort::Kind::STORE) + lsqLdSt;
+    unsigned lsqLdSt = ports.getNumPorts<LSQLoadStorePort>();
+    info.intAttr["bbcount"] = ports.getNumPorts<ControlPort>();
+    info.intAttr["ldcount"] = ports.getNumPorts<LoadPort>() + lsqLdSt;
+    info.intAttr["stcount"] = ports.getNumPorts<StorePort>() + lsqLdSt;
+  };
+
+  auto setLoadOpAttr = [&](NodeInfo &info,
+                           handshake::LoadOpInterface loadOp) -> void {
+    info.stringAttr["in"] = getInputForLoadOp(loadOp);
+    info.stringAttr["out"] = getOutputForLoadOp(loadOp);
+    info.intAttr["portId"] = findMemoryPort(loadOp.getAddressOutput());
+  };
+
+  auto setStoreOpAttr = [&](NodeInfo &info,
+                            handshake::StoreOpInterface storeOp) -> void {
+    info.stringAttr["in"] = getInputForStoreOp(storeOp);
+    info.stringAttr["out"] = getOutputForStoreOp(storeOp);
+    info.intAttr["portId"] = findMemoryPort(storeOp.getAddressOutput());
   };
 
   NodeInfo info =
@@ -703,10 +715,8 @@ LogicalResult DOTPrinter::annotateNode(Operation *op,
             unsigned loadIdx = 0, storeIdx = 0;
             for (GroupMemoryPorts &blockPorts : ports.groups) {
               // Number of load and store ports per block
-              numLoads.push_back(
-                  blockPorts.getNumPorts(MemoryPort::Kind::LOAD));
-              numStores.push_back(
-                  blockPorts.getNumPorts(MemoryPort::Kind::STORE));
+              numLoads.push_back(blockPorts.getNumPorts<LoadPort>());
+              numStores.push_back(blockPorts.getNumPorts<StorePort>());
 
               // Offsets of first load/store in the block and indices of each
               // load/store port
@@ -753,31 +763,30 @@ LogicalResult DOTPrinter::annotateNode(Operation *op,
 
             return info;
           })
-          .Case<handshake::DynamaticLoadOp>([&](handshake::DynamaticLoadOp op) {
+          .Case<handshake::MCLoadOp>([&](handshake::MCLoadOp loadOp) {
             auto info = NodeInfo("Operator");
-            Value addr = op.getAddressResult();
-            if (isa<handshake::LSQOp>(getConnectedMemInterface(addr)))
-              info.stringAttr["op"] = "lsq_load_op";
-            else
-              info.stringAttr["op"] = "mc_load_op";
-            info.stringAttr["in"] = getInputForLoadOp(op);
-            info.stringAttr["out"] = getOutputForLoadOp(op);
-            info.intAttr["portId"] = findMemoryPort(addr);
+            info.stringAttr["op"] = "mc_load_op";
+            setLoadOpAttr(info, loadOp);
             return info;
           })
-          .Case<handshake::DynamaticStoreOp>(
-              [&](handshake::DynamaticStoreOp op) {
-                auto info = NodeInfo("Operator");
-                Value addr = op.getAddressResult();
-                if (isa<handshake::LSQOp>(getConnectedMemInterface(addr)))
-                  info.stringAttr["op"] = "lsq_store_op";
-                else
-                  info.stringAttr["op"] = "mc_store_op";
-                info.stringAttr["in"] = getInputForStoreOp(op);
-                info.stringAttr["out"] = getOutputForStoreOp(op);
-                info.intAttr["portId"] = findMemoryPort(addr);
-                return info;
-              })
+          .Case<handshake::LSQLoadOp>([&](handshake::LSQLoadOp loadOp) {
+            auto info = NodeInfo("Operator");
+            info.stringAttr["op"] = "lsq_load_op";
+            setLoadOpAttr(info, loadOp);
+            return info;
+          })
+          .Case<handshake::MCStoreOp>([&](handshake::MCStoreOp storeOp) {
+            auto info = NodeInfo("Operator");
+            info.stringAttr["op"] = "mc_store_op";
+            setStoreOpAttr(info, storeOp);
+            return info;
+          })
+          .Case<handshake::LSQStoreOp>([&](handshake::LSQStoreOp storeOp) {
+            auto info = NodeInfo("Operator");
+            info.stringAttr["op"] = "lsq_store_op";
+            setStoreOpAttr(info, storeOp);
+            return info;
+          })
           .Case<handshake::ForkOp>([&](auto) { return NodeInfo("Fork"); })
           .Case<handshake::SourceOp>([&](auto) {
             auto info = NodeInfo("Source");
@@ -950,8 +959,8 @@ LogicalResult DOTPrinter::annotateEdge(Operation *src, Operation *dst,
   info.to = fixInputPortNumber(dst, argIdx) + 1;
 
   // Handle the mem_address optional attribute
-  if (auto srcMem = dyn_cast<handshake::MemoryOpInterface>(src)) {
-    if (isa<handshake::DynamaticLoadOp, handshake::DynamaticStoreOp>(dst)) {
+  if (isa<handshake::MemoryOpInterface>(src)) {
+    if (isa<handshake::LoadOpInterface, handshake::StoreOpInterface>(dst)) {
       info.memAddress = false;
     } else if (LSQOp lsqOp = dyn_cast<LSQOp>(src);
                lsqOp && isa<MemoryControllerOp>(dst)) {
@@ -960,10 +969,11 @@ LogicalResult DOTPrinter::annotateEdge(Operation *src, Operation *dst,
       info.memAddress = lsqOutputs[mcPorts.getLoadAddrOutputIndex()] == val ||
                         lsqOutputs[mcPorts.getStoreAddrOutputIndex()] == val;
     }
-  } else if (auto dstMem = dyn_cast<handshake::MemoryOpInterface>(dst))
-    if (isa<handshake::DynamaticLoadOp, handshake::DynamaticStoreOp>(src))
+  } else if (isa<handshake::MemoryOpInterface>(dst)) {
+    if (isa<handshake::LoadOpInterface, handshake::StoreOpInterface>(src))
       // Is val the address result of the memory operation?
       info.memAddress = val == src->getResult(0);
+  }
 
   info.print(os);
   return success();
@@ -1062,8 +1072,10 @@ static std::string getPrettyPrintedNodeLabel(Operation *op) {
       })
       .Case<handshake::BranchOp>([&](auto) { return "branch"; })
       // handshake operations (dynamatic)
-      .Case<handshake::DynamaticLoadOp>([&](auto) { return "load"; })
-      .Case<handshake::DynamaticStoreOp>([&](auto) { return "store"; })
+      .Case<handshake::MCLoadOp>([&](auto) { return "mc_load"; })
+      .Case<handshake::MCStoreOp>([&](auto) { return "mc_store"; })
+      .Case<handshake::LSQLoadOp>([&](auto) { return "lsq_load"; })
+      .Case<handshake::LSQStoreOp>([&](auto) { return "lsq_store"; })
       .Case<handshake::MemoryControllerOp>([&](auto) { return "MC"; })
       .Case<handshake::LSQOp>([&](auto) { return "LSQ"; })
       .Case<handshake::DynamaticReturnOp>([&](auto) { return "return"; })
@@ -1251,8 +1263,8 @@ LogicalResult DOTPrinter::printNode(Operation *op,
             .Case<handshake::SourceOp, handshake::SinkOp>(
                 [&](auto) { return "gainsboro"; })
             .Case<handshake::ConstantOp>([&](auto) { return "plum"; })
-            .Case<handshake::MemoryOpInterface, handshake::DynamaticLoadOp,
-                  handshake::DynamaticStoreOp>([&](auto) { return "coral"; })
+            .Case<handshake::MemoryOpInterface, handshake::LoadOpInterface,
+                  handshake::StoreOpInterface>([&](auto) { return "coral"; })
             .Case<handshake::MergeOp, handshake::ControlMergeOp,
                   handshake::MuxOp>([&](auto) { return "lightblue"; })
             .Case<handshake::BranchOp, handshake::ConditionalBranchOp>(

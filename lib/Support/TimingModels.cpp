@@ -77,7 +77,7 @@ static unsigned getOpDatawidth(Operation *op) {
               maxWidth = std::max(maxWidth, getTypeWidth(ty));
             return maxWidth;
           })
-      .Case<handshake::DynamaticLoadOp, handshake::DynamaticStoreOp>([&](auto) {
+      .Case<handshake::LoadOpInterface, handshake::StoreOpInterface>([&](auto) {
         return std::max(getTypeWidth(op->getOperand(0).getType()),
                         getTypeWidth(op->getOperand(1).getType()));
       })

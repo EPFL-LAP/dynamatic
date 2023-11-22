@@ -8,7 +8,7 @@
 // CHECK:           %[[VAL_3:.*]], %[[VAL_4:.*]] = mem_controller{{\[}}%[[VAL_0]] : memref<4xi32>] (%[[VAL_5:.*]]) {connectedBlocks = [0 : i32]} : (index) -> (i32, none)
 // CHECK:           %[[VAL_6:.*]] = merge %[[VAL_1]] {bb = 0 : ui32} : index
 // CHECK:           %[[VAL_7:.*]] = merge %[[VAL_2]] {bb = 0 : ui32} : none
-// CHECK:           %[[VAL_5]], %[[VAL_8:.*]] = d_load{{\[}}%[[VAL_6]]] %[[VAL_3]] {bb = 0 : ui32} : index, i32
+// CHECK:           %[[VAL_5]], %[[VAL_8:.*]] = mc_load{{\[}}%[[VAL_6]]] %[[VAL_3]] {bb = 0 : ui32} : index, i32
 // CHECK:           %[[VAL_9:.*]] = d_return {bb = 0 : ui32} %[[VAL_8]] : i32
 // CHECK:           end {bb = 0 : ui32} %[[VAL_9]], %[[VAL_4]] : i32, none
 // CHECK:         }

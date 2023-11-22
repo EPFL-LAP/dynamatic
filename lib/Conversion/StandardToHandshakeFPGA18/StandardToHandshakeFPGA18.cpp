@@ -92,27 +92,28 @@ static LogicalResult getOpMemRef(Operation *op, Value &out) {
 /// interface.
 static SmallVector<Value, 2> getResultsToMemory(Operation *op) {
 
-  if (auto loadOp = dyn_cast<handshake::DynamaticLoadOp>(op)) {
+  if (auto loadOp = dyn_cast<handshake::LoadOpInterface>(op)) {
     // For load, get address output
     SmallVector<Value, 2> results;
-    results.push_back(loadOp.getAddressResult());
+    results.push_back(loadOp.getAddressOutput());
     return results;
   }
-  // For store, all outputs (data and address) go to memory
-  auto storeOp = dyn_cast<handshake::DynamaticStoreOp>(op);
+  // For store, all outputs (address and data) go to memory
+  auto storeOp = dyn_cast<handshake::StoreOpInterface>(op);
   assert(storeOp && "input operation must either be load or store");
-  SmallVector<Value, 2> results(storeOp.getResults());
+  SmallVector<Value, 2> results(storeOp->getResults());
   return results;
 }
 
 /// Adds the data input (from memory interface) to the list of load operands.
-static void addLoadDataOperand(Operation *op, Value dataIn) {
-  assert(op->getNumOperands() == 1 &&
+static void addLoadDataOperand(handshake::LoadOpInterface loadOp,
+                               Value dataIn) {
+  assert(loadOp->getNumOperands() == 1 &&
          "load must have single address operand at this point");
   SmallVector<Value, 2> operands;
-  operands.push_back(op->getOperand(0));
+  operands.push_back(loadOp->getOperand(0));
   operands.push_back(dataIn);
-  op->setOperands(operands);
+  loadOp->setOperands(operands);
 }
 
 /// Returns the list of data inputs to be passed as operands to the
@@ -275,29 +276,7 @@ LogicalResult HandshakeLoweringFPGA18::replaceMemoryOps(
       return failure();
     Operation *newOp = nullptr;
 
-    // Replace memref operation with corresponding handshake operation
-    llvm::TypeSwitch<Operation *>(&op)
-        .Case<memref::LoadOp>([&](memref::LoadOp loadOp) {
-          OperandRange indices = loadOp.getIndices();
-          assert(indices.size() == 1 && "load must be unidimensional");
-          newOp = rewriter.create<handshake::DynamaticLoadOp>(
-              op.getLoc(), cast<MemRefType>(memref.getType()), indices[0]);
-          // Replace uses of old load result with data result of new load
-          op.getResult(0).replaceAllUsesWith(
-              dyn_cast<handshake::DynamaticLoadOp>(newOp).getDataResult());
-        })
-        .Case<memref::StoreOp>([&](memref::StoreOp storeOp) {
-          OperandRange indices = storeOp.getIndices();
-          assert(indices.size() == 1 && "load must be unidimensional");
-          newOp = rewriter.create<handshake::DynamaticStoreOp>(
-              op.getLoc(), indices[0], storeOp.getValueToStore());
-        })
-        .Default([&](auto) {
-          return op.emitOpError() << "Memory operation type is not supported.";
-        });
-
-    // Associate the new operation with the memory region it references and
-    // information about the memory interface it should connect to
+    // The memory operation must have a MemInterfaceAttr attribute attached
     StringRef attrName = MemInterfaceAttr::getMnemonic();
     MemInterfaceAttr memAttr = op.getAttrOfType<MemInterfaceAttr>(attrName);
     if (!memAttr)
@@ -305,6 +284,39 @@ LogicalResult HandshakeLoweringFPGA18::replaceMemoryOps(
              << "Memory operation must have attribute " << attrName
              << " of type circt::handshake::MemInterfaceAttr to decide which "
                 "memory interface it should connect to.";
+    bool connectToMC = memAttr.connectsToMC();
+
+    // Replace memref operation with corresponding handshake operation
+    llvm::TypeSwitch<Operation *>(&op)
+        .Case<memref::LoadOp>([&](memref::LoadOp loadOp) {
+          OperandRange indices = loadOp.getIndices();
+          assert(indices.size() == 1 && "load must be unidimensional");
+          if (connectToMC)
+            newOp = rewriter.create<handshake::MCLoadOp>(
+                op.getLoc(), cast<MemRefType>(memref.getType()), indices[0]);
+          else
+            newOp = rewriter.create<handshake::LSQLoadOp>(
+                op.getLoc(), cast<MemRefType>(memref.getType()), indices[0]);
+          // Replace uses of old load result with data result of new load
+          op.getResult(0).replaceAllUsesWith(
+              dyn_cast<handshake::LoadOpInterface>(newOp).getDataOutput());
+        })
+        .Case<memref::StoreOp>([&](memref::StoreOp storeOp) {
+          OperandRange indices = storeOp.getIndices();
+          assert(indices.size() == 1 && "load must be unidimensional");
+          if (connectToMC)
+            newOp = rewriter.create<handshake::MCStoreOp>(
+                op.getLoc(), indices[0], storeOp.getValueToStore());
+          else
+            newOp = rewriter.create<handshake::LSQStoreOp>(
+                op.getLoc(), indices[0], storeOp.getValueToStore());
+        })
+        .Default([&](auto) {
+          return op.emitOpError() << "Memory operation type is not supported.";
+        });
+
+    // Associate the new operation with the memory region it references and
+    // information about the memory interface it should connect to
     if (memAttr.connectsToMC())
       memInfo[memref].mcPorts[op.getBlock()].push_back(newOp);
     else
@@ -389,11 +401,11 @@ LogicalResult HandshakeLoweringFPGA18::verifyAndCreateLSQGroups(
       allInputs.lsqInputs.push_back(getBlockEntryControl(order.front()));
       for (Block *inputBlock : order) {
         for (Operation *memOp : opsPerBlock[inputBlock]) {
-          if (isa<handshake::DynamaticLoadOp>(memOp)) {
+          if (auto loadOp = dyn_cast<handshake::LSQLoadOp>(memOp)) {
             // Accumulate the number of loads and store the load order to
             // connect LSQ interfaces to load ports later
             ++allInputs.lsqNumLoads;
-            allInputs.lsqLoadOrder.push_back(memOp);
+            allInputs.lsqLoadOrder.push_back(loadOp);
           }
           llvm::copy(getResultsToMemory(memOp),
                      std::back_inserter(allInputs.lsqInputs));
@@ -439,7 +451,7 @@ HandshakeLoweringFPGA18::createMCBlocks(ConversionPatternRewriter &rewriter,
     DenseMap<Block *, unsigned> lsqStores;
     for (auto [_, lsqGroupMemOps] : memAccesses.lsqPorts) {
       for (Operation *lsqMemOp : lsqGroupMemOps) {
-        if (isa<handshake::DynamaticStoreOp>(lsqMemOp))
+        if (isa<handshake::LSQStoreOp>(lsqMemOp))
           lsqStores[lsqMemOp->getBlock()] += 1;
       }
     }
@@ -453,7 +465,7 @@ HandshakeLoweringFPGA18::createMCBlocks(ConversionPatternRewriter &rewriter,
       // number of loads to the interface
       unsigned numStoresInBlock = lsqStores.lookup(block);
       for (Operation *memOp : blockMemOps) {
-        if (isa<handshake::DynamaticLoadOp>(memOp))
+        if (isa<handshake::MCLoadOp>(memOp))
           ++mcNumLoads;
         else
           ++numStoresInBlock;
@@ -561,8 +573,8 @@ LogicalResult HandshakeLoweringFPGA18::connectToMemInterfaces(
     unsigned mcResultIdx = 0;
     for (auto &[_, blockMemoryOps] : allMemOps.mcPorts) {
       for (Operation *memOp : blockMemoryOps) {
-        if (isa<handshake::DynamaticLoadOp>(memOp)) {
-          addLoadDataOperand(memOp, mcOp->getResult(mcResultIdx++));
+        if (auto loadOp = dyn_cast<handshake::LoadOpInterface>(memOp)) {
+          addLoadDataOperand(loadOp, mcOp->getResult(mcResultIdx++));
         }
       }
     }
