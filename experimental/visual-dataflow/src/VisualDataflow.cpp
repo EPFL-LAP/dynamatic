@@ -19,11 +19,11 @@
 #include "godot_cpp/classes/center_container.hpp"
 #include "godot_cpp/classes/color_rect.hpp"
 #include "godot_cpp/classes/control.hpp"
+#include "godot_cpp/classes/font.hpp"
 #include "godot_cpp/classes/global_constants.hpp"
 #include "godot_cpp/classes/label.hpp"
 #include "godot_cpp/classes/line2d.hpp"
 #include "godot_cpp/classes/node.hpp"
-#include "godot_cpp/classes/font.hpp"
 #include "godot_cpp/classes/panel.hpp"
 #include "godot_cpp/classes/polygon2d.hpp"
 #include "godot_cpp/classes/style_box_flat.hpp"
@@ -64,6 +64,7 @@ VisualDataflow::VisualDataflow() = default;
 void VisualDataflow::start() {
   createGraph();
   drawGraph();
+  changeCycle(0);
 }
 
 void VisualDataflow::createGraph() {
@@ -96,7 +97,6 @@ void VisualDataflow::drawGraph() {
   mapColor["gold"] = Color(1.0, 0.843, 0.0, 1);
   mapColor["tan2"] = Color(1.0, 0.65, 0.0, 1);
 
-
   for (auto &node : graph.getNodes()) {
     Panel *panel = memnew(Panel);
     StyleBoxFlat *style = memnew(StyleBoxFlat);
@@ -122,16 +122,18 @@ void VisualDataflow::drawGraph() {
     /// Add the label to the center container
     Label *node_label = memnew(Label);
     node_label->set_text(node.second.getNodeId().c_str());
-    node_label->add_theme_color_override("font_color", Color(0, 0, 0)); // Change to font_color
-    node_label->set_horizontal_alignment(HorizontalAlignment::HORIZONTAL_ALIGNMENT_CENTER);
+    node_label->add_theme_color_override(
+        "font_color", Color(0, 0, 0)); // Change to font_color
+    node_label->set_horizontal_alignment(
+        HorizontalAlignment::HORIZONTAL_ALIGNMENT_CENTER);
     node_label->set_autowrap_mode(TextServer::AUTOWRAP_WORD);
-    node_label->add_theme_font_size_override("font_size" , 13);
+    node_label->add_theme_font_size_override("font_size", 13);
 
-// // Create a new Font instance and set its properties
-//     Ref<Font> custom_font = memnew(Font);
-//     custom_font->set("size", 20); // Set your desired size here
+    // // Create a new Font instance and set its properties
+    //     Ref<Font> custom_font = memnew(Font);
+    //     custom_font->set("size", 20); // Set your desired size here
 
-// Apply the custom font to the label
+    // Apply the custom font to the label
     // node_label->add_theme_font_override("font", custom_font);
 
     center_container->add_child(node_label);
