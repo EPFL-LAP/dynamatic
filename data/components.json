@@ -322,7 +322,7 @@
       }
     }
   },
-  "handshake.d_load": {
+  "handshake.mc_load": {
     "latency": {
       "64": 2.0
     },
@@ -389,7 +389,7 @@
       }
     }
   },
-  "handshake.d_store": {
+  "handshake.mc_store": {
     "latency": {
       "64": 0.0
     },
@@ -450,7 +450,7 @@
       }
     }
   },
-  "LsqLoad": {
+  "handshake.lsq_load": {
     "latency": {
       "64": 5.0
     },
@@ -511,7 +511,7 @@
       }
     }
   },
-  "LsqStore": {
+  "handshake.lsq_store": {
     "latency": {
       "64": 0.0
     },

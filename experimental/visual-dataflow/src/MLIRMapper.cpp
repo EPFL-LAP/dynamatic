@@ -92,7 +92,7 @@ static size_t fixOutputPortNumber(Operation *op, size_t idx) {
         return (idx < numReturnValues) ? idx + numMemoryControls
                                        : idx - numReturnValues;
       })
-      .Case<handshake::DynamaticLoadOp, handshake::DynamaticStoreOp>([&](auto) {
+      .Case<handshake::LoadOpInterface, handshake::StoreOpInterface>([&](auto) {
         // Legacy Dynamatic has the data operand/result before the address
         // operand/result
         return 1 - idx;
@@ -101,7 +101,7 @@ static size_t fixOutputPortNumber(Operation *op, size_t idx) {
         // Legacy Dynamatic places the end control signal before the signals
         // going to the MC, if one is connected
         LSQPorts lsqPorts = lsqOp.getPorts();
-        if (!lsqPorts.hasAnyPort(MemoryPort::Kind::MC_LOAD_STORE))
+        if (!lsqPorts.hasAnyPort<MCLoadStorePort>())
           return idx;
 
         // End control signal succeeded by laad address, store address, store
@@ -110,7 +110,7 @@ static size_t fixOutputPortNumber(Operation *op, size_t idx) {
           return idx - 3;
 
         // Signals to MC preceeded by end control signal
-        unsigned numLoads = lsqPorts.getNumPorts(MemoryPort::Kind::LOAD);
+        unsigned numLoads = lsqPorts.getNumPorts<LSQLoadPort>();
         if (idx >= numLoads)
           return idx + 1;
         return idx;
@@ -133,7 +133,7 @@ static size_t fixInputPortNumber(Operation *op, size_t idx) {
         return (idx < numReturnValues) ? idx + numMemoryControls
                                        : idx - numReturnValues;
       })
-      .Case<handshake::DynamaticLoadOp, handshake::DynamaticStoreOp>([&](auto) {
+      .Case<handshake::LoadOpInterface, handshake::StoreOpInterface>([&](auto) {
         // Legacy Dynamatic has the data operand/result before the address
         // operand/result
         return 1 - idx;
@@ -148,7 +148,7 @@ static size_t fixInputPortNumber(Operation *op, size_t idx) {
             FuncMemoryPorts ports = getMemoryPorts(memOp);
 
             // Determine total number of control operands
-            unsigned ctrlCount = ports.getNumPorts(MemoryPort::Kind::CONTROL);
+            unsigned ctrlCount = ports.getNumPorts<ControlPort>();
 
             // Figure out where the value lies
             auto [groupIDx, opIdx] = findValueInGroups(ports, val);
