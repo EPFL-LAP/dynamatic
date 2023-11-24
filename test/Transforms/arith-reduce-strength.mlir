@@ -16,6 +16,41 @@ func.func @replaceMulAddWithSub(%arg0: i32, %arg1: i32) -> i32 {
 
 // -----
 
+// CHECK-LABEL:   func.func @replaceMulSubLhsWithAdd(
+// CHECK-SAME:                                       %[[VAL_0:.*]]: i32,
+// CHECK-SAME:                                       %[[VAL_1:.*]]: i32) -> i32 {
+// CHECK:           %[[VAL_2:.*]] = arith.constant -1 : i32
+// CHECK:           %[[VAL_3:.*]] = arith.constant 1 : i32
+// CHECK:           %[[VAL_4:.*]] = arith.addi %[[VAL_0]], %[[VAL_1]] : i32
+// CHECK:           %[[VAL_5:.*]] = arith.xori %[[VAL_4]], %[[VAL_2]] : i32
+// CHECK:           %[[VAL_6:.*]] = arith.addi %[[VAL_5]], %[[VAL_3]] : i32
+// CHECK:           return %[[VAL_6]] : i32
+// CHECK:         }
+func.func @replaceMulSubLhsWithAdd(%arg0: i32, %arg1: i32) -> i32 {
+  %negOne = arith.constant -1 : i32
+  %mul = arith.muli %negOne, %arg0 : i32
+  %add = arith.subi %mul, %arg1 : i32
+  return %add : i32
+}
+
+// -----
+
+// CHECK-LABEL:   func.func @replaceMulSubRhsWithAdd(
+// CHECK-SAME:                                       %[[VAL_0:.*]]: i32,
+// CHECK-SAME:                                       %[[VAL_1:.*]]: i32) -> i32 {
+// CHECK:           %[[VAL_2:.*]] = arith.addi %[[VAL_1]], %[[VAL_0]] : i32
+// CHECK:           return %[[VAL_2]] : i32
+// CHECK:         }
+func.func @replaceMulSubRhsWithAdd(%arg0: i32, %arg1: i32) -> i32 {
+  %negOne = arith.constant -1 : i32
+  %mul = arith.muli %negOne, %arg0 : i32
+  %add = arith.subi %arg1, %mul : i32
+  return %add : i32
+}
+
+// -----
+
+
 // CHECK-LABEL:   func.func @replaceMulAddWithSubWrongCst(
 // CHECK-SAME:                                            %[[VAL_0:.*]]: i32,
 // CHECK-SAME:                                            %[[VAL_1:.*]]: i32) -> i32 {
