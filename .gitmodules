@@ -5,7 +5,7 @@
 [submodule "circt"]
 	path = circt
 	url = git@github.com:EPFL-LAP/circt.git
-	branch = main
+	branch = speculation
   shallow = true
 [submodule "experimental/visual-dataflow/godot-cpp"]
 	path = experimental/visual-dataflow/godot-cpp

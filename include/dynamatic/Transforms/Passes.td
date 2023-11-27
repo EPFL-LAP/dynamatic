@@ -222,6 +222,27 @@ def HandshakePlaceBuffers : DynamaticPass<"handshake-place-buffers"> {
     "'buffer-placement' at the binary's location.">];
 }
 
+def HandshakeSpeculation : DynamaticPass<"handshake-speculation"> {
+  let summary = "Place Speculation operations";
+  let description = [{
+    Speculation allows to execute certain operations before it is known whether
+    they are required, which can increase fine-grained parallelism. The pass
+    needs to specify the position of the Speculator by means of the source and
+    destination operations. Then, other speculation operations are
+    automatically placed.
+  }];
+  let constructor = "dynamatic::buffer::createHandshakeSpeculation()";
+  let options = [
+    Option<"srcOp", "source-op", "std::string", "",
+    "Name of the source operation to place the Speculator.">,
+    Option<"dstOp", "destination-op", "std::string", "",
+    "Name of the destination operation to place the Speculator.">,
+    Option<"dumpLogs", "dump-logs", "bool", "false",
+    "If true, dump debugging information (identified CFDFCs, MILP "
+    "placement decisions, solution summaries) into a directory named "
+    "'buffer-placement' at the binary's location.">];
+}
+
 //===----------------------------------------------------------------------===//
 // Other passes
 //===----------------------------------------------------------------------===//
