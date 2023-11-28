@@ -57,12 +57,19 @@ void VisualDataflow::_bind_methods() {
   ClassDB::bind_method(D_METHOD("nextCycle"), &VisualDataflow::nextCycle);
   ClassDB::bind_method(D_METHOD("previousCycle"),
                        &VisualDataflow::previousCycle);
+  ClassDB::bind_method(D_METHOD("changeCycle", "cycleNb"),
+                       &VisualDataflow::changeCycle);
 }
 
 VisualDataflow::VisualDataflow() = default;
 
 void VisualDataflow::start() {
+  cycleLabel = (Label *)get_node_internal(NodePath(
+      "CanvasLayer/MarginContainer/VBoxContainer/HBoxContainer/CycleNumber"));
+  cycleSlider = (HSlider *)get_node_internal(
+      NodePath("CanvasLayer/MarginContainer/VBoxContainer/HSlider"));
   createGraph();
+  cycleSlider->set_max(graph.getCycleEdgeStates().size() - 1);
   drawGraph();
   changeCycle(0);
 }
@@ -189,33 +196,32 @@ void VisualDataflow::drawGraph() {
 }
 
 void VisualDataflow::nextCycle() {
-  cycle++;
-  changeCycle(cycle);
+  if (cycle < cycleSlider->get_max()) {
+    changeCycle(cycle + 1);
+  }
 }
 
 void VisualDataflow::previousCycle() {
   if (cycle > 0) {
-    cycle--;
-    changeCycle(cycle);
+    changeCycle(cycle - 1);
   }
 }
 
 void VisualDataflow::changeCycle(int64_t cycleNb) {
-  cycle = cycleNb;
-  Label *label =
-      (Label *)get_node_internal("CanvasLayer/VBoxContainer/CycleNumber");
-  label->set_text("Cycle: " + String::num_int64(cycle));
+  if (cycle != cycleNb) {
+    cycle = cycleNb;
+    cycleLabel->set_text("Cycle: " + String::num_int64(cycle));
+    cycleSlider->set_value(cycle);
 
-  if (graph.getCycleEdgeStates().count(cycle)) {
-    std::map<EdgeId, State> edgeStates = graph.getCycleEdgeStates().at(cycle);
-    for (auto &edgeState : edgeStates) {
-      EdgeId edgeId = edgeState.first;
-      State state = edgeState.second;
-      Line2D *line = edgeIdToLine2D[edgeId];
-      setEdgeColor(state, line);
+    if (graph.getCycleEdgeStates().count(cycle)) {
+      std::map<EdgeId, State> edgeStates = graph.getCycleEdgeStates().at(cycle);
+      for (auto &edgeState : edgeStates) {
+        EdgeId edgeId = edgeState.first;
+        State state = edgeState.second;
+        Line2D *line = edgeIdToLine2D[edgeId];
+        setEdgeColor(state, line);
+      }
     }
-  } else {
-    UtilityFunctions::printerr("Cycle not found");
   }
 }
 

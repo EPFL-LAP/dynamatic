@@ -1,50 +1,22 @@
 extends VisualDataflow
 
-var zoom_minimum = Vector2(.500001,.500001)
-var zoom_maximum = Vector2(3.500001,3.500001)
-var zoom_speed = 1.10000001
+@onready var play_button = $CanvasLayer/MarginContainer/VBoxContainer/HBoxContainer/Play
 
-var dragging = false
-var mouse_start_position
-var screen_start_position
-
-@onready var camera = $Camera2D
+var is_playing = false
+var elapsed_time = 0.0
+var time_interval = 1.0;
 
 func _ready():
 	start()
-
-func zoom_at_point(zoom_change, point):
-	var target_zoom = camera.zoom * zoom_change
-	target_zoom = clamp(target_zoom, zoom_minimum, zoom_maximum)
-
-	# Calculate the position adjustment
-	var mouse_pos_in_world = camera.get_global_mouse_position()
-	var offset = (mouse_pos_in_world - camera.global_position) * (1.0 - 1.0 / zoom_change)
-	var new_camera_position = camera.global_position + offset
-
-	camera.zoom = target_zoom
-	camera.global_position = new_camera_position
-
-func _input(event: InputEvent) -> void:
-	if event is InputEventMouseButton:
-		if event.is_pressed():
-			var mouse_pos = event.position
-			if event.button_index == MOUSE_BUTTON_WHEEL_UP:
-				if camera.zoom < zoom_maximum:
-					zoom_at_point(1.2, mouse_pos)
-			if event.button_index == MOUSE_BUTTON_WHEEL_DOWN:
-				if camera.zoom > zoom_minimum:
-					zoom_at_point(1/1.2, mouse_pos)
-	if event is InputEventMouseButton:
-		if event.is_pressed():
-			mouse_start_position = event.position
-			screen_start_position = camera.position
-			dragging = true
-		else:
-			dragging = false
-	if event is InputEventMouseMotion and dragging:
-		camera.position = Vector2(1/camera.zoom.x,1/camera.zoom.y) * (mouse_start_position - event.position) + screen_start_position
 	
+func _process(delta):
+	if is_playing:
+		elapsed_time += delta
+		if elapsed_time >= time_interval:
+			nextCycle()
+			elapsed_time = 0
+	
+func _input(event: InputEvent):
 	if event.is_action_pressed("ui_right"):
 		_on_next_pressed()
 	if event.is_action_pressed("ui_left"):
@@ -55,3 +27,14 @@ func _on_next_pressed():
 
 func _on_prev_pressed():
 	previousCycle()
+
+func _on_h_slider_value_changed(value):
+	changeCycle(value)
+
+func _on_play_pressed():
+	if is_playing:
+		play_button.text = "Play"
+	else:
+		play_button.text = "Pause"
+	is_playing = !is_playing
+	elapsed_time = 0

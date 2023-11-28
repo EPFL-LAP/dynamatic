@@ -16,6 +16,7 @@
 #include "Graph.h"
 #include "GraphEdge.h"
 #include "godot_cpp/classes/control.hpp"
+#include <godot_cpp/classes/h_slider.hpp>
 #include <godot_cpp/classes/label.hpp>
 #include <godot_cpp/classes/line2d.hpp>
 #include <vector>
@@ -32,10 +33,13 @@ private:
   CycleNb cycle = 0;
   std::map<EdgeId, Line2D *> edgeIdToLine2D;
 
+  // Godot object references
+  Label *cycleLabel;
+  HSlider *cycleSlider;
+
   void createGraph();
   void drawCycleNumber();
   void drawGraph();
-  void changeCycle(int64_t cycleNb);
   void setEdgeColor(State state, Line2D *line);
 
 protected:
@@ -49,6 +53,7 @@ public:
   void start();
   void nextCycle();
   void previousCycle();
+  void changeCycle(int64_t cycleNb);
 };
 
 } // namespace godot
