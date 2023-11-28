@@ -14,6 +14,7 @@
 #include "CSVParser.h"
 #include "DOTParser.h"
 #include "DOTReformat.h"
+#include "Graph.h"
 #include "MLIRMapper.h"
 #include "dynamatic/Support/TimingModels.h"
 #include "mlir/Dialect/Func/IR/FuncOps.h"
@@ -43,10 +44,11 @@ LogicalResult GraphParser::parse(std::string &filePath) {
 
   std::string line;
   size_t lineIndex = 0;
+  CycleNb currCycle = 0;
 
   if (filePath.find(".csv") != std::string::npos) {
     while (std::getline(file, line)) {
-      if (failed(processCSVLine(line, lineIndex, *mGraph)))
+      if (failed(processCSVLine(line, lineIndex, *mGraph, &currCycle)))
         return failure();
       lineIndex++;
     }

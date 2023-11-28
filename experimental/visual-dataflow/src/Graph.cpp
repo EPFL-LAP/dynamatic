@@ -48,11 +48,13 @@ LogicalResult Graph::getEdgeId(
 }
 
 void Graph::addEdgeState(CycleNb cycleNb, EdgeId edgeId, State state) {
-  // Creates an empty map if the key cycleNb is not found in the current
-  // cycleEdgeStates map
-  std::map<EdgeId, State> mapEdgeState = cycleEdgeStates[cycleNb];
-  mapEdgeState.insert(std::pair(edgeId, state));
-  cycleEdgeStates[cycleNb] = mapEdgeState;
+  if (cycleNb == 0) {
+    std::map<EdgeId, State> mapEdgeState = cycleEdgeStates[0];
+    mapEdgeState.insert(std::pair(edgeId, state));
+    cycleEdgeStates[cycleNb] = mapEdgeState;
+  } else {
+    cycleEdgeStates[cycleNb].at(edgeId) = state;
+  }
 }
 
 std::map<CycleNb, std::map<EdgeId, State>> Graph::getCycleEdgeStates() {
@@ -62,3 +64,17 @@ std::map<CycleNb, std::map<EdgeId, State>> Graph::getCycleEdgeStates() {
 std::map<NodeId, GraphNode> Graph::getNodes() { return nodes; }
 
 std::vector<GraphEdge> Graph::getEdges() { return edges; }
+
+void Graph::dupilcateEdgeStates(CycleNb from, CycleNb until) {
+  const std::map<EdgeId, State> &initialMapEdgeState = cycleEdgeStates[from];
+
+  for (CycleNb i = from + 1; i <= until; i++) {
+    std::map<EdgeId, State> newMapEdgeState;
+
+    for (const auto &pair : initialMapEdgeState) {
+      newMapEdgeState[pair.first] = pair.second;
+    }
+
+    cycleEdgeStates[i] = newMapEdgeState;
+  }
+}

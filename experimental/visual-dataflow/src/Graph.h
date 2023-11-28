@@ -59,6 +59,7 @@ public:
   std::vector<GraphEdge> getEdges();
 
   std::map<CycleNb, std::map<EdgeId, State>> getCycleEdgeStates();
+  void dupilcateEdgeStates(CycleNb from, CycleNb until);
 
 private:
   /// Edges of the graph

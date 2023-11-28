@@ -12,6 +12,7 @@
 //===----------------------------------------------------------------------===//
 
 #include "CSVParser.h"
+#include "Graph.h"
 #include <iostream>
 
 using namespace mlir;
@@ -60,7 +61,8 @@ static std::string trim(const std::string &str) {
 }
 
 LogicalResult dynamatic::experimental::visual_dataflow::processCSVLine(
-    const std::string &line, size_t lineIndex, Graph &graph) {
+    const std::string &line, size_t lineIndex, Graph &graph,
+    CycleNb *currCycle) {
 
   // Jump the first 2 lines and empty line (Not needed)
   if (lineIndex == 0 || lineIndex == 1 || line.empty())
@@ -95,6 +97,11 @@ LogicalResult dynamatic::experimental::visual_dataflow::processCSVLine(
       parseTokenInt(iss, outPort) || parseTokenString(iss, dst) ||
       parseTokenInt(iss, inPort) || parseTokenString(iss, stateString)) {
     return failure();
+  }
+
+  if (cycleNb != *currCycle) {
+    graph.dupilcateEdgeStates(*currCycle, cycleNb);
+    *currCycle = cycleNb;
   }
 
   std::pair<NodeId, size_t> srcInfo = std::pair(src, ++outPort);
