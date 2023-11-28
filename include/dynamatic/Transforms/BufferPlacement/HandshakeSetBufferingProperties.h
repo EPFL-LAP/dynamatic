@@ -40,7 +40,7 @@ namespace buffer {
 /// legacy Dynamatic's implementation of the initial smart buffer placement pass
 /// (described in
 /// https://www.epfl.ch/labs/lap/wp-content/uploads/2020/03/JosipovicFeb20_BuffePlacementAndSizingForHigh-PerformanceDataflowCircuits_FPGA20.pdf).
-void setFPGA20Properties(Channel &channel);
+void setFPGA20Properties(circt::handshake::FuncOp funcOp);
 
 std::unique_ptr<dynamatic::DynamaticPass>
 createHandshakeSetBufferingProperties(const std::string &version = "fpga20");

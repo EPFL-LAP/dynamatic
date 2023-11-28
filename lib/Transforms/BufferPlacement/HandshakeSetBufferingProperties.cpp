@@ -28,38 +28,58 @@ using namespace circt;
 using namespace dynamatic;
 using namespace dynamatic::buffer;
 
-void dynamatic::buffer::setFPGA20Properties(Channel &channel) {
+void dynamatic::buffer::setFPGA20Properties(circt::handshake::FuncOp funcOp) {
   // Merges with more than one input should have at least a transparent slot
   // at their output
-  if (isa<handshake::MergeOp>(channel.producer) &&
-      channel.producer->getNumOperands() > 1)
-    channel.props->minTrans = std::max(channel.props->minTrans, 1U);
-
-  // Channels connected to memory interfaces are not bufferizable
-  if ((isa<handshake::MemoryOpInterface>(channel.producer)) ||
-      isa<handshake::MemoryOpInterface>(channel.consumer)) {
-    channel.props->maxOpaque = 0;
-    channel.props->maxTrans = 0;
+  for (handshake::MergeOp mergeOp : funcOp.getOps<handshake::MergeOp>()) {
+    if (mergeOp->getNumOperands() > 1) {
+      Channel channel(mergeOp.getResult(), true);
+      channel.props->minTrans = std::max(channel.props->minTrans, 1U);
+    }
   }
-}
 
-/// Calls the provided callback for all channels in the function. These are all
-/// producer/consumer pairs between a function argument and an operand or an
-/// operation's result and an operand.
-static void callOnAllChannels(handshake::FuncOp funcOp,
-                              void (*callback)(Channel &)) {
-  for (BlockArgument arg : funcOp.getArguments())
-    for (Operation *user : arg.getUsers()) {
-      Channel channel(arg, funcOp, user, true);
-      callback(channel);
+  // Channels connected to MCs are not bufferizable
+  for (auto mcOp : funcOp.getOps<handshake::MemoryControllerOp>()) {
+    for (Value oprd : mcOp->getOperands()) {
+      Channel channel(oprd, true);
+      channel.props->maxOpaque = 0;
+      channel.props->maxTrans = 0;
+    }
+    for (OpResult res : mcOp->getResults()) {
+      Channel channel(res, true);
+      channel.props->maxOpaque = 0;
+      channel.props->maxTrans = 0;
+    }
+  }
+
+  // Channels connected to LSQs are not bufferizable, except control ports which
+  // should have at least one opaque buffer
+  for (handshake::LSQOp lsqOp : funcOp.getOps<handshake::LSQOp>()) {
+    // Get control indices
+    DenseSet<unsigned> controlIndices;
+    LSQPorts ports = lsqOp.getPorts();
+    unsigned idxOffset = lsqOp.isConnectedToMC() ? 0 : 1;
+    for (LSQGroup &group : ports.getGroups())
+      controlIndices.insert((group->ctrlPort->getCtrlInputIndex() + idxOffset));
+
+    for (auto [idx, oprd] : llvm::enumerate(lsqOp->getOperands())) {
+      Channel channel(oprd, true);
+      if (controlIndices.contains(idx)) {
+        // This is a control port input
+        channel.props->minOpaque = std::max(channel.props->minOpaque, 1U);
+      } else {
+        // This is not a control port input
+        channel.props->maxOpaque = 0;
+        channel.props->maxTrans = 0;
+      }
     }
 
-  for (Operation &op : funcOp.getOps())
-    for (OpResult res : op.getResults())
-      for (Operation *user : res.getUsers()) {
-        Channel channel(res, &op, user, true);
-        callback(channel);
-      }
+    for (OpResult res : lsqOp->getResults()) {
+      Channel channel(res, true);
+      channel.props->maxOpaque = 0;
+      channel.props->maxTrans = 0;
+    }
+  }
 }
 
 namespace {
@@ -85,7 +105,7 @@ struct HandshakeSetBufferingPropertiesPass
 
     // Add properties to channels inside each function
     for (handshake::FuncOp funcOp : modOp.getOps<handshake::FuncOp>())
-      callOnAllChannels(funcOp, setFPGA20Properties);
+      setFPGA20Properties(funcOp);
   };
 };
 

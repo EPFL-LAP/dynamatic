@@ -439,6 +439,11 @@ LogicalResult FPGA20Buffers::addThroughputConstraints(CFDFC &cfdfc) {
 
   // Add a set of constraints for each CFDFC channel
   for (auto &[channel, chThroughput] : cfdfcVars.channelThroughputs) {
+
+    // No throughput constraints on channels going to LSQ stores
+    if (isa<handshake::LSQStoreOp>(*channel.getUsers().begin()))
+      continue;
+
     Operation *srcOp = channel.getDefiningOp();
     Operation *dstOp = *(channel.getUsers().begin());
 
