@@ -106,6 +106,25 @@ void VisualDataflow::drawGraph() {
   mapColor["gold"] = Color(1.0, 0.843, 0.0, 1);
   mapColor["tan2"] = Color(1.0, 0.65, 0.0, 1);
 
+
+    for (const auto &bb : graph.getBBs()) {
+
+    std::vector<float> boundries = bb.boundries;
+    Polygon2D* p = memnew(Polygon2D);
+    PackedVector2Array points;
+    points.push_back(Vector2(boundries.at(0), boundries.at(1)));
+    points.push_back(Vector2(boundries.at(2), boundries.at(1)));
+    points.push_back(Vector2(boundries.at(2), boundries.at(3)));
+    points.push_back(Vector2(boundries.at(0), boundries.at(3)));
+    
+    p->set_polygon(points);
+    p->set_color(Color(0, 0, 0, 0.05));
+    
+
+
+    add_child(p);
+  }
+
   for (auto &node : graph.getNodes()) {
     Panel *panel = memnew(Panel);
     StyleBoxFlat *style = memnew(StyleBoxFlat);
@@ -196,20 +215,6 @@ void VisualDataflow::drawGraph() {
     edgeIdToLine2D[edge.getEdgeId()] = line;
   }
 
-  for (const auto &bb : graph.getBBs()) {
-    Line2D *line = memnew(Line2D);
-    line->set_default_color(Color(1, 0, 0, 1));
-    std::vector<float> boundries = bb.boundries;
-    line->add_point(Vector2(boundries.at(0), boundries.at(1)));
-    line->add_point(Vector2(boundries.at(2), boundries.at(1)));
-    line->add_point(Vector2(boundries.at(2), boundries.at(3)));
-    line->add_point(Vector2(boundries.at(0), boundries.at(3)));
-    line->add_point(Vector2(boundries.at(0), boundries.at(1)));
-
-    line->set_width(2.5);
-
-    add_child(line);
-  }
 }
 
 void VisualDataflow::nextCycle() {
