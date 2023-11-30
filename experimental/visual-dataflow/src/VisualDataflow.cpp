@@ -106,21 +106,17 @@ void VisualDataflow::drawGraph() {
   mapColor["gold"] = Color(1.0, 0.843, 0.0, 1);
   mapColor["tan2"] = Color(1.0, 0.65, 0.0, 1);
 
-
-    for (const auto &bb : graph.getBBs()) {
-
+  for (const auto &bb : graph.getBBs()) {
     std::vector<float> boundries = bb.boundries;
-    Polygon2D* p = memnew(Polygon2D);
+    Polygon2D *p = memnew(Polygon2D);
     PackedVector2Array points;
     points.push_back(Vector2(boundries.at(0), boundries.at(1)));
     points.push_back(Vector2(boundries.at(2), boundries.at(1)));
     points.push_back(Vector2(boundries.at(2), boundries.at(3)));
     points.push_back(Vector2(boundries.at(0), boundries.at(3)));
-    
-    p->set_polygon(points);
-    p->set_color(Color(0, 0, 0, 0.05));
-    
 
+    p->set_polygon(points);
+    p->set_color(Color(0, 0, 0, 0.2));
 
     add_child(p);
   }
@@ -210,11 +206,10 @@ void VisualDataflow::drawGraph() {
     arrowHead->set_polygon(points);
     arrowHead->set_color(Color(0, 0, 0, 1));
     line->add_child(arrowHead);
-    line->set_width(1.5);
+    line->set_width(2);
     add_child(line);
     edgeIdToLine2D[edge.getEdgeId()] = line;
   }
-
 }
 
 void VisualDataflow::nextCycle() {

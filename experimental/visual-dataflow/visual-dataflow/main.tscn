@@ -31,6 +31,8 @@ visible = false
 [connection signal="pressed" from="CanvasLayer/Timeline/MarginContainer/VBoxContainer/HBoxContainer/Prev" to="." method="_on_prev_pressed"]
 [connection signal="pressed" from="CanvasLayer/Timeline/MarginContainer/VBoxContainer/HBoxContainer/Next" to="." method="_on_next_pressed"]
 [connection signal="text_submitted" from="CanvasLayer/Timeline/MarginContainer/VBoxContainer/HBoxContainer/GoToCycle" to="." method="_on_go_to_cycle_text_submitted"]
+[connection signal="mouse_entered" from="CanvasLayer/Timeline/MarginContainer/VBoxContainer/HSlider" to="Camera2D" method="_on_h_slider_mouse_entered"]
+[connection signal="mouse_exited" from="CanvasLayer/Timeline/MarginContainer/VBoxContainer/HSlider" to="Camera2D" method="_on_h_slider_mouse_exited"]
 [connection signal="value_changed" from="CanvasLayer/Timeline/MarginContainer/VBoxContainer/HSlider" to="." method="_on_h_slider_value_changed"]
 [connection signal="toggled" from="CanvasLayer/Legend/GeneralLegend/ShowLegend" to="." method="_on_show_legend_toggled"]
 
