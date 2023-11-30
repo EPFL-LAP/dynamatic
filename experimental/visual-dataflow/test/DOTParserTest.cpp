@@ -72,6 +72,8 @@ int main(int argc, char *argv[]) {
               << " OutPorts: " << node.getPorts(false).size() << std::endl;
     std::cout << "Width: " << node.getWidth() << std::endl;
     std::cout << "Color: " << node.getColor() << std::endl;
+    std::cout << "Shape: " << node.getShape() << std::endl;
+    std::cout << "Style: " << node.getDashed() << std::endl;
 
     std::cout << "---------------------------------" << std::endl;
   }

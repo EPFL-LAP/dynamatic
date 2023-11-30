@@ -109,6 +109,17 @@ dynamatic::experimental::visual_dataflow::processDOT(std::ifstream &file,
       insideNodeDefinition = false;
     }
 
+    if (insideNodeDefinition && line.find("shape") != std::string::npos){
+      std::size_t startPos = line.find('=') + 1;
+      std::size_t endPos = line.find(',', startPos);
+      Shape shape = line.substr(startPos, endPos - startPos);
+      currentNode.setShape(shape);
+    }
+
+    if (insideNodeDefinition && line.find("style") != std::string::npos){
+      currentNode.setDashed(true);
+    }
+
     if (insideEdgeDefinition && line.find("pos") != std::string::npos) {
       size_t startPos = line.find('\"');
       size_t endPos = line.rfind('\"');

@@ -58,3 +58,11 @@ float GraphNode::getWidth() { return width; }
 void GraphNode::setColor(Color color) { this->color = color; }
 
 Color GraphNode::getColor() { return color; }
+
+void GraphNode::setShape(Shape shape) { this->shape = shape; }
+
+Shape GraphNode::getShape() { return shape; }
+
+void GraphNode::setDashed(bool dashed) { this->isDashed = dashed; }
+
+bool GraphNode::getDashed() { return isDashed; }
