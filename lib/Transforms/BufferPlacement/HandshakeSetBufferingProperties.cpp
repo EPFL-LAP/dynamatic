@@ -28,6 +28,23 @@ using namespace circt;
 using namespace dynamatic;
 using namespace dynamatic::buffer;
 
+template <typename Op>
+static void makeUnbufferizable(circt::handshake::FuncOp funcOp) {
+  // Channels connected to memory interfaces are not bufferizable
+  for (Op op : funcOp.getOps<Op>()) {
+    for (Value oprd : op->getOperands()) {
+      Channel channel(oprd, true);
+      channel.props->maxOpaque = 0;
+      channel.props->maxTrans = 0;
+    }
+    for (OpResult res : op->getResults()) {
+      Channel channel(res, true);
+      channel.props->maxOpaque = 0;
+      channel.props->maxTrans = 0;
+    }
+  }
+}
+
 void dynamatic::buffer::setFPGA20Properties(circt::handshake::FuncOp funcOp) {
   // Merges with more than one input should have at least a transparent slot
   // at their output
@@ -38,46 +55,32 @@ void dynamatic::buffer::setFPGA20Properties(circt::handshake::FuncOp funcOp) {
     }
   }
 
-  // Channels connected to MCs are not bufferizable
-  for (auto mcOp : funcOp.getOps<handshake::MemoryControllerOp>()) {
-    for (Value oprd : mcOp->getOperands()) {
-      Channel channel(oprd, true);
-      channel.props->maxOpaque = 0;
-      channel.props->maxTrans = 0;
-    }
-    for (OpResult res : mcOp->getResults()) {
-      Channel channel(res, true);
-      channel.props->maxOpaque = 0;
-      channel.props->maxTrans = 0;
-    }
-  }
+  // Channels connected to memory interfaces are not bufferizable
+  makeUnbufferizable<handshake::MemoryControllerOp>(funcOp);
+  makeUnbufferizable<handshake::LSQOp>(funcOp);
 
-  // Channels connected to LSQs are not bufferizable, except control ports which
-  // should have at least one opaque buffer
+  // Forked control signals going to LSQs should have an opaque buffer between
+  // the fork and successors that are not the LSQ
   for (handshake::LSQOp lsqOp : funcOp.getOps<handshake::LSQOp>()) {
-    // Get control indices
-    DenseSet<unsigned> controlIndices;
     LSQPorts ports = lsqOp.getPorts();
-    unsigned idxOffset = lsqOp.isConnectedToMC() ? 0 : 1;
-    for (LSQGroup &group : ports.getGroups())
-      controlIndices.insert((group->ctrlPort->getCtrlInputIndex() + idxOffset));
+    ValueRange lsqInputs = lsqOp.getMemOperands();
 
-    for (auto [idx, oprd] : llvm::enumerate(lsqOp->getOperands())) {
-      Channel channel(oprd, true);
-      if (controlIndices.contains(idx)) {
-        // This is a control port input
-        channel.props->minOpaque = std::max(channel.props->minOpaque, 1U);
-      } else {
-        // This is not a control port input
-        channel.props->maxOpaque = 0;
-        channel.props->maxTrans = 0;
+    for (LSQGroup &group : ports.getGroups()) {
+      // Control signal must come from a fork for this constraint to apply
+      Value ctrlVal = lsqInputs[group->ctrlPort->getCtrlInputIndex()];
+      Operation *ctrlDefOp = ctrlVal.getDefiningOp();
+      auto forkOp = mlir::dyn_cast_if_present<handshake::ForkOp>(ctrlDefOp);
+      if (!forkOp)
+        continue;
+
+      // Force placement of an opaque slot on all fork output channels, except
+      // the one going to the LSQ
+      for (OpResult forkRes : forkOp->getResults()) {
+        if (forkRes != ctrlVal) {
+          Channel channel(forkRes, true);
+          channel.props->minOpaque = std::max(channel.props->minOpaque, 1U);
+        }
       }
-    }
-
-    for (OpResult res : lsqOp->getResults()) {
-      Channel channel(res, true);
-      channel.props->maxOpaque = 0;
-      channel.props->maxTrans = 0;
     }
   }
 }
