@@ -13,8 +13,8 @@ layout_mode = 1
 anchors_preset = 1
 anchor_left = 1.0
 anchor_right = 1.0
-offset_left = -411.0
-offset_bottom = 101.0
+offset_left = -218.0
+offset_bottom = 211.0
 grow_horizontal = 0
 
 [node name="ShowLegend" type="Button" parent="GeneralLegend"]
@@ -25,66 +25,94 @@ toggle_mode = true
 action_mode = 0
 text = "Legend"
 
-[node name="SpecificLegendsVB" type="VBoxContainer" parent="GeneralLegend"]
+[node name="Panel" type="Panel" parent="GeneralLegend"]
+layout_mode = 2
+size_flags_vertical = 3
+
+[node name="EdgeLegend" type="VBoxContainer" parent="GeneralLegend/Panel"]
+layout_mode = 2
+offset_top = 4.0
+offset_right = 218.0
+offset_bottom = 180.0
+size_flags_horizontal = 3
+
+[node name="EdgeLegendTitle" type="Label" parent="GeneralLegend/Panel/EdgeLegend"]
+modulate = Color(0, 0, 0, 1)
+layout_mode = 2
+size_flags_horizontal = 0
+text = "EDGE LEGEND:"
+
+[node name="EdgeComponents" type="HBoxContainer" parent="GeneralLegend/Panel/EdgeLegend"]
 layout_mode = 2
 
-[node name="NodeLegendButton" type="Button" parent="GeneralLegend/SpecificLegendsVB"]
+[node name="Colors" type="VBoxContainer" parent="GeneralLegend/Panel/EdgeLegend/EdgeComponents"]
 layout_mode = 2
-toggle_mode = true
-text = "Node Legend"
 
-[node name="VBoxContainer" type="VBoxContainer" parent="GeneralLegend/SpecificLegendsVB/NodeLegendButton"]
-layout_mode = 0
-offset_left = -11.0
-offset_top = 45.0
-offset_right = 399.0
-offset_bottom = 280.0
+[node name="Line2D" type="Line2D" parent="GeneralLegend/Panel/EdgeLegend/EdgeComponents/Colors"]
+position = Vector2(-1.53754, -41)
+scale = Vector2(0.892472, 2)
+points = PackedVector2Array(5, 26, 61.1084, 26)
+width = 2.0
+default_color = Color(1, 0.294118, 1, 1)
 
-[node name="EdgeLegendButton" type="Button" parent="GeneralLegend/SpecificLegendsVB"]
+[node name="Line2D2" type="Line2D" parent="GeneralLegend/Panel/EdgeLegend/EdgeComponents/Colors"]
+position = Vector2(-1.53754, 80)
+scale = Vector2(0.892472, 2)
+points = PackedVector2Array(5, 26, 61.1084, 26)
+width = 2.0
+default_color = Color(1, 0.294118, 1, 1)
+
+[node name="Line2D3" type="Line2D" parent="GeneralLegend/Panel/EdgeLegend/EdgeComponents/Colors"]
+position = Vector2(-1.53754, 51)
+scale = Vector2(0.892472, 2)
+points = PackedVector2Array(5, 26, 61.1084, 26)
+width = 2.0
+default_color = Color(1, 0.294118, 1, 1)
+
+[node name="Line2D4" type="Line2D" parent="GeneralLegend/Panel/EdgeLegend/EdgeComponents/Colors"]
+position = Vector2(-1.53754, 20)
+scale = Vector2(0.892472, 2)
+points = PackedVector2Array(5, 26, 61.1084, 26)
+width = 2.0
+default_color = Color(1, 0.294118, 1, 1)
+
+[node name="Line2D5" type="Line2D" parent="GeneralLegend/Panel/EdgeLegend/EdgeComponents/Colors"]
+position = Vector2(-1.53754, -9.00002)
+scale = Vector2(0.892472, 2)
+points = PackedVector2Array(5, 26, 61.1084, 26)
+width = 2.0
+default_color = Color(1, 0.294118, 1, 1)
+
+[node name="Definitions" type="VBoxContainer" parent="GeneralLegend/Panel/EdgeLegend/EdgeComponents"]
 layout_mode = 2
-toggle_mode = true
-text = "Edge Legend"
+size_flags_horizontal = 6
 
-[node name="StatesNames" type="VBoxContainer" parent="GeneralLegend/SpecificLegendsVB/EdgeLegendButton"]
-layout_mode = 0
-offset_left = 74.0
-offset_top = 31.0
-offset_right = 411.0
-offset_bottom = 239.0
-
-[node name="Undefined" type="Label" parent="GeneralLegend/SpecificLegendsVB/EdgeLegendButton/StatesNames"]
+[node name="Undefined" type="Label" parent="GeneralLegend/Panel/EdgeLegend/EdgeComponents/Definitions"]
 modulate = Color(0, 0, 0, 1)
 layout_mode = 2
 size_flags_horizontal = 0
 text = "Undefined"
 
-[node name="Empty" type="Label" parent="GeneralLegend/SpecificLegendsVB/EdgeLegendButton/StatesNames"]
+[node name="Empty" type="Label" parent="GeneralLegend/Panel/EdgeLegend/EdgeComponents/Definitions"]
 modulate = Color(0, 0, 0, 1)
 layout_mode = 2
 size_flags_horizontal = 0
 text = "Empty"
 
-[node name="Ready" type="Label" parent="GeneralLegend/SpecificLegendsVB/EdgeLegendButton/StatesNames"]
+[node name="Ready" type="Label" parent="GeneralLegend/Panel/EdgeLegend/EdgeComponents/Definitions"]
 modulate = Color(0, 0, 0, 1)
 layout_mode = 2
 size_flags_horizontal = 0
 text = "Ready"
 
-[node name="Valid" type="Label" parent="GeneralLegend/SpecificLegendsVB/EdgeLegendButton/StatesNames"]
+[node name="Valid" type="Label" parent="GeneralLegend/Panel/EdgeLegend/EdgeComponents/Definitions"]
 modulate = Color(0, 0, 0, 1)
 layout_mode = 2
 size_flags_horizontal = 0
 text = "Valid"
 
-[node name="Valid_Ready" type="Label" parent="GeneralLegend/SpecificLegendsVB/EdgeLegendButton/StatesNames"]
+[node name="Valid_Ready" type="Label" parent="GeneralLegend/Panel/EdgeLegend/EdgeComponents/Definitions"]
 modulate = Color(0, 0, 0, 1)
 layout_mode = 2
 size_flags_horizontal = 0
 text = "Valid_Ready"
-
-[node name="StatesColors" type="VBoxContainer" parent="GeneralLegend/SpecificLegendsVB/EdgeLegendButton"]
-layout_mode = 0
-offset_left = 15.0
-offset_top = 32.0
-offset_right = 55.0
-offset_bottom = 172.0
