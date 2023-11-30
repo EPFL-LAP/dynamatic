@@ -1,15 +1,20 @@
 extends VisualDataflow
 
-@onready var play_button = $CanvasLayer/MarginContainer/VBoxContainer/HBoxContainer/Play
-@onready var goToCycle = $CanvasLayer/MarginContainer/VBoxContainer/HBoxContainer/GoToCycle
-@onready var legend = $CanvasLayer/GeneralLegend/SpecificLegendsVB
+@onready var timeline = $CanvasLayer/Timeline
+@onready var play_button = $CanvasLayer/Timeline/MarginContainer/VBoxContainer/HBoxContainer/Play
+@onready var goToCycle = $CanvasLayer/Timeline/MarginContainer/VBoxContainer/HBoxContainer/GoToCycle
+@onready var legend = $CanvasLayer/Legend
+@onready var legendSubView = $CanvasLayer/Legend/GeneralLegend/Panel
+@onready var menu = $CanvasLayer/Menu
+@onready var drawGraphButton = $CanvasLayer/Menu/VBoxContainer/DrawGraph
 
 var is_playing = false
 var elapsed_time = 0.0
 var time_interval = 1.0;
 
 func _ready():
-	start()
+	legend.hide()
+	timeline.hide()
 	
 func _process(delta):
 	if is_playing:
@@ -45,9 +50,14 @@ func _on_go_to_cycle_text_submitted(value):
 	changeCycle(int(value))
 	goToCycle.clear()
 
-
 func _on_show_legend_toggled(button_pressed):
 	if button_pressed:
-		legend.show()
+		legendSubView.show()
 	else:
-		legend.hide()
+		legendSubView.hide()
+
+func _on_draw_graph_pressed():
+	menu.hide()
+	legend.show()
+	timeline.show()
+	start("../test/bicg.dot", "../test/bicg.csv")

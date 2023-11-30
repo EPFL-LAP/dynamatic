@@ -19,6 +19,7 @@
 #include <godot_cpp/classes/h_slider.hpp>
 #include <godot_cpp/classes/label.hpp>
 #include <godot_cpp/classes/line2d.hpp>
+#include <godot_cpp/variant/string.hpp>
 #include <vector>
 
 using namespace dynamatic::experimental::visual_dataflow;
@@ -37,7 +38,7 @@ private:
   Label *cycleLabel;
   HSlider *cycleSlider;
 
-  void createGraph();
+  void createGraph(std::string inputDOTFile, std::string inputCSVFile);
   void drawCycleNumber();
   void drawGraph();
   void setEdgeColor(State state, Line2D *line);
@@ -50,7 +51,7 @@ public:
 
   ~VisualDataflow() override = default;
 
-  void start();
+  void start(godot::String inputDOTFile, godot::String inputCSVFile);
   void nextCycle();
   void previousCycle();
   void changeCycle(int64_t cycleNb);

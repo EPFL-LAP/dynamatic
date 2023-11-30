@@ -54,7 +54,8 @@ using namespace dynamatic;
 using namespace dynamatic::experimental::visual_dataflow;
 
 void VisualDataflow::_bind_methods() {
-  ClassDB::bind_method(D_METHOD("start"), &VisualDataflow::start);
+  ClassDB::bind_method(D_METHOD("start", "inputDOTFile", "inputCSVFile"),
+                       &VisualDataflow::start);
   ClassDB::bind_method(D_METHOD("nextCycle"), &VisualDataflow::nextCycle);
   ClassDB::bind_method(D_METHOD("previousCycle"),
                        &VisualDataflow::previousCycle);
@@ -64,22 +65,22 @@ void VisualDataflow::_bind_methods() {
 
 VisualDataflow::VisualDataflow() = default;
 
-void VisualDataflow::start() {
-  cycleLabel = (Label *)get_node_internal(NodePath(
-      "CanvasLayer/MarginContainer/VBoxContainer/HBoxContainer/CycleNumber"));
+void VisualDataflow::start(godot::String inputDOTFile,
+                           godot::String inputCSVFile) {
+  cycleLabel = (Label *)get_node_internal(
+      NodePath("CanvasLayer/Timeline/MarginContainer/VBoxContainer/"
+               "HBoxContainer/CycleNumber"));
   cycleSlider = (HSlider *)get_node_internal(
-      NodePath("CanvasLayer/MarginContainer/VBoxContainer/HSlider"));
-  createGraph();
+      NodePath("CanvasLayer/Timeline/MarginContainer/VBoxContainer/HSlider"));
+  createGraph(inputDOTFile.utf8().get_data(), inputCSVFile.utf8().get_data());
   cycleSlider->set_max(graph.getCycleEdgeStates().size() - 1);
   drawGraph();
   changeCycle(0);
 }
 
-void VisualDataflow::createGraph() {
+void VisualDataflow::createGraph(std::string inputDOTFile,
+                                 std::string inputCSVFile) {
   GraphParser parser = GraphParser(&graph);
-
-  std::string inputDOTFile = "../test/bicg.dot";
-  std::string inputCSVFile = "../test/bicg.csv";
 
   if (failed(parser.parse(inputDOTFile))) {
     UtilityFunctions::printerr("Failed to parse graph");
@@ -195,7 +196,7 @@ void VisualDataflow::drawGraph() {
     edgeIdToLine2D[edge.getEdgeId()] = line;
   }
 
-  for (const auto &bb : graph.getBBs()){
+  for (const auto &bb : graph.getBBs()) {
     Line2D *line = memnew(Line2D);
     line->set_default_color(Color(1, 0, 0, 1));
     std::vector<float> boundries = bb.boundries;
@@ -208,8 +209,6 @@ void VisualDataflow::drawGraph() {
     line->set_width(2.5);
 
     add_child(line);
-
-
   }
 }
 

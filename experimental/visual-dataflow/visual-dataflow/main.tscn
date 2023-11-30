@@ -1,8 +1,10 @@
-[gd_scene load_steps=4 format=3 uid="uid://ridjgqca7ygu"]
+[gd_scene load_steps=6 format=3 uid="uid://ridjgqca7ygu"]
 
 [ext_resource type="Script" path="res://main.gd" id="1_k08iy"]
 [ext_resource type="Script" path="res://camera.gd" id="2_kag3i"]
-[ext_resource type="PackedScene" uid="uid://dlkh5bvs0i30h" path="res://legend.tscn" id="3_s2xdb"]
+[ext_resource type="PackedScene" uid="uid://1ukyu4yhubi7" path="res://legend.tscn" id="3_s2xdb"]
+[ext_resource type="PackedScene" uid="uid://baatvintvoqat" path="res://menu.tscn" id="4_3q8o8"]
+[ext_resource type="PackedScene" uid="uid://chdvrqi6hnrga" path="res://timeline.tscn" id="5_q76pr"]
 
 [node name="VisualDataflow" type="VisualDataflow"]
 offset_right = 40.0
@@ -10,65 +12,28 @@ offset_bottom = 40.0
 script = ExtResource("1_k08iy")
 
 [node name="Camera2D" type="Camera2D" parent="."]
+position = Vector2(960, 539)
 script = ExtResource("2_kag3i")
 
 [node name="CanvasLayer" type="CanvasLayer" parent="."]
 
-[node name="MarginContainer" type="MarginContainer" parent="CanvasLayer"]
-anchors_preset = 12
-anchor_top = 1.0
-anchor_right = 1.0
-anchor_bottom = 1.0
-offset_top = -51.0
-grow_horizontal = 2
-grow_vertical = 0
-size_flags_horizontal = 3
-theme_override_constants/margin_left = 10
-theme_override_constants/margin_top = 10
-theme_override_constants/margin_right = 10
-theme_override_constants/margin_bottom = 10
+[node name="Menu" parent="CanvasLayer" instance=ExtResource("4_3q8o8")]
 
-[node name="VBoxContainer" type="VBoxContainer" parent="CanvasLayer/MarginContainer"]
-layout_mode = 2
-theme_override_constants/separation = 10
+[node name="Timeline" parent="CanvasLayer" instance=ExtResource("5_q76pr")]
 
-[node name="HBoxContainer" type="HBoxContainer" parent="CanvasLayer/MarginContainer/VBoxContainer"]
-layout_mode = 2
-theme_override_constants/separation = 10
+[node name="Legend" parent="CanvasLayer" instance=ExtResource("3_s2xdb")]
 
-[node name="Play" type="Button" parent="CanvasLayer/MarginContainer/VBoxContainer/HBoxContainer"]
-layout_mode = 2
-text = "Play"
+[node name="Panel" parent="CanvasLayer/Legend/GeneralLegend" index="1"]
+visible = false
 
-[node name="Prev" type="Button" parent="CanvasLayer/MarginContainer/VBoxContainer/HBoxContainer"]
-layout_mode = 2
-text = "Prev Cycle"
+[connection signal="pressed" from="CanvasLayer/Menu/VBoxContainer/DrawGraph" to="." method="_on_draw_graph_pressed"]
+[connection signal="pressed" from="CanvasLayer/Timeline/MarginContainer/VBoxContainer/HBoxContainer/Play" to="." method="_on_play_pressed"]
+[connection signal="pressed" from="CanvasLayer/Timeline/MarginContainer/VBoxContainer/HBoxContainer/Prev" to="." method="_on_prev_pressed"]
+[connection signal="pressed" from="CanvasLayer/Timeline/MarginContainer/VBoxContainer/HBoxContainer/Next" to="." method="_on_next_pressed"]
+[connection signal="text_submitted" from="CanvasLayer/Timeline/MarginContainer/VBoxContainer/HBoxContainer/GoToCycle" to="." method="_on_go_to_cycle_text_submitted"]
+[connection signal="value_changed" from="CanvasLayer/Timeline/MarginContainer/VBoxContainer/HSlider" to="." method="_on_h_slider_value_changed"]
+[connection signal="toggled" from="CanvasLayer/Legend/GeneralLegend/ShowLegend" to="." method="_on_show_legend_toggled"]
 
-[node name="Next" type="Button" parent="CanvasLayer/MarginContainer/VBoxContainer/HBoxContainer"]
-layout_mode = 2
-text = "Next Cycle"
-
-[node name="GoToCycle" type="LineEdit" parent="CanvasLayer/MarginContainer/VBoxContainer/HBoxContainer"]
-layout_mode = 2
-placeholder_text = "Cycle :"
-
-[node name="CycleNumber" type="Label" parent="CanvasLayer/MarginContainer/VBoxContainer/HBoxContainer"]
-modulate = Color(0, 0, 0, 1)
-layout_mode = 2
-text = "Cycle: 0"
-
-[node name="HSlider" type="HSlider" parent="CanvasLayer/MarginContainer/VBoxContainer"]
-layout_mode = 2
-rounded = true
-
-[node name="legend" parent="CanvasLayer" instance=ExtResource("3_s2xdb")]
-
-[connection signal="pressed" from="CanvasLayer/MarginContainer/VBoxContainer/HBoxContainer/Play" to="." method="_on_play_pressed"]
-[connection signal="pressed" from="CanvasLayer/MarginContainer/VBoxContainer/HBoxContainer/Prev" to="." method="_on_prev_pressed"]
-[connection signal="pressed" from="CanvasLayer/MarginContainer/VBoxContainer/HBoxContainer/Next" to="." method="_on_next_pressed"]
-[connection signal="text_submitted" from="CanvasLayer/MarginContainer/VBoxContainer/HBoxContainer/GoToCycle" to="." method="_on_go_to_cycle_text_submitted"]
-[connection signal="focus_entered" from="CanvasLayer/MarginContainer/VBoxContainer/HSlider" to="Camera2D" method="_on_h_slider_focus_entered"]
-[connection signal="focus_exited" from="CanvasLayer/MarginContainer/VBoxContainer/HSlider" to="Camera2D" method="_on_h_slider_focus_exited"]
-[connection signal="mouse_entered" from="CanvasLayer/MarginContainer/VBoxContainer/HSlider" to="Camera2D" method="_on_h_slider_mouse_entered"]
-[connection signal="mouse_exited" from="CanvasLayer/MarginContainer/VBoxContainer/HSlider" to="Camera2D" method="_on_h_slider_mouse_exited"]
-[connection signal="value_changed" from="CanvasLayer/MarginContainer/VBoxContainer/HSlider" to="." method="_on_h_slider_value_changed"]
+[editable path="CanvasLayer/Menu"]
+[editable path="CanvasLayer/Timeline"]
+[editable path="CanvasLayer/Legend"]

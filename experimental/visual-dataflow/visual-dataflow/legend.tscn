@@ -1,6 +1,6 @@
-[gd_scene format=3 uid="uid://dlkh5bvs0i30h"]
+[gd_scene format=3 uid="uid://1ukyu4yhubi7"]
 
-[node name="legend" type="Control"]
+[node name="Legend" type="Control"]
 layout_mode = 3
 anchors_preset = 15
 anchor_right = 1.0
