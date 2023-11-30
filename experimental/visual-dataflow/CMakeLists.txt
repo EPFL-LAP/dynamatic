@@ -52,7 +52,7 @@ target_link_libraries(${GODOT_LIB_NAME}
 )
 
 add_executable(main
-  test/main.cpp
+  test/DOTParserTest.cpp
   src/CSVParser.cpp
   src/DOTParser.cpp
   src/DOTReformat.cpp

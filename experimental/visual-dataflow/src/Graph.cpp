@@ -78,3 +78,11 @@ void Graph::dupilcateEdgeStates(CycleNb from, CycleNb until) {
     cycleEdgeStates[i] = newMapEdgeState;
   }
 }
+
+
+void Graph::addBB(BB bb){
+  this->bbs.push_back(bb);
+}
+
+std::vector<BB> Graph::getBBs(){ return bbs; }
+
