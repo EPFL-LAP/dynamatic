@@ -106,21 +106,18 @@ void VisualDataflow::drawGraph() {
   mapColor["gold"] = Color(1.0, 0.843, 0.0, 1);
   mapColor["tan2"] = Color(1.0, 0.65, 0.0, 1);
 
-
-    for (const auto &bb : graph.getBBs()) {
+  for (const auto &bb : graph.getBBs()) {
 
     std::vector<float> boundries = bb.boundries;
-    Polygon2D* p = memnew(Polygon2D);
+    Polygon2D *p = memnew(Polygon2D);
     PackedVector2Array points;
-    points.push_back(Vector2(boundries.at(0), boundries.at(1)));
-    points.push_back(Vector2(boundries.at(2), boundries.at(1)));
-    points.push_back(Vector2(boundries.at(2), boundries.at(3)));
-    points.push_back(Vector2(boundries.at(0), boundries.at(3)));
-    
+    points.push_back(Vector2(boundries.at(0), 35 - boundries.at(1)));
+    points.push_back(Vector2(boundries.at(2), 35 - boundries.at(1)));
+    points.push_back(Vector2(boundries.at(2), 35 - boundries.at(3)));
+    points.push_back(Vector2(boundries.at(0), 35 - boundries.at(3)));
+
     p->set_polygon(points);
     p->set_color(Color(0, 0, 0, 0.05));
-    
-
 
     add_child(p);
   }
@@ -136,8 +133,11 @@ void VisualDataflow::drawGraph() {
     panel->set_custom_minimum_size(
         Vector2(node.second.getWidth() * 70, 0.5 * 70));
     std::pair<float, float> pos = node.second.getPosition();
+    // panel->set_position(Vector2(pos.first - node.second.getWidth() * 35, 2554
+    // - pos.second - 0.5 * 35));
+
     panel->set_position(Vector2(pos.first - node.second.getWidth() * 35,
-                                2554 - pos.second - 0.5 * 35));
+                                -(pos.second - 0.5 * 35)));
 
     // Create a center container to hold the label
     CenterContainer *center_container = memnew(CenterContainer);
@@ -173,12 +173,15 @@ void VisualDataflow::drawGraph() {
     Line2D *line = memnew(Line2D);
     line->set_default_color(Color(0, 0, 0, 1));
     std::vector<std::pair<float, float>> positions = edge.getPositions();
-    Vector2 prev =
-        Vector2(positions.at(1).first, 2554 - positions.at(1).second);
+    // Vector2 prev = Vector2(positions.at(1).first, 2554 -
+    // positions.at(1).second);
+    Vector2 prev = Vector2(positions.at(1).first, -positions.at(1).second + 35);
     Vector2 last = prev;
     for (size_t i = 1; i < positions.size(); ++i) {
+      // Vector2 point = Vector2(positions.at(i).first, 2554 -
+      // positions.at(i).second);
       Vector2 point =
-          Vector2(positions.at(i).first, 2554 - positions.at(i).second);
+          Vector2(positions.at(i).first, -positions.at(i).second + 35);
       line->add_point(point);
       prev = last;
       last = point;
@@ -214,7 +217,6 @@ void VisualDataflow::drawGraph() {
     add_child(line);
     edgeIdToLine2D[edge.getEdgeId()] = line;
   }
-
 }
 
 void VisualDataflow::nextCycle() {
