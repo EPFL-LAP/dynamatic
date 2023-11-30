@@ -200,6 +200,16 @@ dynamatic::experimental::visual_dataflow::processDOT(std::ifstream &file,
       currentEdge.setInPort(in);
     }
 
+    if (insideEdgeDefinition && line.find("start_0") != std::string::npos){
+      currentEdge.setDashed(true);
+      std::cout << " abcde " << std::endl;
+    }
+
+    if (insideEdgeDefinition && line.find("style") != std::string::npos){
+      currentEdge.setDashed(true);
+      std::cout << " abcde " << std::endl;
+    }
+
     if (insideEdgeDefinition && line.find(']') != std::string::npos) {
       insideEdgeDefinition = false;
       graph.addEdge(currentEdge);
