@@ -49,6 +49,18 @@ int main(int argc, char *argv[]) {
     return 1;
 
   std::cout << "---------------------------------" << std::endl;
+
+  for (const auto &bb : graph.getBBs()) {
+    std::cout << "Boundries: " << bb.boundries.at(0) << ", " << bb.boundries.at(1) << ", " << bb.boundries.at(2) << ", " << bb.boundries.at(3) << ", " << std::endl;
+    std::cout << "Label: " << bb.label << std::endl;
+    std::cout << "Label position: " << bb.labelPosition.first << ", " << bb.labelPosition.second << std::endl;
+    std::cout << "Label size: " << bb.labelSize.first << ", " << bb.labelSize.second << std::endl;
+
+    std::cout << "---------------------------------" << std::endl;
+  }
+
+  std::cout << "---------------------------------" << std::endl;
+
   for (const auto &pair : graph.getNodes()) {
     NodeId nodeId = pair.first;
     GraphNode node = pair.second;
@@ -60,6 +72,8 @@ int main(int argc, char *argv[]) {
               << " OutPorts: " << node.getPorts(false).size() << std::endl;
     std::cout << "Width: " << node.getWidth() << std::endl;
     std::cout << "Color: " << node.getColor() << std::endl;
+    std::cout << "Shape: " << node.getShape() << std::endl;
+    std::cout << "Style: " << node.getDashed() << std::endl;
 
     std::cout << "---------------------------------" << std::endl;
   }

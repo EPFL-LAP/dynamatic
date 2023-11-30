@@ -34,6 +34,15 @@ using GraphId = int;
 /// State of an edge of the graph
 enum State { UNDEFINED, READY, EMPTY, VALID, VALID_READY };
 
+struct BB
+{
+  std::vector<float> boundries;
+  std::string label;
+  std::pair<float, float> labelPosition;
+  std::pair<float, float> labelSize;
+};
+
+
 /// Implements the logic to create and update a Graph
 class Graph {
 
@@ -60,6 +69,10 @@ public:
 
   std::map<CycleNb, std::map<EdgeId, State>> getCycleEdgeStates();
   void dupilcateEdgeStates(CycleNb from, CycleNb until);
+  /// Adds a BB to the Graph
+  void addBB(BB bb);
+  /// Gets the graph's BBs
+  std::vector<BB> getBBs();
 
 private:
   /// Edges of the graph
@@ -73,6 +86,8 @@ private:
   std::map<std::pair<std::pair<NodeId, size_t>, std::pair<NodeId, size_t>>,
            EdgeId>
       mapEdges;
+  /// BBs of the Graph
+  std::vector<BB> bbs;
 };
 
 } // namespace visual_dataflow

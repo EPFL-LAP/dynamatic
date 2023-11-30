@@ -194,6 +194,23 @@ void VisualDataflow::drawGraph() {
     add_child(line);
     edgeIdToLine2D[edge.getEdgeId()] = line;
   }
+
+  for (const auto &bb : graph.getBBs()){
+    Line2D *line = memnew(Line2D);
+    line->set_default_color(Color(1, 0, 0, 1));
+    std::vector<float> boundries = bb.boundries;
+    line->add_point(Vector2(boundries.at(0), boundries.at(1)));
+    line->add_point(Vector2(boundries.at(2), boundries.at(1)));
+    line->add_point(Vector2(boundries.at(2), boundries.at(3)));
+    line->add_point(Vector2(boundries.at(0), boundries.at(3)));
+    line->add_point(Vector2(boundries.at(0), boundries.at(1)));
+
+    line->set_width(2.5);
+
+    add_child(line);
+
+
+  }
 }
 
 void VisualDataflow::nextCycle() {

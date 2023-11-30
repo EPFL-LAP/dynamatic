@@ -24,6 +24,7 @@ namespace visual_dataflow {
 
 using NodeId = std::string;
 using Color = std::string;
+using Shape = std::string;
 
 /// Implements the logic to create and update a Node
 class GraphNode {
@@ -53,6 +54,14 @@ public:
   void setColor(Color color);
   /// Returns the color of the Node
   Color getColor();
+  /// Sets the shape of the Node
+  void setShape(Shape shape);
+  /// Returns the shape of the Node
+  Shape getShape();
+  /// Sets the  style of the Node
+  void setDashed(bool dashed);
+  /// Returns the style of the Node;
+  bool getDashed();
 
 private:
   /// Node identifier
@@ -66,7 +75,11 @@ private:
   /// Width of the node
   float width;
   /// Color of the Node
-  Color color;
+  Color color = "white";
+  /// Shape of the Node
+  Shape shape = "rectangle";
+  /// Style of the borders
+  bool isDashed = false;
 };
 
 } // namespace visual_dataflow
