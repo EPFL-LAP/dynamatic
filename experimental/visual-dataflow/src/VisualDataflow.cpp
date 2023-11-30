@@ -117,57 +117,10 @@ void VisualDataflow::drawGraph() {
     points.push_back(Vector2(boundries.at(0), -boundries.at(3)));
 
     p->set_polygon(points);
-    p->set_color(Color(0, 0, 0, 0.05));
+    p->set_color(Color(0, 0, 0, 0.15));
 
     add_child(p);
   }
-
-  /*for (auto &node : graph.getNodes()) {
-    Panel *panel = memnew(Panel);
-    StyleBoxFlat *style = memnew(StyleBoxFlat);
-    if (mapColor.count(node.second.getColor()))
-      style->set_bg_color(mapColor.at(node.second.getColor()));
-    else
-      style->set_bg_color(Color(1, 1, 1, 1));
-    panel->add_theme_stylebox_override("panel", style);
-    panel->set_custom_minimum_size(
-        Vector2(node.second.getWidth() * 70, 0.5 * 70));
-    std::pair<float, float> pos = node.second.getPosition();
-    // panel->set_position(Vector2(pos.first - node.second.getWidth() * 35, 2554
-    // - pos.second - 0.5 * 35));
-
-    panel->set_position(Vector2(pos.first - node.second.getWidth() * 35,
-                                -(pos.second - 0.5 * 35)));
-
-    // Create a center container to hold the label
-    CenterContainer *center_container = memnew(CenterContainer);
-    center_container->set_anchor(SIDE_LEFT, ANCHOR_BEGIN);
-    center_container->set_anchor(SIDE_TOP, ANCHOR_BEGIN);
-    center_container->set_anchor(SIDE_RIGHT, ANCHOR_END);
-    center_container->set_anchor(SIDE_BOTTOM, ANCHOR_END);
-    panel->add_child(center_container);
-
-    /// Add the label to the center container
-    Label *node_label = memnew(Label);
-    node_label->set_text(node.second.getNodeId().c_str());
-    node_label->add_theme_color_override(
-        "font_color", Color(0, 0, 0)); // Change to font_color
-    node_label->set_horizontal_alignment(
-        HorizontalAlignment::HORIZONTAL_ALIGNMENT_CENTER);
-    node_label->set_autowrap_mode(TextServer::AUTOWRAP_WORD);
-    node_label->add_theme_font_size_override("font_size", 13);
-
-    // // Create a new Font instance and set its properties
-    //     Ref<Font> custom_font = memnew(Font);
-    //     custom_font->set("size", 20); // Set your desired size here
-
-    // Apply the custom font to the label
-    // node_label->add_theme_font_override("font", custom_font);
-
-    center_container->add_child(node_label);
-
-    add_child(panel);
-  }*/
 
   for (auto &node : graph.getNodes()) {
     std::pair<float, float> center = node.second.getPosition();
@@ -210,31 +163,35 @@ void VisualDataflow::drawGraph() {
     else
       p->set_color(Color(1, 1, 1, 1));
 
+    /// Add the label to the center container
     Label *label = memnew(Label);
     label->set_text(node.second.getNodeId().c_str());
     label->add_theme_color_override("font_color",
                                     Color(0, 0, 0)); // Change to font_color
-    label->add_theme_font_size_override("font_size", 13);
+    label->add_theme_font_size_override("font_size", 12);
     Vector2 size = label->get_combined_minimum_size();
-    Vector2 new_position =
+    Vector2 newPosition =
         Vector2(center.first - size.x * 0.5,
                 -(center.second + size.y * 0.5)); // Centering the label
-    label->set_position(new_position);
-    p->add_child(label);
+    label->set_position(newPosition);
+
+    // Create a center container to hold the polygon and the label
+    CenterContainer *centerContainer = memnew(CenterContainer);
+    centerContainer->set_size(Vector2(width, height));
+    centerContainer->set_position(
+        Vector2(center.first - width / 2, -center.second - height / 2));
+    centerContainer->add_child(label);
     add_child(p);
+    add_child(centerContainer);
   }
 
   for (auto &edge : graph.getEdges()) {
     Line2D *line = memnew(Line2D);
     line->set_default_color(Color(0, 0, 0, 1));
     std::vector<std::pair<float, float>> positions = edge.getPositions();
-    // Vector2 prev = Vector2(positions.at(1).first, 2554 -
-    // positions.at(1).second);
     Vector2 prev = Vector2(positions.at(1).first, -positions.at(1).second);
     Vector2 last = prev;
     for (size_t i = 1; i < positions.size(); ++i) {
-      // Vector2 point = Vector2(positions.at(i).first, 2554 -
-      // positions.at(i).second);
       Vector2 point = Vector2(positions.at(i).first, -positions.at(i).second);
       line->add_point(point);
       prev = last;
@@ -267,7 +224,7 @@ void VisualDataflow::drawGraph() {
     arrowHead->set_polygon(points);
     arrowHead->set_color(Color(0, 0, 0, 1));
     line->add_child(arrowHead);
-    line->set_width(2);
+    line->set_width(1);
     add_child(line);
     edgeIdToLine2D[edge.getEdgeId()] = line;
   }
