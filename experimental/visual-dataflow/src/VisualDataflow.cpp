@@ -110,6 +110,7 @@ void VisualDataflow::drawGraph() {
 
     std::vector<float> boundries = bb.boundries;
     Polygon2D *p = memnew(Polygon2D);
+    Polygon2D *p = memnew(Polygon2D);
     PackedVector2Array points;
     points.push_back(Vector2(boundries.at(0), 35 - boundries.at(1)));
     points.push_back(Vector2(boundries.at(2), 35 - boundries.at(1)));
@@ -213,7 +214,7 @@ void VisualDataflow::drawGraph() {
     arrowHead->set_polygon(points);
     arrowHead->set_color(Color(0, 0, 0, 1));
     line->add_child(arrowHead);
-    line->set_width(1.5);
+    line->set_width(2);
     add_child(line);
     edgeIdToLine2D[edge.getEdgeId()] = line;
   }
