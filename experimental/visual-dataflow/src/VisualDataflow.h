@@ -30,7 +30,7 @@ class VisualDataflow : public Control {
 
 private:
   Graph graph;
-  CycleNb cycle = 0;
+  CycleNb cycle = -1;
   std::map<EdgeId, Line2D *> edgeIdToLine2D;
 
   // Godot object references
