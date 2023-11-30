@@ -1,6 +1,8 @@
 extends VisualDataflow
 
 @onready var play_button = $CanvasLayer/MarginContainer/VBoxContainer/HBoxContainer/Play
+@onready var goToCycle = $CanvasLayer/MarginContainer/VBoxContainer/HBoxContainer/GoToCycle
+@onready var legend = $CanvasLayer/GeneralLegend/SpecificLegendsVB
 
 var is_playing = false
 var elapsed_time = 0.0
@@ -38,3 +40,14 @@ func _on_play_pressed():
 		play_button.text = "Pause"
 	is_playing = !is_playing
 	elapsed_time = 0
+
+func _on_go_to_cycle_text_submitted(value):
+	changeCycle(int(value))
+	goToCycle.clear()
+
+
+func _on_show_legend_toggled(button_pressed):
+	if button_pressed:
+		legend.show()
+	else:
+		legend.hide()

@@ -41,6 +41,7 @@
 #include "llvm/Support/SourceMgr.h"
 #include <godot_cpp/classes/canvas_item.hpp>
 #include <godot_cpp/classes/control.hpp>
+#include <godot_cpp/core/math.hpp>
 #include <godot_cpp/core/memory.hpp>
 #include <godot_cpp/variant/color.hpp>
 #include <godot_cpp/variant/utility_functions.hpp>
@@ -209,7 +210,7 @@ void VisualDataflow::previousCycle() {
 
 void VisualDataflow::changeCycle(int64_t cycleNb) {
   if (cycle != cycleNb) {
-    cycle = cycleNb;
+    cycle = Math::min(Math::max((double)cycleNb, 0.0), cycleSlider->get_max());
     cycleLabel->set_text("Cycle: " + String::num_int64(cycle));
     cycleSlider->set_value(cycle);
 
