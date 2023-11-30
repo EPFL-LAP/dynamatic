@@ -16,6 +16,7 @@
 #include "Graph.h"
 #include "GraphEdge.h"
 #include "godot_cpp/classes/control.hpp"
+#include "godot_cpp/classes/polygon2d.hpp"
 #include <godot_cpp/classes/h_slider.hpp>
 #include <godot_cpp/classes/label.hpp>
 #include <godot_cpp/classes/line2d.hpp>
@@ -34,6 +35,9 @@ private:
   CycleNb cycle = -1;
   std::map<EdgeId, Line2D *> edgeIdToLine2D;
 
+  std::map<EdgeId, std::vector<Line2D *>> edgeIdToLines;
+  std::map<EdgeId, Polygon2D *> edgeIdToArrowHead;
+
   // Godot object references
   Label *cycleLabel;
   HSlider *cycleSlider;
@@ -41,7 +45,8 @@ private:
   void createGraph(std::string inputDOTFile, std::string inputCSVFile);
   void drawCycleNumber();
   void drawGraph();
-  void setEdgeColor(State state, Line2D *line);
+  void setEdgeColor(State state, std::vector<Line2D *> lines,
+                    Polygon2D *arrowHead);
 
 protected:
   static void _bind_methods();

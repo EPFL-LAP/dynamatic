@@ -46,6 +46,7 @@
 #include <godot_cpp/variant/color.hpp>
 #include <godot_cpp/variant/utility_functions.hpp>
 #include <godot_cpp/variant/vector2.hpp>
+#include <vector>
 
 using namespace llvm;
 using namespace mlir;
@@ -186,17 +187,64 @@ void VisualDataflow::drawGraph() {
   }
 
   for (auto &edge : graph.getEdges()) {
-    Line2D *line = memnew(Line2D);
-    line->set_default_color(Color(0, 0, 0, 1));
+
+    std::vector<Line2D *> lines;
+    Vector2 prev;
+    Vector2 last;
+
     std::vector<std::pair<float, float>> positions = edge.getPositions();
-    Vector2 prev = Vector2(positions.at(1).first, -positions.at(1).second);
-    Vector2 last = prev;
+    prev = Vector2(positions.at(1).first, -positions.at(1).second);
+    last = prev;
+    PackedVector2Array linePoints;
+
     for (size_t i = 1; i < positions.size(); ++i) {
       Vector2 point = Vector2(positions.at(i).first, -positions.at(i).second);
-      line->add_point(point);
+      linePoints.push_back(point);
       prev = last;
       last = point;
     }
+
+    if (edge.getDashed()) {
+
+      for (int i = 0; i < linePoints.size() - 1; ++i) {
+        Vector2 start = linePoints[i];
+        Vector2 end = linePoints[i + 1];
+        Vector2 segment = end - start;
+        float segmentLength = segment.length();
+        segment = segment.normalized();
+
+        float currentLength = 0.0;
+        while (currentLength < segmentLength) {
+          Line2D *line = memnew(Line2D);
+          line->set_width(2);
+          line->set_default_color(Color(1, 1, 1, 1)); // White color
+          line->set_width(2);
+          Vector2 lineStart = start + segment * currentLength;
+          Vector2 lineEnd =
+              lineStart + segment * MIN(5, segmentLength - currentLength);
+          PackedVector2Array pointsArray;
+          pointsArray.append(lineStart);
+          pointsArray.append(lineEnd);
+          line->set_points(pointsArray);
+
+          add_child(line);
+          lines.push_back(line);
+
+          currentLength += 5 + 5;
+        }
+      }
+
+    } else {
+      Line2D *line = memnew(Line2D);
+      line->set_points(linePoints);
+      line->set_default_color(Color(1, 1, 1, 1));
+      line->set_width(2);
+      add_child(line);
+      lines.push_back(line);
+    }
+
+    edgeIdToLines[edge.getEdgeId()] = lines;
+
     Polygon2D *arrowHead = memnew(Polygon2D);
     PackedVector2Array points;
     if (prev.x == last.x) {
@@ -223,10 +271,8 @@ void VisualDataflow::drawGraph() {
     }
     arrowHead->set_polygon(points);
     arrowHead->set_color(Color(0, 0, 0, 1));
-    line->add_child(arrowHead);
-    line->set_width(1);
-    add_child(line);
-    edgeIdToLine2D[edge.getEdgeId()] = line;
+    add_child(arrowHead);
+    edgeIdToArrowHead[edge.getEdgeId()] = arrowHead;
   }
 }
 
@@ -253,14 +299,16 @@ void VisualDataflow::changeCycle(int64_t cycleNb) {
       for (auto &edgeState : edgeStates) {
         EdgeId edgeId = edgeState.first;
         State state = edgeState.second;
-        Line2D *line = edgeIdToLine2D[edgeId];
-        setEdgeColor(state, line);
+        std::vector<Line2D *> lines = edgeIdToLines[edgeId];
+        Polygon2D *arrowHead = edgeIdToArrowHead[edgeId];
+        setEdgeColor(state, lines, arrowHead);
       }
     }
   }
 }
 
-void VisualDataflow::setEdgeColor(State state, Line2D *line) {
+void VisualDataflow::setEdgeColor(State state, std::vector<Line2D *> lines,
+                                  Polygon2D *arrowHead) {
   Color color = Color(0, 0, 0, 1);
   if (state == UNDEFINED) {
     color = Color(0.8, 0, 0, 1);
@@ -273,12 +321,10 @@ void VisualDataflow::setEdgeColor(State state, Line2D *line) {
   } else if (state == VALID_READY) {
     color = Color(0, 0.8, 0.8, 1);
   }
-  line->set_default_color(color);
-  for (int i = 0; i < line->get_child_count(); ++i) {
-    Node *child = line->get_child(i);
-    if (child->get_class() == "Polygon2D") {
-      Polygon2D *arrowHead = (Polygon2D *)child;
-      arrowHead->set_color(color);
-    }
+
+  for (auto &line : lines) {
+    line->set_default_color(color);
   }
+
+  arrowHead->set_color(color);
 }
