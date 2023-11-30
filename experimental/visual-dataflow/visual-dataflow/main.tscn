@@ -12,7 +12,7 @@ offset_bottom = 40.0
 script = ExtResource("1_k08iy")
 
 [node name="Camera2D" type="Camera2D" parent="."]
-position = Vector2(960, 539)
+position = Vector2(959, -541)
 script = ExtResource("2_kag3i")
 
 [node name="CanvasLayer" type="CanvasLayer" parent="."]

@@ -110,12 +110,11 @@ void VisualDataflow::drawGraph() {
 
     std::vector<float> boundries = bb.boundries;
     Polygon2D *p = memnew(Polygon2D);
-    Polygon2D *p = memnew(Polygon2D);
     PackedVector2Array points;
-    points.push_back(Vector2(boundries.at(0), 35 - boundries.at(1)));
-    points.push_back(Vector2(boundries.at(2), 35 - boundries.at(1)));
-    points.push_back(Vector2(boundries.at(2), 35 - boundries.at(3)));
-    points.push_back(Vector2(boundries.at(0), 35 - boundries.at(3)));
+    points.push_back(Vector2(boundries.at(0), -boundries.at(1)));
+    points.push_back(Vector2(boundries.at(2), -boundries.at(1)));
+    points.push_back(Vector2(boundries.at(2), -boundries.at(3)));
+    points.push_back(Vector2(boundries.at(0), -boundries.at(3)));
 
     p->set_polygon(points);
     p->set_color(Color(0, 0, 0, 0.05));
@@ -123,7 +122,7 @@ void VisualDataflow::drawGraph() {
     add_child(p);
   }
 
-  for (auto &node : graph.getNodes()) {
+  /*for (auto &node : graph.getNodes()) {
     Panel *panel = memnew(Panel);
     StyleBoxFlat *style = memnew(StyleBoxFlat);
     if (mapColor.count(node.second.getColor()))
@@ -168,6 +167,61 @@ void VisualDataflow::drawGraph() {
     center_container->add_child(node_label);
 
     add_child(panel);
+  }*/
+
+  for (auto &node : graph.getNodes()) {
+    std::pair<float, float> center = node.second.getPosition();
+    float width = node.second.getWidth() * 70;
+    float height = 35;
+    Polygon2D *p = memnew(Polygon2D);
+    PackedVector2Array points;
+
+    if (node.second.getShape() == "diamond") {
+      points.push_back(Vector2(center.first, -center.second + height / 2));
+      points.push_back(Vector2(center.first + width / 2, -center.second));
+      points.push_back(Vector2(center.first, -center.second - height / 2));
+      points.push_back(Vector2(center.first - width / 2, -center.second));
+      p->set_polygon(points);
+    } else if (node.second.getShape() == "oval") {
+      // Code for generating oval points
+      int numPoints = 20; // Adjust this for smoother ovals
+      for (int i = 0; i < numPoints; ++i) {
+        float angle = 2 * M_PI * i / numPoints;
+        float x = center.first + width / 2 * cos(angle);
+        float y = -center.second + height / 2 * sin(angle);
+        points.push_back(Vector2(x, y));
+      }
+      p->set_polygon(points);
+    } else {
+      points.push_back(
+          Vector2(center.first - width / 2, -center.second + height / 2));
+      points.push_back(
+          Vector2(center.first + width / 2, -center.second + height / 2));
+      points.push_back(
+          Vector2(center.first + width / 2, -center.second - height / 2));
+      points.push_back(
+          Vector2(center.first - width / 2, -center.second - height / 2));
+      p->set_polygon(points);
+    }
+
+    // Set color and add to parent (common for all shapes)
+    if (mapColor.count(node.second.getColor()))
+      p->set_color(mapColor.at(node.second.getColor()));
+    else
+      p->set_color(Color(1, 1, 1, 1));
+
+    Label *label = memnew(Label);
+    label->set_text(node.second.getNodeId().c_str());
+    label->add_theme_color_override("font_color",
+                                    Color(0, 0, 0)); // Change to font_color
+    label->add_theme_font_size_override("font_size", 13);
+    Vector2 size = label->get_combined_minimum_size();
+    Vector2 new_position =
+        Vector2(center.first - size.x * 0.5,
+                -(center.second + size.y * 0.5)); // Centering the label
+    label->set_position(new_position);
+    p->add_child(label);
+    add_child(p);
   }
 
   for (auto &edge : graph.getEdges()) {
@@ -176,13 +230,12 @@ void VisualDataflow::drawGraph() {
     std::vector<std::pair<float, float>> positions = edge.getPositions();
     // Vector2 prev = Vector2(positions.at(1).first, 2554 -
     // positions.at(1).second);
-    Vector2 prev = Vector2(positions.at(1).first, -positions.at(1).second + 35);
+    Vector2 prev = Vector2(positions.at(1).first, -positions.at(1).second);
     Vector2 last = prev;
     for (size_t i = 1; i < positions.size(); ++i) {
       // Vector2 point = Vector2(positions.at(i).first, 2554 -
       // positions.at(i).second);
-      Vector2 point =
-          Vector2(positions.at(i).first, -positions.at(i).second + 35);
+      Vector2 point = Vector2(positions.at(i).first, -positions.at(i).second);
       line->add_point(point);
       prev = last;
       last = point;
