@@ -91,6 +91,7 @@ int main(int argc, char *argv[]) {
     std::cout << "Destination Node: " << edge.getDstNode().getNodeId()
               << std::endl;
     std::cout << "Port: " << edge.getInPort() << std::endl;
+    std::cout << "Style: " << edge.getDashed() << std::endl;
 
     std::cout << "---------------------------------" << std::endl;
   }

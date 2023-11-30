@@ -57,6 +57,10 @@ public:
   EdgeId getEdgeId();
   /// Returns the edge positions
   std::vector<std::pair<float, float>> getPositions();
+  /// Sets the  style of the Edge
+  void setDashed(bool dashed);
+  /// Returns the style of the Edge;
+  bool getDashed();
 
 private:
   /// Edge identifier
@@ -71,6 +75,8 @@ private:
   size_t outPort;
   /// Positions of the edge in the graph
   std::vector<std::pair<float, float>> position;
+  /// Style of the edge
+  bool isDashed = false;
 };
 
 } // namespace visual_dataflow
