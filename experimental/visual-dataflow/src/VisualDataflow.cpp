@@ -129,8 +129,11 @@ void VisualDataflow::drawGraph() {
     float height = 35;
     Polygon2D *p = memnew(Polygon2D);
     PackedVector2Array points;
+    Line2D *outline = memnew(Line2D);
+    Vector2 firstPoint;
 
     if (node.second.getShape() == "diamond") {
+      firstPoint = Vector2(center.first, -center.second + height / 2);
       points.push_back(Vector2(center.first, -center.second + height / 2));
       points.push_back(Vector2(center.first + width / 2, -center.second));
       points.push_back(Vector2(center.first, -center.second - height / 2));
@@ -144,9 +147,13 @@ void VisualDataflow::drawGraph() {
         float x = center.first + width / 2 * cos(angle);
         float y = -center.second + height / 2 * sin(angle);
         points.push_back(Vector2(x, y));
+        if (i == 0)
+          firstPoint = Vector2(x, y);
       }
       p->set_polygon(points);
     } else {
+      firstPoint =
+          Vector2(center.first - width / 2, -center.second + height / 2);
       points.push_back(
           Vector2(center.first - width / 2, -center.second + height / 2));
       points.push_back(
@@ -157,6 +164,9 @@ void VisualDataflow::drawGraph() {
           Vector2(center.first - width / 2, -center.second - height / 2));
       p->set_polygon(points);
     }
+
+    outline->set_points(points);
+    outline->add_point(firstPoint);
 
     // Set color and add to parent (common for all shapes)
     if (mapColor.count(node.second.getColor()))
@@ -184,6 +194,9 @@ void VisualDataflow::drawGraph() {
     centerContainer->add_child(label);
     add_child(p);
     add_child(centerContainer);
+    outline->set_default_color(Color(0, 0, 0, 1));
+    outline->set_width(1);
+    add_child(outline);
   }
 
   for (auto &edge : graph.getEdges()) {
