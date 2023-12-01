@@ -96,8 +96,6 @@ class FPGA20Buffers : public BufferPlacementMILP {
 public:
   /// Target clock period.
   const double targetPeriod;
-  /// Maximum clock period.
-  const double maxPeriod;
   /// Whether to use the same placement policy as legacy Dynamatic; non-legacy
   /// placement will yield faster circuits (some opaque slots transformed into
   /// transparent slots).
@@ -112,7 +110,7 @@ public:
   /// calls to `optimize` fail.
   FPGA20Buffers(FuncInfo &funcInfo, const TimingDatabase &timingDB, GRBEnv &env,
                 Logger *log = nullptr, double targetPeriod = 4.0,
-                double maxPeriod = 8.0, bool legacyPlacement = true);
+                bool legacyPlacement = true);
 
 protected:
   /// Contains all variables used throughout the MILP.

@@ -39,10 +39,9 @@ using namespace dynamatic::buffer::fpga20;
 
 FPGA20Buffers::FPGA20Buffers(FuncInfo &funcInfo, const TimingDatabase &timingDB,
                              GRBEnv &env, Logger *logger, double targetPeriod,
-                             double maxPeriod, bool legacyPlacement)
+                             bool legacyPlacement)
     : BufferPlacementMILP(funcInfo, timingDB, env, logger),
-      targetPeriod(targetPeriod), maxPeriod(maxPeriod),
-      legacyPlacement(legacyPlacement) {
+      targetPeriod(targetPeriod), legacyPlacement(legacyPlacement) {
   if (!unsatisfiable && succeeded(setup()))
     markReadyToOptimize();
 }

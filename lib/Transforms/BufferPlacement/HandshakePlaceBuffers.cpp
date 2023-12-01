@@ -364,7 +364,7 @@ LogicalResult HandshakePlaceBuffersPass::getBufferPlacement(
   if (algorithm == "fpga20" || algorithm == "fpga20-legacy") {
     // Create and solve the MILP
     return solveMILP<fpga20::FPGA20Buffers>(placement, info, timingDB, env,
-                                            logger, targetCP, targetCP * 2.0,
+                                            logger, targetCP,
                                             algorithm == "fpga20-legacy");
   }
   llvm_unreachable("unknown algorithm");
