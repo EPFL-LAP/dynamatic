@@ -25,6 +25,7 @@ action_mode = 0
 text = "Legend"
 
 [node name="Panel" type="Panel" parent="GeneralLegend"]
+visible = false
 layout_mode = 2
 size_flags_vertical = 3
 
@@ -52,35 +53,35 @@ position = Vector2(-1.53754, -41)
 scale = Vector2(0.892472, 2)
 points = PackedVector2Array(5, 26, 61.1084, 26)
 width = 2.0
-default_color = Color(1, 0.294118, 1, 1)
+default_color = Color(0.8, 0, 0, 1)
 
 [node name="Line2D2" type="Line2D" parent="GeneralLegend/Panel/EdgeLegend/EdgeComponents/Colors"]
 position = Vector2(-1.53754, 80)
 scale = Vector2(0.892472, 2)
 points = PackedVector2Array(5, 26, 61.1084, 26)
 width = 2.0
-default_color = Color(1, 0.294118, 1, 1)
+default_color = Color(0, 0, 0.8, 1)
 
 [node name="Line2D3" type="Line2D" parent="GeneralLegend/Panel/EdgeLegend/EdgeComponents/Colors"]
 position = Vector2(-1.53754, 51)
 scale = Vector2(0.892472, 2)
 points = PackedVector2Array(5, 26, 61.1084, 26)
 width = 2.0
-default_color = Color(1, 0.294118, 1, 1)
+default_color = Color(0, 0, 0, 1)
 
 [node name="Line2D4" type="Line2D" parent="GeneralLegend/Panel/EdgeLegend/EdgeComponents/Colors"]
 position = Vector2(-1.53754, 20)
 scale = Vector2(0.892472, 2)
 points = PackedVector2Array(5, 26, 61.1084, 26)
 width = 2.0
-default_color = Color(1, 0.294118, 1, 1)
+default_color = Color(0, 0.8, 0, 1)
 
 [node name="Line2D5" type="Line2D" parent="GeneralLegend/Panel/EdgeLegend/EdgeComponents/Colors"]
 position = Vector2(-1.53754, -9.00002)
 scale = Vector2(0.892472, 2)
 points = PackedVector2Array(5, 26, 61.1084, 26)
 width = 2.0
-default_color = Color(1, 0.294118, 1, 1)
+default_color = Color(0, 0.8, 0.8, 1)
 
 [node name="Definitions" type="VBoxContainer" parent="GeneralLegend/Panel/EdgeLegend/EdgeComponents"]
 layout_mode = 2
