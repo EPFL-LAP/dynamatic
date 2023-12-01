@@ -118,7 +118,7 @@ void VisualDataflow::drawGraph() {
     points.push_back(Vector2(boundries.at(0), -boundries.at(3)));
 
     p->set_polygon(points);
-    p->set_color(Color(0, 0, 0, 0.15));
+    p->set_color(Color(0, 0, 0, 0.075));
 
     add_child(p);
 

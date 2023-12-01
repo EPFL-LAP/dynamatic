@@ -27,32 +27,31 @@ offset_bottom = 150.0
 
 [node name="Legend" parent="CanvasLayer" instance=ExtResource("3_s2xdb")]
 
-[node name="Panel" parent="CanvasLayer/Legend/GeneralLegend" index="1"]
-visible = false
-
 [node name="EdgeLegend" parent="CanvasLayer/Legend/GeneralLegend/Panel" index="0"]
-offset_top = 0.0
-offset_bottom = 176.0
+offset_left = 7.0
+offset_top = 1.0
+offset_right = 225.0
+offset_bottom = 177.0
 
 [node name="EdgeLegendTitle" parent="CanvasLayer/Legend/GeneralLegend/Panel/EdgeLegend" index="0"]
 modulate = Color(1, 1, 1, 1)
 text = "Edge Legend:"
 
 [node name="Line2D" parent="CanvasLayer/Legend/GeneralLegend/Panel/EdgeLegend/EdgeComponents/Colors" index="0"]
-position = Vector2(3.00006, -40)
+position = Vector2(6.10352e-05, -40)
 points = PackedVector2Array(5, 26, 39.2488, 26, 61.1084, 26)
 
 [node name="Line2D2" parent="CanvasLayer/Legend/GeneralLegend/Panel/EdgeLegend/EdgeComponents/Colors" index="1"]
-position = Vector2(3.00006, 80)
+position = Vector2(6.10352e-05, 80)
 
 [node name="Line2D3" parent="CanvasLayer/Legend/GeneralLegend/Panel/EdgeLegend/EdgeComponents/Colors" index="2"]
-position = Vector2(3.00006, 51)
+position = Vector2(6.10352e-05, 51)
 
 [node name="Line2D4" parent="CanvasLayer/Legend/GeneralLegend/Panel/EdgeLegend/EdgeComponents/Colors" index="3"]
-position = Vector2(3.00006, 20)
+position = Vector2(6.10352e-05, 20)
 
 [node name="Line2D5" parent="CanvasLayer/Legend/GeneralLegend/Panel/EdgeLegend/EdgeComponents/Colors" index="4"]
-position = Vector2(3.00006, -9)
+position = Vector2(6.10352e-05, -9)
 
 [node name="Undefined" parent="CanvasLayer/Legend/GeneralLegend/Panel/EdgeLegend/EdgeComponents/Definitions" index="0"]
 modulate = Color(1, 1, 1, 1)
