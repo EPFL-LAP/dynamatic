@@ -27,9 +27,6 @@ offset_bottom = 150.0
 
 [node name="Legend" parent="CanvasLayer" instance=ExtResource("3_s2xdb")]
 
-[node name="Panel" parent="CanvasLayer/Legend/GeneralLegend" index="1"]
-visible = false
-
 [node name="EdgeLegend" parent="CanvasLayer/Legend/GeneralLegend/Panel" index="0"]
 offset_top = 0.0
 offset_bottom = 176.0
