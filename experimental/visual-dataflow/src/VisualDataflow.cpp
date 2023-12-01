@@ -122,13 +122,14 @@ void VisualDataflow::drawGraph() {
 
     add_child(p);
 
-    Label* label = memnew(Label);
+    Label *label = memnew(Label);
     label->set_text(bb.label.c_str());
-    label->set_position(Vector2(bb.boundries.at(0) + 5, - bb.labelPosition.second - bb.labelSize.first * 35));
-    label->add_theme_color_override("font_color", Color(0, 0, 0)); 
+    label->set_position(
+        Vector2(bb.boundries.at(0) + 5,
+                -bb.labelPosition.second - bb.labelSize.first * 35));
+    label->add_theme_color_override("font_color", Color(0, 0, 0));
     label->add_theme_font_size_override("font_size", 12);
     add_child(label);
-
   }
 
   for (auto &node : graph.getNodes()) {
@@ -173,9 +174,6 @@ void VisualDataflow::drawGraph() {
       p->set_polygon(points);
     }
 
-    outline->set_points(points);
-    outline->add_point(firstPoint);
-
     // Set color and add to parent (common for all shapes)
     if (mapColor.count(node.second.getColor()))
       p->set_color(mapColor.at(node.second.getColor()));
@@ -202,6 +200,39 @@ void VisualDataflow::drawGraph() {
     centerContainer->add_child(label);
     add_child(p);
     add_child(centerContainer);
+
+    if (node.second.getDashed()) {
+      points.push_back(firstPoint);
+      for (int i = 0; i < points.size() - 1; ++i) {
+        Vector2 start = points[i];
+        Vector2 end = points[i + 1];
+        Vector2 segment = end - start;
+        float segmentLength = segment.length();
+        segment = segment.normalized();
+
+        float currentLength = 0.0;
+        while (currentLength < segmentLength) {
+          Line2D *line = memnew(Line2D);
+          line->set_width(1);
+          line->set_default_color(Color(0, 0, 0, 1));
+          Vector2 lineStart = start + segment * currentLength;
+          Vector2 lineEnd =
+              lineStart + segment * MIN(5, segmentLength - currentLength);
+          PackedVector2Array pointsArray;
+          pointsArray.append(lineStart);
+          pointsArray.append(lineEnd);
+          line->set_points(pointsArray);
+
+          add_child(line);
+
+          currentLength += 5 + 5;
+        }
+      }
+    } else {
+      outline->set_points(points);
+      outline->add_point(firstPoint);
+    }
+
     outline->set_default_color(Color(0, 0, 0, 1));
     outline->set_width(1);
     add_child(outline);
