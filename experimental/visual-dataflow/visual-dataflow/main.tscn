@@ -28,8 +28,8 @@ offset_bottom = 150.0
 [node name="Legend" parent="CanvasLayer" instance=ExtResource("3_s2xdb")]
 
 [node name="EdgeLegend" parent="CanvasLayer/Legend/GeneralLegend/Panel" index="0"]
-offset_top = 0.0
-offset_bottom = 176.0
+offset_top = 1.0
+offset_bottom = 177.0
 
 [node name="EdgeLegendTitle" parent="CanvasLayer/Legend/GeneralLegend/Panel/EdgeLegend" index="0"]
 modulate = Color(1, 1, 1, 1)
