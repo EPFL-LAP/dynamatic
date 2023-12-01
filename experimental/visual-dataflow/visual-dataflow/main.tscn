@@ -30,6 +30,45 @@ offset_bottom = 150.0
 [node name="Panel" parent="CanvasLayer/Legend/GeneralLegend" index="1"]
 visible = false
 
+[node name="EdgeLegend" parent="CanvasLayer/Legend/GeneralLegend/Panel" index="0"]
+offset_top = 0.0
+offset_bottom = 176.0
+
+[node name="EdgeLegendTitle" parent="CanvasLayer/Legend/GeneralLegend/Panel/EdgeLegend" index="0"]
+modulate = Color(1, 1, 1, 1)
+text = "Edge Legend:"
+
+[node name="Line2D" parent="CanvasLayer/Legend/GeneralLegend/Panel/EdgeLegend/EdgeComponents/Colors" index="0"]
+position = Vector2(3.00006, -40)
+points = PackedVector2Array(5, 26, 39.2488, 26, 61.1084, 26)
+
+[node name="Line2D2" parent="CanvasLayer/Legend/GeneralLegend/Panel/EdgeLegend/EdgeComponents/Colors" index="1"]
+position = Vector2(3.00006, 80)
+
+[node name="Line2D3" parent="CanvasLayer/Legend/GeneralLegend/Panel/EdgeLegend/EdgeComponents/Colors" index="2"]
+position = Vector2(3.00006, 51)
+
+[node name="Line2D4" parent="CanvasLayer/Legend/GeneralLegend/Panel/EdgeLegend/EdgeComponents/Colors" index="3"]
+position = Vector2(3.00006, 20)
+
+[node name="Line2D5" parent="CanvasLayer/Legend/GeneralLegend/Panel/EdgeLegend/EdgeComponents/Colors" index="4"]
+position = Vector2(3.00006, -9)
+
+[node name="Undefined" parent="CanvasLayer/Legend/GeneralLegend/Panel/EdgeLegend/EdgeComponents/Definitions" index="0"]
+modulate = Color(1, 1, 1, 1)
+
+[node name="Empty" parent="CanvasLayer/Legend/GeneralLegend/Panel/EdgeLegend/EdgeComponents/Definitions" index="1"]
+modulate = Color(1, 1, 1, 1)
+
+[node name="Ready" parent="CanvasLayer/Legend/GeneralLegend/Panel/EdgeLegend/EdgeComponents/Definitions" index="2"]
+modulate = Color(1, 1, 1, 1)
+
+[node name="Valid" parent="CanvasLayer/Legend/GeneralLegend/Panel/EdgeLegend/EdgeComponents/Definitions" index="3"]
+modulate = Color(1, 1, 1, 1)
+
+[node name="Valid_Ready" parent="CanvasLayer/Legend/GeneralLegend/Panel/EdgeLegend/EdgeComponents/Definitions" index="4"]
+modulate = Color(1, 1, 1, 1)
+
 [connection signal="file_selected" from="CanvasLayer/Menu/FileDialogDot" to="." method="_on_file_dialog_dot_file_selected"]
 [connection signal="file_selected" from="CanvasLayer/Menu/FileDialogCsv" to="." method="_on_file_dialog_csv_file_selected"]
 [connection signal="pressed" from="CanvasLayer/Menu/VBoxContainer/DrawGraph" to="." method="_on_draw_graph_pressed"]
