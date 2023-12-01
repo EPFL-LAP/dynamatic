@@ -7,10 +7,15 @@ extends VisualDataflow
 @onready var legendSubView = $CanvasLayer/Legend/GeneralLegend/Panel
 @onready var menu = $CanvasLayer/Menu
 @onready var drawGraphButton = $CanvasLayer/Menu/VBoxContainer/DrawGraph
+@onready var dotInput = $CanvasLayer/Menu/VBoxContainer/ButtonDot
+@onready var csvInput = $CanvasLayer/Menu/VBoxContainer/ButtonCsv
 
 var is_playing = false
 var elapsed_time = 0.0
 var time_interval = 1.0;
+
+var dotFile = ""
+var csvFile = ""
 
 func _ready():
 	legend.hide()
@@ -57,7 +62,17 @@ func _on_show_legend_toggled(button_pressed):
 		legendSubView.hide()
 
 func _on_draw_graph_pressed():
-	menu.hide()
-	legend.show()
-	timeline.show()
-	start("../test/bicg.dot", "../test/bicg.csv")
+	if (dotFile != "" && csvFile != ""):
+		menu.hide()
+		legend.show()
+		timeline.show()
+		start(dotFile, csvFile)
+
+func _on_file_dialog_dot_file_selected(path):
+	dotFile = path
+	dotInput.text = path
+
+func _on_file_dialog_csv_file_selected(path):
+	csvFile = path
+	csvInput.text = path
+	

@@ -18,6 +18,10 @@ script = ExtResource("2_kag3i")
 [node name="CanvasLayer" type="CanvasLayer" parent="."]
 
 [node name="Menu" parent="CanvasLayer" instance=ExtResource("4_3q8o8")]
+offset_left = -150.0
+offset_top = -150.0
+offset_right = 150.0
+offset_bottom = 150.0
 
 [node name="Timeline" parent="CanvasLayer" instance=ExtResource("5_q76pr")]
 
@@ -26,6 +30,8 @@ script = ExtResource("2_kag3i")
 [node name="Panel" parent="CanvasLayer/Legend/GeneralLegend" index="1"]
 visible = false
 
+[connection signal="file_selected" from="CanvasLayer/Menu/FileDialogDot" to="." method="_on_file_dialog_dot_file_selected"]
+[connection signal="file_selected" from="CanvasLayer/Menu/FileDialogCsv" to="." method="_on_file_dialog_csv_file_selected"]
 [connection signal="pressed" from="CanvasLayer/Menu/VBoxContainer/DrawGraph" to="." method="_on_draw_graph_pressed"]
 [connection signal="pressed" from="CanvasLayer/Timeline/MarginContainer/VBoxContainer/HBoxContainer/Play" to="." method="_on_play_pressed"]
 [connection signal="pressed" from="CanvasLayer/Timeline/MarginContainer/VBoxContainer/HBoxContainer/Prev" to="." method="_on_prev_pressed"]

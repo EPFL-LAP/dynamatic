@@ -216,9 +216,8 @@ void VisualDataflow::drawGraph() {
         float currentLength = 0.0;
         while (currentLength < segmentLength) {
           Line2D *line = memnew(Line2D);
-          line->set_width(2);
+          line->set_width(1);
           line->set_default_color(Color(1, 1, 1, 1)); // White color
-          line->set_width(2);
           Vector2 lineStart = start + segment * currentLength;
           Vector2 lineEnd =
               lineStart + segment * MIN(5, segmentLength - currentLength);
@@ -238,7 +237,7 @@ void VisualDataflow::drawGraph() {
       Line2D *line = memnew(Line2D);
       line->set_points(linePoints);
       line->set_default_color(Color(1, 1, 1, 1));
-      line->set_width(2);
+      line->set_width(1);
       add_child(line);
       lines.push_back(line);
     }
