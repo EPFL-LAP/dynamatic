@@ -42,8 +42,8 @@ using namespace dynamatic::buffer;
 BufferPlacementMILP::BufferPlacementMILP(FuncInfo &funcInfo,
                                          const TimingDatabase &timingDB,
                                          GRBEnv &env, Logger *logger)
-    : timingDB(timingDB), funcInfo(funcInfo), model(GRBModel(env)),
-      logger(logger) {
+    : MILP<BufferPlacement>(env, logger), timingDB(timingDB),
+      funcInfo(funcInfo) {
 
   // Combines any channel-specific buffering properties coming from IR
   // annotations to internal buffer specifications and stores the combined
@@ -53,7 +53,7 @@ BufferPlacementMILP::BufferPlacementMILP(FuncInfo &funcInfo,
     // Increase the minimum number of slots if internal buffers are present, and
     // check for satisfiability
     if (failed(addInternalBuffers(channel))) {
-      status = MILPStatus::UNSAT_PROPERTIES;
+      unsatisfiable = true;
       std::stringstream ss;
       std::string channelName;
       ss << "Including internal component buffers into buffering "
@@ -83,36 +83,8 @@ BufferPlacementMILP::BufferPlacementMILP(FuncInfo &funcInfo,
         return;
     }
   }
-}
 
-LogicalResult BufferPlacementMILP::optimize(int *milpStat) {
-  if (!isReadyForOptimization()) {
-    std::stringstream ss;
-    ss << status;
-    return funcInfo.funcOp->emitError()
-           << "The MILP is not ready for optimization (reason: " << ss.str()
-           << ").";
-  }
-
-  // Optimize the model
-  if (logger)
-    model.write(logger->getLogDir() + path::get_separator().str() +
-                "placement_model.lp");
-  model.optimize();
-  if (logger)
-    model.write(logger->getLogDir() + path::get_separator().str() +
-                "placement_solutions.json");
-
-  // Check whether we found an optimal solution or reached the time limit
-  int stat = model.get(GRB_IntAttr_Status);
-  if (milpStat)
-    *milpStat = stat;
-  if (stat != GRB_OPTIMAL && stat != GRB_TIME_LIMIT) {
-    status = MILPStatus::FAILED_TO_OPTIMIZE;
-    return failure();
-  }
-  status = MILPStatus::OPTIMIZED;
-  return success();
+  markReadyToOptimize();
 }
 
 LogicalResult BufferPlacementMILP::addInternalBuffers(Channel &channel) {

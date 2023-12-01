@@ -108,12 +108,15 @@ public:
   /// optimization. The `legacyPlacemnt` controls the interpretation of the
   /// MILP's results (non-legacy placement should yield faster circuits in
   /// general). If a channel's buffering properties are provably unsatisfiable,
-  /// the MILP status will be set to `MILPStatus::UNSAT_PROPERTIES` before
-  /// returning. If something went wrong during MILP setup, the MILP status will
-  /// be set to `MILPStatus::FAILED_TO_SETUP`.
+  /// the MILP will not be marked ready for optimization, ensuring that further
+  /// calls to `optimize` fail.
   FPGA20Buffers(FuncInfo &funcInfo, const TimingDatabase &timingDB, GRBEnv &env,
                 Logger *log = nullptr, double targetPeriod = 4.0,
                 double maxPeriod = 8.0, bool legacyPlacement = true);
+
+protected:
+  /// Contains all variables used throughout the MILP.
+  MILPVars vars;
 
   /// Interprets the MILP solution to derive buffer placement decisions. Since
   /// the MILP cannot encode the placement of both opaque and transparent slots
@@ -122,12 +125,7 @@ public:
   /// transparent. This interpretation is partically controlled by the
   /// `legacyPlacement` flag, and always respects the channel-specific buffering
   /// constraints.
-  LogicalResult
-  getPlacement(DenseMap<Value, PlacementResult> &placement) override;
-
-protected:
-  /// Contains all variables used throughout the MILP.
-  MILPVars vars;
+  void extractResult(BufferPlacement &placement) override;
 
   /// Setups the entire MILP, first creating all variables, then all
   /// constraints, and finally setting the system's objective. Called by the

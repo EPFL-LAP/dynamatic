@@ -33,6 +33,9 @@ struct PlacementResult {
   bool opaqueBeforeTrans = true;
 };
 
+/// Maps channels to buffer placement decisions.
+using BufferPlacement = DenseMap<Value, PlacementResult>;
+
 /// Helper datatype for buffer placement. Simply aggregates all the information
 /// related to the Handshake function under optimization.
 struct FuncInfo {
