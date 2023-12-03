@@ -20,6 +20,7 @@
 #include "dynamatic/Support/LogicBB.h"
 #include "dynamatic/Transforms/HandshakeConcretizeIndexType.h"
 #include "mlir/Dialect/Arith/IR/Arith.h"
+#include "mlir/IR/BuiltinAttributes.h"
 #include "mlir/IR/BuiltinTypes.h"
 #include "mlir/IR/OperationSupport.h"
 #include "mlir/IR/PatternMatch.h"
@@ -798,34 +799,35 @@ LogicalResult DOTPrinter::annotateNode(Operation *op,
             info.stringAttr["in"] = getIOFromValues(op->getOperands(), "in");
             return info;
           })
-          .Case<handshake::ConstantOp>([&](auto) {
+          .Case<handshake::ConstantOp>([&](handshake::ConstantOp cstOp) {
             auto info = NodeInfo("Constant");
-            // Try to get the constant value as an integer
-            int value = 0;
-            int length = 8;
-            if (mlir::IntegerAttr intAttr =
-                    op->template getAttrOfType<mlir::IntegerAttr>("value");
-                intAttr)
+
+            // Determine the constant value and its bitwidth based on the
+            // vondtnat's value attribute
+            long int value = 0;
+            unsigned bitwidth = 0;
+            TypedAttr valueAttr = cstOp.getValueAttr();
+            if (auto intAttr = dyn_cast<mlir::IntegerAttr>(valueAttr)) {
               value = intAttr.getValue().getSExtValue();
-            // Try to get the constant value as an integer
-            if (mlir::BoolAttr boolAttr =
-                    op->template getAttrOfType<mlir::BoolAttr>("value");
-                boolAttr && boolAttr.getValue()) {
-              value = 1;
-              length = 1;
+              bitwidth = intAttr.getValue().getBitWidth();
+            } else if (auto boolAttr = dyn_cast<mlir::BoolAttr>(valueAttr)) {
+              value = boolAttr.getValue() ? 1 : 0;
+              bitwidth = 1;
+            } else {
+              llvm_unreachable("unsupported constant type");
             }
 
             // Convert the value to hexadecimal format
             std::stringstream stream;
-            stream << "0x" << std::setfill('0') << std::setw(length) << std::hex
-                   << value;
+            int hexLength = (bitwidth >> 2) + ((bitwidth & 0b11) != 0 ? 1 : 0);
+            stream << "0x" << std::setfill('0') << std::setw(hexLength)
+                   << std::hex << value;
+            info.stringAttr["value"] = stream.str();
 
             // Legacy Dynamatic uses the output width of the operations also
             // as input width for some reason, make it so
             info.stringAttr["in"] = getIOFromValues(op->getResults(), "in");
             info.stringAttr["out"] = getIOFromValues(op->getResults(), "out");
-
-            info.stringAttr["value"] = stream.str();
             return info;
           })
           .Case<handshake::DynamaticReturnOp>([&](auto) {
