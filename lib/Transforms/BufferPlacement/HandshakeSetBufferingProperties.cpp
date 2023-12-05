@@ -18,16 +18,21 @@
 //===----------------------------------------------------------------------===//
 
 #include "dynamatic/Transforms/BufferPlacement/HandshakeSetBufferingProperties.h"
+#include "circt/Dialect/Handshake/HandshakeDialect.h"
 #include "circt/Dialect/Handshake/HandshakeOps.h"
+#include "circt/Dialect/Handshake/HandshakePasses.h"
 #include "dynamatic/Transforms/BufferPlacement/BufferingSupport.h"
 #include "dynamatic/Transforms/BufferPlacement/HandshakePlaceBuffers.h"
 #include "mlir/IR/Value.h"
 #include "llvm/ADT/STLExtras.h"
+#include "llvm/ADT/TypeSwitch.h"
 
 using namespace circt;
 using namespace dynamatic;
 using namespace dynamatic::buffer;
 
+/// Makes all channels adjacent to operations of the given type inside the
+/// function unbufferizable.
 template <typename Op>
 static void makeUnbufferizable(circt::handshake::FuncOp funcOp) {
   // Channels connected to memory interfaces are not bufferizable
@@ -73,13 +78,60 @@ void dynamatic::buffer::setFPGA20Properties(circt::handshake::FuncOp funcOp) {
       if (!forkOp)
         continue;
 
-      // Force placement of an opaque slot on all fork output channels, except
-      // the one going to the LSQ
+      // Force placement of an opaque buffer slot on fork output channels
+      // triggering group allocations to the same LSQ
+      SmallVector<Value, 4> controlChannels;
+      SmallPtrSet<Operation *, 4> controlOps;
       for (OpResult forkRes : forkOp->getResults()) {
-        if (forkRes != ctrlVal) {
-          Channel channel(forkRes, true);
-          channel.props->minOpaque = std::max(channel.props->minOpaque, 1U);
-        }
+        // Ignore the fork output that immediately goes to the LSQ
+        if (ctrlVal == forkRes)
+          continue;
+
+        // Reset the list of control channels to explore and the list of control
+        // operations that we have already visited
+        controlChannels.clear();
+        controlOps.clear();
+
+        controlChannels.push_back(forkRes);
+        controlOps.insert(forkOp);
+        do {
+          Value val = controlChannels.pop_back_val();
+          Operation *succOp = *val.getUsers().begin();
+
+          // Make sure to not loop forever over the same control operations
+          if (auto [_, newOp] = controlOps.insert(succOp); !newOp)
+            continue;
+
+          if (succOp == lsqOp) {
+            // We have found a control path triggering a different group
+            // allocation to the LSQ, force placement of an opaque buffer on it
+            Channel channel(forkRes, true);
+            channel.props->minOpaque = std::max(channel.props->minOpaque, 1U);
+            break;
+          }
+          llvm::TypeSwitch<Operation *, void>(succOp)
+              .Case<handshake::ConditionalBranchOp, handshake::BranchOp,
+                    handshake::MergeOp, handshake::MuxOp, handshake::ForkOp>(
+                  [&](auto) {
+                    // If the successor just propagates the control path, add
+                    // all its results to the list of control channels to
+                    // explore
+                    for (OpResult succRes : succOp->getResults())
+                      controlChannels.push_back(succRes);
+                  })
+              .Case<handshake::BufferOp>([&](handshake::BufferOp bufOp) {
+                // Only follow the control path if the buffer isn't opaque,
+                // since we don't need to buffer datapaths that already have a
+                // buffer
+                if (bufOp.getBufferType() == BufferTypeEnum::fifo)
+                  controlChannels.push_back(bufOp.getResult());
+              })
+              .Case<handshake::ControlMergeOp>(
+                  [&](handshake::ControlMergeOp cmergeOp) {
+                    // Only the control merge's data output forwards the input
+                    controlChannels.push_back(cmergeOp.getResult());
+                  });
+        } while (!controlChannels.empty());
       }
     }
   }
@@ -107,8 +159,14 @@ struct HandshakeSetBufferingPropertiesPass
     }
 
     // Add properties to channels inside each function
-    for (handshake::FuncOp funcOp : modOp.getOps<handshake::FuncOp>())
+    for (handshake::FuncOp funcOp : modOp.getOps<handshake::FuncOp>()) {
+      // Buffer placement requires that all values are used exactly once
+      if (failed(verifyAllValuesHasOneUse(funcOp))) {
+        funcOp.emitOpError() << "Not all values are used exactly once";
+        return signalPassFailure();
+      }
       setFPGA20Properties(funcOp);
+    }
   };
 };
 

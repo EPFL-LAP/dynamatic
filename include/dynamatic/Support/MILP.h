@@ -64,7 +64,7 @@ public:
   LogicalResult optimize(int *milpStatus = nullptr) {
     if (!isReadyForOptimization()) {
       llvm::errs() << "The MILP is not ready for optimization (reason: "
-                   << getStateMessage() << ").";
+                   << getStateMessage() << ").\n";
       return failure();
     }
 
@@ -83,6 +83,8 @@ public:
       *milpStatus = stat;
     if (stat != GRB_OPTIMAL && stat != GRB_TIME_LIMIT) {
       state = State::FAILED_TO_OPTIMIZE;
+      llvm::errs() << "Buffer placement MILP failed with status " << stat
+                   << ", reason:" << getGurobiOptStatusDesc(stat) << "\n";
       return failure();
     }
     state = State::OPTIMIZED;
@@ -165,16 +167,13 @@ private:
   StringRef getStateMessage() {
     switch (state) {
     case State::FAILED_TO_SETUP:
-      return "something went wrong during the creation of MILP constraints "
-             "or "
-             "objective, or the constructor forgot to mark the MILP ready "
-             "for "
+      return "something went wrong during the creation of MILP constraints or "
+             "objective, or the constructor forgot to mark the MILP ready for "
              "optimization using MILP::markReadyToOptimize";
     case State::READY:
       return "the MILP is ready to be optimized";
     case State::FAILED_TO_OPTIMIZE:
-      return "the MILP failed to be optimized, check Gurobi's return value "
-             "for "
+      return "the MILP failed to be optimized, check Gurobi's return value for "
              "more details on what went wrong";
     case State::OPTIMIZED:
       return "the MILP was successfully optimized";
@@ -189,17 +188,8 @@ private:
 template <typename MILP, typename MILPRes, typename... Args>
 LogicalResult solveMILP(MILPRes &milpResult, Args &&...args) {
   MILP milp = MILP(std::forward<Args>(args)...);
-  int milpStat;
-  if (failed(milp.optimize(&milpStat))) {
-    llvm::errs() << "Buffer placement MILP failed with status " << milpStat
-                 << ", reason:" << getGurobiOptStatusDesc(milpStat);
+  if (failed(milp.optimize()) || failed(milp.getResult(milpResult)))
     return failure();
-  }
-  if (failed(milp.getResult(milpResult))) {
-    llvm::errs()
-        << "Failed to extract placement decisions from MILP's solution.";
-    return failure();
-  }
   return success();
 }
 
