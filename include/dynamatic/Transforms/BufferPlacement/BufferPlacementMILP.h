@@ -54,8 +54,9 @@ public:
   /// buffers given by the timing models. If some buffering properties become
   /// unsatisfiable following this step, the constructor set the `unsatisfiable`
   /// flag to true.
-  BufferPlacementMILP(FuncInfo &funcInfo, const TimingDatabase &timingDB,
-                      GRBEnv &env, Logger *log = nullptr);
+  BufferPlacementMILP(GRBEnv &env, FuncInfo &funcInfo,
+                      const TimingDatabase &timingDB, Logger *log = nullptr,
+                      std::string *milpName = nullptr);
 
 protected:
   /// Aggregates all data members related to the Handshake function under
@@ -65,6 +66,9 @@ protected:
   /// function to their specific channel buffering properties (unconstraining
   /// properties if none were explicitly specified).
   llvm::MapVector<Value, ChannelBufProps> channels;
+  /// Logger; if not null the class will log setup and placement information.
+  Logger *logger;
+
   /// Whether the MILP was detected to be unsatisfiable dureing creation.
   bool unsatisfiable = false;
 

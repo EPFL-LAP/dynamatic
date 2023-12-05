@@ -37,10 +37,11 @@ using namespace dynamatic;
 using namespace dynamatic::buffer;
 using namespace dynamatic::buffer::fpga20;
 
-FPGA20Buffers::FPGA20Buffers(FuncInfo &funcInfo, const TimingDatabase &timingDB,
-                             GRBEnv &env, Logger *logger, double targetPeriod,
-                             bool legacyPlacement)
-    : BufferPlacementMILP(funcInfo, timingDB, env, logger),
+FPGA20Buffers::FPGA20Buffers(GRBEnv &env, FuncInfo &funcInfo,
+                             const TimingDatabase &timingDB,
+                             double targetPeriod, bool legacyPlacement,
+                             Logger *logger)
+    : BufferPlacementMILP(env, funcInfo, timingDB, logger),
       targetPeriod(targetPeriod), legacyPlacement(legacyPlacement) {
   if (!unsatisfiable && succeeded(setup()))
     markReadyToOptimize();

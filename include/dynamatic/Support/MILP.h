@@ -51,11 +51,11 @@ class MILP {
 
 public:
   /// The Gurobi environment is used to create the internal Gurobi model. If a
-  /// logger is passed, the object may log information to it during its
-  /// lifetime. The lifetime of passed references must exceed the object's
-  /// lifetime, which doesn't copy the underlying data.
-  MILP(GRBEnv &env, Logger *logger = nullptr)
-      : model(GRBModel(env)), logger(logger){};
+  /// non-empty twine is provided, the `MILP::optimize` method will store the
+  /// MILP model and its solution at `writeTo`_model.lp and
+  /// `writeTo`_solution.json, respectively.
+  MILP(GRBEnv &env, const llvm::Twine &writeTo)
+      : model(GRBModel(env)), writeTo(writeTo.str()){};
 
   /// Optimizes the MILP. If a logger was provided at object creation, the MILP
   /// model and its solution are stored in plain text in its associated
@@ -68,13 +68,11 @@ public:
       return failure();
     }
 
-    // Optimize the model, possibly logging the MILP and its solution
-    if (logger) {
-      std::string dirPath =
-          logger->getLogDir() + llvm::sys::path::get_separator().str();
-      model.write(dirPath + "placement_model.lp");
+    // Optimize the model, possibly logging the MILP model and its solution
+    if (!writeTo.empty()) {
+      model.write(writeTo + "_model.lp");
       model.optimize();
-      model.write(dirPath + "placement_solutions.json");
+      model.write(writeTo + "_solution.json");
     } else {
       model.optimize();
     }
@@ -136,10 +134,6 @@ public:
 protected:
   /// Gurobi model holding the MILP's state.
   GRBModel model;
-  /// Logger; if not null the class will log setup and results information.
-  Logger *logger;
-  /// MILP's state, which changes during the object's lifetime.
-  State state = State::FAILED_TO_SETUP;
 
   /// Fills in the argument with the desired results extract from the MILP's
   /// solution. Called by `MILP::getResult` after checking that the underlying
@@ -158,6 +152,14 @@ private:
     /// MILP optimization succeeded, result can be extracted.
     OPTIMIZED
   };
+
+  /// MILP's state, which changes during the object's lifetime.
+  State state = State::FAILED_TO_SETUP;
+  /// Path to a file at which to store the MILP's model and its solution after
+  /// optimization. The model will be stored under `writeTo`_model.lp and the
+  /// solution under `writeTo`_solution.json. Nothing will be stored if the
+  /// string is empty.
+  std::string writeTo;
 
   /// Returns a description of the MILP's current state.
   StringRef getStateMessage() {

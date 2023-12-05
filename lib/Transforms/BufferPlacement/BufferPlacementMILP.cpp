@@ -39,11 +39,12 @@ using namespace mlir;
 using namespace dynamatic;
 using namespace dynamatic::buffer;
 
-BufferPlacementMILP::BufferPlacementMILP(FuncInfo &funcInfo,
+BufferPlacementMILP::BufferPlacementMILP(GRBEnv &env, FuncInfo &funcInfo,
                                          const TimingDatabase &timingDB,
-                                         GRBEnv &env, Logger *logger)
-    : MILP<BufferPlacement>(env, logger), timingDB(timingDB),
-      funcInfo(funcInfo) {
+                                         Logger *logger, std::string *milpName)
+    : MILP<BufferPlacement>(env, logger->getLogDir() + path::get_separator() +
+                                     (milpName ? *milpName : "placement")),
+      timingDB(timingDB), funcInfo(funcInfo) {
 
   // Combines any channel-specific buffering properties coming from IR
   // annotations to internal buffer specifications and stores the combined
