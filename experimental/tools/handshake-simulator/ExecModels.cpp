@@ -234,8 +234,8 @@ dynamatic::experimental::initialiseMap(llvm::StringMap<std::string> &funcMap,
   // Dynamatic operations
   addDefault<handshake::MemoryControllerOp, DynamaticMemController>(
       modelStructuresMap);
-  addDefault<handshake::DynamaticLoadOp, DynamaticLoad>(modelStructuresMap);
-  addDefault<handshake::DynamaticStoreOp, DynamaticStore>(modelStructuresMap);
+  addDefault<handshake::MCLoadOp, DynamaticLoad>(modelStructuresMap);
+  addDefault<handshake::MCStoreOp, DynamaticStore>(modelStructuresMap);
   addDefault<handshake::DynamaticReturnOp, DynamaticReturn>(modelStructuresMap);
   addDefault<handshake::EndOp, DynamaticEnd>(modelStructuresMap);
 
@@ -531,7 +531,7 @@ bool DynamaticMemController::tryExecute(ExecutableData &data,
 }
 
 bool DynamaticLoad::tryExecute(ExecutableData &data, circt::Operation &opArg) {
-  auto op = dyn_cast<circt::handshake::DynamaticLoadOp>(opArg);
+  auto op = dyn_cast<circt::handshake::MCLoadOp>(opArg);
   bool hasDoneStuff = false;
 
   // Send address to mem controller if available
@@ -551,7 +551,7 @@ bool DynamaticLoad::tryExecute(ExecutableData &data, circt::Operation &opArg) {
 }
 
 bool DynamaticStore::tryExecute(ExecutableData &data, circt::Operation &opArg) {
-  auto op = dyn_cast<circt::handshake::DynamaticStoreOp>(opArg);
+  auto op = dyn_cast<circt::handshake::MCStoreOp>(opArg);
   bool hasDoneStuff = false;
 
   // Send address to mem controller if available

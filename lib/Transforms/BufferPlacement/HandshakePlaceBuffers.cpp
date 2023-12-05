@@ -294,7 +294,7 @@ HandshakePlaceBuffersPass::placeBuffers(FuncInfo &info,
     logFuncInfo(info, *logger);
 
   // Solve the MILP to obtain a buffer placement
-  DenseMap<Value, PlacementResult> placement;
+  BufferPlacement placement;
   if (failed(getBufferPlacement(info, timingDB, logger, placement)))
     return failure();
 
@@ -352,7 +352,7 @@ LogicalResult HandshakePlaceBuffersPass::getCFDFCs(FuncInfo &info,
 
 LogicalResult HandshakePlaceBuffersPass::getBufferPlacement(
     FuncInfo &info, TimingDatabase &timingDB, Logger *logger,
-    DenseMap<Value, PlacementResult> &placement) {
+    BufferPlacement &placement) {
 
   // Create Gurobi environment
   GRBEnv env = GRBEnv(true);
@@ -361,27 +361,13 @@ LogicalResult HandshakePlaceBuffersPass::getBufferPlacement(
     env.set(GRB_DoubleParam_TimeLimit, timeout);
   env.start();
 
-  // Create and solve the MILP
-  BufferPlacementMILP *milp = nullptr;
-  if (algorithm == "fpga20")
-    milp = new fpga20::FPGA20Buffers(info, timingDB, env, logger, targetCP,
-                                     targetCP * 2.0, false);
-  else if (algorithm == "fpga20-legacy")
-    milp = new fpga20::FPGA20Buffers(info, timingDB, env, logger, targetCP,
-                                     targetCP * 2.0, true);
-  assert(milp && "unknown placement algorithm");
-  int milpStat;
-  LogicalResult res = success();
-  if (failed(milp->optimize(&milpStat))) {
-    res = info.funcOp->emitError()
-          << "Buffer placement MILP failed with status " << milpStat
-          << ", reason:" << getGurobiOptStatusDesc(milpStat);
-  } else if (failed(milp->getPlacement(placement))) {
-    res = info.funcOp->emitError()
-          << "Failed to extract placement decisions from MILP's solution.";
+  if (algorithm == "fpga20" || algorithm == "fpga20-legacy") {
+    // Create and solve the MILP
+    return solveMILP<fpga20::FPGA20Buffers>(
+        placement, env, info, timingDB, targetCP, algorithm == "fpga20-legacy",
+        logger);
   }
-  delete milp;
-  return res;
+  llvm_unreachable("unknown algorithm");
 }
 #endif // DYNAMATIC_GUROBI_NOT_INSTALLED
 
@@ -389,7 +375,7 @@ LogicalResult HandshakePlaceBuffersPass::placeWithoutUsingMILP() {
   // The only strategy at this point is to place buffers on the output channels
   // of all merge-like operations
   for (handshake::FuncOp funcOp : getOperation().getOps<handshake::FuncOp>()) {
-    DenseMap<Value, PlacementResult> placement;
+    BufferPlacement placement;
     for (auto mergeLikeOp : funcOp.getOps<MergeLikeOpInterface>()) {
       for (OpResult res : mergeLikeOp->getResults())
         placement[res] = PlacementResult{1, 1, true};
@@ -399,8 +385,7 @@ LogicalResult HandshakePlaceBuffersPass::placeWithoutUsingMILP() {
   return success();
 }
 
-void HandshakePlaceBuffersPass::instantiateBuffers(
-    DenseMap<Value, PlacementResult> &placement) {
+void HandshakePlaceBuffersPass::instantiateBuffers(BufferPlacement &placement) {
   OpBuilder builder(&getContext());
   NameAnalysis &nameAnalysis = getAnalysis<NameAnalysis>();
   for (auto &[channel, placeRes] : placement) {
@@ -431,33 +416,6 @@ void HandshakePlaceBuffersPass::instantiateBuffers(
       placeBuffer(BufferTypeEnum::fifo, placeRes.numTrans);
       placeBuffer(BufferTypeEnum::seq, placeRes.numOpaque);
     }
-  }
-}
-
-std::string dynamatic::buffer::getGurobiOptStatusDesc(int status) {
-  switch (status) {
-  case 1:
-    return "Model is loaded, but no solution information is available.";
-  case 2:
-    return "Model was solved to optimality (subject to tolerances), and an "
-           "optimal solution is available.";
-  case 3:
-    return "Model was proven to be infeasible.";
-  case 4:
-    return "Model was proven to be either infeasible or unbounded. To obtain a "
-           "more definitive conclusion, set the DualReductions parameter to 0 "
-           "and reoptimize.";
-  case 5:
-    return "Model was proven to be unbounded.";
-  case 9:
-    return "Optimization terminated because the time expended exceeded the "
-           "value specified in the TimeLimit parameter.";
-  default:
-    return "No description available for optimization status code " +
-           std::to_string(status) +
-           ". Check "
-           "https://www.gurobi.com/documentation/current/refman/"
-           "optimization_status_codes.html for more details";
   }
 }
 

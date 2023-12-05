@@ -37,28 +37,17 @@ using namespace dynamatic;
 using namespace dynamatic::buffer;
 using namespace dynamatic::buffer::fpga20;
 
-FPGA20Buffers::FPGA20Buffers(FuncInfo &funcInfo, const TimingDatabase &timingDB,
-                             GRBEnv &env, Logger *logger, double targetPeriod,
-                             double maxPeriod, bool legacyPlacement)
-    : BufferPlacementMILP(funcInfo, timingDB, env, logger),
-      targetPeriod(targetPeriod), maxPeriod(maxPeriod),
-      legacyPlacement(legacyPlacement) {
-  if (status == MILPStatus::UNSAT_PROPERTIES)
-    return;
-  if (succeeded(setup()))
-    status = BufferPlacementMILP::MILPStatus::READY;
+FPGA20Buffers::FPGA20Buffers(GRBEnv &env, FuncInfo &funcInfo,
+                             const TimingDatabase &timingDB,
+                             double targetPeriod, bool legacyPlacement,
+                             Logger *logger)
+    : BufferPlacementMILP(env, funcInfo, timingDB, logger),
+      targetPeriod(targetPeriod), legacyPlacement(legacyPlacement) {
+  if (!unsatisfiable && succeeded(setup()))
+    markReadyToOptimize();
 }
 
-LogicalResult
-FPGA20Buffers::getPlacement(DenseMap<Value, PlacementResult> &placement) {
-  if (status != MILPStatus::OPTIMIZED) {
-    std::stringstream ss;
-    ss << status;
-    return funcInfo.funcOp->emitError()
-           << "Buffer placements cannot be extracted from MILP (reason: "
-           << ss.str() << ").";
-  }
-
+void FPGA20Buffers::extractResult(BufferPlacement &placement) {
   // Iterate over all channels in the circuit
   for (auto &[value, channelVars] : vars.channels) {
     if (channelVars.bufPresent.get(GRB_DoubleAttr_X) == 0)
@@ -102,7 +91,6 @@ FPGA20Buffers::getPlacement(DenseMap<Value, PlacementResult> &placement) {
 
   if (logger)
     logResults(placement);
-  return success();
 }
 
 LogicalResult FPGA20Buffers::setup() {
@@ -439,6 +427,11 @@ LogicalResult FPGA20Buffers::addThroughputConstraints(CFDFC &cfdfc) {
 
   // Add a set of constraints for each CFDFC channel
   for (auto &[channel, chThroughput] : cfdfcVars.channelThroughputs) {
+
+    // No throughput constraints on channels going to LSQ stores
+    if (isa<handshake::LSQStoreOp>(*channel.getUsers().begin()))
+      continue;
+
     Operation *srcOp = channel.getDefiningOp();
     Operation *dstOp = *(channel.getUsers().begin());
 
