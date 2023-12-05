@@ -324,7 +324,7 @@
   },
   "handshake.mc_load": {
     "latency": {
-      "64": 2.0
+      "64": 1.0
     },
     "delay": {
       "data": {
