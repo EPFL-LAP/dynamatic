@@ -41,9 +41,13 @@ using namespace dynamatic;
 using namespace dynamatic::buffer;
 using namespace dynamatic::experimental;
 
-/// Algorithm names.
-static const llvm::StringLiteral ON_MERGES("on-merges"), FPGA20("fpga20"),
+/// Algorithms that do not require solving an MILP.
+static constexpr llvm::StringLiteral ON_MERGES("on-merges");
+#ifndef DYNAMATIC_GUROBI_NOT_INSTALLED
+/// Algorithms that do require solving an MILP.
+static constexpr llvm::StringLiteral FPGA20("fpga20"),
     FPGA20_LEGACY("fpga20-legacy"), FPL22("fpl22");
+#endif // DYNAMATIC_GUROBI_NOT_INSTALLED
 
 namespace {
 
