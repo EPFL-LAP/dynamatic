@@ -54,7 +54,7 @@ public:
   /// non-empty twine is provided, the `MILP::optimize` method will store the
   /// MILP model and its solution at `writeTo`_model.lp and
   /// `writeTo`_solution.json, respectively.
-  MILP(GRBEnv &env, const llvm::Twine &writeTo)
+  MILP(GRBEnv &env, const llvm::Twine &writeTo = "")
       : model(GRBModel(env)), writeTo(writeTo.str()){};
 
   /// Optimizes the MILP. If a logger was provided at object creation, the MILP

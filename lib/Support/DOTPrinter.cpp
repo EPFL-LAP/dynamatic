@@ -18,6 +18,7 @@
 #include "dynamatic/Analysis/NameAnalysis.h"
 #include "dynamatic/Conversion/PassDetails.h"
 #include "dynamatic/Support/LogicBB.h"
+#include "dynamatic/Support/TimingModels.h"
 #include "dynamatic/Transforms/HandshakeConcretizeIndexType.h"
 #include "mlir/Dialect/Arith/IR/Arith.h"
 #include "mlir/IR/BuiltinAttributes.h"
@@ -1020,7 +1021,7 @@ std::string DOTPrinter::getNodeDelayAttr(Operation *op) {
 
 std::string DOTPrinter::getNodeLatencyAttr(Operation *op) {
   double latency;
-  if (failed(timingDB->getLatency(op, latency)))
+  if (failed(timingDB->getLatency(op, SignalType::DATA, latency)))
     return "0";
   return std::to_string(static_cast<unsigned>(latency));
 }
