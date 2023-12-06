@@ -202,11 +202,14 @@ public:
 class Compile : public Command {
 public:
   Compile(FrontendState &state)
-      : Command(CMD_COMPILE,
-                "Compiles the source kernel into a dataflow circuit; "
-                "produces both handshake-level IR and an equivalent DOT file",
-                state, {},
-                {{"simple-buffers", "Use simple buffer placement"}}){};
+      : Command(
+            CMD_COMPILE,
+            "Compiles the source kernel into a dataflow circuit; "
+            "produces both handshake-level IR and an equivalent DOT file",
+            state, {},
+            {{"simple-buffers", "Use simple buffer placement"},
+             {"speculative-fir",
+              "Place hardcoded speculative units for the FIR benchmark"}}){};
 
   CommandResult decode(SmallVector<std::string> &tokens) override;
 };
@@ -480,11 +483,14 @@ CommandResult Compile::decode(SmallVector<std::string> &tokens) {
   std::string outputDir = kernelDir + sep.str() + "out";
   std::string buffers =
       parsed.optArgsPresent.contains("simple-buffers") ? "1" : "0";
+  std::string spec =
+      parsed.optArgsPresent.contains("speculative-fir") ? "fir" : "0";
 
   // Create and execute the command
   return execShellCommand(state.getScriptsPath() + "/compile.sh " +
                           state.dynamaticPath + " " + kernelDir + " " +
-                          outputDir + " " + kernelName + " " + buffers);
+                          outputDir + " " + kernelName + " " + buffers + " " +
+                          spec);
 }
 
 CommandResult WriteHDL::decode(SmallVector<std::string> &tokens) {
