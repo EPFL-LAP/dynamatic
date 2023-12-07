@@ -38,41 +38,21 @@ using namespace dynamatic;
 using namespace dynamatic::buffer;
 using namespace dynamatic::buffer::fpl22;
 
-FPL22Buffers::FPL22Buffers(GRBEnv &env, FuncInfo &funcInfo,
-                           const TimingDatabase &timingDB, double targetPeriod,
-                           CFDFCUnion &cfUnion)
-    : BufferPlacementMILP(env, funcInfo, timingDB, targetPeriod),
-      cfUnion(cfUnion) {
-  if (!unsatisfiable)
-    setup();
-}
-
-FPL22Buffers::FPL22Buffers(GRBEnv &env, FuncInfo &funcInfo,
-                           const TimingDatabase &timingDB, double targetPeriod,
-                           CFDFCUnion &cfUnion, Logger &logger,
-                           StringRef milpName)
-    : BufferPlacementMILP(env, funcInfo, timingDB, targetPeriod, logger,
-                          milpName),
-      cfUnion(cfUnion) {
-  if (!unsatisfiable)
-    setup();
-}
-
-void FPL22Buffers::extractResult(BufferPlacement &placement) {
+void FPL22BuffersBase::extractResult(BufferPlacement &placement) {
   // Iterate over all channels in the circuit
-  for (Value channel : cfUnion.channels) {
-    ChannelVars &chVars = vars.channelVars[channel];
+  for (auto [channel, channelVars] : vars.channelVars) {
     // Extract number and type of slots from the MILP solution, as well as
     // channel-specific buffering properties
-    unsigned numSlotsToPlace =
-        static_cast<unsigned>(chVars.bufNumSlots.get(GRB_DoubleAttr_X) + 0.5);
+    unsigned numSlotsToPlace = static_cast<unsigned>(
+        channelVars.bufNumSlots.get(GRB_DoubleAttr_X) + 0.5);
     if (numSlotsToPlace == 0)
       continue;
 
-    bool placeOpaque = chVars.signalVars[SignalType::DATA].bufPresent.get(
+    bool placeOpaque = channelVars.signalVars[SignalType::DATA].bufPresent.get(
                            GRB_DoubleAttr_X) > 0;
-    bool placeTransparent = chVars.signalVars[SignalType::READY].bufPresent.get(
-                                GRB_DoubleAttr_X) > 0;
+    bool placeTransparent =
+        channelVars.signalVars[SignalType::READY].bufPresent.get(
+            GRB_DoubleAttr_X) > 0;
 
     ChannelBufProps &props = channelProps[channel];
     PlacementResult result;
@@ -99,9 +79,12 @@ void FPL22Buffers::extractResult(BufferPlacement &placement) {
     deductInternalBuffers(channel, result);
     placement[channel] = result;
   }
+
+  if (logger)
+    logResults(placement);
 }
 
-void FPL22Buffers::addCustomChannelConstraints(Value channel) {
+void FPL22BuffersBase::addCustomChannelConstraints(Value channel) {
   // Get channel-specific buffering properties and channel's variables
   ChannelBufProps &props = channelProps[channel];
   ChannelVars &chVars = vars.channelVars[channel];
@@ -157,7 +140,7 @@ void FPL22Buffers::addCustomChannelConstraints(Value channel) {
   }
 }
 
-void FPL22Buffers::addChannelPathConstraints(
+void FPL22BuffersBase::addChannelPathConstraints(
     Value channel, SignalType type, const BufferPathDelay &otherBuffer) {
   ChannelVars &chVars = vars.channelVars[channel];
   ChannelSignalVars &sigVars = chVars.signalVars[type];
@@ -206,8 +189,8 @@ struct MixedDomainConstraint {
 
 } // namespace
 
-void FPL22Buffers::addUnitMixedPathConstraints(Operation *unit,
-                                               ChannelFilter filter) {
+void FPL22BuffersBase::addUnitMixedPathConstraints(Operation *unit,
+                                                   ChannelFilter filter) {
   std::vector<MixedDomainConstraint> constraints;
   const TimingModel *unitModel = timingDB.getModel(unit);
 
@@ -311,7 +294,26 @@ void FPL22Buffers::addUnitMixedPathConstraints(Operation *unit,
   }
 }
 
-void FPL22Buffers::setup() {
+CFDFCUnionBuffers::CFDFCUnionBuffers(GRBEnv &env, FuncInfo &funcInfo,
+                                     const TimingDatabase &timingDB,
+                                     double targetPeriod, CFDFCUnion &cfUnion)
+    : FPL22BuffersBase(env, funcInfo, timingDB, targetPeriod),
+      cfUnion(cfUnion) {
+  if (!unsatisfiable)
+    setup();
+}
+
+CFDFCUnionBuffers::CFDFCUnionBuffers(GRBEnv &env, FuncInfo &funcInfo,
+                                     const TimingDatabase &timingDB,
+                                     double targetPeriod, CFDFCUnion &cfUnion,
+                                     Logger &logger, StringRef milpName)
+    : FPL22BuffersBase(env, funcInfo, timingDB, targetPeriod, logger, milpName),
+      cfUnion(cfUnion) {
+  if (!unsatisfiable)
+    setup();
+}
+
+void CFDFCUnionBuffers::setup() {
   // Signals for which we have variables
   SmallVector<SignalType, 4> signals;
   signals.push_back(SignalType::DATA);
@@ -374,6 +376,103 @@ void FPL22Buffers::setup() {
   std::vector<Value> allChannels;
   llvm::copy(cfUnion.channels, std::back_inserter(allChannels));
   addObjective(allChannels, cfUnion.cfdfcs);
+  markReadyToOptimize();
+}
+
+OutOfCycleBuffers::OutOfCycleBuffers(GRBEnv &env, FuncInfo &funcInfo,
+                                     const TimingDatabase &timingDB,
+                                     double targetPeriod)
+    : FPL22BuffersBase(env, funcInfo, timingDB, targetPeriod) {
+  if (!unsatisfiable)
+    setup();
+}
+
+OutOfCycleBuffers::OutOfCycleBuffers(GRBEnv &env, FuncInfo &funcInfo,
+                                     const TimingDatabase &timingDB,
+                                     double targetPeriod, Logger &logger)
+    : FPL22BuffersBase(env, funcInfo, timingDB, targetPeriod, logger,
+                       "out_of_cycle") {
+  if (!unsatisfiable)
+    setup();
+}
+
+void OutOfCycleBuffers::setup() {
+  // Signals for which we have variables
+  SmallVector<SignalType, 4> signals;
+  signals.push_back(SignalType::DATA);
+  signals.push_back(SignalType::VALID);
+  signals.push_back(SignalType::READY);
+
+  SmallVector<ArrayRef<SignalType>> signalGroups;
+  SmallVector<SignalType> opaqueGroup{SignalType::DATA, SignalType::VALID};
+  SmallVector<SignalType> transparentGroup{SignalType::READY};
+  signalGroups.push_back(opaqueGroup);
+  signalGroups.push_back(transparentGroup);
+
+  // Create the expression for the MILP objective
+  GRBLinExpr objective;
+
+  // Create variables and  add path and elasticity constraints for all channels
+  // covered by the MILP. These are the channels that are not part of any CFDFC
+  // identified in the Handshake function under consideration
+  for (auto [channel, _] : channelProps) {
+    // Ignore channels that are part of at least one CFDFC and which were
+    // already eligible for placement in a previous MILP
+    bool inCycle = false;
+    for (auto [cfdfc, _] : funcInfo.cfdfcs) {
+      if (cfdfc->channels.contains(channel)) {
+        inCycle = true;
+        break;
+      }
+    }
+    if (inCycle)
+      continue;
+
+    // Create channel variables and add custom constraints for the channel
+    addChannelVars(channel, signals);
+    addCustomChannelConstraints(channel);
+
+    // Single-domain path constraints
+    ChannelVars &channelVars = vars.channelVars[channel];
+    GRBVar &dataBuf = channelVars.signalVars[SignalType::DATA].bufPresent;
+    GRBVar &readyBuf = channelVars.signalVars[SignalType::READY].bufPresent;
+    BufferPathDelay oehb(dataBuf, 0.1);
+    BufferPathDelay tehb(readyBuf, 0.1);
+    addChannelPathConstraints(channel, SignalType::DATA, tehb);
+    addChannelPathConstraints(channel, SignalType::VALID, tehb);
+    addChannelPathConstraints(channel, SignalType::READY, oehb);
+
+    // Add elasticity constraints
+    addChannelElasticityConstraints(channel, signalGroups);
+
+    // Add negative terms to MILP objective, penalizing placement of buffers
+    objective -= dataBuf;
+    objective -= readyBuf;
+    objective -= 0.1 * channelVars.bufNumSlots;
+  }
+
+  // Add single-domain and mixed-domain path constraints as well as elasticity
+  // constraints over all units that are not part of any CFDFC
+  for (Operation &unit : funcInfo.funcOp.getOps()) {
+    bool inCycle = false;
+    for (auto [cfdfc, _] : funcInfo.cfdfcs) {
+      if (cfdfc->units.contains(&unit)) {
+        inCycle = true;
+        break;
+      }
+    }
+    if (inCycle)
+      continue;
+
+    addUnitPathConstraints(&unit, SignalType::DATA);
+    addUnitPathConstraints(&unit, SignalType::VALID);
+    addUnitPathConstraints(&unit, SignalType::READY);
+    addUnitMixedPathConstraints(&unit);
+    addUnitElasticityConstraints(&unit);
+  }
+
+  // Set MILP objective and mark it ready to be optimized
+  model.setObjective(objective, GRB_MAXIMIZE);
   markReadyToOptimize();
 }
 

@@ -153,6 +153,9 @@ protected:
 
   /// Whether the MILP was determined to be unsatisfiable during construction.
   bool unsatisfiable = false;
+  /// Large constant strictly greater than the number of units in the Handshake
+  /// function under consideration.
+  unsigned largeCst;
 
   /// Adds channel variables to the MILP model for the provided channel.
   /// Signal-specific variables will be added for the provided signal types
@@ -259,10 +262,6 @@ protected:
   void logResults(DenseMap<Value, PlacementResult> &placement);
 
 private:
-  /// Large constant strictly greater than the number of units in the Handshake
-  /// function under consideration.
-  unsigned largeCst;
-
   /// During object construction, map all the function's channels to their
   /// specific buffering properties, adjusting for buffers within units as
   /// described by the timing models. Fails if the buffering properties of a

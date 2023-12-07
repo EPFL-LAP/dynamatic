@@ -439,13 +439,15 @@ LogicalResult HandshakePlaceBuffersPass::getBufferPlacement(
     // placement decision because each CFDFC union is disjoint from the others
     for (auto [idx, cfUnion] : llvm::enumerate(disjointUnions)) {
       std::string milpName = "cfdfc_placement_" + std::to_string(idx);
-      if (failed(solveMILP<fpl22::FPL22Buffers>(placement, env, info, timingDB,
-                                                targetCP, cfUnion, *logger,
-                                                milpName)))
+      if (failed(solveMILP<fpl22::CFDFCUnionBuffers>(
+              placement, env, info, timingDB, targetCP, cfUnion, *logger,
+              milpName)))
         return failure();
     }
 
-    return success();
+    // Solve last MILP on channels/units that are not part of any CFDFC
+    return solveMILP<fpl22::OutOfCycleBuffers>(placement, env, info, timingDB,
+                                               targetCP, *logger);
   }
 
   llvm_unreachable("unknown algorithm");
