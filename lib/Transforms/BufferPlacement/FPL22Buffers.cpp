@@ -389,9 +389,10 @@ OutOfCycleBuffers::OutOfCycleBuffers(GRBEnv &env, FuncInfo &funcInfo,
 
 OutOfCycleBuffers::OutOfCycleBuffers(GRBEnv &env, FuncInfo &funcInfo,
                                      const TimingDatabase &timingDB,
-                                     double targetPeriod, Logger &logger)
+                                     double targetPeriod, Logger &logger,
+                                     StringRef milpName)
     : FPL22BuffersBase(env, funcInfo, timingDB, targetPeriod, logger,
-                       "out_of_cycle") {
+                       milpName) {
   if (!unsatisfiable)
     setup();
 }

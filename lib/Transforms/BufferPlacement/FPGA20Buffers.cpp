@@ -50,9 +50,9 @@ FPGA20Buffers::FPGA20Buffers(GRBEnv &env, FuncInfo &funcInfo,
 FPGA20Buffers::FPGA20Buffers(GRBEnv &env, FuncInfo &funcInfo,
                              const TimingDatabase &timingDB,
                              double targetPeriod, bool legacyPlacement,
-                             Logger &logger)
+                             Logger &logger, StringRef milpName)
     : BufferPlacementMILP(env, funcInfo, timingDB, targetPeriod, logger,
-                          "placement"),
+                          milpName),
       legacyPlacement(legacyPlacement) {
   if (!unsatisfiable)
     setup();

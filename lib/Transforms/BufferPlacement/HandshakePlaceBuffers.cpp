@@ -408,6 +408,19 @@ static void logCFDFCUnions(FuncInfo &info, Logger &log,
   }
 }
 
+/// Wraps a call to solveMILP and conditionally passes the logger and MILP name
+/// to the MILP's constructor as last arguments if the logger is not null.
+template <typename MILP, typename... Args>
+static inline LogicalResult
+checkLoggerAndSolve(Logger *logger, StringRef milpName,
+                    BufferPlacement &placement, Args &&...args) {
+  if (logger) {
+    return solveMILP<MILP>(placement, std::forward<Args>(args)..., *logger,
+                           milpName);
+  }
+  return solveMILP<MILP>(placement, std::forward<Args>(args)...);
+}
+
 LogicalResult HandshakePlaceBuffersPass::getBufferPlacement(
     FuncInfo &info, TimingDatabase &timingDB, Logger *logger,
     BufferPlacement &placement) {
@@ -421,8 +434,9 @@ LogicalResult HandshakePlaceBuffersPass::getBufferPlacement(
 
   if (algorithm == FPGA20 || algorithm == FPGA20_LEGACY) {
     // Create and solve the MILP
-    return solveMILP<fpga20::FPGA20Buffers>(
-        placement, env, info, timingDB, targetCP, algorithm != FPGA20, *logger);
+    return checkLoggerAndSolve<fpga20::FPGA20Buffers>(
+        logger, "placement", placement, env, info, timingDB, targetCP,
+        algorithm != FPGA20);
   }
   if (algorithm == FPL22) {
     // Create disjoint block unions of all CFDFCs
@@ -439,15 +453,15 @@ LogicalResult HandshakePlaceBuffersPass::getBufferPlacement(
     // placement decision because each CFDFC union is disjoint from the others
     for (auto [idx, cfUnion] : llvm::enumerate(disjointUnions)) {
       std::string milpName = "cfdfc_placement_" + std::to_string(idx);
-      if (failed(solveMILP<fpl22::CFDFCUnionBuffers>(
-              placement, env, info, timingDB, targetCP, cfUnion, *logger,
-              milpName)))
+      if (failed(checkLoggerAndSolve<fpl22::CFDFCUnionBuffers>(
+              logger, milpName, placement, env, info, timingDB, targetCP,
+              cfUnion)))
         return failure();
     }
 
     // Solve last MILP on channels/units that are not part of any CFDFC
-    return solveMILP<fpl22::OutOfCycleBuffers>(placement, env, info, timingDB,
-                                               targetCP, *logger);
+    return checkLoggerAndSolve<fpl22::OutOfCycleBuffers>(
+        logger, "out_of_cycle", placement, env, info, timingDB, targetCP);
   }
 
   llvm_unreachable("unknown algorithm");

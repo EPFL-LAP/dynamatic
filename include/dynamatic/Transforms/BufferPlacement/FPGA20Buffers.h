@@ -62,9 +62,10 @@ public:
 
   /// Achieves the same as the other constructor but additionally logs placement
   /// decisions and achieved throughputs using the provided logger, and dumps
-  /// the MILP model and solution next to the log file.
+  /// the MILP model and solution at the provided name next to the log file.
   FPGA20Buffers(GRBEnv &env, FuncInfo &funcInfo, const TimingDatabase &timingDB,
-                double targetPeriod, bool legacyPlacement, Logger &logger);
+                double targetPeriod, bool legacyPlacement, Logger &logger,
+                StringRef milpName = "placement");
 
 protected:
   /// Interprets the MILP solution to derive buffer placement decisions. Since

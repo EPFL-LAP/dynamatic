@@ -169,10 +169,10 @@ public:
 
   /// Achieves the same as the other constructor but additionally logs placement
   /// decisions and achieved throughputs using the provided logger, and dumps
-  /// the MILP model and solution next to the log file.
+  /// the MILP model and solution at the provided name next to the log file.
   OutOfCycleBuffers(GRBEnv &env, FuncInfo &funcInfo,
                     const TimingDatabase &timingDB, double targetPeriod,
-                    Logger &logger);
+                    Logger &logger, StringRef milpName = "out_of_cycle");
 
 private:
   /// Setups the entire MILP, creating all variables, constraints, and setting
