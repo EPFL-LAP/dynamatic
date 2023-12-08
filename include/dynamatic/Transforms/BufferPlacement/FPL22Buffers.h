@@ -51,22 +51,6 @@ protected:
       : BufferPlacementMILP(env, funcInfo, timingDB, targetPeriod, logger,
                             milpName){};
 
-  /// Temporarily used for channel path constraints. Denotes the potential
-  /// presence of a buffer type that doens't cut the current signal under
-  /// consideration but may add a combinational delay to the channel. This
-  /// should be quickly deprecated for something more formal.
-  struct BufferPathDelay {
-    /// MILP variable denoting the buffer presence of a buffer type on a
-    /// different signal.
-    GRBVar &present;
-    /// Combinational delay (in ns) introduced by the buffer, if present.
-    double delay;
-
-    /// Simple member-by-member constructor.
-    BufferPathDelay(GRBVar &present, double delay = 0.0)
-        : present(present), delay(delay){};
-  };
-
   /// Interprets the MILP solution to derive buffer placement decisions. Since
   /// the MILP cannot encode the placement of both opaque and transparent slots
   /// on a single channel, some "interpretation" of the results is necessary to
@@ -77,15 +61,6 @@ protected:
   /// Adds channel-specific buffering constraints that were parsed from IR
   /// annotations to the Gurobi model.
   void addCustomChannelConstraints(Value channel);
-
-  /// Adds path constraints for a specific signal of the provided channel.
-  /// At the moment these *do not* take into account channel delays as may be
-  /// specified in the channel's buffering properties.
-  ///
-  /// It is only valid to call this method after having added variables for the
-  /// channel to the model.
-  void addChannelPathConstraints(Value channel, SignalType type,
-                                 const BufferPathDelay &otherBuffer);
 
   /// Adds path constraints between pins of the unit's input and output ports in
   /// different timing domains. At the moment the set of mixed-domain

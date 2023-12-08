@@ -130,6 +130,37 @@ public:
                       Logger &logger, StringRef milpName);
 
 protected:
+  /// Represents a list of signals that are buffered together by a single
+  /// buffer type, which is denoted by its (potentially null) timing model.
+  struct BufferingGroup {
+    /// List of signals buffered by the specific buffer. This must contain at
+    /// least one signal type. The first signal in the list is considered the
+    /// "reference" for this group. The ordering of these signals should only
+    /// change the MILP cosmetically.
+    SmallVector<SignalType> signals;
+    /// Buffer's timing model.
+    const TimingModel *bufModel;
+
+    /// Simple member-by-member constructor. At least one signal must be
+    /// provided, otherwise the cosntructor will assert.
+    BufferingGroup(ArrayRef<SignalType> signals, const TimingModel *bufModel)
+        : signals(signals), bufModel(bufModel) {
+      assert(!signals.empty() && "list of signals cannot be empty");
+    }
+
+    /// Returns the reference signals of the group.
+    SignalType getRefSignal() const { return signals.front(); };
+    /// Returns the "other" signals in the group i.e., those that are not the
+    /// reference. The returned array is empty if the group only contains one
+    /// signal.
+    ArrayRef<SignalType> getOtherSignals() const {
+      return ArrayRef<SignalType>(signals).drop_front();
+    };
+
+    /// Returns the combinational delay of the group's buffer for a signal type.
+    double getCombinationalDelay(Value channel, SignalType type) const;
+  };
+
   /// For unit constraints, oracle function determining whether constraints
   /// corresponding to the port should be added to the MILP model.
   using ChannelFilter = const std::function<bool(Value)> &;
@@ -167,6 +198,21 @@ protected:
   /// for each CFDFC channel, and an overall CFDFC's throughput variable.
   void addCFDFCVars(CFDFC &cfdfc);
 
+  /// Adds path constraints for a signal of the channel. The `bufModel` should
+  /// characterize a buffer that cuts the signal i.e., the path constraints
+  /// added to the model will assume that the placement of such a buffer on the
+  /// signal cuts the path with a register. The optional lists of buffers
+  /// `before` and `after` the cutting buffer represent the optional presence of
+  /// other buffer types--respectively, in front of or behind the cutting
+  /// buffer--on the channel that only add a combinational delay to the signal.
+  ///
+  /// It is only valid to call this method after having added channel variables
+  /// for the specific signal to the model.
+  void addChannelPathConstraints(Value channel, SignalType signal,
+                                 const TimingModel *bufModel,
+                                 ArrayRef<BufferingGroup> before = {},
+                                 ArrayRef<BufferingGroup> after = {});
+
   /// Adds path constraints for a specific signal type between the unit's input
   /// and output ports. If the internal path for the signal is combinational, a
   /// constraint is added for every input/output port pair. Otherwise, a
@@ -181,21 +227,20 @@ protected:
   void addUnitPathConstraints(Operation *unit, SignalType type,
                               ChannelFilter filter = nullFilter);
 
-  /// Adds elasticity constraints for the channel. The `signalGroups` argument
-  /// should contain all the signal types with which channel variables for the
-  /// specific channel were added exactly once. Furthermore, these signals
-  /// can be separated in multiple groups to force the MILP to place buffers for
-  /// all signals within each group at the same locations. For example, if one
-  /// can only place two buffer types, one which cuts both the data and valid
-  /// signals and one which cuts the ready signal only, and channel variables
-  /// were created for all those signals, then `signalGroups` should be:
-  /// [ [SignalType::DATA, SignalType::VALID],
-  ///   [SignalType::READY]                   ]
-  /// The order within each group is irrelevant; the resulting constraints will
-  /// be identical modulo a reordering of the terms.
-  void
-  addChannelElasticityConstraints(Value channel,
-                                  ArrayRef<ArrayRef<SignalType>> signalGroups);
+  /// Adds elasticity constraints for the channel. The buffering groups should
+  /// contain all the signal types with which channel variables for the specific
+  /// channel were added exactly once. Groups force the MILP to place buffers
+  /// for all signals within each group at the same locations. For example, if
+  /// one can only place two buffer types, one which cuts both the data and
+  /// valid signals and one which cuts the ready signal only, and channel
+  /// variables were created for all those signals, then one should pass two
+  /// groups: one containing tne SignalType::DATA and SignalType::VALID signal
+  /// types and one containing the SignalType::READY signal only.
+  ///
+  /// The order of signals within each group is irrelevant; the resulting
+  /// constraints will be identical modulo a reordering of the terms.
+  void addChannelElasticityConstraints(Value channel,
+                                       ArrayRef<BufferingGroup> bufGroups);
 
   /// Adds elasticity constraints between the unit's input and output ports. A
   /// constraint is added for every input/output port pair.

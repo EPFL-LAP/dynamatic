@@ -52,6 +52,65 @@ static StringRef getSignalName(SignalType type) {
   }
 }
 
+/// Returns the bitwidth of a channel.
+static unsigned getChannelBitwidth(Value channel) {
+  Type channelType = channel.getType();
+  if (isa<NoneType>(channelType))
+    return 0;
+  if (isa<IntegerType, FloatType>(channelType))
+    return channelType.getIntOrFloatBitWidth();
+  if (isa<IndexType>(channelType))
+    return IndexType::kInternalStorageBitWidth;
+  llvm_unreachable("unsupported channel type");
+}
+
+/// Returns the input and output port delays of the model for a specific signal
+/// type. If the type is `SignalType::DATA`, the channel's bitwidth is used as a
+/// parameter to determine the delays. If the model is nullptr, delays are
+/// assumed to be 0.
+static std::pair<double, double> getPortDelays(Value channel, SignalType signal,
+                                               const TimingModel *model) {
+  if (!model)
+    return {0.0, 0.0};
+
+  double inBufDelay = 0.0, outBufDelay = 0.0;
+  unsigned bitwidth;
+  switch (signal) {
+  case SignalType::DATA:
+    bitwidth = getChannelBitwidth(channel);
+    /// TODO: It's bad to discard these results, needs a safer way of querying
+    /// for these delays
+    (void)model->inputModel.dataDelay.getCeilMetric(bitwidth, inBufDelay);
+    (void)model->outputModel.dataDelay.getCeilMetric(bitwidth, outBufDelay);
+    return {inBufDelay, outBufDelay};
+  case SignalType::VALID:
+    return {model->inputModel.validDelay, model->outputModel.validDelay};
+  case SignalType::READY:
+    return {model->inputModel.readyDelay, model->outputModel.readyDelay};
+  }
+}
+
+double BufferPlacementMILP::BufferingGroup::getCombinationalDelay(
+    Value channel, SignalType type) const {
+  if (!bufModel)
+    return 0.0;
+
+  unsigned bitwidth;
+  double delay = 0.0;
+  switch (type) {
+  case SignalType::DATA:
+    bitwidth = getChannelBitwidth(channel);
+    /// TODO: It's bad to discard this result, needs a safer way of querying for
+    /// this delay
+    (void)bufModel->getTotalDataDelay(bitwidth, delay);
+    return delay;
+  case SignalType::VALID:
+    return bufModel->getTotalValidDelay();
+  case SignalType::READY:
+    return bufModel->getTotalReadyDelay();
+  }
+}
+
 BufferPlacementMILP::BufferPlacementMILP(GRBEnv &env, FuncInfo &funcInfo,
                                          const TimingDatabase &timingDB,
                                          double targetPeriod)
@@ -148,6 +207,60 @@ void BufferPlacementMILP::addCFDFCVars(CFDFC &cfdfc) {
   model.update();
 }
 
+void BufferPlacementMILP::addChannelPathConstraints(
+    Value channel, SignalType signal, const TimingModel *bufModel,
+    ArrayRef<BufferingGroup> before, ArrayRef<BufferingGroup> after) {
+
+  ChannelVars &channelVars = vars.channelVars[channel];
+  double bigCst = targetPeriod * 10;
+
+  // Sum up conditional delays of buffers before the one that cuts the path
+  GRBLinExpr bufsBeforeDelay;
+  for (const BufferingGroup &group : before)
+    bufsBeforeDelay += channelVars.signalVars[group.getRefSignal()].bufPresent *
+                       group.getCombinationalDelay(channel, signal);
+
+  // Sum up conditional delays of buffers after the one that cuts the path
+  GRBLinExpr bufsAfterDelay;
+  for (const BufferingGroup &group : after)
+    bufsAfterDelay += channelVars.signalVars[group.getRefSignal()].bufPresent *
+                      group.getCombinationalDelay(channel, signal);
+
+  ChannelBufProps &props = channelProps[channel];
+  ChannelSignalVars &signalVars = channelVars.signalVars[signal];
+  GRBVar &t1 = signalVars.path.tIn;
+  GRBVar &t2 = signalVars.path.tOut;
+  GRBVar &bufPresent = signalVars.bufPresent;
+  auto [inBufDelay, outBufDelay] = getPortDelays(channel, signal, bufModel);
+
+  // If a buffer is present on the signal's path, then the arrival time at the
+  // buffer's register must be lower than the clock period. The signal must
+  // propagate on the channel through all potential buffers cutting other
+  // signals before its own, and inside its own buffer's input pin logic
+  model.addConstr(t1 + bufsBeforeDelay +
+                          bufPresent * (props.inDelay + inBufDelay) <=
+                      targetPeriod,
+                  "path_channelIn");
+
+  // Arrival time at channel's output must be lower than target clock period
+  model.addConstr(t2 <= targetPeriod, "path_channelOut");
+
+  // If a buffer is present on the signal's path, then the arrival time at the
+  // channel's output must be greater than the propagation time through its own
+  // buffer's output pin logic and all potential buffers cutting other signals
+  // after its own.
+  model.addConstr(outBufDelay + props.outDelay + bufsAfterDelay <= t2,
+                  "path_bufferedChannel");
+
+  // If there are no buffers cutting the signal's path, arrival time at
+  // channel's output must still propagate through entire channel and all
+  // potential buffers cutting through other signals
+  model.addConstr(t1 + props.delay + bufsBeforeDelay + bufsAfterDelay -
+                          bigCst * bufPresent <=
+                      t2,
+                  "path_unbufferedChannel");
+}
+
 void BufferPlacementMILP::addUnitPathConstraints(Operation *unit,
                                                  SignalType type,
                                                  ChannelFilter filter) {
@@ -218,7 +331,7 @@ void BufferPlacementMILP::addUnitPathConstraints(Operation *unit,
 }
 
 void BufferPlacementMILP::addChannelElasticityConstraints(
-    Value channel, ArrayRef<ArrayRef<SignalType>> signalGroups) {
+    Value channel, ArrayRef<BufferingGroup> bufGroups) {
   ChannelVars &channelVars = vars.channelVars[channel];
   GRBVar &tIn = channelVars.elastic.tIn;
   GRBVar &tOut = channelVars.elastic.tOut;
@@ -246,15 +359,15 @@ void BufferPlacementMILP::addChannelElasticityConstraints(
   // Compute the sum of the binary buffer presence over all signals that have
   // different buffers
   GRBLinExpr disjointBufPresentSum;
-  for (ArrayRef<SignalType> group : signalGroups) {
-    assert(!group.empty() && "no signal group should be empty");
-    GRBVar &groupBufPresent = channelVars.signalVars[group.front()].bufPresent;
+  for (const BufferingGroup &group : bufGroups) {
+    GRBVar &groupBufPresent =
+        channelVars.signalVars[group.getRefSignal()].bufPresent;
     disjointBufPresentSum += groupBufPresent;
 
     // For each group, the binary buffer presence variable of different signals
     // must be equal
-    StringRef refName = getSignalName(group.front());
-    for (SignalType sig : group.drop_front()) {
+    StringRef refName = getSignalName(group.getRefSignal());
+    for (SignalType sig : group.getOtherSignals()) {
       StringRef otherName = getSignalName(sig);
       model.addConstr(groupBufPresent == channelVars.signalVars[sig].bufPresent,
                       "elastic_" + refName.str() + "_same_" + otherName.str());

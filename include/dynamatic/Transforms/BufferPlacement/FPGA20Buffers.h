@@ -82,14 +82,6 @@ private:
   /// annotations to the Gurobi model.
   void addCustomChannelConstraints(Value channel);
 
-  /// Adds path constraints for the channel's data signal. These take into
-  /// account channel delays, as may be specified in the channel's buffering
-  /// properties.
-  ///
-  /// It is only valid to call this method after having added variables for the
-  /// channel to the model.
-  void addChannelPathConstraints(Value channel);
-
   /// Setups the entire MILP, creating all variables, constraints, and setting
   /// the system's objective. Called by the constructor in the absence of prior
   /// failures, after which the MILP is ready to be optimized.

@@ -152,72 +152,17 @@ void FPGA20Buffers::addCustomChannelConstraints(Value channel) {
   }
 }
 
-void FPGA20Buffers::addChannelPathConstraints(Value channel) {
-  // Manually get the timing model for buffers
-  const TimingModel *bufModel = timingDB.getModel(OperationName(
-      handshake::BufferOp::getOperationName(), funcInfo.funcOp->getContext()));
-  double bigCst = targetPeriod * 10;
-
-  // Get delays for a buffer that would be placed on this channel
-  double inBufDelay = 0.0, outBufDelay = 0.0, dataBufDelay = 0.0;
-  if (bufModel) {
-    Type channelType = channel.getType();
-    unsigned bitwidth = 0;
-    if (isa<IntegerType, FloatType>(channelType))
-      bitwidth = channelType.getIntOrFloatBitWidth();
-    /// TODO: It's bad to discard these results, needs a safer way of querying
-    /// for these delays
-    (void)bufModel->inputModel.dataDelay.getCeilMetric(bitwidth, inBufDelay);
-    (void)bufModel->outputModel.dataDelay.getCeilMetric(bitwidth, outBufDelay);
-    (void)bufModel->dataDelay.getCeilMetric(bitwidth, dataBufDelay);
-    // Add the input and output port delays to the total buffer delay
-    dataBufDelay += inBufDelay + outBufDelay;
-  }
-
-  ChannelVars &chVars = vars.channelVars[channel];
-  ChannelBufProps &props = channelProps[channel];
-  ChannelSignalVars &dataVars = chVars.signalVars[SignalType::DATA];
-  GRBVar &t1 = dataVars.path.tIn;
-  GRBVar &t2 = dataVars.path.tOut;
-  GRBVar &present = chVars.bufPresent;
-  GRBVar &dataBuf = dataVars.bufPresent;
-
-  // Arrival time at channel's input must be lower than target clock period
-  double inToBufDelay = props.inDelay + inBufDelay;
-  model.addConstr(t1 + present * inToBufDelay <= targetPeriod,
-                  "path_channelInPeriod");
-
-  // Arrival time at channel's output must be lower than target clock period
-  model.addConstr(t2 <= targetPeriod, "path_channelOutPeriod");
-
-  // If there is an opaque buffer, arrival time at channel's output must be
-  // greater than the delay between the buffer's internal register and the
-  // post-buffer channel delay
-  double bufToOutDelay = outBufDelay + props.outDelay;
-  if (bufToOutDelay > 0)
-    model.addConstr(dataBuf * bufToOutDelay <= t2, "path_opaqueChannel");
-
-  // If there is a transparent buffer, arrival time at channel's output must
-  // be greater than at channel's input (+ whole channel and buffer delay)
-  double inToOutDelay = props.inDelay + dataBufDelay + props.outDelay;
-  model.addConstr(t1 + inToOutDelay - bigCst * (dataBuf - present + 1) <= t2,
-                  "path_transparentChannel");
-
-  // If there are no buffers, arrival time at channel's output must be greater
-  // than at channel's input (+ channel delay)
-  model.addConstr(t1 + props.delay - bigCst * present <= t2,
-                  "path_unbufferedChannel");
-}
-
 void FPGA20Buffers::setup() {
   // Signals for which we have variables
   SmallVector<SignalType, 1> signals;
   signals.push_back(SignalType::DATA);
 
-  // Group signals by matching buffer type for elasticty constraints
-  SmallVector<ArrayRef<SignalType>> signalGroups;
-  SmallVector<SignalType> dataGroup{SignalType::DATA};
-  signalGroups.push_back(dataGroup);
+  // Create buffering groups. In this MILP we only care for the data signal
+  SmallVector<BufferingGroup> bufGroups;
+  OperationName bufName = OperationName(handshake::BufferOp::getOperationName(),
+                                        funcInfo.funcOp->getContext());
+  const TimingModel *dataBufModel = timingDB.getModel(bufName);
+  bufGroups.emplace_back(ArrayRef<SignalType>{SignalType::DATA}, dataBufModel);
 
   // Create channel variables and constraints
   std::vector<Value> allChannels;
@@ -230,8 +175,8 @@ void FPGA20Buffers::setup() {
     // that are not adjacent to a memory interface
     if (!channel.getDefiningOp<handshake::MemoryOpInterface>() &&
         !isa<handshake::MemoryOpInterface>(*channel.getUsers().begin())) {
-      addChannelPathConstraints(channel);
-      addChannelElasticityConstraints(channel, signalGroups);
+      addChannelPathConstraints(channel, SignalType::DATA, dataBufModel);
+      addChannelElasticityConstraints(channel, bufGroups);
     }
   }
 
