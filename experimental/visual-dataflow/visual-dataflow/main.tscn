@@ -1,10 +1,12 @@
-[gd_scene load_steps=6 format=3 uid="uid://ridjgqca7ygu"]
+[gd_scene load_steps=8 format=3 uid="uid://ridjgqca7ygu"]
 
 [ext_resource type="Script" path="res://main.gd" id="1_k08iy"]
 [ext_resource type="Script" path="res://camera.gd" id="2_kag3i"]
 [ext_resource type="PackedScene" uid="uid://1ukyu4yhubi7" path="res://legend.tscn" id="3_s2xdb"]
 [ext_resource type="PackedScene" uid="uid://baatvintvoqat" path="res://menu.tscn" id="4_3q8o8"]
 [ext_resource type="PackedScene" uid="uid://chdvrqi6hnrga" path="res://timeline.tscn" id="5_q76pr"]
+[ext_resource type="Texture2D" uid="uid://mbr8ahmrqnqu" path="res://images.png" id="7_58v1f"]
+[ext_resource type="Texture2D" uid="uid://dlwxu43t5lh2q" path="res://DALL·E 2023-12-01 15.44.23 - Design a flat logo for 'Dynamatic', a VHDL circuitry software, on a white background using a red color palette. The design should be simple and minima.png" id="7_gecun"]
 
 [node name="VisualDataflow" type="VisualDataflow"]
 offset_right = 40.0
@@ -22,6 +24,16 @@ offset_left = -150.0
 offset_top = -150.0
 offset_right = 150.0
 offset_bottom = 150.0
+
+[node name="Images" type="Sprite2D" parent="CanvasLayer/Menu"]
+position = Vector2(151, 616)
+scale = Vector2(0.332914, 0.332914)
+texture = ExtResource("7_58v1f")
+
+[node name="Dall·e2023-12-0115_44_23-DesignAFlatLogoFor\'dynamatic\',AVhdlCircuitrySoftware,OnAWhiteBackgroundUsingARedColorPalette_TheDesignShouldBeSimpleAndMinima" type="Sprite2D" parent="CanvasLayer/Menu"]
+position = Vector2(159, -87)
+scale = Vector2(0.354004, 0.354004)
+texture = ExtResource("7_gecun")
 
 [node name="Timeline" parent="CanvasLayer" instance=ExtResource("5_q76pr")]
 

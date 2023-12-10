@@ -124,11 +124,11 @@ void VisualDataflow::drawGraph() {
 
     Label *label = memnew(Label);
     label->set_text(bb.label.c_str());
-    label->set_position(
-        Vector2(bb.boundries.at(0) + 5,
-                -bb.labelPosition.second - bb.labelSize.first * 35));
+    label->set_position(Vector2(bb.boundries.at(0) + 5, -bb.labelPosition.second - bb.labelSize.first * 35));
     label->add_theme_color_override("font_color", Color(0, 0, 0));
     label->add_theme_font_size_override("font_size", 12);
+    
+
     add_child(label);
   }
 

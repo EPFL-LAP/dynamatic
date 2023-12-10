@@ -23,6 +23,10 @@ window/stretch/mode="canvas_items"
 window/stretch/aspect="expand"
 window/per_pixel_transparency/allowed=true
 
+[gui]
+
+theme/default_font_subpixel_positioning=0
+
 [rendering]
 
 environment/defaults/default_clear_color=Color(0.996078, 1, 1, 1)
