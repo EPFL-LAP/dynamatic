@@ -582,8 +582,7 @@ void BufferPlacementMILP::forEachIOPair(
   }
 }
 
-void BufferPlacementMILP::logResults(
-    DenseMap<Value, PlacementResult> &placement) {
+void BufferPlacementMILP::logResults(BufferPlacement &placement) {
   assert(logger && "no logger was provided");
   mlir::raw_indented_ostream &os = **logger;
 

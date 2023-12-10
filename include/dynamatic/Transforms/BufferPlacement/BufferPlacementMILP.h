@@ -304,7 +304,7 @@ protected:
 
   /// Logs placement decisisons and achieved throughputs after MILP
   /// optimization. Asserts if the logger is nullptr.
-  void logResults(DenseMap<Value, PlacementResult> &placement);
+  void logResults(BufferPlacement &placement);
 
 private:
   /// During object construction, map all the function's channels to their

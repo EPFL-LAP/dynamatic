@@ -34,7 +34,7 @@ struct PlacementResult {
 };
 
 /// Maps channels to buffer placement decisions.
-using BufferPlacement = DenseMap<Value, PlacementResult>;
+using BufferPlacement = llvm::MapVector<Value, PlacementResult>;
 
 /// Helper datatype for buffer placement. Simply aggregates all the information
 /// related to the Handshake function under optimization.
