@@ -30,18 +30,17 @@ namespace visual_dataflow {
 
 using CycleNb = int;
 using GraphId = int;
+using Data = std::string;
 
 /// State of an edge of the graph
-enum State { UNDEFINED, READY, EMPTY, VALID, VALID_READY };
+enum State { UNDEFINED, ACCEPT, IDLE, STALL, TRANSFER };
 
-struct BB
-{
+struct BB {
   std::vector<float> boundries;
   std::string label;
   std::pair<float, float> labelPosition;
   std::pair<float, float> labelSize;
 };
-
 
 /// Implements the logic to create and update a Graph
 class Graph {
@@ -61,13 +60,14 @@ public:
       std::pair<std::pair<NodeId, size_t>, std::pair<NodeId, size_t>> &edgeInfo,
       EdgeId &edgeId);
   /// Given a specific clock cycle, adds a pair (edge, state) to the map
-  void addEdgeState(CycleNb cycle, EdgeId edgeId, State state);
+  void addEdgeState(CycleNb cycle, EdgeId edgeId, State state, Data data);
   /// Returns all the Nodes in the Graph
   std::map<NodeId, GraphNode> getNodes();
   /// Returns all the edges in the Graph
   std::vector<GraphEdge> getEdges();
 
-  std::map<CycleNb, std::map<EdgeId, State>> getCycleEdgeStates();
+  std::map<CycleNb, std::map<EdgeId, std::pair<State, Data>>>
+  getCycleEdgeStates();
   void dupilcateEdgeStates(CycleNb from, CycleNb until);
   /// Adds a BB to the Graph
   void addBB(BB bb);
@@ -80,7 +80,7 @@ private:
   /// Nodes of the graph mapped with their corresponding node identifier
   std::map<NodeId, GraphNode> nodes;
   /// State of each edge given a specific clock cycle
-  std::map<CycleNb, std::map<EdgeId, State>> cycleEdgeStates;
+  std::map<CycleNb, std::map<EdgeId, std::pair<State, Data>>> cycleEdgeStates;
   /// Map of the edges of the graph :
   /// ((src node id, outPort number), (dest node id, inPort number)) -> edge id
   std::map<std::pair<std::pair<NodeId, size_t>, std::pair<NodeId, size_t>>,

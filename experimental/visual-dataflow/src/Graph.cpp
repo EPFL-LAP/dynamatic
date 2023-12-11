@@ -12,6 +12,7 @@
 #include "Graph.h"
 #include <functional>
 #include <iostream>
+#include <utility>
 
 using namespace mlir;
 using namespace dynamatic::experimental::visual_dataflow;
@@ -47,17 +48,21 @@ LogicalResult Graph::getEdgeId(
   return failure();
 }
 
-void Graph::addEdgeState(CycleNb cycleNb, EdgeId edgeId, State state) {
+void Graph::addEdgeState(CycleNb cycleNb, EdgeId edgeId, State state,
+                         Data data) {
   if (cycleNb == 0) {
-    std::map<EdgeId, State> mapEdgeState = cycleEdgeStates[0];
-    mapEdgeState.insert(std::pair(edgeId, state));
+    std::map<EdgeId, std::pair<State, Data>> mapEdgeState = cycleEdgeStates[0];
+    std::pair<State, Data> statePair = std::pair(state, data);
+    mapEdgeState.insert(std::pair(edgeId, statePair));
     cycleEdgeStates[cycleNb] = mapEdgeState;
   } else {
-    cycleEdgeStates[cycleNb].at(edgeId) = state;
+    std::pair<State, Data> statePair = std::pair(state, data);
+    cycleEdgeStates[cycleNb].at(edgeId) = statePair;
   }
 }
 
-std::map<CycleNb, std::map<EdgeId, State>> Graph::getCycleEdgeStates() {
+std::map<CycleNb, std::map<EdgeId, std::pair<State, Data>>>
+Graph::getCycleEdgeStates() {
   return cycleEdgeStates;
 }
 
@@ -66,10 +71,11 @@ std::map<NodeId, GraphNode> Graph::getNodes() { return nodes; }
 std::vector<GraphEdge> Graph::getEdges() { return edges; }
 
 void Graph::dupilcateEdgeStates(CycleNb from, CycleNb until) {
-  const std::map<EdgeId, State> &initialMapEdgeState = cycleEdgeStates[from];
+  const std::map<EdgeId, std::pair<State, Data>> &initialMapEdgeState =
+      cycleEdgeStates[from];
 
   for (CycleNb i = from + 1; i <= until; i++) {
-    std::map<EdgeId, State> newMapEdgeState;
+    std::map<EdgeId, std::pair<State, Data>> newMapEdgeState;
 
     for (const auto &pair : initialMapEdgeState) {
       newMapEdgeState[pair.first] = pair.second;
@@ -79,10 +85,6 @@ void Graph::dupilcateEdgeStates(CycleNb from, CycleNb until) {
   }
 }
 
+void Graph::addBB(BB bb) { this->bbs.push_back(bb); }
 
-void Graph::addBB(BB bb){
-  this->bbs.push_back(bb);
-}
-
-std::vector<BB> Graph::getBBs(){ return bbs; }
-
+std::vector<BB> Graph::getBBs() { return bbs; }

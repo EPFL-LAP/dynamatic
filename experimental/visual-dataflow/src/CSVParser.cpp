@@ -13,6 +13,7 @@
 
 #include "CSVParser.h"
 #include "Graph.h"
+#include "mlir/Support/LogicalResult.h"
 #include <iostream>
 
 using namespace mlir;
@@ -25,20 +26,20 @@ static LogicalResult findState(const std::string &stateString, State &state) {
     state = UNDEFINED;
     return success();
   }
-  if (stateString == "ready") {
-    state = READY;
+  if (stateString == "accept") {
+    state = ACCEPT;
     return success();
   }
-  if (stateString == "empty") {
-    state = EMPTY;
+  if (stateString == "idle") {
+    state = IDLE;
     return success();
   }
-  if (stateString == "valid") {
-    state = VALID;
+  if (stateString == "stall") {
+    state = STALL;
     return success();
   }
-  if (stateString == "valid+ready") {
-    state = VALID_READY;
+  if (stateString == "transfer") {
+    state = TRANSFER;
     return success();
   }
   // Error unknown state for the edge.
@@ -65,7 +66,7 @@ LogicalResult dynamatic::experimental::visual_dataflow::processCSVLine(
     CycleNb *currCycle) {
 
   // Jump the first 2 lines and empty line (Not needed)
-  if (lineIndex == 0 || lineIndex == 1 || line.empty())
+  if (lineIndex == 0 || line.empty())
     return success();
 
   std::string token;
@@ -89,13 +90,14 @@ LogicalResult dynamatic::experimental::visual_dataflow::processCSVLine(
 
   std::istringstream iss(line);
 
-  // Parse all 6 columns
+  // Parse all 7 columns
   int cycleNb, inPort, outPort;
-  std::string src, dst, stateString;
+  std::string src, dst, stateString, data;
 
   if (parseTokenInt(iss, cycleNb) || parseTokenString(iss, src) ||
       parseTokenInt(iss, outPort) || parseTokenString(iss, dst) ||
-      parseTokenInt(iss, inPort) || parseTokenString(iss, stateString)) {
+      parseTokenInt(iss, inPort) || parseTokenString(iss, stateString) ||
+      parseTokenString(iss, data)) {
     return failure();
   }
 
@@ -119,7 +121,7 @@ LogicalResult dynamatic::experimental::visual_dataflow::processCSVLine(
     return failure();
   }
 
-  graph.addEdgeState(cycleNb, edgeId, state);
+  graph.addEdgeState(cycleNb, edgeId, state, data);
 
   return success();
 }
