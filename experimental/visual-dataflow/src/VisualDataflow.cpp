@@ -39,8 +39,11 @@
 #include "llvm/Support/CommandLine.h"
 #include "llvm/Support/InitLLVM.h"
 #include "llvm/Support/SourceMgr.h"
+#include <cstdint>
+#include <godot_cpp/classes/area2d.hpp>
 #include <godot_cpp/classes/canvas_item.hpp>
 #include <godot_cpp/classes/control.hpp>
+#include <godot_cpp/classes/node2d.hpp>
 #include <godot_cpp/core/math.hpp>
 #include <godot_cpp/core/memory.hpp>
 #include <godot_cpp/variant/color.hpp>
@@ -62,6 +65,8 @@ void VisualDataflow::_bind_methods() {
                        &VisualDataflow::previousCycle);
   ClassDB::bind_method(D_METHOD("changeCycle", "cycleNb"),
                        &VisualDataflow::changeCycle);
+  ClassDB::bind_method(D_METHOD("changeStateColor", "state", "color"),
+                       &VisualDataflow::changeStateColor);
 }
 
 VisualDataflow::VisualDataflow() = default;
@@ -124,18 +129,22 @@ void VisualDataflow::drawGraph() {
 
     Label *label = memnew(Label);
     label->set_text(bb.label.c_str());
-    label->set_position(Vector2(bb.boundries.at(0) + 5, -bb.labelPosition.second - bb.labelSize.first * 35));
+    label->set_position(
+        Vector2(bb.boundries.at(0) + 5,
+                -bb.labelPosition.second - bb.labelSize.first * 35));
     label->add_theme_color_override("font_color", Color(0, 0, 0));
     label->add_theme_font_size_override("font_size", 12);
-    
 
     add_child(label);
   }
 
   for (auto &node : graph.getNodes()) {
+
     std::pair<float, float> center = node.second.getPosition();
     float width = node.second.getWidth() * 70;
     float height = 35;
+
+    Area2D *area2D = memnew(Area2D);
     Polygon2D *p = memnew(Polygon2D);
     PackedVector2Array points;
     Line2D *outline = memnew(Line2D);
@@ -198,8 +207,8 @@ void VisualDataflow::drawGraph() {
     centerContainer->set_position(
         Vector2(center.first - width / 2, -center.second - height / 2));
     centerContainer->add_child(label);
-    add_child(p);
-    add_child(centerContainer);
+    area2D->add_child(p);
+    area2D->add_child(centerContainer);
 
     if (node.second.getDashed()) {
       points.push_back(firstPoint);
@@ -223,7 +232,7 @@ void VisualDataflow::drawGraph() {
           pointsArray.append(lineEnd);
           line->set_points(pointsArray);
 
-          add_child(line);
+          area2D->add_child(line);
 
           currentLength += 5 + 5;
         }
@@ -235,11 +244,14 @@ void VisualDataflow::drawGraph() {
 
     outline->set_default_color(Color(0, 0, 0, 1));
     outline->set_width(1);
-    add_child(outline);
+    area2D->add_child(outline);
+
+    add_child(area2D);
   }
 
   for (auto &edge : graph.getEdges()) {
 
+    Area2D *area2D = memnew(Area2D);
     std::vector<Line2D *> lines;
     Vector2 prev;
     Vector2 last;
@@ -278,7 +290,7 @@ void VisualDataflow::drawGraph() {
           pointsArray.append(lineEnd);
           line->set_points(pointsArray);
 
-          add_child(line);
+          area2D->add_child(line);
           lines.push_back(line);
 
           currentLength += 5 + 5;
@@ -290,7 +302,7 @@ void VisualDataflow::drawGraph() {
       line->set_points(linePoints);
       line->set_default_color(Color(1, 1, 1, 1));
       line->set_width(1);
-      add_child(line);
+      area2D->add_child(line);
       lines.push_back(line);
     }
 
@@ -322,8 +334,10 @@ void VisualDataflow::drawGraph() {
     }
     arrowHead->set_polygon(points);
     arrowHead->set_color(Color(0, 0, 0, 1));
-    add_child(arrowHead);
+    area2D->add_child(arrowHead);
     edgeIdToArrowHead[edge.getEdgeId()] = arrowHead;
+
+    add_child(area2D);
   }
 }
 
@@ -361,21 +375,27 @@ void VisualDataflow::changeCycle(int64_t cycleNb) {
 void VisualDataflow::setEdgeColor(State state, std::vector<Line2D *> lines,
                                   Polygon2D *arrowHead) {
   Color color = Color(0, 0, 0, 1);
-  if (state == UNDEFINED) {
-    color = Color(0.8, 0, 0, 1);
-  } else if (state == READY) {
-    color = Color(0, 0, 0.8, 1);
-  } else if (state == EMPTY) {
-    color = Color(0, 0, 0, 1);
-  } else if (state == VALID) {
-    color = Color(0, 0.8, 0, 1);
-  } else if (state == VALID_READY) {
-    color = Color(0, 0.8, 0.8, 1);
-  }
+  color = stateColors.at(state);
 
   for (auto &line : lines) {
     line->set_default_color(color);
   }
 
   arrowHead->set_color(color);
+}
+
+void VisualDataflow::changeStateColor(int64_t state, Color color) {
+  State stateEnum = (State)state;
+
+  stateColors.at(state) = color;
+
+  for (auto &edgeState : graph.getCycleEdgeStates().at(cycle)) {
+    EdgeId edgeId = edgeState.first;
+    State edgeStateEnum = edgeState.second;
+    if (edgeStateEnum == stateEnum) {
+      std::vector<Line2D *> lines = edgeIdToLines[edgeId];
+      Polygon2D *arrowHead = edgeIdToArrowHead[edgeId];
+      setEdgeColor(stateEnum, lines, arrowHead);
+    }
+  }
 }

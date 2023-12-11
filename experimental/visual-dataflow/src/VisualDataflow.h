@@ -20,7 +20,9 @@
 #include <godot_cpp/classes/h_slider.hpp>
 #include <godot_cpp/classes/label.hpp>
 #include <godot_cpp/classes/line2d.hpp>
+#include <godot_cpp/variant/color.hpp>
 #include <godot_cpp/variant/string.hpp>
+#include <godot_cpp/variant/vector2.hpp>
 #include <vector>
 
 using namespace dynamatic::experimental::visual_dataflow;
@@ -37,6 +39,11 @@ private:
 
   std::map<EdgeId, std::vector<Line2D *>> edgeIdToLines;
   std::map<EdgeId, Polygon2D *> edgeIdToArrowHead;
+  std::vector<Color> stateColors = {
+      Color(0.8, 0.0, 0.0, 1.0), Color(0.0, 0.0, 0.0, 1.0),
+      Color(0.0, 0.0, 0.8, 1.0), Color(0.0, 0.8, 0.0, 1.0),
+      Color(0.0, 0.8, 0.8, 1.0),
+  };
 
   // Godot object references
   Label *cycleLabel;
@@ -60,6 +67,7 @@ public:
   void nextCycle();
   void previousCycle();
   void changeCycle(int64_t cycleNb);
+  void changeStateColor(int64_t state, Color color);
 };
 
 } // namespace godot

@@ -17,6 +17,12 @@ var time_interval = 1.0;
 var dotFile = ""
 var csvFile = ""
 
+var color0 = Color(0.8, 0, 0, 1)
+var color1 = Color(0, 0, 0, 1)
+var color2 = Color(0, 0, 0.8, 1)
+var color3 = Color(0, 0.8, 0, 1)
+var color4 = Color(0, 0.8, 0.8, 1)
+
 func _ready():
 	legend.hide()
 	timeline.hide()
@@ -75,4 +81,43 @@ func _on_file_dialog_dot_file_selected(path):
 func _on_file_dialog_csv_file_selected(path):
 	csvFile = path
 	csvInput.text = path
-	
+
+
+func _on_color_picker_button_popup_closed():
+	changeStateColor(0, color0)
+
+
+func _on_color_picker_button_2_popup_closed():
+	changeStateColor(1, color1)
+
+
+func _on_color_picker_button_3_popup_closed():
+	changeStateColor(2, color2)
+
+
+func _on_color_picker_button_4_popup_closed():
+	changeStateColor(3, color3)
+
+
+func _on_color_picker_button_5_popup_closed():
+	changeStateColor(4, color4)
+
+
+func _on_color_picker_button_color_changed(color):
+	color0 = color
+
+
+func _on_color_picker_button_2_color_changed(color):
+	color1 = color
+
+
+func _on_color_picker_button_3_color_changed(color):
+	color2 = color
+
+
+func _on_color_picker_button_4_color_changed(color):
+	color3 = color
+
+
+func _on_color_picker_button_5_color_changed(color):
+	color4 = color

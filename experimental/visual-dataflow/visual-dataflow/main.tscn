@@ -1,12 +1,10 @@
-[gd_scene load_steps=8 format=3 uid="uid://ridjgqca7ygu"]
+[gd_scene load_steps=6 format=3 uid="uid://ridjgqca7ygu"]
 
 [ext_resource type="Script" path="res://main.gd" id="1_k08iy"]
 [ext_resource type="Script" path="res://camera.gd" id="2_kag3i"]
 [ext_resource type="PackedScene" uid="uid://1ukyu4yhubi7" path="res://legend.tscn" id="3_s2xdb"]
 [ext_resource type="PackedScene" uid="uid://baatvintvoqat" path="res://menu.tscn" id="4_3q8o8"]
 [ext_resource type="PackedScene" uid="uid://chdvrqi6hnrga" path="res://timeline.tscn" id="5_q76pr"]
-[ext_resource type="Texture2D" uid="uid://mbr8ahmrqnqu" path="res://images.png" id="7_58v1f"]
-[ext_resource type="Texture2D" uid="uid://dlwxu43t5lh2q" path="res://DALL·E 2023-12-01 15.44.23 - Design a flat logo for 'Dynamatic', a VHDL circuitry software, on a white background using a red color palette. The design should be simple and minima.png" id="7_gecun"]
 
 [node name="VisualDataflow" type="VisualDataflow"]
 offset_right = 40.0
@@ -28,12 +26,10 @@ offset_bottom = 150.0
 [node name="Images" type="Sprite2D" parent="CanvasLayer/Menu"]
 position = Vector2(151, 616)
 scale = Vector2(0.332914, 0.332914)
-texture = ExtResource("7_58v1f")
 
 [node name="Dall·e2023-12-0115_44_23-DesignAFlatLogoFor\'dynamatic\',AVhdlCircuitrySoftware,OnAWhiteBackgroundUsingARedColorPalette_TheDesignShouldBeSimpleAndMinima" type="Sprite2D" parent="CanvasLayer/Menu"]
 position = Vector2(159, -87)
 scale = Vector2(0.354004, 0.354004)
-texture = ExtResource("7_gecun")
 
 [node name="Timeline" parent="CanvasLayer" instance=ExtResource("5_q76pr")]
 
@@ -48,22 +44,6 @@ offset_bottom = 177.0
 [node name="EdgeLegendTitle" parent="CanvasLayer/Legend/GeneralLegend/Panel/EdgeLegend" index="0"]
 modulate = Color(1, 1, 1, 1)
 text = "Edge Legend:"
-
-[node name="Line2D" parent="CanvasLayer/Legend/GeneralLegend/Panel/EdgeLegend/EdgeComponents/Colors" index="0"]
-position = Vector2(6.10352e-05, -40)
-points = PackedVector2Array(5, 26, 39.2488, 26, 61.1084, 26)
-
-[node name="Line2D2" parent="CanvasLayer/Legend/GeneralLegend/Panel/EdgeLegend/EdgeComponents/Colors" index="1"]
-position = Vector2(6.10352e-05, 80)
-
-[node name="Line2D3" parent="CanvasLayer/Legend/GeneralLegend/Panel/EdgeLegend/EdgeComponents/Colors" index="2"]
-position = Vector2(6.10352e-05, 51)
-
-[node name="Line2D4" parent="CanvasLayer/Legend/GeneralLegend/Panel/EdgeLegend/EdgeComponents/Colors" index="3"]
-position = Vector2(6.10352e-05, 20)
-
-[node name="Line2D5" parent="CanvasLayer/Legend/GeneralLegend/Panel/EdgeLegend/EdgeComponents/Colors" index="4"]
-position = Vector2(6.10352e-05, -9)
 
 [node name="Undefined" parent="CanvasLayer/Legend/GeneralLegend/Panel/EdgeLegend/EdgeComponents/Definitions" index="0"]
 modulate = Color(1, 1, 1, 1)
@@ -80,6 +60,36 @@ modulate = Color(1, 1, 1, 1)
 [node name="Valid_Ready" parent="CanvasLayer/Legend/GeneralLegend/Panel/EdgeLegend/EdgeComponents/Definitions" index="4"]
 modulate = Color(1, 1, 1, 1)
 
+[node name="ColorPicker" parent="CanvasLayer/Legend" index="1"]
+offset_left = -466.0
+offset_top = 41.0
+offset_right = -204.0
+offset_bottom = 609.0
+
+[node name="ColorPicker2" parent="CanvasLayer/Legend" index="2"]
+offset_left = -466.0
+offset_top = 41.0
+offset_right = -204.0
+offset_bottom = 609.0
+
+[node name="ColorPicker3" parent="CanvasLayer/Legend" index="3"]
+offset_left = -466.0
+offset_top = 41.0
+offset_right = -204.0
+offset_bottom = 609.0
+
+[node name="ColorPicker4" parent="CanvasLayer/Legend" index="4"]
+offset_left = -466.0
+offset_top = 41.0
+offset_right = -204.0
+offset_bottom = 609.0
+
+[node name="ColorPicker5" parent="CanvasLayer/Legend" index="5"]
+offset_left = -466.0
+offset_top = 41.0
+offset_right = -204.0
+offset_bottom = 609.0
+
 [connection signal="file_selected" from="CanvasLayer/Menu/FileDialogDot" to="." method="_on_file_dialog_dot_file_selected"]
 [connection signal="file_selected" from="CanvasLayer/Menu/FileDialogCsv" to="." method="_on_file_dialog_csv_file_selected"]
 [connection signal="pressed" from="CanvasLayer/Menu/VBoxContainer/DrawGraph" to="." method="_on_draw_graph_pressed"]
@@ -91,6 +101,16 @@ modulate = Color(1, 1, 1, 1)
 [connection signal="mouse_exited" from="CanvasLayer/Timeline/MarginContainer/VBoxContainer/HSlider" to="Camera2D" method="_on_h_slider_mouse_exited"]
 [connection signal="value_changed" from="CanvasLayer/Timeline/MarginContainer/VBoxContainer/HSlider" to="." method="_on_h_slider_value_changed"]
 [connection signal="toggled" from="CanvasLayer/Legend/GeneralLegend/ShowLegend" to="." method="_on_show_legend_toggled"]
+[connection signal="color_changed" from="CanvasLayer/Legend/GeneralLegend/Panel/EdgeLegend/EdgeComponents/Colors/ColorPickerButton" to="." method="_on_color_picker_button_color_changed"]
+[connection signal="popup_closed" from="CanvasLayer/Legend/GeneralLegend/Panel/EdgeLegend/EdgeComponents/Colors/ColorPickerButton" to="." method="_on_color_picker_button_popup_closed"]
+[connection signal="color_changed" from="CanvasLayer/Legend/GeneralLegend/Panel/EdgeLegend/EdgeComponents/Colors/ColorPickerButton2" to="." method="_on_color_picker_button_2_color_changed"]
+[connection signal="popup_closed" from="CanvasLayer/Legend/GeneralLegend/Panel/EdgeLegend/EdgeComponents/Colors/ColorPickerButton2" to="." method="_on_color_picker_button_2_popup_closed"]
+[connection signal="color_changed" from="CanvasLayer/Legend/GeneralLegend/Panel/EdgeLegend/EdgeComponents/Colors/ColorPickerButton3" to="." method="_on_color_picker_button_3_color_changed"]
+[connection signal="popup_closed" from="CanvasLayer/Legend/GeneralLegend/Panel/EdgeLegend/EdgeComponents/Colors/ColorPickerButton3" to="." method="_on_color_picker_button_3_popup_closed"]
+[connection signal="color_changed" from="CanvasLayer/Legend/GeneralLegend/Panel/EdgeLegend/EdgeComponents/Colors/ColorPickerButton4" to="." method="_on_color_picker_button_4_color_changed"]
+[connection signal="popup_closed" from="CanvasLayer/Legend/GeneralLegend/Panel/EdgeLegend/EdgeComponents/Colors/ColorPickerButton4" to="." method="_on_color_picker_button_4_popup_closed"]
+[connection signal="color_changed" from="CanvasLayer/Legend/GeneralLegend/Panel/EdgeLegend/EdgeComponents/Colors/ColorPickerButton5" to="." method="_on_color_picker_button_5_color_changed"]
+[connection signal="popup_closed" from="CanvasLayer/Legend/GeneralLegend/Panel/EdgeLegend/EdgeComponents/Colors/ColorPickerButton5" to="." method="_on_color_picker_button_5_popup_closed"]
 
 [editable path="CanvasLayer/Menu"]
 [editable path="CanvasLayer/Timeline"]
