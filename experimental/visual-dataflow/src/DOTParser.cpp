@@ -116,7 +116,7 @@ dynamatic::experimental::visual_dataflow::processDOT(std::ifstream &file,
       currentNode.setShape(shape);
     }
 
-    if (insideNodeDefinition && line.find("style") != std::string::npos){
+    if (insideNodeDefinition && line.find("style=dashed") != std::string::npos){
       currentNode.setDashed(true);
     }
 
