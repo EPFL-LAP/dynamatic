@@ -337,6 +337,14 @@ void VisualDataflow::drawGraph() {
     area2D->add_child(arrowHead);
     edgeIdToArrowHead[edge.getEdgeId()] = arrowHead;
 
+    Label *label = memnew(Label);
+    label->set_text("");
+    label->set_position(prev);
+    label->add_theme_color_override("font_color", Color(0, 0, 0));
+    label->add_theme_font_size_override("font_size", 10);
+    add_child(label);
+    edgeIdToData[edge.getEdgeId()] = label;
+
     add_child(area2D);
   }
 }
@@ -368,6 +376,7 @@ void VisualDataflow::changeCycle(int64_t cycleNb) {
         std::vector<Line2D *> lines = edgeIdToLines[edgeId];
         Polygon2D *arrowHead = edgeIdToArrowHead[edgeId];
         setEdgeColor(state, lines, arrowHead);
+        edgeIdToData.at(edgeId)->set_text(edgeState.second.second.c_str());
       }
     }
   }
