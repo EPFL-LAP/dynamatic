@@ -13,7 +13,8 @@ anchors_preset = 1
 anchor_left = 1.0
 anchor_right = 1.0
 offset_left = -218.0
-offset_bottom = 211.0
+offset_right = 1.0
+offset_bottom = 221.0
 grow_horizontal = 0
 
 [node name="ShowLegend" type="Button" parent="GeneralLegend"]
@@ -46,31 +47,34 @@ layout_mode = 2
 
 [node name="Colors" type="VBoxContainer" parent="GeneralLegend/Panel/EdgeLegend/EdgeComponents"]
 layout_mode = 2
-size_flags_horizontal = 0
-size_flags_vertical = 4
 
 [node name="ColorPickerButton" type="ColorPickerButton" parent="GeneralLegend/Panel/EdgeLegend/EdgeComponents/Colors"]
 custom_minimum_size = Vector2(60, 20)
 layout_mode = 2
+size_flags_vertical = 3
 color = Color(1, 0, 0, 1)
 
 [node name="ColorPickerButton2" type="ColorPickerButton" parent="GeneralLegend/Panel/EdgeLegend/EdgeComponents/Colors"]
 custom_minimum_size = Vector2(60, 20)
 layout_mode = 2
+size_flags_vertical = 3
 
 [node name="ColorPickerButton3" type="ColorPickerButton" parent="GeneralLegend/Panel/EdgeLegend/EdgeComponents/Colors"]
 custom_minimum_size = Vector2(60, 20)
 layout_mode = 2
+size_flags_vertical = 3
 color = Color(0, 0, 0.878431, 1)
 
 [node name="ColorPickerButton4" type="ColorPickerButton" parent="GeneralLegend/Panel/EdgeLegend/EdgeComponents/Colors"]
 custom_minimum_size = Vector2(60, 20)
 layout_mode = 2
+size_flags_vertical = 3
 color = Color(0, 0.8, 0, 1)
 
 [node name="ColorPickerButton5" type="ColorPickerButton" parent="GeneralLegend/Panel/EdgeLegend/EdgeComponents/Colors"]
 custom_minimum_size = Vector2(60, 20)
 layout_mode = 2
+size_flags_vertical = 3
 color = Color(0, 0.827451, 0.827451, 1)
 
 [node name="Definitions" type="VBoxContainer" parent="GeneralLegend/Panel/EdgeLegend/EdgeComponents"]
@@ -83,66 +87,66 @@ layout_mode = 2
 size_flags_horizontal = 0
 text = "Undefined"
 
-[node name="Empty" type="Label" parent="GeneralLegend/Panel/EdgeLegend/EdgeComponents/Definitions"]
+[node name="Accept" type="Label" parent="GeneralLegend/Panel/EdgeLegend/EdgeComponents/Definitions"]
 modulate = Color(0, 0, 0, 1)
 layout_mode = 2
 size_flags_horizontal = 0
-text = "Empty"
+text = "Accept"
 
-[node name="Ready" type="Label" parent="GeneralLegend/Panel/EdgeLegend/EdgeComponents/Definitions"]
+[node name="Idle" type="Label" parent="GeneralLegend/Panel/EdgeLegend/EdgeComponents/Definitions"]
 modulate = Color(0, 0, 0, 1)
 layout_mode = 2
 size_flags_horizontal = 0
-text = "Ready"
+text = "Idle"
 
-[node name="Valid" type="Label" parent="GeneralLegend/Panel/EdgeLegend/EdgeComponents/Definitions"]
+[node name="Stall" type="Label" parent="GeneralLegend/Panel/EdgeLegend/EdgeComponents/Definitions"]
 modulate = Color(0, 0, 0, 1)
 layout_mode = 2
 size_flags_horizontal = 0
-text = "Valid"
+text = "Stall"
 
-[node name="Valid_Ready" type="Label" parent="GeneralLegend/Panel/EdgeLegend/EdgeComponents/Definitions"]
+[node name="Transfer" type="Label" parent="GeneralLegend/Panel/EdgeLegend/EdgeComponents/Definitions"]
 modulate = Color(0, 0, 0, 1)
 layout_mode = 2
 size_flags_horizontal = 0
-text = "Valid_Ready"
+text = "Transfer"
 
 [node name="ColorPicker" type="ColorPicker" parent="."]
 visible = false
 layout_mode = 2
-offset_left = -506.0
-offset_top = 21.0
-offset_right = -224.0
-offset_bottom = 589.0
+offset_left = -482.0
+offset_top = 33.0
+offset_right = -212.0
+offset_bottom = 601.0
 
 [node name="ColorPicker2" type="ColorPicker" parent="."]
 visible = false
 layout_mode = 2
-offset_left = -506.0
-offset_top = 21.0
-offset_right = -224.0
-offset_bottom = 589.0
+offset_left = -482.0
+offset_top = 33.0
+offset_right = -212.0
+offset_bottom = 601.0
 
 [node name="ColorPicker3" type="ColorPicker" parent="."]
 visible = false
 layout_mode = 2
-offset_left = -506.0
-offset_top = 21.0
-offset_right = -224.0
-offset_bottom = 589.0
+offset_left = -482.0
+offset_top = 33.0
+offset_right = -212.0
+offset_bottom = 601.0
 
 [node name="ColorPicker4" type="ColorPicker" parent="."]
 visible = false
 layout_mode = 2
-offset_left = -506.0
-offset_top = 21.0
-offset_right = -224.0
-offset_bottom = 589.0
+offset_left = -482.0
+offset_top = 33.0
+offset_right = -212.0
+offset_bottom = 601.0
 
 [node name="ColorPicker5" type="ColorPicker" parent="."]
 visible = false
 layout_mode = 2
-offset_left = -506.0
-offset_top = 21.0
-offset_right = -224.0
-offset_bottom = 589.0
+offset_left = -482.0
+offset_top = 33.0
+offset_right = -212.0
+offset_bottom = 601.0

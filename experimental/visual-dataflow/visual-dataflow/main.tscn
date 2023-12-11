@@ -61,34 +61,34 @@ modulate = Color(1, 1, 1, 1)
 modulate = Color(1, 1, 1, 1)
 
 [node name="ColorPicker" parent="CanvasLayer/Legend" index="1"]
-offset_left = -466.0
-offset_top = 41.0
-offset_right = -204.0
-offset_bottom = 609.0
+offset_left = -434.0
+offset_top = 57.0
+offset_right = -188.0
+offset_bottom = 625.0
 
 [node name="ColorPicker2" parent="CanvasLayer/Legend" index="2"]
-offset_left = -466.0
-offset_top = 41.0
-offset_right = -204.0
-offset_bottom = 609.0
+offset_left = -434.0
+offset_top = 57.0
+offset_right = -188.0
+offset_bottom = 625.0
 
 [node name="ColorPicker3" parent="CanvasLayer/Legend" index="3"]
-offset_left = -466.0
-offset_top = 41.0
-offset_right = -204.0
-offset_bottom = 609.0
+offset_left = -434.0
+offset_top = 57.0
+offset_right = -188.0
+offset_bottom = 625.0
 
 [node name="ColorPicker4" parent="CanvasLayer/Legend" index="4"]
-offset_left = -466.0
-offset_top = 41.0
-offset_right = -204.0
-offset_bottom = 609.0
+offset_left = -434.0
+offset_top = 57.0
+offset_right = -188.0
+offset_bottom = 625.0
 
 [node name="ColorPicker5" parent="CanvasLayer/Legend" index="5"]
-offset_left = -466.0
-offset_top = 41.0
-offset_right = -204.0
-offset_bottom = 609.0
+offset_left = -434.0
+offset_top = 57.0
+offset_right = -188.0
+offset_bottom = 625.0
 
 [connection signal="file_selected" from="CanvasLayer/Menu/FileDialogDot" to="." method="_on_file_dialog_dot_file_selected"]
 [connection signal="file_selected" from="CanvasLayer/Menu/FileDialogCsv" to="." method="_on_file_dialog_csv_file_selected"]
