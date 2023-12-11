@@ -24,13 +24,10 @@ offset_top = -150.0
 offset_right = 150.0
 offset_bottom = 150.0
 
-[node name="Images" type="Sprite2D" parent="CanvasLayer/Menu"]
-position = Vector2(151, 616)
-scale = Vector2(0.332914, 0.332914)
-
-[node name="Dall·e2023-12-0115_44_23-DesignAFlatLogoFor\'dynamatic\',AVhdlCircuitrySoftware,OnAWhiteBackgroundUsingARedColorPalette_TheDesignShouldBeSimpleAndMinima" type="Sprite2D" parent="CanvasLayer/Menu"]
-position = Vector2(159, -87)
-scale = Vector2(0.354004, 0.354004)
+[node name="Images2" type="Sprite2D" parent="CanvasLayer/Menu"]
+position = Vector2(151, 575)
+scale = Vector2(0.334171, 0.334171)
+texture = ExtResource("7_58v1f")
 
 [node name="Timeline" parent="CanvasLayer" instance=ExtResource("5_q76pr")]
 
@@ -90,11 +87,6 @@ offset_left = -418.0
 offset_top = 65.0
 offset_right = -180.0
 offset_bottom = 633.0
-
-[node name="Images" type="Sprite2D" parent="."]
-position = Vector2(961, 965)
-scale = Vector2(0.334171, 0.334171)
-texture = ExtResource("7_58v1f")
 
 [connection signal="file_selected" from="CanvasLayer/Menu/FileDialogDot" to="." method="_on_file_dialog_dot_file_selected"]
 [connection signal="file_selected" from="CanvasLayer/Menu/FileDialogCsv" to="." method="_on_file_dialog_csv_file_selected"]
