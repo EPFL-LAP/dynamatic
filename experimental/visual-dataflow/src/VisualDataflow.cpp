@@ -360,10 +360,11 @@ void VisualDataflow::changeCycle(int64_t cycleNb) {
     cycleSlider->set_value(cycle);
 
     if (graph.getCycleEdgeStates().count(cycle)) {
-      std::map<EdgeId, State> edgeStates = graph.getCycleEdgeStates().at(cycle);
+      std::map<EdgeId, std::pair<State, Data>> edgeStates =
+          graph.getCycleEdgeStates().at(cycle);
       for (auto &edgeState : edgeStates) {
         EdgeId edgeId = edgeState.first;
-        State state = edgeState.second;
+        State state = edgeState.second.first;
         std::vector<Line2D *> lines = edgeIdToLines[edgeId];
         Polygon2D *arrowHead = edgeIdToArrowHead[edgeId];
         setEdgeColor(state, lines, arrowHead);
@@ -391,7 +392,7 @@ void VisualDataflow::changeStateColor(int64_t state, Color color) {
 
   for (auto &edgeState : graph.getCycleEdgeStates().at(cycle)) {
     EdgeId edgeId = edgeState.first;
-    State edgeStateEnum = edgeState.second;
+    State edgeStateEnum = edgeState.second.first;
     if (edgeStateEnum == stateEnum) {
       std::vector<Line2D *> lines = edgeIdToLines[edgeId];
       Polygon2D *arrowHead = edgeIdToArrowHead[edgeId];
