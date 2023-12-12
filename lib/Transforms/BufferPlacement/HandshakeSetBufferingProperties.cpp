@@ -20,10 +20,10 @@
 #include "dynamatic/Transforms/BufferPlacement/HandshakeSetBufferingProperties.h"
 #include "circt/Dialect/Handshake/HandshakeDialect.h"
 #include "circt/Dialect/Handshake/HandshakeOps.h"
-#include "circt/Dialect/Handshake/HandshakePasses.h"
 #include "dynamatic/Support/Handshake.h"
 #include "dynamatic/Transforms/BufferPlacement/BufferingSupport.h"
 #include "dynamatic/Transforms/BufferPlacement/HandshakePlaceBuffers.h"
+#include "dynamatic/Transforms/HandshakeMaterialize.h"
 #include "mlir/IR/Value.h"
 #include "llvm/ADT/STLExtras.h"
 #include "llvm/ADT/TypeSwitch.h"
@@ -115,8 +115,8 @@ struct HandshakeSetBufferingPropertiesPass
     // Add properties to channels inside each function
     for (handshake::FuncOp funcOp : modOp.getOps<handshake::FuncOp>()) {
       // Buffer placement requires that all values are used exactly once
-      if (failed(verifyAllValuesHasOneUse(funcOp))) {
-        funcOp.emitOpError() << "Not all values are used exactly once";
+      if (failed(verifyIRMaterialized(funcOp))) {
+        funcOp.emitOpError() << ERR_NON_MATERIALIZED_FUNC;
         return signalPassFailure();
       }
       setFPGA20Properties(funcOp);

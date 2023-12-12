@@ -15,7 +15,6 @@
 #include "dynamatic/Transforms/BufferPlacement/HandshakePlaceBuffers.h"
 #include "circt/Dialect/Handshake/HandshakeDialect.h"
 #include "circt/Dialect/Handshake/HandshakeOps.h"
-#include "circt/Dialect/Handshake/HandshakePasses.h"
 #include "dynamatic/Analysis/NameAnalysis.h"
 #include "dynamatic/Support/Logging.h"
 #include "dynamatic/Support/LogicBB.h"
@@ -23,6 +22,7 @@
 #include "dynamatic/Transforms/BufferPlacement/CFDFC.h"
 #include "dynamatic/Transforms/BufferPlacement/FPGA20Buffers.h"
 #include "dynamatic/Transforms/BufferPlacement/FPL22Buffers.h"
+#include "dynamatic/Transforms/HandshakeMaterialize.h"
 #include "experimental/Support/StdProfiler.h"
 #include "mlir/Dialect/Arith/IR/Arith.h"
 #include "mlir/Dialect/Func/IR/FuncOps.h"
@@ -199,8 +199,8 @@ LogicalResult HandshakePlaceBuffersPass::checkFuncInvariants(FuncInfo &info) {
 
   // Verify that the IR is in a valid state for buffer placement
   // Buffer placement requires that all values are used exactly once
-  if (failed(verifyAllValuesHasOneUse(funcOp)))
-    return funcOp.emitOpError() << "Not all values are used exactly once";
+  if (failed(verifyIRMaterialized(funcOp)))
+    return funcOp.emitOpError() << ERR_NON_MATERIALIZED_FUNC;
 
   // Perform a number of verifications to make sure that the Handshake function
   // whose information is passed as argument is valid for buffer placement

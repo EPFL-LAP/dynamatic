@@ -18,9 +18,9 @@
 #include "circt/Dialect/HW/HWTypes.h"
 #include "circt/Dialect/Handshake/HandshakeDialect.h"
 #include "circt/Dialect/Handshake/HandshakeOps.h"
-#include "circt/Dialect/Handshake/HandshakePasses.h"
 #include "dynamatic/Conversion/PassDetails.h"
 #include "dynamatic/Transforms/HandshakeConcretizeIndexType.h"
+#include "dynamatic/Transforms/HandshakeMaterialize.h"
 #include "mlir/Dialect/Arith/IR/Arith.h"
 #include "mlir/Dialect/MemRef/IR/MemRef.h"
 #include "mlir/IR/BuiltinTypes.h"
@@ -921,12 +921,8 @@ public:
     handshake::FuncOp funcOp = *functions.begin();
 
     // Check that some preconditions are met before doing anything
-    if (failed(verifyAllValuesHasOneUse(funcOp))) {
-      funcOp.emitOpError()
-          << "Lowering to netlist requires that all values in the IR are used "
-             "exactly once. Run the --handshake-materialize-forks-sinks pass "
-             "before to insert forks and sinks in the IR and make every "
-             "value used exactly once.";
+    if (failed(verifyIRMaterialized(funcOp))) {
+      funcOp.emitOpError() << ERR_NON_MATERIALIZED_FUNC;
       return signalPassFailure();
     }
     if (failed(verifyAllIndexConcretized(funcOp))) {

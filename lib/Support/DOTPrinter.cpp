@@ -14,12 +14,12 @@
 
 #include "dynamatic/Support/DOTPrinter.h"
 #include "circt/Dialect/Handshake/HandshakeOps.h"
-#include "circt/Dialect/Handshake/HandshakePasses.h"
 #include "dynamatic/Analysis/NameAnalysis.h"
 #include "dynamatic/Conversion/PassDetails.h"
 #include "dynamatic/Support/LogicBB.h"
 #include "dynamatic/Support/TimingModels.h"
 #include "dynamatic/Transforms/HandshakeConcretizeIndexType.h"
+#include "dynamatic/Transforms/HandshakeMaterialize.h"
 #include "mlir/Dialect/Arith/IR/Arith.h"
 #include "mlir/IR/BuiltinAttributes.h"
 #include "mlir/IR/BuiltinTypes.h"
@@ -555,15 +555,17 @@ static bool isBitModBetweenBlocks(Operation *op) {
 /// Dynamatic's buffer placement tool.
 static void patchUpIRForLegacyBuffers(handshake::FuncOp funcOp) {
   // Remove the BB attribute of all forks "between basic blocks"
-  for (auto forkOp : funcOp.getOps<handshake::ForkOp>()) {
+  for (Operation &forkOp : funcOp.getOps()) {
+    if (!isa<handshake::ForkOp, handshake::LazyForkOp>(forkOp))
+      continue;
     // Only operate on forks which belong to a basic block
-    std::optional<unsigned> optForkBB = getLogicBB(forkOp);
+    std::optional<unsigned> optForkBB = getLogicBB(&forkOp);
     if (!optForkBB.has_value())
       continue;
     unsigned forkBB = optForkBB.value();
 
     // Backtrack through extension operations
-    Value val = forkOp.getOperand();
+    Value val = forkOp.getOperand(0);
     while (Operation *defOp = val.getDefiningOp())
       if (isa<arith::ExtSIOp, arith::ExtUIOp>(defOp))
         val = defOp->getOperand(0);
@@ -579,10 +581,10 @@ static void patchUpIRForLegacyBuffers(handshake::FuncOp funcOp) {
     };
 
     if (isa_and_nonnull<handshake::ConditionalBranchOp>(val.getDefiningOp()) ||
-        llvm::any_of(forkOp->getResults(), isMergeInDiffBlock))
+        llvm::any_of(forkOp.getResults(), isMergeInDiffBlock))
       // Fork is located after a branch in the same block or before a merge-like
       // operation in a different block
-      forkOp->removeAttr(BB_ATTR);
+      forkOp.removeAttr(BB_ATTR);
   }
 }
 
@@ -790,6 +792,8 @@ LogicalResult DOTPrinter::annotateNode(Operation *op,
             return info;
           })
           .Case<handshake::ForkOp>([&](auto) { return NodeInfo("Fork"); })
+          .Case<handshake::LazyForkOp>(
+              [&](auto) { return NodeInfo("LazyFork"); })
           .Case<handshake::SourceOp>([&](auto) {
             auto info = NodeInfo("Source");
             info.stringAttr["out"] = getIOFromValues(op->getResults(), "out");
@@ -1192,13 +1196,8 @@ LogicalResult DOTPrinter::print(mlir::ModuleOp mod,
   if (inLegacyMode()) {
     // In legacy mode, the IR must respect certain additional constraints for it
     // to be compatible with legacy Dynamatic
-    if (failed(verifyAllValuesHasOneUse(funcOp)))
-      return funcOp.emitOpError()
-             << "In legacy mode, all values in the IR must have exactly one "
-                "use to ensure that the DOT is compatible with legacy "
-                "Dynamatic. Run the --handshake-materialize-forks-sinks pass "
-                "before to insert forks and sinks in the IR and make every "
-                "value used exactly once.";
+    if (failed(verifyIRMaterialized(funcOp)))
+      return funcOp.emitOpError() << ERR_NON_MATERIALIZED_FUNC;
     if (failed(verifyAllIndexConcretized(funcOp)))
       return funcOp.emitOpError()
              << "In legacy mode, all index types in the IR must be concretized "
