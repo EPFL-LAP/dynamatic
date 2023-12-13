@@ -226,11 +226,11 @@ HandshakeExecuter::HandshakeExecuter(circt::handshake::FuncOp &func,
     // (Temporary)
     // Inititialize all channels 
     for (auto value : op->getOperands()) 
-      if (circuitState.getState(value) != DataflowState::VALID)
-        circuitState.channelMap[value] = { DataflowState::NONE, std::nullopt };
-    
-      
-
+      if (!circuitState.channelMap[value].isValid) {
+        circuitState.channelMap[value].isValid = false;
+        circuitState.channelMap[value].isReady = false;
+        circuitState.channelMap[value].data = std::nullopt;
+      }
   });
 
   assert(

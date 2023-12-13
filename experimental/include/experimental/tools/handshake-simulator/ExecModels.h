@@ -50,6 +50,8 @@ enum class DataflowState {
 struct ChannelState {
   /// The state of the channel
   DataflowState state;
+  bool isReady;
+  bool isValid;
   /// The data held by the channel
   std::optional<llvm::Any> data;
 };
@@ -60,6 +62,8 @@ using ChannelMap = llvm::DenseMap<mlir::Value, ChannelState>;
 struct CircuitState {
   /// Maps each value to a state
   ChannelMap channelMap;
+
+  /// ------- STATE MANAGEMENT ------- ///
 
   /// Stores a value in a channel, and sets its state to VALID.
   void storeValue(mlir::Value channel, std::optional<llvm::Any> data);
@@ -78,7 +82,18 @@ struct CircuitState {
   inline llvm::Any getData(mlir::Value channel);
 
   /// Returns the DataflowState of the channel
-  DataflowState getState(mlir::Value channel);
+  inline bool isNone(mlir::Value channel);
+
+  /// ------- CYCLE MANAGEMENT -------- ///
+
+  /// 'Maps' multi-cycle operations to their 'rising edge'
+  llvm::DenseMap<circt::Operation, bool> cycleMap;
+
+  /// Returns true if it is the first rising edge encounters
+  inline bool onRisingEdge(circt::Operation& op);
+
+  /// Reset all rising edges states
+  void resetRisingEdges();
 };
 
 //--- Execution Models -------------------------------------------------------//
