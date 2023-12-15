@@ -39,6 +39,7 @@ private:
 
   std::map<EdgeId, std::vector<Line2D *>> edgeIdToLines;
   std::map<EdgeId, Polygon2D *> edgeIdToArrowHead;
+  std::map<EdgeId, Label *> edgeIdToData;
   std::vector<Color> stateColors = {
       Color(0.8, 0.0, 0.0, 1.0), Color(0.0, 0.0, 0.0, 1.0),
       Color(0.0, 0.0, 0.8, 1.0), Color(0.0, 0.8, 0.0, 1.0),
