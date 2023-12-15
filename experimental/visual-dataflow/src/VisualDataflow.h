@@ -15,6 +15,7 @@
 
 #include "Graph.h"
 #include "GraphEdge.h"
+#include "GraphNode.h"
 #include "godot_cpp/classes/control.hpp"
 #include "godot_cpp/classes/polygon2d.hpp"
 #include <godot_cpp/classes/h_slider.hpp>
@@ -40,6 +41,8 @@ private:
   std::map<EdgeId, std::vector<Line2D *>> edgeIdToLines;
   std::map<EdgeId, Polygon2D *> edgeIdToArrowHead;
   std::map<EdgeId, Label *> edgeIdToData;
+  std::map<NodeId, PackedVector2Array> nodeIdToGodoPos;
+  std::map<NodeId, Polygon2D *> nodeIdToPolygon;
   std::vector<Color> stateColors = {
       Color(0.8, 0.0, 0.0, 1.0), Color(0.0, 0.0, 0.0, 1.0),
       Color(0.0, 0.0, 0.8, 1.0), Color(0.0, 0.8, 0.0, 1.0),
@@ -69,6 +72,7 @@ public:
   void previousCycle();
   void changeCycle(int64_t cycleNb);
   void changeStateColor(int64_t state, Color color);
+  void onClick(Vector2 position);
 };
 
 } // namespace godot

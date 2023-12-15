@@ -5,7 +5,7 @@
 [ext_resource type="PackedScene" uid="uid://1ukyu4yhubi7" path="res://legend.tscn" id="3_s2xdb"]
 [ext_resource type="PackedScene" uid="uid://baatvintvoqat" path="res://menu.tscn" id="4_3q8o8"]
 [ext_resource type="PackedScene" uid="uid://chdvrqi6hnrga" path="res://timeline.tscn" id="5_q76pr"]
-[ext_resource type="Texture2D" uid="uid://b8ja66i463u8x" path="res://images.png" id="7_58v1f"]
+[ext_resource type="Texture2D" uid="uid://o2ydpas71ct0" path="res://images.png" id="7_58v1f"]
 
 [node name="VisualDataflow" type="VisualDataflow"]
 offset_right = 40.0
@@ -47,34 +47,34 @@ text = "Edge Legend:"
 modulate = Color(0.854902, 0.854902, 0.854902, 1)
 
 [node name="ColorPicker" parent="CanvasLayer/Legend" index="1"]
-offset_left = -450.0
-offset_top = 49.0
-offset_right = -196.0
-offset_bottom = 617.0
+offset_left = -410.0
+offset_top = 69.0
+offset_right = -176.0
+offset_bottom = 637.0
 
 [node name="ColorPicker2" parent="CanvasLayer/Legend" index="2"]
-offset_left = -450.0
-offset_top = 49.0
-offset_right = -196.0
-offset_bottom = 617.0
+offset_left = -410.0
+offset_top = 69.0
+offset_right = -176.0
+offset_bottom = 637.0
 
 [node name="ColorPicker3" parent="CanvasLayer/Legend" index="3"]
-offset_left = -450.0
-offset_top = 49.0
-offset_right = -196.0
-offset_bottom = 617.0
+offset_left = -410.0
+offset_top = 69.0
+offset_right = -176.0
+offset_bottom = 637.0
 
 [node name="ColorPicker4" parent="CanvasLayer/Legend" index="4"]
-offset_left = -450.0
-offset_top = 49.0
-offset_right = -196.0
-offset_bottom = 617.0
+offset_left = -410.0
+offset_top = 69.0
+offset_right = -176.0
+offset_bottom = 637.0
 
 [node name="ColorPicker5" parent="CanvasLayer/Legend" index="5"]
-offset_left = -450.0
-offset_top = 49.0
-offset_right = -196.0
-offset_bottom = 617.0
+offset_left = -410.0
+offset_top = 69.0
+offset_right = -176.0
+offset_bottom = 637.0
 
 [connection signal="file_selected" from="CanvasLayer/Menu/FileDialogDot" to="." method="_on_file_dialog_dot_file_selected"]
 [connection signal="file_selected" from="CanvasLayer/Menu/FileDialogCsv" to="." method="_on_file_dialog_csv_file_selected"]

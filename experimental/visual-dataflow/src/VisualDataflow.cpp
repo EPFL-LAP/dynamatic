@@ -67,6 +67,8 @@ void VisualDataflow::_bind_methods() {
                        &VisualDataflow::changeCycle);
   ClassDB::bind_method(D_METHOD("changeStateColor", "state", "color"),
                        &VisualDataflow::changeStateColor);
+  ClassDB::bind_method(D_METHOD("onClick", "position"),
+                       &VisualDataflow::onClick);
 }
 
 VisualDataflow::VisualDataflow() = default;
@@ -152,11 +154,16 @@ void VisualDataflow::drawGraph() {
 
     if (node.second.getShape() == "diamond") {
       firstPoint = Vector2(center.first, -center.second + height / 2);
-      points.push_back(Vector2(center.first, -center.second + height / 2));
-      points.push_back(Vector2(center.first + width / 2, -center.second));
-      points.push_back(Vector2(center.first, -center.second - height / 2));
-      points.push_back(Vector2(center.first - width / 2, -center.second));
+      Vector2 pt1 = Vector2(center.first, -center.second + height / 2);
+      Vector2 pt2 = Vector2(center.first + width / 2, -center.second);
+      Vector2 pt3 = Vector2(center.first, -center.second - height / 2);
+      Vector2 pt4 = Vector2(center.first - width / 2, -center.second);
+      points.push_back(pt1);
+      points.push_back(pt2);
+      points.push_back(pt3);
+      points.push_back(pt4);
       p->set_polygon(points);
+
     } else if (node.second.getShape() == "oval") {
       // Code for generating oval points
       int numPoints = 20; // Adjust this for smoother ovals
@@ -172,6 +179,14 @@ void VisualDataflow::drawGraph() {
     } else {
       firstPoint =
           Vector2(center.first - width / 2, -center.second + height / 2);
+      Vector2 pt1 =
+          Vector2(center.first - width / 2, -center.second + height / 2);
+      Vector2 pt2 =
+          Vector2(center.first + width / 2, -center.second + height / 2);
+      Vector2 pt3 =
+          Vector2(center.first + width / 2, -center.second - height / 2);
+      Vector2 pt4 =
+          Vector2(center.first - width / 2, -center.second - height / 2);
       points.push_back(
           Vector2(center.first - width / 2, -center.second + height / 2));
       points.push_back(
@@ -181,6 +196,13 @@ void VisualDataflow::drawGraph() {
       points.push_back(
           Vector2(center.first - width / 2, -center.second - height / 2));
       p->set_polygon(points);
+
+      PackedVector2Array nodePoints;
+      nodePoints.append(pt1);
+      nodePoints.append(pt2);
+      nodePoints.append(pt3);
+      nodePoints.append(pt4);
+      nodeIdToGodoPos[node.first] = nodePoints;
     }
 
     // Set color and add to parent (common for all shapes)
@@ -209,6 +231,8 @@ void VisualDataflow::drawGraph() {
     centerContainer->add_child(label);
     area2D->add_child(p);
     area2D->add_child(centerContainer);
+
+    nodeIdToPolygon[node.first] = p;
 
     if (node.second.getDashed()) {
       points.push_back(firstPoint);
@@ -420,6 +444,18 @@ void VisualDataflow::changeStateColor(int64_t state, Color color) {
       std::vector<Line2D *> lines = edgeIdToLines[edgeId];
       Polygon2D *arrowHead = edgeIdToArrowHead[edgeId];
       setEdgeColor(stateEnum, lines, arrowHead);
+    }
+  }
+}
+
+void VisualDataflow::onClick(Vector2 position) {
+  for (auto &elem : nodeIdToGodoPos) {
+
+    PackedVector2Array points = elem.second;
+
+    if (position.x >= points[0].x && position.x <= points[1].x &&
+        position.y >= points[0].y && position.y <= points[2].y) {
+      nodeIdToPolygon[elem.first]->set_color(Color(0, 0, 0));
     }
   }
 }
