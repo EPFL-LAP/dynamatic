@@ -35,6 +35,7 @@
 #include "dynamatic/Support/TimingModels.h"
 #include "mlir/IR/Attributes.h"
 #include "mlir/IR/MLIRContext.h"
+#include "mlir/IR/Value.h"
 #include "mlir/Support/LLVM.h"
 #include "llvm/ADT/StringRef.h"
 #include "llvm/Support/JSON.h"
@@ -246,10 +247,19 @@ private:
   LogicalResult parseOprdAnnotations(const json::Value &topValue,
                                      json::Path path);
 
+  /// Parses path annotations, for Louis.
+  LogicalResult parsePathAnnotations(const json::Value &topValue,
+                                     json::Path path);
+
   /// Looks for the operation referenced by the JSON object in the IR. `object`
   /// must contain a key "operation-name" whose value is the unique operation
   /// name to look for. Reports an error and returns nullptr on failure.
   Operation *findOperation(const json::Object &object, json::Path path);
+
+  /// Looks for the operation referenced by the JSON object in the IR. Special
+  /// for parsePathAnnotations.
+  Operation *findPathOperation(const json::Object &object, json::Path path,
+                               StringRef attrName, StringLiteral err);
 
   /// Sets an attribute of the template type and of the provided name on the
   /// operation. The `value` should be the "attribute-data" key's value in the
@@ -384,6 +394,103 @@ BackAnnotatePass::parseOprdAnnotations(const json::Value &topValue,
   }
 
   return success();
+}
+
+LogicalResult
+BackAnnotatePass::parsePathAnnotations(const json::Value &topValue,
+                                       json::Path path) {
+  // Try to get the "operands" array
+  const json::Array *pathsArray =
+      getAnnotationArray(topValue, KEY_OPERANDS, path, ERR_EXPECTED_OPERANDS);
+  if (!pathsArray)
+    return failure();
+
+  // Initialize the path
+  json::Path arrayPath = path.field("paths");
+
+  // Loop over the operand annotations
+  for (auto [idx, pathAnnotations] : llvm::enumerate(*pathsArray)) {
+    json::Path jsonPath = arrayPath.index(idx);
+
+    // Every operand annotation must be an object
+    const json::Object *opObject = pathAnnotations.getAsObject();
+    if (!opObject) {
+      jsonPath.report(ERR_EXPECTED_OBJECT);
+      return failure();
+    }
+
+    // Try to find the operations which characterize the path
+    Operation *srcOp =
+        findPathOperation(*opObject, jsonPath, "source-operation-name",
+                          "expected \"source-operation-name\" key");
+    Operation *dstOp =
+        findPathOperation(*opObject, jsonPath, "destination-operation-name",
+                          "expected \"destination-operation-name\" key");
+    if (!srcOp || !dstOp)
+      return failure();
+
+    // Path annotation must reference a result index, an operand index, and an
+    // attribute
+    std::string attrType;
+    unsigned srcResultIdx, dstOprdIdx;
+    if (!fromJSONUnderKey(*opObject, "source-result-idx", srcResultIdx,
+                          jsonPath, "expected \"source-result-idx\" key") ||
+        !fromJSONUnderKey(*opObject, "destination-operand-idx", dstOprdIdx,
+                          jsonPath,
+                          "expected \"destination-operand-idx\" key") ||
+        !fromJSONUnderKey(*opObject, KEY_ATTR_TYPE, attrType, jsonPath,
+                          ERR_EXPECTED_ATTR_TYPE))
+      return failure();
+
+    // Check if the source result index makes sense
+    // if (srcOp->getNumResults() <= srcResultIdx) {
+    //   jsonPath.field(KEY_OPRD_IDX).report(ERR_EXPECTED_OPRD);
+    //   return failure();
+    // }
+    // Value srcResult = srcOp->getResult(srcResultIdx);
+
+    // Check if the destination operand index makes sense
+    if (srcOp->getNumOperands() <= dstOprdIdx) {
+      jsonPath.field(KEY_OPRD_IDX).report(ERR_EXPECTED_OPRD);
+      return failure();
+    }
+    OpOperand &dstOperand = dstOp->getOpOperand(dstOprdIdx);
+
+    // Data key must exist
+    const json::Value *dataValue = opObject->get(KEY_DATA);
+    json::Path dataPath = jsonPath.field(KEY_DATA);
+    if (!dataValue) {
+      dataPath.report(ERR_EXPECTED_DATA);
+      return failure();
+    }
+
+    // Try to decode and set the attribute on the operation
+    if (attrType == ATTR_TYPE_BUFFERING) {
+      if (failed(setOprdAttribute<handshake::ChannelBufPropsAttr>(
+              dstOperand, *dataValue, dataPath)))
+        return failure();
+    }
+  }
+
+  return success();
+}
+
+Operation *BackAnnotatePass::findPathOperation(const json::Object &object,
+                                               json::Path path,
+                                               StringRef attrName,
+                                               StringLiteral err) {
+  // Annotation must reference an operation name
+  std::string opName;
+  if (!fromJSONUnderKey(object, attrName, opName, path, err))
+    return nullptr;
+
+  // Try to find the operation with the referenced name in the IR
+  Operation *op = getAnalysis<NameAnalysis>().getOp(opName);
+  if (!op) {
+    path.field(KEY_OPNAME).report(ERR_EXPECTED_OP);
+    return nullptr;
+  }
+  return op;
 }
 
 Operation *BackAnnotatePass::findOperation(const json::Object &object,
