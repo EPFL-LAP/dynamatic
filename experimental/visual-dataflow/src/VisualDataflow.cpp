@@ -386,7 +386,21 @@ void VisualDataflow::setEdgeColor(State state, std::vector<Line2D *> lines,
 }
 
 void VisualDataflow::changeStateColor(int64_t state, Color color) {
-  State stateEnum = (State)state;
+  State stateEnum;
+  if (state == 0) {
+    stateEnum = State::UNDEFINED;
+  } else if (state == 1) {
+    stateEnum = State::ACCEPT;
+  } else if (state == 2) {
+    stateEnum = State::IDLE;
+  } else if (state == 3) {
+    stateEnum = State::STALL;
+  } else if (state == 4) {
+    stateEnum = State::TRANSFER;
+  } else {
+    UtilityFunctions::printerr("Invalid state");
+    return;
+  }
 
   stateColors.at(state) = color;
 
