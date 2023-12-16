@@ -378,4 +378,25 @@ def RemovePolygeistAttributes : DynamaticPass<"remove-polygeist-attributes"> {
   let constructor = "dynamatic::createRemovePolygeistAttributes()";
 }
 
+
+
+//===----------------------------------------------------------------------===//
+// Hardcoded Passes
+//===----------------------------------------------------------------------===//
+
+
+// Passes for calling hardcoded speculation placements from the CLI/Front end
+
+def SpeculationFir : DynamaticPass<"speculation-fir"> {
+  let summary = "Place the hardcoded speculative units for the FIR benchmark";
+  let description = [{
+    Places the hardcoded speculative units for the FIR benchmarks. 
+    This allows evaluating several different hardcoded examples without needing to
+    recompile the code based on the setup they need.
+    
+  }];
+  let constructor = "dynamatic::speculation::placeSpeculativeUnitsFir()";
+}
+
+
 #endif // DYNAMATIC_TRANSFORMS_PASSES_TD
