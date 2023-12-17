@@ -58,6 +58,7 @@ using namespace dynamatic;
 using namespace dynamatic::experimental::visual_dataflow;
 
 void VisualDataflow::_bind_methods() {
+
   ClassDB::bind_method(D_METHOD("start", "inputDOTFile", "inputCSVFile"),
                        &VisualDataflow::start);
   ClassDB::bind_method(D_METHOD("nextCycle"), &VisualDataflow::nextCycle);
@@ -73,8 +74,9 @@ void VisualDataflow::_bind_methods() {
 
 VisualDataflow::VisualDataflow() = default;
 
-void VisualDataflow::start(godot::String inputDOTFile,
-                           godot::String inputCSVFile) {
+void VisualDataflow::start(const godot::String &inputDOTFile,
+                           const godot::String &inputCSVFile) {
+
   cycleLabel = (Label *)get_node_internal(
       NodePath("CanvasLayer/Timeline/MarginContainer/VBoxContainer/"
                "HBoxContainer/CycleNumber"));
@@ -88,31 +90,21 @@ void VisualDataflow::start(godot::String inputDOTFile,
 
 void VisualDataflow::createGraph(std::string inputDOTFile,
                                  std::string inputCSVFile) {
+
   GraphParser parser = GraphParser(&graph);
 
   if (failed(parser.parse(inputDOTFile))) {
-    UtilityFunctions::printerr("Failed to parse graph");
+    UtilityFunctions::printerr("Failed to parse the graph");
     return;
   }
 
   if (failed(parser.parse(inputCSVFile))) {
-    UtilityFunctions::printerr("Failed to parse transitions");
+    UtilityFunctions::printerr("Failed to parse the graphs transitions");
     return;
   }
 }
 
 void VisualDataflow::drawGraph() {
-  std::map<std::string, Color> mapColor;
-  mapColor["lavender"] = Color(0.9, 0.9, 0.98, 1);
-  mapColor["plum"] = Color(0.867, 0.627, 0.867, 1);
-  mapColor["moccasin"] = Color(1.0, 0.894, 0.71, 1);
-  mapColor["lightblue"] = Color(0.68, 0.85, 1.0, 1);
-  mapColor["lightgreen"] = Color(0.56, 0.93, 0.56, 1);
-  mapColor["coral"] = Color(1.0, 0.5, 0.31, 1);
-  mapColor["gainsboro"] = Color(0.86, 0.86, 0.86, 1);
-  mapColor["blue"] = Color(0, 0, 1, 1);
-  mapColor["gold"] = Color(1.0, 0.843, 0.0, 1);
-  mapColor["tan2"] = Color(1.0, 0.65, 0.0, 1);
 
   for (const auto &bb : graph.getBBs()) {
 
@@ -206,8 +198,8 @@ void VisualDataflow::drawGraph() {
     }
 
     // Set color and add to parent (common for all shapes)
-    if (mapColor.count(node.second.getColor()))
-      p->set_color(mapColor.at(node.second.getColor()));
+    if (colorNameToRGB.count(node.second.getColor()))
+      p->set_color(colorNameToRGB.at(node.second.getColor()));
     else
       p->set_color(Color(1, 1, 1, 1));
 
@@ -449,13 +441,36 @@ void VisualDataflow::changeStateColor(int64_t state, Color color) {
 }
 
 void VisualDataflow::onClick(Vector2 position) {
-  for (auto &elem : nodeIdToGodoPos) {
+
+  UtilityFunctions::print("FIRST");
+
+  UtilityFunctions::print(position.x);
+  UtilityFunctions::print(position.y);
+
+  /*for (auto &elem : nodeIdToGodoPos) {
+
+    UtilityFunctions::print("   ");
 
     PackedVector2Array points = elem.second;
 
+    UtilityFunctions::print(-points[0].y);
+    UtilityFunctions::print(-points[2].y);
+
     if (position.x >= points[0].x && position.x <= points[1].x &&
-        position.y >= points[0].y && position.y <= points[2].y) {
+        position.y <= -points[0].y && position.y >= -points[2].y) {
       nodeIdToPolygon[elem.first]->set_color(Color(0, 0, 0));
+      UtilityFunctions::print("i'm in");
+    }
+  }*/
+
+  for (auto &elem : graph.getNodes()) {
+    if (elem.second.getNodeId() == "fork1") {
+
+      PackedVector2Array points = nodeIdToGodoPos[elem.first];
+      UtilityFunctions::print(points[0].x);
+      UtilityFunctions::print(points[1].x);
+      UtilityFunctions::print(-points[0].y);
+      UtilityFunctions::print(-points[2].y);
     }
   }
 }
