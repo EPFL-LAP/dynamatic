@@ -453,8 +453,8 @@ void VisualDataflow::onClick(Vector2 position) {
 
     PackedVector2Array points = elem.second;
 
-    if (position.x >= points[0].x && position.x <= points[1].x &&
-        position.y >= points[0].y && position.y <= points[2].y) {
+    if (position.x >= points[0].x && position.y <= points[0].y &&
+        position.x <= points[1].x && position.y >= points[2].y) {
       nodeIdToPolygon[elem.first]->set_color(Color(0, 0, 0));
     }
   }

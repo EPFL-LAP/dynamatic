@@ -9,6 +9,7 @@ extends VisualDataflow
 @onready var drawGraphButton = $CanvasLayer/Menu/VBoxContainer/DrawGraph
 @onready var dotInput = $CanvasLayer/Menu/VBoxContainer/ButtonDot
 @onready var csvInput = $CanvasLayer/Menu/VBoxContainer/ButtonCsv
+@onready var camera = $Camera2D
 
 var is_playing = false
 var elapsed_time = 0.0
@@ -42,8 +43,8 @@ func _input(event: InputEvent):
 	if event.is_action_pressed("ui_left"):
 		_on_prev_pressed()
 	if event is InputEventMouseButton:
-		if event.is_pressed():
-			onClick(event.position)
+		if event.is_action_pressed("left_click"):
+			onClick(camera.get_global_mouse_position())
 
 
 func _on_next_pressed():

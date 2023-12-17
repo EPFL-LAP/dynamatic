@@ -114,39 +114,39 @@ text = "Transfer"
 [node name="ColorPicker" type="ColorPicker" parent="."]
 visible = false
 layout_mode = 2
-offset_left = -458.0
-offset_top = 45.0
-offset_right = -200.0
-offset_bottom = 613.0
+offset_left = -450.0
+offset_top = 49.0
+offset_right = -196.0
+offset_bottom = 617.0
 
 [node name="ColorPicker2" type="ColorPicker" parent="."]
 visible = false
 layout_mode = 2
-offset_left = -458.0
-offset_top = 45.0
-offset_right = -200.0
-offset_bottom = 613.0
+offset_left = -450.0
+offset_top = 49.0
+offset_right = -196.0
+offset_bottom = 617.0
 
 [node name="ColorPicker3" type="ColorPicker" parent="."]
 visible = false
 layout_mode = 2
-offset_left = -458.0
-offset_top = 45.0
-offset_right = -200.0
-offset_bottom = 613.0
+offset_left = -450.0
+offset_top = 49.0
+offset_right = -196.0
+offset_bottom = 617.0
 
 [node name="ColorPicker4" type="ColorPicker" parent="."]
 visible = false
 layout_mode = 2
-offset_left = -458.0
-offset_top = 45.0
-offset_right = -200.0
-offset_bottom = 613.0
+offset_left = -450.0
+offset_top = 49.0
+offset_right = -196.0
+offset_bottom = 617.0
 
 [node name="ColorPicker5" type="ColorPicker" parent="."]
 visible = false
 layout_mode = 2
-offset_left = -458.0
-offset_top = 45.0
-offset_right = -200.0
-offset_bottom = 613.0
+offset_left = -450.0
+offset_top = 49.0
+offset_right = -196.0
+offset_bottom = 617.0
