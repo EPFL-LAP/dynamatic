@@ -88,3 +88,13 @@ void Graph::dupilcateEdgeStates(CycleNb from, CycleNb until) {
 void Graph::addBB(BB bb) { this->bbs.push_back(bb); }
 
 std::vector<BB> Graph::getBBs() { return bbs; }
+
+std::vector<EdgeId> Graph::getInOutEdgesOfNode(const NodeId &nodeId) {
+  std::vector<EdgeId> edgeList;
+  for (auto &edge : edges) {
+    if (edge.getSrcNode().getNodeId() == nodeId ||
+        edge.getDstNode().getNodeId() == nodeId)
+      edgeList.push_back(edge.getEdgeId());
+  }
+  return edgeList;
+}

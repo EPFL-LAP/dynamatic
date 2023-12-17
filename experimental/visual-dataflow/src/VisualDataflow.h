@@ -43,6 +43,11 @@ private:
   std::map<EdgeId, Label *> edgeIdToData;
   std::map<NodeId, PackedVector2Array> nodeIdToGodoPos;
   std::map<NodeId, Polygon2D *> nodeIdToPolygon;
+  std::map<NodeId, std::vector<Line2D *>> nodeIdToContourLine;
+  std::map<NodeId, bool> nodeIdToTransparency;
+  std::map<EdgeId, size_t> edgeIdToTransparency;
+  int nbClicked = 0;
+  bool transparent = false;
   /// Initial colors corresponding to the different states on an edge
   std::vector<Color> stateColors = {
       Color(0.8, 0.0, 0.0, 1.0), Color(0.0, 0.0, 0.0, 1.0),
@@ -72,6 +77,10 @@ private:
   /// Changes the color of a given edge in function of its state
   void setEdgeColor(State state, std::vector<Line2D *> lines,
                     Polygon2D *arrowHead);
+
+  void transparentEffect(double transparency);
+  void highlightNode(NodeId nodeId);
+  void transparentNode(NodeId nodeId);
 
 protected:
   /// Binds the cpp methods with Godot

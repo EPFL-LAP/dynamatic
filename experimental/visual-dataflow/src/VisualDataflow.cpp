@@ -155,10 +155,16 @@ void VisualDataflow::drawGraph() {
       points.push_back(pt3);
       points.push_back(pt4);
       p->set_polygon(points);
+      PackedVector2Array nodePoints;
+      nodePoints.append(pt1);
+      nodePoints.append(pt2);
+      nodePoints.append(pt3);
+      nodePoints.append(pt4);
+      nodeIdToGodoPos[node.first] = nodePoints;
 
     } else if (node.second.getShape() == "oval") {
       // Code for generating oval points
-      int numPoints = 20; // Adjust this for smoother ovals
+      int numPoints = 30; // Adjust this for smoother ovals
       for (int i = 0; i < numPoints; ++i) {
         float angle = 2 * M_PI * i / numPoints;
         float x = center.first + width / 2 * cos(angle);
@@ -168,6 +174,16 @@ void VisualDataflow::drawGraph() {
           firstPoint = Vector2(x, y);
       }
       p->set_polygon(points);
+      Vector2 pt1 = Vector2(center.first, -center.second + height / 2);
+      Vector2 pt2 = Vector2(center.first + width / 2, -center.second);
+      Vector2 pt3 = Vector2(center.first, -center.second - height / 2);
+      Vector2 pt4 = Vector2(center.first - width / 2, -center.second);
+      PackedVector2Array nodePoints;
+      nodePoints.append(pt1);
+      nodePoints.append(pt2);
+      nodePoints.append(pt3);
+      nodePoints.append(pt4);
+      nodeIdToGodoPos[node.first] = nodePoints;
     } else {
       firstPoint =
           Vector2(center.first - width / 2, -center.second + height / 2);
@@ -226,6 +242,8 @@ void VisualDataflow::drawGraph() {
 
     nodeIdToPolygon[node.first] = p;
 
+    std::vector<Line2D *> lines;
+
     if (node.second.getDashed()) {
       points.push_back(firstPoint);
       for (int i = 0; i < points.size() - 1; ++i) {
@@ -248,6 +266,8 @@ void VisualDataflow::drawGraph() {
           pointsArray.append(lineEnd);
           line->set_points(pointsArray);
 
+          lines.push_back(line);
+
           area2D->add_child(line);
 
           currentLength += 5 + 5;
@@ -256,6 +276,7 @@ void VisualDataflow::drawGraph() {
     } else {
       outline->set_points(points);
       outline->add_point(firstPoint);
+      lines.push_back(outline);
     }
 
     outline->set_default_color(Color(0, 0, 0, 1));
@@ -263,6 +284,8 @@ void VisualDataflow::drawGraph() {
     area2D->add_child(outline);
 
     add_child(area2D);
+    nodeIdToContourLine[node.first] = lines;
+    nodeIdToTransparency[node.first] = false;
   }
 
   for (auto &edge : graph.getEdges()) {
@@ -362,6 +385,7 @@ void VisualDataflow::drawGraph() {
     edgeIdToData[edge.getEdgeId()] = label;
 
     add_child(area2D);
+    edgeIdToTransparency[edge.getEdgeId()] = 0;
   }
 }
 
@@ -404,6 +428,7 @@ void VisualDataflow::setEdgeColor(State state, std::vector<Line2D *> lines,
   color = stateColors.at(state);
 
   for (auto &line : lines) {
+    color.a = line->get_default_color().a;
     line->set_default_color(color);
   }
 
@@ -440,14 +465,122 @@ void VisualDataflow::changeStateColor(int64_t state, Color color) {
   }
 }
 
+double crossProduct(Vector2 a, Vector2 b, Vector2 c) {
+  return (b.x - a.x) * (c.y - a.y) - (b.y - a.y) * (c.x - a.x);
+}
+
+bool isInside(Vector2 p, Vector2 a, Vector2 b, Vector2 c, Vector2 d) {
+  return crossProduct(a, b, p) * crossProduct(c, d, p) >= 0 &&
+         crossProduct(b, c, p) * crossProduct(d, a, p) >= 0;
+}
+
 void VisualDataflow::onClick(Vector2 position) {
   for (auto &elem : nodeIdToGodoPos) {
 
     PackedVector2Array points = elem.second;
 
-    if (position.x >= points[0].x && position.y <= points[0].y &&
-        position.x <= points[1].x && position.y >= points[2].y) {
-      nodeIdToPolygon[elem.first]->set_color(Color(0, 0, 0));
+    if (isInside(position, points[0], points[1], points[2], points[3])) {
+      if (nbClicked == 0) {
+        ++nbClicked;
+        transparentEffect(0.3);
+        highlightNode(elem.first);
+      } else {
+        if (nodeIdToTransparency[elem.first]) {
+          ++nbClicked;
+          highlightNode(elem.first);
+        } else {
+          --nbClicked;
+
+          if (nbClicked == 0) {
+            transparentEffect(1);
+          } else {
+            transparentNode(elem.first);
+          }
+        }
+      }
+    }
+  }
+}
+
+void VisualDataflow::transparentEffect(double transparency) {
+
+  for (auto &elem : nodeIdToPolygon) {
+    Color color = elem.second->get_color();
+    color.a = transparency;
+    elem.second->set_color(color);
+    nodeIdToTransparency[elem.first] = (transparency < 1);
+  }
+
+  for (auto &elem : nodeIdToContourLine) {
+    for (auto &line : elem.second) {
+      Color color = line->get_default_color();
+      color.a = transparency;
+      line->set_default_color(color);
+    }
+  }
+
+  for (auto &elem : edgeIdToArrowHead) {
+    Color color = elem.second->get_color();
+    color.a = transparency;
+    elem.second->set_color(color);
+    edgeIdToTransparency[elem.first] = 0;
+  }
+
+  for (auto &elem : edgeIdToLines) {
+    for (auto &line : elem.second) {
+      Color color = line->get_default_color();
+      color.a = transparency;
+      line->set_default_color(color);
+    }
+  }
+}
+
+void VisualDataflow::highlightNode(NodeId nodeId) {
+
+  Color c = nodeIdToPolygon[nodeId]->get_color();
+  c.a = 1;
+  nodeIdToPolygon[nodeId]->set_color(c);
+  for (auto &line : nodeIdToContourLine[nodeId]) {
+    Color c3 = line->get_default_color();
+    c3.a = 1;
+    line->set_default_color(c3);
+  }
+  nodeIdToTransparency[nodeId] = false;
+  for (auto &edge : graph.getInOutEdgesOfNode(nodeId)) {
+    ++edgeIdToTransparency[edge];
+    Color c2 = edgeIdToArrowHead[edge]->get_color();
+    c2.a = 1;
+    edgeIdToArrowHead[edge]->set_color(c2);
+    for (auto &line : edgeIdToLines[edge]) {
+      Color c3 = line->get_default_color();
+      c3.a = 1;
+      line->set_default_color(c3);
+    }
+  }
+}
+
+void VisualDataflow::transparentNode(NodeId nodeId) {
+
+  Color c = nodeIdToPolygon[nodeId]->get_color();
+  c.a = 0.3;
+  nodeIdToPolygon[nodeId]->set_color(c);
+  for (auto &line : nodeIdToContourLine[nodeId]) {
+    Color c3 = line->get_default_color();
+    c3.a = 0.3;
+    line->set_default_color(c3);
+  }
+  nodeIdToTransparency[nodeId] = true;
+  for (auto &edge : graph.getInOutEdgesOfNode(nodeId)) {
+    --edgeIdToTransparency[edge];
+    if (edgeIdToTransparency[edge] == 0) {
+      Color c2 = edgeIdToArrowHead[edge]->get_color();
+      c2.a = 0.3;
+      edgeIdToArrowHead[edge]->set_color(c2);
+      for (auto &line : edgeIdToLines[edge]) {
+        Color c3 = line->get_default_color();
+        c3.a = 0.3;
+        line->set_default_color(c3);
+      }
     }
   }
 }
