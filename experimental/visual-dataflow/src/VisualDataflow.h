@@ -30,6 +30,7 @@ using namespace dynamatic::experimental::visual_dataflow;
 
 namespace godot {
 
+/// Implements the logic to visualize the circuit in Godot
 class VisualDataflow : public Control {
   GDCLASS(VisualDataflow, Control)
 
@@ -37,40 +38,47 @@ private:
   Graph graph;
   CycleNb cycle = -1;
   std::map<EdgeId, Line2D *> edgeIdToLine2D;
-
   std::map<EdgeId, std::vector<Line2D *>> edgeIdToLines;
   std::map<EdgeId, Polygon2D *> edgeIdToArrowHead;
   std::map<EdgeId, Label *> edgeIdToData;
   std::map<NodeId, PackedVector2Array> nodeIdToGodoPos;
   std::map<NodeId, Polygon2D *> nodeIdToPolygon;
+  /// Initial colors corresponding to the different states on an edge
   std::vector<Color> stateColors = {
       Color(0.8, 0.0, 0.0, 1.0), Color(0.0, 0.0, 0.0, 1.0),
       Color(0.0, 0.0, 0.8, 1.0), Color(0.0, 0.8, 0.0, 1.0),
       Color(0.0, 0.8, 0.8, 1.0),
   };
 
-  // Godot object references
+  /// Godot object references
   Label *cycleLabel;
   HSlider *cycleSlider;
 
+  /// Creates a graph from the circuits corresponding DOT and CSV file
   void createGraph(std::string inputDOTFile, std::string inputCSVFile);
-  void drawCycleNumber();
+  /// Draws each component of the graph in Godot
   void drawGraph();
+  /// Changes the color of a given edge in function of its state
   void setEdgeColor(State state, std::vector<Line2D *> lines,
                     Polygon2D *arrowHead);
 
 protected:
+  /// Binds the cpp methods with Godot
   static void _bind_methods();
 
 public:
   VisualDataflow();
-
   ~VisualDataflow() override = default;
-
+  /// Given a circuits DOT and CSV file, draws the graph in its initial state in
+  /// Godot
   void start(godot::String inputDOTFile, godot::String inputCSVFile);
+  /// Draws in Godot the state of the graph in its next cycle
   void nextCycle();
+  /// Draws in Godot the state of the graph in its previous cycle
   void previousCycle();
+  /// Draws in Godot the state of the graph in a given cycle
   void changeCycle(int64_t cycleNb);
+  /// Changes the corresponding color of a given edge state
   void changeStateColor(int64_t state, Color color);
   void onClick(Vector2 position);
 };
