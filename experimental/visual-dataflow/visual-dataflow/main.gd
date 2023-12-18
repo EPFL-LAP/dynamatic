@@ -130,3 +130,7 @@ func _on_color_picker_button_4_color_changed(color):
 
 func _on_color_picker_button_5_color_changed(color):
 	color4 = color
+
+
+func _on_reset_selection_pressed():
+	resetSelection()

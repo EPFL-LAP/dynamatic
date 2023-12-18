@@ -43,39 +43,6 @@ offset_bottom = 177.0
 modulate = Color(0.854902, 0.854902, 0.854902, 1)
 text = "Edge Legend:"
 
-[node name="Undefined" parent="CanvasLayer/Legend/GeneralLegend/Panel/EdgeLegend/EdgeComponents/Definitions" index="0"]
-modulate = Color(0.854902, 0.854902, 0.854902, 1)
-
-[node name="ColorPicker" parent="CanvasLayer/Legend" index="1"]
-offset_left = -378.0
-offset_top = 85.0
-offset_right = -160.0
-offset_bottom = 653.0
-
-[node name="ColorPicker2" parent="CanvasLayer/Legend" index="2"]
-offset_left = -378.0
-offset_top = 85.0
-offset_right = -160.0
-offset_bottom = 653.0
-
-[node name="ColorPicker3" parent="CanvasLayer/Legend" index="3"]
-offset_left = -378.0
-offset_top = 85.0
-offset_right = -160.0
-offset_bottom = 653.0
-
-[node name="ColorPicker4" parent="CanvasLayer/Legend" index="4"]
-offset_left = -378.0
-offset_top = 85.0
-offset_right = -160.0
-offset_bottom = 653.0
-
-[node name="ColorPicker5" parent="CanvasLayer/Legend" index="5"]
-offset_left = -378.0
-offset_top = 85.0
-offset_right = -160.0
-offset_bottom = 653.0
-
 [connection signal="file_selected" from="CanvasLayer/Menu/FileDialogDot" to="." method="_on_file_dialog_dot_file_selected"]
 [connection signal="file_selected" from="CanvasLayer/Menu/FileDialogCsv" to="." method="_on_file_dialog_csv_file_selected"]
 [connection signal="pressed" from="CanvasLayer/Menu/VBoxContainer/DrawGraph" to="." method="_on_draw_graph_pressed"]
@@ -86,7 +53,7 @@ offset_bottom = 653.0
 [connection signal="mouse_entered" from="CanvasLayer/Timeline/MarginContainer/VBoxContainer/HSlider" to="Camera2D" method="_on_h_slider_mouse_entered"]
 [connection signal="mouse_exited" from="CanvasLayer/Timeline/MarginContainer/VBoxContainer/HSlider" to="Camera2D" method="_on_h_slider_mouse_exited"]
 [connection signal="value_changed" from="CanvasLayer/Timeline/MarginContainer/VBoxContainer/HSlider" to="." method="_on_h_slider_value_changed"]
-[connection signal="toggled" from="CanvasLayer/Legend/GeneralLegend/ShowLegend" to="." method="_on_show_legend_toggled"]
+[connection signal="pressed" from="CanvasLayer/Legend/GeneralLegend/HBoxContainer/ResetSelection" to="." method="_on_reset_selection_pressed"]
 [connection signal="color_changed" from="CanvasLayer/Legend/GeneralLegend/Panel/EdgeLegend/EdgeComponents/Colors/ColorPickerButton" to="." method="_on_color_picker_button_color_changed"]
 [connection signal="popup_closed" from="CanvasLayer/Legend/GeneralLegend/Panel/EdgeLegend/EdgeComponents/Colors/ColorPickerButton" to="." method="_on_color_picker_button_popup_closed"]
 [connection signal="color_changed" from="CanvasLayer/Legend/GeneralLegend/Panel/EdgeLegend/EdgeComponents/Colors/ColorPickerButton2" to="." method="_on_color_picker_button_2_color_changed"]

@@ -101,7 +101,10 @@ public:
   void changeCycle(int64_t cycleNb);
   /// Changes the corresponding color of a given edge state
   void changeStateColor(int64_t state, Color color);
+  /// Detect if a node has been clicked and if so, highlight it
   void onClick(Vector2 position);
+  /// Reset the selection of nodes
+  void resetSelection();
 }; // namespace godot
 
 } // namespace godot

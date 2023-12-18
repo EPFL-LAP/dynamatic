@@ -1,4 +1,6 @@
-[gd_scene format=3 uid="uid://1ukyu4yhubi7"]
+[gd_scene load_steps=2 format=3 uid="uid://1ukyu4yhubi7"]
+
+[ext_resource type="Script" path="res://legend.gd" id="1_h1ohj"]
 
 [node name="Legend" type="Control"]
 layout_mode = 3
@@ -6,6 +8,7 @@ anchors_preset = 1
 anchor_left = 1.0
 anchor_right = 1.0
 grow_horizontal = 0
+script = ExtResource("1_h1ohj")
 
 [node name="GeneralLegend" type="VBoxContainer" parent="."]
 layout_mode = 1
@@ -17,7 +20,15 @@ offset_right = 1.0
 offset_bottom = 221.0
 grow_horizontal = 0
 
-[node name="ShowLegend" type="Button" parent="GeneralLegend"]
+[node name="HBoxContainer" type="HBoxContainer" parent="GeneralLegend"]
+layout_mode = 2
+size_flags_horizontal = 8
+
+[node name="ResetSelection" type="Button" parent="GeneralLegend/HBoxContainer"]
+layout_mode = 2
+text = "Reset selection"
+
+[node name="ShowLegend" type="Button" parent="GeneralLegend/HBoxContainer"]
 layout_mode = 2
 size_flags_horizontal = 8
 size_flags_vertical = 0
@@ -26,6 +37,7 @@ action_mode = 0
 text = "Legend"
 
 [node name="Panel" type="Panel" parent="GeneralLegend"]
+visible = false
 layout_mode = 2
 size_flags_vertical = 3
 
@@ -37,7 +49,6 @@ offset_bottom = 180.0
 size_flags_horizontal = 3
 
 [node name="EdgeLegendTitle" type="Label" parent="GeneralLegend/Panel/EdgeLegend"]
-modulate = Color(0, 0, 0, 1)
 layout_mode = 2
 size_flags_horizontal = 0
 text = "EDGE LEGEND:"
@@ -82,71 +93,28 @@ layout_mode = 2
 size_flags_horizontal = 6
 
 [node name="Undefined" type="Label" parent="GeneralLegend/Panel/EdgeLegend/EdgeComponents/Definitions"]
-modulate = Color(0, 0, 0, 1)
 layout_mode = 2
 size_flags_horizontal = 0
 text = "Undefined"
 
 [node name="Accept" type="Label" parent="GeneralLegend/Panel/EdgeLegend/EdgeComponents/Definitions"]
-modulate = Color(0, 0, 0, 1)
 layout_mode = 2
 size_flags_horizontal = 0
 text = "Accept"
 
 [node name="Idle" type="Label" parent="GeneralLegend/Panel/EdgeLegend/EdgeComponents/Definitions"]
-modulate = Color(0, 0, 0, 1)
 layout_mode = 2
 size_flags_horizontal = 0
 text = "Idle"
 
 [node name="Stall" type="Label" parent="GeneralLegend/Panel/EdgeLegend/EdgeComponents/Definitions"]
-modulate = Color(0, 0, 0, 1)
 layout_mode = 2
 size_flags_horizontal = 0
 text = "Stall"
 
 [node name="Transfer" type="Label" parent="GeneralLegend/Panel/EdgeLegend/EdgeComponents/Definitions"]
-modulate = Color(0, 0, 0, 1)
 layout_mode = 2
 size_flags_horizontal = 0
 text = "Transfer"
 
-[node name="ColorPicker" type="ColorPicker" parent="."]
-visible = false
-layout_mode = 2
-offset_left = -450.0
-offset_top = 49.0
-offset_right = -196.0
-offset_bottom = 617.0
-
-[node name="ColorPicker2" type="ColorPicker" parent="."]
-visible = false
-layout_mode = 2
-offset_left = -450.0
-offset_top = 49.0
-offset_right = -196.0
-offset_bottom = 617.0
-
-[node name="ColorPicker3" type="ColorPicker" parent="."]
-visible = false
-layout_mode = 2
-offset_left = -450.0
-offset_top = 49.0
-offset_right = -196.0
-offset_bottom = 617.0
-
-[node name="ColorPicker4" type="ColorPicker" parent="."]
-visible = false
-layout_mode = 2
-offset_left = -450.0
-offset_top = 49.0
-offset_right = -196.0
-offset_bottom = 617.0
-
-[node name="ColorPicker5" type="ColorPicker" parent="."]
-visible = false
-layout_mode = 2
-offset_left = -450.0
-offset_top = 49.0
-offset_right = -196.0
-offset_bottom = 617.0
+[connection signal="toggled" from="GeneralLegend/HBoxContainer/ShowLegend" to="." method="_on_show_legend_toggled"]

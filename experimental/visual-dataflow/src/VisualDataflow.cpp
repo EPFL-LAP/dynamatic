@@ -70,6 +70,8 @@ void VisualDataflow::_bind_methods() {
                        &VisualDataflow::changeStateColor);
   ClassDB::bind_method(D_METHOD("onClick", "position"),
                        &VisualDataflow::onClick);
+  ClassDB::bind_method(D_METHOD("resetSelection"),
+                       &VisualDataflow::resetSelection);
 }
 
 VisualDataflow::VisualDataflow() = default;
@@ -583,4 +585,9 @@ void VisualDataflow::transparentNode(NodeId nodeId) {
       }
     }
   }
+}
+
+void VisualDataflow::resetSelection() {
+  nbClicked = 0;
+  transparentEffect(1);
 }
