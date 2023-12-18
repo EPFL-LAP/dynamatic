@@ -57,6 +57,11 @@ using namespace godot;
 using namespace dynamatic;
 using namespace dynamatic::experimental::visual_dataflow;
 
+// Constant colors
+const godot::Color TRANSPARENT_BLACK(0, 0, 0, 0.075);
+const godot::Color OPAQUE_BLACK(0, 0, 0, 1.0);
+const godot::Color OPAQUE_WHITE(1, 1, 1, 1.0);
+
 void VisualDataflow::_bind_methods() {
 
   ClassDB::bind_method(D_METHOD("start", "inputDOTFile", "inputCSVFile"),
@@ -106,20 +111,21 @@ void VisualDataflow::createGraph(std::string inputDOTFile,
   }
 }
 
-void VisualDataflow::drawGraph() {
+void VisualDataflow::drawBBs(){
 
   for (const auto &bb : graph.getBBs()) {
 
     std::vector<float> boundries = bb.boundries;
     Polygon2D *p = memnew(Polygon2D);
     PackedVector2Array points;
+
     points.push_back(Vector2(boundries.at(0), -boundries.at(1)));
     points.push_back(Vector2(boundries.at(2), -boundries.at(1)));
     points.push_back(Vector2(boundries.at(2), -boundries.at(3)));
     points.push_back(Vector2(boundries.at(0), -boundries.at(3)));
 
     p->set_polygon(points);
-    p->set_color(Color(0, 0, 0, 0.075));
+    p->set_color(TRANSPARENT_BLACK);
 
     add_child(p);
 
@@ -128,11 +134,14 @@ void VisualDataflow::drawGraph() {
     label->set_position(
         Vector2(bb.boundries.at(0) + 5,
                 -bb.labelPosition.second - bb.labelSize.first * 35));
-    label->add_theme_color_override("font_color", Color(0, 0, 0));
+    label->add_theme_color_override("font_color", OPAQUE_BLACK);
     label->add_theme_font_size_override("font_size", 12);
 
     add_child(label);
   }
+}
+
+void VisualDataflow::drawNodes() {
 
   for (auto &node : graph.getNodes()) {
 
@@ -147,45 +156,56 @@ void VisualDataflow::drawGraph() {
     Vector2 firstPoint;
 
     if (node.second.getShape() == "diamond") {
+
       firstPoint = Vector2(center.first, -center.second + height / 2);
       Vector2 pt1 = Vector2(center.first, -center.second + height / 2);
       Vector2 pt2 = Vector2(center.first + width / 2, -center.second);
       Vector2 pt3 = Vector2(center.first, -center.second - height / 2);
       Vector2 pt4 = Vector2(center.first - width / 2, -center.second);
+
       points.push_back(pt1);
       points.push_back(pt2);
       points.push_back(pt3);
       points.push_back(pt4);
+
       p->set_polygon(points);
       PackedVector2Array nodePoints;
+
+      nodePoints.append(pt1);
+      nodePoints.append(pt2);
+      nodePoints.append(pt3);
+      nodePoints.append(pt4);
+
+      nodeIdToGodoPos[node.first] = nodePoints;
+
+    } else if (node.second.getShape() == "oval") {
+
+      int numPoints = 30; // Adjust this for smoother oval
+
+      for (int i = 0; i < numPoints; ++i) {
+        float angle = 2 * M_PI * i / numPoints;
+        float x = center.first + width / 2 * cos(angle);
+        float y = -center.second + height / 2 * sin(angle);
+        points.push_back(Vector2(x, y));
+
+        if (i == 0)
+          firstPoint = Vector2(x, y);
+      }
+      p->set_polygon(points);
+
+      Vector2 pt1 = Vector2(center.first, -center.second + height / 2);
+      Vector2 pt2 = Vector2(center.first + width / 2, -center.second);
+      Vector2 pt3 = Vector2(center.first, -center.second - height / 2);
+      Vector2 pt4 = Vector2(center.first - width / 2, -center.second);
+
+      PackedVector2Array nodePoints;
+
       nodePoints.append(pt1);
       nodePoints.append(pt2);
       nodePoints.append(pt3);
       nodePoints.append(pt4);
       nodeIdToGodoPos[node.first] = nodePoints;
 
-    } else if (node.second.getShape() == "oval") {
-      // Code for generating oval points
-      int numPoints = 30; // Adjust this for smoother ovals
-      for (int i = 0; i < numPoints; ++i) {
-        float angle = 2 * M_PI * i / numPoints;
-        float x = center.first + width / 2 * cos(angle);
-        float y = -center.second + height / 2 * sin(angle);
-        points.push_back(Vector2(x, y));
-        if (i == 0)
-          firstPoint = Vector2(x, y);
-      }
-      p->set_polygon(points);
-      Vector2 pt1 = Vector2(center.first, -center.second + height / 2);
-      Vector2 pt2 = Vector2(center.first + width / 2, -center.second);
-      Vector2 pt3 = Vector2(center.first, -center.second - height / 2);
-      Vector2 pt4 = Vector2(center.first - width / 2, -center.second);
-      PackedVector2Array nodePoints;
-      nodePoints.append(pt1);
-      nodePoints.append(pt2);
-      nodePoints.append(pt3);
-      nodePoints.append(pt4);
-      nodeIdToGodoPos[node.first] = nodePoints;
     } else {
       firstPoint =
           Vector2(center.first - width / 2, -center.second + height / 2);
@@ -197,6 +217,7 @@ void VisualDataflow::drawGraph() {
           Vector2(center.first + width / 2, -center.second - height / 2);
       Vector2 pt4 =
           Vector2(center.first - width / 2, -center.second - height / 2);
+
       points.push_back(
           Vector2(center.first - width / 2, -center.second + height / 2));
       points.push_back(
@@ -208,6 +229,7 @@ void VisualDataflow::drawGraph() {
       p->set_polygon(points);
 
       PackedVector2Array nodePoints;
+
       nodePoints.append(pt1);
       nodePoints.append(pt2);
       nodePoints.append(pt3);
@@ -215,25 +237,22 @@ void VisualDataflow::drawGraph() {
       nodeIdToGodoPos[node.first] = nodePoints;
     }
 
-    // Set color and add to parent (common for all shapes)
     if (colorNameToRGB.count(node.second.getColor()))
       p->set_color(colorNameToRGB.at(node.second.getColor()));
     else
-      p->set_color(Color(1, 1, 1, 1));
+      p->set_color(OPAQUE_WHITE);
 
-    /// Add the label to the center container
     Label *label = memnew(Label);
     label->set_text(node.second.getNodeId().c_str());
-    label->add_theme_color_override("font_color",
-                                    Color(0, 0, 0)); // Change to font_color
+    label->add_theme_color_override("font_color", OPAQUE_BLACK);
     label->add_theme_font_size_override("font_size", 12);
+
     Vector2 size = label->get_combined_minimum_size();
     Vector2 newPosition =
         Vector2(center.first - size.x * 0.5,
-                -(center.second + size.y * 0.5)); // Centering the label
+                -(center.second + size.y * 0.5)); 
     label->set_position(newPosition);
 
-    // Create a center container to hold the polygon and the label
     CenterContainer *centerContainer = memnew(CenterContainer);
     centerContainer->set_size(Vector2(width, height));
     centerContainer->set_position(
@@ -249,9 +268,11 @@ void VisualDataflow::drawGraph() {
     if (node.second.getDashed()) {
       points.push_back(firstPoint);
       for (int i = 0; i < points.size() - 1; ++i) {
+
         Vector2 start = points[i];
         Vector2 end = points[i + 1];
         Vector2 segment = end - start;
+
         float segmentLength = segment.length();
         segment = segment.normalized();
 
@@ -259,11 +280,12 @@ void VisualDataflow::drawGraph() {
         while (currentLength < segmentLength) {
           Line2D *line = memnew(Line2D);
           line->set_width(1);
-          line->set_default_color(Color(0, 0, 0, 1));
+          line->set_default_color(OPAQUE_BLACK);
           Vector2 lineStart = start + segment * currentLength;
           Vector2 lineEnd =
               lineStart + segment * MIN(5, segmentLength - currentLength);
           PackedVector2Array pointsArray;
+
           pointsArray.append(lineStart);
           pointsArray.append(lineEnd);
           line->set_points(pointsArray);
@@ -272,7 +294,7 @@ void VisualDataflow::drawGraph() {
 
           area2D->add_child(line);
 
-          currentLength += 5 + 5;
+          currentLength += 10;
         }
       }
     } else {
@@ -281,7 +303,7 @@ void VisualDataflow::drawGraph() {
       lines.push_back(outline);
     }
 
-    outline->set_default_color(Color(0, 0, 0, 1));
+    outline->set_default_color(OPAQUE_BLACK);
     outline->set_width(1);
     area2D->add_child(outline);
 
@@ -289,6 +311,10 @@ void VisualDataflow::drawGraph() {
     nodeIdToContourLine[node.first] = lines;
     nodeIdToTransparency[node.first] = false;
   }
+
+}
+
+void VisualDataflow::drawEdges(){
 
   for (auto &edge : graph.getEdges()) {
 
@@ -322,10 +348,11 @@ void VisualDataflow::drawGraph() {
         while (currentLength < segmentLength) {
           Line2D *line = memnew(Line2D);
           line->set_width(1);
-          line->set_default_color(Color(1, 1, 1, 1)); // White color
+          line->set_default_color(OPAQUE_WHITE); 
           Vector2 lineStart = start + segment * currentLength;
           Vector2 lineEnd =
               lineStart + segment * MIN(5, segmentLength - currentLength);
+
           PackedVector2Array pointsArray;
           pointsArray.append(lineStart);
           pointsArray.append(lineEnd);
@@ -341,8 +368,9 @@ void VisualDataflow::drawGraph() {
     } else {
       Line2D *line = memnew(Line2D);
       line->set_points(linePoints);
-      line->set_default_color(Color(1, 1, 1, 1));
+      line->set_default_color(OPAQUE_WHITE);
       line->set_width(1);
+
       area2D->add_child(line);
       lines.push_back(line);
     }
@@ -373,15 +401,16 @@ void VisualDataflow::drawGraph() {
         points.push_back(Vector2(last.x - 12, last.y));
       }
     }
+
     arrowHead->set_polygon(points);
-    arrowHead->set_color(Color(0, 0, 0, 1));
+    arrowHead->set_color(OPAQUE_BLACK);
     area2D->add_child(arrowHead);
     edgeIdToArrowHead[edge.getEdgeId()] = arrowHead;
 
     Label *label = memnew(Label);
     label->set_text("");
     label->set_position(prev);
-    label->add_theme_color_override("font_color", Color(0, 0, 0));
+    label->add_theme_color_override("font_color", OPAQUE_BLACK);
     label->add_theme_font_size_override("font_size", 10);
     add_child(label);
     edgeIdToData[edge.getEdgeId()] = label;
@@ -389,6 +418,15 @@ void VisualDataflow::drawGraph() {
     add_child(area2D);
     edgeIdToTransparency[edge.getEdgeId()] = 0;
   }
+
+}
+
+void VisualDataflow::drawGraph() {
+
+  drawBBs();
+  drawNodes();
+  drawEdges();
+
 }
 
 void VisualDataflow::nextCycle() {
@@ -413,10 +451,12 @@ void VisualDataflow::changeCycle(int64_t cycleNb) {
       std::map<EdgeId, std::pair<State, Data>> edgeStates =
           graph.getCycleEdgeStates().at(cycle);
       for (auto &edgeState : edgeStates) {
+
         EdgeId edgeId = edgeState.first;
         State state = edgeState.second.first;
         std::vector<Line2D *> lines = edgeIdToLines[edgeId];
         Polygon2D *arrowHead = edgeIdToArrowHead[edgeId];
+
         setEdgeColor(state, lines, arrowHead);
         edgeIdToData.at(edgeId)->set_text(edgeState.second.second.c_str());
       }
@@ -426,8 +466,7 @@ void VisualDataflow::changeCycle(int64_t cycleNb) {
 
 void VisualDataflow::setEdgeColor(State state, std::vector<Line2D *> lines,
                                   Polygon2D *arrowHead) {
-  Color color = Color(0, 0, 0, 1);
-  color = stateColors.at(state);
+  Color color = stateColors.at(state);
 
   for (auto &line : lines) {
     color.a = line->get_default_color().a;
