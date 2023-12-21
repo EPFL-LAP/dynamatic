@@ -42,7 +42,9 @@ size_t GraphEdge::getInPort() { return inPort; }
 
 EdgeId GraphEdge::getEdgeId() { return id; }
 
-std::vector<std::pair<float, float>> GraphEdge::getPositions() { return position; }
+std::vector<std::pair<float, float>> GraphEdge::getPositions() {
+  return position;
+}
 
 void GraphEdge::setDashed(bool dashed) { this->isDashed = dashed; }
 

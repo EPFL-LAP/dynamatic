@@ -109,14 +109,15 @@ dynamatic::experimental::visual_dataflow::processDOT(std::ifstream &file,
       insideNodeDefinition = false;
     }
 
-    if (insideNodeDefinition && line.find("shape") != std::string::npos){
+    if (insideNodeDefinition && line.find("shape") != std::string::npos) {
       std::size_t startPos = line.find('=') + 1;
       std::size_t endPos = line.find(',', startPos);
       Shape shape = line.substr(startPos, endPos - startPos);
       currentNode.setShape(shape);
     }
 
-    if (insideNodeDefinition && line.find("style=dashed") != std::string::npos){
+    if (insideNodeDefinition &&
+        line.find("style=dashed") != std::string::npos) {
       currentNode.setDashed(true);
     }
 
@@ -200,12 +201,12 @@ dynamatic::experimental::visual_dataflow::processDOT(std::ifstream &file,
       currentEdge.setInPort(in);
     }
 
-    if (insideEdgeDefinition && line.find("start_0") != std::string::npos){
+    if (insideEdgeDefinition && line.find("start_0") != std::string::npos) {
       currentEdge.setDashed(true);
       std::cout << " abcde " << std::endl;
     }
 
-    if (insideEdgeDefinition && line.find("style") != std::string::npos){
+    if (insideEdgeDefinition && line.find("style") != std::string::npos) {
       currentEdge.setDashed(true);
       std::cout << " abcde " << std::endl;
     }
@@ -216,71 +217,67 @@ dynamatic::experimental::visual_dataflow::processDOT(std::ifstream &file,
       currentEdgeID += 1;
     }
 
-    if (!insideEdgeDefinition && !insideNodeDefinition && line.find("subgraph") != std::string::npos){
+    if (!insideEdgeDefinition && !insideNodeDefinition &&
+        line.find("subgraph") != std::string::npos) {
       BB newBB;
       currentBB = newBB;
       insideBBDefinition = true;
     }
 
-    if (insideBBDefinition && line.find("bb") != std::string::npos){
-    std::size_t startPos = line.find('"') + 1;
-    std::size_t endPos = line.find_last_of('"');
-    std::string numbers = line.substr(startPos, endPos - startPos);
+    if (insideBBDefinition && line.find("bb") != std::string::npos) {
+      std::size_t startPos = line.find('"') + 1;
+      std::size_t endPos = line.find_last_of('"');
+      std::string numbers = line.substr(startPos, endPos - startPos);
 
-    std::stringstream ss(numbers);
-    std::string item;
-    while (std::getline(ss, item, ',')) {
+      std::stringstream ss(numbers);
+      std::string item;
+      while (std::getline(ss, item, ',')) {
         currentBB.boundries.push_back(std::stof(item));
+      }
+    }
+
+    if (insideBBDefinition && line.find("label") != std::string::npos) {
+      std::size_t startPos = line.find('=') + 1;
+      std::size_t endPos = line.find(',', startPos);
+      std::string label = line.substr(startPos, endPos - startPos);
+      currentBB.label = label;
+    }
+
+    if (insideBBDefinition && line.find("lheight") != std::string::npos) {
+      std::size_t startPos = line.find('=') + 1;
+      std::size_t endPos = line.find(',', startPos);
+      float height = std::stof(line.substr(startPos, endPos - startPos));
+      currentBB.labelSize.first = height;
+    }
+
+    if (insideBBDefinition && line.find("lp") != std::string::npos) {
+      std::size_t startPos = line.find('"') + 1;
+      std::size_t endPos = line.find_last_of('"');
+      std::string numbers = line.substr(startPos, endPos - startPos);
+
+      std::stringstream ss(numbers);
+      std::string item;
+      std::getline(ss, item, ',');
+      float x = std::stof(item);
+      std::getline(ss, item, ',');
+      float y = std::stof(item);
+
+      currentBB.labelPosition.first = x;
+      currentBB.labelPosition.second = y;
+    }
+
+    if (insideBBDefinition && line.find("lwidth") != std::string::npos) {
+      std::size_t startPos = line.find('=') + 1;
+      std::size_t endPos = line.find(',', startPos);
+      float width = std::stof(line.substr(startPos, endPos - startPos));
+      currentBB.labelSize.second = width;
+    }
+
+    if (insideBBDefinition && line.find("];") != std::string::npos) {
+      graph.addBB(currentBB);
+      insideBBDefinition = false;
     }
   }
-  
-
-  if (insideBBDefinition && line.find("label") != std::string::npos){
-    std::size_t startPos = line.find('=') + 1;
-    std::size_t endPos = line.find(',', startPos);
-    std::string label = line.substr(startPos, endPos - startPos);
-    currentBB.label = label;
-  }
-
-  if (insideBBDefinition && line.find("lheight") != std::string::npos){
-    std::size_t startPos = line.find('=') + 1;
-    std::size_t endPos = line.find(',', startPos);
-    float height = std::stof(line.substr(startPos, endPos - startPos));
-    currentBB.labelSize.first = height;
-  }
-
-  if (insideBBDefinition && line.find("lp") != std::string::npos){
-    std::size_t startPos = line.find('"') + 1;
-    std::size_t endPos = line.find_last_of('"');
-    std::string numbers = line.substr(startPos, endPos - startPos);
-
-    std::stringstream ss(numbers);
-    std::string item;
-    std::getline(ss, item, ',');
-    float x = std::stof(item);
-    std::getline(ss, item, ',');
-    float y = std::stof(item);
-
-    currentBB.labelPosition.first = x;
-    currentBB.labelPosition.second = y;
-  }
-
-  if (insideBBDefinition && line.find("lwidth") != std::string::npos){
-    std::size_t startPos = line.find('=') + 1;
-    std::size_t endPos = line.find(',', startPos);
-    float width = std::stof(line.substr(startPos, endPos - startPos));
-    currentBB.labelSize.second = width;
-  }
-
-  if (insideBBDefinition && line.find("];") != std::string::npos){
-    graph.addBB(currentBB);
-    insideBBDefinition = false;
-  }
-  }
-
-
-  
 
   return success();
 }
-

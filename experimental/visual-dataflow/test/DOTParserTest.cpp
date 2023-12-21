@@ -51,10 +51,14 @@ int main(int argc, char *argv[]) {
   std::cout << "---------------------------------" << std::endl;
 
   for (const auto &bb : graph.getBBs()) {
-    std::cout << "Boundries: " << bb.boundries.at(0) << ", " << bb.boundries.at(1) << ", " << bb.boundries.at(2) << ", " << bb.boundries.at(3) << ", " << std::endl;
+    std::cout << "Boundries: " << bb.boundries.at(0) << ", "
+              << bb.boundries.at(1) << ", " << bb.boundries.at(2) << ", "
+              << bb.boundries.at(3) << ", " << std::endl;
     std::cout << "Label: " << bb.label << std::endl;
-    std::cout << "Label position: " << bb.labelPosition.first << ", " << bb.labelPosition.second << std::endl;
-    std::cout << "Label size: " << bb.labelSize.first << ", " << bb.labelSize.second << std::endl;
+    std::cout << "Label position: " << bb.labelPosition.first << ", "
+              << bb.labelPosition.second << std::endl;
+    std::cout << "Label size: " << bb.labelSize.first << ", "
+              << bb.labelSize.second << std::endl;
 
     std::cout << "---------------------------------" << std::endl;
   }
