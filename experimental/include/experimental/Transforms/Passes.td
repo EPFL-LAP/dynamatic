@@ -29,4 +29,15 @@ def HandshakeFixArgNames : DynamaticPass<"handshake-fix-arg-names"> {
             "Path to source C file from which the IR was generated.">];
 }
 
+def HandshakeRemoveMemories : DynamaticPass<"handshake-remove-memories"> {
+  let summary = "Removes memories from circuit.";
+  let description = [{
+    Remove all MCs and LSQs from the circuit, making load/store address and
+    store data signals function results and load data signals function
+    arguments.
+  }];
+  let constructor = "dynamatic::experimental::createHandshakeRemoveMemories()";
+}
+
+
 #endif // EXPERIMENTAL_TRANSFORMS_PASSES_TD
