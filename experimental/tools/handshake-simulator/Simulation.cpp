@@ -278,9 +278,17 @@ HandshakeExecuter::HandshakeExecuter(circt::handshake::FuncOp &func,
             return;
           }
         }
-
       } // for operations
+
+      // Transfer data from rising edges to real data
+      for (auto &[channel, data] : circuitState.bufferChannelMap)
+        circuitState.storeValue(channel, data);
+
     } while (manager.valueChangedThisCycle);
+
+    // Reset rising edges state so they can start at next cycle
+    for (auto &[op, flag] : circuitState.cycleMap)
+      circuitState.cycleMap[op] = false;
 
     ++manager.currentCycle;
   } // while (true)

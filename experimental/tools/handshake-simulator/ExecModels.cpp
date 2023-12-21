@@ -39,8 +39,6 @@ using namespace dynamatic::experimental;
 /// Stores a value in a channel, and sets its state to VALID.
 void dynamatic::experimental::CircuitState::storeValue(
     mlir::Value channel, std::optional<llvm::Any> data) {
-  //channelMap[channel].state = DataflowState::VALID;
-  //channelMap[channel].isValid = true;
   channelMap[channel].data = std::move(data);
 }
 
@@ -54,9 +52,6 @@ void dynamatic::experimental::CircuitState::storeValues(
 
 /// Removes a value from a channel, and sets its state to NONE.
 void dynamatic::experimental::CircuitState::removeValue(mlir::Value channel) {
-  //channelMap[channel].isReady = false;
-  //channelMap[channel].isValid = false;
-  //channelMap[channel].state = DataflowState::NONE;
   channelMap[channel].data = std::nullopt;
 }
 
@@ -74,11 +69,18 @@ inline bool dynamatic::experimental::CircuitState::isNone(mlir::Value channel) {
   return !channelMap[channel].isReady && !channelMap[channel].isValid;
 }
 
+//
+
 inline bool dynamatic::experimental::CircuitState::onRisingEdge(circt::Operation& op) {
-  if (cycleMap[op])
+  if (cycleMap[&op])
     return false;
-  cycleMap[op] = true;
+  cycleMap[&op] = true;
   return true;
+}
+
+void dynamatic::experimental::CircuitState::storeValueOnRisingEdge(
+    mlir::Value channel, std::optional<llvm::Any> data) {
+  bufferChannelMap[channel].data = std::move(data);
 }
 
 //===----------------------------------------------------------------------===//
@@ -423,93 +425,89 @@ bool DefaultConstant::tryExecute(ExecutableData &data,
                       executeFunc);
 }
 
-void TEHB(ExecutableData &data, SmallVector<Value> ins, SmallVector<Value> outs) {
-
-}
-
-struct TEHBdata {
-  unsigned slots;
-  std::queue<APInt> queue;
-};
-
-struct OEHBdata {
-  bool validData = false;
-  std::optional<llvm::Any> content;
-}
-
-// TODO : Comment recup le type des elem du buffer?
-// TODO : need a way to simulate a clock cycle. 
 bool DefaultBuffer::tryExecute(ExecutableData &data, circt::Operation &opArg) {
   auto op = dyn_cast<circt::handshake::BufferOp>(opArg);
-  
+
   // SEQ/OEHB/Opaque buffer
   if (op.isSequential()) {
-    if (!internalDataExists(opArg, data.internalDataMap)) {
-      // todo  
-    }
-
     OEHBdata oehbData;
-    getInternalData(opArg, oehbData, data.internalDataMap);
-
-    bool outsValid = data.circuitState.channelMap[op.getOperand()].isValid &&
-            !data.circuitState.channelMap[op.getOperand()].isReady;
+    if (!internalDataExists(opArg, data.internalDataMap)) {
+      oehbData.registerEnable = false;
+      oehbData.content = std::nullopt;
+      setInternalData<OEHBdata>(opArg, oehbData, data.internalDataMap);
+    } else {
+      getInternalData<OEHBdata>(opArg, oehbData, data.internalDataMap);
+    }
     
-    if (data.circuitState.channelMap[op.getOperand()].isValid &&
-        data.circuitState.channelMap[op.getOperand()].isReady) {
-      
-    }
-    // If buffer holds a data, then token is thrown away
-    if (!oehbData.validData) {
-      oehbData.content = data.circuitState.getDataOpt(op.getOperand());
-    }
-
-    // Update dataflow
-    data.circuitState.channelMap[op.getOperand()].isReady =
-        !outsValid || data.circuitState.channelMap[op.getResult()].isReady;
-
-    oehbData.validData =
+    oehbData.registerEnable =
         data.circuitState.channelMap[op.getOperand()].isReady &&
         data.circuitState.channelMap[op.getOperand()].isValid;
 
+    bool outsValid = data.circuitState.channelMap[op.getResult()].isValid; // useless right ?
+    bool insReady = !data.circuitState.channelMap[op.getResult()].isValid ||
+                    data.circuitState.channelMap[op.getResult()].isReady;
+    // On rising edge
+    if (data.circuitState.onRisingEdge(opArg)) {
+      outsValid = data.circuitState.channelMap[op.getOperand()].isValid &&
+                  !data.circuitState.channelMap[op.getOperand()].isReady;
+          // If input is ready and valid, store the data
+      if (oehbData.registerEnable)
+        oehbData.content = data.circuitState.getDataOpt(op.getOperand());
+    }
+
+    // Update dataflow
+    data.circuitState.channelMap[op.getOperand()].isReady = insReady;
+    data.circuitState.channelMap[op.getResult()].isValid = outsValid;
+
     // Whatsoever, the data is pushed
     data.circuitState.channelMap[op.getResult()].data = oehbData.content;
+
+    // Re-store data
+    setInternalData(opArg, oehbData, data.internalDataMap);
   }
 
   // FIFO/TEHB/Transparent buffer
   else {
     // Instanciates registers
+    TEHBdata tehbData;
     if (!internalDataExists(opArg, data.internalDataMap)) {
-      // todo
+      tehbData.slots = op.getNumSlots();
+    } else {
+      getInternalData<TEHBdata>(opArg, tehbData, data.internalDataMap);
     }
 
-    TEHBdata tehbData;
-    getInternalData(opArg, tehbData, data.internalDataMap);
+    bool alreadySent = false;
 
-    bool alreadySent = data.circuitState.channelMap[op.getResult()].isValid &&
+    // On rising edge
+    if (data.circuitState.onRisingEdge(opArg)) {
+      alreadySent = data.circuitState.channelMap[op.getResult()].isValid &&
                   !data.circuitState.channelMap[op.getResult()].isReady;
     
-    // If something is being done this cycle, stack the data
-    if (alreadySent) {
-      assert((tehbData.queue.size() + 1) <= tehbData.slots && "FIFO buffer is full!");
-      // TODO : data or data opt ?
-      tehbData.queue.push(
-          llvm::any_cast<APInt>(data.circuitState.getData(op.getOperand())));
-    // Otherwise, let is pass and live
-    } else {
-      // Either get the data from the input or from the queue
-      if (tehbData.queue.size() == 0) {
-        data.circuitState.channelMap[op.getResult()].data = data.circuitState.getDataOpt(op.getOperand());
+      // If something is being done this cycle, stack the data
+      if (alreadySent) {
+        assert((tehbData.queue.size() + 1) <= tehbData.slots && "FIFO buffer is full!");
+        tehbData.queue.push(
+            llvm::any_cast<APInt>(data.circuitState.getData(op.getOperand())));
+      // Otherwise, let is pass and live
       } else {
-        APInt fifoOut = tehbData.queue.front();
-        tehbData.queue.pop(); 
-        data.circuitState.channelMap[op.getResult()].data = fifoOut;
+        // Either get the data from the input or from the queue
+        if (tehbData.queue.size() == 0) {
+          data.circuitState.storeValueOnRisingEdge(op.getResult(), data.circuitState.getDataOpt(op.getOperand()));
+        } else {
+          APInt fifoOut = tehbData.queue.front();
+          tehbData.queue.pop(); 
+          data.circuitState.storeValueOnRisingEdge(op.getResult(), fifoOut);
+        }
       }
     }
-
+  
     // Update dataflow states (fifo updates ins ready and outs valid)
     data.circuitState.channelMap[op.getOperand()].isReady = !alreadySent;
     data.circuitState.channelMap[op.getResult()].isValid =
         data.circuitState.channelMap[op.getOperand()].isReady || alreadySent;
+
+    // Re-store data
+    setInternalData<TEHBdata>(opArg, tehbData, data.internalDataMap);
   }
 
   auto executeFunc = [](std::vector<llvm::Any> &ins,

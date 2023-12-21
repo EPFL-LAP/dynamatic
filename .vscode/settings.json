@@ -23,8 +23,6 @@
     "-DLLVM_ENABLE_LLD=ON",
   ],
   "files.associations": {
-    "*.inc": "cpp",
-    "optional": "cpp",
-    "coroutine": "cpp"
+    "*.inc": "cpp"
   }
 }
