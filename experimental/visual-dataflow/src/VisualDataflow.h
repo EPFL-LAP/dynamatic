@@ -81,6 +81,9 @@ private:
   void transparentEffect(double transparency);
   void highlightNode(NodeId nodeId);
   void transparentNode(NodeId nodeId);
+  void drawBBs();
+  void drawNodes();
+  void drawEdges();
 
 protected:
   /// Binds the cpp methods with Godot
