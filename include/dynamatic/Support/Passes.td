@@ -15,9 +15,8 @@
 
 include "mlir/Pass/PassBase.td"
 
-class DynamaticPass<string passArg, string requireNames = "false", 
-                    list<string> dialects = []>
-  : PassBase<passArg, "::dynamatic::DynamaticPass<" # requireNames # ">"> {
+class DynamaticPass<string passArg, list<string> dialects = []>
+  : PassBase<passArg, "::dynamatic::DynamaticPass"> {
 
   // Always load the Handshake dialect, in which all our attributes are
   // registered

@@ -25,7 +25,7 @@ using namespace circt::esi;
 
 namespace dynamatic {
 
-std::unique_ptr<dynamatic::DynamaticPass<false>> createHandshakeToNetlistPass();
+std::unique_ptr<dynamatic::DynamaticPass> createHandshakeToNetlistPass();
 
 } // namespace dynamatic
 

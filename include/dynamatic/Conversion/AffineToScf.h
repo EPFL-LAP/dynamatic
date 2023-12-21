@@ -18,7 +18,7 @@
 
 namespace dynamatic {
 
-std::unique_ptr<dynamatic::DynamaticPass<false>> createAffineToScfPass();
+std::unique_ptr<dynamatic::DynamaticPass> createAffineToScfPass();
 
 } // namespace dynamatic
 

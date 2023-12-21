@@ -31,7 +31,47 @@ using namespace dynamatic::experimental;
 #define CYCLE_TIME_STORE_OP 1
 
 //===----------------------------------------------------------------------===//
-// State tracking
+// Dataflow
+//===----------------------------------------------------------------------===//
+
+/// Stores a value in a channel, and sets its state to VALID.
+void dynamatic::experimental::CircuitState::storeValue(
+    mlir::Value channel, std::optional<llvm::Any> data) {
+  channelMap[channel].state = DataflowState::VALID;
+  channelMap[channel].data = std::move(data);
+}
+
+/// Performs multiples storeValue's at once.
+void dynamatic::experimental::CircuitState::storeValues(
+    std::vector<llvm::Any> &values, llvm::ArrayRef<mlir::Value> outs) {
+  assert(values.size() == outs.size());
+  for (unsigned long i = 0; i < outs.size(); ++i)
+    storeValue(outs[i], values[i]);
+}
+
+/// Removes a value from a channel, and sets its state to NONE.
+void dynamatic::experimental::CircuitState::removeValue(mlir::Value channel) {
+  channelMap[channel].state = DataflowState::NONE;
+  channelMap[channel].data = std::nullopt;
+}
+
+inline std::optional<llvm::Any>
+dynamatic::experimental::CircuitState::getDataOpt(mlir::Value channel) {
+  return channelMap[channel].data;
+}
+
+inline llvm::Any
+dynamatic::experimental::CircuitState::getData(mlir::Value channel) {
+  return *(channelMap[channel].data);
+}
+
+inline DataflowState
+dynamatic::experimental::CircuitState::getState(mlir::Value channel) {
+  return channelMap[channel].state;
+}
+
+//===----------------------------------------------------------------------===//
+// Internal data tracking
 //===----------------------------------------------------------------------===//
 
 /// Returns true if an internal data exists for the operation
@@ -69,59 +109,51 @@ static SmallVector<Value> toVector(ValueRange range) {
 
 /// Returns whether the precondition holds for a general op to execute
 static bool isReadyToExecute(ArrayRef<Value> ins, ArrayRef<Value> outs,
-                             llvm::DenseMap<Value, llvm::Any> &valueMap) {
+                             CircuitState &circuitState) {
+
   for (auto in : ins)
-    if (valueMap.count(in) == 0)
+    if (circuitState.getState(in) == DataflowState::NONE)
       return false;
 
   for (auto out : outs)
-    if (valueMap.count(out) > 0)
+    if (circuitState.getState(out) == DataflowState::VALID)
       return false;
 
   return true;
 }
 
 /// Fetches values from the value map and consume them
-static std::vector<llvm::Any>
-fetchValues(ArrayRef<Value> values,
-            llvm::DenseMap<Value, llvm::Any> &valueMap) {
+static std::vector<llvm::Any> fetchValues(ArrayRef<Value> values,
+                                          CircuitState &circuitState) {
   std::vector<llvm::Any> ins;
   for (auto &value : values) {
-    assert(valueMap[value].has_value());
-    ins.push_back(valueMap[value]);
-    // valueMap.erase(value);
+    if (circuitState.getState(value) == DataflowState::VALID)
+      ins.push_back(circuitState.getData(value));
+    // removeValue(value, channelMap);
   }
   return ins;
 }
 
-/// Stores values to the value map for each output
-static void storeValues(std::vector<llvm::Any> &values, ArrayRef<Value> outs,
-                        llvm::DenseMap<Value, llvm::Any> &valueMap) {
-  assert(values.size() == outs.size());
-  for (unsigned long i = 0; i < outs.size(); ++i)
-    valueMap[outs[i]] = values[i];
-}
-
 /// Wrapper method for simple constant time operations
-static bool tryToExecute(circt::Operation *op,
-                         llvm::DenseMap<Value, llvm::Any> &valueMap,
+static bool tryToExecute(circt::Operation *op, CircuitState &circuitState,
                          ModelMap &models, ExecuteFunction &executeFunc) {
   auto ins = toVector(op->getOperands());
   auto outs = toVector(op->getResults());
 
-  if (!isReadyToExecute(ins, outs, valueMap))
+  if (!isReadyToExecute(ins, outs, circuitState))
     return false;
-  auto in = fetchValues(ins, valueMap);
+  auto in = fetchValues(ins, circuitState);
   std::vector<llvm::Any> out(outs.size());
   executeFunc(in, out, *op);
-  storeValues(out, outs, valueMap);
+  circuitState.storeValues(out, outs);
   return true;
 }
 
 /// Transfers data between to stored element
 static inline void memoryTransfer(Value from, Value to, ExecutableData &data) {
-  data.valueMap[to] = data.valueMap[from];
-  // data.valueMap.erase(from);
+  data.circuitState.channelMap[to].data =
+      data.circuitState.channelMap[from].data;
+  // removeValue(from, data.channelMap)
 }
 
 /// Parses mem_controller operation operands and puts the corresponding index
@@ -131,7 +163,7 @@ parseOperandIndex(circt::handshake::MemoryControllerOp &op, unsigned cycle) {
   MemoryControllerState memControllerData;
   // Parses the operand list
   FuncMemoryPorts ports = op.getPorts();
-  for (BlockMemoryPorts blockPorts : ports.blocks) {
+  for (GroupMemoryPorts blockPorts : ports.groups) {
     MemoryRequest request;
     for (MemoryPort &port : blockPorts.accessPorts) {
       request.isReady = false;
@@ -202,8 +234,8 @@ dynamatic::experimental::initialiseMap(llvm::StringMap<std::string> &funcMap,
   // Dynamatic operations
   addDefault<handshake::MemoryControllerOp, DynamaticMemController>(
       modelStructuresMap);
-  addDefault<handshake::DynamaticLoadOp, DynamaticLoad>(modelStructuresMap);
-  addDefault<handshake::DynamaticStoreOp, DynamaticStore>(modelStructuresMap);
+  addDefault<handshake::MCLoadOp, DynamaticLoad>(modelStructuresMap);
+  addDefault<handshake::MCStoreOp, DynamaticStore>(modelStructuresMap);
   addDefault<handshake::DynamaticReturnOp, DynamaticReturn>(modelStructuresMap);
   addDefault<handshake::EndOp, DynamaticEnd>(modelStructuresMap);
 
@@ -264,7 +296,7 @@ bool DefaultFork::tryExecute(ExecutableData &data, circt::Operation &opArg) {
     for (auto &out : outs)
       out = ins[0];
   };
-  return tryToExecute(op.getOperation(), data.valueMap, data.models,
+  return tryToExecute(op.getOperation(), data.circuitState, data.models,
                       executeFunc);
 }
 
@@ -272,14 +304,13 @@ bool DefaultMerge::tryExecute(ExecutableData &data, circt::Operation &opArg) {
   auto op = dyn_cast<circt::handshake::MergeOp>(opArg);
   bool found = false;
   for (Value in : op.getOperands()) {
-    if (data.valueMap.count(in) == 1) {
+    if (data.circuitState.getState(in) == DataflowState::VALID) {
       if (found)
         op.emitOpError("More than one valid input to Merge!");
-      auto t = data.valueMap[in];
-
-      data.valueMap[op.getResult()] = t;
+      auto t = data.circuitState.getDataOpt(in);
+      data.circuitState.storeValue(op.getResult(), t);
       // Consume the inputs.
-      data.valueMap.erase(in);
+      data.circuitState.removeValue(in);
       found = true;
     }
   }
@@ -293,16 +324,16 @@ bool DefaultControlMerge::tryExecute(ExecutableData &data,
   auto op = dyn_cast<circt::handshake::ControlMergeOp>(opArg);
   bool found = false;
   for (auto in : llvm::enumerate(op.getOperands())) {
-    if (data.valueMap.count(in.value()) == 1) {
+    if (data.circuitState.getState(in.value()) == DataflowState::VALID) {
       if (found)
         op.emitOpError("More than one valid input to CMerge!");
-      data.valueMap[op.getResult()] = data.valueMap[in.value()];
-      data.valueMap[op.getIndex()] =
-          APInt(IndexType::kInternalStorageBitWidth, in.index());
-
+      data.circuitState.storeValue(op.getResult(),
+                                   data.circuitState.getDataOpt(in.value()));
+      data.circuitState.storeValue(
+          op.getIndex(),
+          APInt(IndexType::kInternalStorageBitWidth, in.index()));
       // Consume the inputs.
-      data.valueMap.erase(in.value());
-
+      data.circuitState.removeValue(in.value());
       found = true;
     }
   }
@@ -314,22 +345,22 @@ bool DefaultControlMerge::tryExecute(ExecutableData &data,
 bool DefaultMux::tryExecute(ExecutableData &data, circt::Operation &opArg) {
   auto op = dyn_cast<circt::handshake::MuxOp>(opArg);
   Value control = op.getSelectOperand();
-  if (data.valueMap.count(control) == 0)
+  if (data.circuitState.getState(control) == DataflowState::NONE)
     return false;
-  auto controlValue = data.valueMap[control];
+  auto controlValue = data.circuitState.getData(control);
   auto opIdx = llvm::any_cast<APInt>(controlValue).getZExtValue();
   assert(opIdx < op.getDataOperands().size() &&
          "Trying to select a non-existing mux operand");
 
   Value in = op.getDataOperands()[opIdx];
-  if (data.valueMap.count(in) == 0)
+  if (data.circuitState.getState(in) == DataflowState::NONE)
     return false;
-  auto inValue = data.valueMap[in];
-  data.valueMap[op.getResult()] = inValue;
+  auto inValue = data.circuitState.getDataOpt(in);
+  data.circuitState.storeValue(op.getResult(), inValue);
 
   // Consume the inputs.
-  data.valueMap.erase(control);
-  data.valueMap.erase(in);
+  data.circuitState.removeValue(in);
+  data.circuitState.removeValue(control);
   return true;
 }
 
@@ -338,7 +369,7 @@ bool DefaultBranch::tryExecute(ExecutableData &data, circt::Operation &opArg) {
   auto executeFunc = [](std::vector<llvm::Any> &ins,
                         std::vector<llvm::Any> &outs,
                         circt::Operation &op) { outs[0] = ins[0]; };
-  return tryToExecute(op.getOperation(), data.valueMap, data.models,
+  return tryToExecute(op.getOperation(), data.circuitState, data.models,
                       executeFunc);
 }
 
@@ -346,26 +377,27 @@ bool DefaultConditionalBranch::tryExecute(ExecutableData &data,
                                           circt::Operation &opArg) {
   auto op = dyn_cast<circt::handshake::ConditionalBranchOp>(opArg);
   Value control = op.getConditionOperand();
-  if (data.valueMap.count(control) == 0)
+  if (data.circuitState.getState(control) == DataflowState::NONE)
     return false;
-  auto controlValue = data.valueMap[control];
+  auto controlValue = data.circuitState.getData(control);
   Value in = op.getDataOperand();
-  if (data.valueMap.count(in) == 0)
+  if (data.circuitState.getState(in) == DataflowState::NONE)
     return false;
-  auto inValue = data.valueMap[in];
+  auto inValue = data.circuitState.getDataOpt(in);
   Value out = llvm::any_cast<APInt>(controlValue) != 0 ? op.getTrueResult()
                                                        : op.getFalseResult();
-  data.valueMap[out] = inValue;
+  data.circuitState.storeValue(out, inValue);
 
   // Consume the inputs.
-  data.valueMap.erase(control);
-  data.valueMap.erase(in);
+  data.circuitState.removeValue(in);
+  data.circuitState.removeValue(control);
+
   return true;
 }
 
 bool DefaultSink::tryExecute(ExecutableData &data, circt::Operation &opArg) {
   auto op = dyn_cast<circt::handshake::SinkOp>(opArg);
-  data.valueMap.erase(op.getOperand());
+  data.circuitState.removeValue(op.getOperand());
   return true;
 }
 
@@ -377,7 +409,7 @@ bool DefaultConstant::tryExecute(ExecutableData &data,
     auto attr = op.getAttrOfType<IntegerAttr>("value");
     outs[0] = attr.getValue();
   };
-  return tryToExecute(op.getOperation(), data.valueMap, data.models,
+  return tryToExecute(op.getOperation(), data.circuitState, data.models,
                       executeFunc);
 }
 
@@ -386,7 +418,7 @@ bool DefaultBuffer::tryExecute(ExecutableData &data, circt::Operation &opArg) {
   auto executeFunc = [](std::vector<llvm::Any> &ins,
                         std::vector<llvm::Any> &outs,
                         circt::Operation &op) { outs[0] = ins[0]; };
-  return tryToExecute(op.getOperation(), data.valueMap, data.models,
+  return tryToExecute(op.getOperation(), data.circuitState, data.models,
                       executeFunc);
 }
 
@@ -398,7 +430,7 @@ bool DynamaticMemController::tryExecute(ExecutableData &data,
   bool hasDoneStuff =
       false; // This might be different for the mem controller but ok
   unsigned bufferStart =
-      llvm::any_cast<unsigned>(data.valueMap[op.getMemref()]);
+      llvm::any_cast<unsigned>(data.circuitState.getData(op.getMemRef()));
 
   // Add an internal data to keep track of completed load/store requests
   if (!internalDataExists(opArg, data.internalDataMap))
@@ -417,8 +449,8 @@ bool DynamaticMemController::tryExecute(ExecutableData &data,
     Value dataOperand = op.getOperand(dataIdx);
 
     // Verify if the operands are ready
-    if ((data.valueMap.count(dataOperand) && data.valueMap.count(address))) {
-
+    if (data.circuitState.getState(dataOperand) == DataflowState::VALID &&
+        data.circuitState.getState(address) == DataflowState::VALID) {
       // If this is the cycle the request is made, register it to avoid
       // re-executing the operation
       if (!request.isReady) {
@@ -434,8 +466,8 @@ bool DynamaticMemController::tryExecute(ExecutableData &data,
       // Check if enough cycle passed (simulates the real circuit delay)
       if (request.cyclesToComplete == 0) {
         // Store the data accordingly
-        auto addressValue = data.valueMap[address];
-        auto dataValue = data.valueMap[dataOperand];
+        auto addressValue = data.circuitState.getData(address);
+        auto dataValue = data.circuitState.getData(dataOperand);
 
         assert(bufferStart < data.store.size());
         auto &mem = data.store[bufferStart];
@@ -463,7 +495,7 @@ bool DynamaticMemController::tryExecute(ExecutableData &data,
     Value address = op.getOperand(addressIdx);
     Value dataOperand = op.getResult(i);
     // Verify if the operand is ready
-    if (data.valueMap.count(address)) {
+    if (data.circuitState.getState(address) == DataflowState::VALID) {
 
       if (!request.isReady) {
         request.lastExecution = data.currentCycle;
@@ -479,11 +511,11 @@ bool DynamaticMemController::tryExecute(ExecutableData &data,
       // Check if enough cycle passed (simulates the real circuit delay)
       if (request.cyclesToComplete == 0) {
         // Load the data accordingly
-        auto addressValue = data.valueMap[address];
+        auto addressValue = data.circuitState.getData(address);
         unsigned offset = llvm::any_cast<APInt>(addressValue).getZExtValue();
         auto &mem = data.store[bufferStart];
         assert(offset < mem.size());
-        data.valueMap[dataOperand] = mem[offset];
+        data.circuitState.storeValue(dataOperand, mem[offset]);
 
         mcData.loadRequests.erase(mcData.loadRequests.begin() + i);
         hasDoneStuff = true;
@@ -499,17 +531,18 @@ bool DynamaticMemController::tryExecute(ExecutableData &data,
 }
 
 bool DynamaticLoad::tryExecute(ExecutableData &data, circt::Operation &opArg) {
-  auto op = dyn_cast<circt::handshake::DynamaticLoadOp>(opArg);
+  auto op = dyn_cast<circt::handshake::MCLoadOp>(opArg);
   bool hasDoneStuff = false;
 
   // Send address to mem controller if available
-  if (!data.valueMap.count(op.getAddressResult())) {
+  if (data.circuitState.getState(op.getAddressResult()) ==
+      DataflowState::NONE) {
     memoryTransfer(op.getAddress(), op.getAddressResult(), data);
     hasDoneStuff = true;
   }
   // Send data to successor if available
-  if (data.valueMap.count(op.getData()) &&
-      !data.valueMap.count(op.getDataResult())) {
+  if (data.circuitState.getState(op.getData()) == DataflowState::VALID &&
+      data.circuitState.getState(op.getDataResult()) == DataflowState::NONE) {
     memoryTransfer(op.getData(), op.getDataResult(), data);
     hasDoneStuff = true;
   }
@@ -518,18 +551,19 @@ bool DynamaticLoad::tryExecute(ExecutableData &data, circt::Operation &opArg) {
 }
 
 bool DynamaticStore::tryExecute(ExecutableData &data, circt::Operation &opArg) {
-  auto op = dyn_cast<circt::handshake::DynamaticStoreOp>(opArg);
+  auto op = dyn_cast<circt::handshake::MCStoreOp>(opArg);
   bool hasDoneStuff = false;
 
   // Send address to mem controller if available
-  if (data.valueMap.count(op.getAddress()) &&
-      !data.valueMap.count(op.getAddressResult())) {
+  if (data.circuitState.getState(op.getAddress()) == DataflowState::VALID &&
+      data.circuitState.getState(op.getAddressResult()) ==
+          DataflowState::NONE) {
     memoryTransfer(op.getAddress(), op.getAddressResult(), data);
     hasDoneStuff = true;
   }
   // Send data to mem controller if available
-  if (data.valueMap.count(op.getData()) &&
-      !data.valueMap.count(op.getDataResult())) {
+  if (data.circuitState.getState(op.getData()) == DataflowState::VALID &&
+      data.circuitState.getState(op.getDataResult()) == DataflowState::NONE) {
     memoryTransfer(op.getData(), op.getDataResult(), data);
     hasDoneStuff = true;
   }
@@ -546,7 +580,7 @@ bool DynamaticReturn::tryExecute(ExecutableData &data,
       outs[i] = ins[i];
     data.internalDataMap[&op] = true;
   };
-  return tryToExecute(op.getOperation(), data.valueMap, data.models,
+  return tryToExecute(op.getOperation(), data.circuitState, data.models,
                       executeFunc);
 }
 
@@ -581,7 +615,7 @@ bool ArithAddF::tryExecute(ExecutableData &data, circt::Operation &opArg) {
                         std::vector<llvm::Any> &outs, circt::Operation &op) {
     outs[0] = llvm::any_cast<APFloat>(ins[0]) + llvm::any_cast<APFloat>(ins[1]);
   };
-  return tryToExecute(op.getOperation(), data.valueMap, data.models,
+  return tryToExecute(op.getOperation(), data.circuitState, data.models,
                       executeFunc);
 }
 
@@ -591,7 +625,7 @@ bool ArithAddI::tryExecute(ExecutableData &data, circt::Operation &opArg) {
                         std::vector<llvm::Any> &outs, circt::Operation &op) {
     outs[0] = llvm::any_cast<APInt>(ins[0]) + llvm::any_cast<APInt>(ins[1]);
   };
-  return tryToExecute(op.getOperation(), data.valueMap, data.models,
+  return tryToExecute(op.getOperation(), data.circuitState, data.models,
                       executeFunc);
 }
 
@@ -603,7 +637,7 @@ bool ConstantIndexOp::tryExecute(ExecutableData &data,
     auto attr = op.getAttrOfType<mlir::IntegerAttr>("value");
     outs[0] = attr.getValue().sextOrTrunc(32);
   };
-  return tryToExecute(op.getOperation(), data.valueMap, data.models,
+  return tryToExecute(op.getOperation(), data.circuitState, data.models,
                       executeFunc);
 }
 
@@ -614,7 +648,7 @@ bool ConstantIntOp::tryExecute(ExecutableData &data, circt::Operation &opArg) {
     auto attr = op.getAttrOfType<mlir::IntegerAttr>("value");
     outs[0] = attr.getValue();
   };
-  return tryToExecute(op.getOperation(), data.valueMap, data.models,
+  return tryToExecute(op.getOperation(), data.circuitState, data.models,
                       executeFunc);
 }
 
@@ -624,7 +658,7 @@ bool XOrIOp::tryExecute(ExecutableData &data, circt::Operation &opArg) {
                         std::vector<llvm::Any> &outs, circt::Operation &op) {
     outs[0] = llvm::any_cast<APInt>(ins[0]) ^ llvm::any_cast<APInt>(ins[1]);
   };
-  return tryToExecute(op.getOperation(), data.valueMap, data.models,
+  return tryToExecute(op.getOperation(), data.circuitState, data.models,
                       executeFunc);
 }
 
@@ -639,7 +673,7 @@ bool CmpIOp::tryExecute(ExecutableData &data, circt::Operation &opArg) {
         1, mlir::arith::applyCmpPredicate(castedOp.getPredicate(), in0, in1));
     outs[0] = out0;
   };
-  return tryToExecute(castedOp.getOperation(), data.valueMap, data.models,
+  return tryToExecute(castedOp.getOperation(), data.circuitState, data.models,
                       executeFunc);
 }
 
@@ -654,7 +688,7 @@ bool CmpFOp::tryExecute(ExecutableData &data, circt::Operation &opArg) {
         1, mlir::arith::applyCmpPredicate(castedOp.getPredicate(), in0, in1));
     outs[0] = out0;
   };
-  return tryToExecute(castedOp.getOperation(), data.valueMap, data.models,
+  return tryToExecute(castedOp.getOperation(), data.circuitState, data.models,
                       executeFunc);
 }
 
@@ -664,7 +698,7 @@ bool SubIOp::tryExecute(ExecutableData &data, circt::Operation &opArg) {
                         std::vector<llvm::Any> &outs, circt::Operation &op) {
     outs[0] = llvm::any_cast<APInt>(ins[0]) - llvm::any_cast<APInt>(ins[1]);
   };
-  return tryToExecute(op.getOperation(), data.valueMap, data.models,
+  return tryToExecute(op.getOperation(), data.circuitState, data.models,
                       executeFunc);
 }
 
@@ -674,7 +708,7 @@ bool SubFOp::tryExecute(ExecutableData &data, circt::Operation &opArg) {
                         std::vector<llvm::Any> &outs, circt::Operation &op) {
     outs[0] = llvm::any_cast<APFloat>(ins[0]) + llvm::any_cast<APFloat>(ins[1]);
   };
-  return tryToExecute(op.getOperation(), data.valueMap, data.models,
+  return tryToExecute(op.getOperation(), data.circuitState, data.models,
                       executeFunc);
 }
 
@@ -684,7 +718,7 @@ bool MulIOp::tryExecute(ExecutableData &data, circt::Operation &opArg) {
                         std::vector<llvm::Any> &outs, circt::Operation &op) {
     outs[0] = llvm::any_cast<APInt>(ins[0]) * llvm::any_cast<APInt>(ins[1]);
   };
-  return tryToExecute(op.getOperation(), data.valueMap, data.models,
+  return tryToExecute(op.getOperation(), data.circuitState, data.models,
                       executeFunc);
 }
 
@@ -694,7 +728,7 @@ bool MulFOp::tryExecute(ExecutableData &data, circt::Operation &opArg) {
                         std::vector<llvm::Any> &outs, circt::Operation &op) {
     outs[0] = llvm::any_cast<APFloat>(ins[0]) * llvm::any_cast<APFloat>(ins[1]);
   };
-  return tryToExecute(op.getOperation(), data.valueMap, data.models,
+  return tryToExecute(op.getOperation(), data.circuitState, data.models,
                       executeFunc);
 }
 
@@ -706,7 +740,7 @@ bool DivSIOp::tryExecute(ExecutableData &data, circt::Operation &opArg) {
       op.emitOpError() << "Division By Zero!";
     outs[0] = llvm::any_cast<APInt>(ins[0]).sdiv(llvm::any_cast<APInt>(ins[1]));
   };
-  return tryToExecute(op.getOperation(), data.valueMap, data.models,
+  return tryToExecute(op.getOperation(), data.circuitState, data.models,
                       executeFunc);
 }
 
@@ -718,7 +752,7 @@ bool DivUIOp::tryExecute(ExecutableData &data, circt::Operation &opArg) {
       op.emitOpError() << "Division By Zero!";
     outs[0] = llvm::any_cast<APInt>(ins[0]).udiv(llvm::any_cast<APInt>(ins[1]));
   };
-  return tryToExecute(op.getOperation(), data.valueMap, data.models,
+  return tryToExecute(op.getOperation(), data.circuitState, data.models,
                       executeFunc);
 }
 
@@ -728,7 +762,7 @@ bool DivFOp::tryExecute(ExecutableData &data, circt::Operation &opArg) {
                         std::vector<llvm::Any> &outs, circt::Operation &op) {
     outs[0] = llvm::any_cast<APFloat>(ins[0]) / llvm::any_cast<APFloat>(ins[1]);
   };
-  return tryToExecute(op.getOperation(), data.valueMap, data.models,
+  return tryToExecute(op.getOperation(), data.circuitState, data.models,
                       executeFunc);
 }
 
@@ -751,7 +785,7 @@ bool IndexCastOp::tryExecute(ExecutableData &data, circt::Operation &opArg) {
 
     outs[0] = outValue;
   };
-  return tryToExecute(castedOp.getOperation(), data.valueMap, data.models,
+  return tryToExecute(castedOp.getOperation(), data.circuitState, data.models,
                       executeFunc);
 }
 
@@ -763,7 +797,7 @@ bool ExtSIOp::tryExecute(ExecutableData &data, circt::Operation &opArg) {
     int64_t width = castedOp.getType().getIntOrFloatBitWidth();
     outs[0] = llvm::any_cast<APInt>(ins[0]).sext(width);
   };
-  return tryToExecute(castedOp.getOperation(), data.valueMap, data.models,
+  return tryToExecute(castedOp.getOperation(), data.circuitState, data.models,
                       executeFunc);
 }
 
@@ -775,7 +809,7 @@ bool ExtUIOp::tryExecute(ExecutableData &data, circt::Operation &opArg) {
     int64_t width = castedOp.getType().getIntOrFloatBitWidth();
     outs[0] = llvm::any_cast<APInt>(ins[0]).zext(width);
   };
-  return tryToExecute(castedOp.getOperation(), data.valueMap, data.models,
+  return tryToExecute(castedOp.getOperation(), data.circuitState, data.models,
                       executeFunc);
 }
 

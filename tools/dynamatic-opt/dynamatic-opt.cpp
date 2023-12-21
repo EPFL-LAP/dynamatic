@@ -16,6 +16,11 @@
 #include "dynamatic/InitAllDialects.h"
 #include "dynamatic/InitAllPasses.h"
 #include "experimental/InitAllPasses.h"
+#include "mlir/Dialect/Affine/Passes.h"
+#include "mlir/Dialect/Arith/Transforms/Passes.h"
+#include "mlir/Dialect/Func/Transforms/Passes.h"
+#include "mlir/Dialect/MemRef/Transforms/Passes.h"
+#include "mlir/Dialect/SCF/Transforms/Passes.h"
 #include "mlir/Pass/PassRegistry.h"
 #include "mlir/Tools/mlir-opt/MlirOptMain.h"
 #include "mlir/Transforms/Passes.h"
@@ -36,6 +41,14 @@ void registerTestPasses() {
 
 int main(int argc, char **argv) {
   mlir::DialectRegistry registry;
+
+  // Register standard MLIR passes we care about
+  mlir::registerTransformsPasses();
+  mlir::affine::registerAffinePasses();
+  mlir::arith::registerArithPasses();
+  mlir::func::registerFuncPasses();
+  mlir::memref::registerMemRefPasses();
+  mlir::registerSCFPasses();
 
   // Register specific dialects and passes we want
   dynamatic::registerAllDialects(registry);

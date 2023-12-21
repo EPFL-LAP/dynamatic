@@ -16,31 +16,13 @@
 
 #include "dynamatic/Transforms/HandshakeCanonicalize.h"
 #include "circt/Dialect/Handshake/HandshakeOps.h"
+#include "dynamatic/Support/Handshake.h"
 #include "dynamatic/Support/LogicBB.h"
 #include "mlir/Transforms/GreedyPatternRewriteDriver.h"
 
 using namespace circt;
 using namespace mlir;
 using namespace dynamatic;
-
-/// Determines whether the given value has any "real" use i.e., a use which is
-/// not the operand of a sink. If this function returns true for a given value
-/// and one decides to erase the operation that defines it, one should keep in
-/// mind that there may still be actual users of the value in the IR. In this
-/// situation, using `eraseSinkUsers` in conjunction with this function will get
-/// rid of all of the value's users.
-static bool hasRealUses(Value val) {
-  return llvm::any_of(val.getUsers(), [&](Operation *user) {
-    return !isa<handshake::SinkOp>(user);
-  });
-}
-
-/// Erases all sink operations that have the given value as operand.
-static void eraseSinkUsers(Value val, PatternRewriter &rewriter) {
-  for (Operation *user : llvm::make_early_inc_range(val.getUsers()))
-    if (isa<handshake::SinkOp>(user))
-      rewriter.eraseOp(user);
-}
 
 namespace {
 
@@ -192,7 +174,7 @@ struct HandshakeCanonicalizePass
 };
 }; // namespace
 
-std::unique_ptr<dynamatic::DynamaticPass<false>>
+std::unique_ptr<dynamatic::DynamaticPass>
 dynamatic::createHandshakeCanonicalize() {
   return std::make_unique<HandshakeCanonicalizePass>();
 }

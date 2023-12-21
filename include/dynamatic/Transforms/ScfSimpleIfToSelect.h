@@ -21,7 +21,7 @@
 
 namespace dynamatic {
 
-std::unique_ptr<dynamatic::DynamaticPass<false>> createScfSimpleIfToSelect();
+std::unique_ptr<dynamatic::DynamaticPass> createScfSimpleIfToSelect();
 
 #define GEN_PASS_DECL_SCFSIMPLEIFTOSELECT
 #define GEN_PASS_DEF_SCFSIMPLEIFTOSELECT

@@ -772,7 +772,7 @@ struct HandshakeMCAddress
   LogicalResult matchAndRewrite(handshake::MemoryControllerOp mcOp,
                                 PatternRewriter &rewriter) const override {
     unsigned optWidth =
-        getOptAddrWidth(mcOp.getMemref().getType().getDimSize(0));
+        getOptAddrWidth(mcOp.getMemRef().getType().getDimSize(0));
 
     FuncMemoryPorts ports = mcOp.getPorts();
     if (ports.addrWidth == 0 || optWidth >= ports.addrWidth)
@@ -789,7 +789,7 @@ struct HandshakeMCAddress
     // Iterate over memory controller inputs to create the new inputs and the
     // list of accesses
     SmallVector<Value> newInputs;
-    for (BlockMemoryPorts &blockPorts : ports.blocks) {
+    for (GroupMemoryPorts &blockPorts : ports.groups) {
       // Handle eventual control input
       if (blockPorts.hasControl())
         newInputs.push_back(inputs[blockPorts.ctrlPort->getCtrlInputIndex()]);
@@ -809,8 +809,8 @@ struct HandshakeMCAddress
     // Replace the existing memory controller with the optimized one
     rewriter.setInsertionPoint(mcOp);
     auto newOp = rewriter.create<handshake::MemoryControllerOp>(
-        mcOp.getLoc(), mcOp.getMemref(), newInputs,
-        mcOp.getPorts().getNumLoadPorts());
+        mcOp.getLoc(), mcOp.getMemRef(), newInputs, mcOp.getMCBlocks(),
+        mcOp.getPorts().getNumPorts<LoadPort, LSQLoadStorePort>());
     inheritBB(mcOp, newOp);
     rewriter.replaceOp(mcOp, newOp.getResults());
     return success();
@@ -820,7 +820,7 @@ struct HandshakeMCAddress
 /// Optimizes the bitwidth of memory ports's address-carrying channels so that
 /// they can just support indexing into the memory region these ports ultimately
 /// talk to. The first template parameter is meant to be either
-/// handshake::DynamaticLoadOp or handshake::DynamaticStoreOp. This pattern can
+/// handshake::LoadOpInterface or handshake::StoreOpInterface. This pattern can
 /// be applied as part of a single greedy rewriting pass and doesn't need to be
 /// part of the forward/backward process.
 template <typename Op>
@@ -1525,9 +1525,11 @@ struct HandshakeOptimizeBitwidthsPass
     patterns.add<HandshakeMuxSelect, DowngradeSingleInputMuxes,
                  HandshakeCMergeIndex, DowngradeSingleInputControlMerges>(ctx);
     if (!legacy)
-      patterns.add<HandshakeMCAddress,
-                   HandshakeMemPortAddress<handshake::DynamaticLoadOp>,
-                   HandshakeMemPortAddress<handshake::DynamaticStoreOp>>(ctx);
+      patterns
+          .add<HandshakeMCAddress, HandshakeMemPortAddress<handshake::MCLoadOp>,
+               HandshakeMemPortAddress<handshake::LSQLoadOp>,
+               HandshakeMemPortAddress<handshake::MCStoreOp>,
+               HandshakeMemPortAddress<handshake::LSQStoreOp>>(ctx);
     if (failed(
             applyPatternsAndFoldGreedily(modOp, std::move(patterns), config)))
       return signalPassFailure();
@@ -1637,7 +1639,7 @@ void HandshakeOptimizeBitwidthsPass::addBackwardPatterns(
 
 } // namespace
 
-std::unique_ptr<dynamatic::DynamaticPass<false>>
+std::unique_ptr<dynamatic::DynamaticPass>
 dynamatic::createHandshakeOptimizeBitwidths(bool legacy) {
   return std::make_unique<HandshakeOptimizeBitwidthsPass>(legacy);
 }

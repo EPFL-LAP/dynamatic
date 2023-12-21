@@ -53,7 +53,7 @@ def ScfForLoopRotation : DynamaticPass<"scf-rotate-for-loops"> {
   let constructor = "dynamatic::createScfRotateForLoops()";
 }
 
-def ScfSimpleIfToSelect : DynamaticPass<"scf-simple-if-to-select", "false",
+def ScfSimpleIfToSelect : DynamaticPass<"scf-simple-if-to-select",
                                         ["mlir::arith::ArithDialect"]> {
   let summary = "Transforms if's with simple bodies into select's.";
   let description = [{
@@ -105,6 +105,19 @@ def HandshakeInferBasicBlocks : DynamaticPass<"handshake-infer-basic-blocks"> {
   let constructor = "dynamatic::createHandshakeInferBasicBlocksPass()";
 }
 
+def HandshakeMaterialize : DynamaticPass<"handshake-materialize"> {
+  let summary = "Materializes forks and sinks into the IR.";
+  let description = [{
+    Ensures that every SSA value within Handshake functions is used exactly once
+    by inserting forks and sinks as needed to, respectively, "duplicate" values
+    and "absorb" others. In additon to inserting eager forks and sinks, it also
+    inserts lazy forks on the control memory network as needed to ensure
+    (together with buffer placement) that multiple group allocations to the same
+    LSQ never happen on the same cycle.   
+  }];
+  let constructor = "dynamatic::createHandshakeMaterialize()";
+}
+
 def HandshakePrepareForLegacy : DynamaticPass<"handshake-prepare-for-legacy"> {
   let summary = "Prepare the IR for usage in legacy Dynamatic.";
   let description = [{
@@ -119,7 +132,6 @@ def HandshakePrepareForLegacy : DynamaticPass<"handshake-prepare-for-legacy"> {
 }
 
 def HandshakeOptimizeBitwidths : DynamaticPass< "handshake-optimize-bitwidths", 
-                                                "false",
                                                 ["mlir::arith::ArithDialect"]> {
   let summary = "Optimize bitwidths of all channels.";
   let description = [{
@@ -153,7 +165,6 @@ def HandshakeConcretizeIndexType : DynamaticPass<"handshake-concretize-index-typ
 }
 
 def HandshakeMinimizeCstWidth : DynamaticPass<"handshake-minimize-cst-width",
-                                              "false",
                                               ["mlir::arith::ArithDialect"]> {
   let summary = "Minimizes the bitwidth of all Handshake constants.";
   let description = [{
@@ -187,7 +198,7 @@ def HandshakeSetBufferingProperties :
             "(default).">];
 }
 
-def HandshakePlaceBuffers : DynamaticPass<"handshake-place-buffers", "true"> {
+def HandshakePlaceBuffers : DynamaticPass<"handshake-place-buffers"> {
   let summary = 
     "Places buffers in dataflow circuits for correctness and performance.";
   let description = [{
@@ -205,7 +216,7 @@ def HandshakePlaceBuffers : DynamaticPass<"handshake-place-buffers", "true"> {
     "Algorithm to use for buffer placement. Choices are: 'on-merges' (default, "
     "does not require Gurobi) 'fpga20', 'fpga20-legacy' (same as fpga-20 but "
     "interprets the MILP's results as legacy Dynamatic would, placing at most "
-    "a single buffer type on any given channel)">,
+    "a single buffer type on any given channel), 'fpl22'.">,
     Option<"frequencies", "frequencies", "std::string", "",
     "Path to CSV-formatted file containing estimated transition frequencies "
     "between basic blocks in the kernel.">,
@@ -228,28 +239,6 @@ def HandshakePlaceBuffers : DynamaticPass<"handshake-place-buffers", "true"> {
 // Other passes
 //===----------------------------------------------------------------------===//
 
-def AnalyzeMemoryAccesses : DynamaticPass<"analyze-memory-accesses"> {
-  let summary = "Determine memory dependencies between different accesses.";
-  let description = [{
-    Analyzes memory accesses in each function in a module and identifies all
-    dependencies between them. Stores information about these dependencies in a
-    `circt::handshake::MemDependenceArrayAttr` attribute attached to each
-    operation that is the source of at least one dependence. The attribute
-    belongs to the Handshake dialect as it only becomes useful during the
-    std-to-handshake lowering pass.
-
-    The pass attempts to find dependencies between all `affine::AffineLoadOp`,
-    `affine::AffineStoreOp`, `memref::LoadOp` and `memref::StoreOp` operations.
-    It uses MLIR's polyhedral analysis infrastructure to identify complex
-    dependencies between pairs of affine accesses, and uses a pessimistic
-    approach for pairs of accesses that involve at least one non-affine access.
-
-    The pass will fail if MLIR's polyhedral analysis infrastructure fails to
-    check for a dependence between two affine accesses.
-  }];
-  let constructor = "dynamatic::createAnalyzeMemoryAccesses()";
-}
-
 def BackAnnotate : DynamaticPass<"back-annotate"> {
   let summary = "Back-annotates IR from JSON-formatted attributes";
   let description = [{
@@ -266,7 +255,7 @@ def BackAnnotate : DynamaticPass<"back-annotate"> {
             "Path to JSON-formatted back-annotation file">];
 }
 
-def FlattenMemRefRowMajor : DynamaticPass<"flatten-memref-row-major", "false",
+def FlattenMemRefRowMajor : DynamaticPass<"flatten-memref-row-major",
                                           ["mlir::memref::MemRefDialect"]> {
   let summary = "Flatten memrefs (row-major order)";
   let description = [{
@@ -283,10 +272,9 @@ def ForceMemoryInterface : DynamaticPass<"force-memory-interface"> {
   let description = [{
     Forces the type of memory interface that will be placed for all memory
     operations (from the affine or memref dialects) when lowering to Handshake.
-    Internally, this sets (force MCs) or removes (force LSQs) the 
-    `circt::handshake::NoLSQAttr` singleton attribute on/from all memory
-    operations in the IR. Exactly one of the two pass options should be provided
-    at the same time.
+    Internally, adds/modifies the `circt::handshake::MemoryInterfaceAttr`
+    attribute on all memory operations in the IR. Exactly one of the two pass
+    options should be provided at the same time.
   }];
   let constructor = "dynamatic::createForceMemoryInterface()";
   let options = [
@@ -297,6 +285,47 @@ def ForceMemoryInterface : DynamaticPass<"force-memory-interface"> {
       "Whether to force the placement of MCs in the circuit after Handshake "
       "lowering (off by default, mutually exclusice with force-lsq).">
   ];
+}
+
+def MarkMemoryDependencies : DynamaticPass<"mark-memory-dependencies"> {
+  let summary = "Mark all memory dependencies in the IR.";
+  let description = [{
+    Analyzes memory accesses in each function in a module and identifies all
+    dependencies between them. Stores information about these dependencies in a
+    `circt::handshake::MemDependenceArrayAttr` attribute attached to each
+    operation that is the source of at least one dependency.
+
+    The pass attempts to find dependencies between all `affine::AffineLoadOp`,
+    `affine::AffineStoreOp`, `memref::LoadOp` and `memref::StoreOp` operations.
+    It uses MLIR's polyhedral analysis infrastructure to identify complex
+    dependencies between pairs of affine accesses, and uses a pessimistic
+    approach for pairs of accesses that involve at least one non-affine access.
+    While this pass can be ran at any point before conversion to Handshake, it
+    makes the most sense to run it as early as possible since affine analysis 
+    relies on very high-level information.
+
+    The pass will fail if MLIR's polyhedral analysis infrastructure fails to
+    check for a dependence between two affine accesses.
+  }];
+  let constructor = "dynamatic::createMarkMemoryDependencies()";
+}
+
+def MarkMemoryInterfaces : DynamaticPass<"mark-memory-interfaces"> {
+  let summary = "Mark memory accesses with the interface they should connect to.";
+  let description = [{
+    Annotates all memory accesses in the IR with a
+    `circt::handshake::MemInterfaceAttr` attribute indicating the kind of
+    memory interface they should eventually connect to. It uses memory
+    dependencies derived during polyhedral analysis to determine the type of
+    interface necessary for each memory port. As such this pass should typically
+    be ran after the `--mark-memory-dependencies` pass.
+
+    Internally, it uses `circt::handshake::MemDependenceArrayAttr` attributes
+    attached to memory operations to determine whether any memory access depends
+    on any other. If no such attributes are present it is assumed that there are
+    no memory dependencies.  
+  }];
+  let constructor = "dynamatic::createMarkMemoryInterfaces()";
 }
 
 def NameAllOperations : Pass<"name-all-operations", "mlir::ModuleOp"> {
@@ -332,6 +361,17 @@ def RemoveOperationNames : Pass<"remove-operation-names", "mlir::ModuleOp"> {
   }];
   let constructor = "dynamatic::createRemoveOperationNames()";
   let dependentDialects = ["circt::handshake::HandshakeDialect"];
+}
+
+def RemovePolygeistAttributes : DynamaticPass<"remove-polygeist-attributes"> {
+  let summary = "Removes useless module and function attributes set by Polygeist.";
+  let description = [{
+    Polygeist sets a couple attributes belonging to the `dlti` and `llvm`
+    dialects on the top-level MLIR module and on functions that we do not care
+    about. This simply removes them (avoid having to pass the
+    --allow-unregistered-dialect flag to all optimizer invokations).
+  }];
+  let constructor = "dynamatic::createRemovePolygeistAttributes()";
 }
 
 #endif // DYNAMATIC_TRANSFORMS_PASSES_TD

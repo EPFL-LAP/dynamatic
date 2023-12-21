@@ -18,7 +18,7 @@
 
 namespace dynamatic {
 
-std::unique_ptr<dynamatic::DynamaticPass<false>> createPushConstantsPass();
+std::unique_ptr<dynamatic::DynamaticPass> createPushConstantsPass();
 
 } // namespace dynamatic
 

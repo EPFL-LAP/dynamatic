@@ -28,7 +28,7 @@ namespace dynamatic {
 /// Computes the minimum required bitwidth needed to store the provided integer.
 unsigned computeRequiredBitwidth(APInt val);
 
-std::unique_ptr<dynamatic::DynamaticPass<false>>
+std::unique_ptr<dynamatic::DynamaticPass>
 createHandshakeMinimizeCstWidth(bool optNegatives = false);
 
 } // namespace dynamatic

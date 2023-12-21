@@ -74,24 +74,24 @@ public:
   /// Whether the operation has a name.
   bool hasName(Operation *op) { return opToName.contains(op); }
 
-  /// If the operation has a name, stores a reference to it in `name` and
-  /// succeeds, fails otherwise.
-  LogicalResult getName(Operation *op, StringRef &name);
+  /// If the operation doesn't currently have a name, sets a unique name for the
+  /// operation based on its type and returns a reference to it. If the
+  /// operation already had a name, just return a reference to this name.
+  StringRef getName(Operation *op);
 
   /// Derives a unique name for the provided operand, which is based on the
-  /// respective names of its "producer" and "consumer" operations (therefore,
-  /// both of them need to be named, or a failure will be produced) as well as
+  /// respective names of its "producer" and "consumer" operations as well as
   /// operation-specific result/operand names if available (if not, their
-  /// respective index). On success, sets `name` to the derived name.
-  LogicalResult getName(OpOperand &oprd, std::string &name);
+  /// respective index). The producer and/or comsumer operations are uniquely
+  /// named if they do not already have names.
+  std::string getName(OpOperand &oprd);
 
   /// Return the operation that has this name, if it exists.
   Operation *getOp(StringRef name) { return nameToOp[name]; };
 
-  /// Sets a unique name for the operation and returns a reference to it. The
-  /// name is based on the operation's type. If the operation already had a
-  /// name, just return a reference to this name.
-  StringRef setName(Operation *op);
+  /// This is simply an alias for `getName(Operation*)` for when the
+  /// programmer's intent is to just set a unique name without reading it back.
+  void setName(Operation *op) { getName(op); };
 
   /// Attempts to name the operation with the provided name. Fails if the
   /// operation was already named or if another operation already holds this
@@ -105,11 +105,11 @@ public:
   /// based on the operation's type with the name of an "ascending" operation
   /// that is logically related to the operation being named. This is useful for
   /// debugging when one may want to showcase operation filiations through their
-  /// name. Fails if the operation was already named, if the ascending operation
-  /// does not have a name, or if another operation already holds the derived
-  /// name. If the `uniqueWhenTaken` flag is set, succeeds even if the provided
-  /// name is already taken by deriving a unique name from the "normal" one for
-  /// the operation.
+  /// name. Uniquely name the ascendant operation if it doesn't have a name yet.
+  /// Fails if the operation was already named, or if another operation already
+  /// holds the derived name. If the `uniqueWhenTaken` flag is set, succeeds
+  /// even if the provided name is already taken by deriving a unique name from
+  /// the "normal" one for the operation.
   LogicalResult setName(Operation *op, Operation *ascendant,
                         bool uniqueWhenTaken = false);
 
@@ -193,6 +193,21 @@ private:
     nameToOp[name] = op;
     opToName[op] = name;
   }
+
+  /// Determines whether the operation is intrinsically named i.e., whether it
+  /// has a naturally unique name that is not represented through our Handhsake
+  /// attribute. If it does, updates our internal mappings to make sure it is
+  /// considered taken when assigning auto-generated names to other operations.
+  bool isIntrinsicallyNamed(Operation *op);
+
+  /// When getting the "producer part" of an operand's name and it is a block
+  /// argument, we can derive a meaningful name when it is a function's argument
+  /// of some sort. In those cases, sets the two strings, respectively, to the
+  /// function's name and the argument's name. In other cases, consider the
+  /// parent operation's name and the index of the resgion/block the argument
+  /// belongs to as the producer's and result name, respectively.
+  void getBlockArgName(BlockArgument arg, std::string &prodName,
+                       std::string &resName);
 };
 
 /// Attemps to get the unique name of the operation. Returns an empty string if

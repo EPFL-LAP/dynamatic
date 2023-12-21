@@ -29,8 +29,7 @@ namespace dynamatic {
 /// block attribute on the operation.
 LogicalResult inferLogicBB(Operation *op, unsigned &logicBB);
 
-std::unique_ptr<dynamatic::DynamaticPass<false>>
-createHandshakeInferBasicBlocksPass();
+std::unique_ptr<dynamatic::DynamaticPass> createHandshakeInferBasicBlocksPass();
 
 } // namespace dynamatic
 

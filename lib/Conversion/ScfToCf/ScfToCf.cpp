@@ -136,7 +136,7 @@ struct ScfToCfPass : public dynamatic::impl::ScfToCfBase<ScfToCfPass> {
 } // namespace
 
 namespace dynamatic {
-std::unique_ptr<dynamatic::DynamaticPass<false>> createLowerScfToCf() {
+std::unique_ptr<dynamatic::DynamaticPass> createLowerScfToCf() {
   return std::make_unique<ScfToCfPass>();
 }
 } // namespace dynamatic

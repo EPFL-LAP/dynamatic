@@ -424,7 +424,8 @@ void VisualDataflow::changeStateColor(int64_t state, Color color) {
 
   stateColors.at(state) = color;
 
-  for (auto &edgeState : graph.getCycleEdgeStates().at(cycle)) {
+  auto cycleStates = graph.getCycleEdgeStates();
+  for (auto &edgeState : cycleStates.at(cycle)) {
     EdgeId edgeId = edgeState.first;
     State edgeStateEnum = edgeState.second.first;
     if (edgeStateEnum == stateEnum) {
@@ -505,7 +506,7 @@ void VisualDataflow::transparentEffect(double transparency) {
   }
 }
 
-void VisualDataflow::highlightNode(NodeId nodeId) {
+void VisualDataflow::highlightNode(const NodeId &nodeId) {
 
   Color c = nodeIdToPolygon[nodeId]->get_color();
   c.a = 1;
@@ -529,7 +530,7 @@ void VisualDataflow::highlightNode(NodeId nodeId) {
   }
 }
 
-void VisualDataflow::transparentNode(NodeId nodeId) {
+void VisualDataflow::transparentNode(const NodeId &nodeId) {
 
   Color c = nodeIdToPolygon[nodeId]->get_color();
   c.a = 0.3;

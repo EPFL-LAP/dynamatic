@@ -144,7 +144,7 @@ struct ScfForLoopRotationPass
 } // namespace
 
 namespace dynamatic {
-std::unique_ptr<dynamatic::DynamaticPass<false>> createScfRotateForLoops() {
+std::unique_ptr<dynamatic::DynamaticPass> createScfRotateForLoops() {
   return std::make_unique<ScfForLoopRotationPass>();
 }
 } // namespace dynamatic

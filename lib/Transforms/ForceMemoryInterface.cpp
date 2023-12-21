@@ -6,9 +6,9 @@
 //
 //===----------------------------------------------------------------------===//
 //
-// Implements the --force-memory-interface pass, internally setting/removing the
-// `handshake::NoLSQAttr` from all memory operations to force placement of a
-// specific type of memory interface.
+// Implements the --force-memory-interface pass, internally adding/modifying the
+// `handshake::MemInterfaceAttr` to/on all memory operations to force placement
+// of a specific type of memory interface.
 //
 //===----------------------------------------------------------------------===//
 
@@ -45,18 +45,36 @@ struct ForceMemoryInterfacePass
           << "Neither " << forceLSQ.ArgStr << " and " << forceMC.ArgStr
           << " flags were provided. However, exactly one needs to be set.";
 
-    // Find all memory operations and set/remove the handshake::NoLSQAttr
-    // attribute on/from them depending on the pass parameters
     MLIRContext *ctx = &getContext();
+    StringRef mnemonic = handshake::MemInterfaceAttr::getMnemonic();
+    DenseMap<Block *, unsigned> lsqGroups;
+    unsigned nextGroupID = 0;
+
+    // Find all memory operations and adds/modifies the
+    // handshake::MemInterfaceAttr on them depending on the pass parameters
     getOperation()->walk([&](Operation *op) {
+      // This only makes sense on load/store-like operations
       if (!isa<memref::LoadOp, memref::StoreOp, affine::AffineLoadOp,
                affine::AffineStoreOp>(op))
         return;
-      if (forceLSQ)
-        op->removeAttr(handshake::NoLSQAttr::getMnemonic());
+
+      if (forceMC) {
+        op->setAttr(mnemonic, handshake::MemInterfaceAttr::get(ctx));
+        return;
+      }
+
+      // Make every block its own LSQ group
+      Block *block = op->getBlock();
+      unsigned groupID;
+
+      // Try to find the block's group ID. Failing that, assign a new group ID
+      // to the block
+      if (auto groupIt = lsqGroups.find(block); groupIt != lsqGroups.end())
+        groupID = groupIt->second;
       else
-        op->setAttr(handshake::NoLSQAttr::getMnemonic(),
-                    handshake::NoLSQAttr::get(ctx));
+        lsqGroups[block] = groupID = nextGroupID++;
+
+      op->setAttr(mnemonic, handshake::MemInterfaceAttr::get(ctx, groupID));
     });
   }
 };

@@ -25,7 +25,7 @@ namespace dynamatic {
 #define GEN_PASS_DEF_HANDSHAKEOPTIMIZEBITWIDTHS
 #include "dynamatic/Transforms/Passes.h.inc"
 
-std::unique_ptr<dynamatic::DynamaticPass<false>>
+std::unique_ptr<dynamatic::DynamaticPass>
 createHandshakeOptimizeBitwidths(bool legacy = false);
 
 } // namespace dynamatic

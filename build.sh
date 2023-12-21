@@ -306,8 +306,7 @@ cd "$SCRIPT_CWD" && mkdir -p bin
 # Create symbolic links to all binaries we use from subfolders
 create_symlink polygeist/build/bin/cgeist
 create_symlink polygeist/build/bin/polygeist-opt
-create_symlink polygeist/llvm-project/build/bin/mlir-opt
-create_symlink circt/build/bin/circt-opt
+create_symlink polygeist/llvm-project/build/bin/clang++
 create_symlink build/bin/dynamatic
 create_symlink build/bin/dynamatic-opt
 create_symlink build/bin/export-dot
@@ -315,10 +314,10 @@ create_symlink build/bin/exp-frequency-profiler
 create_symlink build/bin/handshake-simulator
 
 # Make the scripts used by the frontend executable
-chmod +x tools/dynamatic/scripts/synthesize.sh
+chmod +x tools/dynamatic/scripts/compile.sh
 chmod +x tools/dynamatic/scripts/write-hdl.sh
 chmod +x tools/dynamatic/scripts/simulate.sh
-chmod +x tools/dynamatic/scripts/logic-synthesize.sh
+chmod +x tools/dynamatic/scripts/synthesize.sh
 
 echo ""
 echo_subsection "Build successful!"

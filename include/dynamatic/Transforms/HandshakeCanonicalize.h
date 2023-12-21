@@ -30,7 +30,7 @@ namespace dynamatic {
 #define GEN_PASS_DEF_HANDSHAKECANONICALIZE
 #include "dynamatic/Transforms/Passes.h.inc"
 
-std::unique_ptr<dynamatic::DynamaticPass<false>> createHandshakeCanonicalize();
+std::unique_ptr<dynamatic::DynamaticPass> createHandshakeCanonicalize();
 
 } // namespace dynamatic
 
