@@ -36,16 +36,15 @@ using namespace dynamatic::experimental::visual_dataflow;
 
 /// Creates the "in" or "out" attribute of a node from a list of values and a
 /// port name (used as prefix to derive numbered port names for all values).
-namespace {
-std::vector<std::string> getIOFromValues(ValueRange values,
-                                         std::string &&portType) {
+static std::vector<std::string> getIOFromValues(ValueRange values,
+                                                std::string &&portType) {
   std::vector<std::string> ports;
   for (auto [idx, val] : llvm::enumerate(values))
     ports.push_back(portType + std::to_string(idx + 1));
   return ports;
 }
 
-size_t findIndexInRange(ValueRange range, Value val) {
+static size_t findIndexInRange(ValueRange range, Value val) {
   for (auto [idx, res] : llvm::enumerate(range))
     if (res == val)
       return idx;
@@ -53,28 +52,77 @@ size_t findIndexInRange(ValueRange range, Value val) {
   return 0;
 }
 
-/// Finds the position (group index and operand index) of a value in the
+/// Finds the position (block index and operand index) of a value in the
 /// inputs of a memory interface.
-std::pair<size_t, size_t> findValueInGroups(FuncMemoryPorts &ports, Value val) {
-  unsigned numBlocks = ports.getNumConnectedBlock();
+static std::pair<size_t, size_t> findValueInGroups(FuncMemoryPorts &ports,
+                                                   Value val) {
+  unsigned numBlocks = ports.getNumGroups();
+  unsigned accInputIdx = 0;
   for (size_t blockIdx = 0; blockIdx < numBlocks; ++blockIdx) {
-    for (auto [inputIdx, input] :
-         llvm::enumerate(ports.getBlockInputs(blockIdx))) {
+    ValueRange blockInputs = ports.getGroupInputs(blockIdx);
+    accInputIdx += blockInputs.size();
+    for (auto [inputIdx, input] : llvm::enumerate(blockInputs)) {
       if (input == val)
         return std::make_pair(blockIdx, inputIdx);
     }
   }
+
+  // Value must belong to a port with another memory interface, find the one
+  ValueRange lastInputs = ports.memOp.getMemOperands().drop_front(accInputIdx);
+  for (auto [inputIdx, input] : llvm::enumerate(lastInputs)) {
+    if (input == val)
+      return std::make_pair(ports.getNumGroups(), inputIdx + accInputIdx);
+  }
+
   llvm_unreachable("value should be an operand to the memory interface");
 }
 
-/// Transforms the port number associated to an edge endpoint to match the
-/// operand ordering of legacy Dynamatic.
-static size_t fixPortNumber(Operation *op, Value val, size_t idx,
-                            bool isSrcOp) {
+/// Corrects for different output port ordering conventions with legacy
+/// Dynamatic.
+static size_t fixOutputPortNumber(Operation *op, size_t idx) {
   return llvm::TypeSwitch<Operation *, size_t>(op)
       .Case<handshake::ConditionalBranchOp>([&](auto) {
-        if (isSrcOp)
+        // Legacy Dynamatic has the data operand before the condition operand
+        return idx;
+      })
+      .Case<handshake::EndOp>([&](handshake::EndOp endOp) {
+        // Legacy Dynamatic has the memory controls before the return values
+        auto numReturnValues = endOp.getReturnValues().size();
+        auto numMemoryControls = endOp.getMemoryControls().size();
+        return (idx < numReturnValues) ? idx + numMemoryControls
+                                       : idx - numReturnValues;
+      })
+      .Case<handshake::LoadOpInterface, handshake::StoreOpInterface>([&](auto) {
+        // Legacy Dynamatic has the data operand/result before the address
+        // operand/result
+        return 1 - idx;
+      })
+      .Case<handshake::LSQOp>([&](handshake::LSQOp lsqOp) {
+        // Legacy Dynamatic places the end control signal before the signals
+        // going to the MC, if one is connected
+        LSQPorts lsqPorts = lsqOp.getPorts();
+        if (!lsqPorts.hasAnyPort<MCLoadStorePort>())
           return idx;
+
+        // End control signal succeeded by laad address, store address, store
+        // data
+        if (idx == lsqOp.getNumResults() - 1)
+          return idx - 3;
+
+        // Signals to MC preceeded by end control signal
+        unsigned numLoads = lsqPorts.getNumPorts<LSQLoadPort>();
+        if (idx >= numLoads)
+          return idx + 1;
+        return idx;
+      })
+      .Default([&](auto) { return idx; });
+}
+
+/// Corrects for different input port ordering conventions with legacy
+/// Dynamatic.
+static size_t fixInputPortNumber(Operation *op, size_t idx) {
+  return llvm::TypeSwitch<Operation *, size_t>(op)
+      .Case<handshake::ConditionalBranchOp>([&](auto) {
         // Legacy Dynamatic has the data operand before the condition operand
         return 1 - idx;
       })
@@ -85,50 +133,54 @@ static size_t fixPortNumber(Operation *op, Value val, size_t idx,
         return (idx < numReturnValues) ? idx + numMemoryControls
                                        : idx - numReturnValues;
       })
-      .Case<handshake::DynamaticLoadOp, handshake::DynamaticStoreOp>([&](auto) {
+      .Case<handshake::LoadOpInterface, handshake::StoreOpInterface>([&](auto) {
         // Legacy Dynamatic has the data operand/result before the address
         // operand/result
         return 1 - idx;
       })
-      .Case<handshake::MemoryControllerOp>(
-          [&](handshake::MemoryControllerOp memOp) {
-            if (isSrcOp)
-              return idx;
+      .Case<handshake::MemoryOpInterface>(
+          [&](handshake::MemoryOpInterface memOp) {
+            Value val = op->getOperand(idx);
 
             // Legacy Dynamatic puts all control operands before all data
             // operands, whereas for us each control operand appears just
-            // before the data inputs of the block it corresponds to
-            FuncMemoryPorts ports = memOp.getPorts();
-
-            // auto groups = memOp.groupInputsByBB();
+            // before the data inputs of the group it corresponds to
+            FuncMemoryPorts ports = getMemoryPorts(memOp);
 
             // Determine total number of control operands
-            unsigned ctrlCount = ports.getNumPorts(MemoryPort::Kind::CONTROL);
+            unsigned ctrlCount = ports.getNumPorts<ControlPort>();
 
             // Figure out where the value lies
-            auto [groupIdx, opIdx] = findValueInGroups(ports, val);
+            auto [groupIDx, opIdx] = findValueInGroups(ports, val);
+
+            if (groupIDx == ports.getNumGroups()) {
+              // If the group index is equal to the number of connected groups,
+              // then the operand index points directly to the matching port in
+              // legacy Dynamatic's conventions
+              return opIdx;
+            }
 
             // Figure out at which index the value would be in legacy
             // Dynamatic's interface
-            bool valGroupHasControl = ports.blocks[groupIdx].hasControl();
+            bool valGroupHasControl = ports.groups[groupIDx].hasControl();
             if (opIdx == 0 && valGroupHasControl) {
               // Value is a control input
               size_t fixedIdx = 0;
-              for (size_t i = 0; i < groupIdx; i++)
-                if (ports.blocks[i].hasControl())
+              for (size_t i = 0; i < groupIDx; i++)
+                if (ports.groups[i].hasControl())
                   fixedIdx++;
               return fixedIdx;
             }
 
             // Value is a data input
             size_t fixedIdx = ctrlCount;
-            for (size_t i = 0; i < groupIdx; i++)
-              // Add number of data inputs corresponding to the block
-              if (ports.blocks[i].hasControl())
-                fixedIdx += ports.blocks[i].getNumInputs() - 1;
-              else
-                fixedIdx += ports.blocks[i].getNumInputs();
-
+            for (size_t i = 0; i < groupIDx; i++) {
+              // Add number of data inputs corresponding to the group, minus the
+              // control input which was already accounted for (if present)
+              fixedIdx += ports.groups[i].getNumInputs();
+              if (ports.groups[i].hasControl())
+                --fixedIdx;
+            }
             // Add index offset in the group the value belongs to
             if (valGroupHasControl)
               fixedIdx += opIdx - 1;
@@ -138,7 +190,6 @@ static size_t fixPortNumber(Operation *op, Value val, size_t idx,
           })
       .Default([&](auto) { return idx; });
 }
-} // namespace
 
 MLIRMapper::MLIRMapper(Graph *graph) : graph(graph) {}
 
@@ -207,16 +258,16 @@ LogicalResult MLIRMapper::mapNode(Operation *op) {
   std::pair<float, float> pos = {0, 0};
 
   // Create the node
-  GraphNode *node = new GraphNode(opName, pos);
+  GraphNode node(opName, pos);
 
   // Add the ports to the node
   for (auto &inPort : inPorts)
-    node->addPort(inPort.back(), true);
+    node.addPort(inPort.back(), true);
   for (auto &outPort : outPorts)
-    node->addPort(outPort.back(), false);
+    node.addPort(outPort.back(), false);
 
   // Add the node to the graph
-  graph->addNode(*node);
+  graph->addNode(node);
 
   return success();
 }
@@ -226,8 +277,8 @@ LogicalResult MLIRMapper::mapEdge(Operation *src, Operation *dst, Value val,
   // Find the source and destination nodes
   std::string srcNodeName = getNodeName(src);
   std::string dstNodeName = getNodeName(dst);
-  GraphNode *srcNodeIt;
-  GraphNode *dstNodeIt;
+  GraphNode *srcNodeIt = nullptr;
+  GraphNode *dstNodeIt = nullptr;
   if (failed(graph->getNode(srcNodeName, *srcNodeIt)) ||
       failed(graph->getNode(dstNodeName, *dstNodeIt)))
     return failure();
@@ -240,15 +291,14 @@ LogicalResult MLIRMapper::mapEdge(Operation *src, Operation *dst, Value val,
   auto argIdx = findIndexInRange(dst->getOperands(), val);
 
   // Find the source and destination ports
-  int from = fixPortNumber(src, srcVal, resIdx, true) + 1;
-  int to = fixPortNumber(dst, val, argIdx, false) + 1;
+  int from = fixOutputPortNumber(src, resIdx) + 1;
+  int to = fixInputPortNumber(dst, argIdx) + 1;
 
   // Create the edge
-  GraphEdge *edge =
-      new GraphEdge(*edgeId++, *srcNodeIt, *dstNodeIt, from, to, {});
+  GraphEdge edge(*edgeId++, *srcNodeIt, *dstNodeIt, from, to, {});
 
   // Add the edge to the graph
-  graph->addEdge(*edge);
+  graph->addEdge(edge);
 
   return success();
 }

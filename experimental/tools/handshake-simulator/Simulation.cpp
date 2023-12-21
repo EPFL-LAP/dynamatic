@@ -11,10 +11,10 @@
 //
 //===----------------------------------------------------------------------===//
 
+#include "experimental/tools/handshake-simulator/ExecModels.h"
 #include "experimental/tools/handshake-simulator/Simulation.h"
 #include "circt/Dialect/Handshake/HandshakeOps.h"
 #include "circt/Support/JSON.h"
-#include "experimental/tools/handshake-simulator/ExecModels.h"
 #include "mlir/Dialect/Arith/IR/Arith.h"
 #include "mlir/Dialect/ControlFlow/IR/ControlFlowOps.h"
 #include "mlir/Dialect/Func/IR/FuncOps.h"
@@ -25,8 +25,6 @@
 #include "llvm/ADT/StringMap.h"
 #include "llvm/ADT/TypeSwitch.h"
 #include "llvm/Support/Debug.h"
-
-#include <bits/stdc++.h>
 
 #include <list>
 
@@ -180,7 +178,7 @@ class HandshakeExecuter {
 public:
   /// Entry point for circt::handshake::FuncOp top-level functions
   HandshakeExecuter(circt::handshake::FuncOp &func,
-                    llvm::DenseMap<mlir::Value, Any> &valueMap,
+                    CircuitState &circuitState,
                     std::vector<Any> &results,
                     std::vector<std::vector<Any>> &store,
                     mlir::OwningOpRef<mlir::ModuleOp> &module,
@@ -195,7 +193,6 @@ private:
 
 /// Management of the state of each channel
 struct StateManager {
-  llvm::DenseMap<Value, ChannelState> coolValueMap;
   unsigned currentCycle;
   // True if any value has changed during the cycle
   bool valueChangedThisCycle;
@@ -204,7 +201,7 @@ struct StateManager {
 };
 
 HandshakeExecuter::HandshakeExecuter(circt::handshake::FuncOp &func,
-                                     llvm::DenseMap<mlir::Value, Any> &valueMap,
+                                     CircuitState &circuitState,
                                      std::vector<Any> &results,
                                      std::vector<std::vector<Any>> &store,
                                      mlir::OwningOpRef<mlir::ModuleOp> &module,
@@ -226,6 +223,14 @@ HandshakeExecuter::HandshakeExecuter(circt::handshake::FuncOp &func,
     } else if (isa<circt::handshake::EndOp>(op)) {
       hasEnd = true;
     }
+    // (Temporary)
+    // Inititialize all channels 
+    for (auto value : op->getOperands()) 
+      if (circuitState.getState(value) != DataflowState::VALID)
+        circuitState.channelMap[value] = { DataflowState::NONE, std::nullopt };
+    
+      
+
   });
 
   assert(
@@ -240,17 +245,17 @@ HandshakeExecuter::HandshakeExecuter(circt::handshake::FuncOp &func,
              "Handshake-runner only supports buffer initialization with a "
              "single buffer value.");
       Value bufferRes = bufferOp.getResult();
-      valueMap[bufferRes] = APInt(bufferRes.getType().getIntOrFloatBitWidth(),
+      APInt value = APInt(bufferRes.getType().getIntOrFloatBitWidth(),
                                   initValues.front());
+      circuitState.storeValue(bufferRes, value);
     }
   }
 
   // Main simulation initilisation
   StateManager manager;
   manager.currentCycle = 0;
-  ExecutableData execData{valueMap, memoryMap,       store,
+  ExecutableData execData{circuitState, memoryMap,       store,
                           models,   internalDataMap, manager.currentCycle};
-
   // Main simulation loop
   while (true) {
     // 1 cycle
@@ -259,7 +264,6 @@ HandshakeExecuter::HandshakeExecuter(circt::handshake::FuncOp &func,
 
       for (Operation &op : entryBlock.getOperations()) {
         auto opName = op.getName().getStringRef().str();
-
         auto &execModel = models[opName];
         if (models.find(opName) == models.end()) {
           successFlag = false;
@@ -296,10 +300,9 @@ LogicalResult simulate(StringRef toplevelFunction,
   // accessed by it.  Currently values are assumed to be an integer.
   std::vector<std::vector<Any>> store;
 
-  // The valueMap associates each SSA statement in the program
-  // (represented by a Value*) with it's corresponding value.
-  // Currently the value is assumed to be an integer.
-  llvm::DenseMap<mlir::Value, Any> valueMap;
+  // Handler for circuit states
+  CircuitState circuitState;
+  circuitState.channelMap = ChannelMap{};
 
   // We need three things in a function-type independent way.
   // The type signature of the function.
@@ -344,7 +347,7 @@ LogicalResult simulate(StringRef toplevelFunction,
     }
     // Implicit none argument
     APInt apnonearg(1, 0);
-    valueMap[blockArgs[blockArgs.size() - 1]] = apnonearg;
+    circuitState.storeValue(blockArgs[blockArgs.size() - 1], apnonearg);
   } else
     llvm::report_fatal_error("Function '" + toplevelFunction +
                              "' not supported");
@@ -366,7 +369,7 @@ LogicalResult simulate(StringRef toplevelFunction,
       unsigned buffer;
       if (allocateMemRef(memreftype, nothing, store, buffer).failed())
         return failure();
-      valueMap[blockArgs[i]] = buffer;
+      circuitState.storeValue(blockArgs[i], buffer);
       int64_t pos = 0;
       std::stringstream arg(inputArgs[i]);
       while (!arg.eof()) {
@@ -376,7 +379,7 @@ LogicalResult simulate(StringRef toplevelFunction,
       }
     } else {
       Any value = readValueWithType(type, inputArgs[i]);
-      valueMap[blockArgs[i]] = value;
+      circuitState.storeValue(blockArgs[i], value);
     }
   }
 
@@ -385,7 +388,7 @@ LogicalResult simulate(StringRef toplevelFunction,
   if (circt::handshake::FuncOp toplevel =
           module->lookupSymbol<circt::handshake::FuncOp>(toplevelFunction)) {
     succeeded =
-        HandshakeExecuter(toplevel, valueMap, results, store, module, models)
+        HandshakeExecuter(toplevel, circuitState, results, store, module, models)
             .succeeded();
 
     outs() << "Finished execution\n";
@@ -400,7 +403,8 @@ LogicalResult simulate(StringRef toplevelFunction,
     if (type.isa<mlir::MemRefType>()) {
       // We require this memref type to be fully specified.
       auto memreftype = type.dyn_cast<mlir::MemRefType>();
-      unsigned buffer = any_cast<unsigned>(valueMap[blockArgs[i]]);
+      unsigned buffer =
+          any_cast<unsigned>(*(circuitState.channelMap[blockArgs[i]].data));
       auto elementType = memreftype.getElementType();
       for (int j = 0; j < memreftype.getNumElements(); ++j) {
         if (j != 0)

@@ -18,8 +18,10 @@
 #include "mlir/Dialect/Arith/IR/Arith.h"
 #include "mlir/Dialect/Func/IR/FuncOps.h"
 #include "mlir/Dialect/MemRef/IR/MemRef.h"
+#include "mlir/IR/BuiltinTypes.h"
 #include "mlir/IR/MLIRContext.h"
 #include "mlir/Transforms/GreedyPatternRewriteDriver.h"
+#include "llvm/ADT/STLExtras.h"
 #include "llvm/Support/raw_ostream.h"
 #include <variant>
 
@@ -131,48 +133,6 @@ Value OpTree::buildTree(Operation *op, PatternRewriter &rewriter) {
 // Rewrite patterns
 //===----------------------------------------------------------------------===//
 
-namespace {
-
-/// Replaces addition of the form `x + (-y)` into an equivalent `x - y`
-/// substraction. This can end up indirectly removing a multiplication from the
-/// IR via DCE when the result of the multiplication computing `-y` isn't used
-/// anywhere else.
-struct ReplaceMulAddWithSub : public OpRewritePattern<arith::AddIOp> {
-  using OpRewritePattern<arith::AddIOp>::OpRewritePattern;
-
-  LogicalResult matchAndRewrite(arith::AddIOp addOp,
-                                PatternRewriter &rewriter) const override {
-    auto addOperands = addOp->getOperands();
-    auto add0 = addOperands[0], add1 = addOperands[1];
-
-    // Check whether any operand of the addition is the result of a
-    // multiplication with a constant -1. If yes, replace the addition with an
-    // equivalent substraction
-    if (auto newOperand = isMulTimesNegOne(add0)) {
-      rewriter.replaceOp(
-          addOp,
-          rewriter.create<arith::SubIOp>(addOp->getLoc(), add1, newOperand)
-              ->getResults());
-      return success();
-    }
-    if (auto newOperand = isMulTimesNegOne(add1)) {
-      rewriter.replaceOp(
-          addOp,
-          rewriter.create<arith::SubIOp>(addOp->getLoc(), add0, newOperand)
-              ->getResults());
-      return success();
-    }
-
-    return failure();
-  }
-
-private:
-  /// Determines whether the defining operation of a value is a multiplication
-  /// with a constant -1.
-  Value isMulTimesNegOne(Value val) const;
-};
-} // namespace
-
 /// Determines whether the defining operation of a value is a constant -1.
 static bool isConstantNegOne(Value val) {
   if (auto cstOp = val.getDefiningOp<arith::ConstantOp>())
@@ -181,19 +141,113 @@ static bool isConstantNegOne(Value val) {
   return false;
 }
 
-Value ReplaceMulAddWithSub::isMulTimesNegOne(Value val) const {
-  if (auto mulOp = val.getDefiningOp<arith::MulIOp>()) {
-    // Check whether one of the two operands is a constant -1 value. If yes,
-    // return the other operand
-    auto mulOperands = mulOp->getOperands();
-    auto mul0 = mulOperands[0], mul1 = mulOperands[1];
-    if (isConstantNegOne(mul0))
-      return mul1;
-    if (isConstantNegOne(mul1))
-      return mul0;
-  }
+/// Determines whether the argument is a multiplication with a constant -1.
+static Value isMulTimesNegOne(arith::MulIOp mulOp) {
+  // Check whether one of the two operands is a constant -1 value. If yes,
+  // return the other operand
+  auto mulOperands = mulOp->getOperands();
+  auto mul0 = mulOperands[0], mul1 = mulOperands[1];
+  if (isConstantNegOne(mul0))
+    return mul1;
+  if (isConstantNegOne(mul1))
+    return mul0;
   return nullptr;
 }
+
+/// Returns an integer of the same width as the data type and whose binary
+/// representation is all 1s.
+static APInt getMaskAllOnes(Type dataType) {
+  unsigned dataWidth;
+  if (isa<IndexType>(dataType)) {
+    dataWidth = IndexType::kInternalStorageBitWidth;
+  } else {
+    dataWidth = dataType.getIntOrFloatBitWidth();
+  }
+  SmallVector<uint64_t> bits;
+  size_t numElems = (dataWidth >> 6) + 1;
+  for (size_t i = 0; i < numElems; ++i)
+    bits.push_back(0xFFFFFFFFFFFFFFFF);
+  return APInt(dataWidth, bits);
+}
+
+namespace {
+
+/// Replaces uses of the result of multiplications of the form x * (-1) with x
+/// whenever possible. Currently, this can apply to uses within integer
+/// additions and substractions, for which it is always possible to remove the
+/// need for the result of the multiplication.
+struct ReplaceMulNegOneUsers : public OpRewritePattern<arith::MulIOp> {
+  using OpRewritePattern<arith::MulIOp>::OpRewritePattern;
+
+  LogicalResult matchAndRewrite(arith::MulIOp mulOp,
+                                PatternRewriter &rewriter) const override {
+    // Check whether the multiplication has the right form i.e., x * (-1)
+    Value oprd = isMulTimesNegOne(mulOp);
+    if (!oprd)
+      return failure();
+
+    // Iterate over uses of the multiplication results to see if any could
+    // directly use the non-constant operand of the multiplication
+    Value mulRes = mulOp.getResult();
+    bool anyChange = false;
+    Location loc = mulOp.getLoc();
+    SmallVector<Operation *> mulUsers;
+    llvm::copy(mulRes.getUsers(), std::back_inserter(mulUsers));
+
+    for (Operation *user : mulUsers) {
+      if (arith::AddIOp addOp = dyn_cast<arith::AddIOp>(user)) {
+        // Additions get replaced with an equivalent substraction
+        bool isLhs = mulRes == addOp.getLhs();
+        Value newLhs = isLhs ? addOp.getRhs() : addOp.getLhs();
+        rewriter.replaceOp(
+            user,
+            rewriter.create<arith::SubIOp>(loc, newLhs, oprd)->getResults());
+        anyChange = true;
+      } else if (arith::SubIOp subOp = dyn_cast<arith::SubIOp>(user)) {
+        // Substractions are replaced with an equivalemt additiom and,
+        // potentially, a sign flip (when the multiplication provides the RHS)
+        if (mulRes == subOp.getRhs()) {
+          rewriter.replaceOp(
+              user, rewriter.create<arith::AddIOp>(loc, subOp.getLhs(), oprd)
+                        ->getResults());
+          anyChange = true;
+        } else {
+          arith::AddIOp addOp = rewriter.create<arith::AddIOp>(
+              mulOp->getLoc(), oprd, subOp.getRhs());
+          Value addRes = addOp.getResult();
+          Type dataType = addRes.getType();
+
+          // Flip the sign of the addition result. Create a XOR with an all-1
+          // bitmask then add 1: -x = (x XOR 11...11) + 1
+
+          // First create the constant mask
+          IntegerAttr intAttr =
+              rewriter.getIntegerAttr(dataType, getMaskAllOnes(dataType));
+          arith::ConstantOp maskOp =
+              rewriter.create<arith::ConstantOp>(loc, intAttr);
+
+          // Then create the XOR between the first addition's result and the
+          // mask, inverting the former's bits
+          arith::XOrIOp xorOp =
+              rewriter.create<arith::XOrIOp>(loc, addRes, maskOp.getResult());
+
+          // Finally, add one to the XOR's output to get the negated version of
+          // the first result and replace the initial operation
+          arith::ConstantOp cstOneOp = rewriter.create<arith::ConstantOp>(
+              loc, rewriter.getIntegerAttr(dataType, 1));
+          arith::AddIOp negAddOp = rewriter.create<arith::AddIOp>(
+              loc, xorOp.getResult(), cstOneOp.getResult());
+          rewriter.replaceOp(user, negAddOp->getResults());
+          anyChange = true;
+        }
+      }
+    }
+
+    return success(anyChange);
+  }
+};
+
+} // namespace
 
 namespace {
 
@@ -424,7 +478,7 @@ struct ArithReduceStrengthPass
     config.enableRegionSimplification = false;
 
     RewritePatternSet patterns{ctx};
-    patterns.add<ReplaceMulAddWithSub, PromoteSignedCmp>(ctx);
+    patterns.add<ReplaceMulNegOneUsers, PromoteSignedCmp>(ctx);
     /// TODO: (RamirezLucas) Any provided value is somewhat arbitrary here.
     /// Ultimately, this should be driven by models of component delays (same
     /// as for buffer placement) as well as a general optimization strategy
@@ -438,7 +492,7 @@ struct ArithReduceStrengthPass
 };
 } // namespace
 
-std::unique_ptr<dynamatic::DynamaticPass<false>>
+std::unique_ptr<dynamatic::DynamaticPass>
 dynamatic::createArithReduceStrength(unsigned maxAdderDepthMul) {
   return std::make_unique<ArithReduceStrengthPass>(maxAdderDepthMul);
 }

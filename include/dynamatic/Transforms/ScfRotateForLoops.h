@@ -18,7 +18,7 @@
 
 namespace dynamatic {
 
-std::unique_ptr<dynamatic::DynamaticPass<false>> createScfRotateForLoops();
+std::unique_ptr<dynamatic::DynamaticPass> createScfRotateForLoops();
 
 } // namespace dynamatic
 

@@ -32,6 +32,55 @@ using InternalDataMap = llvm::DenseMap<circt::Operation *, llvm::Any>;
 using ExecuteFunction = const std::function<void(
     std::vector<llvm::Any> &, std::vector<llvm::Any> &, circt::Operation &)>;
 
+//--- Dataflow ---------------------------------------------------------------//
+
+/// Represent the state in which each wire is
+enum class DataflowState {
+  /// Not valid nor ready
+  NONE = 1,
+  /// Valid but not ready
+  VALID = 2,
+  /// Ready but not valid
+  READY = 3,
+  /// Ready and valid
+  VALID_READY = 4
+};
+
+/// Data structure to hold state of each value
+struct ChannelState {
+  /// The state of the channel
+  DataflowState state;
+  /// The data held by the channel
+  std::optional<llvm::Any> data;
+};
+
+/// Type for mapping channels to their state
+using ChannelMap = llvm::DenseMap<mlir::Value, ChannelState>;
+
+struct CircuitState {
+  /// Maps each value to a state
+  ChannelMap channelMap;
+
+  /// Stores a value in a channel, and sets its state to VALID.
+  void storeValue(mlir::Value channel, std::optional<llvm::Any> data);
+
+  /// Performs multiples storeValue's at once.
+  void storeValues(std::vector<llvm::Any> &values,
+                  llvm::ArrayRef<mlir::Value> outs);
+
+  /// Removes a value from a channel, and sets its state to NONE.
+  void removeValue(mlir::Value channel);
+
+  /// Unwraps the option containing the data for a channel
+  inline std::optional<llvm::Any> getDataOpt(mlir::Value channel);
+
+  /// Unwraps the option containing the data for a channel
+  inline llvm::Any getData(mlir::Value channel);
+
+  /// Returns the DataflowState of the channel
+  DataflowState getState(mlir::Value channel);
+};
+
 //--- Execution Models -------------------------------------------------------//
 
 /// Maps configurated execution models to their execution structure
@@ -41,9 +90,8 @@ using ModelMap =
 
 /// Data structure to hold informations passed to tryExecute functions
 struct ExecutableData {
-  /// Maps value (usually operands) to something to store
-  /// (comparable to RAM)
-  llvm::DenseMap<mlir::Value, llvm::Any> &valueMap;
+  /// Handler for circuit state management
+  CircuitState circuitState;
   /// Maps memory controller ID to their offset value in store
   /// (store[memoryMap[SOME_ID]] is the beginning of the allocated memory
   /// area for this memory controller)
@@ -65,7 +113,7 @@ struct ExecutableModel {
   /// Returns false if nothing was done, true if some type of jobs were done
   virtual bool tryExecute(ExecutableData &data, circt::Operation &op) = 0;
 
-  virtual ~ExecutableModel(){};
+  virtual ~ExecutableModel() = default;
 
   virtual bool isEndPoint() const { return false; };
 };
@@ -101,21 +149,6 @@ struct MemoryControllerState {
   /// Stores all the loads request towards the memory controller
   llvm::SmallVector<MemoryRequest> loadRequests;
 };
-
-//--- Simulation logging -----------------------------------------------------//
-
-/// All possible states
-enum class ChannelState { NONE = 1, VALID = 2, READY = 3, VALID_READY = 4 };
-
-/// Data structure to hold state of each value
-struct StateChange {
-  /// Cycle at which the state was changed
-  unsigned cycle;
-  /// The new state the value changed to
-  ChannelState state;
-};
-
-using ExecutionMap = llvm::DenseMap<mlir::Value, std::vector<StateChange>>;
 
 //----------------------------------------------------------------------------//
 //                  Execution models structure definitions                    //

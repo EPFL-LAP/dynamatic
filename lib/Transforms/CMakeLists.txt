@@ -1,17 +1,20 @@
 add_dynamatic_library(DynamaticTransforms
   ArithReduceStrength.cpp
-  AnalyzeMemoryAccesses.cpp
   BackAnnotate.cpp
   FlattenMemRefRowMajor.cpp
   ForceMemoryInterface.cpp
   HandshakeCanonicalize.cpp
   HandshakeConcretizeIndexType.cpp
+  HandshakeMaterialize.cpp
   HandshakeMinimizeCstWidth.cpp
   HandshakeOptimizeBitwidths.cpp
   HandshakePrepareForLegacy.cpp
   HandshakeInferBasicBlocks.cpp
+  MarkMemoryDependencies.cpp
+  MarkMemoryInterfaces.cpp
   OperationNames.cpp
   PushConstants.cpp
+  RemovePolygeistAttributes.cpp
   ScfRotateForLoops.cpp
   ScfSimpleIfToSelect.cpp
 

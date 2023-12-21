@@ -32,7 +32,7 @@ using namespace dynamatic;
 /// Determines if the pass should attempt to infer the basic block of the
 /// operation if it is missing.
 static bool isLegalForInference(Operation *op) {
-  return !isa<handshake::MemoryControllerOp, handshake::SinkOp>(op);
+  return !isa<handshake::MemoryOpInterface, handshake::SinkOp>(op);
 }
 
 /// Iterates over all operations legal for inference that do not have a "bb"
@@ -147,7 +147,7 @@ struct HandshakeInferBasicBlocksPass
 };
 } // namespace
 
-std::unique_ptr<dynamatic::DynamaticPass<false>>
+std::unique_ptr<dynamatic::DynamaticPass>
 dynamatic::createHandshakeInferBasicBlocksPass() {
   return std::make_unique<HandshakeInferBasicBlocksPass>();
 }

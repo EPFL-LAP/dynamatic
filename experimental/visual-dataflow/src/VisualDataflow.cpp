@@ -111,7 +111,7 @@ void VisualDataflow::createGraph(std::string inputDOTFile,
   }
 }
 
-void VisualDataflow::drawBBs(){
+void VisualDataflow::drawBBs() {
 
   for (const auto &bb : graph.getBBs()) {
 
@@ -249,8 +249,7 @@ void VisualDataflow::drawNodes() {
 
     Vector2 size = label->get_combined_minimum_size();
     Vector2 newPosition =
-        Vector2(center.first - size.x * 0.5,
-                -(center.second + size.y * 0.5)); 
+        Vector2(center.first - size.x * 0.5, -(center.second + size.y * 0.5));
     label->set_position(newPosition);
 
     CenterContainer *centerContainer = memnew(CenterContainer);
@@ -311,10 +310,9 @@ void VisualDataflow::drawNodes() {
     nodeIdToContourLine[node.first] = lines;
     nodeIdToTransparency[node.first] = false;
   }
-
 }
 
-void VisualDataflow::drawEdges(){
+void VisualDataflow::drawEdges() {
 
   for (auto &edge : graph.getEdges()) {
 
@@ -348,7 +346,7 @@ void VisualDataflow::drawEdges(){
         while (currentLength < segmentLength) {
           Line2D *line = memnew(Line2D);
           line->set_width(1);
-          line->set_default_color(OPAQUE_WHITE); 
+          line->set_default_color(OPAQUE_WHITE);
           Vector2 lineStart = start + segment * currentLength;
           Vector2 lineEnd =
               lineStart + segment * MIN(5, segmentLength - currentLength);
@@ -418,7 +416,6 @@ void VisualDataflow::drawEdges(){
     add_child(area2D);
     edgeIdToTransparency[edge.getEdgeId()] = 0;
   }
-
 }
 
 void VisualDataflow::drawGraph() {
@@ -426,7 +423,6 @@ void VisualDataflow::drawGraph() {
   drawBBs();
   drawNodes();
   drawEdges();
-
 }
 
 void VisualDataflow::nextCycle() {
@@ -495,7 +491,8 @@ void VisualDataflow::changeStateColor(int64_t state, Color color) {
 
   stateColors.at(state) = color;
 
-  for (auto &edgeState : graph.getCycleEdgeStates().at(cycle)) {
+  auto cycleStates = graph.getCycleEdgeStates();
+  for (auto &edgeState : cycleStates.at(cycle)) {
     EdgeId edgeId = edgeState.first;
     State edgeStateEnum = edgeState.second.first;
     if (edgeStateEnum == stateEnum) {
@@ -576,7 +573,7 @@ void VisualDataflow::transparentEffect(double transparency) {
   }
 }
 
-void VisualDataflow::highlightNode(NodeId nodeId) {
+void VisualDataflow::highlightNode(const NodeId &nodeId) {
 
   Color c = nodeIdToPolygon[nodeId]->get_color();
   c.a = 1;
@@ -600,7 +597,7 @@ void VisualDataflow::highlightNode(NodeId nodeId) {
   }
 }
 
-void VisualDataflow::transparentNode(NodeId nodeId) {
+void VisualDataflow::transparentNode(const NodeId &nodeId) {
 
   Color c = nodeIdToPolygon[nodeId]->get_color();
   c.a = 0.3;

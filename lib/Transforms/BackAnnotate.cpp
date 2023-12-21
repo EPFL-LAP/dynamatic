@@ -424,7 +424,7 @@ LogicalResult BackAnnotatePass::setOprdAttribute(OpOperand &oprd,
   return success();
 }
 
-std::unique_ptr<dynamatic::DynamaticPass<false>>
+std::unique_ptr<dynamatic::DynamaticPass>
 dynamatic::createBackAnnotate(const std::string &filepath) {
   return std::make_unique<BackAnnotatePass>(filepath);
 }

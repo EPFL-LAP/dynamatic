@@ -656,17 +656,18 @@ StdExecuter::StdExecuter(mlir::func::FuncOp &toplevel,
     unsigned strat = ExecuteStrategy::Default;
     auto res =
         llvm::TypeSwitch<Operation *, LogicalResult>(&op)
-            .Case<
-                mlir::arith::ConstantIndexOp, mlir::arith::ConstantIntOp,
-                mlir::arith::AddIOp, mlir::arith::AddFOp, mlir::arith::CmpIOp,
-                mlir::arith::CmpFOp, mlir::arith::SubIOp, mlir::arith::SubFOp,
-                mlir::arith::MulIOp, mlir::arith::MulFOp, mlir::arith::DivSIOp,
-                mlir::arith::DivUIOp, mlir::arith::DivFOp,
-                mlir::arith::IndexCastOp, mlir::arith::TruncIOp,
-                mlir::arith::AndIOp, mlir::arith::OrIOp, mlir::arith::SelectOp,
-                mlir::LLVM::UndefOp, mlir::arith::ShRSIOp, mlir::arith::ShLIOp,
-                mlir::arith::ExtSIOp, mlir::arith::ExtUIOp, memref::AllocOp,
-                memref::LoadOp, memref::StoreOp>([&](auto op) {
+            .Case<mlir::arith::ConstantIndexOp, mlir::arith::ConstantIntOp,
+                  mlir::arith::AddIOp, mlir::arith::AddFOp, mlir::arith::CmpIOp,
+                  mlir::arith::CmpFOp, mlir::arith::SubIOp, mlir::arith::SubFOp,
+                  mlir::arith::MulIOp, mlir::arith::MulFOp,
+                  mlir::arith::DivSIOp, mlir::arith::DivUIOp,
+                  mlir::arith::DivFOp, mlir::arith::IndexCastOp,
+                  mlir::arith::TruncIOp, mlir::arith::AndIOp,
+                  mlir::arith::OrIOp, mlir::arith::XOrIOp,
+                  mlir::arith::SelectOp, mlir::LLVM::UndefOp,
+                  mlir::arith::ShRSIOp, mlir::arith::ShLIOp,
+                  mlir::arith::ExtSIOp, mlir::arith::ExtUIOp, memref::AllocOp,
+                  memref::LoadOp, memref::StoreOp>([&](auto op) {
               strat = ExecuteStrategy::Default;
               return execute(op, inValues, outValues);
             })

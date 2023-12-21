@@ -134,7 +134,7 @@ LogicalResult HandshakeFixArgNamesPass::fixArgNames(handshake::FuncOp funcOp,
   return failure();
 }
 
-std::unique_ptr<dynamatic::DynamaticPass<false>>
+std::unique_ptr<dynamatic::DynamaticPass>
 dynamatic::experimental::createHandshakeFixArgNames(const std::string &source) {
   return std::make_unique<HandshakeFixArgNamesPass>(source);
 }

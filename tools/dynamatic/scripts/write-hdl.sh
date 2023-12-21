@@ -1,41 +1,30 @@
 #!/bin/bash
 
+source "$1"/tools/dynamatic/scripts/utils.sh
+
 # ============================================================================ #
 # Variable definitions
 # ============================================================================ #
 
-# Script variables
-LEGACY_DIR=$1
-OUTPUT_DIR=$2
-KERNEL_NAME=$3
+# Script arguments
+DYNAMATIC_DIR=$1
+LEGACY_DIR=$2
+OUTPUT_DIR=$3
+KERNEL_NAME=$4
 
-# ============================================================================ #
-# Helper funtions
-# ============================================================================ #
-
-# Prints some information to stdout.
-#   $1: the text to print
-echo_info() {
-    echo "[INFO] $1"
-}
-
-# Prints a fatal error message to stdout.
-#   $1: the text to print
-echo_fatal() {
-    echo "[FATAL] $1"
-}
+COMP_DIR="$OUTPUT_DIR/comp"
 
 # ============================================================================ #
 # HDL writing flow
 # ============================================================================ #
 
-# Convert DOT graph to VHDL
-"$LEGACY_DIR/dot2vhdl/bin/dot2vhdl" "$OUTPUT_DIR/$KERNEL_NAME" >/dev/null
-if [[ $? -ne 0 ]]; then
-    echo_fatal "Failed to convert DOT to VHDL"
-    exit 1
-fi
-echo_info "Converted DOT to VHDL"
+# Append legacy Dynamatic's bin folder to path so that lsq_generate is visible
+export PATH="${LEGACY_DIR}/bin:${PATH}"
+# Required by the lsq_generate script
+export DHLS_INSTALL_DIR="${LEGACY_DIR}/../.."
 
-echo_info "All done!"
-echo ""
+# Convert DOT graph to VHDL
+cd "$COMP_DIR"
+"$LEGACY_DIR/dot2vhdl/bin/dot2vhdl" "$COMP_DIR/$KERNEL_NAME" >/dev/null
+exit_on_fail "Failed to convert DOT to VHDL" "Converted DOT to VHDL"
+echo_info "HDL generation succeeded"

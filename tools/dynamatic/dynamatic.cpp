@@ -69,7 +69,7 @@ const static std::string HEADER =
     DELIM +
     "============== Dynamatic | Dynamic High-Level Synthesis Compiler "
     "===============\n" +
-    "======================= EPFL-LAP - v0.1.0 | October 2023 "
+    "======================= EPFL-LAP - v0.2.0 | November 2023 "
     "=======================\n" +
     DELIM + "\n\n";
 const static std::string PROMPT = "dynamatic> ";
@@ -78,25 +78,32 @@ const static std::string PROMPT = "dynamatic> ";
 const static std::string CMD_SET_SRC = "set-src";
 const static std::string CMD_SET_DYNAMATIC_PATH = "set-dynamatic-path";
 const static std::string CMD_SET_LEGACY_PATH = "set-legacy-path";
-const static std::string CMD_SYNTHESIZE = "synthesize";
+const static std::string CMD_COMPILE = "compile";
 const static std::string CMD_WRITE_HDL = "write-hdl";
 const static std::string CMD_SIMULATE = "simulate";
-const static std::string CMD_LOGIC_SYNTHESIZE = "logic-synthesize";
+const static std::string CMD_SYNTHESIZE = "synthesize";
 const static std::string CMD_HELP = "help";
 const static std::string CMD_EXIT = "exit";
 
 namespace {
 
 struct FrontendState {
-  std::string dynamaticPath = ".";
+  std::string cwd;
+  std::string dynamaticPath;
   std::optional<std::string> legacyPath = std::nullopt;
   std::optional<std::string> sourcePath = std::nullopt;
 
-  FrontendState() = default;
+  FrontendState(StringRef cwd) : cwd(cwd), dynamaticPath(cwd){};
 
   bool sourcePathIsSet(StringRef keyword);
 
   bool legacyPathIsSet(StringRef keyword);
+
+  std::string getScriptsPath() const {
+    return dynamaticPath + "/tools/dynamatic/scripts";
+  }
+
+  std::string makeAbsolutePath(StringRef path);
 };
 
 struct Argument {
@@ -186,17 +193,17 @@ public:
 class SetSrc : public Command {
 public:
   SetSrc(FrontendState &state)
-      : Command(CMD_SET_SRC, "Sets the C source to synthesize", state,
+      : Command(CMD_SET_SRC, "Sets the C source to compile", state,
                 {{"source", "path to source file"}}){};
 
   CommandResult decode(SmallVector<std::string> &tokens) override;
 };
 
-class Synthesize : public Command {
+class Compile : public Command {
 public:
-  Synthesize(FrontendState &state)
-      : Command(CMD_SYNTHESIZE,
-                "Synthesizes the source kernel into a dataflow circuit; "
+  Compile(FrontendState &state)
+      : Command(CMD_COMPILE,
+                "Compiles the source kernel into a dataflow circuit; "
                 "produces both handshake-level IR and an equivalent DOT file",
                 state, {},
                 {{"simple-buffers", "Use simple buffer placement"}}){};
@@ -209,7 +216,7 @@ public:
   WriteHDL(FrontendState &state)
       : Command(
             CMD_WRITE_HDL,
-            "Converts the DOT file produced after synthesis to VHDL using the "
+            "Converts the DOT file produced after compile to VHDL using the "
             "legacy dot2vhdl tool",
             state){};
 
@@ -227,10 +234,10 @@ public:
   CommandResult decode(SmallVector<std::string> &tokens) override;
 };
 
-class LogicSynthesize : public Command {
+class Synthesize : public Command {
 public:
-  LogicSynthesize(FrontendState &state)
-      : Command(CMD_LOGIC_SYNTHESIZE,
+  Synthesize(FrontendState &state)
+      : Command(CMD_SYNTHESIZE,
                 "Synthesizes the VHDL produced during HDL writing using Vivado",
                 state){};
 
@@ -262,6 +269,19 @@ public:
   }
 };
 } // namespace
+
+static CommandResult execShellCommand(StringRef cmd) {
+  int ret = std::system(cmd.str().c_str());
+  llvm::outs() << "\n";
+  return ret != 0 ? CommandResult::FAIL : CommandResult::SUCCESS;
+}
+
+std::string FrontendState::makeAbsolutePath(StringRef path) {
+  SmallString<128> str;
+  path::append(str, path);
+  fs::make_absolute(cwd, str);
+  return str.str().str();
+}
 
 bool FrontendState::sourcePathIsSet(StringRef keyword) {
   if (!sourcePath.has_value()) {
@@ -395,7 +415,7 @@ CommandResult SetDynamaticPath::decode(SmallVector<std::string> &tokens) {
     return CommandResult::FAIL;
   }
 
-  state.dynamaticPath = dynamaticPath;
+  state.dynamaticPath = state.makeAbsolutePath(dynamaticPath);
   return CommandResult::SUCCESS;
 }
 
@@ -418,7 +438,7 @@ CommandResult SetLegacyPath::decode(SmallVector<std::string> &tokens) {
     return CommandResult::FAIL;
   }
 
-  state.legacyPath = legacyPath;
+  state.legacyPath = state.makeAbsolutePath(legacyPath);
   return CommandResult::SUCCESS;
 }
 
@@ -441,11 +461,11 @@ CommandResult SetSrc::decode(SmallVector<std::string> &tokens) {
     return CommandResult::FAIL;
   }
 
-  state.sourcePath = sourcePath;
+  state.sourcePath = state.makeAbsolutePath(sourcePath);
   return CommandResult::SUCCESS;
 }
 
-CommandResult Synthesize::decode(SmallVector<std::string> &tokens) {
+CommandResult Compile::decode(SmallVector<std::string> &tokens) {
   ParsedCommand parsed;
   if (failed(parse(tokens, parsed)))
     return CommandResult::SYNTAX_ERROR;
@@ -462,14 +482,9 @@ CommandResult Synthesize::decode(SmallVector<std::string> &tokens) {
       parsed.optArgsPresent.contains("simple-buffers") ? "1" : "0";
 
   // Create and execute the command
-  std::stringstream exec;
-  exec << "./tools/dynamatic/scripts/synthesize.sh " << state.dynamaticPath
-       << " " << kernelDir << " " << outputDir << " " << kernelName << " "
-       << buffers;
-  if (int ret = std::system(exec.str().c_str()); ret != 0)
-    return CommandResult::FAIL;
-
-  return CommandResult::SUCCESS;
+  return execShellCommand(state.getScriptsPath() + "/compile.sh " +
+                          state.dynamaticPath + " " + kernelDir + " " +
+                          outputDir + " " + kernelName + " " + buffers);
 }
 
 CommandResult WriteHDL::decode(SmallVector<std::string> &tokens) {
@@ -485,8 +500,8 @@ CommandResult WriteHDL::decode(SmallVector<std::string> &tokens) {
   std::string kernelDir = path::parent_path(*state.sourcePath).str();
   std::string kernelName = path::filename(*state.sourcePath).drop_back(2).str();
   std::string outputDir = kernelDir + sep.str() + "out";
-  std::string dotPath =
-      kernelDir + sep.str() + "out" + sep.str() + kernelName + ".dot";
+  std::string dotPath = kernelDir + sep.str() + "out" + sep.str() + "comp" +
+                        sep.str() + kernelName + ".dot";
 
   // The DOT file must exist to produce the corresponding VHDL
   if (!fs::exists(dotPath)) {
@@ -495,13 +510,9 @@ CommandResult WriteHDL::decode(SmallVector<std::string> &tokens) {
   }
 
   // Create and execute the command
-  std::stringstream exec;
-  exec << "./tools/dynamatic/scripts/write-hdl.sh " << *state.legacyPath << " "
-       << outputDir << " " << kernelName;
-  if (int ret = std::system(exec.str().c_str()); ret != 0)
-    return CommandResult::FAIL;
-
-  return CommandResult::SUCCESS;
+  return execShellCommand(state.getScriptsPath() + "/write-hdl.sh " +
+                          state.dynamaticPath + " " + *state.legacyPath + " " +
+                          outputDir + " " + kernelName);
 }
 
 CommandResult Simulate::decode(SmallVector<std::string> &tokens) {
@@ -517,8 +528,8 @@ CommandResult Simulate::decode(SmallVector<std::string> &tokens) {
   std::string kernelDir = path::parent_path(*state.sourcePath).str();
   std::string kernelName = path::filename(*state.sourcePath).drop_back(2).str();
   std::string outputDir = kernelDir + sep.str() + "out";
-  std::string vhdlPath =
-      kernelDir + sep.str() + "out" + sep.str() + kernelName + ".vhd";
+  std::string vhdlPath = kernelDir + sep.str() + "out" + sep.str() + "comp" +
+                         sep.str() + kernelName + ".vhd";
 
   // The DOT file must exist to produce the corresponding VHDL
   if (!fs::exists(vhdlPath)) {
@@ -527,16 +538,12 @@ CommandResult Simulate::decode(SmallVector<std::string> &tokens) {
   }
 
   // Create and execute the command
-  std::stringstream exec;
-  exec << "./tools/dynamatic/scripts/simulate.sh " << *state.legacyPath << " "
-       << kernelDir << " " << outputDir << " " << kernelName;
-  if (int ret = std::system(exec.str().c_str()); ret != 0)
-    return CommandResult::FAIL;
-
-  return CommandResult::SUCCESS;
+  return execShellCommand(state.getScriptsPath() + "/simulate.sh " +
+                          state.dynamaticPath + " " + *state.legacyPath + " " +
+                          kernelDir + " " + outputDir + " " + kernelName);
 }
 
-CommandResult LogicSynthesize::decode(SmallVector<std::string> &tokens) {
+CommandResult Synthesize::decode(SmallVector<std::string> &tokens) {
   ParsedCommand parsed;
   if (failed(parse(tokens, parsed)))
     return CommandResult::SYNTAX_ERROR;
@@ -549,8 +556,8 @@ CommandResult LogicSynthesize::decode(SmallVector<std::string> &tokens) {
   std::string kernelDir = path::parent_path(*state.sourcePath).str();
   std::string kernelName = path::filename(*state.sourcePath).drop_back(2).str();
   std::string outputDir = kernelDir + sep.str() + "out";
-  std::string vhdlPath =
-      kernelDir + sep.str() + "out" + sep.str() + kernelName + ".vhd";
+  std::string vhdlPath = kernelDir + sep.str() + "out" + sep.str() + "comp" +
+                         sep.str() + kernelName + ".vhd";
 
   // The DOT file must exist to produce the corresponding VHDL
   if (!fs::exists(vhdlPath)) {
@@ -559,13 +566,9 @@ CommandResult LogicSynthesize::decode(SmallVector<std::string> &tokens) {
   }
 
   // Create and execute the command
-  std::stringstream exec;
-  exec << "./tools/dynamatic/scripts/logic-synthesize.sh " << *state.legacyPath
-       << " " << outputDir << " " << kernelName;
-  if (int ret = std::system(exec.str().c_str()); ret != 0)
-    return CommandResult::FAIL;
-
-  return CommandResult::SUCCESS;
+  return execShellCommand(state.getScriptsPath() + "/synthesize.sh " +
+                          state.dynamaticPath + " " + *state.legacyPath + " " +
+                          outputDir + " " + kernelName);
 }
 
 static void tokenizeInput(StringRef input, SmallVector<std::string> &tokens) {
@@ -606,16 +609,23 @@ int main(int argc, char **argv) {
   InitLLVM y(argc, argv);
   cl::ParseCommandLineOptions(argc, argv, "Dynamatic Frontend");
 
+  // Get current working directory
+  SmallString<128> cwd;
+  if (std::error_code ec = fs::current_path(cwd); ec.value() != 0) {
+    llvm::errs() << "Failed to read current working directory.\n";
+    return 1;
+  }
+
   // Set up the frontend end and available commands
-  FrontendState state;
+  FrontendState state(cwd.str());
   FrontendCommands commands;
   commands.add<SetDynamaticPath>(state);
   commands.add<SetLegacyPath>(state);
   commands.add<SetSrc>(state);
-  commands.add<Synthesize>(state);
+  commands.add<Compile>(state);
   commands.add<WriteHDL>(state);
   commands.add<Simulate>(state);
-  commands.add<LogicSynthesize>(state);
+  commands.add<Synthesize>(state);
   commands.add<Help>(state);
   commands.add<Exit>(state);
 

@@ -107,7 +107,7 @@ public:
 
   /// Combinational delay from any valid input to a ready output pin.
   double validToReady = 0.0;
-  /// Combinational delay from the condition input pin  to any valid output pin.
+  /// Combinational delay from the condition input pin to any valid output pin.
   double condToValid = 0.0;
   /// Combinational delay from the condition input pin to any ready output pin.
   double condToReady = 0.0;
@@ -165,9 +165,13 @@ public:
   /// Returns the timing model corresponding to the operation, if any exists.
   const TimingModel *getModel(Operation *op) const;
 
-  /// Attempts to get an operation's latency. On success, sets the last argument
-  /// to the requested latency.
-  LogicalResult getLatency(Operation *op, double &latency) const;
+  /// Attempts to get an operation's latency for a specific signal type. On
+  /// success, sets the last argument to the requested latency.
+  /// TODO: Currently the latency is always 0 for valid and ready signals, which
+  /// may not always be true. Once we have formal timing models we will be able
+  /// to return the real latency for those signal types too.
+  LogicalResult getLatency(Operation *op, SignalType signalType,
+                           double &latency) const;
 
   /// Attempts to get an operation's internal delay for a specific signal type.
   /// On success, sets the last argument to the requested delay.

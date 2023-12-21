@@ -79,11 +79,15 @@ private:
                     Polygon2D *arrowHead);
 
   void transparentEffect(double transparency);
-  void highlightNode(NodeId nodeId);
-  void transparentNode(NodeId nodeId);
+  void highlightNode(const NodeId &nodeId);
+  void transparentNode(const NodeId &nodeId);
+  void drawBBs();
+  void drawNodes();
+  void drawEdges();
 
 protected:
   /// Binds the cpp methods with Godot
+  // NOLINTNEXTLINE(readability-identifier-naming)
   static void _bind_methods();
 
 public:

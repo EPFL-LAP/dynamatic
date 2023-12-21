@@ -20,7 +20,7 @@ include "dynamatic/Support/Passes.td"
 // AffineToScf
 //===----------------------------------------------------------------------===//
 
-def AffineToScf : DynamaticPass<"lower-affine-to-scf", "false",
+def AffineToScf : DynamaticPass<"lower-affine-to-scf",
                                 [ "mlir::memref::MemRefDialect", 
                                   "mlir::scf::SCFDialect", 
                                   "mlir::vector::VectorDialect" ]> {
@@ -39,7 +39,7 @@ def AffineToScf : DynamaticPass<"lower-affine-to-scf", "false",
 // ScfToCf
 //===----------------------------------------------------------------------===//
 
-def ScfToCf : DynamaticPass<"lower-scf-to-cf", "false", [
+def ScfToCf : DynamaticPass<"lower-scf-to-cf", [
     "mlir::cf::ControlFlowDialect", "mlir::arith::ArithDialect"]> {
   let summary = "Lower scf dialect to unstructured control flow (cf)";
   let description = [{
@@ -65,7 +65,7 @@ def StandardToHandshakeFPGA18 : DynamaticPass<"lower-std-to-handshake-fpga18"> {
 // HandshakeToNetlist
 //===----------------------------------------------------------------------===//
 
-def HandshakeToNetlist : DynamaticPass< "lower-handshake-to-netlist", "false",
+def HandshakeToNetlist : DynamaticPass< "lower-handshake-to-netlist",
                                         [ "circt::hw::HWDialect",  
                                           "circt::esi::ESIDialect" ]> {
   let summary = "Lower Handshake to ESI/HW (netlist)";
