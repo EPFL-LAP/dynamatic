@@ -73,6 +73,8 @@ public:
   void addBB(BB bb);
   /// Gets the graph's BBs
   std::vector<BB> getBBs();
+  /// Retrieves a list of edge IDs that are either incoming to or outgoing from
+  /// a specified node
   std::vector<EdgeId> getInOutEdgesOfNode(const NodeId &nodeId);
 
 private:

@@ -35,25 +35,38 @@ class VisualDataflow : public Control {
   GDCLASS(VisualDataflow, Control)
 
 private:
+  /// // Represents the main graph structure for visualizing the circuit
   Graph graph;
+  /// Keeps track of the current cycle number in the visualization
   CycleNb cycle = -1;
-  std::map<EdgeId, Line2D *> edgeIdToLine2D;
+  /// Maps each edge ID to its corresponding Line2D objects in Godot
   std::map<EdgeId, std::vector<Line2D *>> edgeIdToLines;
+  /// Maps each edge ID to its corresponding arrowhead Polygon2D object
   std::map<EdgeId, Polygon2D *> edgeIdToArrowHead;
+  /// Maps each edge ID to a Label object for displaying the value of the data
+  /// carried by the edge
   std::map<EdgeId, Label *> edgeIdToData;
+  /// Maps each node ID to its position in Godot's coordinate system
   std::map<NodeId, PackedVector2Array> nodeIdToGodoPos;
+  /// Maps each node ID to its corresponding Polygon2D object
   std::map<NodeId, Polygon2D *> nodeIdToPolygon;
+  /// // Maps each node ID to its contour line
   std::map<NodeId, std::vector<Line2D *>> nodeIdToContourLine;
+  /// Maps each node ID to a boolean indicating its transparency status (true
+  /// meaning transparent)
   std::map<NodeId, bool> nodeIdToTransparency;
+  /// Maps each edge ID to a counter stating the number of highlighted adjacent
+  /// nodes
   std::map<EdgeId, size_t> edgeIdToTransparency;
+  /// // Counter for the number of nodes clicked by the user
   int nbClicked = 0;
-  bool transparent = false;
   /// Initial colors corresponding to the different states on an edge
   std::vector<Color> stateColors = {
       Color(0.8, 0.0, 0.0, 1.0), Color(0.0, 0.0, 0.0, 1.0),
       Color(0.0, 0.0, 0.8, 1.0), Color(0.0, 0.8, 0.0, 1.0),
       Color(0.0, 0.8, 0.8, 1.0),
   };
+  /// Maps color names to their corresponding RGBA Color values in Godot
   std::map<std::string, Color> colorNameToRGB = {
       {"lavender", Color(0.9, 0.9, 0.98, 1)},
       {"plum", Color(0.867, 0.627, 0.867, 1)},
@@ -77,12 +90,17 @@ private:
   /// Changes the color of a given edge in function of its state
   void setEdgeColor(State state, std::vector<Line2D *> lines,
                     Polygon2D *arrowHead);
-
+  /// Modifies the transparency of all graph elements
   void transparentEffect(double transparency);
+  /// Highlights a specific node in the graph, enhancing its visibility
   void highlightNode(const NodeId &nodeId);
+  /// Makes a specific node in the graph transparent, reducing its visibility
   void transparentNode(const NodeId &nodeId);
+  /// Draws the basic blocks of the graph
   void drawBBs();
+  /// Draws the nodes of the graph
   void drawNodes();
+  /// Draws the edges of the graph
   void drawEdges();
 
 protected:
@@ -109,7 +127,7 @@ public:
   void onClick(Vector2 position);
   /// Reset the selection of nodes
   void resetSelection();
-}; // namespace godot
+};
 
 } // namespace godot
 
