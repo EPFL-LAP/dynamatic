@@ -1,0 +1,120 @@
+[gd_scene load_steps=2 format=3 uid="uid://1ukyu4yhubi7"]
+
+[ext_resource type="Script" path="res://legend.gd" id="1_h1ohj"]
+
+[node name="Legend" type="Control"]
+layout_mode = 3
+anchors_preset = 1
+anchor_left = 1.0
+anchor_right = 1.0
+grow_horizontal = 0
+script = ExtResource("1_h1ohj")
+
+[node name="GeneralLegend" type="VBoxContainer" parent="."]
+layout_mode = 1
+anchors_preset = 1
+anchor_left = 1.0
+anchor_right = 1.0
+offset_left = -218.0
+offset_right = 1.0
+offset_bottom = 221.0
+grow_horizontal = 0
+
+[node name="HBoxContainer" type="HBoxContainer" parent="GeneralLegend"]
+layout_mode = 2
+size_flags_horizontal = 8
+
+[node name="ResetSelection" type="Button" parent="GeneralLegend/HBoxContainer"]
+layout_mode = 2
+text = "Reset selection"
+
+[node name="ShowLegend" type="Button" parent="GeneralLegend/HBoxContainer"]
+layout_mode = 2
+size_flags_horizontal = 8
+size_flags_vertical = 0
+toggle_mode = true
+action_mode = 0
+text = "Legend"
+
+[node name="Panel" type="Panel" parent="GeneralLegend"]
+visible = false
+layout_mode = 2
+size_flags_vertical = 3
+
+[node name="EdgeLegend" type="VBoxContainer" parent="GeneralLegend/Panel"]
+layout_mode = 2
+offset_top = 4.0
+offset_right = 218.0
+offset_bottom = 180.0
+size_flags_horizontal = 3
+
+[node name="EdgeLegendTitle" type="Label" parent="GeneralLegend/Panel/EdgeLegend"]
+layout_mode = 2
+size_flags_horizontal = 0
+text = "EDGE LEGEND:"
+
+[node name="EdgeComponents" type="HBoxContainer" parent="GeneralLegend/Panel/EdgeLegend"]
+layout_mode = 2
+
+[node name="Colors" type="VBoxContainer" parent="GeneralLegend/Panel/EdgeLegend/EdgeComponents"]
+layout_mode = 2
+
+[node name="ColorPickerButton" type="ColorPickerButton" parent="GeneralLegend/Panel/EdgeLegend/EdgeComponents/Colors"]
+custom_minimum_size = Vector2(60, 20)
+layout_mode = 2
+size_flags_vertical = 3
+color = Color(1, 0, 0, 1)
+
+[node name="ColorPickerButton2" type="ColorPickerButton" parent="GeneralLegend/Panel/EdgeLegend/EdgeComponents/Colors"]
+custom_minimum_size = Vector2(60, 20)
+layout_mode = 2
+size_flags_vertical = 3
+
+[node name="ColorPickerButton3" type="ColorPickerButton" parent="GeneralLegend/Panel/EdgeLegend/EdgeComponents/Colors"]
+custom_minimum_size = Vector2(60, 20)
+layout_mode = 2
+size_flags_vertical = 3
+color = Color(0, 0, 0.878431, 1)
+
+[node name="ColorPickerButton4" type="ColorPickerButton" parent="GeneralLegend/Panel/EdgeLegend/EdgeComponents/Colors"]
+custom_minimum_size = Vector2(60, 20)
+layout_mode = 2
+size_flags_vertical = 3
+color = Color(0, 0.8, 0, 1)
+
+[node name="ColorPickerButton5" type="ColorPickerButton" parent="GeneralLegend/Panel/EdgeLegend/EdgeComponents/Colors"]
+custom_minimum_size = Vector2(60, 20)
+layout_mode = 2
+size_flags_vertical = 3
+color = Color(0, 0.827451, 0.827451, 1)
+
+[node name="Definitions" type="VBoxContainer" parent="GeneralLegend/Panel/EdgeLegend/EdgeComponents"]
+layout_mode = 2
+size_flags_horizontal = 6
+
+[node name="Undefined" type="Label" parent="GeneralLegend/Panel/EdgeLegend/EdgeComponents/Definitions"]
+layout_mode = 2
+size_flags_horizontal = 0
+text = "Undefined"
+
+[node name="Accept" type="Label" parent="GeneralLegend/Panel/EdgeLegend/EdgeComponents/Definitions"]
+layout_mode = 2
+size_flags_horizontal = 0
+text = "Accept"
+
+[node name="Idle" type="Label" parent="GeneralLegend/Panel/EdgeLegend/EdgeComponents/Definitions"]
+layout_mode = 2
+size_flags_horizontal = 0
+text = "Idle"
+
+[node name="Stall" type="Label" parent="GeneralLegend/Panel/EdgeLegend/EdgeComponents/Definitions"]
+layout_mode = 2
+size_flags_horizontal = 0
+text = "Stall"
+
+[node name="Transfer" type="Label" parent="GeneralLegend/Panel/EdgeLegend/EdgeComponents/Definitions"]
+layout_mode = 2
+size_flags_horizontal = 0
+text = "Transfer"
+
+[connection signal="toggled" from="GeneralLegend/HBoxContainer/ShowLegend" to="." method="_on_show_legend_toggled"]

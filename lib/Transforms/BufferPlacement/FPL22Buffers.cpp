@@ -70,12 +70,6 @@ void FPL22BuffersBase::extractResult(BufferPlacement &placement) {
       result.numTrans = numSlotsToPlace;
     }
 
-    if (result.numOpaque == 1 && result.numTrans > 0) {
-      // When requesting a single opaque slot, legacy Dynamatic places an
-      // elastic buffer (opaque slot + transparent slot), compensate for this
-      result.numTrans -= 1;
-    }
-
     deductInternalBuffers(channel, result);
     placement[channel] = result;
   }

@@ -232,31 +232,31 @@ void BufferPlacementMILP::addChannelPathConstraints(
   GRBVar &bufPresent = signalVars.bufPresent;
   auto [inBufDelay, outBufDelay] = getPortDelays(channel, signal, bufModel);
 
+  // Arrival time at channel's output must be lower than target clock period
+  model.addConstr(t2 <= targetPeriod, "path_period");
+
   // If a buffer is present on the signal's path, then the arrival time at the
   // buffer's register must be lower than the clock period. The signal must
   // propagate on the channel through all potential buffers cutting other
   // signals before its own, and inside its own buffer's input pin logic
-  model.addConstr(t1 + bufsBeforeDelay +
-                          bufPresent * (props.inDelay + inBufDelay) <=
+  double preBufCstDelay = props.inDelay + inBufDelay;
+  model.addConstr(t1 + bufsBeforeDelay + bufPresent * preBufCstDelay <=
                       targetPeriod,
-                  "path_channelIn");
-
-  // Arrival time at channel's output must be lower than target clock period
-  model.addConstr(t2 <= targetPeriod, "path_channelOut");
+                  "path_bufferedChannelIn");
 
   // If a buffer is present on the signal's path, then the arrival time at the
   // channel's output must be greater than the propagation time through its own
   // buffer's output pin logic and all potential buffers cutting other signals
-  // after its own.
-  model.addConstr(outBufDelay + props.outDelay + bufsAfterDelay <= t2,
-                  "path_bufferedChannel");
+  // after its own
+  double postBufCstDelay = outBufDelay + props.outDelay;
+  model.addConstr(bufPresent * postBufCstDelay + bufsAfterDelay <= t2,
+                  "path_bufferedChannelOut");
 
   // If there are no buffers cutting the signal's path, arrival time at
   // channel's output must still propagate through entire channel and all
   // potential buffers cutting through other signals
-  model.addConstr(t1 + props.delay + bufsBeforeDelay + bufsAfterDelay -
-                          bigCst * bufPresent <=
-                      t2,
+  GRBLinExpr unbufChannelDelay = bufsBeforeDelay + props.delay + bufsAfterDelay;
+  model.addConstr(t1 + unbufChannelDelay - bigCst * bufPresent <= t2,
                   "path_unbufferedChannel");
 }
 

@@ -12,6 +12,9 @@
 //===----------------------------------------------------------------------===//
 
 #include "CSVParser.h"
+#include "Graph.h"
+#include "mlir/Support/LogicalResult.h"
+#include <iostream>
 
 using namespace mlir;
 using namespace dynamatic::experimental::visual_dataflow;
@@ -23,20 +26,20 @@ static LogicalResult findState(const std::string &stateString, State &state) {
     state = UNDEFINED;
     return success();
   }
-  if (stateString == "ready") {
-    state = READY;
+  if (stateString == "accept") {
+    state = ACCEPT;
     return success();
   }
-  if (stateString == "empty") {
-    state = EMPTY;
+  if (stateString == "idle") {
+    state = IDLE;
     return success();
   }
-  if (stateString == "valid") {
-    state = VALID;
+  if (stateString == "stall") {
+    state = STALL;
     return success();
   }
-  if (stateString == "valid_ready") {
-    state = VALID_READY;
+  if (stateString == "transfer") {
+    state = TRANSFER;
     return success();
   }
   // Error unknown state for the edge.
@@ -59,10 +62,11 @@ static std::string trim(const std::string &str) {
 }
 
 LogicalResult dynamatic::experimental::visual_dataflow::processCSVLine(
-    const std::string &line, size_t lineIndex, Graph &graph) {
+    const std::string &line, size_t lineIndex, Graph &graph,
+    CycleNb *currCycle) {
 
-  // Jump the first 2 lines and empty line (Not needed)
-  if (lineIndex == 0 || lineIndex == 1 || line.empty())
+  // Jump the first line which contain column names
+  if (lineIndex == 0 || line.empty())
     return success();
 
   std::string token;
@@ -86,30 +90,38 @@ LogicalResult dynamatic::experimental::visual_dataflow::processCSVLine(
 
   std::istringstream iss(line);
 
-  // Parse all 6 columns
+  // Parse all 7 columns
   int cycleNb, inPort, outPort;
-  std::string src, dst, stateString;
+  std::string src, dst, stateString, data;
 
   if (parseTokenInt(iss, cycleNb) || parseTokenString(iss, src) ||
       parseTokenInt(iss, outPort) || parseTokenString(iss, dst) ||
-      parseTokenInt(iss, inPort) || parseTokenString(iss, stateString)) {
+      parseTokenInt(iss, inPort) || parseTokenString(iss, stateString) ||
+      parseTokenString(iss, data)) {
     return failure();
   }
 
-  std::pair<NodeId, int> srcInfo = std::pair(src, outPort);
+  if (cycleNb != *currCycle) {
+    graph.dupilcateEdgeStates(*currCycle, cycleNb);
+    *currCycle = cycleNb;
+  }
 
-  std::pair<NodeId, int> dstInfo = std::pair(dst, inPort);
+  std::pair<NodeId, size_t> srcInfo = std::pair(src, ++outPort);
 
-  std::pair<std::pair<NodeId, int>, std::pair<NodeId, int>> info =
+  std::pair<NodeId, size_t> dstInfo = std::pair(dst, ++inPort);
+
+  std::pair<std::pair<NodeId, size_t>, std::pair<NodeId, size_t>> info =
       std::pair(srcInfo, dstInfo);
 
   EdgeId edgeId;
   State state;
 
   if (failed(graph.getEdgeId(info, edgeId)) ||
-      failed(findState(stateString, state)))
+      failed(findState(stateString, state))) {
     return failure();
+  }
 
-  graph.addEdgeState(cycleNb, edgeId, state);
+  graph.addEdgeState(cycleNb, edgeId, state, data);
+
   return success();
 }
