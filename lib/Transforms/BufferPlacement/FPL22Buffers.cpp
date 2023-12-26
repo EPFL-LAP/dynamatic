@@ -173,7 +173,7 @@ void FPL22BuffersBase::addUnitMixedPathConstraints(Operation *unit,
   // Adds constraints between the input ports' valid and ready pins of a unit
   // with two operands.
   auto addJoinedOprdConstraints = [&]() -> void {
-    double vr = unitModel->validToReady;
+    double vr = unitModel ? unitModel->validToReady : 0.0;
     Value oprd0 = unit->getOperand(0), oprd1 = unit->getOperand(1);
     constraints.emplace_back(Pin(oprd0, SignalType::VALID),
                              Pin(oprd1, SignalType::READY), vr);
@@ -185,10 +185,10 @@ void FPL22BuffersBase::addUnitMixedPathConstraints(Operation *unit,
   // valid/ready output pins.
   auto addDataToAllValidReadyConstraints = [&](Value inputChannel) -> void {
     Pin input(inputChannel, SignalType::DATA);
-    double cv = unitModel->condToValid;
+    double cv = unitModel ? unitModel->condToValid : 0.0;
     for (OpResult res : unit->getResults())
       constraints.emplace_back(input, Pin(res, SignalType::VALID), cv);
-    double cr = unitModel->condToReady;
+    double cr = unitModel ? unitModel->condToReady : 0.0;
     for (Value oprd : unit->getOperands())
       constraints.emplace_back(input, Pin(oprd, SignalType::READY), cr);
   };
@@ -209,12 +209,13 @@ void FPL22BuffersBase::addUnitMixedPathConstraints(Operation *unit,
         // data pin of the index result
         Pin input(cmergeOp.getOperand(0), SignalType::VALID);
         Pin output(cmergeOp.getIndex(), SignalType::DATA);
-        constraints.emplace_back(input, output, unitModel->validToCond);
+        double vc = unitModel ? unitModel->validToCond : 0.0;
+        constraints.emplace_back(input, output, vc);
       })
       .Case<handshake::MergeOp>([&](handshake::MergeOp mergeOp) {
         // There is a path between every valid input pin and the data output
         // pin
-        double vd = unitModel->validToData;
+        double vd = unitModel ? unitModel->validToData : 0.0;
         Pin output(mergeOp.getResult(), SignalType::DATA);
         for (Value oprd : mergeOp->getOperands())
           constraints.emplace_back(Pin(oprd, SignalType::VALID), output, vd);
@@ -226,8 +227,8 @@ void FPL22BuffersBase::addUnitMixedPathConstraints(Operation *unit,
 
         // There is a path between every valid input pin and every data/ready
         // output pin
-        double vd = unitModel->validToData;
-        double vr = unitModel->validToReady;
+        double vd = unitModel ? unitModel->validToData : 0.0;
+        double vr = unitModel ? unitModel->validToReady : 0.0;
         for (Value oprd : muxOp->getOperands()) {
           for (OpResult res : muxOp->getResults()) {
             constraints.emplace_back(Pin(oprd, SignalType::VALID),
