@@ -65,7 +65,7 @@ LogicalResult dynamatic::experimental::visual_dataflow::processCSVLine(
     const std::string &line, size_t lineIndex, Graph &graph,
     CycleNb *currCycle) {
 
-  // Jump the first 2 lines and empty line (Not needed)
+  // Jump the first line which contain column names
   if (lineIndex == 0 || line.empty())
     return success();
 

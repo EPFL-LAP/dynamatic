@@ -377,8 +377,7 @@ void VisualDataflow::changeCycle(int64_t cycleNb) {
     cycleSlider->set_value(cycle);
 
     if (graph.getCycleEdgeStates().count(cycle)) {
-      std::map<EdgeId, std::pair<State, Data>> edgeStates =
-          graph.getCycleEdgeStates().at(cycle);
+      ChannelTransitions edgeStates = graph.getCycleEdgeStates().at(cycle);
       for (auto &edgeState : edgeStates) {
 
         EdgeId edgeId = edgeState.first;

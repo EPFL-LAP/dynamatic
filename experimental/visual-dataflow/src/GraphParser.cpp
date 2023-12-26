@@ -62,14 +62,12 @@ LogicalResult GraphParser::parse(std::string &filePath) {
     std::ifstream f;
     f.open(outputDotFile);
 
-    if (failed(processDOT(f, *mGraph))) {
+    if (failed(processDOT(f, *mGraph)))
       return failure();
-    }
   } else if (filePath.find(".mlir") != std::string::npos) {
     auto fileOrErr = MemoryBuffer::getFileOrSTDIN(filePath.c_str());
-    if (std::error_code error = fileOrErr.getError()) {
+    if (std::error_code error = fileOrErr.getError())
       return failure();
-    }
 
     MLIRContext context;
     context.loadDialect<func::FuncDialect, memref::MemRefDialect,

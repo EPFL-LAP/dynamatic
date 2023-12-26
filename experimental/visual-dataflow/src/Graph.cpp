@@ -49,9 +49,9 @@ LogicalResult Graph::getEdgeId(
 }
 
 void Graph::addEdgeState(CycleNb cycleNb, EdgeId edgeId, State state,
-                         Data data) {
+                         const Data &data) {
   if (cycleNb == 0) {
-    std::map<EdgeId, std::pair<State, Data>> mapEdgeState = cycleEdgeStates[0];
+    ChannelTransitions mapEdgeState = cycleEdgeStates[0];
     std::pair<State, Data> statePair = std::pair(state, data);
     mapEdgeState.insert(std::pair(edgeId, statePair));
     cycleEdgeStates[cycleNb] = mapEdgeState;
@@ -61,31 +61,19 @@ void Graph::addEdgeState(CycleNb cycleNb, EdgeId edgeId, State state,
   }
 }
 
-std::map<CycleNb, std::map<EdgeId, std::pair<State, Data>>>
-Graph::getCycleEdgeStates() {
-  return cycleEdgeStates;
-}
+CycleTransitions Graph::getCycleEdgeStates() { return cycleEdgeStates; }
 
 std::map<NodeId, GraphNode> Graph::getNodes() { return nodes; }
 
 std::vector<GraphEdge> Graph::getEdges() { return edges; }
 
 void Graph::dupilcateEdgeStates(CycleNb from, CycleNb until) {
-  const std::map<EdgeId, std::pair<State, Data>> &initialMapEdgeState =
-      cycleEdgeStates[from];
-
-  for (CycleNb i = from + 1; i <= until; i++) {
-    std::map<EdgeId, std::pair<State, Data>> newMapEdgeState;
-
-    for (const auto &pair : initialMapEdgeState) {
-      newMapEdgeState[pair.first] = pair.second;
-    }
-
-    cycleEdgeStates[i] = newMapEdgeState;
-  }
+  const ChannelTransitions &initialMapEdgeState = cycleEdgeStates[from];
+  for (CycleNb i = from + 1; i <= until; i++)
+    cycleEdgeStates[i] = ChannelTransitions{initialMapEdgeState};
 }
 
-void Graph::addBB(BB bb) { this->bbs.push_back(bb); }
+void Graph::addBB(BB &bb) { this->bbs.push_back(bb); }
 
 std::vector<BB> Graph::getBBs() { return bbs; }
 
