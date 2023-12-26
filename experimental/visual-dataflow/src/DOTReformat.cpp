@@ -13,81 +13,77 @@
 #include "DOTReformat.h"
 #include "mlir/Support/LogicalResult.h"
 #include <fstream>
+#include <iostream>
+#include <sstream>
 #include <string>
-#include <vector>
 
 using namespace mlir;
 
-LogicalResult reformatDot(const std::string &inputFileName,
-                          const std::string &outputFileName) {
-  std::ifstream inputFile(inputFileName);
-  if (!inputFile.is_open())
-    return failure();
-
-  std::ofstream outputFile(outputFileName);
-  if (!outputFile.is_open()) {
-    inputFile.close();
-    return failure();
-  }
-
-  std::vector<std::string> lines;
+LogicalResult reformatDot(const std::string &inputFile,
+                          const std::string &outputFile) {
+  std::ifstream inFile(inputFile);
+  std::ofstream outFile(outputFile);
   std::string line;
+  std::ostringstream accumulatedLine;
+  bool isEdge = false;
+  bool isPosLine = false;
 
-  // Load entire file into memory (lines vector)
-  while (std::getline(inputFile, line))
-    lines.push_back(line);
-  inputFile.close();
+  if (!inFile.is_open() || !outFile.is_open()) {
+    std::cerr << "Error opening files!" << std::endl;
+    return failure();
+  }
 
-  // Single pass processing
-  for (size_t i = 0; i < lines.size(); ++i) {
-    // Process 1: putPosOnSameLine
-    if (lines[i].find("pos=") != std::string::npos &&
-        lines[i].find('e') != std::string::npos) {
-      while (i + 1 < lines.size() &&
-             lines[i + 1].find("];") == std::string::npos) {
-        lines[i] += " " + lines[i + 1];
-        lines.erase(lines.begin() + i + 1);
+  while (getline(inFile, line)) {
+    // Check if we are within an edge definition
+    if (line.find("->") != std::string::npos) {
+      isEdge = true;
+    }
+
+    if (isEdge) {
+      // Check if this line contains the beginning of a pos attribute
+      if (line.find("pos=\"") != std::string::npos) {
+        isPosLine = true;
+        accumulatedLine.str("");
+        accumulatedLine.clear();
+        accumulatedLine << line;
+        // If the line does not end with a backslash, it's a single-line pos
+        // attribute
+        if (line.back() != '\\') {
+          isPosLine = false;
+          outFile << accumulatedLine.str() << std::endl;
+        }
+        continue;
       }
-    }
 
-    // Process 2: insertNewlineBeforeStyle
-    size_t stylePos = lines[i].find("style=");
-    if (lines[i].find("pos=") != std::string::npos &&
-        stylePos != std::string::npos) {
-      lines[i].insert(stylePos, "\n");
-    }
+      // If currently processing a pos attribute
+      if (isPosLine) {
+        // Remove trailing backslash and newline character
+        if (accumulatedLine.str().back() == '\\') {
+          accumulatedLine.seekp(-1, std::ios_base::end);
+        }
+        accumulatedLine << line;
+        // Check if this is the end of the pos attribute
+        if (line.back() != '\\') {
+          isPosLine = false;
+          outFile << accumulatedLine.str() << std::endl;
+        }
+      } else {
+        // Normal line within an edge definition, write it to the output file
+        outFile << line << std::endl;
+      }
 
-    // Process 3: removeBackslashWithSpaceFromPos
-    size_t posPos = lines[i].find("pos=");
-    size_t backslashPos = lines[i].find("\\ ");
-    if (posPos != std::string::npos && backslashPos != std::string::npos &&
-        posPos < backslashPos) {
-      lines[i] =
-          lines[i].substr(0, backslashPos) + lines[i].substr(backslashPos + 2);
-    }
-
-    // Process 4: removeEverythingAfterCommaInStyle
-    size_t commaPos = lines[i].find(',');
-    if (stylePos != std::string::npos && commaPos != std::string::npos &&
-        stylePos < commaPos) {
-      lines[i] = lines[i].substr(0, commaPos);
-    }
-
-    // Process 5: removeEverythingAfterApostropheComma
-    size_t apostropheCommaPos = lines[i].find("\",");
-    if (posPos != std::string::npos &&
-        apostropheCommaPos != std::string::npos &&
-        posPos < apostropheCommaPos) {
-      lines[i] = lines[i].substr(0, apostropheCommaPos + 2);
+      // Check if the edge definition has ended
+      if (line.find(";") != std::string::npos) {
+        isEdge = false;
+      }
+    } else {
+      // Outside of an edge definition, write the line as is
+      outFile << line << std::endl;
     }
   }
 
-  // Write to output file
-  for (const auto &l : lines) {
-    outputFile << l << '\n';
-  }
-
-  outputFile.close();
+  inFile.close();
+  outFile.close();
 
   return success();
 }

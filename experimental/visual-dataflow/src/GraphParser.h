@@ -22,12 +22,12 @@ namespace visual_dataflow {
 
 class GraphParser {
 public:
-  GraphParser(std::string filePath);
+  GraphParser(Graph *graph);
 
-  LogicalResult parse(Graph *graph);
+  LogicalResult parse(std::string &filePath);
 
 private:
-  std::string mFilePath;
+  Graph *mGraph;
 };
 
 } // namespace visual_dataflow

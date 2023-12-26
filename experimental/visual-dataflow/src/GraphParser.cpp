@@ -13,6 +13,8 @@
 #include "GraphParser.h"
 #include "CSVParser.h"
 #include "DOTParser.h"
+#include "DOTReformat.h"
+#include "Graph.h"
 #include "MLIRMapper.h"
 #include "dynamatic/Support/TimingModels.h"
 #include "mlir/Dialect/Func/IR/FuncOps.h"
@@ -24,6 +26,7 @@
 #include "llvm/Support/CommandLine.h"
 #include "llvm/Support/InitLLVM.h"
 #include "llvm/Support/SourceMgr.h"
+#include <cstdio>
 #include <fstream>
 #include <iostream>
 
@@ -32,29 +35,37 @@ using namespace mlir;
 using namespace dynamatic;
 using namespace dynamatic::experimental::visual_dataflow;
 
-GraphParser::GraphParser(std::string filePath)
-    : mFilePath(std::move(filePath)) {}
+GraphParser::GraphParser(Graph *graph) : mGraph(graph) {}
 
-LogicalResult GraphParser::parse(Graph *graph) {
-  std::ifstream file(mFilePath);
+LogicalResult GraphParser::parse(std::string &filePath) {
+  std::ifstream file(filePath);
   if (!file.is_open()) {
     return failure();
   }
 
   std::string line;
   size_t lineIndex = 0;
+  CycleNb currCycle = 0;
 
-  if (mFilePath.find(".csv") != std::string::npos) {
+  if (filePath.find(".csv") != std::string::npos) {
     while (std::getline(file, line)) {
-      if (failed(processCSVLine(line, lineIndex, *graph)))
+      if (failed(processCSVLine(line, lineIndex, *mGraph, &currCycle)))
         return failure();
       lineIndex++;
     }
-  } else if (mFilePath.find(".dot") != std::string::npos) {
-    if (failed(processDOT(file, *graph)))
+  } else if (filePath.find(".dot") != std::string::npos) {
+    const std::string outputDotFile = "/tmp/graph.dot";
+
+    if (failed(reformatDot(filePath, outputDotFile)))
       return failure();
-  } else if (mFilePath.find(".mlir") != std::string::npos) {
-    auto fileOrErr = MemoryBuffer::getFileOrSTDIN(mFilePath.c_str());
+
+    std::ifstream f;
+    f.open(outputDotFile);
+
+    if (failed(processDOT(f, *mGraph)))
+      return failure();
+  } else if (filePath.find(".mlir") != std::string::npos) {
+    auto fileOrErr = MemoryBuffer::getFileOrSTDIN(filePath.c_str());
     if (std::error_code error = fileOrErr.getError())
       return failure();
 
@@ -73,7 +84,7 @@ LogicalResult GraphParser::parse(Graph *graph) {
       return failure();
 
     // Map the MLIR module to the graph
-    MLIRMapper mapper(graph);
+    MLIRMapper mapper(mGraph);
     if (failed(mapper.mapMLIR(*module)))
       return failure();
   }

@@ -262,9 +262,9 @@ LogicalResult MLIRMapper::mapNode(Operation *op) {
 
   // Add the ports to the node
   for (auto &inPort : inPorts)
-    node.addPort(inPort, true);
+    node.addPort(inPort.back(), true);
   for (auto &outPort : outPorts)
-    node.addPort(outPort, false);
+    node.addPort(outPort.back(), false);
 
   // Add the node to the graph
   graph->addNode(node);

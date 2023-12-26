@@ -1,0 +1,60 @@
+[gd_scene load_steps=2 format=3 uid="uid://baatvintvoqat"]
+
+[ext_resource type="Script" path="res://menu.gd" id="1_nt4qb"]
+
+[node name="Menu" type="Control"]
+custom_minimum_size = Vector2(300, 300)
+layout_mode = 3
+anchors_preset = 8
+anchor_left = 0.5
+anchor_top = 0.5
+anchor_right = 0.5
+anchor_bottom = 0.5
+grow_horizontal = 2
+grow_vertical = 2
+script = ExtResource("1_nt4qb")
+
+[node name="FileDialogDot" type="FileDialog" parent="."]
+title = "Open a File"
+initial_position = 1
+size = Vector2i(1000, 600)
+min_size = Vector2i(200, 200)
+ok_button_text = "Open"
+dialog_hide_on_ok = true
+file_mode = 0
+access = 2
+
+[node name="FileDialogCsv" type="FileDialog" parent="."]
+title = "Open a File"
+initial_position = 1
+size = Vector2i(1000, 600)
+ok_button_text = "Open"
+dialog_hide_on_ok = true
+file_mode = 0
+access = 2
+
+[node name="VBoxContainer" type="VBoxContainer" parent="."]
+layout_mode = 1
+anchors_preset = 15
+anchor_right = 1.0
+anchor_bottom = 1.0
+grow_horizontal = 2
+grow_vertical = 2
+alignment = 1
+
+[node name="ButtonDot" type="Button" parent="VBoxContainer"]
+layout_mode = 2
+text = "Select a DOT file"
+
+[node name="ButtonCsv" type="Button" parent="VBoxContainer"]
+custom_minimum_size = Vector2(0, 30)
+layout_mode = 2
+text = "Select a CSV file"
+
+[node name="DrawGraph" type="Button" parent="VBoxContainer"]
+layout_mode = 2
+size_flags_horizontal = 4
+text = "Draw graph"
+
+[connection signal="pressed" from="VBoxContainer/ButtonDot" to="." method="_on_button_dot_pressed"]
+[connection signal="pressed" from="VBoxContainer/ButtonCsv" to="." method="_on_button_csv_pressed"]

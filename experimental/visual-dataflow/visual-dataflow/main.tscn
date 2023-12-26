@@ -1,8 +1,70 @@
-[gd_scene load_steps=2 format=3 uid="uid://ridjgqca7ygu"]
+[gd_scene load_steps=7 format=3 uid="uid://ridjgqca7ygu"]
 
 [ext_resource type="Script" path="res://main.gd" id="1_k08iy"]
+[ext_resource type="Script" path="res://camera.gd" id="2_kag3i"]
+[ext_resource type="PackedScene" uid="uid://1ukyu4yhubi7" path="res://legend.tscn" id="3_s2xdb"]
+[ext_resource type="PackedScene" uid="uid://baatvintvoqat" path="res://menu.tscn" id="4_3q8o8"]
+[ext_resource type="PackedScene" uid="uid://chdvrqi6hnrga" path="res://timeline.tscn" id="5_q76pr"]
+[ext_resource type="Texture2D" uid="uid://b8ja66i463u8x" path="res://images.png" id="7_58v1f"]
 
 [node name="VisualDataflow" type="VisualDataflow"]
 offset_right = 40.0
 offset_bottom = 40.0
 script = ExtResource("1_k08iy")
+
+[node name="Camera2D" type="Camera2D" parent="."]
+position = Vector2(959, -541)
+script = ExtResource("2_kag3i")
+
+[node name="CanvasLayer" type="CanvasLayer" parent="."]
+
+[node name="Menu" parent="CanvasLayer" instance=ExtResource("4_3q8o8")]
+offset_left = -150.0
+offset_top = -150.0
+offset_right = 150.0
+offset_bottom = 150.0
+
+[node name="Images2" type="Sprite2D" parent="CanvasLayer/Menu"]
+position = Vector2(151, 575)
+scale = Vector2(0.334171, 0.334171)
+texture = ExtResource("7_58v1f")
+
+[node name="Timeline" parent="CanvasLayer" instance=ExtResource("5_q76pr")]
+
+[node name="Legend" parent="CanvasLayer" instance=ExtResource("3_s2xdb")]
+
+[node name="EdgeLegend" parent="CanvasLayer/Legend/GeneralLegend/Panel" index="0"]
+offset_left = 7.0
+offset_top = 1.0
+offset_right = 225.0
+offset_bottom = 177.0
+
+[node name="EdgeLegendTitle" parent="CanvasLayer/Legend/GeneralLegend/Panel/EdgeLegend" index="0"]
+modulate = Color(0.854902, 0.854902, 0.854902, 1)
+text = "Edge Legend:"
+
+[connection signal="file_selected" from="CanvasLayer/Menu/FileDialogDot" to="." method="_on_file_dialog_dot_file_selected"]
+[connection signal="file_selected" from="CanvasLayer/Menu/FileDialogCsv" to="." method="_on_file_dialog_csv_file_selected"]
+[connection signal="pressed" from="CanvasLayer/Menu/VBoxContainer/DrawGraph" to="." method="_on_draw_graph_pressed"]
+[connection signal="pressed" from="CanvasLayer/Timeline/MarginContainer/VBoxContainer/HBoxContainer/Play" to="." method="_on_play_pressed"]
+[connection signal="pressed" from="CanvasLayer/Timeline/MarginContainer/VBoxContainer/HBoxContainer/Prev" to="." method="_on_prev_pressed"]
+[connection signal="pressed" from="CanvasLayer/Timeline/MarginContainer/VBoxContainer/HBoxContainer/Next" to="." method="_on_next_pressed"]
+[connection signal="text_submitted" from="CanvasLayer/Timeline/MarginContainer/VBoxContainer/HBoxContainer/GoToCycle" to="." method="_on_go_to_cycle_text_submitted"]
+[connection signal="mouse_entered" from="CanvasLayer/Timeline/MarginContainer/VBoxContainer/HSlider" to="Camera2D" method="_on_h_slider_mouse_entered"]
+[connection signal="mouse_exited" from="CanvasLayer/Timeline/MarginContainer/VBoxContainer/HSlider" to="Camera2D" method="_on_h_slider_mouse_exited"]
+[connection signal="value_changed" from="CanvasLayer/Timeline/MarginContainer/VBoxContainer/HSlider" to="." method="_on_h_slider_value_changed"]
+[connection signal="pressed" from="CanvasLayer/Legend/GeneralLegend/HBoxContainer/ResetSelection" to="." method="_on_reset_selection_pressed"]
+[connection signal="color_changed" from="CanvasLayer/Legend/GeneralLegend/Panel/EdgeLegend/EdgeComponents/Colors/ColorPickerButton" to="." method="_on_color_picker_button_color_changed"]
+[connection signal="popup_closed" from="CanvasLayer/Legend/GeneralLegend/Panel/EdgeLegend/EdgeComponents/Colors/ColorPickerButton" to="." method="_on_color_picker_button_popup_closed"]
+[connection signal="color_changed" from="CanvasLayer/Legend/GeneralLegend/Panel/EdgeLegend/EdgeComponents/Colors/ColorPickerButton2" to="." method="_on_color_picker_button_2_color_changed"]
+[connection signal="popup_closed" from="CanvasLayer/Legend/GeneralLegend/Panel/EdgeLegend/EdgeComponents/Colors/ColorPickerButton2" to="." method="_on_color_picker_button_2_popup_closed"]
+[connection signal="color_changed" from="CanvasLayer/Legend/GeneralLegend/Panel/EdgeLegend/EdgeComponents/Colors/ColorPickerButton3" to="." method="_on_color_picker_button_3_color_changed"]
+[connection signal="popup_closed" from="CanvasLayer/Legend/GeneralLegend/Panel/EdgeLegend/EdgeComponents/Colors/ColorPickerButton3" to="." method="_on_color_picker_button_3_popup_closed"]
+[connection signal="color_changed" from="CanvasLayer/Legend/GeneralLegend/Panel/EdgeLegend/EdgeComponents/Colors/ColorPickerButton4" to="." method="_on_color_picker_button_4_color_changed"]
+[connection signal="popup_closed" from="CanvasLayer/Legend/GeneralLegend/Panel/EdgeLegend/EdgeComponents/Colors/ColorPickerButton4" to="." method="_on_color_picker_button_4_popup_closed"]
+[connection signal="color_changed" from="CanvasLayer/Legend/GeneralLegend/Panel/EdgeLegend/EdgeComponents/Colors/ColorPickerButton5" to="." method="_on_color_picker_button_5_color_changed"]
+[connection signal="popup_closed" from="CanvasLayer/Legend/GeneralLegend/Panel/EdgeLegend/EdgeComponents/Colors/ColorPickerButton5" to="." method="_on_color_picker_button_5_popup_closed"]
+
+[editable path="CanvasLayer/Menu"]
+[editable path="CanvasLayer/Timeline"]
+[editable path="CanvasLayer/Legend"]
