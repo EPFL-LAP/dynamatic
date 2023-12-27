@@ -23,8 +23,11 @@ using namespace circt;
 using namespace circt::handshake;
 using namespace dynamatic;
 
-void MemoryOpLowering::recordReplacement(Operation *oldOp, Operation *newOp) {
-  copyAttr<MemInterfaceAttr, MemDependenceArrayAttr>(oldOp, newOp);
+void MemoryOpLowering::recordReplacement(Operation *oldOp, Operation *newOp,
+                                         bool forwardInterface) {
+  copyAttr<MemDependenceArrayAttr>(oldOp, newOp);
+  if (forwardInterface)
+    copyAttr<MemInterfaceAttr>(oldOp, newOp);
   nameChanges[namer.getName(oldOp)] = namer.getName(newOp);
 }
 

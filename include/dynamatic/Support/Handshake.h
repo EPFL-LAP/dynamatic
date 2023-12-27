@@ -40,10 +40,11 @@ public:
   /// Records a replacement from the old operation to the new operation (both
   /// are meant to be memory accesses), naming both in the process if they were
   /// not previously named. In addition, copies the
-  /// `handshake::MemoryInterfaceAttr` attribute and
-  /// `handshake::MemoryDependenceArrayAttr`attribute from the old access to the
-  /// new one, if present.
-  void recordReplacement(Operation *oldOp, Operation *newOp);
+  /// `handshake::MemoryDependenceArrayAttr` attribute (and the
+  /// `handshake::MemoryInterfaceAttr` attribute, if the flag is set) from the
+  /// old access to the new one, if present.
+  void recordReplacement(Operation *oldOp, Operation *newOp,
+                         bool forwardInterface = true);
 
   /// Walks the IR under the given operation looking for all memory accesses. If
   /// a memory access is annotated with dependencies to other accesses and if
