@@ -17,6 +17,7 @@
 #include "dynamatic/Conversion/PassDetails.h"
 #include "dynamatic/Support/Attribute.h"
 #include "dynamatic/Support/DynamaticPass.h"
+#include "dynamatic/Support/Handshake.h"
 #include "mlir/Conversion/AffineToStandard/AffineToStandard.h"
 #include "mlir/Dialect/Affine/IR/AffineOps.h"
 #include "mlir/Dialect/Affine/Utils.h"
@@ -84,37 +85,6 @@ static Value lowerAffineMapMin(OpBuilder &builder, Location loc, AffineMap map,
 }
 
 namespace {
-class AffineMinLowering : public OpRewritePattern<AffineMinOp> {
-public:
-  using OpRewritePattern<AffineMinOp>::OpRewritePattern;
-
-  LogicalResult matchAndRewrite(AffineMinOp op,
-                                PatternRewriter &rewriter) const override {
-    Value reduced =
-        lowerAffineMapMin(rewriter, op.getLoc(), op.getMap(), op.getOperands());
-    if (!reduced)
-      return failure();
-
-    rewriter.replaceOp(op, reduced);
-    return success();
-  }
-};
-
-class AffineMaxLowering : public OpRewritePattern<AffineMaxOp> {
-public:
-  using OpRewritePattern<AffineMaxOp>::OpRewritePattern;
-
-  LogicalResult matchAndRewrite(AffineMaxOp op,
-                                PatternRewriter &rewriter) const override {
-    Value reduced =
-        lowerAffineMapMax(rewriter, op.getLoc(), op.getMap(), op.getOperands());
-    if (!reduced)
-      return failure();
-
-    rewriter.replaceOp(op, reduced);
-    return success();
-  }
-};
 
 /// Affine yields ops are removed.
 class AffineYieldOpLowering : public OpRewritePattern<AffineYieldOp> {
@@ -333,47 +303,30 @@ class AffineLoadLowering : public OpRewritePattern<AffineLoadOp> {
 public:
   using OpRewritePattern<AffineLoadOp>::OpRewritePattern;
 
-  LogicalResult matchAndRewrite(AffineLoadOp op,
+  AffineLoadLowering(MemoryOpLowering &memOpLowering, MLIRContext *ctx)
+      : OpRewritePattern(ctx), memOpLowering(memOpLowering){};
+
+  LogicalResult matchAndRewrite(AffineLoadOp affineLoadOp,
                                 PatternRewriter &rewriter) const override {
     // Expand affine map from 'affineLoadOp'.
-    SmallVector<Value, 8> indices(op.getMapOperands());
-    auto resultOperands =
-        expandAffineMap(rewriter, op.getLoc(), op.getAffineMap(), indices);
+    SmallVector<Value, 8> indices(affineLoadOp.getMapOperands());
+    auto resultOperands = expandAffineMap(rewriter, affineLoadOp.getLoc(),
+                                          affineLoadOp.getAffineMap(), indices);
     if (!resultOperands)
       return failure();
 
-    // Build vector.load memref[expandedMap.results].
-    auto loadOp = rewriter.replaceOpWithNewOp<memref::LoadOp>(
-        op, op.getMemRef(), *resultOperands);
-
-    copyAttr<handshake::MemDependenceArrayAttr, handshake::MemInterfaceAttr>(
-        op, loadOp);
+    // Replace with simple load operation and keep correspondance between the
+    // two operations
+    memref::LoadOp loadOp = rewriter.replaceOpWithNewOp<memref::LoadOp>(
+        affineLoadOp, affineLoadOp.getMemRef(), *resultOperands);
+    memOpLowering.recordReplacement(affineLoadOp, loadOp);
     return success();
   }
-};
 
-/// Apply the affine map from an 'affine.prefetch' operation to its operands,
-/// and feed the results to a newly created 'memref.prefetch' operation (which
-/// replaces the original 'affine.prefetch').
-class AffinePrefetchLowering : public OpRewritePattern<AffinePrefetchOp> {
-public:
-  using OpRewritePattern<AffinePrefetchOp>::OpRewritePattern;
-
-  LogicalResult matchAndRewrite(AffinePrefetchOp op,
-                                PatternRewriter &rewriter) const override {
-    // Expand affine map from 'affinePrefetchOp'.
-    SmallVector<Value, 8> indices(op.getMapOperands());
-    auto resultOperands =
-        expandAffineMap(rewriter, op.getLoc(), op.getAffineMap(), indices);
-    if (!resultOperands)
-      return failure();
-
-    // Build memref.prefetch memref[expandedMap.results].
-    rewriter.replaceOpWithNewOp<memref::PrefetchOp>(
-        op, op.getMemref(), *resultOperands, op.getIsWrite(),
-        op.getLocalityHint(), op.getIsDataCache());
-    return success();
-  }
+private:
+  /// Used to record the operation replacement (from an affine-level load to a
+  /// memref-level load).
+  MemoryOpLowering &memOpLowering;
 };
 
 /// Apply the affine map from an 'affine.store' operation to its operands, and
@@ -383,132 +336,32 @@ class AffineStoreLowering : public OpRewritePattern<AffineStoreOp> {
 public:
   using OpRewritePattern<AffineStoreOp>::OpRewritePattern;
 
-  LogicalResult matchAndRewrite(AffineStoreOp op,
+  AffineStoreLowering(MemoryOpLowering &memOpLowering, MLIRContext *ctx)
+      : OpRewritePattern(ctx), memOpLowering(memOpLowering){};
+
+  LogicalResult matchAndRewrite(AffineStoreOp affineStoreOp,
                                 PatternRewriter &rewriter) const override {
     // Expand affine map from 'affineStoreOp'.
-    SmallVector<Value, 8> indices(op.getMapOperands());
+    SmallVector<Value, 8> indices(affineStoreOp.getMapOperands());
     auto maybeExpandedMap =
-        expandAffineMap(rewriter, op.getLoc(), op.getAffineMap(), indices);
+        expandAffineMap(rewriter, affineStoreOp.getLoc(),
+                        affineStoreOp.getAffineMap(), indices);
     if (!maybeExpandedMap)
       return failure();
 
-    // Build memref.store valueToStore, memref[expandedMap.results].
-    auto storeOp = rewriter.replaceOpWithNewOp<memref::StoreOp>(
-        op, op.getValueToStore(), op.getMemRef(), *maybeExpandedMap);
-
-    copyAttr<handshake::MemDependenceArrayAttr, handshake::MemInterfaceAttr>(
-        op, storeOp);
+    // Replace with simple store operation and keep correspondance between the
+    // two operations
+    memref::StoreOp storeOp = rewriter.replaceOpWithNewOp<memref::StoreOp>(
+        affineStoreOp, affineStoreOp.getValueToStore(),
+        affineStoreOp.getMemRef(), *maybeExpandedMap);
+    memOpLowering.recordReplacement(affineStoreOp, storeOp);
     return success();
   }
-};
 
-/// Apply the affine maps from an 'affine.dma_start' operation to each of their
-/// respective map operands, and feed the results to a newly created
-/// 'memref.dma_start' operation (which replaces the original
-/// 'affine.dma_start').
-class AffineDmaStartLowering : public OpRewritePattern<AffineDmaStartOp> {
-public:
-  using OpRewritePattern<AffineDmaStartOp>::OpRewritePattern;
-
-  LogicalResult matchAndRewrite(AffineDmaStartOp op,
-                                PatternRewriter &rewriter) const override {
-    SmallVector<Value, 8> operands(op.getOperands());
-    auto operandsRef = llvm::ArrayRef(operands);
-
-    // Expand affine map for DMA source memref.
-    auto maybeExpandedSrcMap = expandAffineMap(
-        rewriter, op.getLoc(), op.getSrcMap(),
-        operandsRef.drop_front(op.getSrcMemRefOperandIndex() + 1));
-    if (!maybeExpandedSrcMap)
-      return failure();
-    // Expand affine map for DMA destination memref.
-    auto maybeExpandedDstMap = expandAffineMap(
-        rewriter, op.getLoc(), op.getDstMap(),
-        operandsRef.drop_front(op.getDstMemRefOperandIndex() + 1));
-    if (!maybeExpandedDstMap)
-      return failure();
-    // Expand affine map for DMA tag memref.
-    auto maybeExpandedTagMap = expandAffineMap(
-        rewriter, op.getLoc(), op.getTagMap(),
-        operandsRef.drop_front(op.getTagMemRefOperandIndex() + 1));
-    if (!maybeExpandedTagMap)
-      return failure();
-
-    // Build memref.dma_start operation with affine map results.
-    rewriter.replaceOpWithNewOp<memref::DmaStartOp>(
-        op, op.getSrcMemRef(), *maybeExpandedSrcMap, op.getDstMemRef(),
-        *maybeExpandedDstMap, op.getNumElements(), op.getTagMemRef(),
-        *maybeExpandedTagMap, op.getStride(), op.getNumElementsPerStride());
-    return success();
-  }
-};
-
-/// Apply the affine map from an 'affine.dma_wait' operation tag memref,
-/// and feed the results to a newly created 'memref.dma_wait' operation (which
-/// replaces the original 'affine.dma_wait').
-class AffineDmaWaitLowering : public OpRewritePattern<AffineDmaWaitOp> {
-public:
-  using OpRewritePattern<AffineDmaWaitOp>::OpRewritePattern;
-
-  LogicalResult matchAndRewrite(AffineDmaWaitOp op,
-                                PatternRewriter &rewriter) const override {
-    // Expand affine map for DMA tag memref.
-    SmallVector<Value, 8> indices(op.getTagIndices());
-    auto maybeExpandedTagMap =
-        expandAffineMap(rewriter, op.getLoc(), op.getTagMap(), indices);
-    if (!maybeExpandedTagMap)
-      return failure();
-
-    // Build memref.dma_wait operation with affine map results.
-    rewriter.replaceOpWithNewOp<memref::DmaWaitOp>(
-        op, op.getTagMemRef(), *maybeExpandedTagMap, op.getNumElements());
-    return success();
-  }
-};
-
-/// Apply the affine map from an 'affine.vector_load' operation to its operands,
-/// and feed the results to a newly created 'vector.load' operation (which
-/// replaces the original 'affine.vector_load').
-class AffineVectorLoadLowering : public OpRewritePattern<AffineVectorLoadOp> {
-public:
-  using OpRewritePattern<AffineVectorLoadOp>::OpRewritePattern;
-
-  LogicalResult matchAndRewrite(AffineVectorLoadOp op,
-                                PatternRewriter &rewriter) const override {
-    // Expand affine map from 'affineVectorLoadOp'.
-    SmallVector<Value, 8> indices(op.getMapOperands());
-    auto resultOperands =
-        expandAffineMap(rewriter, op.getLoc(), op.getAffineMap(), indices);
-    if (!resultOperands)
-      return failure();
-
-    // Build vector.load memref[expandedMap.results].
-    rewriter.replaceOpWithNewOp<vector::LoadOp>(
-        op, op.getVectorType(), op.getMemRef(), *resultOperands);
-    return success();
-  }
-};
-
-/// Apply the affine map from an 'affine.vector_store' operation to its
-/// operands, and feed the results to a newly created 'vector.store' operation
-/// (which replaces the original 'affine.vector_store').
-class AffineVectorStoreLowering : public OpRewritePattern<AffineVectorStoreOp> {
-public:
-  using OpRewritePattern<AffineVectorStoreOp>::OpRewritePattern;
-
-  LogicalResult matchAndRewrite(AffineVectorStoreOp op,
-                                PatternRewriter &rewriter) const override {
-    // Expand affine map from 'affineVectorStoreOp'.
-    SmallVector<Value, 8> indices(op.getMapOperands());
-    auto maybeExpandedMap =
-        expandAffineMap(rewriter, op.getLoc(), op.getAffineMap(), indices);
-    if (!maybeExpandedMap)
-      return failure();
-
-    rewriter.replaceOpWithNewOp<vector::StoreOp>(
-        op, op.getValueToStore(), op.getMemRef(), *maybeExpandedMap);
-    return success();
-  }
+private:
+  /// Used to record the operation replacement (from an affine-level store to a
+  /// memref-level store).
+  MemoryOpLowering &memOpLowering;
 };
 
 } // namespace
@@ -516,20 +369,24 @@ public:
 namespace {
 class AffineToScfPass : public AffineToScfBase<AffineToScfPass> {
   void runDynamaticPass() override {
-    RewritePatternSet patterns(&getContext());
-    patterns.add<AffineApplyLowering, AffineDmaStartLowering,
-                 AffineDmaWaitLowering, AffineLoadLowering, AffineMinLowering,
-                 AffineMaxLowering, AffineParallelLowering,
-                 AffinePrefetchLowering, AffineStoreLowering, AffineForLowering,
-                 AffineIfLowering, AffineYieldOpLowering>(
-        patterns.getContext());
-    populateAffineToVectorConversionPatterns(patterns);
-    ConversionTarget target(getContext());
+    mlir::ModuleOp modOp = getOperation();
+    MLIRContext *ctx = &getContext();
+    MemoryOpLowering memOpLowering(getAnalysis<NameAnalysis>());
+
+    RewritePatternSet patterns(ctx);
+    patterns.add<AffineApplyLowering, AffineParallelLowering, AffineForLowering,
+                 AffineIfLowering, AffineYieldOpLowering>(ctx);
+    patterns.add<AffineLoadLowering, AffineStoreLowering>(memOpLowering, ctx);
+
+    ConversionTarget target(*ctx);
     target.addLegalDialect<arith::ArithDialect, memref::MemRefDialect,
                            scf::SCFDialect, VectorDialect>();
-    if (failed(applyPartialConversion(getOperation(), target,
-                                      std::move(patterns))))
+    if (failed(applyPartialConversion(modOp, target, std::move(patterns))))
       signalPassFailure();
+
+    // Change the name of destination memory acceses in all stored memory
+    // dependencies to reflect the new access names
+    memOpLowering.renameDependencies(modOp);
   }
 };
 } // namespace

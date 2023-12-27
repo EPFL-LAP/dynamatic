@@ -12,11 +12,57 @@
 
 #include "dynamatic/Support/Handshake.h"
 #include "circt/Dialect/Handshake/HandshakeOps.h"
+#include "dynamatic/Support/Attribute.h"
+#include "mlir/Dialect/Affine/IR/AffineOps.h"
+#include "mlir/Dialect/MemRef/IR/MemRef.h"
 #include "mlir/IR/PatternMatch.h"
 #include "llvm/ADT/TypeSwitch.h"
 
 using namespace mlir;
 using namespace circt;
+using namespace circt::handshake;
+using namespace dynamatic;
+
+void MemoryOpLowering::recordReplacement(Operation *oldOp, Operation *newOp) {
+  copyAttr<MemInterfaceAttr, MemDependenceArrayAttr>(oldOp, newOp);
+  nameChanges[namer.getName(oldOp)] = namer.getName(newOp);
+}
+
+bool MemoryOpLowering::renameDependencies(Operation *topLevelOp) {
+  MLIRContext *ctx = topLevelOp->getContext();
+  bool anyChange = false;
+  topLevelOp->walk([&](Operation *memOp) {
+    // We only care about supported load/store memory accesses
+    if (!isa<memref::LoadOp, memref::StoreOp, affine::AffineLoadOp,
+             affine::AffineStoreOp>(memOp))
+      return;
+
+    // Read potential memory dependencies stored on the memory operation
+    auto oldMemDeps = getUniqueAttr<MemDependenceArrayAttr>(memOp);
+    if (!oldMemDeps)
+      return;
+
+    // Copy memory dependence attributes one-by-one, replacing the name of
+    // replaced destination memory operations along the way if necessary
+    SmallVector<MemDependenceAttr> newMemDeps;
+    for (MemDependenceAttr oldDep : oldMemDeps.getDependencies()) {
+      StringRef oldName = oldDep.getDstAccess();
+      auto replacedName = nameChanges.find(oldName);
+      bool opWasReplaced = replacedName != nameChanges.end();
+      anyChange |= opWasReplaced;
+      if (opWasReplaced) {
+        StringAttr newName = StringAttr::get(ctx, replacedName->second);
+        newMemDeps.push_back(MemDependenceAttr::get(
+            ctx, newName, oldDep.getLoopDepth(), oldDep.getComponents()));
+      } else {
+        newMemDeps.push_back(oldDep);
+      }
+    }
+    setUniqueAttr(memOp, MemDependenceArrayAttr::get(ctx, newMemDeps));
+  });
+
+  return anyChange;
+}
 
 bool dynamatic::hasRealUses(Value val) {
   return llvm::any_of(val.getUsers(), [&](Operation *user) {
