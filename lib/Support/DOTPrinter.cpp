@@ -189,13 +189,17 @@ static std::string getInputForSelect(arith::SelectOp op) {
 }
 
 /// Produces the "in" attribute value of a handshake::EndOp.
-static std::string getInputForEnd(handshake::EndOp op) {
+static std::string getInputForEnd(handshake::EndOp op, bool rippedMemories) {
   MemPortsData ports;
   unsigned idx = 1;
   for (auto val : op.getMemoryControls())
     ports.emplace_back("in" + std::to_string(idx++), val, "e");
-  for (auto val : op.getReturnValues())
-    ports.emplace_back("in" + std::to_string(idx++), val, "");
+  if (rippedMemories) {
+    ports.emplace_back("in1", op.getReturnValues().front(), "");
+  } else {
+    for (auto val : op.getReturnValues())
+      ports.emplace_back("in" + std::to_string(idx++), val, "");
+  }
   return getIOFromPorts(ports);
 }
 
@@ -838,18 +842,28 @@ LogicalResult DOTPrinter::annotateNode(Operation *op,
           .Case<handshake::DynamaticReturnOp>([&](auto) {
             auto info = NodeInfo("Operator");
             info.stringAttr["op"] = "ret_op";
+            if (rippedMemories) {
+              info.stringAttr["in"] =
+                  "in1:" + std::to_string(getWidth(op->getOperand(0)));
+              info.stringAttr["out"] =
+                  "out1:" + std::to_string(getWidth(op->getResult(0)));
+            }
             return info;
           })
           .Case<handshake::EndOp>([&](handshake::EndOp op) {
             auto info = NodeInfo("Exit");
-            info.stringAttr["in"] = getInputForEnd(op);
+            info.stringAttr["in"] = getInputForEnd(op, rippedMemories);
 
             // Output ports of end node are determined by function result
             // types
             std::stringstream stream;
             auto funcOp = op->getParentOfType<handshake::FuncOp>();
-            for (auto [idx, res] : llvm::enumerate(funcOp.getResultTypes()))
-              stream << "out" << (idx + 1) << ":" << getWidth(res);
+            if (rippedMemories) {
+              stream << "out1:" << getWidth(funcOp.getResultTypes()[0]);
+            } else {
+              for (auto [idx, res] : llvm::enumerate(funcOp.getResultTypes()))
+                stream << "out" << (idx + 1) << ":" << getWidth(res);
+            }
             info.stringAttr["out"] = stream.str();
             return info;
           })
@@ -926,7 +940,7 @@ LogicalResult DOTPrinter::annotateArgumentNode(handshake::FuncOp funcOp,
                                                size_t idx,
                                                mlir::raw_indented_ostream &os) {
   BlockArgument arg = funcOp.getArgument(idx);
-  NodeInfo info("Entry");
+  NodeInfo info(rippedMemories ? "Input" : "Entry");
   info.stringAttr["in"] = getIOFromValues(ValueRange(arg), "in");
   info.stringAttr["out"] = getIOFromValues(ValueRange(arg), "out");
   info.intAttr["bbID"] = 1;
@@ -1167,8 +1181,10 @@ static std::string getPrettyPrintedNodeLabel(Operation *op) {
       });
 }
 
-DOTPrinter::DOTPrinter(Mode mode, EdgeStyle edgeStyle, TimingDatabase *timingDB)
-    : mode(mode), edgeStyle(edgeStyle), timingDB(timingDB) {
+DOTPrinter::DOTPrinter(Mode mode, EdgeStyle edgeStyle, bool rippedMemories,
+                       TimingDatabase *timingDB)
+    : mode(mode), edgeStyle(edgeStyle), rippedMemories(rippedMemories),
+      timingDB(timingDB) {
   assert(!inLegacyMode() ||
          timingDB && "timing database must exist in legacy mode");
 };
@@ -1330,6 +1346,18 @@ LogicalResult DOTPrinter::printEdge(Operation *src, Operation *dst, Value val,
   return success();
 }
 
+static LogicalResult annotateResultNode(handshake::FuncOp funcOp, size_t idx,
+                                        mlir::raw_indented_ostream &os) {
+  Type type = funcOp.getResultTypes()[idx];
+  NodeInfo info("Output");
+  std::string width = std::to_string(getWidth(type));
+  info.stringAttr["in"] = "in1:" + width;
+  info.stringAttr["out"] = "out1:" + width;
+  info.intAttr["bbID"] = *getLogicBB(funcOp.getBody().front().getTerminator());
+  info.print(os);
+  return success();
+}
+
 LogicalResult DOTPrinter::printFunc(handshake::FuncOp funcOp,
                                     mlir::raw_indented_ostream &os) {
   bool legacy = inLegacyMode();
@@ -1361,6 +1389,19 @@ LogicalResult DOTPrinter::printFunc(handshake::FuncOp funcOp,
     os << "]\n";
   }
 
+  if (rippedMemories) {
+    os << "// Function results\n";
+    for (size_t idx = 0, e = funcOp.getFunctionType().getResults().size();
+         idx < e; ++idx) {
+      std::string resLabel = funcOp.getResName(idx).str();
+      os << "\"" << resLabel << R"(" [mlir_op="handshake.arg", shape=diamond, )"
+         << "label=\"" << resLabel << "\", ";
+      if (legacy && failed(annotateResultNode(funcOp, idx, os)))
+        return failure();
+      os << "]\n";
+    }
+  }
+
   // Print nodes corresponding to function operations
   os << "// Function operations\n";
   for (auto &op : funcOp.getOps()) {
@@ -1372,6 +1413,32 @@ LogicalResult DOTPrinter::printFunc(handshake::FuncOp funcOp,
     // Print the operation
     if (failed(printNode(&op, os)))
       return failure();
+  }
+
+  if (rippedMemories) {
+    os << "// Output connections\n";
+
+    auto retOp = *funcOp.getOps<handshake::DynamaticReturnOp>().begin();
+    for (size_t idx = 0, e = funcOp.getFunctionType().getResults().size();
+         idx < e; ++idx) {
+      std::string resLabel = funcOp.getResName(idx).str();
+
+      unsigned from;
+      if (idx == 0) {
+        // Take first end output
+        os << R"("end0" -> ")" << resLabel << "\" [";
+        from = 1;
+      } else {
+        // Get the corresponding operand to the return and create an edge with
+        // the output
+        Value retOprd = retOp.getOperand(idx);
+        os << "\"" << getUniqueName(retOprd.getDefiningOp()) << "\" -> \""
+           << resLabel << "\" [";
+        from = fixOutputPortNumber(retOprd.getDefiningOp(), idx);
+      }
+      os << "from=\"out" << from + 1 << "\", to=in1";
+      os << "]\n";
+    }
   }
 
   // Get function's "blocks". These leverage the "bb" attributes attached to

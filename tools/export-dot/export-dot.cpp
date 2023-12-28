@@ -71,6 +71,12 @@ static cl::opt<std::string> edgeStyleArg(
              "\t- ortho (orthogonal polylines)\n"),
     cl::init("spline"), cl::cat(mainCategory));
 
+static cl::opt<bool> rippedMemories(
+    "ripped-memories", cl::Optional,
+    cl::desc(
+        "Informs the DOT printer that memories have been ripped from the IR"),
+    cl::init(false), cl::cat(mainCategory));
+
 int main(int argc, char **argv) {
   InitLLVM y(argc, argv);
 
@@ -143,10 +149,10 @@ int main(int argc, char **argv) {
                    << "\"\n";
       return 1;
     }
-    DOTPrinter printer(mode, edgeStyle, &timingDB);
+    DOTPrinter printer(mode, edgeStyle, rippedMemories, &timingDB);
     return failed(printer.print(*module));
   }
 
-  DOTPrinter printer(mode, edgeStyle);
+  DOTPrinter printer(mode, edgeStyle, rippedMemories);
   return failed(printer.print(*module));
 }

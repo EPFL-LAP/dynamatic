@@ -60,7 +60,7 @@ public:
   /// be provided in any legacy-compatible mode to include node timing
   /// annotations, otherwise the constructor will assert.
   DOTPrinter(Mode mode = Mode::VISUAL, EdgeStyle edgeStyle = EdgeStyle::SPLINE,
-             TimingDatabase *timingDB = nullptr);
+             bool rippedMemories = false, TimingDatabase *timingDB = nullptr);
 
   /// Prints Handshake-level IR to the provided output stream (or to stdout if
   /// `os` is nullptr).
@@ -72,6 +72,8 @@ private:
   Mode mode;
   /// Style of edges in the resulting DOTs.
   EdgeStyle edgeStyle;
+  /// Whether memories were ripped from the IR.
+  bool rippedMemories;
   /// Timing models for dataflow components (required in any legacy-compatible
   /// mode, can safely be nullptr when not in legacy mode).
   TimingDatabase *timingDB = nullptr;

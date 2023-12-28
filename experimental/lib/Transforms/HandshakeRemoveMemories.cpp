@@ -158,15 +158,15 @@ HandshakeRemoveMemoriesPass::removeMemories(handshake::FuncOp funcOp) {
   assert(resTypes.size() == resNames.size() && "res mismatch");
   assert(argTypes.size() != body->getNumArguments() && "block mismatch");
 
-  llvm::errs() << "Function has " << body->getNumArguments()
-               << " block arguments\n";
+  // llvm::errs() << "Function has " << body->getNumArguments()
+  //              << " block arguments\n";
 
-  llvm::errs() << "Argument names are\n";
-  for (auto name : argNames)
-    llvm::errs() << "\t" << cast<StringAttr>(name).str() << "\n";
-  llvm::errs() << "Result names are\n";
-  for (auto name : resNames)
-    llvm::errs() << "\t" << cast<StringAttr>(name).str() << "\n";
+  // llvm::errs() << "Argument names are\n";
+  // for (auto name : argNames)
+  //   llvm::errs() << "\t" << cast<StringAttr>(name).str() << "\n";
+  // llvm::errs() << "Result names are\n";
+  // for (auto name : resNames)
+  //   llvm::errs() << "\t" << cast<StringAttr>(name).str() << "\n";
 
   // Replace function type and arguments/results names
   funcOp.setFunctionType(builder.getFunctionType(argTypes, resTypes));
