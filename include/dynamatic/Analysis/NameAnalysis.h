@@ -19,6 +19,7 @@
 #include "circt/Dialect/Handshake/HandshakeOps.h"
 #include "dynamatic/Support/LLVM.h"
 #include "mlir/Pass/AnalysisManager.h"
+#include <set>
 
 namespace dynamatic {
 
@@ -179,6 +180,8 @@ private:
   /// potentially set to false during it.
   bool allOpsNamed = true;
 
+  std::set<std::string> allNames;
+
   /// Generate a unique name based on the type of an operation (using the
   /// counters).
   std::string genUniqueName(mlir::OperationName opName);
@@ -192,6 +195,7 @@ private:
   void addMapping(Operation *op, StringRef name) {
     nameToOp[name] = op;
     opToName[op] = name;
+    allNames.insert(name.str());
   }
 
   /// Determines whether the operation is intrinsically named i.e., whether it

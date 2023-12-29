@@ -199,6 +199,8 @@ LogicalResult NameAnalysis::walk(UnnamedBehavior onUnnamed) {
   // Reset the flags
   allOpsNamed = true;
   namesValid = true;
+  nameToOp.clear();
+  opToName.clear();
 
   topLevelOp->walk([&](Operation *nestedOp) {
     // Do not name the top-level module or intrinsically named operations
@@ -262,7 +264,7 @@ std::string NameAnalysis::genUniqueName(mlir::OperationName opName) {
   std::string candidate;
   do {
     candidate = prefix + std::to_string(counters[opName]++);
-  } while (nameToOp.contains(candidate));
+  } while (allNames.find(candidate) != allNames.end());
   return candidate;
 }
 
