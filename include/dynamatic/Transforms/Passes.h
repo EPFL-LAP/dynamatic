@@ -18,7 +18,6 @@
 #include "dynamatic/Transforms/BackAnnotate.h"
 #include "dynamatic/Transforms/BufferPlacement/HandshakePlaceBuffers.h"
 #include "dynamatic/Transforms/BufferPlacement/HandshakeSetBufferingProperties.h"
-#include "dynamatic/Transforms/BufferPlacement/HandshakeSpeculation.h"
 #include "dynamatic/Transforms/FlattenMemRefRowMajor.h"
 #include "dynamatic/Transforms/ForceMemoryInterface.h"
 #include "dynamatic/Transforms/HandshakeCanonicalize.h"
@@ -34,6 +33,7 @@
 #include "dynamatic/Transforms/RemovePolygeistAttributes.h"
 #include "dynamatic/Transforms/ScfRotateForLoops.h"
 #include "dynamatic/Transforms/ScfSimpleIfToSelect.h"
+#include "dynamatic/Transforms/Speculation/HandshakeSpeculation.h"
 #include "dynamatic/Transforms/Speculation/SpeculationFir.h"
 #include "mlir/Pass/Pass.h"
 

@@ -5,7 +5,6 @@ add_dynamatic_library(DynamaticBufferPlacement
   FPGA20Buffers.cpp
   HandshakePlaceBuffers.cpp
   HandshakeSetBufferingProperties.cpp
-  HandshakeSpeculation.cpp
 
   DEPENDS
   DynamaticTransformsPassIncGen

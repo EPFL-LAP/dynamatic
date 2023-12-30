@@ -231,12 +231,11 @@ def HandshakeSpeculation : DynamaticPass<"handshake-speculation"> {
     destination operations. Then, other speculation operations are
     automatically placed.
   }];
-  let constructor = "dynamatic::buffer::createHandshakeSpeculation()";
+  let constructor = "dynamatic::speculation::createHandshakeSpeculation()";
   let options = [
-    Option<"srcOpName", "source-op", "llvm::StringRef", "",
-    "Name of the source operation to place the Speculator.">,
-    Option<"dstOpName", "destination-op", "llvm::StringRef", "",
-    "Name of the destination operation to place the Speculator.">];
+    Option<"unitPositions", "unit-positions", "std::string", "",
+    "Path to JSON-formatted file containing the positions for speculative "
+    "operations.">];
 }
 
 //===----------------------------------------------------------------------===//
