@@ -37,6 +37,8 @@ dynamatic::experimental::visual_dataflow::processDOT(std::ifstream &file,
   bool insideNodeDefinition = false;
   GraphEdge currentEdge;
   bool insideEdgeDefinition = false;
+  BB currentBB;
+  bool insideBBDefinition = false;
 
   std::regex positionRegex("e,\\s*([0-9]+),([0-9]+(\\.[0-9]+)?)");
   std::smatch match;
@@ -64,8 +66,7 @@ dynamatic::experimental::visual_dataflow::processDOT(std::ifstream &file,
       size_t occurrences = std::count(line.begin(), line.end(), ' ');
       if (occurrences != std::string::npos) {
         for (size_t i = 1; i <= occurrences + 1; i++) {
-          std::string portName = std::to_string(i);
-          currentNode.addPort(portName, true);
+          currentNode.addPort(i, true);
         }
       }
 
@@ -80,8 +81,7 @@ dynamatic::experimental::visual_dataflow::processDOT(std::ifstream &file,
       size_t occurrences = std::count(line.begin(), line.end(), ' ');
       if (occurrences != std::string::npos) {
         for (size_t i = 1; i <= occurrences + 1; i++) {
-          std::string portName = std::to_string(i);
-          currentNode.addPort(portName, false);
+          currentNode.addPort(i, false);
         }
       }
 
@@ -94,9 +94,31 @@ dynamatic::experimental::visual_dataflow::processDOT(std::ifstream &file,
       std::pair<float, float> position = std::make_pair(x, y);
       currentNode.setPosition(position);
 
-    } else if (insideNodeDefinition && line.find(']') != std::string::npos) {
+    } else if (insideNodeDefinition &&
+               line.find("fillcolor") != std::string::npos) {
+      Color color =
+          line.substr(line.find("=") + 1, line.find(',') - line.find('=') - 1);
+      currentNode.setColor(color);
+
+    } else if (insideNodeDefinition && line.find("]") != std::string::npos) {
+      float width = std::stof(
+          line.substr(line.find("=") + 1, line.find(']') - line.find('=') - 1));
+      currentNode.setWidth(width);
+
       graph.addNode(currentNode);
       insideNodeDefinition = false;
+    }
+
+    if (insideNodeDefinition && line.find("shape") != std::string::npos) {
+      std::size_t startPos = line.find('=') + 1;
+      std::size_t endPos = line.find(',', startPos);
+      Shape shape = line.substr(startPos, endPos - startPos);
+      currentNode.setShape(shape);
+    }
+
+    if (insideNodeDefinition &&
+        line.find("style=dashed") != std::string::npos) {
+      currentNode.setDashed(true);
     }
 
     if (insideEdgeDefinition && line.find("pos") != std::string::npos) {
@@ -119,8 +141,7 @@ dynamatic::experimental::visual_dataflow::processDOT(std::ifstream &file,
           std::istringstream iss(positionString);
           std::string token;
 
-          std::set<std::pair<float, float>>
-              uniquePositions; // Use a set to store unique positions
+          std::set<std::pair<float, float>> uniquePositions;
 
           while ((std::getline(iss, token, ' '))) {
             if (token.empty())
@@ -135,7 +156,6 @@ dynamatic::experimental::visual_dataflow::processDOT(std::ifstream &file,
               float y = std::stof(yStr);
               std::pair<float, float> position = std::make_pair(x, y);
 
-              // Check if the position is unique before adding it
               if (uniquePositions.insert(position).second) {
                 currentEdge.addPosition(position);
               }
@@ -181,10 +201,81 @@ dynamatic::experimental::visual_dataflow::processDOT(std::ifstream &file,
       currentEdge.setInPort(in);
     }
 
+    if (insideEdgeDefinition && line.find("start_0") != std::string::npos) {
+      currentEdge.setDashed(true);
+      std::cout << " abcde " << std::endl;
+    }
+
+    if (insideEdgeDefinition && line.find("style") != std::string::npos) {
+      currentEdge.setDashed(true);
+      std::cout << " abcde " << std::endl;
+    }
+
     if (insideEdgeDefinition && line.find(']') != std::string::npos) {
       insideEdgeDefinition = false;
       graph.addEdge(currentEdge);
       currentEdgeID += 1;
+    }
+
+    if (!insideEdgeDefinition && !insideNodeDefinition &&
+        line.find("subgraph") != std::string::npos) {
+      BB newBB;
+      currentBB = newBB;
+      insideBBDefinition = true;
+    }
+
+    if (insideBBDefinition && line.find("bb") != std::string::npos) {
+      std::size_t startPos = line.find('"') + 1;
+      std::size_t endPos = line.find_last_of('"');
+      std::string numbers = line.substr(startPos, endPos - startPos);
+
+      std::stringstream ss(numbers);
+      std::string item;
+      while (std::getline(ss, item, ',')) {
+        currentBB.boundries.push_back(std::stof(item));
+      }
+    }
+
+    if (insideBBDefinition && line.find("label") != std::string::npos) {
+      std::size_t startPos = line.find('=') + 1;
+      std::size_t endPos = line.find(',', startPos);
+      std::string label = line.substr(startPos, endPos - startPos);
+      currentBB.label = label;
+    }
+
+    if (insideBBDefinition && line.find("lheight") != std::string::npos) {
+      std::size_t startPos = line.find('=') + 1;
+      std::size_t endPos = line.find(',', startPos);
+      float height = std::stof(line.substr(startPos, endPos - startPos));
+      currentBB.labelSize.first = height;
+    }
+
+    if (insideBBDefinition && line.find("lp") != std::string::npos) {
+      std::size_t startPos = line.find('"') + 1;
+      std::size_t endPos = line.find_last_of('"');
+      std::string numbers = line.substr(startPos, endPos - startPos);
+
+      std::stringstream ss(numbers);
+      std::string item;
+      std::getline(ss, item, ',');
+      float x = std::stof(item);
+      std::getline(ss, item, ',');
+      float y = std::stof(item);
+
+      currentBB.labelPosition.first = x;
+      currentBB.labelPosition.second = y;
+    }
+
+    if (insideBBDefinition && line.find("lwidth") != std::string::npos) {
+      std::size_t startPos = line.find('=') + 1;
+      std::size_t endPos = line.find(',', startPos);
+      float width = std::stof(line.substr(startPos, endPos - startPos));
+      currentBB.labelSize.second = width;
+    }
+
+    if (insideBBDefinition && line.find("];") != std::string::npos) {
+      graph.addBB(currentBB);
+      insideBBDefinition = false;
     }
   }
 

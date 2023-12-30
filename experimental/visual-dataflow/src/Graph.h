@@ -30,9 +30,25 @@ namespace visual_dataflow {
 
 using CycleNb = int;
 using GraphId = int;
+using Data = std::string;
 
 /// State of an edge of the graph
-enum State { UNDEFINED, READY, EMPTY, VALID, VALID_READY };
+enum State { UNDEFINED, ACCEPT, IDLE, STALL, TRANSFER };
+
+struct BB {
+  std::vector<float> boundries;
+  std::string label;
+  std::pair<float, float> labelPosition;
+  std::pair<float, float> labelSize;
+};
+
+/// Stores channel state transitions as a map from edge IDs to corresponding
+/// state transition information (and data, when relevant).
+using ChannelTransitions = std::map<EdgeId, std::pair<State, Data>>;
+
+/// Stores the set of state transitionss at each cycle, mapping each cycle
+/// number to the set of channel state transitions that occur during it.
+using CycleTransitions = std::map<CycleNb, ChannelTransitions>;
 
 /// Implements the logic to create and update a Graph
 class Graph {
@@ -48,17 +64,27 @@ public:
   LogicalResult getNode(NodeId &id, GraphNode &result);
   /// Based on information about an edge, retrieves the corresponding edge
   /// identifier
-  LogicalResult
-  getEdgeId(std::pair<std::pair<NodeId, int>, std::pair<NodeId, int>> &edgeInfo,
-            EdgeId &edgeId);
+  LogicalResult getEdgeId(
+      std::pair<std::pair<NodeId, size_t>, std::pair<NodeId, size_t>> &edgeInfo,
+      EdgeId &edgeId);
   /// Given a specific clock cycle, adds a pair (edge, state) to the map
-  void addEdgeState(CycleNb cycle, EdgeId edgeId, State state);
+  void addEdgeState(CycleNb cycle, EdgeId edgeId, State state,
+                    const Data &data);
   /// Returns all the Nodes in the Graph
   std::map<NodeId, GraphNode> getNodes();
   /// Returns all the edges in the Graph
   std::vector<GraphEdge> getEdges();
 
-  std::map<CycleNb, std::map<EdgeId, State>> getCycleEdgeStates();
+  CycleTransitions getCycleEdgeStates();
+
+  void dupilcateEdgeStates(CycleNb from, CycleNb until);
+  /// Adds a BB to the Graph
+  void addBB(BB &bb);
+  /// Gets the graph's BBs
+  std::vector<BB> getBBs();
+  /// Retrieves a list of edge IDs that are either incoming to or outgoing from
+  /// a specified node
+  std::vector<EdgeId> getInOutEdgesOfNode(const NodeId &nodeId);
 
 private:
   /// Edges of the graph
@@ -66,11 +92,14 @@ private:
   /// Nodes of the graph mapped with their corresponding node identifier
   std::map<NodeId, GraphNode> nodes;
   /// State of each edge given a specific clock cycle
-  std::map<CycleNb, std::map<EdgeId, State>> cycleEdgeStates;
+  CycleTransitions cycleEdgeStates;
   /// Map of the edges of the graph :
   /// ((src node id, outPort number), (dest node id, inPort number)) -> edge id
-  std::map<std::pair<std::pair<NodeId, int>, std::pair<NodeId, int>>, EdgeId>
+  std::map<std::pair<std::pair<NodeId, size_t>, std::pair<NodeId, size_t>>,
+           EdgeId>
       mapEdges;
+  /// BBs of the Graph
+  std::vector<BB> bbs;
 };
 
 } // namespace visual_dataflow

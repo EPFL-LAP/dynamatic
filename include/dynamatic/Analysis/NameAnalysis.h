@@ -72,7 +72,7 @@ public:
   bool areAllOpsNamed() { return allOpsNamed; }
 
   /// Whether the operation has a name.
-  bool hasName(Operation *op) { return opToName.contains(op); }
+  bool hasName(Operation *op);
 
   /// If the operation doesn't currently have a name, sets a unique name for the
   /// operation based on its type and returns a reference to it. If the
@@ -86,8 +86,13 @@ public:
   /// named if they do not already have names.
   std::string getName(OpOperand &oprd);
 
-  /// Return the operation that has this name, if it exists.
-  Operation *getOp(StringRef name) { return nameToOp[name]; };
+  /// Returns the operation that has (had) this name, if it exists (existed).
+  /// Note that it is only safe to dereference the returned pointer if it is
+  /// known that the operation currently exists in the IR. The method may return
+  /// a non-null pointer to an erased operation, or to a new operation that was
+  /// assigned to the same memory location after the original operation was
+  /// erased.
+  Operation *getOp(StringRef name) { return namedOperations[name]; };
 
   /// This is simply an alias for `getName(Operation*)` for when the
   /// programmer's intent is to just set a unique name without reading it back.
@@ -161,22 +166,18 @@ private:
   /// Operation counters, used to generate unique names on-demand based on the
   /// operation's type.
   DenseMap<mlir::OperationName, unsigned> counters;
-  /// Maps all operations whose the analysis knows have names to a copy of their
-  /// name. Note that an operation may still be present in the map but no longer
-  /// in the IR.
-  mlir::DenseMap<Operation *, std::string> opToName;
   /// Maps all known operation names to their owning operation. Note that an
   /// operation may still be present in the map but no longer in the IR. This is
   /// intentional and is meant so that the analysis never assigns a name which
   /// belonged to an erased operation to a new operation.
-  llvm::StringMap<Operation *> nameToOp;
+  llvm::StringMap<Operation *> namedOperations;
   /// Whether the last walk through the IR revealed that one of the analysis's
   /// invariants is broken. Reset to true at the beginning of each walk and
   /// potentially set to false during it.
   bool namesValid = true;
-  /// Whether the last walk through the IR revealed found no unnamed operation
-  /// it did not name. Reset to true at the beginning of each walk and
-  /// potentially set to false during it.
+  /// Whether the last walk through the IR found no unnamed operation it did not
+  /// name. Reset to true at the beginning of each walk and potentially set to
+  /// false during it.
   bool allOpsNamed = true;
 
   /// Generate a unique name based on the type of an operation (using the
@@ -186,13 +187,6 @@ private:
   /// Derive a unique name from a base name by appending an increasing "counter"
   /// string at the end (e.g., "baseName0" -> "baseName1" -> ...).
   std::string deriveUniqueName(StringRef base);
-
-  /// Adds the bidirectional mapping between an operation and its name to our
-  /// maps. It's assumed that the operation/name pair was unknown before.
-  void addMapping(Operation *op, StringRef name) {
-    nameToOp[name] = op;
-    opToName[op] = name;
-  }
 
   /// Determines whether the operation is intrinsically named i.e., whether it
   /// has a naturally unique name that is not represented through our Handhsake

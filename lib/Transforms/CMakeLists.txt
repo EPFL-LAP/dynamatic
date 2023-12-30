@@ -5,6 +5,7 @@ add_dynamatic_library(DynamaticTransforms
   ForceMemoryInterface.cpp
   HandshakeCanonicalize.cpp
   HandshakeConcretizeIndexType.cpp
+  HandshakeMaterialize.cpp
   HandshakeMinimizeCstWidth.cpp
   HandshakeOptimizeBitwidths.cpp
   HandshakePrepareForLegacy.cpp

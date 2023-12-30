@@ -18,48 +18,77 @@
 //===----------------------------------------------------------------------===//
 
 #include "dynamatic/Transforms/BufferPlacement/HandshakeSetBufferingProperties.h"
+#include "circt/Dialect/Handshake/HandshakeDialect.h"
 #include "circt/Dialect/Handshake/HandshakeOps.h"
+#include "dynamatic/Support/Handshake.h"
 #include "dynamatic/Transforms/BufferPlacement/BufferingSupport.h"
 #include "dynamatic/Transforms/BufferPlacement/HandshakePlaceBuffers.h"
+#include "dynamatic/Transforms/HandshakeMaterialize.h"
 #include "mlir/IR/Value.h"
 #include "llvm/ADT/STLExtras.h"
+#include "llvm/ADT/TypeSwitch.h"
 
 using namespace circt;
 using namespace dynamatic;
 using namespace dynamatic::buffer;
 
-void dynamatic::buffer::setFPGA20Properties(Channel &channel) {
-  // Merges with more than one input should have at least a transparent slot
-  // at their output
-  if (isa<handshake::MergeOp>(channel.producer) &&
-      channel.producer->getNumOperands() > 1)
-    channel.props->minTrans = std::max(channel.props->minTrans, 1U);
-
+/// Makes all channels adjacent to operations of the given type inside the
+/// function unbufferizable.
+template <typename Op>
+static void makeUnbufferizable(circt::handshake::FuncOp funcOp) {
   // Channels connected to memory interfaces are not bufferizable
-  if ((isa<handshake::MemoryOpInterface>(channel.producer)) ||
-      isa<handshake::MemoryOpInterface>(channel.consumer)) {
-    channel.props->maxOpaque = 0;
-    channel.props->maxTrans = 0;
+  for (Op op : funcOp.getOps<Op>()) {
+    for (Value oprd : op->getOperands()) {
+      Channel channel(oprd, true);
+      channel.props->maxOpaque = 0;
+      channel.props->maxTrans = 0;
+    }
+    for (OpResult res : op->getResults()) {
+      Channel channel(res, true);
+      channel.props->maxOpaque = 0;
+      channel.props->maxTrans = 0;
+    }
   }
 }
 
-/// Calls the provided callback for all channels in the function. These are all
-/// producer/consumer pairs between a function argument and an operand or an
-/// operation's result and an operand.
-static void callOnAllChannels(handshake::FuncOp funcOp,
-                              void (*callback)(Channel &)) {
-  for (BlockArgument arg : funcOp.getArguments())
-    for (Operation *user : arg.getUsers()) {
-      Channel channel(arg, funcOp, user, true);
-      callback(channel);
+void dynamatic::buffer::setFPGA20Properties(circt::handshake::FuncOp funcOp) {
+  // Merges with more than one input should have at least a transparent slot
+  // at their output
+  for (handshake::MergeOp mergeOp : funcOp.getOps<handshake::MergeOp>()) {
+    if (mergeOp->getNumOperands() > 1) {
+      Channel channel(mergeOp.getResult(), true);
+      channel.props->minTrans = std::max(channel.props->minTrans, 1U);
     }
+  }
 
-  for (Operation &op : funcOp.getOps())
-    for (OpResult res : op.getResults())
-      for (Operation *user : res.getUsers()) {
-        Channel channel(res, &op, user, true);
-        callback(channel);
+  // Channels connected to memory interfaces are not bufferizable
+  makeUnbufferizable<handshake::MemoryControllerOp>(funcOp);
+  makeUnbufferizable<handshake::LSQOp>(funcOp);
+
+  // Forked control signals going to LSQs should have an opaque buffer between
+  // the fork and successors that are not the LSQ
+  for (handshake::LSQOp lsqOp : funcOp.getOps<handshake::LSQOp>()) {
+    LSQPorts ports = lsqOp.getPorts();
+    ValueRange lsqInputs = lsqOp.getMemOperands();
+
+    for (LSQGroup &group : ports.getGroups()) {
+      // Control signal must come from a fork for this constraint to apply
+      Value ctrlVal = lsqInputs[group->ctrlPort->getCtrlInputIndex()];
+      Operation *ctrlDefOp = ctrlVal.getDefiningOp();
+      if (!mlir::isa_and_present<handshake::ForkOp, handshake::LazyForkOp>(
+              ctrlDefOp))
+        continue;
+
+      // Force placement of an opaque buffer slot on other fork output channels
+      // triggering group allocations to the same LSQ
+      for (Value forkRes : getLSQControlPaths(lsqOp, ctrlDefOp)) {
+        if (forkRes != ctrlVal) {
+          Channel channel(forkRes, true);
+          channel.props->minOpaque = std::max(channel.props->minOpaque, 1U);
+        }
       }
+    }
+  }
 }
 
 namespace {
@@ -84,8 +113,14 @@ struct HandshakeSetBufferingPropertiesPass
     }
 
     // Add properties to channels inside each function
-    for (handshake::FuncOp funcOp : modOp.getOps<handshake::FuncOp>())
-      callOnAllChannels(funcOp, setFPGA20Properties);
+    for (handshake::FuncOp funcOp : modOp.getOps<handshake::FuncOp>()) {
+      // Buffer placement requires that all values are used exactly once
+      if (failed(verifyIRMaterialized(funcOp))) {
+        funcOp.emitOpError() << ERR_NON_MATERIALIZED_FUNC;
+        return signalPassFailure();
+      }
+      setFPGA20Properties(funcOp);
+    }
   };
 };
 

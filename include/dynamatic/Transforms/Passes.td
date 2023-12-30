@@ -105,6 +105,19 @@ def HandshakeInferBasicBlocks : DynamaticPass<"handshake-infer-basic-blocks"> {
   let constructor = "dynamatic::createHandshakeInferBasicBlocksPass()";
 }
 
+def HandshakeMaterialize : DynamaticPass<"handshake-materialize"> {
+  let summary = "Materializes forks and sinks into the IR.";
+  let description = [{
+    Ensures that every SSA value within Handshake functions is used exactly once
+    by inserting forks and sinks as needed to, respectively, "duplicate" values
+    and "absorb" others. In additon to inserting eager forks and sinks, it also
+    inserts lazy forks on the control memory network as needed to ensure
+    (together with buffer placement) that multiple group allocations to the same
+    LSQ never happen on the same cycle.   
+  }];
+  let constructor = "dynamatic::createHandshakeMaterialize()";
+}
+
 def HandshakePrepareForLegacy : DynamaticPass<"handshake-prepare-for-legacy"> {
   let summary = "Prepare the IR for usage in legacy Dynamatic.";
   let description = [{
@@ -203,7 +216,7 @@ def HandshakePlaceBuffers : DynamaticPass<"handshake-place-buffers"> {
     "Algorithm to use for buffer placement. Choices are: 'on-merges' (default, "
     "does not require Gurobi) 'fpga20', 'fpga20-legacy' (same as fpga-20 but "
     "interprets the MILP's results as legacy Dynamatic would, placing at most "
-    "a single buffer type on any given channel)">,
+    "a single buffer type on any given channel), 'fpl22'.">,
     Option<"frequencies", "frequencies", "std::string", "",
     "Path to CSV-formatted file containing estimated transition frequencies "
     "between basic blocks in the kernel.">,

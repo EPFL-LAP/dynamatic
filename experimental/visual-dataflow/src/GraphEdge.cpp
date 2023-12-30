@@ -24,12 +24,12 @@ void GraphEdge::setSrc(GraphNode src) { this->src = std::move(src); }
 
 void GraphEdge::setDst(GraphNode dst) { this->dst = std::move(dst); }
 
-void GraphEdge::setInPort(unsigned inPort) { this->inPort = inPort; }
+void GraphEdge::setInPort(size_t inPort) { this->inPort = inPort; }
 
-void GraphEdge::setOutPort(unsigned outPort) { this->outPort = outPort; }
+void GraphEdge::setOutPort(size_t outPort) { this->outPort = outPort; }
 
-GraphEdge::GraphEdge(EdgeId id, GraphNode src, GraphNode dst, unsigned inPort,
-                     unsigned outPort,
+GraphEdge::GraphEdge(EdgeId id, GraphNode src, GraphNode dst, size_t inPort,
+                     size_t outPort,
                      std::vector<std::pair<float, float>> position)
     : id(id), src(std::move(src)), dst(std::move(dst)), inPort(inPort),
       outPort(outPort), position(std::move(position)) {}
@@ -37,11 +37,15 @@ GraphEdge::GraphEdge(EdgeId id, GraphNode src, GraphNode dst, unsigned inPort,
 GraphNode GraphEdge::getSrcNode() { return src; }
 GraphNode GraphEdge::getDstNode() { return dst; }
 
-unsigned GraphEdge::getOutPort() { return outPort; }
-unsigned GraphEdge::getInPort() { return inPort; }
+size_t GraphEdge::getOutPort() { return outPort; }
+size_t GraphEdge::getInPort() { return inPort; }
 
 EdgeId GraphEdge::getEdgeId() { return id; }
 
 std::vector<std::pair<float, float>> GraphEdge::getPositions() {
   return position;
 }
+
+void GraphEdge::setDashed(bool dashed) { this->isDashed = dashed; }
+
+bool GraphEdge::getDashed() { return isDashed; }

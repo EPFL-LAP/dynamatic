@@ -14,12 +14,14 @@
 
 #include "dynamatic/Support/DOTPrinter.h"
 #include "circt/Dialect/Handshake/HandshakeOps.h"
-#include "circt/Dialect/Handshake/HandshakePasses.h"
 #include "dynamatic/Analysis/NameAnalysis.h"
 #include "dynamatic/Conversion/PassDetails.h"
 #include "dynamatic/Support/LogicBB.h"
+#include "dynamatic/Support/TimingModels.h"
 #include "dynamatic/Transforms/HandshakeConcretizeIndexType.h"
+#include "dynamatic/Transforms/HandshakeMaterialize.h"
 #include "mlir/Dialect/Arith/IR/Arith.h"
+#include "mlir/IR/BuiltinAttributes.h"
 #include "mlir/IR/BuiltinTypes.h"
 #include "mlir/IR/OperationSupport.h"
 #include "mlir/IR/PatternMatch.h"
@@ -553,15 +555,17 @@ static bool isBitModBetweenBlocks(Operation *op) {
 /// Dynamatic's buffer placement tool.
 static void patchUpIRForLegacyBuffers(handshake::FuncOp funcOp) {
   // Remove the BB attribute of all forks "between basic blocks"
-  for (auto forkOp : funcOp.getOps<handshake::ForkOp>()) {
+  for (Operation &forkOp : funcOp.getOps()) {
+    if (!isa<handshake::ForkOp, handshake::LazyForkOp>(forkOp))
+      continue;
     // Only operate on forks which belong to a basic block
-    std::optional<unsigned> optForkBB = getLogicBB(forkOp);
+    std::optional<unsigned> optForkBB = getLogicBB(&forkOp);
     if (!optForkBB.has_value())
       continue;
     unsigned forkBB = optForkBB.value();
 
     // Backtrack through extension operations
-    Value val = forkOp.getOperand();
+    Value val = forkOp.getOperand(0);
     while (Operation *defOp = val.getDefiningOp())
       if (isa<arith::ExtSIOp, arith::ExtUIOp>(defOp))
         val = defOp->getOperand(0);
@@ -577,10 +581,10 @@ static void patchUpIRForLegacyBuffers(handshake::FuncOp funcOp) {
     };
 
     if (isa_and_nonnull<handshake::ConditionalBranchOp>(val.getDefiningOp()) ||
-        llvm::any_of(forkOp->getResults(), isMergeInDiffBlock))
+        llvm::any_of(forkOp.getResults(), isMergeInDiffBlock))
       // Fork is located after a branch in the same block or before a merge-like
       // operation in a different block
-      forkOp->removeAttr(BB_ATTR);
+      forkOp.removeAttr(BB_ATTR);
   }
 }
 
@@ -788,6 +792,8 @@ LogicalResult DOTPrinter::annotateNode(Operation *op,
             return info;
           })
           .Case<handshake::ForkOp>([&](auto) { return NodeInfo("Fork"); })
+          .Case<handshake::LazyForkOp>(
+              [&](auto) { return NodeInfo("LazyFork"); })
           .Case<handshake::SourceOp>([&](auto) {
             auto info = NodeInfo("Source");
             info.stringAttr["out"] = getIOFromValues(op->getResults(), "out");
@@ -798,34 +804,35 @@ LogicalResult DOTPrinter::annotateNode(Operation *op,
             info.stringAttr["in"] = getIOFromValues(op->getOperands(), "in");
             return info;
           })
-          .Case<handshake::ConstantOp>([&](auto) {
+          .Case<handshake::ConstantOp>([&](handshake::ConstantOp cstOp) {
             auto info = NodeInfo("Constant");
-            // Try to get the constant value as an integer
-            int value = 0;
-            int length = 8;
-            if (mlir::IntegerAttr intAttr =
-                    op->template getAttrOfType<mlir::IntegerAttr>("value");
-                intAttr)
+
+            // Determine the constant value and its bitwidth based on the
+            // vondtnat's value attribute
+            long int value = 0;
+            unsigned bitwidth = 0;
+            TypedAttr valueAttr = cstOp.getValueAttr();
+            if (auto intAttr = dyn_cast<mlir::IntegerAttr>(valueAttr)) {
               value = intAttr.getValue().getSExtValue();
-            // Try to get the constant value as an integer
-            if (mlir::BoolAttr boolAttr =
-                    op->template getAttrOfType<mlir::BoolAttr>("value");
-                boolAttr && boolAttr.getValue()) {
-              value = 1;
-              length = 1;
+              bitwidth = intAttr.getValue().getBitWidth();
+            } else if (auto boolAttr = dyn_cast<mlir::BoolAttr>(valueAttr)) {
+              value = boolAttr.getValue() ? 1 : 0;
+              bitwidth = 1;
+            } else {
+              llvm_unreachable("unsupported constant type");
             }
 
             // Convert the value to hexadecimal format
             std::stringstream stream;
-            stream << "0x" << std::setfill('0') << std::setw(length) << std::hex
-                   << value;
+            int hexLength = (bitwidth >> 2) + ((bitwidth & 0b11) != 0 ? 1 : 0);
+            stream << "0x" << std::setfill('0') << std::setw(hexLength)
+                   << std::hex << value;
+            info.stringAttr["value"] = stream.str();
 
             // Legacy Dynamatic uses the output width of the operations also
             // as input width for some reason, make it so
             info.stringAttr["in"] = getIOFromValues(op->getResults(), "in");
             info.stringAttr["out"] = getIOFromValues(op->getResults(), "out");
-
-            info.stringAttr["value"] = stream.str();
             return info;
           })
           .Case<handshake::DynamaticReturnOp>([&](auto) {
@@ -1018,7 +1025,7 @@ std::string DOTPrinter::getNodeDelayAttr(Operation *op) {
 
 std::string DOTPrinter::getNodeLatencyAttr(Operation *op) {
   double latency;
-  if (failed(timingDB->getLatency(op, latency)))
+  if (failed(timingDB->getLatency(op, SignalType::DATA, latency)))
     return "0";
   return std::to_string(static_cast<unsigned>(latency));
 }
@@ -1189,13 +1196,8 @@ LogicalResult DOTPrinter::print(mlir::ModuleOp mod,
   if (inLegacyMode()) {
     // In legacy mode, the IR must respect certain additional constraints for it
     // to be compatible with legacy Dynamatic
-    if (failed(verifyAllValuesHasOneUse(funcOp)))
-      return funcOp.emitOpError()
-             << "In legacy mode, all values in the IR must have exactly one "
-                "use to ensure that the DOT is compatible with legacy "
-                "Dynamatic. Run the --handshake-materialize-forks-sinks pass "
-                "before to insert forks and sinks in the IR and make every "
-                "value used exactly once.";
+    if (failed(verifyIRMaterialized(funcOp)))
+      return funcOp.emitOpError() << ERR_NON_MATERIALIZED_FUNC;
     if (failed(verifyAllIndexConcretized(funcOp)))
       return funcOp.emitOpError()
              << "In legacy mode, all index types in the IR must be concretized "

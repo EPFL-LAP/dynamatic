@@ -28,11 +28,6 @@
 namespace dynamatic {
 namespace buffer {
 
-/// Returns a string describing the meaning of the passed Gurobi optimization
-/// status code. Descriptions are taken from
-// https://www.gurobi.com/documentation/current/refman/optimization_status_codes.html
-std::string getGurobiOptStatusDesc(int status);
-
 std::unique_ptr<dynamatic::DynamaticPass> createHandshakePlaceBuffers(
     StringRef algorithm = "on-merges", StringRef frequencies = "",
     StringRef timingModels = "", bool firstCFDFC = false, double targetCP = 4.0,
@@ -87,9 +82,10 @@ protected:
   /// a large MILP over the entire dataflow circuit represented by the
   /// function. Fills the `placement` map with placement decisions derived
   /// from the MILP's solution.
-  virtual LogicalResult
-  getBufferPlacement(FuncInfo &info, TimingDatabase &timingDB, Logger *logger,
-                     DenseMap<Value, PlacementResult> &placement);
+  virtual LogicalResult getBufferPlacement(FuncInfo &info,
+                                           TimingDatabase &timingDB,
+                                           Logger *logger,
+                                           BufferPlacement &placement);
 #endif
   /// Called for all buffer placement strategies that do not require Gurobi to
   /// be installed on the host system.
@@ -97,7 +93,7 @@ protected:
 
   /// Instantiates buffers inside the IR, following placement decisions
   /// determined by the buffer placement MILP.
-  virtual void instantiateBuffers(DenseMap<Value, PlacementResult> &placement);
+  virtual void instantiateBuffers(BufferPlacement &placement);
 };
 
 } // namespace buffer

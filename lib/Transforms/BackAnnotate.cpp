@@ -73,6 +73,7 @@ static constexpr StringLiteral
     ERR_EXPECTED_OPRD(
         "expected operand index to be strictly less than number of "
         "operation operands"),
+    ERR_UNKNOWN_ATTR_TYPE("unknown attribute type"),
     ERR_UNKNOWN_KEY("unknown key");
 
 /// Deserializes a JSON value under a provided JSON key into a value of the
@@ -317,6 +318,10 @@ LogicalResult BackAnnotatePass::parseOpAnnotations(const json::Value &topValue,
       if (failed(setOpAttribute<handshake::ChannelBufPropsAttr>(
               op, attrName, *dataValue, dataPath)))
         return failure();
+    } else {
+      json::Path attrTypePath = opPath.field(KEY_ATTR_TYPE);
+      attrTypePath.report(ERR_UNKNOWN_ATTR_TYPE);
+      return failure();
     }
   }
 
@@ -380,6 +385,10 @@ BackAnnotatePass::parseOprdAnnotations(const json::Value &topValue,
       if (failed(setOprdAttribute<handshake::ChannelBufPropsAttr>(
               oprd, *dataValue, dataPath)))
         return failure();
+    } else {
+      json::Path attrTypePath = oprdPath.field(KEY_ATTR_TYPE);
+      attrTypePath.report(ERR_UNKNOWN_ATTR_TYPE);
+      return failure();
     }
   }
 

@@ -11,6 +11,8 @@
 //===----------------------------------------------------------------------===//
 
 #include "dynamatic/Analysis/NameAnalysis.h"
+#include "dynamatic/Support/Attribute.h"
+#include "dynamatic/Support/LLVM.h"
 #include "mlir/Dialect/Func/IR/FuncOps.h"
 #include "mlir/IR/Attributes.h"
 #include "mlir/IR/OperationSupport.h"
@@ -33,15 +35,15 @@ inline static handshake::NameAttr getNameAttr(Operation *op) {
 
 /// If the operation has an intrinsic name, return it. Returns an empty string
 /// instead.
-static std::string getIntrinsicName(Operation *op) {
+static std::optional<StringRef> getIntrinsicName(Operation *op) {
   // Functions already have a unique name; store it in our mapping so that we
   // avoid naming conflicts in case a smart cookie decides one day to name
   // their function "merge0"
   if (func::FuncOp funcOp = dyn_cast<func::FuncOp>(op))
-    return funcOp.getNameAttr().str();
+    return funcOp.getNameAttr().strref();
   if (handshake::FuncOp funcOp = dyn_cast<handshake::FuncOp>(op))
-    return funcOp.getNameAttr().str();
-  return "";
+    return funcOp.getNameAttr().strref();
+  return std::nullopt;
 }
 
 /// Returns the index of the region and block the block argument belongs to in
@@ -113,18 +115,20 @@ StringRef NameAnalysis::getName(Operation *op) {
   assert(namesValid && "analysis invariant is broken");
   // If the operation already has a name or is intrinsically named , do nothing
   // and return the name
-  if (auto nameIt = opToName.find(op); nameIt != opToName.end())
-    return nameIt->second;
-  if (isIntrinsicallyNamed(op))
-    return opToName[op];
+  if (handshake::NameAttr name = getNameAttr(op))
+    return name.getName();
+  if (std::optional<StringRef> name = getIntrinsicName(op))
+    return *name;
 
   // Set the attribute on the operation and update our mapping
   std::string name = genUniqueName(op->getName());
   auto newAttr = handshake::NameAttr::get(op->getContext(), name);
-  op->setAttr(handshake::NameAttr::getMnemonic(), newAttr);
-  addMapping(op, name);
-  return opToName[op];
+  setUniqueAttr<handshake::NameAttr>(op, newAttr);
+  namedOperations[name] = op;
+  return getNameAttr(op).getName();
 }
+
+bool NameAnalysis::hasName(Operation *op) { return getNameAttr(op) != nullptr; }
 
 std::string NameAnalysis::getName(OpOperand &oprd) {
   // The defining operation must have a name (if the defining operation is a
@@ -143,7 +147,6 @@ std::string NameAnalysis::getName(OpOperand &oprd) {
   Operation *userOp = oprd.getOwner();
   userName = getName(userOp);
   oprName = getOperandName(userOp, oprd.getOperandNumber());
-
   return defName + "_" + resName + "_" + oprName + "_" + userName;
 }
 
@@ -158,7 +161,7 @@ LogicalResult NameAnalysis::setName(Operation *op, StringRef name,
     return failure();
 
   std::string uniqueName = name.str();
-  if (nameToOp.contains(name)) {
+  if (namedOperations.contains(name)) {
     if (!uniqueWhenTaken)
       return failure();
     uniqueName = deriveUniqueName(uniqueName);
@@ -167,7 +170,7 @@ LogicalResult NameAnalysis::setName(Operation *op, StringRef name,
   // Set the attribute on the operation and update our mapping
   auto newAttr = handshake::NameAttr::get(op->getContext(), uniqueName);
   op->setAttr(handshake::NameAttr::getMnemonic(), newAttr);
-  addMapping(op, uniqueName);
+  namedOperations[uniqueName] = op;
   return success();
 }
 
@@ -182,7 +185,7 @@ LogicalResult NameAnalysis::setName(Operation *op, Operation *ascendant,
 
   StringRef ascendantName = getName(ascendant);
   std::string uniqueName = genUniqueName(op->getName()) + ascendantName.str();
-  if (nameToOp.contains(uniqueName)) {
+  if (namedOperations.contains(uniqueName)) {
     if (!uniqueWhenTaken)
       return failure();
     uniqueName = deriveUniqueName(uniqueName);
@@ -191,7 +194,7 @@ LogicalResult NameAnalysis::setName(Operation *op, Operation *ascendant,
   // Set the attribute on the operation and update our mapping
   auto newAttr = handshake::NameAttr::get(op->getContext(), uniqueName);
   op->setAttr(handshake::NameAttr::getMnemonic(), newAttr);
-  addMapping(op, uniqueName);
+  namedOperations[uniqueName] = op;
   return success();
 }
 
@@ -225,23 +228,11 @@ LogicalResult NameAnalysis::walk(UnnamedBehavior onUnnamed) {
       return;
     }
 
+    // Check that the name is unqiue with respect to other knwon operations
     StringRef name = attr.getName();
-
-    // Names cannot change during operations' lifetimes
-    if (auto nameIt = opToName.find(nestedOp); nameIt != opToName.end()) {
-      if (nameIt->getSecond() != name) {
-        nestedOp->emitError()
-            << "Operation's name was '" << nameIt->second << "' but now is '"
-            << name
-            << "'. The name of an operation cannot change during its lifetime.";
-        namesValid = false;
-        return;
-      }
-    }
-
-    // Names must be unique
-    if (auto opIt = nameToOp.find(name); opIt != nameToOp.end()) {
-      if (opIt->second != nestedOp) {
+    if (auto namedOp = namedOperations.find(name);
+        namedOp != namedOperations.end()) {
+      if (namedOp->second != nestedOp) {
         nestedOp->emitError() << "Operation has name '" << name
                               << "' but another operation already has this "
                                  "name. Names must be unique.";
@@ -249,7 +240,7 @@ LogicalResult NameAnalysis::walk(UnnamedBehavior onUnnamed) {
         return;
       }
     } else {
-      addMapping(nestedOp, name);
+      namedOperations[name] = nestedOp;
     }
   });
 
@@ -262,7 +253,7 @@ std::string NameAnalysis::genUniqueName(mlir::OperationName opName) {
   std::string candidate;
   do {
     candidate = prefix + std::to_string(counters[opName]++);
-  } while (nameToOp.contains(candidate));
+  } while (namedOperations.contains(candidate));
   return candidate;
 }
 
@@ -271,13 +262,13 @@ std::string NameAnalysis::deriveUniqueName(StringRef base) {
   std::string candidate;
   do {
     candidate = base.str() + std::to_string(counter++);
-  } while (nameToOp.contains(candidate));
+  } while (namedOperations.contains(candidate));
   return candidate;
 }
 
 bool NameAnalysis::isIntrinsicallyNamed(Operation *op) {
-  if (std::string name = getIntrinsicName(op); !name.empty()) {
-    addMapping(op, name);
+  if (std::optional<StringRef> name = getIntrinsicName(op)) {
+    namedOperations[*name] = op;
     return true;
   }
   return false;
@@ -292,7 +283,7 @@ void NameAnalysis::getBlockArgName(BlockArgument arg, std::string &prodName,
 std::string dynamatic::getUniqueName(Operation *op) {
   if (handshake::NameAttr attr = getNameAttr(op))
     return attr.getName().str();
-  return getIntrinsicName(op);
+  return getIntrinsicName(op)->str();
 }
 
 std::string dynamatic::getUniqueName(OpOperand &oprd) {

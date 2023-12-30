@@ -10,8 +10,8 @@
 //
 //===----------------------------------------------------------------------===//
 
-#ifndef VISUAL_DATAFLOW_REGISTER_TYPES_H
-#define VISUAL_DATAFLOW_REGISTER_TYPES_H
+#ifndef DYNAMATIC_VISUAL_DATAFLOW_REGISTER_TYPES_H
+#define DYNAMATIC_VISUAL_DATAFLOW_REGISTER_TYPES_H
 
 void initializeModule();
 void terminateModule();
