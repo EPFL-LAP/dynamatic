@@ -225,11 +225,17 @@ def HandshakePlaceBuffers : DynamaticPass<"handshake-place-buffers"> {
 def HandshakeSpeculation : DynamaticPass<"handshake-speculation"> {
   let summary = "Place Speculation operations";
   let description = [{
-    Speculation allows executing certain operations before it is known whether
-    they are required, which can increase fine-grained parallelism. The pass
-    needs to specify the position of the Speculator by means of the source and
-    destination operations. Then, other speculation operations are
-    automatically placed.
+      Speculative execution involves speculating on the output of a long 
+      latency operation or chain of operations, allowing operations that 
+      depend on it to begin execution early, without impacting correctness. 
+      
+      There are several situations that can benefit from early execution, 
+      including reducing the initiation interval (II) of loops with conditions 
+      that take several cycles to calculate, or loops with 
+      loop-carried dependencies. 
+      
+      The pass needs to specify the position of the Speculation Units by 
+      means of an input JSON file.
   }];
   let constructor = "dynamatic::speculation::createHandshakeSpeculation()";
   let options = [

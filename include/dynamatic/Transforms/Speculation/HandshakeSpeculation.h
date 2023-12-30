@@ -49,14 +49,9 @@ private:
   Operation *specOp;
 
 protected:
-  // Get the placement of the operations
-  LogicalResult findOpPlacement();
 
   // Scan the IR from specOp and store the SaveOp positions in placements
   LogicalResult findSavePlacements(Value startValue);
-
-  // Driver to place the Speculation Operations
-  LogicalResult placeAllOperations();
 
   // Place the operation handshake::SpeculatorOp in between src and dst.
   LogicalResult placeSpeculator();
@@ -66,14 +61,14 @@ protected:
   LogicalResult placeUnits(Value ctrlSignal);
 
   // Wrapper around placeCommitsTraversal to prepare and invoke the placement
-  LogicalResult placeCommits();
+  LogicalResult prepareAndPlaceCommits();
 
   // Create the control path for commit units by replicating branches in the IR
   bool routeCommitControlTraversal(llvm::DenseSet<Operation *> visited,
                                    Value ctrlSignal, Operation *currOp);
 
   // Place the SaveCommit operations and the control path
-  LogicalResult placeSaveCommits();
+  LogicalResult prepareAndPlaceSaveCommits();
 };
 
 } // namespace speculation

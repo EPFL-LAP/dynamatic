@@ -115,7 +115,7 @@ bool HandshakeSpeculationPass::routeCommitControlTraversal(
   return found_commit;
 }
 
-LogicalResult HandshakeSpeculationPass::placeCommits() {
+LogicalResult HandshakeSpeculationPass::prepareAndPlaceCommits() {
 
   // Place commits and connect to the Speculator Commit Control Signal
   Value commitCtrl = specOp->getResult(2);
@@ -157,7 +157,7 @@ ConditionalBranchOp findControlBranch(ModuleOp modOp, unsigned bb) {
   return controlBranch;
 }
 
-LogicalResult HandshakeSpeculationPass::placeSaveCommits() {
+LogicalResult HandshakeSpeculationPass::prepareAndPlaceSaveCommits() {
   MLIRContext *ctx = &getContext();
   OpBuilder builder(ctx);
 
@@ -246,21 +246,6 @@ LogicalResult HandshakeSpeculationPass::placeSpeculator() {
   return success();
 }
 
-LogicalResult HandshakeSpeculationPass::placeAllOperations() {
-  placeSpeculator();
-
-  // Place Save operations
-  placeUnits<handshake::SpecSaveOp>(this->specOp->getResult(1));
-
-  // Place Commit operations and the Commit control path
-  placeCommits();
-
-  // Place SaveCommit operations and the SaveCommit control path
-  placeSaveCommits();
-
-  return success();
-}
-
 // Traverse the IR and store visited Operations and Values
 void findSpeculativePaths(Operation *currOp,
                           SmallPtrSet<Operation *, 4> &specOperations,
@@ -330,7 +315,7 @@ LogicalResult HandshakeSpeculationPass::findSavePlacements(Value startValue) {
 // Traverse the IR and store visited Operations and Values
 void findSpeculativePathsForCommits(Operation *currOp,
                                     SmallPtrSet<Operation *> &specOperations,
-                                    SmallSet<Value> &specValues,
+                                    DenseSet<Value> &specValues,
                                     SpeculationPlacements &placements
                                     NameAnalysis &nameAnalysis) {
 
@@ -341,12 +326,10 @@ void findSpeculativePathsForCommits(Operation *currOp,
   for(OpResult res : currOp->getResults()) {
     specValues.insert(res);
     for(Operation *succOp : res->getUsers()) {
-        StringRef currOpName = nameAnalysis.getName(currOp);
-        StringRef succOpName = NameAnalysis.getName(succOp);
-        if(not placements.containsCommit(currOpName, succOpName)) {
-          findSpeculativePathsForCommits(succOp, specOperations, specValues,
-                                         placements);
-        }
+      if(not placements.containsCommit(res, succOp)) {
+        findSpeculativePathsForCommits(succOp, specOperations, specValues,
+                                        placements);
+      }
     }
   }
 }
@@ -362,7 +345,7 @@ void findCommitsBetweenBBs(SpeculationPlacements &placements,
                            SpeculatorOp *specOp) {
 
   SmallPtrSet<Operation *> specOperations;
-  SmallSet<Value> specValues;
+  DenseSet<Value> specValues;
   for (Operation *succOp : specOp->getResult(0)) {
     findSpeculativePathsForCommits(succOp, specOperations, specValues,
 placements, nameAnalysis);
@@ -452,9 +435,25 @@ LogicalResult findCommitPlacements(SpeculationPlacements &placements,
 void HandshakeSpeculationPass::runDynamaticPass() {
   NameAnalysis &nameAnalysis = getAnalysis<NameAnalysis>();
 
-  SpeculationPlacements::readFromJSON(this->unitPositions, this->placements,
-                                      nameAnalysis);
-  placeAllOperations();
+  if (failed(SpeculationPlacements::readFromJSON(
+          this->unitPositions, this->placements, nameAnalysis)))
+    return signalPassFailure();
+
+  if (failed(placeSpeculator()))
+    return signalPassFailure();
+
+  // Place Save operations
+  if (failed(placeUnits<handshake::SpecSaveOp>(this->specOp->getResult(1))))
+    return signalPassFailure();
+
+  // Place Commit operations and the Commit control path
+  if (failed(prepareAndPlaceCommits()))
+    return signalPassFailure();
+
+  // Place SaveCommit operations and the SaveCommit control path
+  if (failed(prepareAndPlaceSaveCommits()))
+    return signalPassFailure();
+
   // TODO: Add --handshake-materialize-forks-sinks to compile.sh
   // Manually inherit the BB, or can I run handshake-infer-basic-blocks?
 }
