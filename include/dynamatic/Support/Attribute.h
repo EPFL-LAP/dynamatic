@@ -62,8 +62,8 @@
 //
 //===----------------------------------------------------------------------===//
 
-#ifndef DYNAMATIC_SUPPORT_OPERAND_ATTRIBUTE_H
-#define DYNAMATIC_SUPPORT_OPERAND_ATTRIBUTE_H
+#ifndef DYNAMATIC_SUPPORT_ATTRIBUTE_H
+#define DYNAMATIC_SUPPORT_ATTRIBUTE_H
 
 #include "dynamatic/Support/LLVM.h"
 #include "mlir/IR/Operation.h"
@@ -84,12 +84,26 @@ static inline size_t toIdx(const mlir::NamedAttribute &attr) {
 
 namespace dynamatic {
 
+/// Gets the attribute of the given type stored under the attribute mnemonic's
+/// name on the operation, if it exists.
+template <typename Attr>
+static inline Attr getUniqueAttr(Operation *op) {
+  return op->getAttrOfType<Attr>(Attr::getMnemonic());
+}
+
+/// Sets a unique attribute of the given type under the attribute mnemonic's
+/// name on the operation.
+template <typename Attr>
+static inline void setUniqueAttr(Operation *op, Attr attr) {
+  return op->setAttr(Attr::getMnemonic(), attr);
+}
+
 /// Copies an attribute of type `Attr` from the source operation to the
 /// destination operation, if one exists with the same name as the attribute
 /// type's mnemonic.
 template <typename Attr>
 static inline void copyAttr(Operation *srcOp, Operation *dstOp) {
-  if (auto attr = srcOp->getAttrOfType<Attr>(Attr::getMnemonic()))
+  if (Attr attr = srcOp->getAttrOfType<Attr>(Attr::getMnemonic()))
     dstOp->setAttr(Attr::getMnemonic(), attr);
 }
 
@@ -222,4 +236,4 @@ void clearOperandAttr(Operation *op) {
 
 } // namespace dynamatic
 
-#endif // DYNAMATIC_SUPPORT_OPERAND_ATTRIBUTE_H
+#endif // DYNAMATIC_SUPPORT_ATTRIBUTE_H

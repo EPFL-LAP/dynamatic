@@ -19,6 +19,7 @@
 #include "dynamatic/Analysis/ConstantAnalysis.h"
 #include "dynamatic/Conversion/PassDetails.h"
 #include "dynamatic/Support/Attribute.h"
+#include "dynamatic/Support/Handshake.h"
 #include "dynamatic/Support/LogicBB.h"
 #include "mlir/Dialect/Affine/Analysis/AffineAnalysis.h"
 #include "mlir/Dialect/Affine/IR/AffineOps.h"
@@ -256,6 +257,10 @@ LogicalResult HandshakeLoweringFPGA18::replaceMemoryOps(
     }
   }
 
+  // Used to keep consistency betweeen memory access names referenced by memory
+  // dependencies and names of replaced memory operations
+  MemoryOpLowering memOpLowering(nameAnalysis);
+
   // Replace load and store operations with their corresponding Handshake
   // equivalent. Traverse and store memory operations in program order (required
   // by memory interface placement later)
@@ -275,6 +280,7 @@ LogicalResult HandshakeLoweringFPGA18::replaceMemoryOps(
     if (getOpMemRef(&op, memref).failed())
       return failure();
     Operation *newOp = nullptr;
+    Location loc = op.getLoc();
 
     // The memory operation must have a MemInterfaceAttr attribute attached
     StringRef attrName = MemInterfaceAttr::getMnemonic();
@@ -287,33 +293,44 @@ LogicalResult HandshakeLoweringFPGA18::replaceMemoryOps(
     bool connectToMC = memAttr.connectsToMC();
 
     // Replace memref operation with corresponding handshake operation
-    llvm::TypeSwitch<Operation *>(&op)
-        .Case<memref::LoadOp>([&](memref::LoadOp loadOp) {
-          OperandRange indices = loadOp.getIndices();
-          assert(indices.size() == 1 && "load must be unidimensional");
-          if (connectToMC)
-            newOp = rewriter.create<handshake::MCLoadOp>(
-                op.getLoc(), cast<MemRefType>(memref.getType()), indices[0]);
-          else
-            newOp = rewriter.create<handshake::LSQLoadOp>(
-                op.getLoc(), cast<MemRefType>(memref.getType()), indices[0]);
-          // Replace uses of old load result with data result of new load
-          op.getResult(0).replaceAllUsesWith(
-              dyn_cast<handshake::LoadOpInterface>(newOp).getDataOutput());
-        })
-        .Case<memref::StoreOp>([&](memref::StoreOp storeOp) {
-          OperandRange indices = storeOp.getIndices();
-          assert(indices.size() == 1 && "load must be unidimensional");
-          if (connectToMC)
-            newOp = rewriter.create<handshake::MCStoreOp>(
-                op.getLoc(), indices[0], storeOp.getValueToStore());
-          else
-            newOp = rewriter.create<handshake::LSQStoreOp>(
-                op.getLoc(), indices[0], storeOp.getValueToStore());
-        })
-        .Default([&](auto) {
-          return op.emitOpError() << "Memory operation type is not supported.";
-        });
+    LogicalResult res =
+        llvm::TypeSwitch<Operation *, LogicalResult>(&op)
+            .Case<memref::LoadOp>([&](memref::LoadOp loadOp) {
+              OperandRange indices = loadOp.getIndices();
+              assert(indices.size() == 1 && "load must be unidimensional");
+              Value addr = indices.front();
+              MemRefType type = cast<MemRefType>(memref.getType());
+
+              if (connectToMC)
+                newOp = rewriter.create<handshake::MCLoadOp>(loc, type, addr);
+              else
+                newOp = rewriter.create<handshake::LSQLoadOp>(loc, type, addr);
+
+              // Replace uses of old load result with data result of new load
+              op.getResult(0).replaceAllUsesWith(
+                  dyn_cast<handshake::LoadOpInterface>(newOp).getDataOutput());
+              return success();
+            })
+            .Case<memref::StoreOp>([&](memref::StoreOp storeOp) {
+              OperandRange indices = storeOp.getIndices();
+              assert(indices.size() == 1 && "store must be unidimensional");
+              Value addr = indices.front();
+              Value data = storeOp.getValueToStore();
+
+              if (connectToMC)
+                newOp = rewriter.create<handshake::MCStoreOp>(loc, addr, data);
+              else
+                newOp = rewriter.create<handshake::LSQStoreOp>(loc, addr, data);
+              return success();
+            })
+            .Default([&](auto) {
+              return op.emitError() << "Memory operation type unsupported.";
+            });
+    if (failed(res))
+      return failure();
+
+    // Record the memory access replacement
+    memOpLowering.recordReplacement(&op, newOp, false);
 
     // Associate the new operation with the memory region it references and
     // information about the memory interface it should connect to
@@ -322,9 +339,13 @@ LogicalResult HandshakeLoweringFPGA18::replaceMemoryOps(
     else
       memInfo[memref].lsqPorts[*memAttr.getLsqGroup()].push_back(newOp);
 
-    // Delete the now unused old memory operation
+    // Erase the original operation
     rewriter.eraseOp(&op);
   }
+
+  // Change the name of destination memory acceses in all stored memory
+  // dependencies to reflect the new access names
+  memOpLowering.renameDependencies(r.getParentOp());
 
   return success();
 }
@@ -876,8 +897,28 @@ static LogicalResult lowerRegion(HandshakeLoweringFPGA18 &hl) {
   return runPartialLowering(hl, &HandshakeLoweringFPGA18::createReturnNetwork);
 }
 
-/// Fully lowers a func::FuncOp to a handshake::FuncOp.
-static LogicalResult lowerFuncOp(func::FuncOp funcOp, MLIRContext *ctx) {
+namespace {
+/// FPGA18's elastic pass. Runs elastic pass on every function (func::FuncOp)
+/// of the module it is applied on. Succeeds whenever all functions in the
+/// module were succesfully lowered to handshake.
+struct StandardToHandshakeFPGA18Pass
+    : public StandardToHandshakeFPGA18Base<StandardToHandshakeFPGA18Pass> {
+
+  void runDynamaticPass() override {
+    ModuleOp modOp = getOperation();
+
+    // Lower every function individually
+    for (auto funcOp : llvm::make_early_inc_range(modOp.getOps<func::FuncOp>()))
+      if (failed(lowerFuncOp(funcOp)))
+        return signalPassFailure();
+  }
+
+  /// Fully lowers a func::FuncOp to a handshake::FuncOp.
+  LogicalResult lowerFuncOp(func::FuncOp funcOp);
+};
+} // namespace
+
+LogicalResult StandardToHandshakeFPGA18Pass::lowerFuncOp(func::FuncOp funcOp) {
   // Only retain those attributes that are not constructed by build
   SmallVector<NamedAttribute, 4> attributes;
   for (const auto &attr : funcOp->getAttrs()) {
@@ -900,6 +941,7 @@ static LogicalResult lowerFuncOp(func::FuncOp funcOp, MLIRContext *ctx) {
   handshake::FuncOp newFuncOp;
 
   bool funcIsExternal = funcOp.isExternal();
+  MLIRContext *ctx = &getContext();
 
   // Add control input/output to function arguments/results and create a
   // handshake::FuncOp of appropriate type
@@ -929,30 +971,13 @@ static LogicalResult lowerFuncOp(func::FuncOp funcOp, MLIRContext *ctx) {
 
   if (!funcIsExternal) {
     // Lower the region inside the function
-    HandshakeLoweringFPGA18 hl(newFuncOp.getBody());
+    HandshakeLoweringFPGA18 hl(newFuncOp.getBody(),
+                               getAnalysis<NameAnalysis>());
     returnOnError(lowerRegion(hl));
   }
 
   return success();
 }
-
-namespace {
-/// FPGA18's elastic pass. Runs elastic pass on every function (func::FuncOp)
-/// of the module it is applied on. Succeeds whenever all functions in the
-/// module were succesfully lowered to handshake.
-struct StandardToHandshakeFPGA18Pass
-    : public StandardToHandshakeFPGA18Base<StandardToHandshakeFPGA18Pass> {
-
-  void runDynamaticPass() override {
-    ModuleOp m = getOperation();
-
-    // Lower every function individually
-    for (auto funcOp : llvm::make_early_inc_range(m.getOps<func::FuncOp>()))
-      if (failed(lowerFuncOp(funcOp, &getContext())))
-        return signalPassFailure();
-  }
-};
-} // namespace
 
 std::unique_ptr<dynamatic::DynamaticPass>
 dynamatic::createStandardToHandshakeFPGA18Pass() {

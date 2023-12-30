@@ -15,6 +15,7 @@
 #include "dynamatic/Transforms/FlattenMemRefRowMajor.h"
 #include "circt/Dialect/Handshake/HandshakeOps.h"
 #include "dynamatic/Support/Attribute.h"
+#include "dynamatic/Support/Handshake.h"
 #include "dynamatic/Transforms/PassDetails.h"
 #include "mlir/Conversion/LLVMCommon/ConversionTarget.h"
 #include "mlir/Conversion/LLVMCommon/Pattern.h"
@@ -103,42 +104,56 @@ namespace {
 struct LoadOpConversion : public OpConversionPattern<memref::LoadOp> {
   using OpConversionPattern::OpConversionPattern;
 
+  LoadOpConversion(MemoryOpLowering &memOpLowering, TypeConverter &converter,
+                   MLIRContext *ctx)
+      : OpConversionPattern(converter, ctx), memOpLowering(memOpLowering){};
+
   LogicalResult
-  matchAndRewrite(memref::LoadOp op, OpAdaptor adaptor,
+  matchAndRewrite(memref::LoadOp loadOp, OpAdaptor adaptor,
                   ConversionPatternRewriter &rewriter) const override {
-    MemRefType type = op.getMemRefType();
+    MemRefType type = loadOp.getMemRefType();
     if (isUniDimensional(type) || !type.hasStaticShape() ||
-        /*Already converted?*/ op.getIndices().size() == 1)
+        /*Already converted?*/ loadOp.getIndices().size() == 1)
       return failure();
-    Value finalIdx =
-        flattenIndices(rewriter, op, adaptor.getIndices(), op.getMemRefType());
-    memref::LoadOp newLoadOp = rewriter.replaceOpWithNewOp<memref::LoadOp>(
-        op, adaptor.getMemref(), SmallVector<Value>{finalIdx});
-    copyAttr<handshake::MemDependenceArrayAttr, handshake::MemInterfaceAttr>(
-        op, newLoadOp);
+    Value finalIdx = flattenIndices(rewriter, loadOp, adaptor.getIndices(),
+                                    loadOp.getMemRefType());
+    memref::LoadOp flatLoadOp = rewriter.replaceOpWithNewOp<memref::LoadOp>(
+        loadOp, adaptor.getMemref(), SmallVector<Value>{finalIdx});
+    memOpLowering.recordReplacement(loadOp, flatLoadOp);
     return success();
   }
+
+private:
+  /// Used to record the operation replacement.
+  MemoryOpLowering &memOpLowering;
 };
 
 struct StoreOpConversion : public OpConversionPattern<memref::StoreOp> {
   using OpConversionPattern::OpConversionPattern;
 
+  StoreOpConversion(MemoryOpLowering &memOpLowering, TypeConverter &converter,
+                    MLIRContext *ctx)
+      : OpConversionPattern(converter, ctx), memOpLowering(memOpLowering){};
+
   LogicalResult
-  matchAndRewrite(memref::StoreOp op, OpAdaptor adaptor,
+  matchAndRewrite(memref::StoreOp storeOp, OpAdaptor adaptor,
                   ConversionPatternRewriter &rewriter) const override {
-    MemRefType type = op.getMemRefType();
+    MemRefType type = storeOp.getMemRefType();
     if (isUniDimensional(type) || !type.hasStaticShape() ||
-        /*Already converted?*/ op.getIndices().size() == 1)
+        /*Already converted?*/ storeOp.getIndices().size() == 1)
       return failure();
-    Value finalIdx =
-        flattenIndices(rewriter, op, adaptor.getIndices(), op.getMemRefType());
-    memref::StoreOp newStoreOp = rewriter.replaceOpWithNewOp<memref::StoreOp>(
-        op, adaptor.getValue(), adaptor.getMemref(),
+    Value finalIdx = flattenIndices(rewriter, storeOp, adaptor.getIndices(),
+                                    storeOp.getMemRefType());
+    memref::StoreOp flatStoreOp = rewriter.replaceOpWithNewOp<memref::StoreOp>(
+        storeOp, adaptor.getValue(), adaptor.getMemref(),
         SmallVector<Value>{finalIdx});
-    copyAttr<handshake::MemDependenceArrayAttr, handshake::MemInterfaceAttr>(
-        op, newStoreOp);
+    memOpLowering.recordReplacement(storeOp, flatStoreOp);
     return success();
   }
+
+private:
+  /// Used to record the operation replacement.
+  MemoryOpLowering &memOpLowering;
 };
 
 struct AllocOpConversion : public OpConversionPattern<memref::AllocOp> {
@@ -285,31 +300,34 @@ struct FlattenMemRefRowMajorPass
     : public FlattenMemRefRowMajorBase<FlattenMemRefRowMajorPass> {
 public:
   void runDynamaticPass() override {
-
-    auto *ctx = &getContext();
+    mlir::ModuleOp modOp = getOperation();
+    MLIRContext *ctx = &getContext();
     TypeConverter typeConverter;
+    MemoryOpLowering memOpLowering(getAnalysis<NameAnalysis>());
     populateTypeConversionPatterns(typeConverter);
 
     RewritePatternSet patterns(ctx);
     SetVector<StringRef> rewrittenCallees;
-    patterns.add<LoadOpConversion, StoreOpConversion, AllocOpConversion,
-                 OperandConversionPattern<func::ReturnOp>,
+    patterns.add<AllocOpConversion, OperandConversionPattern<func::ReturnOp>,
                  OperandConversionPattern<memref::DeallocOp>,
                  CondBranchOpConversion,
                  OperandConversionPattern<memref::DeallocOp>,
                  OperandConversionPattern<memref::CopyOp>, CallOpConversion>(
         typeConverter, ctx);
+    patterns.add<LoadOpConversion, StoreOpConversion>(memOpLowering,
+                                                      typeConverter, ctx);
     populateFunctionOpInterfaceTypeConversionPattern<func::FuncOp>(
         patterns, typeConverter);
 
     ConversionTarget target(*ctx);
     populateFlattenMemRefsLegality(target);
 
-    if (applyPartialConversion(getOperation(), target, std::move(patterns))
-            .failed()) {
-      signalPassFailure();
-      return;
-    }
+    if (failed(applyPartialConversion(modOp, target, std::move(patterns))))
+      return signalPassFailure();
+
+    // Change the name of destination memory acceses in all stored memory
+    // dependencies to reflect the new access names
+    memOpLowering.renameDependencies(modOp);
   }
 };
 
