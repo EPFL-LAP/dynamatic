@@ -125,6 +125,20 @@ inline void parseOperationPlacements(
   }
 }
 
+// JSON format example:
+// {
+//   "speculator": {"srcOp": "cmpi0", "dstOp":"fork5"},
+//   "saves": [
+//     {"srcOp": "extsi6", "dstOp":"mc_load0"},
+//     {"srcOp": "extsi7", "dstOp":"mc_load1"}
+//   ],
+//   "commits": [
+//     {"srcOp": "trunci0", "dstOp":"cond_br0"}
+//   ],
+//   "saveCommits": [
+//     {"srcOp": "mux1", "dstOp":"buffer10"}
+//   ]
+// }
 bool parseJSON(
     const llvm::json::Value &jsonValue,
     std::map<StringRef, llvm::SmallVector<PlacementNames>> &placements) {
