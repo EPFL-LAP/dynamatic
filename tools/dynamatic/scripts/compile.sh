@@ -12,7 +12,6 @@ SRC_DIR=$2
 OUTPUT_DIR=$3
 KERNEL_NAME=$4
 USE_SIMPLE_BUFFERS=$5
-USE_SPECULATION=$6
 
 # Binaries used during compilation
 POLYGEIST_PATH="$DYNAMATIC_DIR/polygeist/llvm-project/clang/lib/Headers/"
@@ -35,7 +34,6 @@ F_PROFILER_INPUTS="$COMP_DIR/profiler-inputs.txt"
 F_HANDSHAKE="$COMP_DIR/handshake.mlir"
 F_HANDSHAKE_TRANSFORMED="$COMP_DIR/handshake_transformed.mlir"
 F_HANDSHAKE_BUFFERED="$COMP_DIR/handshake_buffered.mlir"
-F_SPECULATIVE="$COMP_DIR/speculative.mlir"
 F_HANDSHAKE_EXPORT="$COMP_DIR/handshake_export.mlir"
 F_FREQUENCIES="$COMP_DIR/frequencies.csv"
 
@@ -159,19 +157,8 @@ else
   cd - > /dev/null
 fi
 
-F_HANDSHAKE_EXPORT_INPUT="$F_HANDSHAKE_BUFFERED"
-
-if [[ $USE_SPECULATION == "fir" ]]; then
-  "$DYNAMATIC_OPT_BIN" "$F_HANDSHAKE_BUFFERED" \
-    --speculation-fir \
-    > "$F_SPECULATIVE"
-    exit_on_fail "Failed to place fir speculative units" "Placed fir speculative units"
-
-  F_HANDSHAKE_EXPORT_INPUT="$F_SPECULATIVE"
-fi
-
 # handshake canonicalization
-"$DYNAMATIC_OPT_BIN" "$F_HANDSHAKE_EXPORT_INPUT" --handshake-canonicalize \
+"$DYNAMATIC_OPT_BIN" "$F_HANDSHAKE_BUFFERED" --handshake-canonicalize \
   > "$F_HANDSHAKE_EXPORT"
 exit_on_fail "Failed to canonicalize Handshake" "Canonicalized handshake"
 

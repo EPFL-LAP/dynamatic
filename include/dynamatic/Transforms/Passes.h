@@ -35,7 +35,6 @@
 #include "dynamatic/Transforms/ScfRotateForLoops.h"
 #include "dynamatic/Transforms/ScfSimpleIfToSelect.h"
 #include "dynamatic/Transforms/Speculation/HandshakeSpeculation.h"
-#include "dynamatic/Transforms/Speculation/SpeculationFir.h"
 #include "mlir/Pass/Pass.h"
 
 namespace dynamatic {

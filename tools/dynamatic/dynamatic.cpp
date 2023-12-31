@@ -483,14 +483,11 @@ CommandResult Compile::decode(SmallVector<std::string> &tokens) {
   std::string outputDir = kernelDir + sep.str() + "out";
   std::string buffers =
       parsed.optArgsPresent.contains("simple-buffers") ? "1" : "0";
-  std::string spec =
-      parsed.optArgsPresent.contains("speculative-fir") ? "fir" : "0";
 
   // Create and execute the command
   return execShellCommand(state.getScriptsPath() + "/compile.sh " +
                           state.dynamaticPath + " " + kernelDir + " " +
-                          outputDir + " " + kernelName + " " + buffers + " " +
-                          spec);
+                          outputDir + " " + kernelName + " " + buffers);
 }
 
 CommandResult WriteHDL::decode(SmallVector<std::string> &tokens) {
