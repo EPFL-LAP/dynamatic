@@ -202,14 +202,11 @@ public:
 class Compile : public Command {
 public:
   Compile(FrontendState &state)
-      : Command(
-            CMD_COMPILE,
-            "Compiles the source kernel into a dataflow circuit; "
-            "produces both handshake-level IR and an equivalent DOT file",
-            state, {},
-            {{"simple-buffers", "Use simple buffer placement"},
-             {"speculative-fir",
-              "Place hardcoded speculative units for the FIR benchmark"}}){};
+      : Command(CMD_COMPILE,
+                "Compiles the source kernel into a dataflow circuit; "
+                "produces both handshake-level IR and an equivalent DOT file",
+                state, {},
+                {{"simple-buffers", "Use simple buffer placement"}}){};
 
   CommandResult decode(SmallVector<std::string> &tokens) override;
 };
