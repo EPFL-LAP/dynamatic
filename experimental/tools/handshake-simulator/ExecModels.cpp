@@ -69,12 +69,10 @@ inline bool dynamatic::experimental::CircuitState::isNone(mlir::Value channel) {
   return !channelMap[channel].isReady && !channelMap[channel].isValid;
 }
 
-//
-
-inline bool dynamatic::experimental::CircuitState::onRisingEdge(circt::Operation& op) {
-  if (cycleMap[&op])
+bool dynamatic::experimental::CircuitState::onRisingEdge(circt::Operation &op) {
+  if (edgeRisenOps.contains(&op))
     return false;
-  cycleMap[&op] = true;
+  edgeRisenOps.insert(&op);
   return true;
 }
 
@@ -90,7 +88,7 @@ void dynamatic::experimental::CircuitState::storeValueOnRisingEdge(
 /// Returns true if an internal data exists for the operation
 static inline bool internalDataExists(circt::Operation &opArg,
                                       InternalDataMap &internalDataMap) {
-  return internalDataMap.count(&opArg);
+  return internalDataMap.contains(&opArg);
 }
 
 /// Set the entry on the internal data for the entered operation
@@ -105,7 +103,7 @@ static inline void setInternalData(circt::Operation &opArg, ContentType content,
 template <typename ContentType>
 static bool getInternalData(circt::Operation &opArg, ContentType &content,
                             InternalDataMap &internalDataMap) {
-  if (!internalDataMap.count(&opArg)) {
+  if (!internalDataMap.contains(&opArg)) {
     return false;
   }
   content = llvm::any_cast<ContentType>(internalDataMap[&opArg]);
@@ -124,9 +122,10 @@ static SmallVector<Value> toVector(ValueRange range) {
 static bool isReadyToExecute(ArrayRef<Value> ins, ArrayRef<Value> outs,
                              CircuitState &circuitState) {
 
-  for (auto in : ins)
+  for (auto in : ins) {
     if (circuitState.isNone(in))
       return false;
+  }
   // We do not care about outputs as this is done for single cycle operations
   return true;
 }
@@ -155,10 +154,10 @@ static bool tryToExecute(circt::Operation *op, CircuitState &circuitState,
   std::vector<llvm::Any> out(outs.size());
   executeFunc(in, out, *op);
   circuitState.storeValues(out, outs);
-  
+
   for (auto out : outs)
     circuitState.channelMap[out].isValid = true;
-  
+
   return true;
 }
 
@@ -438,19 +437,20 @@ bool DefaultBuffer::tryExecute(ExecutableData &data, circt::Operation &opArg) {
     } else {
       getInternalData<OEHBdata>(opArg, oehbData, data.internalDataMap);
     }
-    
+
     oehbData.registerEnable =
         data.circuitState.channelMap[op.getOperand()].isReady &&
         data.circuitState.channelMap[op.getOperand()].isValid;
 
-    bool outsValid = data.circuitState.channelMap[op.getResult()].isValid; // useless right ?
+    bool outsValid =
+        data.circuitState.channelMap[op.getResult()].isValid; // useless right ?
     bool insReady = !data.circuitState.channelMap[op.getResult()].isValid ||
                     data.circuitState.channelMap[op.getResult()].isReady;
     // On rising edge
     if (data.circuitState.onRisingEdge(opArg)) {
       outsValid = data.circuitState.channelMap[op.getOperand()].isValid &&
                   !data.circuitState.channelMap[op.getOperand()].isReady;
-          // If input is ready and valid, store the data
+      // If input is ready and valid, store the data
       if (oehbData.registerEnable)
         oehbData.content = data.circuitState.getDataOpt(op.getOperand());
     }
@@ -464,43 +464,43 @@ bool DefaultBuffer::tryExecute(ExecutableData &data, circt::Operation &opArg) {
 
     // Re-store data
     setInternalData(opArg, oehbData, data.internalDataMap);
-  }
+  } else {
+    // FIFO/TEHB/Transparent buffer
 
-  // FIFO/TEHB/Transparent buffer
-  else {
     // Instanciates registers
     TEHBdata tehbData;
-    if (!internalDataExists(opArg, data.internalDataMap)) {
+    if (!internalDataExists(opArg, data.internalDataMap))
       tehbData.slots = op.getNumSlots();
-    } else {
+    else
       getInternalData<TEHBdata>(opArg, tehbData, data.internalDataMap);
-    }
 
     bool alreadySent = false;
 
     // On rising edge
     if (data.circuitState.onRisingEdge(opArg)) {
       alreadySent = data.circuitState.channelMap[op.getResult()].isValid &&
-                  !data.circuitState.channelMap[op.getResult()].isReady;
-    
+                    !data.circuitState.channelMap[op.getResult()].isReady;
+
       // If something is being done this cycle, stack the data
       if (alreadySent) {
-        assert((tehbData.queue.size() + 1) <= tehbData.slots && "FIFO buffer is full!");
+        assert((tehbData.queue.size() + 1) <= tehbData.slots &&
+               "FIFO buffer is full!");
         tehbData.queue.push(
             llvm::any_cast<APInt>(data.circuitState.getData(op.getOperand())));
-      // Otherwise, let is pass and live
+        // Otherwise, let is pass and live
       } else {
         // Either get the data from the input or from the queue
-        if (tehbData.queue.size() == 0) {
-          data.circuitState.storeValueOnRisingEdge(op.getResult(), data.circuitState.getDataOpt(op.getOperand()));
+        if (tehbData.queue.empty()) {
+          data.circuitState.storeValueOnRisingEdge(
+              op.getResult(), data.circuitState.getDataOpt(op.getOperand()));
         } else {
           APInt fifoOut = tehbData.queue.front();
-          tehbData.queue.pop(); 
+          tehbData.queue.pop();
           data.circuitState.storeValueOnRisingEdge(op.getResult(), fifoOut);
         }
       }
     }
-  
+
     // Update dataflow states (fifo updates ins ready and outs valid)
     data.circuitState.channelMap[op.getOperand()].isReady = !alreadySent;
     data.circuitState.channelMap[op.getResult()].isValid =
@@ -513,8 +513,7 @@ bool DefaultBuffer::tryExecute(ExecutableData &data, circt::Operation &opArg) {
   auto executeFunc = [](std::vector<llvm::Any> &ins,
                         std::vector<llvm::Any> &outs,
                         circt::Operation &op) { outs[0] = ins[0]; };
-  return tryToExecute(op.getOperation(), data.circuitState, data.models,
-                      executeFunc);
+  return tryToExecute(op, data.circuitState, data.models, executeFunc);
 }
 
 //--- Dynamatic models -------------------------------------------------------//
@@ -522,7 +521,7 @@ bool DefaultBuffer::tryExecute(ExecutableData &data, circt::Operation &opArg) {
 bool DynamaticMemController::tryExecute(ExecutableData &data,
                                         circt::Operation &opArg) {
   auto op = dyn_cast<circt::handshake::MemoryControllerOp>(opArg);
-  bool hasDoneStuff = false; // This might be different for the mem controller but ok
+  bool hasChanged = false;
   unsigned bufferStart =
       llvm::any_cast<unsigned>(data.circuitState.getData(op.getMemRef()));
 
@@ -570,7 +569,7 @@ bool DynamaticMemController::tryExecute(ExecutableData &data,
         mem[offset] = dataValue;
 
         mcData.storeRequests.erase(mcData.storeRequests.begin() + i);
-        hasDoneStuff = true;
+        hasChanged = true;
         request.lastExecution = data.currentCycle;
 
       } else {
@@ -611,7 +610,7 @@ bool DynamaticMemController::tryExecute(ExecutableData &data,
         data.circuitState.storeValue(dataOperand, mem[offset]);
 
         mcData.loadRequests.erase(mcData.loadRequests.begin() + i);
-        hasDoneStuff = true;
+        hasChanged = true;
       } else {
         --request.cyclesToComplete;
       }
@@ -620,7 +619,7 @@ bool DynamaticMemController::tryExecute(ExecutableData &data,
     }
   }
 
-  return hasDoneStuff;
+  return hasChanged;
 }
 
 bool DynamaticLoad::tryExecute(ExecutableData &data, circt::Operation &opArg) {
@@ -648,7 +647,7 @@ bool DynamaticStore::tryExecute(ExecutableData &data, circt::Operation &opArg) {
 
   // Send address to mem controller if available
   if (data.circuitState.channelMap[op.getAddress()].isValid &&
-      data.circuitState.isNone(op.getAddressResult())) { 
+      data.circuitState.isNone(op.getAddressResult())) {
     memoryTransfer(op.getAddress(), op.getAddressResult(), data);
     hasDoneStuff = true;
   }

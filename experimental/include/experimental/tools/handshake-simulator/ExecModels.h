@@ -21,7 +21,6 @@
 #include <queue>
 #include <string>
 
-
 namespace dynamatic {
 namespace experimental {
 
@@ -72,7 +71,7 @@ struct CircuitState {
 
   /// Performs multiples storeValue's at once.
   void storeValues(std::vector<llvm::Any> &values,
-                  llvm::ArrayRef<mlir::Value> outs);
+                   llvm::ArrayRef<mlir::Value> outs);
 
   /// Removes a value from a channel, and sets its state to NONE.
   void removeValue(mlir::Value channel);
@@ -90,19 +89,21 @@ struct CircuitState {
   /// MAIN IDEA : Fetch from channelMap, store in a buffer channel map,
   ///             then change the real channelMap to this buffered one.
 
-  /// Stores wether or not a op has done the rising edge
-  llvm::DenseMap<circt::Operation*, bool> cycleMap;
+  /// Stores wether ops that have their "rising edge logic" simulated.
+  llvm::DenseSet<circt::Operation *> edgeRisenOps;
 
   /// Holds data for the rising edge part of the cycle simulation
   ChannelMap bufferChannelMap;
 
   /// Returns true if it is the first rising edge encounters
-  inline bool onRisingEdge(circt::Operation& op);
+  bool onRisingEdge(circt::Operation &op);
 
   // NOTE PR : I really dislike these two methods but I realised that the
-  //           classic store and get doesn't have an OP arguments. IDK if it worth
-  //           to add one, especially knowing some stores are not done by ops (at initialisation...)
-  void storeValueOnRisingEdge(mlir::Value channel, std::optional<llvm::Any> data);
+  //           classic store and get doesn't have an OP arguments. IDK if it
+  //           worth to add one, especially knowing some stores are not done by
+  //           ops (at initialisation...)
+  void storeValueOnRisingEdge(mlir::Value channel,
+                              std::optional<llvm::Any> data);
 };
 
 //--- Execution Models -------------------------------------------------------//
