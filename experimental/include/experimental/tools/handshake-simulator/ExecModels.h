@@ -18,6 +18,7 @@
 #include "llvm/ADT/Any.h"
 #include "llvm/Support/Debug.h"
 
+#include <queue>
 #include <string>
 
 namespace dynamatic {
@@ -50,6 +51,8 @@ enum class DataflowState {
 struct ChannelState {
   /// The state of the channel
   DataflowState state;
+  bool isReady;
+  bool isValid;
   /// The data held by the channel
   std::optional<llvm::Any> data;
 };
@@ -61,12 +64,14 @@ struct CircuitState {
   /// Maps each value to a state
   ChannelMap channelMap;
 
+  /// ------- STATE MANAGEMENT ------- ///
+
   /// Stores a value in a channel, and sets its state to VALID.
   void storeValue(mlir::Value channel, std::optional<llvm::Any> data);
 
   /// Performs multiples storeValue's at once.
   void storeValues(std::vector<llvm::Any> &values,
-                  llvm::ArrayRef<mlir::Value> outs);
+                   llvm::ArrayRef<mlir::Value> outs);
 
   /// Removes a value from a channel, and sets its state to NONE.
   void removeValue(mlir::Value channel);
@@ -78,7 +83,27 @@ struct CircuitState {
   inline llvm::Any getData(mlir::Value channel);
 
   /// Returns the DataflowState of the channel
-  DataflowState getState(mlir::Value channel);
+  inline bool isNone(mlir::Value channel);
+
+  /// ------- CYCLE MANAGEMENT -------- ///
+  /// MAIN IDEA : Fetch from channelMap, store in a buffer channel map,
+  ///             then change the real channelMap to this buffered one.
+
+  /// Stores wether ops that have their "rising edge logic" simulated.
+  llvm::DenseSet<circt::Operation *> edgeRisenOps;
+
+  /// Holds data for the rising edge part of the cycle simulation
+  ChannelMap bufferChannelMap;
+
+  /// Returns true if it is the first rising edge encounters
+  bool onRisingEdge(circt::Operation &op);
+
+  // NOTE PR : I really dislike these two methods but I realised that the
+  //           classic store and get doesn't have an OP arguments. IDK if it
+  //           worth to add one, especially knowing some stores are not done by
+  //           ops (at initialisation...)
+  void storeValueOnRisingEdge(mlir::Value channel,
+                              std::optional<llvm::Any> data);
 };
 
 //--- Execution Models -------------------------------------------------------//
@@ -112,9 +137,10 @@ struct ExecutableModel {
   /// the execution correctly.
   /// Returns false if nothing was done, true if some type of jobs were done
   virtual bool tryExecute(ExecutableData &data, circt::Operation &op) = 0;
-
+  /// Default destructor
   virtual ~ExecutableModel() = default;
-
+  /// Returns wether or not the success of the operation terminates the
+  /// program
   virtual bool isEndPoint() const { return false; };
 };
 
@@ -142,12 +168,30 @@ struct MemoryRequest {
   bool isReady;
 };
 
-/// Data structure to hold memory controllers internal state
+/// Data structure to hold memory controllers internal data
 struct MemoryControllerState {
   /// Stores all the store request towards the memory controller
   llvm::SmallVector<MemoryRequest> storeRequests;
   /// Stores all the loads request towards the memory controller
   llvm::SmallVector<MemoryRequest> loadRequests;
+};
+
+/// Data structure to hold TEHB internal data
+struct TEHBdata {
+  /// Store the number of slots the FIFO buffer have
+  unsigned slots;
+  // NOTE PR : APInt by default but I cant find a c++ way to get the type of
+  // the buffer elements
+  /// The FIFO
+  std::queue<mlir::APInt> queue;
+};
+
+/// Data structure to hold OEHB internal data
+struct OEHBdata {
+  /// Stores if the register can hold data
+  bool registerEnable = false;
+  /// Stores the data held by the buffer
+  std::optional<llvm::Any> content;
 };
 
 //----------------------------------------------------------------------------//
