@@ -250,6 +250,8 @@ LogicalResult NameAnalysis::walk(UnnamedBehavior onUnnamed) {
 
 std::string NameAnalysis::genUniqueName(mlir::OperationName opName) {
   std::string prefix = opName.stripDialect().str();
+  if (prefix.compare("lsq") == 0)
+    prefix = "LSQ";
   std::string candidate;
   do {
     candidate = prefix + std::to_string(counters[opName]++);

@@ -1262,11 +1262,6 @@ LogicalResult DOTPrinter::printNode(Operation *op,
 
   // Print node name
   std::string opName = getUniqueName(op);
-  if (inLegacyMode()) {
-    // LSQ must be capitalized in legacy modes for dot2vhdl to recognize it
-    if (size_t idx = opName.find("lsq"); idx != std::string::npos)
-      opName = "LSQ" + opName.substr(3);
-  }
   os << "\"" << opName << "\""
      << " [mlir_op=\"" << canonicalName << "\", ";
 
@@ -1328,13 +1323,6 @@ LogicalResult DOTPrinter::printEdge(Operation *src, Operation *dst, Value val,
           ? getUniqueName(src->getOperand(0).getDefiningOp())
           : getUniqueName(src);
   std::string dstNodeName = getUniqueName(dst);
-  if (inLegacyMode()) {
-    // LSQ must be capitalized in legacy modes for dot2vhdl to recognize it
-    if (size_t idx = srcNodeName.find("lsq"); idx != std::string::npos)
-      srcNodeName = "LSQ" + srcNodeName.substr(3);
-    if (size_t idx = dstNodeName.find("lsq"); idx != std::string::npos)
-      dstNodeName = "LSQ" + dstNodeName.substr(3);
-  }
 
   os << "\"" << srcNodeName << "\" -> \"" << dstNodeName << "\" ["
      << getStyleOfValue(val);
