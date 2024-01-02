@@ -252,6 +252,10 @@ std::string NameAnalysis::genUniqueName(mlir::OperationName opName) {
   std::string prefix = opName.stripDialect().str();
   if (prefix.compare("lsq") == 0)
     prefix = "LSQ";
+  if (prefix.compare("lsq_load") == 0)
+    prefix = "LSQ_load";
+  if (prefix.compare("lsq_store") == 0)
+    prefix = "LSQ_store";
   std::string candidate;
   do {
     candidate = prefix + std::to_string(counters[opName]++);
