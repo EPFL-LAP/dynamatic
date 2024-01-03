@@ -14,6 +14,9 @@
 //
 //===----------------------------------------------------------------------===//
 
+#ifndef DYNAMATIC_SUPPORT_LOGICBB_H
+#define DYNAMATIC_SUPPORT_LOGICBB_H
+
 #include "circt/Dialect/Handshake/HandshakeOps.h"
 #include "dynamatic/Support/LLVM.h"
 
@@ -89,3 +92,5 @@ bool isBackedge(Value val, Operation *user, BBEndpoints *endpoints = nullptr);
 bool isBackedge(Value val, BBEndpoints *endpoints = nullptr);
 
 } // namespace dynamatic
+
+#endif // DYNAMATIC_SUPPORT_LOGICBB_H
