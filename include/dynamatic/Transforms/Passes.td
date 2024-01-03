@@ -118,6 +118,8 @@ def HandshakeMaterialize : DynamaticPass<"handshake-materialize"> {
     LSQ never happen on the same cycle.   
   }];
   let constructor = "dynamatic::createHandshakeMaterialize()";
+  let options = [Option<"noLazyForks", "no-lazy-forks", "bool", "false",
+    "Prevent placement of lazy forks when on">];
 }
 
 def HandshakePrepareForLegacy : DynamaticPass<"handshake-prepare-for-legacy"> {

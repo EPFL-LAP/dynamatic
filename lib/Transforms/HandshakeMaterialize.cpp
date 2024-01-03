@@ -312,6 +312,10 @@ struct HandshakeMaterializePass
     : public dynamatic::impl::HandshakeMaterializeBase<
           HandshakeMaterializePass> {
 
+  HandshakeMaterializePass(bool noLazyForks) {
+    this->noLazyForks = noLazyForks;
+  }
+
   void runDynamaticPass() override {
     mlir::ModuleOp modOp = getOperation();
     MLIRContext *ctx = &getContext();
@@ -341,13 +345,15 @@ struct HandshakeMaterializePass
       return signalPassFailure();
 
     // Finally, make forks to LSQ control ports lazy
-    for (handshake::FuncOp funcOp : modOp.getOps<handshake::FuncOp>()) {
-      for (handshake::LSQOp lsqOp : funcOp.getOps<handshake::LSQOp>()) {
-        LSQPorts lsqPorts = lsqOp.getPorts();
-        ValueRange lsqInputs = lsqOp.getMemOperands();
-        for (LSQGroup &group : lsqPorts.getGroups()) {
-          Value ctrlValue = lsqInputs[group->ctrlPort->getCtrlInputIndex()];
-          makeLSQControlForksLazy(lsqOp, ctrlValue, builder);
+    if (!noLazyForks) {
+      for (handshake::FuncOp funcOp : modOp.getOps<handshake::FuncOp>()) {
+        for (handshake::LSQOp lsqOp : funcOp.getOps<handshake::LSQOp>()) {
+          LSQPorts lsqPorts = lsqOp.getPorts();
+          ValueRange lsqInputs = lsqOp.getMemOperands();
+          for (LSQGroup &group : lsqPorts.getGroups()) {
+            Value ctrlValue = lsqInputs[group->ctrlPort->getCtrlInputIndex()];
+            makeLSQControlForksLazy(lsqOp, ctrlValue, builder);
+          }
         }
       }
     }
@@ -358,6 +364,6 @@ struct HandshakeMaterializePass
 } // namespace
 
 std::unique_ptr<dynamatic::DynamaticPass>
-dynamatic::createHandshakeMaterialize() {
-  return std::make_unique<HandshakeMaterializePass>();
+dynamatic::createHandshakeMaterialize(bool noLazyForks) {
+  return std::make_unique<HandshakeMaterializePass>(noLazyForks);
 }
