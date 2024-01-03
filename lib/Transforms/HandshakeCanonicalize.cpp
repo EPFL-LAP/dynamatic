@@ -151,6 +151,56 @@ struct DowngradeIndexlessControlMerge
   }
 };
 
+struct DoNotForkConstants : public OpRewritePattern<handshake::ForkOp> {
+  using OpRewritePattern<handshake::ForkOp>::OpRewritePattern;
+
+  LogicalResult matchAndRewrite(handshake::ForkOp forkOp,
+                                PatternRewriter &rewriter) const override {
+    // The fork must be fed by a constant, possibly extended/truncated
+    Operation *defOp = forkOp.getOperand().getDefiningOp();
+    SmallVector<Operation *> bitMods;
+    while (isa_and_nonnull<arith::TruncIOp, arith::ExtSIOp, arith::ExtUIOp>(
+        defOp)) {
+      bitMods.push_back(defOp);
+      defOp = defOp->getOperand(0).getDefiningOp();
+    }
+    if (!defOp || !isa<handshake::ConstantOp>(defOp))
+      return failure();
+    handshake::ConstantOp cstOp = dyn_cast<handshake::ConstantOp>(defOp);
+    mlir::TypedAttr cstVal = cstOp.getValue();
+
+    // Create as many constants (+ possible extensions/truncations) as there are
+    // fork outputs, and create a new fork for the control signal
+    auto newForkOp = rewriter.create<handshake::ForkOp>(
+        cstOp->getLoc(), cstOp.getOperand(), forkOp.getNumResults());
+    inheritBB(cstOp, newForkOp);
+    SmallVector<Value> newResults;
+    for (OpResult ctrlOpr : newForkOp->getResults()) {
+      // Create the new constant
+      auto newCstOp = rewriter.create<handshake::ConstantOp>(
+          cstOp->getLoc(), cstVal.getType(), cstVal, ctrlOpr);
+      Value cstRes = newCstOp.getResult();
+      inheritBB(cstOp, newCstOp);
+
+      // Recreate bitwidth modifiers in the same order (iterate in reverse
+      // discovery order)
+      for (size_t idx = bitMods.size(); idx >= 1; --idx) {
+        Operation *mod = bitMods[idx - 1];
+        Operation *newMod = rewriter.create(
+            mod->getLoc(),
+            StringAttr::get(getContext(), mod->getName().getStringRef()),
+            {cstRes}, mod->getResultTypes());
+        inheritBB(mod, newMod);
+        cstRes = newMod->getResult(0);
+      }
+      newResults.push_back(cstRes);
+    }
+
+    rewriter.replaceOp(forkOp, newResults);
+    return success();
+  }
+};
+
 /// Simple driver for the Handshake canonicalization pass, based on a greedy
 /// pattern rewriter.
 struct HandshakeCanonicalizePass
@@ -167,7 +217,7 @@ struct HandshakeCanonicalizePass
     RewritePatternSet patterns{ctx};
     patterns.add<EraseUnconditionalBranches, EraseSingleInputMerges,
                  EraseSingleInputMuxes, EraseSingleInputControlMerges,
-                 DowngradeIndexlessControlMerge>(ctx);
+                 DowngradeIndexlessControlMerge, DoNotForkConstants>(ctx);
     if (failed(applyPatternsAndFoldGreedily(mod, std::move(patterns), config)))
       return signalPassFailure();
   };
