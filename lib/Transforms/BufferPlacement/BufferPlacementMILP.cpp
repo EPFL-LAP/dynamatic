@@ -175,7 +175,7 @@ void BufferPlacementMILP::addCFDFCVars(CFDFC &cfdfc) {
 
   // Create a set of variables for each unit in the CFDFC
   for (Operation *unit : cfdfc.units) {
-    std::string suffix = "_" + getUniqueName(unit);
+    std::string suffix = "_" + getUniqueName(unit).str();
 
     // Default-initialize unit variables and retrieve a reference
     UnitVars &unitVars = cfVars.unitVars[unit];

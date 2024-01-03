@@ -1245,7 +1245,7 @@ LogicalResult DOTPrinter::printNode(Operation *op,
       (isa<arith::CmpIOp, arith::CmpFOp>(op) ? prettyLabel : "");
 
   // Print node name
-  std::string opName = getUniqueName(op);
+  std::string opName = getUniqueName(op).str();
   if (inLegacyMode()) {
     // LSQ must be capitalized in legacy modes for dot2vhdl to recognize it
     if (size_t idx = opName.find("lsq"); idx != std::string::npos)
@@ -1309,9 +1309,9 @@ LogicalResult DOTPrinter::printEdge(Operation *src, Operation *dst, Value val,
   bool legacy = inLegacyMode();
   std::string srcNodeName =
       legacyBuffers && isBitModBetweenBlocks(src)
-          ? getUniqueName(src->getOperand(0).getDefiningOp())
-          : getUniqueName(src);
-  std::string dstNodeName = getUniqueName(dst);
+          ? getUniqueName(src->getOperand(0).getDefiningOp()).str()
+          : getUniqueName(src).str();
+  std::string dstNodeName = getUniqueName(dst).str();
   if (inLegacyMode()) {
     // LSQ must be capitalized in legacy modes for dot2vhdl to recognize it
     if (size_t idx = srcNodeName.find("lsq"); idx != std::string::npos)

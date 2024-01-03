@@ -33,9 +33,9 @@ inline static handshake::NameAttr getNameAttr(Operation *op) {
       handshake::NameAttr::getMnemonic());
 }
 
-/// If the operation has an intrinsic name, return it. Returns an empty string
-/// instead.
-static std::optional<StringRef> getIntrinsicName(Operation *op) {
+/// If the operation has an intrinsic name, returns it. Returns an empty
+/// `StringRef` if the operation does not have an intrinsic name.
+static StringRef getIntrinsicName(Operation *op) {
   // Functions already have a unique name; store it in our mapping so that we
   // avoid naming conflicts in case a smart cookie decides one day to name
   // their function "merge0"
@@ -43,7 +43,7 @@ static std::optional<StringRef> getIntrinsicName(Operation *op) {
     return funcOp.getNameAttr().strref();
   if (handshake::FuncOp funcOp = dyn_cast<handshake::FuncOp>(op))
     return funcOp.getNameAttr().strref();
-  return std::nullopt;
+  return StringRef();
 }
 
 /// Returns the index of the region and block the block argument belongs to in
@@ -117,8 +117,8 @@ StringRef NameAnalysis::getName(Operation *op) {
   // and return the name
   if (handshake::NameAttr name = getNameAttr(op))
     return name.getName();
-  if (std::optional<StringRef> name = getIntrinsicName(op))
-    return *name;
+  if (StringRef name = getIntrinsicName(op); !name.empty())
+    return name;
 
   // Set the attribute on the operation and update our mapping
   std::string name = genUniqueName(op->getName());
@@ -267,8 +267,8 @@ std::string NameAnalysis::deriveUniqueName(StringRef base) {
 }
 
 bool NameAnalysis::isIntrinsicallyNamed(Operation *op) {
-  if (std::optional<StringRef> name = getIntrinsicName(op)) {
-    namedOperations[*name] = op;
+  if (StringRef name = getIntrinsicName(op); !name.empty()) {
+    namedOperations[name] = op;
     return true;
   }
   return false;
@@ -280,10 +280,12 @@ void NameAnalysis::getBlockArgName(BlockArgument arg, std::string &prodName,
                        prodName, resName);
 }
 
-std::string dynamatic::getUniqueName(Operation *op) {
+StringRef dynamatic::getUniqueName(Operation *op) {
   if (handshake::NameAttr attr = getNameAttr(op))
-    return attr.getName().str();
-  return getIntrinsicName(op)->str();
+    return attr.getName();
+  if (StringRef name = getIntrinsicName(op); !name.empty())
+    return name;
+  return StringRef();
 }
 
 std::string dynamatic::getUniqueName(OpOperand &oprd) {

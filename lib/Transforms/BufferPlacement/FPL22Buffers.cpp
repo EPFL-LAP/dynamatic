@@ -248,7 +248,7 @@ void FPL22BuffersBase::addUnitMixedPathConstraints(Operation *unit,
             arith::ShLIOp, arith::CmpIOp, arith::CmpFOp>(
           [&](auto) { addJoinedOprdConstraints(); });
 
-  std::string unitName = getUniqueName(unit);
+  StringRef unitName = getUniqueName(unit);
   unsigned idx = 0;
   for (MixedDomainConstraint &cons : constraints) {
     // The input/output channels must both be inside the CFDFC union
@@ -266,7 +266,7 @@ void FPL22BuffersBase::addUnitMixedPathConstraints(Operation *unit,
     // Arrival time at unit's output pin must be greater than arrival time at
     // unit's input pin plus the unit's internal delay on the path
     std::string consName =
-        "path_mixed_" + unitName + "_" + std::to_string(idx++);
+        "path_mixed_" + unitName.str() + "_" + std::to_string(idx++);
     model.addConstr(tPinIn + cons.internalDelay <= tPinOut, consName);
   }
 }
