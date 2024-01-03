@@ -89,6 +89,8 @@ def HandshakeCanonicalize : DynamaticPass<"handshake-canonicalize"> {
     made to the IR.
   }];
   let constructor = "dynamatic::createHandshakeCanonicalize()";
+  let options = [Option<"justBranches", "just-branches", "bool", "false",
+    "Only run canonicalization patterns related to branches">];
 }
 
 def HandshakeInferBasicBlocks : DynamaticPass<"handshake-infer-basic-blocks"> {

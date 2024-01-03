@@ -207,6 +207,10 @@ struct HandshakeCanonicalizePass
     : public dynamatic::impl::HandshakeCanonicalizeBase<
           HandshakeCanonicalizePass> {
 
+  HandshakeCanonicalizePass(bool justBranches) {
+    this->justBranches = justBranches;
+  }
+
   void runDynamaticPass() override {
     MLIRContext *ctx = &getContext();
     mlir::ModuleOp mod = getOperation();
@@ -215,9 +219,12 @@ struct HandshakeCanonicalizePass
     config.useTopDownTraversal = true;
     config.enableRegionSimplification = false;
     RewritePatternSet patterns{ctx};
-    patterns.add<EraseUnconditionalBranches, EraseSingleInputMerges,
-                 EraseSingleInputMuxes, EraseSingleInputControlMerges,
-                 DowngradeIndexlessControlMerge, DoNotForkConstants>(ctx);
+    patterns.add<EraseUnconditionalBranches, DoNotForkConstants>(ctx);
+    if (!justBranches)
+      patterns
+          .add<EraseSingleInputMerges, EraseSingleInputMuxes,
+               EraseSingleInputControlMerges, DowngradeIndexlessControlMerge>(
+              ctx);
     if (failed(applyPatternsAndFoldGreedily(mod, std::move(patterns), config)))
       return signalPassFailure();
   };
@@ -225,6 +232,6 @@ struct HandshakeCanonicalizePass
 }; // namespace
 
 std::unique_ptr<dynamatic::DynamaticPass>
-dynamatic::createHandshakeCanonicalize() {
-  return std::make_unique<HandshakeCanonicalizePass>();
+dynamatic::createHandshakeCanonicalize(bool justBranches) {
+  return std::make_unique<HandshakeCanonicalizePass>(justBranches);
 }
