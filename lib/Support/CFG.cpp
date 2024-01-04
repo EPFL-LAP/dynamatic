@@ -11,8 +11,11 @@
 //===----------------------------------------------------------------------===//
 
 #include "dynamatic/Support/CFG.h"
+#include "circt/Dialect/Handshake/HandshakeOps.h"
 #include "mlir/Dialect/Arith/IR/Arith.h"
 #include "llvm/ADT/SmallPtrSet.h"
+#include "llvm/ADT/TypeSwitch.h"
+#include <queue>
 
 using namespace llvm;
 using namespace mlir;
@@ -262,4 +265,128 @@ bool dynamatic::isBackedge(Value val, BBEndpoints *endpoints) {
   assert(std::distance(users.begin(), users.end()) == 1 &&
          "value must have a single user");
   return isBackedge(val, *users.begin(), endpoints);
+}
+
+bool dynamatic::cannotBelongToCFG(Operation *op) {
+  return isa<handshake::MemoryOpInterface, handshake::SinkOp>(op);
+}
+
+HandshakeCFG::HandshakeCFG(circt::handshake::FuncOp funcOp) : funcOp(funcOp) {
+  for (Operation &op : funcOp.getOps()) {
+    if (cannotBelongToCFG(&op))
+      continue;
+
+    // Get the source basic block
+    std::optional<unsigned> srcBB = getLogicBB(&op);
+    assert(srcBB && "source operation must belong to block");
+
+    for (OpResult res : op.getResults()) {
+      for (Operation *user : res.getUsers()) {
+        if (cannotBelongToCFG(user))
+          continue;
+
+        // Get the destination basic block and store the connection
+        std::optional<unsigned> dstBB = getLogicBB(user);
+        assert(dstBB && "destination operation must belong to block");
+        successors[*srcBB].insert(*dstBB);
+      }
+    }
+  }
+}
+
+void HandshakeCFG::getNonCyclicPaths(unsigned from, unsigned to,
+                                     SmallVector<CFGPath> &paths) {
+  // Both blocks must exist in the CFG
+  assert(successors.contains(from) && "source block must exist in the CFG");
+  assert(successors.contains(to) && "destination block must exist in the CFG");
+
+  CFGPath pathSoFar;
+  pathSoFar.insert(from);
+  findPathsTo(pathSoFar, to, paths);
+}
+
+LogicalResult
+HandshakeCFG::getControlValues(DenseMap<unsigned, Value> &ctrlVals) {
+  // Maintain a list of operations on the control path as we go through the
+  // circuit
+  DenseSet<Operation *> exploredOps;
+  mlir::SetVector<Operation *> ctrlOps;
+
+  // Adds the users of an operation's results to the list of control operations,
+  // except if those have already been explored.
+  auto addToCtrlOps = [&](auto users) {
+    for (Operation *userOp : users) {
+      if (!exploredOps.contains(userOp))
+        ctrlOps.insert(userOp);
+    }
+  };
+
+  // Updates the control value registered for a specific block in the map.
+  // Fails if a control already existed and is different from the new value,
+  // succeeds otherwise.
+  auto updateCtrl = [&](unsigned bb, Value newCtrl) -> LogicalResult {
+    if (auto ctrlOfBB = ctrlVals.find(bb); ctrlOfBB != ctrlVals.end()) {
+      if (ctrlOfBB->second != newCtrl) {
+        return funcOp->emitError()
+               << "Inconsistent control value identified for basic block "
+               << bb;
+      }
+    }
+    ctrlVals[bb] = newCtrl;
+    return success();
+  };
+
+  // Explore the control network one operation at a time till we've iterated
+  // over all of it
+  Value ctrl = funcOp.getArguments().back();
+  addToCtrlOps(ctrl.getUsers());
+  while (!ctrlOps.empty()) {
+    Operation *ctrlOp = ctrlOps.pop_back_val();
+    exploredOps.insert(ctrlOp);
+
+    // Do not care about operations that are outside the CFG
+    if (cannotBelongToCFG(ctrlOp))
+      continue;
+
+    // Guaranteed to succeed because of asserts in class constructor
+    unsigned bb = *getLogicBB(ctrlOp);
+
+    // This kills of all paths going out of the control network by ignoring all
+    // operation types that do not forward the control signal to at least one of
+    // their outputs
+    LogicalResult res =
+        llvm::TypeSwitch<Operation *, LogicalResult>(ctrlOp)
+            .Case<handshake::ForkOp, handshake::LazyForkOp, handshake::BufferOp,
+                  handshake::BranchOp, handshake::ConditionalBranchOp>(
+                [&](auto) {
+                  addToCtrlOps(ctrlOp->getUsers());
+                  return success();
+                })
+            .Case<handshake::MergeLikeOpInterface>([&](auto) {
+              OpResult mergeRes = ctrlOp->getResult(0);
+              addToCtrlOps(mergeRes.getUsers());
+              return updateCtrl(bb, mergeRes);
+            })
+            .Default([&](auto) { return success(); });
+    if (failed(res))
+      return failure();
+  }
+
+  return success();
+}
+
+// NOLINTNEXTLINE(misc-no-recursion)
+void HandshakeCFG::findPathsTo(const CFGPath &pathSoFar, unsigned to,
+                               SmallVector<CFGPath> &paths) {
+  assert(!pathSoFar.empty() && "path cannot be empty");
+  for (unsigned nextBB : successors[pathSoFar.back()]) {
+    if (nextBB == to) {
+      CFGPath &newPath = paths.emplace_back(pathSoFar);
+      newPath.insert(to);
+    } else if (!pathSoFar.contains(nextBB)) {
+      CFGPath nextPathSoFar(pathSoFar);
+      nextPathSoFar.insert(nextBB);
+      findPathsTo(nextPathSoFar, to, paths);
+    }
+  }
 }
