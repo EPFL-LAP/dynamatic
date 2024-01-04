@@ -16,8 +16,8 @@
 
 #include "dynamatic/Transforms/HandshakeCanonicalize.h"
 #include "circt/Dialect/Handshake/HandshakeOps.h"
+#include "dynamatic/Support/CFG.h"
 #include "dynamatic/Support/Handshake.h"
-#include "dynamatic/Support/LogicBB.h"
 #include "mlir/Transforms/GreedyPatternRewriteDriver.h"
 
 using namespace circt;

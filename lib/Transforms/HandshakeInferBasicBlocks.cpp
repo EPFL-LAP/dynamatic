@@ -19,7 +19,7 @@
 
 #include "dynamatic/Transforms/HandshakeInferBasicBlocks.h"
 #include "circt/Dialect/Handshake/HandshakeOps.h"
-#include "dynamatic/Support/LogicBB.h"
+#include "dynamatic/Support/CFG.h"
 #include "dynamatic/Transforms/PassDetails.h"
 #include "dynamatic/Transforms/Passes.h"
 #include "mlir/Support/LogicalResult.h"

@@ -16,7 +16,7 @@
 #include "dynamatic/Transforms/HandshakeMinimizeCstWidth.h"
 #include "circt/Dialect/Handshake/HandshakeOps.h"
 #include "dynamatic/Analysis/ConstantAnalysis.h"
-#include "dynamatic/Support/LogicBB.h"
+#include "dynamatic/Support/CFG.h"
 #include "mlir/Dialect/Arith/IR/Arith.h"
 #include "mlir/Transforms/GreedyPatternRewriteDriver.h"
 #include "llvm/Support/Debug.h"

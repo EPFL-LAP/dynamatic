@@ -1,4 +1,4 @@
-//===- LogicBB.h - Infrastructure for working with logical BBs --*- C++ -*-===//
+//===- CFG.h - CFG-related analysis and helpers -----------------*- C++ -*-===//
 //
 // Dynamatic is under the Apache License v2.0 with LLVM Exceptions.
 // See https://llvm.org/LICENSE.txt for license information.
@@ -6,16 +6,21 @@
 //
 //===----------------------------------------------------------------------===//
 //
-// This file declares the infrastructure useful for handling logical basic
-// blocks (logical BBs) in Handshake functions. These are not basic blocks in
-// the MLIR sense since Handshake function only have a single block. They
-// instead map to the original basic blocks that the std-level IR possessed
-// before conversion to Handshake-level.
+// Contains helpers for CFG-style analysis in Handshake functions. These help in
+// identifying properties of the cf-level CFG within Handshake-level IR.
+//
+// In particular, this file offers ways to interact with the concept of "logical
+// basic blocks" in Handshake functions. These are not basic blocks in the MLIR
+// sense since Handshake function only have a single block. They instead map to
+// the original basic blocks that the cf-level IR possessed before conversion to
+// Handshake-level. Any Handshake operation may optionally have a "bb" integer
+// attribute indicating the basic block it logically belonged to at the
+// cf-level.
 //
 //===----------------------------------------------------------------------===//
 
-#ifndef DYNAMATIC_SUPPORT_LOGICBB_H
-#define DYNAMATIC_SUPPORT_LOGICBB_H
+#ifndef DYNAMATIC_SUPPORT_CFG_H
+#define DYNAMATIC_SUPPORT_CFG_H
 
 #include "circt/Dialect/Handshake/HandshakeOps.h"
 #include "dynamatic/Support/LLVM.h"
@@ -93,4 +98,4 @@ bool isBackedge(Value val, BBEndpoints *endpoints = nullptr);
 
 } // namespace dynamatic
 
-#endif // DYNAMATIC_SUPPORT_LOGICBB_H
+#endif // DYNAMATIC_SUPPORT_CFG_H

@@ -12,7 +12,7 @@
 
 #include "dynamatic/Transforms/BufferPlacement/CFDFC.h"
 #include "circt/Dialect/Handshake/HandshakeOps.h"
-#include "dynamatic/Support/LogicBB.h"
+#include "dynamatic/Support/CFG.h"
 #include "mlir/Dialect/Arith/IR/Arith.h"
 #include "mlir/Dialect/Func/IR/FuncOps.h"
 #include "mlir/IR/BuiltinTypes.h"

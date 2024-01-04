@@ -1,4 +1,4 @@
-//===- LogicBB.cpp - Infrastructure for working w/ logical BBs --*- C++ -*-===//
+//===- CFG.cpp - CFG-related analysis and helpers ---------------*- C++ -*-===//
 //
 // Dynamatic is under the Apache License v2.0 with LLVM Exceptions.
 // See https://llvm.org/LICENSE.txt for license information.
@@ -6,12 +6,11 @@
 //
 //===----------------------------------------------------------------------===//
 //
-// Implements the infrastructure useful for handling logical basic
-// blocks (logical BBs) in Handshake functions.
+// Implements the infrastructure for CFG-style analysis in Handshake functions.
 //
 //===----------------------------------------------------------------------===//
 
-#include "dynamatic/Support/LogicBB.h"
+#include "dynamatic/Support/CFG.h"
 #include "mlir/Dialect/Arith/IR/Arith.h"
 #include "llvm/ADT/SmallPtrSet.h"
 

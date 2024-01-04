@@ -13,7 +13,7 @@
 #include "dynamatic/Transforms/BufferPlacement/BufferPlacementMILP.h"
 #include "circt/Dialect/Handshake/HandshakeDialect.h"
 #include "circt/Dialect/Handshake/HandshakeOps.h"
-#include "dynamatic/Support/LogicBB.h"
+#include "dynamatic/Support/CFG.h"
 #include "dynamatic/Transforms/BufferPlacement/BufferingSupport.h"
 #include "dynamatic/Transforms/PassDetails.h"
 #include "mlir/Dialect/Arith/IR/Arith.h"
