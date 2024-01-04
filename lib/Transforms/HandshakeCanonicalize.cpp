@@ -151,6 +151,117 @@ struct DowngradeIndexlessControlMerge
   }
 };
 
+/// Eliminates forks feeding into other forks by replacing both with a single
+/// fork operation.
+struct EliminateForksToForks : OpRewritePattern<handshake::ForkOp> {
+  using mlir::OpRewritePattern<handshake::ForkOp>::OpRewritePattern;
+
+  LogicalResult matchAndRewrite(handshake::ForkOp forkOp,
+                                PatternRewriter &rewriter) const override {
+    // The defining operation must be also be a fork for the pattern to apply
+    Value forkOprd = forkOp.getOperand();
+    auto defForkOp = forkOprd.getDefiningOp<handshake::ForkOp>();
+    if (!defForkOp)
+      return failure();
+
+    // It is important to take into account whether the matched fork's operand
+    // is the single use of the defining fork's corresponding result. If it is
+    // not, the new combined fork needs an extra result to replace the defining
+    // fork's result with in the other uses
+    bool isForkOprdSingleUse = forkOprd.hasOneUse();
+
+    // Create a new combined fork to replace the two others
+    unsigned totalNumResults = forkOp.getSize() + defForkOp.getSize();
+    if (isForkOprdSingleUse)
+      --totalNumResults;
+    rewriter.setInsertionPoint(defForkOp);
+    handshake::ForkOp newForkOp = rewriter.create<handshake::ForkOp>(
+        defForkOp.getLoc(), defForkOp.getOperand(), totalNumResults);
+    inheritBB(defForkOp, newForkOp);
+
+    // Replace the defining fork's results with the first results of the new
+    // fork (skipping the result feeding the matched fork if it has a single
+    // use)
+    ValueRange newResults = newForkOp->getResults();
+    auto newResIt = newResults.begin();
+    for (OpResult defForkRes : defForkOp->getResults()) {
+      if (!isForkOprdSingleUse || defForkRes != forkOprd)
+        rewriter.replaceAllUsesWith(defForkRes, *(newResIt++));
+    }
+
+    // Replace the results of the matched fork with the corresponding results of
+    // the new defining fork
+    rewriter.replaceOp(forkOp, newResults.take_back(forkOp.getSize()));
+    return success();
+  }
+};
+
+/// Erases forks with a single result unless their operand originates from a
+/// lazy fork, in which case they may exist to prevent a combinational cycle.
+struct EraseSingleOutputForks : OpRewritePattern<handshake::ForkOp> {
+  using mlir::OpRewritePattern<handshake::ForkOp>::OpRewritePattern;
+
+  LogicalResult matchAndRewrite(handshake::ForkOp forkOp,
+                                PatternRewriter &rewriter) const override {
+    // The fork must have a single result
+    if (forkOp.getSize() != 1)
+      return failure();
+
+    // The defining operation must not be a lazy fork, otherwise the fork may be
+    // here to avoid a combination cycle between the valid and ready wires
+    if (forkOp.getOperand().getDefiningOp<handshake::LazyForkOp>())
+      return failure();
+
+    // Bypass the fork and succeed
+    rewriter.replaceOp(forkOp, forkOp.getOperand());
+    return success();
+  }
+};
+
+/// Removes outputs of forks that do not have real uses. This can result in the
+/// size reduction or deletion of fork operations (the latter if none of the
+/// fork results have real users) as well as sink users of fork results.
+struct MinimizeForkSizes : OpRewritePattern<handshake::ForkOp> {
+  using OpRewritePattern<handshake::ForkOp>::OpRewritePattern;
+
+  LogicalResult matchAndRewrite(handshake::ForkOp forkOp,
+                                PatternRewriter &rewriter) const override {
+    // Compute the list of fork results that are actually used (erase any sink
+    // user along the way)
+    SmallVector<Value> usedForkResults;
+    for (OpResult res : forkOp.getResults()) {
+      if (hasRealUses(res)) {
+        usedForkResults.push_back(res);
+      } else if (!res.use_empty()) {
+        // The value has sink users, delete them as the fork producing their
+        // operand will be removed
+        for (Operation *sinkUser : llvm::make_early_inc_range(res.getUsers()))
+          rewriter.eraseOp(sinkUser);
+      }
+    }
+    // Fail if all fork results are used, since it means that no transformation
+    // is requires
+    if (usedForkResults.size() == forkOp->getNumResults())
+      return failure();
+
+    if (!usedForkResults.empty()) {
+      // Create a new fork operation
+      rewriter.setInsertionPoint(forkOp);
+      handshake::ForkOp newForkOp = rewriter.create<handshake::ForkOp>(
+          forkOp.getLoc(), forkOp.getOperand(), usedForkResults.size());
+      inheritBB(forkOp, newForkOp);
+
+      // Replace results with actual uses of the original fork with results from
+      // the new fork
+      ValueRange newResults = newForkOp.getResult();
+      for (auto [oldRes, newRes] : llvm::zip(usedForkResults, newResults))
+        rewriter.replaceAllUsesWith(oldRes, newRes);
+    }
+    rewriter.eraseOp(forkOp);
+    return success();
+  }
+};
+
 struct DoNotForkConstants : public OpRewritePattern<handshake::ForkOp> {
   using OpRewritePattern<handshake::ForkOp>::OpRewritePattern;
 
@@ -219,7 +330,10 @@ struct HandshakeCanonicalizePass
     config.useTopDownTraversal = true;
     config.enableRegionSimplification = false;
     RewritePatternSet patterns{ctx};
-    patterns.add<EraseUnconditionalBranches, DoNotForkConstants>(ctx);
+    patterns
+        .add<EraseUnconditionalBranches, DoNotForkConstants,
+             EliminateForksToForks, EraseSingleOutputForks, MinimizeForkSizes>(
+            ctx);
     if (!justBranches)
       patterns
           .add<EraseSingleInputMerges, EraseSingleInputMuxes,
