@@ -335,10 +335,8 @@ struct HandshakeCanonicalizePass
              EliminateForksToForks, EraseSingleOutputForks, MinimizeForkSizes>(
             ctx);
     if (!justBranches)
-      patterns
-          .add<EraseSingleInputMerges, EraseSingleInputMuxes,
-               EraseSingleInputControlMerges, DowngradeIndexlessControlMerge>(
-              ctx);
+      patterns.add<EraseSingleInputMerges, EraseSingleInputMuxes,
+                   EraseSingleInputControlMerges>(ctx);
     if (failed(applyPatternsAndFoldGreedily(mod, std::move(patterns), config)))
       return signalPassFailure();
   };
