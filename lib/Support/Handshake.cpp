@@ -37,7 +37,8 @@ bool MemoryOpLowering::renameDependencies(Operation *topLevelOp) {
   topLevelOp->walk([&](Operation *memOp) {
     // We only care about supported load/store memory accesses
     if (!isa<memref::LoadOp, memref::StoreOp, affine::AffineLoadOp,
-             affine::AffineStoreOp>(memOp))
+             affine::AffineStoreOp, handshake::LoadOpInterface,
+             handshake::StoreOpInterface>(memOp))
       return;
 
     // Read potential memory dependencies stored on the memory operation
