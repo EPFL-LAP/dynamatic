@@ -104,7 +104,7 @@ exit_on_fail "Failed to apply standard transformations to cf" \
 
 # cf transformations (dynamatic) 
 "$DYNAMATIC_OPT_BIN" "$F_CF_TRANFORMED" --flatten-memref-calls \
-  --arith-reduce-strength="max-adder-depth-mul=1" --push-constants \
+  --arith-reduce-strength="max-adder-depth-mul=0" --push-constants \
   > "$F_CF_DYN_TRANSFORMED"
 exit_on_fail "Failed to apply Dynamatic transformations to cf" \
   "Applied Dynamatic transformations to cf"
@@ -151,7 +151,7 @@ else
   cd "$COMP_DIR"
   "$DYNAMATIC_OPT_BIN" "$F_HANDSHAKE_TRANSFORMED" \
     --handshake-set-buffering-properties="version=fpga20" \
-    --handshake-place-buffers="algorithm=fpga20-legacy frequencies=$F_FREQUENCIES timing-models=$DYNAMATIC_DIR/data/components.json timeout=300 dump-logs" \
+    --handshake-place-buffers="algorithm=fpl22 frequencies=$F_FREQUENCIES timing-models=$DYNAMATIC_DIR/data/components.json timeout=300 dump-logs" \
     > "$F_HANDSHAKE_BUFFERED"
   exit_on_fail "Failed to place smart buffers" "Placed smart buffers"
   cd - > /dev/null
