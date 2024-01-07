@@ -50,7 +50,9 @@ struct RegionInterfaces {
 
   /// Default constructor.
   RegionInterfaces() = default;
-  /// Adds the operation to the list that should connect to a memory controller.
+  /// Adds the operation to the list that should connect to a memory controller,
+  /// unless the operation already belongs to the group that should connect to
+  /// an LSQ.
   void connectAccessToMC(Operation *memOp);
   /// Adds the operation to the list that should connect to an LSQ. The group
   /// that the operations should belong to is determined from its parent block
@@ -92,7 +94,8 @@ private:
 } // namespace
 
 void RegionInterfaces::connectAccessToMC(Operation *memOp) {
-  connectToMC.insert(memOp);
+  if (!connectToLSQ.contains(memOp))
+    connectToMC.insert(memOp);
 }
 
 void RegionInterfaces::connectAccessToLSQ(Operation *memOp) {
@@ -124,18 +127,29 @@ void MarkMemoryInterfacesPass::markMemoryInterfaces(func::FuncOp funcOp) {
     if (!memref)
       return;
 
+    StringRef srcOpName = nameAnalysis.getName(op);
+    bool connectToMC = true;
     if (auto allDeps = op->getAttrOfType<MemDependenceArrayAttr>(depAttrName)) {
       for (MemDependenceAttr memDep : allDeps.getDependencies()) {
         // Both the source and destination operation need to connect to an LSQ
         StringRef dstOpName = memDep.getDstAccess();
+        if (srcOpName == dstOpName) {
+          // This is necessarily a WAW dependency with two instances of the same
+          // instruction since we don't record RAR dependencies. Dataflow
+          // circuits guarantee that multiple "executions" of the same operation
+          // are ordered, so we don't need to enforce it with an LSQ
+          continue;
+        }
+
         Operation *dstOp = nameAnalysis.getOp(dstOpName);
         assert(dstOp && "destination memory access does not exist");
+        connectToMC = false;
         interfaces[memref].connectAccessToLSQ(op);
         interfaces[memref].connectAccessToLSQ(dstOp);
       }
-    } else {
-      interfaces[memref].connectAccessToMC(op);
     }
+    if (connectToMC)
+      interfaces[memref].connectAccessToMC(op);
   });
 
   // Set attributes on memory operations to instruct the tell the rest of the
