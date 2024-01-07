@@ -192,14 +192,17 @@ static std::string getInputForSelect(arith::SelectOp op) {
 static std::string getInputForEnd(handshake::EndOp op, bool rippedMemories) {
   MemPortsData ports;
   unsigned idx = 1;
-  for (auto val : op.getMemoryControls())
+  auto funcOp = op->getParentOfType<handshake::FuncOp>();
+  auto numResults = funcOp.getFunctionType().getResults().size();
+
+  for (auto val : op.getOperands().drop_front(numResults))
     ports.emplace_back("in" + std::to_string(idx++), val, "e");
-  if (rippedMemories) {
-    ports.emplace_back("in1", op.getReturnValues().front(), "");
-  } else {
-    for (auto val : op.getReturnValues())
-      ports.emplace_back("in" + std::to_string(idx++), val, "");
-  }
+  // if (rippedMemories) {
+  //   ports.emplace_back("in1", op.getReturnValues().front(), "");
+  // } else {
+  for (auto val : op.getOperands().take_front(numResults))
+    ports.emplace_back("in" + std::to_string(idx++), val, "");
+  // }
   return getIOFromPorts(ports);
 }
 
@@ -1234,9 +1237,13 @@ LogicalResult DOTPrinter::print(mlir::ModuleOp mod,
 std::string DOTPrinter::getArgumentName(handshake::FuncOp funcOp, size_t idx) {
   auto numArgs = funcOp.getNumArguments();
   assert(idx < numArgs && "argument index too high");
-  if (idx == numArgs - 1 && inLegacyMode())
-    // Legacy Dynamatic expects the start signal to be called start_0
+  if (idx == numArgs - 1 && inLegacyMode()) {
+    // if (rippedMemories)
+    //   return "start";
+    // Legacy Dynamatic expects the start signal to be
+    // called start_0
     return "start_0";
+  }
   return funcOp.getArgName(idx).getValue().str();
 }
 
@@ -1309,6 +1316,16 @@ LogicalResult DOTPrinter::printNode(Operation *op,
 
 LogicalResult DOTPrinter::printEdge(Operation *src, Operation *dst, Value val,
                                     mlir::raw_indented_ostream &os) {
+
+  // Skip edges to return that are not the first operand
+  if (isa<handshake::DynamaticReturnOp>(dst) && val != dst->getOperand(0))
+    return success();
+
+  // Skip edges between return and end that are not the first result/operands
+  if (isa<handshake::DynamaticReturnOp>(src) && isa<handshake::EndOp>(dst) &&
+      val != dst->getOperand(0))
+    return success();
+
   bool legacyBuffers = mode == Mode::LEGACY_BUFFERS;
   // In legacy-buffers mode, skip edges from branch-like operations to bitwidth
   // modifiers in between blocks
