@@ -18,6 +18,7 @@
 #include "circt/Dialect/Handshake/HandshakeOps.h"
 #include "dynamatic/Analysis/NameAnalysis.h"
 #include "dynamatic/Support/DynamaticPass.h"
+#include "dynamatic/Support/Handshake.h"
 #include "dynamatic/Support/LLVM.h"
 #include "mlir/Transforms/DialectConversion.h"
 
@@ -32,29 +33,19 @@ namespace dynamatic {
 // pass.
 class HandshakeLoweringFPGA18 : public HandshakeLowering {
 public:
+  /// Groups memory operations by interface and group for a given memory region.
   struct MemAccesses {
+    /// Memory operations for a simple memory controller, grouped by
+    /// originating basic block.
     llvm::MapVector<Block *, SmallVector<Operation *>> mcPorts;
+    /// Memory operations for an LSQ, grouped by belonging LSQ group.
     llvm::MapVector<unsigned, SmallVector<Operation *>> lsqPorts;
-
-    MemAccesses() = default;
   };
 
-  struct MemInputs {
-    SmallVector<Value> mcInputs;
-    SmallVector<unsigned> mcBlocks;
-    unsigned mcNumLoads;
-
-    SmallVector<Value> lsqInputs;
-    SmallVector<unsigned> lsqGroupSizes;
-    SmallVector<LSQLoadOp> lsqLoadOrder;
-    unsigned lsqNumLoads;
-  };
-
-  /// Store a mapping between memory interfaces (identified by the function
+  /// Stores a mapping between memory regions (identified by the function
   /// argument they correspond to) and the set of memory operations referencing
   /// them.
   using MemInterfacesInfo = llvm::MapVector<Value, MemAccesses>;
-  using MemInterfacesInputs = llvm::MapVector<Value, MemInputs>;
 
   /// Constructor simply forwards the region to its parent class and stores a
   /// reference to the top-level name analysis.
@@ -72,26 +63,11 @@ public:
   LogicalResult replaceMemoryOps(ConversionPatternRewriter &rewriter,
                                  MemInterfacesInfo &memInfo);
 
-  /// Derive input information for all LSQs in the function (stores it in
-  /// `memInputs`), while verifying that the LSQ groups derived from input IR
-  /// annotations make sense (check for linear dominance property within each
-  /// group and cross-group control signal compatibility). Fails if the
-  /// definition of an LSQ group is invalid; succeeds otherwise.
-  LogicalResult verifyAndCreateLSQGroups(ConversionPatternRewriter &rewriter,
-                                         MemInterfacesInfo &memInfo,
-                                         MemInterfacesInputs &memInputs);
-
-  /// Derive input information for all memory controllers in the function
-  /// (stores it in `memInputs`). These include potential additional control
-  /// signals that must be fed to an MC due to the presence of an LSQ on the
-  /// same memory interface. This cannot produce a failure (it returns a
-  /// `LogicalResult` to comply with our lowering step infrastructure).
-  LogicalResult createMCBlocks(ConversionPatternRewriter &rewriter,
-                               MemInterfacesInfo &memInfo,
-                               MemInterfacesInputs &memInputs);
-
-  /// Instantiates all memory interfaces and connects them to their respective
-  /// load/store operations. For each memory region:
+  /// Verifies that LSQ groups derived from input IR annotations make sense
+  /// (check for linear dominance property within each group and cross-group
+  /// control signal compatibility). Then, instantiates all memory interfaces
+  /// and connects them to their respective load/store operations. For each
+  /// memory region:
   /// - A single `handshake::MemoryControllerOp` will be instantiated if all of
   /// its accesses indicate that they should connect to an MC.
   /// - A single `handshake::LSQOp` will be instantiated if none of
@@ -99,9 +75,13 @@ public:
   /// - Both a `handhsake::MemoryControllerOp` and `handhsake::LSQOp` will be
   /// instantiated if some but not all of its accesses indicate that they should
   /// connect to an LSQ.
-  LogicalResult connectToMemInterfaces(ConversionPatternRewriter &rewriter,
-                                       MemInterfacesInfo &memInfo,
-                                       MemInterfacesInputs &memInputs);
+  LogicalResult
+  verifyAndCreateMemInterfaces(ConversionPatternRewriter &rewriter,
+                               MemInterfacesInfo &memInfo);
+
+  /// Derive input information for all LSQs in the function (stores it in
+  /// `memInputs`), while . Fails if the
+  /// definition of an LSQ group is invalid; succeeds otherwise.
 
   /// Connect constants to the rest of the circuit. Constants are triggered by a
   /// source if their successor is not a branch/return or memory operation.
