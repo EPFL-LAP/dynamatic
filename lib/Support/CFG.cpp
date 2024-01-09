@@ -13,6 +13,8 @@
 #include "dynamatic/Support/CFG.h"
 #include "circt/Dialect/Handshake/HandshakeOps.h"
 #include "mlir/Dialect/Arith/IR/Arith.h"
+#include "mlir/Support/LogicalResult.h"
+#include "llvm/ADT/SetVector.h"
 #include "llvm/ADT/SmallPtrSet.h"
 #include "llvm/ADT/TypeSwitch.h"
 #include <queue>
@@ -288,7 +290,8 @@ HandshakeCFG::HandshakeCFG(circt::handshake::FuncOp funcOp) : funcOp(funcOp) {
         // Get the destination basic block and store the connection
         std::optional<unsigned> dstBB = getLogicBB(user);
         assert(dstBB && "destination operation must belong to block");
-        successors[*srcBB].insert(*dstBB);
+        if (*srcBB != *dstBB || isBackedge(res, user))
+          successors[*srcBB].insert(*dstBB);
       }
     }
   }
@@ -300,7 +303,7 @@ void HandshakeCFG::getNonCyclicPaths(unsigned from, unsigned to,
   assert(successors.contains(from) && "source block must exist in the CFG");
   assert(successors.contains(to) && "destination block must exist in the CFG");
 
-  CFGPath pathSoFar;
+  mlir::SetVector<unsigned> pathSoFar;
   pathSoFar.insert(from);
   findPathsTo(pathSoFar, to, paths);
 }
@@ -376,17 +379,243 @@ HandshakeCFG::getControlValues(DenseMap<unsigned, Value> &ctrlVals) {
 }
 
 // NOLINTNEXTLINE(misc-no-recursion)
-void HandshakeCFG::findPathsTo(const CFGPath &pathSoFar, unsigned to,
-                               SmallVector<CFGPath> &paths) {
+void HandshakeCFG::findPathsTo(const mlir::SetVector<unsigned> &pathSoFar,
+                               unsigned to, SmallVector<CFGPath> &paths) {
   assert(!pathSoFar.empty() && "path cannot be empty");
   for (unsigned nextBB : successors[pathSoFar.back()]) {
     if (nextBB == to) {
-      CFGPath &newPath = paths.emplace_back(pathSoFar);
-      newPath.insert(to);
+      CFGPath newPath;
+      llvm::copy(pathSoFar, std::back_inserter(newPath));
+      newPath.push_back(to);
     } else if (!pathSoFar.contains(nextBB)) {
-      CFGPath nextPathSoFar(pathSoFar);
+      mlir::SetVector<unsigned> nextPathSoFar(pathSoFar);
       nextPathSoFar.insert(nextBB);
       findPathsTo(nextPathSoFar, to, paths);
     }
   }
+}
+
+namespace {
+/// Internal representation for the failure/success status of a GIID
+/// backtracking process. We distinguish two types of failures:
+/// - An off-path failure, meaning the function went off the CFG path provided
+/// for the search before reaching the predecessor's block. This type of failure
+/// is generally "recoverable", in the sense that the top-level search may still
+/// succeed even if some recursive search fails in this way.
+/// - An on-path failure, meaning the function failed to reach the predecessor
+/// all-the-while staying on the path to it. This type of failure is generally
+/// "terminating", in the sense that the top-level search will probably fail
+/// as soon as some recursive search fails in this way.
+enum class GIIDStatus {
+  /// Denotes an off-path failure.
+  FAIL_OFF_PATH,
+  /// Denotes an on-path failure.
+  FAIL_ON_PATH,
+  /// Denotes a success.
+  SUCCEED
+};
+
+using GIIDFoldFunc = const std::function<GIIDStatus(Value)> &;
+} // namespace
+
+/// Logical "or" operator for the GIID status. Combines the returns values of
+/// the callback on all operands into a single GIID status.
+///
+/// To succeed, it is enough that one operand reaches the predecessor on the CFG
+/// path. If all operands are off path, then report an off-path failure. If no
+/// operand reaches the predecessor but at least one is on path, report an
+/// on-path failure.
+// NOLINTNEXTLINE (remove warning saying the function will not be emitted)
+static GIIDStatus foldGIIDStatusOr(GIIDFoldFunc func, ValueRange operands) {
+  if (operands.empty())
+    return GIIDStatus::FAIL_OFF_PATH;
+
+  GIIDStatus stat = GIIDStatus::FAIL_OFF_PATH;
+  for (Value newVal : operands) {
+    switch (func(newVal)) {
+    case GIIDStatus::FAIL_OFF_PATH:
+      // Do nothing here, so that if all operands are off path we end up
+      // reporting an off-path failure
+      break;
+    case GIIDStatus::FAIL_ON_PATH:
+      // Unless another operand reaches the predecessor, we will end up
+      // reporting an on-path failure
+      stat = GIIDStatus::FAIL_ON_PATH;
+      break;
+    case GIIDStatus::SUCCEED:
+      // Early return when one of the datapaths reaches the predecessor
+      return GIIDStatus::SUCCEED;
+    }
+  }
+  return stat;
+}
+
+/// Logical "and" operator for the GIID status. Combines the returns values of
+/// the callback on all operands into a single GIID status.
+///
+/// To succeed, at least one operand must reach the predecessor on the CFG path,
+/// and none must fail to reach the predecessor on the path. If all operands are
+/// off path, then report an off-path failure.
+static GIIDStatus foldGIIDStatusAnd(GIIDFoldFunc func, ValueRange operands) {
+  if (operands.empty())
+    return GIIDStatus::FAIL_OFF_PATH;
+
+  GIIDStatus stat = GIIDStatus::FAIL_OFF_PATH;
+  for (Value newVal : operands) {
+    switch (func(newVal)) {
+    case GIIDStatus::FAIL_OFF_PATH:
+      // Do nothing here, so that if all operands are off path we end up
+      // reporting an off-path failure
+      break;
+    case GIIDStatus::FAIL_ON_PATH:
+      // All datapaths on the CFG path must connect to the predecessor. Early
+      // return when we fail on the path.
+      return GIIDStatus::FAIL_ON_PATH;
+    case GIIDStatus::SUCCEED:
+      // Unless another operand is on the path but fails to reach the
+      // predecessor, this call will succeed
+      stat = GIIDStatus::SUCCEED;
+      break;
+    }
+  }
+  return stat;
+}
+
+/// Recursive version of `isGIID`. The CFG path is passed as an array reference
+/// to allow us to efficiently drop elements from its back as we backtrack the
+/// circuit on the CFG path. At any point, the path's last block is the one
+/// which the operand's owning operation was a part of on the parent call to
+/// `isGIIDRec`.
+static GIIDStatus isGIIDRec(Value predecessor, OpOperand &oprd,
+                            ArrayRef<unsigned> path) {
+  Value val = oprd.get();
+  if (predecessor == val)
+    return GIIDStatus::SUCCEED;
+
+  // The defining operation must exist, otherwise it means we have reached
+  // function arguments without encountering the predecessor value. It must also
+  // belong to a block
+  Operation *defOp = val.getDefiningOp();
+  if (!defOp)
+    return GIIDStatus::FAIL_ON_PATH;
+  std::optional<unsigned> defBB = getLogicBB(defOp);
+  if (!defBB)
+    return GIIDStatus::FAIL_ON_PATH;
+
+  size_t pathSize = path.size();
+  if (isBackedge(val, oprd.getOwner())) {
+    // Backedges always indicate transitions from one block on the path to its
+    // predecessor
+
+    // If we move past the first block in the path, so it's an "on-path failure"
+    if (pathSize == 1)
+      return GIIDStatus::FAIL_ON_PATH;
+
+    // The previous block in the path must be the one the defining operation
+    // belongs to, otherwise it's an "off-path failure"
+    if (path.drop_back().back() != defBB)
+      return GIIDStatus::FAIL_OFF_PATH;
+    path = path.drop_back();
+  } else {
+    // The defining operation must be somewhere earlier in the path than before.
+    // We allow the path to "jump over" BBs, since datapaths of optimized
+    // circuits will sometimes skip BBs entirely
+
+    bool foundOnPath = false;
+    for (size_t idx = pathSize; idx > 0; --idx) {
+      if (path[idx - 1] == *defBB) {
+        foundOnPath = true;
+        path = path.take_front(idx);
+        break;
+      }
+    }
+    if (!foundOnPath) {
+      // If we had previously reached the block where the predecessor is defined
+      // and moved past it, the failure is "on path". If we failed earlier, the
+      // failure is "off" path.
+      /// NOTE: Is that last part true? Is it possible to jump over the block
+      /// defining the predecessor and still be on path?
+      return pathSize == 1 ? GIIDStatus::FAIL_ON_PATH
+                           : GIIDStatus::FAIL_OFF_PATH;
+    }
+  }
+
+  // Recursively calls the function with a new value as second argument (meant
+  // to be an operand of the defining operation identified above) and changing
+  // the current defining operation to be the current one
+  auto recurse = [&](Value newVal) -> GIIDStatus {
+    for (OpOperand &oprd : defOp->getOpOperands()) {
+      if (oprd.get() == newVal)
+        return isGIIDRec(predecessor, oprd, path);
+    }
+    llvm_unreachable("recursive call should be on operand of defining op");
+  };
+
+  // The backtracking logic depends on the type of the defining operation
+  return llvm::TypeSwitch<Operation *, GIIDStatus>(defOp)
+      .Case<handshake::ConditionalBranchOp>(
+          [&](handshake::ConditionalBranchOp condBrOp) {
+            // The data operand or the condition operand must depend on the
+            // predecessor
+            return foldGIIDStatusAnd(recurse, condBrOp->getOperands());
+          })
+      .Case<handshake::MergeOp, handshake::ControlMergeOp>([&](auto) {
+        // The data input on the path must depend on the predecessor
+        return foldGIIDStatusAnd(recurse, defOp->getOperands());
+      })
+      .Case<handshake::MuxOp>([&](handshake::MuxOp muxOp) {
+        // If the select operand depends on the predecessor, then the mux
+        // depends on the predecessor
+        if (recurse(muxOp.getSelectOperand()) == GIIDStatus::SUCCEED)
+          return GIIDStatus::SUCCEED;
+
+        // Otherwise, data inputs on the path must depend on the predecessor
+        return foldGIIDStatusAnd(recurse, defOp->getOperands());
+      })
+      .Case<handshake::DynamaticReturnOp>([&](auto) {
+        // Just recurse the call on the return operand corresponding to the
+        // value
+        Value oprd = defOp->getOperand(cast<OpResult>(val).getResultNumber());
+        return recurse(oprd);
+      })
+      .Case<handshake::MCLoadOp, handshake::LSQLoadOp>([&](auto) {
+        auto loadOp = cast<handshake::LoadOpInterface>(defOp);
+        if (loadOp.getDataOutput() != val)
+          return GIIDStatus::FAIL_ON_PATH;
+
+        // If the address operand depends on the predecessor then the data
+        // result depends on the predecessor
+        return recurse(loadOp.getAddressInput());
+      })
+      .Case<arith::SelectOp>([&](arith::SelectOp selectOp) {
+        // Similarly to the mux, if the select operand depends on the
+        // predecessor, then the select depends on the predecessor
+        if (recurse(selectOp.getCondition()) == GIIDStatus::SUCCEED)
+          return GIIDStatus::SUCCEED;
+
+        // The select's true value or false value must depend on the predecessor
+        ValueRange values{selectOp.getTrueValue(), selectOp.getFalseValue()};
+        return foldGIIDStatusAnd(recurse, values);
+      })
+      .Case<handshake::ForkOp, handshake::LazyForkOp, handshake::BufferOp,
+            handshake::BranchOp, arith::AddIOp, arith::AndIOp, arith::CmpIOp,
+            arith::DivSIOp, arith::DivUIOp, arith::ExtSIOp, arith::ExtUIOp,
+            arith::MulIOp, arith::OrIOp, arith::RemUIOp, arith::RemSIOp,
+            arith::ShLIOp, arith::ShRUIOp, arith::SIToFPOp, arith::SubIOp,
+            arith::TruncIOp, arith::UIToFPOp, arith::XOrIOp, arith::AddFOp,
+            arith::CmpFOp, arith::DivFOp, arith::ExtFOp, arith::MulFOp,
+            arith::RemFOp, arith::SubFOp, arith::TruncFOp>([&](auto) {
+        // At least one operand must depend on the predecessor
+        return foldGIIDStatusOr(recurse, defOp->getOperands());
+      })
+      .Default([&](auto) {
+        // To err on the conservative side, produce the most terminating kind of
+        // failure on encoutering an unsupported operation
+        return GIIDStatus::FAIL_ON_PATH;
+      });
+}
+
+bool dynamatic::isGIID(Value predecessor, OpOperand &oprd, CFGPath &path) {
+  assert(path.size() >= 2 && "path must have at least two blocks");
+  return isGIIDRec(predecessor, oprd, path) == GIIDStatus::SUCCEED;
 }

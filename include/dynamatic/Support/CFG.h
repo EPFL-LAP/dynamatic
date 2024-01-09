@@ -101,9 +101,8 @@ bool isBackedge(Value val, BBEndpoints *endpoints = nullptr);
 /// of a Handshake function (i.e., cannot have a basic block attribute).
 bool cannotBelongToCFG(Operation *op);
 
-/// Represents a CFG path as an ordered sequence of basic blocks with
-/// set semantics.
-using CFGPath = llvm::SetVector<unsigned>;
+/// Represents a CFG path as an ordered sequence of basic blocks.
+using CFGPath = mlir::SmallVector<unsigned>;
 
 /// Oracle into the implicit CFG underlying a Handshake function, which
 /// originates from the explicit CFG of a func-level function. This contains
@@ -142,9 +141,20 @@ private:
 
   /// Find all non-cyclic paths from the last block of the path to a destination
   /// block. All identified paths are appended to the vector.
-  void findPathsTo(const CFGPath &pathSoFar, unsigned to,
+  void findPathsTo(const mlir::SetVector<unsigned> &pathSoFar, unsigned to,
                    mlir::SmallVector<CFGPath> &paths);
 };
+
+/// Recursive function that determines whether an operand is globally in-order
+/// dependent on another value (the predecessor) along a specific CFG path. In
+/// other words, the function answers the following question: is `predecessor`
+/// involved in the determination of `oprd` in the DFG induced by the CFG path?
+///
+/// The function achieves this by "bactracking" through the dataflow circuit
+/// (from operations' results to operands) in search for the `predecessor`
+/// value along the DFG induced by the CFG path. The backtracking behavior is
+/// influenced by the type of the operation traversed at each step.
+bool isGIID(Value predecessor, OpOperand &oprd, CFGPath &path);
 
 } // namespace dynamatic
 
