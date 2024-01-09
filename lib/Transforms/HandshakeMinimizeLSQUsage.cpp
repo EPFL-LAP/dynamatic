@@ -102,7 +102,7 @@ static bool hasRAW(handshake::LSQLoadOp loadOp,
           LLVM_DEBUG(llvm::dbgs()
                      << "\t" << loadName
                      << " cannot be removed from LSQ: RAW dependency with "
-                     << dependency.getDstAccess() << "\n");
+                     << getUniqueName(storeOp) << "\n");
           return true;
         }
       }
@@ -156,7 +156,7 @@ static bool hasEnforcedWARs(handshake::LSQLoadOp loadOp,
         LLVM_DEBUG(llvm::dbgs()
                    << "\t" << getUniqueName(loadOp)
                    << " cannot be removed from LSQ: non-enforced WAR with "
-                   << dependency.getDstAccess() << "\n");
+                   << getUniqueName(storeOp) << "\n");
         return false;
       }
     }
@@ -227,6 +227,10 @@ HandshakeMinimizeLSQUsagePass::LSQInfo::LSQInfo(handshake::LSQOp lsqOp,
       LLVM_DEBUG(llvm::dbgs() << "\t" << getUniqueName(storeOp)
                               << " can be removed from LSQ\n");
       removableStores.insert(getUniqueName(storeOp));
+    } else {
+      LLVM_DEBUG(llvm::dbgs() << "\t" << getUniqueName(storeOp)
+                              << " cannot be removed from LSQ: WAW or RAW "
+                                 "dependency with other access\n");
     }
   }
 
@@ -338,7 +342,7 @@ void HandshakeMinimizeLSQUsagePass::runDynamaticPass() {
 }
 
 void HandshakeMinimizeLSQUsagePass::tryToOptimizeLSQ(handshake::LSQOp lsqOp) {
-  LLVM_DEBUG(llvm::dbgs() << "Attempting optimization of LSQ (name: "
+  LLVM_DEBUG(llvm::dbgs() << "Attempting optimization of LSQ ("
                           << getUniqueName(lsqOp) << ")\n");
 
   NameAnalysis &namer = getAnalysis<NameAnalysis>();
@@ -459,6 +463,18 @@ void HandshakeMinimizeLSQUsagePass::tryToOptimizeLSQ(handshake::LSQOp lsqOp) {
     return;
   }
 
+  LLVM_DEBUG({
+    llvm::dbgs() << "\t[SUCCESS] LSQ ";
+    if (newLSQOp)
+      llvm::dbgs() << "size reduced ";
+    else
+      llvm::dbgs() << "removed entirely ";
+    if (lsqOp.isConnectedToMC())
+      llvm::dbgs() << "(previously inexistent MC introduced)\n";
+    else
+      llvm::dbgs() << "(MC size increased)\n";
+  });
+
   // Replace memory control signals consumed by the end operation
   replaceEndMemoryControls(lsqOp, newLSQOp, newMCOp, builder);
 
@@ -475,7 +491,6 @@ void HandshakeMinimizeLSQUsagePass::tryToOptimizeLSQ(handshake::LSQOp lsqOp) {
 
   // Now we can safely delete the original LSQ
   lsqOp.erase();
-  LLVM_DEBUG(llvm::dbgs() << "\tLSQ was optimized\n");
 }
 
 std::unique_ptr<dynamatic::DynamaticPass>
