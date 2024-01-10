@@ -333,8 +333,11 @@ def MarkMemoryInterfaces : DynamaticPass<"mark-memory-interfaces"> {
     `circt::handshake::MemInterfaceAttr` attribute indicating the kind of
     memory interface they should eventually connect to. It uses memory
     dependencies derived during polyhedral analysis to determine the type of
-    interface necessary for each memory port. As such this pass should typically
-    be ran after the `--mark-memory-dependencies` pass.
+    interface necessary for each memory port. The pass also requires that the IR
+    is in an unstructured control flow form to create appropriate LSQ groups.
+    As such this pass should typically be ran sometime after the
+    `--mark-memory-dependencies` pass, strictly below the scf IR level, and
+    before memory interface instantiation.
 
     Internally, it uses `circt::handshake::MemDependenceArrayAttr` attributes
     attached to memory operations to determine whether any memory access depends

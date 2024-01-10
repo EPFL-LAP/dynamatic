@@ -80,7 +80,6 @@ exit_on_fail "Failed to compile source to affine" "Compiled source to affine"
 # affine level -> pre-processing and memory analysis
 "$DYNAMATIC_OPT_BIN" "$F_AFFINE" --allow-unregistered-dialect \
   --remove-polygeist-attributes --mark-memory-dependencies \
-  --mark-memory-interfaces \
   > "$F_AFFINE_MEM"
 exit_on_fail "Failed to run memory analysis" "Ran memory analysis"
 
@@ -105,6 +104,7 @@ exit_on_fail "Failed to apply standard transformations to cf" \
 # cf transformations (dynamatic) 
 "$DYNAMATIC_OPT_BIN" "$F_CF_TRANFORMED" --flatten-memref-calls \
   --arith-reduce-strength="max-adder-depth-mul=1" --push-constants \
+  --mark-memory-interfaces \
   > "$F_CF_DYN_TRANSFORMED"
 exit_on_fail "Failed to apply Dynamatic transformations to cf" \
   "Applied Dynamatic transformations to cf"

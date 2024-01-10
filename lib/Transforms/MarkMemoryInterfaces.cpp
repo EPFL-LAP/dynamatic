@@ -15,6 +15,7 @@
 #include "dynamatic/Transforms/MarkMemoryInterfaces.h"
 #include "circt/Dialect/Handshake/HandshakeOps.h"
 #include "dynamatic/Analysis/NameAnalysis.h"
+#include "dynamatic/Support/Attribute.h"
 #include "mlir/Dialect/Affine/IR/AffineOps.h"
 #include "mlir/Dialect/Func/IR/FuncOps.h"
 #include "mlir/Dialect/MemRef/IR/MemRef.h"
@@ -155,12 +156,13 @@ void MarkMemoryInterfacesPass::markMemoryInterfaces(func::FuncOp funcOp) {
   // Set attributes on memory operations to instruct the tell the rest of the
   // pipeline what interface it will eventually connect to
   MLIRContext *ctx = &getContext();
-  StringRef interfaceAttrName = MemInterfaceAttr::getMnemonic();
   for (auto &[_, regionInterfaces] : interfaces) {
     for (Operation *mcMemOp : regionInterfaces.connectToMC)
-      mcMemOp->setAttr(interfaceAttrName, MemInterfaceAttr::get(ctx));
-    for (auto &[lsqMemOp, groupID] : regionInterfaces.connectToLSQ)
-      lsqMemOp->setAttr(interfaceAttrName, MemInterfaceAttr::get(ctx, groupID));
+      setUniqueAttr<MemInterfaceAttr>(mcMemOp, MemInterfaceAttr::get(ctx));
+    for (auto &[lsqMemOp, groupID] : regionInterfaces.connectToLSQ) {
+      MemInterfaceAttr attr = MemInterfaceAttr::get(ctx, groupID);
+      setUniqueAttr<MemInterfaceAttr>(lsqMemOp, attr);
+    }
   }
 }
 
