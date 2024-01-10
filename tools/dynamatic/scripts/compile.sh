@@ -129,7 +129,8 @@ exit_on_fail "Failed to apply transformations to handshake" \
 if [[ $USE_SIMPLE_BUFFERS -ne 0 ]]; then
   # Simple buffer placement
   "$DYNAMATIC_OPT_BIN" "$F_HANDSHAKE_TRANSFORMED" \
-    --handshake-place-buffers="algorithm=on-merges" \
+    --handshake-set-buffering-properties="version=fpga20" \
+    --handshake-place-buffers="algorithm=on-merges timing-models=$DYNAMATIC_DIR/data/components.json" \
     > "$F_HANDSHAKE_BUFFERED"
   exit_on_fail "Failed to place simple buffers" "Placed simple buffers"
 else

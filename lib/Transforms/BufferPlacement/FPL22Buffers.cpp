@@ -70,7 +70,7 @@ void FPL22BuffersBase::extractResult(BufferPlacement &placement) {
       result.numTrans = numSlotsToPlace;
     }
 
-    deductInternalBuffers(channel, result);
+    result.deductInternalBuffers(Channel(channel), timingDB);
     placement[channel] = result;
   }
 

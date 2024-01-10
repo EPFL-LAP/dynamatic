@@ -12,6 +12,7 @@
 
 #include "dynamatic/Transforms/BufferPlacement/BufferingSupport.h"
 #include "circt/Dialect/Handshake/HandshakeOps.h"
+#include "dynamatic/Analysis/NameAnalysis.h"
 #include "dynamatic/Support/Attribute.h"
 #include "mlir/IR/Attributes.h"
 #include "mlir/IR/Value.h"
@@ -24,36 +25,6 @@ using namespace circt;
 using namespace circt::handshake;
 using namespace dynamatic;
 using namespace dynamatic::buffer;
-
-Channel::Channel(Value value, bool updateProps)
-    : value(value), consumer(*value.getUsers().begin()),
-      props(value, updateProps) {
-  if (OpResult res = dyn_cast<OpResult>(value)) {
-    producer = value.getDefiningOp();
-    return;
-  }
-  // Channel must be a block argument: make the parent operation the "producer"
-  BlockArgument arg = cast<BlockArgument>(value);
-  producer = arg.getParentBlock()->getParentOp();
-};
-
-Operation *dynamatic::buffer::getChannelProducer(Value channel, size_t *idx) {
-  if (OpResult res = dyn_cast<OpResult>(channel)) {
-    if (idx)
-      *idx = res.getResultNumber();
-    return channel.getDefiningOp();
-  }
-  // Channel must be a block argument. In this case we only support buffering
-  // properties the channel maps to a Handshake function argument
-  BlockArgument arg = cast<BlockArgument>(channel);
-  Operation *op = arg.getParentBlock()->getParentOp();
-  if (isa<handshake::FuncOp>(op)) {
-    if (idx)
-      *idx = arg.getArgNumber();
-    return op;
-  }
-  return nullptr;
-}
 
 bool LazyChannelBufProps::updateIR() {
   bool updated = updateIRIfNecessary();
@@ -93,4 +64,130 @@ bool LazyChannelBufProps::updateIRIfNecessary() {
   setOperandAttr(*val.getUses().begin(),
                  ChannelBufPropsAttr::get(val.getContext(), *props));
   return true;
+}
+
+Channel::Channel(Value value, bool updateProps)
+    : value(value), consumer(*value.getUsers().begin()),
+      props(value, updateProps) {
+  if (OpResult res = dyn_cast<OpResult>(value)) {
+    producer = value.getDefiningOp();
+    return;
+  }
+  // Channel must be a block argument: make the parent operation the "producer"
+  BlockArgument arg = cast<BlockArgument>(value);
+  producer = arg.getParentBlock()->getParentOp();
+};
+
+void Channel::addInternalBuffers(const TimingDatabase &timingDB) {
+  // Add slots present at the source unit's output ports
+  if (const TimingModel *model = timingDB.getModel(producer)) {
+    props->minTrans += model->outputModel.transparentSlots;
+    props->minOpaque += model->outputModel.opaqueSlots;
+  }
+
+  // Add slots present at the destination unit's input ports
+  if (const TimingModel *model = timingDB.getModel(consumer)) {
+    props->minTrans += model->inputModel.transparentSlots;
+    props->minOpaque += model->inputModel.opaqueSlots;
+  }
+}
+
+void PlacementResult::deductInternalBuffers(const Channel &channel,
+                                            const TimingDatabase &timingDB) {
+  unsigned numTransToDeduct = 0, numOpaqueToDeduct = 0;
+
+  // Remove slots present at the source unit's output ports. If the channel is a
+  // function argument, the model will be nullptr (since Handshake functions do
+  // not have a timing model) and nothing will happen for the producer
+  if (const TimingModel *model = timingDB.getModel(channel.producer)) {
+    numTransToDeduct += model->outputModel.transparentSlots;
+    numOpaqueToDeduct += model->outputModel.opaqueSlots;
+  }
+
+  // Remove slots present at the destination unit's input ports
+  if (const TimingModel *model = timingDB.getModel(channel.consumer)) {
+    numTransToDeduct += model->inputModel.transparentSlots;
+    numOpaqueToDeduct += model->inputModel.opaqueSlots;
+  }
+
+  // Adjust placement results
+  assert(numTrans >= numTransToDeduct && "not enough transparent slots");
+  assert(numOpaque >= numOpaqueToDeduct && "not enough opaque slots");
+  numTrans -= numTransToDeduct;
+  numOpaque -= numOpaqueToDeduct;
+}
+
+Operation *dynamatic::buffer::getChannelProducer(Value channel, size_t *idx) {
+  if (OpResult res = dyn_cast<OpResult>(channel)) {
+    if (idx)
+      *idx = res.getResultNumber();
+    return channel.getDefiningOp();
+  }
+  // Channel must be a block argument. In this case we only support buffering
+  // properties the channel maps to a Handshake function argument
+  BlockArgument arg = cast<BlockArgument>(channel);
+  Operation *op = arg.getParentBlock()->getParentOp();
+  if (isa<handshake::FuncOp>(op)) {
+    if (idx)
+      *idx = arg.getArgNumber();
+    return op;
+  }
+  return nullptr;
+}
+
+LogicalResult dynamatic::buffer::mapChannelsToProperties(
+    circt::handshake::FuncOp funcOp, const TimingDatabase &timingDB,
+    llvm::MapVector<Value, ChannelBufProps> &channelProps) {
+
+  // Combines any channel-specific buffering properties coming from IR
+  // annotations to internal buffer specifications and stores the combined
+  // properties into the channel map. Fails and marks the MILP unsatisfiable if
+  // any of those combined buffering properties become unsatisfiable.
+  auto deriveBufferingProperties = [&](Channel &channel) -> LogicalResult {
+    ChannelBufProps ogProps = *channel.props;
+    if (!ogProps.isSatisfiable()) {
+      std::stringstream ss;
+      std::string channelName;
+      ss << "Channel buffering properties of channel '"
+         << getUniqueName(*channel.value.getUses().begin())
+         << "' are unsatisfiable " << ogProps
+         << "Cannot proceed with buffer placement.";
+      return channel.consumer->emitError() << ss.str();
+    }
+
+    // Increase the minimum number of slots if internal buffers are present, and
+    // check for satisfiability
+    channel.addInternalBuffers(timingDB);
+    if (!channel.props->isSatisfiable()) {
+      std::stringstream ss;
+      std::string channelName;
+      ss << "Including internal component buffers into buffering "
+            "properties of channel '"
+         << getUniqueName(*channel.value.getUses().begin())
+         << "' made them unsatisfiable.\nProperties were " << ogProps
+         << "before inclusion and were changed to " << *channel.props
+         << "Cannot proceed with buffer placement.";
+      return channel.consumer->emitError() << ss.str();
+    }
+    channelProps[channel.value] = *channel.props;
+    return success();
+  };
+
+  // Add channels originating from function arguments to the channel map
+  for (auto [idx, arg] : llvm::enumerate(funcOp.getArguments())) {
+    Channel channel(arg, funcOp, *arg.getUsers().begin());
+    if (failed(deriveBufferingProperties(channel)))
+      return failure();
+  }
+
+  // Add channels originating from operations' results to the channel map
+  for (Operation &op : funcOp.getOps()) {
+    for (auto [idx, res] : llvm::enumerate(op.getResults())) {
+      Channel channel(res, &op, *res.getUsers().begin());
+      if (failed(deriveBufferingProperties(channel)))
+        return failure();
+    }
+  }
+
+  return success();
 }

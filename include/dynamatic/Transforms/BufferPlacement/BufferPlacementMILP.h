@@ -283,20 +283,6 @@ protected:
   /// for each buffer slot placed on any of the provide channels.
   void addObjective(ValueRange channels, ArrayRef<CFDFC *> cfdfcs);
 
-  /// Adds pre-existing buffers that may exist as part of the units the channel
-  /// connects to to the buffering properties. These are added to the minimum
-  /// numbers of transparent and opaque slots so that the MILP is forced to
-  /// place at least a certain quantity of slots on the channel and can take
-  /// them into account in its constraints.
-  void addInternalBuffers(Channel &channel);
-
-  /// Removes pre-existing buffers that may exist as part of the units the
-  /// channel connects to from the placement results. These are deducted from
-  /// the numbers of transparent and opaque slots stored in the placement
-  /// results. The latter are expected to specify more slots than what is going
-  /// to be deducted (which should be guaranteed by the MILP constraints).
-  void deductInternalBuffers(Value channel, PlacementResult &result);
-
   /// Helper method to run a callback function on each input/output port pair of
   /// the provided operation, unless one of the ports has `mlir::MemRefType`.
   void forEachIOPair(Operation *op,
@@ -307,11 +293,10 @@ protected:
   void logResults(BufferPlacement &placement);
 
 private:
-  /// During object construction, map all the function's channels to their
-  /// specific buffering properties, adjusting for buffers within units as
-  /// described by the timing models. Fails if the buffering properties of a
-  /// channel are unsatisfiable or become unsatisfiable after adjustment.
-  LogicalResult mapChannelsToProperties();
+  /// Common logic for all constructors. Fills the channel to buffering
+  /// properties mapping and defines a large constant used for elasticity
+  /// constraints.
+  void initialize();
 };
 
 } // namespace buffer

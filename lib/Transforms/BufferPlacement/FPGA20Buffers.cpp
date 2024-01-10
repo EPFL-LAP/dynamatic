@@ -97,7 +97,7 @@ void FPGA20Buffers::extractResult(BufferPlacement &placement) {
       result.numTrans = numSlotsToPlace;
     }
 
-    deductInternalBuffers(channel, result);
+    result.deductInternalBuffers(Channel(channel), timingDB);
     placement[channel] = result;
   }
 
