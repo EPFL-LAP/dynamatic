@@ -200,8 +200,10 @@ static std::string getInputForEnd(handshake::EndOp op, bool rippedMemories) {
   // if (rippedMemories) {
   //   ports.emplace_back("in1", op.getReturnValues().front(), "");
   // } else {
-  for (auto val : op.getOperands().take_front(numResults))
+  for (auto val : op.getOperands().take_front(numResults)) {
     ports.emplace_back("in" + std::to_string(idx++), val, "");
+    break;
+  }
   // }
   return getIOFromPorts(ports);
 }
@@ -479,10 +481,14 @@ static size_t fixInputPortNumber(Operation *op, size_t idx) {
       })
       .Case<handshake::EndOp>([&](handshake::EndOp endOp) {
         // Legacy Dynamatic has the memory controls before the return values
-        auto numReturnValues = endOp.getReturnValues().size();
-        auto numMemoryControls = endOp.getMemoryControls().size();
-        return (idx < numReturnValues) ? idx + numMemoryControls
-                                       : idx - numReturnValues;
+        // auto numReturnValues = endOp.getReturnValues().size();
+        // auto numMemoryControls = endOp.getMemoryControls().size();
+
+        auto funcOp = op->getParentOfType<handshake::FuncOp>();
+        auto numResults = funcOp.getFunctionType().getResults().size();
+        auto numControls = endOp->getNumOperands() - numResults;
+        auto newIdx = (idx < numResults) ? idx + numControls : idx - numResults;
+        return newIdx;
       })
       .Case<handshake::LoadOpInterface, handshake::StoreOpInterface>([&](auto) {
         // Legacy Dynamatic has the data operand/result before the address
@@ -1432,16 +1438,17 @@ LogicalResult DOTPrinter::printFunc(handshake::FuncOp funcOp,
       if (idx == 0) {
         // Take first end output
         os << R"("end0" -> ")" << resLabel << "\" [";
-        from = 1;
+        from = 0;
       } else {
         // Get the corresponding operand to the return and create an edge with
         // the output
         Value retOprd = retOp.getOperand(idx);
-        os << "\"" << getUniqueName(retOprd.getDefiningOp()) << "\" -> \""
-           << resLabel << "\" [";
-        from = fixOutputPortNumber(retOprd.getDefiningOp(), idx);
+        Operation *defOp = retOprd.getDefiningOp();
+        size_t resIdx = cast<OpResult>(retOprd).getResultNumber();
+        os << "\"" << getUniqueName(defOp) << "\" -> \"" << resLabel << "\" [";
+        from = fixOutputPortNumber(defOp, resIdx);
       }
-      os << "from=\"out" << from + 1 << "\", to=in1";
+      os << "from=\"out" << from + 1 << R"(", to="in1")";
       os << "]\n";
     }
   }
