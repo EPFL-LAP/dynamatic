@@ -78,6 +78,14 @@ Channel::Channel(Value value, bool updateProps)
   producer = arg.getParentBlock()->getParentOp();
 };
 
+OpOperand &Channel::getOperand() const {
+  for (OpOperand &oprd : consumer->getOpOperands()) {
+    if (oprd.get() == value)
+      return oprd;
+  }
+  llvm_unreachable("channel consumer does not have value as operand");
+}
+
 void Channel::addInternalBuffers(const TimingDatabase &timingDB) {
   // Add slots present at the source unit's output ports
   if (const TimingModel *model = timingDB.getModel(producer)) {

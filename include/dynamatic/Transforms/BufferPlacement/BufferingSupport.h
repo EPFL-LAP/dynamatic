@@ -145,6 +145,9 @@ struct Channel {
   /// Constructs a channel from its associated SSA value alone.
   Channel(Value value, bool updateProps = false);
 
+  /// Returns a reference to the operation operand corresponding to the channel.
+  OpOperand &getOperand() const;
+
   /// Adds pre-existing buffers that may exist as part of the units the channel
   /// connects to the channel's buffering properties. These are added to the
   /// minimum numbers of transparent and opaque slots for the channel.
