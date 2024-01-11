@@ -209,8 +209,11 @@ LogicalResult getOpPlacements(
     Operation *srcOp = nameAnalysis.getOp(p.srcOpName);
     Operation *dstOp = nameAnalysis.getOp(p.dstOpName);
     Value srcOpResult;
-    if (failed(areOpConnected(srcOp, dstOp, srcOpResult)))
-      return failure(); // Operations are not connected
+    if (failed(areOpConnected(srcOp, dstOp, srcOpResult))) {
+      llvm::errs() << "Operations " << p.srcOpName << " and " << p.dstOpName
+                 << "are not connected\n";
+      return failure();
+    }
 
     placements.addSaveCommit(srcOpResult, dstOp);
   }
