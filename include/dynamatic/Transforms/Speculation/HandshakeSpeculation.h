@@ -13,49 +13,20 @@
 #ifndef DYNAMATIC_TRANSFORMS_SPECULATION_PASS_H
 #define DYNAMATIC_TRANSFORMS_SPECULATION_PASS_H
 
-#include "circt/Dialect/Handshake/HandshakeOps.h"
 #include "dynamatic/Support/DynamaticPass.h"
 #include "dynamatic/Support/LLVM.h"
-#include "dynamatic/Support/Logging.h"
-#include "dynamatic/Support/TimingModels.h"
-#include "dynamatic/Transforms/Speculation/SpeculationPlacement.h"
-#include "mlir/Dialect/Func/IR/FuncOps.h"
 #include "mlir/Pass/Pass.h"
-#include <map>
 #include <string>
-#include <unordered_set>
-#include <vector>
 
 namespace dynamatic {
 namespace speculation {
-
-std::unique_ptr<dynamatic::DynamaticPass>
-createHandshakeSpeculation(std::string unitPositions = "");
 
 #define GEN_PASS_DECL_HANDSHAKESPECULATION
 #define GEN_PASS_DEF_HANDSHAKESPECULATION
 #include "dynamatic/Transforms/Passes.h.inc"
 
-/// Public pass driver for the speculation placement pass.
-struct HandshakeSpeculationPass
-    : public dynamatic::speculation::impl::HandshakeSpeculationBase<
-          HandshakeSpeculationPass> {
-  HandshakeSpeculationPass(std::string unitPositions = "");
-
-  void runDynamaticPass() override;
-
-private:
-  SpeculationPlacements placements;
-  Operation *specOp;
-
-protected:
-  // Place the operation handshake::SpeculatorOp in between src and dst.
-  LogicalResult placeSpeculator();
-
-  // Place the operation specified in T with the control signal ctrlSignal
-  template <typename T>
-  LogicalResult placeUnits(Value ctrlSignal);
-};
+std::unique_ptr<dynamatic::DynamaticPass>
+createHandshakeSpeculation(const std::string &jsonPath = "");
 
 } // namespace speculation
 } // namespace dynamatic

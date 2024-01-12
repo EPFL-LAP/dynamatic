@@ -47,7 +47,7 @@ struct OpPlacement {
   };
 };
 
-typedef std::unordered_set<OpPlacement, OpPlacement::Hash> PlacementList;
+using PlacementList = std::unordered_set<OpPlacement, OpPlacement::Hash>;
 
 class SpeculationPlacements {
 private:
@@ -57,47 +57,46 @@ private:
   PlacementList saveCommits;
 
 public:
-  // Empty constructor
-  SpeculationPlacements(){};
+  /// Empty constructor
+  SpeculationPlacements() = default;
 
-  // Initializer with source and destination operations for the Speculator
-  SpeculationPlacements(Value srcOpResult, Operation *dstOp) {
-    speculator = {srcOpResult, dstOp};
-  }
+  /// Initializer with source and destination operations for the Speculator
+  SpeculationPlacements(Value srcOpResult, Operation *dstOp)
+      : speculator{srcOpResult, dstOp} {};
 
-  // Set the speculator operations positions according to a JSON file
-  static LogicalResult readFromJSON(std::string &jsonPath,
+  /// Set the speculator operations positions according to a JSON file
+  static LogicalResult readFromJSON(const std::string &jsonPath,
                                     SpeculationPlacements &place,
                                     NameAnalysis &nameAnalysis);
 
-  // Explicitly set the speculator position
+  /// Explicitly set the speculator position
   void setSpeculator(Value srcOpResult, Operation *dstOp);
 
-  // Add the position of a Save operation
+  /// Add the position of a Save operation
   void addSave(Value srcOpResult, Operation *dstOp);
 
-  // Add the position of a Save operation
+  /// Add the position of a Save operation
   void addCommit(Value srcOpResult, Operation *dstOp);
 
-  // Add the position of a Save operation
+  /// Add the position of a Save operation
   void addSaveCommit(Value srcOpResult, Operation *dstOp);
 
-  // Check if there is a commit from srcOp to dstOp
+  /// Check if there is a commit from srcOp to dstOp
   bool containsCommit(Value srcOpResult, Operation *dstOp);
 
-  // Check if there is a save from srcOp to dstOp
+  /// Check if there is a save from srcOp to dstOp
   bool containsSave(Value srcOpResult, Operation *dstOp);
 
-  // Remove a commit from the commit placement map
+  /// Remove a commit from the commit placement map
   void eraseCommit(Value srcOpResult, Operation *dstOp);
 
-  // Remove a save from the save placement map
+  /// Remove a save from the save placement map
   void eraseSave(Value srcOpResult, Operation *dstOp);
 
-  // Get the Placement instance that specifies the Speculator position
+  /// Get the Placement instance that specifies the Speculator position
   OpPlacement getSpeculatorPlacement();
 
-  // Get a vector of the existing Save operation placements
+  /// Get a set of the existing operation placements
   template <typename T>
   const PlacementList &getPlacements();
 };

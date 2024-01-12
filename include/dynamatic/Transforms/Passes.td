@@ -252,7 +252,7 @@ def HandshakeSpeculation : DynamaticPass<"handshake-speculation"> {
   }];
   let constructor = "dynamatic::speculation::createHandshakeSpeculation()";
   let options = [
-    Option<"unitPositions", "unit-positions", "std::string", "",
+    Option<"jsonPath", "json-path", "std::string", "",
     "Path to JSON-formatted file containing the positions for speculative "
     "operations.">];
 }

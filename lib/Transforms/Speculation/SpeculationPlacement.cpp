@@ -21,8 +21,6 @@
 #include <fstream>
 #include <map>
 #include <string>
-#include <unordered_set>
-#include <vector>
 
 using namespace circt;
 using namespace circt::handshake;
@@ -99,7 +97,7 @@ SpeculationPlacements::getPlacements<handshake::SpecSaveCommitOp>() {
   return this->saveCommits;
 }
 
-inline void parseSpeculatorPlacement(
+static inline void parseSpeculatorPlacement(
     std::map<StringRef, llvm::SmallVector<PlacementNames>> &placements,
     const llvm::json::Object *components) {
   if (components->find("speculator") != components->end()) {
@@ -110,7 +108,7 @@ inline void parseSpeculatorPlacement(
   }
 }
 
-inline void parseOperationPlacements(
+static inline void parseOperationPlacements(
     StringRef opType,
     std::map<StringRef, llvm::SmallVector<PlacementNames>> &placements,
     const llvm::json::Object *components) {
@@ -139,9 +137,9 @@ inline void parseOperationPlacements(
 //     {"srcOp": "mux1", "dstOp":"buffer10"}
 //   ]
 // }
-bool parseJSON(
-    const llvm::json::Value &jsonValue,
-    std::map<StringRef, llvm::SmallVector<PlacementNames>> &placements) {
+static bool
+parseJSON(const llvm::json::Value &jsonValue,
+          std::map<StringRef, llvm::SmallVector<PlacementNames>> &placements) {
   const llvm::json::Object *components = jsonValue.getAsObject();
   if (!components)
     return false;
@@ -153,8 +151,8 @@ bool parseJSON(
   return true;
 }
 
-LogicalResult areOpConnected(Operation *srcOp, Operation *dstOp,
-                             Value &srcOpResult) {
+static LogicalResult areOpConnected(Operation *srcOp, Operation *dstOp,
+                                    Value &srcOpResult) {
   unsigned result_idx = 0;
   srcOpResult = srcOp->getResult(result_idx);
   while (not llvm::is_contained(dstOp->getOperands(), srcOpResult)) {
@@ -167,54 +165,55 @@ LogicalResult areOpConnected(Operation *srcOp, Operation *dstOp,
   return success();
 }
 
-LogicalResult getOpPlacements(
+static LogicalResult getOpPlacements(
     SpeculationPlacements &placements,
     std::map<StringRef, llvm::SmallVector<PlacementNames>> &specNameMap,
     NameAnalysis &nameAnalysis) {
-  // Add Speculator operation position
-  {
-    PlacementNames &p = specNameMap["speculator"].front();
-    Operation *srcOp = nameAnalysis.getOp(p.srcOpName);
-    Operation *dstOp = nameAnalysis.getOp(p.dstOpName);
-    Value srcOpResult;
-    if (failed(areOpConnected(srcOp, dstOp, srcOpResult)))
-      return failure(); // Operations are not connected
-    placements.setSpeculator(srcOpResult, dstOp);
-  }
+
+  Operation *srcOp, *dstOp;
+  Value srcOpResult;
+
+  // Check that operations are found by name
+  auto getPlacementOps = [&](PlacementNames &p) {
+    srcOp = nameAnalysis.getOp(p.srcOpName);
+    dstOp = nameAnalysis.getOp(p.dstOpName);
+    if (!srcOp || !dstOp) {
+      llvm::errs() << "Operation names " << p.srcOpName << " or " << p.dstOpName
+                   << "are not found\n";
+      return failure();
+    }
+    if (failed(areOpConnected(srcOp, dstOp, srcOpResult))) {
+      llvm::errs() << "Operations " << p.srcOpName << " and " << p.dstOpName
+                   << "are not connected\n";
+      return failure();
+    }
+    return success();
+  };
+
+  // Add Speculator Operation position
+  PlacementNames &p = specNameMap["speculator"].front();
+  if (failed(getPlacementOps(p)))
+    return failure();
+  placements.setSpeculator(srcOpResult, dstOp);
 
   // Add Save Operations position
   for (PlacementNames &p : specNameMap["saves"]) {
-    Operation *srcOp = nameAnalysis.getOp(p.srcOpName);
-    Operation *dstOp = nameAnalysis.getOp(p.dstOpName);
-    Value srcOpResult;
-    if (failed(areOpConnected(srcOp, dstOp, srcOpResult)))
-      return failure(); // Operations are not connected
-
+    if (failed(getPlacementOps(p)))
+      return failure();
     placements.addSave(srcOpResult, dstOp);
   }
 
   // Add Commit Operations position
   for (PlacementNames &p : specNameMap["commits"]) {
-    Operation *srcOp = nameAnalysis.getOp(p.srcOpName);
-    Operation *dstOp = nameAnalysis.getOp(p.dstOpName);
-    Value srcOpResult;
-    if (failed(areOpConnected(srcOp, dstOp, srcOpResult)))
-      return failure(); // Operations are not connected
-
+    if (failed(getPlacementOps(p)))
+      return failure();
     placements.addCommit(srcOpResult, dstOp);
   }
 
   // Add Save-Commit Operations position
   for (PlacementNames &p : specNameMap["save-commits"]) {
-    Operation *srcOp = nameAnalysis.getOp(p.srcOpName);
-    Operation *dstOp = nameAnalysis.getOp(p.dstOpName);
-    Value srcOpResult;
-    if (failed(areOpConnected(srcOp, dstOp, srcOpResult))) {
-      llvm::errs() << "Operations " << p.srcOpName << " and " << p.dstOpName
-                 << "are not connected\n";
+    if (failed(getPlacementOps(p)))
       return failure();
-    }
-
     placements.addSaveCommit(srcOpResult, dstOp);
   }
 
@@ -222,7 +221,7 @@ LogicalResult getOpPlacements(
 }
 
 LogicalResult
-SpeculationPlacements::readFromJSON(std::string &jsonPath,
+SpeculationPlacements::readFromJSON(const std::string &jsonPath,
                                     SpeculationPlacements &placements,
                                     NameAnalysis &nameAnalysis) {
   // Open the speculation file

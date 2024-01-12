@@ -13,16 +13,15 @@
 #include "dynamatic/Transforms/Speculation/HandshakeSpeculation.h"
 #include "circt/Dialect/Handshake/HandshakeOps.h"
 #include "dynamatic/Analysis/NameAnalysis.h"
+#include "dynamatic/Support/DynamaticPass.h"
 #include "dynamatic/Support/Logging.h"
 #include "dynamatic/Support/LogicBB.h"
+#include "dynamatic/Transforms/Speculation/SpeculationPlacement.h"
 #include "mlir/IR/BuiltinTypes.h"
 #include "mlir/IR/OperationSupport.h"
 #include "mlir/Pass/PassManager.h"
 #include "llvm/ADT/DenseSet.h"
-#include <fstream>
 #include <string>
-#include <unordered_set>
-#include <vector>
 
 using namespace llvm::sys;
 using namespace circt;
@@ -31,9 +30,26 @@ using namespace mlir;
 using namespace dynamatic;
 using namespace dynamatic::speculation;
 
-HandshakeSpeculationPass::HandshakeSpeculationPass(std::string unitPositions) {
-  this->unitPositions = unitPositions;
-}
+struct HandshakeSpeculationPass
+    : public dynamatic::speculation::impl::HandshakeSpeculationBase<
+          HandshakeSpeculationPass> {
+  HandshakeSpeculationPass(const std::string &jsonPath = "") {
+    this->jsonPath = jsonPath;
+  }
+
+  void runDynamaticPass() override;
+
+private:
+  SpeculationPlacements placements;
+  SpeculatorOp specOp;
+
+  /// Place the operation handshake::SpeculatorOp
+  LogicalResult placeSpeculator();
+
+  /// Place the operation specified in T with the control signal ctrlSignal
+  template <typename T>
+  LogicalResult placeUnits(Value ctrlSignal);
+};
 
 template <typename T>
 LogicalResult HandshakeSpeculationPass::placeUnits(Value ctrlSignal) {
@@ -66,7 +82,7 @@ LogicalResult HandshakeSpeculationPass::placeSpeculator() {
   // Replace uses of the orginal source operation's result with the speculator's
   // result, except in the speculator's operands (otherwise this would create a
   // self-loop from the speculator to the speculator)
-  place.srcOpResult.replaceAllUsesExcept(specOp->getResult(0), specOp);
+  place.srcOpResult.replaceAllUsesExcept(specOp.getDataOut(), specOp);
 
   return success();
 }
@@ -75,27 +91,28 @@ void HandshakeSpeculationPass::runDynamaticPass() {
   NameAnalysis &nameAnalysis = getAnalysis<NameAnalysis>();
 
   if (failed(SpeculationPlacements::readFromJSON(
-          this->unitPositions, this->placements, nameAnalysis)))
+          this->jsonPath, this->placements, nameAnalysis)))
     return signalPassFailure();
 
   if (failed(placeSpeculator()))
     return signalPassFailure();
 
   // Place Save operations
-  if (failed(placeUnits<handshake::SpecSaveOp>(this->specOp->getResult(1))))
+  if (failed(placeUnits<handshake::SpecSaveOp>(this->specOp.getSaveCtrl())))
     return signalPassFailure();
 
   // Place Commit operations and the Commit control path
-  if (failed(placeUnits<handshake::SpecCommitOp>(this->specOp->getResult(2))))
+  if (failed(placeUnits<handshake::SpecCommitOp>(this->specOp.getCommitCtrl())))
     return signalPassFailure();
 
   // Place SaveCommit operations and the SaveCommit control path
-  if (failed(
-          placeUnits<handshake::SpecSaveCommitOp>(this->specOp->getResult(3))))
+  if (failed(placeUnits<handshake::SpecSaveCommitOp>(
+          this->specOp.getSCSaveCtrl())))
     return signalPassFailure();
 }
 
 std::unique_ptr<dynamatic::DynamaticPass>
-dynamatic::speculation::createHandshakeSpeculation(std::string unitPositions) {
-  return std::make_unique<HandshakeSpeculationPass>(unitPositions);
+dynamatic::speculation::createHandshakeSpeculation(
+    const std::string &jsonPath) {
+  return std::make_unique<HandshakeSpeculationPass>(jsonPath);
 }
