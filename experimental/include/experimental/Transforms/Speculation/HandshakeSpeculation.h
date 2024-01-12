@@ -19,16 +19,18 @@
 #include <string>
 
 namespace dynamatic {
+namespace experimental {
 namespace speculation {
-
-#define GEN_PASS_DECL_HANDSHAKESPECULATION
-#define GEN_PASS_DEF_HANDSHAKESPECULATION
-#include "dynamatic/Transforms/Passes.h.inc"
 
 std::unique_ptr<dynamatic::DynamaticPass>
 createHandshakeSpeculation(const std::string &jsonPath = "");
 
+#define GEN_PASS_DECL_HANDSHAKESPECULATION
+#define GEN_PASS_DEF_HANDSHAKESPECULATION
+#include "experimental/Transforms/Passes.h.inc"
+
 } // namespace speculation
+} // namespace experimental
 } // namespace dynamatic
 
 #endif // DYNAMATIC_TRANSFORMS_SPECULATION_PASS_H

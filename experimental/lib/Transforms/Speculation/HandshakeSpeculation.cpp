@@ -10,13 +10,13 @@
 //
 //===----------------------------------------------------------------------===//
 
-#include "dynamatic/Transforms/Speculation/HandshakeSpeculation.h"
+#include "experimental/Transforms/Speculation/HandshakeSpeculation.h"
 #include "circt/Dialect/Handshake/HandshakeOps.h"
 #include "dynamatic/Analysis/NameAnalysis.h"
 #include "dynamatic/Support/DynamaticPass.h"
 #include "dynamatic/Support/Logging.h"
 #include "dynamatic/Support/LogicBB.h"
-#include "dynamatic/Transforms/Speculation/SpeculationPlacement.h"
+#include "experimental/Transforms/Speculation/SpeculationPlacement.h"
 #include "mlir/IR/BuiltinTypes.h"
 #include "mlir/IR/OperationSupport.h"
 #include "mlir/Pass/PassManager.h"
@@ -28,11 +28,13 @@ using namespace circt;
 using namespace circt::handshake;
 using namespace mlir;
 using namespace dynamatic;
-using namespace dynamatic::speculation;
+using namespace dynamatic::experimental;
+using namespace dynamatic::experimental::speculation;
 
+namespace {
 struct HandshakeSpeculationPass
-    : public dynamatic::speculation::impl::HandshakeSpeculationBase<
-          HandshakeSpeculationPass> {
+    : public dynamatic::experimental::speculation::impl::
+          HandshakeSpeculationBase<HandshakeSpeculationPass> {
   HandshakeSpeculationPass(const std::string &jsonPath = "") {
     this->jsonPath = jsonPath;
   }
@@ -50,6 +52,7 @@ private:
   template <typename T>
   LogicalResult placeUnits(Value ctrlSignal);
 };
+} // namespace
 
 template <typename T>
 LogicalResult HandshakeSpeculationPass::placeUnits(Value ctrlSignal) {
@@ -112,7 +115,7 @@ void HandshakeSpeculationPass::runDynamaticPass() {
 }
 
 std::unique_ptr<dynamatic::DynamaticPass>
-dynamatic::speculation::createHandshakeSpeculation(
+dynamatic::experimental::speculation::createHandshakeSpeculation(
     const std::string &jsonPath) {
   return std::make_unique<HandshakeSpeculationPass>(jsonPath);
 }

@@ -29,6 +29,7 @@
 #include <vector>
 
 namespace dynamatic {
+namespace experimental {
 namespace speculation {
 
 struct PlacementOperand {
@@ -102,6 +103,7 @@ public:
 };
 
 } // namespace speculation
+} // namespace experimental
 } // namespace dynamatic
 
 #endif // DYNAMATIC_TRANSFORMS_SPECULATION_PASS_H

@@ -3,7 +3,7 @@ add_dynamatic_library(DynamaticSpeculation
   HandshakeSpeculation.cpp
 
   DEPENDS
-  DynamaticTransformsPassIncGen
+  DynamaticExperimentalTransformsPassIncGen
 
   LINK_LIBS PUBLIC
   MLIRIR

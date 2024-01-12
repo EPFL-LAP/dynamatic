@@ -10,7 +10,7 @@
 //
 //===----------------------------------------------------------------------===//
 
-#include "dynamatic/Transforms/Speculation/SpeculationPlacement.h"
+#include "experimental/Transforms/Speculation/SpeculationPlacement.h"
 #include "circt/Dialect/Handshake/HandshakeOps.h"
 #include "dynamatic/Analysis/NameAnalysis.h"
 #include "dynamatic/Support/Logging.h"
@@ -26,7 +26,8 @@ using namespace circt;
 using namespace circt::handshake;
 using namespace mlir;
 using namespace dynamatic;
-using namespace dynamatic::speculation;
+using namespace dynamatic::experimental;
+using namespace dynamatic::experimental::speculation;
 
 // SpeculationPlacements Methods
 
