@@ -31,9 +31,9 @@
 namespace dynamatic {
 namespace speculation {
 
-struct PlacementNames {
-  StringRef srcOpName;
-  StringRef dstOpName;
+struct PlacementOperand {
+  StringRef opName;
+  unsigned opIdx;
 };
 
 struct OpPlacement {

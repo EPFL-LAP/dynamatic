@@ -98,48 +98,63 @@ SpeculationPlacements::getPlacements<handshake::SpecSaveCommitOp>() {
 }
 
 static inline void parseSpeculatorPlacement(
-    std::map<StringRef, llvm::SmallVector<PlacementNames>> &placements,
+    std::map<StringRef, llvm::SmallVector<PlacementOperand>> &placements,
     const llvm::json::Object *components) {
   if (components->find("speculator") != components->end()) {
     const llvm::json::Object *specObj = components->getObject("speculator");
-    StringRef srcOpName = specObj->getString("srcOp").value();
-    StringRef dstOpName = specObj->getString("dstOp").value();
-    placements["speculator"].push_back({srcOpName, dstOpName});
+    StringRef opName = specObj->getString("operation-name").value();
+    unsigned opIdx = specObj->getInteger("operand-idx").value();
+    placements["speculator"].push_back({opName, opIdx});
   }
 }
 
 static inline void parseOperationPlacements(
     StringRef opType,
-    std::map<StringRef, llvm::SmallVector<PlacementNames>> &placements,
+    std::map<StringRef, llvm::SmallVector<PlacementOperand>> &placements,
     const llvm::json::Object *components) {
   if (components->find(opType) != components->end()) {
     const llvm::json::Array *jsonArray = components->getArray(opType);
     for (const llvm::json::Value &element : *jsonArray) {
       const llvm::json::Object *specObj = element.getAsObject();
-      StringRef srcOpName = specObj->getString("srcOp").value();
-      StringRef dstOpName = specObj->getString("dstOp").value();
-      placements[opType].push_back({srcOpName, dstOpName});
+      StringRef opName = specObj->getString("operation-name").value();
+      unsigned opIdx = specObj->getInteger("operand-idx").value();
+      placements[opType].push_back({opName, opIdx});
     }
   }
 }
 
 // JSON format example:
 // {
-//   "speculator": {"srcOp": "cmpi0", "dstOp":"fork5"},
+//   "speculator": {
+//     "operation-name": "fork5",
+//     "operand-idx": 0
+//   },
 //   "saves": [
-//     {"srcOp": "extsi6", "dstOp":"mc_load0"},
-//     {"srcOp": "extsi7", "dstOp":"mc_load1"}
+//     {
+//       "operation-name": "mc_load0",
+//       "operand-idx": 0
+//     },
+//     {
+//       "operation-name": "mc_load1",
+//       "operand-idx": 0
+//     }
 //   ],
 //   "commits": [
-//     {"srcOp": "trunci0", "dstOp":"cond_br0"}
+//     {
+//       "operation-name": "cond_br0",
+//       "operand-idx": 1
+//     }
 //   ],
 //   "saveCommits": [
-//     {"srcOp": "mux1", "dstOp":"buffer10"}
+//     {
+//       "operation-name": "buffer10",
+//       "operand-idx": 0
+//     }
 //   ]
 // }
-static bool
-parseJSON(const llvm::json::Value &jsonValue,
-          std::map<StringRef, llvm::SmallVector<PlacementNames>> &placements) {
+static bool parseJSON(
+    const llvm::json::Value &jsonValue,
+    std::map<StringRef, llvm::SmallVector<PlacementOperand>> &placements) {
   const llvm::json::Object *components = jsonValue.getAsObject();
   if (!components)
     return false;
@@ -151,67 +166,47 @@ parseJSON(const llvm::json::Value &jsonValue,
   return true;
 }
 
-static LogicalResult areOpConnected(Operation *srcOp, Operation *dstOp,
-                                    Value &srcOpResult) {
-  unsigned result_idx = 0;
-  srcOpResult = srcOp->getResult(result_idx);
-  while (not llvm::is_contained(dstOp->getOperands(), srcOpResult)) {
-    result_idx++;
-    if (result_idx >= srcOp->getNumResults()) {
-      return failure(); // srcOp and dstOp are not connected
-    }
-    srcOpResult = srcOp->getResult(result_idx);
-  }
-  return success();
-}
-
 static LogicalResult getOpPlacements(
     SpeculationPlacements &placements,
-    std::map<StringRef, llvm::SmallVector<PlacementNames>> &specNameMap,
+    std::map<StringRef, llvm::SmallVector<PlacementOperand>> &specNameMap,
     NameAnalysis &nameAnalysis) {
 
-  Operation *srcOp, *dstOp;
   Value srcOpResult;
+  Operation *dstOp;
 
   // Check that operations are found by name
-  auto getPlacementOps = [&](PlacementNames &p) {
-    srcOp = nameAnalysis.getOp(p.srcOpName);
-    dstOp = nameAnalysis.getOp(p.dstOpName);
-    if (!srcOp || !dstOp) {
-      llvm::errs() << "Operation names " << p.srcOpName << " or " << p.dstOpName
-                   << "are not found\n";
+  auto getPlacementOps = [&](PlacementOperand &p) {
+    dstOp = nameAnalysis.getOp(p.opName);
+    if (!dstOp) {
+      llvm::errs() << "Operation name " << p.opName << "is not found\n";
       return failure();
     }
-    if (failed(areOpConnected(srcOp, dstOp, srcOpResult))) {
-      llvm::errs() << "Operations " << p.srcOpName << " and " << p.dstOpName
-                   << "are not connected\n";
-      return failure();
-    }
+    srcOpResult = dstOp->getOperand(p.opIdx);
     return success();
   };
 
   // Add Speculator Operation position
-  PlacementNames &p = specNameMap["speculator"].front();
+  PlacementOperand &p = specNameMap["speculator"].front();
   if (failed(getPlacementOps(p)))
     return failure();
   placements.setSpeculator(srcOpResult, dstOp);
 
   // Add Save Operations position
-  for (PlacementNames &p : specNameMap["saves"]) {
+  for (PlacementOperand &p : specNameMap["saves"]) {
     if (failed(getPlacementOps(p)))
       return failure();
     placements.addSave(srcOpResult, dstOp);
   }
 
   // Add Commit Operations position
-  for (PlacementNames &p : specNameMap["commits"]) {
+  for (PlacementOperand &p : specNameMap["commits"]) {
     if (failed(getPlacementOps(p)))
       return failure();
     placements.addCommit(srcOpResult, dstOp);
   }
 
   // Add Save-Commit Operations position
-  for (PlacementNames &p : specNameMap["save-commits"]) {
+  for (PlacementOperand &p : specNameMap["save-commits"]) {
     if (failed(getPlacementOps(p)))
       return failure();
     placements.addSaveCommit(srcOpResult, dstOp);
@@ -246,7 +241,7 @@ SpeculationPlacements::readFromJSON(const std::string &jsonPath,
 
   // Deserialize into a dictionary for operation names
   llvm::json::Path::Root jsonRoot(jsonPath);
-  std::map<StringRef, llvm::SmallVector<PlacementNames>> specNameMap;
+  std::map<StringRef, llvm::SmallVector<PlacementOperand>> specNameMap;
   if (!parseJSON(*value, specNameMap))
     return failure();
 
