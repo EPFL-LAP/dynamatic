@@ -151,11 +151,6 @@ simulate
 synthesize
 
 # Memory-oriented tests
-set-src           integration-test/memory/memory_loop/memory_loop.c
-compile
-write-hdl
-simulate
-synthesize
 set-src           integration-test/memory/test_memory_1/test_memory_1.c
 compile
 write-hdl
@@ -237,6 +232,11 @@ write-hdl
 simulate
 synthesize
 set-src           integration-test/memory/test_memory_17/test_memory_17.c
+compile
+write-hdl
+simulate
+synthesize
+set-src           integration-test/memory/test_memory_18/test_memory_18.c
 compile
 write-hdl
 simulate
