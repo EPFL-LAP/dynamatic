@@ -29,4 +29,26 @@ def HandshakeFixArgNames : DynamaticPass<"handshake-fix-arg-names"> {
             "Path to source C file from which the IR was generated.">];
 }
 
+def HandshakeSpeculation : DynamaticPass<"handshake-speculation"> {
+  let summary = "Place Speculation operations";
+  let description = [{
+      Speculative execution involves speculating on the output of a long 
+      latency operation or chain of operations, allowing operations that 
+      depend on it to begin execution early, without impacting correctness. 
+      
+      There are several situations that can benefit from early execution, 
+      including reducing the initiation interval (II) of loops with conditions 
+      that take several cycles to calculate, or loops with 
+      loop-carried dependencies. 
+      
+      The pass needs to specify the position of the Speculation Units by 
+      means of an input JSON file.
+  }];
+  let constructor = "dynamatic::experimental::speculation::createHandshakeSpeculation()";
+  let options = [
+    Option<"jsonPath", "json-path", "std::string", "",
+    "Path to JSON-formatted file containing the positions for speculative "
+    "operations.">];
+}
+
 #endif // EXPERIMENTAL_TRANSFORMS_PASSES_TD

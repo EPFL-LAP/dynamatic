@@ -1,5 +1,6 @@
-add_dynamatic_library(DynamaticExperimentalTransforms
-  HandshakeFixArgNames.cpp
+add_dynamatic_library(DynamaticSpeculation
+  SpeculationPlacement.cpp
+  HandshakeSpeculation.cpp
 
   DEPENDS
   DynamaticExperimentalTransformsPassIncGen
@@ -10,8 +11,8 @@ add_dynamatic_library(DynamaticExperimentalTransforms
   MLIRFuncDialect
   MLIRSupport
   MLIRTransformUtils
+  CIRCTHandshake
   DynamaticSupport
-  DynamaticAnalysis
-)
+  DynamaticExperimentalSupport
+  )
 
-add_subdirectory(Speculation)
