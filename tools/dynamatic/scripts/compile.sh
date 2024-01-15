@@ -80,7 +80,6 @@ exit_on_fail "Failed to compile source to affine" "Compiled source to affine"
 # affine level -> pre-processing and memory analysis
 "$DYNAMATIC_OPT_BIN" "$F_AFFINE" --allow-unregistered-dialect \
   --remove-polygeist-attributes --mark-memory-dependencies \
-  --mark-memory-interfaces \
   > "$F_AFFINE_MEM"
 exit_on_fail "Failed to run memory analysis" "Ran memory analysis"
 
@@ -105,6 +104,7 @@ exit_on_fail "Failed to apply standard transformations to cf" \
 # cf transformations (dynamatic) 
 "$DYNAMATIC_OPT_BIN" "$F_CF_TRANFORMED" --flatten-memref-calls \
   --arith-reduce-strength="max-adder-depth-mul=1" --push-constants \
+  --mark-memory-interfaces \
   > "$F_CF_DYN_TRANSFORMED"
 exit_on_fail "Failed to apply Dynamatic transformations to cf" \
   "Applied Dynamatic transformations to cf"
@@ -117,6 +117,7 @@ exit_on_fail "Failed to compile cf to handshake" "Compiled cf to handshake"
 
 # handshake transformations
 "$DYNAMATIC_OPT_BIN" "$F_HANDSHAKE" \
+  --handshake-minimize-lsq-usage \
   --handshake-concretize-index-type="width=32" \
   --handshake-minimize-cst-width --handshake-optimize-bitwidths="legacy" \
   --handshake-materialize --handshake-infer-basic-blocks \
@@ -128,7 +129,8 @@ exit_on_fail "Failed to apply transformations to handshake" \
 if [[ $USE_SIMPLE_BUFFERS -ne 0 ]]; then
   # Simple buffer placement
   "$DYNAMATIC_OPT_BIN" "$F_HANDSHAKE_TRANSFORMED" \
-    --handshake-place-buffers="algorithm=on-merges" \
+    --handshake-set-buffering-properties="version=fpga20" \
+    --handshake-place-buffers="algorithm=on-merges timing-models=$DYNAMATIC_DIR/data/components.json" \
     > "$F_HANDSHAKE_BUFFERED"
   exit_on_fail "Failed to place simple buffers" "Placed simple buffers"
 else

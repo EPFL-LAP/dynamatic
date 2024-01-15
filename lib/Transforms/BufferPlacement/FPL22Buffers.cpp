@@ -13,7 +13,7 @@
 #include "dynamatic/Transforms/BufferPlacement/FPL22Buffers.h"
 #include "circt/Dialect/Handshake/HandshakeOps.h"
 #include "dynamatic/Analysis/NameAnalysis.h"
-#include "dynamatic/Support/LogicBB.h"
+#include "dynamatic/Support/CFG.h"
 #include "dynamatic/Support/TimingModels.h"
 #include "dynamatic/Transforms/BufferPlacement/BufferingSupport.h"
 #include "dynamatic/Transforms/BufferPlacement/CFDFC.h"
@@ -70,7 +70,7 @@ void FPL22BuffersBase::extractResult(BufferPlacement &placement) {
       result.numTrans = numSlotsToPlace;
     }
 
-    deductInternalBuffers(channel, result);
+    result.deductInternalBuffers(Channel(channel), timingDB);
     placement[channel] = result;
   }
 
@@ -112,15 +112,12 @@ void FPL22BuffersBase::addCustomChannelConstraints(Value channel) {
 
   // Set constraints based on maximum number of buffer slots
   if (props.maxOpaque && props.maxTrans) {
-    unsigned maxSlots = *props.maxTrans + *props.maxOpaque;
-    if (maxSlots == 0) {
-      // Forbid buffer placement on the channel entirely
+    unsigned maxSlots = *props.maxOpaque + *props.maxTrans;
+    // Forbid buffer placement on the channel entirely when no slots are allowed
+    if (maxSlots == 0)
       model.addConstr(chVars.bufPresent == 0, "custom_noBuffer");
-      model.addConstr(chVars.bufNumSlots == 0, "custom_noSlot");
-    } else {
-      // Restrict the maximum number of slots allowed
-      model.addConstr(chVars.bufNumSlots <= maxSlots, "custom_maxSlots");
-    }
+    // Restrict the maximum number of slots allowed
+    model.addConstr(chVars.bufNumSlots <= maxSlots, "custom_maxSlots");
   }
 
   // Forbid placement of some buffer type based on maximum number of allowed
@@ -128,7 +125,8 @@ void FPL22BuffersBase::addCustomChannelConstraints(Value channel) {
   if (props.maxOpaque && *props.maxOpaque == 0) {
     // Force the MILP to use transparent slots only
     model.addConstr(bufData == 0, "custom_noData");
-  } else if (props.maxTrans && *props.maxTrans == 0) {
+  }
+  if (props.maxTrans && *props.maxTrans == 0) {
     // Force the MILP to use opaque slots only
     model.addConstr(bufReady == 0, "custom_noReady");
   }
@@ -248,7 +246,7 @@ void FPL22BuffersBase::addUnitMixedPathConstraints(Operation *unit,
             arith::ShLIOp, arith::CmpIOp, arith::CmpFOp>(
           [&](auto) { addJoinedOprdConstraints(); });
 
-  std::string unitName = getUniqueName(unit);
+  StringRef unitName = getUniqueName(unit);
   unsigned idx = 0;
   for (MixedDomainConstraint &cons : constraints) {
     // The input/output channels must both be inside the CFDFC union
@@ -266,7 +264,7 @@ void FPL22BuffersBase::addUnitMixedPathConstraints(Operation *unit,
     // Arrival time at unit's output pin must be greater than arrival time at
     // unit's input pin plus the unit's internal delay on the path
     std::string consName =
-        "path_mixed_" + unitName + "_" + std::to_string(idx++);
+        "path_mixed_" + unitName.str() + "_" + std::to_string(idx++);
     model.addConstr(tPinIn + cons.internalDelay <= tPinOut, consName);
   }
 }
@@ -330,7 +328,7 @@ void CFDFCUnionBuffers::setup() {
     addChannelPathConstraints(channel, SignalType::VALID, bufModel, {},
                               readyGroup);
     addChannelPathConstraints(channel, SignalType::READY, bufModel,
-                              dataValidGroup);
+                              dataValidGroup, {});
 
     // Elasticity constraints
     addChannelElasticityConstraints(channel, bufGroups);
@@ -410,20 +408,28 @@ void OutOfCycleBuffers::setup() {
   // Create the expression for the MILP objective
   GRBLinExpr objective;
 
+  // Create a CFDFC union from all CFDFCs in the function so that we can make
+  // very fast queries of the kind: is this channel part of any CFDFC?
+  SmallVector<CFDFC *> allCFDFCs;
+  for (auto [cfdfc, _] : funcInfo.cfdfcs)
+    allCFDFCs.push_back(cfdfc);
+  CFDFCUnion cfUnion(allCFDFCs);
+
+  // Filter out channels part of any CFDFC or adjacent to a memory interface
+  ChannelFilter channelFilter = [&](Value channel) -> bool {
+    if (cfUnion.channels.contains(channel))
+      return false;
+
+    Operation *defOp = channel.getDefiningOp();
+    return !isa_and_present<handshake::MemoryOpInterface>(defOp) &&
+           !isa<handshake::MemoryOpInterface>(*channel.getUsers().begin());
+  };
+
   // Create variables and  add path and elasticity constraints for all channels
   // covered by the MILP. These are the channels that are not part of any CFDFC
   // identified in the Handshake function under consideration
   for (auto [channel, _] : channelProps) {
-    // Ignore channels that are part of at least one CFDFC and which were
-    // already eligible for placement in a previous MILP
-    bool inCycle = false;
-    for (auto [cfdfc, _] : funcInfo.cfdfcs) {
-      if (cfdfc->channels.contains(channel)) {
-        inCycle = true;
-        break;
-      }
-    }
-    if (inCycle)
+    if (!channelFilter(channel))
       continue;
 
     // Create channel variables and add custom constraints for the channel
@@ -436,7 +442,7 @@ void OutOfCycleBuffers::setup() {
     addChannelPathConstraints(channel, SignalType::VALID, bufModel, {},
                               readyGroup);
     addChannelPathConstraints(channel, SignalType::READY, bufModel,
-                              dataValidGroup);
+                              dataValidGroup, {});
 
     // Add elasticity constraints
     addChannelElasticityConstraints(channel, bufGroups);
@@ -453,21 +459,14 @@ void OutOfCycleBuffers::setup() {
   // Add single-domain and mixed-domain path constraints as well as elasticity
   // constraints over all units that are not part of any CFDFC
   for (Operation &unit : funcInfo.funcOp.getOps()) {
-    bool inCycle = false;
-    for (auto [cfdfc, _] : funcInfo.cfdfcs) {
-      if (cfdfc->units.contains(&unit)) {
-        inCycle = true;
-        break;
-      }
-    }
-    if (inCycle)
+    if (cfUnion.units.contains(&unit))
       continue;
 
-    addUnitPathConstraints(&unit, SignalType::DATA);
-    addUnitPathConstraints(&unit, SignalType::VALID);
-    addUnitPathConstraints(&unit, SignalType::READY);
-    addUnitMixedPathConstraints(&unit);
-    addUnitElasticityConstraints(&unit);
+    addUnitPathConstraints(&unit, SignalType::DATA, channelFilter);
+    addUnitPathConstraints(&unit, SignalType::VALID, channelFilter);
+    addUnitPathConstraints(&unit, SignalType::READY, channelFilter);
+    addUnitMixedPathConstraints(&unit, channelFilter);
+    addUnitElasticityConstraints(&unit, channelFilter);
   }
 
   // Set MILP objective and mark it ready to be optimized

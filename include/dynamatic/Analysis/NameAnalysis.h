@@ -204,9 +204,9 @@ private:
                        std::string &resName);
 };
 
-/// Attemps to get the unique name of the operation. Returns an empty string if
-/// the operation does not have a unique name.
-std::string getUniqueName(Operation *op);
+/// Attemps to get the unique name of the operation. Returns an empty
+/// `StringRef` if the operation does not have a unique name.
+StringRef getUniqueName(Operation *op);
 
 /// Attemps to get the unique name of the operand, derived from its producer and
 /// consumer operation respective names. Returns an empty string if the producer

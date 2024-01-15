@@ -13,8 +13,8 @@
 //
 //===----------------------------------------------------------------------===//
 
-#ifndef DYNAMATIC_TRANSFORMS_DYNAMATICPASS_H
-#define DYNAMATIC_TRANSFORMS_DYNAMATICPASS_H
+#ifndef DYNAMATIC_SUPPORT_DYNAMATICPASS_H
+#define DYNAMATIC_SUPPORT_DYNAMATICPASS_H
 
 #include "dynamatic/Analysis/NameAnalysis.h"
 #include "mlir/IR/BuiltinOps.h"
@@ -82,4 +82,4 @@ private:
 
 } // namespace dynamatic
 
-#endif // DYNAMATIC_TRANSFORMS_DYNAMATICPASS_H
+#endif // DYNAMATIC_SUPPORT_DYNAMATICPASS_H

@@ -15,26 +15,12 @@
 
 #include "circt/Dialect/Handshake/HandshakeOps.h"
 #include "dynamatic/Support/LLVM.h"
+#include "dynamatic/Support/TimingModels.h"
 #include "dynamatic/Transforms/BufferPlacement/CFDFC.h"
 #include "experimental/Support/StdProfiler.h"
 
 namespace dynamatic {
 namespace buffer {
-
-/// Holds information about what type of buffer should be placed on a specific
-/// channel.
-struct PlacementResult {
-  /// The number of transparent buffer slots that should be placed.
-  unsigned numTrans = 0;
-  /// The number of opaque buffer slots that should be placed.
-  unsigned numOpaque = 0;
-  /// Whether opaque slots should be placed transparent slots for placement
-  /// results that include both.
-  bool opaqueBeforeTrans = true;
-};
-
-/// Maps channels to buffer placement decisions.
-using BufferPlacement = llvm::MapVector<Value, PlacementResult>;
 
 /// Helper datatype for buffer placement. Simply aggregates all the information
 /// related to the Handshake function under optimization.
@@ -126,12 +112,6 @@ private:
   bool updateIRIfNecessary();
 };
 
-/// Returns the producer of the channel (in the buffer placement sense), or
-/// nullptr if the channel has no producer in this context. If idx is not
-/// nullptr, it is filled with the definition index of the channel in its
-/// producer.
-Operation *getChannelProducer(Value channel, size_t *idx = nullptr);
-
 /// Stores information related to a channel (in the buffer placement sense)
 /// i.e., an SSA value along with its producer (an operation) and its unique
 /// consumer (another operation). This struct is just a way to aggregate data;
@@ -151,7 +131,6 @@ struct Channel {
   /// Channel's consumer.
   Operation *consumer;
   /// Lazily-loaded channel-specific buffering properties.
-  /// NOTE: Modifying these properties will cause the IR to be updated.
   LazyChannelBufProps props;
 
   /// Constructs a channel from its assoicated SSA value, the value's producer,
@@ -166,6 +145,14 @@ struct Channel {
   /// Constructs a channel from its associated SSA value alone.
   Channel(Value value, bool updateProps = false);
 
+  /// Returns a reference to the operation operand corresponding to the channel.
+  OpOperand &getOperand() const;
+
+  /// Adds pre-existing buffers that may exist as part of the units the channel
+  /// connects to the channel's buffering properties. These are added to the
+  /// minimum numbers of transparent and opaque slots for the channel.
+  void addInternalBuffers(const TimingDatabase &timingDB);
+
   /// The lazily-loaded channel buffering properties cannot be safely copied, so
   /// neither can the channel.
   Channel(const Channel &) = delete;
@@ -179,6 +166,44 @@ struct Channel {
     return isa<circt::handshake::FuncOp>(producer);
   }
 };
+
+/// Holds information about what type of buffer should be placed on a specific
+/// channel.
+struct PlacementResult {
+  /// The number of transparent buffer slots that should be placed.
+  unsigned numTrans = 0;
+  /// The number of opaque buffer slots that should be placed.
+  unsigned numOpaque = 0;
+  /// Whether opaque slots should be placed transparent slots for placement
+  /// results that include both.
+  bool opaqueBeforeTrans = true;
+
+  /// Removes pre-existing buffers that may exist as part of the units the
+  /// channel connects to from the placement results. These are deducted from
+  /// the numbers of transparent and opaque slots stored in the placement
+  /// results. The latter are expected to specify more slots than what is going
+  /// to be deducted.
+  void deductInternalBuffers(const Channel &channel,
+                             const TimingDatabase &timingDB);
+};
+
+/// Maps channels to buffer placement decisions.
+using BufferPlacement = llvm::MapVector<Value, PlacementResult>;
+
+/// Returns the producer of the channel (in the buffer placement sense), or
+/// nullptr if the channel has no producer in this context. If idx is not
+/// nullptr, it is filled with the definition index of the channel in its
+/// producer.
+Operation *getChannelProducer(Value channel, size_t *idx = nullptr);
+
+/// Maps all the function's channels to their specific buffering properties,
+/// adjusting for buffers within units as described by the timing models. Fails
+/// if the buffering properties of a channel are unsatisfiable or become
+/// unsatisfiable after adjustment.
+LogicalResult
+mapChannelsToProperties(circt::handshake::FuncOp funcOp,
+                        const TimingDatabase &timingDB,
+                        llvm::MapVector<Value, ChannelBufProps> &channelProps);
 
 } // namespace buffer
 } // namespace dynamatic

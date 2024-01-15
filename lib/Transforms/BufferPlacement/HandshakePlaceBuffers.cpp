@@ -16,9 +16,11 @@
 #include "circt/Dialect/Handshake/HandshakeDialect.h"
 #include "circt/Dialect/Handshake/HandshakeOps.h"
 #include "dynamatic/Analysis/NameAnalysis.h"
+#include "dynamatic/Support/Attribute.h"
+#include "dynamatic/Support/CFG.h"
 #include "dynamatic/Support/Logging.h"
-#include "dynamatic/Support/LogicBB.h"
 #include "dynamatic/Transforms/BufferPlacement/BufferPlacementMILP.h"
+#include "dynamatic/Transforms/BufferPlacement/BufferingSupport.h"
 #include "dynamatic/Transforms/BufferPlacement/CFDFC.h"
 #include "dynamatic/Transforms/BufferPlacement/FPGA20Buffers.h"
 #include "dynamatic/Transforms/BufferPlacement/FPL22Buffers.h"
@@ -110,6 +112,13 @@ HandshakePlaceBuffersPass::HandshakePlaceBuffersPass(
 }
 
 void HandshakePlaceBuffersPass::runDynamaticPass() {
+  // Buffer placement requires that all values are used exactly once
+  mlir::ModuleOp modOp = getOperation();
+  if (failed(verifyIRMaterialized(modOp))) {
+    modOp->emitError() << ERR_NON_MATERIALIZED_MOD;
+    return;
+  }
+
   // Map algorithms to the function to call to execute them
   llvm::MapVector<StringRef, LogicalResult (HandshakePlaceBuffersPass::*)()>
       allAlgorithms;
@@ -138,6 +147,7 @@ void HandshakePlaceBuffersPass::runDynamaticPass() {
 
   // Make sure all operations are named (used to generate unique MILP variable
   // names).
+
   NameAnalysis &namer = getAnalysis<NameAnalysis>();
   namer.nameAllUnnamedOps();
 
@@ -195,16 +205,6 @@ LogicalResult HandshakePlaceBuffersPass::placeUsingMILP() {
 }
 
 LogicalResult HandshakePlaceBuffersPass::checkFuncInvariants(FuncInfo &info) {
-  handshake::FuncOp funcOp = info.funcOp;
-
-  // Verify that the IR is in a valid state for buffer placement
-  // Buffer placement requires that all values are used exactly once
-  if (failed(verifyIRMaterialized(funcOp)))
-    return funcOp.emitOpError() << ERR_NON_MATERIALIZED_FUNC;
-
-  // Perform a number of verifications to make sure that the Handshake function
-  // whose information is passed as argument is valid for buffer placement
-
   // Store all archs in a map for fast query time
   DenseMap<unsigned, llvm::SmallDenseSet<unsigned, 2>> transitions;
   for (ArchBB &arch : info.archs)
@@ -470,15 +470,56 @@ LogicalResult HandshakePlaceBuffersPass::getBufferPlacement(
 
 LogicalResult HandshakePlaceBuffersPass::placeWithoutUsingMILP() {
   // The only strategy at this point is to place buffers on the output channels
-  // of all merge-like operations
+  // of all merge-like operations. We still want to respect channel-specific
+  // buffering constraints
+
+  // Read the operations' timing models from disk
+  TimingDatabase timingDB(&getContext());
+  if (failed(TimingDatabase::readFromJSON(timingModels, timingDB)))
+    return failure();
+
   for (handshake::FuncOp funcOp : getOperation().getOps<handshake::FuncOp>()) {
-    BufferPlacement placement;
+    // Map all channels in the function to their specific buffering properties,
+    // adjusting for internal buffers present inside the units
+    llvm::MapVector<Value, ChannelBufProps> channelProps;
+    if (failed(mapChannelsToProperties(funcOp, timingDB, channelProps)))
+      return failure();
+
+    // Make sure that the data output channels of all merge-like operations have
+    // at least one opaque and one transparent slot, unless a constraint
+    // explicitly prevents us from putting a buffer there
     for (auto mergeLikeOp : funcOp.getOps<MergeLikeOpInterface>()) {
-      for (OpResult res : mergeLikeOp->getResults())
-        placement[res] = PlacementResult{1, 1, true};
+      ChannelBufProps &resProps = channelProps[mergeLikeOp->getResult(0)];
+      if (resProps.maxTrans.value_or(1) >= 1) {
+        resProps.minTrans = std::max(resProps.minTrans, 1U);
+      } else {
+        mergeLikeOp->emitWarning()
+            << "Cannot place transparent buffer on merge-like operation's "
+               "output due to channel-specific buffering constraints. This may "
+               "yield an invalid buffering.";
+      }
+      if (resProps.maxOpaque.value_or(1) >= 1) {
+        resProps.minOpaque = std::max(resProps.minOpaque, 1U);
+      } else {
+        mergeLikeOp->emitWarning()
+            << "Cannot place opaque buffer on merge-like operation's "
+               "output due to channel-specific buffering constraints. This may "
+               "yield an invalid buffering.";
+      }
+    }
+
+    // Place the minimal number of buffers (as specified by the buffering
+    // constraints on each channel) for each channel, deducting internal unit
+    // buffers at the same time
+    BufferPlacement placement;
+    for (auto &[channel, props] : channelProps) {
+      PlacementResult result{props.minTrans, props.minOpaque};
+      result.deductInternalBuffers(Channel(channel), timingDB);
+      placement[channel] = result;
     }
     instantiateBuffers(placement);
   }
+
   return success();
 }
 

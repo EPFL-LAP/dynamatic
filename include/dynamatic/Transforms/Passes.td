@@ -118,6 +118,22 @@ def HandshakeMaterialize : DynamaticPass<"handshake-materialize"> {
   let constructor = "dynamatic::createHandshakeMaterialize()";
 }
 
+def HandshakeMiminizeLSQUsage : DynamaticPass<"handshake-minimize-lsq-usage"> {
+  let summary = "Minimizes the number of memory ports that go to LSQs.";
+  let description = [{
+    Performs flow analysis to identify WAR dependencies between memory accesses
+    that are ensured by the circuit's semantics and which therefore do not need
+    to be enforced by an LSQ. This allows to reduce the number of memory ports
+    that go to LSQs, thereby improving the circuit's performance and area thanks
+    to LSQ size reduction (or elimination, in some instances).
+
+    The pass requires that all eligible operations within Handshake functions
+    are tagged with the basic block they belong to, and that all memory access
+    operations are uniquely named.
+  }];
+  let constructor = "dynamatic::createHandshakeMinimizeLSQUsage()";
+}
+
 def HandshakePrepareForLegacy : DynamaticPass<"handshake-prepare-for-legacy"> {
   let summary = "Prepare the IR for usage in legacy Dynamatic.";
   let description = [{
@@ -317,8 +333,11 @@ def MarkMemoryInterfaces : DynamaticPass<"mark-memory-interfaces"> {
     `circt::handshake::MemInterfaceAttr` attribute indicating the kind of
     memory interface they should eventually connect to. It uses memory
     dependencies derived during polyhedral analysis to determine the type of
-    interface necessary for each memory port. As such this pass should typically
-    be ran after the `--mark-memory-dependencies` pass.
+    interface necessary for each memory port. The pass also requires that the IR
+    is in an unstructured control flow form to create appropriate LSQ groups.
+    As such this pass should typically be ran sometime after the
+    `--mark-memory-dependencies` pass, strictly below the scf IR level, and
+    before memory interface instantiation.
 
     Internally, it uses `circt::handshake::MemDependenceArrayAttr` attributes
     attached to memory operations to determine whether any memory access depends

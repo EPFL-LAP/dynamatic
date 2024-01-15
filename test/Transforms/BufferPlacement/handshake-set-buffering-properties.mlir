@@ -61,17 +61,17 @@ handshake.func @lsqUnbuffered(%memref: memref<64xi32>, %addr: i32, %start: none)
 // CHECK:           %[[VAL_2:.*]]:3, %[[VAL_3:.*]] = lsq{{\[}}%[[VAL_0]] : memref<64xi32>] (%[[VAL_4:.*]]#0, %[[VAL_5:.*]], %[[VAL_6:.*]]#0, %[[VAL_7:.*]], %[[VAL_8:.*]]#0, %[[VAL_9:.*]])  {bufProps = #handshake<bufProps{"0": [0,0], [0,0], 0.000000e+00, 0.000000e+00, 0.000000e+00, "1": [0,0], [0,0], 0.000000e+00, 0.000000e+00, 0.000000e+00, "2": [0,0], [0,0], 0.000000e+00, 0.000000e+00, 0.000000e+00, "3": [0,0], [0,0], 0.000000e+00, 0.000000e+00, 0.000000e+00, "4": [0,0], [0,0], 0.000000e+00, 0.000000e+00, 0.000000e+00, "5": [0,0], [0,0], 0.000000e+00, 0.000000e+00, 0.000000e+00, "6": [0,0], [0,0], 0.000000e+00, 0.000000e+00, 0.000000e+00}>, groupSizes = [1 : i32, 1 : i32, 1 : i32]} : (none, i32, none, i32, none, i32) -> (i32, i32, i32, none)
 // CHECK:           %[[VAL_10:.*]] = merge %[[VAL_1]], %[[VAL_6]]#2 {bb = 1 : ui32, bufProps = #handshake<bufProps{"1": [0,inf], [1,inf], 0.000000e+00, 0.000000e+00, 0.000000e+00}>} : none
 // CHECK:           %[[VAL_4]]:4 = lazy_fork [4] %[[VAL_10]] {bb = 1 : ui32, bufProps = #handshake<bufProps{"0": [1,inf], [0,inf], 0.000000e+00, 0.000000e+00, 0.000000e+00}>} : none
-// CHECK:           %[[VAL_11:.*]] = constant %[[VAL_4]]#1 {bb = 1 : ui32, value = false} : i1
-// CHECK:           %[[VAL_12:.*]] = constant %[[VAL_4]]#2 {bb = 1 : ui32, value = 0 : i32} : i32
+// CHECK:           %[[VAL_11:.*]] = constant %[[VAL_4]]#1 {bb = 1 : ui32, bufProps = #handshake<bufProps{"0": [1,inf], [0,inf], 0.000000e+00, 0.000000e+00, 0.000000e+00}>, value = false} : i1
+// CHECK:           %[[VAL_12:.*]] = constant %[[VAL_4]]#2 {bb = 1 : ui32, bufProps = #handshake<bufProps{"0": [1,inf], [0,inf], 0.000000e+00, 0.000000e+00, 0.000000e+00}>, value = 0 : i32} : i32
 // CHECK:           %[[VAL_5]], %[[VAL_13:.*]] = lsq_load{{\[}}%[[VAL_12]]] %[[VAL_2]]#0 {bb = 1 : ui32, bufProps = #handshake<bufProps{"1": [0,0], [0,0], 0.000000e+00, 0.000000e+00, 0.000000e+00}>} : i32, i32
 // CHECK:           %[[VAL_14:.*]], %[[VAL_15:.*]] = cond_br %[[VAL_11]], %[[VAL_4]]#3 {bb = 1 : ui32, bufProps = #handshake<bufProps{"1": [0,inf], [1,inf], 0.000000e+00, 0.000000e+00, 0.000000e+00}>} : none
 // CHECK:           sink %[[VAL_13]] : i32
 // CHECK:           %[[VAL_6]]:3 = lazy_fork [3] %[[VAL_14]] {bb = 2 : ui32} : none
-// CHECK:           %[[VAL_16:.*]] = constant %[[VAL_6]]#1 {bb = 2 : ui32, value = 1 : i32} : i32
+// CHECK:           %[[VAL_16:.*]] = constant %[[VAL_6]]#1 {bb = 2 : ui32, bufProps = #handshake<bufProps{"0": [1,inf], [0,inf], 0.000000e+00, 0.000000e+00, 0.000000e+00}>, value = 1 : i32} : i32
 // CHECK:           %[[VAL_7]], %[[VAL_17:.*]] = lsq_load{{\[}}%[[VAL_16]]] %[[VAL_2]]#1 {bb = 2 : ui32, bufProps = #handshake<bufProps{"1": [0,0], [0,0], 0.000000e+00, 0.000000e+00, 0.000000e+00}>} : i32, i32
 // CHECK:           sink %[[VAL_17]] : i32
 // CHECK:           %[[VAL_8]]:2 = lazy_fork [2] %[[VAL_15]] {bb = 3 : ui32} : none
-// CHECK:           %[[VAL_18:.*]] = constant %[[VAL_8]]#1 {bb = 3 : ui32, value = 2 : i32} : i32
+// CHECK:           %[[VAL_18:.*]] = constant %[[VAL_8]]#1 {bb = 3 : ui32, bufProps = #handshake<bufProps{"0": [1,inf], [0,inf], 0.000000e+00, 0.000000e+00, 0.000000e+00}>, value = 2 : i32} : i32
 // CHECK:           %[[VAL_9]], %[[VAL_19:.*]] = lsq_load{{\[}}%[[VAL_18]]] %[[VAL_2]]#2 {bb = 3 : ui32, bufProps = #handshake<bufProps{"1": [0,0], [0,0], 0.000000e+00, 0.000000e+00, 0.000000e+00}>} : i32, i32
 // CHECK:           %[[VAL_20:.*]] = d_return {bb = 3 : ui32} %[[VAL_19]] : i32
 // CHECK:           end {bb = 3 : ui32, bufProps = #handshake<bufProps{"1": [0,0], [0,0], 0.000000e+00, 0.000000e+00, 0.000000e+00}>} %[[VAL_20]], %[[VAL_3]] : i32, none

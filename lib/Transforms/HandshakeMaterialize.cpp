@@ -13,8 +13,8 @@
 
 #include "dynamatic/Transforms/HandshakeMaterialize.h"
 #include "circt/Dialect/Handshake/HandshakeOps.h"
+#include "dynamatic/Support/CFG.h"
 #include "dynamatic/Support/Handshake.h"
-#include "dynamatic/Support/LogicBB.h"
 #include "mlir/IR/BuiltinTypes.h"
 #include "mlir/Transforms/GreedyPatternRewriteDriver.h"
 #include "llvm/ADT/STLExtras.h"

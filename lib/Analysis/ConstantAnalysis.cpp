@@ -11,7 +11,7 @@
 //===----------------------------------------------------------------------===//
 
 #include "dynamatic/Analysis/ConstantAnalysis.h"
-#include "dynamatic/Support/LogicBB.h"
+#include "dynamatic/Support/CFG.h"
 
 using namespace circt;
 using namespace dynamatic;

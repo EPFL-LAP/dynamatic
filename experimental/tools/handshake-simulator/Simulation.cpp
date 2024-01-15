@@ -11,10 +11,10 @@
 //
 //===----------------------------------------------------------------------===//
 
-#include "experimental/tools/handshake-simulator/ExecModels.h"
 #include "experimental/tools/handshake-simulator/Simulation.h"
 #include "circt/Dialect/Handshake/HandshakeOps.h"
 #include "circt/Support/JSON.h"
+#include "experimental/tools/handshake-simulator/ExecModels.h"
 #include "mlir/Dialect/Arith/IR/Arith.h"
 #include "mlir/Dialect/ControlFlow/IR/ControlFlowOps.h"
 #include "mlir/Dialect/Func/IR/FuncOps.h"
@@ -25,6 +25,7 @@
 #include "llvm/ADT/StringMap.h"
 #include "llvm/ADT/TypeSwitch.h"
 #include "llvm/Support/Debug.h"
+#include "llvm/Support/ErrorHandling.h"
 
 #include <list>
 
@@ -64,6 +65,7 @@ static void fatalValueError(StringRef reason, T &value) {
 }
 
 /// Read a MLIR value from a stringstream and returns a casted version
+/// NOLINTNEXTLINE(misc-no-recursion)
 static Any readValueWithType(mlir::Type type, std::stringstream &arg) {
   if (type.isIndex()) {
     int64_t x;
@@ -71,23 +73,27 @@ static Any readValueWithType(mlir::Type type, std::stringstream &arg) {
     int64_t width = INDEX_WIDTH;
     APInt aparg(width, x);
     return aparg;
-  } else if (type.isa<mlir::IntegerType>()) {
+  }
+  if (type.isa<mlir::IntegerType>()) {
     int64_t x;
     arg >> x;
     int64_t width = type.getIntOrFloatBitWidth();
     APInt aparg(width, x);
     return aparg;
-  } else if (type.isF32()) {
+  }
+  if (type.isF32()) {
     float x;
     arg >> x;
     APFloat aparg(x);
     return aparg;
-  } else if (type.isF64()) {
+  }
+  if (type.isF64()) {
     double x;
     arg >> x;
     APFloat aparg(x);
     return aparg;
-  } else if (auto tupleType = type.dyn_cast<TupleType>()) {
+  }
+  if (auto tupleType = type.dyn_cast<TupleType>()) {
     char tmp;
     arg >> tmp;
     assert(tmp == '(' && "tuple should start with '('");
@@ -105,15 +111,13 @@ static Any readValueWithType(mlir::Type type, std::stringstream &arg) {
         values.size() == tupleType.getTypes().size() &&
         "expected the number of tuple elements to match with the tuple type");
     return values;
-  } else {
-    assert(false && "unknown argument type!");
-    return {};
   }
+  llvm_unreachable("unknown argument type!");
 }
 
 /// readValueWithType overload to output content to a string
-static Any readValueWithType(mlir::Type type, std::string in) {
-  std::stringstream stream(in);
+static Any readValueWithType(mlir::Type type, StringRef in) {
+  std::stringstream stream(in.str());
   return readValueWithType(type, stream);
 }
 
@@ -177,8 +181,7 @@ static LogicalResult allocateMemRef(mlir::MemRefType type, std::vector<Any> &in,
 class HandshakeExecuter {
 public:
   /// Entry point for circt::handshake::FuncOp top-level functions
-  HandshakeExecuter(circt::handshake::FuncOp &func,
-                    CircuitState &circuitState,
+  HandshakeExecuter(circt::handshake::FuncOp &func, CircuitState &circuitState,
                     std::vector<Any> &results,
                     std::vector<std::vector<Any>> &store,
                     mlir::OwningOpRef<mlir::ModuleOp> &module,
@@ -224,13 +227,13 @@ HandshakeExecuter::HandshakeExecuter(circt::handshake::FuncOp &func,
       hasEnd = true;
     }
     // (Temporary)
-    // Inititialize all channels 
-    for (auto value : op->getOperands()) 
-      if (circuitState.getState(value) != DataflowState::VALID)
-        circuitState.channelMap[value] = { DataflowState::NONE, std::nullopt };
-    
-      
-
+    // Inititialize all channels
+    for (auto value : op->getOperands())
+      if (!circuitState.channelMap[value].isValid) {
+        circuitState.channelMap[value].isValid = false;
+        circuitState.channelMap[value].isReady = false;
+        circuitState.channelMap[value].data = std::nullopt;
+      }
   });
 
   assert(
@@ -246,7 +249,7 @@ HandshakeExecuter::HandshakeExecuter(circt::handshake::FuncOp &func,
              "single buffer value.");
       Value bufferRes = bufferOp.getResult();
       APInt value = APInt(bufferRes.getType().getIntOrFloatBitWidth(),
-                                  initValues.front());
+                          initValues.front());
       circuitState.storeValue(bufferRes, value);
     }
   }
@@ -255,7 +258,7 @@ HandshakeExecuter::HandshakeExecuter(circt::handshake::FuncOp &func,
   StateManager manager;
   manager.currentCycle = 0;
   ExecutableData execData{circuitState, memoryMap,       store,
-                          models,   internalDataMap, manager.currentCycle};
+                          models,       internalDataMap, manager.currentCycle};
   // Main simulation loop
   while (true) {
     // 1 cycle
@@ -278,12 +281,18 @@ HandshakeExecuter::HandshakeExecuter(circt::handshake::FuncOp &func,
             return;
           }
         }
-
       } // for operations
+
+      // Transfer data from rising edges to real data
+      for (auto &[channel, data] : circuitState.bufferChannelMap)
+        circuitState.storeValue(channel, data);
+
     } while (manager.valueChangedThisCycle);
 
+    // Reset rising edges state so they can start at next cycle
+    circuitState.edgeRisenOps.clear();
     ++manager.currentCycle;
-  } // while (true)
+  }
 }
 
 //===----------------------------------------------------------------------===//
@@ -387,9 +396,9 @@ LogicalResult simulate(StringRef toplevelFunction,
   bool succeeded = false;
   if (circt::handshake::FuncOp toplevel =
           module->lookupSymbol<circt::handshake::FuncOp>(toplevelFunction)) {
-    succeeded =
-        HandshakeExecuter(toplevel, circuitState, results, store, module, models)
-            .succeeded();
+    succeeded = HandshakeExecuter(toplevel, circuitState, results, store,
+                                  module, models)
+                    .succeeded();
 
     outs() << "Finished execution\n";
   }
