@@ -135,8 +135,8 @@ if [[ $USE_SIMPLE_BUFFERS -ne 0 ]]; then
   exit_on_fail "Failed to place simple buffers" "Placed simple buffers"
 else
   # Compile kernel's main function to extract profiling information
-  "$CLANGXX_BIN" "$SRC_DIR/$KERNEL_NAME.c" -D PRINT_PROFILING_INFO \
-    -Wno-deprecated -o "$F_PROFILER_BIN"
+  "$CLANGXX_BIN" "$SRC_DIR/$KERNEL_NAME.c" -D PRINT_PROFILING_INFO -I \
+    "$DYNAMATIC_DIR/include" -Wno-deprecated -o "$F_PROFILER_BIN"
   exit_on_fail "Failed to build kernel for profiling" "Built kernel for profiling" 
 
   "$F_PROFILER_BIN" > "$F_PROFILER_INPUTS"
