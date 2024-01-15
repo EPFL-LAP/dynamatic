@@ -33,7 +33,7 @@ namespace experimental {
 namespace speculation {
 
 struct PlacementOperand {
-  StringRef opName;
+  std::string opName;
   unsigned opIdx;
 };
 

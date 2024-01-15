@@ -105,7 +105,7 @@ static inline void parseSpeculatorPlacement(
     const llvm::json::Object *specObj = components->getObject("speculator");
     StringRef opName = specObj->getString("operation-name").value();
     unsigned opIdx = specObj->getInteger("operand-idx").value();
-    placements["speculator"].push_back({opName, opIdx});
+    placements["speculator"].push_back({opName.str(), opIdx});
   }
 }
 
@@ -119,7 +119,7 @@ static inline void parseOperationPlacements(
       const llvm::json::Object *specObj = element.getAsObject();
       StringRef opName = specObj->getString("operation-name").value();
       unsigned opIdx = specObj->getInteger("operand-idx").value();
-      placements[opType].push_back({opName, opIdx});
+      placements[opType].push_back({opName.str(), opIdx});
     }
   }
 }
@@ -146,7 +146,7 @@ static inline void parseOperationPlacements(
 //       "operand-idx": 1
 //     }
 //   ],
-//   "saveCommits": [
+//   "save-commits": [
 //     {
 //       "operation-name": "buffer10",
 //       "operand-idx": 0
