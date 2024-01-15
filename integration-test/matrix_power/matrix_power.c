@@ -1,5 +1,5 @@
 #include "matrix_power.h"
-#include "../integration_utils.h"
+#include "dynamatic/Integration.h"
 #include <stdlib.h>
 
 void matrix_power(inout_int_t x[N][N], in_int_t row[N], in_int_t col[N],

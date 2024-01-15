@@ -5,7 +5,7 @@
 //===----------------------------------------------------------------------===//
 
 #include "threshold.h"
-#include "../integration_utils.h"
+#include "dynamatic/Integration.h"
 #include <stdlib.h>
 
 void threshold(in_int_t th, inout_int_t red[N], inout_int_t green[N],

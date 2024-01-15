@@ -1,5 +1,5 @@
 #include "pivot.h"
-#include "../integration_utils.h"
+#include "dynamatic/Integration.h"
 #include <stdlib.h>
 
 void pivot(inout_int_t x[N], in_int_t a[N], in_int_t n, in_int_t k) {

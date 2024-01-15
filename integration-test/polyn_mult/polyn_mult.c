@@ -5,7 +5,7 @@
 //===----------------------------------------------------------------------===//
 
 #include "polyn_mult.h"
-#include "../integration_utils.h"
+#include "dynamatic/Integration.h"
 
 unsigned polyn_mult(in_int_t a[N], in_int_t b[N], out_int_t out[N]) {
   unsigned p = 0;

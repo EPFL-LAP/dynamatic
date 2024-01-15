@@ -1,5 +1,5 @@
 #include "sumi3_mem.h"
-#include "../integration_utils.h"
+#include "dynamatic/Integration.h"
 #include <stdlib.h>
 
 int sumi3_mem(in_int_t a[N]) {

@@ -5,7 +5,7 @@
 //===----------------------------------------------------------------------===//
 
 #include "gcd.h"
-#include "../integration_utils.h"
+#include "dynamatic/Integration.h"
 
 int gcd(in_int_t a, in_int_t b) {
   // Finding K, where K is the greatest power of 2 that divides both in0 and

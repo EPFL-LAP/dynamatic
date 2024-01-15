@@ -1,5 +1,5 @@
 #include "if_loop_1.h"
-#include "../integration_utils.h"
+#include "dynamatic/Integration.h"
 #include <stdlib.h>
 
 int if_loop_1(in_int_t a[N], in_int_t n) {

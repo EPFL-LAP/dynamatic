@@ -1,5 +1,5 @@
 #include "image_resize.h"
-#include "../integration_utils.h"
+#include "dynamatic/Integration.h"
 #include <stdlib.h>
 
 void image_resize(inout_int_t a[N][N], in_int_t c) {

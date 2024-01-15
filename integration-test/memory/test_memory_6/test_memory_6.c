@@ -1,5 +1,5 @@
 #include "test_memory_6.h"
-#include "../../integration_utils.h"
+#include "dynamatic/Integration.h"
 #include <stdlib.h>
 
 void test_memory_6(inout_int_t a[N], in_int_t n) {

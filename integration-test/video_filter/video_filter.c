@@ -5,7 +5,7 @@
 //===----------------------------------------------------------------------===//
 
 #include "video_filter.h"
-#include "../integration_utils.h"
+#include "dynamatic/Integration.h"
 #include <stdlib.h>
 
 void video_filter(in_int_t offset, in_int_t scale, inout_int_t pixelR[N][N],

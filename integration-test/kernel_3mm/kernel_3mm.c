@@ -7,7 +7,7 @@
  */
 
 #include "kernel_3mm.h"
-#include "../integration_utils.h"
+#include "dynamatic/Integration.h"
 #include <stdio.h>
 #include <stdlib.h>
 

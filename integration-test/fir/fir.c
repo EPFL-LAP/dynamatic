@@ -6,7 +6,7 @@
 //===----------------------------------------------------------------------===//
 
 #include "fir.h"
-#include "../integration_utils.h"
+#include "dynamatic/Integration.h"
 #include "stdlib.h"
 
 int fir(in_int_t di[N], in_int_t idx[N]) {

@@ -1,5 +1,5 @@
 #include "insertion_sort.h"
-#include "../integration_utils.h"
+#include "dynamatic/Integration.h"
 #include <stdlib.h>
 
 void insertion_sort(inout_int_t A[N], in_int_t n) {

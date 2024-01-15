@@ -1,5 +1,5 @@
 #include "simple_example.h"
-#include "../integration_utils.h"
+#include "dynamatic/Integration.h"
 
 void simple_example(inout_int_t a[N]) {
   int x = 0;

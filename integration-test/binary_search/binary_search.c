@@ -5,7 +5,7 @@
 //===----------------------------------------------------------------------===//
 
 #include "binary_search.h"
-#include "../integration_utils.h"
+#include "dynamatic/Integration.h"
 
 int binary_search(in_int_t search, in_int_t a[N]) {
   int evenIdx = -1;

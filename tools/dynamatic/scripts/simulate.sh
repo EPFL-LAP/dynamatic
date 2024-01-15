@@ -36,8 +36,11 @@ rm -rf "$SIM_DIR" && mkdir -p "$SIM_DIR"
 mkdir -p "$C_SRC_DIR" "$C_OUT_DIR" "$VHDL_SRC_DIR" "$VHDL_OUT_DIR" \
     "$INPUT_VECTORS_DIR" "$HLS_VERIFY_DIR"
 
-# Copy integration headers to sim directory to make it visible by the HLS verifier
-cp "$DYNAMATIC_DIR/integration-test/integration_utils.h" "$SIM_DIR"
+# Copy integration header to a C source subdirectory so that its relative path
+# is correct with respect to the source file containing the kernel 
+DYN_INCLUDE_DIR="$C_SRC_DIR/dynamatic"
+mkdir "$DYN_INCLUDE_DIR"
+cp "$DYNAMATIC_DIR/include/dynamatic/Integration.h" "$DYN_INCLUDE_DIR"
 
 # Copy VHDL module and VHDL components to dedicated folder
 cp "$COMP_DIR/$KERNEL_NAME.vhd" "$VHDL_SRC_DIR"
