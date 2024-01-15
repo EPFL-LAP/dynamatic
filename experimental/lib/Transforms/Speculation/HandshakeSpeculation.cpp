@@ -51,6 +51,18 @@ private:
   /// Place the operation specified in T with the control signal ctrlSignal
   template <typename T>
   LogicalResult placeUnits(Value ctrlSignal);
+
+  /// Create the control path for commit signals by replicating branches
+  template <typename TypeCommitOp>
+  bool routeBranchControlTraversal(llvm::DenseSet<Operation *> &visited,
+                                   Value ctrlSignal, Operation *currOp);
+
+  /// Wrapper around routeCommitControlTraversal to prepare and invoke the
+  /// placement
+  LogicalResult prepareAndPlaceCommits();
+
+  /// Place the SaveCommit operations and the control path
+  LogicalResult prepareAndPlaceSaveCommits();
 };
 } // namespace
 
@@ -63,12 +75,195 @@ LogicalResult HandshakeSpeculationPass::placeUnits(Value ctrlSignal) {
     // Create and connect the new Operation
     builder.setInsertionPoint(p.dstOp);
     T newOp = builder.create<T>(p.dstOp->getLoc(), p.srcOpResult, ctrlSignal);
+    inheritBB(p.dstOp, newOp);
 
     // Connect the new Operation to dstOp
     p.srcOpResult.replaceAllUsesExcept(newOp.getResult(), newOp);
   }
 
   return success();
+}
+
+// This function should be used for SpecCommitOp and SpecSaveCommitOp
+template <typename TypeCommitOp>
+bool HandshakeSpeculationPass::routeBranchControlTraversal(
+    llvm::DenseSet<Operation *> &visited, Value ctrlSignal, Operation *currOp) {
+  // End traversal if already visited
+  if (visited.contains(currOp))
+    return false;
+  visited.insert(currOp);
+
+  bool found_commit = false;
+  if (isa<TypeCommitOp>(currOp)) {
+    // Connect commit to the correct control signal and end traversal
+    currOp->setOperand(1, ctrlSignal);
+    found_commit = true;
+  } else if (isa<handshake::ConditionalBranchOp>(currOp)) {
+    // Replicate a branch in the control path and use new control signal
+    MLIRContext *ctx = &getContext();
+    OpBuilder builder(ctx);
+
+    builder.setInsertionPointAfterValue(ctrlSignal);
+
+    // The Speculating Branch will discard the control token if the token
+    // in the speculative path is non-speculative.
+    Operation *branchDisc = builder.create<handshake::SpeculatingBranchOp>(
+        currOp->getLoc(), currOp->getResult(0), // specTagOperand
+        currOp->getOperand(0)                   // dataOperand
+    );
+    visited.insert(branchDisc);
+
+    // Connect a conditional branch at the true result of branchDisc
+    Operation *branchCond = builder.create<handshake::ConditionalBranchOp>(
+        branchDisc->getLoc(),
+        branchDisc->getResult(0), // conditionOperand
+        ctrlSignal                // dataOperand
+    );
+    visited.insert(branchCond);
+
+    // Follow the two branch results with a different control signal
+    for (int i = 0; i <= 1; ++i) {
+      for (Operation *succOp : currOp->getResult(i).getUsers()) {
+        Value ctrl = branchCond->getResult(i);
+        bool routed =
+            routeBranchControlTraversal<TypeCommitOp>(visited, ctrl, succOp);
+        found_commit = found_commit || routed;
+      }
+    }
+
+    if (!found_commit) {
+      // Remove unused branch signal
+      branchCond->erase();
+      branchDisc->erase();
+    }
+
+  } else {
+    // Continue Traversal
+    for (Value res : currOp->getResults()) {
+      for (Operation *succOp : res.getUsers()) {
+        bool routed = routeBranchControlTraversal<TypeCommitOp>(
+            visited, ctrlSignal, succOp);
+        found_commit = found_commit || routed;
+      }
+    }
+  }
+  return found_commit;
+}
+
+LogicalResult HandshakeSpeculationPass::prepareAndPlaceCommits() {
+
+  // Place commits and connect to the Speculator Commit Control Signal
+  Value commitCtrl = specOp.getCommitCtrl();
+  if (failed(placeUnits<handshake::SpecCommitOp>(commitCtrl)))
+    return failure();
+
+  // Create visited set
+  llvm::DenseSet<Operation *> visited;
+  visited.insert(specOp.getDataOut().getDefiningOp());
+
+  // Start traversal at the speculator output
+  for (Operation *succOp : specOp.getDataOut().getUsers()) {
+    routeBranchControlTraversal<SpecCommitOp>(visited, commitCtrl, succOp);
+  }
+
+  return success();
+}
+
+static LogicalResult findControlBranch(ModuleOp modOp, unsigned bb,
+                                       ConditionalBranchOp &cbranchOp) {
+  handshake::FuncOp funcOp = *modOp.getOps<handshake::FuncOp>().begin();
+  assert(funcOp && "funcOp not found");
+  auto handshakeBlocks = getLogicBBs(funcOp);
+
+  handshake::ConditionalBranchOp controlBranch;
+
+  // Iterate all Ops in the BB where we want to have Speculation
+  for (auto blockOp : handshakeBlocks.blocks.lookup(bb)) {
+    if ((controlBranch = dyn_cast<handshake::ConditionalBranchOp>(blockOp))) {
+      // ASSUMPTION: The control branch has a backedge
+      for (Value result : blockOp->getResults()) {
+        for (Operation *user : result.getUsers()) {
+          if (isBackedge(result, user)) {
+            cbranchOp = controlBranch;
+            return success();
+          }
+        }
+      }
+    }
+  }
+  llvm::errs() << "Could not find backedge within the Speculator's BB\n";
+  return failure();
+}
+
+LogicalResult HandshakeSpeculationPass::prepareAndPlaceSaveCommits() {
+  MLIRContext *ctx = &getContext();
+  OpBuilder builder(ctx);
+
+  // Don't do anything if there are no SaveCommits to place
+  if (placements.getPlacements<handshake::SpecSaveCommitOp>().size() == 0)
+    return success();
+
+  // The save commits are a result of a control branch being in the BB
+  // The control path for the SC needs to replicate the branch
+  unsigned bb = getLogicBB(specOp.getDataIn().getDefiningOp()).value();
+  ConditionalBranchOp controlBranch;
+  if (failed(findControlBranch(getOperation(), bb, controlBranch)))
+    return failure();
+
+  // To connect a Save-Commit, two control signals are sent from the Speculator
+  // and are merged before reaching the Save-Commit.
+  // The tokens take differents paths. One needs to always reach the SC,
+  // the other should follow the actual branches similarly to the Commits
+  builder.setInsertionPointAfterValue(specOp.getSCSaveCtrl());
+  auto branchDisc1 = builder.create<handshake::SpeculatingBranchOp>(
+      controlBranch.getLoc(),
+      controlBranch.getTrueResult(),      // specTagOperand
+      controlBranch.getConditionOperand() // Ctrl signal fromthe branch
+  );
+
+  // This branch will propagate the signal SCControl1 according to thecontrol
+  // branch condition, which comes from branchDisc1
+  auto branchDisc2 = builder.create<handshake::ConditionalBranchOp>(
+      branchDisc1.getLoc(), branchDisc1.getTrueResult(),
+      specOp.getSCSaveCtrl());
+
+  // Create a conditional branch driven by SCBranchControl from speculator
+  auto branchSaveCommitCond = builder.create<handshake::ConditionalBranchOp>(
+      branchDisc2.getLoc(), specOp.getSCBranchCtrl(),
+      branchDisc2.getTrueResult());
+
+  // We create a Merge operation to join SCCSaveCtrl and SCCommitCtrl signals
+  SmallVector<Value, 2> mergeOperands;
+  mergeOperands.push_back(specOp.getSCCommitCtrl());
+
+  // We need to send the control token to the same path that the speculative
+  // token followed. Hence, if any branch output leads to a backedge, replicate
+  // the branch in the SaveCommit control path.
+  auto isBranchBackedge = [&](Value result) {
+    for (Operation *user : result.getUsers()) {
+      if (isBackedge(result, user))
+        return true;
+    }
+    return false;
+  };
+
+  // Check if trueResult of controlBranch leads to a backedge (loop)
+  if (isBranchBackedge(controlBranch.getTrueResult())) {
+    mergeOperands.push_back(branchSaveCommitCond.getTrueResult());
+  }
+
+  // Check if falseResult of controlBranch leads to a backedge (loop)
+  if (isBranchBackedge(controlBranch.getFalseResult())) {
+    mergeOperands.push_back(branchSaveCommitCond.getFalseResult());
+  }
+
+  // All the inputs to the merge operation are ready
+  auto mergeOp = builder.create<handshake::MergeOp>(
+      branchSaveCommitCond.getLoc(), mergeOperands);
+
+  // All the control logic is set up, now connect the Save-Commits with
+  // the result of mergeOp
+  return placeUnits<handshake::SpecSaveCommitOp>(mergeOp.getResult());
 }
 
 LogicalResult HandshakeSpeculationPass::placeSpeculator() {
@@ -86,6 +281,9 @@ LogicalResult HandshakeSpeculationPass::placeSpeculator() {
   // result, except in the speculator's operands (otherwise this would create a
   // self-loop from the speculator to the speculator)
   place.srcOpResult.replaceAllUsesExcept(specOp.getDataOut(), specOp);
+
+  // Assign a Basic Block to the speculator
+  inheritBB(place.dstOp, specOp.getDataOut().getDefiningOp());
 
   return success();
 }
@@ -105,12 +303,11 @@ void HandshakeSpeculationPass::runDynamaticPass() {
     return signalPassFailure();
 
   // Place Commit operations and the Commit control path
-  if (failed(placeUnits<handshake::SpecCommitOp>(this->specOp.getCommitCtrl())))
+  if (failed(prepareAndPlaceCommits()))
     return signalPassFailure();
 
   // Place SaveCommit operations and the SaveCommit control path
-  if (failed(placeUnits<handshake::SpecSaveCommitOp>(
-          this->specOp.getSCSaveCtrl())))
+  if (failed(prepareAndPlaceSaveCommits()))
     return signalPassFailure();
 }
 
