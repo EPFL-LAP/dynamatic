@@ -1,0 +1,48 @@
+{
+  "speculator": {
+    "operation-name": "fork5",
+    "operand-idx": 0
+  },
+  "saves": [
+    {
+      "operation-name": "cond_br1",
+      "operand-idx": 1
+    },
+    {
+      "operation-name": "cond_br2",
+      "operand-idx": 1
+    },
+    {
+      "operation-name": "cond_br3",
+      "operand-idx": 1
+    },
+    {
+      "operation-name": "cond_br4",
+      "operand-idx": 1
+    }
+  ],
+  "commits": [
+    {
+      "operation-name": "buffer22",
+      "operand-idx": 0
+    },
+    {
+      "operation-name": "mc_load0",
+      "operand-idx": 0
+    },
+    {
+      "operation-name": "mux0",
+      "operand-idx": 0
+    },
+    {
+      "operation-name": "control_merge3",
+      "operand-idx": 0
+    },
+    {
+      "operation-name": "addi1",
+      "operand-idx": 0
+    }
+  ],
+  "save-commits": [
+  ]
+}

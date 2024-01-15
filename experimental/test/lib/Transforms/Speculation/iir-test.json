@@ -1,0 +1,60 @@
+{
+  "speculator": {
+    "operation-name": "fork5",
+    "operand-idx": 0
+  },
+  "saves": [
+    {
+      "operation-name": "cond_br0",
+      "operand-idx": 1
+    },
+    {
+      "operation-name": "cond_br2",
+      "operand-idx": 1
+    },
+    {
+      "operation-name": "cond_br3",
+      "operand-idx": 1
+    },
+    {
+      "operation-name": "cond_br4",
+      "operand-idx": 1
+    },
+    {
+      "operation-name": "cond_br5",
+      "operand-idx": 1
+    },
+    {
+      "operation-name": "muli1",
+      "operand-idx": 1
+    },
+    {
+      "operation-name": "mux1",
+      "operand-idx": 1
+    },
+    {
+      "operation-name": "mux2",
+      "operand-idx": 1
+    },
+    {
+      "operation-name": "mux3",
+      "operand-idx": 1
+    }
+  ],
+  "commits": [
+    {
+      "operation-name": "mc_store0",
+      "operand-idx": 1
+    },
+    {
+      "operation-name": "buffer16",
+      "operand-idx": 0
+    }
+  ],
+  "save-commits": [
+    {
+      "operation-name": "mux4",
+      "operand-idx": 0
+    }
+  ]
+}
