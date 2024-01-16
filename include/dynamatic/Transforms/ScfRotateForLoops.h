@@ -18,6 +18,10 @@
 
 namespace dynamatic {
 
+#define GEN_PASS_DECL_SCFFORLOOPROTATION
+#define GEN_PASS_DEF_SCFFORLOOPROTATION
+#include "dynamatic/Transforms/Passes.h.inc"
+
 std::unique_ptr<dynamatic::DynamaticPass> createScfRotateForLoops();
 
 } // namespace dynamatic

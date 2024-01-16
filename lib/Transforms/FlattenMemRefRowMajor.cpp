@@ -16,7 +16,6 @@
 #include "circt/Dialect/Handshake/HandshakeOps.h"
 #include "dynamatic/Support/Attribute.h"
 #include "dynamatic/Support/Handshake.h"
-#include "dynamatic/Transforms/PassDetails.h"
 #include "mlir/Conversion/LLVMCommon/ConversionTarget.h"
 #include "mlir/Conversion/LLVMCommon/Pattern.h"
 #include "mlir/Dialect/Arith/IR/Arith.h"
@@ -297,7 +296,8 @@ static void populateTypeConversionPatterns(TypeConverter &typeConverter) {
 }
 
 struct FlattenMemRefRowMajorPass
-    : public FlattenMemRefRowMajorBase<FlattenMemRefRowMajorPass> {
+    : public dynamatic::impl::FlattenMemRefRowMajorBase<
+          FlattenMemRefRowMajorPass> {
 public:
   void runDynamaticPass() override {
     mlir::ModuleOp modOp = getOperation();

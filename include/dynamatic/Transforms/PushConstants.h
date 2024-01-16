@@ -18,6 +18,10 @@
 
 namespace dynamatic {
 
+#define GEN_PASS_DECL_PUSHCONSTANTS
+#define GEN_PASS_DEF_PUSHCONSTANTS
+#include "dynamatic/Transforms/Passes.h.inc"
+
 std::unique_ptr<dynamatic::DynamaticPass> createPushConstantsPass();
 
 } // namespace dynamatic

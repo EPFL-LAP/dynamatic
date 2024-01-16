@@ -14,7 +14,6 @@
 #include "dynamatic/Transforms/HandshakePrepareForLegacy.h"
 #include "circt/Dialect/Handshake/HandshakeOps.h"
 #include "dynamatic/Support/CFG.h"
-#include "dynamatic/Transforms/PassDetails.h"
 #include "dynamatic/Transforms/Passes.h"
 #include "mlir/Dialect/Arith/IR/Arith.h"
 #include "mlir/Dialect/MemRef/IR/MemRef.h"
@@ -205,7 +204,8 @@ struct EraseEntryBlockMerges : public OpRewritePattern<handshake::MergeOp> {
 
 /// Simple driver for prepare for legacy pass.
 struct HandshakePrepareForLegacyPass
-    : public HandshakePrepareForLegacyBase<HandshakePrepareForLegacyPass> {
+    : public dynamatic::impl::HandshakePrepareForLegacyBase<
+          HandshakePrepareForLegacyPass> {
 
   void runDynamaticPass() override {
     auto *ctx = &getContext();

@@ -20,7 +20,6 @@
 #include "dynamatic/Transforms/HandshakeInferBasicBlocks.h"
 #include "circt/Dialect/Handshake/HandshakeOps.h"
 #include "dynamatic/Support/CFG.h"
-#include "dynamatic/Transforms/PassDetails.h"
 #include "dynamatic/Transforms/Passes.h"
 #include "mlir/Support/LogicalResult.h"
 #include "mlir/Transforms/DialectConversion.h"
@@ -132,7 +131,8 @@ struct FuncOpInferBasicBlocks : public OpConversionPattern<handshake::FuncOp> {
 /// using a single operation conversion pattern on each handshake::FuncOp in the
 /// module.
 struct HandshakeInferBasicBlocksPass
-    : public HandshakeInferBasicBlocksBase<HandshakeInferBasicBlocksPass> {
+    : public dynamatic::impl::HandshakeInferBasicBlocksBase<
+          HandshakeInferBasicBlocksPass> {
 
   void runDynamaticPass() override {
     MLIRContext *ctx = &getContext();

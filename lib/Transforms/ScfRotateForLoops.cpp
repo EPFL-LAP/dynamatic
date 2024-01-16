@@ -14,7 +14,6 @@
 #include "dynamatic/Transforms/ScfRotateForLoops.h"
 #include "circt/Dialect/Handshake/HandshakeOps.h"
 #include "dynamatic/Analysis/NumericAnalysis.h"
-#include "dynamatic/Transforms/PassDetails.h"
 #include "mlir/Dialect/Arith/IR/Arith.h"
 #include "mlir/Dialect/SCF/IR/SCF.h"
 #include "mlir/IR/MLIRContext.h"
@@ -125,7 +124,7 @@ namespace {
 
 /// Simple greedy pattern rewrite driver for SCF loop rotation pass.
 struct ScfForLoopRotationPass
-    : public ScfForLoopRotationBase<ScfForLoopRotationPass> {
+    : public dynamatic::impl::ScfForLoopRotationBase<ScfForLoopRotationPass> {
 
   void runDynamaticPass() override {
     auto *ctx = &getContext();

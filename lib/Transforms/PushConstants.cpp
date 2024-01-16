@@ -11,7 +11,6 @@
 //===----------------------------------------------------------------------===//
 
 #include "dynamatic/Transforms/PushConstants.h"
-#include "dynamatic/Transforms/PassDetails.h"
 #include "mlir/Dialect/Arith/IR/Arith.h"
 #include "mlir/Dialect/Func/IR/FuncOps.h"
 #include "mlir/IR/BuiltinTypes.h"
@@ -61,7 +60,8 @@ namespace {
 /// Simple driver for constant pushing pass. Runs the pass on every function in
 /// the module independently and succeeds whenever the transformation succeeded
 /// for every function.
-struct PushConstantsPass : public PushConstantsBase<PushConstantsPass> {
+struct PushConstantsPass
+    : public dynamatic::impl::PushConstantsBase<PushConstantsPass> {
 
   void runDynamaticPass() override {
     ModuleOp m = getOperation();
