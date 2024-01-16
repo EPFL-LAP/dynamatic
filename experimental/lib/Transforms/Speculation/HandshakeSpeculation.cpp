@@ -53,7 +53,6 @@ private:
   LogicalResult placeUnits(Value ctrlSignal);
 
   /// Create the control path for commit signals by replicating branches
-  template <typename TypeCommitOp>
   bool routeBranchControlTraversal(llvm::DenseSet<Operation *> &visited,
                                    Value ctrlSignal, Operation *currOp);
 
@@ -84,8 +83,9 @@ LogicalResult HandshakeSpeculationPass::placeUnits(Value ctrlSignal) {
   return success();
 }
 
-// This function should be used for SpecCommitOp and SpecSaveCommitOp
-template <typename TypeCommitOp>
+// This recursive function traverses the IR and creates a control path
+// by replicating the branches along the way. It stops at commits and
+// connects them to the newly created control path, with value ctrlSignal
 bool HandshakeSpeculationPass::routeBranchControlTraversal(
     llvm::DenseSet<Operation *> &visited, Value ctrlSignal, Operation *currOp) {
   // End traversal if already visited
@@ -94,7 +94,7 @@ bool HandshakeSpeculationPass::routeBranchControlTraversal(
   visited.insert(currOp);
 
   bool found_commit = false;
-  if (isa<TypeCommitOp>(currOp)) {
+  if (isa<handshake::SpecCommitOp>(currOp)) {
     // Connect commit to the correct control signal and end traversal
     currOp->setOperand(1, ctrlSignal);
     found_commit = true;
@@ -125,8 +125,7 @@ bool HandshakeSpeculationPass::routeBranchControlTraversal(
     for (int i = 0; i <= 1; ++i) {
       for (Operation *succOp : currOp->getResult(i).getUsers()) {
         Value ctrl = branchCond->getResult(i);
-        bool routed =
-            routeBranchControlTraversal<TypeCommitOp>(visited, ctrl, succOp);
+        bool routed = routeBranchControlTraversal(visited, ctrl, succOp);
         found_commit = found_commit || routed;
       }
     }
@@ -141,8 +140,7 @@ bool HandshakeSpeculationPass::routeBranchControlTraversal(
     // Continue Traversal
     for (Value res : currOp->getResults()) {
       for (Operation *succOp : res.getUsers()) {
-        bool routed = routeBranchControlTraversal<TypeCommitOp>(
-            visited, ctrlSignal, succOp);
+        bool routed = routeBranchControlTraversal(visited, ctrlSignal, succOp);
         found_commit = found_commit || routed;
       }
     }
@@ -151,7 +149,6 @@ bool HandshakeSpeculationPass::routeBranchControlTraversal(
 }
 
 LogicalResult HandshakeSpeculationPass::prepareAndPlaceCommits() {
-
   // Place commits and connect to the Speculator Commit Control Signal
   Value commitCtrl = specOp.getCommitCtrl();
   if (failed(placeUnits<handshake::SpecCommitOp>(commitCtrl)))
@@ -163,7 +160,7 @@ LogicalResult HandshakeSpeculationPass::prepareAndPlaceCommits() {
 
   // Start traversal at the speculator output
   for (Operation *succOp : specOp.getDataOut().getUsers()) {
-    routeBranchControlTraversal<SpecCommitOp>(visited, commitCtrl, succOp);
+    routeBranchControlTraversal(visited, commitCtrl, succOp);
   }
 
   return success();
@@ -180,7 +177,8 @@ static LogicalResult findControlBranch(ModuleOp modOp, unsigned bb,
   // Iterate all Ops in the BB where we want to have Speculation
   for (auto blockOp : handshakeBlocks.blocks.lookup(bb)) {
     if ((controlBranch = dyn_cast<handshake::ConditionalBranchOp>(blockOp))) {
-      // ASSUMPTION: The control branch has a backedge
+      // SaveCommits should only be placed in BBs where there is a Backedge
+      // If this function is called, a backedge should exist
       for (Value result : blockOp->getResults()) {
         for (Operation *user : result.getUsers()) {
           if (isBackedge(result, user)) {
