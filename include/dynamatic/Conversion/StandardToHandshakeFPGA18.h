@@ -109,6 +109,10 @@ private:
   NameAnalysis &nameAnalysis;
 };
 
+#define GEN_PASS_DECL_STANDARDTOHANDSHAKEFPGA18
+#define GEN_PASS_DEF_STANDARDTOHANDSHAKEFPGA18
+#include "dynamatic/Conversion/Passes.h.inc"
+
 std::unique_ptr<dynamatic::DynamaticPass> createStandardToHandshakeFPGA18Pass();
 
 } // namespace dynamatic

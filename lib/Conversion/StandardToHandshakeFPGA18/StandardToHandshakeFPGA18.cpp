@@ -18,7 +18,6 @@
 #include "circt/Dialect/Handshake/HandshakeOps.h"
 #include "dynamatic/Analysis/ConstantAnalysis.h"
 #include "dynamatic/Analysis/NameAnalysis.h"
-#include "dynamatic/Conversion/PassDetails.h"
 #include "dynamatic/Support/Attribute.h"
 #include "dynamatic/Support/CFG.h"
 #include "dynamatic/Support/Handshake.h"
@@ -683,7 +682,8 @@ namespace {
 /// of the module it is applied on. Succeeds whenever all functions in the
 /// module were succesfully lowered to handshake.
 struct StandardToHandshakeFPGA18Pass
-    : public StandardToHandshakeFPGA18Base<StandardToHandshakeFPGA18Pass> {
+    : public dynamatic::impl::StandardToHandshakeFPGA18Base<
+          StandardToHandshakeFPGA18Pass> {
 
   void runDynamaticPass() override {
     ModuleOp modOp = getOperation();

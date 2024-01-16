@@ -12,13 +12,10 @@
 
 #include "dynamatic/Conversion/HandshakeToNetlist.h"
 #include "circt/Conversion/HandshakeToHW.h"
-#include "circt/Dialect/ESI/ESIOps.h"
 #include "circt/Dialect/HW/HWOpInterfaces.h"
-#include "circt/Dialect/HW/HWOps.h"
 #include "circt/Dialect/HW/HWTypes.h"
 #include "circt/Dialect/Handshake/HandshakeDialect.h"
 #include "circt/Dialect/Handshake/HandshakeOps.h"
-#include "dynamatic/Conversion/PassDetails.h"
 #include "dynamatic/Transforms/HandshakeConcretizeIndexType.h"
 #include "dynamatic/Transforms/HandshakeMaterialize.h"
 #include "mlir/Dialect/Arith/IR/Arith.h"
@@ -905,7 +902,7 @@ struct UnpackBufferSlots : public OpRewritePattern<handshake::BufferOp> {
 /// The function and all the operations it contains are converted to operations
 /// from the HW dialect. Dataflow semantics are made explicit with ESI channels.
 class HandshakeToNetListPass
-    : public HandshakeToNetlistBase<HandshakeToNetListPass> {
+    : public dynamatic::impl::HandshakeToNetlistBase<HandshakeToNetListPass> {
 public:
   void runDynamaticPass() override {
     mlir::ModuleOp mod = getOperation();

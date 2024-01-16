@@ -14,7 +14,6 @@
 
 #include "dynamatic/Conversion/AffineToScf.h"
 #include "circt/Dialect/Handshake/HandshakeOps.h"
-#include "dynamatic/Conversion/PassDetails.h"
 #include "dynamatic/Support/Attribute.h"
 #include "dynamatic/Support/DynamaticPass.h"
 #include "dynamatic/Support/Handshake.h"
@@ -367,7 +366,8 @@ private:
 } // namespace
 
 namespace {
-class AffineToScfPass : public AffineToScfBase<AffineToScfPass> {
+class AffineToScfPass
+    : public dynamatic::impl::AffineToScfBase<AffineToScfPass> {
   void runDynamaticPass() override {
     mlir::ModuleOp modOp = getOperation();
     MLIRContext *ctx = &getContext();

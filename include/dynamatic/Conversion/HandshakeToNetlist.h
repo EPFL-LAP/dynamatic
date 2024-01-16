@@ -17,13 +17,13 @@
 #include "circt/Dialect/HW/HWOps.h"
 #include "dynamatic/Support/DynamaticPass.h"
 #include "dynamatic/Support/LLVM.h"
-#include "mlir/Transforms/DialectConversion.h"
-
-using namespace circt;
-using namespace circt::hw;
-using namespace circt::esi;
+#include "mlir/IR/DialectRegistry.h"
 
 namespace dynamatic {
+
+#define GEN_PASS_DECL_HANDSHAKETONETLIST
+#define GEN_PASS_DEF_HANDSHAKETONETLIST
+#include "dynamatic/Conversion/Passes.h.inc"
 
 std::unique_ptr<dynamatic::DynamaticPass> createHandshakeToNetlistPass();
 
