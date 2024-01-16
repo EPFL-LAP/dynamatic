@@ -22,6 +22,7 @@
 #include "dynamatic/Support/Attribute.h"
 #include "dynamatic/Support/CFG.h"
 #include "dynamatic/Support/Handshake.h"
+#include "dynamatic/Transforms/FuncMaximizeSSA.h"
 #include "mlir/Dialect/Affine/Analysis/AffineAnalysis.h"
 #include "mlir/Dialect/Affine/IR/AffineOps.h"
 #include "mlir/Dialect/Affine/Utils.h"
@@ -42,10 +43,6 @@ using namespace mlir::func;
 using namespace mlir::affine;
 using namespace mlir::memref;
 using namespace dynamatic;
-
-#define returnOnError(logicalResult)                                           \
-  if (failed(logicalResult))                                                   \
-    return failure();
 
 //===-----------------------------------------------------------------------==//
 // Helper functions
@@ -599,25 +596,16 @@ private:
 /// Strategy class for SSA maximization during std-to-handshake conversion.
 /// Block arguments of type MemRefType and allocation operations are not
 /// considered for SSA maximization.
-class HandshakeLoweringSSAStrategy : public SSAMaximizationStrategy {
+class HandshakeLoweringSSAStrategy : public dynamatic::SSAMaximizationStrategy {
   /// Filters out block arguments of type MemRefType
   bool maximizeArgument(BlockArgument arg) override {
     return !arg.getType().isa<mlir::MemRefType>();
   }
 
   /// Filters out allocation operations
-  bool maximizeOp(Operation *op) override { return !isAllocOp(op); }
+  bool maximizeOp(Operation &op) override { return !isAllocOp(&op); }
 };
 } // namespace
-
-/// Converts every value in the region into maximal SSA form, unless the value
-/// is a block argument of type MemRefType or the result of an allocation
-/// operation.
-static LogicalResult maximizeSSANoMem(Region &r,
-                                      ConversionPatternRewriter &rewriter) {
-  HandshakeLoweringSSAStrategy strategy;
-  return maximizeSSA(r, strategy, rewriter);
-}
 
 /// Convenience function for running lowerToHandshake with a partial
 /// handshake::FuncOp lowering function.
@@ -701,9 +689,11 @@ struct StandardToHandshakeFPGA18Pass
     ModuleOp modOp = getOperation();
 
     // Lower every function individually
-    for (auto funcOp : llvm::make_early_inc_range(modOp.getOps<func::FuncOp>()))
+    auto funcOps = modOp.getOps<func::FuncOp>();
+    for (func::FuncOp funcOp : llvm::make_early_inc_range(funcOps)) {
       if (failed(lowerFuncOp(funcOp)))
         return signalPassFailure();
+    }
   }
 
   /// Fully lowers a func::FuncOp to a handshake::FuncOp.
@@ -712,63 +702,61 @@ struct StandardToHandshakeFPGA18Pass
 } // namespace
 
 LogicalResult StandardToHandshakeFPGA18Pass::lowerFuncOp(func::FuncOp funcOp) {
-  // Only retain those attributes that are not constructed by build
+  bool funcIsExternal = funcOp.isExternal();
+
+  // First, put the function into maximal SSA form if it is not external
+  if (!funcIsExternal) {
+    HandshakeLoweringSSAStrategy strategy;
+    if (failed(dynamatic::maximizeSSA(funcOp.getBody(), strategy)))
+      return failure();
+  }
+
+  // The Handshake function only retains the original function's symbol and
+  // function type
   SmallVector<NamedAttribute, 4> attributes;
-  for (const auto &attr : funcOp->getAttrs()) {
+  for (const NamedAttribute &attr : funcOp->getAttrs()) {
     if (attr.getName() == SymbolTable::getSymbolAttrName() ||
         attr.getName() == funcOp.getFunctionTypeAttrName())
       continue;
     attributes.push_back(attr);
   }
 
-  // Get function arguments
-  llvm::SmallVector<mlir::Type, 8> argTypes;
-  for (auto &argType : funcOp.getArgumentTypes())
-    argTypes.push_back(argType);
+  // Get function arguments and results
+  SmallVector<Type, 8> argTypes, resTypes;
+  llvm::copy(funcOp.getArgumentTypes(), std::back_inserter(argTypes));
+  llvm::copy(funcOp.getResultTypes(), std::back_inserter(resTypes));
 
-  // Get function results
-  llvm::SmallVector<mlir::Type, 8> resTypes;
-  for (auto resType : funcOp.getResultTypes())
-    resTypes.push_back(resType);
-
-  handshake::FuncOp newFuncOp;
-
-  bool funcIsExternal = funcOp.isExternal();
   MLIRContext *ctx = &getContext();
+  handshake::FuncOp newFuncOp = nullptr;
 
-  // Add control input/output to function arguments/results and create a
-  // handshake::FuncOp of appropriate type
-  returnOnError(partiallyLowerOp(
-      [&](func::FuncOp funcOp, PatternRewriter &rewriter) {
-        auto noneType = rewriter.getNoneType();
-        if (resTypes.empty())
-          resTypes.push_back(noneType);
-        argTypes.push_back(noneType);
-        auto func_type = rewriter.getFunctionType(argTypes, resTypes);
-        newFuncOp = rewriter.create<handshake::FuncOp>(
-            funcOp.getLoc(), funcOp.getName(), func_type, attributes);
-        rewriter.inlineRegionBefore(funcOp.getBody(), newFuncOp.getBody(),
-                                    newFuncOp.end());
-        if (!funcIsExternal)
-          newFuncOp.resolveArgAndResNames();
-        return success();
-      },
-      ctx, funcOp));
+  // Replaces the func-level function with a corresponding Handshake-level
+  // function.
+  auto funcLowering = [&](func::FuncOp funcOp, PatternRewriter &rewriter) {
+    auto noneType = rewriter.getNoneType();
+    if (resTypes.empty())
+      resTypes.push_back(noneType);
+    argTypes.push_back(noneType);
+    auto funcType = rewriter.getFunctionType(argTypes, resTypes);
+    newFuncOp = rewriter.create<handshake::FuncOp>(
+        funcOp.getLoc(), funcOp.getName(), funcType, attributes);
+    rewriter.inlineRegionBefore(funcOp.getBody(), newFuncOp.getBody(),
+                                newFuncOp.end());
+    if (!funcIsExternal)
+      newFuncOp.resolveArgAndResNames();
+    return success();
+  };
+  if (failed(partiallyLowerOp(funcLowering, ctx, funcOp)))
+    return failure();
 
   // Delete the original function
   funcOp->erase();
 
-  // Apply SSA maximization
-  returnOnError(
-      partiallyLowerRegion(maximizeSSANoMem, ctx, newFuncOp.getBody()));
-
+  // Lower the region inside the function if it is not external
   if (!funcIsExternal) {
-    // Lower the region inside the function
     HandshakeLoweringFPGA18 hl(newFuncOp.getBody(),
                                getAnalysis<NameAnalysis>());
-    returnOnError(lowerRegion(hl));
+    return lowerRegion(hl);
   }
-
   return success();
 }
 
