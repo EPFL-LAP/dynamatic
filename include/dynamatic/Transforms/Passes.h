@@ -20,6 +20,7 @@
 #include "dynamatic/Transforms/BufferPlacement/HandshakeSetBufferingProperties.h"
 #include "dynamatic/Transforms/FlattenMemRefRowMajor.h"
 #include "dynamatic/Transforms/ForceMemoryInterface.h"
+#include "dynamatic/Transforms/FuncMaximizeSSA.h"
 #include "dynamatic/Transforms/HandshakeCanonicalize.h"
 #include "dynamatic/Transforms/HandshakeConcretizeIndexType.h"
 #include "dynamatic/Transforms/HandshakeInferBasicBlocks.h"

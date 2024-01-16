@@ -77,6 +77,22 @@ def ScfSimpleIfToSelect : DynamaticPass<"scf-simple-if-to-select",
 }
 
 //===----------------------------------------------------------------------===//
+// Func passes
+//===----------------------------------------------------------------------===//
+
+def FuncMaximizeSSA : Pass<"func-maximize-ssa", "::mlir::func::FuncOp"> {
+  let summary = "Converts the function's body into maximal SSA form.";
+  let description = [{
+    Converts the region within the function into maximal SSA form. This
+    ensures that every value used within a block is also defined within the
+    block, making dataflow explicit and removing block dominance-based dataflow
+    semantics. The pass achieves this by adding block arguments wherever
+    necessary to forward values to the block(s) where they are used.
+  }];
+  let constructor = "dynamatic::createFuncMaximizeSSA()";
+}
+
+//===----------------------------------------------------------------------===//
 // Handshake passes
 //===----------------------------------------------------------------------===//
 
@@ -271,18 +287,6 @@ def BackAnnotate : DynamaticPass<"back-annotate"> {
             "Path to JSON-formatted back-annotation file">];
 }
 
-def FlattenMemRefRowMajor : DynamaticPass<"flatten-memref-row-major",
-                                          ["mlir::memref::MemRefDialect"]> {
-  let summary = "Flatten memrefs (row-major order)";
-  let description = [{
-    Flattens multidimensional memories and accesses to them into
-    single-dimensional memories using row-major indexing. This pass is almost
-    copied as is from CIRCT's FlattenMemRef, but uses row-major indexing instead
-    of column-major indexing when converting multidimensional load/store
-    operations.}];
-  let constructor = "dynamatic::createFlattenMemRefRowMajorPass()";
-}
-
 def ForceMemoryInterface : DynamaticPass<"force-memory-interface"> {
   let summary = "Forces the use of a single type of memory interface";
   let description = [{
@@ -301,6 +305,18 @@ def ForceMemoryInterface : DynamaticPass<"force-memory-interface"> {
       "Whether to force the placement of MCs in the circuit after Handshake "
       "lowering (off by default, mutually exclusice with force-lsq).">
   ];
+}
+
+def FlattenMemRefRowMajor : DynamaticPass<"flatten-memref-row-major",
+                                          ["mlir::memref::MemRefDialect"]> {
+  let summary = "Flatten memrefs (row-major order)";
+  let description = [{
+    Flattens multidimensional memories and accesses to them into
+    single-dimensional memories using row-major indexing. This pass is almost
+    copied as is from CIRCT's FlattenMemRef, but uses row-major indexing instead
+    of column-major indexing when converting multidimensional load/store
+    operations.}];
+  let constructor = "dynamatic::createFlattenMemRefRowMajorPass()";
 }
 
 def MarkMemoryDependencies : DynamaticPass<"mark-memory-dependencies"> {

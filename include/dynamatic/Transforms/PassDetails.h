@@ -26,6 +26,11 @@ namespace arith {
 class ArithDialect;
 } // namespace arith
 
+namespace func {
+class FuncOp;
+class FuncDialect;
+} // namespace func
+
 namespace memref {
 class MemRefDialect;
 } // namespace memref

@@ -3,6 +3,7 @@ add_dynamatic_library(DynamaticTransforms
   BackAnnotate.cpp
   FlattenMemRefRowMajor.cpp
   ForceMemoryInterface.cpp
+  FuncMaximizeSSA.cpp
   HandshakeCanonicalize.cpp
   HandshakeConcretizeIndexType.cpp
   HandshakeMaterialize.cpp
