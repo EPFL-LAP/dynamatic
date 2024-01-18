@@ -59,7 +59,7 @@ LogicalResult HandshakeSpeculationPass::placeUnits(Value ctrlSignal) {
   MLIRContext *ctx = &getContext();
   OpBuilder builder(ctx);
 
-  for (const OpPlacement p : placements.getPlacements<T>()) {
+  for (OpPlacement p : placements.getPlacements<T>()) {
     // Create and connect the new Operation
     builder.setInsertionPoint(p.dstOp);
     T newOp = builder.create<T>(p.dstOp->getLoc(), p.srcOpResult, ctrlSignal);

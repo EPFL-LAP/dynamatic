@@ -14,7 +14,7 @@
 #ifndef DYNAMATIC_CONVERSION_STANDARDTOHANDSHAKEFPGA18_H
 #define DYNAMATIC_CONVERSION_STANDARDTOHANDSHAKEFPGA18_H
 
-#include "circt/Conversion/StandardToHandshake.h"
+#include "circt/Conversion/CFToHandshake.h"
 #include "circt/Dialect/Handshake/HandshakeOps.h"
 #include "dynamatic/Analysis/NameAnalysis.h"
 #include "dynamatic/Support/DynamaticPass.h"

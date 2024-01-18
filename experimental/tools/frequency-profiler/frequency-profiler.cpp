@@ -16,6 +16,7 @@
 //===----------------------------------------------------------------------===//
 
 #include "experimental/Support/StdProfiler.h"
+#include "mlir/Dialect/ControlFlow/IR/ControlFlow.h"
 #include "mlir/Dialect/Func/IR/FuncOps.h"
 #include "mlir/Dialect/LLVMIR/LLVMDialect.h"
 #include "mlir/Dialect/MemRef/IR/MemRef.h"
@@ -116,7 +117,7 @@ int main(int argc, char **argv) {
   // cases
   MLIRContext context;
   context.loadDialect<func::FuncDialect, memref::MemRefDialect,
-                      LLVM::LLVMDialect>();
+                      LLVM::LLVMDialect, cf::ControlFlowDialect>();
   context.allowUnregisteredDialects();
 
   // Load the MLIR module

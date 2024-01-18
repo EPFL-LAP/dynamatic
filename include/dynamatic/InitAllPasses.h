@@ -29,7 +29,7 @@ inline void registerAllPasses() {
   dynamatic::registerPasses();
 
   // Passes defined in CIRCT
-  circt::registerStandardToHandshake();
+  circt::registerCFToHandshake();
   circt::registerFlattenMemRef();
   circt::registerFlattenMemRefCalls();
   circt::esi::registerPasses();

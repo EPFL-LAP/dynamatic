@@ -23,7 +23,7 @@ target_link_libraries(dynamatic-opt
 
   CIRCTHandshake
   CIRCTHandshakeTransforms
-  CIRCTStandardToHandshake
+  CIRCTCFToHandshake
 
   MLIRIR
   MLIRAffineTransforms

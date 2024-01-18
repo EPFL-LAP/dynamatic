@@ -326,7 +326,7 @@ struct VHDLModuleDescription {
   /// Function that concretizes a library component, that is gets a module with
   /// exact values (BITWIDTH, SIZE and so on). It uses modParameters string,
   /// obtained from processing the input IR, to get all required information.
-  VHDLModule concretize(std::string modName, std::string modParameters) const;
+  VHDLModule concretize(std::string modName, std::string modParameters);
 };
 
 /// VHDL module, that is VHDLModuleDescription + extern module operations from
@@ -341,6 +341,7 @@ struct VHDLModule {
         modParameters(std::move(tempModParameters)),
         concrInputs(std::move(tempInputs)),
         concrOutputs(std::move(tempOutputs)), modDesc(tempModDesc) {}
+
   /// Concretized module's name, i.g. "fork"
   std::string modName;
   /// Component's definition and architecture, obtained from "concretize"
@@ -354,12 +355,12 @@ struct VHDLModule {
   /// Concretized module's outputs
   llvm::SmallVector<VHDLModParameter> concrOutputs;
   /// Reference to the corresponding template in VHDLComponentLibrary
-  const VHDLModuleDescription &modDesc;
+  VHDLModuleDescription modDesc;
   /// Function that instantiates a module component, that is gets an instance
   /// with an exact number. It uses innerOp operation, obtained from processing
   /// the input IR, to get all required information.
   VHDLInstance instantiate(std::string instName,
-                           circt::hw::InstanceOp &innerOp) const;
+                           circt::hw::InstanceOp &innerOp);
 };
 
 /// VHDL instance, that is VHDLModule + inner module operations from
@@ -368,7 +369,7 @@ struct VHDLInstance {
   VHDLInstance(std::string tempInstanceName, std::string tempItext,
                llvm::SmallVector<VHDLInstParameter> tempInputs,
                llvm::SmallVector<VHDLInstParameter> tempOutputs,
-               const VHDLModule &tempMod)
+               VHDLModule *tempMod)
       : instanceName(std::move(tempInstanceName)),
         instanceText(std::move(tempItext)), inputs(std::move(tempInputs)),
         outputs(std::move(tempOutputs)), mod(tempMod) {}
@@ -382,7 +383,7 @@ struct VHDLInstance {
   /// Instance outputs, i.e. signals
   llvm::SmallVector<VHDLInstParameter> outputs;
   /// Reference to the corresponding module in VHDLModuleLibrary
-  const VHDLModule &mod;
+  VHDLModule *mod;
 };
 
 } // namespace
@@ -433,7 +434,7 @@ getConcretizedPorts(const llvm::SmallVector<VHDLDescParameter> &descPorts,
 };
 
 VHDLModule VHDLModuleDescription::concretize(std::string modName,
-                                             std::string modParameters) const {
+                                             std::string modParameters) {
   // Split the given modParameters string into separate parts for convenience
   llvm::SmallVector<std::string> modParametersVec =
       parseDiscriminatingParameters(modParameters);
@@ -664,7 +665,7 @@ getPortsInstantiation(std::string &instText, std::string &instName,
 }
 
 VHDLInstance VHDLModule::instantiate(std::string instName,
-                                     circt::hw::InstanceOp &innerOp) const {
+                                     circt::hw::InstanceOp &innerOp) {
   // Shorten the name
   instName = instName.substr(instName.find('_') + 1);
   // Counter for innerOp argumentss or results array
@@ -723,7 +724,7 @@ VHDLInstance VHDLModule::instantiate(std::string instName,
   instText[instText.size() - 1] = ';';
   instText += "\n";
 
-  return VHDLInstance(instName, instText, inputs, outputs, *this);
+  return VHDLInstance(instName, instText, inputs, outputs, this);
 }
 
 // ============================================================================
@@ -743,7 +744,7 @@ static VHDLModule getMod(StringRef extName, VHDLComponentLibrary &jsonLib) {
     llvm::errs() << "Unable to find the element in the components' library\n";
     exit(1);
   }
-  const VHDLModuleDescription &desc = (*comp).second;
+  VHDLModuleDescription &desc = (*comp).second;
   VHDLModule mod = desc.concretize(modName, modParameters);
   return mod;
 };
@@ -759,7 +760,7 @@ static VHDLInstance getInstance(StringRef extName, StringRef name,
         << "Unable to find the element in the instances' library\n";
     exit(1);
   }
-  const VHDLModule &desc = (*comp).second;
+  VHDLModule &desc = (*comp).second;
   VHDLInstance inst = desc.instantiate(name.str(), innerOp);
   return inst;
 }
@@ -965,8 +966,7 @@ parseInstanceOps(mlir::OwningOpRef<mlir::ModuleOp> &module,
     for (hw::InstanceOp innerOp : modOp.getOps<hw::InstanceOp>()) {
       StringRef extName = innerOp.getReferencedModuleName();
       StringRef name = innerOp.getInstanceName();
-      VHDLInstance i = getInstance(extName, name, modLib, innerOp);
-      instLib.insert(std::pair(innerOp.getOperation(), i));
+      instLib.insert({innerOp, getInstance(extName, name, modLib, innerOp)});
     }
   }
   return instLib;
@@ -997,31 +997,37 @@ static void parseModulePorts(llvm::SmallVector<circt::hw::PortInfo> &ports,
 }
 
 /// Get the description of the head instance, "hw.module"
-static std::pair<Operation *, VHDLInstance>
-parseModule(hw::HWModuleOp &hwModOp) {
+static VHDLInstance parseModule(hw::HWModuleOp &hwModOp) {
   std::string iName;
   llvm::SmallVector<VHDLInstParameter> ins, outs;
-  auto inputs = hwModOp.getPorts().inputs;
-  auto outputs = hwModOp.getPorts().outputs;
+  SmallVector<circt::hw::PortInfo> inputs, outputs;
+  for (circt::hw::PortInfo port : hwModOp.getPortList()) {
+    if (port.isInput())
+      inputs.push_back(port);
+    else
+      outputs.push_back(port);
+  }
   parseModulePorts(inputs, hwModOp, ins);
   parseModulePorts(outputs, hwModOp, outs);
   iName = hwModOp.getName().str();
-  return std::pair(hwModOp, VHDLInstance(iName, {}, ins, outs, {}));
+  return VHDLInstance(iName, {}, ins, outs, nullptr);
 }
 
 /// Get the description of the output instance, "hw.output".
 /// Names are obtained from hw.module
-static std::pair<Operation *, VHDLInstance> parseOut(hw::HWModuleOp &hwModOp) {
-  Operation *outOp;
+static VHDLInstance parseOut(hw::HWModuleOp &hwModOp) {
   std::string iName;
   llvm::SmallVector<VHDLInstParameter> tInputs, tOutputs;
-  auto outputs = hwModOp.getPorts().outputs;
+  SmallVector<circt::hw::PortInfo> outputs;
+  for (circt::hw::PortInfo port : hwModOp.getPortList()) {
+    if (port.isOutput())
+      outputs.push_back(port);
+  }
   SmallVector<VHDLInstParameter> outs;
   parseModulePorts(outputs, hwModOp, outs);
-  outOp = cast<hw::OutputOp>(hwModOp.getBodyBlock()->getTerminator());
   iName = hwModOp.getName().str();
   tOutputs = outs;
-  return std::pair(outOp, VHDLInstance(iName, {}, tOutputs, {}, {}));
+  return VHDLInstance(iName, {}, tOutputs, {}, nullptr);
 }
 
 // ============================================================================
@@ -1054,12 +1060,11 @@ static void getModulesArchitectures(VHDLModuleLibrary &modLib) {
 }
 
 /// Get the declaration of head instance
-static void getEntityDeclaration(std::pair<Operation *, VHDLInstance> &hwmod) {
-  VHDLInstance inst = hwmod.second;
+static void getEntityDeclaration(VHDLInstance &hwInstance) {
   std::string res;
   res += "clock : in std_logic;\n";
   res += "reset : in std_logic;\n";
-  for (const VHDLInstParameter &i : inst.inputs) {
+  for (const VHDLInstParameter &i : hwInstance.inputs) {
     res += i.name;
     if (i.bitwidth > 1)
       res += " : in std_logic_vector (" + std::to_string(i.bitwidth - 1) +
@@ -1072,7 +1077,7 @@ static void getEntityDeclaration(std::pair<Operation *, VHDLInstance> &hwmod) {
     }
   }
 
-  for (const VHDLInstParameter &i : inst.outputs) {
+  for (const VHDLInstParameter &i : hwInstance.outputs) {
     res += i.name;
     if (i.bitwidth > 1)
       res += " : out std_logic_vector (" + std::to_string(i.bitwidth - 1) +
@@ -1153,7 +1158,6 @@ void getSignalsPorts(llvm::SmallVector<VHDLModParameter> &concrPorts,
 /// Get the signals' declaration
 static void getSignalsDeclaration(VHDLInstanceLibrary &instanceLib) {
   for (auto &[op, mod] : instanceLib) {
-    VHDLModule module = mod.mod;
     const VHDLInstParameter *inputsIt = mod.inputs.begin();
     const VHDLInstParameter *outputsIt = mod.outputs.begin();
     llvm::outs() << "signal " << mod.instanceName << "_clk : "
@@ -1161,9 +1165,9 @@ static void getSignalsDeclaration(VHDLInstanceLibrary &instanceLib) {
     llvm::outs() << "signal " << mod.instanceName << "_rst : "
                  << "std_logic;\n";
     // inputs
-    getSignalsPorts(module.concrInputs, inputsIt, mod);
+    getSignalsPorts(mod.mod->concrInputs, inputsIt, mod);
     // outputs
-    getSignalsPorts(module.concrOutputs, outputsIt, mod);
+    getSignalsPorts(mod.mod->concrOutputs, outputsIt, mod);
     llvm::outs() << "\n";
   }
 }
@@ -1197,12 +1201,10 @@ static void processInstance(mlir::Operation *op, mlir::Operation *i,
 
 /// Get signals' wiring for the output
 static void processOutput(mlir::Operation *op, mlir::Operation *i,
-                          const VHDLInstParameter &opIt,
-                          std::pair<Operation *, VHDLInstance> &hwOut,
+                          const VHDLInstParameter &opIt, VHDLInstance &instance,
                           llvm::StringMap<std::string> &d) {
   // Output module
-  VHDLInstance inst = hwOut.second;
-  const VHDLInstParameter *acIt = inst.inputs.begin();
+  const VHDLInstParameter *acIt = instance.inputs.begin();
   for (Value opr : i->getOperands()) {
     Operation *defOp = opr.getDefiningOp();
     if (defOp && defOp == op) {
@@ -1225,8 +1227,8 @@ static void processOutput(mlir::Operation *op, mlir::Operation *i,
 }
 
 /// Get connections between signals
-static void getWiring(VHDLInstanceLibrary &instanceLib,
-                      std::pair<Operation *, VHDLInstance> &hwOut) {
+static void getWiring(VHDLInstanceLibrary &instanceLib, Operation *op,
+                      VHDLInstance &instance) {
   // we process every component line from the input IR (== every instance
   // from instanceLib)
   for (auto &[op, mod] : instanceLib) {
@@ -1235,13 +1237,13 @@ static void getWiring(VHDLInstanceLibrary &instanceLib,
     // Iterator through outputs of each instance
     const VHDLInstParameter *opIt = mod.outputs.begin();
     llvm::StringMap<std::string> d;
-    for (mlir::Operation *i : op->getUsers()) {
+    for (mlir::Operation *user : op->getUsers()) {
       // Get an operation - successor of the instance
-      VHDLInstanceLibrary::iterator it = instanceLib.find(i);
+      VHDLInstanceLibrary::iterator it = instanceLib.find(user);
       if (it != instanceLib.end())
-        processInstance(op, i, *opIt, it, d);
-      else if (i == hwOut.first)
-        processOutput(op, i, *opIt, hwOut, d);
+        processInstance(op, user, *opIt, it, d);
+      else if (user == op)
+        processOutput(op, user, *opIt, instance, d);
       else {
         llvm::errs() << "Error in MLIR: it must be an output!\n";
         exit(1);
@@ -1308,9 +1310,6 @@ int main(int argc, char **argv) {
   VHDLModuleLibrary modLib = parseExternOps(modOp, m);
   VHDLInstanceLibrary instanceLib = parseInstanceOps(module, modLib);
 
-  std::pair<mlir::Operation *, VHDLInstance> hwOut = parseOut(hwModOp);
-  std::pair<mlir::Operation *, VHDLInstance> hwMod = parseModule(hwModOp);
-
   // Generate VHDL
   getSupportFiles();
   llvm::outs() << "\n";
@@ -1323,13 +1322,18 @@ int main(int argc, char **argv) {
                   "============================================================"
                   "==\nentity "
                << hwModName << " is\nport (\n";
-  getEntityDeclaration(hwMod);
+
+  VHDLInstance hwInstance = parseModule(hwModOp);
+  getEntityDeclaration(hwInstance);
   llvm::outs() << "end;\n\n";
   llvm::outs() << "architecture behavioral of " << hwModName << " is\n\n";
 
   getSignalsDeclaration(instanceLib);
   llvm::outs() << "\nbegin\n\n";
-  getWiring(instanceLib, hwOut);
+  VHDLInstance outInstance = parseOut(hwModOp);
+  Operation *outOp =
+      cast<hw::OutputOp>(hwModOp.getBodyBlock()->getTerminator());
+  getWiring(instanceLib, outOp, outInstance);
   llvm::outs() << "\n";
   getModulesInstantiation(instanceLib);
   llvm::outs() << "end behavioral;\n\n";

@@ -14,6 +14,7 @@
 #include "circt/Conversion/HandshakeToHW.h"
 #include "circt/Dialect/HW/HWOpInterfaces.h"
 #include "circt/Dialect/HW/HWTypes.h"
+#include "circt/Dialect/HW/PortImplementation.h"
 #include "circt/Dialect/Handshake/HandshakeDialect.h"
 #include "circt/Dialect/Handshake/HandshakeOps.h"
 #include "dynamatic/Transforms/HandshakeConcretizeIndexType.h"
@@ -21,6 +22,7 @@
 #include "mlir/Dialect/Arith/IR/Arith.h"
 #include "mlir/Dialect/MemRef/IR/MemRef.h"
 #include "mlir/IR/BuiltinTypes.h"
+#include "mlir/IR/MLIRContext.h"
 #include "mlir/Support/LogicalResult.h"
 #include "mlir/Transforms/DialectConversion.h"
 #include "mlir/Transforms/GreedyPatternRewriteDriver.h"
@@ -34,6 +36,11 @@ using namespace dynamatic;
 //===----------------------------------------------------------------------===//
 // Internal data-structures
 //===----------------------------------------------------------------------===//
+
+/// Name of port representing the clock signal.
+static const std::string CLK_PORT = "clock";
+/// Name of port representing the reset signal.
+static const std::string RST_PORT = "reset";
 
 namespace {
 
@@ -60,6 +67,43 @@ struct HandshakeLoweringState {
   }
 };
 
+class ModuleBuilder {
+public:
+  SmallVector<ModulePort> inputs;
+  SmallVector<ModulePort> outputs;
+  MLIRContext *ctx;
+
+  ModuleBuilder(MLIRContext *ctx) : ctx(ctx){};
+
+  ModulePortInfo build() {
+    // Seems stupid but does not seem to be a way around it
+    SmallVector<PortInfo> inputPorts;
+    SmallVector<PortInfo> outputPorts;
+    for (auto [idx, modPort] : llvm::enumerate(inputs))
+      inputPorts.push_back(PortInfo{modPort, idx});
+    for (auto [idx, modPort] : llvm::enumerate(outputs))
+      outputPorts.push_back(PortInfo{modPort, idx});
+    return ModulePortInfo(inputPorts, outputPorts);
+  }
+
+  void addInput(const Twine &name, Type type) {
+    inputs.push_back(ModulePort{StringAttr::get(ctx, name), type,
+                                ModulePort::Direction::Input});
+  }
+
+  void addOutput(const Twine &name, Type type) {
+    outputs.push_back(ModulePort{StringAttr::get(ctx, name), type,
+                                 ModulePort::Direction::Output});
+  }
+
+  /// Adds clock and reset ports to a module's inputs ports.
+  void addClkAndRstPorts() {
+    Type i1Type = IntegerType::get(ctx, 1);
+    addInput(CLK_PORT, i1Type);
+    addInput(RST_PORT, i1Type);
+  }
+};
+
 /// Holds information about a function's ports. This is used primarily to keep
 /// track of ports that connect an internal memory interface with an external
 /// memory component.
@@ -71,8 +115,8 @@ struct FuncModulePortInfo {
   /// the handshake-level function.
   static const size_t NUM_MEM_OUTPUTS = 5;
 
-  /// Function's ports.
-  ModulePortInfo ports;
+  /// Function's module.
+  ModuleBuilder module;
 
   /// Index mapping between input ports and output ports that correspond to
   /// memory IOs. Each entry in the vector represent a different memory
@@ -82,7 +126,7 @@ struct FuncModulePortInfo {
   std::vector<std::pair<size_t, size_t>> memIO;
 
   /// Initializes the struct with empty ports.
-  FuncModulePortInfo() : ports({}, {}){};
+  FuncModulePortInfo(MLIRContext *ctx) : module(ctx){};
 
   /// Adds the IO (input and output ports) corresponding to a memory interface
   /// to the function. The name argument is used to prefix the name of all ports
@@ -105,34 +149,20 @@ void FuncModulePortInfo::addMemIO(MemRefType memref, std::string name,
   Type dataType = memref.getElementType();
 
   // Remember ports which correspond to memory
-  auto inputIdx = ports.inputs.size();
-  auto outputIdx = ports.outputs.size();
-  memIO.push_back(std::make_pair(inputIdx, outputIdx));
+  memIO.emplace_back(module.inputs.size(), module.outputs.size());
 
   // Load data input
-  ports.inputs.push_back({StringAttr::get(ctx, name + "_load_data"),
-                          hw::PortDirection::INPUT, dataType, inputIdx,
-                          hw::InnerSymAttr{}});
+  module.addInput(name + "_load_data", dataType);
   // Load enable output
-  ports.outputs.push_back({StringAttr::get(ctx, name + "_load_en"),
-                           hw::PortDirection::OUTPUT, i1Type, outputIdx++,
-                           hw::InnerSymAttr{}});
+  module.addOutput(name + "_load_en", i1Type);
   // Load address output
-  ports.outputs.push_back({StringAttr::get(ctx, name + "_load_addr"),
-                           hw::PortDirection::OUTPUT, addrType, outputIdx++,
-                           hw::InnerSymAttr{}});
+  module.addOutput(name + "_load_addr", addrType);
   // Store enable output
-  ports.outputs.push_back({StringAttr::get(ctx, name + "_store_en"),
-                           hw::PortDirection::OUTPUT, i1Type, outputIdx++,
-                           hw::InnerSymAttr{}});
+  module.addOutput(name + "_store_en", i1Type);
   // Store address output
-  ports.outputs.push_back({StringAttr::get(ctx, name + "_store_addr"),
-                           hw::PortDirection::OUTPUT, addrType, outputIdx++,
-                           hw::InnerSymAttr{}});
+  module.addOutput(name + "_store_addr", addrType);
   // Store data output
-  ports.outputs.push_back({StringAttr::get(ctx, name + "_store_data"),
-                           hw::PortDirection::OUTPUT, dataType, outputIdx,
-                           hw::InnerSymAttr{}});
+  module.addOutput(name + "_store_data", dataType);
 }
 
 //===----------------------------------------------------------------------===//
@@ -312,15 +342,15 @@ static std::string getExtModuleName(Operation *oldOp) {
           })
       .Case<arith::AddFOp, arith::AddIOp, arith::AndIOp, arith::BitcastOp,
             arith::CeilDivSIOp, arith::CeilDivUIOp, arith::DivFOp,
-            arith::DivSIOp, arith::DivUIOp, arith::FloorDivSIOp, arith::MaxFOp,
-            arith::MaxSIOp, arith::MaxUIOp, arith::MinFOp, arith::MinSIOp,
-            arith::MinUIOp, arith::MulFOp, arith::MulIOp, arith::NegFOp,
-            arith::OrIOp, arith::RemFOp, arith::RemSIOp, arith::RemUIOp,
-            arith::ShLIOp, arith::ShRSIOp, arith::ShRUIOp, arith::SubFOp,
-            arith::SubIOp, arith::XOrIOp>([&](auto) {
-        // bitwidth
-        extModName += getTypeName(inTypes[0], loc);
-      })
+            arith::DivSIOp, arith::DivUIOp, arith::FloorDivSIOp, arith::MaxSIOp,
+            arith::MaxUIOp, arith::MinSIOp, arith::MinUIOp, arith::MulFOp,
+            arith::MulIOp, arith::NegFOp, arith::OrIOp, arith::RemFOp,
+            arith::RemSIOp, arith::RemUIOp, arith::ShLIOp, arith::ShRSIOp,
+            arith::ShRUIOp, arith::SubFOp, arith::SubIOp, arith::XOrIOp>(
+          [&](auto) {
+            // bitwidth
+            extModName += getTypeName(inTypes[0], loc);
+          })
       .Case<arith::SelectOp>([&](auto) {
         // bitwidth
         extModName += getTypeName(outTypes[0], loc);
@@ -365,13 +395,25 @@ static hw::HWModuleLike findModule(mlir::ModuleOp parentModule,
 /// functions first attempts to find an existing module with the same name,
 /// which it returns if it exists. Failing the latter, the function creates an
 /// external module at the provided location and with the provided ports.
-static hw::HWModuleLike getModule(HandshakeLoweringState &ls,
-                                  std::string modName, ModulePortInfo &ports,
-                                  Location modLoc) {
+static hw::HWModuleLike getModule(HandshakeLoweringState &ls, StringRef modName,
+                                  ModuleBuilder &module, Location modLoc) {
   hw::HWModuleLike mod = findModule(ls.parentModule, modName);
   if (!mod)
     return ls.extModBuilder.create<hw::HWModuleExternOp>(
-        modLoc, ls.extModBuilder.getStringAttr(modName), ports);
+        modLoc, ls.extModBuilder.getStringAttr(modName), module.build());
+  return mod;
+}
+
+/// Returns a module-like operation that matches the provided name. The
+/// functions first attempts to find an existing module with the same name,
+/// which it returns if it exists. Failing the latter, the function creates an
+/// external module at the provided location and with the provided ports.
+static hw::HWModuleLike getModule(HandshakeLoweringState &ls, StringRef modName,
+                                  ModulePortInfo &module, Location modLoc) {
+  hw::HWModuleLike mod = findModule(ls.parentModule, modName);
+  if (!mod)
+    return ls.extModBuilder.create<hw::HWModuleExternOp>(
+        modLoc, ls.extModBuilder.getStringAttr(modName), module);
   return mod;
 }
 
@@ -381,64 +423,45 @@ static ModulePortInfo getPortInfo(Operation *op) {
   return getPortInfoForOpTypes(op, op->getOperandTypes(), op->getResultTypes());
 }
 
-/// Name of port representing the clock signal.
-static const std::string CLK_PORT = "clock";
-/// Name of port representing the reset signal.
-static const std::string RST_PORT = "reset";
-
-/// Adds clock and reset ports to a module's inputs ports.
-static void addClkAndRstPorts(ModulePortInfo &ports, MLIRContext *ctx) {
-  Type i1Type = IntegerType::get(ctx, 1);
-  auto idx = ports.inputs.size();
-  ports.inputs.push_back({StringAttr::get(ctx, CLK_PORT),
-                          hw::PortDirection::INPUT, i1Type, idx,
-                          hw::InnerSymAttr{}});
-  ports.inputs.push_back({StringAttr::get(ctx, RST_PORT),
-                          hw::PortDirection::INPUT, i1Type, idx + 1,
-                          hw::InnerSymAttr{}});
-}
-
 /// Adds the clock and reset arguments of a module to the list of operands of an
 /// operation within the module.
 static void addClkAndRstOperands(SmallVector<Value> &operands,
                                  hw::HWModuleOp mod) {
-  auto numArguments = mod.getNumArguments();
+  auto numArguments = mod->getNumOperands();
   assert(numArguments >= 2 &&
          "module should have at least a clock and reset arguments");
-  auto ports = mod.getPorts();
-  assert(ports.inputs[numArguments - 2].getName() == CLK_PORT &&
+  assert(mod.getPort(numArguments - 2).getName() == CLK_PORT &&
          "second to last module port should be clock");
-  assert(ports.inputs[numArguments - 1].getName() == RST_PORT &&
+  assert(mod.getPort(numArguments - 1).getName() == RST_PORT &&
          "last module port should be clock");
-  operands.push_back(mod.getArgument(numArguments - 2));
-  operands.push_back(mod.getArgument(numArguments - 1));
+  operands.push_back(mod->getOperand(numArguments - 2));
+  operands.push_back(mod->getOperand(numArguments - 1));
 }
 
 /// Derives port information for a handshake function so that it can be
 /// converted to a hardware module.
 static FuncModulePortInfo getFuncPortInfo(handshake::FuncOp funcOp) {
 
-  FuncModulePortInfo info;
-  auto *ctx = funcOp.getContext();
+  MLIRContext *ctx = funcOp.getContext();
+  FuncModulePortInfo info(ctx);
 
   // Add all outputs of function
   TypeRange outputs = funcOp.getResultTypes();
-  for (auto [idx, res] : llvm::enumerate(outputs))
-    info.ports.outputs.push_back({funcOp.getResName(idx),
-                                  hw::PortDirection::OUTPUT, esiWrapper(res),
-                                  idx, hw::InnerSymAttr{}});
-
+  for (auto [idx, res] : llvm::enumerate(outputs)) {
+    info.module.addOutput(funcOp.getResName(idx).strref(), esiWrapper(res));
+  }
   // Add all inputs of function, replacing memrefs with appropriate ports
-  for (auto [idx, arg] : llvm::enumerate(funcOp.getArguments()))
-    if (isa<MemRefType>(arg.getType()))
+  for (auto [idx, arg] : llvm::enumerate(funcOp.getArguments())) {
+    if (isa<MemRefType>(arg.getType())) {
       info.addMemIO(dyn_cast<MemRefType>(arg.getType()),
                     funcOp.getArgName(idx).str(), ctx);
-    else
-      info.ports.inputs.push_back(
-          {funcOp.getArgName(idx), hw::PortDirection::INPUT,
-           esiWrapper(arg.getType()), idx, hw::InnerSymAttr{}});
+    } else {
+      info.module.addInput(funcOp.getArgName(idx).strref(),
+                           esiWrapper(arg.getType()));
+    }
+  }
 
-  addClkAndRstPorts(info.ports, ctx);
+  info.module.addClkAndRstPorts();
   return info;
 }
 
@@ -449,77 +472,61 @@ static FuncModulePortInfo getFuncPortInfo(handshake::FuncOp funcOp) {
 static ModulePortInfo getMemPortInfo(handshake::MemoryControllerOp memOp,
                                      FuncModulePortInfo &info, size_t memIdx) {
 
-  ModulePortInfo ports({}, {});
-  auto *ctx = memOp.getContext();
+  MLIRContext *ctx = memOp.getContext();
+  ModuleBuilder module(ctx);
 
   auto &[inFuncPortIdx, outFuncPortIdx] = info.memIO[memIdx];
 
   // Add input ports coming from outside the containing module
-  size_t inPortIdx = 0;
   for (size_t i = inFuncPortIdx,
               e = inFuncPortIdx + FuncModulePortInfo::NUM_MEM_INPUTS;
        i < e; i++) {
-    auto funcInput = info.ports.inputs[i];
-    ports.inputs.push_back({funcInput.name, hw::PortDirection::INPUT,
-                            funcInput.type, inPortIdx++, hw::InnerSymAttr{}});
+    auto funcInput = info.module.inputs[i];
+    module.addInput(funcInput.name.strref(), funcInput.type);
   }
 
   // Add input ports corresponding to memory interface operands
   for (auto [idx, arg] : llvm::enumerate(memOp.getMemInputs()))
-    ports.inputs.push_back({StringAttr::get(ctx, memOp.getOperandName(idx + 1)),
-                            hw::PortDirection::INPUT, esiWrapper(arg.getType()),
-                            inPortIdx++, hw::InnerSymAttr{}});
+    module.addInput(memOp.getOperandName(idx + 1), esiWrapper(arg.getType()));
 
   // Add output ports corresponding to memory interface operands
-  size_t outPortIdx = 0;
   for (auto [idx, arg] : llvm::enumerate(memOp.getResults()))
-    ports.outputs.push_back({StringAttr::get(ctx, memOp.getResultName(idx)),
-                             hw::PortDirection::OUTPUT,
-                             esiWrapper(arg.getType()), outPortIdx++,
-                             hw::InnerSymAttr{}});
+    module.addOutput(memOp.getResultName(idx), esiWrapper(arg.getType()));
 
   // Add output ports going outside the containing module
   for (size_t i = outFuncPortIdx,
               e = outFuncPortIdx + FuncModulePortInfo::NUM_MEM_OUTPUTS;
        i < e; i++) {
-    auto funcOutput = info.ports.outputs[i];
-    ports.outputs.push_back({funcOutput.name, hw::PortDirection::OUTPUT,
-                             funcOutput.type, outPortIdx++,
-                             hw::InnerSymAttr{}});
+    auto funcOutput = info.module.outputs[i];
+    module.addOutput(funcOutput.name.strref(), funcOutput.type);
   }
 
-  addClkAndRstPorts(ports, ctx);
-  return ports;
+  module.addClkAndRstPorts();
+  return module.build();
 }
 
 /// Derives port information for the end operation of a handshake function so
 /// that it can be converted to a hardware module. The function needs
 /// information from the enclosing function's ports to determine the number of
-/// return values in the original function that the future module should output.
+/// return values in the original function that the future module should
+/// output.
 static ModulePortInfo getEndPortInfo(handshake::EndOp endOp,
                                      FuncModulePortInfo &info) {
 
-  ModulePortInfo ports({}, {});
-  auto *ctx = endOp.getContext();
+  ModuleBuilder module(endOp.getContext());
 
   // Add input ports corresponding to end operands
-  size_t inPortIdx = 0;
   for (auto [idx, arg] : llvm::enumerate(endOp.getOperands()))
-    ports.inputs.push_back({StringAttr::get(ctx, "in" + std::to_string(idx)),
-                            hw::PortDirection::INPUT, esiWrapper(arg.getType()),
-                            inPortIdx++, hw::InnerSymAttr{}});
+    module.addInput("in" + std::to_string(idx), esiWrapper(arg.getType()));
 
   // Add output ports corresponding to function return values
-  auto numReturnValues = info.ports.outputs.size() - info.getNumMemOutputs();
+  auto numReturnValues = module.outputs.size() - info.getNumMemOutputs();
   auto returnValOperands = endOp.getOperands().take_front(numReturnValues);
   for (auto [idx, arg] : llvm::enumerate(returnValOperands))
-    ports.outputs.push_back({StringAttr::get(ctx, "out" + std::to_string(idx)),
-                             hw::PortDirection::OUTPUT,
-                             esiWrapper(arg.getType()), idx,
-                             hw::InnerSymAttr{}});
+    module.addOutput("out" + std::to_string(idx), esiWrapper(arg.getType()));
 
-  addClkAndRstPorts(ports, ctx);
-  return ports;
+  module.addClkAndRstPorts();
+  return module.build();
 }
 
 //===----------------------------------------------------------------------===//
@@ -527,8 +534,8 @@ static ModulePortInfo getEndPortInfo(handshake::EndOp endOp,
 //===----------------------------------------------------------------------===//
 namespace {
 
-/// A type converter is needed to perform the in-flight materialization of "raw"
-/// (non-ESI channel) types to their ESI channel correspondents.
+/// A type converter is needed to perform the in-flight materialization of
+/// "raw" (non-ESI channel) types to their ESI channel correspondents.
 class ESITypeConverter : public TypeConverter {
 public:
   ESITypeConverter() {
@@ -555,14 +562,14 @@ public:
 };
 
 /// Converts handshake functions to hardware modules. The pattern creates a
-/// hw::HWModuleOp or hw::HWModuleExternOp with IO corresponding to the original
-/// handshake function. In the case where the matched function is not external,
-/// the pattern additionally (1) buffers the function's inputs, (2) converts
-/// internal memory interfaces to hw::HWInstanceOp's and connects them to the
-/// containing module IO, (3) converts the function's end operation to a
-/// hw::HWInstanceOp that also outputs the function's return values, and (4)
-/// combines all the module outputs in the hw::HwOutputOp operation at the end
-/// of the module.
+/// hw::HWModuleOp or hw::HWModuleExternOp with IO corresponding to the
+/// original handshake function. In the case where the matched function is not
+/// external, the pattern additionally (1) buffers the function's inputs, (2)
+/// converts internal memory interfaces to hw::HWInstanceOp's and connects
+/// them to the containing module IO, (3) converts the function's end
+/// operation to a hw::HWInstanceOp that also outputs the function's return
+/// values, and (4) combines all the module outputs in the hw::HwOutputOp
+/// operation at the end of the module.
 class FuncOpConversionPattern : public OpConversionPattern<handshake::FuncOp> {
 public:
   FuncOpConversionPattern(MLIRContext *ctx, HandshakeLoweringState &ls)
@@ -577,15 +584,15 @@ public:
     if (op.isExternal())
       ls.extModBuilder.create<hw::HWModuleExternOp>(
           op.getLoc(), ls.extModBuilder.getStringAttr(op.getName()),
-          info.ports);
+          info.module.build());
     else {
       // Create module for the function
       auto mod = ls.extModBuilder.create<hw::HWModuleOp>(
           op.getLoc(), ls.extModBuilder.getStringAttr(op.getName()),
-          info.ports);
+          info.module.build());
 
       // Replace uses of function arguments with module inputs
-      for (auto it : llvm::zip(op.getArguments(), mod.getArguments()))
+      for (auto it : llvm::zip(op.getArguments(), mod->getOperands()))
         std::get<0>(it).replaceAllUsesWith(std::get<1>(it));
 
       // Move all operations to the new module
@@ -599,7 +606,8 @@ public:
       // Convert memory interfaces (and connect them with function IO)
       auto memInstances = convertMemories(mod, info, rewriter);
 
-      // Convert end operation (add results to represent function return values)
+      // Convert end operation (add results to represent function return
+      // values)
       auto endInstance = convertEnd(mod, info, rewriter);
 
       // Set operands of output operation to match module outputs
@@ -612,17 +620,19 @@ public:
   }
 
 private:
-  /// Lowering state to help in the creation of new hardware modules/instances.
+  /// Lowering state to help in the creation of new hardware
+  /// modules/instances.
   HandshakeLoweringState &ls;
 
-  /// Inserts a "start module" that acts as a buffer for all module inputs that
-  /// are of type esi::ChannelType. This is done to match legacy Dynamatic's
-  /// implementation of circuits.
+  /// Inserts a "start module" that acts as a buffer for all module inputs
+  /// that are of type esi::ChannelType. This is done to match legacy
+  /// Dynamatic's implementation of circuits.
   void bufferInputs(HWModuleOp mod, ConversionPatternRewriter &rewriter) const;
 
-  /// Converts memory interfaces within the module into hardware instances with
-  /// added IO to handle interactions with external memory through the module
-  /// IO. The function returns the list of newly created hardware instances.
+  /// Converts memory interfaces within the module into hardware instances
+  /// with added IO to handle interactions with external memory through the
+  /// module IO. The function returns the list of newly created hardware
+  /// instances.
   SmallVector<hw::InstanceOp>
   convertMemories(HWModuleOp mod, FuncModulePortInfo &info,
                   ConversionPatternRewriter &rewriter) const;
@@ -642,10 +652,10 @@ private:
 
 /// Converts an operation (of type indicated by the template argument) into an
 /// equivalent hardware instance. The method creates an external module to
-/// instantiate the new component from if a module with matching IO one does not
-/// already exist. Valid/Ready semantics are made explicit thanks to the type
-/// converter which converts implicit handshaked types into ESI channels with a
-/// corresponding data-type.
+/// instantiate the new component from if a module with matching IO one does
+/// not already exist. Valid/Ready semantics are made explicit thanks to the
+/// type converter which converts implicit handshaked types into ESI channels
+/// with a corresponding data-type.
 template <typename T>
 class ExtModuleConversionPattern : public OpConversionPattern<T> {
 public:
@@ -679,7 +689,8 @@ public:
   }
 
 private:
-  /// Lowering state to help in the creation of new hardware modules/instances.
+  /// Lowering state to help in the creation of new hardware
+  /// modules/instances.
   HandshakeLoweringState &ls;
 };
 } // namespace
@@ -690,25 +701,19 @@ void FuncOpConversionPattern::bufferInputs(
   unsigned argIdx = 0;
   rewriter.setInsertionPointToStart(mod.getBodyBlock());
 
-  for (auto arg : mod.getArguments()) {
+  for (Value arg : mod->getOperands()) {
     auto argType = arg.getType();
     if (!isa<esi::ChannelType>(argType))
       continue;
 
-    // Create ports for input buffer
-    ModulePortInfo ports({}, {});
-    auto *ctx = mod.getContext();
+    ModuleBuilder module(mod.getContext());
 
-    // Function argument input
-    ports.inputs.push_back({StringAttr::get(ctx, "in0"),
-                            hw::PortDirection::INPUT, argType, 0,
-                            hw::InnerSymAttr{}});
-    addClkAndRstPorts(ports, ctx);
+    // Create ports for input buffer
+    module.addInput("in0", argType);
+    module.addClkAndRstPorts();
 
     // Module output matches function argument type
-    ports.outputs.push_back({StringAttr::get(ctx, "out0"),
-                             hw::PortDirection::OUTPUT, argType, 0,
-                             hw::InnerSymAttr{}});
+    module.addOutput("out0", argType);
 
     // Check whether we need to create a new external module
     auto argLoc = arg.getLoc();
@@ -716,7 +721,7 @@ void FuncOpConversionPattern::bufferInputs(
     if (auto channelType = argType.dyn_cast<esi::ChannelType>())
       modName += "." + getTypeName(channelType.getInner(), argLoc);
 
-    hw::HWModuleLike extModule = getModule(ls, modName, ports, argLoc);
+    hw::HWModuleLike extModule = getModule(ls, modName, module, argLoc);
 
     // Replace operation with corresponding hardware module instance
     llvm::SmallVector<Value> operands;
@@ -740,13 +745,13 @@ SmallVector<hw::InstanceOp> FuncOpConversionPattern::convertMemories(
 
   for (auto [memIdx, portIndices] : llvm::enumerate(info.memIO)) {
     // Identify the memory controller refering to the memref
-    auto user = *mod.getArgument(portIndices.first).getUsers().begin();
+    Operation *user = *mod->getOperand(portIndices.first).getUsers().begin();
     assert(user && "old memref value should have a user");
     auto memOp = dyn_cast<handshake::MemoryControllerOp>(user);
     assert(memOp && "user of old memref value should be memory interface");
 
     std::string memName = getExtModuleName(memOp);
-    auto ports = getMemPortInfo(memOp, info, memIdx);
+    ModulePortInfo ports = getMemPortInfo(memOp, info, memIdx);
 
     // Create an external module definition if necessary
     hw::HWModuleLike extModule = getModule(ls, memName, ports, memOp->getLoc());
@@ -757,7 +762,7 @@ SmallVector<hw::InstanceOp> FuncOpConversionPattern::convertMemories(
     for (auto i = portIndices.first,
               e = portIndices.first + FuncModulePortInfo::NUM_MEM_INPUTS;
          i < e; i++)
-      operands.push_back(mod.getArgument(i));
+      operands.push_back(mod->getOperand(i));
     operands.insert(operands.end(), memOp.getMemInputs().begin(),
                     memOp.getMemInputs().end());
     addClkAndRstOperands(operands, mod);
@@ -866,9 +871,9 @@ static LogicalResult verifyExportToRTL(handshake::FuncOp funcOp) {
 namespace {
 
 /// Unpack buffers with more that one slot into an equivalent sequence of
-/// multiple one-slot buffers. Our RTL buffer components cannot be parameterized
-/// with a number of slots (they are all 1-slot) so we have to do this unpacking
-/// prior to running the conversion pass.
+/// multiple one-slot buffers. Our RTL buffer components cannot be
+/// parameterized with a number of slots (they are all 1-slot) so we have to
+/// do this unpacking prior to running the conversion pass.
 struct UnpackBufferSlots : public OpRewritePattern<handshake::BufferOp> {
   using OpRewritePattern<handshake::BufferOp>::OpRewritePattern;
 
@@ -899,8 +904,9 @@ struct UnpackBufferSlots : public OpRewritePattern<handshake::BufferOp> {
 
 /// Handshake to netlist conversion pass. The conversion only works on modules
 /// containing a single handshake function (handshake::FuncOp) at the moment.
-/// The function and all the operations it contains are converted to operations
-/// from the HW dialect. Dataflow semantics are made explicit with ESI channels.
+/// The function and all the operations it contains are converted to
+/// operations from the HW dialect. Dataflow semantics are made explicit with
+/// ESI channels.
 class HandshakeToNetListPass
     : public dynamatic::impl::HandshakeToNetlistBase<HandshakeToNetListPass> {
 public:
@@ -923,10 +929,10 @@ public:
       return signalPassFailure();
     }
     if (failed(verifyAllIndexConcretized(funcOp))) {
-      funcOp.emitOpError()
-          << "Lowering to netlist requires that all index types in the IR have "
-             "been concretized."
-          << ERR_RUN_CONCRETIZATION;
+      funcOp.emitOpError() << "Lowering to netlist requires that all index "
+                              "types in the IR have "
+                              "been concretized."
+                           << ERR_RUN_CONCRETIZATION;
       return signalPassFailure();
     }
     if (failed(verifyExportToRTL(funcOp)))
@@ -934,8 +940,8 @@ public:
 
     // Run a pre-processing pass on the IR
     if (failed(preprocessMod())) {
-      mod->emitError()
-          << "Failed to pre-process IR to make it valid for netlist conversion";
+      mod->emitError() << "Failed to pre-process IR to make it valid for "
+                          "netlist conversion";
       return signalPassFailure();
     }
 
@@ -1020,9 +1026,9 @@ public:
   }
 
 private:
-  /// Perfoms some simple transformations on the module to make the netlist that
-  /// will result from the conversion able to be turned into an RTL design.
-  /// NOTE: (RamirezLucas) Ideally, this should be moved to a separate
+  /// Perfoms some simple transformations on the module to make the netlist
+  /// that will result from the conversion able to be turned into an RTL
+  /// design. NOTE: (RamirezLucas) Ideally, this should be moved to a separate
   /// pre-processing pass.
   LogicalResult preprocessMod();
 };
