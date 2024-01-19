@@ -25,6 +25,7 @@ export DHLS_INSTALL_DIR="${LEGACY_DIR}/../.."
 
 # Convert DOT graph to VHDL
 cd "$COMP_DIR"
-"$LEGACY_DIR/dot2vhdl/bin/dot2vhdl" "$COMP_DIR/$KERNEL_NAME" >/dev/null
+"$DYNAMATIC_DIR/bin/export-vhdl" $KERNEL_NAME "$COMP_DIR/$KERNEL_NAME.dot" \
+  "$COMP_DIR/$KERNEL_NAME.vhd" > /dev/null
 exit_on_fail "Failed to convert DOT to VHDL" "Converted DOT to VHDL"
 echo_info "HDL generation succeeded"
