@@ -33,7 +33,6 @@ inline void registerAllPasses() {
   circt::registerFlattenMemRef();
   circt::registerFlattenMemRefCalls();
   circt::esi::registerPasses();
-  handshake::registerPasses();
 }
 
 } // namespace dynamatic

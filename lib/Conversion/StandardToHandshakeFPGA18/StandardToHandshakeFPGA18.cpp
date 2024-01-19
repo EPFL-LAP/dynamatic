@@ -25,8 +25,10 @@
 #include "mlir/Dialect/Affine/Analysis/AffineAnalysis.h"
 #include "mlir/Dialect/Affine/IR/AffineOps.h"
 #include "mlir/Dialect/Affine/Utils.h"
+#include "mlir/Dialect/ControlFlow/IR/ControlFlow.h"
 #include "mlir/Dialect/Func/IR/FuncOps.h"
 #include "mlir/Dialect/LLVMIR/LLVMDialect.h"
+#include "mlir/Dialect/Math/IR/Math.h"
 #include "mlir/Dialect/MemRef/IR/MemRef.h"
 #include "mlir/Dialect/SCF/IR/SCF.h"
 #include "mlir/IR/Dominance.h"
@@ -415,18 +417,14 @@ LogicalResult HandshakeLoweringFPGA18::replaceUndefinedValues(
     for (auto undefOp : block.getOps<mlir::LLVM::UndefOp>()) {
       // Create an attribute of the appropriate type for the constant
       auto resType = undefOp.getRes().getType();
-      TypedAttr cstAttr = llvm::TypeSwitch<Type, TypedAttr>(resType)
-                              .Case<IndexType>([&](auto type) {
-                                return rewriter.getIndexAttr(0);
-                              })
-                              .Case<IntegerType>([&](auto type) {
-                                return rewriter.getIntegerAttr(type, 0);
-                              })
-                              .Case<FloatType>([&](auto type) {
-                                return rewriter.getFloatAttr(type, 0.0);
-                              })
-                              .Default([&](auto type) { return nullptr; });
-      if (!cstAttr)
+      TypedAttr cstAttr;
+      if (isa<IndexType>(resType))
+        cstAttr = rewriter.getIndexAttr(0);
+      else if (isa<IntegerType>(resType))
+        cstAttr = rewriter.getIntegerAttr(resType, 0);
+      else if (FloatType floatType = dyn_cast<FloatType>(resType))
+        cstAttr = rewriter.getFloatAttr(floatType, 0.0);
+      else
         return undefOp->emitError() << "operation has unsupported result type";
 
       // Create a constant with a default value and replace the undefined value
@@ -539,11 +537,9 @@ class LowerFuncOpTarget : public ConversionTarget {
 public:
   explicit LowerFuncOpTarget(MLIRContext &context) : ConversionTarget(context) {
     loweredFuncs.clear();
-    addLegalDialect<handshake::HandshakeDialect>();
-    addLegalDialect<func::FuncDialect>();
-    addLegalDialect<arith::ArithDialect>();
-    addIllegalDialect<scf::SCFDialect>();
-    addIllegalDialect<affine::AffineDialect>();
+    addLegalDialect<handshake::HandshakeDialect, func::FuncDialect,
+                    arith::ArithDialect, math::MathDialect>();
+    addIllegalDialect<affine::AffineDialect, scf::SCFDialect>();
 
     // The root operation to be replaced is marked dynamically legal based on
     // the lowering status of the given operation, see PartialLowerOp. This is

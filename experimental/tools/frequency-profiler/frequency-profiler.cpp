@@ -19,6 +19,7 @@
 #include "mlir/Dialect/ControlFlow/IR/ControlFlow.h"
 #include "mlir/Dialect/Func/IR/FuncOps.h"
 #include "mlir/Dialect/LLVMIR/LLVMDialect.h"
+#include "mlir/Dialect/Math/IR/Math.h"
 #include "mlir/Dialect/MemRef/IR/MemRef.h"
 #include "mlir/IR/BuiltinOps.h"
 #include "mlir/IR/MLIRContext.h"
@@ -116,8 +117,9 @@ int main(int argc, char **argv) {
   // dialects or parsers. Allow unregistered dialects to not fail in these
   // cases
   MLIRContext context;
-  context.loadDialect<func::FuncDialect, memref::MemRefDialect,
-                      LLVM::LLVMDialect, cf::ControlFlowDialect>();
+  context
+      .loadDialect<cf::ControlFlowDialect, func::FuncDialect, math::MathDialect,
+                   memref::MemRefDialect, LLVM::LLVMDialect>();
   context.allowUnregisteredDialects();
 
   // Load the MLIR module

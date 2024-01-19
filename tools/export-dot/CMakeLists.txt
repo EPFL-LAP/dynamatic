@@ -21,5 +21,6 @@ target_link_libraries(export-dot
   MLIRPass
   MLIRLLVMDialect
   MLIRArithDialect
+  MLIRMathDialect
   MLIRMemRefDialect
   )

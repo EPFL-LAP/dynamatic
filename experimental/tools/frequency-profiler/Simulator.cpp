@@ -15,6 +15,7 @@
 #include "mlir/Dialect/ControlFlow/IR/ControlFlowOps.h"
 #include "mlir/Dialect/Func/IR/FuncOps.h"
 #include "mlir/Dialect/LLVMIR/LLVMDialect.h"
+#include "mlir/Dialect/Math/IR/Math.h"
 #include "mlir/Dialect/MemRef/IR/MemRef.h"
 #include "mlir/IR/BuiltinTypes.h"
 #include "mlir/IR/Dominance.h"
@@ -25,7 +26,7 @@
 #include "llvm/ADT/Statistic.h"
 #include "llvm/ADT/TypeSwitch.h"
 #include "llvm/Support/Debug.h"
-
+#include <cmath>
 #include <list>
 
 #define DEBUG_TYPE "simulator"
@@ -54,10 +55,7 @@ public:
 
 private:
   /// Operation execution visitors
-  LogicalResult execute(mlir::arith::ConstantIndexOp,
-                        std::vector<Any> & /*inputs*/,
-                        std::vector<Any> & /*outputs*/);
-  LogicalResult execute(mlir::arith::ConstantIntOp, std::vector<Any> &,
+  LogicalResult execute(mlir::arith::ConstantOp, std::vector<Any> &,
                         std::vector<Any> &);
   LogicalResult execute(mlir::arith::AddIOp, std::vector<Any> &,
                         std::vector<Any> &);
@@ -102,6 +100,22 @@ private:
   LogicalResult execute(mlir::arith::ExtSIOp, std::vector<Any> &,
                         std::vector<Any> &);
   LogicalResult execute(mlir::arith::ExtUIOp, std::vector<Any> &,
+                        std::vector<Any> &);
+  LogicalResult execute(mlir::math::CosOp, std::vector<Any> &,
+                        std::vector<Any> &);
+  LogicalResult execute(mlir::math::ExpOp, std::vector<Any> &,
+                        std::vector<Any> &);
+  LogicalResult execute(mlir::math::Exp2Op, std::vector<Any> &,
+                        std::vector<Any> &);
+  LogicalResult execute(mlir::math::LogOp, std::vector<Any> &,
+                        std::vector<Any> &);
+  LogicalResult execute(mlir::math::Log2Op, std::vector<Any> &,
+                        std::vector<Any> &);
+  LogicalResult execute(mlir::math::Log10Op, std::vector<Any> &,
+                        std::vector<Any> &);
+  LogicalResult execute(mlir::math::SinOp, std::vector<Any> &,
+                        std::vector<Any> &);
+  LogicalResult execute(mlir::math::SqrtOp, std::vector<Any> &,
                         std::vector<Any> &);
   LogicalResult execute(memref::LoadOp, std::vector<Any> &, std::vector<Any> &);
   LogicalResult execute(memref::StoreOp, std::vector<Any> &,
@@ -272,17 +286,26 @@ static unsigned allocateMemRef(mlir::MemRefType type, std::vector<Any> &in,
 // Std executer
 //===----------------------------------------------------------------------===//
 
-LogicalResult StdExecuter::execute(mlir::arith::ConstantIndexOp op,
+LogicalResult StdExecuter::execute(mlir::arith::ConstantOp op,
                                    std::vector<Any> &, std::vector<Any> &out) {
-  auto attr = op->getAttrOfType<mlir::IntegerAttr>("value");
-  out[0] = attr.getValue().sextOrTrunc(IndexType::kInternalStorageBitWidth);
-  return success();
-}
-
-LogicalResult StdExecuter::execute(mlir::arith::ConstantIntOp op,
-                                   std::vector<Any> &, std::vector<Any> &out) {
-  auto attr = op->getAttrOfType<mlir::IntegerAttr>("value");
-  out[0] = attr.getValue();
+  mlir::Type cstType = op.getResult().getType();
+  TypedAttr valueAttr = op.getValueAttr();
+  if (isa<IndexType>(cstType)) {
+    mlir::IntegerAttr attr = cast<mlir::IntegerAttr>(valueAttr);
+    out[0] = attr.getValue().sextOrTrunc(IndexType::kInternalStorageBitWidth);
+  } else if (isa<mlir::IntegerType>(cstType)) {
+    APInt value = cast<mlir::IntegerAttr>(valueAttr).getValue();
+    unsigned bitwidth = cstType.getIntOrFloatBitWidth();
+    if (cstType.isUnsignedInteger())
+      out[0] = value.zextOrTrunc(bitwidth);
+    else
+      out[0] = value.sextOrTrunc(bitwidth);
+  } else if (isa<mlir::FloatType>(cstType)) {
+    mlir::FloatAttr attr = cast<mlir::FloatAttr>(valueAttr);
+    out[0] = attr.getValue();
+  } else {
+    fatalValueError("unsupported constant type", op);
+  }
   return success();
 }
 
@@ -467,6 +490,54 @@ LogicalResult StdExecuter::execute(mlir::arith::ExtUIOp op,
                                    std::vector<Any> &out) {
   int64_t width = op.getType().getIntOrFloatBitWidth();
   out[0] = any_cast<APInt>(in[0]).zext(width);
+  return success();
+}
+
+LogicalResult StdExecuter::execute(mlir::math::CosOp op, std::vector<Any> &in,
+                                   std::vector<Any> &out) {
+  out[0] = APFloat(std::cos(any_cast<APFloat>(in[0]).convertToDouble()));
+  return success();
+}
+
+LogicalResult StdExecuter::execute(mlir::math::ExpOp op, std::vector<Any> &in,
+                                   std::vector<Any> &out) {
+  out[0] = APFloat(std::exp(any_cast<APFloat>(in[0]).convertToDouble()));
+  return success();
+}
+
+LogicalResult StdExecuter::execute(mlir::math::Exp2Op op, std::vector<Any> &in,
+                                   std::vector<Any> &out) {
+  out[0] = APFloat(std::exp2(any_cast<APFloat>(in[0]).convertToDouble()));
+  return success();
+}
+
+LogicalResult StdExecuter::execute(mlir::math::LogOp op, std::vector<Any> &in,
+                                   std::vector<Any> &out) {
+  out[0] = APFloat(std::log(any_cast<APFloat>(in[0]).convertToDouble()));
+  return success();
+}
+
+LogicalResult StdExecuter::execute(mlir::math::Log2Op op, std::vector<Any> &in,
+                                   std::vector<Any> &out) {
+  out[0] = APFloat(std::log2(any_cast<APFloat>(in[0]).convertToDouble()));
+  return success();
+}
+
+LogicalResult StdExecuter::execute(mlir::math::Log10Op op, std::vector<Any> &in,
+                                   std::vector<Any> &out) {
+  out[0] = APFloat(std::log10(any_cast<APFloat>(in[0]).convertToDouble()));
+  return success();
+}
+
+LogicalResult StdExecuter::execute(mlir::math::SinOp op, std::vector<Any> &in,
+                                   std::vector<Any> &out) {
+  out[0] = APFloat(std::sin(any_cast<APFloat>(in[0]).convertToDouble()));
+  return success();
+}
+
+LogicalResult StdExecuter::execute(mlir::math::SqrtOp op, std::vector<Any> &in,
+                                   std::vector<Any> &out) {
+  out[0] = APFloat(std::sqrt(any_cast<APFloat>(in[0]).convertToDouble()));
   return success();
 }
 
@@ -657,26 +728,24 @@ StdExecuter::StdExecuter(mlir::func::FuncOp &toplevel,
     unsigned strat = ExecuteStrategy::Default;
     auto res =
         llvm::TypeSwitch<Operation *, LogicalResult>(&op)
-            .Case<mlir::arith::ConstantIndexOp, mlir::arith::ConstantIntOp,
-                  mlir::arith::AddIOp, mlir::arith::AddFOp, mlir::arith::CmpIOp,
-                  mlir::arith::CmpFOp, mlir::arith::SubIOp, mlir::arith::SubFOp,
-                  mlir::arith::MulIOp, mlir::arith::MulFOp,
-                  mlir::arith::DivSIOp, mlir::arith::DivUIOp,
-                  mlir::arith::DivFOp, mlir::arith::IndexCastOp,
-                  mlir::arith::TruncIOp, mlir::arith::AndIOp,
-                  mlir::arith::OrIOp, mlir::arith::XOrIOp,
-                  mlir::arith::SelectOp, mlir::LLVM::UndefOp,
-                  mlir::arith::ShRSIOp, mlir::arith::ShLIOp,
-                  mlir::arith::ExtSIOp, mlir::arith::ExtUIOp, memref::AllocOp,
-                  memref::LoadOp, memref::StoreOp>([&](auto op) {
+            .Case<arith::ConstantOp, arith::AddIOp, arith::AddFOp,
+                  arith::CmpIOp, arith::CmpFOp, arith::SubIOp, arith::SubFOp,
+                  arith::MulIOp, arith::MulFOp, arith::DivSIOp, arith::DivUIOp,
+                  arith::DivFOp, arith::IndexCastOp, arith::TruncIOp,
+                  arith::AndIOp, arith::OrIOp, arith::XOrIOp, arith::SelectOp,
+                  LLVM::UndefOp, arith::ShRSIOp, arith::ShLIOp, arith::ExtSIOp,
+                  arith::ExtUIOp, math::SqrtOp, math::CosOp, math::ExpOp,
+                  math::Exp2Op, math::LogOp, math::Log2Op, math::Log10Op,
+                  math::SqrtOp, memref::AllocOp, memref::LoadOp,
+                  memref::StoreOp>([&](auto op) {
               strat = ExecuteStrategy::Default;
               return execute(op, inValues, outValues);
             })
-            .Case<mlir::cf::BranchOp, mlir::cf::CondBranchOp,
-                  mlir::CallOpInterface>([&](auto op) {
-              strat = ExecuteStrategy::Continue;
-              return execute(op, inValues, outValues);
-            })
+            .Case<cf::BranchOp, cf::CondBranchOp, CallOpInterface>(
+                [&](auto op) {
+                  strat = ExecuteStrategy::Continue;
+                  return execute(op, inValues, outValues);
+                })
             .Case<func::ReturnOp>([&](auto op) {
               strat = ExecuteStrategy::Return;
               return execute(op, inValues, outValues);
