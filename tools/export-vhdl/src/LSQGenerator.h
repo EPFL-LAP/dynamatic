@@ -13,8 +13,7 @@
 
 #define MAX_SIZES 16
 
-void lsqGenerateConfiguration(const std::string &topLevelFilename);
-void lsqGenerate(const std::string &topLevelFilename);
+void lsqGenerateConfiguration(const std::string &outPath);
 
 int getLSQDataWidth();
 int getLSQAddressWidth(int lsqIndx);

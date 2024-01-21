@@ -22,23 +22,20 @@ int main(int argc, char *argv[]) {
   // Check that the corrent number of arguments were provided
   if (argc != 4) {
     std::cerr << "Expected three arguments: kernel name, path to DOT file to "
-                 "convert, and path to VHD file to write\n";
+                 "convert, and path to output folder\n";
     return 1;
   }
+  std::string kernelName(argv[1]);
+  std::string dotPath(argv[2]);
+  std::string outPath(argv[3]);
 
   // Parse the DOT
-  std::string dotPath = argv[2];
-  std::cout << "Parsing " << dotPath << "\n";
   parseDOT(dotPath);
 
   // Generate the VHDL
-  std::cout << "Generating VHDL\n";
-  writeVHDL(argv[1], argv[3]);
+  writeVHDL(kernelName, outPath);
 
   // Generate LSQ configurations
-  lsqGenerateConfiguration(dotPath);
-  lsqGenerate(dotPath);
-
-  std::cout << "Done\n";
+  lsqGenerateConfiguration(outPath);
   return 0;
 }

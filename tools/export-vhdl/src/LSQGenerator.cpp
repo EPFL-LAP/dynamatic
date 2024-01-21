@@ -11,6 +11,7 @@
 #include "VHDLWriter.h"
 #include <algorithm>
 #include <cctype>
+#include <filesystem>
 #include <fstream>
 #include <iostream>
 #include <list>
@@ -287,15 +288,14 @@ static void lsqSetConfiguration(int lsqIndx) {
   }
 }
 
-static void lsqWriteConfigurationFile(const std::string &topLevelFilename,
-                                      int lsqIndx) {
-  std::string lsqFilename;
-  lsqFilename = topLevelFilename;
-  lsqFilename += "_lsq";
-  lsqFilename += std::to_string(lsqIndx);
-  lsqFilename += "_configuration.json";
+static std::string getLSQConfigPath(const std::string &outPath, int lsqIndx) {
+  return outPath + std::filesystem::path::preferred_separator + "lsq" +
+         std::to_string(lsqIndx) + "_config.json";
+  ;
+}
 
-  lsqConfigurationFile.open(lsqFilename);
+static void lsqWriteConfigurationFile(const std::string &outPath, int lsqIndx) {
+  lsqConfigurationFile.open(getLSQConfigPath(outPath, lsqIndx));
 
   lsqConfigurationFile << "{\n";
   lsqConfigurationFile << "\"specifications\" :[\n";
@@ -340,40 +340,10 @@ static void lsqWriteConfigurationFile(const std::string &topLevelFilename,
   lsqConfigurationFile.close();
 }
 
-void lsqGenerateConfiguration(const std::string &topLevelFilename) {
+void lsqGenerateConfiguration(const std::string &outPath) {
   for (int lsqIndx = 0; lsqIndx < lsqsInNetlist; lsqIndx++) {
     lsqSetConfiguration(lsqIndx);
-    lsqWriteConfigurationFile(topLevelFilename, lsqIndx);
-  }
-}
-
-void lsqGenerate(const std::string &topLevelFilename) {
-  FILE *fp;
-  char path[1035];
-  std::stringstream ssPath, stringPath;
-
-  char cmd[512];
-
-  for (int lsqIndx = 0; lsqIndx < lsqsInNetlist; lsqIndx++) {
-    std::cout << "Generating LSQ " << lsqIndx << " component...\n";
-    sprintf(cmd, "lsq_generate %s_lsq%d_configuration.json",
-            topLevelFilename.c_str(), lsqIndx);
-
-    std::cout << cmd << "\n";
-
-    /* Open the command for reading. */
-    fp = popen(cmd, "r");
-    if (fp == nullptr) {
-      return;
-    }
-
-    /* Read the output a line at a time - output it. */
-    while (fgets(path, sizeof(path) - 1, fp) != nullptr) {
-      printf("%s", path);
-    }
-
-    /* close */
-    pclose(fp);
+    lsqWriteConfigurationFile(outPath, lsqIndx);
   }
 }
 
@@ -388,15 +358,14 @@ int getLSQDataWidth() {
 int getLSQAddressWidth(int lsqIndx) {
   for (int i = 0; i < componentsInNetlist; i++) {
     if (nodes[i].type.find("LSQ") != std::string::npos) {
-      if (lsqIndx == nodes[i].lsqIndx) {
+      if (lsqIndx == nodes[i].lsqIndx)
         return nodes[i].addressSize;
-      }
     }
   }
   return LSQ_ADDRESSWIDTH_DEFAULT;
 }
 
-// Json Example with three components
+// JSON Example with three components
 // {
 //   "specifications"  :[
 //   {

@@ -2816,7 +2816,7 @@ static void writeLSQDeclaration() {
   }
 }
 
-void writeVHDL(const string &kernelName, const string &vhdPath) {
+void writeVHDL(const string &kernelName, const string &outFolder) {
   string entity = cleanEntity(kernelName);
 
   componentsType[COMPONENT_GENERIC].inPorts = 2;
@@ -2833,6 +2833,8 @@ void writeVHDL(const string &kernelName, const string &vhdPath) {
   componentsType[COMPONENT_CONSTANT].outPortsNameStr = outPortsNameGeneric;
   componentsType[COMPONENT_CONSTANT].outPortsTypeStr = outPortsTypeGeneric;
 
+  std::string vhdPath = outFolder + std::filesystem::path::preferred_separator +
+                        kernelName + ".vhd";
   netlist.open(vhdPath);
 
   writeIntro();

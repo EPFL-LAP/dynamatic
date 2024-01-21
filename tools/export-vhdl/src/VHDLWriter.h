@@ -132,6 +132,6 @@ enum {
   ENTITY_MAX
 };
 
-void writeVHDL(const std::string &kernelName, const std::string &vhdPath);
+void writeVHDL(const std::string &kernelName, const std::string &outFolder);
 
 #endif // EXPORT_VHDL_VHDL_WRITER_H

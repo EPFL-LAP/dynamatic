@@ -322,9 +322,6 @@ static In getComponentInputs(string in, int componentsInNetlist) {
             nodes[componentsInNetlist].dataSize =
                 inputs.input[inputIndx].bitSize;
           }
-
-          // cout << nodes[componentsInNetlist].name << " input "<< input_indx
-          // << ":" << inputs.input[input_indx].type << endl;
           inputIndx++;
         }
       }
@@ -391,12 +388,8 @@ static string getComponentName(string name) {
   name.erase(remove(name.begin(), name.end(), '"'), name.end());
   name.erase(remove(name.begin(), name.end(), ' '), name.end());
 
-  if (name[0] == '_') {
-    // cout << "***WARNING***: Vivado doesn't support names with '_' as first
-    // character. Component "<< name <<" renamed as ";
+  if (name[0] == '_')
     name.replace(0, 1, "");
-    // cout << name << endl;
-  }
 
   nameRet = name;
   return nameRet;
@@ -494,20 +487,20 @@ static void parseConnections(const string &line) {
       nodes[nextNodeId].inputs.input[inputIndx].prevNodesID = currentNodeId;
 
     } else {
-      cout << "Netlist Error" << endl;
+      cerr << "Netlist Error" << endl;
 
       if (currentNodeId == COMPONENT_NOT_FOUND) {
-        cout << "Node Description " << v[0] << " not found. Not ID assigned"
+        cerr << "Node Description " << v[0] << " not found. Not ID assigned"
              << endl;
       } else
 
           if (nextNodeId == COMPONENT_NOT_FOUND) {
-        cout << "Node ID" << currentNodeId
+        cerr << "Node ID" << currentNodeId
              << "Node Name: " << nodes[currentNodeId].name
              << " has not next node for output " << outputIndx << endl;
       }
 
-      cout << "Exiting without producing netlist" << endl;
+      cerr << "Exiting without producing netlist" << endl;
       exit(0);
     }
   }
@@ -543,12 +536,10 @@ static void parseComponents(const string &v0, const string &v1) {
         }
       }
       if (parameter.find("in=") != std::string::npos) {
-        // cout << " nodes " << nodes[componentsInNetlist].name << endl;
         nodes[componentsInNetlist].inputs =
             getComponentInputs(indx, componentsInNetlist);
       }
       if (parameter.find("out=") != std::string::npos) {
-        // cout << " nodes " << nodes[componentsInNetlist].name << endl;
         nodes[componentsInNetlist].outputs = getComponentOutputs(indx);
       }
       if (parameter.find("op") != std::string::npos) {
@@ -705,7 +696,6 @@ static void parseComponents(const string &v0, const string &v1) {
 
       if (parameter.find("numLoads") != std::string::npos) {
         nodes[componentsInNetlist].numLoads = getComponentNumloads(indx);
-        // cout << "numLoads" << nodes[componentsInNetlist].numLoads << endl;
       }
       if (parameter.find("numStores") != std::string::npos) {
         nodes[componentsInNetlist].numStores = getComponentNumstores(indx);
@@ -761,7 +751,7 @@ static void parseComponents(const string &v0, const string &v1) {
 
     componentsInNetlist++;
     if (componentsInNetlist >= MAX_NODES) {
-      cout << "The number of components in the netlist exceed the maximum "
+      cerr << "The number of components in the netlist exceed the maximum "
               "allowed "
            << MAX_NODES << endl;
     }
@@ -793,7 +783,7 @@ void parseDOT(const string &filename) {
     }
     inFile.close();
   } else {
-    cout << "File " << filename << " not found " << endl << endl << endl;
+    cerr << "File " << filename << " not found " << endl << endl << endl;
     exit(EXIT_FAILURE);
   }
 }
