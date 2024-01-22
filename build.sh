@@ -313,6 +313,7 @@ create_symlink build/bin/export-dot
 create_symlink build/bin/export-vhdl
 create_symlink build/bin/exp-frequency-profiler
 create_symlink build/bin/handshake-simulator
+create_symlink build/bin/hls-verifier
 
 # Make the scripts used by the frontend executable
 chmod +x tools/dynamatic/scripts/compile.sh

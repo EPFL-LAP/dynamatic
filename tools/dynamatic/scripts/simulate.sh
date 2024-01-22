@@ -13,9 +13,6 @@ SRC_DIR=$3
 OUTPUT_DIR=$4
 KERNEL_NAME=$5
 
-COMP_DIR="$OUTPUT_DIR/comp"
-HLS_VERIFIER="$LEGACY_DIR/Regression_test/hls_verifier/HlsVerifier/build/hlsverifier"
-
 # Generated directories/files
 SIM_DIR="$OUTPUT_DIR/sim"
 C_SRC_DIR="$SIM_DIR/C_SRC"
@@ -24,6 +21,11 @@ VHDL_SRC_DIR="$SIM_DIR/VHDL_SRC"
 VHDL_OUT_DIR="$SIM_DIR/VHDL_OUT"
 INPUT_VECTORS_DIR="$SIM_DIR/INPUT_VECTORS"
 HLS_VERIFY_DIR="$SIM_DIR/HLS_VERIFY"
+
+# Shortcuts
+COMP_DIR="$OUTPUT_DIR/comp"
+HLS_VERIFIER="$DYNAMATIC_DIR/bin/hls-verifier"
+RESOURCE_DIR="$DYNAMATIC_DIR/tools/hls-verifier/resources"
 
 # ============================================================================ #
 # Simulation flow
@@ -54,7 +56,7 @@ cp "$SRC_DIR/$KERNEL_NAME.h" "$C_SRC_DIR"
 # Simulate and verify design
 echo_info "Launching Modelsim simulation"
 cd "$HLS_VERIFY_DIR"
-"$HLS_VERIFIER" cover -aw32 "../C_SRC/$KERNEL_NAME.c" \
+"$HLS_VERIFIER" cover -aw32 "$RESOURCE_DIR" "../C_SRC/$KERNEL_NAME.c" \
   "../C_SRC/$KERNEL_NAME.c" "$KERNEL_NAME" \
   > "../report.txt"
 exit_on_fail "Simulation failed" "Simulation succeeded"
