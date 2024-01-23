@@ -26,6 +26,21 @@ Node nodes[MAX_NODES];
 int componentsInNetlist;
 int lsqsInNetlist;
 
+/// This is certifiably cursed!
+///
+/// It is also the easiest way to replicate dot2vhdl's behavior which uses
+/// exception handling around calls to `std::stoi` to handle arguments with
+/// trailing garbage characters. We do not use exceptions, hence this
+/// monstrosity to ensure that calls to `std::stoi` always succeed.
+///
+/// Thanks legacy!
+static int stoiSubstr(const std::string &str) {
+  size_t idx = 0;
+  while (idx < str.size() && std::isdigit(str[idx]))
+    ++idx;
+  return idx == 0 ? 0 : std::stoi(str.substr(0, idx));
+}
+
 static bool isConnection(const string &line) {
   if (line.find("type") != std::string::npos)
     return false;
@@ -82,7 +97,7 @@ static int getComponentSlots(string parameters) {
   parameters = stringClean(parameters);
 
   string type = getValue(parameters);
-  return stoi(type);
+  return stoiSubstr(type);
 }
 
 static bool getComponentTransparent(string parameters) {
@@ -116,28 +131,28 @@ static int getComponentBbcount(string parameters) {
   parameters = stringClean(parameters);
 
   string type = getValue(parameters);
-  return stoi(type);
+  return stoiSubstr(type);
 }
 
 static int getComponentBbId(string parameters) {
   parameters = stringClean(parameters);
 
   string type = getValue(parameters);
-  return stoi(type);
+  return stoiSubstr(type);
 }
 
 static int getComponentPortId(string parameters) {
   parameters = stringClean(parameters);
 
   string type = getValue(parameters);
-  return stoi(type);
+  return stoiSubstr(type);
 }
 
 static int getComponentOffset(string parameters) {
   parameters = stringClean(parameters);
 
   string type = getValue(parameters);
-  return stoi(type);
+  return stoiSubstr(type);
 }
 
 static bool getComponentMemAddress(string parameters) {
@@ -152,7 +167,7 @@ static int getComponentConstants(string parameters) {
   parameters = stringClean(parameters);
 
   string type = getValue(parameters);
-  return stoi(type);
+  return stoiSubstr(type);
 }
 
 static vector<vector<int>> getComponentOrderings(const string &parameter) {
@@ -184,7 +199,7 @@ static vector<vector<int>> getComponentOrderings(const string &parameter) {
     vector<int> intIndices{};
     intIndices.reserve(stringIndices.size());
     for (const auto &stringIndex : stringIndices) {
-      intIndices.push_back(stoi(stringIndex));
+      intIndices.push_back(stoiSubstr(stringIndex));
     }
     orderings.push_back(intIndices);
   }
@@ -216,7 +231,7 @@ static int getInputPort(const string &in) {
     par[1].erase(remove(par[1].begin(), par[1].end(), '"'), par[1].end());
     if (par[1].size() > 1) {
       val = par[1].at(1);
-      retVal = stoi(val);
+      retVal = stoiSubstr(val);
     }
   }
   return retVal;
@@ -457,7 +472,7 @@ static void parseConnections(const string &line) {
         parameter.erase(remove(parameter.begin(), parameter.end(), '"'),
                         parameter.end());
         parameter.erase(0, 8);
-        outputIndx = stoi(parameter);
+        outputIndx = stoiSubstr(parameter);
         outputIndx--;
       }
       if (parameter.find("to") != std::string::npos) {
@@ -474,7 +489,7 @@ static void parseConnections(const string &line) {
 
         parameter.erase(0, 5);
 
-        inputIndx = stoi(parameter);
+        inputIndx = stoiSubstr(parameter);
         inputIndx--;
       }
     }
