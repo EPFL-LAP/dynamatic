@@ -153,7 +153,7 @@ static void setBBConstraints(GRBModel &model, MILPVars &vars) {
 };
 #endif // DYNAMATIC_GUROBI_NOT_INSTALLED
 
-CFDFC::CFDFC(circt::handshake::FuncOp funcOp, ArchSet &archs, unsigned numExec)
+CFDFC::CFDFC(handshake::FuncOp funcOp, ArchSet &archs, unsigned numExec)
     : numExecs(numExec) {
 
   // Identify the block that starts the CFDFC; it's the only one that is both

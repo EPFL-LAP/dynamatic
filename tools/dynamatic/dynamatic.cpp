@@ -402,10 +402,10 @@ CommandResult SetDynamaticPath::decode(SmallVector<std::string> &tokens) {
     dynamaticPath = dynamaticPath.substr(0, dynamaticPath.size() - 1);
 
   // Check whether the path makes sense
-  if (!fs::exists(dynamaticPath + sep + "circt")) {
+  if (!fs::exists(dynamaticPath + sep + "polygeist")) {
     llvm::outs() << ERR << "'" << dynamaticPath
                  << "' doesn't seem to point to Dynamatic, expected to "
-                    "find, for example, a directory named 'circt' there.\n";
+                    "find, for example, a directory named 'polygeist' there.\n";
     return CommandResult::FAIL;
   }
   if (!fs::exists(dynamaticPath + sep + "bin")) {

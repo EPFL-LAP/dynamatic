@@ -273,7 +273,7 @@ bool dynamatic::cannotBelongToCFG(Operation *op) {
   return isa<handshake::MemoryOpInterface, handshake::SinkOp>(op);
 }
 
-HandshakeCFG::HandshakeCFG(circt::handshake::FuncOp funcOp) : funcOp(funcOp) {
+HandshakeCFG::HandshakeCFG(handshake::FuncOp funcOp) : funcOp(funcOp) {
   for (Operation &op : funcOp.getOps()) {
     if (cannotBelongToCFG(&op))
       continue;

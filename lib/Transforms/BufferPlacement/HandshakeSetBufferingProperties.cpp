@@ -42,7 +42,7 @@ static const llvm::StringLiteral
 /// Makes all channels adjacent to operations of the given type inside the
 /// function unbufferizable.
 template <typename Op>
-static void makeUnbufferizable(circt::handshake::FuncOp funcOp) {
+static void makeUnbufferizable(handshake::FuncOp funcOp) {
   // Channels connected to memory interfaces are not bufferizable
   for (Op op : funcOp.getOps<Op>()) {
     for (Value oprd : op->getOperands()) {

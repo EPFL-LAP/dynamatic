@@ -14,10 +14,9 @@
 #define EXPERIMENTAL_TOOLS_HANDSHAKESIMULATOR_EXECMODELS_H
 
 #include "circt/Dialect/Handshake/HandshakeOps.h"
+#include "dynamatic/Support/LLVM.h"
 #include "mlir/IR/Value.h"
 #include "llvm/ADT/Any.h"
-#include "llvm/Support/Debug.h"
-
 #include <queue>
 #include <string>
 
@@ -27,11 +26,11 @@ namespace experimental {
 struct ExecutableModel;
 
 /// Maps operations to an internal state everyone can access
-using InternalDataMap = llvm::DenseMap<circt::Operation *, llvm::Any>;
+using InternalDataMap = llvm::DenseMap<Operation *, llvm::Any>;
 
 /// Type for operations that only modify outs and ins
 using ExecuteFunction = const std::function<void(
-    std::vector<llvm::Any> &, std::vector<llvm::Any> &, circt::Operation &)>;
+    std::vector<llvm::Any> &, std::vector<llvm::Any> &, Operation &)>;
 
 //--- Dataflow ---------------------------------------------------------------//
 
@@ -90,13 +89,13 @@ struct CircuitState {
   ///             then change the real channelMap to this buffered one.
 
   /// Stores wether ops that have their "rising edge logic" simulated.
-  llvm::DenseSet<circt::Operation *> edgeRisenOps;
+  llvm::DenseSet<Operation *> edgeRisenOps;
 
   /// Holds data for the rising edge part of the cycle simulation
   ChannelMap bufferChannelMap;
 
   /// Returns true if it is the first rising edge encounters
-  bool onRisingEdge(circt::Operation &op);
+  bool onRisingEdge(Operation &op);
 
   // NOTE PR : I really dislike these two methods but I realised that the
   //           classic store and get doesn't have an OP arguments. IDK if it
@@ -136,7 +135,7 @@ struct ExecutableModel {
   /// A wrapper function to do all the utility stuff in order to simulate
   /// the execution correctly.
   /// Returns false if nothing was done, true if some type of jobs were done
-  virtual bool tryExecute(ExecutableData &data, circt::Operation &op) = 0;
+  virtual bool tryExecute(ExecutableData &data, Operation &op) = 0;
   /// Default destructor
   virtual ~ExecutableModel() = default;
   /// Returns wether or not the success of the operation terminates the
@@ -201,151 +200,151 @@ struct OEHBdata {
 //--- Default CIRCT models ---------------------------------------------------//
 
 struct DefaultFork : public ExecutableModel {
-  bool tryExecute(ExecutableData &data, circt::Operation &op) override;
+  bool tryExecute(ExecutableData &data, Operation &op) override;
 };
 
 struct DefaultMerge : public ExecutableModel {
-  bool tryExecute(ExecutableData &data, circt::Operation &op) override;
+  bool tryExecute(ExecutableData &data, Operation &op) override;
 };
 
 struct DefaultControlMerge : public ExecutableModel {
-  bool tryExecute(ExecutableData &data, circt::Operation &op) override;
+  bool tryExecute(ExecutableData &data, Operation &op) override;
 };
 
 struct DefaultMux : public ExecutableModel {
-  bool tryExecute(ExecutableData &data, circt::Operation &op) override;
+  bool tryExecute(ExecutableData &data, Operation &op) override;
 };
 
 struct DefaultBranch : public ExecutableModel {
-  bool tryExecute(ExecutableData &data, circt::Operation &op) override;
+  bool tryExecute(ExecutableData &data, Operation &op) override;
 };
 
 struct DefaultConditionalBranch : public ExecutableModel {
-  bool tryExecute(ExecutableData &data, circt::Operation &op) override;
+  bool tryExecute(ExecutableData &data, Operation &op) override;
 };
 
 struct DefaultSink : public ExecutableModel {
-  bool tryExecute(ExecutableData &data, circt::Operation &op) override;
+  bool tryExecute(ExecutableData &data, Operation &op) override;
 };
 
 struct DefaultConstant : public ExecutableModel {
-  bool tryExecute(ExecutableData &data, circt::Operation &op) override;
+  bool tryExecute(ExecutableData &data, Operation &op) override;
 };
 
 struct DefaultBuffer : public ExecutableModel {
-  bool tryExecute(ExecutableData &data, circt::Operation &op) override;
+  bool tryExecute(ExecutableData &data, Operation &op) override;
 };
 
 //--- Dynamatic models -------------------------------------------------------//
 
 /// Manages all store and load requests and answers them back
 struct DynamaticMemController : public ExecutableModel {
-  bool tryExecute(ExecutableData &data, circt::Operation &op) override;
+  bool tryExecute(ExecutableData &data, Operation &op) override;
 };
 
 /// Sends the address and the data to the memory controller
 struct DynamaticStore : public ExecutableModel {
-  bool tryExecute(ExecutableData &data, circt::Operation &op) override;
+  bool tryExecute(ExecutableData &data, Operation &op) override;
 };
 
 /// Sends the address to memory controller and wait for the result, then pass it
 /// to successor(s)
 struct DynamaticLoad : public ExecutableModel {
-  bool tryExecute(ExecutableData &data, circt::Operation &op) override;
+  bool tryExecute(ExecutableData &data, Operation &op) override;
 };
 
 // Passes the operands to the results. A sort of termination for values
 struct DynamaticReturn : public ExecutableModel {
-  bool tryExecute(ExecutableData &data, circt::Operation &op) override;
+  bool tryExecute(ExecutableData &data, Operation &op) override;
 };
 
 /// Verifies that all returns and memory operations are finished and terminates
 /// the program
 struct DynamaticEnd : public ExecutableModel {
-  bool tryExecute(ExecutableData &data, circt::Operation &op) override;
+  bool tryExecute(ExecutableData &data, Operation &op) override;
   bool isEndPoint() const override { return true; }
 };
 
 //--- ARITH IR Models -------------------------------------------------------//
 
 struct ArithAddF : public ExecutableModel {
-  bool tryExecute(ExecutableData &data, circt::Operation &op) override;
+  bool tryExecute(ExecutableData &data, Operation &op) override;
 };
 
 struct ArithAddI : public ExecutableModel {
-  bool tryExecute(ExecutableData &data, circt::Operation &op) override;
+  bool tryExecute(ExecutableData &data, Operation &op) override;
 };
 
 struct ConstantIndexOp : public ExecutableModel {
-  bool tryExecute(ExecutableData &data, circt::Operation &op) override;
+  bool tryExecute(ExecutableData &data, Operation &op) override;
 };
 
 struct ConstantIntOp : public ExecutableModel {
-  bool tryExecute(ExecutableData &data, circt::Operation &op) override;
+  bool tryExecute(ExecutableData &data, Operation &op) override;
 };
 
 struct XOrIOp : public ExecutableModel {
-  bool tryExecute(ExecutableData &data, circt::Operation &op) override;
+  bool tryExecute(ExecutableData &data, Operation &op) override;
 };
 
 struct CmpIOp : public ExecutableModel {
-  bool tryExecute(ExecutableData &data, circt::Operation &op) override;
+  bool tryExecute(ExecutableData &data, Operation &op) override;
 };
 
 struct CmpFOp : public ExecutableModel {
-  bool tryExecute(ExecutableData &data, circt::Operation &op) override;
+  bool tryExecute(ExecutableData &data, Operation &op) override;
 };
 
 struct SubIOp : public ExecutableModel {
-  bool tryExecute(ExecutableData &data, circt::Operation &op) override;
+  bool tryExecute(ExecutableData &data, Operation &op) override;
 };
 
 struct SubFOp : public ExecutableModel {
-  bool tryExecute(ExecutableData &data, circt::Operation &op) override;
+  bool tryExecute(ExecutableData &data, Operation &op) override;
 };
 
 struct MulIOp : public ExecutableModel {
-  bool tryExecute(ExecutableData &data, circt::Operation &op) override;
+  bool tryExecute(ExecutableData &data, Operation &op) override;
 };
 
 struct MulFOp : public ExecutableModel {
-  bool tryExecute(ExecutableData &data, circt::Operation &op) override;
+  bool tryExecute(ExecutableData &data, Operation &op) override;
 };
 
 struct DivSIOp : public ExecutableModel {
-  bool tryExecute(ExecutableData &data, circt::Operation &op) override;
+  bool tryExecute(ExecutableData &data, Operation &op) override;
 };
 
 struct DivUIOp : public ExecutableModel {
-  bool tryExecute(ExecutableData &data, circt::Operation &op) override;
+  bool tryExecute(ExecutableData &data, Operation &op) override;
 };
 
 struct DivFOp : public ExecutableModel {
-  bool tryExecute(ExecutableData &data, circt::Operation &op) override;
+  bool tryExecute(ExecutableData &data, Operation &op) override;
 };
 
 struct IndexCastOp : public ExecutableModel {
-  bool tryExecute(ExecutableData &data, circt::Operation &op) override;
+  bool tryExecute(ExecutableData &data, Operation &op) override;
 };
 
 struct ExtSIOp : public ExecutableModel {
-  bool tryExecute(ExecutableData &data, circt::Operation &op) override;
+  bool tryExecute(ExecutableData &data, Operation &op) override;
 };
 
 struct ExtUIOp : public ExecutableModel {
-  bool tryExecute(ExecutableData &data, circt::Operation &op) override;
+  bool tryExecute(ExecutableData &data, Operation &op) override;
 };
 
 struct AllocOp : public ExecutableModel {
-  bool tryExecute(ExecutableData &data, circt::Operation &op) override;
+  bool tryExecute(ExecutableData &data, Operation &op) override;
 };
 
 struct BranchOp : public ExecutableModel {
-  bool tryExecute(ExecutableData &data, circt::Operation &op) override;
+  bool tryExecute(ExecutableData &data, Operation &op) override;
 };
 
 struct CondBranchOp : public ExecutableModel {
-  bool tryExecute(ExecutableData &data, circt::Operation &op) override;
+  bool tryExecute(ExecutableData &data, Operation &op) override;
 };
 
 } // namespace experimental

@@ -34,6 +34,7 @@
 
 using namespace llvm;
 using namespace mlir;
+using namespace circt;
 
 namespace dynamatic {
 namespace experimental {
@@ -56,9 +57,6 @@ static void fatalValueError(StringRef reason, T &value) {
   std::string err;
   llvm::raw_string_ostream os(err);
   os << reason << " ('";
-  // Explicitly use ::print instead of << due to possibl operator resolution
-  // error between i.e., circt::Operation::<< and operator<<(OStream &&OS, const
-  // T &Value)
   value.print(os);
   os << "')\n";
   llvm::report_fatal_error(err.c_str());
@@ -180,8 +178,8 @@ static LogicalResult allocateMemRef(mlir::MemRefType type, std::vector<Any> &in,
 
 class HandshakeExecuter {
 public:
-  /// Entry point for circt::handshake::FuncOp top-level functions
-  HandshakeExecuter(circt::handshake::FuncOp &func, CircuitState &circuitState,
+  /// Entry point for handshake::FuncOp top-level functions
+  HandshakeExecuter(handshake::FuncOp &func, CircuitState &circuitState,
                     std::vector<Any> &results,
                     std::vector<std::vector<Any>> &store,
                     mlir::OwningOpRef<mlir::ModuleOp> &module,
@@ -203,7 +201,7 @@ struct StateManager {
   bool internalDataChanged;
 };
 
-HandshakeExecuter::HandshakeExecuter(circt::handshake::FuncOp &func,
+HandshakeExecuter::HandshakeExecuter(handshake::FuncOp &func,
                                      CircuitState &circuitState,
                                      std::vector<Any> &results,
                                      std::vector<std::vector<Any>> &store,
@@ -213,7 +211,7 @@ HandshakeExecuter::HandshakeExecuter(circt::handshake::FuncOp &func,
   mlir::Block &entryBlock = func.getBody().front();
   // The arguments of the entry block.
   // A list of operations which might be ready to execute.
-  std::list<circt::Operation *> readyList;
+  std::list<Operation *> readyList;
   // A map of memory ops
   llvm::DenseMap<unsigned, unsigned> memoryMap;
 
@@ -221,9 +219,9 @@ HandshakeExecuter::HandshakeExecuter(circt::handshake::FuncOp &func,
   bool hasEnd = false;
   func.walk([&](Operation *op) {
     // Set all return flags to false
-    if (isa<circt::handshake::DynamaticReturnOp>(op)) {
+    if (isa<handshake::DynamaticReturnOp>(op)) {
       internalDataMap[op] = false;
-    } else if (isa<circt::handshake::EndOp>(op)) {
+    } else if (isa<handshake::EndOp>(op)) {
       hasEnd = true;
     }
     // (Temporary)
@@ -241,7 +239,7 @@ HandshakeExecuter::HandshakeExecuter(circt::handshake::FuncOp &func,
       "At least one 'end' operation is required for the program to terminate.");
 
   // Initialize the value map for buffers with initial values.
-  for (auto bufferOp : func.getOps<circt::handshake::BufferOp>()) {
+  for (auto bufferOp : func.getOps<handshake::BufferOp>()) {
     if (bufferOp.getInitValues().has_value()) {
       auto initValues = bufferOp.getInitValueArray();
       assert(initValues.size() == 1 &&
@@ -333,8 +331,8 @@ LogicalResult simulate(StringRef toplevelFunction,
   if (initialiseMap(funcMap, models).failed())
     return failure();
 
-  if (circt::handshake::FuncOp toplevel =
-          module->lookupSymbol<circt::handshake::FuncOp>(toplevelFunction)) {
+  if (handshake::FuncOp toplevel =
+          module->lookupSymbol<handshake::FuncOp>(toplevelFunction)) {
     ftype = toplevel.getFunctionType();
     mlir::Block &entryBlock = toplevel.getBody().front();
     blockArgs = entryBlock.getArguments();
@@ -394,8 +392,8 @@ LogicalResult simulate(StringRef toplevelFunction,
 
   std::vector<Any> results(realOutputs);
   bool succeeded = false;
-  if (circt::handshake::FuncOp toplevel =
-          module->lookupSymbol<circt::handshake::FuncOp>(toplevelFunction)) {
+  if (handshake::FuncOp toplevel =
+          module->lookupSymbol<handshake::FuncOp>(toplevelFunction)) {
     succeeded = HandshakeExecuter(toplevel, circuitState, results, store,
                                   module, models)
                     .succeeded();
