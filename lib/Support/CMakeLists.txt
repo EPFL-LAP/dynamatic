@@ -1,4 +1,5 @@
 add_dynamatic_library(DynamaticSupport
+  Backedge.cpp
   CFG.cpp
   DOTPrinter.cpp
   Handshake.cpp

@@ -12,8 +12,8 @@
 
 #include "dynamatic/Support/Handshake.h"
 #include "circt/Dialect/Handshake/HandshakeOps.h"
-#include "circt/Support/BackedgeBuilder.h"
 #include "dynamatic/Support/Attribute.h"
+#include "dynamatic/Support/Backedge.h"
 #include "dynamatic/Support/CFG.h"
 #include "mlir/Dialect/Affine/IR/AffineOps.h"
 #include "mlir/Dialect/MemRef/IR/MemRef.h"

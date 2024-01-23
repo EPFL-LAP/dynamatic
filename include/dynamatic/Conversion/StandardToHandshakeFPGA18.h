@@ -15,8 +15,8 @@
 #define DYNAMATIC_CONVERSION_STANDARDTOHANDSHAKEFPGA18_H
 
 #include "circt/Dialect/Handshake/HandshakeOps.h"
-#include "circt/Support/BackedgeBuilder.h"
 #include "dynamatic/Analysis/NameAnalysis.h"
+#include "dynamatic/Support/Backedge.h"
 #include "dynamatic/Support/DynamaticPass.h"
 #include "dynamatic/Support/Handshake.h"
 #include "dynamatic/Support/LLVM.h"
@@ -47,10 +47,10 @@ public:
     BlockArgument blockArg;
     /// All data operands to the merge-like operation that need to be resolved
     /// during branch insertion.
-    SmallVector<circt::Backedge> dataEdges;
+    SmallVector<Backedge> dataEdges;
     /// An optional index operand that needs to be resolved for mux-like
     /// operations.
-    std::optional<circt::Backedge> indexEdge{};
+    std::optional<Backedge> indexEdge{};
   };
 
   /// Groups information to rewire the IR around merge-like operations by owning
@@ -155,8 +155,7 @@ protected:
   /// control-only (data-less) arguments. For other types of arguments, a
   /// non-deterministic merge is inserted for blocks with 0 or a single
   /// predecessor while a mux is inserted for blocks with multiple predecessors.
-  MergeOpInfo insertMerge(BlockArgument blockArg,
-                          circt::BackedgeBuilder &edgeBuilder,
+  MergeOpInfo insertMerge(BlockArgument blockArg, BackedgeBuilder &edgeBuilder,
                           ConversionPatternRewriter &rewriter);
 
 private:

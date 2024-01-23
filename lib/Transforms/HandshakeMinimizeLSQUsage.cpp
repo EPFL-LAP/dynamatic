@@ -13,9 +13,9 @@
 
 #include "dynamatic/Transforms/HandshakeMinimizeLSQUsage.h"
 #include "circt/Dialect/Handshake/HandshakeOps.h"
-#include "circt/Support/BackedgeBuilder.h"
 #include "dynamatic/Analysis/NameAnalysis.h"
 #include "dynamatic/Support/Attribute.h"
+#include "dynamatic/Support/Backedge.h"
 #include "dynamatic/Support/CFG.h"
 #include "dynamatic/Support/DynamaticPass.h"
 #include "dynamatic/Support/Handshake.h"
