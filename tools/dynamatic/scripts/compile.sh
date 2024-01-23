@@ -102,7 +102,7 @@ exit_on_fail "Failed to apply standard transformations to cf" \
   "Applied standard transformations to cf"
 
 # cf transformations (dynamatic) 
-"$DYNAMATIC_OPT_BIN" "$F_CF_TRANFORMED" --flatten-memref-calls \
+"$DYNAMATIC_OPT_BIN" "$F_CF_TRANFORMED" \
   --arith-reduce-strength="max-adder-depth-mul=1" --push-constants \
   --mark-memory-interfaces \
   > "$F_CF_DYN_TRANSFORMED"
