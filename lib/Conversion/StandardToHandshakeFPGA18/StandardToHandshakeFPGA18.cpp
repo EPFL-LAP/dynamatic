@@ -15,6 +15,7 @@
 //===----------------------------------------------------------------------===//
 
 #include "dynamatic/Conversion/StandardToHandshakeFPGA18.h"
+#include "circt/Dialect/Handshake/HandshakeInterfaces.h"
 #include "circt/Dialect/Handshake/HandshakeOps.h"
 #include "dynamatic/Analysis/ConstantAnalysis.h"
 #include "dynamatic/Analysis/NameAnalysis.h"
@@ -25,7 +26,7 @@
 #include "mlir/Dialect/Affine/Analysis/AffineAnalysis.h"
 #include "mlir/Dialect/Affine/IR/AffineOps.h"
 #include "mlir/Dialect/Affine/Utils.h"
-#include "mlir/Dialect/ControlFlow/IR/ControlFlow.h"
+#include "mlir/Dialect/ControlFlow/IR/ControlFlowOps.h"
 #include "mlir/Dialect/Func/IR/FuncOps.h"
 #include "mlir/Dialect/LLVMIR/LLVMDialect.h"
 #include "mlir/Dialect/Math/IR/Math.h"
@@ -43,6 +44,7 @@ using namespace mlir;
 using namespace mlir::func;
 using namespace mlir::affine;
 using namespace mlir::memref;
+using namespace circt;
 using namespace dynamatic;
 
 //===-----------------------------------------------------------------------==//
@@ -175,27 +177,148 @@ static LogicalResult computeLinearDominance(
   return success();
 }
 
+/// Returns the value from the predecessor block that should be used as the data
+/// operand of the merge-like operation under consideration.
+static Value getMergeOperand(HandshakeLowering::MergeOpInfo &mergeInfo,
+                             Block *predBlock, bool isFirstOperand) {
+  // The input value to the merge operations
+  Value srcVal = mergeInfo.blockArg;
+  // The block the merge operation belongs to
+  Block *block = mergeInfo.mergeLikeOp->getBlock();
+
+  // The block terminator is either a cf-level branch or cf-level conditional
+  // branch. In either case, identify the value passed to the block using its
+  // index in the list of block arguments
+  unsigned index = srcVal.cast<BlockArgument>().getArgNumber();
+  Operation *termOp = predBlock->getTerminator();
+  if (mlir::cf::CondBranchOp br = dyn_cast<mlir::cf::CondBranchOp>(termOp)) {
+    // Block should be one of the two destinations of the conditional branch
+    auto *trueDest = br.getTrueDest(), *falseDest = br.getFalseDest();
+    if (block == trueDest) {
+      if (!isFirstOperand && trueDest == falseDest)
+        return br.getFalseOperand(index);
+      return br.getTrueOperand(index);
+    }
+    assert(block == falseDest);
+    return br.getFalseOperand(index);
+  }
+  if (isa<mlir::cf::BranchOp>(termOp))
+    return termOp->getOperand(index);
+  return nullptr;
+}
+
+/// Returns the first occurance within the block of an operation of the template
+/// type. If none exists, returns nullptr.
+template <typename Op>
+static Op getFirstOp(Block *block) {
+  auto ops = block->getOps<Op>();
+  if (ops.empty())
+    return nullptr;
+  return *ops.begin();
+}
+
+/// Returns the number of predecessors of the block.
+static unsigned getBlockPredecessorCount(Block *block) {
+  auto predecessors = block->getPredecessors();
+  return std::distance(predecessors.begin(), predecessors.end());
+}
+
+/// Replaces all backedges temporarily used as merge-like operation operands
+/// with actual SSA values coming from predecessor blocks.
+static void reconnectMergeOps(Region &region,
+                              HandshakeLowering::BlockOps &blockMerges,
+                              DenseMap<Value, Value> &mergePairs) {
+  for (Block &block : region) {
+    for (HandshakeLowering::MergeOpInfo &mergeInfo : blockMerges[&block]) {
+      size_t operandIdx = 0;
+      // Set appropriate operand from each predecessor block
+      for (Block *predBlock : block.getPredecessors()) {
+        Value mgOperand =
+            getMergeOperand(mergeInfo, predBlock, operandIdx == 0);
+        assert(mgOperand != nullptr);
+        if (!mgOperand.getDefiningOp()) {
+          assert(mergePairs.count(mgOperand));
+          mgOperand = mergePairs[mgOperand];
+        }
+        mergeInfo.dataEdges[operandIdx].setValue(mgOperand);
+        operandIdx++;
+      }
+
+      // Reconnect all operands originating from livein defining value through
+      // corresponding merge of that block
+      for (Operation &opp : block) {
+        if (!isa<handshake::MergeLikeOpInterface>(&opp)) {
+          opp.replaceUsesOfWith(mergeInfo.blockArg,
+                                mergeInfo.mergeLikeOp->getResult(0));
+        }
+      }
+    }
+  }
+
+  // Connect select operand of muxes to control merge's index result in all
+  // blocks with more than one predecessor
+  for (Block &block : region) {
+    if (getBlockPredecessorCount(&block) > 1) {
+      auto ctrlMergeOp = getFirstOp<handshake::ControlMergeOp>(&block);
+      assert(ctrlMergeOp != nullptr);
+
+      for (HandshakeLowering::MergeOpInfo &mergeInfo : blockMerges[&block]) {
+        if (mergeInfo.mergeLikeOp != ctrlMergeOp) {
+          // If the block has multiple predecessors, merge-like operation that
+          // are not the block's control merge must have an index operand (at
+          // this point, an index backedge)
+          assert(mergeInfo.indexEdge.has_value());
+          (*mergeInfo.indexEdge).setValue(ctrlMergeOp->getResult(1));
+        }
+      }
+    }
+  }
+}
+
+/// Returns the branch result of the new handshake-level branch operation that
+/// goes to the successor block of the old cf-level branch result.
+static Value getSuccResult(Operation *brOp, Operation *newBrOp,
+                           Block *succBlock) {
+  // For conditional block, check if result goes to true or to false successor
+  if (auto condBranchOp = dyn_cast<mlir::cf::CondBranchOp>(brOp)) {
+    if (condBranchOp.getTrueDest() == succBlock)
+      return dyn_cast<handshake::ConditionalBranchOp>(newBrOp).getTrueResult();
+    assert(condBranchOp.getFalseDest() == succBlock);
+    return dyn_cast<handshake::ConditionalBranchOp>(newBrOp).getFalseResult();
+  }
+  // If the block is unconditional, newOp has only one result
+  return newBrOp->getResult(0);
+}
+
+/// Returns the data operands of a cf-level branch-like operation.
+static OperandRange getBranchOperands(Operation *termOp) {
+  if (auto condBranchOp = dyn_cast<mlir::cf::CondBranchOp>(termOp))
+    return condBranchOp.getOperands().drop_front();
+  assert(isa<mlir::cf::BranchOp>(termOp) && "unsupported block terminator");
+  return termOp->getOperands();
+}
+
 //===-----------------------------------------------------------------------==//
-// Concrete lowering steps
+// HandshakeLowering
 //===-----------------------------------------------------------------------==//
 
-LogicalResult HandshakeLoweringFPGA18::createControlOnlyNetwork(
-    ConversionPatternRewriter &rewriter) {
+LogicalResult
+HandshakeLowering::createControlNetwork(ConversionPatternRewriter &rewriter) {
 
   // Add start point of the control-only path to the entry block's arguments
-  Block *entryBlock = &r.front();
+  Block *entryBlock = &region.front();
   startCtrl =
       entryBlock->addArgument(rewriter.getNoneType(), rewriter.getUnknownLoc());
   setBlockEntryControl(entryBlock, startCtrl);
 
   // Add a control-only argument to each block
-  for (auto &block : r.getBlocks())
+  for (auto &block : region.getBlocks())
     if (!block.isEntryBlock())
       setBlockEntryControl(&block, block.addArgument(startCtrl.getType(),
                                                      rewriter.getUnknownLoc()));
   // Modify branch-like block terminators to forward control value through
   // all blocks
-  for (auto &block : r.getBlocks())
+  for (auto &block : region.getBlocks())
     if (auto op = dyn_cast<BranchOpInterface>(block.getTerminator()); op)
       for (unsigned i = 0, e = op->getNumSuccessors(); i < e; i++)
         op.getSuccessorOperands(i).append(getBlockEntryControl(&block));
@@ -203,13 +326,176 @@ LogicalResult HandshakeLoweringFPGA18::createControlOnlyNetwork(
   return success();
 }
 
-LogicalResult HandshakeLoweringFPGA18::replaceMemoryOps(
+HandshakeLowering::MergeOpInfo
+HandshakeLowering::insertMerge(BlockArgument blockArg,
+                               BackedgeBuilder &edgeBuilder,
+                               ConversionPatternRewriter &rewriter) {
+  Block *block = blockArg.getOwner();
+  unsigned numPredecessors = getBlockPredecessorCount(block);
+  Location insertLoc = block->front().getLoc();
+  SmallVector<Backedge> dataEdges;
+  SmallVector<Value> operands;
+
+  // Every block (except the entry block) needs to feed it's entry control into
+  // a control merge
+  if (blockArg == getBlockEntryControl(block)) {
+    Operation *mergeOp;
+    if (block == &region.front()) {
+      // For consistency within the entry block, replace the latter's entry
+      // control with the output of a merrge that takes the control-only
+      // network's start point as input. This makes it so that only the
+      // merge's output is used as a control within the entry block, instead
+      // of a combination of the MergeOp's output and the function/block control
+      // argument. Taking this step out should have no impact on functionality
+      // but would make the resulting IR less "regular"
+      operands.push_back(blockArg);
+      mergeOp = rewriter.create<handshake::MergeOp>(insertLoc, operands);
+    } else {
+      for (unsigned i = 0; i < numPredecessors; i++) {
+        Backedge edge = edgeBuilder.get(rewriter.getNoneType());
+        dataEdges.push_back(edge);
+        operands.push_back(Value(edge));
+      }
+      mergeOp = rewriter.create<handshake::ControlMergeOp>(insertLoc, operands);
+    }
+    setBlockEntryControl(block, mergeOp->getResult(0));
+    return MergeOpInfo{dyn_cast<handshake::MergeLikeOpInterface>(mergeOp),
+                       blockArg, dataEdges};
+  }
+
+  // Every live-in value to a block is passed through a merge-like operation,
+  // even when it's not required for circuit correctness (useless merge-like
+  // operations are removed down the line during Handshake canonicalization)
+
+  // Insert "dummy" merges for blocks with less than two predecessors
+  if (numPredecessors <= 1) {
+    if (numPredecessors == 0) {
+      // All of the entry block's block arguments get passed through a dummy
+      // merge. There is no need for a backedge here as the unique operand can
+      // be resolved immediately
+      operands.push_back(blockArg);
+    } else {
+      // The value incoming from the single block predecessor will be resolved
+      // later during merge reconnection
+      Backedge edge = edgeBuilder.get(blockArg.getType());
+      dataEdges.push_back(edge);
+      operands.push_back(Value(edge));
+    }
+    auto mergeOp = rewriter.create<handshake::MergeOp>(insertLoc, operands);
+    return MergeOpInfo{mergeOp, blockArg, dataEdges};
+  }
+
+  // Create a backedge for the index operand, and another one for each data
+  // operand. The index operand will eventually resolve to the current block's
+  // control merge index output, while data operands will resolve to their
+  // respective values from each block predecessor
+  Backedge indexEdge = edgeBuilder.get(rewriter.getIndexType());
+  for (unsigned i = 0; i < numPredecessors; i++) {
+    Backedge edge = edgeBuilder.get(blockArg.getType());
+    dataEdges.push_back(edge);
+    operands.push_back(Value(edge));
+  }
+  handshake::MuxOp muxOp =
+      rewriter.create<handshake::MuxOp>(insertLoc, Value(indexEdge), operands);
+  return MergeOpInfo{muxOp, blockArg, dataEdges, indexEdge};
+}
+
+LogicalResult
+HandshakeLowering::addMergeOps(ConversionPatternRewriter &rewriter) {
+  // Stores mapping from each value that passes through a merge-like operation
+  // to the data result of that merge operation
+  DenseMap<Value, Value> mergePairs;
+
+  // Create backedge builder to manage operands of merge operations between
+  // insertion and reconnection
+  BackedgeBuilder edgeBuilder{rewriter, region.front().front().getLoc()};
+
+  // Insert merge operations (with backedges instead of actual operands)
+  BlockOps blockMerges;
+  for (Block &block : region) {
+    rewriter.setInsertionPointToStart(&block);
+
+    // All of the block's live-ins are passed explictly through block arguments
+    // thanks to prior SSA maximization
+    for (BlockArgument arg : block.getArguments()) {
+      // No merges on memref block arguments; these are handled separately
+      if (arg.getType().isa<mlir::MemRefType>())
+        continue;
+
+      MergeOpInfo mergeInfo = insertMerge(arg, edgeBuilder, rewriter);
+      blockMerges[&block].push_back(mergeInfo);
+      mergePairs[arg] = mergeInfo.mergeLikeOp->getResult(0);
+    }
+  }
+
+  // Reconnect merge operations with values incoming from predecessor blocks
+  // and resolve all backedges that were created during merge insertion
+  reconnectMergeOps(region, blockMerges, mergePairs);
+
+  // Remove all block arguments, which are no longer used
+  for (Block &block : region) {
+    if (!block.isEntryBlock()) {
+      for (unsigned idx = block.getNumArguments(); idx > 0; --idx)
+        block.eraseArgument(idx - 1);
+    }
+  }
+
+  return success();
+}
+
+LogicalResult
+HandshakeLowering::addBranchOps(ConversionPatternRewriter &rewriter) {
+  for (Block &block : region) {
+    Operation *termOp = block.getTerminator();
+    rewriter.setInsertionPoint(termOp);
+
+    Value condValue = nullptr;
+    if (cf::CondBranchOp condBranchOp = dyn_cast<cf::CondBranchOp>(termOp))
+      condValue = condBranchOp.getCondition();
+    else if (isa<func::ReturnOp>(termOp))
+      continue;
+
+    // Insert a branch-like operation for each live-out and replace the original
+    // branch operand value in successor blocks with the result(s) of the new
+    // operation
+    for (Value val : getBranchOperands(termOp)) {
+      // Create a branch-like operation for the branch operand
+      Operation *newOp = nullptr;
+      if (condValue) {
+        newOp = rewriter.create<handshake::ConditionalBranchOp>(
+            termOp->getLoc(), condValue, val);
+      } else {
+        newOp = rewriter.create<handshake::BranchOp>(termOp->getLoc(), val);
+      }
+
+      // Connect the newly created branch's output with its successors
+      for (unsigned j = 0, e = block.getNumSuccessors(); j < e; ++j) {
+        Block *succ = block.getSuccessor(j);
+
+        // Look for the merge-like operation in the successor block that takes
+        // as input the original branch operand, and replace the latter with a
+        // result of the newly inserted branch operation
+        for (Operation *user : val.getUsers()) {
+          if (user->getBlock() == succ &&
+              isa<handshake::MergeLikeOpInterface>(user)) {
+            user->replaceUsesOfWith(val, getSuccResult(termOp, newOp, succ));
+            break;
+          }
+        }
+      }
+    }
+  }
+
+  return success();
+}
+
+LogicalResult HandshakeLowering::replaceMemoryOps(
     ConversionPatternRewriter &rewriter,
-    HandshakeLoweringFPGA18::MemInterfacesInfo &memInfo) {
+    HandshakeLowering::MemInterfacesInfo &memInfo) {
 
   // Make sure to record external memories passed as function arguments, even if
   // they aren't used by any memory operation
-  for (BlockArgument arg : r.getArguments()) {
+  for (BlockArgument arg : region.getArguments()) {
     if (mlir::MemRefType memref = dyn_cast<mlir::MemRefType>(arg.getType())) {
       // Ensure that this is a valid memref-typed value.
       if (!isValidMemrefType(arg.getLoc(), memref))
@@ -225,7 +511,7 @@ LogicalResult HandshakeLoweringFPGA18::replaceMemoryOps(
   // Replace load and store operations with their corresponding Handshake
   // equivalent. Traverse and store memory operations in program order (required
   // by memory interface placement later)
-  for (Operation &op : llvm::make_early_inc_range(r.getOps())) {
+  for (Operation &op : llvm::make_early_inc_range(region.getOps())) {
     if (!isMemoryOp(&op))
       continue;
 
@@ -244,8 +530,8 @@ LogicalResult HandshakeLoweringFPGA18::replaceMemoryOps(
     Location loc = op.getLoc();
 
     // The memory operation must have a MemInterfaceAttr attribute attached
-    StringRef attrName = MemInterfaceAttr::getMnemonic();
-    MemInterfaceAttr memAttr = op.getAttrOfType<MemInterfaceAttr>(attrName);
+    StringRef attrName = handshake::MemInterfaceAttr::getMnemonic();
+    auto memAttr = op.getAttrOfType<handshake::MemInterfaceAttr>(attrName);
     if (!memAttr)
       return op.emitError()
              << "Memory operation must have attribute " << attrName
@@ -306,21 +592,21 @@ LogicalResult HandshakeLoweringFPGA18::replaceMemoryOps(
 
   // Change the name of destination memory acceses in all stored memory
   // dependencies to reflect the new access names
-  memOpLowering.renameDependencies(r.getParentOp());
+  memOpLowering.renameDependencies(region.getParentOp());
 
   return success();
 }
 
-LogicalResult HandshakeLoweringFPGA18::verifyAndCreateMemInterfaces(
+LogicalResult HandshakeLowering::verifyAndCreateMemInterfaces(
     ConversionPatternRewriter &rewriter, MemInterfacesInfo &memInfo) {
   // Create a mapping between each block and all the other blocks it properly
   // dominates so that we can quickly determine whether LSQ groups make sense
   DominanceInfo domInfo;
   DenseMap<Block *, DenseSet<Block *>> dominations;
-  for (Block &maybeDominator : r) {
+  for (Block &maybeDominator : region) {
     // Start with an empty set of dominated blocks for each potential dominator
     dominations[&maybeDominator] = {};
-    for (Block &maybeDominated : r) {
+    for (Block &maybeDominated : region) {
       if (&maybeDominator == &maybeDominated)
         continue;
       if (domInfo.properlyDominates(&maybeDominator, &maybeDominated))
@@ -331,15 +617,15 @@ LogicalResult HandshakeLoweringFPGA18::verifyAndCreateMemInterfaces(
   // Create a mapping between each block and its control value in the right
   // format for the memory interface builder
   DenseMap<unsigned, Value> ctrlVals;
-  for (auto [blockIdx, block] : llvm::enumerate(r))
+  for (auto [blockIdx, block] : llvm::enumerate(region))
     ctrlVals[blockIdx] = getBlockEntryControl(&block);
 
   // Each memory region is independent from the others
   for (auto &[memref, memAccesses] : memInfo) {
     SmallPtrSet<Block *, 4> controlBlocks;
 
-    MemoryInterfaceBuilder memBuilder(r.getParentOfType<handshake::FuncOp>(),
-                                      memref, ctrlVals);
+    MemoryInterfaceBuilder memBuilder(
+        region.getParentOfType<handshake::FuncOp>(), memref, ctrlVals);
 
     // Add MC ports to the interface builder
     for (auto [_, mcBlockOps] : memAccesses.mcPorts) {
@@ -390,10 +676,9 @@ LogicalResult HandshakeLoweringFPGA18::verifyAndCreateMemInterfaces(
 }
 
 LogicalResult
-HandshakeLoweringFPGA18::connectConstants(ConversionPatternRewriter &rewriter) {
-
+HandshakeLowering::connectConstants(ConversionPatternRewriter &rewriter) {
   for (auto cstOp :
-       llvm::make_early_inc_range(r.getOps<mlir::arith::ConstantOp>())) {
+       llvm::make_early_inc_range(region.getOps<mlir::arith::ConstantOp>())) {
 
     rewriter.setInsertionPointAfter(cstOp);
     auto cstVal = cstOp.getValue();
@@ -411,9 +696,9 @@ HandshakeLoweringFPGA18::connectConstants(ConversionPatternRewriter &rewriter) {
   return success();
 }
 
-LogicalResult HandshakeLoweringFPGA18::replaceUndefinedValues(
-    ConversionPatternRewriter &rewriter) {
-  for (auto &block : r) {
+LogicalResult
+HandshakeLowering::replaceUndefinedValues(ConversionPatternRewriter &rewriter) {
+  for (auto &block : region) {
     for (auto undefOp : block.getOps<mlir::LLVM::UndefOp>()) {
       // Create an attribute of the appropriate type for the constant
       auto resType = undefOp.getRes().getType();
@@ -438,8 +723,8 @@ LogicalResult HandshakeLoweringFPGA18::replaceUndefinedValues(
 }
 
 LogicalResult
-HandshakeLoweringFPGA18::idBasicBlocks(ConversionPatternRewriter &rewriter) {
-  for (auto [blockID, block] : llvm::enumerate(r)) {
+HandshakeLowering::idBasicBlocks(ConversionPatternRewriter &rewriter) {
+  for (auto [blockID, block] : llvm::enumerate(region)) {
     for (Operation &op : block) {
       if (!isa<handshake::MemoryOpInterface>(op)) {
         // Memory interfaces do not naturally belong to any block, so they do
@@ -451,10 +736,9 @@ HandshakeLoweringFPGA18::idBasicBlocks(ConversionPatternRewriter &rewriter) {
   return success();
 }
 
-LogicalResult HandshakeLoweringFPGA18::createReturnNetwork(
-    ConversionPatternRewriter &rewriter) {
-
-  auto *entryBlock = &r.front();
+LogicalResult
+HandshakeLowering::createReturnNetwork(ConversionPatternRewriter &rewriter) {
+  Block *entryBlock = &region.front();
   auto &entryBlockOps = entryBlock->getOperations();
 
   // Move all operations to entry block. While doing so, delete all block
@@ -463,7 +747,7 @@ LogicalResult HandshakeLoweringFPGA18::createReturnNetwork(
   // func-level return operation
   SmallVector<Operation *> terminatorsToErase;
   SmallVector<Operation *, 4> newReturnOps;
-  for (auto &block : r) {
+  for (Block &block : region) {
     Operation &termOp = block.back();
     if (isa<func::ReturnOp>(termOp)) {
       SmallVector<Value, 8> operands(termOp.getOperands());
@@ -479,7 +763,7 @@ LogicalResult HandshakeLoweringFPGA18::createReturnNetwork(
       newReturnOps.push_back(newRet);
 
       // New return operation belongs in the same basic block as the old one
-      newRet->setAttr(BB_ATTR, termOp.getAttr(BB_ATTR));
+      inheritBB(&termOp, newRet);
     }
     terminatorsToErase.push_back(&termOp);
     entryBlockOps.splice(entryBlockOps.end(), block.getOperations());
@@ -492,14 +776,14 @@ LogicalResult HandshakeLoweringFPGA18::createReturnNetwork(
   // merges that feed it its data inputs
   std::optional<size_t> endNetworkID{};
   endNetworkID = (newReturnOps.size() > 1)
-                     ? r.getBlocks().size()
+                     ? region.getBlocks().size()
                      : newReturnOps[0]
                            ->getAttrOfType<mlir::IntegerAttr>(BB_ATTR)
                            .getValue()
                            .getZExtValue();
 
   // Erase all blocks except the entry block
-  for (auto &block : llvm::make_early_inc_range(llvm::drop_begin(r, 1))) {
+  for (Block &block : llvm::make_early_inc_range(llvm::drop_begin(region, 1))) {
     block.clear();
     block.dropAllDefinedValueUses();
     block.eraseArguments(0, block.getNumArguments());
@@ -515,11 +799,11 @@ LogicalResult HandshakeLoweringFPGA18::createReturnNetwork(
   // to signal completion
   SmallVector<Value, 8> endOperands;
   endOperands.append(
-      mergeFunctionResults(r, rewriter, newReturnOps, endNetworkID));
-  endOperands.append(getFunctionEndControls(r));
+      mergeFunctionResults(region, rewriter, newReturnOps, endNetworkID));
+  endOperands.append(getFunctionEndControls(region));
   rewriter.setInsertionPointToEnd(entryBlock);
-  auto endOp = rewriter.create<handshake::EndOp>(entryBlockOps.back().getLoc(),
-                                                 endOperands);
+  handshake::EndOp endOp = rewriter.create<handshake::EndOp>(
+      entryBlockOps.back().getLoc(), endOperands);
   if (endNetworkID.has_value())
     endOp->setAttr(BB_ATTR, rewriter.getUI32IntegerAttr(endNetworkID.value()));
 
@@ -532,9 +816,66 @@ LogicalResult HandshakeLoweringFPGA18::createReturnNetwork(
 
 namespace {
 
-/// Conversion target for lowering a func::FuncOp to a handshake::FuncOp
-class LowerFuncOpTarget : public ConversionTarget {
-public:
+/// Conversion target for lowering a region.
+struct LowerRegionTarget : public ConversionTarget {
+  explicit LowerRegionTarget(MLIRContext &context, Region &region)
+      : ConversionTarget(context), region(region) {
+    // The root operation is marked dynamically legal to ensure
+    // the pattern on its region is only applied once.
+    markUnknownOpDynamicallyLegal([&](Operation *op) {
+      if (op != region.getParentOp())
+        return true;
+      return regionLowered;
+    });
+  }
+
+  /// Whether the region's parent operation was lowered.
+  bool regionLowered = false;
+  /// The region being lowered.
+  Region &region;
+};
+
+/// Allows to partially lower a region by matching on the parent operation to
+/// then call the provided partial lowering function with the region and the
+/// rewriter.
+///
+/// The interplay with the target is similar to `PartialLowerFuncOp`.
+struct PartialLowerRegion : public ConversionPattern {
+  using PartialLoweringFunc =
+      std::function<LogicalResult(Region &, ConversionPatternRewriter &)>;
+
+  PartialLowerRegion(LowerRegionTarget &target, MLIRContext *context,
+                     LogicalResult &loweringResRef,
+                     const PartialLoweringFunc &fun)
+      : ConversionPattern(target.region.getParentOp()->getName().getStringRef(),
+                          1, context),
+        target(target), loweringRes(loweringResRef), fun(fun) {}
+  using ConversionPattern::ConversionPattern;
+  LogicalResult
+  matchAndRewrite(Operation *op, ArrayRef<Value> /*operands*/,
+                  ConversionPatternRewriter &rewriter) const override {
+    // Dialect conversion scheme requires the matched root operation to be
+    // replaced or updated if the match was successful; this ensures that
+    // happens even if the lowering function does not modify the root operation
+    rewriter.updateRootInPlace(
+        op, [&] { loweringRes = fun(target.region, rewriter); });
+
+    // Signal to the conversion target that the conversion pattern ran
+    target.regionLowered = true;
+
+    // Success status of conversion pattern determined by success of partial
+    // lowering function
+    return loweringRes;
+  };
+
+private:
+  LowerRegionTarget &target;
+  LogicalResult &loweringRes;
+  PartialLoweringFunc fun;
+};
+
+/// Conversion target for lowering a func::FuncOp to a handshake::FuncOp.
+struct LowerFuncOpTarget : public ConversionTarget {
   explicit LowerFuncOpTarget(MLIRContext &context) : ConversionTarget(context) {
     loweredFuncs.clear();
     addLegalDialect<handshake::HandshakeDialect, func::FuncDialect,
@@ -542,12 +883,14 @@ public:
     addIllegalDialect<affine::AffineDialect, scf::SCFDialect>();
 
     // The root operation to be replaced is marked dynamically legal based on
-    // the lowering status of the given operation, see PartialLowerOp. This is
-    // to make the operation go from illegal to legal after partial lowering
+    // the lowering status of the given operation, see `PartialLowerFuncOp`.
+    // This is to make the operation go from illegal to legal after partial
+    // lowering
     addDynamicallyLegalOp<func::FuncOp>(
-        [&](const auto &op) { return loweredFuncs[op]; });
+        [&](const auto &op) { return loweredFuncs.contains(op); });
   }
-  DenseMap<Operation *, bool> loweredFuncs;
+
+  SmallPtrSet<Operation *, 4> loweredFuncs;
 };
 
 /// Conversion pattern for partially lowering a func::FuncOp to a
@@ -557,7 +900,6 @@ struct PartialLowerFuncOp : public OpConversionPattern<func::FuncOp> {
   using PartialLoweringFunc =
       std::function<LogicalResult(func::FuncOp, ConversionPatternRewriter &)>;
 
-public:
   PartialLowerFuncOp(LowerFuncOpTarget &target, MLIRContext *context,
                      const PartialLoweringFunc &fun)
       : OpConversionPattern<func::FuncOp>(context), target(target),
@@ -566,15 +908,13 @@ public:
   matchAndRewrite(func::FuncOp op, OpAdaptor /*adaptor*/,
                   ConversionPatternRewriter &rewriter) const override {
     // Dialect conversion scheme requires the matched root operation to be
-    // replaced or updated if the match was successful. Calling
-    // updateRootInPlace ensures that happens even if loweringFUnc doesn't
-    // modify the root operation
+    // replaced or updated if the match was successful; this ensures that
+    // happens even if the lowering function does not modify the root operation
     LogicalResult res = failure();
     rewriter.updateRootInPlace(op, [&] { res = loweringFunc(op, rewriter); });
 
-    // Signal to the conversion target that the function was successfully
-    // partially lowered
-    target.loweredFuncs[op] = true;
+    // Signal to the conversion target that the conversion pattern ran
+    target.loweredFuncs.insert(op);
 
     // Success status of conversion pattern determined by success of partial
     // lowering function
@@ -582,9 +922,9 @@ public:
   };
 
 private:
-  /// The conversion target for this pattern
+  /// The conversion target for this pattern.
   LowerFuncOpTarget &target;
-  /// The rewrite function
+  /// The rewrite function.
   PartialLoweringFunc loweringFunc;
 };
 
@@ -602,75 +942,89 @@ class HandshakeLoweringSSAStrategy : public dynamatic::SSAMaximizationStrategy {
 };
 } // namespace
 
+LogicalResult
+dynamatic::partiallyLowerRegion(const RegionLoweringFunc &loweringFunc,
+                                Region &region) {
+  Operation *op = region.getParentOp();
+  MLIRContext *ctx = region.getContext();
+  RewritePatternSet patterns(ctx);
+  LowerRegionTarget target(*ctx, region);
+  LogicalResult partialLoweringSuccessfull = success();
+  patterns.add<PartialLowerRegion>(target, ctx, partialLoweringSuccessfull,
+                                   loweringFunc);
+  return success(
+      applyPartialConversion(op, target, std::move(patterns)).succeeded() &&
+      partialLoweringSuccessfull.succeeded());
+}
+
 /// Convenience function for running lowerToHandshake with a partial
 /// handshake::FuncOp lowering function.
 static LogicalResult
 partiallyLowerOp(const PartialLowerFuncOp::PartialLoweringFunc &loweringFunc,
-                 MLIRContext *ctx, func::FuncOp op) {
-
+                 func::FuncOp funcOp) {
+  MLIRContext *ctx = funcOp->getContext();
   RewritePatternSet patterns(ctx);
-  auto target = LowerFuncOpTarget(*ctx);
+  LowerFuncOpTarget target(*ctx);
   patterns.add<PartialLowerFuncOp>(target, ctx, loweringFunc);
-  return applyPartialConversion(op, target, std::move(patterns));
+  return applyPartialConversion(funcOp, target, std::move(patterns));
 }
 
 /// Lowers the region referenced by the handshake lowering strategy following
 /// a fixed sequence of steps, some implemented in this file and some in
 /// CIRCT's standard-to-handshake conversion pass.
-static LogicalResult lowerRegion(HandshakeLoweringFPGA18 &hl) {
-  HandshakeLowering &baseHl = static_cast<HandshakeLowering &>(hl);
+static LogicalResult lowerRegion(HandshakeLowering &hl) {
 
-  if (failed(runPartialLowering(
-          hl, &HandshakeLoweringFPGA18::createControlOnlyNetwork)))
+  if (failed(runPartialLowering(hl, &HandshakeLowering::createControlNetwork)))
     return failure();
 
   //===--------------------------------------------------------------------===//
   // Merges and branches instantiation
   //===--------------------------------------------------------------------===//
 
-  if (failed(runPartialLowering(baseHl, &HandshakeLowering::addMergeOps)))
+  if (failed(runPartialLowering(hl, &HandshakeLowering::addMergeOps)))
     return failure();
 
-  if (failed(runPartialLowering(baseHl, &HandshakeLowering::addBranchOps)))
+  if (failed(runPartialLowering(hl, &HandshakeLowering::addBranchOps)))
     return failure();
 
   //===--------------------------------------------------------------------===//
   // Create, analyze, and connect memory ports and interfaces
   //===--------------------------------------------------------------------===//
 
-  HandshakeLoweringFPGA18::MemInterfacesInfo memInfo;
-  if (failed(runPartialLowering(hl, &HandshakeLoweringFPGA18::replaceMemoryOps,
+  HandshakeLowering::MemInterfacesInfo memInfo;
+  if (failed(runPartialLowering(hl, &HandshakeLowering::replaceMemoryOps,
                                 memInfo)))
     return failure();
 
-  // First round of bb-tagging so that Dynamatic memory ports get tagged
-  if (failed(runPartialLowering(hl, &HandshakeLoweringFPGA18::idBasicBlocks)))
+  // First round of bb-tagging so that newly inserted Dynamatic memory ports get
+  // tagged with the BB they belong to (required by memory interface
+  // instantiation logic)
+  if (failed(runPartialLowering(hl, &HandshakeLowering::idBasicBlocks)))
     return failure();
 
   if (failed(runPartialLowering(
-          hl, &HandshakeLoweringFPGA18::verifyAndCreateMemInterfaces, memInfo)))
+          hl, &HandshakeLowering::verifyAndCreateMemInterfaces, memInfo)))
     return failure();
 
   //===--------------------------------------------------------------------===//
   // Simple final transformations
   //===--------------------------------------------------------------------===//
 
+  if (failed(runPartialLowering(hl, &HandshakeLowering::connectConstants)))
+    return failure();
+
   if (failed(
-          runPartialLowering(hl, &HandshakeLoweringFPGA18::connectConstants)))
+          runPartialLowering(hl, &HandshakeLowering::replaceUndefinedValues)))
     return failure();
 
-  if (failed(runPartialLowering(
-          hl, &HandshakeLoweringFPGA18::replaceUndefinedValues)))
-    return failure();
-
-  if (failed(runPartialLowering(hl, &HandshakeLoweringFPGA18::idBasicBlocks)))
+  if (failed(runPartialLowering(hl, &HandshakeLowering::idBasicBlocks)))
     return failure();
 
   //===--------------------------------------------------------------------===//
   // Create return/end logic and flatten IR (delete actual basic blocks)
   //===--------------------------------------------------------------------===//
 
-  return runPartialLowering(hl, &HandshakeLoweringFPGA18::createReturnNetwork);
+  return runPartialLowering(hl, &HandshakeLowering::createReturnNetwork);
 }
 
 namespace {
@@ -722,11 +1076,9 @@ LogicalResult StandardToHandshakeFPGA18Pass::lowerFuncOp(func::FuncOp funcOp) {
   llvm::copy(funcOp.getArgumentTypes(), std::back_inserter(argTypes));
   llvm::copy(funcOp.getResultTypes(), std::back_inserter(resTypes));
 
-  MLIRContext *ctx = &getContext();
-  handshake::FuncOp newFuncOp = nullptr;
-
   // Replaces the func-level function with a corresponding Handshake-level
   // function.
+  handshake::FuncOp newFuncOp = nullptr;
   auto funcLowering = [&](func::FuncOp funcOp, PatternRewriter &rewriter) {
     auto noneType = rewriter.getNoneType();
     if (resTypes.empty())
@@ -741,7 +1093,7 @@ LogicalResult StandardToHandshakeFPGA18Pass::lowerFuncOp(func::FuncOp funcOp) {
       newFuncOp.resolveArgAndResNames();
     return success();
   };
-  if (failed(partiallyLowerOp(funcLowering, ctx, funcOp)))
+  if (failed(partiallyLowerOp(funcLowering, funcOp)))
     return failure();
 
   // Delete the original function
@@ -749,8 +1101,7 @@ LogicalResult StandardToHandshakeFPGA18Pass::lowerFuncOp(func::FuncOp funcOp) {
 
   // Lower the region inside the function if it is not external
   if (!funcIsExternal) {
-    HandshakeLoweringFPGA18 hl(newFuncOp.getBody(),
-                               getAnalysis<NameAnalysis>());
+    HandshakeLowering hl(newFuncOp.getBody(), getAnalysis<NameAnalysis>());
     return lowerRegion(hl);
   }
   return success();

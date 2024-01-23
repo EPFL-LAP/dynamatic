@@ -5,6 +5,7 @@ add_dynamatic_library(DynamaticStandardToHandshakeFPGA18
   DynamaticConversionPassIncGen
 
   LINK_LIBS PUBLIC
+  DynamaticSupport
   CIRCTHandshake
   CIRCTSupport
   MLIRIR
@@ -15,5 +16,4 @@ add_dynamatic_library(DynamaticStandardToHandshakeFPGA18
   MLIRSupport
   MLIRTransforms
   MLIRAffineToStandard
-  DynamaticSupport
   )
