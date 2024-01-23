@@ -108,13 +108,6 @@ int getNumberOfTransactions(const string &inputPath);
 bool executeCommand(const string &command);
 
 /**
- * Add tag [[[runtime]]] at the begining of file @filename, and add tag
- * [[[/runtime]]] at the end of file @filename.
- * @param filename path of the file to be modified
- */
-void addHeaderAndFooter(const string &filename);
-
-/**
  * Get a list of file paths in the given directory that has the given extension.
  * @param directory the path of the directory
  * @param extension extension of the required files including '.' character

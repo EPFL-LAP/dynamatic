@@ -11,7 +11,6 @@
 //===----------------------------------------------------------------------===//
 
 #include "src/Help.h"
-#include "src/HlsCVerification.h"
 #include "src/HlsCoVerification.h"
 #include "src/HlsVhdlVerification.h"
 #include <iostream>
@@ -26,15 +25,14 @@ int main(int argc, char **argv) {
     vector<string> remainingArgs;
     for (int i = 2; i < argc; i++)
       remainingArgs.emplace_back(argv[i]);
-
-    if (firstArg == CVER_CMD)
-      return runCVerification(remainingArgs) ? 0 : -1;
     if (firstArg == VVER_CMD)
       return runVhdlVerification(remainingArgs) ? 0 : -1;
     if (firstArg == COVER_CMD)
       return runCoverification(remainingArgs) ? 0 : -1;
+    std::cout << std::endl << "Invalid arguments!" << std::endl;
+  } else {
+    std::cout << std::endl << "No arguments!" << std::endl;
   }
-  cout << endl << "No/invalid arguments!" << endl << endl;
-  cout << getGeneralHelpMessage() << endl;
+  std::cout << getGeneralHelpMessage() << std::endl;
   return -1;
 }

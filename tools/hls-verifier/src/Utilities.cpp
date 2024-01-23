@@ -173,16 +173,6 @@ bool executeCommand(const string &command) {
   return (status == 0);
 }
 
-void addHeaderAndFooter(const string &filename) {
-  ifstream fileIn(filename);
-  string content((istreambuf_iterator<char>(fileIn)),
-                 istreambuf_iterator<char>());
-  fileIn.close();
-  ofstream fileOut(filename);
-  fileOut << "[[[runtime]]]" << endl << content << "[[[/runtime]]]" << endl;
-  fileOut.close();
-}
-
 vector<string> getListOfFilesInDirectory(const string &directory,
                                          const string &extension) {
   vector<string> result;

@@ -9,80 +9,116 @@
 // To be included by all integration tests to get access to utilities necessary
 // to run, for example, profiling for smart buffer placement.
 //
-// The file mainly defines the CALL macro to wrap a kernel function call as well
-// as it arguments, which may be seen as some kind of code instrumentation. This
-// is occasionally useful when one needs do something right before or after a
-// kernel call. All the "instrumentation" code is written in C++ and hidden
-// behind off-by-default compile boolean macros to maintain pure-C-compatibility
+// The file mainly defines the CALL_KERNEL macro to wrap a kernel function call
+// as well as it arguments, which may be seen as some kind of code
+// instrumentation. This is useful when one needs do something right before or
+// after a kernel call. All the "instrumentation" code is written in
+// clang-compliant (the version built through Polygeist) C++ and hidden behind
+// off-by-default compile-time boolean macros to maintain pure-C-compatibility
 // and so that one may choose which (if any) "instrumentation" to apply at
 // compile-time. By default, the macro does nothing and just produces the kernel
 // call as one would have written it.
 //
-// Right now there is only a single instrumentation controlled by the
-// `PRINT_PROFILING_INFO` boolean macro. Its effect is to print the value of
-// wrapped function arguments to standard output to serve as profiling inputs to
-// our MLIR std-level profiler. Every argument is printed on a single line, with
-// arrays printed as a comma-separated list of their elements.
+// Right now there are two available instrumentations.
+// 1. `PRINT_PROFILING_INFO` | Prints the value of kernel arguments to
+// standard output to serve as profiling inputs for `frequency-profiler`.
+// Every argument is printed on a single line, with arrays printed as a
+// comma-separated list of their elements.
+// 2. `HLS_VERIFICATION` | Stores value of kernel arguments before and after the
+// kernel call (as well as the kernel's return value, if any) into individual
+// files for use during C/VHDL co-simulation by our `hls-verifier`. The
+// `HLS_VERIFICATION_PATH` macro indicates the relative path to the directory
+// where arguments' value will be stored (`HLS_VERIFICATION_PATH/INPUT_VECTORS`
+// for values before the kernel call and `HLS_VERIFICATION_PATH/C_OUT` for
+// values after the kernel call).
 //
 //===----------------------------------------------------------------------===//
 
 #ifndef DYNAMATIC_INTEGRATION_H
 #define DYNAMATIC_INTEGRATION_H
 
-#ifdef PRINT_PROFILING_INFO
+//===----------------------------------------------------------------------===//
+// PRINT_PROFILING_INFO/HLS_VERIFICATION - Common code
+//===----------------------------------------------------------------------===//
+
+#if defined(PRINT_PROFILING_INFO) || defined(HLS_VERIFICATION)
 #include <cstddef>
-#include <iostream>
+#include <ostream>
 
-/// Dumps the contents of an array of known size.
-template <typename T>
-static void dumpArray(T *arrayPtr, size_t size) {
-  if (size == 0) {
-    std::cout << std::endl;
-    return;
-  }
-  for (size_t idx = 0; idx < size - 1; ++idx)
-    std::cout << arrayPtr[idx] << ",";
-  std::cout << arrayPtr[size - 1] << std::endl;
-}
+using OS = std::basic_ostream<char>;
 
-/// Dumps the value of the argument.
 template <typename T>
-static void dumpArg(T arg) {
-  std::cout << arg << std::endl;
+static void scalarPrinter(const T &arg, OS &os);
+
+template <typename T>
+static void arrayPrinter(const T *arrayPtr, size_t size, OS &os);
+
+/// Dumps the contents of a scalar type.
+template <typename T>
+static void dumpArg(const T &arg, OS &os) {
+  scalarPrinter(arg, os);
 }
 
 /// Dumps the contents of a statically sized 1-dimensional array.
 template <typename T, size_t Size1>
-static void dumpArg(T (&arrayArg)[Size1]) {
-  dumpArray((T *)arrayArg, Size1);
+static void dumpArg(const T (&arrayArg)[Size1], OS &os) {
+  arrayPrinter((T *)arrayArg, Size1, os);
 }
 
 /// Dumps the contents of a statically sized 2-dimensional array.
 template <typename T, size_t Size1, size_t Size2>
-static void dumpArg(T (&arrayArg)[Size1][Size2]) {
-  dumpArray((T *)arrayArg, Size1 * Size2);
+static void dumpArg(const T (&arrayArg)[Size1][Size2], OS &os) {
+  arrayPrinter((T *)arrayArg, Size1 * Size2, os);
 }
 
 /// Dumps the contents of a statically sized 3-dimensional array.
 template <typename T, size_t Size1, size_t Size2, size_t Size3>
-static void dumpArg(T (&arrayArg)[Size1][Size2][Size3]) {
-  dumpArray((T *)arrayArg, Size1 * Size2 * Size3);
+static void dumpArg(const T (&arrayArg)[Size1][Size2][Size3], OS &os) {
+  arrayPrinter((T *)arrayArg, Size1 * Size2 * Size3, os);
 }
 
 /// Dumps the contents of a statically sized 4-dimensional array.
 template <typename T, size_t Size1, size_t Size2, size_t Size3, size_t Size4>
-static void dumpArg(T (&arrayArg)[Size1][Size2][Size3][Size4]) {
-  dumpArray((T *)arrayArg, Size1 * Size2 * Size3 * Size4);
+static void dumpArg(const T (&arrayArg)[Size1][Size2][Size3][Size4], OS &os) {
+  arrayPrinter((T *)arrayArg, Size1 * Size2 * Size3 * Size4, os);
 }
 
 /// Dumps the contents of a statically sized 5-dimensional array.
 template <typename T, size_t Size1, size_t Size2, size_t Size3, size_t Size4,
           size_t Size5>
-static void dumpArg(T (&arrayArg)[Size1][Size2][Size3][Size4][Size5]) {
-  dumpArray((T *)arrayArg, Size1 * Size2 * Size3 * Size4 * Size5);
+static void dumpArg(const T (&arrayArg)[Size1][Size2][Size3][Size4][Size5],
+                    OS &os) {
+  arrayPrinter((T *)arrayArg, Size1 * Size2 * Size3 * Size4 * Size5, os);
 }
 
 /// And on and on... Go further with higher-dimensional arrays if you want!
+#endif // defined(PRINT_PROFILING_INFO) || defined (HLS_VERIFICATION)
+
+//===----------------------------------------------------------------------===//
+// PRINT_PROFILING_INFO - Compile for profiling using frequency-profiler
+//===----------------------------------------------------------------------===//
+
+#ifdef PRINT_PROFILING_INFO
+#include <iostream>
+
+/// Writes the argument's directly to the stream.
+template <typename T>
+static void scalarPrinter(const T &arg, OS &os) {
+  os << arg << std::endl;
+}
+
+/// Writes the array's content in row-major-order as a comma-separated list of
+/// individual array elements.
+template <typename T>
+static void arrayPrinter(const T *arrayPtr, size_t size, OS &os) {
+  if (size == 0) {
+    os << std::endl;
+    return;
+  }
+  for (size_t idx = 0; idx < size - 1; ++idx)
+    os << arrayPtr[idx] << ",";
+  os << arrayPtr[size - 1] << std::endl;
+}
 
 /// After dumping the contents of all kernel arguments to stdout, calls the
 /// kernel with the arguments and returns its result. We use two variadic
@@ -95,15 +131,167 @@ static void dumpArg(T (&arrayArg)[Size1][Size2][Size3][Size4][Size5]) {
 /// `dumpArg` that operates on those.
 template <typename Res, typename... FunArgs, typename... RealArgs>
 static Res callKernel(Res (*kernel)(FunArgs...), RealArgs &&...args) {
-  (dumpArg(args), ...);
+  (dumpArg(args, std::cout), ...);
   return kernel(std::forward<RealArgs>(args)...);
 }
+
+#define CALL_KERNEL(kernel, args...) callKernel(kernel, args);
 #endif // PRINT_PROFILING_INFO
 
-#ifdef PRINT_PROFILING_INFO
-#define CALL_KERNEL(KERNEL, ARGS...) callKernel(KERNEL, ARGS);
-#else
-#define CALL_KERNEL(KERNEL, ARGS...) KERNEL(ARGS)
+//===----------------------------------------------------------------------===//
+// HLS_VERIFICATION - Compile for HLS verification using hls-verifier
+//===----------------------------------------------------------------------===//
+
+/// CALL_KERNEL macro expansion when compiling for HLS verification: logs the
+/// values of all function arguments to dedicated folders on disk before and
+/// after kernel execution. Also logs the kernel's return value, if it has one.
+#ifdef HLS_VERIFICATION
+#include <filesystem>
+#include <fstream>
+#include <iostream>
+
+/// Whenever HLS_VERIFICATION is defined, this macro must contain the path to
+/// the directory where the INPUT_VECTORS and C_OUT directories have been
+/// created. By default, it points to the current working directory.
+#ifndef HLS_VERIFICATION_PATH
+#define HLS_VERIFICATION_PATH .
+#endif // HLS_VERIFICATION_PATH
+
+#define STRINGIFY_IMPL(str) #str
+#define STRINGIFY(str) STRINGIFY_IMPL(str)
+
+#define CONCAT_IMPL(x, y) x##y
+#define CONCAT(x, y) CONCAT_IMPL(x, y)
+
+// NOLINTBEGIN(readability-identifier-naming)
+
+/// Incremented once at each use of CALL_KERNEL.
+static unsigned _transactionID_ = 0;
+/// Outpath path prefix for storing the value of a function argument to a file
+/// on disk.
+static std::string _outPrefix_;
+
+// NOLINTEND(readability-identifier-naming)
+
+/// Specialization of the scalar printer for float.
+template <>
+void scalarPrinter<float>(const float &arg, OS &os) {
+  os << "0x" << std::hex << std::setfill('0') << std::setw(8)
+     << *((const unsigned int *)(&arg)) << std::endl;
+}
+
+/// Specialization of the scalar printer for double.
+template <>
+void scalarPrinter<double>(const double &arg, OS &os) {
+  os << "0x" << std::hex << std::setfill('0') << std::setw(8)
+     << *((const unsigned int *)(&arg)) << std::endl;
+}
+
+/// Writes the argument's as an 8-digits hexadecimal number padded with zeros
+/// directly to stdout.
+template <typename T>
+static void scalarPrinter(const T &arg, OS &os) {
+  os << "0x" << std::hex << std::setfill('0') << std::setw(8) << arg
+     << std::endl;
+}
+
+/// Writes the array's content in row-major-order; one element per line,
+/// formatted as 8-digits hexadecimal number padded with zeros.
+template <typename T>
+static void arrayPrinter(const T *arrayPtr, size_t size, OS &os) {
+  for (size_t idx = 0; idx < size; ++idx)
+    scalarPrinter(arrayPtr[idx], os);
+}
+
+template <typename T>
+void dumpHLSArg(const T &arg, const char *argName) {
+  std::string filepath = _outPrefix_ + argName + ".dat";
+  std::ofstream outFile(filepath);
+  if (!outFile.is_open()) {
+    std::cerr << "Failed to open " << filepath << std::endl;
+    exit(1);
+  }
+
+  outFile << "[[[runtime]]]" << std::endl
+          << "[[transaction]] " << _transactionID_ << std::endl;
+  dumpArg(arg, outFile);
+  outFile << "[[/transaction]]" << std::endl << "[[[/runtime]]]" << std::endl;
+  outFile.close();
+}
+
+/// Just calls the kernel with the provided arguments.
+template <typename... FunArgs, typename... RealArgs>
+static void callKernel(void (*kernel)(FunArgs...), RealArgs &&...args) {
+  return kernel(std::forward<RealArgs>(args)...);
+}
+
+/// Calls the kernel with the provided arguments and dumps the function's result
+/// to a file.
+template <typename Res, typename... FunArgs, typename... RealArgs>
+static void callKernel(Res (*kernel)(FunArgs...), RealArgs &&...args) {
+  Res res = kernel(std::forward<RealArgs>(args)...);
+  dumpHLSArg(res, "end");
+}
+
+// Following macro definitions strongly inspired by
+// https://stackoverflow.com/questions/46725369/how-to-get-name-for-each-argument-in-variadic-macros
+
+// This works for kernels with at most 16 arguments, but can be trivially
+// extended to more if needed.
+
+#define VA_NUM_ARGS_IMPL(_1, _2, _3, _4, _5, _6, _7, _8, _9, _10, _11, _12,    \
+                         _13, _14, _15, _16, N, ...)                           \
+  N
+#define VA_NUM_ARGS(...)                                                       \
+  VA_NUM_ARGS_IMPL(__VA_ARGS__, 16, 15, 14, 13, 12, 11, 10, 9, 8, 7, 6, 5, 4,  \
+                   3, 2, 1, 0)
+
+#define HLS_DUMP(arg) dumpHLSArg(arg, #arg);
+#define DUMP_ARG_0
+#define DUMP_ARG_1(arg) HLS_DUMP(arg)
+#define DUMP_ARG_2(arg, ...) HLS_DUMP(arg) DUMP_ARG_1(__VA_ARGS__)
+#define DUMP_ARG_3(arg, ...) HLS_DUMP(arg) DUMP_ARG_2(__VA_ARGS__)
+#define DUMP_ARG_4(arg, ...) HLS_DUMP(arg) DUMP_ARG_3(__VA_ARGS__)
+#define DUMP_ARG_5(arg, ...) HLS_DUMP(arg) DUMP_ARG_4(__VA_ARGS__)
+#define DUMP_ARG_6(arg, ...) HLS_DUMP(arg) DUMP_ARG_5(__VA_ARGS__)
+#define DUMP_ARG_7(arg, ...) HLS_DUMP(arg) DUMP_ARG_6(__VA_ARGS__)
+#define DUMP_ARG_8(arg, ...) HLS_DUMP(arg) DUMP_ARG_7(__VA_ARGS__)
+#define DUMP_ARG_9(arg, ...) HLS_DUMP(arg) DUMP_ARG_8(__VA_ARGS__)
+#define DUMP_ARG_10(arg, ...) HLS_DUMP(arg) DUMP_ARG_9(__VA_ARGS__)
+#define DUMP_ARG_11(arg, ...) HLS_DUMP(arg) DUMP_ARG_10(__VA_ARGS__)
+#define DUMP_ARG_12(arg, ...) HLS_DUMP(arg) DUMP_ARG_11(__VA_ARGS__)
+#define DUMP_ARG_13(arg, ...) HLS_DUMP(arg) DUMP_ARG_12(__VA_ARGS__)
+#define DUMP_ARG_14(arg, ...) HLS_DUMP(arg) DUMP_ARG_13(__VA_ARGS__)
+#define DUMP_ARG_15(arg, ...) HLS_DUMP(arg) DUMP_ARG_14(__VA_ARGS__)
+#define DUMP_ARG_16(arg, ...) HLS_DUMP(arg) DUMP_ARG_15(__VA_ARGS__)
+#define DUMP_ARGS(args...) CONCAT(DUMP_ARG_, VA_NUM_ARGS(args))(args)
+
+#define CALL_KERNEL(kernel, args...)                                           \
+  {                                                                            \
+    _outPrefix_ = std::string{STRINGIFY(HLS_VERIFICATION_PATH)} +              \
+                  std::filesystem::path::preferred_separator +                 \
+                  "INPUT_VECTORS" +                                            \
+                  std::filesystem::path::preferred_separator + "input_";       \
+    DUMP_ARGS(args)                                                            \
+    _outPrefix_ = std::string{STRINGIFY(HLS_VERIFICATION_PATH)} +              \
+                  std::filesystem::path::preferred_separator + "C_OUT" +       \
+                  std::filesystem::path::preferred_separator + "output_";      \
+    callKernel(kernel, args);                                                  \
+    DUMP_ARGS(args)                                                            \
+    ++_transactionID_;                                                         \
+  }
+#endif // HLS_VERIFICATION
+
+//===----------------------------------------------------------------------===//
+// Default compilation
+//===----------------------------------------------------------------------===//
+
+/// CALL_KERNEL macro expansion when compiling in no specific mode: simply
+/// calls the kernel.
+#ifndef PRINT_PROFILING_INFO
+#ifndef HLS_VERIFICATION
+#define CALL_KERNEL(kernel, args...) kernel(args)
+#endif // HLS_VERIFICATION
 #endif // PRINT_PROFILING_INFO
 
 #endif // INTEGRATION_UTILS_H

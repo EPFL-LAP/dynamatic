@@ -21,10 +21,12 @@ VHDL_SRC_DIR="$SIM_DIR/VHDL_SRC"
 VHDL_OUT_DIR="$SIM_DIR/VHDL_OUT"
 INPUT_VECTORS_DIR="$SIM_DIR/INPUT_VECTORS"
 HLS_VERIFY_DIR="$SIM_DIR/HLS_VERIFY"
+IO_GEN_BIN="$SIM_DIR/C_SRC/$KERNEL_NAME-io-gen"
 
 # Shortcuts
 COMP_DIR="$OUTPUT_DIR/comp"
-HLS_VERIFIER="$DYNAMATIC_DIR/bin/hls-verifier"
+CLANGXX_BIN="$DYNAMATIC_DIR/bin/clang++"
+HLS_VERIFIER_BIN="$DYNAMATIC_DIR/bin/hls-verifier"
 RESOURCE_DIR="$DYNAMATIC_DIR/tools/hls-verifier/resources"
 
 # ============================================================================ #
@@ -53,10 +55,21 @@ cp "$LEGACY_DIR"/components/*.vhd "$VHDL_SRC_DIR"
 cp "$SRC_DIR/$KERNEL_NAME.c" "$C_SRC_DIR" 
 cp "$SRC_DIR/$KERNEL_NAME.h" "$C_SRC_DIR"
 
+# Compile kernel's main function to generate inputs and golden outputs for the
+# simulation
+"$CLANGXX_BIN" "$SRC_DIR/$KERNEL_NAME.c" -D HLS_VERIFICATION \
+  -DHLS_VERIFICATION_PATH="$SIM_DIR" -I "$DYNAMATIC_DIR/include" \
+  -Wno-deprecated -o "$IO_GEN_BIN"
+exit_on_fail "Failed to build kernel for IO gen." "Built kernel for IO gen." 
+
+# Generate IO
+"$IO_GEN_BIN"
+exit_on_fail "Failed to run kernel for IO gen." "Ran kernel for IO gen." 
+
 # Simulate and verify design
 echo_info "Launching Modelsim simulation"
 cd "$HLS_VERIFY_DIR"
-"$HLS_VERIFIER" cover -aw32 "$RESOURCE_DIR" "../C_SRC/$KERNEL_NAME.c" \
+"$HLS_VERIFIER_BIN" cover -aw32 "$RESOURCE_DIR" "../C_SRC/$KERNEL_NAME.c" \
   "../C_SRC/$KERNEL_NAME.c" "$KERNEL_NAME" \
   > "../report.txt"
 exit_on_fail "Simulation failed" "Simulation succeeded"

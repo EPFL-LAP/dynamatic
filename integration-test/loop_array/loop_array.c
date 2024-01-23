@@ -8,8 +8,8 @@ void loop_array(in_int_t n, in_int_t k, inout_int_t c[10]) {
 }
 
 int main(void) {
-  in_int_t k;
   in_int_t n;
+  in_int_t k;
   inout_int_t c[N];
 
   srand(13);

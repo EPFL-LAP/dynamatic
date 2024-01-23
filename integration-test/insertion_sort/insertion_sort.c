@@ -16,6 +16,7 @@ void insertion_sort(inout_int_t A[N], in_int_t n) {
 
 int main(void) {
   inout_int_t a[N];
+  inout_int_t n = N;
   for (int j = 0; j < N; ++j)
     a[j] = rand() % 10;
 

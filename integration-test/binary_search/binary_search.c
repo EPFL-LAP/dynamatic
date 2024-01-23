@@ -35,9 +35,10 @@ int binary_search(in_int_t search, in_int_t a[N]) {
 }
 
 int main(void) {
+  in_int_t search = 55;
   in_int_t a[N];
   for (int i = 0; i < N; i++)
     a[i] = i;
-  CALL_KERNEL(binary_search, 55, a);
+  CALL_KERNEL(binary_search, search, a);
   return 0;
 }

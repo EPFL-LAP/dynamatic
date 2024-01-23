@@ -5,10 +5,8 @@ set(LLVM_LINK_COMPONENTS
 add_llvm_tool(hls-verifier
   hls-verifier.cpp
   src/CAnalyser.cpp
-  src/CInjector.cpp
   src/Help.cpp
   src/HlsCoVerification.cpp
-  src/HlsCVerification.cpp
   src/HlsLogging.cpp
   src/HlsVhdlTb.cpp
   src/HlsVhdlVerification.cpp

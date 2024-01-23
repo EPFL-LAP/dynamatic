@@ -8,7 +8,6 @@
 
 #include "HlsCoVerification.h"
 #include "Help.h"
-#include "HlsCVerification.h"
 #include "HlsLogging.h"
 #include "HlsVhdlVerification.h"
 #include "Utilities.h"
@@ -49,7 +48,6 @@ bool runCoverification(vector<string> args) {
   VerificationContext ctx(cTbPath, cDuvPath, cFuvFunctionName,
                           vhdlDuvEntityName, otherCPaths);
   ctx.useAddrWidth32 = useAddrWidth32;
-  executeCTestbench(ctx);
   executeVhdlTestbench(ctx, resourceDir);
   return compareCAndVhdlOutputs(ctx);
 }

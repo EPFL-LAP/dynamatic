@@ -14,9 +14,10 @@ int if_loop_2(in_int_t a[N], in_int_t n) {
 
 int main(void) {
   in_int_t a[N];
+  in_int_t n = N;
   for (int j = 0; j < N; ++j)
     a[j] = rand() % N;
 
-  CALL_KERNEL(if_loop_2, a, N);
+  CALL_KERNEL(if_loop_2, a, n);
   return 0;
 }
