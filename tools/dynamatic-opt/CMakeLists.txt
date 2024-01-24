@@ -13,7 +13,7 @@ target_link_libraries(dynamatic-opt
   DynamaticLowerScfToCf
   DynamaticBufferPlacement
   DynamaticSpeculation
-  DynamaticStandardToHandshakeFPGA18
+  DynamaticCfToHandshake
   DynamaticHandshakeToNetlist
   DynamaticTransforms
   DynamaticTutorialsCreatingPasses

@@ -1,4 +1,4 @@
-//===- StandardToHandshakeFPGA18.cpp - FPGA18's elastic pass ----*- C++ -*-===//
+//===- CfToHandhsake.cpp - Convert func/cf to handhsake dialect -*- C++ -*-===//
 //
 // Dynamatic is under the Apache License v2.0 with LLVM Exceptions.
 // See https://llvm.org/LICENSE.txt for license information.
@@ -6,15 +6,17 @@
 //
 //===----------------------------------------------------------------------===//
 //
-// This file contains the implementation of the elastic pass, as described in
-// https://www.epfl.ch/labs/lap/wp-content/uploads/2018/11/JosipovicFeb18_DynamicallyScheduledHighLevelSynthesis_FPGA18.pdf.
-// The implementation relies for some parts on CIRCT's standard-to-handshake
-// conversion pass, but brings siginificant changes related to memory interface
+// This file contains the implementation of the elastic pass, as introduced in
+// https://dl.acm.org/doi/abs/10.1145/3174243.3174264.
+//
+// Pars of the implementation are taken from CIRCT's cf-to-handshake conversion
+// pass with cosmetic modifications. Other parts of the implementation are
+// significantly different, in particular those related to memory interface
 // management and return network creation.
 //
 //===----------------------------------------------------------------------===//
 
-#include "dynamatic/Conversion/StandardToHandshakeFPGA18.h"
+#include "dynamatic/Conversion/CfToHandshake.h"
 #include "circt/Dialect/Handshake/HandshakeInterfaces.h"
 #include "circt/Dialect/Handshake/HandshakeOps.h"
 #include "dynamatic/Analysis/ConstantAnalysis.h"
@@ -1031,9 +1033,8 @@ namespace {
 /// FPGA18's elastic pass. Runs elastic pass on every function (func::FuncOp)
 /// of the module it is applied on. Succeeds whenever all functions in the
 /// module were succesfully lowered to handshake.
-struct StandardToHandshakeFPGA18Pass
-    : public dynamatic::impl::StandardToHandshakeFPGA18Base<
-          StandardToHandshakeFPGA18Pass> {
+struct CfToHandshakePass
+    : public dynamatic::impl::CfToHandshakeBase<CfToHandshakePass> {
 
   void runDynamaticPass() override {
     ModuleOp modOp = getOperation();
@@ -1051,7 +1052,7 @@ struct StandardToHandshakeFPGA18Pass
 };
 } // namespace
 
-LogicalResult StandardToHandshakeFPGA18Pass::lowerFuncOp(func::FuncOp funcOp) {
+LogicalResult CfToHandshakePass::lowerFuncOp(func::FuncOp funcOp) {
   bool funcIsExternal = funcOp.isExternal();
 
   // First, put the function into maximal SSA form if it is not external
@@ -1107,7 +1108,6 @@ LogicalResult StandardToHandshakeFPGA18Pass::lowerFuncOp(func::FuncOp funcOp) {
   return success();
 }
 
-std::unique_ptr<dynamatic::DynamaticPass>
-dynamatic::createStandardToHandshakeFPGA18Pass() {
-  return std::make_unique<StandardToHandshakeFPGA18Pass>();
+std::unique_ptr<dynamatic::DynamaticPass> dynamatic::createCfToHandshake() {
+  return std::make_unique<CfToHandshakePass>();
 }

@@ -1,4 +1,4 @@
-//===- StandardToHandshakeFPGA18.h - FPGA18's elastic pass ------*- C++ -*-===//
+//===- CfToHandhsake.h - Convert func/cf to handhsake dialect ---*- C++ -*-===//
 //
 // Dynamatic is under the Apache License v2.0 with LLVM Exceptions.
 // See https://llvm.org/LICENSE.txt for license information.
@@ -6,13 +6,13 @@
 //
 //===----------------------------------------------------------------------===//
 //
-// This file declares the --lower-std-to-handshake-fpga18 conversion pass along
-// with a helper class for performing the lowering.
+// This file declares the --lower-cf-to-handshake conversion pass along with a
+// helper class for performing the lowering.
 //
 //===----------------------------------------------------------------------===//
 
-#ifndef DYNAMATIC_CONVERSION_STANDARDTOHANDSHAKEFPGA18_H
-#define DYNAMATIC_CONVERSION_STANDARDTOHANDSHAKEFPGA18_H
+#ifndef DYNAMATIC_CONVERSION_CF_TO_HANDSHAKE_H
+#define DYNAMATIC_CONVERSION_CF_TO_HANDSHAKE_H
 
 #include "circt/Dialect/Handshake/HandshakeOps.h"
 #include "dynamatic/Analysis/NameAnalysis.h"
@@ -192,12 +192,12 @@ static LogicalResult runPartialLowering(
       instance.getRegion());
 }
 
-#define GEN_PASS_DECL_STANDARDTOHANDSHAKEFPGA18
-#define GEN_PASS_DEF_STANDARDTOHANDSHAKEFPGA18
+#define GEN_PASS_DECL_CFTOHANDSHAKE
+#define GEN_PASS_DEF_CFTOHANDSHAKE
 #include "dynamatic/Conversion/Passes.h.inc"
 
-std::unique_ptr<dynamatic::DynamaticPass> createStandardToHandshakeFPGA18Pass();
+std::unique_ptr<dynamatic::DynamaticPass> createCfToHandshake();
 
 } // namespace dynamatic
 
-#endif // DYNAMATIC_CONVERSION_STANDARDTOHANDSHAKEFPGA18_H
+#endif // DYNAMATIC_CONVERSION_CF_TO_HANDSHAKE_H

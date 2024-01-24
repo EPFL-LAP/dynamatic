@@ -1,4 +1,4 @@
 add_subdirectory(AffineToScf)
+add_subdirectory(CfToHandshake)
 add_subdirectory(ScfToCf)
 add_subdirectory(HandshakeToNetlist)
-add_subdirectory(StandardToHandshakeFPGA18)

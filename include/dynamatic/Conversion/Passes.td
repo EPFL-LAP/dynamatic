@@ -53,12 +53,17 @@ def ScfToCf : DynamaticPass<"lower-scf-to-cf", [
 }
 
 //===----------------------------------------------------------------------===//
-// StandardToHandshakeFPGA18
+// CfToHandshake
 //===----------------------------------------------------------------------===//
 
-def StandardToHandshakeFPGA18 : DynamaticPass<"lower-std-to-handshake-fpga18"> {
-  let summary = "Lowers cf-level IR to Handshake.";
-  let constructor = "dynamatic::createStandardToHandshakeFPGA18Pass()";
+def CfToHandshake : DynamaticPass<"lower-cf-to-handshake"> {
+  let summary = "Lowers func and cf dialects to handshake.";
+  let description = [{
+    Lowers func-level functions whose body have unstructured control flow into
+    their handshake counterparts, which represent dataflow circuits that can
+    ultimately be converted to an RTL design. 
+  }];
+  let constructor = "dynamatic::createCfToHandshake()";
 }
 
 //===----------------------------------------------------------------------===//

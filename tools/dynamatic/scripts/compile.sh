@@ -110,7 +110,7 @@ exit_on_fail "Failed to apply Dynamatic transformations to cf" \
   "Applied Dynamatic transformations to cf"
 
 # cf level -> handshake level
-"$DYNAMATIC_OPT_BIN" "$F_CF_DYN_TRANSFORMED" --lower-std-to-handshake-fpga18 \
+"$DYNAMATIC_OPT_BIN" "$F_CF_DYN_TRANSFORMED" --lower-cf-to-handshake \
   --handshake-fix-arg-names="source=$SRC_DIR/$KERNEL_NAME.c" \
   > "$F_HANDSHAKE"
 exit_on_fail "Failed to compile cf to handshake" "Compiled cf to handshake"

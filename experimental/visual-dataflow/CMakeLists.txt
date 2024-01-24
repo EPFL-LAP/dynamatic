@@ -27,7 +27,7 @@ target_link_libraries(${GODOT_LIB_NAME}
   AffineToScf
   DynamaticLowerScfToCf
   DynamaticBufferPlacement
-  DynamaticStandardToHandshakeFPGA18
+  DynamaticCfToHandshake
   DynamaticHandshakeToNetlist
   DynamaticTransforms
   DynamaticTutorialsCreatingPasses
@@ -35,8 +35,6 @@ target_link_libraries(${GODOT_LIB_NAME}
   DynamaticExperimentalSupport
 
   CIRCTHandshake
-  CIRCTHandshakeTransforms
-  CIRCTStandardToHandshake
 
   MLIRIR
   MLIRLLVMDialect

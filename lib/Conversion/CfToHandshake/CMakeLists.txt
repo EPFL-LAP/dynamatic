@@ -1,5 +1,5 @@
-add_dynamatic_library(DynamaticStandardToHandshakeFPGA18
-  StandardToHandshakeFPGA18.cpp
+add_dynamatic_library(DynamaticCfToHandshake
+  CfToHandshake.cpp
 
   DEPENDS
   DynamaticConversionPassIncGen
