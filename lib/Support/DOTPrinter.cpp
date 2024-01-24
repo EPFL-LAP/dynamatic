@@ -13,8 +13,8 @@
 //===----------------------------------------------------------------------===//
 
 #include "dynamatic/Support/DOTPrinter.h"
-#include "circt/Dialect/Handshake/HandshakeOps.h"
 #include "dynamatic/Analysis/NameAnalysis.h"
+#include "dynamatic/Dialect/Handshake/HandshakeOps.h"
 #include "dynamatic/Support/CFG.h"
 #include "dynamatic/Support/TimingModels.h"
 #include "dynamatic/Transforms/HandshakeConcretizeIndexType.h"
@@ -34,10 +34,9 @@
 #include <string>
 #include <utility>
 
-using namespace circt;
-using namespace circt::handshake;
 using namespace mlir;
 using namespace dynamatic;
+using namespace dynamatic::handshake;
 
 namespace {
 

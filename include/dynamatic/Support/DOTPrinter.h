@@ -15,7 +15,7 @@
 #ifndef DYNAMATIC_SUPPORT_DOTPRINTER_H
 #define DYNAMATIC_SUPPORT_DOTPRINTER_H
 
-#include "circt/Dialect/Handshake/HandshakeOps.h"
+#include "dynamatic/Dialect/Handshake/HandshakeOps.h"
 #include "dynamatic/Support/LLVM.h"
 #include "dynamatic/Support/TimingModels.h"
 #include "mlir/Support/IndentedOstream.h"
@@ -24,7 +24,6 @@
 #include <unordered_map>
 
 using namespace mlir;
-using namespace circt;
 
 namespace dynamatic {
 

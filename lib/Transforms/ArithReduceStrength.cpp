@@ -13,8 +13,8 @@
 //===----------------------------------------------------------------------===//
 
 #include "dynamatic/Transforms/ArithReduceStrength.h"
-#include "circt/Dialect/Handshake/HandshakeOps.h"
 #include "dynamatic/Analysis/NumericAnalysis.h"
+#include "dynamatic/Dialect/Handshake/HandshakeOps.h"
 #include "mlir/Dialect/Arith/IR/Arith.h"
 #include "mlir/Dialect/Func/IR/FuncOps.h"
 #include "mlir/Dialect/MemRef/IR/MemRef.h"
@@ -27,7 +27,6 @@
 
 using namespace mlir;
 using namespace dynamatic;
-using namespace circt::handshake;
 
 //===----------------------------------------------------------------------===//
 // OpTree implementation

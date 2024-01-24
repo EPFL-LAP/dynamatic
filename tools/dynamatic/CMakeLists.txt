@@ -12,8 +12,7 @@ target_link_libraries(dynamatic
   DynamaticSupport
   DynamaticTransforms
 
-  CIRCTHandshake
-  CIRCTHandshakeTransforms
+  DynamaticHandshake
 
   MLIRIR
   MLIRParser

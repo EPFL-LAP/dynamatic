@@ -13,7 +13,6 @@
 #include "dynamatic/Analysis/ConstantAnalysis.h"
 #include "dynamatic/Support/CFG.h"
 
-using namespace circt;
 using namespace dynamatic;
 
 /// Determines whether the control value of two constants can be considered
@@ -63,7 +62,7 @@ dynamatic::findEquivalentCst(handshake::ConstantOp cstOp) {
 /// logic that legacy Dynamatic follows.
 static bool cstUserIsSourcable(Operation *cstUser) {
   return !isa<handshake::BranchOp, handshake::ConditionalBranchOp,
-              handshake::ReturnOp, handshake::LoadOpInterface,
+              handshake::DynamaticReturnOp, handshake::LoadOpInterface,
               handshake::StoreOpInterface>(cstUser);
 }
 

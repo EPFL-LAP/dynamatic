@@ -32,8 +32,8 @@ class Backedge;
 ///
 /// Example use:
 /// ```
-///   circt::BackedgeBuilder back(rewriter, loc);
-///   circt::Backedge ready = back.get(rewriter.getI1Type());
+///   dynamatic::BackedgeBuilder back(rewriter, loc);
+///   dynamatic::Backedge ready = back.get(rewriter.getI1Type());
 ///   // Use `ready` as a `Value`.
 ///   auto addOp = rewriter.create<addOp>(loc, ready);
 ///   // When the actual value is available,

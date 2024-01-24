@@ -6,14 +6,14 @@
 //
 //===----------------------------------------------------------------------===//
 //
-// Inherited from CIRCT which holds the informations about each operation
+// Execution models for dataflow simulator.
 //
 //===----------------------------------------------------------------------===//
 
 #ifndef EXPERIMENTAL_TOOLS_HANDSHAKESIMULATOR_EXECMODELS_H
 #define EXPERIMENTAL_TOOLS_HANDSHAKESIMULATOR_EXECMODELS_H
 
-#include "circt/Dialect/Handshake/HandshakeOps.h"
+#include "dynamatic/Dialect/Handshake/HandshakeOps.h"
 #include "dynamatic/Support/LLVM.h"
 #include "mlir/IR/Value.h"
 #include "llvm/ADT/Any.h"
@@ -197,8 +197,6 @@ struct OEHBdata {
 //                  Execution models structure definitions                    //
 //----------------------------------------------------------------------------//
 
-//--- Default CIRCT models ---------------------------------------------------//
-
 struct DefaultFork : public ExecutableModel {
   bool tryExecute(ExecutableData &data, Operation &op) override;
 };
@@ -234,8 +232,6 @@ struct DefaultConstant : public ExecutableModel {
 struct DefaultBuffer : public ExecutableModel {
   bool tryExecute(ExecutableData &data, Operation &op) override;
 };
-
-//--- Dynamatic models -------------------------------------------------------//
 
 /// Manages all store and load requests and answers them back
 struct DynamaticMemController : public ExecutableModel {

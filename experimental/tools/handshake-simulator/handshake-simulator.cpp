@@ -11,9 +11,9 @@
 //
 //===----------------------------------------------------------------------===//
 
-#include "circt/Dialect/Handshake/HandshakeOps.h"
 #include "circt/Support/JSON.h"
 #include "circt/Support/Version.h"
+#include "dynamatic/Dialect/Handshake/HandshakeOps.h"
 #include "experimental/tools/handshake-simulator/Simulation.h"
 #include "mlir/Dialect/Func/IR/FuncOps.h"
 #include "mlir/Dialect/LLVMIR/LLVMDialect.h"
@@ -32,7 +32,7 @@
 
 using namespace llvm;
 using namespace mlir;
-using namespace circt;
+using namespace dynamatic;
 
 static cl::OptionCategory mainCategory("Application options");
 static cl::OptionCategory configCategory("Configuration options");

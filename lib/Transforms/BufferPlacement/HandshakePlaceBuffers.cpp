@@ -13,9 +13,9 @@
 //===----------------------------------------------------------------------===//
 
 #include "dynamatic/Transforms/BufferPlacement/HandshakePlaceBuffers.h"
-#include "circt/Dialect/Handshake/HandshakeDialect.h"
-#include "circt/Dialect/Handshake/HandshakeOps.h"
 #include "dynamatic/Analysis/NameAnalysis.h"
+#include "dynamatic/Dialect/Handshake/HandshakeDialect.h"
+#include "dynamatic/Dialect/Handshake/HandshakeOps.h"
 #include "dynamatic/Support/Attribute.h"
 #include "dynamatic/Support/CFG.h"
 #include "dynamatic/Support/Logging.h"
@@ -36,10 +36,9 @@
 #include <string>
 
 using namespace llvm::sys;
-using namespace circt;
-using namespace circt::handshake;
 using namespace mlir;
 using namespace dynamatic;
+using namespace dynamatic::handshake;
 using namespace dynamatic::buffer;
 using namespace dynamatic::experimental;
 

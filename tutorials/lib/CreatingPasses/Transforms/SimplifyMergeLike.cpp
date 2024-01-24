@@ -12,11 +12,11 @@
 //===----------------------------------------------------------------------===//
 
 #include "tutorials/CreatingPasses/Transforms/SimplifyMergeLike.h"
-#include "circt/Dialect/Handshake/HandshakeOps.h"
+#include "dynamatic/Dialect/Handshake/HandshakeOps.h"
 #include "mlir/IR/MLIRContext.h"
 
 using namespace mlir;
-using namespace circt;
+using namespace dynamatic;
 
 /// Performs the simple transformation on the provided Handshake function,
 /// deleting merges with a single input and downgrades control merges with an

@@ -13,7 +13,7 @@
 //===----------------------------------------------------------------------===//
 
 #include "dynamatic/Conversion/AffineToScf.h"
-#include "circt/Dialect/Handshake/HandshakeOps.h"
+#include "dynamatic/Dialect/Handshake/HandshakeOps.h"
 #include "dynamatic/Support/Attribute.h"
 #include "dynamatic/Support/DynamaticPass.h"
 #include "dynamatic/Support/Handshake.h"
@@ -32,8 +32,6 @@
 using namespace mlir;
 using namespace mlir::vector;
 using namespace mlir::affine;
-using namespace circt;
-using namespace circt::handshake;
 using namespace dynamatic;
 
 namespace {

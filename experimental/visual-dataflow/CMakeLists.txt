@@ -34,7 +34,7 @@ target_link_libraries(${GODOT_LIB_NAME}
   DynamaticExperimentalTestTransforms
   DynamaticExperimentalSupport
 
-  CIRCTHandshake
+  DynamaticHandshake
 
   MLIRIR
   MLIRLLVMDialect

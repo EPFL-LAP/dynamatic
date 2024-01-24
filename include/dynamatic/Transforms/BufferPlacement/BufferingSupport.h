@@ -13,7 +13,7 @@
 #ifndef DYNAMATIC_TRANSFORMS_BUFFERPLACEMENT_BUFFERINGSUPPORT_H
 #define DYNAMATIC_TRANSFORMS_BUFFERPLACEMENT_BUFFERINGSUPPORT_H
 
-#include "circt/Dialect/Handshake/HandshakeOps.h"
+#include "dynamatic/Dialect/Handshake/HandshakeOps.h"
 #include "dynamatic/Support/LLVM.h"
 #include "dynamatic/Support/TimingModels.h"
 #include "dynamatic/Transforms/BufferPlacement/CFDFC.h"
@@ -26,7 +26,7 @@ namespace buffer {
 /// related to the Handshake function under optimization.
 struct FuncInfo {
   /// The Handshake function in which to place buffers.
-  circt::handshake::FuncOp funcOp;
+  handshake::FuncOp funcOp;
   /// The list of archs in the function (i.e., transitions between basic
   /// blocks).
   SmallVector<experimental::ArchBB> archs;
@@ -40,7 +40,7 @@ struct FuncInfo {
 
   /// Constructs an instance from the function it refers to. Other struct
   /// members start empty.
-  FuncInfo(circt::handshake::FuncOp funcOp) : funcOp(funcOp){};
+  FuncInfo(handshake::FuncOp funcOp) : funcOp(funcOp){};
 };
 
 /// Acts as a "smart and lazy getter" around a channel's buffering properties.
@@ -162,9 +162,7 @@ struct Channel {
   Channel &operator=(const Channel &) = delete;
 
   /// Determines whether the channel represents a function's argument.
-  inline bool isFunArg() const {
-    return isa<circt::handshake::FuncOp>(producer);
-  }
+  inline bool isFunArg() const { return isa<handshake::FuncOp>(producer); }
 };
 
 /// Holds information about what type of buffer should be placed on a specific
@@ -201,7 +199,7 @@ Operation *getChannelProducer(Value channel, size_t *idx = nullptr);
 /// if the buffering properties of a channel are unsatisfiable or become
 /// unsatisfiable after adjustment.
 LogicalResult
-mapChannelsToProperties(circt::handshake::FuncOp funcOp,
+mapChannelsToProperties(handshake::FuncOp funcOp,
                         const TimingDatabase &timingDB,
                         llvm::MapVector<Value, ChannelBufProps> &channelProps);
 

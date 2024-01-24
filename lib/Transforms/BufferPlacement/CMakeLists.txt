@@ -16,7 +16,7 @@ add_dynamatic_library(DynamaticBufferPlacement
   MLIRFuncDialect
   MLIRSupport
   MLIRTransformUtils
-  CIRCTHandshake
+  DynamaticHandshake
   DynamaticSupport
   DynamaticExperimentalSupport
   )

@@ -22,7 +22,7 @@
 #ifndef DYNAMATIC_SUPPORT_CFG_H
 #define DYNAMATIC_SUPPORT_CFG_H
 
-#include "circt/Dialect/Handshake/HandshakeOps.h"
+#include "dynamatic/Dialect/Handshake/HandshakeOps.h"
 #include "dynamatic/Support/LLVM.h"
 #include "llvm/ADT/SmallSet.h"
 
@@ -47,7 +47,7 @@ struct LogicBBs {
 
 /// Groups the operations of a function into "blocks" based on the "bb"
 /// attribute of each operation.
-LogicBBs getLogicBBs(circt::handshake::FuncOp funcOp);
+LogicBBs getLogicBBs(handshake::FuncOp funcOp);
 
 /// If the source operation belongs to a logical BB, makes the destination
 /// operation part of the same BB and returns true; otherwise return false.
@@ -116,7 +116,7 @@ public:
   /// assert if any operation within the function that can belong to a basic
   /// block (this excludes memory interfaces and sinks, for example) is not
   /// annotated with the basic block it logically belongs to.
-  HandshakeCFG(circt::handshake::FuncOp funcOp);
+  HandshakeCFG(handshake::FuncOp funcOp);
 
   /// Get all non-cyclic paths between two basic blocks (which may be
   /// identical). Non-cyclic paths are paths that do not contain the same block
@@ -135,7 +135,7 @@ public:
 
 private:
   /// The referenced Handshake function.
-  circt::handshake::FuncOp funcOp;
+  handshake::FuncOp funcOp;
   /// Maps each basic blocks in the function to its successors.
   mlir::DenseMap<unsigned, llvm::SmallSet<unsigned, 2>> successors;
 

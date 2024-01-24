@@ -17,10 +17,10 @@
 //===----------------------------------------------------------------------===//
 
 #include "dynamatic/Conversion/CfToHandshake.h"
-#include "circt/Dialect/Handshake/HandshakeInterfaces.h"
-#include "circt/Dialect/Handshake/HandshakeOps.h"
 #include "dynamatic/Analysis/ConstantAnalysis.h"
 #include "dynamatic/Analysis/NameAnalysis.h"
+#include "dynamatic/Dialect/Handshake/HandshakeInterfaces.h"
+#include "dynamatic/Dialect/Handshake/HandshakeOps.h"
 #include "dynamatic/Support/Attribute.h"
 #include "dynamatic/Support/CFG.h"
 #include "dynamatic/Support/Handshake.h"
@@ -46,7 +46,6 @@ using namespace mlir;
 using namespace mlir::func;
 using namespace mlir::affine;
 using namespace mlir::memref;
-using namespace circt;
 using namespace dynamatic;
 
 //===-----------------------------------------------------------------------==//
@@ -537,8 +536,8 @@ LogicalResult HandshakeLowering::replaceMemoryOps(
     if (!memAttr)
       return op.emitError()
              << "Memory operation must have attribute " << attrName
-             << " of type circt::handshake::MemInterfaceAttr to decide which "
-                "memory interface it should connect to.";
+             << " of type dynamatic::handshake::MemInterfaceAttr to decide "
+                "which memory interface it should connect to.";
     bool connectToMC = memAttr.connectsToMC();
 
     // Replace memref operation with corresponding handshake operation
@@ -972,8 +971,7 @@ partiallyLowerOp(const PartialLowerFuncOp::PartialLoweringFunc &loweringFunc,
 }
 
 /// Lowers the region referenced by the handshake lowering strategy following
-/// a fixed sequence of steps, some implemented in this file and some in
-/// CIRCT's standard-to-handshake conversion pass.
+/// a fixed sequence of steps.
 static LogicalResult lowerRegion(HandshakeLowering &hl) {
 
   if (failed(runPartialLowering(hl, &HandshakeLowering::createControlNetwork)))

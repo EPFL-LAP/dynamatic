@@ -14,8 +14,8 @@
 #ifndef DYNAMATIC_CONVERSION_CF_TO_HANDSHAKE_H
 #define DYNAMATIC_CONVERSION_CF_TO_HANDSHAKE_H
 
-#include "circt/Dialect/Handshake/HandshakeOps.h"
 #include "dynamatic/Analysis/NameAnalysis.h"
+#include "dynamatic/Dialect/Handshake/HandshakeOps.h"
 #include "dynamatic/Support/Backedge.h"
 #include "dynamatic/Support/DynamaticPass.h"
 #include "dynamatic/Support/Handshake.h"
@@ -42,7 +42,7 @@ public:
   /// operation.
   struct MergeOpInfo {
     /// The merge-like operation under consideration.
-    circt::handshake::MergeLikeOpInterface mergeLikeOp;
+    handshake::MergeLikeOpInterface mergeLikeOp;
     /// The original block argument that the merge-like operation "replaces".
     BlockArgument blockArg;
     /// All data operands to the merge-like operation that need to be resolved

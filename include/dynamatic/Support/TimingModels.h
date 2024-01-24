@@ -19,7 +19,7 @@
 #ifndef DYNAMATIC_SUPPORT_TIMINGMODELS_H
 #define DYNAMATIC_SUPPORT_TIMINGMODELS_H
 
-#include "circt/Dialect/Handshake/HandshakeOps.h"
+#include "dynamatic/Dialect/Handshake/HandshakeOps.h"
 #include "dynamatic/Support/LLVM.h"
 #include "mlir/Dialect/Func/IR/FuncOps.h"
 #include "mlir/IR/MLIRContext.h"

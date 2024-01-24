@@ -35,7 +35,7 @@ constexpr llvm::StringLiteral ERR_NON_MATERIALIZED_FUNC(
 /// SSA value in the function (function arguments or operation result) has
 /// exactly one use. Fails and emits an error if a value does not have exactly
 /// one use.
-LogicalResult verifyIRMaterialized(circt::handshake::FuncOp funcOp);
+LogicalResult verifyIRMaterialized(handshake::FuncOp funcOp);
 
 /// Error message to display when the MLIR module is not materialized.
 constexpr llvm::StringLiteral ERR_NON_MATERIALIZED_MOD(

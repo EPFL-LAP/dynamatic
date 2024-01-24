@@ -16,7 +16,7 @@
 #ifndef DYNAMATIC_ANALYSIS_NAMEANALYSIS
 #define DYNAMATIC_ANALYSIS_NAMEANALYSIS
 
-#include "circt/Dialect/Handshake/HandshakeOps.h"
+#include "dynamatic/Dialect/Handshake/HandshakeOps.h"
 #include "dynamatic/Support/LLVM.h"
 #include "mlir/Pass/AnalysisManager.h"
 
@@ -43,8 +43,8 @@ namespace dynamatic {
 /// and lead to undefined behavior.
 ///
 /// Operation names are internally stored in an operation attribute of type
-/// `circt::handhsake::NameAttr` attached to the operation being named under the
-/// attibute name "name"; the attribute is a simple wrapper around a
+/// `dynamatic::handhsake::NameAttr` attached to the operation being named under
+/// the attibute name "name"; the attribute is a simple wrapper around a
 /// `mlir::StringAttr`. Channel names are determined based on the names of the
 /// "producing" and "consuming" operations.
 class NameAnalysis {

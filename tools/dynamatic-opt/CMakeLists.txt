@@ -14,16 +14,13 @@ target_link_libraries(dynamatic-opt
   DynamaticBufferPlacement
   DynamaticSpeculation
   DynamaticCfToHandshake
+  DynamaticHandshake
   DynamaticHandshakeToNetlist
   DynamaticTransforms
   DynamaticTutorialsCreatingPasses
   DynamaticExperimentalTestTransforms
   DynamaticExperimentalSupport
   DynamaticExperimentalTransforms
-
-  CIRCTHandshake
-  CIRCTHandshakeTransforms
-  CIRCTCFToHandshake
 
   MLIRIR
   MLIRAffineTransforms

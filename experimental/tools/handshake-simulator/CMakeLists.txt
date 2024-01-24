@@ -8,6 +8,6 @@ target_link_libraries(handshake-simulator
   MLIRSupport
   MLIRMemRefDialect
 
-  CIRCTHandshake
+  DynamaticHandshake
   DynamaticSupport
   )

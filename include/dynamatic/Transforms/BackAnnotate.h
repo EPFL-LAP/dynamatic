@@ -63,7 +63,7 @@
 //
 // At the moment, a single "proof-of-concept" attribute type is supported for
 // both operations and operands, it is called "buffering-properties" and maps to
-// the `circt::handshake::ChannelBufPropsAttr` attribute internally, which
+// the `dynamatic::handshake::ChannelBufPropsAttr` attribute internally, which
 // encodes buffering constraints for a specific channel (see attribute
 // documentation for a description of what each field means). Its expected data
 // format is outlined below.

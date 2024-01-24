@@ -28,7 +28,7 @@
 //===----------------------------------------------------------------------===//
 
 #include "dynamatic/Transforms/HandshakeOptimizeBitwidths.h"
-#include "circt/Dialect/Handshake/HandshakeOps.h"
+#include "dynamatic/Dialect/Handshake/HandshakeOps.h"
 #include "dynamatic/Support/CFG.h"
 #include "dynamatic/Transforms/HandshakeMinimizeCstWidth.h"
 #include "mlir/Dialect/Arith/IR/Arith.h"
@@ -37,7 +37,6 @@
 #include <functional>
 
 using namespace mlir;
-using namespace circt;
 using namespace dynamatic;
 
 namespace {

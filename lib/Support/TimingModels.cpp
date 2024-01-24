@@ -13,7 +13,7 @@
 //===----------------------------------------------------------------------===//
 
 #include "dynamatic/Support/TimingModels.h"
-#include "circt/Dialect/Handshake/HandshakeOps.h"
+#include "dynamatic/Dialect/Handshake/HandshakeOps.h"
 #include "mlir/Dialect/Arith/IR/Arith.h"
 #include "mlir/IR/Operation.h"
 #include "mlir/Support/LogicalResult.h"
@@ -24,7 +24,6 @@
 
 using namespace llvm;
 using namespace mlir;
-using namespace circt;
 using namespace dynamatic;
 
 //===----------------------------------------------------------------------===//

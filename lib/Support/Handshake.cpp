@@ -11,7 +11,7 @@
 //===----------------------------------------------------------------------===//
 
 #include "dynamatic/Support/Handshake.h"
-#include "circt/Dialect/Handshake/HandshakeOps.h"
+#include "dynamatic/Dialect/Handshake/HandshakeOps.h"
 #include "dynamatic/Support/Attribute.h"
 #include "dynamatic/Support/Backedge.h"
 #include "dynamatic/Support/CFG.h"
@@ -23,9 +23,8 @@
 #include "llvm/Support/ErrorHandling.h"
 
 using namespace mlir;
-using namespace circt;
-using namespace circt::handshake;
 using namespace dynamatic;
+using namespace dynamatic::handshake;
 
 //===----------------------------------------------------------------------===//
 // MemoryOpLowering

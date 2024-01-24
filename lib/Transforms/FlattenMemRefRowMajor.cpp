@@ -13,7 +13,7 @@
 //===----------------------------------------------------------------------===//
 
 #include "dynamatic/Transforms/FlattenMemRefRowMajor.h"
-#include "circt/Dialect/Handshake/HandshakeOps.h"
+#include "dynamatic/Dialect/Handshake/HandshakeOps.h"
 #include "dynamatic/Support/Attribute.h"
 #include "dynamatic/Support/Handshake.h"
 #include "mlir/Conversion/LLVMCommon/ConversionTarget.h"
@@ -31,7 +31,6 @@
 #include "llvm/Support/MathExtras.h"
 
 using namespace mlir;
-using namespace circt;
 using namespace dynamatic;
 
 static inline bool isUniDimensional(MemRefType memref) {

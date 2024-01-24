@@ -11,8 +11,8 @@
 //===----------------------------------------------------------------------===//
 
 #include "experimental/Transforms/Speculation/HandshakeSpeculation.h"
-#include "circt/Dialect/Handshake/HandshakeOps.h"
 #include "dynamatic/Analysis/NameAnalysis.h"
+#include "dynamatic/Dialect/Handshake/HandshakeOps.h"
 #include "dynamatic/Support/CFG.h"
 #include "dynamatic/Support/DynamaticPass.h"
 #include "dynamatic/Support/Logging.h"
@@ -24,10 +24,9 @@
 #include <string>
 
 using namespace llvm::sys;
-using namespace circt;
-using namespace circt::handshake;
 using namespace mlir;
 using namespace dynamatic;
+using namespace dynamatic::handshake;
 using namespace dynamatic::experimental;
 using namespace dynamatic::experimental::speculation;
 

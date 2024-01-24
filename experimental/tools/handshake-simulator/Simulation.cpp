@@ -12,8 +12,8 @@
 //===----------------------------------------------------------------------===//
 
 #include "experimental/tools/handshake-simulator/Simulation.h"
-#include "circt/Dialect/Handshake/HandshakeOps.h"
 #include "circt/Support/JSON.h"
+#include "dynamatic/Dialect/Handshake/HandshakeOps.h"
 #include "experimental/tools/handshake-simulator/ExecModels.h"
 #include "mlir/Dialect/Arith/IR/Arith.h"
 #include "mlir/Dialect/ControlFlow/IR/ControlFlowOps.h"

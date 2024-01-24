@@ -6,8 +6,7 @@ add_dynamatic_library(DynamaticCfToHandshake
 
   LINK_LIBS PUBLIC
   DynamaticSupport
-  CIRCTHandshake
-  CIRCTSupport
+  DynamaticHandshake
   MLIRIR
   MLIRPass
   MLIRArithDialect

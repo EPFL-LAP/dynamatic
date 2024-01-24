@@ -14,8 +14,8 @@
 //===----------------------------------------------------------------------===//
 
 #include "dynamatic/Transforms/HandshakeMinimizeCstWidth.h"
-#include "circt/Dialect/Handshake/HandshakeOps.h"
 #include "dynamatic/Analysis/ConstantAnalysis.h"
+#include "dynamatic/Dialect/Handshake/HandshakeOps.h"
 #include "dynamatic/Support/CFG.h"
 #include "mlir/Dialect/Arith/IR/Arith.h"
 #include "mlir/Transforms/GreedyPatternRewriteDriver.h"
@@ -26,7 +26,6 @@
 STATISTIC(savedBits, "Number of saved bits");
 
 using namespace mlir;
-using namespace circt;
 using namespace dynamatic;
 
 /// Inserts an extension op after the constant op that extends the constant's

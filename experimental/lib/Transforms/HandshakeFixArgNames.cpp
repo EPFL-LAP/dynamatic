@@ -11,14 +11,13 @@
 //===----------------------------------------------------------------------===//
 
 #include "experimental/Transforms/HandshakeFixArgNames.h"
-#include "circt/Dialect/Handshake/HandshakeOps.h"
+#include "dynamatic/Dialect/Handshake/HandshakeOps.h"
 #include "mlir/IR/BuiltinAttributes.h"
 #include "mlir/IR/BuiltinOps.h"
 #include "mlir/Support/LogicalResult.h"
 #include <fstream>
 
 using namespace mlir;
-using namespace circt;
 using namespace dynamatic;
 
 namespace {

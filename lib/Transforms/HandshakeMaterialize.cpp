@@ -12,7 +12,7 @@
 //===----------------------------------------------------------------------===//
 
 #include "dynamatic/Transforms/HandshakeMaterialize.h"
-#include "circt/Dialect/Handshake/HandshakeOps.h"
+#include "dynamatic/Dialect/Handshake/HandshakeOps.h"
 #include "dynamatic/Support/CFG.h"
 #include "dynamatic/Support/Handshake.h"
 #include "mlir/IR/BuiltinTypes.h"
@@ -24,7 +24,6 @@
 #include "llvm/Support/ErrorHandling.h"
 #include <iterator>
 
-using namespace circt;
 using namespace mlir;
 using namespace dynamatic;
 

@@ -9,14 +9,14 @@
 // Implements the --mark-memory-dependencies pass, which identifies all
 // dependences between all pairs of memory accesses in each function. All
 // information regarding the dependencies is stored in a
-// `circt::handshake::MemDependenceArrayAttr` attribute attached to each memory
-// operation that is the source of at least one dependency.
+// `dynamatic::handshake::MemDependenceArrayAttr` attribute attached to each
+// memory operation that is the source of at least one dependency.
 //
 //===----------------------------------------------------------------------===//
 
 #include "dynamatic/Transforms/MarkMemoryDependencies.h"
-#include "circt/Dialect/Handshake/HandshakeOps.h"
 #include "dynamatic/Analysis/NameAnalysis.h"
+#include "dynamatic/Dialect/Handshake/HandshakeOps.h"
 #include "mlir/Dialect/Affine/Analysis/AffineAnalysis.h"
 #include "mlir/Dialect/Affine/Analysis/AffineStructures.h"
 #include "mlir/Dialect/Affine/Analysis/Utils.h"
@@ -31,8 +31,7 @@
 using namespace mlir;
 using namespace mlir::affine;
 using namespace dynamatic;
-using namespace circt;
-using namespace circt::handshake;
+using namespace dynamatic::handshake;
 
 /// Maps values representing memory regions to load/store operations to it
 using MemAccesses = llvm::MapVector<Value, SmallVector<Operation *>>;

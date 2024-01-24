@@ -64,7 +64,7 @@ option(LLVM_BUILD_TOOLS "Build the LLVM tools. If OFF, just generate build targe
 # Dynamatic configuration 
 #-------------------------------------------------------------------------------
 
-option(DYNAMATIC_BUILD_VISUALIZER "Disable the vivado synthesis tests." OFF)
+option(DYNAMATIC_BUILD_VISUALIZER "Disable building the dataflow visualizer." OFF)
 
 # Define some variables for Dynamatic
 set(DYNAMATIC_SOURCE_DIR ${CMAKE_SOURCE_DIR})
@@ -102,6 +102,16 @@ endfunction()
 function(add_dynamatic_dialect_library name)
   set_property(GLOBAL APPEND PROPERTY DYNAMATIC_DIALECT_LIBS ${name})
   add_dynamatic_library(${ARGV} DEPENDS dynamatic-headers)
+endfunction()
+
+function(add_dynamatic_dialect dialect dialect_namespace)
+  add_mlir_dialect(${ARGV})
+  add_dependencies(dynamatic-headers MLIR${dialect}IncGen)
+endfunction()
+
+function(add_dynamatic_interface interface)
+  add_mlir_interface(${ARGV})
+  add_dependencies(dynamatic-headers MLIR${interface}IncGen)
 endfunction()
 
 #-------------------------------------------------------------------------------

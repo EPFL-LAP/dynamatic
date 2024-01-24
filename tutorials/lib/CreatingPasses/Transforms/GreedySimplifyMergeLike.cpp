@@ -13,12 +13,12 @@
 //===----------------------------------------------------------------------===//
 
 #include "tutorials/CreatingPasses/Transforms/GreedySimplifyMergeLike.h"
-#include "circt/Dialect/Handshake/HandshakeOps.h"
+#include "dynamatic/Dialect/Handshake/HandshakeOps.h"
 #include "mlir/IR/MLIRContext.h"
 #include "mlir/Transforms/GreedyPatternRewriteDriver.h"
 
 using namespace mlir;
-using namespace circt;
+using namespace dynamatic;
 
 namespace {
 

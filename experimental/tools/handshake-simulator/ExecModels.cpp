@@ -12,7 +12,7 @@
 //===----------------------------------------------------------------------===//
 
 #include "experimental/tools/handshake-simulator/ExecModels.h"
-#include "circt/Dialect/Handshake/HandshakeOps.h"
+#include "dynamatic/Dialect/Handshake/HandshakeOps.h"
 #include "mlir/Dialect/ControlFlow/IR/ControlFlowOps.h"
 #include "mlir/Dialect/MemRef/IR/MemRef.h"
 #include "mlir/IR/AsmState.h"
@@ -23,7 +23,6 @@
 #include <queue>
 
 using namespace mlir;
-using namespace circt;
 using namespace dynamatic;
 using namespace dynamatic::experimental;
 

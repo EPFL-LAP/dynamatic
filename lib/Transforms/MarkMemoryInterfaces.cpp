@@ -6,15 +6,15 @@
 //
 //===----------------------------------------------------------------------===//
 //
-// Mark all memory operations with a `circt::handshake::MemInterfaceAttr`,
+// Mark all memory operations with a `dynamatic::handshake::MemInterfaceAttr`,
 // denoting which kind of memory interface it should eventually connect to. Uses
 // results of the memory dependence analysis to make this determination.
 //
 //===----------------------------------------------------------------------===//
 
 #include "dynamatic/Transforms/MarkMemoryInterfaces.h"
-#include "circt/Dialect/Handshake/HandshakeOps.h"
 #include "dynamatic/Analysis/NameAnalysis.h"
+#include "dynamatic/Dialect/Handshake/HandshakeOps.h"
 #include "dynamatic/Support/Attribute.h"
 #include "mlir/Dialect/Affine/IR/AffineOps.h"
 #include "mlir/Dialect/Func/IR/FuncOps.h"
@@ -23,8 +23,8 @@
 #include "llvm/Support/ErrorHandling.h"
 
 using namespace mlir;
-using namespace circt::handshake;
 using namespace dynamatic;
+using namespace dynamatic::handshake;
 
 /// If the operartions is load/store-like, returns the memref value it
 /// references. Otherwise returns nullptr.
@@ -84,10 +84,10 @@ struct MarkMemoryInterfacesPass
 
 private:
   /// Annotates each memory operation in the IR with the
-  /// `circt::handshake::MemInterfaceAttr` attribute, denoting the kind of
+  /// `dynamatic::handshake::MemInterfaceAttr` attribute, denoting the kind of
   /// memory interface it should eventually connect to. The decision is based on
   /// identified memory dependencies between the memory accesses, represented
-  /// using potential `circt::handshake::MemDependenceArrayAttr` attributes
+  /// using potential `dynamatic::handshake::MemDependenceArrayAttr` attributes
   /// attached to memory operations.
   void markMemoryInterfaces(func::FuncOp funcOp);
 };

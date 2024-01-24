@@ -12,7 +12,7 @@
 //===----------------------------------------------------------------------===//
 
 #include "dynamatic/Transforms/HandshakePrepareForLegacy.h"
-#include "circt/Dialect/Handshake/HandshakeOps.h"
+#include "dynamatic/Dialect/Handshake/HandshakeOps.h"
 #include "dynamatic/Support/CFG.h"
 #include "dynamatic/Transforms/Passes.h"
 #include "mlir/Dialect/Arith/IR/Arith.h"
@@ -22,10 +22,9 @@
 #include "mlir/Transforms/GreedyPatternRewriteDriver.h"
 #include "llvm/ADT/SmallPtrSet.h"
 
-using namespace circt;
-using namespace circt::handshake;
 using namespace mlir;
 using namespace dynamatic;
+using namespace dynamatic::handshake;
 
 /// Creates a corresponding conditional branch for each unconditional branch.
 /// The data input of corresponding branches is the same. A constant true

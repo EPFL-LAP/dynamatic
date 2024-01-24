@@ -11,8 +11,8 @@
 //===----------------------------------------------------------------------===//
 
 #include "dynamatic/Transforms/BufferPlacement/BufferPlacementMILP.h"
-#include "circt/Dialect/Handshake/HandshakeDialect.h"
-#include "circt/Dialect/Handshake/HandshakeOps.h"
+#include "dynamatic/Dialect/Handshake/HandshakeDialect.h"
+#include "dynamatic/Dialect/Handshake/HandshakeOps.h"
 #include "dynamatic/Support/CFG.h"
 #include "dynamatic/Transforms/BufferPlacement/BufferingSupport.h"
 #include "mlir/Dialect/Arith/IR/Arith.h"
@@ -33,7 +33,6 @@
 #include "gurobi_c++.h"
 
 using namespace llvm::sys;
-using namespace circt;
 using namespace mlir;
 using namespace dynamatic;
 using namespace dynamatic::buffer;
