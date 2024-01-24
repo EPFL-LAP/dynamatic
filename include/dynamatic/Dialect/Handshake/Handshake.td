@@ -19,6 +19,7 @@
 #define DYNAMATIC_DIALECT_HANDSHAKE_HANDSHAKE_TD
 
 include "mlir/IR/OpBase.td"
+include "mlir/IR/AttrTypeBase.td"
 include "mlir/IR/PatternBase.td"
 include "mlir/IR/SymbolInterfaces.td"
 include "mlir/IR/RegionKindInterface.td"
@@ -44,7 +45,7 @@ def Handshake_Dialect : Dialect {
   let usePropertiesForAttributes = 0;
 }
 
-// Base class for Handshake dialect opserations.
+/// Base class for Handshake dialect operations.
 class Handshake_Op<string mnemonic, list<Trait> traits = []>
     : Op<Handshake_Dialect, mnemonic,
          traits #[HasParent<"handshake::FuncOp">,
@@ -52,6 +53,32 @@ class Handshake_Op<string mnemonic, list<Trait> traits = []>
          DeclareOpInterfaceMethods<ControlInterface>]> {
 }
 
+/// Base class for Handshake dialect types.
+class Handshake_Type<string name, string typeMnemonic, list<Trait> traits = []>
+    : TypeDef<Handshake_Dialect, name, traits> {
+  let mnemonic = typeMnemonic;
+}
+
+def ChannelType : Handshake_Type<"Channel", "channel"> {
+  let summary = "A dataflow channel with optional data.";
+  let description = [{
+    Represents a dataflow channel, which is made up of a 1-bit valid signal
+    going downstream, a 1-bit ready signal going upsteam, and an arbitrary and
+    optional data signal going downstream. 
+  }];
+
+  /// A channel is parameterized by the type of the data signal it carries. For
+  /// control-only channels, this would be i0.  
+  let parameters = (ins "::mlir::Type":$dataType);
+
+  let builders = [
+    TypeBuilderWithInferredContext<(ins "Type":$type), [{
+        return Base::get(type.getContext(), type);
+      }]>
+  ];
+
+  let assemblyFormat = "`<` $dataType `>`";
+}
 
 include "dynamatic/Dialect/Handshake/HandshakeOps.td"
 

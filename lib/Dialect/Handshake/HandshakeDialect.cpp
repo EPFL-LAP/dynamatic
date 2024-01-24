@@ -23,17 +23,20 @@
 #include "llvm/ADT/TypeSwitch.h"
 
 using namespace dynamatic;
-using namespace dynamatic::handshake;
 
 //===----------------------------------------------------------------------===//
 // Dialect specification.
 //===----------------------------------------------------------------------===//
 
-void HandshakeDialect::initialize() {
+void handshake::HandshakeDialect::initialize() {
   // Register operations.
   addOperations<
 #define GET_OP_LIST
 #include "dynamatic/Dialect/Handshake/Handshake.cpp.inc"
+      >();
+  addTypes<
+#define GET_TYPEDEF_LIST
+#include "dynamatic/Dialect/Handshake/HandshakeTypes.cpp.inc"
       >();
   addAttributes<
 #define GET_ATTRDEF_LIST
@@ -41,9 +44,12 @@ void HandshakeDialect::initialize() {
       >();
 }
 
-// Provide implementations for the enums, attributes and interfaces that we use.
-#define GET_ATTRDEF_CLASSES
-#include "dynamatic/Dialect/Handshake/HandshakeAttributes.cpp.inc"
+// Provide implementations for the attributes, enums, interfaces, and types that
+// we use
 #include "dynamatic/Dialect/Handshake/HandshakeDialect.cpp.inc"
 #include "dynamatic/Dialect/Handshake/HandshakeEnums.cpp.inc"
 #include "dynamatic/Dialect/Handshake/HandshakeInterfaces.cpp.inc"
+#define GET_ATTRDEF_CLASSES
+#include "dynamatic/Dialect/Handshake/HandshakeAttributes.cpp.inc"
+#define GET_TYPEDEF_CLASSES
+#include "dynamatic/Dialect/Handshake/HandshakeTypes.cpp.inc"

@@ -6,17 +6,16 @@
 //
 //===----------------------------------------------------------------------===//
 //
-// Experimental tool that exports VHDL from a netlist-level IR expressed in a
-// combination of the HW and ESI dialects. The result is produced on standart
-// llvm output.
+// Experimental tool that exports VHDL from a netlist-level IR expressed in the
+// HW dialect. The result is produced on standart llvm output.
 //
 //===----------------------------------------------------------------------===//
 
-#include "circt/Dialect/ESI/ESIDialect.h"
-#include "circt/Dialect/ESI/ESITypes.h"
 #include "circt/Dialect/HW/HWDialect.h"
 #include "circt/Dialect/HW/HWOpInterfaces.h"
 #include "circt/Dialect/HW/HWOps.h"
+#include "dynamatic/Dialect/Handshake/HandshakeDialect.h"
+#include "dynamatic/Dialect/Handshake/HandshakeOps.h"
 #include "mlir/IR/BuiltinOps.h"
 #include "mlir/IR/MLIRContext.h"
 #include "mlir/IR/Operation.h"
@@ -36,27 +35,25 @@
 #include "llvm/Support/SMLoc.h"
 #include "llvm/Support/SourceMgr.h"
 #include "llvm/Support/raw_ostream.h"
-
 #include <algorithm>
+#include <array>
 #include <cctype>
 #include <cstddef>
+#include <cstdio>
 #include <cstdlib>
 #include <fstream>
+#include <iostream>
 #include <iterator>
+#include <memory>
 #include <sstream>
 #include <stdio.h>
 #include <string>
 #include <system_error>
 #include <utility>
 
-#include <array>
-#include <cstdio>
-#include <iostream>
-#include <memory>
-
 using namespace llvm;
 using namespace mlir;
-using namespace circt;
+using namespace dynamatic;
 
 static cl::OptionCategory mainCategory("Application options");
 
@@ -146,9 +143,8 @@ static std::pair<std::string, size_t> extractType(mlir::Type &t) {
   if (t.isIntOrFloat()) {
     size_t type = t.getIntOrFloatBitWidth();
     p = std::pair(VALUE_STR, std::max(type, 1UL));
-  } else if (auto ch = t.dyn_cast<esi::ChannelType>())
-    // In case of !esi.channel<i...>
-    p = std::pair(CHANNEL_STR, ch.getInner().getIntOrFloatBitWidth());
+  } else if (auto ch = t.dyn_cast<handshake::ChannelType>())
+    p = std::pair(CHANNEL_STR, ch.getDataType().getIntOrFloatBitWidth());
   else
     llvm_unreachable("Unsupported type");
 
@@ -950,7 +946,8 @@ static VHDLComponentLibrary parseJSON() {
 static VHDLModuleLibrary parseExternOps(mlir::ModuleOp modOp,
                                         VHDLComponentLibrary &m) {
   VHDLModuleLibrary modLib;
-  for (hw::HWModuleExternOp modOp : modOp.getOps<hw::HWModuleExternOp>()) {
+  for (circt::hw::HWModuleExternOp modOp :
+       modOp.getOps<circt::hw::HWModuleExternOp>()) {
     StringRef extName = modOp.getName();
     VHDLModule i = getMod(extName, m);
     modLib.insert(std::pair(extName, i));
@@ -962,8 +959,9 @@ static VHDLInstanceLibrary
 parseInstanceOps(mlir::OwningOpRef<mlir::ModuleOp> &module,
                  VHDLModuleLibrary &modLib) {
   VHDLInstanceLibrary instLib;
-  for (hw::HWModuleOp modOp : module->getOps<hw::HWModuleOp>()) {
-    for (hw::InstanceOp innerOp : modOp.getOps<hw::InstanceOp>()) {
+  for (circt::hw::HWModuleOp modOp : module->getOps<circt::hw::HWModuleOp>()) {
+    for (circt::hw::InstanceOp innerOp :
+         modOp.getOps<circt::hw::InstanceOp>()) {
       StringRef extName = innerOp.getReferencedModuleName();
       StringRef name = innerOp.getInstanceName();
       instLib.insert({innerOp, getInstance(extName, name, modLib, innerOp)});
@@ -974,7 +972,7 @@ parseInstanceOps(mlir::OwningOpRef<mlir::ModuleOp> &module,
 
 /// Function that processes ports for parseModule function
 static void parseModulePorts(llvm::SmallVector<circt::hw::PortInfo> &ports,
-                             hw::HWModuleOp &hwModOp,
+                             circt::hw::HWModuleOp &hwModOp,
                              llvm::SmallVector<VHDLInstParameter> &instPorts) {
   for (auto i : ports) {
     mlir::Type t = i.type;
@@ -997,7 +995,7 @@ static void parseModulePorts(llvm::SmallVector<circt::hw::PortInfo> &ports,
 }
 
 /// Get the description of the head instance, "hw.module"
-static VHDLInstance parseModule(hw::HWModuleOp &hwModOp) {
+static VHDLInstance parseModule(circt::hw::HWModuleOp &hwModOp) {
   std::string iName;
   llvm::SmallVector<VHDLInstParameter> ins, outs;
   SmallVector<circt::hw::PortInfo> inputs, outputs;
@@ -1015,7 +1013,7 @@ static VHDLInstance parseModule(hw::HWModuleOp &hwModOp) {
 
 /// Get the description of the output instance, "hw.output".
 /// Names are obtained from hw.module
-static VHDLInstance parseOut(hw::HWModuleOp &hwModOp) {
+static VHDLInstance parseOut(circt::hw::HWModuleOp &hwModOp) {
   std::string iName;
   llvm::SmallVector<VHDLInstParameter> tInputs, tOutputs;
   SmallVector<circt::hw::PortInfo> outputs;
@@ -1283,7 +1281,7 @@ int main(int argc, char **argv) {
   // high(er) level dialects or parsers. Allow unregistered dialects to
   // not fail in these cases
   MLIRContext context;
-  context.loadDialect<circt::hw::HWDialect, circt::esi::ESIDialect>();
+  context.loadDialect<circt::hw::HWDialect, handshake::HandshakeDialect>();
   context.allowUnregisteredDialects();
 
   // Load the MLIR module in memory
@@ -1296,13 +1294,13 @@ int main(int argc, char **argv) {
   mlir::ModuleOp modOp = *module;
 
   // We only support one HW module per MLIR module
-  auto ops = modOp.getOps<hw::HWModuleOp>();
+  auto ops = modOp.getOps<circt::hw::HWModuleOp>();
   if (std::distance(ops.begin(), ops.end()) != 1) {
     llvm::errs() << "The tool only supports a single top-level module in the "
                     "netlist.\n";
     return 1;
   }
-  hw::HWModuleOp hwModOp = *ops.begin();
+  circt::hw::HWModuleOp hwModOp = *ops.begin();
   std::string hwModName = hwModOp.getName().str();
 
   // Get all necessary structures
@@ -1332,7 +1330,7 @@ int main(int argc, char **argv) {
   llvm::outs() << "\nbegin\n\n";
   VHDLInstance outInstance = parseOut(hwModOp);
   Operation *outOp =
-      cast<hw::OutputOp>(hwModOp.getBodyBlock()->getTerminator());
+      cast<circt::hw::OutputOp>(hwModOp.getBodyBlock()->getTerminator());
   getWiring(instanceLib, outOp, outInstance);
   llvm::outs() << "\n";
   getModulesInstantiation(instanceLib);

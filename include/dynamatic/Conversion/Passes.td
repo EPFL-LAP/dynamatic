@@ -71,12 +71,11 @@ def CfToHandshake : DynamaticPass<"lower-cf-to-handshake"> {
 //===----------------------------------------------------------------------===//
 
 def HandshakeToNetlist : DynamaticPass< "lower-handshake-to-netlist",
-                                        [ "circt::hw::HWDialect",  
-                                          "circt::esi::ESIDialect" ]> {
-  let summary = "Lower Handshake to ESI/HW (netlist)";
+                                        [ "circt::hw::HWDialect" ]> {
+  let summary = "Lower Handshake to HW (netlist)";
   let description = [{
     Lower Handshake IR into a "netlist-level" representation made up of HW
-    instances of external modules interconnected by ESI channels.
+    instances of external modules interconnected by dataflow channels.
   }];
   let constructor = "dynamatic::createHandshakeToNetlistPass()";
 }

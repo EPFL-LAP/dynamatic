@@ -14,7 +14,6 @@
 #ifndef DYNAMATIC_INITALLPASSES_H
 #define DYNAMATIC_INITALLPASSES_H
 
-#include "circt/Dialect/ESI/ESIPasses.h"
 #include "dynamatic/Conversion/Passes.h"
 #include "dynamatic/Transforms/Passes.h"
 
@@ -24,9 +23,6 @@ inline void registerAllPasses() {
   // Passes defined in Dynamatic
   registerConversionPasses();
   dynamatic::registerPasses();
-
-  // Passes defined in CIRCT
-  circt::esi::registerPasses();
 }
 
 } // namespace dynamatic

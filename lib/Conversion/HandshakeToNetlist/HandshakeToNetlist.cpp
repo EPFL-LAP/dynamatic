@@ -1,4 +1,4 @@
-//===- HandshakeToNetlist.cpp - Converts handshake to HW/ESI ----*- C++ -*-===//
+//===- HandshakeToNetlist.cpp - Converts handshake to HW --------*- C++ -*-===//
 //
 // Dynamatic is under the Apache License v2.0 with LLVM Exceptions.
 // See https://llvm.org/LICENSE.txt for license information.
@@ -96,77 +96,31 @@ private:
 };
 } // namespace
 
-// NOLINTNEXTLINE(misc-no-recursion)
-static Type tupleToStruct(TupleType tuple) {
-  MLIRContext *ctx = tuple.getContext();
-  mlir::SmallVector<circt::hw::StructType::FieldInfo, 8> hwfields;
-  for (auto [i, innerType] : llvm::enumerate(tuple)) {
-    Type convertedInnerType = innerType;
-    if (auto tupleInnerType = innerType.dyn_cast<TupleType>())
-      convertedInnerType = tupleToStruct(tupleInnerType);
-    hwfields.push_back({StringAttr::get(ctx, "field" + std::to_string(i)),
-                        convertedInnerType});
-  }
-
-  return circt::hw::StructType::get(ctx, hwfields);
-}
-
-/// Converts 't' into a valid HW type. This is strictly used for
-/// converting 'index' types into a fixed-width type.
-Type toValidType(Type t) {
-  return TypeSwitch<Type, Type>(t)
-      .Case<IndexType>(
-          [&](IndexType it) { return IntegerType::get(it.getContext(), 64); })
-      .Case<TupleType>([&](TupleType tt) {
-        llvm::SmallVector<Type> types;
-        for (auto innerType : tt)
-          types.push_back(toValidType(innerType));
-        return tupleToStruct(
-            mlir::TupleType::get(types[0].getContext(), types));
-      })
-      .Case<circt::hw::StructType>([&](auto st) {
-        llvm::SmallVector<circt::hw::StructType::FieldInfo> structFields(
-            st.getElements());
-        for (auto &field : structFields)
-          field.type = toValidType(field.type);
-        return circt::hw::StructType::get(st.getContext(), structFields);
-      })
-      .Case<NoneType>(
-          [&](NoneType nt) { return IntegerType::get(nt.getContext(), 0); })
-      .Default([&](Type t) { return t; });
-}
-
-/// Wraps a type into an ESI ChannelType type. The inner type is
-/// converted to ensure comprehensability by the RTL dialects.
-circt::esi::ChannelType esiWrapper(Type t) {
-  return TypeSwitch<Type, circt::esi::ChannelType>(t)
-      .Case<circt::esi::ChannelType>([](auto t) { return t; })
-      .Case<TupleType>(
-          [&](TupleType tt) { return esiWrapper(tupleToStruct(tt)); })
+/// Wraps a type into a handshake::ChannelType type.
+static handshake::ChannelType channelWrapper(Type t) {
+  return TypeSwitch<Type, handshake::ChannelType>(t)
+      .Case<handshake::ChannelType>([](auto t) { return t; })
       .Case<NoneType>([](NoneType nt) {
-        // todo: change when handshake switches to i0
-        return esiWrapper(IntegerType::get(nt.getContext(), 0));
+        return handshake::ChannelType::get(
+            IntegerType::get(nt.getContext(), 0));
       })
-      .Default([](auto t) {
-        return circt::esi::ChannelType::get(t.getContext(), toValidType(t));
-      });
+      .Default([](Type t) { return handshake::ChannelType::get(t); });
 }
 
-circt::hw::ModulePortInfo getPortInfoForOpTypes(Operation *op, TypeRange inputs,
-                                                TypeRange outputs) {
+static circt::hw::ModulePortInfo
+getPortInfoForOpTypes(Operation *op, TypeRange inputs, TypeRange outputs) {
   SmallVector<circt::hw::PortInfo> pinputs, poutputs;
 
   HandshakePortNameGenerator portNames(op);
   auto *ctx = op->getContext();
 
   Type i1Type = IntegerType::get(ctx, 1);
-  Type clkType = circt::seq::ClockType::get(ctx);
 
   // Add all inputs of funcOp.
   unsigned inIdx = 0;
   for (auto arg : llvm::enumerate(inputs)) {
     pinputs.push_back(
-        {{portNames.inputName(arg.index()), esiWrapper(arg.value()),
+        {{portNames.inputName(arg.index()), channelWrapper(arg.value()),
           circt::hw::ModulePort::Direction::Input},
          arg.index(),
          {}});
@@ -176,7 +130,7 @@ circt::hw::ModulePortInfo getPortInfoForOpTypes(Operation *op, TypeRange inputs,
   // Add all outputs of funcOp.
   for (auto res : llvm::enumerate(outputs)) {
     poutputs.push_back(
-        {{portNames.outputName(res.index()), esiWrapper(res.value()),
+        {{portNames.outputName(res.index()), channelWrapper(res.value()),
           circt::hw::ModulePort::Direction::Output},
          res.index(),
          {}});
@@ -184,7 +138,7 @@ circt::hw::ModulePortInfo getPortInfoForOpTypes(Operation *op, TypeRange inputs,
 
   // Add clock and reset signals.
   if (op->hasTrait<mlir::OpTrait::HasClock>()) {
-    pinputs.push_back({{StringAttr::get(ctx, "clock"), clkType,
+    pinputs.push_back({{StringAttr::get(ctx, "clock"), i1Type,
                         circt::hw::ModulePort::Direction::Input},
                        inIdx++,
                        {}});
@@ -341,13 +295,13 @@ static std::string getBareExtModuleName(Operation *oldOp) {
   return extModuleName;
 }
 
-/// Extracts the data-carrying type of a value. If the value is an ESI
+/// Extracts the data-carrying type of a value. If the value is a dataflow
 /// channel, extracts the data-carrying type, else assumes that the value's type
 /// itself is the data-carrying type.
 static Type getOperandDataType(Value val) {
   auto valType = val.getType();
-  if (auto channelType = valType.dyn_cast<circt::esi::ChannelType>())
-    return channelType.getInner();
+  if (auto channelType = valType.dyn_cast<handshake::ChannelType>())
+    return channelType.getDataType();
   return valType;
 }
 
@@ -616,7 +570,7 @@ static FuncModulePortInfo getFuncPortInfo(handshake::FuncOp funcOp) {
   // Add all outputs of function
   TypeRange outputs = funcOp.getResultTypes();
   for (auto [idx, res] : llvm::enumerate(outputs)) {
-    info.module.addOutput(funcOp.getResName(idx).strref(), esiWrapper(res));
+    info.module.addOutput(funcOp.getResName(idx).strref(), channelWrapper(res));
   }
   // Add all inputs of function, replacing memrefs with appropriate ports
   for (auto [idx, arg] : llvm::enumerate(funcOp.getArguments())) {
@@ -625,7 +579,7 @@ static FuncModulePortInfo getFuncPortInfo(handshake::FuncOp funcOp) {
                     funcOp.getArgName(idx).str(), ctx);
     } else {
       info.module.addInput(funcOp.getArgName(idx).strref(),
-                           esiWrapper(arg.getType()));
+                           channelWrapper(arg.getType()));
     }
   }
 
@@ -655,11 +609,12 @@ static ModulePortInfo getMemPortInfo(handshake::MemoryControllerOp memOp,
 
   // Add input ports corresponding to memory interface operands
   for (auto [idx, arg] : llvm::enumerate(memOp.getMemInputs()))
-    module.addInput(memOp.getOperandName(idx + 1), esiWrapper(arg.getType()));
+    module.addInput(memOp.getOperandName(idx + 1),
+                    channelWrapper(arg.getType()));
 
   // Add output ports corresponding to memory interface operands
   for (auto [idx, arg] : llvm::enumerate(memOp.getResults()))
-    module.addOutput(memOp.getResultName(idx), esiWrapper(arg.getType()));
+    module.addOutput(memOp.getResultName(idx), channelWrapper(arg.getType()));
 
   // Add output ports going outside the containing module
   for (size_t i = outFuncPortIdx,
@@ -685,13 +640,14 @@ static ModulePortInfo getEndPortInfo(handshake::EndOp endOp,
 
   // Add input ports corresponding to end operands
   for (auto [idx, arg] : llvm::enumerate(endOp.getOperands()))
-    module.addInput("in" + std::to_string(idx), esiWrapper(arg.getType()));
+    module.addInput("in" + std::to_string(idx), channelWrapper(arg.getType()));
 
   // Add output ports corresponding to function return values
   auto numReturnValues = module.outputs.size() - info.getNumMemOutputs();
   auto returnValOperands = endOp.getOperands().take_front(numReturnValues);
   for (auto [idx, arg] : llvm::enumerate(returnValOperands))
-    module.addOutput("out" + std::to_string(idx), esiWrapper(arg.getType()));
+    module.addOutput("out" + std::to_string(idx),
+                     channelWrapper(arg.getType()));
 
   module.addClkAndRstPorts();
   return module.build();
@@ -703,11 +659,12 @@ static ModulePortInfo getEndPortInfo(handshake::EndOp endOp,
 namespace {
 
 /// A type converter is needed to perform the in-flight materialization of
-/// "raw" (non-ESI channel) types to their ESI channel correspondents.
-class ESITypeConverter : public TypeConverter {
+/// "raw" (implicit channels) types to their explicit dataflow channel
+/// correspondents.
+class ChannelTypeConverter : public TypeConverter {
 public:
-  ESITypeConverter() {
-    addConversion([](Type type) -> Type { return esiWrapper(type); });
+  ChannelTypeConverter() {
+    addConversion([](Type type) -> Type { return channelWrapper(type); });
 
     addTargetMaterialization(
         [&](mlir::OpBuilder &builder, mlir::Type resultType,
@@ -793,7 +750,7 @@ private:
   HandshakeLoweringState &ls;
 
   /// Inserts a "start module" that acts as a buffer for all module inputs
-  /// that are of type circt::esi::ChannelType. This is done to match legacy
+  /// that are of type handshake::ChannelType. This is done to match legacy
   /// Dynamatic's implementation of circuits.
   void bufferInputs(HWModuleOp mod, ConversionPatternRewriter &rewriter) const;
 
@@ -822,13 +779,13 @@ private:
 /// equivalent hardware instance. The method creates an external module to
 /// instantiate the new component from if a module with matching IO one does
 /// not already exist. Valid/Ready semantics are made explicit thanks to the
-/// type converter which converts implicit handshaked types into ESI channels
-/// with a corresponding data-type.
+/// type converter which converts implicit handshaked types into dataflow
+/// channels with a corresponding data-type.
 template <typename T>
 class ExtModuleConversionPattern : public OpConversionPattern<T> {
 public:
-  ExtModuleConversionPattern(ESITypeConverter &typeConverter, MLIRContext *ctx,
-                             HandshakeLoweringState &ls)
+  ExtModuleConversionPattern(ChannelTypeConverter &typeConverter,
+                             MLIRContext *ctx, HandshakeLoweringState &ls)
       : OpConversionPattern<T>::OpConversionPattern(typeConverter, ctx),
         ls(ls) {}
   using OpAdaptor = typename T::Adaptor;
@@ -873,7 +830,7 @@ void FuncOpConversionPattern::bufferInputs(
 
   for (Value arg : mod->getOperands()) {
     auto argType = arg.getType();
-    if (!isa<circt::esi::ChannelType>(argType))
+    if (!isa<handshake::ChannelType>(argType))
       continue;
 
     ModuleBuilder module(mod.getContext());
@@ -888,8 +845,8 @@ void FuncOpConversionPattern::bufferInputs(
     // Check whether we need to create a new external module
     auto argLoc = arg.getLoc();
     std::string modName = "handshake_start_node";
-    if (auto channelType = argType.dyn_cast<circt::esi::ChannelType>())
-      modName += "." + getTypeName(channelType.getInner(), argLoc);
+    if (auto channelType = argType.dyn_cast<handshake::ChannelType>())
+      modName += "." + getTypeName(channelType.getDataType(), argLoc);
 
     circt::hw::HWModuleLike extModule = getModule(ls, modName, module, argLoc);
 
@@ -1077,7 +1034,7 @@ struct UnpackBufferSlots : public OpRewritePattern<handshake::BufferOp> {
 /// containing a single handshake function (handshake::FuncOp) at the moment.
 /// The function and all the operations it contains are converted to
 /// operations from the HW dialect. Dataflow semantics are made explicit with
-/// ESI channels.
+/// Handshake channels.
 class HandshakeToNetListPass
     : public dynamatic::impl::HandshakeToNetlistBase<HandshakeToNetListPass> {
 public:
@@ -1125,7 +1082,7 @@ public:
     HandshakeLoweringState ls(mod, instanceUniquer);
 
     // Create pattern set
-    ESITypeConverter typeConverter;
+    ChannelTypeConverter typeConverter;
     RewritePatternSet patterns(&ctx);
     ConversionTarget target(ctx);
     patterns.insert<FuncOpConversionPattern>(&ctx, ls);
