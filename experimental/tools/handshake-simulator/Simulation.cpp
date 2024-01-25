@@ -12,7 +12,6 @@
 //===----------------------------------------------------------------------===//
 
 #include "experimental/tools/handshake-simulator/Simulation.h"
-#include "circt/Support/JSON.h"
 #include "dynamatic/Dialect/Handshake/HandshakeOps.h"
 #include "experimental/tools/handshake-simulator/ExecModels.h"
 #include "mlir/Dialect/Arith/IR/Arith.h"
@@ -26,6 +25,7 @@
 #include "llvm/ADT/TypeSwitch.h"
 #include "llvm/Support/Debug.h"
 #include "llvm/Support/ErrorHandling.h"
+#include "llvm/Support/JSON.h"
 
 #include <list>
 
@@ -34,7 +34,6 @@
 
 using namespace llvm;
 using namespace mlir;
-using namespace circt;
 
 namespace dynamatic {
 namespace experimental {

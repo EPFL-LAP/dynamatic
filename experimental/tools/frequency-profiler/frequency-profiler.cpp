@@ -6,12 +6,11 @@
 //
 //===----------------------------------------------------------------------===//
 //
-// Tool inherited from CIRCT which executes a restricted form of the standard
-// dialect and profile the IR by counting the number of transitions between
-// basic blocks for a provided set of inputs. The tool prints transition
-// frequencies between basic blocks on standard output, either in a CSV (for
-// Dynamatic buffer placement) or DOT (for legacy Dynamatic buffer placement)
-// format.
+// Tool which executes a restricted form of the standard dialect and profile the
+// IR by counting the number of transitions between basic blocks for a provided
+// set of inputs. The tool prints transition frequencies between basic blocks on
+// standard output, either in a CSV (for Dynamatic buffer placement) or DOT (for
+// legacy Dynamatic buffer placement) format.
 //
 //===----------------------------------------------------------------------===//
 

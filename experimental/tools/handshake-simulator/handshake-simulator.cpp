@@ -6,13 +6,10 @@
 //
 //===----------------------------------------------------------------------===//
 //
-// Tool inherited from CIRCT which executes a restricted form of Handshake-level
-// IR.
+// Tool which executes a restricted form of Handshake-level IR.
 //
 //===----------------------------------------------------------------------===//
 
-#include "circt/Support/JSON.h"
-#include "circt/Support/Version.h"
 #include "dynamatic/Dialect/Handshake/HandshakeOps.h"
 #include "experimental/tools/handshake-simulator/Simulation.h"
 #include "mlir/Dialect/Func/IR/FuncOps.h"
@@ -23,6 +20,7 @@
 #include "mlir/Parser/Parser.h"
 #include "llvm/ADT/StringMap.h"
 #include "llvm/Support/InitLLVM.h"
+#include "llvm/Support/JSON.h"
 #include "llvm/Support/SourceMgr.h"
 
 #include <fstream>

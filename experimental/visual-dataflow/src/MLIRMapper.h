@@ -20,7 +20,6 @@
 #include "dynamatic/Support/TimingModels.h"
 
 using namespace mlir;
-using namespace circt;
 
 namespace dynamatic {
 namespace experimental {

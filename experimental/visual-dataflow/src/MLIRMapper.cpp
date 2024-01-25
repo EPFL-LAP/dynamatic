@@ -15,7 +15,6 @@
 #include "GraphEdge.h"
 #include "GraphNode.h"
 #include "dynamatic/Dialect/Handshake/HandshakeOps.h"
-#include "dynamatic/Dialect/Handshake/HandshakePasses.h"
 #include "dynamatic/Transforms/HandshakeConcretizeIndexType.h"
 #include "mlir/Dialect/Arith/IR/Arith.h"
 #include "mlir/IR/BuiltinTypes.h"
@@ -27,8 +26,6 @@
 #include <string>
 #include <vector>
 
-using namespace circt;
-using namespace circt::handshake;
 using namespace mlir;
 using namespace dynamatic;
 using namespace dynamatic::experimental::visual_dataflow;
