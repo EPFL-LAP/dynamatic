@@ -13,7 +13,7 @@
 #ifndef DYNAMATIC_CONVERSION_HANDSHAKETONETLIST_H
 #define DYNAMATIC_CONVERSION_HANDSHAKETONETLIST_H
 
-#include "circt/Dialect/HW/HWOps.h"
+#include "dynamatic/Dialect/HW/HWOps.h"
 #include "dynamatic/Support/DynamaticPass.h"
 #include "dynamatic/Support/LLVM.h"
 #include "mlir/IR/DialectRegistry.h"

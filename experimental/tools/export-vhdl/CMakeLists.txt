@@ -7,6 +7,5 @@ target_link_libraries(exp-export-vhdl PRIVATE
   MLIRSupport
   MLIRArithDialect
   DynamaticHandshake
-  CIRCTHW
-  CIRCTESI
+  DynamaticHW
 )

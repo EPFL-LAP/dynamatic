@@ -6,7 +6,7 @@ add_dynamatic_library(DynamaticHandshakeToNetlist
 
   LINK_LIBS PUBLIC
   DynamaticHandshake
-  CIRCTHW
+  DynamaticHW
   MLIRIR
   MLIRPass
   MLIRArithDialect

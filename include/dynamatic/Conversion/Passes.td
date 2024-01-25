@@ -71,7 +71,7 @@ def CfToHandshake : DynamaticPass<"lower-cf-to-handshake"> {
 //===----------------------------------------------------------------------===//
 
 def HandshakeToNetlist : DynamaticPass< "lower-handshake-to-netlist",
-                                        [ "circt::hw::HWDialect" ]> {
+                                        [ "dynamatic::hw::HWDialect" ]> {
   let summary = "Lower Handshake to HW (netlist)";
   let description = [{
     Lower Handshake IR into a "netlist-level" representation made up of HW

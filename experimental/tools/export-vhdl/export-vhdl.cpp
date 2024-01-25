@@ -11,9 +11,9 @@
 //
 //===----------------------------------------------------------------------===//
 
-#include "circt/Dialect/HW/HWDialect.h"
-#include "circt/Dialect/HW/HWOpInterfaces.h"
-#include "circt/Dialect/HW/HWOps.h"
+#include "dynamatic/Dialect/HW/HWDialect.h"
+#include "dynamatic/Dialect/HW/HWOpInterfaces.h"
+#include "dynamatic/Dialect/HW/HWOps.h"
 #include "dynamatic/Dialect/Handshake/HandshakeDialect.h"
 #include "dynamatic/Dialect/Handshake/HandshakeOps.h"
 #include "mlir/IR/BuiltinOps.h"
@@ -355,8 +355,7 @@ struct VHDLModule {
   /// Function that instantiates a module component, that is gets an instance
   /// with an exact number. It uses innerOp operation, obtained from processing
   /// the input IR, to get all required information.
-  VHDLInstance instantiate(std::string instName,
-                           circt::hw::InstanceOp &innerOp);
+  VHDLInstance instantiate(std::string instName, hw::InstanceOp &innerOp);
 };
 
 /// VHDL instance, that is VHDLModule + inner module operations from
@@ -661,7 +660,7 @@ getPortsInstantiation(std::string &instText, std::string &instName,
 }
 
 VHDLInstance VHDLModule::instantiate(std::string instName,
-                                     circt::hw::InstanceOp &innerOp) {
+                                     hw::InstanceOp &innerOp) {
   // Shorten the name
   instName = instName.substr(instName.find('_') + 1);
   // Counter for innerOp argumentss or results array
@@ -748,7 +747,7 @@ static VHDLModule getMod(StringRef extName, VHDLComponentLibrary &jsonLib) {
 /// Get an instance
 static VHDLInstance getInstance(StringRef extName, StringRef name,
                                 VHDLModuleLibrary &modLib,
-                                circt::hw::InstanceOp innerOp) {
+                                hw::InstanceOp innerOp) {
   // find external module in VHDLModuleLibrary
   StringMapIterator<VHDLModule> comp = modLib.find(extName);
   if (comp == modLib.end()) {
@@ -946,8 +945,7 @@ static VHDLComponentLibrary parseJSON() {
 static VHDLModuleLibrary parseExternOps(mlir::ModuleOp modOp,
                                         VHDLComponentLibrary &m) {
   VHDLModuleLibrary modLib;
-  for (circt::hw::HWModuleExternOp modOp :
-       modOp.getOps<circt::hw::HWModuleExternOp>()) {
+  for (hw::HWModuleExternOp modOp : modOp.getOps<hw::HWModuleExternOp>()) {
     StringRef extName = modOp.getName();
     VHDLModule i = getMod(extName, m);
     modLib.insert(std::pair(extName, i));
@@ -959,9 +957,8 @@ static VHDLInstanceLibrary
 parseInstanceOps(mlir::OwningOpRef<mlir::ModuleOp> &module,
                  VHDLModuleLibrary &modLib) {
   VHDLInstanceLibrary instLib;
-  for (circt::hw::HWModuleOp modOp : module->getOps<circt::hw::HWModuleOp>()) {
-    for (circt::hw::InstanceOp innerOp :
-         modOp.getOps<circt::hw::InstanceOp>()) {
+  for (hw::HWModuleOp modOp : module->getOps<hw::HWModuleOp>()) {
+    for (hw::InstanceOp innerOp : modOp.getOps<hw::InstanceOp>()) {
       StringRef extName = innerOp.getReferencedModuleName();
       StringRef name = innerOp.getInstanceName();
       instLib.insert({innerOp, getInstance(extName, name, modLib, innerOp)});
@@ -971,8 +968,8 @@ parseInstanceOps(mlir::OwningOpRef<mlir::ModuleOp> &module,
 }
 
 /// Function that processes ports for parseModule function
-static void parseModulePorts(llvm::SmallVector<circt::hw::PortInfo> &ports,
-                             circt::hw::HWModuleOp &hwModOp,
+static void parseModulePorts(llvm::SmallVector<hw::PortInfo> &ports,
+                             hw::HWModuleOp &hwModOp,
                              llvm::SmallVector<VHDLInstParameter> &instPorts) {
   for (auto i : ports) {
     mlir::Type t = i.type;
@@ -995,11 +992,11 @@ static void parseModulePorts(llvm::SmallVector<circt::hw::PortInfo> &ports,
 }
 
 /// Get the description of the head instance, "hw.module"
-static VHDLInstance parseModule(circt::hw::HWModuleOp &hwModOp) {
+static VHDLInstance parseModule(hw::HWModuleOp &hwModOp) {
   std::string iName;
   llvm::SmallVector<VHDLInstParameter> ins, outs;
-  SmallVector<circt::hw::PortInfo> inputs, outputs;
-  for (circt::hw::PortInfo port : hwModOp.getPortList()) {
+  SmallVector<hw::PortInfo> inputs, outputs;
+  for (hw::PortInfo port : hwModOp.getPortList()) {
     if (port.isInput())
       inputs.push_back(port);
     else
@@ -1013,11 +1010,11 @@ static VHDLInstance parseModule(circt::hw::HWModuleOp &hwModOp) {
 
 /// Get the description of the output instance, "hw.output".
 /// Names are obtained from hw.module
-static VHDLInstance parseOut(circt::hw::HWModuleOp &hwModOp) {
+static VHDLInstance parseOut(hw::HWModuleOp &hwModOp) {
   std::string iName;
   llvm::SmallVector<VHDLInstParameter> tInputs, tOutputs;
-  SmallVector<circt::hw::PortInfo> outputs;
-  for (circt::hw::PortInfo port : hwModOp.getPortList()) {
+  SmallVector<hw::PortInfo> outputs;
+  for (hw::PortInfo port : hwModOp.getPortList()) {
     if (port.isOutput())
       outputs.push_back(port);
   }
@@ -1281,7 +1278,7 @@ int main(int argc, char **argv) {
   // high(er) level dialects or parsers. Allow unregistered dialects to
   // not fail in these cases
   MLIRContext context;
-  context.loadDialect<circt::hw::HWDialect, handshake::HandshakeDialect>();
+  context.loadDialect<hw::HWDialect, handshake::HandshakeDialect>();
   context.allowUnregisteredDialects();
 
   // Load the MLIR module in memory
@@ -1294,13 +1291,13 @@ int main(int argc, char **argv) {
   mlir::ModuleOp modOp = *module;
 
   // We only support one HW module per MLIR module
-  auto ops = modOp.getOps<circt::hw::HWModuleOp>();
+  auto ops = modOp.getOps<hw::HWModuleOp>();
   if (std::distance(ops.begin(), ops.end()) != 1) {
     llvm::errs() << "The tool only supports a single top-level module in the "
                     "netlist.\n";
     return 1;
   }
-  circt::hw::HWModuleOp hwModOp = *ops.begin();
+  hw::HWModuleOp hwModOp = *ops.begin();
   std::string hwModName = hwModOp.getName().str();
 
   // Get all necessary structures
@@ -1330,7 +1327,7 @@ int main(int argc, char **argv) {
   llvm::outs() << "\nbegin\n\n";
   VHDLInstance outInstance = parseOut(hwModOp);
   Operation *outOp =
-      cast<circt::hw::OutputOp>(hwModOp.getBodyBlock()->getTerminator());
+      cast<hw::OutputOp>(hwModOp.getBodyBlock()->getTerminator());
   getWiring(instanceLib, outOp, outInstance);
   llvm::outs() << "\n";
   getModulesInstantiation(instanceLib);

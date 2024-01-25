@@ -11,10 +11,8 @@
 //===----------------------------------------------------------------------===//
 
 #include "dynamatic/Conversion/HandshakeToNetlist.h"
-#include "circt/Conversion/HandshakeToHW.h"
-#include "circt/Dialect/HW/HWOpInterfaces.h"
-#include "circt/Dialect/HW/HWTypes.h"
-#include "circt/Dialect/HW/PortImplementation.h"
+#include "dynamatic/Dialect/HW/HWTypes.h"
+#include "dynamatic/Dialect/HW/PortImplementation.h"
 #include "dynamatic/Dialect/Handshake/HandshakeDialect.h"
 #include "dynamatic/Dialect/Handshake/HandshakeOps.h"
 #include "dynamatic/Transforms/HandshakeConcretizeIndexType.h"
@@ -26,9 +24,9 @@
 #include "mlir/Support/LogicalResult.h"
 #include "mlir/Transforms/DialectConversion.h"
 #include "mlir/Transforms/GreedyPatternRewriteDriver.h"
+#include "llvm/ADT/TypeSwitch.h"
 
 using namespace mlir;
-using namespace circt::hw;
 using namespace dynamatic;
 
 //===----------------------------------------------------------------------===//
@@ -107,9 +105,9 @@ static handshake::ChannelType channelWrapper(Type t) {
       .Default([](Type t) { return handshake::ChannelType::get(t); });
 }
 
-static circt::hw::ModulePortInfo
-getPortInfoForOpTypes(Operation *op, TypeRange inputs, TypeRange outputs) {
-  SmallVector<circt::hw::PortInfo> pinputs, poutputs;
+static hw::ModulePortInfo getPortInfoForOpTypes(Operation *op, TypeRange inputs,
+                                                TypeRange outputs) {
+  SmallVector<hw::PortInfo> pinputs, poutputs;
 
   HandshakePortNameGenerator portNames(op);
   auto *ctx = op->getContext();
@@ -121,7 +119,7 @@ getPortInfoForOpTypes(Operation *op, TypeRange inputs, TypeRange outputs) {
   for (auto arg : llvm::enumerate(inputs)) {
     pinputs.push_back(
         {{portNames.inputName(arg.index()), channelWrapper(arg.value()),
-          circt::hw::ModulePort::Direction::Input},
+          hw::ModulePort::Direction::Input},
          arg.index(),
          {}});
     inIdx++;
@@ -131,7 +129,7 @@ getPortInfoForOpTypes(Operation *op, TypeRange inputs, TypeRange outputs) {
   for (auto res : llvm::enumerate(outputs)) {
     poutputs.push_back(
         {{portNames.outputName(res.index()), channelWrapper(res.value()),
-          circt::hw::ModulePort::Direction::Output},
+          hw::ModulePort::Direction::Output},
          res.index(),
          {}});
   }
@@ -139,16 +137,16 @@ getPortInfoForOpTypes(Operation *op, TypeRange inputs, TypeRange outputs) {
   // Add clock and reset signals.
   if (op->hasTrait<mlir::OpTrait::HasClock>()) {
     pinputs.push_back({{StringAttr::get(ctx, "clock"), i1Type,
-                        circt::hw::ModulePort::Direction::Input},
+                        hw::ModulePort::Direction::Input},
                        inIdx++,
                        {}});
     pinputs.push_back({{StringAttr::get(ctx, "reset"), i1Type,
-                        circt::hw::ModulePort::Direction::Input},
+                        hw::ModulePort::Direction::Input},
                        inIdx,
                        {}});
   }
 
-  return circt::hw::ModulePortInfo{pinputs, poutputs};
+  return hw::ModulePortInfo{pinputs, poutputs};
 }
 
 //===----------------------------------------------------------------------===//
@@ -187,31 +185,31 @@ struct HandshakeLoweringState {
 
 class ModuleBuilder {
 public:
-  SmallVector<ModulePort> inputs;
-  SmallVector<ModulePort> outputs;
+  SmallVector<hw::ModulePort> inputs;
+  SmallVector<hw::ModulePort> outputs;
   MLIRContext *ctx;
 
   ModuleBuilder(MLIRContext *ctx) : ctx(ctx){};
 
-  ModulePortInfo build() {
+  hw::ModulePortInfo build() {
     // Seems stupid but does not seem to be a way around it
-    SmallVector<PortInfo> inputPorts;
-    SmallVector<PortInfo> outputPorts;
+    SmallVector<hw::PortInfo> inputPorts;
+    SmallVector<hw::PortInfo> outputPorts;
     for (auto [idx, modPort] : llvm::enumerate(inputs))
-      inputPorts.push_back(PortInfo{modPort, idx});
+      inputPorts.push_back(hw::PortInfo{modPort, idx});
     for (auto [idx, modPort] : llvm::enumerate(outputs))
-      outputPorts.push_back(PortInfo{modPort, idx});
-    return ModulePortInfo(inputPorts, outputPorts);
+      outputPorts.push_back(hw::PortInfo{modPort, idx});
+    return hw::ModulePortInfo(inputPorts, outputPorts);
   }
 
   void addInput(const Twine &name, Type type) {
-    inputs.push_back(ModulePort{StringAttr::get(ctx, name), type,
-                                ModulePort::Direction::Input});
+    inputs.push_back(hw::ModulePort{StringAttr::get(ctx, name), type,
+                                    hw::ModulePort::Direction::Input});
   }
 
   void addOutput(const Twine &name, Type type) {
-    outputs.push_back(ModulePort{StringAttr::get(ctx, name), type,
-                                 ModulePort::Direction::Output});
+    outputs.push_back(hw::ModulePort{StringAttr::get(ctx, name), type,
+                                     hw::ModulePort::Direction::Output});
   }
 
   /// Adds clock and reset ports to a module's inputs ports.
@@ -500,11 +498,11 @@ static std::string getExtModuleName(Operation *oldOp) {
 /// Checks whether a module with the same name has been created elsewhere in the
 /// top level module. Returns the matched module operation if true, otherwise
 /// returns nullptr.
-static circt::hw::HWModuleLike findModule(mlir::ModuleOp parentModule,
-                                          StringRef modName) {
-  if (auto mod = parentModule.lookupSymbol<HWModuleOp>(modName))
+static hw::HWModuleLike findModule(mlir::ModuleOp parentModule,
+                                   StringRef modName) {
+  if (auto mod = parentModule.lookupSymbol<hw::HWModuleOp>(modName))
     return mod;
-  if (auto mod = parentModule.lookupSymbol<HWModuleExternOp>(modName))
+  if (auto mod = parentModule.lookupSymbol<hw::HWModuleExternOp>(modName))
     return mod;
   return nullptr;
 }
@@ -513,13 +511,11 @@ static circt::hw::HWModuleLike findModule(mlir::ModuleOp parentModule,
 /// functions first attempts to find an existing module with the same name,
 /// which it returns if it exists. Failing the latter, the function creates an
 /// external module at the provided location and with the provided ports.
-static circt::hw::HWModuleLike getModule(HandshakeLoweringState &ls,
-                                         StringRef modName,
-                                         ModuleBuilder &module,
-                                         Location modLoc) {
-  circt::hw::HWModuleLike mod = findModule(ls.parentModule, modName);
+static hw::HWModuleLike getModule(HandshakeLoweringState &ls, StringRef modName,
+                                  ModuleBuilder &module, Location modLoc) {
+  hw::HWModuleLike mod = findModule(ls.parentModule, modName);
   if (!mod)
-    return ls.extModBuilder.create<circt::hw::HWModuleExternOp>(
+    return ls.extModBuilder.create<hw::HWModuleExternOp>(
         modLoc, ls.extModBuilder.getStringAttr(modName), module.build());
   return mod;
 }
@@ -528,27 +524,25 @@ static circt::hw::HWModuleLike getModule(HandshakeLoweringState &ls,
 /// functions first attempts to find an existing module with the same name,
 /// which it returns if it exists. Failing the latter, the function creates an
 /// external module at the provided location and with the provided ports.
-static circt::hw::HWModuleLike getModule(HandshakeLoweringState &ls,
-                                         StringRef modName,
-                                         ModulePortInfo &module,
-                                         Location modLoc) {
-  circt::hw::HWModuleLike mod = findModule(ls.parentModule, modName);
+static hw::HWModuleLike getModule(HandshakeLoweringState &ls, StringRef modName,
+                                  hw::ModulePortInfo &module, Location modLoc) {
+  hw::HWModuleLike mod = findModule(ls.parentModule, modName);
   if (!mod)
-    return ls.extModBuilder.create<circt::hw::HWModuleExternOp>(
+    return ls.extModBuilder.create<hw::HWModuleExternOp>(
         modLoc, ls.extModBuilder.getStringAttr(modName), module);
   return mod;
 }
 
 /// Derives port information for an operation so that it can be converted to a
 /// hardware module.
-static ModulePortInfo getPortInfo(Operation *op) {
+static hw::ModulePortInfo getPortInfo(Operation *op) {
   return getPortInfoForOpTypes(op, op->getOperandTypes(), op->getResultTypes());
 }
 
 /// Adds the clock and reset arguments of a module to the list of operands of an
 /// operation within the module.
 static void addClkAndRstOperands(SmallVector<Value> &operands,
-                                 circt::hw::HWModuleOp mod) {
+                                 hw::HWModuleOp mod) {
   auto numArguments = mod->getNumOperands();
   assert(numArguments >= 2 &&
          "module should have at least a clock and reset arguments");
@@ -591,8 +585,9 @@ static FuncModulePortInfo getFuncPortInfo(handshake::FuncOp funcOp) {
 /// converted to a hardware module. The function needs information from the
 /// enclosing function's ports as well as the index of the memory interface
 /// within that data-structure to derive the future module's ports.
-static ModulePortInfo getMemPortInfo(handshake::MemoryControllerOp memOp,
-                                     FuncModulePortInfo &info, size_t memIdx) {
+static hw::ModulePortInfo getMemPortInfo(handshake::MemoryControllerOp memOp,
+                                         FuncModulePortInfo &info,
+                                         size_t memIdx) {
 
   MLIRContext *ctx = memOp.getContext();
   ModuleBuilder module(ctx);
@@ -633,8 +628,8 @@ static ModulePortInfo getMemPortInfo(handshake::MemoryControllerOp memOp,
 /// information from the enclosing function's ports to determine the number of
 /// return values in the original function that the future module should
 /// output.
-static ModulePortInfo getEndPortInfo(handshake::EndOp endOp,
-                                     FuncModulePortInfo &info) {
+static hw::ModulePortInfo getEndPortInfo(handshake::EndOp endOp,
+                                         FuncModulePortInfo &info) {
 
   ModuleBuilder module(endOp.getContext());
 
@@ -687,14 +682,14 @@ public:
 };
 
 /// Converts handshake functions to hardware modules. The pattern creates a
-/// circt::hw::HWModuleOp or circt::hw::HWModuleExternOp with IO corresponding
+/// hw::HWModuleOp or hw::HWModuleExternOp with IO corresponding
 /// to the original handshake function. In the case where the matched function
 /// is not external, the pattern additionally (1) buffers the function's inputs,
-/// (2) converts internal memory interfaces to circt::hw::HWInstanceOp's and
+/// (2) converts internal memory interfaces to hw::HWInstanceOp's and
 /// connects them to the containing module IO, (3) converts the function's end
-/// operation to a circt::hw::HWInstanceOp that also outputs the function's
+/// operation to a hw::HWInstanceOp that also outputs the function's
 /// return values, and (4) combines all the module outputs in the
-/// circt::hw::HwOutputOp operation at the end of the module.
+/// hw::HwOutputOp operation at the end of the module.
 class FuncOpConversionPattern : public OpConversionPattern<handshake::FuncOp> {
 public:
   FuncOpConversionPattern(MLIRContext *ctx, HandshakeLoweringState &ls)
@@ -707,12 +702,12 @@ public:
     FuncModulePortInfo info = getFuncPortInfo(op);
 
     if (op.isExternal())
-      ls.extModBuilder.create<circt::hw::HWModuleExternOp>(
+      ls.extModBuilder.create<hw::HWModuleExternOp>(
           op.getLoc(), ls.extModBuilder.getStringAttr(op.getName()),
           info.module.build());
     else {
       // Create module for the function
-      auto mod = ls.extModBuilder.create<circt::hw::HWModuleOp>(
+      auto mod = ls.extModBuilder.create<hw::HWModuleOp>(
           op.getLoc(), ls.extModBuilder.getStringAttr(op.getName()),
           info.module.build());
 
@@ -752,27 +747,28 @@ private:
   /// Inserts a "start module" that acts as a buffer for all module inputs
   /// that are of type handshake::ChannelType. This is done to match legacy
   /// Dynamatic's implementation of circuits.
-  void bufferInputs(HWModuleOp mod, ConversionPatternRewriter &rewriter) const;
+  void bufferInputs(hw::HWModuleOp mod,
+                    ConversionPatternRewriter &rewriter) const;
 
   /// Converts memory interfaces within the module into hardware instances
   /// with added IO to handle interactions with external memory through the
   /// module IO. The function returns the list of newly created hardware
   /// instances.
-  SmallVector<circt::hw::InstanceOp>
-  convertMemories(HWModuleOp mod, FuncModulePortInfo &info,
+  SmallVector<hw::InstanceOp>
+  convertMemories(hw::HWModuleOp mod, FuncModulePortInfo &info,
                   ConversionPatternRewriter &rewriter) const;
 
   /// Converts the end operation of a handshake function into a corresponding
   /// hardware instance with added outputs to hold the function return values.
   /// The function returns the created hardware instance.
-  circt::hw::InstanceOp convertEnd(HWModuleOp mod, FuncModulePortInfo &info,
-                                   ConversionPatternRewriter &rewriter) const;
+  hw::InstanceOp convertEnd(hw::HWModuleOp mod, FuncModulePortInfo &info,
+                            ConversionPatternRewriter &rewriter) const;
 
-  /// Modifies the operands of the circt::hw::OutputOp operation within the
+  /// Modifies the operands of the hw::OutputOp operation within the
   /// newly created module to match the latter's outputs.
-  void setModuleOutputs(HWModuleOp mod,
-                        SmallVector<circt::hw::InstanceOp> memInstances,
-                        circt::hw::InstanceOp endInstance) const;
+  void setModuleOutputs(hw::HWModuleOp mod,
+                        SmallVector<hw::InstanceOp> memInstances,
+                        hw::InstanceOp endInstance) const;
 };
 
 /// Converts an operation (of type indicated by the template argument) into an
@@ -796,16 +792,14 @@ public:
 
     auto modName = getExtModuleName(op);
     auto ports = getPortInfo(op);
-    circt::hw::HWModuleLike extModule =
-        getModule(ls, modName, ports, op.getLoc());
+    hw::HWModuleLike extModule = getModule(ls, modName, ports, op.getLoc());
 
     // Replace operation with corresponding hardware module instance
     SmallVector<Value> operands = adaptor.getOperands();
     if (op.template hasTrait<mlir::OpTrait::HasClock>())
-      addClkAndRstOperands(operands,
-                           cast<circt::hw::HWModuleOp>(op->getParentOp()));
+      addClkAndRstOperands(operands, cast<hw::HWModuleOp>(op->getParentOp()));
 
-    auto instanceOp = rewriter.replaceOpWithNewOp<circt::hw::InstanceOp>(
+    auto instanceOp = rewriter.replaceOpWithNewOp<hw::InstanceOp>(
         op, extModule, rewriter.getStringAttr(ls.nameUniquer(op)), operands);
 
     // Replace operation results with new instance results
@@ -823,7 +817,7 @@ private:
 } // namespace
 
 void FuncOpConversionPattern::bufferInputs(
-    HWModuleOp mod, ConversionPatternRewriter &rewriter) const {
+    hw::HWModuleOp mod, ConversionPatternRewriter &rewriter) const {
 
   unsigned argIdx = 0;
   rewriter.setInsertionPointToStart(mod.getBodyBlock());
@@ -848,13 +842,13 @@ void FuncOpConversionPattern::bufferInputs(
     if (auto channelType = argType.dyn_cast<handshake::ChannelType>())
       modName += "." + getTypeName(channelType.getDataType(), argLoc);
 
-    circt::hw::HWModuleLike extModule = getModule(ls, modName, module, argLoc);
+    hw::HWModuleLike extModule = getModule(ls, modName, module, argLoc);
 
     // Replace operation with corresponding hardware module instance
     llvm::SmallVector<Value> operands;
     operands.push_back(arg);
     addClkAndRstOperands(operands, mod);
-    auto instanceOp = rewriter.create<circt::hw::InstanceOp>(
+    auto instanceOp = rewriter.create<hw::InstanceOp>(
         argLoc, extModule,
         rewriter.getStringAttr("handshake_start_node" +
                                std::to_string(argIdx++)),
@@ -864,11 +858,11 @@ void FuncOpConversionPattern::bufferInputs(
   }
 }
 
-SmallVector<circt::hw::InstanceOp> FuncOpConversionPattern::convertMemories(
-    HWModuleOp mod, FuncModulePortInfo &info,
+SmallVector<hw::InstanceOp> FuncOpConversionPattern::convertMemories(
+    hw::HWModuleOp mod, FuncModulePortInfo &info,
     ConversionPatternRewriter &rewriter) const {
 
-  SmallVector<circt::hw::InstanceOp> instances;
+  SmallVector<hw::InstanceOp> instances;
 
   for (auto [memIdx, portIndices] : llvm::enumerate(info.memIO)) {
     // Identify the memory controller refering to the memref
@@ -878,11 +872,10 @@ SmallVector<circt::hw::InstanceOp> FuncOpConversionPattern::convertMemories(
     assert(memOp && "user of old memref value should be memory interface");
 
     std::string memName = getExtModuleName(memOp);
-    ModulePortInfo ports = getMemPortInfo(memOp, info, memIdx);
+    hw::ModulePortInfo ports = getMemPortInfo(memOp, info, memIdx);
 
     // Create an external module definition if necessary
-    circt::hw::HWModuleLike extModule =
-        getModule(ls, memName, ports, memOp->getLoc());
+    hw::HWModuleLike extModule = getModule(ls, memName, ports, memOp->getLoc());
 
     // Combine memory inputs from the function and internal memory inputs into
     // the new instance operands
@@ -897,7 +890,7 @@ SmallVector<circt::hw::InstanceOp> FuncOpConversionPattern::convertMemories(
 
     // Create instance of memory interface
     rewriter.setInsertionPoint(memOp);
-    auto instance = rewriter.create<circt::hw::InstanceOp>(
+    auto instance = rewriter.create<hw::InstanceOp>(
         memOp.getLoc(), extModule,
         rewriter.getStringAttr(ls.nameUniquer(memOp)), operands);
 
@@ -914,14 +907,15 @@ SmallVector<circt::hw::InstanceOp> FuncOpConversionPattern::convertMemories(
   return instances;
 }
 
-circt::hw::InstanceOp
-FuncOpConversionPattern::convertEnd(HWModuleOp mod, FuncModulePortInfo &info,
+hw::InstanceOp
+FuncOpConversionPattern::convertEnd(hw::HWModuleOp mod,
+                                    FuncModulePortInfo &info,
                                     ConversionPatternRewriter &rewriter) const {
   // End operation is guaranteed to exist and be unique
   auto endOp = *mod.getBodyBlock()->getOps<handshake::EndOp>().begin();
 
   // Create external module
-  auto extModule = ls.extModBuilder.create<circt::hw::HWModuleExternOp>(
+  auto extModule = ls.extModBuilder.create<hw::HWModuleExternOp>(
       endOp->getLoc(), ls.extModBuilder.getStringAttr(getExtModuleName(endOp)),
       getEndPortInfo(endOp, info));
 
@@ -929,7 +923,7 @@ FuncOpConversionPattern::convertEnd(HWModuleOp mod, FuncModulePortInfo &info,
   SmallVector<Value> operands(endOp.getOperands());
   addClkAndRstOperands(operands, mod);
   rewriter.setInsertionPoint(endOp);
-  auto instance = rewriter.create<circt::hw::InstanceOp>(
+  auto instance = rewriter.create<hw::InstanceOp>(
       endOp.getLoc(), extModule, rewriter.getStringAttr(ls.nameUniquer(endOp)),
       operands);
 
@@ -938,10 +932,10 @@ FuncOpConversionPattern::convertEnd(HWModuleOp mod, FuncModulePortInfo &info,
 }
 
 void FuncOpConversionPattern::setModuleOutputs(
-    HWModuleOp mod, SmallVector<circt::hw::InstanceOp> memInstances,
-    circt::hw::InstanceOp endInstance) const {
+    hw::HWModuleOp mod, SmallVector<hw::InstanceOp> memInstances,
+    hw::InstanceOp endInstance) const {
   // Output operation is guaranteed to exist and be unique
-  auto outputOp = *mod.getBodyBlock()->getOps<circt::hw::OutputOp>().begin();
+  auto outputOp = *mod.getBodyBlock()->getOps<hw::OutputOp>().begin();
 
   // Derive new operands
   SmallVector<Value> newOperands;
@@ -1144,8 +1138,8 @@ public:
                                                    funcOp->getContext(), ls);
 
     // Everything must be converted to operations in the hw dialect
-    target.addLegalOp<circt::hw::HWModuleOp, circt::hw::HWModuleExternOp,
-                      circt::hw::OutputOp, circt::hw::InstanceOp>();
+    target.addLegalOp<hw::HWModuleOp, hw::HWModuleExternOp, hw::OutputOp,
+                      hw::InstanceOp>();
     target.addIllegalDialect<handshake::HandshakeDialect, arith::ArithDialect,
                              memref::MemRefDialect>();
 
