@@ -6,7 +6,7 @@ Dynamatic is an academic, open-source high-level synthesis compiler that produce
 
 The following instructions can be used to setup Dynamatic from source.
 
-1. **Install dependencies required by LLVM/MLIR.** These includes working C and C++ toolchains (compiler, linker), `cmake` and `ninja` for building the project, and `git`. For example, on Ubuntu:
+1. **Install dependencies required by the project.** These include working C and C++ toolchains (compiler, linker), `cmake` and `ninja` for building the project, and `git`. For example, on apt-based Linux distributions:
     
     ```sh
     $ sudo apt-get install git cmake ninja-build clang lld ccache graphviz
@@ -14,19 +14,17 @@ The following instructions can be used to setup Dynamatic from source.
 
     `clang`, `lld`, and `ccache` are not stictly required but significantly speed up (re)builds. If you do not wish to install them, pass the `--disable-build-opt` flag to the build script to disable their use when building.
 
-2. **Clone the project and its submodules.** Dynamatic depends on [Polygeist](https://github.com/llvm/Polygeist) (C/C++ frontend for MLIR) and a fork of [CIRCT](https://github.com/EPFL-LAP/circt) (Circuit-level IR compiler and tools). Both of them depend on [LLVM/MLIR](https://github.com/llvm/llvm-project).
+2. **Clone the project and its submodules.** Dynamatic depends on a fork of [Polygeist](https://github.com/EPFL-LAP/Polygeist) (C/C++ frontend for MLIR), which itself depends on [LLVM/MLIR](https://github.com/llvm/llvm-project).
     
     ```sh
     $ git clone --recurse-submodules git@github.com:EPFL-LAP/dynamatic.git
     $ cd dynamatic
     ```
 
-    *Note:* The repository is set up so that the two submodules are shallow cloned by default, meaning the clone command downloads just enough of them to check out the currently specified commits. If you wish to work with the full history of these repositories, you can manually unshallow them.
+    *Note:* The repository is set up so that Polygeist is shallow cloned by default, meaning the clone command downloads just enough of it to check out the currently specified commit. If you wish to work with the full history of this repository, you can manually unshallow it.
 
     ```sh
     $ cd polygeist
-    $ git fetch --unshallow
-    $ cd ../circt
     $ git fetch --unshallow
     ```
 

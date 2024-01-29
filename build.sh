@@ -54,9 +54,15 @@ exit_on_fail() {
     fi
 }
 
-# Helper function to create build directory and cd to it
-create_build_directory() {
-    cd "$SCRIPT_CWD" && mkdir -p $1 && cd $1
+# Prepares to build a particular part of the project by creating a "build"
+# folder for it, cd-ing to it, and displaying a message to stdout.
+# $1: Name of the project part
+# $2: Path to build folder (relative to script's CWD) 
+prepare_to_build_project() {
+  local project_name=$1 
+  local build_dir=$2
+  cd "$SCRIPT_CWD" && mkdir -p "$build_dir" && cd "$build_dir"
+  echo_section "Building $project_name ($build_dir)"
 }
 
 # Create symbolic link from the bin/ directory to an executable file built by
@@ -143,13 +149,6 @@ do
     fi
 done
 
-# Path to build directories
-POLYGEIST_LLVM_BUILD_DIR="polygeist/llvm-project/build"
-POLYGEIST_BUILD_DIR="polygeist/build"
-CIRCT_LLVM_BUILD_DIR="circt/llvm/build"
-CIRCT_BUILD_DIR="circt/build"
-DYNAMATIC_BUILD_DIR="build"
-
 #### Build the project (submodules and superproject) ####
 
 # Print header
@@ -157,17 +156,14 @@ echo "##########################################################################
 echo "############# DYNAMATIC - DHLS COMPILER INFRASTRUCTURE - EPFL/LAP ##############"
 echo "################################################################################"
 
-echo_section "Building Polygeist"
-echo_subsection "Building LLVM submodule"
-echo ""
-create_build_directory "$POLYGEIST_LLVM_BUILD_DIR"
+prepare_to_build_project "LLVM" "polygeist/llvm-project/build"
 
 # CMake
 if should_run_cmake ; then
   cmake -G Ninja ../llvm \
       -DLLVM_ENABLE_PROJECTS="mlir;clang" \
       -DLLVM_TARGETS_TO_BUILD="host" \
-      -DCMAKE_BUILD_TYPE=Release \
+      -DCMAKE_BUILD_TYPE=$BUILD_TYPE \
       -DLLVM_ENABLE_ASSERTIONS=ON \
       $CMAKE_FLAGS_LLVM
   exit_on_fail "Failed to cmake polygeist/llvm-project"
@@ -181,10 +177,7 @@ if [[ ENABLE_TESTS -eq 1 ]]; then
     exit_on_fail "Tests for polygeist/llvm-project failed"
 fi
 
-echo ""
-echo_subsection "Building superproject"
-echo ""
-create_build_directory "$POLYGEIST_BUILD_DIR"
+prepare_to_build_project "Polygeist" "polygeist/build"
 
 # CMake
 if should_run_cmake ; then
@@ -192,7 +185,7 @@ if should_run_cmake ; then
       -DMLIR_DIR=$PWD/../llvm-project/build/lib/cmake/mlir \
       -DCLANG_DIR=$PWD/../llvm-project/build/lib/cmake/clang \
       -DLLVM_TARGETS_TO_BUILD="host" \
-      -DCMAKE_BUILD_TYPE=Release \
+      -DCMAKE_BUILD_TYPE=$BUILD_TYPE \
       -DLLVM_ENABLE_ASSERTIONS=ON \
       -Wno-dev \
       $CMAKE_FLAGS_SUPER
@@ -209,79 +202,13 @@ if [[ ENABLE_TESTS -eq 1 ]]; then
     exit_on_fail "Tests for polygeist failed"
 fi
 
-echo_section "Building CIRCT"
-echo_subsection "Building LLVM submodule"
-echo ""
-create_build_directory "$CIRCT_LLVM_BUILD_DIR"
-
-# CMake
-if should_run_cmake ; then
-  cmake -G Ninja ../llvm \
-      -DLLVM_ENABLE_PROJECTS="mlir" \
-      -DLLVM_TARGETS_TO_BUILD="host" \
-      -DCMAKE_BUILD_TYPE=$BUILD_TYPE \
-      -DLLVM_ENABLE_ASSERTIONS=ON \
-      -DCMAKE_EXPORT_COMPILE_COMMANDS=ON \
-      $CMAKE_FLAGS_LLVM
-  exit_on_fail "Failed to cmake circt/llvm"
-fi
-
-# Build
-run_ninja
-exit_on_fail "Failed to build circt-llvm"
-if [[ ENABLE_TESTS -eq 1 ]]; then
-    ninja check-mlir
-    exit_on_fail "Tests for circt/llvm failed"
-fi
-
-echo ""
-echo_subsection "Building superproject"
-echo 
-create_build_directory "$CIRCT_BUILD_DIR"
+prepare_to_build_project "Dynamatic" "build"
 
 # CMake
 if should_run_cmake ; then
   cmake -G Ninja .. \
-      -DMLIR_DIR=$PWD/../llvm/build/lib/cmake/mlir \
-      -DLLVM_DIR=$PWD/../llvm/build/lib/cmake/llvm \
-      -DCMAKE_BUILD_TYPE=$BUILD_TYPE \
-      -DLLVM_ENABLE_ASSERTIONS=ON \
-      -DCMAKE_EXPORT_COMPILE_COMMANDS=ON \
-      -DVERILATOR_DISABLE=ON \
-      -DVIVADO_DISABLE=ON \
-      -DCLANG_TIDY_DISABLE=ON \
-      -DSYSTEMC_DISABLE=ON \
-      -DQUARTUS_DISABLE=ON \
-      -DQUESTA_DISABLE=ON \
-      -DYOSYS_DISABLE=ON \
-      -DIVERILOG_DISABLE=ON \
-      -DYOSYS_DISABLE=ON \
-      -DCAPNP_DISABLE=ON \
-      -DOR_TOOLS_DISABLE=ON \
-      -DCAPNP_DISABLE=ON \
-      $CMAKE_FLAGS_SUPER
-  exit_on_fail "Failed to cmake circt"
-fi
-
-# Build
-run_ninja
-exit_on_fail "Failed to build circt"
-if [[ ENABLE_TESTS -eq 1 ]]; then
-    ninja check-circt
-    exit_on_fail "Tests for circt failed"
-    ninja check-circt-integration
-    exit_on_fail "Integration tests for circt failed"
-fi
-
-echo_section "Building Dynamatic"
-create_build_directory "$DYNAMATIC_BUILD_DIR"
-
-# CMake
-if should_run_cmake ; then
-  cmake -G Ninja .. \
-      -DCIRCT_DIR=$PWD/../circt/build/lib/cmake/circt \
-      -DMLIR_DIR=$PWD/../circt/llvm/build/lib/cmake/mlir \
-      -DLLVM_DIR=$PWD/../circt/llvm/build/lib/cmake/llvm \
+      -DMLIR_DIR=polygeist/llvm-project/build/lib/cmake/mlir \
+      -DLLVM_DIR=polygeist/llvm-project/build/lib/cmake/llvm \
       -DCMAKE_BUILD_TYPE=$BUILD_TYPE \
       -DLLVM_ENABLE_ASSERTIONS=ON \
       -DCMAKE_EXPORT_COMPILE_COMMANDS=ON \

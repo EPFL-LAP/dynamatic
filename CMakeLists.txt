@@ -31,18 +31,16 @@ endif ()
 include(FindPackageHandleStandardArgs)
 
 #-------------------------------------------------------------------------------
-# CIRCT/MLIR/LLVM configuration
+# MLIR/LLVM configuration
 #-------------------------------------------------------------------------------
 
-find_package(CIRCT REQUIRED CONFIG)
-message(STATUS "Using LLVMConfig.cmake in: ${LLVM_DIR}")
+find_package(MLIR REQUIRED CONFIG)
 message(STATUS "Using MLIRConfig.cmake in: ${MLIR_DIR}")
-message(STATUS "Using CIRCTConfig.cmake in: ${CIRCT_DIR}")
+message(STATUS "Using LLVMConfig.cmake in: ${LLVM_DIR}")
 
 set(LLVM_RUNTIME_OUTPUT_INTDIR ${CMAKE_BINARY_DIR}/bin)
 set(LLVM_LIBRARY_OUTPUT_INTDIR ${CMAKE_BINARY_DIR}/lib)
 
-list(APPEND CMAKE_MODULE_PATH "${CIRCT_CMAKE_DIR}")
 list(APPEND CMAKE_MODULE_PATH "${MLIR_CMAKE_DIR}")
 list(APPEND CMAKE_MODULE_PATH "${LLVM_CMAKE_DIR}")
 
@@ -56,7 +54,6 @@ add_definitions(${LLVM_DEFINITIONS})
 
 include_directories(${LLVM_INCLUDE_DIRS})
 include_directories(${MLIR_INCLUDE_DIRS})
-include_directories(${CIRCT_INCLUDE_DIRS})
 
 option(LLVM_BUILD_TOOLS "Build the LLVM tools. If OFF, just generate build targets." ON)
 
