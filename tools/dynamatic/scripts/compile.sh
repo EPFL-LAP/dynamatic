@@ -14,7 +14,7 @@ KERNEL_NAME=$4
 USE_SIMPLE_BUFFERS=$5
 
 # Binaries used during compilation
-POLYGEIST_PATH="$DYNAMATIC_DIR/polygeist/llvm-project/clang/lib/Headers/"
+POLYGEIST_PATH="$DYNAMATIC_DIR/polygeist"
 POLYGEIST_CLANG_BIN="$DYNAMATIC_DIR/bin/cgeist"
 CLANGXX_BIN="$DYNAMATIC_DIR/bin/clang++"
 DYNAMATIC_OPT_BIN="$DYNAMATIC_DIR/bin/dynamatic-opt"
@@ -71,10 +71,11 @@ export_dot() {
 rm -rf "$COMP_DIR" && mkdir -p "$COMP_DIR"
 
 # source -> affine level
-"$POLYGEIST_CLANG_BIN" "$SRC_DIR/$KERNEL_NAME.c" -I \
-  "$POLYGEIST_PATH/llvm-project/clang/lib/Headers/" --function="$KERNEL_NAME" \
+"$POLYGEIST_CLANG_BIN" "$SRC_DIR/$KERNEL_NAME.c" --function="$KERNEL_NAME" \
+  -I "$POLYGEIST_PATH/llvm-project/clang/lib/Headers" \
+  -I "$DYNAMATIC_DIR/include" \
   -S -O3 --memref-fullrank --raise-scf-to-affine \
-  > "$F_AFFINE" 2>/dev/null
+  > "$F_AFFINE"
 exit_on_fail "Failed to compile source to affine" "Compiled source to affine"
 
 # affine level -> pre-processing and memory analysis
