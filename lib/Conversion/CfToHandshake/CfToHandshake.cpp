@@ -291,12 +291,15 @@ static Value getSuccResult(Operation *brOp, Operation *newBrOp,
   return newBrOp->getResult(0);
 }
 
-/// Returns the data operands of a cf-level branch-like operation.
-static OperandRange getBranchOperands(Operation *termOp) {
-  if (auto condBranchOp = dyn_cast<mlir::cf::CondBranchOp>(termOp))
-    return condBranchOp.getOperands().drop_front();
+/// Returns the unique data operands of a cf-level branch-like operation.
+static DenseSet<Value> getBranchOperands(Operation *termOp) {
+  if (auto condBranchOp = dyn_cast<mlir::cf::CondBranchOp>(termOp)) {
+    OperandRange oprds = condBranchOp.getOperands().drop_front();
+    return DenseSet<Value>{oprds.begin(), oprds.end()};
+  }
   assert(isa<mlir::cf::BranchOp>(termOp) && "unsupported block terminator");
-  return termOp->getOperands();
+  OperandRange oprds = termOp->getOperands();
+  return DenseSet<Value>{oprds.begin(), oprds.end()};
 }
 
 //===-----------------------------------------------------------------------==//
@@ -448,11 +451,12 @@ LogicalResult
 HandshakeLowering::addBranchOps(ConversionPatternRewriter &rewriter) {
   for (Block &block : region) {
     Operation *termOp = block.getTerminator();
+    Location loc = termOp->getLoc();
     rewriter.setInsertionPoint(termOp);
 
-    Value condValue = nullptr;
+    Value cond = nullptr;
     if (cf::CondBranchOp condBranchOp = dyn_cast<cf::CondBranchOp>(termOp))
-      condValue = condBranchOp.getCondition();
+      cond = condBranchOp.getCondition();
     else if (isa<func::ReturnOp>(termOp))
       continue;
 
@@ -462,26 +466,20 @@ HandshakeLowering::addBranchOps(ConversionPatternRewriter &rewriter) {
     for (Value val : getBranchOperands(termOp)) {
       // Create a branch-like operation for the branch operand
       Operation *newOp = nullptr;
-      if (condValue) {
-        newOp = rewriter.create<handshake::ConditionalBranchOp>(
-            termOp->getLoc(), condValue, val);
-      } else {
-        newOp = rewriter.create<handshake::BranchOp>(termOp->getLoc(), val);
-      }
+      if (cond)
+        newOp = rewriter.create<handshake::ConditionalBranchOp>(loc, cond, val);
+      else
+        newOp = rewriter.create<handshake::BranchOp>(loc, val);
 
-      // Connect the newly created branch's output with its successors
-      for (unsigned j = 0, e = block.getNumSuccessors(); j < e; ++j) {
-        Block *succ = block.getSuccessor(j);
-
-        // Look for the merge-like operation in the successor block that takes
-        // as input the original branch operand, and replace the latter with a
-        // result of the newly inserted branch operation
-        for (Operation *user : val.getUsers()) {
-          if (user->getBlock() == succ &&
-              isa<handshake::MergeLikeOpInterface>(user)) {
+      // Connect the newly created branch's outputs with their successors by
+      // looking for merge-like operations in successor blocks that take as
+      // input the original branch operand, and replace the latter with a result
+      // of the newly inserted branch operation
+      for (Block *succ : block.getSuccessors()) {
+        for (Operation *user : llvm::make_early_inc_range(val.getUsers())) {
+          Block *userBlock = user->getBlock();
+          if (userBlock == succ && isa<handshake::MergeLikeOpInterface>(user))
             user->replaceUsesOfWith(val, getSuccResult(termOp, newOp, succ));
-            break;
-          }
         }
       }
     }
