@@ -15,11 +15,10 @@ void insertion_sort(inout_int_t A[N], in_int_t n) {
 }
 
 int main(void) {
-  inout_int_t a[N];
+  inout_int_t A[N];
   inout_int_t n = N;
   for (int j = 0; j < N; ++j)
-    a[j] = rand() % 10;
-
-  CALL_KERNEL(insertion_sort, a, N);
+    A[j] = rand() % 10;
+  CALL_KERNEL(insertion_sort, A, n);
   return 0;
 }
