@@ -32,10 +32,43 @@
 // for values before the kernel call and `HLS_VERIFICATION_PATH/C_OUT` for
 // values after the kernel call).
 //
+//===- IMPORTANT NOTE -----------------------------------------------------===//
+//
+// There are two "limitations" when instrumenting a kernel call using
+// CALL_KERNEL. However, they can easily be lifted should there be a need.
+// 1. Statically-sized arrays are supported only up to 5 dimensions. Adding
+// support for higher-dimensional arrays is as simple as adding more `dumpArg`
+// functions similar to those already present.
+// 2. Kernels must have a maximum of 16 arguments. Adding support for kernels
+// with more arguments requires modifying a couple macros.
+//   - HAS_ARGS_IMPL (before argument N, add _17, _18, ... )
+//   - HAS_ARGS (add ARGS as many times as the number of extra arguments you
+//   want to support before NO_ARGS)
+//   - VA_NUM_ARGS_IMPL (before argument N, add _17, _18, ... )
+//   - VA_NUM_ARGS (after variadic argument in expansion, add ..., 18, 17)
+//   - DUMP_ARG_* (add DUMP_ARG_17, DUMP_ARG_18, ...)
+//
 //===----------------------------------------------------------------------===//
 
 #ifndef DYNAMATIC_INTEGRATION_H
 #define DYNAMATIC_INTEGRATION_H
+
+#define STRINGIFY_IMPL(str) #str
+#define STRINGIFY(str) STRINGIFY_IMPL(str)
+
+#define CONCAT_IMPL(x, y) x##y
+#define CONCAT(x, y) CONCAT_IMPL(x, y)
+
+/// Expands to the 18th macro argument.
+#define HAS_ARGS_IMPL(_kernel, _1, _2, _3, _4, _5, _6, _7, _8, _9, _10, _11,   \
+                      _12, _13, _14, _15, _16, N, ...)                         \
+  N
+
+/// HAS_ARGS will expand to NO_ARGS if kernelAndArgs has size 1 (just the kernel
+/// name). Otherwise it will expand to ARGS.
+#define HAS_ARGS(kernelAndArgs...)                                             \
+  HAS_ARGS_IMPL(kernelAndArgs, ARGS, ARGS, ARGS, ARGS, ARGS, ARGS, ARGS, ARGS, \
+                ARGS, ARGS, ARGS, ARGS, ARGS, ARGS, ARGS, ARGS, NO_ARGS)
 
 //===----------------------------------------------------------------------===//
 // PRINT_PROFILING_INFO/HLS_VERIFICATION - Common code
@@ -135,7 +168,15 @@ static Res callKernel(Res (*kernel)(FunArgs...), RealArgs &&...args) {
   return kernel(std::forward<RealArgs>(args)...);
 }
 
-#define CALL_KERNEL(kernel, args...) callKernel(kernel, args);
+template <typename Res>
+static Res callKernel(Res (*kernel)(void)) {
+  return kernel();
+}
+
+#define CALL_NO_ARGS(kernel) callKernel(kernel)
+#define CALL_ARGS(kernel, args...) callKernel(kernel, args)
+#define CALL_KERNEL(kernelAndArgs...)                                          \
+  CONCAT(CALL_, HAS_ARGS(kernelAndArgs))(kernelAndArgs)
 #endif // PRINT_PROFILING_INFO
 
 //===----------------------------------------------------------------------===//
@@ -156,12 +197,6 @@ static Res callKernel(Res (*kernel)(FunArgs...), RealArgs &&...args) {
 #ifndef HLS_VERIFICATION_PATH
 #define HLS_VERIFICATION_PATH .
 #endif // HLS_VERIFICATION_PATH
-
-#define STRINGIFY_IMPL(str) #str
-#define STRINGIFY(str) STRINGIFY_IMPL(str)
-
-#define CONCAT_IMPL(x, y) x##y
-#define CONCAT(x, y) CONCAT_IMPL(x, y)
 
 // NOLINTBEGIN(readability-identifier-naming)
 
@@ -219,17 +254,27 @@ void dumpHLSArg(const T &arg, const char *argName) {
   outFile.close();
 }
 
-/// Just calls the kernel with the provided arguments.
+/// Calls the kernel with the provided arguments.
 template <typename... FunArgs, typename... RealArgs>
 static void callKernel(void (*kernel)(FunArgs...), RealArgs &&...args) {
   return kernel(std::forward<RealArgs>(args)...);
 }
+
+/// Calls the kernel.
+static void callKernel(void (*kernel)(void)) { return kernel(); }
 
 /// Calls the kernel with the provided arguments and dumps the function's result
 /// to a file.
 template <typename Res, typename... FunArgs, typename... RealArgs>
 static void callKernel(Res (*kernel)(FunArgs...), RealArgs &&...args) {
   Res res = kernel(std::forward<RealArgs>(args)...);
+  dumpHLSArg(res, "end");
+}
+
+/// Calls the kernel and dumps the function's result to a file.
+template <typename Res>
+static void callKernel(Res (*kernel)(void)) {
+  Res res = kernel();
   dumpHLSArg(res, "end");
 }
 
@@ -266,7 +311,16 @@ static void callKernel(Res (*kernel)(FunArgs...), RealArgs &&...args) {
 #define DUMP_ARG_16(arg, ...) HLS_DUMP(arg) DUMP_ARG_15(__VA_ARGS__)
 #define DUMP_ARGS(args...) CONCAT(DUMP_ARG_, VA_NUM_ARGS(args))(args)
 
-#define CALL_KERNEL(kernel, args...)                                           \
+#define CALL_NO_ARGS(kernel)                                                   \
+  {                                                                            \
+    _outPrefix_ = std::string{STRINGIFY(HLS_VERIFICATION_PATH)} +              \
+                  std::filesystem::path::preferred_separator + "C_OUT" +       \
+                  std::filesystem::path::preferred_separator + "output_";      \
+    callKernel(kernel);                                                        \
+    ++_transactionID_;                                                         \
+  }
+
+#define CALL_ARGS(kernel, args...)                                             \
   {                                                                            \
     _outPrefix_ = std::string{STRINGIFY(HLS_VERIFICATION_PATH)} +              \
                   std::filesystem::path::preferred_separator +                 \
@@ -280,6 +334,9 @@ static void callKernel(Res (*kernel)(FunArgs...), RealArgs &&...args) {
     DUMP_ARGS(args)                                                            \
     ++_transactionID_;                                                         \
   }
+
+#define CALL_KERNEL(kernelAndArgs...)                                          \
+  CONCAT(CALL_, HAS_ARGS(kernelAndArgs))(kernelAndArgs)
 #endif // HLS_VERIFICATION
 
 //===----------------------------------------------------------------------===//

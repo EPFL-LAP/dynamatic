@@ -87,6 +87,9 @@ LogicalResult HandshakeFixArgNamesPass::fixArgNames(handshake::FuncOp funcOp,
         break;
 
       std::string argList = srcTxt.substr(openIdx + 1, closeIdx - openIdx - 1);
+      if (std::all_of(argList.begin(), argList.end(),
+                      [](char c) { return isspace(c); }))
+        return success();
 
       // Now split the argument list on commas to get each individual argument
       size_t pos;

@@ -143,7 +143,9 @@ vector<string> split(const string &str, const string &delims) {
     previous = str.find_first_not_of(delims, current);
     current = str.find_first_of(delims, previous);
   }
-  cont.push_back(trim(str.substr(previous, current - previous)));
+  std::string remainder = trim(str.substr(previous, current - previous));
+  if (!remainder.empty())
+    cont.push_back(remainder);
   return cont;
 }
 

@@ -373,11 +373,10 @@ bool CAnalyser::parseCFunction(const string &cSrc, const string &fuvName,
 
   vector<CFunctionParameter> params;
 
-  vector<string> p = split(paramList, ",");
-  for (const auto &i : p) {
+  vector<string> paramStrings = split(paramList, ",");
+  for (const auto &i : paramStrings) {
     CFunctionParameter param;
-    bool ok = paramFromString(i, param);
-    if (ok) {
+    if (paramFromString(i, param)) {
       params.push_back(param);
     } else {
       logErr(LOG_TAG, "Function parameter \"" + i + "\" could not be parsed.");

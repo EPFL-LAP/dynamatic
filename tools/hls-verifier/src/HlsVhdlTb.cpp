@@ -865,13 +865,15 @@ string HlsVhdlTb::generateVhdlTestbench() {
 }
 
 int HlsVhdlTb::getTransactionNumberFromInput() {
+  bool hasInput = false;
   for (auto &cDuvParam : cDuvParams) {
     if (cDuvParam.isInput) {
+      hasInput = true;
       string inputPath = getInputFilepathForParam(cDuvParam);
       return getNumberOfTransactions(inputPath);
     }
   }
-  return -1;
+  return hasInput ? -1 : 1;
 }
 
 } // namespace hls_verify
