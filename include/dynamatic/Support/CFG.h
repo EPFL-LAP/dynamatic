@@ -40,7 +40,7 @@ const unsigned ENTRY_BB = 0;
 struct LogicBBs {
   /// Maps each block ID to the operations (in program order) that are tagged
   /// with it.
-  mlir::DenseMap<unsigned, mlir::SmallVector<mlir::Operation *>> blocks;
+  llvm::MapVector<unsigned, mlir::SmallVector<mlir::Operation *>> blocks;
   /// List of operations (in program order) that do not belong to any block.
   mlir::SmallVector<mlir::Operation *> outOfBlocks;
 };

@@ -1074,10 +1074,17 @@ static StringRef getMemName(Value memref) {
 template <typename Op>
 static StringRef getMemNameForPort(Op memPortOp) {
   Value addrRes = memPortOp.getAddressOutput();
-  Operation *userOp = *addrRes.getUsers().begin();
+  auto addrUsers = addrRes.getUsers();
+  if (addrUsers.empty())
+    return "";
+  Operation *userOp = *addrUsers.begin();
   while (isa_and_present<arith::ExtSIOp, arith::ExtUIOp, arith::TruncIOp,
-                         handshake::ForkOp>(userOp))
-    userOp = *userOp->getResult(0).getUsers().begin();
+                         handshake::ForkOp>(userOp)) {
+    auto users = userOp->getResult(0).getUsers();
+    if (users.empty())
+      return "";
+    userOp = *users.begin();
+  }
   // We should have reached a memory interface
   if (handshake::LSQOp lsqOp = dyn_cast<handshake::LSQOp>(userOp))
     return getMemName(lsqOp.getMemRef());
@@ -1380,6 +1387,8 @@ LogicalResult DOTPrinter::printEdge(Operation *src, Operation *dst, Value val,
   return success();
 }
 
+using OutgoingEdge = std::tuple<Operation *, Operation *, OpResult>;
+
 LogicalResult DOTPrinter::printFunc(handshake::FuncOp funcOp,
                                     mlir::raw_indented_ostream &os) {
   bool legacy = inLegacyMode();
@@ -1395,48 +1404,32 @@ LogicalResult DOTPrinter::printFunc(handshake::FuncOp funcOp,
   os << "splines=" << splines << ";\n";
   os << "compound=true; // Allow edges between clusters\n";
 
-  // Print nodes corresponding to function arguments
-  os << "// Function arguments\n";
-  for (const auto &arg : enumerate(funcOp.getArguments())) {
-    if (isa<MemRefType>(arg.value().getType()))
-      // Arguments with memref types are represented by memory interfaces
-      // inside the function so they are not displayed
-      continue;
+  /// Prints all nodes corresponding to function arguments.
+  auto printArgNodes = [&]() -> LogicalResult {
+    os << "// Units from function arguments\n";
+    for (const auto &arg : enumerate(funcOp.getArguments())) {
+      if (isa<MemRefType>(arg.value().getType()))
+        // Arguments with memref types are represented by memory interfaces
+        // inside the function so they are not displayed
+        continue;
 
-    auto argLabel = getArgumentName(funcOp, arg.index());
-    os << "\"" << argLabel << R"(" [mlir_op="handshake.arg", shape=diamond, )"
-       << getStyleOfValue(arg.value()) << "label=\"" << argLabel << "\", ";
-    if (legacy && failed(annotateArgumentNode(funcOp, arg.index(), os)))
-      return failure();
-    os << "]\n";
-  }
+      auto argLabel = getArgumentName(funcOp, arg.index());
+      os << "\"" << argLabel << R"(" [mlir_op="handshake.arg", shape=diamond, )"
+         << getStyleOfValue(arg.value()) << "label=\"" << argLabel << "\", ";
+      if (legacy && failed(annotateArgumentNode(funcOp, arg.index(), os)))
+        return failure();
+      os << "]\n";
+    }
+    return success();
+  };
 
-  // Print nodes corresponding to function operations
-  os << "// Function operations\n";
-  for (auto &op : funcOp.getOps()) {
-    // In legacy-buffers mode, do not print bitwidth modification operation
-    // between branch-like and merge-like operations
-    if (mode == Mode::LEGACY_BUFFERS && isBitModBetweenBlocks(&op))
-      continue;
-
-    // Print the operation
-    if (failed(printNode(&op, os)))
-      return failure();
-  }
-
-  // Get function's "blocks". These leverage the "bb" attributes attached to
-  // operations in handshake functions to display operations belonging to the
-  // same original basic block together
-  auto handshakeBlocks = getLogicBBs(funcOp);
-
-  // Print all edges incoming from operations in a block
-  bool argEdgesAdded = false;
-  auto addArgEdges = [&]() -> LogicalResult {
-    argEdgesAdded = true;
+  /// Prints all edges incoming from function arguments.
+  auto printArgEdges = [&]() -> LogicalResult {
+    os << "// Channels from function arguments\n";
     for (auto [idx, arg] : llvm::enumerate(funcOp.getArguments()))
       if (!isa<MemRefType>(arg.getType()))
         for (Operation *user : arg.getUsers()) {
-          auto argLabel = getArgumentName(funcOp, idx);
+          std::string argLabel = getArgumentName(funcOp, idx);
           os << "\"" << argLabel << "\" -> \"" << getUniqueName(user) << "\" ["
              << getStyleOfValue(arg);
           if (legacy && failed(annotateArgumentEdge(funcOp, idx, user, os)))
@@ -1446,77 +1439,104 @@ LogicalResult DOTPrinter::printFunc(handshake::FuncOp funcOp,
     return success();
   };
 
-  for (auto &[blockID, ops] : handshakeBlocks.blocks) {
+  // Get function's "blocks". These leverage the "bb" attributes attached to
+  // operations in handshake functions to display operations belonging to the
+  // same original basic block together
+  LogicBBs blocks = getLogicBBs(funcOp);
 
-    // For each block, we create a subgraph to contain all edges between two
-    // operations of that block
-    auto blockStrID = std::to_string(blockID);
-    os << "// Edges within basic block " << blockStrID << "\n";
-    std::string graphName = "cluster" + blockStrID;
-    std::string graphLabel = "block" + blockStrID;
+  // Whether nodes and edges corresponding to function arguments have already
+  // been handled
+  bool areArgsHandled = false;
+
+  // Collect all edges that do not connect two nodes in the same block
+  llvm::MapVector<unsigned, std::vector<OutgoingEdge>> outgoingEdges;
+
+  // We print the function "block-by-block" by grouping nodes in the same block
+  // (as well as edges between nodes of the same block) within DOT clusters
+  for (auto &[blockID, blockOps] : blocks.blocks) {
+    areArgsHandled |= blockID == ENTRY_BB;
+
+    // Open the subgraph
+    os << "// Units/Channels in BB " << blockID << "\n";
+    std::string graphName = "cluster" + std::to_string(blockID);
+    std::string graphLabel = "block" + std::to_string(blockID);
     openSubgraph(graphName, graphLabel, os);
 
-    // Collect all edges leaving the block and print them after the subgraph
-    std::vector<std::tuple<Operation *, Operation *, OpResult>> outgoingEdges;
+    // For entry block, also add all nodes corresponding to function arguments
+    if (blockID == ENTRY_BB && failed(printArgNodes()))
+      return failure();
 
-    // Determines whether an edge to a destination operation should be inside
-    // of the source operation's basic block
-    auto isEdgeInSubgraph = [](Operation *useOp, unsigned currentBB) {
-      // Sink operations are always displayed outside of blocks
-      if (isa<handshake::SinkOp>(useOp))
-        return false;
-
-      auto bb = useOp->getAttrOfType<mlir::IntegerAttr>(BB_ATTR);
-      return bb && bb.getValue().getZExtValue() == currentBB;
-    };
-
-    // Iterate over all uses of all results of all operations inside the
-    // block
-    for (auto *op : ops) {
-      for (auto res : op->getResults())
-        for (auto &use : res.getUses()) {
-          // Add edge to subgraph or outgoing edges depending on the block of
-          // the operation using the result
-          Operation *useOp = use.getOwner();
-          if (isEdgeInSubgraph(useOp, blockID)) {
-            if (failed(printEdge(op, useOp, res, os)))
-              return failure();
-          } else {
-            outgoingEdges.emplace_back(op, useOp, res);
-          }
-        }
+    os << "// Units in BB " << blockID << "\n";
+    for (Operation *op : blockOps) {
+      // In legacy-buffers mode, do not print bitwidth modification operation
+      // between branch-like and merge-like operations
+      if (mode == Mode::LEGACY_BUFFERS && isBitModBetweenBlocks(op))
+        continue;
+      if (failed(printNode(op, os)))
+        return failure();
     }
 
     // For entry block, also add all edges incoming from function arguments
-    if (blockID == 0 && failed(addArgEdges()))
+    if (blockID == ENTRY_BB && failed(printArgEdges()))
       return failure();
+
+    os << "// Channels in BB " << blockID << "\n";
+    for (Operation *op : blockOps) {
+      for (OpResult res : op->getResults()) {
+        for (OpOperand &oprd : res.getUses()) {
+          Operation *userOp = oprd.getOwner();
+          std::optional<unsigned> bb = getLogicBB(userOp);
+          if (bb && *bb == blockID) {
+            if (failed(printEdge(op, userOp, res, os)))
+              return failure();
+          } else {
+            outgoingEdges[blockID].emplace_back(op, userOp, res);
+          }
+        }
+      }
+    }
 
     // Close the subgraph
     closeSubgraph(os);
+  }
 
-    // Print outgoing edges for this block
-    if (!outgoingEdges.empty())
-      os << "// Edges outgoing of basic block " << blockStrID << "\n";
-    for (auto &[op, useOp, res] : outgoingEdges)
-      if (failed(printEdge(op, useOp, res, os)))
+  // Print edges coming from function arguments if they haven't been so far
+  if (!areArgsHandled && failed(printArgNodes()))
+    return failure();
+
+  os << "// Units outside of all basic blocks\n";
+  for (Operation *op : blocks.outOfBlocks) {
+    // In legacy-buffers mode, do not print bitwidth modification operation
+    // between branch-like and merge-like operations
+    if (mode == Mode::LEGACY_BUFFERS && isBitModBetweenBlocks(op))
+      continue;
+    if (failed(printNode(op, os)))
+      return failure();
+  }
+
+  // Print outgoing edges for each block
+  for (auto &[blockID, blockEdges] : outgoingEdges) {
+    os << "// Channels outgoing of BB " << blockID << "\n";
+    for (auto &[op, userOp, res] : blockEdges)
+      if (failed(printEdge(op, userOp, res, os)))
         return failure();
   }
 
-  // Print all edges incoming from operations not belonging to any block
-  // outside of all subgraphs
-  os << "// Edges outside of all basic blocks\n";
   // Print edges coming from function arguments if they haven't been so far
-  if (!argEdgesAdded && failed(addArgEdges()))
+  if (!areArgsHandled && failed(printArgEdges()))
     return failure();
-  for (auto *op : handshakeBlocks.outOfBlocks)
-    for (auto res : op->getResults())
-      for (auto &use : res.getUses())
-        if (failed(printEdge(op, use.getOwner(), res, os)))
-          return failure();
 
+  os << "// Channels outside of all basic blocks\n";
+  for (Operation *op : blocks.outOfBlocks) {
+    for (OpResult res : op->getResults()) {
+      for (OpOperand &oprd : res.getUses()) {
+        if (failed(printEdge(op, oprd.getOwner(), res, os)))
+          return failure();
+      }
+    }
+  }
   os.unindent();
   os << "}\n";
-
   return success();
 }
 
