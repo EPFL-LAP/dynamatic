@@ -1055,8 +1055,46 @@ static std::string getStyleOfValue(Value result) {
   return isa<NoneType>(result.getType()) ? "style=" + CONTROL_STYLE + ", " : "";
 }
 
-/// Determines the pretty-printed version of a node label.
-static std::string getPrettyPrintedNodeLabel(Operation *op) {
+/// Returns the name of the function argument that corresponds to the memref
+/// operand of a memory interface. Returns an empty reference if the memref
+/// cannot be found in the arguments.
+static StringRef getMemName(Value memref) {
+  Operation *parentOp = memref.getParentBlock()->getParentOp();
+  handshake::FuncOp funcOp = dyn_cast<handshake::FuncOp>(parentOp);
+  for (auto [name, funArg] :
+       llvm::zip(funcOp.getArgNames(), funcOp.getArguments())) {
+    if (funArg == memref)
+      return cast<StringAttr>(name).getValue();
+  }
+  return StringRef();
+}
+
+/// Returns the name of the function argument that corresponds to the memory
+/// interface that the memory port operation connects to.
+template <typename Op>
+static StringRef getMemNameForPort(Op memPortOp) {
+  Value addrRes = memPortOp.getAddressOutput();
+  Operation *userOp = *addrRes.getUsers().begin();
+  while (isa_and_present<arith::ExtSIOp, arith::ExtUIOp, arith::TruncIOp,
+                         handshake::ForkOp>(userOp))
+    userOp = *userOp->getResult(0).getUsers().begin();
+  // We should have reached a memory interface
+  if (handshake::LSQOp lsqOp = dyn_cast<handshake::LSQOp>(userOp))
+    return getMemName(lsqOp.getMemRef());
+  if (handshake::MemoryControllerOp mcOp =
+          dyn_cast<handshake::MemoryControllerOp>(userOp))
+    return getMemName(mcOp.getMemRef());
+  llvm_unreachable("cannot reach memory interface");
+}
+
+/// Returns the pretty-field version of a label fro a memory-related operation.
+static inline std::string getMemLabel(StringRef baseName, StringRef memName) {
+  return (baseName + (memName.empty() ? "" : " (" + memName.str() + ")")).str();
+}
+
+/// Returns the pretty-fied version of the DOT node's label corresponding  to
+/// the operation.
+static std::string getPrettyNodeLabel(Operation *op) {
   return llvm::TypeSwitch<Operation *, std::string>(op)
       // handshake operations
       .Case<handshake::ConstantOp>(
@@ -1078,23 +1116,30 @@ static std::string getPrettyPrintedNodeLabel(Operation *op) {
               mlir::FloatAttr attr = dyn_cast<mlir::FloatAttr>(valueAttr);
               return std::to_string(attr.getValue().convertToDouble());
             }
-            // Fallback on a generic string
-            return std::string("constant");
+            // Fallback on an empty string
+            return std::string("");
           })
-      .Case<handshake::ControlMergeOp>([&](auto) { return "cmerge"; })
-      .Case<handshake::ConditionalBranchOp>([&](auto) { return "cbranch"; })
       .Case<handshake::BufferOp>([&](handshake::BufferOp bufOp) {
-        return stringifyEnum(bufOp.getBufferType()).str() + " [" +
-               std::to_string(bufOp.getNumSlots()) + "]";
+        std::string bufType = bufOp.isSequential() ? "oehb" : "tehb";
+        return bufType + " [" + std::to_string(bufOp.getNumSlots()) + "]";
       })
+      .Case<handshake::MemoryControllerOp>([&](MemoryControllerOp mcOp) {
+        return getMemLabel("MC", getMemName(mcOp.getMemRef()));
+      })
+      .Case<handshake::LSQOp>([&](handshake::LSQOp lsqOp) {
+        return getMemLabel("LSQ", getMemName(lsqOp.getMemRef()));
+      })
+      .Case<handshake::MCLoadOp, handshake::LSQLoadOp>([&](auto) {
+        StringRef memName = getMemNameForPort(dyn_cast<LoadOpInterface>(op));
+        return getMemLabel("LD", memName);
+      })
+      .Case<handshake::MCStoreOp, handshake::LSQStoreOp>([&](auto) {
+        StringRef memName = getMemNameForPort(dyn_cast<StoreOpInterface>(op));
+        return getMemLabel("ST", memName);
+      })
+      .Case<handshake::ControlMergeOp>([&](auto) { return "cmerge"; })
       .Case<handshake::BranchOp>([&](auto) { return "branch"; })
-      // handshake operations (dynamatic)
-      .Case<handshake::MCLoadOp>([&](auto) { return "mc_load"; })
-      .Case<handshake::MCStoreOp>([&](auto) { return "mc_store"; })
-      .Case<handshake::LSQLoadOp>([&](auto) { return "lsq_load"; })
-      .Case<handshake::LSQStoreOp>([&](auto) { return "lsq_store"; })
-      .Case<handshake::MemoryControllerOp>([&](auto) { return "MC"; })
-      .Case<handshake::LSQOp>([&](auto) { return "LSQ"; })
+      .Case<handshake::ConditionalBranchOp>([&](auto) { return "cbranch"; })
       .Case<handshake::DynamaticReturnOp>([&](auto) { return "return"; })
       // arith operations
       .Case<arith::AddIOp, arith::AddFOp>([&](auto) { return "+"; })
@@ -1114,7 +1159,6 @@ static std::string getPrettyPrintedNodeLabel(Operation *op) {
         return "[" + std::to_string(opWidth) + "..." +
                std::to_string(resWidth) + "]";
       })
-      .Case<arith::SelectOp>([&](auto) { return "select"; })
       .Case<arith::CmpIOp>([&](arith::CmpIOp op) {
         switch (op.getPredicate()) {
         case arith::CmpIPredicate::eq:
@@ -1134,7 +1178,6 @@ static std::string getPrettyPrintedNodeLabel(Operation *op) {
         case arith::CmpIPredicate::slt:
           return "<";
         }
-        llvm_unreachable("unhandled cmpi predicate");
       })
       .Case<arith::CmpFOp>([&](arith::CmpFOp op) {
         switch (op.getPredicate()) {
@@ -1165,16 +1208,32 @@ static std::string getPrettyPrintedNodeLabel(Operation *op) {
         case arith::CmpFPredicate::AlwaysTrue:
           return "true";
         }
-        llvm_unreachable("unhandled cmpf predicate");
       })
-      .Default([&](auto op) {
-        auto opDialect = op->getDialect()->getNamespace();
+      .Default([&](auto) {
+        StringRef dialect = op->getDialect()->getNamespace();
         std::string label = op->getName().getStringRef().str();
-        if (opDialect == "handshake")
-          label.erase(0, StringLiteral("handshake.").size());
-
+        label.erase(0, dialect.size() + 1);
         return label;
       });
+}
+
+static StringRef getNodeColor(Operation *op) {
+  return llvm::TypeSwitch<Operation *, StringRef>(op)
+      .Case<handshake::ForkOp, handshake::LazyForkOp, handshake::JoinOp>(
+          [&](auto) { return "lavender"; })
+      .Case<handshake::BufferOp>([&](auto) { return "lightgreen"; })
+      .Case<handshake::DynamaticReturnOp, handshake::EndOp>(
+          [&](auto) { return "gold"; })
+      .Case<handshake::SourceOp, handshake::SinkOp>(
+          [&](auto) { return "gainsboro"; })
+      .Case<handshake::ConstantOp>([&](auto) { return "plum"; })
+      .Case<handshake::MemoryOpInterface, handshake::LoadOpInterface,
+            handshake::StoreOpInterface>([&](auto) { return "coral"; })
+      .Case<handshake::MergeOp, handshake::ControlMergeOp, handshake::MuxOp>(
+          [&](auto) { return "lightblue"; })
+      .Case<handshake::BranchOp, handshake::ConditionalBranchOp>(
+          [&](auto) { return "tan2"; })
+      .Default([&](auto) { return "moccasin"; });
 }
 
 DOTPrinter::DOTPrinter(Mode mode, EdgeStyle edgeStyle, TimingDatabase *timingDB)
@@ -1248,61 +1307,42 @@ void DOTPrinter::closeSubgraph(mlir::raw_indented_ostream &os) {
 
 LogicalResult DOTPrinter::printNode(Operation *op,
                                     mlir::raw_indented_ostream &os) {
-
-  std::string prettyLabel = getPrettyPrintedNodeLabel(op);
-  std::string canonicalName =
-      op->getName().getStringRef().str() +
-      (isa<arith::CmpIOp, arith::CmpFOp>(op) ? prettyLabel : "");
-
-  // Print node name
+  // The node's DOT name
   std::string opName = getUniqueName(op).str();
   if (inLegacyMode()) {
     // LSQ must be capitalized in legacy modes for dot2vhdl to recognize it
     if (size_t idx = opName.find("lsq"); idx != std::string::npos)
       opName = "LSQ" + opName.substr(3);
   }
+
+  // The node's DOT "mlir_op" attribute
+  std::string mlirOpName = op->getName().getStringRef().str();
+  std::string prettyLabel = getPrettyNodeLabel(op);
+  if (isa<arith::CmpIOp, arith::CmpFOp>(op))
+    mlirOpName += prettyLabel;
+
+  // The node's DOT "shape" attribute
+  StringRef dialect = op->getDialect()->getNamespace();
+  StringRef shape = dialect == "handshake" ? "box" : "oval";
+
+  // The node's DOT "label" attribute
+  StringRef label = inLegacyMode() ? opName : prettyLabel;
+
+  // The node's DOT "style" attribute
+  std::string style = "filled";
+  if (auto controlInterface = dyn_cast<handshake::ControlInterface>(op)) {
+    if (controlInterface.isControl())
+      style += ", " + CONTROL_STYLE;
+  }
+
+  // Write the node
   os << "\"" << opName << "\""
-     << " [mlir_op=\"" << canonicalName << "\", ";
-
-  // Determine fill color
-  os << "fillcolor=";
-  os << llvm::TypeSwitch<Operation *, std::string>(op)
-            .Case<handshake::ForkOp, handshake::LazyForkOp, handshake::JoinOp>(
-                [&](auto) { return "lavender"; })
-            .Case<handshake::BufferOp>([&](auto) { return "lightgreen"; })
-            .Case<handshake::DynamaticReturnOp, handshake::EndOp>(
-                [&](auto) { return "gold"; })
-            .Case<handshake::SourceOp, handshake::SinkOp>(
-                [&](auto) { return "gainsboro"; })
-            .Case<handshake::ConstantOp>([&](auto) { return "plum"; })
-            .Case<handshake::MemoryOpInterface, handshake::LoadOpInterface,
-                  handshake::StoreOpInterface>([&](auto) { return "coral"; })
-            .Case<handshake::MergeOp, handshake::ControlMergeOp,
-                  handshake::MuxOp>([&](auto) { return "lightblue"; })
-            .Case<handshake::BranchOp, handshake::ConditionalBranchOp>(
-                [&](auto) { return "tan2"; })
-            .Default([&](auto) { return "moccasin"; });
-
-  // Determine shape
-  os << ", shape=";
-  if (op->getDialect()->getNamespace() == "handshake")
-    os << "box";
-  else
-    os << "oval";
-
-  // Determine label
-  os << ", label=\"" << (inLegacyMode() ? opName : prettyLabel) << "\"";
-
-  // Determine style
-  os << ", style=\"filled";
-  if (auto controlInterface = dyn_cast<handshake::ControlInterface>(op);
-      controlInterface && controlInterface.isControl())
-    os << ", " + CONTROL_STYLE;
-  os << "\", ";
+     << " [mlir_op=\"" << mlirOpName << "\", fillcolor=" << getNodeColor(op)
+     << ", shape=" << shape << ", label=\"" << label << "\", style=\"" << style
+     << "\", ";
   if (inLegacyMode() && failed(annotateNode(op, os)))
     return failure();
   os << "]\n";
-
   return success();
 }
 
