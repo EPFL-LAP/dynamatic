@@ -1048,7 +1048,7 @@ std::string DOTPrinter::getNodeLatencyAttr(Operation *op) {
 // ============================================================================
 
 /// Style attribute value for control nodes/edges.
-static const std::string CONTROL_STYLE = "dashed";
+static const std::string CONTROL_STYLE = "dotted";
 
 /// Determines the style attribute of a value.
 static std::string getStyleOfValue(Value result) {
