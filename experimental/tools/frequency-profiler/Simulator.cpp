@@ -95,6 +95,12 @@ private:
                         std::vector<Any> &);
   LogicalResult execute(mlir::arith::DivFOp, std::vector<Any> &,
                         std::vector<Any> &);
+  LogicalResult execute(mlir::arith::RemFOp, std::vector<Any> &,
+                        std::vector<Any> &);
+  LogicalResult execute(mlir::arith::RemSIOp, std::vector<Any> &,
+                        std::vector<Any> &);
+  LogicalResult execute(mlir::arith::RemUIOp, std::vector<Any> &,
+                        std::vector<Any> &);
   LogicalResult execute(mlir::arith::IndexCastOp, std::vector<Any> &,
                         std::vector<Any> &);
   LogicalResult execute(mlir::arith::ExtSIOp, std::vector<Any> &,
@@ -458,6 +464,24 @@ LogicalResult StdExecuter::execute(mlir::arith::DivFOp, std::vector<Any> &in,
   return success();
 }
 
+LogicalResult StdExecuter::execute(mlir::arith::RemFOp, std::vector<Any> &in,
+                                   std::vector<Any> &out) {
+  out[0] = any_cast<APFloat>(in[0]).mod(any_cast<APFloat>(in[1]));
+  return success();
+}
+
+LogicalResult StdExecuter::execute(mlir::arith::RemSIOp, std::vector<Any> &in,
+                                   std::vector<Any> &out) {
+  out[0] = any_cast<APInt>(in[0]).srem(any_cast<APInt>(in[1]));
+  return success();
+}
+
+LogicalResult StdExecuter::execute(mlir::arith::RemUIOp, std::vector<Any> &in,
+                                   std::vector<Any> &out) {
+  out[0] = any_cast<APInt>(in[0]).urem(any_cast<APInt>(in[1]));
+  return success();
+}
+
 LogicalResult StdExecuter::execute(mlir::arith::IndexCastOp op,
                                    std::vector<Any> &in,
                                    std::vector<Any> &out) {
@@ -731,16 +755,17 @@ StdExecuter::StdExecuter(mlir::func::FuncOp &toplevel,
             .Case<arith::ConstantOp, arith::AddIOp, arith::AddFOp,
                   arith::CmpIOp, arith::CmpFOp, arith::SubIOp, arith::SubFOp,
                   arith::MulIOp, arith::MulFOp, arith::DivSIOp, arith::DivUIOp,
-                  arith::DivFOp, arith::IndexCastOp, arith::TruncIOp,
-                  arith::AndIOp, arith::OrIOp, arith::XOrIOp, arith::SelectOp,
-                  LLVM::UndefOp, arith::ShRSIOp, arith::ShLIOp, arith::ExtSIOp,
-                  arith::ExtUIOp, math::SqrtOp, math::CosOp, math::ExpOp,
-                  math::Exp2Op, math::LogOp, math::Log2Op, math::Log10Op,
-                  math::SqrtOp, memref::AllocOp, memref::LoadOp,
-                  memref::StoreOp>([&](auto op) {
-              strat = ExecuteStrategy::Default;
-              return execute(op, inValues, outValues);
-            })
+                  arith::DivFOp, arith::RemFOp, arith::RemSIOp, arith::RemUIOp,
+                  arith::IndexCastOp, arith::TruncIOp, arith::AndIOp,
+                  arith::OrIOp, arith::XOrIOp, arith::SelectOp, LLVM::UndefOp,
+                  arith::ShRSIOp, arith::ShLIOp, arith::ExtSIOp, arith::ExtUIOp,
+                  math::SqrtOp, math::CosOp, math::ExpOp, math::Exp2Op,
+                  math::LogOp, math::Log2Op, math::Log10Op, math::SqrtOp,
+                  memref::AllocOp, memref::LoadOp, memref::StoreOp>(
+                [&](auto op) {
+                  strat = ExecuteStrategy::Default;
+                  return execute(op, inValues, outValues);
+                })
             .Case<cf::BranchOp, cf::CondBranchOp, CallOpInterface>(
                 [&](auto op) {
                   strat = ExecuteStrategy::Continue;
