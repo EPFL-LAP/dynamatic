@@ -17,8 +17,7 @@
 #include "dynamatic/Support/LLVM.h"
 
 namespace dynamatic {
-namespace experimental {
-namespace visual_dataflow {
+namespace visual {
 
 class GraphParser {
 public:
@@ -30,8 +29,7 @@ private:
   Graph *mGraph;
 };
 
-} // namespace visual_dataflow
-} // namespace experimental
+} // namespace visual
 } // namespace dynamatic
 
 #endif // DYNAMATIC_VISUAL_DATAFLOW_PARSER_H

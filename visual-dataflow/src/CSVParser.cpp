@@ -17,7 +17,7 @@
 #include <iostream>
 
 using namespace mlir;
-using namespace dynamatic::experimental::visual_dataflow;
+using namespace dynamatic::visual;
 
 /// This function transforms a state of type 'string' into its corresponding
 /// state in type 'State'.
@@ -61,9 +61,9 @@ static std::string trim(const std::string &str) {
   return s;
 }
 
-LogicalResult dynamatic::experimental::visual_dataflow::processCSVLine(
-    const std::string &line, size_t lineIndex, Graph &graph,
-    CycleNb *currCycle) {
+LogicalResult dynamatic::visual::processCSVLine(const std::string &line,
+                                                size_t lineIndex, Graph &graph,
+                                                CycleNb *currCycle) {
 
   // Jump the first line which contain column names
   if (lineIndex == 0 || line.empty())

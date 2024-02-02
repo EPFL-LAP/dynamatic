@@ -21,15 +21,13 @@
 #include <sstream>
 
 namespace dynamatic {
-namespace experimental {
-namespace visual_dataflow {
+namespace visual {
 
 /// This function reads and interprets a edge transition line form a csv file.
 LogicalResult processCSVLine(const std::string &line, size_t lineIndex,
                              Graph &graph, CycleNb *currCycle);
 
-} // namespace visual_dataflow
-} // namespace experimental
+} // namespace visual
 } // namespace dynamatic
 
 #endif // DYNAMATIC_VISUAL_DATAFLOW_CSVPARSER_H

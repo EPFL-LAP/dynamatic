@@ -33,7 +33,7 @@
 using namespace llvm;
 using namespace mlir;
 using namespace dynamatic;
-using namespace dynamatic::experimental::visual_dataflow;
+using namespace dynamatic::visual;
 
 GraphParser::GraphParser(Graph *graph) : mGraph(graph) {}
 

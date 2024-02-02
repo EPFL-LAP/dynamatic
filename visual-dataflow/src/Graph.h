@@ -25,8 +25,7 @@
 #include <vector>
 
 namespace dynamatic {
-namespace experimental {
-namespace visual_dataflow {
+namespace visual {
 
 using CycleNb = int;
 using GraphId = int;
@@ -102,8 +101,7 @@ private:
   std::vector<BB> bbs;
 };
 
-} // namespace visual_dataflow
-} // namespace experimental
+} // namespace visual
 } // namespace dynamatic
 
 #endif // DYNAMATIC_VISUAL_DATAFLOW_GRAPH_H

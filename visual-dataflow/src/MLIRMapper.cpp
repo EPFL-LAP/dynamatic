@@ -28,7 +28,7 @@
 
 using namespace mlir;
 using namespace dynamatic;
-using namespace dynamatic::experimental::visual_dataflow;
+using namespace dynamatic::visual;
 
 /// Creates the "in" or "out" attribute of a node from a list of values and a
 /// port name (used as prefix to derive numbered port names for all values).

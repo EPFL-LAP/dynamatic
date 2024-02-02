@@ -15,6 +15,8 @@
 #include "GraphParser.h"
 #include "dynamatic/Support/DOTPrinter.h"
 #include "dynamatic/Support/TimingModels.h"
+#include "godot_cpp/classes/area2d.hpp"
+#include "godot_cpp/classes/canvas_item.hpp"
 #include "godot_cpp/classes/canvas_layer.hpp"
 #include "godot_cpp/classes/center_container.hpp"
 #include "godot_cpp/classes/color_rect.hpp"
@@ -24,11 +26,17 @@
 #include "godot_cpp/classes/label.hpp"
 #include "godot_cpp/classes/line2d.hpp"
 #include "godot_cpp/classes/node.hpp"
+#include "godot_cpp/classes/node2d.hpp"
 #include "godot_cpp/classes/panel.hpp"
 #include "godot_cpp/classes/polygon2d.hpp"
 #include "godot_cpp/classes/style_box_flat.hpp"
 #include "godot_cpp/core/class_db.hpp"
+#include "godot_cpp/core/math.hpp"
+#include "godot_cpp/core/memory.hpp"
+#include "godot_cpp/variant/color.hpp"
 #include "godot_cpp/variant/packed_vector2_array.hpp"
+#include "godot_cpp/variant/utility_functions.hpp"
+#include "godot_cpp/variant/vector2.hpp"
 #include "mlir/Dialect/Func/IR/FuncOps.h"
 #include "mlir/Dialect/LLVMIR/LLVMDialect.h"
 #include "mlir/Dialect/MemRef/IR/MemRef.h"
@@ -40,22 +48,13 @@
 #include "llvm/Support/InitLLVM.h"
 #include "llvm/Support/SourceMgr.h"
 #include <cstdint>
-#include <godot_cpp/classes/area2d.hpp>
-#include <godot_cpp/classes/canvas_item.hpp>
-#include <godot_cpp/classes/control.hpp>
-#include <godot_cpp/classes/node2d.hpp>
-#include <godot_cpp/core/math.hpp>
-#include <godot_cpp/core/memory.hpp>
-#include <godot_cpp/variant/color.hpp>
-#include <godot_cpp/variant/utility_functions.hpp>
-#include <godot_cpp/variant/vector2.hpp>
 #include <vector>
 
 using namespace llvm;
 using namespace mlir;
 using namespace godot;
 using namespace dynamatic;
-using namespace dynamatic::experimental::visual_dataflow;
+using namespace dynamatic::visual;
 
 const godot::Color TRANSPARENT_BLACK(0, 0, 0, 0.075);
 const godot::Color OPAQUE_BLACK(0, 0, 0, 1.0);

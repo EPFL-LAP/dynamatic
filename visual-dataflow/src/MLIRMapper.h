@@ -22,8 +22,7 @@
 using namespace mlir;
 
 namespace dynamatic {
-namespace experimental {
-namespace visual_dataflow {
+namespace visual {
 
 /// Implements the logic to convert Handshake-level IR to a Graph. The only
 /// public method of this class, mapMLIR, converts an MLIR module containing a
@@ -56,8 +55,7 @@ private:
   std::string getNodeName(Operation *op);
 };
 
-} // namespace visual_dataflow
-} // namespace experimental
+} // namespace visual
 } // namespace dynamatic
 
 #endif // DYNAMATIC_VISUAL_DATAFLOW_MLIRMAPPER_H

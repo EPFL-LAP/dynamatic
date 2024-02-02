@@ -25,7 +25,7 @@
 #include <string>
 #include <vector>
 
-using namespace dynamatic::experimental::visual_dataflow;
+using namespace dynamatic::visual;
 
 int main(int argc, char *argv[]) {
   if (argc != 3) {

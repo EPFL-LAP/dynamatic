@@ -15,7 +15,7 @@
 #include <utility>
 
 using namespace mlir;
-using namespace dynamatic::experimental::visual_dataflow;
+using namespace dynamatic::visual;
 
 void Graph::addEdge(GraphEdge edge) {
   edges.push_back(edge);

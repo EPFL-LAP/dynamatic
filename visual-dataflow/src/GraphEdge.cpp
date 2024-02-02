@@ -12,7 +12,7 @@
 #include "GraphEdge.h"
 #include <utility>
 
-using namespace dynamatic::experimental::visual_dataflow;
+using namespace dynamatic::visual;
 
 void GraphEdge::setId(EdgeId id) { this->id = id; }
 

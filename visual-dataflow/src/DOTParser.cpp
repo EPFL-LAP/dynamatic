@@ -23,12 +23,10 @@
 #include <string>
 #include <vector>
 
-using namespace dynamatic::experimental::visual_dataflow;
+using namespace dynamatic::visual;
 using namespace mlir;
 
-LogicalResult
-dynamatic::experimental::visual_dataflow::processDOT(std::ifstream &file,
-                                                     Graph &graph) {
+LogicalResult dynamatic::visual::processDOT(std::ifstream &file, Graph &graph) {
 
   std::string line;
 

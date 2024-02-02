@@ -19,13 +19,11 @@
 #include <fstream>
 
 namespace dynamatic {
-namespace experimental {
-namespace visual_dataflow {
+namespace visual {
 
 LogicalResult processDOT(std::ifstream &file, Graph &graph);
 
-} // namespace visual_dataflow
-} // namespace experimental
+} // namespace visual
 } // namespace dynamatic
 
 #endif // VISUAL_DATAFLOW_DOTPARSER_H

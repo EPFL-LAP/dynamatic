@@ -19,8 +19,7 @@
 #include <vector>
 
 namespace dynamatic {
-namespace experimental {
-namespace visual_dataflow {
+namespace visual {
 
 using EdgeId = int;
 
@@ -79,8 +78,7 @@ private:
   bool isDashed = false;
 };
 
-} // namespace visual_dataflow
-} // namespace experimental
+} // namespace visual
 } // namespace dynamatic
 
 #endif // DYNAMATIC_VISUAL_DATAFLOW_GRAPHEDGE_H
