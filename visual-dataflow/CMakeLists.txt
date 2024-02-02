@@ -21,19 +21,9 @@ add_library(${GODOT_LIB_NAME}
   src/VisualDataflow.cpp
   src/MLIRMapper.cpp
 )
+
 target_link_libraries(${GODOT_LIB_NAME}
   PRIVATE
- 
-  AffineToScf
-  DynamaticLowerScfToCf
-  DynamaticBufferPlacement
-  DynamaticCfToHandshake
-  DynamaticHandshakeToNetlist
-  DynamaticTransforms
-  DynamaticTutorialsCreatingPasses
-  DynamaticExperimentalTestTransforms
-  DynamaticExperimentalSupport
-
   DynamaticHandshake
 
   MLIRIR

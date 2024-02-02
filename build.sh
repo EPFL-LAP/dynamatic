@@ -21,7 +21,7 @@ List of options:
   --threads | -t              : number of concurrent threads to build on with
                                 ninja (by default, ninja spawns one thread per
                                 logical core on the host machine)
-  --build-visualizer | -v     : build experimental visual-dataflow tool
+  --build-viz | -v            : build visual-dataflow tool
   --check | -c                : run tests during build
   --help | -h                 : display this help message
 "
@@ -111,7 +111,7 @@ FORCE_CMAKE=0
 PARSE_NUM_THREADS=0
 NUM_THREADS=0
 BUILD_TYPE="Debug"
-BUILD_VISUALIZER="OFF"
+BUILD_VISUAL_DATAFLOW="OFF"
 for arg in "$@"; 
 do
     if [[ $PARSE_NUM_THREADS -eq 1 ]]; then
@@ -135,8 +135,8 @@ do
           "--check" | "-c")
               ENABLE_TESTS=1
               ;;
-          "--build-visualizer" | "-v")
-              BUILD_VISUALIZER="ON"
+          "--build-viz" | "-v")
+              BUILD_VISUAL_DATAFLOW="ON"
               ;;
           "--help" | "-h")
               print_help_and_exit
@@ -212,7 +212,7 @@ if should_run_cmake ; then
       -DCMAKE_BUILD_TYPE=$BUILD_TYPE \
       -DLLVM_ENABLE_ASSERTIONS=ON \
       -DCMAKE_EXPORT_COMPILE_COMMANDS=ON \
-      -DDYNAMATIC_BUILD_VISUALIZER=$BUILD_VISUALIZER \
+      -DBUILD_VISUAL_DATAFLOW=$BUILD_VISUAL_DATAFLOW \
       $CMAKE_FLAGS_SUPER
   exit_on_fail "Failed to cmake dynamatic"
 fi
