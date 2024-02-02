@@ -292,14 +292,14 @@ static Value getSuccResult(Operation *brOp, Operation *newBrOp,
 }
 
 /// Returns the unique data operands of a cf-level branch-like operation.
-static DenseSet<Value> getBranchOperands(Operation *termOp) {
+static SetVector<Value> getBranchOperands(Operation *termOp) {
   if (auto condBranchOp = dyn_cast<mlir::cf::CondBranchOp>(termOp)) {
     OperandRange oprds = condBranchOp.getOperands().drop_front();
-    return DenseSet<Value>{oprds.begin(), oprds.end()};
+    return SetVector<Value>{oprds.begin(), oprds.end()};
   }
   assert(isa<mlir::cf::BranchOp>(termOp) && "unsupported block terminator");
   OperandRange oprds = termOp->getOperands();
-  return DenseSet<Value>{oprds.begin(), oprds.end()};
+  return SetVector<Value>{oprds.begin(), oprds.end()};
 }
 
 //===-----------------------------------------------------------------------==//
