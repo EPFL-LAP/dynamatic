@@ -950,9 +950,12 @@ LogicalResult DOTPrinter::annotateArgumentNode(handshake::FuncOp funcOp,
   return success();
 }
 
-LogicalResult DOTPrinter::annotateEdge(Operation *src, Operation *dst,
-                                       Value val,
+LogicalResult DOTPrinter::annotateEdge(OpOperand &oprd,
                                        mlir::raw_indented_ostream &os) {
+  Value val = oprd.get();
+  Operation *src = val.getDefiningOp();
+  Operation *dst = oprd.getOwner();
+
   bool legacyBuffers = mode == Mode::LEGACY_BUFFERS;
   // In legacy-buffers mode, skip edges from branch-like operations to bitwidth
   // modifiers in between blocks
@@ -1047,12 +1050,29 @@ std::string DOTPrinter::getNodeLatencyAttr(Operation *op) {
 // Printing
 // ============================================================================
 
-/// Style attribute value for control nodes/edges.
-static const std::string CONTROL_STYLE = "dotted";
+static constexpr StringLiteral DOTTED("dotted"), SOLID("solid"), DOT("dot"),
+    NORMAL("normal");
 
-/// Determines the style attribute of a value.
-static std::string getStyleOfValue(Value result) {
-  return isa<NoneType>(result.getType()) ? "style=" + CONTROL_STYLE + ", " : "";
+/// Determines the "arrowhead" attribute of the edge corresponding to the
+/// operand.
+static StringRef getArrowheadStyle(OpOperand &oprd) {
+  Value val = oprd.get();
+  Operation *ownerOp = oprd.getOwner();
+  if (auto muxOp = dyn_cast<handshake::MuxOp>(ownerOp))
+    return val == muxOp.getSelectOperand() ? DOT : NORMAL;
+  if (auto condBrOp = dyn_cast<handshake::ConditionalBranchOp>(ownerOp))
+    return val == condBrOp.getConditionOperand() ? DOT : NORMAL;
+  return NORMAL;
+}
+
+/// Determines cosmetic attributes of the edge corresponding to the operand.
+static std::string getEdgeStyle(OpOperand &oprd) {
+  std::string attributes;
+  StringRef style = isa<NoneType>(oprd.get().getType()) ? DOTTED : SOLID;
+  // StringRef arrowhead =
+  return "style=\"" + style.str() +
+         R"(", dir="both", arrowtail="none", arrowhead=")" +
+         getArrowheadStyle(oprd).str() + "\", ";
 }
 
 /// Returns the name of the function argument that corresponds to the memref
@@ -1339,22 +1359,26 @@ LogicalResult DOTPrinter::printNode(Operation *op,
   std::string style = "filled";
   if (auto controlInterface = dyn_cast<handshake::ControlInterface>(op)) {
     if (controlInterface.isControl())
-      style += ", " + CONTROL_STYLE;
+      style += ", " + DOTTED.str();
   }
 
   // Write the node
   os << "\"" << opName << "\""
-     << " [mlir_op=\"" << mlirOpName << "\", fillcolor=" << getNodeColor(op)
-     << ", shape=" << shape << ", label=\"" << label << "\", style=\"" << style
-     << "\", ";
+     << " [mlir_op=\"" << mlirOpName << "\", label=\"" << label
+     << "\", fillcolor=" << getNodeColor(op) << ", shape=\"" << shape
+     << "\", style=\"" << style << "\", ";
   if (inLegacyMode() && failed(annotateNode(op, os)))
     return failure();
   os << "]\n";
   return success();
 }
 
-LogicalResult DOTPrinter::printEdge(Operation *src, Operation *dst, Value val,
+LogicalResult DOTPrinter::printEdge(OpOperand &oprd,
                                     mlir::raw_indented_ostream &os) {
+  Value val = oprd.get();
+  Operation *src = val.getDefiningOp();
+  Operation *dst = oprd.getOwner();
+
   bool legacyBuffers = mode == Mode::LEGACY_BUFFERS;
   // In legacy-buffers mode, skip edges from branch-like operations to bitwidth
   // modifiers in between blocks
@@ -1378,16 +1402,14 @@ LogicalResult DOTPrinter::printEdge(Operation *src, Operation *dst, Value val,
   }
 
   os << "\"" << srcNodeName << "\" -> \"" << dstNodeName << "\" ["
-     << getStyleOfValue(val);
-  if (legacy && failed(annotateEdge(src, dst, val, os)))
+     << getEdgeStyle(oprd);
+  if (legacy && failed(annotateEdge(oprd, os)))
     return failure();
   if (isBackedge(val, dst))
     os << (legacy ? ", " : "") << " color=\"blue\"";
   os << "]\n";
   return success();
 }
-
-using OutgoingEdge = std::tuple<Operation *, Operation *, OpResult>;
 
 LogicalResult DOTPrinter::printFunc(handshake::FuncOp funcOp,
                                     mlir::raw_indented_ostream &os) {
@@ -1413,9 +1435,11 @@ LogicalResult DOTPrinter::printFunc(handshake::FuncOp funcOp,
         // inside the function so they are not displayed
         continue;
 
-      auto argLabel = getArgumentName(funcOp, arg.index());
-      os << "\"" << argLabel << R"(" [mlir_op="handshake.arg", shape=diamond, )"
-         << getStyleOfValue(arg.value()) << "label=\"" << argLabel << "\", ";
+      std::string argLabel = getArgumentName(funcOp, arg.index());
+      StringRef style = isa<NoneType>(arg.value().getType()) ? DOTTED : SOLID;
+      os << "\"" << argLabel
+         << R"(" [mlir_op="handshake.func", shape=diamond, )"
+         << "label=\"" << argLabel << "\", style=\"" << style << "\", ";
       if (legacy && failed(annotateArgumentNode(funcOp, arg.index(), os)))
         return failure();
       os << "]\n";
@@ -1426,16 +1450,20 @@ LogicalResult DOTPrinter::printFunc(handshake::FuncOp funcOp,
   /// Prints all edges incoming from function arguments.
   auto printArgEdges = [&]() -> LogicalResult {
     os << "// Channels from function arguments\n";
-    for (auto [idx, arg] : llvm::enumerate(funcOp.getArguments()))
-      if (!isa<MemRefType>(arg.getType()))
-        for (Operation *user : arg.getUsers()) {
-          std::string argLabel = getArgumentName(funcOp, idx);
-          os << "\"" << argLabel << "\" -> \"" << getUniqueName(user) << "\" ["
-             << getStyleOfValue(arg);
-          if (legacy && failed(annotateArgumentEdge(funcOp, idx, user, os)))
-            return failure();
-          os << "]\n";
-        }
+    for (auto [idx, arg] : llvm::enumerate(funcOp.getArguments())) {
+      if (isa<MemRefType>(arg.getType()))
+        continue;
+
+      for (OpOperand &oprd : arg.getUses()) {
+        Operation *ownerOp = oprd.getOwner();
+        std::string argLabel = getArgumentName(funcOp, idx);
+        os << "\"" << argLabel << "\" -> \"" << getUniqueName(ownerOp) << "\" ["
+           << getEdgeStyle(oprd);
+        if (legacy && failed(annotateArgumentEdge(funcOp, idx, ownerOp, os)))
+          return failure();
+        os << "]\n";
+      }
+    }
     return success();
   };
 
@@ -1449,7 +1477,7 @@ LogicalResult DOTPrinter::printFunc(handshake::FuncOp funcOp,
   bool areArgsHandled = false;
 
   // Collect all edges that do not connect two nodes in the same block
-  llvm::MapVector<unsigned, std::vector<OutgoingEdge>> outgoingEdges;
+  llvm::MapVector<unsigned, std::vector<OpOperand *>> outgoingEdges;
 
   // We print the function "block-by-block" by grouping nodes in the same block
   // (as well as edges between nodes of the same block) within DOT clusters
@@ -1487,10 +1515,10 @@ LogicalResult DOTPrinter::printFunc(handshake::FuncOp funcOp,
           Operation *userOp = oprd.getOwner();
           std::optional<unsigned> bb = getLogicBB(userOp);
           if (bb && *bb == blockID) {
-            if (failed(printEdge(op, userOp, res, os)))
+            if (failed(printEdge(oprd, os)))
               return failure();
           } else {
-            outgoingEdges[blockID].emplace_back(op, userOp, res);
+            outgoingEdges[blockID].push_back(&oprd);
           }
         }
       }
@@ -1517,9 +1545,10 @@ LogicalResult DOTPrinter::printFunc(handshake::FuncOp funcOp,
   // Print outgoing edges for each block
   for (auto &[blockID, blockEdges] : outgoingEdges) {
     os << "// Channels outgoing of BB " << blockID << "\n";
-    for (auto &[op, userOp, res] : blockEdges)
-      if (failed(printEdge(op, userOp, res, os)))
+    for (OpOperand *oprd : blockEdges) {
+      if (failed(printEdge(*oprd, os)))
         return failure();
+    }
   }
 
   // Print edges coming from function arguments if they haven't been so far
@@ -1530,7 +1559,7 @@ LogicalResult DOTPrinter::printFunc(handshake::FuncOp funcOp,
   for (Operation *op : blocks.outOfBlocks) {
     for (OpResult res : op->getResults()) {
       for (OpOperand &oprd : res.getUses()) {
-        if (failed(printEdge(op, oprd.getOwner(), res, os)))
+        if (failed(printEdge(oprd, os)))
           return failure();
       }
     }
