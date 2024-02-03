@@ -29,6 +29,7 @@ else ()
 endif ()
 
 include(FindPackageHandleStandardArgs)
+find_package(Python3 3.6 REQUIRED COMPONENTS Interpreter)
 
 #-------------------------------------------------------------------------------
 # MLIR/LLVM configuration
