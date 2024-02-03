@@ -12,7 +12,7 @@
 // CHECK:           %[[VAL_11:.*]] = constant %[[VAL_10]] {bb = 0 : ui32, value = 1 : i32} : i32
 // CHECK:           %[[VAL_6]], %[[VAL_7]] = mc_store{{\[}}%[[VAL_9]]] %[[VAL_11]] {bb = 0 : ui32} : i32, index
 // CHECK:           %[[VAL_8]], %[[VAL_12:.*]] = mc_load{{\[}}%[[VAL_9]]] %[[VAL_3]] {bb = 0 : ui32} : index, i32
-// CHECK:           %[[VAL_13:.*]] = d_return {bb = 0 : ui32} %[[VAL_10]] : none
+// CHECK:           %[[VAL_13:.*]] = return {bb = 0 : ui32} %[[VAL_10]] : none
 // CHECK:           end {bb = 0 : ui32} %[[VAL_13]], %[[VAL_4]] : none, none
 // CHECK:         }
 func.func @simpleLoadStore(%arg0 : index, %arg1 : memref<4xi32>) {
@@ -48,7 +48,7 @@ func.func @simpleLoadStore(%arg0 : index, %arg1 : memref<4xi32>) {
 // CHECK:           %[[VAL_9]], %[[VAL_10]] = mc_store{{\[}}%[[VAL_23]]] %[[VAL_26]] {bb = 2 : ui32} : i32, index
 // CHECK:           %[[VAL_27:.*]] = br %[[VAL_24]] {bb = 2 : ui32} : none
 // CHECK:           %[[VAL_28:.*]], %[[VAL_29:.*]] = control_merge %[[VAL_27]], %[[VAL_22]] {bb = 3 : ui32} : none, index
-// CHECK:           %[[VAL_30:.*]] = d_return {bb = 3 : ui32} %[[VAL_28]] : none
+// CHECK:           %[[VAL_30:.*]] = return {bb = 3 : ui32} %[[VAL_28]] : none
 // CHECK:           end {bb = 3 : ui32} %[[VAL_30]], %[[VAL_4]] : none, none
 // CHECK:         }
 func.func @storeMulBlocks(%arg0 : i1, %arg1 : index, %arg2 : memref<4xi32>) {
@@ -86,7 +86,7 @@ func.func @storeMulBlocks(%arg0 : i1, %arg1 : index, %arg2 : memref<4xi32>) {
 // CHECK:           %[[VAL_20:.*]] = arith.addi %[[VAL_15]], %[[VAL_19]] {bb = 1 : ui32} : i32
 // CHECK:           %[[VAL_21:.*]] = br %[[VAL_16]] {bb = 1 : ui32} : none
 // CHECK:           %[[VAL_22:.*]], %[[VAL_23:.*]] = control_merge %[[VAL_21]], %[[VAL_14]] {bb = 2 : ui32} : none, index
-// CHECK:           %[[VAL_24:.*]] = d_return {bb = 2 : ui32} %[[VAL_22]] : none
+// CHECK:           %[[VAL_24:.*]] = return {bb = 2 : ui32} %[[VAL_22]] : none
 // CHECK:           end {bb = 2 : ui32} %[[VAL_24]], %[[VAL_5]] : none, none
 // CHECK:         }
 func.func @forwardLoadToBB(%arg0 : i1, %arg1 : index, %arg2: memref<4xi32>) {
@@ -119,13 +119,13 @@ func.func @forwardLoadToBB(%arg0 : i1, %arg1 : index, %arg2: memref<4xi32>) {
 // CHECK:           %[[VAL_12]] = constant %[[VAL_27]] {bb = 1 : ui32, value = 1 : i32} : i32
 // CHECK:           %[[VAL_6]], %[[VAL_29:.*]] = mc_load{{\[}}%[[VAL_26]]] %[[VAL_4]] {bb = 1 : ui32} : index, i32
 // CHECK:           %[[VAL_13]], %[[VAL_14]] = mc_store{{\[}}%[[VAL_26]]] %[[VAL_29]] {bb = 1 : ui32} : i32, index
-// CHECK:           %[[VAL_30:.*]] = d_return {bb = 1 : ui32} %[[VAL_27]] : none
+// CHECK:           %[[VAL_30:.*]] = return {bb = 1 : ui32} %[[VAL_27]] : none
 // CHECK:           %[[VAL_31:.*]] = merge %[[VAL_25]] {bb = 2 : ui32} : index
 // CHECK:           %[[VAL_32:.*]], %[[VAL_33:.*]] = control_merge %[[VAL_23]] {bb = 2 : ui32} : none, index
 // CHECK:           %[[VAL_7]] = constant %[[VAL_32]] {bb = 2 : ui32, value = 1 : i32} : i32
 // CHECK:           %[[VAL_15]], %[[VAL_34:.*]] = mc_load{{\[}}%[[VAL_31]]] %[[VAL_10]] {bb = 2 : ui32} : index, i32
 // CHECK:           %[[VAL_8]], %[[VAL_9]] = mc_store{{\[}}%[[VAL_31]]] %[[VAL_34]] {bb = 2 : ui32} : i32, index
-// CHECK:           %[[VAL_35:.*]] = d_return {bb = 2 : ui32} %[[VAL_32]] : none
+// CHECK:           %[[VAL_35:.*]] = return {bb = 2 : ui32} %[[VAL_32]] : none
 // CHECK:           %[[VAL_36:.*]] = merge %[[VAL_30]], %[[VAL_35]] {bb = 3 : ui32} : none
 // CHECK:           end {bb = 3 : ui32} %[[VAL_36]], %[[VAL_5]], %[[VAL_11]] : none, none, none
 // CHECK:         }

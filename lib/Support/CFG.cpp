@@ -571,7 +571,7 @@ static GIIDStatus isGIIDRec(Value predecessor, OpOperand &oprd,
         // Otherwise, data inputs on the path must depend on the predecessor
         return foldGIIDStatusAnd(recurse, defOp->getOperands());
       })
-      .Case<handshake::DynamaticReturnOp>([&](auto) {
+      .Case<handshake::ReturnOp>([&](auto) {
         // Just recurse the call on the return operand corresponding to the
         // value
         Value oprd = defOp->getOperand(cast<OpResult>(val).getResultNumber());

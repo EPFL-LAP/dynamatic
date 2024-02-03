@@ -14,7 +14,7 @@
 // CHECK:           %[[VAL_8]], %[[VAL_12:.*]] = cond_br %[[VAL_11]], %[[VAL_6]] {bb = 1 : ui32} : i32
 // CHECK:           %[[VAL_10]], %[[VAL_13:.*]] = cond_br %[[VAL_11]], %[[VAL_9]] {bb = 1 : ui32} : none
 // CHECK:           %[[VAL_14:.*]], %[[VAL_15:.*]] = control_merge %[[VAL_13]] {bb = 2 : ui32} : none, index
-// CHECK:           %[[VAL_16:.*]] = d_return {bb = 2 : ui32} %[[VAL_14]] : none
+// CHECK:           %[[VAL_16:.*]] = return {bb = 2 : ui32} %[[VAL_14]] : none
 // CHECK:           end {bb = 2 : ui32} %[[VAL_16]] : none
 // CHECK:         }
 func.func @selfLoop(%arg0: i32) {
@@ -43,7 +43,7 @@ func.func @selfLoop(%arg0: i32) {
 // CHECK:           %[[VAL_16:.*]] = mux %[[VAL_15]] {{\[}}%[[VAL_10]], %[[VAL_10]]] {bb = 1 : ui32} : index, i32
 // CHECK:           %[[VAL_17:.*]] = mux %[[VAL_15]] {{\[}}%[[VAL_8]], %[[VAL_10]]] {bb = 1 : ui32} : index, i32
 // CHECK:           %[[VAL_18:.*]], %[[VAL_15]] = control_merge %[[VAL_12]], %[[VAL_12]] {bb = 1 : ui32} : none, index
-// CHECK:           %[[VAL_19:.*]] = d_return {bb = 1 : ui32} %[[VAL_18]] : none
+// CHECK:           %[[VAL_19:.*]] = return {bb = 1 : ui32} %[[VAL_18]] : none
 // CHECK:           end {bb = 1 : ui32} %[[VAL_19]] : none
 // CHECK:         }
 func.func @duplicateLiveOut(%arg0: i1, %arg1: i32, %arg2: i32) {
@@ -70,7 +70,7 @@ func.func @duplicateLiveOut(%arg0: i1, %arg1: i32, %arg2: i32) {
 // CHECK:           %[[VAL_15:.*]], %[[VAL_16:.*]] = control_merge %[[VAL_9]] {bb = 2 : ui32} : none, index
 // CHECK:           %[[VAL_17:.*]] = br %[[VAL_15]] {bb = 2 : ui32} : none
 // CHECK:           %[[VAL_18:.*]], %[[VAL_19:.*]] = control_merge %[[VAL_17]], %[[VAL_13]] {bb = 3 : ui32} : none, index
-// CHECK:           %[[VAL_20:.*]] = d_return {bb = 3 : ui32} %[[VAL_18]] : none
+// CHECK:           %[[VAL_20:.*]] = return {bb = 3 : ui32} %[[VAL_18]] : none
 // CHECK:           end {bb = 3 : ui32} %[[VAL_20]] : none
 // CHECK:         }
 func.func @divergeSameArg(%arg0: i1, %arg1: i32) {

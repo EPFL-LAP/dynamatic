@@ -439,7 +439,7 @@ static std::string getExtModuleName(Operation *oldOp) {
         // bitwidth
         extModName += "_" + getTypeName(inTypes[0], loc);
       })
-      .Case<handshake::DynamaticReturnOp>([&](auto) {
+      .Case<handshake::ReturnOp>([&](auto) {
         // bitwidth
         extModName += getTypeName(inTypes[0], loc);
       })
@@ -967,8 +967,8 @@ static LogicalResult verifyExportToRTL(handshake::FuncOp funcOp) {
                               "only supports integer and floating-point types";
                   return success();
                 })
-            .Case<handshake::DynamaticReturnOp>(
-                [&](handshake::DynamaticReturnOp retOp) -> LogicalResult {
+            .Case<handshake::ReturnOp>(
+                [&](handshake::ReturnOp retOp) -> LogicalResult {
                   if (retOp->getNumOperands() != 1)
                     return retOp.emitError()
                            << "Incompatible number of return values, our VHDL "
@@ -1092,7 +1092,7 @@ public:
         ExtModuleConversionPattern<handshake::ConstantOp>,
         ExtModuleConversionPattern<handshake::SinkOp>,
         ExtModuleConversionPattern<handshake::ForkOp>,
-        ExtModuleConversionPattern<handshake::DynamaticReturnOp>,
+        ExtModuleConversionPattern<handshake::ReturnOp>,
         ExtModuleConversionPattern<handshake::MCLoadOp>,
         ExtModuleConversionPattern<handshake::LSQLoadOp>,
         ExtModuleConversionPattern<handshake::MCStoreOp>,

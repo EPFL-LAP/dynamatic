@@ -62,7 +62,7 @@ dynamatic::findEquivalentCst(handshake::ConstantOp cstOp) {
 /// logic that legacy Dynamatic follows.
 static bool cstUserIsSourcable(Operation *cstUser) {
   return !isa<handshake::BranchOp, handshake::ConditionalBranchOp,
-              handshake::DynamaticReturnOp, handshake::LoadOpInterface,
+              handshake::ReturnOp, handshake::LoadOpInterface,
               handshake::StoreOpInterface>(cstUser);
 }
 

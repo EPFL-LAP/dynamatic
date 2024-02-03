@@ -861,11 +861,10 @@ using ExtValue = std::pair<Value, ExtType>;
 /// (different return result types and enclosing function return types).
 /// When we eventually formalize and rework our circuit's interfaces, this may
 /// become useful, so here it stays.
-struct HandshakeReturnFW
-    : public OpRewritePattern<handshake::DynamaticReturnOp> {
-  using OpRewritePattern<handshake::DynamaticReturnOp>::OpRewritePattern;
+struct HandshakeReturnFW : public OpRewritePattern<handshake::ReturnOp> {
+  using OpRewritePattern<handshake::ReturnOp>::OpRewritePattern;
 
-  LogicalResult matchAndRewrite(handshake::DynamaticReturnOp retOp,
+  LogicalResult matchAndRewrite(handshake::ReturnOp retOp,
                                 PatternRewriter &rewriter) const override {
 
     // Try to move potential extension operations after the return
@@ -892,8 +891,8 @@ struct HandshakeReturnFW
     // Insert an optimized return operation that moves eventual value extensions
     // after itself
     rewriter.setInsertionPoint(retOp);
-    auto newOp = rewriter.create<handshake::DynamaticReturnOp>(retOp->getLoc(),
-                                                               newOperands);
+    auto newOp =
+        rewriter.create<handshake::ReturnOp>(retOp->getLoc(), newOperands);
     inheritBB(retOp, newOp);
 
     // Create required extension operations on the new return's results so that

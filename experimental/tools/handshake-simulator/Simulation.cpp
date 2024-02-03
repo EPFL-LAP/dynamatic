@@ -218,7 +218,7 @@ HandshakeExecuter::HandshakeExecuter(handshake::FuncOp &func,
   bool hasEnd = false;
   func.walk([&](Operation *op) {
     // Set all return flags to false
-    if (isa<handshake::DynamaticReturnOp>(op)) {
+    if (isa<handshake::ReturnOp>(op)) {
       internalDataMap[op] = false;
     } else if (isa<handshake::EndOp>(op)) {
       hasEnd = true;

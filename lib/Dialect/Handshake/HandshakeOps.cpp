@@ -1668,10 +1668,10 @@ void LSQLoadOp::build(OpBuilder &odsBuilder, OperationState &odsState,
 }
 
 //===----------------------------------------------------------------------===//
-// DynamaticReturnOp
+// ReturnOp
 //===----------------------------------------------------------------------===//
 
-LogicalResult DynamaticReturnOp::inferReturnTypes(
+LogicalResult ReturnOp::inferReturnTypes(
     MLIRContext *context, std::optional<Location> location, ValueRange operands,
     DictionaryAttr attributes, mlir::OpaqueProperties properties,
     mlir::RegionRange regions,
@@ -1681,7 +1681,7 @@ LogicalResult DynamaticReturnOp::inferReturnTypes(
   return success();
 }
 
-LogicalResult DynamaticReturnOp::verify() {
+LogicalResult ReturnOp::verify() {
   auto funcOp = getOperation()->getParentOfType<handshake::FuncOp>();
   if (!funcOp)
     return emitOpError("must have a handshake.func parent");

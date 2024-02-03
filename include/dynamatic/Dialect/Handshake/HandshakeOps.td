@@ -916,10 +916,10 @@ def LSQStoreOp : Handshake_StoreOp<"lsq_store"> {
   }];
 }
 
-def DynamaticReturnOp : Handshake_Op<"d_return", [
+def ReturnOp : Handshake_Op<"return", [
   DeclareOpInterfaceMethods<InferTypeOpInterface, ["inferReturnTypes"]>
 ]> {
-  let summary = "handshake-level return (dynamatic)";
+  let summary = "handshake-level return";
   let description = [{
     This return operation represents the handshake equivalent of a 
     func::ReturnOp (i.e., the latter is converted to the former one-to-one,
@@ -929,7 +929,7 @@ def DynamaticReturnOp : Handshake_Op<"d_return", [
 
     Example:
     ```mlir
-    %out1, %out2 = d_return %in1, %in2 : i32, i64
+    %out1, %out2 = return %in1, %in2 : i32, i64
     ```
   }];
 

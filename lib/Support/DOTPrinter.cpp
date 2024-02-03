@@ -851,7 +851,7 @@ LogicalResult DOTPrinter::annotateNode(Operation *op,
             info.stringAttr["out"] = getIOFromValues(op->getResults(), "out");
             return info;
           })
-          .Case<handshake::DynamaticReturnOp>([&](auto) {
+          .Case<handshake::ReturnOp>([&](auto) {
             auto info = NodeInfo("Operator");
             info.stringAttr["op"] = "ret_op";
             return info;
@@ -1167,7 +1167,7 @@ static std::string getPrettyNodeLabel(Operation *op) {
       .Case<handshake::ControlMergeOp>([&](auto) { return "cmerge"; })
       .Case<handshake::BranchOp>([&](auto) { return "branch"; })
       .Case<handshake::ConditionalBranchOp>([&](auto) { return "cbranch"; })
-      .Case<handshake::DynamaticReturnOp>([&](auto) { return "return"; })
+      .Case<handshake::ReturnOp>([&](auto) { return "return"; })
       // arith operations
       .Case<arith::AddIOp, arith::AddFOp>([&](auto) { return "+"; })
       .Case<arith::SubIOp, arith::SubFOp>([&](auto) { return "-"; })
@@ -1249,8 +1249,7 @@ static StringRef getNodeColor(Operation *op) {
       .Case<handshake::ForkOp, handshake::LazyForkOp, handshake::JoinOp>(
           [&](auto) { return "lavender"; })
       .Case<handshake::BufferOp>([&](auto) { return "lightgreen"; })
-      .Case<handshake::DynamaticReturnOp, handshake::EndOp>(
-          [&](auto) { return "gold"; })
+      .Case<handshake::ReturnOp, handshake::EndOp>([&](auto) { return "gold"; })
       .Case<handshake::SourceOp, handshake::SinkOp>(
           [&](auto) { return "gainsboro"; })
       .Case<handshake::ConstantOp>([&](auto) { return "plum"; })

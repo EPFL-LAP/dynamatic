@@ -9,7 +9,7 @@
 // CHECK:           %[[VAL_6:.*]] = merge %[[VAL_1]] {bb = 0 : ui32} : index
 // CHECK:           %[[VAL_7:.*]] = merge %[[VAL_2]] {bb = 0 : ui32} : none
 // CHECK:           %[[VAL_5]], %[[VAL_8:.*]] = mc_load{{\[}}%[[VAL_6]]] %[[VAL_3]] {bb = 0 : ui32} : index, i32
-// CHECK:           %[[VAL_9:.*]] = d_return {bb = 0 : ui32} %[[VAL_8]] : i32
+// CHECK:           %[[VAL_9:.*]] = return {bb = 0 : ui32} %[[VAL_8]] : i32
 // CHECK:           end {bb = 0 : ui32} %[[VAL_9]], %[[VAL_4]] : i32, none
 // CHECK:         }
 func.func @simpleLoad(%arg0: memref<4xi32>, %arg1: index) -> i32 {
@@ -43,7 +43,7 @@ func.func @simpleLoad(%arg0: memref<4xi32>, %arg1: index) -> i32 {
 // CHECK:           %[[VAL_25:.*]] = br %[[VAL_19]] {bb = 2 : ui32} : none
 // CHECK:           %[[VAL_26:.*]] = mux %[[VAL_27:.*]] {{\[}}%[[VAL_24]], %[[VAL_16]]] {bb = 3 : ui32} : index, i32
 // CHECK:           %[[VAL_28:.*]], %[[VAL_27]] = control_merge %[[VAL_25]], %[[VAL_17]] {bb = 3 : ui32} : none, index
-// CHECK:           %[[VAL_29:.*]] = d_return {bb = 3 : ui32} %[[VAL_26]] : i32
+// CHECK:           %[[VAL_29:.*]] = return {bb = 3 : ui32} %[[VAL_26]] : i32
 // CHECK:           end {bb = 3 : ui32} %[[VAL_29]] : i32
 // CHECK:         }
 func.func @ifThenElse(%arg0: i32, %arg1: i1) -> i32 {
@@ -76,13 +76,13 @@ func.func @ifThenElse(%arg0: i32, %arg1: i1) -> i32 {
 // CHECK:           %[[VAL_13:.*]] = source {bb = 1 : ui32}
 // CHECK:           %[[VAL_14:.*]] = constant %[[VAL_13]] {bb = 1 : ui32, value = 1 : i32} : i32
 // CHECK:           %[[VAL_15:.*]] = arith.addi %[[VAL_10]], %[[VAL_14]] {bb = 1 : ui32} : i32
-// CHECK:           %[[VAL_16:.*]] = d_return {bb = 1 : ui32} %[[VAL_15]] : i32
+// CHECK:           %[[VAL_16:.*]] = return {bb = 1 : ui32} %[[VAL_15]] : i32
 // CHECK:           %[[VAL_17:.*]] = merge %[[VAL_7]] {bb = 2 : ui32} : i32
 // CHECK:           %[[VAL_18:.*]], %[[VAL_19:.*]] = control_merge %[[VAL_9]] {bb = 2 : ui32} : none, index
 // CHECK:           %[[VAL_20:.*]] = source {bb = 2 : ui32}
 // CHECK:           %[[VAL_21:.*]] = constant %[[VAL_20]] {bb = 2 : ui32, value = 2 : i32} : i32
 // CHECK:           %[[VAL_22:.*]] = arith.addi %[[VAL_17]], %[[VAL_21]] {bb = 2 : ui32} : i32
-// CHECK:           %[[VAL_23:.*]] = d_return {bb = 2 : ui32} %[[VAL_22]] : i32
+// CHECK:           %[[VAL_23:.*]] = return {bb = 2 : ui32} %[[VAL_22]] : i32
 // CHECK:           %[[VAL_24:.*]] = merge %[[VAL_16]], %[[VAL_23]] {bb = 3 : ui32} : i32
 // CHECK:           end {bb = 3 : ui32} %[[VAL_24]] : i32
 // CHECK:         }
@@ -130,7 +130,7 @@ func.func @multipleReturns(%arg0: i32, %arg1: i1) -> i32 {
 // CHECK:           %[[VAL_16]] = br %[[VAL_29]] {bb = 2 : ui32} : index
 // CHECK:           %[[VAL_18]] = br %[[VAL_31]] {bb = 2 : ui32} : none
 // CHECK:           %[[VAL_34:.*]], %[[VAL_35:.*]] = control_merge %[[VAL_27]] {bb = 3 : ui32} : none, index
-// CHECK:           %[[VAL_36:.*]] = d_return {bb = 3 : ui32} %[[VAL_34]] : none
+// CHECK:           %[[VAL_36:.*]] = return {bb = 3 : ui32} %[[VAL_34]] : none
 // CHECK:           end {bb = 3 : ui32} %[[VAL_36]] : none
 // CHECK:         }
 func.func @simpleLoop(%arg0: index) {

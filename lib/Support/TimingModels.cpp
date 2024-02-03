@@ -69,7 +69,7 @@ static unsigned getOpDatawidth(Operation *op) {
           })
       .Case<handshake::SourceOp, handshake::ConstantOp>(
           [&](auto) { return getTypeWidth(op->getResult(0).getType()); })
-      .Case<handshake::DynamaticReturnOp, handshake::EndOp, handshake::JoinOp>(
+      .Case<handshake::ReturnOp, handshake::EndOp, handshake::JoinOp>(
           [&](auto) {
             unsigned maxWidth = 0;
             for (Type ty : op->getOperandTypes())

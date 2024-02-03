@@ -3,12 +3,12 @@
 
 // CHECK-LABEL:   handshake.func @eraseUnconditionalBranches(
 // CHECK-SAME:                                               %[[VAL_0:.*]]: none, ...) -> none attributes {argNames = ["start"], resNames = ["out0"]} {
-// CHECK:           %[[VAL_1:.*]] = d_return %[[VAL_0]] : none
+// CHECK:           %[[VAL_1:.*]] = return %[[VAL_0]] : none
 // CHECK:           end %[[VAL_1]] : none
 // CHECK:         }
 handshake.func @eraseUnconditionalBranches(%start: none) -> none {
   %br = br %start : none
-  %returnVal = d_return %br : none
+  %returnVal = return %br : none
   end %returnVal : none
 }
 
@@ -19,14 +19,14 @@ handshake.func @eraseUnconditionalBranches(%start: none) -> none {
 // CHECK-SAME:                                           %[[VAL_2:.*]]: none, ...) -> i32 attributes {argNames = ["arg0", "arg1", "start"], resNames = ["out0"]} {
 // CHECK:           %[[VAL_3:.*]] = merge %[[VAL_0]], %[[VAL_1]] : i32
 // CHECK:           %[[VAL_4:.*]] = arith.addi %[[VAL_0]], %[[VAL_3]] : i32
-// CHECK:           %[[VAL_5:.*]] = d_return %[[VAL_4]] : i32
+// CHECK:           %[[VAL_5:.*]] = return %[[VAL_4]] : i32
 // CHECK:           end %[[VAL_5]] : i32
 // CHECK:         }
 handshake.func @eraseSingleInputMerges(%arg0: i32, %arg1: i32, %start: none) -> i32 {
   %merge1 = merge %arg0 : i32
   %merge2 = merge %arg0, %arg1 : i32
   %add = arith.addi %merge1, %merge2 : i32
-  %returnVal = d_return %add : i32
+  %returnVal = return %add : i32
   end %returnVal : i32
 }
 
@@ -38,14 +38,14 @@ handshake.func @eraseSingleInputMerges(%arg0: i32, %arg1: i32, %start: none) -> 
 // CHECK:           sink %[[VAL_2]] : i1
 // CHECK:           %[[VAL_4:.*]] = mux %[[VAL_2]] {{\[}}%[[VAL_0]], %[[VAL_1]]] {bb = 0 : ui32} : i1, i32
 // CHECK:           %[[VAL_5:.*]] = arith.addi %[[VAL_0]], %[[VAL_4]] : i32
-// CHECK:           %[[VAL_6:.*]] = d_return %[[VAL_5]] : i32
+// CHECK:           %[[VAL_6:.*]] = return %[[VAL_5]] : i32
 // CHECK:           end %[[VAL_6]] : i32
 // CHECK:         }
 handshake.func @eraseSingleInputMuxes(%arg0: i32, %arg1: i32, %cond: i1, %start: none) -> i32 {
   %mux1 = mux %cond [%arg0] {bb = 0 : ui32} : i1, i32
   %mux2 = mux %cond [%arg0, %arg1] {bb = 0 : ui32} : i1, i32
   %add = arith.addi %mux1, %mux2 : i32
-  %returnVal = d_return %add : i32
+  %returnVal = return %add : i32
   end %returnVal : i32
 }
 
@@ -61,7 +61,7 @@ handshake.func @eraseSingleInputMuxes(%arg0: i32, %arg1: i32, %cond: i1, %start:
 // CHECK:           %[[VAL_8:.*]] = arith.addi %[[VAL_7]], %[[VAL_5]] : i32
 // CHECK:           %[[VAL_9:.*]] = arith.addi %[[VAL_4]], %[[VAL_6]] : i32
 // CHECK:           %[[VAL_10:.*]] = arith.addi %[[VAL_8]], %[[VAL_9]] : i32
-// CHECK:           %[[VAL_11:.*]] = d_return %[[VAL_10]] : i32
+// CHECK:           %[[VAL_11:.*]] = return %[[VAL_10]] : i32
 // CHECK:           end %[[VAL_11]] : i32
 // CHECK:         }
 handshake.func @eraseSingleControlMerges(%arg0: i32, %arg1: i32, %start: none) -> i32 {
@@ -72,7 +72,7 @@ handshake.func @eraseSingleControlMerges(%arg0: i32, %arg1: i32, %start: none) -
   %addData2 = arith.addi %addData1, %cmergeData3 : i32
   %addIndex = arith.addi %cmergeIndex1, %cmergeIndex3 : i32
   %add = arith.addi %addData2, %addIndex : i32
-  %returnVal = d_return %add : i32
+  %returnVal = return %add : i32
   end %returnVal : i32
 }
 
@@ -82,11 +82,11 @@ handshake.func @eraseSingleControlMerges(%arg0: i32, %arg1: i32, %start: none) -
 // CHECK-SAME:                                                   %[[VAL_0:.*]]: i32, %[[VAL_1:.*]]: i32,
 // CHECK-SAME:                                                   %[[VAL_2:.*]]: none, ...) -> i32 attributes {argNames = ["arg0", "arg1", "start"], resNames = ["out0"]} {
 // CHECK:           %[[VAL_3:.*]] = merge %[[VAL_0]], %[[VAL_1]] {bb = 0 : ui32} : i32
-// CHECK:           %[[VAL_4:.*]] = d_return %[[VAL_3]] : i32
+// CHECK:           %[[VAL_4:.*]] = return %[[VAL_3]] : i32
 // CHECK:           end %[[VAL_4]] : i32
 // CHECK:         }
 handshake.func @downgradeIndexlessControlMerge(%arg0: i32, %arg1: i32, %start: none) -> i32 {
   %cmergeData, %cmergeIndex = control_merge %arg0, %arg1 {bb = 0 : ui32} : i32, i32
-  %returnVal = d_return %cmergeData : i32
+  %returnVal = return %cmergeData : i32
   end %returnVal : i32
 }

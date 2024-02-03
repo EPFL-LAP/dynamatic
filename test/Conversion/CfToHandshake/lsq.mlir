@@ -12,7 +12,7 @@
 // CHECK:           %[[VAL_5]], %[[VAL_13:.*]] = lsq_load{{\[}}%[[VAL_10]]] %[[VAL_2]] {bb = 0 : ui32} : index, i32
 // CHECK:           %[[VAL_6]], %[[VAL_7]] = lsq_store{{\[}}%[[VAL_11]]] %[[VAL_13]] {bb = 0 : ui32} : i32, index
 // CHECK:           %[[VAL_8]], %[[VAL_9]] = lsq_store{{\[}}%[[VAL_12]]] %[[VAL_13]] {bb = 0 : ui32} : i32, index
-// CHECK:           %[[VAL_14:.*]] = d_return {bb = 0 : ui32} %[[VAL_13]] : i32
+// CHECK:           %[[VAL_14:.*]] = return {bb = 0 : ui32} %[[VAL_13]] : i32
 // CHECK:           end {bb = 0 : ui32} %[[VAL_14]], %[[VAL_3]] : i32, none
 // CHECK:         }
 func.func @simpleOneGroupLSQ(%mem: memref<64xi32>) -> i32 {
@@ -49,7 +49,7 @@ func.func @simpleOneGroupLSQ(%mem: memref<64xi32>) -> i32 {
 // CHECK:           %[[VAL_7]], %[[VAL_26:.*]] = control_merge %[[VAL_21]] {bb = 1 : ui32} : none, index
 // CHECK:           %[[VAL_8]], %[[VAL_9]] = lsq_store{{\[}}%[[VAL_24]]] %[[VAL_22]] {bb = 1 : ui32} : i32, index
 // CHECK:           %[[VAL_10]], %[[VAL_11]] = lsq_store{{\[}}%[[VAL_25]]] %[[VAL_23]] {bb = 1 : ui32} : i32, index
-// CHECK:           %[[VAL_27:.*]] = d_return {bb = 1 : ui32} %[[VAL_22]] : i32
+// CHECK:           %[[VAL_27:.*]] = return {bb = 1 : ui32} %[[VAL_22]] : i32
 // CHECK:           end {bb = 1 : ui32} %[[VAL_27]], %[[VAL_3]] : i32, none
 // CHECK:         }
 func.func @simpleMultiGroupLSQ(%mem: memref<64xi32>) -> i32 {
@@ -87,7 +87,7 @@ func.func @simpleMultiGroupLSQ(%mem: memref<64xi32>) -> i32 {
 // CHECK:           %[[VAL_11]], %[[VAL_23:.*]] = lsq_load{{\[}}%[[VAL_20]]] %[[VAL_6]]#1 {bb = 1 : ui32} : index, i32
 // CHECK:           %[[VAL_5]], %[[VAL_24:.*]] = mc_load{{\[}}%[[VAL_21]]] %[[VAL_2]]#1 {bb = 1 : ui32} : index, i32
 // CHECK:           %[[VAL_25:.*]] = arith.addi %[[VAL_23]], %[[VAL_24]] {bb = 1 : ui32} : i32
-// CHECK:           %[[VAL_26:.*]] = d_return {bb = 1 : ui32} %[[VAL_25]] : i32
+// CHECK:           %[[VAL_26:.*]] = return {bb = 1 : ui32} %[[VAL_25]] : i32
 // CHECK:           end {bb = 1 : ui32} %[[VAL_26]], %[[VAL_3]], %[[VAL_7]] : i32, none, none
 // CHECK:         }
 func.func @mixLSQAndMCLoads(%mem: memref<64xi32>) -> i32 {
@@ -128,7 +128,7 @@ func.func @mixLSQAndMCLoads(%mem: memref<64xi32>) -> i32 {
 // CHECK:           %[[VAL_14]], %[[VAL_26:.*]] = control_merge %[[VAL_23]] {bb = 1 : ui32} : none, index
 // CHECK:           %[[VAL_8]] = constant %[[VAL_14]] {bb = 1 : ui32, value = 1 : i32} : i32
 // CHECK:           %[[VAL_15]], %[[VAL_16]] = lsq_store{{\[}}%[[VAL_25]]] %[[VAL_24]] {bb = 1 : ui32} : i32, index
-// CHECK:           %[[VAL_27:.*]] = d_return {bb = 1 : ui32} %[[VAL_24]] : i32
+// CHECK:           %[[VAL_27:.*]] = return {bb = 1 : ui32} %[[VAL_24]] : i32
 // CHECK:           end {bb = 1 : ui32} %[[VAL_27]], %[[VAL_4]], %[[VAL_10]] : i32, none, none
 // CHECK:         }
 func.func @mixLSQAndMCStores(%mem: memref<64xi32>, %data : i32) -> i32 {
@@ -182,7 +182,7 @@ func.func @mixLSQAndMCStores(%mem: memref<64xi32>, %data : i32) -> i32 {
 // CHECK:           %[[VAL_46:.*]], %[[VAL_44]] = control_merge %[[VAL_42]], %[[VAL_32]] {bb = 3 : ui32} : none, index
 // CHECK:           %[[VAL_7]] = constant %[[VAL_46]] {bb = 3 : ui32, value = 1 : i32} : i32
 // CHECK:           %[[VAL_12]], %[[VAL_13]] = lsq_store{{\[}}%[[VAL_45]]] %[[VAL_43]] {bb = 3 : ui32} : i32, index
-// CHECK:           %[[VAL_47:.*]] = d_return {bb = 3 : ui32} %[[VAL_43]] : i32
+// CHECK:           %[[VAL_47:.*]] = return {bb = 3 : ui32} %[[VAL_43]] : i32
 // CHECK:           end {bb = 3 : ui32} %[[VAL_47]], %[[VAL_4]], %[[VAL_9]] : i32, none, none
 // CHECK:         }
 func.func @ifThenElseSameLSQGroup(%mem: memref<64xi32>, %idx: index) -> i32 {

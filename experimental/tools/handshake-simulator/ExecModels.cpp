@@ -246,7 +246,7 @@ dynamatic::experimental::initialiseMap(llvm::StringMap<std::string> &funcMap,
       modelStructuresMap);
   addDefault<handshake::MCLoadOp, DynamaticLoad>(modelStructuresMap);
   addDefault<handshake::MCStoreOp, DynamaticStore>(modelStructuresMap);
-  addDefault<handshake::DynamaticReturnOp, DynamaticReturn>(modelStructuresMap);
+  addDefault<handshake::ReturnOp, DynamaticReturn>(modelStructuresMap);
   addDefault<handshake::EndOp, DynamaticEnd>(modelStructuresMap);
 
   // Arith operations
@@ -659,7 +659,7 @@ bool DynamaticStore::tryExecute(ExecutableData &data, Operation &opArg) {
 }
 
 bool DynamaticReturn::tryExecute(ExecutableData &data, Operation &opArg) {
-  auto op = dyn_cast<handshake::DynamaticReturnOp>(opArg);
+  auto op = dyn_cast<handshake::ReturnOp>(opArg);
   auto executeFunc = [&](std::vector<llvm::Any> &ins,
                          std::vector<llvm::Any> &outs, Operation &op) {
     for (unsigned i = 0; i < op.getNumOperands(); ++i)
@@ -673,7 +673,7 @@ bool DynamaticReturn::tryExecute(ExecutableData &data, Operation &opArg) {
 bool DynamaticEnd::tryExecute(ExecutableData &data, Operation &opArg) {
   for (auto &[opKey, state] : data.internalDataMap) {
     // Verify that all returns have been completed
-    if (isa<handshake::DynamaticReturnOp>(opKey)) {
+    if (isa<handshake::ReturnOp>(opKey)) {
       bool completed = llvm::any_cast<bool>(state);
       if (!completed)
         return false;

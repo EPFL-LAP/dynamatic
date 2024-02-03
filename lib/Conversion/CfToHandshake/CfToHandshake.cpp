@@ -757,8 +757,8 @@ HandshakeLowering::createReturnNetwork(ConversionPatternRewriter &rewriter) {
 
       // Insert new return operation next to the old one
       rewriter.setInsertionPoint(&termOp);
-      auto newRet = rewriter.create<handshake::DynamaticReturnOp>(
-          termOp.getLoc(), operands);
+      auto newRet =
+          rewriter.create<handshake::ReturnOp>(termOp.getLoc(), operands);
       newReturnOps.push_back(newRet);
 
       // New return operation belongs in the same basic block as the old one

@@ -4,11 +4,11 @@
 // CHECK-LABEL:   handshake.func @funcSignature(
 // CHECK-SAME:                                  %[[VAL_0:.*]]: i64,
 // CHECK-SAME:                                  %[[VAL_1:.*]]: none, ...) -> i64 attributes {argNames = ["arg0", "start"], resNames = ["out0"]} {
-// CHECK:           %[[VAL_2:.*]] = d_return %[[VAL_0]] : i64
+// CHECK:           %[[VAL_2:.*]] = return %[[VAL_0]] : i64
 // CHECK:           end %[[VAL_2]] : i64
 // CHECK:         }
 handshake.func @funcSignature(%arg0: index, %start: none) -> index {
-  %returnVal = d_return %arg0 : index
+  %returnVal = return %arg0 : index
   end %returnVal : index
 }
 
@@ -18,13 +18,13 @@ handshake.func @funcSignature(%arg0: index, %start: none) -> index {
 // CHECK-SAME:                        %[[VAL_0:.*]]: i64,
 // CHECK-SAME:                        %[[VAL_1:.*]]: none, ...) -> i64 attributes {argNames = ["arg0", "start"], resNames = ["out0"]} {
 // CHECK:           %[[VAL_2:.*]] = constant %[[VAL_1]] {value = 0 : i64} : i64
-// CHECK:           %[[VAL_3:.*]] = d_return %[[VAL_2]] : i64
+// CHECK:           %[[VAL_3:.*]] = return %[[VAL_2]] : i64
 // CHECK:           end %[[VAL_3]] : i64
 // CHECK:         }
 handshake.func @cst(%arg0: i64, %start: none) -> i64 {
   %cst = constant %start {value = 0 : index} : index
   %casted = arith.index_cast %cst : index to i64
-  %returnVal = d_return %casted : i64
+  %returnVal = return %casted : i64
   end %returnVal : i64
 }
 
@@ -34,12 +34,12 @@ handshake.func @cst(%arg0: i64, %start: none) -> i64 {
 // CHECK-SAME:                          %[[VAL_0:.*]]: i64,
 // CHECK-SAME:                          %[[VAL_1:.*]]: none, ...) -> i16 attributes {argNames = ["arg0", "start"], resNames = ["out0"]} {
 // CHECK:           %[[VAL_2:.*]] = arith.trunci %[[VAL_0]] : i64 to i16
-// CHECK:           %[[VAL_3:.*]] = d_return %[[VAL_2]] : i16
+// CHECK:           %[[VAL_3:.*]] = return %[[VAL_2]] : i16
 // CHECK:           end %[[VAL_3]] : i16
 // CHECK:         }
 handshake.func @trunc(%arg0: index, %start: none) -> i16 {
   %casted = arith.index_cast %arg0 : index to i16
-  %returnVal = d_return %casted : i16
+  %returnVal = return %casted : i16
   end %returnVal: i16
 }
 
@@ -50,13 +50,13 @@ handshake.func @trunc(%arg0: index, %start: none) -> i16 {
 // CHECK-SAME:                           %[[VAL_1:.*]]: none, ...) -> (i64, i64) attributes {argNames = ["arg0", "start"], resNames = ["out0", "out1"]} {
 // CHECK:           %[[VAL_2:.*]] = arith.extsi %[[VAL_0]] : i32 to i64
 // CHECK:           %[[VAL_3:.*]] = arith.extui %[[VAL_0]] : i32 to i64
-// CHECK:           %[[VAL_4:.*]]:2 = d_return %[[VAL_2]], %[[VAL_3]] : i64, i64
+// CHECK:           %[[VAL_4:.*]]:2 = return %[[VAL_2]], %[[VAL_3]] : i64, i64
 // CHECK:           end %[[VAL_4]]#0, %[[VAL_4]]#1 : i64, i64
 // CHECK:         }
 handshake.func @extend(%arg0: i32, %start: none) -> (index, index) {
   %sCast = arith.index_cast %arg0 : i32 to index
   %uCast = arith.index_castui %arg0 : i32 to index
-  %sRet, %uRet = d_return %sCast, %uCast : index, index
+  %sRet, %uRet = return %sCast, %uCast : index, index
   end %sRet, %uRet : index, index
 }
 
@@ -65,13 +65,13 @@ handshake.func @extend(%arg0: i32, %start: none) -> (index, index) {
 // CHECK-LABEL:   handshake.func @intToIdxToInt(
 // CHECK-SAME:                                  %[[VAL_0:.*]]: i64,
 // CHECK-SAME:                                  %[[VAL_1:.*]]: none, ...) -> i64 attributes {argNames = ["arg0", "start"], resNames = ["out0"]} {
-// CHECK:           %[[VAL_2:.*]] = d_return %[[VAL_0]] : i64
+// CHECK:           %[[VAL_2:.*]] = return %[[VAL_0]] : i64
 // CHECK:           end %[[VAL_2]] : i64
 // CHECK:         }
 handshake.func @intToIdxToInt(%arg0: i64, %start: none) -> i64 {
   %casted = arith.index_cast %arg0 : i64 to index
   %castedAgain = arith.index_cast %casted : index to i64
-  %returnVal = d_return %castedAgain : i64
+  %returnVal = return %castedAgain : i64
   end %returnVal : i64
 }
 
@@ -81,13 +81,13 @@ handshake.func @intToIdxToInt(%arg0: i64, %start: none) -> i64 {
 // CHECK-SAME:                                      %[[VAL_0:.*]]: i64,
 // CHECK-SAME:                                      %[[VAL_1:.*]]: none, ...) -> i32 attributes {argNames = ["arg0", "start"], resNames = ["out0"]} {
 // CHECK:           %[[VAL_2:.*]] = arith.trunci %[[VAL_0]] : i64 to i32
-// CHECK:           %[[VAL_3:.*]] = d_return %[[VAL_2]] : i32
+// CHECK:           %[[VAL_3:.*]] = return %[[VAL_2]] : i32
 // CHECK:           end %[[VAL_3]] : i32
 // CHECK:         }
 handshake.func @intToIdxToTrucInt(%arg0: i64, %start: none) -> i32 {
   %casted = arith.index_cast %arg0 : i64 to index
   %castedAgain = arith.index_cast %casted : index to i32
-  %returnVal = d_return %castedAgain : i32
+  %returnVal = return %castedAgain : i32
   end %returnVal : i32
 }
 
@@ -97,12 +97,12 @@ handshake.func @intToIdxToTrucInt(%arg0: i64, %start: none) -> i32 {
 // CHECK-SAME:                              %[[VAL_0:.*]]: i64,
 // CHECK-SAME:                              %[[VAL_1:.*]]: none, ...) -> i32 attributes {argNames = ["arg0", "start"], resNames = ["out0"]} {
 // CHECK:           %[[VAL_2:.*]] = arith.trunci %[[VAL_0]] {bb = 0 : ui32} : i64 to i32
-// CHECK:           %[[VAL_3:.*]] = d_return %[[VAL_2]] : i32
+// CHECK:           %[[VAL_3:.*]] = return %[[VAL_2]] : i32
 // CHECK:           end %[[VAL_3]] : i32
 // CHECK:         }
 handshake.func @inheritBB(%arg0: index, %start: none) -> i32 {
   %cast = arith.index_cast %arg0 {bb = 0 : ui32} : index to i32
-  %returnVal = d_return %cast : i32
+  %returnVal = return %cast : i32
   end %returnVal : i32
 }
 
@@ -111,13 +111,13 @@ handshake.func @inheritBB(%arg0: index, %start: none) -> i32 {
 // CHECK-LABEL:   handshake.func @deleteDuplicateCst(
 // CHECK-SAME:                                       %[[VAL_0:.*]]: none, ...) -> (i64, i64) attributes {argNames = ["start"], resNames = ["out0", "out1"]} {
 // CHECK:           %[[VAL_1:.*]] = constant %[[VAL_0]] {value = 32 : i64} : i64
-// CHECK:           %[[VAL_2:.*]]:2 = d_return %[[VAL_1]], %[[VAL_1]] : i64, i64
+// CHECK:           %[[VAL_2:.*]]:2 = return %[[VAL_1]], %[[VAL_1]] : i64, i64
 // CHECK:           end %[[VAL_2]]#0, %[[VAL_2]]#1 : i64, i64
 // CHECK:         }
 handshake.func @deleteDuplicateCst(%start: none) -> (i64, index) {
   %cst1 = handshake.constant %start {value = 32 : i64} : i64
   %cst2 = handshake.constant %start {value = 32 : index} : index
-  %returnVal1, %returnVal2 = d_return %cst1, %cst2 : i64, index
+  %returnVal1, %returnVal2 = return %cst1, %cst2 : i64, index
   end %returnVal1, %returnVal2 : i64, index
 }
 
@@ -126,12 +126,12 @@ handshake.func @deleteDuplicateCst(%start: none) -> (i64, index) {
 // CHECK-LABEL:   handshake.func @deleteSameDuplicateCst(
 // CHECK-SAME:                                           %[[VAL_0:.*]]: none, ...) -> (i64, i64) attributes {argNames = ["start"], resNames = ["out0", "out1"]} {
 // CHECK:           %[[VAL_1:.*]] = constant %[[VAL_0]] {value = 32 : i64} : i64
-// CHECK:           %[[VAL_2:.*]]:2 = d_return %[[VAL_1]], %[[VAL_1]] : i64, i64
+// CHECK:           %[[VAL_2:.*]]:2 = return %[[VAL_1]], %[[VAL_1]] : i64, i64
 // CHECK:           end %[[VAL_2]]#0, %[[VAL_2]]#1 : i64, i64
 // CHECK:         }
 handshake.func @deleteSameDuplicateCst(%start: none) -> (index, index) {
   %cst1 = handshake.constant %start {value = 32 : index} : index
   %cst2 = handshake.constant %start {value = 32 : index} : index
-  %returnVal1, %returnVal2 = d_return %cst1, %cst2 : index, index
+  %returnVal1, %returnVal2 = return %cst1, %cst2 : index, index
   end %returnVal1, %returnVal2 : index, index
 }

@@ -10,7 +10,7 @@
   "handshake.buffer": "default.handshake.buffer",
   "handshake.d_load": "default.handshake.d_load",
   "handshake.d_store": "default.handshake.d_store",
-  "handshake.d_return": "default.handshake.d_return",
+  "handshake.return": "default.handshake.return",
   "handshake.end": "default.handshake.end",
   "handshake.mem_controller": "default.handshake.mem_controller",
   "arith.addi": "default.arith.addi",
