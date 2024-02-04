@@ -1,24 +1,24 @@
 [gd_scene load_steps=7 format=3 uid="uid://ridjgqca7ygu"]
 
-[ext_resource type="Script" path="res://main.gd" id="1_k08iy"]
-[ext_resource type="Script" path="res://camera.gd" id="2_kag3i"]
-[ext_resource type="PackedScene" uid="uid://1ukyu4yhubi7" path="res://legend.tscn" id="3_s2xdb"]
-[ext_resource type="PackedScene" uid="uid://baatvintvoqat" path="res://menu.tscn" id="4_3q8o8"]
-[ext_resource type="PackedScene" uid="uid://chdvrqi6hnrga" path="res://timeline.tscn" id="5_q76pr"]
-[ext_resource type="Texture2D" uid="uid://b8ja66i463u8x" path="res://images.png" id="7_58v1f"]
+[ext_resource type="Script" path="res://scripts/main.gd" id="1_2137g"]
+[ext_resource type="Script" path="res://scripts/camera.gd" id="2_kbyo6"]
+[ext_resource type="PackedScene" uid="uid://baatvintvoqat" path="res://scenes/menu.tscn" id="3_katj8"]
+[ext_resource type="Texture2D" uid="uid://b8ja66i463u8x" path="res://resources/images.png" id="4_gasbi"]
+[ext_resource type="PackedScene" uid="uid://chdvrqi6hnrga" path="res://scenes/timeline.tscn" id="5_ccu7c"]
+[ext_resource type="PackedScene" uid="uid://1ukyu4yhubi7" path="res://scenes/legend.tscn" id="6_b6m0q"]
 
 [node name="VisualDataflow" type="VisualDataflow"]
 offset_right = 40.0
 offset_bottom = 40.0
-script = ExtResource("1_k08iy")
+script = ExtResource("1_2137g")
 
 [node name="Camera2D" type="Camera2D" parent="."]
 position = Vector2(959, -541)
-script = ExtResource("2_kag3i")
+script = ExtResource("2_kbyo6")
 
 [node name="CanvasLayer" type="CanvasLayer" parent="."]
 
-[node name="Menu" parent="CanvasLayer" instance=ExtResource("4_3q8o8")]
+[node name="Menu" parent="CanvasLayer" instance=ExtResource("3_katj8")]
 offset_left = -150.0
 offset_top = -150.0
 offset_right = 150.0
@@ -27,11 +27,11 @@ offset_bottom = 150.0
 [node name="Images2" type="Sprite2D" parent="CanvasLayer/Menu"]
 position = Vector2(151, 575)
 scale = Vector2(0.334171, 0.334171)
-texture = ExtResource("7_58v1f")
+texture = ExtResource("4_gasbi")
 
-[node name="Timeline" parent="CanvasLayer" instance=ExtResource("5_q76pr")]
+[node name="Timeline" parent="CanvasLayer" instance=ExtResource("5_ccu7c")]
 
-[node name="Legend" parent="CanvasLayer" instance=ExtResource("3_s2xdb")]
+[node name="Legend" parent="CanvasLayer" instance=ExtResource("6_b6m0q")]
 
 [node name="EdgeLegend" parent="CanvasLayer/Legend/GeneralLegend/Panel" index="0"]
 offset_left = 7.0

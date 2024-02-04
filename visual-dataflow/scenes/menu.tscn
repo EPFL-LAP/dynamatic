@@ -1,6 +1,6 @@
 [gd_scene load_steps=2 format=3 uid="uid://baatvintvoqat"]
 
-[ext_resource type="Script" path="res://menu.gd" id="1_nt4qb"]
+[ext_resource type="Script" path="res://scripts/menu.gd" id="1_rl5k5"]
 
 [node name="Menu" type="Control"]
 custom_minimum_size = Vector2(300, 300)
@@ -12,7 +12,7 @@ anchor_right = 0.5
 anchor_bottom = 0.5
 grow_horizontal = 2
 grow_vertical = 2
-script = ExtResource("1_nt4qb")
+script = ExtResource("1_rl5k5")
 
 [node name="FileDialogDot" type="FileDialog" parent="."]
 title = "Open a File"
