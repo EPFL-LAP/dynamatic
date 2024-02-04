@@ -201,12 +201,10 @@ LogicalResult dynamatic::visual::processDOT(std::ifstream &file, Graph &graph) {
 
     if (insideEdgeDefinition && line.find("start_0") != std::string::npos) {
       currentEdge.setDashed(true);
-      std::cout << " abcde " << std::endl;
     }
 
     if (insideEdgeDefinition && line.find("style") != std::string::npos) {
       currentEdge.setDashed(true);
-      std::cout << " abcde " << std::endl;
     }
 
     if (insideEdgeDefinition && line.find(']') != std::string::npos) {
