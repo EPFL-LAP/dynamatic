@@ -60,8 +60,8 @@ static unsigned getOpDatawidth(Operation *op) {
             return getTypeWidth(
                 mergeLikeOp.getDataOperands().front().getType());
           })
-      .Case<handshake::BufferOp, handshake::ForkOp, handshake::LazyForkOp,
-            handshake::BranchOp, handshake::SinkOp>(
+      .Case<handshake::BufferOpInterface, handshake::ForkOp,
+            handshake::LazyForkOp, handshake::BranchOp, handshake::SinkOp>(
           [&](auto) { return getTypeWidth(op->getOperand(0).getType()); })
       .Case<handshake::ConditionalBranchOp>(
           [&](handshake::ConditionalBranchOp condOp) {

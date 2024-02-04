@@ -68,10 +68,10 @@ def SOSTInterface : OpInterface<"SOSTInterface"> {
       }]
     >,
     InterfaceMethod<[{
-        Print the "SOST characteristics" of an operation.
-        If the `explicitSize` parameter is set to true, then the method prints
-        the operation's size (in the SOST sense) between square brackets before
-        printing the operation's operands, attributes, and data type.
+        Prints an SOST operation. If the `explicitSize` parameter is set to
+        true, then the method prints the operation's size (in the SOST sense)
+        between square brackets before printing the operation's operands,
+        attributes, and data type.
       }],
       "void", "sostPrint", (ins 
         "mlir::OpAsmPrinter &": $printer, "bool": $explicitSize
@@ -180,10 +180,18 @@ def MemoryOpInterface : OpInterface<"MemoryOpInterface"> {
   ];
 }
 
+def BufferOpInterface : OpInterface<"BufferOpInterface"> {
+  let cppNamespace = "::dynamatic::handshake";
+  let description = [{
+    Handshake operations which act as buffers with a strictly positive number
+    of slots.
+  }];
+}
+
 def LoadOpInterface : OpInterface<"LoadOpInterface"> {
   let cppNamespace = "::dynamatic::handshake";
   let description = [{
-    Handhsake operations which act as load ports to a memory interface.
+    Handshake operations which act as load ports to a memory interface.
   }];
 
   let methods = [
@@ -225,7 +233,7 @@ def LoadOpInterface : OpInterface<"LoadOpInterface"> {
 def StoreOpInterface : OpInterface<"StoreOpInterface"> {
   let cppNamespace = "::dynamatic::handshake";
   let description = [{
-    Handhsake operations which act as store ports to a memory interface.
+    Handshake operations which act as store ports to a memory interface.
   }];
 
   let methods = [

@@ -358,12 +358,12 @@ HandshakeCFG::getControlValues(DenseMap<unsigned, Value> &ctrlVals) {
     // their outputs
     LogicalResult res =
         llvm::TypeSwitch<Operation *, LogicalResult>(ctrlOp)
-            .Case<handshake::ForkOp, handshake::LazyForkOp, handshake::BufferOp,
-                  handshake::BranchOp, handshake::ConditionalBranchOp>(
-                [&](auto) {
-                  addToCtrlOps(ctrlOp->getUsers());
-                  return success();
-                })
+            .Case<handshake::ForkOp, handshake::LazyForkOp,
+                  handshake::BufferOpInterface, handshake::BranchOp,
+                  handshake::ConditionalBranchOp>([&](auto) {
+              addToCtrlOps(ctrlOp->getUsers());
+              return success();
+            })
             .Case<handshake::MergeLikeOpInterface>([&](auto) {
               OpResult mergeRes = ctrlOp->getResult(0);
               addToCtrlOps(mergeRes.getUsers());
@@ -596,14 +596,15 @@ static GIIDStatus isGIIDRec(Value predecessor, OpOperand &oprd,
         ValueRange values{selectOp.getTrueValue(), selectOp.getFalseValue()};
         return foldGIIDStatusAnd(recurse, values);
       })
-      .Case<handshake::ForkOp, handshake::LazyForkOp, handshake::BufferOp,
-            handshake::BranchOp, arith::AddIOp, arith::AndIOp, arith::CmpIOp,
-            arith::DivSIOp, arith::DivUIOp, arith::ExtSIOp, arith::ExtUIOp,
-            arith::MulIOp, arith::OrIOp, arith::RemUIOp, arith::RemSIOp,
-            arith::ShLIOp, arith::ShRUIOp, arith::SIToFPOp, arith::SubIOp,
-            arith::TruncIOp, arith::UIToFPOp, arith::XOrIOp, arith::AddFOp,
-            arith::CmpFOp, arith::DivFOp, arith::ExtFOp, arith::MulFOp,
-            arith::RemFOp, arith::SubFOp, arith::TruncFOp>([&](auto) {
+      .Case<handshake::ForkOp, handshake::LazyForkOp,
+            handshake::BufferOpInterface, handshake::BranchOp, arith::AddIOp,
+            arith::AndIOp, arith::CmpIOp, arith::DivSIOp, arith::DivUIOp,
+            arith::ExtSIOp, arith::ExtUIOp, arith::MulIOp, arith::OrIOp,
+            arith::RemUIOp, arith::RemSIOp, arith::ShLIOp, arith::ShRUIOp,
+            arith::SIToFPOp, arith::SubIOp, arith::TruncIOp, arith::UIToFPOp,
+            arith::XOrIOp, arith::AddFOp, arith::CmpFOp, arith::DivFOp,
+            arith::ExtFOp, arith::MulFOp, arith::RemFOp, arith::SubFOp,
+            arith::TruncFOp>([&](auto) {
         // At least one operand must depend on the predecessor
         return foldGIIDStatusOr(recurse, defOp->getOperands());
       })

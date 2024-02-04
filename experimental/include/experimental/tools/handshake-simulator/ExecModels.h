@@ -229,7 +229,11 @@ struct DefaultConstant : public ExecutableModel {
   bool tryExecute(ExecutableData &data, Operation &op) override;
 };
 
-struct DefaultBuffer : public ExecutableModel {
+struct DefaultOEHB : public ExecutableModel {
+  bool tryExecute(ExecutableData &data, Operation &op) override;
+};
+
+struct DefaultTEHB : public ExecutableModel {
   bool tryExecute(ExecutableData &data, Operation &op) override;
 };
 

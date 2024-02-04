@@ -56,21 +56,21 @@ static std::string defaultOperandName(unsigned int idx) {
   return "in" + std::to_string(idx);
 }
 
-static ParseResult parseIntInSquareBrackets(OpAsmParser &parser, int &v) {
-  if (parser.parseLSquare() || parser.parseInteger(v) || parser.parseRSquare())
-    return failure();
-  return success();
-}
-
+/// Parses an SOST operation. If the `explicitSize` parameter is set to true,
+/// then the method parses the operation's size (in the SOST sense) between
+/// square brackets before parsing the operation's operands, attributes, and
+/// data type. In this case the parsed size is also saved in the `size`
+/// argument, otherwise the number of argument is saved in `size`.
 static ParseResult
-parseSostOperation(OpAsmParser &parser,
-                   SmallVectorImpl<OpAsmParser::UnresolvedOperand> &operands,
-                   OperationState &result, int &size, Type &type,
-                   bool explicitSize) {
-  if (explicitSize)
-    if (parseIntInSquareBrackets(parser, size))
+parseSOSTOp(bool explicitSize, OpAsmParser &parser,
+            SmallVectorImpl<OpAsmParser::UnresolvedOperand> &operands,
+            OperationState &result, unsigned &size, Type &type) {
+  if (explicitSize) {
+    // Try to parse the operation's size between square brackets
+    if (parser.parseLSquare() || parser.parseInteger(size) ||
+        parser.parseRSquare())
       return failure();
-
+  }
   if (parser.parseOperandList(operands) ||
       parser.parseOptionalAttrDict(result.attributes) || parser.parseColon() ||
       parser.parseType(type))
@@ -128,8 +128,8 @@ static ParseResult parseForkOp(OpAsmParser &parser, OperationState &result) {
   ArrayRef<Type> operandTypes(type);
   SmallVector<Type, 1> resultTypes;
   llvm::SMLoc allOperandLoc = parser.getCurrentLocation();
-  int size;
-  if (parseSostOperation(parser, allOperands, result, size, type, true))
+  unsigned size;
+  if (parseSOSTOp(true, parser, allOperands, result, size, type))
     return failure();
 
   resultTypes.assign(size, type);
@@ -164,8 +164,8 @@ ParseResult MergeOp::parse(OpAsmParser &parser, OperationState &result) {
   ArrayRef<Type> operandTypes(type);
   SmallVector<Type, 1> resultTypes, dataOperandsTypes;
   llvm::SMLoc allOperandLoc = parser.getCurrentLocation();
-  int size;
-  if (parseSostOperation(parser, allOperands, result, size, type, false))
+  unsigned size;
+  if (parseSOSTOp(false, parser, allOperands, result, size, type))
     return failure();
 
   dataOperandsTypes.assign(size, type);
@@ -178,21 +178,6 @@ ParseResult MergeOp::parse(OpAsmParser &parser, OperationState &result) {
 }
 
 void MergeOp::print(OpAsmPrinter &p) { sostPrint(p, false); }
-
-/// Returns a dematerialized version of the value 'v', defined as the source of
-/// the value before passing through a buffer or fork operation.
-static Value getDematerialized(Value v) {
-  Operation *parentOp = v.getDefiningOp();
-  if (!parentOp)
-    return v;
-
-  return llvm::TypeSwitch<Operation *, Value>(parentOp)
-      .Case<ForkOp>(
-          [&](ForkOp op) { return getDematerialized(op.getOperand()); })
-      .Case<BufferOp>(
-          [&](BufferOp op) { return getDematerialized(op.getOperand()); })
-      .Default([&](auto) { return v; });
-}
 
 LogicalResult
 MuxOp::inferReturnTypes(MLIRContext *context, std::optional<Location> location,
@@ -267,10 +252,10 @@ ParseResult ControlMergeOp::parse(OpAsmParser &parser, OperationState &result) {
   Type resultType, indexType;
   SmallVector<Type> resultTypes, dataOperandsTypes;
   llvm::SMLoc allOperandLoc = parser.getCurrentLocation();
-  int size;
-  if (parseSostOperation(parser, allOperands, result, size, resultType, false))
+  unsigned size;
+  if (parseSOSTOp(false, parser, allOperands, result, size, resultType))
     return failure();
-  // Parse type of index result
+
   if (parser.parseComma() || parser.parseType(indexType))
     return failure();
 
@@ -520,13 +505,13 @@ ParseResult BranchOp::parse(OpAsmParser &parser, OperationState &result) {
   SmallVector<OpAsmParser::UnresolvedOperand, 4> allOperands;
   Type type;
   ArrayRef<Type> operandTypes(type);
-  SmallVector<Type, 1> dataOperandsTypes;
   llvm::SMLoc allOperandLoc = parser.getCurrentLocation();
-  int size;
-  if (parseSostOperation(parser, allOperands, result, size, type, false))
+  unsigned size;
+  if (parseSOSTOp(false, parser, allOperands, result, size, type))
     return failure();
 
-  dataOperandsTypes.assign(size, type);
+  SmallVector<Type, 1> dataOperandsTypes;
+  dataOperandsTypes.push_back(type);
   result.addTypes({type});
   if (parser.resolveOperands(allOperands, dataOperandsTypes, allOperandLoc,
                              result.operands))
@@ -588,8 +573,8 @@ ParseResult SinkOp::parse(OpAsmParser &parser, OperationState &result) {
   Type type;
   ArrayRef<Type> operandTypes(type);
   llvm::SMLoc allOperandLoc = parser.getCurrentLocation();
-  int size;
-  if (parseSostOperation(parser, allOperands, result, size, type, false))
+  unsigned size;
+  if (parseSOSTOp(false, parser, allOperands, result, size, type))
     return failure();
 
   if (parser.resolveOperands(allOperands, operandTypes, allOperandLoc,
@@ -629,67 +614,6 @@ LogicalResult ConstantOp::verify() {
     return emitOpError() << "constant value type " << typedValue.getType()
                          << " differs from operation result type "
                          << getResult().getType();
-
-  return success();
-}
-
-unsigned BufferOp::getSize() {
-  return (*this)->getAttrOfType<IntegerAttr>("slots").getValue().getZExtValue();
-}
-
-ParseResult BufferOp::parse(OpAsmParser &parser, OperationState &result) {
-  SmallVector<OpAsmParser::UnresolvedOperand, 4> allOperands;
-  Type type;
-  ArrayRef<Type> operandTypes(type);
-  llvm::SMLoc allOperandLoc = parser.getCurrentLocation();
-  int slots;
-  if (parseIntInSquareBrackets(parser, slots))
-    return failure();
-
-  auto bufferTypeAttr = BufferTypeEnumAttr::parse(parser, {});
-  if (!bufferTypeAttr)
-    return failure();
-
-  result.addAttribute(
-      "slots",
-      IntegerAttr::get(IntegerType::get(result.getContext(), 32), slots));
-  result.addAttribute("bufferType", bufferTypeAttr);
-
-  if (parser.parseOperandList(allOperands) ||
-      parser.parseOptionalAttrDict(result.attributes) || parser.parseColon() ||
-      parser.parseType(type))
-    return failure();
-
-  result.addTypes({type});
-  if (parser.resolveOperands(allOperands, operandTypes, allOperandLoc,
-                             result.operands))
-    return failure();
-  return success();
-}
-
-void BufferOp::print(OpAsmPrinter &p) {
-  int size =
-      (*this)->getAttrOfType<IntegerAttr>("slots").getValue().getZExtValue();
-  p << " [" << size << "]";
-  p << " " << stringifyEnum(getBufferType());
-  p << " " << (*this)->getOperands();
-  p.printOptionalAttrDict((*this)->getAttrs(), {"slots", "bufferType"});
-  p << " : " << (*this).getDataType();
-}
-
-LogicalResult BufferOp::verify() {
-  // Verify that exactly 'size' number of initial values have been provided, if
-  // an initializer list have been provided.
-  if (auto initVals = getInitValues()) {
-    if (!isSequential())
-      return emitOpError()
-             << "only bufferType buffers are allowed to have initial values.";
-
-    auto nInits = initVals->size();
-    if (nInits != getSize())
-      return emitOpError() << "expected " << getSize()
-                           << " init values but got " << nInits << ".";
-  }
 
   return success();
 }

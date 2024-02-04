@@ -693,12 +693,16 @@ LogicalResult DOTPrinter::annotateNode(Operation *op,
                 info.stringAttr["out"] = getOutputForCondBranch(op);
                 return info;
               })
-          .Case<handshake::BufferOp>([&](handshake::BufferOp bufOp) {
+          .Case<handshake::OEHBOp>([&](handshake::OEHBOp oehbOp) {
             auto info = NodeInfo("Buffer");
-            info.intAttr["slots"] = bufOp.getNumSlots();
-            info.stringAttr["transparent"] =
-                bufOp.getBufferType() == BufferTypeEnum::fifo ? "true"
-                                                              : "false";
+            info.intAttr["slots"] = oehbOp.getSlots();
+            info.stringAttr["transparent"] = "false";
+            return info;
+          })
+          .Case<handshake::TEHBOp>([&](handshake::TEHBOp tehbOp) {
+            auto info = NodeInfo("Buffer");
+            info.intAttr["slots"] = tehbOp.getSlots();
+            info.stringAttr["transparent"] = "true";
             return info;
           })
           .Case<handshake::MemoryControllerOp>(
@@ -1146,9 +1150,11 @@ static std::string getPrettyNodeLabel(Operation *op) {
             // Fallback on an empty string
             return std::string("");
           })
-      .Case<handshake::BufferOp>([&](handshake::BufferOp bufOp) {
-        std::string bufType = bufOp.isSequential() ? "oehb" : "tehb";
-        return bufType + " [" + std::to_string(bufOp.getNumSlots()) + "]";
+      .Case<handshake::OEHBOp>([&](handshake::OEHBOp oehbOp) {
+        return "oehb [" + std::to_string(oehbOp.getSlots()) + "]";
+      })
+      .Case<handshake::TEHBOp>([&](handshake::TEHBOp tehbOp) {
+        return "tehb [" + std::to_string(tehbOp.getSlots()) + "]";
       })
       .Case<handshake::MemoryControllerOp>([&](MemoryControllerOp mcOp) {
         return getMemLabel("MC", getMemName(mcOp.getMemRef()));
@@ -1248,7 +1254,7 @@ static StringRef getNodeColor(Operation *op) {
   return llvm::TypeSwitch<Operation *, StringRef>(op)
       .Case<handshake::ForkOp, handshake::LazyForkOp, handshake::JoinOp>(
           [&](auto) { return "lavender"; })
-      .Case<handshake::BufferOp>([&](auto) { return "lightgreen"; })
+      .Case<handshake::BufferOpInterface>([&](auto) { return "lightgreen"; })
       .Case<handshake::ReturnOp, handshake::EndOp>([&](auto) { return "gold"; })
       .Case<handshake::SourceOp, handshake::SinkOp>(
           [&](auto) { return "gainsboro"; })

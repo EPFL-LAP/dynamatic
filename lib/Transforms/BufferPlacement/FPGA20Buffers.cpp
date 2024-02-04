@@ -156,9 +156,9 @@ void FPGA20Buffers::setup() {
 
   // Create buffering groups. In this MILP we only care for the data signal
   SmallVector<BufferingGroup> bufGroups;
-  OperationName bufName = OperationName(handshake::BufferOp::getOperationName(),
-                                        funcInfo.funcOp->getContext());
-  const TimingModel *dataBufModel = timingDB.getModel(bufName);
+  OperationName oehbName = OperationName(handshake::OEHBOp::getOperationName(),
+                                         funcInfo.funcOp->getContext());
+  const TimingModel *dataBufModel = timingDB.getModel(oehbName);
   bufGroups.emplace_back(ArrayRef<SignalType>{SignalType::DATA}, dataBufModel);
 
   // Create channel variables and constraints

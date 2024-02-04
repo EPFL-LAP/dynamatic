@@ -360,13 +360,10 @@ static std::string getExtModuleName(Operation *oldOp) {
   SmallVector<Type> &outTypes = types.second;
 
   llvm::TypeSwitch<Operation *>(oldOp)
-      .Case<handshake::BufferOp>([&](handshake::BufferOp bufOp) {
-        // buffer type
-        extModName +=
-            bufOp.getBufferType() == BufferTypeEnum::seq ? "seq" : "fifo";
-        // bitwidth
-        extModName += "_" + getTypeName(outTypes[0], loc);
-      })
+      .Case<handshake::OEHBOp>(
+          [&](auto) { extModName += "seq_" + getTypeName(outTypes[0], loc); })
+      .Case<handshake::TEHBOp>(
+          [&](auto) { extModName += "fifo_" + getTypeName(outTypes[0], loc); })
       .Case<handshake::ForkOp, handshake::LazyForkOp>([&](auto) {
         // number of outputs
         extModName += std::to_string(outTypes.size());
@@ -996,10 +993,11 @@ namespace {
 /// multiple one-slot buffers. Our RTL buffer components cannot be
 /// parameterized with a number of slots (they are all 1-slot) so we have to
 /// do this unpacking prior to running the conversion pass.
-struct UnpackBufferSlots : public OpRewritePattern<handshake::BufferOp> {
-  using OpRewritePattern<handshake::BufferOp>::OpRewritePattern;
+template <typename BufOp>
+struct UnpackBufferSlots : public OpRewritePattern<BufOp> {
+  using OpRewritePattern<BufOp>::OpRewritePattern;
 
-  LogicalResult matchAndRewrite(handshake::BufferOp bufOp,
+  LogicalResult matchAndRewrite(BufOp bufOp,
                                 PatternRewriter &rewriter) const override {
     // Only operate on buffers with strictly more than one slots
     unsigned numSlots = bufOp.getSlots();
@@ -1009,13 +1007,9 @@ struct UnpackBufferSlots : public OpRewritePattern<handshake::BufferOp> {
     rewriter.setInsertionPoint(bufOp);
 
     // Create a sequence of one-slot buffers
-    BufferTypeEnum bufType = bufOp.getBufferType();
     Value bufVal = bufOp.getOperand();
     for (size_t idx = 0; idx < numSlots; ++idx)
-      bufVal =
-          rewriter
-              .create<handshake::BufferOp>(bufOp.getLoc(), bufVal, 1, bufType)
-              .getResult();
+      bufVal = rewriter.create<BufOp>(bufOp.getLoc(), bufVal, 1).getResult();
 
     // Replace the original multi-slots buffer with the output of the last
     // buffer in the sequence
@@ -1082,7 +1076,8 @@ public:
     patterns.insert<FuncOpConversionPattern>(&ctx, ls);
     patterns.insert<
         // Handshake operations
-        ExtModuleConversionPattern<handshake::BufferOp>,
+        ExtModuleConversionPattern<handshake::OEHBOp>,
+        ExtModuleConversionPattern<handshake::TEHBOp>,
         ExtModuleConversionPattern<handshake::ConditionalBranchOp>,
         ExtModuleConversionPattern<handshake::BranchOp>,
         ExtModuleConversionPattern<handshake::MergeOp>,
@@ -1162,7 +1157,8 @@ LogicalResult HandshakeToNetListPass::preprocessMod() {
   config.useTopDownTraversal = true;
   config.enableRegionSimplification = false;
   RewritePatternSet preprocessPatterns(ctx);
-  preprocessPatterns.add<UnpackBufferSlots>(ctx);
+  preprocessPatterns.add<UnpackBufferSlots<handshake::OEHBOp>,
+                         UnpackBufferSlots<handshake::TEHBOp>>(ctx);
   return applyPatternsAndFoldGreedily(modOp, std::move(preprocessPatterns),
                                       config);
 }

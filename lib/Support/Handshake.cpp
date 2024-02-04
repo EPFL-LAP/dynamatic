@@ -380,13 +380,14 @@ SmallVector<Value> dynamatic::getLSQControlPaths(handshake::LSQOp lsqOp,
         llvm::TypeSwitch<Operation *, void>(succOp)
             .Case<handshake::ConditionalBranchOp, handshake::BranchOp,
                   handshake::MergeOp, handshake::MuxOp, handshake::ForkOp,
-                  handshake::LazyForkOp, handshake::BufferOp>([&](auto) {
-              // If the successor just propagates the control path, add
-              // all its results to the list of control channels to
-              // explore
-              for (OpResult succRes : succOp->getResults())
-                controlChannels.push_back(succRes);
-            })
+                  handshake::LazyForkOp, handshake::BufferOpInterface>(
+                [&](auto) {
+                  // If the successor just propagates the control path, add
+                  // all its results to the list of control channels to
+                  // explore
+                  for (OpResult succRes : succOp->getResults())
+                    controlChannels.push_back(succRes);
+                })
             .Case<handshake::ControlMergeOp>(
                 [&](handshake::ControlMergeOp cmergeOp) {
                   // Only the control merge's data output forwards the input

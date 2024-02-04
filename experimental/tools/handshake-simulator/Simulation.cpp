@@ -237,20 +237,6 @@ HandshakeExecuter::HandshakeExecuter(handshake::FuncOp &func,
       hasEnd &&
       "At least one 'end' operation is required for the program to terminate.");
 
-  // Initialize the value map for buffers with initial values.
-  for (auto bufferOp : func.getOps<handshake::BufferOp>()) {
-    if (bufferOp.getInitValues().has_value()) {
-      auto initValues = bufferOp.getInitValueArray();
-      assert(initValues.size() == 1 &&
-             "Handshake-runner only supports buffer initialization with a "
-             "single buffer value.");
-      Value bufferRes = bufferOp.getResult();
-      APInt value = APInt(bufferRes.getType().getIntOrFloatBitWidth(),
-                          initValues.front());
-      circuitState.storeValue(bufferRes, value);
-    }
-  }
-
   // Main simulation initilisation
   StateManager manager;
   manager.currentCycle = 0;

@@ -523,35 +523,38 @@ LogicalResult HandshakePlaceBuffersPass::placeWithoutUsingMILP() {
 }
 
 void HandshakePlaceBuffersPass::instantiateBuffers(BufferPlacement &placement) {
-  OpBuilder builder(&getContext());
+  MLIRContext *ctx = &getContext();
+  OpBuilder builder(ctx);
   NameAnalysis &nameAnalysis = getAnalysis<NameAnalysis>();
+  StringAttr slotName = StringAttr::get(ctx, "slots");
   for (auto &[channel, placeRes] : placement) {
     Operation *opDst = *channel.getUsers().begin();
     builder.setInsertionPoint(opDst);
 
     Value bufferIn = channel;
-    auto placeBuffer = [&](BufferTypeEnum bufType, unsigned numSlots) {
+    auto placeBuffer = [&](StringRef bufName, unsigned numSlots) {
       if (numSlots == 0)
         return;
 
       // Insert an opaque buffer
-      auto bufOp = builder.create<handshake::BufferOp>(
-          bufferIn.getLoc(), bufferIn, numSlots, bufType);
+      NamedAttribute slots(slotName, builder.getI32IntegerAttr(numSlots));
+      StringAttr opName = StringAttr::get(ctx, bufName);
+      auto *bufOp = builder.create(bufferIn.getLoc(), opName, bufferIn,
+                                   {bufferIn.getType()}, {slots});
       inheritBB(opDst, bufOp);
       nameAnalysis.setName(bufOp);
 
-      Value bufferRes = bufOp.getResult();
-
+      Value bufferRes = bufOp->getResult(0);
       opDst->replaceUsesOfWith(bufferIn, bufferRes);
       bufferIn = bufferRes;
     };
 
     if (placeRes.opaqueBeforeTrans) {
-      placeBuffer(BufferTypeEnum::seq, placeRes.numOpaque);
-      placeBuffer(BufferTypeEnum::fifo, placeRes.numTrans);
+      placeBuffer(handshake::OEHBOp::getOperationName(), placeRes.numOpaque);
+      placeBuffer(handshake::TEHBOp::getOperationName(), placeRes.numTrans);
     } else {
-      placeBuffer(BufferTypeEnum::fifo, placeRes.numTrans);
-      placeBuffer(BufferTypeEnum::seq, placeRes.numOpaque);
+      placeBuffer(handshake::TEHBOp::getOperationName(), placeRes.numTrans);
+      placeBuffer(handshake::OEHBOp::getOperationName(), placeRes.numOpaque);
     }
   }
 }

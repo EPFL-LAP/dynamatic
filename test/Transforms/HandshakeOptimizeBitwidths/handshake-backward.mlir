@@ -136,12 +136,12 @@ handshake.func @condBrBW(%arg0: i32, %cond: i1, %start: none) -> (i16, i8) {
 // CHECK-SAME:                             %[[VAL_0:.*]]: i32,
 // CHECK-SAME:                             %[[VAL_1:.*]]: none, ...) -> i16 attributes {argNames = ["arg0", "start"], resNames = ["out0"]} {
 // CHECK:           %[[VAL_2:.*]] = arith.trunci %[[VAL_0]] {bb = 0 : ui32} : i32 to i16
-// CHECK:           %[[VAL_3:.*]] = buffer [2] seq %[[VAL_2]] : i16
+// CHECK:           %[[VAL_3:.*]] = oehb [2] %[[VAL_2]] : i16
 // CHECK:           %[[VAL_4:.*]] = return %[[VAL_3]] : i16
 // CHECK:           end %[[VAL_4]] : i16
 // CHECK:         }
 handshake.func @bufferBW(%arg0: i32, %start: none) -> i16 {
-  %buf = buffer [2] seq %arg0 : i32
+  %buf = oehb [2] %arg0 : i32
   %trunc = arith.trunci %buf : i32 to i16
   %returnVal = return %trunc : i16
   end %returnVal : i16

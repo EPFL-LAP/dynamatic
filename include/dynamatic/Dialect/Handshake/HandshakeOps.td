@@ -215,70 +215,76 @@ def InstanceOp : Handshake_Op<"instance", [
   }];
 }
 
-// Here use I32EnumAttr to better suit the BufferOp sequential
-// attribute for it can only be seq or fifo.
-def BufferCaseSeq: I32EnumAttrCase<"seq", 0>;
-def BufferCaseFIFO: I32EnumAttrCase<"fifo", 1>;
-
-def BufferTypeEnum: I32EnumAttr<
-  "BufferTypeEnum", "BufferOp seq or fifo", [BufferCaseSeq, BufferCaseFIFO]> {
-  let genSpecializedAttr = 0;
-}
-def BufferTypeEnumAttr: EnumAttr<Handshake_Dialect, BufferTypeEnum, "buffer_type_enum">;
-
-def BufferOp : Handshake_Op<"buffer", [Pure,
-  HasClock, SameOperandsAndResultType,
-  DeclareOpInterfaceMethods<SOSTInterface, ["getSize"]>
+class Handshake_BufferOp<string mnemonic> : Handshake_Op<mnemonic, [
+  BufferOpInterface, HasClock, SameOperandsAndResultType,
+  DeclareOpInterfaceMethods<SOSTInterface, ["getSize"]>,
 ]> {
-  let summary = "buffer operation";
-
-  let description = [{
-    The buffer operation represents a buffer operation. $slots
-    must be an unsigned integer larger than 0. $bufferType=BufferTypeEnum::seq indicates a
-    nontransparent buffer, while $bufferType=BufferTypeEnum::fifo indicates a transparent
-    buffer.
-
-    An 'initValues' attribute containing a list of integer values may be provided.
-    The list must be of the same length as the number of slots. This will
-    initialize the buffer with the given values upon reset.
-    For now, only sequential buffers are allowed to have initial values.
-    @todo: How to support different init types? these have to be stored (and
-    retrieved) as attributes, hence they must be of a known type.
-  }];
-
-  let arguments = (ins
-    AnyType:$operand,
-    ConfinedAttr<I32Attr, [IntMinValue<1>]>:$slots,
-    BufferTypeEnumAttr:$bufferType,
-    OptionalAttr<I64ArrayAttr>:$initValues);
+  let arguments = (ins  AnyType:$operand,
+                        ConfinedAttr<I32Attr, [IntMinValue<1>]>:$slots);
   let results = (outs AnyType:$result);
 
-  let builders = [OpBuilder<
-      (ins "Value":$operand, "int":$slots, "BufferTypeEnum":$bufferType), [{
-        $_state.addOperands(operand);
-        $_state.addTypes(operand.getType());
-        $_state.addAttribute("slots", $_builder.getI32IntegerAttr(slots));
-        $_state.addAttribute("bufferType", BufferTypeEnumAttr::get($_state.getContext(), bufferType));
-    }]>];
-
-  let extraClassDeclaration = [{
-    bool isSequential() {
-      return this->getBufferType() == BufferTypeEnum::seq;
-    }
-    int getNumSlots() {
-      return (*this)->getAttrOfType<IntegerAttr>("slots").getValue().getZExtValue();
-    }
-    SmallVector<int64_t> getInitValueArray() {
-      assert(getInitValues() && "initValues attribute not set");
-      SmallVector<int64_t> values;
-      for (auto value : (*this)->getAttrOfType<ArrayAttr>("initValues"))
-        values.push_back(value.cast<IntegerAttr>().getValue().getSExtValue());
-      return values;
+  let extraClassDefinition = [{
+    /// Custom implementation of the SOST::getSize method for buffers. Simply
+    /// returns the number of buffer slots.
+    unsigned $cppClass::getSize() {
+      return getSlots();
     }
 
+    /// Prints the buffer operation.
+    void $cppClass::print(mlir::OpAsmPrinter &p) {
+      p << " [" << getSize() << "] " << getOperand();
+      p.printOptionalAttrDict((*this)->getAttrs(), {"slots"});
+      p << " : " << getOperand().getType();
+    }
+
+    /// Parses the buffer operation.
+    mlir::ParseResult $cppClass::parse(mlir::OpAsmParser &parser,
+                                       mlir::OperationState &result) {
+      mlir::SmallVector<OpAsmParser::UnresolvedOperand, 4> allOperands;
+      llvm::SMLoc loc = parser.getCurrentLocation();
+      mlir::Type type;
+      unsigned slots;
+      if (parseSOSTOp(true, parser, allOperands, result, slots, type))
+        return failure();
+
+      result.addTypes({type});
+      result.addAttribute(
+          "slots",
+          IntegerAttr::get(IntegerType::get(result.getContext(), 32), slots));
+
+      if (parser.resolveOperands(allOperands, {type}, loc, result.operands))
+        return failure();
+      return success();
+    }
   }];
+
   let hasCustomAssemblyFormat = 1;
-  let hasVerifier = 1;
+}
+
+def OEHBOp : Handshake_BufferOp<"oehb"> {
+  let summary = "opaque elastic half buffer";
+  let description = [{
+    An OEHB (opaque elastic half buffer) is a type of buffer that breaks
+    combinatinal paths in the downstream data/valid network.
+
+    Example:
+    ```mlir
+    %result = oehb [2] %operand : i32
+    ```
+  }];
+}
+
+def TEHBOp : Handshake_BufferOp<"tehb"> {
+  let summary = "transparent elastic half buffer";
+  let description = [{
+    A TEHB (transparent elastic half buffer) is a type of buffer that breaks
+    combinatinal paths in the upstream ready network.
+
+    Example:
+    ```mlir
+    %result = tehb [2] %operand : i32
+    ```
+  }];
 }
 
 def ForkOp : Handshake_Op<"fork", [
