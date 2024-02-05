@@ -40,14 +40,7 @@ static unsigned getTypeWidth(Type type) {
   llvm_unreachable("unsupported channel type");
 }
 
-/// Gets the datawidth of an operation, for use in determining which data point
-/// of a bitwidth-dependent metric to pick.
-///
-/// TODO: Computations for some of the Handshake operations are shady at best
-/// due to unclear semantics that we inherit from legacy Dynamatic. Some
-/// conservative choices were made, but we should go back to that and clarify
-/// everything at some point.
-static unsigned getOpDatawidth(Operation *op) {
+unsigned dynamatic::getOpDatawidth(Operation *op) {
   // All arithmetic operations are handled the same way
   if (op->getName().getDialectNamespace() == "arith")
     return getTypeWidth(op->getOperand(0).getType());
@@ -91,39 +84,6 @@ static unsigned getOpDatawidth(Operation *op) {
         assert(false && "unsupported operation");
         return dynamatic::MAX_DATAWIDTH;
       });
-}
-
-template <typename M>
-LogicalResult BitwidthDepMetric<M>::getCeilMetric(unsigned bitwidth,
-                                                  M &metric) const {
-  std::optional<unsigned> widthCeil;
-  M metricCeil = 0.0;
-
-  // Iterate over the available bitwidths and determine which is the closest one
-  // above the operation's bitwidth
-  for (const auto &[width, metric] : data) {
-    if (width >= bitwidth) {
-      if (!widthCeil.has_value() || *widthCeil > width) {
-        widthCeil = width;
-        metricCeil = metric;
-      }
-    }
-  }
-
-  if (!widthCeil.has_value())
-    // If the maximum bitwidth in the model is strictly lower than the
-    // operation's data bitwidth, then we do not know what delay to set and
-    // we have to fail
-    return failure();
-
-  metric = metricCeil;
-  return success();
-}
-
-template <typename M>
-LogicalResult BitwidthDepMetric<M>::getCeilMetric(Operation *op,
-                                                  M &metric) const {
-  return getCeilMetric(getOpDatawidth(op), metric);
 }
 
 LogicalResult TimingModel::getTotalDataDelay(unsigned bitwidth,
