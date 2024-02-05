@@ -38,9 +38,6 @@ LogicalResult dynamatic::visual::processDOT(std::ifstream &file, Graph &graph) {
   BB currentBB;
   bool insideBBDefinition = false;
 
-  std::regex positionRegex("e,\\s*([0-9]+),([0-9]+(\\.[0-9]+)?)");
-  std::smatch match;
-
   while (std::getline(file, line)) {
     if (line.find("->") == std::string::npos &&
         line.find('[') != std::string::npos &&
@@ -55,12 +52,7 @@ LogicalResult dynamatic::visual::processDOT(std::ifstream &file, Graph &graph) {
       insideEdgeDefinition = true;
       currentEdge.setId(currentEdgeID);
 
-    } else if (insideNodeDefinition && line.find("in") != std::string::npos &&
-               line.find("label") == std::string::npos &&
-               line.find("mlir_op") == std::string::npos &&
-               line.find('[') == std::string::npos &&
-               line.find("fillcolor") == std::string::npos &&
-               line.find("type") == std::string::npos) {
+    } else if (insideNodeDefinition && line.find("in=") != std::string::npos) {
       size_t occurrences = std::count(line.begin(), line.end(), ' ');
       if (occurrences != std::string::npos) {
         for (size_t i = 1; i <= occurrences + 1; i++) {
@@ -114,8 +106,8 @@ LogicalResult dynamatic::visual::processDOT(std::ifstream &file, Graph &graph) {
       currentNode.setShape(shape);
     }
 
-    if (insideNodeDefinition &&
-        line.find("style=dashed") != std::string::npos) {
+    if (insideNodeDefinition && line.find("style=") != std::string::npos &&
+        line.find("dotted") != std::string::npos) {
       currentNode.setDashed(true);
     }
 
@@ -203,7 +195,8 @@ LogicalResult dynamatic::visual::processDOT(std::ifstream &file, Graph &graph) {
       currentEdge.setDashed(true);
     }
 
-    if (insideEdgeDefinition && line.find("style") != std::string::npos) {
+    if (insideEdgeDefinition && line.find("style=") != std::string::npos &&
+        line.find("dotted") != std::string::npos) {
       currentEdge.setDashed(true);
     }
 
