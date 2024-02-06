@@ -8,10 +8,9 @@ source "$1"/tools/dynamatic/scripts/utils.sh
 
 # Script arguments
 DYNAMATIC_DIR=$1
-LEGACY_DIR=$2
-SRC_DIR=$3
-OUTPUT_DIR=$4
-KERNEL_NAME=$5
+SRC_DIR=$2
+OUTPUT_DIR=$3
+KERNEL_NAME=$4
 
 # Generated directories/files
 SIM_DIR="$OUTPUT_DIR/sim"
@@ -49,7 +48,7 @@ cp "$DYNAMATIC_DIR/include/dynamatic/Integration.h" "$DYN_INCLUDE_DIR"
 # Copy VHDL module and VHDL components to dedicated folder
 cp "$COMP_DIR/$KERNEL_NAME.vhd" "$VHDL_SRC_DIR"
 cp "$COMP_DIR/"LSQ*.v "$VHDL_SRC_DIR" 2> /dev/null
-cp "$LEGACY_DIR"/components/*.vhd "$VHDL_SRC_DIR"
+cp "$DYNAMATIC_DIR"/data/vhdl/*.vhd "$VHDL_SRC_DIR"
 
 # Copy sources to dedicated folder
 cp "$SRC_DIR/$KERNEL_NAME.c" "$C_SRC_DIR" 

@@ -229,7 +229,7 @@ public:
   Simulate(FrontendState &state)
       : Command(CMD_SIMULATE,
                 "Simulates the VHDL produced during HDL writing using Modelsim "
-                "and the legacy HLSVerifier tool",
+                "and the hls-verifier tool",
                 state){};
 
   CommandResult decode(SmallVector<std::string> &tokens) override;
@@ -533,7 +533,7 @@ CommandResult Simulate::decode(SmallVector<std::string> &tokens) {
     return CommandResult::SYNTAX_ERROR;
 
   // We need the source and legacy paths to be set
-  if (!state.sourcePathIsSet(keyword) || !state.legacyPathIsSet(keyword))
+  if (!state.sourcePathIsSet(keyword))
     return CommandResult::FAIL;
 
   StringRef sep = sys::path::get_separator();
@@ -551,8 +551,8 @@ CommandResult Simulate::decode(SmallVector<std::string> &tokens) {
 
   // Create and execute the command
   return execShellCommand(state.getScriptsPath() + "/simulate.sh " +
-                          state.dynamaticPath + " " + *state.legacyPath + " " +
-                          kernelDir + " " + outputDir + " " + kernelName);
+                          state.dynamaticPath + " " + kernelDir + " " +
+                          outputDir + " " + kernelName);
 }
 
 CommandResult Visualize::decode(SmallVector<std::string> &tokens) {
