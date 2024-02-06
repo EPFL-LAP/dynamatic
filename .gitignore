@@ -31,6 +31,9 @@
 *.out
 *.app
 
+# Jar files
+*.jar
+
 # Build-related directories
 build/
 bin/

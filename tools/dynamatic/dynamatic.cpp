@@ -505,7 +505,7 @@ CommandResult WriteHDL::decode(SmallVector<std::string> &tokens) {
     return CommandResult::SYNTAX_ERROR;
 
   // We need the source and legacy paths to be set
-  if (!state.sourcePathIsSet(keyword) || !state.legacyPathIsSet(keyword))
+  if (!state.sourcePathIsSet(keyword))
     return CommandResult::FAIL;
 
   StringRef sep = sys::path::get_separator();
@@ -523,8 +523,8 @@ CommandResult WriteHDL::decode(SmallVector<std::string> &tokens) {
 
   // Create and execute the command
   return execShellCommand(state.getScriptsPath() + "/write-hdl.sh " +
-                          state.dynamaticPath + " " + *state.legacyPath + " " +
-                          outputDir + " " + kernelName);
+                          state.dynamaticPath + " " + outputDir + " " +
+                          kernelName);
 }
 
 CommandResult Simulate::decode(SmallVector<std::string> &tokens) {
