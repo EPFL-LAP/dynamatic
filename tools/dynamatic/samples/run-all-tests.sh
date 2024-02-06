@@ -1,8 +1,9 @@
 # Fully run (from C to synthesis) all integration tests available on the 
 # repository
 
-# Indicate the path to your legacy Dynamatic install here
-set-legacy-path   ../dynamatic-utils/legacy-dynamatic/dhls/etc/dynamatic
+# Indicate the path to Dynamatic's top-level directory here (leave unchanged if
+# running the frontend from the top-level directory)
+set-dynamatic-path  .
 
 set-src           integration-test/bicg/bicg.c
 compile

@@ -8,9 +8,8 @@ source "$1"/tools/dynamatic/scripts/utils.sh
 
 # Script arguments
 DYNAMATIC_DIR=$1
-LEGACY_DIR=$2
-OUTPUT_DIR=$3
-KERNEL_NAME=$4
+OUTPUT_DIR=$2
+KERNEL_NAME=$3
 
 COMP_DIR="$OUTPUT_DIR/comp"
 
@@ -35,7 +34,7 @@ rm -rf "$SYNTH_DIR" && mkdir -p "$SYNTH_DIR"
 # Copy all synthesizable components to specific folder for Vivado
 mkdir -p "$HDL_DIR"
 cp "$COMP_DIR/$KERNEL_NAME.vhd" "$HDL_DIR"
-cp "$LEGACY_DIR"/components/*.vhd "$HDL_DIR"
+cp "$DYNAMATIC_DIR"/data/vhdl/*.vhd "$HDL_DIR"
 
 # See if we should include any LSQ in the synthesis script
 READ_VERILOG=""

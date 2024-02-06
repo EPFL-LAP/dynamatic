@@ -77,7 +77,6 @@ const static std::string PROMPT = "dynamatic> ";
 // Command names
 const static std::string CMD_SET_SRC = "set-src";
 const static std::string CMD_SET_DYNAMATIC_PATH = "set-dynamatic-path";
-const static std::string CMD_SET_LEGACY_PATH = "set-legacy-path";
 const static std::string CMD_COMPILE = "compile";
 const static std::string CMD_WRITE_HDL = "write-hdl";
 const static std::string CMD_SIMULATE = "simulate";
@@ -91,14 +90,11 @@ namespace {
 struct FrontendState {
   std::string cwd;
   std::string dynamaticPath;
-  std::optional<std::string> legacyPath = std::nullopt;
   std::optional<std::string> sourcePath = std::nullopt;
 
   FrontendState(StringRef cwd) : cwd(cwd), dynamaticPath(cwd){};
 
   bool sourcePathIsSet(StringRef keyword);
-
-  bool legacyPathIsSet(StringRef keyword);
 
   std::string getScriptsPath() const {
     return dynamaticPath + "/tools/dynamatic/scripts";
@@ -180,17 +176,6 @@ public:
   CommandResult decode(SmallVector<std::string> &tokens) override;
 };
 
-class SetLegacyPath : public Command {
-public:
-  SetLegacyPath(FrontendState &state)
-      : Command(CMD_SET_LEGACY_PATH,
-                "Sets the path to legacy Dynamatic's top-level directory",
-                state,
-                {{"path", "path to legacy Dynamatic's top-level directory"}}){};
-
-  CommandResult decode(SmallVector<std::string> &tokens) override;
-};
-
 class SetSrc : public Command {
 public:
   SetSrc(FrontendState &state)
@@ -218,7 +203,7 @@ public:
       : Command(
             CMD_WRITE_HDL,
             "Converts the DOT file produced after compile to VHDL using the "
-            "legacy dot2vhdl tool",
+            "export-dot tool",
             state){};
 
   CommandResult decode(SmallVector<std::string> &tokens) override;
@@ -298,19 +283,9 @@ std::string FrontendState::makeAbsolutePath(StringRef path) {
 bool FrontendState::sourcePathIsSet(StringRef keyword) {
   if (!sourcePath.has_value()) {
     llvm::outs() << ERR
-                 << "The path to legacy Dynamatic needs to be set to run '"
+                 << "The path to the source file needs to be set to run '"
                  << keyword << "' use the '" << CMD_SET_SRC
                  << "' command before '" << keyword << "'.\n";
-    return false;
-  }
-  return true;
-}
-
-bool FrontendState::legacyPathIsSet(StringRef keyword) {
-  if (!legacyPath.has_value()) {
-    llvm::outs() << ERR << "The source needs to be set to run '" << keyword
-                 << "' use the '" << CMD_SET_LEGACY_PATH << "' command before '"
-                 << keyword << "'.\n";
     return false;
   }
   return true;
@@ -431,29 +406,6 @@ CommandResult SetDynamaticPath::decode(SmallVector<std::string> &tokens) {
   return CommandResult::SUCCESS;
 }
 
-CommandResult SetLegacyPath::decode(SmallVector<std::string> &tokens) {
-  ParsedCommand parsed;
-  if (failed(parse(tokens, parsed)))
-    return CommandResult::SYNTAX_ERROR;
-
-  // Remove the eventual slash at the end of the path
-  StringRef sep = sys::path::get_separator();
-  std::string legacyPath = parsed.positionals.front().str();
-  if (StringRef(legacyPath).ends_with(sep))
-    legacyPath = legacyPath.substr(0, legacyPath.size() - 1);
-
-  // Check whether the path makes sense
-  if (!fs::exists(legacyPath + sep + "dot2vhdl")) {
-    llvm::outs() << ERR << "'" << legacyPath
-                 << "' doesn't seem to point to legacy Dynamatic, expected to "
-                    "find, for example, a directory named 'dot2vhdl' there.\n";
-    return CommandResult::FAIL;
-  }
-
-  state.legacyPath = state.makeAbsolutePath(legacyPath);
-  return CommandResult::SUCCESS;
-}
-
 CommandResult SetSrc::decode(SmallVector<std::string> &tokens) {
   ParsedCommand parsed;
   if (failed(parse(tokens, parsed)))
@@ -482,7 +434,7 @@ CommandResult Compile::decode(SmallVector<std::string> &tokens) {
   if (failed(parse(tokens, parsed)))
     return CommandResult::SYNTAX_ERROR;
 
-  // We need the source and legacy paths to be set
+  // We need the source path to be set
   if (!state.sourcePathIsSet(keyword))
     return CommandResult::FAIL;
 
@@ -504,7 +456,7 @@ CommandResult WriteHDL::decode(SmallVector<std::string> &tokens) {
   if (failed(parse(tokens, parsed)))
     return CommandResult::SYNTAX_ERROR;
 
-  // We need the source and legacy paths to be set
+  // We need the source path to be set
   if (!state.sourcePathIsSet(keyword))
     return CommandResult::FAIL;
 
@@ -532,7 +484,7 @@ CommandResult Simulate::decode(SmallVector<std::string> &tokens) {
   if (failed(parse(tokens, parsed)))
     return CommandResult::SYNTAX_ERROR;
 
-  // We need the source and legacy paths to be set
+  // We need the source path to be set
   if (!state.sourcePathIsSet(keyword))
     return CommandResult::FAIL;
 
@@ -595,7 +547,7 @@ CommandResult Synthesize::decode(SmallVector<std::string> &tokens) {
   if (failed(parse(tokens, parsed)))
     return CommandResult::SYNTAX_ERROR;
 
-  // We need the source and legacy paths to be set
+  // We need the source path to be set
   if (!state.sourcePathIsSet(keyword))
     return CommandResult::FAIL;
 
@@ -614,8 +566,8 @@ CommandResult Synthesize::decode(SmallVector<std::string> &tokens) {
 
   // Create and execute the command
   return execShellCommand(state.getScriptsPath() + "/synthesize.sh " +
-                          state.dynamaticPath + " " + *state.legacyPath + " " +
-                          outputDir + " " + kernelName);
+                          state.dynamaticPath + " " + outputDir + " " +
+                          kernelName);
 }
 
 static void tokenizeInput(StringRef input, SmallVector<std::string> &tokens) {
@@ -667,7 +619,6 @@ int main(int argc, char **argv) {
   FrontendState state(cwd.str());
   FrontendCommands commands;
   commands.add<SetDynamaticPath>(state);
-  commands.add<SetLegacyPath>(state);
   commands.add<SetSrc>(state);
   commands.add<Compile>(state);
   commands.add<WriteHDL>(state);
