@@ -68,7 +68,7 @@ set_property HD.CLK_SRC BUFGCTRL_X0Y0 [get_ports clk]
 #set_input_delay 0 -clock CLK  [all_inputs]
 #set_output_delay 0 -clock CLK [all_outputs]" > "$F_PERIOD"
 
-echo_info "Created synthesization scripts"
+echo_info "Created synthesis scripts"
 echo_info "Launching Vivado synthesis"
 cd "$SYNTH_DIR"
 vivado -mode tcl -source "$F_SCRIPT" > "$F_REPORT"
