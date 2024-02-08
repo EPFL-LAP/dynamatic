@@ -1,8 +1,10 @@
-#ifndef SIMPLE_LOOP_H
-#define SIMPLE_LOOP_H
+#ifndef LOOP_ACCUMULATE_H
+#define LOOP_ACCUMULATE_H
 
-#define N 8
+#define N 10
 
-unsigned loop_accumulate();
+typedef int in_int_t;
 
-#endif // SIMPLE_LOOP_H
+unsigned loop_accumulate(in_int_t a[N]);
+
+#endif // LOOP_ACCUMULATE_H

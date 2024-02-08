@@ -1,16 +1,21 @@
 #include "loop_accumulate.h"
 #include "dynamatic/Integration.h"
 
-unsigned loop_accumulate() {
+unsigned loop_accumulate(in_int_t a[N]) {
   unsigned x = 2;
   for (unsigned i = 0; i < N; ++i) {
-    if ((i & 1) == 0)
+    if (a[i] == 0)
       x = x * x;
   }
   return x;
 }
 
 int main(void) {
-  CALL_KERNEL(loop_accumulate);
+  in_int_t a[N];
+  // Initialize a to [0, 1, 0, 1, ...]
+  for (unsigned i = 0; i < N; ++i) {
+    a[i] = i % 1;
+  }
+  CALL_KERNEL(loop_accumulate, a);
   return 0;
 }
