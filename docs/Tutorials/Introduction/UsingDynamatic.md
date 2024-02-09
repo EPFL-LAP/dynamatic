@@ -3,7 +3,7 @@
 This tutorial will walk you through the compilation of a simple kernel function written in C into an equivalent VHDL design, the functional verification of the resulting dataflow circuit using Modelsim, and the latter's visualization using our custom interactive dataflow visualizer. The tutorial assumes basic knowledge of dataflow circuits but does not require any insight into MLIR or compilers in general.
 
 Below are some technical details about this tutorial.
-- All resources are located in the repository's [`tutorials/Introduction/UsingDynamatic`](https://github.com/EPFL-LAP/dynamatic/tree/main/tutorials/Introduction/UsingDynamatic) folder.
+- All resources are located in the repository's [`tutorials/Introduction/UsingDynamatic`](../../../tutorials/Introduction/UsingDynamatic) folder.
 - All relative paths mentionned throughout the tutorial are assumed to start at Dynamatic's top-level folder.
 - We assume that you have already built Dynamatic from source using the instructions in the top-level [README](../../../README.md) or that you have access to a Docker container that has a pre-built version of Dynamatic . 
 
@@ -19,7 +19,7 @@ In this tutorial, we will tranform the following C function (the *kernel*, in DH
 
 ```c
 // The number of loop iterations
-#define N 8
+#define N 10
 
 // The kernel under consideration
 unsigned loop_accumulate(in_int_t a[N]) {
