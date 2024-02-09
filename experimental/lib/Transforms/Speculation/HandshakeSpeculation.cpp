@@ -53,11 +53,10 @@ private:
   LogicalResult placeUnits(Value ctrlSignal);
 
   /// Create the control path for commit signals by replicating branches
-  bool routeBranchControlTraversal(llvm::DenseSet<Operation *> &visited,
-                                   Value ctrlSignal, Operation *currOp);
+  void routeCommitControl(llvm::DenseSet<Operation *> &markedPath,
+                          Value ctrlSignal, Operation *currOp);
 
-  /// Wrapper around routeCommitControlTraversal to prepare and invoke the
-  /// placement
+  /// Wrapper around routeCommitControl to prepare and invoke the placement
   LogicalResult prepareAndPlaceCommits();
 
   /// Place the SaveCommit operations and the control path
@@ -83,20 +82,43 @@ LogicalResult HandshakeSpeculationPass::placeUnits(Value ctrlSignal) {
   return success();
 }
 
-// This recursive function traverses the IR and creates a control path
-// by replicating the branches along the way. It stops at commits and
-// connects them to the newly created control path, with value ctrlSignal
-bool HandshakeSpeculationPass::routeBranchControlTraversal(
-    llvm::DenseSet<Operation *> &visited, Value ctrlSignal, Operation *currOp) {
-  // End traversal if already visited
+// Traverse the IR in a DFS manner. Mark all paths that lead to commit units
+// by adding them to the set markedPath. Returns a true if a Commit is reached.
+static bool markPathToCommits(llvm::DenseSet<Operation *> &visited,
+                              llvm::DenseSet<Operation *> &markedPath,
+                              Operation *currOp) {
   if (auto [_, isNewOp] = visited.insert(currOp); !isNewOp)
     return false;
 
   bool foundCommit = false;
+  if (isa<handshake::SpecCommitOp>(currOp)) {
+    // End traversal at Commits and notify that the path leads to a commit
+    foundCommit = true;
+  } else {
+    // Continue DFS traversal
+    for (Operation *succOp : currOp->getUsers())
+      foundCommit |= markPathToCommits(visited, markedPath, succOp);
+
+    if (foundCommit)
+      markedPath.insert(currOp);
+  }
+
+  return foundCommit;
+}
+
+// This recursive function traverses the IR along a marked path and creates a
+// control path by replicating the branches it finds in the way. It stops at
+// commits and connects them to the newly created path with value ctrlSignal
+void HandshakeSpeculationPass::routeCommitControl(
+    llvm::DenseSet<Operation *> &markedPath, Value ctrlSignal,
+    Operation *currOp) {
+  // End traversal if currOp is not in the marked path to commits
+  if (!markedPath.contains(currOp))
+    return;
+
   if (auto commitOp = dyn_cast<handshake::SpecCommitOp>(currOp)) {
     // Connect commit to the correct control signal and end traversal
     commitOp.setOperand(1, ctrlSignal);
-    foundCommit = true;
   } else if (auto branchOp = dyn_cast<handshake::ConditionalBranchOp>(currOp)) {
     // Replicate a branch in the control path and use new control signal.
     // To do so, a structure of two connected branches is created.
@@ -113,37 +135,26 @@ bool HandshakeSpeculationPass::routeBranchControlTraversal(
     auto branchDisc = builder.create<handshake::SpeculatingBranchOp>(
         branchOp.getLoc(), branchOp.getTrueResult() /* specTag */,
         branchOp.getConditionOperand());
-    visited.insert(branchDisc);
 
     // Connect a conditional branch at the true result of branchDisc
     auto branchCond = builder.create<handshake::ConditionalBranchOp>(
         branchDisc->getLoc(), branchDisc.getTrueResult() /* condition */,
         ctrlSignal /* data */);
-    visited.insert(branchCond);
 
     // Follow the two branch results with a different control signal
     for (unsigned i = 0; i <= 1; ++i) {
-      for (Operation *succOp : currOp->getResult(i).getUsers()) {
+      for (Operation *succOp : branchOp->getResult(i).getUsers()) {
         Value ctrl = branchCond->getResult(i);
-        bool routed = routeBranchControlTraversal(visited, ctrl, succOp);
-        foundCommit |= routed;
+        routeCommitControl(markedPath, ctrl, succOp);
       }
-    }
-
-    if (!foundCommit) {
-      // Remove unused branch signal
-      branchCond->erase();
-      branchDisc->erase();
     }
 
   } else {
     // Continue Traversal
     for (Operation *succOp : currOp->getUsers()) {
-      bool routed = routeBranchControlTraversal(visited, ctrlSignal, succOp);
-      foundCommit |= routed;
+      routeCommitControl(markedPath, ctrlSignal, succOp);
     }
   }
-  return foundCommit;
 }
 
 LogicalResult HandshakeSpeculationPass::prepareAndPlaceCommits() {
@@ -154,11 +165,16 @@ LogicalResult HandshakeSpeculationPass::prepareAndPlaceCommits() {
 
   // Create visited set
   llvm::DenseSet<Operation *> visited;
+  llvm::DenseSet<Operation *> markedPath;
   visited.insert(specOp);
 
-  // Start traversal at the speculator output
+  // Start traversal to mark the path to commits the speculator output
   for (Operation *succOp : specOp.getDataOut().getUsers())
-    routeBranchControlTraversal(visited, commitCtrl, succOp);
+    markPathToCommits(visited, markedPath, succOp);
+
+  // Follow the marked path and replicate branches
+  for (Operation *succOp : specOp.getDataOut().getUsers())
+    routeCommitControl(markedPath, commitCtrl, succOp);
 
   return success();
 }
