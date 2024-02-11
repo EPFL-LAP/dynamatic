@@ -51,4 +51,19 @@ def HandshakeSpeculation : DynamaticPass<"handshake-speculation"> {
     "operations.">];
 }
 
+def HandshakePlaceBuffersCustom : DynamaticPass<"handshake-placebuffers-custom"> {
+  let summary = "Place buffers on specific channels";
+  let description = [{ place buffers on specific channels using a string }];
+  let constructor = "dynamatic::experimental::buffer::createHandshakePlaceBuffersCustom()";
+  let options = [
+  	Option<"pred", "pred", "std::string", "", "the predecessor unit of the channel">,
+  	Option<"outid", "outid", "unsigned", "", "output id of the predecessor, range: from 0 to number of outputs - 1">,
+  	Option<"slots", "slots", "unsigned", "", "num of slots of buffer, range: anything > 0">,
+  	Option<"type", "type", "std::string", "", "type of buffer, can be either oehb or tehb">
+  ];
+
+
+}
+
+
 #endif // EXPERIMENTAL_TRANSFORMS_PASSES_TD
