@@ -57,22 +57,28 @@ struct HandshakePlaceBuffersCustomPass
                  "The output id exceeds the number of output ports!");
           Value channel = op.getResult(outid);
           // Set the insertion point to be before the original successor of the
-          // channel
+          // channel.
           Operation *succ = channel.getUses().begin()->getOwner();
           builder.setInsertionPoint(succ);
+	  // if the specified type is "oehb", then we add a Opaque buffer with number of slots = slots.
           if (type == "oehb") {
             auto bufOp = builder.create<handshake::OEHBOp>(channel.getLoc(),
                                                            channel, slots);
             inheritBB(succ, bufOp);
             Value bufferRes = bufOp.getResult();
             succ->replaceUsesOfWith(channel, bufferRes);
-          } else {
+	  // if the specified type is "tehb", then we add a Transparent buffer with number of slots = slots.
+          } else if (type == "tehb") {
             auto bufOp = builder.create<handshake::TEHBOp>(channel.getLoc(),
                                                            channel, slots);
             inheritBB(succ, bufOp);
             Value bufferRes = bufOp.getResult();
             succ->replaceUsesOfWith(channel, bufferRes);
-          }
+          } else {
+    		llvm::errs() << "Unknown buffer type: \"" << type << "\"!\n";
+    	return signalPassFailure();
+
+	  }
           return;
         }
       }
