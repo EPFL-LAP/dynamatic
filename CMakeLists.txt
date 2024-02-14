@@ -118,11 +118,10 @@ endfunction()
 
 find_package(GUROBI)
 if (GUROBI_FOUND)
-  message(STATUS "Found Gurobi")
   include_directories(${GUROBI_INCLUDE_DIRS})
 else()
-  message(WARNING "Gurobi wasn't found, the buffer placement infrastructure \
-                   that requires solving an MILP will not be built with the \
+  message(WARNING "Gurobi wasn't found, the buffer placement algorithms \
+                   that requires solving MILPs will not be built with the \
                    project.")
   add_compile_definitions(DYNAMATIC_GUROBI_NOT_INSTALLED)
 endif()
