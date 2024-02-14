@@ -20,7 +20,7 @@ class DynamaticPass<string passArg, list<string> dialects = []>
 
   // Always load the Handshake dialect, in which all our attributes are
   // registered
-  let dependentDialects = dialects #["circt::handshake::HandshakeDialect"];
+  let dependentDialects = dialects #["handshake::HandshakeDialect"];
 }
 
 #endif // DYNAMATIC_SUPPORT_PASSES_TD

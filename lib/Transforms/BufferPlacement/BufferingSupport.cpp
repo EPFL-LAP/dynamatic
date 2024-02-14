@@ -11,8 +11,8 @@
 //===----------------------------------------------------------------------===//
 
 #include "dynamatic/Transforms/BufferPlacement/BufferingSupport.h"
-#include "circt/Dialect/Handshake/HandshakeOps.h"
 #include "dynamatic/Analysis/NameAnalysis.h"
+#include "dynamatic/Dialect/Handshake/HandshakeOps.h"
 #include "dynamatic/Support/Attribute.h"
 #include "mlir/IR/Attributes.h"
 #include "mlir/IR/Value.h"
@@ -21,9 +21,8 @@
 #include <string>
 
 using namespace mlir;
-using namespace circt;
-using namespace circt::handshake;
 using namespace dynamatic;
+using namespace dynamatic::handshake;
 using namespace dynamatic::buffer;
 
 bool LazyChannelBufProps::updateIR() {
@@ -144,7 +143,7 @@ Operation *dynamatic::buffer::getChannelProducer(Value channel, size_t *idx) {
 }
 
 LogicalResult dynamatic::buffer::mapChannelsToProperties(
-    circt::handshake::FuncOp funcOp, const TimingDatabase &timingDB,
+    handshake::FuncOp funcOp, const TimingDatabase &timingDB,
     llvm::MapVector<Value, ChannelBufProps> &channelProps) {
 
   // Combines any channel-specific buffering properties coming from IR

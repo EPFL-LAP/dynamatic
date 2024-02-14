@@ -1,5 +1,5 @@
 #include "if_loop_3.h"
-#include "../integration_utils.h"
+#include "dynamatic/Integration.h"
 #include <stdlib.h>
 
 int if_loop_3(in_int_t a[N], in_int_t b[N], in_int_t n) {
@@ -16,11 +16,12 @@ int if_loop_3(in_int_t a[N], in_int_t b[N], in_int_t n) {
 int main(void) {
   in_int_t a[N];
   in_int_t b[N];
+  in_int_t n = N;
   for (int j = 0; j < N; ++j) {
     a[j] = rand() % 10;
     b[j] = a[j] + 1;
   }
 
-  CALL_KERNEL(if_loop_3, a, b, N);
+  CALL_KERNEL(if_loop_3, a, b, n);
   return 0;
 }

@@ -8,7 +8,7 @@
 //===----------------------------------------------------------------------===//
 
 #include "bicg.h"
-#include "../integration_utils.h"
+#include "dynamatic/Integration.h"
 #include "stdlib.h"
 
 int bicg(in_int_t a[N][N], inout_int_t s[N], inout_int_t q[N], in_int_t p[N],

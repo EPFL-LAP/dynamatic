@@ -20,7 +20,7 @@
 #ifndef DYNAMATIC_TRANSFORMS_BUFFERPLACEMENT_CFDFC_H
 #define DYNAMATIC_TRANSFORMS_BUFFERPLACEMENT_CFDFC_H
 
-#include "circt/Dialect/Handshake/HandshakeOps.h"
+#include "dynamatic/Dialect/Handshake/HandshakeOps.h"
 #include "dynamatic/Support/LLVM.h"
 #include "experimental/Support/StdProfiler.h"
 
@@ -48,7 +48,7 @@ struct CFDFC {
 
   /// Constructs a CFDFC from a set of selected archs and basic blocks in the
   /// function. Assumes that every value in the function is used exactly once.
-  CFDFC(circt::handshake::FuncOp funcOp, ArchSet &archs, unsigned numExec);
+  CFDFC(handshake::FuncOp funcOp, ArchSet &archs, unsigned numExec);
 
 private:
   // Determines whether the channel is a "CFDFC backedge" i.e., the first
@@ -96,9 +96,9 @@ void getDisjointBlockUnions(ArrayRef<CFDFC *> cfdfcs,
 /// number of executions of the latter. When no CFDFC could be extracted,
 /// succeeds but sets the number of executions to 0. On failure, and if
 /// `milpStat` is not nullptr, the Gurobi status is saved in it.
-LogicalResult extractCFDFC(circt::handshake::FuncOp funcOp, ArchSet &archs,
-                           BBSet &bbs, ArchSet &selectedArchs,
-                           unsigned &numExec, const std::string &logPath = "",
+LogicalResult extractCFDFC(handshake::FuncOp funcOp, ArchSet &archs, BBSet &bbs,
+                           ArchSet &selectedArchs, unsigned &numExec,
+                           const std::string &logPath = "",
                            int *milpStat = nullptr);
 
 } // namespace buffer

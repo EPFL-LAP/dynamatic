@@ -9,11 +9,7 @@
 // This file declares the --handshake-canonicalize pass.
 //
 // We use this pass instead of MLIR's generic canonicalization pass to have
-// fine-grained control over the rewriter patterns we apply on the IR. In
-// addition, "official" canonicalization patterns for Handshake operations are
-// defined within CIRCT, and it makes more sense to create additional patterns
-// here to avoid potential future conflicts with upstream CIRCT. Eventually,
-// some of the new rewrite patterns could be upstreamed.
+// fine-grained control over the rewriter patterns we apply on the IR.
 //
 //===----------------------------------------------------------------------===//
 

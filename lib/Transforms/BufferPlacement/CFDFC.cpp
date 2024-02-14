@@ -11,7 +11,7 @@
 //===----------------------------------------------------------------------===//
 
 #include "dynamatic/Transforms/BufferPlacement/CFDFC.h"
-#include "circt/Dialect/Handshake/HandshakeOps.h"
+#include "dynamatic/Dialect/Handshake/HandshakeOps.h"
 #include "dynamatic/Support/CFG.h"
 #include "mlir/Dialect/Arith/IR/Arith.h"
 #include "mlir/Dialect/Func/IR/FuncOps.h"
@@ -24,10 +24,9 @@
 #include "llvm/ADT/SmallVector.h"
 #include <fstream>
 
-using namespace circt;
-using namespace circt::handshake;
 using namespace mlir;
 using namespace dynamatic;
+using namespace dynamatic::handshake;
 using namespace dynamatic::buffer;
 using namespace dynamatic::experimental;
 
@@ -153,7 +152,7 @@ static void setBBConstraints(GRBModel &model, MILPVars &vars) {
 };
 #endif // DYNAMATIC_GUROBI_NOT_INSTALLED
 
-CFDFC::CFDFC(circt::handshake::FuncOp funcOp, ArchSet &archs, unsigned numExec)
+CFDFC::CFDFC(handshake::FuncOp funcOp, ArchSet &archs, unsigned numExec)
     : numExecs(numExec) {
 
   // Identify the block that starts the CFDFC; it's the only one that is both

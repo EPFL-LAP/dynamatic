@@ -1,5 +1,4 @@
 {
-
   "arith": [
     {
       "components": [
@@ -75,9 +74,9 @@
       "concretization_method": "GENERIC",
       "generators": [],
       "generics": [
-        { 
-          "name" : "BITWIDTH",
-          "type" : "integer"
+        {
+          "name": "BITWIDTH",
+          "type": "integer"
         }
       ],
       "ports": {
@@ -117,9 +116,9 @@
       "concretization_method": "GENERATOR",
       "generators": ["PREDICATE"],
       "generics": [
-        { 
-          "name" : "BITWIDTH",
-          "type" : "integer"
+        {
+          "name": "BITWIDTH",
+          "type": "integer"
         }
       ],
       "ports": {
@@ -162,13 +161,13 @@
       "concretization_method": "GENERIC",
       "generators": [],
       "generics": [
-        { 
-          "name" : "INPUT_BITWIDTH",
-          "type" : "integer"
+        {
+          "name": "INPUT_BITWIDTH",
+          "type": "integer"
         },
-        { 
-          "name" : "OUTPUT_BITWIDTH",
-          "type" : "integer"
+        {
+          "name": "OUTPUT_BITWIDTH",
+          "type": "integer"
         }
       ],
       "ports": {
@@ -199,9 +198,9 @@
       "concretization_method": "GENERIC",
       "generators": [],
       "generics": [
-        { 
-          "name" : "BITWIDTH",
-          "type" : "integer"
+        {
+          "name": "BITWIDTH",
+          "type": "integer"
         }
       ],
       "ports": {
@@ -232,9 +231,9 @@
       "concretization_method": "GENERIC",
       "generators": [],
       "generics": [
-        { 
-          "name" : "BITWIDTH",
-          "type" : "integer"
+        {
+          "name": "BITWIDTH",
+          "type": "integer"
         }
       ],
       "ports": {
@@ -274,7 +273,7 @@
         },
         {
           "name": "d_return_node",
-          "path": "experimental/data/vhdl/handshake/d_return.vhd"
+          "path": "experimental/data/vhdl/handshake/return.vhd"
         },
         {
           "name": "start_node",
@@ -284,9 +283,9 @@
       "concretization_method": "GENERIC",
       "generators": [],
       "generics": [
-        { 
-          "name" : "BITWIDTH",
-          "type" : "integer"
+        {
+          "name": "BITWIDTH",
+          "type": "integer"
         }
       ],
       "ports": {
@@ -317,9 +316,9 @@
       "concretization_method": "GENERATOR",
       "generators": ["BUFFER_TYPE"],
       "generics": [
-        { 
-          "name" : "BITWIDTH",
-          "type" : "integer"
+        {
+          "name": "BITWIDTH",
+          "type": "integer"
         }
       ],
       "ports": {
@@ -350,9 +349,9 @@
       "concretization_method": "GENERIC",
       "generators": [],
       "generics": [
-        { 
-          "name" : "BITWIDTH",
-          "type" : "integer"
+        {
+          "name": "BITWIDTH",
+          "type": "integer"
         }
       ],
       "ports": {
@@ -392,9 +391,9 @@
       "concretization_method": "GENERATOR",
       "generators": ["CONST_VALUE"],
       "generics": [
-        { 
-          "name" : "BITWIDTH",
-          "type" : "integer"
+        {
+          "name": "BITWIDTH",
+          "type": "integer"
         }
       ],
       "ports": {
@@ -425,17 +424,17 @@
       "concretization_method": "GENERIC",
       "generators": [],
       "generics": [
-        { 
-          "name" : "INPUTS",
-          "type" : "integer"
+        {
+          "name": "INPUTS",
+          "type": "integer"
         },
-        { 
-          "name" : "BITWIDTH",
-          "type" : "integer"
+        {
+          "name": "BITWIDTH",
+          "type": "integer"
         },
-        { 
-          "name" : "COND_BITWIDTH",
-          "type" : "integer"
+        {
+          "name": "COND_BITWIDTH",
+          "type": "integer"
         }
       ],
       "ports": {
@@ -472,13 +471,13 @@
       "concretization_method": "GENERIC",
       "generators": [],
       "generics": [
-        { 
-          "name" : "DATA_BITWIDTH",
-          "type" : "integer"
+        {
+          "name": "DATA_BITWIDTH",
+          "type": "integer"
         },
-        { 
-          "name" : "ADDR_BITWIDTH",
-          "type" : "integer"
+        {
+          "name": "ADDR_BITWIDTH",
+          "type": "integer"
         }
       ],
       "ports": {
@@ -519,13 +518,13 @@
       "concretization_method": "GENERIC",
       "generators": [],
       "generics": [
-        { 
-          "name" : "DATA_BITWIDTH",
-          "type" : "integer"
+        {
+          "name": "DATA_BITWIDTH",
+          "type": "integer"
         },
-        { 
-          "name" : "ADDR_BITWIDTH",
-          "type" : "integer"
+        {
+          "name": "ADDR_BITWIDTH",
+          "type": "integer"
         }
       ],
       "ports": {
@@ -566,13 +565,13 @@
       "concretization_method": "GENERIC",
       "generators": [],
       "generics": [
-        { 
-          "name" : "MEM_INPUTS",
-          "type" : "integer"
+        {
+          "name": "MEM_INPUTS",
+          "type": "integer"
         },
-        { 
-          "name" : "BITWIDTH",
-          "type" : "integer"
+        {
+          "name": "BITWIDTH",
+          "type": "integer"
         }
       ],
       "ports": {
@@ -613,13 +612,13 @@
       "concretization_method": "GENERIC",
       "generators": [],
       "generics": [
-        { 
-          "name" : "OUTPUTS",
-          "type" : "integer"
+        {
+          "name": "OUTPUTS",
+          "type": "integer"
         },
-        { 
-          "name" : "BITWIDTH",
-          "type" : "integer"
+        {
+          "name": "BITWIDTH",
+          "type": "integer"
         }
       ],
       "ports": {
@@ -651,9 +650,9 @@
       "concretization_method": "GENERIC",
       "generators": [],
       "generics": [
-        { 
-          "name" : "BITWIDTH",
-          "type" : "integer"
+        {
+          "name": "BITWIDTH",
+          "type": "integer"
         }
       ],
       "ports": {
@@ -685,25 +684,25 @@
       "concretization_method": "GENERIC",
       "generators": [],
       "generics": [
-        { 
-          "name" : "DATA_BITWIDTH",
-          "type" : "natural"
+        {
+          "name": "DATA_BITWIDTH",
+          "type": "natural"
         },
-        { 
-          "name" : "ADDR_BITWIDTH",
-          "type" : "natural"
+        {
+          "name": "ADDR_BITWIDTH",
+          "type": "natural"
         },
-        { 
-          "name" : "LOAD_COUNT",
-          "type" : "natural"
+        {
+          "name": "LOAD_COUNT",
+          "type": "natural"
         },
-        { 
-          "name" : "STORE_COUNT",
-          "type" : "natural"
+        {
+          "name": "STORE_COUNT",
+          "type": "natural"
         },
-        { 
-          "name" : "CTRL_COUNT",
-          "type" : "natural"
+        {
+          "name": "CTRL_COUNT",
+          "type": "natural"
         }
       ],
       "ports": {
@@ -786,13 +785,13 @@
       "concretization_method": "GENERIC",
       "generators": [],
       "generics": [
-        { 
-          "name" : "INPUTS",
-          "type" : "integer"
+        {
+          "name": "INPUTS",
+          "type": "integer"
         },
-        { 
-          "name" : "BITWIDTH",
-          "type" : "integer"
+        {
+          "name": "BITWIDTH",
+          "type": "integer"
         }
       ],
       "ports": {
@@ -824,17 +823,17 @@
       "concretization_method": "GENERIC",
       "generators": [],
       "generics": [
-        { 
-          "name" : "NUM_INPUTS",
-          "type" : "integer"
+        {
+          "name": "NUM_INPUTS",
+          "type": "integer"
         },
-        { 
-          "name" : "BITWIDTH",
-          "type" : "integer"
+        {
+          "name": "BITWIDTH",
+          "type": "integer"
         },
-        { 
-          "name" : "COND_BITWIDTH",
-          "type" : "integer"
+        {
+          "name": "COND_BITWIDTH",
+          "type": "integer"
         }
       ],
       "ports": {
@@ -871,9 +870,9 @@
       "concretization_method": "GENERIC",
       "generators": [],
       "generics": [
-        { 
-          "name" : "BITWIDTH",
-          "type" : "integer"
+        {
+          "name": "BITWIDTH",
+          "type": "integer"
         }
       ],
       "ports": {
@@ -887,7 +886,7 @@
         "out": []
       }
     },
-    
+
     {
       "components": [
         {
@@ -898,9 +897,9 @@
       "concretization_method": "GENERIC",
       "generators": [],
       "generics": [
-        { 
-          "name" : "BITWIDTH",
-          "type" : "integer"
+        {
+          "name": "BITWIDTH",
+          "type": "integer"
         }
       ],
       "ports": {

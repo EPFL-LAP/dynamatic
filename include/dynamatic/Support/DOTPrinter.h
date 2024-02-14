@@ -15,7 +15,7 @@
 #ifndef DYNAMATIC_SUPPORT_DOTPRINTER_H
 #define DYNAMATIC_SUPPORT_DOTPRINTER_H
 
-#include "circt/Dialect/Handshake/HandshakeOps.h"
+#include "dynamatic/Dialect/Handshake/HandshakeOps.h"
 #include "dynamatic/Support/LLVM.h"
 #include "dynamatic/Support/TimingModels.h"
 #include "mlir/Support/IndentedOstream.h"
@@ -24,7 +24,6 @@
 #include <unordered_map>
 
 using namespace mlir;
-using namespace circt;
 
 namespace dynamatic {
 
@@ -119,14 +118,12 @@ private:
   /// prints them to the output; it is the responsibility of the caller
   /// of this method to insert an opening bracket before the call and a closing
   /// bracket after the call.
-  LogicalResult annotateEdge(Operation *src, Operation *dst, Value val,
-                             mlir::raw_indented_ostream &os);
+  LogicalResult annotateEdge(OpOperand &oprd, mlir::raw_indented_ostream &os);
 
   /// Prints an edge between a source and destination operation, which are
   /// linked by a result of the source that the destination uses as an
   /// operand.
-  LogicalResult printEdge(Operation *src, Operation *dst, Value val,
-                          mlir::raw_indented_ostream &os);
+  LogicalResult printEdge(OpOperand &oprd, mlir::raw_indented_ostream &os);
 
   /// Prints an instance of a handshake.func to the graph.
   LogicalResult printFunc(handshake::FuncOp funcOp,

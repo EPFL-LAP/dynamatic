@@ -18,9 +18,9 @@
 //===----------------------------------------------------------------------===//
 
 #include "dynamatic/Transforms/BufferPlacement/HandshakeSetBufferingProperties.h"
-#include "circt/Dialect/Handshake/HandshakeDialect.h"
-#include "circt/Dialect/Handshake/HandshakeOps.h"
 #include "dynamatic/Analysis/NameAnalysis.h"
+#include "dynamatic/Dialect/Handshake/HandshakeDialect.h"
+#include "dynamatic/Dialect/Handshake/HandshakeOps.h"
 #include "dynamatic/Support/Handshake.h"
 #include "dynamatic/Transforms/BufferPlacement/BufferingSupport.h"
 #include "dynamatic/Transforms/BufferPlacement/HandshakePlaceBuffers.h"
@@ -29,7 +29,6 @@
 #include "llvm/ADT/STLExtras.h"
 #include "llvm/ADT/TypeSwitch.h"
 
-using namespace circt;
 using namespace dynamatic;
 using namespace dynamatic::buffer;
 
@@ -42,7 +41,7 @@ static const llvm::StringLiteral
 /// Makes all channels adjacent to operations of the given type inside the
 /// function unbufferizable.
 template <typename Op>
-static void makeUnbufferizable(circt::handshake::FuncOp funcOp) {
+static void makeUnbufferizable(handshake::FuncOp funcOp) {
   // Channels connected to memory interfaces are not bufferizable
   for (Op op : funcOp.getOps<Op>()) {
     for (Value oprd : op->getOperands()) {

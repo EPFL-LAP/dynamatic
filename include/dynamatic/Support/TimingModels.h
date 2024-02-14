@@ -19,7 +19,7 @@
 #ifndef DYNAMATIC_SUPPORT_TIMINGMODELS_H
 #define DYNAMATIC_SUPPORT_TIMINGMODELS_H
 
-#include "circt/Dialect/Handshake/HandshakeOps.h"
+#include "dynamatic/Dialect/Handshake/HandshakeOps.h"
 #include "dynamatic/Support/LLVM.h"
 #include "mlir/Dialect/Func/IR/FuncOps.h"
 #include "mlir/IR/MLIRContext.h"
@@ -39,6 +39,15 @@ enum class SignalType { DATA, VALID, READY };
 /// The type of a port: IN or OUT.
 enum class PortType { IN, OUT };
 
+/// Gets the datawidth of an operation, for use in determining which data point
+/// of a bitwidth-dependent metric to pick.
+///
+/// TODO: Computations for some of the Handshake operations are shady at best
+/// due to unclear semantics that we inherit from legacy Dynamatic. Some
+/// conservative choices were made, but we should go back to that and clarify
+/// everything at some point.
+unsigned getOpDatawidth(Operation *op);
+
 /// Represents a metric of type M that is bitwidth-dependent i.e., whose value
 /// changes depending on the bitwidth of the signal it refers to. Internally, it
 /// maps any number of the metric's data points (with no specific order) with
@@ -56,12 +65,37 @@ public:
   /// sets the metric's value otherwise. For the returned metric to make any
   /// sense, the metric must be monotonically increasing with respect to the
   /// bitwidth.
-  LogicalResult getCeilMetric(unsigned bitwidth, M &metric) const;
+  LogicalResult getCeilMetric(unsigned bitwidth, M &metric) const {
+    std::optional<unsigned> widthCeil;
+    M metricCeil = 0.0;
+
+    // Iterate over the available bitwidths and determine which is the closest
+    // one above the operation's bitwidth
+    for (const auto &[width, metric] : data) {
+      if (width >= bitwidth) {
+        if (!widthCeil.has_value() || *widthCeil > width) {
+          widthCeil = width;
+          metricCeil = metric;
+        }
+      }
+    }
+
+    if (!widthCeil.has_value())
+      // If the maximum bitwidth in the model is strictly lower than the
+      // operation's data bitwidth, then we do not know what delay to set and
+      // we have to fail
+      return failure();
+
+    metric = metricCeil;
+    return success();
+  }
 
   /// Determines the value of the metric at the bitwidth that is closest and
   /// greater than or equal to the passed operation's datawidth. See override's
   /// documentation for more details.
-  LogicalResult getCeilMetric(Operation *op, M &metric) const;
+  LogicalResult getCeilMetric(Operation *op, M &metric) const {
+    return getCeilMetric(getOpDatawidth(op), metric);
+  }
 };
 
 /// Deserializes a JSON value into a BitwidthDepMetric<double>. See

@@ -11,10 +11,9 @@
 //===----------------------------------------------------------------------===//
 
 #include "dynamatic/Transforms/OperationNames.h"
-#include "circt/Dialect/Handshake/HandshakeOps.h"
 #include "dynamatic/Analysis/NameAnalysis.h"
+#include "dynamatic/Dialect/Handshake/HandshakeOps.h"
 
-using namespace circt;
 using namespace dynamatic;
 
 namespace {

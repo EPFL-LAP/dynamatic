@@ -77,6 +77,22 @@ def ScfSimpleIfToSelect : DynamaticPass<"scf-simple-if-to-select",
 }
 
 //===----------------------------------------------------------------------===//
+// Func passes
+//===----------------------------------------------------------------------===//
+
+def FuncMaximizeSSA : Pass<"func-maximize-ssa", "::mlir::func::FuncOp"> {
+  let summary = "Converts the function's body into maximal SSA form.";
+  let description = [{
+    Converts the region within the function into maximal SSA form. This
+    ensures that every value used within a block is also defined within the
+    block, making dataflow explicit and removing block dominance-based dataflow
+    semantics. The pass achieves this by adding block arguments wherever
+    necessary to forward values to the block(s) where they are used.
+  }];
+  let constructor = "dynamatic::createFuncMaximizeSSA()";
+}
+
+//===----------------------------------------------------------------------===//
 // Handshake passes
 //===----------------------------------------------------------------------===//
 
@@ -260,8 +276,8 @@ def BackAnnotate : DynamaticPass<"back-annotate"> {
   let description = [{
     Sets supported attributes on operations and operands based on
     back-annotation information contained in an input JSON file. Operations
-    need to have a unique name (`circt::handshake::NameAttr` attribute) to be
-    able to be referenced by the back-annotation file. Fails if the
+    need to have a unique name (`dynamatic::handshake::NameAttr` attribute) to
+    be able to be referenced by the back-annotation file. Fails if the
     back-annotation file is badly formatted or if a referenced operation/operand
     cannot be found in the IR.
   }];
@@ -271,24 +287,12 @@ def BackAnnotate : DynamaticPass<"back-annotate"> {
             "Path to JSON-formatted back-annotation file">];
 }
 
-def FlattenMemRefRowMajor : DynamaticPass<"flatten-memref-row-major",
-                                          ["mlir::memref::MemRefDialect"]> {
-  let summary = "Flatten memrefs (row-major order)";
-  let description = [{
-    Flattens multidimensional memories and accesses to them into
-    single-dimensional memories using row-major indexing. This pass is almost
-    copied as is from CIRCT's FlattenMemRef, but uses row-major indexing instead
-    of column-major indexing when converting multidimensional load/store
-    operations.}];
-  let constructor = "dynamatic::createFlattenMemRefRowMajorPass()";
-}
-
 def ForceMemoryInterface : DynamaticPass<"force-memory-interface"> {
   let summary = "Forces the use of a single type of memory interface";
   let description = [{
     Forces the type of memory interface that will be placed for all memory
     operations (from the affine or memref dialects) when lowering to Handshake.
-    Internally, adds/modifies the `circt::handshake::MemoryInterfaceAttr`
+    Internally, adds/modifies the `dynamatic::handshake::MemoryInterfaceAttr`
     attribute on all memory operations in the IR. Exactly one of the two pass
     options should be provided at the same time.
   }];
@@ -303,12 +307,24 @@ def ForceMemoryInterface : DynamaticPass<"force-memory-interface"> {
   ];
 }
 
+def FlattenMemRefRowMajor : DynamaticPass<"flatten-memref-row-major",
+                                          ["mlir::memref::MemRefDialect"]> {
+  let summary = "Flatten memrefs (row-major order)";
+  let description = [{
+    Flattens multidimensional memories and accesses to them into
+    single-dimensional memories using row-major indexing. This pass is almost
+    copied as is from CIRCT's FlattenMemRef, but uses row-major indexing instead
+    of column-major indexing when converting multidimensional load/store
+    operations.}];
+  let constructor = "dynamatic::createFlattenMemRefRowMajorPass()";
+}
+
 def MarkMemoryDependencies : DynamaticPass<"mark-memory-dependencies"> {
   let summary = "Mark all memory dependencies in the IR.";
   let description = [{
     Analyzes memory accesses in each function in a module and identifies all
     dependencies between them. Stores information about these dependencies in a
-    `circt::handshake::MemDependenceArrayAttr` attribute attached to each
+    `dynamatic::handshake::MemDependenceArrayAttr` attribute attached to each
     operation that is the source of at least one dependency.
 
     The pass attempts to find dependencies between all `affine::AffineLoadOp`,
@@ -330,7 +346,7 @@ def MarkMemoryInterfaces : DynamaticPass<"mark-memory-interfaces"> {
   let summary = "Mark memory accesses with the interface they should connect to.";
   let description = [{
     Annotates all memory accesses in the IR with a
-    `circt::handshake::MemInterfaceAttr` attribute indicating the kind of
+    `dynamatic::handshake::MemInterfaceAttr` attribute indicating the kind of
     memory interface they should eventually connect to. It uses memory
     dependencies derived during polyhedral analysis to determine the type of
     interface necessary for each memory port. The pass also requires that the IR
@@ -339,10 +355,10 @@ def MarkMemoryInterfaces : DynamaticPass<"mark-memory-interfaces"> {
     `--mark-memory-dependencies` pass, strictly below the scf IR level, and
     before memory interface instantiation.
 
-    Internally, it uses `circt::handshake::MemDependenceArrayAttr` attributes
-    attached to memory operations to determine whether any memory access depends
-    on any other. If no such attributes are present it is assumed that there are
-    no memory dependencies.  
+    Internally, it uses `dynamatic::handshake::MemDependenceArrayAttr`
+    attributes attached to memory operations to determine whether any memory
+    access depends on any other. If no such attributes are present it is assumed
+    that there are no memory dependencies.  
   }];
   let constructor = "dynamatic::createMarkMemoryInterfaces()";
 }
@@ -354,7 +370,7 @@ def NameAllOperations : Pass<"name-all-operations", "mlir::ModuleOp"> {
     operation in the IR, which is attached as an attribute to each operation.
   }];
   let constructor = "dynamatic::createNameAllOperations()";
-  let dependentDialects = ["circt::handshake::HandshakeDialect"];
+  let dependentDialects = ["dynamatic::handshake::HandshakeDialect"];
 }
 
 def PushConstants : DynamaticPass<"push-constants"> {
@@ -379,7 +395,7 @@ def RemoveOperationNames : Pass<"remove-operation-names", "mlir::ModuleOp"> {
     test to remove all names).
   }];
   let constructor = "dynamatic::createRemoveOperationNames()";
-  let dependentDialects = ["circt::handshake::HandshakeDialect"];
+  let dependentDialects = ["dynamatic::handshake::HandshakeDialect"];
 }
 
 def RemovePolygeistAttributes : DynamaticPass<"remove-polygeist-attributes"> {

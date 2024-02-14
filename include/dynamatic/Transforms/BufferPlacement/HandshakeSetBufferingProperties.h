@@ -27,7 +27,7 @@
 #ifndef DYNAMATIC_TRANSFORMS_BUFFERPLACEMENT_HANDSHAKESETBUFFERINGPROPERTIES_H
 #define DYNAMATIC_TRANSFORMS_BUFFERPLACEMENT_HANDSHAKESETBUFFERINGPROPERTIES_H
 
-#include "circt/Dialect/Handshake/HandshakeOps.h"
+#include "dynamatic/Dialect/Handshake/HandshakeOps.h"
 #include "dynamatic/Support/DynamaticPass.h"
 #include "dynamatic/Support/LLVM.h"
 #include "dynamatic/Transforms/BufferPlacement/HandshakePlaceBuffers.h"
@@ -38,9 +38,8 @@ namespace buffer {
 
 /// Updates the channel's buffering properties in the same way as it was done in
 /// legacy Dynamatic's implementation of the initial smart buffer placement pass
-/// (described in
-/// https://www.epfl.ch/labs/lap/wp-content/uploads/2020/03/JosipovicFeb20_BuffePlacementAndSizingForHigh-PerformanceDataflowCircuits_FPGA20.pdf).
-void setFPGA20Properties(circt::handshake::FuncOp funcOp);
+/// (described in https://dl.acm.org/doi/full/10.1145/3477053).
+void setFPGA20Properties(handshake::FuncOp funcOp);
 
 std::unique_ptr<dynamatic::DynamaticPass>
 createHandshakeSetBufferingProperties(const std::string &version = "fpga20");

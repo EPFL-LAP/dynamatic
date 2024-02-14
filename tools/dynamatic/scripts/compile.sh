@@ -14,7 +14,7 @@ KERNEL_NAME=$4
 USE_SIMPLE_BUFFERS=$5
 
 # Binaries used during compilation
-POLYGEIST_PATH="$DYNAMATIC_DIR/polygeist/llvm-project/clang/lib/Headers/"
+POLYGEIST_PATH="$DYNAMATIC_DIR/polygeist"
 POLYGEIST_CLANG_BIN="$DYNAMATIC_DIR/bin/cgeist"
 CLANGXX_BIN="$DYNAMATIC_DIR/bin/clang++"
 DYNAMATIC_OPT_BIN="$DYNAMATIC_DIR/bin/dynamatic-opt"
@@ -71,10 +71,11 @@ export_dot() {
 rm -rf "$COMP_DIR" && mkdir -p "$COMP_DIR"
 
 # source -> affine level
-"$POLYGEIST_CLANG_BIN" "$SRC_DIR/$KERNEL_NAME.c" -I \
-  "$POLYGEIST_PATH/llvm-project/clang/lib/Headers/" --function="$KERNEL_NAME" \
+"$POLYGEIST_CLANG_BIN" "$SRC_DIR/$KERNEL_NAME.c" --function="$KERNEL_NAME" \
+  -I "$POLYGEIST_PATH/llvm-project/clang/lib/Headers" \
+  -I "$DYNAMATIC_DIR/include" \
   -S -O3 --memref-fullrank --raise-scf-to-affine \
-  > "$F_AFFINE" 2>/dev/null
+  > "$F_AFFINE"
 exit_on_fail "Failed to compile source to affine" "Compiled source to affine"
 
 # affine level -> pre-processing and memory analysis
@@ -102,7 +103,7 @@ exit_on_fail "Failed to apply standard transformations to cf" \
   "Applied standard transformations to cf"
 
 # cf transformations (dynamatic) 
-"$DYNAMATIC_OPT_BIN" "$F_CF_TRANFORMED" --flatten-memref-calls \
+"$DYNAMATIC_OPT_BIN" "$F_CF_TRANFORMED" \
   --arith-reduce-strength="max-adder-depth-mul=1" --push-constants \
   --mark-memory-interfaces \
   > "$F_CF_DYN_TRANSFORMED"
@@ -110,7 +111,7 @@ exit_on_fail "Failed to apply Dynamatic transformations to cf" \
   "Applied Dynamatic transformations to cf"
 
 # cf level -> handshake level
-"$DYNAMATIC_OPT_BIN" "$F_CF_DYN_TRANSFORMED" --lower-std-to-handshake-fpga18 \
+"$DYNAMATIC_OPT_BIN" "$F_CF_DYN_TRANSFORMED" --lower-cf-to-handshake \
   --handshake-fix-arg-names="source=$SRC_DIR/$KERNEL_NAME.c" \
   > "$F_HANDSHAKE"
 exit_on_fail "Failed to compile cf to handshake" "Compiled cf to handshake"
@@ -135,8 +136,8 @@ if [[ $USE_SIMPLE_BUFFERS -ne 0 ]]; then
   exit_on_fail "Failed to place simple buffers" "Placed simple buffers"
 else
   # Compile kernel's main function to extract profiling information
-  "$CLANGXX_BIN" "$SRC_DIR/$KERNEL_NAME.c" -D PRINT_PROFILING_INFO \
-    -Wno-deprecated -o "$F_PROFILER_BIN"
+  "$CLANGXX_BIN" "$SRC_DIR/$KERNEL_NAME.c" -D PRINT_PROFILING_INFO -I \
+    "$DYNAMATIC_DIR/include" -Wno-deprecated -o "$F_PROFILER_BIN"
   exit_on_fail "Failed to build kernel for profiling" "Built kernel for profiling" 
 
   "$F_PROFILER_BIN" > "$F_PROFILER_INPUTS"
@@ -153,7 +154,7 @@ else
   cd "$COMP_DIR"
   "$DYNAMATIC_OPT_BIN" "$F_HANDSHAKE_TRANSFORMED" \
     --handshake-set-buffering-properties="version=fpga20" \
-    --handshake-place-buffers="algorithm=fpga20-legacy frequencies=$F_FREQUENCIES timing-models=$DYNAMATIC_DIR/data/components.json timeout=300 dump-logs" \
+    --handshake-place-buffers="algorithm=fpl22 frequencies=$F_FREQUENCIES timing-models=$DYNAMATIC_DIR/data/components.json timeout=300 dump-logs" \
     > "$F_HANDSHAKE_BUFFERED"
   exit_on_fail "Failed to place smart buffers" "Placed smart buffers"
   cd - > /dev/null

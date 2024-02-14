@@ -1,8 +1,13 @@
 //===- FlattenMemRefROwMajor.cpp - MemRef flattening pass -------*- C++ -*-===//
 //
-// Dynamatic is under the Apache License v2.0 with LLVM Exceptions.
+// Part of the LLVM Project, under the Apache License v2.0 with LLVM Exceptions.
 // See https://llvm.org/LICENSE.txt for license information.
 // SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
+//
+//===----------------------------------------------------------------------===//
+//
+// This file originates from the CIRCT project (https://github.com/llvm/circt).
+// It includes modifications made as part of Dynamatic.
 //
 //===----------------------------------------------------------------------===//
 //
@@ -13,10 +18,9 @@
 //===----------------------------------------------------------------------===//
 
 #include "dynamatic/Transforms/FlattenMemRefRowMajor.h"
-#include "circt/Dialect/Handshake/HandshakeOps.h"
+#include "dynamatic/Dialect/Handshake/HandshakeOps.h"
 #include "dynamatic/Support/Attribute.h"
 #include "dynamatic/Support/Handshake.h"
-#include "dynamatic/Transforms/PassDetails.h"
 #include "mlir/Conversion/LLVMCommon/ConversionTarget.h"
 #include "mlir/Conversion/LLVMCommon/Pattern.h"
 #include "mlir/Dialect/Arith/IR/Arith.h"
@@ -32,7 +36,6 @@
 #include "llvm/Support/MathExtras.h"
 
 using namespace mlir;
-using namespace circt;
 using namespace dynamatic;
 
 static inline bool isUniDimensional(MemRefType memref) {
@@ -297,7 +300,8 @@ static void populateTypeConversionPatterns(TypeConverter &typeConverter) {
 }
 
 struct FlattenMemRefRowMajorPass
-    : public FlattenMemRefRowMajorBase<FlattenMemRefRowMajorPass> {
+    : public dynamatic::impl::FlattenMemRefRowMajorBase<
+          FlattenMemRefRowMajorPass> {
 public:
   void runDynamaticPass() override {
     mlir::ModuleOp modOp = getOperation();

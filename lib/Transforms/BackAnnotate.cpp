@@ -29,8 +29,8 @@
 //===----------------------------------------------------------------------===//
 
 #include "dynamatic/Transforms/BackAnnotate.h"
-#include "circt/Dialect/Handshake/HandshakeOps.h"
 #include "dynamatic/Analysis/NameAnalysis.h"
+#include "dynamatic/Dialect/Handshake/HandshakeOps.h"
 #include "dynamatic/Support/Attribute.h"
 #include "dynamatic/Support/TimingModels.h"
 #include "mlir/IR/Attributes.h"
@@ -45,7 +45,6 @@
 
 using namespace llvm;
 using namespace mlir;
-using namespace circt;
 using namespace dynamatic;
 
 /// Recognized keys in back-annotation files (excluded attribute-specific data).

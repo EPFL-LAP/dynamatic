@@ -5,7 +5,7 @@
 //===----------------------------------------------------------------------===//
 
 #include "gcd.h"
-#include "../integration_utils.h"
+#include "dynamatic/Integration.h"
 
 int gcd(in_int_t a, in_int_t b) {
   // Finding K, where K is the greatest power of 2 that divides both in0 and
@@ -37,6 +37,8 @@ int gcd(in_int_t a, in_int_t b) {
 }
 
 int main(void) {
-  CALL_KERNEL(gcd, 7966496, 314080416);
+  in_int_t a = 7966496;
+  in_int_t b = 314080416;
+  CALL_KERNEL(gcd, a, b);
   return 0;
 }

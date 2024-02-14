@@ -51,7 +51,6 @@ struct ForLowering : public OpRewritePattern<scf::ForOp> {
     arith::CmpIPredicate pred = analysis.getRange(lowerBound).isPositive()
                                     ? arith::CmpIPredicate::ult
                                     : arith::CmpIPredicate::slt;
-
     // Start by splitting the block containing the 'scf.for' into two parts.
     // The part before will get the init code, the part after will be the end
     // point.
@@ -91,8 +90,7 @@ struct ForLowering : public OpRewritePattern<scf::ForOp> {
     // of the loop operation.
     SmallVector<Value, 8> destOperands;
     destOperands.push_back(lowerBound);
-    auto iterOperands = forOp.getIterOperands();
-    destOperands.append(iterOperands.begin(), iterOperands.end());
+    llvm::append_range(destOperands, forOp.getInitArgs());
     rewriter.setInsertionPointToEnd(initBlock);
     rewriter.create<cf::BranchOp>(loc, conditionBlock, destOperands);
 
@@ -120,8 +118,8 @@ struct ScfToCfPass : public dynamatic::impl::ScfToCfBase<ScfToCfPass> {
     RewritePatternSet patterns{ctx};
     // Our for lowering is given a higher benefit than the one defined in MLIR,
     // so it will be matched first, essentially overriding the default one
-    patterns.add<ForLowering>(ctx, /*benefit=*/2);
     populateSCFToControlFlowConversionPatterns(patterns);
+    patterns.add<ForLowering>(ctx, /*benefit=*/2);
 
     // Set up conversion target
     ConversionTarget target(*ctx);

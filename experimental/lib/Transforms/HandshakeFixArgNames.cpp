@@ -11,14 +11,13 @@
 //===----------------------------------------------------------------------===//
 
 #include "experimental/Transforms/HandshakeFixArgNames.h"
-#include "circt/Dialect/Handshake/HandshakeOps.h"
+#include "dynamatic/Dialect/Handshake/HandshakeOps.h"
 #include "mlir/IR/BuiltinAttributes.h"
 #include "mlir/IR/BuiltinOps.h"
 #include "mlir/Support/LogicalResult.h"
 #include <fstream>
 
 using namespace mlir;
-using namespace circt;
 using namespace dynamatic;
 
 namespace {
@@ -88,6 +87,9 @@ LogicalResult HandshakeFixArgNamesPass::fixArgNames(handshake::FuncOp funcOp,
         break;
 
       std::string argList = srcTxt.substr(openIdx + 1, closeIdx - openIdx - 1);
+      if (std::all_of(argList.begin(), argList.end(),
+                      [](char c) { return isspace(c); }))
+        return success();
 
       // Now split the argument list on commas to get each individual argument
       size_t pos;

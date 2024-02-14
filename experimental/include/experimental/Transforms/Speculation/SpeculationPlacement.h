@@ -13,7 +13,7 @@
 #ifndef DYNAMATIC_TRANSFORMS_SPECULATION_PLACEMENT_H
 #define DYNAMATIC_TRANSFORMS_SPECULATION_PLACEMENT_H
 
-#include "circt/Dialect/Handshake/HandshakeOps.h"
+#include "dynamatic/Dialect/Handshake/HandshakeOps.h"
 #include "dynamatic/Support/DynamaticPass.h"
 #include "dynamatic/Support/LLVM.h"
 #include "dynamatic/Support/Logging.h"
@@ -106,4 +106,4 @@ public:
 } // namespace experimental
 } // namespace dynamatic
 
-#endif // DYNAMATIC_TRANSFORMS_SPECULATION_PASS_H
+#endif // DYNAMATIC_TRANSFORMS_SPECULATION_PLACEMENT_H

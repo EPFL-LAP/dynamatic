@@ -5,7 +5,7 @@
 //===----------------------------------------------------------------------===//
 
 #include "matrix.h"
-#include "../integration_utils.h"
+#include "dynamatic/Integration.h"
 #include <stdlib.h>
 
 void matrix(in_int_t inA[A_ROWS][A_COLS], in_int_t inB[A_COLS][B_COLS],

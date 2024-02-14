@@ -5,7 +5,7 @@
 //===----------------------------------------------------------------------===//
 
 #include "matvec.h"
-#include "../integration_utils.h"
+#include "dynamatic/Integration.h"
 #include "stdlib.h"
 
 int matvec(in_int_t m[N][N], in_int_t v[N], out_int_t out[N]) {

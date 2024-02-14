@@ -1,5 +1,5 @@
 #include "if_loop_1.h"
-#include "../integration_utils.h"
+#include "dynamatic/Integration.h"
 #include <stdlib.h>
 
 int if_loop_1(in_int_t a[N], in_int_t n) {
@@ -14,9 +14,10 @@ int if_loop_1(in_int_t a[N], in_int_t n) {
 
 int main(void) {
   in_int_t a[N];
+  in_int_t n = N;
   for (int j = 0; j < N; ++j)
     a[j] = rand() % N;
 
-  CALL_KERNEL(if_loop_1, a, N);
+  CALL_KERNEL(if_loop_1, a, n);
   return 0;
 }

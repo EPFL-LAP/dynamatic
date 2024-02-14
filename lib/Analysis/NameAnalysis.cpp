@@ -24,7 +24,6 @@
 #include <string>
 
 using namespace mlir;
-using namespace circt;
 using namespace dynamatic;
 
 /// Shortcut to get the name attribute of an operation.

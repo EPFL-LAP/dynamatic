@@ -21,10 +21,9 @@
 #include "mlir/Dialect/Arith/IR/Arith.h"
 #include "mlir/Transforms/GreedyPatternRewriteDriver.h"
 
-using namespace circt;
-using namespace circt::handshake;
 using namespace mlir;
 using namespace dynamatic;
+using namespace dynamatic::handshake;
 
 /// Is the type not an index type?
 static bool isNotIndexType(Type type) { return !isa<IndexType>(type); };

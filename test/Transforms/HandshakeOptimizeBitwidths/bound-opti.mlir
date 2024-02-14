@@ -10,7 +10,7 @@
 // CHECK:           %[[VAL_5:.*]] = arith.cmpi eq, %[[VAL_0]], %[[VAL_4]] : i32
 // CHECK:           %[[VAL_6:.*]], %[[VAL_7:.*]] = cond_br %[[VAL_5]], %[[VAL_2]] : i6
 // CHECK:           %[[VAL_8:.*]] = arith.extsi %[[VAL_6]] : i6 to i32
-// CHECK:           %[[VAL_9:.*]] = d_return %[[VAL_8]] : i32
+// CHECK:           %[[VAL_9:.*]] = return %[[VAL_8]] : i32
 // CHECK:           end %[[VAL_9]] : i32
 // CHECK:         }
 handshake.func @boundEqCst(%arg0: i32, %start: none) -> i32 {
@@ -18,7 +18,7 @@ handshake.func @boundEqCst(%arg0: i32, %start: none) -> i32 {
   %boundExt = arith.extsi %bound : i6 to i32
   %cond = arith.cmpi eq, %arg0, %boundExt : i32
   %true, %false = cond_br %cond, %arg0 : i32
-  %returnVal = d_return %true : i32
+  %returnVal = return %true : i32
   end %returnVal : i32
 }
 
@@ -33,7 +33,7 @@ handshake.func @boundEqCst(%arg0: i32, %start: none) -> i32 {
 // CHECK:           %[[VAL_5:.*]] = arith.cmpi ule, %[[VAL_0]], %[[VAL_4]] : i32
 // CHECK:           %[[VAL_6:.*]], %[[VAL_7:.*]] = cond_br %[[VAL_5]], %[[VAL_2]] : i6
 // CHECK:           %[[VAL_8:.*]] = arith.extsi %[[VAL_6]] : i6 to i32
-// CHECK:           %[[VAL_9:.*]] = d_return %[[VAL_8]] : i32
+// CHECK:           %[[VAL_9:.*]] = return %[[VAL_8]] : i32
 // CHECK:           end %[[VAL_9]] : i32
 // CHECK:         }
 handshake.func @boundUleCst(%arg0: i32, %start: none) -> i32 {
@@ -41,7 +41,7 @@ handshake.func @boundUleCst(%arg0: i32, %start: none) -> i32 {
   %boundExt = arith.extsi %bound : i6 to i32
   %cond = arith.cmpi ule, %arg0, %boundExt : i32
   %true, %false = cond_br %cond, %arg0 : i32
-  %returnVal = d_return %true : i32
+  %returnVal = return %true : i32
   end %returnVal : i32
 }
 
@@ -56,7 +56,7 @@ handshake.func @boundUleCst(%arg0: i32, %start: none) -> i32 {
 // CHECK:           %[[VAL_5:.*]] = arith.cmpi ule, %[[VAL_4]], %[[VAL_0]] : i32
 // CHECK:           %[[VAL_6:.*]], %[[VAL_7:.*]] = cond_br %[[VAL_5]], %[[VAL_2]] : i5
 // CHECK:           %[[VAL_8:.*]] = arith.extsi %[[VAL_7]] : i5 to i32
-// CHECK:           %[[VAL_9:.*]] = d_return %[[VAL_8]] : i32
+// CHECK:           %[[VAL_9:.*]] = return %[[VAL_8]] : i32
 // CHECK:           end %[[VAL_9]] : i32
 // CHECK:         }
 handshake.func @boundUleCstFlip(%arg0: i32, %start: none) -> i32 {
@@ -64,7 +64,7 @@ handshake.func @boundUleCstFlip(%arg0: i32, %start: none) -> i32 {
   %boundExt = arith.extsi %bound : i6 to i32
   %cond = arith.cmpi ule, %boundExt, %arg0 : i32
   %true, %false = cond_br %cond, %arg0 : i32
-  %returnVal = d_return %false : i32
+  %returnVal = return %false : i32
   end %returnVal : i32
 }
 
@@ -79,14 +79,14 @@ handshake.func @boundUleCstFlip(%arg0: i32, %start: none) -> i32 {
 // CHECK:           %[[VAL_5:.*]] = arith.cmpi ule, %[[VAL_0]], %[[VAL_4]] : i32
 // CHECK:           %[[VAL_6:.*]], %[[VAL_7:.*]] = cond_br %[[VAL_5]], %[[VAL_3]] : i8
 // CHECK:           %[[VAL_8:.*]] = arith.extsi %[[VAL_6]] : i8 to i32
-// CHECK:           %[[VAL_9:.*]] = d_return %[[VAL_8]] : i32
+// CHECK:           %[[VAL_9:.*]] = return %[[VAL_8]] : i32
 // CHECK:           end %[[VAL_9]] : i32
 // CHECK:         }
 handshake.func @argUleArg(%arg0: i32, %bound: i8, %start: none) -> i32 {
   %boundExt = arith.extsi %bound : i8 to i32
   %cond = arith.cmpi ule, %arg0, %boundExt : i32
   %true, %false = cond_br %cond, %arg0 : i32
-  %returnVal = d_return %true : i32
+  %returnVal = return %true : i32
   end %returnVal : i32
 }
 
@@ -112,7 +112,7 @@ handshake.func @argUleArg(%arg0: i32, %bound: i8, %start: none) -> i32 {
 // CHECK:           %[[VAL_17:.*]] = arith.andi %[[VAL_15]], %[[VAL_16]] : i1
 // CHECK:           %[[VAL_18:.*]], %[[VAL_19:.*]] = cond_br %[[VAL_17]], %[[VAL_3]] : i4
 // CHECK:           %[[VAL_20:.*]] = arith.extsi %[[VAL_18]] : i4 to i32
-// CHECK:           %[[VAL_21:.*]] = d_return %[[VAL_20]] : i32
+// CHECK:           %[[VAL_21:.*]] = return %[[VAL_20]] : i32
 // CHECK:           end %[[VAL_21]] : i32
 // CHECK:         }
 handshake.func @mulCmps(%arg0: i32, %bound: i4, %start: none) -> i32 {
@@ -131,7 +131,7 @@ handshake.func @mulCmps(%arg0: i32, %bound: i4, %start: none) -> i32 {
   %and2 = arith.andi %ne50, %ltBound : i1
   %cond = arith.andi %and1, %and2 : i1
   %true, %false = cond_br %cond, %arg0 : i32
-  %returnVal = d_return %true : i32
+  %returnVal = return %true : i32
   end %returnVal : i32
 }
 
@@ -152,7 +152,7 @@ handshake.func @mulCmps(%arg0: i32, %bound: i4, %start: none) -> i32 {
 // CHECK:           %[[VAL_12:.*]], %[[VAL_13:.*]] = cond_br %[[VAL_11]], %[[VAL_10]] : i6
 // CHECK:           %[[VAL_14:.*]] = arith.extsi %[[VAL_13]] : i6 to i32
 // CHECK:           %[[VAL_8]] = arith.trunci %[[VAL_12]] : i6 to i5
-// CHECK:           %[[VAL_15:.*]] = d_return %[[VAL_14]] : i32
+// CHECK:           %[[VAL_15:.*]] = return %[[VAL_14]] : i32
 // CHECK:           end %[[VAL_15]] : i32
 // CHECK:         }
 handshake.func @simpleLoop(%start: none) -> i32 {
@@ -167,7 +167,7 @@ handshake.func @simpleLoop(%start: none) -> i32 {
   %add = arith.addi %iter, %one : i32
   %cond = arith.cmpi ult, %add, %bound : i32
   %lt, %ge = cond_br %cond, %add : i32
-  %returnVal = d_return %ge : i32
+  %returnVal = return %ge : i32
   end %returnVal : i32
 }
 
@@ -217,7 +217,7 @@ handshake.func @simpleLoop(%start: none) -> i32 {
 // CHECK:           %[[VAL_37]] = br %[[VAL_49]] : i32
 // CHECK:           %[[VAL_32]] = br %[[VAL_47]] : none
 // CHECK:           %[[VAL_50:.*]] = merge %[[VAL_21]] : i32
-// CHECK:           %[[VAL_51:.*]] = d_return %[[VAL_50]] : i32
+// CHECK:           %[[VAL_51:.*]] = return %[[VAL_50]] : i32
 // CHECK:           end %[[VAL_51]] : i32
 // CHECK:         }
 handshake.func @nestedLoop(%start: none) -> i32 {
@@ -268,6 +268,6 @@ handshake.func @nestedLoop(%start: none) -> i32 {
 // ^^exit:
   %ctrlEnd, %indexEnd = control_merge %ctrlToExit : none, i32
   %accExit = merge %accToExit : i32
-  %returnVal = d_return %accExit : i32
+  %returnVal = return %accExit : i32
   end %returnVal : i32
 }

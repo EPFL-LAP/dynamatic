@@ -1,6 +1,6 @@
 
 #include "iir.h"
-#include "../integration_utils.h"
+#include "dynamatic/Integration.h"
 #include <stdlib.h>
 
 #define AMOUNT_OF_TEST 1

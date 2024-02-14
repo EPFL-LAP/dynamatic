@@ -18,6 +18,10 @@
 
 namespace dynamatic {
 
+#define GEN_PASS_DECL_HANDSHAKEPREPAREFORLEGACY
+#define GEN_PASS_DEF_HANDSHAKEPREPAREFORLEGACY
+#include "dynamatic/Transforms/Passes.h.inc"
+
 std::unique_ptr<dynamatic::DynamaticPass> createHandshakePrepareForLegacy();
 
 } // namespace dynamatic

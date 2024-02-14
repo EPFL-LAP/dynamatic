@@ -1,5 +1,5 @@
 #include "mul_example.h"
-#include "../integration_utils.h"
+#include "dynamatic/Integration.h"
 
 void mul_example(inout_int_t a[N]) {
   for (unsigned i = 0; i < N; ++i) {

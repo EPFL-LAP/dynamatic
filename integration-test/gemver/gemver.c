@@ -8,7 +8,7 @@
 //===----------------------------------------------------------------------===//
 
 #include "gemver.h"
-#include "../integration_utils.h"
+#include "dynamatic/Integration.h"
 #include <stdlib.h>
 
 void gemver(in_int_t alpha, in_int_t beta, in_int_t u1[N], in_int_t v1[N],

@@ -29,20 +29,19 @@ else ()
 endif ()
 
 include(FindPackageHandleStandardArgs)
+find_package(Python3 3.6 REQUIRED COMPONENTS Interpreter)
 
 #-------------------------------------------------------------------------------
-# CIRCT/MLIR/LLVM configuration
+# MLIR/LLVM configuration
 #-------------------------------------------------------------------------------
 
-find_package(CIRCT REQUIRED CONFIG)
-message(STATUS "Using LLVMConfig.cmake in: ${LLVM_DIR}")
+find_package(MLIR REQUIRED CONFIG)
 message(STATUS "Using MLIRConfig.cmake in: ${MLIR_DIR}")
-message(STATUS "Using CIRCTConfig.cmake in: ${CIRCT_DIR}")
+message(STATUS "Using LLVMConfig.cmake in: ${LLVM_DIR}")
 
 set(LLVM_RUNTIME_OUTPUT_INTDIR ${CMAKE_BINARY_DIR}/bin)
 set(LLVM_LIBRARY_OUTPUT_INTDIR ${CMAKE_BINARY_DIR}/lib)
 
-list(APPEND CMAKE_MODULE_PATH "${CIRCT_CMAKE_DIR}")
 list(APPEND CMAKE_MODULE_PATH "${MLIR_CMAKE_DIR}")
 list(APPEND CMAKE_MODULE_PATH "${LLVM_CMAKE_DIR}")
 
@@ -56,7 +55,6 @@ add_definitions(${LLVM_DEFINITIONS})
 
 include_directories(${LLVM_INCLUDE_DIRS})
 include_directories(${MLIR_INCLUDE_DIRS})
-include_directories(${CIRCT_INCLUDE_DIRS})
 
 option(LLVM_BUILD_TOOLS "Build the LLVM tools. If OFF, just generate build targets." ON)
 
@@ -64,7 +62,7 @@ option(LLVM_BUILD_TOOLS "Build the LLVM tools. If OFF, just generate build targe
 # Dynamatic configuration 
 #-------------------------------------------------------------------------------
 
-option(DYNAMATIC_BUILD_VISUALIZER "Disable the vivado synthesis tests." OFF)
+option(BUILD_VISUAL_DATAFLOW "Disable building the dataflow visualizer." OFF)
 
 # Define some variables for Dynamatic
 set(DYNAMATIC_SOURCE_DIR ${CMAKE_SOURCE_DIR})
@@ -104,6 +102,16 @@ function(add_dynamatic_dialect_library name)
   add_dynamatic_library(${ARGV} DEPENDS dynamatic-headers)
 endfunction()
 
+function(add_dynamatic_dialect dialect dialect_namespace)
+  add_mlir_dialect(${ARGV})
+  add_dependencies(dynamatic-headers MLIR${dialect}IncGen)
+endfunction()
+
+function(add_dynamatic_interface interface)
+  add_mlir_interface(${ARGV})
+  add_dependencies(dynamatic-headers MLIR${interface}IncGen)
+endfunction()
+
 #-------------------------------------------------------------------------------
 # Gurobi setup
 #-------------------------------------------------------------------------------
@@ -129,3 +137,7 @@ add_subdirectory(${DYNAMATIC_SOURCE_DIR}/lib)
 add_subdirectory(${DYNAMATIC_SOURCE_DIR}/test)
 add_subdirectory(${DYNAMATIC_SOURCE_DIR}/tools)
 add_subdirectory(${DYNAMATIC_SOURCE_DIR}/tutorials)
+
+if (BUILD_VISUAL_DATAFLOW)
+  add_subdirectory(${DYNAMATIC_SOURCE_DIR}/visual-dataflow)
+endif()

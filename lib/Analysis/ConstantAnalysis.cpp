@@ -13,7 +13,6 @@
 #include "dynamatic/Analysis/ConstantAnalysis.h"
 #include "dynamatic/Support/CFG.h"
 
-using namespace circt;
 using namespace dynamatic;
 
 /// Determines whether the control value of two constants can be considered

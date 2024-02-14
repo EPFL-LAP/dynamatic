@@ -1,5 +1,5 @@
 #include "image_resize.h"
-#include "../integration_utils.h"
+#include "dynamatic/Integration.h"
 #include <stdlib.h>
 
 void image_resize(inout_int_t a[N][N], in_int_t c) {
@@ -12,11 +12,13 @@ void image_resize(inout_int_t a[N][N], in_int_t c) {
 
 int main(void) {
   inout_int_t a[N][N];
+  in_int_t c = 1000;
+
   for (int y = 0; y < N; ++y) {
     for (int x = 0; x < N; ++x)
       a[y][x] = rand() % 100;
   }
 
-  CALL_KERNEL(image_resize, a, 1000);
+  CALL_KERNEL(image_resize, a, c);
   return 0;
 }

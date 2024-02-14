@@ -12,10 +12,10 @@
 //===----------------------------------------------------------------------===//
 
 #include "dynamatic/Transforms/HandshakeMinimizeLSQUsage.h"
-#include "circt/Dialect/Handshake/HandshakeOps.h"
-#include "circt/Support/BackedgeBuilder.h"
 #include "dynamatic/Analysis/NameAnalysis.h"
+#include "dynamatic/Dialect/Handshake/HandshakeOps.h"
 #include "dynamatic/Support/Attribute.h"
+#include "dynamatic/Support/Backedge.h"
 #include "dynamatic/Support/CFG.h"
 #include "dynamatic/Support/DynamaticPass.h"
 #include "dynamatic/Support/Handshake.h"
@@ -29,9 +29,8 @@
 #define DEBUG_TYPE "handshake-minimize-lsq-usage"
 
 using namespace mlir;
-using namespace circt;
-using namespace circt::handshake;
 using namespace dynamatic;
+using namespace dynamatic::handshake;
 
 namespace {
 

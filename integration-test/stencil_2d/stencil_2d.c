@@ -5,7 +5,7 @@
 //===----------------------------------------------------------------------===//
 
 #include "stencil_2d.h"
-#include "../integration_utils.h"
+#include "dynamatic/Integration.h"
 #include "stdlib.h"
 
 int stencil_2d(in_int_t orig[N], in_int_t filter[M], out_int_t sol[N]) {

@@ -5,7 +5,7 @@
 //===----------------------------------------------------------------------===//
 
 #include "sobel.h"
-#include "../integration_utils.h"
+#include "dynamatic/Integration.h"
 
 int sobel(in_int_t in[N], in_int_t gX[9], in_int_t gY[9], out_int_t out[N]) {
   int sum = 0;

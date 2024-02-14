@@ -28,7 +28,7 @@
 //===----------------------------------------------------------------------===//
 
 #include "dynamatic/Transforms/HandshakeOptimizeBitwidths.h"
-#include "circt/Dialect/Handshake/HandshakeOps.h"
+#include "dynamatic/Dialect/Handshake/HandshakeOps.h"
 #include "dynamatic/Support/CFG.h"
 #include "dynamatic/Transforms/HandshakeMinimizeCstWidth.h"
 #include "mlir/Dialect/Arith/IR/Arith.h"
@@ -37,7 +37,6 @@
 #include <functional>
 
 using namespace mlir;
-using namespace circt;
 using namespace dynamatic;
 
 namespace {
@@ -132,8 +131,8 @@ static Value backtrack(Value val) {
     if (auto [_, isNewOp] = visitedOps.insert(defOp); !isNewOp)
       return val;
 
-    if (isa<handshake::BufferOp, handshake::ForkOp, handshake::LazyForkOp,
-            handshake::BranchOp>(defOp))
+    if (isa<handshake::BufferOpInterface, handshake::ForkOp,
+            handshake::LazyForkOp, handshake::BranchOp>(defOp))
       val = defOp->getOperand(0);
     if (auto condOp = dyn_cast<handshake::ConditionalBranchOp>(defOp))
       val = condOp.getDataOperand();
@@ -256,8 +255,9 @@ static bool isOperandInCycle(Value val, OpResult res,
 
   // Backtrack through operations that end up "forwarding" one of their
   // inputs to the output
-  if (isa<handshake::BufferOp, handshake::ForkOp, handshake::LazyForkOp,
-          handshake::BranchOp, arith::ExtSIOp, arith::ExtUIOp>(defOp))
+  if (isa<handshake::BufferOpInterface, handshake::ForkOp,
+          handshake::LazyForkOp, handshake::BranchOp, arith::ExtSIOp,
+          arith::ExtUIOp>(defOp))
     return isOperandInCycle(defOp->getOperand(0), res, mergedValues,
                             visitedOps);
   if (auto condOp = dyn_cast<handshake::ConditionalBranchOp>(defOp))
@@ -517,12 +517,13 @@ public:
 
 /// Special configuration for buffers required because of the buffer type
 /// attribute and custom builder.
-class BufferDataConfig : public OptDataConfig<handshake::BufferOp> {
+template <typename BufOp>
+class BufferDataConfig : public OptDataConfig<BufOp> {
 public:
-  BufferDataConfig(handshake::BufferOp op) : OptDataConfig(op){};
+  BufferDataConfig(BufOp op) : OptDataConfig<BufOp>(op){};
 
   SmallVector<Value> getDataOperands() override {
-    return SmallVector<Value>{op.getOperand()};
+    return SmallVector<Value>{this->op.getOperand()};
   }
 
   void getNewOperands(unsigned optWidth, ExtType ext,
@@ -533,11 +534,11 @@ public:
         modVal({minDataOperands[0], ext}, optWidth, rewriter));
   }
 
-  handshake::BufferOp createOp(SmallVector<Type> &newResTypes,
-                               SmallVector<Value> &newOperands,
-                               PatternRewriter &rewriter) override {
-    return rewriter.create<handshake::BufferOp>(
-        op.getLoc(), newOperands[0], op.getNumSlots(), op.getBufferType());
+  BufOp createOp(SmallVector<Type> &newResTypes,
+                 SmallVector<Value> &newOperands,
+                 PatternRewriter &rewriter) override {
+    return rewriter.create<BufOp>(this->op.getLoc(), newOperands[0],
+                                  this->op.getSlots());
   }
 };
 
@@ -862,11 +863,10 @@ using ExtValue = std::pair<Value, ExtType>;
 /// (different return result types and enclosing function return types).
 /// When we eventually formalize and rework our circuit's interfaces, this may
 /// become useful, so here it stays.
-struct HandshakeReturnFW
-    : public OpRewritePattern<handshake::DynamaticReturnOp> {
-  using OpRewritePattern<handshake::DynamaticReturnOp>::OpRewritePattern;
+struct HandshakeReturnFW : public OpRewritePattern<handshake::ReturnOp> {
+  using OpRewritePattern<handshake::ReturnOp>::OpRewritePattern;
 
-  LogicalResult matchAndRewrite(handshake::DynamaticReturnOp retOp,
+  LogicalResult matchAndRewrite(handshake::ReturnOp retOp,
                                 PatternRewriter &rewriter) const override {
 
     // Try to move potential extension operations after the return
@@ -893,8 +893,8 @@ struct HandshakeReturnFW
     // Insert an optimized return operation that moves eventual value extensions
     // after itself
     rewriter.setInsertionPoint(retOp);
-    auto newOp = rewriter.create<handshake::DynamaticReturnOp>(retOp->getLoc(),
-                                                               newOperands);
+    auto newOp =
+        rewriter.create<handshake::ReturnOp>(retOp->getLoc(), newOperands);
     inheritBB(retOp, newOp);
 
     // Create required extension operations on the new return's results so that
@@ -1607,8 +1607,10 @@ void HandshakeOptimizeBitwidthsPass::addHandshakeDataPatterns(
   patterns
       .add<HandshakeOptData<handshake::ConditionalBranchOp, CBranchDataConfig>>(
           forward, ctx);
-  patterns.add<HandshakeOptData<handshake::BufferOp, BufferDataConfig>>(forward,
-                                                                        ctx);
+  patterns.add<
+      HandshakeOptData<handshake::OEHBOp, BufferDataConfig<handshake::OEHBOp>>,
+      HandshakeOptData<handshake::TEHBOp, BufferDataConfig<handshake::TEHBOp>>>(
+      forward, ctx);
 }
 
 void HandshakeOptimizeBitwidthsPass::addForwardPatterns(

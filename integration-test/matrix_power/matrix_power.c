@@ -1,12 +1,12 @@
 #include "matrix_power.h"
-#include "../integration_utils.h"
+#include "dynamatic/Integration.h"
 #include <stdlib.h>
 
-void matrix_power(inout_int_t x[N][N], in_int_t row[N], in_int_t col[N],
+void matrix_power(inout_int_t mat[N][N], in_int_t row[N], in_int_t col[N],
                   in_int_t a[N]) {
   for (unsigned k = 1; k < N; k++) {
     for (unsigned p = 0; p < N; p++)
-      x[k][row[p]] += a[p] * x[k - 1][col[p]];
+      mat[k][row[p]] += a[p] * mat[k - 1][col[p]];
   }
 }
 

@@ -16,8 +16,8 @@
 #ifndef DYNAMATIC_SUPPORT_HANDSHAKE_H
 #define DYNAMATIC_SUPPORT_HANDSHAKE_H
 
-#include "circt/Dialect/Handshake/HandshakeOps.h"
 #include "dynamatic/Analysis/NameAnalysis.h"
+#include "dynamatic/Dialect/Handshake/HandshakeOps.h"
 #include "dynamatic/Support/CFG.h"
 #include "dynamatic/Support/LLVM.h"
 
@@ -87,7 +87,7 @@ public:
   /// reference, and a mapping between basic block IDs within the function and
   /// their respective control value, the latter of which which will be used to
   /// trigger the start of memory access groups in the interface(s).
-  MemoryInterfaceBuilder(circt::handshake::FuncOp funcOp, Value memref,
+  MemoryInterfaceBuilder(handshake::FuncOp funcOp, Value memref,
                          const DenseMap<unsigned, Value> &ctrlVals)
       : funcOp(funcOp), memref(memref), ctrlVals(ctrlVals){};
 
@@ -109,10 +109,9 @@ public:
   /// ports and returns instantiated interfaces through method arguments (which
   /// are set to nullptr if no interface of the type was created). Fails if the
   /// method could not determine memory inputs for the interface(s).
-  LogicalResult
-  instantiateInterfaces(OpBuilder &builder,
-                        circt::handshake::MemoryControllerOp &mcOp,
-                        circt::handshake::LSQOp &lsqOp);
+  LogicalResult instantiateInterfaces(OpBuilder &builder,
+                                      handshake::MemoryControllerOp &mcOp,
+                                      handshake::LSQOp &lsqOp);
 
   /// Returns results of load/store-like operations which are to be given as
   /// operands to a memory interface.
@@ -125,7 +124,7 @@ public:
 
   /// Sets the data operand of a load-like operation, reusing the existing
   /// address operand.
-  static void setLoadDataOperand(circt::handshake::LoadOpInterface loadOp,
+  static void setLoadDataOperand(handshake::LoadOpInterface loadOp,
                                  Value dataIn);
 
 private:
@@ -148,7 +147,7 @@ private:
   using InterfacePorts = llvm::MapVector<unsigned, SmallVector<Operation *>>;
 
   /// Handshake function in which to instantiate memory interfaces.
-  circt::handshake::FuncOp funcOp;
+  handshake::FuncOp funcOp;
   /// Memory region that interface will reference.
   Value memref;
   /// Mapping between basic block ID and their respective entry control signal,
@@ -205,7 +204,7 @@ void eraseSinkUsers(Value val, PatternRewriter &rewriter);
 /// other fork results that would trigger other group allocations. The returned
 /// values are guaranteed to be in the same order as the control operation's
 /// results.
-SmallVector<Value> getLSQControlPaths(circt::handshake::LSQOp lsqOp,
+SmallVector<Value> getLSQControlPaths(handshake::LSQOp lsqOp,
                                       Operation *ctrlOp);
 
 } // namespace dynamatic

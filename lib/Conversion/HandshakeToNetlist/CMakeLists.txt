@@ -5,9 +5,8 @@ add_dynamatic_library(DynamaticHandshakeToNetlist
   DynamaticConversionPassIncGen
 
   LINK_LIBS PUBLIC
-  CIRCTHandshake
-  CIRCTHandshakeTransforms
-  CIRCTSupport
+  DynamaticHandshake
+  DynamaticHW
   MLIRIR
   MLIRPass
   MLIRArithDialect

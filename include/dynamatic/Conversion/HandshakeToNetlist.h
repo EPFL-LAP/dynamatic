@@ -1,4 +1,4 @@
-//===- HandshakeToNetlist.h - Converts handshake to HW/ESI ------*- C++ -*-===//
+//===- HandshakeToNetlist.h - Converts handshake to HW ----------*- C++ -*-===//
 //
 // Dynamatic is under the Apache License v2.0 with LLVM Exceptions.
 // See https://llvm.org/LICENSE.txt for license information.
@@ -13,17 +13,16 @@
 #ifndef DYNAMATIC_CONVERSION_HANDSHAKETONETLIST_H
 #define DYNAMATIC_CONVERSION_HANDSHAKETONETLIST_H
 
-#include "circt/Dialect/ESI/ESIOps.h"
-#include "circt/Dialect/HW/HWOps.h"
+#include "dynamatic/Dialect/HW/HWOps.h"
 #include "dynamatic/Support/DynamaticPass.h"
 #include "dynamatic/Support/LLVM.h"
-#include "mlir/Transforms/DialectConversion.h"
-
-using namespace circt;
-using namespace circt::hw;
-using namespace circt::esi;
+#include "mlir/IR/DialectRegistry.h"
 
 namespace dynamatic {
+
+#define GEN_PASS_DECL_HANDSHAKETONETLIST
+#define GEN_PASS_DEF_HANDSHAKETONETLIST
+#include "dynamatic/Conversion/Passes.h.inc"
 
 std::unique_ptr<dynamatic::DynamaticPass> createHandshakeToNetlistPass();
 

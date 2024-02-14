@@ -11,14 +11,12 @@
 //===----------------------------------------------------------------------===//
 
 #include "dynamatic/Transforms/BufferPlacement/FPGA20Buffers.h"
-#include "circt/Dialect/Handshake/HandshakeDialect.h"
-#include "circt/Dialect/Handshake/HandshakeOps.h"
-#include "circt/Dialect/Handshake/HandshakePasses.h"
 #include "dynamatic/Analysis/NameAnalysis.h"
+#include "dynamatic/Dialect/Handshake/HandshakeDialect.h"
+#include "dynamatic/Dialect/Handshake/HandshakeOps.h"
 #include "dynamatic/Support/CFG.h"
 #include "dynamatic/Support/TimingModels.h"
 #include "dynamatic/Transforms/BufferPlacement/BufferingSupport.h"
-#include "dynamatic/Transforms/PassDetails.h"
 #include "mlir/Dialect/Arith/IR/Arith.h"
 #include "mlir/Dialect/Func/IR/FuncOps.h"
 #include "mlir/IR/BuiltinTypes.h"
@@ -32,7 +30,6 @@
 #include "gurobi_c++.h"
 
 using namespace llvm::sys;
-using namespace circt;
 using namespace mlir;
 using namespace dynamatic;
 using namespace dynamatic::buffer;
@@ -159,9 +156,9 @@ void FPGA20Buffers::setup() {
 
   // Create buffering groups. In this MILP we only care for the data signal
   SmallVector<BufferingGroup> bufGroups;
-  OperationName bufName = OperationName(handshake::BufferOp::getOperationName(),
-                                        funcInfo.funcOp->getContext());
-  const TimingModel *dataBufModel = timingDB.getModel(bufName);
+  OperationName oehbName = OperationName(handshake::OEHBOp::getOperationName(),
+                                         funcInfo.funcOp->getContext());
+  const TimingModel *dataBufModel = timingDB.getModel(oehbName);
   bufGroups.emplace_back(ArrayRef<SignalType>{SignalType::DATA}, dataBufModel);
 
   // Create channel variables and constraints

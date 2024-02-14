@@ -7,12 +7,12 @@
 // CHECK:           sink %[[VAL_1]] : none
 // CHECK:           %[[VAL_2:.*]]:2 = fork [2] %[[VAL_0]] : i32
 // CHECK:           %[[VAL_3:.*]] = arith.addi %[[VAL_2]]#0, %[[VAL_2]]#1 : i32
-// CHECK:           %[[VAL_4:.*]] = d_return %[[VAL_3]] : i32
+// CHECK:           %[[VAL_4:.*]] = return %[[VAL_3]] : i32
 // CHECK:           end %[[VAL_4]] : i32
 // CHECK:         }
 handshake.func @forkArgument(%toFork : i32, %start: none) -> i32 {
   %add = arith.addi %toFork, %toFork : i32
-  %returnVal = d_return %add : i32
+  %returnVal = return %add : i32
   end %returnVal : i32
 }
 
@@ -22,11 +22,11 @@ handshake.func @forkArgument(%toFork : i32, %start: none) -> i32 {
 // CHECK-SAME:                                 %[[VAL_0:.*]]: i32,
 // CHECK-SAME:                                 %[[VAL_1:.*]]: none, ...) -> none attributes {argNames = ["toSink", "start"], resNames = ["out0"]} {
 // CHECK:           sink %[[VAL_0]] : i32
-// CHECK:           %[[VAL_2:.*]] = d_return %[[VAL_1]] : none
+// CHECK:           %[[VAL_2:.*]] = return %[[VAL_1]] : none
 // CHECK:           end %[[VAL_2]] : none
 // CHECK:         }
 handshake.func @sinkArgument(%toSink : i32, %start: none) -> none {
-  %returnVal = d_return %start : none
+  %returnVal = return %start : none
   end %returnVal : none
 }
 
@@ -37,13 +37,13 @@ handshake.func @sinkArgument(%toSink : i32, %start: none) -> none {
 // CHECK:           %[[VAL_1:.*]] = constant %[[VAL_0]] {value = 42 : i32} : i32
 // CHECK:           %[[VAL_2:.*]]:2 = fork [2] %[[VAL_1]] : i32
 // CHECK:           %[[VAL_3:.*]] = arith.addi %[[VAL_2]]#0, %[[VAL_2]]#1 : i32
-// CHECK:           %[[VAL_4:.*]] = d_return %[[VAL_3]] : i32
+// CHECK:           %[[VAL_4:.*]] = return %[[VAL_3]] : i32
 // CHECK:           end %[[VAL_4]] : i32
 // CHECK:         }
 handshake.func @forkResult(%start: none) -> i32 {
   %cst = constant %start {value = 42 : i32 } : i32
   %add = arith.addi %cst, %cst : i32
-  %returnVal = d_return %add : i32
+  %returnVal = return %add : i32
   end %returnVal : i32
 }
 
@@ -53,12 +53,12 @@ handshake.func @forkResult(%start: none) -> i32 {
 // CHECK-SAME:                               %[[VAL_0:.*]]: none, ...) -> none attributes {argNames = ["start"], resNames = ["out0"]} {
 // CHECK:           %[[VAL_1:.*]], %[[VAL_2:.*]] = control_merge %[[VAL_0]] : none, i32
 // CHECK:           sink %[[VAL_2]] : i32
-// CHECK:           %[[VAL_3:.*]] = d_return %[[VAL_1]] : none
+// CHECK:           %[[VAL_3:.*]] = return %[[VAL_1]] : none
 // CHECK:           end %[[VAL_3]] : none
 // CHECK:         }
 handshake.func @sinkResult(%start: none) -> none {
   %ctrl, %idx = control_merge %start : none, i32
-  %returnVal = d_return %ctrl : none
+  %returnVal = return %ctrl : none
   end %returnVal : none
 }
 
@@ -70,7 +70,7 @@ handshake.func @sinkResult(%start: none) -> none {
 // CHECK:           sink %[[VAL_1]] : none
 // CHECK:           %[[VAL_2:.*]]:2 = fork [2] %[[VAL_0]] : i32
 // CHECK:           %[[VAL_3:.*]] = arith.addi %[[VAL_2]]#0, %[[VAL_2]]#1 : i32
-// CHECK:           %[[VAL_4:.*]] = d_return %[[VAL_3]] : i32
+// CHECK:           %[[VAL_4:.*]] = return %[[VAL_3]] : i32
 // CHECK:           end %[[VAL_4]] : i32
 // CHECK:         }
 handshake.func @minimizeForkSizes(%arg0: i32, %start: none) -> i32 {
@@ -79,7 +79,7 @@ handshake.func @minimizeForkSizes(%arg0: i32, %start: none) -> i32 {
   sink %fork#0 : i32
   sink %fork#2 : i32
   %add = arith.addi %fork#1, %fork#3 : i32
-  %returnVal = d_return %add : i32
+  %returnVal = return %add : i32
   end %returnVal : i32
 }
 
@@ -93,7 +93,7 @@ handshake.func @minimizeForkSizes(%arg0: i32, %start: none) -> i32 {
 // CHECK:           %[[VAL_3:.*]] = arith.addi %[[VAL_2]]#0, %[[VAL_2]]#1 : i32
 // CHECK:           %[[VAL_4:.*]] = arith.addi %[[VAL_2]]#2, %[[VAL_2]]#3 : i32
 // CHECK:           %[[VAL_5:.*]] = arith.addi %[[VAL_3]], %[[VAL_4]] : i32
-// CHECK:           %[[VAL_6:.*]] = d_return %[[VAL_5]] : i32
+// CHECK:           %[[VAL_6:.*]] = return %[[VAL_5]] : i32
 // CHECK:           end %[[VAL_6]] : i32
 // CHECK:         }
 handshake.func @eliminateForkToFork(%arg0: i32, %start: none) -> i32 {
@@ -103,7 +103,7 @@ handshake.func @eliminateForkToFork(%arg0: i32, %start: none) -> i32 {
   %add1 = arith.addi %fork1#1, %fork1#2 : i32
   %add2 = arith.addi %fork2#0, %fork2#1 : i32
   %add = arith.addi %add1, %add2 : i32
-  %returnVal = d_return %add : i32
+  %returnVal = return %add : i32
   end %returnVal : i32
 }
 
@@ -117,7 +117,7 @@ handshake.func @eliminateForkToFork(%arg0: i32, %start: none) -> i32 {
 // CHECK:           %[[VAL_3:.*]] = arith.addi %[[VAL_2]]#1, %[[VAL_2]]#0 : i32
 // CHECK:           %[[VAL_4:.*]] = arith.addi %[[VAL_2]]#2, %[[VAL_2]]#3 : i32
 // CHECK:           %[[VAL_5:.*]] = arith.addi %[[VAL_3]], %[[VAL_4]] : i32
-// CHECK:           %[[VAL_6:.*]] = d_return %[[VAL_5]] : i32
+// CHECK:           %[[VAL_6:.*]] = return %[[VAL_5]] : i32
 // CHECK:           end %[[VAL_6]] : i32
 // CHECK:         }
 handshake.func @eliminateForkToForkMultipleUses(%arg0: i32, %start: none) -> i32 {
@@ -127,7 +127,7 @@ handshake.func @eliminateForkToForkMultipleUses(%arg0: i32, %start: none) -> i32
   %add1 = arith.addi %fork1#0, %fork1#1 : i32
   %add2 = arith.addi %fork2#0, %fork2#1 : i32
   %add = arith.addi %add1, %add2 : i32
-  %returnVal = d_return %add : i32
+  %returnVal = return %add : i32
   end %returnVal : i32
 }
 
@@ -135,12 +135,12 @@ handshake.func @eliminateForkToForkMultipleUses(%arg0: i32, %start: none) -> i32
 
 // CHECK-LABEL:   handshake.func @eraseSingleInputFork(
 // CHECK-SAME:                                         %[[VAL_0:.*]]: none, ...) -> none attributes {argNames = ["start"], resNames = ["out0"]} {
-// CHECK:           %[[VAL_1:.*]] = d_return %[[VAL_0]] : none
+// CHECK:           %[[VAL_1:.*]] = return %[[VAL_0]] : none
 // CHECK:           end %[[VAL_1]] : none
 // CHECK:         }
 handshake.func @eraseSingleInputFork(%start: none) -> none {
   %forkedStart = fork [1] %start : none
-  %returnVal = d_return %forkedStart : none
+  %returnVal = return %forkedStart : none
   end %returnVal : none
 }
 
@@ -150,13 +150,13 @@ handshake.func @eraseSingleInputFork(%start: none) -> none {
 // CHECK-SAME:                                              %[[VAL_0:.*]]: none, ...) -> none attributes {argNames = ["start"], resNames = ["out0"]} {
 // CHECK:           %[[VAL_1:.*]] = lazy_fork [1] %[[VAL_0]] : none
 // CHECK:           %[[VAL_2:.*]] = fork [1] %[[VAL_1]] : none
-// CHECK:           %[[VAL_3:.*]] = d_return %[[VAL_2]] : none
+// CHECK:           %[[VAL_3:.*]] = return %[[VAL_2]] : none
 // CHECK:           end %[[VAL_3]] : none
 // CHECK:         }
 handshake.func @doNotEraseSingleInputFork(%start: none) -> none {
   %lazyForkedStart = lazy_fork [1] %start : none
   %forkedStart = fork [1] %lazyForkedStart : none
-  %returnVal = d_return %forkedStart : none
+  %returnVal = return %forkedStart : none
   end %returnVal : none
 }
 
@@ -168,13 +168,13 @@ handshake.func @doNotEraseSingleInputFork(%start: none) -> none {
 // CHECK-SAME:                                                %[[VAL_2:.*]]: none, ...) -> i32 attributes {argNames = ["memref", "addr", "start"], resNames = ["out0"]} {
 // CHECK:           %[[VAL_3:.*]], %[[VAL_4:.*]] = lsq{{\[}}%[[VAL_0]] : memref<64xi32>] (%[[VAL_2]], %[[VAL_5:.*]])  {groupSizes = [1 : i32]} : (none, i32) -> (i32, none)
 // CHECK:           %[[VAL_5]], %[[VAL_6:.*]] = lsq_load{{\[}}%[[VAL_1]]] %[[VAL_3]] : i32, i32
-// CHECK:           %[[VAL_7:.*]] = d_return %[[VAL_6]] : i32
+// CHECK:           %[[VAL_7:.*]] = return %[[VAL_6]] : i32
 // CHECK:           end %[[VAL_7]], %[[VAL_4]] : i32, none
 // CHECK:         }
 handshake.func @makeLSQForkLazyDoNothingArg(%memref: memref<64xi32>, %addr: i32, %start: none) -> i32 {
   %ldData1, %done = lsq [%memref: memref<64xi32>] (%start, %ldAddrToMem) {groupSizes = [1 : i32]} : (none, i32) -> (i32, none)
   %ldAddrToMem, %ldDataToSucc = lsq_load [%addr] %ldData1 : i32, i32
-  %returnVal = d_return %ldDataToSucc : i32
+  %returnVal = return %ldDataToSucc : i32
   end %returnVal, %done : i32, none
 }
 
@@ -188,7 +188,7 @@ handshake.func @makeLSQForkLazyDoNothingArg(%memref: memref<64xi32>, %addr: i32,
 // CHECK:           %[[VAL_4]]:2 = fork [2] %[[VAL_1]] : none
 // CHECK:           %[[VAL_6:.*]] = constant %[[VAL_4]]#1 {value = 0 : i32} : i32
 // CHECK:           %[[VAL_5]], %[[VAL_7:.*]] = lsq_load{{\[}}%[[VAL_6]]] %[[VAL_2]] : i32, i32
-// CHECK:           %[[VAL_8:.*]] = d_return %[[VAL_7]] : i32
+// CHECK:           %[[VAL_8:.*]] = return %[[VAL_7]] : i32
 // CHECK:           end %[[VAL_8]], %[[VAL_3]] : i32, none
 // CHECK:         }
 handshake.func @makeLSQForkLazyDoNothingFork(%memref: memref<64xi32>, %start: none) -> i32 {
@@ -196,7 +196,7 @@ handshake.func @makeLSQForkLazyDoNothingFork(%memref: memref<64xi32>, %start: no
   %forkCtrl:2 = fork [2] %start : none
   %addr = constant %forkCtrl#1 {value = 0 : i32} : i32
   %ldAddrToMem, %ldDataToSucc = lsq_load [%addr] %ldData1 : i32, i32
-  %returnVal = d_return %ldDataToSucc : i32
+  %returnVal = return %ldDataToSucc : i32
   end %returnVal, %done : i32, none
 }
 
@@ -211,7 +211,7 @@ handshake.func @makeLSQForkLazyDoNothingFork(%memref: memref<64xi32>, %start: no
 // CHECK:           %[[VAL_7]], %[[VAL_9:.*]] = lsq_load{{\[}}%[[VAL_1]]] %[[VAL_4]]#0 : i32, i32
 // CHECK:           %[[VAL_8]], %[[VAL_10:.*]] = lsq_load{{\[}}%[[VAL_2]]] %[[VAL_4]]#1 : i32, i32
 // CHECK:           %[[VAL_11:.*]] = arith.addi %[[VAL_9]], %[[VAL_10]] : i32
-// CHECK:           %[[VAL_12:.*]] = d_return %[[VAL_11]] : i32
+// CHECK:           %[[VAL_12:.*]] = return %[[VAL_11]] : i32
 // CHECK:           end %[[VAL_12]], %[[VAL_5]] : i32, none
 // CHECK:         }
 handshake.func @makeLSQForkLazyEasy(%memref: memref<64xi32>, %addr1 : i32, %addr2 : i32, %start: none) -> i32 {
@@ -220,7 +220,7 @@ handshake.func @makeLSQForkLazyEasy(%memref: memref<64xi32>, %addr1 : i32, %addr
   %ldAddrToMem1, %ldDataToSucc1 = lsq_load [%addr1] %ldData1 : i32, i32
   %ldAddrToMem2, %ldDataToSucc2 = lsq_load [%addr2] %ldData2 : i32, i32
   %add = arith.addi %ldDataToSucc1, %ldDataToSucc2 : i32
-  %returnVal = d_return %add : i32
+  %returnVal = return %add : i32
   end %returnVal, %done : i32, none
 }
 
@@ -237,7 +237,7 @@ handshake.func @makeLSQForkLazyEasy(%memref: memref<64xi32>, %addr1 : i32, %addr
 // CHECK:           %[[VAL_10:.*]] = constant %[[VAL_7]]#1 {value = 1 : i32} : i32
 // CHECK:           %[[VAL_6]], %[[VAL_11:.*]] = lsq_load{{\[}}%[[VAL_10]]] %[[VAL_2]]#1 : i32, i32
 // CHECK:           %[[VAL_12:.*]] = arith.addi %[[VAL_9]], %[[VAL_11]] : i32
-// CHECK:           %[[VAL_13:.*]] = d_return %[[VAL_12]] : i32
+// CHECK:           %[[VAL_13:.*]] = return %[[VAL_12]] : i32
 // CHECK:           end %[[VAL_13]], %[[VAL_3]] : i32, none
 // CHECK:         }
 handshake.func @makeLSQForkLazyNeedEager(%memref: memref<64xi32>, %start: none) -> i32 {
@@ -249,7 +249,7 @@ handshake.func @makeLSQForkLazyNeedEager(%memref: memref<64xi32>, %start: none) 
   %addr2 = constant %forkCtrl2#1 {value = 1 : i32} : i32
   %ldAddrToMem2, %ldDataToSucc2 = lsq_load [%addr2] %ldData2 : i32, i32
   %add = arith.addi %ldDataToSucc1, %ldDataToSucc2 : i32
-  %returnVal = d_return %add : i32
+  %returnVal = return %add : i32
   end %returnVal, %done : i32, none
 }
 
@@ -273,7 +273,7 @@ handshake.func @makeLSQForkLazyNeedEager(%memref: memref<64xi32>, %start: none) 
 // CHECK:           %[[VAL_8]]:2 = fork [2] %[[VAL_16]] {bb = 3 : ui32} : none
 // CHECK:           %[[VAL_20:.*]] = constant %[[VAL_8]]#1 {bb = 3 : ui32, value = 2 : i32} : i32
 // CHECK:           %[[VAL_9]], %[[VAL_21:.*]] = lsq_load{{\[}}%[[VAL_20]]] %[[VAL_2]]#2 {bb = 3 : ui32} : i32, i32
-// CHECK:           %[[VAL_22:.*]] = d_return {bb = 3 : ui32} %[[VAL_21]] : i32
+// CHECK:           %[[VAL_22:.*]] = return {bb = 3 : ui32} %[[VAL_21]] : i32
 // CHECK:           end {bb = 3 : ui32} %[[VAL_22]], %[[VAL_3]] : i32, none
 // CHECK:         }
 handshake.func @makeLSQForkLazyComplex(%memref: memref<64xi32>, %start: none) -> i32 {
@@ -296,6 +296,6 @@ handshake.func @makeLSQForkLazyComplex(%memref: memref<64xi32>, %start: none) ->
   %forkCtrl3:2 = fork [2] %ctrl1To3 {bb = 3 : ui32} : none
   %addr3 = constant %forkCtrl3#1 {value = 2 : i32, bb = 3 : ui32} : i32
   %ldAddrToMem3, %ldDataToSucc3 = lsq_load [%addr3] %ldData3 {bb = 3 : ui32} : i32, i32
-  %returnVal = d_return {bb = 3 : ui32} %ldDataToSucc3 : i32
+  %returnVal = return {bb = 3 : ui32} %ldDataToSucc3 : i32
   end {bb = 3 : ui32} %returnVal, %done : i32, none
 }

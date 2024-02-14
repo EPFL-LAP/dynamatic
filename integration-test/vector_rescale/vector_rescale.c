@@ -1,5 +1,5 @@
 #include "vector_rescale.h"
-#include "../integration_utils.h"
+#include "dynamatic/Integration.h"
 #include <stdlib.h>
 
 void vector_rescale(inout_int_t a[N], in_int_t c) {

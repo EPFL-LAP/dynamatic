@@ -13,13 +13,12 @@
 //===----------------------------------------------------------------------===//
 
 #include "dynamatic/Transforms/ForceMemoryInterface.h"
-#include "circt/Dialect/Handshake/HandshakeOps.h"
 #include "dynamatic/Analysis/NameAnalysis.h"
+#include "dynamatic/Dialect/Handshake/HandshakeOps.h"
 #include "mlir/Dialect/Affine/IR/AffineOps.h"
 #include "mlir/Dialect/MemRef/IR/MemRef.h"
 
 using namespace mlir;
-using namespace circt;
 using namespace dynamatic;
 
 namespace {

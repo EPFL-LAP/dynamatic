@@ -8,6 +8,7 @@ target_link_libraries(exp-frequency-profiler PRIVATE
   MLIRLLVMDialect
   MLIRArithDialect
   MLIRFuncDialect
+  MLIRMathDialect
   MLIRMemRefDialect
   DynamaticExperimentalSupport
   )

@@ -13,17 +13,14 @@ target_link_libraries(dynamatic-opt
   DynamaticLowerScfToCf
   DynamaticBufferPlacement
   DynamaticSpeculation
-  DynamaticStandardToHandshakeFPGA18
+  DynamaticCfToHandshake
+  DynamaticHandshake
   DynamaticHandshakeToNetlist
   DynamaticTransforms
   DynamaticTutorialsCreatingPasses
   DynamaticExperimentalTestTransforms
   DynamaticExperimentalSupport
   DynamaticExperimentalTransforms
-
-  CIRCTHandshake
-  CIRCTHandshakeTransforms
-  CIRCTStandardToHandshake
 
   MLIRIR
   MLIRAffineTransforms

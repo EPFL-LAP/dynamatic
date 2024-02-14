@@ -13,30 +13,30 @@
 //===----------------------------------------------------------------------===//
 
 #include "dynamatic/Support/DOTPrinter.h"
-#include "circt/Dialect/Handshake/HandshakeOps.h"
 #include "dynamatic/Analysis/NameAnalysis.h"
-#include "dynamatic/Conversion/PassDetails.h"
+#include "dynamatic/Dialect/Handshake/HandshakeOps.h"
 #include "dynamatic/Support/CFG.h"
 #include "dynamatic/Support/TimingModels.h"
 #include "dynamatic/Transforms/HandshakeConcretizeIndexType.h"
 #include "dynamatic/Transforms/HandshakeMaterialize.h"
 #include "mlir/Dialect/Arith/IR/Arith.h"
+#include "mlir/Dialect/Math/IR/Math.h"
 #include "mlir/IR/BuiltinAttributes.h"
 #include "mlir/IR/BuiltinTypes.h"
 #include "mlir/IR/OperationSupport.h"
 #include "mlir/IR/PatternMatch.h"
 #include "mlir/IR/Value.h"
 #include "mlir/Support/IndentedOstream.h"
+#include "llvm/ADT/StringRef.h"
 #include "llvm/ADT/TypeSwitch.h"
 #include "llvm/Support/ErrorHandling.h"
 #include <iomanip>
 #include <string>
 #include <utility>
 
-using namespace circt;
-using namespace circt::handshake;
 using namespace mlir;
 using namespace dynamatic;
+using namespace dynamatic::handshake;
 
 namespace {
 
@@ -54,21 +54,42 @@ using RawPort = std::pair<std::string, unsigned>;
 // Legacy node/edge attributes
 // ============================================================================
 
-/// Maps name of arithmetic operation to "op" attribute.
-static std::unordered_map<std::string, std::string> arithNameToOpName{
-    {"arith.addi", "add_op"},      {"arith.addf", "fadd_op"},
-    {"arith.subi", "sub_op"},      {"arith.subf", "fsub_op"},
-    {"arith.andi", "and_op"},      {"arith.ori", "or_op"},
-    {"arith.xori", "xor_op"},      {"arith.muli", "mul_op"},
-    {"arith.mulf", "fmul_op"},     {"arith.divui", "udiv_op"},
-    {"arith.divsi", "sdiv_op"},    {"arith.divf", "fdiv_op"},
-    {"arith.sitofp", "sitofp_op"}, {"arith.remsi", "urem_op"},
-    {"arith.extsi", "sext_op"},    {"arith.extui", "zext_op"},
-    {"arith.trunci", "trunc_op"},  {"arith.shrsi", "ashr_op"},
-    {"arith.shli", "shl_op"},      {"arith.select", "select_op"}};
+/// Maps name of arith/math operations to "op" attribute.
+static llvm::StringMap<StringRef> compNameToOpName{
+    {arith::AddFOp::getOperationName(), "fadd_op"},
+    {arith::AddIOp::getOperationName(), "add_op"},
+    {arith::AndIOp::getOperationName(), "and_op"},
+    {arith::DivFOp::getOperationName(), "fdiv_op"},
+    {arith::DivSIOp::getOperationName(), "sdiv_op"},
+    {arith::DivUIOp::getOperationName(), "udiv_op"},
+    {arith::ExtSIOp::getOperationName(), "sext_op"},
+    {arith::ExtUIOp::getOperationName(), "zext_op"},
+    {arith::MulFOp::getOperationName(), "fmul_op"},
+    {arith::MulIOp::getOperationName(), "mul_op"},
+    {arith::OrIOp::getOperationName(), "or_op"},
+    {arith::RemFOp::getOperationName(), "frem_op"},
+    {arith::RemSIOp::getOperationName(), "srem_op"},
+    {arith::RemUIOp::getOperationName(), "urem_op"},
+    {arith::SelectOp::getOperationName(), "select_op"},
+    {arith::ShLIOp::getOperationName(), "shl_op"},
+    {arith::SubIOp::getOperationName(), "sub_op"},
+    {arith::SubFOp::getOperationName(), "fsub_op"},
+    {arith::ShRSIOp::getOperationName(), "ashr_op"},
+    {arith::SIToFPOp::getOperationName(), "sitofp_op"},
+    {arith::TruncIOp::getOperationName(), "trunc_op"},
+    {arith::XOrIOp::getOperationName(), "xor_op"},
+    {math::CosOp::getOperationName(), "cosf_op"},
+    {math::ExpOp::getOperationName(), "expf_op"},
+    {math::Exp2Op::getOperationName(), "exp2f_op"},
+    {math::LogOp::getOperationName(), "logf_op"},
+    {math::Log2Op::getOperationName(), "log2f_op"},
+    {math::Log10Op::getOperationName(), "log10f_op"},
+    {math::SinOp::getOperationName(), "sinf_op"},
+    {math::SqrtOp::getOperationName(), "sqrtf_op"},
+};
 
 /// Maps name of integer comparison type to "op" attribute.
-static std::unordered_map<arith::CmpIPredicate, std::string> cmpINameToOpName{
+static DenseMap<arith::CmpIPredicate, StringRef> cmpINameToOpName{
     {arith::CmpIPredicate::eq, "icmp_eq_op"},
     {arith::CmpIPredicate::ne, "icmp_ne_op"},
     {arith::CmpIPredicate::slt, "icmp_slt_op"},
@@ -82,7 +103,7 @@ static std::unordered_map<arith::CmpIPredicate, std::string> cmpINameToOpName{
 };
 
 /// Maps name of floating-point comparison type to "op" attribute.
-static std::unordered_map<arith::CmpFPredicate, std::string> cmpFNameToOpName{
+static DenseMap<arith::CmpFPredicate, StringRef> cmpFNameToOpName{
     {arith::CmpFPredicate::AlwaysFalse, "fcmp_false_op"},
     {arith::CmpFPredicate::OEQ, "fcmp_oeq_op"},
     {arith::CmpFPredicate::OGT, "fcmp_ogt_op"},
@@ -176,15 +197,6 @@ static std::string getOutputForCondBranch(handshake::ConditionalBranchOp op) {
   PortsData ports;
   ports.emplace_back("out1+", op.getTrueResult());
   ports.emplace_back("out2-", op.getFalseResult());
-  return getIOFromPorts(ports);
-}
-
-/// Produces the "in" attribute value of a handshake::SelectOp.
-static std::string getInputForSelect(arith::SelectOp op) {
-  PortsData ports;
-  ports.emplace_back("in1?", op.getCondition());
-  ports.emplace_back("in2+", op.getTrueValue());
-  ports.emplace_back("in3-", op.getFalseValue());
   return getIOFromPorts(ports);
 }
 
@@ -681,12 +693,16 @@ LogicalResult DOTPrinter::annotateNode(Operation *op,
                 info.stringAttr["out"] = getOutputForCondBranch(op);
                 return info;
               })
-          .Case<handshake::BufferOp>([&](handshake::BufferOp bufOp) {
+          .Case<handshake::OEHBOp>([&](handshake::OEHBOp oehbOp) {
             auto info = NodeInfo("Buffer");
-            info.intAttr["slots"] = bufOp.getNumSlots();
-            info.stringAttr["transparent"] =
-                bufOp.getBufferType() == BufferTypeEnum::fifo ? "true"
-                                                              : "false";
+            info.intAttr["slots"] = oehbOp.getSlots();
+            info.stringAttr["transparent"] = "false";
+            return info;
+          })
+          .Case<handshake::TEHBOp>([&](handshake::TEHBOp tehbOp) {
+            auto info = NodeInfo("Buffer");
+            info.intAttr["slots"] = tehbOp.getSlots();
+            info.stringAttr["transparent"] = "true";
             return info;
           })
           .Case<handshake::MemoryControllerOp>(
@@ -807,26 +823,30 @@ LogicalResult DOTPrinter::annotateNode(Operation *op,
           .Case<handshake::ConstantOp>([&](handshake::ConstantOp cstOp) {
             auto info = NodeInfo("Constant");
 
-            // Determine the constant value and its bitwidth based on the
-            // vondtnat's value attribute
-            long int value = 0;
-            unsigned bitwidth = 0;
+            // Convert the value to an hexadecimal string value
+            std::stringstream stream;
+            Type cstType = cstOp.getResult().getType();
+            unsigned bitwidth = cstType.getIntOrFloatBitWidth();
+            size_t hexLength =
+                (bitwidth >> 2) + ((bitwidth & 0b11) != 0 ? 1 : 0);
+            stream << "0x" << std::setfill('0') << std::setw(hexLength)
+                   << std::hex;
+
+            // Determine the constant value based on the constant's return type
             TypedAttr valueAttr = cstOp.getValueAttr();
-            if (auto intAttr = dyn_cast<mlir::IntegerAttr>(valueAttr)) {
-              value = intAttr.getValue().getSExtValue();
-              bitwidth = intAttr.getValue().getBitWidth();
-            } else if (auto boolAttr = dyn_cast<mlir::BoolAttr>(valueAttr)) {
-              value = boolAttr.getValue() ? 1 : 0;
-              bitwidth = 1;
+            if (isa<IntegerType>(cstType)) {
+              APInt value = cast<mlir::IntegerAttr>(valueAttr).getValue();
+              if (cstType.isUnsignedInteger())
+                stream << value.getZExtValue();
+              else
+                stream << value.getSExtValue();
+            } else if (isa<FloatType>(cstType)) {
+              mlir::FloatAttr attr = dyn_cast<mlir::FloatAttr>(valueAttr);
+              stream << attr.getValue().convertToDouble();
             } else {
-              llvm_unreachable("unsupported constant type");
+              return NodeInfo("");
             }
 
-            // Convert the value to hexadecimal format
-            std::stringstream stream;
-            int hexLength = (bitwidth >> 2) + ((bitwidth & 0b11) != 0 ? 1 : 0);
-            stream << "0x" << std::setfill('0') << std::setw(hexLength)
-                   << std::hex << value;
             info.stringAttr["value"] = stream.str();
 
             // Legacy Dynamatic uses the output width of the operations also
@@ -835,7 +855,7 @@ LogicalResult DOTPrinter::annotateNode(Operation *op,
             info.stringAttr["out"] = getIOFromValues(op->getResults(), "out");
             return info;
           })
-          .Case<handshake::DynamaticReturnOp>([&](auto) {
+          .Case<handshake::ReturnOp>([&](auto) {
             auto info = NodeInfo("Operator");
             info.stringAttr["op"] = "ret_op";
             return info;
@@ -853,23 +873,6 @@ LogicalResult DOTPrinter::annotateNode(Operation *op,
             info.stringAttr["out"] = stream.str();
             return info;
           })
-          .Case<arith::SelectOp>([&](arith::SelectOp op) {
-            auto info = NodeInfo("Operator");
-            auto opName = op->getName().getStringRef().str();
-            info.stringAttr["op"] = arithNameToOpName[opName];
-            info.stringAttr["in"] = getInputForSelect(op);
-            return info;
-          })
-          .Case<arith::AddIOp, arith::AddFOp, arith::SubIOp, arith::SubFOp,
-                arith::AndIOp, arith::OrIOp, arith::XOrIOp, arith::MulIOp,
-                arith::MulFOp, arith::DivUIOp, arith::DivSIOp, arith::DivFOp,
-                arith::SIToFPOp, arith::RemSIOp, arith::ExtSIOp, arith::ExtUIOp,
-                arith::TruncIOp, arith::ShRSIOp, arith::ShLIOp>([&](auto) {
-            auto info = NodeInfo("Operator");
-            auto opName = op->getName().getStringRef().str();
-            info.stringAttr["op"] = arithNameToOpName[opName];
-            return info;
-          })
           .Case<arith::CmpIOp>([&](arith::CmpIOp op) {
             auto info = NodeInfo("Operator");
             info.stringAttr["op"] = cmpINameToOpName[op.getPredicate()];
@@ -880,12 +883,26 @@ LogicalResult DOTPrinter::annotateNode(Operation *op,
             info.stringAttr["op"] = cmpFNameToOpName[op.getPredicate()];
             return info;
           })
-          .Case<arith::IndexCastOp>([&](auto) {
-            auto info = NodeInfo("Operator");
-            info.stringAttr["op"] = "zext_op";
+          .Default([&](auto) {
+            // All our supported "mathematical" operations are stored in a map,
+            // query it to see if we support this particular operation
+            auto opName = compNameToOpName.find(op->getName().getStringRef());
+            if (opName == compNameToOpName.end())
+              return NodeInfo("");
+            NodeInfo info("Operator");
+            info.stringAttr["op"] = opName->second;
+
+            // Among mathematical operations, only the select operation has
+            // special input port logic
+            if (arith::SelectOp selOp = dyn_cast<arith::SelectOp>(op)) {
+              PortsData ports;
+              ports.emplace_back("in1?", selOp.getCondition());
+              ports.emplace_back("in2+", selOp.getTrueValue());
+              ports.emplace_back("in3-", selOp.getFalseValue());
+              info.stringAttr["in"] = getIOFromPorts(ports);
+            }
             return info;
-          })
-          .Default([&](auto) { return NodeInfo(""); });
+          });
 
   if (info.type.empty())
     return op->emitOpError("unsupported in legacy mode");
@@ -937,9 +954,12 @@ LogicalResult DOTPrinter::annotateArgumentNode(handshake::FuncOp funcOp,
   return success();
 }
 
-LogicalResult DOTPrinter::annotateEdge(Operation *src, Operation *dst,
-                                       Value val,
+LogicalResult DOTPrinter::annotateEdge(OpOperand &oprd,
                                        mlir::raw_indented_ostream &os) {
+  Value val = oprd.get();
+  Operation *src = val.getDefiningOp();
+  Operation *dst = oprd.getOwner();
+
   bool legacyBuffers = mode == Mode::LEGACY_BUFFERS;
   // In legacy-buffers mode, skip edges from branch-like operations to bitwidth
   // modifiers in between blocks
@@ -1034,58 +1054,126 @@ std::string DOTPrinter::getNodeLatencyAttr(Operation *op) {
 // Printing
 // ============================================================================
 
-/// Style attribute value for control nodes/edges.
-static const std::string CONTROL_STYLE = "dashed";
+static constexpr StringLiteral DOTTED("dotted"), SOLID("solid"), DOT("dot"),
+    NORMAL("normal");
 
-/// Determines the style attribute of a value.
-static std::string getStyleOfValue(Value result) {
-  return isa<NoneType>(result.getType()) ? "style=" + CONTROL_STYLE + ", " : "";
+/// Determines the "arrowhead" attribute of the edge corresponding to the
+/// operand.
+static StringRef getArrowheadStyle(OpOperand &oprd) {
+  Value val = oprd.get();
+  Operation *ownerOp = oprd.getOwner();
+  if (auto muxOp = dyn_cast<handshake::MuxOp>(ownerOp))
+    return val == muxOp.getSelectOperand() ? DOT : NORMAL;
+  if (auto condBrOp = dyn_cast<handshake::ConditionalBranchOp>(ownerOp))
+    return val == condBrOp.getConditionOperand() ? DOT : NORMAL;
+  return NORMAL;
 }
 
-/// Determines the pretty-printed version of a node label.
-static std::string getPrettyPrintedNodeLabel(Operation *op) {
+/// Determines cosmetic attributes of the edge corresponding to the operand.
+static std::string getEdgeStyle(OpOperand &oprd) {
+  std::string attributes;
+  StringRef style = isa<NoneType>(oprd.get().getType()) ? DOTTED : SOLID;
+  // StringRef arrowhead =
+  return "style=\"" + style.str() +
+         R"(", dir="both", arrowtail="none", arrowhead=")" +
+         getArrowheadStyle(oprd).str() + "\", ";
+}
+
+/// Returns the name of the function argument that corresponds to the memref
+/// operand of a memory interface. Returns an empty reference if the memref
+/// cannot be found in the arguments.
+static StringRef getMemName(Value memref) {
+  Operation *parentOp = memref.getParentBlock()->getParentOp();
+  handshake::FuncOp funcOp = dyn_cast<handshake::FuncOp>(parentOp);
+  for (auto [name, funArg] :
+       llvm::zip(funcOp.getArgNames(), funcOp.getArguments())) {
+    if (funArg == memref)
+      return cast<StringAttr>(name).getValue();
+  }
+  return StringRef();
+}
+
+/// Returns the name of the function argument that corresponds to the memory
+/// interface that the memory port operation connects to.
+template <typename Op>
+static StringRef getMemNameForPort(Op memPortOp) {
+  Value addrRes = memPortOp.getAddressOutput();
+  auto addrUsers = addrRes.getUsers();
+  if (addrUsers.empty())
+    return "";
+  Operation *userOp = *addrUsers.begin();
+  while (isa_and_present<arith::ExtSIOp, arith::ExtUIOp, arith::TruncIOp,
+                         handshake::ForkOp>(userOp)) {
+    auto users = userOp->getResult(0).getUsers();
+    if (users.empty())
+      return "";
+    userOp = *users.begin();
+  }
+  // We should have reached a memory interface
+  if (handshake::LSQOp lsqOp = dyn_cast<handshake::LSQOp>(userOp))
+    return getMemName(lsqOp.getMemRef());
+  if (handshake::MemoryControllerOp mcOp =
+          dyn_cast<handshake::MemoryControllerOp>(userOp))
+    return getMemName(mcOp.getMemRef());
+  llvm_unreachable("cannot reach memory interface");
+}
+
+/// Returns the pretty-field version of a label fro a memory-related operation.
+static inline std::string getMemLabel(StringRef baseName, StringRef memName) {
+  return (baseName + (memName.empty() ? "" : " (" + memName.str() + ")")).str();
+}
+
+/// Returns the pretty-fied version of the DOT node's label corresponding  to
+/// the operation.
+static std::string getPrettyNodeLabel(Operation *op) {
   return llvm::TypeSwitch<Operation *, std::string>(op)
       // handshake operations
-      .Case<handshake::ConstantOp>([&](auto op) {
-        // Try to get the constant value as a boolean
-        if (mlir::BoolAttr boolAttr =
-                op->template getAttrOfType<mlir::BoolAttr>("value"))
-          return std::to_string(boolAttr.getValue());
+      .Case<handshake::ConstantOp>(
+          [&](handshake::ConstantOp cstOp) -> std::string {
+            Type cstType = cstOp.getResult().getType();
+            TypedAttr valueAttr = cstOp.getValueAttr();
+            if (isa<IntegerType>(cstType)) {
+              // Special case boolean attribute (which would result in an i1
+              // constant integer results) to print true/false instead of 1/0
+              if (auto boolAttr = dyn_cast<mlir::BoolAttr>(valueAttr))
+                return boolAttr.getValue() ? "true" : "false";
 
-        // Try to get the constant value as an integer
-        if (mlir::IntegerAttr intAttr =
-                op->template getAttrOfType<mlir::IntegerAttr>("value")) {
-          Type inType = intAttr.getType();
-          if (!isa<IndexType>(inType) && inType.getIntOrFloatBitWidth() == 0)
-            return std::string("null");
-          APInt ap = intAttr.getValue();
-          return ap.isNegative() ? std::to_string(ap.getSExtValue())
-                                 : std::to_string(ap.getZExtValue());
-        }
-
-        // Try to get the constant value as floating point
-        if (mlir::FloatAttr floatAttr =
-                op->template getAttrOfType<mlir::FloatAttr>("value"))
-          return std::to_string(floatAttr.getValue().convertToFloat());
-
-        // Fallback on a generic string
-        return std::string("constant");
+              APInt value = cast<mlir::IntegerAttr>(valueAttr).getValue();
+              if (cstType.isUnsignedInteger())
+                return std::to_string(value.getZExtValue());
+              return std::to_string(value.getSExtValue());
+            }
+            if (isa<FloatType>(cstType)) {
+              mlir::FloatAttr attr = dyn_cast<mlir::FloatAttr>(valueAttr);
+              return std::to_string(attr.getValue().convertToDouble());
+            }
+            // Fallback on an empty string
+            return std::string("");
+          })
+      .Case<handshake::OEHBOp>([&](handshake::OEHBOp oehbOp) {
+        return "oehb [" + std::to_string(oehbOp.getSlots()) + "]";
+      })
+      .Case<handshake::TEHBOp>([&](handshake::TEHBOp tehbOp) {
+        return "tehb [" + std::to_string(tehbOp.getSlots()) + "]";
+      })
+      .Case<handshake::MemoryControllerOp>([&](MemoryControllerOp mcOp) {
+        return getMemLabel("MC", getMemName(mcOp.getMemRef()));
+      })
+      .Case<handshake::LSQOp>([&](handshake::LSQOp lsqOp) {
+        return getMemLabel("LSQ", getMemName(lsqOp.getMemRef()));
+      })
+      .Case<handshake::MCLoadOp, handshake::LSQLoadOp>([&](auto) {
+        StringRef memName = getMemNameForPort(dyn_cast<LoadOpInterface>(op));
+        return getMemLabel("LD", memName);
+      })
+      .Case<handshake::MCStoreOp, handshake::LSQStoreOp>([&](auto) {
+        StringRef memName = getMemNameForPort(dyn_cast<StoreOpInterface>(op));
+        return getMemLabel("ST", memName);
       })
       .Case<handshake::ControlMergeOp>([&](auto) { return "cmerge"; })
-      .Case<handshake::ConditionalBranchOp>([&](auto) { return "cbranch"; })
-      .Case<handshake::BufferOp>([&](handshake::BufferOp bufOp) {
-        return stringifyEnum(bufOp.getBufferType()).str() + " [" +
-               std::to_string(bufOp.getNumSlots()) + "]";
-      })
       .Case<handshake::BranchOp>([&](auto) { return "branch"; })
-      // handshake operations (dynamatic)
-      .Case<handshake::MCLoadOp>([&](auto) { return "mc_load"; })
-      .Case<handshake::MCStoreOp>([&](auto) { return "mc_store"; })
-      .Case<handshake::LSQLoadOp>([&](auto) { return "lsq_load"; })
-      .Case<handshake::LSQStoreOp>([&](auto) { return "lsq_store"; })
-      .Case<handshake::MemoryControllerOp>([&](auto) { return "MC"; })
-      .Case<handshake::LSQOp>([&](auto) { return "LSQ"; })
-      .Case<handshake::DynamaticReturnOp>([&](auto) { return "return"; })
+      .Case<handshake::ConditionalBranchOp>([&](auto) { return "cbranch"; })
+      .Case<handshake::ReturnOp>([&](auto) { return "return"; })
       // arith operations
       .Case<arith::AddIOp, arith::AddFOp>([&](auto) { return "+"; })
       .Case<arith::SubIOp, arith::SubFOp>([&](auto) { return "-"; })
@@ -1104,7 +1192,6 @@ static std::string getPrettyPrintedNodeLabel(Operation *op) {
         return "[" + std::to_string(opWidth) + "..." +
                std::to_string(resWidth) + "]";
       })
-      .Case<arith::SelectOp>([&](auto) { return "select"; })
       .Case<arith::CmpIOp>([&](arith::CmpIOp op) {
         switch (op.getPredicate()) {
         case arith::CmpIPredicate::eq:
@@ -1124,7 +1211,6 @@ static std::string getPrettyPrintedNodeLabel(Operation *op) {
         case arith::CmpIPredicate::slt:
           return "<";
         }
-        llvm_unreachable("unhandled cmpi predicate");
       })
       .Case<arith::CmpFOp>([&](arith::CmpFOp op) {
         switch (op.getPredicate()) {
@@ -1155,16 +1241,31 @@ static std::string getPrettyPrintedNodeLabel(Operation *op) {
         case arith::CmpFPredicate::AlwaysTrue:
           return "true";
         }
-        llvm_unreachable("unhandled cmpf predicate");
       })
-      .Default([&](auto op) {
-        auto opDialect = op->getDialect()->getNamespace();
+      .Default([&](auto) {
+        StringRef dialect = op->getDialect()->getNamespace();
         std::string label = op->getName().getStringRef().str();
-        if (opDialect == "handshake")
-          label.erase(0, StringLiteral("handshake.").size());
-
+        label.erase(0, dialect.size() + 1);
         return label;
       });
+}
+
+static StringRef getNodeColor(Operation *op) {
+  return llvm::TypeSwitch<Operation *, StringRef>(op)
+      .Case<handshake::ForkOp, handshake::LazyForkOp, handshake::JoinOp>(
+          [&](auto) { return "lavender"; })
+      .Case<handshake::BufferOpInterface>([&](auto) { return "lightgreen"; })
+      .Case<handshake::ReturnOp, handshake::EndOp>([&](auto) { return "gold"; })
+      .Case<handshake::SourceOp, handshake::SinkOp>(
+          [&](auto) { return "gainsboro"; })
+      .Case<handshake::ConstantOp>([&](auto) { return "plum"; })
+      .Case<handshake::MemoryOpInterface, handshake::LoadOpInterface,
+            handshake::StoreOpInterface>([&](auto) { return "coral"; })
+      .Case<handshake::MergeOp, handshake::ControlMergeOp, handshake::MuxOp>(
+          [&](auto) { return "lightblue"; })
+      .Case<handshake::BranchOp, handshake::ConditionalBranchOp>(
+          [&](auto) { return "tan2"; })
+      .Default([&](auto) { return "moccasin"; });
 }
 
 DOTPrinter::DOTPrinter(Mode mode, EdgeStyle edgeStyle, TimingDatabase *timingDB)
@@ -1238,66 +1339,51 @@ void DOTPrinter::closeSubgraph(mlir::raw_indented_ostream &os) {
 
 LogicalResult DOTPrinter::printNode(Operation *op,
                                     mlir::raw_indented_ostream &os) {
-
-  std::string prettyLabel = getPrettyPrintedNodeLabel(op);
-  std::string canonicalName =
-      op->getName().getStringRef().str() +
-      (isa<arith::CmpIOp, arith::CmpFOp>(op) ? prettyLabel : "");
-
-  // Print node name
+  // The node's DOT name
   std::string opName = getUniqueName(op).str();
   if (inLegacyMode()) {
     // LSQ must be capitalized in legacy modes for dot2vhdl to recognize it
     if (size_t idx = opName.find("lsq"); idx != std::string::npos)
       opName = "LSQ" + opName.substr(3);
   }
+
+  // The node's DOT "mlir_op" attribute
+  std::string mlirOpName = op->getName().getStringRef().str();
+  std::string prettyLabel = getPrettyNodeLabel(op);
+  if (isa<arith::CmpIOp, arith::CmpFOp>(op))
+    mlirOpName += prettyLabel;
+
+  // The node's DOT "shape" attribute
+  StringRef dialect = op->getDialect()->getNamespace();
+  StringRef shape = dialect == "handshake" ? "box" : "oval";
+
+  // The node's DOT "label" attribute
+  StringRef label = inLegacyMode() ? opName : prettyLabel;
+
+  // The node's DOT "style" attribute
+  std::string style = "filled";
+  if (auto controlInterface = dyn_cast<handshake::ControlInterface>(op)) {
+    if (controlInterface.isControl())
+      style += ", " + DOTTED.str();
+  }
+
+  // Write the node
   os << "\"" << opName << "\""
-     << " [mlir_op=\"" << canonicalName << "\", ";
-
-  // Determine fill color
-  os << "fillcolor=";
-  os << llvm::TypeSwitch<Operation *, std::string>(op)
-            .Case<handshake::ForkOp, handshake::LazyForkOp, handshake::JoinOp>(
-                [&](auto) { return "lavender"; })
-            .Case<handshake::BufferOp>([&](auto) { return "lightgreen"; })
-            .Case<handshake::DynamaticReturnOp, handshake::EndOp>(
-                [&](auto) { return "gold"; })
-            .Case<handshake::SourceOp, handshake::SinkOp>(
-                [&](auto) { return "gainsboro"; })
-            .Case<handshake::ConstantOp>([&](auto) { return "plum"; })
-            .Case<handshake::MemoryOpInterface, handshake::LoadOpInterface,
-                  handshake::StoreOpInterface>([&](auto) { return "coral"; })
-            .Case<handshake::MergeOp, handshake::ControlMergeOp,
-                  handshake::MuxOp>([&](auto) { return "lightblue"; })
-            .Case<handshake::BranchOp, handshake::ConditionalBranchOp>(
-                [&](auto) { return "tan2"; })
-            .Default([&](auto) { return "moccasin"; });
-
-  // Determine shape
-  os << ", shape=";
-  if (op->getDialect()->getNamespace() == "handshake")
-    os << "box";
-  else
-    os << "oval";
-
-  // Determine label
-  os << ", label=\"" << (inLegacyMode() ? opName : prettyLabel) << "\"";
-
-  // Determine style
-  os << ", style=\"filled";
-  if (auto controlInterface = dyn_cast<handshake::ControlInterface>(op);
-      controlInterface && controlInterface.isControl())
-    os << ", " + CONTROL_STYLE;
-  os << "\", ";
+     << " [mlir_op=\"" << mlirOpName << "\", label=\"" << label
+     << "\", fillcolor=" << getNodeColor(op) << ", shape=\"" << shape
+     << "\", style=\"" << style << "\", ";
   if (inLegacyMode() && failed(annotateNode(op, os)))
     return failure();
   os << "]\n";
-
   return success();
 }
 
-LogicalResult DOTPrinter::printEdge(Operation *src, Operation *dst, Value val,
+LogicalResult DOTPrinter::printEdge(OpOperand &oprd,
                                     mlir::raw_indented_ostream &os) {
+  Value val = oprd.get();
+  Operation *src = val.getDefiningOp();
+  Operation *dst = oprd.getOwner();
+
   bool legacyBuffers = mode == Mode::LEGACY_BUFFERS;
   // In legacy-buffers mode, skip edges from branch-like operations to bitwidth
   // modifiers in between blocks
@@ -1321,8 +1407,8 @@ LogicalResult DOTPrinter::printEdge(Operation *src, Operation *dst, Value val,
   }
 
   os << "\"" << srcNodeName << "\" -> \"" << dstNodeName << "\" ["
-     << getStyleOfValue(val);
-  if (legacy && failed(annotateEdge(src, dst, val, os)))
+     << getEdgeStyle(oprd);
+  if (legacy && failed(annotateEdge(oprd, os)))
     return failure();
   if (isBackedge(val, dst))
     os << (legacy ? ", " : "") << " color=\"blue\"";
@@ -1345,128 +1431,146 @@ LogicalResult DOTPrinter::printFunc(handshake::FuncOp funcOp,
   os << "splines=" << splines << ";\n";
   os << "compound=true; // Allow edges between clusters\n";
 
-  // Print nodes corresponding to function arguments
-  os << "// Function arguments\n";
-  for (const auto &arg : enumerate(funcOp.getArguments())) {
-    if (isa<MemRefType>(arg.value().getType()))
-      // Arguments with memref types are represented by memory interfaces
-      // inside the function so they are not displayed
-      continue;
+  /// Prints all nodes corresponding to function arguments.
+  auto printArgNodes = [&]() -> LogicalResult {
+    os << "// Units from function arguments\n";
+    for (const auto &arg : enumerate(funcOp.getArguments())) {
+      if (isa<MemRefType>(arg.value().getType()))
+        // Arguments with memref types are represented by memory interfaces
+        // inside the function so they are not displayed
+        continue;
 
-    auto argLabel = getArgumentName(funcOp, arg.index());
-    os << "\"" << argLabel << R"(" [mlir_op="handshake.arg", shape=diamond, )"
-       << getStyleOfValue(arg.value()) << "label=\"" << argLabel << "\", ";
-    if (legacy && failed(annotateArgumentNode(funcOp, arg.index(), os)))
-      return failure();
-    os << "]\n";
-  }
+      std::string argLabel = getArgumentName(funcOp, arg.index());
+      StringRef style = isa<NoneType>(arg.value().getType()) ? DOTTED : SOLID;
+      os << "\"" << argLabel
+         << R"(" [mlir_op="handshake.func", shape=diamond, )"
+         << "label=\"" << argLabel << "\", style=\"" << style << "\", ";
+      if (legacy && failed(annotateArgumentNode(funcOp, arg.index(), os)))
+        return failure();
+      os << "]\n";
+    }
+    return success();
+  };
 
-  // Print nodes corresponding to function operations
-  os << "// Function operations\n";
-  for (auto &op : funcOp.getOps()) {
-    // In legacy-buffers mode, do not print bitwidth modification operation
-    // between branch-like and merge-like operations
-    if (mode == Mode::LEGACY_BUFFERS && isBitModBetweenBlocks(&op))
-      continue;
+  /// Prints all edges incoming from function arguments.
+  auto printArgEdges = [&]() -> LogicalResult {
+    os << "// Channels from function arguments\n";
+    for (auto [idx, arg] : llvm::enumerate(funcOp.getArguments())) {
+      if (isa<MemRefType>(arg.getType()))
+        continue;
 
-    // Print the operation
-    if (failed(printNode(&op, os)))
-      return failure();
-  }
+      for (OpOperand &oprd : arg.getUses()) {
+        Operation *ownerOp = oprd.getOwner();
+        std::string argLabel = getArgumentName(funcOp, idx);
+        os << "\"" << argLabel << "\" -> \"" << getUniqueName(ownerOp) << "\" ["
+           << getEdgeStyle(oprd);
+        if (legacy && failed(annotateArgumentEdge(funcOp, idx, ownerOp, os)))
+          return failure();
+        os << "]\n";
+      }
+    }
+    return success();
+  };
 
   // Get function's "blocks". These leverage the "bb" attributes attached to
   // operations in handshake functions to display operations belonging to the
   // same original basic block together
-  auto handshakeBlocks = getLogicBBs(funcOp);
+  LogicBBs blocks = getLogicBBs(funcOp);
 
-  // Print all edges incoming from operations in a block
-  bool argEdgesAdded = false;
-  auto addArgEdges = [&]() -> LogicalResult {
-    argEdgesAdded = true;
-    for (auto [idx, arg] : llvm::enumerate(funcOp.getArguments()))
-      if (!isa<MemRefType>(arg.getType()))
-        for (Operation *user : arg.getUsers()) {
-          auto argLabel = getArgumentName(funcOp, idx);
-          os << "\"" << argLabel << "\" -> \"" << getUniqueName(user) << "\" ["
-             << getStyleOfValue(arg);
-          if (legacy && failed(annotateArgumentEdge(funcOp, idx, user, os)))
-            return failure();
-          os << "]\n";
-        }
-    return success();
-  };
+  // Whether nodes and edges corresponding to function arguments have already
+  // been handled
+  bool areArgsHandled = false;
 
-  for (auto &[blockID, ops] : handshakeBlocks.blocks) {
+  // Collect all edges that do not connect two nodes in the same block
+  llvm::MapVector<unsigned, std::vector<OpOperand *>> outgoingEdges;
 
-    // For each block, we create a subgraph to contain all edges between two
-    // operations of that block
-    auto blockStrID = std::to_string(blockID);
-    os << "// Edges within basic block " << blockStrID << "\n";
-    std::string graphName = "cluster" + blockStrID;
-    std::string graphLabel = "block" + blockStrID;
+  // We print the function "block-by-block" by grouping nodes in the same block
+  // (as well as edges between nodes of the same block) within DOT clusters
+  for (auto &[blockID, blockOps] : blocks.blocks) {
+    areArgsHandled |= blockID == ENTRY_BB;
+
+    // Open the subgraph
+    os << "// Units/Channels in BB " << blockID << "\n";
+    std::string graphName = "cluster" + std::to_string(blockID);
+    std::string graphLabel = "block" + std::to_string(blockID);
     openSubgraph(graphName, graphLabel, os);
 
-    // Collect all edges leaving the block and print them after the subgraph
-    std::vector<std::tuple<Operation *, Operation *, OpResult>> outgoingEdges;
+    // For entry block, also add all nodes corresponding to function arguments
+    if (blockID == ENTRY_BB && failed(printArgNodes()))
+      return failure();
 
-    // Determines whether an edge to a destination operation should be inside
-    // of the source operation's basic block
-    auto isEdgeInSubgraph = [](Operation *useOp, unsigned currentBB) {
-      // Sink operations are always displayed outside of blocks
-      if (isa<handshake::SinkOp>(useOp))
-        return false;
-
-      auto bb = useOp->getAttrOfType<mlir::IntegerAttr>(BB_ATTR);
-      return bb && bb.getValue().getZExtValue() == currentBB;
-    };
-
-    // Iterate over all uses of all results of all operations inside the
-    // block
-    for (auto *op : ops) {
-      for (auto res : op->getResults())
-        for (auto &use : res.getUses()) {
-          // Add edge to subgraph or outgoing edges depending on the block of
-          // the operation using the result
-          Operation *useOp = use.getOwner();
-          if (isEdgeInSubgraph(useOp, blockID)) {
-            if (failed(printEdge(op, useOp, res, os)))
-              return failure();
-          } else {
-            outgoingEdges.emplace_back(op, useOp, res);
-          }
-        }
+    os << "// Units in BB " << blockID << "\n";
+    for (Operation *op : blockOps) {
+      // In legacy-buffers mode, do not print bitwidth modification operation
+      // between branch-like and merge-like operations
+      if (mode == Mode::LEGACY_BUFFERS && isBitModBetweenBlocks(op))
+        continue;
+      if (failed(printNode(op, os)))
+        return failure();
     }
 
     // For entry block, also add all edges incoming from function arguments
-    if (blockID == 0 && failed(addArgEdges()))
+    if (blockID == ENTRY_BB && failed(printArgEdges()))
       return failure();
+
+    os << "// Channels in BB " << blockID << "\n";
+    for (Operation *op : blockOps) {
+      for (OpResult res : op->getResults()) {
+        for (OpOperand &oprd : res.getUses()) {
+          Operation *userOp = oprd.getOwner();
+          std::optional<unsigned> bb = getLogicBB(userOp);
+          if (bb && *bb == blockID) {
+            if (failed(printEdge(oprd, os)))
+              return failure();
+          } else {
+            outgoingEdges[blockID].push_back(&oprd);
+          }
+        }
+      }
+    }
 
     // Close the subgraph
     closeSubgraph(os);
-
-    // Print outgoing edges for this block
-    if (!outgoingEdges.empty())
-      os << "// Edges outgoing of basic block " << blockStrID << "\n";
-    for (auto &[op, useOp, res] : outgoingEdges)
-      if (failed(printEdge(op, useOp, res, os)))
-        return failure();
   }
 
-  // Print all edges incoming from operations not belonging to any block
-  // outside of all subgraphs
-  os << "// Edges outside of all basic blocks\n";
   // Print edges coming from function arguments if they haven't been so far
-  if (!argEdgesAdded && failed(addArgEdges()))
+  if (!areArgsHandled && failed(printArgNodes()))
     return failure();
-  for (auto *op : handshakeBlocks.outOfBlocks)
-    for (auto res : op->getResults())
-      for (auto &use : res.getUses())
-        if (failed(printEdge(op, use.getOwner(), res, os)))
-          return failure();
 
+  os << "// Units outside of all basic blocks\n";
+  for (Operation *op : blocks.outOfBlocks) {
+    // In legacy-buffers mode, do not print bitwidth modification operation
+    // between branch-like and merge-like operations
+    if (mode == Mode::LEGACY_BUFFERS && isBitModBetweenBlocks(op))
+      continue;
+    if (failed(printNode(op, os)))
+      return failure();
+  }
+
+  // Print outgoing edges for each block
+  for (auto &[blockID, blockEdges] : outgoingEdges) {
+    os << "// Channels outgoing of BB " << blockID << "\n";
+    for (OpOperand *oprd : blockEdges) {
+      if (failed(printEdge(*oprd, os)))
+        return failure();
+    }
+  }
+
+  // Print edges coming from function arguments if they haven't been so far
+  if (!areArgsHandled && failed(printArgEdges()))
+    return failure();
+
+  os << "// Channels outside of all basic blocks\n";
+  for (Operation *op : blocks.outOfBlocks) {
+    for (OpResult res : op->getResults()) {
+      for (OpOperand &oprd : res.getUses()) {
+        if (failed(printEdge(oprd, os)))
+          return failure();
+      }
+    }
+  }
   os.unindent();
   os << "}\n";
-
   return success();
 }
 

@@ -4,12 +4,12 @@
 // CHECK-LABEL:   handshake.func @doNothing(
 // CHECK-SAME:                              %[[VAL_0:.*]]: none, ...) -> i6 attributes {argNames = ["start"], resNames = ["out0"]} {
 // CHECK:           %[[VAL_1:.*]] = constant %[[VAL_0]] {value = 31 : i6} : i6
-// CHECK:           %[[VAL_2:.*]] = d_return %[[VAL_1]] : i6
+// CHECK:           %[[VAL_2:.*]] = return %[[VAL_1]] : i6
 // CHECK:           end %[[VAL_2]] : i6
 // CHECK:         }
 handshake.func @doNothing(%start: none) -> i6 {
   %cst = constant %start {value = 31 : i6} : i6
-  %returnVal = d_return %cst : i6
+  %returnVal = return %cst : i6
   end %returnVal : i6
 }
 
@@ -19,12 +19,12 @@ handshake.func @doNothing(%start: none) -> i6 {
 // CHECK-SAME:                            %[[VAL_0:.*]]: none, ...) -> i32 attributes {argNames = ["start"], resNames = ["out0"]} {
 // CHECK:           %[[VAL_1:.*]] = constant %[[VAL_0]] {value = false} : i1
 // CHECK:           %[[VAL_2:.*]] = arith.extsi %[[VAL_1]] : i1 to i32
-// CHECK:           %[[VAL_3:.*]] = d_return %[[VAL_2]] : i32
+// CHECK:           %[[VAL_3:.*]] = return %[[VAL_2]] : i32
 // CHECK:           end %[[VAL_3]] : i32
 // CHECK:         }
 handshake.func @zeroCst(%start: none) -> i32 {
   %cst = constant %start {value = 0 : i32} : i32
-  %returnVal = d_return %cst : i32
+  %returnVal = return %cst : i32
   end %returnVal : i32
 }
 
@@ -34,12 +34,12 @@ handshake.func @zeroCst(%start: none) -> i32 {
 // CHECK-SAME:                           %[[VAL_0:.*]]: none, ...) -> i32 attributes {argNames = ["start"], resNames = ["out0"]} {
 // CHECK:           %[[VAL_1:.*]] = constant %[[VAL_0]] {value = 1 : i2} : i2
 // CHECK:           %[[VAL_2:.*]] = arith.extsi %[[VAL_1]] : i2 to i32
-// CHECK:           %[[VAL_3:.*]] = d_return %[[VAL_2]] : i32
+// CHECK:           %[[VAL_3:.*]] = return %[[VAL_2]] : i32
 // CHECK:           end %[[VAL_3]] : i32
 // CHECK:         }
 handshake.func @oneCst(%start: none) -> i32 {
   %cst = constant %start {value = 1 : i32} : i32
-  %returnVal = d_return %cst : i32
+  %returnVal = return %cst : i32
   end %returnVal : i32
 }
 
@@ -49,12 +49,12 @@ handshake.func @oneCst(%start: none) -> i32 {
 // CHECK-SAME:                                       %[[VAL_0:.*]]: none, ...) -> i32 attributes {argNames = ["start"], resNames = ["out0"]} {
 // CHECK:           %[[VAL_1:.*]] = constant %[[VAL_0]] {value = 31 : i6} : i6
 // CHECK:           %[[VAL_2:.*]] = arith.extsi %[[VAL_1]] : i6 to i32
-// CHECK:           %[[VAL_3:.*]] = d_return %[[VAL_2]] : i32
+// CHECK:           %[[VAL_3:.*]] = return %[[VAL_2]] : i32
 // CHECK:           end %[[VAL_3]] : i32
 // CHECK:         }
 handshake.func @powerOfTwoMinusOne(%start: none) -> i32 {
   %cst = constant %start {value = 31 : i32} : i32
-  %returnVal = d_return %cst : i32
+  %returnVal = return %cst : i32
   end %returnVal : i32
 }
 
@@ -64,12 +64,12 @@ handshake.func @powerOfTwoMinusOne(%start: none) -> i32 {
 // CHECK-SAME:                               %[[VAL_0:.*]]: none, ...) -> i32 attributes {argNames = ["start"], resNames = ["out0"]} {
 // CHECK:           %[[VAL_1:.*]] = constant %[[VAL_0]] {value = 32 : i7} : i7
 // CHECK:           %[[VAL_2:.*]] = arith.extsi %[[VAL_1]] : i7 to i32
-// CHECK:           %[[VAL_3:.*]] = d_return %[[VAL_2]] : i32
+// CHECK:           %[[VAL_3:.*]] = return %[[VAL_2]] : i32
 // CHECK:           end %[[VAL_3]] : i32
 // CHECK:         }
 handshake.func @powerOfTwo(%start: none) -> i32 {
   %cst = constant %start {value = 32 : i32} : i32
-  %returnVal = d_return %cst : i32
+  %returnVal = return %cst : i32
   end %returnVal : i32
 }
 
@@ -78,12 +78,12 @@ handshake.func @powerOfTwo(%start: none) -> i32 {
 // CHECK-LABEL:   handshake.func @maxPosVal(
 // CHECK-SAME:                              %[[VAL_0:.*]]: none, ...) -> i64 attributes {argNames = ["start"], resNames = ["out0"]} {
 // CHECK:           %[[VAL_1:.*]] = constant %[[VAL_0]] {value = 9223372036854775807 : i64} : i64
-// CHECK:           %[[VAL_2:.*]] = d_return %[[VAL_1]] : i64
+// CHECK:           %[[VAL_2:.*]] = return %[[VAL_1]] : i64
 // CHECK:           end %[[VAL_2]] : i64
 // CHECK:         }
 handshake.func @maxPosVal(%start: none) -> i64 {
   %cst = constant %start {value = 9223372036854775807 : i64} : i64
-  %returnVal = d_return %cst : i64
+  %returnVal = return %cst : i64
   end %returnVal : i64
 }
 
@@ -93,12 +93,12 @@ handshake.func @maxPosVal(%start: none) -> i64 {
 // CHECK-SAME:                                       %[[VAL_0:.*]]: none, ...) -> i32 attributes {argNames = ["start"], resNames = ["out0"]} {
 // CHECK:           %[[VAL_1:.*]] = constant %[[VAL_0]] {value = -33 : i7} : i7
 // CHECK:           %[[VAL_2:.*]] = arith.extsi %[[VAL_1]] : i7 to i32
-// CHECK:           %[[VAL_3:.*]] = d_return %[[VAL_2]] : i32
+// CHECK:           %[[VAL_3:.*]] = return %[[VAL_2]] : i32
 // CHECK:           end %[[VAL_3]] : i32
 // CHECK:         }
 handshake.func @negPowerOfMinusOne(%start: none) -> i32 {
   %cst = constant %start {value = -33 : i32} : i32
-  %returnVal = d_return %cst : i32
+  %returnVal = return %cst : i32
   end %returnVal : i32
 }
 
@@ -108,12 +108,12 @@ handshake.func @negPowerOfMinusOne(%start: none) -> i32 {
 // CHECK-SAME:                                  %[[VAL_0:.*]]: none, ...) -> i32 attributes {argNames = ["start"], resNames = ["out0"]} {
 // CHECK:           %[[VAL_1:.*]] = constant %[[VAL_0]] {value = -32 : i6} : i6
 // CHECK:           %[[VAL_2:.*]] = arith.extsi %[[VAL_1]] : i6 to i32
-// CHECK:           %[[VAL_3:.*]] = d_return %[[VAL_2]] : i32
+// CHECK:           %[[VAL_3:.*]] = return %[[VAL_2]] : i32
 // CHECK:           end %[[VAL_3]] : i32
 // CHECK:         }
 handshake.func @negPowerOfTwo(%start: none) -> i32 {
   %cst = constant %start {value = -32 : i32} : i32
-  %returnVal = d_return %cst : i32
+  %returnVal = return %cst : i32
   end %returnVal : i32
 }
 
@@ -122,12 +122,12 @@ handshake.func @negPowerOfTwo(%start: none) -> i32 {
 // CHECK-LABEL:   handshake.func @minNegVal(
 // CHECK-SAME:                              %[[VAL_0:.*]]: none, ...) -> i64 attributes {argNames = ["start"], resNames = ["out0"]} {
 // CHECK:           %[[VAL_1:.*]] = constant %[[VAL_0]] {value = -9223372036854775808 : i64} : i64
-// CHECK:           %[[VAL_2:.*]] = d_return %[[VAL_1]] : i64
+// CHECK:           %[[VAL_2:.*]] = return %[[VAL_1]] : i64
 // CHECK:           end %[[VAL_2]] : i64
 // CHECK:         }
 handshake.func @minNegVal(%start: none) -> i64 {
   %cst = constant %start {value = -9223372036854775808 : i64} : i64
-  %returnVal = d_return %cst : i64
+  %returnVal = return %cst : i64
   end %returnVal : i64
 }
 
@@ -139,14 +139,14 @@ handshake.func @minNegVal(%start: none) -> i64 {
 // CHECK:           %[[VAL_2:.*]] = arith.extsi %[[VAL_1]] : i7 to i32
 // CHECK:           %[[VAL_3:.*]] = arith.addi %[[VAL_2]], %[[VAL_2]] : i32
 // CHECK:           %[[VAL_4:.*]] = arith.addi %[[VAL_3]], %[[VAL_2]] : i32
-// CHECK:           %[[VAL_5:.*]] = d_return %[[VAL_4]] : i32
+// CHECK:           %[[VAL_5:.*]] = return %[[VAL_4]] : i32
 // CHECK:           end %[[VAL_5]] : i32
 // CHECK:         }
 handshake.func @multipleUsers(%start: none) -> i32 {
   %cst = constant %start {value = 32 : i32} : i32
   %add = arith.addi %cst, %cst : i32
   %add2 = arith.addi %add, %cst : i32
-  %returnVal = d_return %add2 : i32
+  %returnVal = return %add2 : i32
   end %returnVal : i32
 }
 
@@ -156,12 +156,12 @@ handshake.func @multipleUsers(%start: none) -> i32 {
 // CHECK-SAME:                              %[[VAL_0:.*]]: none, ...) -> i32 attributes {argNames = ["start"], resNames = ["out0"]} {
 // CHECK:           %[[VAL_1:.*]] = constant %[[VAL_0]] {bb = 0 : i32, value = 32 : i7} : i7
 // CHECK:           %[[VAL_2:.*]] = arith.extsi %[[VAL_1]] {bb = 0 : i32} : i7 to i32
-// CHECK:           %[[VAL_3:.*]] = d_return %[[VAL_2]] : i32
+// CHECK:           %[[VAL_3:.*]] = return %[[VAL_2]] : i32
 // CHECK:           end %[[VAL_3]] : i32
 // CHECK:         }
 handshake.func @inheritBB(%start: none) -> i32 {
   %cst = constant %start {value = 32 : i32, bb = 0 : i32} : i32
-  %returnVal = d_return %cst : i32
+  %returnVal = return %cst : i32
   end %returnVal : i32
 }
 
@@ -178,7 +178,7 @@ handshake.func @inheritBB(%start: none) -> i32 {
 // CHECK:           %[[VAL_7:.*]] = arith.extsi %[[VAL_6]] : i3 to i32
 // CHECK:           %[[VAL_8:.*]] = arith.addi %[[VAL_3]], %[[VAL_5]] : i32
 // CHECK:           %[[VAL_9:.*]] = arith.addi %[[VAL_8]], %[[VAL_7]] : i32
-// CHECK:           %[[VAL_10:.*]] = d_return %[[VAL_9]] : i32
+// CHECK:           %[[VAL_10:.*]] = return %[[VAL_9]] : i32
 // CHECK:           end %[[VAL_10]] : i32
 // CHECK:         }
 handshake.func @duplicateDoNothingDiff(%start: none) -> i32 {
@@ -188,7 +188,7 @@ handshake.func @duplicateDoNothingDiff(%start: none) -> i32 {
   %cst3 = constant %start {value = 2 : i32} : i32
   %add1 = arith.addi %cst1, %cst2 : i32
   %add2 = arith.addi %add1, %cst3 : i32
-  %returnVal = d_return %add2 : i32
+  %returnVal = return %add2 : i32
   end %returnVal : i32
 }
 
@@ -199,14 +199,14 @@ handshake.func @duplicateDoNothingDiff(%start: none) -> i32 {
 // CHECK:           %[[VAL_1:.*]] = constant %[[VAL_0]] {value = 32 : i7} : i7
 // CHECK:           %[[VAL_2:.*]] = constant %[[VAL_0]] {value = 32 : i7} : i7
 // CHECK:           %[[VAL_3:.*]] = arith.addi %[[VAL_1]], %[[VAL_2]] : i7
-// CHECK:           %[[VAL_4:.*]] = d_return %[[VAL_3]] : i7
+// CHECK:           %[[VAL_4:.*]] = return %[[VAL_3]] : i7
 // CHECK:           end %[[VAL_4]] : i7
 // CHECK:         }
 handshake.func @duplicateDoNothingPrevious(%start: none) -> i7 {
   %cst1 = constant %start {value = 32 : i7} : i7
   %cst2 = constant %start {value = 32 : i7} : i7
   %add = arith.addi %cst1, %cst2 : i7
-  %returnVal = d_return %add : i7
+  %returnVal = return %add : i7
   end %returnVal : i7
 }
 
@@ -217,14 +217,14 @@ handshake.func @duplicateDoNothingPrevious(%start: none) -> i7 {
 // CHECK:           %[[VAL_1:.*]] = constant %[[VAL_0]] {value = 32 : i7} : i7
 // CHECK:           %[[VAL_2:.*]] = arith.extsi %[[VAL_1]] : i7 to i32
 // CHECK:           %[[VAL_3:.*]] = arith.addi %[[VAL_2]], %[[VAL_2]] : i32
-// CHECK:           %[[VAL_4:.*]] = d_return %[[VAL_3]] : i32
+// CHECK:           %[[VAL_4:.*]] = return %[[VAL_3]] : i32
 // CHECK:           end %[[VAL_4]] : i32
 // CHECK:         }
 handshake.func @deleteDuplicate(%start: none) -> i32 {
   %cst1 = constant %start {value = 32 : i32} : i32
   %cst2 = constant %start {value = 32 : i32} : i32
   %add = arith.addi %cst1, %cst2 : i32
-  %returnVal = d_return %add : i32
+  %returnVal = return %add : i32
   end %returnVal : i32
 }
 
@@ -236,7 +236,7 @@ handshake.func @deleteDuplicate(%start: none) -> i32 {
 // CHECK:           %[[VAL_1:.*]] = constant %[[VAL_0]] {value = 32 : i7} : i7
 // CHECK:           %[[VAL_2:.*]] = arith.extsi %[[VAL_1]] : i7 to i32
 // CHECK:           %[[VAL_3:.*]] = arith.addi %[[VAL_2]], %[[VAL_2]] : i32
-// CHECK:           %[[VAL_4:.*]] = d_return %[[VAL_3]] : i32
+// CHECK:           %[[VAL_4:.*]] = return %[[VAL_3]] : i32
 // CHECK:           end %[[VAL_4]] : i32
 // CHECK:         }
 handshake.func @deleteDuplicateMatchExists(%start: none) -> i32 {
@@ -244,6 +244,6 @@ handshake.func @deleteDuplicateMatchExists(%start: none) -> i32 {
   %cst2 = constant %start {value = 32 : i32} : i32
   %cst1ext = arith.extsi %cst1 : i7 to i32
   %add = arith.addi %cst1ext, %cst2 : i32
-  %returnVal = d_return %add : i32
+  %returnVal = return %add : i32
   end %returnVal : i32
 }

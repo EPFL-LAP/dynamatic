@@ -5,7 +5,7 @@
 //===----------------------------------------------------------------------===//
 
 #include "gaussian.h"
-#include "../integration_utils.h"
+#include "dynamatic/Integration.h"
 #include "stdlib.h"
 
 unsigned gaussian(in_int_t c[N], inout_int_t a[N][N]) {

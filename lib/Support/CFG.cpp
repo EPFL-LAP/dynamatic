@@ -11,7 +11,7 @@
 //===----------------------------------------------------------------------===//
 
 #include "dynamatic/Support/CFG.h"
-#include "circt/Dialect/Handshake/HandshakeOps.h"
+#include "dynamatic/Dialect/Handshake/HandshakeOps.h"
 #include "mlir/Dialect/Arith/IR/Arith.h"
 #include "mlir/Support/LogicalResult.h"
 #include "llvm/ADT/SetVector.h"
@@ -21,7 +21,6 @@
 
 using namespace llvm;
 using namespace mlir;
-using namespace circt;
 using namespace dynamatic;
 
 dynamatic::LogicBBs dynamatic::getLogicBBs(handshake::FuncOp funcOp) {
@@ -273,7 +272,7 @@ bool dynamatic::cannotBelongToCFG(Operation *op) {
   return isa<handshake::MemoryOpInterface, handshake::SinkOp>(op);
 }
 
-HandshakeCFG::HandshakeCFG(circt::handshake::FuncOp funcOp) : funcOp(funcOp) {
+HandshakeCFG::HandshakeCFG(handshake::FuncOp funcOp) : funcOp(funcOp) {
   for (Operation &op : funcOp.getOps()) {
     if (cannotBelongToCFG(&op))
       continue;
@@ -359,12 +358,12 @@ HandshakeCFG::getControlValues(DenseMap<unsigned, Value> &ctrlVals) {
     // their outputs
     LogicalResult res =
         llvm::TypeSwitch<Operation *, LogicalResult>(ctrlOp)
-            .Case<handshake::ForkOp, handshake::LazyForkOp, handshake::BufferOp,
-                  handshake::BranchOp, handshake::ConditionalBranchOp>(
-                [&](auto) {
-                  addToCtrlOps(ctrlOp->getUsers());
-                  return success();
-                })
+            .Case<handshake::ForkOp, handshake::LazyForkOp,
+                  handshake::BufferOpInterface, handshake::BranchOp,
+                  handshake::ConditionalBranchOp>([&](auto) {
+              addToCtrlOps(ctrlOp->getUsers());
+              return success();
+            })
             .Case<handshake::MergeLikeOpInterface>([&](auto) {
               OpResult mergeRes = ctrlOp->getResult(0);
               addToCtrlOps(mergeRes.getUsers());
@@ -572,7 +571,7 @@ static GIIDStatus isGIIDRec(Value predecessor, OpOperand &oprd,
         // Otherwise, data inputs on the path must depend on the predecessor
         return foldGIIDStatusAnd(recurse, defOp->getOperands());
       })
-      .Case<handshake::DynamaticReturnOp>([&](auto) {
+      .Case<handshake::ReturnOp>([&](auto) {
         // Just recurse the call on the return operand corresponding to the
         // value
         Value oprd = defOp->getOperand(cast<OpResult>(val).getResultNumber());
@@ -597,14 +596,15 @@ static GIIDStatus isGIIDRec(Value predecessor, OpOperand &oprd,
         ValueRange values{selectOp.getTrueValue(), selectOp.getFalseValue()};
         return foldGIIDStatusAnd(recurse, values);
       })
-      .Case<handshake::ForkOp, handshake::LazyForkOp, handshake::BufferOp,
-            handshake::BranchOp, arith::AddIOp, arith::AndIOp, arith::CmpIOp,
-            arith::DivSIOp, arith::DivUIOp, arith::ExtSIOp, arith::ExtUIOp,
-            arith::MulIOp, arith::OrIOp, arith::RemUIOp, arith::RemSIOp,
-            arith::ShLIOp, arith::ShRUIOp, arith::SIToFPOp, arith::SubIOp,
-            arith::TruncIOp, arith::UIToFPOp, arith::XOrIOp, arith::AddFOp,
-            arith::CmpFOp, arith::DivFOp, arith::ExtFOp, arith::MulFOp,
-            arith::RemFOp, arith::SubFOp, arith::TruncFOp>([&](auto) {
+      .Case<handshake::ForkOp, handshake::LazyForkOp,
+            handshake::BufferOpInterface, handshake::BranchOp, arith::AddIOp,
+            arith::AndIOp, arith::CmpIOp, arith::DivSIOp, arith::DivUIOp,
+            arith::ExtSIOp, arith::ExtUIOp, arith::MulIOp, arith::OrIOp,
+            arith::RemUIOp, arith::RemSIOp, arith::ShLIOp, arith::ShRUIOp,
+            arith::SIToFPOp, arith::SubIOp, arith::TruncIOp, arith::UIToFPOp,
+            arith::XOrIOp, arith::AddFOp, arith::CmpFOp, arith::DivFOp,
+            arith::ExtFOp, arith::MulFOp, arith::RemFOp, arith::SubFOp,
+            arith::TruncFOp>([&](auto) {
         // At least one operand must depend on the predecessor
         return foldGIIDStatusOr(recurse, defOp->getOperands());
       })

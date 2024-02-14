@@ -1,0 +1,105 @@
+//===- HWOpInterfaces.h - Declare HW op interfaces --------------*- C++ -*-===//
+//
+// Part of the LLVM Project, under the Apache License v2.0 with LLVM Exceptions.
+// See https://llvm.org/LICENSE.txt for license information.
+// SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
+//
+//===----------------------------------------------------------------------===//
+//
+// This file originates from the CIRCT project (https://github.com/llvm/circt).
+// It includes modifications made as part of Dynamatic.
+//
+//===----------------------------------------------------------------------===//
+//
+// This file declares the operation interfaces for the HW dialect.
+//
+//===----------------------------------------------------------------------===//
+
+#ifndef DYNAMATIC_DIALECT_HW_HW_OP_INTERFACES_H
+#define DYNAMATIC_DIALECT_HW_HW_OP_INTERFACES_H
+
+#include "dynamatic/Dialect/HW/HWInstanceImplementation.h"
+#include "dynamatic/Dialect/HW/HWTypes.h"
+#include "dynamatic/Dialect/HW/InnerSymbolTable.h"
+#include "dynamatic/Support/LLVM.h"
+#include "mlir/IR/OpDefinition.h"
+#include "mlir/IR/SymbolTable.h"
+
+namespace dynamatic {
+namespace hw {
+
+void populateHWModuleLikeTypeConversionPattern(StringRef moduleLikeOpName,
+                                               RewritePatternSet &patterns,
+                                               TypeConverter &converter);
+
+class InnerSymbolOpInterface;
+/// Verification hook for verifying InnerSym Attribute.
+LogicalResult verifyInnerSymAttr(InnerSymbolOpInterface op);
+
+namespace detail {
+LogicalResult verifyInnerRefNamespace(Operation *op);
+} // namespace detail
+
+/// Classify operations that are InnerRefNamespace-like,
+/// until structure is in place to do this via Traits.
+/// Useful for getParentOfType<>, or scheduling passes.
+/// Prefer putting the trait on operations here or downstream.
+struct InnerRefNamespaceLike {
+  /// Return if this operation is explicitly an IRN or appears compatible.
+  static bool classof(mlir::Operation *op);
+  /// Return if this operation is explicitly an IRN or appears compatible.
+  static bool classof(const mlir::RegisteredOperationName *opInfo);
+};
+
+} // namespace hw
+} // namespace dynamatic
+
+namespace mlir {
+namespace OpTrait {
+
+/// This trait is for operations that define a scope for resolving InnerRef's,
+/// and provides verification for InnerRef users (via InnerRefUserOpInterface).
+template <typename ConcreteType>
+class InnerRefNamespace : public TraitBase<ConcreteType, InnerRefNamespace> {
+public:
+  static LogicalResult verifyRegionTrait(Operation *op) {
+    static_assert(
+        ConcreteType::template hasTrait<::mlir::OpTrait::SymbolTable>(),
+        "expected operation to be a SymbolTable");
+
+    if (op->getNumRegions() != 1)
+      return op->emitError("expected operation to have a single region");
+    if (!op->getRegion(0).hasOneBlock())
+      return op->emitError("expected operation to have a single block");
+
+    // Verify all InnerSymbolTable's and InnerRef users.
+    return ::dynamatic::hw::detail::verifyInnerRefNamespace(op);
+  }
+};
+
+/// A trait for inner symbol table functionality on an operation.
+template <typename ConcreteType>
+class InnerSymbolTable : public TraitBase<ConcreteType, InnerSymbolTable> {
+public:
+  static LogicalResult verifyRegionTrait(Operation *op) {
+    // Insist that ops with InnerSymbolTable's provide a Symbol, this is
+    // essential to how InnerRef's work.
+    static_assert(
+        ConcreteType::template hasTrait<::mlir::SymbolOpInterface::Trait>(),
+        "expected operation to define a Symbol");
+
+    // InnerSymbolTable's must be directly nested within an InnerRefNamespace.
+    auto *parent = op->getParentOp();
+    if (!parent || !isa<dynamatic::hw::InnerRefNamespaceLike>(parent))
+      return op->emitError(
+          "InnerSymbolTable must have InnerRefNamespace parent");
+
+    return success();
+  }
+};
+} // namespace OpTrait
+} // namespace mlir
+
+#include "dynamatic/Dialect/HW/HWOpInterfaces.h.inc"
+
+#endif // DYNAMATIC_DIALECT_HW_HW_OP_INTERFACES_H

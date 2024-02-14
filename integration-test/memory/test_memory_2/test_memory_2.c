@@ -1,5 +1,5 @@
 #include "test_memory_2.h"
-#include "../../integration_utils.h"
+#include "dynamatic/Integration.h"
 #include <stdlib.h>
 
 void test_memory_2(inout_int_t a[N], in_int_t n) {
@@ -9,9 +9,11 @@ void test_memory_2(inout_int_t a[N], in_int_t n) {
 
 int main(void) {
   inout_int_t a[N];
+  in_int_t n = N;
+
   for (unsigned j = 0; j < N; ++j)
     a[j] = rand() % 10;
 
-  CALL_KERNEL(test_memory_2, a, N);
+  CALL_KERNEL(test_memory_2, a, n);
   return 0;
 }

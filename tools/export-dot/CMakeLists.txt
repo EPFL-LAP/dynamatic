@@ -12,14 +12,15 @@ target_link_libraries(export-dot
   DynamaticSupport
   DynamaticTransforms
 
-  CIRCTHandshake
-  CIRCTHandshakeTransforms
+  DynamaticHandshake
 
   MLIRIR
   MLIRParser
   MLIRSupport
   MLIRPass
   MLIRLLVMDialect
+  MLIRAffineDialect
   MLIRArithDialect
+  MLIRMathDialect
   MLIRMemRefDialect
   )

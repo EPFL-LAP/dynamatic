@@ -39,7 +39,7 @@
 //
 //    let extraClassDeclaration = [{
 //      /// Container attribute corresponding to this operand attribute
-//      using ContainerAttr = ::circt::handshake::ContainerAttr;
+//      using ContainerAttr = ::dynamatic::handshake::ContainerAttr;
 //    }];
 //  }
 //
@@ -51,7 +51,7 @@
 //    }];
 //    let extraClassDeclaration = [{
 //      /// Operand attribute corresponding to this container attribute
-//      using OperandAttr = ::circt::handshake::OperandAttr;
+//      using OperandAttr = ::dynamatic::handshake::OperandAttr;
 //    }];
 //  }
 // ```

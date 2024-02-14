@@ -22,9 +22,9 @@ def SimplifyMergeLike : Pass< "tutorial-handshake-simplify-merge-like",
   let description = [{
     The pass performs two simple transformation steps sequentially in each
     Handshake function present in the input MLIR module. First, it bypasses and
-    removes all merge operations (circt::handshake::MergeOp) with a single
+    removes all merge operations (dynamatic::handshake::MergeOp) with a single
     operand from the IR, since they serve no purpose. Second, it downgrades all
-    control merge operations (circt::handshake::ControlMergeOp) whose index
+    control merge operations (dynamatic::handshake::ControlMergeOp) whose index
     result is unused into simpler merges with the same operands.
   }];
   let constructor = "dynamatic::tutorials::createSimplifyMergeLikePass()";

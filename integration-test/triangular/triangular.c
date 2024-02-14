@@ -5,7 +5,7 @@
 //===----------------------------------------------------------------------===//
 
 #include "triangular.h"
-#include "../integration_utils.h"
+#include "dynamatic/Integration.h"
 #include <stdlib.h>
 
 void triangular(in_int_t x[N], in_int_t n, inout_int_t a[N][N]) {

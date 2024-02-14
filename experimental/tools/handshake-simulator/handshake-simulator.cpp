@@ -6,14 +6,11 @@
 //
 //===----------------------------------------------------------------------===//
 //
-// Tool inherited from CIRCT which executes a restricted form of Handshake-level
-// IR.
+// Tool which executes a restricted form of Handshake-level IR.
 //
 //===----------------------------------------------------------------------===//
 
-#include "circt/Dialect/Handshake/HandshakeOps.h"
-#include "circt/Support/JSON.h"
-#include "circt/Support/Version.h"
+#include "dynamatic/Dialect/Handshake/HandshakeOps.h"
 #include "experimental/tools/handshake-simulator/Simulation.h"
 #include "mlir/Dialect/Func/IR/FuncOps.h"
 #include "mlir/Dialect/LLVMIR/LLVMDialect.h"
@@ -23,6 +20,7 @@
 #include "mlir/Parser/Parser.h"
 #include "llvm/ADT/StringMap.h"
 #include "llvm/Support/InitLLVM.h"
+#include "llvm/Support/JSON.h"
 #include "llvm/Support/SourceMgr.h"
 
 #include <fstream>
@@ -32,7 +30,7 @@
 
 using namespace llvm;
 using namespace mlir;
-using namespace circt;
+using namespace dynamatic;
 
 static cl::OptionCategory mainCategory("Application options");
 static cl::OptionCategory configCategory("Configuration options");
@@ -65,10 +63,6 @@ static cl::opt<std::string>
 
 int main(int argc, char **argv) {
   InitLLVM y(argc, argv);
-
-  // Set the bug report message to indicate users should file issues on
-  // llvm/circt and not llvm/llvm-project.
-  setBugReportMsg(circtBugReportMsg);
 
   cl::ParseCommandLineOptions(
       argc, argv,

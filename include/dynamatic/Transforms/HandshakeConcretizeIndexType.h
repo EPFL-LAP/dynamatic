@@ -13,7 +13,7 @@
 #ifndef DYNAMATIC_TRANSFORMS_HANDSHAKECONCRETIZEINDEXTYPE_H
 #define DYNAMATIC_TRANSFORMS_HANDSHAKECONCRETIZEINDEXTYPE_H
 
-#include "circt/Dialect/Handshake/HandshakeOps.h"
+#include "dynamatic/Dialect/Handshake/HandshakeOps.h"
 #include "dynamatic/Support/DynamaticPass.h"
 #include "dynamatic/Support/LLVM.h"
 #include "mlir/Pass/Pass.h"
@@ -33,7 +33,7 @@ LogicalResult verifyAllIndexConcretized(Operation *op);
 
 /// Verifies that none of a Handshake function's arguments and results, as well
 /// as any of its nested operations operands and results, has an IndexType.
-LogicalResult verifyAllIndexConcretized(circt::handshake::FuncOp funcOp);
+LogicalResult verifyAllIndexConcretized(handshake::FuncOp funcOp);
 
 /// Verifies that none of the Handshake functions in a module has an argument
 /// ar result with an IndexType, or that any operation in the body of a

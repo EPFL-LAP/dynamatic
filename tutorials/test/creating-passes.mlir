@@ -1,13 +1,13 @@
 module {
   handshake.func @eraseSingleInputMerge(%start: none) -> none attributes {argNames = ["start"], resNames = ["out0"]} {
     %mergeStart = merge %start : none
-    %returnVal = d_return %mergeStart : none
+    %returnVal = return %mergeStart : none
     end %returnVal : none
   }
 
   handshake.func @downgradeIndexLessControlMerge(%arg0: i32, %arg1: i32, %start: none) -> i32 attributes {argNames = ["arg0", "arg1", "start"], resNames = ["out0"]} {
     %cmergeRes, %cmergeIdx = control_merge %arg0, %arg1 : i32, index
-    %returnVal = d_return %cmergeRes : i32
+    %returnVal = return %cmergeRes : i32
     end %returnVal : i32
   }
 
@@ -29,7 +29,7 @@ module {
   // ^bb3:
     %cmergeRes3, %cmergeIdx3 = control_merge %cmergeRes1, %cmergeRes2 : none, index
     %res = mux %cmergeIdx3 [%res1, %res2] : index, i1
-    %returnVal = d_return %res : i1
+    %returnVal = return %res : i1
     end %returnVal : i1
   }
 }

@@ -11,9 +11,9 @@
 //===----------------------------------------------------------------------===//
 
 #include "dynamatic/Support/Handshake.h"
-#include "circt/Dialect/Handshake/HandshakeOps.h"
-#include "circt/Support/BackedgeBuilder.h"
+#include "dynamatic/Dialect/Handshake/HandshakeOps.h"
 #include "dynamatic/Support/Attribute.h"
+#include "dynamatic/Support/Backedge.h"
 #include "dynamatic/Support/CFG.h"
 #include "mlir/Dialect/Affine/IR/AffineOps.h"
 #include "mlir/Dialect/MemRef/IR/MemRef.h"
@@ -23,9 +23,8 @@
 #include "llvm/Support/ErrorHandling.h"
 
 using namespace mlir;
-using namespace circt;
-using namespace circt::handshake;
 using namespace dynamatic;
+using namespace dynamatic::handshake;
 
 //===----------------------------------------------------------------------===//
 // MemoryOpLowering
@@ -381,13 +380,14 @@ SmallVector<Value> dynamatic::getLSQControlPaths(handshake::LSQOp lsqOp,
         llvm::TypeSwitch<Operation *, void>(succOp)
             .Case<handshake::ConditionalBranchOp, handshake::BranchOp,
                   handshake::MergeOp, handshake::MuxOp, handshake::ForkOp,
-                  handshake::LazyForkOp, handshake::BufferOp>([&](auto) {
-              // If the successor just propagates the control path, add
-              // all its results to the list of control channels to
-              // explore
-              for (OpResult succRes : succOp->getResults())
-                controlChannels.push_back(succRes);
-            })
+                  handshake::LazyForkOp, handshake::BufferOpInterface>(
+                [&](auto) {
+                  // If the successor just propagates the control path, add
+                  // all its results to the list of control channels to
+                  // explore
+                  for (OpResult succRes : succOp->getResults())
+                    controlChannels.push_back(succRes);
+                })
             .Case<handshake::ControlMergeOp>(
                 [&](handshake::ControlMergeOp cmergeOp) {
                   // Only the control merge's data output forwards the input

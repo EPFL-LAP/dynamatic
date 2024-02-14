@@ -1,3 +1,5 @@
 add_subdirectory(dynamatic)
 add_subdirectory(dynamatic-opt)
 add_subdirectory(export-dot)
+add_subdirectory(export-vhdl)
+add_subdirectory(hls-verifier)
