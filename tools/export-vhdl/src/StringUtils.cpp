@@ -127,6 +127,54 @@ string stringConstant(unsigned long int value, int size) {
   case 16:
     ss << std::bitset<16>(value);
     break;
+  case 17:
+    ss << std::bitset<17>(value);
+    break;
+  case 18:
+    ss << std::bitset<18>(value);
+    break;
+  case 19:
+    ss << std::bitset<19>(value);
+    break;
+  case 20:
+    ss << std::bitset<20>(value);
+    break;
+  case 21:
+    ss << std::bitset<21>(value);
+    break;
+  case 22:
+    ss << std::bitset<22>(value);
+    break;
+  case 23:
+    ss << std::bitset<23>(value);
+    break;
+  case 24:
+    ss << std::bitset<24>(value);
+    break;
+  case 25:
+    ss << std::bitset<25>(value);
+    break;
+  case 26:
+    ss << std::bitset<26>(value);
+    break;
+  case 27:
+    ss << std::bitset<27>(value);
+    break;
+  case 28:
+    ss << std::bitset<28>(value);
+    break;
+  case 29:
+    ss << std::bitset<29>(value);
+    break;
+  case 30:
+    ss << std::bitset<30>(value);
+    break;
+  case 31:
+    ss << std::bitset<31>(value);
+    break;
+  case 32:
+    ss << std::bitset<32>(value);
+    break;
   default:
     if ((value > 0xFFFFFFFF) && (size > 32)) {
       ss << std::bitset<64>(value);

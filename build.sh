@@ -103,9 +103,9 @@ run_ninja() {
 #### Parse arguments ####
 
 # Loop over command line arguments and update script variables
-CMAKE_FLAGS_SUPER="-DCMAKE_C_COMPILER=clang -DCMAKE_CXX_COMPILER=clang++ \
-    -DLLVM_ENABLE_LLD=ON" 
-CMAKE_FLAGS_LLVM="$CMAKE_FLAGS_SUPER -DLLVM_CCACHE_BUILD=ON" 
+CMAKE_COMPILERS="-DCMAKE_C_COMPILER=clang -DCMAKE_CXX_COMPILER=clang++"
+CMAKE_EXTRA_LLVM="" 
+CMAKE_EXTRA_POLYGEIST="" 
 ENABLE_TESTS=0
 FORCE_CMAKE=0
 PARSE_NUM_THREADS=0
@@ -120,8 +120,9 @@ do
     else
       case "$arg" in 
           "--disable-build-opt" | "-o")
-              CMAKE_FLAGS_LLVM=""
-              CMAKE_FLAGS_SUPER=""
+              CMAKE_COMPILERS=""
+              CMAKE_EXTRA_LLVM="-DLLVM_CCACHE_BUILD=ON -DLLVM_USE_LINKER=lld"
+              CMAKE_EXTRA_POLYGEIST="-DPOLYGEIST_USE_LINKER=lld"
               ;;
           "--force-cmake" | "-f")
               FORCE_CMAKE=1
@@ -164,8 +165,7 @@ if should_run_cmake ; then
       -DLLVM_ENABLE_PROJECTS="mlir;clang" \
       -DLLVM_TARGETS_TO_BUILD="host" \
       -DCMAKE_BUILD_TYPE=$BUILD_TYPE \
-      -DLLVM_ENABLE_ASSERTIONS=ON \
-      $CMAKE_FLAGS_LLVM
+      $CMAKE_COMPILERS $CMAKE_EXTRA_LLVM
   exit_on_fail "Failed to cmake polygeist/llvm-project"
 fi
 
@@ -186,9 +186,7 @@ if should_run_cmake ; then
       -DCLANG_DIR=$PWD/../llvm-project/build/lib/cmake/clang \
       -DLLVM_TARGETS_TO_BUILD="host" \
       -DCMAKE_BUILD_TYPE=$BUILD_TYPE \
-      -DLLVM_ENABLE_ASSERTIONS=ON \
-      -Wno-dev \
-      $CMAKE_FLAGS_SUPER
+      $CMAKE_COMPILERS $CMAKE_EXTRA_POLYGEIST
   exit_on_fail "Failed to cmake polygeist"
 fi
 
@@ -209,11 +207,10 @@ if should_run_cmake ; then
   cmake -G Ninja .. \
       -DMLIR_DIR=polygeist/llvm-project/build/lib/cmake/mlir \
       -DLLVM_DIR=polygeist/llvm-project/build/lib/cmake/llvm \
+      -DLLVM_TARGETS_TO_BUILD="host" \
       -DCMAKE_BUILD_TYPE=$BUILD_TYPE \
-      -DLLVM_ENABLE_ASSERTIONS=ON \
-      -DCMAKE_EXPORT_COMPILE_COMMANDS=ON \
       -DBUILD_VISUAL_DATAFLOW=$BUILD_VISUAL_DATAFLOW \
-      $CMAKE_FLAGS_SUPER
+      $CMAKE_COMPILERS
   exit_on_fail "Failed to cmake dynamatic"
 fi
 
@@ -247,6 +244,7 @@ chmod +x tools/dynamatic/scripts/compile.sh
 chmod +x tools/dynamatic/scripts/write-hdl.sh
 chmod +x tools/dynamatic/scripts/simulate.sh
 chmod +x tools/dynamatic/scripts/synthesize.sh
+chmod +x tools/dynamatic/scripts/visualize.sh
 
 echo ""
 echo_subsection "Build successful!"

@@ -3,7 +3,7 @@
 This tutorial will walk you through the compilation of a simple kernel function written in C into an equivalent VHDL design, the functional verification of the resulting dataflow circuit using Modelsim, and the latter's visualization using our custom interactive dataflow visualizer. The tutorial assumes basic knowledge of dataflow circuits but does not require any insight into MLIR or compilers in general.
 
 Below are some technical details about this tutorial.
-- All resources are located in the repository's [`tutorials/UsingDynamatic`](https://github.com/EPFL-LAP/dynamatic/tree/main/tutorials/UsingDynamatic) folder.
+- All resources are located in the repository's [`tutorials/Introduction/UsingDynamatic`](../../../tutorials/Introduction/UsingDynamatic) folder.
 - All relative paths mentionned throughout the tutorial are assumed to start at Dynamatic's top-level folder.
 - We assume that you have already built Dynamatic from source using the instructions in the top-level [README](../../../README.md) or that you have access to a Docker container that has a pre-built version of Dynamatic . 
 
@@ -19,22 +19,22 @@ In this tutorial, we will tranform the following C function (the *kernel*, in DH
 
 ```c
 // The number of loop iterations
-#define N 8
+#define N 10
 
 // The kernel under consideration
-unsigned loop_accumulate() {
+unsigned loop_accumulate(in_int_t a[N]) {
   unsigned x = 2;
   for (unsigned i = 0; i < N; ++i) {
-    if ((i & 1) == 0)
+    if (a[i] == 0)
       x = x * x;
   }
   return x;
 }
 ```
 
-This simple argument-less kernel multiplies a number by itself at each even iteration of a simple loop from 0 to any number `N`. The function returns the accumulated value after the loop exits. Note that this function is purposefully very simple so that it corresponds to a small dataflow circuit that will be easier to visually explore later on. Dynamatic is capable of transforming much more complex functions into fast and functional dataflow circuits.
+This simple kernel multiplies a number by itself at each iteration of a simple loop from 0 to any number `N` where the corresponding element of an array equals 0. The function returns the accumulated value after the loop exits. Note that this function is purposefully very simple so that it corresponds to a small dataflow circuit that will be easier to visually explore later on. Dynamatic is capable of transforming much more complex functions into fast and functional dataflow circuits.
 
-You can find the source code of this function in [`tutorials/UsingDynamatic/loop_accumulate.c`](../../../tutorials/UsingDynamatic/loop_accumulate.c). You will notice the `main` function in the file, which allows one to run the C kernel with user-provided arguments (of which there are none here since the kernel is argument-less). The `CALL_KERNEL` macro in `main`'s body, as its name indicates, calls the kernel while allowing us to automatically run code prior to and/or after the call. For example, this is used during C/VHDL co-verification to automatically write the C function's reference output to a file to later compare it with the generated VHDL design's output.
+You can find the source code of this function in [`tutorials/Introduction/UsingDynamatic/loop_accumulate.c`](../../../tutorials/Introduction/UsingDynamatic/loop_accumulate.c). You will notice the `main` function in the file, which allows one to run the C kernel with user-provided arguments. The `CALL_KERNEL` macro in `main`'s body, as its name indicates, calls the kernel while allowing us to automatically run code prior to and/or after the call. For example, this is used during C/VHDL co-verification to automatically write the C function's reference output to a file to later compare it with the generated VHDL design's output.
 
 Now that we are familiar with the source code, we can move on to generating a matching dataflow circuit! 
 
@@ -57,10 +57,10 @@ This will print the frontend's header and display a prompt where you can start i
 dynamatic> # Input your command here
 ```
 
-First, we must provide the frontend with the path to the C source file under consideration. As we mentionned in the previous section, ours is located at [`tutorials/UsingDynamatic/loop_accumulate.c`](../../../tutorials/UsingDynamatic/loop_accumulate.c), so input the following command into the frontend.
+First, we must provide the frontend with the path to the C source file under consideration. As we mentionned in the previous section, ours is located at [`tutorials/Introduction/UsingDynamatic/loop_accumulate.c`](../../../tutorials/Introduction/UsingDynamatic/loop_accumulate.c), so input the following command into the frontend.
 
 ```sh
-dynamatic> set-src tutorials/UsingDynamatic/loop_accumulate.c
+dynamatic> set-src tutorials/Introduction/UsingDynamatic/loop_accumulate.c
 ```
 
 The frontend will assume that the C function to transform has the same name as the last component of the argument to `set-src` without the file extension, here `loop_accumulate`.
@@ -70,7 +70,7 @@ The first step towards generating the VHDL design is *compilation*, during which
 To compile the C function, simply input `compile`. This will call a shell script in the background that will iteratively transform the IR into an optimized dataflow circuit, storing intermediate IR forms to disk at multiple points in the process.
 
 ```
-dynamatic> set-src tutorials/UsingDynamatic/loop_accumulate.c
+dynamatic> set-src tutorials/Introduction/UsingDynamatic/loop_accumulate.c
 dynamatic> compile
 ```
 
@@ -102,9 +102,9 @@ dynamatic> compile
 [INFO] Compilation succeeded
 ```
 
-This signals that compilation succeeded. All results are placed in a folder named `out/comp` created next to the C source under consideration. In this case, it is located at `tutorials/UsingDynamatic/out/comp`. It is not necessary that you look inside this folder for this tutorial.
+This signals that compilation succeeded. All results are placed in a folder named `out/comp` created next to the C source under consideration. In this case, it is located at `tutorials/Introduction/UsingDynamatic/out/comp`. It is not necessary that you look inside this folder for this tutorial.
 
-In addition to the final optimized version of the IR (in `tutorials/UsingDynamatic/out/comp/handshake_export.mlir`), the compilation script generates an equivalent Graphviz-formatted file (`tutorials/UsingDynamatic/out/comp/loop_accumulate.dot`) which serves as input to our VHDL backend, which we can now call using the `write-hdl` command.
+In addition to the final optimized version of the IR (in `tutorials/Introduction/UsingDynamatic/out/comp/handshake_export.mlir`), the compilation script generates an equivalent Graphviz-formatted file (`tutorials/Introduction/UsingDynamatic/out/comp/loop_accumulate.dot`) which serves as input to our VHDL backend, which we can now call using the `write-hdl` command.
 
 ```
 ...
@@ -115,7 +115,7 @@ dynamatic> write-hdl
 [INFO] HDL generation succeeded
 ```
 
-The command looks for the Graphviz-formatted version of our circuit (`tutorials/UsingDynamatic/out/comp/loop_accumulate.dot`) generated by the compile command and transforms it into a synthesizable VHDL design (`tutorials/UsingDynamatic/out/comp/loop_accumulate.vhd`) corresponding to the C kernel. This design can finally be co-simulated along the C function on Modelsim to verify that their behavior matches using the `simulate` command.
+The command looks for the Graphviz-formatted version of our circuit (`tutorials/Introduction/UsingDynamatic/out/comp/loop_accumulate.dot`) generated by the compile command and transforms it into a synthesizable VHDL design (`tutorials/Introduction/UsingDynamatic/out/comp/loop_accumulate.vhd`) corresponding to the C kernel. This design can finally be co-simulated along the C function on Modelsim to verify that their behavior matches using the `simulate` command.
 
 ```
 ...
@@ -128,21 +128,21 @@ dynamatic> simulate
 [INFO] Simulation succeeded
 ```
 
-Similarly to `compile`, this creates a folder `out/sim` next to the C source under consideration. In this case, it is located at `tutorials/UsingDynamatic/out/sim`. While it is not necessary that you look inside this folder for this tutorial, just know that it contains everything necessary to co-simulate the design (input C function and VHDL entity values, auto-generated testbench, full implementation of all dataflow components, etc.) and everything generated by the co-simulation process (output C function and VHDL entitiy values, VHDL compilation logs, full waveform). `[INFO] Simulation suceeded` indicates that the C function and VHDL design showcased the same behavior. Since `loop_accumulate` has no arguments, this just means that their return values were the same after execution or simulation, respectively. When verifying a kernel with arguments, `simulate` would use argument values as set in the `main` function next to the kernel as input values for VHDL simulation. If any arguments were pointers to memory regions, `simulate` would also check that the state of these memories is the name after the C kernel call and after VHDL simulation.
+Similarly to `compile`, this creates a folder `out/sim` next to the C source under consideration. In this case, it is located at `tutorials/Introduction/UsingDynamatic/out/sim`. While it is not necessary that you look inside this folder for this tutorial, just know that it contains everything necessary to co-simulate the design (input C function and VHDL entity values, auto-generated testbench, full implementation of all dataflow components, etc.) and everything generated by the co-simulation process (output C function and VHDL entitiy values, VHDL compilation logs, full waveform). `[INFO] Simulation suceeded` indicates that the C function and VHDL design showcased the same behavior. This just means that their return values were the same after execution or simulation, respectively, on kernel inputs computed in the `main` function. If any arguments were pointers to memory regions, `simulate` would also check that the state of these memories is the name after the C kernel call and after VHDL simulation.
 
 That's it, you have successfully synthesized your first dataflow circuit from C code and functionnaly verified it using Dynamatic! 
 
-At this point, you can quit the Dynamatic frontend by inputting the `exit` command. If you would like to re-run these commands all at once, note that it is possible to use the frontend in a non-interactive way by writing the sequence of commands you would like to run in a file and referencing it when launching the frontend. One such file has already been created for you at [`tutorials/UsingDynamatic/frontend-script.sh`](../../../tutorials/UsingDynamatic/frontend-script.sh). You can replay this whole section by running the following from Dynamatic's top-level folder.
+At this point, you can quit the Dynamatic frontend by inputting the `exit` command. If you would like to re-run these commands all at once, note that it is possible to use the frontend in a non-interactive way by writing the sequence of commands you would like to run in a file and referencing it when launching the frontend. One such file has already been created for you at [`tutorials/Introduction/UsingDynamatic/frontend-script.sh`](../../../tutorials/Introduction/UsingDynamatic/frontend-script.sh). You can replay this whole section by running the following from Dynamatic's top-level folder.
 
 ```sh
-./bin/dynamatic --run tutorials/UsingDynamatic/frontend-script.sh
+./bin/dynamatic --run tutorials/Introduction/UsingDynamatic/frontend-script.sh
 ```
 
 In the last section of this tutorial, we will take a closer look at the actual circuit that was generated by Dynamatic and visualize its execution interactively. 
 
 ## Visualizing the resulting dataflow circuit
 
-At the end of the last section, you used the `simulate` command to co-simulate the VHDL design obtained from the compilation flow along with the C source. This process generated a waveform file at `tutorials/UsingDynamatic/out/sim/HLS_VERIFY/vsim.wlf` containing all state transitions that happened during simulation for all signals. After a simple pre-processing step using the frontend's `visualize` command, we will be able to visualize these transitions on a graphical representation of our circuit to get more insights into how our dataflow circuit behaves.
+At the end of the last section, you used the `simulate` command to co-simulate the VHDL design obtained from the compilation flow along with the C source. This process generated a waveform file at `tutorials/Introduction/UsingDynamatic/out/sim/HLS_VERIFY/vsim.wlf` containing all state transitions that happened during simulation for all signals. After a simple pre-processing step using the frontend's `visualize` command, we will be able to visualize these transitions on a graphical representation of our circuit to get more insights into how our dataflow circuit behaves.
 
 To generate the information needed by the visualizer, re-open the frontend, re-set the source, then input the `visualize` command.
 
@@ -153,7 +153,7 @@ $ ./bin/dynamatic
 ==================== EPFL-LAP - <release> | <release-date> =====================
 ================================================================================
 
-dynamatic> set-src tutorials/UsingDynamatic/loop_accumulate.c
+dynamatic> set-src tutorials/Introduction/UsingDynamatic/loop_accumulate.c
 dynamatic> visualize
 [INFO] Generated channel changes
 [INFO] Added positioning info. to DOT
@@ -163,11 +163,11 @@ dynamatic> exit
 Goodbye!
 ```
 
-We do not have to re-run the previous synthesis steps because the data expected by the `visualize` command is still present on disk in the output folders generated by `compile` and `simulate`. `visualize` creates a folder `out/visual` next to the source file (here `tutorials/UsingDynamatic/out/visual`) containing the data expected by the visualizer as input, which is a different binary you have to launch manually.
+We do not have to re-run the previous synthesis steps because the data expected by the `visualize` command is still present on disk in the output folders generated by `compile` and `simulate`. `visualize` creates a folder `out/visual` next to the source file (here `tutorials/Introduction/UsingDynamatic/out/visual`) containing the data expected by the visualizer as input, which is a different binary you have to launch manually.
 
 Now launch the dataflow visualizer. At this point of development, we only offer a pre-built version working on 64-bits Linux and distributed separately from the repository. Instructions for how to compile the visualizer yourself will come in the future.
 
-On the main menu, the visualizer prompts you to indicate the path to a DOT file and a CSV file to render the visualization. These are the files we just generated using the `visualize` command, they are located respectively at `tutorials/UsingDynamatic/out/visual/loop_accumulate.dot` and `tutorials/UsingDynamatic/out/visual/sim.csv`. The Graphviz-formatted DOT file contains a description of the circuit we just generated, while the CSV file is a simplified version of Modelsim's waveform output and models a sequence of dataflow channel state changes at each cycle. Click on each button to open a file explorer from which you can find each file, then click `Draw graph` to generate the circuit's visualization.
+On the main menu, the visualizer prompts you to indicate the path to a DOT file and a CSV file to render the visualization. These are the files we just generated using the `visualize` command, they are located respectively at `tutorials/Introduction/UsingDynamatic/out/visual/loop_accumulate.dot` and `tutorials/Introduction/UsingDynamatic/out/visual/sim.csv`. The Graphviz-formatted DOT file contains a description of the circuit we just generated, while the CSV file is a simplified version of Modelsim's waveform output and models a sequence of dataflow channel state changes at each cycle. Click on each button to open a file explorer from which you can find each file, then click `Draw graph` to generate the circuit's visualization.
 
 You should now see a visual representation of the dataflow circuit you just synthesized. It is basically a graph, where each node represents some kind of dataflow component and each directed edge represents a dataflow channel, which is a combination of two 1-bit signals and of an optional bus.
 - A `valid` wire, going in the same direction as the edge (*downstream*).  
@@ -182,7 +182,7 @@ During execution of the circuit, each combination of the `valid`/`ready` wires--
 
 Let's now take a closer look at the nodes. They each have a unique name inherited from the MLIR-formatted IR that was used to generate the input DOT file to begin with, and are grouped together based on the basic block they belong to. These are the same basic blocks used to represent control-free sequences of instructions in classical compilers. In this example, the original source code had 5 basic blocks, which are transcribed here in 5 labeled rectangular boxes.
 
-> [!TIP] Question  
+> [!TIP]
 > Two of these basic blocks represent the start and end of the kernel before and after the loop, respectively. The other 3 hold the loop's logic. Try to identify which is which from the nature of the nodes and from their connections. Consider that the loop may have been slightly transformed by Dynamatic to optimize the resulting circuit. 
 
 Now that we have gotten familiar with the circuit representation, it is time to see it execute! There are several interactive elements at the bottom of the window that you can play with to see data flow through the circuit.
@@ -191,9 +191,9 @@ Now that we have gotten familiar with the circuit representation, it is time to 
 - As their name indicates, `Prev cycle` and `Next cycle` will move backward or forward in time by one cycle, respectively.
 - The `Cycle: ` textbox lets you enter a cycle number directly, which the visualizer then jumps to.
 
-> [!TIP] Question  
-> Observe the circuit executes using the interactive controls at the bottom of the window. At cycle 7, for example, you can see that tokens are transferred on both input channels of `muli0` in `block2`. Try to infer the multiplier's latency by looking at its output channel in the next execution cycles. Then, try to track that output token through the circuit to see where it can end up. Study the execution till you get an understanding of how tokens flow inside the loop and of how the conditional multiplication influences the latency of each loop iteration.
+> [!TIP]
+> Observe the circuit executes using the interactive controls at the bottom of the window. On cycle 6, for example, you can see that tokens are transferred on both input channels of `muli0` in `block2`. Try to infer the multiplier's latency by looking at its output channel in the next execution cycles. Then, try to track that output token through the circuit to see where it can end up. Study the execution till you get an understanding of how tokens flow inside the loop and of how the conditional multiplication influences the latency of each loop iteration.
 
 ## Conclusion
 
-**TODO**
+Congratulations on reaching the end of this tutorial! You now have a better idea of how to very easily use Dynamatic to compile C kernels into functional dataflow circuits, then visualize these circuits to better understand them and identify potential optimization opportunities.  
