@@ -1,0 +1,40 @@
+{
+  "speculator": {
+    "operation-name": "cond_br1",
+    "operand-idx": 1
+  },
+  "saves": [
+    {
+      "operation-name": "cond_br1",
+      "operand-idx": 0
+    },
+    {
+      "operation-name": "cond_br2",
+      "operand-idx": 0
+    }
+  ],
+  "commits": [
+    {
+      "operation-name": "end0",
+      "operand-idx": 0
+    },
+    {
+      "operation-name": "end0",
+      "operand-idx": 1
+    },
+    {
+      "operation-name": "end0",
+      "operand-idx": 2
+    },
+    {
+      "operation-name": "end0",
+      "operand-idx": 3
+    },
+    {
+      "operation-name": "end0",
+      "operand-idx": 4
+    }
+  ],
+  "save-commits": [
+  ]
+}
