@@ -7,18 +7,31 @@
 //
 //===----------------------------------------------------------------------===//
 //
-// Buffer placement in Handshake functions, taking a list of
-// predecessor:successor pairs, for example "mux1:add1 mux2:add2"
+// Buffer placement pass in Handshake functions, it takes the location (i.e.,
+// the predecessor, and which output channel of it), type (i.e., opaque or
+// transparent), and slots of the buffer that should be placed.
 //
+// This pass facilitates externally prototyping a custom buffer placement
+// analysis, e.g., in Python. This also makes the results of some research
+// artifacts (e.g., Mapbuf) developed in Python easily reproducible in the
+// current Dynamatic framework.
+//
+// Currently, this pass only supports adding units for a IR that is already
+// materized (i.e., each value is produced by exactly one producer, and consumed
+// by exactly one consumer). For future work on unmaterialized IRs, we need to
+// supply the producer--consumer pair as arguments
 //===----------------------------------------------------------------------===//
 
-#include "experimental/Transforms/HandshakePlaceBuffersCustom.h"
 #include "dynamatic/Analysis/NameAnalysis.h"
 #include "dynamatic/Dialect/Handshake/HandshakeDialect.h"
 #include "dynamatic/Dialect/Handshake/HandshakeOps.h"
 #include "dynamatic/Support/Attribute.h"
 #include "dynamatic/Support/CFG.h"
 #include "dynamatic/Support/Logging.h"
+#include "experimental/Transforms/HandshakePlaceBuffersCustom.h"
+#include "mlir/IR/BuiltinTypes.h"
+#include "mlir/IR/OperationSupport.h"
+#include "llvm/ADT/StringRef.h"
 
 using namespace llvm;
 using namespace dynamatic;
@@ -44,49 +57,49 @@ struct HandshakePlaceBuffersCustomPass
   void runDynamaticPass() override {
     mlir::ModuleOp modOp = getOperation();
     MLIRContext *ctx = &getContext();
+
+    // Check if the IR is after being materialized, if not, reject the input
+    // IR.
     if (failed(verifyIRMaterialized(modOp))) {
       modOp->emitError() << ERR_NON_MATERIALIZED_MOD;
-      return;
+      return signalPassFailure();
     }
 
     OpBuilder builder(ctx);
-    for (handshake::FuncOp funcOp : modOp.getOps<handshake::FuncOp>())
-      for (Operation &op : funcOp.getOps()) {
-        if (getUniqueName(&op).str() == pred) {
-          assert(outid <= op.getNumResults() &&
-                 "The output id exceeds the number of output ports!");
-          Value channel = op.getResult(outid);
-          // Set the insertion point to be before the original successor of the
-          // channel.
-          Operation *succ = channel.getUses().begin()->getOwner();
-          builder.setInsertionPoint(succ);
-	  // if the specified type is "oehb", then we add a Opaque buffer with number of slots = slots.
-          if (type == "oehb") {
-            auto bufOp = builder.create<handshake::OEHBOp>(channel.getLoc(),
-                                                           channel, slots);
-            inheritBB(succ, bufOp);
-            Value bufferRes = bufOp.getResult();
-            succ->replaceUsesOfWith(channel, bufferRes);
-	  // if the specified type is "tehb", then we add a Transparent buffer with number of slots = slots.
-          } else if (type == "tehb") {
-            auto bufOp = builder.create<handshake::TEHBOp>(channel.getLoc(),
-                                                           channel, slots);
-            inheritBB(succ, bufOp);
-            Value bufferRes = bufOp.getResult();
-            succ->replaceUsesOfWith(channel, bufferRes);
-          } else {
-    		llvm::errs() << "Unknown buffer type: \"" << type << "\"!\n";
-    	return signalPassFailure();
-
-	  }
-          return;
-        }
-      }
-
-    llvm::errs() << "The unit " << pred
-                 << "does not exist in the dataflow graph!"
-                 << "\n";
-    return signalPassFailure();
+    NameAnalysis &namer = getAnalysis<NameAnalysis>();
+    Operation *op = namer.getOp(pred);
+    if (!op) {
+      llvm::errs() << "No operation named \"" << pred << "\" exists\n";
+      return signalPassFailure();
+    }
+    assert(outid <= op->getNumResults() &&
+           "The output id exceeds the number of output ports!");
+    Value channel = op->getResult(outid);
+    // Set the insertion point to be before the original successor of the
+    // channel.
+    Operation *succ = *channel.getUsers().begin();
+    builder.setInsertionPoint(succ);
+    StringAttr slotName = StringAttr::get(ctx, "slots");
+    StringRef bufOpType;
+    if (type == "oehb") {
+      // if the specified type is "oehb", then we add a Opaque buffer with
+      // number of slots = slots.
+      bufOpType = handshake::OEHBOp::getOperationName();
+    } else if (type == "tehb") {
+      // If the specified type is "tehb", then we add a Transparent buffer
+      // with number of slots = slots.
+      bufOpType = handshake::TEHBOp::getOperationName();
+    } else {
+      llvm::errs() << "Unknown buffer type: \"" << type << "\"!\n";
+      return signalPassFailure();
+    }
+    NamedAttribute namedSlots(slotName, builder.getI32IntegerAttr(slots));
+    auto *bufOp =
+        builder.create(channel.getLoc(), StringAttr::get(ctx, bufOpType),
+                       channel, {channel.getType()}, {namedSlots});
+    inheritBB(succ, bufOp);
+    Value bufferRes = bufOp->getResult(0);
+    succ->replaceUsesOfWith(channel, bufferRes);
   }
 };
 } // namespace
