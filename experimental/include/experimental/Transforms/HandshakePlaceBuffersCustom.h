@@ -1,4 +1,4 @@
-//===- HandshakePlaceBuffers.h - Place buffers in DFG -----------*- C++ -*-===//
+//===- HandshakePlaceBuffersCustom.h - Place buffers in DFG -----------*- C++ -*-===//
 //
 // Dynamatic is under the Apache License v2.0 with LLVM Exceptions.
 // See https://llvm.org/LICENSE.txt for license information.
@@ -10,8 +10,8 @@
 //
 //===----------------------------------------------------------------------===//
 
-#ifndef DYNAMATIC_TRANSFORMS_BUFFERPLACEMENT_PLACEBUFFERS_CUSTOM_H
-#define DYNAMATIC_TRANSFORMS_BUFFERPLACEMENT_PLACEBUFFERS_CUSTOM_H
+#ifndef EXPERIMENTAL_TRANSFORMS_BUFFERPLACEMENT_PLACEBUFFERS_CUSTOM_H
+#define EXPERIMENTAL_TRANSFORMS_BUFFERPLACEMENT_PLACEBUFFERS_CUSTOM_H
 
 #include "dynamatic/Dialect/Handshake/HandshakeOps.h"
 #include "dynamatic/Support/DynamaticPass.h"
@@ -50,4 +50,4 @@ std::unique_ptr<dynamatic::DynamaticPass> createHandshakePlaceBuffersCustom(
 } // namespace experimental
 } // namespace dynamatic
 
-#endif // DYNAMATIC_TRANSFORMS_BUFFERPLACEMENT_PLACEBUFFERS_CUSTOM_H
+#endif // EXPERIMENTAL_TRANSFORMS_BUFFERPLACEMENT_PLACEBUFFERS_CUSTOM_H

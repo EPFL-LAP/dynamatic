@@ -63,8 +63,6 @@ def HandshakePlaceBuffersCustom : DynamaticPass<"handshake-placebuffers-custom">
   	Option<"slots", "slots", "unsigned", "", "num of slots of buffer, range: anything > 0">,
   	Option<"type", "type", "std::string", "", "type of buffer, can be either oehb or tehb">
   ];
-
-
 }
 
 
