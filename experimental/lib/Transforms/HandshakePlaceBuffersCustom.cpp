@@ -27,10 +27,9 @@
 #include "dynamatic/Dialect/Handshake/HandshakeOps.h"
 #include "dynamatic/Support/Attribute.h"
 #include "dynamatic/Support/CFG.h"
-#include "dynamatic/Support/Logging.h"
+#include "dynamatic/Transforms/HandshakeMaterialize.h"
 #include "experimental/Transforms/HandshakePlaceBuffersCustom.h"
-#include "mlir/IR/BuiltinTypes.h"
-#include "mlir/IR/OperationSupport.h"
+#include "mlir/Dialect/Func/IR/FuncOps.h"
 #include "llvm/ADT/StringRef.h"
 
 using namespace llvm;
