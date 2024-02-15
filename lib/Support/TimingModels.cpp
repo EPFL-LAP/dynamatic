@@ -54,7 +54,8 @@ unsigned dynamatic::getOpDatawidth(Operation *op) {
                 mergeLikeOp.getDataOperands().front().getType());
           })
       .Case<handshake::BufferOpInterface, handshake::ForkOp,
-            handshake::LazyForkOp, handshake::BranchOp, handshake::SinkOp, handshake::SyncOp>(
+            handshake::LazyForkOp, handshake::BranchOp, handshake::SinkOp,
+            handshake::SyncOp>(
           [&](auto) { return getTypeWidth(op->getOperand(0).getType()); })
       .Case<handshake::ConditionalBranchOp>(
           [&](handshake::ConditionalBranchOp condOp) {

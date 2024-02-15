@@ -16,16 +16,16 @@
 #ifndef EXPERIMENTAL_INCLUDE_DYNAMATIC_TRANSFORMS_RESOURCESHARING_SCC_H
 #define EXPERIMENTAL_INCLUDE_DYNAMATIC_TRANSFORMS_RESOURCESHARING_SCC_H
 
-#include <set>
+#include <algorithm>
 #include <list>
+#include <set>
 #include <stack>
 #include <vector>
-#include <algorithm>
 
-#include "mlir/IR/Operation.h"
-#include "llvm/ADT/SmallVector.h"
 #include "dynamatic/Support/CFG.h"
 #include "experimental/Support/StdProfiler.h"
+#include "mlir/IR/Operation.h"
+#include "llvm/ADT/SmallVector.h"
 
 namespace dynamatic {
 namespace experimental {
@@ -35,7 +35,9 @@ namespace sharing {
 std::vector<int> Kosarajus_algorithm_BBL(SmallVector<ArchBB> archs);
 
 // different implementation: performed on operation level
-void Kosarajus_algorithm_OPL(mlir::Operation* startOp, handshake::FuncOp *funcOp, std::set<mlir::Operation*>& result);
+void Kosarajus_algorithm_OPL(mlir::Operation *startOp,
+                             handshake::FuncOp *funcOp,
+                             std::set<mlir::Operation *> &result);
 
 } // namespace sharing
 } // namespace experimental
