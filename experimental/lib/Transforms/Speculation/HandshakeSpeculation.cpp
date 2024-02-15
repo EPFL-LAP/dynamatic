@@ -131,6 +131,9 @@ void HandshakeSpeculationPass::routeCommitControl(
   if (!markedPath.contains(currOp))
     return;
 
+  // Remove operation from the set to avoid visiting it twice
+  markedPath.erase(currOp);
+
   if (auto commitOp = dyn_cast<handshake::SpecCommitOp>(currOp)) {
     // Connect commit to the correct control signal and end traversal
     commitOp.setOperand(1, ctrlSignal);
@@ -168,7 +171,6 @@ void HandshakeSpeculationPass::routeCommitControl(
         routeCommitControl(markedPath, ctrl, succOp);
       }
     }
-
   } else {
     // Continue Traversal
     for (Operation *succOp : currOp->getUsers()) {
