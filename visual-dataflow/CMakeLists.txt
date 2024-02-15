@@ -4,7 +4,13 @@ include_directories(${CMAKE_CURRENT_SOURCE_DIR}/godot-cpp/gdextension)
 
 add_subdirectory(godot-cpp)
 
-set(GODOT_LIB_NAME "visual_dataflow.linux.template_debug.x86_64")
+# Set Godot lib name
+if(CMAKE_BUILD_TYPE MATCHES Release)
+  set(GODOT_LIB_NAME "VisualDataflow.linux.release.x86_64")
+else()
+  set(GODOT_LIB_NAME "VisualDataflow.linux.debug.x86_64")
+endif()
+
 set(CMAKE_LIBRARY_OUTPUT_DIRECTORY "${CMAKE_CURRENT_SOURCE_DIR}/build/")
 
 add_library(${GODOT_LIB_NAME}
