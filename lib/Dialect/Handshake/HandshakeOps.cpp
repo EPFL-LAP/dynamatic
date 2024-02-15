@@ -1605,6 +1605,16 @@ LogicalResult ReturnOp::inferReturnTypes(
   return success();
 }
 
+LogicalResult SyncOp::inferReturnTypes(
+    MLIRContext *context, std::optional<Location> location, ValueRange operands,
+    DictionaryAttr attributes, mlir::OpaqueProperties properties,
+    mlir::RegionRange regions,
+    SmallVectorImpl<mlir::Type> &inferredReturnTypes) {
+  auto types = operands.getTypes();
+  inferredReturnTypes.append(types.begin(), types.end());
+  return success();
+}
+
 LogicalResult ReturnOp::verify() {
   auto funcOp = getOperation()->getParentOfType<handshake::FuncOp>();
   if (!funcOp)
