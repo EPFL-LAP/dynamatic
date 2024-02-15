@@ -13,6 +13,7 @@ target_link_libraries(dynamatic-opt
   DynamaticLowerScfToCf
   DynamaticBufferPlacement
   DynamaticSpeculation
+  ResourceSharingFCCM22
   DynamaticCfToHandshake
   DynamaticHandshake
   DynamaticHandshakeToNetlist

@@ -1,5 +1,7 @@
-add_dynamatic_library(DynamaticExperimentalTransforms
-  HandshakeFixArgNames.cpp
+add_dynamatic_library(ResourceSharingFCCM22
+  FCCM22Sharing.cpp
+  SCC.cpp
+  SharingSupport.cpp
 
   DEPENDS
   DynamaticExperimentalTransformsPassIncGen
@@ -10,9 +12,7 @@ add_dynamatic_library(DynamaticExperimentalTransforms
   MLIRFuncDialect
   MLIRSupport
   MLIRTransformUtils
+  DynamaticHandshake
   DynamaticSupport
-  DynamaticAnalysis
+  DynamaticExperimentalSupport
 )
-
-add_subdirectory(Speculation)
-add_subdirectory(ResourceSharing)
