@@ -1,5 +1,6 @@
 add_dynamatic_library(DynamaticExperimentalTransforms
   HandshakeFixArgNames.cpp
+  HandshakePlaceBuffersCustom.cpp
 
   DEPENDS
   DynamaticExperimentalTransformsPassIncGen

@@ -17,6 +17,7 @@
 #include "dynamatic/Support/LLVM.h"
 #include "experimental/Transforms/HandshakeFixArgNames.h"
 #include "experimental/Transforms/Speculation/HandshakeSpeculation.h"
+#include "experimental/Transforms/HandshakePlaceBuffersCustom.h"
 #include "mlir/Pass/Pass.h"
 
 namespace dynamatic {
