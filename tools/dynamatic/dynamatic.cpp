@@ -420,11 +420,6 @@ CommandResult SetSrc::decode(SmallVector<std::string> &tokens) {
     return CommandResult::FAIL;
   }
 
-  if (!fs::exists(sourcePath)) {
-    llvm::outs() << ERR << "File '" << sourcePath << "' does not exist.\n";
-    return CommandResult::FAIL;
-  }
-
   state.sourcePath = state.makeAbsolutePath(sourcePath);
   return CommandResult::SUCCESS;
 }
@@ -464,14 +459,6 @@ CommandResult WriteHDL::decode(SmallVector<std::string> &tokens) {
   std::string kernelDir = path::parent_path(*state.sourcePath).str();
   std::string kernelName = path::filename(*state.sourcePath).drop_back(2).str();
   std::string outputDir = kernelDir + sep.str() + "out";
-  std::string dotPath = kernelDir + sep.str() + "out" + sep.str() + "comp" +
-                        sep.str() + kernelName + ".dot";
-
-  // The DOT file must exist to produce the corresponding VHDL
-  if (!fs::exists(dotPath)) {
-    llvm::outs() << ERR << "File '" << dotPath << "' does not exist.";
-    return CommandResult::FAIL;
-  }
 
   // Create and execute the command
   return execShellCommand(state.getScriptsPath() + "/write-hdl.sh " +
@@ -492,14 +479,6 @@ CommandResult Simulate::decode(SmallVector<std::string> &tokens) {
   std::string kernelDir = path::parent_path(*state.sourcePath).str();
   std::string kernelName = path::filename(*state.sourcePath).drop_back(2).str();
   std::string outputDir = kernelDir + sep.str() + "out";
-  std::string vhdlPath = kernelDir + sep.str() + "out" + sep.str() + "comp" +
-                         sep.str() + kernelName + ".vhd";
-
-  // The VHDL file must exist to produce the corresponding VHDL
-  if (!fs::exists(vhdlPath)) {
-    llvm::outs() << ERR << "File '" << vhdlPath << "' does not exist.";
-    return CommandResult::FAIL;
-  }
 
   // Create and execute the command
   return execShellCommand(state.getScriptsPath() + "/simulate.sh " +
@@ -525,17 +504,6 @@ CommandResult Visualize::decode(SmallVector<std::string> &tokens) {
   std::string wlfPath = kernelDir + sep.str() + "out" + sep.str() + "sim" +
                         sep.str() + "HLS_VERIFY" + sep.str() + "vsim.wlf";
 
-  // The DOT file must exist
-  if (!fs::exists(dotPath)) {
-    llvm::outs() << ERR << "File '" << dotPath << "' does not exist.";
-    return CommandResult::FAIL;
-  }
-  // The WLF file must exist
-  if (!fs::exists(wlfPath)) {
-    llvm::outs() << ERR << "File '" << wlfPath << "' does not exist.";
-    return CommandResult::FAIL;
-  }
-
   // Create and execute the command
   return execShellCommand(state.getScriptsPath() + "/visualize.sh " +
                           state.dynamaticPath + " " + dotPath + " " + wlfPath +
@@ -555,14 +523,6 @@ CommandResult Synthesize::decode(SmallVector<std::string> &tokens) {
   std::string kernelDir = path::parent_path(*state.sourcePath).str();
   std::string kernelName = path::filename(*state.sourcePath).drop_back(2).str();
   std::string outputDir = kernelDir + sep.str() + "out";
-  std::string vhdlPath = kernelDir + sep.str() + "out" + sep.str() + "comp" +
-                         sep.str() + kernelName + ".vhd";
-
-  // The DOT file must exist to produce the corresponding VHDL
-  if (!fs::exists(vhdlPath)) {
-    llvm::outs() << ERR << "File '" << vhdlPath << "' does not exist.";
-    return CommandResult::FAIL;
-  }
 
   // Create and execute the command
   return execShellCommand(state.getScriptsPath() + "/synthesize.sh " +
