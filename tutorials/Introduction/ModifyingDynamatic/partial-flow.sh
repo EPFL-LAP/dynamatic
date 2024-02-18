@@ -26,4 +26,4 @@ dot -Tpng $PATH_TO_COMP/loop_store.dot > $PATH_TO_COMP/loop_store.png
 
 # Simulate using the frontend
 ./bin/dynamatic --run \
-  tutorials/Introduction/ModifyingDynamatic/loop_accumulate_partial.sh
+  tutorials/Introduction/ModifyingDynamatic/loop-store-partial.sh
