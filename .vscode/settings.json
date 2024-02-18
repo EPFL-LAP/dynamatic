@@ -6,21 +6,6 @@
   "editor.useTabStops": true,
   "editor.formatOnSave": true,
   "editor.defaultFormatter": "llvm-vs-code-extensions.vscode-clangd",
-  // CMake configuration
-  "C_Cpp.default.configurationProvider": "ms-vscode.cmake-tools",
-  "cmake.sourceDirectory": "${workspaceFolder}",
-  "cmake.buildDirectory": "${workspaceFolder}/build",
-  "cmake.generator": "Ninja",
-  "cmake.configureArgs": [
-    "-DMLIR_DIR=${workspaceFolder}/polygeist/llvm-project/build/lib/cmake/mlir",
-    "-DLLVM_DIR=${workspaceFolder}/polygeist/llvm-project/build/lib/cmake/llvm",
-    "-DLLVM_ENABLE_ASSERTIONS=ON",
-    "-DCMAKE_EXPORT_COMPILE_COMMANDS=ON",
-    // Arguments below facultative but speed up (re)builds
-    "-DCMAKE_C_COMPILER=clang",
-    "-DCMAKE_CXX_COMPILER=clang++",
-    "-DLLVM_ENABLE_LLD=ON",
-  ],
   "files.associations": {
     "*.inc": "cpp"
   }

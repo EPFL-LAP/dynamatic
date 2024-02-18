@@ -209,6 +209,7 @@ if should_run_cmake ; then
       -DLLVM_DIR=polygeist/llvm-project/build/lib/cmake/llvm \
       -DLLVM_TARGETS_TO_BUILD="host" \
       -DCMAKE_BUILD_TYPE=$BUILD_TYPE \
+      -DCMAKE_EXPORT_COMPILE_COMMANDS="ON" \
       -DBUILD_VISUAL_DATAFLOW=$BUILD_VISUAL_DATAFLOW \
       $CMAKE_COMPILERS
   exit_on_fail "Failed to cmake dynamatic"
