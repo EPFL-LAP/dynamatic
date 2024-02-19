@@ -178,7 +178,7 @@ static LogicalResult getOpPlacements(
   auto getPlacementOps = [&](PlacementOperand &p) {
     dstOp = nameAnalysis.getOp(p.opName);
     if (!dstOp) {
-      llvm::errs() << "Operation name " << p.opName << "is not found\n";
+      llvm::errs() << "Error: operation name " << p.opName << " is not found\n";
       return failure();
     }
     srcOpResult = dstOp->getOperand(p.opIdx);
