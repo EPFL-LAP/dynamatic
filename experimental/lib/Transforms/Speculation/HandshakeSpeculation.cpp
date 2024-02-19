@@ -162,7 +162,7 @@ void HandshakeSpeculationPass::routeCommitControl(
     // branch output is non-speculative. Speculative tag of the token is
     // currently implicit, so the branch output itself is used at IR level.
     auto branchDiscardNonSpec = builder.create<handshake::SpeculatingBranchOp>(
-        branchOp.getLoc(), branchOp.getTrueResult() /* specTag */,
+        branchOp.getLoc(), mergedSpecTag /* specTag */,
         branchOp.getConditionOperand());
     inheritBB(specOp, branchDiscardNonSpec);
 
