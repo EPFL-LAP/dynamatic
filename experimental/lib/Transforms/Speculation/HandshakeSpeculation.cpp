@@ -17,6 +17,7 @@
 #include "dynamatic/Support/CFG.h"
 #include "dynamatic/Support/DynamaticPass.h"
 #include "dynamatic/Support/Logging.h"
+#include "experimental/Transforms/Speculation/PlacementFinder.h"
 #include "experimental/Transforms/Speculation/SpeculationPlacement.h"
 #include "mlir/IR/BuiltinTypes.h"
 #include "mlir/IR/OperationSupport.h"
@@ -35,8 +36,10 @@ namespace {
 struct HandshakeSpeculationPass
     : public dynamatic::experimental::speculation::impl::
           HandshakeSpeculationBase<HandshakeSpeculationPass> {
-  HandshakeSpeculationPass(const std::string &jsonPath = "") {
+  HandshakeSpeculationPass(const std::string &jsonPath = "",
+                           bool automatic = true) {
     this->jsonPath = jsonPath;
+    this->automatic = automatic;
   }
 
   void runDynamaticPass() override;
@@ -357,6 +360,13 @@ void HandshakeSpeculationPass::runDynamaticPass() {
           this->jsonPath, this->placements, nameAnalysis)))
     return signalPassFailure();
 
+  // Run automatic unit position placement finder
+  if (this->automatic) {
+    PlacementFinder finder(this->placements);
+    if (failed(finder.findPlacements()))
+      return signalPassFailure();
+  }
+
   if (failed(placeSpeculator()))
     return signalPassFailure();
 
@@ -375,6 +385,6 @@ void HandshakeSpeculationPass::runDynamaticPass() {
 
 std::unique_ptr<dynamatic::DynamaticPass>
 dynamatic::experimental::speculation::createHandshakeSpeculation(
-    const std::string &jsonPath) {
-  return std::make_unique<HandshakeSpeculationPass>(jsonPath);
+    const std::string &jsonPath, bool automatic) {
+  return std::make_unique<HandshakeSpeculationPass>(jsonPath, automatic);
 }

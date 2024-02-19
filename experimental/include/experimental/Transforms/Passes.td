@@ -47,8 +47,12 @@ def HandshakeSpeculation : DynamaticPass<"handshake-speculation"> {
   let constructor = "dynamatic::experimental::speculation::createHandshakeSpeculation()";
   let options = [
     Option<"jsonPath", "json-path", "std::string", "",
-    "Path to JSON-formatted file containing the positions for speculative "
-    "operations.">];
+           "Path to JSON-formatted file containing the positions for speculative "
+           "operations.">,
+    Option<"automatic", "automatic", "bool", "true",
+           "When the automatic mode is enabled, the speculative unit positions are "
+           "automatically detected. The speculator position still needs to be "
+           "specified in the JSON-formatted file.">];
 }
 
 def HandshakePlaceBuffersCustom : DynamaticPass<"handshake-placebuffers-custom"> {
