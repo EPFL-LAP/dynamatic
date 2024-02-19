@@ -1,5 +1,5 @@
 # Set the source file to run
-set-src             tutorials/Introduction/UsingDynamatic/loop_accumulate.c
+set-src             tutorials/Introduction/Ch1/loop_accumulate.c
 
 # Compile (from source to Handshake IR/DOT)
 # Provide the --simple-buffers flag to `compile` to use a simple buffering
@@ -11,6 +11,9 @@ write-hdl
 
 # Simulate and verify using Modelsim
 simulate
+
+# Prepare data for the dataflow visualizer
+visualize
 
 # Exit the frontend
 exit

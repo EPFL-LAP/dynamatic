@@ -28,7 +28,7 @@ WLF2CSV="$DYNAMATIC_DIR/visual-dataflow/wlf2csv.py"
 rm -rf "$VISUAL_DIR" && mkdir -p "$VISUAL_DIR"
 
 # Convert the Modelsim waveform to a CSV for the visualizer 
-python "$WLF2CSV" "$F_DOT" "$F_WLF" "$VISUAL_DIR"
+python3 "$WLF2CSV" "$F_DOT" "$F_WLF" "$VISUAL_DIR"
 exit_on_fail "Failed to generate channel changes from waveform" "Generated channel changes"
 
 # Generate a version of the DOT with positioning information

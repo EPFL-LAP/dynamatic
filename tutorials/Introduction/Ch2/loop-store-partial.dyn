@@ -1,5 +1,5 @@
 # Set the source file to run
-set-src             tutorials/Introduction/UsingDynamatic/loop_accumulate.c
+set-src             tutorials/Introduction/Ch2/loop_store.c
 
 # Generate the VHDL design corresponding to the source code
 write-hdl

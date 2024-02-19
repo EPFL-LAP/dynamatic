@@ -23,7 +23,7 @@ HLS_VERIFY_DIR="$SIM_DIR/HLS_VERIFY"
 IO_GEN_BIN="$SIM_DIR/C_SRC/$KERNEL_NAME-io-gen"
 
 # Shortcuts
-COMP_DIR="$OUTPUT_DIR/comp"
+HDL_DIR="$OUTPUT_DIR/hdl"
 CLANGXX_BIN="$DYNAMATIC_DIR/bin/clang++"
 HLS_VERIFIER_BIN="$DYNAMATIC_DIR/bin/hls-verifier"
 RESOURCE_DIR="$DYNAMATIC_DIR/tools/hls-verifier/resources"
@@ -46,8 +46,8 @@ mkdir "$DYN_INCLUDE_DIR"
 cp "$DYNAMATIC_DIR/include/dynamatic/Integration.h" "$DYN_INCLUDE_DIR"
 
 # Copy VHDL module and VHDL components to dedicated folder
-cp "$COMP_DIR/$KERNEL_NAME.vhd" "$VHDL_SRC_DIR"
-cp "$COMP_DIR/"LSQ*.v "$VHDL_SRC_DIR" 2> /dev/null
+cp "$HDL_DIR/$KERNEL_NAME.vhd" "$VHDL_SRC_DIR"
+cp "$HDL_DIR/"LSQ*.v "$VHDL_SRC_DIR" 2> /dev/null
 cp "$DYNAMATIC_DIR"/data/vhdl/*.vhd "$VHDL_SRC_DIR"
 
 # Copy sources to dedicated folder

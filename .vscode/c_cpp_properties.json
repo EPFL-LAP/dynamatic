@@ -13,16 +13,16 @@
         "${workspaceFolder}/polygeist/llvm-project/mlir/include/",
         "${workspaceFolder}/polygeist/llvm-project/build/include/",
         "${workspaceFolder}/polygeist/llvm-project/build/tools/mlir/include/",
-        "${workspaceFolder}/experimental/visual-dataflow/godot-cpp/include/",
-        "${workspaceFolder}/experimental/visual-dataflow/godot-cpp/gen/include/",
-        "${workspaceFolder}/experimental/visual-dataflow/godot-cpp/gdextension/",
+        "${workspaceFolder}/visual-dataflow/godot-cpp/include/",
+        "${workspaceFolder}/visual-dataflow/godot-cpp/gdextension/",
         "${env:GUROBI_HOME}/include/"
       ],
       "intelliSenseMode": "linux-clang-x64",
       "compilerPath": "/usr/bin/clang",
       "cStandard": "c17",
       "cppStandard": "c++17",
-      "configurationProvider": "ms-vscode.cpptools"
+      "configurationProvider": "llvm-vs-code-extensions.vscode-clangd",
+      "compileCommands": "${workspaceFolder}/build/compile_commands.json"
     }
   ],
   "version": 4

@@ -10,4 +10,5 @@ add_dynamatic_library(DynamaticSupport
   LINK_LIBS PUBLIC
   MLIRIR
   MLIRSupport
+  MLIRAffineDialect
 )

@@ -1,6 +1,6 @@
 #!/bin/bash
 
-PATH_TO_COMP="tutorials/Introduction/ModifyingDynamatic/out/comp"
+PATH_TO_COMP="tutorials/Introduction/Ch2/out/comp"
 
 # Export to DOT (visual)
 ./bin/export-dot \
@@ -25,5 +25,4 @@ dot -Tpng $PATH_TO_COMP/visual.dot > $PATH_TO_COMP/visual.png
 dot -Tpng $PATH_TO_COMP/loop_store.dot > $PATH_TO_COMP/loop_store.png
 
 # Simulate using the frontend
-./bin/dynamatic --run \
-  tutorials/Introduction/ModifyingDynamatic/loop_accumulate_partial.sh
+./bin/dynamatic --run tutorials/Introduction/Ch2/loop-store-partial.dyn
