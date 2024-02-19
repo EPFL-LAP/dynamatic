@@ -148,6 +148,16 @@ void HandshakeSpeculationPass::routeCommitControl(
     OpBuilder builder(ctx);
     builder.setInsertionPointAfterValue(ctrlSignal);
 
+    // Tokens are labeled as speculative or non-speculative according to the
+    // spec tag. Because the tag can take any of the  two branch outputs, a
+    // merge is needed. This is to be improved in the future.
+    SmallVector<Value, 2> mergeOperands;
+    mergeOperands.push_back(branchOp.getTrueResult());
+    mergeOperands.push_back(branchOp.getFalseResult());
+    auto mergedSpecTag =
+        builder.create<handshake::MergeOp>(branchOp.getLoc(), mergeOperands);
+    inheritBB(specOp, mergedSpecTag);
+
     // The speculating branch will discard the branch's condition token if the
     // branch output is non-speculative. Speculative tag of the token is
     // currently implicit, so the branch output itself is used at IR level.
