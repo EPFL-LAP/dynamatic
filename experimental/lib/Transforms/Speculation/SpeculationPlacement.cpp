@@ -81,12 +81,16 @@ void SpeculationPlacements::eraseSave(Value srcOpResult, Operation *dstOp) {
 }
 
 void SpeculationPlacements::mergeSaveCommits() {
+  PlacementList toRemove;
   for (OpPlacement p : this->saves) {
     if (containsCommit(p.srcOpResult, p.dstOp)) {
-      eraseCommit(p.srcOpResult, p.dstOp);
-      eraseSave(p.srcOpResult, p.dstOp);
+      toRemove.insert({p.srcOpResult, p.dstOp});
       addSaveCommit(p.srcOpResult, p.dstOp);
     }
+  }
+  for (OpPlacement p : toRemove) {
+    eraseSave(p.srcOpResult, p.dstOp);
+    eraseCommit(p.srcOpResult, p.dstOp);
   }
 }
 
