@@ -99,32 +99,26 @@ LogicalResult PlacementFinder::findSavePositions() {
 
 void PlacementFinder::findCommitsTraversal(llvm::DenseSet<Operation *> &visited,
                                            Operation *currOp) {
-  llvm::outs() << "Visiting " << currOp->getName() << "\n";
-
   // End traversal if currOp is already in visited set
-  if (auto [_, isNewOp] = visited.insert(currOp); !isNewOp) {
-    llvm::outs() << "ending traversal " << currOp->getName() << "\n";
+  if (auto [_, isNewOp] = visited.insert(currOp); !isNewOp)
     return;
-  }
 
   for (Value res : currOp->getResults()) {
-    llvm::outs() << "Value: " << res << "\n";
     for (Operation *succOp : res.getUsers()) {
-      succOp->emitWarning("checked succOp");
       if (placements.containsSave(res, succOp)) {
         // A Commit is needed in front of Save Operations. This will be later
         // converted into a SaveCommit for multiple loop speculation.
         placements.addCommit(res, succOp);
       } else if (isa<handshake::LSQOp, handshake::MemoryControllerOp,
                      handshake::MCStoreOp, handshake::LSQStoreOp,
-                     handshake::MCLoadOp, handshake::LSQLoadOp>(currOp)) {
+                     handshake::MCLoadOp, handshake::LSQLoadOp>(succOp)) {
         // A commit is needed in front of memory operations
         placements.addCommit(res, succOp);
-      } else if (isa<handshake::EndOp>(currOp)) {
+      } else if (isa<handshake::EndOp>(succOp)) {
         // A commit is needed in front of the end/exit operation
         placements.addCommit(res, succOp);
       } else {
-        findCommitsTraversal(visited, currOp);
+        findCommitsTraversal(visited, succOp);
       }
     }
   }
@@ -176,8 +170,7 @@ static void markSpeculativePaths(Operation *currOp,
 
 void PlacementFinder::findCommitsBetweenBBs() {
   OpPlacement specPos = placements.getSpeculatorPlacement();
-  handshake::FuncOp funcOp =
-      specPos.dstOp->getParentOfType<handshake::FuncOp>();
+  auto funcOp = specPos.dstOp->getParentOfType<handshake::FuncOp>();
   assert(funcOp && "op should have parent function");
 
   // Place commits in-between BBs
@@ -198,14 +191,19 @@ void PlacementFinder::findCommitsBetweenBBs() {
     }
   }
 
-  // Remove commits that cannot be reached
+  // Find new, shorter speculative path with the new commit units
   markedPaths.clear();
   markSpeculativePaths(specPos.dstOp, placements, markedPaths);
+
+  // Remove commits that cannot be reached
+  PlacementList toRemove;
   for (OpPlacement arc : placements.getPlacements<handshake::SpecCommitOp>()) {
     if (not markedPaths.count(arc)) {
-      placements.eraseCommit(arc.srcOpResult, arc.dstOp);
+      toRemove.insert({arc.srcOpResult, arc.dstOp});
     }
   }
+  for (OpPlacement p : toRemove)
+    placements.eraseCommit(p.srcOpResult, p.dstOp);
 }
 
 LogicalResult PlacementFinder::findCommitPositions() {
@@ -224,9 +222,78 @@ LogicalResult PlacementFinder::findCommitPositions() {
   return success();
 }
 
+void PlacementFinder::findSaveCommitsTraversal(
+    llvm::DenseSet<Operation *> &visited, Operation *currOp) {
+  // End traversal if currOp is already in visited set
+  if (auto [_, isNewOp] = visited.insert(currOp); !isNewOp)
+    return;
+
+  OpPlacement specPos = placements.getSpeculatorPlacement();
+  auto specBB = getLogicBB(specPos.dstOp);
+
+  for (Value res : currOp->getResults()) {
+    for (Operation *succOp : res.getUsers()) {
+      if (auto succOpBB = getLogicBB(succOp); !succOpBB || succOpBB != specBB) {
+        // Stop traversal if we go outside the speculation BB
+        continue;
+      } else if (placements.containsCommit(res, succOp) or
+                 placements.containsSaveCommit(res, succOp)) {
+        // End traversal on this path, as it already is cut
+        continue;
+      } else if (isa<handshake::SpeculatorOp>(succOp)) {
+        // End traversal on this path, as it already is cut
+        continue;
+      } else if (isa<handshake::ConditionalBranchOp>(succOp)) {
+        // A SaveCommit is needed in front of the branch
+        placements.addSaveCommit(res, succOp);
+      } else {
+        // Continue DFS traversal along the path
+        findCommitsTraversal(visited, succOp);
+      }
+    }
+  }
+}
+
 LogicalResult PlacementFinder::findSaveCommitPositions() {
+  // Merge consecutive save and commit units into save-commits
   placements.mergeSaveCommits();
-  // Need to add save-commits in all paths
+
+  // Find additional save commits
+  OpPlacement specPos = placements.getSpeculatorPlacement();
+  auto funcOp = specPos.dstOp->getParentOfType<handshake::FuncOp>();
+  assert(funcOp && "op should have parent function");
+
+  auto specBB = getLogicBB(specPos.dstOp);
+  if (not specBB) {
+    specPos.dstOp->emitError("Operation does not have a BB.");
+    return failure();
+  }
+
+  // Every path from entry points to exit points in the Speculator BB should
+  // cross either the speculator or a save-commit
+  if (not placements.getPlacements<handshake::SpecSaveCommitOp>().empty()) {
+    bool foundControlMerge = false;
+    // Every BB starts at a control merge
+    for (auto controlMergeOp : funcOp.getOps<handshake::ControlMergeOp>()) {
+      if (auto mergeBB = getLogicBB(controlMergeOp);
+          !mergeBB || mergeBB != specBB)
+        continue;
+
+      // Found a control merge in the speculation BB
+      if (not foundControlMerge) {
+        foundControlMerge = true;
+      } else {
+        controlMergeOp->emitError("Found many control merges in the same BB");
+        return failure();
+      }
+
+      // Add commits such that all paths are cut by a save-commit or the
+      // speculator.
+      llvm::DenseSet<Operation *> visited;
+      findSaveCommitsTraversal(visited, controlMergeOp);
+    }
+  }
+
   return success();
 }
 

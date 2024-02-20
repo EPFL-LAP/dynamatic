@@ -88,6 +88,9 @@ public:
   /// Check if there is a save from srcOp to dstOp
   bool containsSave(Value srcOpResult, Operation *dstOp);
 
+  /// Check if there is a save-commit from srcOp to dstOp
+  bool containsSaveCommit(Value srcOpResult, Operation *dstOp);
+
   /// Remove a commit from the commit placement map
   void eraseCommit(Value srcOpResult, Operation *dstOp);
 

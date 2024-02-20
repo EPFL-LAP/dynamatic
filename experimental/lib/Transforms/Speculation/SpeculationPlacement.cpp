@@ -67,6 +67,11 @@ bool SpeculationPlacements::containsSave(Value srcOpResult, Operation *dstOp) {
   return this->saves.count({srcOpResult, dstOp});
 }
 
+bool SpeculationPlacements::containsSaveCommit(Value srcOpResult,
+                                               Operation *dstOp) {
+  return this->saveCommits.count({srcOpResult, dstOp});
+}
+
 void SpeculationPlacements::eraseCommit(Value srcOpResult, Operation *dstOp) {
   this->commits.erase({srcOpResult, dstOp});
 }

@@ -55,6 +55,9 @@ private:
 
   /// Find save-commit operations positions
   LogicalResult findSaveCommitPositions();
+
+  void findSaveCommitsTraversal(llvm::DenseSet<Operation *> &visited,
+                                Operation *currOp);
 };
 } // namespace speculation
 } // namespace experimental
