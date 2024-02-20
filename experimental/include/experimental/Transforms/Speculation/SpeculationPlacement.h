@@ -94,6 +94,9 @@ public:
   /// Remove a save from the save placement map
   void eraseSave(Value srcOpResult, Operation *dstOp);
 
+  /// Merge save and commit units
+  void mergeSaveCommits();
+
   /// Get the Placement instance that specifies the Speculator position
   OpPlacement getSpeculatorPlacement();
 

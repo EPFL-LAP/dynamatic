@@ -360,7 +360,7 @@ void HandshakeSpeculationPass::runDynamaticPass() {
           this->jsonPath, this->placements, nameAnalysis)))
     return signalPassFailure();
 
-  // Run automatic unit position placement finder
+  // Run automatic finding of the unit placements
   if (this->automatic) {
     PlacementFinder finder(this->placements);
     if (failed(finder.findPlacements()))

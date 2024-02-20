@@ -75,6 +75,16 @@ void SpeculationPlacements::eraseSave(Value srcOpResult, Operation *dstOp) {
   this->saves.erase({srcOpResult, dstOp});
 }
 
+void SpeculationPlacements::mergeSaveCommits() {
+  for (OpPlacement p : this->saves) {
+    if (containsCommit(p.srcOpResult, p.dstOp)) {
+      eraseCommit(p.srcOpResult, p.dstOp);
+      eraseSave(p.srcOpResult, p.dstOp);
+      addSaveCommit(p.srcOpResult, p.dstOp);
+    }
+  }
+}
+
 OpPlacement SpeculationPlacements::getSpeculatorPlacement() {
   return this->speculator;
 }

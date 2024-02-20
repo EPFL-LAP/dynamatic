@@ -16,6 +16,9 @@
 
 #include "dynamatic/Support/LLVM.h"
 #include "experimental/Transforms/Speculation/SpeculationPlacement.h"
+#include "mlir/IR/BuiltinTypes.h"
+#include "mlir/IR/OperationSupport.h"
+#include "llvm/ADT/DenseSet.h"
 
 namespace dynamatic {
 namespace experimental {
@@ -28,7 +31,7 @@ public:
   /// Speculator position is set
   PlacementFinder(SpeculationPlacements &placements);
 
-  /// Find the speculative unit positions. Modifies the internal
+  /// Find the speculative unit positions. Mutates the internal
   /// SpeculationPlacements data structure
   LogicalResult findPlacements();
 
@@ -44,6 +47,11 @@ private:
 
   /// Find commit operations positions
   LogicalResult findCommitPositions();
+
+  void findCommitsTraversal(llvm::DenseSet<Operation *> &visited,
+                            Operation *currOp);
+
+  void findCommitsBetweenBBs();
 
   /// Find save-commit operations positions
   LogicalResult findSaveCommitPositions();
