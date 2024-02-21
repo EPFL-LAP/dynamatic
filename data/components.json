@@ -261,67 +261,6 @@
       }
     }
   },
-  "arith.extsi": {
-    "latency": {
-      "64": 0.0
-    },
-    "delay": {
-      "data": {
-        "64": 0.672
-      },
-      "valid": {
-        "1": 0.672
-      },
-      "ready": {
-        "1": 1.397
-      },
-      "VR": 1.397,
-      "CV": 0,
-      "CR": 0,
-      "VC": 0,
-      "VD": 0
-    },
-    "inport": {
-      "transparentBuffer": 0,
-      "opaqueBuffer": 0,
-      "delay": {
-        "data": {
-          "64": 0
-        },
-        "valid": {
-          "1": 0
-        },
-        "ready": {
-          "1": 0
-        },
-        "VR": 0,
-        "CV": 0,
-        "CR": 0,
-        "VC": 0,
-        "VD": 0
-      }
-    },
-    "outport": {
-      "transparentBuffer": 0,
-      "opaqueBuffer": 0,
-      "delay": {
-        "data": {
-          "64": 0
-        },
-        "valid": {
-          "1": 0
-        },
-        "ready": {
-          "1": 0
-        },
-        "VR": 0,
-        "CV": 0,
-        "CR": 0,
-        "VC": 0,
-        "VD": 0
-      }
-    }
-  },
   "handshake.mc_load": {
     "latency": {
       "64": 1.0
