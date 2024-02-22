@@ -15,13 +15,13 @@ print_help_and_exit () {
 "./build.sh [options]
 
 List of options:
-  --disable-build-opt | -o    : don't use clang/lld/ccache to speed up builds
-  --force-cmake | -f          : force cmake reconfiguration in each (sub)project 
   --release | -r              : build in \"Release\" mode (default is \"Debug\")
+  --visual-dataflow | -v      : build visual-dataflow tool
+  --force | -f                : force cmake reconfiguration in each (sub)project 
   --threads | -t              : number of concurrent threads to build on with
                                 ninja (by default, ninja spawns one thread per
                                 logical core on the host machine)
-  --build-viz | -v            : build visual-dataflow tool
+  --disable-build-opt | -o    : don't use clang/lld/ccache to speed up builds
   --check | -c                : run tests during build
   --help | -h                 : display this help message
 "
@@ -83,7 +83,7 @@ create_symlink() {
 should_run_cmake() {
   if [[ -f "CMakeCache.txt" && $FORCE_CMAKE -eq 0 ]]; then
     echo "CMake configuration found, will not re-configure cmake"
-    echo "Run script with -f or --force-cmake flag to re-configure cmake"
+    echo "Run script with -f or --force flag to re-configure cmake"
     echo ""
     return 1
   fi 
@@ -111,7 +111,7 @@ FORCE_CMAKE=0
 PARSE_NUM_THREADS=0
 NUM_THREADS=0
 BUILD_TYPE="Debug"
-BUILD_VISUAL_DATAFLOW="OFF"
+BUILD_VISUAL_DATAFLOW=0
 for arg in "$@"; 
 do
     if [[ $PARSE_NUM_THREADS -eq 1 ]]; then
@@ -124,7 +124,7 @@ do
               CMAKE_EXTRA_LLVM="-DLLVM_CCACHE_BUILD=ON -DLLVM_USE_LINKER=lld"
               CMAKE_EXTRA_POLYGEIST="-DPOLYGEIST_USE_LINKER=lld"
               ;;
-          "--force-cmake" | "-f")
+          "--force" | "-f")
               FORCE_CMAKE=1
               ;;
           "--release" | "-r")
@@ -136,8 +136,8 @@ do
           "--check" | "-c")
               ENABLE_TESTS=1
               ;;
-          "--build-viz" | "-v")
-              BUILD_VISUAL_DATAFLOW="ON"
+          "--visual-dataflow" | "-v")
+              BUILD_VISUAL_DATAFLOW=1
               ;;
           "--help" | "-h")
               print_help_and_exit
@@ -210,7 +210,6 @@ if should_run_cmake ; then
       -DLLVM_TARGETS_TO_BUILD="host" \
       -DCMAKE_BUILD_TYPE=$BUILD_TYPE \
       -DCMAKE_EXPORT_COMPILE_COMMANDS="ON" \
-      -DBUILD_VISUAL_DATAFLOW=$BUILD_VISUAL_DATAFLOW \
       $CMAKE_COMPILERS
   exit_on_fail "Failed to cmake dynamatic"
 fi
@@ -221,6 +220,26 @@ exit_on_fail "Failed to build dynamatic"
 if [[ ENABLE_TESTS -eq 1 ]]; then
     ninja check-dynamatic
     exit_on_fail "Tests for dynamatic failed"
+fi
+
+if [[ BUILD_VISUAL_DATAFLOW -ne 0 ]]; then
+  prepare_to_build_project "visual-dataflow" "visual-dataflow/build"
+
+  # CMake
+  if should_run_cmake ; then
+    cmake -G Ninja .. \
+        -DMLIR_DIR=../polygeist/llvm-project/build/lib/cmake/mlir \
+        -DLLVM_DIR=../polygeist/llvm-project/build/lib/cmake/llvm \
+        -DLLVM_TARGETS_TO_BUILD="host" \
+        -DCMAKE_BUILD_TYPE=$BUILD_TYPE \
+        -DCMAKE_EXPORT_COMPILE_COMMANDS="ON" \
+        $CMAKE_COMPILERS
+    exit_on_fail "Failed to cmake visual-dataflow"
+  fi
+
+  # Build
+  run_ninja
+  exit_on_fail "Failed to build visual-dataflow"
 fi
 
 echo_section "Creating symbolic links"
