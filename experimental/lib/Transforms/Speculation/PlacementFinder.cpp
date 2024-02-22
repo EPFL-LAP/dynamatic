@@ -37,18 +37,24 @@ void PlacementFinder::clearPlacements() {
   this->placements = SpeculationPlacements(specPos.srcOpResult, specPos.dstOp);
 }
 
+//===----------------------------------------------------------------------===//
+// Save Units Finder Methods
+//===----------------------------------------------------------------------===//
+
 // Recursively traverse the IR until reaching branches and store visited values
 static void markSpeculativePaths(Operation *currOp,
                                  DenseSet<Value> &specValues) {
+  // End traversal when reaching a branch, because save units are only
+  // placed inside the speculation BB
+  if (isa<handshake::ConditionalBranchOp>(currOp))
+    return;
+
   for (OpResult res : currOp->getResults()) {
     if (specValues.contains(res))
       continue;
     specValues.insert(res);
     for (Operation *succOp : res.getUsers()) {
-      // End traversal when reaching a branch, because save units are only
-      // placed inside the speculation BB
-      if (not isa<handshake::ConditionalBranchOp>(succOp))
-        markSpeculativePaths(succOp, specValues);
+      markSpeculativePaths(succOp, specValues);
     }
   }
 }
@@ -97,12 +103,15 @@ LogicalResult PlacementFinder::findSavePositions() {
   return success();
 }
 
+//===----------------------------------------------------------------------===//
+// Commit Units Finder Methods
+//===----------------------------------------------------------------------===//
+
 void PlacementFinder::findCommitsTraversal(llvm::DenseSet<Operation *> &visited,
                                            Operation *currOp) {
   // End traversal if currOp is already in visited set
   if (auto [_, isNewOp] = visited.insert(currOp); !isNewOp)
     return;
-
   for (Value res : currOp->getResults()) {
     for (Operation *succOp : res.getUsers()) {
       if (placements.containsSave(res, succOp)) {
@@ -131,24 +140,43 @@ struct endpointComparator {
     return a.dstBB < b.dstBB;
   }
 };
-
-using PlacementMap =
+using BBEndpointsMap =
     std::map<BBEndpoints, std::vector<OpPlacement>, endpointComparator>;
+
+// Data structure to hold all arcs leading to a single BB predecessor
+struct BlockPredecessor {
+  unsigned srcBB;
+  unsigned dstBB;
+  std::vector<OpPlacement> arcs;
+};
+using BBPredecessorMap = std::map<unsigned, std::vector<BlockPredecessor>>;
 
 // Get a map from Endpoints to all arcs (OpPlacements) that connect the
 // BBs specified in the endpoints.
-static PlacementMap getBlockPredecessors(handshake::FuncOp funcOp) {
-  PlacementMap predecessors;
+static BBPredecessorMap getBlockPredecessors(handshake::FuncOp funcOp) {
+  // Traverse all operations to find arcs between BBs (and self-arcs)
+  BBEndpointsMap endpointArcs;
   funcOp->walk([&](Operation *op) {
     for (Value operand : op->getOperands()) {
       BBEndpoints endpoints;
       if (isBackedge(operand, op, &endpoints) or
           endpoints.srcBB != endpoints.dstBB) {
         OpPlacement arc = {operand, op};
-        predecessors[endpoints].push_back(arc);
+        endpointArcs[endpoints].push_back(arc);
       }
     }
   });
+
+  // Join all predecessors of a BB
+  BBPredecessorMap predecessors;
+  for (const auto &[endpoints, arcs] : endpointArcs) {
+    BlockPredecessor predecessor;
+    predecessor.srcBB = endpoints.srcBB;
+    predecessor.dstBB = endpoints.dstBB;
+    predecessor.arcs = arcs;
+    predecessors[endpoints.dstBB].push_back(predecessor);
+  }
+
   return predecessors;
 }
 
@@ -174,19 +202,26 @@ void PlacementFinder::findCommitsBetweenBBs() {
   assert(funcOp && "op should have parent function");
 
   // Place commits in-between BBs
-  PlacementMap predecessors = getBlockPredecessors(funcOp);
+  BBPredecessorMap predecessors = getBlockPredecessors(funcOp);
   PlacementList markedPaths;
   markSpeculativePaths(specPos.dstOp, placements, markedPaths);
-  for (const auto &[_, arcs] : predecessors) {
+  // Iterate all BBs to check if commits are needed
+  for (const auto &[bb, blockPredecessors] : predecessors) {
+    // Count number of speculative inputs to the BB
     unsigned countSpecInputs = 0;
-    for (OpPlacement arc : arcs) {
-      if (markedPaths.count(arc))
+    for (BlockPredecessor pred : blockPredecessors) {
+      if (llvm::any_of(pred.arcs,
+                       [&](OpPlacement p) { return markedPaths.count(p); }))
         countSpecInputs++;
     }
-    // Potential ordering issue
+
     if (countSpecInputs > 1) {
-      for (OpPlacement arc : arcs) {
-        placements.addCommit(arc.srcOpResult, arc.dstOp);
+      // Potential ordering issue, add commits
+      for (BlockPredecessor pred : blockPredecessors) {
+        for (OpPlacement arc : pred.arcs) {
+          placements.addCommit(arc.srcOpResult, arc.dstOp);
+          // Here, synchronizer operations will be needed in the future
+        }
       }
     }
   }
@@ -202,8 +237,9 @@ void PlacementFinder::findCommitsBetweenBBs() {
       toRemove.insert({arc.srcOpResult, arc.dstOp});
     }
   }
-  for (OpPlacement p : toRemove)
+  for (OpPlacement p : toRemove) {
     placements.eraseCommit(p.srcOpResult, p.dstOp);
+  }
 }
 
 LogicalResult PlacementFinder::findCommitPositions() {
@@ -222,6 +258,10 @@ LogicalResult PlacementFinder::findCommitPositions() {
   return success();
 }
 
+//===----------------------------------------------------------------------===//
+// SaveCommit Units Finder Methods
+//===----------------------------------------------------------------------===//
+
 void PlacementFinder::findSaveCommitsTraversal(
     llvm::DenseSet<Operation *> &visited, Operation *currOp) {
   // End traversal if currOp is already in visited set
@@ -238,17 +278,18 @@ void PlacementFinder::findSaveCommitsTraversal(
         continue;
       } else if (placements.containsCommit(res, succOp) or
                  placements.containsSaveCommit(res, succOp)) {
-        // End traversal on this path, as it already is cut
+        // End traversal on this path, as it already is cut by a commit or sc
         continue;
-      } else if (isa<handshake::SpeculatorOp>(succOp)) {
-        // End traversal on this path, as it already is cut
+      } else if (OpPlacement specPos = placements.getSpeculatorPlacement();
+                 specPos.srcOpResult == res and specPos.dstOp == succOp) {
+        // End traversal on this path, as it already is cut by the speculator
         continue;
       } else if (isa<handshake::ConditionalBranchOp>(succOp)) {
         // A SaveCommit is needed in front of the branch
         placements.addSaveCommit(res, succOp);
       } else {
         // Continue DFS traversal along the path
-        findCommitsTraversal(visited, succOp);
+        findSaveCommitsTraversal(visited, succOp);
       }
     }
   }
