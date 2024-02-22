@@ -202,7 +202,8 @@ void PlacementFinder::findCommitsBetweenBBs() {
   auto funcOp = specPos.dstOp->getParentOfType<handshake::FuncOp>();
   assert(funcOp && "op should have parent function");
 
-  // Place commits in-between BBs
+  // Whenever a BB has two speculative inputs, commit units are needed to avoid
+  // tokens going out-of-order. First, the block predecessor arcs are found
   BBPredecessorMap predecessors = getBlockPredecessors(funcOp);
   PlacementList markedPaths;
   markSpeculativePaths(specPos.dstOp, placements, markedPaths);
@@ -227,7 +228,9 @@ void PlacementFinder::findCommitsBetweenBBs() {
     }
   }
 
-  // Find new, shorter speculative path with the new commit units
+  // Now that new commits have been added, some of the already placed commits
+  // might be unreachable. Hence, the path to commits is marked again and
+  // unreachable commits are removed
   markedPaths.clear();
   markSpeculativePaths(specPos.dstOp, placements, markedPaths);
 
