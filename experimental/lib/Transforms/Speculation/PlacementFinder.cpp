@@ -144,6 +144,7 @@ using BBEndpointsMap =
     std::map<BBEndpoints, std::vector<OpPlacement>, endpointComparator>;
 
 // Data structure to hold all arcs leading to a single BB predecessor
+// Note: srcBB and dstBB can be equal when the arcs are Backedges
 struct BlockPredecessor {
   unsigned srcBB;
   unsigned dstBB;
@@ -151,8 +152,7 @@ struct BlockPredecessor {
 };
 using BBPredecessorMap = std::map<unsigned, std::vector<BlockPredecessor>>;
 
-// Get a map from Endpoints to all arcs (OpPlacements) that connect the
-// BBs specified in the endpoints.
+// Get a map from BBs to the list of its BlockPredecessors
 static BBPredecessorMap getBlockPredecessors(handshake::FuncOp funcOp) {
   // Traverse all operations to find arcs between BBs (and self-arcs)
   BBEndpointsMap endpointArcs;
@@ -180,6 +180,7 @@ static BBPredecessorMap getBlockPredecessors(handshake::FuncOp funcOp) {
   return predecessors;
 }
 
+// DFS traversal to mark all operations that lead to Commit units
 static void markSpeculativePaths(Operation *currOp,
                                  SpeculationPlacements &placements,
                                  PlacementList &markedPaths) {
