@@ -27,7 +27,25 @@ var color4 = Color(0, 0.8, 0.8, 1)
 func _ready():
 	legend.hide()
 	timeline.hide()
-
+	
+	for argument in OS.get_cmdline_args():
+		if argument.find("=") > -1:
+			var key_value = argument.split("=")
+			var key = key_value[0].lstrip("--")
+			var value = key_value[1]
+			if (key == "dot"):
+				print("Setting DOT file from CL: " + value)
+				dotFile = value
+			elif (key == "csv"):
+				print("Setting CSV file from CL: " + value)
+				csvFile = value
+			else:
+				print("Unknown argument " + key)
+	if (!dotFile.is_empty() && !csvFile.is_empty()):
+		menu.hide()
+		legend.show()
+		timeline.show()
+		start(dotFile, csvFile)
 
 func _process(delta):
 	if is_playing:

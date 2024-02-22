@@ -19,6 +19,7 @@ F_DOT_POS="$VISUAL_DIR/$KERNEL_NAME.dot"
 
 # Shortcuts
 WLF2CSV="$DYNAMATIC_DIR/visual-dataflow/wlf2csv.py"
+VISUAL_DATAFLOW_BIN="$DYNAMATIC_DIR/bin/visual-dataflow"
 
 # ============================================================================ #
 # Simulation flow
@@ -34,3 +35,6 @@ exit_on_fail "Failed to generate channel changes from waveform" "Generated chann
 # Generate a version of the DOT with positioning information
 dot -Tdot "$F_DOT" > "$F_DOT_POS"
 exit_on_fail "Failed to add positioning info. to DOT" "Added positioning info. to DOT"
+
+# Launch the dataflow visualizer
+"$VISUAL_DATAFLOW_BIN" "--dot=$F_DOT_POS" "--csv=$VISUAL_DIR/sim.csv" > /dev/null
