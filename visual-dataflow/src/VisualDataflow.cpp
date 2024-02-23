@@ -60,9 +60,12 @@ const godot::Color TRANSPARENT_BLACK(0, 0, 0, 0.075);
 const godot::Color OPAQUE_BLACK(0, 0, 0, 1.0);
 const godot::Color OPAQUE_WHITE(1, 1, 1, 1.0);
 
-const int NODE_HEIGHT = 35;
-const int NODE_WIDTH_SCALING_COEFFICIENT = 70;
-const int DASH_LENGTH = 5;
+static const double LINE_WIDTH = 1.5;
+static const double NODE_HEIGHT = 35;
+static const double NODE_WIDTH_SCALING_COEFFICIENT = 70;
+static const double DASH_LENGTH = 3;
+static const double DASH_SPACE_LENGTH = DASH_LENGTH * 2;
+static const unsigned NUM_OVAL_POINTS = 50;
 
 void VisualDataflow::_bind_methods() {
 
@@ -143,147 +146,137 @@ void VisualDataflow::drawBBs() {
   }
 }
 
-void createDashedLine(PackedVector2Array &points, std::vector<Line2D *> *lines,
-                      Area2D *area2D) {
-  for (int i = 0; i < points.size() - 1; ++i) {
+static void setBasicLineProps(Line2D *line) {
+  line->set_width(LINE_WIDTH);
+  line->set_default_color(OPAQUE_BLACK);
+  line->set_antialiased(true);
+}
+
+static void createDashedLine(PackedVector2Array &points,
+                             std::vector<Line2D *> *lines, Area2D *area2D) {
+  for (unsigned i = 0; i < points.size() - 1; ++i) {
     Vector2 start = points[i];
     Vector2 end = points[i + 1];
     Vector2 segment = end - start;
-    float segmentLength = segment.length();
+    double segmentLength = segment.length();
     segment = segment.normalized();
-    float currentLength = 0.0;
+    double currentLength = 0.0;
     while (currentLength < segmentLength) {
       Line2D *line = memnew(Line2D);
-      line->set_width(1);
-      line->set_default_color(OPAQUE_BLACK);
+      setBasicLineProps(line);
       Vector2 lineStart = start + segment * currentLength;
-      Vector2 lineEnd =
-          lineStart + segment * MIN(DASH_LENGTH, segmentLength - currentLength);
+      double length = MIN(DASH_LENGTH, segmentLength - currentLength);
+      Vector2 lineEnd = lineStart + segment * length;
       PackedVector2Array linePoints;
       linePoints.append(lineStart);
       linePoints.append(lineEnd);
       line->set_points(linePoints);
+
       lines->push_back(line);
       area2D->add_child(line);
-      currentLength += 2 * DASH_LENGTH;
+      currentLength += DASH_LENGTH + DASH_SPACE_LENGTH;
     }
   }
 }
 
 void VisualDataflow::drawNodes() {
 
-  for (auto &node : graph.getNodes()) {
-    std::pair<float, float> center = node.second.getPosition();
-    float width = node.second.getWidth() * NODE_WIDTH_SCALING_COEFFICIENT;
+  for (auto &[id, node] : graph.getNodes()) {
+    auto [centerX, centerY] = node.getPosition();
+    float width = node.getWidth() * NODE_WIDTH_SCALING_COEFFICIENT;
     Area2D *area2D = memnew(Area2D);
     Polygon2D *godotNode = memnew(Polygon2D);
-    PackedVector2Array points;
-    Line2D *outline = memnew(Line2D);
-    Vector2 firstPoint, point1, point2, point3, point4;
-    Shape shape = node.second.getShape();
+    Shape shape = node.getShape();
 
-    // Set points for either diamond or box shapes
+    // Define the shape of the node as a sequence of 2D points
+    PackedVector2Array points;
     if (shape == "diamond" || shape == "box") {
+      double halfWidth = width / 2;
+      double halfHeight = NODE_HEIGHT / 2;
+
       if (shape == "box") {
         // Define points for a box-shaped node
-        point1 =
-            Vector2(center.first - width / 2, -center.second + NODE_HEIGHT / 2);
-        point2 =
-            Vector2(center.first + width / 2, -center.second + NODE_HEIGHT / 2);
-        point3 =
-            Vector2(center.first + width / 2, -center.second - NODE_HEIGHT / 2);
-        point4 =
-            Vector2(center.first - width / 2, -center.second - NODE_HEIGHT / 2);
+        points.push_back(Vector2(centerX - halfWidth, -centerY + halfHeight));
+        points.push_back(Vector2(centerX + halfWidth, -centerY + halfHeight));
+        points.push_back(Vector2(centerX + halfWidth, -centerY - halfHeight));
+        points.push_back(Vector2(centerX - halfWidth, -centerY - halfHeight));
       } else {
         // Define points for a diamond-shaped node
-        point1 = Vector2(center.first, -center.second + NODE_HEIGHT / 2);
-        point2 = Vector2(center.first + width / 2, -center.second);
-        point3 = Vector2(center.first, -center.second - NODE_HEIGHT / 2);
-        point4 = Vector2(center.first - width / 2, -center.second);
+        points.push_back(Vector2(centerX, -centerY + halfHeight));
+        points.push_back(Vector2(centerX + halfWidth, -centerY));
+        points.push_back(Vector2(centerX, -centerY - halfHeight));
+        points.push_back(Vector2(centerX - halfWidth, -centerY));
       }
 
-      firstPoint = point1;
-      points.push_back(point1);
-      points.push_back(point2);
-      points.push_back(point3);
-      points.push_back(point4);
-      godotNode->set_polygon(points);
-      nodeIdToGodoPos[node.first] = points;
+      // The collision area is the same as the node itself
+      nodeIdToGodoPos[id] = points;
     } else {
-      // Code for an oval-shaped node
-      int numPoints = 30; // Increase for smoother oval
-      for (int i = 0; i < numPoints; ++i) {
-        float angle = 2 * M_PI * i / numPoints;
-        float x = center.first + width / 2 * cos(angle);
-        float y = -center.second + NODE_HEIGHT / 2 * sin(angle);
+      // Create points to characterize an oval shape
+      double angle = 0;
+      for (unsigned i = 0; i < NUM_OVAL_POINTS; ++i) {
+        angle += 2 * M_PI / NUM_OVAL_POINTS;
+        double x = centerX + width / 2 * cos(angle);
+        double y = -centerY + NODE_HEIGHT / 2 * sin(angle);
         points.push_back(Vector2(x, y));
-        if (i == 0)
-          firstPoint = Vector2(x, y);
       }
-      godotNode->set_polygon(points);
 
-      // Define points for an oval bounding rectangle
-      point1 = Vector2(center.first, -center.second + NODE_HEIGHT / 2);
-      point2 = Vector2(center.first + width / 2, -center.second);
-      point3 = Vector2(center.first, -center.second - NODE_HEIGHT / 2);
-      point4 = Vector2(center.first - width / 2, -center.second);
+      // The collison area is a rectangle centered within the oval
       PackedVector2Array rectanglePoints;
-      rectanglePoints.push_back(point1);
-      rectanglePoints.push_back(point2);
-      rectanglePoints.push_back(point3);
-      rectanglePoints.push_back(point4);
-      nodeIdToGodoPos[node.first] = rectanglePoints;
+      rectanglePoints.push_back(Vector2(centerX, -centerY + NODE_HEIGHT / 2));
+      rectanglePoints.push_back(Vector2(centerX + width / 2, -centerY));
+      rectanglePoints.push_back(Vector2(centerX, -centerY - NODE_HEIGHT / 2));
+      rectanglePoints.push_back(Vector2(centerX - width / 2, -centerY));
+      nodeIdToGodoPos[id] = rectanglePoints;
     }
 
-    // Set the node color
-    godotNode->set_color(colorNameToRGB.count(node.second.getColor())
-                             ? colorNameToRGB.at(node.second.getColor())
+    // Sets the node's polygon and color
+    godotNode->set_polygon(points);
+    godotNode->set_color(colorNameToRGB.count(node.getColor())
+                             ? colorNameToRGB.at(node.getColor())
                              : OPAQUE_WHITE);
 
     // Create and position the label
     Label *label = memnew(Label);
-    label->set_text(node.second.getNodeId().c_str());
+    label->set_text(node.getNodeId().c_str());
     label->add_theme_color_override("font_color", OPAQUE_BLACK);
     label->add_theme_font_size_override("font_size", 12);
     Vector2 size = label->get_combined_minimum_size();
     label->set_position(
-        Vector2(center.first - size.x * 0.5, -(center.second + size.y * 0.5)));
+        Vector2(centerX - size.x * 0.5, -(centerY + size.y * 0.5)));
 
     // Create a container for the label and the node
     CenterContainer *centerContainer = memnew(CenterContainer);
     centerContainer->set_size(Vector2(width, NODE_HEIGHT));
     centerContainer->set_position(
-        Vector2(center.first - width / 2, -center.second - NODE_HEIGHT / 2));
+        Vector2(centerX - width / 2, -centerY - NODE_HEIGHT / 2));
     centerContainer->add_child(label);
     area2D->add_child(godotNode);
     area2D->add_child(centerContainer);
-    nodeIdToPolygon[node.first] = godotNode;
-
-    std::vector<Line2D *> lines;
+    nodeIdToPolygon[id] = godotNode;
 
     // Create the ouline of the node
-    if (node.second.getDashed()) {
-      points.push_back(firstPoint);
+    Line2D *outline = memnew(Line2D);
+    setBasicLineProps(outline);
+    std::vector<Line2D *> lines;
+    if (node.getDashed()) {
+      points.push_back(points[0]);
       createDashedLine(points, &lines, area2D);
     } else {
       outline->set_points(points);
-      outline->add_point(firstPoint);
+      outline->add_point(points[0]);
       lines.push_back(outline);
     }
 
     // Set outline color and width, and add to the area
-    outline->set_default_color(OPAQUE_BLACK);
-    outline->set_width(1);
     area2D->add_child(outline);
     add_child(area2D);
-    nodeIdToContourLine[node.first] = lines;
-    nodeIdToTransparency[node.first] = false;
+    nodeIdToContourLine[id] = lines;
+    nodeIdToTransparency[id] = false;
   }
 }
 
 void VisualDataflow::drawEdges() {
-
-  for (auto &edge : graph.getEdges()) {
+  for (GraphEdge &edge : graph.getEdges()) {
 
     Area2D *area2D = memnew(Area2D);
     std::vector<Line2D *> lines;
@@ -306,8 +299,7 @@ void VisualDataflow::drawEdges() {
     } else {
       Line2D *line = memnew(Line2D);
       line->set_points(linePoints);
-      line->set_default_color(OPAQUE_BLACK);
-      line->set_width(1);
+      setBasicLineProps(line);
       area2D->add_child(line);
       lines.push_back(line);
     }
