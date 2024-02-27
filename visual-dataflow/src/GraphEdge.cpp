@@ -9,7 +9,9 @@
 // This file contains the implementation of a GraphEdge.
 //
 //===----------------------------------------------------------------------===//
+
 #include "GraphEdge.h"
+#include "llvm/ADT/StringRef.h"
 #include <utility>
 
 using namespace dynamatic::visual;
@@ -47,5 +49,9 @@ std::vector<std::pair<float, float>> GraphEdge::getPositions() {
 }
 
 void GraphEdge::setDashed(bool dashed) { this->isDashed = dashed; }
+
+void GraphEdge::setArrowhead(StringRef arrowhead) {
+  this->arrowhead = arrowhead;
+}
 
 bool GraphEdge::getDashed() { return isDashed; }

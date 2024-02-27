@@ -15,6 +15,7 @@
 #include "Graph.h"
 #include "GraphEdge.h"
 #include "GraphNode.h"
+#include "llvm/ADT/StringRef.h"
 #include <fstream>
 #include <iostream>
 #include <regex>
@@ -189,6 +190,10 @@ LogicalResult dynamatic::visual::processDOT(std::ifstream &file, Graph &graph) {
         line.find("->") == std::string::npos) {
       int in = std::stoi(line.substr(line.find('n') + 1, line.find(',')));
       currentEdge.setInPort(in);
+    }
+    if (insideEdgeDefinition && line.find("arrowhead") != std::string::npos) {
+      size_t eqIDx = line.find('=') + 1;
+      currentEdge.setArrowhead(line.substr(eqIDx, line.find(',') - eqIDx));
     }
 
     if (insideEdgeDefinition && line.find("start_0") != std::string::npos) {
