@@ -40,4 +40,5 @@ exit_on_fail "Failed to add positioning info. to DOT" "Added positioning info. t
 rm "$F_DOT_POS_TMP"
 
 # Launch the dataflow visualizer
-"$VISUAL_DATAFLOW_BIN" "--dot=$F_DOT_POS" "--csv=$VISUAL_DIR/sim.csv" > /dev/null
+"$VISUAL_DATAFLOW_BIN" "--dot=$F_DOT_POS" "--csv=$VISUAL_DIR/sim.csv" \
+  2>&1 >/dev/null &
