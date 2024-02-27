@@ -48,21 +48,22 @@ static cl::opt<std::string> inputFileName(cl::Positional,
 // later generate a unit for each parametrization used by the model
 LogicalResult getNodeType(Operation *op, mlir::raw_indented_ostream &os) {
 
+  int numInputs = op->getNumOperands();
+  int numOutputs = op->getNumResults();
+
   std::string type =
       llvm::TypeSwitch<Operation *, std::string>(op)
           .Case<handshake::OEHBOp>([&](handshake::OEHBOp oehbOp) {
-            return "oehb_" + std::to_string(oehbOp.getSlots()) + "s_" +
-                   std::to_string(op->getNumOperands()) + "_" +
-                   std::to_string(op->getNumResults());
+            return "buffer" + std::to_string(oehbOp.getSlots()) + "o_" +
+                   std::to_string(numInputs) + "_" + std::to_string(numOutputs);
           })
           .Case<handshake::TEHBOp>([&](handshake::TEHBOp tehbOp) {
-            return "tehb_" + std::to_string(tehbOp.getSlots()) + "s_" +
-                   std::to_string(op->getNumOperands()) + "_" +
-                   std::to_string(op->getNumResults());
+            return "buffer" + std::to_string(tehbOp.getSlots()) + "t_" +
+                   std::to_string(numInputs) + "_" + std::to_string(numOutputs);
           })
           .Default([&](auto) {
-            return "unknownop" + std::to_string(op->getNumOperands()) + "_" +
-                   std::to_string(op->getNumResults());
+            return "unknownop" + std::to_string(numInputs) + "_" +
+                   std::to_string(numOutputs);
           });
 
   os << type;
