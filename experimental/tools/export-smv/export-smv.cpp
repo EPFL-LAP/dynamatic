@@ -6,39 +6,31 @@
 //
 //===----------------------------------------------------------------------===//
 //
-// Experimental tool that exports VHDL from a netlist-level IR expressed in the
-// HW dialect. The result is produced on standart llvm output.
+// Experimental tool that exports nuXmv-compatible format from a netlist-level
+// IR expressed in the handshake dialect
 //
 //===----------------------------------------------------------------------===//
 
 #include "dynamatic/Analysis/NameAnalysis.h"
 #include "dynamatic/Dialect/Handshake/HandshakeOps.h"
-#include "dynamatic/Support/CFG.h"
-#include "dynamatic/Support/DOTPrinter.h"
-#include "dynamatic/Support/TimingModels.h"
-#include "dynamatic/Transforms/HandshakeConcretizeIndexType.h"
-#include "dynamatic/Transforms/HandshakeMaterialize.h"
 #include "mlir/Dialect/Arith/IR/Arith.h"
-#include "mlir/Dialect/Func/IR/FuncOps.h"
-#include "mlir/Dialect/LLVMIR/LLVMDialect.h"
 #include "mlir/Dialect/Math/IR/Math.h"
 #include "mlir/Dialect/MemRef/IR/MemRef.h"
 #include "mlir/IR/BuiltinAttributes.h"
 #include "mlir/IR/BuiltinOps.h"
-#include "mlir/IR/BuiltinTypes.h"
 #include "mlir/IR/MLIRContext.h"
 #include "mlir/IR/OperationSupport.h"
-#include "mlir/IR/PatternMatch.h"
 #include "mlir/IR/Value.h"
 #include "mlir/Parser/Parser.h"
 #include "mlir/Support/IndentedOstream.h"
+#include "mlir/Support/LogicalResult.h"
 #include "llvm/ADT/StringRef.h"
 #include "llvm/ADT/TypeSwitch.h"
 #include "llvm/Support/CommandLine.h"
 #include "llvm/Support/ErrorHandling.h"
 #include "llvm/Support/InitLLVM.h"
 #include "llvm/Support/SourceMgr.h"
-#include <iomanip>
+#include <cstddef>
 #include <string>
 #include <utility>
 
@@ -52,6 +44,8 @@ static cl::opt<std::string> inputFileName(cl::Positional,
                                           cl::desc("<input file>"),
                                           cl::cat(mainCategory));
 
+// for parametrized units, we encode the parameter in the type of the unit and
+// later generate a unit for each parametrization used by the model
 LogicalResult getNodeType(Operation *op, mlir::raw_indented_ostream &os) {
 
   std::string type =
@@ -75,15 +69,21 @@ LogicalResult getNodeType(Operation *op, mlir::raw_indented_ostream &os) {
   return success();
 }
 
+// prints the declaration for the unit
 LogicalResult printUnit(Operation *op, mlir::raw_indented_ostream &os) {
   StringRef unitName = getUniqueName(op);
 
-  os << "DEFINE " << unitName << " : ";
-  getNodeType(op, os);
+  os << "VAR " << unitName << " : ";
+  if (failed(getNodeType(op, os))) {
+    return failure();
+  }
   os << " (";
 
   for (auto [idx, arg] : llvm::enumerate(op->getOperands())) {
     os << unitName << "_dataIn" << idx << ", " << unitName << "_pValid" << idx;
+    if (idx < op->getNumOperands() - 1) {
+      os << ", ";
+    }
   }
 
   if (op->getNumOperands() > 0 && op->getNumResults() > 0)
@@ -91,8 +91,41 @@ LogicalResult printUnit(Operation *op, mlir::raw_indented_ostream &os) {
 
   for (auto [idx, arg] : llvm::enumerate(op->getResults())) {
     os << unitName << "_nReady" << idx;
+    if (idx < op->getNumResults() - 1) {
+      os << ", ";
+    }
   }
   os << ");\n";
+  return success();
+}
+
+static size_t findIndexInRange(ValueRange range, Value val) {
+  for (auto [idx, res] : llvm::enumerate(range))
+    if (res == val)
+      return idx;
+  llvm_unreachable("value should exist in range");
+}
+
+// prints the declaration for the channels, one line per each data, ready and
+// valid signal
+LogicalResult printEdge(OpOperand &oprd, mlir::raw_indented_ostream &os) {
+  Value val = oprd.get();
+  Operation *src = val.getDefiningOp();
+  Operation *dst = oprd.getOwner();
+
+  // Locate value in source results and destination operands
+  const size_t resIdx = findIndexInRange(src->getResults(), val);
+  const size_t argIdx = findIndexInRange(dst->getOperands(), val);
+
+  os << "DEFINE " << getUniqueName(src) << "_nReady" << resIdx << " = "
+     << getUniqueName(dst) << "_ready" << argIdx << ";\n";
+
+  os << "DEFINE " << getUniqueName(dst) << "_pValid" << argIdx << " = "
+     << getUniqueName(src) << "_valid" << resIdx << ";\n";
+
+  os << "DEFINE " << getUniqueName(dst) << "_dataIn" << argIdx << " = "
+     << getUniqueName(src) << "_dataOut" << resIdx << ";\n";
+
   return success();
 }
 
@@ -112,10 +145,27 @@ LogicalResult writeSmv(mlir::ModuleOp mod) {
 
   handshake::FuncOp funcOp = *funcs.begin();
 
+  stdOs << "MODULE main\n";
+  stdOs << "\n-- units\n";
+
   for (auto &op : funcOp.getOps()) {
     if (failed(printUnit(&op, stdOs)))
       return failure();
   }
+
+  stdOs << "\n\n-- channels\n";
+
+  for (auto &op : funcOp.getOps()) {
+    for (OpResult res : op.getResults()) {
+      for (OpOperand &val : res.getUses()) {
+        if (failed(printEdge(val, stdOs)))
+          return failure();
+      }
+    }
+  }
+
+  stdOs << "\n\n-- formal properties\n";
+
   return success();
 }
 
