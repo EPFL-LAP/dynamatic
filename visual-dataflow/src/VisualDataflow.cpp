@@ -223,8 +223,9 @@ void VisualDataflow::drawNodes() {
     } else {
       // Create points to characterize an oval shape
       double angle = 0;
+      double angleIncrement = 2 * M_PI / NUM_OVAL_POINTS;
       for (unsigned i = 0; i < NUM_OVAL_POINTS; ++i) {
-        angle += 2 * M_PI / NUM_OVAL_POINTS;
+        angle += angleIncrement;
         double x = centerX + width / 2 * cos(angle);
         double y = -centerY + NODE_HEIGHT / 2 * sin(angle);
         points.push_back(Vector2(x, y));
@@ -322,27 +323,62 @@ void VisualDataflow::drawEdges() {
     Vector2 lastPoint = linePoints[numPoints - 1];
 
     // Create and set up the arrowhead for the edge
-    Polygon2D *arrowHead = memnew(Polygon2D);
+    Polygon2D *arrowheadPoly = memnew(Polygon2D);
+    arrowheadPoly->set_color(OPAQUE_BLACK);
+
     PackedVector2Array points;
-    // Determine the orientation of the arrowhead
-    if (secondToLastPoint.x == lastPoint.x) {
-      points.push_back(Vector2(lastPoint.x - 8, lastPoint.y));
-      points.push_back(Vector2(lastPoint.x + 8, lastPoint.y));
-      points.push_back(secondToLastPoint.y < lastPoint.y
-                           ? Vector2(lastPoint.x, lastPoint.y + 12)
-                           : Vector2(lastPoint.x, lastPoint.y - 12));
+    if (edge.getArrowhead() == "normal") {
+      // Draw an arrow
+      if (secondToLastPoint.x == lastPoint.x) {
+        // Horizontal arrow
+        points.push_back(Vector2(lastPoint.x - 5, lastPoint.y));
+        points.push_back(Vector2(lastPoint.x + 5, lastPoint.y));
+        points.push_back(secondToLastPoint.y < lastPoint.y
+                             ? Vector2(lastPoint.x, lastPoint.y + 12)
+                             : Vector2(lastPoint.x, lastPoint.y - 12));
+      } else {
+        // Vertical arrow
+        points.push_back(Vector2(lastPoint.x, lastPoint.y + 5));
+        points.push_back(Vector2(lastPoint.x, lastPoint.y - 5));
+        points.push_back(secondToLastPoint.x < lastPoint.x
+                             ? Vector2(lastPoint.x + 12, lastPoint.y)
+                             : Vector2(lastPoint.x - 12, lastPoint.y));
+      }
     } else {
-      points.push_back(Vector2(lastPoint.x, lastPoint.y + 8));
-      points.push_back(Vector2(lastPoint.x, lastPoint.y - 8));
-      points.push_back(secondToLastPoint.x < lastPoint.x
-                           ? Vector2(lastPoint.x + 12, lastPoint.y)
-                           : Vector2(lastPoint.x - 12, lastPoint.y));
+      // Draw a circle
+      double centerX = lastPoint.x, centerY = lastPoint.y, radius = 5;
+      if (secondToLastPoint.x == lastPoint.x) {
+        centerX = lastPoint.x;
+        if (secondToLastPoint.y < lastPoint.y) {
+          // Edge is going down
+          centerY += radius;
+        } else {
+          // Edge is going up
+          centerY -= radius;
+        }
+      } else {
+        centerY = lastPoint.y;
+        if (secondToLastPoint.x < lastPoint.x) {
+          // Edge is going right
+          centerX += radius;
+        } else {
+          // Edge is going left
+          centerX -= radius;
+        }
+      }
+      double angle = 0;
+      double angleIncrement = 2 * M_PI / NUM_OVAL_POINTS;
+      for (unsigned i = 0; i < NUM_OVAL_POINTS; ++i) {
+        angle += angleIncrement;
+        double x = centerX + radius * cos(angle);
+        double y = centerY + radius * sin(angle);
+        points.push_back(Vector2(x, y));
+      }
     }
 
-    arrowHead->set_polygon(points);
-    arrowHead->set_color(OPAQUE_BLACK);
-    area2D->add_child(arrowHead);
-    edgeIdToArrowHead[edge.getEdgeId()] = arrowHead;
+    arrowheadPoly->set_polygon(points);
+    area2D->add_child(arrowheadPoly);
+    edgeIdToArrowHead[edge.getEdgeId()] = arrowheadPoly;
 
     // Create the label and configure it
     RichTextLabel *label = memnew(RichTextLabel);
