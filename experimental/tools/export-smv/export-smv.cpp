@@ -13,6 +13,7 @@
 
 #include "dynamatic/Analysis/NameAnalysis.h"
 #include "dynamatic/Dialect/Handshake/HandshakeOps.h"
+#include "dynamatic/Support/TimingModels.h"
 #include "mlir/Dialect/Arith/IR/Arith.h"
 #include "mlir/Dialect/Math/IR/Math.h"
 #include "mlir/Dialect/MemRef/IR/MemRef.h"
@@ -44,9 +45,25 @@ static cl::opt<std::string> inputFileName(cl::Positional,
                                           cl::desc("<input file>"),
                                           cl::cat(mainCategory));
 
+static cl::opt<std::string> timingDBFilepath(
+    "timing-models", cl::Optional,
+    cl::desc(
+        "Relative path to JSON-formatted file containing timing models for "
+        "dataflow components. The tool will fetch the latency information from "
+        "this file"),
+    cl::init("data/components.json"), cl::cat(mainCategory));
+
+std::string getNodeLatencyAttr(Operation *op, TimingDatabase &timingDB) {
+  double latency;
+  if (failed(timingDB.getLatency(op, SignalType::DATA, latency)))
+    return "0";
+  return std::to_string(static_cast<unsigned>(latency));
+}
+
 // for parametrized units, we encode the parameter in the type of the unit and
 // later generate a unit for each parametrization used by the model
-LogicalResult getNodeType(Operation *op, mlir::raw_indented_ostream &os) {
+LogicalResult getNodeType(Operation *op, mlir::raw_indented_ostream &os,
+                          TimingDatabase timingDB) {
 
   int numInputs = op->getNumOperands();
   int numOutputs = op->getNumResults();
@@ -54,28 +71,38 @@ LogicalResult getNodeType(Operation *op, mlir::raw_indented_ostream &os) {
   std::string type =
       llvm::TypeSwitch<Operation *, std::string>(op)
           .Case<handshake::OEHBOp>([&](handshake::OEHBOp oehbOp) {
-            return "buffer" + std::to_string(oehbOp.getSlots()) + "o_" +
-                   std::to_string(numInputs) + "_" + std::to_string(numOutputs);
+            return "buffer" + std::to_string(oehbOp.getSlots()) + "o";
           })
           .Case<handshake::TEHBOp>([&](handshake::TEHBOp tehbOp) {
-            return "buffer" + std::to_string(tehbOp.getSlots()) + "t_" +
-                   std::to_string(numInputs) + "_" + std::to_string(numOutputs);
+            return "buffer" + std::to_string(tehbOp.getSlots()) + "t";
           })
-          .Default([&](auto) {
-            return "unknownop" + std::to_string(numInputs) + "_" +
-                   std::to_string(numOutputs);
-          });
+          .Case<arith::CmpIOp, arith::CmpFOp, arith::AndIOp, arith::OrIOp,
+                arith::XOrIOp>([&](auto) {
+            return "decider" + getNodeLatencyAttr(op, timingDB) + "c";
+          })
+          .Case<arith::AddIOp, arith::AddFOp, arith::SubIOp, arith::SubFOp,
+                arith::MulIOp, arith::MulFOp, arith::DivUIOp, arith::DivSIOp,
+                arith::DivFOp, arith::ShRSIOp, arith::ShRUIOp, arith::ShLIOp,
+                arith::ExtSIOp, arith::ExtUIOp, arith::ExtFOp, arith::TruncIOp,
+                arith::TruncFOp>([&](auto) {
+            return "operator" + getNodeLatencyAttr(op, timingDB) + "c";
+          })
+          .Default(
+              [&](auto) { return "unknownop" + std::to_string(numInputs); });
 
-  os << type;
+  os << type << "_" << std::to_string(numInputs) << "_"
+     << std::to_string(numOutputs);
+  ;
   return success();
 }
 
 // prints the declaration for the unit
-LogicalResult printUnit(Operation *op, mlir::raw_indented_ostream &os) {
+LogicalResult printUnit(Operation *op, mlir::raw_indented_ostream &os,
+                        TimingDatabase &timingDB) {
   StringRef unitName = getUniqueName(op);
 
   os << "VAR " << unitName << " : ";
-  if (failed(getNodeType(op, os))) {
+  if (failed(getNodeType(op, os, timingDB))) {
     return failure();
   }
   os << " (";
@@ -130,7 +157,7 @@ LogicalResult printEdge(OpOperand &oprd, mlir::raw_indented_ostream &os) {
   return success();
 }
 
-LogicalResult writeSmv(mlir::ModuleOp mod) {
+LogicalResult writeSmv(mlir::ModuleOp mod, TimingDatabase &timingDB) {
 
   mlir::raw_indented_ostream stdOs(llvm::outs());
   auto funcs = mod.getOps<handshake::FuncOp>();
@@ -150,7 +177,7 @@ LogicalResult writeSmv(mlir::ModuleOp mod) {
   stdOs << "\n-- units\n";
 
   for (auto &op : funcOp.getOps()) {
-    if (failed(printUnit(&op, stdOs)))
+    if (failed(printUnit(&op, stdOs, timingDB)))
       return failure();
   }
 
@@ -196,6 +223,13 @@ int main(int argc, char **argv) {
                       handshake::HandshakeDialect, math::MathDialect>();
   context.allowUnregisteredDialects();
 
+  TimingDatabase timingDB(&context);
+  if (failed(TimingDatabase::readFromJSON(timingDBFilepath, timingDB))) {
+    llvm::errs() << "Failed to read timing database at \"" << timingDBFilepath
+                 << "\"\n";
+    return 1;
+  }
+
   // Load the MLIR module
   SourceMgr sourceMgr;
   sourceMgr.AddNewSourceBuffer(std::move(*fileOrErr), SMLoc());
@@ -203,5 +237,5 @@ int main(int argc, char **argv) {
       mlir::parseSourceFile<ModuleOp>(sourceMgr, &context));
   if (!mod)
     return 1;
-  return failed(writeSmv(*mod));
+  return failed(writeSmv(*mod, timingDB));
 }
