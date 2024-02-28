@@ -25,6 +25,8 @@
 #include "mlir/Parser/Parser.h"
 #include "mlir/Support/IndentedOstream.h"
 #include "mlir/Support/LogicalResult.h"
+#include "llvm/ADT/STLExtras.h"
+#include "llvm/ADT/StringExtras.h"
 #include "llvm/ADT/StringRef.h"
 #include "llvm/ADT/TypeSwitch.h"
 #include "llvm/Support/CommandLine.h"
@@ -53,11 +55,71 @@ static cl::opt<std::string> timingDBFilepath(
         "this file"),
     cl::init("data/components.json"), cl::cat(mainCategory));
 
+static size_t findIndexInRange(ValueRange range, Value val) {
+  for (auto [idx, res] : llvm::enumerate(range))
+    if (res == val)
+      return idx;
+  llvm_unreachable("value should exist in range");
+}
+
 std::string getNodeLatencyAttr(Operation *op, TimingDatabase &timingDB) {
   double latency;
   if (failed(timingDB.getLatency(op, SignalType::DATA, latency)))
     return "0";
   return std::to_string(static_cast<unsigned>(latency));
+}
+
+LogicalResult getBufferImpl(bool transp, unsigned slots,
+                            mlir::raw_indented_ostream &os) {
+
+  if (!transp && (slots == 1 || slots == 2)) {
+    os << "MODULE buffer" << slots << "o_1_1(dataIn0, pValid0, nReady0)\n";
+    os << "VAR\n";
+    os << "b0     : tehb_1_1(dataIn0, pValid0, b1.ready0);\n";
+    os << "b1     : oehb_1_1(b0.dataOut0, b0.valid0, nReady0);\n";
+    os << "DEFINE\n";
+    os << "dataOut0 := b1.dataOut0;\n";
+    os << "valid0 := b1.valid0;\n";
+    os << "ready0 := b0.ready0;\n";
+    return success();
+  }
+
+  if (transp && slots == 1) {
+    os << "MODULE _buffer1t_1_1(dataIn0, pValid0, nReady0)\n";
+    os << "VAR\n";
+    os << "b0 : tehb_1_1(dataIn0, pValid0, nReady0);\n";
+    os << "DEFINE\n";
+    os << "dataOut0 := b0.dataOut0;\n";
+    os << "valid0   := b0.valid0;\n";
+    os << "ready0   := b0.ready0;\n";
+    return success();
+  }
+
+  std::vector<std::string> data;
+  std::vector<std::string> valid;
+  std::vector<std::string> ready;
+
+  // cascading tslots
+  if (transp) {
+    data.emplace_back("dataIn0");
+    valid.emplace_back("pValid0");
+    for (unsigned i = 0; i < slots; i++) {
+      data.emplace_back("b" + itostr(i) + ".dataOut0");
+      valid.emplace_back("b" + itostr(i) + ".valid0");
+      ready.emplace_back("b" + itostr(i) + ".ready0");
+    }
+    ready.emplace_back("nReady");
+    os << "MODULE buffer" << slots << "t_1_1(dataIn0, pValid0, nReady0)\n";
+    os << "VAR\n";
+    os << "DEFINE dataOut0 := b" << slots - 1 << ".dataOut0; \n";
+    os << "DEFINE valid0   := b" << slots - 1 << ".valid0; \n";
+    os << "DEFINE ready0   := b0.ready0; \n";
+    for (unsigned i = 0; i < slots; i++) {
+      os << "VAR b" << i << " : tslot_1_1(" << data[i] << ", " << valid[i]
+         << ", " << ready[i] << ");\n";
+    }
+  }
+  return success();
 }
 
 // for parametrized units, we encode the parameter in the type of the unit and
@@ -142,13 +204,6 @@ LogicalResult printUnit(Operation *op, mlir::raw_indented_ostream &os,
   return success();
 }
 
-static size_t findIndexInRange(ValueRange range, Value val) {
-  for (auto [idx, res] : llvm::enumerate(range))
-    if (res == val)
-      return idx;
-  llvm_unreachable("value should exist in range");
-}
-
 // prints the declaration for the channels, one line per each data, ready and
 // valid signal
 LogicalResult printEdge(OpOperand &oprd, mlir::raw_indented_ostream &os) {
@@ -176,14 +231,14 @@ LogicalResult printEdge(OpOperand &oprd, mlir::raw_indented_ostream &os) {
           .Default([&](auto) { return "false"; });
 
   os << "DEFINE " << getUniqueName(src) << "_nReady" << resIdx << " = "
-     << getUniqueName(dst) << "_ready" << argIdx << ";\n";
+     << getUniqueName(dst) << ".ready" << argIdx << ";\n";
 
   os << "DEFINE " << getUniqueName(dst) << "_pValid" << argIdx << " = "
-     << getUniqueName(src) << "_valid" << resIdx << ";\n";
+     << getUniqueName(src) << ".valid" << resIdx << ";\n";
 
   if (!isa<handshake::ConstantOp>(src))
     os << "DEFINE " << getUniqueName(dst) << "_dataIn" << argIdx << " = "
-       << getUniqueName(src) << "_dataOut" << resIdx << ";\n";
+       << getUniqueName(src) << ".dataOut" << resIdx << ";\n";
   else
     os << "DEFINE " << getUniqueName(dst) << "_dataIn" << argIdx << " = "
        << cstValue << ";\n";
