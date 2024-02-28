@@ -70,16 +70,31 @@ LogicalResult getNodeType(Operation *op, mlir::raw_indented_ostream &os,
 
   std::string type =
       llvm::TypeSwitch<Operation *, std::string>(op)
+          .Case<handshake::ConstantOp>(
+              [&](handshake::ConstantOp cstOp) -> std::string {
+                return "constant";
+              })
           .Case<handshake::OEHBOp>([&](handshake::OEHBOp oehbOp) {
             return "buffer" + std::to_string(oehbOp.getSlots()) + "o";
           })
           .Case<handshake::TEHBOp>([&](handshake::TEHBOp tehbOp) {
             return "buffer" + std::to_string(tehbOp.getSlots()) + "t";
           })
+          .Case<handshake::ReturnOp>([&](auto) { return "buffer1t"; })
           .Case<arith::CmpIOp, arith::CmpFOp, arith::AndIOp, arith::OrIOp,
                 arith::XOrIOp>([&](auto) {
             return "decider" + getNodeLatencyAttr(op, timingDB) + "c";
           })
+          .Case<handshake::ForkOp>([&](auto) { return "fork"; })
+          .Case<handshake::ControlMergeOp>([&](auto) { return "cmerge"; })
+          .Case<handshake::SourceOp>([&](auto) { return "source"; })
+          .Case<handshake::SinkOp>([&](auto) { return "sink"; })
+          .Case<handshake::MuxOp>([&](auto) { return "mux"; })
+          .Case<handshake::MergeOp>([&](auto) { return "merge"; })
+          .Case<handshake::LSQOp>([&](auto) { return "lsq"; })
+          .Case<handshake::MemoryControllerOp>([&](auto) { return "mc"; })
+          .Case<handshake::ConditionalBranchOp, handshake::BranchOp>(
+              [&](auto) { return "branch"; })
           .Case<arith::AddIOp, arith::AddFOp, arith::SubIOp, arith::SubFOp,
                 arith::MulIOp, arith::MulFOp, arith::DivUIOp, arith::DivSIOp,
                 arith::DivFOp, arith::ShRSIOp, arith::ShRUIOp, arith::ShLIOp,
@@ -145,20 +160,38 @@ LogicalResult printEdge(OpOperand &oprd, mlir::raw_indented_ostream &os) {
   const size_t resIdx = findIndexInRange(src->getResults(), val);
   const size_t argIdx = findIndexInRange(dst->getOperands(), val);
 
+  std::string cstValue =
+      llvm::TypeSwitch<Operation *, std::string>(src)
+          .Case<handshake::ConstantOp>([&](handshake::ConstantOp cstOp) {
+            Type cstType = cstOp.getResult().getType();
+            TypedAttr valueAttr = cstOp.getValueAttr();
+            if (isa<IntegerType>(cstType)) {
+              if (auto boolAttr = dyn_cast<mlir::BoolAttr>(valueAttr))
+                return boolAttr.getValue() ? "TRUE" : "FALSE";
+            }
+            // if not a Boolean value: the abstract model doesn't care constant
+            // values like this
+            return "FALSE";
+          })
+          .Default([&](auto) { return "false"; });
+
   os << "DEFINE " << getUniqueName(src) << "_nReady" << resIdx << " = "
      << getUniqueName(dst) << "_ready" << argIdx << ";\n";
 
   os << "DEFINE " << getUniqueName(dst) << "_pValid" << argIdx << " = "
      << getUniqueName(src) << "_valid" << resIdx << ";\n";
 
-  os << "DEFINE " << getUniqueName(dst) << "_dataIn" << argIdx << " = "
-     << getUniqueName(src) << "_dataOut" << resIdx << ";\n";
+  if (!isa<handshake::ConstantOp>(src))
+    os << "DEFINE " << getUniqueName(dst) << "_dataIn" << argIdx << " = "
+       << getUniqueName(src) << "_dataOut" << resIdx << ";\n";
+  else
+    os << "DEFINE " << getUniqueName(dst) << "_dataIn" << argIdx << " = "
+       << cstValue << ";\n";
 
   return success();
 }
 
 LogicalResult writeSmv(mlir::ModuleOp mod, TimingDatabase &timingDB) {
-
   mlir::raw_indented_ostream stdOs(llvm::outs());
   auto funcs = mod.getOps<handshake::FuncOp>();
   if (++funcs.begin() != funcs.end()) {
@@ -198,7 +231,6 @@ LogicalResult writeSmv(mlir::ModuleOp mod, TimingDatabase &timingDB) {
 }
 
 int main(int argc, char **argv) {
-
   InitLLVM y(argc, argv);
 
   cl::ParseCommandLineOptions(
@@ -215,9 +247,9 @@ int main(int argc, char **argv) {
     return 1;
   }
 
-  // Functions feeding into HLS tools might have attributes from high(er) level
-  // dialects or parsers. Allow unregistered dialects to not fail in these
-  // cases
+  // Functions feeding into HLS tools might have attributes from high(er)
+  // level dialects or parsers. Allow unregistered dialects to not fail in
+  // these cases
   MLIRContext context;
   context.loadDialect<memref::MemRefDialect, arith::ArithDialect,
                       handshake::HandshakeDialect, math::MathDialect>();
