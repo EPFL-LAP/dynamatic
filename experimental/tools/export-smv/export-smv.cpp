@@ -82,10 +82,10 @@ LogicalResult getBufferImpl(bool transp, unsigned slots,
 
   // Currently, when mapping the (transp, slot) to the buffer implementation, we
   // consider the following convention:
-  // not transparent && slot == 1: OEHB
-  //     transparent && slot == 1: TEHB
-  // not transparent && slot >  1: OEHB + tslots * (slot - 1)
-  //     transparent && slot >  1: tslots * (slot)
+  // not transparent && slot == 1 or 2: OEHB
+  //     transparent && slot == 1     : TEHB
+  // not transparent && slot >  2     : OEHB + tslots * (slot - 1) + TEHB
+  //     transparent && slot >  1     : tslots * (slot)
 
   // This will be revised in the future when we consider the buffer parameter as
   // a tuple, i.e., (fwdLatency, bwdLatency, slots)
@@ -185,9 +185,82 @@ LogicalResult getForkImpl(unsigned nOutputs, mlir::raw_indented_ostream &os) {
   return success();
 }
 
+LogicalResult getOperatorImpl(unsigned numInputs, unsigned lat,
+                              raw_indented_ostream &os) {
+  os << "\nMODULE operator" << lat << "c_" << numInputs << "_1 (";
+  for (unsigned i = 0; i < numInputs; i++) {
+    os << "dataIn" << i << ", pValid" << i << ", ";
+  }
+  os << "nReady0)\nVAR\n";
+  os << "d0 : delay" << lat << "c_1_1(FALSE, j0.valid0, nReady0);\n";
+  os << "j0 : join_" << numInputs << "_1(";
+  for (unsigned i = 0; i < numInputs; i++) {
+    os << "pValid" << i << ", ";
+  }
+  os << "d0.ready0);\n";
+  os << "DEFINE\n";
+  os << "valid0   := d0.valid0;\n";
+  os << "dataOut0 := d0.dataOut0;\n";
+  os << "num      := d0.num;\n";
+  for (unsigned i = 0; i < numInputs; i++) {
+    os << "ready" << i << " := j0.ready" << i << ";\n";
+  }
+  return success();
+}
+
+// this implements model of the pipeline stage inside the pipelined units
+LogicalResult getDelayImpl(unsigned lat, raw_indented_ostream &os) {
+  os << "\nMODULE delay" << lat << "c_1_1 (dataIn0, pValid0, nReady0)\n";
+  if (lat == 0) {
+    os << "DEFINE dataOut0 := dataIn0;\n";
+    os << "DEFINE valid0   := pValid0;\n";
+    os << "DEFINE ready0   := nReady0;\n";
+    return success();
+  }
+
+  if (lat == 1) {
+    os << "VAR b0          := oehb_1_1(dataIn0, pValid0, nReady0);\n";
+    os << "DEFINE dataOut0 := b0.dataIn0;\n";
+    os << "DEFINE valid0   := b0.pValid0;\n";
+    os << "DEFINE ready0   := b0.ready0;\n";
+    os << "DEFINE num      := toint(b0.valid0);\n";
+    os << "DEFINE v1.full  := b0.valid0;\n";
+    os << "DEFINE v1.num   := num;\n";
+    return success();
+  }
+
+  if (lat > 1) {
+    os << "VAR b0 := oehb_1_1(dataIn0, v" << lat - 1 << ", nReady0);\n";
+    os << "DEFINE v0       := pValid0;\n";
+    for (unsigned i = 1; i < lat; i++) {
+      os << "VAR b" << i << " : boolean;\n";
+      os << "ASSIGN init(v" << i << ") := FALSE;\n";
+      os << "ASSIGN next(v" << i << ") := b0.ready0 ? v" << i - 1 << " : v" << i
+         << ";\n";
+    }
+    os << "DEFINE dataOut0 := FALSE;\n";
+    os << "DEFINE valid0   := b0.pValid0;\n";
+    os << "DEFINE ready0   := b0.ready0;\n";
+    os << "DEFINE v" << lat << " := b0.valid0;\n";
+
+    os << "num : count(";
+    for (unsigned i = 1; i < lat; i++) {
+      os << "v" << itostr(i) << ", ";
+    }
+    os << "v" << lat << ");\n";
+    for (unsigned i = 1; i < lat; i++) {
+      os << "DEFINE v" << i << ".full := v" << i << ";\n";
+      os << "DEFINE v" << i << ".num  := toint(v" << i << ");\n";
+    }
+    return success();
+  }
+
+  return failure();
+}
+
 // for parametrized units, we encode the parameter in the type of the unit and
 // later generate a unit for each parametrization used by the model
-LogicalResult getNodeType(Operation *op, mlir::raw_indented_ostream &os,
+LogicalResult getUnitType(Operation *op, mlir::raw_indented_ostream &os,
                           TimingDatabase timingDB) {
 
   int numInputs = op->getNumOperands();
@@ -242,7 +315,7 @@ LogicalResult printUnit(Operation *op, mlir::raw_indented_ostream &os,
   StringRef unitName = getUniqueName(op);
 
   os << "VAR " << unitName << " : ";
-  if (failed(getNodeType(op, os, timingDB))) {
+  if (failed(getUnitType(op, os, timingDB))) {
     return failure();
   }
   os << " (";
@@ -269,7 +342,7 @@ LogicalResult printUnit(Operation *op, mlir::raw_indented_ostream &os,
 
 // prints the declaration for the channels, one line per each data, ready and
 // valid signal
-LogicalResult printEdge(OpOperand &oprd, mlir::raw_indented_ostream &os) {
+LogicalResult printChannel(OpOperand &oprd, mlir::raw_indented_ostream &os) {
   Value val = oprd.get();
   Operation *src = val.getDefiningOp();
   Operation *dst = oprd.getOwner();
@@ -293,27 +366,29 @@ LogicalResult printEdge(OpOperand &oprd, mlir::raw_indented_ostream &os) {
           })
           .Default([&](auto) { return "false"; });
 
-  os << "DEFINE " << getUniqueName(src) << "_nReady" << resIdx << " = "
-     << getUniqueName(dst) << ".ready" << argIdx << ";\n";
+  os << "DEFINE " << getUniqueName(src) << "_nReady" << resIdx
+     << " := " << getUniqueName(dst) << ".ready" << argIdx << ";\n";
 
-  os << "DEFINE " << getUniqueName(dst) << "_pValid" << argIdx << " = "
-     << getUniqueName(src) << ".valid" << resIdx << ";\n";
+  os << "DEFINE " << getUniqueName(dst) << "_pValid" << argIdx
+     << " := " << getUniqueName(src) << ".valid" << resIdx << ";\n";
 
   if (!isa<handshake::ConstantOp>(src))
-    os << "DEFINE " << getUniqueName(dst) << "_dataIn" << argIdx << " = "
-       << getUniqueName(src) << ".dataOut" << resIdx << ";\n";
+    os << "DEFINE " << getUniqueName(dst) << "_dataIn" << argIdx
+       << " := " << getUniqueName(src) << ".dataOut" << resIdx << ";\n";
   else
-    os << "DEFINE " << getUniqueName(dst) << "_dataIn" << argIdx << " = "
-       << cstValue << ";\n";
+    os << "DEFINE " << getUniqueName(dst) << "_dataIn" << argIdx
+       << " := " << cstValue << ";\n";
 
   return success();
 }
 
 LogicalResult writeUnitImpl(handshake::FuncOp &funcOp,
-                            mlir::raw_indented_ostream &os) {
+                            mlir::raw_indented_ostream &os,
+                            const TimingDatabase &timingDB) {
   // make sure the each configuration is generated no more than once
   std::set<std::tuple<bool, signed>> bufAttrs;
-  std::set<unsigned> forkAttrs;
+  std::set<unsigned> forkAttrs, delayAttrs;
+  std::set<std::tuple<unsigned, unsigned>> operatorAttrs;
   for (auto &op : funcOp.getOps()) {
     if (handshake::OEHBOp oehb = llvm::dyn_cast<handshake::OEHBOp>(op); oehb) {
       unsigned slots = oehb.getSlots();
@@ -328,18 +403,42 @@ LogicalResult writeUnitImpl(handshake::FuncOp &funcOp,
       if (bufAttrs.count({true, slots}) == 0) {
         if (failed(getBufferImpl(true, slots, os)))
           return failure();
+        bufAttrs.emplace(true, slots);
       }
-      bufAttrs.emplace(true, slots);
     }
     if (handshake::ForkOp forkOp = llvm::dyn_cast<handshake::ForkOp>(op);
         forkOp) {
       unsigned numOutputs = forkOp.getNumResults();
       // only generate implementation for forks that have more than 3 outputs
-      if (forkAttrs.count(numOutputs) == 0 && numOutputs >= 3) {
+      // the 2-output and 3-output forks are provided in the smv component
+      // library
+      if (forkAttrs.count(numOutputs) == 0 && numOutputs > 3) {
         if (failed(getForkImpl(numOutputs, os)))
           return failure();
+        forkAttrs.emplace(numOutputs);
       }
-      forkAttrs.emplace(numOutputs);
+    }
+    if (isa<arith::AddIOp, arith::AddFOp, arith::SubIOp, arith::SubFOp,
+            arith::MulIOp, arith::MulFOp, arith::DivUIOp, arith::DivSIOp,
+            arith::DivFOp, arith::ShRSIOp, arith::ShRUIOp, arith::ShLIOp,
+            arith::ExtSIOp, arith::ExtUIOp, arith::ExtFOp, arith::TruncIOp,
+            arith::TruncFOp>(op)) {
+      double floatLat = 0.0;
+      unsigned lat = 0;
+      if (!failed(timingDB.getLatency(&op, SignalType::DATA, floatLat))) {
+        lat = (int)round(floatLat);
+      }
+      if (delayAttrs.count(lat) == 0) {
+        if (failed(getDelayImpl(lat, os)))
+          return failure();
+        delayAttrs.emplace((int)round(lat));
+      }
+      int numInputs = op.getNumOperands();
+      if (operatorAttrs.count({numInputs, lat}) == 0) {
+        if (failed(getOperatorImpl(numInputs, lat, os)))
+          return failure();
+        operatorAttrs.emplace(numInputs, lat);
+      }
     }
   }
   return success();
@@ -373,7 +472,7 @@ LogicalResult writeSmv(mlir::ModuleOp mod, TimingDatabase &timingDB) {
   for (auto &op : funcOp.getOps()) {
     for (OpResult res : op.getResults()) {
       for (OpOperand &val : res.getUses()) {
-        if (failed(printEdge(val, stdOs)))
+        if (failed(printChannel(val, stdOs)))
           return failure();
       }
     }
@@ -382,7 +481,7 @@ LogicalResult writeSmv(mlir::ModuleOp mod, TimingDatabase &timingDB) {
   stdOs << "\n\n-- formal properties\n";
 
   stdOs << "\n\n-- parametrized units\n";
-  if (failed(writeUnitImpl(funcOp, stdOs)))
+  if (failed(writeUnitImpl(funcOp, stdOs, timingDB)))
     return failure();
 
   return success();
