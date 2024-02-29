@@ -640,12 +640,18 @@ int main(int argc, char **argv) {
     }
 
     // Read the script line-by-line and execute its commands
+    // supported delimeters: '\n' and ';'
     std::string line;
-    while (std::getline(inputFile, line))
-      if (!line.empty() && !StringRef(line).starts_with("#")) {
-        llvm::outs() << PROMPT << line << "\n";
-        handleInput(line);
+    while (std::getline(inputFile, line, '\n')) {
+      std::stringstream subss(line);
+      std::string line;
+      while (std::getline(subss, line, ';')) {
+        if (!line.empty() && !StringRef(line).starts_with("#")) {
+          llvm::outs() << PROMPT << line << "\n";
+          handleInput(line);
+        }
       }
+    }
   }
 
   std::string userInput;
