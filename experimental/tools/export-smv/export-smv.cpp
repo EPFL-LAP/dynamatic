@@ -29,12 +29,15 @@
 #include "llvm/ADT/StringExtras.h"
 #include "llvm/ADT/StringRef.h"
 #include "llvm/ADT/TypeSwitch.h"
+#include "llvm/Support/Casting.h"
 #include "llvm/Support/CommandLine.h"
 #include "llvm/Support/ErrorHandling.h"
 #include "llvm/Support/InitLLVM.h"
 #include "llvm/Support/SourceMgr.h"
 #include <cstddef>
+#include <set>
 #include <string>
+#include <tuple>
 #include <utility>
 
 using namespace llvm;
@@ -72,6 +75,7 @@ std::string getNodeLatencyAttr(Operation *op, TimingDatabase &timingDB) {
 LogicalResult getBufferImpl(bool transp, unsigned slots,
                             mlir::raw_indented_ostream &os) {
 
+  os << "\n";
   if (!transp && (slots == 1 || slots == 2)) {
     os << "MODULE buffer" << slots << "o_1_1(dataIn0, pValid0, nReady0)\n";
     os << "VAR\n";
@@ -85,7 +89,7 @@ LogicalResult getBufferImpl(bool transp, unsigned slots,
   }
 
   if (transp && slots == 1) {
-    os << "MODULE _buffer1t_1_1(dataIn0, pValid0, nReady0)\n";
+    os << "MODULE buffer1t_1_1(dataIn0, pValid0, nReady0)\n";
     os << "VAR\n";
     os << "b0 : tehb_1_1(dataIn0, pValid0, nReady0);\n";
     os << "DEFINE\n";
@@ -99,7 +103,7 @@ LogicalResult getBufferImpl(bool transp, unsigned slots,
   std::vector<std::string> valid;
   std::vector<std::string> ready;
 
-  // cascading tslots
+  // Transparent buffer with more than 1 slot: cascading tslots
   if (transp) {
     data.emplace_back("dataIn0");
     valid.emplace_back("pValid0");
@@ -119,6 +123,8 @@ LogicalResult getBufferImpl(bool transp, unsigned slots,
          << ", " << ready[i] << ");\n";
     }
   }
+  // Non-transparent buffer with more than 2 slots
+
   return success();
 }
 
@@ -246,6 +252,30 @@ LogicalResult printEdge(OpOperand &oprd, mlir::raw_indented_ostream &os) {
   return success();
 }
 
+LogicalResult writeUnitImpl(handshake::FuncOp &funcOp,
+                            mlir::raw_indented_ostream &os) {
+  std::set<std::tuple<bool, signed>> bufAttrs;
+  for (auto &op : funcOp.getOps()) {
+    if (handshake::OEHBOp oehb = llvm::dyn_cast<handshake::OEHBOp>(op); oehb) {
+      unsigned slots = oehb.getSlots();
+      if (bufAttrs.count({false, slots}) == 0) {
+        if (failed(getBufferImpl(false, slots, os)))
+          return failure();
+      }
+      bufAttrs.emplace(false, slots);
+    }
+    if (handshake::TEHBOp tehb = llvm::dyn_cast<handshake::TEHBOp>(op); tehb) {
+      unsigned slots = tehb.getSlots();
+      if (bufAttrs.count({true, slots}) == 0) {
+        if (failed(getBufferImpl(true, slots, os)))
+          return failure();
+      }
+      bufAttrs.emplace(true, slots);
+    }
+  }
+  return success();
+}
+
 LogicalResult writeSmv(mlir::ModuleOp mod, TimingDatabase &timingDB) {
   mlir::raw_indented_ostream stdOs(llvm::outs());
   auto funcs = mod.getOps<handshake::FuncOp>();
@@ -281,6 +311,10 @@ LogicalResult writeSmv(mlir::ModuleOp mod, TimingDatabase &timingDB) {
   }
 
   stdOs << "\n\n-- formal properties\n";
+
+  stdOs << "\n\n-- parametrized units\n";
+  if (failed(writeUnitImpl(funcOp, stdOs)))
+    return failure();
 
   return success();
 }
