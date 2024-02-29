@@ -87,6 +87,9 @@ LogicalResult getBufferImpl(bool transp, unsigned slots,
   // not transparent && slot >  1: OEHB + tslots * (slot - 1)
   //     transparent && slot >  1: tslots * (slot)
 
+  // This will be revised in the future when we consider the buffer parameter as
+  // a tuple, i.e., (fwdLatency, bwdLatency, slots)
+
   if (!transp && (slots == 1 || slots == 2)) {
     os << "b0     : tehb_1_1(dataIn0, pValid0, b1.ready0);\n";
     os << "b1     : oehb_1_1(b0.dataOut0, b0.valid0, nReady0);\n";
@@ -145,7 +148,40 @@ LogicalResult getBufferImpl(bool transp, unsigned slots,
     }
     os << "VAR b" << slots << " : tehb_1_1" << data[slots] << ", "
        << valid[slots] << ", " << ready[slots] << ");\n";
+    return success();
   }
+
+  // encountered unknown buffer configuration!
+  return failure();
+}
+
+LogicalResult getForkImpl(unsigned nOutputs, mlir::raw_indented_ostream &os) {
+  assert(nOutputs >= 2 && "received a fork with 0 or 1 output ports!");
+  // interface
+  os << "\nMODULE fork_1_" << nOutputs << "(dataIn0, pValid0, ";
+  for (unsigned i = 0; i < nOutputs - 1; i++) {
+    os << "nReady" << i << ", ";
+  }
+  os << "nReady" << nOutputs - 1 << ")\n";
+  os << "forkStop := ";
+  for (unsigned i = 0; i < nOutputs - 1; i++) {
+    os << "regBlock" << i << ".blockStop | ";
+  }
+  os << "regBlock" << nOutputs - 1 << "blockStop;\n";
+  os << "pValidAndForkStop := pValid0 & forkStop;\n";
+  os << "ready0 := !forkStop;\n";
+  for (unsigned i = 0; i < nOutputs; i++) {
+    os << "-- output" << i << "\n";
+    os << "VAR regBlock" << i << " : eagerFork_RegisterBlock(pValid0, !nReady"
+       << i << ", pValidAndForkStop);\n";
+    os << "DEFINE valid" << i << " := regBlock" << i << ".valid;\n";
+    os << "DEFINE dataOut" << i << " := dataIn0;\n";
+    os << "sent" << i << " := !regBlock" << i << ".reg_value;\n";
+    os << "sent_plus" << i << " := !regBlock" << i << ".reg_value & dataIn0;\n";
+    os << "sent_minus" << i << " := !regBlock" << i
+       << ".reg_value & !dataIn0;\n";
+  }
+
   return success();
 }
 
@@ -275,7 +311,9 @@ LogicalResult printEdge(OpOperand &oprd, mlir::raw_indented_ostream &os) {
 
 LogicalResult writeUnitImpl(handshake::FuncOp &funcOp,
                             mlir::raw_indented_ostream &os) {
+  // make sure the each configuration is generated no more than once
   std::set<std::tuple<bool, signed>> bufAttrs;
+  std::set<unsigned> forkAttrs;
   for (auto &op : funcOp.getOps()) {
     if (handshake::OEHBOp oehb = llvm::dyn_cast<handshake::OEHBOp>(op); oehb) {
       unsigned slots = oehb.getSlots();
@@ -292,6 +330,16 @@ LogicalResult writeUnitImpl(handshake::FuncOp &funcOp,
           return failure();
       }
       bufAttrs.emplace(true, slots);
+    }
+    if (handshake::ForkOp forkOp = llvm::dyn_cast<handshake::ForkOp>(op);
+        forkOp) {
+      unsigned numOutputs = forkOp.getNumResults();
+      // only generate implementation for forks that have more than 3 outputs
+      if (forkAttrs.count(numOutputs) == 0 && numOutputs >= 3) {
+        if (failed(getForkImpl(numOutputs, os)))
+          return failure();
+      }
+      forkAttrs.emplace(numOutputs);
     }
   }
   return success();
