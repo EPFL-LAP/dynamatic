@@ -76,9 +76,18 @@ LogicalResult getBufferImpl(bool transp, unsigned slots,
                             mlir::raw_indented_ostream &os) {
 
   os << "\n";
+  os << "MODULE buffer" << slots << (transp ? "t" : "o")
+     << "_1_1(dataIn0, pValid0, nReady0)\n";
+  os << "VAR\n";
+
+  // Currently, when mapping the (transp, slot) to the buffer implementation, we
+  // consider the following convention:
+  // not transparent && slot == 1: OEHB
+  //     transparent && slot == 1: TEHB
+  // not transparent && slot >  1: OEHB + tslots * (slot - 1)
+  //     transparent && slot >  1: tslots * (slot)
+
   if (!transp && (slots == 1 || slots == 2)) {
-    os << "MODULE buffer" << slots << "o_1_1(dataIn0, pValid0, nReady0)\n";
-    os << "VAR\n";
     os << "b0     : tehb_1_1(dataIn0, pValid0, b1.ready0);\n";
     os << "b1     : oehb_1_1(b0.dataOut0, b0.valid0, nReady0);\n";
     os << "DEFINE\n";
@@ -89,8 +98,6 @@ LogicalResult getBufferImpl(bool transp, unsigned slots,
   }
 
   if (transp && slots == 1) {
-    os << "MODULE buffer1t_1_1(dataIn0, pValid0, nReady0)\n";
-    os << "VAR\n";
     os << "b0 : tehb_1_1(dataIn0, pValid0, nReady0);\n";
     os << "DEFINE\n";
     os << "dataOut0 := b0.dataOut0;\n";
@@ -99,32 +106,46 @@ LogicalResult getBufferImpl(bool transp, unsigned slots,
     return success();
   }
 
+  // The data/valid/ready port signals of the individual slots
   std::vector<std::string> data;
   std::vector<std::string> valid;
   std::vector<std::string> ready;
 
-  // Transparent buffer with more than 1 slot: cascading tslots
+  // Transparent buffer with more than 1 slot: equivalent to a N-slot elastic
+  // FIFO with bypass, i.e, has no sequential delay on both directions.
+  data.emplace_back("dataIn0");
+  valid.emplace_back("pValid0");
+  for (unsigned i = 0; i < slots - 1 + (!transp); i++) {
+    data.emplace_back("b" + itostr(i) + ".dataOut0");
+    valid.emplace_back("b" + itostr(i) + ".valid0");
+    ready.emplace_back("b" + itostr(i) + ".ready0");
+  }
+  ready.emplace_back("nReady");
+  os << "DEFINE dataOut0 := b" << slots - (transp) << ".dataOut0; \n";
+  os << "DEFINE valid0   := b" << slots - (transp) << ".valid0; \n";
+  os << "DEFINE ready0   := b0.ready0; \n";
   if (transp) {
-    data.emplace_back("dataIn0");
-    valid.emplace_back("pValid0");
-    for (unsigned i = 0; i < slots; i++) {
-      data.emplace_back("b" + itostr(i) + ".dataOut0");
-      valid.emplace_back("b" + itostr(i) + ".valid0");
-      ready.emplace_back("b" + itostr(i) + ".ready0");
-    }
-    ready.emplace_back("nReady");
-    os << "MODULE buffer" << slots << "t_1_1(dataIn0, pValid0, nReady0)\n";
-    os << "VAR\n";
-    os << "DEFINE dataOut0 := b" << slots - 1 << ".dataOut0; \n";
-    os << "DEFINE valid0   := b" << slots - 1 << ".valid0; \n";
-    os << "DEFINE ready0   := b0.ready0; \n";
+    assert(std::size(data) == slots);
     for (unsigned i = 0; i < slots; i++) {
       os << "VAR b" << i << " : tslot_1_1(" << data[i] << ", " << valid[i]
          << ", " << ready[i] << ");\n";
     }
+    return success();
   }
-  // Non-transparent buffer with more than 2 slots
-
+  // Non-transparent buffer (N slots) with more than 2 slots: equivalent to a
+  // N-slot elastic FIFO + TEHB, i.e., it has sequential latency on both
+  // directions
+  if (!transp) {
+    assert(std::size(data) == slots + 1);
+    os << "VAR b0 : oehb_1_1(" << data[0] << ", " << valid[0] << ", "
+       << ready[0] << ");\n";
+    for (unsigned i = 1; i < slots; i++) {
+      os << "VAR b" << i << " : tslot_1_1(" << data[i] << ", " << valid[i]
+         << ", " << ready[i] << ");\n";
+    }
+    os << "VAR b" << slots << " : tehb_1_1" << data[slots] << ", "
+       << valid[slots] << ", " << ready[slots] << ");\n";
+  }
   return success();
 }
 
