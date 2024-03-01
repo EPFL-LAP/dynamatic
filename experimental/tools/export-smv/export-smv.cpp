@@ -58,6 +58,17 @@ static cl::opt<std::string> timingDBFilepath(
         "this file"),
     cl::init("data/components.json"), cl::cat(mainCategory));
 
+static StringRef getMemName(Value memref) {
+  Operation *parentOp = memref.getParentBlock()->getParentOp();
+  handshake::FuncOp funcOp = dyn_cast<handshake::FuncOp>(parentOp);
+  for (auto [name, funArg] :
+       llvm::zip(funcOp.getArgNames(), funcOp.getArguments())) {
+    if (funArg == memref)
+      return cast<StringAttr>(name).getValue();
+  }
+  return StringRef();
+}
+
 static size_t findIndexInRange(ValueRange range, Value val) {
   for (auto [idx, res] : llvm::enumerate(range))
     if (res == val)
