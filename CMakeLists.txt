@@ -76,8 +76,6 @@ list(APPEND CMAKE_MODULE_PATH "${CMAKE_CURRENT_SOURCE_DIR}/cmake/modules")
 # Dynamatic include directories
 include_directories(${DYNAMATIC_INCLUDE_DIR})
 include_directories(${DYNAMATIC_BIN_INCLUDE_DIR})
-include_directories(${DYNAMATIC_SOURCE_DIR}/tutorials/include)
-include_directories(${DYNAMATIC_BINARY_DIR}/tutorials/include)
 include_directories(${DYNAMATIC_EXPERIMENTAL_DIR}/include)
 include_directories(${DYNAMATIC_BINARY_DIR}/experimental/include)
 

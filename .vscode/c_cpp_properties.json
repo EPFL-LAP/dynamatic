@@ -7,22 +7,22 @@
         "${workspaceFolder}/build/include/",
         "${workspaceFolder}/experimental/include/",
         "${workspaceFolder}/build/experimental/include/",
-        "${workspaceFolder}/tutorials/include/",
-        "${workspaceFolder}/build/tutorials/include/",
+        "${workspaceFolder}/tutorials/CreatingPasses/include/",
+        "${workspaceFolder}/build/tutorials/CreatingPasses/include/",
         "${workspaceFolder}/polygeist/llvm-project/llvm/include/",
         "${workspaceFolder}/polygeist/llvm-project/mlir/include/",
         "${workspaceFolder}/polygeist/llvm-project/build/include/",
         "${workspaceFolder}/polygeist/llvm-project/build/tools/mlir/include/",
         "${workspaceFolder}/visual-dataflow/godot-cpp/include/",
         "${workspaceFolder}/visual-dataflow/godot-cpp/gdextension/",
+        "${workspaceFolder}/visual-dataflow/build/godot-cpp/gen/include/",
         "${env:GUROBI_HOME}/include/"
       ],
       "intelliSenseMode": "linux-clang-x64",
       "compilerPath": "/usr/bin/clang",
       "cStandard": "c17",
       "cppStandard": "c++17",
-      "configurationProvider": "llvm-vs-code-extensions.vscode-clangd",
-      "compileCommands": "${workspaceFolder}/build/compile_commands.json"
+      "configurationProvider": "llvm-vs-code-extensions.vscode-clangd"
     }
   ],
   "version": 4
