@@ -1,8 +1,8 @@
 extends Camera2D
 
-var zoom_minimum = Vector2(.200001,.200001)
-var zoom_maximum = Vector2(3.500001,3.500001)
-var zoom_speed = 1.10000001
+const zoom_minimum: Vector2 = Vector2(.5,.5)
+const zoom_maximum: Vector2 = Vector2(5.0, 5.0)
+const zoom_speed: float = 1.1
 var dragging = false
 var mouse_start_position
 var screen_start_position

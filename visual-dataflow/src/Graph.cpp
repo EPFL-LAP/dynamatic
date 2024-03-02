@@ -61,7 +61,7 @@ void Graph::addEdgeState(CycleNb cycleNb, EdgeId edgeId, State state,
   }
 }
 
-CycleTransitions Graph::getCycleEdgeStates() { return cycleEdgeStates; }
+CycleTransitions &Graph::getCycleEdgeStates() { return cycleEdgeStates; }
 
 std::map<NodeId, GraphNode> Graph::getNodes() { return nodes; }
 
