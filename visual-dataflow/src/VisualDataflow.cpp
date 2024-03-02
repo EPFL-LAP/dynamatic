@@ -454,8 +454,11 @@ void VisualDataflow::setEdgeColors(CycleNb cycle) {
     std::vector<Line2D *> &lines = edgeIdToLines[edgeID];
     Polygon2D *arrowHead = edgeIdToArrowHead[edgeID];
     Color color = stateColors[state.first];
-    for (Line2D *line : lines)
+    for (Line2D *line : lines) {
+      color.a = line->get_default_color().a;
+
       line->set_default_color(color);
+    }
     arrowHead->set_color(color);
   }
 }
@@ -463,8 +466,10 @@ void VisualDataflow::setEdgeColors(CycleNb cycle) {
 void VisualDataflow::setEdgeColor(State state, std::vector<Line2D *> &lines,
                                   Polygon2D *arrowHead) {
   Color color = stateColors[state];
-  for (Line2D *line : lines)
+  for (Line2D *line : lines) {
+    color.a = line->get_default_color().a;
     line->set_default_color(color);
+  }
   arrowHead->set_color(color);
 }
 
