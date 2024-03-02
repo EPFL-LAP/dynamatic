@@ -48,14 +48,14 @@ struct OpPlacement {
   };
 };
 
-using PlacementList = std::unordered_set<OpPlacement, OpPlacement::Hash>;
+using PlacementSet = std::unordered_set<OpPlacement, OpPlacement::Hash>;
 
 class SpeculationPlacements {
 private:
   OpPlacement speculator;
-  PlacementList saves;
-  PlacementList commits;
-  PlacementList saveCommits;
+  PlacementSet saves;
+  PlacementSet commits;
+  PlacementSet saveCommits;
 
 public:
   /// Empty constructor
@@ -105,7 +105,7 @@ public:
 
   /// Get a set of the existing operation placements
   template <typename T>
-  const PlacementList &getPlacements();
+  const PlacementSet &getPlacements();
 };
 
 } // namespace speculation

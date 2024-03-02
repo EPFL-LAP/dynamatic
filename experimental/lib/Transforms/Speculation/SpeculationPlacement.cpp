@@ -81,7 +81,7 @@ void SpeculationPlacements::eraseSave(Value srcOpResult, Operation *dstOp) {
 }
 
 void SpeculationPlacements::mergeSaveCommits() {
-  PlacementList toRemove;
+  PlacementSet toRemove;
   for (OpPlacement p : this->saves) {
     if (containsCommit(p.srcOpResult, p.dstOp)) {
       toRemove.insert({p.srcOpResult, p.dstOp});
@@ -99,19 +99,19 @@ OpPlacement SpeculationPlacements::getSpeculatorPlacement() {
 }
 
 template <>
-const PlacementList &
+const PlacementSet &
 SpeculationPlacements::getPlacements<handshake::SpecSaveOp>() {
   return this->saves;
 }
 
 template <>
-const PlacementList &
+const PlacementSet &
 SpeculationPlacements::getPlacements<handshake::SpecCommitOp>() {
   return this->commits;
 }
 
 template <>
-const PlacementList &
+const PlacementSet &
 SpeculationPlacements::getPlacements<handshake::SpecSaveCommitOp>() {
   return this->saveCommits;
 }

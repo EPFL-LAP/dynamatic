@@ -42,8 +42,9 @@ void PlacementFinder::clearPlacements() {
 //===----------------------------------------------------------------------===//
 
 // Recursively traverse the IR until reaching branches and store visited values
-static void markSpeculativePaths(Operation *currOp,
-                                 DenseSet<Value> &specValues) {
+// The values are stored in the set specValues that is passed by reference
+static void markSpeculativePathsForSaves(Operation *currOp,
+                                         DenseSet<Value> &specValues) {
   // End traversal when reaching a branch, because save units are only
   // placed inside the speculation BB
   if (isa<handshake::ConditionalBranchOp>(currOp))
@@ -54,13 +55,13 @@ static void markSpeculativePaths(Operation *currOp,
       continue;
     specValues.insert(res);
     for (Operation *succOp : res.getUsers()) {
-      markSpeculativePaths(succOp, specValues);
+      markSpeculativePathsForSaves(succOp, specValues);
     }
   }
 }
 
 // Save units are needed where speculative tokens can interact with
-// non-speculative tokens
+// non-speculative tokens. Updates `placements` with the Save placements
 LogicalResult PlacementFinder::findSavePositions() {
   OpPlacement specPos = placements.getSpeculatorPlacement();
   handshake::FuncOp funcOp =
@@ -71,7 +72,7 @@ LogicalResult PlacementFinder::findSavePositions() {
   // Mark all values that are speculative in the speculation BB
   llvm::DenseSet<Value> specValues;
   specValues.insert(specPos.srcOpResult);
-  markSpeculativePaths(specPos.dstOp, specValues);
+  markSpeculativePathsForSaves(specPos.dstOp, specValues);
 
   // Iterate all operations in the speculation BB
   unsigned bb = getLogicBB(specPos.dstOp).value();
@@ -107,6 +108,9 @@ LogicalResult PlacementFinder::findSavePositions() {
 // Commit Units Finder Methods
 //===----------------------------------------------------------------------===//
 
+// Recursively traverse the IR in a DFS way to find the placements of Commit
+// units. A commit unit before (1) an exit unit; (2) a store unit; (3) a save
+// unit if speculative tokens can reach them. Updates the `placements`
 void PlacementFinder::findCommitsTraversal(llvm::DenseSet<Operation *> &visited,
                                            Operation *currOp) {
   // End traversal if currOp is already in visited set
@@ -115,9 +119,11 @@ void PlacementFinder::findCommitsTraversal(llvm::DenseSet<Operation *> &visited,
   for (Value res : currOp->getResults()) {
     for (Operation *succOp : res.getUsers()) {
       if (placements.containsSave(res, succOp)) {
-        // A Commit is needed in front of Save Operations. This will be later
-        // converted into a SaveCommit for multiple loop speculation.
-        placements.addCommit(res, succOp);
+        // A Commit is needed in front of Save Operations. To allow for multiple
+        // loop speculation, SaveCommit units are used instead of consecutive
+        // Commit-Save units.
+        placements.addSaveCommit(res, succOp);
+        placements.eraseSave(res, succOp);
       } else if (isa<handshake::LSQOp, handshake::MemoryControllerOp,
                      handshake::MCStoreOp, handshake::LSQStoreOp,
                      handshake::MCLoadOp, handshake::LSQLoadOp>(succOp)) {
@@ -145,45 +151,48 @@ using BBEndpointsMap =
 
 // Data structure to hold all arcs leading to a single BB predecessor
 // Note: srcBB and dstBB can be equal when the arcs are Backedges
-struct BlockPredecessor {
+struct BBArc {
   unsigned srcBB;
   unsigned dstBB;
-  std::vector<OpPlacement> arcs;
+  std::vector<OpPlacement> edges;
 };
-using BBPredecessorMap = std::map<unsigned, std::vector<BlockPredecessor>>;
+using BBtoPredecessorArcsMap = std::map<unsigned, std::vector<BBArc>>;
 
-// Get a map from BBs to the list of its BlockPredecessors
-static BBPredecessorMap getBlockPredecessors(handshake::FuncOp funcOp) {
+// Calculate the BBArcs that lead to predecessor BBs within funcOp
+// Returns a map from each BB number to a vector of BBArcs
+static BBtoPredecessorArcsMap getPredecessorArcs(handshake::FuncOp funcOp) {
   // Traverse all operations to find arcs between BBs (and self-arcs)
-  BBEndpointsMap endpointArcs;
+  BBEndpointsMap endpointEdges;
   funcOp->walk([&](Operation *op) {
     for (Value operand : op->getOperands()) {
       BBEndpoints endpoints;
       if (isBackedge(operand, op, &endpoints) or
           endpoints.srcBB != endpoints.dstBB) {
         OpPlacement arc = {operand, op};
-        endpointArcs[endpoints].push_back(arc);
+        endpointEdges[endpoints].push_back(arc);
       }
     }
   });
 
   // Join all predecessors of a BB
-  BBPredecessorMap predecessors;
-  for (const auto &[endpoints, arcs] : endpointArcs) {
-    BlockPredecessor predecessor;
-    predecessor.srcBB = endpoints.srcBB;
-    predecessor.dstBB = endpoints.dstBB;
-    predecessor.arcs = arcs;
-    predecessors[endpoints.dstBB].push_back(predecessor);
+  BBtoPredecessorArcsMap predecessorArcs;
+  for (const auto &[endpoints, edges] : endpointEdges) {
+    BBArc arc;
+    arc.srcBB = endpoints.srcBB;
+    arc.dstBB = endpoints.dstBB;
+    arc.edges = edges;
+    predecessorArcs[endpoints.dstBB].push_back(arc);
   }
 
-  return predecessors;
+  return predecessorArcs;
 }
 
 // DFS traversal to mark all operations that lead to Commit units
-static void markSpeculativePaths(Operation *currOp,
-                                 SpeculationPlacements &placements,
-                                 PlacementList &markedPaths) {
+// The set markedPaths is passed by reference and is updated with
+// the OpPlacements (pair value-operation) that are traversed
+static void markSpeculativePathsForCommits(Operation *currOp,
+                                           SpeculationPlacements &placements,
+                                           PlacementSet &markedPaths) {
   for (Value res : currOp->getResults()) {
     for (Operation *succOp : res.getUsers()) {
       OpPlacement arc = {res, succOp};
@@ -191,12 +200,14 @@ static void markSpeculativePaths(Operation *currOp,
         markedPaths.insert(arc);
         // Stop traversal if a commit is reached
         if (not placements.containsCommit(res, succOp))
-          markSpeculativePaths(succOp, placements, markedPaths);
+          markSpeculativePathsForCommits(succOp, placements, markedPaths);
       }
     }
   }
 }
 
+// Find the placements of Commit units in between BBs, that are needed to avoid
+// two control-only tokens going out of order. Updates the `placements`
 void PlacementFinder::findCommitsBetweenBBs() {
   OpPlacement specPos = placements.getSpeculatorPlacement();
   auto funcOp = specPos.dstOp->getParentOfType<handshake::FuncOp>();
@@ -204,24 +215,28 @@ void PlacementFinder::findCommitsBetweenBBs() {
 
   // Whenever a BB has two speculative inputs, commit units are needed to avoid
   // tokens going out-of-order. First, the block predecessor arcs are found
-  BBPredecessorMap predecessors = getBlockPredecessors(funcOp);
-  PlacementList markedPaths;
-  markSpeculativePaths(specPos.dstOp, placements, markedPaths);
+  BBtoPredecessorArcsMap predecessors = getPredecessorArcs(funcOp);
+  PlacementSet markedPaths;
+  markSpeculativePathsForCommits(specPos.dstOp, placements, markedPaths);
   // Iterate all BBs to check if commits are needed
-  for (const auto &[bb, blockPredecessors] : predecessors) {
+  for (const auto &[bb, predecessorArcs] : predecessors) {
     // Count number of speculative inputs to the BB
     unsigned countSpecInputs = 0;
-    for (BlockPredecessor pred : blockPredecessors) {
-      if (llvm::any_of(pred.arcs,
+    for (BBArc arc : predecessorArcs) {
+      // If any of the edges in an arc is speculative, count the input arc as
+      // speculative
+      if (llvm::any_of(arc.edges,
                        [&](OpPlacement p) { return markedPaths.count(p); }))
         countSpecInputs++;
     }
 
     if (countSpecInputs > 1) {
       // Potential ordering issue, add commits
-      for (BlockPredecessor pred : blockPredecessors) {
-        for (OpPlacement arc : pred.arcs) {
-          placements.addCommit(arc.srcOpResult, arc.dstOp);
+      for (BBArc pred : predecessorArcs) {
+        for (OpPlacement edge : pred.edges) {
+          // Add a Commit only in front of speculative inputs
+          if (markedPaths.count(edge))
+            placements.addCommit(edge.srcOpResult, edge.dstOp);
           // Here, synchronizer operations will be needed in the future
         }
       }
@@ -232,10 +247,10 @@ void PlacementFinder::findCommitsBetweenBBs() {
   // might be unreachable. Hence, the path to commits is marked again and
   // unreachable commits are removed
   markedPaths.clear();
-  markSpeculativePaths(specPos.dstOp, placements, markedPaths);
+  markSpeculativePathsForCommits(specPos.dstOp, placements, markedPaths);
 
   // Remove commits that cannot be reached
-  PlacementList toRemove;
+  PlacementSet toRemove;
   for (OpPlacement arc : placements.getPlacements<handshake::SpecCommitOp>()) {
     if (not markedPaths.count(arc)) {
       toRemove.insert({arc.srcOpResult, arc.dstOp});
@@ -266,6 +281,9 @@ LogicalResult PlacementFinder::findCommitPositions() {
 // SaveCommit Units Finder Methods
 //===----------------------------------------------------------------------===//
 
+// Traverse the speculator's BB from top to bottom (from the control merge until
+// the branches) and adds save-commits in such a way that every path is cut by a
+// save-commit or the speculator itself. Updates `placements`.
 void PlacementFinder::findSaveCommitsTraversal(
     llvm::DenseSet<Operation *> &visited, Operation *currOp) {
   // End traversal if currOp is already in visited set

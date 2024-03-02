@@ -49,18 +49,18 @@ private:
   /// findCommitsBetweenBBs
   LogicalResult findCommitPositions();
 
-  // DFS traversal to find the paths that need Commit units
+  /// DFS traversal to find the paths that need Commit units
   void findCommitsTraversal(llvm::DenseSet<Operation *> &visited,
                             Operation *currOp);
 
-  // Check arcs between BBs to determine if extra commits are needed to solve
-  // out-of-order tokens
+  /// Check arcs between BBs to determine if extra commits are needed to solve
+  /// out-of-order tokens
   void findCommitsBetweenBBs();
 
   /// Find save-commit operations positions. Uses findSaveCommitsTraversal
   LogicalResult findSaveCommitPositions();
 
-  // DFS traversal of the speculation BB to find all SaveCommit placements
+  /// DFS traversal of the speculation BB to find all SaveCommit placements
   void findSaveCommitsTraversal(llvm::DenseSet<Operation *> &visited,
                                 Operation *currOp);
 };
