@@ -36,6 +36,7 @@
 #include "llvm/Support/InitLLVM.h"
 #include "llvm/Support/Path.h"
 #include "llvm/Support/raw_ostream.h"
+#include <cstdio>
 #include <cstdlib>
 #include <fstream>
 #include <iostream>
@@ -639,26 +640,31 @@ int main(int argc, char **argv) {
       return 1;
     }
 
-    // Read the script line-by-line and execute its commands
-    // supported delimeters: '\n' and ';'
+    // Read the script line-by-line and execute its commands supported
+    // delimeters: '\n' and ';'
     std::string line;
     while (std::getline(inputFile, line, '\n')) {
-      std::stringstream subss(line);
-      std::string line;
-      while (std::getline(subss, line, ';')) {
-        if (!line.empty() && !StringRef(line).starts_with("#")) {
-          llvm::outs() << PROMPT << line << "\n";
-          handleInput(line);
+      if (StringRef(line).starts_with("#"))
+        continue;
+      // cast '\n'-separated lines into streams, then split it by ';'
+      std::stringstream sLine(line);
+      for (std::string cmd; getline(sLine, cmd, ';');)
+        if (!cmd.empty()) {
+          llvm::outs() << PROMPT << cmd << "\n";
+          handleInput(cmd);
         }
-      }
     }
   }
 
+  // Read from stdin, multiple commands in one line are separated by ';'
   std::string userInput;
   while (true) {
     llvm::outs() << PROMPT;
-    getline(std::cin, userInput);
-    handleInput(userInput);
+    getline(std::cin, userInput, '\n');
+    // Cast '\n'-separated lines into streams, then split it by ';'
+    std::stringstream sUserInput(userInput);
+    for (std::string cmd; std::getline(sUserInput, cmd, ';');)
+      handleInput(cmd);
   }
   return 0;
 }
