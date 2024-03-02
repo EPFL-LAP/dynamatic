@@ -21,6 +21,7 @@
 #include "godot_cpp/classes/label.hpp"
 #include "godot_cpp/classes/line2d.hpp"
 #include "godot_cpp/classes/polygon2d.hpp"
+#include "godot_cpp/classes/rich_text_label.hpp"
 #include "godot_cpp/variant/color.hpp"
 #include "godot_cpp/variant/string.hpp"
 #include "godot_cpp/variant/vector2.hpp"
@@ -45,7 +46,7 @@ private:
   std::map<EdgeId, Polygon2D *> edgeIdToArrowHead;
   /// Maps each edge ID to a Label object for displaying the value of the data
   /// carried by the edge
-  std::map<EdgeId, Label *> edgeIdToData;
+  std::map<EdgeId, RichTextLabel *> edgeIdToData;
   /// Maps each node ID to its position in Godot's coordinate system
   std::map<NodeId, PackedVector2Array> nodeIdToGodoPos;
   /// Maps each node ID to its corresponding Polygon2D object

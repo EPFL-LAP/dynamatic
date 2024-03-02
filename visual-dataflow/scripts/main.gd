@@ -34,10 +34,8 @@ func _ready():
 			var key = key_value[0].lstrip("--")
 			var value = key_value[1]
 			if (key == "dot"):
-				print("Setting DOT file from CL: " + value)
 				dotFile = value
 			elif (key == "csv"):
-				print("Setting CSV file from CL: " + value)
 				csvFile = value
 			else:
 				print("Unknown argument " + key)

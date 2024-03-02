@@ -14,6 +14,8 @@
 #define DYNAMATIC_VISUAL_DATAFLOW_GRAPHEDGE_H
 
 #include "GraphNode.h"
+#include "dynamatic/Support/LLVM.h"
+#include "llvm/ADT/StringRef.h"
 #include <map>
 #include <string>
 #include <vector>
@@ -54,10 +56,15 @@ public:
   size_t getInPort();
   /// Returns the edge identifier
   EdgeId getEdgeId();
+  /// Returns the edge's "arrowhead" attribute.
+  StringRef getArrowhead() { return this->arrowhead; }
+
   /// Returns the edge positions
   std::vector<std::pair<float, float>> getPositions();
   /// Sets the  style of the Edge
   void setDashed(bool dashed);
+  /// Sets the arrowhead style.
+  void setArrowhead(StringRef arrowhead);
   /// Returns the style of the Edge;
   bool getDashed();
 
@@ -76,6 +83,8 @@ private:
   std::vector<std::pair<float, float>> position;
   /// Style of the edge
   bool isDashed = false;
+  /// Arrowhead style.
+  std::string arrowhead;
 };
 
 } // namespace visual

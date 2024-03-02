@@ -1,15 +1,20 @@
-[gd_scene load_steps=7 format=3 uid="uid://ridjgqca7ygu"]
+[gd_scene load_steps=9 format=3 uid="uid://ridjgqca7ygu"]
 
 [ext_resource type="Script" path="res://scripts/main.gd" id="1_2137g"]
+[ext_resource type="FontFile" uid="uid://23mpu6co8p0r" path="res://resources/OpenSans.ttf" id="1_a3kl4"]
 [ext_resource type="Script" path="res://scripts/camera.gd" id="2_kbyo6"]
 [ext_resource type="PackedScene" uid="uid://baatvintvoqat" path="res://scenes/menu.tscn" id="3_katj8"]
 [ext_resource type="Texture2D" uid="uid://b8ja66i463u8x" path="res://resources/images.png" id="4_gasbi"]
 [ext_resource type="PackedScene" uid="uid://chdvrqi6hnrga" path="res://scenes/timeline.tscn" id="5_ccu7c"]
 [ext_resource type="PackedScene" uid="uid://1ukyu4yhubi7" path="res://scenes/legend.tscn" id="6_b6m0q"]
 
+[sub_resource type="Theme" id="Theme_rldtn"]
+default_font = ExtResource("1_a3kl4")
+
 [node name="VisualDataflow" type="VisualDataflow"]
 offset_right = 40.0
 offset_bottom = 40.0
+theme = SubResource("Theme_rldtn")
 script = ExtResource("1_2137g")
 
 [node name="Camera2D" type="Camera2D" parent="."]
