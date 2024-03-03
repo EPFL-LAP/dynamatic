@@ -269,6 +269,20 @@ LogicalResult getDelayImpl(unsigned lat, raw_indented_ostream &os) {
   return failure();
 }
 
+LogicalResult writeMCImpl(handshake::MemoryControllerOp mcOp,
+                          raw_indented_ostream &os) {
+  StringRef memName = getMemName(mcOp.getMemRef());
+  os << "mc_" << std::string(memName) << "_" << mcOp->getNumOperands() << "_"
+     << mcOp.getNumResults() << "(";
+  MCPorts ports = mcOp.getPorts();
+  int numCtrl = 0, numIn = 0, numOut = 0;
+  if (ports.hasAnyPort<ControlPort>()) {
+    numCtrl += 1;
+  }
+
+  return success();
+}
+
 // for parametrized units, we encode the parameter in the type of the unit and
 // later generate a unit for each parametrization used by the model
 LogicalResult getUnitType(Operation *op, mlir::raw_indented_ostream &os,
