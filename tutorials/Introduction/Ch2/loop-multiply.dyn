@@ -1,5 +1,5 @@
 # Set the source file to run
-set-src             tutorials/Introduction/Ch1/loop_accumulate.c
+set-src             tutorials/Introduction/Ch1/loop_multiply.c
 
 # Compile (from source to Handshake IR/DOT)
 # Provide the --simple-buffers flag to `compile` to use a simple buffering
