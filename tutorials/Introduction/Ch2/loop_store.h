@@ -1,7 +1,7 @@
 #ifndef LOOP_STORE_H
 #define LOOP_STORE_H
 
-#define N 10
+#define N 8
 
 typedef int inout_int_t;
 

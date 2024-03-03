@@ -19,7 +19,7 @@ In this tutorial, we will tranform the following C function (the *kernel*, in DH
 
 ```c
 // The number of loop iterations
-#define N 10
+#define N 8
 
 // The kernel under consideration
 unsigned loop_multiply(in_int_t a[N]) {

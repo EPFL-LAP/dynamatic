@@ -290,7 +290,7 @@ Just to be sure, let's try our optimization on a different yet similar C kernel 
 
 ```c
 // The number of loop iterations
-#define N 10
+#define N 8
 
 // The kernel under consideration
 void loop_store(inout_int_t a[N]) {
@@ -342,8 +342,6 @@ Let's go check the `simulate` command's output folder to see the content of the 
 0x00000001
 0x00000000
 0x00000001
-0x00000000
-0x00000001
 [[/transaction]]
 [[[/runtime]]]
 ```
@@ -361,8 +359,6 @@ Looking back at our C kernel, we then should expect that every element at an eve
 0x00000005
 0x00000024
 0x00000007
-0x00000040
-0x00000009
 [[/transaction]]
 [[[/runtime]]]
 ```
@@ -381,8 +377,6 @@ Looking back at our C kernel, we then should expect that every element at an eve
 0x00000010
 0x00000007
 0x00000024
-0x00000009
-0x00000040
 [[/transaction]]
 [[[/runtime]]]
 ```

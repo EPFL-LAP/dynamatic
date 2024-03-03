@@ -1,7 +1,7 @@
 #ifndef LOOP_MULTIPLY_H
 #define LOOP_MULTIPLY_H
 
-#define N 10
+#define N 8
 
 typedef int in_int_t;
 
