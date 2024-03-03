@@ -300,8 +300,15 @@ LogicalResult getUnitType(Operation *op, mlir::raw_indented_ostream &os,
           .Case<handshake::SinkOp>([&](auto) { return "sink"; })
           .Case<handshake::MuxOp>([&](auto) { return "mux"; })
           .Case<handshake::MergeOp>([&](auto) { return "merge"; })
-          .Case<handshake::LSQOp>([&](auto) { return "lsq"; })
-          .Case<handshake::MemoryControllerOp>([&](auto) { return "mc"; })
+          .Case<handshake::LSQOp>([&](handshake::LSQOp lsqOp) {
+            StringRef memName = getMemName(lsqOp.getMemRef());
+            return "lsq_" + std::string(memName);
+          })
+          .Case<handshake::MemoryControllerOp>(
+              [&](handshake::MemoryControllerOp mcOp) {
+                StringRef memName = getMemName(mcOp.getMemRef());
+                return "mc_" + std::string(memName);
+              })
           .Case<handshake::ConditionalBranchOp, handshake::BranchOp>(
               [&](auto) { return "branch"; })
           .Case<arith::AddIOp, arith::AddFOp, arith::SubIOp, arith::SubFOp,
