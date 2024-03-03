@@ -105,57 +105,57 @@ struct ResourceSharingFCCM22Pass
 
 // this runs performance analysis of one permutation
 bool runPerformanceAnalysisOfOnePermutation(
-    ResourceSharingInfo &data, std::vector<Operation *> &current_permutation,
+    ResourceSharingInfo &data, std::vector<Operation *> &currentPermutation,
     ResourceSharing &sharing, OpBuilder *builder, mlir::PassManager &pm,
     ModuleOp &modOp) {
   deleteAllBuffers(data.funcOp);
-  data.opaqueChannel = generate_performance_model(builder, current_permutation,
-                                                  sharing.control_map);
+  data.opaqueChannel = generatePerformanceModel(builder, currentPermutation,
+                                                  sharing.controlMap);
   if (failed(pm.run(modOp))) {
     return false;
   }
-  destroy_performance_model(builder, current_permutation);
+  destroyPerformanceModel(builder, currentPermutation);
   return true;
 }
 
 // this runs performance analysis of two groups
 bool runPerformanceAnalysis(GroupIt group1, GroupIt group2,
-                            double occupancy_sum, ResourceSharingInfo &data,
+                            double occupancySum, ResourceSharingInfo &data,
                             OpBuilder *builder, mlir::PassManager &pm,
                             ModuleOp &modOp, std::vector<Operation *> &finalOrd,
                             ResourceSharing &sharing) {
   // put operations of both groups in a single vector
-  std::vector<Operation *> current_permutation;
-  current_permutation.insert(current_permutation.end(), group1->items.begin(),
+  std::vector<Operation *> currentPermutation;
+  currentPermutation.insert(currentPermutation.end(), group1->items.begin(),
                              group1->items.end());
-  current_permutation.insert(current_permutation.end(), group2->items.begin(),
+  currentPermutation.insert(currentPermutation.end(), group2->items.begin(),
                              group2->items.end());
 
   // convert data from "current_permutation" vector to " data.testedGroups" set
   data.testedGroups.clear();
-  std::copy(current_permutation.begin(), current_permutation.end(),
+  std::copy(currentPermutation.begin(), currentPermutation.end(),
             std::inserter(data.testedGroups, data.testedGroups.end()));
 
   // run performance analysis for each permutation
   do {
-    if (runPerformanceAnalysisOfOnePermutation(
-            data, current_permutation, sharing, builder, pm, modOp) == false) {
+    if (!runPerformanceAnalysisOfOnePermutation(
+            data, currentPermutation, sharing, builder, pm, modOp)) {
       return false;
     }
     // exit if no performance loss
-    if (equal(occupancy_sum, data.occupancySum)) {
-      finalOrd = current_permutation;
+    if (equal(occupancySum, data.occupancySum)) {
+      finalOrd = currentPermutation;
       return true;
     }
   } while (
-      next_permutation(current_permutation.begin(), current_permutation.end()));
+      next_permutation(currentPermutation.begin(), currentPermutation.end()));
   return false;
 }
 
 } // namespace
 
 void ResourceSharingFCCM22Pass::runDynamaticPass() {
-  llvm::errs() << "***** Resource Sharing *****\n";
+  llvm::errs() << "[INFO] Running Resource Sharing Pass\n";
   OpBuilder builder(&getContext());
   ModuleOp modOp = getOperation();
 
@@ -188,35 +188,34 @@ void ResourceSharingFCCM22Pass::runDynamaticPass() {
   for (auto &operationType : sharing.operationTypes) {
     // Sharing within a loop nest
     for (auto &set : operationType.sets) {
-      bool groups_modified = true;
-      while (groups_modified) {
-        groups_modified = false;
+      bool groupsModified = true;
+      while (groupsModified) {
+        groupsModified = false;
         std::vector<std::pair<GroupIt, GroupIt>> combination =
             combinations(&set, alreadyTested);
         // iterate over combinations of groups
         for (auto [group1, group2] : combination) {
           // check if sharing is potentially possible
-          double occupancy_sum =
-              group1->shared_occupancy + group2->shared_occupancy;
+          double occupancySum =
+              group1->sharedOccupancy + group2->sharedOccupancy;
 
-          if (lessOrEqual(occupancy_sum, operationType.op_latency)) {
+          if (lessOrEqual(occupancySum, operationType.opLatency)) {
             std::vector<Operation *> finalOrd;
             // check if operations on loop
             if (!group1->hasCycle && !group2->hasCycle) {
               finalOrd = sharing.sortTopologically(group1, group2);
             } else {
-              runPerformanceAnalysis(group1, group2, occupancy_sum, data,
+              runPerformanceAnalysis(group1, group2, occupancySum, data,
                                      &builder, pm, modOp, finalOrd, sharing);
             }
-            if (finalOrd.size() != 0) {
+            if (!finalOrd.empty()) {
               // Merge groups, update ordering and update shared occupancy
               set.joinGroups(group1, group2, finalOrd);
-              groups_modified = true;
+              groupsModified = true;
               break;
-            } else {
-              alreadyTested[*group1].insert(*group2);
-              alreadyTested[*group2].insert(*group1);
-            }
+            }                
+            alreadyTested[*group1].insert(*group2);
+            alreadyTested[*group2].insert(*group1);
           }
         }
       }

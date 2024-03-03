@@ -32,10 +32,10 @@ namespace experimental {
 namespace sharing {
 
 // kosarajus algorithm performed on basic block level
-std::vector<int> Kosarajus_algorithm_BBL(SmallVector<ArchBB> archs);
+std::vector<int> kosarajusAlgorithmBbl(const SmallVector<ArchBB>& archs);
 
 // different implementation: performed on operation level
-void Kosarajus_algorithm_OPL(mlir::Operation *startOp,
+void kosarajusAlgorithmOpl(mlir::Operation *startOp,
                              handshake::FuncOp *funcOp,
                              std::set<mlir::Operation *> &result);
 

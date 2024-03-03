@@ -23,38 +23,36 @@ namespace sharing {
 /*
  * Dumps content of vector of lists to the console
  */
-void print_list(std::vector<std::list<int>> &adjacency_list) {
-  int Nodes = adjacency_list.size();
-  for (int i = 0; i < Nodes; i++) {
+void printList(std::vector<std::list<int>> &adjacencyList) {
+  int nodes = adjacencyList.size();
+  for (int i = 0; i < nodes; i++) {
     llvm::errs() << i << ": ";
-    for (auto item : adjacency_list[i]) {
+    for (auto item : adjacencyList[i]) {
       llvm::errs() << item << ", ";
     }
     llvm::errs() << "\n";
   }
-  return;
 }
 
 /*
  * Dumps content of stack to the console
  */
-void print_stack(std::stack<int> DFSstack) {
+void printStack(std::stack<int> dfsStack) {
   llvm::errs() << "Printing stack: ";
-  while (!DFSstack.empty()) {
-    llvm::errs() << DFSstack.top() << " ";
-    DFSstack.pop();
+  while (!dfsStack.empty()) {
+    llvm::errs() << dfsStack.top() << " ";
+    dfsStack.pop();
   }
   llvm::errs() << "\n";
-  return;
 }
 
 /*
  * Gets the number of Basic Blocks in the IR
  */
-unsigned int getNumberOfBBs(SmallVector<ArchBB> archs) {
+unsigned int getNumberOfBBs(const SmallVector<ArchBB>& archs) {
   unsigned int maximum = 0;
-  for (auto arch_item : archs) {
-    maximum = std::max(maximum, std::max(arch_item.srcBB, arch_item.dstBB));
+  for (auto archItem : archs) {
+    maximum = std::max(maximum, std::max(archItem.srcBB, archItem.dstBB));
   }
   // as we have BB0, we need to add one at the end
   return maximum + 1;
@@ -72,11 +70,11 @@ unsigned int getNumberOfBBs(SmallVector<ArchBB> archs) {
                    2: 2,3
                    3: -
  */
-std::vector<std::list<int>> create_adjacency_list_bbl(SmallVector<ArchBB> archs,
-                                                      int Nodes) {
-  std::vector<std::list<int>> result(Nodes);
-  for (auto arch_item : archs) {
-    result[arch_item.srcBB].push_front(arch_item.dstBB);
+std::vector<std::list<int>> createAdjacencyListBbl(const SmallVector<ArchBB>& archs,
+                                                      int nodes) {
+  std::vector<std::list<int>> result(nodes);
+  for (auto archItem : archs) {
+    result[archItem.srcBB].push_front(archItem.dstBB);
   }
   return result;
 }
@@ -87,8 +85,8 @@ std::vector<std::list<int>> create_adjacency_list_bbl(SmallVector<ArchBB> archs,
  *      the algorithm (see top of this file) using "geeks for geeks"
  */
 std::vector<std::list<int>>
-create_adjacency_list_gfg(std::vector<std::vector<int>> &adj, int V) {
-  std::vector<std::list<int>> result(V);
+createAdjacencyListGfg(std::vector<std::vector<int>> &adj, int v) {
+  std::vector<std::list<int>> result(v);
   for (unsigned long i = 0; i < adj.size(); i++) {
     for (auto item : adj[i]) {
       result[i].push_front(item);
@@ -110,20 +108,19 @@ create_adjacency_list_gfg(std::vector<std::vector<int>> &adj, int V) {
  *                         to Node 1 and push 1 to the stack
  *                         Output: 4,3,2,1
  */
-void firstRecursiveDFStravel(std::stack<int> &DFSstack,
-                             std::vector<bool> &node_visited,
-                             std::vector<std::list<int>> &adjacency_list,
-                             int Nodes, int current_node) {
-  std::list<int> current_list = adjacency_list[current_node];
-  for (auto item : current_list) {
-    if (!node_visited[item]) {
-      node_visited[item] = true;
-      firstRecursiveDFStravel(DFSstack, node_visited, adjacency_list, Nodes,
+void firstRecursiveDFStravel(std::stack<int> &dfsStack,
+                             std::vector<bool> &nodeVisited,
+                             std::vector<std::list<int>> &adjacencyList,
+                             int nodes, int currentNode) {
+  std::list<int> currentList = adjacencyList[currentNode];
+  for (auto item : currentList) {
+    if (!nodeVisited[item]) {
+      nodeVisited[item] = true;
+      firstRecursiveDFStravel(dfsStack, nodeVisited, adjacencyList, nodes,
                               item);
     }
   }
-  DFSstack.push(current_node);
-  return;
+  dfsStack.push(currentNode);
 }
 
 /*
@@ -131,15 +128,15 @@ void firstRecursiveDFStravel(std::stack<int> &DFSstack,
  * an IR, all nodes are reachable from node 0, aka start. Then we are just
  * calling function firstRecursiveDFStravel
  */
-void firstDFStravel(std::stack<int> &DFSstack,
-                    std::vector<std::list<int>> &adjacency_list, int Nodes) {
-  std::vector<bool> node_visited(Nodes, false);
+void firstDFStravel(std::stack<int> &dfsStack,
+                    std::vector<std::list<int>> &adjacencyList, int nodes) {
+  std::vector<bool> nodeVisited(nodes, false);
   // Every BB can inevitably be reached from BB0
-  int current_node = 0;
+  int currentNode = 0;
   // As we start with node 0, we mark it as visited
-  node_visited[0] = true;
-  firstRecursiveDFStravel(DFSstack, node_visited, adjacency_list, Nodes,
-                          current_node);
+  nodeVisited[0] = true;
+  firstRecursiveDFStravel(dfsStack, nodeVisited, adjacencyList, nodes,
+                          currentNode);
   /*
   //This code part is only used for algorithm verification using gfg
   //The assumption here is, that not all nodes can be reached through node 0
@@ -155,7 +152,6 @@ void firstDFStravel(std::stack<int> &DFSstack,
       }
   }
   */
-  return;
 }
 
 /*
@@ -163,10 +159,10 @@ void firstDFStravel(std::stack<int> &DFSstack,
  * Example: The edge 1->2 gets replaced with 2->1
  */
 std::vector<std::list<int>>
-converse_graph(std::vector<std::list<int>> &adjacency_list, int Nodes) {
-  std::vector<std::list<int>> result(Nodes);
-  for (int i = 0; i < Nodes; i++) {
-    for (auto item : adjacency_list[i]) {
+converseGraph(std::vector<std::list<int>> &adjacencyList, int nodes) {
+  std::vector<std::list<int>> result(nodes);
+  for (int i = 0; i < nodes; i++) {
+    for (auto item : adjacencyList[i]) {
       result[item].push_front(i);
     }
   }
@@ -177,19 +173,18 @@ converse_graph(std::vector<std::list<int>> &adjacency_list, int Nodes) {
  * This function does the same as function firstRecursiveDFStravel with the key
  * difference that the wanted result here is a list instead of a stack
  */
-void secondRecursiveDFStravel(std::vector<std::list<int>> &transpose_graph,
-                              int Nodes, std::vector<bool> &node_visited,
-                              int current_node, std::list<int> &currSCC) {
-  std::list<int> current_list = transpose_graph[current_node];
-  for (auto item : current_list) {
-    if (!node_visited[item]) {
-      node_visited[item] = true;
-      secondRecursiveDFStravel(transpose_graph, Nodes, node_visited, item,
+void secondRecursiveDFStravel(std::vector<std::list<int>> &transposeGraph,
+                              int nodes, std::vector<bool> &nodeVisited,
+                              int currentNode, std::list<int> &currSCC) {
+  std::list<int> currentList = transposeGraph[currentNode];
+  for (auto item : currentList) {
+    if (!nodeVisited[item]) {
+      nodeVisited[item] = true;
+      secondRecursiveDFStravel(transposeGraph, nodes, nodeVisited, item,
                                currSCC);
     }
   }
-  currSCC.push_front(current_node);
-  return;
+  currSCC.push_front(currentNode);
 }
 
 /*
@@ -198,19 +193,19 @@ void secondRecursiveDFStravel(std::vector<std::list<int>> &transpose_graph,
  * container. This is done till all nodes are marked visited.
  */
 std::vector<std::list<int>>
-secondDFStravel(std::vector<std::list<int>> transpose_graph,
-                std::stack<int> DFSstack, int Nodes) {
+secondDFStravel(std::vector<std::list<int>> transposeGraph,
+                std::stack<int> dfsStack, int nodes) {
   std::vector<std::list<int>> result;
-  std::vector<bool> node_visited(Nodes, false);
-  while (!DFSstack.empty()) {
-    int current_node = DFSstack.top();
-    DFSstack.pop();
-    if (node_visited[current_node]) {
+  std::vector<bool> nodeVisited(nodes, false);
+  while (!dfsStack.empty()) {
+    int currentNode = dfsStack.top();
+    dfsStack.pop();
+    if (nodeVisited[currentNode]) {
       continue;
     }
-    node_visited[current_node] = true;
+    nodeVisited[currentNode] = true;
     std::list<int> currSCC;
-    secondRecursiveDFStravel(transpose_graph, Nodes, node_visited, current_node,
+    secondRecursiveDFStravel(transposeGraph, nodes, nodeVisited, currentNode,
                              currSCC);
     result.push_back(currSCC);
   }
@@ -222,33 +217,33 @@ secondDFStravel(std::vector<std::list<int>> transpose_graph,
  * Basic Blocks Output: vector of the size of nodes, vector[n] returns the SCC
  * id the n.th node belongs to.
  */
-std::vector<int> Kosarajus_algorithm_BBL(SmallVector<ArchBB> archs) {
-  int Nodes = getNumberOfBBs(archs);
-  std::vector<int> result(Nodes);
-  std::vector<std::list<int>> adjacency_list =
-      create_adjacency_list_bbl(archs, Nodes);
-  std::stack<int> DFSstack;
-  firstDFStravel(DFSstack, adjacency_list, Nodes);
-  std::vector<std::list<int>> transpose_graph =
-      converse_graph(adjacency_list, Nodes);
-  std::vector<std::list<int>> SCC =
-      secondDFStravel(transpose_graph, DFSstack, Nodes);
+std::vector<int> kosarajusAlgorithmBbl(const SmallVector<ArchBB>& archs) {
+  int nodes = getNumberOfBBs(archs);
+  std::vector<int> result(nodes);
+  std::vector<std::list<int>> adjacencyList =
+      createAdjacencyListBbl(archs, nodes);
+  std::stack<int> dfsStack;
+  firstDFStravel(dfsStack, adjacencyList, nodes);
+  std::vector<std::list<int>> transposeGraph =
+      converseGraph(adjacencyList, nodes);
+  std::vector<std::list<int>> scc =
+      secondDFStravel(transposeGraph, dfsStack, nodes);
   int position = 0;
-  for (auto component : SCC) {
-    bool is_loop_nest = true;
+  for (auto component : scc) {
+    bool isLoopNest = true;
     if (component.size() == 1) {
       // may be not a CFG loop nest
-      is_loop_nest = false;
-      unsigned long BB = *component.begin();
-      for (unsigned long item : adjacency_list[BB]) {
-        if (item == BB) {
+      isLoopNest = false;
+      unsigned long bb = *component.begin();
+      for (unsigned long item : adjacencyList[bb]) {
+        if (item == bb) {
           // CFG loop nest
-          is_loop_nest = true;
+          isLoopNest = true;
         }
       }
     }
     for (auto number : component) {
-      if (is_loop_nest) {
+      if (isLoopNest) {
         result[number] = position;
       } else {
         result[number] = -1;
@@ -259,116 +254,111 @@ std::vector<int> Kosarajus_algorithm_BBL(SmallVector<ArchBB> archs) {
   return result;
 }
 
-void recursive_list_creator_opl(
+void recursiveListCreatorOpl(
     mlir::Operation *currOp,
-    std::map<Operation *, std::list<Operation *>> &adjacency_list,
-    std::set<mlir::Operation *> &node_visited,
-    std::stack<Operation *> &DFSstack) {
-  node_visited.insert(currOp);
+    std::map<Operation *, std::list<Operation *>> &adjacencyList,
+    std::set<mlir::Operation *> &nodeVisited,
+    std::stack<Operation *> &dfsStack) {
+  nodeVisited.insert(currOp);
   for (auto &u : currOp->getResults().getUses()) {
     // get child operation
-    Operation *child_op = u.getOwner();
+    Operation *childOp = u.getOwner();
 
-    adjacency_list[child_op].push_back(currOp);
+    adjacencyList[childOp].push_back(currOp);
 
     // traverse child operation if not yet done
-    auto it = node_visited.find(child_op);
-    if (it == node_visited.end()) {
+    auto it = nodeVisited.find(childOp);
+    if (it == nodeVisited.end()) {
       // not visited yet
-      recursive_list_creator_opl(child_op, adjacency_list, node_visited,
-                                 DFSstack);
+      recursiveListCreatorOpl(childOp, adjacencyList, nodeVisited,
+                                 dfsStack);
     }
   }
-  DFSstack.push(currOp);
-  return;
+  dfsStack.push(currOp);
 }
 
-void create_adjacency_list_opl(
+void createAdjacencyListOpl(
     mlir::Operation *startOp,
-    std::map<Operation *, std::list<Operation *>> &adjacency_list,
-    std::stack<Operation *> &DFSstack, handshake::FuncOp *funcOp) {
-  std::set<mlir::Operation *> node_visited;
-  recursive_list_creator_opl(startOp, adjacency_list, node_visited, DFSstack);
+    std::map<Operation *, std::list<Operation *>> &adjacencyList,
+    std::stack<Operation *> &dfsStack, handshake::FuncOp *funcOp) {
+  std::set<mlir::Operation *> nodeVisited;
+  recursiveListCreatorOpl(startOp, adjacencyList, nodeVisited, dfsStack);
   for (Operation &op : funcOp->getOps()) {
-    auto it = node_visited.find(&op);
-    if (it == node_visited.end()) {
-      recursive_list_creator_opl(&op, adjacency_list, node_visited, DFSstack);
+    auto it = nodeVisited.find(&op);
+    if (it == nodeVisited.end()) {
+      recursiveListCreatorOpl(&op, adjacencyList, nodeVisited, dfsStack);
     }
   }
-  return;
 }
 
 void secondRecursiveDFStravel(
-    std::map<Operation *, std::list<Operation *>> &adjacency_list,
-    std::set<mlir::Operation *> &node_visited, Operation *current_node,
+    std::map<Operation *, std::list<Operation *>> &adjacencyList,
+    std::set<mlir::Operation *> &nodeVisited, Operation *currentNode,
     std::list<Operation *> &currSCC) {
-  std::list<Operation *> current_list = adjacency_list[current_node];
-  for (auto item : current_list) {
-    auto it = node_visited.find(item);
-    if (it == node_visited.end()) {
-      node_visited.insert(item);
-      secondRecursiveDFStravel(adjacency_list, node_visited, item, currSCC);
+  std::list<Operation *> currentList = adjacencyList[currentNode];
+  for (auto *item : currentList) {
+    auto it = nodeVisited.find(item);
+    if (it == nodeVisited.end()) {
+      nodeVisited.insert(item);
+      secondRecursiveDFStravel(adjacencyList, nodeVisited, item, currSCC);
     }
   }
-  currSCC.push_front(current_node);
-  return;
+  currSCC.push_front(currentNode);
 }
 
 std::vector<std::list<Operation *>>
-secondDFStravel(std::map<Operation *, std::list<Operation *>> &adjacency_list,
-                std::stack<Operation *> &DFSstack) {
+secondDFStravel(std::map<Operation *, std::list<Operation *>> &adjacencyList,
+                std::stack<Operation *> &dfsStack) {
   std::vector<std::list<Operation *>> result;
-  std::set<mlir::Operation *> node_visited;
-  while (!DFSstack.empty()) {
-    auto current_node = DFSstack.top();
-    DFSstack.pop();
-    auto it = node_visited.find(current_node);
-    if (it != node_visited.end()) {
+  std::set<mlir::Operation *> nodeVisited;
+  while (!dfsStack.empty()) {
+    auto *currentNode = dfsStack.top();
+    dfsStack.pop();
+    auto it = nodeVisited.find(currentNode);
+    if (it != nodeVisited.end()) {
       continue;
     }
-    node_visited.insert(current_node);
+    nodeVisited.insert(currentNode);
     std::list<Operation *> currSCC;
-    secondRecursiveDFStravel(adjacency_list, node_visited, current_node,
+    secondRecursiveDFStravel(adjacencyList, nodeVisited, currentNode,
                              currSCC);
     result.push_back(currSCC);
   }
   return result;
 }
 
-void get_noncyclic_operations(
-    std::map<Operation *, std::list<Operation *>> &adjacency_list,
-    std::vector<std::list<Operation *>> &SCC,
+void getNoncyclicOperations(
+    std::map<Operation *, std::list<Operation *>> &adjacencyList,
+    std::vector<std::list<Operation *>> &scc,
     std::set<mlir::Operation *> &result) {
-  for (auto list : SCC) {
+  for (auto list : scc) {
     if (list.size() == 1) {
       // may be noncyclic
-      bool is_not_on_loop = true;
-      auto op = *list.begin();
+      bool isNotOnLoop = true;
+      auto *op = *list.begin();
       for (auto &u : op->getResults().getUses()) {
         // get child operation
         if (u.getOwner() == op) {
-          is_not_on_loop = false;
+          isNotOnLoop = false;
           break;
         }
       }
-      if (is_not_on_loop) {
+      if (isNotOnLoop) {
         result.insert(op);
       }
     }
   }
-  return;
 }
 
-void Kosarajus_algorithm_OPL(mlir::Operation *startOp,
+void kosarajusAlgorithmOpl(mlir::Operation *startOp,
                              handshake::FuncOp *funcOp,
                              std::set<mlir::Operation *> &result) {
-  std::map<Operation *, std::list<Operation *>> adjacency_list;
-  std::stack<Operation *> DFSstack;
-  create_adjacency_list_opl(startOp, adjacency_list, DFSstack, funcOp);
-  std::vector<std::list<Operation *>> SCC =
-      secondDFStravel(adjacency_list, DFSstack);
-  get_noncyclic_operations(adjacency_list, SCC, result);
-  return;
+  std::map<Operation *, std::list<Operation *>> adjacencyList;
+  std::stack<Operation *> dfsStack;
+  createAdjacencyListOpl(startOp, adjacencyList, dfsStack, funcOp);
+  std::vector<std::list<Operation *>> scc =
+      secondDFStravel(adjacencyList, dfsStack);
+  getNoncyclicOperations(adjacencyList, scc, result);
 }
 
 } // namespace sharing

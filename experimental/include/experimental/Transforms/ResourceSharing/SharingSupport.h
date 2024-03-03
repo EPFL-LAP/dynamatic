@@ -16,6 +16,8 @@
 #ifndef EXPERIMENTAL_INCLUDE_DYNAMATIC_TRANSFORMS_RESOURCESHARING_SHARINGSUPPORT_H
 #define EXPERIMENTAL_INCLUDE_DYNAMATIC_TRANSFORMS_RESOURCESHARING_SHARINGSUPPORT_H
 
+#include <utility>
+
 #include "dynamatic/Support/TimingModels.h"
 #include "dynamatic/Transforms/BufferPlacement/FPGA20Buffers.h"
 #include "experimental/Transforms/ResourceSharing/SCC.h"
@@ -75,13 +77,13 @@ struct ResourceSharingInfo {
 */
 struct Group {
   std::vector<mlir::Operation *> items;
-  double shared_occupancy;
+  double sharedOccupancy;
   bool hasCycle;
 
   // determine if an operation is cyclic (if there is a path from the op that
   // reaches back to it)
-  bool recursivelyDetermineIfCyclic(mlir::Operation *current_op,
-                                    std::set<mlir::Operation *> &node_visited,
+  bool recursivelyDetermineIfCyclic(mlir::Operation *currentOp,
+                                    std::set<mlir::Operation *> &nodeVisited,
                                     mlir::Operation *op);
   bool determineIfCyclic(mlir::Operation *op);
 
@@ -89,12 +91,12 @@ struct Group {
   // important: changes neither the shared occupancy nor the hasCycle attributes
   void addOperation(mlir::Operation *op);
 
-  bool operator<(Group a) const {
-    return shared_occupancy < a.shared_occupancy;
+  bool operator<(const Group& a) const {
+    return sharedOccupancy < a.sharedOccupancy;
   }
 
   bool operator==(Group a) const {
-    if (items.size() == 0) {
+    if (items.empty()) {
       return true;
     }
     return items[0] == a.items[0];
@@ -102,32 +104,32 @@ struct Group {
 
   Group &operator=(const Group &a) {
     items = a.items;
-    shared_occupancy = a.shared_occupancy;
+    sharedOccupancy = a.sharedOccupancy;
     hasCycle = a.hasCycle;
     return *this;
   }
 
   // Constructors
   Group(std::vector<mlir::Operation *> ops, double occupancy, bool cyclic)
-      : shared_occupancy(occupancy) {
-    items = ops;
+      : sharedOccupancy(occupancy) {
+    items = std::move(ops);
     hasCycle = cyclic;
   }
-  Group(mlir::Operation *op, double occupancy) : shared_occupancy(occupancy) {
+  Group(mlir::Operation *op, double occupancy) : sharedOccupancy(occupancy) {
     items.push_back(op);
     hasCycle = determineIfCyclic(op);
   }
-  Group(mlir::Operation *op) : shared_occupancy(-1) {
+  Group(mlir::Operation *op) : sharedOccupancy(-1) {
     items.push_back(op);
     hasCycle = determineIfCyclic(op);
   }
 
   // Destructor
-  ~Group(){};
+  ~Group();
 };
 
 // abbreviation to iterate through list of groups
-typedef std::list<Group>::iterator GroupIt;
+using GroupIt = std::list<Group>::iterator;
 
 /*
        Each basic block resides in a set
@@ -136,11 +138,11 @@ typedef std::list<Group>::iterator GroupIt;
 */
 struct Set {
   std::list<Group> groups{};
-  int SCC_id;
-  double op_latency;
+  int sccId;
+  double opLatency;
 
   // add group to set
-  void addGroup(Group group);
+  void addGroup(const Group& group);
 
   // merge two existing groups (of this specific set) into one newly created
   // group
@@ -150,19 +152,19 @@ struct Set {
   // join another set to this specific set
   // important: while joining, one group of each set is paired with one group of
   // the other set
-  void joinSet(Set *joined_element);
+  void joinSet(Set *joinedElement);
 
   // print content of specific set
   void print();
 
   // Constructors
-  Set(double latency) { op_latency = latency; }
+  Set(double latency) { opLatency = latency; }
 
-  Set(Group group) { groups.push_back(group); }
+  Set(const Group& group) { groups.push_back(group); }
 
-  Set(int SCC_idx, double latency) {
-    SCC_id = SCC_idx;
-    op_latency = latency;
+  Set(int sccIdx, double latency) {
+    sccId = sccIdx;
+    opLatency = latency;
   }
 };
 
@@ -171,15 +173,15 @@ struct Set {
        can be treated separately
 */
 struct ResourceSharingForSingleType {
-  double op_latency;
+  double opLatency;
   llvm::StringRef identifier;
   std::vector<Set> sets{};
-  std::map<int, int> SetSelect;
-  Set final_grouping;
-  std::list<mlir::Operation *> Ops_not_on_CFG;
+  std::map<int, int> setSelect;
+  Set finalGrouping;
+  std::list<mlir::Operation *> opsNotOnCfg;
 
   // add set to operation type
-  void addSet(Group group);
+  void addSet(const Group& group);
 
   // print the composition of Sets/SCCs - Groups
   void print();
@@ -196,14 +198,14 @@ struct ResourceSharingForSingleType {
 
   // Constructor
   ResourceSharingForSingleType(double latency, llvm::StringRef identifier)
-      : op_latency(latency), identifier(identifier),
-        final_grouping(Set(latency)) {}
+      : opLatency(latency), identifier(identifier),
+        finalGrouping(Set(latency)) {}
 };
 
-struct controlStructure {
-  mlir::Value control_merge;
-  mlir::Value control_branch;
-  mlir::Value current_position;
+struct ControlStructure {
+  mlir::Value controlMerge;
+  mlir::Value controlBranch;
+  mlir::Value currentPosition;
 };
 
 /*
@@ -216,21 +218,21 @@ class ResourceSharing {
   // connections between basic blocks
   SmallVector<dynamatic::experimental::ArchBB> archs;
   // maps operation types to integers (SCC analysis)
-  std::map<llvm::StringRef, int> OpNames;
+  std::map<llvm::StringRef, int> opNames;
   // number of sharable operation types
-  int number_of_operation_types;
+  int numberOfOperationTypes;
   // operation directly after start
   Operation *firstOp = nullptr;
   // Operations in topological order
-  std::map<Operation *, unsigned int> OpTopologicalOrder;
+  std::map<Operation *, unsigned int> opTopologicalOrder;
 
   // used to run topological sorting
   void recursiveDFStravel(Operation *op, unsigned int *position,
-                          std::set<mlir::Operation *> &node_visited);
+                          std::set<mlir::Operation *> &nodeVisited);
 
 public:
   // stores control merge and branch of each BB
-  std::map<int, controlStructure> control_map;
+  std::map<int, ControlStructure> controlMap;
 
   std::vector<ResourceSharingForSingleType> operationTypes;
 
@@ -255,26 +257,26 @@ public:
   std::vector<Operation *> sortTopologically(GroupIt group1, GroupIt group2);
 
   // determine if a vector of operations are in topological order
-  bool isTopologicallySorted(std::vector<Operation *> Ops);
+  bool isTopologicallySorted(std::vector<Operation *> ops);
 
   // place resource sharing data retrieved from buffer placement
-  void retrieveDataFromPerformanceAnalysis(ResourceSharingInfo sharing_feedback,
-                                           std::vector<int> &SCC,
-                                           int number_of_SCC,
-                                           TimingDatabase timingDB);
+  void retrieveDataFromPerformanceAnalysis(const ResourceSharingInfo& sharingFeedback,
+                                           std::vector<int> &scc,
+                                           int numberOfScc,
+                                           const TimingDatabase& timingDB);
 
   // return number of Basic Blocks
   int getNumberOfBasicBlocks();
 
   // place retrieved connections between Basic blocks
   void getListOfControlFlowEdges(
-      SmallVector<dynamatic::experimental::ArchBB> archs_ext);
+      SmallVector<dynamatic::experimental::ArchBB> archsExt);
 
   // perform SCC-agorithm on basic block level
-  std::vector<int> performSCC_bbl();
+  std::vector<int> performSccBbl();
 
   // perform SCC-agorithm on operation level
-  void performSCC_opl(std::set<mlir::Operation *> &result,
+  void performSccOpl(std::set<mlir::Operation *> &result,
                       handshake::FuncOp *funcOp);
 
   // print source-destination BB of connection between BBs, throughput per CFDFC
@@ -287,11 +289,11 @@ public:
   // place and compute all necessary data to perform resource sharing
   void
   placeAndComputeNecessaryDataFromPerformanceAnalysis(ResourceSharingInfo data,
-                                                      TimingDatabase timingDB);
+                                                      const TimingDatabase& timingDB);
 
   // constructor
-  ResourceSharing(ResourceSharingInfo data, TimingDatabase timingDB) {
-    placeAndComputeNecessaryDataFromPerformanceAnalysis(data, timingDB);
+  ResourceSharing(ResourceSharingInfo data, const TimingDatabase& timingDB) {
+    placeAndComputeNecessaryDataFromPerformanceAnalysis(std::move(data), timingDB);
   }
 };
 
@@ -307,20 +309,20 @@ bool equal(double a, double b);
 bool lessOrEqual(double a, double b);
 
 // generate performance model with all neccessary connections
-Value generate_performance_step(OpBuilder *builder, mlir::Operation *op,
-                                std::map<int, controlStructure> &control_map);
+Value generatePerformanceStep(OpBuilder *builder, mlir::Operation *op,
+                                std::map<int, ControlStructure> &controlMap);
 std::vector<Value>
-generate_performance_model(OpBuilder *builder,
+generatePerformanceModel(OpBuilder *builder,
                            std::vector<mlir::Operation *> &items,
-                           std::map<int, controlStructure> &control_map);
+                           std::map<int, ControlStructure> &controlMap);
 
 // revert IR to its original state
-void revert_performance_step(OpBuilder *builder, mlir::Operation *op);
-void destroy_performance_model(OpBuilder *builder,
+void revertPerformanceStep(OpBuilder *builder, mlir::Operation *op);
+void destroyPerformanceModel(OpBuilder *builder,
                                std::vector<mlir::Operation *> &items);
 
 // extend the current fork by one output and return that output
-mlir::OpResult extend_fork(OpBuilder *builder, handshake::ForkOp OldFork);
+mlir::OpResult extendFork(OpBuilder *builder, handshake::ForkOp oldFork);
 
 // add sink at the given connection point
 void addSink(OpBuilder *builder, mlir::OpResult *connectionPoint);
@@ -341,7 +343,7 @@ void deleteAllBuffers(handshake::FuncOp funcOp);
 
 namespace permutation {
 
-typedef std::vector<Operation *>::iterator PermutationEdge;
+using PermutationEdge = std::vector<Operation *>::iterator;
 
 // input: vector of Operations
 // changes input: sort vector in BB regions and sort those with regular
@@ -353,8 +355,8 @@ typedef std::vector<Operation *>::iterator PermutationEdge;
  *          change to: {Op1, Op2, Op3, Op4, Op5}
  *          output: {0,2},{2,5}
  */
-void findBBEdges(std::deque<std::pair<int, int>> &BBops,
-                 std::vector<Operation *> &permutation_vector);
+void findBBEdges(std::deque<std::pair<int, int>> &bbOps,
+                 std::vector<Operation *> &permutationVector);
 
 // inputs: permutation_vector.begin(), output of function findBBEdges
 // changes: permutation_vector to the next permutation step
@@ -365,8 +367,8 @@ void findBBEdges(std::deque<std::pair<int, int>> &BBops,
  * blocks, this function does exactly only permute within a BB region and goes
  * over all combinations of permutations of different BBs.
  */
-bool get_next_permutation(PermutationEdge begin_of_permutation_vector,
-                          std::deque<std::pair<int, int>> &separation_of_BBs);
+bool getNextPermutation(PermutationEdge beginOfPermutationVector,
+                          std::deque<std::pair<int, int>> &separationOfBBs);
 
 } // namespace permutation
 
@@ -378,7 +380,7 @@ class MyFPGA20Buffers : public FPGA20Buffers {
 public:
   std::vector<ResourceSharingInfo::OperationData> getData();
   double getOccupancySum(std::set<Operation *> &group);
-  LogicalResult addSyncConstraints(std::vector<Value> opaqueChannel);
+  LogicalResult addSyncConstraints(const std::vector<Value>& opaqueChannel);
 
   // constructor
   MyFPGA20Buffers(GRBEnv &env, FuncInfo &funcInfo,
