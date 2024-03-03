@@ -69,8 +69,8 @@ const static std::string HEADER =
     DELIM +
     "============== Dynamatic | Dynamic High-Level Synthesis Compiler "
     "===============\n" +
-    "======================= EPFL-LAP - v0.3.0 | February 2024 "
-    "======================\n" +
+    "======================== EPFL-LAP - v2.0.0 | March 2024 "
+    "========================\n" +
     DELIM + "\n\n";
 const static std::string PROMPT = "dynamatic> ";
 
