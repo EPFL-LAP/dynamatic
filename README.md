@@ -10,7 +10,7 @@ The following instructions can be used to setup Dynamatic from source.
     
     ```sh
     sudo apt-get update
-    sudo apt-get install clang lld ccache cmake ninja-build python3 graphviz libbbost-regex-dev git 
+    sudo apt-get install clang lld ccache cmake ninja-build python3 graphviz libboost-regex-dev git 
     ```
 
     `clang`, `lld`, and `ccache` are not stictly required but significantly speed up (re)builds. If you do not wish to install them, call the build script with the `--disable-build-opt` flag to prevent their usage.
