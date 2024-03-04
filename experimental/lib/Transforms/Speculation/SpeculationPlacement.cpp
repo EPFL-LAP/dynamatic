@@ -63,8 +63,16 @@ bool SpeculationPlacements::containsCommit(Value srcOpResult,
   return this->commits.count({srcOpResult, dstOp});
 }
 
+bool SpeculationPlacements::containsCommit(OpPlacement edge) {
+  return this->commits.count(edge);
+}
+
 bool SpeculationPlacements::containsSave(Value srcOpResult, Operation *dstOp) {
   return this->saves.count({srcOpResult, dstOp});
+}
+
+bool SpeculationPlacements::containsSave(OpPlacement edge) {
+  return this->saves.count(edge);
 }
 
 bool SpeculationPlacements::containsSaveCommit(Value srcOpResult,
@@ -72,12 +80,24 @@ bool SpeculationPlacements::containsSaveCommit(Value srcOpResult,
   return this->saveCommits.count({srcOpResult, dstOp});
 }
 
+bool SpeculationPlacements::containsSaveCommit(OpPlacement edge) {
+  return this->saveCommits.count(edge);
+}
+
 void SpeculationPlacements::eraseCommit(Value srcOpResult, Operation *dstOp) {
   this->commits.erase({srcOpResult, dstOp});
 }
 
+void SpeculationPlacements::eraseCommit(OpPlacement edge) {
+  this->commits.erase(edge);
+}
+
 void SpeculationPlacements::eraseSave(Value srcOpResult, Operation *dstOp) {
   this->saves.erase({srcOpResult, dstOp});
+}
+
+void SpeculationPlacements::eraseSave(OpPlacement edge) {
+  this->saves.erase(edge);
 }
 
 void SpeculationPlacements::mergeSaveCommits() {

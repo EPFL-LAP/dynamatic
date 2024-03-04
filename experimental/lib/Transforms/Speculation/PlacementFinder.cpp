@@ -139,6 +139,10 @@ void PlacementFinder::findCommitsTraversal(llvm::DenseSet<Operation *> &visited,
   }
 }
 
+// Define a Control-Flow Graph Edge as the pair (srcOpResult, *dstOp)
+using CFGEdge = OpPlacement;
+
+// Define a comparator between BBEndpoints
 struct endpointComparator {
   bool operator()(const BBEndpoints &a, const BBEndpoints &b) const {
     if (a.srcBB != b.srcBB)
@@ -146,30 +150,36 @@ struct endpointComparator {
     return a.dstBB < b.dstBB;
   }
 };
+
+// Define a map from BBEndpoints to the CFGEdges that connect the BBs
 using BBEndpointsMap =
-    std::map<BBEndpoints, std::vector<OpPlacement>, endpointComparator>;
+    std::map<BBEndpoints, std::vector<CFGEdge>, endpointComparator>;
 
 // Data structure to hold all arcs leading to a single BB predecessor
 // Note: srcBB and dstBB can be equal when the arcs are Backedges
 struct BBArc {
   unsigned srcBB;
   unsigned dstBB;
-  std::vector<OpPlacement> edges;
+  std::vector<CFGEdge> edges;
 };
+
+// Define a map from a BB's number to the BBArcs that lead to predecessor BBs
 using BBtoPredecessorArcsMap = std::map<unsigned, std::vector<BBArc>>;
 
 // Calculate the BBArcs that lead to predecessor BBs within funcOp
 // Returns a map from each BB number to a vector of BBArcs
 static BBtoPredecessorArcsMap getPredecessorArcs(handshake::FuncOp funcOp) {
-  // Traverse all operations to find arcs between BBs (and self-arcs)
   BBEndpointsMap endpointEdges;
+  // Traverse all operations within funcOp to find edges between BBs, including
+  // self-edges, and save them in a map from the Endpoints to the edges
   funcOp->walk([&](Operation *op) {
     for (Value operand : op->getOperands()) {
       BBEndpoints endpoints;
+      // Store the edge if it is a Backedge or connects two different BBs
       if (isBackedge(operand, op, &endpoints) or
           endpoints.srcBB != endpoints.dstBB) {
-        OpPlacement arc = {operand, op};
-        endpointEdges[endpoints].push_back(arc);
+        CFGEdge edge = {operand, op};
+        endpointEdges[endpoints].push_back(edge);
       }
     }
   });
@@ -192,15 +202,15 @@ static BBtoPredecessorArcsMap getPredecessorArcs(handshake::FuncOp funcOp) {
 // the OpPlacements (pair value-operation) that are traversed
 static void markSpeculativePathsForCommits(Operation *currOp,
                                            SpeculationPlacements &placements,
-                                           PlacementSet &markedPaths) {
+                                           PlacementSet &markedEdges) {
   for (Value res : currOp->getResults()) {
     for (Operation *succOp : res.getUsers()) {
-      OpPlacement arc = {res, succOp};
-      if (not markedPaths.count(arc)) {
-        markedPaths.insert(arc);
+      CFGEdge edge = {res, succOp};
+      if (not markedEdges.count(edge)) {
+        markedEdges.insert(edge);
         // Stop traversal if a commit is reached
-        if (not placements.containsCommit(res, succOp))
-          markSpeculativePathsForCommits(succOp, placements, markedPaths);
+        if (not placements.containsCommit(edge))
+          markSpeculativePathsForCommits(succOp, placements, markedEdges);
       }
     }
   }
@@ -209,33 +219,36 @@ static void markSpeculativePathsForCommits(Operation *currOp,
 // Find the placements of Commit units in between BBs, that are needed to avoid
 // two control-only tokens going out of order. Updates the `placements`
 void PlacementFinder::findCommitsBetweenBBs() {
-  OpPlacement specPos = placements.getSpeculatorPlacement();
+  CFGEdge specPos = placements.getSpeculatorPlacement();
   auto funcOp = specPos.dstOp->getParentOfType<handshake::FuncOp>();
   assert(funcOp && "op should have parent function");
 
   // Whenever a BB has two speculative inputs, commit units are needed to avoid
   // tokens going out-of-order. First, the block predecessor arcs are found
-  BBtoPredecessorArcsMap predecessors = getPredecessorArcs(funcOp);
-  PlacementSet markedPaths;
-  markSpeculativePathsForCommits(specPos.dstOp, placements, markedPaths);
+  BBtoPredecessorArcsMap bbToPredecessorArcs = getPredecessorArcs(funcOp);
+
+  // Mark the speculative edges. The set speculativeEdges is passed by reference
+  PlacementSet speculativeEdges;
+  markSpeculativePathsForCommits(specPos.dstOp, placements, speculativeEdges);
+
   // Iterate all BBs to check if commits are needed
-  for (const auto &[bb, predecessorArcs] : predecessors) {
+  for (const auto &[bb, predecessorArcs] : bbToPredecessorArcs) {
     // Count number of speculative inputs to the BB
     unsigned countSpecInputs = 0;
     for (BBArc arc : predecessorArcs) {
       // If any of the edges in an arc is speculative, count the input arc as
       // speculative
       if (llvm::any_of(arc.edges,
-                       [&](OpPlacement p) { return markedPaths.count(p); }))
+                       [&](CFGEdge p) { return speculativeEdges.count(p); }))
         countSpecInputs++;
     }
 
     if (countSpecInputs > 1) {
       // Potential ordering issue, add commits
       for (BBArc pred : predecessorArcs) {
-        for (OpPlacement edge : pred.edges) {
+        for (CFGEdge edge : pred.edges) {
           // Add a Commit only in front of speculative inputs
-          if (markedPaths.count(edge))
+          if (speculativeEdges.count(edge))
             placements.addCommit(edge.srcOpResult, edge.dstOp);
           // Here, synchronizer operations will be needed in the future
         }
@@ -246,18 +259,18 @@ void PlacementFinder::findCommitsBetweenBBs() {
   // Now that new commits have been added, some of the already placed commits
   // might be unreachable. Hence, the path to commits is marked again and
   // unreachable commits are removed
-  markedPaths.clear();
-  markSpeculativePathsForCommits(specPos.dstOp, placements, markedPaths);
+  speculativeEdges.clear();
+  markSpeculativePathsForCommits(specPos.dstOp, placements, speculativeEdges);
 
   // Remove commits that cannot be reached
   PlacementSet toRemove;
-  for (OpPlacement arc : placements.getPlacements<handshake::SpecCommitOp>()) {
-    if (not markedPaths.count(arc)) {
-      toRemove.insert({arc.srcOpResult, arc.dstOp});
+  for (CFGEdge edge : placements.getPlacements<handshake::SpecCommitOp>()) {
+    if (not speculativeEdges.count(edge)) {
+      toRemove.insert(edge);
     }
   }
-  for (OpPlacement p : toRemove) {
-    placements.eraseCommit(p.srcOpResult, p.dstOp);
+  for (CFGEdge edge : toRemove) {
+    placements.eraseCommit(edge);
   }
 }
 
@@ -318,10 +331,8 @@ void PlacementFinder::findSaveCommitsTraversal(
 }
 
 LogicalResult PlacementFinder::findSaveCommitPositions() {
-  // Merge consecutive save and commit units into save-commits
-  placements.mergeSaveCommits();
-
-  // Find additional save commits
+  // There already exist save-commits which have been placed instead of
+  // consecutive save and commit units. Here, additional save commits are found
   OpPlacement specPos = placements.getSpeculatorPlacement();
   auto funcOp = specPos.dstOp->getParentOfType<handshake::FuncOp>();
   assert(funcOp && "op should have parent function");
@@ -332,8 +343,9 @@ LogicalResult PlacementFinder::findSaveCommitPositions() {
     return failure();
   }
 
-  // Every path from entry points to exit points in the Speculator BB should
-  // cross either the speculator or a save-commit
+  // If a save-commit is placed, then for correctness, every path from entry
+  // points to exit points in the Speculator BB should cross either the
+  // speculator or a save-commit
   if (not placements.getPlacements<handshake::SpecSaveCommitOp>().empty()) {
     bool foundControlMerge = false;
     // Every BB starts at a control merge

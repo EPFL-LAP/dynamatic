@@ -85,17 +85,32 @@ public:
   /// Check if there is a commit from srcOp to dstOp
   bool containsCommit(Value srcOpResult, Operation *dstOp);
 
+  /// Check if there is a commit in the given OpPlacement edge
+  bool containsCommit(OpPlacement edge);
+
   /// Check if there is a save from srcOp to dstOp
   bool containsSave(Value srcOpResult, Operation *dstOp);
+
+  /// Check if there is a save in the given OpPlacement edge
+  bool containsSave(OpPlacement edge);
 
   /// Check if there is a save-commit from srcOp to dstOp
   bool containsSaveCommit(Value srcOpResult, Operation *dstOp);
 
-  /// Remove a commit from the commit placement map
+  /// Check if there is a save-commit in the given OpPlacement edge
+  bool containsSaveCommit(OpPlacement edge);
+
+  /// Remove a commit (srcOp to dstOp) from the commit placement map
   void eraseCommit(Value srcOpResult, Operation *dstOp);
 
-  /// Remove a save from the save placement map
+  /// Remove a commit (edge) from the commit placement map
+  void eraseCommit(OpPlacement edge);
+
+  /// Remove a save (srcOp to dstOp) from the save placement map
   void eraseSave(Value srcOpResult, Operation *dstOp);
+
+  /// Remove a save (edge) from the save placement map
+  void eraseSave(OpPlacement edge);
 
   /// Merge save and commit units
   void mergeSaveCommits();
