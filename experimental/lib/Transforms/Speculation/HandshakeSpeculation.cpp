@@ -72,14 +72,17 @@ LogicalResult HandshakeSpeculationPass::placeUnits(Value ctrlSignal) {
   MLIRContext *ctx = &getContext();
   OpBuilder builder(ctx);
 
-  for (const OpPlacement p : placements.getPlacements<T>()) {
+  for (OpOperand *operand : placements.getPlacements<T>()) {
+    Operation *dstOp = operand->getOwner();
+    Value srcOpResult = operand->get();
+
     // Create and connect the new Operation
-    builder.setInsertionPoint(p.dstOp);
-    T newOp = builder.create<T>(p.dstOp->getLoc(), p.srcOpResult, ctrlSignal);
-    inheritBB(p.dstOp, newOp);
+    builder.setInsertionPoint(dstOp);
+    T newOp = builder.create<T>(dstOp->getLoc(), srcOpResult, ctrlSignal);
+    inheritBB(dstOp, newOp);
 
     // Connect the new Operation to dstOp
-    p.srcOpResult.replaceAllUsesExcept(newOp.getResult(), newOp);
+    srcOpResult.replaceAllUsesExcept(newOp.getResult(), newOp);
   }
 
   return success();
@@ -334,21 +337,23 @@ LogicalResult HandshakeSpeculationPass::prepareAndPlaceSaveCommits() {
 LogicalResult HandshakeSpeculationPass::placeSpeculator() {
   MLIRContext *ctx = &getContext();
 
-  OpPlacement place = placements.getSpeculatorPlacement();
+  OpOperand &operand = placements.getSpeculatorPlacement();
+  Operation *dstOp = operand.getOwner();
+  Value srcOpResult = operand.get();
 
   OpBuilder builder(ctx);
-  builder.setInsertionPoint(place.dstOp);
+  builder.setInsertionPoint(dstOp);
 
-  specOp = builder.create<handshake::SpeculatorOp>(place.dstOp->getLoc(),
-                                                   place.srcOpResult);
+  specOp =
+      builder.create<handshake::SpeculatorOp>(dstOp->getLoc(), srcOpResult);
 
-  // Replace uses of the orginal source operation's result with the speculator's
-  // result, except in the speculator's operands (otherwise this would create a
-  // self-loop from the speculator to the speculator)
-  place.srcOpResult.replaceAllUsesExcept(specOp.getDataOut(), specOp);
+  // Replace uses of the original source operation's result with the
+  // speculator's result, except in the speculator's operands (otherwise this
+  // would create a self-loop from the speculator to the speculator)
+  srcOpResult.replaceAllUsesExcept(specOp.getDataOut(), specOp);
 
   // Assign a Basic Block to the speculator
-  inheritBB(place.dstOp, specOp);
+  inheritBB(dstOp, specOp);
 
   return success();
 }

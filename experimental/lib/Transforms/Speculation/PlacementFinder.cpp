@@ -18,6 +18,7 @@
 #include "experimental/Transforms/Speculation/SpeculationPlacement.h"
 #include "mlir/IR/BuiltinTypes.h"
 #include "mlir/IR/OperationSupport.h"
+#include "llvm/ADT/DenseMap.h"
 #include "llvm/ADT/DenseSet.h"
 
 using namespace mlir;
@@ -28,13 +29,13 @@ using namespace dynamatic::experimental::speculation;
 
 PlacementFinder::PlacementFinder(SpeculationPlacements &placements)
     : placements(placements) {
-  OpPlacement specPos = placements.getSpeculatorPlacement();
-  assert(specPos.dstOp && "Speculator position is undefined");
+  OpOperand &specPos = placements.getSpeculatorPlacement();
+  assert(specPos.getOwner() && "Speculator position is undefined");
 }
 
 void PlacementFinder::clearPlacements() {
-  OpPlacement specPos = placements.getSpeculatorPlacement();
-  this->placements = SpeculationPlacements(specPos.srcOpResult, specPos.dstOp);
+  OpOperand &specPos = placements.getSpeculatorPlacement();
+  this->placements = SpeculationPlacements(specPos);
 }
 
 //===----------------------------------------------------------------------===//
@@ -63,20 +64,25 @@ static void markSpeculativePathsForSaves(Operation *currOp,
 // Save units are needed where speculative tokens can interact with
 // non-speculative tokens. Updates `placements` with the Save placements
 LogicalResult PlacementFinder::findSavePositions() {
-  OpPlacement specPos = placements.getSpeculatorPlacement();
+  OpOperand &specPos = placements.getSpeculatorPlacement();
   handshake::FuncOp funcOp =
-      specPos.dstOp->getParentOfType<handshake::FuncOp>();
+      specPos.getOwner()->getParentOfType<handshake::FuncOp>();
   assert(funcOp && "op should have parent function");
   auto handshakeBlocks = getLogicBBs(funcOp);
 
   // Mark all values that are speculative in the speculation BB
   llvm::DenseSet<Value> specValues;
-  specValues.insert(specPos.srcOpResult);
-  markSpeculativePathsForSaves(specPos.dstOp, specValues);
+  specValues.insert(specPos.get());
+  markSpeculativePathsForSaves(specPos.getOwner(), specValues);
 
   // Iterate all operations in the speculation BB
-  unsigned bb = getLogicBB(specPos.dstOp).value();
-  for (Operation *blockOp : handshakeBlocks.blocks[bb]) {
+  std::optional<unsigned> specBB = getLogicBB(specPos.getOwner());
+  if (!specBB) {
+    specPos.getOwner()->emitError("Operation does not have a BB.");
+    return failure();
+  }
+
+  for (Operation *blockOp : handshakeBlocks.blocks[specBB.value()]) {
     // Create a save if an operation has both spec and non-spec operands
     bool hasNonSpecInput = false;
     bool hasSpecInput = false;
@@ -88,14 +94,14 @@ LogicalResult PlacementFinder::findSavePositions() {
     }
 
     if (hasSpecInput && hasNonSpecInput) {
-      for (Value operand : blockOp->getOperands()) {
+      for (OpOperand &operand : blockOp->getOpOperands()) {
         // Create a Save for every non-speculative operand
-        if (!specValues.contains(operand)) {
+        if (!specValues.contains(operand.get())) {
           // No save needed in front of Source Operations
-          if (isa<handshake::SourceOp>(operand.getDefiningOp()))
+          if (isa<handshake::SourceOp>(operand.get().getDefiningOp()))
             continue;
 
-          placements.addSave(operand, blockOp);
+          placements.addSave(operand);
         }
       }
     }
@@ -116,23 +122,27 @@ void PlacementFinder::findCommitsTraversal(llvm::DenseSet<Operation *> &visited,
   // End traversal if currOp is already in visited set
   if (auto [_, isNewOp] = visited.insert(currOp); !isNewOp)
     return;
-  for (Value res : currOp->getResults()) {
-    for (Operation *succOp : res.getUsers()) {
-      if (placements.containsSave(res, succOp)) {
-        // A Commit is needed in front of Save Operations. To allow for multiple
-        // loop speculation, SaveCommit units are used instead of consecutive
-        // Commit-Save units.
-        placements.addSaveCommit(res, succOp);
-        placements.eraseSave(res, succOp);
-      } else if (isa<handshake::MemoryOpInterface, handshake::LoadOpInterface,
-                     handshake::StoreOpInterface>(succOp)) {
-        // A commit is needed in front of memory operations
-        placements.addCommit(res, succOp);
-      } else if (isa<handshake::EndOp>(succOp)) {
-        // A commit is needed in front of the end/exit operation
-        placements.addCommit(res, succOp);
-      } else {
-        findCommitsTraversal(visited, succOp);
+
+  for (Operation *succOp : currOp->getUsers()) {
+    for (OpOperand &dstOpOperand : succOp->getOpOperands()) {
+      // Iterate the operands of succOp that are results of currOp
+      if (dstOpOperand.get().getDefiningOp() == currOp) {
+        if (placements.containsSave(dstOpOperand)) {
+          // A Commit is needed in front of Save Operations. To allow for
+          // multiple loop speculation, SaveCommit units are used instead of
+          // consecutive Commit-Save units.
+          placements.addSaveCommit(dstOpOperand);
+          placements.eraseSave(dstOpOperand);
+        } else if (isa<handshake::MemoryOpInterface, handshake::LoadOpInterface,
+                       handshake::StoreOpInterface>(succOp)) {
+          // A commit is needed in front of memory operations
+          placements.addCommit(dstOpOperand);
+        } else if (isa<handshake::EndOp>(succOp)) {
+          // A commit is needed in front of the end/exit operation
+          placements.addCommit(dstOpOperand);
+        } else {
+          findCommitsTraversal(visited, succOp);
+        }
       }
     }
   }
@@ -140,7 +150,7 @@ void PlacementFinder::findCommitsTraversal(llvm::DenseSet<Operation *> &visited,
 
 namespace {
 // Define a Control-Flow Graph Edge as the pair (srcOpResult, *dstOp)
-using CFGEdge = OpPlacement;
+using CFGEdge = OpOperand;
 
 // Define a comparator between BBEndpoints
 struct EndpointComparator {
@@ -153,18 +163,18 @@ struct EndpointComparator {
 
 // Define a map from BBEndpoints to the CFGEdges that connect the BBs
 using BBEndpointsMap =
-    std::map<BBEndpoints, std::vector<CFGEdge>, EndpointComparator>;
+    std::map<BBEndpoints, std::vector<CFGEdge *>, EndpointComparator>;
 
 // Data structure to hold all arcs leading to a single BB predecessor
 // Note: srcBB and dstBB can be equal when the arcs are Backedges
 struct BBArc {
   unsigned srcBB;
   unsigned dstBB;
-  std::vector<CFGEdge> edges;
+  std::vector<CFGEdge *> edges;
 };
 
 // Define a map from a BB's number to the BBArcs that lead to predecessor BBs
-using BBtoPredecessorArcsMap = std::map<unsigned, std::vector<BBArc>>;
+using BBtoPredecessorArcsMap = llvm::DenseMap<unsigned, std::vector<BBArc>>;
 } // namespace
 
 // Calculate the BBArcs that lead to predecessor BBs within funcOp
@@ -174,13 +184,12 @@ static BBtoPredecessorArcsMap getPredecessorArcs(handshake::FuncOp funcOp) {
   // Traverse all operations within funcOp to find edges between BBs, including
   // self-edges, and save them in a map from the Endpoints to the edges
   funcOp->walk([&](Operation *op) {
-    for (Value operand : op->getOperands()) {
+    for (CFGEdge &edge : op->getOpOperands()) {
       BBEndpoints endpoints;
       // Store the edge if it is a Backedge or connects two different BBs
-      if (isBackedge(operand, op, &endpoints) or
+      if (isBackedge(edge.get(), op, &endpoints) or
           endpoints.srcBB != endpoints.dstBB) {
-        CFGEdge edge{operand, op};
-        endpointEdges[endpoints].push_back(edge);
+        endpointEdges[endpoints].push_back(&edge);
       }
     }
   });
@@ -201,36 +210,42 @@ static BBtoPredecessorArcsMap getPredecessorArcs(handshake::FuncOp funcOp) {
 // DFS traversal to mark all operations that lead to Commit units
 // The set markedPaths is passed by reference and is updated with
 // the OpPlacements (pair value-operation) that are traversed
-static void markSpeculativePathsForCommits(Operation *currOp,
-                                           SpeculationPlacements &placements,
-                                           PlacementSet &markedEdges) {
-  for (Value res : currOp->getResults()) {
-    for (Operation *succOp : res.getUsers()) {
-      CFGEdge edge{res, succOp};
-      if (!markedEdges.count(edge)) {
-        markedEdges.insert(edge);
-        // Stop traversal if a commit is reached
-        if (!placements.containsCommit(edge))
-          markSpeculativePathsForCommits(succOp, placements, markedEdges);
+static void
+markSpeculativePathsForCommits(Operation *currOp,
+                               SpeculationPlacements &placements,
+                               llvm::DenseSet<CFGEdge *> &markedEdges) {
+  for (Operation *succOp : currOp->getUsers()) {
+    for (CFGEdge &edge : succOp->getOpOperands()) {
+      // Iterate only the operands of succOp that are results from currOp
+      if (edge.get().getDefiningOp() == currOp) {
+        if (!markedEdges.count(&edge)) {
+          markedEdges.insert(&edge);
+          // Stop traversal if a commit is reached
+          if (!placements.containsCommit(edge))
+            markSpeculativePathsForCommits(succOp, placements, markedEdges);
+        }
       }
     }
   }
 }
 
-// Find the placements of Commit units in between BBs, that are needed to avoid
-// two control-only tokens going out of order. Updates the `placements`
+// Find the placements of Commit units in between BBs, that are needed to
+// avoid two control-only tokens going out of order. Updates the `placements`
 void PlacementFinder::findCommitsBetweenBBs() {
-  CFGEdge specPos = placements.getSpeculatorPlacement();
-  auto funcOp = specPos.dstOp->getParentOfType<handshake::FuncOp>();
+  OpOperand &specPos = placements.getSpeculatorPlacement();
+  auto funcOp = specPos.getOwner()->getParentOfType<handshake::FuncOp>();
   assert(funcOp && "op should have parent function");
 
-  // Whenever a BB has two speculative inputs, commit units are needed to avoid
-  // tokens going out-of-order. First, the block predecessor arcs are found
+  // Whenever a BB has two speculative inputs, commit units are needed to
+  // avoid tokens going out-of-order. First, the block predecessor arcs are
+  // found
   BBtoPredecessorArcsMap bbToPredecessorArcs = getPredecessorArcs(funcOp);
 
-  // Mark the speculative edges. The set speculativeEdges is passed by reference
-  PlacementSet speculativeEdges;
-  markSpeculativePathsForCommits(specPos.dstOp, placements, speculativeEdges);
+  // Mark the speculative edges. The set speculativeEdges is passed by
+  // reference
+  llvm::DenseSet<CFGEdge *> speculativeEdges;
+  markSpeculativePathsForCommits(specPos.getOwner(), placements,
+                                 speculativeEdges);
 
   // Iterate all BBs to check if commits are needed
   for (const auto &[bb, predecessorArcs] : bbToPredecessorArcs) {
@@ -240,17 +255,17 @@ void PlacementFinder::findCommitsBetweenBBs() {
       // If any of the edges in an arc is speculative, count the input arc as
       // speculative
       if (llvm::any_of(arc.edges,
-                       [&](CFGEdge p) { return speculativeEdges.count(p); }))
+                       [&](CFGEdge *p) { return speculativeEdges.count(p); }))
         countSpecInputs++;
     }
 
     if (countSpecInputs > 1) {
       // Potential ordering issue, add commits
       for (const BBArc &pred : predecessorArcs) {
-        for (CFGEdge edge : pred.edges) {
+        for (CFGEdge *edge : pred.edges) {
           // Add a Commit only in front of speculative inputs
           if (speculativeEdges.count(edge))
-            placements.addCommit(edge.srcOpResult, edge.dstOp);
+            placements.addCommit(*edge);
           // Here, synchronizer operations will be needed in the future
         }
       }
@@ -261,26 +276,31 @@ void PlacementFinder::findCommitsBetweenBBs() {
   // might be unreachable. Hence, the path to commits is marked again and
   // unreachable commits are removed
   speculativeEdges.clear();
-  markSpeculativePathsForCommits(specPos.dstOp, placements, speculativeEdges);
+  markSpeculativePathsForCommits(specPos.getOwner(), placements,
+                                 speculativeEdges);
 
   // Remove commits that cannot be reached
-  PlacementSet toRemove;
-  for (CFGEdge edge : placements.getPlacements<handshake::SpecCommitOp>()) {
+  llvm::DenseSet<CFGEdge *> toRemove;
+  for (CFGEdge *edge : placements.getPlacements<handshake::SpecCommitOp>()) {
     if (not speculativeEdges.count(edge)) {
       toRemove.insert(edge);
     }
   }
-  for (CFGEdge edge : toRemove)
-    placements.eraseCommit(edge);
+  for (CFGEdge *edge : toRemove)
+    placements.eraseCommit(*edge);
 }
 
 LogicalResult PlacementFinder::findCommitPositions() {
-  OpPlacement specPos = placements.getSpeculatorPlacement();
+  OpOperand &specPos = placements.getSpeculatorPlacement();
+  if (!getLogicBB(specPos.getOwner())) {
+    specPos.getOwner()->emitError("Operation does not have a BB.");
+    return failure();
+  }
 
   // We need to place a commit unit before (1) an exit unit; (2) a store
   // unit; (3) a save unit if speculative tokens can reach them.
   llvm::DenseSet<Operation *> visited;
-  findCommitsTraversal(visited, specPos.dstOp);
+  findCommitsTraversal(visited, specPos.getOwner());
 
   // Additionally, if there are many BBs, two control-only tokens can
   // themselves go out of order. For this reason, additional commits need
@@ -294,51 +314,52 @@ LogicalResult PlacementFinder::findCommitPositions() {
 // SaveCommit Units Finder Methods
 //===----------------------------------------------------------------------===//
 
-// Traverse the speculator's BB from top to bottom (from the control merge until
-// the branches) and adds save-commits in such a way that every path is cut by a
-// save-commit or the speculator itself. Updates `placements`.
+// Traverse the speculator's BB from top to bottom (from the control merge
+// until the branches) and adds save-commits in such a way that every path is
+// cut by a save-commit or the speculator itself. Updates `placements`.
 void PlacementFinder::findSaveCommitsTraversal(
     llvm::DenseSet<Operation *> &visited, Operation *currOp) {
   // End traversal if currOp is already in visited set
   if (auto [_, isNewOp] = visited.insert(currOp); !isNewOp)
     return;
 
-  OpPlacement specPos = placements.getSpeculatorPlacement();
-  std::optional<unsigned> specBB = getLogicBB(specPos.dstOp);
+  OpOperand &specPos = placements.getSpeculatorPlacement();
+  std::optional<unsigned> specBB = getLogicBB(specPos.getOwner());
 
   // Verify conditions to stop the traversal on the current path
-  auto stopTraversalConditions = [&](Value res, Operation *succOp) -> bool {
+  auto stopTraversalConditions = [&](OpOperand &dstOpOperand) -> bool {
     // Stop traversal if we go outside the speculation BB
-    std::optional<unsigned> succOpBB = getLogicBB(succOp);
+    std::optional<unsigned> succOpBB = getLogicBB(dstOpOperand.getOwner());
     if (!succOpBB || succOpBB != specBB)
       return true;
 
     // End traversal if the path is already cut by a commit or save-commit
-    if (placements.containsCommit(res, succOp) ||
-        placements.containsSaveCommit(res, succOp))
+    if (placements.containsCommit(dstOpOperand) ||
+        placements.containsSaveCommit(dstOpOperand))
       return true;
 
     // End traversal if the path is already cut by the speculator
-
-    OpPlacement specPos = placements.getSpeculatorPlacement();
-    if (specPos.srcOpResult == res && specPos.dstOp == succOp)
+    if (&dstOpOperand == &specPos)
       return true;
 
     // The traversal should continue on this path
     return false;
   };
 
-  for (Value res : currOp->getResults()) {
-    for (Operation *succOp : res.getUsers()) {
-      if (stopTraversalConditions(res, succOp))
-        continue;
+  for (Operation *succOp : currOp->getUsers()) {
+    for (OpOperand &dstOpOperand : succOp->getOpOperands()) {
+      // Iterate only the operands of succOp that are results from currOp
+      if (dstOpOperand.get().getDefiningOp() == currOp) {
+        if (stopTraversalConditions(dstOpOperand))
+          continue;
 
-      if (isa<handshake::ConditionalBranchOp>(succOp)) {
-        // A SaveCommit is needed in front of the branch
-        placements.addSaveCommit(res, succOp);
-      } else {
-        // Continue DFS traversal along the path
-        findSaveCommitsTraversal(visited, succOp);
+        if (isa<handshake::ConditionalBranchOp>(succOp)) {
+          // A SaveCommit is needed in front of the branch
+          placements.addSaveCommit(dstOpOperand);
+        } else {
+          // Continue DFS traversal along the path
+          findSaveCommitsTraversal(visited, succOp);
+        }
       }
     }
   }
@@ -346,14 +367,15 @@ void PlacementFinder::findSaveCommitsTraversal(
 
 LogicalResult PlacementFinder::findSaveCommitPositions() {
   // There already exist save-commits which have been placed instead of
-  // consecutive save and commit units. Here, additional save commits are found
-  OpPlacement specPos = placements.getSpeculatorPlacement();
-  auto funcOp = specPos.dstOp->getParentOfType<handshake::FuncOp>();
+  // consecutive save and commit units. Here, additional save commits are
+  // found
+  OpOperand &specPos = placements.getSpeculatorPlacement();
+  auto funcOp = specPos.getOwner()->getParentOfType<handshake::FuncOp>();
   assert(funcOp && "op should have parent function");
 
-  std::optional<unsigned> specBB = getLogicBB(specPos.dstOp);
+  std::optional<unsigned> specBB = getLogicBB(specPos.getOwner());
   if (!specBB) {
-    specPos.dstOp->emitError("Operation does not have a BB.");
+    specPos.getOwner()->emitError("Operation does not have a BB.");
     return failure();
   }
 
@@ -391,6 +413,4 @@ LogicalResult PlacementFinder::findPlacements() {
 
   return failure(failed(findSavePositions()) || failed(findCommitPositions()) ||
                  failed(findSaveCommitPositions()));
-
-  return success();
 }
