@@ -282,7 +282,7 @@ void PlacementFinder::findCommitsBetweenBBs() {
   // Remove commits that cannot be reached
   llvm::DenseSet<CFGEdge *> toRemove;
   for (CFGEdge *edge : placements.getPlacements<handshake::SpecCommitOp>()) {
-    if (not speculativeEdges.count(edge)) {
+    if (!speculativeEdges.count(edge)) {
       toRemove.insert(edge);
     }
   }
