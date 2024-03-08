@@ -123,26 +123,24 @@ void PlacementFinder::findCommitsTraversal(llvm::DenseSet<Operation *> &visited,
   if (auto [_, isNewOp] = visited.insert(currOp); !isNewOp)
     return;
 
-  for (Operation *succOp : currOp->getUsers()) {
-    for (OpOperand &dstOpOperand : succOp->getOpOperands()) {
-      // Iterate the operands of succOp that are results of currOp
-      if (dstOpOperand.get().getDefiningOp() == currOp) {
-        if (placements.containsSave(dstOpOperand)) {
-          // A Commit is needed in front of Save Operations. To allow for
-          // multiple loop speculation, SaveCommit units are used instead of
-          // consecutive Commit-Save units.
-          placements.addSaveCommit(dstOpOperand);
-          placements.eraseSave(dstOpOperand);
-        } else if (isa<handshake::MemoryOpInterface, handshake::LoadOpInterface,
-                       handshake::StoreOpInterface>(succOp)) {
-          // A commit is needed in front of memory operations
-          placements.addCommit(dstOpOperand);
-        } else if (isa<handshake::EndOp>(succOp)) {
-          // A commit is needed in front of the end/exit operation
-          placements.addCommit(dstOpOperand);
-        } else {
-          findCommitsTraversal(visited, succOp);
-        }
+  for (OpResult res : currOp->getResults()) {
+    for (OpOperand &dstOpOperand : res.getUses()) {
+      Operation *succOp = dstOpOperand.getOwner();
+      if (placements.containsSave(dstOpOperand)) {
+        // A Commit is needed in front of Save Operations. To allow for
+        // multiple loop speculation, SaveCommit units are used instead of
+        // consecutive Commit-Save units.
+        placements.addSaveCommit(dstOpOperand);
+        placements.eraseSave(dstOpOperand);
+      } else if (isa<handshake::MemoryOpInterface, handshake::LoadOpInterface,
+                     handshake::StoreOpInterface>(succOp)) {
+        // A commit is needed in front of memory operations
+        placements.addCommit(dstOpOperand);
+      } else if (isa<handshake::EndOp>(succOp)) {
+        // A commit is needed in front of the end/exit operation
+        placements.addCommit(dstOpOperand);
+      } else {
+        findCommitsTraversal(visited, succOp);
       }
     }
   }
@@ -214,16 +212,14 @@ static void
 markSpeculativePathsForCommits(Operation *currOp,
                                SpeculationPlacements &placements,
                                llvm::DenseSet<CFGEdge *> &markedEdges) {
-  for (Operation *succOp : currOp->getUsers()) {
-    for (CFGEdge &edge : succOp->getOpOperands()) {
-      // Iterate only the operands of succOp that are results from currOp
-      if (edge.get().getDefiningOp() == currOp) {
-        if (!markedEdges.count(&edge)) {
-          markedEdges.insert(&edge);
-          // Stop traversal if a commit is reached
-          if (!placements.containsCommit(edge))
-            markSpeculativePathsForCommits(succOp, placements, markedEdges);
-        }
+  for (OpResult res : currOp->getResults()) {
+    for (OpOperand &edge : res.getUses()) {
+      if (!markedEdges.count(&edge)) {
+        markedEdges.insert(&edge);
+        // Stop traversal if a commit is reached
+        if (!placements.containsCommit(edge))
+          markSpeculativePathsForCommits(edge.getOwner(), placements,
+                                         markedEdges);
       }
     }
   }
@@ -346,20 +342,18 @@ void PlacementFinder::findSaveCommitsTraversal(
     return false;
   };
 
-  for (Operation *succOp : currOp->getUsers()) {
-    for (OpOperand &dstOpOperand : succOp->getOpOperands()) {
-      // Iterate only the operands of succOp that are results from currOp
-      if (dstOpOperand.get().getDefiningOp() == currOp) {
-        if (stopTraversalConditions(dstOpOperand))
-          continue;
+  for (OpResult res : currOp->getResults()) {
+    for (OpOperand &dstOpOperand : res.getUses()) {
+      if (stopTraversalConditions(dstOpOperand))
+        continue;
 
-        if (isa<handshake::ConditionalBranchOp>(succOp)) {
-          // A SaveCommit is needed in front of the branch
-          placements.addSaveCommit(dstOpOperand);
-        } else {
-          // Continue DFS traversal along the path
-          findSaveCommitsTraversal(visited, succOp);
-        }
+      Operation *succOp = dstOpOperand.getOwner();
+      if (isa<handshake::ConditionalBranchOp>(succOp)) {
+        // A SaveCommit is needed in front of the branch
+        placements.addSaveCommit(dstOpOperand);
+      } else {
+        // Continue DFS traversal along the path
+        findSaveCommitsTraversal(visited, succOp);
       }
     }
   }
