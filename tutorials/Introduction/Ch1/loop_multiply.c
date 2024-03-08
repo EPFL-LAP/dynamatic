@@ -1,7 +1,7 @@
-#include "loop_accumulate.h"
+#include "loop_multiply.h"
 #include "dynamatic/Integration.h"
 
-unsigned loop_accumulate(in_int_t a[N]) {
+unsigned loop_multiply(in_int_t a[N]) {
   unsigned x = 2;
   for (unsigned i = 0; i < N; ++i) {
     if (a[i] == 0)
@@ -15,6 +15,6 @@ int main(void) {
   // Initialize a to [0, 1, 0, 1, ...]
   for (unsigned i = 0; i < N; ++i)
     a[i] = i % 2;
-  CALL_KERNEL(loop_accumulate, a);
+  CALL_KERNEL(loop_multiply, a);
   return 0;
 }

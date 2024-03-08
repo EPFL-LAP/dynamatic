@@ -21,6 +21,7 @@
 #include "godot_cpp/classes/label.hpp"
 #include "godot_cpp/classes/line2d.hpp"
 #include "godot_cpp/classes/polygon2d.hpp"
+#include "godot_cpp/classes/rich_text_label.hpp"
 #include "godot_cpp/variant/color.hpp"
 #include "godot_cpp/variant/string.hpp"
 #include "godot_cpp/variant/vector2.hpp"
@@ -45,7 +46,7 @@ private:
   std::map<EdgeId, Polygon2D *> edgeIdToArrowHead;
   /// Maps each edge ID to a Label object for displaying the value of the data
   /// carried by the edge
-  std::map<EdgeId, Label *> edgeIdToData;
+  std::map<EdgeId, RichTextLabel *> edgeIdToData;
   /// Maps each node ID to its position in Godot's coordinate system
   std::map<NodeId, PackedVector2Array> nodeIdToGodoPos;
   /// Maps each node ID to its corresponding Polygon2D object
@@ -61,10 +62,12 @@ private:
   /// // Counter for the number of nodes clicked by the user
   int nbClicked = 0;
   /// Initial colors corresponding to the different states on an edge
-  std::vector<Color> stateColors = {
-      Color(0.8, 0.0, 0.0, 1.0), Color(0.0, 0.0, 0.0, 1.0),
-      Color(0.0, 0.0, 0.8, 1.0), Color(0.0, 0.8, 0.0, 1.0),
-      Color(0.0, 0.8, 0.8, 1.0),
+  std::map<State, Color> stateColors = {
+      {State::UNDEFINED, Color(0.78, 0.0, 0.0, 1.0)},
+      {State::IDLE, Color(0.0, 0.0, 0.0, 1.0)},
+      {State::ACCEPT, Color(0.19, 0.14, 0.72, 1.0)},
+      {State::STALL, Color(0.85, 0.47, 0.14, 1.0)},
+      {State::TRANSFER, Color(0.0, 0.78, 0.0, 1.0)},
   };
   /// Maps color names to their corresponding RGBA Color values in Godot
   std::map<std::string, Color> colorNameToRGB = {
@@ -87,8 +90,11 @@ private:
   void createGraph(std::string inputDOTFile, std::string inputCSVFile);
   /// Draws each component of the graph in Godot
   void drawGraph();
+  /// Sets the color of all edges which change states at the given clock cycle
+  /// number.
+  void setEdgeColors(CycleNb cycle);
   /// Changes the color of a given edge in function of its state
-  void setEdgeColor(State state, std::vector<Line2D *> lines,
+  void setEdgeColor(State state, std::vector<Line2D *> &lines,
                     Polygon2D *arrowHead);
   /// Modifies the transparency of all graph elements
   void transparentEffect(double transparency);

@@ -1,3 +1,7 @@
+# Include headers from tutorials
+include_directories(${DYNAMATIC_SOURCE_DIR}/tutorials/CreatingPasses/include)
+include_directories(${DYNAMATIC_BINARY_DIR}/tutorials/CreatingPasses/include)
+
 set(LLVM_LINK_COMPONENTS
   Support
 )

@@ -29,7 +29,9 @@
 #include "godot_cpp/classes/node2d.hpp"
 #include "godot_cpp/classes/panel.hpp"
 #include "godot_cpp/classes/polygon2d.hpp"
+#include "godot_cpp/classes/rich_text_label.hpp"
 #include "godot_cpp/classes/style_box_flat.hpp"
+#include "godot_cpp/classes/text_server.hpp"
 #include "godot_cpp/core/class_db.hpp"
 #include "godot_cpp/core/math.hpp"
 #include "godot_cpp/core/memory.hpp"
@@ -44,6 +46,7 @@
 #include "mlir/IR/MLIRContext.h"
 #include "mlir/Parser/Parser.h"
 #include "mlir/Support/LogicalResult.h"
+#include "llvm/ADT/STLExtras.h"
 #include "llvm/Support/CommandLine.h"
 #include "llvm/Support/InitLLVM.h"
 #include "llvm/Support/SourceMgr.h"
@@ -60,9 +63,12 @@ const godot::Color TRANSPARENT_BLACK(0, 0, 0, 0.075);
 const godot::Color OPAQUE_BLACK(0, 0, 0, 1.0);
 const godot::Color OPAQUE_WHITE(1, 1, 1, 1.0);
 
-const int NODE_HEIGHT = 35;
-const int NODE_WIDTH_SCALING_COEFFICIENT = 70;
-const int DASH_LENGTH = 5;
+static const double LINE_WIDTH = 1.5;
+static const double NODE_HEIGHT = 35;
+static const double NODE_WIDTH_SCALING_COEFFICIENT = 70;
+static const double DASH_LENGTH = 3;
+static const double DASH_SPACE_LENGTH = DASH_LENGTH * 2;
+static const unsigned NUM_OVAL_POINTS = 50;
 
 void VisualDataflow::_bind_methods() {
 
@@ -114,9 +120,7 @@ void VisualDataflow::createGraph(std::string inputDOTFile,
 }
 
 void VisualDataflow::drawBBs() {
-
   for (const auto &bb : graph.getBBs()) {
-
     std::vector<float> boundries = bb.boundries;
     Polygon2D *p = memnew(Polygon2D);
     PackedVector2Array points;
@@ -131,174 +135,175 @@ void VisualDataflow::drawBBs() {
 
     add_child(p);
 
-    Label *label = memnew(Label);
-    label->set_text(bb.label.c_str());
-    label->set_position(
+    // Create the label and configure it
+    RichTextLabel *bbLabel = memnew(RichTextLabel);
+    bbLabel->set_use_bbcode(true);
+    bbLabel->set_fit_content(true);
+    bbLabel->set_autowrap_mode(TextServer::AUTOWRAP_OFF);
+    bbLabel->set_position(
         Vector2(bb.boundries.at(0) + 5,
                 -bb.labelPosition.second - bb.labelSize.first * 35));
-    label->add_theme_color_override("font_color", OPAQUE_BLACK);
-    label->add_theme_font_size_override("font_size", 12);
 
-    add_child(label);
+    // Set the label's content
+    bbLabel->push_font(get_theme_default_font(), 12);
+    bbLabel->push_color(OPAQUE_BLACK);
+    bbLabel->append_text(bb.label.c_str());
+    bbLabel->pop();
+    bbLabel->pop();
+
+    add_child(bbLabel);
   }
 }
 
-void createDashedLine(PackedVector2Array &points, std::vector<Line2D *> *lines,
-                      Area2D *area2D) {
-  for (int i = 0; i < points.size() - 1; ++i) {
+static void setBasicLineProps(Line2D *line) {
+  line->set_width(LINE_WIDTH);
+  line->set_default_color(OPAQUE_BLACK);
+  line->set_antialiased(true);
+}
+
+static void createDashedLine(PackedVector2Array &points,
+                             std::vector<Line2D *> *lines, Area2D *area2D) {
+  for (unsigned i = 0; i < points.size() - 1; ++i) {
     Vector2 start = points[i];
     Vector2 end = points[i + 1];
     Vector2 segment = end - start;
-    float segmentLength = segment.length();
+    double segmentLength = segment.length();
     segment = segment.normalized();
-    float currentLength = 0.0;
+    double currentLength = 0.0;
     while (currentLength < segmentLength) {
       Line2D *line = memnew(Line2D);
-      line->set_width(1);
-      line->set_default_color(OPAQUE_BLACK);
+      setBasicLineProps(line);
       Vector2 lineStart = start + segment * currentLength;
-      Vector2 lineEnd =
-          lineStart + segment * MIN(DASH_LENGTH, segmentLength - currentLength);
+      double length = MIN(DASH_LENGTH, segmentLength - currentLength);
+      Vector2 lineEnd = lineStart + segment * length;
       PackedVector2Array linePoints;
       linePoints.append(lineStart);
       linePoints.append(lineEnd);
       line->set_points(linePoints);
+
       lines->push_back(line);
       area2D->add_child(line);
-      currentLength += 2 * DASH_LENGTH;
+      currentLength += DASH_LENGTH + DASH_SPACE_LENGTH;
     }
   }
 }
 
 void VisualDataflow::drawNodes() {
 
-  for (auto &node : graph.getNodes()) {
-    std::pair<float, float> center = node.second.getPosition();
-    float width = node.second.getWidth() * NODE_WIDTH_SCALING_COEFFICIENT;
+  for (auto &[id, node] : graph.getNodes()) {
+    auto [centerX, centerY] = node.getPosition();
+    float width = node.getWidth() * NODE_WIDTH_SCALING_COEFFICIENT;
     Area2D *area2D = memnew(Area2D);
     Polygon2D *godotNode = memnew(Polygon2D);
-    PackedVector2Array points;
-    Line2D *outline = memnew(Line2D);
-    Vector2 firstPoint, point1, point2, point3, point4;
-    Shape shape = node.second.getShape();
+    Shape shape = node.getShape();
 
-    // Set points for either diamond or box shapes
+    double halfWidth = width / 2;
+    double halfHeight = NODE_HEIGHT / 2;
+
+    // Define the shape of the node as a sequence of 2D points
+    PackedVector2Array points;
     if (shape == "diamond" || shape == "box") {
+
       if (shape == "box") {
         // Define points for a box-shaped node
-        point1 =
-            Vector2(center.first - width / 2, -center.second + NODE_HEIGHT / 2);
-        point2 =
-            Vector2(center.first + width / 2, -center.second + NODE_HEIGHT / 2);
-        point3 =
-            Vector2(center.first + width / 2, -center.second - NODE_HEIGHT / 2);
-        point4 =
-            Vector2(center.first - width / 2, -center.second - NODE_HEIGHT / 2);
+        points.push_back(Vector2(centerX - halfWidth, -centerY + halfHeight));
+        points.push_back(Vector2(centerX + halfWidth, -centerY + halfHeight));
+        points.push_back(Vector2(centerX + halfWidth, -centerY - halfHeight));
+        points.push_back(Vector2(centerX - halfWidth, -centerY - halfHeight));
       } else {
         // Define points for a diamond-shaped node
-        point1 = Vector2(center.first, -center.second + NODE_HEIGHT / 2);
-        point2 = Vector2(center.first + width / 2, -center.second);
-        point3 = Vector2(center.first, -center.second - NODE_HEIGHT / 2);
-        point4 = Vector2(center.first - width / 2, -center.second);
+        points.push_back(Vector2(centerX, -centerY + halfHeight));
+        points.push_back(Vector2(centerX + halfWidth, -centerY));
+        points.push_back(Vector2(centerX, -centerY - halfHeight));
+        points.push_back(Vector2(centerX - halfWidth, -centerY));
       }
 
-      firstPoint = point1;
-      points.push_back(point1);
-      points.push_back(point2);
-      points.push_back(point3);
-      points.push_back(point4);
-      godotNode->set_polygon(points);
-      nodeIdToGodoPos[node.first] = points;
+      // The collision area is the same as the node itself
+      nodeIdToGodoPos[id] = points;
     } else {
-      // Code for an oval-shaped node
-      int numPoints = 30; // Increase for smoother oval
-      for (int i = 0; i < numPoints; ++i) {
-        float angle = 2 * M_PI * i / numPoints;
-        float x = center.first + width / 2 * cos(angle);
-        float y = -center.second + NODE_HEIGHT / 2 * sin(angle);
+      // Create points to characterize an oval shape
+      double angle = 0;
+      double angleIncrement = 2 * M_PI / NUM_OVAL_POINTS;
+      for (unsigned i = 0; i < NUM_OVAL_POINTS; ++i) {
+        angle += angleIncrement;
+        double x = centerX + width / 2 * cos(angle);
+        double y = -centerY + NODE_HEIGHT / 2 * sin(angle);
         points.push_back(Vector2(x, y));
-        if (i == 0)
-          firstPoint = Vector2(x, y);
       }
-      godotNode->set_polygon(points);
 
-      // Define points for an oval bounding rectangle
-      point1 = Vector2(center.first, -center.second + NODE_HEIGHT / 2);
-      point2 = Vector2(center.first + width / 2, -center.second);
-      point3 = Vector2(center.first, -center.second - NODE_HEIGHT / 2);
-      point4 = Vector2(center.first - width / 2, -center.second);
+      // The collison area is a rectangle centered within the oval
       PackedVector2Array rectanglePoints;
-      rectanglePoints.push_back(point1);
-      rectanglePoints.push_back(point2);
-      rectanglePoints.push_back(point3);
-      rectanglePoints.push_back(point4);
-      nodeIdToGodoPos[node.first] = rectanglePoints;
+      rectanglePoints.push_back(Vector2(centerX, -centerY + NODE_HEIGHT / 2));
+      rectanglePoints.push_back(Vector2(centerX + width / 2, -centerY));
+      rectanglePoints.push_back(Vector2(centerX, -centerY - NODE_HEIGHT / 2));
+      rectanglePoints.push_back(Vector2(centerX - width / 2, -centerY));
+      nodeIdToGodoPos[id] = rectanglePoints;
     }
 
-    // Set the node color
-    godotNode->set_color(colorNameToRGB.count(node.second.getColor())
-                             ? colorNameToRGB.at(node.second.getColor())
+    // Sets the node's polygon and color
+    godotNode->set_polygon(points);
+    godotNode->set_color(colorNameToRGB.count(node.getColor())
+                             ? colorNameToRGB.at(node.getColor())
                              : OPAQUE_WHITE);
 
-    // Create and position the label
-    Label *label = memnew(Label);
-    label->set_text(node.second.getNodeId().c_str());
-    label->add_theme_color_override("font_color", OPAQUE_BLACK);
-    label->add_theme_font_size_override("font_size", 12);
-    Vector2 size = label->get_combined_minimum_size();
-    label->set_position(
-        Vector2(center.first - size.x * 0.5, -(center.second + size.y * 0.5)));
+    // Create the label and configure it
+    RichTextLabel *nodeName = memnew(RichTextLabel);
+    nodeName->set_use_bbcode(true);
+    nodeName->set_fit_content(true);
+    nodeName->set_autowrap_mode(TextServer::AUTOWRAP_OFF);
+    nodeName->set_position(Vector2(centerX, -centerY));
+
+    // Set the label's content
+    nodeName->push_font(get_theme_default_font(), 11);
+    nodeName->push_color(OPAQUE_BLACK);
+    std::string text = "[center]" + node.getNodeId() + "[/center]";
+    nodeName->append_text(text.c_str());
+    nodeName->pop();
+    nodeName->pop();
 
     // Create a container for the label and the node
     CenterContainer *centerContainer = memnew(CenterContainer);
     centerContainer->set_size(Vector2(width, NODE_HEIGHT));
     centerContainer->set_position(
-        Vector2(center.first - width / 2, -center.second - NODE_HEIGHT / 2));
-    centerContainer->add_child(label);
+        Vector2(centerX - halfWidth, -centerY - halfHeight));
+    centerContainer->add_child(nodeName);
     area2D->add_child(godotNode);
     area2D->add_child(centerContainer);
-    nodeIdToPolygon[node.first] = godotNode;
-
-    std::vector<Line2D *> lines;
+    nodeIdToPolygon[id] = godotNode;
 
     // Create the ouline of the node
-    if (node.second.getDashed()) {
-      points.push_back(firstPoint);
+    Line2D *outline = memnew(Line2D);
+    setBasicLineProps(outline);
+    std::vector<Line2D *> lines;
+    if (node.getDashed()) {
+      points.push_back(points[0]);
       createDashedLine(points, &lines, area2D);
     } else {
       outline->set_points(points);
-      outline->add_point(firstPoint);
+      outline->add_point(points[0]);
       lines.push_back(outline);
     }
 
     // Set outline color and width, and add to the area
-    outline->set_default_color(OPAQUE_BLACK);
-    outline->set_width(1);
     area2D->add_child(outline);
     add_child(area2D);
-    nodeIdToContourLine[node.first] = lines;
-    nodeIdToTransparency[node.first] = false;
+    nodeIdToContourLine[id] = lines;
+    nodeIdToTransparency[id] = false;
   }
 }
 
 void VisualDataflow::drawEdges() {
-
-  for (auto &edge : graph.getEdges()) {
+  for (GraphEdge &edge : graph.getEdges()) {
 
     Area2D *area2D = memnew(Area2D);
     std::vector<Line2D *> lines;
-    Vector2 previousPoint, lastPoint;
     std::vector<std::pair<float, float>> positions = edge.getPositions();
     PackedVector2Array linePoints;
 
     // Generate points for the edge line, inverting the y-axis due to a change
-    // of reference in Godot.
-    for (size_t i = 1; i < positions.size(); ++i) {
-      Vector2 point = Vector2(positions.at(i).first, -positions.at(i).second);
-      linePoints.push_back(point);
-      previousPoint = lastPoint;
-      lastPoint = point;
-    }
+    // of reference in Godot
+    for (auto [x, y] : llvm::drop_begin(positions, 1))
+      linePoints.push_back(Vector2(x, -y));
 
     // Draw dashed or solid lines based on edge properties
     if (edge.getDashed()) {
@@ -306,43 +311,85 @@ void VisualDataflow::drawEdges() {
     } else {
       Line2D *line = memnew(Line2D);
       line->set_points(linePoints);
-      line->set_default_color(OPAQUE_BLACK);
-      line->set_width(1);
+      setBasicLineProps(line);
       area2D->add_child(line);
       lines.push_back(line);
     }
 
     edgeIdToLines[edge.getEdgeId()] = lines;
 
+    size_t numPoints = linePoints.size();
+    Vector2 secondToLastPoint = linePoints[numPoints - 2];
+    Vector2 lastPoint = linePoints[numPoints - 1];
+
     // Create and set up the arrowhead for the edge
-    Polygon2D *arrowHead = memnew(Polygon2D);
+    Polygon2D *arrowheadPoly = memnew(Polygon2D);
+    arrowheadPoly->set_color(OPAQUE_BLACK);
+
     PackedVector2Array points;
-    // Determine the orientation of the arrowhead
-    if (previousPoint.x == lastPoint.x) {
-      points.push_back(Vector2(lastPoint.x - 8, lastPoint.y));
-      points.push_back(Vector2(lastPoint.x + 8, lastPoint.y));
-      points.push_back(previousPoint.y < lastPoint.y
-                           ? Vector2(lastPoint.x, lastPoint.y + 12)
-                           : Vector2(lastPoint.x, lastPoint.y - 12));
+    if (edge.getArrowhead() == "normal") {
+      // Draw an arrow
+      if (secondToLastPoint.x == lastPoint.x) {
+        // Horizontal arrow
+        points.push_back(Vector2(lastPoint.x - 5, lastPoint.y));
+        points.push_back(Vector2(lastPoint.x + 5, lastPoint.y));
+        points.push_back(secondToLastPoint.y < lastPoint.y
+                             ? Vector2(lastPoint.x, lastPoint.y + 12)
+                             : Vector2(lastPoint.x, lastPoint.y - 12));
+      } else {
+        // Vertical arrow
+        points.push_back(Vector2(lastPoint.x, lastPoint.y + 5));
+        points.push_back(Vector2(lastPoint.x, lastPoint.y - 5));
+        points.push_back(secondToLastPoint.x < lastPoint.x
+                             ? Vector2(lastPoint.x + 12, lastPoint.y)
+                             : Vector2(lastPoint.x - 12, lastPoint.y));
+      }
     } else {
-      points.push_back(Vector2(lastPoint.x, lastPoint.y + 8));
-      points.push_back(Vector2(lastPoint.x, lastPoint.y - 8));
-      points.push_back(previousPoint.x < lastPoint.x
-                           ? Vector2(lastPoint.x + 12, lastPoint.y)
-                           : Vector2(lastPoint.x - 12, lastPoint.y));
+      // Draw a circle
+      double centerX = lastPoint.x, centerY = lastPoint.y, radius = 5;
+      if (secondToLastPoint.x == lastPoint.x) {
+        centerX = lastPoint.x;
+        if (secondToLastPoint.y < lastPoint.y) {
+          // Edge is going down
+          centerY += radius;
+        } else {
+          // Edge is going up
+          centerY -= radius;
+        }
+      } else {
+        centerY = lastPoint.y;
+        if (secondToLastPoint.x < lastPoint.x) {
+          // Edge is going right
+          centerX += radius;
+        } else {
+          // Edge is going left
+          centerX -= radius;
+        }
+      }
+      double angle = 0;
+      double angleIncrement = 2 * M_PI / NUM_OVAL_POINTS;
+      for (unsigned i = 0; i < NUM_OVAL_POINTS; ++i) {
+        angle += angleIncrement;
+        double x = centerX + radius * cos(angle);
+        double y = centerY + radius * sin(angle);
+        points.push_back(Vector2(x, y));
+      }
     }
 
-    arrowHead->set_polygon(points);
-    arrowHead->set_color(OPAQUE_BLACK);
-    area2D->add_child(arrowHead);
-    edgeIdToArrowHead[edge.getEdgeId()] = arrowHead;
+    arrowheadPoly->set_polygon(points);
+    area2D->add_child(arrowheadPoly);
+    edgeIdToArrowHead[edge.getEdgeId()] = arrowheadPoly;
 
-    // Create a label for the edge
-    Label *label = memnew(Label);
-    label->set_text("");
-    label->set_position(previousPoint);
-    label->add_theme_color_override("font_color", OPAQUE_BLACK);
-    label->add_theme_font_size_override("font_size", 10);
+    // Create the label and configure it
+    RichTextLabel *label = memnew(RichTextLabel);
+    label->set_use_bbcode(true);
+    label->set_fit_content(true);
+    label->set_autowrap_mode(TextServer::AUTOWRAP_OFF);
+    // Lightly offset the label toward the bottom right compared to the start of
+    // the line
+    Vector2 firstPoint = linePoints[0];
+    label->set_position(Vector2(firstPoint.x + 4, firstPoint.y + 4));
+
     add_child(label);
     edgeIdToData[edge.getEdgeId()] = label;
 
@@ -370,75 +417,95 @@ void VisualDataflow::previousCycle() {
 }
 
 void VisualDataflow::changeCycle(int64_t cycleNb) {
-  if (cycle != cycleNb) {
-    cycle = Math::min(Math::max((double)cycleNb, 0.0), cycleSlider->get_max());
-    cycleLabel->set_text("Cycle: " + String::num_int64(cycle));
-    cycleSlider->set_value(cycle);
+  if (cycle == cycleNb)
+    return;
 
-    if (graph.getCycleEdgeStates().count(cycle)) {
-      ChannelTransitions edgeStates = graph.getCycleEdgeStates().at(cycle);
-      for (auto &edgeState : edgeStates) {
+  int64_t maxCycle = (int64_t)cycleSlider->get_max();
+  cycle = std::min(std::max(cycleNb, (int64_t)0), maxCycle);
+  cycleLabel->set_text("Cycle: " + String::num_int64(cycle));
+  cycleSlider->set_value(cycle);
+  setEdgeColors(cycleNb);
 
-        EdgeId edgeId = edgeState.first;
-        State state = edgeState.second.first;
-        std::vector<Line2D *> lines = edgeIdToLines[edgeId];
-        Polygon2D *arrowHead = edgeIdToArrowHead[edgeId];
+  if (graph.getCycleEdgeStates().count(cycle)) {
+    ChannelTransitions edgeStates = graph.getCycleEdgeStates().at(cycle);
+    for (auto &[edgeID, state] : edgeStates) {
+      std::vector<Line2D *> &lines = edgeIdToLines[edgeID];
+      Polygon2D *arrowHead = edgeIdToArrowHead[edgeID];
+      setEdgeColor(state.first, lines, arrowHead);
 
-        setEdgeColor(state, lines, arrowHead);
-        edgeIdToData.at(edgeId)->set_text(edgeState.second.second.c_str());
+      // Display channel content if the valid wire is set
+      RichTextLabel *dataValue = edgeIdToData.at(edgeID);
+      dataValue->clear();
+      if (state.first == State::STALL || state.first == State::TRANSFER) {
+        // Write the data value only when it is valid
+        dataValue->push_font(get_theme_default_font(), 11);
+        dataValue->push_color(OPAQUE_BLACK);
+        dataValue->append_text(state.second.c_str());
+        dataValue->pop();
+        dataValue->pop();
       }
     }
   }
 }
 
-void VisualDataflow::setEdgeColor(State state, std::vector<Line2D *> lines,
-                                  Polygon2D *arrowHead) {
-  Color color = stateColors.at(state);
+void VisualDataflow::setEdgeColors(CycleNb cycle) {
+  ChannelTransitions edgeStates = graph.getCycleEdgeStates().at(cycle);
+  for (auto &[edgeID, state] : edgeStates) {
+    std::vector<Line2D *> &lines = edgeIdToLines[edgeID];
+    Polygon2D *arrowHead = edgeIdToArrowHead[edgeID];
+    Color color = stateColors[state.first];
+    for (Line2D *line : lines) {
+      color.a = line->get_default_color().a;
 
-  for (auto &line : lines) {
+      line->set_default_color(color);
+    }
+    arrowHead->set_color(color);
+  }
+}
+
+void VisualDataflow::setEdgeColor(State state, std::vector<Line2D *> &lines,
+                                  Polygon2D *arrowHead) {
+  Color color = stateColors[state];
+  for (Line2D *line : lines) {
     color.a = line->get_default_color().a;
     line->set_default_color(color);
   }
-
   arrowHead->set_color(color);
 }
 
 void VisualDataflow::changeStateColor(int64_t state, Color color) {
+  // Update the color associated to the state
   State stateEnum;
-  if (state == 0) {
+  if (state == 0)
     stateEnum = State::UNDEFINED;
-  } else if (state == 1) {
-    stateEnum = State::ACCEPT;
-  } else if (state == 2) {
+  else if (state == 1)
     stateEnum = State::IDLE;
-  } else if (state == 3) {
+  else if (state == 2)
+    stateEnum = State::ACCEPT;
+  else if (state == 3)
     stateEnum = State::STALL;
-  } else if (state == 4) {
+  else if (state == 4)
     stateEnum = State::TRANSFER;
-  } else {
-    UtilityFunctions::printerr("Invalid state");
-    return;
-  }
+  else
+    llvm_unreachable("invalid channel state!");
+  stateColors[stateEnum] = color;
 
-  stateColors.at(state) = color;
-
-  auto cycleStates = graph.getCycleEdgeStates();
-  for (auto &edgeState : cycleStates.at(cycle)) {
-    EdgeId edgeId = edgeState.first;
-    State edgeStateEnum = edgeState.second.first;
-    if (edgeStateEnum == stateEnum) {
-      std::vector<Line2D *> lines = edgeIdToLines[edgeId];
-      Polygon2D *arrowHead = edgeIdToArrowHead[edgeId];
+  // Change color of all edges currently in the state whose color was changed
+  CycleTransitions &cycleStates = graph.getCycleEdgeStates();
+  for (auto &[edgeID, state] : cycleStates[cycle]) {
+    if (state.first == stateEnum) {
+      std::vector<Line2D *> &lines = edgeIdToLines[edgeID];
+      Polygon2D *arrowHead = edgeIdToArrowHead[edgeID];
       setEdgeColor(stateEnum, lines, arrowHead);
     }
   }
 }
 
-double crossProduct(Vector2 a, Vector2 b, Vector2 c) {
+static double crossProduct(Vector2 a, Vector2 b, Vector2 c) {
   return (b.x - a.x) * (c.y - a.y) - (b.y - a.y) * (c.x - a.x);
 }
 
-bool isInside(Vector2 p, Vector2 a, Vector2 b, Vector2 c, Vector2 d) {
+static bool isInside(Vector2 p, Vector2 a, Vector2 b, Vector2 c, Vector2 d) {
   return crossProduct(a, b, p) * crossProduct(c, d, p) >= 0 &&
          crossProduct(b, c, p) * crossProduct(d, a, p) >= 0;
 }

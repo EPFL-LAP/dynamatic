@@ -62,8 +62,6 @@ option(LLVM_BUILD_TOOLS "Build the LLVM tools. If OFF, just generate build targe
 # Dynamatic configuration 
 #-------------------------------------------------------------------------------
 
-option(BUILD_VISUAL_DATAFLOW "Disable building the dataflow visualizer." OFF)
-
 # Define some variables for Dynamatic
 set(DYNAMATIC_SOURCE_DIR ${CMAKE_SOURCE_DIR})
 set(DYNAMATIC_INCLUDE_DIR ${DYNAMATIC_SOURCE_DIR}/include)
@@ -78,8 +76,6 @@ list(APPEND CMAKE_MODULE_PATH "${CMAKE_CURRENT_SOURCE_DIR}/cmake/modules")
 # Dynamatic include directories
 include_directories(${DYNAMATIC_INCLUDE_DIR})
 include_directories(${DYNAMATIC_BIN_INCLUDE_DIR})
-include_directories(${DYNAMATIC_SOURCE_DIR}/tutorials/include)
-include_directories(${DYNAMATIC_BINARY_DIR}/tutorials/include)
 include_directories(${DYNAMATIC_EXPERIMENTAL_DIR}/include)
 include_directories(${DYNAMATIC_BINARY_DIR}/experimental/include)
 
@@ -136,7 +132,3 @@ add_subdirectory(${DYNAMATIC_SOURCE_DIR}/lib)
 add_subdirectory(${DYNAMATIC_SOURCE_DIR}/test)
 add_subdirectory(${DYNAMATIC_SOURCE_DIR}/tools)
 add_subdirectory(${DYNAMATIC_SOURCE_DIR}/tutorials)
-
-if (BUILD_VISUAL_DATAFLOW)
-  add_subdirectory(${DYNAMATIC_SOURCE_DIR}/visual-dataflow)
-endif()

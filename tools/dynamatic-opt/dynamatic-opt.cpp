@@ -24,7 +24,7 @@
 #include "mlir/Pass/PassRegistry.h"
 #include "mlir/Tools/mlir-opt/MlirOptMain.h"
 #include "mlir/Transforms/Passes.h"
-#include "tutorials/InitAllPasses.h"
+#include "tutorials/CreatingPasses/InitAllPasses.h"
 
 // Defined in the test directory, no public header.
 namespace dynamatic {

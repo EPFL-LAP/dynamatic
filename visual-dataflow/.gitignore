@@ -2,4 +2,4 @@
 .godot/
 
 # Top-level .gitignore ignores bin/ directories, but we want to include the .gdextension file
-!bin/
+!bin/.gdextension

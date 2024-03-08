@@ -15,15 +15,16 @@ print_help_and_exit () {
 "./build.sh [options]
 
 List of options:
-  --disable-build-opt | -o    : don't use clang/lld/ccache to speed up builds
-  --force-cmake | -f          : force cmake reconfiguration in each (sub)project 
-  --release | -r              : build in \"Release\" mode (default is \"Debug\")
-  --threads | -t              : number of concurrent threads to build on with
-                                ninja (by default, ninja spawns one thread per
-                                logical core on the host machine)
-  --build-viz | -v            : build visual-dataflow tool
-  --check | -c                : run tests during build
-  --help | -h                 : display this help message
+  --release | -r                    : build in \"Release\" mode (default is \"Debug\")
+  --visual-dataflow | -v            : build visual-dataflow's C++ library
+  --export-godot | -e <godot-path>  : export the Godot project (requires engine)
+  --force | -f                      : force cmake reconfiguration in each (sub)project 
+  --threads | -t <num-threads>      : number of concurrent threads to build on (by
+                                      default, one thread per logical core on the host
+                                      machine)
+  --disable-build-opt | -o          : don't use clang/lld/ccache to speed up builds
+  --check | -c                      : run tests during build
+  --help | -h                       : display this help message
 "
     exit
 }
@@ -83,7 +84,7 @@ create_symlink() {
 should_run_cmake() {
   if [[ -f "CMakeCache.txt" && $FORCE_CMAKE -eq 0 ]]; then
     echo "CMake configuration found, will not re-configure cmake"
-    echo "Run script with -f or --force-cmake flag to re-configure cmake"
+    echo "Run script with -f or --force flag to re-configure cmake"
     echo ""
     return 1
   fi 
@@ -102,21 +103,31 @@ run_ninja() {
 
 #### Parse arguments ####
 
-# Loop over command line arguments and update script variables
 CMAKE_COMPILERS="-DCMAKE_C_COMPILER=clang -DCMAKE_CXX_COMPILER=clang++"
 CMAKE_EXTRA_LLVM="" 
 CMAKE_EXTRA_POLYGEIST="" 
 ENABLE_TESTS=0
 FORCE_CMAKE=0
-PARSE_NUM_THREADS=0
 NUM_THREADS=0
 BUILD_TYPE="Debug"
-BUILD_VISUAL_DATAFLOW="OFF"
+BUILD_VISUAL_DATAFLOW=0
+GODOT_PATH=""
+
+# Loop over command line arguments and update script variables
+PARSE_ARG=""
 for arg in "$@"; 
 do
-    if [[ $PARSE_NUM_THREADS -eq 1 ]]; then
-      NUM_THREADS=$arg
-      PARSE_NUM_THREADS=0
+    if [[ $PARSE_ARG == "num-threads" ]]; then
+      NUM_THREADS="$arg"
+      PARSE_ARG=""
+    elif [[ $PARSE_ARG == "godot-path" ]]; then
+      GODOT_PATH="$arg"
+      # If the path is relative, prepend .. to it since we will build the
+      # project from the visual-dataflow subfolder
+      if [[ $GODOT_PATH != /* ]]; then
+        GODOT_PATH="../$GODOT_PATH"
+      fi
+      PARSE_ARG=""
     else
       case "$arg" in 
           "--disable-build-opt" | "-o")
@@ -124,20 +135,23 @@ do
               CMAKE_EXTRA_LLVM="-DLLVM_CCACHE_BUILD=ON -DLLVM_USE_LINKER=lld"
               CMAKE_EXTRA_POLYGEIST="-DPOLYGEIST_USE_LINKER=lld"
               ;;
-          "--force-cmake" | "-f")
+          "--force" | "-f")
               FORCE_CMAKE=1
               ;;
           "--release" | "-r")
               BUILD_TYPE="Release"
               ;;
-          "--threads" | "-t")
-              PARSE_NUM_THREADS=1
-              ;;
           "--check" | "-c")
               ENABLE_TESTS=1
               ;;
-          "--build-viz" | "-v")
-              BUILD_VISUAL_DATAFLOW="ON"
+          "--visual-dataflow" | "-v")
+              BUILD_VISUAL_DATAFLOW=1
+              ;;
+          "--threads" | "-t")
+              PARSE_ARG="num-threads"
+              ;;
+          "--export-godot" | "-e")
+              PARSE_ARG="godot-path"
               ;;
           "--help" | "-h")
               print_help_and_exit
@@ -149,13 +163,20 @@ do
       esac
     fi
 done
+if [[ $PARSE_ARG != "" ]]; then
+  echo "Missing argument \"$PARSE_ARG\", printing help and aborting"
+  print_help_and_exit
+fi
 
-#### Build the project (submodules and superproject) ####
+
+#### Build the project (submodules, superproject, and tools) ####
 
 # Print header
 echo "################################################################################"
 echo "############# DYNAMATIC - DHLS COMPILER INFRASTRUCTURE - EPFL/LAP ##############"
 echo "################################################################################"
+
+#### Polygeist ####
 
 prepare_to_build_project "LLVM" "polygeist/llvm-project/build"
 
@@ -200,6 +221,8 @@ if [[ ENABLE_TESTS -eq 1 ]]; then
     exit_on_fail "Tests for polygeist failed"
 fi
 
+#### Dynamatic ####
+
 prepare_to_build_project "Dynamatic" "build"
 
 # CMake
@@ -210,7 +233,6 @@ if should_run_cmake ; then
       -DLLVM_TARGETS_TO_BUILD="host" \
       -DCMAKE_BUILD_TYPE=$BUILD_TYPE \
       -DCMAKE_EXPORT_COMPILE_COMMANDS="ON" \
-      -DBUILD_VISUAL_DATAFLOW=$BUILD_VISUAL_DATAFLOW \
       $CMAKE_COMPILERS
   exit_on_fail "Failed to cmake dynamatic"
 fi
@@ -222,6 +244,44 @@ if [[ ENABLE_TESTS -eq 1 ]]; then
     ninja check-dynamatic
     exit_on_fail "Tests for dynamatic failed"
 fi
+
+#### visual-dataflow ####
+
+if [[ BUILD_VISUAL_DATAFLOW -ne 0 ]]; then
+  prepare_to_build_project "visual-dataflow" "visual-dataflow/build"
+
+  # CMake
+  if should_run_cmake ; then
+    cmake -G Ninja .. \
+        -DMLIR_DIR=../polygeist/llvm-project/build/lib/cmake/mlir \
+        -DLLVM_DIR=../polygeist/llvm-project/build/lib/cmake/llvm \
+        -DLLVM_TARGETS_TO_BUILD="host" \
+        -DCMAKE_BUILD_TYPE=$BUILD_TYPE \
+        -DCMAKE_EXPORT_COMPILE_COMMANDS="ON" \
+        $CMAKE_COMPILERS
+    exit_on_fail "Failed to cmake visual-dataflow"
+  fi
+
+  # Build
+  run_ninja
+  exit_on_fail "Failed to build visual-dataflow"
+fi
+
+#### Godot ####
+
+if [[ $GODOT_PATH != "" ]]; then
+  # Go to the visualizer's subfolder and build it using godot
+  cd "$SCRIPT_CWD/visual-dataflow"
+  "$GODOT_PATH" --headless --export-debug "Linux/X11"
+  exit_on_fail "Failed to build Godot project"
+
+  # Erase the useless shell script generated by Godot and cd back the 
+  # Dynamatic's top-level folder 
+  rm bin/visual-dataflow.sh
+  cd ..
+fi
+
+#### Symbolic links ####
 
 echo_section "Creating symbolic links"
 
@@ -239,6 +299,9 @@ create_symlink build/bin/export-vhdl
 create_symlink build/bin/exp-frequency-profiler
 create_symlink build/bin/handshake-simulator
 create_symlink build/bin/hls-verifier
+if [[ $GODOT_PATH != "" ]]; then
+  create_symlink visual-dataflow/bin/visual-dataflow
+fi
 
 # Make the scripts used by the frontend executable
 chmod +x tools/dynamatic/scripts/compile.sh
