@@ -22,6 +22,15 @@ namespace dynamatic {
 namespace experimental {
 namespace speculation {
 
+// Check if the given operand is annotated to be speculative
+bool isSpeculative(mlir::OpOperand &operand, bool runAnalysis = false);
+
+// Check if the given value is annotated to be speculative
+bool isSpeculative(mlir::Value value, bool runAnalysis = false);
+
+// Check if the given operation is annotated to be speculative
+bool isSpeculative(mlir::Operation *op, bool runAnalysis = false);
+
 std::unique_ptr<dynamatic::DynamaticPass> createSpecAnnotatePaths();
 
 #define GEN_PASS_DECL_SPECANNOTATEPATHS

@@ -21,6 +21,43 @@
 
 using namespace mlir;
 using namespace dynamatic;
+using namespace dynamatic::experimental;
+
+static void annotateSpeculativeRegion(handshake::SpeculatorOp specOp);
+
+static std::optional<bool> getSpeculativeAttr(Operation *op) {
+  if (auto spec = op->getAttrOfType<mlir::BoolAttr>("speculative"))
+    return spec.getValue();
+  return {};
+}
+
+static void runAnnotateOnFuncOp(handshake::FuncOp funcOp) {
+  funcOp->walk([](handshake::SpeculatorOp specOp) {
+    annotateSpeculativeRegion(specOp);
+  });
+}
+
+// Check if the given operation is annotated to be speculative
+bool speculation::isSpeculative(mlir::Operation *op, bool runAnalysis) {
+  // Run the analysis when the op is not annotated
+  if (runAnalysis && !getSpeculativeAttr(op)) {
+    handshake::FuncOp funcOp = op->getParentOfType<handshake::FuncOp>();
+    assert(funcOp && "op should have parent function");
+    runAnnotateOnFuncOp(funcOp);
+  }
+  std::optional<bool> spec = getSpeculativeAttr(op);
+  return spec && spec.value();
+}
+
+bool speculation::isSpeculative(mlir::OpOperand &operand, bool runAnalysis) {
+  Operation *op = operand.getOwner();
+  return speculation::isSpeculative(op, runAnalysis);
+}
+
+bool speculation::isSpeculative(mlir::Value value, bool runAnalysis) {
+  Operation *op = value.getDefiningOp();
+  return speculation::isSpeculative(op, runAnalysis);
+}
 
 static void
 markSpeculativeOperationsRecursive(Operation *currOp,
@@ -39,8 +76,7 @@ markSpeculativeOperationsRecursive(Operation *currOp,
   }
 }
 
-static bool annotateSpeculativeRegion(handshake::SpeculatorOp specOp) {
-
+static void annotateSpeculativeRegion(handshake::SpeculatorOp specOp) {
   // Create visited set
   llvm::DenseSet<Operation *> visited;
   visited.insert(specOp);
@@ -54,7 +90,6 @@ static bool annotateSpeculativeRegion(handshake::SpeculatorOp specOp) {
   for (Operation *user : specOp.getSaveCtrl().getUsers()) {
     markSpeculativeOperationsRecursive(user, visited);
   }
-  return true;
 }
 
 namespace {
@@ -65,7 +100,6 @@ struct SpecAnnotatePathsPass
   void runDynamaticPass() override {
     mlir::ModuleOp modOp = getOperation();
     modOp->walk([](handshake::SpeculatorOp specOp) {
-      llvm::outs() << "Found a speculator\n";
       annotateSpeculativeRegion(specOp);
     });
   }
