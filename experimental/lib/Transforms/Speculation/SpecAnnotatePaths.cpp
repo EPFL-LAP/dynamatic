@@ -59,9 +59,11 @@ bool speculation::isSpeculative(mlir::Value value, bool runAnalysis) {
   return speculation::isSpeculative(op, runAnalysis);
 }
 
-static void
-markSpeculativeOperationsRecursive(Operation *currOp,
-                                   llvm::DenseSet<Operation *> visited) {
+// DFS-like traversal in within the speculative region that marks every visited
+// operation with the speculative=true attribute. The traversal ends where the
+// speculative region ends, that is, at commit units.
+static void markSpeculativeOpsRecursive(Operation *currOp,
+                                        llvm::DenseSet<Operation *> visited) {
   // End traversal if currOp is already in visited set
   if (auto [_, isNewOp] = visited.insert(currOp); !isNewOp)
     return;
@@ -71,7 +73,7 @@ markSpeculativeOperationsRecursive(Operation *currOp,
   // End traversal at Commit units
   if (not isa<handshake::SpecCommitOp>(currOp)) {
     for (Operation *succOp : currOp->getUsers()) {
-      markSpeculativeOperationsRecursive(succOp, visited);
+      markSpeculativeOpsRecursive(succOp, visited);
     }
   }
 }
@@ -79,17 +81,8 @@ markSpeculativeOperationsRecursive(Operation *currOp,
 static void annotateSpeculativeRegion(handshake::SpeculatorOp specOp) {
   // Create visited set
   llvm::DenseSet<Operation *> visited;
-  visited.insert(specOp);
-
   // Traverse speculative region starting at the speculator
-  for (Operation *user : specOp.getDataOut().getUsers()) {
-    markSpeculativeOperationsRecursive(user, visited);
-  }
-
-  // Traverse speculative region starting at save units
-  for (Operation *user : specOp.getSaveCtrl().getUsers()) {
-    markSpeculativeOperationsRecursive(user, visited);
-  }
+  markSpeculativeOpsRecursive(specOp, visited);
 }
 
 namespace {
