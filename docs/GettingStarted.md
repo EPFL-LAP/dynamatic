@@ -10,7 +10,7 @@ The project [welcomes contributions](#contributing) from the open-source communi
 
 ## Building the project
 
-We use the [CMake](https://cmake.org/) build system to build and test Dynamatic. You can find detailed instructions on how to build the project, including its software dependencies, in the [`README.md`](../README.md) file at the top level of the repository.
+We use the [CMake](https://cmake.org/) build system to build and test Dynamatic. You can find instructions on how to build the project, including its software dependencies, in the [`README.md`](../README.md) file at the top level of the repository. You can also check out our [advanced build instructions](AdvancedBuild.md) to personalize the build to your needs.
 
 # Software architecture
 
