@@ -6,7 +6,7 @@ We welcome contributions and feedback from the community. If you would like to p
 
 ## Building the project
 
-The following instructions can be used to setup Dynamatic from source.
+The following instructions can be used to setup Dynamatic from source. If you intend to modify Dynamatic's source code and/or build the interactive dataflow circuit visualizer, you can check our [advanced build instructions](docs/AdvancedBuild.md) to learn how to customize the build process to your needs.
 
 1. **Install dependencies required by the project.** These are: working C and C++ toolchains (compiler, linker), `cmake` and `ninja` for building the project, Python (3.6 or newer), GraphViz to work with `.dot` files, Boost's regex library, and `git`. For example, on apt-based Linux distributions (requires `sudo`):
     
@@ -20,36 +20,28 @@ The following instructions can be used to setup Dynamatic from source.
 2. **Clone the project and its submodules.** Dynamatic depends on a fork of [Polygeist](https://github.com/EPFL-LAP/Polygeist) (C/C++ frontend for MLIR), which itself depends on [LLVM/MLIR](https://github.com/llvm/llvm-project).
     
     ```sh
+    # Either clone with HTTPS...
+    git clone --recurse-submodules https://github.com/EPFL-LAP/dynamatic.git
+    # ...or SSH
     git clone --recurse-submodules git@github.com:EPFL-LAP/dynamatic.git
     ```
 
-    *Note:* The repository is set up so that Polygeist and LLVM are shallow cloned by default, meaning the clone command downloads just enough of them to check out currently specified commits. If you wish to work with the full history of these repositories, you can manually unshallow them. For Polygeist:
+    This creates a `dynamatic` folder in your current working directory. 
 
-    ```sh
-    cd dynamatic/polygeist
-    git fetch --unshallow
-    ```
-
-    For LLVM:
-
-    ```sh
-    cd dynamatic/polygeist/llvm-project
-    git fetch --unshallow
-    ```
-
-3. **Build the project.** Run the build script from the directory created by the clone command (pass it the `--help` flag to see available build options).
+3. **Build the project.** Run the build script from the directory created by the clone command (check out our [advanced build instructions](docs/AdvancedBuild.md) to see how you can customize the build process and/or build the interactive dataflow visualizer).
 
     ```sh
     cd dynamatic
     chmod +x ./build.sh
-    ./build.sh
+    ./build.sh --release
     ```
 
-    The build script creates `build` folders in the top level directory and in each submodule to run the build tasks from. All files generated during build (libraries, executable binaries, intermediate compilation files) are placed in these folders, which the repository is configured to not track. Additionally, the build script creates a `bin` folder in the top level directory that contains symbolic links to a number of executable binaries built by the superproject and subprojects that Dynamatic users may especially care about.
+    If everything went well, you should see `# ===--- Build successful! ---===` displayed at the end of the build script's output.
 
-4. **Run the Dynamatic testsuite.** After building the project, or at any time during development, you can run Dynamatic's testsuite from the top level `build` folder using `ninja`.
+4. **Run the Dynamatic testsuite.** After building the project, or at any time during development, you can run Dynamatic's testsuite from the top-level `build` folder using `ninja`.
 
     ```sh
-    cd dynamatic/build
+    # From the "dynamatic" folder created by the clone command
+    cd build
     ninja check-dynamatic
     ```
