@@ -644,9 +644,8 @@ int main(int argc, char **argv) {
     // Supported delimeters: '\n' and ';'
     std::string line;
     while (std::getline(inputFile, line, '\n')) {
-      // Break the line using the comment identifier "#"
-      std::stringstream sLine(line.substr(0, line.find("#")));
-      // Cast '\n'-separated lines into streams, then split it by ';'
+      // cast '\n'-separated lines into streams, then split it by ';'
+      std::stringstream sLine(line);
       for (std::string cmd; getline(sLine, cmd, ';');) {
         if (!cmd.empty()) {
           llvm::outs() << PROMPT << cmd << "\n";
