@@ -97,8 +97,26 @@ bool isBackedge(Value val, Operation *user, BBEndpoints *endpoints = nullptr);
 /// user (the function will assert if that is not the case).
 bool isBackedge(Value val, BBEndpoints *endpoints = nullptr);
 
-/// Determines whether the Handshake operation cannot belong to the implicit CFG
-/// of a Handshake function (i.e., cannot have a basic block attribute).
+/// Data structure to hold all edges belonging to a pair of endpoints. This
+/// constitutes an Arc. srcBB and dstBB can be equal when the arcs are
+/// Backedges. An edge is represented by means of an mlir::OpOperand.
+struct BBArc {
+  unsigned srcBB;
+  unsigned dstBB;
+  mlir::SmallVector<OpOperand *> edges;
+};
+
+/// Define a map from a BB's number to a vector of BBArcs. This can be used, for
+/// example, to map a BB to a set of arcs that lead to BBs that are predecessors
+/// in the CFG.
+using BBtoArcsMap = llvm::MapVector<unsigned, mlir::SmallVector<BBArc>>;
+
+/// Calculate the BBArcs that lead to predecessor BBs within funcOp
+/// Returns a map from each BB number to a vector of BBArcs.
+BBtoArcsMap getBBPredecessorArcs(handshake::FuncOp funcOp);
+
+/// Determines whether the Handshake operation cannot belong to the implicit
+/// CFG of a Handshake function (i.e., cannot have a basic block attribute).
 bool cannotBelongToCFG(Operation *op);
 
 /// Represents a CFG path as an ordered sequence of basic blocks.

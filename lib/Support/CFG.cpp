@@ -268,6 +268,54 @@ bool dynamatic::isBackedge(Value val, BBEndpoints *endpoints) {
   return isBackedge(val, *users.begin(), endpoints);
 }
 
+namespace {
+// Define a Control-Flow Graph Edge as a OpOperand
+using CFGEdge = OpOperand;
+
+// Define a comparator between BBEndpoints
+struct EndpointComparator {
+  bool operator()(const BBEndpoints &a, const BBEndpoints &b) const {
+    if (a.srcBB != b.srcBB)
+      return a.srcBB < b.srcBB;
+    return a.dstBB < b.dstBB;
+  }
+};
+
+// Define a map from BBEndpoints to the CFGEdges that connect the BBs
+using BBEndpointsMap =
+    std::map<BBEndpoints, mlir::SmallVector<CFGEdge *>, EndpointComparator>;
+} // namespace
+
+// Calculate the BBArcs that lead to predecessor BBs within funcOp
+// Returns a map from each BB number to a vector of BBArcs
+BBtoArcsMap dynamatic::getBBPredecessorArcs(handshake::FuncOp funcOp) {
+  BBEndpointsMap endpointEdges;
+  // Traverse all operations within funcOp to find edges between BBs, including
+  // self-edges, and save them in a map from the Endpoints to the edges
+  funcOp->walk([&](Operation *op) {
+    for (CFGEdge &edge : op->getOpOperands()) {
+      BBEndpoints endpoints;
+      // Store the edge if it is a Backedge or connects two different BBs
+      if (isBackedge(edge.get(), op, &endpoints) or
+          endpoints.srcBB != endpoints.dstBB) {
+        endpointEdges[endpoints].push_back(&edge);
+      }
+    }
+  });
+
+  // Join all predecessors of a BB
+  BBtoArcsMap predecessorArcs;
+  for (const auto &[endpoints, edges] : endpointEdges) {
+    BBArc arc;
+    arc.srcBB = endpoints.srcBB;
+    arc.dstBB = endpoints.dstBB;
+    arc.edges = edges;
+    predecessorArcs[endpoints.dstBB].push_back(arc);
+  }
+
+  return predecessorArcs;
+}
+
 bool dynamatic::cannotBelongToCFG(Operation *op) {
   return isa<handshake::MemoryOpInterface, handshake::SinkOp>(op);
 }
