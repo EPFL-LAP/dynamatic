@@ -640,19 +640,19 @@ int main(int argc, char **argv) {
       return 1;
     }
 
-    // Read the script line-by-line and execute its commands supported
-    // delimeters: '\n' and ';'
+    // Read the script line-by-line and execute its commands
+    // Supported delimeters: '\n' and ';'
     std::string line;
     while (std::getline(inputFile, line, '\n')) {
-      if (StringRef(line).starts_with("#"))
-        continue;
-      // cast '\n'-separated lines into streams, then split it by ';'
-      std::stringstream sLine(line);
-      for (std::string cmd; getline(sLine, cmd, ';');)
+      // Break the line using the comment identifier "#"
+      std::stringstream sLine(line.substr(0, line.find("#")));
+      // Cast '\n'-separated lines into streams, then split it by ';'
+      for (std::string cmd; getline(sLine, cmd, ';');) {
         if (!cmd.empty()) {
           llvm::outs() << PROMPT << cmd << "\n";
           handleInput(cmd);
         }
+      }
     }
   }
 
