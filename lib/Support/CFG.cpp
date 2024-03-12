@@ -269,10 +269,10 @@ bool dynamatic::isBackedge(Value val, BBEndpoints *endpoints) {
 }
 
 namespace {
-// Define a Control-Flow Graph Edge as a OpOperand
+/// Define a Control-Flow Graph Edge as a OpOperand
 using CFGEdge = OpOperand;
 
-// Define a comparator between BBEndpoints
+/// Define a comparator between BBEndpoints
 struct EndpointComparator {
   bool operator()(const BBEndpoints &a, const BBEndpoints &b) const {
     if (a.srcBB != b.srcBB)
@@ -281,13 +281,11 @@ struct EndpointComparator {
   }
 };
 
-// Define a map from BBEndpoints to the CFGEdges that connect the BBs
+/// Define a map from BBEndpoints to the CFGEdges that connect the BBs
 using BBEndpointsMap =
-    std::map<BBEndpoints, mlir::SmallVector<CFGEdge *>, EndpointComparator>;
+    std::map<BBEndpoints, llvm::DenseSet<CFGEdge *>, EndpointComparator>;
 } // namespace
 
-// Calculate the BBArcs that lead to predecessor BBs within funcOp
-// Returns a map from each BB number to a vector of BBArcs
 BBtoArcsMap dynamatic::getBBPredecessorArcs(handshake::FuncOp funcOp) {
   BBEndpointsMap endpointEdges;
   // Traverse all operations within funcOp to find edges between BBs, including
@@ -296,9 +294,9 @@ BBtoArcsMap dynamatic::getBBPredecessorArcs(handshake::FuncOp funcOp) {
     for (CFGEdge &edge : op->getOpOperands()) {
       BBEndpoints endpoints;
       // Store the edge if it is a Backedge or connects two different BBs
-      if (isBackedge(edge.get(), op, &endpoints) or
+      if (isBackedge(edge.get(), op, &endpoints) ||
           endpoints.srcBB != endpoints.dstBB) {
-        endpointEdges[endpoints].push_back(&edge);
+        endpointEdges[endpoints].insert(&edge);
       }
     }
   });

@@ -97,21 +97,24 @@ bool isBackedge(Value val, Operation *user, BBEndpoints *endpoints = nullptr);
 /// user (the function will assert if that is not the case).
 bool isBackedge(Value val, BBEndpoints *endpoints = nullptr);
 
-/// Data structure to hold all edges belonging to a pair of endpoints. This
-/// constitutes an Arc. srcBB and dstBB can be equal when the arcs are
-/// Backedges. An edge is represented by means of an mlir::OpOperand.
+/// Represents an arc in the implicit CFG of a Handshake function i.e., a set of
+/// edges (represented by `mlir::OpOperand`s) in the circuit graph that connect
+/// two specific and potentially identical basic blocks.
 struct BBArc {
+  /// The arc's source basic block.
   unsigned srcBB;
+  /// The arc's destination basic block.
   unsigned dstBB;
-  mlir::SmallVector<OpOperand *> edges;
+  /// Set of pointers to OpOperands that uniquely identify an edge in the CFG.
+  llvm::DenseSet<OpOperand *> edges;
 };
 
-/// Define a map from a BB's number to a vector of BBArcs. This can be used, for
-/// example, to map a BB to a set of arcs that lead to BBs that are predecessors
-/// in the CFG.
+/// Defines a map from a BB's number to a vector of BBArcs. This can be used,
+/// for example, to map a BB to a list of arcs that start from BBs that are
+/// predecessors in the CFG.
 using BBtoArcsMap = llvm::MapVector<unsigned, mlir::SmallVector<BBArc>>;
 
-/// Calculate the BBArcs that lead to predecessor BBs within funcOp
+/// Calculates the BBArcs that lead to predecessor BBs within funcOp
 /// Returns a map from each BB number to a vector of BBArcs.
 BBtoArcsMap getBBPredecessorArcs(handshake::FuncOp funcOp);
 
