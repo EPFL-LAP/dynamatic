@@ -1,4 +1,4 @@
-//===- HandshakeToNetlist.cpp - Converts handshake to HW --------*- C++ -*-===//
+//===- HandshakeToHW.cpp - Convert Handshake to HW --------------*- C++ -*-===//
 //
 // Dynamatic is under the Apache License v2.0 with LLVM Exceptions.
 // See https://llvm.org/LICENSE.txt for license information.
@@ -6,11 +6,11 @@
 //
 //===----------------------------------------------------------------------===//
 //
-// This file contains the implementation of the handshake to netlist pass.
+// Converts Handshake constructs into equivalent HW constructs.
 //
 //===----------------------------------------------------------------------===//
 
-#include "dynamatic/Conversion/HandshakeToNetlist.h"
+#include "dynamatic/Conversion/HandshakeToHW.h"
 #include "dynamatic/Dialect/HW/HWTypes.h"
 #include "dynamatic/Dialect/HW/PortImplementation.h"
 #include "dynamatic/Dialect/Handshake/HandshakeDialect.h"
@@ -1023,8 +1023,8 @@ struct UnpackBufferSlots : public OpRewritePattern<BufOp> {
 /// The function and all the operations it contains are converted to
 /// operations from the HW dialect. Dataflow semantics are made explicit with
 /// Handshake channels.
-class HandshakeToNetListPass
-    : public dynamatic::impl::HandshakeToNetlistBase<HandshakeToNetListPass> {
+class HandshakeToHWPass
+    : public dynamatic::impl::HandshakeToHWBase<HandshakeToHWPass> {
 public:
   void runDynamaticPass() override {
     mlir::ModuleOp mod = getOperation();
@@ -1150,7 +1150,7 @@ private:
   LogicalResult preprocessMod();
 };
 
-LogicalResult HandshakeToNetListPass::preprocessMod() {
+LogicalResult HandshakeToHWPass::preprocessMod() {
   mlir::ModuleOp modOp = getOperation();
   MLIRContext *ctx = &getContext();
   mlir::GreedyRewriteConfig config;
@@ -1165,7 +1165,6 @@ LogicalResult HandshakeToNetListPass::preprocessMod() {
 
 } // end anonymous namespace
 
-std::unique_ptr<dynamatic::DynamaticPass>
-dynamatic::createHandshakeToNetlistPass() {
-  return std::make_unique<HandshakeToNetListPass>();
+std::unique_ptr<dynamatic::DynamaticPass> dynamatic::createHandshakeToHWPass() {
+  return std::make_unique<HandshakeToHWPass>();
 }

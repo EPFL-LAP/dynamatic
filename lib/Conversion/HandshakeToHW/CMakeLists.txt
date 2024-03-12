@@ -1,5 +1,5 @@
-add_dynamatic_library(DynamaticHandshakeToNetlist
-  HandshakeToNetlist.cpp
+add_dynamatic_library(DynamaticHandshakeToHW
+  HandshakeToHW.cpp
 
   DEPENDS
   DynamaticConversionPassIncGen

@@ -1,4 +1,4 @@
-//===- HandshakeToNetlist.h - Converts handshake to HW ----------*- C++ -*-===//
+//===- HandshakeToHW.h - Convert Handshake to HW ----------------*- C++ -*-===//
 //
 // Dynamatic is under the Apache License v2.0 with LLVM Exceptions.
 // See https://llvm.org/LICENSE.txt for license information.
@@ -6,12 +6,12 @@
 //
 //===----------------------------------------------------------------------===//
 //
-// This file declares the --lower-handshake-to-netlist conversion pass.
+// This file declares the --lower-handshake-to-hw conversion pass.
 //
 //===----------------------------------------------------------------------===//
 
-#ifndef DYNAMATIC_CONVERSION_HANDSHAKETONETLIST_H
-#define DYNAMATIC_CONVERSION_HANDSHAKETONETLIST_H
+#ifndef DYNAMATIC_CONVERSION_HANDSHAKETOHW_H
+#define DYNAMATIC_CONVERSION_HANDSHAKETOHW_H
 
 #include "dynamatic/Dialect/HW/HWOps.h"
 #include "dynamatic/Support/DynamaticPass.h"
@@ -20,12 +20,12 @@
 
 namespace dynamatic {
 
-#define GEN_PASS_DECL_HANDSHAKETONETLIST
-#define GEN_PASS_DEF_HANDSHAKETONETLIST
+#define GEN_PASS_DECL_HANDSHAKETOHW
+#define GEN_PASS_DEF_HANDSHAKETOHW
 #include "dynamatic/Conversion/Passes.h.inc"
 
-std::unique_ptr<dynamatic::DynamaticPass> createHandshakeToNetlistPass();
+std::unique_ptr<dynamatic::DynamaticPass> createHandshakeToHWPass();
 
 } // namespace dynamatic
 
-#endif // DYNAMATIC_CONVERSION_HANDSHAKETONETLIST_H
+#endif // DYNAMATIC_CONVERSION_HANDSHAKETOHW_H

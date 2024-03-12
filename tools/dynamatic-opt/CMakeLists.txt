@@ -19,7 +19,7 @@ target_link_libraries(dynamatic-opt
   DynamaticSpeculation
   DynamaticCfToHandshake
   DynamaticHandshake
-  DynamaticHandshakeToNetlist
+  DynamaticHandshakeToHW
   DynamaticTransforms
   DynamaticTutorialsCreatingPasses
   DynamaticExperimentalTestTransforms
