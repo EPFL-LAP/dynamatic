@@ -160,25 +160,21 @@ static const std::string RST_PORT = "reset";
 
 namespace {
 
-/// Function that returns a unique name for each distinct operation it is passed
-/// as input.
-using NameUniquer = std::function<std::string(Operation *)>;
-
 /// Shared state used during lowering. Captured in a struct to reduce the number
 /// of arguments we have to pass around.
 struct HandshakeLoweringState {
   /// Module containing the handshake-level function to lower.
   ModuleOp parentModule;
-  /// Producer of unique names for external modules.
-  NameUniquer nameUniquer;
+  /// Reference to the pass's name analysis, to query unique names for each
+  /// operation.
+  NameAnalysis &namer;
   /// Builder for (external) modules.
   OpBuilder extModBuilder;
 
   /// Creates the lowering state, producing an OpBuilder from the parent
   /// module's context and setting its insertion point in the module's body.
-  HandshakeLoweringState(ModuleOp mod, NameUniquer nameUniquer)
-      : parentModule(mod), nameUniquer(nameUniquer),
-        extModBuilder(mod->getContext()) {
+  HandshakeLoweringState(ModuleOp mod, NameAnalysis &namer)
+      : parentModule(mod), namer(namer), extModBuilder(mod->getContext()) {
     extModBuilder.setInsertionPointToStart(mod.getBody());
   }
 };
@@ -248,7 +244,7 @@ struct FuncModulePortInfo {
   /// to the function. The name argument is used to prefix the name of all ports
   /// associated with the memory interface; it must therefore be unique across
   /// calls to the method.
-  void addMemIO(MemRefType memref, std::string name, MLIRContext *ctx);
+  void addMemIO(MemRefType memref, StringRef name, MLIRContext *ctx);
 
   /// Computes the number of output ports that are associated with internal
   /// memory interfaces.
@@ -257,7 +253,7 @@ struct FuncModulePortInfo {
 
 } // namespace
 
-void FuncModulePortInfo::addMemIO(MemRefType memref, std::string name,
+void FuncModulePortInfo::addMemIO(MemRefType memref, StringRef name,
                                   MLIRContext *ctx) {
   // Types used by memory IO
   Type i1Type = IntegerType::get(ctx, 1);
@@ -532,7 +528,7 @@ static hw::HWModuleLike getModule(HandshakeLoweringState &ls, StringRef modName,
 
 /// Derives port information for an operation so that it can be converted to a
 /// hardware module.
-static hw::ModulePortInfo getPortInfo(Operation *op) {
+static inline hw::ModulePortInfo getPortInfo(Operation *op) {
   return getPortInfoForOpTypes(op, op->getOperandTypes(), op->getResultTypes());
 }
 
@@ -797,7 +793,7 @@ public:
       addClkAndRstOperands(operands, cast<hw::HWModuleOp>(op->getParentOp()));
 
     auto instanceOp = rewriter.replaceOpWithNewOp<hw::InstanceOp>(
-        op, extModule, rewriter.getStringAttr(ls.nameUniquer(op)), operands);
+        op, extModule, rewriter.getStringAttr(ls.namer.getName(op)), operands);
 
     // Replace operation results with new instance results
     for (auto it : llvm::zip(op->getResults(), instanceOp->getResults()))
@@ -889,7 +885,7 @@ SmallVector<hw::InstanceOp> FuncOpConversionPattern::convertMemories(
     rewriter.setInsertionPoint(memOp);
     auto instance = rewriter.create<hw::InstanceOp>(
         memOp.getLoc(), extModule,
-        rewriter.getStringAttr(ls.nameUniquer(memOp)), operands);
+        rewriter.getStringAttr(ls.namer.getName(memOp)), operands);
 
     // Replace uses of memory interface results with new instance results
     for (auto it :
@@ -921,8 +917,8 @@ FuncOpConversionPattern::convertEnd(hw::HWModuleOp mod,
   addClkAndRstOperands(operands, mod);
   rewriter.setInsertionPoint(endOp);
   auto instance = rewriter.create<hw::InstanceOp>(
-      endOp.getLoc(), extModule, rewriter.getStringAttr(ls.nameUniquer(endOp)),
-      operands);
+      endOp.getLoc(), extModule,
+      rewriter.getStringAttr(ls.namer.getName(endOp)), operands);
 
   rewriter.eraseOp(endOp);
   return instance;
@@ -953,6 +949,15 @@ void FuncOpConversionPattern::setModuleOutputs(
 /// exportable to an RTL design. Fails if at least one operation inside the
 /// function is not exportable to RTL.
 static LogicalResult verifyExportToRTL(handshake::FuncOp funcOp) {
+  if (failed(verifyIRMaterialized(funcOp)))
+    return funcOp.emitError() << ERR_NON_MATERIALIZED_FUNC;
+  if (failed(verifyAllIndexConcretized(funcOp))) {
+    return funcOp.emitError() << "Lowering to netlist requires that all index "
+                                 "types in the IR have "
+                                 "been concretized."
+                              << ERR_RUN_CONCRETIZATION;
+  }
+
   for (Operation &op : funcOp.getOps()) {
     LogicalResult res =
         llvm::TypeSwitch<Operation *, LogicalResult>(&op)
@@ -989,35 +994,6 @@ static LogicalResult verifyExportToRTL(handshake::FuncOp funcOp) {
 
 namespace {
 
-/// Unpack buffers with more that one slot into an equivalent sequence of
-/// multiple one-slot buffers. Our RTL buffer components cannot be
-/// parameterized with a number of slots (they are all 1-slot) so we have to
-/// do this unpacking prior to running the conversion pass.
-template <typename BufOp>
-struct UnpackBufferSlots : public OpRewritePattern<BufOp> {
-  using OpRewritePattern<BufOp>::OpRewritePattern;
-
-  LogicalResult matchAndRewrite(BufOp bufOp,
-                                PatternRewriter &rewriter) const override {
-    // Only operate on buffers with strictly more than one slots
-    unsigned numSlots = bufOp.getSlots();
-    if (numSlots == 1)
-      return failure();
-
-    rewriter.setInsertionPoint(bufOp);
-
-    // Create a sequence of one-slot buffers
-    Value bufVal = bufOp.getOperand();
-    for (size_t idx = 0; idx < numSlots; ++idx)
-      bufVal = rewriter.create<BufOp>(bufOp.getLoc(), bufVal, 1).getResult();
-
-    // Replace the original multi-slots buffer with the output of the last
-    // buffer in the sequence
-    rewriter.replaceOp(bufOp, bufVal);
-    return success();
-  }
-};
-
 /// Handshake to netlist conversion pass. The conversion only works on modules
 /// containing a single handshake function (handshake::FuncOp) at the moment.
 /// The function and all the operations it contains are converted to
@@ -1040,34 +1016,11 @@ public:
     handshake::FuncOp funcOp = *functions.begin();
 
     // Check that some preconditions are met before doing anything
-    if (failed(verifyIRMaterialized(funcOp))) {
-      funcOp.emitOpError() << ERR_NON_MATERIALIZED_FUNC;
-      return signalPassFailure();
-    }
-    if (failed(verifyAllIndexConcretized(funcOp))) {
-      funcOp.emitOpError() << "Lowering to netlist requires that all index "
-                              "types in the IR have "
-                              "been concretized."
-                           << ERR_RUN_CONCRETIZATION;
-      return signalPassFailure();
-    }
     if (failed(verifyExportToRTL(funcOp)))
       return signalPassFailure();
 
-    // Run a pre-processing pass on the IR
-    if (failed(preprocessMod())) {
-      mod->emitError() << "Failed to pre-process IR to make it valid for "
-                          "netlist conversion";
-      return signalPassFailure();
-    }
-
-    // Create helper struct for lowering
-    std::map<std::string, unsigned> instanceNameCntr;
-    NameUniquer instanceUniquer = [&](Operation *op) {
-      std::string instName = getBareExtModuleName(op);
-      return instName + std::to_string(instanceNameCntr[instName]++);
-    };
-    HandshakeLoweringState ls(mod, instanceUniquer);
+    // Helper struct for lowering
+    HandshakeLoweringState ls(mod, getAnalysis<NameAnalysis>());
 
     // Create pattern set
     ChannelTypeConverter typeConverter;
@@ -1141,27 +1094,7 @@ public:
     if (failed(applyPartialConversion(funcOp, target, std::move(patterns))))
       return signalPassFailure();
   }
-
-private:
-  /// Perfoms some simple transformations on the module to make the netlist
-  /// that will result from the conversion able to be turned into an RTL
-  /// design. NOTE: (RamirezLucas) Ideally, this should be moved to a separate
-  /// pre-processing pass.
-  LogicalResult preprocessMod();
 };
-
-LogicalResult HandshakeToHWPass::preprocessMod() {
-  mlir::ModuleOp modOp = getOperation();
-  MLIRContext *ctx = &getContext();
-  mlir::GreedyRewriteConfig config;
-  config.useTopDownTraversal = true;
-  config.enableRegionSimplification = false;
-  RewritePatternSet preprocessPatterns(ctx);
-  preprocessPatterns.add<UnpackBufferSlots<handshake::OEHBOp>,
-                         UnpackBufferSlots<handshake::TEHBOp>>(ctx);
-  return applyPatternsAndFoldGreedily(modOp, std::move(preprocessPatterns),
-                                      config);
-}
 
 } // end anonymous namespace
 
