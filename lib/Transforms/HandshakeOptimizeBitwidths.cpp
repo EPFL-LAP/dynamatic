@@ -82,7 +82,6 @@ static inline unsigned getOptAddrWidth(unsigned value) {
 /// original value can be safely discarded. If an extension type is provided and
 /// the function is able to backtrack through any extension operation, updates
 /// the extension type with respect to the latter.
-// NOLINTNEXTLINE(misc-no-recursion)
 static Value getMinimalValue(Value val, ExtType *ext = nullptr) {
   // Ignore values whose type isn't optimizable
   Type type = val.getType();
@@ -236,7 +235,6 @@ static Value modVal(ExtValue extVal, unsigned targetWidth,
 /// parameter to keep track of which operations were already visited during
 /// backtracking to avoid looping forever. See overload's documentation for more
 /// details.
-/// NOLINTNEXTLINE(misc-no-recursion)
 static bool isOperandInCycle(Value val, OpResult res,
                              DenseSet<Value> &mergedValues,
                              VisitedOps &visitedOps) {
@@ -264,7 +262,6 @@ static bool isOperandInCycle(Value val, OpResult res,
     return isOperandInCycle(condOp.getDataOperand(), res, mergedValues,
                             visitedOps);
 
-  // NOLINTNEXTLINE(misc-no-recursion)
   auto recurseMergeLike = [&](ValueRange dataOperands) -> bool {
     bool oneOprInCycle = false;
     SmallVector<Value> mergeOperands;
@@ -1381,7 +1378,6 @@ private:
 
 } // namespace
 
-/// NOLINTNEXTLINE(misc-no-recursion)
 SmallVector<arith::CmpIOp> ArithBoundOpt::getCmpOps(Value condVal) const {
   Value minVal = backtrackToMinimalValue(condVal);
 

@@ -71,8 +71,6 @@ static bool areOpsInSameBlock(SmallVector<Operation *> &ops) {
   return true;
 }
 
-// NOLINTBEGIN(misc-no-recursion)
-
 /// Attempts to identify an operation's predecessor block, which is either the
 /// block the operation belongs to, or (if the latter isn't defined), the unique
 /// first block reached by recursively backtracking through the def-use chain of
@@ -198,8 +196,6 @@ static Operation *followToMerge(Operation *op) {
   }
   return nullptr;
 }
-
-// NOLINTEND(misc-no-recursion)
 
 bool dynamatic::getBBEndpoints(Value val, Operation *user,
                                BBEndpoints &endpoints) {
@@ -377,7 +373,6 @@ HandshakeCFG::getControlValues(DenseMap<unsigned, Value> &ctrlVals) {
   return success();
 }
 
-// NOLINTNEXTLINE(misc-no-recursion)
 void HandshakeCFG::findPathsTo(const mlir::SetVector<unsigned> &pathSoFar,
                                unsigned to, SmallVector<CFGPath> &paths) {
   assert(!pathSoFar.empty() && "path cannot be empty");

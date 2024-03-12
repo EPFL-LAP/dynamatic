@@ -62,7 +62,6 @@ static void fatalValueError(StringRef reason, T &value) {
 }
 
 /// Read a MLIR value from a stringstream and returns a casted version
-/// NOLINTNEXTLINE(misc-no-recursion)
 static Any readValueWithType(mlir::Type type, std::stringstream &arg) {
   if (type.isIndex()) {
     int64_t x;
