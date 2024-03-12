@@ -976,7 +976,8 @@ def EndOp : Handshake_Op<"end", [Terminator]> {
 // Speculation operations
 //===----------------------------------------------------------------------===//
 
-def SpeculatorOp : Handshake_Op<"speculator", [ 
+def SpeculatorOp : Handshake_Op<"speculator", [
+  SpeculationOpInterface,
   TypesMatchWith<"data operand type matches data result type",
                  "dataIn", "dataOut", "$_self">]> {
   let summary = "Central control unit of the speculative circuit.";
@@ -1008,6 +1009,7 @@ def SpeculatorOp : Handshake_Op<"speculator", [
 }
 
 def SpecSaveOp : Handshake_Op<"spec_save", [
+  SpeculationOpInterface,
   TypesMatchWith<"data operand type matches data result type",
                  "dataIn", "dataOut", "$_self">] > {
   let summary = "Saves data tokens that interact in the speculative region.";
@@ -1033,6 +1035,7 @@ def SpecSaveOp : Handshake_Op<"spec_save", [
 }
 
 def SpecCommitOp : Handshake_Op<"spec_commit", [
+  SpeculationOpInterface,
   TypesMatchWith<"data operand type matches data result type",
                     "dataIn", "dataOut", "$_self">] > {
   let summary = "Stall speculative data tokens until they are resolved.";
@@ -1059,6 +1062,7 @@ def SpecCommitOp : Handshake_Op<"spec_commit", [
 }
 
 def SpecSaveCommitOp : Handshake_Op<"spec_save_commit", [
+  SpeculationOpInterface,
   TypesMatchWith<"data operand type matches data result type",
                     "dataIn", "dataOut", "$_self">]> {
   let summary = "Lets all tokens pass and saves a copy of them.";
@@ -1080,6 +1084,7 @@ def SpecSaveCommitOp : Handshake_Op<"spec_save_commit", [
 }
 
 def SpeculatingBranchOp : Handshake_Op<"speculating_branch", [
+  SpeculationOpInterface,
   TypesMatchWith<"data operand type matches true branch result type",
                     "dataOperand", "trueResult", "$_self">,
   TypesMatchWith<"data operand type matches false branch result type",

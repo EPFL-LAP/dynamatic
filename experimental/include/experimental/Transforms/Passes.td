@@ -55,6 +55,17 @@ def HandshakeSpeculation : DynamaticPass<"handshake-speculation"> {
            "specified in the JSON-formatted file.">];
 }
 
+def SpecAnnotatePaths : DynamaticPass<"spec-annotate-paths"> {
+  let summary = "Adds an attribute to mark operations in speculative regions";
+  let description = [{
+    The operations within speculative regions need to be marked for
+    VHDL exporting purposes. The pass adds the attribute "speculative" to
+    operations that are found within the speculative region, which is defined from
+    save units and the speculator, to commit units.
+  }];
+  let constructor = "dynamatic::experimental::speculation::createSpecAnnotatePaths()";
+}
+
 def HandshakePlaceBuffersCustom : DynamaticPass<"handshake-placebuffers-custom"> {
   let summary = "Place buffers on specific channels";
   let description = [{ Placing a single buffer on a specific output channel of
