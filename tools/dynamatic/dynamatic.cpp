@@ -26,12 +26,9 @@
 #include "mlir/Support/IndentedOstream.h"
 #include "mlir/Support/LLVM.h"
 #include "mlir/Support/LogicalResult.h"
-#include "llvm/ADT/DenseSet.h"
-#include "llvm/ADT/SetVector.h"
 #include "llvm/ADT/SmallVector.h"
 #include "llvm/ADT/StringRef.h"
 #include "llvm/Support/CommandLine.h"
-#include "llvm/Support/Compiler.h"
 #include "llvm/Support/FileSystem.h"
 #include "llvm/Support/InitLLVM.h"
 #include "llvm/Support/Path.h"
@@ -137,9 +134,9 @@ public:
       this->flags[arg.name] = arg;
   };
 
-  virtual CommandResult decode(SmallVector<std::string> &tokens) = 0;
+  virtual CommandResult decode(ArrayRef<std::string> tokens) = 0;
 
-  LogicalResult parse(SmallVector<std::string> &tokens, ParsedCommand &parsed);
+  LogicalResult parse(ArrayRef<std::string> tokens, ParsedCommand &parsed);
 
   std::string getShortCmdDesc();
 
@@ -156,7 +153,7 @@ public:
   Exit(FrontendState &state)
       : Command(CMD_EXIT, "Exits the Dynamatic frontend", state){};
 
-  CommandResult decode(SmallVector<std::string> &tokens) override;
+  CommandResult decode(ArrayRef<std::string> tokens) override;
 };
 
 class Help : public Command {
@@ -164,7 +161,7 @@ public:
   Help(FrontendState &state)
       : Command(CMD_HELP, "Displays this help message", state){};
 
-  CommandResult decode(SmallVector<std::string> &tokens) override;
+  CommandResult decode(ArrayRef<std::string> tokens) override;
 };
 
 class SetDynamaticPath : public Command {
@@ -174,7 +171,7 @@ public:
                 "Sets the path to Dynamatic's top-level directory", state,
                 {{"path", "path to Dynamatic's top-level directory"}}){};
 
-  CommandResult decode(SmallVector<std::string> &tokens) override;
+  CommandResult decode(ArrayRef<std::string> tokens) override;
 };
 
 class SetSrc : public Command {
@@ -183,7 +180,7 @@ public:
       : Command(CMD_SET_SRC, "Sets the C source to compile", state,
                 {{"source", "path to source file"}}){};
 
-  CommandResult decode(SmallVector<std::string> &tokens) override;
+  CommandResult decode(ArrayRef<std::string> tokens) override;
 };
 
 class Compile : public Command {
@@ -195,7 +192,7 @@ public:
                 state, {},
                 {{"simple-buffers", "Use simple buffer placement"}}){};
 
-  CommandResult decode(SmallVector<std::string> &tokens) override;
+  CommandResult decode(ArrayRef<std::string> tokens) override;
 };
 
 class WriteHDL : public Command {
@@ -207,7 +204,7 @@ public:
             "export-dot tool",
             state){};
 
-  CommandResult decode(SmallVector<std::string> &tokens) override;
+  CommandResult decode(ArrayRef<std::string> tokens) override;
 };
 
 class Simulate : public Command {
@@ -218,7 +215,7 @@ public:
                 "and the hls-verifier tool",
                 state){};
 
-  CommandResult decode(SmallVector<std::string> &tokens) override;
+  CommandResult decode(ArrayRef<std::string> tokens) override;
 };
 
 class Visualize : public Command {
@@ -229,7 +226,7 @@ public:
             "Visualizes the execution of the circuit simulated by Modelsim.",
             state){};
 
-  CommandResult decode(SmallVector<std::string> &tokens) override;
+  CommandResult decode(ArrayRef<std::string> tokens) override;
 };
 
 class Synthesize : public Command {
@@ -239,7 +236,7 @@ public:
                 "Synthesizes the VHDL produced during HDL writing using Vivado",
                 state){};
 
-  CommandResult decode(SmallVector<std::string> &tokens) override;
+  CommandResult decode(ArrayRef<std::string> tokens) override;
 };
 
 class FrontendCommands {
@@ -292,7 +289,7 @@ bool FrontendState::sourcePathIsSet(StringRef keyword) {
   return true;
 }
 
-LogicalResult Command::parse(SmallVector<std::string> &tokens,
+LogicalResult Command::parse(ArrayRef<std::string> tokens,
                              ParsedCommand &parsed) {
   bool firstIsKw = true;
   for (StringRef tok : tokens) {
@@ -367,18 +364,18 @@ void Command::help() {
   os << "\n";
 }
 
-CommandResult Exit::decode(SmallVector<std::string> &tokens) {
+CommandResult Exit::decode(ArrayRef<std::string> tokens) {
   if (tokens.size() == 1)
     return CommandResult::EXIT;
   llvm::outs() << ERR << "To exit Dynamatic, just type 'exit'.\n";
   return CommandResult::FAIL;
 }
 
-CommandResult Help::decode(SmallVector<std::string> &tokens) {
+CommandResult Help::decode(ArrayRef<std::string> tokens) {
   return CommandResult::HELP;
 }
 
-CommandResult SetDynamaticPath::decode(SmallVector<std::string> &tokens) {
+CommandResult SetDynamaticPath::decode(ArrayRef<std::string> tokens) {
   ParsedCommand parsed;
   if (failed(parse(tokens, parsed)))
     return CommandResult::SYNTAX_ERROR;
@@ -407,7 +404,7 @@ CommandResult SetDynamaticPath::decode(SmallVector<std::string> &tokens) {
   return CommandResult::SUCCESS;
 }
 
-CommandResult SetSrc::decode(SmallVector<std::string> &tokens) {
+CommandResult SetSrc::decode(ArrayRef<std::string> tokens) {
   ParsedCommand parsed;
   if (failed(parse(tokens, parsed)))
     return CommandResult::SYNTAX_ERROR;
@@ -425,7 +422,7 @@ CommandResult SetSrc::decode(SmallVector<std::string> &tokens) {
   return CommandResult::SUCCESS;
 }
 
-CommandResult Compile::decode(SmallVector<std::string> &tokens) {
+CommandResult Compile::decode(ArrayRef<std::string> tokens) {
   ParsedCommand parsed;
   if (failed(parse(tokens, parsed)))
     return CommandResult::SYNTAX_ERROR;
@@ -447,7 +444,7 @@ CommandResult Compile::decode(SmallVector<std::string> &tokens) {
                           outputDir + " " + kernelName + " " + buffers);
 }
 
-CommandResult WriteHDL::decode(SmallVector<std::string> &tokens) {
+CommandResult WriteHDL::decode(ArrayRef<std::string> tokens) {
   ParsedCommand parsed;
   if (failed(parse(tokens, parsed)))
     return CommandResult::SYNTAX_ERROR;
@@ -467,7 +464,7 @@ CommandResult WriteHDL::decode(SmallVector<std::string> &tokens) {
                           kernelName);
 }
 
-CommandResult Simulate::decode(SmallVector<std::string> &tokens) {
+CommandResult Simulate::decode(ArrayRef<std::string> tokens) {
   ParsedCommand parsed;
   if (failed(parse(tokens, parsed)))
     return CommandResult::SYNTAX_ERROR;
@@ -487,7 +484,7 @@ CommandResult Simulate::decode(SmallVector<std::string> &tokens) {
                           outputDir + " " + kernelName);
 }
 
-CommandResult Visualize::decode(SmallVector<std::string> &tokens) {
+CommandResult Visualize::decode(ArrayRef<std::string> tokens) {
   ParsedCommand parsed;
   if (failed(parse(tokens, parsed)))
     return CommandResult::SYNTAX_ERROR;
@@ -511,7 +508,7 @@ CommandResult Visualize::decode(SmallVector<std::string> &tokens) {
                           " " + outputDir + " " + kernelName);
 }
 
-CommandResult Synthesize::decode(SmallVector<std::string> &tokens) {
+CommandResult Synthesize::decode(ArrayRef<std::string> tokens) {
   ParsedCommand parsed;
   if (failed(parse(tokens, parsed)))
     return CommandResult::SYNTAX_ERROR;
@@ -531,15 +528,18 @@ CommandResult Synthesize::decode(SmallVector<std::string> &tokens) {
                           kernelName);
 }
 
+static StringRef removeComment(StringRef input) {
+  if (size_t cutAt = input.find('#'); cutAt != std::string::npos)
+    return input.take_front(cutAt);
+  return input;
+}
+
 static void tokenizeInput(StringRef input, SmallVector<std::string> &tokens) {
   tokens.clear();
-  std::istringstream iss(input.str());
+  std::istringstream inputStream(removeComment(input).str());
   std::string tok;
-  while (iss >> tok) {
-    if (StringRef(tok).starts_with("#"))
-      return;
+  while (inputStream >> tok)
     tokens.push_back(tok);
-  }
 }
 
 static void help(FrontendCommands &commands) {
@@ -576,7 +576,7 @@ int main(int argc, char **argv) {
     return 1;
   }
 
-  // Set up the frontend end and available commands
+  // Set up the frontend and available commands
   FrontendState state(cwd.str());
   FrontendCommands commands;
   commands.add<SetDynamaticPath>(state);
@@ -589,11 +589,14 @@ int main(int argc, char **argv) {
   commands.add<Help>(state);
   commands.add<Exit>(state);
 
-  auto handleInput = [&](StringRef input) -> void {
-    SmallVector<std::string> tokens;
+  SmallVector<std::string> tokens;
+  auto handleCmd = [&](StringRef input, bool prompt) -> void {
     tokenizeInput(input, tokens);
     if (tokens.empty())
       return;
+
+    if (prompt)
+      llvm::outs() << PROMPT << input << "\n";
 
     // Look for the command
     StringRef kw = tokens.front();
@@ -627,6 +630,12 @@ int main(int argc, char **argv) {
     }
   };
 
+  auto splitOnSemicolonAndHandle = [&](StringRef input, bool prompt) -> void {
+    std::stringstream lineStream(removeComment(input).str());
+    for (std::string cmd; std::getline(lineStream, cmd, ';');)
+      handleCmd(cmd, prompt);
+  };
+
   // Print frontend header
   llvm::outs() << HEADER;
 
@@ -642,17 +651,8 @@ int main(int argc, char **argv) {
 
     // Read the script line-by-line and execute its commands
     // Supported delimeters: '\n' and ';'
-    std::string line;
-    while (std::getline(inputFile, line, '\n')) {
-      // cast '\n'-separated lines into streams, then split it by ';'
-      std::stringstream sLine(line);
-      for (std::string cmd; getline(sLine, cmd, ';');) {
-        if (!cmd.empty()) {
-          llvm::outs() << PROMPT << cmd << "\n";
-          handleInput(cmd);
-        }
-      }
-    }
+    for (std::string scriptInput; std::getline(inputFile, scriptInput, '\n');)
+      splitOnSemicolonAndHandle(scriptInput, true);
   }
 
   // Read from stdin, multiple commands in one line are separated by ';'
@@ -660,10 +660,7 @@ int main(int argc, char **argv) {
   while (true) {
     llvm::outs() << PROMPT;
     getline(std::cin, userInput, '\n');
-    // Cast '\n'-separated lines into streams, then split it by ';'
-    std::stringstream sUserInput(userInput);
-    for (std::string cmd; std::getline(sUserInput, cmd, ';');)
-      handleInput(cmd);
+    splitOnSemicolonAndHandle(userInput, false);
   }
   return 0;
 }
