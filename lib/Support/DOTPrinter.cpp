@@ -695,15 +695,23 @@ LogicalResult DOTPrinter::annotateNode(Operation *op,
                 return info;
               })
           .Case<handshake::OEHBOp>([&](handshake::OEHBOp oehbOp) {
-            auto info = NodeInfo("Buffer");
+            /// NOTE: Explicitly set the type to OEHB when the buffer has a
+            /// single slot so that the legach backend respects our wishes
+            bool singleSlot = oehbOp.getSlots() == 1;
+            auto info = NodeInfo(singleSlot ? "OEHB" : "Buffer");
             info.intAttr["slots"] = oehbOp.getSlots();
-            info.stringAttr["transparent"] = "false";
+            if (!singleSlot)
+              info.stringAttr["transparent"] = "false";
             return info;
           })
           .Case<handshake::TEHBOp>([&](handshake::TEHBOp tehbOp) {
-            auto info = NodeInfo("Buffer");
+            /// NOTE: Explicitly set the type to TEHB when the buffer has a
+            /// single slot so that the legach backend respects our wishes
+            bool singleSlot = tehbOp.getSlots() == 1;
+            auto info = NodeInfo(singleSlot ? "TEHB" : "Buffer");
             info.intAttr["slots"] = tehbOp.getSlots();
-            info.stringAttr["transparent"] = "true";
+            if (!singleSlot)
+              info.stringAttr["transparent"] = "true";
             return info;
           })
           .Case<handshake::MemoryControllerOp>(
