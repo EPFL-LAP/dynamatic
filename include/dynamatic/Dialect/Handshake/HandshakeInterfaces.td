@@ -152,14 +152,17 @@ def MemoryOpInterface : OpInterface<"MemoryOpInterface"> {
 
   let methods = [
     InterfaceMethod<
-        "Simulate the memory allocation in the memoryMap", "bool",
-        "allocateMemory",
-        (ins  "llvm::DenseMap<unsigned, unsigned> &" : $memoryMap, 
-              "std::vector<std::vector<llvm::Any>> &" : $store,
-              "std::vector<double> &" : $storeTimes),
+        "Returns the memref-typed SSA value that the interface references.",
+        "::mlir::TypedValue<::mlir::MemRefType>", "getMemRef", (ins)>,
+    InterfaceMethod<[{
+        Returns the type of the memref-typed SSA value that the interface
+        references.
+        }],
+        "::mlir::MemRefType", "getMemRefType", (ins),
         "",
         [{
-          return false;
+          ConcreteOp concreteOp = cast<ConcreteOp>($_op);
+          return concreteOp.getMemRef().getType().template cast<mlir::MemRefType>();
         }]>,
     InterfaceMethod<
         "Returns the memory interface's operands related to memory ports.",

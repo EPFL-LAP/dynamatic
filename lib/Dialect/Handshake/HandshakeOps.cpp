@@ -19,28 +19,17 @@
 #include "dynamatic/Support/LLVM.h"
 #include "mlir/Dialect/Affine/Analysis/AffineAnalysis.h"
 #include "mlir/Dialect/Arith/IR/Arith.h"
-#include "mlir/Dialect/Func/IR/FuncOps.h"
 #include "mlir/IR/Attributes.h"
 #include "mlir/IR/Builders.h"
-#include "mlir/IR/BuiltinOps.h"
 #include "mlir/IR/BuiltinTypes.h"
-#include "mlir/IR/IntegerSet.h"
-#include "mlir/IR/Matchers.h"
 #include "mlir/IR/OpDefinition.h"
 #include "mlir/IR/OpImplementation.h"
-#include "mlir/IR/PatternMatch.h"
 #include "mlir/IR/SymbolTable.h"
 #include "mlir/IR/Value.h"
 #include "mlir/Interfaces/FunctionImplementation.h"
 #include "mlir/Transforms/InliningUtils.h"
-#include "llvm/ADT/SetVector.h"
-#include "llvm/ADT/SmallBitVector.h"
-#include "llvm/ADT/SmallSet.h"
 #include "llvm/ADT/TypeSwitch.h"
-#include "llvm/Support/Casting.h"
 #include "llvm/Support/ErrorHandling.h"
-#include <cctype>
-#include <set>
 
 using namespace mlir;
 using namespace dynamatic;
@@ -1359,14 +1348,10 @@ handshake::MemoryControllerOp LSQOp::getConnectedMC() {
       *getMemInputs().back().getDefiningOp());
 }
 
-Value LSQOp::getMemRef() {
+TypedValue<MemRefType> LSQOp::getMemRef() {
   if (handshake::MemoryControllerOp mcOp = getConnectedMC())
     return mcOp.getMemRef();
-  return getMemInputs().front();
-}
-
-mlir::MemRefType LSQOp::getMemRefType() {
-  return getMemRef().getType().cast<mlir::MemRefType>();
+  return cast<TypedValue<MemRefType>>(getMemInputs().front());
 }
 
 //===----------------------------------------------------------------------===//

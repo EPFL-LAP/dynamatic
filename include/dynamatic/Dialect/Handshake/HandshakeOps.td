@@ -645,11 +645,6 @@ def MemoryControllerOp : Handshake_Op<"mem_controller", [
     /// Returns a convenient data-structure to go over the controls and memory
     /// accesses that are connected to the memory controller. 
     dynamatic::MCPorts getPorts();
-
-    /// Returns the type of the memref referenced by the memory interface.
-    mlir::MemRefType getMemRefType() {
-      return getMemRef().getType().cast<mlir::MemRefType>();
-    }
   }];
 }
 
@@ -755,12 +750,6 @@ def LSQOp : Handshake_Op<"lsq", [
 
     /// Returns the MC connected to the LSQ, if it exists.
     handshake::MemoryControllerOp getConnectedMC();
-
-    /// Returns the memref referenced by the LSQ.
-    mlir::Value getMemRef();
-
-    /// Returns the type of the memref referenced by the LSQ.
-    mlir::MemRefType getMemRefType();
   }];
 }
 
