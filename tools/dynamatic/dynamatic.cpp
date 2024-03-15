@@ -75,6 +75,7 @@ const static std::string PROMPT = "dynamatic> ";
 // Command names
 const static std::string CMD_SET_SRC = "set-src";
 const static std::string CMD_SET_DYNAMATIC_PATH = "set-dynamatic-path";
+const static std::string CMD_SET_CP = "set-clock-period";
 const static std::string CMD_COMPILE = "compile";
 const static std::string CMD_WRITE_HDL = "write-hdl";
 const static std::string CMD_SIMULATE = "simulate";
@@ -88,6 +89,8 @@ namespace {
 struct FrontendState {
   std::string cwd;
   std::string dynamaticPath;
+  // By default, the clock period is 4 ns
+  std::string targetCP = "4.0";
   std::optional<std::string> sourcePath = std::nullopt;
 
   FrontendState(StringRef cwd) : cwd(cwd), dynamaticPath(cwd){};
@@ -180,6 +183,14 @@ public:
       : Command(CMD_SET_SRC, "Sets the C source to compile", state,
                 {{"source", "path to source file"}}){};
 
+  CommandResult decode(ArrayRef<std::string> tokens) override;
+};
+
+class SetCP : public Command {
+public:
+  SetCP(FrontendState &state)
+      : Command(CMD_SET_CP, "Sets the clock period", state,
+                {{"clock-period", "clock period in ns"}}){};
   CommandResult decode(ArrayRef<std::string> tokens) override;
 };
 
@@ -422,6 +433,17 @@ CommandResult SetSrc::decode(ArrayRef<std::string> tokens) {
   return CommandResult::SUCCESS;
 }
 
+CommandResult SetCP::decode(ArrayRef<std::string> tokens) {
+  ParsedCommand parsed;
+  if (failed(parse(tokens, parsed)))
+    return CommandResult::SYNTAX_ERROR;
+
+  // let dynamatic-opt to check if the string is a legal float number
+  state.targetCP = parsed.positionals.front().str();
+
+  return CommandResult::SUCCESS;
+}
+
 CommandResult Compile::decode(ArrayRef<std::string> tokens) {
   ParsedCommand parsed;
   if (failed(parse(tokens, parsed)))
@@ -441,7 +463,8 @@ CommandResult Compile::decode(ArrayRef<std::string> tokens) {
   // Create and execute the command
   return execShellCommand(state.getScriptsPath() + "/compile.sh " +
                           state.dynamaticPath + " " + kernelDir + " " +
-                          outputDir + " " + kernelName + " " + buffers);
+                          outputDir + " " + kernelName + " " + buffers + " " +
+                          state.targetCP);
 }
 
 CommandResult WriteHDL::decode(ArrayRef<std::string> tokens) {
@@ -581,6 +604,7 @@ int main(int argc, char **argv) {
   FrontendCommands commands;
   commands.add<SetDynamaticPath>(state);
   commands.add<SetSrc>(state);
+  commands.add<SetCP>(state);
   commands.add<Compile>(state);
   commands.add<WriteHDL>(state);
   commands.add<Simulate>(state);
