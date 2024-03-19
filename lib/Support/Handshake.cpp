@@ -148,12 +148,12 @@ LogicalResult MemoryInterfaceBuilder::instantiateInterfaces(
     // Add the MC's load data result to the LSQ's inputs and create the LSQ,
     // passing a flag to the builder so that it generates the necessary
     // outputs that will go to the MC
-    inputs.lsqInputs.push_back(mcOp.getMemOutputs().back());
+    inputs.lsqInputs.push_back(mcOp.getOutputs().back());
     lsqOp = builder.create<handshake::LSQOp>(loc, mcOp, inputs.lsqInputs,
                                              inputs.lsqGroupSizes, lsqNumLoads);
 
     // Resolve the backedges to fully connect the MC and LSQ
-    ValueRange lsqMemResults = lsqOp.getMemOutputs().take_back(3);
+    ValueRange lsqMemResults = lsqOp.getOutputs().take_back(3);
     ldAddr.setValue(lsqMemResults[0]);
     stAddr.setValue(lsqMemResults[1]);
     stData.setValue(lsqMemResults[2]);

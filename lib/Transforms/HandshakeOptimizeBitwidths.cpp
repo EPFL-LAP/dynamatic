@@ -776,7 +776,7 @@ struct HandshakeMCAddress
     if (ports.addrWidth == 0 || optWidth >= ports.addrWidth)
       return failure();
 
-    ValueRange inputs = mcOp.getMemInputs();
+    ValueRange inputs = mcOp.getOperands();
     // Optimizes the bitwidth of the address channel currently being pointed to
     // by inputIdx, and increment inputIdx before returning the optimized value
     auto getOptAddrInput = [&](unsigned inputIdx) {

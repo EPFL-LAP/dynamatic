@@ -164,22 +164,6 @@ def MemoryOpInterface : OpInterface<"MemoryOpInterface"> {
           ConcreteOp concreteOp = cast<ConcreteOp>($_op);
           return concreteOp.getMemRef().getType().template cast<mlir::MemRefType>();
         }]>,
-    InterfaceMethod<
-        "Returns the memory interface's operands related to memory ports.",
-        "mlir::ValueRange", "getMemOperands", (ins),
-        "",
-        [{
-          ConcreteOp concreteOp = cast<ConcreteOp>($_op);
-          return concreteOp.getMemInputs();
-        }]>,
-    InterfaceMethod<
-        "Returns the memory interface's results related to memory ports.",
-        "mlir::ValueRange", "getMemResults", (ins),
-        "",
-        [{
-          ConcreteOp concreteOp = cast<ConcreteOp>($_op);
-          return concreteOp.getMemOutputs();
-        }]>
   ];
 }
 

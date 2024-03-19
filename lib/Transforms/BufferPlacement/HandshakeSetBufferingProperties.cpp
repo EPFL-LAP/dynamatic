@@ -72,7 +72,7 @@ static bool vectorContains(Value find, SmallVector<Value> &values) {
 /// - all other outputs must have their ready path cut
 static void setLSQControlConstraints(handshake::LSQOp lsqOp) {
   LSQPorts ports = lsqOp.getPorts();
-  ValueRange lsqInputs = lsqOp.getMemOperands();
+  ValueRange lsqInputs = lsqOp.getOperands();
 
   for (LSQGroup &group : ports.getGroups()) {
     // Control signal must come from a fork for this constraint to apply

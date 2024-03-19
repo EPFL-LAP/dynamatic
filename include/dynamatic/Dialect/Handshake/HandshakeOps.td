@@ -622,16 +622,16 @@ def MemoryControllerOp : Handshake_Op<"mem_controller", [
     ```
   }];
   
-  let arguments = (ins  AnyMemRef : $memRef, Variadic<AnyType> : $memInputs,
+  let arguments = (ins  AnyMemRef : $memRef, Variadic<AnyType> : $inputs,
                         I32ArrayAttr : $connectedBlocks);
-  let results = (outs Variadic<AnyType> : $memOutputs, NoneType : $done);
+  let results = (outs Variadic<AnyType> : $outputs, NoneType : $done);
 
   let skipDefaultBuilders = 1;
   let builders = [OpBuilder<(ins  "Value":$memRef, "ValueRange":$inputs,
                                   "ArrayRef<unsigned>":$blocks, 
                                   "unsigned":$numLoads)>];
   let hasVerifier = 1;
-  let assemblyFormat = " `[` $memRef `:` qualified(type($memRef)) `]` `(` $memInputs `)` attr-dict `:` functional-type($memInputs, results)";
+  let assemblyFormat = " `[` $memRef `:` qualified(type($memRef)) `]` `(` $inputs `)` attr-dict `:` functional-type($inputs, results)";
 
   let extraClassDeclaration = [{
     /// Returns the list of basic block IDs the MC is connected to.
@@ -649,7 +649,7 @@ def MemoryControllerOp : Handshake_Op<"mem_controller", [
 }
 
 def LSQOp : Handshake_Op<"lsq", [
-  DeclareOpInterfaceMethods<MemoryOpInterface, ["getMemOperands"]>,
+  DeclareOpInterfaceMethods<MemoryOpInterface>,
   DeclareOpInterfaceMethods<NamedIOInterface, ["getOperandName"]>,
   DeclareOpInterfaceMethods<NamedIOInterface, ["getResultName"]>
 ]> {
@@ -716,8 +716,8 @@ def LSQOp : Handshake_Op<"lsq", [
     ```
   }];
   
-  let arguments = (ins Variadic<AnyType> : $memInputs, I32ArrayAttr : $groupSizes);
-  let results = (outs Variadic<AnyType> : $memOutputs, NoneType : $done);
+  let arguments = (ins Variadic<AnyType> : $inputs, I32ArrayAttr : $groupSizes);
+  let results = (outs Variadic<AnyType> : $outputs, NoneType : $done);
 
   let skipDefaultBuilders = 1;
   let builders = [
@@ -745,7 +745,7 @@ def LSQOp : Handshake_Op<"lsq", [
     
     /// Determines whether the LSQ is connected to an MC. 
     bool isConnectedToMC() {
-      return !isa<mlir::MemRefType>(getMemInputs().front().getType());
+      return !isa<mlir::MemRefType>(getInputs().front().getType());
     }
 
     /// Returns the MC connected to the LSQ, if it exists.

@@ -52,24 +52,22 @@ static size_t findIndexInRange(ValueRange range, Value val) {
 /// inputs of a memory interface.
 static std::pair<size_t, size_t> findValueInGroups(FuncMemoryPorts &ports,
                                                    Value val) {
-  unsigned numBlocks = ports.getNumGroups();
+  unsigned numGroups = ports.getNumGroups();
   unsigned accInputIdx = 0;
-  for (size_t blockIdx = 0; blockIdx < numBlocks; ++blockIdx) {
-    ValueRange blockInputs = ports.getGroupInputs(blockIdx);
-    accInputIdx += blockInputs.size();
-    for (auto [inputIdx, input] : llvm::enumerate(blockInputs)) {
+  for (size_t groupIdx = 0; groupIdx < numGroups; ++groupIdx) {
+    ValueRange groupInputs = ports.getGroupInputs(groupIdx);
+    accInputIdx += groupInputs.size();
+    for (auto [inputIdx, input] : llvm::enumerate(groupInputs)) {
       if (input == val)
-        return std::make_pair(blockIdx, inputIdx);
+        return std::make_pair(groupIdx, inputIdx);
     }
   }
 
   // Value must belong to a port with another memory interface, find the one
-  ValueRange lastInputs = ports.memOp.getMemOperands().drop_front(accInputIdx);
-  for (auto [inputIdx, input] : llvm::enumerate(lastInputs)) {
+  for (auto [inputIdx, input] : llvm::enumerate(ports.getInterfacesInputs())) {
     if (input == val)
-      return std::make_pair(ports.getNumGroups(), inputIdx + accInputIdx);
+      return std::make_pair(numGroups, inputIdx + accInputIdx);
   }
-
   llvm_unreachable("value should be an operand to the memory interface");
 }
 

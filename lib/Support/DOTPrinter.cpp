@@ -249,7 +249,7 @@ static std::string getInputForMemInterface(FuncMemoryPorts &funcPorts) {
   MemPortsData portsData;
   unsigned ctrlIdx = 0, ldIdx = 0, stIdx = 0, inputIdx = 1;
   MemoryOpInterface memOp = funcPorts.memOp;
-  ValueRange inputs = memOp.getMemOperands();
+  ValueRange inputs = memOp->getOperands();
 
   // Add all control signals first
   for (GroupMemoryPorts &blockPorts : funcPorts.groups) {
@@ -312,7 +312,7 @@ static std::string getInputForMemInterface(FuncMemoryPorts &funcPorts) {
 static std::string getOutputForMemInterface(FuncMemoryPorts &funcPorts) {
   MemPortsData portsData;
   MemoryOpInterface memOp = funcPorts.memOp;
-  ValueRange results = memOp.getMemResults();
+  ValueRange results = memOp->getResults();
   unsigned outputIdx = 1, ldIdx = 0;
 
   // Control signal to end
@@ -383,7 +383,7 @@ static unsigned findMemoryPort(Value addressToMem) {
   // Iterate over memory accesses to find the one that matches the address
   // value
   handshake::MemoryOpInterface memOp = getConnectedMemInterface(addressToMem);
-  ValueRange memInputs = memOp.getMemOperands();
+  ValueRange memInputs = memOp->getOperands();
   FuncMemoryPorts ports = getMemoryPorts(memOp);
   for (GroupMemoryPorts &groupPorts : ports.groups) {
     for (auto [portIdx, port] : llvm::enumerate(groupPorts.accessPorts)) {
@@ -413,24 +413,22 @@ static size_t findIndexInRange(ValueRange range, Value val) {
 /// inputs of a memory interface.
 static std::pair<size_t, size_t> findValueInGroups(FuncMemoryPorts &ports,
                                                    Value val) {
-  unsigned numBlocks = ports.getNumGroups();
+  unsigned numGroups = ports.getNumGroups();
   unsigned accInputIdx = 0;
-  for (size_t blockIdx = 0; blockIdx < numBlocks; ++blockIdx) {
-    ValueRange blockInputs = ports.getGroupInputs(blockIdx);
-    accInputIdx += blockInputs.size();
-    for (auto [inputIdx, input] : llvm::enumerate(blockInputs)) {
+  for (size_t groupIdx = 0; groupIdx < numGroups; ++groupIdx) {
+    ValueRange groupInputs = ports.getGroupInputs(groupIdx);
+    accInputIdx += groupInputs.size();
+    for (auto [inputIdx, input] : llvm::enumerate(groupInputs)) {
       if (input == val)
-        return std::make_pair(blockIdx, inputIdx);
+        return std::make_pair(groupIdx, inputIdx);
     }
   }
 
   // Value must belong to a port with another memory interface, find the one
-  ValueRange lastInputs = ports.memOp.getMemOperands().drop_front(accInputIdx);
-  for (auto [inputIdx, input] : llvm::enumerate(lastInputs)) {
+  for (auto [inputIdx, input] : llvm::enumerate(ports.getInterfacesInputs())) {
     if (input == val)
-      return std::make_pair(ports.getNumGroups(), inputIdx + accInputIdx);
+      return std::make_pair(numGroups, inputIdx + accInputIdx);
   }
-
   llvm_unreachable("value should be an operand to the memory interface");
 }
 
@@ -1010,9 +1008,9 @@ LogicalResult DOTPrinter::annotateEdge(OpOperand &oprd,
     } else if (LSQOp lsqOp = dyn_cast<LSQOp>(src);
                lsqOp && isa<MemoryControllerOp>(dst)) {
       MCLoadStorePort mcPorts = lsqOp.getPorts().getMCPort();
-      ValueRange lsqOutputs = lsqOp.getMemResults();
-      info.memAddress = lsqOutputs[mcPorts.getLoadAddrOutputIndex()] == val ||
-                        lsqOutputs[mcPorts.getStoreAddrOutputIndex()] == val;
+      ValueRange lsqResults = lsqOp.getResults();
+      info.memAddress = lsqResults[mcPorts.getLoadAddrOutputIndex()] == val ||
+                        lsqResults[mcPorts.getStoreAddrOutputIndex()] == val;
     }
   } else if (isa<handshake::MemoryOpInterface>(dst)) {
     if (isa<handshake::LoadOpInterface, handshake::StoreOpInterface>(src))

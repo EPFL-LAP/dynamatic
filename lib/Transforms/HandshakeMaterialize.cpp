@@ -343,7 +343,7 @@ struct HandshakeMaterializePass
     for (handshake::FuncOp funcOp : modOp.getOps<handshake::FuncOp>()) {
       for (handshake::LSQOp lsqOp : funcOp.getOps<handshake::LSQOp>()) {
         LSQPorts lsqPorts = lsqOp.getPorts();
-        ValueRange lsqInputs = lsqOp.getMemOperands();
+        ValueRange lsqInputs = lsqOp.getOperands();
         for (LSQGroup &group : lsqPorts.getGroups()) {
           Value ctrlValue = lsqInputs[group->ctrlPort->getCtrlInputIndex()];
           makeLSQControlForksLazy(lsqOp, ctrlValue, builder);

@@ -28,6 +28,7 @@
 #include "mlir/IR/Value.h"
 #include "mlir/Interfaces/FunctionImplementation.h"
 #include "mlir/Transforms/InliningUtils.h"
+#include "llvm/ADT/STLExtras.h"
 #include "llvm/ADT/TypeSwitch.h"
 #include "llvm/Support/ErrorHandling.h"
 
@@ -774,7 +775,7 @@ static LogicalResult getMCPorts(MCPorts &mcPorts) {
   unsigned nextBlockIdx = 0, resIdx = 0;
   std::optional<unsigned> currentBlockID;
   GroupMemoryPorts *currentGroup = nullptr;
-  ValueRange memResults = mcPorts.memOp.getMemResults();
+  ValueRange memResults = mcPorts.memOp->getResults();
   SmallVector<unsigned> blocks = mcPorts.getMCOp().getMCBlocks();
 
   // Moves forward in our list of blocks, checking that we do not overflow it.
@@ -788,9 +789,13 @@ static LogicalResult getMCPorts(MCPorts &mcPorts) {
 
   // Iterate over all memory inputs and figure out which ports are connected to
   // the memory controller
-  auto inputIter = llvm::enumerate(mcPorts.memOp.getMemOperands());
-  for (auto currentIt = inputIter.begin(); currentIt != inputIter.end();
-       ++currentIt) {
+  auto inputIter = llvm::enumerate(mcPorts.memOp->getOperands());
+  auto currentIt = inputIter.begin();
+
+  // Skip the first memref operand
+  ++currentIt;
+
+  for (; currentIt != inputIter.end(); ++currentIt) {
     auto input = *currentIt;
     Operation *portOp = backtrackToMemInput(input.value());
 
@@ -911,7 +916,7 @@ static LogicalResult getMCPorts(MCPorts &mcPorts) {
     return mcPorts.memOp->emitError()
            << "MC declares more blocks than it connects to.";
   // Check that all memory results have been accounted for
-  if (resIdx != memResults.size())
+  if (resIdx != memResults.size() - 1)
     return mcPorts.memOp->emitError()
            << "When identifying memory ports, some memory results were "
               "unnacounted for, this is not normal!";
@@ -983,18 +988,17 @@ std::string MemoryControllerOp::getOperandName(unsigned int idx) {
 
   // Try to get the operand name from the regular ports
   MCPorts mcPorts = getPorts();
-  unsigned inputIdx = idx - 1;
-  if (std::string name = getMemOperandName(mcPorts, inputIdx); !name.empty())
+  if (std::string name = getMemOperandName(mcPorts, idx); !name.empty())
     return name;
 
   // Try to get the operand name from a potential LSQ port
   if (mcPorts.hasConnectionToLSQ()) {
     LSQLoadStorePort lsqPort = mcPorts.getLSQPort();
-    if (lsqPort.getLoadAddrInputIndex() == inputIdx)
+    if (lsqPort.getLoadAddrInputIndex() == idx)
       return "lsqLdAddr";
-    if (lsqPort.getStoreAddrInputIndex() == inputIdx)
+    if (lsqPort.getStoreAddrInputIndex() == idx)
       return "lsqStAddr";
-    if (lsqPort.getStoreDataInputIndex() == inputIdx)
+    if (lsqPort.getStoreDataInputIndex() == idx)
       return "lsqStData";
   }
   llvm_unreachable("faulty port logic");
@@ -1119,33 +1123,32 @@ ParseResult LSQOp::parse(OpAsmParser &parser, OperationState &result) {
 
 void LSQOp::print(OpAsmPrinter &p) {
   // Print reference to memory region
-  if (isConnectedToMC()) {
+  bool connectsToMC = isConnectedToMC();
+  if (connectsToMC) {
     p << "[MC] ";
   } else {
-    Value memref = getMemInputs().front();
+    Value memref = getInputs().front();
     p << "[" << memref << " : " << memref.getType() << "] ";
   }
 
   // Print memory operands
-  ValueRange memOperands = getMemOperands();
+  ValueRange inputs = getOperands();
+  if (!connectsToMC) {
+    // Skip the memref if present
+    inputs = inputs.drop_front();
+  }
   p << "(";
-  for (Value oprd : memOperands.drop_back(1))
+  for (Value oprd : inputs.drop_back(1))
     p << oprd << ", ";
-  p << memOperands.back() << ") ";
+  p << inputs.back() << ") ";
 
   // Print group sizes and other attributes
   p.printOptionalAttrDict((*this)->getAttrs());
 
   // Print result types
   p << " : ";
-  p.printFunctionalType(memOperands.getTypes(), getResults().getTypes());
+  p.printFunctionalType(inputs.getTypes(), getResults().getTypes());
 }
-
-ValueRange LSQOp::getMemOperands() {
-  if (isConnectedToMC())
-    return getMemInputs();
-  return getMemInputs().drop_front();
-};
 
 /// Attempts to derive the ports for an LSQ. Fails if some of the ports fails to
 /// be identified.
@@ -1153,7 +1156,7 @@ static LogicalResult getLSQPorts(LSQPorts &lsqPorts) {
   unsigned nextGroupIdx = 0, resIdx = 0;
   std::optional<unsigned> currentGroupRemaining;
   GroupMemoryPorts *currentGroup = nullptr;
-  ValueRange memResults = lsqPorts.memOp.getMemResults();
+  ValueRange memResults = lsqPorts.memOp->getResults();
   SmallVector<unsigned> groupSizes = lsqPorts.getLSQOp().getLSQGroupSizes();
 
   auto checkGroupIsValid = [&]() -> LogicalResult {
@@ -1169,9 +1172,14 @@ static LogicalResult getLSQPorts(LSQPorts &lsqPorts) {
 
   // Iterate over all memory inputs and figure out which ports are connected to
   // the memory controller
-  auto inputIter = llvm::enumerate(lsqPorts.memOp.getMemOperands());
-  for (auto currentIt = inputIter.begin(); currentIt != inputIter.end();
-       ++currentIt) {
+  auto inputIter = llvm::enumerate(lsqPorts.memOp->getOperands());
+  auto currentIt = inputIter.begin();
+
+  // If the first operand is a memref, skip it
+  if (!cast<handshake::LSQOp>(lsqPorts.memOp).isConnectedToMC())
+    ++currentIt;
+
+  for (; currentIt != inputIter.end(); ++currentIt) {
     auto input = *currentIt;
 
     auto handleLoad = [&](handshake::LSQLoadOp loadOp) -> LogicalResult {
@@ -1261,7 +1269,7 @@ static LogicalResult getLSQPorts(LSQPorts &lsqPorts) {
     return lsqPorts.memOp->emitError()
            << "LSQ declares more groups than it connects to.";
   // Check that all memory results have been accounted for
-  if (resIdx != memResults.size())
+  if (resIdx != memResults.size() - 1)
     return lsqPorts.memOp->emitError()
            << "When identifying memory ports, some memory results were "
               "unnacounted for, this is not normal!";
@@ -1301,14 +1309,13 @@ std::string LSQOp::getOperandName(unsigned int idx) {
 
   // Try to get the operand name from the regular ports
   LSQPorts lsqPorts = getPorts();
-  unsigned inputIdx = idx - (connectsToMC ? 0 : 1);
-  if (std::string name = getMemOperandName(lsqPorts, inputIdx); !name.empty())
+  if (std::string name = getMemOperandName(lsqPorts, idx); !name.empty())
     return name;
 
   // Try to get the operand name from a potential MC port
   if (connectsToMC) {
     MCLoadStorePort mcPort = lsqPorts.getMCPort();
-    if (mcPort.getLoadDataInputIndex() == inputIdx)
+    if (mcPort.getLoadDataInputIndex() == idx)
       return "mcLdData";
   }
   llvm_unreachable("faulty port logic");
@@ -1345,13 +1352,13 @@ dynamatic::LSQPorts LSQOp::getPorts() {
 
 handshake::MemoryControllerOp LSQOp::getConnectedMC() {
   return dyn_cast<dynamatic::handshake::MemoryControllerOp>(
-      *getMemInputs().back().getDefiningOp());
+      *getInputs().back().getDefiningOp());
 }
 
 TypedValue<MemRefType> LSQOp::getMemRef() {
   if (handshake::MemoryControllerOp mcOp = getConnectedMC())
     return mcOp.getMemRef();
-  return cast<TypedValue<MemRefType>>(getMemInputs().front());
+  return cast<TypedValue<MemRefType>>(getInputs().front());
 }
 
 //===----------------------------------------------------------------------===//
@@ -1490,28 +1497,96 @@ unsigned GroupMemoryPorts::getNumResults() const {
   return numResults;
 }
 
+size_t GroupMemoryPorts::getFirstOperandIndex() const {
+  if (ctrlPort)
+    return (*ctrlPort).getCtrlInputIndex();
+  for (const MemoryPort &port : accessPorts) {
+    if (std::optional<LoadPort> loadPort = dyn_cast<LoadPort>(port)) {
+      return loadPort->getAddrInputIndex();
+    }
+    std::optional<StorePort> storePort = dyn_cast<StorePort>(port);
+    assert(storePort && "port must be load or store");
+    return storePort->getAddrInputIndex();
+  }
+  return std::string::npos;
+}
+
+size_t GroupMemoryPorts::getLastOperandIndex() const {
+  for (const MemoryPort &port : llvm::reverse(accessPorts)) {
+    if (std::optional<LoadPort> loadPort = dyn_cast<LoadPort>(port)) {
+      return loadPort->getAddrInputIndex();
+    }
+    std::optional<StorePort> storePort = dyn_cast<StorePort>(port);
+    assert(storePort && "port must be load or store");
+    return storePort->getDataInputIndex();
+  }
+  if (ctrlPort)
+    return (*ctrlPort).getCtrlInputIndex();
+  return std::string::npos;
+}
+
+size_t GroupMemoryPorts::getFirstResultIndex() const {
+  for (const MemoryPort &port : accessPorts) {
+    if (std::optional<LoadPort> loadPort = dyn_cast<LoadPort>(port))
+      return loadPort->getDataOutputIndex();
+  }
+  return std::string::npos;
+}
+
+size_t GroupMemoryPorts::getLastResultIndex() const {
+  for (const MemoryPort &port : llvm::reverse(accessPorts)) {
+    if (std::optional<LoadPort> loadPort = dyn_cast<LoadPort>(port))
+      return loadPort->getDataOutputIndex();
+  }
+  return std::string::npos;
+}
+
 //===----------------------------------------------------------------------===//
 // FuncMemoryPorts (and children)
 //===----------------------------------------------------------------------===//
 
 mlir::ValueRange FuncMemoryPorts::getGroupInputs(unsigned groupIdx) {
   assert(groupIdx < groups.size() && "index higher than number of blocks");
-  unsigned numToTake = groups[groupIdx].getNumInputs();
-  unsigned numToDrop = 0;
-  // Drop inputs of all blocks before the target one
-  for (size_t i = 0; i < groupIdx; ++i)
-    numToDrop += groups[i].getNumInputs();
-  return memOp.getMemOperands().drop_front(numToDrop).take_front(numToTake);
+  size_t firstIdx = groups[groupIdx].getFirstOperandIndex();
+  if (firstIdx == std::string::npos)
+    return {};
+  size_t lastIdx = groups[groupIdx].getLastOperandIndex();
+  return memOp->getOperands().slice(firstIdx, lastIdx - firstIdx + 1);
 }
 
 mlir::ValueRange FuncMemoryPorts::getGroupResults(unsigned groupIdx) {
   assert(groupIdx < groups.size() && "index higher than number of blocks");
-  unsigned numToTake = groups[groupIdx].getNumResults();
-  unsigned numToDrop = 0;
-  // Drop inputs of all blocks before the target one
-  for (size_t i = 0; i < groupIdx; ++i)
-    numToDrop += groups[i].getNumResults();
-  return memOp.getMemResults().drop_front(numToDrop).take_front(numToTake);
+  size_t firstIdx = groups[groupIdx].getFirstResultIndex();
+  if (firstIdx == std::string::npos)
+    return {};
+  size_t lastIdx = groups[groupIdx].getLastResultIndex();
+  return memOp->getResults().slice(firstIdx, lastIdx - firstIdx + 1);
+}
+
+mlir::ValueRange FuncMemoryPorts::getInterfacesInputs() {
+  ValueRange memResults = memOp->getOperands();
+  for (const MemoryPort &port : interfacePorts) {
+    if (std::optional<MCLoadStorePort> mc = dyn_cast<MCLoadStorePort>(port)) {
+      return memResults.drop_front(mc->getLoadDataInputIndex());
+    }
+    std::optional<LSQLoadStorePort> lsq = dyn_cast<LSQLoadStorePort>(port);
+    assert(lsq && "port must be mc load/store or lsq load/store");
+    return memResults.drop_front(lsq->getLoadAddrInputIndex());
+  }
+  return {};
+}
+
+mlir::ValueRange FuncMemoryPorts::getInterfacesResults() {
+  ValueRange memOperands = memOp->getResults();
+  for (const MemoryPort &port : interfacePorts) {
+    if (std::optional<MCLoadStorePort> mc = dyn_cast<MCLoadStorePort>(port)) {
+      return memOperands.drop_front(mc->getLoadAddrOutputIndex());
+    }
+    std::optional<LSQLoadStorePort> lsq = dyn_cast<LSQLoadStorePort>(port);
+    assert(lsq && "port must be mc load/store or lsq load/store");
+    return memOperands.drop_front(lsq->getLoadDataOutputIndex());
+  }
+  return {};
 }
 
 MCBlock::MCBlock(GroupMemoryPorts *group, unsigned blockID)
@@ -1535,6 +1610,14 @@ SmallVector<MCBlock> MCPorts::getBlocks() {
   return mcBlocks;
 }
 
+LSQLoadStorePort MCPorts::getLSQPort() const {
+  assert(hasConnectionToLSQ() && "no LSQ connected");
+  std::optional<LSQLoadStorePort> lsqPort =
+      dyn_cast<LSQLoadStorePort>(interfacePorts.front());
+  assert(lsqPort && "lsq load/store port undefined");
+  return *lsqPort;
+}
+
 LSQGroup::LSQGroup(GroupMemoryPorts *group) : group(group){};
 
 SmallVector<LSQGroup> LSQPorts::getGroups() {
@@ -1548,6 +1631,14 @@ LSQPorts::LSQPorts(handshake::LSQOp lsqOp) : FuncMemoryPorts(lsqOp){};
 
 handshake::LSQOp LSQPorts::getLSQOp() const {
   return cast<handshake::LSQOp>(memOp);
+}
+
+MCLoadStorePort LSQPorts::getMCPort() const {
+  assert(hasConnectionToMC() && "no LSQ connected");
+  std::optional<MCLoadStorePort> mcPort =
+      dyn_cast<MCLoadStorePort>(interfacePorts.front());
+  assert(mcPort && "mc load/store port undefined");
+  return *mcPort;
 }
 
 //===----------------------------------------------------------------------===//
