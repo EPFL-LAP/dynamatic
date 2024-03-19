@@ -13,12 +13,14 @@
 #ifndef DYNAMATIC_CONVERSION_HANDSHAKETOHW_H
 #define DYNAMATIC_CONVERSION_HANDSHAKETOHW_H
 
-#include "dynamatic/Dialect/HW/HWOps.h"
 #include "dynamatic/Support/DynamaticPass.h"
-#include "dynamatic/Support/LLVM.h"
-#include "mlir/IR/DialectRegistry.h"
 
 namespace dynamatic {
+
+namespace hw {
+/// Forward declare the HW dialect which the pass depends on.
+class HWDialect;
+} // namespace hw
 
 #define GEN_PASS_DECL_HANDSHAKETOHW
 #define GEN_PASS_DEF_HANDSHAKETOHW
