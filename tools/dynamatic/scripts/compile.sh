@@ -12,6 +12,7 @@ SRC_DIR=$2
 OUTPUT_DIR=$3
 KERNEL_NAME=$4
 USE_SIMPLE_BUFFERS=$5
+TARGET_CP=$6
 
 # Binaries used during compilation
 POLYGEIST_PATH="$DYNAMATIC_DIR/polygeist"
@@ -102,7 +103,7 @@ exit_on_fail "Failed to compile scf to cf" "Compiled scf to cf"
 exit_on_fail "Failed to apply standard transformations to cf" \
   "Applied standard transformations to cf"
 
-# cf transformations (dynamatic) 
+# cf transformations (dynamatic)
 "$DYNAMATIC_OPT_BIN" "$F_CF_TRANFORMED" \
   --arith-reduce-strength="max-adder-depth-mul=1" --push-constants \
   --mark-memory-interfaces \
@@ -122,7 +123,7 @@ exit_on_fail "Failed to compile cf to handshake" "Compiled cf to handshake"
   --handshake-concretize-index-type="width=32" \
   --handshake-minimize-cst-width --handshake-optimize-bitwidths="legacy" \
   --handshake-materialize --handshake-infer-basic-blocks \
-  > "$F_HANDSHAKE_TRANSFORMED"    
+  > "$F_HANDSHAKE_TRANSFORMED"
 exit_on_fail "Failed to apply transformations to handshake" \
   "Applied transformations to handshake"
 
@@ -138,15 +139,15 @@ else
   # Compile kernel's main function to extract profiling information
   "$CLANGXX_BIN" "$SRC_DIR/$KERNEL_NAME.c" -D PRINT_PROFILING_INFO -I \
     "$DYNAMATIC_DIR/include" -Wno-deprecated -o "$F_PROFILER_BIN"
-  exit_on_fail "Failed to build kernel for profiling" "Built kernel for profiling" 
+  exit_on_fail "Failed to build kernel for profiling" "Built kernel for profiling"
 
   "$F_PROFILER_BIN" > "$F_PROFILER_INPUTS"
-  exit_on_fail "Failed to kernel for profiling" "Ran kernel for profiling" 
+  exit_on_fail "Failed to kernel for profiling" "Ran kernel for profiling"
 
   # cf-level profiler
   "$DYNAMATIC_PROFILER_BIN" "$F_CF_DYN_TRANSFORMED" \
     --top-level-function="$KERNEL_NAME" --input-args-file="$F_PROFILER_INPUTS" \
-    > $F_FREQUENCIES 
+    > $F_FREQUENCIES
   exit_on_fail "Failed to profile cf-level" "Profiled cf-level"
 
   # Smart buffer placement
@@ -154,7 +155,7 @@ else
   cd "$COMP_DIR"
   "$DYNAMATIC_OPT_BIN" "$F_HANDSHAKE_TRANSFORMED" \
     --handshake-set-buffering-properties="version=fpga20" \
-    --handshake-place-buffers="algorithm=fpl22 frequencies=$F_FREQUENCIES timing-models=$DYNAMATIC_DIR/data/components.json timeout=300 dump-logs" \
+    --handshake-place-buffers="algorithm=fpl22 frequencies=$F_FREQUENCIES timing-models=$DYNAMATIC_DIR/data/components.json target-period=$TARGET_CP timeout=300 dump-logs" \
     > "$F_HANDSHAKE_BUFFERED"
   exit_on_fail "Failed to place smart buffers" "Placed smart buffers"
   cd - > /dev/null
