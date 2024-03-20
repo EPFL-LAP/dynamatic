@@ -25,7 +25,6 @@
 #include "mlir/IR/BuiltinAttributes.h"
 #include "mlir/IR/BuiltinTypes.h"
 #include "mlir/IR/OperationSupport.h"
-#include "mlir/IR/PatternMatch.h"
 #include "mlir/IR/Value.h"
 #include "mlir/Support/IndentedOstream.h"
 #include "llvm/ADT/StringRef.h"
@@ -65,6 +64,7 @@ static llvm::StringMap<StringRef> compNameToOpName{
     {arith::DivUIOp::getOperationName(), "udiv_op"},
     {arith::ExtSIOp::getOperationName(), "sext_op"},
     {arith::ExtUIOp::getOperationName(), "zext_op"},
+    {arith::ExtFOp::getOperationName(), "fext_op"},
     {arith::MulFOp::getOperationName(), "fmul_op"},
     {arith::MulIOp::getOperationName(), "mul_op"},
     {arith::OrIOp::getOperationName(), "or_op"},
