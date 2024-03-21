@@ -44,16 +44,14 @@ static constexpr llvm::StringLiteral CLK_PORT("clk"), RST_PORT("rst");
 //===----------------------------------------------------------------------===//
 
 namespace {
-/// A class to be used with getPortInfoForOp. Provides an opaque interface for
-/// generating the port names of an operation; handshake operations generate
-/// names by the Handshake NamedIOInterface;  and other operations, such as
-/// arith ops, are assigned default names.
-class HandshakePortNameGenerator {
+/// Provides an opaque interface for generating the port names of an operation;
+/// handshake operations generate names by the `handshake::NamedIOInterface`;
+/// and other operations, such as arith ops, are assigned default names.
+class PortNameGenerator {
 public:
-  explicit HandshakePortNameGenerator(Operation *op)
-      : builder(op->getContext()) {
-    auto namedOpInterface = dyn_cast<handshake::NamedIOInterface>(op);
-    if (namedOpInterface)
+  explicit PortNameGenerator(Operation *op) {
+    assert(op && "cannot generate port names for null operation");
+    if (auto namedOpInterface = dyn_cast<handshake::NamedIOInterface>(op))
       inferFromNamedOpInterface(namedOpInterface);
     else if (auto funcOp = dyn_cast<handshake::FuncOp>(op))
       inferFromFuncOp(funcOp);
@@ -61,46 +59,72 @@ public:
       inferDefault(op);
   }
 
-  StringAttr inputName(unsigned idx) { return inputs[idx]; }
-  StringAttr outputName(unsigned idx) { return outputs[idx]; }
+  StringRef getInputName(unsigned idx) { return inputs[idx]; }
+  StringRef getOutputName(unsigned idx) { return outputs[idx]; }
 
 private:
   using IdxToStrF = const std::function<std::string(unsigned)> &;
   void infer(Operation *op, IdxToStrF &inF, IdxToStrF &outF) {
-    llvm::transform(
-        llvm::enumerate(op->getOperandTypes()), std::back_inserter(inputs),
-        [&](auto it) { return builder.getStringAttr(inF(it.index())); });
-    llvm::transform(
-        llvm::enumerate(op->getResultTypes()), std::back_inserter(outputs),
-        [&](auto it) { return builder.getStringAttr(outF(it.index())); });
+    for (size_t idx = 0, e = op->getNumOperands(); idx < e; ++idx)
+      inputs.push_back(inF(idx));
+    for (size_t idx = 0, e = op->getNumResults(); idx < e; ++idx)
+      outputs.push_back(outF(idx));
   }
 
   void inferDefault(Operation *op) {
-    infer(
-        op, [](unsigned idx) { return "in" + std::to_string(idx); },
-        [](unsigned idx) { return "out" + std::to_string(idx); });
+    llvm::TypeSwitch<Operation *, void>(op)
+        .Case<arith::AddFOp, arith::AddIOp, arith::AndIOp, arith::CmpIOp,
+              arith::CmpFOp, arith::DivFOp, arith::DivSIOp, arith::DivUIOp,
+              arith::MaximumFOp, arith::MinimumFOp, arith::MulFOp,
+              arith::MulIOp, arith::OrIOp, arith::ShLIOp, arith::ShRSIOp,
+              arith::ShRUIOp, arith::SubFOp, arith::SubIOp, arith::XOrIOp>(
+            [&](auto) {
+              infer(
+                  op, [](unsigned idx) { return idx == 0 ? "lhs" : "rhs"; },
+                  [](unsigned idx) { return "result"; });
+            })
+        .Case<arith::ExtSIOp, arith::ExtUIOp, arith::NegFOp, arith::TruncIOp>(
+            [&](auto) {
+              infer(
+                  op, [](unsigned idx) { return "ins"; },
+                  [](unsigned idx) { return "outs"; });
+            })
+        .Case<arith::SelectOp>([&](auto) {
+          infer(
+              op,
+              [](unsigned idx) {
+                switch (idx) {
+                case 0:
+                  return "condition";
+                case 1:
+                  return "true_value";
+                }
+                return "false_value";
+              },
+              [](unsigned idx) { return "result"; });
+        })
+        .Default([&](auto) {
+          infer(
+              op, [](unsigned idx) { return "in" + std::to_string(idx); },
+              [](unsigned idx) { return "out" + std::to_string(idx); });
+        });
   }
 
-  void inferFromNamedOpInterface(handshake::NamedIOInterface op) {
-    infer(
-        op, [&](unsigned idx) { return op.getOperandName(idx); },
-        [&](unsigned idx) { return op.getResultName(idx); });
+  void inferFromNamedOpInterface(handshake::NamedIOInterface namedIO) {
+    auto inF = [&](unsigned idx) { return namedIO.getOperandName(idx); };
+    auto outF = [&](unsigned idx) { return namedIO.getResultName(idx); };
+    infer(namedIO, inF, outF);
   }
 
-  void inferFromFuncOp(handshake::FuncOp op) {
-    auto inF = [&](unsigned idx) { return op.getArgName(idx).str(); };
-    auto outF = [&](unsigned idx) { return op.getResName(idx).str(); };
-    llvm::transform(
-        llvm::enumerate(op.getArgumentTypes()), std::back_inserter(inputs),
-        [&](auto it) { return builder.getStringAttr(inF(it.index())); });
-    llvm::transform(
-        llvm::enumerate(op.getResultTypes()), std::back_inserter(outputs),
-        [&](auto it) { return builder.getStringAttr(outF(it.index())); });
+  void inferFromFuncOp(handshake::FuncOp funcOp) {
+    llvm::transform(funcOp.getArgNames(), std::back_inserter(inputs),
+                    [](Attribute arg) { return cast<StringAttr>(arg).str(); });
+    llvm::transform(funcOp.getResNames(), std::back_inserter(outputs),
+                    [](Attribute res) { return cast<StringAttr>(res).str(); });
   }
 
-  Builder builder;
-  llvm::SmallVector<StringAttr> inputs;
-  llvm::SmallVector<StringAttr> outputs;
+  SmallVector<std::string> inputs;
+  SmallVector<std::string> outputs;
 };
 
 /// Aggregates information to convert a Handshake memory interface into a
@@ -119,20 +143,17 @@ struct MemLoweringState {
   /// Cache memory port information before modifying the interface, which can
   /// make them impossible to query.
   FuncMemoryPorts ports;
-  /// Cache list of operand names before modifying the interface, which can
-  /// make them impossible to query.
-  SmallVector<std::string> operandNames;
-  /// Cache list of result names before modifying the interface, which can
-  /// make them impossible to query.
-  SmallVector<std::string> resultNames;
-  /// Backedges to the containing module's `hw::OutputOp` operation, which must
-  /// be set, in order, with the memory interface's results that connect to the
-  /// top-level module IO.
+  /// Generates and stores the interface's port names before starting the
+  /// conversion, when those are still queryable.
+  PortNameGenerator portNames;
+  /// Backedges to the containing module's `hw::OutputOp` operation, which
+  /// must be set, in order, with the memory interface's results that connect
+  /// to the top-level module IO.
   SmallVector<Backedge> backedges;
 
   /// Needed because we use the class as a value type in a map, which needs to
   /// be default-constructible.
-  MemLoweringState() : ports(nullptr) {
+  MemLoweringState() : ports(nullptr), portNames(nullptr) {
     llvm_unreachable("object should never be default-constructed");
   }
 
@@ -141,7 +162,10 @@ struct MemLoweringState {
   /// generated for the Handshake function containing the interface.
   MemLoweringState(handshake::MemoryOpInterface memOp, size_t inputIdx = 0,
                    size_t numInputs = 0, size_t outputIdx = 0,
-                   size_t numOutputs = 0);
+                   size_t numOutputs = 0)
+      : inputIdx(inputIdx), numInputs(numInputs), outputIdx(outputIdx),
+        numOutputs(numOutputs), ports(getMemoryPorts(memOp)),
+        portNames(memOp){};
 
   /// Returns the module's input ports that connect to the memory interface.
   SmallVector<hw::ModulePort> getMemInputPorts(hw::HWModuleOp modOp);
@@ -153,12 +177,12 @@ struct MemLoweringState {
 /// Summarizes information to convert a Handshake function into a
 /// `hw::HWModuleOp`.
 struct ModuleLoweringState {
-  /// Maps each Handshake memory interface in the module with information on how
-  /// to convert it into equivalent HW constructs.
+  /// Maps each Handshake memory interface in the module with information on
+  /// how to convert it into equivalent HW constructs.
   llvm::DenseMap<handshake::MemoryOpInterface, MemLoweringState> memInterfaces;
-  /// Backedges to the containing module's `hw::OutputOp` operation, which must
-  /// be set, in order, with the results of the `hw::InstanceOp` operation to
-  /// which the `handshake::EndOp` operation was converted to.
+  /// Backedges to the containing module's `hw::OutputOp` operation, which
+  /// must be set, in order, with the results of the `hw::InstanceOp`
+  /// operation to which the `handshake::EndOp` operation was converted to.
   SmallVector<Backedge> endBackedges;
 
   /// Computes the total number of module outputs that are fed by memory
@@ -171,8 +195,8 @@ struct ModuleLoweringState {
   }
 };
 
-/// Shared state used during lowering. Captured in a struct to reduce the number
-/// of arguments we have to pass around.
+/// Shared state used during lowering. Captured in a struct to reduce the
+/// number of arguments we have to pass around.
 struct LoweringState {
   /// Top-level MLIR module.
   mlir::ModuleOp modOp;
@@ -180,10 +204,11 @@ struct LoweringState {
   /// operation.
   NameAnalysis &namer;
   /// Allowa to create transient backedges for the `hw::OutputOp` of every
-  /// create `hw::HWModuleOp`. We need backedges because, at the moment where a
-  /// Handshake function is turned into a HW module, the operands to the
-  /// `hw::OutputOp` terminator are not yet available but instead progressively
-  /// appear as other oeprations inside the HW module are converted.
+  /// create `hw::HWModuleOp`. We need backedges because, at the moment where
+  /// a Handshake function is turned into a HW module, the operands to the
+  /// `hw::OutputOp` terminator are not yet available but instead
+  /// progressively appear as other oeprations inside the HW module are
+  /// converted.
   BackedgeBuilder edgeBuilder;
 
   /// Maps each created `hw::HWModuleOp` during conversion to some lowering
@@ -195,22 +220,6 @@ struct LoweringState {
   LoweringState(mlir::ModuleOp modOp, NameAnalysis &namer, OpBuilder &builder);
 };
 } // namespace
-
-MemLoweringState::MemLoweringState(handshake::MemoryOpInterface memOp,
-                                   size_t inputIdx, size_t numInputs,
-                                   size_t outputIdx, size_t numOutputs)
-    : inputIdx(inputIdx), numInputs(numInputs), outputIdx(outputIdx),
-      numOutputs(numOutputs), ports(getMemoryPorts(memOp)) {
-  // To extract operand/result names from the memory interface
-  auto namedMemOp = cast<handshake::NamedIOInterface>(memOp.getOperation());
-
-  // Cache the list of operand and result names of the memory interface's ports,
-  // as they may become invalid during conversion
-  for (size_t idx = 0; idx < memOp->getNumOperands(); ++idx)
-    operandNames.push_back(namedMemOp.getOperandName(idx));
-  for (size_t idx = 0; idx < memOp->getNumResults(); ++idx)
-    resultNames.push_back(namedMemOp.getResultName(idx));
-};
 
 SmallVector<hw::ModulePort>
 MemLoweringState::getMemInputPorts(hw::HWModuleOp modOp) {
@@ -626,19 +635,21 @@ static void addMemIO(ModuleBuilder &modBuilder, handshake::FuncOp funcOp,
 hw::ModulePortInfo getFuncPortInfo(handshake::FuncOp funcOp,
                                    ModuleLoweringState &state) {
   ModuleBuilder modBuilder(funcOp.getContext());
+  PortNameGenerator portNames(funcOp);
 
   // Add all function outputs to the module
   for (auto [idx, res] : llvm::enumerate(funcOp.getResultTypes()))
-    modBuilder.addOutput(funcOp.getResName(idx).strref(), channelWrapper(res));
+    modBuilder.addOutput(portNames.getOutputName(idx), channelWrapper(res));
 
   // Add all function inputs to the module, expanding memory references into a
   // set of individual ports for loads and stores
   for (auto [idx, arg] : llvm::enumerate(funcOp.getArguments())) {
     StringAttr argName = funcOp.getArgName(idx);
+    Type type = arg.getType();
     if (TypedValue<MemRefType> memref = dyn_cast<TypedValue<MemRefType>>(arg))
       addMemIO(modBuilder, funcOp, memref, argName, state);
     else
-      modBuilder.addInput(argName.strref(), channelWrapper(arg.getType()));
+      modBuilder.addInput(portNames.getInputName(idx), channelWrapper(type));
   }
 
   modBuilder.addClkAndRstPorts();
@@ -893,7 +904,7 @@ LogicalResult ConvertMemInterface::matchAndRewrite(
   auto addInput = [&](size_t idx) -> void {
     Value oprd = operands[idx];
     instOperands.push_back(oprd);
-    modBuilder.addInput(memState.operandNames[idx], oprd.getType());
+    modBuilder.addInput(memState.portNames.getInputName(idx), oprd.getType());
   };
 
   // Construct the list of operands to the HW instance and the list of input
@@ -923,7 +934,7 @@ LogicalResult ConvertMemInterface::matchAndRewrite(
   // Add output ports corresponding to memory interface results, then those
   // going outside the top-level HW module
   for (auto [idx, arg] : llvm::enumerate(memOp->getResults())) {
-    std::string resName = memState.resultNames[idx];
+    StringRef resName = memState.portNames.getOutputName(idx);
     modBuilder.addOutput(resName, channelWrapper(arg.getType()));
   }
   for (const hw::ModulePort &outputPort :
@@ -1017,17 +1028,17 @@ hw::HWModuleExternOp ExtModuleConversionPattern<T>::getExtModule(
   // We need to instantiate a new external module for that operation; first
   // derive port information for that module, then create it
   ModuleBuilder modBuilder(op->getContext());
-  HandshakePortNameGenerator portNames(op);
+  PortNameGenerator portNames(op);
 
   // Add all operation operands to the inputs
   for (auto [idx, type] : llvm::enumerate(op->getOperandTypes()))
-    modBuilder.addInput(portNames.inputName(idx).str(), channelWrapper(type));
+    modBuilder.addInput(portNames.getInputName(idx), channelWrapper(type));
   if (op.template hasTrait<mlir::OpTrait::HasClock>())
     modBuilder.addClkAndRstPorts();
 
   // Add all operation results to the inputs
   for (auto [idx, type] : llvm::enumerate(op->getResultTypes()))
-    modBuilder.addOutput(portNames.outputName(idx).str(), channelWrapper(type));
+    modBuilder.addOutput(portNames.getOutputName(idx), channelWrapper(type));
 
   return modBuilder.getModule(op, rewriter);
 }
