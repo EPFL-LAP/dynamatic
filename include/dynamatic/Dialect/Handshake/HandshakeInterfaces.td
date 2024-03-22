@@ -173,6 +173,13 @@ def BufferOpInterface : OpInterface<"BufferOpInterface"> {
     Handshake operations which act as buffers with a strictly positive number
     of slots.
   }];
+
+  let methods = [
+    InterfaceMethod<
+      "Returns the number of buffer slots.",
+      "unsigned", "getSlots", (ins)
+    >
+  ];
 }
 
 def LoadOpInterface : OpInterface<"LoadOpInterface"> {

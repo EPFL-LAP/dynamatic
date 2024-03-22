@@ -505,12 +505,12 @@ def SourceOp : Handshake_Op<"source", [
 ]> {
   let summary = "source operation";
   let description = [{
-    The source operation represents continuous token
-    source.  The source continously sets a 'valid' signal which the
-    successor can consume at any point in time.
+    The source operation represents a continuous control-only-token source. The
+    source continously sets a 'valid' signal which the successor can consume at
+    any point in time.
   }];
 
-  let results = (outs AnyType:$result);
+  let results = (outs NoneType:$result);
   let hasCustomAssemblyFormat = 1;
 }
 
