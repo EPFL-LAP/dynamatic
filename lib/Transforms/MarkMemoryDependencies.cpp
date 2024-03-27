@@ -167,7 +167,6 @@ LogicalResult MarkMemoryDependenciesPass::checkAffineAccessPair(
       opDeps[srcOp].push_back(
           MemDependenceAttr::get(ctx, dstName, loopDepth, components));
     } else if (result.value == DependenceResult::Failure) {
-      llvm::errs() << "Check affine access pair\n";
       return srcOp->emitError()
              << "Dependence check failed with memory access '" << dstName
              << "'.";
