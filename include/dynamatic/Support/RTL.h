@@ -15,6 +15,7 @@
 #ifndef DYNAMATIC_SUPPORT_RTL_H
 #define DYNAMATIC_SUPPORT_RTL_H
 
+#include "dynamatic/Dialect/HW/HWOps.h"
 #include "dynamatic/Support/LLVM.h"
 #include "dynamatic/Support/TimingModels.h"
 #include "llvm/ADT/StringRef.h"
@@ -212,6 +213,9 @@ struct ConstraintVector {
   /// Default constructor.
   ConstraintVector() = default;
 
+  /// Verifies whether the parameter value satisifies all the constraints.
+  bool verifyConstraints(StringRef paramValue) const;
+
   /// Object can't be copied due to memory allocation.
   ConstraintVector(const ConstraintVector &) = delete;
   /// Object can't be copy-assigned due to memory allocation.
@@ -242,11 +246,17 @@ public:
   /// true when parsing succeeded, false otherwise.
   bool fromJSON(const llvm::json::Value &value, llvm::json::Path path);
 
+  /// Verifies whether the parameter value satisifies all the parameter's
+  /// constraints.
+  bool verifyConstraints(StringRef paramValue) const {
+    return constraints.verifyConstraints(paramValue);
+  }
+
   /// Return's the parameter's name.
-  StringRef getName() { return name; }
+  StringRef getName() const { return name; }
 
   /// Return's the parameter's type.
-  RTLParameter::Type getType() { return type; }
+  RTLParameter::Type getType() const { return type; }
 
   RTLParameter(RTLParameter &&) noexcept = default;
   RTLParameter &operator=(RTLParameter &&) noexcept = default;
@@ -270,8 +280,29 @@ inline bool fromJSON(const llvm::json::Value &value, RTLParameter &parameter,
   return parameter.fromJSON(value, path);
 }
 
+/// ADL-findable LLVM-standard JSON deserializer for a vector of RTL parameters.
 bool fromJSON(const llvm::json::Value &value,
               SmallVector<RTLParameter> &parameters, llvm::json::Path path);
+
+/// Helper data-structure used to qeury for a component/model match between an
+/// MLIR operation and an entity parsed from the RTL configuration file. Should
+/// rarely be instantiated on its own; instead, its one-argument constructor
+/// can implicitly perform the conversion when calling methods expecting an
+/// instance of this struct.
+struct RTLMatch {
+  /// The MLIR operation we are trying to match an RTL component/model for.
+  Operation *op;
+  /// The RTL component's name to look for.
+  std::string name;
+  /// Maps RTL component's parameter names to their respective value.
+  llvm::StringMap<std::string> parameters;
+  /// Whether the match is possible altohgether. If this is `true`, all matching
+  /// methods should "fail" with this object.
+  bool invalid = true;
+
+  /// Constructs a match from an external module operation from the HW dialect.
+  RTLMatch(dynamatic::hw::HWModuleExternOp modOp);
+};
 
 /// Represents an RTL component i.e., a top-level entry in the RTL configuration
 /// file. A component maps to an MLIR operation identified by its canonical name
@@ -302,6 +333,14 @@ public:
   /// true when parsing succeeded, false otherwise.
   bool fromJSON(const llvm::json::Value &value, llvm::json::Path path);
 
+  /// Determines whether the RTL component is compatible with the match object.
+  bool isCompatible(const RTLMatch &match) const;
+
+  /// Determines whether the RTL component has any timing model compatible with
+  /// the match object. Returns the first compatible model (in model list
+  /// order), if any exists.
+  const RTLComponent::Model *getModel(const RTLMatch &match) const;
+
   RTLComponent(RTLComponent &&) noexcept = default;
   RTLComponent &operator=(RTLComponent &&) noexcept = default;
 
@@ -324,8 +363,8 @@ private:
   /// for a specific set of parameter values.
   std::string generator;
 
-  /// Returns a pointer to the RTL parameter with a specific name.
-  RTLParameter *getParameter(StringRef name);
+  /// Returns a pointer to the RTL parameter with a specific name, if it exists.
+  RTLParameter *getParameter(StringRef name) const;
 };
 
 /// ADL-findable LLVM-standard JSON deserializer for an RTL component.
@@ -346,6 +385,16 @@ public:
   /// provided location and add all its component descriptions to the existing
   /// list.
   LogicalResult addComponentsFromJSON(StringRef filepath);
+
+  /// Determines whether the RTL configuration has any compatible component with
+  /// the match object. Returns the first compatible component (in component
+  /// list order), if any exists.
+  const RTLComponent *getComponent(const RTLMatch &match) const;
+
+  /// Determines whether the RTL configuration has any component with a timing
+  /// model compatible with the match object. Returns the first compatible model
+  /// (in component and model list order), if any exists.
+  const RTLComponent::Model *getModel(const RTLMatch &match) const;
 
   RTLConfiguration(RTLConfiguration &&) noexcept = default;
   RTLConfiguration &operator=(RTLConfiguration &&) noexcept = default;

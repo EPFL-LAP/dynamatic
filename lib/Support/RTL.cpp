@@ -11,8 +11,13 @@
 //===----------------------------------------------------------------------===//
 
 #include "dynamatic/Support/RTL.h"
+#include "dynamatic/Dialect/HW/HWOps.h"
+#include "mlir/IR/Diagnostics.h"
+#include "llvm/Support/Debug.h"
 #include "llvm/Support/JSON.h"
 #include <fstream>
+
+#define DEBUG_TYPE "support-rtl"
 
 using namespace llvm;
 using namespace dynamatic;
@@ -145,6 +150,33 @@ bool UnsignedRange::fromJSON(const json::Value &value, json::Path path) {
   }
   return llvm::json::fromJSON((*array)[0], lb, path) &&
          llvm::json::fromJSON((*array)[1], ub, path);
+}
+
+bool ConstraintVector::verifyConstraints(StringRef paramValue) const {
+  return llvm::all_of(constraints, [&](ParameterConstraint *cons) {
+    return cons->apply(paramValue);
+  });
+}
+
+RTLMatch::RTLMatch(hw::HWModuleExternOp modOp) : op(modOp) {
+  StringAttr nameAttr = modOp->getAttrOfType<StringAttr>("hw.name");
+  if (!nameAttr)
+    return;
+  name = nameAttr.str();
+
+  auto paramAttr = modOp->getAttrOfType<DictionaryAttr>("hw.parameters");
+  if (!paramAttr)
+    return;
+
+  for (const NamedAttribute &namedParameter : paramAttr) {
+    // Must be a string attribute
+    StringAttr paramValue = dyn_cast<StringAttr>(namedParameter.getValue());
+    if (!paramValue)
+      return;
+    parameters[namedParameter.getName()] = paramValue.str();
+  }
+
+  invalid = false;
 }
 
 bool RTLParameter::fromJSON(const llvm::json::Value &value,
@@ -296,10 +328,90 @@ bool RTLComponent::fromJSON(const llvm::json::Value &value,
   return true;
 }
 
-RTLParameter *RTLComponent::getParameter(StringRef name) {
+RTLParameter *RTLComponent::getParameter(StringRef name) const {
   auto paramIt = nameToParam.find(name);
   if (paramIt != nameToParam.end())
     return paramIt->second;
+  return nullptr;
+}
+
+bool RTLComponent::isCompatible(const RTLMatch &match) const {
+  LLVM_DEBUG(llvm::dbgs() << "Attempting match with RTL component " << component
+                          << "\n";);
+  // Component must be valid and have matching name
+  if (match.invalid) {
+    LLVM_DEBUG(llvm::dbgs() << "-> Match is invalid\n");
+    return false;
+  }
+  if (match.name != component) {
+    LLVM_DEBUG(llvm::dbgs() << "-> Names to do match.\n");
+    return false;
+  }
+
+  // Keep track of the set of parameters we parse from the dictionnary
+  // attribute. We never have duplicate parameters due to the dictionary's keys
+  // uniqueness invariant, but we need to make sure all known parameters are
+  // present
+  DenseSet<StringRef> parsedParams;
+  SmallVector<StringRef> ignoredParams;
+
+  for (auto &[paramName, paramValue] : match.parameters) {
+    RTLParameter *parameter = getParameter(paramName);
+    if (!parameter) {
+      // Skip over unknown parameters (the external module may just be "more
+      // specialized" than the RTL support)
+      ignoredParams.push_back(paramName);
+      continue;
+    }
+
+    // Must pass type constraints
+    if (!parameter->verifyConstraints(paramValue)) {
+      LLVM_DEBUG(llvm::dbgs()
+                 << "-> Failed constraint checking for parameter \""
+                 << paramName << "\"\n");
+      return false;
+    }
+    parsedParams.insert(paramName);
+  }
+
+  // Due to key uniqueness, if we parsed the same number of parameters as the
+  // number of known RTL parameters, then it means we have parsed them all
+  if (parsedParams.size() != parameters.size()) {
+    LLVM_DEBUG(llvm::dbgs()
+                   << "Missing " << parameters.size() - parsedParams.size()
+                   << " parameters in match";);
+    return false;
+  }
+
+  // We have a successful match, warn user of any ignored parameter
+  for (StringRef paramName : ignoredParams) {
+    match.op->emitWarning()
+        << "Ignoring parameter \"" << paramName << "\n not found in match.";
+  }
+  return true;
+}
+
+const RTLComponent::Model *RTLComponent::getModel(const RTLMatch &match) const {
+  if (!isCompatible(match))
+    return nullptr;
+
+  for (const Model &model : models) {
+    /// Returns true when all additional constraints on the parameters are
+    /// satisfied.
+    auto constraintsSatisfied = [&](const auto &paramAndConstraints) -> bool {
+      auto &[param, constraints] = paramAndConstraints;
+      // Guaranteed to exist since the component matches
+      auto paramValue = match.parameters.find(param->getName());
+      assert(paramValue != match.parameters.end() && "parameter must exist");
+      return constraints.verifyConstraints(paramValue->second);
+    };
+
+    // The model matches if all additional parameter constraints are satsified
+    if (llvm::all_of(model.constraints, constraintsSatisfied))
+      return &model;
+  }
+
+  // No matching model
   return nullptr;
 }
 
@@ -345,4 +457,33 @@ LogicalResult RTLConfiguration::addComponentsFromJSON(StringRef filepath) {
   }
 
   return success();
+}
+
+const RTLComponent *
+RTLConfiguration::getComponent(const RTLMatch &match) const {
+  LLVM_DEBUG({
+    llvm::dbgs() << "Attempting to match " << match.name
+                 << " with parameters:\n";
+    for (const auto &[name, value] : match.parameters)
+      llvm::dbgs() << "\t" << name << ": " << value << "\n";
+  });
+  if (match.invalid)
+    return nullptr;
+
+  for (const RTLComponent &component : components) {
+    if (component.isCompatible(match))
+      return &component;
+  }
+  return nullptr;
+}
+
+const RTLComponent::Model *
+RTLConfiguration::getModel(const RTLMatch &match) const {
+  if (match.invalid)
+    return nullptr;
+  for (const RTLComponent &component : components) {
+    if (const RTLComponent::Model *model = component.getModel(match))
+      return model;
+  }
+  return nullptr;
 }
