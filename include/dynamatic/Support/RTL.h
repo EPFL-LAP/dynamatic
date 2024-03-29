@@ -17,228 +17,166 @@
 
 #include "dynamatic/Dialect/HW/HWOps.h"
 #include "dynamatic/Support/LLVM.h"
-#include "dynamatic/Support/TimingModels.h"
-#include "llvm/ADT/StringRef.h"
 #include "llvm/Support/JSON.h"
 #include <string>
 
 namespace dynamatic {
 
-/// An abstract constraint on an RTL parameter. Children should override the
-/// pure virtual `apply` and `fromJSON` methods to define a custom constraint.
-struct ParameterConstraint {
-  /// Returns whether the constraint is satisfied for a specific parameter vale
-  /// (encoded as a string).
-  virtual bool apply(StringRef paramValue) = 0;
+class RTLParameter;
+class RTLComponent;
 
-  /// JSON deserializer for the constraint. Same semantics as the LLVM-standard
-  /// `fromJSON(const json::Value&, T&, Path) -> bool` functions, but defined on
-  /// the constraint object itself so that we can make polymorphic calls to the
-  /// method.
-  virtual bool fromJSON(const llvm::json::Value &value,
-                        llvm::json::Path path) = 0;
+/// Abstract base class for RTL parameter types, with optional and customizable
+/// type constraints.
+class RTLType {
+public:
+  /// Abstract base class for RTL parameter type constraints. Each concrete RTL
+  /// parameter type should subclass if it wants to define custom constraints.
+  struct Constraints {
+    /// Determines whether constraints are satisified with a specific parameter
+    /// value encoded as a string.
+    virtual bool verify(StringRef paramValue) const { return true; };
 
-  virtual ~ParameterConstraint() = default;
-};
+    /// Necessary because of virtual function.
+    virtual ~Constraints() = default;
+  };
 
-/// JSON deserializer for a generic parameter constraint, calling the
-/// corresponding virtual deserializer of the actual constraint type.
-inline bool fromJSON(const llvm::json::Value &value,
-                     ParameterConstraint &constraint, llvm::json::Path path) {
-  return constraint.fromJSON(value, path);
-}
+  /// Default constructor.
+  RTLType() = default;
 
-/// An abstract constraint on an RTL parameter of `unsigned` type.
-struct UnsignedConstraint : public ParameterConstraint {
-  /// Error message to print when the constraint's keyword cannot be recognized.
-  static constexpr StringLiteral ERR_UNSUPPORTED =
-      StringLiteral("unknown unsigned constraint: options are \"lb\", \"ub\", "
-                    "\"range\", \"eq\", or \"ne\"");
+  /// Allocates the constraints object and attemps to deserialize its content
+  /// from the JSON object. Returns whether constraints were able to be
+  /// deserialized from the JSON data.
+  virtual bool constraintsFromJSON(const llvm::json::Object &object,
+                                   Constraints *&constraints,
+                                   llvm::json::Path path) = 0;
 
-  bool apply(StringRef paramValue) override;
+  /// Prohibit copy due to dynamic allocation of constraints.
+  RTLType(const RTLType &) = delete;
+  /// Prohibit copy due to dynamic allocation of constraints.
+  RTLType operator=(const RTLType &) = delete;
 
-protected:
-  /// Overloads of parent's `apply` method that takes as input an unsigned
-  /// number rather than a string, so that concrete unsigned constraints can
-  /// directly operate on an unsigned number.
-  virtual bool apply(unsigned paramValue) = 0;
+  RTLType(RTLType &&other) noexcept
+      : constraints(std::exchange(other.constraints, nullptr)) {}
 
-  virtual ~UnsignedConstraint() = default;
-};
-
-/// Lower bound (inclusive) constraint on an RTL parameter of unsigned type.
-struct UnsignedLowerBound : public UnsignedConstraint {
-  bool fromJSON(const llvm::json::Value &value,
-                llvm::json::Path path) override {
-    return llvm::json::fromJSON(value, lb, path);
+  RTLType &operator=(RTLType &&other) noexcept {
+    constraints = std::exchange(other.constraints, nullptr);
+    return *this;
   }
 
-  /// Returns the JSON key associated to the constraint.
-  static StringRef getKey() { return "lb"; }
+  /// Deallocates the constraints if they are not `nullptr`.
+  virtual ~RTLType();
+
+  /// RTL parameters need mutable access to their type constraints to initialize
+  /// them during JSON deserialization.
+  friend RTLParameter;
 
 protected:
-  bool apply(unsigned paramValue) override { return paramValue >= lb; }
-
-private:
-  /// The lower bound.
-  unsigned lb;
+  /// Type constraints (dynamically allocated).
+  Constraints *constraints = nullptr;
 };
 
-/// Upper bound (inclusive) constraint on an RTL parameter of unsigned type.
-struct UnsignedUpperBound : public UnsignedConstraint {
-  bool fromJSON(const llvm::json::Value &value,
-                llvm::json::Path path) override {
-    return llvm::json::fromJSON(value, ub, path);
-  }
+/// Unsigned RTL type, mappable to an `unsigned` in C++.
+class RTLUnsignedType : public RTLType {
+  using RTLType::RTLType;
 
-  /// Returns the JSON key associated to the constraint.
-  static StringRef getKey() { return "ub"; }
+public:
+  /// Unsigned type constraints.
+  struct UnsignedConstraints : public Constraints {
+    /// Lower bound (inclusive).
+    std::optional<unsigned> lb;
+    /// Upper bound (inclusive).
+    std::optional<unsigned> ub;
+    /// Equality constraint.
+    std::optional<unsigned> eq;
+    /// Difference constraint.
+    std::optional<unsigned> ne;
 
-protected:
-  bool apply(unsigned paramValue) override { return paramValue <= ub; }
+    bool verify(StringRef paramValue) const override;
+  };
 
-private:
-  /// The upper bound.
-  unsigned ub;
-};
+  bool constraintsFromJSON(const llvm::json::Object &object,
+                           Constraints *&constraints,
+                           llvm::json::Path path) override;
 
-/// Range (inclusive on both sides) constraint on an RTL parameter of unsigned
-/// type.
-struct UnsignedRange : public UnsignedConstraint {
+  /// Encodes an unsigned to a string.
+  static std::string encode(unsigned value) { return std::to_string(value); }
 
-  bool fromJSON(const llvm::json::Value &value, llvm::json::Path path) override;
-
-  /// Returns the JSON key associated to the constraint.
-  static StringRef getKey() { return "range"; }
-
-protected:
-  bool apply(unsigned paramValue) override {
-    return lb <= paramValue && paramValue <= ub;
+  /// Decodes a string into an optional unsigned if the string not represents a
+  /// valid non-negative number. Otherwise, `std::nullopt` is returned.
+  static std::optional<unsigned> decode(StringRef value) {
+    if (llvm::any_of(value.str(), [](char c) { return !isdigit(c); }))
+      return {};
+    return std::stoi(value.str());
   }
 
 private:
-  /// The lower bound.
-  unsigned lb;
-  /// The upper bound.
-  unsigned ub;
+  /// Keywords
+  static constexpr StringLiteral LB = StringLiteral("lb"),
+                                 UB = StringLiteral("ub"),
+                                 RANGE = StringLiteral("range"),
+                                 EQ = StringLiteral("eq"),
+                                 NE = StringLiteral("ne");
 
-  static constexpr StringLiteral ERR_ARRAY_FORMAT =
-      StringLiteral("expected array to have [lb, ub] format");
+  /// Errors
+  static constexpr StringLiteral
+      ERR_ARRAY_FORMAT =
+          StringLiteral("expected array to have [lb, ub] format"),
+      ERR_LB = StringLiteral("lower bound already set"),
+      ERR_UB = StringLiteral("upper bound already set"),
+      ERR_UNSUPPORTED = StringLiteral(
+          "unknown unsigned constraint: options are \"lb\", \"ub\", "
+          "\"range\", \"eq\", or \"ne\"");
 };
 
-/// Equality constraint on an RTL parameter of unsigned type.
-struct UnsignedEqual : public UnsignedConstraint {
-  bool fromJSON(const llvm::json::Value &value,
-                llvm::json::Path path) override {
-    return llvm::json::fromJSON(value, val, path);
+/// String RTL type, mappable to a `std::string` in C++.
+class RTLStringType : public RTLType {
+  using RTLType::RTLType;
+
+public:
+  /// String type constraints.
+  struct StringConstraints : public Constraints {
+    /// Equality constraint.
+    std::optional<std::string> eq;
+    /// Difference constraint.
+    std::optional<std::string> ne;
+
+    bool verify(StringRef paramValue) const override;
+  };
+
+  bool constraintsFromJSON(const llvm::json::Object &object,
+                           Constraints *&constraints,
+                           llvm::json::Path path) override;
+
+  /// Returns the input string (method necessary to enable identical templated
+  /// APIs for subtypes of `RTLType`).
+  static std::string encode(StringRef value) { return value.str(); }
+
+  /// Returns the input string (method necessary to enable identical templated
+  /// APIs for subtypes of `RTLType`).
+  static std::optional<std::string> decode(StringRef value) {
+    return value.str();
   }
 
-  /// Returns the JSON key associated to the constraint.
-  static StringRef getKey() { return "eq"; }
-
-protected:
-  bool apply(unsigned paramValue) override { return paramValue == val; }
-
 private:
-  /// The value to compare to.
-  unsigned val;
-};
+  /// Keywords
+  static constexpr StringLiteral EQ = StringLiteral("eq"),
+                                 NE = StringLiteral("ne");
 
-/// Difference constraint on an RTL parameter of unsigned type.
-struct UnsignedDifferent : public UnsignedConstraint {
-  bool fromJSON(const llvm::json::Value &value,
-                llvm::json::Path path) override {
-    return llvm::json::fromJSON(value, val, path);
-  }
-
-  /// Returns the JSON key associated to the constraint.
-  static StringRef getKey() { return "ne"; }
-
-protected:
-  bool apply(unsigned paramValue) override { return paramValue != val; }
-
-private:
-  /// The value to compare to.
-  unsigned val;
-};
-
-/// An abstract constraint on an RTL parameter of `string` type.
-struct StringConstraint : public ParameterConstraint {
+  /// Errors
   static constexpr StringLiteral ERR_UNSUPPORTED = StringLiteral(
       R"(unknown string constraint: options are "unsigned" or "string")");
 };
 
-/// Equality constraint on an RTL parameter of string type.
-struct StringEqual : public StringConstraint {
-  bool apply(StringRef paramValue) override { return paramValue == str; }
-
-  bool fromJSON(const llvm::json::Value &value,
-                llvm::json::Path path) override {
-    return llvm::json::fromJSON(value, str, path);
-  }
-
-  /// Returns the JSON key associated to the constraint.
-  static StringRef getKey() { return "eq"; }
-
-private:
-  /// The string to compare to.
-  std::string str;
-};
-
-/// Difference constraint on an RTL parameter of string type.
-struct StringDifferent : public StringConstraint {
-public:
-  bool apply(StringRef paramValue) override { return paramValue != str; }
-
-  bool fromJSON(const llvm::json::Value &value,
-                llvm::json::Path path) override {
-    return llvm::json::fromJSON(value, str, path);
-  }
-
-  /// Returns the JSON key associated to the constraint.
-  static StringRef getKey() { return "ne"; }
-
-private:
-  /// The string to compare to.
-  std::string str;
-};
-
-/// A vector of parameter constraints. Every constraint added the the vector
-/// should be dynamically allocated; they will be freed when the object goes out
-/// of scope.
-struct ConstraintVector {
-  /// Constraint vector, stored as pointers because the class is abstract.
-  SmallVector<ParameterConstraint *> constraints;
-
-  /// Default constructor.
-  ConstraintVector() = default;
-
-  /// Verifies whether the parameter value satisifies all the constraints.
-  bool verifyConstraints(StringRef paramValue) const;
-
-  /// Object can't be copied due to memory allocation.
-  ConstraintVector(const ConstraintVector &) = delete;
-  /// Object can't be copy-assigned due to memory allocation.
-  ConstraintVector &operator=(const ConstraintVector &) = delete;
-
-  ConstraintVector(ConstraintVector &&other) noexcept = default;
-  ConstraintVector &operator=(ConstraintVector &&other) noexcept = default;
-
-  /// Deletes all constraints stored in the vector.
-  ~ConstraintVector() {
-    for (ParameterConstraint *param : constraints)
-      delete param;
-  }
-};
+/// ADL-findable LLVM-standard JSON deserializer for an RTL parameter pointer.
+/// Allocates a concrete RTL type and stores its address in the type.
+bool fromJSON(const llvm::json::Value &value, RTLType *&type,
+              llvm::json::Path path);
 
 /// Represents a named RTL parameter of a specific type, with optional
 /// constraints on allowed values for it. This can be moved but not copied due
 /// to underlying dynamatic memory allocation.
 class RTLParameter {
 public:
-  /// RTL parameter type.
-  enum class Type { UNSIGNED, STRING };
-
   /// Default constructor.
   RTLParameter() = default;
 
@@ -249,30 +187,42 @@ public:
   /// Verifies whether the parameter value satisifies all the parameter's
   /// constraints.
   bool verifyConstraints(StringRef paramValue) const {
-    return constraints.verifyConstraints(paramValue);
+    return type->constraints->verify(paramValue);
   }
 
-  /// Return's the parameter's name.
+  /// Returns the parameter's name.
   StringRef getName() const { return name; }
 
-  /// Return's the parameter's type.
-  RTLParameter::Type getType() const { return type; }
+  /// Returns the parameter's type.
+  const RTLType &getType() const { return *type; }
 
-  RTLParameter(RTLParameter &&) noexcept = default;
-  RTLParameter &operator=(RTLParameter &&) noexcept = default;
+  /// Prohibit copy due to dynamic allocation of the parameter type.
+  RTLParameter(const RTLParameter &) = delete;
+  /// Prohibit copy due to dynamic allocation of the parameter type.
+  RTLParameter &operator=(const RTLParameter &) = delete;
+
+  RTLParameter(RTLParameter &&other) noexcept
+      : name(other.name), type(std::exchange(other.type, nullptr)){};
+
+  RTLParameter &operator=(RTLParameter &&other) noexcept {
+    name = other.name;
+    type = std::exchange(other.type, nullptr);
+    return *this;
+  }
+
+  /// Deallocates the parameter if it is not `nullptr`.
+  ~RTLParameter();
+
+  /// RTL components need mutable access to their parameters to initialize them
+  /// during JSON deserialization.
+  friend RTLComponent;
 
 private:
   /// The parameter's name.
   std::string name;
   /// The parameter's type.
-  RTLParameter::Type type;
-  /// A list of optional constraints for the parameter.
-  ConstraintVector constraints;
+  RTLType *type = nullptr;
 };
-
-/// ADL-findable LLVM-standard JSON deserializer for an RTL parameter's type.
-bool fromJSON(const llvm::json::Value &value, RTLParameter::Type &type,
-              llvm::json::Path path);
 
 /// ADL-findable LLVM-standard JSON deserializer for an RTL parameter.
 inline bool fromJSON(const llvm::json::Value &value, RTLParameter &parameter,
@@ -311,19 +261,25 @@ struct RTLMatch {
 /// be restricted by parameter constraints too.
 class RTLComponent {
 public:
-  /// A timing model for the component, optionally constrained.
+  /// A timing model for the component, optionally constrained for specific RTL
+  /// parameters.
   struct Model {
+    using AddConstraints = std::pair<RTLParameter *, RTLType::Constraints *>;
+
     /// Path of the timing model on disk.
     std::string path;
     /// Additional parameter constraints under which the timing model is
     /// applicable.
-    SmallVector<std::pair<RTLParameter *, ConstraintVector>> constraints;
+    SmallVector<AddConstraints> addConstraints;
 
     /// Default constructor.
     Model() = default;
 
     Model(Model &&other) noexcept = default;
     Model &operator=(Model &&other) noexcept = default;
+
+    /// Deallocates additional constraint objects.
+    ~Model();
   };
 
   /// Default constructor.

@@ -12,7 +12,7 @@
 
 #include "dynamatic/Support/RTL.h"
 #include "dynamatic/Dialect/HW/HWOps.h"
-#include "mlir/IR/Diagnostics.h"
+#include "dynamatic/Support/TimingModels.h"
 #include "llvm/Support/Debug.h"
 #include "llvm/Support/JSON.h"
 #include <fstream>
@@ -43,118 +43,99 @@ static constexpr StringLiteral ERR_MISSING_VALUE("missing value"),
     ERR_UNKNOWN_TYPE(
         R"(unknown parameter type: options are "unsigned" or "string")");
 
-/// Attempts to deserialize the template parameter constraint from the JSON
-/// value if the JSON key matches the constraint's expected key. Sets `knownKey`
-/// to true if the key matches, and returns whether the constraint was able to
-/// be deserialized from JSON. If it was, adds the constraint to the constraint
-/// vector.
-template <typename Constraint>
-static bool fromJSON(StringRef jsonKey, const llvm::json::Value &value,
-                     llvm::json::Path path, ConstraintVector &consVec,
-                     bool &knownKey) {
-  if (Constraint::getKey() != jsonKey)
+/// Reserved JSON keys when deserializing type constraints, should be ignored.
+static const mlir::DenseSet<StringRef> RESERVED_KEYS{KEY_NAME, KEY_TYPE,
+                                                     KEY_PARAMETER};
+
+RTLType::~RTLType() {
+  if (constraints)
+    delete constraints;
+}
+
+bool RTLUnsignedType::UnsignedConstraints::verify(StringRef paramValue) const {
+  // Decode the unsigned value from the string, if possible
+  std::optional optValue = RTLUnsignedType::decode(paramValue);
+  if (!optValue)
     return false;
-  knownKey = true;
-  Constraint *cons = new Constraint;
-  if (!cons->fromJSON(value, path.field(jsonKey))) {
-    delete cons;
-    return false;
-  }
+  unsigned value = *optValue;
 
-  consVec.constraints.push_back(cons);
-  return true;
+  // Check all constraints
+  return (!lb || lb <= value) && (!ub || value <= ub) && (!eq || value == ub) &&
+         (!ne || value != ne);
 }
 
-/// Attempts to deserialize any of the template parameter constraints from the
-/// JSON value, using the JSON key to decide which (if any) to match. Sets
-/// `knownKey` to true if the key matches, and returns whether the constraint
-/// was able to be deserialized from JSON. If it was, adds the constraint to the
-/// constraint vector.
-template <typename FirstConstraint, typename SecondConstraint,
-          typename... OtherConstraints>
-static bool fromJSON(StringRef jsonKey, const llvm::json::Value &value,
-                     llvm::json::Path path, ConstraintVector &consVec,
-                     bool &knownKey) {
-  if (fromJSON<FirstConstraint>(jsonKey, value, path, consVec, knownKey) ||
-      knownKey)
-    return true;
-  return fromJSON<SecondConstraint, OtherConstraints...>(jsonKey, value, path,
-                                                         consVec, knownKey);
-}
-
-/// Attempts to deserialize any of the template parameter constraints from the
-/// JSON value, using the JSON key to decide which (if any) to match. Returns
-/// whether the constraint was able to be deserialized from JSON. If it was,
-/// adds the constraint to the constraint vector.
-template <typename FirstConstraint, typename... OtherConstraints>
-static bool fromJSON(StringRef jsonKey, const llvm::json::Value &value,
-                     llvm::json::Path path, StringLiteral err,
-                     ConstraintVector &consVec) {
-  bool knownKey = false;
-  if (fromJSON<FirstConstraint, OtherConstraints...>(jsonKey, value, path,
-                                                     consVec, knownKey))
-    return true;
-  if (!knownKey)
-    path.field(jsonKey).report(err);
-  return false;
-}
-
-/// Attempts to deserialize parameter constraints from the JSON object based on
-/// the provided RTL parameter type. Reports an error if any key in the object
-/// cannot be matched to a known constraint, unless the key is in the set of
-/// skipped keys. Returns whether constraints were able to be parsed.
-static bool parseConstraints(const json::Object &object,
-                             RTLParameter::Type type, llvm::json::Path path,
-                             const mlir::DenseSet<StringRef> &skippedKeys,
-                             ConstraintVector &consVec) {
-  for (auto &[jsonKey, value] : object) {
-    std::string key = jsonKey.str();
-    // Skip any known key
-    if (skippedKeys.contains(key))
-      continue;
-
-    // Parse optional constraint, depending on the parameter type
-    bool ret;
-    switch (type) {
-    case RTLParameter::Type::UNSIGNED:
-      ret = fromJSON<UnsignedLowerBound, UnsignedUpperBound, UnsignedRange,
-                     UnsignedEqual, UnsignedDifferent>(
-          key, value, path, UnsignedConstraint::ERR_UNSUPPORTED, consVec);
-      break;
-    case RTLParameter::Type::STRING:
-      ret = fromJSON<StringEqual, StringDifferent>(
-          key, value, path, StringConstraint::ERR_UNSUPPORTED, consVec);
-      break;
-    }
-    if (!ret)
+bool RTLUnsignedType::constraintsFromJSON(const json::Object &object,
+                                          Constraints *&constraints,
+                                          json::Path path) {
+  auto boundFromJSON = [&](StringRef kw, StringLiteral err,
+                           const llvm::json::Value &value,
+                           std::optional<unsigned> &bound) -> bool {
+    if (bound) {
+      // The bound may be set by the "range" key or the dedicated bound key,
+      // make sure there is no conflict
+      path.report(err);
       return false;
-  }
-  return true;
+    }
+    return json::fromJSON(value, bound, path);
+  };
+
+  // Allocate the constraint object
+  UnsignedConstraints *cons = new UnsignedConstraints;
+  constraints = cons;
+
+  return llvm::all_of(object, [&](auto &keyAndVal) {
+    auto &[jsonKey, val] = keyAndVal;
+    std::string key = jsonKey.str();
+
+    if (RESERVED_KEYS.contains(key))
+      return true;
+    if (key == LB)
+      return boundFromJSON(LB, ERR_LB, val, cons->lb);
+    if (key == UB)
+      return boundFromJSON(UB, ERR_UB, val, cons->ub);
+    if (key == RANGE) {
+      const json::Array *array = val.getAsArray();
+      if (!array) {
+        path.report(ERR_EXPECTED_ARRAY);
+        return false;
+      }
+      if (array->size() != 2) {
+        path.report(ERR_ARRAY_FORMAT);
+        return false;
+      }
+      return boundFromJSON(LB, ERR_LB, (*array)[0], cons->lb) &&
+             boundFromJSON(UB, ERR_UB, (*array)[1], cons->ub);
+    }
+    if (key == EQ)
+      return json::fromJSON(val, cons->eq, path);
+    if (key == NE)
+      return json::fromJSON(val, cons->eq, path);
+    path.report(ERR_UNSUPPORTED);
+    return false;
+  });
 }
 
-bool UnsignedConstraint::apply(StringRef paramValue) {
-  if (llvm::any_of(paramValue.str(), [](char c) { return !isdigit(c); }))
-    return false;
-  return apply(std::stoi(paramValue.str()));
+bool RTLStringType::StringConstraints::verify(StringRef paramValue) const {
+  return (!eq || paramValue == eq) && (!ne || paramValue != ne);
 }
 
-bool UnsignedRange::fromJSON(const json::Value &value, json::Path path) {
-  const json::Array *array = value.getAsArray();
-  if (!array) {
-    path.report(ERR_EXPECTED_ARRAY);
-    return false;
-  }
-  if (array->size() != 2) {
-    path.report(ERR_ARRAY_FORMAT);
-    return false;
-  }
-  return llvm::json::fromJSON((*array)[0], lb, path) &&
-         llvm::json::fromJSON((*array)[1], ub, path);
-}
+bool RTLStringType::constraintsFromJSON(const json::Object &object,
+                                        Constraints *&constraints,
+                                        json::Path path) {
+  // Allocate the constraint object
+  StringConstraints *cons = new StringConstraints;
+  constraints = cons;
 
-bool ConstraintVector::verifyConstraints(StringRef paramValue) const {
-  return llvm::all_of(constraints, [&](ParameterConstraint *cons) {
-    return cons->apply(paramValue);
+  return llvm::all_of(object, [&](auto &keyAndVal) {
+    auto &[jsonKey, val] = keyAndVal;
+    std::string key = jsonKey.str();
+
+    if (key == EQ)
+      return json::fromJSON(val, cons->eq, path);
+    if (key == NE)
+      return json::fromJSON(val, cons->ne, path);
+    path.report(ERR_UNSUPPORTED);
+    return false;
   });
 }
 
@@ -179,34 +160,37 @@ RTLMatch::RTLMatch(hw::HWModuleExternOp modOp) : op(modOp) {
   invalid = false;
 }
 
-bool RTLParameter::fromJSON(const llvm::json::Value &value,
-                            llvm::json::Path path) {
-  json::ObjectMapper mapper(value, path);
-  if (!mapper || !mapper.map(KEY_NAME, name) || !mapper.map(KEY_TYPE, type))
-    return false;
-
-  // The mapper ensures that this object is valid
-  const json::Object &object = *value.getAsObject();
-  DenseSet<StringRef> skipped{KEY_NAME, KEY_TYPE};
-  return parseConstraints(object, type, path, skipped, constraints);
-}
-
-bool dynamatic::fromJSON(const llvm::json::Value &value,
-                         RTLParameter::Type &type, llvm::json::Path path) {
+bool dynamatic::fromJSON(const llvm::json::Value &value, RTLType *&type,
+                         llvm::json::Path path) {
   std::optional<StringRef> strType = value.getAsString();
   if (!strType) {
     path.report(ERR_EXPECTED_STRING);
     return false;
   }
   if (*strType == "unsigned") {
-    type = RTLParameter::Type::UNSIGNED;
+    type = new RTLUnsignedType;
   } else if (*strType == "string") {
-    type = RTLParameter::Type::STRING;
+    type = new RTLStringType;
   } else {
     path.report(ERR_UNKNOWN_TYPE);
     return false;
   }
   return true;
+}
+
+bool RTLParameter::fromJSON(const llvm::json::Value &value,
+                            llvm::json::Path path) {
+  json::ObjectMapper mapper(value, path);
+  if (!mapper || !mapper.map(KEY_NAME, name) || !mapper.map(KEY_TYPE, type))
+    return false;
+  // The mapper ensures that this object is valid
+  const json::Object &object = *value.getAsObject();
+  return type->constraintsFromJSON(object, type->constraints, path);
+}
+
+RTLParameter::~RTLParameter() {
+  if (type)
+    delete type;
 }
 
 bool dynamatic::fromJSON(const llvm::json::Value &value,
@@ -218,12 +202,18 @@ bool dynamatic::fromJSON(const llvm::json::Value &value,
     return false;
   }
 
+  // parameters.reserve(jsonParametersArray->size());
   for (auto [idx, jsonParam] : llvm::enumerate(*jsonParametersArray)) {
     RTLParameter *param = &parameters.emplace_back();
     if (!param->fromJSON(jsonParam, path.index(idx)))
       return false;
   }
   return true;
+}
+
+RTLComponent::Model::~Model() {
+  for (auto &[_, constraints] : addConstraints)
+    delete constraints;
 }
 
 bool RTLComponent::fromJSON(const llvm::json::Value &value,
@@ -309,7 +299,7 @@ bool RTLComponent::fromJSON(const llvm::json::Value &value,
         return false;
 
       // Add a new parameter/constraint vector pair to the model's list.
-      auto &[param, constraints] = model.constraints.emplace_back();
+      auto &[param, constraints] = model.addConstraints.emplace_back();
 
       // Retrieve the parameter with this name, if it exists
       param = getParameter(paramName);
@@ -318,10 +308,9 @@ bool RTLComponent::fromJSON(const llvm::json::Value &value,
         return false;
       }
 
-      // Parse the constraints for the parameter, checking that they make sense
-      // with the type
-      if (parseConstraints(*jsonConst.getAsObject(), param->getType(),
-                           constPath, skipped, constraints))
+      // The mapper ensures that this object is valid
+      const json::Object &object = *value.getAsObject();
+      if (param->type->constraintsFromJSON(object, constraints, path))
         return false;
     }
   }
@@ -349,9 +338,9 @@ bool RTLComponent::isCompatible(const RTLMatch &match) const {
   }
 
   // Keep track of the set of parameters we parse from the dictionnary
-  // attribute. We never have duplicate parameters due to the dictionary's keys
-  // uniqueness invariant, but we need to make sure all known parameters are
-  // present
+  // attribute. We never have duplicate parameters due to the dictionary's
+  // keys uniqueness invariant, but we need to make sure all known parameters
+  // are present
   DenseSet<StringRef> parsedParams;
   SmallVector<StringRef> ignoredParams;
 
@@ -398,16 +387,16 @@ const RTLComponent::Model *RTLComponent::getModel(const RTLMatch &match) const {
   for (const Model &model : models) {
     /// Returns true when all additional constraints on the parameters are
     /// satisfied.
-    auto constraintsSatisfied = [&](const auto &paramAndConstraints) -> bool {
-      auto &[param, constraints] = paramAndConstraints;
+    auto constraintsSatisfied = [&](const auto &paramAndType) -> bool {
+      auto &[param, type] = paramAndType;
       // Guaranteed to exist since the component matches
       auto paramValue = match.parameters.find(param->getName());
       assert(paramValue != match.parameters.end() && "parameter must exist");
-      return constraints.verifyConstraints(paramValue->second);
+      return type->verify(paramValue->second);
     };
 
     // The model matches if all additional parameter constraints are satsified
-    if (llvm::all_of(model.constraints, constraintsSatisfied))
+    if (llvm::all_of(model.addConstraints, constraintsSatisfied))
       return &model;
   }
 
