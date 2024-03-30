@@ -18,6 +18,7 @@
 #include "dynamatic/Dialect/Handshake/HandshakeInterfaces.h"
 #include "dynamatic/Dialect/Handshake/HandshakeOps.h"
 #include "dynamatic/Support/Backedge.h"
+#include "dynamatic/Support/RTL.h"
 #include "dynamatic/Transforms/HandshakeConcretizeIndexType.h"
 #include "dynamatic/Transforms/HandshakeMaterialize.h"
 #include "mlir/Dialect/Arith/IR/Arith.h"
@@ -38,8 +39,7 @@ using namespace mlir;
 using namespace dynamatic;
 
 /// Name of ports representing the clock and reset signals.
-static constexpr llvm::StringLiteral CLK_PORT("clk"), RST_PORT("rst"),
-    NAME_ATTR("hw.name"), PARAMETERS_ATTR("hw.parameters");
+static constexpr llvm::StringLiteral CLK_PORT("clk"), RST_PORT("rst");
 
 //===----------------------------------------------------------------------===//
 // Internal data-structures
@@ -307,7 +307,7 @@ public:
   ModuleDiscriminator(Operation *op);
 
   /// Same role as the construction which takes an opaque operation but
-  /// specialized for memory interfaces, passed through their port inforamtion.
+  /// specialized for memory interfaces, passed through their port information.
   ModuleDiscriminator(FuncMemoryPorts &ports);
 
   /// Returns the unique external module name for the operation. Two operations
@@ -327,26 +327,29 @@ private:
   /// The operation whose parameters are being identified.
   Operation *op;
   /// The operation's parameters.
-  SmallVector<std::string> parameters;
+  SmallVector<std::pair<std::string, std::string>> parameters;
   /// Whether the operation is unsupported (set during construction).
   bool unsupported = false;
 
   /// Adds a scalar-type parameter.
-  void addScalar(unsigned scalar) {
-    parameters.push_back(std::to_string(scalar));
+  void addUnsigned(const Twine &name, unsigned scalar) {
+    parameters.emplace_back(name.str(), RTLUnsignedType::encode(scalar));
   };
 
-  /// Adds a bitwidth parameter.
-  void addBitwidth(unsigned bitwidth) { addScalar(bitwidth); };
-
   /// Adds a bitwdith parameter extracted from a type.
-  void addBitwidth(Type type) { addBitwidth(getTypeWidth(type)); };
+  void addBitwidth(const Twine &name, Type type) {
+    addUnsigned(name, getTypeWidth(type));
+  };
 
   /// Adds a bitwdith parameter extracted from a value's type.
-  void addBitwidth(Value val) { addBitwidth(getTypeWidth(val.getType())); };
+  void addBitwidth(const Twine &name, Value val) {
+    addUnsigned(name, getTypeWidth(val.getType()));
+  };
 
   /// Adds a string parameter.
-  void addString(const Twine &str) { parameters.push_back(str.str()); };
+  void addString(const Twine &name, const Twine &txt) {
+    parameters.emplace_back(name.str(), RTLStringType::encode(txt.str()));
+  };
 
   /// Returns the bitwidth of a type.
   static unsigned getTypeWidth(Type type);
@@ -362,40 +365,40 @@ ModuleDiscriminator::ModuleDiscriminator(Operation *op) : op(op) {
       .Case<handshake::BufferOpInterface>(
           [&](handshake::BufferOpInterface bufOp) {
             // Number of slots and bitwdith
-            addScalar(bufOp.getSlots());
-            addBitwidth(op->getResult(0));
+            addUnsigned("SLOTS", bufOp.getSlots());
+            addBitwidth("DATA_WIDTH", op->getResult(0));
           })
       .Case<handshake::ForkOp, handshake::LazyForkOp>([&](auto) {
         // Number of output channels and bitwidth
-        addScalar(op->getNumResults());
-        addBitwidth(op->getOperand(0));
+        addUnsigned("SIZE", op->getNumResults());
+        addBitwidth("DATA_WIDTH", op->getOperand(0));
       })
       .Case<handshake::MuxOp>([&](handshake::MuxOp muxOp) {
         // Number of input data channels, data bitwidth, and select bitwidth
-        addScalar(muxOp.getDataOperands().size());
-        addBitwidth(muxOp.getResult());
-        addBitwidth(muxOp.getSelectOperand());
+        addUnsigned("SIZE", muxOp.getDataOperands().size());
+        addBitwidth("DATA_WIDTH", muxOp.getResult());
+        addBitwidth("SELECT_WIDTH", muxOp.getSelectOperand());
       })
       .Case<handshake::ControlMergeOp>([&](handshake::ControlMergeOp cmergeOp) {
         // Number of input data channels, data bitwidth, and index
         // bitwidth
-        addScalar(cmergeOp.getDataOperands().size());
-        addBitwidth(cmergeOp.getResult());
-        addBitwidth(cmergeOp.getIndex());
+        addUnsigned("SIZE", cmergeOp.getDataOperands().size());
+        addBitwidth("DATA_WIDTH", cmergeOp.getResult());
+        addBitwidth("INDEX_WIDTH", cmergeOp.getIndex());
       })
       .Case<handshake::MergeOp>([&](auto) {
         // Number of input data channels and data bitwidth
-        addScalar(op->getNumOperands());
-        addBitwidth(op->getResult(0));
+        addUnsigned("SIZE", op->getNumOperands());
+        addBitwidth("DATA_WIDTH", op->getResult(0));
       })
       .Case<handshake::BranchOp, handshake::SinkOp>([&](auto) {
         // Bitwidth
-        addBitwidth(op->getOperand(0));
+        addBitwidth("DATA_WIDTH", op->getOperand(0));
       })
       .Case<handshake::ConditionalBranchOp>(
           [&](handshake::ConditionalBranchOp cbrOp) {
             // Bitwidth
-            addBitwidth(cbrOp.getDataOperand());
+            addBitwidth("DATA_WIDTH", cbrOp.getDataOperand());
           })
       .Case<handshake::SourceOp>([&](auto) {
         // No discrimianting parameters, just to avoid falling into the
@@ -403,14 +406,14 @@ ModuleDiscriminator::ModuleDiscriminator(Operation *op) : op(op) {
       })
       .Case<handshake::LoadOpInterface>([&](handshake::LoadOpInterface loadOp) {
         // Data bitwidth and address bitwidth
-        addBitwidth(loadOp.getDataInput());
-        addBitwidth(loadOp.getAddressInput());
+        addBitwidth("DATA_WIDTH", loadOp.getDataInput());
+        addBitwidth("ADDR_WIDTH", loadOp.getAddressInput());
       })
       .Case<handshake::StoreOpInterface>(
           [&](handshake::StoreOpInterface storeOp) {
             // Data bitwidth and address bitwidth
-            addBitwidth(storeOp.getDataInput());
-            addBitwidth(storeOp.getAddressInput());
+            addBitwidth("DATA_WIDTH", storeOp.getDataInput());
+            addBitwidth("ADDR_WIDTH", storeOp.getAddressInput());
           })
       .Case<handshake::ConstantOp>([&](handshake::ConstantOp cstOp) {
         // Bitwidth and binary-encoded constant value
@@ -422,7 +425,7 @@ ModuleDiscriminator::ModuleDiscriminator(Operation *op) : op(op) {
           unsupported = true;
           return;
         }
-        addBitwidth(bitwidth);
+        addUnsigned("DATA_WIDTH", bitwidth);
 
         // Determine the constant value based on the constant's return type
         // and convert it to a binary string value
@@ -462,19 +465,19 @@ ModuleDiscriminator::ModuleDiscriminator(Operation *op) : op(op) {
           return;
         }
 
-        addString(bitValue);
+        addString("VALUE", bitValue);
       })
       .Case<handshake::EndOp>([&](auto) {
         // Number of memory inputs and bitwidth (we assume that there is
         // a single function return value due to our current VHDL
         // limitation)
-        addScalar(op->getNumOperands() - 1);
-        addBitwidth(op->getOperand(0));
+        addUnsigned("NUM_MEMORIES", op->getNumOperands() - 1);
+        addBitwidth("DATA_WIDTH", op->getOperand(0));
       })
       .Case<handshake::ReturnOp>([&](auto) {
         // Bitwidth (we assume that there is a single function return value
         // due to our current VHDL limitation)
-        addBitwidth(op->getOperand(0));
+        addBitwidth("DATA_WIDTH", op->getOperand(0));
       })
       .Case<arith::AddFOp, arith::AddIOp, arith::AndIOp, arith::DivFOp,
             arith::DivSIOp, arith::DivUIOp, arith::MaximumFOp,
@@ -482,26 +485,26 @@ ModuleDiscriminator::ModuleDiscriminator(Operation *op) : op(op) {
             arith::OrIOp, arith::ShLIOp, arith::ShRSIOp, arith::ShRUIOp,
             arith::SubFOp, arith::SubIOp, arith::XOrIOp>([&](auto) {
         // Bitwidth
-        addBitwidth(op->getOperand(0));
+        addBitwidth("DATA_WIDTH", op->getOperand(0));
       })
       .Case<arith::SelectOp>([&](arith::SelectOp selectOp) {
         // Data bitwidth
-        addBitwidth(selectOp.getTrueValue());
+        addBitwidth("DATA_WIDTH", selectOp.getTrueValue());
       })
       .Case<arith::CmpFOp>([&](arith::CmpFOp cmpFOp) {
         // Predicate and bitwidth
-        addString(stringifyEnum(cmpFOp.getPredicate()));
-        addBitwidth(cmpFOp.getLhs());
+        addString("OP", stringifyEnum(cmpFOp.getPredicate()));
+        addBitwidth("DATA_WIDTH", cmpFOp.getLhs());
       })
       .Case<arith::CmpIOp>([&](arith::CmpIOp cmpIOp) {
         // Predicate and bitwidth
-        addString(stringifyEnum(cmpIOp.getPredicate()));
-        addBitwidth(cmpIOp.getLhs());
+        addString("OP", stringifyEnum(cmpIOp.getPredicate()));
+        addBitwidth("DATA_WIDTH", cmpIOp.getLhs());
       })
       .Case<arith::ExtSIOp, arith::ExtUIOp, arith::TruncIOp>([&](auto) {
         // Input bitwidth and output bitwidth
-        addBitwidth(op->getOperand(0));
-        addBitwidth(op->getResult(0));
+        addBitwidth("INPUT_WIDTH", op->getOperand(0));
+        addBitwidth("OUTPUT_WIDTH", op->getResult(0));
       })
       .Default([&](auto) {
         op->emitError() << "This operation cannot be lowered to RTL "
@@ -516,22 +519,22 @@ ModuleDiscriminator::ModuleDiscriminator(FuncMemoryPorts &ports)
       .Case<handshake::MemoryControllerOp>([&](auto) {
         // Control port count, load port count, store port count, data
         // bitwidth, and address bitwidth
-        addScalar(ports.getNumPorts<ControlPort>());
-        addScalar(ports.getNumPorts<LoadPort>());
-        addScalar(ports.getNumPorts<StorePort>());
-        addBitwidth(ports.dataWidth);
-        addBitwidth(ports.addrWidth);
+        addUnsigned("NUM_CONTROL", ports.getNumPorts<ControlPort>());
+        addUnsigned("NUM_LOAD", ports.getNumPorts<LoadPort>());
+        addUnsigned("NUM_STORE", ports.getNumPorts<StorePort>());
+        addUnsigned("DATA_WIDTH", ports.dataWidth);
+        addUnsigned("ADDR_WIDTH", ports.addrWidth);
       })
       .Case<handshake::LSQOp>([&](auto) {
         /// TODO: dummy implemenation, need to connect it to old Chisel
         /// generator which takes JSON inputs
         // Control port count, load port count, store port count, data
         // bitwidth, and address bitwidth
-        addScalar(ports.getNumPorts<ControlPort>());
-        addScalar(ports.getNumPorts<LoadPort>());
-        addScalar(ports.getNumPorts<StorePort>());
-        addBitwidth(ports.dataWidth);
-        addBitwidth(ports.addrWidth);
+        addUnsigned("NUM_CONTROL", ports.getNumPorts<ControlPort>());
+        addUnsigned("NUM_LOAD", ports.getNumPorts<LoadPort>());
+        addUnsigned("NUM_STORE", ports.getNumPorts<StorePort>());
+        addUnsigned("DATA_WIDTH", ports.dataWidth);
+        addUnsigned("ADDR_WIDTH", ports.addrWidth);
       })
       .Default([&](auto) {
         op->emitError() << "This operation cannot be lowered to RTL "
@@ -544,8 +547,8 @@ std::string ModuleDiscriminator::getDiscriminatedModName() {
   assert(!unsupported && "operation unsupported");
   std::string modName = op->getName().getStringRef().str();
   std::replace(modName.begin(), modName.end(), '.', '_');
-  for (StringRef param : parameters)
-    modName += "_" + param.str();
+  for (auto &[_, paramValue] : parameters)
+    modName += "_" + paramValue;
   return modName;
 }
 
@@ -555,15 +558,19 @@ void ModuleDiscriminator::setParameters(hw::HWModuleExternOp modOp) {
 
   // The name is used to determine which RTL component to instantiate
   StringRef opName = op->getName().getStringRef();
-  modOp->setAttr(NAME_ATTR, StringAttr::get(ctx, opName));
+  modOp->setAttr(RTLMatch::NAME_ATTR, StringAttr::get(ctx, opName));
 
   // Parameters are used to determine the concrete version of the RTL
   // component to instantiate
-  SmallVector<Attribute> paramAttrs;
-  llvm::transform(
-      parameters, std::back_inserter(paramAttrs),
-      [&](StringRef paramVal) { return StringAttr::get(ctx, paramVal); });
-  modOp->setAttr(PARAMETERS_ATTR, ArrayAttr::get(ctx, paramAttrs));
+  SmallVector<NamedAttribute> paramAttrs;
+  llvm::transform(parameters, std::back_inserter(paramAttrs),
+                  [&](std::pair<std::string, std::string> &nameAndValue) {
+                    return NamedAttribute(
+                        StringAttr::get(ctx, nameAndValue.first),
+                        StringAttr::get(ctx, nameAndValue.second));
+                  });
+  modOp->setAttr(RTLMatch::PARAMETERS_ATTR,
+                 DictionaryAttr::get(ctx, paramAttrs));
 }
 
 unsigned ModuleDiscriminator::getTypeWidth(Type type) {

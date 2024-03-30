@@ -240,6 +240,12 @@ bool fromJSON(const llvm::json::Value &value,
 /// can implicitly perform the conversion when calling methods expecting an
 /// instance of this struct.
 struct RTLMatch {
+  /// Attribute names under which the RTL component's name and parameters are
+  /// stored on an MLIR operation, respectively.
+  static constexpr StringLiteral NAME_ATTR = StringLiteral("hw.name"),
+                                 PARAMETERS_ATTR =
+                                     StringLiteral("hw.parameters");
+
   /// The MLIR operation we are trying to match an RTL component/model for.
   Operation *op;
   /// The RTL component's name to look for.

@@ -140,12 +140,12 @@ bool RTLStringType::constraintsFromJSON(const json::Object &object,
 }
 
 RTLMatch::RTLMatch(hw::HWModuleExternOp modOp) : op(modOp) {
-  StringAttr nameAttr = modOp->getAttrOfType<StringAttr>("hw.name");
+  StringAttr nameAttr = modOp->getAttrOfType<StringAttr>(NAME_ATTR);
   if (!nameAttr)
     return;
   name = nameAttr.str();
 
-  auto paramAttr = modOp->getAttrOfType<DictionaryAttr>("hw.parameters");
+  auto paramAttr = modOp->getAttrOfType<DictionaryAttr>(PARAMETERS_ATTR);
   if (!paramAttr)
     return;
 
