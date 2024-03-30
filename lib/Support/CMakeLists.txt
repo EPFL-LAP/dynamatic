@@ -5,6 +5,7 @@ add_dynamatic_library(DynamaticSupport
   Handshake.cpp
   Logging.cpp
   MILP.cpp
+  RTL.cpp
   TimingModels.cpp
 
   LINK_LIBS PUBLIC
