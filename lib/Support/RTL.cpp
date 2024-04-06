@@ -130,6 +130,8 @@ bool RTLStringType::constraintsFromJSON(const json::Object &object,
     auto &[jsonKey, val] = keyAndVal;
     std::string key = jsonKey.str();
 
+    if (RESERVED_KEYS.contains(key))
+      return true;
     if (key == EQ)
       return json::fromJSON(val, cons->eq, path);
     if (key == NE)
