@@ -44,8 +44,8 @@ static constexpr StringLiteral ERR_MISSING_VALUE("missing value"),
         R"(unknown parameter type: options are "unsigned" or "string")");
 
 /// Reserved JSON keys when deserializing type constraints, should be ignored.
-static const mlir::DenseSet<StringRef> RESERVED_KEYS{KEY_NAME, KEY_TYPE,
-                                                     KEY_PARAMETER};
+static const mlir::DenseSet<StringRef> RESERVED_KEYS{
+    KEY_NAME, KEY_TYPE, KEY_PARAMETER, KEY_GENERIC};
 
 RTLType::~RTLType() {
   if (constraints)
@@ -181,7 +181,8 @@ bool dynamatic::fromJSON(const llvm::json::Value &value, RTLType *&type,
 bool RTLParameter::fromJSON(const llvm::json::Value &value,
                             llvm::json::Path path) {
   json::ObjectMapper mapper(value, path);
-  if (!mapper || !mapper.map(KEY_NAME, name) || !mapper.map(KEY_TYPE, type))
+  if (!mapper || !mapper.map(KEY_NAME, name) || !mapper.map(KEY_TYPE, type) ||
+      !mapper.mapOptional(KEY_GENERIC, forceGeneric))
     return false;
   // The mapper ensures that this object is valid
   const json::Object &object = *value.getAsObject();
@@ -202,7 +203,6 @@ bool dynamatic::fromJSON(const llvm::json::Value &value,
     return false;
   }
 
-  // parameters.reserve(jsonParametersArray->size());
   for (auto [idx, jsonParam] : llvm::enumerate(*jsonParametersArray)) {
     RTLParameter *param = &parameters.emplace_back();
     if (!param->fromJSON(jsonParam, path.index(idx)))
