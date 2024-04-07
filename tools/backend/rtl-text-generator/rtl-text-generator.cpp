@@ -1,5 +1,11 @@
 //===- rtl-text-generator.cpp - Text-based RTL generator --------*- C++ -*-===//
 //
+// Dynamatic is under the Apache License v2.0 with LLVM Exceptions.
+// See https://llvm.org/LICENSE.txt for license information.
+// SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
+//
+//===----------------------------------------------------------------------===//
+//
 // Simple generator for RTL components, which takes as input an RTL file,
 // replaces user-provided strings (with regex support) within it, and dumps the
 // result at a specified location.
@@ -17,11 +23,11 @@ using namespace llvm;
 
 static cl::OptionCategory mainCategory("Tool options");
 
-static cl::opt<std::string> inputRTLPath(cl::Positional,
+static cl::opt<std::string> inputRTLPath(cl::Positional, cl::Required,
                                          cl::desc("<input file>"),
                                          cl::cat(mainCategory));
 
-static cl::opt<std::string> outputRTLPath(cl::Positional,
+static cl::opt<std::string> outputRTLPath(cl::Positional, cl::Required,
                                           cl::desc("<output file>"),
                                           cl::cat(mainCategory));
 
