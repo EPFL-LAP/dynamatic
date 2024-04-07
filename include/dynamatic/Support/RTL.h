@@ -18,6 +18,7 @@
 #include "dynamatic/Dialect/HW/HWOps.h"
 #include "dynamatic/Support/LLVM.h"
 #include "llvm/Support/JSON.h"
+#include <map>
 #include <string>
 
 namespace dynamatic {
@@ -369,6 +370,16 @@ private:
   /// configuration files.
   std::vector<RTLComponent> components;
 };
+
+/// Performs a series of regular expression match-and-replace in the input
+/// string, and returns the resulting string. Each key-value pair in the
+/// `replacements` map represent a regular expression to replace and the string
+/// to replace it with, respectively. If a regex exists multiple times in the
+/// input, it is replaced every time. Replacements happen one at a time in map
+/// iteration order.
+std::string
+replaceRegexes(StringRef input,
+               const std::map<std::string, std::string> &replacements);
 
 } // namespace dynamatic
 

@@ -16,6 +16,7 @@
 #include "llvm/Support/Debug.h"
 #include "llvm/Support/JSON.h"
 #include <fstream>
+#include <regex>
 
 #define DEBUG_TYPE "support-rtl"
 
@@ -477,4 +478,12 @@ RTLConfiguration::getModel(const RTLMatch &match) const {
       return model;
   }
   return nullptr;
+}
+
+std::string dynamatic::replaceRegexes(
+    StringRef input, const std::map<std::string, std::string> &replacements) {
+  std::string result(input);
+  for (auto &[from, to] : replacements)
+    result = std::regex_replace(result, std::regex(from), to);
+  return result;
 }

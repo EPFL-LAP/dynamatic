@@ -2,8 +2,8 @@ library ieee;
 use ieee.std_logic_1164.all;
 use ieee.numeric_std.all;
 use work.customTypes.all;
--- #CST_VALUE#
-entity constant_node_#CST_NAME# is
+
+entity ENTITY_NAME is
   generic (
     BITWIDTH : integer
   );
@@ -19,9 +19,9 @@ entity constant_node_#CST_NAME# is
     result_valid : out std_logic);
 end entity;
 
-architecture arch of constant_node_#CST_NAME# is
+architecture arch of ENTITY_NAME is
 begin
-  result       <= #CST_VALUE#;
+  result       <= "VALUE";
   result_valid <= ctrl_valid;
   ctrl_ready   <= result_ready;
 end architecture;
