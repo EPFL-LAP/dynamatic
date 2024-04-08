@@ -1,39 +1,37 @@
 library IEEE;
 use IEEE.std_logic_1164.all;
 use IEEE.numeric_std.all;
-use work.customTypes.all;
 
-entity d_return_node is
+entity return is
   generic (
     BITWIDTH : integer
   );
   port (
     -- inputs
-    clk        : in std_logic;
-    rst        : in std_logic;
+    clk, rst   : in std_logic;
     ins        : in std_logic_vector(BITWIDTH - 1 downto 0);
     ins_valid  : in std_logic;
     outs_ready : in std_logic;
     -- outputs
-    ins_ready  : out std_logic;
     outs       : out std_logic_vector(BITWIDTH - 1 downto 0);
-    outs_valid : out std_logic);
+    outs_valid : out std_logic;
+    ins_ready  : out std_logic
+  );
 end entity;
 
-architecture arch of d_return_node is
-
+architecture arch of return is
 begin
-
-  tehb : entity work.TEHB(arch) generic map (BITWIDTH)
+  tehb : entity work.tehb(arch) generic map (BITWIDTH)
     port map(
+      -- inputs
       clk        => clk,
       rst        => rst,
+      ins        => ins,
       ins_valid  => ins_valid,
       outs_ready => outs_ready,
+      -- outputs
+      outs       => outs,
       outs_valid => outs_valid,
-      ins_ready  => ins_ready,
-      ins        => ins,
-      outs       => outs
+      ins_ready  => ins_ready
     );
-
 end architecture;
