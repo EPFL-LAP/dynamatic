@@ -36,16 +36,6 @@ using namespace mlir;
 using namespace dynamatic;
 using namespace dynamatic::handshake;
 
-bool dynamatic::handshake::isControlOpImpl(Operation *op) {
-  if (SOSTInterface sostInterface = dyn_cast<SOSTInterface>(op); sostInterface)
-    return sostInterface.sostIsControl();
-  return false;
-}
-
-static std::string defaultOperandName(unsigned int idx) {
-  return "in" + std::to_string(idx);
-}
-
 /// Parses an SOST operation. If the `explicitSize` parameter is set to true,
 /// then the method parses the operation's size (in the SOST sense) between
 /// square brackets before parsing the operation's operands, attributes, and
@@ -186,10 +176,6 @@ MuxOp::inferReturnTypes(MLIRContext *context, std::optional<Location> location,
 
 bool MuxOp::isControl() { return getResult().getType().isa<NoneType>(); }
 
-std::string handshake::MuxOp::getOperandName(unsigned int idx) {
-  return idx == 0 ? "select" : defaultOperandName(idx - 1);
-}
-
 ParseResult MuxOp::parse(OpAsmParser &parser, OperationState &result) {
   OpAsmParser::UnresolvedOperand selectOperand;
   SmallVector<OpAsmParser::UnresolvedOperand, 4> allOperands;
@@ -230,11 +216,6 @@ void MuxOp::print(OpAsmPrinter &p) {
 LogicalResult MuxOp::verify() {
   return verifyIndexWideEnough(*this, getSelectOperand(),
                                getDataOperands().size());
-}
-
-std::string handshake::ControlMergeOp::getResultName(unsigned int idx) {
-  assert(idx == 0 || idx == 1);
-  return idx == 0 ? "dataOut" : "index";
 }
 
 ParseResult ControlMergeOp::parse(OpAsmParser &parser, OperationState &result) {
@@ -543,16 +524,6 @@ void ConditionalBranchOp::print(OpAsmPrinter &p) {
   p << " : " << type;
 }
 
-std::string handshake::ConditionalBranchOp::getOperandName(unsigned int idx) {
-  assert(idx == 0 || idx == 1);
-  return idx == 0 ? "cond" : "data";
-}
-
-std::string handshake::ConditionalBranchOp::getResultName(unsigned int idx) {
-  assert(idx == 0 || idx == 1);
-  return idx == ConditionalBranchOp::falseIndex ? "outFalse" : "outTrue";
-}
-
 bool ConditionalBranchOp::isControl() {
   return isControlCheckTypeAndOperand(getDataOperand().getType(),
                                       getDataOperand());
@@ -574,11 +545,6 @@ ParseResult SinkOp::parse(OpAsmParser &parser, OperationState &result) {
 }
 
 void SinkOp::print(OpAsmPrinter &p) { sostPrint(p, false); }
-
-std::string handshake::ConstantOp::getOperandName(unsigned int idx) {
-  assert(idx == 0);
-  return "ctrl";
-}
 
 Type SourceOp::getDataType() { return getResult().getType(); }
 unsigned SourceOp::getSize() { return 1; }
@@ -692,27 +658,6 @@ static LogicalResult verifyMemOp(FuncMemoryPorts &ports) {
                                       "other memory interfaces, but has "
                                    << ports.interfacePorts.size() << ".";
   return success();
-}
-
-/// Common result naming logic for memory controllers and LSQs.
-static std::string getMemResultName(const FuncMemoryPorts &ports,
-                                    unsigned int idx) {
-  if (idx == ports.memOp->getNumResults() - 1)
-    return "done";
-
-  // Iterate through all memory ports to find out the type of the
-  // operand
-  unsigned loadIdx = 0;
-  for (const GroupMemoryPorts &blockPorts : ports.groups) {
-    for (const MemoryPort &accessPort : blockPorts.accessPorts) {
-      if (std::optional<LoadPort> loadPort = dyn_cast<LoadPort>(accessPort)) {
-        if (loadPort->getDataOutputIndex() == idx)
-          return "ldAddr" + std::to_string(loadIdx);
-        ++loadIdx;
-      }
-    }
-  }
-  return "";
 }
 
 /// During construction of a memory interface's ports information, checks
@@ -948,77 +893,6 @@ LogicalResult MemoryControllerOp::verify() {
                 "supports is to an LSQ.";
   }
   return success();
-}
-
-/// Common operand naming logic for memory controllers and LSQs.
-static std::string getMemOperandName(const FuncMemoryPorts &ports,
-                                     unsigned int idx) {
-  // Iterate through all memory ports to find out the type of the operand
-  unsigned ctrlIdx = 0, loadIdx = 0, storeIdx = 0;
-  for (const GroupMemoryPorts &blockPorts : ports.groups) {
-    if (blockPorts.hasControl()) {
-      if (idx == blockPorts.ctrlPort->getCtrlInputIndex())
-        return "ctrl" + std::to_string(ctrlIdx);
-      ++ctrlIdx;
-    }
-    for (const MemoryPort &accessPort : blockPorts.accessPorts) {
-      if (std::optional<LoadPort> loadPort = dyn_cast<LoadPort>(accessPort)) {
-        if (loadPort->getAddrInputIndex() == idx)
-          return "ldAddr" + std::to_string(loadIdx);
-        ++loadIdx;
-      } else {
-        std::optional<StorePort> storePort = cast<StorePort>(accessPort);
-        if (storePort->getAddrInputIndex() == idx)
-          return "stAddr" + std::to_string(storeIdx);
-        if (storePort->getDataInputIndex() == idx)
-          return "stData" + std::to_string(storeIdx);
-        ++storeIdx;
-      }
-    }
-  }
-
-  return "";
-}
-
-std::string MemoryControllerOp::getOperandName(unsigned int idx) {
-  assert(idx < getNumOperands() && "index too high");
-
-  if (idx == 0)
-    return "memref";
-
-  // Try to get the operand name from the regular ports
-  MCPorts mcPorts = getPorts();
-  if (std::string name = getMemOperandName(mcPorts, idx); !name.empty())
-    return name;
-
-  // Try to get the operand name from a potential LSQ port
-  if (mcPorts.hasConnectionToLSQ()) {
-    LSQLoadStorePort lsqPort = mcPorts.getLSQPort();
-    if (lsqPort.getLoadAddrInputIndex() == idx)
-      return "lsqLdAddr";
-    if (lsqPort.getStoreAddrInputIndex() == idx)
-      return "lsqStAddr";
-    if (lsqPort.getStoreDataInputIndex() == idx)
-      return "lsqStData";
-  }
-  llvm_unreachable("faulty port logic");
-}
-
-std::string MemoryControllerOp::getResultName(unsigned int idx) {
-  assert(idx < getNumResults() && "index too high");
-
-  // Try to get the operand name from the regular ports
-  MCPorts mcPorts = getPorts();
-  if (std::string name = getMemResultName(mcPorts, idx); !name.empty())
-    return name;
-
-  // Try to get the result name from a potential LSQ port
-  if (mcPorts.hasConnectionToLSQ()) {
-    LSQLoadStorePort lsqPort = mcPorts.getLSQPort();
-    if (lsqPort.getLoadDataOutputIndex() == idx)
-      return "lsqLdData";
-  }
-  llvm_unreachable("faulty port logic");
 }
 
 dynamatic::MCPorts MemoryControllerOp::getPorts() {
@@ -1298,49 +1172,6 @@ LogicalResult LSQOp::verify() {
                             "is to a memory controller.";
   }
   return success();
-}
-
-std::string LSQOp::getOperandName(unsigned int idx) {
-  assert(idx < getNumOperands() && "index too high");
-
-  bool connectsToMC = isConnectedToMC();
-  if (idx == 0 && !connectsToMC)
-    return "memref";
-
-  // Try to get the operand name from the regular ports
-  LSQPorts lsqPorts = getPorts();
-  if (std::string name = getMemOperandName(lsqPorts, idx); !name.empty())
-    return name;
-
-  // Try to get the operand name from a potential MC port
-  if (connectsToMC) {
-    MCLoadStorePort mcPort = lsqPorts.getMCPort();
-    if (mcPort.getLoadDataInputIndex() == idx)
-      return "mcLdData";
-  }
-  llvm_unreachable("faulty port logic");
-}
-
-std::string LSQOp::getResultName(unsigned int idx) {
-  assert(idx < getNumResults() && "index too high");
-
-  // Try to get the operand name from the regular ports
-  LSQPorts lsqPorts = getPorts();
-  if (std::string name = getMemResultName(lsqPorts, idx); !name.empty())
-    return name;
-
-  // Go through ports to other memory interfaces
-  // Try to get the operand name from a potential MC port
-  if (lsqPorts.hasConnectionToMC()) {
-    MCLoadStorePort mcPort = lsqPorts.getMCPort();
-    if (mcPort.getLoadAddrOutputIndex() == idx)
-      return "mcLdAddr";
-    if (mcPort.getStoreAddrOutputIndex() == idx)
-      return "mcStAddr";
-    if (mcPort.getStoreDataOutputIndex() == idx)
-      return "mcStData";
-  }
-  llvm_unreachable("faulty port logic");
 }
 
 dynamatic::LSQPorts LSQOp::getPorts() {

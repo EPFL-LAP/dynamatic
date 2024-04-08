@@ -51,6 +51,9 @@ namespace {
 /// and other operations, such as arith ops, are assigned default names.
 class PortNameGenerator {
 public:
+  /// Does nohting; no port name will be generated.
+  PortNameGenerator() = default;
+
   /// Derives port names for the operation on object creation.
   PortNameGenerator(Operation *op);
 
@@ -99,6 +102,16 @@ void PortNameGenerator::infer(Operation *op, IdxToStrF &inF, IdxToStrF &outF) {
     inputs.push_back(inF(idx));
   for (size_t idx = 0, e = op->getNumResults(); idx < e; ++idx)
     outputs.push_back(outF(idx));
+
+  // The Handshake terminator forwards its non-memory inputs to its outputs, so
+  // it needs port names for them
+  if (handshake::EndOp endOp = dyn_cast<handshake::EndOp>(op)) {
+    handshake::FuncOp funcOp = endOp->getParentOfType<handshake::FuncOp>();
+    assert(funcOp && "end must be child of handshake function");
+    size_t numResults = funcOp.getFunctionType().getNumResults();
+    for (size_t idx = 0, e = numResults; idx < e; ++idx)
+      outputs.push_back(endOp.getDefaultResultName(idx));
+  }
 }
 
 void PortNameGenerator::inferDefault(Operation *op) {
@@ -126,9 +139,9 @@ void PortNameGenerator::inferDefault(Operation *op) {
               case 0:
                 return "condition";
               case 1:
-                return "true_value";
+                return "trueOut";
               }
-              return "false_value";
+              return "falseOut";
             },
             [](unsigned idx) { return "result"; });
       })
@@ -207,10 +220,21 @@ struct ModuleLoweringState {
   /// Maps each Handshake memory interface in the module with information on
   /// how to convert it into equivalent HW constructs.
   llvm::DenseMap<handshake::MemoryOpInterface, MemLoweringState> memInterfaces;
+  /// Generates and stores the end operations's port names before starting the
+  /// conversion, when those are still queryable.
+  PortNameGenerator endPorts;
   /// Backedges to the containing module's `hw::OutputOp` operation, which
   /// must be set, in order, with the results of the `hw::InstanceOp`
   /// operation to which the `handshake::EndOp` operation was converted to.
   SmallVector<Backedge> endBackedges;
+
+  /// Default constructor required because we use the class as a map's value,
+  /// which must be default cosntructible.
+  ModuleLoweringState() = default;
+
+  /// Constructs the lowering state from the Handshake function to lower.
+  ModuleLoweringState(handshake::FuncOp funcOp)
+      : endPorts(funcOp.getBodyBlock()->getTerminator()){};
 
   /// Computes the total number of module outputs that are fed by memory
   /// interfaces within the module.
@@ -425,7 +449,6 @@ ModuleDiscriminator::ModuleDiscriminator(Operation *op) : op(op) {
           unsupported = true;
           return;
         }
-        addUnsigned("DATA_WIDTH", bitwidth);
 
         // Determine the constant value based on the constant's return type
         // and convert it to a binary string value
@@ -466,13 +489,14 @@ ModuleDiscriminator::ModuleDiscriminator(Operation *op) : op(op) {
         }
 
         addString("VALUE", bitValue);
+        addUnsigned("DATA_WIDTH", bitwidth);
       })
       .Case<handshake::EndOp>([&](auto) {
         // Number of memory inputs and bitwidth (we assume that there is
         // a single function return value due to our current VHDL
         // limitation)
-        addUnsigned("NUM_MEMORIES", op->getNumOperands() - 1);
         addBitwidth("DATA_WIDTH", op->getOperand(0));
+        addUnsigned("NUM_MEMORIES", op->getNumOperands() - 1);
       })
       .Case<handshake::ReturnOp>([&](auto) {
         // Bitwidth (we assume that there is a single function return value
@@ -493,12 +517,12 @@ ModuleDiscriminator::ModuleDiscriminator(Operation *op) : op(op) {
       })
       .Case<arith::CmpFOp>([&](arith::CmpFOp cmpFOp) {
         // Predicate and bitwidth
-        addString("OP", stringifyEnum(cmpFOp.getPredicate()));
+        addString("PREDICATE", stringifyEnum(cmpFOp.getPredicate()));
         addBitwidth("DATA_WIDTH", cmpFOp.getLhs());
       })
       .Case<arith::CmpIOp>([&](arith::CmpIOp cmpIOp) {
         // Predicate and bitwidth
-        addString("OP", stringifyEnum(cmpIOp.getPredicate()));
+        addString("PREDICATE", stringifyEnum(cmpIOp.getPredicate()));
         addBitwidth("DATA_WIDTH", cmpIOp.getLhs());
       })
       .Case<arith::ExtSIOp, arith::ExtUIOp, arith::TruncIOp>([&](auto) {
@@ -960,7 +984,7 @@ private:
 LogicalResult
 ConvertFunc::matchAndRewrite(handshake::FuncOp funcOp, OpAdaptor adaptor,
                              ConversionPatternRewriter &rewriter) const {
-  ModuleLoweringState state;
+  ModuleLoweringState state(funcOp);
   hw::ModulePortInfo modInfo = getFuncPortInfo(funcOp, state);
   StringAttr name = rewriter.getStringAttr(funcOp.getName());
 
@@ -1047,25 +1071,23 @@ ConvertEnd::matchAndRewrite(handshake::EndOp endOp, OpAdaptor adaptor,
   hw::HWModuleOp parentModOp = endOp->getParentOfType<hw::HWModuleOp>();
   ModuleLoweringState &modState = lowerState.modState[parentModOp];
   ExternalModAndInstanceBuilder builder(endOp);
-  PortNameGenerator portNames(endOp);
 
   // Inputs to the module are identical the the original Handshake end
   // operation, plus clock and reset
   for (auto [idx, oprd] : llvm::enumerate(adaptor.getOperands()))
-    builder.addInput("in_" + portNames.getInputName(idx), oprd);
+    builder.addInput(modState.endPorts.getInputName(idx), oprd);
   builder.addClkAndRst();
 
   // The end operation has one input per memory interface in the function
   // which should not be forwarded to its output ports
   unsigned numMemOperands = modState.memInterfaces.size();
   auto numReturnValues = endOp.getNumOperands() - numMemOperands;
-  auto returnValOperands = endOp.getOperands().take_front(numReturnValues);
+  auto returnValOperands = adaptor.getOperands().take_front(numReturnValues);
 
   // All non-memory inputs to the Handshake end operations should be forwarded
   // to its outputs
   for (auto [idx, oprd] : llvm::enumerate(returnValOperands))
-    builder.addOutput("out_" + portNames.getInputName(idx),
-                      channelWrapper(oprd.getType()));
+    builder.addOutput(modState.endPorts.getOutputName(idx), oprd.getType());
 
   hw::InstanceOp instOp =
       builder.createInstance(lowerState.namer.getName(endOp), rewriter);

@@ -755,8 +755,7 @@ def LSQOp : Handshake_Op<"lsq", [
 
 class Handshake_LoadOp<string mnemonic> : Handshake_Op<mnemonic, [
   LoadOpInterface,
-  DeclareOpInterfaceMethods<NamedIOInterface, ["getOperandName"]>,
-  DeclareOpInterfaceMethods<NamedIOInterface, ["getResultName"]>,
+  DeclareOpInterfaceMethods<NamedIOInterface, ["getOperandName", "getResultName"]>,
   DeclareOpInterfaceMethods<InferTypeOpInterface, ["inferReturnTypes"]>
 ]> {
   let arguments = (ins AnyType:$address, AnyType:$data);
@@ -765,11 +764,13 @@ class Handshake_LoadOp<string mnemonic> : Handshake_Op<mnemonic, [
   let assemblyFormat = " `[` $address `]` $data attr-dict `:` qualified(type($address)) `,` qualified(type($data)) ";
 
   let extraClassDefinition = [{
-    std::string $cppClass::getOperandName(unsigned int idx) {
+    std::string $cppClass::getOperandName(unsigned idx) {
+      assert(idx < getNumOperands() && "index too high");
       return (idx == 0) ? "addrIn" : "dataFromMem";
     }
 
-    std::string $cppClass::getResultName(unsigned int idx) {
+    std::string $cppClass::getResultName(unsigned idx) {
+      assert(idx < getNumResults() && "index too high");
       return (idx == 0) ? "addrOut" : "dataOut";
     }
 
@@ -835,8 +836,7 @@ def LSQLoadOp : Handshake_LoadOp<"lsq_load"> {
 
 class Handshake_StoreOp<string mnemonic> : Handshake_Op<mnemonic, [
   StoreOpInterface,
-  DeclareOpInterfaceMethods<NamedIOInterface, ["getOperandName"]>,
-  DeclareOpInterfaceMethods<NamedIOInterface, ["getResultName"]>,
+  DeclareOpInterfaceMethods<NamedIOInterface, ["getOperandName", "getResultName"]>,
   DeclareOpInterfaceMethods<InferTypeOpInterface, ["inferReturnTypes"]>
 ]> {
   let arguments = (ins AnyType:$address, AnyType:$data);
@@ -934,7 +934,10 @@ def ReturnOp : Handshake_Op<"return", [
   let assemblyFormat = [{ attr-dict ($inputs^ `:` type($inputs))? }];
 }
 
-def EndOp : Handshake_Op<"end", [Terminator]> {
+def EndOp : Handshake_Op<"end", [
+  DeclareOpInterfaceMethods<NamedIOInterface, ["getOperandName"]>,
+  Terminator
+]> {
   let summary = "function endpoint (dynamatic)";
   let description = [{
     This operation is the terminator of every handshake function in Dynamatic.

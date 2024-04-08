@@ -17,19 +17,12 @@
 
 #include "dynamatic/Dialect/Handshake/HandshakeDialect.h"
 #include "dynamatic/Dialect/Handshake/HandshakeOps.h"
-#include "mlir/IR/Builders.h"
-#include "mlir/IR/BuiltinTypes.h"
 #include "mlir/IR/DialectImplementation.h"
 #include "llvm/ADT/TypeSwitch.h"
 
 using namespace dynamatic;
 
-//===----------------------------------------------------------------------===//
-// Dialect specification.
-//===----------------------------------------------------------------------===//
-
 void handshake::HandshakeDialect::initialize() {
-  // Register operations.
   addOperations<
 #define GET_OP_LIST
 #include "dynamatic/Dialect/Handshake/Handshake.cpp.inc"
@@ -44,11 +37,9 @@ void handshake::HandshakeDialect::initialize() {
       >();
 }
 
-// Provide implementations for the attributes, enums, interfaces, and types that
-// we use
+// Provide implementations for the attributes, enums, and types that we use
 #include "dynamatic/Dialect/Handshake/HandshakeDialect.cpp.inc"
 #include "dynamatic/Dialect/Handshake/HandshakeEnums.cpp.inc"
-#include "dynamatic/Dialect/Handshake/HandshakeInterfaces.cpp.inc"
 #define GET_ATTRDEF_CLASSES
 #include "dynamatic/Dialect/Handshake/HandshakeAttributes.cpp.inc"
 #define GET_TYPEDEF_CLASSES
