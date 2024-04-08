@@ -223,9 +223,11 @@ private:
   std::string name;
   /// The parameter's type.
   RTLType *type = nullptr;
-  /// Whether the parameter should be used as a generic, even if the component
-  /// it attaches to is generated.
-  bool forceGeneric = false;
+  /// Whether the parameter should be used as a generic parameter during
+  /// component instantiation. If none, the RTL parameter will be used as a
+  /// generic parameter if and only if the associated RTL component is marked
+  /// generic.
+  std::optional<bool> useAsGeneric;
 };
 
 /// ADL-findable LLVM-standard JSON deserializer for an RTL parameter.

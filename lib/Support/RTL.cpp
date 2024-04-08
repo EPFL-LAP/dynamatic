@@ -185,7 +185,7 @@ bool RTLParameter::fromJSON(const llvm::json::Value &value,
                             llvm::json::Path path) {
   json::ObjectMapper mapper(value, path);
   if (!mapper || !mapper.map(KEY_NAME, name) || !mapper.map(KEY_TYPE, type) ||
-      !mapper.mapOptional(KEY_GENERIC, forceGeneric))
+      !mapper.map(KEY_GENERIC, useAsGeneric))
     return false;
   // The mapper ensures that this object is valid
   const json::Object &object = *value.getAsObject();
