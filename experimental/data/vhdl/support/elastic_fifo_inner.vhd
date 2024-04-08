@@ -4,7 +4,7 @@ use IEEE.NUMERIC_STD.all;
 
 entity elastic_fifo_inner is
   generic (
-    SIZE     : integer
+    SIZE     : integer;
     BITWIDTH : integer
   );
   port (
@@ -15,8 +15,8 @@ entity elastic_fifo_inner is
     outs_ready : in std_logic;
     -- outputs
     outs       : out std_logic_vector(BITWIDTH - 1 downto 0);
-    outs_valid : out std_logic
-    ins_ready  : out std_logic;
+    outs_valid : out std_logic;
+    ins_ready  : out std_logic
   );
 end entity;
 

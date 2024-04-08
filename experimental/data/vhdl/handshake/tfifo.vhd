@@ -15,8 +15,8 @@ entity tfifo is
     outs_ready : in std_logic;
     -- outputs
     outs       : out std_logic_vector(BITWIDTH - 1 downto 0);
-    outs_valid : out std_logic
-    outs_ready : out std_logic;
+    outs_valid : out std_logic;
+    outs_ready : out std_logic
   );
 end entity;
 
@@ -55,7 +55,7 @@ begin
       -- outputs
       outs       => fifo_out,
       outs_valid => fifo_valid,
-      ins_ready  => fifo_ready,
+      ins_ready  => fifo_ready
     );
 
 end arch;
