@@ -236,10 +236,6 @@ inline bool fromJSON(const llvm::json::Value &value, RTLParameter &parameter,
   return parameter.fromJSON(value, path);
 }
 
-/// ADL-findable LLVM-standard JSON deserializer for a vector of RTL parameters.
-bool fromJSON(const llvm::json::Value &value,
-              SmallVector<RTLParameter> &parameters, llvm::json::Path path);
-
 /// Helper data-structure used to qeury for a component/model match between an
 /// MLIR operation and an entity parsed from the RTL configuration file. Should
 /// rarely be instantiated on its own; instead, its one-argument constructor
@@ -314,16 +310,17 @@ public:
 
 private:
   /// Canonical name of the MLIR operation corresponding to this component.
-  std::string component;
+  std::string name;
   /// The component's RTL parameters.
-  SmallVector<RTLParameter> parameters;
-
+  std::vector<RTLParameter> parameters;
   /// Maps each unique parameter name to its parameter object for easy access
   /// when concretizing components.
   llvm::StringMap<RTLParameter *> nameToParam;
 
   /// The component's timing models.
   SmallVector<Model> models;
+  /// The component's dependencies (referenced by name).
+  std::vector<std::string> dependencies;
 
   /// Path to the generic implementation of the component.
   std::string generic;

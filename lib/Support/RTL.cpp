@@ -24,15 +24,14 @@ using namespace llvm;
 using namespace dynamatic;
 
 /// Recognized keys in RTL configuration files.
-static constexpr StringLiteral KEY_COMPONENT("component"),
-    KEY_PARAMETERS("parameters"), KEY_MODELS("models"), KEY_GENERIC("generic"),
-    KEY_GENERATOR("generator"), KEY_NAME("name"), KEY_TYPE("type"),
-    KEY_PATH("path"), KEY_CONSTRAINTS("constraints"),
-    KEY_PARAMETER("parameter");
+static constexpr StringLiteral KEY_PARAMETERS("parameters"),
+    KEY_MODELS("models"), KEY_GENERIC("generic"), KEY_GENERATOR("generator"),
+    KEY_NAME("name"), KEY_TYPE("type"), KEY_PATH("path"),
+    KEY_CONSTRAINTS("constraints"), KEY_PARAMETER("parameter"),
+    KEY_DEPENDENCIES("dependencies");
 
 /// JSON path errors.
-static constexpr StringLiteral ERR_MISSING_VALUE("missing value"),
-    ERR_EXPECTED_ARRAY("expected array"),
+static constexpr StringLiteral ERR_EXPECTED_ARRAY("expected array"),
     ERR_MISSING_CONCRETIZATION("missing concretization method, either "
                                "\"generic\" or \"generator\" key must exist"),
     ERR_MULTIPLE_CONCRETIZATION(
@@ -197,23 +196,6 @@ RTLParameter::~RTLParameter() {
     delete type;
 }
 
-bool dynamatic::fromJSON(const llvm::json::Value &value,
-                         SmallVector<RTLParameter> &parameters,
-                         llvm::json::Path path) {
-  const json::Array *jsonParametersArray = value.getAsArray();
-  if (!jsonParametersArray) {
-    path.report(ERR_EXPECTED_ARRAY);
-    return false;
-  }
-
-  for (auto [idx, jsonParam] : llvm::enumerate(*jsonParametersArray)) {
-    RTLParameter *param = &parameters.emplace_back();
-    if (!param->fromJSON(jsonParam, path.index(idx)))
-      return false;
-  }
-  return true;
-}
-
 RTLComponent::Model::~Model() {
   for (auto &[_, constraints] : addConstraints)
     delete constraints;
@@ -222,10 +204,11 @@ RTLComponent::Model::~Model() {
 bool RTLComponent::fromJSON(const llvm::json::Value &value,
                             llvm::json::Path path) {
   json::ObjectMapper mapper(value, path);
-  if (!mapper || !mapper.map(KEY_COMPONENT, component) ||
-      !mapper.map(KEY_PARAMETERS, parameters) ||
+  if (!mapper || !mapper.map(KEY_NAME, name) ||
+      !mapper.mapOptional(KEY_PARAMETERS, parameters) ||
       !mapper.mapOptional(KEY_GENERIC, generic) ||
-      !mapper.mapOptional(KEY_GENERATOR, generator)) {
+      !mapper.mapOptional(KEY_GENERATOR, generator) ||
+      !mapper.mapOptional(KEY_DEPENDENCIES, dependencies)) {
     return false;
   }
 
@@ -257,10 +240,9 @@ bool RTLComponent::fromJSON(const llvm::json::Value &value,
   // The mapper ensures that the object is valid
   const json::Value *jsonModelsValue = value.getAsObject()->get(KEY_MODELS);
   json::Path modelsPath = path.field(KEY_MODELS);
-  if (!jsonModelsValue) {
-    modelsPath.report(ERR_MISSING_VALUE);
-    return false;
-  }
+  if (!jsonModelsValue)
+    return true;
+
   const json::Array *jsonModelsArray = jsonModelsValue->getAsArray();
   if (!jsonModelsArray) {
     modelsPath.report(ERR_EXPECTED_ARRAY);
@@ -328,14 +310,14 @@ RTLParameter *RTLComponent::getParameter(StringRef name) const {
 }
 
 bool RTLComponent::isCompatible(const RTLMatch &match) const {
-  LLVM_DEBUG(llvm::dbgs() << "Attempting match with RTL component " << component
+  LLVM_DEBUG(llvm::dbgs() << "Attempting match with RTL component " << name
                           << "\n";);
   // Component must be valid and have matching name
   if (match.invalid) {
     LLVM_DEBUG(llvm::dbgs() << "-> Match is invalid\n");
     return false;
   }
-  if (match.name != component) {
+  if (match.name != name) {
     LLVM_DEBUG(llvm::dbgs() << "-> Names to do match.\n");
     return false;
   }
