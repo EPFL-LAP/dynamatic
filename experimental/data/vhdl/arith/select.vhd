@@ -1,60 +1,107 @@
-library IEEE;
-use IEEE.std_logic_1164.all;
+library ieee;
+use ieee.std_logic_1164.all;
 use ieee.numeric_std.all;
-use work.customTypes.all;
 
-entity select_node is
+entity selector is
   generic (
     BITWIDTH : integer
   );
-
   port (
     -- inputs
-    clk               : in std_logic;
-    rst               : in std_logic;
-    condition         : in std_logic;
-    condition_valid   : in std_logic;
-    true_value        : in std_logic_vector(BITWIDTH - 1 downto 0);
-    true_value_valid  : in std_logic;
-    false_value       : in std_logic_vector(BITWIDTH - 1 downto 0);
-    false_value_valid : in std_logic;
-    result_ready      : in std_logic;
+    clk, rst         : in std_logic;
+    condition        : in std_logic;
+    condition_valid  : in std_logic;
+    trueValue        : in std_logic_vector(BITWIDTH - 1 downto 0);
+    trueValue_valid  : in std_logic;
+    falseValue       : in std_logic_vector(BITWIDTH - 1 downto 0);
+    falseValue_valid : in std_logic;
+    result_ready     : in std_logic;
     -- outputs
-    condition_ready   : out std_logic;
-    true_value_ready  : out std_logic;
-    false_value_ready : out std_logic;
-    result            : out std_logic_vector(BITWIDTH - 1 downto 0);
-    result_valid      : out std_logic);
-
+    result           : out std_logic_vector(BITWIDTH - 1 downto 0);
+    result_valid     : out std_logic;
+    condition_ready  : out std_logic;
+    trueValue_ready  : out std_logic;
+    falseValue_ready : out std_logic
+  );
 end entity;
 
-architecture arch of select_node is
+architecture arch of selector is
   signal ee, validInternal : std_logic;
   signal kill0, kill1      : std_logic;
   signal antitokenStop     : std_logic;
   signal g0, g1            : std_logic;
 begin
 
-  ee            <= condition_valid and ((not condition and false_value_valid) or (condition and true_value_valid)); --condition and one input
-  validInternal <= ee and not antitokenStop;                                                                        -- propagate ee if not stopped by antitoken
+  ee            <= condition_valid and ((not condition and falseValue_valid) or (condition and trueValue_valid)); --condition and one input
+  validInternal <= ee and not antitokenStop; -- propagate ee if not stopped by antitoken
 
-  g0 <= not true_value_valid and validInternal and result_ready;
-  g1 <= not false_value_valid and validInternal and result_ready;
+  g0 <= not trueValue_valid and validInternal and result_ready;
+  g1 <= not falseValue_valid and validInternal and result_ready;
 
-  result_valid      <= validInternal;
-  true_value_ready  <= (not true_value_valid) or (validInternal and result_ready) or kill0;  -- normal join or antitoken
-  false_value_ready <= (not false_value_valid) or (validInternal and result_ready) or kill1; --normal join or antitoken
-  condition_ready   <= (not condition_valid) or (validInternal and result_ready);            --like normal join
+  result_valid     <= validInternal;
+  trueValue_ready  <= (not trueValue_valid) or (validInternal and result_ready) or kill0; -- normal join or antitoken
+  falseValue_ready <= (not falseValue_valid) or (validInternal and result_ready) or kill1; --normal join or antitoken
+  condition_ready  <= (not condition_valid) or (validInternal and result_ready); --like normal join
 
-  result <= false_value when (condition = '0') else
-    true_value;
+  result <= falseValue when (condition = '0') else
+            trueValue;
 
   Antitokens : entity work.antitokens
     port map(
       clk, rst,
-      false_value_valid, true_value_valid,
+      falseValue_valid, trueValue_valid,
       kill1, kill0,
       g1, g0,
-      antitokenStop);
+      antitokenStop
+    );
 
+end architecture;
+
+library ieee;
+use ieee.std_logic_1164.all;
+use ieee.numeric_std.all;
+
+entity antitokens is
+  port (
+    clk, reset                 : in  std_logic;
+    pvalid1, pvalid0           : in  std_logic;
+    kill1, kill0               : out std_logic;
+    generate_at1, generate_at0 : in  std_logic;
+    stop_valid                 : out std_logic
+  );
+end antitokens;
+
+architecture arch of antitokens is
+  signal reg_in0, reg_in1, reg_out0, reg_out1 : std_logic;
+begin
+
+  reg0 : process (clk, reset, reg_in0)
+  begin
+    if (reset = '1') then
+      reg_out0 <= '0';
+    else
+      if (rising_edge(clk)) then
+        reg_out0 <= reg_in0;
+      end if;
+    end if;
+  end process reg0;
+
+  reg1 : process (clk, reset, reg_in1)
+  begin
+    if (reset = '1') then
+      reg_out1 <= '0';
+    else
+      if (rising_edge(clk)) then
+        reg_out1 <= reg_in1;
+      end if;
+    end if;
+  end process reg1;
+
+  reg_in0 <= not pvalid0 and (generate_at0 or reg_out0);
+  reg_in1 <= not pvalid1 and (generate_at1 or reg_out1);
+
+  stop_valid <= reg_out0 or reg_out1;
+
+  kill0 <= generate_at0 or reg_out0;
+  kill1 <= generate_at1 or reg_out1;
 end architecture;

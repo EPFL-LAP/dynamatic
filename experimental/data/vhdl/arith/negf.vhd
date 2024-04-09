@@ -1,8 +1,7 @@
-library IEEE;
-use IEEE.std_logic_1164.all;
+library ieee;
+use ieee.std_logic_1164.all;
 use ieee.numeric_std.all;
-use work.customTypes.all;
-entity negf_node is
+entity negf is
   generic (
     BITWIDTH : integer
   );
@@ -14,18 +13,16 @@ entity negf_node is
     ins_valid  : in std_logic;
     outs_ready : in std_logic;
     -- outputs
-    ins_ready  : out std_logic;
     outs       : out std_logic_vector(BITWIDTH - 1 downto 0);
-    outs_valid : out std_logic);
+    outs_valid : out std_logic;
+    ins_ready  : out std_logic
+  );
 end entity;
 
-architecture arch of negf_node is
-
-  constant msb_mask : std_logic_vector(31 downto 0) := (31 => '1', others => '0');
-
+architecture arch of negf is
 begin
-
-  outs       <= ins xor msb_mask;
-  outs_valid <= ins_valid;
-  ins_ready  <= outs_ready;
+  outs(BITWIDTH - 1)          <= ins(BITWIDTH - 1) xor '1';
+  outs(BITWIDTH - 2 downto 0) <= ins(BITWIDTH - 2 downto 0);
+  outs_valid                  <= ins_valid;
+  ins_ready                   <= outs_ready;
 end architecture;
