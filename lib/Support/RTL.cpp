@@ -60,7 +60,7 @@ bool RTLUnsignedType::UnsignedConstraints::verify(StringRef paramValue) const {
   unsigned value = *optValue;
 
   // Check all constraints
-  return (!lb || lb <= value) && (!ub || value <= ub) && (!eq || value == ub) &&
+  return (!lb || lb <= value) && (!ub || value <= ub) && (!eq || value == eq) &&
          (!ne || value != ne);
 }
 
