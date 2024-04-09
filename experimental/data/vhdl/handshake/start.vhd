@@ -1,6 +1,6 @@
-library IEEE;
-use IEEE.STD_LOGIC_1164.all;
-use IEEE.NUMERIC_STD.all;
+library ieee;
+use ieee.std_logic_1164.all;
+use ieee.numeric_std.all;
 
 entity start is
   generic (
@@ -20,10 +20,10 @@ entity start is
 end entity;
 
 architecture arch of start is
-  signal set : std_logic;
-  signal start_internal : std_logic;
-  signal startBuff_readyArray : std_logic;
-  signal startBuff_validArray : std_logic;
+  signal set                    : std_logic;
+  signal start_internal         : std_logic;
+  signal startBuff_readyArray   : std_logic;
+  signal startBuff_validArray   : std_logic;
   signal startBuff_dataOutArray : std_logic_vector(BITWIDTH - 1 downto 0);
 
 begin
@@ -31,12 +31,12 @@ begin
   begin
     if (rst = '1') then
       start_internal <= '0';
-      set <= '0';
+      set            <= '0';
 
     elsif rising_edge(clk) then
       if (ins_valid = '1' and set = '0') then
         start_internal <= '1';
-        set <= '1';
+        set            <= '1';
       else
         start_internal <= '0';
       end if;
@@ -58,6 +58,6 @@ begin
     );
 
   outs_valid <= startBuff_validArray;
-  outs <= startBuff_dataOutArray;
-  ins_ready <= startBuff_readyArray;
+  outs       <= startBuff_dataOutArray;
+  ins_ready  <= startBuff_readyArray;
 end architecture;

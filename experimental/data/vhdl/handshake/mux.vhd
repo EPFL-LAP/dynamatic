@@ -1,10 +1,10 @@
 library ieee;
 use ieee.std_logic_1164.all;
-use work.customTypes.all;
+use work.types.all;
 use ieee.numeric_std.all;
-use IEEE.math_real.all;
+use ieee.math_real.all;
 
-entity mux_node is
+entity mux is
   generic (
     NUM_INPUTS    : integer;
     BITWIDTH      : integer;
@@ -26,7 +26,7 @@ entity mux_node is
     outs_valid       : out std_logic);
 end entity;
 
-architecture arch of mux_node is
+architecture arch of mux is
 
   signal tehb_data_in : std_logic_vector(BITWIDTH - 1 downto 0);
   signal tehb_pvalid  : std_logic;

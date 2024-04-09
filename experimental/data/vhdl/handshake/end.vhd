@@ -2,7 +2,7 @@ library ieee;
 use ieee.std_logic_1164.all;
 use ieee.numeric_std.all;
 
-entity end is
+entity end_sync is
   generic (
     BITWIDTH   : integer;
     MEM_INPUTS : integer
@@ -22,34 +22,34 @@ entity end is
   );
 end entity;
 
-architecture arch of end is
+architecture arch of end_sync is
   signal allPValid : std_logic;
-  signal nReady : std_logic;
-  signal valid : std_logic;
+  signal nReady    : std_logic;
+  signal valid     : std_logic;
   signal mem_valid : std_logic;
   signal joinValid : std_logic;
   signal joinReady : std_logic;
   signal out_array : std_logic_vector(1 downto 0);
 
 begin
-  nReady <= out_array(0);
+  nReady    <= out_array(0);
   joinReady <= out_array(1);
 
   process (ins_valid, ins)
-    variable tmp_data_out : unsigned(BITWIDTH - 1 downto 0);
+    variable tmp_data_out  : unsigned(BITWIDTH - 1 downto 0);
     variable tmp_valid_out : std_logic;
   begin
-    tmp_data_out := unsigned(ins);
+    tmp_data_out  := unsigned(ins);
     tmp_valid_out := '0';
     if (ins_valid = '1') then
-      tmp_data_out := unsigned(ins);
+      tmp_data_out  := unsigned(ins);
       tmp_valid_out := ins_valid;
     end if;
-    outs <= std_logic_vector(resize(tmp_data_out, BITWIDTH));
+    outs  <= std_logic_vector(resize(tmp_data_out, BITWIDTH));
     valid <= tmp_valid_out;
   end process;
 
-  mem_and : entity work.andN(vanilla) generic map (MEM_INPUTS)
+  mem_and : entity work.and_n(vanilla) generic map (MEM_INPUTS)
     port map(memDone_valid, mem_valid);
 
   j : entity work.join(arch) generic map(2)

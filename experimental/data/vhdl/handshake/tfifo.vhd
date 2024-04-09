@@ -16,15 +16,15 @@ entity tfifo is
     -- outputs
     outs       : out std_logic_vector(BITWIDTH - 1 downto 0);
     outs_valid : out std_logic;
-    outs_ready : out std_logic
+    ins_ready  : out std_logic
   );
 end entity;
 
 architecture arch of tfifo is
-  signal mux_sel : std_logic;
-  signal fifo_valid, fifo_ready : std_logic;
+  signal mux_sel                  : std_logic;
+  signal fifo_valid, fifo_ready   : std_logic;
   signal fifo_pvalid, fifo_nready : std_logic;
-  signal fifo_in, fifo_out : std_logic_vector(BITWIDTH - 1 downto 0);
+  signal fifo_in, fifo_out        : std_logic_vector(BITWIDTH - 1 downto 0);
 begin
 
   process (mux_sel, fifo_out, ins) is
@@ -36,13 +36,13 @@ begin
     end if;
   end process;
 
-  outs_valid <= ins_valid or fifo_valid;
-  outs_ready <= fifo_ready or outs_ready;
+  outs_valid  <= ins_valid or fifo_valid;
+  ins_ready   <= fifo_ready or outs_ready;
   fifo_pvalid <= ins_valid and (not outs_ready or fifo_valid);
-  mux_sel <= fifo_valid;
+  mux_sel     <= fifo_valid;
 
   fifo_nready <= outs_ready;
-  fifo_in <= ins;
+  fifo_in     <= ins;
 
   fifo : entity work.elastic_fifo_inner(arch) generic map (SIZE, BITWIDTH)
     port map(

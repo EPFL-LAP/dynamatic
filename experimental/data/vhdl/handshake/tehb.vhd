@@ -8,21 +8,20 @@ entity tehb is
   );
   port (
     -- inputs
+    clk, rst   : in std_logic;
     ins        : in std_logic_vector(BITWIDTH - 1 downto 0);
     ins_valid  : in std_logic;
-    clk        : in std_logic;
-    rst        : in std_logic;
     outs_ready : in std_logic;
     -- outputs
-    ins_ready  : out std_logic;
     outs       : out std_logic_vector(BITWIDTH - 1 downto 0);
-    outs_valid : out std_logic
+    outs_valid : out std_logic;
+    ins_ready  : out std_logic
   );
 end entity;
 
 architecture arch of tehb is
-  signal full_reg, reg_en, mux_sel : std_logic;
-  signal data_reg : std_logic_vector(BITWIDTH - 1 downto 0);
+  signal full_reg, empty_reg, reg_en : std_logic;
+  signal data_reg                    : std_logic_vector(BITWIDTH - 1 downto 0);
 
 begin
   process (clk, rst) is
@@ -30,7 +29,7 @@ begin
     if (rst = '1') then
       full_reg <= '0';
     elsif (rising_edge(clk)) then
-      full_reg <= outs_valid and not outs_ready;
+      full_reg <= ins_valid and not outs_ready;
     end if;
   end process;
 
@@ -45,17 +44,18 @@ begin
     end if;
   end process;
 
-  process (mux_sel, data_reg, ins) is
+  process (full_reg, data_reg, ins) is
   begin
-    if (mux_sel = '1') then
+    if (full_reg = '1') then
       outs <= data_reg;
     else
       outs <= ins;
     end if;
   end process;
 
+  empty_reg <= not full_reg;
+  reg_en    <= empty_reg and (ins_valid and (not outs_ready));
+
   outs_valid <= ins_valid or full_reg;
-  ins_ready <= not full_reg;
-  reg_en <= ins_ready and ins_valid and not outs_ready;
-  mux_sel <= full_reg;
-end arch;
+  ins_ready  <= empty_reg;
+end architecture;

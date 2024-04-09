@@ -1,31 +1,32 @@
 library ieee;
 use ieee.std_logic_1164.all;
-use work.customTypes.all;
 use ieee.numeric_std.all;
-use IEEE.math_real.all;
-entity control_merge_node is generic (
-  INPUTS        : integer;
-  BITWIDTH      : integer;
-  COND_BITWIDTH : integer
-);
+use work.types.all;
 
-port (
-  -- inputs
-  ins             : in data_array(INPUTS - 1 downto 0)(BITWIDTH - 1 downto 0);
-  ins_valid       : in std_logic_vector(INPUTS - 1 downto 0);
-  clk             : in std_logic;
-  rst             : in std_logic;
-  outs_ready      : in std_logic;
-  condition_ready : in std_logic;
-  -- outputs
-  ins_ready       : out std_logic_vector(INPUTS - 1 downto 0);
-  outs            : out std_logic_vector(BITWIDTH - 1 downto 0);
-  outs_valid      : out std_logic;
-  condition       : out std_logic_vector(COND_BITWIDTH - 1 downto 0);
-  condition_valid : out std_logic);
+entity control_merge is
+  generic (
+    INPUTS        : integer;
+    BITWIDTH      : integer;
+    COND_BITWIDTH : integer
+  );
+  port (
+    -- inputs
+    ins             : in data_array(INPUTS - 1 downto 0)(BITWIDTH - 1 downto 0);
+    ins_valid       : in std_logic_vector(INPUTS - 1 downto 0);
+    clk             : in std_logic;
+    rst             : in std_logic;
+    outs_ready      : in std_logic;
+    condition_ready : in std_logic;
+    -- outputs
+    ins_ready       : out std_logic_vector(INPUTS - 1 downto 0);
+    outs            : out std_logic_vector(BITWIDTH - 1 downto 0);
+    outs_valid      : out std_logic;
+    condition       : out std_logic_vector(COND_BITWIDTH - 1 downto 0);
+    condition_valid : out std_logic
+  );
 end entity;
 
-architecture arch of control_merge_node is
+architecture arch of control_merge is
 
   signal phi_C1_readyArray   : std_logic_vector (INPUTS - 1 downto 0);
   signal phi_C1_validArray   : std_logic;
@@ -47,7 +48,7 @@ begin
       clk        => clk,
       rst        => rst,
       ins_valid  => ins_valid,
-      ins => (INPUTS - 1 downto 0 => all_ones),
+      ins        => (INPUTS - 1 downto 0 => all_ones),
       outs_ready => oehb1_ready,
       outs       => phi_C1_dataOutArray,
       ins_ready  => phi_C1_readyArray,
@@ -63,7 +64,8 @@ begin
       end if;
     end loop;
   end process;
-  oehb1 : entity work.TEHB(arch) generic map (COND_BITWIDTH)
+
+  oehb1 : entity work.tehb(arch) generic map (COND_BITWIDTH)
     port map(
       clk        => clk,
       rst        => rst,
@@ -75,7 +77,7 @@ begin
       outs       => oehb1_dataOut
     );
 
-  fork_C1 : entity work.fork_node(arch) generic map (2, 1)
+  fork_C1 : entity work.fork(arch) generic map (2, 1)
     port map(
       clk           => clk,
       rst           => rst,

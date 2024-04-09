@@ -1,6 +1,6 @@
-library IEEE;
-use IEEE.STD_LOGIC_1164.all;
-use IEEE.NUMERIC_STD.all;
+library ieee;
+use ieee.std_logic_1164.all;
+use ieee.numeric_std.all;
 
 entity elastic_fifo_inner is
   generic (
@@ -22,13 +22,13 @@ end entity;
 
 architecture arch of elastic_fifo_inner is
 
-  signal ReadEn : std_logic := '0';
-  signal WriteEn : std_logic := '0';
-  signal Tail : natural range 0 to SIZE - 1;
-  signal Head : natural range 0 to SIZE - 1;
-  signal Empty : std_logic;
-  signal Full : std_logic;
-  signal Bypass : std_logic;
+  signal ReadEn     : std_logic := '0';
+  signal WriteEn    : std_logic := '0';
+  signal Tail       : natural range 0 to SIZE - 1;
+  signal Head       : natural range 0 to SIZE - 1;
+  signal Empty      : std_logic;
+  signal Full       : std_logic;
+  signal Bypass     : std_logic;
   signal fifo_valid : std_logic;
   type FIFO_Memory is array (0 to SIZE - 1) of std_logic_vector (BITWIDTH - 1 downto 0);
   signal Memory : FIFO_Memory;
@@ -55,7 +55,7 @@ begin
     elsif (rising_edge(clk)) then
       if (ReadEn = '1') then
         fifo_valid <= '1';
-      elsif (outs_ready(0) = '1') then
+      elsif (outs_ready = '1') then
         fifo_valid <= '0';
       end if;
 

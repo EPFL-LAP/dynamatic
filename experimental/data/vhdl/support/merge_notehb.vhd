@@ -1,7 +1,7 @@
 library ieee;
 use ieee.std_logic_1164.all;
-use work.customTypes.all;
 use ieee.numeric_std.all;
+use work.types.all;
 
 entity merge_notehb is
 
@@ -9,12 +9,12 @@ entity merge_notehb is
     INPUTS   : integer;
     BITWIDTH : integer);
   port (
-    clk        : in std_logic;
-    rst        : in std_logic;
-    ins        : in data_array(INPUTS - 1 downto 0)(BITWIDTH - 1 downto 0);
+    clk        : in  std_logic;
+    rst        : in  std_logic;
+    ins        : in  data_array(INPUTS - 1 downto 0)(BITWIDTH - 1 downto 0);
     outs       : out std_logic_vector(BITWIDTH - 1 downto 0);
-    ins_valid  : in std_logic_vector(INPUTS - 1 downto 0);
-    outs_ready : in std_logic;
+    ins_valid  : in  std_logic_vector(INPUTS - 1 downto 0);
+    outs_ready : in  std_logic;
     outs_valid : out std_logic;
     ins_ready  : out std_logic_vector(INPUTS - 1 downto 0));
 end merge_notehb;

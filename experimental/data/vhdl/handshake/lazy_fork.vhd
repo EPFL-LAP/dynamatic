@@ -1,8 +1,8 @@
 library ieee;
 use ieee.std_logic_1164.all;
-use work.customTypes.all;
+use work.types.all;
 
-entity lazy_fork_node is generic (
+entity lazy_fork is generic (
   OUTPUTS  : integer;
   BITWIDTH : integer);
 port (
@@ -20,11 +20,11 @@ port (
 
 end entity;
 
-architecture arch of lazy_fork_node is
+architecture arch of lazy_fork is
   signal allnReady : std_logic;
 begin
 
-  genericAnd : entity work.andn generic map (OUTPUTS)
+  genericAnd : entity work.and_n generic map (OUTPUTS)
     port map(outs_ready, allnReady);
 
   valids : process (ins_valid, outs_ready, allnReady)

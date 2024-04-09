@@ -1,6 +1,6 @@
-library IEEE;
-use IEEE.std_logic_1164.all;
-use IEEE.numeric_std.all;
+library ieee;
+use ieee.std_logic_1164.all;
+use ieee.numeric_std.all;
 
 entity lsq_store is
   generic (
@@ -20,20 +20,20 @@ entity lsq_store is
     addrOut         : out std_logic_vector(ADDR_BITWIDTH - 1 downto 0);
     addrOut_valid   : out std_logic;
     dataToMem       : out std_logic_vector(DATA_BITWIDTH - 1 downto 0);
-    dataToMem_valid : out std_logic
+    dataToMem_valid : out std_logic;
     addrIn_ready    : out std_logic;
-    dataIn_ready    : out std_logic;
+    dataIn_ready    : out std_logic
   );
 end entity;
 
 architecture arch of lsq_store is
 begin
   -- data
-  dataToMem <= dataFromMem;
-  dataToMem_valid <= dataFromMem_valid;
-  dataFromMem_ready <= dataToMem_ready;
+  dataToMem       <= dataIn;
+  dataToMem_valid <= dataIn_valid;
+  dataIn_ready    <= dataToMem_ready;
   -- addr
-  addrOut <= addrIn;
+  addrOut       <= addrIn;
   addrOut_valid <= addrIn_valid;
-  addrIn_ready <= addrOut_ready;
+  addrIn_ready  <= addrOut_ready;
 end architecture;
