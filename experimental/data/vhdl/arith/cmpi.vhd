@@ -16,7 +16,7 @@ entity ENTITY_NAME is
     rhs_valid    : in std_logic;
     result_ready : in std_logic;
     -- outputs
-    result       : out std_logic_vector(BITWIDTH - 1 downto 0);
+    result       : out std_logic;
     result_valid : out std_logic;
     lhs_ready    : out std_logic;
     rhs_ready    : out std_logic
