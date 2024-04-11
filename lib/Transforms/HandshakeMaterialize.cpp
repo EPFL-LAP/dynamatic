@@ -12,9 +12,10 @@
 //===----------------------------------------------------------------------===//
 
 #include "dynamatic/Transforms/HandshakeMaterialize.h"
+#include "dynamatic/Dialect/Handshake/HandshakeCanonicalize.h"
 #include "dynamatic/Dialect/Handshake/HandshakeOps.h"
+#include "dynamatic/Dialect/Handshake/MemoryInterfaces.h"
 #include "dynamatic/Support/CFG.h"
-#include "dynamatic/Support/Handshake.h"
 #include "mlir/IR/BuiltinTypes.h"
 #include "mlir/Transforms/GreedyPatternRewriteDriver.h"
 #include "llvm/ADT/STLExtras.h"

@@ -1,4 +1,4 @@
-//===- Handshake.cpp - Helpers for Handshake-level analysis -----*- C++ -*-===//
+//===- MemoryInterfaces.cpp - Memory interface helpers ----------*- C++ -*-===//
 //
 // Dynamatic is under the Apache License v2.0 with LLVM Exceptions.
 // See https://llvm.org/LICENSE.txt for license information.
@@ -6,18 +6,17 @@
 //
 //===----------------------------------------------------------------------===//
 //
-// Implements helpers for working with Handshake-level IR.
+// Implements support to work with Handshake memory interfaces.
 //
 //===----------------------------------------------------------------------===//
 
-#include "dynamatic/Support/Handshake.h"
+#include "dynamatic/Dialect/Handshake/MemoryInterfaces.h"
 #include "dynamatic/Dialect/Handshake/HandshakeOps.h"
 #include "dynamatic/Support/Attribute.h"
 #include "dynamatic/Support/Backedge.h"
 #include "dynamatic/Support/CFG.h"
 #include "mlir/Dialect/Affine/IR/AffineOps.h"
 #include "mlir/Dialect/MemRef/IR/MemRef.h"
-#include "mlir/IR/PatternMatch.h"
 #include "mlir/IR/Value.h"
 #include "llvm/ADT/TypeSwitch.h"
 #include "llvm/Support/ErrorHandling.h"
@@ -319,26 +318,6 @@ void MemoryInterfaceBuilder::addMemDataResultToLoads(InterfacePorts &ports,
 //===----------------------------------------------------------------------===//
 // Misc functions
 //===----------------------------------------------------------------------===//
-
-bool dynamatic::hasRealUses(Value val) {
-  return llvm::any_of(val.getUsers(), [&](Operation *user) {
-    return !isa<handshake::SinkOp>(user);
-  });
-}
-
-void dynamatic::eraseSinkUsers(Value val) {
-  for (Operation *user : llvm::make_early_inc_range(val.getUsers())) {
-    if (isa<handshake::SinkOp>(user))
-      user->erase();
-  }
-}
-
-void dynamatic::eraseSinkUsers(Value val, PatternRewriter &rewriter) {
-  for (Operation *user : llvm::make_early_inc_range(val.getUsers())) {
-    if (isa<handshake::SinkOp>(user))
-      rewriter.eraseOp(user);
-  }
-}
 
 SmallVector<Value> dynamatic::getLSQControlPaths(handshake::LSQOp lsqOp,
                                                  Operation *ctrlOp) {
