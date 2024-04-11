@@ -36,12 +36,12 @@ std::string handshake::MuxOp::getOperandName(unsigned idx) {
 
 std::string handshake::ControlMergeOp::getResultName(unsigned idx) {
   assert(idx < getNumResults() && "index too high");
-  return idx == 0 ? "index" : getDefaultResultName(idx - 1);
+  return idx == 0 ? "outs" : "index";
 }
 
 std::string handshake::ConditionalBranchOp::getOperandName(unsigned idx) {
   assert(idx < getNumOperands() && "index too high");
-  return idx == 0 ? "condition" : "ins";
+  return idx == 0 ? "condition" : "data";
 }
 
 std::string handshake::ConditionalBranchOp::getResultName(unsigned idx) {
@@ -51,7 +51,7 @@ std::string handshake::ConditionalBranchOp::getResultName(unsigned idx) {
 
 std::string handshake::ConstantOp::getOperandName(unsigned idx) {
   assert(idx == 0 && "index too high");
-  return "control";
+  return "ctrl";
 }
 
 std::string handshake::EndOp::getOperandName(unsigned idx) {

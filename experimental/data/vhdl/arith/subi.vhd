@@ -2,7 +2,7 @@ library ieee;
 use ieee.std_logic_1164.all;
 use ieee.numeric_std.all;
 
-entity addi is
+entity subi is
   generic (
     BITWIDTH : integer
   );
@@ -23,7 +23,7 @@ entity addi is
   );
 end entity;
 
-architecture arch of addi is
+architecture arch of subi is
 begin
   join_inputs : entity work.join(arch) generic map(2)
     port map(

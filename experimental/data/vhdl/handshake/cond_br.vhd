@@ -8,7 +8,7 @@ entity cond_br is
   port (
     -- inputs
     clk, rst        : in std_logic;
-    condition       : in std_logic;
+    condition       : in std_logic_vector(0 downto 0);
     condition_valid : in std_logic;
     data            : in std_logic_vector(BITWIDTH - 1 downto 0);
     data_valid      : in std_logic;
@@ -43,7 +43,7 @@ begin
 
   cond_brp : entity work.branch_simple(arch)
     port map(
-      condition,
+      condition(0),
       joinValid,
       (trueOut_ready,
       falseOut_ready),
