@@ -29,6 +29,7 @@
 #include "mlir/IR/PatternMatch.h"
 #include "mlir/Support/LogicalResult.h"
 #include "mlir/Transforms/DialectConversion.h"
+#include "mlir/Transforms/GreedyPatternRewriteDriver.h"
 #include "llvm/ADT/STLExtras.h"
 #include "llvm/ADT/TypeSwitch.h"
 #include "llvm/Support/ErrorHandling.h"
@@ -1013,7 +1014,7 @@ ConvertFunc::matchAndRewrite(handshake::FuncOp funcOp, OpAdaptor adaptor,
   for (const hw::PortInfo &outPort : modInfo.getOutputs())
     outputPorts.push_back(&outPort);
 
-  // Crerate backege inputs for the module's output operation and associate
+  // Create backege inputs for the module's output operation and associate
   // them to the future operations whose conversion will resolve them
   SmallVector<Value> outputOperands;
   size_t portIdx = 0;
@@ -1024,10 +1025,11 @@ ConvertFunc::matchAndRewrite(handshake::FuncOp funcOp, OpAdaptor adaptor,
     backedges.push_back(backedge);
   };
 
+  // Function results will come through the Handshake terminator
   size_t numEndResults = modInfo.sizeOutputs() - state.getNumMemOutputs();
   for (size_t i = 0; i < numEndResults; ++i)
     addBackedge(state.endBackedges);
-
+  // Outgoing memory signals will come through memory interfaces
   for (auto &[_, memState] : state.memInterfaces) {
     for (size_t i = 0; i < memState.numOutputs; ++i)
       addBackedge(memState.backedges);
@@ -1251,8 +1253,7 @@ LogicalResult ExtModuleConversionPattern<T>::matchAndRewrite(
   // Add all operation operands to the inputs
   for (auto [idx, oprd] : llvm::enumerate(adaptor.getOperands()))
     builder.addInput(portNames.getInputName(idx), oprd);
-  if (op.template hasTrait<mlir::OpTrait::HasClock>())
-    builder.addClkAndRst();
+  builder.addClkAndRst();
 
   // Add all operation results to the outputs
   for (auto [idx, type] : llvm::enumerate(op->getResultTypes()))
@@ -1288,14 +1289,6 @@ static LogicalResult verifyExportToRTL(handshake::FuncOp funcOp) {
                               "only supports integer and floating-point types";
                   return success();
                 })
-            .Case<handshake::ReturnOp>(
-                [&](handshake::ReturnOp retOp) -> LogicalResult {
-                  if (retOp->getNumOperands() != 1)
-                    return retOp.emitError()
-                           << "Incompatible number of return values, our VHDL "
-                              "component only supports a single return value";
-                  return success();
-                })
             .Case<handshake::EndOp>(
                 [&](handshake::EndOp endOp) -> LogicalResult {
                   if (endOp.getReturnValues().size() != 1)
@@ -1312,6 +1305,25 @@ static LogicalResult verifyExportToRTL(handshake::FuncOp funcOp) {
 }
 
 namespace {
+/// Replaces Handshake return operations into a sequence of TEHBs, one for each
+/// return operand.
+struct ReplaceReturnWithTEHB : public OpRewritePattern<handshake::ReturnOp> {
+  using OpRewritePattern<handshake::ReturnOp>::OpRewritePattern;
+
+  LogicalResult matchAndRewrite(handshake::ReturnOp returnOp,
+                                PatternRewriter &rewriter) const override {
+    rewriter.setInsertionPoint(returnOp);
+    SmallVector<Value> tehbOutputs;
+    for (Value oprd : returnOp->getOperands()) {
+      auto tehbOp =
+          rewriter.create<handshake::TEHBOp>(returnOp.getLoc(), oprd, 1);
+      tehbOutputs.push_back(tehbOp.getResult());
+    }
+    rewriter.replaceOp(returnOp, tehbOutputs);
+    return success();
+  }
+};
+
 /// Conversion pass driver. The conversion only works on modules containing
 /// a single handshake function (handshake::FuncOp) at the moment. The
 /// function and all the operations it contains are converted to operations
@@ -1341,6 +1353,16 @@ public:
     if (failed(verifyExportToRTL(funcOp)))
       return signalPassFailure();
 
+    // Apply some basic IR transformations before actually doing the lowering
+    mlir::GreedyRewriteConfig config;
+    config.useTopDownTraversal = true;
+    config.enableRegionSimplification = false;
+    RewritePatternSet transformPatterns{ctx};
+    transformPatterns.add<ReplaceReturnWithTEHB>(ctx);
+    if (failed(applyPatternsAndFoldGreedily(modOp, std::move(transformPatterns),
+                                            config)))
+      return signalPassFailure();
+
     // Helper struct for lowering
     OpBuilder builder(ctx);
     builder.setInsertionPointToStart(modOp.getBody(0));
@@ -1363,7 +1385,6 @@ public:
                     ExtModuleConversionPattern<handshake::SinkOp>,
                     ExtModuleConversionPattern<handshake::ForkOp>,
                     ExtModuleConversionPattern<handshake::LazyForkOp>,
-                    ExtModuleConversionPattern<handshake::ReturnOp>,
                     ExtModuleConversionPattern<handshake::MCLoadOp>,
                     ExtModuleConversionPattern<handshake::LSQLoadOp>,
                     ExtModuleConversionPattern<handshake::MCStoreOp>,
