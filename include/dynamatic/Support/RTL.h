@@ -23,6 +23,23 @@
 
 namespace dynamatic {
 
+/// Performs a series of regular expression match-and-replace in the input
+/// string, and returns the resulting string. Each key-value pair in the
+/// `replacements` map represent a regular expression to replace and the string
+/// to replace it with, respectively. If a regex exists multiple times in the
+/// input, it is replaced every time. Replacements happen one at a time in map
+/// iteration order.
+std::string
+replaceRegexes(StringRef input,
+               const std::map<std::string, std::string> &replacements);
+
+/// Substitutes parameters in the input string. The map maps parameter names,
+/// which need to be prefixed by a $ symbol to be replaced in the input, to
+/// their respective value. Returns the input string after substitutions were
+/// performed.
+std::string substituteParams(StringRef input,
+                             const llvm::StringMap<std::string> &parameters);
+
 class RTLParameter;
 class RTLComponent;
 
@@ -178,6 +195,12 @@ bool fromJSON(const llvm::json::Value &value, RTLType *&type,
 /// to underlying dynamatic memory allocation.
 class RTLParameter {
 public:
+  /// Reserved parameter names (used during RTL generation).
+  static constexpr llvm::StringLiteral DYNAMATIC = StringLiteral("DYNAMATIC"),
+                                       OUTPUT_DIR = StringLiteral("OUTPUT_DIR"),
+                                       MODULE_NAME =
+                                           StringLiteral("MODULE_NAME");
+
   /// Default constructor.
   RTLParameter() = default;
 
@@ -247,19 +270,22 @@ struct RTLMatch {
   static constexpr StringLiteral NAME_ATTR = StringLiteral("hw.name"),
                                  PARAMETERS_ATTR =
                                      StringLiteral("hw.parameters");
-
-  /// The MLIR operation we are trying to match an RTL component/model for.
-  Operation *op;
   /// The RTL component's name to look for.
   std::string name;
   /// Maps RTL component's parameter names to their respective value.
   llvm::StringMap<std::string> parameters;
-  /// Whether the match is possible altohgether. If this is `true`, all matching
+
+  /// Location at which to report errors.
+  Location loc;
+  /// Whether the match is possible altogether. If this is `true`, all matching
   /// methods should "fail" with this object.
   bool invalid = true;
 
   /// Constructs a match from an external module operation from the HW dialect.
   RTLMatch(dynamatic::hw::HWModuleExternOp modOp);
+
+  /// Constructs a match from a component name, without parameters.
+  RTLMatch(StringRef name, Location loc);
 };
 
 /// Represents an RTL component i.e., a top-level entry in the RTL configuration
@@ -300,10 +326,44 @@ public:
   /// Determines whether the RTL component is compatible with the match object.
   bool isCompatible(const RTLMatch &match) const;
 
-  /// Determines whether the RTL component has any timing model compatible with
-  /// the match object. Returns the first compatible model (in model list
-  /// order), if any exists.
+  /// Returns whether the component is concretized using a "generic" RTL
+  /// implementation.
+  bool isGeneric() const { return !generic.empty(); }
+
+  /// Returns the component's entity name after performing substitutions with
+  /// the given parameters.
+  std::string
+  getEntityName(const llvm::StringMap<std::string> &parameters) const {
+    return substituteParams(entityName, parameters);
+  };
+
+  /// Returns the component's architecture name after performing substitutions
+  /// with the given parameters.
+  std::string
+  getArchName(const llvm::StringMap<std::string> &parameters) const {
+    return substituteParams(archName, parameters);
+  };
+
+  /// Returns the component's list of RTL dependencies.
+  ArrayRef<std::string> getDependencies() const { return dependencies; }
+
+  /// Returns the list of RTL parameters, in order, which must be provided as
+  /// generic parameters during instantiations of this component.
+  SmallVector<const RTLParameter *> getGenericParameters() const;
+
+  /// Determines whether the RTL component has any timing model compatible
+  /// with the match object. Returns the first compatible model (in model
+  /// list order), if any exists.
   const RTLComponent::Model *getModel(const RTLMatch &match) const;
+
+  /// Concretizes the RTL component with the provided parameters. Generic
+  /// components are simply copied to the output directory. Generated components
+  /// are produced by the user-provided arbitrary generation command. Succeeds
+  /// when the component could either be copied (generic) or when the generation
+  /// command returned 0 (generator). Reports an error at the provided location
+  /// in case of failure.
+  LogicalResult concretize(llvm::StringMap<std::string> &parameters,
+                           Location loc) const;
 
   RTLComponent(RTLComponent &&) noexcept = default;
   RTLComponent &operator=(RTLComponent &&) noexcept = default;
@@ -322,11 +382,19 @@ private:
   /// The component's dependencies (referenced by name).
   std::vector<std::string> dependencies;
 
-  /// Path to the generic implementation of the component.
+  /// Path to the generic implementation of the component. Supports parameter
+  /// substitution.
   std::string generic;
   /// Opaque command to issue when generating when concretizing the component
-  /// for a specific set of parameter values.
+  /// for a specific set of parameter values. Supports parameter substitution.
   std::string generator;
+  /// Name of the RTL entity. For generic components, by default this is the
+  /// filename part (without extension) of the components's path. For generated
+  /// component, it is the $MODULE_NAME parameter by default, which is provided
+  /// at generation time. Supports parameter substitution.
+  std::string entityName;
+  /// Architecture's name, "arch" be default. Supports parameter substitution.
+  std::string archName;
 
   /// Returns a pointer to the RTL parameter with a specific name, if it exists.
   RTLParameter *getParameter(StringRef name) const;
@@ -369,16 +437,6 @@ private:
   /// configuration files.
   std::vector<RTLComponent> components;
 };
-
-/// Performs a series of regular expression match-and-replace in the input
-/// string, and returns the resulting string. Each key-value pair in the
-/// `replacements` map represent a regular expression to replace and the string
-/// to replace it with, respectively. If a regex exists multiple times in the
-/// input, it is replaced every time. Replacements happen one at a time in map
-/// iteration order.
-std::string
-replaceRegexes(StringRef input,
-               const std::map<std::string, std::string> &replacements);
 
 } // namespace dynamatic
 
