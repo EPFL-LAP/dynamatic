@@ -56,6 +56,11 @@
 #define ENTITY_DISTRIBUTOR "Distributor"
 #define ENTITY_SELECTOR "Selector"
 #define ENTITY_INJECTOR "Inj"
+#define ENTITY_SPEC_BRANCH "speculating_branch"
+#define ENTITY_COMMIT_UNIT "spec_commit"
+#define ENTITY_SAVE_COMMIT_UNIT "spec_save_commit"
+#define ENTITY_SAVE_UNIT "spec_save"
+#define ENTITY_SPECULATOR "speculator"
 
 #define COMPONENT_MERGE "Merge"
 #define COMPONENT_READ_MEMORY "load"
@@ -88,6 +93,11 @@
 #define COMPONENT_DISTRIBUTOR "Distributor"
 #define COMPONENT_SELECTOR "Selector"
 #define COMPONENT_INJECTOR "Inj"
+#define COMPONENT_SPEC_BRANCH "speculating_branch"
+#define COMPONENT_COMMIT_UNIT "commit_unit"
+#define COMPONENT_SAVE_COMMIT_UNIT "save_commit_unit"
+#define COMPONENT_SAVE_UNIT "save_unit"
+#define COMPONENT_SPECULATOR "speculator"
 
 #define UNDERSCORE "_"
 #define COLOUMN " : "
@@ -129,6 +139,11 @@ enum {
   ENTITY_SEL_INDX,
   ENTITY_DISTRIBUTOR_INDX,
   ENTITY_SELECTOR_INDX,
+  ENTITY_SPEC_BRANCH_INDX,
+  ENTITY_COMMIT_UNIT_INDX,
+  ENTITY_SAVE_COMMIT_UNIT_INDX,
+  ENTITY_SAVE_UNIT_INDX,
+  ENTITY_SPECULATOR_INDX,
   ENTITY_MAX
 };
 

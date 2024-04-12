@@ -413,6 +413,12 @@ static string getComponentName(string name) {
   return nameRet;
 }
 
+static bool getSpeculativeFlag(string parameters) {
+  parameters = stringClean(parameters);
+  string type = getValue(parameters);
+  return type == "1";
+}
+
 static void parseConnections(const string &line) {
   vector<string> v;
   vector<string> fromTo;
@@ -466,6 +472,7 @@ static void parseConnections(const string &line) {
 
     int inputIndx;
     int outputIndx;
+    bool specConnection = false;
     for (auto &parameter : parameters) {
       if (parameter.find("from") != std::string::npos) {
         parameter.erase(remove(parameter.begin(), parameter.end(), ' '),
@@ -495,6 +502,8 @@ static void parseConnections(const string &line) {
         inputIndx = stoiSubstr(parameter);
         inputIndx--;
       }
+      if (parameter.find("speculative") != std::string::npos)
+        specConnection = getSpeculativeFlag(parameter);
     }
 
     if (currentNodeId != COMPONENT_NOT_FOUND &&
@@ -503,6 +512,9 @@ static void parseConnections(const string &line) {
       nodes[currentNodeId].outputs.output[outputIndx].nextNodesID = nextNodeId;
       nodes[currentNodeId].outputs.output[outputIndx].nextNodesPort = inputIndx;
       nodes[nextNodeId].inputs.input[inputIndx].prevNodesID = currentNodeId;
+      nodes[nextNodeId].inputs.input[inputIndx].speculative = specConnection;
+      nodes[currentNodeId].outputs.output[outputIndx].speculative =
+          specConnection;
 
     } else {
       cerr << "Netlist Error" << endl;
@@ -738,6 +750,10 @@ static void parseComponents(const string &v0, const string &v1) {
       }
       if (parameter.find("constants") != std::string::npos) {
         nodes[componentsInNetlist].constants = getComponentConstants(indx);
+      }
+      // Speculation
+      if (parameter.find("speculative") != std::string::npos) {
+        nodes[componentsInNetlist].speculative = getSpeculativeFlag(indx);
       }
     }
     if (nodes[componentsInNetlist].type == "Buffer" &&

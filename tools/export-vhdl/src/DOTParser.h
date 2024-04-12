@@ -24,6 +24,7 @@ struct Input {
   std::string type;
   int port;
   std::string infoType;
+  bool speculative;
 };
 
 struct In {
@@ -38,6 +39,7 @@ struct Output {
   std::string type;
   int port;
   std::string infoType;
+  bool speculative;
 };
 
 struct Out {
@@ -84,6 +86,9 @@ struct Node {
   int fifodepthS;
   int fifodepth;
   int constants;
+
+  // Speculation
+  bool speculative;
 };
 
 void parseDOT(const std::string &filename);

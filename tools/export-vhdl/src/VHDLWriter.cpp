@@ -43,7 +43,9 @@ static string entityName[] = {
     ENTITY_END,         ENTITY_START,       ENTITY_WRITE_MEMORY,
     ENTITY_SOURCE,      ENTITY_SINK,        ENTITY_CTRLMERGE,
     ENTITY_MUX,         ENTITY_LSQ,         ENTITY_MC,
-    ENTITY_DISTRIBUTOR, ENTITY_INJECTOR,    ENTITY_SELECTOR};
+    ENTITY_DISTRIBUTOR, ENTITY_INJECTOR,    ENTITY_SELECTOR,
+    ENTITY_SPEC_BRANCH, ENTITY_COMMIT_UNIT, ENTITY_SAVE_COMMIT_UNIT,
+    ENTITY_SAVE_UNIT,   ENTITY_SPECULATOR};
 
 static string componentTypes[] = {
     COMPONENT_MERGE,       COMPONENT_READ_MEMORY, COMPONENT_SINGLE_OP,
@@ -55,7 +57,9 @@ static string componentTypes[] = {
     COMPONENT_END,         COMPONENT_START,       COMPONENT_WRITE_MEMORY,
     COMPONENT_SOURCE,      COMPONENT_SINK,        COMPONENT_CTRLMERGE,
     COMPONENT_MUX,         COMPONENT_LSQ,         COMPONENT_MC,
-    COMPONENT_DISTRIBUTOR, COMPONENT_INJECTOR,    COMPONENT_SELECTOR};
+    COMPONENT_DISTRIBUTOR, COMPONENT_INJECTOR,    COMPONENT_SELECTOR,
+    COMPONENT_SPEC_BRANCH, COMPONENT_COMMIT_UNIT, COMPONENT_SAVE_COMMIT_UNIT,
+    COMPONENT_SAVE_UNIT,   COMPONENT_SPECULATOR};
 
 static string inputsName[] = {DATAIN_ARRAY, PVALID_ARRAY, NREADY_ARRAY
 
@@ -92,6 +96,10 @@ Component componentsType[MAX_COMPONENTS];
 
 ofstream netlist;
 ofstream tbWrapper;
+
+bool isSpecInput(Node node_i, int node_indx) { return node_i.speculative; }
+
+bool isSpecOutput(Node node_i, int node_indx) { return node_i.speculative; }
 
 static void writeSignals() {
   int indx;
@@ -166,6 +174,21 @@ static void writeSignals() {
         }
       }
       for (indx = 0; indx < nodes[i].inputs.size; indx++) {
+        if (isSpecInput(nodes[i], indx)) {
+          // Write the SpecInput Signals
+          signal = SIGNAL_STRING;
+          signal += nodes[i].name;
+          signal += UNDERSCORE;
+          signal += "specInArray";
+          signal += UNDERSCORE;
+          signal += to_string(indx);
+          signal += COLOUMN;
+          signal += "std_logic_vector (0 downto 0);";
+          signal += '\n';
+          netlist << "\t" << signal;
+        }
+      }
+      for (indx = 0; indx < nodes[i].inputs.size; indx++) {
 
         // Write the Valid Signals
         signal = SIGNAL_STRING;
@@ -237,6 +260,21 @@ static void writeSignals() {
           signal += " downto 0);";
           signal += '\n';
 
+          netlist << "\t" << signal;
+        }
+      }
+      for (indx = 0; indx < nodes[i].outputs.size; indx++) {
+        if (isSpecOutput(nodes[i], indx)) {
+          // Write the SpecOutput Signals
+          signal = SIGNAL_STRING;
+          signal += nodes[i].name;
+          signal += UNDERSCORE;
+          signal += "specOutArray";
+          signal += UNDERSCORE;
+          signal += to_string(indx);
+          signal += COLOUMN;
+          signal += "std_logic_vector (0 downto 0);";
+          signal += '\n';
           netlist << "\t" << signal;
         }
       }
@@ -826,6 +864,37 @@ static void writeConnections() {
                     << "std_logic_vector (resize(unsigned(" << signal2 << "),"
                     << signal1 << "'length))" << SEMICOLOUMN << endl;
           }
+          // Speculative bit propagation
+          int nextSpecNodeId = nodes[i].outputs.output[indx].nextNodesID;
+          int nextSpecNodePort = nodes[i].outputs.output[indx].nextNodesPort;
+
+          if (isSpecInput(nodes[nextSpecNodeId], nextSpecNodePort)) {
+            // Write the Spec Signal connections
+            if (nodes[nextSpecNodeId]
+                    .inputs.input[nextSpecNodePort]
+                    .speculative) {
+              // Predecessor
+              signal1 = nodes[nextSpecNodeId].name;
+              signal1 += "_specInArray_";
+              signal1 += to_string(nextSpecNodePort);
+
+              signal2 = nodes[i].name;
+              signal2 += "_specOutArray_";
+              signal2 += to_string(indx);
+
+              netlist << "\t" << signal1
+                      << " <= std_logic_vector (resize(unsigned(" << signal2
+                      << ")," << signal1 << "'length))" << SEMICOLOUMN << endl;
+            } else {
+              // Write zero
+              signal1 = nodes[nextSpecNodeId].name;
+              signal1 += "_specInArray_";
+              signal1 += to_string(nextSpecNodePort);
+
+              netlist << "\t" << signal1
+                      << "(0) <= '0';  -- Non-speculative input" << endl;
+            }
+          }
         }
       }
     }
@@ -871,6 +940,40 @@ static string getGeneric(int nodeId) {
     generic += COMMA;
     generic += to_string(nodes[nodeId].outputs.size);
     generic += COMMA;
+    generic += to_string(nodes[nodeId].inputs.input[0].bitSize);
+    generic += COMMA;
+    generic += to_string(nodes[nodeId].outputs.output[0].bitSize);
+  }
+  if (nodes[nodeId].type.find("speculating_branch") != std::string::npos) {
+    generic = to_string(nodes[nodeId].inputs.size);
+    generic += COMMA;
+    generic += to_string(nodes[nodeId].outputs.size);
+    generic += COMMA;
+    generic += to_string(nodes[nodeId].inputs.input[0].bitSize);
+    generic += COMMA;
+    generic += to_string(nodes[nodeId].outputs.output[0].bitSize);
+  }
+  if (nodes[nodeId].type.find("speculator") != std::string::npos) {
+    generic += to_string(nodes[nodeId].inputs.input[0].bitSize);
+    generic += COMMA;
+    generic += to_string(nodes[nodeId].outputs.output[0].bitSize);
+    generic += COMMA;
+    generic += to_string(nodes[nodeId].fifodepth);
+  }
+  if (nodes[nodeId].type.find("spec_commit") != std::string::npos &&
+      nodes[nodeId].type.find("spec_save_commit") == std::string::npos) {
+    generic += to_string(nodes[nodeId].inputs.input[0].bitSize);
+    generic += COMMA;
+    generic += to_string(nodes[nodeId].outputs.output[0].bitSize);
+  }
+  if (nodes[nodeId].type.find("spec_save_commit") != std::string::npos) {
+    generic += to_string(nodes[nodeId].inputs.input[0].bitSize);
+    generic += COMMA;
+    generic += to_string(nodes[nodeId].outputs.output[0].bitSize);
+    generic += COMMA;
+    generic += to_string(nodes[nodeId].fifodepth);
+  }
+  if (nodes[nodeId].type.find("spec_save") != std::string::npos) {
     generic += to_string(nodes[nodeId].inputs.input[0].bitSize);
     generic += COMMA;
     generic += to_string(nodes[nodeId].outputs.output[0].bitSize);
@@ -2223,6 +2326,8 @@ static void writeComponents() {
         for (int inPortIndx = 0; inPortIndx < 1; inPortIndx++) {
           if ((nodes[i].type.find("Branch") != std::string::npos &&
                indx == 1) ||
+              (nodes[i].type.find("speculating_branch") != std::string::npos &&
+               indx == 1) ||
               ((nodes[i].componentOperator.find("select") !=
                 std::string::npos) &&
                indx == 0) ||
@@ -2231,6 +2336,10 @@ static void writeComponents() {
               (nodes[i].type.find(COMPONENT_DISTRIBUTOR) != std::string::npos &&
                indx == 1)) {
             inputPort = "Condition(0)";
+          } else if ((nodes[i].type.find("speculator") != std::string::npos &&
+                      indx == 1)) {
+            // speculator enable input
+            inputPort = "enableInArray(0)";
           } else if (nodes[i].type.find("Selector") != std::string::npos &&
                      indx >= nodes[i].inputs.size -
                                  (int)nodes[i].orderings.size()) {
@@ -2250,6 +2359,13 @@ static void writeComponents() {
                      std::string::npos)) &&
                    indx == 1) {
             inputPort = "input_addr";
+          } else if (((nodes[i].type == "commit_unit") ||
+                      (nodes[i].type == "save_unit") ||
+                      (nodes[i].type == "save_commit_unit")) &&
+                     (indx == 1)) {
+            // Special spec signals
+            inputPort = "ControlInArray(0)";
+
           } else {
             inputPort = componentsType[0].inPortsNameStr[inPortIndx];
             inputPort += "(";
@@ -2282,6 +2398,28 @@ static void writeComponents() {
 
           netlist << COMMA << endl
                   << "\t" << inputPort << " => " << inputSignal;
+        }
+      }
+
+      // Write the SpecInput Signals
+      for (indx = 0; indx < nodes[i].inputs.size; indx++) {
+        for (int in_port_indx = 0; in_port_indx < 1; in_port_indx++) {
+          if (isSpecInput(nodes[i], indx)) {
+            inputPort = "specInArray(";
+            if (nodes[i].type == "Mux") {
+              inputPort += to_string(indx - 1);
+            } else {
+              inputPort += to_string(indx);
+            }
+            inputPort += ")";
+
+            inputSignal = nodes[i].name;
+            inputSignal += "_specInArray_";
+            inputSignal += to_string(indx);
+
+            netlist << COMMA << endl
+                    << "\t" << inputPort << " => " << inputSignal;
+          }
         }
       }
 
@@ -2446,6 +2584,23 @@ static void writeComponents() {
                        std::string::npos)) &&
                      indx == 1) {
             outputPort = "output_addr";
+          } else if (nodes[i].type == "speculator" && indx >= 1) {
+            // Special spec signals for speculator
+            if (indx == 1) {
+              outputPort = "scBranchOutArray(0)";
+            }
+            if (indx == 2) {
+              outputPort = "scOut0Array(0)";
+            }
+            if (indx == 3) {
+              outputPort = "scOut1Array(0)";
+            }
+            if (indx == 4) {
+              outputPort = "commitOutArray(0)";
+            }
+            if (indx == 5) {
+              outputPort = "saveOutArray(0)";
+            }
           } else {
             outputPort = componentsType[nodes[i].componentType]
                              .outPortsNameStr[outPortIndx];
@@ -2462,6 +2617,25 @@ static void writeComponents() {
           outputSignal += to_string(indx);
           netlist << COMMA << endl
                   << "\t" << outputPort << " => " << outputSignal;
+        }
+      }
+      // Write the SpecOutput Signals
+      for (indx = 0; indx < nodes[i].outputs.size; indx++) {
+        for (int out_port_indx = 0;
+             out_port_indx < componentsType[nodes[i].componentType].outPorts;
+             out_port_indx++) {
+          if (isSpecOutput(nodes[i], indx)) {
+            outputPort = "specOutArray(";
+            outputPort += to_string(indx);
+            outputPort += ")";
+
+            outputSignal = nodes[i].name;
+            outputSignal += "_specOutArray_";
+            outputSignal += to_string(indx);
+
+            netlist << COMMA << endl
+                    << "\t" << outputPort << " => " << outputSignal;
+          }
         }
       }
     }
