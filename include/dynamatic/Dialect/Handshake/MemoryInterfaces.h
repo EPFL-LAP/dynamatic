@@ -179,6 +179,43 @@ private:
   void addMemDataResultToLoads(InterfacePorts &ports, Operation *memIfaceOp);
 };
 
+/// Aggregates LSQ generation information to be passed to the DOT printer under
+/// DOT attribute form or to the Chisel LSQ generator under JSON form.
+struct LSQGenerationInfo {
+  /// The LSQ for which generation information is being derived.
+  handshake::LSQOp lsqOp;
+  /// The name to give to the RTL module representing the LSQ.
+  std::string name;
+  /// Signals widths, for data and address buses.
+  unsigned dataWidth, addrWidth;
+  /// Number of groups, load ports, and store ports the LSQ connects to.
+  unsigned numGroups, numLoads, numStores;
+  /// Number of loads and store accesses per LSQ group.
+  SmallVector<unsigned> loadsPerGroup, storesPerGroup;
+  /// Index of first load and store port within each LSQ group.
+  SmallVector<unsigned> loadOffsets, storeOffsets;
+  /// Overall indices for all load and store ports, split by LSQ group.
+  SmallVector<SmallVector<unsigned>> loadPorts, storePorts;
+  /// Depth of queues within the LSQ.
+  unsigned depth = 16, depthLoad = 16, depthStore = 16, bufferDepth = 0;
+  /// Type of memory interface used to connect the LSQ to an external memory.
+  std::string accessType = "BRAM";
+  /// Whether to enable speculation.
+  bool speculation = false;
+
+  /// Derives generation information for the provided LSQ.
+  LSQGenerationInfo(handshake::LSQOp lsqOp, StringRef name = "LSQ");
+
+  /// Derives generation information for the provided LSQ, passed through its
+  /// port information.
+  LSQGenerationInfo(FuncMemoryPorts &ports, StringRef name = "LSQ");
+
+private:
+  /// Called by all constructor to derive generation information for an LSQ
+  /// passed through its port information.
+  void fromPorts(FuncMemoryPorts &ports);
+};
+
 /// Identifies the subset of the control operation's results that are part of
 /// the control path to the LSQ interface. The control operations' results
 /// that are not of type `NoneType` are ignored and will never be part of the

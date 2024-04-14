@@ -18,9 +18,12 @@
 #include "mlir/Dialect/Affine/IR/AffineOps.h"
 #include "mlir/Dialect/MemRef/IR/MemRef.h"
 #include "mlir/IR/Value.h"
+#include "llvm/ADT/SmallVector.h"
+#include "llvm/ADT/Twine.h"
 #include "llvm/ADT/TypeSwitch.h"
 #include "llvm/Support/ErrorHandling.h"
 
+using namespace llvm;
 using namespace mlir;
 using namespace dynamatic;
 using namespace dynamatic::handshake;
@@ -313,6 +316,84 @@ void MemoryInterfaceBuilder::addMemDataResultToLoads(InterfacePorts &ports,
         setLoadDataOperand(loadOp, memIfaceOp->getResult(resIdx++));
     }
   }
+}
+
+//===----------------------------------------------------------------------===//
+// LSQGenerationInfo
+//===----------------------------------------------------------------------===//
+
+LSQGenerationInfo::LSQGenerationInfo(handshake::LSQOp lsqOp, StringRef name)
+    : lsqOp(lsqOp), name(name) {
+  FuncMemoryPorts lsqPorts = getMemoryPorts(lsqOp);
+  fromPorts(lsqPorts);
+}
+
+LSQGenerationInfo::LSQGenerationInfo(FuncMemoryPorts &ports, StringRef name)
+    : lsqOp(cast<handshake::LSQOp>(ports.memOp)), name(name) {
+  fromPorts(ports);
+}
+
+void LSQGenerationInfo::fromPorts(FuncMemoryPorts &ports) {
+  dataWidth = ports.dataWidth;
+  addrWidth = ports.addrWidth;
+
+  numGroups = ports.getNumGroups();
+  numLoads = ports.getNumPorts<LoadPort>();
+  numStores = ports.getNumPorts<StorePort>();
+
+  unsigned loadIdx = 0, storeIdx = 0;
+  for (GroupMemoryPorts &groupPorts : ports.groups) {
+    // Number of load and store ports per block
+    loadsPerGroup.push_back(groupPorts.getNumPorts<LoadPort>());
+    storesPerGroup.push_back(groupPorts.getNumPorts<StorePort>());
+
+    // Compute the ffset of first load/store in the group and indices of each
+    // load/store port
+    std::optional<unsigned> firstLoadOffset, firstStoreOffset;
+    SmallVector<unsigned> groupLoadPorts, groupStorePorts;
+    for (auto [portIdx, accessPort] : llvm::enumerate(groupPorts.accessPorts)) {
+      if (isa<LoadPort>(accessPort)) {
+        if (!firstLoadOffset)
+          firstLoadOffset = portIdx;
+        groupLoadPorts.push_back(loadIdx++);
+      } else {
+        assert(isa<StorePort>(accessPort) && "port must be load or store");
+        if (!firstStoreOffset)
+          firstStoreOffset = portIdx;
+        groupStorePorts.push_back(storeIdx++);
+      }
+    }
+
+    // If there are no loads or no stores in the block, set the corresponding
+    // offset to 0
+    loadOffsets.push_back(firstLoadOffset.value_or(0));
+    storeOffsets.push_back(firstStoreOffset.value_or(0));
+
+    loadPorts.push_back(groupLoadPorts);
+    storePorts.push_back(groupStorePorts);
+  }
+
+  /// Adds as many 0s as necessary to the array so that its size equals the
+  /// depth. Asserts if the array size is larger than the depth.
+  auto capArray = [&](SmallVector<unsigned> &array, unsigned depth) -> void {
+    assert(array.size() <= depth && "array larger than LSQ depth");
+    for (size_t i = 0, e = array.size(); i < depth - e; ++i)
+      array.push_back(0);
+  };
+
+  /// Adds as many 0s as necessary to each nested array so that their size
+  /// equals the depth.
+  auto capBiArray = [&](SmallVector<SmallVector<unsigned>> &biArray,
+                        unsigned depth) -> void {
+    for (SmallVector<unsigned> &array : biArray)
+      capArray(array, depth);
+  };
+
+  // Port offsets and index arrays must have length equal to the depth
+  capArray(loadOffsets, depth);
+  capArray(storeOffsets, depth);
+  capBiArray(loadPorts, depth);
+  capBiArray(storePorts, depth);
 }
 
 //===----------------------------------------------------------------------===//

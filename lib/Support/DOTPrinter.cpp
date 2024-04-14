@@ -15,6 +15,7 @@
 #include "dynamatic/Support/DOTPrinter.h"
 #include "dynamatic/Analysis/NameAnalysis.h"
 #include "dynamatic/Dialect/Handshake/HandshakeOps.h"
+#include "dynamatic/Dialect/Handshake/MemoryInterfaces.h"
 #include "dynamatic/Support/CFG.h"
 #include "dynamatic/Support/TimingModels.h"
 #include "dynamatic/Transforms/HandshakeConcretizeIndexType.h"
@@ -600,40 +601,27 @@ static void patchUpIRForLegacyBuffers(handshake::FuncOp funcOp) {
 }
 
 /// Converts an array of unsigned numbers to a string of the following format:
-/// "{array[0];array[1];...;array[size - 1];0;0;...;0}". The "0"w are generated
-/// dynamically to reach `length` elements based on size of the array; the
-/// latter of which cannot exceed the length.
-static std::string arrayToString(ArrayRef<unsigned> array, unsigned length) {
+/// "{array[0];array[1];...;array[size - 1]}".
+static std::string arrayToString(ArrayRef<unsigned> array) {
   std::stringstream ss;
-  assert(array.size() <= length && "vector too large");
   ss << "{";
-  if (!array.empty()) {
-    for (unsigned num : array.drop_back())
-      ss << num << ";";
-    ss << array.back();
-    for (size_t i = array.size(); i < length; ++i)
-      ss << ";0";
-  } else {
-    for (size_t i = 0; i < length - 1; ++i)
-      ss << "0;";
-    ss << "0";
-  }
+  for (unsigned num : array.drop_back())
+    ss << num << ";";
+  ss << array.back();
   ss << "}";
   return ss.str();
 }
 
 /// Converts a bidimensional array of unsigned numbers to a string of the
 /// following format: "{biArray[0];biArray[1];...;biArray[size - 1]}" where each
-/// `biArray` element is represented using `arrayToString` with the provided
-/// length.
-static std::string biArrayToString(ArrayRef<SmallVector<unsigned>> biArray,
-                                   unsigned length) {
+/// `biArray` element is represented using `arrayToString`.
+static std::string biArrayToString(ArrayRef<SmallVector<unsigned>> biArray) {
   std::stringstream ss;
   ss << "{";
   if (!biArray.empty()) {
     for (ArrayRef<unsigned> array : biArray.drop_back())
-      ss << arrayToString(array, length) << ";";
-    ss << arrayToString(biArray.back(), length);
+      ss << arrayToString(array) << ";";
+    ss << arrayToString(biArray.back());
   }
   ss << "}";
   return ss.str();
@@ -642,7 +630,7 @@ static std::string biArrayToString(ArrayRef<SmallVector<unsigned>> biArray,
 LogicalResult DOTPrinter::annotateNode(Operation *op,
                                        mlir::raw_indented_ostream &os) {
   /// Set common attributes for memory interfaces
-  auto setMemInterfaceAttr = [&](NodeInfo &info, FuncMemoryPorts &ports,
+  auto setMemInterfaceAttr = [&](DOTNode &info, FuncMemoryPorts &ports,
                                  Value memref) -> void {
     info.stringAttr["in"] = getInputForMemInterface(ports);
     info.stringAttr["out"] = getOutputForMemInterface(ports);
@@ -658,36 +646,36 @@ LogicalResult DOTPrinter::annotateNode(Operation *op,
     info.intAttr["stcount"] = ports.getNumPorts<StorePort>() + lsqLdSt;
   };
 
-  auto setLoadOpAttr = [&](NodeInfo &info,
+  auto setLoadOpAttr = [&](DOTNode &info,
                            handshake::LoadOpInterface loadOp) -> void {
     info.stringAttr["in"] = getInputForLoadOp(loadOp);
     info.stringAttr["out"] = getOutputForLoadOp(loadOp);
     info.intAttr["portId"] = findMemoryPort(loadOp.getAddressOutput());
   };
 
-  auto setStoreOpAttr = [&](NodeInfo &info,
+  auto setStoreOpAttr = [&](DOTNode &info,
                             handshake::StoreOpInterface storeOp) -> void {
     info.stringAttr["in"] = getInputForStoreOp(storeOp);
     info.stringAttr["out"] = getOutputForStoreOp(storeOp);
     info.intAttr["portId"] = findMemoryPort(storeOp.getAddressOutput());
   };
 
-  NodeInfo info =
-      llvm::TypeSwitch<Operation *, NodeInfo>(op)
-          .Case<handshake::MergeOp>([&](auto) { return NodeInfo("Merge"); })
+  DOTNode info =
+      llvm::TypeSwitch<Operation *, DOTNode>(op)
+          .Case<handshake::MergeOp>([&](auto) { return DOTNode("Merge"); })
           .Case<handshake::MuxOp>([&](handshake::MuxOp op) {
-            auto info = NodeInfo("Mux");
+            auto info = DOTNode("Mux");
             info.stringAttr["in"] = getInputForMux(op);
             return info;
           })
           .Case<handshake::ControlMergeOp>([&](handshake::ControlMergeOp op) {
-            auto info = NodeInfo("CntrlMerge");
+            auto info = DOTNode("CntrlMerge");
             info.stringAttr["out"] = getOutputForControlMerge(op);
             return info;
           })
           .Case<handshake::ConditionalBranchOp>(
               [&](handshake::ConditionalBranchOp op) {
-                auto info = NodeInfo("Branch");
+                auto info = DOTNode("Branch");
                 info.stringAttr["in"] = getInputForCondBranch(op);
                 info.stringAttr["out"] = getOutputForCondBranch(op);
                 return info;
@@ -696,7 +684,7 @@ LogicalResult DOTPrinter::annotateNode(Operation *op,
             /// NOTE: Explicitly set the type to OEHB when the buffer has a
             /// single slot so that the legach backend respects our wishes
             bool singleSlot = oehbOp.getSlots() == 1;
-            auto info = NodeInfo(singleSlot ? "OEHB" : "Buffer");
+            auto info = DOTNode(singleSlot ? "OEHB" : "Buffer");
             info.intAttr["slots"] = oehbOp.getSlots();
             if (!singleSlot)
               info.stringAttr["transparent"] = "false";
@@ -706,7 +694,7 @@ LogicalResult DOTPrinter::annotateNode(Operation *op,
             /// NOTE: Explicitly set the type to TEHB when the buffer has a
             /// single slot so that the legach backend respects our wishes
             bool singleSlot = tehbOp.getSlots() == 1;
-            auto info = NodeInfo(singleSlot ? "TEHB" : "Buffer");
+            auto info = DOTNode(singleSlot ? "TEHB" : "Buffer");
             info.intAttr["slots"] = tehbOp.getSlots();
             if (!singleSlot)
               info.stringAttr["transparent"] = "true";
@@ -714,121 +702,66 @@ LogicalResult DOTPrinter::annotateNode(Operation *op,
           })
           .Case<handshake::MemoryControllerOp>(
               [&](handshake::MemoryControllerOp mcOp) {
-                auto info = NodeInfo("MC");
+                auto info = DOTNode("MC");
                 MCPorts ports = mcOp.getPorts();
                 setMemInterfaceAttr(info, ports, mcOp.getMemRef());
                 return info;
               })
           .Case<handshake::LSQOp>([&](handshake::LSQOp lsqOp) {
-            auto info = NodeInfo("LSQ");
+            auto info = DOTNode("LSQ");
             LSQPorts ports = lsqOp.getPorts();
             setMemInterfaceAttr(info, ports, lsqOp.getMemRef());
-            unsigned depth = 16;
-            info.intAttr["fifoDepth"] = depth;
-
-            // Create port information for the LSQ generator
-
-            // Number of load and store ports per block
-            SmallVector<unsigned> numLoads, numStores;
-
-            // Offset and (block-relative) port indices for loads and stores.
-            // Note that the offsets are semantically undimensional vectors (one
-            // logical value per block); however, in legacy DOTs they are stored
-            // as bi-dimensional arrays therefore we use the same data-structure
-            // here
-            SmallVector<SmallVector<unsigned>> loadOffsets, storeOffsets,
-                loadPorts, storePorts;
-
-            unsigned loadIdx = 0, storeIdx = 0;
-            for (GroupMemoryPorts &blockPorts : ports.groups) {
-              // Number of load and store ports per block
-              numLoads.push_back(blockPorts.getNumPorts<LoadPort>());
-              numStores.push_back(blockPorts.getNumPorts<StorePort>());
-
-              // Offsets of first load/store in the block and indices of each
-              // load/store port
-              std::optional<unsigned> firstLoadOffset, firstStoreOffset;
-              SmallVector<unsigned> blockLoadPorts, blockStorePorts;
-              for (auto [portIdx, accessPort] :
-                   llvm::enumerate(blockPorts.accessPorts)) {
-                if (isa<LoadPort>(accessPort)) {
-                  if (!firstLoadOffset)
-                    firstLoadOffset = portIdx;
-                  blockLoadPorts.push_back(loadIdx++);
-                } else {
-                  // This is a StorePort
-                  assert(isa<StorePort>(accessPort) &&
-                         "access port must be load or store");
-                  if (!firstStoreOffset)
-                    firstStoreOffset = portIdx;
-                  blockStorePorts.push_back(storeIdx++);
-                }
-              }
-
-              // If there are no loads or no stores in the block, set the
-              // corresponding offset to 0
-              loadOffsets.push_back(
-                  SmallVector<unsigned>{firstLoadOffset.value_or(0)});
-              storeOffsets.push_back(
-                  SmallVector<unsigned>{firstStoreOffset.value_or(0)});
-
-              loadPorts.push_back(blockLoadPorts);
-              storePorts.push_back(blockStorePorts);
-            }
 
             // Set LSQ attributes
-            info.stringAttr["numLoads"] =
-                arrayToString(numLoads, numLoads.size());
-            info.stringAttr["numStores"] =
-                arrayToString(numStores, numStores.size());
-            info.stringAttr["loadOffsets"] =
-                biArrayToString(loadOffsets, depth);
-            info.stringAttr["storeOffsets"] =
-                biArrayToString(storeOffsets, depth);
-            info.stringAttr["loadPorts"] = biArrayToString(loadPorts, depth);
-            info.stringAttr["storePorts"] = biArrayToString(storePorts, depth);
-
+            LSQGenerationInfo gen(lsqOp);
+            info.intAttr["fifoDepth"] = gen.depth;
+            info.stringAttr["numLoads"] = arrayToString(gen.loadsPerGroup);
+            info.stringAttr["numStores"] = arrayToString(gen.storesPerGroup);
+            info.stringAttr["loadOffsets"] = biArrayToString(gen.loadOffsets);
+            info.stringAttr["storeOffsets"] = biArrayToString(gen.storeOffsets);
+            info.stringAttr["loadPorts"] = biArrayToString(gen.loadPorts);
+            info.stringAttr["storePorts"] = biArrayToString(gen.storePorts);
             return info;
           })
           .Case<handshake::MCLoadOp>([&](handshake::MCLoadOp loadOp) {
-            auto info = NodeInfo("Operator");
+            auto info = DOTNode("Operator");
             info.stringAttr["op"] = "mc_load_op";
             setLoadOpAttr(info, loadOp);
             return info;
           })
           .Case<handshake::LSQLoadOp>([&](handshake::LSQLoadOp loadOp) {
-            auto info = NodeInfo("Operator");
+            auto info = DOTNode("Operator");
             info.stringAttr["op"] = "lsq_load_op";
             setLoadOpAttr(info, loadOp);
             return info;
           })
           .Case<handshake::MCStoreOp>([&](handshake::MCStoreOp storeOp) {
-            auto info = NodeInfo("Operator");
+            auto info = DOTNode("Operator");
             info.stringAttr["op"] = "mc_store_op";
             setStoreOpAttr(info, storeOp);
             return info;
           })
           .Case<handshake::LSQStoreOp>([&](handshake::LSQStoreOp storeOp) {
-            auto info = NodeInfo("Operator");
+            auto info = DOTNode("Operator");
             info.stringAttr["op"] = "lsq_store_op";
             setStoreOpAttr(info, storeOp);
             return info;
           })
-          .Case<handshake::ForkOp>([&](auto) { return NodeInfo("Fork"); })
+          .Case<handshake::ForkOp>([&](auto) { return DOTNode("Fork"); })
           .Case<handshake::LazyForkOp>(
-              [&](auto) { return NodeInfo("LazyFork"); })
+              [&](auto) { return DOTNode("LazyFork"); })
           .Case<handshake::SourceOp>([&](auto) {
-            auto info = NodeInfo("Source");
+            auto info = DOTNode("Source");
             info.stringAttr["out"] = getIOFromValues(op->getResults(), "out");
             return info;
           })
           .Case<handshake::SinkOp>([&](auto) {
-            auto info = NodeInfo("Sink");
+            auto info = DOTNode("Sink");
             info.stringAttr["in"] = getIOFromValues(op->getOperands(), "in");
             return info;
           })
           .Case<handshake::ConstantOp>([&](handshake::ConstantOp cstOp) {
-            auto info = NodeInfo("Constant");
+            auto info = DOTNode("Constant");
 
             // Convert the value to an hexadecimal string value
             std::stringstream stream;
@@ -851,7 +784,7 @@ LogicalResult DOTPrinter::annotateNode(Operation *op,
               mlir::FloatAttr attr = dyn_cast<mlir::FloatAttr>(valueAttr);
               stream << attr.getValue().convertToDouble();
             } else {
-              return NodeInfo("");
+              return DOTNode("");
             }
 
             info.stringAttr["value"] = stream.str();
@@ -863,12 +796,12 @@ LogicalResult DOTPrinter::annotateNode(Operation *op,
             return info;
           })
           .Case<handshake::ReturnOp>([&](auto) {
-            auto info = NodeInfo("Operator");
+            auto info = DOTNode("Operator");
             info.stringAttr["op"] = "ret_op";
             return info;
           })
           .Case<handshake::EndOp>([&](handshake::EndOp op) {
-            auto info = NodeInfo("Exit");
+            auto info = DOTNode("Exit");
             info.stringAttr["in"] = getInputForEnd(op);
 
             // Output ports of end node are determined by function result
@@ -881,17 +814,17 @@ LogicalResult DOTPrinter::annotateNode(Operation *op,
             return info;
           })
           .Case<arith::CmpIOp>([&](arith::CmpIOp op) {
-            auto info = NodeInfo("Operator");
+            auto info = DOTNode("Operator");
             info.stringAttr["op"] = cmpINameToOpName[op.getPredicate()];
             return info;
           })
           .Case<arith::CmpFOp>([&](arith::CmpFOp op) {
-            auto info = NodeInfo("Operator");
+            auto info = DOTNode("Operator");
             info.stringAttr["op"] = cmpFNameToOpName[op.getPredicate()];
             return info;
           })
           .Case<handshake::SpeculationOpInterface>([&](Operation *op) {
-            auto info = NodeInfo(op->getName().stripDialect().str());
+            auto info = DOTNode(op->getName().stripDialect().str());
             info.stringAttr["in"] = getIOFromValues(op->getOperands(), "in");
             info.stringAttr["out"] = getIOFromValues(op->getResults(), "out");
             return info;
@@ -901,8 +834,8 @@ LogicalResult DOTPrinter::annotateNode(Operation *op,
             // query it to see if we support this particular operation
             auto opName = compNameToOpName.find(op->getName().getStringRef());
             if (opName == compNameToOpName.end())
-              return NodeInfo("");
-            NodeInfo info("Operator");
+              return DOTNode("");
+            DOTNode info("Operator");
             info.stringAttr["op"] = opName->second;
 
             // Among mathematical operations, only the select operation has
@@ -959,7 +892,7 @@ LogicalResult DOTPrinter::annotateArgumentNode(handshake::FuncOp funcOp,
                                                size_t idx,
                                                mlir::raw_indented_ostream &os) {
   BlockArgument arg = funcOp.getArgument(idx);
-  NodeInfo info("Entry");
+  DOTNode info("Entry");
   info.stringAttr["in"] = getIOFromValues(ValueRange(arg), "in");
   info.stringAttr["out"] = getIOFromValues(ValueRange(arg), "out");
   info.intAttr["bbID"] = 1;
@@ -982,7 +915,7 @@ LogicalResult DOTPrinter::annotateEdge(OpOperand &oprd,
   if (legacyBuffers && isBitModBetweenBlocks(dst))
     return success();
 
-  EdgeInfo info;
+  DOTEdge info;
 
   // "Jump over" bitwidth modification operations that go to a merge-like
   // operation in a different block
@@ -1026,7 +959,7 @@ LogicalResult DOTPrinter::annotateArgumentEdge(handshake::FuncOp funcOp,
                                                size_t idx, Operation *dst,
                                                mlir::raw_indented_ostream &os) {
   BlockArgument arg = funcOp.getArgument(idx);
-  EdgeInfo info;
+  DOTEdge info;
 
   // Locate value in destination operands
   auto argIdx = findIndexInRange(dst->getOperands(), arg);
@@ -1594,7 +1527,7 @@ LogicalResult DOTPrinter::printFunc(handshake::FuncOp funcOp,
   return success();
 }
 
-void NodeInfo::print(mlir::raw_indented_ostream &os) {
+void DOTNode::print(mlir::raw_indented_ostream &os) {
   // Print type
   os << "type=\"" << type << "\"";
   if (!stringAttr.empty() || !intAttr.empty())
@@ -1617,7 +1550,7 @@ void NodeInfo::print(mlir::raw_indented_ostream &os) {
   }
 }
 
-void EdgeInfo::print(mlir::raw_indented_ostream &os) {
+void DOTEdge::print(mlir::raw_indented_ostream &os) {
   os << "from=\"out" << from << "\", to=\"in" << to << "\"";
   if (memAddress.has_value())
     os << ", mem_address=\"" << (memAddress.value() ? "true" : "false") << "\"";
