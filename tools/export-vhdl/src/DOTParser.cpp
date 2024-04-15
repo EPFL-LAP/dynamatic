@@ -226,15 +226,14 @@ static string getInputType(const string &in) {
 static int getInputPort(const string &in) {
   vector<string> par;
   int retVal = 0;
-  string val;
 
   stringSplit(in, '*', par);
 
   if (!par.empty()) {
     par[1].erase(remove(par[1].begin(), par[1].end(), '"'), par[1].end());
     if (par[1].size() > 1) {
-      val = par[1].at(1);
-      retVal = stoiSubstr(val);
+      // Drop first chararacter which denotes the port type
+      retVal = stoiSubstr(par[1].substr(1));
     }
   }
   return retVal;
@@ -249,7 +248,8 @@ static string getInfoType(const string &in) {
   if (!par.empty()) {
     par[1].erase(remove(par[1].begin(), par[1].end(), '"'), par[1].end());
     if (par[1].size() > 2) {
-      retVal = par[1].at(2);
+      // Last character indicates whether this is an address or data bus
+      retVal = par[1].at(par[1].size() - 1);
     }
   }
 
