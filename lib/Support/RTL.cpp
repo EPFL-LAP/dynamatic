@@ -12,9 +12,13 @@
 
 #include "dynamatic/Support/RTL.h"
 #include "dynamatic/Dialect/HW/HWOps.h"
+#include "dynamatic/Support/Attribute.h"
 #include "dynamatic/Support/TimingModels.h"
+#include "mlir/IR/Attributes.h"
+#include "mlir/IR/BuiltinAttributes.h"
 #include "mlir/IR/Diagnostics.h"
 #include "llvm/ADT/STLExtras.h"
+#include "llvm/ADT/TypeSwitch.h"
 #include "llvm/Support/Debug.h"
 #include "llvm/Support/FileSystem.h"
 #include "llvm/Support/JSON.h"
@@ -34,7 +38,8 @@ static constexpr StringLiteral KEY_PARAMETERS("parameters"),
     KEY_NAME("name"), KEY_TYPE("type"), KEY_PATH("path"),
     KEY_CONSTRAINTS("constraints"), KEY_PARAMETER("parameter"),
     KEY_DEPENDENCIES("dependencies"), KEY_ENTITY_NAME("entity-name"),
-    KEY_ARCH_NAME("arch-name");
+    KEY_ARCH_NAME("arch-name"), KEY_HDL("hdl"), KEY_IO_KIND("io-kind"),
+    KEY_USE_JSON_CONFIG("use-json-config");
 
 /// JSON path errors.
 static constexpr StringLiteral ERR_EXPECTED_ARRAY("expected array"),
@@ -48,7 +53,10 @@ static constexpr StringLiteral ERR_EXPECTED_ARRAY("expected array"),
     ERR_DUPLICATE_NAME("duplicated parameter name"),
     ERR_UNKNOWN_TYPE(
         R"(unknown parameter type: options are "unsigned" or "string")"),
-    ERR_RESERVED_NAME("this is a reserved parameter name");
+    ERR_RESERVED_NAME("this is a reserved parameter name"),
+    ERR_INVALID_HDL(R"(unknown hdl: options are "vhdl" or "verilog")"),
+    ERR_INVALID_IO_STYLE(
+        R"(unknown IO style: options are "hierarchical" or "flat")");
 
 /// Reserved JSON keys when deserializing type constraints, should be ignored.
 static const mlir::DenseSet<StringRef> RESERVED_KEYS{
@@ -58,7 +66,7 @@ static const mlir::DenseSet<StringRef> RESERVED_KEYS{
 /// names in the RTL configuration files.
 static const mlir::DenseSet<StringRef> RESERVED_PARAMETER_NAMES{
     RTLParameter::DYNAMATIC, RTLParameter::OUTPUT_DIR,
-    RTLParameter::MODULE_NAME};
+    RTLParameter::MODULE_NAME, RTLParameter::JSON_CONFIG};
 
 std::string dynamatic::replaceRegexes(
     StringRef input, const std::map<std::string, std::string> &replacements) {
@@ -171,30 +179,6 @@ bool RTLStringType::constraintsFromJSON(const json::Object &object,
   });
 }
 
-RTLMatch::RTLMatch(hw::HWModuleExternOp modOp) : loc(modOp.getLoc()) {
-  StringAttr nameAttr = modOp->getAttrOfType<StringAttr>(NAME_ATTR);
-  if (!nameAttr)
-    return;
-  name = nameAttr.str();
-
-  auto paramAttr = modOp->getAttrOfType<DictionaryAttr>(PARAMETERS_ATTR);
-  if (!paramAttr)
-    return;
-
-  for (const NamedAttribute &namedParameter : paramAttr) {
-    // Must be a string attribute
-    StringAttr paramValue = dyn_cast<StringAttr>(namedParameter.getValue());
-    if (!paramValue)
-      return;
-    parameters[namedParameter.getName()] = paramValue.str();
-  }
-
-  invalid = false;
-}
-
-RTLMatch::RTLMatch(StringRef name, Location loc)
-    : name(name), loc(loc), invalid(false) {}
-
 bool dynamatic::fromJSON(const llvm::json::Value &value, RTLType *&type,
                          llvm::json::Path path) {
   std::optional<StringRef> strType = value.getAsString();
@@ -211,6 +195,134 @@ bool dynamatic::fromJSON(const llvm::json::Value &value, RTLType *&type,
     return false;
   }
   return true;
+}
+
+RTLMatch::RTLMatch(hw::HWModuleExternOp modOp)
+    : loc(modOp.getLoc()), modOp(modOp) {
+  if (StringAttr nameAttr = modOp->getAttrOfType<StringAttr>(NAME_ATTR))
+    name = nameAttr.str();
+
+  // Add parameters stored in the operation's attributes, if any
+  if (auto paramAttr = modOp->getAttrOfType<DictionaryAttr>(PARAMETERS_ATTR)) {
+    for (const NamedAttribute &namedParameter : paramAttr)
+      parameters[namedParameter.getName()] = namedParameter.getValue();
+  }
+}
+
+RTLMatch::RTLMatch(StringRef name, Location loc) : name(name), loc(loc) {}
+
+LogicalResult RTLMatch::setMatch(const RTLComponent &component) {
+  assert(!(*this).component && "match was already set");
+  (*this).component = &component;
+
+  for (const RTLParameter &rtlParam : component.parameters) {
+    StringRef paramName = rtlParam.getName();
+    auto paramValue = parameters.find(paramName);
+    assert(paramValue != parameters.end() && "parameter must exist");
+    std::string value;
+    if (failed(encodeParameter(paramValue->second, value))) {
+      return emitError(loc)
+             << "Unsupported attribute type associated to name \"" << paramName
+             << "\"";
+    }
+    encodedParameters[paramName] = value;
+  }
+  if (modOp)
+    encodedParameters[RTLParameter::MODULE_NAME] = modOp.getSymName();
+
+  entityName = substituteParams(component.entityName, encodedParameters);
+  archName = substituteParams(component.archName, encodedParameters);
+  return success();
+}
+
+LogicalResult RTLMatch::concretize(StringRef dynamaticPath,
+                                   StringRef outputDir) const {
+  if (!component) {
+    return emitError(loc)
+           << "Cannot concretize module, no matching RTL component found";
+  }
+
+  // Consolidate reserved and regular parameters in a single map to perform
+  // text substitutions
+  llvm::StringMap<std::string> allParams(encodedParameters);
+  allParams[RTLParameter::DYNAMATIC] = dynamaticPath;
+  allParams[RTLParameter::OUTPUT_DIR] = outputDir;
+
+  if (component->isGeneric()) {
+    std::string inputFile = substituteParams(component->generic, allParams);
+    std::string outputFile = outputDir.str() +
+                             sys::path::get_separator().str() + entityName +
+                             ".vhd";
+
+    // Just copy the file to the output location
+    if (auto ec = sys::fs::copy_file(inputFile, outputFile); ec.value() != 0) {
+      return emitError(loc)
+             << "Failed to copy generic RTL implementation from \"" << inputFile
+             << "\" to \"" << outputFile << "\"\n"
+             << ec.message();
+    }
+    return success();
+  }
+  assert(!component->generator.empty() && "generator is empty");
+
+  if (component->jsonConfig) {
+    /// Dump all parameters to a JSON file at the provided path
+    if (!modOp) {
+      return emitError(loc) << "RTL configuration file indicates that "
+                               "parameters should be serialized to JSON, but "
+                               "no MLIR operation is associated to the match";
+    }
+
+    auto jsonPath = substituteParams(*(component->jsonConfig), allParams);
+    allParams[RTLParameter::JSON_CONFIG] = jsonPath;
+
+    DictionaryAttr paramAttr =
+        modOp->getAttrOfType<DictionaryAttr>(RTLMatch::PARAMETERS_ATTR);
+    if (!paramAttr) {
+      return emitError(loc)
+             << "RTL configuration file indicates that parameters should be "
+                "serialized to JSON, but there are no parameters associated to "
+                "the operation";
+    }
+    if (failed(serializeToJSON(paramAttr, jsonPath, loc)))
+      return failure();
+  }
+
+  // The implementation needs to be generated
+  std::string cmd = substituteParams(component->generator, allParams);
+  if (int ret = std::system(cmd.c_str()); ret != 0) {
+    return emitError(loc)
+           << "Failed to generate component, generator failed with status "
+           << ret << ": " << cmd << "\n";
+  }
+  return success();
+}
+
+LogicalResult RTLMatch::encodeParameter(Attribute attr, std::string &value) {
+  return llvm::TypeSwitch<Attribute, LogicalResult>(attr)
+      .Case<StringAttr>([&](StringAttr strAttr) {
+        value = RTLStringType::encode(strAttr);
+        return success();
+      })
+      .Case<IntegerAttr>([&](IntegerAttr intAttr) {
+        value = RTLUnsignedType::encode(intAttr.getUInt());
+        return success();
+      })
+      .Case<ArrayAttr>([&](ArrayAttr arrayAttr) {
+        value += "[";
+        if (!arrayAttr.empty()) {
+          for (size_t i = 0, e = arrayAttr.size(); i < e; ++i) {
+            Attribute nestedAttr = arrayAttr[i];
+            if (failed(encodeParameter(nestedAttr, value)))
+              return failure();
+            if (i != e - 1)
+              value += ",";
+          }
+        }
+        value += "]";
+        return success();
+      })
+      .Default([&](auto) { return failure(); });
 }
 
 bool RTLParameter::fromJSON(const llvm::json::Value &value,
@@ -247,9 +359,12 @@ bool RTLComponent::fromJSON(const llvm::json::Value &value,
       !mapper.mapOptional(KEY_PARAMETERS, parameters) ||
       !mapper.mapOptional(KEY_GENERIC, generic) ||
       !mapper.mapOptional(KEY_GENERATOR, generator) ||
+      !mapper.mapOptional(KEY_DEPENDENCIES, dependencies) ||
       !mapper.mapOptional(KEY_ENTITY_NAME, entityName) ||
       !mapper.mapOptional(KEY_ARCH_NAME, archName) ||
-      !mapper.mapOptional(KEY_DEPENDENCIES, dependencies)) {
+      !mapper.mapOptional(KEY_HDL, hdl) ||
+      !mapper.mapOptional(KEY_IO_KIND, ioKind) ||
+      !mapper.mapOptional(KEY_USE_JSON_CONFIG, jsonConfig)) {
     return false;
   }
 
@@ -269,7 +384,6 @@ bool RTLComponent::fromJSON(const llvm::json::Value &value,
     path.report(ERR_MISSING_CONCRETIZATION);
     return false;
   }
-  // Check that at most one concretization method was provided
   if (!generic.empty() && !generator.empty()) {
     path.report(ERR_MULTIPLE_CONCRETIZATION);
     return false;
@@ -289,10 +403,6 @@ bool RTLComponent::fromJSON(const llvm::json::Value &value,
       entityName = "$" + RTLParameter::MODULE_NAME.str();
     }
   }
-
-  // Use a default architecture name if none was provided
-  if (archName.empty())
-    archName = "arch";
 
   // Timing models need access to the component's RTL parameters to verify the
   // sanity of constraints, so they are parsed separately
@@ -372,11 +482,6 @@ RTLParameter *RTLComponent::getParameter(StringRef name) const {
 bool RTLComponent::isCompatible(const RTLMatch &match) const {
   LLVM_DEBUG(llvm::dbgs() << "Attempting match with RTL component " << name
                           << "\n";);
-  // Component must be valid and have matching name
-  if (match.invalid) {
-    LLVM_DEBUG(llvm::dbgs() << "-> Match is invalid\n");
-    return false;
-  }
   if (match.name != name) {
     LLVM_DEBUG(llvm::dbgs() << "-> Names to do match.\n");
     return false;
@@ -398,8 +503,17 @@ bool RTLComponent::isCompatible(const RTLMatch &match) const {
       continue;
     }
 
+    // First encode the parameter value to a string
+    std::string strValue;
+    if (failed(match.encodeParameter(paramValue, strValue))) {
+      LLVM_DEBUG(llvm::dbgs()
+                 << "Unsupported attribute type associated to name \""
+                 << paramName << "\"");
+      return false;
+    }
+
     // Must pass type constraints
-    if (!parameter->verifyConstraints(paramValue)) {
+    if (!parameter->verifyConstraints(strValue)) {
       LLVM_DEBUG(llvm::dbgs()
                  << "-> Failed constraint checking for parameter \""
                  << paramName << "\"\n");
@@ -417,10 +531,19 @@ bool RTLComponent::isCompatible(const RTLMatch &match) const {
     return false;
   }
 
+  LLVM_DEBUG(llvm::dbgs() << "Matched!\n");
+
+  // Skip warning about unmatched parameters if the backend is supposed to
+  // serialize them to JSON
+  if (jsonConfig)
+    return true;
+
   // We have a successful match, warn user of any ignored parameter
   for (StringRef paramName : ignoredParams) {
-    emitError(match.loc) << "Ignoring parameter \"" << paramName
-                         << "\" not found in match.";
+    if (!RESERVED_PARAMETER_NAMES.contains(paramName)) {
+      emitWarning(match.loc)
+          << "Ignoring parameter \"" << paramName << "\" not found in match.";
+    }
   }
   return true;
 }
@@ -450,12 +573,16 @@ const RTLComponent::Model *RTLComponent::getModel(const RTLMatch &match) const {
   for (const Model &model : models) {
     /// Returns true when all additional constraints on the parameters are
     /// satisfied.
-    auto constraintsSatisfied = [&](const auto &paramAndType) -> bool {
+    auto constraintsSatisfied =
+        [&](const Model::AddConstraints &paramAndType) -> bool {
       auto &[param, type] = paramAndType;
       // Guaranteed to exist since the component matches
       auto paramValue = match.parameters.find(param->getName());
       assert(paramValue != match.parameters.end() && "parameter must exist");
-      return type->verify(paramValue->second);
+      std::string value;
+      if (failed(match.encodeParameter(paramValue->second, value)))
+        return false;
+      return type->verify(value);
     };
 
     // The model matches if all additional parameter constraints are satsified
@@ -467,32 +594,41 @@ const RTLComponent::Model *RTLComponent::getModel(const RTLMatch &match) const {
   return nullptr;
 }
 
-LogicalResult RTLComponent::concretize(StringMap<std::string> &parameters,
-                                       Location loc) const {
-  if (isGeneric()) {
-    std::string inputFile = substituteParams(generic, parameters);
-    std::string outputFile = parameters[RTLParameter::OUTPUT_DIR] +
-                             substituteParams(entityName, parameters) + ".vhd";
-
-    // Just move the file to the output location
-    if (auto ec = sys::fs::copy_file(inputFile, outputFile); ec.value() != 0) {
-      return emitError(loc)
-             << "Failed to copy generic RTL implementation from \"" << inputFile
-             << "\" to \"" << outputFile << "\"\n"
-             << ec.message();
-    }
-    return success();
+inline bool dynamatic::fromJSON(const llvm::json::Value &value,
+                                RTLComponent::HDL &hdl, llvm::json::Path path) {
+  std::optional<StringRef> hdlStr = value.getAsString();
+  if (!hdlStr) {
+    path.report(ERR_EXPECTED_STRING);
+    return false;
   }
-
-  // The implementation needs to be generated
-  assert(!generator.empty() && "generator is empty");
-  std::string cmd = substituteParams(generator, parameters);
-  if (int ret = std::system(cmd.c_str()); ret != 0) {
-    return emitError(loc)
-           << "Failed to generate component, generator failed with status "
-           << ret << ": " << cmd << "\n";
+  if (hdlStr == "verilog") {
+    hdl = RTLComponent::HDL::VERILOG;
+  } else if (hdlStr == "vhdl") {
+    hdl = RTLComponent::HDL::VHDL;
+  } else {
+    path.report(ERR_INVALID_HDL);
+    return false;
   }
-  return success();
+  return true;
+}
+
+inline bool dynamatic::fromJSON(const llvm::json::Value &value,
+                                RTLComponent::IOKind &io,
+                                llvm::json::Path path) {
+  std::optional<StringRef> hdlStr = value.getAsString();
+  if (!hdlStr) {
+    path.report(ERR_EXPECTED_STRING);
+    return false;
+  }
+  if (hdlStr == "hierarchical") {
+    io = RTLComponent::IOKind::HIERARCICAL;
+  } else if (hdlStr == "flat") {
+    io = RTLComponent::IOKind::FLAT;
+  } else {
+    path.report(ERR_INVALID_IO_STYLE);
+    return false;
+  }
+  return true;
 }
 
 LogicalResult RTLConfiguration::addComponentsFromJSON(StringRef filepath) {
@@ -539,28 +675,22 @@ LogicalResult RTLConfiguration::addComponentsFromJSON(StringRef filepath) {
   return success();
 }
 
-const RTLComponent *
-RTLConfiguration::getComponent(const RTLMatch &match) const {
+bool RTLConfiguration::findCompatibleComponent(RTLMatch &match) const {
   LLVM_DEBUG({
     llvm::dbgs() << "Attempting to match " << match.name
                  << " with parameters:\n";
     for (const auto &[name, value] : match.parameters)
       llvm::dbgs() << "\t" << name << ": " << value << "\n";
   });
-  if (match.invalid)
-    return nullptr;
-
   for (const RTLComponent &component : components) {
     if (component.isCompatible(match))
-      return &component;
+      return succeeded(match.setMatch(component));
   }
-  return nullptr;
+  return false;
 }
 
 const RTLComponent::Model *
 RTLConfiguration::getModel(const RTLMatch &match) const {
-  if (match.invalid)
-    return nullptr;
   for (const RTLComponent &component : components) {
     if (const RTLComponent::Model *model = component.getModel(match))
       return model;

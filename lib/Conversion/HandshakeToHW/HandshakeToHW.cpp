@@ -11,18 +11,22 @@
 //===----------------------------------------------------------------------===//
 
 #include "dynamatic/Conversion/HandshakeToHW.h"
+#include "dynamatic/Analysis/NameAnalysis.h"
 #include "dynamatic/Dialect/HW/HWOps.h"
 #include "dynamatic/Dialect/HW/HWTypes.h"
 #include "dynamatic/Dialect/HW/PortImplementation.h"
 #include "dynamatic/Dialect/Handshake/HandshakeDialect.h"
 #include "dynamatic/Dialect/Handshake/HandshakeInterfaces.h"
 #include "dynamatic/Dialect/Handshake/HandshakeOps.h"
+#include "dynamatic/Dialect/Handshake/MemoryInterfaces.h"
 #include "dynamatic/Support/Backedge.h"
 #include "dynamatic/Support/RTL.h"
 #include "dynamatic/Transforms/HandshakeConcretizeIndexType.h"
 #include "dynamatic/Transforms/HandshakeMaterialize.h"
 #include "mlir/Dialect/Arith/IR/Arith.h"
 #include "mlir/Dialect/MemRef/IR/MemRef.h"
+#include "mlir/IR/Attributes.h"
+#include "mlir/IR/BuiltinAttributes.h"
 #include "mlir/IR/BuiltinOps.h"
 #include "mlir/IR/BuiltinTypes.h"
 #include "mlir/IR/MLIRContext.h"
@@ -35,6 +39,7 @@
 #include "llvm/Support/ErrorHandling.h"
 #include <algorithm>
 #include <bitset>
+#include <iterator>
 
 using namespace mlir;
 using namespace dynamatic;
@@ -337,7 +342,7 @@ public:
 
   /// Returns the unique external module name for the operation. Two operations
   /// with different parameter values will never received the same name.
-  std::string getDiscriminatedModName();
+  std::string getDiscriminatedModName() { return modName; }
 
   /// Sets attribute on the external module (corresponding to the operation the
   /// object was constructed with) to tell the backend how to instantiate the
@@ -351,14 +356,26 @@ public:
 private:
   /// The operation whose parameters are being identified.
   Operation *op;
-  /// The operation's parameters.
-  SmallVector<std::pair<std::string, std::string>> parameters;
+  /// MLIR context to create attributes with.
+  MLIRContext *ctx;
+  /// Discriminated module name.
+  std::string modName;
+  /// The operation's parameters, as a list of named attributes.
+  SmallVector<NamedAttribute> parameters;
+
   /// Whether the operation is unsupported (set during construction).
   bool unsupported = false;
 
+  /// Adds a parameter.
+  void addParam(const Twine &name, Attribute attr) {
+    parameters.emplace_back(StringAttr::get(ctx, name), attr);
+  }
+
   /// Adds a scalar-type parameter.
   void addUnsigned(const Twine &name, unsigned scalar) {
-    parameters.emplace_back(name.str(), RTLUnsignedType::encode(scalar));
+    std::string encoded = RTLUnsignedType::encode(scalar);
+    addParam(name, StringAttr::get(ctx, encoded));
+    modName += "_" + encoded;
   };
 
   /// Adds a bitwdith parameter extracted from a type.
@@ -373,18 +390,26 @@ private:
 
   /// Adds a string parameter.
   void addString(const Twine &name, const Twine &txt) {
-    parameters.emplace_back(name.str(), RTLStringType::encode(txt.str()));
+    std::string encoded = RTLStringType::encode(txt.str());
+    addParam(name, StringAttr::get(ctx, encoded));
+    modName += "_" + encoded;
   };
+
+  /// Returns the module name's prefix from the name of the operation it
+  /// represents.
+  std::string setModPrefix(Operation *op) {
+    std::string prefixModName = op->getName().getStringRef().str();
+    std::replace(prefixModName.begin(), prefixModName.end(), '.', '_');
+    return prefixModName;
+  }
 
   /// Returns the bitwidth of a type.
   static unsigned getTypeWidth(Type type);
 };
 } // namespace
 
-ModuleDiscriminator::ModuleDiscriminator(Operation *op) : op(op) {
-  std::string extModName = op->getName().getStringRef().str();
-  std::replace(extModName.begin(), extModName.end(), '.', '_');
-  extModName += "_";
+ModuleDiscriminator::ModuleDiscriminator(Operation *op)
+    : op(op), ctx(op->getContext()), modName(setModPrefix(op)) {
 
   llvm::TypeSwitch<Operation *, void>(op)
       .Case<handshake::BufferOpInterface>(
@@ -539,7 +564,7 @@ ModuleDiscriminator::ModuleDiscriminator(Operation *op) : op(op) {
 }
 
 ModuleDiscriminator::ModuleDiscriminator(FuncMemoryPorts &ports)
-    : op(ports.memOp) {
+    : op(ports.memOp), ctx(op->getContext()), modName(setModPrefix(op)) {
   llvm::TypeSwitch<Operation *, void>(op)
       .Case<handshake::MemoryControllerOp>([&](auto) {
         // Control port count, load port count, store port count, data
@@ -551,35 +576,94 @@ ModuleDiscriminator::ModuleDiscriminator(FuncMemoryPorts &ports)
         addUnsigned("ADDR_WIDTH", ports.addrWidth);
       })
       .Case<handshake::LSQOp>([&](auto) {
-        /// TODO: dummy implemenation, need to connect it to old Chisel
-        /// generator which takes JSON inputs
-        // Control port count, load port count, store port count, data
-        // bitwidth, and address bitwidth
-        addUnsigned("NUM_CONTROL", ports.getNumPorts<ControlPort>());
-        addUnsigned("NUM_LOAD", ports.getNumPorts<LoadPort>());
-        addUnsigned("NUM_STORE", ports.getNumPorts<StorePort>());
-        addUnsigned("DATA_WIDTH", ports.dataWidth);
-        addUnsigned("ADDR_WIDTH", ports.addrWidth);
+        LSQGenerationInfo genInfo(ports, getUniqueName(op).str());
+        modName += "_" + genInfo.name;
+
+        SmallVector<NamedAttribute> attributes;
+
+        /// Converts a string into an equivalent MLIR attribute.
+        auto stringAttr = [&](StringRef name, StringRef value) -> void {
+          attributes.emplace_back(StringAttr::get(ctx, name),
+                                  StringAttr::get(ctx, value));
+        };
+
+        /// Converts an unsigned number into an equivalent MLIR attribute.
+        Type intType = IntegerType::get(ctx, 32);
+        auto intAttr = [&](StringRef name, unsigned value) -> void {
+          attributes.emplace_back(StringAttr::get(ctx, name),
+                                  IntegerAttr::get(intType, value));
+        };
+
+        /// Converts an array into an equivalent MLIR attribute.
+        auto arrayIntAttr = [&](StringRef name,
+                                ArrayRef<unsigned> array) -> void {
+          SmallVector<Attribute> arrayAttr;
+          llvm::transform(
+              array, std::back_inserter(arrayAttr),
+              [&](unsigned elem) { return IntegerAttr::get(intType, elem); });
+          attributes.emplace_back(StringAttr::get(ctx, name),
+                                  ArrayAttr::get(ctx, arrayAttr));
+        };
+
+        /// Converts a bi-dimensional array into an equivalent MLIR attribute.
+        auto biArrayIntAttr =
+            [&](StringRef name,
+                ArrayRef<SmallVector<unsigned>> biArray) -> void {
+          SmallVector<Attribute> biArrayAttr;
+          for (ArrayRef<unsigned> array : biArray) {
+            SmallVector<Attribute> arrayAttr;
+            llvm::transform(
+                array, std::back_inserter(arrayAttr),
+                [&](unsigned elem) { return IntegerAttr::get(intType, elem); });
+            biArrayAttr.push_back(ArrayAttr::get(ctx, arrayAttr));
+          }
+          attributes.emplace_back(StringAttr::get(ctx, name),
+                                  ArrayAttr::get(ctx, biArrayAttr));
+        };
+
+        stringAttr("name", modName);
+        intAttr("fifoDepth", genInfo.depth);
+        intAttr("fifoDepth_L", genInfo.depthLoad);
+        intAttr("fifoDepth_S", genInfo.depthStore);
+        intAttr("bufferDepth", genInfo.bufferDepth);
+        stringAttr("accessType", genInfo.accessType);
+        // The Chisel LSQ generator expects this to be a string, not a boolean
+        stringAttr("speculation", genInfo.speculation ? "true" : "false");
+        intAttr("dataWidth", genInfo.dataWidth);
+        intAttr("addrWidth", genInfo.addrWidth);
+        intAttr("numBBs", genInfo.numGroups);
+        intAttr("numLoadPorts", genInfo.numLoads);
+        intAttr("numStorePorts", genInfo.numStores);
+        arrayIntAttr("numLoads", genInfo.loadsPerGroup);
+        arrayIntAttr("numStores", genInfo.storesPerGroup);
+        biArrayIntAttr("loadOffsets",
+                       ArrayRef<SmallVector<unsigned>>{genInfo.loadOffsets});
+        biArrayIntAttr("storeOffsets",
+                       ArrayRef<SmallVector<unsigned>>{genInfo.storeOffsets});
+        biArrayIntAttr("loadPorts", genInfo.loadPorts);
+        biArrayIntAttr("storePorts", genInfo.storePorts);
+
+        // The LSQ generator expects the JSON containing all the elements to be
+        // nested inside a JSON array under  the "specifications" key within the
+        // top-level JSON object, make it so
+        // {
+        //   "specifications": [{
+        //    ...all generation info
+        //   }]
+        // }
+        DictionaryAttr dictAttr = DictionaryAttr::get(ctx, attributes);
+        ArrayAttr arrayAttr =
+            ArrayAttr::get(ctx, SmallVector<Attribute>{dictAttr});
+        addParam("specifications", arrayAttr);
       })
       .Default([&](auto) {
-        op->emitError() << "This operation cannot be lowered to RTL "
-                           "due to a lack of an RTL implementation for it.";
+        op->emitError() << "Unsupported memory interface type.";
         unsupported = true;
       });
 }
 
-std::string ModuleDiscriminator::getDiscriminatedModName() {
-  assert(!unsupported && "operation unsupported");
-  std::string modName = op->getName().getStringRef().str();
-  std::replace(modName.begin(), modName.end(), '.', '_');
-  for (auto &[_, paramValue] : parameters)
-    modName += "_" + paramValue;
-  return modName;
-}
-
 void ModuleDiscriminator::setParameters(hw::HWModuleExternOp modOp) {
   assert(!unsupported && "operation unsupported");
-  MLIRContext *ctx = op->getContext();
 
   // The name is used to determine which RTL component to instantiate
   StringRef opName = op->getName().getStringRef();
@@ -587,15 +671,8 @@ void ModuleDiscriminator::setParameters(hw::HWModuleExternOp modOp) {
 
   // Parameters are used to determine the concrete version of the RTL
   // component to instantiate
-  SmallVector<NamedAttribute> paramAttrs;
-  llvm::transform(parameters, std::back_inserter(paramAttrs),
-                  [&](std::pair<std::string, std::string> &nameAndValue) {
-                    return NamedAttribute(
-                        StringAttr::get(ctx, nameAndValue.first),
-                        StringAttr::get(ctx, nameAndValue.second));
-                  });
   modOp->setAttr(RTLMatch::PARAMETERS_ATTR,
-                 DictionaryAttr::get(ctx, paramAttrs));
+                 DictionaryAttr::get(ctx, parameters));
 }
 
 unsigned ModuleDiscriminator::getTypeWidth(Type type) {

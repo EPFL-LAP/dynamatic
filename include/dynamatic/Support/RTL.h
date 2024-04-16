@@ -48,9 +48,10 @@ class RTLComponent;
 class RTLType {
 public:
   /// Abstract base class for RTL parameter type constraints. Each concrete RTL
-  /// parameter type should subclass if it wants to define custom constraints.
+  /// parameter type should subclass it if it wants to define custom
+  /// constraints.
   struct Constraints {
-    /// Determines whether constraints are satisified with a specific parameter
+    /// Determines whether constraints are satisfied with a specific parameter
     /// value encoded as a string.
     virtual bool verify(StringRef paramValue) const { return true; };
 
@@ -199,7 +200,9 @@ public:
   static constexpr llvm::StringLiteral DYNAMATIC = StringLiteral("DYNAMATIC"),
                                        OUTPUT_DIR = StringLiteral("OUTPUT_DIR"),
                                        MODULE_NAME =
-                                           StringLiteral("MODULE_NAME");
+                                           StringLiteral("MODULE_NAME"),
+                                       JSON_CONFIG =
+                                           StringLiteral("JSON_CONFIG");
 
   /// Default constructor.
   RTLParameter() = default;
@@ -259,33 +262,75 @@ inline bool fromJSON(const llvm::json::Value &value, RTLParameter &parameter,
   return parameter.fromJSON(value, path);
 }
 
-/// Helper data-structure used to qeury for a component/model match between an
-/// MLIR operation and an entity parsed from the RTL configuration file. Should
-/// rarely be instantiated on its own; instead, its one-argument constructor
-/// can implicitly perform the conversion when calling methods expecting an
-/// instance of this struct.
-struct RTLMatch {
+/// Helper data-structure used to query for a component/model match between an
+/// MLIR operation and an entity parsed from the RTL configuration file. When an
+/// RTL component matches, associate it to the match object using
+/// `RTLMatch::setMatch` and then concretize it to RTL using
+/// `RTLMatch::concretize`.
+class RTLMatch {
+  friend RTLComponent;
+
+public:
   /// Attribute names under which the RTL component's name and parameters are
   /// stored on an MLIR operation, respectively.
   static constexpr StringLiteral NAME_ATTR = StringLiteral("hw.name"),
                                  PARAMETERS_ATTR =
                                      StringLiteral("hw.parameters");
+
+  /// Fields below set before a match.
+
   /// The RTL component's name to look for.
   std::string name;
-  /// Maps RTL component's parameter names to their respective value.
-  llvm::StringMap<std::string> parameters;
-
   /// Location at which to report errors.
   Location loc;
-  /// Whether the match is possible altogether. If this is `true`, all matching
-  /// methods should "fail" with this object.
-  bool invalid = true;
+  /// If the match is associated to a HW module, references it.
+  hw::HWModuleExternOp modOp = nullptr;
+  /// If the match is associated to a HW module, maps RTL component's parameter
+  /// names to their respective attribute.
+  llvm::StringMap<Attribute> parameters;
 
-  /// Constructs a match from an external module operation from the HW dialect.
-  RTLMatch(dynamatic::hw::HWModuleExternOp modOp);
+  /// Fields below set after a match.
 
-  /// Constructs a match from a component name, without parameters.
+  /// Concrete entity name that the RTL component defines, derived from the
+  /// entity name in the RTL component description with RTL parameter values
+  /// substituted.
+  std::string entityName;
+  /// Concrete architecture name that the RTL component defines, derived from
+  /// the entity name in the RTL component description with RTL parameter values
+  /// substituted.
+  std::string archName;
+  /// Once a match is set, all RTL parameters of the matched components are
+  /// encoded as strings in the map.
+  llvm::StringMap<std::string> encodedParameters;
+
+  /// Attempts to match external module operation from the HW dialect.
+  RTLMatch(hw::HWModuleExternOp modOp);
+
+  /// Attempts to match a component by name, without parameters.
   RTLMatch(StringRef name, Location loc);
+
+  /// Returns the matched RTL component, or nullptr if no match was set.
+  const RTLComponent *getMatchedComponent() { return component; }
+
+  /// Matches the RTL component. Should only be called once per `RTLMatch`
+  /// object, before calling `concretize`. Fails if at least one of the
+  /// component's RTL parameters cannot be encoded to string; succeeds
+  /// otherwise.
+  LogicalResult setMatch(const RTLComponent &component);
+
+  /// Attempts to concretize the matched RTL component. Generic components are
+  /// copied to the output directory while generated components are produced by
+  /// the user-provided generator.
+  LogicalResult concretize(StringRef dynamaticPath, StringRef outputDir) const;
+
+  /// Attempts to encode an attribute to a string and sets the second argument
+  /// to the encoded string. Fails if the attribute type isn't supported for
+  /// encoding.
+  static LogicalResult encodeParameter(Attribute attr, std::string &value);
+
+private:
+  /// Matched RTL component.
+  const RTLComponent *component = nullptr;
 };
 
 /// Represents an RTL component i.e., a top-level entry in the RTL configuration
@@ -294,7 +339,19 @@ struct RTLMatch {
 /// component has optional timing models attached to it, whose applicability can
 /// be restricted by parameter constraints too.
 class RTLComponent {
+  // Match objects can concretize RTL components and therefore need easy access
+  // to their data.
+  friend RTLMatch;
+
 public:
+  /// Hardware description languages.
+  enum class HDL { VHDL, VERILOG };
+
+  /// Denotes whether "arrays of ports" in the component's IO are expressed as
+  /// multi-dimensional arrays (`HIERARCHICAL`) or as separate ports with
+  /// indices encoded in their names (`FLAT`) as follows: <port-name>_<index>.
+  enum class IOKind { HIERARCICAL, FLAT };
+
   /// A timing model for the component, optionally constrained for specific RTL
   /// parameters.
   struct Model {
@@ -330,19 +387,11 @@ public:
   /// implementation.
   bool isGeneric() const { return !generic.empty(); }
 
-  /// Returns the component's entity name after performing substitutions with
-  /// the given parameters.
-  std::string
-  getEntityName(const llvm::StringMap<std::string> &parameters) const {
-    return substituteParams(entityName, parameters);
-  };
+  /// Returns the HDL in which the component is written.
+  HDL getHDL() const { return hdl; }
 
-  /// Returns the component's architecture name after performing substitutions
-  /// with the given parameters.
-  std::string
-  getArchName(const llvm::StringMap<std::string> &parameters) const {
-    return substituteParams(archName, parameters);
-  };
+  /// Returns the IO kind used by the component.
+  IOKind getIOKind() const { return ioKind; }
 
   /// Returns the component's list of RTL dependencies.
   ArrayRef<std::string> getDependencies() const { return dependencies; }
@@ -355,15 +404,6 @@ public:
   /// with the match object. Returns the first compatible model (in model
   /// list order), if any exists.
   const RTLComponent::Model *getModel(const RTLMatch &match) const;
-
-  /// Concretizes the RTL component with the provided parameters. Generic
-  /// components are simply copied to the output directory. Generated components
-  /// are produced by the user-provided arbitrary generation command. Succeeds
-  /// when the component could either be copied (generic) or when the generation
-  /// command returned 0 (generator). Reports an error at the provided location
-  /// in case of failure.
-  LogicalResult concretize(llvm::StringMap<std::string> &parameters,
-                           Location loc) const;
 
   RTLComponent(RTLComponent &&) noexcept = default;
   RTLComponent &operator=(RTLComponent &&) noexcept = default;
@@ -393,12 +433,30 @@ private:
   /// component, it is the $MODULE_NAME parameter by default, which is provided
   /// at generation time. Supports parameter substitution.
   std::string entityName;
-  /// Architecture's name, "arch" be default. Supports parameter substitution.
-  std::string archName;
+  /// Architecture's name, "arch" be default (only meaningful for VHDL
+  /// components). Supports parameter substitution.
+  std::string archName = "arch";
+  /// HDL in which the component is written.
+  HDL hdl = HDL::VHDL;
+  /// IO kind used by the component, hierarchical by default.
+  IOKind ioKind = IOKind::HIERARCICAL;
+  /// If defined, instructs an RTL backend to serialize all RTL parameters to a
+  /// JSON file at the provided filepath prior to component generation. It only
+  /// makes sense for this to be defined for generated components. The filepath
+  /// supports parameter substitution.
+  std::optional<std::string> jsonConfig;
 
   /// Returns a pointer to the RTL parameter with a specific name, if it exists.
   RTLParameter *getParameter(StringRef name) const;
 };
+
+/// ADL-findable LLVM-standard JSON deserializer for a HDL.
+inline bool fromJSON(const llvm::json::Value &value, RTLComponent::HDL &hdl,
+                     llvm::json::Path path);
+
+/// ADL-findable LLVM-standard JSON deserializer for IO kinds.
+inline bool fromJSON(const llvm::json::Value &value, RTLComponent::IOKind &io,
+                     llvm::json::Path path);
 
 /// ADL-findable LLVM-standard JSON deserializer for an RTL component.
 inline bool fromJSON(const llvm::json::Value &value, RTLComponent &component,
@@ -419,10 +477,12 @@ public:
   /// list.
   LogicalResult addComponentsFromJSON(StringRef filepath);
 
-  /// Determines whether the RTL configuration has any compatible component with
-  /// the match object. Returns the first compatible component (in component
-  /// list order), if any exists.
-  const RTLComponent *getComponent(const RTLMatch &match) const;
+  /// Tries to find an RTL component that is compatible with the match object.
+  /// Returns true and records the match in the match object if at least one
+  /// such component exist; returns false otherwise. If multiple components are
+  /// compatible with the match object, the first one (in JSON-parsing-order) is
+  /// matched.
+  bool findCompatibleComponent(RTLMatch &match) const;
 
   /// Determines whether the RTL configuration has any component with a timing
   /// model compatible with the match object. Returns the first compatible model

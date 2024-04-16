@@ -1,4 +1,5 @@
 add_dynamatic_library(DynamaticSupport
+  Attribute.cpp  
   Backedge.cpp
   CFG.cpp
   DOTPrinter.cpp
@@ -8,6 +9,7 @@ add_dynamatic_library(DynamaticSupport
   TimingModels.cpp
 
   LINK_LIBS PUBLIC
+  DynamaticHW
   MLIRIR
   MLIRSupport
   MLIRAffineDialect
