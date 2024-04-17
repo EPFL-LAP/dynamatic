@@ -38,11 +38,13 @@ static constexpr StringLiteral KEY_PARAMETERS("parameters"),
     KEY_NAME("name"), KEY_TYPE("type"), KEY_PATH("path"),
     KEY_CONSTRAINTS("constraints"), KEY_PARAMETER("parameter"),
     KEY_DEPENDENCIES("dependencies"), KEY_ENTITY_NAME("entity-name"),
-    KEY_ARCH_NAME("arch-name"), KEY_HDL("hdl"), KEY_IO_KIND("io-kind"),
-    KEY_USE_JSON_CONFIG("use-json-config");
+    KEY_ARCH_NAME("arch-name"), KEY_HDL("hdl"),
+    KEY_USE_JSON_CONFIG("use-json-config"), KEY_IO_KIND("io-kind"),
+    KEY_IO_MAP("io-map"), KEY_IO_CHANNELS("io-channels");
 
 /// JSON path errors.
-static constexpr StringLiteral ERR_EXPECTED_ARRAY("expected array"),
+static constexpr StringLiteral ERR_EXPECTED_OBJECT("expected object"),
+    ERR_EXPECTED_ARRAY("expected array"),
     ERR_MISSING_CONCRETIZATION("missing concretization method, either "
                                "\"generic\" or \"generator\" key must exist"),
     ERR_MULTIPLE_CONCRETIZATION(
@@ -352,6 +354,13 @@ RTLComponent::Model::~Model() {
     delete constraints;
 }
 
+/// Counts the number of times the wildcard character ('*') appears in the
+/// input.
+static inline size_t countWildcards(StringRef input) {
+  return std::count_if(input.begin(), input.end(),
+                       [](char c) { return c == '*'; });
+}
+
 bool RTLComponent::fromJSON(const llvm::json::Value &value,
                             llvm::json::Path path) {
   json::ObjectMapper mapper(value, path);
@@ -363,8 +372,10 @@ bool RTLComponent::fromJSON(const llvm::json::Value &value,
       !mapper.mapOptional(KEY_ENTITY_NAME, entityName) ||
       !mapper.mapOptional(KEY_ARCH_NAME, archName) ||
       !mapper.mapOptional(KEY_HDL, hdl) ||
+      !mapper.mapOptional(KEY_USE_JSON_CONFIG, jsonConfig) ||
       !mapper.mapOptional(KEY_IO_KIND, ioKind) ||
-      !mapper.mapOptional(KEY_USE_JSON_CONFIG, jsonConfig)) {
+      !mapper.mapOptional(KEY_IO_MAP, ioMap) ||
+      !mapper.mapOptional(KEY_IO_CHANNELS, ioChannels)) {
     return false;
   }
 
@@ -404,8 +415,45 @@ bool RTLComponent::fromJSON(const llvm::json::Value &value,
     }
   }
 
-  // Timing models need access to the component's RTL parameters to verify the
-  // sanity of constraints, so they are parsed separately
+  /// Defines default signal type suffixes if they were not overriden
+  auto setDefaultSignalSuffix = [&](SignalType type, StringRef suffix) {
+    if (ioChannels.find(type) == ioChannels.end())
+      ioChannels[type] = suffix;
+  };
+  setDefaultSignalSuffix(SignalType::DATA, "");
+  setDefaultSignalSuffix(SignalType::VALID, "_valid");
+  setDefaultSignalSuffix(SignalType::READY, "_ready");
+
+  // Make sure the IO map makes sense
+  for (auto &[from, to] : ioMap) {
+    // At most one wildcard in the key
+    size_t keyNumWild = countWildcards(from);
+    if (keyNumWild > 1) {
+      path.field(KEY_IO_MAP)
+          .field(from)
+          .report("At most one wildcard is allowed in the key");
+      return false;
+    }
+
+    // At most one wildcard in the value, and no more than in the key
+    size_t valudNumWild = countWildcards(to);
+    if (valudNumWild > 1) {
+      path.field(KEY_IO_MAP)
+          .field(from)
+          .report("At most one wildcard is allowed in the value");
+      return false;
+    }
+    if (keyNumWild == 0 && valudNumWild == 1) {
+      path.field(KEY_IO_MAP)
+          .field(from)
+          .report("Value has wildcard but key does not, this is not allowed");
+      return false;
+    }
+  }
+
+  // Timing models need access to the component's RTL parameters to verify
+  // the sanity of constraints, so they are parsed separately and somewhat
+  // differently
 
   // The mapper ensures that the object is valid
   const json::Value *jsonModelsValue = value.getAsObject()->get(KEY_MODELS);
@@ -592,6 +640,155 @@ const RTLComponent::Model *RTLComponent::getModel(const RTLMatch &match) const {
 
   // No matching model
   return nullptr;
+}
+
+std::string RTLComponent::portRemap(StringRef mlirPortName) const {
+  for (const auto &[rtlPortName, mappedRTLPortName] : ioMap) {
+
+    size_t wildcardIdx = rtlPortName.find('*');
+    if (wildcardIdx == std::string::npos) {
+      // Only an exact match will work
+      if (mlirPortName != rtlPortName)
+        continue;
+      return mappedRTLPortName;
+    }
+
+    // Check whether we can match the MLIR port name to the RTl port name
+    // template; we must identify whether any part of the MLIR port name matches
+    // the wildcard, then replace the potential wildcard in the remapped port
+    // name with that part of the MLIR port name
+    StringRef refRTlPortName(rtlPortName);
+
+    // Characters before the wildcard must match between the MLIR port name and
+    // RTL source port name
+    if (mlirPortName.size() < wildcardIdx ||
+        mlirPortName.take_front(wildcardIdx) !=
+            refRTlPortName.take_front(wildcardIdx))
+      continue;
+
+    StringRef wildcardMatch;
+    size_t afterWildcardSize = rtlPortName.size() - wildcardIdx - 1;
+    if (afterWildcardSize > 0) {
+      // Characters after the wildcard must match between the MLIR port name and
+      // source RTL port name
+      if (mlirPortName.size() < afterWildcardSize ||
+          mlirPortName.take_back(afterWildcardSize) !=
+              refRTlPortName.take_back(afterWildcardSize))
+        continue;
+      wildcardMatch = mlirPortName.slice(wildcardIdx, mlirPortName.size() -
+                                                          afterWildcardSize);
+    } else {
+      wildcardMatch = mlirPortName.drop_front(wildcardIdx);
+    }
+
+    // Replace a potential wildcard in the remapped name with the part of the
+    // MLIR port name that matched the wildcard in the source port name
+    if (size_t idx = mappedRTLPortName.find('*'); idx != std::string::npos)
+      return std::string{mappedRTLPortName}.replace(idx, 1, wildcardMatch);
+    return mappedRTLPortName;
+  }
+
+  // When no source port name in the map matched the MLIR port name, just return
+  // it unmodified
+  return mlirPortName.str();
+}
+
+bool RTLComponent::portNameIsIndexed(StringRef portName, StringRef &baseName,
+                                     size_t &arrayIdx) const {
+  // IO kind must be hierarchical and port name must contain an underscore to
+  // separate a base name from an index
+  if (ioKind == IOKind::FLAT)
+    return false;
+  size_t idx = portName.rfind("_");
+  if (idx == std::string::npos)
+    return false;
+
+  StringRef maybeNumber = portName.substr(idx + 1);
+  if (!StringRef{maybeNumber}.getAsInteger(10, arrayIdx)) {
+    baseName = portName.substr(0, idx);
+    return true;
+  }
+  return false;
+}
+
+std::string RTLComponent::getRTLPortName(StringRef mlirPortName) const {
+  std::string remappedName = portRemap(mlirPortName);
+  StringRef baseName;
+  size_t arrayIdx;
+  if (!portNameIsIndexed(remappedName, baseName, arrayIdx))
+    return remappedName;
+  return baseName.str() + "(" + std::to_string(arrayIdx) + ")";
+}
+
+std::string RTLComponent::getRTLPortName(StringRef mlirPortName,
+                                         SignalType type) const {
+  std::string signalSuffix = ioChannels.at(type);
+  std::string remappedName = portRemap(mlirPortName);
+  StringRef baseName;
+  size_t arrayIdx;
+  if (!portNameIsIndexed(remappedName, baseName, arrayIdx))
+    return remappedName + signalSuffix;
+  return baseName.str() + signalSuffix + "(" + std::to_string(arrayIdx) + ")";
+}
+
+inline bool
+llvm::json::fromJSON(const json::Value &value,
+                     std::pair<std::string, std::string> &stringPair,
+                     json::Path path) {
+  const json::Object *object = value.getAsObject();
+  if (!object) {
+    path.report(ERR_EXPECTED_OBJECT);
+    return false;
+  }
+
+  // We expect a single key-value pair
+  if (object->size() != 1) {
+    path.report("expected single key-value pair mapping");
+    return false;
+  }
+
+  // The JSON value in the object must be a string
+  const auto &[jsonKey, jsonValue] = *object->begin();
+  std::string mappedRTLPortName;
+  if (!fromJSON(jsonValue, mappedRTLPortName, path.field(jsonKey)))
+    return false;
+
+  stringPair.first = jsonKey.str();
+  stringPair.second = mappedRTLPortName;
+  return true;
+}
+
+inline bool dynamatic::fromJSON(const json::Value &value,
+                                std::map<SignalType, std::string> &ioChannels,
+                                json::Path path) {
+  const json::Object *object = value.getAsObject();
+  if (!object) {
+    path.report(ERR_EXPECTED_OBJECT);
+    return false;
+  }
+
+  ioChannels.clear();
+  for (const auto &[signalStr, jsonSuffix] : *object) {
+    // Deserialize the signal type
+    SignalType type;
+    if (signalStr == "data") {
+      type = SignalType::DATA;
+    } else if (signalStr == "valid") {
+      type = SignalType::VALID;
+    } else if (signalStr == "ready") {
+      type = SignalType::READY;
+    } else {
+      path.field(signalStr).report("unknown channel signal type: possible keys "
+                                   "are 'data', 'valid', or 'ready'");
+      return false;
+    }
+
+    // Deserialize the suffix (just a string)
+    if (!fromJSON(jsonSuffix, ioChannels[type], path.field(signalStr)))
+      return false;
+  }
+
+  return true;
 }
 
 inline bool dynamatic::fromJSON(const llvm::json::Value &value,

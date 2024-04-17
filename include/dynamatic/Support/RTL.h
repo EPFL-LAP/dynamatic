@@ -17,6 +17,7 @@
 
 #include "dynamatic/Dialect/HW/HWOps.h"
 #include "dynamatic/Support/LLVM.h"
+#include "dynamatic/Support/TimingModels.h"
 #include "llvm/Support/JSON.h"
 #include <map>
 #include <string>
@@ -383,6 +384,15 @@ public:
   /// Determines whether the RTL component is compatible with the match object.
   bool isCompatible(const RTLMatch &match) const;
 
+  /// Determines whether the RTL component has any timing model compatible
+  /// with the match object. Returns the first compatible model (in model
+  /// list order), if any exists.
+  const RTLComponent::Model *getModel(const RTLMatch &match) const;
+
+  /// Returns the list of RTL parameters, in order, which must be provided as
+  /// generic parameters during instantiations of this component.
+  SmallVector<const RTLParameter *> getGenericParameters() const;
+
   /// Returns whether the component is concretized using a "generic" RTL
   /// implementation.
   bool isGeneric() const { return !generic.empty(); }
@@ -390,20 +400,20 @@ public:
   /// Returns the HDL in which the component is written.
   HDL getHDL() const { return hdl; }
 
-  /// Returns the IO kind used by the component.
-  IOKind getIOKind() const { return ioKind; }
-
   /// Returns the component's list of RTL dependencies.
   ArrayRef<std::string> getDependencies() const { return dependencies; }
 
-  /// Returns the list of RTL parameters, in order, which must be provided as
-  /// generic parameters during instantiations of this component.
-  SmallVector<const RTLParameter *> getGenericParameters() const;
+  /// Returns the name of the component port matching the MLIR port name. If the
+  /// component does not define any port name remapping this is simply the input
+  /// MLIR port name.
+  std::string getRTLPortName(StringRef mlirPortName) const;
 
-  /// Determines whether the RTL component has any timing model compatible
-  /// with the match object. Returns the first compatible model (in model
-  /// list order), if any exists.
-  const RTLComponent::Model *getModel(const RTLMatch &match) const;
+  /// Returns the name of the component port matching the MLIR port name for the
+  /// specific signal type. This is the remapped port name returned by the
+  /// non-signal-specific version of that method suffixed by a string
+  /// identifying the signal type (e.g., "_valid" for valid signals). Default
+  /// suffixes may be overriden on a per-component basis.
+  std::string getRTLPortName(StringRef mlirPortName, SignalType type) const;
 
   RTLComponent(RTLComponent &&) noexcept = default;
   RTLComponent &operator=(RTLComponent &&) noexcept = default;
@@ -438,17 +448,44 @@ private:
   std::string archName = "arch";
   /// HDL in which the component is written.
   HDL hdl = HDL::VHDL;
-  /// IO kind used by the component, hierarchical by default.
-  IOKind ioKind = IOKind::HIERARCICAL;
   /// If defined, instructs an RTL backend to serialize all RTL parameters to a
   /// JSON file at the provided filepath prior to component generation. It only
   /// makes sense for this to be defined for generated components. The filepath
   /// supports parameter substitution.
   std::optional<std::string> jsonConfig;
 
+  /// IO kind used by the component, hierarchical by default.
+  IOKind ioKind = IOKind::HIERARCICAL;
+  /// Define port renamings for the component compared to the expected names.
+  /// Supports wildcard matching with '*' chacacter.
+  std::vector<std::pair<std::string, std::string>> ioMap;
+  /// Maps each signal type of a dataflow channel to the suffix to use for port
+  /// names of this type. For example, if the map contained the
+  /// SignalType::VALID -> "valid" association, then it would be assumed that
+  /// the valid wire of a channel-typed port with name <PORT-NAME> would be
+  /// named <PORT-NAME>_valid in the RTL component.
+  std::map<SignalType, std::string> ioChannels;
+
   /// Returns a pointer to the RTL parameter with a specific name, if it exists.
   RTLParameter *getParameter(StringRef name) const;
+
+  /// Applies any component-specific remapping on a port name coming from MLIR
+  /// and returns the remapped port name (which may be identical to the input).
+  std::string portRemap(StringRef mlirPortName) const;
+
+  /// If the component's IO type is hierarchical and the port name has indexed
+  /// port name (portName == <baseName>_<arrayIdx>), returns true and stores the
+  /// two port name components in the last two arguments; otherwise returns
+  /// false.
+  bool portNameIsIndexed(StringRef portName, StringRef &baseName,
+                         size_t &arrayIdx) const;
 };
+
+/// ADL-findable LLVM-standard JSON deserializer for a signal type to string
+/// mapping.
+inline bool fromJSON(const llvm::json::Value &value,
+                     std::map<SignalType, std::string> &ioChannels,
+                     llvm::json::Path path);
 
 /// ADL-findable LLVM-standard JSON deserializer for a HDL.
 inline bool fromJSON(const llvm::json::Value &value, RTLComponent::HDL &hdl,
@@ -499,5 +536,15 @@ private:
 };
 
 } // namespace dynamatic
+
+namespace llvm {
+namespace json {
+/// ADL-findable LLVM-standard JSON deserializer for a pair of strings (expect
+/// an object with a single key-value pair).
+inline bool fromJSON(const llvm::json::Value &value,
+                     std::pair<std::string, std::string> &stringPair,
+                     llvm::json::Path path);
+} // namespace json
+} // namespace llvm
 
 #endif // DYNAMATIC_SUPPORT_RTL_H
