@@ -28,11 +28,12 @@ git fetch --unshallow
 This section provides some insights into our custom build script, [build.sh](../build.sh), located in the repository's top-level folder. The script recognizes a number of flags and arguments that allow you to customize the build process to your needs. The `--help` flag makes the script print the entire list of available flags/arguments and exit.
 
 > [!WARNING]
-> The script should always be ran from Dynamatic's top-level folder. 
+> The script should always be ran from Dynamatic's top-level folder.
 
 ### General behavior
 
 The build script successively builds all parts of the project using *CMake* and *Ninja*. In order, it builds
+
 1. LLVM (with *MLIR* and *clang* as additional tools),
 2. Polygeist (our C/C++ frontend for MLIR),
 3. Dynamatic, and
@@ -70,7 +71,7 @@ By default, *Ninja* builds the project by concurrently using at most one thread 
 
 ### Forcing CMake re-configuration
 
-To reduce the build script's execution time when re-building the project regularly (which happens during active development), the script does not try to fully reconfigure each submodule or the superproject using *CMake* if it sees that a *CMake* cache is already present on your filesystem for each part. This can cause problems if you suddenly decide to change build flags that affect the CMake configuration (e.g., when going from a *Debug* build to a *Release* build) as the CMake configuration will not take into account the new configuration. Whenever that happens (or whenever in doubt), provide the `--force` flag to force the build script to re-configure each part of the project using CMake. 
+To reduce the build script's execution time when re-building the project regularly (which happens during active development), the script does not try to fully reconfigure each submodule or the superproject using *CMake* if it sees that a *CMake* cache is already present on your filesystem for each part. This can cause problems if you suddenly decide to change build flags that affect the CMake configuration (e.g., when going from a *Debug* build to a *Release* build) as the CMake configuration will not take into account the new configuration. Whenever that happens (or whenever in doubt), provide the `--force` flag to force the build script to re-configure each part of the project using CMake.
 
 ```sh
 # Force re-configuration of every submodule and the superproject
@@ -78,18 +79,19 @@ To reduce the build script's execution time when re-building the project regular
 ```
 
 > [!NOTE]
-> If the *CMake* configuration of each submodule and of the superproject has not changed since the last build script's invocation and the `--force` flag is provided, the script will just take around half a minute more to run than normal but will not fully re-build everything. Therefore it is safe and not too inconvenient to specify the `--force` flag on every invocation of the script. 
+> If the *CMake* configuration of each submodule and of the superproject has not changed since the last build script's invocation and the `--force` flag is provided, the script will just take around half a minute more to run than normal but will not fully re-build everything. Therefore it is safe and not too inconvenient to specify the `--force` flag on every invocation of the script.
 
 ### Interactive dataflow circuit visualizer
 
 The repository contains an optionally built tool that allows to visualize the dataflow circuits produced by Dynamatic and interact with them as they are simulated on test inputs. This is a very useful tool for debugging and for better understanding dataflow circuits in general. It is built on top of the open-source [Godot game engine](https://godotengine.org/) and of its [C++ bindings](https://github.com/godotengine/godot-cpp), the latter of which Dynamatic depends on as a submodule rooted at `visual-dataflow/godot-cpp` (relative to Dynamatic's top-level folder). To build and/or modify this tool (which is only supported on Linux at this point), one must therefore download the Godot engine (a single executable file) from the Internet manually.
 
 > [!WARNING]
-> Note that Godot's C++ bindings only work for a specific major/minor version of the engine. This version is specified in the `branch` field of the submodule's declaration in [`.gitmodules`](../.gitmodules). The version of the engine you download must therefore match the bindinds currently tracked by Dynamatic. [You can download any version of Godot from the official archive](https://godotengine.org/download/archive/).
+> Note that Godot's C++ bindings only work for a specific major/minor version of the engine. This version is specified in the `branch` field of the submodule's declaration in [`.gitmodules`](../.gitmodules). The version of the engine you download must therefore match the bindings currently tracked by Dynamatic. [You can download any version of Godot from the official archive](https://godotengine.org/download/archive/).
 
 Due to these extra dependencies, building this tool is opt-in, meaning that by default it is not built along the rest of Dynamatic. This also means that the `CMakeLists.txt` file in `visual-dataflow/` is meant to be configured independently from the one located one folder above it i.e., at the project's root. As a consequence, intermediate build files for the tool are dumped into the `visual-dataflow/build/` folder instead of the top-level `build/` folder.  
 
 Building an executable binary for the interactive dataflow circuit visualizer is a two-step process, one which is automated and one which still requires some manual work detailed below.
+
 1. First, one must build the C++ shared library that the Godot project uses to get access to Dynamatic's API. The `--visual-dataflow` build script flag performs this task automatically.
   
     ```sh
