@@ -72,8 +72,6 @@ public:
 
   /// Prohibit copy due to dynamic allocation of constraints.
   RTLType(const RTLType &) = delete;
-  /// Prohibit copy due to dynamic allocation of constraints.
-  RTLType operator=(const RTLType &) = delete;
 
   RTLType(RTLType &&other) noexcept
       : constraints(std::exchange(other.constraints, nullptr)) {}
