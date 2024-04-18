@@ -24,7 +24,6 @@
 #include "mlir/Dialect/Func/IR/FuncOps.h"
 #include "mlir/Dialect/MemRef/IR/MemRef.h"
 #include "mlir/IR/MLIRContext.h"
-#include "mlir/Interfaces/SideEffectInterfaces.h"
 #include "llvm/ADT/TypeSwitch.h"
 #include "llvm/Support/raw_ostream.h"
 
@@ -43,6 +42,11 @@ using MemDependencies = DenseMap<Operation *, SmallVector<MemDependenceAttr>>;
 /// Determines whether an operation is akin to a load.
 static inline bool isLoadLike(Operation *op) {
   return isa<memref::LoadOp, AffineLoadOp>(op);
+}
+
+/// Determines whether the operation is nested within any loop-like operation.
+static bool isOutsideAllLoops(Operation *op) {
+  return !op->getParentWithTrait<LoopLikeOpInterface::Trait>();
 }
 
 namespace {
@@ -176,9 +180,9 @@ LogicalResult MarkMemoryDependenciesPass::checkNonAffineAccessPair(
   // We don't care about RAR dependencies
   if (isLoadLike(srcOp) && isLoadLike(dstOp))
     return success();
-  // A write outside of all loops cannot depend on itself
-  if (srcOp == dstOp && getNumCommonSurroundingLoops(*srcOp, *dstOp) == 0)
-    return failure();
+  // An operation outside of all loops cannot depend on itself
+  if (srcOp == dstOp && isOutsideAllLoops(srcOp))
+    return success();
 
   NameAnalysis &namer = getAnalysis<NameAnalysis>();
   StringRef dstName = namer.getName(dstOp);

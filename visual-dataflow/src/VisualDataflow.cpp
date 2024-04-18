@@ -417,85 +417,95 @@ void VisualDataflow::previousCycle() {
 }
 
 void VisualDataflow::changeCycle(int64_t cycleNb) {
-  if (cycle != cycleNb) {
-    cycle = Math::min(Math::max((double)cycleNb, 0.0), cycleSlider->get_max());
-    cycleLabel->set_text("Cycle: " + String::num_int64(cycle));
-    cycleSlider->set_value(cycle);
+  if (cycle == cycleNb)
+    return;
 
-    if (graph.getCycleEdgeStates().count(cycle)) {
-      ChannelTransitions edgeStates = graph.getCycleEdgeStates().at(cycle);
-      for (auto &edgeState : edgeStates) {
+  int64_t maxCycle = (int64_t)cycleSlider->get_max();
+  cycle = std::min(std::max(cycleNb, (int64_t)0), maxCycle);
+  cycleLabel->set_text("Cycle: " + String::num_int64(cycle));
+  cycleSlider->set_value(cycle);
+  setEdgeColors(cycleNb);
 
-        EdgeId edgeId = edgeState.first;
-        State state = edgeState.second.first;
-        std::vector<Line2D *> lines = edgeIdToLines[edgeId];
-        Polygon2D *arrowHead = edgeIdToArrowHead[edgeId];
+  if (graph.getCycleEdgeStates().count(cycle)) {
+    ChannelTransitions edgeStates = graph.getCycleEdgeStates().at(cycle);
+    for (auto &[edgeID, state] : edgeStates) {
+      std::vector<Line2D *> &lines = edgeIdToLines[edgeID];
+      Polygon2D *arrowHead = edgeIdToArrowHead[edgeID];
+      setEdgeColor(state.first, lines, arrowHead);
 
-        setEdgeColor(state, lines, arrowHead);
-        RichTextLabel *dataValue = edgeIdToData.at(edgeId);
-
-        dataValue->clear();
-        if (state == State::STALL || state == State::TRANSFER) {
-          // Write the data value only when it is valid
-          dataValue->push_font(get_theme_default_font(), 11);
-          dataValue->push_color(OPAQUE_BLACK);
-          dataValue->append_text(edgeState.second.second.c_str());
-          dataValue->pop();
-          dataValue->pop();
-        }
+      // Display channel content if the valid wire is set
+      RichTextLabel *dataValue = edgeIdToData.at(edgeID);
+      dataValue->clear();
+      if (state.first == State::STALL || state.first == State::TRANSFER) {
+        // Write the data value only when it is valid
+        dataValue->push_font(get_theme_default_font(), 11);
+        dataValue->push_color(OPAQUE_BLACK);
+        dataValue->append_text(state.second.c_str());
+        dataValue->pop();
+        dataValue->pop();
       }
     }
   }
 }
 
-void VisualDataflow::setEdgeColor(State state, std::vector<Line2D *> lines,
-                                  Polygon2D *arrowHead) {
-  Color color = stateColors.at(state);
+void VisualDataflow::setEdgeColors(CycleNb cycle) {
+  ChannelTransitions edgeStates = graph.getCycleEdgeStates().at(cycle);
+  for (auto &[edgeID, state] : edgeStates) {
+    std::vector<Line2D *> &lines = edgeIdToLines[edgeID];
+    Polygon2D *arrowHead = edgeIdToArrowHead[edgeID];
+    Color color = stateColors[state.first];
+    for (Line2D *line : lines) {
+      color.a = line->get_default_color().a;
 
-  for (auto &line : lines) {
+      line->set_default_color(color);
+    }
+    arrowHead->set_color(color);
+  }
+}
+
+void VisualDataflow::setEdgeColor(State state, std::vector<Line2D *> &lines,
+                                  Polygon2D *arrowHead) {
+  Color color = stateColors[state];
+  for (Line2D *line : lines) {
     color.a = line->get_default_color().a;
     line->set_default_color(color);
   }
-
   arrowHead->set_color(color);
 }
 
 void VisualDataflow::changeStateColor(int64_t state, Color color) {
+  // Update the color associated to the state
   State stateEnum;
-  if (state == 0) {
+  if (state == 0)
     stateEnum = State::UNDEFINED;
-  } else if (state == 1) {
-    stateEnum = State::ACCEPT;
-  } else if (state == 2) {
+  else if (state == 1)
     stateEnum = State::IDLE;
-  } else if (state == 3) {
+  else if (state == 2)
+    stateEnum = State::ACCEPT;
+  else if (state == 3)
     stateEnum = State::STALL;
-  } else if (state == 4) {
+  else if (state == 4)
     stateEnum = State::TRANSFER;
-  } else {
-    UtilityFunctions::printerr("Invalid state");
-    return;
-  }
+  else
+    llvm_unreachable("invalid channel state!");
+  stateColors[stateEnum] = color;
 
-  stateColors.at(state) = color;
-
-  auto cycleStates = graph.getCycleEdgeStates();
-  for (auto &edgeState : cycleStates.at(cycle)) {
-    EdgeId edgeId = edgeState.first;
-    State edgeStateEnum = edgeState.second.first;
-    if (edgeStateEnum == stateEnum) {
-      std::vector<Line2D *> lines = edgeIdToLines[edgeId];
-      Polygon2D *arrowHead = edgeIdToArrowHead[edgeId];
+  // Change color of all edges currently in the state whose color was changed
+  CycleTransitions &cycleStates = graph.getCycleEdgeStates();
+  for (auto &[edgeID, state] : cycleStates[cycle]) {
+    if (state.first == stateEnum) {
+      std::vector<Line2D *> &lines = edgeIdToLines[edgeID];
+      Polygon2D *arrowHead = edgeIdToArrowHead[edgeID];
       setEdgeColor(stateEnum, lines, arrowHead);
     }
   }
 }
 
-double crossProduct(Vector2 a, Vector2 b, Vector2 c) {
+static double crossProduct(Vector2 a, Vector2 b, Vector2 c) {
   return (b.x - a.x) * (c.y - a.y) - (b.y - a.y) * (c.x - a.x);
 }
 
-bool isInside(Vector2 p, Vector2 a, Vector2 b, Vector2 c, Vector2 d) {
+static bool isInside(Vector2 p, Vector2 a, Vector2 b, Vector2 c, Vector2 d) {
   return crossProduct(a, b, p) * crossProduct(c, d, p) >= 0 &&
          crossProduct(b, c, p) * crossProduct(d, a, p) >= 0;
 }

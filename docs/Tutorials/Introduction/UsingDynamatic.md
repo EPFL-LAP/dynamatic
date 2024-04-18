@@ -19,10 +19,10 @@ In this tutorial, we will tranform the following C function (the *kernel*, in DH
 
 ```c
 // The number of loop iterations
-#define N 10
+#define N 8
 
 // The kernel under consideration
-unsigned loop_accumulate(in_int_t a[N]) {
+unsigned loop_multiply(in_int_t a[N]) {
   unsigned x = 2;
   for (unsigned i = 0; i < N; ++i) {
     if (a[i] == 0)
@@ -32,15 +32,15 @@ unsigned loop_accumulate(in_int_t a[N]) {
 }
 ```
 
-This simple kernel multiplies a number by itself at each iteration of a simple loop from 0 to any number `N` where the corresponding element of an array equals 0. The function returns the accumulated value after the loop exits. Note that this function is purposefully very simple so that it corresponds to a small dataflow circuit that will be easier to visually explore later on. Dynamatic is capable of transforming much more complex functions into fast and functional dataflow circuits.
+This simple kernel multiplies a number by itself at each iteration of a simple loop from 0 to any number `N` where the corresponding element of an array equals 0. The function returns the calculated value after the loop exits. Note that this function is purposefully very simple so that it corresponds to a small dataflow circuit that will be easier to visually explore later on. Dynamatic is capable of transforming much more complex functions into fast and functional dataflow circuits.
 
-You can find the source code of this function in [`tutorials/Introduction/Ch1/loop_accumulate.c`](../../../tutorials/Introduction/Ch1/loop_accumulate.c). You will notice the `main` function in the file, which allows one to run the C kernel with user-provided arguments. The `CALL_KERNEL` macro in `main`'s body, as its name indicates, calls the kernel while allowing us to automatically run code prior to and/or after the call. For example, this is used during C/VHDL co-verification to automatically write the C function's reference output to a file to later compare it with the generated VHDL design's output.
+You can find the source code of this function in [`tutorials/Introduction/Ch1/loop_multiply.c`](../../../tutorials/Introduction/Ch1/loop_multiply.c). You will notice the `main` function in the file, which allows one to run the C kernel with user-provided arguments. The `CALL_KERNEL` macro in `main`'s body, as its name indicates, calls the kernel while allowing us to automatically run code prior to and/or after the call. For example, this is used during C/VHDL co-verification to automatically write the C function's reference output to a file to later compare it with the generated VHDL design's output.
 
 Now that we are familiar with the source code, we can move on to generating a matching dataflow circuit! 
 
 ## Using Dynamatic's frontend
 
-We will now use Dynamatic's frontend in interactive mode to compile the `loop_accumulate` kernel into a VHDL design in a couple of simple commands. Dynamatic frontend's is built by the project in `build/bin/dynamatic`, with a symbolic link located at `bin/dynamatic`, which we will be using. In a terminal, from Dynamatic's top-level folder, run the following.
+We will now use Dynamatic's frontend in interactive mode to compile the `loop_multiply` kernel into a VHDL design in a couple of simple commands. Dynamatic frontend's is built by the project in `build/bin/dynamatic`, with a symbolic link located at `bin/dynamatic`, which we will be using. In a terminal, from Dynamatic's top-level folder, run the following.
 
 ```sh
 ./bin/dynamatic
@@ -57,20 +57,20 @@ This will print the frontend's header and display a prompt where you can start i
 dynamatic> # Input your command here
 ```
 
-First, we must provide the frontend with the path to the C source file under consideration. As we mentionned in the previous section, ours is located at [`tutorials/Introduction/Ch1/loop_accumulate.c`](../../../tutorials/Introduction/Ch1/loop_accumulate.c), so input the following command into the frontend.
+First, we must provide the frontend with the path to the C source file under consideration. As we mentionned in the previous section, ours is located at [`tutorials/Introduction/Ch1/loop_multiply.c`](../../../tutorials/Introduction/Ch1/loop_multiply.c), so input the following command into the frontend.
 
 ```sh
-dynamatic> set-src tutorials/Introduction/Ch1/loop_accumulate.c
+dynamatic> set-src tutorials/Introduction/Ch1/loop_multiply.c
 ```
 
-The frontend will assume that the C function to transform has the same name as the last component of the argument to `set-src` without the file extension, here `loop_accumulate`.
+The frontend will assume that the C function to transform has the same name as the last component of the argument to `set-src` without the file extension, here `loop_multiply`.
 
 The first step towards generating the VHDL design is *compilation*, during which the C source goes through our MLIR frontend ([Polygeist](https://github.com/llvm/Polygeist)) and then through a pre-defined sequence of transformation and optimization passes that ultimately yield a description of an equivalent dataflow circuit. That description takes the form of a human-readable and machine-parsable IR (Intermediate Representation) within the MLIR framework. In particular, it represents dataflow components using specially-defined IR instructions (in MLIR jargon, [operations](../MLIRPrimer.md#operations)) that are part of the [*Handshake dialect*](../MLIRPrimer.md#dialects). A dialect is simply a collection of logically-connected IR entities like instructions, types, and attributes. MLIR provides so-called standard dialects for common use cases, while allowing external tools (like Dynamatic) to define their own custom dialects to model domain-specific semantics. We inherit part of the infrastructure surrounding the *Handshake* dialect from the [CIRCT project](https://github.com/llvm/circt) (a satellite project of LLVM/MLIR), but have tailored it to our specific use cases.
 
 To compile the C function, simply input `compile`. This will call a shell script in the background that will iteratively transform the IR into an optimized dataflow circuit, storing intermediate IR forms to disk at multiple points in the process.
 
 ```
-dynamatic> set-src tutorials/Introduction/Ch1/loop_accumulate.c
+dynamatic> set-src tutorials/Introduction/Ch1/loop_multiply.c
 dynamatic> compile
 ```
 
@@ -97,14 +97,14 @@ dynamatic> compile
 [INFO] Canonicalized handshake
 [INFO] Created visual DOT
 [INFO] Converted visual DOT to PNG
-[INFO] Created loop_accumulate DOT
-[INFO] Converted loop_accumulate DOT to PNG
+[INFO] Created loop_multiply DOT
+[INFO] Converted loop_multiply DOT to PNG
 [INFO] Compilation succeeded
 ```
 
 This signals that compilation succeeded. All results are placed in a folder named `out/comp` created next to the C source under consideration. In this case, it is located at `tutorials/Introduction/Ch1/out/comp`. It is not necessary that you look inside this folder for this tutorial.
 
-In addition to the final optimized version of the IR (in `tutorials/Introduction/Ch1/out/comp/handshake_export.mlir`), the compilation script generates an equivalent Graphviz-formatted file (`tutorials/Introduction/Ch1/out/comp/loop_accumulate.dot`) which serves as input to our VHDL backend, which we can now call using the `write-hdl` command.
+In addition to the final optimized version of the IR (in `tutorials/Introduction/Ch1/out/comp/handshake_export.mlir`), the compilation script generates an equivalent Graphviz-formatted file (`tutorials/Introduction/Ch1/out/comp/loop_multiply.dot`) which serves as input to our VHDL backend, which we can now call using the `write-hdl` command.
 
 ```
 ...
@@ -115,7 +115,7 @@ dynamatic> write-hdl
 [INFO] HDL generation succeeded
 ```
 
-Similarly to `compile`, this creates a folder `out/hdl` next to the C source under consideration. The command looks for the Graphviz-formatted version of our circuit (`tutorials/Introduction/Ch1/out/comp/loop_accumulate.dot`) generated by the compile command and transforms it into a synthesizable VHDL design (`tutorials/Introduction/Ch1/out/hdl/loop_accumulate.vhd`) corresponding to the C kernel. This design can finally be co-simulated along the C function on Modelsim to verify that their behavior matches using the `simulate` command.
+Similarly to `compile`, this creates a folder `out/hdl` next to the C source under consideration. The command looks for the Graphviz-formatted version of our circuit (`tutorials/Introduction/Ch1/out/comp/loop_multiply.dot`) generated by the compile command and transforms it into a synthesizable VHDL design (`tutorials/Introduction/Ch1/out/hdl/loop_multiply.vhd`) corresponding to the C kernel. This design can finally be co-simulated along the C function on Modelsim to verify that their behavior matches using the `simulate` command.
 
 ```
 ...
@@ -155,7 +155,7 @@ In the last section of this tutorial, we will take a closer look at the actual c
 
 At the end of the last section, you used the `simulate` command to co-simulate the VHDL design obtained from the compilation flow along with the C source. This process generated a waveform file at `tutorials/Introduction/Ch1/out/sim/HLS_VERIFY/vsim.wlf` containing all state transitions that happened during simulation for all signals. After a simple pre-processing step using the frontend's `visualize` command, we will be able to visualize these transitions on a graphical representation of our circuit to get more insights into how our dataflow circuit behaves.
 
-To launch the visualizer, re-open the frontend, re-set the source with `set-src tutorials/Introduction/Ch1/loop_accumulate.c`, then input the `visualize` command.
+To launch the visualizer, re-open the frontend, re-set the source with `set-src tutorials/Introduction/Ch1/loop_multiply.c`, then input the `visualize` command.
 
 ```
 $ ./bin/dynamatic
@@ -164,7 +164,7 @@ $ ./bin/dynamatic
 ==================== EPFL-LAP - <release> | <release-date> =====================
 ================================================================================
 
-dynamatic> set-src tutorials/Introduction/Ch1/loop_accumulate.c
+dynamatic> set-src tutorials/Introduction/Ch1/loop_multiply.c
 dynamatic> visualize
 [INFO] Generated channel changes
 [INFO] Added positioning info. to DOT

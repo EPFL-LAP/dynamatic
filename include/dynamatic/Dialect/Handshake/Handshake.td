@@ -39,6 +39,7 @@ def Handshake_Dialect : Dialect {
     communicating data through First-in First-out (FIFO) communication channels.
   }];
 
+  let useDefaultTypePrinterParser = 1;
   let useDefaultAttributePrinterParser = 1;
 
   // Opt-out of properties for now, must migrate by LLVM 19.  #5273.

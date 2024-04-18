@@ -377,7 +377,7 @@ public:
 /// (1) and output (3).
 /// 1. The load address value produced by the memory interface and consumed by
 /// the LSQ (output).
-/// 1. The load data value produced by the MC and consumed by the memory
+/// 2. The load data value produced by the MC and consumed by the memory
 /// interface (input).
 /// 3. The store address value produced by the memory interface and consumed by
 /// the LSQ (output).
@@ -456,6 +456,26 @@ public:
   /// to this group's ports.
   unsigned getNumResults() const;
 
+  /// Returns the first operand index that is associated with a port of the
+  /// group. If no port of the group has an operand associated with it, returns
+  /// std::string::npos.
+  size_t getFirstOperandIndex() const;
+
+  /// Returns the last operand index that is associated with a port of the
+  /// group. If no port of the group has an operand associated with it, returns
+  /// std::string::npos.
+  size_t getLastOperandIndex() const;
+
+  /// Returns the first result index that is associated with a port of the
+  /// group. If no port of the group has a result associated with it, returns
+  /// std::string::npos.
+  size_t getFirstResultIndex() const;
+
+  /// Returns the last result index that is associated with a port of the
+  /// group. If no port of the group has a result associated with it, returns
+  /// std::string::npos.
+  size_t getLastResultIndex() const;
+
   /// Determines whether the group contains any port of the provided kinds.
   template <typename... PortKinds>
   bool hasAnyPort() const {
@@ -513,6 +533,14 @@ public:
   /// Returns the continuous subrange of the memory interface's results which a
   /// group (indicated by its index in the list) maps to.
   mlir::ValueRange getGroupResults(unsigned groupIdx);
+
+  /// Returns the continuous subrange of the memory interface's inputs which
+  /// connect to other memory interfaces.
+  mlir::ValueRange getInterfacesInputs();
+
+  /// Returns the continuous subrange of the memory interface's results which
+  /// connect to other memory interfaces.
+  mlir::ValueRange getInterfacesResults();
 
   /// Returns the number of groups attached to the memory interface.
   unsigned getNumGroups() { return groups.size(); }
@@ -587,10 +615,7 @@ public:
 
   /// Returns the memory controller's LSQ ports (which must exist, check with
   /// `hasConnectionToLSQ`).
-  LSQLoadStorePort getLSQPort() const {
-    assert(hasConnectionToLSQ() && "no LSQ connected");
-    return llvm::cast<LSQLoadStorePort>(interfacePorts.front());
-  }
+  LSQLoadStorePort getLSQPort() const;
 };
 
 /// Smart-pointer around a `dynamatic::GroupMemoryPorts`, specializing it for
@@ -633,10 +658,7 @@ public:
 
   /// Returns the LSQ's memory controller ports (which must exist, check with
   /// `hasConnectionToMC`).
-  MCLoadStorePort getMCPort() const {
-    assert(hasConnectionToMC() && "no LSQ connected");
-    return llvm::cast<MCLoadStorePort>(interfacePorts.front());
-  }
+  MCLoadStorePort getMCPort() const;
 };
 
 /// Specifies how a handshake channel (i.e. a SSA value used once) may be

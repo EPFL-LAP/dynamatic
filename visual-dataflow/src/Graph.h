@@ -74,7 +74,7 @@ public:
   /// Returns all the edges in the Graph
   std::vector<GraphEdge> getEdges();
 
-  CycleTransitions getCycleEdgeStates();
+  CycleTransitions &getCycleEdgeStates();
 
   void dupilcateEdgeStates(CycleNb from, CycleNb until);
   /// Adds a BB to the Graph

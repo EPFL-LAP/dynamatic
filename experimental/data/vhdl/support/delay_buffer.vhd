@@ -1,5 +1,5 @@
-library IEEE;
-use IEEE.std_logic_1164.all;
+library ieee;
+use ieee.std_logic_1164.all;
 use ieee.numeric_std.all;
 
 entity delay_buffer is
@@ -7,9 +7,9 @@ entity delay_buffer is
     SIZE : integer := 32
   );
   port (
-    clk, rst  : in std_logic;
-    valid_in  : in std_logic;
-    ready_in  : in std_logic;
+    clk, rst  : in  std_logic;
+    valid_in  : in  std_logic;
+    ready_in  : in  std_logic;
     valid_out : out std_logic);
 end entity;
 

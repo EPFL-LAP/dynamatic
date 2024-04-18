@@ -17,6 +17,7 @@
 #include "dynamatic/Support/CFG.h"
 #include "dynamatic/Support/DynamaticPass.h"
 #include "dynamatic/Support/Logging.h"
+#include "experimental/Transforms/Speculation/PlacementFinder.h"
 #include "experimental/Transforms/Speculation/SpeculationPlacement.h"
 #include "mlir/IR/BuiltinTypes.h"
 #include "mlir/IR/OperationSupport.h"
@@ -35,8 +36,10 @@ namespace {
 struct HandshakeSpeculationPass
     : public dynamatic::experimental::speculation::impl::
           HandshakeSpeculationBase<HandshakeSpeculationPass> {
-  HandshakeSpeculationPass(const std::string &jsonPath = "") {
+  HandshakeSpeculationPass(const std::string &jsonPath = "",
+                           bool automatic = true) {
     this->jsonPath = jsonPath;
+    this->automatic = automatic;
   }
 
   void runDynamaticPass() override;
@@ -69,14 +72,17 @@ LogicalResult HandshakeSpeculationPass::placeUnits(Value ctrlSignal) {
   MLIRContext *ctx = &getContext();
   OpBuilder builder(ctx);
 
-  for (const OpPlacement p : placements.getPlacements<T>()) {
+  for (OpOperand *operand : placements.getPlacements<T>()) {
+    Operation *dstOp = operand->getOwner();
+    Value srcOpResult = operand->get();
+
     // Create and connect the new Operation
-    builder.setInsertionPoint(p.dstOp);
-    T newOp = builder.create<T>(p.dstOp->getLoc(), p.srcOpResult, ctrlSignal);
-    inheritBB(p.dstOp, newOp);
+    builder.setInsertionPoint(dstOp);
+    T newOp = builder.create<T>(dstOp->getLoc(), srcOpResult, ctrlSignal);
+    inheritBB(dstOp, newOp);
 
     // Connect the new Operation to dstOp
-    p.srcOpResult.replaceAllUsesExcept(newOp.getResult(), newOp);
+    srcOpResult.replaceAllUsesExcept(newOp.getResult(), newOp);
   }
 
   return success();
@@ -162,7 +168,7 @@ void HandshakeSpeculationPass::routeCommitControl(
     // branch output is non-speculative. Speculative tag of the token is
     // currently implicit, so the branch output itself is used at IR level.
     auto branchDiscardNonSpec = builder.create<handshake::SpeculatingBranchOp>(
-        branchOp.getLoc(), branchOp.getTrueResult() /* specTag */,
+        branchOp.getLoc(), mergedSpecTag /* specTag */,
         branchOp.getConditionOperand());
     inheritBB(specOp, branchDiscardNonSpec);
 
@@ -331,21 +337,23 @@ LogicalResult HandshakeSpeculationPass::prepareAndPlaceSaveCommits() {
 LogicalResult HandshakeSpeculationPass::placeSpeculator() {
   MLIRContext *ctx = &getContext();
 
-  OpPlacement place = placements.getSpeculatorPlacement();
+  OpOperand &operand = placements.getSpeculatorPlacement();
+  Operation *dstOp = operand.getOwner();
+  Value srcOpResult = operand.get();
 
   OpBuilder builder(ctx);
-  builder.setInsertionPoint(place.dstOp);
+  builder.setInsertionPoint(dstOp);
 
-  specOp = builder.create<handshake::SpeculatorOp>(place.dstOp->getLoc(),
-                                                   place.srcOpResult);
+  specOp =
+      builder.create<handshake::SpeculatorOp>(dstOp->getLoc(), srcOpResult);
 
-  // Replace uses of the orginal source operation's result with the speculator's
-  // result, except in the speculator's operands (otherwise this would create a
-  // self-loop from the speculator to the speculator)
-  place.srcOpResult.replaceAllUsesExcept(specOp.getDataOut(), specOp);
+  // Replace uses of the original source operation's result with the
+  // speculator's result, except in the speculator's operands (otherwise this
+  // would create a self-loop from the speculator to the speculator)
+  srcOpResult.replaceAllUsesExcept(specOp.getDataOut(), specOp);
 
   // Assign a Basic Block to the speculator
-  inheritBB(place.dstOp, specOp);
+  inheritBB(dstOp, specOp);
 
   return success();
 }
@@ -356,6 +364,13 @@ void HandshakeSpeculationPass::runDynamaticPass() {
   if (failed(SpeculationPlacements::readFromJSON(
           this->jsonPath, this->placements, nameAnalysis)))
     return signalPassFailure();
+
+  // Run automatic finding of the unit placements
+  if (this->automatic) {
+    PlacementFinder finder(this->placements);
+    if (failed(finder.findPlacements()))
+      return signalPassFailure();
+  }
 
   if (failed(placeSpeculator()))
     return signalPassFailure();
@@ -375,6 +390,6 @@ void HandshakeSpeculationPass::runDynamaticPass() {
 
 std::unique_ptr<dynamatic::DynamaticPass>
 dynamatic::experimental::speculation::createHandshakeSpeculation(
-    const std::string &jsonPath) {
-  return std::make_unique<HandshakeSpeculationPass>(jsonPath);
+    const std::string &jsonPath, bool automatic) {
+  return std::make_unique<HandshakeSpeculationPass>(jsonPath, automatic);
 }

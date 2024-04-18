@@ -71,8 +71,6 @@ static bool areOpsInSameBlock(SmallVector<Operation *> &ops) {
   return true;
 }
 
-// NOLINTBEGIN(misc-no-recursion)
-
 /// Attempts to identify an operation's predecessor block, which is either the
 /// block the operation belongs to, or (if the latter isn't defined), the unique
 /// first block reached by recursively backtracking through the def-use chain of
@@ -199,8 +197,6 @@ static Operation *followToMerge(Operation *op) {
   return nullptr;
 }
 
-// NOLINTEND(misc-no-recursion)
-
 bool dynamatic::getBBEndpoints(Value val, Operation *user,
                                BBEndpoints &endpoints) {
   assert(llvm::find(val.getUsers(), user) != val.getUsers().end() &&
@@ -266,6 +262,52 @@ bool dynamatic::isBackedge(Value val, BBEndpoints *endpoints) {
   assert(std::distance(users.begin(), users.end()) == 1 &&
          "value must have a single user");
   return isBackedge(val, *users.begin(), endpoints);
+}
+
+namespace {
+/// Define a Control-Flow Graph Edge as a OpOperand
+using CFGEdge = OpOperand;
+
+/// Define a comparator between BBEndpoints
+struct EndpointComparator {
+  bool operator()(const BBEndpoints &a, const BBEndpoints &b) const {
+    if (a.srcBB != b.srcBB)
+      return a.srcBB < b.srcBB;
+    return a.dstBB < b.dstBB;
+  }
+};
+
+/// Define a map from BBEndpoints to the CFGEdges that connect the BBs
+using BBEndpointsMap =
+    std::map<BBEndpoints, llvm::DenseSet<CFGEdge *>, EndpointComparator>;
+} // namespace
+
+BBtoArcsMap dynamatic::getBBPredecessorArcs(handshake::FuncOp funcOp) {
+  BBEndpointsMap endpointEdges;
+  // Traverse all operations within funcOp to find edges between BBs, including
+  // self-edges, and save them in a map from the Endpoints to the edges
+  funcOp->walk([&](Operation *op) {
+    for (CFGEdge &edge : op->getOpOperands()) {
+      BBEndpoints endpoints;
+      // Store the edge if it is a Backedge or connects two different BBs
+      if (isBackedge(edge.get(), op, &endpoints) ||
+          endpoints.srcBB != endpoints.dstBB) {
+        endpointEdges[endpoints].insert(&edge);
+      }
+    }
+  });
+
+  // Join all predecessors of a BB
+  BBtoArcsMap predecessorArcs;
+  for (const auto &[endpoints, edges] : endpointEdges) {
+    BBArc arc;
+    arc.srcBB = endpoints.srcBB;
+    arc.dstBB = endpoints.dstBB;
+    arc.edges = edges;
+    predecessorArcs[endpoints.dstBB].push_back(arc);
+  }
+
+  return predecessorArcs;
 }
 
 bool dynamatic::cannotBelongToCFG(Operation *op) {
@@ -377,7 +419,6 @@ HandshakeCFG::getControlValues(DenseMap<unsigned, Value> &ctrlVals) {
   return success();
 }
 
-// NOLINTNEXTLINE(misc-no-recursion)
 void HandshakeCFG::findPathsTo(const mlir::SetVector<unsigned> &pathSoFar,
                                unsigned to, SmallVector<CFGPath> &paths) {
   assert(!pathSoFar.empty() && "path cannot be empty");

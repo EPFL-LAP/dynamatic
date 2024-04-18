@@ -59,34 +59,34 @@ layout_mode = 2
 [node name="Colors" type="VBoxContainer" parent="GeneralLegend/Panel/EdgeLegend/EdgeComponents"]
 layout_mode = 2
 
-[node name="ColorPickerButton" type="ColorPickerButton" parent="GeneralLegend/Panel/EdgeLegend/EdgeComponents/Colors"]
+[node name="UndefinedColor" type="ColorPickerButton" parent="GeneralLegend/Panel/EdgeLegend/EdgeComponents/Colors"]
 custom_minimum_size = Vector2(60, 20)
 layout_mode = 2
 size_flags_vertical = 3
-color = Color(1, 0, 0, 1)
+color = Color(0.784314, 0, 0, 1)
 
-[node name="ColorPickerButton2" type="ColorPickerButton" parent="GeneralLegend/Panel/EdgeLegend/EdgeComponents/Colors"]
+[node name="IdleColor" type="ColorPickerButton" parent="GeneralLegend/Panel/EdgeLegend/EdgeComponents/Colors"]
 custom_minimum_size = Vector2(60, 20)
 layout_mode = 2
 size_flags_vertical = 3
 
-[node name="ColorPickerButton3" type="ColorPickerButton" parent="GeneralLegend/Panel/EdgeLegend/EdgeComponents/Colors"]
+[node name="AcceptColor" type="ColorPickerButton" parent="GeneralLegend/Panel/EdgeLegend/EdgeComponents/Colors"]
 custom_minimum_size = Vector2(60, 20)
 layout_mode = 2
 size_flags_vertical = 3
-color = Color(0, 0, 0.878431, 1)
+color = Color(0.188235, 0.137255, 0.717647, 1)
 
-[node name="ColorPickerButton4" type="ColorPickerButton" parent="GeneralLegend/Panel/EdgeLegend/EdgeComponents/Colors"]
+[node name="StallColor" type="ColorPickerButton" parent="GeneralLegend/Panel/EdgeLegend/EdgeComponents/Colors"]
 custom_minimum_size = Vector2(60, 20)
 layout_mode = 2
 size_flags_vertical = 3
-color = Color(0, 0.8, 0, 1)
+color = Color(0.85098, 0.47451, 0.137255, 1)
 
-[node name="ColorPickerButton5" type="ColorPickerButton" parent="GeneralLegend/Panel/EdgeLegend/EdgeComponents/Colors"]
+[node name="TransferColor" type="ColorPickerButton" parent="GeneralLegend/Panel/EdgeLegend/EdgeComponents/Colors"]
 custom_minimum_size = Vector2(60, 20)
 layout_mode = 2
 size_flags_vertical = 3
-color = Color(0, 0.827451, 0.827451, 1)
+color = Color(0, 0.784314, 0, 1)
 
 [node name="Definitions" type="VBoxContainer" parent="GeneralLegend/Panel/EdgeLegend/EdgeComponents"]
 layout_mode = 2
@@ -97,24 +97,24 @@ layout_mode = 2
 size_flags_horizontal = 0
 text = "Undefined"
 
-[node name="Accept" type="Label" parent="GeneralLegend/Panel/EdgeLegend/EdgeComponents/Definitions"]
-layout_mode = 2
-size_flags_horizontal = 0
-text = "Accept"
-
 [node name="Idle" type="Label" parent="GeneralLegend/Panel/EdgeLegend/EdgeComponents/Definitions"]
 layout_mode = 2
 size_flags_horizontal = 0
 text = "Idle"
 
+[node name="Accept" type="Label" parent="GeneralLegend/Panel/EdgeLegend/EdgeComponents/Definitions"]
+layout_mode = 2
+size_flags_horizontal = 0
+text = "Accept (R)"
+
 [node name="Stall" type="Label" parent="GeneralLegend/Panel/EdgeLegend/EdgeComponents/Definitions"]
 layout_mode = 2
 size_flags_horizontal = 0
-text = "Stall"
+text = "Stall (V)"
 
 [node name="Transfer" type="Label" parent="GeneralLegend/Panel/EdgeLegend/EdgeComponents/Definitions"]
 layout_mode = 2
 size_flags_horizontal = 0
-text = "Transfer"
+text = "Transfer (V+R)"
 
 [connection signal="toggled" from="GeneralLegend/HBoxContainer/ShowLegend" to="." method="_on_show_legend_toggled"]

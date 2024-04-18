@@ -30,69 +30,60 @@ using namespace dynamatic::experimental::speculation;
 
 // SpeculationPlacements Methods
 
-bool OpPlacement::operator==(const OpPlacement &other) const {
-  return (this->srcOpResult == other.srcOpResult) and
-         (this->dstOp == other.dstOp);
+void SpeculationPlacements::setSpeculator(OpOperand &dstOpOperand) {
+  this->speculator = &dstOpOperand;
 }
 
-std::size_t OpPlacement::Hash::operator()(const OpPlacement &p) const {
-  std::size_t srcHash = mlir::hash_value(p.srcOpResult);
-  std::size_t dstHash = p.dstOp->hashProperties();
-  std::size_t hash = llvm::hash_combine(srcHash, dstHash);
-  return hash;
+void SpeculationPlacements::addSave(OpOperand &dstOpOperand) {
+  this->saves.insert(&dstOpOperand);
 }
 
-void SpeculationPlacements::setSpeculator(Value srcOpResult, Operation *dstOp) {
-  this->speculator = {srcOpResult, dstOp};
+void SpeculationPlacements::addCommit(OpOperand &dstOpOperand) {
+  this->commits.insert(&dstOpOperand);
 }
 
-void SpeculationPlacements::addSave(Value srcOpResult, Operation *dstOp) {
-  this->saves.insert({srcOpResult, dstOp});
+void SpeculationPlacements::addSaveCommit(OpOperand &dstOpOperand) {
+  this->saveCommits.insert(&dstOpOperand);
 }
 
-void SpeculationPlacements::addCommit(Value srcOpResult, Operation *dstOp) {
-  this->commits.insert({srcOpResult, dstOp});
+bool SpeculationPlacements::containsCommit(OpOperand &dstOpOperand) {
+  return this->commits.contains(&dstOpOperand);
 }
 
-void SpeculationPlacements::addSaveCommit(Value srcOpResult, Operation *dstOp) {
-  this->saveCommits.insert({srcOpResult, dstOp});
+bool SpeculationPlacements::containsSave(OpOperand &dstOpOperand) {
+  return this->saves.contains(&dstOpOperand);
 }
 
-bool SpeculationPlacements::containsCommit(Value srcOpResult,
-                                           Operation *dstOp) {
-  return this->commits.count({srcOpResult, dstOp});
+bool SpeculationPlacements::containsSaveCommit(OpOperand &dstOpOperand) {
+  return this->saveCommits.contains(&dstOpOperand);
 }
 
-bool SpeculationPlacements::containsSave(Value srcOpResult, Operation *dstOp) {
-  return this->saves.count({srcOpResult, dstOp});
+void SpeculationPlacements::eraseSave(OpOperand &dstOpOperand) {
+  this->saves.erase(&dstOpOperand);
 }
 
-void SpeculationPlacements::eraseCommit(Value srcOpResult, Operation *dstOp) {
-  this->commits.erase({srcOpResult, dstOp});
+void SpeculationPlacements::eraseCommit(OpOperand &dstOpOperand) {
+  this->commits.erase(&dstOpOperand);
 }
 
-void SpeculationPlacements::eraseSave(Value srcOpResult, Operation *dstOp) {
-  this->saves.erase({srcOpResult, dstOp});
-}
-
-OpPlacement SpeculationPlacements::getSpeculatorPlacement() {
-  return this->speculator;
+OpOperand &SpeculationPlacements::getSpeculatorPlacement() {
+  return *this->speculator;
 }
 
 template <>
-const PlacementList &
+const llvm::DenseSet<OpOperand *> &
 SpeculationPlacements::getPlacements<handshake::SpecSaveOp>() {
   return this->saves;
 }
 
 template <>
-const PlacementList &
+const llvm::DenseSet<OpOperand *> &
 SpeculationPlacements::getPlacements<handshake::SpecCommitOp>() {
   return this->commits;
 }
 
 template <>
-const PlacementList &
+const llvm::DenseSet<OpOperand *> &
 SpeculationPlacements::getPlacements<handshake::SpecSaveCommitOp>() {
   return this->saveCommits;
 }
@@ -171,17 +162,16 @@ static LogicalResult getOpPlacements(
     std::map<StringRef, llvm::SmallVector<PlacementOperand>> &specNameMap,
     NameAnalysis &nameAnalysis) {
 
-  Value srcOpResult;
-  Operation *dstOp;
+  OpOperand *dstOpOperand;
 
   // Check that operations are found by name
   auto getPlacementOps = [&](PlacementOperand &p) {
-    dstOp = nameAnalysis.getOp(p.opName);
+    Operation *dstOp = nameAnalysis.getOp(p.opName);
     if (!dstOp) {
       llvm::errs() << "Error: operation name " << p.opName << " is not found\n";
       return failure();
     }
-    srcOpResult = dstOp->getOperand(p.opIdx);
+    dstOpOperand = &dstOp->getOpOperand(p.opIdx);
     return success();
   };
 
@@ -189,27 +179,27 @@ static LogicalResult getOpPlacements(
   PlacementOperand &p = specNameMap["speculator"].front();
   if (failed(getPlacementOps(p)))
     return failure();
-  placements.setSpeculator(srcOpResult, dstOp);
+  placements.setSpeculator(*dstOpOperand);
 
   // Add Save Operations position
   for (PlacementOperand &p : specNameMap["saves"]) {
     if (failed(getPlacementOps(p)))
       return failure();
-    placements.addSave(srcOpResult, dstOp);
+    placements.addSave(*dstOpOperand);
   }
 
   // Add Commit Operations position
   for (PlacementOperand &p : specNameMap["commits"]) {
     if (failed(getPlacementOps(p)))
       return failure();
-    placements.addCommit(srcOpResult, dstOp);
+    placements.addCommit(*dstOpOperand);
   }
 
   // Add Save-Commit Operations position
   for (PlacementOperand &p : specNameMap["save-commits"]) {
     if (failed(getPlacementOps(p)))
       return failure();
-    placements.addSaveCommit(srcOpResult, dstOp);
+    placements.addSaveCommit(*dstOpOperand);
   }
 
   return success();

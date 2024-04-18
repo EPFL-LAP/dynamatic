@@ -62,10 +62,12 @@ private:
   /// // Counter for the number of nodes clicked by the user
   int nbClicked = 0;
   /// Initial colors corresponding to the different states on an edge
-  std::vector<Color> stateColors = {
-      Color(0.8, 0.0, 0.0, 1.0), Color(0.0, 0.0, 0.0, 1.0),
-      Color(0.0, 0.0, 0.8, 1.0), Color(0.0, 0.8, 0.0, 1.0),
-      Color(0.0, 0.8, 0.8, 1.0),
+  std::map<State, Color> stateColors = {
+      {State::UNDEFINED, Color(0.78, 0.0, 0.0, 1.0)},
+      {State::IDLE, Color(0.0, 0.0, 0.0, 1.0)},
+      {State::ACCEPT, Color(0.19, 0.14, 0.72, 1.0)},
+      {State::STALL, Color(0.85, 0.47, 0.14, 1.0)},
+      {State::TRANSFER, Color(0.0, 0.78, 0.0, 1.0)},
   };
   /// Maps color names to their corresponding RGBA Color values in Godot
   std::map<std::string, Color> colorNameToRGB = {
@@ -88,8 +90,11 @@ private:
   void createGraph(std::string inputDOTFile, std::string inputCSVFile);
   /// Draws each component of the graph in Godot
   void drawGraph();
+  /// Sets the color of all edges which change states at the given clock cycle
+  /// number.
+  void setEdgeColors(CycleNb cycle);
   /// Changes the color of a given edge in function of its state
-  void setEdgeColor(State state, std::vector<Line2D *> lines,
+  void setEdgeColor(State state, std::vector<Line2D *> &lines,
                     Polygon2D *arrowHead);
   /// Modifies the transparency of all graph elements
   void transparentEffect(double transparency);

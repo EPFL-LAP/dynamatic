@@ -125,7 +125,6 @@ NumericRange NumericAnalysis::getRange(Value val) {
   return getRange(val, visited);
 }
 
-// NOLINTBEGIN(misc-no-recursion)
 NumericRange NumericAnalysis::getRange(Value val, VisitSet &visited) {
   Type valType = val.getType();
   assert((isa<IntegerType, IndexType>(valType) || isa<FloatType>(valType)) &&
@@ -368,7 +367,6 @@ NumericRange NumericAnalysis::fromCmp(Value val, mlir::arith::CmpIOp cmpOp,
     return newRange(std::nullopt, *ub);
   }
 }
-// NOLINTEND(misc-no-recursion)
 
 void NumericAnalysis::setDeepCopy(VisitSet &from, VisitSet &to) {
   for (Value val : from)
