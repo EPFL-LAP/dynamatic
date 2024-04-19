@@ -15,8 +15,8 @@ At the Handshake level, the IR that Dynamatic generates for this kernel would li
 
 ```mlir
 handshake.func @adder(%a: i32, %b: i32, %start: none) -> i32  {
-    %add_result = arith.addi %a, %b : i32
-    %ret = return %add_result : i32
+    %add = arith.addi %a, %b : i32
+    %ret = return %add : i32
     end %ret : i32
 }
 ```
@@ -46,7 +46,7 @@ We argue that the only way to obtain the flexibility outlined above is to
 
 We propose to add two new types to the IR to enable us to reliably model our use cases inside Handshake-level IR.
 
-- A *non-parametric* type to model control-only dataflow channels which lowers to a bundle made up of a downstream valid wire and upstream ready wire. This `handshake::ControlType` would serialize to `control` inside the IR.
+- A *non-parametric* type to model control-only tokens which lowers to a bundle made up of a downstream valid wire and upstream ready wire. This `handshake::ControlType` would serialize to `control` inside the IR.
 - A *parametric* type to model dataflow channels with an arbitrary data type and optional extra signals. In their most basic form, SSA values of this type would be a composition of an arbitrary "raw-typed" SSA value (e.g., `i32`) and of a `control`-typed SSA value. It follows that values of this type, in their basic form, would lower to a bundle made up of a downstream data bus of a specific bitwidth plus what the `control`-typed SSA value lowered to (valid and ready wires). Optionally, this type could also hold extra "raw-typed" signals (e.g., speculation bits, thread tags) that would lower to downstream or upstream buses of corresponding widths. This `handshake::ChannelType` would serialize to `channel<data-type, {optional-extra-types}>` inside the IR.
 
 ### New operations
@@ -65,8 +65,8 @@ However, this in fact would be rejected by MLIR. The problem is that the standar
 
 In a way, an additional unstated assumption in our current Handshake-level IR is that an add operation (`arith.addi`) is not in fact *just* an addition, it is a join of both operands' control ports *in parallel to* an addition of the operands' data port (the same is true for all other mathematical operations). In the spirit of making dataflow semantics explicit within the IR, it therefore would make sense to start treating an add operation as *just* an addition, and make the joining logic explicit in the IR when it happens. We would need to introduce a couple new Handshake operations to make this work.
 
-- An unpacking operation (`handshake::UnpackOp`) which takes as operand a channel-typed SSA value and breaks it down into its two individual components; a raw data-typed SSA value and a control-typed SSA value.
-- A corresponding packing operation (`handshake::PackOp`) which takes two operands, a raw data-typed SSA value and a control-typed SSA value, and produces a single channel-typed SSA value as result.
+- An unbundling operation (`handshake::UnbundleOp`) which takes as operand a channel-typed SSA value in the simple case and breaks it down into its individual components; a control-typed SSA value and, in the simple case, a single aw data-typed SSA value (we'll look at more complex cases later on).
+- A converse bundling operation (`handshake::BundleOp`) which takes two operands in the simple case; a control-typed SSA value and a raw data-typed SSA value. It produces a single channel-typed SSA value as result.
 - An explicit join operation (`handshake::JoinOp`) which takes an arbitray number of control-typed SSA values as operands and produces a single control-typed SSA value which results from the join of all the operands (join operations with a single operand could be canonicalized away since they would act as no-op). This operation actually already exists in Handshake.
 
 With those new operations available, a correct IR for our simple adder would be much more formal and explicit, at the cost of some added operations.
@@ -74,21 +74,84 @@ With those new operations available, a correct IR for our simple adder would be 
 ```mlir
 handshake.func @adder(%a: channel<i32>, %b: channel<i32>, %start: control) -> channel<i32>  {
     // Split a and b into their data/control components
-    %a_data, %a_control = handshake.unpack %a : i32, control
-    %b_data, %b_control = handshake.unpack %b : i32, control
+    %a_control, %a_data = handshake.unbundle %a : control, i32
+    %b_control, %b_data = handshake.unbundle %b : control, i32
     
-    // Perform the addition between a's and b's data port and the join
-    // between their respective control ports separately
-    %add_data = arith.addi %a_data, %b_data : i32
+    // Perform the addition between a's and b's data port and the join between
+    // their respective control ports separately
     %add_control = handshake.join %a_control, %b_control : control
+    %add_data = arith.addi %a_data, %b_data : i32
 
     // Recombine the addition's result with the join's result and return 
-    %add = handshake.pack %add_data, %add_control : channel<i32>
+    %add = handshake.bundle %add_control, %add_data : channel<i32>
     %ret = return %add : channel<i32>
     end %ret : channel<i32>
 }
 ```
 
+### Extra signal handling
+
+To support the use case where extra signals need to be carried on some dataflow channel (e.g., speculation bits, thread tags), the `handshake::ChannelType` needs to be flexible enough to model an arbitrary number of extra raw data-types (in addition to the "regular" data-type). In order to prepare for future use cases, each extra signal should also be characterized by its direction, either downstream or upstream. Extra signals may also optionally declare unique names to refer themselves by, allowing client code to more easily query for a specifc signal in complex bundles.  
+
+Below are a few MLIR serialization examples for dataflow channels with extra signals.
+
+```mlir
+// A basic channel with 32-bit integer data and no extra signal
+%channel = ... : channel<i32>
+
+// -----
+
+// A channel with 32-bit integer data and an extra unnamed 1-bit signal (e.g., a
+// speculation bit) going downstream
+%channel = ... : channel<i32, [i1]>
+
+// -----
+
+// A channel with 32-bit integer data and two extra named thread tags,
+// respectively of 2-bit width and 4-bit width, both going downstream
+%channel = ... : channel<i32, [tag1: i2, tag2: i4]>
+
+// -----
+
+// A channel with 32-bit integer data and an extra 1-bit signal going upstream,
+// as indicated by the "(U)"; extra signals are by default downstream (most
+// common use case) so they get no such annotation
+%channel = ... : channel<i32, [otherReady: (U) i1]>
+```
+
+The unbundling and bundling operations would also unbundle and bundle, respectively, all the extra signals together with the raw data bus and control-only token.
+
+```mlir
+// Multiple thread tags example from above
+%channel = ... : channel<i32, [tag1: i2, tag2: i4]>
+
+// Unbundle into control-only token and all individual signals
+%control, %data, %tag1, %tag2 = handshake.unbundle %channel : control, i32, i2, i4
+
+// Bundle to get back the original channel (extra signal names need to be
+// re-specified as to not lose the original context)
+%bundled = handshake.bundle %control, %data [tag1: %tag1, tag2: %tag2] : channel<i32, [tag1: i2, tag2: i4]>
+
+// -----
+
+// Upstream extra signal example from above
+%channel = ... : channel<i32, [otherReady: (U) i1]>
+
+// Unbundle into control-only token and raw data; note that, because the extra
+// signal is going upstream, it is an input of the unbundling operation instead
+// of an output 
+%control, %data = handshake.unbundle %channel, %otherReady : control, i32
+
+// Bundle to get back the original channel; note that, because the extra signal
+// is going upstream, it is an output of the bundling operation instead of an
+// input (its name still needs to be re-specified as an input attribute for the
+// same reason as the downstream case)
+%bundled, %otherReady = handshake.bundle %control, %data [otherReady] : channel<i32, [otherReady: (U) i1]>
+
+```
+
+Most operations accepting channel-typed SSA operands will likely not care for these extra signals and will follow some sort of simple forwarding behavior for them. It is likely that pairs of specific Handshake operations will care to add/remove certain types of extra signals between their operands and results. For example, in the speculation use case, the specific operation marking the beginning of a speculative region would take care of adding an extra 1-bit signal to its operand's specific channel-type. Conversely, the special operation marking the end of the speculative region would take carte of removing the extra 1-bit signal from its operand's specific channel-type. Going further, if multiple regions requiring extra signals were ever nested within each other, it is likely that adding/removing extra signals in a stack-like fashion would suffice to achieve correct behavior. However, if that is insufficient and extra signals were not necessarily removed at the same rate or in the exact reverse order in which they were added, then the unique extra signal names could serve as identifiers for the specific signals that a signal-removing unit should care about removing.
+
 ## Discussion
 
-There is no question that the proposed redesign would yield IRs that are longer and visually more complex than what our current Handshake implementation produces. However, we argue that, in addition to enabling arbitrarily complex mixing of signal bundles as part of the IR's formalized type system, it would be easier in many cases to reason about the IR systematically from compiler passes, even in cases where our circuit would only be made up of "standard" (data, valid, and ready) dataflow channels.
+There is no question that the proposed redesign would yield IRs that are longer and visually more complex than what our current Handshake implementation produces. However, we argue that, in addition to enabling arbitrarily complex mixing of signal bundles as part of the IR's formalized type system, it would be easier in many cases to reason about the IR systematically from compiler passes, even in cases where our circuit would only be made up of "standard" signal bundles (data, valid, and ready).
