@@ -69,7 +69,7 @@ In a way, an additional unstated assumption in our current Handshake-level IR is
 - A converse bundling operation (`handshake::BundleOp`) which takes two operands in the simple case; a control-typed SSA value and a raw data-typed SSA value. It produces a single channel-typed SSA value as result.
 - An explicit join operation (`handshake::JoinOp`) which takes an arbitray number of control-typed SSA values as operands and produces a single control-typed SSA value which results from the join of all the operands (join operations with a single operand could be canonicalized away since they would act as no-op). This operation actually already exists in Handshake.
 
-With those new operations available, a correct IR for our simple adder would be much more formal and explicit, at the cost of some added operations.
+With those new operations available, a correct IR for our simple adder would be much more explicit, at the cost of some added operations.
 
 ```mlir
 handshake.func @adder(%a: channel<i32>, %b: channel<i32>, %start: control) -> channel<i32>  {
@@ -147,11 +147,89 @@ The unbundling and bundling operations would also unbundle and bundle, respectiv
 // input (its name still needs to be re-specified as an input attribute for the
 // same reason as the downstream case)
 %bundled, %otherReady = handshake.bundle %control, %data [otherReady] : channel<i32, [otherReady: (U) i1]>
-
 ```
 
-Most operations accepting channel-typed SSA operands will likely not care for these extra signals and will follow some sort of simple forwarding behavior for them. It is likely that pairs of specific Handshake operations will care to add/remove certain types of extra signals between their operands and results. For example, in the speculation use case, the specific operation marking the beginning of a speculative region would take care of adding an extra 1-bit signal to its operand's specific channel-type. Conversely, the special operation marking the end of the speculative region would take carte of removing the extra 1-bit signal from its operand's specific channel-type. Going further, if multiple regions requiring extra signals were ever nested within each other, it is likely that adding/removing extra signals in a stack-like fashion would suffice to achieve correct behavior. However, if that is insufficient and extra signals were not necessarily removed at the same rate or in the exact reverse order in which they were added, then the unique extra signal names could serve as identifiers for the specific signals that a signal-removing unit should care about removing.
+Most operations accepting channel-typed SSA operands will likely not care for these extra signals and will follow some sort of simple forwarding behavior for them. It is likely that pairs of specific Handshake operations will care to add/remove certain types of extra signals between their operands and results. For example, in the speculation use case, the specific operation marking the beginning of a speculative region would take care of adding an extra 1-bit signal to its operand's specific channel-type. Conversely, the special operation marking the end of the speculative region would take care of removing the extra 1-bit signal from its operand's specific channel-type.
+
+Going further, if multiple regions requiring extra signals were ever nested within each other, it is likely that adding/removing extra signals in a stack-like fashion would suffice to achieve correct behavior. However, if that is insufficient and extra signals were not necessarily removed at the same rate or in the exact reverse order in which they were added, then the unique extra signal names could serve as identifiers for the specific signals that a signal-removing unit should care about removing.
 
 ## Discussion
 
-There is no question that the proposed redesign would yield IRs that are longer and visually more complex than what our current Handshake implementation produces. However, we argue that, in addition to enabling arbitrarily complex mixing of signal bundles as part of the IR's formalized type system, it would be easier in many cases to reason about the IR systematically from compiler passes, even in cases where our circuit would only be made up of "standard" signal bundles (data, valid, and ready).
+In this section we try to alleviate potential concerns with the proposed change and discuss the latter's impact on other parts of Dynamatic.
+
+### IR complexity
+
+There is no question that the proposed redesign would yield IRs that are longer and visually more complex than what our current Handshake implementation produces. Note that, while mathematical operations would require explicit bundling/unbundling operations around them, core dataflow components (e.g., merges and branches) would remain structurally identical beyond cosmetic type name changes.
+
+```mlir
+// Current implementation
+%mergeOprd1 = ... : none
+%mergeOprd2 = ... : none
+%mergeResult, %index = handshake.control_merge %mergeOprd1, %mergeOprd2 : none, i1
+
+%muxOprd1 = ... : i32
+%muxOprd2 = ... : i32
+%muxResult = handshake.mux %index [%muxOprd1, %muxOprd2] : i32
+
+// -----
+
+// With proposed changes 
+%mergeOprd1 = ... : control
+%mergeOprd2 = ... : control
+%mergeResult, %index = handshake.control_merge %mergeOprd1, %mergeOprd2 : control, channel<i1>
+
+%muxOprd1 = ... : channel<i32>
+%muxOprd2 = ... : channel<i32>
+%muxResult = handshake.mux %index [%muxOprd1, %muxOprd2] : channel<i1>, channel<i32>
+
+// -----
+
+// No extra operations when extra signals are present 
+%mergeOprd1 = ... : control
+%mergeOprd2 = ... : control
+%mergeResult, %index = handshake.control_merge %mergeOprd1, %mergeOprd2 : control, channel<i1>
+
+%muxOprd1 = ... : channel<i32, [i2, i4]>
+%muxOprd2 = ... : channel<i32, [i2, i4]>
+%muxResult = handshake.mux %index [%muxOprd1, %muxOprd2] : channel<i1>, channel<i32, [i2, i4]>
+```
+
+### Backend changes
+
+The support for "non-standard" signal bundles in the IR means that we have to match this support in our RTL backend. Indeed, most current RTL components take the data bus's bitwidth as an RTL parameter. This is no longer sufficient when dataflow channels can carry extra downstream or upstream signals, which must somehow be encoded in the RTL parameters of numerous core dataflow components (e.g., all merge-like and branch-like components). Complex signals bundles will need to become encodable as RTL parameters for the underlying RTL implementations to be concretized correctly. It is basically a given that generic RTL implementations which we largely rely on today will not be sufficient, and that the design change will require us moving to RTL generators for most core dataflow components (actually it may be possible to "cheat" there, see [signal de-struturing](#signal-de-structuring)) below.
+
+### Signal de-structuring
+
+In some instances, it may be useful to compose all of a channel's signals going in the same direction (downstream or upstream) together around operations that do not care about the actual content of their operands' data buses (e.g., all data operands of merge-like and branch-like operations). This would allow us to expose to certain operations "regular" dataflow channels without extra signals; their *exposed data buses* would in fact be constituted of the *actual data buses* plus all extra downstream signals. Just before lowering to HW and then RTL (after applying all Handshake-level transformations and optimizations to the IR), we could run a signal-composition pass that would apply this transformation around specific dataflow components in order to make our backend's life easier.
+
+Re-considering the last example with extra signals from the [IR complexity](#ir-complexity) subsection above, we could make our current generic mux implementation work with the new type system without modifications to the RTL.
+
+```mlir
+%index = ... : channel<i1>
+%muxOprd1 = ... : channel<i32, [i2, i4]>
+%muxOprd2 = ... : channel<i32, [i2, i4]>
+
+// Our current generic RTL mux implementation does not work because of the extra
+// signals attached to the data operands' channels
+%muxResult = handshake.mux %index [%muxOprd1, %muxOprd2] : channel<i1>, channel<i32, [i2, i4]>
+
+// -----
+
+// Same inputs as before 
+%index = ... : channel<i1>
+%muxOprd1 = ... : channel<i32, [i2, i4]>
+%muxOprd2 = ... : channel<i32, [i2, i4]>
+
+// Compose data operands's extra signals with the data bus
+%muxComposedOprd1 = handshake.compose %muxOprd1 : channel<i32, [i2, i4]> -> channel<i38> 
+%muxComposedOprd2 = handshake.compose %muxOprd2 : channel<i32, [i2, i4]> -> channel<i38> 
+
+// Our current generic RTL mux implementation would work out-of-the-box!
+%muxComposedResult = handshake.mux %index [%muxComposedOprd1, %muxComposedOprd2] : channel<i1>, channel<i38>
+
+// Most likely some operation down-the-line actually cares about the isolated
+// extra signals, so undo handshake.compose's effect on the mux result 
+%muxResult = handshake.decompose %muxComposedResult : channel<i38> -> channel<i32, [i2, i4]>
+```
+
+The RTL implementations of the `handshake.compose` and `handshake.decompose` signals would be trivial and offload complexity from the dataflow components themselves, making their RTL implementation simpler and area smaller.
