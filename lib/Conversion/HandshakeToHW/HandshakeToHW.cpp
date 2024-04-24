@@ -373,9 +373,9 @@ private:
 
   /// Adds a scalar-type parameter.
   void addUnsigned(const Twine &name, unsigned scalar) {
-    std::string encoded = RTLUnsignedType::encode(scalar);
-    addParam(name, StringAttr::get(ctx, encoded));
-    modName += "_" + encoded;
+    Type intType = IntegerType::get(ctx, 32, IntegerType::Unsigned);
+    addParam(name, IntegerAttr::get(intType, scalar));
+    modName += "_" + std::to_string(scalar);
   };
 
   /// Adds a bitwdith parameter extracted from a type.
@@ -390,9 +390,8 @@ private:
 
   /// Adds a string parameter.
   void addString(const Twine &name, const Twine &txt) {
-    std::string encoded = RTLStringType::encode(txt.str());
-    addParam(name, StringAttr::get(ctx, encoded));
-    modName += "_" + encoded;
+    addParam(name, StringAttr::get(ctx, txt));
+    modName += "_" + txt.str();
   };
 
   /// Returns the module name's prefix from the name of the operation it
@@ -667,11 +666,11 @@ void ModuleDiscriminator::setParameters(hw::HWModuleExternOp modOp) {
 
   // The name is used to determine which RTL component to instantiate
   StringRef opName = op->getName().getStringRef();
-  modOp->setAttr(RTLMatch::NAME_ATTR, StringAttr::get(ctx, opName));
+  modOp->setAttr(RTLRequest::NAME_ATTR, StringAttr::get(ctx, opName));
 
   // Parameters are used to determine the concrete version of the RTL
   // component to instantiate
-  modOp->setAttr(RTLMatch::PARAMETERS_ATTR,
+  modOp->setAttr(RTLRequest::PARAMETERS_ATTR,
                  DictionaryAttr::get(ctx, parameters));
 }
 
