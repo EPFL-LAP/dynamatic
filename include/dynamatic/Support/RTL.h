@@ -24,6 +24,9 @@
 
 namespace dynamatic {
 
+/// Mapping between parameter names and their respective values.
+using ParameterMappings = llvm::StringMap<std::string>;
+
 /// Performs a series of regular expression match-and-replace in the input
 /// string, and returns the resulting string. Each key-value pair in the
 /// `replacements` map represent a regular expression to replace and the string
@@ -39,7 +42,7 @@ replaceRegexes(StringRef input,
 /// their respective value. Returns the input string after substitutions were
 /// performed.
 std::string substituteParams(StringRef input,
-                             const llvm::StringMap<std::string> &parameters);
+                             const ParameterMappings &parameters);
 
 class RTLMatch;
 class RTLParameter;
@@ -334,9 +337,8 @@ public:
   /// parameters identified by name (which may be a subset of the set of
   /// parameters the request defines) and their string serialization is
   /// associated to the match.
-  virtual RTLMatch
-  setMatch(const RTLComponent &component,
-           llvm::StringMap<std::string> &&serializedParams) const;
+  virtual RTLMatch setMatch(const RTLComponent &component,
+                            ParameterMappings &serializedParams) const;
 
   /// Attempts to serialize the request's parameters to a JSON file at the
   /// provided filepath.
@@ -375,9 +377,8 @@ public:
 
   /// Before creating the match object, adds the module's name to the list of
   /// serialized parameters.
-  RTLMatch
-  setMatch(const RTLComponent &component,
-           llvm::StringMap<std::string> &&serializedParams) const override;
+  RTLMatch setMatch(const RTLComponent &component,
+                    ParameterMappings &serializedParams) const override;
 
 private:
   /// Returns the canonical name of the MLIR operation that was converted into
@@ -390,14 +391,38 @@ private:
 /// the matched component.
 class RTLMatch {
 public:
-  /// A reference to the RTL request that created the match.
-  const RTLRequest &request;
   /// Matched RTL component.
-  const RTLComponent &component;
-  /// Maps every RTL parameter in the matched RTL component to its value
-  /// serialized to string obtained from the RTL request.
-  llvm::StringMap<std::string> serializedParams;
+  const RTLComponent *component = nullptr;
 
+  /// Default constructor so that RTL matches can be used as map values.
+  RTLMatch() = default;
+
+  /// Constructs a match for an RTL component, associating a mapping between
+  /// parameter names and their respective serialized value that were used to
+  /// determine the match. The component must outlive the match object.
+  RTLMatch(const RTLComponent &component,
+           const ParameterMappings &serializedParams);
+
+  /// Returns the RTL component's concrete entity name (i.e., with parameter
+  /// values substituted).
+  StringRef getConcreteEntityName() const { return entityName; }
+
+  /// Returns the RTL component's concrete architecture name (i.e., with
+  /// parameter values substituted).
+  StringRef getConcreteArchName() const { return archName; }
+
+  /// Returns the serialized values of all of the RTL component's generic
+  /// parameters, in the order in which the component defines them,
+  SmallVector<StringRef> getGenericParameterValues() const;
+
+  /// Attempts to concretize the matched RTL component using the original RTL
+  /// request that created the match. Generic components are copied to the
+  /// output directory while generated components are produced by the
+  /// user-provided generator.
+  LogicalResult concretize(const RTLRequest &request, StringRef dynamaticPath,
+                           StringRef outputDir) const;
+
+private:
   /// Concrete entity name that the RTL component defines, derived from the
   /// entity name in the RTL component description with RTL parameter values
   /// substituted.
@@ -406,17 +431,9 @@ public:
   /// the entity name in the RTL component description with RTL parameter values
   /// substituted.
   std::string archName;
-
-  /// Constructs a match between an RTL request and component, associating a
-  /// mapping between parameter names and their respective serialized value that
-  /// were used to determine the match.
-  RTLMatch(const RTLRequest &request, const RTLComponent &component,
-           llvm::StringMap<std::string> &&serializedParams);
-
-  /// Attempts to concretize the matched RTL component. Generic components are
-  /// copied to the output directory while generated components are produced by
-  /// the user-provided generator.
-  LogicalResult concretize(StringRef dynamaticPath, StringRef outputDir) const;
+  /// Maps every RTL parameter in the matched RTL component to its value
+  /// serialized to string obtained from the RTL request.
+  ParameterMappings serializedParams;
 };
 
 /// Represents an RTL component i.e., a top-level entry in the RTL configuration

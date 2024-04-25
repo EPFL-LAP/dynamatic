@@ -78,9 +78,8 @@ std::string dynamatic::replaceRegexes(
   return result;
 }
 
-std::string
-dynamatic::substituteParams(StringRef input,
-                            const llvm::StringMap<std::string> &parameters) {
+std::string dynamatic::substituteParams(StringRef input,
+                                        const ParameterMappings &parameters) {
   std::map<std::string, std::string> replacements;
   for (auto &[name, value] : parameters)
     replacements["\\$" + name.str()] = value;
@@ -215,10 +214,9 @@ bool dynamatic::fromJSON(const llvm::json::Value &value, RTLType *&type,
   return true;
 }
 
-RTLMatch
-RTLRequest::setMatch(const RTLComponent &component,
-                     llvm::StringMap<std::string> &&serializedParams) const {
-  return RTLMatch(*this, component, std::move(serializedParams));
+RTLMatch RTLRequest::setMatch(const RTLComponent &component,
+                              ParameterMappings &serializedParams) const {
+  return RTLMatch(component, serializedParams);
 }
 
 RTLRequestFromOp::RTLRequestFromOp(Operation *op, const llvm::Twine &name)
@@ -252,12 +250,12 @@ RTLRequestFromOp::paramsToJSON(const llvm::Twine &filepath) const {
 RTLRequestFromHWModule::RTLRequestFromHWModule(hw::HWModuleExternOp modOp)
     : RTLRequestFromOp(modOp, getName(modOp)){};
 
-RTLMatch RTLRequestFromHWModule::setMatch(
-    const RTLComponent &component,
-    llvm::StringMap<std::string> &&serializedParams) const {
+RTLMatch
+RTLRequestFromHWModule::setMatch(const RTLComponent &component,
+                                 ParameterMappings &serializedParams) const {
   serializedParams[RTLParameter::MODULE_NAME] =
       cast<hw::HWModuleExternOp>(op).getSymName();
-  return RTLMatch(*this, component, std::move(serializedParams));
+  return RTLMatch(component, serializedParams);
 }
 
 std::string RTLRequestFromHWModule::getName(hw::HWModuleExternOp modOp) {
@@ -267,24 +265,34 @@ std::string RTLRequestFromHWModule::getName(hw::HWModuleExternOp modOp) {
   return "";
 }
 
-RTLMatch::RTLMatch(const RTLRequest &request, const RTLComponent &component,
-                   llvm::StringMap<std::string> &&serializedParams)
-    : request(request), component(component),
-      serializedParams(serializedParams) {
-  entityName = substituteParams(component.entityName, serializedParams);
-  archName = substituteParams(component.archName, serializedParams);
+RTLMatch::RTLMatch(const RTLComponent &component,
+                   const ParameterMappings &serializedParams)
+    : component(&component),
+      entityName(substituteParams(component.entityName, serializedParams)),
+      archName(substituteParams(component.archName, serializedParams)),
+      serializedParams(serializedParams) {}
+
+SmallVector<StringRef> RTLMatch::getGenericParameterValues() const {
+  SmallVector<StringRef> values;
+  for (const RTLParameter *param : component->getGenericParameters()) {
+    auto valueIt = serializedParams.find(param->getName());
+    assert(valueIt != serializedParams.end() && "missing parameter value");
+    values.push_back(valueIt->second);
+  }
+  return values;
 }
 
-LogicalResult RTLMatch::concretize(StringRef dynamaticPath,
+LogicalResult RTLMatch::concretize(const RTLRequest &request,
+                                   StringRef dynamaticPath,
                                    StringRef outputDir) const {
   // Consolidate reserved and regular parameters in a single map to perform
   // text substitutions
-  llvm::StringMap<std::string> allParams(serializedParams);
+  ParameterMappings allParams(serializedParams);
   allParams[RTLParameter::DYNAMATIC] = dynamaticPath;
   allParams[RTLParameter::OUTPUT_DIR] = outputDir;
 
-  if (component.isGeneric()) {
-    std::string inputFile = substituteParams(component.generic, allParams);
+  if (component->isGeneric()) {
+    std::string inputFile = substituteParams(component->generic, allParams);
     std::string outputFile = outputDir.str() +
                              sys::path::get_separator().str() + entityName +
                              ".vhd";
@@ -298,17 +306,18 @@ LogicalResult RTLMatch::concretize(StringRef dynamaticPath,
     }
     return success();
   }
-  assert(!component.generator.empty() && "generator is empty");
+  assert(!component->generator.empty() && "generator is empty");
 
-  if (component.jsonConfig) {
-    std::string jsonPath = substituteParams(*(component.jsonConfig), allParams);
+  if (component->jsonConfig) {
+    std::string jsonPath =
+        substituteParams(*(component->jsonConfig), allParams);
     allParams[RTLParameter::JSON_CONFIG] = jsonPath;
     if (failed(request.paramsToJSON(jsonPath)))
       return failure();
   }
 
   // The implementation needs to be generated
-  std::string cmd = substituteParams(component.generator, allParams);
+  std::string cmd = substituteParams(component->generator, allParams);
   if (int ret = std::system(cmd.c_str()); ret != 0) {
     return emitError(request.loc)
            << "Failed to generate component, generator failed with status "
@@ -533,7 +542,7 @@ bool RTLComponent::isCompatible(const RTLRequest &request,
   DenseSet<StringRef> parsedParams;
   SmallVector<StringRef> ignoredParams;
 
-  llvm::StringMap<std::string> serializedParams;
+  ParameterMappings serializedParams;
 
   for (const RTLParameter &parameter : parameters) {
     ParamMatch paramMatch = request.matchParameter(parameter);
@@ -562,7 +571,7 @@ bool RTLComponent::isCompatible(const RTLRequest &request,
   }
 
   if (matches)
-    matches->push_back(request.setMatch(*this, std::move(serializedParams)));
+    matches->push_back(request.setMatch(*this, serializedParams));
   LLVM_DEBUG(llvm::dbgs() << "Matched!\n");
   return true;
 }
