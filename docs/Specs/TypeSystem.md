@@ -16,8 +16,8 @@ At the Handshake level, the IR that Dynamatic generates for this kernel would li
 ```mlir
 handshake.func @adder(%a: i32, %b: i32, %start: none) -> i32  {
     %add = arith.addi %a, %b : i32
-    %ret = return %add : i32
-    end %ret : i32
+    %ret = handshake.return %add : i32
+    handshake.end %ret : i32
 }
 ```
 
@@ -46,47 +46,44 @@ We argue that the only way to obtain the flexibility outlined above is to
 
 We propose to add two new types to the IR to enable us to reliably model our use cases inside Handshake-level IR.
 
-- A *non-parametric* type to model control-only tokens which lowers to a bundle made up of a downstream valid wire and upstream ready wire. This `handshake::ControlType` would serialize to `control` inside the IR.
-- A *parametric* type to model dataflow channels with an arbitrary data type and optional extra signals. In their most basic form, SSA values of this type would be a composition of an arbitrary "raw-typed" SSA value (e.g., `i32`) and of a `control`-typed SSA value. It follows that values of this type, in their basic form, would lower to a bundle made up of a downstream data bus of a specific bitwidth plus what the `control`-typed SSA value lowered to (valid and ready wires). Optionally, this type could also hold extra "raw-typed" signals (e.g., speculation bits, thread tags) that would lower to downstream or upstream buses of corresponding widths. This `handshake::ChannelType` would serialize to `channel<data-type, {optional-extra-types}>` inside the IR.
-
-### New operations
+- A *non-parametric* type to model control-only tokens which lowers to a bundle made up of a downstream valid wire and upstream ready wire. This `handshake::ControlType` type would serialize to `control` inside the IR.
+- A *parametric* type to model dataflow channels with an arbitrary data type and optional extra signals. In their most basic form, SSA values of this type would be a composition of an arbitrary "raw-typed" SSA value (e.g., `i32`) and of a `control`-typed SSA value. It follows that values of this type, in their basic form, would lower to a bundle made up of a downstream data bus of a specific bitwidth plus what the `control`-typed SSA value lowered to (valid and ready wires). Optionally, this type could also hold extra "raw-typed" signals (e.g., speculation bits, thread tags) that would lower to downstream or upstream buses of corresponding widths. This `handshake::ChannelType` type would serialize to `channel<data-type, {optional-extra-types}>` inside the IR.
 
 Re-considering our initial simple example, it seems that the proposed changes would make the IR look identical modulo cosmetic type changes.
 
 ```mlir
 handshake.func @adder(%a: channel<i32>, %b: channel<i32>, %start: control) -> channel<i32>  {
     %add_result = arith.addi %a, %b : channel<i32>
-    %ret = return %add_result : channel<i32>
-    end %ret : channel<i32>
+    %ret = handshake.return %add_result : channel<i32>
+    handshake.end %ret : channel<i32>
 }
 ```
 
-However, this in fact would be rejected by MLIR. The problem is that the standard MLIR operation representing the addition (`arith.addi`) expects operands of a raw integer-like type, as opposed to some custom data-type it does not know (i.e., `channel<i32>`). This in fact may have been one of the motivations behind the implicit dataflow semantic design assumption in Handshake; all operations from the standard `arith` and `math` dialects expect raw integer or floating-point types (depending on the specific operation) and cannot consequently accept custom types like the one we are proposing here.
-
-In a way, an additional unstated assumption in our current Handshake-level IR is that an add operation (`arith.addi`) is not in fact *just* an addition, it is a join of both operands' control ports *in parallel to* an addition of the operands' data port (the same is true for all other mathematical operations). In the spirit of making dataflow semantics explicit within the IR, it therefore would make sense to start treating an add operation as *just* an addition, and make the joining logic explicit in the IR when it happens. We would need to introduce a couple new Handshake operations to make this work.
-
-- An unbundling operation (`handshake::UnbundleOp`) which takes as operand a channel-typed SSA value in the simple case and breaks it down into its individual components; a control-typed SSA value and, in the simple case, a single aw data-typed SSA value (we'll look at more complex cases later on).
-- A converse bundling operation (`handshake::BundleOp`) which takes two operands in the simple case; a control-typed SSA value and a raw data-typed SSA value. It produces a single channel-typed SSA value as result.
-- An explicit join operation (`handshake::JoinOp`) which takes an arbitray number of control-typed SSA values as operands and produces a single control-typed SSA value which results from the join of all the operands (join operations with a single operand could be canonicalized away since they would act as no-op). This operation actually already exists in Handshake.
-
-With those new operations available, a correct IR for our simple adder would be much more explicit, at the cost of some added operations.
+However, this in fact would be rejected by MLIR. The problem is that the standard MLIR operation representing the addition (`arith.addi`) expects operands of a raw integer-like type, as opposed to some custom data-type it does not know (i.e., `channel<i32>`). This in fact may have been one of the motivations behind the implicit dataflow semantic design assumption in Handshake; all operations from the standard `arith` and `math` dialects expect raw integer or floating-point types (depending on the specific operation) and cannot consequently accept custom types like the one we are proposing here. We will therefore need to redefine the standard arithmetic and mathematical operations within Handshake to support our custom data types. The IR would look identical as above module the name of the dialect prefixing `addi`.
 
 ```mlir
 handshake.func @adder(%a: channel<i32>, %b: channel<i32>, %start: control) -> channel<i32>  {
-    // Split a and b into their data/control components
-    %a_control, %a_data = handshake.unbundle %a : control, i32
-    %b_control, %b_data = handshake.unbundle %b : control, i32
-    
-    // Perform the addition between a's and b's data port and the join between
-    // their respective control ports separately
-    %add_control = handshake.join %a_control, %b_control : control
-    %add_data = arith.addi %a_data, %b_data : i32
-
-    // Recombine the addition's result with the join's result and return 
-    %add = handshake.bundle %add_control, %add_data : channel<i32>
-    %ret = return %add : channel<i32>
-    end %ret : channel<i32>
+    %add_result = handshake.addi %a, %b : channel<i32>
+    %ret = handshake.return %add_result : channel<i32>
+    handshake.end %ret : channel<i32>
 }
+```
+
+### New operations
+
+Occasionaly, we will want to unbundle channel-typed SSA values into their individual signals and later re-combine the individual components into a single channel-typed SSA value. We propose to introduce two new operations to fulfill this requirement.
+
+- An unbundling operation (`handshake::UnbundleOp`) which generally breaks down its bundle-like-typed SSA operand into its individual components, which it produces as separate SSA results.
+- A converse bundling operation (`handshake::BundleOp`) which generally combines multiple raw-typed SSA operands and combines them into a single bundle-like-typed SSA value which it produces as a single SSA result.
+
+We include a simple example below (see the [next subsection](#extra-signal-handling) for more complex use cases).
+
+```mlir
+// Breaking down a simple 32-bit dataflow channel into its individual
+// control and data components, then rebundling it
+%channel = ... : channel<i32>
+%control, %data = handshake.unbundle %channel : control, i32
+%channelAgain = handshake.bundle %control, %data : channel<i32>
 ```
 
 ### Extra signal handling
@@ -128,9 +125,8 @@ The unbundling and bundling operations would also unbundle and bundle, respectiv
 // Unbundle into control-only token and all individual signals
 %control, %data, %tag1, %tag2 = handshake.unbundle %channel : control, i32, i2, i4
 
-// Bundle to get back the original channel (extra signal names need to be
-// re-specified as to not lose the original context)
-%bundled = handshake.bundle %control, %data [tag1: %tag1, tag2: %tag2] : channel<i32, [tag1: i2, tag2: i4]>
+// Bundle to get back the original channel
+%bundled = handshake.bundle %control, %data [%tag1, %tag2] : channel<i32, [tag1: i2, tag2: i4]>
 
 // -----
 
@@ -144,14 +140,81 @@ The unbundling and bundling operations would also unbundle and bundle, respectiv
 
 // Bundle to get back the original channel; note that, because the extra signal
 // is going upstream, it is an output of the bundling operation instead of an
-// input (its name still needs to be re-specified as an input attribute for the
-// same reason as the downstream case)
-%bundled, %otherReady = handshake.bundle %control, %data [otherReady] : channel<i32, [otherReady: (U) i1]>
+// input
+%bundled, %otherReady = handshake.bundle %control, %data : channel<i32, [otherReady: (U) i1]>
+
+// -----
+
+// Control-typed values can be further unbundled into their individual signals 
+%control = ... : control
+%valid = handshake.unbundle %control, %ready : i1
+%controlAgain, %ready = handshake.bundle %valid : control, i1
 ```
 
 Most operations accepting channel-typed SSA operands will likely not care for these extra signals and will follow some sort of simple forwarding behavior for them. It is likely that pairs of specific Handshake operations will care to add/remove certain types of extra signals between their operands and results. For example, in the speculation use case, the specific operation marking the beginning of a speculative region would take care of adding an extra 1-bit signal to its operand's specific channel-type. Conversely, the special operation marking the end of the speculative region would take care of removing the extra 1-bit signal from its operand's specific channel-type.
 
 Going further, if multiple regions requiring extra signals were ever nested within each other, it is likely that adding/removing extra signals in a stack-like fashion would suffice to achieve correct behavior. However, if that is insufficient and extra signals were not necessarily removed at the same rate or in the exact reverse order in which they were added, then the unique extra signal names could serve as identifiers for the specific signals that a signal-removing unit should care about removing.
+
+### A generic bundle type
+
+The `handshake::ControlType` and `handshake::ChannelType` types will allow us to represent most if not all of our current use cases within MLIR's type system. However, it is possible that we will one day want to remove assumptions that these types make. For example, we may want to change the bundle of signals responsible for controlling the exchange of tokens on a particular channel. However, the `handshake::ControlType` type (and the `handshake::ChannelType` type by extension) represents the specific combination of a downstream valid wire and of an upstream ready wire.
+
+We therefore propose to introduce a third new *parametric* type representing an arbitrary bundle of wires. This `handshake::BundleType` would serialize to `bundle<description-of-signals>` inside the IR and represent a generalization of a `handshake::ChannelType`. Our `adder` example could be written in a semantically equivalent way using `handshake::BundleType` instead of the more specific `handshake::ChannelType`, at the cost of some verbosity.
+
+```mlir
+handshake.func @adder(%a: bundle<data: i32, valid: i1, ready: (U) 1>,
+                      %b: bundle<data: i32, valid: i1, ready: (U) 1>,
+                      %start: bundle<valid: i1, ready: (U) 1>
+                      ) -> bundle<data: i32, valid: i1, ready: (U) 1>  {
+    %add_result = handshake.addi %a, %b : bundle<data: i32, valid: i1, ready: (U) 1>
+    %ret = handshake.return %add_result : bundle<data: i32, valid: i1, ready: (U) 1>
+    handshake.end %ret : bundle<data: i32, valid: i1, ready: (U) 1>
+}
+```
+
+The `handshake::BundleOp` and `handshake::UnbundleOp` operations would have the same semantic as with `handshake::ChannelType`-typed SSA values.
+
+```mlir
+// An arbitrary bundle of signals
+%bundle = ... : bundle<data: i32, otherData: i16, valid: i1>
+
+// Unbundle it, producing all the individual signals 
+%data, %otherData, %valid = handshake.unbundle %bundle : i32, i16, i1
+
+// Re-bundle it; all signal names need to be re-specified as to not lose the
+// original context
+%bundleAgain = handshake.bundle [%data, %otherData, %valid] : bundle<data: i32, otherData: i16, valid: i1>
+```
+
+Finally, two operations `handshake::ToChannel` and `handshake::ToBundle` would allow us to convert between the generic bundle type and the specific channel type at will inside the IR (at no hardware cost during RTL emission). A channel-typed SSA value would always be convertible to a bundle-typed SSA value whereas the latter would only be convertible to a channel-typed SSA value when it has
+
+1. a downstream signal named `data` (of any type),
+2. an `i1`-typed `valid` downstream signal, and
+3. an `i1`-typed `ready` upstream signal.
+
+```mlir
+// A basic channel with 32-bit integer data and no extra signal
+%channel = ... : channel<i32>
+
+// Converting the channel to an explicit bundle
+%bundle = handshake.to_bundle %channel : bundle<data: i32, valid: i1, ready: (U) i1>
+
+// Converting back to the original channel type
+%channel = handshake.to_channel %bundle : channel<i32>
+```
+
+Extra signals would be copied in order when converting from one type to the other.
+
+```mlir
+// Multiple thread tags example from above
+%channel = ... : channel<i32, [tag1: i2, tag2: i4]>
+
+// Converting the channel to an explicit bundle
+%bundle = handshake.to_bundle %channel : bundle<data: i32, valid: i1, ready: (U) i1, tag1: i2, tag2: i4>
+
+// Converting back to the original channel type
+%channel = handshake.to_channel %bundle : channel<i32, [tag1: i2, tag2: i4]>
+```
 
 ## Discussion
 
