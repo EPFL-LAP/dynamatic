@@ -124,7 +124,7 @@
     "name": "arith.select",
     "parameters": [{ "name": "DATA_WIDTH", "type": "unsigned" }],
     "generic": "$DYNAMATIC/experimental/data/vhdl/arith/select.vhd",
-    "entity-name": "selector"
+    "module-name": "selector"
   },
   {
     "name": "arith.shli",
@@ -365,7 +365,7 @@
       { "name": "NUM_MEMORIES", "type": "unsigned" }
     ],
     "generic": "$DYNAMATIC/experimental/data/vhdl/handshake/end.vhd",
-    "entity-name": "end_sync",
+    "module-name": "end_sync",
     "dependencies": ["handshake.join", "support.logic", "support.types"]
   },
   {
@@ -397,7 +397,7 @@
   {
     "name": "support.logic",
     "generic": "$DYNAMATIC/experimental/data/vhdl/support/logic.vhd",
-    "entity-name": "logic_combinators"
+    "module-name": "logic_combinators"
   },
   {
     "name": "support.mc_support",

@@ -37,7 +37,7 @@ static constexpr StringLiteral KEY_PARAMETERS("parameters"),
     KEY_MODELS("models"), KEY_GENERIC("generic"), KEY_GENERATOR("generator"),
     KEY_NAME("name"), KEY_TYPE("type"), KEY_PATH("path"),
     KEY_CONSTRAINTS("constraints"), KEY_PARAMETER("parameter"),
-    KEY_DEPENDENCIES("dependencies"), KEY_ENTITY_NAME("entity-name"),
+    KEY_DEPENDENCIES("dependencies"), KEY_MODULE_NAME("module-name"),
     KEY_ARCH_NAME("arch-name"), KEY_HDL("hdl"),
     KEY_USE_JSON_CONFIG("use-json-config"), KEY_IO_KIND("io-kind"),
     KEY_IO_MAP("io-map"), KEY_IO_CHANNELS("io-channels");
@@ -268,7 +268,7 @@ std::string RTLRequestFromHWModule::getName(hw::HWModuleExternOp modOp) {
 RTLMatch::RTLMatch(const RTLComponent &component,
                    const ParameterMappings &serializedParams)
     : component(&component),
-      entityName(substituteParams(component.entityName, serializedParams)),
+      moduleName(substituteParams(component.moduleName, serializedParams)),
       archName(substituteParams(component.archName, serializedParams)),
       serializedParams(serializedParams) {}
 
@@ -294,7 +294,7 @@ LogicalResult RTLMatch::concretize(const RTLRequest &request,
   if (component->isGeneric()) {
     std::string inputFile = substituteParams(component->generic, allParams);
     std::string outputFile = outputDir.str() +
-                             sys::path::get_separator().str() + entityName +
+                             sys::path::get_separator().str() + moduleName +
                              ".vhd";
 
     // Just copy the file to the output location
@@ -368,7 +368,7 @@ bool RTLComponent::fromJSON(const llvm::json::Value &value,
       !mapper.mapOptional(KEY_GENERIC, generic) ||
       !mapper.mapOptional(KEY_GENERATOR, generator) ||
       !mapper.mapOptional(KEY_DEPENDENCIES, dependencies) ||
-      !mapper.mapOptional(KEY_ENTITY_NAME, entityName) ||
+      !mapper.mapOptional(KEY_MODULE_NAME, moduleName) ||
       !mapper.mapOptional(KEY_ARCH_NAME, archName) ||
       !mapper.mapOptional(KEY_HDL, hdl) ||
       !mapper.mapOptional(KEY_USE_JSON_CONFIG, jsonConfig) ||
@@ -399,18 +399,18 @@ bool RTLComponent::fromJSON(const llvm::json::Value &value,
     return false;
   }
 
-  // Derive the entity name if none was provided
-  if (entityName.empty()) {
+  // Derive the module name if none was provided
+  if (moduleName.empty()) {
     if (isGeneric()) {
       // Get the filename and remove the extension
       std::string filename = llvm::sys::path::filename(generic).str();
       if (size_t idx = filename.find('.'); idx != std::string::npos)
         filename = filename.substr(0, idx);
-      entityName = filename;
+      moduleName = filename;
     } else {
       // Component is generated, by default the name is the one provided during
       // generation
-      entityName = "$" + RTLParameter::MODULE_NAME.str();
+      moduleName = "$" + RTLParameter::MODULE_NAME.str();
     }
   }
 

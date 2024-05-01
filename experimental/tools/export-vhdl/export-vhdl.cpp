@@ -263,7 +263,7 @@ LogicalResult ExportInfo::concretizeExternalModules() {
       externals[extOp] = *match;
 
     // No need to do anything if an entity with the same name already exists
-    if (auto [_, isNew] = entities.insert(match->getConcreteEntityName());
+    if (auto [_, isNew] = entities.insert(match->getConcreteModuleName());
         !isNew)
       return success();
 
@@ -508,12 +508,9 @@ void RTLWriter::writeModuleInstantiations() {
 
     // Declare the instance
     os << instOp.getInstanceName() << " : ";
-    if (match.component->getHDL() == RTLComponent::HDL::VHDL) {
-      os << "entity work." << match.getConcreteEntityName() << "("
-         << match.getConcreteArchName() << ")";
-    } else {
-      os << match.getConcreteEntityName();
-    }
+    os << "entity work." << match.getConcreteModuleName();
+    if (match.component->getHDL() == RTLComponent::HDL::VHDL)
+      os << "(" << match.getConcreteArchName() << ")";
 
     // Write generic parameters if there are any
     SmallVector<StringRef> genericParams = match.getGenericParameterValues();

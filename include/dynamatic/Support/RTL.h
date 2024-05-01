@@ -403,9 +403,9 @@ public:
   RTLMatch(const RTLComponent &component,
            const ParameterMappings &serializedParams);
 
-  /// Returns the RTL component's concrete entity name (i.e., with parameter
+  /// Returns the RTL component's concrete module name (i.e., with parameter
   /// values substituted).
-  StringRef getConcreteEntityName() const { return entityName; }
+  StringRef getConcreteModuleName() const { return moduleName; }
 
   /// Returns the RTL component's concrete architecture name (i.e., with
   /// parameter values substituted).
@@ -423,13 +423,13 @@ public:
                            StringRef outputDir) const;
 
 private:
-  /// Concrete entity name that the RTL component defines, derived from the
-  /// entity name in the RTL component description with RTL parameter values
+  /// Concrete module name that the RTL component defines, derived from the
+  /// module name in the RTL component description with RTL parameter values
   /// substituted.
-  std::string entityName;
+  std::string moduleName;
   /// Concrete architecture name that the RTL component defines, derived from
-  /// the entity name in the RTL component description with RTL parameter values
-  /// substituted.
+  /// the architecture name in the RTL component description with RTL parameter
+  /// values substituted.
   std::string archName;
   /// Maps every RTL parameter in the matched RTL component to its value
   /// serialized to string obtained from the RTL request.
@@ -542,11 +542,11 @@ private:
   /// Opaque command to issue when generating when concretizing the component
   /// for a specific set of parameter values. Supports parameter substitution.
   std::string generator;
-  /// Name of the RTL entity. For generic components, by default this is the
+  /// Name of the RTL module. For generic components, by default this is the
   /// filename part (without extension) of the components's path. For generated
   /// component, it is the $MODULE_NAME parameter by default, which is provided
   /// at generation time. Supports parameter substitution.
-  std::string entityName;
+  std::string moduleName;
   /// Architecture's name, "arch" be default (only meaningful for VHDL
   /// components). Supports parameter substitution.
   std::string archName = "arch";
