@@ -68,7 +68,7 @@ static const mlir::DenseSet<StringRef> RESERVED_KEYS{
 /// names in the RTL configuration files.
 static const mlir::DenseSet<StringRef> RESERVED_PARAMETER_NAMES{
     RTLParameter::DYNAMATIC, RTLParameter::OUTPUT_DIR,
-    RTLParameter::MODULE_NAME, RTLParameter::JSON_CONFIG};
+    RTLParameter::MODULE_NAME};
 
 std::string dynamatic::replaceRegexes(
     StringRef input, const std::map<std::string, std::string> &replacements) {
@@ -308,13 +308,9 @@ LogicalResult RTLMatch::concretize(const RTLRequest &request,
   }
   assert(!component->generator.empty() && "generator is empty");
 
-  if (component->jsonConfig) {
-    std::string jsonPath =
-        substituteParams(*(component->jsonConfig), allParams);
-    allParams[RTLParameter::JSON_CONFIG] = jsonPath;
-    if (failed(request.paramsToJSON(jsonPath)))
-      return failure();
-  }
+  if (component->jsonConfig && failed(request.paramsToJSON(substituteParams(
+                                   *(component->jsonConfig), allParams))))
+    return failure();
 
   // The implementation needs to be generated
   std::string cmd = substituteParams(component->generator, allParams);

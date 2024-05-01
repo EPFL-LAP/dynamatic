@@ -349,7 +349,7 @@
   },
   {
     "name": "handshake.lsq",
-    "generator": "java -jar -Xmx7G \"$DYNAMATIC/data/vhdl/lsq.jar\" --target-dir \"$OUTPUT_DIR\" --spec-file \"$JSON_CONFIG\" > /dev/null",
+    "generator": "java -jar -Xmx7G \"$DYNAMATIC/data/vhdl/lsq.jar\" --target-dir \"$OUTPUT_DIR\" --spec-file \"$OUTPUT_DIR/$MODULE_NAME.json\" > /dev/null",
     "use-json-config": "$OUTPUT_DIR/$MODULE_NAME.json",
     "hdl": "verilog",
     "io-kind": "flat",

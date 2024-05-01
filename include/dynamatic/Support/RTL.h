@@ -206,9 +206,7 @@ public:
   static constexpr llvm::StringLiteral DYNAMATIC = StringLiteral("DYNAMATIC"),
                                        OUTPUT_DIR = StringLiteral("OUTPUT_DIR"),
                                        MODULE_NAME =
-                                           StringLiteral("MODULE_NAME"),
-                                       JSON_CONFIG =
-                                           StringLiteral("JSON_CONFIG");
+                                           StringLiteral("MODULE_NAME");
 
   /// Default constructor.
   RTLParameter() = default;
