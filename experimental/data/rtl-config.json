@@ -354,7 +354,7 @@
     "hdl": "verilog",
     "io-kind": "flat",
     "io-map": [{ "clk": "clock" }, { "rst": "reset" }, { "*": "io_*" }],
-    "io-channels": {
+    "io-signals": {
       "data": "_bits"
     }
   },

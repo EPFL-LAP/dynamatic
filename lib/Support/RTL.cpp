@@ -40,7 +40,7 @@ static constexpr StringLiteral KEY_PARAMETERS("parameters"),
     KEY_DEPENDENCIES("dependencies"), KEY_MODULE_NAME("module-name"),
     KEY_ARCH_NAME("arch-name"), KEY_HDL("hdl"),
     KEY_USE_JSON_CONFIG("use-json-config"), KEY_IO_KIND("io-kind"),
-    KEY_IO_MAP("io-map"), KEY_IO_CHANNELS("io-channels");
+    KEY_IO_MAP("io-map"), KEY_IO_SIGNALS("io-signals");
 
 /// JSON path errors.
 static constexpr StringLiteral ERR_EXPECTED_OBJECT("expected object"),
@@ -216,6 +216,7 @@ bool dynamatic::fromJSON(const llvm::json::Value &value, RTLType *&type,
 
 RTLMatch RTLRequest::setMatch(const RTLComponent &component,
                               ParameterMappings &serializedParams) const {
+  serializedParams[RTLParameter::MODULE_NAME] = "";
   return RTLMatch(component, serializedParams);
 }
 
@@ -254,7 +255,9 @@ RTLMatch
 RTLRequestFromHWModule::setMatch(const RTLComponent &component,
                                  ParameterMappings &serializedParams) const {
   serializedParams[RTLParameter::MODULE_NAME] =
-      cast<hw::HWModuleExternOp>(op).getSymName();
+      component.isGeneric()
+          ? substituteParams(component.getModuleName(), serializedParams)
+          : cast<hw::HWModuleExternOp>(op).getSymName();
   return RTLMatch(component, serializedParams);
 }
 
@@ -370,7 +373,7 @@ bool RTLComponent::fromJSON(const llvm::json::Value &value,
       !mapper.mapOptional(KEY_USE_JSON_CONFIG, jsonConfig) ||
       !mapper.mapOptional(KEY_IO_KIND, ioKind) ||
       !mapper.mapOptional(KEY_IO_MAP, ioMap) ||
-      !mapper.mapOptional(KEY_IO_CHANNELS, ioChannels)) {
+      !mapper.mapOptional(KEY_IO_SIGNALS, ioSignals)) {
     return false;
   }
 
@@ -412,8 +415,8 @@ bool RTLComponent::fromJSON(const llvm::json::Value &value,
 
   /// Defines default signal type suffixes if they were not overriden
   auto setDefaultSignalSuffix = [&](SignalType type, StringRef suffix) {
-    if (ioChannels.find(type) == ioChannels.end())
-      ioChannels[type] = suffix;
+    if (ioSignals.find(type) == ioSignals.end())
+      ioSignals[type] = suffix;
   };
   setDefaultSignalSuffix(SignalType::DATA, "");
   setDefaultSignalSuffix(SignalType::VALID, "_valid");
@@ -692,7 +695,7 @@ std::string RTLComponent::getRTLPortName(StringRef mlirPortName) const {
 
 std::string RTLComponent::getRTLPortName(StringRef mlirPortName,
                                          SignalType type) const {
-  std::string signalSuffix = ioChannels.at(type);
+  std::string signalSuffix = ioSignals.at(type);
   std::string remappedName = portRemap(mlirPortName);
   StringRef baseName;
   size_t arrayIdx;

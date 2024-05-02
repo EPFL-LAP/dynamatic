@@ -499,6 +499,9 @@ public:
   /// implementation.
   bool isGeneric() const { return !generic.empty(); }
 
+  /// Returns the component's module name.
+  StringRef getModuleName() const { return moduleName; }
+
   /// Returns the HDL in which the component is written.
   HDL getHDL() const { return hdl; }
 
@@ -566,7 +569,7 @@ private:
   /// SignalType::VALID -> "valid" association, then it would be assumed that
   /// the valid wire of a channel-typed port with name <PORT-NAME> would be
   /// named <PORT-NAME>_valid in the RTL component.
-  std::map<SignalType, std::string> ioChannels;
+  std::map<SignalType, std::string> ioSignals;
 
   /// Returns a pointer to the RTL parameter with a specific name, if it exists.
   RTLParameter *getParameter(StringRef name) const;
