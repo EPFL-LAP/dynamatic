@@ -370,15 +370,18 @@
   },
   {
     "name": "handshake.oehb_internal",
-    "generic": "$DYNAMATIC/experimental/data/vhdl/handshake/oehb.vhd"
+    "generic": "$DYNAMATIC/experimental/data/vhdl/handshake/oehb.vhd",
+    "module-name": "oehb"
   },
   {
     "name": "handshake.tehb_internal",
-    "generic": "$DYNAMATIC/experimental/data/vhdl/handshake/tehb.vhd"
+    "generic": "$DYNAMATIC/experimental/data/vhdl/handshake/tehb.vhd",
+    "module-name": "tehb"
   },
   {
     "name": "handshake.fork_internal",
     "generic": "$DYNAMATIC/experimental/data/vhdl/handshake/fork.vhd",
+    "module-name": "fork",
     "dependencies": ["support.types", "support.logic"]
   },
   {
