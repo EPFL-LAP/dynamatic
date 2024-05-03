@@ -4,7 +4,7 @@ We provide a virtual machine (VM) which contains a pre-built/ready-to-use versio
 
 This VM was originally set-up for the [*Dynamatic Reloaded tutorial* given at the FPGA'24 conference](https://www.isfpga.org/workshops-tutorials/#t7) in Monterey, California. You can use it to simply follow the tutorial (available in the [repository's documentation](Tutorials/Introduction/Introduction.md)) or as a starting point to use/modify Dynamatic in general.
 
-> ![NOTE]
+> [!NOTE]
 > Note that Dynamatic's repository on the VM does not track the `main` branch but a branch specifically made for the tutorial. If you would like to build Dynamatic's latest version from the VM, you can checkout the `main` branch and use the [regular build instructions](../README.md#building-from-source) from the top-level README to build the project's latest version.
 
 ## System-based instructions

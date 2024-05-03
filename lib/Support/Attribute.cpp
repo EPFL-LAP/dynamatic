@@ -133,6 +133,9 @@ private:
 
 LogicalResult dynamatic::serializeToJSON(Attribute attr, StringRef filepath,
                                          Location loc) {
+  if (!attr)
+    return emitError(loc) << "The attribute is null; cannot serialize to JSON.";
+
   std::error_code ec;
   llvm::raw_fd_ostream filestream(filepath, ec);
   if (ec.value() != 0) {

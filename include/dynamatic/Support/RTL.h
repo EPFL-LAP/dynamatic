@@ -24,6 +24,9 @@
 
 namespace dynamatic {
 
+/// Mapping between parameter names and their respective values.
+using ParameterMappings = llvm::StringMap<std::string>;
+
 /// Performs a series of regular expression match-and-replace in the input
 /// string, and returns the resulting string. Each key-value pair in the
 /// `replacements` map represent a regular expression to replace and the string
@@ -39,8 +42,9 @@ replaceRegexes(StringRef input,
 /// their respective value. Returns the input string after substitutions were
 /// performed.
 std::string substituteParams(StringRef input,
-                             const llvm::StringMap<std::string> &parameters);
+                             const ParameterMappings &parameters);
 
+class RTLMatch;
 class RTLParameter;
 class RTLComponent;
 
@@ -53,8 +57,8 @@ public:
   /// constraints.
   struct Constraints {
     /// Determines whether constraints are satisfied with a specific parameter
-    /// value encoded as a string.
-    virtual bool verify(StringRef paramValue) const { return true; };
+    /// value stored in an MLIR attribute.
+    virtual bool verify(Attribute attr) const { return true; };
 
     /// Necessary because of virtual function.
     virtual ~Constraints() = default;
@@ -70,10 +74,16 @@ public:
                                    Constraints *&constraints,
                                    llvm::json::Path path) = 0;
 
+  /// Serializes the attribute to a string and returns it unless the attribute
+  /// is of an incorrect type, in which case the returned string is empty.
+  virtual std::string serialize(Attribute attr) const = 0;
+
+  /// Determines whether the type's constraints are satisfied with a specific
+  /// parameter value stored in the MLIR attribute.
+  bool verify(Attribute attr) const { return constraints->verify(attr); };
+
   /// Prohibit copy due to dynamic allocation of constraints.
   RTLType(const RTLType &) = delete;
-  /// Prohibit copy due to dynamic allocation of constraints.
-  RTLType operator=(const RTLType &) = delete;
 
   RTLType(RTLType &&other) noexcept
       : constraints(std::exchange(other.constraints, nullptr)) {}
@@ -111,15 +121,14 @@ public:
     /// Difference constraint.
     std::optional<unsigned> ne;
 
-    bool verify(StringRef paramValue) const override;
+    bool verify(Attribute attr) const override;
   };
 
   bool constraintsFromJSON(const llvm::json::Object &object,
                            Constraints *&constraints,
                            llvm::json::Path path) override;
 
-  /// Encodes an unsigned to a string.
-  static std::string encode(unsigned value) { return std::to_string(value); }
+  std::string serialize(Attribute attr) const override;
 
   /// Decodes a string into an optional unsigned if the string not represents a
   /// valid non-negative number. Otherwise, `std::nullopt` is returned.
@@ -160,22 +169,14 @@ public:
     /// Difference constraint.
     std::optional<std::string> ne;
 
-    bool verify(StringRef paramValue) const override;
+    bool verify(Attribute attr) const override;
   };
 
   bool constraintsFromJSON(const llvm::json::Object &object,
                            Constraints *&constraints,
                            llvm::json::Path path) override;
 
-  /// Returns the input string (method necessary to enable identical templated
-  /// APIs for subtypes of `RTLType`).
-  static std::string encode(StringRef value) { return value.str(); }
-
-  /// Returns the input string (method necessary to enable identical templated
-  /// APIs for subtypes of `RTLType`).
-  static std::optional<std::string> decode(StringRef value) {
-    return value.str();
-  }
+  std::string serialize(Attribute attr) const override;
 
 private:
   /// Keywords
@@ -196,14 +197,16 @@ bool fromJSON(const llvm::json::Value &value, RTLType *&type,
 /// constraints on allowed values for it. This can be moved but not copied due
 /// to underlying dynamatic memory allocation.
 class RTLParameter {
+  /// RTL components need mutable access to their parameters to initialize them
+  /// during JSON deserialization.
+  friend RTLComponent;
+
 public:
   /// Reserved parameter names (used during RTL generation).
   static constexpr llvm::StringLiteral DYNAMATIC = StringLiteral("DYNAMATIC"),
                                        OUTPUT_DIR = StringLiteral("OUTPUT_DIR"),
                                        MODULE_NAME =
-                                           StringLiteral("MODULE_NAME"),
-                                       JSON_CONFIG =
-                                           StringLiteral("JSON_CONFIG");
+                                           StringLiteral("MODULE_NAME");
 
   /// Default constructor.
   RTLParameter() = default;
@@ -211,12 +214,6 @@ public:
   /// Attempts to deserialize the parameter's state from a JSON value. Returns
   /// true when parsing succeeded, false otherwise.
   bool fromJSON(const llvm::json::Value &value, llvm::json::Path path);
-
-  /// Verifies whether the parameter value satisifies all the parameter's
-  /// constraints.
-  bool verifyConstraints(StringRef paramValue) const {
-    return type->constraints->verify(paramValue);
-  }
 
   /// Returns the parameter's name.
   StringRef getName() const { return name; }
@@ -241,10 +238,6 @@ public:
   /// Deallocates the parameter if it is not `nullptr`.
   ~RTLParameter();
 
-  /// RTL components need mutable access to their parameters to initialize them
-  /// during JSON deserialization.
-  friend RTLComponent;
-
 private:
   /// The parameter's name.
   std::string name;
@@ -263,14 +256,53 @@ inline bool fromJSON(const llvm::json::Value &value, RTLParameter &parameter,
   return parameter.fromJSON(value, path);
 }
 
-/// Helper data-structure used to query for a component/model match between an
-/// MLIR operation and an entity parsed from the RTL configuration file. When an
-/// RTL component matches, associate it to the match object using
-/// `RTLMatch::setMatch` and then concretize it to RTL using
-/// `RTLMatch::concretize`.
-class RTLMatch {
-  friend RTLComponent;
+/// Models the result of trying to match a constrained RTL parameter with an
+/// explicit parameter value.
+struct ParamMatch {
+  /// Match state.
+  enum State {
+    DOES_NOT_EXIST,
+    FAILED_VERIFICATION,
+    FAILED_SERIALIZATION,
+    SUCCESS
+  } state;
 
+  /// If the match is successful, holds the string-serialized version of the
+  /// parameter value.
+  std::string serialized = "";
+
+  /// Denotes a parameter value that does not exist.
+  static ParamMatch doesNotExist() { return ParamMatch(DOES_NOT_EXIST); }
+
+  /// Denotes a parameter value that exists but failed to match the RTL
+  /// parameter's constraints.
+  static ParamMatch failedVerification() {
+    return ParamMatch(FAILED_VERIFICATION);
+  }
+
+  /// Denotes a parameter value that exists and passed the RTL parameter's
+  /// constraints but which failed to be serialized to a string.
+  static ParamMatch failedSerialization() {
+    return ParamMatch(FAILED_SERIALIZATION);
+  }
+
+  /// Denotes a successful parameter value match and serialization.
+  static ParamMatch success(const llvm::Twine &serial) {
+    return ParamMatch(SUCCESS, serial);
+  }
+
+protected:
+  /// Construts a parameter match object from the state and an optional
+  /// serialization for the parameter value.
+  ParamMatch(State state, const llvm::Twine &serial = "")
+      : state(state), serialized(serial.str()){};
+};
+
+/// A parameterized request for RTL components that match certain properties.
+/// All of the class's methods are virtual to allow subclasses to define
+/// context-specific matching logic depending on where the request originates
+/// from.
+class RTLRequest {
 public:
   /// Attribute names under which the RTL component's name and parameters are
   /// stored on an MLIR operation, respectively.
@@ -278,60 +310,128 @@ public:
                                  PARAMETERS_ATTR =
                                      StringLiteral("hw.parameters");
 
-  /// Fields below set before a match.
-
-  /// The RTL component's name to look for.
-  std::string name;
-  /// Location at which to report errors.
+  /// Name of the RTL component to match.
+  const std::string name;
+  /// Location to report errors from.
   Location loc;
-  /// If the match is associated to a HW module, references it.
-  hw::HWModuleExternOp modOp = nullptr;
-  /// If the match is associated to a HW module, maps RTL component's parameter
-  /// names to their respective attribute.
-  llvm::StringMap<Attribute> parameters;
 
-  /// Fields below set after a match.
+  /// Creates a request for a component with a specific name. Reports errors at
+  /// the provided location.
+  RTLRequest(const llvm::Twine &name, Location loc)
+      : name(name.str()), loc(loc){};
 
-  /// Concrete entity name that the RTL component defines, derived from the
-  /// entity name in the RTL component description with RTL parameter values
-  /// substituted.
-  std::string entityName;
-  /// Concrete architecture name that the RTL component defines, derived from
-  /// the entity name in the RTL component description with RTL parameter values
-  /// substituted.
-  std::string archName;
-  /// Once a match is set, all RTL parameters of the matched components are
-  /// encoded as strings in the map.
-  llvm::StringMap<std::string> encodedParameters;
+  /// Returns the MLIR attribute holding the RTL parameter's value if it exists;
+  /// otherwise returns nullptr.
+  virtual Attribute getParameter(const RTLParameter &param) const {
+    return nullptr;
+  }
 
-  /// Attempts to match external module operation from the HW dialect.
-  RTLMatch(hw::HWModuleExternOp modOp);
+  /// Matches the RTL parameter with the value the request associates to it
+  /// (according to `getParameter`). Returns a param match object denoting
+  /// whether the match was successful and, if it was not, why it failed.
+  virtual ParamMatch matchParameter(const RTLParameter &param) const;
 
-  /// Attempts to match a component by name, without parameters.
-  RTLMatch(StringRef name, Location loc);
+  /// Matches the request to an RTL component; a mapping between relevant
+  /// parameters identified by name (which may be a subset of the set of
+  /// parameters the request defines) and their string serialization is
+  /// associated to the match.
+  virtual RTLMatch setMatch(const RTLComponent &component,
+                            ParameterMappings &serializedParams) const;
 
-  /// Returns the matched RTL component, or nullptr if no match was set.
-  const RTLComponent *getMatchedComponent() { return component; }
+  /// Attempts to serialize the request's parameters to a JSON file at the
+  /// provided filepath.
+  virtual LogicalResult paramsToJSON(const llvm::Twine &filepath) const {
+    return failure();
+  };
 
-  /// Matches the RTL component. Should only be called once per `RTLMatch`
-  /// object, before calling `concretize`. Fails if at least one of the
-  /// component's RTL parameters cannot be encoded to string; succeeds
-  /// otherwise.
-  LogicalResult setMatch(const RTLComponent &component);
+  /// Default destructor.
+  virtual ~RTLRequest() = default;
+};
 
-  /// Attempts to concretize the matched RTL component. Generic components are
-  /// copied to the output directory while generated components are produced by
-  /// the user-provided generator.
-  LogicalResult concretize(StringRef dynamaticPath, StringRef outputDir) const;
+/// Request for RTL components matching an opaque MLIR operation.
+class RTLRequestFromOp : public RTLRequest {
+public:
+  /// Creates the request from the opaque MLIR operation to match RTL components
+  /// for, and the name that matching RTL components must have.
+  RTLRequestFromOp(Operation *op, const llvm::Twine &name);
 
-  /// Attempts to encode an attribute to a string and sets the second argument
-  /// to the encoded string. Fails if the attribute type isn't supported for
-  /// encoding.
-  static LogicalResult encodeParameter(Attribute attr, std::string &value);
+  Attribute getParameter(const RTLParameter &param) const override;
+
+  LogicalResult paramsToJSON(const llvm::Twine &filepath) const override;
+
+protected:
+  /// The operation to find matches for.
+  Operation *op;
+  /// Parameter dictionary stored in the operation's attributes.
+  DictionaryAttr parameters;
+};
+
+/// Request for RTL components matchin an external hardware module.
+class RTLRequestFromHWModule : public RTLRequestFromOp {
+public:
+  /// Creates the request from the external hardware module to match RTL
+  /// components for.
+  RTLRequestFromHWModule(hw::HWModuleExternOp modOp);
+
+  /// Before creating the match object, adds the module's name to the list of
+  /// serialized parameters.
+  RTLMatch setMatch(const RTLComponent &component,
+                    ParameterMappings &serializedParams) const override;
 
 private:
+  /// Returns the canonical name of the MLIR operation that was converted into
+  /// the external hardware module.
+  std::string getName(hw::HWModuleExternOp modOp);
+};
+
+/// A match between an RTL request and an RTL component, holding information
+/// derived from the match and allowing to concretize an RTL implementation for
+/// the matched component.
+class RTLMatch {
+public:
   /// Matched RTL component.
   const RTLComponent *component = nullptr;
+
+  /// Default constructor so that RTL matches can be used as map values.
+  RTLMatch() = default;
+
+  /// Constructs a match for an RTL component, associating a mapping between
+  /// parameter names and their respective serialized value that were used to
+  /// determine the match. The component must outlive the match object.
+  RTLMatch(const RTLComponent &component,
+           const ParameterMappings &serializedParams);
+
+  /// Returns the RTL component's concrete module name (i.e., with parameter
+  /// values substituted).
+  StringRef getConcreteModuleName() const { return moduleName; }
+
+  /// Returns the RTL component's concrete architecture name (i.e., with
+  /// parameter values substituted).
+  StringRef getConcreteArchName() const { return archName; }
+
+  /// Returns the serialized values of all of the RTL component's generic
+  /// parameters, in the order in which the component defines them,
+  SmallVector<StringRef> getGenericParameterValues() const;
+
+  /// Attempts to concretize the matched RTL component using the original RTL
+  /// request that created the match. Generic components are copied to the
+  /// output directory while generated components are produced by the
+  /// user-provided generator.
+  LogicalResult concretize(const RTLRequest &request, StringRef dynamaticPath,
+                           StringRef outputDir) const;
+
+private:
+  /// Concrete module name that the RTL component defines, derived from the
+  /// module name in the RTL component description with RTL parameter values
+  /// substituted.
+  std::string moduleName;
+  /// Concrete architecture name that the RTL component defines, derived from
+  /// the architecture name in the RTL component description with RTL parameter
+  /// values substituted.
+  std::string archName;
+  /// Maps every RTL parameter in the matched RTL component to its value
+  /// serialized to string obtained from the RTL request.
+  ParameterMappings serializedParams;
 };
 
 /// Represents an RTL component i.e., a top-level entry in the RTL configuration
@@ -381,13 +481,15 @@ public:
   /// true when parsing succeeded, false otherwise.
   bool fromJSON(const llvm::json::Value &value, llvm::json::Path path);
 
-  /// Determines whether the RTL component is compatible with the match object.
-  bool isCompatible(const RTLMatch &match) const;
+  /// Determines whether the RTL component is compatible with the RTL request.
+  /// If it is and the vector is not null, adds the match to the list.
+  bool isCompatible(const RTLRequest &request,
+                    std::vector<RTLMatch> *matches = nullptr) const;
 
   /// Determines whether the RTL component has any timing model compatible
-  /// with the match object. Returns the first compatible model (in model
-  /// list order), if any exists.
-  const RTLComponent::Model *getModel(const RTLMatch &match) const;
+  /// with the request. Returns the first compatible model (in model list
+  /// order), if any exists.
+  const RTLComponent::Model *getModel(const RTLRequest &request) const;
 
   /// Returns the list of RTL parameters, in order, which must be provided as
   /// generic parameters during instantiations of this component.
@@ -396,6 +498,9 @@ public:
   /// Returns whether the component is concretized using a "generic" RTL
   /// implementation.
   bool isGeneric() const { return !generic.empty(); }
+
+  /// Returns the component's module name.
+  StringRef getModuleName() const { return moduleName; }
 
   /// Returns the HDL in which the component is written.
   HDL getHDL() const { return hdl; }
@@ -438,11 +543,11 @@ private:
   /// Opaque command to issue when generating when concretizing the component
   /// for a specific set of parameter values. Supports parameter substitution.
   std::string generator;
-  /// Name of the RTL entity. For generic components, by default this is the
+  /// Name of the RTL module. For generic components, by default this is the
   /// filename part (without extension) of the components's path. For generated
   /// component, it is the $MODULE_NAME parameter by default, which is provided
   /// at generation time. Supports parameter substitution.
-  std::string entityName;
+  std::string moduleName;
   /// Architecture's name, "arch" be default (only meaningful for VHDL
   /// components). Supports parameter substitution.
   std::string archName = "arch";
@@ -464,7 +569,7 @@ private:
   /// SignalType::VALID -> "valid" association, then it would be assumed that
   /// the valid wire of a channel-typed port with name <PORT-NAME> would be
   /// named <PORT-NAME>_valid in the RTL component.
-  std::map<SignalType, std::string> ioChannels;
+  std::map<SignalType, std::string> ioSignals;
 
   /// Returns a pointer to the RTL parameter with a specific name, if it exists.
   RTLParameter *getParameter(StringRef name) const;
@@ -514,17 +619,23 @@ public:
   /// list.
   LogicalResult addComponentsFromJSON(StringRef filepath);
 
-  /// Tries to find an RTL component that is compatible with the match object.
-  /// Returns true and records the match in the match object if at least one
-  /// such component exist; returns false otherwise. If multiple components are
-  /// compatible with the match object, the first one (in JSON-parsing-order) is
-  /// matched.
-  bool findCompatibleComponent(RTLMatch &match) const;
+  /// Determines whether any RTL component is compatible with the request.
+  bool hasMatchingComponent(const RTLRequest &request);
+
+  /// Tries to find an RTL component that is compatible with the request.
+  /// Returns the first matching component (in JSON-parsing-order) if one
+  /// exists, otherwise returns `std::nullopt`.
+  std::optional<RTLMatch> getMatchingComponent(const RTLRequest &request);
+
+  /// Finds all RTL components compatible with the request and pushes
+  /// corresponding matches to the vector (in JSON-parsing-order).
+  void findMatchingComponents(const RTLRequest &request,
+                              std::vector<RTLMatch> &matches) const;
 
   /// Determines whether the RTL configuration has any component with a timing
   /// model compatible with the match object. Returns the first compatible model
   /// (in component and model list order), if any exists.
-  const RTLComponent::Model *getModel(const RTLMatch &match) const;
+  const RTLComponent::Model *getModel(const RTLRequest &request) const;
 
   RTLConfiguration(RTLConfiguration &&) noexcept = default;
   RTLConfiguration &operator=(RTLConfiguration &&) noexcept = default;
