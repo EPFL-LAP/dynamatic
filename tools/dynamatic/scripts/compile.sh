@@ -36,6 +36,7 @@ F_HANDSHAKE="$COMP_DIR/handshake.mlir"
 F_HANDSHAKE_TRANSFORMED="$COMP_DIR/handshake_transformed.mlir"
 F_HANDSHAKE_BUFFERED="$COMP_DIR/handshake_buffered.mlir"
 F_HANDSHAKE_EXPORT="$COMP_DIR/handshake_export.mlir"
+F_HW="$COMP_DIR/hw.mlir"
 F_FREQUENCIES="$COMP_DIR/frequencies.csv"
 
 # ============================================================================ #
@@ -165,6 +166,11 @@ fi
 "$DYNAMATIC_OPT_BIN" "$F_HANDSHAKE_BUFFERED" --handshake-canonicalize \
   > "$F_HANDSHAKE_EXPORT"
 exit_on_fail "Failed to canonicalize Handshake" "Canonicalized handshake"
+
+# handshake level -> hw level
+"$DYNAMATIC_OPT_BIN" "$F_HANDSHAKE_EXPORT" --lower-handshake-to-hw \
+  > "$F_HW"
+exit_on_fail "Failed to lower to HW" "Lowered to HW"
 
 # Export to DOT (one clean for viewing and one compatible with legacy)
 export_dot "visual" "visual"
