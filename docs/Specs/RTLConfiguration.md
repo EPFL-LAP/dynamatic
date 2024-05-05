@@ -3,19 +3,175 @@
 This document describes the interconnected behavior of our RTL backend and of the JSON-formatted RTL configuration file, which together bridge the gap between MLIR and synthesizable RTL. There are two main sections in this document.
 
 1. [Design](#design) | Provides an overview of the backend's design and its underlying rationale.
-2. [JSON Format](#json-format) | Describes the expected JSON format for the RTL configuration file.
+2. [RTL configuration files](#rtl-configuration-files) | Describes the expected JSON format for RTL configuration files.
 3. [Matching logic](#matching-logic) | Explains the logic that the backend uses to parse the configuration file and determine the mapping between MLIR and RTL.
 
 ## Design
 
-*To come...*
+The RTL backend's role is to transform a semi-abstract in-MLIR representation of a dataflow circuit into a specific RTL implementation that matches the behavior that the IR expresses. As such, the backend does not alter the semantics of its input circuit; rather, its task is two-fold.
 
-## JSON Format
+1. To emit synthesizable RTL modules that implement each operation of the input IR.
+2. To emit the "glue" RTL that connects all the RTL modules together to implement the entire circuit.
 
-The RTL configuration file is made up of a list of JSON objects which each describe a parameterized RTL component along with
+The first subtask is by far the most complex to implement in a flexible and robust way, whereas the second subtask is easily achievable once we know how to instantiate each of the RTL module we need. As such this design section heavily focuses on how our RTL backend fulfills the first one's requirements. The [next section](#rtl-configuration-files) indirectly touches on both subtasks by describing how RTL configuration files dictate RTL emission.
 
-1. a method to retrieve a concrete implementation of the RTL component for each valid combination of parameters (a step we call *concretization*), and
-2. a list of timing models for the component, each optionally constrained by specific RTL parameter values.  
+Formally, the RTL backend is a sequence of two transformations handled by two separate binaries. This process's starting point is the fully optimized and buffered Handshake-level IR produced by our numerous transformation and optimization passes.
+
+1. In a first step, Handshake operations are converted to *HW* (read "hardware") operations; *HW* is a "lower-level" MLIR dialect whose structure closely ressembles that of RTL code. This is achieved by running the [`HandshakeToHW` conversion pass](#handshake-to-hw) using Dynamatic's optimizer (`dynamatic-opt`). In addition to performing the lowering of Handshake operations, the conversion pass also adds information to the IR that tells the second step which standard RTL modules the circuit uses.
+2. In the second step, the HW-level IR emitted by the first step goes through our RTL emitter (`export-vhdl`), which produces synthesizable RTL.
+
+### Handshake to HW
+
+The `HandshakeToHW` conversion pass may appear unnecessary at first glance; one could imagine going directly from Handshake-level IR to RTL without any intermediate IR transformation. While this would certainly be possible, we argue that the resulting backend would become quite complex for no discernable advantage. Having the conversion pass as a kind of pre-processing step to the actual RTL emission allow us to separate concerns in an elegant way, yielding two manageable pieces of software that, while intrinsically linked, are technically independent.  
+
+In particular, the conversion pass offloads multiple IR analysis/transformation steps from the RTL emission logic and is able to emit a valid (HW-level) IR that showcases the result of these transformations in a convenient way. The ability to observe the close-to-RTL in-MLIR representation of the circuit before emitting the actual RTL makes debugging significantly easier, as one can see precisely what circuit will be emitted (identical IO ports, module names, etc.); this would be impossible or at least cumbersome had these transformations happened purely in-memory. Importantly, the conversion pass
+
+1. makes memory interfaces (i.e., their respective signal bundle in the top-level RTL module) explicit,
+2. identifies precisely the set of standard RTL modules we will need in the final circuit, and
+3. associate a port name to each SSA value use and each SSA result and store it inside the IR to make the RTL emitter's job as minimal as possible.
+
+#### Making memory interfaces explicit
+
+IR at the Handshake level still links MLIR operations representing memory interfaces (e.g., LSQ) inside dataflow circuits to their (implicitly represented) backing memories using the standard `mlir::MemRefType` type, which abstracts the underlying IO that will eventually connect the two together. For example, a Handshake function operating on a single 32-bit-wide integer array of size 64 has the following signature (control signals omitted).
+
+```mlir
+handshake.func @func(%mem: memref<64xi32>) -> none { ... }
+```
+
+The conversion pass would lower this Handshake function (`handshake::FuncOp`) to an equivalent HW module (`hw::HwModuleOp`) with a signature that makes all the signals connecting the memory interface to its memory explicit (the following snippet omits control signals for brevity).
+
+```mlir
+hw.module @func(in %mem_loadData : i32, out mem_loadEn : i1, out mem_loadAddr : i32,
+                out mem_storeEn : i1, out mem_storeAddr : i32, out mem_storeData : i32) { ... }
+```
+
+> [!NOTE]
+> Note that unlike in the Handshake function, the HW module's inputs *and* outputs are between parentheses.
+
+The single `memref`-typed `mem` argument to the Handshake function is replaced by one module input (`mem_loadData`) and 5 module outputs (`mem_loadEn`, `mem_loadAddr`, `mem_storeEn`, `mem_storeAddr`, and `mem_storeData`) that all have simple types immediately lowerable to RTL. The interface's actual specification (i.e., the composition of the signal bundle that the `memref` lowers to) is a separate concern; shown here is Dynamatic's current memory interface, but it could in practice be any signal bundle that fits one's needs.
+
+#### Identifying necessary modules
+
+In the general case, every MLIR operation inside a Handshake function in the input IR ends up being emitted as an instantiation of a specific RTL module. The mapping between these MLIR operations and the eventual RTL instantiations being one-to-one, this part of the conversion is relatively trivial to implement and think about. One less trivial matter, however, is determining what those instances should be *of*. In other words, which RTL modules need to be instantiated and therefore need be part of the final RTL design.
+
+Consider the following `handshake::MuxOp` operation, which represents a regular dataflow multiplexer taking any strictly positive number of data inputs and a select input to dictate which of the data inputs should be forwarded to the single output.
+
+```mlir
+%result1 = handshake.mux %select [%data1, %data2] : i1, i32
+```
+
+This particular multiplexer has 2 data inputs whose data bus is 32-bit wide, and a 1-bit wide select input (1 bit is enough to select between 2 inputs). Now consider this second multiplexer which, despite having the same identified characteristics, has different data inputs.
+
+```mlir
+// Previous multipexer
+%result1 = handshake.mux %select [%data1, %data2] : i1, i32
+
+// New one with same characteristics
+// - 2 data inputs
+// - 32-bit data bus
+// - 1-bit select bus
+%result2 = handshake.mux %select [%data3, %data4] : i1, i32
+```
+
+As mentioned before, each of these two multiplexers would be emitted as a separate instantiation of a specific RTL module. However, it remains to determine whether these two instantiations would be of *the same RTL module*. In that particular example, both multiplexer modules (whether they were different or identical) would have the same top-level IO. Indeed, the three characteristics we previously identified (number of data inputs, data bus width, select bus width) completely characterize the multiplexer's RTL interface (their gate-level implementation could of course be different).
+
+Predictably, not all multiplexers will have the same RTL interface. Consider the following multiplexer with 16-bit data buses.
+
+```mlir
+// Previous multipexers with
+// - 2 data inputs
+// - 32-bit data bus
+// - 1-bit select bus
+%result1 = handshake.mux %select [%data1, %data2] : i1, i32
+%result2 = handshake.mux %select [%data3, %data4] : i1, i32
+
+// This multiplexer has 16-bit data buses instead of 32
+%result3 = handshake.mux %select [%data5, %data6] : i1, i16
+```
+
+It should be clear that there is not, at least in the general case, a clear correspondance between Handshake operation types (e.g., `handshake::MuxOp`) and the interface of the RTL module they will eventually being emitted as. Two MLIR operations of the same type may be emitted as two RTL instances of the same RTL module, or as two RTL instances of different RTL modules. The conversion pass needs a way to identify its concrete RTL module needs based on its input IR.
+
+We introduce the concept of *RTL parameter* to formalize this mapping between MLIR operations and RTL modules. The general idea is, during conversion of each Handshake-level MLIR operation to an `hw::InstanceOp`---the HW dialect's operation that represents RTL instances---to identify the "intrinsic structural characteristics" of each operation and add to the IR an operation that will instruct the RTL emitter to emit a matching RTL module. We call these "intrinsic structural characteristics" *RTL parameters*, and we encode them as attributes to `hw::HWModuleExternOp` operations, which as their name suggest represent external RTL modules that are needed by the main module's implementation.
+
+Consider an input Handshake function containing the three multiplexers we previously described (all other operations omitted).
+
+```mlir
+handshake.func @func(...) -> ... {
+  ...
+  // 2 data inputs, 32-bit data, 1-bit select
+  %result1 = handshake.mux %select [%data1, %data2] : i1, i32
+  %result2 = handshake.mux %select [%data3, %data4] : i1, i32
+  // 2 data inputs, 16-bit data, 1-bit select
+  %result3 = handshake.mux %select [%data5, %data6] : i1, i16
+  ...
+}
+```
+
+The conversion pass would lower this Handshake function to something that looks like the following (details omitted for brevity).
+
+```mlir
+// RTL module directly corresponding to the input Handshake function.
+// This is the "glue" RTL that connects everything together.
+hw.module @func(...) {
+  ...
+  // 2 data inputs, **32-bit data**, 1-bit select
+  %result1 = hw.instance @mux_32 "mux1" (%select, %data1, %data2) -> channel<i32>
+  %result1 = hw.instance @mux_32 "mux2" (%select, %data3, %data4) -> channel<i32>
+
+  // 2 data inputs, **16-bit data**, 1-bit select
+  %result1 = hw.instance @mux_16 "mux3" (%select, %data5, %data6) -> channel<i16>
+  ...
+}
+
+// RTL module corresponding to the mux variant with **32-bit data**.
+// The RTL emitter will need to *concretize* an RTL implementation for this module.
+hw.module.extern @mux_32( in channel<i1>, in channel<i32>,
+                          in channel<i32>, out channel<i32>) attributes {
+  hw.name = "handshake.mux", 
+  hw.parameters = {SIZE = 2 : ui32, DATA_WIDTH = 32 : ui32, SELECT_WIDTH = 1 : ui32}
+}
+
+
+// RTL module corresponding to the mux variant with **16-bit data**.
+// The RTL emitter will need to *concretize* an RTL implementation for this module.
+hw.module.extern @mux_16( in channel<i1>, in channel<i16>,
+                          in channel<i16>, out channel<i16>) attributes {
+  hw.name = "handshake.mux", 
+  hw.parameters = {SIZE = 2 : ui32, DATA_WIDTH = 16 : ui32, SELECT_WIDTH = 1 : ui32}
+}
+```
+
+Observe that while each multiplexer maps directly to a `hw.instance` (`hw::InstanceOp`) operation, the conversion pass only produces two external RTL modules (`hw.module.extern`): one for the multiplexer variant with 32-bit data, and one for the variant with 16-bit data. These `hw.module.extern` (`hw::HWModuleExternOp`) operations encode two important pieces of information in dedicated MLIR attributes.
+
+- `hw.name` is the canonical name of the MLIR operation from which the RTL module originates, here the Handshake-level multiplexer `handshake.mux`.
+- `hw.parameters` is a dictionary mapping each of the multiplexers's RTL parameter to a specific value.
+
+Importantly, each input operation type defines the set of RTL parameters which characterizes it. As we just saw, for multiplexers these are the number of data inputs (`SIZE`), the data-bus width (`DATA_WIDTH`), and the select-bus width (`SELECT_WIDTH`). The conversion pass will generate one external module definition for each unique combination of RTL name and parameter values dervied from the input IR. These are the RTL modules that the second part of the backend, the RTL emitter, will need to derive an implementation for so that they can be instantiated from the main RTL module. We call this step *concretization* and explain its underlying logic in the [RTL emission](#rtl-emission) subsection.
+
+> [!IMPORTANT]
+> While the pass itself sets RTL parameters purely according to each operation's structural characteristics, nothing prevents passes up the pipeline to already set arbitrary RTL parameters on MLIR operations. The `HandshakeToHW` conversion pass treats RTL parameters already present in the input IR transparently by considering them on the same level as the structural parameters it itself sets (unless there is a name conflict, in which case it emits a warning). It is then up to the backend's [RTL configuration](#rtl-configuration) to recognize these "extra RTL parameters" and act accordingly (they may be ignored if nothing is done, resulting in a "regular" RTL module being concretized, see the [matching logic](#matching-logic)). For example, a pass up the pipeline may wish to distinguish between two different RTL implementations (say, `A` and `B`) of `handshake.mux` operations in order to gain performance. Such a pass could already tag these operations with an RTL parameter (e.g., `hw.parameters = {IMPLEMENTATION = "A"}`) to carry that information down the pipeline and, with proper support in the backend's RTL configuration, concretize and instantiate the intended RTL module.
+
+#### Port names
+
+At the Handshake level, the input and output ports of MLIR operations (in MLIR jargon, their operands and results) do not have names. In keeping with the objective of the `HandshakeToHW` conversion pass to lower the IR to a close-to-RTL representation, the pass associates a port name to each input and output port of each HW-level instance and (external) module operation. These port names will end up as-is in the emitted RTL design (unless explicitly modified by the RTL configuration, see JSON options [`io-kind`](#io-kind), [`io-signals`](#io-signals), and [`io-map`](#io-map)). They are derived through a mix of means depending on the specific input MLIR operation type.
+
+### RTL emission
+
+The RTL emitter picks up the IR that comes out of the `HandshakeToHW` conversion pass and turns it into a synthesizable RTL design. Importantly, the emitter takes as additional argument a list of JSON-formatted RTL configuration files which describe the set of parameterized RTL components it can conretize and instantiate; the [next section](#rtl-configuration-files) covers in details the configuration file's expected syntax, including all of its options.
+
+After parsing RTL configuration files, the emitter attempts to match each `hw.module.extern` (`hw::HWModuleExternOp`) operation in its input IR to entries in the configuration files using the `hw.name` and `hw.parameters` attributes; the [last section](#matching-logic) describes the matching logic in details. If a matching RTL component is found, then the emitter *concretizes* the RTL module implementation that corresponds to the `hw.module.extern` operation into the final RTL design. This concretization may be as simple as copying a generic RTL implementation of a component to the output directory, or require running an arbitrarily complex RTL generator that will generate a specific implementation of the component that depends on the specific RTL parameter values. RTL configuration files dictate the concretization method for each RTL component they declare. If any `hw.module.extern` operation finds no match in the RTL configuration, RTL emission fails.
+
+Circling back to the multiplexer example, it is possible to define [a single generic RTL multiplexer implementation](../../experimental/data/vhdl/handshake/mux.vhd) that is able to implement all possible combinations of RTL parameter values. Assuming an appropriate RTL configuration, the RTL emitter would simply copy that known generic RTL implementation to the final RTL design if its input IR contained any `hw.module.extern` operation with name `handshake.mux` and valid value for each of the three RTL parameters.
+
+Emitting each `hw.module` (`hw::hwModuleOp`) and `hw.instance` (`hw::InstanceOp`) operation to RTL is relatively straightforward once all external modules are concretized. This translation is almost one-to-one, requires little work, and is HDL-independent beyond syntactic concerns.
+
+## RTL configuration files
+
+An RTL configuration file is made up of a list of JSON objects which each describe a parameterized RTL component along with
+
+1. a method to [retrieve a concrete implementation](#concretization-methods) of the RTL component for each valid combination of [parameters](#parameters-format) (a step we call *concretization*),
+2. a list of [timing models](#models-format) for the component, each optionally constrained by specific RTL parameter values, and
+3. a list of [options](#options).
 
 ### Component description format
 
