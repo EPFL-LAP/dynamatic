@@ -560,4 +560,16 @@ For example, if the `handshake.mux` components's RTL implementation prefixed all
 
 ## Matching logic
 
-*To come...*
+As mentionned, a large part of the RTL emitter's job is to concretize an RTL module for each `hw.module.extern` (`hw::HWModuleExternOp`) operation present in the input IR. It does so by querying the RTL configuration it parsed from RTL configuration files for possible matches. This section gives some pointers as to how the matching logic work.
+
+Upon encountering a `hw.module.extern` operation, the RTL emitter creates an *RTL request* which it then sends to the RTL configuration. The request looks for the `hw.name` and `hw.parameters` attributes attached to the operation to determine, respectively, the name of the RTL component that the operation corresponds to and the mapping between RTL parameter name and value. Upon reception of the RTL request, the RTL configuration iterates over all of its known components *in parsing order* to try to find a potential match. The order of evaluation of RTL components parsed from the same JSON file is the same as the order of top-level objects in the file. If the RTL configuration was parsed from multiple files, it evaluates files in the order in which they were provided as arguments to the RTL emitter. The RTL configuration stops at the first successful match, if there is any.
+
+A successful match between an RTL request and an RTL component requires a combination of two factors.
+
+1. The name of the RTL component and the name associated to the RTL request must be *exactly* the same.
+2. The name of every RTL parameter that the component declares must be part of the parameter name-to-value mapping associated to the RTL request. Furthermore, the value of that parameter must satisfy any [constraints associated to the RTL parameter's type](#parameters-format).
+
+> [!IMPORTANT]
+> A successful match does not require the second factor's reciprocal. If the RTL request contains a name-to-value parameter mapping whose name is not a known RTL parameter according to the RTL component's definition, then the match will still be successful. This allows to easily define "fallback" behaviors in advanced use cases. A specific RTL component may have "extra RTL parameters" that allows compiler passes to configure the underlying RTL implementation of this component to a very fine degree. However, we do not want to force the default compilation flow (which may not care for this level of control) to specify these RTL parameters in every request for the component. We need to be able to match requests specifying all parameters (including the extra ones) to the RTL component offering fine control while still being able to match requests only specifying the regular "structural" parameters to the "basic" RTL component. This can be achieved by declaring the RTL component *twice* in the configuration files, once with the extra parameters and once without. As long as RTL configuration evaluates the former component first (see evaluation order above), we will get the desired "fallback" behavior while benefiting from the extra control on-demand.
+
+If the RTL configuration finds a match, it returns the associated component to the RTL emitter which then concretizes the RTL module (along any dependency) inside the circuit's final RTL design.
