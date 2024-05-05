@@ -1,9 +1,9 @@
-# RTL Configuration
+# Backend
 
 This document describes the interconnected behavior of our RTL backend and of the JSON-formatted RTL configuration file, which together bridge the gap between MLIR and synthesizable RTL. There are two main sections in this document.
 
 1. [Design](#design) | Provides an overview of the backend's design and its underlying rationale.
-2. [RTL configuration files](#rtl-configuration-files) | Describes the expected JSON format for RTL configuration files.
+2. [RTL configuration](#rtl-configuration) | Describes the expected JSON format for RTL configuration files.
 3. [Matching logic](#matching-logic) | Explains the logic that the backend uses to parse the configuration file and determine the mapping between MLIR and RTL.
 
 ## Design
@@ -13,7 +13,7 @@ The RTL backend's role is to transform a semi-abstract in-MLIR representation of
 1. To emit synthesizable RTL modules that implement each operation of the input IR.
 2. To emit the "glue" RTL that connects all the RTL modules together to implement the entire circuit.
 
-The first subtask is by far the most complex to implement in a flexible and robust way, whereas the second subtask is easily achievable once we know how to instantiate each of the RTL module we need. As such this design section heavily focuses on how our RTL backend fulfills the first one's requirements. The [next section](#rtl-configuration-files) indirectly touches on both subtasks by describing how RTL configuration files dictate RTL emission.
+The first subtask is by far the most complex to implement in a flexible and robust way, whereas the second subtask is easily achievable once we know how to instantiate each of the RTL module we need. As such this design section heavily focuses on how our RTL backend fulfills the first one's requirements. The [next section](#rtl-configuration) indirectly touches on both subtasks by describing how RTL configuration files dictate RTL emission.
 
 Formally, the RTL backend is a sequence of two transformations handled by two separate binaries. This process's starting point is the fully optimized and buffered Handshake-level IR produced by our numerous transformation and optimization passes.
 
@@ -157,7 +157,7 @@ At the Handshake level, the input and output ports of MLIR operations (in MLIR j
 
 ### RTL emission
 
-The RTL emitter picks up the IR that comes out of the `HandshakeToHW` conversion pass and turns it into a synthesizable RTL design. Importantly, the emitter takes as additional argument a list of JSON-formatted RTL configuration files which describe the set of parameterized RTL components it can conretize and instantiate; the [next section](#rtl-configuration-files) covers in details the configuration file's expected syntax, including all of its options.
+The RTL emitter picks up the IR that comes out of the `HandshakeToHW` conversion pass and turns it into a synthesizable RTL design. Importantly, the emitter takes as additional argument a list of JSON-formatted RTL configuration files which describe the set of parameterized RTL components it can conretize and instantiate; the [next section](#rtl-configuration) covers in details the configuration file's expected syntax, including all of its options.
 
 After parsing RTL configuration files, the emitter attempts to match each `hw.module.extern` (`hw::HWModuleExternOp`) operation in its input IR to entries in the configuration files using the `hw.name` and `hw.parameters` attributes; the [last section](#matching-logic) describes the matching logic in details. If a matching RTL component is found, then the emitter *concretizes* the RTL module implementation that corresponds to the `hw.module.extern` operation into the final RTL design. This concretization may be as simple as copying a generic RTL implementation of a component to the output directory, or require running an arbitrarily complex RTL generator that will generate a specific implementation of the component that depends on the specific RTL parameter values. RTL configuration files dictate the concretization method for each RTL component they declare. If any `hw.module.extern` operation finds no match in the RTL configuration, RTL emission fails.
 
@@ -165,7 +165,7 @@ Circling back to the multiplexer example, it is possible to define [a single gen
 
 Emitting each `hw.module` (`hw::hwModuleOp`) and `hw.instance` (`hw::InstanceOp`) operation to RTL is relatively straightforward once all external modules are concretized. This translation is almost one-to-one, requires little work, and is HDL-independent beyond syntactic concerns.
 
-## RTL configuration files
+## RTL configuration
 
 An RTL configuration file is made up of a list of JSON objects which each describe a parameterized RTL component along with
 
