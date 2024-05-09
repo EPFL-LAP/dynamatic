@@ -16,3 +16,4 @@ add_dynamatic_library(DynamaticExperimentalTransforms
 )
 
 add_subdirectory(Speculation)
+add_subdirectory(ResourceSharing)
