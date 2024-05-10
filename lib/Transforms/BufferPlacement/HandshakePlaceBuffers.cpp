@@ -413,11 +413,14 @@ template <typename MILP, typename... Args>
 static inline LogicalResult
 checkLoggerAndSolve(Logger *logger, StringRef milpName,
                     BufferPlacement &placement, Args &&...args) {
+  LogicalResult solverResult(failure());
   if (logger) {
-    return solveMILP<MILP>(placement, std::forward<Args>(args)..., *logger,
-                           milpName);
+    solverResult = solveMILP<MILP>(placement, std::forward<Args>(args)...,
+                                   *logger, milpName);
+  } else {
+    solverResult = solveMILP<MILP>(placement, std::forward<Args>(args)...);
   }
-  return solveMILP<MILP>(placement, std::forward<Args>(args)...);
+  return solverResult;
 }
 
 LogicalResult HandshakePlaceBuffersPass::getBufferPlacement(
