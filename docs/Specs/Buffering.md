@@ -20,7 +20,7 @@ Having latency information encoded in the IR itself is generally undesirable for
 
 ### Operation representation
 
-To address the current issue, we propose to replace the two existing buffer operations (`handshake::OEHBOp` and `handshake::TEHBOp`) with a single buffer operation (`handshake::BufferOp`) that takes as additional input latency information associating each cut path with the number of cycles the buffer delays the flow of data by, thus filling the current implementation's representation gap. A new MLIR attribute `handshake::LatencyInfo` would represent that information conveniently as a list of input-to-output port associations with their associated latency. For convenience, all unspecified paths would be assumed to have 0 latency. An instance of the `handshake::BufferOp` operation with no latencies explicitly specified would therefore behave as a no-op and could be canonicalized during compilation.
+To address the current issue, we propose to replace the two existing buffer operations (`handshake::OEHBOp` and `handshake::TEHBOp`) with a generic single-operand and single-result buffer operation (`handshake::BufferOp`) that takes as additional input latency information associating each cut path with the number of cycles the buffer delays the flow of data by, thus filling the current implementation's representation gap. A new MLIR attribute `handshake::LatencyInfo` would represent that information conveniently as a list of input-to-output port associations with their associated latency. For convenience, all unspecified paths would be assumed to have 0 latency.
 
 The textual representation of the `handshake::BufferOp` operation would look as follows.
 
@@ -30,7 +30,7 @@ The textual representation of the `handshake::BufferOp` operation would look as 
 
 Here `%dataIn` is the buffer's operand SSA value (the input dataflow channel) and, conversely,`%dataOut` is the buffer's result SSA value (the output dataflow channel).
 
-For example, a 1-slot buffer on a 32-bit dataflow channel which induces a one-cycle latency on the data to data and valid to valid paths would be serialized to the following text.
+For example, a 1-slot buffer on a 32-bit dataflow channel which induces a one-cycle latency on the data to data and valid to valid paths would be serialized to the following.
 
 ```mlir
 %dataOut = handshake.buffer [1] %dataIn [D -> D: 1, V -> V: 1] : channel<i32>
@@ -42,11 +42,26 @@ Paths between identically-typed ports (data, valid, or ready) could even be shor
 %dataOut = handshake.buffer [1] %dataIn [D: 1, V: 1] : channel<i32>
 ```
 
+### Extra characterization
+
+Using Dynamatic's new backend and its support for adding RTL parameters to operations at any point in the compilation flow (see [relevant section in backend documentation](Backend.md#identifying-necessary-modules), in particular the note at the end), it would also be possible to differentiate between multiple types of buffers with identical latency characteristics through user-defined "extra RTL parameters". For example, to differentiate between two different implementations (say, `A` and `B`) of a buffer that adds a one-cycle latency on the data and valid paths, one could define and add an `IMPLEMENTATION` RTL parameter on relevant buffers at the Handshake IR level. With proper support in [RTL configuration files](Backend.md#rtl-configuration), the backend would then be able to instantiate the appropriate buffer implementation for each `handshake::BufferOp` operation in the IR.
+
+```mlir
+// One-slot data/valid-cutting buffer, implementation "A" 
+%dataOut1 = handshake.buffer [1] %dataIn1 [D: 1, V: 1] {hw.parameters = {IMPLEMENTATION = "A"}} : channel<i32>
+
+// One-slot data/valid-cutting buffer, implementation "B" 
+%dataOut2 = handshake.buffer [1] %dataIn2 [D: 1, V: 1] {hw.parameters = {IMPLEMENTATION = "B"}} : channel<i32>
+```
+
+This effectively allows arbitrary complexity in modeling buffers in the IR and eventually emit them to RTL.
+
 ### Interaction with buffer placement pass
 
-Currently, the buffer placement pass assumes that it can only place the two types of elastic buffers we can represent using Handshake, OEHBs and TEHBs, and incorporates assumptions on the latency each of them induce on specific paths. Adding a new type of buffer currently requires changing the implementation of the pass itself (though this would be a small change, the pass being implemented in a relatively generic way).
+Currently, the buffer placement pass assumes that it can only place the two types of elastic buffers we can represent using Handshake, OEHBs and TEHBs, and incorporates assumptions on the latency each of them induce on specific paths. Adding a new type of buffer currently requires changing the implementation of the pass itself (though this would be a small change, the pass being implemented in a relatively generic way). The proposed redesign would remove these assumptions and make the pass completely general in the nature of buffers it can model inside the MILP and eventually decide to place on our circuits' channels. There are two general ways in which to approach MILP-based buffer placement with our new generic buffer representation while ensuring that (1) all combinational loops are cut by at least one buffer and that (2) all combinational paths will be able to meet the target clock period.
 
-The proposed redesign would remove these assumptions and make the pass completely general in the nature of buffers it can model inside the MILP and eventually decide to place on our circuits' channels. In terms of workflow, a user would now need to inform the buffer placement pass of the set of buffer types (characterized by their `handshake::LatencyInfo` attribute) that it is allowed to place in the circuit. The pass would then retrieve complete timing models for each of the requested buffers by using a list of [RTL configuration files](RTLConfiguration.md) (the same ones that the backend uses later for RTL emission). Each timing model, in addition to holding the same path latencies contained in the `handshake::LatencyInfo` attribute it was queried from, would provide all relevant combinational delays within the buffer (including on paths with 0 latency). Finally, each of these buffer model would be accurately transcribed inside the MILP, allowing the pass to place our specific buffers so that (1) all combinational loops are cut by at least one buffer and (2) that all combinational paths will be able to meet the target clock period.  
+1. *Path-based approach*, in which we express the MILP independently from the set of buffer types available. The MILP's results encode which path(s) it decides to cut on each channel, if any. It is then up to the user to honor the MILP's results by placing buffers on appropriate channels depending on the set of buffer types available. This is basically what we currently do.
+2. *Buffer-based approach*, in which the set of available buffer types is encoded in the MILP itself. The MILP's results directly encode which specific buffer type(s) it decides to place on each channel, if any. This has the advantage of incorporating the full timing characteristics (including combinational delays) of each placable buffer type in the MILP's calculations, yielding placements more likely to meet the target clock period. The MILP, however, is likely to be more complex and as such harder to solve than the path-based one when many buffer types are available.  
 
 ### RTL generation
 
