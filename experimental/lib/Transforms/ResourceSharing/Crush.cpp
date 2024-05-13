@@ -1,4 +1,4 @@
-//===- FCCM22Sharing.cpp - Resource Sharing ---------*- C++ -*-===//
+//===- Crush.cpp - Credit-Based Resource Sharing ---------*- C++ -*-===//
 //
 // Dynamatic is under the Apache License v2.0 with LLVM Exceptions.
 // See https://llvm.org/LICENSE.txt for license information.
@@ -43,20 +43,17 @@ static constexpr llvm::StringLiteral FPGA20("fpga20"),
 // extracted data from buffer placement
 struct PerfOptInfo {
 
-  // // The list of units of each CFC
-  // llvm::MapVector<CFDFC *, llvm::SetVector<Operation *>> cfUnits;
-
-  // // The list of units of each CFC
-  // llvm::MapVector<CFDFC *, llvm::SetVector<Value *>> cfEdges;
-
   // For each CFC, the achieved throughput
   std::map<size_t, double> cfThroughput;
 
   // A list of performance critical CFCs.
   std::set<size_t> critCfcs;
 
-  // The list of units of each CFC
-  std::map<size_t, llvm::SetVector<Operation *>> cfUnits;
+  // The set of units of each CFC
+  std::map<size_t, std::set<Operation *>> cfUnits;
+
+  // The set of channels of each CFC
+  std::map<size_t, std::set<Channel *>> cfChannels;
 };
 
 namespace dynamatic {
@@ -97,9 +94,15 @@ public:
       // info.cfcThroughput[cf] = throughput;
       info.cfUnits[cfIndices[cf]] = {};
 
-      // track the operations of the CFC
-      for (auto *op : cf->units) {
+      // Track the units of the CFC
+      for (auto *op : cf->units)
         info.cfUnits[cfIndices[cf]].insert(op);
+
+      // Track the channels of the CFC
+      for (auto val : cf->channels) {
+        Channel ch(val);
+
+        info.cfChannels[cfIndices[cf]].insert(&ch);
       }
     }
 
