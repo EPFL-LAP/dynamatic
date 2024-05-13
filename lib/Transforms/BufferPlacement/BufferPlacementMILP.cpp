@@ -29,9 +29,6 @@
 #include "llvm/ADT/iterator_range.h"
 #include "llvm/Support/Casting.h"
 
-#include "llvm/Support/JSON.h"
-#include <string>
-
 #ifndef DYNAMATIC_GUROBI_NOT_INSTALLED
 #include "gurobi_c++.h"
 
@@ -39,8 +36,6 @@ using namespace llvm::sys;
 using namespace mlir;
 using namespace dynamatic;
 using namespace dynamatic::buffer;
-
-using namespace llvm;
 
 /// Returns a textual name for a signal type.
 static StringRef getSignalName(SignalType type) {
@@ -544,8 +539,6 @@ void BufferPlacementMILP::forEachIOPair(
 
 void BufferPlacementMILP::logResults(BufferPlacement &placement) {
   assert(logger && "no logger was provided");
-
-  dumpBufferPlacementJson(placement);
   mlir::raw_indented_ostream &os = **logger;
 
   os << "# ========================== #\n";
@@ -607,26 +600,6 @@ void BufferPlacementMILP::logResults(BufferPlacement &placement) {
     os.unindent();
     os << "\n";
   }
-}
-
-void BufferPlacementMILP::dumpBufferPlacementJson(BufferPlacement &placement) {
-
-  std::string jsonBuffer;
-  llvm::raw_string_ostream jsonOs(jsonBuffer);
-  llvm::json::OStream json(jsonOs, 2);
-
-  // Json placement report convention: an array of CFDFCs, with many attributes
-  // Example (TODO):
-  json.arrayBegin();
-  for (auto [idx, cfdfcWithVars] : llvm::enumerate(vars.cfVars)) {
-    auto [cf, cfVars] = cfdfcWithVars;
-    double throughput = cfVars.throughput.get(GRB_DoubleAttr_X);
-    std::string keyIndex = std::to_string(idx);
-    json.object([&] { json.attribute(keyIndex, std::to_string(throughput)); });
-  }
-  json.arrayEnd();
-
-  llvm::errs() << jsonBuffer;
 }
 
 void BufferPlacementMILP::initialize() {

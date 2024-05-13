@@ -292,10 +292,6 @@ protected:
   /// optimization. Asserts if the logger is nullptr.
   void logResults(BufferPlacement &placement);
 
-  /// Logs placement decisisons and achieved throughputs after MILP
-  /// optimization (similar to logResults); formatted in json: "placement.json"
-  void dumpBufferPlacementJson(BufferPlacement &placement);
-
 private:
   /// Common logic for all constructors. Fills the channel to buffering
   /// properties mapping and defines a large constant used for elasticity
