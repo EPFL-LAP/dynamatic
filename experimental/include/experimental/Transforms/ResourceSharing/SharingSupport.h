@@ -10,11 +10,29 @@
 #define EXPERIMENTAL_INCLUDE_DYNAMATIC_TRANSFORMS_RESOURCESHARING_SHARINGSUPPORT_H
 
 #include "dynamatic/Support/TimingModels.h"
+#include "dynamatic/Transforms/BufferPlacement/BufferingSupport.h"
+#include <set>
 #include <vector>
 
 // list of types that can be shared
 #define SHARING_TARGETS                                                        \
   mlir::arith::MulFOp, mlir::arith::MulIOp, mlir::arith::AddFOp,               \
       mlir::arith::SubFOp
+
+using namespace dynamatic::buffer;
+
+namespace dynamatic {
+namespace experimental {
+namespace sharing {
+
+// for a CFC, find the list of SCCs
+// here SCCs are encoded as a component id per each op
+std::set<Operation *, size_t> getSccsInCfc(handshake::FuncOp funcOp,
+                                           std::set<Operation *> cfUnits,
+                                           std::set<Channel *> cfChannels);
+
+} // namespace sharing
+} // namespace experimental
+} // namespace dynamatic
 
 #endif

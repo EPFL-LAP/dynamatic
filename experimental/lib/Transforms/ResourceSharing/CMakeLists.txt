@@ -1,5 +1,6 @@
 add_dynamatic_library(DynamaticResourceSharing
   Crush.cpp
+  SharingSupport.cpp
 
   DEPENDS
   DynamaticExperimentalTransformsPassIncGen
