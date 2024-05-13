@@ -21,7 +21,10 @@
 #include "experimental/Transforms/ResourceSharing/SharingSupport.h"
 #include "mlir/Pass/Pass.h"
 #include "mlir/Pass/PassManager.h"
+#include <algorithm>
+#include <cstddef>
 #include <map>
+#include <set>
 #include <string>
 
 using namespace llvm;
@@ -40,11 +43,20 @@ static constexpr llvm::StringLiteral FPGA20("fpga20"),
 // extracted data from buffer placement
 struct PerfOptInfo {
 
-  // For each CFC, the achieved throughput
+  // // The list of units of each CFC
+  // llvm::MapVector<CFDFC *, llvm::SetVector<Operation *>> cfUnits;
 
-  // TODO: does this work for different functions? Since different functions
-  // have different CFC, therefore, each CFC has a unique pointer.
-  llvm::MapVector<CFDFC *, double> cfcThroughput;
+  // // The list of units of each CFC
+  // llvm::MapVector<CFDFC *, llvm::SetVector<Value *>> cfEdges;
+
+  // For each CFC, the achieved throughput
+  std::map<size_t, double> cfThroughput;
+
+  // A list of performance critical CFCs.
+  std::set<size_t> critCfcs;
+
+  // The list of units of each CFC
+  std::map<size_t, llvm::SetVector<Operation *>> cfUnits;
 };
 
 namespace dynamatic {
@@ -68,12 +80,53 @@ public:
         info(info){};
   PerfOptInfo &info;
   void extractResult(BufferPlacement &placement) override {
+    // Run the FPGA20Buffers's extractResult as it is
     FPGA20Buffers::extractResult(placement);
-    // Save global CFDFC throuhgputs into info
+
+    // Map each individual CFDFC to its iteration index
+    std::map<CFDFC *, size_t> cfIndices;
+    for (auto [idx, cfAndOpt] : llvm::enumerate(funcInfo.cfdfcs))
+      cfIndices[cfAndOpt.first] = idx;
+
+    // Extract result: save global CFDFC throuhgputs into info
     for (auto [idx, cfdfcWithVars] : llvm::enumerate(vars.cfVars)) {
       auto [cf, cfVars] = cfdfcWithVars;
       double throughput = cfVars.throughput.get(GRB_DoubleAttr_X);
-      info.cfcThroughput[cf] = throughput;
+
+      info.cfThroughput[cfIndices[cf]] = throughput;
+      // info.cfcThroughput[cf] = throughput;
+      info.cfUnits[cfIndices[cf]] = {};
+
+      // track the operations of the CFC
+      for (auto *op : cf->units) {
+        info.cfUnits[cfIndices[cf]].insert(op);
+      }
+    }
+
+    SmallVector<CFDFC *, 8> cfdfcs;
+    std::vector<CFDFCUnion> disjointUnions;
+    llvm::transform(funcInfo.cfdfcs, std::back_inserter(cfdfcs),
+                    [](auto cfAndOpt) { return cfAndOpt.first; });
+    getDisjointBlockUnions(cfdfcs, disjointUnions);
+
+    // Instrumentation: for each CFDFC Union, mark the most-frequently-executed
+    // CFC as performance critical
+
+    for (auto &cfUnion : disjointUnions) {
+
+      auto *critCf =
+          std::max_element(cfUnion.cfdfcs.begin(), cfUnion.cfdfcs.end(),
+                           [](CFDFC const *l, CFDFC const *r) {
+                             return l->numExecs < r->numExecs;
+                           });
+      if (!critCf) {
+        funcInfo.funcOp->emitError()
+            << "Failed running determining performance critical CFC";
+        return;
+      }
+
+      info.critCfcs.emplace(cfIndices[*critCf]);
+      llvm::errs() << "Frequency of crit cfc: " << (*critCf)->numExecs << "\n";
     }
   }
 };
@@ -221,14 +274,24 @@ void CreditBasedSharingPass::runDynamaticPass() {
 
   PerfOptInfo data;
 
+  // Run buffer placement pass and fill data with performance analysis
+  // information
   if (failed(runBufferPlacementPass(modOp, data))) {
     modOp->emitError() << "Failed running buffer placement";
     return;
   }
 
+  for (auto cf : data.critCfcs) {
+
+    for (auto *op : data.cfUnits[cf])
+      llvm::errs() << namer.getName(op) << " ";
+
+    llvm::errs() << "\n";
+  }
+
   // TODO: check the extracted data
-  for (auto [idx, cfdfc] : llvm::enumerate(data.cfcThroughput)) {
-    llvm::errs() << "Throughput of CFDFC #" << idx << " is " << cfdfc.second
+  for (auto [idx, throughput] : data.cfThroughput) {
+    llvm::errs() << "Throughput of CFDFC #" << idx << " is " << throughput
                  << "\n";
   }
 
