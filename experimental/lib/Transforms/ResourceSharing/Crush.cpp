@@ -41,7 +41,7 @@ static constexpr llvm::StringLiteral FPGA20("fpga20"),
 #endif // DYNAMATIC_GUROBI_NOT_INSTALLED
 
 // extracted data from buffer placement
-struct PerfOptInfo {
+struct FuncPerfInfo {
 
   // For each CFC, the achieved throughput
   std::map<size_t, double> cfThroughput;
@@ -56,6 +56,8 @@ struct PerfOptInfo {
   std::map<size_t, std::set<Channel *>> cfChannels;
 };
 
+using SharingInfo = std::map<handshake::FuncOp *, FuncPerfInfo>;
+
 namespace dynamatic {
 namespace buffer {
 namespace fpga20 {
@@ -64,18 +66,18 @@ namespace fpga20 {
 class FPGA20BuffersWrapper : public FPGA20Buffers {
 public:
   // constructor
-  FPGA20BuffersWrapper(PerfOptInfo &info, GRBEnv &env, FuncInfo &funcInfo,
+  FPGA20BuffersWrapper(SharingInfo &info, GRBEnv &env, FuncInfo &funcInfo,
                        const TimingDatabase &timingDB, double targetPeriod,
                        bool legacyPlacement, Logger &logger, StringRef milpName)
       : FPGA20Buffers(env, funcInfo, timingDB, targetPeriod, legacyPlacement,
                       logger, milpName),
         info(info){};
-  FPGA20BuffersWrapper(PerfOptInfo &info, GRBEnv &env, FuncInfo &funcInfo,
+  FPGA20BuffersWrapper(SharingInfo &info, GRBEnv &env, FuncInfo &funcInfo,
                        const TimingDatabase &timingDB, double targetPeriod,
                        bool legacyPlacement)
       : FPGA20Buffers(env, funcInfo, timingDB, targetPeriod, legacyPlacement),
         info(info){};
-  PerfOptInfo &info;
+  SharingInfo &info;
   void extractResult(BufferPlacement &placement) override {
     // Run the FPGA20Buffers's extractResult as it is
     FPGA20Buffers::extractResult(placement);
@@ -90,19 +92,19 @@ public:
       auto [cf, cfVars] = cfdfcWithVars;
       double throughput = cfVars.throughput.get(GRB_DoubleAttr_X);
 
-      info.cfThroughput[cfIndices[cf]] = throughput;
+      info[&funcInfo.funcOp].cfThroughput[cfIndices[cf]] = throughput;
       // info.cfcThroughput[cf] = throughput;
-      info.cfUnits[cfIndices[cf]] = {};
+      info[&funcInfo.funcOp].cfUnits[cfIndices[cf]] = {};
 
       // Track the units of the CFC
       for (auto *op : cf->units)
-        info.cfUnits[cfIndices[cf]].insert(op);
+        info[&funcInfo.funcOp].cfUnits[cfIndices[cf]].insert(op);
 
       // Track the channels of the CFC
       for (auto val : cf->channels) {
-        Channel ch(val);
+        Channel *ch = new Channel(val);
 
-        info.cfChannels[cfIndices[cf]].insert(&ch);
+        info[&funcInfo.funcOp].cfChannels[cfIndices[cf]].insert(ch);
       }
     }
 
@@ -128,7 +130,7 @@ public:
         return;
       }
 
-      info.critCfcs.emplace(cfIndices[*critCf]);
+      info[&funcInfo.funcOp].critCfcs.emplace(cfIndices[*critCf]);
       llvm::errs() << "Frequency of crit cfc: " << (*critCf)->numExecs << "\n";
     }
   }
@@ -157,7 +159,7 @@ using fpga20::FPGA20BuffersWrapper;
 // An wrapper class that applies buffer p
 // extracts the report.
 struct HandshakePlaceBuffersPassWrapper : public HandshakePlaceBuffersPass {
-  HandshakePlaceBuffersPassWrapper(PerfOptInfo &info, StringRef algorithm,
+  HandshakePlaceBuffersPassWrapper(SharingInfo &info, StringRef algorithm,
                                    StringRef frequencies,
                                    StringRef timingModels, bool firstCFDFC,
                                    double targetCP, unsigned timeout,
@@ -165,7 +167,7 @@ struct HandshakePlaceBuffersPassWrapper : public HandshakePlaceBuffersPass {
       : HandshakePlaceBuffersPass(algorithm, frequencies, timingModels,
                                   firstCFDFC, targetCP, timeout, dumpLogs),
         info(info){};
-  PerfOptInfo &info;
+  SharingInfo &info;
 
   LogicalResult getBufferPlacement(FuncInfo &funcInfo, TimingDatabase &timingDB,
                                    Logger *logger,
@@ -243,7 +245,7 @@ struct CreditBasedSharingPass
 
   // Call the wrapper class HandshakePlaceBuffersPassWrapper, which again wraps
   // FPGA20BuffersWrapper
-  LogicalResult runBufferPlacementPass(ModuleOp &modOp, PerfOptInfo &data) {
+  LogicalResult runBufferPlacementPass(ModuleOp &modOp, SharingInfo &data) {
     TimingDatabase timingDB(&getContext());
     if (failed(TimingDatabase::readFromJSON(timingModels, timingDB)))
       return failure();
@@ -275,7 +277,7 @@ void CreditBasedSharingPass::runDynamaticPass() {
     return;
   }
 
-  PerfOptInfo data;
+  SharingInfo data;
 
   // Run buffer placement pass and fill data with performance analysis
   // information
@@ -284,22 +286,33 @@ void CreditBasedSharingPass::runDynamaticPass() {
     return;
   }
 
-  for (auto cf : data.critCfcs) {
-
-    for (auto *op : data.cfUnits[cf])
-      llvm::errs() << namer.getName(op) << " ";
-
+  for (auto [funcOp, info] : data) {
+    for (auto [idx, cf] : info.cfUnits) {
+      for (auto *op : cf)
+        llvm::errs() << namer.getName(op) << " ";
+    }
     llvm::errs() << "\n";
   }
 
-  // TODO: check the extracted data
-  for (auto [idx, throughput] : data.cfThroughput) {
-    llvm::errs() << "Throughput of CFDFC #" << idx << " is " << throughput
-                 << "\n";
+  for (auto [funcOp, info] : data) {
+    for (auto [idx, cf] : info.cfChannels) {
+      for (auto *ch : cf)
+        llvm::errs() << namer.getName(ch->producer) << "->"
+                     << namer.getName(ch->consumer) << " ";
+    }
+    llvm::errs() << "\n";
   }
 
-  for (handshake::FuncOp funcOp : getOperation().getOps<handshake::FuncOp>()) {
-    SmallVector<Operation *> sharingTargets = getSharingTargets(funcOp);
+  for (auto [funcOp, info] : data) {
+    for (auto [idx, throughput] : info.cfThroughput) {
+      llvm::errs() << "Throughput of CFDFC #" << idx << " is " << throughput
+                   << "\n";
+    }
+  }
+
+  for (auto [funcOp, info] : data) {
+    // Check the sharing targets
+    SmallVector<Operation *> sharingTargets = getSharingTargets(*funcOp);
 
     llvm::errs() << "Sharing Targets:";
     for (Operation *op : sharingTargets) {
@@ -307,7 +320,15 @@ void CreditBasedSharingPass::runDynamaticPass() {
     }
     llvm::errs() << "\n";
 
-    // check the sharing targets
+    // Determine SCCs
+    for (auto critCfc : info.critCfcs) {
+      llvm::errs() << "SCC ID of CFC #" << critCfc << "\n";
+      std::map<Operation *, size_t> sccMap =
+          getSccsInCfc(info.cfUnits[critCfc], info.cfChannels[critCfc]);
+      for (auto [op, sccId] : sccMap) {
+        llvm::errs() << namer.getName(op) << " " << sccId << "\n";
+      }
+    }
   }
 }
 
