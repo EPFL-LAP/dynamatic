@@ -6,7 +6,7 @@
 //
 //===----------------------------------------------------------------------===//
 
-#include "experimental/Transforms/ResourceSharing/crush.h"
+#include "experimental/Transforms/ResourceSharing/Crush.h"
 #include "dynamatic/Support/DynamaticPass.h"
 #include "dynamatic/Support/LLVM.h"
 #include "dynamatic/Transforms/BufferPlacement/BufferingSupport.h"
@@ -25,7 +25,7 @@ using namespace dynamatic::experimental::sharing;
 using namespace dynamatic::buffer;
 
 // extracted data from buffer placement
-struct ThroughputInfo {
+struct PerfOptInfo {
 
   // For each CFDFC, the obtained throughput
   std::map<CFDFC, double> cfdfcThroughput;
@@ -36,14 +36,14 @@ namespace {
 // An wrapper class that applies buffer p
 // extracts the report.
 struct BufferPlacementWrapperPass : public HandshakePlaceBuffersPass {
-  BufferPlacementWrapperPass(ThroughputInfo &info, StringRef algorithm,
+  BufferPlacementWrapperPass(PerfOptInfo &info, StringRef algorithm,
                              StringRef frequencies, StringRef timingModels,
                              bool firstCFDFC, double targetCP, unsigned timeout,
                              bool dumpLogs)
       : HandshakePlaceBuffersPass(algorithm, frequencies, timingModels,
                                   firstCFDFC, targetCP, timeout, dumpLogs),
         info(info){};
-  ThroughputInfo &info;
+  PerfOptInfo &info;
 
 protected:
   void runDynamaticPass() override {
@@ -51,9 +51,6 @@ protected:
   }
 };
 
-} // namespace
-
-namespace {
 struct CreditBasedSharingPass
     : public dynamatic::experimental::sharing::impl::CreditBasedSharingBase<
           CreditBasedSharingPass> {
@@ -79,7 +76,7 @@ void CreditBasedSharingPass::runDynamaticPass() {
 
   ModuleOp modOp = getOperation();
 
-  ThroughputInfo data;
+  PerfOptInfo data;
 
   TimingDatabase timingDB(&getContext());
   if (failed(TimingDatabase::readFromJSON(timingModels, timingDB)))
