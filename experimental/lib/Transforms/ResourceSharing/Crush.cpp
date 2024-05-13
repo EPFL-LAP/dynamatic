@@ -9,8 +9,11 @@
 #include "experimental/Transforms/ResourceSharing/Crush.h"
 #include "dynamatic/Support/DynamaticPass.h"
 #include "dynamatic/Support/LLVM.h"
+#include "dynamatic/Support/MILP.h"
 #include "dynamatic/Transforms/BufferPlacement/BufferingSupport.h"
 #include "dynamatic/Transforms/BufferPlacement/CFDFC.h"
+#include "dynamatic/Transforms/BufferPlacement/FPGA20Buffers.h"
+#include "dynamatic/Transforms/BufferPlacement/FPL22Buffers.h"
 #include "dynamatic/Transforms/BufferPlacement/HandshakePlaceBuffers.h"
 #include "mlir/Pass/Pass.h"
 #include "mlir/Pass/PassManager.h"
@@ -24,14 +27,65 @@ using namespace dynamatic::experimental::sharing;
 
 using namespace dynamatic::buffer;
 
+#ifndef DYNAMATIC_GUROBI_NOT_INSTALLED
+/// Algorithms that do require solving an MILP.
+static constexpr llvm::StringLiteral FPGA20("fpga20"),
+    FPGA20_LEGACY("fpga20-legacy"), FPL22("fpl22");
+#endif // DYNAMATIC_GUROBI_NOT_INSTALLED
+
 // extracted data from buffer placement
 struct PerfOptInfo {
 
-  // For each CFDFC, the obtained throughput
-  std::map<CFDFC, double> cfdfcThroughput;
+  // For each CFC, the achieved throughput
+  llvm::MapVector<CFDFC *, double> cfcThroughput;
 };
 
+namespace dynamatic {
+namespace buffer {
+namespace fpga20 {
+
+// An wrapper class for instrumenting FPGA20 buffers.
+class MyFPGA20Buffers : public FPGA20Buffers {
+public:
+  // constructor
+  MyFPGA20Buffers(PerfOptInfo &info, GRBEnv &env, FuncInfo &funcInfo,
+                  const TimingDatabase &timingDB, double targetPeriod,
+                  bool legacyPlacement, Logger &logger, StringRef milpName)
+      : FPGA20Buffers(env, funcInfo, timingDB, targetPeriod, legacyPlacement,
+                      logger, milpName),
+        info(info){};
+  MyFPGA20Buffers(PerfOptInfo &info, GRBEnv &env, FuncInfo &funcInfo,
+                  const TimingDatabase &timingDB, double targetPeriod,
+                  bool legacyPlacement)
+      : FPGA20Buffers(env, funcInfo, timingDB, targetPeriod, legacyPlacement),
+        info(info){};
+  PerfOptInfo &info;
+  void extractResult(BufferPlacement &placement) override {
+    FPGA20Buffers::extractResult(placement);
+    // do my things
+    llvm::errs() << "Extracting data!\n";
+  }
+};
+
+} // namespace fpga20
+} // namespace buffer
+} // namespace dynamatic
+
+/// Wraps a call to solveMILP and conditionally passes the logger and MILP name
+/// to the MILP's constructor as last arguments if the logger is not null.
+template <typename MILP, typename... Args>
+static inline LogicalResult
+checkLoggerAndSolve(Logger *logger, StringRef milpName,
+                    BufferPlacement &placement, Args &&...args) {
+  if (logger) {
+    return solveMILP<MILP>(placement, std::forward<Args>(args)..., *logger,
+                           milpName);
+  }
+  return solveMILP<MILP>(placement, std::forward<Args>(args)...);
+}
+
 namespace {
+using fpga20::MyFPGA20Buffers;
 
 // An wrapper class that applies buffer p
 // extracts the report.
@@ -45,9 +99,48 @@ struct BufferPlacementWrapperPass : public HandshakePlaceBuffersPass {
         info(info){};
   PerfOptInfo &info;
 
-protected:
-  void runDynamaticPass() override {
-    HandshakePlaceBuffersPass::runDynamaticPass();
+  LogicalResult getBufferPlacement(FuncInfo &funcInfo, TimingDatabase &timingDB,
+                                   Logger *logger,
+                                   BufferPlacement &placement) override {
+
+    // Create Gurobi environment
+    GRBEnv env = GRBEnv(true);
+    env.set(GRB_IntParam_OutputFlag, 0);
+    if (timeout > 0)
+      env.set(GRB_DoubleParam_TimeLimit, timeout);
+    env.start();
+
+    if (algorithm == FPGA20 || algorithm == FPGA20_LEGACY) {
+      // Create and solve the MILP
+      return checkLoggerAndSolve<MyFPGA20Buffers>(
+          logger, "placement", placement, info, env, funcInfo, timingDB,
+          targetCP, algorithm != FPGA20);
+    }
+    if (algorithm == FPL22) {
+      // Create disjoint block unions of all CFDFCs
+      SmallVector<CFDFC *, 8> cfdfcs;
+      std::vector<CFDFCUnion> disjointUnions;
+      llvm::transform(funcInfo.cfdfcs, std::back_inserter(cfdfcs),
+                      [](auto cfAndOpt) { return cfAndOpt.first; });
+      getDisjointBlockUnions(cfdfcs, disjointUnions);
+
+      // Create and solve an MILP for each CFDFC union. Placement decisions get
+      // accumulated over all MILPs. It's not possible to override a previous
+      // placement decision because each CFDFC union is disjoint from the others
+      for (auto [idx, cfUnion] : llvm::enumerate(disjointUnions)) {
+        std::string milpName = "cfdfc_placement_" + std::to_string(idx);
+        if (failed(checkLoggerAndSolve<fpl22::CFDFCUnionBuffers>(
+                logger, milpName, placement, env, funcInfo, timingDB, targetCP,
+                cfUnion)))
+          return failure();
+      }
+
+      // Solve last MILP on channels/units that are not part of any CFDFC
+      return checkLoggerAndSolve<fpl22::OutOfCycleBuffers>(
+          logger, "out_of_cycle", placement, env, funcInfo, timingDB, targetCP);
+    }
+
+    llvm_unreachable("unknown algorithm");
   }
 };
 
