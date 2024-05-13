@@ -64,6 +64,14 @@ public:
     FPGA20Buffers::extractResult(placement);
     // do my things
     llvm::errs() << "Extracting data!\n";
+    // Log global CFDFC throuhgputs
+    for (auto [idx, cfdfcWithVars] : llvm::enumerate(vars.cfVars)) {
+      auto [cf, cfVars] = cfdfcWithVars;
+      double throughput = cfVars.throughput.get(GRB_DoubleAttr_X);
+      // llvm::errs() << "Throughput of CFDFC #" << idx << ": " << throughput
+      //              << "\n";
+      info.cfcThroughput[cf] = throughput;
+    }
   }
 };
 
@@ -169,6 +177,7 @@ void CreditBasedSharingPass::runDynamaticPass() {
 
   ModuleOp modOp = getOperation();
 
+  // TODO: how to handle different functions?
   PerfOptInfo data;
 
   TimingDatabase timingDB(&getContext());
@@ -182,6 +191,12 @@ void CreditBasedSharingPass::runDynamaticPass() {
       dumpLogs));
   if (failed(pm.run(modOp))) {
     return signalPassFailure();
+  }
+
+  // check the extracted data
+  for (auto [idx, cfdfc] : llvm::enumerate(data.cfcThroughput)) {
+    llvm::errs() << "Throughput of CFDFC #" << idx << " is " << cfdfc.second
+                 << "\n";
   }
 }
 
