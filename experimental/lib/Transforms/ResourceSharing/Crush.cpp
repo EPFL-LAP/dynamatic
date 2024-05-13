@@ -7,6 +7,8 @@
 //===----------------------------------------------------------------------===//
 
 #include "experimental/Transforms/ResourceSharing/Crush.h"
+#include "dynamatic/Analysis/NameAnalysis.h"
+#include "dynamatic/Dialect/Handshake/HandshakeOps.h"
 #include "dynamatic/Support/DynamaticPass.h"
 #include "dynamatic/Support/LLVM.h"
 #include "dynamatic/Support/MILP.h"
@@ -15,6 +17,8 @@
 #include "dynamatic/Transforms/BufferPlacement/FPGA20Buffers.h"
 #include "dynamatic/Transforms/BufferPlacement/FPL22Buffers.h"
 #include "dynamatic/Transforms/BufferPlacement/HandshakePlaceBuffers.h"
+#include "dynamatic/Transforms/HandshakeMaterialize.h"
+#include "experimental/Transforms/ResourceSharing/SharingSupport.h"
 #include "mlir/Pass/Pass.h"
 #include "mlir/Pass/PassManager.h"
 #include <map>
@@ -37,6 +41,9 @@ static constexpr llvm::StringLiteral FPGA20("fpga20"),
 struct PerfOptInfo {
 
   // For each CFC, the achieved throughput
+
+  // TODO: does this work for different functions? Since different functions
+  // have different CFC, therefore, each CFC has a unique pointer.
   llvm::MapVector<CFDFC *, double> cfcThroughput;
 };
 
@@ -44,32 +51,28 @@ namespace dynamatic {
 namespace buffer {
 namespace fpga20 {
 
-// An wrapper class for instrumenting FPGA20 buffers.
-class MyFPGA20Buffers : public FPGA20Buffers {
+// An wrapper class for extracting CFDFC performance from FPGA20 buffers.
+class FPGA20BuffersWrapper : public FPGA20Buffers {
 public:
   // constructor
-  MyFPGA20Buffers(PerfOptInfo &info, GRBEnv &env, FuncInfo &funcInfo,
-                  const TimingDatabase &timingDB, double targetPeriod,
-                  bool legacyPlacement, Logger &logger, StringRef milpName)
+  FPGA20BuffersWrapper(PerfOptInfo &info, GRBEnv &env, FuncInfo &funcInfo,
+                       const TimingDatabase &timingDB, double targetPeriod,
+                       bool legacyPlacement, Logger &logger, StringRef milpName)
       : FPGA20Buffers(env, funcInfo, timingDB, targetPeriod, legacyPlacement,
                       logger, milpName),
         info(info){};
-  MyFPGA20Buffers(PerfOptInfo &info, GRBEnv &env, FuncInfo &funcInfo,
-                  const TimingDatabase &timingDB, double targetPeriod,
-                  bool legacyPlacement)
+  FPGA20BuffersWrapper(PerfOptInfo &info, GRBEnv &env, FuncInfo &funcInfo,
+                       const TimingDatabase &timingDB, double targetPeriod,
+                       bool legacyPlacement)
       : FPGA20Buffers(env, funcInfo, timingDB, targetPeriod, legacyPlacement),
         info(info){};
   PerfOptInfo &info;
   void extractResult(BufferPlacement &placement) override {
     FPGA20Buffers::extractResult(placement);
-    // do my things
-    llvm::errs() << "Extracting data!\n";
-    // Log global CFDFC throuhgputs
+    // Save global CFDFC throuhgputs into info
     for (auto [idx, cfdfcWithVars] : llvm::enumerate(vars.cfVars)) {
       auto [cf, cfVars] = cfdfcWithVars;
       double throughput = cfVars.throughput.get(GRB_DoubleAttr_X);
-      // llvm::errs() << "Throughput of CFDFC #" << idx << ": " << throughput
-      //              << "\n";
       info.cfcThroughput[cf] = throughput;
     }
   }
@@ -93,15 +96,16 @@ checkLoggerAndSolve(Logger *logger, StringRef milpName,
 }
 
 namespace {
-using fpga20::MyFPGA20Buffers;
+using fpga20::FPGA20BuffersWrapper;
 
 // An wrapper class that applies buffer p
 // extracts the report.
-struct BufferPlacementWrapperPass : public HandshakePlaceBuffersPass {
-  BufferPlacementWrapperPass(PerfOptInfo &info, StringRef algorithm,
-                             StringRef frequencies, StringRef timingModels,
-                             bool firstCFDFC, double targetCP, unsigned timeout,
-                             bool dumpLogs)
+struct HandshakePlaceBuffersPassWrapper : public HandshakePlaceBuffersPass {
+  HandshakePlaceBuffersPassWrapper(PerfOptInfo &info, StringRef algorithm,
+                                   StringRef frequencies,
+                                   StringRef timingModels, bool firstCFDFC,
+                                   double targetCP, unsigned timeout,
+                                   bool dumpLogs)
       : HandshakePlaceBuffersPass(algorithm, frequencies, timingModels,
                                   firstCFDFC, targetCP, timeout, dumpLogs),
         info(info){};
@@ -120,7 +124,7 @@ struct BufferPlacementWrapperPass : public HandshakePlaceBuffersPass {
 
     if (algorithm == FPGA20 || algorithm == FPGA20_LEGACY) {
       // Create and solve the MILP
-      return checkLoggerAndSolve<MyFPGA20Buffers>(
+      return checkLoggerAndSolve<FPGA20BuffersWrapper>(
           logger, "placement", placement, info, env, funcInfo, timingDB,
           targetCP, algorithm != FPGA20);
     }
@@ -169,34 +173,75 @@ struct CreditBasedSharingPass
   }
 
   void runDynamaticPass() override;
+
+  SmallVector<mlir::Operation *> getSharingTargets(handshake::FuncOp funcOp) {
+    SmallVector<Operation *> sharingTargets;
+
+    for (auto &op : funcOp.getOps()) {
+      if (isa<SHARING_TARGETS>(op)) {
+        sharingTargets.emplace_back(&op);
+      }
+    }
+    return sharingTargets;
+  }
+
+  // Call the wrapper class HandshakePlaceBuffersPassWrapper, which again wraps
+  // FPGA20BuffersWrapper
+  LogicalResult runBufferPlacementPass(ModuleOp &modOp, PerfOptInfo &data) {
+    TimingDatabase timingDB(&getContext());
+    if (failed(TimingDatabase::readFromJSON(timingModels, timingDB)))
+      return failure();
+
+    // running buffer placement on current module
+    mlir::PassManager pm(&getContext());
+    pm.addPass(std::make_unique<HandshakePlaceBuffersPassWrapper>(
+        data, algorithm, frequencies, timingModels, firstCFDFC, targetCP,
+        timeout, dumpLogs));
+    if (failed(pm.run(modOp))) {
+      return failure();
+    }
+    return success();
+  }
 };
 } // namespace
 
 void CreditBasedSharingPass::runDynamaticPass() {
   llvm::errs() << "***** Resource Sharing *****\n";
 
+  MLIRContext *ctx = &getContext();
+  OpBuilder builder(ctx);
+  NameAnalysis &namer = getAnalysis<NameAnalysis>();
+
+  // Buffer placement requires that all values are used exactly once
   ModuleOp modOp = getOperation();
-
-  // TODO: how to handle different functions?
-  PerfOptInfo data;
-
-  TimingDatabase timingDB(&getContext());
-  if (failed(TimingDatabase::readFromJSON(timingModels, timingDB)))
-    return signalPassFailure();
-
-  // running buffer placement on current module
-  mlir::PassManager pm(&getContext());
-  pm.addPass(std::make_unique<BufferPlacementWrapperPass>(
-      data, algorithm, frequencies, timingModels, firstCFDFC, targetCP, timeout,
-      dumpLogs));
-  if (failed(pm.run(modOp))) {
-    return signalPassFailure();
+  if (failed(verifyIRMaterialized(modOp))) {
+    modOp->emitError() << ERR_NON_MATERIALIZED_MOD;
+    return;
   }
 
-  // check the extracted data
+  PerfOptInfo data;
+
+  if (failed(runBufferPlacementPass(modOp, data))) {
+    modOp->emitError() << "Failed running buffer placement";
+    return;
+  }
+
+  // TODO: check the extracted data
   for (auto [idx, cfdfc] : llvm::enumerate(data.cfcThroughput)) {
     llvm::errs() << "Throughput of CFDFC #" << idx << " is " << cfdfc.second
                  << "\n";
+  }
+
+  for (handshake::FuncOp funcOp : getOperation().getOps<handshake::FuncOp>()) {
+    SmallVector<Operation *> sharingTargets = getSharingTargets(funcOp);
+
+    llvm::errs() << "Sharing Targets:";
+    for (Operation *op : sharingTargets) {
+      llvm::errs() << namer.getName(op) << " ";
+    }
+    llvm::errs() << "\n";
+
+    // check the sharing targets
   }
 }
 
