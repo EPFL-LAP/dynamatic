@@ -26,6 +26,12 @@
 #include <map>
 #include <set>
 #include <string>
+#include <tuple>
+#include <utility>
+#include <vector>
+
+using std::all_of;
+using std::none_of;
 
 using namespace llvm;
 using namespace dynamatic;
@@ -49,14 +55,23 @@ struct FuncPerfInfo {
   // A list of performance critical CFCs.
   std::set<size_t> critCfcs;
 
-  // The set of units of each CFC
+  // The set of units of each CFC.
   std::map<size_t, std::set<Operation *>> cfUnits;
 
-  // The set of channels of each CFC
+  // The set of channels of each CFC.
   std::map<size_t, std::set<Channel *>> cfChannels;
+
+  // The set of strongly connected components of each CFC.
+  // For instance, (muli1, 1) and (muli2, 1) means two units, muli1 and muli2
+  // are in the same SCC (with id 1).
+  std::map<size_t, std::map<Operation *, size_t>> cfSccs;
 };
 
+// SharingInfo: for each funcOp, its extracted FuncPerfInfo.
 using SharingInfo = std::map<handshake::FuncOp *, FuncPerfInfo>;
+
+// SharingGroups: a list of operations that share the same unit.
+using SharingGroups = std::map<size_t, std::set<Operation *>>;
 
 namespace dynamatic {
 namespace buffer {
@@ -263,6 +278,92 @@ struct CreditBasedSharingPass
 };
 } // namespace
 
+// for two sharing groups, check if the following criteria hold.
+bool checkGroupMergable(const std::set<Operation *> &g1,
+                        const std::set<Operation *> &g2,
+                        FuncPerfInfo funcPerfInfo) {
+
+  std::set<Operation *> gMerged;
+  gMerged.insert(g1.begin(), g1.end());
+  gMerged.insert(g2.begin(), g2.end());
+
+  OperationName opName = (*(gMerged.begin()))->getName();
+
+  // 1. The merged group must have operations of the same type.
+  for (auto *op : gMerged) {
+    if (op->getName() != opName)
+      return false;
+  }
+
+  // 2. For each CFC, the sum of occupancy must be smaller than the capacity
+  // (i.e., units in CFC must no greater than the II).
+  // This is equivalent to checking that throughput * n_ops <= 1;
+
+  // 3. For each CFC, there must be no two operations have the same SCC ID (this
+  // is simplified).
+  for (auto cf : funcPerfInfo.critCfcs) {
+    // for each cf, numOps contains the number of operations
+    // that are in the merged group and also in cf
+    unsigned numOps = 0;
+
+    // listOfSccIds: a list of SCC IDs that the group has
+    // it is used to check if there are any duplicates (i.e.,
+    // two operation that are in the same SCC cannot be in the
+    // same sharing group).
+    std::vector<size_t> listOfSccIds;
+    for (auto *op : (funcPerfInfo.cfUnits)[cf]) {
+      // In the op is in (SCC union MergedGroup):
+      if (gMerged.find(op) != gMerged.end()) {
+        // increase number of Ops
+        numOps++;
+        // Push back the SCC ID of each op inside the group and
+        // also SCC;
+        listOfSccIds.push_back((funcPerfInfo.cfSccs)[cf][op]);
+      }
+    }
+    // Check if there are any duplicates:
+    std::set<size_t> setOfSccIds(listOfSccIds.begin(), listOfSccIds.end());
+    // Check if numOps * cfcThroughput <= 1 and no duplicate SCC
+    // IDs.
+    if (!(numOps * (funcPerfInfo.cfThroughput)[cf] <= 1) ||
+        (listOfSccIds.size() == setOfSccIds.size())) {
+      return false;
+    }
+  }
+  // return (all_of(funcPerfInfo.critCfcs.begin(), funcPerfInfo.critCfcs.end(),
+  //                [funcPerfInfo, gMerged](auto cf) {
+  //                  // for each cf, numOps contains the number of operations
+  //                  // that are in the merged group and also in cf
+  //                  unsigned numOps = 0;
+
+  //                  // listOfSccIds: a list of SCC IDs that the group has
+  //                  // it is used to check if there are any duplicates (i.e.,
+  //                  // two operation that are in the same SCC cannot be in the
+  //                  // same sharing group).
+  //                  std::vector<size_t> listOfSccIds;
+  //                  for (auto op : (funcPerfInfo.cfUnits)[cf]) {
+  //                    // In the op is in (SCC union MergedGroup):
+  //                    if (gMerged.find(op) != gMerged.end()) {
+  //                      // increase number of Ops
+  //                      numOps++;
+  //                      // Push back the SCC ID of each op inside the group
+  //                      and
+  //                      // also SCC;
+  //                      listOfSccIds.push_back((funcPerfInfo.cfSccs)[cf][op]);
+  //                    }
+  //                  }
+  //                  // Check if there are any duplicates:
+  //                  std::set<size_t> setOfSccIds(listOfSccIds.begin(),
+  //                                               listOfSccIds.end());
+  //                  // Check if numOps * cfcThroughput <= 1 and no duplicate
+  //                  SCC
+  //                  // IDs.
+  //                  return (numOps * (funcPerfInfo.cfThroughput)[cf] <= 1) ||
+  //                         (listOfSccIds.size() == setOfSccIds.size());
+  //                }));
+  return true;
+}
+
 void CreditBasedSharingPass::runDynamaticPass() {
   llvm::errs() << "***** Resource Sharing *****\n";
 
@@ -286,22 +387,22 @@ void CreditBasedSharingPass::runDynamaticPass() {
     return;
   }
 
-  for (auto [funcOp, info] : data) {
-    for (auto [idx, cf] : info.cfUnits) {
-      for (auto *op : cf)
-        llvm::errs() << namer.getName(op) << " ";
-    }
-    llvm::errs() << "\n";
-  }
+  // for (auto [funcOp, info] : data) {
+  //   for (auto [idx, cf] : info.cfUnits) {
+  //     for (auto *op : cf)
+  //       llvm::errs() << namer.getName(op) << " ";
+  //   }
+  //   llvm::errs() << "\n";
+  // }
 
-  for (auto [funcOp, info] : data) {
-    for (auto [idx, cf] : info.cfChannels) {
-      for (auto *ch : cf)
-        llvm::errs() << namer.getName(ch->producer) << "->"
-                     << namer.getName(ch->consumer) << " ";
-    }
-    llvm::errs() << "\n";
-  }
+  // for (auto [funcOp, info] : data) {
+  //   for (auto [idx, cf] : info.cfChannels) {
+  //     for (auto *ch : cf)
+  //       llvm::errs() << namer.getName(ch->producer) << "->"
+  //                    << namer.getName(ch->consumer) << " ";
+  //   }
+  //   llvm::errs() << "\n";
+  // }
 
   for (auto [funcOp, info] : data) {
     for (auto [idx, throughput] : info.cfThroughput) {
@@ -310,7 +411,7 @@ void CreditBasedSharingPass::runDynamaticPass() {
     }
   }
 
-  for (auto [funcOp, info] : data) {
+  for (auto &[funcOp, info] : data) {
     // Check the sharing targets
     SmallVector<Operation *> sharingTargets = getSharingTargets(*funcOp);
 
@@ -320,13 +421,29 @@ void CreditBasedSharingPass::runDynamaticPass() {
     }
     llvm::errs() << "\n";
 
+    // Initialize the sharing groups:
+    SharingGroups sharingGroups;
+    for (auto [id, op] : llvm::enumerate(sharingTargets)) {
+      std::set<Operation *> g = {op};
+      sharingGroups.emplace(id, g);
+    }
+
     // Determine SCCs
     for (auto critCfc : info.critCfcs) {
-      llvm::errs() << "SCC ID of CFC #" << critCfc << "\n";
       std::map<Operation *, size_t> sccMap =
           getSccsInCfc(info.cfUnits[critCfc], info.cfChannels[critCfc]);
-      for (auto [op, sccId] : sccMap) {
+      info.cfSccs.emplace(critCfc, sccMap);
+      llvm::errs() << "SCC ID of CFC #" << critCfc << "\n";
+      for (auto [op, sccId] : info.cfSccs[critCfc]) {
         llvm::errs() << namer.getName(op) << " " << sccId << "\n";
+      }
+    }
+
+    // Merge groups
+    bool modified = false;
+    while (modified) {
+      for (auto &[id, group] : sharingGroups) {
+        // check if two groups are mergable.
       }
     }
   }
