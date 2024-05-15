@@ -2,9 +2,9 @@
 <!-- Created with Inkscape (http://www.inkscape.org/) -->
 
 <svg
-   width="217.58466mm"
+   width="220.68387mm"
    height="121.30593mm"
-   viewBox="0 0 217.58468 121.30593"
+   viewBox="0 0 220.68389 121.30593"
    version="1.1"
    id="svg1"
    xmlns:xlink="http://www.w3.org/1999/xlink"
@@ -367,14 +367,14 @@
   </defs>
   <g
      id="layer2"
-     transform="translate(-47.72416,-12.733087)"
+     transform="translate(-44.924729,-12.733088)"
      style="display:inline">
     <rect
-       style="fill:#ffffff;fill-opacity:1;stroke:none;stroke-width:0.705555;stroke-opacity:1"
+       style="display:inline;fill:#ffffff;fill-opacity:1;stroke:none;stroke-width:0.705555;stroke-opacity:1"
        id="rect16"
-       width="217.58464"
+       width="220.68385"
        height="121.30593"
-       x="47.724163"
+       x="44.924728"
        y="12.733088"
        ry="0" />
     <g
@@ -528,7 +528,7 @@
            id="tspan4-4-6"
            style="font-style:normal;font-variant:normal;font-weight:normal;font-stretch:normal;font-size:3.52778px;font-family:'Fira Code';-inkscape-font-specification:'Fira Code, Normal';font-variant-ligatures:normal;font-variant-caps:normal;font-variant-numeric:normal;font-variant-east-asian:normal;text-align:start;text-anchor:start;fill:#1019cf;fill-opacity:1;stroke:none;stroke-width:0.529167"
            x="175.51909"
-           y="47.991367">Function results (L)</tspan></text>
+           y="47.991367">Results (L)</tspan></text>
     </g>
     <g
        id="g11-0"
@@ -839,7 +839,7 @@
            id="tspan4-4"
            style="font-style:normal;font-variant:normal;font-weight:normal;font-stretch:normal;font-size:3.52778px;font-family:'Fira Code';-inkscape-font-specification:'Fira Code, Normal';font-variant-ligatures:normal;font-variant-caps:normal;font-variant-numeric:normal;font-variant-east-asian:normal;text-align:start;text-anchor:start;fill:#a722b8;fill-opacity:1;stroke:none;stroke-width:0.529167"
            x="175.51909"
-           y="18.117548">Function arguments (N)</tspan></text>
+           y="18.117548">Arguments (N)</tspan></text>
     </g>
     <g
        id="g11"
@@ -949,7 +949,7 @@
   <g
      id="layer3"
      style="display:inline"
-     transform="translate(150.92195,30.600357)">
+     transform="translate(153.72138,30.600356)">
     <rect
        style="display:inline;fill:#000000;fill-opacity:0.095432;stroke:#000000;stroke-width:0.705555;stroke-dasharray:none;stroke-dashoffset:0;stroke-opacity:1"
        id="rect15-3-8"
@@ -1174,7 +1174,7 @@
       </g>
       <g
          id="g45"
-         style="display:inline"
+         style="display:none"
          transform="translate(79.708299,-2.3591841)">
         <rect
            style="display:inline;fill:#000000;fill-opacity:0.303647;stroke:#000000;stroke-width:0.352778;stroke-dasharray:none;stroke-dashoffset:0;stroke-opacity:1"
@@ -1207,6 +1207,10 @@
            style="display:inline;fill:none;fill-opacity:0.303647;stroke:#000000;stroke-width:0.176389;stroke-dasharray:0.176389, 0.176389;stroke-dashoffset:0;stroke-opacity:1;marker-start:url(#Dot);marker-end:url(#Triangle)"
            d="m -213.83846,50.064888 h 47.43079"
            id="path45" />
+        <path
+           style="display:inline;fill:none;fill-opacity:0.303647;stroke:#000000;stroke-width:0.176389;stroke-dasharray:0.176389, 0.176389;stroke-dashoffset:0;stroke-opacity:1;marker-end:url(#marker3)"
+           d="m -161.3986,54.147421 6.70947,-1e-6 -0.0107,-26.919127"
+           id="path46" />
       </g>
       <path
          style="fill:none;fill-opacity:0.301961;stroke:#000000;stroke-width:0.176389;stroke-dasharray:0.176389, 0.176389;stroke-dashoffset:0;stroke-opacity:1;marker-start:url(#Dot);marker-end:url(#marker3)"
@@ -1215,8 +1219,22 @@
     </g>
     <g
        id="g26"
-       transform="translate(0.2552844,13.690551)"
+       transform="translate(0.2552844,13.690553)"
        style="display:inline">
+      <text
+         xml:space="preserve"
+         style="font-style:normal;font-variant:normal;font-weight:normal;font-stretch:normal;font-size:2.11667px;line-height:normal;font-family:'Fira Code';-inkscape-font-specification:'Fira Code, Normal';font-variant-ligatures:normal;font-variant-caps:normal;font-variant-numeric:normal;font-variant-east-asian:normal;text-align:center;text-decoration-color:#000000;text-anchor:middle;display:inline;fill:#000000;fill-opacity:1;stroke:none;stroke-width:0.529167"
+         x="-83.98465"
+         y="31.131001"
+         id="text4-7-05-9-6-3-0-1"><tspan
+           style="font-style:normal;font-variant:normal;font-weight:normal;font-stretch:normal;font-size:2.11667px;font-family:'Fira Code';-inkscape-font-specification:'Fira Code, Normal';font-variant-ligatures:normal;font-variant-caps:normal;font-variant-numeric:normal;font-variant-east-asian:normal;fill:#000000;fill-opacity:1;stroke:none;stroke-width:0.529167"
+           x="-83.98465"
+           y="31.131001"
+           id="tspan46-4">exit block</tspan><tspan
+           style="font-style:normal;font-variant:normal;font-weight:normal;font-stretch:normal;font-size:2.11667px;font-family:'Fira Code';-inkscape-font-specification:'Fira Code, Normal';font-variant-ligatures:normal;font-variant-caps:normal;font-variant-numeric:normal;font-variant-east-asian:normal;fill:#000000;fill-opacity:1;stroke:none;stroke-width:0.529167"
+           x="-83.98465"
+           y="33.776836"
+           id="tspan42">reached</tspan></text>
       <path
          style="fill:#000000;fill-opacity:0.301961;stroke:#000000;stroke-width:0.352777;stroke-dasharray:none;stroke-dashoffset:0;stroke-opacity:1"
          d="m -80.347603,3.8215344 h 10.201484 v 6.6145826 h -10.201484 z"
@@ -1244,10 +1262,10 @@
          d="M -75.213578,-18.638447 V 3.173475"
          id="path1-5-5-3-11-3-5" />
       <path
-         style="display:inline;fill:none;fill-opacity:0.303647;stroke:#000000;stroke-width:0.176389;stroke-dasharray:0.176389, 0.176389;stroke-dashoffset:0;stroke-opacity:1;marker-end:url(#marker3)"
-         d="m -161.3986,54.147421 6.70947,-1e-6 -0.0107,-26.919127"
-         id="path46"
-         transform="translate(79.453014,-16.049735)" />
+         style="display:inline;fill:none;fill-opacity:1;stroke:#000000;stroke-width:0.176;stroke-dasharray:0.176, 0.176;stroke-dashoffset:0;stroke-opacity:1;marker-end:url(#Triangle-3)"
+         d="m -92.227121,41.033354 v 7.478051 h 17.284861 v -23.5735"
+         id="path42"
+         transform="translate(-0.255284,-13.690551)" />
     </g>
   </g>
 </svg>

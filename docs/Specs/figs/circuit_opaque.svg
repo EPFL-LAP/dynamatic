@@ -2,9 +2,9 @@
 <!-- Created with Inkscape (http://www.inkscape.org/) -->
 
 <svg
-   width="217.58466mm"
+   width="220.68387mm"
    height="121.30593mm"
-   viewBox="0 0 217.58468 121.30593"
+   viewBox="0 0 220.68389 121.30593"
    version="1.1"
    id="svg1"
    xmlns:xlink="http://www.w3.org/1999/xlink"
@@ -143,14 +143,14 @@
   </defs>
   <g
      id="layer2"
-     transform="translate(-47.72416,-12.733087)"
+     transform="translate(-44.924729,-12.733088)"
      style="display:inline">
     <rect
-       style="fill:#ffffff;fill-opacity:1;stroke:none;stroke-width:0.705555;stroke-opacity:1"
+       style="display:inline;fill:#ffffff;fill-opacity:1;stroke:none;stroke-width:0.705555;stroke-opacity:1"
        id="rect16"
-       width="217.58464"
+       width="220.68385"
        height="121.30593"
-       x="47.724163"
+       x="44.924728"
        y="12.733088"
        ry="0" />
     <g
@@ -304,7 +304,7 @@
            id="tspan4-4-6"
            style="font-style:normal;font-variant:normal;font-weight:normal;font-stretch:normal;font-size:3.52778px;font-family:'Fira Code';-inkscape-font-specification:'Fira Code, Normal';font-variant-ligatures:normal;font-variant-caps:normal;font-variant-numeric:normal;font-variant-east-asian:normal;text-align:start;text-anchor:start;fill:#1019cf;fill-opacity:1;stroke:none;stroke-width:0.529167"
            x="175.51909"
-           y="47.991367">Function results (L)</tspan></text>
+           y="47.991367">Results (L)</tspan></text>
     </g>
     <g
        id="g11-0"
@@ -615,7 +615,7 @@
            id="tspan4-4"
            style="font-style:normal;font-variant:normal;font-weight:normal;font-stretch:normal;font-size:3.52778px;font-family:'Fira Code';-inkscape-font-specification:'Fira Code, Normal';font-variant-ligatures:normal;font-variant-caps:normal;font-variant-numeric:normal;font-variant-east-asian:normal;text-align:start;text-anchor:start;fill:#a722b8;fill-opacity:1;stroke:none;stroke-width:0.529167"
            x="175.51909"
-           y="18.117548">Function arguments (N)</tspan></text>
+           y="18.117548">Arguments (N)</tspan></text>
     </g>
     <g
        id="g11"
@@ -725,7 +725,7 @@
   <g
      id="layer1"
      style="display:inline"
-     transform="translate(150.92195,30.600357)">
+     transform="translate(153.72138,30.600356)">
     <g
        id="g12"
        style="display:inline"

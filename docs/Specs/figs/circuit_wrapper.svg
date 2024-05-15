@@ -336,7 +336,7 @@
            id="tspan4-4-6"
            style="font-style:normal;font-variant:normal;font-weight:normal;font-stretch:normal;font-size:3.52778px;font-family:'Fira Code';-inkscape-font-specification:'Fira Code, Normal';font-variant-ligatures:normal;font-variant-caps:normal;font-variant-numeric:normal;font-variant-east-asian:normal;text-align:start;text-anchor:start;fill:#1019cf;fill-opacity:1;stroke:none;stroke-width:0.529167"
            x="175.51909"
-           y="47.991367">Function results (L)</tspan></text>
+           y="47.991367">Results (L)</tspan></text>
     </g>
     <g
        id="g11-0"
@@ -540,7 +540,7 @@
            id="tspan4-4"
            style="font-style:normal;font-variant:normal;font-weight:normal;font-stretch:normal;font-size:3.52778px;font-family:'Fira Code';-inkscape-font-specification:'Fira Code, Normal';font-variant-ligatures:normal;font-variant-caps:normal;font-variant-numeric:normal;font-variant-east-asian:normal;text-align:start;text-anchor:start;fill:#a722b8;fill-opacity:1;stroke:none;stroke-width:0.529167"
            x="175.51909"
-           y="18.117548">Function arguments (N)</tspan></text>
+           y="18.117548">Arguments (N)</tspan></text>
     </g>
     <g
        id="g11"
@@ -716,13 +716,17 @@
       <text
          xml:space="preserve"
          style="font-style:normal;font-variant:normal;font-weight:normal;font-stretch:normal;font-size:3.52778px;line-height:normal;font-family:'Fira Code';-inkscape-font-specification:'Fira Code, Normal';font-variant-ligatures:normal;font-variant-caps:normal;font-variant-numeric:normal;font-variant-east-asian:normal;text-align:center;text-decoration-color:#000000;text-anchor:middle;fill:#d57609;fill-opacity:1;stroke:none;stroke-width:0.529167"
-         x="177.29475"
-         y="23.76186"
+         x="231.34038"
+         y="18.522623"
          id="text4-7-5-1-4-9-2"><tspan
-           id="tspan4-4-6-0-7-6-8"
-           style="font-style:normal;font-variant:normal;font-weight:normal;font-stretch:normal;font-size:3.52778px;font-family:'Fira Code';-inkscape-font-specification:'Fira Code, Normal';font-variant-ligatures:normal;font-variant-caps:normal;font-variant-numeric:normal;font-variant-east-asian:normal;text-align:start;text-anchor:start;fill:#d57609;fill-opacity:1;stroke:none;stroke-width:0.529167"
-           x="177.29475"
-           y="23.76186">AXI memory interfaces (M)</tspan></text>
+           style="font-style:normal;font-variant:normal;font-weight:normal;font-stretch:normal;font-size:3.52778px;font-family:'Fira Code';-inkscape-font-specification:'Fira Code, Normal';font-variant-ligatures:normal;font-variant-caps:normal;font-variant-numeric:normal;font-variant-east-asian:normal;text-align:end;text-anchor:end;fill:#d57609;fill-opacity:1;stroke:none;stroke-width:0.529167"
+           x="231.34038"
+           y="18.522623"
+           id="tspan37">AXI memory</tspan><tspan
+           style="font-style:normal;font-variant:normal;font-weight:normal;font-stretch:normal;font-size:3.52778px;font-family:'Fira Code';-inkscape-font-specification:'Fira Code, Normal';font-variant-ligatures:normal;font-variant-caps:normal;font-variant-numeric:normal;font-variant-east-asian:normal;text-align:end;text-anchor:end;fill:#d57609;fill-opacity:1;stroke:none;stroke-width:0.529167"
+           x="231.34038"
+           y="22.932348"
+           id="tspan40">interfaces (M)</tspan></text>
     </g>
     <g
        id="g15-8"
