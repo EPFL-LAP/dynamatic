@@ -74,6 +74,63 @@ using Group = std::vector<Operation *>;
 // SharingGroups: a list of operations that share the same unit.
 using SharingGroups = std::list<Group>;
 
+// Wrapper function for saving the data retrived from buffer placement milp
+// algorithm into a SharingInfo structure.
+void loadFuncPerfInfo(SharingInfo &info, MILPVars &vars, FuncInfo &funcInfo) {
+  // Map each individual CFDFC to its iteration index
+  std::map<CFDFC *, size_t> cfIndices;
+  for (auto [idx, cfAndOpt] : llvm::enumerate(funcInfo.cfdfcs))
+    cfIndices[cfAndOpt.first] = idx;
+
+  // Extract result: save global CFDFC throuhgputs into info
+  for (auto [idx, cfdfcWithVars] : llvm::enumerate(vars.cfVars)) {
+    auto [cf, cfVars] = cfdfcWithVars;
+    double throughput = cfVars.throughput.get(GRB_DoubleAttr_X);
+
+    info[&funcInfo.funcOp].cfThroughput[cfIndices[cf]] = throughput;
+    // info.cfcThroughput[cf] = throughput;
+    info[&funcInfo.funcOp].cfUnits[cfIndices[cf]] = {};
+
+    // Track the units of the CFC
+    for (auto *op : cf->units)
+      info[&funcInfo.funcOp].cfUnits[cfIndices[cf]].insert(op);
+
+    // Track the channels of the CFC
+    for (auto val : cf->channels) {
+      Channel *ch = new Channel(val);
+
+      info[&funcInfo.funcOp].cfChannels[cfIndices[cf]].insert(ch);
+    }
+  }
+
+  SmallVector<CFDFC *, 8> cfdfcs;
+  std::vector<CFDFCUnion> disjointUnions;
+  llvm::transform(funcInfo.cfdfcs, std::back_inserter(cfdfcs),
+                  [](auto cfAndOpt) { return cfAndOpt.first; });
+  getDisjointBlockUnions(cfdfcs, disjointUnions);
+
+  // Instrumentation: for each CFDFC Union, mark the most-frequently-executed
+  // CFC as performance critical
+
+  for (auto &cfUnion : disjointUnions) {
+
+    auto *critCf =
+        std::max_element(cfUnion.cfdfcs.begin(), cfUnion.cfdfcs.end(),
+                         [](CFDFC const *l, CFDFC const *r) {
+                           return l->numExecs < r->numExecs;
+                         });
+    if (!critCf) {
+      funcInfo.funcOp->emitError()
+          << "Failed running determining performance critical CFC";
+      return;
+    }
+
+    info[&funcInfo.funcOp].critCfcs.emplace(cfIndices[*critCf]);
+    llvm::errs() << "Frequency of crit cfc: " << (*critCf)->numExecs << "\n";
+  }
+}
+
+#ifndef DYNAMATIC_GUROBI_NOT_INSTALLED
 namespace dynamatic {
 namespace buffer {
 namespace fpga20 {
@@ -98,63 +155,15 @@ public:
     // Run the FPGA20Buffers's extractResult as it is
     FPGA20Buffers::extractResult(placement);
 
-    // Map each individual CFDFC to its iteration index
-    std::map<CFDFC *, size_t> cfIndices;
-    for (auto [idx, cfAndOpt] : llvm::enumerate(funcInfo.cfdfcs))
-      cfIndices[cfAndOpt.first] = idx;
-
-    // Extract result: save global CFDFC throuhgputs into info
-    for (auto [idx, cfdfcWithVars] : llvm::enumerate(vars.cfVars)) {
-      auto [cf, cfVars] = cfdfcWithVars;
-      double throughput = cfVars.throughput.get(GRB_DoubleAttr_X);
-
-      info[&funcInfo.funcOp].cfThroughput[cfIndices[cf]] = throughput;
-      // info.cfcThroughput[cf] = throughput;
-      info[&funcInfo.funcOp].cfUnits[cfIndices[cf]] = {};
-
-      // Track the units of the CFC
-      for (auto *op : cf->units)
-        info[&funcInfo.funcOp].cfUnits[cfIndices[cf]].insert(op);
-
-      // Track the channels of the CFC
-      for (auto val : cf->channels) {
-        Channel *ch = new Channel(val);
-
-        info[&funcInfo.funcOp].cfChannels[cfIndices[cf]].insert(ch);
-      }
-    }
-
-    SmallVector<CFDFC *, 8> cfdfcs;
-    std::vector<CFDFCUnion> disjointUnions;
-    llvm::transform(funcInfo.cfdfcs, std::back_inserter(cfdfcs),
-                    [](auto cfAndOpt) { return cfAndOpt.first; });
-    getDisjointBlockUnions(cfdfcs, disjointUnions);
-
-    // Instrumentation: for each CFDFC Union, mark the most-frequently-executed
-    // CFC as performance critical
-
-    for (auto &cfUnion : disjointUnions) {
-
-      auto *critCf =
-          std::max_element(cfUnion.cfdfcs.begin(), cfUnion.cfdfcs.end(),
-                           [](CFDFC const *l, CFDFC const *r) {
-                             return l->numExecs < r->numExecs;
-                           });
-      if (!critCf) {
-        funcInfo.funcOp->emitError()
-            << "Failed running determining performance critical CFC";
-        return;
-      }
-
-      info[&funcInfo.funcOp].critCfcs.emplace(cfIndices[*critCf]);
-      llvm::errs() << "Frequency of crit cfc: " << (*critCf)->numExecs << "\n";
-    }
+    loadFuncPerfInfo(info, vars, funcInfo);
   }
 };
 
 } // namespace fpga20
 } // namespace buffer
 } // namespace dynamatic
+
+#endif // DYNAMATIC_GUROBI_NOT_INSTALLED
 
 /// Wraps a call to solveMILP and conditionally passes the logger and MILP name
 /// to the MILP's constructor as last arguments if the logger is not null.
@@ -185,6 +194,7 @@ struct HandshakePlaceBuffersPassWrapper : public HandshakePlaceBuffersPass {
         info(info){};
   SharingInfo &info;
 
+#ifndef DYNAMATIC_GUROBI_NOT_INSTALLED
   LogicalResult getBufferPlacement(FuncInfo &funcInfo, TimingDatabase &timingDB,
                                    Logger *logger,
                                    BufferPlacement &placement) override {
@@ -228,6 +238,7 @@ struct HandshakePlaceBuffersPassWrapper : public HandshakePlaceBuffersPass {
 
     llvm_unreachable("unknown algorithm");
   }
+#endif // DYNAMATIC_GUROBI_NOT_INSTALLED
 };
 
 struct CreditBasedSharingPass
@@ -475,13 +486,13 @@ void CreditBasedSharingPass::runDynamaticPass() {
     }
 
     // log
-    llvm::errs() << "Finished merging \n";
+    llvm::errs() << "Finished merging\n";
     logGroups(sharingGroups, namer);
 
     // sort each sharing group according to their SCC ID.
     sortGroups(sharingGroups, info);
     // log
-    llvm::errs() << "Sorted groups \n";
+    llvm::errs() << "Sorted groups\n";
     logGroups(sharingGroups, namer);
   }
 }
