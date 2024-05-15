@@ -339,10 +339,10 @@ bool checkGroupMergable(const Group &g1, const Group &g2,
   return true;
 }
 
-// A greedy algorithm that iteratively test checkGroupMergable on combination of
-// 2 groups, if success then the 2 given groups are merged.
-// return true if successfully merged groups, otherwise it returns false.
-bool mergeGroups(SharingGroups &sharingGroups, const FuncPerfInfo &info) {
+// A greedy algorithm that test checkGroupMergable on combination of
+// 2 groups, if success then the 2 given groups are merged, and immediately
+// returns true if successfully merged groups, otherwise it returns false.
+bool tryMergeGroups(SharingGroups &sharingGroups, const FuncPerfInfo &info) {
   for (auto g1 = sharingGroups.begin(); g1 != sharingGroups.end(); g1++) {
     for (auto g2 = std::next(g1); g2 != sharingGroups.end(); g2++) {
       if (checkGroupMergable(*g1, *g2, info)) {
@@ -363,11 +363,11 @@ bool mergeGroups(SharingGroups &sharingGroups, const FuncPerfInfo &info) {
 
 void logGroups(const SharingGroups &sharingGroups, NameAnalysis &namer) {
   for (const auto &group : sharingGroups) {
-    llvm::errs() << "group: ";
+    llvm::errs() << "group : {";
     for (auto *op : group) {
       llvm::errs() << namer.getName(op) << " ";
     }
-    llvm::errs() << "\n";
+    llvm::errs() << "}\n";
   }
 }
 
@@ -376,7 +376,10 @@ void sortGroups(SharingGroups &sharingGroups, FuncPerfInfo &info) {
     // use bubble sort to sort each group:
     if (g.size() <= 1)
       continue;
-    for (bool modified = false; !modified;) {
+    bool modified = false;
+
+    do {
+      modified = false;
       for (size_t i = 1; i < g.size(); i++) {
         for (auto cf : info.critCfcs) {
 
@@ -389,7 +392,7 @@ void sortGroups(SharingGroups &sharingGroups, FuncPerfInfo &info) {
           }
         }
       }
-    }
+    } while (modified);
   }
 }
 
@@ -468,7 +471,7 @@ void CreditBasedSharingPass::runDynamaticPass() {
 
     // Merge groups
     for (bool continueMerging = true; continueMerging;) {
-      continueMerging = mergeGroups(sharingGroups, info);
+      continueMerging = tryMergeGroups(sharingGroups, info);
     }
 
     // log
