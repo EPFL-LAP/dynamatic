@@ -23,15 +23,13 @@
 #include "mlir/Pass/PassManager.h"
 #include <algorithm>
 #include <cstddef>
+#include <list>
 #include <map>
 #include <set>
 #include <string>
 #include <tuple>
 #include <utility>
 #include <vector>
-
-using std::all_of;
-using std::none_of;
 
 using namespace llvm;
 using namespace dynamatic;
@@ -70,8 +68,10 @@ struct FuncPerfInfo {
 // SharingInfo: for each funcOp, its extracted FuncPerfInfo.
 using SharingInfo = std::map<handshake::FuncOp *, FuncPerfInfo>;
 
+using Group = std::set<Operation *>;
+
 // SharingGroups: a list of operations that share the same unit.
-using SharingGroups = std::map<size_t, std::set<Operation *>>;
+using SharingGroups = std::list<Group>;
 
 namespace dynamatic {
 namespace buffer {
@@ -278,10 +278,11 @@ struct CreditBasedSharingPass
 };
 } // namespace
 
-// for two sharing groups, check if the following criteria hold.
-bool checkGroupMergable(const std::set<Operation *> &g1,
-                        const std::set<Operation *> &g2,
+// For two sharing groups, check if the following criteria hold.
+bool checkGroupMergable(const Group &g1, const Group &g2,
                         FuncPerfInfo funcPerfInfo) {
+  if (g1.empty() || g2.empty())
+    return false;
 
   std::set<Operation *> gMerged;
   gMerged.insert(g1.begin(), g1.end());
@@ -325,43 +326,38 @@ bool checkGroupMergable(const std::set<Operation *> &g1,
     std::set<size_t> setOfSccIds(listOfSccIds.begin(), listOfSccIds.end());
     // Check if numOps * cfcThroughput <= 1 and no duplicate SCC
     // IDs.
-    if (!(numOps * (funcPerfInfo.cfThroughput)[cf] <= 1) ||
-        (listOfSccIds.size() == setOfSccIds.size())) {
+    if (numOps * (funcPerfInfo.cfThroughput)[cf] > 1) {
+      return false;
+    }
+    if ((listOfSccIds.size() != setOfSccIds.size())) {
       return false;
     }
   }
-  // return (all_of(funcPerfInfo.critCfcs.begin(), funcPerfInfo.critCfcs.end(),
-  //                [funcPerfInfo, gMerged](auto cf) {
-  //                  // for each cf, numOps contains the number of operations
-  //                  // that are in the merged group and also in cf
-  //                  unsigned numOps = 0;
 
-  //                  // listOfSccIds: a list of SCC IDs that the group has
-  //                  // it is used to check if there are any duplicates (i.e.,
-  //                  // two operation that are in the same SCC cannot be in the
-  //                  // same sharing group).
-  //                  std::vector<size_t> listOfSccIds;
-  //                  for (auto op : (funcPerfInfo.cfUnits)[cf]) {
-  //                    // In the op is in (SCC union MergedGroup):
-  //                    if (gMerged.find(op) != gMerged.end()) {
-  //                      // increase number of Ops
-  //                      numOps++;
-  //                      // Push back the SCC ID of each op inside the group
-  //                      and
-  //                      // also SCC;
-  //                      listOfSccIds.push_back((funcPerfInfo.cfSccs)[cf][op]);
-  //                    }
-  //                  }
-  //                  // Check if there are any duplicates:
-  //                  std::set<size_t> setOfSccIds(listOfSccIds.begin(),
-  //                                               listOfSccIds.end());
-  //                  // Check if numOps * cfcThroughput <= 1 and no duplicate
-  //                  SCC
-  //                  // IDs.
-  //                  return (numOps * (funcPerfInfo.cfThroughput)[cf] <= 1) ||
-  //                         (listOfSccIds.size() == setOfSccIds.size());
-  //                }));
+  // If none of the checks has failed, then return true
   return true;
+}
+
+// A greedy algorithm that iteratively test checkGroupMergable on combination of
+// 2 groups, if success then the 2 given groups are merged.
+// return true if successfully merged groups, otherwise it returns false.
+bool mergeGroups(SharingGroups &sharingGroups, const FuncPerfInfo &info) {
+  for (auto g1 = sharingGroups.begin(); g1 != sharingGroups.end(); g1++) {
+    for (auto g2 = std::next(g1); g2 != sharingGroups.end(); g2++) {
+      if (checkGroupMergable(*g1, *g2, info)) {
+        // If all three criteria met, then merge the second group into the
+        // first group.
+        Group unionGroup;
+        unionGroup.insert(g1->begin(), g1->end());
+        unionGroup.insert(g2->begin(), g2->end());
+        sharingGroups.push_back(unionGroup);
+        sharingGroups.erase(g1);
+        sharingGroups.erase(g2);
+        return true;
+      }
+    }
+  }
+  return false;
 }
 
 void CreditBasedSharingPass::runDynamaticPass() {
@@ -424,8 +420,9 @@ void CreditBasedSharingPass::runDynamaticPass() {
     // Initialize the sharing groups:
     SharingGroups sharingGroups;
     for (auto [id, op] : llvm::enumerate(sharingTargets)) {
-      std::set<Operation *> g = {op};
-      sharingGroups.emplace(id, g);
+      Group g;
+      g.insert(op);
+      sharingGroups.push_back(g);
     }
 
     // Determine SCCs
@@ -439,12 +436,26 @@ void CreditBasedSharingPass::runDynamaticPass() {
       }
     }
 
-    // Merge groups
-    bool modified = false;
-    while (modified) {
-      for (auto &[id, group] : sharingGroups) {
-        // check if two groups are mergable.
+    llvm::errs() << "Initial groups\n";
+    for (const auto &group : sharingGroups) {
+      llvm::errs() << "group: ";
+      for (auto *op : group) {
+        llvm::errs() << namer.getName(op) << " ";
       }
+      llvm::errs() << "\n";
+    }
+
+    // Merge groups
+    for (bool continueMerging = true; continueMerging;) {
+      continueMerging = mergeGroups(sharingGroups, info);
+    }
+    llvm::errs() << "Finished merging \n";
+    for (const auto &group : sharingGroups) {
+      llvm::errs() << "group: ";
+      for (auto *op : group) {
+        llvm::errs() << namer.getName(op) << " ";
+      }
+      llvm::errs() << "\n";
     }
   }
 }
