@@ -11,6 +11,7 @@
 #include "dynamatic/Dialect/Handshake/HandshakeOps.h"
 #include "dynamatic/Support/DynamaticPass.h"
 #include "dynamatic/Support/LLVM.h"
+#include "dynamatic/Support/Logging.h"
 #include "dynamatic/Support/MILP.h"
 #include "dynamatic/Transforms/BufferPlacement/BufferingSupport.h"
 #include "dynamatic/Transforms/BufferPlacement/CFDFC.h"
@@ -68,7 +69,7 @@ struct FuncPerfInfo {
 // SharingInfo: for each funcOp, its extracted FuncPerfInfo.
 using SharingInfo = std::map<handshake::FuncOp *, FuncPerfInfo>;
 
-using Group = std::set<Operation *>;
+using Group = std::vector<Operation *>;
 
 // SharingGroups: a list of operations that share the same unit.
 using SharingGroups = std::list<Group>;
@@ -347,9 +348,9 @@ bool mergeGroups(SharingGroups &sharingGroups, const FuncPerfInfo &info) {
       if (checkGroupMergable(*g1, *g2, info)) {
         // If all three criteria met, then merge the second group into the
         // first group.
-        Group unionGroup;
-        unionGroup.insert(g1->begin(), g1->end());
-        unionGroup.insert(g2->begin(), g2->end());
+        Group unionGroup = *g1;
+        // unionGroup.insert(g1->begin(), g1->end());
+        unionGroup.insert(unionGroup.end(), g2->begin(), g2->end());
         sharingGroups.push_back(unionGroup);
         sharingGroups.erase(g1);
         sharingGroups.erase(g2);
@@ -358,6 +359,38 @@ bool mergeGroups(SharingGroups &sharingGroups, const FuncPerfInfo &info) {
     }
   }
   return false;
+}
+
+void logGroups(const SharingGroups &sharingGroups, NameAnalysis &namer) {
+  for (const auto &group : sharingGroups) {
+    llvm::errs() << "group: ";
+    for (auto *op : group) {
+      llvm::errs() << namer.getName(op) << " ";
+    }
+    llvm::errs() << "\n";
+  }
+}
+
+void sortGroups(SharingGroups &sharingGroups, FuncPerfInfo &info) {
+  for (auto &g : sharingGroups) {
+    // use bubble sort to sort each group:
+    if (g.size() <= 1)
+      continue;
+    for (bool modified = false; !modified;) {
+      for (size_t i = 1; i < g.size(); i++) {
+        for (auto cf : info.critCfcs) {
+
+          auto op1 = info.cfSccs[cf].find(g[i - 1]);
+          auto op2 = info.cfSccs[cf].find(g[i]);
+          if (op1 != info.cfSccs[cf].end() && op2 != info.cfSccs[cf].end() &&
+              op1->second > op2->second) {
+            iter_swap(g.begin() + i, g.begin() + i - 1);
+            modified = true;
+          }
+        }
+      }
+    }
+  }
 }
 
 void CreditBasedSharingPass::runDynamaticPass() {
@@ -411,17 +444,11 @@ void CreditBasedSharingPass::runDynamaticPass() {
     // Check the sharing targets
     SmallVector<Operation *> sharingTargets = getSharingTargets(*funcOp);
 
-    llvm::errs() << "Sharing Targets:";
-    for (Operation *op : sharingTargets) {
-      llvm::errs() << namer.getName(op) << " ";
-    }
-    llvm::errs() << "\n";
-
     // Initialize the sharing groups:
     SharingGroups sharingGroups;
     for (auto [id, op] : llvm::enumerate(sharingTargets)) {
       Group g;
-      g.insert(op);
+      g.push_back(op);
       sharingGroups.push_back(g);
     }
 
@@ -437,26 +464,22 @@ void CreditBasedSharingPass::runDynamaticPass() {
     }
 
     llvm::errs() << "Initial groups\n";
-    for (const auto &group : sharingGroups) {
-      llvm::errs() << "group: ";
-      for (auto *op : group) {
-        llvm::errs() << namer.getName(op) << " ";
-      }
-      llvm::errs() << "\n";
-    }
+    logGroups(sharingGroups, namer);
 
     // Merge groups
     for (bool continueMerging = true; continueMerging;) {
       continueMerging = mergeGroups(sharingGroups, info);
     }
+
+    // log
     llvm::errs() << "Finished merging \n";
-    for (const auto &group : sharingGroups) {
-      llvm::errs() << "group: ";
-      for (auto *op : group) {
-        llvm::errs() << namer.getName(op) << " ";
-      }
-      llvm::errs() << "\n";
-    }
+    logGroups(sharingGroups, namer);
+
+    // sort each sharing group according to their SCC ID.
+    sortGroups(sharingGroups, info);
+    // log
+    llvm::errs() << "Sorted groups \n";
+    logGroups(sharingGroups, namer);
   }
 }
 
