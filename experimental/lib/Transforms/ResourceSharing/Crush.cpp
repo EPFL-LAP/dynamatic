@@ -20,6 +20,7 @@
 #include "dynamatic/Transforms/BufferPlacement/HandshakePlaceBuffers.h"
 #include "dynamatic/Transforms/HandshakeMaterialize.h"
 #include "experimental/Transforms/ResourceSharing/SharingSupport.h"
+#include "mlir/IR/BuiltinAttributes.h"
 #include "mlir/Pass/Pass.h"
 #include "mlir/Pass/PassManager.h"
 #include <algorithm>
@@ -33,6 +34,7 @@
 #include <vector>
 
 using namespace llvm;
+using namespace mlir;
 using namespace dynamatic;
 using namespace dynamatic::experimental;
 using namespace dynamatic::experimental::sharing;
@@ -407,6 +409,104 @@ void sortGroups(SharingGroups &sharingGroups, FuncPerfInfo &info) {
   }
 }
 
+LogicalResult sharingWrapperInsertion(handshake::FuncOp &funcOp,
+                                      SharingGroups &sharingGroups,
+                                      MLIRContext *ctx) {
+  OpBuilder builder(ctx);
+  for (auto group : sharingGroups) {
+
+    // If the group only has one operation or has no operations, then go to next
+    // group
+    if (group.size() <= 1)
+      continue;
+
+    // Elect one operation as the shared operation.
+    auto sharedOp = *group.begin();
+    llvm::errs() << "Before checking operands\n";
+    //
+
+    // Enumerate the operands of the original pre-sharing operations.
+    llvm::SmallVector<Value> origOperands;
+    // llvm::SmallVector<Value> origResults;
+    for (auto op : group) {
+      for (auto val : op->getOperands()) {
+        origOperands.push_back(val);
+      }
+    }
+
+    size_t numDataOperand = origOperands.size();
+
+    assert(numDataOperand > 0);
+
+    // The result of the shared operation is also one of the inputs of the
+    // sharing wrapper.
+    origOperands.push_back(sharedOp->getResult(0));
+
+    // TODO: assign correct credit values
+    llvm::SmallVector<int64_t> credits;
+
+    for (auto op : group) {
+      credits.push_back(1);
+    }
+
+    NamedAttribute namedCredits(
+        StringAttr::get(ctx, "credits"),
+        builder.getDenseI64ArrayAttr(llvm::ArrayRef<int64_t>(credits)));
+
+    // Result types (this also tracks the number of results)
+    llvm::SmallVector<Type> outputTypes;
+
+    // The outputs of the original operations are also the outputs of the
+    // sharing wrapper.
+    for (auto op : group) {
+      outputTypes.push_back(op->getResultTypes()[0]);
+    }
+
+    // The inputs of the shared operation is also the output of the sharing
+    // wrapper.
+    outputTypes.insert(outputTypes.end(), sharedOp->getOperandTypes().begin(),
+                       sharedOp->getOperandTypes().end());
+
+    llvm::errs() << "Before credits Arry\n";
+
+    builder.setInsertionPoint(*group.begin());
+    handshake::SharingWrapperOp wrapperOp =
+        builder.create<handshake::SharingWrapperOp>(
+            sharedOp->getLoc(), outputTypes, origOperands, namedCredits);
+
+    llvm::errs() << "Before access results\n";
+
+    for (auto [id, op] : llvm::enumerate(group)) {
+      llvm::errs() << "ID" << id << "\n";
+      op->getResult(0).replaceAllUsesWith(wrapperOp->getResult(id));
+    }
+
+    llvm::errs() << "Num of data operands " << numDataOperand << "\n";
+    llvm::errs() << "Num of results of wrapper " << wrapperOp.getNumResults()
+                 << "\n";
+
+    llvm::errs() << "Before rewiring the input operands of shared Op\n";
+
+    for (auto [id, val] : llvm::enumerate(sharedOp->getOperands())) {
+      sharedOp->replaceUsesOfWith(val, wrapperOp->getResult(id + group.size()));
+      // val.replaceAllUsesWith(wrapperOp->getResult(id + group.size()));
+    }
+
+    llvm::errs() << "Before erasing unused Ops\n";
+
+    for (auto op : group) {
+      if (op != *(group.begin())) {
+        op->erase();
+      }
+    }
+
+    llvm::errs() << "After erasing unused Ops\n";
+  }
+
+  llvm::errs() << "Before function return\n";
+  return success();
+}
+
 void CreditBasedSharingPass::runDynamaticPass() {
   llvm::errs() << "***** Resource Sharing *****\n";
 
@@ -489,12 +589,19 @@ void CreditBasedSharingPass::runDynamaticPass() {
     llvm::errs() << "Finished merging\n";
     logGroups(sharingGroups, namer);
 
-    // sort each sharing group according to their SCC ID.
+    // Sort each sharing group according to their SCC ID.
     sortGroups(sharingGroups, info);
     // log
     llvm::errs() << "Sorted groups\n";
     logGroups(sharingGroups, namer);
+
+    // For each sharing group, unite them with a sharing wrapper and shared
+    // operation.
+    if (failed(sharingWrapperInsertion(*funcOp, sharingGroups, ctx)))
+      signalPassFailure();
   }
+
+  llvm::errs() << "Before leaving the pass\n";
 }
 
 namespace dynamatic {
