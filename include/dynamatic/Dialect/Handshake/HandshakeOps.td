@@ -1104,4 +1104,51 @@ def SpeculatingBranchOp : Handshake_Op<"speculating_branch", [
   let assemblyFormat = " `[` $tagFromOperand `]` $dataOperand attr-dict `:` qualified(type($tagFromOperand)) `,` qualified(type($dataOperand)) ";
 }
 
+//===----------------------------------------------------------------------===//
+// Resource Sharing Operations
+//===----------------------------------------------------------------------===//
+
+def SharingWrapperOp : Handshake_Op<"sharing_wrapper", [
+TypesMatchWith<"data operand type matches data result type",
+                 "dataIn", "dataOut", "$_self">, 
+]> {
+  let summary = "sharing wrapper operation"; let description = [{
+    The sharing_wrapper operation represents the selecting & distributing logic
+    that wraps around a functional unit.
+
+    Example: Consider an muli operation is shared between two operations
+
+    Before sharing:
+
+    ```mlir
+    %succOut1 = arith.muli %pred1In1, %pred1In2 { name=#handshake.name<"muli0"> } : i32
+    %succOut2 = arith.muli %pred2In1, %pred2In2 { name=#handshake.name<"muli1"> } : i32
+    ```
+
+    After sharing:
+
+    ```mlir
+    %sharedOut1 = arith.muli %selIn1, %selIn1 { name=#handshake.name<"muliShared1"> } : i32
+    %selIn1, %selIn2, %succOut1, %succOut2 = sharing_wrapper %pred1In1, %pred1In2, %pred2In1, %pred2In2, %sharedOut1 [3, 3] : i32
+    ```
+
+    The sharing wrapper selects the original operands (%pred1In1, %pred1In2,
+    %pred2In1, %pred2In2), and distributes the computed results to the original
+    results (%succOut1, %succOut2).
+
+    It sends the selected results to the shared multiplier through %selIn1 and
+    %selIn2, and takes the result %sharedOut1 of the shared multiplier.
+
+    The integer array in the attribute is the number of credits per each
+    operation that shares it.
+  }];
+
+  let arguments = (ins AnyType : $dataIn, ConfinedAttr<DefaultValuedAttr<DenseI64ArrayAttr, "{}">, [IntPositive]>:$credits);
+                 
+  let results = (outs AnyType : $dataOut);
+  let assemblyFormat = "$dataIn `[` $credits `]` attr-dict `:` qualified(type($dataIn)) ";
+
+}
+
+
 #endif // DYNAMATIC_DIALECT_HANDSHAKE_HANDHSAKE_OPS_TD
