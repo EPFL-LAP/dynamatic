@@ -20,7 +20,7 @@ The inputs of a Dynamatic circuit are made up its [arguments](#arguments--result
 > [!IMPORTANT]
 > We define a *circuit execution* as a single token (in the dataflow sense) being consumed on each of the circuit's inputs, and a single token eventually being transmitted on each of the circuit's outputs. After all output tokens have been transmitted---which necessarily happens *after* all inputs tokens have been consumed---we consider the execution to be *completed*. Dynamatic circuits may support streaming---i.e., concurrent executions on multiple sets of input tokens. In this case, Dynamatic circuits produce the set of output tokens associated to each execution in the order in which it consumed the sets of input tokens.
 >
-> Dynamatic circuits guarantee that, after consuming a single token on each of their input ports, they will *eventually* produce a single token on each of their output ports; *circuit executions are guaranteed to complete*. Howeever, they offer no guarantee on input consumption order across different input ports or output production order across different output ports.
+> Dynamatic circuits guarantee that, after consuming a single token on each of their input ports, they will *eventually* produce a single token on each of their output ports; *circuit executions are guaranteed to complete*. However, they offer no guarantee on input consumption order across different input ports or output production order across different output ports.
 
 ### `start` & `end`
 
