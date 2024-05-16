@@ -11,7 +11,7 @@ For example, consider a trivial C kernel.
 int adder(int a, int b) { return a + b; }
 ```
 
-At the Handshake level, the IR that Dynamatic generates for this kernel would like as follows (some details unimportant in the context of this proposal are ommited for brevity).
+At the Handshake level, the IR that Dynamatic generates for this kernel would like as follows (some details unimportant in the context of this proposal are omitted for brevity).
 
 ```mlir
 handshake.func @adder(%a: i32, %b: i32, %start: none) -> i32  {
@@ -28,7 +28,7 @@ Each `i32`-typed SSA value in this IR represents in fact a dataflow channel with
 On one hand, implicit dataflow semantics within Handshake functions have the advantage of yielding neat-looking IRs that do not bother to deal with an explicit parametric "dataflow type" repeated everywhere. On the other hand, it also prevents us from mixing regular dataflow channels (downstream data bus, downstream valid wire, and upstream ready wire) with any other kind of signal bundle.
 
 1. On one side, "raw" un-handshaked signals would look indistinguishable from regular dataflow channels in the IR. If a dataflow channel with a 32-bit data bus is represented using `i32`, then no existing type can represent a 32-bit data bus without the valid/ready signal bundle. Raw signals could be useful, for example, for any kind of partial circuit rigidification, where some channels that provably do not need handshake semantics could drop their valid/ready bundle and only be represented as a single data bus.
-2. On the other side, adding extra signals to some dataflow channels that may need to cary additional information around is also impossible modulo addition of a new parametric type. For example, speculation bits or thread tags cannot currently be modeled by this simple type system.
+2. On the other side, adding extra signals to some dataflow channels that may need to carry additional information around is also impossible modulo addition of a new parametric type. For example, speculation bits or thread tags cannot currently be modeled by this simple type system.
 
 While MLIR attributes attached to operations whose adjacent channels are "special" (either because they drop handshake semantics or add extra signals) could potentially be a solution to the issue, we argue that it would be cumbersome to work with and error-prone for the following reasons.
 
@@ -46,10 +46,10 @@ We argue that the only way to obtain the flexibility outlined above is to
 
 We propose to add two new types to the IR to enable us to reliably model our use cases inside Handshake-level IR.
 
-- A *non-parametric* type to model control-only tokens which lowers to a bundle made up of a downstream valid wire and upstream ready wire. This `handshake::ControlType` type would serialize to `control` inside the IR.
+- A *nonparametric* type to model control-only tokens which lowers to a bundle made up of a downstream valid wire and upstream ready wire. This `handshake::ControlType` type would serialize to `control` inside the IR.
 - A *parametric* type to model dataflow channels with an arbitrary data type and optional extra signals. In their most basic form, SSA values of this type would be a composition of an arbitrary "raw-typed" SSA value (e.g., `i32`) and of a `control`-typed SSA value. It follows that values of this type, in their basic form, would lower to a bundle made up of a downstream data bus of a specific bitwidth plus what the `control`-typed SSA value lowered to (valid and ready wires). Optionally, this type could also hold extra "raw-typed" signals (e.g., speculation bits, thread tags) that would lower to downstream or upstream buses of corresponding widths. This `handshake::ChannelType` type would serialize to `channel<data-type, {optional-extra-types}>` inside the IR.
 
-Re-considering our initial simple example, it seems that the proposed changes would make the IR look identical modulo cosmetic type changes.
+Considering again our initial simple example, it seems that the proposed changes would make the IR look identical modulo cosmetic type changes.
 
 ```mlir
 handshake.func @adder(%a: channel<i32>, %b: channel<i32>, %start: control) -> channel<i32>  {
