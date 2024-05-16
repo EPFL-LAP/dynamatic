@@ -220,6 +220,30 @@ Extra signals would be copied in order when converting from one type to the othe
 
 In this section we try to alleviate potential concerns with the proposed change and discuss the latter's impact on other parts of Dynamatic.
 
+### Type checking
+
+Using MLIR's type system to model the exact nature of each channel in our circuits makes us benefit from MLIR's existing type management and verification infrastructure. We will be able to cleanly define and check for custom type checking rules on each operation type, ensuring that the relationships between operand and result types always makes sense; all the while permitting our operations to handle an infinite number of variations of our parametric types.
+
+For example, the integer addition operation (`handshake.addi`) would check that its two operands and result have the same type. Furtermore, this type would only be required to have a downstream 1-bit *valid*, upstream 1-bit *ready*, and downstream data signal.
+
+```mlir
+// Valid, any channel implicitly has the required signals 
+%addOprd1, %addOprd2 = ... : channel<i32>
+%addResult = handshake.addi %addOprd1, %addOprd2 : channel<i32>
+
+// -----
+
+// Valid, the bundle explicitly has all the required signals 
+%addOprd1, %addOprd2 = ... : bundle<data: i32, valid: i1, ready: (U) i1, extra: i4>
+%addResult = handshake.addi %addOprd1, %addOprd2 : bundle<data: i32, valid: i1, ready: (U) i1, extra: i4>
+
+// -----
+
+// Invalid, the bundle does not have a data signal
+%addOprd1, %addOprd2 = ... : bundle<notData: i32, valid: i1, ready: (U) i1>
+%addResult = handshake.addi %addOprd1, %addOprd2 : bundle<notData: i32, valid: i1, ready: (U) i1>
+```
+
 ### IR complexity
 
 There is no question that the proposed redesign would yield IRs that are longer and visually more complex than what our current Handshake implementation produces. Note that, while mathematical operations would require explicit bundling/unbundling operations around them, core dataflow components (e.g., merges and branches) would remain structurally identical beyond cosmetic type name changes.
@@ -259,9 +283,9 @@ There is no question that the proposed redesign would yield IRs that are longer 
 
 ### Backend changes
 
-The support for "nonstandard" signal bundles in the IR means that we have to match this support in our RTL backend. Indeed, most current RTL components take the data bus's bitwidth as an RTL parameter. This is no longer sufficient when dataflow channels can carry extra downstream or upstream signals, which must somehow be encoded in the RTL parameters of numerous core dataflow components (e.g., all merge-like and branch-like components). Complex signals bundles will need to become encodable as RTL parameters for the underlying RTL implementations to be concretized correctly. It is basically a given that generic RTL implementations which we largely rely on today will not be sufficient, and that the design change will require us moving to RTL generators for most core dataflow components (actually it may be possible to "cheat" there, see [signal de-structuring](#signal-de-structuring)) below.
+The support for "nonstandard" signal bundles in the IR means that we have to match this support in our RTL backend. Indeed, most current RTL components take the data bus's bitwidth as an RTL parameter. This is no longer sufficient when dataflow channels can carry extra downstream or upstream signals, which must somehow be encoded in the RTL parameters of numerous core dataflow components (e.g., all merge-like and branch-like components). Complex signals bundles will need to become encodable as RTL parameters for the underlying RTL implementations to be concretized correctly. It is basically a given that generic RTL implementations which we largely rely on today will not be sufficient, and that the design change will require us moving to RTL generators for most core dataflow components. Alternatively, we could use a form of [signal composition](#signal-compositon) (see below) to narrow down the amount of channel types our components have to support.
 
-### Signal de-structuring
+### Signal compositon
 
 In some instances, it may be useful to compose all of a channel's signals going in the same direction (downstream or upstream) together around operations that do not care about the actual content of their operands' data buses (e.g., all data operands of merge-like and branch-like operations). This would allow us to expose to certain operations "regular" dataflow channels without extra signals; their *exposed data buses* would in fact be constituted of the *actual data buses* plus all extra downstream signals. Just before lowering to HW and then RTL (after applying all Handshake-level transformations and optimizations to the IR), we could run a signal-composition pass that would apply this transformation around specific dataflow components in order to make our backend's life easier.
 
@@ -295,4 +319,35 @@ Considering again the last example with extra signals from the [IR complexity](#
 %muxResult = handshake.decompose %muxComposedResult : channel<i38> -> channel<i32, [i2, i4]>
 ```
 
-The RTL implementations of the `handshake.compose` and `handshake.decompose` signals would be trivial and offload complexity from the dataflow components themselves, making their RTL implementation simpler and area smaller.
+The RTL implementations of the `handshake.compose` and `handshake.decompose` signals would be trivial and offload complexity from the dataflow components themselves, making the latter's RTL implementations simpler and area smaller.
+
+A similar yet slightly different composition behavior could help us simplify the RTL implementation of arithmetic operations---which would usually forward all extra signals between their operands and results---as well. In cases where it makes sense, we could compose all of the operands' and results' downstream extra signals into a single one that is still separate from the data signal, which arithmetic operations actually use. We could then design a (couple of) generic implementation(s) for these arithmetic operations that would work for all channel types, removing the need for a generator.
+
+```mlir
+%addOprd1 = ... : channel<i32, [i2, i4, (U) i4, (U) i8]>
+%addOprd2 = ... : channel<i32, [i2, i4, (U) i4, (U) i8]>
+
+// Given the variability in the extra signals, this operation would require an
+// RTL generator
+%addResult = handshake.addi %addOprd1, %addOprd2 : channel<i32, [i2, i4, (U) i4, (U) i8]>
+
+// -----
+
+// Same inputs as before 
+%addOprd1 = ... : channel<i32, [i2, i4, (U) i4, (U) i8]>
+%addOprd2 = ... : channel<i32, [i2, i4, (U) i4, (U) i8]>
+
+// Compose all extra signals going in the same direction into a single one
+%addComposedOprd1 = handshake.compose %addOprd1 : channel<i32, [i2, i4, (U) i4, (U) i8]> 
+                                                  -> channel<i32, [i6, (U) i12]> 
+%addComposedOprd2 = handshake.compose %addOprd2 : channel<i32, [i2, i4, (U) i4, (U) i8]>
+                                                  -> channel<i32, [i6, (U) i12]> 
+
+// We could design a generic version of the adder that accepts a single
+// downstream extra signal and a single upstream data signal
+%addComposedResult = handshake.addi %addComposedOprd2, %addComposedOprd2 : channel<i32, [i6, (U) i12]>
+
+// Decompose back into the original type
+%addResult = handshake.decompose %addComposedResult : channel<i32, [i6, (U) i12]>
+                                                      -> channel<i32, [i2, i4, (U) i4, (U) i8]>
+```
