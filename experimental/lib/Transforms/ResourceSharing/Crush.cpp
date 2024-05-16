@@ -24,6 +24,7 @@
 #include "mlir/Pass/Pass.h"
 #include "mlir/Pass/PassManager.h"
 #include <algorithm>
+#include <cassert>
 #include <cstddef>
 #include <list>
 #include <map>
@@ -421,9 +422,12 @@ LogicalResult sharingWrapperInsertion(handshake::FuncOp &funcOp,
       continue;
 
     // Elect one operation as the shared operation.
-    auto sharedOp = *group.begin();
-    llvm::errs() << "Before checking operands\n";
-    //
+    auto *sharedOp = *group.begin();
+
+    // Check if the number of results is exactly 1.
+    assert(sharedOp->getNumResults() == 1 &&
+           "Sharing wrapper currently only supports operation with a single "
+           "return value.");
 
     // Enumerate the operands of the original pre-sharing operations.
     llvm::SmallVector<Value> origOperands;
@@ -442,9 +446,15 @@ LogicalResult sharingWrapperInsertion(handshake::FuncOp &funcOp,
     // sharing wrapper.
     origOperands.push_back(sharedOp->getResult(0));
 
-    // TODO: assign correct credit values
+    assert(group.size() * sharedOp->getNumOperands() +
+                   sharedOp->getNumResults() ==
+               origOperands.size() &&
+           "The sharing wrapper has an incorrect number of input ports.");
+
     llvm::SmallVector<int64_t> credits;
 
+    // TODO: the number of credits of each operation will be passed as a
+    // function argument.
     for (auto op : group) {
       credits.push_back(1);
     }
@@ -458,7 +468,7 @@ LogicalResult sharingWrapperInsertion(handshake::FuncOp &funcOp,
 
     // The outputs of the original operations are also the outputs of the
     // sharing wrapper.
-    for (auto op : group) {
+    for (auto *op : group) {
       outputTypes.push_back(op->getResultTypes()[0]);
     }
 
@@ -467,43 +477,29 @@ LogicalResult sharingWrapperInsertion(handshake::FuncOp &funcOp,
     outputTypes.insert(outputTypes.end(), sharedOp->getOperandTypes().begin(),
                        sharedOp->getOperandTypes().end());
 
-    llvm::errs() << "Before credits Arry\n";
+    assert(outputTypes.size() == sharedOp->getNumOperands() + group.size() &&
+           "The sharing wrapper has an incorrect number of output ports.");
 
     builder.setInsertionPoint(*group.begin());
     handshake::SharingWrapperOp wrapperOp =
         builder.create<handshake::SharingWrapperOp>(
             sharedOp->getLoc(), outputTypes, origOperands, namedCredits);
 
-    llvm::errs() << "Before access results\n";
-
     for (auto [id, op] : llvm::enumerate(group)) {
-      llvm::errs() << "ID" << id << "\n";
       op->getResult(0).replaceAllUsesWith(wrapperOp->getResult(id));
     }
 
-    llvm::errs() << "Num of data operands " << numDataOperand << "\n";
-    llvm::errs() << "Num of results of wrapper " << wrapperOp.getNumResults()
-                 << "\n";
-
-    llvm::errs() << "Before rewiring the input operands of shared Op\n";
-
     for (auto [id, val] : llvm::enumerate(sharedOp->getOperands())) {
       sharedOp->replaceUsesOfWith(val, wrapperOp->getResult(id + group.size()));
-      // val.replaceAllUsesWith(wrapperOp->getResult(id + group.size()));
     }
-
-    llvm::errs() << "Before erasing unused Ops\n";
 
     for (auto op : group) {
       if (op != *(group.begin())) {
         op->erase();
       }
     }
-
-    llvm::errs() << "After erasing unused Ops\n";
   }
 
-  llvm::errs() << "Before function return\n";
   return success();
 }
 
@@ -600,8 +596,6 @@ void CreditBasedSharingPass::runDynamaticPass() {
     if (failed(sharingWrapperInsertion(*funcOp, sharingGroups, ctx)))
       signalPassFailure();
   }
-
-  llvm::errs() << "Before leaving the pass\n";
 }
 
 namespace dynamatic {
