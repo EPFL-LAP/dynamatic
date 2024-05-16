@@ -36,7 +36,7 @@ A Dynamatic circuit may interact with 0 or more distinct memory regions. Interac
 
 ### Ad-hoc memory interfaces
 
-A Dynamatic circuit connects to memory regions through ad-hoc elastic memory interfaces ($M$ memory interfaces displayed right in the figure). These bi-directional ports may be different between memory regions; they carry the load/store requests back and forth between the Dynamatic circuit and the external memory region. Implementors are free to choose the exact signal bundles making up each memory interface.
+A Dynamatic circuit connects to memory regions through ad-hoc elastic memory interfaces ($M$ memory interfaces displayed right in the figure). These bidirectional ports may be different between memory regions; they carry the load/store requests back and forth between the Dynamatic circuit and the external memory region. Implementors are free to choose the exact signal bundles making up each memory interface.
 
 ## Memory interface
 
