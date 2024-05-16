@@ -1109,8 +1109,7 @@ def SpeculatingBranchOp : Handshake_Op<"speculating_branch", [
 //===----------------------------------------------------------------------===//
 
 def SharingWrapperOp : Handshake_Op<"sharing_wrapper", [
-TypesMatchWith<"data operand type matches data result type",
-                 "dataIn", "dataOut", "$_self">, 
+SameOperandsAndResultType
 ]> {
   let summary = "sharing wrapper operation"; let description = [{
     The sharing_wrapper operation represents the selecting & distributing logic
@@ -1143,9 +1142,9 @@ TypesMatchWith<"data operand type matches data result type",
     operation that shares it.
   }];
 
-  let arguments = (ins AnyType : $dataIn, ConfinedAttr<DefaultValuedAttr<DenseI64ArrayAttr, "{}">, [IntPositive]>:$credits);
+  let arguments = (ins Variadic<AnyType> : $dataIn, DefaultValuedAttr<DenseI64ArrayAttr, "{}">:$credits);
                  
-  let results = (outs AnyType : $dataOut);
+  let results = (outs Variadic<AnyType> : $dataOut);
   let assemblyFormat = "$dataIn `[` $credits `]` attr-dict `:` qualified(type($dataIn)) ";
 
 }
