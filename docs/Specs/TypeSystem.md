@@ -46,10 +46,10 @@ We argue that the only way to obtain the flexibility outlined above is to
 
 We propose to add two new types to the IR to enable us to reliably model our use cases inside Handshake-level IR.
 
-- A *non-parametric* type to model control-only tokens which lowers to a bundle made up of a downstream valid wire and upstream ready wire. This `handshake::ControlType` type would serialize to `control` inside the IR.
+- A *nonparametric* type to model control-only tokens which lowers to a bundle made up of a downstream valid wire and upstream ready wire. This `handshake::ControlType` type would serialize to `control` inside the IR.
 - A *parametric* type to model dataflow channels with an arbitrary data type and optional extra signals. In their most basic form, SSA values of this type would be a composition of an arbitrary "raw-typed" SSA value (e.g., `i32`) and of a `control`-typed SSA value. It follows that values of this type, in their basic form, would lower to a bundle made up of a downstream data bus of a specific bitwidth plus what the `control`-typed SSA value lowered to (valid and ready wires). Optionally, this type could also hold extra "raw-typed" signals (e.g., speculation bits, thread tags) that would lower to downstream or upstream buses of corresponding widths. This `handshake::ChannelType` type would serialize to `channel<data-type, {optional-extra-types}>` inside the IR.
 
-Re-considering our initial simple example, it seems that the proposed changes would make the IR look identical modulo cosmetic type changes.
+Considering again our initial simple example, it seems that the proposed changes would make the IR look identical modulo cosmetic type changes.
 
 ```mlir
 handshake.func @adder(%a: channel<i32>, %b: channel<i32>, %start: control) -> channel<i32>  {
