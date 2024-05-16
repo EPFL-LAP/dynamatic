@@ -40,7 +40,7 @@ A Dynamatic circuit connects to memory regions through ad-hoc elastic memory int
 
 ## Memory interface
 
-While the [ad-hoc memory interfaces](#ad-hoc-memory-interfaces) described above are very flexible by nature, users of Dynamatic circuits are likely to want to connect them to their design using standardized memory interfaces and talk to them through standard communication protocols. To fulfill this requirement, Dynamatic should also be able to emit wrappers around its "core dataflow circuits" that simply convert every of its ad-hoc memory interface to a standard interface (such as AXI). The figure below shows how such a wrapper would look like.
+While the [ad-hoc memory interfaces](#ad-hoc-memory-interfaces) described above are very flexible by nature, users of Dynamatic circuits are likely to want to connect them to their design using standard memory interfaces and talk to them through standard communication protocols. To fulfill this requirement, Dynamatic should also be able to emit wrappers around its "core dataflow circuits" that simply convert every of its ad-hoc memory interface to a standard interface (such as AXI). The figure below shows how such a wrapper would look like.
 
 ![Dynamatic circuit wrapper](figs/circuit_wrapper.svg)
 
