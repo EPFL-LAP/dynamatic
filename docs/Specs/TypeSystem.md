@@ -11,7 +11,7 @@ For example, consider a trivial C kernel.
 int adder(int a, int b) { return a + b; }
 ```
 
-At the Handshake level, the IR that Dynamatic generates for this kernel would like as follows (some details unimportant in the context of this proposal are omited for brevity).
+At the Handshake level, the IR that Dynamatic generates for this kernel would like as follows (some details unimportant in the context of this proposal are omitted for brevity).
 
 ```mlir
 handshake.func @adder(%a: i32, %b: i32, %start: none) -> i32  {
