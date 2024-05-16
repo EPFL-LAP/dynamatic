@@ -71,7 +71,7 @@ handshake.func @adder(%a: channel<i32>, %b: channel<i32>, %start: control) -> ch
 
 ### New operations
 
-Occasionaly, we will want to unbundle channel-typed SSA values into their individual signals and later re-combine the individual components into a single channel-typed SSA value. We propose to introduce two new operations to fulfill this requirement.
+Occasionaly, we will want to unbundle channel-typed SSA values into their individual signals and later recombine the individual components into a single channel-typed SSA value. We propose to introduce two new operations to fulfill this requirement.
 
 - An unbundling operation (`handshake::UnbundleOp`) which generally breaks down its bundle-like-typed SSA operand into its individual components, which it produces as separate SSA results.
 - A converse bundling operation (`handshake::BundleOp`) which generally combines multiple raw-typed SSA operands and combines them into a single bundle-like-typed SSA value which it produces as a single SSA result.
@@ -181,7 +181,7 @@ The `handshake::BundleOp` and `handshake::UnbundleOp` operations would have the 
 // Unbundle it, producing all the individual signals 
 %data, %otherData, %valid = handshake.unbundle %bundle : i32, i16, i1
 
-// Re-bundle it; all signal names need to be re-specified as to not lose the
+// Rebundle it; all signal names need to be specified again as to not lose the
 // original context
 %bundleAgain = handshake.bundle [%data, %otherData, %valid] : bundle<data: i32, otherData: i16, valid: i1>
 ```
@@ -265,7 +265,7 @@ The support for "nonstandard" signal bundles in the IR means that we have to mat
 
 In some instances, it may be useful to compose all of a channel's signals going in the same direction (downstream or upstream) together around operations that do not care about the actual content of their operands' data buses (e.g., all data operands of merge-like and branch-like operations). This would allow us to expose to certain operations "regular" dataflow channels without extra signals; their *exposed data buses* would in fact be constituted of the *actual data buses* plus all extra downstream signals. Just before lowering to HW and then RTL (after applying all Handshake-level transformations and optimizations to the IR), we could run a signal-composition pass that would apply this transformation around specific dataflow components in order to make our backend's life easier.
 
-Re-considering the last example with extra signals from the [IR complexity](#ir-complexity) subsection above, we could make our current generic mux implementation work with the new type system without modifications to the RTL.
+Considering again the last example with extra signals from the [IR complexity](#ir-complexity) subsection above, we could make our current generic mux implementation work with the new type system without modifications to the RTL.
 
 ```mlir
 %index = ... : channel<i1>
