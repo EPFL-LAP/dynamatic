@@ -5,31 +5,43 @@
 // SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
 //
 //===----------------------------------------------------------------------===//
+//
+// This file implements the Kosaraju's algorithm for generating SCCs in linear
+// time.
+//
+//===----------------------------------------------------------------------===//
 
 #include "experimental/Transforms/ResourceSharing/SharingSupport.h"
 
 using namespace dynamatic;
 using namespace dynamatic::buffer;
 
-void recursiveDfs(Operation *op, std::map<Operation *, bool> &visited,
-                  std::vector<Operation *> &discoveredOps,
-                  const std::set<Channel *> &cfChannels) {
+// This recursive function traverses the CFC and calculates a post-order, i.e.,
+// if there is a path from node_1 to node_2, then in the returned relative
+// order, node_1 < node_2.
+void recursiveDfsComponentOrder(Operation *op,
+                                std::map<Operation *, bool> &visited,
+                                std::vector<Operation *> &dfsPostOrder,
+                                const std::set<Channel *> &cfChannels) {
   if (!visited[op]) {
     // 1. Mark op as visited
     visited[op] = true;
 
-    // 2. For each of the outgoing channels of op, do a recursiveDfs call
+    // 2. For each of the outgoing channels of op, do a
+    // recursiveDfsComponentOrder call
     for (auto *ch : cfChannels) {
       if (ch->producer == op) {
-        recursiveDfs(ch->consumer, visited, discoveredOps, cfChannels);
+        recursiveDfsComponentOrder(ch->consumer, visited, dfsPostOrder,
+                                   cfChannels);
       }
     }
 
     // 3. Backtracking: Set the operation as discovered
-    discoveredOps.insert(discoveredOps.begin(), op);
+    dfsPostOrder.insert(dfsPostOrder.begin(), op);
   }
 }
 
+// This recursive function assigns a single ID to each operations in a SCC.
 void recursiveDfsAssignSCCId(Operation *op,
                              std::map<Operation *, size_t> &assigned,
                              const std::set<Channel *> &cfChannels,
@@ -49,13 +61,15 @@ void recursiveDfsAssignSCCId(Operation *op,
   }
 }
 
-// for a CFC, find the list of SCCs
+// For a given CFC (specified as the set of units and channels), find the list
+// of SCCs.
 std::map<Operation *, size_t> dynamatic::experimental::sharing::getSccsInCfc(
     const std::set<Operation *> &cfUnits,
     const std::set<Channel *> &cfChannels) {
   std::map<Operation *, bool> visited;
 
-  std::vector<Operation *> visitList;
+  // DFS post-order of the CFC (see description above).
+  std::vector<Operation *> dfsPostOrder;
 
   std::map<Operation *, size_t> assigned;
 
@@ -65,7 +79,7 @@ std::map<Operation *, size_t> dynamatic::experimental::sharing::getSccsInCfc(
 
   // 2. For each unit in the CFC, do RecursiveBFS(u).
   for (auto *op : cfUnits)
-    recursiveDfs(op, visited, visitList, cfChannels);
+    recursiveDfsComponentOrder(op, visited, dfsPostOrder, cfChannels);
 
   // For each unit in the CFC, mark u as not assigned (0 means not assigned).
   for (auto *op : cfUnits)
@@ -73,7 +87,7 @@ std::map<Operation *, size_t> dynamatic::experimental::sharing::getSccsInCfc(
 
   size_t currSCCId = 0;
   // 3. For each unit in the CFC, do recursiveBackBfs(u)
-  for (auto *op : visitList) {
+  for (auto *op : dfsPostOrder) {
     if (assigned[op] == 0) {
       currSCCId += 1;
       recursiveDfsAssignSCCId(op, assigned, cfChannels, currSCCId);
