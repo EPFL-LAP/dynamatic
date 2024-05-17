@@ -26,6 +26,7 @@
 #include "mlir/Pass/PassManager.h"
 #include <algorithm>
 #include <cassert>
+#include <cmath>
 #include <cstddef>
 #include <list>
 #include <map>
@@ -43,6 +44,8 @@ using namespace dynamatic::experimental::sharing;
 
 using namespace dynamatic::buffer;
 
+/// Algorithms that do not require solving an MILP.
+static constexpr llvm::StringLiteral ON_MERGES("on-merges");
 #ifndef DYNAMATIC_GUROBI_NOT_INSTALLED
 /// Algorithms that do require solving an MILP.
 static constexpr llvm::StringLiteral FPGA20("fpga20"),
@@ -130,7 +133,6 @@ void loadFuncPerfInfo(SharingInfo &info, MILPVars &vars, FuncInfo &funcInfo) {
     }
 
     info[&funcInfo.funcOp].critCfcs.emplace(cfIndices[*critCf]);
-    llvm::errs() << "Frequency of crit cfc: " << (*critCf)->numExecs << "\n";
   }
 }
 
@@ -289,6 +291,7 @@ struct CreditBasedSharingPass
     if (failed(pm.run(modOp))) {
       return failure();
     }
+
     return success();
   }
 };
@@ -413,12 +416,16 @@ void sortGroups(SharingGroups &sharingGroups, FuncPerfInfo &info) {
 
 // Set opOccupancy[op] to the occupancy required to achieve maximum performance
 // of all performance critical CFCs.
-void getChannelOccupancy(const SmallVector<Operation *> &sharingTargets,
-                         llvm::MapVector<Operation *, double> &opOccupancy,
-                         TimingDatabase &timingDB, FuncPerfInfo &funcPerfInfo) {
+void getOpOccupancy(const SmallVector<Operation *> &sharingTargets,
+                    llvm::MapVector<Operation *, double> &opOccupancy,
+                    TimingDatabase &timingDB, FuncPerfInfo &funcPerfInfo) {
 
   double latency;
   for (auto *target : sharingTargets) {
+    // By default, the op is assigned with no occupancy. If a performance
+    // critical CFC contains that op, then we set the occupancy to the occupancy
+    // of op in that CFC.
+    opOccupancy[target] = 0.0;
     for (auto cf : funcPerfInfo.critCfcs) {
       if (funcPerfInfo.cfUnits[cf].find(target) !=
           funcPerfInfo.cfUnits[cf].end()) {
@@ -431,9 +438,10 @@ void getChannelOccupancy(const SmallVector<Operation *> &sharingTargets,
   }
 }
 
-LogicalResult sharingWrapperInsertion(handshake::FuncOp &funcOp,
-                                      SharingGroups &sharingGroups,
-                                      MLIRContext *ctx) {
+LogicalResult
+sharingWrapperInsertion(handshake::FuncOp &funcOp, SharingGroups &sharingGroups,
+                        MLIRContext *ctx,
+                        MapVector<Operation *, double> &opOccupancy) {
   OpBuilder builder(ctx);
   for (auto group : sharingGroups) {
 
@@ -477,7 +485,9 @@ LogicalResult sharingWrapperInsertion(handshake::FuncOp &funcOp,
     // TODO: the number of credits of each operation will be passed as a
     // function argument.
     for (auto op : group) {
-      credits.push_back(1);
+      double occupancy = opOccupancy[op];
+      // The number of credits must be an integer.
+      credits.push_back(1 + std::ceil(occupancy));
     }
 
     NamedAttribute namedCredits(
@@ -525,8 +535,6 @@ LogicalResult sharingWrapperInsertion(handshake::FuncOp &funcOp,
 }
 
 void CreditBasedSharingPass::runDynamaticPass() {
-  llvm::errs() << "***** Resource Sharing *****\n";
-
   MLIRContext *ctx = &getContext();
   OpBuilder builder(ctx);
   NameAnalysis &namer = getAnalysis<NameAnalysis>();
@@ -551,33 +559,24 @@ void CreditBasedSharingPass::runDynamaticPass() {
     return;
   }
 
-  // for (auto [funcOp, info] : data) {
-  //   for (auto [idx, cf] : info.cfUnits) {
-  //     for (auto *op : cf)
-  //       llvm::errs() << namer.getName(op) << " ";
-  //   }
-  //   llvm::errs() << "\n";
-  // }
-
-  // for (auto [funcOp, info] : data) {
-  //   for (auto [idx, cf] : info.cfChannels) {
-  //     for (auto *ch : cf)
-  //       llvm::errs() << namer.getName(ch->producer) << "->"
-  //                    << namer.getName(ch->consumer) << " ";
-  //   }
-  //   llvm::errs() << "\n";
-  // }
-
-  for (auto [funcOp, info] : data) {
-    for (auto [idx, throughput] : info.cfThroughput) {
-      llvm::errs() << "Throughput of CFDFC #" << idx << " is " << throughput
-                   << "\n";
+  // If buffers are placed naively, then no critical CFC is set for each funcOp.
+  // We can also share operations naively.
+  if (algorithm == ON_MERGES) {
+    for (handshake::FuncOp funcOp :
+         getOperation().getOps<handshake::FuncOp>()) {
+      FuncPerfInfo funcPerfInfo;
+      data[&funcOp] = funcPerfInfo;
     }
   }
 
   for (auto &[funcOp, info] : data) {
     // Check the sharing targets
     SmallVector<Operation *> sharingTargets = getSharingTargets(*funcOp);
+
+    // opOccupancy: maps each operation to the maximum occupancy it has to
+    // achieve.
+    llvm::MapVector<Operation *, double> opOccupancy;
+    getOpOccupancy(sharingTargets, opOccupancy, timingDB, info);
 
     // Initialize the sharing groups:
     SharingGroups sharingGroups;
@@ -592,10 +591,6 @@ void CreditBasedSharingPass::runDynamaticPass() {
       std::map<Operation *, size_t> sccMap =
           getSccsInCfc(info.cfUnits[critCfc], info.cfChannels[critCfc]);
       info.cfSccs.emplace(critCfc, sccMap);
-      llvm::errs() << "SCC ID of CFC #" << critCfc << "\n";
-      for (auto [op, sccId] : info.cfSccs[critCfc]) {
-        llvm::errs() << namer.getName(op) << " " << sccId << "\n";
-      }
     }
 
     llvm::errs() << "Initial groups\n";
@@ -618,7 +613,8 @@ void CreditBasedSharingPass::runDynamaticPass() {
 
     // For each sharing group, unite them with a sharing wrapper and shared
     // operation.
-    if (failed(sharingWrapperInsertion(*funcOp, sharingGroups, ctx)))
+    if (failed(
+            sharingWrapperInsertion(*funcOp, sharingGroups, ctx, opOccupancy)))
       signalPassFailure();
   }
 }
