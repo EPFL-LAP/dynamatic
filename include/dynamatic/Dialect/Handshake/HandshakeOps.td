@@ -1128,7 +1128,7 @@ SameOperandsAndResultType
 
     ```mlir
     %sharedOut1 = arith.muli %selIn1, %selIn1 { name=#handshake.name<"muliShared1"> } : i32
-    %selIn1, %selIn2, %succOut1, %succOut2 = sharing_wrapper %pred1In1, %pred1In2, %pred2In1, %pred2In2, %sharedOut1 [3, 3] : i32
+    %selIn1, %selIn2, %succOut1, %succOut2 = sharing_wrapper %pred1In1, %pred1In2, %pred2In1, %pred2In2, %sharedOut1 [3, 3] : i32, i32, i32, i32, i32
     ```
 
     The sharing wrapper selects the original operands (%pred1In1, %pred1In2,
@@ -1145,7 +1145,7 @@ SameOperandsAndResultType
   let arguments = (ins Variadic<AnyType> : $dataIn, DefaultValuedAttr<DenseI64ArrayAttr, "{}">:$credits);
                  
   let results = (outs Variadic<AnyType> : $dataOut);
-  let assemblyFormat = "$dataIn ` ` `[` $credits `]` attr-dict `:` qualified(type($dataIn)) ";
+  let assemblyFormat = "$dataIn $credits attr-dict `:` qualified(type($dataIn)) ";
 
 }
 
