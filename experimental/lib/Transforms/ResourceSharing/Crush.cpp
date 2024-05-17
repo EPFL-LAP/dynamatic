@@ -76,6 +76,7 @@ struct FuncPerfInfo {
 // SharingInfo: for each funcOp, its extracted FuncPerfInfo.
 using SharingInfo = std::map<handshake::FuncOp *, FuncPerfInfo>;
 
+// A sharing group Group holds a list of operations that share one unit.
 using Group = std::vector<Operation *>;
 
 // SharingGroups: a list of operations that share the same unit.
@@ -83,42 +84,48 @@ using SharingGroups = std::list<Group>;
 
 // Wrapper function for saving the data retrived from buffer placement milp
 // algorithm into a SharingInfo structure.
-void loadFuncPerfInfo(SharingInfo &info, MILPVars &vars, FuncInfo &funcInfo) {
+void loadFuncPerfInfo(SharingInfo &sharingInfo, MILPVars &vars,
+                      FuncInfo &funcInfo) {
+
   // Map each individual CFDFC to its iteration index
   std::map<CFDFC *, size_t> cfIndices;
-  for (auto [idx, cfAndOpt] : llvm::enumerate(funcInfo.cfdfcs))
-    cfIndices[cfAndOpt.first] = idx;
-
-  // Extract result: save global CFDFC throuhgputs into info
-  for (auto [idx, cfdfcWithVars] : llvm::enumerate(vars.cfVars)) {
-    auto [cf, cfVars] = cfdfcWithVars;
-    double throughput = cfVars.throughput.get(GRB_DoubleAttr_X);
-
-    info[&funcInfo.funcOp].cfThroughput[cfIndices[cf]] = throughput;
-    // info.cfcThroughput[cf] = throughput;
-    info[&funcInfo.funcOp].cfUnits[cfIndices[cf]] = {};
-
-    // Track the units of the CFC
-    for (auto *op : cf->units)
-      info[&funcInfo.funcOp].cfUnits[cfIndices[cf]].insert(op);
-
-    // Track the channels of the CFC
-    for (auto val : cf->channels) {
-      Channel *ch = new Channel(val);
-
-      info[&funcInfo.funcOp].cfChannels[cfIndices[cf]].insert(ch);
-    }
-  }
 
   SmallVector<CFDFC *, 8> cfdfcs;
   std::vector<CFDFCUnion> disjointUnions;
   llvm::transform(funcInfo.cfdfcs, std::back_inserter(cfdfcs),
                   [](auto cfAndOpt) { return cfAndOpt.first; });
+
   getDisjointBlockUnions(cfdfcs, disjointUnions);
 
-  // Instrumentation: for each CFDFC Union, mark the most-frequently-executed
-  // CFC as performance critical
+  // Map each CFDFC to a numeric ID.
+  for (auto [id, cfAndOpt] : llvm::enumerate(funcInfo.cfdfcs))
+    cfIndices[cfAndOpt.first] = id;
 
+  // Extract result: save global CFDFC throuhgputs into sharingInfo
+  for (auto [id, cfdfcWithVars] : llvm::enumerate(vars.cfVars)) {
+
+    auto [cf, cfVars] = cfdfcWithVars;
+    double throughput = cfVars.throughput.get(GRB_DoubleAttr_X);
+
+    sharingInfo[&funcInfo.funcOp].cfThroughput[cfIndices[cf]] = throughput;
+
+    sharingInfo[&funcInfo.funcOp].cfUnits[cfIndices[cf]] =
+        std::set(cf->units.begin(), cf->units.end());
+
+    // // Track the units of the CFC
+    // for (auto *op : cf->units)
+    //   sharingInfo[&funcInfo.funcOp].cfUnits[cfIndices[cf]].insert(op);
+
+    // Track the channels of the CFC
+    for (auto val : cf->channels) {
+      Channel *ch = new Channel(val);
+
+      sharingInfo[&funcInfo.funcOp].cfChannels[cfIndices[cf]].insert(ch);
+    }
+  }
+
+  // or each CFDFC Union, mark the most-frequently-executed
+  // CFC as performance critical.
   for (auto &cfUnion : disjointUnions) {
 
     auto *critCf =
@@ -132,7 +139,7 @@ void loadFuncPerfInfo(SharingInfo &info, MILPVars &vars, FuncInfo &funcInfo) {
       return;
     }
 
-    info[&funcInfo.funcOp].critCfcs.emplace(cfIndices[*critCf]);
+    sharingInfo[&funcInfo.funcOp].critCfcs.emplace(cfIndices[*critCf]);
   }
 }
 
@@ -145,27 +152,60 @@ namespace fpga20 {
 class FPGA20BuffersWrapper : public FPGA20Buffers {
 public:
   // constructor
-  FPGA20BuffersWrapper(SharingInfo &info, GRBEnv &env, FuncInfo &funcInfo,
-                       const TimingDatabase &timingDB, double targetPeriod,
-                       bool legacyPlacement, Logger &logger, StringRef milpName)
+  FPGA20BuffersWrapper(SharingInfo &sharingInfo, GRBEnv &env,
+                       FuncInfo &funcInfo, const TimingDatabase &timingDB,
+                       double targetPeriod, bool legacyPlacement,
+                       Logger &logger, StringRef milpName)
       : FPGA20Buffers(env, funcInfo, timingDB, targetPeriod, legacyPlacement,
                       logger, milpName),
-        info(info){};
-  FPGA20BuffersWrapper(SharingInfo &info, GRBEnv &env, FuncInfo &funcInfo,
-                       const TimingDatabase &timingDB, double targetPeriod,
-                       bool legacyPlacement)
+        sharingInfo(sharingInfo){};
+  FPGA20BuffersWrapper(SharingInfo &sharingInfo, GRBEnv &env,
+                       FuncInfo &funcInfo, const TimingDatabase &timingDB,
+                       double targetPeriod, bool legacyPlacement)
       : FPGA20Buffers(env, funcInfo, timingDB, targetPeriod, legacyPlacement),
-        info(info){};
-  SharingInfo &info;
+        sharingInfo(sharingInfo){};
+
+private:
+  SharingInfo &sharingInfo;
   void extractResult(BufferPlacement &placement) override {
     // Run the FPGA20Buffers's extractResult as it is
     FPGA20Buffers::extractResult(placement);
 
-    loadFuncPerfInfo(info, vars, funcInfo);
+    loadFuncPerfInfo(sharingInfo, vars, funcInfo);
   }
 };
 
 } // namespace fpga20
+
+namespace fpl22 {
+
+class FPL22BuffersWraper : public CFDFCUnionBuffers {
+public:
+  FPL22BuffersWraper(SharingInfo &sharingInfo, GRBEnv &env, FuncInfo &funcInfo,
+                     const TimingDatabase &timingDB, double targetPeriod,
+                     CFDFCUnion &cfUnion, Logger &logger, StringRef milpName)
+      : CFDFCUnionBuffers(env, funcInfo, timingDB, targetPeriod, cfUnion,
+                          logger, milpName),
+        sharingInfo(sharingInfo){};
+  FPL22BuffersWraper(SharingInfo &sharingInfo, GRBEnv &env, FuncInfo &funcInfo,
+                     const TimingDatabase &timingDB, double targetPeriod,
+                     CFDFCUnion &cfUnion)
+      : CFDFCUnionBuffers(env, funcInfo, timingDB, targetPeriod, cfUnion),
+        sharingInfo(sharingInfo){};
+
+private:
+  SharingInfo &sharingInfo;
+
+  void extractResult(BufferPlacement &placement) override {
+    // Run the FPL22BuffersBase's extractResult as it is
+    FPL22BuffersBase::extractResult(placement);
+
+    loadFuncPerfInfo(sharingInfo, vars, funcInfo);
+  }
+};
+
+} // namespace fpl22
+
 } // namespace buffer
 } // namespace dynamatic
 
@@ -186,19 +226,20 @@ checkLoggerAndSolve(Logger *logger, StringRef milpName,
 
 namespace {
 using fpga20::FPGA20BuffersWrapper;
+using fpl22::FPL22BuffersWraper;
 
 // An wrapper class that applies buffer p
 // extracts the report.
 struct HandshakePlaceBuffersPassWrapper : public HandshakePlaceBuffersPass {
-  HandshakePlaceBuffersPassWrapper(SharingInfo &info, StringRef algorithm,
-                                   StringRef frequencies,
+  HandshakePlaceBuffersPassWrapper(SharingInfo &sharingInfo,
+                                   StringRef algorithm, StringRef frequencies,
                                    StringRef timingModels, bool firstCFDFC,
                                    double targetCP, unsigned timeout,
                                    bool dumpLogs)
       : HandshakePlaceBuffersPass(algorithm, frequencies, timingModels,
                                   firstCFDFC, targetCP, timeout, dumpLogs),
-        info(info){};
-  SharingInfo &info;
+        sharingInfo(sharingInfo){};
+  SharingInfo &sharingInfo;
 
 #ifndef DYNAMATIC_GUROBI_NOT_INSTALLED
   LogicalResult getBufferPlacement(FuncInfo &funcInfo, TimingDatabase &timingDB,
@@ -215,7 +256,7 @@ struct HandshakePlaceBuffersPassWrapper : public HandshakePlaceBuffersPass {
     if (algorithm == FPGA20 || algorithm == FPGA20_LEGACY) {
       // Create and solve the MILP
       return checkLoggerAndSolve<FPGA20BuffersWrapper>(
-          logger, "placement", placement, info, env, funcInfo, timingDB,
+          logger, "placement", placement, sharingInfo, env, funcInfo, timingDB,
           targetCP, algorithm != FPGA20);
     }
     if (algorithm == FPL22) {
@@ -229,11 +270,11 @@ struct HandshakePlaceBuffersPassWrapper : public HandshakePlaceBuffersPass {
       // Create and solve an MILP for each CFDFC union. Placement decisions get
       // accumulated over all MILPs. It's not possible to override a previous
       // placement decision because each CFDFC union is disjoint from the others
-      for (auto [idx, cfUnion] : llvm::enumerate(disjointUnions)) {
-        std::string milpName = "cfdfc_placement_" + std::to_string(idx);
-        if (failed(checkLoggerAndSolve<fpl22::CFDFCUnionBuffers>(
-                logger, milpName, placement, env, funcInfo, timingDB, targetCP,
-                cfUnion)))
+      for (auto [id, cfUnion] : llvm::enumerate(disjointUnions)) {
+        std::string milpName = "cfdfc_placement_" + std::to_string(id);
+        if (failed(checkLoggerAndSolve<FPL22BuffersWraper>(
+                logger, milpName, placement, sharingInfo, env, funcInfo,
+                timingDB, targetCP, cfUnion)))
           return failure();
       }
 
@@ -297,7 +338,8 @@ struct CreditBasedSharingPass
 };
 } // namespace
 
-// For two sharing groups, check if the following criteria hold.
+// For two sharing groups, check if the following criteria hold (see
+// descriptions below).
 bool checkGroupMergable(const Group &g1, const Group &g2,
                         FuncPerfInfo funcPerfInfo) {
   if (g1.empty() || g2.empty())
@@ -453,68 +495,68 @@ sharingWrapperInsertion(handshake::FuncOp &funcOp, SharingGroups &sharingGroups,
     // Elect one operation as the shared operation.
     auto *sharedOp = *group.begin();
 
+    // Enumerate the operands of the original pre-sharing operations.
+    llvm::SmallVector<Value> sharingWrapperInputs;
+    for (auto *op : group) {
+      for (auto val : op->getOperands()) {
+        sharingWrapperInputs.push_back(val);
+      }
+    }
+
     // Check if the number of results is exactly 1.
     assert(sharedOp->getNumResults() == 1 &&
            "Sharing wrapper currently only supports operation with a single "
            "return value.");
 
-    // Enumerate the operands of the original pre-sharing operations.
-    llvm::SmallVector<Value> origOperands;
-    // llvm::SmallVector<Value> origResults;
-    for (auto op : group) {
-      for (auto val : op->getOperands()) {
-        origOperands.push_back(val);
-      }
-    }
-
-    size_t numDataOperand = origOperands.size();
-
-    assert(numDataOperand > 0);
-
     // The result of the shared operation is also one of the inputs of the
     // sharing wrapper.
-    origOperands.push_back(sharedOp->getResult(0));
+    sharingWrapperInputs.push_back(sharedOp->getResult(0));
 
     assert(group.size() * sharedOp->getNumOperands() +
                    sharedOp->getNumResults() ==
-               origOperands.size() &&
+               sharingWrapperInputs.size() &&
            "The sharing wrapper has an incorrect number of input ports.");
 
+    // Determining the number of credits of each operation that share the unit
+    // based on the maximum achievable occupancy in critical CFCs.
     llvm::SmallVector<int64_t> credits;
-
-    // TODO: the number of credits of each operation will be passed as a
-    // function argument.
-    for (auto op : group) {
+    for (auto *op : group) {
       double occupancy = opOccupancy[op];
-      // The number of credits must be an integer.
+      // The number of credits must be an integer. It is incremented by 1 to
+      // hide the latency of returning a credit, and accounts for token staying
+      // in the output buffers due to the effect of sharing.
       credits.push_back(1 + std::ceil(occupancy));
     }
 
-    NamedAttribute namedCredits(
+    // Retrieve the type reference the the number of credits per each operation.
+    NamedAttribute namedCreditsAttr(
         StringAttr::get(ctx, "credits"),
         builder.getDenseI64ArrayAttr(llvm::ArrayRef<int64_t>(credits)));
 
-    // Result types (this also tracks the number of results)
-    llvm::SmallVector<Type> outputTypes;
+    // Result types (this also tracks the number of results).
+    llvm::SmallVector<Type> sharingWrapperOutputTypes;
 
     // The outputs of the original operations are also the outputs of the
     // sharing wrapper.
     for (auto *op : group) {
-      outputTypes.push_back(op->getResultTypes()[0]);
+      sharingWrapperOutputTypes.push_back(op->getResultTypes()[0]);
     }
 
     // The inputs of the shared operation is also the output of the sharing
     // wrapper.
-    outputTypes.insert(outputTypes.end(), sharedOp->getOperandTypes().begin(),
-                       sharedOp->getOperandTypes().end());
+    sharingWrapperOutputTypes.insert(sharingWrapperOutputTypes.end(),
+                                     sharedOp->getOperandTypes().begin(),
+                                     sharedOp->getOperandTypes().end());
 
-    assert(outputTypes.size() == sharedOp->getNumOperands() + group.size() &&
+    assert(sharingWrapperOutputTypes.size() ==
+               sharedOp->getNumOperands() + group.size() &&
            "The sharing wrapper has an incorrect number of output ports.");
 
     builder.setInsertionPoint(*group.begin());
     handshake::SharingWrapperOp wrapperOp =
         builder.create<handshake::SharingWrapperOp>(
-            sharedOp->getLoc(), outputTypes, origOperands, namedCredits);
+            sharedOp->getLoc(), sharingWrapperOutputTypes, sharingWrapperInputs,
+            namedCreditsAttr);
 
     for (auto [id, op] : llvm::enumerate(group)) {
       op->getResult(0).replaceAllUsesWith(wrapperOp->getResult(id));
@@ -524,7 +566,8 @@ sharingWrapperInsertion(handshake::FuncOp &funcOp, SharingGroups &sharingGroups,
       sharedOp->replaceUsesOfWith(val, wrapperOp->getResult(id + group.size()));
     }
 
-    for (auto op : group) {
+    // Remove all operations in the sharing group except for the shared one.
+    for (auto *op : group) {
       if (op != *(group.begin())) {
         op->erase();
       }
@@ -550,11 +593,11 @@ void CreditBasedSharingPass::runDynamaticPass() {
     return;
   }
 
-  SharingInfo data;
+  SharingInfo sharingInfo;
 
-  // Run buffer placement pass and fill data with performance analysis
+  // Run buffer placement pass and fill sharingInfo with performance analysis
   // information
-  if (failed(runBufferPlacementPass(modOp, data))) {
+  if (failed(runBufferPlacementPass(modOp, sharingInfo))) {
     modOp->emitError() << "Failed running buffer placement";
     return;
   }
@@ -565,18 +608,19 @@ void CreditBasedSharingPass::runDynamaticPass() {
     for (handshake::FuncOp funcOp :
          getOperation().getOps<handshake::FuncOp>()) {
       FuncPerfInfo funcPerfInfo;
-      data[&funcOp] = funcPerfInfo;
+      sharingInfo[&funcOp] = funcPerfInfo;
     }
   }
 
-  for (auto &[funcOp, info] : data) {
+  for (auto &[funcOp, funcPerfInfo] : sharingInfo) {
+
     // Check the sharing targets
     SmallVector<Operation *> sharingTargets = getSharingTargets(*funcOp);
 
     // opOccupancy: maps each operation to the maximum occupancy it has to
     // achieve.
     llvm::MapVector<Operation *, double> opOccupancy;
-    getOpOccupancy(sharingTargets, opOccupancy, timingDB, info);
+    getOpOccupancy(sharingTargets, opOccupancy, timingDB, funcPerfInfo);
 
     // Initialize the sharing groups:
     SharingGroups sharingGroups;
@@ -587,10 +631,10 @@ void CreditBasedSharingPass::runDynamaticPass() {
     }
 
     // Determine SCCs
-    for (auto critCfc : info.critCfcs) {
-      std::map<Operation *, size_t> sccMap =
-          getSccsInCfc(info.cfUnits[critCfc], info.cfChannels[critCfc]);
-      info.cfSccs.emplace(critCfc, sccMap);
+    for (auto critCfc : funcPerfInfo.critCfcs) {
+      std::map<Operation *, size_t> sccMap = getSccsInCfc(
+          funcPerfInfo.cfUnits[critCfc], funcPerfInfo.cfChannels[critCfc]);
+      funcPerfInfo.cfSccs.emplace(critCfc, sccMap);
     }
 
     llvm::errs() << "Initial groups\n";
@@ -598,7 +642,7 @@ void CreditBasedSharingPass::runDynamaticPass() {
 
     // Merge groups
     for (bool continueMerging = true; continueMerging;) {
-      continueMerging = tryMergeGroups(sharingGroups, info);
+      continueMerging = tryMergeGroups(sharingGroups, funcPerfInfo);
     }
 
     // log
@@ -606,7 +650,7 @@ void CreditBasedSharingPass::runDynamaticPass() {
     logGroups(sharingGroups, namer);
 
     // Sort each sharing group according to their SCC ID.
-    sortGroups(sharingGroups, info);
+    sortGroups(sharingGroups, funcPerfInfo);
     // log
     llvm::errs() << "Sorted groups\n";
     logGroups(sharingGroups, namer);
