@@ -13,6 +13,7 @@
 #include "dynamatic/Support/LLVM.h"
 #include "dynamatic/Support/Logging.h"
 #include "dynamatic/Support/MILP.h"
+#include "dynamatic/Support/TimingModels.h"
 #include "dynamatic/Transforms/BufferPlacement/BufferingSupport.h"
 #include "dynamatic/Transforms/BufferPlacement/CFDFC.h"
 #include "dynamatic/Transforms/BufferPlacement/FPGA20Buffers.h"
@@ -410,6 +411,26 @@ void sortGroups(SharingGroups &sharingGroups, FuncPerfInfo &info) {
   }
 }
 
+// Set opOccupancy[op] to the occupancy required to achieve maximum performance
+// of all performance critical CFCs.
+void getChannelOccupancy(const SmallVector<Operation *> &sharingTargets,
+                         llvm::MapVector<Operation *, double> &opOccupancy,
+                         TimingDatabase &timingDB, FuncPerfInfo &funcPerfInfo) {
+
+  double latency;
+  for (auto *target : sharingTargets) {
+    for (auto cf : funcPerfInfo.critCfcs) {
+      if (funcPerfInfo.cfUnits[cf].find(target) !=
+          funcPerfInfo.cfUnits[cf].end()) {
+        if (failed(timingDB.getLatency(target, SignalType::DATA, latency)))
+          latency = 0.0;
+        // Occupancy = Latency / II = Latency * Throughput.
+        opOccupancy[target] = latency * funcPerfInfo.cfThroughput[cf];
+      }
+    }
+  }
+}
+
 LogicalResult sharingWrapperInsertion(handshake::FuncOp &funcOp,
                                       SharingGroups &sharingGroups,
                                       MLIRContext *ctx) {
@@ -509,6 +530,10 @@ void CreditBasedSharingPass::runDynamaticPass() {
   MLIRContext *ctx = &getContext();
   OpBuilder builder(ctx);
   NameAnalysis &namer = getAnalysis<NameAnalysis>();
+
+  TimingDatabase timingDB(&getContext());
+  if (failed(TimingDatabase::readFromJSON(timingModels, timingDB)))
+    signalPassFailure();
 
   // Buffer placement requires that all values are used exactly once
   ModuleOp modOp = getOperation();
