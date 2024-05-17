@@ -3,7 +3,7 @@
 > [!NOTE]
 > This is a proposed design change; it is not implemented yet.
 
-The interface of Dynamatic-generated circuits has so far never been properly formalized; it is unclear what guarantees our circuits provide to the outside world, or even what the semantics of their top-level IO are. This design proposal aims to clarify these concerns and lay out clear invariants that all Dynamatic circuits must honor to allow their useas part of larger arbitrary circuits and the composition of multiple Dynamatic circuits together. This specification introduces the proposed interfaces by looking at our circuits at different levels of granularity.
+The interface of Dynamatic-generated circuits has so far never been properly formalized; it is unclear what guarantees our circuits provide to the outside world, or even what the semantics of their top-level IO are. This design proposal aims to clarify these concerns and lay out clear invariants that all Dynamatic circuits must honor to allow their use as part of larger arbitrary circuits and the composition of multiple Dynamatic circuits together. This specification introduces the proposed interfaces by looking at our circuits at different levels of granularity.
 
 1. [Circuit interface](#circuit-interface) | Describes the semantics of our circuit's top-level IO.
 2. [Memory interface](#memory-interface) | Explains how we can implement standardized memory interfaces (e.g., AXI) from our ad-hoc ones.
@@ -34,9 +34,15 @@ A Dynamatic circuit may have 0 or more arguments ($N$ arguments displayed top-le
 
 A Dynamatic circuit may interact with 0 or more distinct memory regions. Interactions with each memory region is controlled independently by a pair of control-only ports, a `mem_start` input ($M$ memory control inputs displayed top-right in the figure) and `mem_end` output ($M$ memory control outputs displayed bottom-right in the figure). The `mem_start` input indicates to the Dynamatic circuit that it may start to make accesses to that memory region in the current circuit execution. Conversely, the `mem_end` output indicates that the Dynamatic circuit will not make any more accesses to the memory region in the current circuit execution.
 
+> [!NOTE]
+> The number of distinct memory regions that a Dynamatic circuit instantiates is not a direct function of the source code from which it was synthesized. The compiler is free to make optimizations or transformations as required. For convenience, Dynamatic still offers the option of simply assigning a distinct memory region to each array-typed argument in the source code.
+
 ### Ad-hoc memory interfaces
 
-A Dynamatic circuit connects to memory regions through ad-hoc elastic memory interfaces ($M$ memory interfaces displayed right in the figure). These bidirectional ports may be different between memory regions; they carry the load/store requests back and forth between the Dynamatic circuit and the external memory region. Implementors are free to choose the exact signal bundles making up each memory interface.
+A Dynamatic circuit connects to memory regions through ad-hoc memory interfaces ($M$ memory interfaces displayed right in the figure). These bidirectional ports may be different between memory regions; they carry the load/store requests back and forth between the Dynamatic circuit and the external memory region. Implementors are free to choose the exact signal bundles making up each memory interface.
+
+> [!IMPORTANT]
+> While the specification imposes no restriction on these memory interfaces, it is good practice to always use some kind of *elastic* (e.g., latency-insensitive) interface to guaranteee compatibility with standardized latency-insensitive protocols such as AXI. Note that our current ad-hoc memory interfaces are *not* elastic, which should be fixed in the future.
 
 ## Memory interface
 
@@ -44,7 +50,7 @@ While the [ad-hoc memory interfaces](#ad-hoc-memory-interfaces) described above 
 
 ![Dynamatic circuit wrapper](figs/circuit_wrapper.svg)
 
-The wrapper has exactly the same `start`, `end`, arguments, results, and memory control signals as the Dynamatic circuit it wraps. However, the Dynamatic circuit's ad-hoc memory interfaces (double-sided arrows on the right of the inner box on the figure) get converted on-the-fly to standard memory interfaces (AXI displayed right in the figure). Given the requirement that our ad-hoc memory interfaces are elastic (i.e., latency-insensitive), it should be possible and often easy to make load/store requests coming from Dynamatic circuits compliant with standard communication protocols.  
+The wrapper has exactly the same `start`, `end`, arguments, results, and memory control signals as the Dynamatic circuit it wraps. However, the Dynamatic circuit's ad-hoc memory interfaces (double-sided arrows on the right of the inner box on the figure) get converted on-the-fly to standard memory interfaces (AXI displayed right in the figure). As a sanity check on any ad-hoc interface, it should always be possible and often easy to make load/store requests coming through them compliant with standard communication protocols.
 
 ## Internal implementation
 
