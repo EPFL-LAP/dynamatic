@@ -93,7 +93,7 @@ RTLType::~RTLType() {
 
 bool RTLUnsignedType::UnsignedConstraints::verify(Attribute attr) const {
   IntegerAttr intAttr = dyn_cast_if_present<IntegerAttr>(attr);
-  if (!intAttr)
+  if (!intAttr || !intAttr.getType().isUnsignedInteger())
     return false;
 
   // Check all constraints
