@@ -13,6 +13,7 @@
 //===----------------------------------------------------------------------===//
 
 #include "dynamatic/Dialect/HW/HWDialect.h"
+#include "dynamatic/Dialect/HW/HWOpInterfaces.h"
 #include "dynamatic/Dialect/HW/HWOps.h"
 #include "dynamatic/Dialect/Handshake/HandshakeDialect.h"
 #include "dynamatic/Dialect/Handshake/HandshakeOps.h"
@@ -40,6 +41,7 @@
 #include "llvm/Support/raw_ostream.h"
 #include <iterator>
 #include <memory>
+#include <set>
 #include <string>
 #include <system_error>
 #include <utility>
@@ -144,6 +146,11 @@ struct RTLWriter {
     /// RTL component. Queries internal signal names from the RTL writer.
     IOMap(hw::InstanceOp instOp, const RTLComponent &rtlComponent,
           RTLWriter &writer);
+
+    /// Constructs the IO map for an hardware instance corresponding to a
+    /// hardware module in the IR. Queries internal signal names from the RTL
+    /// writer.
+    IOMap(hw::InstanceOp instOp, hw::HWModuleOp modOp, RTLWriter &writer);
   };
 
   /// A value of channel type.
@@ -152,6 +159,8 @@ struct RTLWriter {
   /// Suffixes for specfic signal types.
   static constexpr StringLiteral VALID_SUFFIX = StringLiteral("_valid"),
                                  READY_SUFFIX = StringLiteral("_ready");
+  /// Architecture name for VHDL modules we create directly.
+  static constexpr StringLiteral ARCH_NAME = "behavioral";
 
   /// Export information (external modules must have already been concretized).
   ExportInfo exportInfo;
@@ -223,13 +232,13 @@ static std::string getChannelDataType(handshake::ChannelType type) {
   return "std_logic_vector(" + std::to_string(signalWidth) + " downto 0)";
 }
 
-/// Returns the external hardare module the hardware instance is from.
-static hw::HWModuleExternOp getExtModOp(hw::InstanceOp instOp) {
+/// Returns the hardare module the hardware instance is of.
+static hw::HWModuleLike getHWModule(hw::InstanceOp instOp) {
   mlir::ModuleOp modOp = instOp->getParentOfType<mlir::ModuleOp>();
   assert(modOp && "cannot find top-level MLIR module");
   Operation *lookup = modOp.lookupSymbol(instOp.getModuleName());
   assert(lookup && "symbol does not reference an operation");
-  return cast<hw::HWModuleExternOp>(lookup);
+  return cast<hw::HWModuleLike>(lookup);
 }
 
 /// Returns the internal signal name for a specific signal type.
@@ -248,7 +257,7 @@ using FGenComp =
     std::function<LogicalResult(const RTLRequest &, hw::HWModuleExternOp)>;
 
 LogicalResult ExportInfo::concretizeExternalModules() {
-  mlir::DenseSet<StringRef> entities;
+  std::set<std::string> entities;
 
   FGenComp concretizeComponent =
       [&](const RTLRequest &request,
@@ -263,7 +272,7 @@ LogicalResult ExportInfo::concretizeExternalModules() {
       externals[extOp] = *match;
 
     // No need to do anything if an entity with the same name already exists
-    if (auto [_, isNew] = entities.insert(match->getConcreteModuleName());
+    if (auto [_, isNew] = entities.insert(match->getConcreteModuleName().str());
         !isNew)
       return success();
 
@@ -322,7 +331,7 @@ RTLWriter::EntityIO::EntityIO(hw::HWModuleOp modOp) {
 
 RTLWriter::IOMap::IOMap(hw::InstanceOp instOp, const RTLComponent &rtlComponent,
                         RTLWriter &writer) {
-  hw::HWModuleExternOp refModOp = getExtModOp(instOp);
+  hw::HWModuleLike refModOp = getHWModule(instOp);
 
   for (auto [oprd, portAttr] :
        llvm::zip_equal(instOp.getOperands(), refModOp.getInputNamesStr())) {
@@ -358,6 +367,41 @@ RTLWriter::IOMap::IOMap(hw::InstanceOp instOp, const RTLComponent &rtlComponent,
   }
 }
 
+RTLWriter::IOMap::IOMap(hw::InstanceOp instOp, hw::HWModuleOp modOp,
+                        RTLWriter &writer) {
+
+  for (auto [oprd, portAttr] :
+       llvm::zip_equal(instOp.getOperands(), modOp.getInputNamesStr())) {
+    std::string port = portAttr.str();
+    if (auto channelOprd = dyn_cast<ChannelValue>(oprd)) {
+      StringRef signal = writer.dataflowSignals[channelOprd];
+      inputs.emplace_back(getInternalSignalName(port, SignalType::DATA),
+                          getInternalSignalName(signal, SignalType::DATA));
+      inputs.emplace_back(getInternalSignalName(port, SignalType::VALID),
+                          getInternalSignalName(signal, SignalType::VALID));
+      outputs.emplace_back(getInternalSignalName(port, SignalType::READY),
+                           getInternalSignalName(signal, SignalType::READY));
+    } else {
+      inputs.emplace_back(port, writer.signals[oprd]);
+    }
+  }
+  for (auto [oprd, portAttr] :
+       llvm::zip_equal(instOp.getResults(), modOp.getOutputNamesStr())) {
+    std::string port = portAttr.str();
+    if (auto channelOprd = dyn_cast<ChannelValue>(oprd)) {
+      StringRef signal = writer.dataflowSignals[channelOprd];
+      outputs.emplace_back(getInternalSignalName(port, SignalType::DATA),
+                           getInternalSignalName(signal, SignalType::DATA));
+      outputs.emplace_back(getInternalSignalName(port, SignalType::VALID),
+                           getInternalSignalName(signal, SignalType::VALID));
+      inputs.emplace_back(getInternalSignalName(port, SignalType::READY),
+                          getInternalSignalName(signal, SignalType::READY));
+    } else {
+      outputs.emplace_back(port, writer.signals[oprd]);
+    }
+  }
+}
+
 LogicalResult RTLWriter::createInternalSignals() {
 
   // Create signal names for all block arguments
@@ -375,7 +419,7 @@ LogicalResult RTLWriter::createInternalSignals() {
         llvm::TypeSwitch<Operation *, LogicalResult>(&op)
             .Case<hw::InstanceOp>([&](hw::InstanceOp instOp) {
               // Retrieve the module referenced by the instance
-              hw::HWModuleExternOp refModOp = getExtModOp(instOp);
+              hw::HWModuleLike refModOp = getHWModule(instOp);
 
               std::string prefix = instOp.getInstanceName().str() + "_";
 
@@ -448,7 +492,8 @@ void RTLWriter::writeEntityIO(const EntityIO &entityIO) const {
 }
 
 void RTLWriter::writeArchitecture() {
-  os << "architecture behavioral of " << modOp.getSymName() << " is\n\n";
+  os << "architecture " << ARCH_NAME << " of " << modOp.getSymName()
+     << " is\n\n";
   os.indent();
 
   writeInternalSignals();
@@ -502,18 +547,33 @@ void RTLWriter::writeSignalAssignments() {
 
 void RTLWriter::writeModuleInstantiations() {
   for (hw::InstanceOp instOp : modOp.getOps<hw::InstanceOp>()) {
-    // Retrieve the module referenced by the instance
-    hw::HWModuleExternOp refModOp = getExtModOp(instOp);
-    const RTLMatch &match = exportInfo.externals[refModOp];
+
+    RTLComponent::HDL hdl(dynamatic::RTLComponent::HDL::VHDL);
+    std::string moduleName;
+    std::string archName;
+    SmallVector<StringRef> genericParams;
+    IOMap map =
+        llvm::TypeSwitch<Operation *, IOMap>(getHWModule(instOp))
+            .Case<hw::HWModuleOp>([&](hw::HWModuleOp hwModOp) {
+              moduleName = hwModOp.getSymName();
+              archName = ARCH_NAME;
+              return IOMap{instOp, hwModOp, *this};
+            })
+            .Case<hw::HWModuleExternOp>([&](hw::HWModuleExternOp extModOp) {
+              const RTLMatch &match = exportInfo.externals[extModOp];
+              hdl = match.component->getHDL();
+              moduleName = match.getConcreteModuleName();
+              archName = match.getConcreteArchName();
+              genericParams = match.getGenericParameterValues();
+              return IOMap{instOp, *match.component, *this};
+            });
 
     // Declare the instance
-    os << instOp.getInstanceName() << " : ";
-    os << "entity work." << match.getConcreteModuleName();
-    if (match.component->getHDL() == RTLComponent::HDL::VHDL)
-      os << "(" << match.getConcreteArchName() << ")";
+    os << instOp.getInstanceName() << " : entity work." << moduleName;
+    if (hdl == RTLComponent::HDL::VHDL)
+      os << "(" << archName << ")";
 
     // Write generic parameters if there are any
-    SmallVector<StringRef> genericParams = match.getGenericParameterValues();
     if (!genericParams.empty()) {
       os << " generic map(";
       for (StringRef param : ArrayRef<StringRef>{genericParams}.drop_back())
@@ -522,11 +582,13 @@ void RTLWriter::writeModuleInstantiations() {
     }
     os << "\n";
 
+    // Write the IO mappings between the hardware instance and the module's
+    // internal signals
     os.indent();
     os << "port map(\n";
     os.indent();
 
-    writeIOMap(IOMap{instOp, *match.component, *this});
+    writeIOMap(map);
 
     os.unindent();
     os << ");\n";
