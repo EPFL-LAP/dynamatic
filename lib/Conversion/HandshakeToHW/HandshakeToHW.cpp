@@ -1615,7 +1615,7 @@ MemToBRAMConverter::buildExternalModule(hw::HWModuleOp circuitMod,
   modBuilder.addInput("loadEn", i1Type);
   modBuilder.addInput("loadAddr", addrType);
   modBuilder.addInput("storeEn", i1Type);
-  modBuilder.addInput("storeAddr", memState.dataType);
+  modBuilder.addInput("storeAddr", addrType);
   modBuilder.addInput("storeData", memState.dataType);
 
   // Outputs to wrapper
