@@ -415,5 +415,13 @@
   {
     "name": "support.types",
     "generic": "$DYNAMATIC/experimental/data/vhdl/support/types.vhd"
+  },
+  {
+    "name": "mem_to_bram",
+    "parameters": [
+      { "name": "DATA_WIDTH", "type": "unsigned", "lb": 1 },
+      { "name": "ADDR_WIDTH", "type": "unsigned", "lb": 1 }
+    ],
+    "generic": "$DYNAMATIC/experimental/data/vhdl/support/mem_to_bram.vhd"
   }
 ]

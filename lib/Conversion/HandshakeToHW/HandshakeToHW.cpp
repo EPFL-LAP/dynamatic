@@ -12,6 +12,7 @@
 
 #include "dynamatic/Conversion/HandshakeToHW.h"
 #include "dynamatic/Analysis/NameAnalysis.h"
+#include "dynamatic/Dialect/HW/HWOpInterfaces.h"
 #include "dynamatic/Dialect/HW/HWOps.h"
 #include "dynamatic/Dialect/HW/HWTypes.h"
 #include "dynamatic/Dialect/HW/PortImplementation.h"
@@ -26,15 +27,18 @@
 #include "mlir/Dialect/Arith/IR/Arith.h"
 #include "mlir/Dialect/MemRef/IR/MemRef.h"
 #include "mlir/IR/Attributes.h"
+#include "mlir/IR/Builders.h"
 #include "mlir/IR/BuiltinAttributes.h"
 #include "mlir/IR/BuiltinOps.h"
 #include "mlir/IR/BuiltinTypes.h"
 #include "mlir/IR/MLIRContext.h"
 #include "mlir/IR/PatternMatch.h"
+#include "mlir/IR/Value.h"
 #include "mlir/Support/LogicalResult.h"
 #include "mlir/Transforms/DialectConversion.h"
 #include "mlir/Transforms/GreedyPatternRewriteDriver.h"
 #include "llvm/ADT/STLExtras.h"
+#include "llvm/ADT/StringRef.h"
 #include "llvm/ADT/TypeSwitch.h"
 #include "llvm/Support/ErrorHandling.h"
 #include <algorithm>
@@ -232,7 +236,7 @@ namespace {
 /// function containing the interface.
 struct MemLoweringState {
   /// Memory region's name.
-  std::string memName;
+  std::string name;
   /// Data type.
   Type dataType = nullptr;
   /// Cache memory port information before modifying the interface, which can
@@ -246,11 +250,11 @@ struct MemLoweringState {
   /// to the top-level module IO.
   SmallVector<Backedge> backedges;
 
-  /// Index of first module input corresponding the the interface's inputs.
+  /// Index of first module input corresponding to the interface's inputs.
   size_t inputIdx = 0;
   /// Number of inputs for the memory interface, starting at the `inputIdx`.
   size_t numInputs = 0;
-  /// Index of first module output corresponding the the interface's ouputs.
+  /// Index of first module output corresponding to the interface's ouputs.
   size_t outputIdx = 0;
   /// Number of outputs for the memory interface, starting at the `outputIdx`.
   size_t numOutputs = 0;
@@ -263,7 +267,7 @@ struct MemLoweringState {
 
   /// Constructs an instance of the object for the provided memory interface.
   MemLoweringState(handshake::MemoryOpInterface memOp, const Twine &name)
-      : memName(name.str()), dataType(memOp.getMemRefType().getElementType()),
+      : name(name.str()), dataType(memOp.getMemRefType().getElementType()),
         ports(getMemoryPorts(memOp)), portNames(memOp){};
 
   /// Returns the module's input ports that connect to the memory interface.
@@ -347,17 +351,17 @@ void MemLoweringState::connectWithCircuit(ModuleBuilder &modBuilder) {
   Type addrType = IntegerType::get(ctx, ports.addrWidth);
 
   // Load data input
-  modBuilder.addInput(memName + "_loadData", dataType);
+  modBuilder.addInput(name + "_loadData", dataType);
   // Load enable output
-  modBuilder.addOutput(memName + "_loadEn", i1Type);
+  modBuilder.addOutput(name + "_loadEn", i1Type);
   // Load address output
-  modBuilder.addOutput(memName + "_loadAddr", addrType);
+  modBuilder.addOutput(name + "_loadAddr", addrType);
   // Store enable output
-  modBuilder.addOutput(memName + "_storeEn", i1Type);
+  modBuilder.addOutput(name + "_storeEn", i1Type);
   // Store address output
-  modBuilder.addOutput(memName + "_storeAddr", addrType);
+  modBuilder.addOutput(name + "_storeAddr", addrType);
   // Store data output
-  modBuilder.addOutput(memName + "_storeData", dataType);
+  modBuilder.addOutput(name + "_storeData", dataType);
 
   numInputs = modBuilder.getNumInputs() - inputIdx;
   numOutputs = modBuilder.getNumOutputs() - outputIdx;
@@ -1395,9 +1399,408 @@ static LogicalResult verifyExportToRTL(handshake::FuncOp funcOp) {
   return success();
 }
 
+/// Returns the module's input ports.
+static ArrayRef<hw::ModulePort> getModInputs(hw::HWModuleLike modOp) {
+  return modOp.getHWModuleType().getPorts().slice(modOp.getPortIdForInputId(0),
+                                                  modOp.getNumInputPorts());
+}
+
+/// Returns the module's output ports.
+static ArrayRef<hw::ModulePort> getModOutputs(hw::HWModuleLike modOp) {
+  return modOp.getHWModuleType().getPorts().slice(modOp.getPortIdForOutputId(0),
+                                                  modOp.getNumOutputPorts());
+}
+
 namespace {
-/// Replaces Handshake return operations into a sequence of TEHBs, one for each
-/// return operand.
+
+/// Records a mapping between a module's continuous range of output ports and
+/// another module's continuous range of input ports. Ranges are identified by
+/// their index and must have the same size.
+struct IOMapping {
+  /// Starting index in the source module's list of output ports.
+  size_t srcIdx;
+  /// Starting index in the destination module's list of inputs ports.
+  size_t dstIdx;
+  /// Range size.
+  size_t size;
+
+  /// Initialize all fields to 0.
+  IOMapping() : srcIdx(0), dstIdx(0), size(0) {}
+
+  /// Member-by-member constructor.
+  IOMapping(size_t srcIdx, size_t dstIdx, size_t size)
+      : srcIdx(srcIdx), dstIdx(dstIdx), size(size) {}
+};
+
+/// Helper class to allow for the creation of a "converter hardware module
+/// instance" in between a hardware module's (the "wrapper") top-level IO ports
+/// and a module instance (the "circuit") within it.
+class ConverterBuilder {
+public:
+  /// IO mapping from circuit to the converter.
+  IOMapping circuitToConverter;
+  /// IO mapping from the converter to the wrapper.
+  IOMapping converterToWrapper;
+  /// IO mapping from the wrapper to the converter.
+  IOMapping wrapperToConverter;
+  /// IO mapping from the converter to the circuit.
+  IOMapping converterToCircuit;
+
+  ConverterBuilder() = default;
+
+  /// Creates the converter builder from the external hardware module which
+  /// instances of the converter will reference and the IO mappings between the
+  /// converter and the circuit/wrapper.
+  ConverterBuilder(hw::HWModuleExternOp converterModOp,
+                   const IOMapping &circuitToConverter,
+                   const IOMapping &converterToWrapper,
+                   const IOMapping &wrapperToConverter,
+                   const IOMapping &converterToCircuit)
+      : circuitToConverter(circuitToConverter),
+        converterToWrapper(converterToWrapper),
+        wrapperToConverter(wrapperToConverter),
+        converterToCircuit(converterToCircuit), converterModOp(converterModOp) {
+  }
+
+private:
+  /// Slices the converter module's input ports according to the IO map.
+  inline ArrayRef<hw::ModulePort> getSlicedInputs(IOMapping &map) {
+    return getModInputs(converterModOp).slice(map.dstIdx, map.size);
+  }
+
+  /// Slices the converter module's output ports according to the IO map.
+  inline ArrayRef<hw::ModulePort> getSlicedOutputs(IOMapping &map) {
+    return getModOutputs(converterModOp).slice(map.srcIdx, map.size);
+  }
+
+public:
+  /// Adds wrapper inputs that will connect to the converter instance to the
+  /// module builder.
+  void addWrapperInputs(ModuleBuilder &modBuilder, StringRef baseName) {
+    wrapperToConverter.srcIdx = modBuilder.getNumInputs();
+    for (const hw::ModulePort port : getSlicedInputs(wrapperToConverter))
+      modBuilder.addInput(baseName + "_" + port.name.strref(), port.type);
+  }
+
+  /// Adds wrapper output that will originate from the converter instance to the
+  /// module builder.
+  void addWrapperOutputs(ModuleBuilder &modBuilder, StringRef baseName) {
+    converterToWrapper.dstIdx = modBuilder.getNumOutputs();
+    for (const hw::ModulePort port : getSlicedOutputs(converterToWrapper))
+      modBuilder.addOutput(baseName + "_" + port.name.strref(), port.type);
+  }
+
+  /// Adds backedges matching the converter instance's outputs going to the
+  /// wrapper to the vector.
+  void addWrapperBackedges(BackedgeBuilder &edgeBuilder,
+                           SmallVector<Value> &wrapperOutputs) {
+    for (const hw::ModulePort port : getSlicedOutputs(converterToWrapper)) {
+      wrapperBackedges.push_back(edgeBuilder.get(port.type));
+      wrapperOutputs.push_back(wrapperBackedges.back());
+    }
+  }
+
+  /// Adds backedges matching the converter instance's outputs going to the
+  /// circuit to the vector.
+  void addCircuitBackedges(BackedgeBuilder &edgeBuilder,
+                           SmallVector<Value> &circuitOperands) {
+    for (const hw::ModulePort port : getSlicedOutputs(converterToCircuit)) {
+      circuitBackedges.push_back(edgeBuilder.get(port.type));
+      circuitOperands.push_back(circuitBackedges.back());
+    }
+  }
+
+public:
+  /// Creates an instance of the wrapper between the module's top-level IO ports
+  /// and the circuit instance within it. This resolves all internally created
+  /// backedges. Returns the converter instance that was inserted.
+  hw::InstanceOp createInstance(hw::HWModuleOp wrapperOp,
+                                hw::InstanceOp circuitOp, StringRef memName,
+                                OpBuilder &builder);
+
+private:
+  /// The external hardware module representing the converter.
+  hw::HWModuleExternOp converterModOp;
+  /// Backedges to the circuit instance's inputs.
+  SmallVector<Backedge> circuitBackedges;
+  /// Backedges to the wrapper module's outputs.
+  SmallVector<Backedge> wrapperBackedges;
+};
+
+/// Converter builder between the "simplifier dual-port BRAM interface"
+/// implemented by our RTL components and an actual dual-port BRAM interface.
+class MemToBRAMConverter : public ConverterBuilder {
+public:
+  using ConverterBuilder::ConverterBuilder;
+
+  /// RTL module's name (must match one in RTL configuration file).
+  static constexpr llvm::StringLiteral HW_NAME = "mem_to_bram";
+
+  /// Constructs from the hardware module that the circuit instance references,
+  /// and the memory lowering state object representing the memory interface to
+  /// convert.
+  MemToBRAMConverter(hw::HWModuleOp circuitMod, const MemLoweringState &state,
+                     OpBuilder &builder)
+      : ConverterBuilder(buildExternalModule(circuitMod, state, builder),
+                         IOMapping(state.outputIdx, 0, 5), IOMapping(0, 0, 8),
+                         IOMapping(0, 5, 2), IOMapping(8, state.inputIdx, 1)){};
+
+private:
+  /// Creates, inserts, and returns the external harware module corresponding to
+  /// the memory converter.
+  hw::HWModuleExternOp buildExternalModule(hw::HWModuleOp circuitMod,
+                                           const MemLoweringState &memState,
+                                           OpBuilder &builder) const;
+};
+
+} // namespace
+
+hw::InstanceOp ConverterBuilder::createInstance(hw::HWModuleOp wrapperOp,
+                                                hw::InstanceOp circuitOp,
+                                                StringRef memName,
+                                                OpBuilder &builder) {
+  SmallVector<Value> instOperands;
+
+  // Assume that the converter's first inputs come from the wrapper circuit,
+  // followed by the wrapper's inputs
+  llvm::copy(circuitOp.getResults().slice(circuitToConverter.srcIdx,
+                                          circuitToConverter.size),
+             std::back_inserter(instOperands));
+  llvm::copy(wrapperOp.getBodyBlock()->getArguments().slice(
+                 wrapperToConverter.srcIdx, wrapperToConverter.size),
+             std::back_inserter(instOperands));
+
+  // Create an instance of the converter
+  StringAttr name = builder.getStringAttr("mem_to_bram_converter_" + memName);
+  builder.setInsertionPoint(circuitOp);
+  hw::InstanceOp converterInstOp = builder.create<hw::InstanceOp>(
+      circuitOp.getLoc(), converterModOp, name, instOperands);
+
+  // Resolve backedges in the wrapped circuit operands and in the wrapper's
+  // outputs
+  ValueRange results = converterInstOp->getResults();
+  for (auto [backedge, res] :
+       llvm::zip(circuitBackedges, results.slice(converterToCircuit.srcIdx,
+                                                 converterToCircuit.size)))
+    backedge.setValue(res);
+  for (auto [backedge, res] :
+       llvm::zip(wrapperBackedges, results.slice(converterToWrapper.srcIdx,
+                                                 converterToWrapper.size)))
+    backedge.setValue(res);
+
+  return converterInstOp;
+}
+
+hw::HWModuleExternOp
+MemToBRAMConverter::buildExternalModule(hw::HWModuleOp circuitMod,
+                                        const MemLoweringState &memState,
+                                        OpBuilder &builder) const {
+  std::string extModName =
+      HW_NAME.str() + "_" +
+      std::to_string(memState.dataType.getIntOrFloatBitWidth()) + "_" +
+      std::to_string(memState.ports.addrWidth);
+  mlir::ModuleOp topModOp = circuitMod->getParentOfType<mlir::ModuleOp>();
+  hw::HWModuleExternOp extModOp = findExternMod(topModOp, extModName);
+
+  if (extModOp)
+    return extModOp;
+
+  // The external module does not yet exist, create it
+  MLIRContext *ctx = builder.getContext();
+  ModuleBuilder modBuilder(ctx);
+  Type i1Type = IntegerType::get(ctx, 1);
+  Type addrType = IntegerType::get(ctx, memState.ports.addrWidth);
+
+  // Inputs from wrapped circuit
+  modBuilder.addInput("loadEn", i1Type);
+  modBuilder.addInput("loadAddr", addrType);
+  modBuilder.addInput("storeEn", i1Type);
+  modBuilder.addInput("storeAddr", memState.dataType);
+  modBuilder.addInput("storeData", memState.dataType);
+
+  // Outputs to wrapper
+  modBuilder.addOutput("ce0", i1Type);
+  modBuilder.addOutput("we0", i1Type);
+  modBuilder.addOutput("address0", addrType);
+  modBuilder.addOutput("mem_din0", memState.dataType);
+  modBuilder.addOutput("ce1", i1Type);
+  modBuilder.addOutput("we1", i1Type);
+  modBuilder.addOutput("address1", addrType);
+  modBuilder.addOutput("mem_din1", memState.dataType);
+
+  // Inputs from wrapper
+  modBuilder.addInput("mem_dout0", memState.dataType);
+  modBuilder.addInput("mem_dout1", memState.dataType);
+
+  // Outputs to wrapped circuit
+  modBuilder.addOutput("loadData", memState.dataType);
+
+  builder.setInsertionPointToEnd(topModOp.getBody());
+  StringAttr modNameAttr = builder.getStringAttr(extModName);
+  extModOp = builder.create<hw::HWModuleExternOp>(
+      circuitMod->getLoc(), modNameAttr, modBuilder.getPortInfo());
+
+  extModOp->setAttr(RTLRequest::NAME_ATTR, StringAttr::get(ctx, HW_NAME));
+  SmallVector<NamedAttribute> parameters;
+  Type i32 = IntegerType::get(ctx, 32, IntegerType::Unsigned);
+  parameters.emplace_back(
+      StringAttr::get(ctx, "DATA_WIDTH"),
+      IntegerAttr::get(i32, memState.dataType.getIntOrFloatBitWidth()));
+  parameters.emplace_back(StringAttr::get(ctx, "ADDR_WIDTH"),
+                          IntegerAttr::get(i32, memState.ports.addrWidth));
+  extModOp->setAttr(RTLRequest::PARAMETERS_ATTR,
+                    DictionaryAttr::get(ctx, parameters));
+  return extModOp;
+}
+
+/// Creates and returns an empty wrapper module. When the function returns,
+/// `memConverters `associates each memory interface in the wrapped circuit to a
+/// builder for their respective converter; in addition, backedges for the
+/// future wrapped circuit results going directly to the wrapper (without
+/// passing through a converter) are stored along their corresponding result
+/// index inside the `circuitBackedges` vector.
+static hw::HWModuleOp createWrapper(
+    LoweringState &lowering, OpBuilder &builder,
+    mlir::DenseMap<const MemLoweringState *, ConverterBuilder> &memConverters,
+    SmallVector<std::pair<size_t, Backedge>> &circuitBackedges) {
+  ModuleLoweringState &modState = lowering.modState.begin()->second;
+  hw::HWModuleOp circuitOp = *lowering.modOp.getOps<hw::HWModuleOp>().begin();
+
+  MLIRContext *ctx = builder.getContext();
+  ModuleBuilder wrapperBuilder(ctx);
+
+  DenseMap<size_t, const MemLoweringState *> inputToMem, outputToMem;
+  for (const auto &[_, memState] : modState.memInterfaces) {
+    if (!memState.connectsToCircuit())
+      continue;
+    inputToMem[memState.inputIdx] = &memState;
+    outputToMem[memState.outputIdx] = &memState;
+    memConverters[&memState] = MemToBRAMConverter(circuitOp, memState, builder);
+  }
+
+  // Create input ports for the wrapper; we need to identify the inputs which
+  // map to internal memory interfaces and replace them with an interface for a
+  // dual-port BRAM
+  ArrayRef<hw::ModulePort> inputPorts = getModInputs(circuitOp);
+  for (size_t i = 0, e = inputPorts.size(); i < e;) {
+    hw::ModulePort port = inputPorts[i];
+    if (auto it = inputToMem.find(i); it != inputToMem.end()) {
+      // Beginning of internal mem interface, replace with IO for dual-port BRAM
+      const MemLoweringState *memState = it->second;
+      ConverterBuilder &converter = memConverters.find(memState)->second;
+      converter.addWrapperInputs(wrapperBuilder, memState->name);
+      i += memState->numInputs;
+    } else {
+      // This is a regular argument, just forward it
+      wrapperBuilder.addInput(port.name.strref(), port.type);
+      ++i;
+    }
+  }
+
+  // Same as above, but for the wrapper's outputs
+  ArrayRef<hw::ModulePort> outputPorts = getModOutputs(circuitOp);
+  DenseMap<size_t, ConverterBuilder *> wrapperOutputToMem;
+  for (size_t i = 0, e = outputPorts.size(); i < e;) {
+    hw::ModulePort port = outputPorts[i];
+    if (auto it = outputToMem.find(i); it != outputToMem.end()) {
+      // Beginning of internal mem interface, replace with IO for dual-port BRAM
+      const MemLoweringState *memState = it->second;
+      ConverterBuilder &converter = memConverters.find(memState)->second;
+      wrapperOutputToMem[wrapperBuilder.getNumOutputs()] = &converter;
+      converter.addWrapperOutputs(wrapperBuilder, memState->name);
+      i += memState->numOutputs;
+    } else {
+      // This is a regular result, just forward it
+      wrapperBuilder.addOutput(port.name.strref(), port.type);
+      ++i;
+    }
+  }
+
+  // Create the wrapper
+  builder.setInsertionPointToEnd(lowering.modOp.getBody());
+  hw::HWModuleOp wrapperOp = builder.create<hw::HWModuleOp>(
+      circuitOp.getLoc(),
+      StringAttr::get(ctx, circuitOp.getSymName() + "_wrapper"),
+      wrapperBuilder.getPortInfo());
+  builder.setInsertionPointToStart(wrapperOp.getBodyBlock());
+
+  // Create backedges for all of the wrapper module's outputs
+  SmallVector<Value> modOutputs;
+  ArrayRef<hw::ModulePort> wrapperOutputs = getModOutputs(wrapperOp);
+  for (size_t i = 0, e = wrapperOutputs.size(); i < e;) {
+    hw::ModulePort port = wrapperOutputs[i];
+    if (auto it = wrapperOutputToMem.find(i); it != wrapperOutputToMem.end()) {
+      // This is the beginning of memory interface outputs that will eventually
+      // come from a converter
+      it->second->addWrapperBackedges(lowering.edgeBuilder, modOutputs);
+      i += it->second->converterToWrapper.size;
+    } else {
+      // This is a regular result that will come directly from the wrapped
+      // circuit
+      circuitBackedges.push_back({i, lowering.edgeBuilder.get(port.type)});
+      modOutputs.push_back(circuitBackedges.back().second);
+      i += 1;
+    }
+  }
+
+  Operation *outputOp = wrapperOp.getBodyBlock()->getTerminator();
+  outputOp->setOperands(modOutputs);
+  return wrapperOp;
+};
+
+/// Creates a wrapper module made up of the (assumed single) hardware module
+/// that resulted from Handshake lowering and of memory converters sitting
+/// between the latter's memory interfaces and "standard memory interfaces"
+/// exposed by the wrapper's module.
+static void createMemWrapper(LoweringState &lowering, OpBuilder &builder) {
+  // We assume a single hardware module inside the MLIR module
+  hw::HWModuleOp circuitOp = *lowering.modOp.getOps<hw::HWModuleOp>().begin();
+
+  DenseMap<const MemLoweringState *, ConverterBuilder> memConverters;
+  SmallVector<std::pair<size_t, Backedge>> circuitBackedges;
+  hw::HWModuleOp wrapperOp =
+      createWrapper(lowering, builder, memConverters, circuitBackedges);
+  builder.setInsertionPointToStart(wrapperOp.getBodyBlock());
+
+  // Operands for the circuit instance inside the wrapper
+  SmallVector<Value> circuitOperands;
+
+  DenseMap<size_t, ConverterBuilder *> wrapperInputToConv;
+  for (auto &[_, converter] : memConverters)
+    wrapperInputToConv[converter.wrapperToConverter.srcIdx] = &converter;
+
+  ArrayRef<BlockArgument> wrapperArgs = wrapperOp.getBody().getArguments();
+  for (size_t i = 0, e = wrapperArgs.size(); i < e;) {
+    if (auto it = wrapperInputToConv.find(i); it != wrapperInputToConv.end()) {
+      ConverterBuilder *converter = it->second;
+      converter->addCircuitBackedges(lowering.edgeBuilder, circuitOperands);
+      i += converter->wrapperToConverter.size;
+    } else {
+      // Argument, just forward it to the operands
+      circuitOperands.push_back(wrapperArgs[i]);
+      ++i;
+    }
+  }
+
+  // Create the wrapped circuit instance inside the wrapper
+  hw::InstanceOp circuitInstOp = builder.create<hw::InstanceOp>(
+      circuitOp.getLoc(), circuitOp,
+      builder.getStringAttr(circuitOp.getSymName() + "_wrapped"),
+      circuitOperands);
+
+  // Instantiate the memory interface converters inside the wrapper module,
+  // which also resolved all backedges meant to originate from the converter
+  for (auto &[memState, converter] : memConverters)
+    converter.createInstance(wrapperOp, circuitInstOp, memState->name, builder);
+
+  // Resolve backedges coming from the circuit to the wrapper's outputs
+  for (auto [resIdx, backedge] : circuitBackedges)
+    backedge.setValue(circuitInstOp.getResult(resIdx));
+}
+
+namespace {
+/// Replaces Handshake return operations into a sequence of TEHBs, one for
+/// each return operand.
 struct ReplaceReturnWithTEHB : public OpRewritePattern<handshake::ReturnOp> {
   using OpRewritePattern<handshake::ReturnOp>::OpRewritePattern;
 
@@ -1424,10 +1827,6 @@ class HandshakeToHWPass
     : public dynamatic::impl::HandshakeToHWBase<HandshakeToHWPass> {
 public:
   void runDynamaticPass() override {
-    // At this level, all operations already have an intrinsic name so we
-    // can disable our naming system
-    doNotNameOperations();
-
     mlir::ModuleOp modOp = getOperation();
     MLIRContext *ctx = &getContext();
 
@@ -1456,10 +1855,14 @@ public:
                                             config)))
       return signalPassFailure();
 
+    // Make sure all operations are named
+    NameAnalysis &namer = getAnalysis<NameAnalysis>();
+    namer.nameAllUnnamedOps();
+
     // Helper struct for lowering
     OpBuilder builder(ctx);
     builder.setInsertionPointToStart(modOp.getBody(0));
-    LoweringState lowerState(modOp, getAnalysis<NameAnalysis>(), builder);
+    LoweringState lowerState(modOp, namer, builder);
     ChannelTypeConverter typeConverter;
 
     // Create pattern set
@@ -1531,6 +1934,11 @@ public:
 
     if (failed(applyPartialConversion(funcOp, target, std::move(patterns))))
       return signalPassFailure();
+    createMemWrapper(lowerState, builder);
+
+    // At this level all operations already have an intrinsic name so we can
+    // disable our naming system
+    doNotNameOperations();
   }
 };
 
