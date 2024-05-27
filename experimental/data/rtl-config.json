@@ -27,7 +27,7 @@
       { "name": "PREDICATE", "type": "string" },
       { "name": "DATA_WIDTH", "type": "unsigned", "generic": true }
     ],
-    "generator": "\"$DYNAMATIC/build/bin/rtl-cmpf-generator\" \"$DYNAMATIC/experimental/data/vhdl/arith/cmpf.vhd\" \"$OUTPUT_DIR/$MODULE_NAME.vhd\" $MODULE_NAME $PREDICATE",
+    "generator": "\"$DYNAMATIC/bin/generators/rtl-cmpf-generator\" \"$DYNAMATIC/experimental/data/vhdl/arith/cmpf.vhd\" \"$OUTPUT_DIR/$MODULE_NAME.vhd\" $MODULE_NAME $PREDICATE",
     "dependencies": ["handshake.join", "support.delay_buffer"]
   },
   {
@@ -36,7 +36,7 @@
       { "name": "PREDICATE", "type": "string" },
       { "name": "DATA_WIDTH", "type": "unsigned", "generic": true }
     ],
-    "generator": "\"$DYNAMATIC/build/bin/rtl-cmpi-generator\" \"$DYNAMATIC/experimental/data/vhdl/arith/cmpi.vhd\" \"$OUTPUT_DIR/$MODULE_NAME.vhd\" $MODULE_NAME $PREDICATE",
+    "generator": "\"$DYNAMATIC/bin/generators/rtl-cmpi-generator\" \"$DYNAMATIC/experimental/data/vhdl/arith/cmpi.vhd\" \"$OUTPUT_DIR/$MODULE_NAME.vhd\" $MODULE_NAME $PREDICATE",
     "dependencies": ["handshake.join"]
   },
   {
@@ -287,7 +287,7 @@
       { "name": "VALUE", "type": "string" },
       { "name": "DATA_WIDTH", "type": "unsigned", "generic": true }
     ],
-    "generator": "\"$DYNAMATIC/build/bin/rtl-text-generator\" \"$DYNAMATIC/experimental/data/vhdl/handshake/constant.vhd\" \"$OUTPUT_DIR/$MODULE_NAME.vhd\" ENTITY_NAME $MODULE_NAME VALUE $VALUE"
+    "generator": "\"$DYNAMATIC/bin/generators/rtl-text-generator\" \"$DYNAMATIC/experimental/data/vhdl/handshake/constant.vhd\" \"$OUTPUT_DIR/$MODULE_NAME.vhd\" ENTITY_NAME $MODULE_NAME VALUE $VALUE"
   },
   {
     "name": "handshake.mc_load",
@@ -349,7 +349,7 @@
   },
   {
     "name": "handshake.lsq",
-    "generator": "java -jar -Xmx7G \"$DYNAMATIC/data/vhdl/lsq.jar\" --target-dir \"$OUTPUT_DIR\" --spec-file \"$OUTPUT_DIR/$MODULE_NAME.json\" > /dev/null",
+    "generator": "java -jar -Xmx7G \"$DYNAMATIC/bin/generators/lsq-generator.jar\" --target-dir \"$OUTPUT_DIR\" --spec-file \"$OUTPUT_DIR/$MODULE_NAME.json\" > /dev/null",
     "use-json-config": "$OUTPUT_DIR/$MODULE_NAME.json",
     "hdl": "verilog",
     "io-kind": "flat",

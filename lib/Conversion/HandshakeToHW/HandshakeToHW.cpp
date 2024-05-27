@@ -668,34 +668,19 @@ ModuleDiscriminator::ModuleDiscriminator(FuncMemoryPorts &ports)
         LSQGenerationInfo genInfo(ports, getUniqueName(op).str());
         modName += "_" + genInfo.name;
 
-        SmallVector<NamedAttribute> attributes;
-
-        /// Converts a string into an equivalent MLIR attribute.
-        auto stringAttr = [&](StringRef name, StringRef value) -> void {
-          attributes.emplace_back(StringAttr::get(ctx, name),
-                                  StringAttr::get(ctx, value));
-        };
-
-        /// Converts an unsigned number into an equivalent MLIR attribute.
-        Type intType = IntegerType::get(ctx, 32);
-        auto intAttr = [&](StringRef name, unsigned value) -> void {
-          attributes.emplace_back(StringAttr::get(ctx, name),
-                                  IntegerAttr::get(intType, value));
-        };
-
         /// Converts an array into an equivalent MLIR attribute.
-        auto arrayIntAttr = [&](StringRef name,
-                                ArrayRef<unsigned> array) -> void {
+        Type intType = IntegerType::get(ctx, 32);
+        auto addArrayIntAttr = [&](StringRef name,
+                                   ArrayRef<unsigned> array) -> void {
           SmallVector<Attribute> arrayAttr;
           llvm::transform(
               array, std::back_inserter(arrayAttr),
               [&](unsigned elem) { return IntegerAttr::get(intType, elem); });
-          attributes.emplace_back(StringAttr::get(ctx, name),
-                                  ArrayAttr::get(ctx, arrayAttr));
+          addParam(name, ArrayAttr::get(ctx, arrayAttr));
         };
 
         /// Converts a bi-dimensional array into an equivalent MLIR attribute.
-        auto biArrayIntAttr =
+        auto addBiArrayIntAttr =
             [&](StringRef name,
                 ArrayRef<SmallVector<unsigned>> biArray) -> void {
           SmallVector<Attribute> biArrayAttr;
@@ -706,44 +691,30 @@ ModuleDiscriminator::ModuleDiscriminator(FuncMemoryPorts &ports)
                 [&](unsigned elem) { return IntegerAttr::get(intType, elem); });
             biArrayAttr.push_back(ArrayAttr::get(ctx, arrayAttr));
           }
-          attributes.emplace_back(StringAttr::get(ctx, name),
-                                  ArrayAttr::get(ctx, biArrayAttr));
+          addParam(name, ArrayAttr::get(ctx, biArrayAttr));
         };
 
-        stringAttr("name", modName);
-        intAttr("fifoDepth", genInfo.depth);
-        intAttr("fifoDepth_L", genInfo.depthLoad);
-        intAttr("fifoDepth_S", genInfo.depthStore);
-        intAttr("bufferDepth", genInfo.bufferDepth);
-        stringAttr("accessType", genInfo.accessType);
+        addString("name", modName);
+        addUnsigned("fifoDepth", genInfo.depth);
+        addUnsigned("fifoDepth_L", genInfo.depthLoad);
+        addUnsigned("fifoDepth_S", genInfo.depthStore);
+        addUnsigned("bufferDepth", genInfo.bufferDepth);
+        addString("accessType", genInfo.accessType);
         // The Chisel LSQ generator expects this to be a string, not a boolean
-        stringAttr("speculation", genInfo.speculation ? "true" : "false");
-        intAttr("dataWidth", genInfo.dataWidth);
-        intAttr("addrWidth", genInfo.addrWidth);
-        intAttr("numBBs", genInfo.numGroups);
-        intAttr("numLoadPorts", genInfo.numLoads);
-        intAttr("numStorePorts", genInfo.numStores);
-        arrayIntAttr("numLoads", genInfo.loadsPerGroup);
-        arrayIntAttr("numStores", genInfo.storesPerGroup);
-        biArrayIntAttr("loadOffsets",
-                       ArrayRef<SmallVector<unsigned>>{genInfo.loadOffsets});
-        biArrayIntAttr("storeOffsets",
-                       ArrayRef<SmallVector<unsigned>>{genInfo.storeOffsets});
-        biArrayIntAttr("loadPorts", genInfo.loadPorts);
-        biArrayIntAttr("storePorts", genInfo.storePorts);
-
-        // The LSQ generator expects the JSON containing all the elements to be
-        // nested inside a JSON array under  the "specifications" key within the
-        // top-level JSON object, make it so
-        // {
-        //   "specifications": [{
-        //    ...all generation info
-        //   }]
-        // }
-        DictionaryAttr dictAttr = DictionaryAttr::get(ctx, attributes);
-        ArrayAttr arrayAttr =
-            ArrayAttr::get(ctx, SmallVector<Attribute>{dictAttr});
-        addParam("specifications", arrayAttr);
+        addString("speculation", genInfo.speculation ? "true" : "false");
+        addUnsigned("dataWidth", genInfo.dataWidth);
+        addUnsigned("addrWidth", genInfo.addrWidth);
+        addUnsigned("numBBs", genInfo.numGroups);
+        addUnsigned("numLoadPorts", genInfo.numLoads);
+        addUnsigned("numStorePorts", genInfo.numStores);
+        addArrayIntAttr("numLoads", genInfo.loadsPerGroup);
+        addArrayIntAttr("numStores", genInfo.storesPerGroup);
+        addBiArrayIntAttr("loadOffsets",
+                          ArrayRef<SmallVector<unsigned>>{genInfo.loadOffsets});
+        addBiArrayIntAttr("storeOffsets", ArrayRef<SmallVector<unsigned>>{
+                                              genInfo.storeOffsets});
+        addBiArrayIntAttr("loadPorts", genInfo.loadPorts);
+        addBiArrayIntAttr("storePorts", genInfo.storePorts);
       })
       .Default([&](auto) {
         op->emitError() << "Unsupported memory interface type.";

@@ -13,10 +13,8 @@
 #include "src/DOTParser.h"
 #include "src/LSQGenerator.h"
 #include "src/VHDLWriter.h"
-#include <fstream>
 #include <iostream>
 #include <string>
-#include <vector>
 
 int main(int argc, char *argv[]) {
   // Check that the corrent number of arguments were provided
