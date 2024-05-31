@@ -39,3 +39,10 @@ build/
 bin/
 .cache/
 __pycache__/
+
+# Scala/Metals-related
+.metals/
+.scala-build/
+.bloop/
+.ammonite/
+metals.sbt

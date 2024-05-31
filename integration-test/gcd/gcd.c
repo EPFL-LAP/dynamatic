@@ -1,6 +1,6 @@
 //===- gcd.c - Computes GCD of two integers  ----------------------*- C -*-===//
 //
-// Implements the gcd kernel.
+// Implements the gcd kernel (https://en.algorithmica.org/hpc/algorithms/gcd/).
 //
 //===----------------------------------------------------------------------===//
 
@@ -8,8 +8,12 @@
 #include "dynamatic/Integration.h"
 
 int gcd(in_int_t a, in_int_t b) {
-  // Finding K, where K is the greatest power of 2 that divides both in0 and
-  // in1. for (int k = 0; ((in0 | in1) & 1) == 0; ++k)
+  if (a == 0)
+    return b;
+  if (b == 0)
+    return a;
+
+  // Find the greatest power of 2 that divides both a and b
   unsigned k = 0;
   while (((a | b) & 1) == 0) {
     a >>= 1;
@@ -17,23 +21,29 @@ int gcd(in_int_t a, in_int_t b) {
     k++;
   }
 
-  // Dividing in0 by 2 until in0 becomes odd
-  while ((a & 1) == 0)
+  // a := __builtin_ctz(a)
+  while (a > 0 && (a & 1) == 0)
     a >>= 1;
-
-  // From here on, 'in0' is always odd.
-  // If in1 is even, remove all factor of 2 in in1
-  while ((b & 1) == 0)
+  // b := __builtin_ctz(b)
+  while (b > 0 && (b & 1) == 0)
     b >>= 1;
 
-  // Now in0 and in1 are both odd. Swap if necessary so in0 <= in1, then set in1
-  // = in1 - in0 (which is even).
-  while (b > 0 && ((b & 1) == 0)) {
-    b = b - a;
+  while (a != 0) {
+    in_int_t diff = a - b;
+    // b := min(a, b);
+    if (a < b)
+      b = a;
+    // a := abs(diff)
+    if (diff >= 0)
+      a = diff;
+    else
+      a = -diff;
+    // a := __builtin_ctz(a)
+    while (a > 0 && (a & 1) == 0)
+      a >>= 1;
   }
 
-  // Restore common factors of 2
-  return a << k;
+  return b << k;
 }
 
 int main(void) {

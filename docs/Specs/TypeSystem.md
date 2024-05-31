@@ -73,8 +73,8 @@ handshake.func @adder(%a: channel<i32>, %b: channel<i32>, %start: control) -> ch
 
 Occasionaly, we will want to unbundle channel-typed SSA values into their individual signals and later recombine the individual components into a single channel-typed SSA value. We propose to introduce two new operations to fulfill this requirement.
 
-- An unbundling operation (`handshake::UnbundleOp`) which generally breaks down its bundle-like-typed SSA operand into its individual components, which it produces as separate SSA results.
-- A converse bundling operation (`handshake::BundleOp`) which generally combines multiple raw-typed SSA operands and combines them into a single bundle-like-typed SSA value which it produces as a single SSA result.
+- An unbundling operation (`handshake::UnbundleOp`) which generally breaks down its channel-typed SSA operand into its individual components, which it produces as separate SSA results.
+- A converse bundling operation (`handshake::BundleOp`) which generally combines multiple raw-typed SSA operands and combines them into a single channel-typed SSA value which it produces as a single SSA result.
 
 We include a simple example below (see the [next subsection](#extra-signal-handling) for more complex use cases).
 
@@ -88,7 +88,7 @@ We include a simple example below (see the [next subsection](#extra-signal-handl
 
 ### Extra signal handling
 
-To support the use case where extra signals need to be carried on some dataflow channel (e.g., speculation bits, thread tags), the `handshake::ChannelType` needs to be flexible enough to model an arbitrary number of extra raw data-types (in addition to the "regular" data-type). In order to prepare for future use cases, each extra signal should also be characterized by its direction, either downstream or upstream. Extra signals may also optionally declare unique names to refer themselves by, allowing client code to more easily query for a specifc signal in complex bundles.  
+To support the use case where extra signals need to be carried on some dataflow channel (e.g., speculation bits, thread tags), the `handshake::ChannelType` needs to be flexible enough to model an arbitrary number of extra raw data-types (in addition to the "regular" data-type). In order to prepare for future use cases, each extra signal should also be characterized by its direction, either downstream or upstream. Extra signals may also optionally declare unique names to refer themselves by, allowing client code to more easily query for a specifc signal in complex channels.  
 
 Below are a few MLIR serialization examples for dataflow channels with extra signals.
 
@@ -155,67 +155,6 @@ Most operations accepting channel-typed SSA operands will likely not care for th
 
 Going further, if multiple regions requiring extra signals were ever nested within each other, it is likely that adding/removing extra signals in a stack-like fashion would suffice to achieve correct behavior. However, if that is insufficient and extra signals were not necessarily removed at the same rate or in the exact reverse order in which they were added, then the unique extra signal names could serve as identifiers for the specific signals that a signal-removing unit should care about removing.
 
-### A generic bundle type
-
-The `handshake::ControlType` and `handshake::ChannelType` types will allow us to represent most if not all of our current use cases within MLIR's type system. However, it is possible that we will one day want to remove assumptions that these types make. For example, we may want to change the bundle of signals responsible for controlling the exchange of tokens on a particular channel. However, the `handshake::ControlType` type (and the `handshake::ChannelType` type by extension) represents the specific combination of a downstream valid wire and of an upstream ready wire.
-
-We therefore propose to introduce a third new *parametric* type representing an arbitrary bundle of wires. This `handshake::BundleType` would serialize to `bundle<description-of-signals>` inside the IR and represent a generalization of a `handshake::ChannelType`. Our `adder` example could be written in a semantically equivalent way using `handshake::BundleType` instead of the more specific `handshake::ChannelType`, at the cost of some verbosity.
-
-```mlir
-handshake.func @adder(%a: bundle<data: i32, valid: i1, ready: (U) 1>,
-                      %b: bundle<data: i32, valid: i1, ready: (U) 1>,
-                      %start: bundle<valid: i1, ready: (U) 1>
-                      ) -> bundle<data: i32, valid: i1, ready: (U) 1>  {
-    %add_result = handshake.addi %a, %b : bundle<data: i32, valid: i1, ready: (U) 1>
-    %ret = handshake.return %add_result : bundle<data: i32, valid: i1, ready: (U) 1>
-    handshake.end %ret : bundle<data: i32, valid: i1, ready: (U) 1>
-}
-```
-
-The `handshake::BundleOp` and `handshake::UnbundleOp` operations would have the same semantic as with `handshake::ChannelType`-typed SSA values.
-
-```mlir
-// An arbitrary bundle of signals
-%bundle = ... : bundle<data: i32, otherData: i16, valid: i1>
-
-// Unbundle it, producing all the individual signals 
-%data, %otherData, %valid = handshake.unbundle %bundle : i32, i16, i1
-
-// Rebundle it; all signal names need to be specified again as to not lose the
-// original context
-%bundleAgain = handshake.bundle [%data, %otherData, %valid] : bundle<data: i32, otherData: i16, valid: i1>
-```
-
-Finally, two operations `handshake::ToChannel` and `handshake::ToBundle` would allow us to convert between the generic bundle type and the specific channel type at will inside the IR (at no hardware cost during RTL emission). A channel-typed SSA value would always be convertible to a bundle-typed SSA value whereas the latter would only be convertible to a channel-typed SSA value when it has
-
-1. a downstream signal named `data` (of any type),
-2. an `i1`-typed `valid` downstream signal, and
-3. an `i1`-typed `ready` upstream signal.
-
-```mlir
-// A basic channel with 32-bit integer data and no extra signal
-%channel = ... : channel<i32>
-
-// Converting the channel to an explicit bundle
-%bundle = handshake.to_bundle %channel : bundle<data: i32, valid: i1, ready: (U) i1>
-
-// Converting back to the original channel type
-%channel = handshake.to_channel %bundle : channel<i32>
-```
-
-Extra signals would be copied in order when converting from one type to the other.
-
-```mlir
-// Multiple thread tags example from above
-%channel = ... : channel<i32, [tag1: i2, tag2: i4]>
-
-// Converting the channel to an explicit bundle
-%bundle = handshake.to_bundle %channel : bundle<data: i32, valid: i1, ready: (U) i1, tag1: i2, tag2: i4>
-
-// Converting back to the original channel type
-%channel = handshake.to_channel %bundle : channel<i32, [tag1: i2, tag2: i4]>
-```
-
 ## Discussion
 
 In this section we try to alleviate potential concerns with the proposed change and discuss the latter's impact on other parts of Dynamatic.
@@ -224,29 +163,23 @@ In this section we try to alleviate potential concerns with the proposed change 
 
 Using MLIR's type system to model the exact nature of each channel in our circuits makes us benefit from MLIR's existing type management and verification infrastructure. We will be able to cleanly define and check for custom type checking rules on each operation type, ensuring that the relationships between operand and result types always makes sense; all the while permitting our operations to handle an infinite number of variations of our parametric types.
 
-For example, the integer addition operation (`handshake.addi`) would check that its two operands and result have the same type. Furtermore, this type would only be required to have a downstream 1-bit *valid*, upstream 1-bit *ready*, and downstream data signal.
+For example, the integer addition operation (`handshake.addi`) would check that its two operands and result have the same type. Furthermore, this type would only be required to be a channel with a non-zero-width integer type.
 
 ```mlir
-// Valid, any channel implicitly has the required signals 
+// Valid
 %addOprd1, %addOprd2 = ... : channel<i32>
 %addResult = handshake.addi %addOprd1, %addOprd2 : channel<i32>
 
 // -----
 
-// Valid, the bundle explicitly has all the required signals 
-%addOprd1, %addOprd2 = ... : bundle<data: i32, valid: i1, ready: (U) i1, extra: i4>
-%addResult = handshake.addi %addOprd1, %addOprd2 : bundle<data: i32, valid: i1, ready: (U) i1, extra: i4>
-
-// -----
-
-// Invalid, the bundle does not have a data signal
-%addOprd1, %addOprd2 = ... : bundle<notData: i32, valid: i1, ready: (U) i1>
-%addResult = handshake.addi %addOprd1, %addOprd2 : bundle<notData: i32, valid: i1, ready: (U) i1>
+// Invalid, data type has 0 width
+%addOprd1, %addOprd2 = ... : channel<i0>
+%addResult = handshake.addi %addOprd1, %addOprd2 : channel<i0>
 ```
 
 ### IR complexity
 
-There is no question that the proposed redesign would yield IRs that are longer and visually more complex than what our current Handshake implementation produces. Note that, while mathematical operations would require explicit bundling/unbundling operations around them, core dataflow components (e.g., merges and branches) would remain structurally identical beyond cosmetic type name changes.
+Despite the added complexity introduced by our parametric channel type, the representation of core dataflow components (e.g., merges and branches) would remain structurally identical beyond cosmetic type name changes.
 
 ```mlir
 // Current implementation
@@ -283,7 +216,7 @@ There is no question that the proposed redesign would yield IRs that are longer 
 
 ### Backend changes
 
-The support for "nonstandard" signal bundles in the IR means that we have to match this support in our RTL backend. Indeed, most current RTL components take the data bus's bitwidth as an RTL parameter. This is no longer sufficient when dataflow channels can carry extra downstream or upstream signals, which must somehow be encoded in the RTL parameters of numerous core dataflow components (e.g., all merge-like and branch-like components). Complex signals bundles will need to become encodable as RTL parameters for the underlying RTL implementations to be concretized correctly. It is basically a given that generic RTL implementations which we largely rely on today will not be sufficient, and that the design change will require us moving to RTL generators for most core dataflow components. Alternatively, we could use a form of [signal composition](#signal-compositon) (see below) to narrow down the amount of channel types our components have to support.
+The support for "nonstandard" channels in the IR means that we have to match this support in our RTL backend. Indeed, most current RTL components take the data bus's bitwidth as an RTL parameter. This is no longer sufficient when dataflow channels can carry extra downstream or upstream signals, which must somehow be encoded in the RTL parameters of numerous core dataflow components (e.g., all merge-like and branch-like components). Complex channels will need to become encodable as RTL parameters for the underlying RTL implementations to be concretized correctly. It is basically a given that generic RTL implementations which we largely rely on today will not be sufficient, and that the design change will require us moving to RTL generators for most core dataflow components. Alternatively, we could use a form of [signal composition](#signal-compositon) (see below) to narrow down the amount of channel types our components have to support.
 
 ### Signal compositon
 
