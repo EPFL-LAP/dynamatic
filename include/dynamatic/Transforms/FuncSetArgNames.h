@@ -10,23 +10,21 @@
 //
 //===----------------------------------------------------------------------===//
 
-#ifndef EXPERIMENTAL_TRANSFORMS_FUNCSETARGNAMES_H
-#define EXPERIMENTAL_TRANSFORMS_FUNCSETARGNAMES_H
+#ifndef DYNAMATIC_TRANSFORMS_FUNCSETARGNAMES_H
+#define DYNAMATIC_TRANSFORMS_FUNCSETARGNAMES_H
 
 #include "dynamatic/Support/DynamaticPass.h"
 #include "dynamatic/Support/LLVM.h"
 
 namespace dynamatic {
-namespace experimental {
 
 std::unique_ptr<dynamatic::DynamaticPass>
 createFuncSetArgNames(StringRef source = {});
 
 #define GEN_PASS_DECL_FUNCSETARGNAMES
 #define GEN_PASS_DEF_FUNCSETARGNAMES
-#include "experimental/Transforms/Passes.h.inc"
+#include "dynamatic/Transforms/Passes.h.inc"
 
-} // namespace experimental
 } // namespace dynamatic
 
-#endif // EXPERIMENTAL_TRANSFORMS_FUNCSETARGNAMES_H
+#endif // DYNAMATIC_TRANSFORMS_FUNCSETARGNAMES_H

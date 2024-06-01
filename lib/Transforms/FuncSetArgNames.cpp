@@ -10,7 +10,7 @@
 //
 //===----------------------------------------------------------------------===//
 
-#include "experimental/Transforms/FuncSetArgNames.h"
+#include "dynamatic/Transforms/FuncSetArgNames.h"
 #include "mlir/Dialect/Func/IR/FuncOps.h"
 #include "mlir/IR/Attributes.h"
 #include "mlir/IR/BuiltinAttributes.h"
@@ -65,8 +65,7 @@ namespace {
 /// Simple pass driver that replaces the functions argument names of each
 /// Handshake-level function in the IR.
 struct FuncSetArgNamesPass
-    : public dynamatic::experimental::impl::FuncSetArgNamesBase<
-          FuncSetArgNamesPass> {
+    : public dynamatic::impl::FuncSetArgNamesBase<FuncSetArgNamesPass> {
 
   FuncSetArgNamesPass(StringRef source) { this->source = source.str(); }
 
@@ -116,6 +115,6 @@ struct FuncSetArgNamesPass
 } // namespace
 
 std::unique_ptr<dynamatic::DynamaticPass>
-dynamatic::experimental::createFuncSetArgNames(StringRef source) {
+dynamatic::createFuncSetArgNames(StringRef source) {
   return std::make_unique<FuncSetArgNamesPass>(source);
 }

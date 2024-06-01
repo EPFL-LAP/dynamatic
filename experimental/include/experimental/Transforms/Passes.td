@@ -16,19 +16,6 @@
 include "dynamatic/Support/Passes.td"
 include "mlir/Pass/PassBase.td"
 
-def FuncSetArgNames : DynamaticPass<"func-set-arg-names"> {
-  let summary = "Replace function argument names with original ones from C";
-  let description = [{
-    The pass uses clang's C API to parse the original source code and replaces
-    the default argument names given by Polygeist to all function arguments with
-    the actual ones used in the source code.
-  }];
-  let constructor = "dynamatic::experimental::createFuncSetArgNames()";
-  let options =
-    [Option<"source", "source", "std::string", "",
-            "Path to source C file from which the IR was generated.">];
-}
-
 def HandshakeSpeculation : DynamaticPass<"handshake-speculation"> {
   let summary = "Place Speculation operations";
   let description = [{
