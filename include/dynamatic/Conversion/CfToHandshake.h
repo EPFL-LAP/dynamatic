@@ -15,8 +15,6 @@
 #define DYNAMATIC_CONVERSION_CF_TO_HANDSHAKE_H
 
 #include "dynamatic/Analysis/NameAnalysis.h"
-#include "dynamatic/Dialect/Handshake/HandshakeOps.h"
-#include "dynamatic/Dialect/Handshake/MemoryInterfaces.h"
 #include "dynamatic/Support/Backedge.h"
 #include "dynamatic/Support/DynamaticPass.h"
 #include "dynamatic/Support/LLVM.h"
@@ -105,6 +103,10 @@ public:
   LogicalResult
   verifyAndCreateMemInterfaces(ConversionPatternRewriter &rewriter,
                                MemInterfacesInfo &memInfo);
+
+  /// Converts each `func::CallOp` operation to an equivalent
+  /// `handshake::InstanceOp` operation. This always succeeds.
+  LogicalResult convertCalls(ConversionPatternRewriter &rewriter);
 
   /// Connect constants to the rest of the circuit. Constants are triggered by a
   /// source if their successor is not a branch/return or memory operation.
