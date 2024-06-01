@@ -30,7 +30,9 @@
 #include "mlir/Dialect/Func/IR/FuncOps.h"
 #include "mlir/Dialect/LLVMIR/LLVMDialect.h"
 #include "mlir/Dialect/MemRef/IR/MemRef.h"
+#include "mlir/IR/BuiltinAttributes.h"
 #include "mlir/IR/Dominance.h"
+#include "mlir/IR/MLIRContext.h"
 #include "mlir/IR/PatternMatch.h"
 #include "mlir/Support/LogicalResult.h"
 #include "mlir/Transforms/DialectConversion.h"
@@ -1012,13 +1014,40 @@ struct ConvertFuncToHandshake : OpRewritePattern<func::FuncOp> {
         return failure();
     }
 
-    // The symbol and function type attributes are set directly by the Handshake
-    // function constructor, all others are forwarded directly
+    // Derive attribute for the new function
     SmallVector<NamedAttribute, 4> attributes;
+    MLIRContext *ctx = getContext();
     for (const NamedAttribute &attr : funcOp->getAttrs()) {
-      if (attr.getName() == SymbolTable::getSymbolAttrName() ||
-          attr.getName() == funcOp.getFunctionTypeAttrName())
+      StringAttr attrName = attr.getName();
+
+      // The symbol and function type attributes are set directly by the
+      // Handshake function constructor, all others are forwarded directly
+      if (attrName == SymbolTable::getSymbolAttrName() ||
+          attrName == funcOp.getFunctionTypeAttrName())
         continue;
+
+      // Argument names need to be augmented with the additional start argument
+      if (attrName == funcOp.getArgAttrsAttrName()) {
+        // Extracts the name key's value from the dictionary attribute
+        // corresponding to each function's argument.
+        auto extractNames = [&](Attribute argAttr) -> Attribute {
+          DictionaryAttr argDict = cast<DictionaryAttr>(argAttr);
+          std::optional<NamedAttribute> name =
+              argDict.getNamed("handshake.arg_name");
+          assert(name && "missing name key in arg attribute");
+          return name->getValue();
+        };
+
+        SmallVector<Attribute> argNames;
+        llvm::transform(funcOp.getArgAttrsAttr(), std::back_inserter(argNames),
+                        extractNames);
+        argNames.push_back(StringAttr::get(ctx, "start"));
+        attributes.emplace_back(StringAttr::get(ctx, "argNames"),
+                                ArrayAttr::get(ctx, argNames));
+        continue;
+      }
+
+      // All other attributes are forwarded without changes
       attributes.push_back(attr);
     }
 
@@ -1026,8 +1055,12 @@ struct ConvertFuncToHandshake : OpRewritePattern<func::FuncOp> {
     NoneType noneType = rewriter.getNoneType();
     SmallVector<Type, 8> argTypes(funcOp.getArgumentTypes());
     SmallVector<Type, 8> resTypes(funcOp.getResultTypes());
-    if (resTypes.empty())
+    if (resTypes.empty()) {
       resTypes.push_back(noneType);
+      // The only result should be named "end"
+      auto resNames = ArrayAttr::get(ctx, {StringAttr::get(ctx, "end")});
+      attributes.emplace_back(StringAttr::get(ctx, "resNames"), resNames);
+    }
     argTypes.push_back(noneType);
     FunctionType funcType = rewriter.getFunctionType(argTypes, resTypes);
 

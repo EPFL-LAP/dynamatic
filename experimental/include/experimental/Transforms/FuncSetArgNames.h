@@ -1,4 +1,4 @@
-//===- HandshakeFixArgNames.h - Match argument names with C --00-*- C++ -*-===//
+//===- FuncSetArgNames.h - Set argument names from C source -----*- C++ -*-===//
 //
 // Dynamatic is under the Apache License v2.0 with LLVM Exceptions.
 // See https://llvm.org/LICENSE.txt for license information.
@@ -6,29 +6,27 @@
 //
 //===----------------------------------------------------------------------===//
 //
-// This file declares the --handshake-fix-arg-names pass.
+// This file declares the --func-set-arg-names pass.
 //
 //===----------------------------------------------------------------------===//
 
-#ifndef EXPERIMENTAL_TRANSFORMS_HANDHSHAKEFIXARGNAMES_H
-#define EXPERIMENTAL_TRANSFORMS_HANDHSHAKEFIXARGNAMES_H
+#ifndef EXPERIMENTAL_TRANSFORMS_FUNCSETARGNAMES_H
+#define EXPERIMENTAL_TRANSFORMS_FUNCSETARGNAMES_H
 
 #include "dynamatic/Support/DynamaticPass.h"
 #include "dynamatic/Support/LLVM.h"
-#include "mlir/IR/Value.h"
-#include "mlir/Pass/Pass.h"
 
 namespace dynamatic {
 namespace experimental {
 
 std::unique_ptr<dynamatic::DynamaticPass>
-createHandshakeFixArgNames(const std::string &source = "");
+createFuncSetArgNames(StringRef source = {});
 
-#define GEN_PASS_DECL_HANDSHAKEFIXARGNAMES
-#define GEN_PASS_DEF_HANDSHAKEFIXARGNAMES
+#define GEN_PASS_DECL_FUNCSETARGNAMES
+#define GEN_PASS_DEF_FUNCSETARGNAMES
 #include "experimental/Transforms/Passes.h.inc"
 
 } // namespace experimental
 } // namespace dynamatic
 
-#endif // EXPERIMENTAL_TRANSFORMS_HANDHSHAKEFIXARGNAMES_H
+#endif // EXPERIMENTAL_TRANSFORMS_FUNCSETARGNAMES_H

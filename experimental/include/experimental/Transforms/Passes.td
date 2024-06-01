@@ -16,14 +16,14 @@
 include "dynamatic/Support/Passes.td"
 include "mlir/Pass/PassBase.td"
 
-def HandshakeFixArgNames : DynamaticPass<"handshake-fix-arg-names"> {
+def FuncSetArgNames : DynamaticPass<"func-set-arg-names"> {
   let summary = "Replace function argument names with original ones from C";
   let description = [{
-    Extremely hacky pass that text parses the original source code from which
-    the IR was obtained and replaces the default argument names given by
-    Polygeist to all function arguments with the ones used in the source code.
+    The pass uses clang's C API to parse the original source code and replaces
+    the default argument names given by Polygeist to all function arguments with
+    the actual ones used in the source code.
   }];
-  let constructor = "dynamatic::experimental::createHandshakeFixArgNames()";
+  let constructor = "dynamatic::experimental::createFuncSetArgNames()";
   let options =
     [Option<"source", "source", "std::string", "",
             "Path to source C file from which the IR was generated.">];

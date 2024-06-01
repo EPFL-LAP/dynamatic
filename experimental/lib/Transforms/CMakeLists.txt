@@ -1,5 +1,5 @@
 add_dynamatic_library(DynamaticExperimentalTransforms
-  HandshakeFixArgNames.cpp
+  FuncSetArgNames.cpp
   HandshakePlaceBuffersCustom.cpp
 
   DEPENDS
@@ -13,6 +13,7 @@ add_dynamatic_library(DynamaticExperimentalTransforms
   MLIRTransformUtils
   DynamaticSupport
   DynamaticAnalysis
+  libclang
 )
 
 add_subdirectory(Speculation)
