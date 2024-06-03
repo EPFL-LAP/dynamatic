@@ -163,7 +163,7 @@ func.func @mixLSQAndMCStores(%mem: memref<64xi32>, %data : i32) -> i32 {
 // CHECK:           %[[VAL_24:.*]], %[[VAL_25:.*]] = control_merge %[[VAL_21]] {bb = 1 : ui32} : none, index
 // CHECK:           %[[VAL_26:.*]] = source {bb = 1 : ui32}
 // CHECK:           %[[VAL_27:.*]] = constant %[[VAL_26]] {bb = 1 : ui32, value = 1 : index} : index
-// CHECK:           %[[VAL_28:.*]] = arith.addi %[[VAL_27]], %[[VAL_23]] {bb = 1 : ui32} : index
+// CHECK:           %[[VAL_28:.*]] = arith.addi %[[VAL_23]], %[[VAL_27]] {bb = 1 : ui32} : index
 // CHECK:           %[[VAL_5]], %[[VAL_29:.*]] = mc_load{{\[}}%[[VAL_28]]] %[[VAL_3]]#0 {bb = 1 : ui32} : index, i32
 // CHECK:           %[[VAL_30:.*]] = br %[[VAL_29]] {bb = 1 : ui32} : i32
 // CHECK:           %[[VAL_31:.*]] = br %[[VAL_23]] {bb = 1 : ui32} : index
@@ -172,7 +172,7 @@ func.func @mixLSQAndMCStores(%mem: memref<64xi32>, %data : i32) -> i32 {
 // CHECK:           %[[VAL_34:.*]], %[[VAL_35:.*]] = control_merge %[[VAL_22]] {bb = 2 : ui32} : none, index
 // CHECK:           %[[VAL_36:.*]] = source {bb = 2 : ui32}
 // CHECK:           %[[VAL_37:.*]] = constant %[[VAL_36]] {bb = 2 : ui32, value = 1 : index} : index
-// CHECK:           %[[VAL_38:.*]] = arith.addi %[[VAL_37]], %[[VAL_33]] {bb = 2 : ui32} : index
+// CHECK:           %[[VAL_38:.*]] = arith.addi %[[VAL_33]], %[[VAL_37]] {bb = 2 : ui32} : index
 // CHECK:           %[[VAL_6]], %[[VAL_39:.*]] = mc_load{{\[}}%[[VAL_38]]] %[[VAL_3]]#1 {bb = 2 : ui32} : index, i32
 // CHECK:           %[[VAL_40:.*]] = br %[[VAL_39]] {bb = 2 : ui32} : i32
 // CHECK:           %[[VAL_41:.*]] = br %[[VAL_33]] {bb = 2 : ui32} : index

@@ -711,21 +711,20 @@ HandshakeLowering::convertCalls(ConversionPatternRewriter &rewriter) {
 
 LogicalResult
 HandshakeLowering::connectConstants(ConversionPatternRewriter &rewriter) {
-  for (auto cstOp :
-       llvm::make_early_inc_range(region.getOps<mlir::arith::ConstantOp>())) {
-
-    rewriter.setInsertionPointAfter(cstOp);
-    auto cstVal = cstOp.getValue();
-
-    if (isCstSourcable(cstOp))
-      rewriter.replaceOpWithNewOp<handshake::ConstantOp>(
-          cstOp, cstVal.getType(), cstVal,
-          rewriter.create<handshake::SourceOp>(cstOp.getLoc(),
-                                               rewriter.getNoneType()));
-    else
-      rewriter.replaceOpWithNewOp<handshake::ConstantOp>(
-          cstOp, cstVal.getType(), cstVal,
-          getBlockEntryControl(cstOp->getBlock()));
+  auto constants = region.getOps<mlir::arith::ConstantOp>();
+  for (auto cstOp : llvm::make_early_inc_range(constants)) {
+    rewriter.setInsertionPoint(cstOp);
+    TypedAttr cstAttr = cstOp.getValue();
+    Value controlVal;
+    if (isCstSourcable(cstOp)) {
+      auto sourceOp = rewriter.create<handshake::SourceOp>(
+          cstOp.getLoc(), rewriter.getNoneType());
+      controlVal = sourceOp.getResult();
+    } else {
+      controlVal = getBlockEntryControl(cstOp->getBlock());
+    }
+    rewriter.replaceOpWithNewOp<handshake::ConstantOp>(cstOp, cstAttr.getType(),
+                                                       cstAttr, controlVal);
   }
   return success();
 }
@@ -1002,11 +1001,12 @@ namespace {
 /// control-only argument to represent the starting point of the control
 /// network. If the function did not return any result, a control-only result is
 /// added to signal function completion.
-struct ConvertFuncToHandshake : OpRewritePattern<func::FuncOp> {
-  using OpRewritePattern<func::FuncOp>::OpRewritePattern;
+struct ConvertFuncToHandshake : OpConversionPattern<func::FuncOp> {
+  using OpConversionPattern<func::FuncOp>::OpConversionPattern;
 
-  LogicalResult matchAndRewrite(func::FuncOp funcOp,
-                                PatternRewriter &rewriter) const override {
+  LogicalResult
+  matchAndRewrite(func::FuncOp funcOp, OpAdaptor operands,
+                  ConversionPatternRewriter &rewriter) const override {
     // Put the function into maximal SSA form if it is not external
     if (!funcOp.isExternal()) {
       HandshakeLoweringSSAStrategy strategy;
@@ -1095,8 +1095,13 @@ struct CfToHandshakePass
     config.enableRegionSimplification = false;
     RewritePatternSet patterns{ctx};
     patterns.add<ConvertFuncToHandshake>(ctx);
-    if (failed(
-            applyPatternsAndFoldGreedily(modOp, std::move(patterns), config)))
+
+    // All func-level functions must become handshake-level functions
+    ConversionTarget funcTarget(*ctx);
+    funcTarget.addIllegalOp<func::FuncOp>();
+    funcTarget.addLegalOp<handshake::FuncOp>();
+
+    if (failed(applyPartialConversion(modOp, funcTarget, std::move(patterns))))
       return signalPassFailure();
 
     // Lower every function individually
