@@ -4,7 +4,7 @@
 // CHECK-LABEL:   handshake.func @simpleLoadStore(
 // CHECK-SAME:                                    %[[VAL_0:.*]]: index,
 // CHECK-SAME:                                    %[[VAL_1:.*]]: memref<4xi32>,
-// CHECK-SAME:                                    %[[VAL_2:.*]]: none, ...) -> none attributes {argNames = ["in0", "in1", "in2"], resNames = ["out0"]} {
+// CHECK-SAME:                                    %[[VAL_2:.*]]: none, ...) -> none attributes {argNames = ["in0", "in1", "in2"], resNames = ["end"]} {
 // CHECK:           %[[VAL_3:.*]], %[[VAL_4:.*]] = mem_controller{{\[}}%[[VAL_1]] : memref<4xi32>] (%[[VAL_5:.*]], %[[VAL_6:.*]], %[[VAL_7:.*]], %[[VAL_8:.*]]) {connectedBlocks = [0 : i32]} : (i32, index, i32, index) -> (i32, none)
 // CHECK:           %[[VAL_9:.*]] = merge %[[VAL_0]] {bb = 0 : ui32} : index
 // CHECK:           %[[VAL_10:.*]] = merge %[[VAL_2]] {bb = 0 : ui32} : none
@@ -28,7 +28,7 @@ func.func @simpleLoadStore(%arg0 : index, %arg1 : memref<4xi32>) {
 // CHECK-SAME:                                   %[[VAL_0:.*]]: i1,
 // CHECK-SAME:                                   %[[VAL_1:.*]]: index,
 // CHECK-SAME:                                   %[[VAL_2:.*]]: memref<4xi32>,
-// CHECK-SAME:                                   %[[VAL_3:.*]]: none, ...) -> none attributes {argNames = ["in0", "in1", "in2", "in3"], resNames = ["out0"]} {
+// CHECK-SAME:                                   %[[VAL_3:.*]]: none, ...) -> none attributes {argNames = ["in0", "in1", "in2", "in3"], resNames = ["end"]} {
 // CHECK:           %[[VAL_4:.*]] = mem_controller{{\[}}%[[VAL_2]] : memref<4xi32>] (%[[VAL_5:.*]], %[[VAL_6:.*]], %[[VAL_7:.*]], %[[VAL_8:.*]], %[[VAL_9:.*]], %[[VAL_10:.*]]) {connectedBlocks = [1 : i32, 2 : i32]} : (i32, index, i32, i32, index, i32) -> none
 // CHECK:           %[[VAL_11:.*]] = merge %[[VAL_0]] {bb = 0 : ui32} : i1
 // CHECK:           %[[VAL_12:.*]] = merge %[[VAL_1]] {bb = 0 : ui32} : index
@@ -71,7 +71,7 @@ func.func @storeMulBlocks(%arg0 : i1, %arg1 : index, %arg2 : memref<4xi32>) {
 // CHECK-SAME:                                    %[[VAL_0:.*]]: i1,
 // CHECK-SAME:                                    %[[VAL_1:.*]]: index,
 // CHECK-SAME:                                    %[[VAL_2:.*]]: memref<4xi32>,
-// CHECK-SAME:                                    %[[VAL_3:.*]]: none, ...) -> none attributes {argNames = ["in0", "in1", "in2", "in3"], resNames = ["out0"]} {
+// CHECK-SAME:                                    %[[VAL_3:.*]]: none, ...) -> none attributes {argNames = ["in0", "in1", "in2", "in3"], resNames = ["end"]} {
 // CHECK:           %[[VAL_4:.*]], %[[VAL_5:.*]] = mem_controller{{\[}}%[[VAL_2]] : memref<4xi32>] (%[[VAL_6:.*]]) {connectedBlocks = [0 : i32]} : (index) -> (i32, none)
 // CHECK:           %[[VAL_7:.*]] = merge %[[VAL_0]] {bb = 0 : ui32} : i1
 // CHECK:           %[[VAL_8:.*]] = merge %[[VAL_1]] {bb = 0 : ui32} : index
@@ -104,7 +104,7 @@ func.func @forwardLoadToBB(%arg0 : i1, %arg1 : index, %arg2: memref<4xi32>) {
 
 // CHECK-LABEL:   handshake.func @multipleMemories(
 // CHECK-SAME:                                     %[[VAL_0:.*]]: i1, %[[VAL_1:.*]]: memref<4xi32>, %[[VAL_2:.*]]: memref<4xi32>,
-// CHECK-SAME:                                     %[[VAL_3:.*]]: none, ...) -> none attributes {argNames = ["in0", "in1", "in2", "in3"], resNames = ["out0"]} {
+// CHECK-SAME:                                     %[[VAL_3:.*]]: none, ...) -> none attributes {argNames = ["in0", "in1", "in2", "in3"], resNames = ["end"]} {
 // CHECK:           %[[VAL_4:.*]], %[[VAL_5:.*]] = mem_controller{{\[}}%[[VAL_2]] : memref<4xi32>] (%[[VAL_6:.*]], %[[VAL_7:.*]], %[[VAL_8:.*]], %[[VAL_9:.*]]) {connectedBlocks = [1 : i32, 2 : i32]} : (index, i32, index, i32) -> (i32, none)
 // CHECK:           %[[VAL_10:.*]], %[[VAL_11:.*]] = mem_controller{{\[}}%[[VAL_1]] : memref<4xi32>] (%[[VAL_12:.*]], %[[VAL_13:.*]], %[[VAL_14:.*]], %[[VAL_15:.*]]) {connectedBlocks = [1 : i32, 2 : i32]} : (i32, index, i32, index) -> (i32, none)
 // CHECK:           %[[VAL_16:.*]] = merge %[[VAL_0]] {bb = 0 : ui32} : i1

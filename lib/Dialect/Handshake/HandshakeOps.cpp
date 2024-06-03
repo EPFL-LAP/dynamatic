@@ -369,19 +369,21 @@ void handshake::FuncOp::resolveArgAndResNames() {
 
   /// Generate a set of fallback names. These are used in case names are
   /// missing from the currently set arg- and res name attributes.
-  auto fallbackArgNames = getFuncOpNames(builder, getNumArguments(), "in");
-  auto fallbackResNames = getFuncOpNames(builder, getNumResults(), "out");
-  auto argNames = getArgNames().getValue();
-  auto resNames = getResNames().getValue();
+  SmallVector<Attribute> fallbackArgNames =
+      getFuncOpNames(builder, getNumArguments(), "in");
+  SmallVector<Attribute> fallbackResNames =
+      getFuncOpNames(builder, getNumResults(), "out");
+  ArrayRef<Attribute> argNames = getArgNames().getValue();
+  ArrayRef<Attribute> resNames = getResNames().getValue();
 
   /// Use fallback names where actual names are missing.
-  auto resolveNames = [&](auto &fallbackNames, auto &actualNames,
-                          StringRef attrName) {
-    for (auto fallbackName : llvm::enumerate(fallbackNames)) {
-      if (actualNames.size() <= fallbackName.index())
-        addStringToStringArrayAttr(
-            builder, this->getOperation(), attrName,
-            fallbackName.value().template cast<StringAttr>());
+  auto resolveNames = [&](ArrayRef<Attribute> fallbackNames,
+                          ArrayRef<Attribute> actualNames, StringRef attrName) {
+    for (auto [idx, fallbackName] : llvm::enumerate(fallbackNames)) {
+      if (actualNames.size() <= idx) {
+        addStringToStringArrayAttr(builder, this->getOperation(), attrName,
+                                   fallbackName.cast<StringAttr>());
+      }
     }
   };
   resolveNames(fallbackArgNames, argNames, "argNames");

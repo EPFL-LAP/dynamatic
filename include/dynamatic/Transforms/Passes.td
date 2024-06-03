@@ -92,6 +92,19 @@ def FuncMaximizeSSA : Pass<"func-maximize-ssa", "::mlir::func::FuncOp"> {
   let constructor = "dynamatic::createFuncMaximizeSSA()";
 }
 
+def FuncSetArgNames : DynamaticPass<"func-set-arg-names"> {
+  let summary = "Replace function argument names with original ones from C";
+  let description = [{
+    The pass uses clang's C API to parse the original source code and replaces
+    the default argument names given by Polygeist to all function arguments with
+    the actual ones used in the source code.
+  }];
+  let constructor = "dynamatic::createFuncSetArgNames()";
+  let options =
+    [Option<"source", "source", "std::string", "",
+            "Path to source C file from which the IR was generated.">];
+}
+
 //===----------------------------------------------------------------------===//
 // Handshake passes
 //===----------------------------------------------------------------------===//

@@ -15,7 +15,6 @@
 #define EXPERIMENTAL_TRANSFORMS_PASSES_H
 
 #include "dynamatic/Support/LLVM.h"
-#include "experimental/Transforms/HandshakeFixArgNames.h"
 #include "experimental/Transforms/HandshakePlaceBuffersCustom.h"
 #include "experimental/Transforms/ResourceSharing/Crush.h"
 #include "experimental/Transforms/Speculation/HandshakeSpeculation.h"

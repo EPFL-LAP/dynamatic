@@ -2,7 +2,7 @@
 // RUN: dynamatic-opt --lower-cf-to-handshake --remove-operation-names %s --split-input-file | FileCheck %s
 
 // CHECK-LABEL:   handshake.func @returnNothing(
-// CHECK-SAME:                                  %[[VAL_0:.*]]: none, ...) -> none attributes {argNames = ["in0"], resNames = ["out0"]} {
+// CHECK-SAME:                                  %[[VAL_0:.*]]: none, ...) -> none attributes {argNames = ["in0"], resNames = ["end"]} {
 // CHECK:           %[[VAL_1:.*]] = merge %[[VAL_0]] {bb = 0 : ui32} : none
 // CHECK:           %[[VAL_2:.*]] = return {bb = 0 : ui32} %[[VAL_1]] : none
 // CHECK:           end {bb = 0 : ui32} %[[VAL_2]] : none

@@ -102,7 +102,7 @@ func.func @multipleReturns(%arg0: i32, %arg1: i1) -> i32 {
 
 // CHECK-LABEL:   handshake.func @simpleLoop(
 // CHECK-SAME:                               %[[VAL_0:.*]]: index,
-// CHECK-SAME:                               %[[VAL_1:.*]]: none, ...) -> none attributes {argNames = ["in0", "in1"], resNames = ["out0"]} {
+// CHECK-SAME:                               %[[VAL_1:.*]]: none, ...) -> none attributes {argNames = ["in0", "in1"], resNames = ["end"]} {
 // CHECK:           %[[VAL_2:.*]] = merge %[[VAL_0]] {bb = 0 : ui32} : index
 // CHECK:           %[[VAL_3:.*]] = merge %[[VAL_1]] {bb = 0 : ui32} : none
 // CHECK:           %[[VAL_4:.*]] = constant %[[VAL_3]] {bb = 0 : ui32, value = 0 : index} : index
