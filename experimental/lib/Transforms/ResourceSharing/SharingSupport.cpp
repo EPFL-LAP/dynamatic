@@ -29,7 +29,7 @@ void recursiveDfsComponentOrder(Operation *op,
 
     // 2. For each of the outgoing channels of op, do a
     // recursiveDfsComponentOrder call
-    for (auto *ch : cfChannels) {
+    for (Channel *ch : cfChannels) {
       if (ch->producer == op) {
         recursiveDfsComponentOrder(ch->consumer, visited, dfsPostOrder,
                                    cfChannels);
@@ -53,7 +53,7 @@ void recursiveDfsAssignSCCId(Operation *op,
 
     // 2. For all the nodes discovered using backward DFS call, assign them with
     // the same SCC ID
-    for (auto *ch : cfChannels) {
+    for (Channel *ch : cfChannels) {
       if (ch->consumer == op) {
         recursiveDfsAssignSCCId(ch->producer, assigned, cfChannels, currSCCId);
       }
@@ -74,24 +74,23 @@ std::map<Operation *, size_t> dynamatic::experimental::sharing::getSccsInCfc(
   std::map<Operation *, size_t> assigned;
 
   // 1. For each unit in the CFC, mark u as unvisited.
-  for (auto *op : cfUnits)
+  for (Operation *op : cfUnits)
     visited[op] = false;
 
   // 2. For each unit in the CFC, do RecursiveBFS(u).
-  for (auto *op : cfUnits)
+  for (Operation *op : cfUnits)
     recursiveDfsComponentOrder(op, visited, dfsPostOrder, cfChannels);
 
   // For each unit in the CFC, mark u as not assigned (0 means not assigned).
-  for (auto *op : cfUnits)
+  for (Operation *op : cfUnits)
     assigned[op] = 0;
 
   size_t currSCCId = 0;
   // 3. For each unit in the CFC, do recursiveBackBfs(u)
-  for (auto *op : dfsPostOrder) {
+  for (Operation *op : dfsPostOrder) {
     if (assigned[op] == 0) {
       currSCCId += 1;
       recursiveDfsAssignSCCId(op, assigned, cfChannels, currSCCId);
-      // llvm::errs() << "Current ID" << currSCCId << "\n";
     }
   }
 

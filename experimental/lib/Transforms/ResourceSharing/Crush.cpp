@@ -117,7 +117,7 @@ void loadFuncPerfInfo(SharingInfo &sharingInfo, MILPVars &vars,
     //   sharingInfo[&funcInfo.funcOp].cfUnits[cfIndices[cf]].insert(op);
 
     // Track the channels of the CFC
-    for (auto val : cf->channels) {
+    for (Value val : cf->channels) {
       Channel *ch = new Channel(val);
 
       sharingInfo[&funcInfo.funcOp].cfChannels[cfIndices[cf]].insert(ch);
@@ -126,9 +126,9 @@ void loadFuncPerfInfo(SharingInfo &sharingInfo, MILPVars &vars,
 
   // or each CFDFC Union, mark the most-frequently-executed
   // CFC as performance critical.
-  for (auto &cfUnion : disjointUnions) {
+  for (CFDFCUnion &cfUnion : disjointUnions) {
 
-    auto *critCf =
+    CFDFC **critCf =
         std::max_element(cfUnion.cfdfcs.begin(), cfUnion.cfdfcs.end(),
                          [](CFDFC const *l, CFDFC const *r) {
                            return l->numExecs < r->numExecs;
@@ -309,7 +309,7 @@ struct CreditBasedSharingPass
   SmallVector<mlir::Operation *> getSharingTargets(handshake::FuncOp funcOp) {
     SmallVector<Operation *> sharingTargets;
 
-    for (auto &op : funcOp.getOps()) {
+    for (Operation &op : funcOp.getOps()) {
       if (isa<SHARING_TARGETS>(op)) {
         sharingTargets.emplace_back(&op);
       }
@@ -352,7 +352,7 @@ bool checkGroupMergable(const Group &g1, const Group &g2,
   OperationName opName = (*(gMerged.begin()))->getName();
 
   // 1. The merged group must have operations of the same type.
-  for (auto *op : gMerged) {
+  for (Operation *op : gMerged) {
     if (op->getName() != opName)
       return false;
   }
@@ -363,7 +363,7 @@ bool checkGroupMergable(const Group &g1, const Group &g2,
 
   // 3. For each CFC, there must be no two operations have the same SCC ID (this
   // is simplified).
-  for (auto cf : funcPerfInfo.critCfcs) {
+  for (unsigned long cf : funcPerfInfo.critCfcs) {
     // for each cf, numOps contains the number of operations
     // that are in the merged group and also in cf
     unsigned numOps = 0;
@@ -373,7 +373,7 @@ bool checkGroupMergable(const Group &g1, const Group &g2,
     // two operation that are in the same SCC cannot be in the
     // same sharing group).
     std::vector<size_t> listOfSccIds;
-    for (auto *op : (funcPerfInfo.cfUnits)[cf]) {
+    for (Operation *op : (funcPerfInfo.cfUnits)[cf]) {
       // In the op is in (SCC union MergedGroup):
       if (gMerged.find(op) != gMerged.end()) {
         // increase number of Ops
@@ -422,7 +422,7 @@ bool tryMergeGroups(SharingGroups &sharingGroups, const FuncPerfInfo &info) {
 }
 
 void logGroups(const SharingGroups &sharingGroups, NameAnalysis &namer) {
-  for (const auto &group : sharingGroups) {
+  for (const Group &group : sharingGroups) {
     llvm::errs() << "group : {";
     for (auto *op : group) {
       llvm::errs() << namer.getName(op) << " ";
@@ -432,7 +432,7 @@ void logGroups(const SharingGroups &sharingGroups, NameAnalysis &namer) {
 }
 
 void sortGroups(SharingGroups &sharingGroups, FuncPerfInfo &info) {
-  for (auto &g : sharingGroups) {
+  for (Group &g : sharingGroups) {
     // use bubble sort to sort each group:
     if (g.size() <= 1)
       continue;
@@ -463,7 +463,7 @@ void getOpOccupancy(const SmallVector<Operation *> &sharingTargets,
                     TimingDatabase &timingDB, FuncPerfInfo &funcPerfInfo) {
 
   double latency;
-  for (auto *target : sharingTargets) {
+  for (Operation *target : sharingTargets) {
     // By default, the op is assigned with no occupancy. If a performance
     // critical CFC contains that op, then we set the occupancy to the occupancy
     // of op in that CFC.
@@ -485,7 +485,7 @@ sharingWrapperInsertion(handshake::FuncOp &funcOp, SharingGroups &sharingGroups,
                         MLIRContext *ctx,
                         MapVector<Operation *, double> &opOccupancy) {
   OpBuilder builder(ctx);
-  for (auto group : sharingGroups) {
+  for (Group group : sharingGroups) {
 
     // If the group only has one operation or has no operations, then go to next
     // group
@@ -493,12 +493,12 @@ sharingWrapperInsertion(handshake::FuncOp &funcOp, SharingGroups &sharingGroups,
       continue;
 
     // Elect one operation as the shared operation.
-    auto *sharedOp = *group.begin();
+    Operation *sharedOp = *group.begin();
 
     // Enumerate the operands of the original pre-sharing operations.
     llvm::SmallVector<Value> sharingWrapperInputs;
-    for (auto *op : group) {
-      for (auto val : op->getOperands()) {
+    for (Operation *op : group) {
+      for (Value val : op->getOperands()) {
         sharingWrapperInputs.push_back(val);
       }
     }
@@ -520,7 +520,7 @@ sharingWrapperInsertion(handshake::FuncOp &funcOp, SharingGroups &sharingGroups,
     // Determining the number of credits of each operation that share the unit
     // based on the maximum achievable occupancy in critical CFCs.
     llvm::SmallVector<int64_t> credits;
-    for (auto *op : group) {
+    for (Operation *op : group) {
       double occupancy = opOccupancy[op];
       // The number of credits must be an integer. It is incremented by 1 to
       // hide the latency of returning a credit, and accounts for token staying
@@ -538,7 +538,7 @@ sharingWrapperInsertion(handshake::FuncOp &funcOp, SharingGroups &sharingGroups,
 
     // The outputs of the original operations are also the outputs of the
     // sharing wrapper.
-    for (auto *op : group) {
+    for (Operation *op : group) {
       sharingWrapperOutputTypes.push_back(op->getResultTypes()[0]);
     }
 
@@ -567,7 +567,7 @@ sharingWrapperInsertion(handshake::FuncOp &funcOp, SharingGroups &sharingGroups,
     }
 
     // Remove all operations in the sharing group except for the shared one.
-    for (auto *op : group) {
+    for (Operation *op : group) {
       if (op != *(group.begin())) {
         op->erase();
       }
