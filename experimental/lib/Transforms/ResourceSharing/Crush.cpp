@@ -217,10 +217,9 @@ template <typename MILP, typename... Args>
 static inline LogicalResult
 checkLoggerAndSolve(Logger *logger, StringRef milpName,
                     BufferPlacement &placement, Args &&...args) {
-  if (logger) {
+  if (logger)
     return solveMILP<MILP>(placement, std::forward<Args>(args)..., *logger,
                            milpName);
-  }
   return solveMILP<MILP>(placement, std::forward<Args>(args)...);
 }
 
@@ -253,12 +252,11 @@ struct HandshakePlaceBuffersPassWrapper : public HandshakePlaceBuffersPass {
       env.set(GRB_DoubleParam_TimeLimit, timeout);
     env.start();
 
-    if (algorithm == FPGA20 || algorithm == FPGA20_LEGACY) {
+    if (algorithm == FPGA20 || algorithm == FPGA20_LEGACY)
       // Create and solve the MILP
       return checkLoggerAndSolve<FPGA20BuffersWrapper>(
           logger, "placement", placement, sharingInfo, env, funcInfo, timingDB,
           targetCP, algorithm != FPGA20);
-    }
     if (algorithm == FPL22) {
       // Create disjoint block unions of all CFDFCs
       SmallVector<CFDFC *, 8> cfdfcs;
@@ -329,9 +327,8 @@ struct CreditBasedSharingPass
     pm.addPass(std::make_unique<HandshakePlaceBuffersPassWrapper>(
         data, algorithm, frequencies, timingModels, firstCFDFC, targetCP,
         timeout, dumpLogs));
-    if (failed(pm.run(modOp))) {
+    if (failed(pm.run(modOp)))
       return failure();
-    }
 
     return success();
   }
@@ -352,10 +349,9 @@ bool checkGroupMergable(const Group &g1, const Group &g2,
   OperationName opName = (*(gMerged.begin()))->getName();
 
   // 1. The merged group must have operations of the same type.
-  for (Operation *op : gMerged) {
+  for (Operation *op : gMerged)
     if (op->getName() != opName)
       return false;
-  }
 
   // 2. For each CFC, the sum of occupancy must be smaller than the capacity
   // (i.e., units in CFC must no greater than the II).
@@ -387,12 +383,10 @@ bool checkGroupMergable(const Group &g1, const Group &g2,
     std::set<size_t> setOfSccIds(listOfSccIds.begin(), listOfSccIds.end());
     // Check if numOps * cfcThroughput <= 1 and no duplicate SCC
     // IDs.
-    if (numOps * (funcPerfInfo.cfThroughput)[cf] > 1) {
+    if (numOps * (funcPerfInfo.cfThroughput)[cf] > 1)
       return false;
-    }
-    if ((listOfSccIds.size() != setOfSccIds.size())) {
+    if ((listOfSccIds.size() != setOfSccIds.size()))
       return false;
-    }
   }
 
   // If none of the checks has failed, then return true
@@ -403,8 +397,8 @@ bool checkGroupMergable(const Group &g1, const Group &g2,
 // 2 groups, if success then the 2 given groups are merged, and immediately
 // returns true if successfully merged groups, otherwise it returns false.
 bool tryMergeGroups(SharingGroups &sharingGroups, const FuncPerfInfo &info) {
-  for (auto g1 = sharingGroups.begin(); g1 != sharingGroups.end(); g1++) {
-    for (auto g2 = std::next(g1); g2 != sharingGroups.end(); g2++) {
+  for (auto g1 = sharingGroups.begin(); g1 != sharingGroups.end(); g1++)
+    for (auto g2 = std::next(g1); g2 != sharingGroups.end(); g2++)
       if (checkGroupMergable(*g1, *g2, info)) {
         // If all three criteria met, then merge the second group into the
         // first group.
@@ -416,8 +410,6 @@ bool tryMergeGroups(SharingGroups &sharingGroups, const FuncPerfInfo &info) {
         sharingGroups.erase(g2);
         return true;
       }
-    }
-  }
   return false;
 }
 
@@ -440,7 +432,7 @@ void sortGroups(SharingGroups &sharingGroups, FuncPerfInfo &info) {
 
     do {
       modified = false;
-      for (size_t i = 1; i < g.size(); i++) {
+      for (size_t i = 1; i < g.size(); i++)
         for (auto cf : info.critCfcs) {
 
           auto op1 = info.cfSccs[cf].find(g[i - 1]);
@@ -451,7 +443,6 @@ void sortGroups(SharingGroups &sharingGroups, FuncPerfInfo &info) {
             modified = true;
           }
         }
-      }
     } while (modified);
   }
 }
@@ -497,11 +488,9 @@ sharingWrapperInsertion(handshake::FuncOp &funcOp, SharingGroups &sharingGroups,
 
     // Enumerate the operands of the original pre-sharing operations.
     llvm::SmallVector<Value> sharingWrapperInputs;
-    for (Operation *op : group) {
-      for (Value val : op->getOperands()) {
+    for (Operation *op : group)
+      for (Value val : op->getOperands())
         sharingWrapperInputs.push_back(val);
-      }
-    }
 
     // Check if the number of results is exactly 1.
     assert(sharedOp->getNumResults() == 1 &&
@@ -558,20 +547,16 @@ sharingWrapperInsertion(handshake::FuncOp &funcOp, SharingGroups &sharingGroups,
             sharedOp->getLoc(), sharingWrapperOutputTypes, sharingWrapperInputs,
             namedCreditsAttr);
 
-    for (auto [id, op] : llvm::enumerate(group)) {
+    for (auto [id, op] : llvm::enumerate(group))
       op->getResult(0).replaceAllUsesWith(wrapperOp->getResult(id));
-    }
 
-    for (auto [id, val] : llvm::enumerate(sharedOp->getOperands())) {
+    for (auto [id, val] : llvm::enumerate(sharedOp->getOperands()))
       sharedOp->replaceUsesOfWith(val, wrapperOp->getResult(id + group.size()));
-    }
 
     // Remove all operations in the sharing group except for the shared one.
-    for (Operation *op : group) {
-      if (op != *(group.begin())) {
+    for (Operation *op : group)
+      if (op != *(group.begin()))
         op->erase();
-      }
-    }
   }
 
   return success();
@@ -604,13 +589,12 @@ void CreditBasedSharingPass::runDynamaticPass() {
 
   // If buffers are placed naively, then no critical CFC is set for each funcOp.
   // We can also share operations naively.
-  if (algorithm == ON_MERGES) {
+  if (algorithm == ON_MERGES)
     for (handshake::FuncOp funcOp :
          getOperation().getOps<handshake::FuncOp>()) {
       FuncPerfInfo funcPerfInfo;
       sharingInfo[&funcOp] = funcPerfInfo;
     }
-  }
 
   for (auto &[funcOp, funcPerfInfo] : sharingInfo) {
 
@@ -641,9 +625,8 @@ void CreditBasedSharingPass::runDynamaticPass() {
     logGroups(sharingGroups, namer);
 
     // Merge groups
-    for (bool continueMerging = true; continueMerging;) {
+    for (bool continueMerging = true; continueMerging;)
       continueMerging = tryMergeGroups(sharingGroups, funcPerfInfo);
-    }
 
     // log
     llvm::errs() << "Finished merging\n";

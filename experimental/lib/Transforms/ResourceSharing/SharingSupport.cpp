@@ -29,12 +29,10 @@ void recursiveDfsComponentOrder(Operation *op,
 
     // 2. For each of the outgoing channels of op, do a
     // recursiveDfsComponentOrder call
-    for (Channel *ch : cfChannels) {
-      if (ch->producer == op) {
+    for (Channel *ch : cfChannels)
+      if (ch->producer == op)
         recursiveDfsComponentOrder(ch->consumer, visited, dfsPostOrder,
                                    cfChannels);
-      }
-    }
 
     // 3. Backtracking: Set the operation as discovered
     dfsPostOrder.insert(dfsPostOrder.begin(), op);
@@ -53,11 +51,9 @@ void recursiveDfsAssignSCCId(Operation *op,
 
     // 2. For all the nodes discovered using backward DFS call, assign them with
     // the same SCC ID
-    for (Channel *ch : cfChannels) {
-      if (ch->consumer == op) {
+    for (Channel *ch : cfChannels)
+      if (ch->consumer == op)
         recursiveDfsAssignSCCId(ch->producer, assigned, cfChannels, currSCCId);
-      }
-    }
   }
 }
 
