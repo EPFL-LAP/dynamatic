@@ -85,7 +85,7 @@ create_generator_symlink() {
     local src=$1
     local dst="bin/generators/$(basename $1)"
     echo "$dst -> $src"
-    ln -f --symbolic ../$src $dst
+    ln -f --symbolic ../../$src $dst
 }
 
 
