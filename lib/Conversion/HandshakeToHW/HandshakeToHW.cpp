@@ -501,6 +501,8 @@ ModuleDiscriminator::ModuleDiscriminator(Operation *op)
     : op(op), ctx(op->getContext()), modName(setModPrefix(op)) {
 
   llvm::TypeSwitch<Operation *, void>(op)
+      .Case<handshake::InstanceOp>(
+          [&](handshake::InstanceOp instOp) { modName = instOp.getModule(); })
       .Case<handshake::BufferOpInterface>(
           [&](handshake::BufferOpInterface bufOp) {
             // Number of slots and bitwdith
@@ -894,10 +896,9 @@ public:
 };
 } // namespace
 
-void HWBuilder::addClkAndRst(hw::HWModuleOp hwModOp) {
-  // Let the parent class add clock and reset to the input ports
-  modBuilder.addClkAndRst();
-
+/// Returns the clock and reset module inputs (which are assumed to be the last
+/// two module inputs).
+std::pair<Value, Value> getClkAndRst(hw::HWModuleOp hwModOp) {
   // Check that the parent module's last port are the clock and reset
   // signals we need for the instance operands
   unsigned numInputs = hwModOp.getNumInputPorts();
@@ -909,8 +910,17 @@ void HWBuilder::addClkAndRst(hw::HWModuleOp hwModOp) {
 
   // Add clock and reset to the instance's operands
   ValueRange blockArgs = hwModOp.getBodyBlock()->getArguments();
-  instOperands.push_back(blockArgs.drop_back().back());
-  instOperands.push_back(blockArgs.back());
+  return {blockArgs.drop_back().back(), blockArgs.back()};
+}
+
+void HWBuilder::addClkAndRst(hw::HWModuleOp hwModOp) {
+  // Let the parent class add clock and reset to the input ports
+  modBuilder.addClkAndRst();
+
+  // Add clock and reset to the instance's operands
+  auto [clkVal, rstVal] = getClkAndRst(hwModOp);
+  instOperands.push_back(clkVal);
+  instOperands.push_back(rstVal);
 }
 
 hw::InstanceOp HWBuilder::createInstance(ModuleDiscriminator &discriminator,
@@ -1048,11 +1058,10 @@ public:
   }
 };
 
-/// Converts a Handshake function into a HW module. The pattern creates a
-/// `hw::HWModuleOp` or `hw::HWModuleExternOp` with IO corresponding to the
-/// original Handshake function. In case of non-external function, the
-/// pattern creates a lowering state object associated to the created HW
-/// module to control the conversion of other operations within the module.
+/// Converts a non-external Handshake function into a `hw::HWModuleOp` with IO
+/// corresponding to the original Handshake function. The pattern also creates a
+/// lowering state object associated to the created HW module to control the
+/// conversion of other operations within the module.
 class ConvertFunc : public OpConversionPattern<handshake::FuncOp> {
 public:
   ConvertFunc(ChannelTypeConverter &typeConverter, MLIRContext *ctx,
@@ -1068,24 +1077,31 @@ private:
   /// Shared lowering state.
   LoweringState &lowerState;
 };
+
+/// Converts an external Handshake function into a `hw::HWModuleExternOp` with
+/// IO corresponding to the original Handshake function.
+class ConvertExternalFunc : public OpConversionPattern<handshake::FuncOp> {
+public:
+  using OpConversionPattern<handshake::FuncOp>::OpConversionPattern;
+
+  LogicalResult
+  matchAndRewrite(handshake::FuncOp funcOp, OpAdaptor adaptor,
+                  ConversionPatternRewriter &rewriter) const override;
+};
 } // namespace
 
 LogicalResult
 ConvertFunc::matchAndRewrite(handshake::FuncOp funcOp, OpAdaptor adaptor,
                              ConversionPatternRewriter &rewriter) const {
+  if (funcOp.isExternal())
+    return failure();
+
+  StringAttr name = rewriter.getStringAttr(funcOp.getName());
   ModuleLoweringState state(funcOp);
   hw::ModulePortInfo modInfo = getFuncPortInfo(funcOp, state);
-  StringAttr name = rewriter.getStringAttr(funcOp.getName());
-
-  rewriter.setInsertionPoint(funcOp);
-
-  // External functions simply have to be turned into external HW modules
-  if (funcOp.isExternal()) {
-    rewriter.replaceOpWithNewOp<hw::HWModuleExternOp>(funcOp, name, modInfo);
-    return success();
-  }
 
   // Create non-external HW module to replace the function with
+  rewriter.setInsertionPoint(funcOp);
   auto modOp = rewriter.create<hw::HWModuleOp>(funcOp.getLoc(), name, modInfo);
 
   // Move the block from the Handshake function to the new HW module, after
@@ -1129,6 +1145,37 @@ ConvertFunc::matchAndRewrite(handshake::FuncOp funcOp, OpAdaptor adaptor,
 
   // Associate the newly created module to its lowering state object
   lowerState.modState[modOp] = state;
+  return success();
+}
+
+LogicalResult ConvertExternalFunc::matchAndRewrite(
+    handshake::FuncOp funcOp, OpAdaptor adaptor,
+    ConversionPatternRewriter &rewriter) const {
+  if (!funcOp.isExternal())
+    return failure();
+
+  StringAttr name = rewriter.getStringAttr(funcOp.getName());
+  ModuleBuilder modBuilder(funcOp.getContext());
+  PortNameGenerator portNames(funcOp);
+
+  // Add all function outputs to the module
+  for (auto [idx, res] : llvm::enumerate(funcOp.getResultTypes()))
+    modBuilder.addOutput(portNames.getOutputName(idx), channelWrapper(res));
+
+  // Add all function inputs to the module
+  for (auto [idx, type] : llvm::enumerate(funcOp.getArgumentTypes())) {
+    if (isa<MemRefType>(type)) {
+      return funcOp->emitError()
+             << "Memory interfaces are not supported for external "
+                "functions";
+    }
+    modBuilder.addInput(portNames.getInputName(idx), channelWrapper(type));
+  }
+  modBuilder.addClkAndRst();
+
+  rewriter.setInsertionPoint(funcOp);
+  rewriter.replaceOpWithNewOp<hw::HWModuleExternOp>(funcOp, name,
+                                                    modBuilder.getPortInfo());
   return success();
 }
 
@@ -1288,12 +1335,9 @@ namespace {
 /// type converter which converts implicit handshaked types into dataflow
 /// channels with a corresponding data-type.
 template <typename T>
-class ExtModuleConversionPattern : public OpConversionPattern<T> {
+class ConvertToHWInstance : public OpConversionPattern<T> {
 public:
-  ExtModuleConversionPattern(ChannelTypeConverter &typeConverter,
-                             MLIRContext *ctx, LoweringState &lowerState)
-      : OpConversionPattern<T>::OpConversionPattern(typeConverter, ctx),
-        lowerState(lowerState) {}
+  using OpConversionPattern<T>::OpConversionPattern;
   using OpAdaptor = typename T::Adaptor;
 
   /// Always succeeds in replacing the matched operation with an equivalent
@@ -1302,18 +1346,12 @@ public:
   LogicalResult
   matchAndRewrite(T op, OpAdaptor adaptor,
                   ConversionPatternRewriter &rewriter) const override;
-
-private:
-  /// Shared lowering state.
-  LoweringState &lowerState;
 };
 } // namespace
 
 template <typename T>
-LogicalResult ExtModuleConversionPattern<T>::matchAndRewrite(
+LogicalResult ConvertToHWInstance<T>::matchAndRewrite(
     T op, OpAdaptor adaptor, ConversionPatternRewriter &rewriter) const {
-  // We need to instantiate a new external module for that operation; first
-  // derive port information for that module, then create it
   HWConverter converter(this->getContext());
   PortNameGenerator portNames(op);
 
@@ -1328,6 +1366,42 @@ LogicalResult ExtModuleConversionPattern<T>::matchAndRewrite(
 
   hw::InstanceOp instOp = converter.convertToInstance(op, rewriter);
   return instOp ? success() : failure();
+}
+
+namespace {
+
+/// Converts a Handshake-level instance operation to an equivalent HW-level one.
+/// The pattern assumes that the module the Handshake instance references has
+/// already been converted to a `hw::HWExternModuleOp`.
+class ConvertInstance : public OpConversionPattern<handshake::InstanceOp> {
+public:
+  using OpConversionPattern<handshake::InstanceOp>::OpConversionPattern;
+  using OpAdaptor = typename handshake::InstanceOp::Adaptor;
+
+  /// Always succeeds in replacing the matched operation with an equivalent
+  /// HW instance operation.
+  LogicalResult
+  matchAndRewrite(handshake::InstanceOp instOp, OpAdaptor adaptor,
+                  ConversionPatternRewriter &rewriter) const override;
+};
+} // namespace
+
+LogicalResult
+ConvertInstance::matchAndRewrite(handshake::InstanceOp instOp,
+                                 OpAdaptor adaptor,
+                                 ConversionPatternRewriter &rewriter) const {
+  SmallVector<Value> instOperands(adaptor.getOperands());
+  auto [clk, rst] = getClkAndRst(instOp->getParentOfType<hw::HWModuleOp>());
+  instOperands.push_back(clk);
+  instOperands.push_back(rst);
+
+  auto topLevelModOp = instOp->getParentOfType<mlir::ModuleOp>();
+  hw::HWModuleLike modOp = findExternMod(topLevelModOp, instOp.getModule());
+  assert(modOp && "failed to find referenced external module");
+  StringAttr instNameAttr = rewriter.getStringAttr(getUniqueName(instOp));
+  rewriter.replaceOpWithNewOp<hw::InstanceOp>(instOp, modOp, instNameAttr,
+                                              instOperands);
+  return success();
 }
 
 /// Verifies that all the operations inside the function, which may be more
@@ -1630,13 +1704,12 @@ MemToBRAMConverter::buildExternalModule(hw::HWModuleOp circuitMod,
 /// future wrapped circuit results going directly to the wrapper (without
 /// passing through a converter) are stored along their corresponding result
 /// index inside the `circuitBackedges` vector.
-static hw::HWModuleOp createWrapper(
-    LoweringState &lowering, OpBuilder &builder,
-    mlir::DenseMap<const MemLoweringState *, ConverterBuilder> &memConverters,
+static hw::HWModuleOp createEmptyWrapperMod(
+    hw::HWModuleOp circuitOp, LoweringState &state, OpBuilder &builder,
+    DenseMap<const MemLoweringState *, ConverterBuilder> &memConverters,
     SmallVector<std::pair<size_t, Backedge>> &circuitBackedges) {
-  ModuleLoweringState &modState = lowering.modState.begin()->second;
-  hw::HWModuleOp circuitOp = *lowering.modOp.getOps<hw::HWModuleOp>().begin();
 
+  ModuleLoweringState &modState = state.modState[circuitOp];
   MLIRContext *ctx = builder.getContext();
   ModuleBuilder wrapperBuilder(ctx);
 
@@ -1688,7 +1761,7 @@ static hw::HWModuleOp createWrapper(
   }
 
   // Create the wrapper
-  builder.setInsertionPointToEnd(lowering.modOp.getBody());
+  builder.setInsertionPointToEnd(state.modOp.getBody());
   hw::HWModuleOp wrapperOp = builder.create<hw::HWModuleOp>(
       circuitOp.getLoc(),
       StringAttr::get(ctx, circuitOp.getSymName() + "_wrapper"),
@@ -1703,12 +1776,12 @@ static hw::HWModuleOp createWrapper(
     if (auto it = wrapperOutputToMem.find(i); it != wrapperOutputToMem.end()) {
       // This is the beginning of memory interface outputs that will eventually
       // come from a converter
-      it->second->addWrapperBackedges(lowering.edgeBuilder, modOutputs);
+      it->second->addWrapperBackedges(state.edgeBuilder, modOutputs);
       i += it->second->converterToWrapper.size;
     } else {
       // This is a regular result that will come directly from the wrapped
       // circuit
-      circuitBackedges.push_back({i, lowering.edgeBuilder.get(port.type)});
+      circuitBackedges.push_back({i, state.edgeBuilder.get(port.type)});
       modOutputs.push_back(circuitBackedges.back().second);
       i += 1;
     }
@@ -1719,18 +1792,17 @@ static hw::HWModuleOp createWrapper(
   return wrapperOp;
 };
 
-/// Creates a wrapper module made up of the (assumed single) hardware module
-/// that resulted from Handshake lowering and of memory converters sitting
-/// between the latter's memory interfaces and "standard memory interfaces"
-/// exposed by the wrapper's module.
-static void createMemWrapper(LoweringState &lowering, OpBuilder &builder) {
-  // We assume a single hardware module inside the MLIR module
-  hw::HWModuleOp circuitOp = *lowering.modOp.getOps<hw::HWModuleOp>().begin();
+/// Creates a wrapper module made up of the hardware module that resulted from
+/// Handshake lowering and of memory converters sitting between the latter's
+/// memory interfaces and "standard memory interfaces" exposed by the wrapper's
+/// module.
+static void createWrapper(hw::HWModuleOp circuitOp, LoweringState &state,
+                          OpBuilder &builder) {
 
   DenseMap<const MemLoweringState *, ConverterBuilder> memConverters;
   SmallVector<std::pair<size_t, Backedge>> circuitBackedges;
-  hw::HWModuleOp wrapperOp =
-      createWrapper(lowering, builder, memConverters, circuitBackedges);
+  hw::HWModuleOp wrapperOp = createEmptyWrapperMod(
+      circuitOp, state, builder, memConverters, circuitBackedges);
   builder.setInsertionPointToStart(wrapperOp.getBodyBlock());
 
   // Operands for the circuit instance inside the wrapper
@@ -1744,7 +1816,7 @@ static void createMemWrapper(LoweringState &lowering, OpBuilder &builder) {
   for (size_t i = 0, e = wrapperArgs.size(); i < e;) {
     if (auto it = wrapperInputToConv.find(i); it != wrapperInputToConv.end()) {
       ConverterBuilder *converter = it->second;
-      converter->addCircuitBackedges(lowering.edgeBuilder, circuitOperands);
+      converter->addCircuitBackedges(state.edgeBuilder, circuitOperands);
       i += converter->wrapperToConverter.size;
     } else {
       // Argument, just forward it to the operands
@@ -1802,99 +1874,88 @@ public:
     MLIRContext *ctx = &getContext();
 
     // We only support one function per module
-    auto functions = modOp.getOps<handshake::FuncOp>();
-    if (functions.empty())
-      return;
-    if (++functions.begin() != functions.end()) {
-      modOp->emitOpError()
-          << "we currently only support one handshake function per module";
-      return signalPassFailure();
+    handshake::FuncOp funcOp = nullptr;
+    for (auto op : modOp.getOps<handshake::FuncOp>()) {
+      if (op.isExternal())
+        continue;
+      if (funcOp) {
+        modOp->emitOpError() << "we currently only support one non-external "
+                                "handshake function per module";
+        return signalPassFailure();
+      }
+      funcOp = op;
     }
-    handshake::FuncOp funcOp = *functions.begin();
 
     // Check that some preconditions are met before doing anything
-    if (failed(verifyExportToRTL(funcOp)))
+    if (funcOp && failed(verifyExportToRTL(funcOp)))
       return signalPassFailure();
 
-    // Apply some basic IR transformations before actually doing the lowering
-    mlir::GreedyRewriteConfig config;
-    config.useTopDownTraversal = true;
-    config.enableRegionSimplification = false;
-    RewritePatternSet transformPatterns{ctx};
-    transformPatterns.add<ReplaceReturnWithTEHB>(ctx);
-    if (failed(applyPatternsAndFoldGreedily(modOp, std::move(transformPatterns),
-                                            config)))
+    if (failed(runPreprocessing()))
       return signalPassFailure();
 
     // Make sure all operations are named
     NameAnalysis &namer = getAnalysis<NameAnalysis>();
     namer.nameAllUnnamedOps();
 
+    ChannelTypeConverter typeConverter;
+    if (failed(convertExternalFunctions(typeConverter)))
+      return signalPassFailure();
+
     // Helper struct for lowering
     OpBuilder builder(ctx);
-    builder.setInsertionPointToStart(modOp.getBody(0));
     LoweringState lowerState(modOp, namer, builder);
-    ChannelTypeConverter typeConverter;
 
     // Create pattern set
     RewritePatternSet patterns(ctx);
-    patterns.insert<ConvertFunc, ConvertEnd, ConvertMemInterface,
-                    // Handshake operations
-                    ExtModuleConversionPattern<handshake::OEHBOp>,
-                    ExtModuleConversionPattern<handshake::TEHBOp>,
-                    ExtModuleConversionPattern<handshake::ConditionalBranchOp>,
-                    ExtModuleConversionPattern<handshake::BranchOp>,
-                    ExtModuleConversionPattern<handshake::MergeOp>,
-                    ExtModuleConversionPattern<handshake::ControlMergeOp>,
-                    ExtModuleConversionPattern<handshake::MuxOp>,
-                    ExtModuleConversionPattern<handshake::SourceOp>,
-                    ExtModuleConversionPattern<handshake::ConstantOp>,
-                    ExtModuleConversionPattern<handshake::SinkOp>,
-                    ExtModuleConversionPattern<handshake::ForkOp>,
-                    ExtModuleConversionPattern<handshake::LazyForkOp>,
-                    ExtModuleConversionPattern<handshake::MCLoadOp>,
-                    ExtModuleConversionPattern<handshake::LSQLoadOp>,
-                    ExtModuleConversionPattern<handshake::MCStoreOp>,
-                    ExtModuleConversionPattern<handshake::LSQStoreOp>,
-                    // Arith operations
-                    ExtModuleConversionPattern<arith::AddFOp>,
-                    ExtModuleConversionPattern<arith::AddIOp>,
-                    ExtModuleConversionPattern<arith::AndIOp>,
-                    ExtModuleConversionPattern<arith::BitcastOp>,
-                    ExtModuleConversionPattern<arith::CeilDivSIOp>,
-                    ExtModuleConversionPattern<arith::CeilDivUIOp>,
-                    ExtModuleConversionPattern<arith::CmpFOp>,
-                    ExtModuleConversionPattern<arith::CmpIOp>,
-                    ExtModuleConversionPattern<arith::DivFOp>,
-                    ExtModuleConversionPattern<arith::DivSIOp>,
-                    ExtModuleConversionPattern<arith::DivUIOp>,
-                    ExtModuleConversionPattern<arith::ExtFOp>,
-                    ExtModuleConversionPattern<arith::ExtSIOp>,
-                    ExtModuleConversionPattern<arith::ExtUIOp>,
-                    ExtModuleConversionPattern<arith::FPToSIOp>,
-                    ExtModuleConversionPattern<arith::FPToUIOp>,
-                    ExtModuleConversionPattern<arith::FloorDivSIOp>,
-                    ExtModuleConversionPattern<arith::IndexCastOp>,
-                    ExtModuleConversionPattern<arith::IndexCastUIOp>,
-                    ExtModuleConversionPattern<arith::MulFOp>,
-                    ExtModuleConversionPattern<arith::MulIOp>,
-                    ExtModuleConversionPattern<arith::NegFOp>,
-                    ExtModuleConversionPattern<arith::OrIOp>,
-                    ExtModuleConversionPattern<arith::RemFOp>,
-                    ExtModuleConversionPattern<arith::RemSIOp>,
-                    ExtModuleConversionPattern<arith::RemUIOp>,
-                    ExtModuleConversionPattern<arith::SelectOp>,
-                    ExtModuleConversionPattern<arith::SIToFPOp>,
-                    ExtModuleConversionPattern<arith::ShLIOp>,
-                    ExtModuleConversionPattern<arith::ShRSIOp>,
-                    ExtModuleConversionPattern<arith::ShRUIOp>,
-                    ExtModuleConversionPattern<arith::SubFOp>,
-                    ExtModuleConversionPattern<arith::SubIOp>,
-                    ExtModuleConversionPattern<arith::TruncFOp>,
-                    ExtModuleConversionPattern<arith::TruncIOp>,
-                    ExtModuleConversionPattern<arith::UIToFPOp>,
-                    ExtModuleConversionPattern<arith::XOrIOp>>(
-        typeConverter, funcOp->getContext(), lowerState);
+    patterns.insert<ConvertFunc, ConvertEnd, ConvertMemInterface>(
+        typeConverter, ctx, lowerState);
+    patterns.insert<
+        ConvertInstance, ConvertToHWInstance<handshake::OEHBOp>,
+        ConvertToHWInstance<handshake::TEHBOp>,
+        ConvertToHWInstance<handshake::ConditionalBranchOp>,
+        ConvertToHWInstance<handshake::BranchOp>,
+        ConvertToHWInstance<handshake::MergeOp>,
+        ConvertToHWInstance<handshake::ControlMergeOp>,
+        ConvertToHWInstance<handshake::MuxOp>,
+        ConvertToHWInstance<handshake::SourceOp>,
+        ConvertToHWInstance<handshake::ConstantOp>,
+        ConvertToHWInstance<handshake::SinkOp>,
+        ConvertToHWInstance<handshake::ForkOp>,
+        ConvertToHWInstance<handshake::LazyForkOp>,
+        ConvertToHWInstance<handshake::MCLoadOp>,
+        ConvertToHWInstance<handshake::LSQLoadOp>,
+        ConvertToHWInstance<handshake::MCStoreOp>,
+        ConvertToHWInstance<handshake::LSQStoreOp>,
+        // Arith operations
+        ConvertToHWInstance<arith::AddFOp>, ConvertToHWInstance<arith::AddIOp>,
+        ConvertToHWInstance<arith::AndIOp>,
+        ConvertToHWInstance<arith::BitcastOp>,
+        ConvertToHWInstance<arith::CeilDivSIOp>,
+        ConvertToHWInstance<arith::CeilDivUIOp>,
+        ConvertToHWInstance<arith::CmpFOp>, ConvertToHWInstance<arith::CmpIOp>,
+        ConvertToHWInstance<arith::DivFOp>, ConvertToHWInstance<arith::DivSIOp>,
+        ConvertToHWInstance<arith::DivUIOp>, ConvertToHWInstance<arith::ExtFOp>,
+        ConvertToHWInstance<arith::ExtSIOp>,
+        ConvertToHWInstance<arith::ExtUIOp>,
+        ConvertToHWInstance<arith::FPToSIOp>,
+        ConvertToHWInstance<arith::FPToUIOp>,
+        ConvertToHWInstance<arith::FloorDivSIOp>,
+        ConvertToHWInstance<arith::IndexCastOp>,
+        ConvertToHWInstance<arith::IndexCastUIOp>,
+        ConvertToHWInstance<arith::MulFOp>, ConvertToHWInstance<arith::MulIOp>,
+        ConvertToHWInstance<arith::NegFOp>, ConvertToHWInstance<arith::OrIOp>,
+        ConvertToHWInstance<arith::RemFOp>, ConvertToHWInstance<arith::RemSIOp>,
+        ConvertToHWInstance<arith::RemUIOp>,
+        ConvertToHWInstance<arith::SelectOp>,
+        ConvertToHWInstance<arith::SIToFPOp>,
+        ConvertToHWInstance<arith::ShLIOp>, ConvertToHWInstance<arith::ShRSIOp>,
+        ConvertToHWInstance<arith::ShRUIOp>, ConvertToHWInstance<arith::SubFOp>,
+        ConvertToHWInstance<arith::SubIOp>,
+        ConvertToHWInstance<arith::TruncFOp>,
+        ConvertToHWInstance<arith::TruncIOp>,
+        ConvertToHWInstance<arith::UIToFPOp>,
+        ConvertToHWInstance<arith::XOrIOp>>(typeConverter,
+                                            funcOp->getContext());
 
     // Everything must be converted to operations in the hw dialect
     ConversionTarget target(*ctx);
@@ -1903,13 +1964,47 @@ public:
     target.addIllegalDialect<handshake::HandshakeDialect, arith::ArithDialect,
                              memref::MemRefDialect>();
 
-    if (failed(applyPartialConversion(funcOp, target, std::move(patterns))))
+    if (failed(applyPartialConversion(modOp, target, std::move(patterns))))
       return signalPassFailure();
-    createMemWrapper(lowerState, builder);
+
+    // Create memory wrappers around all hardware modules
+    for (auto [circuitOp, _] : lowerState.modState)
+      createWrapper(circuitOp, lowerState, builder);
 
     // At this level all operations already have an intrinsic name so we can
     // disable our naming system
     doNotNameOperations();
+  }
+
+private:
+  /// Runs a pre-processiong greedy pattern rewriter on the input module to get
+  /// rid of constructs that have no hardware mapping.
+  LogicalResult runPreprocessing() {
+    mlir::ModuleOp modOp = getOperation();
+    MLIRContext *ctx = &getContext();
+
+    RewritePatternSet patterns{ctx};
+    patterns.add<ReplaceReturnWithTEHB>(ctx);
+    mlir::GreedyRewriteConfig config;
+    config.useTopDownTraversal = true;
+    config.enableRegionSimplification = false;
+
+    return applyPatternsAndFoldGreedily(modOp, std::move(patterns), config);
+  }
+
+  /// Converts all external `handshake::FuncOp` operations into corresponding
+  /// `hw::HWModuleExternOp` operations using a partial IR conversion.
+  LogicalResult convertExternalFunctions(ChannelTypeConverter &typeConverter) {
+    MLIRContext *ctx = &getContext();
+
+    RewritePatternSet patterns(ctx);
+    patterns.insert<ConvertExternalFunc>(typeConverter, ctx);
+    ConversionTarget target(*ctx);
+    target.addLegalOp<hw::HWModuleExternOp>();
+    target.addDynamicallyLegalOp<handshake::FuncOp>(
+        [&](handshake::FuncOp funcOp) { return !funcOp.isExternal(); });
+    target.markOpRecursivelyLegal<handshake::FuncOp>();
+    return applyPartialConversion(getOperation(), target, std::move(patterns));
   }
 };
 
