@@ -820,7 +820,7 @@ LogicalResult RTLConfiguration::addComponentsFromJSON(StringRef filepath) {
   llvm::Expected<json::Value> value = json::parse(jsonString);
   if (!value) {
     llvm::errs() << "Failed to parse RTL configuration file @ \"" << filepath
-                 << "\" as JSON\n";
+                 << "\" as JSON.\n-> " << toString(value.takeError()) << "\n";
     return failure();
   }
 
