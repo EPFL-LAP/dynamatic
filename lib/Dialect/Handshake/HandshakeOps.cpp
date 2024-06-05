@@ -1518,20 +1518,6 @@ LogicalResult ReturnOp::verify() {
   auto funcOp = getOperation()->getParentOfType<handshake::FuncOp>();
   if (!funcOp)
     return emitOpError("must have a handshake.func parent");
-
-  // Operand number and types should match enclosing function's return types
-  const auto &results = funcOp.getResultTypes();
-  if (getNumOperands() != results.size())
-    return emitOpError("has ")
-           << getNumOperands() << " operands, but enclosing function returns "
-           << results.size();
-  for (unsigned i = 0, e = results.size(); i != e; ++i)
-    if (getOperand(i).getType() != results[i])
-      return emitError() << "type of return operand " << i << " ("
-                         << getOperand(i).getType()
-                         << ") doesn't match function result type ("
-                         << results[i] << ")";
-
   return success();
 }
 

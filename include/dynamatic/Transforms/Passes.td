@@ -120,6 +120,17 @@ def HandshakeCanonicalize : DynamaticPass<"handshake-canonicalize"> {
   let constructor = "dynamatic::createHandshakeCanonicalize()";
 }
 
+def HandshakeHoistExtInstances : DynamaticPass<"handshake-hoist-ext-instances"> {
+  let summary = "Hoist external function instances into top-level IO.";
+  let description = [{
+    Replaces instances (`handshake::InstanceOp`) of external Handshake functions
+    by extra arguments/results in their containing (internal) Handshake
+    functions. This is the equivalent of moving RTL modules from inside the
+    Handshake function to outside of it.       
+  }];
+  let constructor = "dynamatic::createHandshakeHoistExtInstances()";
+}
+
 def HandshakeInferBasicBlocks : DynamaticPass<"handshake-infer-basic-blocks"> {
   let summary = "Try to infer the basic block of untagged operations.";
   let description = [{
