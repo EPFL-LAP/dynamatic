@@ -213,7 +213,7 @@ public:
             CMD_WRITE_HDL,
             "Converts the DOT file produced after compile to VHDL using the "
             "export-dot tool",
-            state){};
+            state, {}, {{"experimental", "Use experimental backend"}}){};
 
   CommandResult decode(ArrayRef<std::string> tokens) override;
 };
@@ -224,7 +224,7 @@ public:
       : Command(CMD_SIMULATE,
                 "Simulates the VHDL produced during HDL writing using Modelsim "
                 "and the hls-verifier tool",
-                state){};
+                state, {}, {{"experimental", "Use experimental backend"}}){};
 
   CommandResult decode(ArrayRef<std::string> tokens) override;
 };
@@ -276,7 +276,7 @@ public:
 };
 } // namespace
 
-static CommandResult execShellCommand(StringRef cmd) {
+static CommandResult execShellCommand(const Twine &cmd) {
   int ret = std::system(cmd.str().c_str());
   llvm::outs() << "\n";
   return ret != 0 ? CommandResult::FAIL : CommandResult::SUCCESS;
@@ -480,11 +480,13 @@ CommandResult WriteHDL::decode(ArrayRef<std::string> tokens) {
   std::string kernelDir = path::parent_path(*state.sourcePath).str();
   std::string kernelName = path::filename(*state.sourcePath).drop_back(2).str();
   std::string outputDir = kernelDir + sep.str() + "out";
+  std::string experimental =
+      parsed.optArgsPresent.contains("experimental") ? "1" : "0";
 
   // Create and execute the command
   return execShellCommand(state.getScriptsPath() + "/write-hdl.sh " +
                           state.dynamaticPath + " " + outputDir + " " +
-                          kernelName);
+                          kernelName + " " + experimental);
 }
 
 CommandResult Simulate::decode(ArrayRef<std::string> tokens) {
@@ -500,11 +502,13 @@ CommandResult Simulate::decode(ArrayRef<std::string> tokens) {
   std::string kernelDir = path::parent_path(*state.sourcePath).str();
   std::string kernelName = path::filename(*state.sourcePath).drop_back(2).str();
   std::string outputDir = kernelDir + sep.str() + "out";
+  std::string experimental =
+      parsed.optArgsPresent.contains("experimental") ? "1" : "0";
 
   // Create and execute the command
   return execShellCommand(state.getScriptsPath() + "/simulate.sh " +
                           state.dynamaticPath + " " + kernelDir + " " +
-                          outputDir + " " + kernelName);
+                          outputDir + " " + kernelName + " " + experimental);
 }
 
 CommandResult Visualize::decode(ArrayRef<std::string> tokens) {
