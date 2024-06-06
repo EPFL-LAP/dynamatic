@@ -6,7 +6,7 @@
 //
 //===----------------------------------------------------------------------===//
 //
-// Experimental tool that exports VHDL from HW-level IR. Files corresponding to
+// Experimental tool that exports RTL from HW-level IR. Files corresponding to
 // internal and external modules are written inside a provided output directory
 // (which is created if necessary).
 //
@@ -28,6 +28,7 @@
 #include "mlir/Support/LLVM.h"
 #include "mlir/Support/LogicalResult.h"
 #include "llvm/ADT/DenseMap.h"
+#include "llvm/ADT/MapVector.h"
 #include "llvm/ADT/STLExtras.h"
 #include "llvm/ADT/TypeSwitch.h"
 #include "llvm/Support/CommandLine.h"
@@ -40,7 +41,6 @@
 #include "llvm/Support/SourceMgr.h"
 #include "llvm/Support/raw_ostream.h"
 #include <iterator>
-#include <memory>
 #include <set>
 #include <string>
 #include <system_error>
@@ -63,6 +63,13 @@ static cl::opt<std::string> outputDir(cl::Positional, cl::Required,
 static cl::opt<std::string> dynamaticPath("dynamatic-path", cl::Optional,
                                           cl::desc("<path to Dynamatic>"),
                                           cl::init("."), cl::cat(mainCategory));
+
+static cl::opt<RTLComponent::HDL> hdl(
+    "hdl", cl::Optional, cl::desc("<hdl to use>"),
+    cl::init(RTLComponent::HDL::VHDL),
+    cl::values(clEnumValN(RTLComponent::HDL::VHDL, "vhdl", "VHDL"),
+               clEnumValN(RTLComponent::HDL::VERILOG, "verilog", "Verilog")),
+    cl::cat(mainCategory));
 
 static cl::list<std::string>
     rtlConfigs(cl::Positional, cl::OneOrMore,
@@ -183,12 +190,12 @@ struct WriteData {
   }
 };
 
-/// RTL file writer. This is currently specialized for VHDL but will in the
-/// future probably become abstract with child classes to write VHDL or Verilog.
+/// Abstract RTL module writer. Contains common logic and data-structures for
+/// writing RTL, regardless of the HDL.
 class RTLWriter {
 public:
   /// A pair of strings.
-  using IOPort = std::pair<std::string, std::string>;
+  using IOPort = std::pair<std::string, std::optional<unsigned>>;
 
   /// Groups all of the top-level entity's IO as pairs of signal name and signal
   /// type. Inputs and outputs are also separated.
@@ -268,25 +275,30 @@ public:
   virtual LogicalResult write(hw::HWModuleOp modOp,
                               raw_indented_ostream &os) const = 0;
 
+  /// Associates each SSA value inside the module to internal module signals.
+  /// Fails when encoutering an unsupported operation inside the module;
+  /// succeeds otherwise.
+  LogicalResult createInternalSignals(WriteData &data) const;
+
   /// Default destructor.
   virtual ~RTLWriter() = default;
 };
 } // namespace
 
-/// Returns the VHDL data type correspnding to the MLIR type.
-static std::string getDataType(Type type) {
+/// Returns the type's "raw" RTL type.
+std::optional<unsigned> getRawType(Type type) {
   unsigned dataWidth = type.getIntOrFloatBitWidth();
+  assert(dataWidth != 0 && "0-width signals are not allowed");
   if (dataWidth == 1)
-    return "std_logic";
-  unsigned signalWidth = dataWidth == 0 ? 0 : dataWidth - 1;
-  return "std_logic_vector(" + std::to_string(signalWidth) + " downto 0)";
+    return std::nullopt;
+  return dataWidth - 1;
 }
 
-/// Returns the VHDL data type correspnding to the channel type.
-static std::string getChannelDataType(handshake::ChannelType type) {
+/// Returns the upper bound of the RTL vector-like type that correspnds to the
+/// channel type.
+static unsigned getChannelDataBound(handshake::ChannelType type) {
   unsigned dataWidth = type.getDataType().getIntOrFloatBitWidth();
-  unsigned signalWidth = dataWidth == 0 ? 0 : dataWidth - 1;
-  return "std_logic_vector(" + std::to_string(signalWidth) + " downto 0)";
+  return dataWidth == 0 ? 0 : dataWidth - 1;
 }
 
 /// Returns the hardare module the hardware instance is of.
@@ -317,13 +329,13 @@ RTLWriter::EntityIO::EntityIO(hw::HWModuleOp modOp) {
     std::string port = portAttr.str();
     if (auto channelType = dyn_cast<handshake::ChannelType>(arg.getType())) {
       inputs.emplace_back(getInternalSignalName(port, SignalType::DATA),
-                          getChannelDataType(channelType));
+                          getChannelDataBound(channelType));
       inputs.emplace_back(getInternalSignalName(port, SignalType::VALID),
-                          "std_logic");
+                          std::nullopt);
       outputs.emplace_back(getInternalSignalName(port, SignalType::READY),
-                           "std_logic");
+                           std::nullopt);
     } else {
-      inputs.emplace_back(port, getDataType(arg.getType()));
+      inputs.emplace_back(port, getRawType(arg.getType()));
     }
   }
 
@@ -332,13 +344,13 @@ RTLWriter::EntityIO::EntityIO(hw::HWModuleOp modOp) {
     std::string port = portAttr.str();
     if (auto channelType = dyn_cast<handshake::ChannelType>(resType)) {
       outputs.emplace_back(getInternalSignalName(port, SignalType::DATA),
-                           getChannelDataType(channelType));
+                           getChannelDataBound(channelType));
       outputs.emplace_back(getInternalSignalName(port, SignalType::VALID),
-                           "std_logic");
+                           std::nullopt);
       inputs.emplace_back(getInternalSignalName(port, SignalType::READY),
-                          "std_logic");
+                          std::nullopt);
     } else {
-      outputs.emplace_back(port, getDataType(resType));
+      outputs.emplace_back(port, getRawType(resType));
     }
   }
 }
@@ -349,10 +361,10 @@ RTLWriter::IOMap::IOMap(hw::InstanceOp instOp, const ExportInfo &info,
   if (auto extModOp = dyn_cast<hw::HWModuleExternOp>(modOp.getOperation())) {
     const RTLMatch &match = info.externals.at(extModOp);
     FGetTypedSignalName getTypedSignalName = [&](auto port, auto type) {
-      return match.component->getRTLPortName(port, type);
+      return match.component->getRTLPortName(port, type, hdl);
     };
     FGetSignalName getSignalName = [&](auto port) {
-      return match.component->getRTLPortName(port);
+      return match.component->getRTLPortName(port, hdl);
     };
     construct(instOp, modOp, getValueName, getTypedSignalName, getSignalName);
   } else {
@@ -402,6 +414,54 @@ void RTLWriter::IOMap::construct(hw::InstanceOp instOp, hw::HWModuleLike modOp,
   }
 }
 
+LogicalResult RTLWriter::createInternalSignals(WriteData &data) const {
+
+  // Create signal names for all block arguments
+  for (auto [arg, name] :
+       llvm::zip_equal(data.modOp.getBodyBlock()->getArguments(),
+                       data.modOp.getInputNamesStr())) {
+    if (auto channelArg = dyn_cast<ChannelValue>(arg))
+      data.dataflowSignals[channelArg] = name.strref();
+    else
+      data.signals[arg] = name.strref();
+  }
+
+  // Create signal names for all operation results
+  for (Operation &op : data.modOp.getBodyBlock()->getOperations()) {
+    LogicalResult res =
+        llvm::TypeSwitch<Operation *, LogicalResult>(&op)
+            .Case<hw::InstanceOp>([&](hw::InstanceOp instOp) {
+              // Retrieve the module referenced by the instance
+              hw::HWModuleLike refModOp = getHWModule(instOp);
+              std::string prefix = instOp.getInstanceName().str() + "_";
+
+              // Associate each instance result with a signal name
+              for (auto [res, name] : llvm::zip_equal(
+                       instOp->getResults(), refModOp.getOutputNamesStr())) {
+                const Twine &sigName = prefix + name.strref();
+                if (auto channelRes = dyn_cast<ChannelValue>(res))
+                  data.dataflowSignals[channelRes] = sigName.str();
+                else
+                  data.signals[res] = sigName.str();
+              }
+              return success();
+            })
+            .Case<hw::OutputOp>([&](hw::OutputOp outputOp) {
+              llvm::copy(outputOp->getOperands(),
+                         std::back_inserter(data.outputs));
+              return success();
+            })
+            .Default([&](auto) {
+              return op.emitOpError()
+                     << "Unsupported operation type within module";
+            });
+    if (failed(res))
+      return failure();
+  }
+
+  return success();
+}
+
 namespace {
 
 struct VHDLWriter : public RTLWriter {
@@ -415,10 +475,11 @@ struct VHDLWriter : public RTLWriter {
                       raw_indented_ostream &os) const override;
 
 private:
-  /// Associates each SSA value inside the module to internal module signals.
-  /// Fails when encoutering an unsupported operation inside the module;
-  /// succeeds otherwise.
-  LogicalResult createInternalSignals(WriteData &data) const;
+  std::string getVHDLType(std::optional<unsigned> width) const {
+    if (width)
+      return "std_logic_vector(" + std::to_string(*width) + " downto 0)";
+    return "std_logic";
+  }
 
   /// Writes the entry's IO ports.
   void writeEntityIO(WriteData &data) const;
@@ -487,54 +548,6 @@ LogicalResult VHDLWriter::write(hw::HWModuleOp modOp,
   return success();
 }
 
-LogicalResult VHDLWriter::createInternalSignals(WriteData &data) const {
-
-  // Create signal names for all block arguments
-  for (auto [arg, name] :
-       llvm::zip_equal(data.modOp.getBodyBlock()->getArguments(),
-                       data.modOp.getInputNamesStr())) {
-    if (auto channelArg = dyn_cast<ChannelValue>(arg))
-      data.dataflowSignals[channelArg] = name.strref();
-    else
-      data.signals[arg] = name.strref();
-  }
-
-  // Create signal names for all operation results
-  for (Operation &op : data.modOp.getBodyBlock()->getOperations()) {
-    LogicalResult res =
-        llvm::TypeSwitch<Operation *, LogicalResult>(&op)
-            .Case<hw::InstanceOp>([&](hw::InstanceOp instOp) {
-              // Retrieve the module referenced by the instance
-              hw::HWModuleLike refModOp = getHWModule(instOp);
-              std::string prefix = instOp.getInstanceName().str() + "_";
-
-              // Associate each instance result with a signal name
-              for (auto [res, name] : llvm::zip_equal(
-                       instOp->getResults(), refModOp.getOutputNamesStr())) {
-                const Twine &sigName = prefix + name.strref();
-                if (auto channelRes = dyn_cast<ChannelValue>(res))
-                  data.dataflowSignals[channelRes] = sigName.str();
-                else
-                  data.signals[res] = sigName.str();
-              }
-              return success();
-            })
-            .Case<hw::OutputOp>([&](hw::OutputOp outputOp) {
-              llvm::copy(outputOp->getOperands(),
-                         std::back_inserter(data.outputs));
-              return success();
-            })
-            .Default([&](auto) {
-              return op.emitOpError()
-                     << "Unsupported operation type within module";
-            });
-    if (failed(res))
-      return failure();
-  }
-
-  return success();
-}
-
 void VHDLWriter::writeEntityIO(WriteData &data) const {
   const EntityIO entityIO(data.modOp);
   size_t numIOLeft = entityIO.inputs.size() + entityIO.outputs.size();
@@ -545,7 +558,7 @@ void VHDLWriter::writeEntityIO(WriteData &data) const {
     if (!io.empty())
       os << "-- " << name << "\n";
     for (auto &[portName, portType] : io) {
-      os << portName << " : " << dir << " " << portType;
+      os << portName << " : " << dir << " " << getVHDLType(portType);
       if (--numIOLeft != 0)
         os << ";";
       os << "\n";
@@ -565,15 +578,17 @@ void VHDLWriter::writeInternalSignals(WriteData &data) const {
   for (auto [value, name] :
        make_filter_range(data.dataflowSignals, isNotBlockArg)) {
     os << "signal " << getInternalSignalName(name, SignalType::DATA) << " : "
-       << getChannelDataType(value.getType()) << ";\n";
+       << getVHDLType(getChannelDataBound(value.getType())) << ";\n";
     os << "signal " << getInternalSignalName(name, SignalType::VALID)
        << " : std_logic;\n";
     os << "signal " << getInternalSignalName(name, SignalType::READY)
        << " : std_logic;\n";
   }
 
-  for (auto [value, name] : make_filter_range(data.signals, isNotBlockArg))
-    os << "signal " << name << " : " << getDataType(value.getType()) << ";\n";
+  for (auto [value, name] : make_filter_range(data.signals, isNotBlockArg)) {
+    std::string type = getVHDLType(getRawType(value.getType()));
+    os << "signal " << name << " : " << type << ";\n";
+  }
 }
 
 void VHDLWriter::writeSignalAssignments(WriteData &data) const {
@@ -594,11 +609,13 @@ void VHDLWriter::writeSignalAssignments(WriteData &data) const {
 }
 
 void VHDLWriter::writeModuleInstantiations(WriteData &data) const {
+  using KeyValuePair = std::pair<StringRef, StringRef>;
+
   for (hw::InstanceOp instOp : data.modOp.getOps<hw::InstanceOp>()) {
-    RTLComponent::HDL hdl(dynamatic::RTLComponent::HDL::VHDL);
+    RTLComponent::HDL hdl(RTLComponent::HDL::VHDL);
     std::string moduleName;
     std::string archName;
-    SmallVector<StringRef, 4> genericParams;
+    SmallVector<KeyValuePair> genericParams;
 
     llvm::TypeSwitch<Operation *, void>(getHWModule(instOp).getOperation())
         .Case<hw::HWModuleOp>([&](hw::HWModuleOp hwModOp) {
@@ -610,7 +627,7 @@ void VHDLWriter::writeModuleInstantiations(WriteData &data) const {
           hdl = match.component->getHDL();
           moduleName = match.getConcreteModuleName();
           archName = match.getConcreteArchName();
-          genericParams = match.getGenericParameterValues();
+          genericParams = match.getGenericParameterValues().takeVector();
         })
         .Default([&](auto) { llvm_unreachable("unknown module type"); });
 
@@ -623,9 +640,10 @@ void VHDLWriter::writeModuleInstantiations(WriteData &data) const {
     // Write generic parameters if there are any
     if (!genericParams.empty()) {
       os << " generic map(";
-      for (StringRef param : ArrayRef<StringRef>{genericParams}.drop_back())
-        os << param << ", ";
-      os << genericParams.back() << ")";
+
+      for (auto [_, val] : ArrayRef<KeyValuePair>{genericParams}.drop_back())
+        os << val << ", ";
+      os << genericParams.back().second << ")";
     }
     os << "\n";
 
@@ -670,15 +688,214 @@ void VHDLWriter::writeIOMap(hw::InstanceOp instOp, WriteData &data) const {
   writePortsDir(ioMap.outputs, "outputs");
 }
 
+namespace {
+
+struct VerilogWriter : public RTLWriter {
+  using RTLWriter::RTLWriter;
+
+  /// Writes the Verilog implementation of the module to the output stream.
+  LogicalResult write(hw::HWModuleOp modOp,
+                      raw_indented_ostream &os) const override;
+
+private:
+  std::string getVerilogType(std::optional<unsigned> width) const {
+    if (width)
+      return "[" + std::to_string(*width) + ":0]";
+    return "";
+  }
+
+  /// Writes the entry's IO ports.
+  void writeEntityIO(WriteData &data) const;
+
+  /// Writes all internal signal declarations inside the entity's architecture.
+  void writeInternalSignals(WriteData &data) const;
+
+  /// Writes signal assignments betwween the top-level entity's outputs and the
+  /// architecture's internal signals.
+  void writeSignalAssignments(WriteData &data) const;
+
+  /// Writes all module instantiations inside the entity's architecture.
+  void writeModuleInstantiations(WriteData &data) const;
+
+  /// Writes IO mappings for a component instantiation.
+  void writeIOMap(hw::InstanceOp instOp, WriteData &data) const;
+};
+
+} // namespace
+
+LogicalResult VerilogWriter::write(hw::HWModuleOp modOp,
+                                   raw_indented_ostream &os) const {
+  WriteData data(modOp, os);
+  if (failed(createInternalSignals(data)))
+    return failure();
+
+  os << "module " << modOp.getSymName() << "(\n";
+
+  os.indent();
+  writeEntityIO(data);
+  os.unindent();
+
+  os << ");\n";
+  os.indent();
+
+  writeInternalSignals(data);
+  os << "\n";
+  writeSignalAssignments(data);
+  os << "\n";
+  writeModuleInstantiations(data);
+
+  os.unindent();
+  os << "endmodule\n";
+  return success();
+}
+
+void VerilogWriter::writeEntityIO(WriteData &data) const {
+  const EntityIO entityIO(data.modOp);
+  size_t numIOLeft = entityIO.inputs.size() + entityIO.outputs.size();
+
+  raw_indented_ostream &os = data.os;
+  auto writePortsDir = [&](const std::vector<IOPort> &io, StringRef dir,
+                           StringRef name) -> void {
+    if (!io.empty())
+      os << "// " << name << "\n";
+    for (auto &[portName, portType] : io) {
+      os << dir << " " << getVerilogType(portType) << " " << portName;
+      if (--numIOLeft != 0)
+        os << ",";
+      os << "\n";
+    }
+  };
+
+  writePortsDir(entityIO.inputs, "input", "inputs");
+  writePortsDir(entityIO.outputs, "output", "outputs");
+}
+
+void VerilogWriter::writeInternalSignals(WriteData &data) const {
+  auto isNotBlockArg = [](auto valAndName) -> bool {
+    return !isa<BlockArgument>(valAndName.first);
+  };
+
+  raw_indented_ostream &os = data.os;
+  for (auto [value, name] :
+       make_filter_range(data.dataflowSignals, isNotBlockArg)) {
+    os << "wire " << getVerilogType(getChannelDataBound(value.getType())) << " "
+       << getInternalSignalName(name, SignalType::DATA) << ";\n";
+    os << "wire " << getInternalSignalName(name, SignalType::VALID) << ";\n";
+    os << "wire " << getInternalSignalName(name, SignalType::READY) << ";\n";
+  }
+
+  for (auto [value, name] : make_filter_range(data.signals, isNotBlockArg)) {
+    std::string type = getVerilogType(getRawType(value.getType()));
+    os << "wire " << name << " : " << getRawType(value.getType()) << ";\n";
+  }
+}
+
+void VerilogWriter::writeSignalAssignments(WriteData &data) const {
+  raw_indented_ostream &os = data.os;
+  os << "// module outputs\n";
+  for (auto [val, outputName] :
+       llvm::zip(data.outputs, data.modOp.getOutputNamesStr())) {
+    StringRef name = outputName.strref();
+    if (auto channelVal = dyn_cast<ChannelValue>(val)) {
+      StringRef signal = data.dataflowSignals[channelVal];
+      os << "assign " << name << " = " << signal << ";\n";
+      os << "assign " << name << VALID_SUFFIX << " = " << signal << VALID_SUFFIX
+         << ";\n";
+      os << "assign " << signal << READY_SUFFIX << " = " << name << READY_SUFFIX
+         << ";\n";
+    } else {
+      os << "assign " << name << " = " << data.signals[val] << ";\n";
+    }
+  }
+}
+
+void VerilogWriter::writeModuleInstantiations(WriteData &data) const {
+  using KeyValuePair = std::pair<StringRef, StringRef>;
+
+  for (hw::InstanceOp instOp : data.modOp.getOps<hw::InstanceOp>()) {
+    RTLComponent::HDL hdl(dynamatic::RTLComponent::HDL::VERILOG);
+    std::string moduleName;
+    SmallVector<KeyValuePair> genericParams;
+
+    llvm::TypeSwitch<Operation *, void>(getHWModule(instOp).getOperation())
+        .Case<hw::HWModuleOp>(
+            [&](hw::HWModuleOp hwModOp) { moduleName = hwModOp.getSymName(); })
+        .Case<hw::HWModuleExternOp>([&](hw::HWModuleExternOp extModOp) {
+          const RTLMatch &match = exportInfo.externals.at(extModOp);
+          hdl = match.component->getHDL();
+          moduleName = match.getConcreteModuleName();
+          genericParams = match.getGenericParameterValues().takeVector();
+        })
+        .Default([&](auto) { llvm_unreachable("unknown module type"); });
+
+    raw_indented_ostream &os = data.os;
+    os << instOp.getInstanceName() << " ";
+
+    // Write generic parameters if there are any
+    if (!genericParams.empty()) {
+      os << "#(";
+      for (auto [name, val] : ArrayRef<KeyValuePair>{genericParams}.drop_back())
+        os << "." << name << "(" << val << "), ";
+      auto [name, val] = genericParams.back();
+      os << "." << name << "(" << val << ")) ";
+    }
+
+    os << moduleName << "(\n";
+    os.indent();
+
+    // Write IO mappings between the hardware instance and the module's internal
+    // signals
+    writeIOMap(instOp, data);
+
+    os.unindent();
+    os << ");\n\n";
+  }
+}
+
+void VerilogWriter::writeIOMap(hw::InstanceOp instOp, WriteData &data) const {
+  IOMap ioMap(instOp, exportInfo, data.getSignalNameFunc());
+  size_t numIOLeft = ioMap.inputs.size() + ioMap.outputs.size();
+
+  raw_indented_ostream &os = data.os;
+  auto writePortsDir = [&](std::vector<PortMapPair> io, StringRef name) {
+    // Just to be consistent with the VHDL writer
+    std::sort(io.begin(), io.end(),
+              [](auto &firstIO, auto &secondIO) { return firstIO < secondIO; });
+
+    if (!io.empty())
+      os << "// " << name << "\n";
+    for (auto &[modPortName, internalSignalName] : io) {
+      os << "." << modPortName << " (" << internalSignalName << ")";
+      if (--numIOLeft != 0)
+        os << ",";
+      os << "\n";
+    }
+  };
+
+  writePortsDir(ioMap.inputs, "inputs");
+  writePortsDir(ioMap.outputs, "outputs");
+}
+
 /// Writes the RTL implementation corresponding to the hardware module in a file
 /// named like the module inside the output directory. Fails if the output file
 /// cannot be created or if the module cannot be converted to RTL; succeeds
 /// otherwise.
-static LogicalResult generateModule(RTLWriter &writer, hw::HWModuleOp modOp) {
+static LogicalResult writeModule(RTLWriter &writer, hw::HWModuleOp modOp) {
+  // Determine file extension
+  StringRef ext;
+  switch (hdl) {
+  case RTLComponent::HDL::VHDL:
+    ext = ".vhd";
+    break;
+  case RTLComponent::HDL::VERILOG:
+    ext = ".v";
+    break;
+  }
+
   // Open the file in which we will create the module, it is named like the
   // module itself
   const llvm::Twine &filepath =
-      outputDir + sys::path::get_separator() + modOp.getSymName() + ".vhd";
+      outputDir + sys::path::get_separator() + modOp.getSymName() + ext;
   std::error_code ec;
   llvm::raw_fd_ostream fileStream(filepath.str(), ec);
   if (ec.value() != 0) {
@@ -697,6 +914,15 @@ int main(int argc, char **argv) {
       "Exports a VHDL design corresponding to an input HW-level IR. "
       "JSON-formatted RTL configuration files encode the procedure to "
       "instantiate/generate external HW modules present in the input IR.");
+
+  // Make sure the output path does not end in a file separator
+  if (outputDir.empty()) {
+    llvm::errs() << "Output path is empty\n";
+    return 1;
+  }
+  StringRef sep = sys::path::get_separator();
+  if (StringRef{outputDir}.ends_with(sep))
+    outputDir = outputDir.substr(0, outputDir.size() - sep.size());
 
   auto fileOrErr = MemoryBuffer::getFileOrSTDIN(inputFilename.c_str());
   if (std::error_code error = fileOrErr.getError()) {
@@ -724,16 +950,6 @@ int main(int argc, char **argv) {
       return 1;
   }
 
-  // Make sure the output path does not end in a file separator
-  if (outputDir.empty()) {
-    llvm::errs() << "Output path is empty\n";
-    return 1;
-  }
-  StringRef sep = sys::path::get_separator();
-  if (StringRef{outputDir}.ends_with(sep)) {
-    outputDir = outputDir.substr(0, outputDir.size() - sep.size());
-  }
-
   // Create the (potentially nested) output directory
   if (auto ec = sys::fs::create_directories(outputDir); ec.value() != 0) {
     llvm::errs() << "Failed to create output directory\n" << ec.message();
@@ -745,12 +961,25 @@ int main(int argc, char **argv) {
   if (failed(info.concretizeExternalModules()))
     return 1;
 
-  // Write each module's RTL implementation to a separate file
-  VHDLWriter writer(info);
-  for (hw::HWModuleOp hwModOp : modOp->getOps<hw::HWModuleOp>()) {
-    if (failed(generateModule(writer, hwModOp)))
-      return 1;
+  // Create an RTL writer
+  RTLWriter *writer;
+  switch (hdl) {
+  case RTLComponent::HDL::VHDL:
+    writer = new VHDLWriter(info);
+    break;
+  case RTLComponent::HDL::VERILOG:
+    writer = new VerilogWriter(info);
+    break;
   }
 
+  // Write each module's RTL implementation to a separate file
+  for (hw::HWModuleOp hwModOp : modOp->getOps<hw::HWModuleOp>()) {
+    if (failed(writeModule(*writer, hwModOp))) {
+      delete writer;
+      return 1;
+    }
+  }
+
+  delete writer;
   return 0;
 }

@@ -275,12 +275,12 @@ RTLMatch::RTLMatch(const RTLComponent &component,
       archName(substituteParams(component.archName, serializedParams)),
       serializedParams(serializedParams) {}
 
-SmallVector<StringRef> RTLMatch::getGenericParameterValues() const {
-  SmallVector<StringRef> values;
+MapVector<StringRef, StringRef> RTLMatch::getGenericParameterValues() const {
+  MapVector<StringRef, StringRef> values;
   for (const RTLParameter *param : component->getGenericParameters()) {
     auto valueIt = serializedParams.find(param->getName());
     assert(valueIt != serializedParams.end() && "missing parameter value");
-    values.push_back(valueIt->second);
+    values.insert({param->getName(), valueIt->second});
   }
   return values;
 }
@@ -666,6 +666,17 @@ std::string RTLComponent::portRemap(StringRef mlirPortName) const {
   return mlirPortName.str();
 }
 
+/// Returns the indexed version of a vector-like RTL signal for a specfic HDL.
+static std::string getIndexedName(const Twine &name, size_t arrayIdx,
+                                  RTLComponent::HDL hdl) {
+  switch (hdl) {
+  case RTLComponent::HDL::VHDL:
+    return name.str() + "(" + std::to_string(arrayIdx) + ")";
+  case RTLComponent::HDL::VERILOG:
+    return name.str() + "[" + std::to_string(arrayIdx) + "]";
+  }
+}
+
 bool RTLComponent::portNameIsIndexed(StringRef portName, StringRef &baseName,
                                      size_t &arrayIdx) const {
   // IO kind must be hierarchical and port name must contain an underscore to
@@ -684,24 +695,25 @@ bool RTLComponent::portNameIsIndexed(StringRef portName, StringRef &baseName,
   return false;
 }
 
-std::string RTLComponent::getRTLPortName(StringRef mlirPortName) const {
+std::string RTLComponent::getRTLPortName(StringRef mlirPortName,
+                                         HDL hdl) const {
   std::string remappedName = portRemap(mlirPortName);
   StringRef baseName;
   size_t arrayIdx;
   if (!portNameIsIndexed(remappedName, baseName, arrayIdx))
     return remappedName;
-  return baseName.str() + "(" + std::to_string(arrayIdx) + ")";
+  return getIndexedName(baseName, arrayIdx, hdl);
 }
 
 std::string RTLComponent::getRTLPortName(StringRef mlirPortName,
-                                         SignalType type) const {
+                                         SignalType type, HDL hdl) const {
   std::string signalSuffix = ioSignals.at(type);
   std::string remappedName = portRemap(mlirPortName);
   StringRef baseName;
   size_t arrayIdx;
   if (!portNameIsIndexed(remappedName, baseName, arrayIdx))
     return remappedName + signalSuffix;
-  return baseName.str() + signalSuffix + "(" + std::to_string(arrayIdx) + ")";
+  return getIndexedName(baseName + signalSuffix, arrayIdx, hdl);
 }
 
 inline bool
