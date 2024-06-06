@@ -28,9 +28,9 @@ rm -rf "$HDL_DIR" && mkdir -p "$HDL_DIR"
 
 if [[ $EXPERIMENTAL -ne 0 ]]; then
   # Use experimental backend
-  "$DYNAMATIC_DIR/build/bin/exp-export-vhdl" "$COMP_DIR/hw.mlir" "$HDL_DIR" \
+  "$DYNAMATIC_DIR/build/bin/exp-export-rtl" "$COMP_DIR/hw.mlir" "$HDL_DIR" \
     "$DYNAMATIC_DIR/experimental/data/rtl-config.json" \
-    --dynamatic-path "$DYNAMATIC_DIR"
+    --dynamatic-path "$DYNAMATIC_DIR" --hdl vhdl
   exit_on_fail "Failed to export RTL" "Exported RTL"
 else
   # Convert DOT graph to VHDL
