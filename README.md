@@ -30,7 +30,7 @@ The following instructions can be used to setup Dynamatic from source. If you in
 
     ```sh
     apt-get update
-    apt-get install clang lld ccache cmake ninja-build python3 openjdk-21-jdk graphviz libboost-regex-dev git curl gzip
+    apt-get install clang lld ccache cmake ninja-build python3 openjdk-21-jdk graphviz libboost-regex-dev git curl gzip libreadline-dev
     ```
 
     On `pacman`-based Linux distributions:
