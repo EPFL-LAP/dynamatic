@@ -16,9 +16,10 @@
 #ifndef DYNAMATIC_ANALYSIS_NAMEANALYSIS
 #define DYNAMATIC_ANALYSIS_NAMEANALYSIS
 
-#include "dynamatic/Dialect/Handshake/HandshakeOps.h"
 #include "dynamatic/Support/LLVM.h"
 #include "mlir/Pass/AnalysisManager.h"
+#include "llvm/ADT/StringMap.h"
+#include "llvm/ADT/StringRef.h"
 
 namespace dynamatic {
 
@@ -44,11 +45,14 @@ namespace dynamatic {
 ///
 /// Operation names are internally stored in an operation attribute of type
 /// `dynamatic::handhsake::NameAttr` attached to the operation being named under
-/// the attibute name "name"; the attribute is a simple wrapper around a
-/// `mlir::StringAttr`. Channel names are determined based on the names of the
+/// the attibute name "handshake.name"; the attribute is a simple wrapper around
+/// a `mlir::StringAttr`. Channel names are determined based on the names of the
 /// "producing" and "consuming" operations.
 class NameAnalysis {
 public:
+  /// Name of the attribute under which unique names are stored.
+  static constexpr llvm::StringLiteral ATTR_NAME = "handshake.name";
+
   /// Constructor called automatically by `getAnalysis<NameAnalysis>()` if the
   /// analysis is not already cached. Simply stores the top-level pass operation
   /// it is passed and walks the IR to establish mappings between already named

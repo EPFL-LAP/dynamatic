@@ -4,8 +4,10 @@ add_dynamatic_library(DynamaticTransforms
   FlattenMemRefRowMajor.cpp
   ForceMemoryInterface.cpp
   FuncMaximizeSSA.cpp
+  FuncSetArgNames.cpp
   HandshakeCanonicalize.cpp
   HandshakeConcretizeIndexType.cpp
+  HandshakeHoistExtInstances.cpp
   HandshakeMaterialize.cpp
   HandshakeMinimizeCstWidth.cpp
   HandshakeMinimizeLSQUsage.cpp
@@ -31,6 +33,7 @@ add_dynamatic_library(DynamaticTransforms
   MLIRTransformUtils
   DynamaticSupport
   DynamaticAnalysis
+  libclang
 )
 
 add_subdirectory(BufferPlacement)

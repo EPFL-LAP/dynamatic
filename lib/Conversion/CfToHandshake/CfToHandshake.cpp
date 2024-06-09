@@ -10,9 +10,9 @@
 // https://dl.acm.org/doi/abs/10.1145/3174243.3174264.
 //
 // Pars of the implementation are taken from CIRCT's cf-to-handshake conversion
-// pass with cosmetic modifications. Other parts of the implementation are
-// significantly different, in particular those related to memory interface
-// management and return network creation.
+// pass with modifications. Other parts of the implementation are significantly
+// different, in particular those related to memory interface management and
+// return network creation.
 //
 //===----------------------------------------------------------------------===//
 
@@ -22,23 +22,22 @@
 #include "dynamatic/Dialect/Handshake/HandshakeInterfaces.h"
 #include "dynamatic/Dialect/Handshake/HandshakeOps.h"
 #include "dynamatic/Dialect/Handshake/MemoryInterfaces.h"
-#include "dynamatic/Support/Attribute.h"
 #include "dynamatic/Support/CFG.h"
 #include "dynamatic/Transforms/FuncMaximizeSSA.h"
 #include "mlir/Dialect/Affine/Analysis/AffineAnalysis.h"
-#include "mlir/Dialect/Affine/IR/AffineOps.h"
 #include "mlir/Dialect/Affine/Utils.h"
 #include "mlir/Dialect/ControlFlow/IR/ControlFlowOps.h"
 #include "mlir/Dialect/Func/IR/FuncOps.h"
 #include "mlir/Dialect/LLVMIR/LLVMDialect.h"
-#include "mlir/Dialect/Math/IR/Math.h"
 #include "mlir/Dialect/MemRef/IR/MemRef.h"
-#include "mlir/Dialect/SCF/IR/SCF.h"
+#include "mlir/IR/BuiltinAttributes.h"
 #include "mlir/IR/Dominance.h"
+#include "mlir/IR/MLIRContext.h"
+#include "mlir/IR/PatternMatch.h"
 #include "mlir/Support/LogicalResult.h"
 #include "mlir/Transforms/DialectConversion.h"
+#include "mlir/Transforms/GreedyPatternRewriteDriver.h"
 #include "llvm/ADT/TypeSwitch.h"
-#include "llvm/Support/ErrorHandling.h"
 #include <iterator>
 #include <utility>
 
@@ -120,9 +119,10 @@ mergeFunctionResults(Region &r, ConversionPatternRewriter &rewriter,
     results.push_back(mergeOp.getResult());
     // Merge operation inherits from the bb atttribute of the latest (in program
     // order) return operation
-    if (endNetworkId.has_value())
-      mergeOp->setAttr(BB_ATTR,
+    if (endNetworkId.has_value()) {
+      mergeOp->setAttr(BB_ATTR_NAME,
                        rewriter.getUI32IntegerAttr(endNetworkId.value()));
+    }
   }
   return results;
 }
@@ -675,22 +675,57 @@ LogicalResult HandshakeLowering::verifyAndCreateMemInterfaces(
 }
 
 LogicalResult
+HandshakeLowering::convertCalls(ConversionPatternRewriter &rewriter) {
+  auto modOp = region.getParentOfType<mlir::ModuleOp>();
+  for (Block &block : region) {
+    for (auto callOp : block.getOps<func::CallOp>()) {
+      // The instance's operands are the same as the call plus an extra
+      // control-only start coming from the call's parent basic block
+      SmallVector<Value> operands(callOp.getOperands());
+      operands.push_back(getBlockEntryControl(&block));
+
+      // Retrieve the Handshake function that the call references to determine
+      // the instance's result types (may be different from the call's result
+      // types)
+      SymbolRefAttr symbol = callOp->getAttrOfType<SymbolRefAttr>("callee");
+      assert(symbol && "call symbol does not exist");
+      Operation *lookup = modOp.lookupSymbol(symbol);
+      if (!lookup)
+        return callOp->emitError() << "call references unknown function";
+      auto funcOp = dyn_cast<handshake::FuncOp>(lookup);
+      if (!funcOp)
+        return callOp->emitError() << "call does not reference a function";
+      TypeRange resultTypes = funcOp.getFunctionType().getResults();
+
+      // Replace the call with the Handshake instance
+      rewriter.setInsertionPoint(callOp);
+      auto instOp = rewriter.create<handshake::InstanceOp>(
+          callOp.getLoc(), callOp.getCallee(), resultTypes, operands);
+      if (callOp->getNumResults() == 0)
+        rewriter.eraseOp(callOp);
+      else
+        rewriter.replaceOp(callOp, instOp->getResults());
+    }
+  }
+  return success();
+}
+
+LogicalResult
 HandshakeLowering::connectConstants(ConversionPatternRewriter &rewriter) {
-  for (auto cstOp :
-       llvm::make_early_inc_range(region.getOps<mlir::arith::ConstantOp>())) {
-
-    rewriter.setInsertionPointAfter(cstOp);
-    auto cstVal = cstOp.getValue();
-
-    if (isCstSourcable(cstOp))
-      rewriter.replaceOpWithNewOp<handshake::ConstantOp>(
-          cstOp, cstVal.getType(), cstVal,
-          rewriter.create<handshake::SourceOp>(cstOp.getLoc(),
-                                               rewriter.getNoneType()));
-    else
-      rewriter.replaceOpWithNewOp<handshake::ConstantOp>(
-          cstOp, cstVal.getType(), cstVal,
-          getBlockEntryControl(cstOp->getBlock()));
+  auto constants = region.getOps<mlir::arith::ConstantOp>();
+  for (auto cstOp : llvm::make_early_inc_range(constants)) {
+    rewriter.setInsertionPoint(cstOp);
+    TypedAttr cstAttr = cstOp.getValue();
+    Value controlVal;
+    if (isCstSourcable(cstOp)) {
+      auto sourceOp = rewriter.create<handshake::SourceOp>(
+          cstOp.getLoc(), rewriter.getNoneType());
+      controlVal = sourceOp.getResult();
+    } else {
+      controlVal = getBlockEntryControl(cstOp->getBlock());
+    }
+    rewriter.replaceOpWithNewOp<handshake::ConstantOp>(cstOp, cstAttr.getType(),
+                                                       cstAttr, controlVal);
   }
   return success();
 }
@@ -728,7 +763,7 @@ HandshakeLowering::idBasicBlocks(ConversionPatternRewriter &rewriter) {
       if (!isa<handshake::MemoryOpInterface>(op)) {
         // Memory interfaces do not naturally belong to any block, so they do
         // not get an attribute
-        op.setAttr(BB_ATTR, rewriter.getUI32IntegerAttr(blockID));
+        op.setAttr(BB_ATTR_NAME, rewriter.getUI32IntegerAttr(blockID));
       }
     }
   }
@@ -777,7 +812,7 @@ HandshakeLowering::createReturnNetwork(ConversionPatternRewriter &rewriter) {
   endNetworkID = (newReturnOps.size() > 1)
                      ? region.getBlocks().size()
                      : newReturnOps[0]
-                           ->getAttrOfType<mlir::IntegerAttr>(BB_ATTR)
+                           ->getAttrOfType<mlir::IntegerAttr>(BB_ATTR_NAME)
                            .getValue()
                            .getZExtValue();
 
@@ -804,7 +839,8 @@ HandshakeLowering::createReturnNetwork(ConversionPatternRewriter &rewriter) {
   handshake::EndOp endOp = rewriter.create<handshake::EndOp>(
       entryBlockOps.back().getLoc(), endOperands);
   if (endNetworkID.has_value())
-    endOp->setAttr(BB_ATTR, rewriter.getUI32IntegerAttr(endNetworkID.value()));
+    endOp->setAttr(BB_ATTR_NAME,
+                   rewriter.getUI32IntegerAttr(endNetworkID.value()));
 
   return success();
 }
@@ -837,8 +873,6 @@ struct LowerRegionTarget : public ConversionTarget {
 /// Allows to partially lower a region by matching on the parent operation to
 /// then call the provided partial lowering function with the region and the
 /// rewriter.
-///
-/// The interplay with the target is similar to `PartialLowerFuncOp`.
 struct PartialLowerRegion : public ConversionPattern {
   using PartialLoweringFunc =
       std::function<LogicalResult(Region &, ConversionPatternRewriter &)>;
@@ -873,60 +907,6 @@ private:
   PartialLoweringFunc fun;
 };
 
-/// Conversion target for lowering a func::FuncOp to a handshake::FuncOp.
-struct LowerFuncOpTarget : public ConversionTarget {
-  explicit LowerFuncOpTarget(MLIRContext &context) : ConversionTarget(context) {
-    loweredFuncs.clear();
-    addLegalDialect<handshake::HandshakeDialect, func::FuncDialect,
-                    arith::ArithDialect, math::MathDialect>();
-    addIllegalDialect<affine::AffineDialect, scf::SCFDialect>();
-
-    // The root operation to be replaced is marked dynamically legal based on
-    // the lowering status of the given operation, see `PartialLowerFuncOp`.
-    // This is to make the operation go from illegal to legal after partial
-    // lowering
-    addDynamicallyLegalOp<func::FuncOp>(
-        [&](const auto &op) { return loweredFuncs.contains(op); });
-  }
-
-  SmallPtrSet<Operation *, 4> loweredFuncs;
-};
-
-/// Conversion pattern for partially lowering a func::FuncOp to a
-/// handshake::FuncOp. Lowering is achieved by a provided partial lowering
-/// function.
-struct PartialLowerFuncOp : public OpConversionPattern<func::FuncOp> {
-  using PartialLoweringFunc =
-      std::function<LogicalResult(func::FuncOp, ConversionPatternRewriter &)>;
-
-  PartialLowerFuncOp(LowerFuncOpTarget &target, MLIRContext *context,
-                     const PartialLoweringFunc &fun)
-      : OpConversionPattern<func::FuncOp>(context), target(target),
-        loweringFunc(fun) {}
-  LogicalResult
-  matchAndRewrite(func::FuncOp op, OpAdaptor /*adaptor*/,
-                  ConversionPatternRewriter &rewriter) const override {
-    // Dialect conversion scheme requires the matched root operation to be
-    // replaced or updated if the match was successful; this ensures that
-    // happens even if the lowering function does not modify the root operation
-    LogicalResult res = failure();
-    rewriter.updateRootInPlace(op, [&] { res = loweringFunc(op, rewriter); });
-
-    // Signal to the conversion target that the conversion pattern ran
-    target.loweredFuncs.insert(op);
-
-    // Success status of conversion pattern determined by success of partial
-    // lowering function
-    return res;
-  };
-
-private:
-  /// The conversion target for this pattern.
-  LowerFuncOpTarget &target;
-  /// The rewrite function.
-  PartialLoweringFunc loweringFunc;
-};
-
 /// Strategy class for SSA maximization during std-to-handshake conversion.
 /// Block arguments of type MemRefType and allocation operations are not
 /// considered for SSA maximization.
@@ -954,18 +934,6 @@ dynamatic::partiallyLowerRegion(const RegionLoweringFunc &loweringFunc,
   return success(
       applyPartialConversion(op, target, std::move(patterns)).succeeded() &&
       partialLoweringSuccessfull.succeeded());
-}
-
-/// Convenience function for running lowerToHandshake with a partial
-/// handshake::FuncOp lowering function.
-static LogicalResult
-partiallyLowerOp(const PartialLowerFuncOp::PartialLoweringFunc &loweringFunc,
-                 func::FuncOp funcOp) {
-  MLIRContext *ctx = funcOp->getContext();
-  RewritePatternSet patterns(ctx);
-  LowerFuncOpTarget target(*ctx);
-  patterns.add<PartialLowerFuncOp>(target, ctx, loweringFunc);
-  return applyPartialConversion(funcOp, target, std::move(patterns));
 }
 
 /// Lowers the region referenced by the handshake lowering strategy following
@@ -1008,6 +976,9 @@ static LogicalResult lowerRegion(HandshakeLowering &hl) {
   // Simple final transformations
   //===--------------------------------------------------------------------===//
 
+  if (failed(runPartialLowering(hl, &HandshakeLowering::convertCalls)))
+    return failure();
+
   if (failed(runPartialLowering(hl, &HandshakeLowering::connectConstants)))
     return failure();
 
@@ -1026,6 +997,89 @@ static LogicalResult lowerRegion(HandshakeLowering &hl) {
 }
 
 namespace {
+
+/// Converts a func-level function into a handshake-level function, without
+/// modifying the function's body. The function signature gets an extra
+/// control-only argument to represent the starting point of the control
+/// network. If the function did not return any result, a control-only result is
+/// added to signal function completion.
+struct ConvertFuncToHandshake : OpConversionPattern<func::FuncOp> {
+  using OpConversionPattern<func::FuncOp>::OpConversionPattern;
+
+  LogicalResult
+  matchAndRewrite(func::FuncOp funcOp, OpAdaptor operands,
+                  ConversionPatternRewriter &rewriter) const override {
+    // Put the function into maximal SSA form if it is not external
+    if (!funcOp.isExternal()) {
+      HandshakeLoweringSSAStrategy strategy;
+      if (failed(dynamatic::maximizeSSA(funcOp.getBody(), strategy)))
+        return failure();
+    }
+
+    // Derive attribute for the new function
+    SmallVector<NamedAttribute, 4> attributes;
+    MLIRContext *ctx = getContext();
+    for (const NamedAttribute &attr : funcOp->getAttrs()) {
+      StringAttr attrName = attr.getName();
+
+      // The symbol and function type attributes are set directly by the
+      // Handshake function constructor, all others are forwarded directly
+      if (attrName == SymbolTable::getSymbolAttrName() ||
+          attrName == funcOp.getFunctionTypeAttrName())
+        continue;
+
+      // Argument names need to be augmented with the additional start argument
+      if (attrName == funcOp.getArgAttrsAttrName()) {
+        // Extracts the name key's value from the dictionary attribute
+        // corresponding to each function's argument.
+        auto extractNames = [&](Attribute argAttr) -> Attribute {
+          DictionaryAttr argDict = cast<DictionaryAttr>(argAttr);
+          std::optional<NamedAttribute> name =
+              argDict.getNamed("handshake.arg_name");
+          assert(name && "missing name key in arg attribute");
+          return name->getValue();
+        };
+
+        SmallVector<Attribute> argNames;
+        llvm::transform(funcOp.getArgAttrsAttr(), std::back_inserter(argNames),
+                        extractNames);
+        argNames.push_back(StringAttr::get(ctx, "start"));
+        attributes.emplace_back(StringAttr::get(ctx, "argNames"),
+                                ArrayAttr::get(ctx, argNames));
+        continue;
+      }
+
+      // All other attributes are forwarded without changes
+      attributes.push_back(attr);
+    }
+
+    // Derive function argument and result types
+    NoneType noneType = rewriter.getNoneType();
+    SmallVector<Type, 8> argTypes(funcOp.getArgumentTypes());
+    SmallVector<Type, 8> resTypes(funcOp.getResultTypes());
+    if (resTypes.empty()) {
+      resTypes.push_back(noneType);
+      // The only result should be named "end"
+      auto resNames = ArrayAttr::get(ctx, {StringAttr::get(ctx, "end")});
+      attributes.emplace_back(StringAttr::get(ctx, "resNames"), resNames);
+    }
+    argTypes.push_back(noneType);
+    FunctionType funcType = rewriter.getFunctionType(argTypes, resTypes);
+
+    // Replace the func-level function with a corresponding handshake-level
+    // function
+    rewriter.setInsertionPoint(funcOp);
+    auto newFuncOp = rewriter.create<handshake::FuncOp>(
+        funcOp.getLoc(), funcOp.getName(), funcType, attributes);
+    rewriter.inlineRegionBefore(funcOp.getBody(), newFuncOp.getBody(),
+                                newFuncOp.end());
+    newFuncOp.resolveArgAndResNames();
+
+    rewriter.eraseOp(funcOp);
+    return success();
+  }
+};
+
 /// FPGA18's elastic pass. Runs elastic pass on every function (func::FuncOp)
 /// of the module it is applied on. Succeeds whenever all functions in the
 /// module were succesfully lowered to handshake.
@@ -1033,76 +1087,38 @@ struct CfToHandshakePass
     : public dynamatic::impl::CfToHandshakeBase<CfToHandshakePass> {
 
   void runDynamaticPass() override {
+    MLIRContext *ctx = &getContext();
     ModuleOp modOp = getOperation();
 
+    // First convert functions from func-level to handshake-level, without
+    // altering their bodies yet
+    mlir::GreedyRewriteConfig config;
+    config.useTopDownTraversal = true;
+    config.enableRegionSimplification = false;
+    RewritePatternSet patterns{ctx};
+    patterns.add<ConvertFuncToHandshake>(ctx);
+
+    // All func-level functions must become handshake-level functions
+    ConversionTarget funcTarget(*ctx);
+    funcTarget.addIllegalOp<func::FuncOp>();
+    funcTarget.addLegalOp<handshake::FuncOp>();
+
+    if (failed(applyPartialConversion(modOp, funcTarget, std::move(patterns))))
+      return signalPassFailure();
+
     // Lower every function individually
-    auto funcOps = modOp.getOps<func::FuncOp>();
-    for (func::FuncOp funcOp : llvm::make_early_inc_range(funcOps)) {
-      if (failed(lowerFuncOp(funcOp)))
-        return signalPassFailure();
+    auto funcOps = modOp.getOps<handshake::FuncOp>();
+    for (handshake::FuncOp funcOp : llvm::make_early_inc_range(funcOps)) {
+      // Lower the region inside the function if it is not external
+      if (!funcOp.isExternal()) {
+        HandshakeLowering hl(funcOp.getBody(), getAnalysis<NameAnalysis>());
+        if (failed(lowerRegion(hl)))
+          return signalPassFailure();
+      }
     }
   }
-
-  /// Fully lowers a func::FuncOp to a handshake::FuncOp.
-  LogicalResult lowerFuncOp(func::FuncOp funcOp);
 };
 } // namespace
-
-LogicalResult CfToHandshakePass::lowerFuncOp(func::FuncOp funcOp) {
-  bool funcIsExternal = funcOp.isExternal();
-
-  // First, put the function into maximal SSA form if it is not external
-  if (!funcIsExternal) {
-    HandshakeLoweringSSAStrategy strategy;
-    if (failed(dynamatic::maximizeSSA(funcOp.getBody(), strategy)))
-      return failure();
-  }
-
-  // The Handshake function only retains the original function's symbol and
-  // function type
-  SmallVector<NamedAttribute, 4> attributes;
-  for (const NamedAttribute &attr : funcOp->getAttrs()) {
-    if (attr.getName() == SymbolTable::getSymbolAttrName() ||
-        attr.getName() == funcOp.getFunctionTypeAttrName())
-      continue;
-    attributes.push_back(attr);
-  }
-
-  // Get function arguments and results
-  SmallVector<Type, 8> argTypes, resTypes;
-  llvm::copy(funcOp.getArgumentTypes(), std::back_inserter(argTypes));
-  llvm::copy(funcOp.getResultTypes(), std::back_inserter(resTypes));
-
-  // Replaces the func-level function with a corresponding Handshake-level
-  // function.
-  handshake::FuncOp newFuncOp = nullptr;
-  auto funcLowering = [&](func::FuncOp funcOp, PatternRewriter &rewriter) {
-    auto noneType = rewriter.getNoneType();
-    if (resTypes.empty())
-      resTypes.push_back(noneType);
-    argTypes.push_back(noneType);
-    auto funcType = rewriter.getFunctionType(argTypes, resTypes);
-    newFuncOp = rewriter.create<handshake::FuncOp>(
-        funcOp.getLoc(), funcOp.getName(), funcType, attributes);
-    rewriter.inlineRegionBefore(funcOp.getBody(), newFuncOp.getBody(),
-                                newFuncOp.end());
-    if (!funcIsExternal)
-      newFuncOp.resolveArgAndResNames();
-    return success();
-  };
-  if (failed(partiallyLowerOp(funcLowering, funcOp)))
-    return failure();
-
-  // Delete the original function
-  funcOp->erase();
-
-  // Lower the region inside the function if it is not external
-  if (!funcIsExternal) {
-    HandshakeLowering hl(newFuncOp.getBody(), getAnalysis<NameAnalysis>());
-    return lowerRegion(hl);
-  }
-  return success();
-}
 
 std::unique_ptr<dynamatic::DynamaticPass> dynamatic::createCfToHandshake() {
   return std::make_unique<CfToHandshakePass>();

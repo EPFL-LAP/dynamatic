@@ -169,7 +169,6 @@ def InstanceOp : Handshake_Op<"instance", [
       $_state.addOperands(operands);
       $_state.addAttribute("module", module);
       $_state.addTypes(results);
-      $_state.addTypes({$_builder.getType<::mlir::NoneType>()});
   }]>, OpBuilder<
     (ins "StringRef":$module, "TypeRange":$results,
      CArg<"ValueRange", "{}">:$operands), [{

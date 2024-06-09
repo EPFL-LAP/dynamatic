@@ -82,7 +82,9 @@ exit_on_fail "Failed to compile source to affine" "Compiled source to affine"
 
 # affine level -> pre-processing and memory analysis
 "$DYNAMATIC_OPT_BIN" "$F_AFFINE" --allow-unregistered-dialect \
-  --remove-polygeist-attributes --mark-memory-dependencies \
+  --remove-polygeist-attributes \
+  --func-set-arg-names="source=$SRC_DIR/$KERNEL_NAME.c" \
+  --mark-memory-dependencies \
   > "$F_AFFINE_MEM"
 exit_on_fail "Failed to run memory analysis" "Ran memory analysis"
 
@@ -114,7 +116,6 @@ exit_on_fail "Failed to apply Dynamatic transformations to cf" \
 
 # cf level -> handshake level
 "$DYNAMATIC_OPT_BIN" "$F_CF_DYN_TRANSFORMED" --lower-cf-to-handshake \
-  --handshake-fix-arg-names="source=$SRC_DIR/$KERNEL_NAME.c" \
   > "$F_HANDSHAKE"
 exit_on_fail "Failed to compile cf to handshake" "Compiled cf to handshake"
 
@@ -163,7 +164,9 @@ else
 fi
 
 # handshake canonicalization
-"$DYNAMATIC_OPT_BIN" "$F_HANDSHAKE_BUFFERED" --handshake-canonicalize \
+"$DYNAMATIC_OPT_BIN" "$F_HANDSHAKE_BUFFERED" \
+  --handshake-canonicalize \
+  --handshake-hoist-ext-instances \
   > "$F_HANDSHAKE_EXPORT"
 exit_on_fail "Failed to canonicalize Handshake" "Canonicalized handshake"
 

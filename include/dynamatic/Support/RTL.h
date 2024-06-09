@@ -409,9 +409,9 @@ public:
   /// parameter values substituted).
   StringRef getConcreteArchName() const { return archName; }
 
-  /// Returns the serialized values of all of the RTL component's generic
+  /// Returns name-value mappings for all of the RTL component's generic
   /// parameters, in the order in which the component defines them,
-  SmallVector<StringRef> getGenericParameterValues() const;
+  llvm::MapVector<StringRef, StringRef> getGenericParameterValues() const;
 
   /// Attempts to concretize the matched RTL component using the original RTL
   /// request that created the match. Generic components are copied to the
@@ -511,14 +511,15 @@ public:
   /// Returns the name of the component port matching the MLIR port name. If the
   /// component does not define any port name remapping this is simply the input
   /// MLIR port name.
-  std::string getRTLPortName(StringRef mlirPortName) const;
+  std::string getRTLPortName(StringRef mlirPortName, HDL hdl) const;
 
   /// Returns the name of the component port matching the MLIR port name for the
   /// specific signal type. This is the remapped port name returned by the
   /// non-signal-specific version of that method suffixed by a string
   /// identifying the signal type (e.g., "_valid" for valid signals). Default
   /// suffixes may be overriden on a per-component basis.
-  std::string getRTLPortName(StringRef mlirPortName, SignalType type) const;
+  std::string getRTLPortName(StringRef mlirPortName, SignalType type,
+                             HDL hdl) const;
 
   RTLComponent(RTLComponent &&) noexcept = default;
   RTLComponent &operator=(RTLComponent &&) noexcept = default;

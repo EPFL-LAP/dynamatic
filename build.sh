@@ -85,7 +85,7 @@ create_generator_symlink() {
     local src=$1
     local dst="bin/generators/$(basename $1)"
     echo "$dst -> $src"
-    ln -f --symbolic ../$src $dst
+    ln -f --symbolic ../../$src $dst
 }
 
 
@@ -240,6 +240,7 @@ if should_run_cmake ; then
   cmake -G Ninja .. \
       -DMLIR_DIR=polygeist/llvm-project/build/lib/cmake/mlir \
       -DLLVM_DIR=polygeist/llvm-project/build/lib/cmake/llvm \
+      -DCLANG_DIR=polygeist/llvm-project/build/lib/cmake/clang \
       -DLLVM_TARGETS_TO_BUILD="host" \
       -DCMAKE_BUILD_TYPE=$BUILD_TYPE \
       -DCMAKE_EXPORT_COMPILE_COMMANDS="ON" \
