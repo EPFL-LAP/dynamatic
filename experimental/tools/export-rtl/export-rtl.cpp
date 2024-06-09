@@ -786,7 +786,7 @@ void VerilogWriter::writeInternalSignals(WriteData &data) const {
 
   for (auto [value, name] : make_filter_range(data.signals, isNotBlockArg)) {
     std::string type = getVerilogType(getRawType(value.getType()));
-    os << "wire " << name << " : " << getRawType(value.getType()) << ";\n";
+    os << "wire " << type << " " << name << ";\n";
   }
 }
 
