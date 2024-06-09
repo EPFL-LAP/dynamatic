@@ -6,6 +6,8 @@ add_llvm_tool(dynamatic
   dynamatic.cpp
 )
 
+include_directories(/usr/include/readline)
+
 llvm_update_compile_flags(dynamatic)
 target_link_libraries(dynamatic
   PRIVATE
@@ -21,4 +23,5 @@ target_link_libraries(dynamatic
   MLIRLLVMDialect
   MLIRArithDialect
   MLIRMemRefDialect
+  readline
   )

@@ -39,6 +39,8 @@
 #include <iostream>
 #include <memory>
 #include <sstream>
+#include <readline/readline.h>
+#include <readline/history.h>
 
 using namespace llvm;
 using namespace llvm::sys;
@@ -680,11 +682,14 @@ int main(int argc, char **argv) {
   }
 
   // Read from stdin, multiple commands in one line are separated by ';'
-  std::string userInput;
+  // readline handles command history, allows user to repeat commands
+  // with arrow keys
+  char *rawInput;
   while (true) {
-    llvm::outs() << PROMPT;
-    getline(std::cin, userInput, '\n');
-    splitOnSemicolonAndHandle(userInput, false);
+    rawInput = readline(PROMPT.c_str());
+    add_history(rawInput);
+    splitOnSemicolonAndHandle(std::string(rawInput), false);
+    free(rawInput);
   }
   return 0;
 }
