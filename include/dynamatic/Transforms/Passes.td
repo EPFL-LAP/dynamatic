@@ -139,8 +139,8 @@ def HandshakeInferBasicBlocks : DynamaticPass<"handshake-infer-basic-blocks"> {
     inference logic is conservative and relies on the operation's successors and
     predecessors to determine the operation's basic block. When the pass's
     heuristics manage to infer an operation's block, the pass sets the
-    `dynamatic::BB_ATTR` on the operation. This pass does not fail, even when it
-    does not manage to infer the basic block of all operations.
+    `dynamatic::BB_ATTR_NAME` on the operation. This pass does not fail, even
+    when it does not manage to infer the basic block of all operations.
   }];
   let constructor = "dynamatic::createHandshakeInferBasicBlocksPass()";
 }

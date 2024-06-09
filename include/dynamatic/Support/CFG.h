@@ -25,15 +25,16 @@
 #include "dynamatic/Dialect/Handshake/HandshakeOps.h"
 #include "dynamatic/Support/LLVM.h"
 #include "llvm/ADT/SmallSet.h"
+#include "llvm/ADT/StringRef.h"
 
 namespace dynamatic {
 
 /// Operation attribute to identify the basic block the operation originated
 /// from in the std-level IR.
-const std::string BB_ATTR = "bb";
+constexpr llvm::StringLiteral BB_ATTR_NAME("handshake.bb");
 
 /// ID of entry basic block of every Handshake function.
-const unsigned ENTRY_BB = 0;
+constexpr unsigned ENTRY_BB = 0;
 
 /// This struct groups the operations of a handshake::FuncOp in "blocks" based
 /// on the "bb" attribute potentially attached to each operation.

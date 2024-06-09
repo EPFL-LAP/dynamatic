@@ -42,7 +42,7 @@ static void createNewBranches(ArrayRef<handshake::BranchOp> branches,
   if (auto defOp = ctrl.getDefiningOp())
     inheritBB(defOp, constOp);
   else
-    constOp->setAttr(BB_ATTR, builder.getUI32IntegerAttr(0));
+    constOp->setAttr(BB_ATTR_NAME, builder.getUI32IntegerAttr(0));
 
   // Insert a conditional branch for every unconditional branch and replace the
   // latter's result uses with the "true" result of the former
@@ -189,7 +189,7 @@ struct EraseEntryBlockMerges : public OpRewritePattern<handshake::MergeOp> {
     if (mergeOp.getNumOperands() > 1)
       return failure();
 
-    if (auto bbAttr = mergeOp->getAttrOfType<IntegerAttr>(BB_ATTR))
+    if (auto bbAttr = mergeOp->getAttrOfType<IntegerAttr>(BB_ATTR_NAME))
       if (bbAttr.getValue().getZExtValue() == 0) {
         // Merge belongs to the entry block
         rewriter.replaceAllUsesWith(mergeOp.getResult(), mergeOp.getOperands());

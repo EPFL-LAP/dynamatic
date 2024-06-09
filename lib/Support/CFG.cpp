@@ -26,7 +26,7 @@ using namespace dynamatic;
 dynamatic::LogicBBs dynamatic::getLogicBBs(handshake::FuncOp funcOp) {
   dynamatic::LogicBBs logicBBs;
   for (auto &op : funcOp.getOps())
-    if (auto bbAttr = op.getAttrOfType<mlir::IntegerAttr>(BB_ATTR); bbAttr)
+    if (auto bbAttr = op.getAttrOfType<mlir::IntegerAttr>(BB_ATTR_NAME); bbAttr)
       logicBBs.blocks[bbAttr.getValue().getZExtValue()].push_back(&op);
     else
       logicBBs.outOfBlocks.push_back(&op);
@@ -34,8 +34,8 @@ dynamatic::LogicBBs dynamatic::getLogicBBs(handshake::FuncOp funcOp) {
 }
 
 bool dynamatic::inheritBB(Operation *srcOp, Operation *dstOp) {
-  if (auto bb = srcOp->getAttrOfType<mlir::IntegerAttr>(BB_ATTR)) {
-    dstOp->setAttr(BB_ATTR, bb);
+  if (auto bb = srcOp->getAttrOfType<mlir::IntegerAttr>(BB_ATTR_NAME)) {
+    dstOp->setAttr(BB_ATTR_NAME, bb);
     return true;
   }
   return false;
@@ -44,13 +44,13 @@ bool dynamatic::inheritBB(Operation *srcOp, Operation *dstOp) {
 bool dynamatic::inheritBBFromValue(Value val, Operation *dstOp) {
   if (Operation *defOp = val.getDefiningOp())
     return inheritBB(defOp, dstOp);
-  dstOp->setAttr(BB_ATTR,
+  dstOp->setAttr(BB_ATTR_NAME,
                  OpBuilder(val.getContext()).getUI32IntegerAttr(ENTRY_BB));
   return true;
 }
 
 std::optional<unsigned> dynamatic::getLogicBB(Operation *op) {
-  if (auto bb = op->getAttrOfType<mlir::IntegerAttr>(BB_ATTR))
+  if (auto bb = op->getAttrOfType<mlir::IntegerAttr>(BB_ATTR_NAME))
     return bb.getUInt();
   return {};
 }

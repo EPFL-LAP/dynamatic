@@ -45,7 +45,7 @@ static bool inferBasicBlocks(Operation *op, PatternRewriter &rewriter) {
   // Run the inference logic
   unsigned infBB;
   if (succeeded(inferLogicBB(op, infBB))) {
-    op->setAttr(BB_ATTR, rewriter.getUI32IntegerAttr(infBB));
+    op->setAttr(BB_ATTR_NAME, rewriter.getUI32IntegerAttr(infBB));
     return true;
   }
   return false;

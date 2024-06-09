@@ -596,7 +596,7 @@ static void patchUpIRForLegacyBuffers(handshake::FuncOp funcOp) {
         llvm::any_of(forkOp.getResults(), isMergeInDiffBlock))
       // Fork is located after a branch in the same block or before a merge-like
       // operation in a different block
-      forkOp.removeAttr(BB_ATTR);
+      forkOp.removeAttr(BB_ATTR_NAME);
   }
 }
 
@@ -859,7 +859,7 @@ LogicalResult DOTPrinter::annotateNode(Operation *op,
 
   // Basic block ID is 0 for out-of-blocks components, something positive
   // otherwise
-  if (auto bbID = op->getAttrOfType<mlir::IntegerAttr>(BB_ATTR); bbID)
+  if (auto bbID = op->getAttrOfType<mlir::IntegerAttr>(BB_ATTR_NAME); bbID)
     info.intAttr["bbID"] = bbID.getValue().getZExtValue() + 1;
   else
     info.intAttr["bbID"] = 0;
