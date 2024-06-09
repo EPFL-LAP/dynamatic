@@ -742,7 +742,7 @@ int main(int argc, char **argv) {
   // with arrow keys
   char *rawInput;
   while (true) {
-    rawInput = readline(PROMPT.c_str());
+    rawInput = readline(PROMPT.str().c_str());
     add_history(rawInput);
     splitOnSemicolonAndHandle(std::string(rawInput), false);
     free(rawInput);
