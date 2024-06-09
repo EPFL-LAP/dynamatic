@@ -37,17 +37,24 @@ mkdir -p "$SYNTH_HDL_DIR"
 cp "$HDL_DIR/$KERNEL_NAME.vhd" "$SYNTH_HDL_DIR"
 cp "$DYNAMATIC_DIR"/data/vhdl/*.vhd "$SYNTH_HDL_DIR"
 
-# See if we should include any LSQ in the synthesis script
+# See if we should include any VHDL in the synthesis script
+READ_VHDL=""
+if ls "$HDL_DIR"/*.vhd 1> /dev/null 2>&1; then
+  cp "$HDL_DIR/"*.vhd "$SYNTH_HDL_DIR"
+  READ_VHDL="read_vhdl -vhdl2008 [glob $SYNTH_DIR/hdl/*.vhd]"
+fi
+
+# See if we should include any Verilog in the synthesis script
 READ_VERILOG=""
-if ls "$HDL_DIR"/LSQ*.v 1> /dev/null 2>&1; then
-  cp "$HDL_DIR/"LSQ*.v "$SYNTH_HDL_DIR"
+if ls "$HDL_DIR"/*.v 1> /dev/null 2>&1; then
+  cp "$HDL_DIR/"*.v "$SYNTH_HDL_DIR"
   READ_VERILOG="read_verilog [glob $SYNTH_DIR/hdl/*.v]"
 fi
 
 # Generate synthesis script
 echo -e \
 "set_param general.maxThreads 8
-read_vhdl -vhdl2008 [glob $SYNTH_DIR/hdl/*.vhd]
+$READ_VHDL
 $READ_VERILOG
 read_xdc "$F_PERIOD"
 synth_design -top $KERNEL_NAME -part xc7k160tfbg484-2 -no_iobuf -mode out_of_context

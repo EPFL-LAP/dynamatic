@@ -125,7 +125,8 @@ class Command {
 public:
   StringRef keyword;
   StringRef desc;
-  StringMap<Argument> posArgs;
+
+  StringMap<Argument> positionals;
   StringMap<Argument> flags;
   StringMap<Argument> options;
 
@@ -133,8 +134,8 @@ public:
       : keyword(keyword), desc(desc), state(state) {}
 
   void addPositionalArg(const Argument &arg) {
-    assert(!posArgs.contains(arg.name) && "duplicate positional arg name");
-    posArgs[arg.name] = arg;
+    assert(!positionals.contains(arg.name) && "duplicate positional arg name");
+    positionals[arg.name] = arg;
   }
 
   void addFlag(const Argument &arg) {
@@ -151,7 +152,7 @@ public:
 
   CommandResult parseAndExecute(ArrayRef<std::string> tokens);
 
-  virtual CommandResult execute(CommandArguments &parsed) = 0;
+  virtual CommandResult execute(CommandArguments &args) = 0;
 
   std::string getShortCmdDesc() const;
 
@@ -165,12 +166,12 @@ protected:
   inline std::string getSeparator() const { return state.getSeparator(); }
 
 private:
-  LogicalResult parsePositional(StringRef arg, CommandArguments &parsed) const;
+  LogicalResult parsePositional(StringRef arg, CommandArguments &args) const;
 
-  LogicalResult parseFlag(StringRef name, CommandArguments &parsed) const;
+  LogicalResult parseFlag(StringRef name, CommandArguments &args) const;
 
   LogicalResult parseOption(StringRef name, StringRef value,
-                            CommandArguments &parsed) const;
+                            CommandArguments &args) const;
 };
 
 class Exit : public Command {
@@ -178,7 +179,7 @@ public:
   Exit(FrontendState &state)
       : Command("exit", "Exits the Dynamatic frontend", state){};
 
-  CommandResult execute(CommandArguments &parsed) override;
+  CommandResult execute(CommandArguments &args) override;
 };
 
 class Help : public Command {
@@ -186,7 +187,7 @@ public:
   Help(FrontendState &state)
       : Command("help", "Displays this help message", state){};
 
-  CommandResult execute(CommandArguments &parsed) override;
+  CommandResult execute(CommandArguments &args) override;
 };
 
 class SetDynamaticPath : public Command {
@@ -197,7 +198,7 @@ public:
     addPositionalArg({"path", "path to Dynamatic's top-level directory"});
   }
 
-  CommandResult execute(CommandArguments &parsed) override;
+  CommandResult execute(CommandArguments &args) override;
 };
 
 class SetSrc : public Command {
@@ -207,7 +208,7 @@ public:
     addPositionalArg({"source", "path to source file"});
   }
 
-  CommandResult execute(CommandArguments &parsed) override;
+  CommandResult execute(CommandArguments &args) override;
 };
 
 class SetCP : public Command {
@@ -216,47 +217,55 @@ public:
       : Command("set-clock-period", "Sets the clock period", state) {
     addPositionalArg({"clock-period", "clock period in ns"});
   }
-  CommandResult execute(CommandArguments &parsed) override;
+  CommandResult execute(CommandArguments &args) override;
 };
 
 class Compile : public Command {
 public:
+  static constexpr llvm::StringLiteral SIMPLE_BUFFERS = "simple-buffers";
+
   Compile(FrontendState &state)
       : Command("compile",
                 "Compiles the source kernel into a dataflow circuit; "
                 "produces both handshake-level IR and an equivalent DOT file",
                 state) {
-    addFlag({"simple-buffers", "Use simple buffer placement"});
+    addFlag({SIMPLE_BUFFERS, "Use simple buffer placement"});
   }
 
-  CommandResult execute(CommandArguments &parsed) override;
+  CommandResult execute(CommandArguments &args) override;
 };
 
 class WriteHDL : public Command {
 public:
+  static constexpr llvm::StringLiteral EXPERIMENTAL = "experimental",
+                                       HDL = "hdl";
+
   WriteHDL(FrontendState &state)
       : Command(
             "write-hdl",
             "Converts the DOT file produced after compile to VHDL using the "
             "export-dot tool",
             state) {
-    addFlag({"experimental", "Use experimental backend"});
+    addFlag({EXPERIMENTAL, "Use experimental backend"});
+    addOption({HDL, "HDL to use for design's top-level"});
   }
 
-  CommandResult execute(CommandArguments &parsed) override;
+  CommandResult execute(CommandArguments &args) override;
 };
 
 class Simulate : public Command {
 public:
+  static constexpr llvm::StringLiteral EXPERIMENTAL = "experimental";
+
   Simulate(FrontendState &state)
       : Command("simulate",
                 "Simulates the VHDL produced during HDL writing using Modelsim "
                 "and the hls-verifier tool",
                 state) {
-    addFlag({"experimental", "Use experimental backend"});
+    addFlag({EXPERIMENTAL, "Use experimental backend"});
   }
 
-  CommandResult execute(CommandArguments &parsed) override;
+  CommandResult execute(CommandArguments &args) override;
 };
 
 class Visualize : public Command {
@@ -267,7 +276,7 @@ public:
             "Visualizes the execution of the circuit simulated by Modelsim.",
             state) {}
 
-  CommandResult execute(CommandArguments &parsed) override;
+  CommandResult execute(CommandArguments &args) override;
 };
 
 class Synthesize : public Command {
@@ -277,7 +286,7 @@ public:
                 "Synthesizes the VHDL produced during HDL writing using Vivado",
                 state) {}
 
-  CommandResult execute(CommandArguments &parsed) override;
+  CommandResult execute(CommandArguments &args) override;
 };
 
 class FrontendCommands {
@@ -387,35 +396,34 @@ CommandResult Command::parseAndExecute(ArrayRef<std::string> tokens) {
 }
 
 LogicalResult Command::parsePositional(StringRef arg,
-                                       CommandArguments &parsed) const {
+                                       CommandArguments &args) const {
   // Positional argument
-  if (parsed.positionals.size() == posArgs.size()) {
-    llvm::outs() << ERR << "Expected only " << posArgs.size()
+  if (args.positionals.size() == positionals.size()) {
+    llvm::outs() << ERR << "Expected only " << positionals.size()
                  << " argument for " << keyword << " command, but got extra '"
                  << arg << "'.\n";
     return failure();
   }
-  parsed.positionals.push_back(arg);
+  args.positionals.push_back(arg);
   return success();
 };
 
-LogicalResult Command::parseFlag(StringRef name,
-                                 CommandArguments &parsed) const {
-  if (parsed.flags.contains(name)) {
+LogicalResult Command::parseFlag(StringRef name, CommandArguments &args) const {
+  if (args.flags.contains(name)) {
     llvm::errs() << ERR << "Flag '" << name << "' given more than once\n";
     return failure();
   }
-  parsed.flags.insert(name);
+  args.flags.insert(name);
   return success();
 };
 
 LogicalResult Command::parseOption(StringRef name, StringRef value,
-                                   CommandArguments &parsed) const {
-  if (parsed.options.contains(name)) {
+                                   CommandArguments &args) const {
+  if (args.options.contains(name)) {
     llvm::errs() << ERR << "Option '" << name << "' given more than once\n";
     return failure();
   }
-  parsed.options.insert({name, value.str()});
+  args.options.insert({name, value});
   return success();
 };
 
@@ -424,7 +432,7 @@ std::string Command::getShortCmdDesc() const {
   ss << keyword.str() << " ";
   if (!flags.empty())
     ss << "[options] ";
-  for (auto &nameAndArg : posArgs)
+  for (auto &nameAndArg : positionals)
     ss << "<" << nameAndArg.first().str() << "> ";
   return ss.str();
 }
@@ -455,24 +463,26 @@ void Command::help() const {
     os << "\n";
   };
 
-  printListArgs(posArgs, "ARGUMENTS",
+  printListArgs(positionals, "ARGUMENTS",
                 [&](auto ref) { os << "<" << ref << ">"; });
-  printListArgs(flags, "OPTIONS", [&](auto ref) { os << "--" << ref; });
+  printListArgs(flags, "FLAGS", [&](auto ref) { os << "--" << ref; });
+  printListArgs(options, "OPTIONS",
+                [&](auto ref) { os << "--" << ref << " <option-value>"; });
   os << "\n";
 }
 
-CommandResult Exit::execute(CommandArguments &parsed) {
+CommandResult Exit::execute(CommandArguments &args) {
   return CommandResult::EXIT;
 }
 
-CommandResult Help::execute(CommandArguments &parsed) {
+CommandResult Help::execute(CommandArguments &args) {
   return CommandResult::HELP;
 }
 
-CommandResult SetDynamaticPath::execute(CommandArguments &parsed) {
+CommandResult SetDynamaticPath::execute(CommandArguments &args) {
   // Remove the separator at the end of the path if there is one
   StringRef sep = sys::path::get_separator();
-  std::string dynamaticPath = parsed.positionals.front().str();
+  std::string dynamaticPath = args.positionals.front().str();
   if (StringRef(dynamaticPath).ends_with(sep))
     dynamaticPath = dynamaticPath.substr(0, dynamaticPath.size() - 1);
 
@@ -494,8 +504,8 @@ CommandResult SetDynamaticPath::execute(CommandArguments &parsed) {
   return CommandResult::SUCCESS;
 }
 
-CommandResult SetSrc::execute(CommandArguments &parsed) {
-  std::string sourcePath = parsed.positionals.front().str();
+CommandResult SetSrc::execute(CommandArguments &args) {
+  std::string sourcePath = args.positionals.front().str();
   StringRef srcName = path::filename(sourcePath);
   if (!srcName.ends_with(".c")) {
     llvm::outs() << ERR
@@ -508,50 +518,62 @@ CommandResult SetSrc::execute(CommandArguments &parsed) {
   return CommandResult::SUCCESS;
 }
 
-CommandResult SetCP::execute(CommandArguments &parsed) {
+CommandResult SetCP::execute(CommandArguments &args) {
   // Let dynamatic-opt check if the string is a legal float number
-  state.targetCP = parsed.positionals.front().str();
+  state.targetCP = args.positionals.front().str();
   return CommandResult::SUCCESS;
 }
 
-CommandResult Compile::execute(CommandArguments &parsed) {
+CommandResult Compile::execute(CommandArguments &args) {
   // We need the source path to be set
   if (!state.sourcePathIsSet(keyword))
     return CommandResult::FAIL;
 
   std::string script = state.getScriptsPath() + getSeparator() + "compile.sh";
-  std::string buffers = parsed.flags.contains("simple-buffers") ? "1" : "0";
+  std::string buffers = args.flags.contains(SIMPLE_BUFFERS) ? "1" : "0";
 
   return exec(script, state.dynamaticPath, state.getKernelDir(),
               state.getOutputDir(), state.getKernelName(), buffers,
               state.targetCP);
 }
 
-CommandResult WriteHDL::execute(CommandArguments &parsed) {
+CommandResult WriteHDL::execute(CommandArguments &args) {
   // We need the source path to be set
   if (!state.sourcePathIsSet(keyword))
     return CommandResult::FAIL;
 
   std::string script = state.getScriptsPath() + getSeparator() + "write-hdl.sh";
-  std::string experimental = parsed.flags.contains("experimental") ? "1" : "0";
+  std::string experimental = args.flags.contains(EXPERIMENTAL) ? "1" : "0";
+  std::string hdl = "vhdl";
+
+  if (auto it = args.options.find(HDL); it != args.options.end()) {
+    if (it->second == "verilog") {
+      hdl = "verilog";
+    } else if (it->second != "vhdl") {
+      llvm::errs() << "Unknow HDL '" << it->second
+                   << "', possible options are 'vhdl' and "
+                      "'verilog'.\n";
+      return CommandResult::FAIL;
+    }
+  }
 
   return exec(script, state.dynamaticPath, state.getOutputDir(),
-              state.getKernelName(), experimental);
+              state.getKernelName(), experimental, hdl);
 }
 
-CommandResult Simulate::execute(CommandArguments &parsed) {
+CommandResult Simulate::execute(CommandArguments &args) {
   // We need the source path to be set
   if (!state.sourcePathIsSet(keyword))
     return CommandResult::FAIL;
 
   std::string script = state.getScriptsPath() + getSeparator() + "simulate.sh";
-  std::string experimental = parsed.flags.contains("experimental") ? "1" : "0";
+  std::string experimental = args.flags.contains(EXPERIMENTAL) ? "1" : "0";
 
   return exec(script, state.dynamaticPath, state.getKernelDir(),
               state.getOutputDir(), state.getKernelName(), experimental);
 }
 
-CommandResult Visualize::execute(CommandArguments &parsed) {
+CommandResult Visualize::execute(CommandArguments &args) {
   // We need the source path to be set
   if (!state.sourcePathIsSet(keyword))
     return CommandResult::FAIL;
@@ -567,7 +589,7 @@ CommandResult Visualize::execute(CommandArguments &parsed) {
               state.getOutputDir(), state.getKernelName());
 }
 
-CommandResult Synthesize::execute(CommandArguments &parsed) {
+CommandResult Synthesize::execute(CommandArguments &args) {
   // We need the source path to be set
   if (!state.sourcePathIsSet(keyword))
     return CommandResult::FAIL;
