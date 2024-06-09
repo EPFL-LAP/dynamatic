@@ -300,10 +300,10 @@ def BackAnnotate : DynamaticPass<"back-annotate"> {
   let description = [{
     Sets supported attributes on operations and operands based on
     back-annotation information contained in an input JSON file. Operations
-    need to have a unique name (`dynamatic::handshake::NameAttr` attribute) to
-    be able to be referenced by the back-annotation file. Fails if the
-    back-annotation file is badly formatted or if a referenced operation/operand
-    cannot be found in the IR.
+    need to have a unique name (`handshake.name` attribute) to be able to be
+    referenced by the back-annotation file. Fails if the back-annotation file is
+    badly formatted or if a referenced operation/operand cannot be found in the
+    IR.
   }];
   let constructor = "dynamatic::createBackAnnotate()";
     let options =

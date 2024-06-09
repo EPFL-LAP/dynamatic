@@ -148,25 +148,6 @@ class OperandContainerAttr<string name, string attrMnemonic, list<Trait> traits 
 }
 
 //===----------------------------------------------------------------------===//
-// Naming annotations
-//===----------------------------------------------------------------------===//
-
-def NameAttr : Handshake_Attr<"Name", "name"> {
-  let summary = "A unique name given to an operation";
-  let description = [{
-    This holds a unique name given to an operation. This attribute is a simple
-    wrapper around a `StringAttr`.
-  }];
-  
-  let parameters = (ins "mlir::StringAttr":$name);
-  let builders = [
-    AttrBuilder<(ins "mlir::StringRef":$name),
-      "return $_get(context, mlir::StringAttr::get(context, name));">,
-  ];
-  let assemblyFormat = "`<` $name `>`";
-}
-
-//===----------------------------------------------------------------------===//
 // Memory annotations
 //===----------------------------------------------------------------------===//
 
