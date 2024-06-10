@@ -96,7 +96,7 @@ exit_on_fail "Failed to run memory analysis" "Ran memory analysis"
 exit_on_fail "Failed to compile affine to scf" "Compiled affine to scf"
 
 # scf level -> cf level
-"$DYNAMATIC_OPT_BIN" "$F_SCF" --lower-scf-to-cf --func-ssa-to-gsa > "$F_CF"
+"$DYNAMATIC_OPT_BIN" "$F_SCF" --lower-scf-to-cf > "$F_CF"
 exit_on_fail "Failed to compile scf to cf" "Compiled scf to cf"
 
 # cf transformations (standard)
