@@ -13,8 +13,8 @@
 //
 //===----------------------------------------------------------------------===//
 
-#ifndef DYNAMATIC_ANALYSIS_NAMEANALYSIS
-#define DYNAMATIC_ANALYSIS_NAMEANALYSIS
+#ifndef DYNAMATIC_ANALYSIS_NAMEANALYSIS_H
+#define DYNAMATIC_ANALYSIS_NAMEANALYSIS_H
 
 #include "dynamatic/Support/LLVM.h"
 #include "mlir/Pass/AnalysisManager.h"
@@ -219,4 +219,4 @@ std::string getUniqueName(OpOperand &oprd);
 
 } // namespace dynamatic
 
-#endif // DYNAMATIC_ANALYSIS_NAMEANALYSIS
+#endif // DYNAMATIC_ANALYSIS_NAMEANALYSIS_H
