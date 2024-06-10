@@ -16,6 +16,7 @@
 //===----------------------------------------------------------------------===//
 
 #include "dynamatic/Dialect/Handshake/HandshakeOps.h"
+#include "dynamatic/Support/CFG.h"
 #include "dynamatic/Support/LLVM.h"
 #include "mlir/Dialect/Affine/Analysis/AffineAnalysis.h"
 #include "mlir/Dialect/Arith/IR/Arith.h"
@@ -747,11 +748,10 @@ static LogicalResult getMCPorts(MCPorts &mcPorts) {
     Operation *portOp = backtrackToMemInput(input.value());
 
     // Identify the block the input operation belongs to
-    /// TODO: change hardcoded "bb" to attribute mnemonic once the basic block
-    /// is made part of the Handshake dialect
     unsigned portOpBlock = 0;
     if (portOp) {
-      auto ctrlBlock = dyn_cast_if_present<IntegerAttr>(portOp->getAttr("bb"));
+      auto ctrlBlock =
+          dyn_cast_if_present<IntegerAttr>(portOp->getAttr(BB_ATTR_NAME));
       if (ctrlBlock) {
         portOpBlock = ctrlBlock.getUInt();
       } else if (isa<handshake::MCLoadOp, handshake::MCStoreOp>(portOp)) {
@@ -1518,20 +1518,6 @@ LogicalResult ReturnOp::verify() {
   auto funcOp = getOperation()->getParentOfType<handshake::FuncOp>();
   if (!funcOp)
     return emitOpError("must have a handshake.func parent");
-
-  // Operand number and types should match enclosing function's return types
-  const auto &results = funcOp.getResultTypes();
-  if (getNumOperands() != results.size())
-    return emitOpError("has ")
-           << getNumOperands() << " operands, but enclosing function returns "
-           << results.size();
-  for (unsigned i = 0, e = results.size(); i != e; ++i)
-    if (getOperand(i).getType() != results[i])
-      return emitError() << "type of return operand " << i << " ("
-                         << getOperand(i).getType()
-                         << ") doesn't match function result type ("
-                         << results[i] << ")";
-
   return success();
 }
 

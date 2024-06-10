@@ -119,9 +119,10 @@ mergeFunctionResults(Region &r, ConversionPatternRewriter &rewriter,
     results.push_back(mergeOp.getResult());
     // Merge operation inherits from the bb atttribute of the latest (in program
     // order) return operation
-    if (endNetworkId.has_value())
-      mergeOp->setAttr(BB_ATTR,
+    if (endNetworkId.has_value()) {
+      mergeOp->setAttr(BB_ATTR_NAME,
                        rewriter.getUI32IntegerAttr(endNetworkId.value()));
+    }
   }
   return results;
 }
@@ -762,7 +763,7 @@ HandshakeLowering::idBasicBlocks(ConversionPatternRewriter &rewriter) {
       if (!isa<handshake::MemoryOpInterface>(op)) {
         // Memory interfaces do not naturally belong to any block, so they do
         // not get an attribute
-        op.setAttr(BB_ATTR, rewriter.getUI32IntegerAttr(blockID));
+        op.setAttr(BB_ATTR_NAME, rewriter.getUI32IntegerAttr(blockID));
       }
     }
   }
@@ -811,7 +812,7 @@ HandshakeLowering::createReturnNetwork(ConversionPatternRewriter &rewriter) {
   endNetworkID = (newReturnOps.size() > 1)
                      ? region.getBlocks().size()
                      : newReturnOps[0]
-                           ->getAttrOfType<mlir::IntegerAttr>(BB_ATTR)
+                           ->getAttrOfType<mlir::IntegerAttr>(BB_ATTR_NAME)
                            .getValue()
                            .getZExtValue();
 
@@ -838,7 +839,8 @@ HandshakeLowering::createReturnNetwork(ConversionPatternRewriter &rewriter) {
   handshake::EndOp endOp = rewriter.create<handshake::EndOp>(
       entryBlockOps.back().getLoc(), endOperands);
   if (endNetworkID.has_value())
-    endOp->setAttr(BB_ATTR, rewriter.getUI32IntegerAttr(endNetworkID.value()));
+    endOp->setAttr(BB_ATTR_NAME,
+                   rewriter.getUI32IntegerAttr(endNetworkID.value()));
 
   return success();
 }

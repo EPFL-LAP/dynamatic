@@ -24,6 +24,7 @@
 #include "dynamatic/Transforms/FuncSetArgNames.h"
 #include "dynamatic/Transforms/HandshakeCanonicalize.h"
 #include "dynamatic/Transforms/HandshakeConcretizeIndexType.h"
+#include "dynamatic/Transforms/HandshakeHoistExtInstances.h"
 #include "dynamatic/Transforms/HandshakeInferBasicBlocks.h"
 #include "dynamatic/Transforms/HandshakeMaterialize.h"
 #include "dynamatic/Transforms/HandshakeMinimizeCstWidth.h"

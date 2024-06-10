@@ -33,17 +33,26 @@
 #include "llvm/Support/InitLLVM.h"
 #include "llvm/Support/Path.h"
 #include "llvm/Support/raw_ostream.h"
+#include <algorithm>
 #include <cstdio>
 #include <cstdlib>
 #include <fstream>
+#include <initializer_list>
 #include <iostream>
 #include <memory>
 #include <sstream>
+#include <readline/readline.h>
+#include <readline/history.h>
 
 using namespace llvm;
 using namespace llvm::sys;
 using namespace mlir;
 using namespace dynamatic;
+
+static constexpr llvm::StringLiteral ERR("[ERROR] "),
+    DELIM("============================================="
+          "===================================\n"),
+    PROMPT("dynamatic> "), CMD_SET_SRC("set-src");
 
 static cl::OptionCategory mainCategory("Application options");
 
@@ -58,31 +67,6 @@ static cl::opt<bool> exitOnFailure(
     cl::desc(
         "If specified, exits the frontend automatically on command failure"),
     cl::init(false), cl::cat(mainCategory));
-
-const static std::string INFO = "[INFO] ";
-const static std::string ERR = "[ERROR] ";
-const static std::string DELIM = "============================================="
-                                 "===================================\n";
-const static std::string HEADER =
-    DELIM +
-    "============== Dynamatic | Dynamic High-Level Synthesis Compiler "
-    "===============\n" +
-    "======================== EPFL-LAP - v2.0.0 | March 2024 "
-    "========================\n" +
-    DELIM + "\n\n";
-const static std::string PROMPT = "dynamatic> ";
-
-// Command names
-const static std::string CMD_SET_SRC = "set-src";
-const static std::string CMD_SET_DYNAMATIC_PATH = "set-dynamatic-path";
-const static std::string CMD_SET_CP = "set-clock-period";
-const static std::string CMD_COMPILE = "compile";
-const static std::string CMD_WRITE_HDL = "write-hdl";
-const static std::string CMD_SIMULATE = "simulate";
-const static std::string CMD_VISUALIZE = "visualize";
-const static std::string CMD_SYNTHESIZE = "synthesize";
-const static std::string CMD_HELP = "help";
-const static std::string CMD_EXIT = "exit";
 
 namespace {
 
@@ -101,6 +85,24 @@ struct FrontendState {
     return dynamaticPath + "/tools/dynamatic/scripts";
   }
 
+  inline std::string getSeparator() const {
+    return sys::path::get_separator().str();
+  }
+
+  inline std::string getKernelDir() const {
+    assert(sourcePath && "source path not set");
+    return path::parent_path(*sourcePath).str();
+  }
+
+  inline std::string getKernelName() const {
+    assert(sourcePath && "source path not set");
+    return path::filename(*sourcePath).drop_back(2).str();
+  }
+
+  inline std::string getOutputDir() const {
+    return getKernelDir() + getSeparator() + "out";
+  }
+
   std::string makeAbsolutePath(StringRef path);
 };
 
@@ -115,139 +117,178 @@ struct Argument {
 
 enum class CommandResult { SYNTAX_ERROR, FAIL, SUCCESS, EXIT, HELP };
 
-struct ParsedCommand {
+struct CommandArguments {
   SmallVector<StringRef> positionals;
-  mlir::DenseSet<StringRef> optArgsPresent;
+  mlir::DenseSet<StringRef> flags;
+  StringMap<StringRef> options;
 };
 
 class Command {
 public:
   StringRef keyword;
   StringRef desc;
-  StringMap<Argument> posArgs;
+
+  StringMap<Argument> positionals;
   StringMap<Argument> flags;
+  StringMap<Argument> options;
 
-  Command(StringRef keyword, StringRef desc, FrontendState &state,
-          SmallVector<Argument> &&posArgs = {},
-          SmallVector<Argument> &&flags = {})
-      : keyword(keyword), desc(desc), state(state) {
-    for (Argument &arg : posArgs)
-      this->posArgs[arg.name] = arg;
-    for (Argument &arg : flags)
-      this->flags[arg.name] = arg;
-  };
+  Command(StringRef keyword, StringRef desc, FrontendState &state)
+      : keyword(keyword), desc(desc), state(state) {}
 
-  virtual CommandResult decode(ArrayRef<std::string> tokens) = 0;
+  void addPositionalArg(const Argument &arg) {
+    assert(!positionals.contains(arg.name) && "duplicate positional arg name");
+    positionals[arg.name] = arg;
+  }
 
-  LogicalResult parse(ArrayRef<std::string> tokens, ParsedCommand &parsed);
+  void addFlag(const Argument &arg) {
+    assert(!flags.contains(arg.name) && "duplicate flag name");
+    assert(!options.contains(arg.name) && "option and flag have same name");
+    flags[arg.name] = arg;
+  }
 
-  std::string getShortCmdDesc();
+  void addOption(const Argument &arg) {
+    assert(!options.contains(arg.name) && "duplicate option name");
+    assert(!flags.contains(arg.name) && "option and flag have same name");
+    options[arg.name] = arg;
+  }
 
-  void help();
+  CommandResult parseAndExecute(ArrayRef<std::string> tokens);
+
+  virtual CommandResult execute(CommandArguments &args) = 0;
+
+  std::string getShortCmdDesc() const;
+
+  void help() const;
 
   virtual ~Command() = default;
 
 protected:
   FrontendState &state;
+
+  inline std::string getSeparator() const { return state.getSeparator(); }
+
+private:
+  LogicalResult parsePositional(StringRef arg, CommandArguments &args) const;
+
+  LogicalResult parseFlag(StringRef name, CommandArguments &args) const;
+
+  LogicalResult parseOption(StringRef name, StringRef value,
+                            CommandArguments &args) const;
 };
 
 class Exit : public Command {
 public:
   Exit(FrontendState &state)
-      : Command(CMD_EXIT, "Exits the Dynamatic frontend", state){};
+      : Command("exit", "Exits the Dynamatic frontend", state){};
 
-  CommandResult decode(ArrayRef<std::string> tokens) override;
+  CommandResult execute(CommandArguments &args) override;
 };
 
 class Help : public Command {
 public:
   Help(FrontendState &state)
-      : Command(CMD_HELP, "Displays this help message", state){};
+      : Command("help", "Displays this help message", state){};
 
-  CommandResult decode(ArrayRef<std::string> tokens) override;
+  CommandResult execute(CommandArguments &args) override;
 };
 
 class SetDynamaticPath : public Command {
 public:
   SetDynamaticPath(FrontendState &state)
-      : Command(CMD_SET_DYNAMATIC_PATH,
-                "Sets the path to Dynamatic's top-level directory", state,
-                {{"path", "path to Dynamatic's top-level directory"}}){};
+      : Command("set-dynamatic-path",
+                "Sets the path to Dynamatic's top-level directory", state) {
+    addPositionalArg({"path", "path to Dynamatic's top-level directory"});
+  }
 
-  CommandResult decode(ArrayRef<std::string> tokens) override;
+  CommandResult execute(CommandArguments &args) override;
 };
 
 class SetSrc : public Command {
 public:
   SetSrc(FrontendState &state)
-      : Command(CMD_SET_SRC, "Sets the C source to compile", state,
-                {{"source", "path to source file"}}){};
+      : Command(CMD_SET_SRC, "Sets the C source to compile", state) {
+    addPositionalArg({"source", "path to source file"});
+  }
 
-  CommandResult decode(ArrayRef<std::string> tokens) override;
+  CommandResult execute(CommandArguments &args) override;
 };
 
 class SetCP : public Command {
 public:
   SetCP(FrontendState &state)
-      : Command(CMD_SET_CP, "Sets the clock period", state,
-                {{"clock-period", "clock period in ns"}}){};
-  CommandResult decode(ArrayRef<std::string> tokens) override;
+      : Command("set-clock-period", "Sets the clock period", state) {
+    addPositionalArg({"clock-period", "clock period in ns"});
+  }
+  CommandResult execute(CommandArguments &args) override;
 };
 
 class Compile : public Command {
 public:
+  static constexpr llvm::StringLiteral SIMPLE_BUFFERS = "simple-buffers";
+
   Compile(FrontendState &state)
-      : Command(CMD_COMPILE,
+      : Command("compile",
                 "Compiles the source kernel into a dataflow circuit; "
                 "produces both handshake-level IR and an equivalent DOT file",
-                state, {},
-                {{"simple-buffers", "Use simple buffer placement"}}){};
+                state) {
+    addFlag({SIMPLE_BUFFERS, "Use simple buffer placement"});
+  }
 
-  CommandResult decode(ArrayRef<std::string> tokens) override;
+  CommandResult execute(CommandArguments &args) override;
 };
 
 class WriteHDL : public Command {
 public:
+  static constexpr llvm::StringLiteral EXPERIMENTAL = "experimental",
+                                       HDL = "hdl";
+
   WriteHDL(FrontendState &state)
       : Command(
-            CMD_WRITE_HDL,
+            "write-hdl",
             "Converts the DOT file produced after compile to VHDL using the "
             "export-dot tool",
-            state){};
+            state) {
+    addFlag({EXPERIMENTAL, "Use experimental backend"});
+    addOption({HDL, "HDL to use for design's top-level"});
+  }
 
-  CommandResult decode(ArrayRef<std::string> tokens) override;
+  CommandResult execute(CommandArguments &args) override;
 };
 
 class Simulate : public Command {
 public:
+  static constexpr llvm::StringLiteral EXPERIMENTAL = "experimental";
+
   Simulate(FrontendState &state)
-      : Command(CMD_SIMULATE,
+      : Command("simulate",
                 "Simulates the VHDL produced during HDL writing using Modelsim "
                 "and the hls-verifier tool",
-                state){};
+                state) {
+    addFlag({EXPERIMENTAL, "Use experimental backend"});
+  }
 
-  CommandResult decode(ArrayRef<std::string> tokens) override;
+  CommandResult execute(CommandArguments &args) override;
 };
 
 class Visualize : public Command {
 public:
   Visualize(FrontendState &state)
       : Command(
-            CMD_VISUALIZE,
+            "visualize",
             "Visualizes the execution of the circuit simulated by Modelsim.",
-            state){};
+            state) {}
 
-  CommandResult decode(ArrayRef<std::string> tokens) override;
+  CommandResult execute(CommandArguments &args) override;
 };
 
 class Synthesize : public Command {
 public:
   Synthesize(FrontendState &state)
-      : Command(CMD_SYNTHESIZE,
+      : Command("synthesize",
                 "Synthesizes the VHDL produced during HDL writing using Vivado",
-                state){};
+                state) {}
 
-  CommandResult decode(ArrayRef<std::string> tokens) override;
+  CommandResult execute(CommandArguments &args) override;
 };
 
 class FrontendCommands {
@@ -276,10 +317,28 @@ public:
 };
 } // namespace
 
-static CommandResult execShellCommand(StringRef cmd) {
+static CommandResult exec(std::initializer_list<StringRef> args) {
+  if (args.size() == 0)
+    return CommandResult::FAIL;
+
+  // Append all arguments into the command, with a space in between each
+  std::stringstream cmd;
+  auto *it = args.begin();
+  StringRef arg = *it;
+  while (++it != args.end()) {
+    cmd << arg.str() + " ";
+    arg = *it;
+  }
+  cmd << arg.str();
+
   int ret = std::system(cmd.str().c_str());
   llvm::outs() << "\n";
   return ret != 0 ? CommandResult::FAIL : CommandResult::SUCCESS;
+}
+
+template <typename... Args>
+static CommandResult exec(Args... args) {
+  return exec({args...});
 }
 
 std::string FrontendState::makeAbsolutePath(StringRef path) {
@@ -291,7 +350,7 @@ std::string FrontendState::makeAbsolutePath(StringRef path) {
 
 bool FrontendState::sourcePathIsSet(StringRef keyword) {
   if (!sourcePath.has_value()) {
-    llvm::outs() << ERR
+    llvm::errs() << ERR
                  << "The path to the source file needs to be set to run '"
                  << keyword << "' use the '" << CMD_SET_SRC
                  << "' command before '" << keyword << "'.\n";
@@ -300,55 +359,92 @@ bool FrontendState::sourcePathIsSet(StringRef keyword) {
   return true;
 }
 
-LogicalResult Command::parse(ArrayRef<std::string> tokens,
-                             ParsedCommand &parsed) {
-  bool firstIsKw = true;
-  for (StringRef tok : tokens) {
-    if (firstIsKw) {
-      firstIsKw = false;
-      continue;
-    }
+CommandResult Command::parseAndExecute(ArrayRef<std::string> tokens) {
+  // Don't report an error if the command is just empty
+  if (tokens.empty())
+    return CommandResult::SUCCESS;
+
+  CommandArguments parsed;
+  ArrayRef<std::string> opts = tokens.drop_front();
+  for (const auto *tokIt = opts.begin(); tokIt != opts.end(); ++tokIt) {
+    StringRef tok = *tokIt;
     if (tok.starts_with("--")) {
-      StringRef flagName = tok.drop_front(2);
-      if (!flags.contains(flagName)) {
-        llvm::outs() << ERR << "Unknow flag '" << tok << "'\n";
-        return failure();
+      // Flag or option
+      StringRef name = tok.drop_front(2);
+      if (flags.contains(name)) {
+        // This is a flag
+        if (failed(parseFlag(name, parsed)))
+          return CommandResult::SYNTAX_ERROR;
+      } else if (options.contains(name)) {
+        // This is an option
+        const auto *nextToken = ++tokIt;
+        if (nextToken == opts.end()) {
+          llvm::errs() << "Missing value for option '" << tok << "'\n";
+          return CommandResult::SYNTAX_ERROR;
+        }
+        if (failed(parseOption(name, *nextToken, parsed)))
+          return CommandResult::SYNTAX_ERROR;
+      } else {
+        llvm::errs() << ERR << "Unknow flag/option '" << tok << "'\n";
+        return CommandResult::SYNTAX_ERROR;
       }
-      if (parsed.optArgsPresent.contains(flagName)) {
-        llvm::outs() << ERR << "Flag '" << tok
-                     << "' indicated more than once\n";
-        return failure();
-      }
-      parsed.optArgsPresent.insert(flagName);
-    } else {
-      if (parsed.positionals.size() == posArgs.size()) {
-        llvm::outs() << ERR << "Expected only " << posArgs.size()
-                     << " argument for " << keyword
-                     << " command, but got extra '" << tok << "'.\n";
-        return failure();
-      }
-      parsed.positionals.push_back(tok);
+    } else if (failed(parsePositional(tok, parsed))) {
+      // Positional argument
+      return CommandResult::SYNTAX_ERROR;
     }
   }
-  return success();
+
+  return execute(parsed);
 }
 
-std::string Command::getShortCmdDesc() {
+LogicalResult Command::parsePositional(StringRef arg,
+                                       CommandArguments &args) const {
+  // Positional argument
+  if (args.positionals.size() == positionals.size()) {
+    llvm::outs() << ERR << "Expected only " << positionals.size()
+                 << " argument for " << keyword << " command, but got extra '"
+                 << arg << "'.\n";
+    return failure();
+  }
+  args.positionals.push_back(arg);
+  return success();
+};
+
+LogicalResult Command::parseFlag(StringRef name, CommandArguments &args) const {
+  if (args.flags.contains(name)) {
+    llvm::errs() << ERR << "Flag '" << name << "' given more than once\n";
+    return failure();
+  }
+  args.flags.insert(name);
+  return success();
+};
+
+LogicalResult Command::parseOption(StringRef name, StringRef value,
+                                   CommandArguments &args) const {
+  if (args.options.contains(name)) {
+    llvm::errs() << ERR << "Option '" << name << "' given more than once\n";
+    return failure();
+  }
+  args.options.insert({name, value});
+  return success();
+};
+
+std::string Command::getShortCmdDesc() const {
   std::stringstream ss;
   ss << keyword.str() << " ";
   if (!flags.empty())
     ss << "[options] ";
-  for (auto &nameAndArg : posArgs)
+  for (auto &nameAndArg : positionals)
     ss << "<" << nameAndArg.first().str() << "> ";
   return ss.str();
 }
 
-void Command::help() {
+void Command::help() const {
   mlir::raw_indented_ostream os(llvm::outs());
   os << "USAGE: " << getShortCmdDesc() << "\n\n";
 
   auto printListArgs =
-      [&](StringMap<Argument> &args, const std::string &catName,
+      [&](const StringMap<Argument> &args, const std::string &catName,
           const std::function<void(StringRef)> &fmtArg) -> void {
     if (args.empty())
       return;
@@ -360,7 +456,7 @@ void Command::help() {
 
     os.indent();
     for (auto &nameAndArg : args) {
-      Argument &arg = nameAndArg.second;
+      const Argument &arg = nameAndArg.second;
       fmtArg(arg.name);
       os << std::string(maxLength - arg.name.size(), ' ') << " - " << arg.desc
          << "\n";
@@ -369,31 +465,26 @@ void Command::help() {
     os << "\n";
   };
 
-  printListArgs(posArgs, "ARGUMENTS",
+  printListArgs(positionals, "ARGUMENTS",
                 [&](auto ref) { os << "<" << ref << ">"; });
-  printListArgs(flags, "OPTIONS", [&](auto ref) { os << "--" << ref; });
+  printListArgs(flags, "FLAGS", [&](auto ref) { os << "--" << ref; });
+  printListArgs(options, "OPTIONS",
+                [&](auto ref) { os << "--" << ref << " <option-value>"; });
   os << "\n";
 }
 
-CommandResult Exit::decode(ArrayRef<std::string> tokens) {
-  if (tokens.size() == 1)
-    return CommandResult::EXIT;
-  llvm::outs() << ERR << "To exit Dynamatic, just type 'exit'.\n";
-  return CommandResult::FAIL;
+CommandResult Exit::execute(CommandArguments &args) {
+  return CommandResult::EXIT;
 }
 
-CommandResult Help::decode(ArrayRef<std::string> tokens) {
+CommandResult Help::execute(CommandArguments &args) {
   return CommandResult::HELP;
 }
 
-CommandResult SetDynamaticPath::decode(ArrayRef<std::string> tokens) {
-  ParsedCommand parsed;
-  if (failed(parse(tokens, parsed)))
-    return CommandResult::SYNTAX_ERROR;
-
-  // Add a slash at the end of the path if there isn't one already
+CommandResult SetDynamaticPath::execute(CommandArguments &args) {
+  // Remove the separator at the end of the path if there is one
   StringRef sep = sys::path::get_separator();
-  std::string dynamaticPath = parsed.positionals.front().str();
+  std::string dynamaticPath = args.positionals.front().str();
   if (StringRef(dynamaticPath).ends_with(sep))
     dynamaticPath = dynamaticPath.substr(0, dynamaticPath.size() - 1);
 
@@ -415,12 +506,8 @@ CommandResult SetDynamaticPath::decode(ArrayRef<std::string> tokens) {
   return CommandResult::SUCCESS;
 }
 
-CommandResult SetSrc::decode(ArrayRef<std::string> tokens) {
-  ParsedCommand parsed;
-  if (failed(parse(tokens, parsed)))
-    return CommandResult::SYNTAX_ERROR;
-
-  std::string sourcePath = parsed.positionals.front().str();
+CommandResult SetSrc::execute(CommandArguments &args) {
+  std::string sourcePath = args.positionals.front().str();
   StringRef srcName = path::filename(sourcePath);
   if (!srcName.ends_with(".c")) {
     llvm::outs() << ERR
@@ -433,122 +520,87 @@ CommandResult SetSrc::decode(ArrayRef<std::string> tokens) {
   return CommandResult::SUCCESS;
 }
 
-CommandResult SetCP::decode(ArrayRef<std::string> tokens) {
-  ParsedCommand parsed;
-  if (failed(parse(tokens, parsed)))
-    return CommandResult::SYNTAX_ERROR;
-
-  // let dynamatic-opt to check if the string is a legal float number
-  state.targetCP = parsed.positionals.front().str();
-
+CommandResult SetCP::execute(CommandArguments &args) {
+  // Let dynamatic-opt check if the string is a legal float number
+  state.targetCP = args.positionals.front().str();
   return CommandResult::SUCCESS;
 }
 
-CommandResult Compile::decode(ArrayRef<std::string> tokens) {
-  ParsedCommand parsed;
-  if (failed(parse(tokens, parsed)))
-    return CommandResult::SYNTAX_ERROR;
-
+CommandResult Compile::execute(CommandArguments &args) {
   // We need the source path to be set
   if (!state.sourcePathIsSet(keyword))
     return CommandResult::FAIL;
 
-  StringRef sep = sys::path::get_separator();
-  std::string kernelDir = path::parent_path(*state.sourcePath).str();
-  std::string kernelName = path::filename(*state.sourcePath).drop_back(2).str();
-  std::string outputDir = kernelDir + sep.str() + "out";
-  std::string buffers =
-      parsed.optArgsPresent.contains("simple-buffers") ? "1" : "0";
+  std::string script = state.getScriptsPath() + getSeparator() + "compile.sh";
+  std::string buffers = args.flags.contains(SIMPLE_BUFFERS) ? "1" : "0";
 
-  // Create and execute the command
-  return execShellCommand(state.getScriptsPath() + "/compile.sh " +
-                          state.dynamaticPath + " " + kernelDir + " " +
-                          outputDir + " " + kernelName + " " + buffers + " " +
-                          state.targetCP);
+  return exec(script, state.dynamaticPath, state.getKernelDir(),
+              state.getOutputDir(), state.getKernelName(), buffers,
+              state.targetCP);
 }
 
-CommandResult WriteHDL::decode(ArrayRef<std::string> tokens) {
-  ParsedCommand parsed;
-  if (failed(parse(tokens, parsed)))
-    return CommandResult::SYNTAX_ERROR;
-
+CommandResult WriteHDL::execute(CommandArguments &args) {
   // We need the source path to be set
   if (!state.sourcePathIsSet(keyword))
     return CommandResult::FAIL;
 
-  StringRef sep = sys::path::get_separator();
-  std::string kernelDir = path::parent_path(*state.sourcePath).str();
-  std::string kernelName = path::filename(*state.sourcePath).drop_back(2).str();
-  std::string outputDir = kernelDir + sep.str() + "out";
+  std::string script = state.getScriptsPath() + getSeparator() + "write-hdl.sh";
+  std::string experimental = args.flags.contains(EXPERIMENTAL) ? "1" : "0";
+  std::string hdl = "vhdl";
 
-  // Create and execute the command
-  return execShellCommand(state.getScriptsPath() + "/write-hdl.sh " +
-                          state.dynamaticPath + " " + outputDir + " " +
-                          kernelName);
+  if (auto it = args.options.find(HDL); it != args.options.end()) {
+    if (it->second == "verilog") {
+      hdl = "verilog";
+    } else if (it->second != "vhdl") {
+      llvm::errs() << "Unknow HDL '" << it->second
+                   << "', possible options are 'vhdl' and "
+                      "'verilog'.\n";
+      return CommandResult::FAIL;
+    }
+  }
+
+  return exec(script, state.dynamaticPath, state.getOutputDir(),
+              state.getKernelName(), experimental, hdl);
 }
 
-CommandResult Simulate::decode(ArrayRef<std::string> tokens) {
-  ParsedCommand parsed;
-  if (failed(parse(tokens, parsed)))
-    return CommandResult::SYNTAX_ERROR;
-
+CommandResult Simulate::execute(CommandArguments &args) {
   // We need the source path to be set
   if (!state.sourcePathIsSet(keyword))
     return CommandResult::FAIL;
 
-  StringRef sep = sys::path::get_separator();
-  std::string kernelDir = path::parent_path(*state.sourcePath).str();
-  std::string kernelName = path::filename(*state.sourcePath).drop_back(2).str();
-  std::string outputDir = kernelDir + sep.str() + "out";
+  std::string script = state.getScriptsPath() + getSeparator() + "simulate.sh";
+  std::string experimental = args.flags.contains(EXPERIMENTAL) ? "1" : "0";
 
-  // Create and execute the command
-  return execShellCommand(state.getScriptsPath() + "/simulate.sh " +
-                          state.dynamaticPath + " " + kernelDir + " " +
-                          outputDir + " " + kernelName);
+  return exec(script, state.dynamaticPath, state.getKernelDir(),
+              state.getOutputDir(), state.getKernelName(), experimental);
 }
 
-CommandResult Visualize::decode(ArrayRef<std::string> tokens) {
-  ParsedCommand parsed;
-  if (failed(parse(tokens, parsed)))
-    return CommandResult::SYNTAX_ERROR;
-
+CommandResult Visualize::execute(CommandArguments &args) {
   // We need the source path to be set
   if (!state.sourcePathIsSet(keyword))
     return CommandResult::FAIL;
 
-  StringRef sep = sys::path::get_separator();
-  std::string kernelDir = path::parent_path(*state.sourcePath).str();
-  std::string kernelName = path::filename(*state.sourcePath).drop_back(2).str();
-  std::string outputDir = kernelDir + sep.str() + "out";
-  std::string dotPath = kernelDir + sep.str() + "out" + sep.str() + "comp" +
-                        sep.str() + kernelName + ".dot";
-  std::string wlfPath = kernelDir + sep.str() + "out" + sep.str() + "sim" +
-                        sep.str() + "HLS_VERIFY" + sep.str() + "vsim.wlf";
+  std::string sep = getSeparator();
+  std::string script = state.getScriptsPath() + sep + "visualize.sh";
+  std::string dotPath = state.getOutputDir() + sep + "comp" + sep +
+                        state.getKernelName() + ".dot";
+  std::string wlfPath = state.getOutputDir() + sep + "sim" + sep +
+                        "HLS_VERIFY" + sep + "vsim.wlf";
 
-  // Create and execute the command
-  return execShellCommand(state.getScriptsPath() + "/visualize.sh " +
-                          state.dynamaticPath + " " + dotPath + " " + wlfPath +
-                          " " + outputDir + " " + kernelName);
+  return exec(script, state.dynamaticPath, dotPath, wlfPath,
+              state.getOutputDir(), state.getKernelName());
 }
 
-CommandResult Synthesize::decode(ArrayRef<std::string> tokens) {
-  ParsedCommand parsed;
-  if (failed(parse(tokens, parsed)))
-    return CommandResult::SYNTAX_ERROR;
-
+CommandResult Synthesize::execute(CommandArguments &args) {
   // We need the source path to be set
   if (!state.sourcePathIsSet(keyword))
     return CommandResult::FAIL;
 
-  StringRef sep = sys::path::get_separator();
-  std::string kernelDir = path::parent_path(*state.sourcePath).str();
-  std::string kernelName = path::filename(*state.sourcePath).drop_back(2).str();
-  std::string outputDir = kernelDir + sep.str() + "out";
+  std::string script =
+      state.getScriptsPath() + getSeparator() + "synthesize.sh";
 
-  // Create and execute the command
-  return execShellCommand(state.getScriptsPath() + "/synthesize.sh " +
-                          state.dynamaticPath + " " + outputDir + " " +
-                          kernelName);
+  return exec(script, state.dynamaticPath, state.getOutputDir(),
+              state.getKernelName());
 }
 
 static StringRef removeComment(StringRef input) {
@@ -635,7 +687,7 @@ int main(int argc, char **argv) {
     Command &cmd = commands.get(kw);
 
     // Decode the command that was identified via its keyword
-    switch (cmd.decode(tokens)) {
+    switch (cmd.parseAndExecute(tokens)) {
     case CommandResult::SYNTAX_ERROR:
       cmd.help();
       [[fallthrough]];
@@ -661,7 +713,13 @@ int main(int argc, char **argv) {
   };
 
   // Print frontend header
-  llvm::outs() << HEADER;
+  llvm::outs()
+      << DELIM +
+             "============== Dynamatic | Dynamic High-Level Synthesis Compiler "
+             "===============\n" +
+             "======================== EPFL-LAP - v2.0.0 | March 2024 "
+             "========================\n" +
+             DELIM + "\n\n";
 
   // If a startup script is defined, we must run its commands first
   if (!run.empty()) {
@@ -680,11 +738,14 @@ int main(int argc, char **argv) {
   }
 
   // Read from stdin, multiple commands in one line are separated by ';'
-  std::string userInput;
+  // readline handles command history, allows user to repeat commands
+  // with arrow keys
+  char *rawInput;
   while (true) {
-    llvm::outs() << PROMPT;
-    getline(std::cin, userInput, '\n');
-    splitOnSemicolonAndHandle(userInput, false);
+    rawInput = readline(PROMPT.str().c_str());
+    add_history(rawInput);
+    splitOnSemicolonAndHandle(std::string(rawInput), false);
+    free(rawInput);
   }
   return 0;
 }

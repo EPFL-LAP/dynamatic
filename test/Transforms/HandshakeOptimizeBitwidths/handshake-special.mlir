@@ -55,10 +55,10 @@ handshake.func @cmergeToMuxIndexOpt(%arg0: i32, %arg1: i32, %start: none) -> i32
 // CHECK:           %[[VAL_14:.*]] = constant %[[VAL_1]] {value = 999 : i32} : i32
 // CHECK:           %[[VAL_15:.*]] = arith.trunci %[[VAL_14]] : i32 to i10
 // CHECK:           %[[VAL_16:.*]] = constant %[[VAL_1]] {value = 42 : i32} : i32
-// CHECK:           %[[VAL_4]] = constant %[[VAL_1]] {bb = 0 : ui32, value = 2 : i32} : i32
-// CHECK:           %[[VAL_5]], %[[VAL_17:.*]] = mc_load{{\[}}%[[VAL_11]]] %[[VAL_2]] {bb = 0 : ui32} : i10, i32
-// CHECK:           %[[VAL_6]], %[[VAL_7]] = mc_store{{\[}}%[[VAL_13]]] %[[VAL_16]] {bb = 0 : ui32} : i32, i10
-// CHECK:           %[[VAL_8]], %[[VAL_9]] = mc_store{{\[}}%[[VAL_15]]] %[[VAL_16]] {bb = 0 : ui32} : i32, i10
+// CHECK:           %[[VAL_4]] = constant %[[VAL_1]] {handshake.bb = 0 : ui32, value = 2 : i32} : i32
+// CHECK:           %[[VAL_5]], %[[VAL_17:.*]] = mc_load{{\[}}%[[VAL_11]]] %[[VAL_2]] {handshake.bb = 0 : ui32} : i10, i32
+// CHECK:           %[[VAL_6]], %[[VAL_7]] = mc_store{{\[}}%[[VAL_13]]] %[[VAL_16]] {handshake.bb = 0 : ui32} : i32, i10
+// CHECK:           %[[VAL_8]], %[[VAL_9]] = mc_store{{\[}}%[[VAL_15]]] %[[VAL_16]] {handshake.bb = 0 : ui32} : i32, i10
 // CHECK:           %[[VAL_18:.*]] = return %[[VAL_17]] : i32
 // CHECK:           end %[[VAL_18]], %[[VAL_3]] : i32, none
 // CHECK:         }
@@ -68,12 +68,12 @@ handshake.func @memAddrOpt(%mem: memref<1000xi32>, %start: none) -> i32 {
   %addr2 = handshake.constant %start {value = 500 : i16}: i16
   %addr3 = handshake.constant %start {value = 999 : i32}: i32
   %dataStore = handshake.constant %start {value = 42 : i32}: i32
-  %ctrl1 = handshake.constant %start {value = 2 : i32, bb = 0 : ui32}: i32
+  %ctrl1 = handshake.constant %start {value = 2 : i32, handshake.bb = 0 : ui32}: i32
   %addr1Ext = arith.extui %addr1 : i8 to i32
   %addr2Ext = arith.extui %addr2 : i16 to i32
-  %ldAddr1, %ldVal = mc_load[%addr1Ext] %ldData1 {bb = 0 : ui32} : i32, i32
-  %stAddr1, %stData1 = mc_store[%addr2Ext] %dataStore {bb = 0 : ui32} : i32, i32
-  %stAddr2, %stData2 = mc_store[%addr3] %dataStore {bb = 0 : ui32} : i32, i32
+  %ldAddr1, %ldVal = mc_load[%addr1Ext] %ldData1 {handshake.bb = 0 : ui32} : i32, i32
+  %stAddr1, %stData1 = mc_store[%addr2Ext] %dataStore {handshake.bb = 0 : ui32} : i32, i32
+  %stAddr2, %stData2 = mc_store[%addr3] %dataStore {handshake.bb = 0 : ui32} : i32, i32
   %returnVal = return %ldVal : i32
   end %returnVal, %done : i32, none
 }
@@ -102,8 +102,8 @@ handshake.func @simpleCycle(%arg0: i8, %index: i1, %cond: i1, %start: none) -> i
 // CHECK-LABEL:   handshake.func @complexCycle(
 // CHECK-SAME:                                 %[[VAL_0:.*]]: i8, %[[VAL_1:.*]]: i16, %[[VAL_2:.*]]: i24, %[[VAL_3:.*]]: i2, %[[VAL_4:.*]]: i1, %[[VAL_5:.*]]: i1,
 // CHECK-SAME:                                 %[[VAL_6:.*]]: none, ...) -> i32 attributes {argNames = ["arg0", "arg1", "arg2", "bigIndex", "index", "cond", "start"], resNames = ["out0"]} {
-// CHECK:           %[[VAL_7:.*]] = arith.extsi %[[VAL_0]] {bb = 0 : ui32} : i8 to i24
-// CHECK:           %[[VAL_8:.*]] = arith.extsi %[[VAL_1]] {bb = 0 : ui32} : i16 to i24
+// CHECK:           %[[VAL_7:.*]] = arith.extsi %[[VAL_0]] {handshake.bb = 0 : ui32} : i8 to i24
+// CHECK:           %[[VAL_8:.*]] = arith.extsi %[[VAL_1]] {handshake.bb = 0 : ui32} : i16 to i24
 // CHECK:           %[[VAL_9:.*]] = mux %[[VAL_3]] {{\[}}%[[VAL_7]], %[[VAL_10:.*]], %[[VAL_11:.*]], %[[VAL_12:.*]]] : i2, i24
 // CHECK:           %[[VAL_10]], %[[VAL_13:.*]] = cond_br %[[VAL_5]], %[[VAL_9]] : i24
 // CHECK:           %[[VAL_14:.*]] = mux %[[VAL_4]] {{\[}}%[[VAL_8]], %[[VAL_13]]] : i1, i24

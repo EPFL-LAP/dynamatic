@@ -60,10 +60,7 @@ begin
       outs_ready(0),
       joinValid,
       out_array);
-  outs_valid(0) <= joinValid;
 
-  process (joinReady)
-  begin
-    ins_ready(0) <= joinReady;
-  end process;
+  outs_valid(0) <= joinValid;
+  ins_ready(0)  <= joinReady;
 end architecture;

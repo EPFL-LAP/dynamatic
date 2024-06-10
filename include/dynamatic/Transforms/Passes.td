@@ -120,6 +120,17 @@ def HandshakeCanonicalize : DynamaticPass<"handshake-canonicalize"> {
   let constructor = "dynamatic::createHandshakeCanonicalize()";
 }
 
+def HandshakeHoistExtInstances : DynamaticPass<"handshake-hoist-ext-instances"> {
+  let summary = "Hoist external function instances into top-level IO.";
+  let description = [{
+    Replaces instances (`handshake::InstanceOp`) of external Handshake functions
+    by extra arguments/results in their containing (internal) Handshake
+    functions. This is the equivalent of moving RTL modules from inside the
+    Handshake function to outside of it.       
+  }];
+  let constructor = "dynamatic::createHandshakeHoistExtInstances()";
+}
+
 def HandshakeInferBasicBlocks : DynamaticPass<"handshake-infer-basic-blocks"> {
   let summary = "Try to infer the basic block of untagged operations.";
   let description = [{
@@ -128,8 +139,8 @@ def HandshakeInferBasicBlocks : DynamaticPass<"handshake-infer-basic-blocks"> {
     inference logic is conservative and relies on the operation's successors and
     predecessors to determine the operation's basic block. When the pass's
     heuristics manage to infer an operation's block, the pass sets the
-    `dynamatic::BB_ATTR` on the operation. This pass does not fail, even when it
-    does not manage to infer the basic block of all operations.
+    `dynamatic::BB_ATTR_NAME` on the operation. This pass does not fail, even
+    when it does not manage to infer the basic block of all operations.
   }];
   let constructor = "dynamatic::createHandshakeInferBasicBlocksPass()";
 }
@@ -289,10 +300,10 @@ def BackAnnotate : DynamaticPass<"back-annotate"> {
   let description = [{
     Sets supported attributes on operations and operands based on
     back-annotation information contained in an input JSON file. Operations
-    need to have a unique name (`dynamatic::handshake::NameAttr` attribute) to
-    be able to be referenced by the back-annotation file. Fails if the
-    back-annotation file is badly formatted or if a referenced operation/operand
-    cannot be found in the IR.
+    need to have a unique name (`handshake.name` attribute) to be able to be
+    referenced by the back-annotation file. Fails if the back-annotation file is
+    badly formatted or if a referenced operation/operand cannot be found in the
+    IR.
   }];
   let constructor = "dynamatic::createBackAnnotate()";
     let options =

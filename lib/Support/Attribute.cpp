@@ -38,7 +38,13 @@ public:
           return success();
         })
         .Case<IntegerAttr>([&](IntegerAttr intAttr) {
-          os.value(intAttr.getInt());
+          Type intType = intAttr.getType();
+          if (intType.isUnsignedInteger())
+            os.value(intAttr.getUInt());
+          else if (intType.isSignedInteger())
+            os.value(intAttr.getSInt());
+          else
+            os.value(intAttr.getInt());
           return success();
         })
         .Case<ArrayAttr>([&](ArrayAttr arrayAttr) {
@@ -85,7 +91,13 @@ public:
           return success();
         })
         .Case<IntegerAttr>([&](IntegerAttr intAttr) {
-          os.attribute(attrName, intAttr.getInt());
+          Type intType = intAttr.getType();
+          if (intType.isUnsignedInteger())
+            os.attribute(attrName, intAttr.getUInt());
+          else if (intType.isSignedInteger())
+            os.attribute(attrName, intAttr.getSInt());
+          else
+            os.attribute(attrName, intAttr.getInt());
           return success();
         })
         .Case<ArrayAttr>([&](ArrayAttr arrayAttr) {

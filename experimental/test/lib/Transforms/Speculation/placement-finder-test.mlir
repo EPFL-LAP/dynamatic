@@ -3,166 +3,166 @@
 
 // CHECK-LABEL:   handshake.func @placeSimpleSave(
 // CHECK-SAME:                                    %[[VAL_0:.*]]: i1, ...) attributes {argNames = ["start"], resNames = []} {
-// CHECK:           %[[VAL_1:.*]] = source {bb = 0 : ui32, name = #[[?]]<"source1">}
-// CHECK:           %[[VAL_2:.*]] = constant %[[VAL_1]] {bb = 0 : ui32, name = #[[?]]<"constant0">, value = true} : i1
-// CHECK:           %[[VAL_3:.*]]:4 = fork [4] %[[VAL_2]] {bb = 0 : ui32, name = #[[?]]<"fork0">} : i1
-// CHECK:           %[[VAL_4:.*]] = mux %[[VAL_2]] {{\[}}%[[VAL_0]], %[[VAL_2]]] {bb = 0 : ui32, name = #[[?]]<"mux0">} : i1, i1
-// CHECK:           %[[VAL_5:.*]], %[[VAL_6:.*]], %[[VAL_7:.*]], %[[VAL_8:.*]], %[[VAL_9:.*]], %[[VAL_10:.*]] = speculator %[[VAL_4]] {bb = 0 : ui32, name = #[[?]]<"speculator0">} : i1
-// CHECK:           %[[VAL_11:.*]] = merge %[[VAL_12:.*]], %[[VAL_13:.*]] {bb = 0 : ui32, name = #[[?]]<"merge0">} : i1
-// CHECK:           %[[VAL_14:.*]], %[[VAL_15:.*]] = speculating_branch{{\[}}%[[VAL_11]]] %[[VAL_16:.*]] {bb = 0 : ui32, name = #[[?]]<"speculating_branch0">} : i1, i1
-// CHECK:           %[[VAL_17:.*]], %[[VAL_18:.*]] = cond_br %[[VAL_14]], %[[VAL_7]] {bb = 0 : ui32, name = #[[?]]<"cond_br0">} : i1
-// CHECK:           %[[VAL_19:.*]] = merge %[[VAL_20:.*]], %[[VAL_21:.*]] {bb = 0 : ui32, name = #[[?]]<"merge1">} : i1
-// CHECK:           %[[VAL_22:.*]], %[[VAL_23:.*]] = speculating_branch{{\[}}%[[VAL_19]]] %[[VAL_3]]#1 {bb = 0 : ui32, name = #[[?]]<"speculating_branch1">} : i1, i1
-// CHECK:           %[[VAL_24:.*]], %[[VAL_25:.*]] = cond_br %[[VAL_22]], %[[VAL_17]] {bb = 0 : ui32, name = #[[?]]<"cond_br5">} : i1
-// CHECK:           %[[VAL_26:.*]] = merge %[[VAL_27:.*]], %[[VAL_28:.*]] {bb = 0 : ui32, name = #[[?]]<"merge2">} : i1
-// CHECK:           %[[VAL_29:.*]], %[[VAL_30:.*]] = speculating_branch{{\[}}%[[VAL_26]]] %[[VAL_3]]#2 {bb = 0 : ui32, name = #[[?]]<"speculating_branch2">} : i1, i1
-// CHECK:           %[[VAL_31:.*]], %[[VAL_32:.*]] = cond_br %[[VAL_29]], %[[VAL_24]] {bb = 0 : ui32, name = #[[?]]<"cond_br6">} : i1
-// CHECK:           %[[VAL_33:.*]] = merge %[[VAL_34:.*]], %[[VAL_35:.*]] {bb = 0 : ui32, name = #[[?]]<"merge3">} : i1
-// CHECK:           %[[VAL_36:.*]], %[[VAL_37:.*]] = speculating_branch{{\[}}%[[VAL_33]]] %[[VAL_3]]#3 {bb = 0 : ui32, name = #[[?]]<"speculating_branch3">} : i1, i1
-// CHECK:           %[[VAL_38:.*]], %[[VAL_39:.*]] = cond_br %[[VAL_36]], %[[VAL_31]] {bb = 0 : ui32, name = #[[?]]<"cond_br7">} : i1
-// CHECK:           %[[VAL_16]] = spec_save{{\[}}%[[VAL_6]]] %[[VAL_3]]#0 {bb = 0 : ui32, name = #[[?]]<"spec_save0">} : i1
-// CHECK:           %[[VAL_12]], %[[VAL_13]] = cond_br %[[VAL_16]], %[[VAL_5]] {bb = 0 : ui32, name = #[[?]]<"cond_br1">} : i1
-// CHECK:           %[[VAL_20]], %[[VAL_21]] = cond_br %[[VAL_3]]#1, %[[VAL_12]] {bb = 0 : ui32, name = #[[?]]<"cond_br2">} : i1
-// CHECK:           %[[VAL_27]], %[[VAL_28]] = cond_br %[[VAL_3]]#2, %[[VAL_20]] {bb = 0 : ui32, name = #[[?]]<"cond_br3">} : i1
-// CHECK:           %[[VAL_34]], %[[VAL_35]] = cond_br %[[VAL_3]]#3, %[[VAL_27]] {bb = 0 : ui32, name = #[[?]]<"cond_br4">} : i1
-// CHECK:           %[[VAL_40:.*]] = spec_commit{{\[}}%[[VAL_38]]] %[[VAL_34]] {bb = 0 : ui32, name = #[[?]]<"spec_commit0">} : i1
-// CHECK:           end {bb = 0 : ui32, name = #[[?]]<"end0">} %[[VAL_40]] : i1
+// CHECK:           %[[VAL_1:.*]] = source {handshake.bb = 0 : ui32, name = #[[?]]<"source1">}
+// CHECK:           %[[VAL_2:.*]] = constant %[[VAL_1]] {handshake.bb = 0 : ui32, name = #[[?]]<"constant0">, value = true} : i1
+// CHECK:           %[[VAL_3:.*]]:4 = fork [4] %[[VAL_2]] {handshake.bb = 0 : ui32, name = #[[?]]<"fork0">} : i1
+// CHECK:           %[[VAL_4:.*]] = mux %[[VAL_2]] {{\[}}%[[VAL_0]], %[[VAL_2]]] {handshake.bb = 0 : ui32, name = #[[?]]<"mux0">} : i1, i1
+// CHECK:           %[[VAL_5:.*]], %[[VAL_6:.*]], %[[VAL_7:.*]], %[[VAL_8:.*]], %[[VAL_9:.*]], %[[VAL_10:.*]] = speculator %[[VAL_4]] {handshake.bb = 0 : ui32, name = #[[?]]<"speculator0">} : i1
+// CHECK:           %[[VAL_11:.*]] = merge %[[VAL_12:.*]], %[[VAL_13:.*]] {handshake.bb = 0 : ui32, name = #[[?]]<"merge0">} : i1
+// CHECK:           %[[VAL_14:.*]], %[[VAL_15:.*]] = speculating_branch{{\[}}%[[VAL_11]]] %[[VAL_16:.*]] {handshake.bb = 0 : ui32, name = #[[?]]<"speculating_branch0">} : i1, i1
+// CHECK:           %[[VAL_17:.*]], %[[VAL_18:.*]] = cond_br %[[VAL_14]], %[[VAL_7]] {handshake.bb = 0 : ui32, name = #[[?]]<"cond_br0">} : i1
+// CHECK:           %[[VAL_19:.*]] = merge %[[VAL_20:.*]], %[[VAL_21:.*]] {handshake.bb = 0 : ui32, name = #[[?]]<"merge1">} : i1
+// CHECK:           %[[VAL_22:.*]], %[[VAL_23:.*]] = speculating_branch{{\[}}%[[VAL_19]]] %[[VAL_3]]#1 {handshake.bb = 0 : ui32, name = #[[?]]<"speculating_branch1">} : i1, i1
+// CHECK:           %[[VAL_24:.*]], %[[VAL_25:.*]] = cond_br %[[VAL_22]], %[[VAL_17]] {handshake.bb = 0 : ui32, name = #[[?]]<"cond_br5">} : i1
+// CHECK:           %[[VAL_26:.*]] = merge %[[VAL_27:.*]], %[[VAL_28:.*]] {handshake.bb = 0 : ui32, name = #[[?]]<"merge2">} : i1
+// CHECK:           %[[VAL_29:.*]], %[[VAL_30:.*]] = speculating_branch{{\[}}%[[VAL_26]]] %[[VAL_3]]#2 {handshake.bb = 0 : ui32, name = #[[?]]<"speculating_branch2">} : i1, i1
+// CHECK:           %[[VAL_31:.*]], %[[VAL_32:.*]] = cond_br %[[VAL_29]], %[[VAL_24]] {handshake.bb = 0 : ui32, name = #[[?]]<"cond_br6">} : i1
+// CHECK:           %[[VAL_33:.*]] = merge %[[VAL_34:.*]], %[[VAL_35:.*]] {handshake.bb = 0 : ui32, name = #[[?]]<"merge3">} : i1
+// CHECK:           %[[VAL_36:.*]], %[[VAL_37:.*]] = speculating_branch{{\[}}%[[VAL_33]]] %[[VAL_3]]#3 {handshake.bb = 0 : ui32, name = #[[?]]<"speculating_branch3">} : i1, i1
+// CHECK:           %[[VAL_38:.*]], %[[VAL_39:.*]] = cond_br %[[VAL_36]], %[[VAL_31]] {handshake.bb = 0 : ui32, name = #[[?]]<"cond_br7">} : i1
+// CHECK:           %[[VAL_16]] = spec_save{{\[}}%[[VAL_6]]] %[[VAL_3]]#0 {handshake.bb = 0 : ui32, name = #[[?]]<"spec_save0">} : i1
+// CHECK:           %[[VAL_12]], %[[VAL_13]] = cond_br %[[VAL_16]], %[[VAL_5]] {handshake.bb = 0 : ui32, name = #[[?]]<"cond_br1">} : i1
+// CHECK:           %[[VAL_20]], %[[VAL_21]] = cond_br %[[VAL_3]]#1, %[[VAL_12]] {handshake.bb = 0 : ui32, name = #[[?]]<"cond_br2">} : i1
+// CHECK:           %[[VAL_27]], %[[VAL_28]] = cond_br %[[VAL_3]]#2, %[[VAL_20]] {handshake.bb = 0 : ui32, name = #[[?]]<"cond_br3">} : i1
+// CHECK:           %[[VAL_34]], %[[VAL_35]] = cond_br %[[VAL_3]]#3, %[[VAL_27]] {handshake.bb = 0 : ui32, name = #[[?]]<"cond_br4">} : i1
+// CHECK:           %[[VAL_40:.*]] = spec_commit{{\[}}%[[VAL_38]]] %[[VAL_34]] {handshake.bb = 0 : ui32, name = #[[?]]<"spec_commit0">} : i1
+// CHECK:           end {handshake.bb = 0 : ui32, name = #[[?]]<"end0">} %[[VAL_40]] : i1
 // CHECK:         }
 handshake.func @placeSimpleSave(%start: i1) {
-  %0 = source {bb = 0 : ui32, name = #handshake.name<"source1">}
-  %1 = constant %0 {bb = 0 : ui32, name = #handshake.name<"constant0">, value = 1 : i1} : i1
-  %2:4 = fork [4] %1  {bb = 0 : ui32, name = #handshake.name<"fork0">} : i1
-  %3 = mux %1 [%start, %1] {bb = 0 : ui32, name = #handshake.name<"mux0">} : i1, i1
-  %trueResult1, %falseResult1 = cond_br %2#0, %3 {bb = 0 : ui32, name = #handshake.name<"cond_br1">} : i1
-  %trueResult2, %falseResult2 = cond_br %2#1, %trueResult1 {bb = 0 : ui32, name = #handshake.name<"cond_br2">} : i1
-  %trueResult3, %falseResult3 = cond_br %2#2, %trueResult2 {bb = 0 : ui32, name = #handshake.name<"cond_br3">} : i1
-  %trueResult4, %falseResult4 = cond_br %2#3, %trueResult3 {bb = 0 : ui32, name = #handshake.name<"cond_br4">} : i1
-  end {bb = 0 : ui32, name = #handshake.name<"end0">} %trueResult4 : i1
+  %0 = source {handshake.bb = 0 : ui32, name = #handshake.name<"source1">}
+  %1 = constant %0 {handshake.bb = 0 : ui32, name = #handshake.name<"constant0">, value = 1 : i1} : i1
+  %2:4 = fork [4] %1  {handshake.bb = 0 : ui32, name = #handshake.name<"fork0">} : i1
+  %3 = mux %1 [%start, %1] {handshake.bb = 0 : ui32, name = #handshake.name<"mux0">} : i1, i1
+  %trueResult1, %falseResult1 = cond_br %2#0, %3 {handshake.bb = 0 : ui32, name = #handshake.name<"cond_br1">} : i1
+  %trueResult2, %falseResult2 = cond_br %2#1, %trueResult1 {handshake.bb = 0 : ui32, name = #handshake.name<"cond_br2">} : i1
+  %trueResult3, %falseResult3 = cond_br %2#2, %trueResult2 {handshake.bb = 0 : ui32, name = #handshake.name<"cond_br3">} : i1
+  %trueResult4, %falseResult4 = cond_br %2#3, %trueResult3 {handshake.bb = 0 : ui32, name = #handshake.name<"cond_br4">} : i1
+  end {handshake.bb = 0 : ui32, name = #handshake.name<"end0">} %trueResult4 : i1
 }
 
 // -----
 
 // CHECK-LABEL:   handshake.func @placeCommitsOnMultipleBranches(
 // CHECK-SAME:                                                   %[[VAL_0:.*]]: i1, ...) attributes {argNames = ["start"], resNames = []} {
-// CHECK:           %[[VAL_1:.*]] = source {bb = 0 : ui32, name = #[[?]]<"source1">}
-// CHECK:           %[[VAL_2:.*]] = constant %[[VAL_1]] {bb = 0 : ui32, name = #[[?]]<"constant0">, value = true} : i1
-// CHECK:           %[[VAL_3:.*]]:2 = fork [2] %[[VAL_2]] {bb = 0 : ui32, name = #[[?]]<"fork0">} : i1
-// CHECK:           %[[VAL_4:.*]] = mux %[[VAL_2]] {{\[}}%[[VAL_0]], %[[VAL_2]]] {bb = 0 : ui32, name = #[[?]]<"mux0">} : i1, i1
-// CHECK:           %[[VAL_5:.*]], %[[VAL_6:.*]], %[[VAL_7:.*]], %[[VAL_8:.*]], %[[VAL_9:.*]], %[[VAL_10:.*]] = speculator %[[VAL_4]] {bb = 0 : ui32, name = #[[?]]<"speculator0">} : i1
-// CHECK:           %[[VAL_11:.*]] = merge %[[VAL_12:.*]], %[[VAL_13:.*]] {bb = 0 : ui32, name = #[[?]]<"merge0">} : i1
-// CHECK:           %[[VAL_14:.*]], %[[VAL_15:.*]] = speculating_branch{{\[}}%[[VAL_11]]] %[[VAL_16:.*]] {bb = 0 : ui32, name = #[[?]]<"speculating_branch0">} : i1, i1
-// CHECK:           %[[VAL_17:.*]], %[[VAL_18:.*]] = cond_br %[[VAL_14]], %[[VAL_7]] {bb = 0 : ui32, name = #[[?]]<"cond_br0">} : i1
-// CHECK:           %[[VAL_19:.*]] = merge %[[VAL_20:.*]], %[[VAL_21:.*]] {bb = 0 : ui32, name = #[[?]]<"merge1">} : i1
-// CHECK:           %[[VAL_22:.*]], %[[VAL_23:.*]] = speculating_branch{{\[}}%[[VAL_19]]] %[[VAL_3]]#1 {bb = 0 : ui32, name = #[[?]]<"speculating_branch1">} : i1, i1
-// CHECK:           %[[VAL_24:.*]], %[[VAL_25:.*]] = cond_br %[[VAL_22]], %[[VAL_17]] {bb = 0 : ui32, name = #[[?]]<"cond_br5">} : i1
-// CHECK:           %[[VAL_26:.*]] = merge %[[VAL_27:.*]], %[[VAL_28:.*]] {bb = 0 : ui32, name = #[[?]]<"merge2">} : i1
-// CHECK:           %[[VAL_29:.*]], %[[VAL_30:.*]] = speculating_branch{{\[}}%[[VAL_26]]] %[[VAL_21]] {bb = 0 : ui32, name = #[[?]]<"speculating_branch2">} : i1, i1
-// CHECK:           %[[VAL_31:.*]], %[[VAL_32:.*]] = cond_br %[[VAL_29]], %[[VAL_25]] {bb = 0 : ui32, name = #[[?]]<"cond_br6">} : i1
-// CHECK:           %[[VAL_33:.*]] = merge %[[VAL_34:.*]], %[[VAL_35:.*]] {bb = 0 : ui32, name = #[[?]]<"merge3">} : i1
-// CHECK:           %[[VAL_36:.*]], %[[VAL_37:.*]] = speculating_branch{{\[}}%[[VAL_33]]] %[[VAL_20]] {bb = 0 : ui32, name = #[[?]]<"speculating_branch3">} : i1, i1
-// CHECK:           %[[VAL_38:.*]], %[[VAL_39:.*]] = cond_br %[[VAL_36]], %[[VAL_24]] {bb = 0 : ui32, name = #[[?]]<"cond_br7">} : i1
-// CHECK:           %[[VAL_16]] = spec_save{{\[}}%[[VAL_6]]] %[[VAL_3]]#0 {bb = 0 : ui32, name = #[[?]]<"spec_save0">} : i1
-// CHECK:           %[[VAL_12]], %[[VAL_13]] = cond_br %[[VAL_16]], %[[VAL_5]] {bb = 0 : ui32, name = #[[?]]<"cond_br1">} : i1
-// CHECK:           %[[VAL_20]], %[[VAL_21]] = cond_br %[[VAL_3]]#1, %[[VAL_12]] {bb = 0 : ui32, name = #[[?]]<"cond_br2">} : i1
-// CHECK:           %[[VAL_34]], %[[VAL_35]] = cond_br %[[VAL_20]], %[[VAL_2]] {bb = 0 : ui32, name = #[[?]]<"cond_br3">} : i1
-// CHECK:           %[[VAL_27]], %[[VAL_28]] = cond_br %[[VAL_21]], %[[VAL_2]] {bb = 0 : ui32, name = #[[?]]<"cond_br4">} : i1
-// CHECK:           %[[VAL_40:.*]] = spec_commit{{\[}}%[[VAL_18]]] %[[VAL_13]] {bb = 0 : ui32, name = #[[?]]<"spec_commit0">} : i1
-// CHECK:           %[[VAL_41:.*]] = spec_commit{{\[}}%[[VAL_38]]] %[[VAL_34]] {bb = 0 : ui32, name = #[[?]]<"spec_commit1">} : i1
-// CHECK:           %[[VAL_42:.*]] = spec_commit{{\[}}%[[VAL_31]]] %[[VAL_27]] {bb = 0 : ui32, name = #[[?]]<"spec_commit2">} : i1
-// CHECK:           %[[VAL_43:.*]] = spec_commit{{\[}}%[[VAL_39]]] %[[VAL_35]] {bb = 0 : ui32, name = #[[?]]<"spec_commit3">} : i1
-// CHECK:           %[[VAL_44:.*]] = spec_commit{{\[}}%[[VAL_32]]] %[[VAL_28]] {bb = 0 : ui32, name = #[[?]]<"spec_commit4">} : i1
-// CHECK:           end {bb = 0 : ui32, name = #[[?]]<"end0">} %[[VAL_40]], %[[VAL_41]], %[[VAL_42]], %[[VAL_43]], %[[VAL_44]] : i1, i1, i1, i1, i1
+// CHECK:           %[[VAL_1:.*]] = source {handshake.bb = 0 : ui32, name = #[[?]]<"source1">}
+// CHECK:           %[[VAL_2:.*]] = constant %[[VAL_1]] {handshake.bb = 0 : ui32, name = #[[?]]<"constant0">, value = true} : i1
+// CHECK:           %[[VAL_3:.*]]:2 = fork [2] %[[VAL_2]] {handshake.bb = 0 : ui32, name = #[[?]]<"fork0">} : i1
+// CHECK:           %[[VAL_4:.*]] = mux %[[VAL_2]] {{\[}}%[[VAL_0]], %[[VAL_2]]] {handshake.bb = 0 : ui32, name = #[[?]]<"mux0">} : i1, i1
+// CHECK:           %[[VAL_5:.*]], %[[VAL_6:.*]], %[[VAL_7:.*]], %[[VAL_8:.*]], %[[VAL_9:.*]], %[[VAL_10:.*]] = speculator %[[VAL_4]] {handshake.bb = 0 : ui32, name = #[[?]]<"speculator0">} : i1
+// CHECK:           %[[VAL_11:.*]] = merge %[[VAL_12:.*]], %[[VAL_13:.*]] {handshake.bb = 0 : ui32, name = #[[?]]<"merge0">} : i1
+// CHECK:           %[[VAL_14:.*]], %[[VAL_15:.*]] = speculating_branch{{\[}}%[[VAL_11]]] %[[VAL_16:.*]] {handshake.bb = 0 : ui32, name = #[[?]]<"speculating_branch0">} : i1, i1
+// CHECK:           %[[VAL_17:.*]], %[[VAL_18:.*]] = cond_br %[[VAL_14]], %[[VAL_7]] {handshake.bb = 0 : ui32, name = #[[?]]<"cond_br0">} : i1
+// CHECK:           %[[VAL_19:.*]] = merge %[[VAL_20:.*]], %[[VAL_21:.*]] {handshake.bb = 0 : ui32, name = #[[?]]<"merge1">} : i1
+// CHECK:           %[[VAL_22:.*]], %[[VAL_23:.*]] = speculating_branch{{\[}}%[[VAL_19]]] %[[VAL_3]]#1 {handshake.bb = 0 : ui32, name = #[[?]]<"speculating_branch1">} : i1, i1
+// CHECK:           %[[VAL_24:.*]], %[[VAL_25:.*]] = cond_br %[[VAL_22]], %[[VAL_17]] {handshake.bb = 0 : ui32, name = #[[?]]<"cond_br5">} : i1
+// CHECK:           %[[VAL_26:.*]] = merge %[[VAL_27:.*]], %[[VAL_28:.*]] {handshake.bb = 0 : ui32, name = #[[?]]<"merge2">} : i1
+// CHECK:           %[[VAL_29:.*]], %[[VAL_30:.*]] = speculating_branch{{\[}}%[[VAL_26]]] %[[VAL_21]] {handshake.bb = 0 : ui32, name = #[[?]]<"speculating_branch2">} : i1, i1
+// CHECK:           %[[VAL_31:.*]], %[[VAL_32:.*]] = cond_br %[[VAL_29]], %[[VAL_25]] {handshake.bb = 0 : ui32, name = #[[?]]<"cond_br6">} : i1
+// CHECK:           %[[VAL_33:.*]] = merge %[[VAL_34:.*]], %[[VAL_35:.*]] {handshake.bb = 0 : ui32, name = #[[?]]<"merge3">} : i1
+// CHECK:           %[[VAL_36:.*]], %[[VAL_37:.*]] = speculating_branch{{\[}}%[[VAL_33]]] %[[VAL_20]] {handshake.bb = 0 : ui32, name = #[[?]]<"speculating_branch3">} : i1, i1
+// CHECK:           %[[VAL_38:.*]], %[[VAL_39:.*]] = cond_br %[[VAL_36]], %[[VAL_24]] {handshake.bb = 0 : ui32, name = #[[?]]<"cond_br7">} : i1
+// CHECK:           %[[VAL_16]] = spec_save{{\[}}%[[VAL_6]]] %[[VAL_3]]#0 {handshake.bb = 0 : ui32, name = #[[?]]<"spec_save0">} : i1
+// CHECK:           %[[VAL_12]], %[[VAL_13]] = cond_br %[[VAL_16]], %[[VAL_5]] {handshake.bb = 0 : ui32, name = #[[?]]<"cond_br1">} : i1
+// CHECK:           %[[VAL_20]], %[[VAL_21]] = cond_br %[[VAL_3]]#1, %[[VAL_12]] {handshake.bb = 0 : ui32, name = #[[?]]<"cond_br2">} : i1
+// CHECK:           %[[VAL_34]], %[[VAL_35]] = cond_br %[[VAL_20]], %[[VAL_2]] {handshake.bb = 0 : ui32, name = #[[?]]<"cond_br3">} : i1
+// CHECK:           %[[VAL_27]], %[[VAL_28]] = cond_br %[[VAL_21]], %[[VAL_2]] {handshake.bb = 0 : ui32, name = #[[?]]<"cond_br4">} : i1
+// CHECK:           %[[VAL_40:.*]] = spec_commit{{\[}}%[[VAL_18]]] %[[VAL_13]] {handshake.bb = 0 : ui32, name = #[[?]]<"spec_commit0">} : i1
+// CHECK:           %[[VAL_41:.*]] = spec_commit{{\[}}%[[VAL_38]]] %[[VAL_34]] {handshake.bb = 0 : ui32, name = #[[?]]<"spec_commit1">} : i1
+// CHECK:           %[[VAL_42:.*]] = spec_commit{{\[}}%[[VAL_31]]] %[[VAL_27]] {handshake.bb = 0 : ui32, name = #[[?]]<"spec_commit2">} : i1
+// CHECK:           %[[VAL_43:.*]] = spec_commit{{\[}}%[[VAL_39]]] %[[VAL_35]] {handshake.bb = 0 : ui32, name = #[[?]]<"spec_commit3">} : i1
+// CHECK:           %[[VAL_44:.*]] = spec_commit{{\[}}%[[VAL_32]]] %[[VAL_28]] {handshake.bb = 0 : ui32, name = #[[?]]<"spec_commit4">} : i1
+// CHECK:           end {handshake.bb = 0 : ui32, name = #[[?]]<"end0">} %[[VAL_40]], %[[VAL_41]], %[[VAL_42]], %[[VAL_43]], %[[VAL_44]] : i1, i1, i1, i1, i1
 // CHECK:         }
 handshake.func @placeCommitsOnMultipleBranches(%start: i1) {
-  %0 = source {bb = 0 : ui32, name = #handshake.name<"source1">}
-  %1 = constant %0 {bb = 0 : ui32, name = #handshake.name<"constant0">, value = 1 : i1} : i1
-  %2:2 = fork [2] %1  {bb = 0 : ui32, name = #handshake.name<"fork0">} : i1
-  %3 = mux %1 [%start, %1] {bb = 0 : ui32, name = #handshake.name<"mux0">} : i1, i1
-  %trueResult1, %falseResult1 = cond_br %2#0, %3 {bb = 0 : ui32, name = #handshake.name<"cond_br1">} : i1
-  %trueResult2, %falseResult2 = cond_br %2#1, %trueResult1 {bb = 0 : ui32, name = #handshake.name<"cond_br2">} : i1
-  %trueResult3, %falseResult3 = cond_br %trueResult2, %1 {bb = 0 : ui32, name = #handshake.name<"cond_br3">} : i1
-  %trueResult4, %falseResult4 = cond_br %falseResult2, %1 {bb = 0 : ui32, name = #handshake.name<"cond_br4">} : i1
-  end {bb = 0 : ui32, name = #handshake.name<"end0">} %falseResult1, %trueResult3, %trueResult4, %falseResult3, %falseResult4 : i1, i1, i1, i1, i1
+  %0 = source {handshake.bb = 0 : ui32, name = #handshake.name<"source1">}
+  %1 = constant %0 {handshake.bb = 0 : ui32, name = #handshake.name<"constant0">, value = 1 : i1} : i1
+  %2:2 = fork [2] %1  {handshake.bb = 0 : ui32, name = #handshake.name<"fork0">} : i1
+  %3 = mux %1 [%start, %1] {handshake.bb = 0 : ui32, name = #handshake.name<"mux0">} : i1, i1
+  %trueResult1, %falseResult1 = cond_br %2#0, %3 {handshake.bb = 0 : ui32, name = #handshake.name<"cond_br1">} : i1
+  %trueResult2, %falseResult2 = cond_br %2#1, %trueResult1 {handshake.bb = 0 : ui32, name = #handshake.name<"cond_br2">} : i1
+  %trueResult3, %falseResult3 = cond_br %trueResult2, %1 {handshake.bb = 0 : ui32, name = #handshake.name<"cond_br3">} : i1
+  %trueResult4, %falseResult4 = cond_br %falseResult2, %1 {handshake.bb = 0 : ui32, name = #handshake.name<"cond_br4">} : i1
+  end {handshake.bb = 0 : ui32, name = #handshake.name<"end0">} %falseResult1, %trueResult3, %trueResult4, %falseResult3, %falseResult4 : i1, i1, i1, i1, i1
 }
 
 // -----
 
 // CHECK-LABEL:   handshake.func @placeSaveCommitsOnAllPaths(
 // CHECK-SAME:                                               %[[VAL_0:.*]]: i1, ...) attributes {argNames = ["start"], resNames = []} {
-// CHECK:           %[[VAL_1:.*]], %[[VAL_2:.*]] = control_merge %[[VAL_3:.*]], %[[VAL_0]] {bb = 0 : ui32, name = #[[?]]<"control_merge0">} : i1, i1
-// CHECK:           %[[VAL_4:.*]] = spec_save_commit{{\[}}%[[VAL_5:.*]]] %[[VAL_6:.*]]#2 {bb = 0 : ui32, name = #[[?]]<"spec_save_commit0">} : i1
-// CHECK:           %[[VAL_7:.*]] = spec_save_commit{{\[}}%[[VAL_5]]] %[[VAL_1]] {bb = 0 : ui32, name = #[[?]]<"spec_save_commit1">} : i1
-// CHECK:           %[[VAL_3]], %[[VAL_8:.*]] = cond_br %[[VAL_4]], %[[VAL_7]] {bb = 0 : ui32, name = #[[?]]<"cond_br0">} : i1
-// CHECK:           %[[VAL_9:.*]] = source {bb = 0 : ui32, name = #[[?]]<"source1">}
-// CHECK:           %[[VAL_10:.*]] = constant %[[VAL_9]] {bb = 0 : ui32, name = #[[?]]<"constant0">, value = true} : i1
-// CHECK:           %[[VAL_11:.*]] = mux %[[VAL_2]] {{\[}}%[[VAL_12:.*]], %[[VAL_10]]] {bb = 0 : ui32, name = #[[?]]<"mux0">} : i1, i1
-// CHECK:           %[[VAL_6]]:3 = fork [3] %[[VAL_11]] {bb = 0 : ui32, name = #[[?]]<"fork0">} : i1
-// CHECK:           %[[VAL_13:.*]], %[[VAL_14:.*]], %[[VAL_15:.*]], %[[VAL_16:.*]], %[[VAL_17:.*]], %[[VAL_18:.*]] = speculator %[[VAL_6]]#1 {bb = 0 : ui32, name = #[[?]]<"speculator0">} : i1
-// CHECK:           %[[VAL_19:.*]], %[[VAL_20:.*]] = speculating_branch{{\[}}%[[VAL_13]]] %[[VAL_4]] {bb = 0 : ui32, name = #[[?]]<"speculating_branch0">} : i1, i1
-// CHECK:           %[[VAL_21:.*]], %[[VAL_22:.*]] = cond_br %[[VAL_19]], %[[VAL_17]] {bb = 0 : ui32, name = #[[?]]<"cond_br2">} : i3
-// CHECK:           %[[VAL_23:.*]], %[[VAL_24:.*]] = cond_br %[[VAL_18]], %[[VAL_21]] {bb = 0 : ui32, name = #[[?]]<"cond_br3">} : i3
-// CHECK:           %[[VAL_5]] = merge %[[VAL_16]], %[[VAL_23]] {bb = 0 : ui32, name = #[[?]]<"merge0">} : i3
-// CHECK:           %[[VAL_25:.*]] = merge %[[VAL_12]], %[[VAL_26:.*]] {bb = 0 : ui32, name = #[[?]]<"merge1">} : i1
-// CHECK:           %[[VAL_27:.*]], %[[VAL_28:.*]] = speculating_branch{{\[}}%[[VAL_25]]] %[[VAL_29:.*]] {bb = 0 : ui32, name = #[[?]]<"speculating_branch1">} : i1, i1
-// CHECK:           %[[VAL_30:.*]], %[[VAL_31:.*]] = cond_br %[[VAL_27]], %[[VAL_15]] {bb = 0 : ui32, name = #[[?]]<"cond_br4">} : i1
-// CHECK:           %[[VAL_32:.*]] = merge %[[VAL_3]], %[[VAL_8]] {bb = 0 : ui32, name = #[[?]]<"merge2">} : i1
-// CHECK:           %[[VAL_33:.*]], %[[VAL_34:.*]] = speculating_branch{{\[}}%[[VAL_32]]] %[[VAL_4]] {bb = 0 : ui32, name = #[[?]]<"speculating_branch2">} : i1, i1
-// CHECK:           %[[VAL_35:.*]], %[[VAL_36:.*]] = cond_br %[[VAL_33]], %[[VAL_30]] {bb = 0 : ui32, name = #[[?]]<"cond_br5">} : i1
-// CHECK:           %[[VAL_29]] = spec_save_commit{{\[}}%[[VAL_5]]] %[[VAL_6]]#0 {bb = 0 : ui32, name = #[[?]]<"spec_save_commit2">} : i1
-// CHECK:           %[[VAL_12]], %[[VAL_26]] = cond_br %[[VAL_29]], %[[VAL_13]] {bb = 0 : ui32, name = #[[?]]<"cond_br1">} : i1
-// CHECK:           %[[VAL_37:.*]] = spec_commit{{\[}}%[[VAL_36]]] %[[VAL_8]] {bb = 0 : ui32, name = #[[?]]<"spec_commit0">} : i1
-// CHECK:           end {bb = 0 : ui32, name = #[[?]]<"end0">} %[[VAL_37]] : i1
+// CHECK:           %[[VAL_1:.*]], %[[VAL_2:.*]] = control_merge %[[VAL_3:.*]], %[[VAL_0]] {handshake.bb = 0 : ui32, name = #[[?]]<"control_merge0">} : i1, i1
+// CHECK:           %[[VAL_4:.*]] = spec_save_commit{{\[}}%[[VAL_5:.*]]] %[[VAL_6:.*]]#2 {handshake.bb = 0 : ui32, name = #[[?]]<"spec_save_commit0">} : i1
+// CHECK:           %[[VAL_7:.*]] = spec_save_commit{{\[}}%[[VAL_5]]] %[[VAL_1]] {handshake.bb = 0 : ui32, name = #[[?]]<"spec_save_commit1">} : i1
+// CHECK:           %[[VAL_3]], %[[VAL_8:.*]] = cond_br %[[VAL_4]], %[[VAL_7]] {handshake.bb = 0 : ui32, name = #[[?]]<"cond_br0">} : i1
+// CHECK:           %[[VAL_9:.*]] = source {handshake.bb = 0 : ui32, name = #[[?]]<"source1">}
+// CHECK:           %[[VAL_10:.*]] = constant %[[VAL_9]] {handshake.bb = 0 : ui32, name = #[[?]]<"constant0">, value = true} : i1
+// CHECK:           %[[VAL_11:.*]] = mux %[[VAL_2]] {{\[}}%[[VAL_12:.*]], %[[VAL_10]]] {handshake.bb = 0 : ui32, name = #[[?]]<"mux0">} : i1, i1
+// CHECK:           %[[VAL_6]]:3 = fork [3] %[[VAL_11]] {handshake.bb = 0 : ui32, name = #[[?]]<"fork0">} : i1
+// CHECK:           %[[VAL_13:.*]], %[[VAL_14:.*]], %[[VAL_15:.*]], %[[VAL_16:.*]], %[[VAL_17:.*]], %[[VAL_18:.*]] = speculator %[[VAL_6]]#1 {handshake.bb = 0 : ui32, name = #[[?]]<"speculator0">} : i1
+// CHECK:           %[[VAL_19:.*]], %[[VAL_20:.*]] = speculating_branch{{\[}}%[[VAL_13]]] %[[VAL_4]] {handshake.bb = 0 : ui32, name = #[[?]]<"speculating_branch0">} : i1, i1
+// CHECK:           %[[VAL_21:.*]], %[[VAL_22:.*]] = cond_br %[[VAL_19]], %[[VAL_17]] {handshake.bb = 0 : ui32, name = #[[?]]<"cond_br2">} : i3
+// CHECK:           %[[VAL_23:.*]], %[[VAL_24:.*]] = cond_br %[[VAL_18]], %[[VAL_21]] {handshake.bb = 0 : ui32, name = #[[?]]<"cond_br3">} : i3
+// CHECK:           %[[VAL_5]] = merge %[[VAL_16]], %[[VAL_23]] {handshake.bb = 0 : ui32, name = #[[?]]<"merge0">} : i3
+// CHECK:           %[[VAL_25:.*]] = merge %[[VAL_12]], %[[VAL_26:.*]] {handshake.bb = 0 : ui32, name = #[[?]]<"merge1">} : i1
+// CHECK:           %[[VAL_27:.*]], %[[VAL_28:.*]] = speculating_branch{{\[}}%[[VAL_25]]] %[[VAL_29:.*]] {handshake.bb = 0 : ui32, name = #[[?]]<"speculating_branch1">} : i1, i1
+// CHECK:           %[[VAL_30:.*]], %[[VAL_31:.*]] = cond_br %[[VAL_27]], %[[VAL_15]] {handshake.bb = 0 : ui32, name = #[[?]]<"cond_br4">} : i1
+// CHECK:           %[[VAL_32:.*]] = merge %[[VAL_3]], %[[VAL_8]] {handshake.bb = 0 : ui32, name = #[[?]]<"merge2">} : i1
+// CHECK:           %[[VAL_33:.*]], %[[VAL_34:.*]] = speculating_branch{{\[}}%[[VAL_32]]] %[[VAL_4]] {handshake.bb = 0 : ui32, name = #[[?]]<"speculating_branch2">} : i1, i1
+// CHECK:           %[[VAL_35:.*]], %[[VAL_36:.*]] = cond_br %[[VAL_33]], %[[VAL_30]] {handshake.bb = 0 : ui32, name = #[[?]]<"cond_br5">} : i1
+// CHECK:           %[[VAL_29]] = spec_save_commit{{\[}}%[[VAL_5]]] %[[VAL_6]]#0 {handshake.bb = 0 : ui32, name = #[[?]]<"spec_save_commit2">} : i1
+// CHECK:           %[[VAL_12]], %[[VAL_26]] = cond_br %[[VAL_29]], %[[VAL_13]] {handshake.bb = 0 : ui32, name = #[[?]]<"cond_br1">} : i1
+// CHECK:           %[[VAL_37:.*]] = spec_commit{{\[}}%[[VAL_36]]] %[[VAL_8]] {handshake.bb = 0 : ui32, name = #[[?]]<"spec_commit0">} : i1
+// CHECK:           end {handshake.bb = 0 : ui32, name = #[[?]]<"end0">} %[[VAL_37]] : i1
 // CHECK:         }
 handshake.func @placeSaveCommitsOnAllPaths(%start: i1) {
-  %result, %index = control_merge %trueResult, %start {bb = 0 : ui32, name = #handshake.name<"control_merge0">} : i1, i1
-  %trueResult, %falseResult = cond_br %3#2, %result {bb = 0 : ui32, name = #handshake.name<"cond_br0">} : i1
-  %0 = source {bb = 0 : ui32, name = #handshake.name<"source1">}
-  %1 = constant %0 {bb = 0 : ui32, name = #handshake.name<"constant0">, value = 1 : i1} : i1
-  %2 = mux %index [%trueResult1, %1] {bb = 0 : ui32, name = #handshake.name<"mux0">} : i1, i1
-  %3:3 = fork [3] %2  {bb = 0 : ui32, name = #handshake.name<"fork0">} : i1
-  %trueResult1, %falseResult1 = cond_br %3#0, %3#1 {bb = 0 : ui32, name = #handshake.name<"cond_br1">} : i1
-  end {bb = 0 : ui32, name = #handshake.name<"end0">} %falseResult  : i1
+  %result, %index = control_merge %trueResult, %start {handshake.bb = 0 : ui32, name = #handshake.name<"control_merge0">} : i1, i1
+  %trueResult, %falseResult = cond_br %3#2, %result {handshake.bb = 0 : ui32, name = #handshake.name<"cond_br0">} : i1
+  %0 = source {handshake.bb = 0 : ui32, name = #handshake.name<"source1">}
+  %1 = constant %0 {handshake.bb = 0 : ui32, name = #handshake.name<"constant0">, value = 1 : i1} : i1
+  %2 = mux %index [%trueResult1, %1] {handshake.bb = 0 : ui32, name = #handshake.name<"mux0">} : i1, i1
+  %3:3 = fork [3] %2  {handshake.bb = 0 : ui32, name = #handshake.name<"fork0">} : i1
+  %trueResult1, %falseResult1 = cond_br %3#0, %3#1 {handshake.bb = 0 : ui32, name = #handshake.name<"cond_br1">} : i1
+  end {handshake.bb = 0 : ui32, name = #handshake.name<"end0">} %falseResult  : i1
 }
 
 // -----
 
 // CHECK-LABEL:   handshake.func @multipleBBs(
 // CHECK-SAME:                                %[[VAL_0:.*]]: i1, ...) attributes {argNames = ["start"], resNames = []} {
-// CHECK:           %[[VAL_1:.*]] = source {bb = 0 : ui32, name = #[[?]]<"source1">}
-// CHECK:           %[[VAL_2:.*]] = constant %[[VAL_1]] {bb = 0 : ui32, name = #[[?]]<"constant0">, value = true} : i1
-// CHECK:           %[[VAL_3:.*]], %[[VAL_4:.*]], %[[VAL_5:.*]], %[[VAL_6:.*]], %[[VAL_7:.*]], %[[VAL_8:.*]] = speculator %[[VAL_0]] {bb = 0 : ui32, name = #[[?]]<"speculator0">} : i1
-// CHECK:           %[[VAL_9:.*]] = merge %[[VAL_10:.*]], %[[VAL_11:.*]] {bb = 0 : ui32, name = #[[?]]<"merge1">} : i1
-// CHECK:           %[[VAL_12:.*]], %[[VAL_13:.*]] = speculating_branch{{\[}}%[[VAL_9]]] %[[VAL_14:.*]] {bb = 0 : ui32, name = #[[?]]<"speculating_branch0">} : i1, i1
-// CHECK:           %[[VAL_15:.*]], %[[VAL_16:.*]] = cond_br %[[VAL_12]], %[[VAL_5]] {bb = 0 : ui32, name = #[[?]]<"cond_br0">} : i1
-// CHECK:           %[[VAL_17:.*]] = merge %[[VAL_18:.*]], %[[VAL_19:.*]] {bb = 0 : ui32, name = #[[?]]<"merge2">} : i1
-// CHECK:           %[[VAL_20:.*]], %[[VAL_21:.*]] = speculating_branch{{\[}}%[[VAL_17]]] %[[VAL_22:.*]] {bb = 0 : ui32, name = #[[?]]<"speculating_branch1">} : i1, i1
-// CHECK:           %[[VAL_23:.*]], %[[VAL_24:.*]] = cond_br %[[VAL_20]], %[[VAL_15]] {bb = 0 : ui32, name = #[[?]]<"cond_br4">} : i1
-// CHECK:           %[[VAL_25:.*]] = merge %[[VAL_26:.*]], %[[VAL_27:.*]] {bb = 0 : ui32, name = #[[?]]<"merge3">} : i1
-// CHECK:           %[[VAL_28:.*]], %[[VAL_29:.*]] = speculating_branch{{\[}}%[[VAL_25]]] %[[VAL_30:.*]] {bb = 0 : ui32, name = #[[?]]<"speculating_branch2">} : i1, i1
-// CHECK:           %[[VAL_31:.*]], %[[VAL_32:.*]] = cond_br %[[VAL_28]], %[[VAL_15]] {bb = 0 : ui32, name = #[[?]]<"cond_br5">} : i1
-// CHECK:           %[[VAL_14]] = spec_save{{\[}}%[[VAL_4]]] %[[VAL_2]] {bb = 0 : ui32, name = #[[?]]<"spec_save0">} : i1
-// CHECK:           %[[VAL_10]], %[[VAL_11]] = cond_br %[[VAL_14]], %[[VAL_3]] {bb = 0 : ui32, name = #[[?]]<"cond_br1">} : i1
-// CHECK:           %[[VAL_33:.*]] = source {bb = 1 : ui32, name = #[[?]]<"source2">}
-// CHECK:           %[[VAL_22]] = constant %[[VAL_33]] {bb = 1 : ui32, name = #[[?]]<"constant1">, value = true} : i1
-// CHECK:           %[[VAL_18]], %[[VAL_19]] = cond_br %[[VAL_22]], %[[VAL_10]] {bb = 1 : ui32, name = #[[?]]<"cond_br2">} : i1
-// CHECK:           %[[VAL_34:.*]] = source {bb = 2 : ui32, name = #[[?]]<"source3">}
-// CHECK:           %[[VAL_30]] = constant %[[VAL_34]] {bb = 2 : ui32, name = #[[?]]<"constant2">, value = true} : i1
-// CHECK:           %[[VAL_26]], %[[VAL_27]] = cond_br %[[VAL_30]], %[[VAL_10]] {bb = 2 : ui32, name = #[[?]]<"cond_br3">} : i1
-// CHECK:           %[[VAL_35:.*]] = spec_commit{{\[}}%[[VAL_31]]] %[[VAL_26]] {bb = 3 : ui32, name = #[[?]]<"spec_commit0">} : i1
-// CHECK:           %[[VAL_36:.*]] = spec_commit{{\[}}%[[VAL_23]]] %[[VAL_18]] {bb = 3 : ui32, name = #[[?]]<"spec_commit1">} : i1
-// CHECK:           %[[VAL_37:.*]] = merge %[[VAL_36]], %[[VAL_35]] {bb = 3 : ui32, name = #[[?]]<"merge0">} : i1
-// CHECK:           end {bb = 3 : ui32, name = #[[?]]<"end0">} %[[VAL_37]] : i1
+// CHECK:           %[[VAL_1:.*]] = source {handshake.bb = 0 : ui32, name = #[[?]]<"source1">}
+// CHECK:           %[[VAL_2:.*]] = constant %[[VAL_1]] {handshake.bb = 0 : ui32, name = #[[?]]<"constant0">, value = true} : i1
+// CHECK:           %[[VAL_3:.*]], %[[VAL_4:.*]], %[[VAL_5:.*]], %[[VAL_6:.*]], %[[VAL_7:.*]], %[[VAL_8:.*]] = speculator %[[VAL_0]] {handshake.bb = 0 : ui32, name = #[[?]]<"speculator0">} : i1
+// CHECK:           %[[VAL_9:.*]] = merge %[[VAL_10:.*]], %[[VAL_11:.*]] {handshake.bb = 0 : ui32, name = #[[?]]<"merge1">} : i1
+// CHECK:           %[[VAL_12:.*]], %[[VAL_13:.*]] = speculating_branch{{\[}}%[[VAL_9]]] %[[VAL_14:.*]] {handshake.bb = 0 : ui32, name = #[[?]]<"speculating_branch0">} : i1, i1
+// CHECK:           %[[VAL_15:.*]], %[[VAL_16:.*]] = cond_br %[[VAL_12]], %[[VAL_5]] {handshake.bb = 0 : ui32, name = #[[?]]<"cond_br0">} : i1
+// CHECK:           %[[VAL_17:.*]] = merge %[[VAL_18:.*]], %[[VAL_19:.*]] {handshake.bb = 0 : ui32, name = #[[?]]<"merge2">} : i1
+// CHECK:           %[[VAL_20:.*]], %[[VAL_21:.*]] = speculating_branch{{\[}}%[[VAL_17]]] %[[VAL_22:.*]] {handshake.bb = 0 : ui32, name = #[[?]]<"speculating_branch1">} : i1, i1
+// CHECK:           %[[VAL_23:.*]], %[[VAL_24:.*]] = cond_br %[[VAL_20]], %[[VAL_15]] {handshake.bb = 0 : ui32, name = #[[?]]<"cond_br4">} : i1
+// CHECK:           %[[VAL_25:.*]] = merge %[[VAL_26:.*]], %[[VAL_27:.*]] {handshake.bb = 0 : ui32, name = #[[?]]<"merge3">} : i1
+// CHECK:           %[[VAL_28:.*]], %[[VAL_29:.*]] = speculating_branch{{\[}}%[[VAL_25]]] %[[VAL_30:.*]] {handshake.bb = 0 : ui32, name = #[[?]]<"speculating_branch2">} : i1, i1
+// CHECK:           %[[VAL_31:.*]], %[[VAL_32:.*]] = cond_br %[[VAL_28]], %[[VAL_15]] {handshake.bb = 0 : ui32, name = #[[?]]<"cond_br5">} : i1
+// CHECK:           %[[VAL_14]] = spec_save{{\[}}%[[VAL_4]]] %[[VAL_2]] {handshake.bb = 0 : ui32, name = #[[?]]<"spec_save0">} : i1
+// CHECK:           %[[VAL_10]], %[[VAL_11]] = cond_br %[[VAL_14]], %[[VAL_3]] {handshake.bb = 0 : ui32, name = #[[?]]<"cond_br1">} : i1
+// CHECK:           %[[VAL_33:.*]] = source {handshake.bb = 1 : ui32, name = #[[?]]<"source2">}
+// CHECK:           %[[VAL_22]] = constant %[[VAL_33]] {handshake.bb = 1 : ui32, name = #[[?]]<"constant1">, value = true} : i1
+// CHECK:           %[[VAL_18]], %[[VAL_19]] = cond_br %[[VAL_22]], %[[VAL_10]] {handshake.bb = 1 : ui32, name = #[[?]]<"cond_br2">} : i1
+// CHECK:           %[[VAL_34:.*]] = source {handshake.bb = 2 : ui32, name = #[[?]]<"source3">}
+// CHECK:           %[[VAL_30]] = constant %[[VAL_34]] {handshake.bb = 2 : ui32, name = #[[?]]<"constant2">, value = true} : i1
+// CHECK:           %[[VAL_26]], %[[VAL_27]] = cond_br %[[VAL_30]], %[[VAL_10]] {handshake.bb = 2 : ui32, name = #[[?]]<"cond_br3">} : i1
+// CHECK:           %[[VAL_35:.*]] = spec_commit{{\[}}%[[VAL_31]]] %[[VAL_26]] {handshake.bb = 3 : ui32, name = #[[?]]<"spec_commit0">} : i1
+// CHECK:           %[[VAL_36:.*]] = spec_commit{{\[}}%[[VAL_23]]] %[[VAL_18]] {handshake.bb = 3 : ui32, name = #[[?]]<"spec_commit1">} : i1
+// CHECK:           %[[VAL_37:.*]] = merge %[[VAL_36]], %[[VAL_35]] {handshake.bb = 3 : ui32, name = #[[?]]<"merge0">} : i1
+// CHECK:           end {handshake.bb = 3 : ui32, name = #[[?]]<"end0">} %[[VAL_37]] : i1
 // CHECK:         }
 handshake.func @multipleBBs(%start: i1) {
-  %0 = source {bb = 0 : ui32, name = #handshake.name<"source1">}
-  %1 = constant %0 {bb = 0 : ui32, name = #handshake.name<"constant0">, value = 1 : i1} : i1
-  %trueResult1, %falseResult1 = cond_br %1, %start {bb = 0 : ui32, name = #handshake.name<"cond_br1">} : i1
-  %4 = source {bb = 1 : ui32, name = #handshake.name<"source2">}
-  %5 = constant %4 {bb = 1 : ui32, name = #handshake.name<"constant1">, value = 1 : i1} : i1
-  %trueResult2, %falseResult2 = cond_br %5, %trueResult1 {bb = 1 : ui32, name = #handshake.name<"cond_br2">} : i1
-  %8 = source {bb = 2 : ui32, name = #handshake.name<"source3">}
-  %9 = constant %8 {bb = 2 : ui32, name = #handshake.name<"constant2">, value = 1 : i1} : i1
-  %trueResult3, %falseResult3 = cond_br %9, %trueResult1 {bb = 2 : ui32, name = #handshake.name<"cond_br3">} : i1
-  %12 = merge %trueResult2, %trueResult3 {bb = 3 : ui32, name = #handshake.name<"merge0">} : i1
-  end {bb = 3 : ui32, name = #handshake.name<"end0">} %12 : i1
+  %0 = source {handshake.bb = 0 : ui32, name = #handshake.name<"source1">}
+  %1 = constant %0 {handshake.bb = 0 : ui32, name = #handshake.name<"constant0">, value = 1 : i1} : i1
+  %trueResult1, %falseResult1 = cond_br %1, %start {handshake.bb = 0 : ui32, name = #handshake.name<"cond_br1">} : i1
+  %4 = source {handshake.bb = 1 : ui32, name = #handshake.name<"source2">}
+  %5 = constant %4 {handshake.bb = 1 : ui32, name = #handshake.name<"constant1">, value = 1 : i1} : i1
+  %trueResult2, %falseResult2 = cond_br %5, %trueResult1 {handshake.bb = 1 : ui32, name = #handshake.name<"cond_br2">} : i1
+  %8 = source {handshake.bb = 2 : ui32, name = #handshake.name<"source3">}
+  %9 = constant %8 {handshake.bb = 2 : ui32, name = #handshake.name<"constant2">, value = 1 : i1} : i1
+  %trueResult3, %falseResult3 = cond_br %9, %trueResult1 {handshake.bb = 2 : ui32, name = #handshake.name<"cond_br3">} : i1
+  %12 = merge %trueResult2, %trueResult3 {handshake.bb = 3 : ui32, name = #handshake.name<"merge0">} : i1
+  end {handshake.bb = 3 : ui32, name = #handshake.name<"end0">} %12 : i1
 }
