@@ -10,8 +10,8 @@
 
 namespace dynamatic {
 
-#define GEN_PASS_DECL_HANDSHAKESSATOGSA
-#define GEN_PASS_DEF_HANDSHAKESSATOGSA
+#define GEN_PASS_DECL_FUNCSSATOGSA
+#define GEN_PASS_DEF_FUNCSSATOGSA
 #include "dynamatic/Transforms/Passes.h.inc"
 
 // (1) Makes SSA explicit, (2) Converts SSA to GSA
