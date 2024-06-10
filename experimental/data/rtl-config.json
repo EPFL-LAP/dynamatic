@@ -362,6 +362,16 @@
     "name": "handshake.end",
     "parameters": [
       { "name": "DATA_WIDTH", "type": "unsigned" },
+      { "name": "NUM_MEMORIES", "type": "unsigned", "eq": 0 }
+    ],
+    "generic": "$DYNAMATIC/experimental/data/vhdl/handshake/end_no_mem.vhd",
+    "module-name": "end_sync_no_mem",
+    "dependencies": ["support.types"]
+  },
+  {
+    "name": "handshake.end",
+    "parameters": [
+      { "name": "DATA_WIDTH", "type": "unsigned" },
       { "name": "NUM_MEMORIES", "type": "unsigned" }
     ],
     "generic": "$DYNAMATIC/experimental/data/vhdl/handshake/end.vhd",
