@@ -280,6 +280,14 @@ def HandshakePlaceBuffers : DynamaticPass<"handshake-place-buffers"> {
     "'buffer-placement' at the binary's location.">];
 }
 
+def FuncSSAToGSA : Pass<"func-ssa-to-gsa", "::mlir::func::FuncOp"> {
+  let summary = "Transform the static single assignment representation into the gated single assignment representation.";
+  let description = [{
+    Transform the implicit SSA into explicit GSA. 
+  }];
+  let constructor = "dynamatic::createFuncSSAToGSA()";
+}
+
 //===----------------------------------------------------------------------===//
 // Other passes
 //===----------------------------------------------------------------------===//
