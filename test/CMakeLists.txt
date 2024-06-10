@@ -20,5 +20,3 @@ set_target_properties(check-dynamatic PROPERTIES FOLDER "Tests")
 add_lit_testsuites(Dynamatic ${CMAKE_CURRENT_BINARY_DIR}
   DEPENDS ${DYNAMATIC_TEST_DEPENDS}
   )
-
-add_subdirectory(lib)
