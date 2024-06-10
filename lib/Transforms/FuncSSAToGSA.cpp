@@ -16,8 +16,12 @@ struct FuncSSAToGSAPass
 
   public:
     void runOnOperation() override {
+      llvm::outs() << "Hii from inside Aya's pass!\n";
+      Region &funcReg = getOperation().getRegion(); 
       
-
+      for (Block &block : funcReg.getBlocks()) {
+        llvm::outs() << "Block!\n";
+      }
     };
   };
 }; // namespace
