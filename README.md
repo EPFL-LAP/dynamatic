@@ -37,7 +37,7 @@ The following instructions can be used to setup Dynamatic from source. If you in
 
     ```sh
     pacman -Syu
-    pacman -S clang lld ccache cmake ninja python jdk21-openjdk graphviz boost git curl gzip
+    pacman -S clang lld ccache cmake ninja python jdk21-openjdk graphviz boost git curl gzip readline
     ```
 
     `clang`, `lld`, and `ccache` are not stictly required but significantly speed up (re)builds. If you do not wish to install them, in step 3 call the build script with the `--disable-build-opt` flag to prevent their usage.
