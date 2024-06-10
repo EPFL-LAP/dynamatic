@@ -52,9 +52,12 @@ using namespace dynamatic;
 /// Name of ports representing the clock and reset signals.
 static constexpr llvm::StringLiteral CLK_PORT("clk"), RST_PORT("rst");
 
-//===----------------------------------------------------------------------===//
-// Internal data-structures
-//===----------------------------------------------------------------------===//
+/// NOTE: temporary hack to support external functions as top-level IO.
+static unsigned getNumExtInstanceArgs(handshake::EndOp endOp) {
+  if (auto attr = endOp->getAttrOfType<IntegerAttr>("hw.funcCutoff"))
+    return endOp->getNumOperands() - attr.getUInt();
+  return 0;
+}
 
 namespace {
 
@@ -297,6 +300,10 @@ struct ModuleLoweringState {
   /// must be set, in order, with the results of the `hw::InstanceOp`
   /// operation to which the `handshake::EndOp` operation was converted to.
   SmallVector<Backedge> endBackedges;
+  /// Backedges to the containing module's `hw::OutputOp` operation, which
+  /// must be set, in order, with the original arguments to external function
+  /// calls inside the Handshake function.
+  SmallVector<Backedge> extInstBackedges;
 
   /// Default constructor required because we use the class as a map's value,
   /// which must be default cosntructible.
@@ -608,17 +615,12 @@ ModuleDiscriminator::ModuleDiscriminator(Operation *op)
         addString("VALUE", bitValue);
         addUnsigned("DATA_WIDTH", bitwidth);
       })
-      .Case<handshake::EndOp>([&](auto) {
+      .Case<handshake::EndOp>([&](handshake::EndOp endOp) {
         // Number of memory inputs and bitwidth (we assume that there is
-        // a single function return value due to our current VHDL
-        // limitation)
+        // a single function return value due to our current RTL limitation)
         addBitwidth("DATA_WIDTH", op->getOperand(0));
-        addUnsigned("NUM_MEMORIES", op->getNumOperands() - 1);
-      })
-      .Case<handshake::ReturnOp>([&](auto) {
-        // Bitwidth (we assume that there is a single function return value
-        // due to our current VHDL limitation)
-        addBitwidth("DATA_WIDTH", op->getOperand(0));
+        addUnsigned("NUM_MEMORIES",
+                    op->getNumOperands() - getNumExtInstanceArgs(endOp) - 1);
       })
       .Case<arith::AddFOp, arith::AddIOp, arith::AndIOp, arith::DivFOp,
             arith::DivSIOp, arith::DivUIOp, arith::MaximumFOp,
@@ -1129,10 +1131,19 @@ ConvertFunc::matchAndRewrite(handshake::FuncOp funcOp, OpAdaptor adaptor,
     backedges.push_back(backedge);
   };
 
-  // Function results will come through the Handshake terminator
-  size_t numEndResults = modInfo.sizeOutputs() - state.getNumMemOutputs();
+  /// NOTE: this is hacky, but only the end arguments that correspond to the
+  /// original function results and memory completion signals should go to the
+  /// end synchronizer, the rest of the operands go directly to the module's
+  /// outputs
+  auto endOp = *modOp.getBodyBlock()->getOps<handshake::EndOp>().begin();
+  unsigned numExtInstArgs = getNumExtInstanceArgs(endOp);
+  size_t numEndResults =
+      modInfo.sizeOutputs() - state.getNumMemOutputs() - numExtInstArgs;
   for (size_t i = 0; i < numEndResults; ++i)
     addBackedge(state.endBackedges);
+  for (size_t i = 0; i < numExtInstArgs; ++i)
+    addBackedge(state.extInstBackedges);
+
   // Outgoing memory signals will come through memory interfaces
   for (auto &[_, memState] : state.memInterfaces) {
     for (size_t i = 0; i < memState.numOutputs; ++i)
@@ -1211,15 +1222,28 @@ ConvertEnd::matchAndRewrite(handshake::EndOp endOp, OpAdaptor adaptor,
 
   // Inputs to the module are identical the the original Handshake end
   // operation, plus clock and reset
-  for (auto [idx, oprd] : llvm::enumerate(adaptor.getOperands()))
+
+  /// NOTE: this is hacky, but only the end arguments that correspond to the
+  /// original function results and memory completion signals should go to the
+  /// end synchronizer, the rest of the operands go directly to the module's
+  /// outputs
+  ValueRange endOperands = adaptor.getOperands();
+  unsigned numExtInstArgs = getNumExtInstanceArgs(endOp);
+  for (auto [idx, oprd] :
+       llvm::enumerate(endOperands.drop_back(numExtInstArgs)))
     converter.addInput(modState.endPorts.getInputName(idx), oprd);
   converter.addClkAndRst(parentModOp);
+
+  // Remaining inputs to the end terminator go directly to the module's outputs
+  for (auto [backedge, oprd] : llvm::zip_equal(
+           modState.extInstBackedges, endOperands.take_back(numExtInstArgs)))
+    backedge.setValue(oprd);
 
   // The end operation has one input per memory interface in the function
   // which should not be forwarded to its output ports
   unsigned numMemOperands = modState.memInterfaces.size();
-  auto numReturnValues = endOp.getNumOperands() - numMemOperands;
-  auto returnValOperands = adaptor.getOperands().take_front(numReturnValues);
+  auto numReturnValues = endOperands.size() - numMemOperands - numExtInstArgs;
+  auto returnValOperands = endOperands.take_front(numReturnValues);
 
   // All non-memory inputs to the Handshake end operations should be forwarded
   // to its outputs
@@ -1401,46 +1425,6 @@ ConvertInstance::matchAndRewrite(handshake::InstanceOp instOp,
   StringAttr instNameAttr = rewriter.getStringAttr(getUniqueName(instOp));
   rewriter.replaceOpWithNewOp<hw::InstanceOp>(instOp, modOp, instNameAttr,
                                               instOperands);
-  return success();
-}
-
-/// Verifies that all the operations inside the function, which may be more
-/// general than what we can turn into an RTL design, will be successfully
-/// exportable to an RTL design. Fails if at least one operation inside the
-/// function is not exportable to RTL.
-static LogicalResult verifyExportToRTL(handshake::FuncOp funcOp) {
-  if (failed(verifyIRMaterialized(funcOp)))
-    return funcOp.emitError() << ERR_NON_MATERIALIZED_FUNC;
-  if (failed(verifyAllIndexConcretized(funcOp))) {
-    return funcOp.emitError() << "Lowering to HW requires that all index "
-                                 "types in the IR have "
-                                 "been concretized."
-                              << ERR_RUN_CONCRETIZATION;
-  }
-
-  for (Operation &op : funcOp.getOps()) {
-    LogicalResult res =
-        llvm::TypeSwitch<Operation *, LogicalResult>(&op)
-            .Case<handshake::ConstantOp>(
-                [&](handshake::ConstantOp cstOp) -> LogicalResult {
-                  if (!cstOp.getValue().isa<IntegerAttr, FloatAttr>())
-                    return cstOp->emitError()
-                           << "Incompatible attribute type, our VHDL component "
-                              "only supports integer and floating-point types";
-                  return success();
-                })
-            .Case<handshake::EndOp>(
-                [&](handshake::EndOp endOp) -> LogicalResult {
-                  if (endOp.getReturnValues().size() != 1)
-                    return endOp.emitError()
-                           << "Incompatible number of return values, our VHDL "
-                              "component only supports a single return value";
-                  return success();
-                })
-            .Default([](auto) { return success(); });
-    if (failed(res))
-      return failure();
-  }
   return success();
 }
 
@@ -1886,9 +1870,20 @@ public:
       funcOp = op;
     }
 
-    // Check that some preconditions are met before doing anything
-    if (funcOp && failed(verifyExportToRTL(funcOp)))
-      return signalPassFailure();
+    if (funcOp) {
+      // Check that some preconditions are met before doing anything
+      if (failed(verifyIRMaterialized(funcOp))) {
+        funcOp.emitError() << ERR_NON_MATERIALIZED_FUNC;
+        return signalPassFailure();
+      }
+      if (failed(verifyAllIndexConcretized(funcOp))) {
+        funcOp.emitError() << "Lowering to HW requires that all index "
+                              "types in the IR have "
+                              "been concretized."
+                           << ERR_RUN_CONCRETIZATION;
+        return signalPassFailure();
+      }
+    }
 
     if (failed(runPreprocessing()))
       return signalPassFailure();
