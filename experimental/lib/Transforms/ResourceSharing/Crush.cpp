@@ -471,6 +471,18 @@ void getOpOccupancy(const SmallVector<Operation *> &sharingTargets,
   }
 }
 
+/// Replaces the first use of `oldVal` by `newVal` in the operation's operands.
+/// Asserts if the operation's operands do not contain the old value.
+static void replaceFirstUse(Operation *op, Value oldVal, Value newVal) {
+  for (unsigned i = 0, e = op->getNumOperands(); i < e; ++i) {
+    if (op->getOperand(i) == oldVal) {
+      op->setOperand(i, newVal);
+      return;
+    }
+  }
+  llvm_unreachable("failed to find operation operand");
+}
+
 LogicalResult
 sharingWrapperInsertion(handshake::FuncOp &funcOp, SharingGroups &sharingGroups,
                         MLIRContext *ctx,
@@ -548,14 +560,16 @@ sharingWrapperInsertion(handshake::FuncOp &funcOp, SharingGroups &sharingGroups,
             namedCreditsAttr);
 
     for (auto [id, op] : llvm::enumerate(group))
-      op->getResult(0).replaceAllUsesWith(wrapperOp->getResult(id));
+      for (Operation *succ : op->getResult(0).getUsers())
+        replaceFirstUse(succ, op->getResult(0), wrapperOp.getResult(id));
 
     for (auto [id, val] : llvm::enumerate(sharedOp->getOperands()))
       sharedOp->replaceUsesOfWith(val, wrapperOp->getResult(id + group.size()));
 
+    llvm::errs() << "Before removing group ops\n";
     // Remove all operations in the sharing group except for the shared one.
     for (Operation *op : group)
-      if (op != *(group.begin()))
+      if (op != sharedOp)
         op->erase();
   }
 
