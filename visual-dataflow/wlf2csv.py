@@ -446,47 +446,54 @@ def log2csv(graph: DOTGraph, log_file: str, out_file: str) -> None:
 # Read the original DOT into memory and cache the sequence of edges
 def parse_dot(dot_file: str) -> DOTGraph:
     graph: DOTGraph = DOTGraph(dot_file)
+    all_endpoints: list[tuple[str, tuple[str, str]]] = []
+
+    # First register all nodes...
     with open(dot_file, "r") as dot_file_handle:
         while line := dot_file_handle.readline():
             if (name := try_to_parse_node(line)) is not None:
                 attributes = get_attributes(line)
                 node = DOTNode(name, attributes)
                 graph.nodes[name] = node
-            elif (endpoints := try_to_parse_edge(line)) is not None:
-                # Find the nodes the channel connects
-                src_node, dst_node = endpoints
-                src_og_node = src_node[1:] if src_node.startswith("_") else src_node
-                dst_og_node = dst_node[1:] if dst_node.startswith("_") else dst_node
+            if (endpoints := try_to_parse_edge(line)) is not None:
+                all_endpoints.append((line, endpoints))
 
-                # Find the ports the channel connects
-                attributes = get_attributes(line)
-                assert "from" in attributes and "to" in attributes
-                src_port_id: int = int(attributes["from"][3:]) - 1
-                dst_port_id: int = int(attributes["to"][2:]) - 1
+    # ...then register all edges
+    for line, endpoints in all_endpoints:
+        # Find the nodes the channel connects
+        src_node, dst_node = endpoints
+        src_og_node = src_node[1:] if src_node.startswith("_") else src_node
+        dst_og_node = dst_node[1:] if dst_node.startswith("_") else dst_node
 
-                # Find the channel's bitwidth. Look for width of destination's unit
-                # input port, to be consistent with the dataInArray signals we save from
-                # the Modelsim waveform
-                node: DOTNode = graph.nodes[dst_og_node]
-                assert "in" in node.attributes
-                port_str: str = node.attributes["in"].split()[dst_port_id]
-                datawidth: int = int(port_str.split(":")[1].split("*")[0])
+        # Find the ports the channel connects
+        attributes = get_attributes(line)
+        assert "from" in attributes and "to" in attributes
+        src_port_id: int = int(attributes["from"][3:]) - 1
+        dst_port_id: int = int(attributes["to"][2:]) - 1
 
-                # Append the edge to the list
-                src_port = Port(src_node, src_port_id, False)
-                dst_port = Port(dst_node, dst_port_id, True)
-                edge = DOTEdge(
-                    Channel(src_port, dst_port, datawidth),
-                    attributes,
-                    src_og_node,
-                    dst_og_node,
-                )
-                graph.edges.append(edge)
+        # Find the channel's bitwidth. Look for width of destination's unit
+        # input port, to be consistent with the dataInArray signals we save from
+        # the Modelsim waveform
+        node: DOTNode = graph.nodes[dst_og_node]
+        assert "in" in node.attributes
+        port_str: str = node.attributes["in"].split()[dst_port_id]
+        datawidth: int = int(port_str.split(":")[1].split("*")[0])
 
-                # Map both of the edge's endpoints to the channel they belong to for
-                # quick access
-                graph.port_to_edge[src_port] = edge
-                graph.port_to_edge[dst_port] = edge
+        # Append the edge to the list
+        src_port = Port(src_node, src_port_id, False)
+        dst_port = Port(dst_node, dst_port_id, True)
+        edge = DOTEdge(
+            Channel(src_port, dst_port, datawidth),
+            attributes,
+            src_og_node,
+            dst_og_node,
+        )
+        graph.edges.append(edge)
+
+        # Map both of the edge's endpoints to the channel they belong to for
+        # quick access
+        graph.port_to_edge[src_port] = edge
+        graph.port_to_edge[dst_port] = edge
     return graph
 
 
