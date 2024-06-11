@@ -30,8 +30,8 @@ public:
   /// Constructor called automatically by `getAnalysis<ControlDependenceAnalysis>()` if the
   /// analysis is not already cached. 
   /// It expects to be passed a FuncOp operation where it can loop over its blocks (mimicking the BBs of the CFG)
-  ControlDependenceAnalysis(mlir::func::FuncOp &funcOp) {
-    identifyAllControlDeps(funcOp);
+  ControlDependenceAnalysis(mlir::Operation*operation){//(mlir::func::FuncOp &funcOp) {
+    identifyAllControlDeps(operation);
   };
 
   // return all BBs that the argument block is control dependent on
@@ -51,7 +51,7 @@ private:
   llvm::DenseMap<mlir::Block *, llvm::SmallVector<mlir::Block*, 4>> control_deps_map;
 
   // Simply fill the control_deps_map 
-  void identifyAllControlDeps(mlir::func::FuncOp &funcOp);
+  void identifyAllControlDeps(mlir::Operation*operation);
 
   // recursive function called inside traversePostDomTree
   void traversePostDomTreeUtil(mlir::DominanceInfoNode *start_node, mlir::DominanceInfoNode *end_node, llvm::DenseMap<mlir::DominanceInfoNode*, bool> is_visited, llvm::SmallVector<mlir::DominanceInfoNode*, 4> path, int path_index, llvm::SmallVector<llvm::SmallVector<mlir::DominanceInfoNode*, 4> , 4>*traversed_nodes);

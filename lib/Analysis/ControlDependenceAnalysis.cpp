@@ -17,23 +17,23 @@ using namespace mlir;
 using namespace llvm;
 using namespace dynamatic;
 
-void ControlDependenceAnalysis::identifyAllControlDeps(mlir::func::FuncOp &funcOp) {
-  Region &funcReg = funcOp.getRegion();
+void ControlDependenceAnalysis::identifyAllControlDeps(Operation *operation) {
+  Region *funcReg = operation->getParentRegion(); //funcOp.getRegion();
 
   // Get information about post-dominance
   PostDominanceInfo postDomInfo;
   // Get the post-dominance tree
   llvm::DominatorTreeBase<Block, true> &postDomTree =
-      postDomInfo.getDomTree(&funcReg);
+      postDomInfo.getDomTree(funcReg);
 
   // Initialize the control_deps_map by creating an entry for every block constituting the region
-  for (Block &block : funcReg.getBlocks()) {
+  for (Block &block : funcReg->getBlocks()) {
     SmallVector<mlir::Block*, 4> deps;
     control_deps_map.insert(std::make_pair(&block, deps));
   }
 
   // Loop over the control flow edges connnecting the different blocks of this region
-  for (Block& block : funcReg.getBlocks()) {
+  for (Block& block : funcReg->getBlocks()) {
     for (Block* block_succ : block.getSuccessors()) {
       if (!postDomInfo.properlyPostDominates(block_succ, &block)) {
           Block* least_common_anc = postDomInfo.findNearestCommonDominator(block_succ, &block);
@@ -46,7 +46,7 @@ void ControlDependenceAnalysis::identifyAllControlDeps(mlir::func::FuncOp &funcO
 
             // traverse the tree to get all nodes between "least_common_anc" and "block_succ"
             llvm::SmallVector<llvm::SmallVector<mlir::DominanceInfoNode*, 4> , 4> traversed_nodes; 
-            traversePostDomTree(&block, block_succ, &funcReg, &postDomTree, &traversed_nodes);
+            traversePostDomTree(&block, block_succ, funcReg, &postDomTree, &traversed_nodes);
             for(size_t i = 0; i < traversed_nodes.size(); i++) {
               for(size_t j = 0; j < traversed_nodes[i].size(); j++) {
                 // for every node in every path, add block to its control dependencies
@@ -64,7 +64,7 @@ void ControlDependenceAnalysis::identifyAllControlDeps(mlir::func::FuncOp &funcO
 
             // traverse the tree to get all nodes between "least_common_anc" and "block_succ"
             llvm::SmallVector<llvm::SmallVector<mlir::DominanceInfoNode*, 4> , 4> traversed_nodes; 
-            traversePostDomTree(least_common_anc, block_succ, &funcReg, &postDomTree, &traversed_nodes);
+            traversePostDomTree(least_common_anc, block_succ, funcReg, &postDomTree, &traversed_nodes);
             for(size_t i = 0; i < traversed_nodes.size(); i++) {
               for(size_t j = 0; j < traversed_nodes[i].size(); j++) {
                 // for every node in every path, add block to its control dependencies
