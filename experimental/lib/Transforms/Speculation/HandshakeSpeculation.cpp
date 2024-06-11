@@ -232,11 +232,11 @@ LogicalResult HandshakeSpeculationPass::prepareAndPlaceCommits() {
   return success(areAllCommitsRouted(fakeControl));
 }
 
-static handshake::ConditionalBranchOp
-findControlBranch(handshake::SpeculatorOp specOp, unsigned bb) {
-  handshake::FuncOp funcOp = specOp->getParentOfType<handshake::FuncOp>();
+static handshake::ConditionalBranchOp findControlBranch(Operation *op) {
+  handshake::FuncOp funcOp = op->getParentOfType<handshake::FuncOp>();
   assert(funcOp && "op should have parent function");
   auto handshakeBlocks = getLogicBBs(funcOp);
+  unsigned bb = getLogicBB(op).value();
 
   for (auto condBrOp : funcOp.getOps<handshake::ConditionalBranchOp>()) {
     if (auto brBB = getLogicBB(condBrOp); !brBB || brBB != bb)
@@ -250,7 +250,7 @@ findControlBranch(handshake::SpeculatorOp specOp, unsigned bb) {
       }
     }
   }
-  funcOp->emitError() << "Could not find backedge within BB " << bb << "\n";
+
   return nullptr;
 }
 
@@ -264,10 +264,11 @@ LogicalResult HandshakeSpeculationPass::prepareAndPlaceSaveCommits() {
 
   // The save commits are a result of a control branch being in the BB
   // The control path for the SC needs to replicate the branch
-  unsigned bb = getLogicBB(specOp).value();
-  ConditionalBranchOp controlBranch = findControlBranch(specOp, bb);
-  if (controlBranch == nullptr)
+  ConditionalBranchOp controlBranch = findControlBranch(specOp);
+  if (controlBranch == nullptr) {
+    specOp->emitError() << "Could not find backedge within speculation bb.\n";
     return failure();
+  }
 
   // To connect a Save-Commit, two control signals are sent from the Speculator
   // and are merged before reaching the Save-Commit.
@@ -319,6 +320,7 @@ LogicalResult HandshakeSpeculationPass::prepareAndPlaceSaveCommits() {
   }
   // If neither trueResult nor falseResult leads to a backedge, handle the error
   else {
+    unsigned bb = getLogicBB(specOp).value();
     controlBranch->emitError()
         << "Could not find the backedge in the Control Branch " << bb << "\n";
     return failure();
@@ -334,6 +336,21 @@ LogicalResult HandshakeSpeculationPass::prepareAndPlaceSaveCommits() {
   return placeUnits<handshake::SpecSaveCommitOp>(mergeOp.getResult());
 }
 
+static handshake::MuxOp findMuxOpInBB(Operation *op) {
+  handshake::FuncOp funcOp = op->getParentOfType<handshake::FuncOp>();
+  assert(funcOp && "op should have parent function");
+  unsigned bb = getLogicBB(op).value();
+
+  for (auto muxOp : funcOp.getOps<handshake::MuxOp>()) {
+    if (auto brBB = getLogicBB(muxOp); !brBB || brBB != bb)
+      continue;
+    // there should only exist one muxOp in the BB
+    return muxOp;
+  }
+
+  return nullptr;
+}
+
 LogicalResult HandshakeSpeculationPass::placeSpeculator() {
   MLIRContext *ctx = &getContext();
 
@@ -341,11 +358,21 @@ LogicalResult HandshakeSpeculationPass::placeSpeculator() {
   Operation *dstOp = operand.getOwner();
   Value srcOpResult = operand.get();
 
+  Value enableSpecIn;
+  if (auto controlBranch = findControlBranch(dstOp); controlBranch) {
+    enableSpecIn = controlBranch.getTrueResult();
+  } else if (auto muxOp = findMuxOpInBB(dstOp); muxOp) {
+    enableSpecIn = muxOp.getResult();
+  } else {
+    dstOp->emitError("Could not find controlBranchOp or muxOp in BB.");
+    return failure();
+  }
+
   OpBuilder builder(ctx);
   builder.setInsertionPoint(dstOp);
 
-  specOp =
-      builder.create<handshake::SpeculatorOp>(dstOp->getLoc(), srcOpResult);
+  specOp = builder.create<handshake::SpeculatorOp>(dstOp->getLoc(), srcOpResult,
+                                                   enableSpecIn);
 
   // Replace uses of the original source operation's result with the
   // speculator's result, except in the speculator's operands (otherwise this

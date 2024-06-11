@@ -987,16 +987,16 @@ def SpeculatorOp : Handshake_Op<"speculator", [
     Example:
     ```mlir
     %dataOut, %saveCtrl, %commitCtrl, %SCSaveCtrl, 
-      %SCCommitCtrl, %SCBranchCtrl = speculator %dataIn : i1
+      %SCCommitCtrl, %SCBranchCtrl = speculator[enable] %dataIn : i1
     ```
   }];
 
-  let arguments = (ins AnyType : $dataIn);
+  let arguments = (ins AnyType : $dataIn, I1 : $enable);
   let results = (outs AnyType : $dataOut,
                   I1 : $saveCtrl, I1 : $commitCtrl, 
                   I<3> : $SCSaveCtrl, I<3> : $SCCommitCtrl, 
                   I1 : $SCBranchCtrl);
-  let assemblyFormat = "$dataIn attr-dict `:` qualified(type($dataIn)) ";
+  let assemblyFormat = " `[` $enable `]` $dataIn attr-dict `:` qualified(type($dataIn)) ";
 }
 
 def SpecSaveOp : Handshake_Op<"spec_save", [
