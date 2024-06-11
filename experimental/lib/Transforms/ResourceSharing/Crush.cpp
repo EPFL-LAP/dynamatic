@@ -559,11 +559,9 @@ LogicalResult CreditBasedSharingPass::sharingWrapperInsertion(
 
     // Maps each original successor and the input operand (Value)
     std::vector<std::tuple<Operation *, Value>> succValueMap;
-    for (Operation *op : group) {
-      for (Operation *succ : op->getResult(0).getUsers()) {
+    for (Operation *op : group)
+      for (Operation *succ : op->getResult(0).getUsers())
         succValueMap.emplace_back(succ, op->getResult(0));
-      }
-    }
 
     llvm::SmallVector<Value, 24> sharingWrapperInputs;
 
@@ -633,8 +631,14 @@ LogicalResult CreditBasedSharingPass::sharingWrapperInsertion(
       replaceFirstUse(succ, val, wrapperOp->getResult(id));
     }
 
-    for (auto [id, val] : llvm::enumerate(sharedOp->getOperands()))
+    for (auto [id, val] : llvm::enumerate(sharedOp->getOperands())) {
       sharedOp->replaceUsesOfWith(val, wrapperOp->getResult(id + group.size()));
+    }
+
+    for (Operation *op : group) {
+      if (op != sharedOp)
+        op->erase();
+    }
   }
 
   return success();
