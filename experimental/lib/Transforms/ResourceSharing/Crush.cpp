@@ -1,4 +1,4 @@
-//===- Crush.cpp - Credit-Based Resource Sharing ---------*- C++ -*-===//
+//===- Crush.cpp - Credit-Based Resource Sharing ----------------*- C++ -*-===//
 //
 // Dynamatic is under the Apache License v2.0 with LLVM Exceptions.
 // See https://llvm.org/LICENSE.txt for license information.
@@ -369,14 +369,14 @@ bool checkGroupMergable(const Group &g1, const Group &g2,
     // two operation that are in the same SCC cannot be in the
     // same sharing group).
     std::vector<size_t> listOfSccIds;
-    for (Operation *op : (funcPerfInfo.cfUnits)[cf]) {
+    for (Operation *op : funcPerfInfo.cfUnits[cf]) {
       // In the op is in (SCC union MergedGroup):
       if (gMerged.find(op) != gMerged.end()) {
         // increase number of Ops
         numOps++;
         // Push back the SCC ID of each op inside the group and
         // also SCC;
-        listOfSccIds.push_back((funcPerfInfo.cfSccs)[cf][op]);
+        listOfSccIds.push_back(funcPerfInfo.cfSccs[cf][op]);
       }
     }
     // Check if there are any duplicates:
@@ -608,11 +608,8 @@ void CreditBasedSharingPass::runDynamaticPass() {
 
     // Initialize the sharing groups:
     SharingGroups sharingGroups;
-    for (auto [id, op] : llvm::enumerate(sharingTargets)) {
-      Group g;
-      g.push_back(op);
-      sharingGroups.push_back(g);
-    }
+    for (auto [id, op] : llvm::enumerate(sharingTargets))
+      sharingGroups.emplace_back(Group{op});
 
     // Determine SCCs
     for (auto critCfc : funcPerfInfo.critCfcs) {
