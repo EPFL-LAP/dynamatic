@@ -6,6 +6,8 @@
 
 #include "dynamatic/Analysis/ControlDependenceAnalysis.h"
 
+#include "dynamatic/Analysis/ControlDependenceAnalysis.h"
+
 using namespace mlir;
 using namespace dynamatic;
 
@@ -21,9 +23,26 @@ struct FuncSSAToGSAPass
     };
   public:
     void translate_ssa_to_gsa(func::FuncOp funcOp);  // the main function of the pass
+      translate_ssa_to_gsa(getOperation());
+    };
+  public:
+    void translate_ssa_to_gsa(func::FuncOp funcOp);
   };
 }; // namespace
 
+
+void FuncSSAToGSAPass::translate_ssa_to_gsa(func::FuncOp funcOp) {
+  ControlDependenceAnalysis &cdg_analysis = getAnalysis<ControlDependenceAnalysis>();
+
+  Region &funcReg = funcOp.getRegion();
+  for (Block &block : funcReg.getBlocks()) {
+    llvm::SmallVector<mlir::Block*, 4> returned_control_deps;
+    cdg_analysis.returnControlDeps(&block, returned_control_deps);
+  }
+
+  // TODO: Validate the correctness of the returned control dependencies
+
+}
 void FuncSSAToGSAPass::translate_ssa_to_gsa(func::FuncOp funcOp) {
   // instantiate the control dependence graph analysis 
   ControlDependenceAnalysis &cdg_analysis = getAnalysis<ControlDependenceAnalysis>();
