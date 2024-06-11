@@ -1142,9 +1142,8 @@ SameOperandsAndResultType
   }];
 
   let arguments = (ins Variadic<AnyType> : $dataIn, DefaultValuedAttr<DenseI64ArrayAttr, "{}">:$credits);
-                 
   let results = (outs Variadic<AnyType> : $dataOut);
-  let assemblyFormat = "$dataIn $credits attr-dict `:` qualified(type($dataIn)) ";
+  let assemblyFormat = " $dataIn attr-dict `:` functional-type($dataIn, $dataOut) ";
 
 }
 
