@@ -32,6 +32,7 @@
 #include <map>
 #include <set>
 #include <string>
+#include <system_error>
 #include <tuple>
 #include <utility>
 #include <vector>
@@ -224,8 +225,51 @@ checkLoggerAndSolve(Logger *logger, StringRef milpName,
 }
 
 namespace {
+
+class SharingLogger {
+public:
+  /// The underlying logger object, which may remain nullptr.
+  Logger *log = nullptr;
+
+  /// Optionally allocates a logger based on whether the `dumpLogs` flag is set.
+  /// If it is, the log file's location is determined based om the provided
+  /// function's name. On error, `ec` will contain a non-zero error code
+  /// and the logger should not be used.
+  SharingLogger(handshake::FuncOp funcOp, bool dumpLogs, std::error_code &ec);
+
+  /// Returns the underlying logger, which may be nullptr.
+  Logger *operator*() { return log; }
+
+  /// Returns the underlying indented writer stream to the log file. Requires
+  /// the object to have been created with the `dumpLogs` flag set to true.
+  mlir::raw_indented_ostream &getStream() {
+    assert(log && "logger was not allocated");
+    return **log;
+  }
+
+  SharingLogger(const SharingLogger *) = delete;
+  SharingLogger operator=(const SharingLogger *) = delete;
+
+  /// Deletes the underlying logger object if it was allocated.
+  ~SharingLogger() {
+    if (log)
+      delete log;
+  }
+};
+
+SharingLogger::SharingLogger(handshake::FuncOp funcOp, bool dumpLogs,
+                             std::error_code &ec) {
+  if (!dumpLogs)
+    return;
+
+  std::string sep = llvm::sys::path::get_separator().str();
+  std::string fp = "resource-sharing" + sep + funcOp.getName().str() + sep;
+  log = new Logger(fp + "sharing.log", ec);
+}
+
 using fpga20::FPGA20BuffersWrapper;
 using fpl22::FPL22BuffersWraper;
+using llvm::sys::path::get_separator;
 
 // An wrapper class that applies buffer p
 // extracts the report.
@@ -303,6 +347,15 @@ struct CreditBasedSharingPass
   }
 
   void runDynamaticPass() override;
+
+  LogicalResult sharingInFuncOp(handshake::FuncOp *funcOp,
+                                FuncPerfInfo &funcPerfInfo, NameAnalysis &namer,
+                                TimingDatabase &timingDB);
+
+  LogicalResult
+  sharingWrapperInsertion(handshake::FuncOp &funcOp,
+                          SharingGroups &sharingGroups,
+                          MapVector<Operation *, double> &opOccupancy);
 
   SmallVector<mlir::Operation *> getSharingTargets(handshake::FuncOp funcOp) {
     SmallVector<Operation *> sharingTargets;
@@ -413,13 +466,15 @@ bool tryMergeGroups(SharingGroups &sharingGroups, const FuncPerfInfo &info) {
   return false;
 }
 
-void logGroups(const SharingGroups &sharingGroups, NameAnalysis &namer) {
+void logGroups(Logger *logger, const SharingGroups &sharingGroups,
+               NameAnalysis &namer, StringRef intro) {
+  **logger << intro << ": ";
   for (const Group &group : sharingGroups) {
-    llvm::errs() << "group : {";
+    **logger << "group : {";
     for (auto *op : group) {
-      llvm::errs() << namer.getName(op) << " ";
+      **logger << namer.getName(op) << " ";
     }
-    llvm::errs() << "}\n";
+    **logger << "}\n";
   }
 }
 
@@ -483,10 +538,10 @@ static void replaceFirstUse(Operation *op, Value oldVal, Value newVal) {
   llvm_unreachable("failed to find operation operand");
 }
 
-LogicalResult
-sharingWrapperInsertion(handshake::FuncOp &funcOp, SharingGroups &sharingGroups,
-                        MLIRContext *ctx,
-                        MapVector<Operation *, double> &opOccupancy) {
+LogicalResult CreditBasedSharingPass::sharingWrapperInsertion(
+    handshake::FuncOp &funcOp, SharingGroups &sharingGroups,
+    MapVector<Operation *, double> &opOccupancy) {
+  MLIRContext *ctx = &getContext();
   OpBuilder builder(ctx);
   for (Group group : sharingGroups) {
 
@@ -542,20 +597,8 @@ sharingWrapperInsertion(handshake::FuncOp &funcOp, SharingGroups &sharingGroups,
                sharingWrapperInputs.size() &&
            "The sharing wrapper has an incorrect number of input ports.");
 
-    // sharedOp->getResult(0).dropAllUses();
-
-    // // The result of the shared operation is also one of the inputs of the
-    // // sharing wrapper.
-    // sharingWrapperInputs.push_back(sharedOp->getResult(0));
-
-    // assert(group.size() * sharedOp->getNumOperands() +
-    //                sharedOp->getNumResults() ==
-    //            sharingWrapperInputs.size() &&
-    //        "The sharing wrapper has an incorrect number of input ports.");
-
     // Determining the number of credits of each operation that share the
-    // unit
-    // based on the maximum achievable occupancy in critical CFCs.
+    // unit based on the maximum achievable occupancy in critical CFCs.
     llvm::SmallVector<int64_t> credits;
     for (Operation *op : group) {
       double occupancy = opOccupancy[op];
@@ -587,32 +630,67 @@ sharingWrapperInsertion(handshake::FuncOp &funcOp, SharingGroups &sharingGroups,
                       wrapperOp->getResult(id));
     }
 
-    // for (auto [id, op] : llvm::enumerate(group))
-    //   for (Operation *succ : op->getResult(0).getUsers())
-    //     replaceFirstUse(succ, op->getResult(0), wrapperOp.getResult(id));
-
     for (auto [id, val] : llvm::enumerate(sharedOp->getOperands()))
       sharedOp->replaceUsesOfWith(val, wrapperOp->getResult(id + group.size()));
 
-    llvm::errs() << "Before removing group ops\n";
     // Remove all operations in the sharing group except for the shared one.
     for (Operation *op : group)
       if (op != sharedOp)
         op->erase();
-
-    wrapperOp.emitWarning()
-        << "Number of results: " << wrapperOp.getNumResults() << "\n";
-
-    wrapperOp.emitWarning()
-        << "Number of results !: " << sharingWrapperOutputTypes.size() << "\n";
   }
 
   return success();
 }
 
+LogicalResult CreditBasedSharingPass::sharingInFuncOp(
+    handshake::FuncOp *funcOp, FuncPerfInfo &funcPerfInfo, NameAnalysis &namer,
+    TimingDatabase &timingDB) {
+
+  // if (dumpLogs) {
+  //   std::string sep = get_separator().str();
+  //   std::string fp = "resource-sharing" + sep + funcOp->getName().str() +
+  //   sep; std::error_code ec; Logger logger = Logger(fp + "sharing.log", ec);
+  // }
+
+  // Check the sharing targets
+  SmallVector<Operation *> sharingTargets = getSharingTargets(*funcOp);
+
+  // opOccupancy: maps each operation to the maximum occupancy it has to
+  // achieve.
+  llvm::MapVector<Operation *, double> opOccupancy;
+  getOpOccupancy(sharingTargets, opOccupancy, timingDB, funcPerfInfo);
+
+  // Initialize the sharing groups:
+  SharingGroups sharingGroups;
+  for (auto [id, op] : llvm::enumerate(sharingTargets))
+    sharingGroups.emplace_back(Group{op});
+
+  // Determine SCCs
+  for (auto critCfc : funcPerfInfo.critCfcs) {
+    std::map<Operation *, size_t> sccMap = getSccsInCfc(
+        funcPerfInfo.cfUnits[critCfc], funcPerfInfo.cfChannels[critCfc]);
+    funcPerfInfo.cfSccs.emplace(critCfc, sccMap);
+  }
+
+  // logGroups(pLogger, sharingGroups, namer, "Initial groups");
+
+  // Merge groups
+  for (bool continueMerging = true; continueMerging;)
+    continueMerging = tryMergeGroups(sharingGroups, funcPerfInfo);
+
+  // logGroups(pLogger, sharingGroups, namer, "Finished merging");
+
+  // Sort each sharing group according to their SCC ID.
+  sortGroups(sharingGroups, funcPerfInfo);
+
+  // logGroups(pLogger, sharingGroups, namer, "Sorted groups");
+
+  // For each sharing group, unite them with a sharing wrapper and shared
+  // operation.
+  return sharingWrapperInsertion(*funcOp, sharingGroups, opOccupancy);
+}
+
 void CreditBasedSharingPass::runDynamaticPass() {
-  MLIRContext *ctx = &getContext();
-  OpBuilder builder(ctx);
   NameAnalysis &namer = getAnalysis<NameAnalysis>();
 
   TimingDatabase timingDB(&getContext());
@@ -645,49 +723,9 @@ void CreditBasedSharingPass::runDynamaticPass() {
     }
 
   for (auto &[funcOp, funcPerfInfo] : sharingInfo) {
-
-    // Check the sharing targets
-    SmallVector<Operation *> sharingTargets = getSharingTargets(*funcOp);
-
-    // opOccupancy: maps each operation to the maximum occupancy it has to
-    // achieve.
-    llvm::MapVector<Operation *, double> opOccupancy;
-    getOpOccupancy(sharingTargets, opOccupancy, timingDB, funcPerfInfo);
-
-    // Initialize the sharing groups:
-    SharingGroups sharingGroups;
-    for (auto [id, op] : llvm::enumerate(sharingTargets))
-      sharingGroups.emplace_back(Group{op});
-
-    // Determine SCCs
-    for (auto critCfc : funcPerfInfo.critCfcs) {
-      std::map<Operation *, size_t> sccMap = getSccsInCfc(
-          funcPerfInfo.cfUnits[critCfc], funcPerfInfo.cfChannels[critCfc]);
-      funcPerfInfo.cfSccs.emplace(critCfc, sccMap);
-    }
-
-    llvm::errs() << "Initial groups\n";
-    logGroups(sharingGroups, namer);
-
-    // Merge groups
-    for (bool continueMerging = true; continueMerging;)
-      continueMerging = tryMergeGroups(sharingGroups, funcPerfInfo);
-
-    // log
-    llvm::errs() << "Finished merging\n";
-    logGroups(sharingGroups, namer);
-
-    // Sort each sharing group according to their SCC ID.
-    sortGroups(sharingGroups, funcPerfInfo);
-    // log
-    llvm::errs() << "Sorted groups\n";
-    logGroups(sharingGroups, namer);
-
-    // For each sharing group, unite them with a sharing wrapper and shared
-    // operation.
-    if (failed(
-            sharingWrapperInsertion(*funcOp, sharingGroups, ctx, opOccupancy)))
+    if (failed(sharingInFuncOp(funcOp, funcPerfInfo, namer, timingDB))) {
       signalPassFailure();
+    }
   }
 }
 
