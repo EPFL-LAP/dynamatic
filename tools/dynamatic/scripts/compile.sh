@@ -110,6 +110,7 @@ exit_on_fail "Failed to apply standard transformations to cf" \
 "$DYNAMATIC_OPT_BIN" "$F_CF_TRANFORMED" \
   --arith-reduce-strength="max-adder-depth-mul=1" --push-constants \
   --mark-memory-interfaces \
+  --func-ssa-to-gsa \
   > "$F_CF_DYN_TRANSFORMED"
 exit_on_fail "Failed to apply Dynamatic transformations to cf" \
   "Applied Dynamatic transformations to cf"
