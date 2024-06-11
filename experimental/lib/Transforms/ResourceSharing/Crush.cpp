@@ -466,15 +466,19 @@ bool tryMergeGroups(SharingGroups &sharingGroups, const FuncPerfInfo &info) {
   return false;
 }
 
-void logGroups(Logger *logger, const SharingGroups &sharingGroups,
-               NameAnalysis &namer, StringRef intro) {
-  **logger << intro << ": ";
+void logGroups(Logger &logger, bool dumpLogs,
+               const SharingGroups &sharingGroups, NameAnalysis &namer,
+               StringRef intro) {
+  if (!dumpLogs)
+    return;
+  mlir::raw_indented_ostream &os = *logger;
+  os << intro << "\n";
   for (const Group &group : sharingGroups) {
-    **logger << "group : {";
+    os << "group : {";
     for (auto *op : group) {
-      **logger << namer.getName(op) << " ";
+      os << namer.getName(op) << " ";
     }
-    **logger << "}\n";
+    os << "}\n";
   }
 }
 
@@ -553,22 +557,19 @@ LogicalResult CreditBasedSharingPass::sharingWrapperInsertion(
     // Elect one operation as the shared operation.
     Operation *sharedOp = *group.begin();
 
-    // The output values of the predecessors of the original ops in the group
-    llvm::SmallVector<Value, 16> predOutputValues;
-    for (Operation *op : group)
-      for (Value val : op->getOperands())
-        predOutputValues.push_back(val);
-
     // Maps each original successor and the input operand (Value)
-    llvm ::MapVector<Operation *, Value> succValueMap;
-    for (Operation *op : group)
-      for (Operation *succ : op->getResult(0).getUsers())
-        succValueMap[succ] = op->getResult(0);
+    std::vector<std::tuple<Operation *, Value>> succValueMap;
+    for (Operation *op : group) {
+      for (Operation *succ : op->getResult(0).getUsers()) {
+        succValueMap.emplace_back(succ, op->getResult(0));
+      }
+    }
 
     llvm::SmallVector<Value, 24> sharingWrapperInputs;
 
-    for (Value val : predOutputValues)
-      sharingWrapperInputs.push_back(val);
+    for (Operation *op : group)
+      for (Value val : op->getOperands())
+        sharingWrapperInputs.push_back(val);
 
     // Check if the number of results is exactly 1.
     assert(sharedOp->getNumResults() == 1 &&
@@ -626,17 +627,14 @@ LogicalResult CreditBasedSharingPass::sharingWrapperInsertion(
             namedCreditsAttr);
 
     for (auto [id, succValue] : llvm::enumerate(succValueMap)) {
-      replaceFirstUse(succValue.first, succValue.second,
-                      wrapperOp->getResult(id));
+      auto [succ, val] = succValue;
+      // succValue.first->replaceUsesOfWith(succValue.second,
+      //                                    wrapperOp.getResult(id));
+      replaceFirstUse(succ, val, wrapperOp->getResult(id));
     }
 
     for (auto [id, val] : llvm::enumerate(sharedOp->getOperands()))
       sharedOp->replaceUsesOfWith(val, wrapperOp->getResult(id + group.size()));
-
-    // Remove all operations in the sharing group except for the shared one.
-    for (Operation *op : group)
-      if (op != sharedOp)
-        op->erase();
   }
 
   return success();
@@ -646,11 +644,15 @@ LogicalResult CreditBasedSharingPass::sharingInFuncOp(
     handshake::FuncOp *funcOp, FuncPerfInfo &funcPerfInfo, NameAnalysis &namer,
     TimingDatabase &timingDB) {
 
-  // if (dumpLogs) {
-  //   std::string sep = get_separator().str();
-  //   std::string fp = "resource-sharing" + sep + funcOp->getName().str() +
-  //   sep; std::error_code ec; Logger logger = Logger(fp + "sharing.log", ec);
-  // }
+  std::error_code ec;
+  SharingLogger sharingLogger(*funcOp, dumpLogs, ec);
+  if (ec.value() != 0) {
+    funcOp->emitError() << "Failed to create logger for function "
+                        << funcOp->getName() << "\n"
+                        << ec.message();
+    return failure();
+  }
+  Logger *logger = dumpLogs ? *sharingLogger : nullptr;
 
   // Check the sharing targets
   SmallVector<Operation *> sharingTargets = getSharingTargets(*funcOp);
@@ -672,18 +674,18 @@ LogicalResult CreditBasedSharingPass::sharingInFuncOp(
     funcPerfInfo.cfSccs.emplace(critCfc, sccMap);
   }
 
-  // logGroups(pLogger, sharingGroups, namer, "Initial groups");
+  logGroups(*logger, dumpLogs, sharingGroups, namer, "Initial groups");
 
   // Merge groups
   for (bool continueMerging = true; continueMerging;)
     continueMerging = tryMergeGroups(sharingGroups, funcPerfInfo);
 
-  // logGroups(pLogger, sharingGroups, namer, "Finished merging");
+  logGroups(*logger, dumpLogs, sharingGroups, namer, "Finished merging");
 
   // Sort each sharing group according to their SCC ID.
   sortGroups(sharingGroups, funcPerfInfo);
 
-  // logGroups(pLogger, sharingGroups, namer, "Sorted groups");
+  logGroups(*logger, dumpLogs, sharingGroups, namer, "Sorted groups");
 
   // For each sharing group, unite them with a sharing wrapper and shared
   // operation.
