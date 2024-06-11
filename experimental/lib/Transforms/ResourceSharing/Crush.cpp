@@ -498,41 +498,27 @@ sharingWrapperInsertion(handshake::FuncOp &funcOp, SharingGroups &sharingGroups,
     // Elect one operation as the shared operation.
     Operation *sharedOp = *group.begin();
 
-    // Enumerate the operands of the original pre-sharing operations.
-    llvm::SmallVector<Value> sharingWrapperInputs;
+    // The output values of the predecessors of the original ops in the group
+    llvm::SmallVector<Value, 16> predOutputValues;
     for (Operation *op : group)
       for (Value val : op->getOperands())
-        sharingWrapperInputs.push_back(val);
+        predOutputValues.push_back(val);
+
+    // Maps each original successor and the input operand (Value)
+    llvm ::MapVector<Operation *, Value> succValueMap;
+    for (Operation *op : group)
+      for (Operation *succ : op->getResult(0).getUsers())
+        succValueMap[succ] = op->getResult(0);
+
+    llvm::SmallVector<Value, 24> sharingWrapperInputs;
+
+    for (Value val : predOutputValues)
+      sharingWrapperInputs.push_back(val);
 
     // Check if the number of results is exactly 1.
     assert(sharedOp->getNumResults() == 1 &&
            "Sharing wrapper currently only supports operation with a single "
            "return value.");
-
-    // The result of the shared operation is also one of the inputs of the
-    // sharing wrapper.
-    sharingWrapperInputs.push_back(sharedOp->getResult(0));
-
-    assert(group.size() * sharedOp->getNumOperands() +
-                   sharedOp->getNumResults() ==
-               sharingWrapperInputs.size() &&
-           "The sharing wrapper has an incorrect number of input ports.");
-
-    // Determining the number of credits of each operation that share the unit
-    // based on the maximum achievable occupancy in critical CFCs.
-    llvm::SmallVector<int64_t> credits;
-    for (Operation *op : group) {
-      double occupancy = opOccupancy[op];
-      // The number of credits must be an integer. It is incremented by 1 to
-      // hide the latency of returning a credit, and accounts for token staying
-      // in the output buffers due to the effect of sharing.
-      credits.push_back(1 + std::ceil(occupancy));
-    }
-
-    // Retrieve the type reference the the number of credits per each operation.
-    NamedAttribute namedCreditsAttr(
-        StringAttr::get(ctx, "credits"),
-        builder.getDenseI64ArrayAttr(llvm::ArrayRef<int64_t>(credits)));
 
     // Result types (this also tracks the number of results).
     llvm::SmallVector<Type> sharingWrapperOutputTypes;
@@ -549,6 +535,43 @@ sharingWrapperInsertion(handshake::FuncOp &funcOp, SharingGroups &sharingGroups,
                                      sharedOp->getOperandTypes().begin(),
                                      sharedOp->getOperandTypes().end());
 
+    sharingWrapperInputs.push_back(sharedOp->getResult(0));
+
+    assert(group.size() * sharedOp->getNumOperands() +
+                   sharedOp->getNumResults() ==
+               sharingWrapperInputs.size() &&
+           "The sharing wrapper has an incorrect number of input ports.");
+
+    // sharedOp->getResult(0).dropAllUses();
+
+    // // The result of the shared operation is also one of the inputs of the
+    // // sharing wrapper.
+    // sharingWrapperInputs.push_back(sharedOp->getResult(0));
+
+    // assert(group.size() * sharedOp->getNumOperands() +
+    //                sharedOp->getNumResults() ==
+    //            sharingWrapperInputs.size() &&
+    //        "The sharing wrapper has an incorrect number of input ports.");
+
+    // Determining the number of credits of each operation that share the
+    // unit
+    // based on the maximum achievable occupancy in critical CFCs.
+    llvm::SmallVector<int64_t> credits;
+    for (Operation *op : group) {
+      double occupancy = opOccupancy[op];
+      // The number of credits must be an integer. It is incremented by 1 to
+      // hide the latency of returning a credit, and accounts for token
+      // staying
+      // in the output buffers due to the effect of sharing.
+      credits.push_back(1 + std::ceil(occupancy));
+    }
+
+    // // Retrieve the type reference the the number of credits per each
+    // operation.
+    NamedAttribute namedCreditsAttr(
+        StringAttr::get(ctx, "credits"),
+        builder.getDenseI64ArrayAttr(llvm::ArrayRef<int64_t>(credits)));
+
     assert(sharingWrapperOutputTypes.size() ==
                sharedOp->getNumOperands() + group.size() &&
            "The sharing wrapper has an incorrect number of output ports.");
@@ -559,9 +582,14 @@ sharingWrapperInsertion(handshake::FuncOp &funcOp, SharingGroups &sharingGroups,
             sharedOp->getLoc(), sharingWrapperOutputTypes, sharingWrapperInputs,
             namedCreditsAttr);
 
-    for (auto [id, op] : llvm::enumerate(group))
-      for (Operation *succ : op->getResult(0).getUsers())
-        replaceFirstUse(succ, op->getResult(0), wrapperOp.getResult(id));
+    for (auto [id, succValue] : llvm::enumerate(succValueMap)) {
+      replaceFirstUse(succValue.first, succValue.second,
+                      wrapperOp->getResult(id));
+    }
+
+    // for (auto [id, op] : llvm::enumerate(group))
+    //   for (Operation *succ : op->getResult(0).getUsers())
+    //     replaceFirstUse(succ, op->getResult(0), wrapperOp.getResult(id));
 
     for (auto [id, val] : llvm::enumerate(sharedOp->getOperands()))
       sharedOp->replaceUsesOfWith(val, wrapperOp->getResult(id + group.size()));
@@ -571,6 +599,12 @@ sharingWrapperInsertion(handshake::FuncOp &funcOp, SharingGroups &sharingGroups,
     for (Operation *op : group)
       if (op != sharedOp)
         op->erase();
+
+    wrapperOp.emitWarning()
+        << "Number of results: " << wrapperOp.getNumResults() << "\n";
+
+    wrapperOp.emitWarning()
+        << "Number of results !: " << sharingWrapperOutputTypes.size() << "\n";
   }
 
   return success();
