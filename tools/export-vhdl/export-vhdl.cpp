@@ -20,7 +20,7 @@
 
 int main(int argc, char *argv[]) {
   // Check that the corrent number of arguments were provided
-  if (argc != 4) {
+  if (argc != 4 && argc != 5) {
     std::cerr << "Expected three arguments: kernel name, path to DOT file to "
                  "convert, and path to output folder\n";
     return 1;

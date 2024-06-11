@@ -97,9 +97,19 @@ Component componentsType[MAX_COMPONENTS];
 ofstream netlist;
 ofstream tbWrapper;
 
-bool isSpecInput(Node node_i, int node_indx) { return node_i.speculative; }
+bool ENABLE_SPECULATION = false;
 
-bool isSpecOutput(Node node_i, int node_indx) { return node_i.speculative; }
+bool isSpecInput(Node node_i, int node_indx) {
+  if (node_i.type == "speculator" && node_indx != 0)
+    return false;
+  return node_i.speculative;
+}
+
+bool isSpecOutput(Node node_i, int node_indx) {
+  if (node_i.type == "speculator" && node_indx != 0)
+    return false;
+  return node_i.speculative;
+}
 
 static void writeSignals() {
   int indx;
@@ -870,10 +880,12 @@ static void writeConnections() {
 
           if (isSpecInput(nodes[nextSpecNodeId], nextSpecNodePort)) {
             // Write the Spec Signal connections
-            if (nodes[nextSpecNodeId]
-                    .inputs.input[nextSpecNodePort]
-                    .speculative) {
+            if (isSpecOutput(nodes[i], indx)) {
               // Predecessor
+              cout << nodes[nextSpecNodeId]
+                          .inputs.input[nextSpecNodePort]
+                          .type //.speculative
+                   << " ";
               signal1 = nodes[nextSpecNodeId].name;
               signal1 += "_specInArray_";
               signal1 += to_string(nextSpecNodePort);
@@ -881,6 +893,11 @@ static void writeConnections() {
               signal2 = nodes[i].name;
               signal2 += "_specOutArray_";
               signal2 += to_string(indx);
+
+              cout << nextSpecNodePort << ' ' << indx << " " << i << " ";
+              cout << "\t" << signal1
+                   << " <= std_logic_vector (resize(unsigned(" << signal2
+                   << ")," << signal1 << "'length))" << SEMICOLOUMN << endl;
 
               netlist << "\t" << signal1
                       << " <= std_logic_vector (resize(unsigned(" << signal2
@@ -912,6 +929,7 @@ static string getComponentEntity(const string &component, int componentId) {
       break;
     }
   }
+
   return componentEntity;
 }
 
@@ -960,8 +978,7 @@ static string getGeneric(int nodeId) {
     generic += COMMA;
     generic += to_string(nodes[nodeId].fifodepth);
   }
-  if (nodes[nodeId].type.find("spec_commit") != std::string::npos &&
-      nodes[nodeId].type.find("spec_save_commit") == std::string::npos) {
+  if (nodes[nodeId].type.find("spec_commit") != std::string::npos) {
     generic += to_string(nodes[nodeId].inputs.input[0].bitSize);
     generic += COMMA;
     generic += to_string(nodes[nodeId].outputs.output[0].bitSize);
@@ -973,7 +990,8 @@ static string getGeneric(int nodeId) {
     generic += COMMA;
     generic += to_string(nodes[nodeId].fifodepth);
   }
-  if (nodes[nodeId].type.find("spec_save") != std::string::npos) {
+  if (nodes[nodeId].type.find("spec_save") != std::string::npos &&
+      nodes[nodeId].type.find("spec_save_commit") == std::string::npos) {
     generic += to_string(nodes[nodeId].inputs.input[0].bitSize);
     generic += COMMA;
     generic += to_string(nodes[nodeId].outputs.output[0].bitSize);
@@ -1430,6 +1448,7 @@ static void writeComponents() {
     //                 << endl;
     //         }
     //         else
+    cout << "Entering condition for node type " << nodes[i].type << endl;
     if (nodes[i].type == "LSQ" || nodes[i].type == "MC") {
       for (int lsqIndx = 0; lsqIndx < nodes[i].inputs.size; lsqIndx++) {
         // cout << nodes[i].name << "LSQ input "<< lsqIndx << " = " <<
@@ -2208,6 +2227,10 @@ static void writeComponents() {
 
     } else if (nodes[i].type == "Exit") {
 
+      cout << "Exit";
+      for (indx = 0; indx < nodes[i].inputs.size; indx++)
+        cout << nodes[i].inputs.input[indx].type << endl;
+
       for (indx = 0; indx < nodes[i].inputs.size; indx++) {
 
         if (nodes[i].inputs.input[indx].type != "e") {
@@ -2359,9 +2382,10 @@ static void writeComponents() {
                      std::string::npos)) &&
                    indx == 1) {
             inputPort = "input_addr";
-          } else if (((nodes[i].type == "commit_unit") ||
-                      (nodes[i].type == "save_unit") ||
-                      (nodes[i].type == "save_commit_unit")) &&
+            // TODO(ASEGUI): match names
+          } else if (((nodes[i].type == "spec_commit") ||
+                      (nodes[i].type == "spec_save") ||
+                      (nodes[i].type == "spec_save_commit")) &&
                      (indx == 1)) {
             // Special spec signals
             inputPort = "ControlInArray(0)";
@@ -2624,7 +2648,9 @@ static void writeComponents() {
         for (int out_port_indx = 0;
              out_port_indx < componentsType[nodes[i].componentType].outPorts;
              out_port_indx++) {
+
           if (isSpecOutput(nodes[i], indx)) {
+            // nodes[i].outputs.output[out_port_indx].speculative
             outputPort = "specOutArray(";
             outputPort += to_string(indx);
             outputPort += ")";
@@ -3021,5 +3047,8 @@ void writeVHDL(const string &kernelName, const string &outFolder) {
   writeComponents();
   netlist << endl << "end behavioral; " << endl;
 
+  for (int i = 0; i < componentsInNetlist; ++i) {
+    std::cout << "node " << i << " " << nodes[i].type << std::endl;
+  }
   netlist.close();
 }

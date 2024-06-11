@@ -94,9 +94,9 @@
 #define COMPONENT_SELECTOR "Selector"
 #define COMPONENT_INJECTOR "Inj"
 #define COMPONENT_SPEC_BRANCH "speculating_branch"
-#define COMPONENT_COMMIT_UNIT "commit_unit"
-#define COMPONENT_SAVE_COMMIT_UNIT "save_commit_unit"
-#define COMPONENT_SAVE_UNIT "save_unit"
+#define COMPONENT_COMMIT_UNIT "spec_commit"           // "commit_unit"
+#define COMPONENT_SAVE_COMMIT_UNIT "spec_save_commit" // "save_commit_unit"
+#define COMPONENT_SAVE_UNIT "spec_save"               // "save_unit"
 #define COMPONENT_SPECULATOR "speculator"
 
 #define UNDERSCORE "_"
@@ -124,6 +124,7 @@ enum {
   ENTITY_NFIFO_INDX,
   ENTITY_TFIFO_INDX,
   ENTITY_FORK_INDX,
+  ENTITY_LFORK_INDX,
   ENTITY_ICMP_INDX,
   ENTITY_CONSTANT_INDX,
   ENTITY_BRANCH_INDX,
@@ -146,6 +147,8 @@ enum {
   ENTITY_SPECULATOR_INDX,
   ENTITY_MAX
 };
+
+extern bool ENABLE_SPECULATION;
 
 void writeVHDL(const std::string &kernelName, const std::string &outFolder);
 
