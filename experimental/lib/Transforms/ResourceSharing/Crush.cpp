@@ -5,6 +5,21 @@
 // SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
 //
 //===----------------------------------------------------------------------===//
+// This file implement the credit-based resource sharing pass
+// It contains the following components:
+// 1. A set of wrapper classes for buffer placement passes, which are
+//   instrumented to be able to retrive the achieved performance of each
+//   critical CFDFC in the handshake function
+// 2. An implementation of the sharing target decision heuristic; the heuristic
+//   decides sharing groups---groups of operations that will share the same unit
+//   in the circuit
+// 3. An implementation of the access priority decision heuristic; for a sharing
+//   group, the heuristic decides which operation to start first when multiple
+//   of them can start at the same time.
+// 4. An implementation of the MLIR transformation strategy to replace multiple
+//   operations in the sharing group with a single operation, and add a sharing
+//   wrapper around it to manage access to the share operation.
+//===----------------------------------------------------------------------===//
 
 #include "experimental/Transforms/ResourceSharing/Crush.h"
 #include "dynamatic/Analysis/NameAnalysis.h"
@@ -85,7 +100,8 @@ using Group = std::vector<Operation *>;
 using SharingGroups = std::list<Group>;
 
 // Wrapper function for saving the data retrived from buffer placement milp
-// algorithm into a SharingInfo structure.
+// algorithm into a SharingInfo structure. This function is shared between
+// the FPGA '20 buffer wrapper and FPL '22 buffer wrapper.
 void loadFuncPerfInfo(SharingInfo &sharingInfo, MILPVars &vars,
                       FuncInfo &funcInfo) {
 
@@ -122,8 +138,8 @@ void loadFuncPerfInfo(SharingInfo &sharingInfo, MILPVars &vars,
     }
   }
 
-  // or each CFDFC Union, mark the most-frequently-executed
-  // CFC as performance critical.
+  // For each CFDFC Union, mark the most-frequently-executed CFC as performance
+  // critical.
   for (CFDFCUnion &cfUnion : disjointUnions) {
 
     CFDFC **critCf =
@@ -149,7 +165,6 @@ namespace fpga20 {
 // An wrapper class for extracting CFDFC performance from FPGA20 buffers.
 class FPGA20BuffersWrapper : public FPGA20Buffers {
 public:
-  // constructor
   FPGA20BuffersWrapper(SharingInfo &sharingInfo, GRBEnv &env,
                        FuncInfo &funcInfo, const TimingDatabase &timingDB,
                        double targetPeriod, bool legacyPlacement,
@@ -267,8 +282,8 @@ using fpga20::FPGA20BuffersWrapper;
 using fpl22::FPL22BuffersWraper;
 
 // An wrapper class that applies buffer placement and extracts the performance
-// analysis report, stored in sharingInfo (passed as a reference to be able to
-// read from the resource sharing pass).
+// analysis report, stored in sharingInfo; sharingInfo is passed as a reference
+// to be able to be read from the sharing pass.
 struct HandshakePlaceBuffersPassWrapper : public HandshakePlaceBuffersPass {
   HandshakePlaceBuffersPassWrapper(SharingInfo &sharingInfo,
                                    StringRef algorithm, StringRef frequencies,
@@ -379,7 +394,7 @@ struct CreditBasedSharingPass
     if (failed(TimingDatabase::readFromJSON(timingModels, timingDB)))
       return failure();
 
-    // running buffer placement on current module
+    // Running buffer placement on current module
     mlir::PassManager pm(&getContext());
     pm.addPass(std::make_unique<HandshakePlaceBuffersPassWrapper>(
         data, algorithm, frequencies, timingModels, firstCFDFC, targetCP,
@@ -462,7 +477,6 @@ bool tryMergeGroups(SharingGroups &sharingGroups, const FuncPerfInfo &info) {
         // If all three criteria met, then merge the second group into the
         // first group.
         Group unionGroup = *g1;
-        // unionGroup.insert(g1->begin(), g1->end());
         unionGroup.insert(unionGroup.end(), g2->begin(), g2->end());
         sharingGroups.push_back(unionGroup);
         sharingGroups.erase(g1);
@@ -531,6 +545,7 @@ void getOpOccupancy(const SmallVector<Operation *> &sharingTargets,
           funcPerfInfo.cfUnits[cf].end()) {
         if (failed(timingDB.getLatency(target, SignalType::DATA, latency)))
           latency = 0.0;
+        // Formula for operation occupancy:
         // Occupancy = Latency / II = Latency * Throughput.
         opOccupancy[target] = latency * funcPerfInfo.cfThroughput[cf];
       }
@@ -671,7 +686,7 @@ LogicalResult CreditBasedSharingPass::sharingInFuncOp(
   }
   Logger *logger = dumpLogs ? *sharingLogger : nullptr;
 
-  // Check the sharing targets
+  // Get all the sharing targets within the funcOp
   SmallVector<Operation *> sharingTargets = getSharingTargets(*funcOp);
 
   // opOccupancy: maps each operation to the maximum occupancy it has to
