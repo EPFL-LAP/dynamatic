@@ -713,10 +713,8 @@ ModuleDiscriminator::ModuleDiscriminator(FuncMemoryPorts &ports)
         addUnsigned("numStorePorts", genInfo.numStores);
         addArrayIntAttr("numLoads", genInfo.loadsPerGroup);
         addArrayIntAttr("numStores", genInfo.storesPerGroup);
-        addBiArrayIntAttr("loadOffsets",
-                          ArrayRef<SmallVector<unsigned>>{genInfo.loadOffsets});
-        addBiArrayIntAttr("storeOffsets", ArrayRef<SmallVector<unsigned>>{
-                                              genInfo.storeOffsets});
+        addBiArrayIntAttr("loadOffsets", genInfo.loadOffsets);
+        addBiArrayIntAttr("storeOffsets", genInfo.storeOffsets);
         addBiArrayIntAttr("loadPorts", genInfo.loadPorts);
         addBiArrayIntAttr("storePorts", genInfo.storePorts);
       })

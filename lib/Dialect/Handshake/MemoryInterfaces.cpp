@@ -366,8 +366,8 @@ void LSQGenerationInfo::fromPorts(FuncMemoryPorts &ports) {
 
     // If there are no loads or no stores in the block, set the corresponding
     // offset to 0
-    loadOffsets.push_back(firstLoadOffset.value_or(0));
-    storeOffsets.push_back(firstStoreOffset.value_or(0));
+    loadOffsets.push_back(SmallVector<unsigned>{firstLoadOffset.value_or(0)});
+    storeOffsets.push_back(SmallVector<unsigned>{firstStoreOffset.value_or(0)});
 
     loadPorts.push_back(groupLoadPorts);
     storePorts.push_back(groupStorePorts);
@@ -390,8 +390,8 @@ void LSQGenerationInfo::fromPorts(FuncMemoryPorts &ports) {
   };
 
   // Port offsets and index arrays must have length equal to the depth
-  capArray(loadOffsets, depth);
-  capArray(storeOffsets, depth);
+  capBiArray(loadOffsets, depth);
+  capBiArray(storeOffsets, depth);
   capBiArray(loadPorts, depth);
   capBiArray(storePorts, depth);
 }
