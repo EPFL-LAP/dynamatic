@@ -357,11 +357,19 @@ struct CreditBasedSharingPass
                           SharingGroups &sharingGroups,
                           MapVector<Operation *, double> &opOccupancy);
 
+  // This class method finds all sharing targets for a given handshake function
   SmallVector<mlir::Operation *> getSharingTargets(handshake::FuncOp funcOp) {
     SmallVector<Operation *> sharingTargets;
 
     for (Operation &op : funcOp.getOps()) {
-      if (isa<SHARING_TARGETS>(op)) {
+      // This is a list of sharable operations. To support more operation types,
+      // simply add in the end of the list.
+      if (isa<mlir::arith::MulFOp, mlir::arith::MulIOp, mlir::arith::AddFOp,
+              mlir::arith::SubFOp>(op)) {
+        assert(op.getNumOperands() > 1 && op.getNumResults() == 1 &&
+               "Invalid sharing target is being added to the list of sharing "
+               "targets! Currently operations with 1 input or more than 1 "
+               "outputs are not supported!");
         sharingTargets.emplace_back(&op);
       }
     }
@@ -626,8 +634,6 @@ LogicalResult CreditBasedSharingPass::sharingWrapperInsertion(
 
     for (auto [id, succValue] : llvm::enumerate(succValueMap)) {
       auto [succ, val] = succValue;
-      // succValue.first->replaceUsesOfWith(succValue.second,
-      //                                    wrapperOp.getResult(id));
       replaceFirstUse(succ, val, wrapperOp->getResult(id));
     }
 

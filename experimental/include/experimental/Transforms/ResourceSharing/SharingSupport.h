@@ -14,11 +14,6 @@
 #include <set>
 #include <vector>
 
-// list of types that can be shared
-#define SHARING_TARGETS                                                        \
-  mlir::arith::MulFOp, mlir::arith::MulIOp, mlir::arith::AddFOp,               \
-      mlir::arith::SubFOp
-
 using namespace dynamatic::buffer;
 
 namespace dynamatic {
