@@ -192,8 +192,10 @@ struct LSQGenerationInfo {
   unsigned numGroups, numLoads, numStores;
   /// Number of loads and store accesses per LSQ group.
   SmallVector<unsigned> loadsPerGroup, storesPerGroup;
-  /// Index of first load and store port within each LSQ group.
-  SmallVector<unsigned> loadOffsets, storeOffsets;
+  /// Index of first load and store port within each LSQ group (stored as a
+  /// vector of vector to support the legacy Chisel LSQ generator, only the
+  /// first value in each vector is meaningful).
+  SmallVector<SmallVector<unsigned>> loadOffsets, storeOffsets;
   /// Overall indices for all load and store ports, split by LSQ group.
   SmallVector<SmallVector<unsigned>> loadPorts, storePorts;
   /// Depth of queues within the LSQ.
