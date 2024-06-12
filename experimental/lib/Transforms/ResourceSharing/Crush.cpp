@@ -593,8 +593,7 @@ LogicalResult CreditBasedSharingPass::sharingWrapperInsertion(
     // The output values from the predecessors of the operations in the group.
     llvm::SmallVector<Value, 24> sharingWrapperInputs;
     for (Operation *op : group)
-      for (Value val : op->getOperands())
-        sharingWrapperInputs.push_back(val);
+      llvm::copy(op->getOperands(), std::back_inserter(sharingWrapperInputs));
 
     // Check if the number of results is exactly 1.
     assert(sharedOp->getNumResults() == 1 &&
@@ -606,9 +605,8 @@ LogicalResult CreditBasedSharingPass::sharingWrapperInsertion(
 
     // The outputs of the original operations are also the outputs of the
     // sharing wrapper.
-    for (Operation *op : group) {
+    for (Operation *op : group)
       sharingWrapperOutputTypes.push_back(op->getResultTypes()[0]);
-    }
 
     // The inputs of the shared operation is also the output of the sharing
     // wrapper.
@@ -660,28 +658,24 @@ LogicalResult CreditBasedSharingPass::sharingWrapperInsertion(
     // If operation1 in the group is feeding another operation2 in the group,
     // the above method will retain operation1->wrapperOp, instead of
     // wrapperOp->wrapperOp. The code below will correct this case.
-    for (auto origInputValue : sharingWrapperInputs) {
-      for (auto [outId, op] : llvm::enumerate(group)) {
-        if (op == origInputValue.getDefiningOp()) {
+    for (auto origInputValue : sharingWrapperInputs)
+      for (auto [outId, op] : llvm::enumerate(group))
+        if (op == origInputValue.getDefiningOp())
           wrapperOp->replaceUsesOfWith(origInputValue,
                                        wrapperOp.getResult(outId));
-        }
-      }
-    }
+
     wrapperOp->setOperand(wrapperOp.getNumOperands() - 1,
                           sharedOp->getResult(0));
 
     // Connect the last outputs of the sharing wrapper to the input of the
     // shared operation.
-    for (auto [id, val] : llvm::enumerate(sharedOp->getOperands())) {
+    for (auto [id, val] : llvm::enumerate(sharedOp->getOperands()))
       sharedOp->replaceUsesOfWith(val, wrapperOp->getResult(id + group.size()));
-    }
 
     // Remove all the operations in the group except for the shared one.
     for (Operation *op : group)
-      if (op != sharedOp) {
+      if (op != sharedOp)
         op->erase();
-      }
   }
 
   return success();
