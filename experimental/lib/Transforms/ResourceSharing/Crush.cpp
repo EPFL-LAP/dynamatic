@@ -53,7 +53,8 @@ static constexpr llvm::StringLiteral FPGA20("fpga20"),
     FPGA20_LEGACY("fpga20-legacy"), FPL22("fpl22");
 #endif // DYNAMATIC_GUROBI_NOT_INSTALLED
 
-// extracted data from buffer placement
+// A FuncPerfInfo holds the extracted data from buffer placement, for a single
+// handshake FuncOp.
 struct FuncPerfInfo {
 
   // For each CFC, the achieved throughput
@@ -112,10 +113,6 @@ void loadFuncPerfInfo(SharingInfo &sharingInfo, MILPVars &vars,
 
     sharingInfo[&funcInfo.funcOp].cfUnits[cfIndices[cf]] =
         std::set(cf->units.begin(), cf->units.end());
-
-    // // Track the units of the CFC
-    // for (auto *op : cf->units)
-    //   sharingInfo[&funcInfo.funcOp].cfUnits[cfIndices[cf]].insert(op);
 
     // Track the channels of the CFC
     for (Value val : cf->channels) {
@@ -206,7 +203,6 @@ private:
 };
 
 } // namespace fpl22
-
 } // namespace buffer
 } // namespace dynamatic
 
@@ -269,10 +265,10 @@ SharingLogger::SharingLogger(handshake::FuncOp funcOp, bool dumpLogs,
 
 using fpga20::FPGA20BuffersWrapper;
 using fpl22::FPL22BuffersWraper;
-using llvm::sys::path::get_separator;
 
-// An wrapper class that applies buffer p
-// extracts the report.
+// An wrapper class that applies buffer placement and extracts the performance
+// analysis report, stored in sharingInfo (passed as a reference to be able to
+// read from the resource sharing pass).
 struct HandshakePlaceBuffersPassWrapper : public HandshakePlaceBuffersPass {
   HandshakePlaceBuffersPassWrapper(SharingInfo &sharingInfo,
                                    StringRef algorithm, StringRef frequencies,
@@ -419,9 +415,11 @@ bool checkGroupMergable(const Group &g1, const Group &g2,
   // This is equivalent to checking that throughput * n_ops <= 1;
 
   // 3. For each CFC, there must be no two operations have the same SCC ID (this
-  // is simplified).
+  // is simplified). TODO: we could try to check that if two operations in the
+  // same SCC never start at the same time, then we can put them into the same
+  // group without hurting the performance.
   for (unsigned long cf : funcPerfInfo.critCfcs) {
-    // for each cf, numOps contains the number of operations
+    // For each cf, numOps contains the number of operations
     // that are in the merged group and also in cf
     unsigned numOps = 0;
 
@@ -490,9 +488,11 @@ void logGroups(Logger &logger, bool dumpLogs,
   }
 }
 
+// For a given sharingGroup, we determine an access priority order that does not
+// hurt the performance.
 void sortGroups(SharingGroups &sharingGroups, FuncPerfInfo &info) {
   for (Group &g : sharingGroups) {
-    // use bubble sort to sort each group:
+    // Use bubble sort to sort each group:
     if (g.size() <= 1)
       continue;
     bool modified = false;
@@ -550,6 +550,10 @@ static void replaceFirstUse(Operation *op, Value oldVal, Value newVal) {
   llvm_unreachable("failed to find operation operand");
 }
 
+// This function
+// 1. Replaces a group of operations with a single operation
+// 2. Creates a sharing wrapper that manages selecting the correct inputs of the
+//    operations and dispatches the result to the correct outputs.
 LogicalResult CreditBasedSharingPass::sharingWrapperInsertion(
     handshake::FuncOp &funcOp, SharingGroups &sharingGroups,
     MapVector<Operation *, double> &opOccupancy) {
@@ -571,8 +575,8 @@ LogicalResult CreditBasedSharingPass::sharingWrapperInsertion(
       for (Operation *succ : op->getResult(0).getUsers())
         succValueMap.emplace_back(succ, op->getResult(0));
 
+    // The output values from the predecessors of the operations in the group.
     llvm::SmallVector<Value, 24> sharingWrapperInputs;
-
     for (Operation *op : group)
       for (Value val : op->getOperands())
         sharingWrapperInputs.push_back(val);
@@ -611,12 +615,11 @@ LogicalResult CreditBasedSharingPass::sharingWrapperInsertion(
       double occupancy = opOccupancy[op];
       // The number of credits must be an integer. It is incremented by 1 to
       // hide the latency of returning a credit, and accounts for token
-      // staying
-      // in the output buffers due to the effect of sharing.
+      // staying in the output buffers due to the effect of sharing.
       credits.push_back(1 + std::ceil(occupancy));
     }
 
-    // // Retrieve the type reference the the number of credits per each
+    // Retrieve the type reference the the number of credits per each
     // operation.
     NamedAttribute namedCreditsAttr(
         StringAttr::get(ctx, "credits"),
@@ -632,19 +635,23 @@ LogicalResult CreditBasedSharingPass::sharingWrapperInsertion(
             sharedOp->getLoc(), sharingWrapperOutputTypes, sharingWrapperInputs,
             namedCreditsAttr);
 
+    // Replace original connection from op->successor to
+    // sharingWrapper->successor
     for (auto [id, succValue] : llvm::enumerate(succValueMap)) {
       auto [succ, val] = succValue;
       replaceFirstUse(succ, val, wrapperOp->getResult(id));
     }
 
+    // Connect the last outputs of the sharing wrapper to the input of the
+    // shared operation.
     for (auto [id, val] : llvm::enumerate(sharedOp->getOperands())) {
       sharedOp->replaceUsesOfWith(val, wrapperOp->getResult(id + group.size()));
     }
 
-    for (Operation *op : group) {
+    // Remove all the operations in the group except for the shared one.
+    for (Operation *op : group)
       if (op != sharedOp)
         op->erase();
-    }
   }
 
   return success();
@@ -734,6 +741,7 @@ void CreditBasedSharingPass::runDynamaticPass() {
       sharingInfo[&funcOp] = funcPerfInfo;
     }
 
+  // Apply resource sharing for each function in the module op.
   for (auto &[funcOp, funcPerfInfo] : sharingInfo) {
     if (failed(sharingInFuncOp(funcOp, funcPerfInfo, namer, timingDB))) {
       signalPassFailure();
