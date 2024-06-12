@@ -1,4 +1,4 @@
-add_dynamatic_library(DynamaticResourceSharing
+add_dynamatic_library(DynamaticExperimentalResourceSharing
   Crush.cpp
   SharingSupport.cpp
 

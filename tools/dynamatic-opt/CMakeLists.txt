@@ -17,7 +17,7 @@ target_link_libraries(dynamatic-opt
   DynamaticLowerScfToCf
   DynamaticBufferPlacement
   DynamaticSpeculation
-  DynamaticResourceSharing
+  DynamaticExperimentalResourceSharing
   DynamaticCfToHandshake
   DynamaticHandshake
   DynamaticHandshakeToHW

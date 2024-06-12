@@ -6,8 +6,8 @@
 //
 //===----------------------------------------------------------------------===//
 
-#ifndef EXPERIMENTAL_INCLUDE_DYNAMATIC_TRANSFORMS_RESOURCESHARING_SHARINGSUPPORT_H
-#define EXPERIMENTAL_INCLUDE_DYNAMATIC_TRANSFORMS_RESOURCESHARING_SHARINGSUPPORT_H
+#ifndef EXPERIMENTAL_TRANSFORMS_RESOURCESHARING_SHARINGSUPPORT_H
+#define EXPERIMENTAL_TRANSFORMS_RESOURCESHARING_SHARINGSUPPORT_H
 
 #include "dynamatic/Support/TimingModels.h"
 #include "dynamatic/Transforms/BufferPlacement/BufferingSupport.h"
@@ -30,4 +30,4 @@ getSccsInCfc(const std::set<Operation *> &cfUnits,
 } // namespace experimental
 } // namespace dynamatic
 
-#endif
+#endif // EXPERIMENTAL_INCLUDE_DYNAMATIC_TRANSFORMS_RESOURCESHARING_SHARINGSUPPORT_H

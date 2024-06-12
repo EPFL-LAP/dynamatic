@@ -10,8 +10,8 @@
 //
 //===----------------------------------------------------------------------===//
 
-#ifndef DYNAMATIC_TRANSFORMS_CREDIT_BASED_SHARING_H
-#define DYNAMATIC_TRANSFORMS_CREDIT_BASED_SHARING_H
+#ifndef EXPERIMENTAL_TRANSFORMS_CREDIT_BASED_SHARING_H
+#define EXPERIMENTAL_TRANSFORMS_CREDIT_BASED_SHARING_H
 
 #include "dynamatic/Support/DynamaticPass.h"
 #include "dynamatic/Support/LLVM.h"
@@ -35,4 +35,4 @@ std::unique_ptr<dynamatic::DynamaticPass> createCreditBasedSharing(
 } // namespace experimental
 } // namespace dynamatic
 
-#endif // DYNAMATIC_TRANSFORMS_CREDIT_BASED_SHARING_H
+#endif // EXPERIMENTAL_TRANSFORMS_CREDIT_BASED_SHARING_H
