@@ -1113,39 +1113,12 @@ SameOperandsAndResultType
 
   let summary = "sharing wrapper operation"; let description = [{
     The sharing_wrapper operation represents the selecting & distributing logic
-    that wraps around a functional unit.
-
-    Example: Consider an muli operation is shared between two operations
-
-    Before sharing:
-
-    ```mlir
-    %succOut1 = arith.muli %pred1In1, %pred1In2 { name=#handshake.name<"muli0"> } : i32
-    %succOut2 = arith.muli %pred2In1, %pred2In2 { name=#handshake.name<"muli1"> } : i32
-    ```
-
-    After sharing:
-
-    ```mlir
-    %sharedOut1 = arith.muli %wrapperResult#1, %wrapperResult#2 { name=#handshake.name<"muliShared1"> } : i32
-    %wrapperResult:4 = sharing_wrapper %pred1In1, %pred1In2, %pred2In1, %pred2In2, %sharedOut1 { credits = array<i64: 3, 3> } : (i32, i32, i32, i32), (i32) -> (i32, i32, i32, i32)
-    ```
-
-    The sharing wrapper selects the original operands (%pred1In1, %pred1In2,
-    %pred2In1, %pred2In2), and distributes the computed results to the original
-    results (%succOut1, %succOut2).
-
-    It sends the selected results to the shared multiplier through %selIn1 and
-    %selIn2, and takes the result %sharedOut1 of the shared multiplier.
-
-    The integer array in the attribute is the number of credits per each
-    operation that shares it.
-  }];
+    that wraps around a functional unit.}];
 
   let arguments = (ins Variadic<AnyType> : $dataOperands,
     AnyType : $sharedOpResult,
     DefaultValuedAttr<DenseI64ArrayAttr, "{}">:$credits,
-    ConfinedAttr<I32Attr, [IntMinValue<1>]>:$sharingGroupSize);
+    ConfinedAttr<I32Attr, [IntMinValue<1>]>:$numSharedOperands);
   let results = (outs Variadic<AnyType> : $dataOut);
 
   let assemblyFormat = " `[` $dataOperands `]` `,` `[` $sharedOpResult `]` attr-dict `:` `(` qualified(type($dataOperands)) `)` `,` `(` qualified(type($sharedOpResult)) `)` `->` `(` qualified(type($dataOut)) `)` ";
