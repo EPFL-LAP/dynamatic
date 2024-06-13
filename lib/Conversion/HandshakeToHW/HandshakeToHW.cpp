@@ -1656,15 +1656,15 @@ MemToBRAMConverter::buildExternalModule(hw::HWModuleOp circuitMod,
   modBuilder.addOutput("ce0", i1Type);
   modBuilder.addOutput("we0", i1Type);
   modBuilder.addOutput("address0", addrType);
-  modBuilder.addOutput("mem_din0", memState.dataType);
+  modBuilder.addOutput("din0", memState.dataType);
   modBuilder.addOutput("ce1", i1Type);
   modBuilder.addOutput("we1", i1Type);
   modBuilder.addOutput("address1", addrType);
-  modBuilder.addOutput("mem_din1", memState.dataType);
+  modBuilder.addOutput("din1", memState.dataType);
 
   // Inputs from wrapper
-  modBuilder.addInput("mem_dout0", memState.dataType);
-  modBuilder.addInput("mem_dout1", memState.dataType);
+  modBuilder.addInput("dout0", memState.dataType);
+  modBuilder.addInput("dout1", memState.dataType);
 
   // Outputs to wrapped circuit
   modBuilder.addOutput("loadData", memState.dataType);
