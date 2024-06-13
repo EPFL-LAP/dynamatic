@@ -591,9 +591,9 @@ LogicalResult CreditBasedSharingPass::sharingWrapperInsertion(
         succValueMap.emplace_back(succ, op->getResult(0));
 
     // The output values from the predecessors of the operations in the group.
-    llvm::SmallVector<Value, 24> sharingWrapperInputs;
+    llvm::SmallVector<Value, 24> dataOperands;
     for (Operation *op : group)
-      llvm::copy(op->getOperands(), std::back_inserter(sharingWrapperInputs));
+      llvm::copy(op->getOperands(), std::back_inserter(dataOperands));
 
     // Check if the number of results is exactly 1.
     assert(sharedOp->getNumResults() == 1 &&
@@ -614,11 +614,7 @@ LogicalResult CreditBasedSharingPass::sharingWrapperInsertion(
                                      sharedOp->getOperandTypes().begin(),
                                      sharedOp->getOperandTypes().end());
 
-    sharingWrapperInputs.push_back(sharedOp->getResult(0));
-
-    assert(group.size() * sharedOp->getNumOperands() +
-                   sharedOp->getNumResults() ==
-               sharingWrapperInputs.size() &&
+    assert(group.size() * sharedOp->getNumOperands() == dataOperands.size() &&
            "The sharing wrapper has an incorrect number of input ports.");
 
     // Determining the number of credits of each operation that share the
@@ -632,12 +628,6 @@ LogicalResult CreditBasedSharingPass::sharingWrapperInsertion(
       credits.push_back(1 + std::ceil(occupancy));
     }
 
-    // Retrieve the type reference the the number of credits per each
-    // operation.
-    NamedAttribute namedCreditsAttr(
-        StringAttr::get(ctx, "credits"),
-        builder.getDenseI64ArrayAttr(llvm::ArrayRef<int64_t>(credits)));
-
     assert(sharingWrapperOutputTypes.size() ==
                sharedOp->getNumOperands() + group.size() &&
            "The sharing wrapper has an incorrect number of output ports.");
@@ -645,8 +635,9 @@ LogicalResult CreditBasedSharingPass::sharingWrapperInsertion(
     builder.setInsertionPoint(*group.begin());
     handshake::SharingWrapperOp wrapperOp =
         builder.create<handshake::SharingWrapperOp>(
-            sharedOp->getLoc(), sharingWrapperOutputTypes, sharingWrapperInputs,
-            namedCreditsAttr);
+            sharedOp->getLoc(), sharingWrapperOutputTypes, dataOperands,
+            sharedOp->getResult(0), llvm::ArrayRef<int64_t>(credits),
+            sharedOp->getNumOperands());
 
     // Replace original connection from op->successor to
     // sharingWrapper->successor
@@ -658,7 +649,7 @@ LogicalResult CreditBasedSharingPass::sharingWrapperInsertion(
     // If operation1 in the group is feeding another operation2 in the group,
     // the above method will retain operation1->wrapperOp, instead of
     // wrapperOp->wrapperOp. The code below will correct this case.
-    for (auto origInputValue : sharingWrapperInputs)
+    for (auto origInputValue : dataOperands)
       for (auto [outId, op] : llvm::enumerate(group))
         if (op == origInputValue.getDefiningOp())
           wrapperOp->replaceUsesOfWith(origInputValue,
