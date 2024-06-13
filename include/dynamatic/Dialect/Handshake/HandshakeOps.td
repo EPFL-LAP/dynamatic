@@ -1110,6 +1110,7 @@ def SpeculatingBranchOp : Handshake_Op<"speculating_branch", [
 def SharingWrapperOp : Handshake_Op<"sharing_wrapper", [
 SameOperandsAndResultType
 ]> {
+
   let summary = "sharing wrapper operation"; let description = [{
     The sharing_wrapper operation represents the selecting & distributing logic
     that wraps around a functional unit.
@@ -1126,8 +1127,8 @@ SameOperandsAndResultType
     After sharing:
 
     ```mlir
-    %sharedOut1 = arith.muli %selIn1, %selIn1 { name=#handshake.name<"muliShared1"> } : i32
-    %selIn1, %selIn2, %succOut1, %succOut2 = sharing_wrapper %pred1In1, %pred1In2, %pred2In1, %pred2In2, %sharedOut1 [3, 3] : i32, i32, i32, i32, i32
+    %sharedOut1 = arith.muli %wrapperResult#1, %wrapperResult#2 { name=#handshake.name<"muliShared1"> } : i32
+    %wrapperResult:4 = sharing_wrapper %pred1In1, %pred1In2, %pred2In1, %pred2In2, %sharedOut1 { credits = array<i64: 3, 3> } : (i32, i32, i32, i32), (i32) -> (i32, i32, i32, i32)
     ```
 
     The sharing wrapper selects the original operands (%pred1In1, %pred1In2,
@@ -1141,10 +1142,10 @@ SameOperandsAndResultType
     operation that shares it.
   }];
 
-  let arguments = (ins Variadic<AnyType> : $dataIn, DefaultValuedAttr<DenseI64ArrayAttr, "{}">:$credits);
+  let arguments = (ins Variadic<AnyType> : $dataOperands, AnyType : $sharedOpResult, DefaultValuedAttr<DenseI64ArrayAttr, "{}">:$credits);
   let results = (outs Variadic<AnyType> : $dataOut);
-  let assemblyFormat = " $dataIn attr-dict `:` functional-type($dataIn, $dataOut) ";
 
+  let assemblyFormat = " `[` $dataOperands `]` `,` `[` $sharedOpResult `]` attr-dict `:` `(` qualified(type($dataOperands)) `)` `,` `(` qualified(type($sharedOpResult)) `)` `->` `(` qualified(type($dataOut)) `)` ";
 }
 
 
