@@ -1,5 +1,6 @@
-add_dynamatic_library(DynamaticExperimentalTransforms
-  HandshakePlaceBuffersCustom.cpp
+add_dynamatic_library(DynamaticExperimentalResourceSharing
+  Crush.cpp
+  SharingSupport.cpp
 
   DEPENDS
   DynamaticExperimentalTransformsPassIncGen
@@ -10,9 +11,7 @@ add_dynamatic_library(DynamaticExperimentalTransforms
   MLIRFuncDialect
   MLIRSupport
   MLIRTransformUtils
+  DynamaticHandshake
   DynamaticSupport
-  DynamaticAnalysis
-)
-
-add_subdirectory(Speculation)
-add_subdirectory(ResourceSharing)
+  DynamaticExperimentalSupport
+  )

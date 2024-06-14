@@ -1103,4 +1103,26 @@ def SpeculatingBranchOp : Handshake_Op<"speculating_branch", [
   let assemblyFormat = " `[` $tagFromOperand `]` $dataOperand attr-dict `:` qualified(type($tagFromOperand)) `,` qualified(type($dataOperand)) ";
 }
 
+//===----------------------------------------------------------------------===//
+// Resource Sharing Operations
+//===----------------------------------------------------------------------===//
+
+def SharingWrapperOp : Handshake_Op<"sharing_wrapper", [
+SameOperandsAndResultType
+]> {
+
+  let summary = "sharing wrapper operation"; let description = [{
+    The sharing_wrapper operation represents the selecting & distributing logic
+    that wraps around a functional unit.}];
+
+  let arguments = (ins Variadic<AnyType> : $dataOperands,
+    AnyType : $sharedOpResult,
+    DefaultValuedAttr<DenseI64ArrayAttr, "{}">:$credits,
+    ConfinedAttr<I32Attr, [IntMinValue<1>]>:$numSharedOperands);
+  let results = (outs Variadic<AnyType> : $dataOut);
+
+  let assemblyFormat = " `[` $dataOperands `]` `,` `[` $sharedOpResult `]` attr-dict `:` `(` qualified(type($dataOperands)) `)` `,` `(` qualified(type($sharedOpResult)) `)` `->` `(` qualified(type($dataOut)) `)` ";
+}
+
+
 #endif // DYNAMATIC_DIALECT_HANDSHAKE_HANDHSAKE_OPS_TD
