@@ -43,6 +43,7 @@
 #include "llvm/Support/ErrorHandling.h"
 #include <algorithm>
 #include <bitset>
+#include <cstdint>
 #include <iterator>
 #include <string>
 
@@ -562,6 +563,29 @@ ModuleDiscriminator::ModuleDiscriminator(Operation *op)
             // Data bitwidth and address bitwidth
             addBitwidth("DATA_WIDTH", storeOp.getDataInput());
             addBitwidth("ADDR_WIDTH", storeOp.getAddressInput());
+          })
+      .Case<handshake::SharingWrapperOp>(
+          [&](handshake::SharingWrapperOp sharingWrapperOp) {
+            /// Converts a bi-dimensional array into an equivalent MLIR
+            /// attribute.
+
+            addBitwidth("DATA_WIDTH", sharingWrapperOp.getDataOperands()[0]);
+
+            // addBiArrayIntAttr("CREDITS", sharingWrapperOp.getCredits());
+            Type intType = IntegerType::get(ctx, 64);
+            auto addArrayIntAttr = [&](StringRef name,
+                                       ArrayRef<int64_t> array) -> void {
+              SmallVector<Attribute> arrayAttr;
+              llvm::transform(array, std::back_inserter(arrayAttr),
+                              [&](unsigned elem) {
+                                return IntegerAttr::get(intType, elem);
+                              });
+              addParam(name, ArrayAttr::get(ctx, arrayAttr));
+            };
+            addArrayIntAttr("CREDITS", sharingWrapperOp.getCredits());
+
+            addUnsigned("NUM_SHARED_OPERANDS",
+                        sharingWrapperOp.getNumSharedOperands());
           })
       .Case<handshake::ConstantOp>([&](handshake::ConstantOp cstOp) {
         // Bitwidth and binary-encoded constant value
@@ -1919,6 +1943,7 @@ public:
         ConvertToHWInstance<handshake::LSQLoadOp>,
         ConvertToHWInstance<handshake::MCStoreOp>,
         ConvertToHWInstance<handshake::LSQStoreOp>,
+        ConvertToHWInstance<handshake::SharingWrapperOp>,
         // Arith operations
         ConvertToHWInstance<arith::AddFOp>, ConvertToHWInstance<arith::AddIOp>,
         ConvertToHWInstance<arith::AndIOp>,
