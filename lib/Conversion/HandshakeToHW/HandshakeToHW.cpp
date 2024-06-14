@@ -37,15 +37,23 @@
 #include "mlir/Support/LogicalResult.h"
 #include "mlir/Transforms/DialectConversion.h"
 #include "mlir/Transforms/GreedyPatternRewriteDriver.h"
+#include "llvm/ADT/ArrayRef.h"
 #include "llvm/ADT/STLExtras.h"
+#include "llvm/ADT/SmallVector.h"
+#include "llvm/ADT/StringExtras.h"
 #include "llvm/ADT/StringRef.h"
 #include "llvm/ADT/TypeSwitch.h"
+#include "llvm/Support/Debug.h"
 #include "llvm/Support/ErrorHandling.h"
 #include <algorithm>
 #include <bitset>
+#include <cctype>
+#include <charconv>
 #include <cstdint>
 #include <iterator>
 #include <string>
+
+#define DEBUG_TYPE "HandshakeToHW"
 
 using namespace mlir;
 using namespace dynamatic;
@@ -489,7 +497,14 @@ private:
   /// Adds a string parameter.
   void addString(const Twine &name, const Twine &txt) {
     addParam(name, StringAttr::get(ctx, txt));
-    modName += "_" + txt.str();
+
+    // Replace all non-alphanumeric characters by an underscore.
+    std::string cleanedName = txt.str();
+    std::replace_if(
+        cleanedName.begin(), cleanedName.end(),
+        [](char c) { return !std::isalnum(c); }, '_');
+
+    modName += "_" + cleanedName;
   };
 
   /// Returns the module name's prefix from the name of the operation it
@@ -566,23 +581,25 @@ ModuleDiscriminator::ModuleDiscriminator(Operation *op)
           })
       .Case<handshake::SharingWrapperOp>(
           [&](handshake::SharingWrapperOp sharingWrapperOp) {
-            /// Converts a bi-dimensional array into an equivalent MLIR
-            /// attribute.
-
             addBitwidth("DATA_WIDTH", sharingWrapperOp.getDataOperands()[0]);
 
-            // addBiArrayIntAttr("CREDITS", sharingWrapperOp.getCredits());
-            Type intType = IntegerType::get(ctx, 64);
-            auto addArrayIntAttr = [&](StringRef name,
-                                       ArrayRef<int64_t> array) -> void {
-              SmallVector<Attribute> arrayAttr;
-              llvm::transform(array, std::back_inserter(arrayAttr),
-                              [&](unsigned elem) {
-                                return IntegerAttr::get(intType, elem);
-                              });
-              addParam(name, ArrayAttr::get(ctx, arrayAttr));
+            // In a sharing wrapper, we have the credits as a list of unsigned
+            // integers. This will be encoded as a space-separated string and
+            // passed to the sharing wrapper generator.
+
+            auto addSpaceSeparatedListOfInt =
+                [&](StringRef name, ArrayRef<int64_t> array) -> void {
+              std::string strAttr;
+              for (unsigned i = 0; i < array.size(); i++) {
+                if (i > 0)
+                  strAttr += " ";
+                strAttr += std::to_string(array[i]);
+              }
+              addString(name, strAttr);
             };
-            addArrayIntAttr("CREDITS", sharingWrapperOp.getCredits());
+
+            addSpaceSeparatedListOfInt("CREDITS",
+                                       sharingWrapperOp.getCredits());
 
             addUnsigned("NUM_SHARED_OPERANDS",
                         sharingWrapperOp.getNumSharedOperands());
