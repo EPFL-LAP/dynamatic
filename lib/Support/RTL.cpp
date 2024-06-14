@@ -214,14 +214,8 @@ bool dynamatic::fromJSON(const llvm::json::Value &value, RTLType *&type,
   return true;
 }
 
-RTLMatch RTLRequest::setMatch(const RTLComponent &component,
-                              ParameterMappings &serializedParams) const {
-  serializedParams[RTLParameter::MODULE_NAME] = "";
-  return RTLMatch(component, serializedParams);
-}
-
 RTLRequestFromOp::RTLRequestFromOp(Operation *op, const llvm::Twine &name)
-    : RTLRequest(name, op->getLoc()), op(op),
+    : RTLRequest(op->getLoc()), name(name.str()), op(op),
       parameters(
           op->getAttrOfType<DictionaryAttr>(RTLRequest::PARAMETERS_ATTR)){};
 
@@ -231,7 +225,62 @@ Attribute RTLRequestFromOp::getParameter(const RTLParameter &param) const {
   return parameters.get(param.getName());
 }
 
-ParamMatch RTLRequest::matchParameter(const RTLParameter &param) const {
+RTLMatch *RTLRequestFromOp::tryToMatch(const RTLComponent &component) const {
+  ParameterMappings mappings;
+  if (failed(areParametersCompatible(component, mappings)))
+    return nullptr;
+
+  mappings[RTLParameter::MODULE_NAME] = "";
+  return new RTLMatch(component, mappings);
+}
+
+LogicalResult
+RTLRequestFromOp::areParametersCompatible(const RTLComponent &component,
+                                          ParameterMappings &mappings) const {
+  LLVM_DEBUG(llvm::dbgs() << "Attempting match with RTL component "
+                          << component.getName() << "\n\t-> ";);
+  if (name != component.getName()) {
+    LLVM_DEBUG(llvm::dbgs() << "Names do not match.\n");
+    return failure();
+  }
+
+  // Keep track of the set of parameters we parse from the dictionnary
+  // attribute. We never have duplicate parameters due to the dictionary's
+  // keys uniqueness invariant, but we need to make sure all known parameters
+  // are present
+  DenseSet<StringRef> parsedParams;
+  SmallVector<StringRef> ignoredParams;
+
+  for (const RTLParameter *parameter : component.getParameters()) {
+    ParamMatch paramMatch = matchParameter(*parameter);
+    StringRef paramName = parameter->getName();
+    LLVM_DEBUG({
+      switch (paramMatch.state) {
+      case ParamMatch::State::DOES_NOT_EXIST:
+        llvm::dbgs() << "Parameter \"" << paramName << "\" does not exist\n";
+        break;
+      case ParamMatch::State::FAILED_VERIFICATION:
+        llvm::dbgs() << "Failed constraint checking for parameter \""
+                     << paramName << "\"\n";
+        break;
+      case ParamMatch::State::FAILED_SERIALIZATION:
+        llvm::dbgs() << "Failed serialization for parameter \"" << paramName
+                     << "\"\n";
+        break;
+      case ParamMatch::State::SUCCESS:
+        llvm::dbgs() << "Matched parameter \"" << paramName << "\"\n";
+        break;
+      }
+    });
+    if (paramMatch.state != ParamMatch::SUCCESS)
+      return failure();
+    mappings[paramName] = paramMatch.serialized;
+  }
+  LLVM_DEBUG(llvm::dbgs() << "Matched!\n");
+  return success();
+}
+
+ParamMatch RTLRequestFromOp::matchParameter(const RTLParameter &param) const {
   Attribute attr = getParameter(param);
   if (!attr)
     return ParamMatch::doesNotExist();
@@ -249,16 +298,19 @@ RTLRequestFromOp::paramsToJSON(const llvm::Twine &filepath) const {
 };
 
 RTLRequestFromHWModule::RTLRequestFromHWModule(hw::HWModuleExternOp modOp)
-    : RTLRequestFromOp(modOp, getName(modOp)){};
+    : RTLRequestFromOp(modOp, getName(modOp)) {}
 
-RTLMatch
-RTLRequestFromHWModule::setMatch(const RTLComponent &component,
-                                 ParameterMappings &serializedParams) const {
-  serializedParams[RTLParameter::MODULE_NAME] =
+RTLMatch *
+RTLRequestFromHWModule::tryToMatch(const RTLComponent &component) const {
+  ParameterMappings mappings;
+  if (failed(areParametersCompatible(component, mappings)))
+    return nullptr;
+
+  mappings[RTLParameter::MODULE_NAME] =
       component.isGeneric()
-          ? substituteParams(component.getModuleName(), serializedParams)
+          ? substituteParams(component.getModuleName(), mappings)
           : cast<hw::HWModuleExternOp>(op).getSymName();
-  return RTLMatch(component, serializedParams);
+  return new RTLMatch(component, mappings);
 }
 
 std::string RTLRequestFromHWModule::getName(hw::HWModuleExternOp modOp) {
@@ -266,6 +318,33 @@ std::string RTLRequestFromHWModule::getName(hw::HWModuleExternOp modOp) {
           modOp->getAttrOfType<StringAttr>(RTLRequest::NAME_ATTR))
     return nameAttr.str();
   return "";
+}
+
+RTLDependencyRequest::RTLDependencyRequest(const Twine &moduleName,
+                                           Location loc)
+    : RTLRequest(loc), moduleName(moduleName.str()) {}
+
+RTLMatch *
+RTLDependencyRequest::tryToMatch(const RTLComponent &component) const {
+  LLVM_DEBUG(
+      llvm::dbgs() << "Attempting dependency match between request for \""
+                   << moduleName << "\" and RTL component "
+                   << component.getName() << "\n\t-> ";);
+
+  if (!component.isGeneric()) {
+    LLVM_DEBUG(llvm::dbgs() << "Component is not generic\n");
+    return nullptr;
+  }
+  if (component.getModuleName() != moduleName) {
+    LLVM_DEBUG(llvm::dbgs() << "Component has incorrect module name \""
+                            << component.getModuleName() << "\"\n");
+    return nullptr;
+  }
+
+  LLVM_DEBUG(llvm::dbgs() << "Matched!\n");
+  ParameterMappings mappings;
+  mappings[RTLParameter::MODULE_NAME] = moduleName;
+  return new RTLMatch(component, mappings);
 }
 
 RTLMatch::RTLMatch(const RTLComponent &component,
@@ -362,7 +441,7 @@ static inline size_t countWildcards(StringRef input) {
 bool RTLComponent::fromJSON(const llvm::json::Value &value,
                             llvm::json::Path path) {
   json::ObjectMapper mapper(value, path);
-  if (!mapper || !mapper.map(KEY_NAME, name) ||
+  if (!mapper || !mapper.mapOptional(KEY_NAME, name) ||
       !mapper.mapOptional(KEY_PARAMETERS, parameters) ||
       !mapper.mapOptional(KEY_GENERIC, generic) ||
       !mapper.mapOptional(KEY_GENERATOR, generator) ||
@@ -525,54 +604,11 @@ RTLParameter *RTLComponent::getParameter(StringRef name) const {
   return nullptr;
 }
 
-bool RTLComponent::isCompatible(const RTLRequest &request,
-                                std::vector<RTLMatch> *matches) const {
-  LLVM_DEBUG(llvm::dbgs() << "Attempting match with RTL component " << name
-                          << "\n\t->";);
-  if (request.name != name) {
-    LLVM_DEBUG(llvm::dbgs() << "Names to do match.\n");
-    return false;
-  }
-
-  // Keep track of the set of parameters we parse from the dictionnary
-  // attribute. We never have duplicate parameters due to the dictionary's
-  // keys uniqueness invariant, but we need to make sure all known parameters
-  // are present
-  DenseSet<StringRef> parsedParams;
-  SmallVector<StringRef> ignoredParams;
-
-  ParameterMappings serializedParams;
-
-  for (const RTLParameter &parameter : parameters) {
-    ParamMatch paramMatch = request.matchParameter(parameter);
-    LLVM_DEBUG({
-      switch (paramMatch.state) {
-      case ParamMatch::State::DOES_NOT_EXIST:
-        llvm::dbgs() << "Parameter \"" << parameter.getName()
-                     << "\" does not exist\n";
-        break;
-      case ParamMatch::State::FAILED_VERIFICATION:
-        llvm::dbgs() << "Failed constraint checking for parameter \""
-                     << parameter.getName() << "\"\n";
-        break;
-      case ParamMatch::State::FAILED_SERIALIZATION:
-        llvm::dbgs() << "Failed serialization for parameter \""
-                     << parameter.getName() << "\"\n";
-        break;
-      case ParamMatch::State::SUCCESS:
-        llvm::dbgs() << "Matched parameter \"" << parameter.getName() << "\"\n";
-        break;
-      }
-    });
-    if (paramMatch.state != ParamMatch::SUCCESS)
-      return false;
-    serializedParams[parameter.name] = paramMatch.serialized;
-  }
-
-  if (matches)
-    matches->push_back(request.setMatch(*this, serializedParams));
-  LLVM_DEBUG(llvm::dbgs() << "Matched!\n");
-  return true;
+SmallVector<const RTLParameter *> RTLComponent::getParameters() const {
+  SmallVector<const RTLParameter *> genericParams;
+  for (const RTLParameter &param : parameters)
+    genericParams.push_back(&param);
+  return genericParams;
 }
 
 SmallVector<const RTLParameter *> RTLComponent::getGenericParameters() const {
@@ -595,19 +631,21 @@ SmallVector<const RTLParameter *> RTLComponent::getGenericParameters() const {
 
 const RTLComponent::Model *
 RTLComponent::getModel(const RTLRequest &request) const {
-  if (!isCompatible(request))
+  RTLMatch *match = request.tryToMatch(*this);
+  if (!match)
     return nullptr;
+  delete match;
 
   for (const Model &model : models) {
     /// Returns true when all additional constraints on the parameters are
     /// satisfied.
-    auto satisifed = [&](const Model::AddConstraints &addConstraints) -> bool {
+    auto satisfied = [&](const Model::AddConstraints &addConstraints) -> bool {
       auto &[param, constraints] = addConstraints;
       return constraints->verify(request.getParameter(*param));
     };
 
     // The model matches if all additional parameter constraints are satsified
-    if (llvm::all_of(model.addConstraints, satisifed))
+    if (llvm::all_of(model.addConstraints, satisfied))
       return &model;
   }
 
@@ -667,12 +705,11 @@ std::string RTLComponent::portRemap(StringRef mlirPortName) const {
 }
 
 /// Returns the indexed version of a vector-like RTL signal for a specfic HDL.
-static std::string getIndexedName(const Twine &name, size_t arrayIdx,
-                                  RTLComponent::HDL hdl) {
+static std::string getIndexedName(const Twine &name, size_t arrayIdx, HDL hdl) {
   switch (hdl) {
-  case RTLComponent::HDL::VHDL:
+  case HDL::VHDL:
     return name.str() + "(" + std::to_string(arrayIdx) + ")";
-  case RTLComponent::HDL::VERILOG:
+  case HDL::VERILOG:
     return name.str() + "[" + std::to_string(arrayIdx) + "]";
   }
 }
@@ -776,17 +813,17 @@ inline bool dynamatic::fromJSON(const json::Value &value,
   return true;
 }
 
-inline bool dynamatic::fromJSON(const llvm::json::Value &value,
-                                RTLComponent::HDL &hdl, llvm::json::Path path) {
+inline bool dynamatic::fromJSON(const llvm::json::Value &value, HDL &hdl,
+                                llvm::json::Path path) {
   std::optional<StringRef> hdlStr = value.getAsString();
   if (!hdlStr) {
     path.report(ERR_EXPECTED_STRING);
     return false;
   }
   if (hdlStr == "verilog") {
-    hdl = RTLComponent::HDL::VERILOG;
+    hdl = HDL::VERILOG;
   } else if (hdlStr == "vhdl") {
-    hdl = RTLComponent::HDL::VHDL;
+    hdl = HDL::VHDL;
   } else {
     path.report(ERR_INVALID_HDL);
     return false;
@@ -857,34 +894,40 @@ LogicalResult RTLConfiguration::addComponentsFromJSON(StringRef filepath) {
   return success();
 }
 
+static inline void notifyRequest(const RTLRequest &request) {
+  LLVM_DEBUG(llvm::dbgs()
+             << "Attempting to find compatible component for RTL request at "
+             << request.loc << "\n");
+}
+
 bool RTLConfiguration::hasMatchingComponent(const RTLRequest &request) {
-  LLVM_DEBUG(
-      llvm::dbgs() << "Attempting to find compatible component for request \""
-                   << request.name << "\"\n");
+  notifyRequest(request);
   return llvm::any_of(components, [&](const RTLComponent &component) {
-    return component.isCompatible(request);
+    if (RTLMatch *match = request.tryToMatch(component)) {
+      delete match;
+      return true;
+    }
+    return false;
   });
 }
 
-std::optional<RTLMatch>
-RTLConfiguration::getMatchingComponent(const RTLRequest &request) {
-  LLVM_DEBUG(
-      llvm::dbgs() << "Attempting to find compatible component for request \""
-                   << request.name << "\"\n");
+RTLMatch *RTLConfiguration::getMatchingComponent(const RTLRequest &request) {
+  notifyRequest(request);
   std::vector<RTLMatch> matches;
   for (const RTLComponent &component : components) {
-    if (component.isCompatible(request, &matches))
-      return matches.front();
+    if (RTLMatch *match = request.tryToMatch(component))
+      return match;
   }
-  return std::nullopt;
+  return nullptr;
 }
 
 void RTLConfiguration::findMatchingComponents(
-    const RTLRequest &request, std::vector<RTLMatch> &matches) const {
-  LLVM_DEBUG(llvm::dbgs() << "Finding compatible components for request \""
-                          << request.name << "\"\n");
-  for (const RTLComponent &component : components)
-    component.isCompatible(request, &matches);
+    const RTLRequest &request, std::vector<RTLMatch *> &matches) const {
+  notifyRequest(request);
+  for (const RTLComponent &component : components) {
+    if (RTLMatch *match = request.tryToMatch(component))
+      matches.push_back(match);
+  }
   LLVM_DEBUG(llvm::dbgs() << matches.size()
                           << " compatible components found\n");
 }

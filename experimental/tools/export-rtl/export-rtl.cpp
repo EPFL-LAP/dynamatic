@@ -64,12 +64,11 @@ static cl::opt<std::string> dynamaticPath("dynamatic-path", cl::Optional,
                                           cl::desc("<path to Dynamatic>"),
                                           cl::init("."), cl::cat(mainCategory));
 
-static cl::opt<RTLComponent::HDL> hdl(
-    "hdl", cl::Optional, cl::desc("<hdl to use>"),
-    cl::init(RTLComponent::HDL::VHDL),
-    cl::values(clEnumValN(RTLComponent::HDL::VHDL, "vhdl", "VHDL"),
-               clEnumValN(RTLComponent::HDL::VERILOG, "verilog", "Verilog")),
-    cl::cat(mainCategory));
+static cl::opt<HDL>
+    hdl("hdl", cl::Optional, cl::desc("<hdl to use>"), cl::init(HDL::VHDL),
+        cl::values(clEnumValN(HDL::VHDL, "vhdl", "VHDL"),
+                   clEnumValN(HDL::VERILOG, "verilog", "Verilog")),
+        cl::cat(mainCategory));
 
 static cl::list<std::string>
     rtlConfigs(cl::Positional, cl::OneOrMore,
@@ -87,9 +86,9 @@ struct ExportInfo {
   mlir::ModuleOp modOp;
   /// The RTL configuration parsed from JSON-formatted files.
   RTLConfiguration &config;
-  /// Maps every external hardware module in the IR to its corresponding match
-  /// according to the RTL configuration.
-  mlir::DenseMap<hw::HWModuleExternOp, RTLMatch> externals;
+  /// Maps every external hardware module in the IR to its corresponding
+  /// heap-allocated match according to the RTL configuration.
+  mlir::DenseMap<hw::HWModuleExternOp, RTLMatch *> externals;
 
   /// Creates export information for the given module and RTL configuration.
   ExportInfo(mlir::ModuleOp modOp, RTLConfiguration &config)
@@ -100,32 +99,38 @@ struct ExportInfo {
   /// directory. Fails if any external module does not have a match in the RTL
   /// configuration; succeeds otherwise.
   LogicalResult concretizeExternalModules();
+
+  /// Deallocates all of our RTL matches.
+  ~ExportInfo() {
+    for (auto [_, match] : externals)
+      delete match;
+  }
 };
 } // namespace
 
 LogicalResult ExportInfo::concretizeExternalModules() {
-  std::set<std::string> entities;
+  std::set<std::string> modules;
 
   FGenComp concretizeComponent =
       [&](const RTLRequest &request,
           hw::HWModuleExternOp extOp) -> LogicalResult {
     // Try to find a matching component
-    std::optional<RTLMatch> match = config.getMatchingComponent(request);
+    RTLMatch *match = config.getMatchingComponent(request);
     if (!match) {
       return emitError(request.loc)
              << "Failed to find matching RTL component for external module";
     }
     if (extOp)
-      externals[extOp] = *match;
+      externals[extOp] = match;
 
-    // No need to do anything if an entity with the same name already exists
-    if (auto [_, isNew] = entities.insert(match->getConcreteModuleName().str());
-        !isNew)
+    // No need to do anything if a module with the same name already exists
+    StringRef concreteModName = match->getConcreteModuleName();
+    if (auto [_, isNew] = modules.insert(concreteModName.str()); !isNew)
       return success();
 
-    // First generate dependencies...
+    // First generate dependencies recursively...
     for (StringRef dep : match->component->getDependencies()) {
-      RTLRequest dependencyRequest(dep, request.loc);
+      RTLDependencyRequest dependencyRequest(dep, request.loc);
       if (failed(concretizeComponent(dependencyRequest, nullptr)))
         return failure();
     }
@@ -139,7 +144,6 @@ LogicalResult ExportInfo::concretizeExternalModules() {
     if (failed(concretizeComponent(request, extOp)))
       return failure();
   }
-
   return success();
 }
 
@@ -359,7 +363,7 @@ RTLWriter::IOMap::IOMap(hw::InstanceOp instOp, const ExportInfo &info,
                         const FGetValueName &getValueName) {
   hw::HWModuleLike modOp = getHWModule(instOp);
   if (auto extModOp = dyn_cast<hw::HWModuleExternOp>(modOp.getOperation())) {
-    const RTLMatch &match = info.externals.at(extModOp);
+    const RTLMatch &match = *info.externals.at(extModOp);
     FGetTypedSignalName getTypedSignalName = [&](auto port, auto type) {
       return match.component->getRTLPortName(port, type, hdl);
     };
@@ -612,7 +616,7 @@ void VHDLWriter::writeModuleInstantiations(WriteData &data) const {
   using KeyValuePair = std::pair<StringRef, StringRef>;
 
   for (hw::InstanceOp instOp : data.modOp.getOps<hw::InstanceOp>()) {
-    RTLComponent::HDL hdl(RTLComponent::HDL::VHDL);
+    HDL hdl(HDL::VHDL);
     std::string moduleName;
     std::string archName;
     SmallVector<KeyValuePair> genericParams;
@@ -623,7 +627,7 @@ void VHDLWriter::writeModuleInstantiations(WriteData &data) const {
           archName = ARCH_NAME;
         })
         .Case<hw::HWModuleExternOp>([&](hw::HWModuleExternOp extModOp) {
-          const RTLMatch &match = exportInfo.externals.at(extModOp);
+          const RTLMatch &match = *exportInfo.externals.at(extModOp);
           hdl = match.component->getHDL();
           moduleName = match.getConcreteModuleName();
           archName = match.getConcreteArchName();
@@ -634,7 +638,7 @@ void VHDLWriter::writeModuleInstantiations(WriteData &data) const {
     raw_indented_ostream &os = data.os;
     // Declare the instance
     os << instOp.getInstanceName() << " : entity work." << moduleName;
-    if (hdl == RTLComponent::HDL::VHDL)
+    if (hdl == HDL::VHDL)
       os << "(" << archName << ")";
 
     // Write generic parameters if there are any
@@ -813,7 +817,7 @@ void VerilogWriter::writeModuleInstantiations(WriteData &data) const {
   using KeyValuePair = std::pair<StringRef, StringRef>;
 
   for (hw::InstanceOp instOp : data.modOp.getOps<hw::InstanceOp>()) {
-    RTLComponent::HDL hdl(dynamatic::RTLComponent::HDL::VERILOG);
+    HDL hdl(dynamatic::HDL::VERILOG);
     std::string moduleName;
     SmallVector<KeyValuePair> genericParams;
 
@@ -821,7 +825,7 @@ void VerilogWriter::writeModuleInstantiations(WriteData &data) const {
         .Case<hw::HWModuleOp>(
             [&](hw::HWModuleOp hwModOp) { moduleName = hwModOp.getSymName(); })
         .Case<hw::HWModuleExternOp>([&](hw::HWModuleExternOp extModOp) {
-          const RTLMatch &match = exportInfo.externals.at(extModOp);
+          const RTLMatch &match = *exportInfo.externals.at(extModOp);
           hdl = match.component->getHDL();
           moduleName = match.getConcreteModuleName();
           genericParams = match.getGenericParameterValues().takeVector();
@@ -884,10 +888,10 @@ static LogicalResult writeModule(RTLWriter &writer, hw::HWModuleOp modOp) {
   // Determine file extension
   StringRef ext;
   switch (hdl) {
-  case RTLComponent::HDL::VHDL:
+  case HDL::VHDL:
     ext = ".vhd";
     break;
-  case RTLComponent::HDL::VERILOG:
+  case HDL::VERILOG:
     ext = ".v";
     break;
   }
@@ -964,10 +968,10 @@ int main(int argc, char **argv) {
   // Create an RTL writer
   RTLWriter *writer;
   switch (hdl) {
-  case RTLComponent::HDL::VHDL:
+  case HDL::VHDL:
     writer = new VHDLWriter(info);
     break;
-  case RTLComponent::HDL::VERILOG:
+  case HDL::VERILOG:
     writer = new VerilogWriter(info);
     break;
   }

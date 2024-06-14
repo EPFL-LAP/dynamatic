@@ -699,19 +699,23 @@ ModuleDiscriminator::ModuleDiscriminator(Operation *op)
 
 ModuleDiscriminator::ModuleDiscriminator(FuncMemoryPorts &ports)
     : op(ports.memOp), ctx(op->getContext()), modName(setModPrefix(op)) {
+
   llvm::TypeSwitch<Operation *, void>(op)
       .Case<handshake::MemoryControllerOp>([&](auto) {
+        // There can be at most one of those, and it is a load/store port
+        unsigned lsqPort = ports.getNumPorts<LSQLoadStorePort>();
+
         // Control port count, load port count, store port count, data
         // bitwidth, and address bitwidth
         addUnsigned("NUM_CONTROL", ports.getNumPorts<ControlPort>());
-        addUnsigned("NUM_LOAD", ports.getNumPorts<LoadPort>());
-        addUnsigned("NUM_STORE", ports.getNumPorts<StorePort>());
+        addUnsigned("NUM_LOAD", ports.getNumPorts<LoadPort>() + lsqPort);
+        addUnsigned("NUM_STORE", ports.getNumPorts<StorePort>() + lsqPort);
         addUnsigned("DATA_WIDTH", ports.dataWidth);
         addUnsigned("ADDR_WIDTH", ports.addrWidth);
       })
       .Case<handshake::LSQOp>([&](auto) {
         LSQGenerationInfo genInfo(ports, getUniqueName(op).str());
-        modName += "_" + genInfo.name;
+        std::string lsqName = modName + "_" + genInfo.name;
 
         /// Converts an array into an equivalent MLIR attribute.
         Type intType = IntegerType::get(ctx, 32);
@@ -739,7 +743,7 @@ ModuleDiscriminator::ModuleDiscriminator(FuncMemoryPorts &ports)
           addParam(name, ArrayAttr::get(ctx, biArrayAttr));
         };
 
-        addString("name", modName);
+        addString("name", lsqName);
         addUnsigned("fifoDepth", genInfo.depth);
         addUnsigned("fifoDepth_L", genInfo.depthLoad);
         addUnsigned("fifoDepth_S", genInfo.depthStore);
@@ -758,6 +762,9 @@ ModuleDiscriminator::ModuleDiscriminator(FuncMemoryPorts &ports)
         addBiArrayIntAttr("storeOffsets", genInfo.storeOffsets);
         addBiArrayIntAttr("loadPorts", genInfo.loadPorts);
         addBiArrayIntAttr("storePorts", genInfo.storePorts);
+
+        // Override the module's name
+        modName = lsqName;
       })
       .Default([&](auto) {
         op->emitError() << "Unsupported memory interface type.";
@@ -1690,15 +1697,15 @@ MemToBRAMConverter::buildExternalModule(hw::HWModuleOp circuitMod,
   modBuilder.addOutput("ce0", i1Type);
   modBuilder.addOutput("we0", i1Type);
   modBuilder.addOutput("address0", addrType);
-  modBuilder.addOutput("mem_din0", memState.dataType);
+  modBuilder.addOutput("din0", memState.dataType);
   modBuilder.addOutput("ce1", i1Type);
   modBuilder.addOutput("we1", i1Type);
   modBuilder.addOutput("address1", addrType);
-  modBuilder.addOutput("mem_din1", memState.dataType);
+  modBuilder.addOutput("din1", memState.dataType);
 
   // Inputs from wrapper
-  modBuilder.addInput("mem_dout0", memState.dataType);
-  modBuilder.addInput("mem_dout1", memState.dataType);
+  modBuilder.addInput("dout0", memState.dataType);
+  modBuilder.addInput("dout1", memState.dataType);
 
   // Outputs to wrapped circuit
   modBuilder.addOutput("loadData", memState.dataType);
