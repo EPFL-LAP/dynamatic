@@ -31,6 +31,7 @@
 #include "mlir/IR/BuiltinAttributes.h"
 #include "mlir/IR/BuiltinOps.h"
 #include "mlir/IR/BuiltinTypes.h"
+#include "mlir/IR/Diagnostics.h"
 #include "mlir/IR/MLIRContext.h"
 #include "mlir/IR/PatternMatch.h"
 #include "mlir/IR/Value.h"
@@ -749,6 +750,7 @@ ModuleDiscriminator::ModuleDiscriminator(FuncMemoryPorts &ports)
 
         addString("name", lsqName);
         addBoolean("experimental", true);
+        addBoolean("toMC", !ports.interfacePorts.empty());
         addUnsigned("fifoDepth", genInfo.depth);
         addUnsigned("fifoDepth_L", genInfo.depthLoad);
         addUnsigned("fifoDepth_S", genInfo.depthStore);
@@ -939,8 +941,8 @@ public:
 
     // Resolve backedges in the module's terminator that are coming from the
     // memory interface
-    ValueRange results = instOp->getResults().drop_front(numResults);
-    for (auto [backedge, res] : llvm::zip_equal(state.backedges, results))
+    ValueRange toModOutput = instOp->getResults().drop_front(numResults);
+    for (auto [backedge, res] : llvm::zip_equal(state.backedges, toModOutput))
       backedge.setValue(res);
     return instOp;
   }
@@ -949,7 +951,7 @@ public:
 
 /// Returns the clock and reset module inputs (which are assumed to be the last
 /// two module inputs).
-std::pair<Value, Value> getClkAndRst(hw::HWModuleOp hwModOp) {
+static std::pair<Value, Value> getClkAndRst(hw::HWModuleOp hwModOp) {
   // Check that the parent module's last port are the clock and reset
   // signals we need for the instance operands
   unsigned numInputs = hwModOp.getNumInputPorts();
@@ -1351,47 +1353,55 @@ LogicalResult ConvertMemInterface::matchAndRewrite(
   // number of input ports, add those first
   ValueRange blockArgs = parentModOp.getBodyBlock()->getArguments();
   ValueRange memArgs = blockArgs.slice(memState.inputIdx, memState.numInputs);
-  SmallVector<hw::ModulePort> memPorts = memState.getMemInputPorts(parentModOp);
-  for (auto [port, arg] : llvm::zip_equal(memPorts, memArgs))
+  auto inputModPorts = memState.getMemInputPorts(parentModOp);
+  for (auto [port, arg] : llvm::zip_equal(inputModPorts, memArgs))
     converter.addInput(removePortNamePrefix(port), arg);
 
-  // Adds the operand at the given index to the ports and instance operands.
   auto addInput = [&](size_t idx) -> void {
     Value oprd = operands[idx];
     converter.addInput(memState.portNames.getInputName(idx), oprd);
   };
+  auto addOutput = [&](size_t idx) -> void {
+    StringRef resName = memState.portNames.getOutputName(idx);
+    OpResult res = memOp->getResults()[idx];
+    converter.addOutput(resName, channelWrapper(res.getType()));
+  };
 
-  // Construct the list of operands to the HW instance and the list of input
-  // ports at the same time by iterating over the interface's ports
+  // Add all input/output ports corresponding to the memory interface's groups
   for (GroupMemoryPorts &groupPorts : memState.ports.groups) {
-    if (groupPorts.hasControl()) {
-      ControlPort &ctrlPort = *groupPorts.ctrlPort;
-      addInput(ctrlPort.getCtrlInputIndex());
+    size_t inputIdx = groupPorts.getFirstOperandIndex();
+    if (inputIdx != std::string::npos) {
+      size_t lastInputIdx = groupPorts.getLastOperandIndex();
+      for (; inputIdx <= lastInputIdx; ++inputIdx)
+        addInput(inputIdx);
     }
 
-    for (auto [portIdx, port] : llvm::enumerate(groupPorts.accessPorts)) {
-      if (std::optional<LoadPort> loadPort = dyn_cast<LoadPort>(port)) {
-        addInput(loadPort->getAddrInputIndex());
-      } else {
-        std::optional<StorePort> storePort = dyn_cast<StorePort>(port);
-        assert(storePort && "port must be load or store");
-        addInput(storePort->getAddrInputIndex());
-        addInput(storePort->getDataInputIndex());
-      }
+    size_t outputIdx = groupPorts.getFirstResultIndex();
+    if (outputIdx != std::string::npos) {
+      size_t lastOutputIdx = groupPorts.getLastResultIndex();
+      for (; outputIdx <= lastOutputIdx; ++outputIdx)
+        addOutput(outputIdx);
     }
   }
 
-  // Finish by clock and reset ports
+  // Add all input/output ports corresponding to the memory interface's ports
+  // with other memory interfaces
+  for (MemoryPort &memPort : memState.ports.interfacePorts) {
+    for (size_t inputIdx : memPort.getOprdIndices())
+      addInput(inputIdx);
+    for (size_t outputIdx : memPort.getResIndices())
+      addOutput(outputIdx);
+  }
+
+  // Finish inputs by clock and reset ports
   converter.addClkAndRst(parentModOp);
 
-  // Add output ports corresponding to memory interface results, then those
-  // going outside the parent HW module
-  for (auto [idx, arg] : llvm::enumerate(memOp->getResults())) {
-    StringRef resName = memState.portNames.getOutputName(idx);
-    converter.addOutput(resName, channelWrapper(arg.getType()));
-  }
-  for (const hw::ModulePort &outputPort :
-       memState.getMemOutputPorts(parentModOp))
+  // Add output port corresponding to the interface's done signal
+  addOutput(memOp->getNumResults() - 1);
+
+  // Add output ports going to the parent HW module
+  auto outputModPorts = memState.getMemOutputPorts(parentModOp);
+  for (const hw::ModulePort &outputPort : outputModPorts)
     converter.addOutput(removePortNamePrefix(outputPort), outputPort.type);
 
   // Create the instance, then replace the original memory interface's result

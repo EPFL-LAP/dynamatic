@@ -42,7 +42,9 @@ begin
 
   -- load request
   ce1      <= loadEn;
+  we1      <= '0';
   address1 <= loadAddr;
+  din1     <= (others => '0');
   loadData <= dout1;
 
 end architecture;

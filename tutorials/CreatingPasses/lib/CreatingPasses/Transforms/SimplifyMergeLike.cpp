@@ -13,6 +13,7 @@
 
 #include "tutorials/CreatingPasses/Transforms/SimplifyMergeLike.h"
 #include "dynamatic/Dialect/Handshake/HandshakeOps.h"
+#include "mlir/IR/BuiltinOps.h"
 #include "mlir/IR/MLIRContext.h"
 
 using namespace mlir;
