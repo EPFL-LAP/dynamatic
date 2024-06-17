@@ -1217,19 +1217,21 @@ dynamatic::getMemoryPorts(handshake::MemoryOpInterface memOp) {
 
 // MemoryPort (asbtract)
 
-MemoryPort::MemoryPort(Operation *portOp, ArrayRef<unsigned> indices, Kind kind)
-    : portOp(portOp), indices(indices), kind(kind) {}
+MemoryPort::MemoryPort(Operation *portOp, ArrayRef<unsigned> oprdIndices,
+                       ArrayRef<unsigned> resIndices, Kind kind)
+    : portOp(portOp), oprdIndices(oprdIndices), resIndices(resIndices),
+      kind(kind) {}
 
 // ControlPort: op -> mem. interface
 
 ControlPort::ControlPort(Operation *ctrlOp, unsigned ctrlInputIdx)
-    : MemoryPort(ctrlOp, {ctrlInputIdx}, Kind::CONTROL) {}
+    : MemoryPort(ctrlOp, {ctrlInputIdx}, {}, Kind::CONTROL) {}
 
 // LoadPort: LoadOpInterface <-> mem. interface
 
 LoadPort::LoadPort(handshake::LoadOpInterface loadOp, unsigned addrInputIdx,
                    unsigned dataOutputIdx, Kind kind)
-    : MemoryPort(loadOp, {addrInputIdx, dataOutputIdx}, kind) {}
+    : MemoryPort(loadOp, {addrInputIdx}, {dataOutputIdx}, kind) {}
 
 handshake::LoadOpInterface LoadPort::getLoadOp() const {
   return cast<handshake::LoadOpInterface>(portOp);
@@ -1255,7 +1257,7 @@ handshake::LSQLoadOp LSQLoadPort::getLSQLoadOp() const {
 
 StorePort::StorePort(handshake::StoreOpInterface storeOp, unsigned addrInputIdx,
                      Kind kind)
-    : MemoryPort(storeOp, {addrInputIdx, addrInputIdx + 1}, kind){};
+    : MemoryPort(storeOp, {addrInputIdx, addrInputIdx + 1}, {}, kind){};
 
 handshake::StoreOpInterface StorePort::getStoreOp() const {
   return cast<handshake::StoreOpInterface>(portOp);
@@ -1281,9 +1283,8 @@ LSQLoadStorePort::LSQLoadStorePort(dynamatic::handshake::LSQOp lsqOp,
                                    unsigned loadAddrInputIdx,
                                    unsigned loadDataOutputIdx)
     : MemoryPort(lsqOp,
-                 {loadAddrInputIdx, loadDataOutputIdx, loadAddrInputIdx + 1,
-                  loadAddrInputIdx + 2},
-                 Kind::LSQ_LOAD_STORE) {}
+                 {loadAddrInputIdx, loadAddrInputIdx + 1, loadAddrInputIdx + 2},
+                 {loadDataOutputIdx}, Kind::LSQ_LOAD_STORE) {}
 
 handshake::LSQOp LSQLoadStorePort::getLSQOp() const {
   return cast<handshake::LSQOp>(portOp);
@@ -1294,10 +1295,10 @@ handshake::LSQOp LSQLoadStorePort::getLSQOp() const {
 MCLoadStorePort::MCLoadStorePort(dynamatic::handshake::MemoryControllerOp mcOp,
                                  unsigned loadAddrOutputIdx,
                                  unsigned loadDataInputIdx)
-    : MemoryPort(mcOp,
-                 {loadAddrOutputIdx, loadDataInputIdx, loadAddrOutputIdx + 1,
-                  loadAddrOutputIdx + 2},
-                 Kind::MC_LOAD_STORE) {}
+    : MemoryPort(
+          mcOp, {loadDataInputIdx},
+          {loadAddrOutputIdx, loadAddrOutputIdx + 1, loadAddrOutputIdx + 2},
+          Kind::MC_LOAD_STORE) {}
 
 handshake::MemoryControllerOp MCLoadStorePort::getMCOp() const {
   return cast<handshake::MemoryControllerOp>(portOp);
@@ -1334,24 +1335,16 @@ size_t GroupMemoryPorts::getFirstOperandIndex() const {
   if (ctrlPort)
     return (*ctrlPort).getCtrlInputIndex();
   for (const MemoryPort &port : accessPorts) {
-    if (std::optional<LoadPort> loadPort = dyn_cast<LoadPort>(port)) {
-      return loadPort->getAddrInputIndex();
-    }
-    std::optional<StorePort> storePort = dyn_cast<StorePort>(port);
-    assert(storePort && "port must be load or store");
-    return storePort->getAddrInputIndex();
+    if (auto indices = port.getOprdIndices(); !indices.empty())
+      return indices.front();
   }
   return std::string::npos;
 }
 
 size_t GroupMemoryPorts::getLastOperandIndex() const {
   for (const MemoryPort &port : llvm::reverse(accessPorts)) {
-    if (std::optional<LoadPort> loadPort = dyn_cast<LoadPort>(port)) {
-      return loadPort->getAddrInputIndex();
-    }
-    std::optional<StorePort> storePort = dyn_cast<StorePort>(port);
-    assert(storePort && "port must be load or store");
-    return storePort->getDataInputIndex();
+    if (auto indices = port.getOprdIndices(); !indices.empty())
+      return indices.back();
   }
   if (ctrlPort)
     return (*ctrlPort).getCtrlInputIndex();
@@ -1360,16 +1353,16 @@ size_t GroupMemoryPorts::getLastOperandIndex() const {
 
 size_t GroupMemoryPorts::getFirstResultIndex() const {
   for (const MemoryPort &port : accessPorts) {
-    if (std::optional<LoadPort> loadPort = dyn_cast<LoadPort>(port))
-      return loadPort->getDataOutputIndex();
+    if (auto indices = port.getResIndices(); !indices.empty())
+      return indices.front();
   }
   return std::string::npos;
 }
 
 size_t GroupMemoryPorts::getLastResultIndex() const {
   for (const MemoryPort &port : llvm::reverse(accessPorts)) {
-    if (std::optional<LoadPort> loadPort = dyn_cast<LoadPort>(port))
-      return loadPort->getDataOutputIndex();
+    if (auto indices = port.getResIndices(); !indices.empty())
+      return indices.front();
   }
   return std::string::npos;
 }
