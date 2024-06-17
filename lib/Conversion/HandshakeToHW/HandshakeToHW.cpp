@@ -1195,8 +1195,10 @@ LogicalResult ConvertExternalFunc::matchAndRewrite(
   modBuilder.addClkAndRst();
 
   rewriter.setInsertionPoint(funcOp);
-  rewriter.replaceOpWithNewOp<hw::HWModuleExternOp>(funcOp, name,
-                                                    modBuilder.getPortInfo());
+  auto modOp = rewriter.replaceOpWithNewOp<hw::HWModuleExternOp>(
+      funcOp, name, modBuilder.getPortInfo());
+  modOp->setAttr(StringAttr::get(getContext(), RTLRequest::NAME_ATTR),
+                 funcOp.getNameAttr());
   return success();
 }
 
