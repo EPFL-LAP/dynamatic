@@ -202,13 +202,11 @@ void PortNameGenerator::inferDefault(Operation *op) {
         infer(
             op,
             [](unsigned idx) {
-              switch (idx) {
-              case 0:
+              if (idx == 0)
                 return "condition";
-              case 1:
-                return "trueOut";
-              }
-              return "falseOut";
+              if (idx == 1)
+                return "trueValue";
+              return "falseValue";
             },
             [](unsigned idx) { return "result"; });
       })
@@ -468,6 +466,12 @@ private:
     parameters.emplace_back(StringAttr::get(ctx, name), attr);
   }
 
+  /// Adds a boolean-type parameter.
+  void addBoolean(const Twine &name, bool value) {
+    addParam(name, BoolAttr::get(ctx, value));
+    modName += "_" + std::to_string(value);
+  };
+
   /// Adds a scalar-type parameter.
   void addUnsigned(const Twine &name, unsigned scalar) {
     Type intType = IntegerType::get(ctx, 32, IntegerType::Unsigned);
@@ -703,13 +707,12 @@ ModuleDiscriminator::ModuleDiscriminator(FuncMemoryPorts &ports)
         };
 
         addString("name", lsqName);
+        addBoolean("experimental", true);
         addUnsigned("fifoDepth", genInfo.depth);
         addUnsigned("fifoDepth_L", genInfo.depthLoad);
         addUnsigned("fifoDepth_S", genInfo.depthStore);
         addUnsigned("bufferDepth", genInfo.bufferDepth);
         addString("accessType", genInfo.accessType);
-        // The Chisel LSQ generator expects this to be a string, not a boolean
-        addString("speculation", genInfo.speculation ? "true" : "false");
         addUnsigned("dataWidth", genInfo.dataWidth);
         addUnsigned("addrWidth", genInfo.addrWidth);
         addUnsigned("numBBs", genInfo.numGroups);
