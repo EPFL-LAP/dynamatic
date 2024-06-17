@@ -80,13 +80,23 @@ object Main extends App {
     )
   } else if (config.accessType == "BRAM") {
     if (config.experimental) {
-      (new ChiselStage).execute(
-        chiselArgs,
-        Seq(ChiselGeneratorAnnotation(() => new LSQBRAMExperimental(config))) ++ firtoolArgs
-          .map(
-            FirtoolOption(_)
-          )
-      )
+      if (config.toMC){
+        (new ChiselStage).execute(
+          chiselArgs,
+          Seq(ChiselGeneratorAnnotation(() => new LSQBRAMExperimentalMC(config))) ++ firtoolArgs
+            .map(
+              FirtoolOption(_)
+            )
+        )
+      } else {
+        (new ChiselStage).execute(
+          chiselArgs,
+          Seq(ChiselGeneratorAnnotation(() => new LSQBRAMExperimental(config))) ++ firtoolArgs
+            .map(
+              FirtoolOption(_)
+            )
+        )
+      }
     } else {
       (new ChiselStage).execute(
         chiselArgs,
