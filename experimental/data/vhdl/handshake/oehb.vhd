@@ -7,32 +7,32 @@ entity oehb is
     BITWIDTH : integer
   );
   port (
-    -- inputs
-    clk        : in std_logic;
-    rst        : in std_logic;
-    ins        : in std_logic_vector(BITWIDTH - 1 downto 0);
-    ins_valid  : in std_logic;
-    outs_ready : in std_logic;
-    -- outputs
+    clk, rst : in std_logic;
+    -- input channel
+    ins       : in  std_logic_vector(BITWIDTH - 1 downto 0);
+    ins_valid : in  std_logic;
+    ins_ready : out std_logic;
+    -- output channel
     outs       : out std_logic_vector(BITWIDTH - 1 downto 0);
     outs_valid : out std_logic;
-    ins_ready  : out std_logic
+    outs_ready : in  std_logic
   );
 end entity;
 
 architecture arch of oehb is
-  signal full_reg, reg_en, mux_sel : std_logic;
+  signal reg_en   : std_logic;
   signal data_reg : std_logic_vector(BITWIDTH - 1 downto 0);
-
 begin
-  process (clk, rst) is
-  begin
-    if (rst = '1') then
-      outs_valid <= '0';
-    elsif (rising_edge(clk)) then
-      outs_valid <= ins_valid or not ins_ready;
-    end if;
-  end process;
+
+  control : entity work.oehb_dataless
+    port map(
+      clk        => clk,
+      rst        => rst,
+      ins_valid  => ins_valid,
+      ins_ready  => ins_ready,
+      outs_valid => outs_valid,
+      outs_ready => outs_ready
+    );
 
   process (clk, rst) is
   begin
@@ -45,7 +45,6 @@ begin
     end if;
   end process;
 
-  ins_ready <= not outs_valid or outs_ready;
   reg_en <= ins_ready and ins_valid;
-  outs <= data_reg;
+  outs   <= data_reg;
 end arch;

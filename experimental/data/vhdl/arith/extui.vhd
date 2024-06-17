@@ -2,7 +2,7 @@ library ieee;
 use ieee.std_logic_1164.all;
 use ieee.numeric_std.all;
 
-entity extsi is
+entity extui is
   generic (
     INPUT_BITWIDTH  : integer;
     OUTPUT_BITWIDTH : integer
@@ -21,7 +21,7 @@ entity extsi is
   );
 end entity;
 
-architecture arch of extsi is
+architecture arch of extui is
 begin
   outs       <= std_logic_vector(ieee.numeric_std.resize(unsigned(ins), OUTPUT_BITWIDTH));
   outs_valid <= ins_valid;
