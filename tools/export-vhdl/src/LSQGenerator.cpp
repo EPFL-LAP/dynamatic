@@ -297,10 +297,9 @@ static void lsqWriteConfigurationFile(const std::string &outPath, int lsqIndx) {
   lsqConfigurationFile << R"("name": ")" << lsqConf[lsqIndx].name << "\",\n";
   lsqConfigurationFile << "\"dataWidth\":" << lsqConf[lsqIndx].dataWidth
                        << ",\n";
-
-  lsqConfigurationFile << R"("accessType" : "BRAM" )"
+  lsqConfigurationFile << R"("experimental" : false )"
                        << ",\n";
-  lsqConfigurationFile << R"("speculation": "false" )"
+  lsqConfigurationFile << R"("accessType" : "BRAM" )"
                        << ",\n";
   lsqConfigurationFile << "\"addrWidth\":" << lsqConf[lsqIndx].addressWidth
                        << ",\n";

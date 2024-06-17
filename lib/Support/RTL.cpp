@@ -91,6 +91,45 @@ RTLType::~RTLType() {
     delete constraints;
 }
 
+bool RTLBooleanType::BoolConstraints::verify(Attribute attr) const {
+  BoolAttr boolAttr = dyn_cast_if_present<BoolAttr>(attr);
+  if (!boolAttr)
+    return false;
+
+  // Check all constraints
+  bool value = boolAttr.getValue();
+  return (!eq || value == eq) && (!ne || value != ne);
+}
+
+bool RTLBooleanType::constraintsFromJSON(const json::Object &object,
+                                         Constraints *&constraints,
+                                         json::Path path) {
+  // Allocate the constraint object
+  BoolConstraints *cons = new BoolConstraints;
+  constraints = cons;
+
+  return llvm::all_of(object, [&](auto &keyAndVal) {
+    auto &[jsonKey, val] = keyAndVal;
+    std::string key = jsonKey.str();
+
+    if (RESERVED_KEYS.contains(key))
+      return true;
+    if (key == EQ)
+      return json::fromJSON(val, cons->eq, path);
+    if (key == NE)
+      return json::fromJSON(val, cons->ne, path);
+    path.report(ERR_UNSUPPORTED);
+    return false;
+  });
+}
+
+std::string RTLBooleanType::serialize(Attribute attr) const {
+  BoolAttr boolAttr = dyn_cast_if_present<BoolAttr>(attr);
+  if (!boolAttr)
+    return "";
+  return std::to_string(boolAttr.getValue());
+}
+
 bool RTLUnsignedType::UnsignedConstraints::verify(Attribute attr) const {
   IntegerAttr intAttr = dyn_cast_if_present<IntegerAttr>(attr);
   if (!intAttr || !intAttr.getType().isUnsignedInteger())
@@ -207,6 +246,8 @@ bool dynamatic::fromJSON(const llvm::json::Value &value, RTLType *&type,
     type = new RTLUnsignedType;
   } else if (*strType == "string") {
     type = new RTLStringType;
+  } else if (*strType == "boolean") {
+    type = new RTLBooleanType;
   } else {
     path.report(ERR_UNKNOWN_TYPE);
     return false;
