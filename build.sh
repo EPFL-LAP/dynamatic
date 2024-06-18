@@ -270,7 +270,7 @@ chmod +x $LSQ_GEN_JAR
 #### visual-dataflow ####
 
 if [[ BUILD_VISUAL_DATAFLOW -ne 0 ]]; then
-  prepare_to_build_project "visual-dataflow" "visualj-dataflow/build"
+  prepare_to_build_project "visual-dataflow" "visual-dataflow/build"
 
   # CMake
   if should_run_cmake ; then
