@@ -7,6 +7,10 @@ add_dynamatic_library(DynamaticSupport
   MILP.cpp
   RTL.cpp
   TimingModels.cpp
+  Lexer.cpp
+  Parser.cpp
+  BooleanExpression.cpp
+  BooleanLogicLibrary.cpp
 
   LINK_LIBS PUBLIC
   DynamaticHW
