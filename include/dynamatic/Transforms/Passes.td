@@ -109,6 +109,13 @@ def FuncSetArgNames : DynamaticPass<"func-set-arg-names"> {
 // Handshake passes
 //===----------------------------------------------------------------------===//
 
+def HandshakeOptimization : DynamaticPass<"handshake-optimization"> {
+  let summary = "optimize Handshake operations.";
+  let description = [{
+      optimize Handshake operations.
+  }];
+  let constructor = "dynamatic::createHandshakeOptimization()";
+}
 def HandshakeCanonicalize : DynamaticPass<"handshake-canonicalize"> {
   let summary = "Canonicalize Handshake operations.";
   let description = [{

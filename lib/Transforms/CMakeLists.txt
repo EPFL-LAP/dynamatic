@@ -8,6 +8,7 @@ add_dynamatic_library(DynamaticTransforms
   HandshakeCanonicalize.cpp
   HandshakeConcretizeIndexType.cpp
   HandshakeHoistExtInstances.cpp
+  HandshakeOptimization.cpp
   HandshakeMaterialize.cpp
   HandshakeMinimizeCstWidth.cpp
   HandshakeMinimizeLSQUsage.cpp
