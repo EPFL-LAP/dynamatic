@@ -14,16 +14,16 @@
 //
 //===----------------------------------------------------------------------===//
 
-#include <string>
+#include "dynamatic/Support/BooleanExpression.h"
+#include "llvm/Support/raw_ostream.h"
 
 #include <cassert>
-#include <iostream>
-
-#include "dynamatic/Support/BooleanExpression.h"
-
 #include <cmath>
+#include <set>
+#include <string>
 
 using namespace dynamatic;
+using namespace llvm;
 
 //----------BoolExpression Functions Implementatins--------
 
@@ -121,6 +121,8 @@ void BoolExpression::generateMintermAnd(
     std::string &s, const std::map<std::string, int> &varIndex) {
   if (type == ExpressionType::Variable) {
     generateMintermVariable(s, varIndex);
+  } else if (type == ExpressionType::Zero) { // 0 . exp =0 -> not a a minterm
+    s[0] = 'n';
   } else {
     if (left != nullptr)
       left->generateMintermAnd(s, varIndex);
@@ -134,10 +136,14 @@ void BoolExpression::generateMinterms(
     std::set<std::string> &minterms) {
   if (!this) // if null
     return;
-
   if (type == ExpressionType::Or) {
     left->generateMinterms(numOfVariables, varIndex, minterms);
     right->generateMinterms(numOfVariables, varIndex, minterms);
+  } else if (type == ExpressionType::One) { // 1 + exp = 1;
+    std::string s(numOfVariables, 'd');
+    minterms.insert(s);
+  } else if (type == ExpressionType::Zero) { // 0 + exp = exp
+    return;
   } else {
     std::string s(numOfVariables, 'd');
     generateMintermAnd(s, varIndex);
@@ -199,7 +205,7 @@ void BoolExpression::print(int space) {
   if (type == ExpressionType::Variable) {
     if (singleCond.isNegated)
       llvm::outs() << "~";
-    llvm::outs() << SingleCond.id << "\n";
+    llvm::outs() << singleCond.id << "\n";
   } else if (type == ExpressionType::Or) {
     llvm::outs() << "+ " << "\n";
   } else if (type == ExpressionType::And) {

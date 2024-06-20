@@ -15,17 +15,12 @@
 //
 //===----------------------------------------------------------------------===//
 
-#include <iostream>
-
-#include <string>
-
-#include <string>
-
-#include <utility>
-
-#include <vector>
-
 #include "dynamatic/Support/Lexer.h"
+#include "llvm/Support/raw_ostream.h"
+
+#include <string>
+#include <utility>
+#include <vector>
 
 using namespace llvm;
 using namespace dynamatic;
@@ -70,22 +65,23 @@ void LexicalAnalyzer::tokenize() {
       case '&':
         token.tokenType = TokenType::AndToken;
         break;
-      // case '&':   token.tokenType = TokenType::AndToken; break;
       case '+':
       case '|':
         token.tokenType = TokenType::OrToken;
         break;
-      // case '|':   token.tokenType = TokenType::OrToken; break;
       case '~':
       case '!':
         token.tokenType = TokenType::NotToken;
         break;
-      // case '!':   token.tokenType = TokenType::NotToken; break;
       case '(':
         token.tokenType = TokenType::LparenToken;
         break;
       case ')':
         token.tokenType = TokenType::RparenToken;
+        break;
+      case '0':
+      case '1':
+        token.tokenType = TokenType::VariableToken;
         break;
       default:
         syntaxError();

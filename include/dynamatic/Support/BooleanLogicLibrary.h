@@ -20,11 +20,9 @@
 #ifndef DYNAMATIC_SUPPORT_BOOLEANLOGICLIBRARY_H
 #define DYNAMATIC_SUPPORT_BOOLEANLOGICLIBRARY_H
 
-#include "BooleanExpression.h"
-#include "Parser.h"
+#include "dynamatic/Support/BooleanExpression.h"
+
 #include <string>
-// #include "dynamatic/Support/Parser.h"
-// #include "dynamatic/Support/BooleanExpression.h"
 
 namespace dynamatic {
 

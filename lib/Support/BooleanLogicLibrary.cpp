@@ -17,21 +17,17 @@
 //
 //===----------------------------------------------------------------------===//
 
-#include <cstring>
-
-#include <string>
-
-#include <utility>
+#include "dynamatic/Support/BooleanLogicLibrary.h"
+#include "dynamatic/Support/BooleanExpression.h"
+#include "dynamatic/Support/Parser.h"
 
 #include <cstdio>
 #include <cstdlib>
 #include <cstring>
+#include <string>
 #include <sys/wait.h>
-
 #include <unistd.h>
-
-#include "dynamatic/Support/BooleanExpression.h"
-#include "dynamatic/Support/BooleanLogicLibrary.h"
+#include <utility>
 
 using namespace dynamatic;
 
@@ -120,9 +116,9 @@ std::string dynamatic::execute(const std::string &command,
 
 /*
 Espresso's Input Format:
-.i (number of variables)
-.o 1                     # which is the number of outputs
-.ilb (variable names)
+.i [d]                   # number of input variables
+.o 1                     # number of outputs
+.ilb [s1] [s2] ... [sn]  # names of input variables
 .ob f                    # output name
 ---truth table rows---
 .re

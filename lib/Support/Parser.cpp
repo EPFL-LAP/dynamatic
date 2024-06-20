@@ -16,20 +16,17 @@
 //
 //===----------------------------------------------------------------------===//
 
+#include "dynamatic/Support/Parser.h"
+#include "dynamatic/Support/BooleanExpression.h"
+#include "dynamatic/Support/Lexer.h"
+
 #include <array>
-
 #include <cassert>
-
+#include <cmath>
 #include <stack>
 #include <string>
 #include <utility>
-
 #include <vector>
-
-#include "dynamatic/Support/BooleanExpression.h"
-#include "dynamatic/Support/Lexer.h"
-#include "dynamatic/Support/Parser.h"
-#include <cmath>
 
 using namespace dynamatic;
 
@@ -65,7 +62,7 @@ BoolExpression *dynamatic::constructNodeOperator(StackNode *operate,
   ExpressionType oo;
   if (t.tokenType == TokenType::AndToken)
     oo = ExpressionType::And;
-  else if (t.tokenType == TokenType::OrToken)
+  else
     oo = ExpressionType::Or;
   BoolExpression *e1 = s1->expr;
   BoolExpression *e2 = s2->expr;
@@ -81,9 +78,13 @@ BoolExpression *dynamatic::constructNodeNegator(StackNode *s1) {
 // returns a dynamically-allocated variable
 StackNode *dynamatic::termToExpr(StackNode *s) {
   assert(s != nullptr);
-  return new StackNode(
-      StackNodeType::Expr,
-      new BoolExpression(ExpressionType::Variable, s->term.lexeme));
+  ExpressionType t = ExpressionType::Variable;
+  if (s->term.lexeme == "0")
+    t = ExpressionType::Zero;
+  if (s->term.lexeme == "1")
+    t = ExpressionType::One;
+  return new StackNode(StackNodeType::Expr,
+                       new BoolExpression(t, s->term.lexeme));
 }
 
 // returns a dynamically-allocated variable

@@ -1,4 +1,4 @@
-//===- BooleanEXpression.h - Definition for boolean expressions -----*- C++
+//===- BooleanExpression.h - Definition for boolean expressions -----*- C++
 //-*-===//
 //
 // Dynamatic is under the Apache License v2.0 with LLVM Exceptions.
@@ -15,16 +15,10 @@
 #ifndef DYNAMATIC_SUPPORT_BOOLEANEXPRESSION_H
 #define DYNAMATIC_SUPPORT_BOOLEANEXPRESSION_H
 
-#include <cstddef>
 #include <map>
-
 #include <set>
-
-#include <stack>
 #include <string>
 #include <utility>
-
-#include "Lexer.h"
 
 namespace dynamatic {
 
