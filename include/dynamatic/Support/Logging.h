@@ -16,8 +16,6 @@
 
 #include "dynamatic/Support/LLVM.h"
 #include "mlir/Support/IndentedOstream.h"
-#include "llvm/Support/Path.h"
-#include <filesystem>
 
 namespace dynamatic {
 

@@ -18,6 +18,7 @@
 #include "dynamatic/Dialect/Handshake/HandshakeDialect.h"
 #include "dynamatic/Dialect/Handshake/HandshakeOps.h"
 #include "dynamatic/Support/RTL.h"
+#include "dynamatic/Support/System.h"
 #include "dynamatic/Support/TimingModels.h"
 #include "mlir/IR/BuiltinOps.h"
 #include "mlir/IR/MLIRContext.h"
@@ -86,13 +87,17 @@ struct ExportInfo {
   mlir::ModuleOp modOp;
   /// The RTL configuration parsed from JSON-formatted files.
   RTLConfiguration &config;
+  /// Output directory (without trailing separators).
+  StringRef outputPath;
+
   /// Maps every external hardware module in the IR to its corresponding
   /// heap-allocated match according to the RTL configuration.
   mlir::DenseMap<hw::HWModuleExternOp, RTLMatch *> externals;
 
   /// Creates export information for the given module and RTL configuration.
-  ExportInfo(mlir::ModuleOp modOp, RTLConfiguration &config)
-      : modOp(modOp), config(config){};
+  ExportInfo(mlir::ModuleOp modOp, RTLConfiguration &config,
+             StringRef outputPath)
+      : modOp(modOp), config(config), outputPath(outputPath){};
 
   /// Associates every external hardware module to its match according to the
   /// RTL configuration and concretizes each of them inside the output
@@ -136,7 +141,7 @@ LogicalResult ExportInfo::concretizeExternalModules() {
     }
 
     // ...then generate the component itself
-    return match->concretize(request, dynamaticPath, outputDir);
+    return match->concretize(request, dynamaticPath, outputPath);
   };
 
   for (hw::HWModuleExternOp extOp : modOp.getOps<hw::HWModuleExternOp>()) {
@@ -910,8 +915,9 @@ static LogicalResult writeModule(RTLWriter &writer, hw::HWModuleOp modOp) {
 
   // Open the file in which we will create the module, it is named like the
   // module itself
-  const llvm::Twine &filepath =
-      outputDir + sys::path::get_separator() + modOp.getSymName() + ext;
+  const llvm::Twine &filepath = writer.exportInfo.outputPath +
+                                sys::path::get_separator() +
+                                modOp.getSymName() + ext;
   std::error_code ec;
   llvm::raw_fd_ostream fileStream(filepath.str(), ec);
   if (ec.value() != 0) {
@@ -932,13 +938,7 @@ int main(int argc, char **argv) {
       "instantiate/generate external HW modules present in the input IR.");
 
   // Make sure the output path does not end in a file separator
-  if (outputDir.empty()) {
-    llvm::errs() << "Output path is empty\n";
-    return 1;
-  }
-  StringRef sep = sys::path::get_separator();
-  if (StringRef{outputDir}.ends_with(sep))
-    outputDir = outputDir.substr(0, outputDir.size() - sep.size());
+  StringRef outputPath = sys::path::removeTrailingSeparators(outputDir);
 
   auto fileOrErr = MemoryBuffer::getFileOrSTDIN(inputFilename.c_str());
   if (std::error_code error = fileOrErr.getError()) {
@@ -967,13 +967,13 @@ int main(int argc, char **argv) {
   }
 
   // Create the (potentially nested) output directory
-  if (auto ec = sys::fs::create_directories(outputDir); ec.value() != 0) {
+  if (auto ec = sys::fs::create_directories(outputPath); ec.value() != 0) {
     llvm::errs() << "Failed to create output directory\n" << ec.message();
     return 1;
   }
 
   // Generate/Pull all external modules into the output directory
-  ExportInfo info(*modOp, config);
+  ExportInfo info(*modOp, config, outputPath);
   if (failed(info.concretizeExternalModules()))
     return 1;
 

@@ -6,6 +6,7 @@ add_dynamatic_library(DynamaticSupport
   Logging.cpp
   MILP.cpp
   RTL.cpp
+  System.cpp
   TimingModels.cpp
 
   LINK_LIBS PUBLIC
