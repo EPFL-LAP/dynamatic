@@ -16,3 +16,79 @@ Gurobi 11.0.2 (linux64, gurobi_cl) logging started Tue Jun 11 00:20:34 2024
 Set parameter Username
 Set parameter LogFile to value "gurobi.log"
 Using license file /opt/gurobi1102/gurobi.lic
+
+Gurobi 11.0.2 (linux64, gurobi_cl) logging started Sun Jun 16 18:07:28 2024
+
+Set parameter WLSAccessID
+Set parameter WLSSecret
+Set parameter LicenseID to value 2523263
+Set parameter LogFile to value "gurobi.log"
+Using license file /opt/gurobi1102/gurobi.lic
+Academic license 2523263 - for non-commercial use only - registered to ay___@epfl.ch
+
+Gurobi Optimizer version 11.0.2 build v11.0.2rc0 (linux64 - "Ubuntu 20.04.6 LTS")
+Copyright (c) 2024, Gurobi Optimization, LLC
+
+Read MPS format model from file /opt/gurobi1102/linux64/examples/data/afiro.mps
+Reading time = 0.00 seconds
+AFIRO: 27 rows, 32 columns, 83 nonzeros
+
+CPU model: Intel(R) Core(TM) i7-10510U CPU @ 1.80GHz, instruction set [SSE2|AVX|AVX2]
+Thread count: 4 physical cores, 8 logical processors, using up to 8 threads
+
+Academic license 2523263 - for non-commercial use only - registered to ay___@epfl.ch
+Optimize a model with 27 rows, 32 columns and 83 nonzeros
+Model fingerprint: 0x092217cc
+Coefficient statistics:
+  Matrix range     [1e-01, 2e+00]
+  Objective range  [3e-01, 1e+01]
+  Bounds range     [0e+00, 0e+00]
+  RHS range        [4e+01, 5e+02]
+Presolve removed 18 rows and 20 columns
+Presolve time: 0.01s
+Presolved: 9 rows, 12 columns, 32 nonzeros
+
+Iteration    Objective       Primal Inf.    Dual Inf.      Time
+       0   -5.9751945e+02   5.541356e+01   0.000000e+00      0s
+       6   -4.6475314e+02   0.000000e+00   0.000000e+00      0s
+
+Solved in 6 iterations and 0.02 seconds (0.00 work units)
+Optimal objective -4.647531429e+02
+
+Gurobi 11.0.2 (linux64, gurobi_cl) logging started Sun Jun 16 18:38:15 2024
+
+Set parameter WLSAccessID
+Set parameter WLSSecret
+Set parameter LicenseID to value 2523263
+Set parameter LogFile to value "gurobi.log"
+Using license file /opt/gurobi1102/gurobi.lic
+Academic license 2523263 - for non-commercial use only - registered to ay___@epfl.ch
+
+Gurobi Optimizer version 11.0.2 build v11.0.2rc0 (linux64 - "Ubuntu 20.04.6 LTS")
+Copyright (c) 2024, Gurobi Optimization, LLC
+
+Read MPS format model from file /opt/gurobi1102/linux64/examples/data/afiro.mps
+Reading time = 0.00 seconds
+AFIRO: 27 rows, 32 columns, 83 nonzeros
+
+CPU model: Intel(R) Core(TM) i7-10510U CPU @ 1.80GHz, instruction set [SSE2|AVX|AVX2]
+Thread count: 4 physical cores, 8 logical processors, using up to 8 threads
+
+Academic license 2523263 - for non-commercial use only - registered to ay___@epfl.ch
+Optimize a model with 27 rows, 32 columns and 83 nonzeros
+Model fingerprint: 0x092217cc
+Coefficient statistics:
+  Matrix range     [1e-01, 2e+00]
+  Objective range  [3e-01, 1e+01]
+  Bounds range     [0e+00, 0e+00]
+  RHS range        [4e+01, 5e+02]
+Presolve removed 18 rows and 20 columns
+Presolve time: 0.01s
+Presolved: 9 rows, 12 columns, 32 nonzeros
+
+Iteration    Objective       Primal Inf.    Dual Inf.      Time
+       0   -5.9751945e+02   5.541356e+01   0.000000e+00      0s
+       6   -4.6475314e+02   0.000000e+00   0.000000e+00      0s
+
+Solved in 6 iterations and 0.01 seconds (0.00 work units)
+Optimal objective -4.647531429e+02

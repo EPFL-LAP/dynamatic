@@ -30,12 +30,22 @@ public:
   /// Constructor called automatically by `getAnalysis<ControlDependenceAnalysis>()` if the
   /// analysis is not already cached. 
   /// It expects to be passed a FuncOp operation where it can loop over its blocks (mimicking the BBs of the CFG)
-  ControlDependenceAnalysis(mlir::Operation*operation){//(mlir::func::FuncOp &funcOp) {
-    identifyAllControlDeps(operation);
+  ControlDependenceAnalysis(mlir::Operation*operation){
+    // type-cast it into mlir::func::FuncOp
+    mlir::func::FuncOp funcOp = mlir::dyn_cast<mlir::func::FuncOp>(operation);
+    if (funcOp) {
+      identifyAllControlDeps(funcOp);
+    } else {
+      // report an error indicating that the anaylsis is instantiated over an inappropriate operation
+      llvm::errs() << "ControlDependenceAnalysis is instantiated over an operation that is not FuncOp!\n";
+    }
   };
 
   // return all BBs that the argument block is control dependent on
   void returnControlDeps(mlir::Block* block, llvm::SmallVector<mlir::Block*, 4>& returned_control_deps);
+
+  // loops over the blocks and prints to the terminal the block's control dependencies
+  void printBlocksDeps(mlir::func::FuncOp &funcOp);
 
   /// Invalidation hook to keep the analysis cached across passes. Returns true
   /// if the analysis should be invalidated and fully reconstructed the next
@@ -51,14 +61,18 @@ private:
   llvm::DenseMap<mlir::Block *, llvm::SmallVector<mlir::Block*, 4>> control_deps_map;
 
   // Simply fill the control_deps_map 
-  void identifyAllControlDeps(mlir::Operation*operation);
-
-  // recursive function called inside traversePostDomTree
-  void traversePostDomTreeUtil(mlir::DominanceInfoNode *start_node, mlir::DominanceInfoNode *end_node, llvm::DenseMap<mlir::DominanceInfoNode*, bool> is_visited, llvm::SmallVector<mlir::DominanceInfoNode*, 4> path, int path_index, llvm::SmallVector<llvm::SmallVector<mlir::DominanceInfoNode*, 4> , 4>*traversed_nodes);
+  void identifyAllControlDeps(mlir::func::FuncOp &funcOp);  // called inside the constructor
 
   // Returns all postDominator tree nodes between start_node and end_node in the postDominator tree
   void traversePostDomTree(mlir::Block *start_block, mlir::Block *end_block, mlir::Region *funcReg, llvm::DominatorTreeBase<mlir::Block, true> *postDomTree, llvm::SmallVector<llvm::SmallVector<mlir::DominanceInfoNode*, 4> , 4>*traversed_nodes);
+
+   // recursive function called inside traversePostDomTree
+  void traversePostDomTreeUtil(mlir::DominanceInfoNode *start_node, mlir::DominanceInfoNode *end_node, llvm::DenseMap<mlir::DominanceInfoNode*, bool> is_visited, llvm::SmallVector<mlir::DominanceInfoNode*, 4> path, int path_index, llvm::SmallVector<llvm::SmallVector<mlir::DominanceInfoNode*, 4> , 4>*traversed_nodes);
+
 };
+
+  // takes any traversed_nodes structure and prints it to the terminal
+  void printPostDomTreeTraversal(llvm::SmallVector<llvm::SmallVector<mlir::DominanceInfoNode*, 4> , 4>traversed_nodes);
 
 } // namespace dynamatic
 

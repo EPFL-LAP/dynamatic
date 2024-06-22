@@ -14,7 +14,7 @@ namespace dynamatic {
 #define GEN_PASS_DEF_FUNCSSATOGSA
 #include "dynamatic/Transforms/Passes.h.inc"
 
-// (1) Makes SSA explicit, (2) Converts SSA to GSA
+
 std::unique_ptr<mlir::OperationPass<mlir::func::FuncOp>> createFuncSSAToGSA();
 
 } // namespace dynamatic
