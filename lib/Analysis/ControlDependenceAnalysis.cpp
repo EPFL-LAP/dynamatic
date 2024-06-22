@@ -39,7 +39,7 @@ void ControlDependenceAnalysis::identifyAllControlDeps(mlir::func::FuncOp &funcO
       postDomInfo.getDomTree(funcReg);
 
   // Loop over the control flow edges connnecting the different blocks of this region
-  for (Block& block : funcReg->getBlocks()) {
+  for (Block& block : funcReg.getBlocks()) {
     for (Block* block_succ : block.getSuccessors()) {
       if (!postDomInfo.properlyPostDominates(block_succ, &block)) {
           Block* least_common_anc = postDomInfo.findNearestCommonDominator(block_succ, &block);

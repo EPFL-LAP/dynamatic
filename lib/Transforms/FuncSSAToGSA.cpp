@@ -32,6 +32,7 @@ struct FuncSSAToGSAPass
 
 
 void FuncSSAToGSAPass::translate_ssa_to_gsa(func::FuncOp funcOp) {
+  // instantiate the control dependence graph analysis 
   ControlDependenceAnalysis &cdg_analysis = getAnalysis<ControlDependenceAnalysis>();
 
   Region &funcReg = funcOp.getRegion();
