@@ -3,10 +3,28 @@
 
 unsigned loop_multiply(in_int_t a[N]) {
   unsigned x = 2;
-  for (unsigned i = 0; i < N; ++i) {
-    if (a[i] == 0)
-      x = x * x;
+  // for (unsigned i = 0; i < N; ++i) {
+  //   if (a[i] == 0)
+  //     x = x * x;
+  // }
+
+  int i = 0;
+  if( x < a[i]) {
+    x = x + a[i+1];
+    if(x < a[7])
+      x = x + a[2] + a[7];
   }
+  else
+    x = x + a[i+1] + a[i+2];
+  
+  // for(unsigned k = 0; k < N; k++)
+  // for(unsigned i = 0; i < N-2; i++) {
+  //   if( x < a[i])
+  //     x = x + a[i+1];
+  //   else
+  //     x = x + a[i+1] + a[i+2];
+  // }
+ 
   return x;
 }
 
