@@ -1,4 +1,4 @@
-//===- BooleanExpression.h - Definition for boolean expressions -----*- C++
+//===- BooleanEXpression.h - Definition for boolean expressions -----*- C++
 //-*-===//
 //
 // Dynamatic is under the Apache License v2.0 with LLVM Exceptions.
@@ -22,6 +22,14 @@
 
 namespace dynamatic {
 
+// Variable: x,y, z,...
+// AND: & or .
+// Or: | or +
+// Not: ! or ~
+// Remark: NOT perator is an INTEMEDIATE operator. That is, in all returned
+// Boolean Expressions, it's not present. The NOT operator is only used in the
+// parsig procedure and is then removed from the BoolExpression by the function
+// propagateNegation which propagates a NOT operator by applying DeMorgan's Law.
 enum class ExpressionType : int { Variable, Or, And, Not, Zero, One, End };
 
 // recursie function that replaces don't cares with 0 and 1
@@ -33,30 +41,9 @@ std::set<std::string> replaceDontCares(const std::set<std::string> &minterms);
 struct BoolExpression {
   ExpressionType type;
 
-  struct {
-    std::string id;
-    bool isNegated;
-  } singleCond;
+  BoolExpression(ExpressionType t) : type(t) {}
 
-  BoolExpression *left;
-  BoolExpression *right;
-
-  BoolExpression(ExpressionType t)
-      : type(t), singleCond{"", false}, left(nullptr), right(nullptr) {}
-
-  // Constructor for single condition nodes
-  BoolExpression(ExpressionType t, std::string i, bool negated = false)
-      : type(t), singleCond{std::move(i), negated}, left(nullptr),
-        right(nullptr) {}
-
-  // Constructor for operator nodes
-  BoolExpression(ExpressionType t, BoolExpression *l, BoolExpression *r)
-      : type(t), singleCond{"", false}, left(l), right(r) {}
-
-  ~BoolExpression() {
-    delete left;
-    delete right;
-  }
+  virtual ~BoolExpression() = default;
 
   // Function to print BooolExpression tree in inorder traversal
   void print(int space = 0);
@@ -81,13 +68,38 @@ struct BoolExpression {
                           const std::map<std::string, int> &varIndex);
 
   // Function that generates the minterms of a BoolExpression
-  void generateMinterms(int numOfVariables,
-                        const std::map<std::string, int> &varIndex,
-                        std::set<std::string> &minterms);
+  void generateMintermsOr(int numOfVariables,
+                          const std::map<std::string, int> &varIndex,
+                          std::set<std::string> &minterms);
 
   // Fuction that generates the truth table for a BoolExpression based on the
   // minterms generated in generateMinterms
   std::set<std::string> generateTruthTable();
+};
+
+// This struct is specifically for operators: And, Or, Not
+struct Operator : public BoolExpression {
+  BoolExpression *left;
+  BoolExpression *right;
+
+  // Constructor for operator nodes
+  Operator(ExpressionType t, BoolExpression *l, BoolExpression *r)
+      : BoolExpression(t), left(l), right(r) {}
+
+  ~Operator() {
+    delete left;
+    delete right;
+  }
+};
+
+// This struct is specifically for signgle conditions: Variable, One, Zero
+struct SingleCond : public BoolExpression {
+  std::string id;
+  bool isNegated;
+
+  // Constructor for single condition nodes
+  SingleCond(ExpressionType t, std::string i = "", bool negated = false)
+      : BoolExpression(t), id(std::move(i)), isNegated(negated) {}
 };
 
 } // namespace dynamatic

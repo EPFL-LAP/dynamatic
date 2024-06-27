@@ -32,9 +32,6 @@ BoolExpression *propagateNegation(BoolExpression *root, bool negated);
 
 //--------------Espresso--------------
 
-// functon to execute a command from the terminal and get the result
-std::string execute(const std::string &command, const std::string &input);
-
 // function to run espresso logic minimzer on a BoolExpression
 std::string runEspresso(BoolExpression *expr);
 

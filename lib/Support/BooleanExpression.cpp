@@ -33,13 +33,16 @@ std::string BoolExpression::toString() {
 
   std::string s = "";
 
-  if (type != ExpressionType::Variable)
-    s += left->toString();
+  if (type == ExpressionType::And || type == ExpressionType::Or) {
+    Operator *op = static_cast<Operator *>(this);
+    s += op->left->toString();
+  }
 
   if (type == ExpressionType::Variable) {
-    if (singleCond.isNegated)
+    SingleCond *singleCond = static_cast<SingleCond *>(this);
+    if (singleCond->isNegated)
       s += "~";
-    s += singleCond.id;
+    s += singleCond->id;
   } else if (type == ExpressionType::One) {
     s += "1";
   } else if (type == ExpressionType::Zero) {
@@ -48,12 +51,12 @@ std::string BoolExpression::toString() {
     s += " + ";
   } else if (type == ExpressionType::And) {
     s += " . ";
-  } else if (type == ExpressionType::Not) {
-    s += " ~";
   }
 
-  if (type != ExpressionType::Variable)
-    s += right->toString();
+  if (type == ExpressionType::And || type == ExpressionType::Or) {
+    Operator *op = static_cast<Operator *>(this);
+    s += op->right->toString();
+  }
 
   return s;
 }
@@ -63,10 +66,12 @@ void BoolExpression::getVariablesRec(std::set<std::string> &s) {
     return;
   }
   if (type == ExpressionType::Variable) {
-    s.insert(singleCond.id);
-  } else {
-    left->getVariablesRec(s);
-    right->getVariablesRec(s);
+    SingleCond *cond = static_cast<SingleCond *>(this);
+    s.insert(cond->id);
+  } else if (type == ExpressionType::And || type == ExpressionType::Or) {
+    Operator *op = static_cast<Operator *>(this);
+    op->left->getVariablesRec(s);
+    op->right->getVariablesRec(s);
   }
 }
 
@@ -109,12 +114,13 @@ dynamatic::replaceDontCares(const std::set<std::string> &minterms) {
 // and is present in negated form in the minterm
 void BoolExpression::generateMintermVariable(
     std::string &s, std::map<std::string, int> varIndex) {
-  if (s[varIndex[singleCond.id]] == 'd')
-    s[varIndex[singleCond.id]] = singleCond.isNegated ? '0' : '1';
-  else if (s[varIndex[singleCond.id]] == '0')
-    s[varIndex[singleCond.id]] = singleCond.isNegated ? '0' : 'n';
-  else if (s[varIndex[singleCond.id]] == '1')
-    s[varIndex[singleCond.id]] = (!singleCond.isNegated) ? '1' : 'n';
+  SingleCond *singleCond = static_cast<SingleCond *>(this);
+  if (s[varIndex[singleCond->id]] == 'd')
+    s[varIndex[singleCond->id]] = singleCond->isNegated ? '0' : '1';
+  else if (s[varIndex[singleCond->id]] == '0')
+    s[varIndex[singleCond->id]] = singleCond->isNegated ? '0' : 'n';
+  else if (s[varIndex[singleCond->id]] == '1')
+    s[varIndex[singleCond->id]] = (!singleCond->isNegated) ? '1' : 'n';
 }
 
 void BoolExpression::generateMintermAnd(
@@ -123,29 +129,31 @@ void BoolExpression::generateMintermAnd(
     generateMintermVariable(s, varIndex);
   } else if (type == ExpressionType::Zero) { // 0 . exp =0 -> not a a minterm
     s[0] = 'n';
-  } else {
-    if (left != nullptr)
-      left->generateMintermAnd(s, varIndex);
-    if (right != nullptr)
-      right->generateMintermAnd(s, varIndex);
+  } else if (type == ExpressionType::And || type == ExpressionType::Or) {
+    Operator *op = static_cast<Operator *>(this);
+    if (op->left != nullptr)
+      op->left->generateMintermAnd(s, varIndex);
+    if (op->right != nullptr)
+      op->right->generateMintermAnd(s, varIndex);
   }
 }
 
-void BoolExpression::generateMinterms(
+void BoolExpression::generateMintermsOr(
     int numOfVariables, const std::map<std::string, int> &varIndex,
     std::set<std::string> &minterms) {
   if (!this) // if null
     return;
   if (type == ExpressionType::Or) {
-    left->generateMinterms(numOfVariables, varIndex, minterms);
-    right->generateMinterms(numOfVariables, varIndex, minterms);
+    Operator *op = static_cast<Operator *>(this);
+    op->left->generateMintermsOr(numOfVariables, varIndex, minterms);
+    op->right->generateMintermsOr(numOfVariables, varIndex, minterms);
   } else if (type == ExpressionType::One) { // 1 + exp = 1;
     std::string s(numOfVariables, 'd');
     minterms.insert(s);
   } else if (type == ExpressionType::Zero) { // 0 + exp = exp
     return;
   } else {
-    std::string s(numOfVariables, 'd');
+    std::string s(numOfVariables, 'd'); // initializing s
     generateMintermAnd(s, varIndex);
     if (s.find('n') ==
         std::string::npos) // no null in the minterm -> minterm is valid
@@ -153,6 +161,10 @@ void BoolExpression::generateMinterms(
   }
 }
 
+// 1- generate all the minterms with don't cars
+// 2- replace the don't cares wit 0s and 1s
+// 3- loop over all rows in the truth table and check wether it corresponds to a
+// minterm or not
 std::set<std::string> BoolExpression::generateTruthTable() {
   std::set<std::string> variables = BoolExpression::getVariables();
   int numOfVariables = variables.size();
@@ -163,7 +175,7 @@ std::set<std::string> BoolExpression::generateTruthTable() {
   }
   // generate the minterms
   std::set<std::string> minterms;
-  generateMinterms(numOfVariables, varIndex, minterms);
+  generateMintermsOr(numOfVariables, varIndex, minterms);
   std::set<std::string> mintermsWithoutDontCares = replaceDontCares(minterms);
   // generate the truth table
   std::string s(numOfVariables, 'd');
@@ -192,10 +204,10 @@ void BoolExpression::print(int space) {
   space += COUNT;
 
   // Process right child first
-  if (type == ExpressionType::Or || type == ExpressionType::And ||
-      type == ExpressionType::Not)
-    right->print(space);
-
+  if (type == ExpressionType::Or || type == ExpressionType::And) {
+    Operator *op = static_cast<Operator *>(this);
+    op->right->print(space);
+  }
   // Print current node after space
   // count
   llvm::outs() << "\n";
@@ -203,15 +215,14 @@ void BoolExpression::print(int space) {
     llvm::outs() << " ";
 
   if (type == ExpressionType::Variable) {
-    if (singleCond.isNegated)
+    SingleCond *singleCond = static_cast<SingleCond *>(this);
+    if (singleCond->isNegated)
       llvm::outs() << "~";
-    llvm::outs() << singleCond.id << "\n";
+    llvm::outs() << singleCond->id << "\n";
   } else if (type == ExpressionType::Or) {
     llvm::outs() << "+ " << "\n";
   } else if (type == ExpressionType::And) {
     llvm::outs() << ". " << "\n";
-  } else if (type == ExpressionType::Not) {
-    llvm::outs() << "~ " << "\n";
   } else if (type == ExpressionType::Zero) {
     llvm::outs() << "0 " << "\n";
   } else if (type == ExpressionType::One) {
@@ -219,6 +230,8 @@ void BoolExpression::print(int space) {
   }
 
   // Process left child
-  if (type == ExpressionType::Or || type == ExpressionType::And)
-    left->print(space);
+  if (type == ExpressionType::Or || type == ExpressionType::And) {
+    Operator *op = static_cast<Operator *>(this);
+    op->left->print(space);
+  }
 }

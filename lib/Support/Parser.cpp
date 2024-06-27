@@ -66,13 +66,13 @@ BoolExpression *dynamatic::constructNodeOperator(StackNode *operate,
     oo = ExpressionType::Or;
   BoolExpression *e1 = s1->expr;
   BoolExpression *e2 = s2->expr;
-  return new BoolExpression(oo, e1, e2);
+  return new Operator(oo, e1, e2);
 }
 
 // returns a dynamically-allocated variable
 BoolExpression *dynamatic::constructNodeNegator(StackNode *s1) {
   assert(s1 != nullptr);
-  return new BoolExpression(ExpressionType::Not, nullptr, s1->expr);
+  return new Operator(ExpressionType::Not, nullptr, s1->expr);
 }
 
 // returns a dynamically-allocated variable
@@ -83,8 +83,7 @@ StackNode *dynamatic::termToExpr(StackNode *s) {
     t = ExpressionType::Zero;
   if (s->term.lexeme == "1")
     t = ExpressionType::One;
-  return new StackNode(StackNodeType::Expr,
-                       new BoolExpression(t, s->term.lexeme));
+  return new StackNode(StackNodeType::Expr, new SingleCond(t, s->term.lexeme));
 }
 
 // returns a dynamically-allocated variable
