@@ -21,4 +21,5 @@ target_link_libraries(dynamatic
   MLIRLLVMDialect
   MLIRArithDialect
   MLIRMemRefDialect
+  readline
   )

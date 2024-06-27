@@ -12,15 +12,13 @@
 //===----------------------------------------------------------------------===//
 
 #include "dynamatic/Transforms/HandshakeMaterialize.h"
+#include "dynamatic/Dialect/Handshake/HandshakeCanonicalize.h"
 #include "dynamatic/Dialect/Handshake/HandshakeOps.h"
+#include "dynamatic/Dialect/Handshake/MemoryInterfaces.h"
 #include "dynamatic/Support/CFG.h"
-#include "dynamatic/Support/Handshake.h"
-#include "mlir/IR/BuiltinTypes.h"
 #include "mlir/Transforms/GreedyPatternRewriteDriver.h"
 #include "llvm/ADT/STLExtras.h"
 #include "llvm/ADT/SetVector.h"
-#include "llvm/ADT/SmallSet.h"
-#include "llvm/ADT/TypeSwitch.h"
 #include "llvm/Support/ErrorHandling.h"
 #include <iterator>
 
@@ -343,7 +341,7 @@ struct HandshakeMaterializePass
     for (handshake::FuncOp funcOp : modOp.getOps<handshake::FuncOp>()) {
       for (handshake::LSQOp lsqOp : funcOp.getOps<handshake::LSQOp>()) {
         LSQPorts lsqPorts = lsqOp.getPorts();
-        ValueRange lsqInputs = lsqOp.getMemOperands();
+        ValueRange lsqInputs = lsqOp.getOperands();
         for (LSQGroup &group : lsqPorts.getGroups()) {
           Value ctrlValue = lsqInputs[group->ctrlPort->getCtrlInputIndex()];
           makeLSQControlForksLazy(lsqOp, ctrlValue, builder);

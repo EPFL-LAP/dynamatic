@@ -11,10 +11,11 @@
 //===----------------------------------------------------------------------===//
 
 #include "dynamatic/Analysis/NameAnalysis.h"
-#include "dynamatic/Support/Attribute.h"
+#include "dynamatic/Dialect/Handshake/HandshakeOps.h"
 #include "dynamatic/Support/LLVM.h"
 #include "mlir/Dialect/Func/IR/FuncOps.h"
 #include "mlir/IR/Attributes.h"
+#include "mlir/IR/BuiltinOps.h"
 #include "mlir/IR/OperationSupport.h"
 #include "mlir/IR/Value.h"
 #include "mlir/Support/LogicalResult.h"
@@ -27,9 +28,8 @@ using namespace mlir;
 using namespace dynamatic;
 
 /// Shortcut to get the name attribute of an operation.
-inline static handshake::NameAttr getNameAttr(Operation *op) {
-  return op->getAttrOfType<handshake::NameAttr>(
-      handshake::NameAttr::getMnemonic());
+inline static mlir::StringAttr getNameAttr(Operation *op) {
+  return op->getAttrOfType<mlir::StringAttr>(NameAnalysis::ATTR_NAME);
 }
 
 /// If the operation has an intrinsic name, returns it. Returns an empty
@@ -114,17 +114,16 @@ StringRef NameAnalysis::getName(Operation *op) {
   assert(namesValid && "analysis invariant is broken");
   // If the operation already has a name or is intrinsically named , do nothing
   // and return the name
-  if (handshake::NameAttr name = getNameAttr(op))
-    return name.getName();
+  if (mlir::StringAttr attr = getNameAttr(op))
+    return attr;
   if (StringRef name = getIntrinsicName(op); !name.empty())
     return name;
 
   // Set the attribute on the operation and update our mapping
   std::string name = genUniqueName(op->getName());
-  auto newAttr = handshake::NameAttr::get(op->getContext(), name);
-  setUniqueAttr<handshake::NameAttr>(op, newAttr);
+  op->setAttr(ATTR_NAME, StringAttr::get(op->getContext(), name));
   namedOperations[name] = op;
-  return getNameAttr(op).getName();
+  return getNameAttr(op);
 }
 
 bool NameAnalysis::hasName(Operation *op) { return getNameAttr(op) != nullptr; }
@@ -154,7 +153,7 @@ LogicalResult NameAnalysis::setName(Operation *op, StringRef name,
   assert(namesValid && "analysis invariant is broken");
   assert(!name.empty() && "name can't be empty");
   // The operation cannot already have a name or be intrinsically named
-  if (handshake::NameAttr attr = getNameAttr(op))
+  if (mlir::StringAttr attr = getNameAttr(op))
     return failure();
   if (isIntrinsicallyNamed(op))
     return failure();
@@ -167,8 +166,8 @@ LogicalResult NameAnalysis::setName(Operation *op, StringRef name,
   }
 
   // Set the attribute on the operation and update our mapping
-  auto newAttr = handshake::NameAttr::get(op->getContext(), uniqueName);
-  op->setAttr(handshake::NameAttr::getMnemonic(), newAttr);
+  auto newAttr = mlir::StringAttr::get(op->getContext(), uniqueName);
+  op->setAttr(ATTR_NAME, newAttr);
   namedOperations[uniqueName] = op;
   return success();
 }
@@ -177,7 +176,7 @@ LogicalResult NameAnalysis::setName(Operation *op, Operation *ascendant,
                                     bool uniqueWhenTaken) {
   assert(namesValid && "analysis invariant is broken");
   // The operation cannot already have a name or be intrinsically named
-  if (handshake::NameAttr attr = getNameAttr(op))
+  if (mlir::StringAttr attr = getNameAttr(op))
     return failure();
   if (isIntrinsicallyNamed(op))
     return failure();
@@ -191,8 +190,8 @@ LogicalResult NameAnalysis::setName(Operation *op, Operation *ascendant,
   }
 
   // Set the attribute on the operation and update our mapping
-  auto newAttr = handshake::NameAttr::get(op->getContext(), uniqueName);
-  op->setAttr(handshake::NameAttr::getMnemonic(), newAttr);
+  auto newAttr = mlir::StringAttr::get(op->getContext(), uniqueName);
+  op->setAttr(ATTR_NAME, newAttr);
   namedOperations[uniqueName] = op;
   return success();
 }
@@ -207,7 +206,7 @@ LogicalResult NameAnalysis::walk(UnnamedBehavior onUnnamed) {
     if (isa<mlir::ModuleOp>(nestedOp) || isIntrinsicallyNamed(nestedOp))
       return;
 
-    handshake::NameAttr attr = getNameAttr(nestedOp);
+    mlir::StringAttr attr = getNameAttr(nestedOp);
     if (!attr) {
       // Check what we must do when we encounter an unnamed operation
       switch (onUnnamed) {
@@ -228,18 +227,17 @@ LogicalResult NameAnalysis::walk(UnnamedBehavior onUnnamed) {
     }
 
     // Check that the name is unqiue with respect to other knwon operations
-    StringRef name = attr.getName();
-    if (auto namedOp = namedOperations.find(name);
+    if (auto namedOp = namedOperations.find(attr);
         namedOp != namedOperations.end()) {
       if (namedOp->second != nestedOp) {
-        nestedOp->emitError() << "Operation has name '" << name
+        nestedOp->emitError() << "Operation has name '" << attr
                               << "' but another operation already has this "
                                  "name. Names must be unique.";
         namesValid = false;
         return;
       }
     } else {
-      namedOperations[name] = nestedOp;
+      namedOperations[attr] = nestedOp;
     }
   });
 
@@ -280,8 +278,8 @@ void NameAnalysis::getBlockArgName(BlockArgument arg, std::string &prodName,
 }
 
 StringRef dynamatic::getUniqueName(Operation *op) {
-  if (handshake::NameAttr attr = getNameAttr(op))
-    return attr.getName();
+  if (mlir::StringAttr attr = getNameAttr(op))
+    return attr;
   if (StringRef name = getIntrinsicName(op); !name.empty())
     return name;
   return StringRef();
@@ -293,8 +291,8 @@ std::string dynamatic::getUniqueName(OpOperand &oprd) {
   std::string defName, resName;
   Value val = oprd.get();
   if (Operation *defOp = val.getDefiningOp()) {
-    if (handshake::NameAttr attr = getNameAttr(defOp)) {
-      defName = attr.getName().str();
+    if (mlir::StringAttr attr = getNameAttr(defOp)) {
+      defName = attr.str();
       resName = getResultName(defOp, cast<OpResult>(val).getResultNumber());
     } else {
       return "";
@@ -309,8 +307,8 @@ std::string dynamatic::getUniqueName(OpOperand &oprd) {
   // The user operation must have a name
   std::string userName, oprName;
   Operation *userOp = oprd.getOwner();
-  if (handshake::NameAttr attr = getNameAttr(userOp)) {
-    userName = attr.getName().str();
+  if (mlir::StringAttr attr = getNameAttr(userOp)) {
+    userName = attr.str();
     oprName = getOperandName(userOp, oprd.getOperandNumber());
   } else {
     return "";

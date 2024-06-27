@@ -1,67 +1,69 @@
 library ieee;
 use ieee.std_logic_1164.all;
-use work.customTypes.all;
 use ieee.numeric_std.all;
-use IEEE.math_real.all;
+use ieee.math_real.all;
+use work.types.all;
 
-entity mux_node is
+entity mux is
   generic (
-    NUM_INPUTS    : integer;
-    BITWIDTH      : integer;
-    COND_BITWIDTH : integer
+    SIZE         : integer;
+    DATA_WIDTH   : integer;
+    SELECT_WIDTH : integer
   );
   port (
-    -- inputs
-    clk              : in std_logic;
-    rst              : in std_logic;
-    select_ind       : in std_logic_vector(COND_BITWIDTH - 1 downto 0);
-    select_ind_valid : in std_logic;
-    ins              : in data_array(NUM_INPUTS - 1 downto 0)(BITWIDTH - 1 downto 0);
-    ins_valid        : in std_logic_vector(NUM_INPUTS - 1 downto 0);
-    outs_ready       : in std_logic;
-    -- outputs
-    select_ind_ready : out std_logic;
-    ins_ready        : out std_logic_vector(NUM_INPUTS - 1 downto 0);
-    outs             : out std_logic_vector(BITWIDTH - 1 downto 0);
-    outs_valid       : out std_logic);
+    clk, rst : in std_logic;
+    -- data input channels
+    ins       : in  data_array(SIZE - 1 downto 0)(DATA_WIDTH - 1 downto 0);
+    ins_valid : in  std_logic_vector(SIZE - 1 downto 0);
+    ins_ready : out std_logic_vector(SIZE - 1 downto 0);
+    -- index input channel
+    index       : in  std_logic_vector(SELECT_WIDTH - 1 downto 0);
+    index_valid : in  std_logic;
+    index_ready : out std_logic;
+    -- output channel
+    outs       : out std_logic_vector(DATA_WIDTH - 1 downto 0);
+    outs_valid : out std_logic;
+    outs_ready : in  std_logic
+  );
 end entity;
 
-architecture arch of mux_node is
+architecture arch of mux is
 
-  signal tehb_data_in : std_logic_vector(BITWIDTH - 1 downto 0);
+  signal tehb_data_in : std_logic_vector(DATA_WIDTH - 1 downto 0);
   signal tehb_pvalid  : std_logic;
   signal tehb_ready   : std_logic;
 
 begin
-  process (ins, ins_valid, outs_ready, select_ind, tehb_ready)
-    variable tmp_data_out  : unsigned(BITWIDTH - 1 downto 0);
+  process (ins, ins_valid, outs_ready, index, tehb_ready)
+    variable tmp_data_out  : unsigned(DATA_WIDTH - 1 downto 0);
     variable tmp_valid_out : std_logic;
   begin
     tmp_data_out  := unsigned(ins(0));
     tmp_valid_out := '0';
-    for I in NUM_INPUTS - 1 downto 0 loop
-      if (unsigned(select_ind) = to_unsigned(I, select_ind'length) and select_ind_valid = '1' and ins_valid(I) = '1') then
+    for I in SIZE - 1 downto 0 loop
+      if (unsigned(index) = to_unsigned(I, index'length) and index_valid = '1' and ins_valid(I) = '1') then
         tmp_data_out  := unsigned(ins(I));
         tmp_valid_out := '1';
       end if;
 
-      if ((unsigned(select_ind) = to_unsigned(I, select_ind'length) and select_ind_valid = '1' and tehb_ready = '1' and ins_valid(I) = '1') or ins_valid(I) = '0') then
+      if ((unsigned(index) = to_unsigned(I, index'length) and index_valid = '1' and tehb_ready = '1' and ins_valid(I) = '1') or ins_valid(I) = '0') then
         ins_ready(I) <= '1';
       else
         ins_ready(I) <= '0';
       end if;
     end loop;
 
-    if (select_ind_valid = '0' or (tmp_valid_out = '1' and tehb_ready = '1')) then
-      select_ind_ready <= '1';
+    if (index_valid = '0' or (tmp_valid_out = '1' and tehb_ready = '1')) then
+      index_ready <= '1';
     else
-      select_ind_ready <= '0';
+      index_ready <= '0';
     end if;
 
-    tehb_data_in <= std_logic_vector(resize(tmp_data_out, BITWIDTH));
+    tehb_data_in <= std_logic_vector(resize(tmp_data_out, DATA_WIDTH));
     tehb_pvalid  <= tmp_valid_out;
   end process;
-  tehb1 : entity work.TEHB(arch) generic map (BITWIDTH)
+
+  tehb : entity work.tehb(arch) generic map (DATA_WIDTH)
     port map(
       clk        => clk,
       rst        => rst,
@@ -72,4 +74,4 @@ begin
       ins        => tehb_data_in,
       outs       => outs
     );
-end arch;
+end architecture;

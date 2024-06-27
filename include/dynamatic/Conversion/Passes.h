@@ -15,7 +15,7 @@
 
 #include "dynamatic/Conversion/AffineToScf.h"
 #include "dynamatic/Conversion/CfToHandshake.h"
-#include "dynamatic/Conversion/HandshakeToNetlist.h"
+#include "dynamatic/Conversion/HandshakeToHW.h"
 #include "dynamatic/Conversion/ScfToCf.h"
 #include "mlir/IR/DialectRegistry.h"
 #include "mlir/Pass/Pass.h"

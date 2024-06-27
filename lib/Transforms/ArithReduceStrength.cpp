@@ -57,7 +57,6 @@ unsigned OpTree::getOperandNumNodes(OpTreeOperand &operand) {
   return 0U;
 }
 
-// NOLINTBEGIN(misc-no-recursion)
 Value OpTree::buildTreeRecursive(
     Operation *op, PatternRewriter &rewriter,
     std::unordered_map<size_t, Value> &cstCache,
@@ -119,7 +118,6 @@ Value OpTree::buildTreeRecursive(
   }
   return result;
 }
-// NOLINTEND(misc-no-recursion)
 
 Value OpTree::buildTree(Operation *op, PatternRewriter &rewriter) {
   std::unordered_map<size_t, Value> cstCache;

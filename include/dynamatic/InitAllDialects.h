@@ -14,16 +14,16 @@
 #ifndef DYNAMATIC_INITALLDIALECTS_H
 #define DYNAMATIC_INITALLDIALECTS_H
 
+#include "dynamatic/Dialect/HW/HWDialect.h"
 #include "dynamatic/Dialect/Handshake/HandshakeDialect.h"
 #include "mlir/Dialect/Affine/IR/AffineOps.h"
 #include "mlir/Dialect/Arith/IR/Arith.h"
-#include "mlir/Dialect/ControlFlow/IR/ControlFlowOps.h"
+#include "mlir/Dialect/ControlFlow/IR/ControlFlow.h"
 #include "mlir/Dialect/Func/IR/FuncOps.h"
 #include "mlir/Dialect/LLVMIR/LLVMDialect.h"
 #include "mlir/Dialect/Math/IR/Math.h"
 #include "mlir/Dialect/MemRef/IR/MemRef.h"
 #include "mlir/Dialect/SCF/IR/SCF.h"
-#include "mlir/IR/Dialect.h"
 
 namespace dynamatic {
 
@@ -32,7 +32,7 @@ inline void registerAllDialects(mlir::DialectRegistry &registry) {
                   mlir::math::MathDialect, mlir::memref::MemRefDialect,
                   mlir::func::FuncDialect, mlir::arith::ArithDialect,
                   mlir::cf::ControlFlowDialect, mlir::scf::SCFDialect,
-                  handshake::HandshakeDialect>();
+                  handshake::HandshakeDialect, hw::HWDialect>();
 }
 
 } // namespace dynamatic

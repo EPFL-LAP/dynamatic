@@ -66,8 +66,8 @@
 #define DYNAMATIC_SUPPORT_ATTRIBUTE_H
 
 #include "dynamatic/Support/LLVM.h"
+#include "mlir/IR/BuiltinAttributes.h"
 #include "mlir/IR/Operation.h"
-#include "mlir/IR/Value.h"
 
 /// Converts the attribute's name to an unsigned number. Asserts if the
 /// attribute name doesn't represent a valid index (the verification function of
@@ -115,6 +115,13 @@ static inline void copyAttr(Operation *srcOp, Operation *dstOp) {
   copyAttr<FirstAttr>(srcOp, dstOp);
   copyAttr<SecondAttr, RestAttr...>(srcOp, dstOp);
 }
+
+/// Attempts to serialize an MLIR attribute into a JSON file, which is created
+/// at the provided filepath. Succeeds when the attribute was of a supported
+/// type; otherwise fails and reports an error at the given location. Note that
+/// the top-level attribute must either be an array or dictionnary attribute for
+/// serialization to have a change at succeeding.
+LogicalResult serializeToJSON(Attribute attr, StringRef filepath, Location loc);
 
 /// Casts the attribute's value to the template attribute type.
 template <typename OperandAttr>

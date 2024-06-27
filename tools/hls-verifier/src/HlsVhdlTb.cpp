@@ -344,6 +344,7 @@ string HlsVhdlTb::getSignalDeclaration() {
   code << endl;
 
   for (size_t i = 0; i < cDuvParams.size(); i++) {
+    CFunctionParameter p = cDuvParams[i];
     MemElem m = memElems[i];
 
     if (m.isArray) {
@@ -366,15 +367,10 @@ string HlsVhdlTb::getSignalDeclaration() {
       code << "\tsignal " << m.addr1SignalName << " : std_logic_vector("
            << m.addrWidthParamValue << " - 1 downto 0);" << endl
            << endl;
-
-      //   code << "\tsignal " << m.addr0SignalName + "_dummy" << " :
-      //   std_logic_vector(31 downto 0);" << endl; code << "\tsignal " <<
-      //   m.addr1SignalName + "_dummy" << " : std_logic_vector(31 downto 0);"
-      //   << endl;
-
     } else {
       if ((cDuvParams[i].isReturn && cDuvParams[i].isOutput) ||
           !cDuvParams[i].isReturn) {
+        code << "\tsignal " << p.parameterName << "_ready : std_logic;" << endl;
         code << "\tsignal " << m.ce0SignalName << " : std_logic;" << endl;
         code << "\tsignal " << m.we0SignalName << " : std_logic;" << endl;
         code << "\tsignal " << m.dOut0SignalName << " : std_logic_vector("
@@ -663,37 +659,50 @@ string HlsVhdlTb::getDuvInstanceGeneration() {
                               m.dOut1SignalName);
       duvPortMap.emplace_back(getDataOut1PortNameForCParam(p.parameterName),
                               m.dIn1SignalName);
-    }
+    } else {
+      if (p.isInput) {
+        if (ctx.experimental) {
+          duvPortMap.emplace_back(p.parameterName, m.dOut0SignalName);
+          duvPortMap.emplace_back(p.parameterName + "_valid", "'1'");
+          duvPortMap.emplace_back(p.parameterName + "_ready",
+                                  p.parameterName + "_ready");
+        } else {
+          duvPortMap.emplace_back(getValidInPortNameForCParam(p.parameterName),
+                                  "'1'");
+          duvPortMap.emplace_back(getDataInSaPortNameForCParam(p.parameterName),
+                                  m.dOut0SignalName);
+        }
+      }
 
-    if (!m.isArray && p.isInput) {
-      duvPortMap.emplace_back(getValidInPortNameForCParam(p.parameterName),
-                              "'1'");
-      duvPortMap.emplace_back(getDataInSaPortNameForCParam(p.parameterName),
-                              m.dOut0SignalName);
-    }
-
-    if (!m.isArray && p.isOutput && p.isReturn) {
-      duvPortMap.emplace_back("end_out", m.dIn0SignalName);
-      duvPortMap.emplace_back("end_valid", "tb_end_valid"); ///////
-      duvPortMap.emplace_back("end_ready", "'1'");
-    }
-
-    if (!m.isArray && !p.isOutput && p.isReturn) {
-      duvPortMap.emplace_back("end_valid", "tb_end_valid"); ///////
-      duvPortMap.emplace_back("end_ready", "'1'");
-    }
-
-    if (!m.isArray && p.isOutput && !p.isReturn) {
-      duvPortMap.emplace_back(getValidOutPortNameForCParam(p.parameterName),
-                              m.we0SignalName);
-      duvPortMap.emplace_back(getDataOutSaPortNameForCParam(p.parameterName),
-                              m.dIn0SignalName);
-      duvPortMap.emplace_back(getReadyInPortNameForCParam(p.parameterName),
-                              "'1'");
+      if (p.isOutput) {
+        if (p.isReturn) {
+          if (ctx.experimental) {
+            duvPortMap.emplace_back("out0", m.dIn0SignalName);
+            duvPortMap.emplace_back("out0_valid", "tb_end_valid");
+            duvPortMap.emplace_back("out0_ready", "'1'");
+          } else {
+            duvPortMap.emplace_back("end_out", m.dIn0SignalName);
+            duvPortMap.emplace_back("end_valid", "tb_end_valid");
+            duvPortMap.emplace_back("end_ready", "'1'");
+          }
+        } else {
+          duvPortMap.emplace_back(getValidOutPortNameForCParam(p.parameterName),
+                                  m.we0SignalName);
+          duvPortMap.emplace_back(
+              getDataOutSaPortNameForCParam(p.parameterName), m.dIn0SignalName);
+          duvPortMap.emplace_back(getReadyInPortNameForCParam(p.parameterName),
+                                  "'1'");
+        }
+      } else if (p.isReturn) {
+        duvPortMap.emplace_back("end_valid", "tb_end_valid");
+        duvPortMap.emplace_back("end_ready", "'1'");
+      }
     }
   }
 
-  duvPortMap.emplace_back("start_in", "(others => '0')");
+  // Start signal
+  if (!ctx.experimental)
+    duvPortMap.emplace_back("start_in", "(others => '0')");
   duvPortMap.emplace_back("start_ready", "tb_start_ready");
   duvPortMap.emplace_back("start_valid", "tb_start_valid");
 

@@ -4,7 +4,7 @@
 // CHECK-LABEL:   handshake.func @forkBW(
 // CHECK-SAME:                           %[[VAL_0:.*]]: i32,
 // CHECK-SAME:                           %[[VAL_1:.*]]: none, ...) -> (i16, i8) attributes {argNames = ["arg0", "start"], resNames = ["out0", "out1"]} {
-// CHECK:           %[[VAL_2:.*]] = arith.trunci %[[VAL_0]] {bb = 0 : ui32} : i32 to i16
+// CHECK:           %[[VAL_2:.*]] = arith.trunci %[[VAL_0]] {handshake.bb = 0 : ui32} : i32 to i16
 // CHECK:           %[[VAL_3:.*]]:2 = fork [2] %[[VAL_2]] : i16
 // CHECK:           %[[VAL_4:.*]] = arith.trunci %[[VAL_3]]#1 : i16 to i8
 // CHECK:           %[[VAL_5:.*]]:2 = return %[[VAL_3]]#0, %[[VAL_4]] : i16, i8
@@ -23,7 +23,7 @@ handshake.func @forkBW(%arg0: i32, %start: none) -> (i16, i8) {
 // CHECK-LABEL:   handshake.func @lazyForkBW(
 // CHECK-SAME:                               %[[VAL_0:.*]]: i32,
 // CHECK-SAME:                               %[[VAL_1:.*]]: none, ...) -> (i16, i8) attributes {argNames = ["arg0", "start"], resNames = ["out0", "out1"]} {
-// CHECK:           %[[VAL_2:.*]] = arith.trunci %[[VAL_0]] {bb = 0 : ui32} : i32 to i16
+// CHECK:           %[[VAL_2:.*]] = arith.trunci %[[VAL_0]] {handshake.bb = 0 : ui32} : i32 to i16
 // CHECK:           %[[VAL_3:.*]]:2 = lazy_fork [2] %[[VAL_2]] : i16
 // CHECK:           %[[VAL_4:.*]] = arith.trunci %[[VAL_3]]#1 : i16 to i8
 // CHECK:           %[[VAL_5:.*]]:2 = return %[[VAL_3]]#0, %[[VAL_4]] : i16, i8
@@ -42,8 +42,8 @@ handshake.func @lazyForkBW(%arg0: i32, %start: none) -> (i16, i8) {
 // CHECK-LABEL:   handshake.func @mergeBW(
 // CHECK-SAME:                            %[[VAL_0:.*]]: i32, %[[VAL_1:.*]]: i32,
 // CHECK-SAME:                            %[[VAL_2:.*]]: none, ...) -> i16 attributes {argNames = ["arg0", "arg1", "start"], resNames = ["out0"]} {
-// CHECK:           %[[VAL_3:.*]] = arith.trunci %[[VAL_1]] {bb = 0 : ui32} : i32 to i16
-// CHECK:           %[[VAL_4:.*]] = arith.trunci %[[VAL_0]] {bb = 0 : ui32} : i32 to i16
+// CHECK:           %[[VAL_3:.*]] = arith.trunci %[[VAL_1]] {handshake.bb = 0 : ui32} : i32 to i16
+// CHECK:           %[[VAL_4:.*]] = arith.trunci %[[VAL_0]] {handshake.bb = 0 : ui32} : i32 to i16
 // CHECK:           %[[VAL_5:.*]] = merge %[[VAL_4]], %[[VAL_3]] : i16
 // CHECK:           %[[VAL_6:.*]] = return %[[VAL_5]] : i16
 // CHECK:           end %[[VAL_6]] : i16
@@ -60,7 +60,7 @@ handshake.func @mergeBW(%arg0: i32, %arg1: i32, %start: none) -> i16 {
 // CHECK-LABEL:   handshake.func @branchBW(
 // CHECK-SAME:                             %[[VAL_0:.*]]: i32,
 // CHECK-SAME:                             %[[VAL_1:.*]]: none, ...) -> i16 attributes {argNames = ["arg0", "start"], resNames = ["out0"]} {
-// CHECK:           %[[VAL_2:.*]] = arith.trunci %[[VAL_0]] {bb = 0 : ui32} : i32 to i16
+// CHECK:           %[[VAL_2:.*]] = arith.trunci %[[VAL_0]] {handshake.bb = 0 : ui32} : i32 to i16
 // CHECK:           %[[VAL_3:.*]] = br %[[VAL_2]] : i16
 // CHECK:           %[[VAL_4:.*]] = return %[[VAL_3]] : i16
 // CHECK:           end %[[VAL_4]] : i16
@@ -77,8 +77,8 @@ handshake.func @branchBW(%arg0: i32, %start: none) -> i16 {
 // CHECK-LABEL:   handshake.func @cmergeBW(
 // CHECK-SAME:                             %[[VAL_0:.*]]: i32, %[[VAL_1:.*]]: i32,
 // CHECK-SAME:                             %[[VAL_2:.*]]: none, ...) -> (i16, i16) attributes {argNames = ["arg0", "arg1", "start"], resNames = ["out0", "out1"]} {
-// CHECK:           %[[VAL_3:.*]] = arith.trunci %[[VAL_1]] {bb = 0 : ui32} : i32 to i16
-// CHECK:           %[[VAL_4:.*]] = arith.trunci %[[VAL_0]] {bb = 0 : ui32} : i32 to i16
+// CHECK:           %[[VAL_3:.*]] = arith.trunci %[[VAL_1]] {handshake.bb = 0 : ui32} : i32 to i16
+// CHECK:           %[[VAL_4:.*]] = arith.trunci %[[VAL_0]] {handshake.bb = 0 : ui32} : i32 to i16
 // CHECK:           %[[VAL_5:.*]], %[[VAL_6:.*]] = control_merge %[[VAL_4]], %[[VAL_3]] : i16, i1
 // CHECK:           %[[VAL_7:.*]] = arith.extui %[[VAL_6]] : i1 to i16
 // CHECK:           %[[VAL_8:.*]]:2 = return %[[VAL_5]], %[[VAL_7]] : i16, i16
@@ -97,9 +97,9 @@ handshake.func @cmergeBW(%arg0: i32, %arg1: i32, %start: none) -> (i16, i16) {
 // CHECK-LABEL:   handshake.func @muxBW(
 // CHECK-SAME:                          %[[VAL_0:.*]]: i32, %[[VAL_1:.*]]: i32, %[[VAL_2:.*]]: i32,
 // CHECK-SAME:                          %[[VAL_3:.*]]: none, ...) -> i16 attributes {argNames = ["arg0", "arg1", "index", "start"], resNames = ["out0"]} {
-// CHECK:           %[[VAL_4:.*]] = arith.trunci %[[VAL_1]] {bb = 0 : ui32} : i32 to i16
-// CHECK:           %[[VAL_5:.*]] = arith.trunci %[[VAL_0]] {bb = 0 : ui32} : i32 to i16
-// CHECK:           %[[VAL_6:.*]] = arith.trunci %[[VAL_2]] {bb = 0 : ui32} : i32 to i1
+// CHECK:           %[[VAL_4:.*]] = arith.trunci %[[VAL_1]] {handshake.bb = 0 : ui32} : i32 to i16
+// CHECK:           %[[VAL_5:.*]] = arith.trunci %[[VAL_0]] {handshake.bb = 0 : ui32} : i32 to i16
+// CHECK:           %[[VAL_6:.*]] = arith.trunci %[[VAL_2]] {handshake.bb = 0 : ui32} : i32 to i1
 // CHECK:           %[[VAL_7:.*]] = mux %[[VAL_6]] {{\[}}%[[VAL_5]], %[[VAL_4]]] : i1, i16
 // CHECK:           %[[VAL_8:.*]] = return %[[VAL_7]] : i16
 // CHECK:           end %[[VAL_8]] : i16
@@ -116,7 +116,7 @@ handshake.func @muxBW(%arg0: i32, %arg1: i32, %index: i32, %start: none) -> i16 
 // CHECK-LABEL:   handshake.func @condBrBW(
 // CHECK-SAME:                             %[[VAL_0:.*]]: i32, %[[VAL_1:.*]]: i1,
 // CHECK-SAME:                             %[[VAL_2:.*]]: none, ...) -> (i16, i8) attributes {argNames = ["arg0", "cond", "start"], resNames = ["out0", "out1"]} {
-// CHECK:           %[[VAL_3:.*]] = arith.trunci %[[VAL_0]] {bb = 0 : ui32} : i32 to i16
+// CHECK:           %[[VAL_3:.*]] = arith.trunci %[[VAL_0]] {handshake.bb = 0 : ui32} : i32 to i16
 // CHECK:           %[[VAL_4:.*]], %[[VAL_5:.*]] = cond_br %[[VAL_1]], %[[VAL_3]] : i16
 // CHECK:           %[[VAL_6:.*]] = arith.trunci %[[VAL_5]] : i16 to i8
 // CHECK:           %[[VAL_7:.*]]:2 = return %[[VAL_4]], %[[VAL_6]] : i16, i8
@@ -135,7 +135,7 @@ handshake.func @condBrBW(%arg0: i32, %cond: i1, %start: none) -> (i16, i8) {
 // CHECK-LABEL:   handshake.func @bufferBW(
 // CHECK-SAME:                             %[[VAL_0:.*]]: i32,
 // CHECK-SAME:                             %[[VAL_1:.*]]: none, ...) -> i16 attributes {argNames = ["arg0", "start"], resNames = ["out0"]} {
-// CHECK:           %[[VAL_2:.*]] = arith.trunci %[[VAL_0]] {bb = 0 : ui32} : i32 to i16
+// CHECK:           %[[VAL_2:.*]] = arith.trunci %[[VAL_0]] {handshake.bb = 0 : ui32} : i32 to i16
 // CHECK:           %[[VAL_3:.*]] = oehb [2] %[[VAL_2]] : i16
 // CHECK:           %[[VAL_4:.*]] = return %[[VAL_3]] : i16
 // CHECK:           end %[[VAL_4]] : i16

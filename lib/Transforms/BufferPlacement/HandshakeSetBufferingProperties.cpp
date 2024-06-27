@@ -21,7 +21,7 @@
 #include "dynamatic/Analysis/NameAnalysis.h"
 #include "dynamatic/Dialect/Handshake/HandshakeDialect.h"
 #include "dynamatic/Dialect/Handshake/HandshakeOps.h"
-#include "dynamatic/Support/Handshake.h"
+#include "dynamatic/Dialect/Handshake/MemoryInterfaces.h"
 #include "dynamatic/Transforms/BufferPlacement/BufferingSupport.h"
 #include "dynamatic/Transforms/BufferPlacement/HandshakePlaceBuffers.h"
 #include "dynamatic/Transforms/HandshakeMaterialize.h"
@@ -72,7 +72,7 @@ static bool vectorContains(Value find, SmallVector<Value> &values) {
 /// - all other outputs must have their ready path cut
 static void setLSQControlConstraints(handshake::LSQOp lsqOp) {
   LSQPorts ports = lsqOp.getPorts();
-  ValueRange lsqInputs = lsqOp.getMemOperands();
+  ValueRange lsqInputs = lsqOp.getOperands();
 
   for (LSQGroup &group : ports.getGroups()) {
     // Control signal must come from a fork for this constraint to apply

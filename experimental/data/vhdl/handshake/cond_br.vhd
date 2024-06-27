@@ -1,58 +1,49 @@
 library ieee;
 use ieee.std_logic_1164.all;
-use work.customTypes.all;
+use ieee.numeric_std.all;
 
-entity cond_br_node is generic (BITWIDTH : integer);
-port (
-  -- inputs
-  clk                : in std_logic;
-  rst                : in std_logic;
-  condition          : in std_logic;
-  condition_valid    : in std_logic;
-  data               : in std_logic_vector(BITWIDTH - 1 downto 0);
-  data_valid         : in std_logic;
-  true_result_ready  : in std_logic;
-  false_result_ready : in std_logic;
-  -- outputs
-  condition_ready    : out std_logic;
-  data_ready         : out std_logic;
-  true_result        : out std_logic_vector(BITWIDTH - 1 downto 0);
-  true_result_valid  : out std_logic;
-  false_result       : out std_logic_vector(BITWIDTH - 1 downto 0);
-  false_result_valid : out std_logic);
-
+entity cond_br is
+  generic (
+    BITWIDTH : integer
+  );
+  port (
+    clk, rst : in std_logic;
+    -- data input channel
+    data       : in  std_logic_vector(BITWIDTH - 1 downto 0);
+    data_valid : in  std_logic;
+    data_ready : out std_logic;
+    -- condition input channel
+    condition       : in  std_logic_vector(0 downto 0);
+    condition_valid : in  std_logic;
+    condition_ready : out std_logic;
+    -- true output channel
+    trueOut       : out std_logic_vector(BITWIDTH - 1 downto 0);
+    trueOut_valid : out std_logic;
+    trueOut_ready : in  std_logic;
+    -- false output channel
+    falseOut       : out std_logic_vector(BITWIDTH - 1 downto 0);
+    falseOut_valid : out std_logic;
+    falseOut_ready : in  std_logic
+  );
 end entity;
-architecture arch of cond_br_node is
-  signal joinValid, brReady : std_logic;
-  signal out_array          : std_logic_vector(1 downto 0);
-  signal out2_array         : std_logic_vector(1 downto 0);
 
+architecture arch of cond_br is
 begin
-  data_ready <= out_array(0);
-  condition_ready <= out_array(1);
-  true_result_valid <= out2_array(0);
-  false_result_valid <= out2_array(1);
-
-  j : entity work.join(arch) generic map(2)
+  control : entity work.cond_br_dataless
     port map(
-    (data_valid, condition_valid),
-      brReady,
-      joinValid,
-      out_array);
+      clk             => clk,
+      rst             => rst,
+      data_valid      => data_valid,
+      data_ready      => data_ready,
+      condition       => condition,
+      condition_valid => condition_valid,
+      condition_ready => condition_ready,
+      trueOut_valid   => trueOut_valid,
+      trueOut_ready   => trueOut_ready,
+      falseOut_valid  => falseOut_valid,
+      falseOut_ready  => falseOut_ready
+    );
 
-  cond_brp : entity work.branchSimple(arch)
-    port map(
-      condition,
-      joinValid,
-      (true_result_ready,
-      false_result_ready),
-      out2_array,
-      brReady);
-
-  process (data)
-  begin
-    true_result  <= data;
-    false_result <= data;
-  end process;
-
+  trueOut  <= data;
+  falseOut <= data;
 end architecture;

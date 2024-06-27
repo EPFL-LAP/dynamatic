@@ -1,20 +1,21 @@
 library ieee;
 use ieee.std_logic_1164.all;
 
-entity branchSimple is port (
-  condition,
-  pValid      : in std_logic;
-  nReadyArray : in std_logic_vector(1 downto 0);
-  validArray  : out std_logic_vector(1 downto 0);
-  ready       : out std_logic);
-end branchSimple;
+entity branch_simple is
+  port (
+    -- inputs
+    condition  : in std_logic;
+    valid      : in std_logic;
+    outs_ready : in std_logic_vector(1 downto 0);
+    -- outputs
+    ins_valid : out std_logic_vector(1 downto 0);
+    ins_ready : out std_logic
+  );
+end branch_simple;
 
-architecture arch of branchSimple is
+architecture arch of branch_simple is
 begin
-  validArray(1) <= (not condition) and pValid;
-  validArray(0) <= condition and pValid;
-
-  ready <= (nReadyArray(1) and not condition)
-    or (nReadyArray(0) and condition);
-
+  ins_valid(1) <= (not condition) and valid;
+  ins_valid(0) <= condition and valid;
+  ins_ready    <= (outs_ready(1) and not condition) or (outs_ready(0) and condition);
 end arch;

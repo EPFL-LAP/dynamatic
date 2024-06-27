@@ -154,13 +154,13 @@ handshake.func @multipleUsers(%start: none) -> i32 {
 
 // CHECK-LABEL:   handshake.func @inheritBB(
 // CHECK-SAME:                              %[[VAL_0:.*]]: none, ...) -> i32 attributes {argNames = ["start"], resNames = ["out0"]} {
-// CHECK:           %[[VAL_1:.*]] = constant %[[VAL_0]] {bb = 0 : i32, value = 32 : i7} : i7
-// CHECK:           %[[VAL_2:.*]] = arith.extsi %[[VAL_1]] {bb = 0 : i32} : i7 to i32
+// CHECK:           %[[VAL_1:.*]] = constant %[[VAL_0]] {handshake.bb = 0 : i32, value = 32 : i7} : i7
+// CHECK:           %[[VAL_2:.*]] = arith.extsi %[[VAL_1]] {handshake.bb = 0 : i32} : i7 to i32
 // CHECK:           %[[VAL_3:.*]] = return %[[VAL_2]] : i32
 // CHECK:           end %[[VAL_3]] : i32
 // CHECK:         }
 handshake.func @inheritBB(%start: none) -> i32 {
-  %cst = constant %start {value = 32 : i32, bb = 0 : i32} : i32
+  %cst = constant %start {value = 32 : i32, handshake.bb = 0 : i32} : i32
   %returnVal = return %cst : i32
   end %returnVal : i32
 }

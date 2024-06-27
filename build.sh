@@ -1,3 +1,4 @@
+
 #!/bin/bash
 
 # Kill the whole script on Ctrl+C
@@ -40,7 +41,7 @@ echo_section() {
 
 # Helper function to print subsection title text
 echo_subsection() {
-    echo "# ===--- $1 ---==="
+    echo -e "\n# ===--- $1 ---==="
 }
 
 # Helper function to exit script on failed command
@@ -49,7 +50,6 @@ exit_on_fail() {
         if [[ ! -z $1 ]]; then
             echo -e "\n$1"
         fi
-        echo ""
         echo_subsection "Build failed!"
         exit 1
     fi
@@ -78,6 +78,16 @@ create_symlink() {
     echo "$dst -> $src"
     ln -f --symbolic ../$src $dst
 }
+
+# Same as create_symlink but creates the symbolic link inside the bin/generators
+# subfolder.
+create_generator_symlink() {
+    local src=$1
+    local dst="bin/generators/$(basename $1)"
+    echo "$dst -> $src"
+    ln -f --symbolic ../../$src $dst
+}
+
 
 # Determine whether cmake should be re-configured by looking for a
 # CMakeCache.txt file in the current working directory.
@@ -230,6 +240,7 @@ if should_run_cmake ; then
   cmake -G Ninja .. \
       -DMLIR_DIR=polygeist/llvm-project/build/lib/cmake/mlir \
       -DLLVM_DIR=polygeist/llvm-project/build/lib/cmake/llvm \
+      -DCLANG_DIR=polygeist/llvm-project/build/lib/cmake/clang \
       -DLLVM_TARGETS_TO_BUILD="host" \
       -DCMAKE_BUILD_TYPE=$BUILD_TYPE \
       -DCMAKE_EXPORT_COMPILE_COMMANDS="ON" \
@@ -244,6 +255,17 @@ if [[ ENABLE_TESTS -eq 1 ]]; then
     ninja check-dynamatic
     exit_on_fail "Tests for dynamatic failed"
 fi
+
+# Build Chisel generators
+
+echo_subsection "Building LSQ generator"
+
+LSQ_GEN_PATH="tools/backend/lsq-generator" 
+LSQ_GEN_JAR="target/scala-2.13/lsq-generator.jar" 
+cd "$SCRIPT_CWD/$LSQ_GEN_PATH"
+sbt assembly
+exit_on_fail "Failed to build LSQ generator"
+chmod +x $LSQ_GEN_JAR
 
 #### visual-dataflow ####
 
@@ -286,7 +308,7 @@ fi
 echo_section "Creating symbolic links"
 
 # Create bin/ directory at the project's root
-cd "$SCRIPT_CWD" && mkdir -p bin 
+cd "$SCRIPT_CWD" && mkdir -p bin/generators
 
 # Create symbolic links to all binaries we use from subfolders
 create_symlink polygeist/build/bin/cgeist
@@ -299,6 +321,10 @@ create_symlink build/bin/export-vhdl
 create_symlink build/bin/exp-frequency-profiler
 create_symlink build/bin/handshake-simulator
 create_symlink build/bin/hls-verifier
+create_generator_symlink build/bin/rtl-cmpf-generator
+create_generator_symlink build/bin/rtl-cmpi-generator
+create_generator_symlink build/bin/rtl-text-generator
+create_generator_symlink "$LSQ_GEN_PATH/$LSQ_GEN_JAR"
 if [[ $GODOT_PATH != "" ]]; then
   create_symlink visual-dataflow/bin/visual-dataflow
 fi
@@ -310,5 +336,4 @@ chmod +x tools/dynamatic/scripts/simulate.sh
 chmod +x tools/dynamatic/scripts/synthesize.sh
 chmod +x tools/dynamatic/scripts/visualize.sh
 
-echo ""
 echo_subsection "Build successful!"

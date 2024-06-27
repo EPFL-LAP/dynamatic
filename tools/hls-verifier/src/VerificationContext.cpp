@@ -103,7 +103,7 @@ string VerificationContext::getCExecutablePath() const {
 }
 
 string VerificationContext::getVhdlTestbenchPath() const {
-  return getVhdlSrcDir() + "/" + "hls_verify_" + getVhdlDuvEntityName() +
+  return getVhdlSrcDir() + "/" + "hls_verify_" + getCFuvFunctionName() +
          "_tb.vhd";
 }
 

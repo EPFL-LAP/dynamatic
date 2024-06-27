@@ -16,8 +16,8 @@
 #define DYNAMATIC_SUPPORT_MILP_H
 
 #include "dynamatic/Support/LLVM.h"
-#include "dynamatic/Support/Logging.h"
-#include "mlir/Support/LogicalResult.h"
+#include "llvm/ADT/Twine.h"
+#include "llvm/Support/raw_ostream.h"
 
 #ifndef DYNAMATIC_GUROBI_NOT_INSTALLED
 #include "gurobi_c++.h"

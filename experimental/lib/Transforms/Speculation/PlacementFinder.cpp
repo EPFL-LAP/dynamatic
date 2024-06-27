@@ -147,62 +147,7 @@ void PlacementFinder::findCommitsTraversal(llvm::DenseSet<Operation *> &visited,
 }
 
 namespace {
-// Define a Control-Flow Graph Edge as the pair (srcOpResult, *dstOp)
 using CFGEdge = OpOperand;
-
-// Define a comparator between BBEndpoints
-struct EndpointComparator {
-  bool operator()(const BBEndpoints &a, const BBEndpoints &b) const {
-    if (a.srcBB != b.srcBB)
-      return a.srcBB < b.srcBB;
-    return a.dstBB < b.dstBB;
-  }
-};
-
-// Define a map from BBEndpoints to the CFGEdges that connect the BBs
-using BBEndpointsMap =
-    std::map<BBEndpoints, std::vector<CFGEdge *>, EndpointComparator>;
-
-// Data structure to hold all arcs leading to a single BB predecessor
-// Note: srcBB and dstBB can be equal when the arcs are Backedges
-struct BBArc {
-  unsigned srcBB;
-  unsigned dstBB;
-  std::vector<CFGEdge *> edges;
-};
-
-// Define a map from a BB's number to the BBArcs that lead to predecessor BBs
-using BBtoPredecessorArcsMap = llvm::DenseMap<unsigned, std::vector<BBArc>>;
-} // namespace
-
-// Calculate the BBArcs that lead to predecessor BBs within funcOp
-// Returns a map from each BB number to a vector of BBArcs
-static BBtoPredecessorArcsMap getPredecessorArcs(handshake::FuncOp funcOp) {
-  BBEndpointsMap endpointEdges;
-  // Traverse all operations within funcOp to find edges between BBs, including
-  // self-edges, and save them in a map from the Endpoints to the edges
-  funcOp->walk([&](Operation *op) {
-    for (CFGEdge &edge : op->getOpOperands()) {
-      BBEndpoints endpoints;
-      // Store the edge if it is a Backedge or connects two different BBs
-      if (isBackedge(edge.get(), op, &endpoints) or
-          endpoints.srcBB != endpoints.dstBB) {
-        endpointEdges[endpoints].push_back(&edge);
-      }
-    }
-  });
-
-  // Join all predecessors of a BB
-  BBtoPredecessorArcsMap predecessorArcs;
-  for (const auto &[endpoints, edges] : endpointEdges) {
-    BBArc arc;
-    arc.srcBB = endpoints.srcBB;
-    arc.dstBB = endpoints.dstBB;
-    arc.edges = edges;
-    predecessorArcs[endpoints.dstBB].push_back(arc);
-  }
-
-  return predecessorArcs;
 }
 
 // DFS traversal to mark all operations that lead to Commit units
@@ -235,7 +180,7 @@ void PlacementFinder::findCommitsBetweenBBs() {
   // Whenever a BB has two speculative inputs, commit units are needed to
   // avoid tokens going out-of-order. First, the block predecessor arcs are
   // found
-  BBtoPredecessorArcsMap bbToPredecessorArcs = getPredecessorArcs(funcOp);
+  BBtoArcsMap bbToPredecessorArcs = getBBPredecessorArcs(funcOp);
 
   // Mark the speculative edges. The set speculativeEdges is passed by
   // reference

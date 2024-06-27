@@ -94,6 +94,7 @@ public:
   vector<CFunctionParameter> getFuvParams() const;
 
   bool useAddrWidth32;
+  bool experimental;
 
 private:
   Properties properties;

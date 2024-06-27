@@ -8,16 +8,11 @@
 
 #include "LSQGenerator.h"
 #include "DOTParser.h"
-#include "VHDLWriter.h"
 #include <algorithm>
-#include <cctype>
 #include <filesystem>
 #include <fstream>
 #include <iostream>
-#include <list>
-#include <sstream>
 #include <string>
-#include <vector>
 
 #define LSQ_ADDRESSWIDTH_DEFAULT 32
 #define LSQ_DATAWIDTH_DEFAULT 32
@@ -298,16 +293,15 @@ static void lsqWriteConfigurationFile(const std::string &outPath, int lsqIndx) {
   lsqConfigurationFile.open(getLSQConfigPath(outPath, lsqIndx));
 
   lsqConfigurationFile << "{\n";
-  lsqConfigurationFile << "\"specifications\" :[\n";
-  lsqConfigurationFile << "{\n";
 
   lsqConfigurationFile << R"("name": ")" << lsqConf[lsqIndx].name << "\",\n";
   lsqConfigurationFile << "\"dataWidth\":" << lsqConf[lsqIndx].dataWidth
                        << ",\n";
-
-  lsqConfigurationFile << R"("accessType" : "BRAM" )"
+  lsqConfigurationFile << R"("experimental" : false )"
                        << ",\n";
-  lsqConfigurationFile << R"("speculation": "false" )"
+  lsqConfigurationFile << R"("toMC" : false )"
+                       << ",\n";
+  lsqConfigurationFile << R"("accessType" : "BRAM" )"
                        << ",\n";
   lsqConfigurationFile << "\"addrWidth\":" << lsqConf[lsqIndx].addressWidth
                        << ",\n";
@@ -333,8 +327,6 @@ static void lsqWriteConfigurationFile(const std::string &outPath, int lsqIndx) {
 
   lsqConfigurationFile << "\"bufferDepth\": 0\n";
 
-  lsqConfigurationFile << "}\n";
-  lsqConfigurationFile << "]\n";
   lsqConfigurationFile << "}\n";
 
   lsqConfigurationFile.close();

@@ -25,15 +25,16 @@
 #include "dynamatic/Dialect/Handshake/HandshakeOps.h"
 #include "dynamatic/Support/LLVM.h"
 #include "llvm/ADT/SmallSet.h"
+#include "llvm/ADT/StringRef.h"
 
 namespace dynamatic {
 
 /// Operation attribute to identify the basic block the operation originated
 /// from in the std-level IR.
-const std::string BB_ATTR = "bb";
+constexpr llvm::StringLiteral BB_ATTR_NAME("handshake.bb");
 
 /// ID of entry basic block of every Handshake function.
-const unsigned ENTRY_BB = 0;
+constexpr unsigned ENTRY_BB = 0;
 
 /// This struct groups the operations of a handshake::FuncOp in "blocks" based
 /// on the "bb" attribute potentially attached to each operation.
@@ -97,8 +98,29 @@ bool isBackedge(Value val, Operation *user, BBEndpoints *endpoints = nullptr);
 /// user (the function will assert if that is not the case).
 bool isBackedge(Value val, BBEndpoints *endpoints = nullptr);
 
-/// Determines whether the Handshake operation cannot belong to the implicit CFG
-/// of a Handshake function (i.e., cannot have a basic block attribute).
+/// Represents an arc in the implicit CFG of a Handshake function i.e., a set of
+/// edges (represented by `mlir::OpOperand`s) in the circuit graph that connect
+/// two specific and potentially identical basic blocks.
+struct BBArc {
+  /// The arc's source basic block.
+  unsigned srcBB;
+  /// The arc's destination basic block.
+  unsigned dstBB;
+  /// Set of pointers to OpOperands that uniquely identify an edge in the CFG.
+  llvm::DenseSet<OpOperand *> edges;
+};
+
+/// Defines a map from a BB's number to a vector of BBArcs. This can be used,
+/// for example, to map a BB to a list of arcs that start from BBs that are
+/// predecessors in the CFG.
+using BBtoArcsMap = llvm::MapVector<unsigned, mlir::SmallVector<BBArc>>;
+
+/// Calculates the BBArcs that lead to predecessor BBs within funcOp
+/// Returns a map from each BB number to a vector of BBArcs.
+BBtoArcsMap getBBPredecessorArcs(handshake::FuncOp funcOp);
+
+/// Determines whether the Handshake operation cannot belong to the implicit
+/// CFG of a Handshake function (i.e., cannot have a basic block attribute).
 bool cannotBelongToCFG(Operation *op);
 
 /// Represents a CFG path as an ordered sequence of basic blocks.
