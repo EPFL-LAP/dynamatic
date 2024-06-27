@@ -47,6 +47,10 @@ static cl::opt<std::string> dataWidthOpt(cl::Positional, cl::Required,
                                          cl::desc("<dataWidth>"),
                                          cl::cat(mainCategory));
 
+static cl::opt<std::string> latencyOpt(cl::Positional, cl::Required,
+                                       cl::desc("<latency>"),
+                                       cl::cat(mainCategory));
+
 llvm::SmallVector<unsigned, 8> parseCreditOpt(std::string creditString) {
   llvm::SmallVector<unsigned, 8> listOfCredits;
 
@@ -108,6 +112,8 @@ int main(int argc, char **argv) {
   unsigned numInputOperands = std::stoi(numInputOperandsOpt.getValue());
 
   unsigned groupSize = listOfCredits.size();
+
+  unsigned latency = std::stoi(latencyOpt.getValue());
 
   outputFile << "-- Sharing Wrapper Circuit for Managing the Shared Unit --\n";
   outputFile << "-- Number of credits of each operation: ";
@@ -203,7 +209,7 @@ int main(int argc, char **argv) {
   outputFile << "\n";
 
   outputFile << "-- Flag that says the sharing wrapper is taking a token\n";
-  outputFile << "signal fifo_ins_valid : std_logic;\n";
+  outputFile << "signal arbiter_out_valid : std_logic;\n";
   outputFile << "\n";
 
   outputFile << "-- cond FIFO output data\n";
@@ -294,7 +300,49 @@ int main(int argc, char **argv) {
   outputFile << "grant => arbiter_out\n";
   outputFile << ");\n";
 
-  outputFile << "end architecture\n";
+  // Generating valid signals to the shared unit
+  outputFile << "or_n0 : work.or_n0(arch) generic map(" << groupSize << ")\n";
+  outputFile << "port map(\n";
+  for (unsigned i = 0; i < groupSize; i++) {
+    outputFile << "ins(" << i << ") => sync" << i << "_out0_valid,\n";
+  }
+  outputFile << "outs => arbiter_out_valid\n";
+  outputFile << ");\n";
+
+  // Wiring the valid signals to the shared unit
+  for (unsigned i = groupSize; i < groupSize + numInputOperands; i++) {
+    outputFile << "outs_valid(" << i << ") <= arbiter_out_valid;\n";
+    outputFile << "outs(" << i << ") <= mux" << i - groupSize
+               << "_out0_data;\n";
+  }
+  outputFile << "\n";
+
+  outputFile << "cond_fifo : work.ofifo(arch) generic map(" << latency << ", "
+             << dataWidth << ")\n";
+  outputFile << "port map(\n";
+  outputFile << "clk => clk, rst => rst,\n";
+  outputFile << "ins => arbiter_out,\n";
+  outputFile << "ins_valid => arbiter_out_valid,\n";
+  outputFile << "outs => cond_fifo_outs_data,\n";
+  outputFile << "outs_valid => cond_fifo_outs_valid,\n";
+  outputFile << "outs_ready => cond_fifo_outs_ready\n";
+  outputFile << ");\n";
+
+  // Branch
+
+  outputFile << "branch : work.crush_oh_branch(arch) generic map(" << groupSize
+             << ", " << dataWidth << ")\nport map(\n";
+  outputFile << "ins => ins(" << groupSize << "),\n";
+  outputFile << "ins_valid => ins_valid(" << groupSize << "),\n";
+  outputFile << "ins_ready => ins_ready(" << groupSize << "),\n";
+  outputFile << "sel => cond_fifo_outs_data,\n";
+  outputFile << "sel_valid => cond_fifo_outs_valid,\n";
+  outputFile << "sel_ready => conf_fifo_outs_ready\n";
+
+  // TODO
+  outputFile << ");\n";
+
+  outputFile << "end architecture\n\n";
 
   return 0;
 }
