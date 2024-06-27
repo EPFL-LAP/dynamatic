@@ -175,7 +175,7 @@ struct MemLoweringState {
 struct ModuleLoweringState {
   /// Maps each Handshake memory interface in the module with information on
   /// how to convert it into equivalent HW constructs.
-  llvm::DenseMap<handshake::MemoryOpInterface, MemLoweringState> memInterfaces;
+  llvm::MapVector<handshake::MemoryOpInterface, MemLoweringState> memInterfaces;
   /// Generates and stores the end operations's port names before starting the
   /// conversion, when those are still queryable.
   hw::PortNameGenerator endPorts;
