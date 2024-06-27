@@ -608,6 +608,8 @@ ModuleDiscriminator::ModuleDiscriminator(Operation *op)
 
             addUnsigned("NUM_SHARED_OPERANDS",
                         sharingWrapperOp.getNumSharedOperands());
+
+            addUnsigned("LATENCY", sharingWrapperOp.getLatency());
           })
       .Case<handshake::ConstantOp>([&](handshake::ConstantOp cstOp) {
         // Bitwidth and binary-encoded constant value

@@ -1118,7 +1118,8 @@ SameOperandsAndResultType
   let arguments = (ins Variadic<AnyType> : $dataOperands,
     AnyType : $sharedOpResult,
     DefaultValuedAttr<DenseI64ArrayAttr, "{}">:$credits,
-    ConfinedAttr<I32Attr, [IntMinValue<1>]>:$numSharedOperands);
+    ConfinedAttr<I32Attr, [IntMinValue<1>]>:$numSharedOperands,
+    ConfinedAttr<I32Attr, [IntMinValue<1>]>:$latency);
   let results = (outs Variadic<AnyType> : $dataOut);
 
   let assemblyFormat = " `[` $dataOperands `]` `,` `[` $sharedOpResult `]` attr-dict `:` `(` qualified(type($dataOperands)) `)` `,` `(` qualified(type($sharedOpResult)) `)` `->` `(` qualified(type($dataOut)) `)` ";

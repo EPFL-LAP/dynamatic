@@ -464,13 +464,14 @@
   },
   {
     "name": "handshake.sharing_wrapper",
-    "generator": "\"$DYNAMATIC/bin/generators/exp-sharing-wrapper-generator\" \"$OUTPUT_DIR/$MODULE_NAME.vhd\" $MODULE_NAME \"$CREDITS\" \"$NUM_SHARED_OPERANDS\" \"$DATA_WIDTH\"",
+    "generator": "\"$DYNAMATIC/bin/generators/exp-sharing-wrapper-generator\" \"$OUTPUT_DIR/$MODULE_NAME.vhd\" $MODULE_NAME \"$CREDITS\" \"$NUM_SHARED_OPERANDS\" \"$DATA_WIDTH\" \"$LATENCY\"" ,
     "parameters": [
       { "name": "CREDITS", "type": "string" },
       { "name": "NUM_SHARED_OPERANDS", "type": "unsigned", "lb" : 1},
-      { "name": "DATA_WIDTH", "type": "unsigned", "lb": 1 }
+      { "name": "DATA_WIDTH", "type": "unsigned", "lb": 1 },
+      { "name": "LATENCY", "type": "unsigned", "lb": 1 }
     ],
-    "dependencies": ["support.types", "handshake.tehb_internal"]
+    "dependencies": ["types"]
   },
   {
     "name": "handshake.end",
