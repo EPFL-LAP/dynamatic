@@ -17,7 +17,7 @@ print_help_and_exit () {
 
 List of options:
   --release | -r                    : build in \"Release\" mode (default is \"Debug\")
-  --skip_polygeist <polygeist-path> : skip building POLYGEIST
+  --skip-polygeist <polygeist-path> : skip building POLYGEIST
   --visual-dataflow | -v            : build visual-dataflow's C++ library
   --export-godot | -e <godot-path>  : export the Godot project (requires engine)
   --force | -f                      : force cmake reconfiguration in each (sub)project 
@@ -80,7 +80,7 @@ create_symlink() {
     ln -f --symbolic $src $dst
 }
 
-# Same as create_symlink ../but creates the symbolic link inside the bin/generators
+# Same as create_symlink but creates the symbolic link inside the bin/generators
 # subfolder.
 create_generator_symlink() {
     local src=$1
@@ -169,7 +169,7 @@ do
           "--export-godot" | "-e")
               PARSE_ARG="godot-path"
               ;;
-          "--skip_polygeist")
+          "--skip-polygeist")
               SKIP_POLYGEIST=1
               PARSE_ARG="polygeist-path"
               ;;
@@ -244,7 +244,7 @@ if [[ $SKIP_POLYGEIST -eq 0 ]]; then
   fi
 
 else
-  echo "Skipping POLYGEIST/LLVM build"
+  echo "Skipping POLYGEIST/LLVM build. IMPORTANT: Verify that the path of polygeist in the script `tools/dynamatic/scripts/compile.sh` is the same"
   if [[ ! -d $POLYGEIST_DIR ]]; then
     echo "POLYGEIST directory not found: $POLYGEIST_DIR"
     exit 1
@@ -258,9 +258,9 @@ prepare_to_build_project "Dynamatic" "build"
 # CMake
 if should_run_cmake ; then
   cmake -G Ninja .. \
-      -DMLIR_DIR=$POLYGEIST_DIR/llvm-project/build/lib/cmake/mlir \
-      -DLLVM_DIR=$POLYGEIST_DIR/llvm-project/build/lib/cmake/llvm \
-      -DCLANG_DIR=$POLYGEIST_DIR/llvm-project/build/lib/cmake/clang \
+      -DMLIR_DIR="$POLYGEIST_DIR"/llvm-project/build/lib/cmake/mlir \
+      -DLLVM_DIR="$POLYGEIST_DIR"/llvm-project/build/lib/cmake/llvm \
+      -DCLANG_DIR="$POLYGEIST_DIR"/llvm-project/build/lib/cmake/clang \
       -DLLVM_TARGETS_TO_BUILD="host" \
       -DCMAKE_BUILD_TYPE=$BUILD_TYPE \
       -DCMAKE_EXPORT_COMPILE_COMMANDS="ON" \
@@ -295,8 +295,8 @@ if [[ BUILD_VISUAL_DATAFLOW -ne 0 ]]; then
   # CMake
   if should_run_cmake ; then
     cmake -G Ninja .. \
-        -DMLIR_DIR=$POLYGEIST_DIR/llvm-project/build/lib/cmake/mlir \
-        -DLLVM_DIR=$POLYGEIST_DIR/llvm-project/build/lib/cmake/llvm \
+        -DMLIR_DIR="$POLYGEIST_DIR"/llvm-project/build/lib/cmake/mlir \
+        -DLLVM_DIR="$POLYGEIST_DIR"/llvm-project/build/lib/cmake/llvm \
         -DLLVM_TARGETS_TO_BUILD="host" \
         -DCMAKE_BUILD_TYPE=$BUILD_TYPE \
         -DCMAKE_EXPORT_COMPILE_COMMANDS="ON" \
@@ -331,9 +331,9 @@ echo_section "Creating symbolic links"
 cd "$SCRIPT_CWD" && mkdir -p bin/generators
 
 # Create symbolic links to all binaries we use from subfolders
-create_symlink $POLYGEIST_DIR/build/bin/cgeist
-create_symlink $POLYGEIST_DIR/build/bin/polygeist-opt
-create_symlink $POLYGEIST_DIR/llvm-project/build/bin/clang++
+create_symlink "$POLYGEIST_DIR"/build/bin/cgeist
+create_symlink "$POLYGEIST_DIR"/build/bin/polygeist-opt
+create_symlink "$POLYGEIST_DIR"/llvm-project/build/bin/clang++
 create_symlink ../build/bin/dynamatic
 create_symlink ../build/bin/dynamatic-opt
 create_symlink ../build/bin/export-dot
