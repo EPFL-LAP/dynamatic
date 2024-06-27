@@ -68,6 +68,20 @@ std::string getRangeFromSize(unsigned size) {
   return "(" + std::to_string(size) + " - 1 downto 0)";
 }
 
+void printOutPorts(std::ofstream &os, const std::string &unitName,
+                   unsigned bitwidth, unsigned numOutputs) {
+  for (unsigned i = 0; i < numOutputs; i++) {
+    os << unitName << "_out" << i << "_data"
+       << " : std_logic_vector" << getRangeFromSize(bitwidth) << ";\n";
+    os << unitName << "_out" << i << "_valid"
+       << " : std_logic;\n";
+    os << unitName << "_out" << i << "_ready"
+       << " : std_logic;\n";
+    os << "\n";
+  }
+  os << "\n";
+}
+
 int main(int argc, char **argv) {
   InitLLVM y(argc, argv);
 
@@ -120,14 +134,14 @@ int main(int argc, char **argv) {
   std::vector<std::string> syncsOutputData;
   for (const std::string &sync : syncs) {
     for (unsigned i = 0; i < numInputOperands + 1; i++) {
-      syncsOutputData.push_back(sync + "_outs_" + std::to_string(i));
+      syncsOutputData.push_back(sync + "_out" + std::to_string(i) + "_data");
     }
   }
 
   // Output signals of the sync:
   std::vector<std::string> syncOutputValid;
   for (const std::string &sync : syncs) {
-    syncOutputValid.push_back(sync + "_outs_valid");
+    syncOutputValid.push_back(sync + "_out0_valid");
   }
 
   // List of mux that synchronizes the inputs
@@ -139,7 +153,7 @@ int main(int argc, char **argv) {
   // List of forks that returns the credit
   std::vector<std::string> lazyForks;
   for (unsigned i = 0; i < groupSize; i++) {
-    syncs.emplace_back("lazyfork" + std::to_string(i));
+    lazyForks.emplace_back("lazyfork" + std::to_string(i));
   }
 
   // Header
@@ -178,21 +192,10 @@ int main(int argc, char **argv) {
     outputFile << "signal " << signal << " : std_logic;\n";
   outputFile << "\n";
 
-  outputFile << "-- Output data from the muxes\n";
   for (const std::string &mux : muxes)
-    outputFile << "signal " << mux << "_outs      : std_logic_vector"
-               << getRangeFromSize(dataWidth) << ";\n";
-  outputFile << "\n";
+    printOutPorts(outputFile, mux, dataWidth, 1);
 
-  outputFile << "-- Output valids from the muxes\n";
-  for (const std::string &mux : muxes)
-    outputFile << "signal " << mux << "_out_valid : std_logic;\n";
-  outputFile << "\n";
-
-  outputFile << "-- Output valids from the branch\n";
-  outputFile << "signal branch_outs_valid : std_logic_vector"
-             << getRangeFromSize(groupSize) << ";\n";
-  outputFile << "\n";
+  printOutPorts(outputFile, "branch", dataWidth, groupSize);
 
   outputFile << "-- Output valids from the priority arbiter\n";
   outputFile << "signal arbiter_out : std_logic_vector"
@@ -203,15 +206,94 @@ int main(int argc, char **argv) {
   outputFile << "signal fifo_ins_valid : std_logic;\n";
   outputFile << "\n";
 
-  outputFile << "-- FIFO output data\n";
-  outputFile << "signal fifo_outs_data : std_logic_vector"
+  outputFile << "-- cond FIFO output data\n";
+  outputFile << "signal cond_fifo_outs_data : std_logic_vector"
              << getRangeFromSize(groupSize) << ";\n";
 
-  outputFile << "-- FIFO output valid\n";
-  outputFile << "signal fifo_outs_valid : std_logic;\n";
+  outputFile << "-- cond FIFO output valid\n";
+  outputFile << "signal cond_fifo_outs_valid : std_logic;\n";
   outputFile << "\n";
 
+  outputFile << "-- out buffer output data\n";
+  for (unsigned i = 0; i < groupSize; i++) {
+    std::string unitName = "out_fifo" + std::to_string(i);
+    printOutPorts(outputFile, unitName, dataWidth, 1);
+  }
+
+  outputFile << "-- out lazy fork output channels\n";
+  for (unsigned i = 0; i < groupSize; i++) {
+    printOutPorts(outputFile, "out_fork" + std::to_string(i), dataWidth, 2);
+  }
+
+  outputFile << "-- credit output channels\n";
+  for (unsigned i = 0; i < groupSize; i++) {
+    std::string unitName = "credit" + std::to_string(i);
+    printOutPorts(outputFile, unitName, dataWidth, 1);
+  }
+
   outputFile << "begin\n";
+
+  for (unsigned i = 0; i < groupSize; i++) {
+    std::string sync = "sync" + std::to_string(i);
+    std::string credit = "credit" + std::to_string(i);
+    outputFile << "-- Wiring for " << sync << ":\n";
+    outputFile << sync << " : entity work.crush_sync(arch) generic map("
+               << numInputOperands + 1 << ", " << dataWidth << ")\n";
+    outputFile << "port map(\n";
+    for (unsigned i = 0; i < numInputOperands; i++) {
+      outputFile << "ins(" << i << ") => ins(" << i << "),\n";
+    }
+    for (unsigned i = 0; i < numInputOperands; i++) {
+      outputFile << "ins_valid(" << i << ") => ins_valid(" << i << "),\n";
+    }
+    for (unsigned i = 0; i < numInputOperands; i++) {
+      outputFile << "ins_ready(" << i << ") => ins_ready(" << i << "),\n";
+    }
+
+    outputFile << "ins_data(" << numInputOperands << ") => " << credit
+               << "_out0"
+               << "_data),\n";
+    outputFile << "ins_valid(" << numInputOperands << ") => " << credit
+               << "_out0"
+               << "_valid),\n";
+    outputFile << "ins_ready(" << numInputOperands << ") => " << credit
+               << "_out0"
+               << "_ready),\n";
+
+    for (unsigned i = 0; i < numInputOperands; i++) {
+      outputFile << "outs(" << i << ") => " << sync << "_out" << i
+                 << "_data),\n";
+    }
+    outputFile << "outs_valid => " << sync << "_out0"
+               << "_valid),\n";
+    outputFile << "outs_valid => " << sync << "_out0"
+               << "_ready)\n";
+
+    outputFile << ");\n\n";
+  }
+
+  for (unsigned i = 0; i < numInputOperands; i++) {
+    std::string mux = "mux" + std::to_string(i);
+    outputFile << mux << " : entity work.crush_oh_mux(arch) generic map("
+               << groupSize << ", " << dataWidth << ")\n";
+    for (unsigned j = 0; j < groupSize; j++) {
+      std::string sync = "sync" + std::to_string(j);
+      outputFile << "ins(" << j << ") => " << sync << "_out" << i << "_data,\n";
+    }
+    outputFile << "sel => arbiter_out,\n";
+    outputFile << "outs => " << mux << "_out0_data\n";
+    outputFile << ");\n\n";
+  }
+
+  outputFile << "arbiter0 : work.bitscan(arch) generic map(" << groupSize
+             << ")\n";
+  outputFile << "port map(\n";
+  for (unsigned i = 0; i < groupSize; i++) {
+    outputFile << "request(" << i << ") => sync" << i << "_out0_valid,\n";
+  }
+  outputFile << "grant => arbiter_out\n";
+  outputFile << ");\n";
+
   outputFile << "end architecture\n";
 
   return 0;
