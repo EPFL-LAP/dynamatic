@@ -244,7 +244,7 @@ if [[ $SKIP_POLYGEIST -eq 0 ]]; then
   fi
 
 else
-  echo "Skipping POLYGEIST/LLVM build. IMPORTANT: Verify that the path of polygeist in the script `tools/dynamatic/scripts/compile.sh` is the same"
+  echo "Skipping POLYGEIST/LLVM build. IMPORTANT: Verify that the path of polygeist in the script tools/dynamatic/scripts/compile.sh is the same"
   if [[ ! -d $POLYGEIST_DIR ]]; then
     echo "POLYGEIST directory not found: $POLYGEIST_DIR"
     exit 1
