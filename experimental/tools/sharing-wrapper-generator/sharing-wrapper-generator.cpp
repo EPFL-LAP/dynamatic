@@ -84,14 +84,14 @@ void printOutPorts(mlir::raw_indented_ostream &os, const std::string &unitName,
        << " : std_logic;\n";
     os << "\n";
   }
-  os << "\n";
 }
 
 void printVhdlImpl(mlir::raw_indented_ostream &os, const unsigned &dataWidth,
                    const unsigned &numInputOperands, const unsigned &groupSize,
                    const unsigned &latency,
                    const llvm::SmallVector<unsigned, 8> &listOfCredits) {
-  os << "-- Sharing Wrapper Circuit for Managing the Shared Unit --\n";
+  os << "---------------------------------------------------------\n";
+  os << "-- Sharing Wrapper Circuit for Managing the Shared Unit\n";
   os << "-- Number of credits of each operation: ";
   for (auto credit : listOfCredits) {
     os << std::to_string(credit) << " ";
@@ -100,7 +100,10 @@ void printVhdlImpl(mlir::raw_indented_ostream &os, const unsigned &dataWidth,
   os << "-- Total number of shared operations: " << groupSize << "\n";
 
   os << "-- Number of input operands of the shared op: " << numInputOperands
-     << "\n\n";
+     << "\n";
+
+  os << "-- Latency of the shared operation: " << latency << "\n";
+  os << "---------------------------------------------------------\n\n";
 
   unsigned totalNumInputChannels = listOfCredits.size() * numInputOperands + 1;
 
@@ -128,7 +131,7 @@ void printVhdlImpl(mlir::raw_indented_ostream &os, const unsigned &dataWidth,
   os << ");\nend entity"
      << ";\n";
 
-  os << "architecture arch of " << clOptEntityName.getValue() << " is\n";
+  os << "architecture arch of " << clOptEntityName.getValue() << " is\n\n";
 
   for (unsigned i = 0; i < groupSize; i++) {
     for (unsigned j = 0; j < numInputOperands + 1; j++)
@@ -143,35 +146,34 @@ void printVhdlImpl(mlir::raw_indented_ostream &os, const unsigned &dataWidth,
 
   printOutPorts(os, "branch0", dataWidth, groupSize);
 
-  os << "-- Output valids from the priority arbiter\n";
+  // Output valids from the priority arbiter
   os << "signal arbiter_out : std_logic_vector" << getRangeFromSize(groupSize)
      << ";\n";
   os << "\n";
 
-  os << "-- Flag that says the sharing wrapper is taking a token\n";
+  // Flag that says the sharing wrapper is taking a token
   os << "signal arbiter_out_valid : std_logic;\n";
   os << "\n";
 
-  os << "-- cond FIFO output data\n";
-  os << "signal cond_fifo_outs_data : std_logic_vector"
+  // Conditon FIFO output channel
+  os << "signal cond_buffer_outs_data : std_logic_vector"
      << getRangeFromSize(groupSize) << ";\n";
 
-  os << "-- cond FIFO output valid\n";
-  os << "signal cond_fifo_outs_valid : std_logic;\n";
-  os << "\n";
+  os << "signal cond_buffer_outs_valid : std_logic;\n";
+  os << "signal cond_buffer_outs_ready : std_logic;\n\n";
 
-  os << "-- out buffer output data\n";
+  // Output buffer output data
   for (unsigned i = 0; i < groupSize; i++) {
-    std::string unitName = "out_fifo" + std::to_string(i);
+    std::string unitName = "out_buffer" + std::to_string(i);
     printOutPorts(os, unitName, dataWidth, 1);
   }
 
-  os << "-- out lazy fork output channels\n";
+  // Out lazy fork output channels
   for (unsigned i = 0; i < groupSize; i++) {
     printOutPorts(os, "out_fork" + std::to_string(i), dataWidth, 2);
   }
 
-  os << "-- credit output channels\n";
+  // Credit output channels
   for (unsigned i = 0; i < groupSize; i++) {
     std::string unitName = "credit" + std::to_string(i);
     printOutPorts(os, unitName, dataWidth, 1);
@@ -179,10 +181,10 @@ void printVhdlImpl(mlir::raw_indented_ostream &os, const unsigned &dataWidth,
 
   os << "begin\n";
 
+  // Wiring for sync
   for (unsigned i = 0; i < groupSize; i++) {
     std::string sync = "sync" + std::to_string(i);
     std::string credit = "credit" + std::to_string(i);
-    os << "-- Wiring for " << sync << ":\n";
     os << sync << " : entity work.crush_sync(arch)\ngeneric map("
        << numInputOperands + 1 << ", " << dataWidth << ")\n";
     os << "port map(\n";
@@ -251,15 +253,15 @@ void printVhdlImpl(mlir::raw_indented_ostream &os, const unsigned &dataWidth,
   }
   os << "\n";
 
-  os << "cond_fifo : work.ofifo(arch)\ngeneric map(" << latency << ", "
+  os << "cond_buffer : work.ofifo(arch)\ngeneric map(" << latency << ", "
      << dataWidth << ")\n";
   os << "port map(\n";
   os << "clk => clk, rst => rst,\n";
   os << "ins => arbiter_out,\n";
   os << "ins_valid => arbiter_out_valid,\n";
-  os << "outs => cond_fifo_outs_data,\n";
-  os << "outs_valid => cond_fifo_outs_valid,\n";
-  os << "outs_ready => cond_fifo_outs_ready\n";
+  os << "outs => cond_buffer_outs_data,\n";
+  os << "outs_valid => cond_buffer_outs_valid,\n";
+  os << "outs_ready => cond_buffer_outs_ready\n";
   os << ");\n\n";
 
   // -- Branch -- //
@@ -268,9 +270,9 @@ void printVhdlImpl(mlir::raw_indented_ostream &os, const unsigned &dataWidth,
   os << "ins => ins(" << groupSize << "),\n";
   os << "ins_valid => ins_valid(" << groupSize << "),\n";
   os << "ins_ready => ins_ready(" << groupSize << "),\n";
-  os << "sel => cond_fifo_outs_data,\n";
-  os << "sel_valid => cond_fifo_outs_valid,\n";
-  os << "sel_ready => conf_fifo_outs_ready,\n";
+  os << "sel => cond_buffer_outs_data,\n";
+  os << "sel_valid => cond_buffer_outs_valid,\n";
+  os << "sel_ready => conf_buffer_outs_ready,\n";
   for (unsigned i = 0; i < groupSize; i++) {
     os << "outs(" << i << ") => branch0_out" << i << "_data,\n";
     os << "outs_valid(" << i << ") => branch0_out" << i << "_valid,\n";
@@ -290,9 +292,9 @@ void printVhdlImpl(mlir::raw_indented_ostream &os, const unsigned &dataWidth,
     os << "ins => branch0_out" << i << "_data,\n";
     os << "ins_valid => branch0_out" << i << "_valid,\n";
     os << "ins_ready => branch0_out" << i << "_ready,\n";
-    os << "outs => out_fifo" << i << "_out0_data,\n";
-    os << "outs_valid => out_fifo" << i << "_out0_valid,\n";
-    os << "outs_ready => out_fifo" << i << "_out0_ready\n";
+    os << "outs => out_buffer" << i << "_out0_data,\n";
+    os << "outs_valid => out_buffer" << i << "_out0_valid,\n";
+    os << "outs_ready => out_buffer" << i << "_out0_ready\n";
     os << ");\n\n";
   }
 
@@ -301,9 +303,9 @@ void printVhdlImpl(mlir::raw_indented_ostream &os, const unsigned &dataWidth,
     os << "fork" << i << " : work.lazy_fork(arch)\ngeneric map(2, " << dataWidth
        << ")\n";
     os << "port map(\n";
-    os << "ins => out_fifo" << i << "_out0_data,\n";
-    os << "ins_valid => out_fifo" << i << "_out0_valid,\n";
-    os << "ins_ready => out_fifo" << i << "_out0_ready,\n";
+    os << "ins => out_buffer" << i << "_out0_data,\n";
+    os << "ins_valid => out_buffer" << i << "_out0_valid,\n";
+    os << "ins_ready => out_buffer" << i << "_out0_ready,\n";
     os << "outs(0) => out_fork" << i << "_out0_data,\n";
     os << "outs_valid(0) => out_fork" << i << "_out0_valid,\n";
     os << "outs_ready(0) => out_fork" << i << "_out0_ready,\n";
