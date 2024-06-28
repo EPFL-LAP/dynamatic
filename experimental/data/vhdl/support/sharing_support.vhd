@@ -147,31 +147,20 @@ use ieee.std_logic_1164.all;
 use ieee.math_real.all;
 use work.customTypes.all;
 
-entity credit is 
+entity credit_dataless is 
   generic (
-            INPUTS        : integer;
-            OUTPUTS       : integer;
-            DATA_SIZE_IN  : integer;
-            DATA_SIZE_OUT : integer;
-            NUM_CREDITS       : integer
+            DATA_WIDTH   : integer;
+            NUM_CREDITS  : integer
           );
   port (
   clk, rst      : in  std_logic;    
-  pValidArray   : in  std_logic_vector (INPUTS - 1 downto 0);
-  nReadyArray   : in  std_logic_vector (OUTPUTS - 1 downto 0);
-  validArray    : out std_logic_vector (OUTPUTS - 1 downto 0);
-  readyArray    : out std_logic_vector (INPUTS - 1 downto 0);
-  -- one of the data input is a don't care, we simply not connecting anything
-  -- to it.
-  dataInArray   : in  data_array (INPUTS - 1 downto 0)(DATA_SIZE_IN - 1 downto 0); 
-  dataOutArray  : out data_array (OUTPUTS - 1 downto 0)(DATA_SIZE_OUT - 1 downto 0)
+  -- input channels
+  ins_valid   : in  std_logic;
+  ins_ready    : out std_logic;
+  -- output channels
+  outs_valid    : out std_logic;
+  outs_ready   : in  std_logic;
 );
-
-begin
-  assert INPUTS = OUTPUTS severity failure;
-  assert INPUTS = 1 severity failure;
-  assert NUM_CREDITS > 0 severity failure;
-
 end credit;
 
 architecture arch of credit is
@@ -197,8 +186,8 @@ architecture arch of credit is
 
 begin
 
-  output_transfer <= (valid_internal and nReadyArray(0));
-  input_transfer <= (pValidArray(0) and ready_internal);
+  output_transfer <= (valid_internal and outs_ready);
+  input_transfer <= (ins_valid and ready_internal);
 
   p_update_counter : process (clk)
   begin
@@ -217,17 +206,15 @@ begin
   -- else (input_transfer) and (output_transfer), the counter_reg stays the same
   end process p_update_counter;
 
-  validArray(0) <= valid_internal;
-  readyArray(0) <= ready_internal;
+  outs_valid <= valid_internal;
+  ins_ready <= ready_internal;
 
   -- the credit counter should break combinational path in ready direction,
   -- the shared unit already breaks the path in valid direction
   ready_internal <= (not full_reg);
-  -- valid_internal <= (not empty_reg) or pValidArray(0);
   valid_internal <= (not empty_reg);
 
   full_reg <= '1' when (counter_reg = c_counter_init) else '0';
   empty_reg <= '1' when (counter_reg = (counter_width -1 downto 0 => '0')) else '0';
-
 
 end arch;
