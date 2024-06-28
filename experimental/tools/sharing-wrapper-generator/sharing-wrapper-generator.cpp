@@ -1,4 +1,4 @@
-//===- rtl-cmpf-generator.cpp - Generator for arith.cmpf --------*- C++ -*-===//
+//===- shairng-wrapper-generator.cpp - Generator--------------- -*- C++ -*-===//
 //
 // Dynamatic is under the Apache License v2.0 with LLVM Exceptions.
 // See https://llvm.org/LICENSE.txt for license information.
@@ -201,7 +201,7 @@ int main(int argc, char **argv) {
   for (const std::string &mux : muxes)
     printOutPorts(outputFile, mux, dataWidth, 1);
 
-  printOutPorts(outputFile, "branch", dataWidth, groupSize);
+  printOutPorts(outputFile, "branch0", dataWidth, groupSize);
 
   outputFile << "-- Output valids from the priority arbiter\n";
   outputFile << "signal arbiter_out : std_logic_vector"
@@ -243,7 +243,7 @@ int main(int argc, char **argv) {
     std::string sync = "sync" + std::to_string(i);
     std::string credit = "credit" + std::to_string(i);
     outputFile << "-- Wiring for " << sync << ":\n";
-    outputFile << sync << " : entity work.crush_sync(arch) generic map("
+    outputFile << sync << " : entity work.crush_sync(arch)\ngeneric map("
                << numInputOperands + 1 << ", " << dataWidth << ")\n";
     outputFile << "port map(\n";
     for (unsigned i = 0; i < numInputOperands; i++) {
@@ -280,7 +280,7 @@ int main(int argc, char **argv) {
 
   for (unsigned i = 0; i < numInputOperands; i++) {
     std::string mux = "mux" + std::to_string(i);
-    outputFile << mux << " : entity work.crush_oh_mux(arch) generic map("
+    outputFile << mux << " : entity work.crush_oh_mux(arch)\ngeneric map("
                << groupSize << ", " << dataWidth << ")\n";
     for (unsigned j = 0; j < groupSize; j++) {
       std::string sync = "sync" + std::to_string(j);
@@ -291,7 +291,7 @@ int main(int argc, char **argv) {
     outputFile << ");\n\n";
   }
 
-  outputFile << "arbiter0 : work.bitscan(arch) generic map(" << groupSize
+  outputFile << "arbiter0 : work.bitscan(arch)\ngeneric map(" << groupSize
              << ")\n";
   outputFile << "port map(\n";
   for (unsigned i = 0; i < groupSize; i++) {
@@ -301,7 +301,7 @@ int main(int argc, char **argv) {
   outputFile << ");\n";
 
   // Generating valid signals to the shared unit
-  outputFile << "or_n0 : work.or_n0(arch) generic map(" << groupSize << ")\n";
+  outputFile << "or_n0 : work.or_n0(arch)\ngeneric map(" << groupSize << ")\n";
   outputFile << "port map(\n";
   for (unsigned i = 0; i < groupSize; i++) {
     outputFile << "ins(" << i << ") => sync" << i << "_out0_valid,\n";
@@ -317,7 +317,7 @@ int main(int argc, char **argv) {
   }
   outputFile << "\n";
 
-  outputFile << "cond_fifo : work.ofifo(arch) generic map(" << latency << ", "
+  outputFile << "cond_fifo : work.ofifo(arch)\ngeneric map(" << latency << ", "
              << dataWidth << ")\n";
   outputFile << "port map(\n";
   outputFile << "clk => clk, rst => rst,\n";
@@ -326,21 +326,77 @@ int main(int argc, char **argv) {
   outputFile << "outs => cond_fifo_outs_data,\n";
   outputFile << "outs_valid => cond_fifo_outs_valid,\n";
   outputFile << "outs_ready => cond_fifo_outs_ready\n";
-  outputFile << ");\n";
+  outputFile << ");\n\n";
 
-  // Branch
-
-  outputFile << "branch : work.crush_oh_branch(arch) generic map(" << groupSize
+  // -- Branch -- //
+  outputFile << "branch : work.crush_oh_branch(arch)\ngeneric map(" << groupSize
              << ", " << dataWidth << ")\nport map(\n";
   outputFile << "ins => ins(" << groupSize << "),\n";
   outputFile << "ins_valid => ins_valid(" << groupSize << "),\n";
   outputFile << "ins_ready => ins_ready(" << groupSize << "),\n";
   outputFile << "sel => cond_fifo_outs_data,\n";
   outputFile << "sel_valid => cond_fifo_outs_valid,\n";
-  outputFile << "sel_ready => conf_fifo_outs_ready\n";
+  outputFile << "sel_ready => conf_fifo_outs_ready,\n";
+  for (unsigned i = 0; i < groupSize; i++) {
+    outputFile << "outs(" << i << ") => branch0_out" << i << "_data,\n";
+    outputFile << "outs_valid(" << i << ") => branch0_out" << i << "_valid,\n";
+    outputFile << "outs_ready(" << i << ") => branch0_out" << i << "_ready";
+    if (i < groupSize - 1) {
+      outputFile << ", ";
+    }
+    outputFile << "\n";
+  }
+  outputFile << ");\n\n";
 
-  // TODO
-  outputFile << ");\n";
+  // -- Output Buffers --//
+  for (unsigned i = 0; i < groupSize; i++) {
+    outputFile << "out_buffer" << i << " : work.tfifo(arch)\ngeneric map("
+               << listOfCredits[i] << ", " << dataWidth << ")\n";
+    outputFile << "port map(\n";
+    outputFile << "ins => branch0_out" << i << "_data,\n";
+    outputFile << "ins_valid => branch0_out" << i << "_valid,\n";
+    outputFile << "ins_ready => branch0_out" << i << "_ready,\n";
+    outputFile << "outs => out_fifo" << i << "_out0_data,\n";
+    outputFile << "outs_valid => out_fifo" << i << "_out0_valid,\n";
+    outputFile << "outs_ready => out_fifo" << i << "_out0_ready\n";
+    outputFile << ");\n\n";
+  }
+
+  // -- Output Forks -- //
+  for (unsigned i = 0; i < groupSize; i++) {
+    outputFile << "fork" << i << " : work.lazy_fork(arch)\ngeneric map(2, "
+               << dataWidth << ")\n";
+    outputFile << "port map(\n";
+    outputFile << "ins => out_fifo" << i << "_out0_data,\n";
+    outputFile << "ins_valid => out_fifo" << i << "_out0_valid,\n";
+    outputFile << "ins_ready => out_fifo" << i << "_out0_ready,\n";
+    outputFile << "outs(0) => out_fork" << i << "_out0_data,\n";
+    outputFile << "outs_valid(0) => out_fork" << i << "_out0_valid,\n";
+    outputFile << "outs_ready(0) => out_fork" << i << "_out0_ready,\n";
+    outputFile << "outs(1) => out_fork" << i << "_out1_data,\n";
+    outputFile << "outs_valid(1) => out_fork" << i << "_out1_valid,\n";
+    outputFile << "outs_ready(1) => out_fork" << i << "_out1_ready\n";
+    outputFile << ");\n\n";
+  }
+
+  // -- Credits -- //
+  for (unsigned i = 0; i < groupSize; i++) {
+    outputFile << "credit" << i << " : work.credit(arch)\ngeneric map("
+               << listOfCredits[i] << ", " << dataWidth << ")\n";
+    outputFile << "port map(\n";
+    outputFile << "ins_valid => out_fork" << i << "_out1_valid,\n";
+    outputFile << "ins_ready => out_fork" << i << "_out1_ready,\n";
+    outputFile << "outs_valid => credit" << i << "_out0_valid,\n";
+    outputFile << "outs_ready => credit" << i << "_out0_ready\n";
+    outputFile << ");\n\n";
+  }
+
+  // -- Output data
+  for (unsigned i = 0; i < groupSize; i++) {
+    outputFile << "outs(" << i << ") <= fork" << i << "_out0_data;\n";
+    outputFile << "outs_valid(" << i << ") <= fork" << i << "_out0_valid;\n";
+    outputFile << "outs_ready(" << i << ") <= fork" << i << "_out0_ready;\n\n";
+  }
 
   outputFile << "end architecture\n\n";
 
