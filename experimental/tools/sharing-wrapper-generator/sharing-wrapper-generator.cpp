@@ -27,30 +27,30 @@ using namespace mlir;
 
 static cl::OptionCategory mainCategory("Tool options");
 
-static cl::opt<std::string> outputRTLPath(cl::Positional, cl::Required,
-                                          cl::desc("<output file>"),
-                                          cl::cat(mainCategory));
+static cl::opt<std::string> clOptOutputRTLPath(cl::Positional, cl::Required,
+                                               cl::desc("<output file>"),
+                                               cl::cat(mainCategory));
 
-static cl::opt<std::string> entityName(cl::Positional, cl::Required,
-                                       cl::desc("<entity name>"),
-                                       cl::cat(mainCategory));
+static cl::opt<std::string> clOptEntityName(cl::Positional, cl::Required,
+                                            cl::desc("<entity name>"),
+                                            cl::cat(mainCategory));
 
-static cl::opt<std::string> creditOpt(cl::Positional, cl::Required,
-                                      cl::desc("<list of credits>"),
-                                      cl::cat(mainCategory));
+static cl::opt<std::string> clOptListOfCredits(cl::Positional, cl::Required,
+                                               cl::desc("<list of credits>"),
+                                               cl::cat(mainCategory));
 
-static cl::opt<std::string> numInputOperandsOpt(
+static cl::opt<std::string> clOptNumInputOperands(
     cl::Positional, cl::Required,
     cl::desc("<number of input operands (space separated)>"),
     cl::cat(mainCategory));
 
-static cl::opt<std::string> dataWidthOpt(cl::Positional, cl::Required,
-                                         cl::desc("<dataWidth>"),
-                                         cl::cat(mainCategory));
+static cl::opt<std::string> clOptDataWidth(cl::Positional, cl::Required,
+                                           cl::desc("<dataWidth>"),
+                                           cl::cat(mainCategory));
 
-static cl::opt<std::string> latencyOpt(cl::Positional, cl::Required,
-                                       cl::desc("<latency>"),
-                                       cl::cat(mainCategory));
+static cl::opt<std::string> clOptLatency(cl::Positional, cl::Required,
+                                         cl::desc("<latency>"),
+                                         cl::cat(mainCategory));
 
 llvm::SmallVector<unsigned, 8> parseCreditOpt(std::string creditString) {
   llvm::SmallVector<unsigned, 8> listOfCredits;
@@ -60,7 +60,7 @@ llvm::SmallVector<unsigned, 8> parseCreditOpt(std::string creditString) {
   size_t pos = 0;
   std::string token;
   while ((pos = creditString.find(delimiter)) != std::string::npos) {
-    token = creditOpt.substr(0, pos);
+    token = clOptListOfCredits.substr(0, pos);
     listOfCredits.emplace_back(std::stoi(token));
     creditString.erase(0, pos + delimiter.length());
   }
@@ -107,7 +107,7 @@ void printVhdlImpl(mlir::raw_indented_ostream &os, const unsigned &dataWidth,
   unsigned totalNumOutputChannels = listOfCredits.size() + numInputOperands;
 
   // Header
-  os << "entity " << entityName.getValue() << " is\n";
+  os << "entity " << clOptEntityName.getValue() << " is\n";
   os << "port(\n";
   os << "clk        : in std_logic;\n";
   os << "rst        : in std_logic;\n";
@@ -128,7 +128,7 @@ void printVhdlImpl(mlir::raw_indented_ostream &os, const unsigned &dataWidth,
   os << ");\nend entity"
      << ";\n";
 
-  os << "architecture arch of " << entityName.getValue() << " is\n";
+  os << "architecture arch of " << clOptEntityName.getValue() << " is\n";
 
   for (unsigned i = 0; i < groupSize; i++) {
     for (unsigned j = 0; j < numInputOperands + 1; j++)
@@ -345,28 +345,20 @@ int main(int argc, char **argv) {
 
   // Open the output file
   std::error_code ec;
-  llvm::raw_fd_ostream fileStream(outputRTLPath, ec);
+  llvm::raw_fd_ostream fileStream(clOptOutputRTLPath, ec);
   if (ec.value() != 0) {
-    llvm::errs() << "Failed to open output file @ \"" << outputRTLPath
+    llvm::errs() << "Failed to open output file @ \"" << clOptOutputRTLPath
                  << "\"\n";
     return 1;
   }
   mlir::raw_indented_ostream os(fileStream);
 
-  // Read the JSON content from the file and into a string
-  std::string inputData;
-
   llvm::SmallVector<unsigned, 8> listOfCredits =
-      parseCreditOpt(creditOpt.getValue());
+      parseCreditOpt(clOptListOfCredits.getValue());
 
-  unsigned dataWidth = std::stoi(dataWidthOpt.getValue());
-  unsigned numInputOperands = std::stoi(numInputOperandsOpt.getValue());
-
-  unsigned groupSize = listOfCredits.size();
-
-  unsigned latency = std::stoi(latencyOpt.getValue());
-
-  printVhdlImpl(os, dataWidth, numInputOperands, groupSize, latency,
+  printVhdlImpl(os, std::stoi(clOptDataWidth.getValue()),
+                std::stoi(clOptNumInputOperands.getValue()),
+                listOfCredits.size(), std::stoi(clOptLatency.getValue()),
                 listOfCredits);
 
   return 0;
