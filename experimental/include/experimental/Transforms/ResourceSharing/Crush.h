@@ -15,8 +15,6 @@
 
 #include "dynamatic/Support/DynamaticPass.h"
 #include "dynamatic/Support/LLVM.h"
-#include "mlir/Pass/Pass.h"
-#include <string>
 
 namespace dynamatic {
 namespace experimental {

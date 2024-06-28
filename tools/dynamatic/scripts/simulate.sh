@@ -68,10 +68,15 @@ exit_on_fail "Failed to build kernel for IO gen." "Built kernel for IO gen."
 "$IO_GEN_BIN"
 exit_on_fail "Failed to run kernel for IO gen." "Ran kernel for IO gen." 
 
+MODULE_NAME="$KERNEL_NAME"
+if [[ $EXPERIMENTAL -ne 0 ]]; then
+  MODULE_NAME="$KERNEL_NAME"_wrapper
+fi
+
 # Simulate and verify design
 echo_info "Launching Modelsim simulation"
 cd "$HLS_VERIFY_DIR"
 "$HLS_VERIFIER_BIN" cover -aw32 "$RESOURCE_DIR" "../C_SRC/$KERNEL_NAME.c" \
-  "../C_SRC/$KERNEL_NAME.c" "$KERNEL_NAME" \
+  "../C_SRC/$KERNEL_NAME.c" "$KERNEL_NAME" "$MODULE_NAME" "$EXPERIMENTAL" \
   > "../report.txt"
 exit_on_fail "Simulation failed" "Simulation succeeded"

@@ -27,7 +27,6 @@
 #include "dynamatic/Support/DynamaticPass.h"
 #include "dynamatic/Support/LLVM.h"
 #include "dynamatic/Support/Logging.h"
-#include "dynamatic/Support/MILP.h"
 #include "dynamatic/Support/TimingModels.h"
 #include "dynamatic/Transforms/BufferPlacement/BufferingSupport.h"
 #include "dynamatic/Transforms/BufferPlacement/CFDFC.h"
@@ -37,8 +36,8 @@
 #include "dynamatic/Transforms/HandshakeMaterialize.h"
 #include "experimental/Transforms/ResourceSharing/SharingSupport.h"
 #include "mlir/IR/BuiltinAttributes.h"
-#include "mlir/Pass/Pass.h"
 #include "mlir/Pass/PassManager.h"
+#include "llvm/Support/Path.h"
 #include <algorithm>
 #include <cassert>
 #include <cmath>
@@ -57,7 +56,6 @@ using namespace mlir;
 using namespace dynamatic;
 using namespace dynamatic::experimental;
 using namespace dynamatic::experimental::sharing;
-
 using namespace dynamatic::buffer;
 
 /// Algorithms that do not require solving an MILP.
@@ -99,11 +97,13 @@ using Group = std::vector<Operation *>;
 // SharingGroups: a list of operations that share the same unit.
 using SharingGroups = std::list<Group>;
 
+#ifndef DYNAMATIC_GUROBI_NOT_INSTALLED
+
 // Wrapper function for saving the data retrived from buffer placement milp
 // algorithm into a SharingInfo structure. This function is shared between
 // the FPGA '20 buffer wrapper and FPL '22 buffer wrapper.
-void loadFuncPerfInfo(SharingInfo &sharingInfo, MILPVars &vars,
-                      FuncInfo &funcInfo) {
+static void loadFuncPerfInfo(SharingInfo &sharingInfo, MILPVars &vars,
+                             FuncInfo &funcInfo) {
 
   // Map each individual CFDFC to its iteration index
   std::map<CFDFC *, size_t> cfIndices;
@@ -157,7 +157,6 @@ void loadFuncPerfInfo(SharingInfo &sharingInfo, MILPVars &vars,
   }
 }
 
-#ifndef DYNAMATIC_GUROBI_NOT_INSTALLED
 namespace dynamatic {
 namespace buffer {
 namespace fpga20 {
@@ -221,8 +220,6 @@ private:
 } // namespace buffer
 } // namespace dynamatic
 
-#endif // DYNAMATIC_GUROBI_NOT_INSTALLED
-
 /// Wraps a call to solveMILP and conditionally passes the logger and MILP name
 /// to the MILP's constructor as last arguments if the logger is not null.
 template <typename MILP, typename... Args>
@@ -234,6 +231,8 @@ checkLoggerAndSolve(Logger *logger, StringRef milpName,
                            milpName);
   return solveMILP<MILP>(placement, std::forward<Args>(args)...);
 }
+
+#endif // DYNAMATIC_GUROBI_NOT_INSTALLED
 
 namespace {
 
@@ -278,9 +277,6 @@ SharingLogger::SharingLogger(handshake::FuncOp funcOp, bool dumpLogs,
   log = new Logger(fp + "sharing.log", ec);
 }
 
-using fpga20::FPGA20BuffersWrapper;
-using fpl22::FPL22BuffersWraper;
-
 // An wrapper class that applies buffer placement and extracts the performance
 // analysis report, stored in sharingInfo; sharingInfo is passed as a reference
 // to be able to be read from the sharing pass.
@@ -309,7 +305,7 @@ struct HandshakePlaceBuffersPassWrapper : public HandshakePlaceBuffersPass {
 
     if (algorithm == FPGA20 || algorithm == FPGA20_LEGACY)
       // Create and solve the MILP
-      return checkLoggerAndSolve<FPGA20BuffersWrapper>(
+      return checkLoggerAndSolve<buffer::fpga20::FPGA20BuffersWrapper>(
           logger, "placement", placement, sharingInfo, env, funcInfo, timingDB,
           targetCP, algorithm != FPGA20);
     if (algorithm == FPL22) {
@@ -325,7 +321,7 @@ struct HandshakePlaceBuffersPassWrapper : public HandshakePlaceBuffersPass {
       // placement decision because each CFDFC union is disjoint from the others
       for (auto [id, cfUnion] : llvm::enumerate(disjointUnions)) {
         std::string milpName = "cfdfc_placement_" + std::to_string(id);
-        if (failed(checkLoggerAndSolve<FPL22BuffersWraper>(
+        if (failed(checkLoggerAndSolve<buffer::fpl22::FPL22BuffersWraper>(
                 logger, milpName, placement, sharingInfo, env, funcInfo,
                 timingDB, targetCP, cfUnion)))
           return failure();

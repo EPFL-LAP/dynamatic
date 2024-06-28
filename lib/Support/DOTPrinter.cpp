@@ -662,6 +662,12 @@ LogicalResult DOTPrinter::annotateNode(Operation *op,
 
   DOTNode info =
       llvm::TypeSwitch<Operation *, DOTNode>(op)
+          .Case<handshake::InstanceOp>([&](auto) {
+            /// NOTE: this is not actually supported, I just need the DOT
+            /// printer in legacy mode with Handshake instances. People should
+            /// know that the old backend doesn't support it.
+            return DOTNode("Instance");
+          })
           .Case<handshake::MergeOp>([&](auto) { return DOTNode("Merge"); })
           .Case<handshake::MuxOp>([&](handshake::MuxOp op) {
             auto info = DOTNode("Mux");
@@ -1230,10 +1236,17 @@ LogicalResult DOTPrinter::print(mlir::ModuleOp mod,
   auto funcs = mod.getOps<handshake::FuncOp>();
   if (funcs.empty())
     return success();
-  if (++funcs.begin() != funcs.end()) {
-    mod->emitOpError()
-        << "we currently only support one handshake function per module";
-    return failure();
+
+  // We only support one function per module
+  handshake::FuncOp funcOp = nullptr;
+  for (auto op : mod.getOps<handshake::FuncOp>()) {
+    if (op.isExternal())
+      continue;
+    if (funcOp) {
+      return mod->emitOpError() << "we currently only support one non-external "
+                                   "handshake function per module";
+    }
+    funcOp = op;
   }
 
   // Name all operations in the IR
@@ -1241,8 +1254,6 @@ LogicalResult DOTPrinter::print(mlir::ModuleOp mod,
   if (!nameAnalysis.isAnalysisValid())
     return failure();
   nameAnalysis.nameAllUnnamedOps();
-
-  handshake::FuncOp funcOp = *funcs.begin();
 
   if (inLegacyMode()) {
     // In legacy mode, the IR must respect certain additional constraints for it

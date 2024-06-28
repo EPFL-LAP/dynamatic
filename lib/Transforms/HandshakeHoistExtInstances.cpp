@@ -24,6 +24,10 @@
 using namespace mlir;
 using namespace dynamatic;
 
+static bool isIntrinsic(handshake::FuncOp funcOp) {
+  return funcOp.getNameAttr().strref().starts_with("__");
+}
+
 namespace {
 
 /// Simple pass driver for the external instance hoisitng pass.
@@ -91,8 +95,8 @@ void HandshakeHoistExtInstancesPass::hoistInstances(handshake::FuncOp funcOp,
   auto instOps = funcOp.getOps<handshake::InstanceOp>();
   for (auto instOp : llvm::make_early_inc_range(instOps)) {
     auto instFuncOp = symbols.lookup<handshake::FuncOp>(instOp.getModule());
-    // Only replace instances of external functions
-    if (!instFuncOp.isExternal())
+    // Only replace instances of non-intrinsic external functions
+    if (!instFuncOp.isExternal() || isIntrinsic(instFuncOp))
       continue;
 
     anyInstance = true;

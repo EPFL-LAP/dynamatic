@@ -11,28 +11,22 @@
 //===----------------------------------------------------------------------===//
 
 #include "dynamatic/Transforms/BufferPlacement/BufferPlacementMILP.h"
-#include "dynamatic/Dialect/Handshake/HandshakeDialect.h"
 #include "dynamatic/Dialect/Handshake/HandshakeOps.h"
 #include "dynamatic/Support/CFG.h"
 #include "dynamatic/Transforms/BufferPlacement/BufferingSupport.h"
 #include "mlir/Dialect/Arith/IR/Arith.h"
-#include "mlir/Dialect/Func/IR/FuncOps.h"
 #include "mlir/IR/BuiltinTypes.h"
 #include "mlir/IR/OperationSupport.h"
-#include "mlir/IR/PatternMatch.h"
 #include "mlir/IR/Value.h"
 #include "mlir/Support/IndentedOstream.h"
-#include "mlir/Support/LogicalResult.h"
 #include "llvm/ADT/STLExtras.h"
-#include "llvm/ADT/SmallVector.h"
 #include "llvm/ADT/Twine.h"
 #include "llvm/ADT/iterator_range.h"
-#include "llvm/Support/Casting.h"
+#include "llvm/Support/Path.h"
 
 #ifndef DYNAMATIC_GUROBI_NOT_INSTALLED
 #include "gurobi_c++.h"
 
-using namespace llvm::sys;
 using namespace mlir;
 using namespace dynamatic;
 using namespace dynamatic::buffer;
@@ -120,7 +114,8 @@ BufferPlacementMILP::BufferPlacementMILP(GRBEnv &env, FuncInfo &funcInfo,
                                          const TimingDatabase &timingDB,
                                          double targetPeriod, Logger &logger,
                                          StringRef milpName)
-    : MILP<BufferPlacement>(env, logger.getLogDir() + path::get_separator() +
+    : MILP<BufferPlacement>(env, logger.getLogDir() +
+                                     llvm::sys::path::get_separator() +
                                      milpName),
       timingDB(timingDB), targetPeriod(targetPeriod), funcInfo(funcInfo),
       logger(&logger) {
