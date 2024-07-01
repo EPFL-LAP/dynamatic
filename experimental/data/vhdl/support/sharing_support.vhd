@@ -2,26 +2,53 @@ library ieee;
 use ieee.std_logic_1164.all;
 use ieee.numeric_std.all;
 
--- Synchronizes the input tokens (credits and operands).
--- Asserts valid only when all of them are present
--- - It has a handshake interface to each input,
--- - It has a single handshake interface for output (data are bundled together)
+-- Simple request handling: it just takes whatever is more prioritized
+-- > request : a vector of requests encoded as 0/1
+-- > grant : a one-hot encoded signal indicates which request has been granted
+-- The convention is that MSBs are more prioritized than LSBs
+
+entity bitscan is
+  generic (
+            size : unsigned
+          );
+  port (
+         request : in std_logic_vector(size - 1 downto 0);
+         grant : out std_logic_vector(size - 1 downto 0)
+       );
+begin
+end bitscan;
+
+architecture arch of bitscan is
+begin
+  p_bitscan : process(request)
+  begin
+    grant <= std_logic_vector(unsigned(request) and (not (unsigned(request) - 1)));
+  end process p_bitscan;
+end arch;
+
+library ieee;
+use ieee.std_logic_1164.all;
+use ieee.numeric_std.all;
+
+-- Synchronizes the input tokens (credits and operands). Asserts valid only when all of them are present
+-- > It has a handshake interface to each input,
+-- > It has a single handshake interface for output (data are bundled together)
 
 entity crush_sync is
   generic (
-    NUM_OPERANDS : natural;
-    DATA_WIDTH   : natural
-  );
+            NUM_OPERANDS : natural;
+            DATA_WIDTH : natural
+          );
   port (
-  -- Input data channels:
-    ins        : in data_array (NUM_OPERANDS - 1 downto 0)(DATA_WIDTH - 1 downto 0);
-    ins_valid  : in std_logic_vector (NUM_OPERANDS - 1 downto 0);
-    ins_ready  : out std_logic_vector (NUM_OPERANDS - 1 downto 0);
+    -- Input data channels:
+         ins : in data_array (NUM_OPERANDS - 1 downto 0)(DATA_WIDTH - 1 downto 0);
+         ins_valid : in std_logic_vector (NUM_OPERANDS - 1 downto 0);
+         ins_ready : out std_logic_vector (NUM_OPERANDS - 1 downto 0);
 
-  -- Outputs (one valid bit):
-    outs       : out data_array (NUM_OPERANDS - 1 downto 0)(DATA_WIDTH - 1 downto 0);
-    outs_valid : out std_logic; 
-    outs_ready : in std_logic
+    -- Outputs (one valid bit):
+         outs : out data_array (NUM_OPERANDS - 1 downto 0)(DATA_WIDTH - 1 downto 0);
+         outs_valid : out std_logic; 
+         outs_ready : in std_logic
        );
 end crush_sync;
 
@@ -34,30 +61,30 @@ begin
   -- 1. all other inputs have a valid token present.
   -- 2. the output channel is ready.
   p_ins_ready : process(ins_valid, outs_ready)
-    variable allOtherInputsValid : std_logic_vector ((NUM_OPERANDS) - 1 downto 0);
+    variable all_other_inputs_valid : std_logic_vector ((NUM_OPERANDS) - 1 downto 0);
   begin
     for i in 0 to NUM_OPERANDS - 1 loop
-      allOtherInputsValid(i) := '1';
+      all_other_inputs_valid(i) := '1';
       for j in 0 to NUM_OPERANDS - 1 loop
         if (i /= j) then
-          allOtherInputsValid(i) := (allOtherInputsValid(i) and ins_valid(j));
+          all_other_inputs_valid(i) := (all_other_inputs_valid(i) and ins_valid(j));
         end if;
       end loop;
     end loop;
     for i in 0 to INPUTS-1 loop
-      ins_ready(i) <=  (allOtherInputsValid(i) and outs_ready);
+      ins_ready(i) <= (all_other_inputs_valid(i) and outs_ready);
     end loop;
   end process;
 
   -- p_outs_valid : a process for assigning valid signal to the bundled output channel
   p_outs_valid : process (ins_valid)
-    variable allInputChannelValid : std_logic;
+    variable all_input_channels_valid : std_logic;
   begin
-    allInputChannelValid := '1';
+    all_input_channels_valid := '1';
     for i in 0 to NUM_OPERANDS - 1 loop
-      allInputChannelValid := allInputChannelValid and ins_valid(i);
+      all_input_channels_valid := all_input_channels_valid and ins_valid(i);
     end loop;
-    outs_valid <= allInputChannelValid; 
+    outs_valid <= all_input_channels_valid; 
   end process;
 end arch;
 
@@ -68,15 +95,15 @@ use ieee.numeric_std.all;
 -- crush_oh_mux : a non-elastic mux that operates on an one-hot sel signal.
 entity crush_oh_mux is
   generic (
-    MUX_WIDTH  : natural;
-    DATA_WIDTH : natural
-  );
+            MUX_WIDTH : natural;
+            DATA_WIDTH : natural
+          );
   port (
     -- inputs
-    ins        : in data_array (MUX_WIDTH - 1 downto 0)(DATA_WIDTH - 1 downto 0);
-    sel        : in std_logic_vector (MUX_WIDTH - 1 downto 0);
-    outs       : out std_logic_vector (DATA_WIDTH - 1 downto 0)
-  );
+         ins : in data_array (MUX_WIDTH - 1 downto 0)(DATA_WIDTH - 1 downto 0);
+         sel : in std_logic_vector (MUX_WIDTH - 1 downto 0);
+         outs : out std_logic_vector (DATA_WIDTH - 1 downto 0)
+       );
 end crush_oh_mux;
 
 architecture arch of crush_oh_mux is
@@ -89,9 +116,9 @@ begin
       if (sel(i) = '1') then
         var_result := ins(i);
       end loop;
-    outs <= var_result;
-  end process p_sel;
-end crush_oh_mux;
+      outs <= var_result;
+    end process p_sel;
+  end crush_oh_mux;
 
 library ieee;
 use ieee.std_logic_1164.all;
@@ -100,23 +127,23 @@ use ieee.numeric_std.all;
 -- crush_oh_branch : an elastic branch that operates on an one-hot sel signal.
 entity crush_oh_branch is
   generic (
-    BRANCH_WIDTH : natural;
-    DATA_WIDTH   : natural
+            BRANCH_WIDTH : natural;
+            DATA_WIDTH : natural
           );
   port (
   -- data channel
-  ins        : in std_logic_vector(DATA_WIDTH - 1 downto 0);
-  ins_valid  : in std_logic;
-  ins_ready  : out std_logic;
+         ins : in std_logic_vector(DATA_WIDTH - 1 downto 0);
+         ins_valid : in std_logic;
+         ins_ready : out std_logic;
 
   -- sel channel
-  sel        : in std_logic_vector (BRANCH_WIDTH - 1 downto 0);
-  sel_valid  : in std_logic;
-  sel_ready  : out std_logic;
+         sel : in std_logic_vector (BRANCH_WIDTH - 1 downto 0);
+         sel_valid : in std_logic;
+         sel_ready : out std_logic;
 
-  outs       : out data_array(BRANCH_WIDTH - 1 downto 0)(DATA_WIDTH - 1 downto 0)
-  outs_valid : out std_logic_vector (BRANCH_WIDTH - 1 downto 0);
-       );
+         outs : out data_array(BRANCH_WIDTH - 1 downto 0)(DATA_WIDTH - 1 downto 0)
+         outs_valid : out std_logic_vector (BRANCH_WIDTH - 1 downto 0);
+);
 end crush_oh_branch;
 
 architecture arch of crush_oh_mux is
@@ -149,17 +176,17 @@ use work.customTypes.all;
 
 entity credit_dataless is 
   generic (
-            DATA_WIDTH   : integer;
-            NUM_CREDITS  : integer
+            DATA_WIDTH : integer;
+            NUM_CREDITS : integer
           );
   port (
-  clk, rst      : in  std_logic;    
+  clk, rst : in  std_logic;    
   -- input channels
-  ins_valid   : in  std_logic;
-  ins_ready    : out std_logic;
+  ins_valid : in  std_logic;
+  ins_ready : out std_logic;
   -- output channels
-  outs_valid    : out std_logic;
-  outs_ready   : in  std_logic;
+  outs_valid : out std_logic;
+  outs_ready : in  std_logic;
 );
 end credit;
 
