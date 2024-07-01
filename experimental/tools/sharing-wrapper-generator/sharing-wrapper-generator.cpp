@@ -76,11 +76,11 @@ std::string getRangeFromSize(unsigned size) {
 void printOutPorts(mlir::raw_indented_ostream &os, const std::string &unitName,
                    unsigned bitwidth, unsigned numOutputs) {
   for (unsigned i = 0; i < numOutputs; i++) {
-    os << unitName << "_out" << i << "_data"
+    os << "signal " << unitName << "_out" << i << "_data"
        << " : std_logic_vector" << getRangeFromSize(bitwidth) << ";\n";
-    os << unitName << "_out" << i << "_valid"
+    os << "signal " << unitName << "_out" << i << "_valid"
        << " : std_logic;\n";
-    os << unitName << "_out" << i << "_ready"
+    os << "signal " << unitName << "_out" << i << "_ready"
        << " : std_logic;\n";
     os << "\n";
   }
@@ -156,11 +156,11 @@ void printVhdlImpl(mlir::raw_indented_ostream &os, const unsigned &dataWidth,
   os << "\n";
 
   // Conditon FIFO output channel
-  os << "signal cond_buffer_outs_data : std_logic_vector"
+  os << "signal cond_buffer_out0_data : std_logic_vector"
      << getRangeFromSize(groupSize) << ";\n";
 
-  os << "signal cond_buffer_outs_valid : std_logic;\n";
-  os << "signal cond_buffer_outs_ready : std_logic;\n\n";
+  os << "signal cond_buffer_out0_valid : std_logic;\n";
+  os << "signal cond_buffer_out0_ready : std_logic;\n\n";
 
   // Output buffer output data
   for (unsigned i = 0; i < groupSize; i++) {
@@ -259,9 +259,9 @@ void printVhdlImpl(mlir::raw_indented_ostream &os, const unsigned &dataWidth,
   os << "clk => clk, rst => rst,\n";
   os << "ins => arbiter_out,\n";
   os << "ins_valid => arbiter_out_valid,\n";
-  os << "outs => cond_buffer_outs_data,\n";
-  os << "outs_valid => cond_buffer_outs_valid,\n";
-  os << "outs_ready => cond_buffer_outs_ready\n";
+  os << "outs => cond_buffer_out0_data,\n";
+  os << "outs_valid => cond_buffer_out0_valid,\n";
+  os << "outs_ready => cond_buffer_out0_ready\n";
   os << ");\n\n";
 
   // -- Branch -- //
@@ -270,9 +270,9 @@ void printVhdlImpl(mlir::raw_indented_ostream &os, const unsigned &dataWidth,
   os << "ins => ins(" << groupSize << "),\n";
   os << "ins_valid => ins_valid(" << groupSize << "),\n";
   os << "ins_ready => ins_ready(" << groupSize << "),\n";
-  os << "sel => cond_buffer_outs_data,\n";
-  os << "sel_valid => cond_buffer_outs_valid,\n";
-  os << "sel_ready => conf_buffer_outs_ready,\n";
+  os << "sel => cond_buffer_out0_data,\n";
+  os << "sel_valid => cond_buffer_out0_valid,\n";
+  os << "sel_ready => cond_buffer_out0_ready,\n";
   for (unsigned i = 0; i < groupSize; i++) {
     os << "outs(" << i << ") => branch0_out" << i << "_data,\n";
     os << "outs_valid(" << i << ") => branch0_out" << i << "_valid,\n";
