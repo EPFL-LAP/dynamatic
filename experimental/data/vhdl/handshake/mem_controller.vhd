@@ -65,9 +65,9 @@ begin
       stData_ready  => stData_ready,
       memDone_valid => memDone_valid,
       memDone_ready => memDone_ready,
-      loadData      => loadData,
-      loadEn        => loadEn,
-      loadAddr      => dropLoadAddr,
+      loadData      => (others => '0'),
+      loadEn        => open,
+      loadAddr      => open,
       storeEn       => storeEn,
       storeAddr     => storeAddr,
       storeData     => storeData
