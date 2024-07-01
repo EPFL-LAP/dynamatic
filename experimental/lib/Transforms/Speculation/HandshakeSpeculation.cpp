@@ -57,7 +57,7 @@ private:
 
   /// Create the control path for commit signals by replicating branches
   void routeCommitControl(llvm::DenseSet<Operation *> &markedPath,
-                          Value ctrlSignal, Operation *currOp);
+                          Value ctrlSignal, OpOperand &currOpOperand);
 
   /// Wrapper around routeCommitControl to prepare and invoke the placement
   LogicalResult prepareAndPlaceCommits();
@@ -132,7 +132,8 @@ static void markPathToCommits(llvm::DenseSet<Operation *> &markedPath,
 // ctrlSignal
 void HandshakeSpeculationPass::routeCommitControl(
     llvm::DenseSet<Operation *> &markedPath, Value ctrlSignal,
-    Operation *currOp) {
+    OpOperand &currOpOperand) {
+  Operation *currOp = currOpOperand.getOwner();
   // End traversal if currOp is not in the marked path to commits
   if (!markedPath.contains(currOp))
     return;
@@ -154,21 +155,11 @@ void HandshakeSpeculationPass::routeCommitControl(
     OpBuilder builder(ctx);
     builder.setInsertionPointAfterValue(ctrlSignal);
 
-    // Tokens are labeled as speculative or non-speculative according to the
-    // spec tag. Because the tag can take any of the  two branch outputs, a
-    // merge is needed. This is to be improved in the future.
-    SmallVector<Value, 2> mergeOperands;
-    mergeOperands.push_back(branchOp.getTrueResult());
-    mergeOperands.push_back(branchOp.getFalseResult());
-    auto mergedSpecTag =
-        builder.create<handshake::MergeOp>(branchOp.getLoc(), mergeOperands);
-    inheritBB(specOp, mergedSpecTag);
-
     // The speculating branch will discard the branch's condition token if the
     // branch output is non-speculative. Speculative tag of the token is
-    // currently implicit, so the branch output itself is used at IR level.
+    // currently implicit, so the branch input itself is used at the IR level.
     auto branchDiscardNonSpec = builder.create<handshake::SpeculatingBranchOp>(
-        branchOp.getLoc(), mergedSpecTag /* specTag */,
+        branchOp.getLoc(), currOpOperand.get() /* specTag */,
         branchOp.getConditionOperand());
     inheritBB(specOp, branchDiscardNonSpec);
 
@@ -182,15 +173,17 @@ void HandshakeSpeculationPass::routeCommitControl(
 
     // Follow the two branch results with a different control signal
     for (unsigned i = 0; i <= 1; ++i) {
-      for (Operation *succOp : branchOp->getResult(i).getUsers()) {
+      for (OpOperand &dstOpOperand : branchOp->getResult(i).getUses()) {
         Value ctrl = branchReplicated->getResult(i);
-        routeCommitControl(markedPath, ctrl, succOp);
+        routeCommitControl(markedPath, ctrl, dstOpOperand);
       }
     }
   } else {
     // Continue Traversal
-    for (Operation *succOp : currOp->getUsers()) {
-      routeCommitControl(markedPath, ctrlSignal, succOp);
+    for (OpResult res : currOp->getResults()) {
+      for (OpOperand &dstOpOperand : res.getUses()) {
+        routeCommitControl(markedPath, ctrlSignal, dstOpOperand);
+      }
     }
   }
 }
@@ -225,8 +218,8 @@ LogicalResult HandshakeSpeculationPass::prepareAndPlaceCommits() {
   markPathToCommits(markedPath, specOp);
 
   // Follow the marked path and replicate branches
-  for (Operation *succOp : specOp.getDataOut().getUsers())
-    routeCommitControl(markedPath, commitCtrl, succOp);
+  for (OpOperand &succOpOperand : specOp.getDataOut().getUses())
+    routeCommitControl(markedPath, commitCtrl, succOpOperand);
 
   // Verify that all commits are routed to a control signal
   return success(areAllCommitsRouted(fakeControl));
@@ -336,19 +329,25 @@ LogicalResult HandshakeSpeculationPass::prepareAndPlaceSaveCommits() {
   return placeUnits<handshake::SpecSaveCommitOp>(mergeOp.getResult());
 }
 
-static handshake::MuxOp findMuxOpInBB(Operation *op) {
+std::optional<Value> findControlInputToBB(Operation *op) {
   handshake::FuncOp funcOp = op->getParentOfType<handshake::FuncOp>();
   assert(funcOp && "op should have parent function");
+
+  // Find input arcs to BBs in the IR
+  BBtoArcsMap bbToPredecessorArcs = getBBPredecessorArcs(funcOp);
   unsigned bb = getLogicBB(op).value();
 
-  for (auto muxOp : funcOp.getOps<handshake::MuxOp>()) {
-    if (auto brBB = getLogicBB(muxOp); !brBB || brBB != bb)
-      continue;
-    // there should only exist one muxOp in the BB
-    return muxOp;
+  // Iterate input arcs to the speculation BB to find the control signal
+  for (const BBArc &arc : bbToPredecessorArcs[bb]) {
+    // Iterate the operands in the edge
+    for (mlir::OpOperand *p : arc.edges) {
+      Value inEdge = p->get();
+      // The control signal should be the only NoneType input to the BB
+      if (inEdge.getType().isa<mlir::NoneType>())
+        return inEdge;
+    }
   }
-
-  return nullptr;
+  return {};
 }
 
 LogicalResult HandshakeSpeculationPass::placeSpeculator() {
@@ -358,13 +357,9 @@ LogicalResult HandshakeSpeculationPass::placeSpeculator() {
   Operation *dstOp = operand.getOwner();
   Value srcOpResult = operand.get();
 
-  Value enableSpecIn;
-  if (auto controlBranch = findControlBranch(dstOp); controlBranch) {
-    enableSpecIn = controlBranch.getTrueResult();
-  } else if (auto muxOp = findMuxOpInBB(dstOp); muxOp) {
-    enableSpecIn = muxOp.getResult();
-  } else {
-    dstOp->emitError("Could not find controlBranchOp or muxOp in BB.");
+  std::optional<Value> enableSpecIn = findControlInputToBB(dstOp);
+  if (not enableSpecIn.has_value()) {
+    dstOp->emitError("Control signal for speculator's enableIn not found.");
     return failure();
   }
 
@@ -372,7 +367,7 @@ LogicalResult HandshakeSpeculationPass::placeSpeculator() {
   builder.setInsertionPoint(dstOp);
 
   specOp = builder.create<handshake::SpeculatorOp>(dstOp->getLoc(), srcOpResult,
-                                                   enableSpecIn);
+                                                   enableSpecIn.value());
 
   // Replace uses of the original source operation's result with the
   // speculator's result, except in the speculator's operands (otherwise this
