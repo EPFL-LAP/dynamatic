@@ -13,7 +13,7 @@ OUTPUT_DIR=$3
 KERNEL_NAME=$4
 USE_SIMPLE_BUFFERS=$5
 TARGET_CP=$6
-USE_CREDIT_SHARING=$7
+USE_SHARING=$7
 
 # Binaries used during compilation
 POLYGEIST_PATH="$DYNAMATIC_DIR/polygeist"
@@ -132,7 +132,7 @@ exit_on_fail "Failed to apply transformations to handshake" \
 
 
 # Credit-based sharing
-if [[ $USE_CREDIT_SHARING -ne 0 ]]; then
+if [[ $USE_SHARING -ne 0 ]]; then
   BUFFER_PLACEMENT_PASS="credit-based-sharing"
 else
   BUFFER_PLACEMENT_PASS="handshake-place-buffers"
