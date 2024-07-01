@@ -34,7 +34,7 @@ architecture arch of mux is
   signal tehb_ready   : std_logic;
 
 begin
-  process (ins, ins_valid, outs_ready, index, tehb_ready)
+  process (ins, ins_valid, outs_ready, index, index_valid, tehb_ready)
     variable tmp_data_out  : unsigned(DATA_WIDTH - 1 downto 0);
     variable tmp_valid_out : std_logic;
   begin
