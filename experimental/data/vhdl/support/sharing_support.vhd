@@ -9,7 +9,7 @@ use ieee.numeric_std.all;
 
 entity bitscan is
   generic (
-            size : unsigned
+            size : natural
           );
   port (
          request : in std_logic_vector(size - 1 downto 0);
@@ -29,6 +29,7 @@ end arch;
 library ieee;
 use ieee.std_logic_1164.all;
 use ieee.numeric_std.all;
+use work.types.all;
 
 -- Synchronizes the input tokens (credits and operands). Asserts valid only when all of them are present
 -- > It has a handshake interface to each input,
@@ -71,10 +72,10 @@ begin
         end if;
       end loop;
     end loop;
-    for i in 0 to INPUTS-1 loop
+    for i in 0 to NUM_OPERANDS-1 loop
       ins_ready(i) <= (all_other_inputs_valid(i) and outs_ready);
     end loop;
-  end process;
+  end process p_ins_ready;
 
   -- p_outs_valid : a process for assigning valid signal to the bundled output channel
   p_outs_valid : process (ins_valid)
@@ -85,12 +86,13 @@ begin
       all_input_channels_valid := all_input_channels_valid and ins_valid(i);
     end loop;
     outs_valid <= all_input_channels_valid; 
-  end process;
+  end process p_outs_valid;
 end arch;
 
 library ieee;
 use ieee.std_logic_1164.all;
 use ieee.numeric_std.all;
+use work.types.all;
 
 -- crush_oh_mux : a non-elastic mux that operates on an one-hot sel signal.
 entity crush_oh_mux is
@@ -115,14 +117,16 @@ begin
     for i in sel'range loop
       if (sel(i) = '1') then
         var_result := ins(i);
-      end loop;
-      outs <= var_result;
-    end process p_sel;
-  end crush_oh_mux;
+      end if;
+    end loop;
+    outs <= var_result;
+  end process p_sel;
+end arch;
 
 library ieee;
 use ieee.std_logic_1164.all;
 use ieee.numeric_std.all;
+use work.types.all;
 
 -- crush_oh_branch : an elastic branch that operates on an one-hot sel signal.
 entity crush_oh_branch is
@@ -141,19 +145,19 @@ entity crush_oh_branch is
          sel_valid : in std_logic;
          sel_ready : out std_logic;
 
-         outs : out data_array(BRANCH_WIDTH - 1 downto 0)(DATA_WIDTH - 1 downto 0)
-         outs_valid : out std_logic_vector (BRANCH_WIDTH - 1 downto 0);
+         outs : out data_array(BRANCH_WIDTH - 1 downto 0)(DATA_WIDTH - 1 downto 0);
+         outs_valid : out std_logic_vector (BRANCH_WIDTH - 1 downto 0)
 );
 end crush_oh_branch;
 
-architecture arch of crush_oh_mux is
+architecture arch of crush_oh_branch is
 begin
   p_outs : process (ins)
   begin
     for i in outs'range loop
       outs(i) <= ins;
-    end loop
-  end p_outs;
+    end loop;
+  end process p_outs;
 
   p_outs_valid : process (ins_valid, sel_valid, sel) 
     variable sel_valid_wide : std_logic_vector(BRANCH_WIDTH - 1 downto 0);
@@ -162,17 +166,17 @@ begin
     sel_valid_wide := (others => sel_valid);
     ins_valid_wide := (others => ins_valid);
     outs_valid <= ((sel and sel_valid_wide) and ins_valid_wide);
-  end p_outs_valid;
+  end process p_outs_valid;
 
   sel_ready <= ins_valid;
   ins_ready <= sel_valid;
-end crush_oh_branch;
+end arch;
 
 library ieee;
 use ieee.numeric_std.all;
 use ieee.std_logic_1164.all;
 use ieee.math_real.all;
-use work.customTypes.all;
+use work.types.all;
 
 entity credit_dataless is 
   generic (
@@ -186,11 +190,11 @@ entity credit_dataless is
   ins_ready : out std_logic;
   -- output channels
   outs_valid : out std_logic;
-  outs_ready : in  std_logic;
+  outs_ready : in  std_logic
 );
-end credit;
+end credit_dataless;
 
-architecture arch of credit is
+architecture arch of credit_dataless is
 
   -- 1 + NUM_CREDITS since the bitwidth has to represent 0 to NUM_CREDITS, which is NUM_CREDITS + 1 numbers.
   constant counter_width : integer := integer(ceil(log2(real(1 + NUM_CREDITS))));
