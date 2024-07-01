@@ -41,7 +41,7 @@ begin
     port map(
     (addrIn_valid,
       dataIn_valid),
-      addrIn_ready,
+      addrOut_ready,
       join_valid,
       out_array);
 
