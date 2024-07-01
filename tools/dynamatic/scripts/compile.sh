@@ -13,6 +13,7 @@ OUTPUT_DIR=$3
 KERNEL_NAME=$4
 USE_SIMPLE_BUFFERS=$5
 TARGET_CP=$6
+USE_CREDIT_SHARING=$7
 
 # Binaries used during compilation
 POLYGEIST_PATH="$DYNAMATIC_DIR/polygeist"
@@ -129,12 +130,20 @@ exit_on_fail "Failed to compile cf to handshake" "Compiled cf to handshake"
 exit_on_fail "Failed to apply transformations to handshake" \
   "Applied transformations to handshake"
 
+
+# Credit-based sharing
+if [[ $USE_CREDIT_SHARING -ne 0 ]]; then
+  BUFFER_PLACEMENT_PASS="credit-based-sharing"
+else
+  BUFFER_PLACEMENT_PASS="handshake-place-buffers"
+fi
+
 # Buffer placement
 if [[ $USE_SIMPLE_BUFFERS -ne 0 ]]; then
   # Simple buffer placement
   "$DYNAMATIC_OPT_BIN" "$F_HANDSHAKE_TRANSFORMED" \
     --handshake-set-buffering-properties="version=fpga20" \
-    --handshake-place-buffers="algorithm=on-merges timing-models=$DYNAMATIC_DIR/data/components.json" \
+    --$BUFFER_PLACEMENT_PASS="algorithm=on-merges timing-models=$DYNAMATIC_DIR/data/components.json" \
     > "$F_HANDSHAKE_BUFFERED"
   exit_on_fail "Failed to place simple buffers" "Placed simple buffers"
 else
@@ -157,7 +166,7 @@ else
   cd "$COMP_DIR"
   "$DYNAMATIC_OPT_BIN" "$F_HANDSHAKE_TRANSFORMED" \
     --handshake-set-buffering-properties="version=fpga20" \
-    --handshake-place-buffers="algorithm=fpl22 frequencies=$F_FREQUENCIES timing-models=$DYNAMATIC_DIR/data/components.json target-period=$TARGET_CP timeout=300 dump-logs" \
+    --$BUFFER_PLACEMENT_PASS="algorithm=fpl22 frequencies=$F_FREQUENCIES timing-models=$DYNAMATIC_DIR/data/components.json target-period=$TARGET_CP timeout=300 dump-logs" \
     > "$F_HANDSHAKE_BUFFERED"
   exit_on_fail "Failed to place smart buffers" "Placed smart buffers"
   cd - > /dev/null
