@@ -3,6 +3,8 @@
 
 #include "dynamatic/Support/DynamaticPass.h"
 #include "dynamatic/Support/LLVM.h"
+#include "mlir/Dialect/Arith/IR/Arith.h"
+#include "mlir/IR/DialectRegistry.h"
 #include "mlir/Pass/Pass.h"
 
 namespace dynamatic {

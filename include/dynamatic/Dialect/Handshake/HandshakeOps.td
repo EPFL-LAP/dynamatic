@@ -476,6 +476,14 @@ def ConditionalBranchOp : Handshake_Op<"cond_br", [
 
   let arguments = (ins I1 : $conditionOperand, AnyType : $dataOperand);
   let results = (outs AnyType : $trueResult, AnyType : $falseResult);
+
+
+  // let builders = [OpBuilder<
+  //   (ins "Value":$conditionOperand, "Value":$dataOperand), [{
+  //     $_state.addOperands(conditionOperand, dataOperand);
+  //     SmallVector<Type> resultTypes {dataOperand.getType()};
+  //     $_state.addTypes(resultTypes);
+  // }]>];
   let hasCustomAssemblyFormat = 1;
   let extraClassDeclaration = [{
     // These are the indices into the dests list.
@@ -552,6 +560,9 @@ def JoinOp : Handshake_Op<"join", [
   let results = (outs NoneType : $result);
   let hasCustomAssemblyFormat = 1;
 }
+
+
+
 
 def MemoryControllerOp : Handshake_Op<"mem_controller", [
   DeclareOpInterfaceMethods<MemoryOpInterface>,

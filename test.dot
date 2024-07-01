@@ -1,0 +1,23 @@
+Digraph G {
+  splines=spline;
+  compound=true; // Allow edges between clusters
+  // Units from function arguments
+  "arg0" [mlir_op="handshake.func", shape=diamond, label="arg0", style="solid", ]
+  "arg1" [mlir_op="handshake.func", shape=diamond, label="arg1", style="solid", ]
+  "arg2" [mlir_op="handshake.func", shape=diamond, label="arg2", style="solid", ]
+  "arg3" [mlir_op="handshake.func", shape=diamond, label="arg3", style="solid", ]
+  "arg4" [mlir_op="handshake.func", shape=diamond, label="arg4", style="solid", ]
+  "start" [mlir_op="handshake.func", shape=diamond, label="start", style="dotted", ]
+  // Units outside of all basic blocks
+  "mux0" [mlir_op="handshake.mux", label="mux", fillcolor=lightblue, shape="box", style="filled", ]
+  "cond_br0" [mlir_op="handshake.cond_br", label="cbranch", fillcolor=tan2, shape="box", style="filled", ]
+  "end0" [mlir_op="handshake.end", label="end", fillcolor=gold, shape="box", style="filled", ]
+  // Channels from function arguments
+  "arg0" -> "mux0" [style="solid", dir="both", arrowtail="none", arrowhead="normal", ]
+  "arg1" -> "mux0" [style="solid", dir="both", arrowtail="none", arrowhead="dot", ]
+  "arg2" -> "cond_br0" [style="solid", dir="both", arrowtail="none", arrowhead="dot", ]
+  "arg3" -> "mux0" [style="solid", dir="both", arrowtail="none", arrowhead="normal", ]
+  // Channels outside of all basic blocks
+  "mux0" -> "end0" [style="solid", dir="both", arrowtail="none", arrowhead="normal", ]
+  "mux0" -> "cond_br0" [style="solid", dir="both", arrowtail="none", arrowhead="normal", ]
+}
