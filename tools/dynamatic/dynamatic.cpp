@@ -23,6 +23,7 @@
 //===----------------------------------------------------------------------===//
 
 #include "dynamatic/Support/LLVM.h"
+#include "dynamatic/Support/System.h"
 #include "mlir/Support/IndentedOstream.h"
 #include "mlir/Support/LLVM.h"
 #include "mlir/Support/LogicalResult.h"
@@ -37,12 +38,10 @@
 #include <cstdio>
 #include <cstdlib>
 #include <fstream>
-#include <initializer_list>
-#include <iostream>
 #include <memory>
-#include <sstream>
-#include <readline/readline.h>
 #include <readline/history.h>
+#include <readline/readline.h>
+#include <sstream>
 
 using namespace llvm;
 using namespace llvm::sys;
@@ -67,6 +66,15 @@ static cl::opt<bool> exitOnFailure(
     cl::desc(
         "If specified, exits the frontend automatically on command failure"),
     cl::init(false), cl::cat(mainCategory));
+
+namespace {
+enum class CommandResult { SYNTAX_ERROR, FAIL, SUCCESS, EXIT, HELP };
+} // namespace
+
+template <typename... Tokens>
+static CommandResult execCmd(Tokens... tokens) {
+  return exec({tokens...}) != 0 ? CommandResult::FAIL : CommandResult::SUCCESS;
+}
 
 namespace {
 
@@ -114,8 +122,6 @@ struct Argument {
 
   Argument(StringRef name, StringRef desc) : name(name), desc(desc){};
 };
-
-enum class CommandResult { SYNTAX_ERROR, FAIL, SUCCESS, EXIT, HELP };
 
 struct CommandArguments {
   SmallVector<StringRef> positionals;
@@ -317,30 +323,6 @@ public:
 };
 } // namespace
 
-static CommandResult exec(std::initializer_list<StringRef> args) {
-  if (args.size() == 0)
-    return CommandResult::FAIL;
-
-  // Append all arguments into the command, with a space in between each
-  std::stringstream cmd;
-  auto *it = args.begin();
-  StringRef arg = *it;
-  while (++it != args.end()) {
-    cmd << arg.str() + " ";
-    arg = *it;
-  }
-  cmd << arg.str();
-
-  int ret = std::system(cmd.str().c_str());
-  llvm::outs() << "\n";
-  return ret != 0 ? CommandResult::FAIL : CommandResult::SUCCESS;
-}
-
-template <typename... Args>
-static CommandResult exec(Args... args) {
-  return exec({args...});
-}
-
 std::string FrontendState::makeAbsolutePath(StringRef path) {
   SmallString<128> str;
   path::append(str, path);
@@ -534,9 +516,9 @@ CommandResult Compile::execute(CommandArguments &args) {
   std::string script = state.getScriptsPath() + getSeparator() + "compile.sh";
   std::string buffers = args.flags.contains(SIMPLE_BUFFERS) ? "1" : "0";
 
-  return exec(script, state.dynamaticPath, state.getKernelDir(),
-              state.getOutputDir(), state.getKernelName(), buffers,
-              state.targetCP);
+  return execCmd(script, state.dynamaticPath, state.getKernelDir(),
+                 state.getOutputDir(), state.getKernelName(), buffers,
+                 state.targetCP);
 }
 
 CommandResult WriteHDL::execute(CommandArguments &args) {
@@ -559,8 +541,8 @@ CommandResult WriteHDL::execute(CommandArguments &args) {
     }
   }
 
-  return exec(script, state.dynamaticPath, state.getOutputDir(),
-              state.getKernelName(), experimental, hdl);
+  return execCmd(script, state.dynamaticPath, state.getOutputDir(),
+                 state.getKernelName(), experimental, hdl);
 }
 
 CommandResult Simulate::execute(CommandArguments &args) {
@@ -571,8 +553,8 @@ CommandResult Simulate::execute(CommandArguments &args) {
   std::string script = state.getScriptsPath() + getSeparator() + "simulate.sh";
   std::string experimental = args.flags.contains(EXPERIMENTAL) ? "1" : "0";
 
-  return exec(script, state.dynamaticPath, state.getKernelDir(),
-              state.getOutputDir(), state.getKernelName(), experimental);
+  return execCmd(script, state.dynamaticPath, state.getKernelDir(),
+                 state.getOutputDir(), state.getKernelName(), experimental);
 }
 
 CommandResult Visualize::execute(CommandArguments &args) {
@@ -587,8 +569,8 @@ CommandResult Visualize::execute(CommandArguments &args) {
   std::string wlfPath = state.getOutputDir() + sep + "sim" + sep +
                         "HLS_VERIFY" + sep + "vsim.wlf";
 
-  return exec(script, state.dynamaticPath, dotPath, wlfPath,
-              state.getOutputDir(), state.getKernelName());
+  return execCmd(script, state.dynamaticPath, dotPath, wlfPath,
+                 state.getOutputDir(), state.getKernelName());
 }
 
 CommandResult Synthesize::execute(CommandArguments &args) {
@@ -599,8 +581,8 @@ CommandResult Synthesize::execute(CommandArguments &args) {
   std::string script =
       state.getScriptsPath() + getSeparator() + "synthesize.sh";
 
-  return exec(script, state.dynamaticPath, state.getOutputDir(),
-              state.getKernelName());
+  return execCmd(script, state.dynamaticPath, state.getOutputDir(),
+                 state.getKernelName());
 }
 
 static StringRef removeComment(StringRef input) {

@@ -561,8 +561,20 @@ def JoinOp : Handshake_Op<"join", [
   let hasCustomAssemblyFormat = 1;
 }
 
+def NotOp : Handshake_Op<"not", [Pure, SameOperandsAndResultType]> {
+  let summary = "Logical negation";
+  let description = [{
+    Bitwise logical negation.
 
-
+    Example:
+    ```mlir
+    %neg = not %value : i32
+    ```
+  }];
+  let arguments = (ins AnyType : $operand);
+  let results = (outs AnyType : $result);
+  let assemblyFormat = [{ $operand attr-dict `:` qualified(type($result))}];
+}
 
 def MemoryControllerOp : Handshake_Op<"mem_controller", [
   DeclareOpInterfaceMethods<MemoryOpInterface>,
