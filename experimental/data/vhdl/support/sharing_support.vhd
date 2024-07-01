@@ -145,8 +145,10 @@ entity crush_oh_branch is
          sel_valid : in std_logic;
          sel_ready : out std_logic;
 
+          -- output channel
          outs : out data_array(BRANCH_WIDTH - 1 downto 0)(DATA_WIDTH - 1 downto 0);
-         outs_valid : out std_logic_vector (BRANCH_WIDTH - 1 downto 0)
+         outs_valid : out std_logic_vector (BRANCH_WIDTH - 1 downto 0);
+         outs_ready : in std_logic_vector (BRANCH_WIDTH - 1 downto 0)
 );
 end crush_oh_branch;
 
@@ -168,8 +170,18 @@ begin
     outs_valid <= ((sel and sel_valid_wide) and ins_valid_wide);
   end process p_outs_valid;
 
-  sel_ready <= ins_valid;
-  ins_ready <= sel_valid;
+  p_ins_ready : process (outs_ready, ins_valid, sel_valid, sel)
+    variable output_stalled : std_logic;
+  begin
+    output_stalled := '0';
+    for i in outs_valid'range loop
+      if sel(i) = '1'then
+        output_stalled := output_stalled or (not outs_ready(i));
+      end if;
+    end loop;
+    sel_ready <= ins_valid and (not output_stalled);
+    ins_ready <= sel_valid and (not output_stalled);
+  end process p_ins_ready;
 end arch;
 
 library ieee;
@@ -178,7 +190,7 @@ use ieee.std_logic_1164.all;
 use ieee.math_real.all;
 use work.types.all;
 
-entity credit_dataless is 
+entity crush_credit_dataless is 
   generic (
             DATA_WIDTH : integer;
             NUM_CREDITS : integer
@@ -192,9 +204,9 @@ entity credit_dataless is
   outs_valid : out std_logic;
   outs_ready : in  std_logic
 );
-end credit_dataless;
+end crush_credit_dataless;
 
-architecture arch of credit_dataless is
+architecture arch of crush_credit_dataless is
 
   -- 1 + NUM_CREDITS since the bitwidth has to represent 0 to NUM_CREDITS, which is NUM_CREDITS + 1 numbers.
   constant counter_width : integer := integer(ceil(log2(real(1 + NUM_CREDITS))));

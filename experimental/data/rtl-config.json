@@ -471,7 +471,7 @@
       { "name": "DATA_WIDTH", "type": "unsigned", "lb": 1 },
       { "name": "LATENCY", "type": "unsigned", "lb": 1 }
     ],
-    "dependencies": ["types"]
+    "dependencies": ["logic", "types", "sharing_support", "ofifo", "tfifo", "lazy_fork"]
   },
   {
     "name": "handshake.end",
@@ -548,6 +548,10 @@
   {
     "generic": "$DYNAMATIC/experimental/data/vhdl/support/dataless/merge_notehb.vhd",
     "module-name": "merge_notehb_dataless"
+  },
+  {
+    "generic": "$DYNAMATIC/experimental/data/vhdl/support/sharing_support.vhd",
+    "dependencies" : ["types"]
   },
   {
     "generic": "$DYNAMATIC/experimental/data/vhdl/support/types.vhd"
