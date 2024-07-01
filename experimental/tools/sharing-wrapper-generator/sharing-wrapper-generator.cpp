@@ -35,14 +35,15 @@ static cl::opt<std::string> clOptEntityName(cl::Positional, cl::Required,
                                             cl::desc("<entity name>"),
                                             cl::cat(mainCategory));
 
-static cl::opt<std::string> clOptListOfCredits(cl::Positional, cl::Required,
-                                               cl::desc("<list of credits>"),
-                                               cl::cat(mainCategory));
+static cl::opt<std::string>
+    clOptListOfCredits(cl::Positional, cl::Required,
+                       cl::desc("<list of credits (space separated)>"),
+                       cl::cat(mainCategory));
 
-static cl::opt<std::string> clOptNumInputOperands(
-    cl::Positional, cl::Required,
-    cl::desc("<number of input operands (space separated)>"),
-    cl::cat(mainCategory));
+static cl::opt<std::string>
+    clOptNumInputOperands(cl::Positional, cl::Required,
+                          cl::desc("<number of input operands>"),
+                          cl::cat(mainCategory));
 
 static cl::opt<std::string> clOptDataWidth(cl::Positional, cl::Required,
                                            cl::desc("<dataWidth>"),
@@ -104,6 +105,10 @@ void printVhdlImpl(mlir::raw_indented_ostream &os, const unsigned &dataWidth,
 
   os << "-- Latency of the shared operation: " << latency << "\n";
   os << "---------------------------------------------------------\n\n";
+  os << "library ieee;\n";
+  os << "use ieee.std_logic_1164.all;\n";
+  os << "use ieee.numeric_std.all;\n";
+  os << "use work.types.all;\n";
 
   unsigned totalNumInputChannels = listOfCredits.size() * numInputOperands + 1;
 
@@ -115,7 +120,7 @@ void printVhdlImpl(mlir::raw_indented_ostream &os, const unsigned &dataWidth,
   os << "clk        : in std_logic;\n";
   os << "rst        : in std_logic;\n";
   os << "ins        : in data_array" << getRangeFromSize(totalNumInputChannels)
-     << getRangeFromSize(dataWidth) << "\n";
+     << getRangeFromSize(dataWidth) << ";\n";
   os << "ins_valid  : in std_logic_vector"
      << getRangeFromSize(totalNumInputChannels) << ";\n";
   os << "ins_ready  : out std_logic_vector"
@@ -135,9 +140,9 @@ void printVhdlImpl(mlir::raw_indented_ostream &os, const unsigned &dataWidth,
 
   for (unsigned i = 0; i < groupSize; i++) {
     for (unsigned j = 0; j < numInputOperands + 1; j++)
-      os << "sync" << i << "_out" << j << "_data : std_logic_vector"
+      os << "signal sync" << i << "_out" << j << "_data : std_logic_vector"
          << getRangeFromSize(dataWidth) << ";\n";
-    os << "sync" << i << "_out0_valid : std_logic;\n";
+    os << "signal sync" << i << "_out0_valid : std_logic;\n";
   }
 
   for (unsigned i = 0; i < numInputOperands; i++) {
@@ -179,7 +184,7 @@ void printVhdlImpl(mlir::raw_indented_ostream &os, const unsigned &dataWidth,
     printOutPorts(os, unitName, dataWidth, 1);
   }
 
-  os << "begin\n";
+  os << "begin\n\n";
 
   // Wiring for sync
   for (unsigned i = 0; i < groupSize; i++) {
@@ -188,30 +193,30 @@ void printVhdlImpl(mlir::raw_indented_ostream &os, const unsigned &dataWidth,
     os << sync << " : entity work.crush_sync(arch)\ngeneric map("
        << numInputOperands + 1 << ", " << dataWidth << ")\n";
     os << "port map(\n";
-    for (unsigned i = 0; i < numInputOperands; i++) {
-      os << "ins(" << i << ") => ins(" << i << "),\n";
+    for (unsigned j = 0; j < numInputOperands; j++) {
+      os << "ins(" << j << ") => ins(" << i * numInputOperands + j << "),\n";
     }
-    for (unsigned i = 0; i < numInputOperands; i++) {
-      os << "ins_valid(" << i << ") => ins_valid(" << i << "),\n";
+    os << "ins(" << numInputOperands << ") => " << credit << "_out0"
+       << "_data,\n";
+    for (unsigned j = 0; j < numInputOperands; j++) {
+      os << "ins_valid(" << j << ") => ins_valid(" << i * numInputOperands + j
+         << "),\n";
     }
-    for (unsigned i = 0; i < numInputOperands; i++) {
-      os << "ins_ready(" << i << ") => ins_ready(" << i << "),\n";
-    }
-
-    os << "ins_data(" << numInputOperands << ") => " << credit << "_out0"
-       << "_data),\n";
     os << "ins_valid(" << numInputOperands << ") => " << credit << "_out0"
-       << "_valid),\n";
+       << "_valid,\n";
+    for (unsigned j = 0; j < numInputOperands; j++) {
+      os << "ins_ready(" << j << ") => ins_ready(" << i * numInputOperands + j
+         << "),\n";
+    }
     os << "ins_ready(" << numInputOperands << ") => " << credit << "_out0"
-       << "_ready),\n";
+       << "_ready,\n";
 
-    for (unsigned i = 0; i < numInputOperands; i++) {
-      os << "outs(" << i << ") => " << sync << "_out" << i << "_data),\n";
+    for (unsigned j = 0; j < numInputOperands + 1; j++) {
+      os << "outs(" << j << ") => " << sync << "_out" << j << "_data,\n";
     }
     os << "outs_valid => " << sync << "_out0"
-       << "_valid),\n";
-    os << "outs_valid => " << sync << "_out0"
-       << "_ready)\n";
+       << "_valid,\n";
+    os << "outs_ready => arbiter_out(" << i << ")\n";
 
     os << ");\n\n";
   }
@@ -219,7 +224,7 @@ void printVhdlImpl(mlir::raw_indented_ostream &os, const unsigned &dataWidth,
   for (unsigned i = 0; i < numInputOperands; i++) {
     std::string mux = "mux" + std::to_string(i);
     os << mux << " : entity work.crush_oh_mux(arch)\ngeneric map(" << groupSize
-       << ", " << dataWidth << ")\n";
+       << ", " << dataWidth << ")\nport map(\n";
     for (unsigned j = 0; j < groupSize; j++) {
       std::string sync = "sync" + std::to_string(j);
       os << "ins(" << j << ") => " << sync << "_out" << i << "_data,\n";
@@ -229,7 +234,8 @@ void printVhdlImpl(mlir::raw_indented_ostream &os, const unsigned &dataWidth,
     os << ");\n\n";
   }
 
-  os << "arbiter0 : work.bitscan(arch)\ngeneric map(" << groupSize << ")\n";
+  os << "arbiter0 : entity work.bitscan(arch)\ngeneric map(" << groupSize
+     << ")\n";
   os << "port map(\n";
   for (unsigned i = 0; i < groupSize; i++) {
     os << "request(" << i << ") => sync" << i << "_out0_valid,\n";
@@ -238,7 +244,7 @@ void printVhdlImpl(mlir::raw_indented_ostream &os, const unsigned &dataWidth,
   os << ");\n";
 
   // Generating valid signals to the shared unit
-  os << "or_n0 : work.or_n0(arch)\ngeneric map(" << groupSize << ")\n";
+  os << "or_n0 : entity work.or_n(arch)\ngeneric map(" << groupSize << ")\n";
   os << "port map(\n";
   for (unsigned i = 0; i < groupSize; i++) {
     os << "ins(" << i << ") => sync" << i << "_out0_valid,\n";
@@ -253,8 +259,8 @@ void printVhdlImpl(mlir::raw_indented_ostream &os, const unsigned &dataWidth,
   }
   os << "\n";
 
-  os << "cond_buffer : work.ofifo(arch)\ngeneric map(" << latency << ", "
-     << dataWidth << ")\n";
+  os << "cond_buffer : entity work.ofifo(arch)\ngeneric map(" << latency << ", "
+     << groupSize << ")\n";
   os << "port map(\n";
   os << "clk => clk, rst => rst,\n";
   os << "ins => arbiter_out,\n";
@@ -265,8 +271,8 @@ void printVhdlImpl(mlir::raw_indented_ostream &os, const unsigned &dataWidth,
   os << ");\n\n";
 
   // -- Branch -- //
-  os << "branch : work.crush_oh_branch(arch)\ngeneric map(" << groupSize << ", "
-     << dataWidth << ")\nport map(\n";
+  os << "branch : entity work.crush_oh_branch(arch)\ngeneric map(" << groupSize
+     << ", " << dataWidth << ")\nport map(\n";
   os << "ins => ins(" << groupSize << "),\n";
   os << "ins_valid => ins_valid(" << groupSize << "),\n";
   os << "ins_ready => ins_ready(" << groupSize << "),\n";
@@ -275,7 +281,11 @@ void printVhdlImpl(mlir::raw_indented_ostream &os, const unsigned &dataWidth,
   os << "sel_ready => cond_buffer_out0_ready,\n";
   for (unsigned i = 0; i < groupSize; i++) {
     os << "outs(" << i << ") => branch0_out" << i << "_data,\n";
+  }
+  for (unsigned i = 0; i < groupSize; i++) {
     os << "outs_valid(" << i << ") => branch0_out" << i << "_valid,\n";
+  }
+  for (unsigned i = 0; i < groupSize; i++) {
     os << "outs_ready(" << i << ") => branch0_out" << i << "_ready";
     if (i < groupSize - 1) {
       os << ", ";
@@ -286,9 +296,10 @@ void printVhdlImpl(mlir::raw_indented_ostream &os, const unsigned &dataWidth,
 
   // -- Output Buffers --//
   for (unsigned i = 0; i < groupSize; i++) {
-    os << "out_buffer" << i << " : work.tfifo(arch)\ngeneric map("
+    os << "out_buffer" << i << " : entity work.tfifo(arch)\ngeneric map("
        << listOfCredits[i] << ", " << dataWidth << ")\n";
     os << "port map(\n";
+    os << "clk => clk, rst => rst,\n";
     os << "ins => branch0_out" << i << "_data,\n";
     os << "ins_valid => branch0_out" << i << "_valid,\n";
     os << "ins_ready => branch0_out" << i << "_ready,\n";
@@ -300,26 +311,29 @@ void printVhdlImpl(mlir::raw_indented_ostream &os, const unsigned &dataWidth,
 
   // -- Output Forks -- //
   for (unsigned i = 0; i < groupSize; i++) {
-    os << "fork" << i << " : work.lazy_fork(arch)\ngeneric map(2, " << dataWidth
-       << ")\n";
+    os << "fork" << i << " : entity work.lazy_fork(arch)\ngeneric map(2, "
+       << dataWidth << ")\n";
     os << "port map(\n";
+    os << "clk => clk, rst => rst,\n";
     os << "ins => out_buffer" << i << "_out0_data,\n";
     os << "ins_valid => out_buffer" << i << "_out0_valid,\n";
     os << "ins_ready => out_buffer" << i << "_out0_ready,\n";
     os << "outs(0) => out_fork" << i << "_out0_data,\n";
-    os << "outs_valid(0) => out_fork" << i << "_out0_valid,\n";
-    os << "outs_ready(0) => out_fork" << i << "_out0_ready,\n";
     os << "outs(1) => out_fork" << i << "_out1_data,\n";
+    os << "outs_valid(0) => out_fork" << i << "_out0_valid,\n";
     os << "outs_valid(1) => out_fork" << i << "_out1_valid,\n";
+    os << "outs_ready(0) => outs_ready(" << i << "),\n";
     os << "outs_ready(1) => out_fork" << i << "_out1_ready\n";
     os << ");\n\n";
   }
 
   // -- Credits -- //
   for (unsigned i = 0; i < groupSize; i++) {
-    os << "credit" << i << " : work.credit(arch)\ngeneric map("
+    os << "credit" << i
+       << " : entity work.crush_credit_dataless(arch)\ngeneric map("
        << listOfCredits[i] << ", " << dataWidth << ")\n";
     os << "port map(\n";
+    os << "clk => clk, rst => rst,\n";
     os << "ins_valid => out_fork" << i << "_out1_valid,\n";
     os << "ins_ready => out_fork" << i << "_out1_ready,\n";
     os << "outs_valid => credit" << i << "_out0_valid,\n";
@@ -329,12 +343,11 @@ void printVhdlImpl(mlir::raw_indented_ostream &os, const unsigned &dataWidth,
 
   // -- Output data
   for (unsigned i = 0; i < groupSize; i++) {
-    os << "outs(" << i << ") <= fork" << i << "_out0_data;\n";
-    os << "outs_valid(" << i << ") <= fork" << i << "_out0_valid;\n";
-    os << "outs_ready(" << i << ") <= fork" << i << "_out0_ready;\n\n";
+    os << "outs(" << i << ") <= out_fork" << i << "_out0_data;\n";
+    os << "outs_valid(" << i << ") <= out_fork" << i << "_out0_valid;\n";
   }
 
-  os << "end architecture\n\n";
+  os << "end architecture;\n\n";
 }
 
 int main(int argc, char **argv) {
