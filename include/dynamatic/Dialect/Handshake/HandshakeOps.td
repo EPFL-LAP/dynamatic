@@ -991,7 +991,7 @@ def SpeculatorOp : Handshake_Op<"speculator", [
     ```
   }];
 
-  let arguments = (ins AnyType : $dataIn, I1 : $enable);
+  let arguments = (ins AnyType : $dataIn, NoneType : $enable);
   let results = (outs AnyType : $dataOut,
                   I1 : $saveCtrl, I1 : $commitCtrl, 
                   I<3> : $SCSaveCtrl, I<3> : $SCCommitCtrl, 
