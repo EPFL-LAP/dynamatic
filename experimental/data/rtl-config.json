@@ -508,6 +508,12 @@
     "dependencies": ["logic"]
   },
   {
+    "name": "handshake.not",
+    "parameters": [{ "name": "DATA_WIDTH", "type": "unsigned", "lb": 1 }],
+    "generic": "$DYNAMATIC/experimental/data/vhdl/handshake/not.vhd",
+    "module-name": "logic_not"
+  },
+  {
     "generic": "$DYNAMATIC/experimental/data/vhdl/support/delay_buffer.vhd"
   },
   {
