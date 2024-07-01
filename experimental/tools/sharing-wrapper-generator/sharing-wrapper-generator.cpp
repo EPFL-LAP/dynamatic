@@ -196,8 +196,7 @@ void printVhdlImpl(mlir::raw_indented_ostream &os, const unsigned &dataWidth,
     for (unsigned j = 0; j < numInputOperands; j++) {
       os << "ins(" << j << ") => ins(" << i * numInputOperands + j << "),\n";
     }
-    os << "ins(" << numInputOperands << ") => " << credit << "_out0"
-       << "_data,\n";
+    os << "ins(" << numInputOperands << ") => (others => \'0\'),\n";
     for (unsigned j = 0; j < numInputOperands; j++) {
       os << "ins_valid(" << j << ") => ins_valid(" << i * numInputOperands + j
          << "),\n";
@@ -273,9 +272,9 @@ void printVhdlImpl(mlir::raw_indented_ostream &os, const unsigned &dataWidth,
   // -- Branch -- //
   os << "branch : entity work.crush_oh_branch(arch)\ngeneric map(" << groupSize
      << ", " << dataWidth << ")\nport map(\n";
-  os << "ins => ins(" << groupSize << "),\n";
-  os << "ins_valid => ins_valid(" << groupSize << "),\n";
-  os << "ins_ready => ins_ready(" << groupSize << "),\n";
+  os << "ins => ins(" << groupSize * numInputOperands << "),\n";
+  os << "ins_valid => ins_valid(" << groupSize * numInputOperands << "),\n";
+  os << "ins_ready => ins_ready(" << groupSize * numInputOperands << "),\n";
   os << "sel => cond_buffer_out0_data,\n";
   os << "sel_valid => cond_buffer_out0_valid,\n";
   os << "sel_ready => cond_buffer_out0_ready,\n";
