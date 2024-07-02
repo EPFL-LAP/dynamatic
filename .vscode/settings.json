@@ -8,5 +8,13 @@
   "editor.defaultFormatter": "llvm-vs-code-extensions.vscode-clangd",
   "files.associations": {
     "*.inc": "cpp"
+  },
+  "cmake.configureSettings": {
+    "MLIR_DIR": "${workspaceFolder}/polygeist/llvm-project/build/lib/cmake/mlir",
+    "LLVM_DIR": "${workspaceFolder}/polygeist/llvm-project/build/lib/cmake/llvm",
+    "CLANG_DIR": "${workspaceFolder}/polygeist/llvm-project/build/lib/cmake/clang",
+    "LLVM_TARGETS_TO_BUILD": "host",
+    "CMAKE_BUILD_TYPE": "Debug",
+    "CMAKE_EXPORT_COMPILE_COMMAND": "ON"
   }
 }

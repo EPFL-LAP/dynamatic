@@ -359,10 +359,9 @@ struct CreditBasedSharingPass
                                 FuncPerfInfo &funcPerfInfo, NameAnalysis &namer,
                                 TimingDatabase &timingDB);
 
-  LogicalResult
-  sharingWrapperInsertion(handshake::FuncOp &funcOp,
-                          SharingGroups &sharingGroups,
-                          MapVector<Operation *, double> &opOccupancy);
+  LogicalResult sharingWrapperInsertion(
+      handshake::FuncOp &funcOp, SharingGroups &sharingGroups,
+      MapVector<Operation *, double> &opOccupancy, TimingDatabase &timingDB);
 
   // This class method finds all sharing targets for a given handshake function
   SmallVector<mlir::Operation *> getSharingTargets(handshake::FuncOp funcOp) {
@@ -567,7 +566,7 @@ static void replaceFirstUse(Operation *op, Value oldVal, Value newVal) {
 //    operations and dispatches the result to the correct outputs.
 LogicalResult CreditBasedSharingPass::sharingWrapperInsertion(
     handshake::FuncOp &funcOp, SharingGroups &sharingGroups,
-    MapVector<Operation *, double> &opOccupancy) {
+    MapVector<Operation *, double> &opOccupancy, TimingDatabase &timingDB) {
   MLIRContext *ctx = &getContext();
   OpBuilder builder(ctx);
   for (Group group : sharingGroups) {
@@ -579,6 +578,10 @@ LogicalResult CreditBasedSharingPass::sharingWrapperInsertion(
 
     // Elect one operation as the shared operation.
     Operation *sharedOp = *group.begin();
+
+    double latency;
+    if (failed(timingDB.getLatency(sharedOp, SignalType::DATA, latency)))
+      latency = 0.0;
 
     // Maps each original successor and the input operand (Value)
     std::vector<std::tuple<Operation *, Value>> succValueMap;
@@ -633,7 +636,7 @@ LogicalResult CreditBasedSharingPass::sharingWrapperInsertion(
         builder.create<handshake::SharingWrapperOp>(
             sharedOp->getLoc(), sharingWrapperOutputTypes, dataOperands,
             sharedOp->getResult(0), llvm::ArrayRef<int64_t>(credits),
-            sharedOp->getNumOperands());
+            sharedOp->getNumOperands(), (unsigned)round(latency));
 
     // Replace original connection from op->successor to
     // sharingWrapper->successor
@@ -717,7 +720,7 @@ LogicalResult CreditBasedSharingPass::sharingInFuncOp(
 
   // For each sharing group, unite them with a sharing wrapper and shared
   // operation.
-  return sharingWrapperInsertion(*funcOp, sharingGroups, opOccupancy);
+  return sharingWrapperInsertion(*funcOp, sharingGroups, opOccupancy, timingDB);
 }
 
 void CreditBasedSharingPass::runDynamaticPass() {
