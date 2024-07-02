@@ -19,7 +19,9 @@
 #include "dynamatic/Support/Backedge.h"
 #include "dynamatic/Support/DynamaticPass.h"
 #include "dynamatic/Support/LLVM.h"
+#include "mlir/Analysis/CFGLoopInfo.h"
 #include "mlir/Transforms/DialectConversion.h"
+#include <set>
 
 namespace dynamatic {
 
@@ -126,8 +128,15 @@ public:
   /// operations to the entry block, replacing func::ReturnOp's with
   /// handshake::ReturnOp's, deleting all block terminators and non-entry
   /// blocks, merging the results of all return statements, and creating the
-  /// region's end operation.
+  /// region's end operation./// This class is strongly inspired by CIRCT's own
+  /// `HandshakeLowering` class. It
+  /// provides all the conversion steps necessary to concert a func-level
+  /// function into a matching handshake-level function.
   LogicalResult createReturnNetwork(ConversionPatternRewriter &rewriter);
+
+  // interfaces dataflow circuits with LSQs
+  LogicalResult addSmartControlForLSQ(ConversionPatternRewriter &rewriter,
+                                      MemInterfacesInfo &memInfo);
 
   /// Returns the entry control value for operations contained within this
   /// block.
@@ -180,9 +189,9 @@ LogicalResult partiallyLowerRegion(const RegionLoweringFunc &loweringFunc,
 
 /// Runs a partial lowering method on an instance of the class the method
 /// belongs to. We need two variadic template parameters because arguments
-/// provided to this function may be slightly different but convertible to the
-/// arguments expected by the partial lowering method. Success status is
-/// forwarded from the partial lowering method.
+/// provided to this function may be slightly differeprod_cons_mem_depnt but
+/// convertible to the arguments expected by the partial lowering method.
+/// Success status is forwarded from the partial lowering method.
 template <typename T, typename... TArgs1, typename... TArgs2>
 static LogicalResult runPartialLowering(
     T &instance,
@@ -200,6 +209,51 @@ static LogicalResult runPartialLowering(
 #include "dynamatic/Conversion/Passes.h.inc"
 
 std::unique_ptr<dynamatic::DynamaticPass> createCfToHandshake();
+
+// Represents a memory dependeency bteween 2 blocks: the producer basic block
+// prodBb, and the consumer basic block consBb isBackward is used to indicate if
+// the producer and the consumer are in a loop
+struct ProdConsMemDep {
+  Block *prodBb;
+  Block *consBb;
+  bool isBackward;
+
+  ProdConsMemDep(Block *prod, Block *cons, bool backward)
+      : prodBb(prod), consBb(cons), isBackward(backward) {}
+};
+
+// A group represents all operations belonging to the same basic block bb
+struct Group {
+  Block *bb;
+  std::set<Group> preds;
+  std::set<Group> succs;
+
+  Group(Block *b) : bb(b) {}
+
+  bool operator<(const Group &other) const { return bb < other.bb; }
+};
+
+// Structure that stores loop information of a Block.
+struct BlockLoopInfo {
+  mlir::CFGLoop *loop = nullptr;
+  bool isHeader = false;
+  bool isExit = false;
+  bool isLatch = false;
+};
+
+// Function that runs loop analysis on the funcOp Region.
+DenseMap<Block *, BlockLoopInfo> findLoopDetails(mlir::CFGLoopInfo &li,
+                                                 Region &funcReg);
+
+// identify all the memory dependencies between the predecessors of an LSQ. This
+// is the first step towards making memory deps explicit
+void identifyMemDeps(SmallVector<Operation *> &operations,
+                     std::vector<ProdConsMemDep> &allMemDeps);
+
+// build a dependence graph betweeen the groups
+void constructGroupsGraph(const SmallVector<Operation *> &operations,
+                          std::vector<ProdConsMemDep> &allMemDeps,
+                          std::set<Group> &groups);
 
 } // namespace dynamatic
 
