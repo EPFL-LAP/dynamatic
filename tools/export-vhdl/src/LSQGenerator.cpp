@@ -44,9 +44,14 @@ struct BBSt {
 
 BBSt bb[MAX_BBs];
 
+static inline bool isLSQ(const std::string &str) {
+  return str.find("LSQ") != std::string::npos ||
+         str.find("lsq") != std::string::npos;
+}
+
 static std::string getLsqName(int lsqIndx) {
   for (int i = 0; i < componentsInNetlist; i++) {
-    if (nodes[i].type.find("LSQ") != std::string::npos) {
+    if (isLSQ(nodes[i].type)) {
       if (lsqIndx == nodes[i].lsqIndx)
         return nodes[i].name;
     }
@@ -56,7 +61,7 @@ static std::string getLsqName(int lsqIndx) {
 
 static int getLsqFifoDepth(int lsqIndx) {
   for (int i = 0; i < componentsInNetlist; i++) {
-    if (nodes[i].type.find("LSQ") != std::string::npos) {
+    if (isLSQ(nodes[i].type)) {
       if (lsqIndx == nodes[i].lsqIndx)
         return nodes[i].fifodepth;
     }
@@ -67,7 +72,7 @@ static int getLsqFifoDepth(int lsqIndx) {
 // Jiantao, 14/06/2022
 static int getLsqFifoLDepth(int lsqIndx) {
   for (int i = 0; i < componentsInNetlist; i++) {
-    if (nodes[i].type.find("LSQ") != std::string::npos) {
+    if (isLSQ(nodes[i].type)) {
       if (lsqIndx == nodes[i].lsqIndx) {
         // Jiantao, 05/09/2022
         // Check whether the depths is given or not.
@@ -82,7 +87,7 @@ static int getLsqFifoLDepth(int lsqIndx) {
 
 static int getLsqFifoSDepth(int lsqIndx) {
   for (int i = 0; i < componentsInNetlist; i++) {
-    if (nodes[i].type.find("LSQ") != std::string::npos) {
+    if (isLSQ(nodes[i].type)) {
       if (lsqIndx == nodes[i].lsqIndx) {
         // Jiantao, 05/09/2022
         // Check whether the depths is given or not.
@@ -97,7 +102,7 @@ static int getLsqFifoSDepth(int lsqIndx) {
 
 static int getLsqLoadPorts(int lsqIndx) {
   for (int i = 0; i < componentsInNetlist; i++) {
-    if (nodes[i].type.find("LSQ") != std::string::npos) {
+    if (isLSQ(nodes[i].type)) {
       if (lsqIndx == nodes[i].lsqIndx)
         return nodes[i].loadCount;
     }
@@ -107,7 +112,7 @@ static int getLsqLoadPorts(int lsqIndx) {
 
 static int getLsqStorePorts(int lsqIndx) {
   for (int i = 0; i < componentsInNetlist; i++) {
-    if (nodes[i].type.find("LSQ") != std::string::npos) {
+    if (isLSQ(nodes[i].type)) {
       if (lsqIndx == nodes[i].lsqIndx)
         return nodes[i].storeCount;
     }
@@ -118,7 +123,7 @@ static int getLsqStorePorts(int lsqIndx) {
 static std::string getNumLoads(int lsqIndx) {
   std::string numLoads;
   for (int i = 0; i < componentsInNetlist; i++) {
-    if (nodes[i].type.find("LSQ") != std::string::npos) {
+    if (isLSQ(nodes[i].type)) {
       if (lsqIndx == nodes[i].lsqIndx) {
         numLoads = nodes[i].numLoads;
         replace(numLoads.begin(), numLoads.end(), '{', '[');
@@ -136,7 +141,7 @@ static std::string getNumLoads(int lsqIndx) {
 static std::string getNumStores(int lsqIndx) {
   std::string numStores;
   for (int i = 0; i < componentsInNetlist; i++) {
-    if (nodes[i].type.find("LSQ") != std::string::npos) {
+    if (isLSQ(nodes[i].type)) {
       if (lsqIndx == nodes[i].lsqIndx) {
         numStores = nodes[i].numStores;
         replace(numStores.begin(), numStores.end(), '{', '[');
@@ -154,7 +159,7 @@ static std::string getNumStores(int lsqIndx) {
 static std::string getLoadOffset(int lsqIndx) {
   std::string loadOffset;
   for (int i = 0; i < componentsInNetlist; i++) {
-    if (nodes[i].type.find("LSQ") != std::string::npos) {
+    if (isLSQ(nodes[i].type)) {
       if (lsqIndx == nodes[i].lsqIndx) {
         loadOffset = nodes[i].loadOffsets;
         replace(loadOffset.begin(), loadOffset.end(), '{', '[');
@@ -171,7 +176,7 @@ static std::string getLoadOffset(int lsqIndx) {
 static std::string getStoreOffset(int lsqIndx) {
   std::string storeOffset;
   for (int i = 0; i < componentsInNetlist; i++) {
-    if (nodes[i].type.find("LSQ") != std::string::npos) {
+    if (isLSQ(nodes[i].type)) {
       if (lsqIndx == nodes[i].lsqIndx) {
         storeOffset = nodes[i].storeOffsets;
         replace(storeOffset.begin(), storeOffset.end(), '{', '[');
@@ -189,7 +194,7 @@ static std::string getStoreOffset(int lsqIndx) {
 static std::string getLoadPorts(int lsqIndx) {
   std::string loadPorts;
   for (int i = 0; i < componentsInNetlist; i++) {
-    if (nodes[i].type.find("LSQ") != std::string::npos) {
+    if (isLSQ(nodes[i].type)) {
       if (lsqIndx == nodes[i].lsqIndx) {
         loadPorts = nodes[i].loadPorts;
         replace(loadPorts.begin(), loadPorts.end(), '{', '[');
@@ -207,7 +212,7 @@ static std::string getLoadPorts(int lsqIndx) {
 static std::string getStorePorts(int lsqIndx) {
   std::string storePorts;
   for (int i = 0; i < componentsInNetlist; i++) {
-    if (nodes[i].type.find("LSQ") != std::string::npos) {
+    if (isLSQ(nodes[i].type)) {
       if (lsqIndx == nodes[i].lsqIndx) {
         storePorts = nodes[i].storePorts;
         replace(storePorts.begin(), storePorts.end(), '{', '[');
@@ -239,7 +244,7 @@ static void mapBb(int lsqIndx) {
   int bbindx = 0;
 
   for (int i = 0; i < componentsInNetlist; i++) {
-    if (nodes[i].name.find("LSQ") != std::string::npos) {
+    if (isLSQ(nodes[i].name)) {
       if (nodes[i].lsqIndx == lsqIndx) {
         bbcount = nodes[i].bbcount;
       }
@@ -349,7 +354,7 @@ int getLSQDataWidth() {
 
 int getLSQAddressWidth(int lsqIndx) {
   for (int i = 0; i < componentsInNetlist; i++) {
-    if (nodes[i].type.find("LSQ") != std::string::npos) {
+    if (isLSQ(nodes[i].type)) {
       if (lsqIndx == nodes[i].lsqIndx)
         return nodes[i].addressSize;
     }
