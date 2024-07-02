@@ -66,13 +66,7 @@ void ControlDependenceAnalysis::identifyAllControlDeps(mlir::func::FuncOp &funcO
                   continue;  // skip the start and the end nodes because we have taken care of them above
 
                 if(std::find(control_deps_map[b].begin(), control_deps_map[b].end(), &block) == control_deps_map[b].end()) {
-                  llvm::errs() << "\n 1 Adding ";
-                  block.printAsOperand(llvm::errs());
-                  llvm::errs() << " to the control deps of ";
-                  b->printAsOperand(llvm::errs());
-
                   control_deps_map[b].push_back(&block);
-
                 }
               }
             }
