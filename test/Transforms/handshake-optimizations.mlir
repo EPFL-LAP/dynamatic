@@ -84,14 +84,6 @@
 // //   end %sta : i32
 // // }
 
-
-
-
-
-
-
-
-
 // // handshake.func @trial(%arg0: i32, %arg2: i32, %start: none) -> (i32, index) {
   
 // //   %result_mux= mux true, [%arg0, %arg2] : i32
@@ -118,10 +110,18 @@
 // }
 
 
-// handshake.func @BranchtoForkSupressPairs (%arg0: i32, %arg1: i1, %start: none) -> (i32, i32){
-//   %true, %false= cond_br %arg1, %arg0: i32
-//   end %true, %false: i32, i32
-// }
+handshake.func @BranchtoForkSupressPairs (%arg0: i32, %arg1: i1, %start: none) -> (i32, i32){
+  %true, %false= cond_br %arg1, %arg0: i32
+  end %true, %false: i32, i32
+}
+
+handshake.func @BranchtoForkSupressPairs_3 (%arg0: i32, %arg1: i1, %start: none) -> (i32, i32, i32, i32){
+  %val1, %val2, %val3= fork [3] %arg1: i1
+  %true, %false= cond_br %val1, %arg0: i32
+  %true_1, %false_1 = cond_br %val2, %true: i32
+  %true_2, %false_2 = cond_br %val3, %false: i32
+  end %true_1, %false_1, %true_2, %false_2: i32, i32, i32, i32
+}
 
 
 
@@ -131,12 +131,12 @@ handshake.func @removeForkForkPair(%arg0: i32, %start: none) -> (i32, i32, i32) 
   end %one, %two1, %two2: i32, i32, i32
 }
 
-// handshake.func @removeForkForkPairMultiple(%arg0: i32, %start: none) -> (i32, i32, i32) {
-//   %one, %two, %three = fork [3] %arg0: i32
-//   %two1, %two2 = fork [2] %two: i32
-//   %three1, %three2, %three3, %three4 = fork [4] %three: i32
-//   end %one, %two1, %two2, %three1, %three2, %three3, %three4 : i32, i32, i32, i32, i32, i32, i32
-// }
+handshake.func @removeForkForkPairMultiple(%arg0: i32, %start: none) -> (i32, i32, i32) {
+  %one, %two, %three = fork [3] %arg0: i32
+  %two1, %two2 = fork [2] %two: i32
+  %three1, %three2, %three3, %three4 = fork [4] %three: i32
+  end %one, %two1, %two2, %three1, %three2, %three3, %three4 : i32, i32, i32, i32, i32, i32, i32
+}
 
 // handshake.func @removeForkForkPairdonot(%arg0: i32, %start: none) -> (i32, i32, i32) {
 //   %one, %two, %three = fork [3] %arg0: i32
@@ -177,9 +177,20 @@ handshake.func @removeForkForkPair(%arg0: i32, %start: none) -> (i32, i32, i32) 
 //   %one, %two= fork [2] %arg0: i32
 //   %one1, %two1, %three1 = fork [3] %arg1: i1
 //   %true, %false= cond_br %one1, %one: i32
-//   %num1= arith.constant 1: i1
-//   %ans = arith.xori %two1, %num1 : i1
+//   %ans = not %two1 : i1
 //   %true_2, %false_2= cond_br %ans, %two: i32
 //   %c = mux %three1 [%false_2, %false]:i1, i32
 //   end %c: i32
+// }
+
+// handshake.func @removeBranchMUXPair_simplee(%arg0: i32, %arg1: i1, %arg2: none, ...) -> i32 attributes {argNames = ["arg0", "arg1", "start"], resNames = ["out0"]} {
+//   %0:3 = fork [3] %arg1 : i1
+//   %1:2 = fork [2] %arg0 : i32
+//   %trueResult, %falseResult = cond_br %0#0, %1#0 : i32
+//   sink %trueResult : i32
+//   %2 = not %0#1 : i1
+//   %trueResult_0, %falseResult_1 = cond_br %2, %1#1 : i32
+//   sink %trueResult_0 : i32
+//   %3 = mux %0#2 [%falseResult, %falseResult_1] : i1, i32
+//   end %3 : i32
 // }

@@ -271,8 +271,8 @@ struct RemoveCMergeBranchLoopPairs
         mlir::Value one = rewriter.create<handshake::ConstantOp>(
             cmergeOp->getLoc(), constantType,
             rewriter.getIntegerAttr(constantType, 1), start);
-        arith::XOrIOp xorOp = rewriter.create<mlir::arith::XOrIOp>(
-            cmergeOp->getLoc(), condition, constantOne);
+        handshake::NotOp notOp =
+            rewriter.create<handshake::NotOp>(cmergeOp->getLoc(), condition);
         mlir::Value valueOfConstant;
         mlir::Value inputToMerge;
         if (trueResult == first) {
@@ -286,12 +286,12 @@ struct RemoveCMergeBranchLoopPairs
           rewriter.replaceAllUsesWith(trueResult, first);
           rewriter.replaceAllUsesWith(resultCMerge, first);
         } else if (trueResult == second) {
-          inputToMerge = xorOp.getResult();
+          inputToMerge = notOp.getResult();
           valueOfConstant = zero;
           rewriter.replaceAllUsesWith(falseResult, first);
           rewriter.replaceAllUsesWith(resultCMerge, first);
         } else if (falseResult == first) {
-          inputToMerge = xorOp.getResult();
+          inputToMerge = notOp.getResult();
           valueOfConstant = one;
           rewriter.replaceAllUsesWith(trueResult, second);
           rewriter.replaceAllUsesWith(resultCMerge, second);
@@ -335,7 +335,6 @@ struct RemoveConsecutiveForksPairs
     }
     if (NumNewResultsReqd == 0)
       return failure();
-    rewriter.setInsertionPointAfter(fork1);
     handshake::ForkOp newFork = rewriter.create<handshake::ForkOp>(
         fork1.getLoc(), input, NumResultsFork + NumNewResultsReqd);
 
@@ -354,6 +353,7 @@ struct RemoveConsecutiveForksPairs
           rewriter.replaceAllUsesWith(forkNextResults[j],
                                       newForkResults[curNew++]);
         }
+        rewriter.eraseOp(forkNext);
       } else {
         rewriter.replaceAllUsesWith(forkResults[curOld],
                                     newForkResults[curNew++]);
@@ -361,8 +361,6 @@ struct RemoveConsecutiveForksPairs
       curOld++;
     }
     rewriter.eraseOp(fork1);
-    // Why do I get an error when I try to erase this fork even though I have
-    // already replaced all its results?
     return success();
   }
 };
@@ -378,7 +376,6 @@ struct RemoveSupressForkPairs
     mlir::Value falseResult = condBranchOp.getFalseResult();
     if (hasRealUses(trueResult))
       return failure();
-    // llvm::errs() << "\n\n\nSo, true value has no use\n\n";
     mlir::Operation *useOwner = nullptr;
     auto op = falseResult.getUsers().begin();
     if (op == falseResult.getUsers().end())
@@ -395,29 +392,30 @@ struct RemoveSupressForkPairs
       mlir::Value condBr = condBranchOp.getConditionOperand();
       handshake::ForkOp forkForDataop = rewriter.create<handshake::ForkOp>(
           condBranchOp.getLoc(), dataOperand, numOfResults);
+      rewriter.setInsertionPointAfter(forkForDataop);
       handshake::ForkOp forkForCondition = rewriter.create<handshake::ForkOp>(
           condBranchOp.getLoc(), condBr, numOfResults);
       llvm::errs() << "New forks created\n\n\n\n";
       mlir::ResultRange forkDataResult = forkForDataop->getResults();
       mlir::ResultRange forkCondResult = forkForCondition->getResults();
-      std::vector<handshake::ConditionalBranchOp> vector_for_suppress(
-          numOfResults);
-      std::vector<handshake::SinkOp> vector_for_sinks(numOfResults);
+      std::vector<handshake::ConditionalBranchOp> vectorForSuppress(numOfResults);
+      std::vector<handshake::SinkOp> vectorForSinks(numOfResults);
       ValueRange op = {dataOperand, dataOperand};
       rewriter.replaceOp(condBranchOp, op);
+      rewriter.setInsertionPointAfter(forkForCondition);
       for (int i{0}; i < numOfResults; i++) {
         llvm::errs() << i << "\n\n\n";
-        rewriter.setInsertionPointAfter(forkForDataop);
-        vector_for_suppress[i] =
+        vectorForSuppress[i] =
             rewriter.create<handshake::ConditionalBranchOp>(
                 forkOp.getLoc(), forkCondResult[i], forkDataResult[i]);
-        vector_for_sinks[i] = rewriter.create<handshake::SinkOp>(
-            vector_for_suppress[i].getLoc(),
-            vector_for_suppress[i].getTrueResult());
+        rewriter.setInsertionPointAfter(vectorForSuppress[i]);
+        vectorForSinks[i] = rewriter.create<handshake::SinkOp>(
+            vectorForSuppress[i].getLoc(),
+            vectorForSuppress[i].getTrueResult());
         rewriter.replaceAllUsesWith(forkResult[i],
-                                    vector_for_suppress[i].getFalseResult());
+                                    vectorForSuppress[i].getFalseResult());
+        rewriter.setInsertionPointAfter(vectorForSinks[i]);
       }
-
       return success();
     }
     return failure();
@@ -444,7 +442,6 @@ struct RemoveSupressSupressPairs
       handshake::ConditionalBranchOp suppress2 =
           mlir::cast<handshake::ConditionalBranchOp>(useOwner);
       mlir::Value trueResult2 = suppress2.getTrueResult();
-
       if (hasRealUses(trueResult2))
         return failure();
       mlir::Value dataOperand = condBranchOp.getDataOperand();
@@ -468,18 +465,6 @@ struct RemoveSupressSupressPairs
                                          suppress2.getTrueResult());
       ValueRange op = {dataOperand, dataOperand};
       rewriter.replaceOp(condBranchOp, op);
-      // condBranchOp->getUsers() is not empty but dereferencing the iterator
-      // gives a segmentation fault EraseOp(condBranchOp) gives me a
-      // segmentation fault but I have already done rewriter.replaceOp for it.
-      // auto p = condBranchOp->getUsers();
-      // auto it= p.begin();
-      // mlir::Operation* y= nullptr;
-      // if (it!=p.end()){
-      //   y = *it;
-      //   if (isa<handshake::ConditionalBranchOp> (y)){
-      //     y->emitWarning();
-      //   }
-      // }
       return success();
     }
     return failure();
@@ -497,173 +482,38 @@ struct BranchToSupressForkPairs
     mlir::Value falseResult = condBranchOp.getFalseResult();
     mlir::Value trueResult = condBranchOp.getTrueResult();
     if (hasRealUses(falseResult) and hasRealUses(trueResult)) {
-
-      llvm::errs() << "In the function\n\n\n";
-      // ValueRange muxOperands= {constantOne, condBr2};
       handshake::ForkOp fork_data = rewriter.create<handshake::ForkOp>(
           condBranchOp->getLoc(), dataOperand, 2);
-      // rewriter.setInsertionPointAfter(fork_data);
+      rewriter.setInsertionPointAfter(fork_data);
       handshake::ForkOp fork_cond = rewriter.create<handshake::ForkOp>(
           condBranchOp->getLoc(), condition, 2);
-      // rewriter.setInsertionPointAfter(fork_cond);
+      rewriter.setInsertionPointAfter(fork_cond);
+      handshake::NotOp notOp = rewriter.create<handshake::NotOp>(
+          condBranchOp->getLoc(), fork_cond->getResults()[1]);
+      rewriter.setInsertionPointAfter(notOp);
       handshake::ConditionalBranchOp suppress1 =
           rewriter.create<handshake::ConditionalBranchOp>(
               condBranchOp->getLoc(), fork_cond->getResults()[0],
               fork_data.getResults()[0]);
-      // rewriter.setInsertionPointAfter(suppress1);
+      rewriter.setInsertionPointAfter(suppress1);
       handshake::SinkOp a = rewriter.create<handshake::SinkOp>(
           condBranchOp->getLoc(), suppress1.getTrueResult());
-      // rewriter.setInsertionPointAfter(a);
-      mlir::Value source =
-          rewriter.create<handshake::SourceOp>(condBranchOp->getLoc());
-      int64_t constantValue = 1;
-      mlir::Type constantType = rewriter.getIntegerType(1);
-      mlir::Value constantOne = rewriter.create<handshake::ConstantOp>(
-          condBranchOp->getLoc(), constantType,
-          rewriter.getIntegerAttr(constantType, constantValue), source);
-      ValueRange xorOperands = {constantOne, fork_cond->getResults()[1]};
-      arith::XOrIOp xorOp = rewriter.create<arith::XOrIOp>(
-          condBranchOp->getLoc(), constantOne, fork_cond->getResults()[1]);
+      rewriter.setInsertionPointAfter(a);
       handshake::ConditionalBranchOp suppress2 =
           rewriter.create<handshake::ConditionalBranchOp>(
-              condBranchOp->getLoc(), xorOp.getResult(),
+              condBranchOp->getLoc(), notOp.getResult(),
               fork_data->getResults()[1]);
-      // rewriter.setInsertionPointAfter(suppress2);
+      rewriter.setInsertionPointAfter(suppress2);
       handshake::SinkOp b = rewriter.create<handshake::SinkOp>(
           condBranchOp->getLoc(), suppress2.getTrueResult());
       ValueRange results = {suppress1.getFalseResult(),
                             suppress2.getFalseResult()};
       rewriter.replaceOp(condBranchOp, results);
-      // rewriter.replaceAllUsesWith(condBranchOp.getFalseResult(),
-      // suppress2.getFalseResult());
       return success();
     }
     return failure();
   }
 };
-
-// struct RemoveForkSupressPairsMUX : public OpRewritePattern<handshake::ForkOp>
-// {
-//   using OpRewritePattern<handshake::ForkOp>::OpRewritePattern;
-
-//   LogicalResult matchAndRewrite(handshake::ForkOp forkOp,
-//                                 PatternRewriter &rewriter) const override {
-//     mlir::Value dataOperand = forkOp.getOperand();
-//     if (forkOp->getNumResults() == 2) {
-//       mlir::Operation *useOwner = nullptr;
-//       handshake::ConditionalBranchOp suppress1 = nullptr;
-//       handshake::ConditionalBranchOp suppress2 = nullptr;
-//       mlir::ResultRange::user_range users = forkOp->getUsers();
-
-//       for (auto it = users.begin(); it != users.end(); it++) {
-//         useOwner = *it;
-//         if (not(isa<handshake::ConditionalBranchOp>(useOwner)))
-//           return failure();
-//         if (suppress1) {
-//           suppress2 = mlir::cast<handshake::ConditionalBranchOp>(useOwner);
-//         } else {
-//           suppress1 = mlir::cast<handshake::ConditionalBranchOp>(useOwner);
-//         }
-//       }
-//       if (hasRealUses(suppress1.getTrueResult()) or
-//           hasRealUses(suppress2.getTrueResult()))
-//         return failure();
-//       mlir::Operation *op1, *op2;
-//       auto it = (suppress1.getFalseResult().getUsers().begin());
-//       if (it != suppress1.getFalseResult().getUsers().end())
-//       {
-//         op1 = *it;
-//       }
-//       it = (suppress2.getFalseResult().getUsers().begin());
-//       if (it != suppress2.getFalseResult().getUsers().end())
-//       {
-//         op2 = *it;
-//       }
-//       if (llvm::isa_and_nonnull<handshake::MuxOp>(op1) and op1 == op2) {
-//         handshake::MuxOp mux = mlir::cast<handshake::MuxOp>(op1);
-//         mlir::Value select = mux.getSelectOperand();
-//         mlir::Value cond1 = suppress1.getConditionOperand();
-//         mlir::Value cond2 = suppress2.getConditionOperand();
-//         mlir::Operation *f1 = cond1.getDefiningOp();
-//         mlir::Operation *f2 = cond2.getDefiningOp();
-//         mlir::Operation *m = select.getDefiningOp();
-//         arith::XOrIOp xorOp;
-//         handshake::ForkOp forkC;
-//         bool replacement = false;
-//         if (llvm::isa_and_nonnull<handshake::ForkOp>(m)) {
-//           llvm::errs() << "\n\nIn the fork\n\n";
-//           forkC = mlir::cast<handshake::ForkOp>(m);
-//           mlir::Value condition = forkC.getOperand();
-//           mlir::Value operand1, operand0;
-//           handshake::ConstantOp one;
-//           int64_t constantValue = 1;
-//           mlir::Type constantType = rewriter.getIntegerType(1);
-//           mlir::IntegerAttr on = rewriter.getIntegerAttr(constantType,
-//           constantValue); if (f1 == m and
-//           llvm::isa_and_nonnull<arith::XOrIOp>(f2)) {
-//             llvm::errs() << "\n\nIn the xor\n\n";
-//             xorOp = mlir::cast<arith::XOrIOp>(f2);
-//             operand1 = xorOp->getOperand(1);
-//             operand0 = xorOp->getOperand(0);
-//             operand1.getDefiningOp()->emitWarning() << "\n\n";
-//             if (operand1.getDefiningOp() == forkC and
-//             llvm::isa<handshake::ConstantOp>(operand0.getDefiningOp())) {
-//               one =
-//               mlir::cast<handshake::ConstantOp>(operand0.getDefiningOp()); if
-//               (one.getValue() != on)
-//                 return failure();
-//               replacement = true;
-//             }
-
-//             else if (operand0.getDefiningOp() == forkC and
-//             llvm::isa_and_nonnull<handshake::ConstantOp>(operand1.getDefiningOp()))
-//             {
-//               one =
-//               mlir::cast<handshake::ConstantOp>(operand1.getDefiningOp());
-//               llvm::errs() << one.getValue() << "\n\n";
-//               if (one.getValue() != on)
-//                 return failure();
-//               replacement = true;
-//             }
-//           }
-//           else if (f2 == m and llvm::isa_and_nonnull<arith::XOrIOp>(f1)) {
-//             xorOp = mlir::cast<arith::XOrIOp>(f1);
-//             operand1 = xorOp->getOperand(1);
-//             operand0 = xorOp->getOperand(0);
-//             if (operand1.getDefiningOp() == forkC and
-//             llvm::isa_and_nonnull<handshake::ConstantOp>(operand0.getDefiningOp()))
-//             {
-//               one =
-//               mlir::cast<handshake::ConstantOp>(operand0.getDefiningOp()); if
-//               (one.getValue() != on)
-//                 return failure();
-//               replacement = true;
-//             }
-//             else if (operand0.getDefiningOp() == forkC and
-//             llvm::isa_and_nonnull<handshake::ConstantOp>(operand1.getDefiningOp()))
-//             {
-//               one =
-//               mlir::cast<handshake::ConstantOp>(operand1.getDefiningOp()); if
-//               (one.getValue() != on)
-//                 return failure();
-//               replacement = true;
-//             }
-//           }
-//           if (replacement) {
-//             llvm::errs()<<"In the replacement\n\n";
-//             rewriter.replaceOp(mux, dataOperand);
-//             rewriter.create<handshake::SinkOp>(mux->getLoc(),
-//             condition);
-//             rewriter.eraseOp(suppress1);
-//             rewriter.eraseOp(suppress2);
-//             return success();
-//           }
-//         }
-//       }
-//     }
-//     return failure();
-//   }
-// };
 
 struct RemoveForkSupressPairsMUX : public OpRewritePattern<handshake::ForkOp> {
   using OpRewritePattern<handshake::ForkOp>::OpRewritePattern;
@@ -700,7 +550,6 @@ struct RemoveForkSupressPairsMUX : public OpRewritePattern<handshake::ForkOp> {
         op2 = *it;
       }
       if (llvm::isa_and_nonnull<handshake::MuxOp>(op1) and op1 == op2) {
-        llvm::errs() << "In the mux\n\n";
         handshake::MuxOp mux = mlir::cast<handshake::MuxOp>(op1);
         mlir::Value select = mux.getSelectOperand();
         mlir::Value cond1 = suppress1.getConditionOperand();
@@ -708,64 +557,33 @@ struct RemoveForkSupressPairsMUX : public OpRewritePattern<handshake::ForkOp> {
         mlir::Operation *f1 = cond1.getDefiningOp();
         mlir::Operation *f2 = cond2.getDefiningOp();
         mlir::Operation *m = select.getDefiningOp();
-        arith::XOrIOp xorOp;
+        handshake::NotOp notOp;
         handshake::ForkOp forkC;
         bool replacement = false;
-        llvm::errs() << "In\n\n";
         if (llvm::isa_and_nonnull<handshake::ForkOp>(m)) {
-          llvm::errs() << "\n\nIn the fork\n\n";
           forkC = mlir::cast<handshake::ForkOp>(m);
           mlir::Value condition = forkC.getOperand();
-          mlir::Value operand1, operand0;
-          handshake::ConstantOp one;
-          int64_t constantValue = 1;
-          mlir::Type constantType = rewriter.getIntegerType(1);
-          mlir::IntegerAttr on =
-              rewriter.getIntegerAttr(constantType, constantValue);
-          if (f1 == m and llvm::isa_and_nonnull<arith::XOrIOp>(f2)) {
-            llvm::errs() << "\n\nIn the xor\n\n";
-            xorOp = mlir::cast<arith::XOrIOp>(f2);
-            operand1 = xorOp->getOperand(1);
-            operand0 = xorOp->getOperand(0);
-            operand1.getDefiningOp()->emitWarning() << "\n\n";
-            if (operand1.getDefiningOp() == forkC) {
+          mlir::Value operand;
+          if (f1 == m and llvm::isa_and_nonnull<handshake::NotOp>(f2)) {
+            notOp = mlir::cast<handshake::NotOp>(f2);
+            operand = notOp.getOperand();
+            if (operand.getDefiningOp() == forkC) {
               replacement = true;
             }
-
-            else if (operand0.getDefiningOp() == forkC) {
-              replacement = true;
-            }
-          } else if (f2 == m and llvm::isa_and_nonnull<arith::XOrIOp>(f1)) {
-            xorOp = mlir::cast<arith::XOrIOp>(f1);
-            operand1 = xorOp->getOperand(1);
-            operand0 = xorOp->getOperand(0);
-            if (operand1.getDefiningOp() == forkC) {
-              one = mlir::cast<handshake::ConstantOp>(operand0.getDefiningOp());
-              if (one.getValue() != on)
-                return failure();
-              replacement = true;
-            } else if (operand0.getDefiningOp() == forkC and
-                       llvm::isa_and_nonnull<handshake::ConstantOp>(
-                           operand1.getDefiningOp())) {
-              one = mlir::cast<handshake::ConstantOp>(operand1.getDefiningOp());
-              if (one.getValue() != on)
-                return failure();
+          } else if (f2 == m and llvm::isa_and_nonnull<handshake::NotOp>(f1)) {
+            notOp = mlir::cast<handshake::NotOp>(f1);
+            operand = notOp.getOperand();
+            if (operand.getDefiningOp() == forkC) {
               replacement = true;
             }
           }
           if (replacement) {
-            llvm::errs() << "In the replacement\n\n";
             rewriter.replaceOp(mux, dataOperand);
             rewriter.create<handshake::SinkOp>(mux->getLoc(), condition);
-            // rewriter.replaceAllUsesWith(suppress1.getFalseResult(),
-            //                             dataOperand);
-            // rewriter.replaceAllUsesWith(suppress1.getTrueResult(),
-            // dataOperand);
-            // rewriter.eraseOp(suppress1);
-
+            eraseSinkUsers(suppress1.getTrueResult(), rewriter);
+            eraseSinkUsers(suppress2.getTrueResult(), rewriter);
             rewriter.replaceOp(suppress1, {dataOperand, dataOperand});
-
-            // rewriter.eraseOp(suppress2);
+            rewriter.replaceOp(suppress2, {dataOperand, dataOperand});
             return success();
           }
         }
@@ -787,7 +605,7 @@ struct HandshakeOptimizationPass
     config.useTopDownTraversal = true;
     config.enableRegionSimplification = false;
     RewritePatternSet patterns{ctx};
-    patterns.add<RemoveConsecutiveForksPairs>(ctx);
+    patterns.add<RemoveConsecutiveForksPairs, BranchToSupressForkPairs>(ctx);
     if (failed(applyPatternsAndFoldGreedily(mod, std::move(patterns), config)))
       return signalPassFailure();
   };
