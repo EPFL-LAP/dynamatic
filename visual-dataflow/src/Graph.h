@@ -17,8 +17,6 @@
 #include "GraphEdge.h"
 #include "GraphNode.h"
 #include "dynamatic/Support/LLVM.h"
-#include "mlir/Support/LogicalResult.h"
-#include <functional>
 #include <map>
 #include <string>
 #include <utility>
@@ -40,6 +38,9 @@ struct BB {
   std::pair<float, float> labelPosition;
   std::pair<float, float> labelSize;
 };
+
+using NodePortPair = std::pair<NodeId, size_t>;
+using EdgePorts = std::pair<NodePortPair, NodePortPair>;
 
 /// Stores channel state transitions as a map from edge IDs to corresponding
 /// state transition information (and data, when relevant).
@@ -63,9 +64,7 @@ public:
   LogicalResult getNode(NodeId &id, GraphNode &result);
   /// Based on information about an edge, retrieves the corresponding edge
   /// identifier
-  LogicalResult getEdgeId(
-      std::pair<std::pair<NodeId, size_t>, std::pair<NodeId, size_t>> &edgeInfo,
-      EdgeId &edgeId);
+  LogicalResult getEdgeId(EdgePorts &edgeInfo, EdgeId &edgeId);
   /// Given a specific clock cycle, adds a pair (edge, state) to the map
   void addEdgeState(CycleNb cycle, EdgeId edgeId, State state,
                     const Data &data);
@@ -94,9 +93,7 @@ private:
   CycleTransitions cycleEdgeStates;
   /// Map of the edges of the graph :
   /// ((src node id, outPort number), (dest node id, inPort number)) -> edge id
-  std::map<std::pair<std::pair<NodeId, size_t>, std::pair<NodeId, size_t>>,
-           EdgeId>
-      mapEdges;
+  std::map<EdgePorts, EdgeId> mapEdges;
   /// BBs of the Graph
   std::vector<BB> bbs;
 };

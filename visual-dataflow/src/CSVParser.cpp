@@ -14,14 +14,14 @@
 #include "CSVParser.h"
 #include "Graph.h"
 #include "mlir/Support/LogicalResult.h"
-#include <iostream>
+#include "llvm/Support/raw_ostream.h"
 
 using namespace mlir;
 using namespace dynamatic::visual;
 
 /// This function transforms a state of type 'string' into its corresponding
 /// state in type 'State'.
-static LogicalResult findState(const std::string &stateString, State &state) {
+static LogicalResult decodeState(StringRef stateString, State &state) {
   if (stateString == "undefined") {
     state = UNDEFINED;
     return success();
@@ -43,6 +43,7 @@ static LogicalResult findState(const std::string &stateString, State &state) {
     return success();
   }
   // Error unknown state for the edge.
+  llvm::errs() << "Failed to decode state \"" << stateString << "\"\n";
   return failure();
 }
 
@@ -106,22 +107,20 @@ LogicalResult dynamatic::visual::processCSVLine(const std::string &line,
     *currCycle = cycleNb;
   }
 
-  std::pair<NodeId, size_t> srcInfo = std::pair(src, ++outPort);
-
-  std::pair<NodeId, size_t> dstInfo = std::pair(dst, ++inPort);
-
-  std::pair<std::pair<NodeId, size_t>, std::pair<NodeId, size_t>> info =
-      std::pair(srcInfo, dstInfo);
-
-  EdgeId edgeId;
+  NodePortPair srcPort(src, ++outPort);
+  NodePortPair dstPort(dst, ++inPort);
+  EdgePorts edgePorts(srcPort, dstPort);
+  EdgeId edgeID;
   State state;
 
-  if (failed(graph.getEdgeId(info, edgeId)) ||
-      failed(findState(stateString, state))) {
+  if (failed(graph.getEdgeId(edgePorts, edgeID))) {
+    llvm::errs() << "Failed to retrieve matching edge for CSV line \"" << line
+                 << "\"\n";
     return failure();
   }
+  if (failed(decodeState(stateString, state)))
+    return failure();
 
-  graph.addEdgeState(cycleNb, edgeId, state, data);
-
+  graph.addEdgeState(cycleNb, edgeID, state, data);
   return success();
 }

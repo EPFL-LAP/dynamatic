@@ -553,6 +553,21 @@ def JoinOp : Handshake_Op<"join", [
   let hasCustomAssemblyFormat = 1;
 }
 
+def NotOp : Handshake_Op<"not", [Pure, SameOperandsAndResultType]> {
+  let summary = "Logical negation";
+  let description = [{
+    Bitwise logical negation.
+
+    Example:
+    ```mlir
+    %neg = not %value : i32
+    ```
+  }];
+  let arguments = (ins AnyType : $operand);
+  let results = (outs AnyType : $result);
+  let assemblyFormat = [{ $operand attr-dict `:` qualified(type($result))}];
+}
+
 def MemoryControllerOp : Handshake_Op<"mem_controller", [
   DeclareOpInterfaceMethods<MemoryOpInterface>,
   DeclareOpInterfaceMethods<NamedIOInterface, ["getOperandName"]>,
@@ -1102,5 +1117,27 @@ def SpeculatingBranchOp : Handshake_Op<"speculating_branch", [
   let results = (outs AnyType : $trueResult, AnyType : $falseResult);
   let assemblyFormat = " `[` $tagFromOperand `]` $dataOperand attr-dict `:` qualified(type($tagFromOperand)) `,` qualified(type($dataOperand)) ";
 }
+
+//===----------------------------------------------------------------------===//
+// Resource Sharing Operations
+//===----------------------------------------------------------------------===//
+
+def SharingWrapperOp : Handshake_Op<"sharing_wrapper", [
+SameOperandsAndResultType
+]> {
+
+  let summary = "sharing wrapper operation"; let description = [{
+    The sharing_wrapper operation represents the selecting & distributing logic
+    that wraps around a functional unit.}];
+
+  let arguments = (ins Variadic<AnyType> : $dataOperands,
+    AnyType : $sharedOpResult,
+    DefaultValuedAttr<DenseI64ArrayAttr, "{}">:$credits,
+    ConfinedAttr<I32Attr, [IntMinValue<1>]>:$numSharedOperands);
+  let results = (outs Variadic<AnyType> : $dataOut);
+
+  let assemblyFormat = " `[` $dataOperands `]` `,` `[` $sharedOpResult `]` attr-dict `:` `(` qualified(type($dataOperands)) `)` `,` `(` qualified(type($sharedOpResult)) `)` `->` `(` qualified(type($dataOut)) `)` ";
+}
+
 
 #endif // DYNAMATIC_DIALECT_HANDSHAKE_HANDHSAKE_OPS_TD

@@ -14,28 +14,22 @@
 
 #include "dynamatic/Transforms/BufferPlacement/HandshakePlaceBuffers.h"
 #include "dynamatic/Analysis/NameAnalysis.h"
-#include "dynamatic/Dialect/Handshake/HandshakeDialect.h"
 #include "dynamatic/Dialect/Handshake/HandshakeOps.h"
-#include "dynamatic/Support/Attribute.h"
 #include "dynamatic/Support/CFG.h"
 #include "dynamatic/Support/Logging.h"
-#include "dynamatic/Transforms/BufferPlacement/BufferPlacementMILP.h"
 #include "dynamatic/Transforms/BufferPlacement/BufferingSupport.h"
 #include "dynamatic/Transforms/BufferPlacement/CFDFC.h"
 #include "dynamatic/Transforms/BufferPlacement/FPGA20Buffers.h"
 #include "dynamatic/Transforms/BufferPlacement/FPL22Buffers.h"
 #include "dynamatic/Transforms/HandshakeMaterialize.h"
 #include "experimental/Support/StdProfiler.h"
-#include "mlir/Dialect/Arith/IR/Arith.h"
-#include "mlir/Dialect/Func/IR/FuncOps.h"
 #include "mlir/IR/BuiltinTypes.h"
 #include "mlir/IR/OperationSupport.h"
-#include "mlir/IR/PatternMatch.h"
 #include "mlir/Support/IndentedOstream.h"
 #include "llvm/ADT/StringRef.h"
+#include "llvm/Support/Path.h"
 #include <string>
 
-using namespace llvm::sys;
 using namespace mlir;
 using namespace dynamatic;
 using namespace dynamatic::handshake;
@@ -93,7 +87,7 @@ BufferLogger::BufferLogger(handshake::FuncOp funcOp, bool dumpLogs,
   if (!dumpLogs)
     return;
 
-  std::string sep = path::get_separator().str();
+  std::string sep = llvm::sys::path::get_separator().str();
   std::string fp = "buffer-placement" + sep + funcOp.getName().str() + sep;
   log = new Logger(fp + "placement.log", ec);
 }
@@ -343,8 +337,8 @@ LogicalResult HandshakePlaceBuffersPass::getCFDFCs(FuncInfo &info,
     // Path where to dump the MILP model and solutions, if necessary
     std::string logPath = "";
     if (logger)
-      logPath = logger->getLogDir() + path::get_separator().str() + "cfdfc" +
-                std::to_string(cfdfcs.size());
+      logPath = logger->getLogDir() + llvm::sys::path::get_separator().str() +
+                "cfdfc" + std::to_string(cfdfcs.size());
 
     // Try to extract the next CFDFC
     int milpStat;

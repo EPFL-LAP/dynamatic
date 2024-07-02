@@ -290,7 +290,7 @@ chmod +x $LSQ_GEN_JAR
 #### visual-dataflow ####
 
 if [[ BUILD_VISUAL_DATAFLOW -ne 0 ]]; then
-  prepare_to_build_project "visual-dataflow" "visualj-dataflow/build"
+  prepare_to_build_project "visual-dataflow" "visual-dataflow/build"
 
   # CMake
   if should_run_cmake ; then
@@ -331,6 +331,7 @@ echo_section "Creating symbolic links"
 cd "$SCRIPT_CWD" && mkdir -p bin/generators
 
 # Create symbolic links to all binaries we use from subfolders
+
 create_symlink "$POLYGEIST_DIR"/build/bin/cgeist
 create_symlink "$POLYGEIST_DIR"/build/bin/polygeist-opt
 create_symlink "$POLYGEIST_DIR"/llvm-project/build/bin/clang++
@@ -341,6 +342,7 @@ create_symlink ../build/bin/export-vhdl
 create_symlink ../build/bin/exp-frequency-profiler
 create_symlink ../build/bin/handshake-simulator
 create_symlink ../build/bin/hls-verifier
+create_symlink ../build/bin/wlf2csv
 create_generator_symlink build/bin/rtl-cmpf-generator
 create_generator_symlink build/bin/rtl-cmpi-generator
 create_generator_symlink build/bin/rtl-text-generator

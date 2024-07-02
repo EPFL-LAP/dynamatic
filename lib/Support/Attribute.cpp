@@ -37,6 +37,10 @@ public:
           os.value(stringAttr.strref());
           return success();
         })
+        .Case<BoolAttr>([&](BoolAttr boolAttr) {
+          os.value(boolAttr.getValue());
+          return success();
+        })
         .Case<IntegerAttr>([&](IntegerAttr intAttr) {
           Type intType = intAttr.getType();
           if (intType.isUnsignedInteger())
@@ -88,6 +92,10 @@ public:
     return llvm::TypeSwitch<Attribute, LogicalResult>(attr)
         .Case<StringAttr>([&](StringAttr stringAttr) {
           os.attribute(attrName, stringAttr.strref());
+          return success();
+        })
+        .Case<BoolAttr>([&](BoolAttr boolAttr) {
+          os.attribute(attrName, boolAttr.getValue());
           return success();
         })
         .Case<IntegerAttr>([&](IntegerAttr intAttr) {
