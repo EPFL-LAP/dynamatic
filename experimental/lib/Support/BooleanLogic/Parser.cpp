@@ -1,5 +1,4 @@
-//===- Parser.cpp - // Implementation of Parser for Boolean Logic Expressions
-//-----*- C++ -*-===//
+//===- Parser.cpp - Parser for boolean expressions --------------*- C++ -*-===//
 //
 // Dynamatic is under the Apache License v2.0 with LLVM Exceptions.
 // See https://llvm.org/LICENSE.txt for license information.
@@ -16,19 +15,13 @@
 //
 //===----------------------------------------------------------------------===//
 
-#include "dynamatic/Support/Parser.h"
-#include "dynamatic/Support/BooleanExpression.h"
-#include "dynamatic/Support/Lexer.h"
-
+#include "experimental/Support/BooleanLogic/Parser.h"
+#include "experimental/Support/BooleanLogic/BoolExpression.h"
+#include "experimental/Support/BooleanLogic/Lexer.h"
 #include <array>
 #include <cassert>
-#include <cmath>
-#include <stack>
-#include <string>
-#include <utility>
-#include <vector>
 
-using namespace dynamatic;
+using namespace dynamatic::experimental::boolean;
 
 enum class Compare : int { lessThan, greaterThan, equal, error, accept };
 
@@ -55,8 +48,8 @@ static constexpr std::array<std::array<Compare, 7>, 7> PRECEDENCE_TABLE = {
       Compare::lessThan, Compare::error, Compare::lessThan, Compare::accept}}};
 
 // returns a dynamically-allocated variable
-BoolExpression *dynamatic::constructNodeOperator(StackNode *operate,
-                                                 StackNode *s1, StackNode *s2) {
+BoolExpression *dynamatic::experimental::boolean::constructNodeOperator(
+    StackNode *operate, StackNode *s1, StackNode *s2) {
   assert(operate != nullptr && s1 != nullptr && s2 != nullptr);
   Token t = operate->term;
   ExpressionType oo;
@@ -70,13 +63,14 @@ BoolExpression *dynamatic::constructNodeOperator(StackNode *operate,
 }
 
 // returns a dynamically-allocated variable
-BoolExpression *dynamatic::constructNodeNegator(StackNode *s1) {
+BoolExpression *
+dynamatic::experimental::boolean::constructNodeNegator(StackNode *s1) {
   assert(s1 != nullptr);
   return new Operator(ExpressionType::Not, nullptr, s1->expr);
 }
 
 // returns a dynamically-allocated variable
-StackNode *dynamatic::termToExpr(StackNode *s) {
+StackNode *dynamatic::experimental::boolean::termToExpr(StackNode *s) {
   assert(s != nullptr);
   ExpressionType t = ExpressionType::Variable;
   if (s->term.lexeme == "0")
@@ -87,23 +81,25 @@ StackNode *dynamatic::termToExpr(StackNode *s) {
 }
 
 // returns a dynamically-allocated variable
-StackNode *dynamatic::constructTermStackNode(Token t) {
+StackNode *dynamatic::experimental::boolean::constructTermStackNode(Token t) {
   return new StackNode(StackNodeType::Term, std::move(t));
 }
 
 // returns a dynamically-allocated variable
-StackNode *dynamatic::constructOperatorStackNode(StackNode *operate,
-                                                 StackNode *s1, StackNode *s2) {
+StackNode *dynamatic::experimental::boolean::constructOperatorStackNode(
+    StackNode *operate, StackNode *s1, StackNode *s2) {
   return new StackNode(StackNodeType::Expr,
                        constructNodeOperator(operate, s1, s2));
 }
 
 // returns a dynamically-allocated variable
-StackNode *dynamatic::constructNegatorStackNode(StackNode *s1) {
+StackNode *
+dynamatic::experimental::boolean::constructNegatorStackNode(StackNode *s1) {
   return new StackNode(StackNodeType::Expr, constructNodeNegator(s1));
 }
 
-StackNode *dynamatic::reduce(std::stack<StackNode *> stack) {
+StackNode *
+dynamatic::experimental::boolean::reduce(std::stack<StackNode *> stack) {
   // Case 1: Handling parentheses: expr --> ( expr )
   if (stack.size() == 3 &&
       (stack.top()->type == StackNodeType::Term &&

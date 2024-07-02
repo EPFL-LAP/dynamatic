@@ -1,4 +1,4 @@
-//===- Parser.h - Parser for boolean expressions -----*- C++ -*-===//
+//===- Parser.h - Parser for boolean expressions ----------------*- C++ -*-===//
 //
 // Dynamatic is under the Apache License v2.0 with LLVM Exceptions.
 // See https://llvm.org/LICENSE.txt for license information.
@@ -11,16 +11,17 @@
 //
 //===----------------------------------------------------------------------===//
 
-#ifndef DYNAMATIC_SUPPORT_PARSER_H
-#define DYNAMATIC_SUPPORT_PARSER_H
+#ifndef EXPERIMENTAL_SUPPORT_BOOLEANLOGIC_PARSER_H
+#define EXPERIMENTAL_SUPPORT_BOOLEANLOGIC_PARSER_H
 
-#include "dynamatic/Support/BooleanExpression.h"
-#include "dynamatic/Support/Lexer.h"
-
+#include "experimental/Support/BooleanLogic/BoolExpression.h"
+#include "experimental/Support/BooleanLogic/Lexer.h"
 #include <stack>
 #include <utility>
 
 namespace dynamatic {
+namespace experimental {
+namespace boolean {
 
 enum class StackNodeType : int { Expr, Term };
 
@@ -90,6 +91,9 @@ StackNode *constructNegatorStackNode(StackNode *s1);
 // reduce a sequence of tokens based on operator precedence and returns the
 // resulting stack node.
 StackNode *reduce(std::stack<StackNode *> stack);
+
+} // namespace boolean
+} // namespace experimental
 } // namespace dynamatic
 
-#endif // DYNAMATIC_SUPPORT_PARSER_H
+#endif // EXPERIMENTAL_SUPPORT_BOOLEANLOGIC_PARSER_H

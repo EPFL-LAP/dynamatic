@@ -1,5 +1,4 @@
-//===- BooleanLogicLibrary.cpp - // Boolean Logic Expression Library
-// Implementation -----*- C++ -*-===//
+//===- Support.cpp - Support for working with bool. expressions -*- C++ -*-===//
 //
 // Dynamatic is under the Apache License v2.0 with LLVM Exceptions.
 // See https://llvm.org/LICENSE.txt for license information.
@@ -7,32 +6,25 @@
 //
 //===----------------------------------------------------------------------===//
 //
-// This file implements the functions defined in BooleanLogicLibrary.h for
-// handling boolean logic expressions.
-// It includes propagating negation using DeMorgan's law, and creating basic
-// boolean expressions.
-// The implemented functions support basic boolean operations such as AND, OR,
-// and negation, and enable minimization of boolean expressions using the
-// Espresso algorithm.
+// This file implements the functions defined in Support.h for handling boolean
+// logic expressions. It includes propagating negation using DeMorgan's law, and
+// creating basic boolean expressions. The implemented functions support basic
+// boolean operations such as AND, OR, and negation, and enable minimization of
+// boolean expressions using the Espresso algorithm.
 //
 //===----------------------------------------------------------------------===//
 
-#include "dynamatic/Support/BooleanLogicLibrary.h"
-#include "dynamatic/Support/BooleanExpression.h"
-#include "dynamatic/Support/Parser.h"
-
-#include <cstdio>
-#include <cstdlib>
-#include <cstring>
+#include "experimental/Support/BooleanLogic/Support.h"
+#include "experimental/Support/BooleanLogic/BoolExpression.h"
+#include "experimental/Support/BooleanLogic/Parser.h"
 #include <string>
-#include <sys/wait.h>
-#include <unistd.h>
 #include <utility>
 
-using namespace dynamatic;
+using namespace dynamatic::experimental::boolean;
 
-BoolExpression *dynamatic::propagateNegation(BoolExpression *root,
-                                             bool negated) {
+BoolExpression *
+dynamatic::experimental::boolean::propagateNegation(BoolExpression *root,
+                                                    bool negated) {
   if (root == nullptr)
     return nullptr;
   if (root->type == ExpressionType::Not) {
@@ -63,7 +55,8 @@ BoolExpression *dynamatic::propagateNegation(BoolExpression *root,
 
 //--------------Espresso--------------
 
-std::string dynamatic::runEspresso(BoolExpression *expr) {
+std::string
+dynamatic::experimental::boolean::runEspresso(BoolExpression *expr) {
   std::string espressoInput = "";
   std::set<std::string> vars = expr->getVariables();
   // adding the number of inputs and outputs to the file
@@ -92,35 +85,41 @@ std::string dynamatic::runEspresso(BoolExpression *expr) {
   return result.substr(start + 1, end - start - 1);
 }
 
-BoolExpression *dynamatic::parseSop(std::string strSop) {
+BoolExpression *dynamatic::experimental::boolean::parseSop(std::string strSop) {
   Parser parser(std::move(strSop));
   return propagateNegation(parser.parseSop(), false);
 }
 
-std::string dynamatic::sopToString(BoolExpression *exp1) {
+std::string
+dynamatic::experimental::boolean::sopToString(BoolExpression *exp1) {
   return exp1->toString();
 }
 
 // returns a dynamically-allocated variable
-BoolExpression *dynamatic::boolVar(std::string id) {
+BoolExpression *dynamatic::experimental::boolean::boolVar(std::string id) {
   return new SingleCond(ExpressionType::Variable, std::move(id), false);
 }
 
 // returns a dynamically-allocated variable
-BoolExpression *dynamatic::boolAnd(BoolExpression *exp1, BoolExpression *exp2) {
+BoolExpression *
+dynamatic::experimental::boolean::boolAnd(BoolExpression *exp1,
+                                          BoolExpression *exp2) {
   return new Operator(ExpressionType::And, exp1, exp2);
 }
 
 // returns a dynamically-allocated variable
-BoolExpression *dynamatic::boolOr(BoolExpression *exp1, BoolExpression *exp2) {
+BoolExpression *dynamatic::experimental::boolean::boolOr(BoolExpression *exp1,
+                                                         BoolExpression *exp2) {
   return new Operator(ExpressionType::Or, exp1, exp2);
 }
 
-BoolExpression *dynamatic::boolNegate(BoolExpression *exp1) {
+BoolExpression *
+dynamatic::experimental::boolean::boolNegate(BoolExpression *exp1) {
   return propagateNegation(exp1, true);
 }
 
-BoolExpression *dynamatic::boolMinimize(BoolExpression *expr) {
+BoolExpression *
+dynamatic::experimental::boolean::boolMinimize(BoolExpression *expr) {
   std::string espressoResult = runEspresso(expr);
   // if espresso fails, return the expression as is
   if (espressoResult == "Failed to minimize")

@@ -1,5 +1,4 @@
-//===- Lexer.cpp - Implementation of Lexical Analyzer for Boolean Logic
-// Expressions -----*- C++ -*-===//
+//===- Lexer.cpp - Lexer for boolean expressions ----------------*- C++ -*-===//
 //
 // Dynamatic is under the Apache License v2.0 with LLVM Exceptions.
 // See https://llvm.org/LICENSE.txt for license information.
@@ -15,18 +14,17 @@
 //
 //===----------------------------------------------------------------------===//
 
-#include "dynamatic/Support/Lexer.h"
+#include "experimental/Support/BooleanLogic/Lexer.h"
 #include "llvm/Support/raw_ostream.h"
-
 #include <string>
 #include <utility>
 #include <vector>
 
 using namespace llvm;
-using namespace dynamatic;
+using namespace dynamatic::experimental::boolean;
 
 // Function for reporting syntax errors encountered during lexical analysis.
-void dynamatic::syntaxError() {
+void dynamatic::experimental::boolean::syntaxError() {
   llvm::errs() << "Syntax error in expression!\n";
 }
 

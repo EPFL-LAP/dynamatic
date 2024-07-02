@@ -1,5 +1,4 @@
-//===- BooleanLogicLibrary.h - // Boolean Logic Expression Library Interface
-//-----*- C++ -*-===//
+//===- Support.h - Support for working with bool. expressions ---*- C++ -*-===//
 //
 // Dynamatic is under the Apache License v2.0 with LLVM Exceptions.
 // See https://llvm.org/LICENSE.txt for license information.
@@ -17,23 +16,18 @@
 //
 //===----------------------------------------------------------------------===//
 
-#ifndef DYNAMATIC_SUPPORT_BOOLEANLOGICLIBRARY_H
-#define DYNAMATIC_SUPPORT_BOOLEANLOGICLIBRARY_H
+#ifndef EXPERIMENTAL_SUPPORT_BOOLEANLOGIC_SUPPORT_H
+#define EXPERIMENTAL_SUPPORT_BOOLEANLOGIC_SUPPORT_H
 
-#include "dynamatic/Support/BooleanExpression.h"
-
-#include <string>
+#include "experimental/Support/BooleanLogic/BoolExpression.h"
 
 namespace dynamatic {
+namespace experimental {
+namespace boolean {
 
 // Recursive function that propagates a not operator in a BoolExpression tree by
 // applying DeMorgan's law
 BoolExpression *propagateNegation(BoolExpression *root, bool negated);
-
-//--------------Espresso--------------
-
-// function to run espresso logic minimzer on a BoolExpression
-std::string runEspresso(BoolExpression *expr);
 
 // Convert String to BoolExpression
 // parses an expression such as c1. c2.c1+~c3 . c1 + c4. ~c1 and stores it in
@@ -58,6 +52,11 @@ BoolExpression *boolNegate(BoolExpression *exp1);
 // Minimize an expression based on the espresso logic minimizer algorithm
 BoolExpression *boolMinimize(BoolExpression *expr);
 
+// function to run espresso logic minimzer on a BoolExpression
+std::string runEspresso(BoolExpression *expr);
+
+} // namespace boolean
+} // namespace experimental
 } // namespace dynamatic
 
-#endif // DYNAMATIC_SUPPORT_BOOLEANLOGICLIBRARY_H
+#endif // EXPERIMENTAL_SUPPORT_BOOLEANLOGIC_SUPPORT_H

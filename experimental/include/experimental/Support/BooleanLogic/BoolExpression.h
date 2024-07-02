@@ -1,5 +1,4 @@
-//===- BooleanEXpression.h - Definition for boolean expressions -----*- C++
-//-*-===//
+//===- BoolExpression.h - Boolean expressions -------------------*- C++ -*-===//
 //
 // Dynamatic is under the Apache License v2.0 with LLVM Exceptions.
 // See https://llvm.org/LICENSE.txt for license information.
@@ -12,8 +11,8 @@
 //
 //===----------------------------------------------------------------------===//
 
-#ifndef DYNAMATIC_SUPPORT_BOOLEANEXPRESSION_H
-#define DYNAMATIC_SUPPORT_BOOLEANEXPRESSION_H
+#ifndef EXPERIMENTAL_SUPPORT_BOOLEANLOGIC_BOOLEXPRESSION_H
+#define EXPERIMENTAL_SUPPORT_BOOLEANLOGIC_BOOLEXPRESSION_H
 
 #include <map>
 #include <set>
@@ -21,6 +20,8 @@
 #include <utility>
 
 namespace dynamatic {
+namespace experimental {
+namespace boolean {
 
 // Variable: x,y, z,...
 // AND: & or .
@@ -102,6 +103,8 @@ struct SingleCond : public BoolExpression {
       : BoolExpression(t), id(std::move(i)), isNegated(negated) {}
 };
 
+} // namespace boolean
+} // namespace experimental
 } // namespace dynamatic
 
-#endif // DYNAMATIC_SUPPORT_BOOLEANEXPRESSION_H
+#endif // EXPERIMENTAL_SUPPORT_BOOLEANLOGIC_BOOLEXPRESSION_H

@@ -1,5 +1,4 @@
-//===- BooleanExpression.cpp - Implementation of Boolean Expression Handling
-//-----*- C++ -*-===//
+//===- BoolExpression.cpp - Boolean expressions -----------------*- C++ -*-===//
 //
 // Dynamatic is under the Apache License v2.0 with LLVM Exceptions.
 // See https://llvm.org/LICENSE.txt for license information.
@@ -14,15 +13,12 @@
 //
 //===----------------------------------------------------------------------===//
 
-#include "dynamatic/Support/BooleanExpression.h"
+#include "experimental/Support/BooleanLogic/BoolExpression.h"
 #include "llvm/Support/raw_ostream.h"
-
-#include <cassert>
-#include <cmath>
 #include <set>
 #include <string>
 
-using namespace dynamatic;
+using namespace dynamatic::experimental::boolean;
 using namespace llvm;
 
 //----------BoolExpression Functions Implementatins--------
@@ -83,8 +79,8 @@ std::set<std::string> BoolExpression::getVariables() {
 
 //---------Generating Truth Table based on Mintems (SOP Only)-----------
 
-void dynamatic::replaceDontCaresRec(std::string s,
-                                    std::set<std::string> &minterms) {
+void dynamatic::experimental::boolean::replaceDontCaresRec(
+    std::string s, std::set<std::string> &minterms) {
   int dontCareIndex = s.find('d');
   if (dontCareIndex == std::string::npos) {
     minterms.insert(s);
@@ -96,8 +92,8 @@ void dynamatic::replaceDontCaresRec(std::string s,
   replaceDontCaresRec(s, minterms);
 }
 
-std::set<std::string>
-dynamatic::replaceDontCares(const std::set<std::string> &minterms) {
+std::set<std::string> dynamatic::experimental::boolean::replaceDontCares(
+    const std::set<std::string> &minterms) {
   std::set<std::string> mintermsWithoudDontCares;
   for (const std::string &s : minterms) {
     replaceDontCaresRec(s, mintermsWithoudDontCares);
@@ -220,13 +216,17 @@ void BoolExpression::print(int space) {
       llvm::outs() << "~";
     llvm::outs() << singleCond->id << "\n";
   } else if (type == ExpressionType::Or) {
-    llvm::outs() << "+ " << "\n";
+    llvm::outs() << "+ "
+                 << "\n";
   } else if (type == ExpressionType::And) {
-    llvm::outs() << ". " << "\n";
+    llvm::outs() << ". "
+                 << "\n";
   } else if (type == ExpressionType::Zero) {
-    llvm::outs() << "0 " << "\n";
+    llvm::outs() << "0 "
+                 << "\n";
   } else if (type == ExpressionType::One) {
-    llvm::outs() << "1 " << "\n";
+    llvm::outs() << "1 "
+                 << "\n";
   }
 
   // Process left child

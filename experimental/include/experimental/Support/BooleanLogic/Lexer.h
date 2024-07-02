@@ -1,5 +1,4 @@
-//===- Lexer.h - Lexical Analyzer for Boolean Logic Expressions -----*- C++
-//-*-===//
+//===- Lexer.h - Lexer for boolean expressions ------------------*- C++ -*-===//
 //
 // Dynamatic is under the Apache License v2.0 with LLVM Exceptions.
 // See https://llvm.org/LICENSE.txt for license information.
@@ -14,14 +13,16 @@
 //
 //===----------------------------------------------------------------------===//
 
-#ifndef DYNAMATIC_SUPPORT_LEXER_H
-#define DYNAMATIC_SUPPORT_LEXER_H
+#ifndef EXPERIMENTAL_SUPPORT_BOOLEANLOGIC_LEXER_H
+#define EXPERIMENTAL_SUPPORT_BOOLEANLOGIC_LEXER_H
 
 #include <string>
 #include <utility>
 #include <vector>
 
 namespace dynamatic {
+namespace experimental {
+namespace boolean {
 
 // Enumeration defining the types of tokens in the boolean logic expressions.
 enum class TokenType : int {
@@ -73,6 +74,8 @@ private:
   std::string expression;
 };
 
+} // namespace boolean
+} // namespace experimental
 } // namespace dynamatic
 
-#endif // DYNAMATIC_SUPPORT_LEXER_H
+#endif // EXPERIMENTAL_SUPPORT_BOOLEANLOGIC_LEXER_H
