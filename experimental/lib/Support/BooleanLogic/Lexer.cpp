@@ -37,7 +37,7 @@ LexicalAnalyzer::LexicalAnalyzer(std::string exp) {
 // for operators and parentheses, storing all tokens in tokenList. An end token
 // is added to mark the completion of tokenization.
 void LexicalAnalyzer::tokenize() {
-  int position = 0;
+  size_t position = 0;
   while (position < expression.length()) {
     char current = expression[position];
     if (isspace(current)) {
@@ -46,7 +46,7 @@ void LexicalAnalyzer::tokenize() {
     }
     if (isalpha(current)) { // If the current character is a letter, it
                             // indicates a variable.
-      int idIndex = position + 1;
+      size_t idIndex = position + 1;
       while (idIndex < expression.length() && isdigit(expression[idIndex]))
         idIndex++;
       std::string id = expression.substr(position, idIndex - position);
@@ -103,7 +103,7 @@ Token LexicalAnalyzer::getToken() {
 
 Token LexicalAnalyzer::peek(unsigned int i) {
   Token token;
-  int peekIndex = index + i - 1;
+  size_t peekIndex = index + i - 1;
   if (peekIndex < tokenList.size())
     token = tokenList[peekIndex];
   return token;

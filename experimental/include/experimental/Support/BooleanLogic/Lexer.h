@@ -69,8 +69,8 @@ public:
 
 private:
   std::vector<Token>
-      tokenList; // List of tokens extracted from the input expression.
-  int index = 0; // Current index in the token list.
+      tokenList;    // List of tokens extracted from the input expression.
+  size_t index = 0; // Current index in the token list.
   std::string expression;
 };
 

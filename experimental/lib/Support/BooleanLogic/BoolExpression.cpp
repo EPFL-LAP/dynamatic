@@ -75,7 +75,7 @@ std::set<std::string> BoolExpression::getVariables() {
 
 void dynamatic::experimental::boolean::replaceDontCaresRec(
     std::string s, std::set<std::string> &minterms) {
-  int dontCareIndex = s.find('d');
+  size_t dontCareIndex = s.find('d');
   if (dontCareIndex == std::string::npos) {
     minterms.insert(s);
     return;
