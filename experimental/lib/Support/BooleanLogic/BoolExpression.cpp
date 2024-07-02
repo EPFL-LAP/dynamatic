@@ -24,10 +24,7 @@ using namespace llvm;
 //----------BoolExpression Functions Implementatins--------
 
 std::string BoolExpression::toString() {
-  if (!this)
-    return "";
-
-  std::string s = "";
+  std::string s;
 
   if (type == ExpressionType::And || type == ExpressionType::Or) {
     Operator *op = static_cast<Operator *>(this);
@@ -58,9 +55,6 @@ std::string BoolExpression::toString() {
 }
 
 void BoolExpression::getVariablesRec(std::set<std::string> &s) {
-  if (!this) { // if null
-    return;
-  }
   if (type == ExpressionType::Variable) {
     SingleCond *cond = static_cast<SingleCond *>(this);
     s.insert(cond->id);
@@ -137,8 +131,6 @@ void BoolExpression::generateMintermAnd(
 void BoolExpression::generateMintermsOr(
     int numOfVariables, const std::map<std::string, int> &varIndex,
     std::set<std::string> &minterms) {
-  if (!this) // if null
-    return;
   if (type == ExpressionType::Or) {
     Operator *op = static_cast<Operator *>(this);
     op->left->generateMintermsOr(numOfVariables, varIndex, minterms);
@@ -194,8 +186,6 @@ static constexpr unsigned COUNT = 10;
 
 // Inspired from https://www.geeksforgeeks.org/print-binary-tree-2-dimensions/
 void BoolExpression::print(int space) {
-  if (!this) // if null
-    return;
   // Increase distance between levels
   space += COUNT;
 
