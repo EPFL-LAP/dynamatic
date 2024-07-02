@@ -554,6 +554,9 @@ ModuleDiscriminator::ModuleDiscriminator(Operation *op)
         addUnsigned("NUM_MEMORIES",
                     op->getNumOperands() - getNumExtInstanceArgs(endOp) - 1);
       })
+      .Case<handshake::NotOp>([&](handshake::NotOp notOp) {
+        addBitwidth("DATA_WIDTH", op->getOperand(0));
+      })
       .Case<arith::AddFOp, arith::AddIOp, arith::AndIOp, arith::DivFOp,
             arith::DivSIOp, arith::DivUIOp, arith::MaximumFOp,
             arith::MinimumFOp, arith::MulFOp, arith::MulIOp, arith::NegFOp,

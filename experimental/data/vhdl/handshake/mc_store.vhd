@@ -31,22 +31,26 @@ end entity;
 architecture arch of mc_store is
   signal single_ready : std_logic;
   signal join_valid   : std_logic;
-  signal out_array    : std_logic_vector(1 downto 0);
-
 begin
-  addrIn_ready <= out_array(0);
-  dataIn_ready <= out_array(1);
-
-  join_write : entity work.join(arch) generic map(2)
+  join : entity work.join(arch)
+    generic map(
+      SIZE => 2
+    )
     port map(
-    (addrIn_valid,
-      dataIn_valid),
-      addrIn_ready,
-      join_valid,
-      out_array);
+      -- input channels
+      ins_valid(0) => dataIn_valid,
+      ins_valid(1) => addrIn_valid,
+      ins_ready(0) => dataIn_ready,
+      ins_ready(1) => addrIn_ready,
+      -- output channel
+      outs_valid => join_valid,
+      outs_ready => dataToMem_ready
+    );
 
+  -- address
+  addrOut       <= addrIn;
+  addrOut_valid <= join_valid;
+  -- data
   dataToMem       <= dataIn;
-  addrOut_valid   <= join_valid;
-  addrOut         <= addrIn;
   dataToMem_valid <= join_valid;
 end architecture;

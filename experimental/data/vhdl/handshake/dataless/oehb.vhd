@@ -15,16 +15,17 @@ entity oehb_dataless is
 end entity;
 
 architecture arch of oehb_dataless is
-  signal full_reg, mux_sel : std_logic;
+  signal outputValid : std_logic;
 begin
   process (clk, rst) is
   begin
     if (rst = '1') then
-      outs_valid <= '0';
+      outputValid <= '0';
     elsif (rising_edge(clk)) then
-      outs_valid <= ins_valid or not ins_ready;
+      outputValid <= ins_valid or (outputValid and not outs_ready);
     end if;
   end process;
 
-  ins_ready <= not outs_valid or outs_ready;
+  ins_ready  <= not outputValid or outs_ready;
+  outs_valid <= outputValid;
 end architecture;

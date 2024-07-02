@@ -2,7 +2,7 @@ library ieee;
 use ieee.std_logic_1164.all;
 use ieee.numeric_std.all;
 
-entity andi is
+entity xori is
   generic (
     BITWIDTH : integer
   );
@@ -23,7 +23,7 @@ entity andi is
   );
 end entity;
 
-architecture arch of andi is
+architecture arch of xori is
 begin
   join_inputs : entity work.join(arch) generic map(2)
     port map(
