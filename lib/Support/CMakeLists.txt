@@ -8,7 +8,7 @@ add_dynamatic_library(DynamaticSupport
   RTL.cpp
   System.cpp
   TimingModels.cpp
-
+  
   LINK_LIBS PUBLIC
   DynamaticHW
   MLIRIR
