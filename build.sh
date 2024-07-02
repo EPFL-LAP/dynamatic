@@ -17,6 +17,7 @@ print_help_and_exit () {
 
 List of options:
   --release | -r                    : build in \"Release\" mode (default is \"Debug\")
+  --skip-polygeist <polygeist-path> : skip building POLYGEIST
   --visual-dataflow | -v            : build visual-dataflow's C++ library
   --export-godot | -e <godot-path>  : export the Godot project (requires engine)
   --force | -f                      : force cmake reconfiguration in each (sub)project 
@@ -76,7 +77,7 @@ create_symlink() {
     local src=$1
     local dst="bin/$(basename $1)"
     echo "$dst -> $src"
-    ln -f --symbolic ../$src $dst
+    ln -f --symbolic $src $dst
 }
 
 # Same as create_symlink but creates the symbolic link inside the bin/generators
@@ -122,6 +123,8 @@ NUM_THREADS=0
 BUILD_TYPE="Debug"
 BUILD_VISUAL_DATAFLOW=0
 GODOT_PATH=""
+SKIP_POLYGEIST=0
+POLYGEIST_DIR="$PWD/polygeist"
 
 # Loop over command line arguments and update script variables
 PARSE_ARG=""
@@ -137,6 +140,9 @@ do
       if [[ $GODOT_PATH != /* ]]; then
         GODOT_PATH="../$GODOT_PATH"
       fi
+      PARSE_ARG=""
+    elif [[ $PARSE_ARG == "polygeist-path" ]]; then
+      POLYGEIST_DIR="$arg"
       PARSE_ARG=""
     else
       case "$arg" in 
@@ -163,6 +169,10 @@ do
           "--export-godot" | "-e")
               PARSE_ARG="godot-path"
               ;;
+          "--skip-polygeist")
+              SKIP_POLYGEIST=1
+              PARSE_ARG="polygeist-path"
+              ;;
           "--help" | "-h")
               print_help_and_exit
               ;;
@@ -186,49 +196,59 @@ echo "##########################################################################
 echo "############# DYNAMATIC - DHLS COMPILER INFRASTRUCTURE - EPFL/LAP ##############"
 echo "################################################################################"
 
-#### Polygeist ####
+if [[ $SKIP_POLYGEIST -eq 0 ]]; then
 
-prepare_to_build_project "LLVM" "polygeist/llvm-project/build"
+  #### Polygeist ####
 
-# CMake
-if should_run_cmake ; then
-  cmake -G Ninja ../llvm \
-      -DLLVM_ENABLE_PROJECTS="mlir;clang" \
-      -DLLVM_TARGETS_TO_BUILD="host" \
-      -DCMAKE_BUILD_TYPE=$BUILD_TYPE \
-      $CMAKE_COMPILERS $CMAKE_EXTRA_LLVM
-  exit_on_fail "Failed to cmake polygeist/llvm-project"
-fi
+  prepare_to_build_project "LLVM" "polygeist/llvm-project/build"
 
-# Build
-run_ninja
-exit_on_fail "Failed to build polygeist/llvm-project"
-if [[ ENABLE_TESTS -eq 1 ]]; then
-    ninja check-mlir
-    exit_on_fail "Tests for polygeist/llvm-project failed"
-fi
+  # CMake
+  if should_run_cmake ; then
+    cmake -G Ninja ../llvm \
+        -DLLVM_ENABLE_PROJECTS="mlir;clang" \
+        -DLLVM_TARGETS_TO_BUILD="host" \
+        -DCMAKE_BUILD_TYPE=$BUILD_TYPE \
+        $CMAKE_COMPILERS $CMAKE_EXTRA_LLVM
+    exit_on_fail "Failed to cmake polygeist/llvm-project"
+  fi
 
-prepare_to_build_project "Polygeist" "polygeist/build"
+  # Build
+  run_ninja
+  exit_on_fail "Failed to build polygeist/llvm-project"
+  if [[ ENABLE_TESTS -eq 1 ]]; then
+      ninja check-mlir
+      exit_on_fail "Tests for polygeist/llvm-project failed"
+  fi
 
-# CMake
-if should_run_cmake ; then
-  cmake -G Ninja .. \
-      -DMLIR_DIR=$PWD/../llvm-project/build/lib/cmake/mlir \
-      -DCLANG_DIR=$PWD/../llvm-project/build/lib/cmake/clang \
-      -DLLVM_TARGETS_TO_BUILD="host" \
-      -DCMAKE_BUILD_TYPE=$BUILD_TYPE \
-      $CMAKE_COMPILERS $CMAKE_EXTRA_POLYGEIST
-  exit_on_fail "Failed to cmake polygeist"
-fi
+  prepare_to_build_project "Polygeist" "polygeist/build"
 
-# Build
-run_ninja
-exit_on_fail "Failed to build polygeist"
-if [[ ENABLE_TESTS -eq 1 ]]; then
-    ninja check-polygeist-opt
-    exit_on_fail "Tests for polygeist failed"
-    ninja check-cgeist
-    exit_on_fail "Tests for polygeist failed"
+  # CMake
+  if should_run_cmake ; then
+    cmake -G Ninja .. \
+        -DMLIR_DIR=$PWD/../llvm-project/build/lib/cmake/mlir \
+        -DCLANG_DIR=$PWD/../llvm-project/build/lib/cmake/clang \
+        -DLLVM_TARGETS_TO_BUILD="host" \
+        -DCMAKE_BUILD_TYPE=$BUILD_TYPE \
+        $CMAKE_COMPILERS $CMAKE_EXTRA_POLYGEIST
+    exit_on_fail "Failed to cmake polygeist"
+  fi
+
+  # Build
+  run_ninja
+  exit_on_fail "Failed to build polygeist"
+  if [[ ENABLE_TESTS -eq 1 ]]; then
+      ninja check-polygeist-opt
+      exit_on_fail "Tests for polygeist failed"
+      ninja check-cgeist
+      exit_on_fail "Tests for polygeist failed"
+  fi
+
+else
+  echo "Skipping POLYGEIST/LLVM build. IMPORTANT: Verify that the path of polygeist in the script tools/dynamatic/scripts/compile.sh is the same"
+  if [[ ! -d $POLYGEIST_DIR ]]; then
+    echo "POLYGEIST directory not found: $POLYGEIST_DIR"
+    exit 1
+  fi
 fi
 
 #### Dynamatic ####
@@ -238,9 +258,9 @@ prepare_to_build_project "Dynamatic" "build"
 # CMake
 if should_run_cmake ; then
   cmake -G Ninja .. \
-      -DMLIR_DIR=polygeist/llvm-project/build/lib/cmake/mlir \
-      -DLLVM_DIR=polygeist/llvm-project/build/lib/cmake/llvm \
-      -DCLANG_DIR=polygeist/llvm-project/build/lib/cmake/clang \
+      -DMLIR_DIR="$POLYGEIST_DIR"/llvm-project/build/lib/cmake/mlir \
+      -DLLVM_DIR="$POLYGEIST_DIR"/llvm-project/build/lib/cmake/llvm \
+      -DCLANG_DIR="$POLYGEIST_DIR"/llvm-project/build/lib/cmake/clang \
       -DLLVM_TARGETS_TO_BUILD="host" \
       -DCMAKE_BUILD_TYPE=$BUILD_TYPE \
       -DCMAKE_EXPORT_COMPILE_COMMANDS="ON" \
@@ -275,8 +295,8 @@ if [[ BUILD_VISUAL_DATAFLOW -ne 0 ]]; then
   # CMake
   if should_run_cmake ; then
     cmake -G Ninja .. \
-        -DMLIR_DIR=../polygeist/llvm-project/build/lib/cmake/mlir \
-        -DLLVM_DIR=../polygeist/llvm-project/build/lib/cmake/llvm \
+        -DMLIR_DIR="$POLYGEIST_DIR"/llvm-project/build/lib/cmake/mlir \
+        -DLLVM_DIR="$POLYGEIST_DIR"/llvm-project/build/lib/cmake/llvm \
         -DLLVM_TARGETS_TO_BUILD="host" \
         -DCMAKE_BUILD_TYPE=$BUILD_TYPE \
         -DCMAKE_EXPORT_COMPILE_COMMANDS="ON" \
@@ -311,23 +331,24 @@ echo_section "Creating symbolic links"
 cd "$SCRIPT_CWD" && mkdir -p bin/generators
 
 # Create symbolic links to all binaries we use from subfolders
-create_symlink polygeist/build/bin/cgeist
-create_symlink polygeist/build/bin/polygeist-opt
-create_symlink polygeist/llvm-project/build/bin/clang++
-create_symlink build/bin/dynamatic
-create_symlink build/bin/dynamatic-opt
-create_symlink build/bin/export-dot
-create_symlink build/bin/export-vhdl
-create_symlink build/bin/exp-frequency-profiler
-create_symlink build/bin/handshake-simulator
-create_symlink build/bin/hls-verifier
-create_symlink build/bin/wlf2csv
+
+create_symlink "$POLYGEIST_DIR"/build/bin/cgeist
+create_symlink "$POLYGEIST_DIR"/build/bin/polygeist-opt
+create_symlink "$POLYGEIST_DIR"/llvm-project/build/bin/clang++
+create_symlink ../build/bin/dynamatic
+create_symlink ../build/bin/dynamatic-opt
+create_symlink ../build/bin/export-dot
+create_symlink ../build/bin/export-vhdl
+create_symlink ../build/bin/exp-frequency-profiler
+create_symlink ../build/bin/handshake-simulator
+create_symlink ../build/bin/hls-verifier
+create_symlink ../build/bin/wlf2csv
 create_generator_symlink build/bin/rtl-cmpf-generator
 create_generator_symlink build/bin/rtl-cmpi-generator
 create_generator_symlink build/bin/rtl-text-generator
 create_generator_symlink "$LSQ_GEN_PATH/$LSQ_GEN_JAR"
 if [[ $GODOT_PATH != "" ]]; then
-  create_symlink visual-dataflow/bin/visual-dataflow
+  create_symlink ../visual-dataflow/bin/visual-dataflow
 fi
 
 # Make the scripts used by the frontend executable
