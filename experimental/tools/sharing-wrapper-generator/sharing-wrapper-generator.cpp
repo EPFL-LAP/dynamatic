@@ -10,17 +10,12 @@
 //
 //===----------------------------------------------------------------------===//
 
-#include "dynamatic/Support/RTL.h"
 #include "mlir/Support/IndentedOstream.h"
-#include "llvm/ADT/ArrayRef.h"
 #include "llvm/ADT/SmallVector.h"
 #include "llvm/Support/CommandLine.h"
 #include "llvm/Support/InitLLVM.h"
 #include "llvm/Support/SourceMgr.h"
-#include <fstream>
-#include <map>
 #include <string>
-#include <vector>
 
 using namespace llvm;
 using namespace mlir;
@@ -74,16 +69,23 @@ std::string getRangeFromSize(unsigned size) {
   return "(" + std::to_string(size) + " - 1 downto 0)";
 }
 
-void printOutPorts(mlir::raw_indented_ostream &os, const std::string &unitName,
-                   unsigned bitwidth, unsigned numOutputs) {
+void declareDataSignal(mlir::raw_indented_ostream &os,
+                       const std::string &unitName, unsigned bitwidth,
+                       unsigned numOutputs) {
   for (unsigned i = 0; i < numOutputs; i++) {
     os << "signal " << unitName << "_out" << i << "_data"
        << " : std_logic_vector" << getRangeFromSize(bitwidth) << ";\n";
+  }
+}
+
+void declareHandshakeSignals(mlir::raw_indented_ostream &os,
+                             const std::string &unitName, unsigned bitwidth,
+                             unsigned numOutputs) {
+  for (unsigned i = 0; i < numOutputs; i++) {
     os << "signal " << unitName << "_out" << i << "_valid"
        << " : std_logic;\n";
     os << "signal " << unitName << "_out" << i << "_ready"
        << " : std_logic;\n";
-    os << "\n";
   }
 }
 
@@ -110,8 +112,10 @@ void printVhdlImpl(mlir::raw_indented_ostream &os, const unsigned &dataWidth,
   os << "use ieee.numeric_std.all;\n";
   os << "use work.types.all;\n";
 
+  // Sharing Wrapper's total number of input channels
   unsigned totalNumInputChannels = listOfCredits.size() * numInputOperands + 1;
 
+  // Sharing Wrapper's total number of output channels
   unsigned totalNumOutputChannels = listOfCredits.size() + numInputOperands;
 
   // Header
@@ -146,10 +150,12 @@ void printVhdlImpl(mlir::raw_indented_ostream &os, const unsigned &dataWidth,
   }
 
   for (unsigned i = 0; i < numInputOperands; i++) {
-    printOutPorts(os, "mux" + std::to_string(i), dataWidth, 1);
+    declareDataSignal(os, "mux" + std::to_string(i), dataWidth, 1);
+    declareHandshakeSignals(os, "mux" + std::to_string(i), dataWidth, 1);
   }
 
-  printOutPorts(os, "branch0", dataWidth, groupSize);
+  declareDataSignal(os, "branch0", dataWidth, groupSize);
+  declareHandshakeSignals(os, "branch0", dataWidth, groupSize);
 
   // Output valids from the priority arbiter
   os << "signal arbiter_out : std_logic_vector" << getRangeFromSize(groupSize)
@@ -170,18 +176,20 @@ void printVhdlImpl(mlir::raw_indented_ostream &os, const unsigned &dataWidth,
   // Output buffer output data
   for (unsigned i = 0; i < groupSize; i++) {
     std::string unitName = "out_buffer" + std::to_string(i);
-    printOutPorts(os, unitName, dataWidth, 1);
+    declareDataSignal(os, unitName, dataWidth, 1);
+    declareHandshakeSignals(os, unitName, dataWidth, 1);
   }
 
   // Out lazy fork output channels
   for (unsigned i = 0; i < groupSize; i++) {
-    printOutPorts(os, "out_fork" + std::to_string(i), dataWidth, 2);
+    declareDataSignal(os, "out_fork" + std::to_string(i), dataWidth, 2);
+    declareHandshakeSignals(os, "out_fork" + std::to_string(i), dataWidth, 2);
   }
 
   // Credit output channels
   for (unsigned i = 0; i < groupSize; i++) {
     std::string unitName = "credit" + std::to_string(i);
-    printOutPorts(os, unitName, dataWidth, 1);
+    declareHandshakeSignals(os, unitName, dataWidth, 1);
   }
 
   os << "begin\n\n";
