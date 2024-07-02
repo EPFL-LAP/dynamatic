@@ -91,32 +91,33 @@ VisualDataflow::VisualDataflow() = default;
 
 void VisualDataflow::start(const godot::String &inputDOTFile,
                            const godot::String &inputCSVFile) {
-
   cycleLabel = (Label *)get_node_internal(
       NodePath("CanvasLayer/Timeline/MarginContainer/VBoxContainer/"
                "HBoxContainer/CycleNumber"));
   cycleSlider = (HSlider *)get_node_internal(
       NodePath("CanvasLayer/Timeline/MarginContainer/VBoxContainer/HSlider"));
-  createGraph(inputDOTFile.utf8().get_data(), inputCSVFile.utf8().get_data());
-  cycleSlider->set_max(graph.getCycleEdgeStates().size() - 1);
-  drawGraph();
-  changeCycle(0);
+  if (failed(createGraph(inputDOTFile.utf8().get_data(),
+                         inputCSVFile.utf8().get_data()))) {
+    llvm::errs() << "Failed to create graph\n";
+  } else {
+    cycleSlider->set_max(graph.getCycleEdgeStates().size() - 1);
+    drawGraph();
+    changeCycle(0);
+  }
 }
 
-void VisualDataflow::createGraph(std::string inputDOTFile,
-                                 std::string inputCSVFile) {
-
+LogicalResult VisualDataflow::createGraph(std::string inputDOTFile,
+                                          std::string inputCSVFile) {
   GraphParser parser = GraphParser(&graph);
-
   if (failed(parser.parse(inputDOTFile))) {
     UtilityFunctions::printerr("Failed to parse the graph");
-    return;
+    return failure();
   }
-
   if (failed(parser.parse(inputCSVFile))) {
     UtilityFunctions::printerr("Failed to parse the graphs transitions");
-    return;
+    return failure();
   }
+  return success();
 }
 
 void VisualDataflow::drawBBs() {

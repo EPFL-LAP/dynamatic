@@ -16,19 +16,14 @@
 #include "DOTReformat.h"
 #include "Graph.h"
 #include "MLIRMapper.h"
-#include "dynamatic/Support/TimingModels.h"
 #include "mlir/Dialect/Func/IR/FuncOps.h"
 #include "mlir/Dialect/LLVMIR/LLVMDialect.h"
 #include "mlir/Dialect/MemRef/IR/MemRef.h"
 #include "mlir/IR/BuiltinOps.h"
-#include "mlir/IR/MLIRContext.h"
 #include "mlir/Parser/Parser.h"
-#include "llvm/Support/CommandLine.h"
-#include "llvm/Support/InitLLVM.h"
 #include "llvm/Support/SourceMgr.h"
 #include <cstdio>
 #include <fstream>
-#include <iostream>
 
 using namespace llvm;
 using namespace mlir;
