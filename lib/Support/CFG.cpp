@@ -288,7 +288,7 @@ BBtoArcsMap dynamatic::getBBPredecessorArcs(handshake::FuncOp funcOp) {
   // self-edges, and save them in a map from the Endpoints to the edges
   funcOp->walk([&](Operation *op) {
     for (CFGEdge &edge : op->getOpOperands()) {
-      BBEndpoints endpoints;
+      BBEndpoints endpoints = {0, 0};
       // Store the edge if it is a Backedge or connects two different BBs
       if (isBackedge(edge.get(), op, &endpoints) ||
           endpoints.srcBB != endpoints.dstBB) {

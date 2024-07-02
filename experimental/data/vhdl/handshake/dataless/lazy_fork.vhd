@@ -22,10 +22,19 @@ begin
   genericAnd : entity work.and_n generic map (SIZE)
     port map(outs_ready, allnReady);
 
-  valids : process (ins_valid, outs_ready, allnReady)
+  valids : process (ins_valid, outs_ready)
+    variable tmp_ready : std_logic_vector(SIZE - 1 downto 0);
   begin
-    for i in 0 to SIZE - 1 loop
-      outs_valid(i) <= ins_valid and allnReady;
+    for i in tmp_ready'range loop
+      tmp_ready(i) := '1';
+      for j in outs_ready'range loop
+        if i /= j then
+          tmp_ready(i) := (tmp_ready(i) and outs_ready(j));
+        end if;
+      end loop;
+    end loop;
+    for i in outs_valid'range loop
+      outs_valid(i) <= ins_valid and tmp_ready(i);
     end loop;
   end process;
 
