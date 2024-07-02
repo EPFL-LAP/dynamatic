@@ -22,25 +22,24 @@ entity cond_br_dataless is
 end entity;
 
 architecture arch of cond_br_dataless is
-  signal joinValid, brReady : std_logic;
+  signal branchInputs_valid, branch_ready : std_logic;
 begin
-
-  j : entity work.join(arch) generic map(2)
+  join : entity work.join(arch)
+    generic map(
+      SIZE => 2
+    )
     port map(
-    ins_valid(0) => data_valid,
-    ins_valid(1) => condition_valid,
-    outs_ready => brReady,
-    outs_valid => joinValid,
-    ins_ready(0) => data_ready, 
-    ins_ready(1) => condition_ready);
+      -- input channels
+      ins_valid(0) => data_valid,
+      ins_valid(1) => condition_valid,
+      ins_ready(0) => data_ready,
+      ins_ready(1) => condition_ready,
+      -- output channel
+      outs_valid => branchInputs_valid,
+      outs_ready => branch_ready
+    );
 
-  cond_brp : entity work.branch_simple(arch)
-    port map(
-      condition => condition(0),
-      valid => joinValid,
-      trueOut_ready => trueOut_ready,
-      falseOut_ready => falseOut_ready,
-      trueOut_valid => trueOut_valid,
-      falseOut_valid => falseOut_valid,
-      ins_ready => brReady);
+  trueOut_valid  <= condition(0) and branchInputs_valid;
+  falseOut_valid <= (not condition(0)) and branchInputs_valid;
+  branch_ready   <= (falseOut_ready and not condition(0)) or (trueOut_ready and condition(0));
 end architecture;

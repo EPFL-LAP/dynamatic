@@ -18,31 +18,32 @@ entity fork_dataless is
 end entity;
 
 architecture arch of fork_dataless is
-  signal forkStop          : std_logic;
-  signal nStopArray        : std_logic_vector(SIZE - 1 downto 0);
-  signal blockStopArray    : std_logic_vector(SIZE - 1 downto 0);
-  signal anyBlockStop      : std_logic;
-  signal pValidAndForkStop : std_logic;
+  signal blockStopArray : std_logic_vector(SIZE - 1 downto 0);
+  signal anyBlockStop   : std_logic;
+  signal backpressure   : std_logic;
 begin
-  wrapper : process (forkStop, outs_ready)
-  begin
-    ins_ready <= not forkStop;
-    for i in 0 to SIZE - 1 loop
-      nStopArray(i) <= not outs_ready(i);
-    end loop;
-  end process;
+  anyBlockFull : entity work.or_n generic map (SIZE)
+    port map(
+      blockStopArray,
+      anyBlockStop
+    );
 
-  genericOr : entity work.or_n generic map (SIZE) port map(blockStopArray, anyBlockStop);
-  forkStop          <= anyBlockStop;
-  pValidAndForkStop <= ins_valid and forkStop;
+  ins_ready    <= not anyBlockStop;
+  backpressure <= ins_valid and anyBlockStop;
 
   generateBlocks : for i in SIZE - 1 downto 0 generate
     regblock : entity work.eager_fork_register_block(arch)
       port map(
-        clk, rst,
-        ins_valid, nStopArray(i),
-        pValidAndForkStop,
-        outs_valid(i), blockStopArray(i));
+        -- inputs
+        clk          => clk,
+        rst          => rst,
+        ins_valid    => ins_valid,
+        outs_ready   => outs_ready(i),
+        backpressure => backpressure,
+        -- outputs
+        outs_valid => outs_valid(i),
+        blockStop  => blockStopArray(i)
+      );
   end generate;
 
 end architecture;
