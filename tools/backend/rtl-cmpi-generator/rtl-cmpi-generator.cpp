@@ -45,9 +45,9 @@ static cl::opt<std::string>
 static StringRef getComparator(arith::CmpIPredicate pred) {
   switch (pred) {
   case arith::CmpIPredicate::eq:
-    return "==";
+    return "=";
   case arith::CmpIPredicate::ne:
-    return "!=";
+    return "/=";
   case arith::CmpIPredicate::slt:
   case arith::CmpIPredicate::ult:
     return "<";
