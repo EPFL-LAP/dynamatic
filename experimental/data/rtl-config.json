@@ -360,7 +360,7 @@
     ],
     "generic": "$DYNAMATIC/experimental/data/vhdl/handshake/dataless/cond_br.vhd",
     "module-name": "cond_br_dataless",
-    "dependencies": ["join", "branch_simple"]
+    "dependencies": ["join"]
   },
   {
     "name": "handshake.cond_br",
@@ -525,9 +525,6 @@
   {
     "generic": "$DYNAMATIC/experimental/data/vhdl/support/dataless/elastic_fifo_inner.vhd",
     "module-name": "elastic_fifo_inner_dataless"
-  },
-  {
-    "generic": "$DYNAMATIC/experimental/data/vhdl/support/branch_simple.vhd"
   },
   {
     "generic": "$DYNAMATIC/experimental/data/vhdl/support/logic.vhd"
