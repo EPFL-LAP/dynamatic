@@ -15,28 +15,28 @@
 //===----------------------------------------------------------------------===//
 
 #include "experimental/Support/BooleanLogic/Lexer.h"
+#include "mlir/Support/LogicalResult.h"
 #include "llvm/Support/raw_ostream.h"
 #include <string>
-#include <utility>
 #include <vector>
 
 using namespace llvm;
+using namespace mlir;
 using namespace dynamatic::experimental::boolean;
 
 // Function for reporting syntax errors encountered during lexical analysis.
-void dynamatic::experimental::boolean::syntaxError() {
-  llvm::errs() << "Syntax error in expression!\n";
+void dynamatic::experimental::boolean::syntaxError(char current) {
+  llvm::errs() << "Syntax error in expression! Invalid character " << current
+               << '\n';
 }
 
-LexicalAnalyzer::LexicalAnalyzer(std::string exp) {
-  expression = std::move(exp);
-}
+LexicalAnalyzer::LexicalAnalyzer(StringRef exp) : expression(exp) {}
 
 // The function tokenize processes a string expression, skipping whitespace and
 // identifying variable tokens from letter-digit sequences. It creates tokens
 // for operators and parentheses, storing all tokens in tokenList. An end token
 // is added to mark the completion of tokenization.
-void LexicalAnalyzer::tokenize() {
+mlir::LogicalResult LexicalAnalyzer::tokenize() {
   size_t position = 0;
   while (position < expression.length()) {
     char current = expression[position];
@@ -50,7 +50,7 @@ void LexicalAnalyzer::tokenize() {
       while (idIndex < expression.length() && isdigit(expression[idIndex]))
         idIndex++;
       std::string id = expression.substr(position, idIndex - position);
-      Token token(id, TokenType::VariableToken);
+      Token token(id, TokenType::VARIABLE_TOKEN);
       tokenList.push_back(token);
       position = idIndex;
 
@@ -61,28 +61,29 @@ void LexicalAnalyzer::tokenize() {
       switch (current) {
       case '.':
       case '&':
-        token.tokenType = TokenType::AndToken;
+        token.tokenType = TokenType::AND_TOKEN;
         break;
       case '+':
       case '|':
-        token.tokenType = TokenType::OrToken;
+        token.tokenType = TokenType::OR_TOKEN;
         break;
       case '~':
       case '!':
-        token.tokenType = TokenType::NotToken;
+        token.tokenType = TokenType::NOT_TOKEN;
         break;
       case '(':
-        token.tokenType = TokenType::LparenToken;
+        token.tokenType = TokenType::LPAREN_TOKEN;
         break;
       case ')':
-        token.tokenType = TokenType::RparenToken;
+        token.tokenType = TokenType::RPAREN_TOKEN;
         break;
       case '0':
       case '1':
-        token.tokenType = TokenType::VariableToken;
+        token.tokenType = TokenType::VARIABLE_TOKEN;
         break;
       default:
-        syntaxError();
+        syntaxError(current);
+        return failure();
       }
       tokenList.push_back(token);
       position++;
@@ -90,13 +91,14 @@ void LexicalAnalyzer::tokenize() {
   }
   Token endToken;
   tokenList.push_back(endToken);
+  return success();
 }
 
 Token LexicalAnalyzer::getToken() {
   Token token;
   if (index < tokenList.size()) {
     token = tokenList[index];
-    index = index + 1;
+    ++index;
   }
   return token;
 }

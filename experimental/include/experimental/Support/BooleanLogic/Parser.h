@@ -23,28 +23,23 @@ namespace dynamatic {
 namespace experimental {
 namespace boolean {
 
-enum class StackNodeType : int { Expr, Term };
-
 // The StackNode struct represents elements in the parsing stack,
 // which can be either expressions or terms (tokens).
 struct StackNode {
-  StackNodeType type;
-  union {
-    BoolExpression *expr;
-    Token term;
-  };
+  BoolExpression *expr;
+  Token term;
 
   // Constructors
-  StackNode() : type(StackNodeType::Expr), expr(nullptr){};
+  StackNode(Token tt) : term(std::move(tt)){};
 
-  StackNode(StackNodeType t, Token tt) : type(t), term(std::move(tt)){};
-
-  StackNode(StackNodeType t, BoolExpression *e) : type(t), expr(e){};
+  StackNode(BoolExpression *e) : expr(e){};
 
   ~StackNode() {
-    if (type == StackNodeType::Expr && expr != nullptr)
+    if (expr != nullptr)
       delete expr;
   }
+
+  void printError();
 };
 
 // The Parser class provides
@@ -60,7 +55,7 @@ public:
   BoolExpression *parseSop();
 
   // Constructor
-  Parser(std::string s);
+  Parser(llvm::StringRef s);
 
 private:
   // This function ensures the correct terminal node is used for precedence

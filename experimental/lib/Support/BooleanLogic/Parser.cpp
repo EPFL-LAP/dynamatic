@@ -18,45 +18,57 @@
 #include "experimental/Support/BooleanLogic/Parser.h"
 #include "experimental/Support/BooleanLogic/BoolExpression.h"
 #include "experimental/Support/BooleanLogic/Lexer.h"
+#include "mlir/Support/LogicalResult.h"
+#include "llvm/Support/raw_ostream.h"
 #include <array>
 #include <cassert>
 
 using namespace dynamatic::experimental::boolean;
 
-enum class Compare : int { lessThan, greaterThan, equal, error, accept };
+void StackNode::printError() {
+  llvm::errs() << "Operator precedence logial error at ";
+  if (expr)
+    expr->print();
+  else
+    llvm::errs() << term.lexeme << "\n";
+}
 
-// Define the static constexpr precedence table
+enum class Compare { LESS_THAN, GREATER_THAN, EQUAL, ERROR, ACCEPT };
+
+// Define the static constexpr precedence tableS
 static constexpr std::array<std::array<Compare, 7>, 7> PRECEDENCE_TABLE = {
-    {{Compare::greaterThan, Compare::greaterThan, Compare::greaterThan,
-      Compare::lessThan, Compare::greaterThan, Compare::lessThan,
-      Compare::greaterThan},
-     {Compare::lessThan, Compare::greaterThan, Compare::greaterThan,
-      Compare::lessThan, Compare::greaterThan, Compare::lessThan,
-      Compare::greaterThan},
-     {Compare::lessThan, Compare::lessThan, Compare::greaterThan,
-      Compare::lessThan, Compare::greaterThan, Compare::lessThan,
-      Compare::greaterThan},
-     {Compare::lessThan, Compare::lessThan, Compare::lessThan,
-      Compare::lessThan, Compare::equal, Compare::lessThan, Compare::error},
-     {Compare::greaterThan, Compare::greaterThan, Compare::greaterThan,
-      Compare::error, Compare::greaterThan, Compare::error,
-      Compare::greaterThan},
-     {Compare::greaterThan, Compare::greaterThan, Compare::greaterThan,
-      Compare::error, Compare::greaterThan, Compare::error,
-      Compare::greaterThan},
-     {Compare::lessThan, Compare::lessThan, Compare::lessThan,
-      Compare::lessThan, Compare::error, Compare::lessThan, Compare::accept}}};
+    {{Compare::GREATER_THAN, Compare::GREATER_THAN, Compare::GREATER_THAN,
+      Compare::LESS_THAN, Compare::GREATER_THAN, Compare::LESS_THAN,
+      Compare::GREATER_THAN},
+     {Compare::LESS_THAN, Compare::GREATER_THAN, Compare::GREATER_THAN,
+      Compare::LESS_THAN, Compare::GREATER_THAN, Compare::LESS_THAN,
+      Compare::GREATER_THAN},
+     {Compare::LESS_THAN, Compare::LESS_THAN, Compare::GREATER_THAN,
+      Compare::LESS_THAN, Compare::GREATER_THAN, Compare::LESS_THAN,
+      Compare::GREATER_THAN},
+     {Compare::LESS_THAN, Compare::LESS_THAN, Compare::LESS_THAN,
+      Compare::LESS_THAN, Compare::EQUAL, Compare::LESS_THAN, Compare::ERROR},
+     {Compare::GREATER_THAN, Compare::GREATER_THAN, Compare::GREATER_THAN,
+      Compare::ERROR, Compare::GREATER_THAN, Compare::ERROR,
+      Compare::GREATER_THAN},
+     {Compare::GREATER_THAN, Compare::GREATER_THAN, Compare::GREATER_THAN,
+      Compare::ERROR, Compare::GREATER_THAN, Compare::ERROR,
+      Compare::GREATER_THAN},
+     {Compare::LESS_THAN, Compare::LESS_THAN, Compare::LESS_THAN,
+      Compare::LESS_THAN, Compare::ERROR, Compare::LESS_THAN,
+      Compare::ACCEPT}}};
 
 // returns a dynamically-allocated variable
 BoolExpression *dynamatic::experimental::boolean::constructNodeOperator(
     StackNode *operate, StackNode *s1, StackNode *s2) {
-  assert(operate != nullptr && s1 != nullptr && s2 != nullptr);
+  assert((operate && s1 && s2) &&
+         "cannot construct operator node with missing operand");
   Token t = operate->term;
   ExpressionType oo;
-  if (t.tokenType == TokenType::AndToken)
-    oo = ExpressionType::And;
+  if (t.tokenType == TokenType::AND_TOKEN)
+    oo = ExpressionType::AND;
   else
-    oo = ExpressionType::Or;
+    oo = ExpressionType::OR;
   BoolExpression *e1 = s1->expr;
   BoolExpression *e2 = s2->expr;
   return new Operator(oo, e1, e2);
@@ -65,52 +77,51 @@ BoolExpression *dynamatic::experimental::boolean::constructNodeOperator(
 // returns a dynamically-allocated variable
 BoolExpression *
 dynamatic::experimental::boolean::constructNodeNegator(StackNode *s1) {
-  assert(s1 != nullptr);
-  return new Operator(ExpressionType::Not, nullptr, s1->expr);
+  assert(s1 && "cannot negate null node");
+  return new Operator(ExpressionType::NOT, nullptr, s1->expr);
 }
 
 // returns a dynamically-allocated variable
 StackNode *dynamatic::experimental::boolean::termToExpr(StackNode *s) {
-  assert(s != nullptr);
-  ExpressionType t = ExpressionType::Variable;
+  assert(s && "cannot convert a null term to an expression");
+  ExpressionType t = ExpressionType::VARIABLE;
   if (s->term.lexeme == "0")
-    t = ExpressionType::Zero;
+    t = ExpressionType::ZERO;
   if (s->term.lexeme == "1")
-    t = ExpressionType::One;
-  return new StackNode(StackNodeType::Expr, new SingleCond(t, s->term.lexeme));
+    t = ExpressionType::ONE;
+  return new StackNode(new SingleCond(t, s->term.lexeme));
 }
 
 // returns a dynamically-allocated variable
 StackNode *dynamatic::experimental::boolean::constructTermStackNode(Token t) {
-  return new StackNode(StackNodeType::Term, std::move(t));
+  return new StackNode(std::move(t));
 }
 
 // returns a dynamically-allocated variable
 StackNode *dynamatic::experimental::boolean::constructOperatorStackNode(
     StackNode *operate, StackNode *s1, StackNode *s2) {
-  return new StackNode(StackNodeType::Expr,
-                       constructNodeOperator(operate, s1, s2));
+  return new StackNode(constructNodeOperator(operate, s1, s2));
 }
 
 // returns a dynamically-allocated variable
 StackNode *
 dynamatic::experimental::boolean::constructNegatorStackNode(StackNode *s1) {
-  return new StackNode(StackNodeType::Expr, constructNodeNegator(s1));
+  return new StackNode(constructNodeNegator(s1));
 }
 
 StackNode *
 dynamatic::experimental::boolean::reduce(std::stack<StackNode *> stack) {
   // Case 1: Handling parentheses: expr --> ( expr )
   if (stack.size() == 3 &&
-      (stack.top()->type == StackNodeType::Term &&
-       stack.top()->term.tokenType == TokenType::LparenToken)) {
+      (!stack.top()->expr &&
+       stack.top()->term.tokenType == TokenType::LPAREN_TOKEN)) {
     stack.pop();
     StackNode *ex = stack.top();
     stack.pop();
-    if (stack.top()->type == StackNodeType::Term &&
-        stack.top()->term.tokenType == TokenType::RparenToken)
+    if (!stack.top()->expr &&
+        stack.top()->term.tokenType == TokenType::RPAREN_TOKEN)
       return ex;
-    syntaxError();
+    stack.top()->printError();
     return nullptr;
   }
 
@@ -126,9 +137,8 @@ dynamatic::experimental::boolean::reduce(std::stack<StackNode *> stack) {
   }
 
   // Case 3: Handling negation: expr -> NOT expr
-  if (stack.size() == 2 &&
-      (stack.top()->type == StackNodeType::Term &&
-       stack.top()->term.tokenType == TokenType::NotToken)) {
+  if (stack.size() == 2 && (!stack.top()->expr && stack.top()->term.tokenType ==
+                                                      TokenType::NOT_TOKEN)) {
     stack.pop();
     StackNode *ex = stack.top();
     return constructNegatorStackNode(ex);
@@ -136,30 +146,30 @@ dynamatic::experimental::boolean::reduce(std::stack<StackNode *> stack) {
 
   // Case 4: Handling single variable: expr -> variable
   if (stack.size() == 1 &&
-      stack.top()->term.tokenType == TokenType::VariableToken) {
+      stack.top()->term.tokenType == TokenType::VARIABLE_TOKEN) {
     return termToExpr(stack.top());
   }
 
   // If none of the above cases match, it's a syntax error
-  syntaxError();
+  if (stack.size() > 0)
+    stack.top()->printError();
   return nullptr;
 }
 
-Parser::Parser(std::string s) {
-  lexer = LexicalAnalyzer(std::move(s));
-  lexer.tokenize();
-};
+Parser::Parser(llvm::StringRef s) { lexer = LexicalAnalyzer(s); };
 
 StackNode *Parser::terminalPeek(std::vector<StackNode *> stack) {
-  if (stack.at(stack.size() - 1)->type == StackNodeType::Term)
+  if (!stack.at(stack.size() - 1)->expr)
     return stack.at(stack.size() - 1);
-  if (stack.at(stack.size() - 2)->type == StackNodeType::Term)
+  if (!stack.at(stack.size() - 2)->expr)
     return stack.at(stack.size() - 2);
-  syntaxError();
+  stack.at(0)->printError();
   return nullptr;
 }
 
 BoolExpression *Parser::parseSop() {
+  if (mlir::failed(lexer.tokenize()))
+    return nullptr;
   std::vector<StackNode *> stack;
   Token start;
   stack.push_back(constructTermStackNode(start));
@@ -170,45 +180,46 @@ BoolExpression *Parser::parseSop() {
 
     // Peek at the top terminal node in the stack.
     StackNode *s2 = terminalPeek(stack);
-    if (s2 == nullptr)
+    if (!s2)
       return nullptr;
     Token t2 = s2->term;
     int type2 = static_cast<int>(t2.tokenType);
 
     // Compare the precedence of the current top token with the next token.
-    if (PRECEDENCE_TABLE[type2][type1] == Compare::lessThan ||
-        PRECEDENCE_TABLE[type2][type1] == Compare::equal) {
+    if (PRECEDENCE_TABLE[type2][type1] == Compare::LESS_THAN ||
+        PRECEDENCE_TABLE[type2][type1] == Compare::EQUAL) {
       Token t3 = lexer.getToken();
       stack.push_back(constructTermStackNode(t3));
-    } else if (PRECEDENCE_TABLE[type2][type1] == Compare::greaterThan) {
+    } else if (PRECEDENCE_TABLE[type2][type1] == Compare::GREATER_THAN) {
       std::stack<StackNode *> rhs;
       StackNode *lastPoppedTerminal = terminalPeek(stack);
 
       // Pop nodes from the stack until the precedence condition is met.
-      while (stack.at(stack.size() - 1)->type != StackNodeType::Term ||
+      while (stack.at(stack.size() - 1)->expr ||
              PRECEDENCE_TABLE[static_cast<int>(
                  ((stack.at(stack.size() - 1))->term).tokenType)]
                              [static_cast<int>(
                                  (lastPoppedTerminal->term).tokenType)] !=
-                 Compare::lessThan) {
+                 Compare::LESS_THAN) {
         StackNode *s = stack.at(stack.size() - 1);
         stack.pop_back();
 
-        if (s->type == StackNodeType::Term)
+        if (!s->expr)
           lastPoppedTerminal = s;
 
         rhs.push(s);
       }
       // Reduce the right-hand side nodes into a single node.
       StackNode *reduced = reduce(rhs);
-      if (reduced == nullptr)
+      if (!reduced)
         return nullptr;
 
       stack.push_back(reduced);
-    } else if (PRECEDENCE_TABLE[type2][type1] == Compare::accept) {
+    } else if (PRECEDENCE_TABLE[type2][type1] == Compare::ACCEPT) {
       return stack.at(1)->expr; // Return the root of the expression tree.
     } else {
-      syntaxError();
+      llvm::errs() << "Operator precedence logial error at " << t1.lexeme
+                   << "n";
       return nullptr;
     }
   }

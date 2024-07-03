@@ -16,6 +16,8 @@
 #ifndef EXPERIMENTAL_SUPPORT_BOOLEANLOGIC_LEXER_H
 #define EXPERIMENTAL_SUPPORT_BOOLEANLOGIC_LEXER_H
 
+#include "mlir/Support/LogicalResult.h"
+#include "llvm/ADT/StringRef.h"
 #include <string>
 #include <utility>
 #include <vector>
@@ -25,14 +27,14 @@ namespace experimental {
 namespace boolean {
 
 // Enumeration defining the types of tokens in the boolean logic expressions.
-enum class TokenType : int {
-  NotToken,
-  AndToken,
-  OrToken,
-  LparenToken,
-  RparenToken,
-  VariableToken,
-  EndToken
+enum class TokenType {
+  NOT_TOKEN,
+  AND_TOKEN,
+  OR_TOKEN,
+  LPAREN_TOKEN,
+  RPAREN_TOKEN,
+  VARIABLE_TOKEN,
+  END_TOKEN
 };
 
 // Struct representing an individual token, consisting of a lexeme and a token
@@ -43,23 +45,23 @@ struct Token {
 
   // Default constructor initializing lexeme to empty string and token type to
   // EndToken.
-  Token() : lexeme(""), tokenType(TokenType::EndToken) {}
+  Token() : tokenType(TokenType::END_TOKEN) {}
 
   // Constructor initializing lexeme and token type.
   Token(std::string l, TokenType r) : lexeme(std::move(l)), tokenType(r) {}
 };
 
 // Function for reporting syntax errors encountered during lexical analysis.
-void syntaxError();
+void syntaxError(char current);
 
 // Class representing the Lexical Analyzer for boolean logic expressions.
 class LexicalAnalyzer {
 public:
   // Constructor to initialize the lexical analyzer with an input string.
-  LexicalAnalyzer(std::string expression = "");
+  LexicalAnalyzer(llvm::StringRef exp = "");
 
   // tokenize the string
-  void tokenize();
+  mlir::LogicalResult tokenize();
 
   // retrieve the next token from the token list.
   Token getToken();

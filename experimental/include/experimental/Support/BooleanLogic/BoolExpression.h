@@ -8,12 +8,20 @@
 //
 // This file defines the datastrucure BoolExpression to represent a boolean
 // logical expresion as a tree.
+// This also defines the interface for the library that handles boolean
+// logic expressions.
+// It includes functions for propagating negation through a tree using
+// DeMorgan's law, and creating boolean expressions. Additionally, it provides
+// functions to interact with the Espresso logic minimizer tool. The library
+// supports basic operations on boolean expressions such as AND, OR, and
+// negation.
 //
 //===----------------------------------------------------------------------===//
 
 #ifndef EXPERIMENTAL_SUPPORT_BOOLEANLOGIC_BOOLEXPRESSION_H
 #define EXPERIMENTAL_SUPPORT_BOOLEANLOGIC_BOOLEXPRESSION_H
 
+#include "llvm/ADT/StringRef.h"
 #include <map>
 #include <set>
 #include <string>
@@ -31,7 +39,7 @@ namespace boolean {
 // Boolean Expressions, it's not present. The NOT operator is only used in the
 // parsig procedure and is then removed from the BoolExpression by the function
 // propagateNegation which propagates a NOT operator by applying DeMorgan's Law.
-enum class ExpressionType : int { Variable, Or, And, Not, Zero, One, End };
+enum class ExpressionType { VARIABLE, OR, AND, NOT, ZERO, ONE, END };
 
 // recursie function that replaces don't cares with 0 and 1
 void replaceDontCaresRec(std::string s, std::set<std::string> &minterms);
@@ -52,9 +60,6 @@ struct BoolExpression {
   // Function to convert a BoolExpression tree into its string representation
   std::string toString();
 
-  // recursive helper function for getVariables()
-  void getVariablesRec(std::set<std::string> &s);
-
   // function that gets all the variables inside a BoolExpression
   std::set<std::string> getVariables();
 
@@ -62,20 +67,58 @@ struct BoolExpression {
 
   // Function that generates the minterms based n the variables
   void generateMintermVariable(std::string &s,
-                               std::map<std::string, int> varIndex);
+                               std::map<llvm::StringRef, int> varIndex);
 
   // Function that generates the minterms of a specfic AND node
   void generateMintermAnd(std::string &s,
-                          const std::map<std::string, int> &varIndex);
+                          const std::map<llvm::StringRef, int> &varIndex);
 
   // Function that generates the minterms of a BoolExpression
-  void generateMintermsOr(int numOfVariables,
-                          const std::map<std::string, int> &varIndex,
+  void generateMintermsOr(unsigned numOfVariables,
+                          const std::map<llvm::StringRef, int> &varIndex,
                           std::set<std::string> &minterms);
 
   // Fuction that generates the truth table for a BoolExpression based on the
   // minterms generated in generateMinterms
   std::set<std::string> generateTruthTable();
+
+  //--------------Library Helper Functions--------------
+
+  // Recursive function that propagates a not operator in a BoolExpression tree
+  // by applying DeMorgan's law
+  BoolExpression *propagateNegation(bool negated);
+
+  // function to run espresso logic minimzer on a BoolExpression
+  std::string runEspresso();
+
+  //--------------Library APIs--------------
+
+  // Convert String to BoolExpression
+  // parses an expression such as c1. c2.c1+~c3 . c1 + c4. ~c1 and stores it in
+  // the tree structure
+  static BoolExpression *parseSop(llvm::StringRef strSop);
+
+  // Convert BoolExpression to String
+  std::string sopToString();
+
+  // Create an expression of a single variable
+  static BoolExpression *boolVar(std::string id);
+
+  // AND two expressions
+  static BoolExpression *boolAnd(BoolExpression *exp1, BoolExpression *exp2);
+
+  // OR two expressions
+  static BoolExpression *boolOr(BoolExpression *exp1, BoolExpression *exp2);
+
+  // Negate an expression (apply DeMorgan's law)
+  BoolExpression *boolNegate();
+
+  // Minimize an expression based on the espresso logic minimizer algorithm
+  BoolExpression *boolMinimize();
+
+private:
+  // recursive helper function for getVariables()
+  void getVariablesRec(std::set<std::string> &s);
 };
 
 // This struct is specifically for operators: And, Or, Not
