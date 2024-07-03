@@ -1126,9 +1126,32 @@ def SharingWrapperOp : Handshake_Op<"sharing_wrapper", [
 SameOperandsAndResultType
 ]> {
 
-  let summary = "sharing wrapper operation"; let description = [{
-    The sharing_wrapper operation represents the selecting & distributing logic
-    that wraps around a functional unit.}];
+  let summary = "sharing wrapper operation";
+  let description = [{
+    The sharing_wrapper operation represents the selecting & distributing logic 
+    that manages access to a shared unit.
+    
+    The sharing wrapper interfaces with the shared unit and the rest of the
+    circuit.
+    
+    The convention for the input operands:
+    - the first "numSharedOperands * len(credits)" operands are the operands
+      from the circuit
+    - the last operand is the result computed by the shared unit
+    
+    The convention for the output results:
+    - the first "len(credits)" results are results dispatched to the rest of the
+      circuit
+    - the last "numSharedOperands" result is the selected operands that will be
+      delivered to the shared unit.
+    
+    Future improvement:
+    - Add the number of operations that share the unit (now it is assumed to be
+      the size of the DenseI64ArrayAttr credits).
+    - More verbose separations between the operands/results that interface with
+      the rest of the circuit or interface with the shared unit (i.e., add a
+      custom interface printing for different operand/result types).
+    }];
 
   let arguments = (ins Variadic<AnyType> : $dataOperands,
     AnyType : $sharedOpResult,
