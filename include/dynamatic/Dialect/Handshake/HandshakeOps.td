@@ -1133,6 +1133,13 @@ SameOperandsAndResultType
     
     The sharing wrapper interfaces with the shared unit and the rest of the
     circuit.
+
+    Attributes:
+    - $credits: an array of integers that indicates, each integer indicates the
+      maximum number of in-flight accesses in the shared resource of one
+      operation that share the unit.
+    - $numSharedOperands: the number of operands of the shared unit.
+    - $latency: the execution latency of the shared unit.
     
     The convention for the input operands:
     - the first "numSharedOperands * len(credits)" operands are the operands
