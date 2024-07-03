@@ -66,9 +66,9 @@ BoolExpression *dynamatic::experimental::boolean::constructNodeOperator(
   Token t = operate->term;
   ExpressionType oo;
   if (t.tokenType == TokenType::AND_TOKEN)
-    oo = ExpressionType::AND;
+    oo = ExpressionType::And;
   else
-    oo = ExpressionType::OR;
+    oo = ExpressionType::Or;
   BoolExpression *e1 = s1->expr;
   BoolExpression *e2 = s2->expr;
   return new Operator(oo, e1, e2);
@@ -78,17 +78,17 @@ BoolExpression *dynamatic::experimental::boolean::constructNodeOperator(
 BoolExpression *
 dynamatic::experimental::boolean::constructNodeNegator(StackNode *s1) {
   assert(s1 && "cannot negate null node");
-  return new Operator(ExpressionType::NOT, nullptr, s1->expr);
+  return new Operator(ExpressionType::Not, nullptr, s1->expr);
 }
 
 // returns a dynamically-allocated variable
 StackNode *dynamatic::experimental::boolean::termToExpr(StackNode *s) {
   assert(s && "cannot convert a null term to an expression");
-  ExpressionType t = ExpressionType::VARIABLE;
+  ExpressionType t = ExpressionType::Variable;
   if (s->term.lexeme == "0")
-    t = ExpressionType::ZERO;
+    t = ExpressionType::Zero;
   if (s->term.lexeme == "1")
-    t = ExpressionType::ONE;
+    t = ExpressionType::One;
   return new StackNode(new SingleCond(t, s->term.lexeme));
 }
 

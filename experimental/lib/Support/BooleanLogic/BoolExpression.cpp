@@ -18,6 +18,7 @@
 //===----------------------------------------------------------------------===//
 
 #include "experimental/Support/BooleanLogic/BoolExpression.h"
+#include "dynamatic/Support/Espresso/main.h"
 #include "experimental/Support/BooleanLogic/Parser.h"
 #include "llvm/Support/raw_ostream.h"
 #include <set>
@@ -31,37 +32,37 @@ using namespace llvm;
 std::string BoolExpression::toString() {
   std::string s;
 
-  if (type == ExpressionType::AND || type == ExpressionType::OR) {
+  if (type == ExpressionType::And || type == ExpressionType::Or) {
     Operator *op = static_cast<Operator *>(this);
     if (op->left)
       s += op->left->toString();
   }
 
   switch (type) {
-  case ExpressionType::VARIABLE: {
+  case ExpressionType::Variable: {
     SingleCond *singleCond = static_cast<SingleCond *>(this);
     if (singleCond->isNegated)
       s += "~";
     s += singleCond->id;
     break;
   }
-  case ExpressionType::ONE:
+  case ExpressionType::One:
     s += "1";
     break;
-  case ExpressionType::ZERO:
+  case ExpressionType::Zero:
     s += "0";
     break;
-  case ExpressionType::OR:
+  case ExpressionType::Or:
     s += " + ";
     break;
-  case ExpressionType::AND:
+  case ExpressionType::And:
     s += " . ";
     break;
   default:
     break;
   }
 
-  if (type == ExpressionType::AND || type == ExpressionType::OR) {
+  if (type == ExpressionType::And || type == ExpressionType::Or) {
     Operator *op = static_cast<Operator *>(this);
     if (op->right)
       s += op->right->toString();
@@ -71,10 +72,10 @@ std::string BoolExpression::toString() {
 }
 
 void BoolExpression::getVariablesRec(std::set<std::string> &s) {
-  if (type == ExpressionType::VARIABLE) {
+  if (type == ExpressionType::Variable) {
     SingleCond *cond = static_cast<SingleCond *>(this);
     s.insert(cond->id);
-  } else if (type == ExpressionType::AND || type == ExpressionType::OR) {
+  } else if (type == ExpressionType::And || type == ExpressionType::Or) {
     Operator *op = static_cast<Operator *>(this);
     if (op->left)
       op->left->getVariablesRec(s);
@@ -134,11 +135,11 @@ void BoolExpression::generateMintermVariable(
 
 void BoolExpression::generateMintermAnd(
     std::string &s, const std::map<StringRef, int> &varIndex) {
-  if (type == ExpressionType::VARIABLE) {
+  if (type == ExpressionType::Variable) {
     generateMintermVariable(s, varIndex);
-  } else if (type == ExpressionType::ZERO) { // 0 . exp =0 -> not a a minterm
+  } else if (type == ExpressionType::Zero) { // 0 . exp =0 -> not a a minterm
     s[0] = 'n';
-  } else if (type == ExpressionType::AND || type == ExpressionType::OR) {
+  } else if (type == ExpressionType::And || type == ExpressionType::Or) {
     Operator *op = static_cast<Operator *>(this);
     if (op->left)
       op->left->generateMintermAnd(s, varIndex);
@@ -150,16 +151,16 @@ void BoolExpression::generateMintermAnd(
 void BoolExpression::generateMintermsOr(
     unsigned numOfVariables, const std::map<StringRef, int> &varIndex,
     std::set<std::string> &minterms) {
-  if (type == ExpressionType::OR) {
+  if (type == ExpressionType::Or) {
     Operator *op = static_cast<Operator *>(this);
     if (op->left)
       op->left->generateMintermsOr(numOfVariables, varIndex, minterms);
     if (op->right)
       op->right->generateMintermsOr(numOfVariables, varIndex, minterms);
-  } else if (type == ExpressionType::ONE) { // 1 + exp = 1;
+  } else if (type == ExpressionType::One) { // 1 + exp = 1;
     std::string s(numOfVariables, 'd');
     minterms.insert(s);
-  } else if (type == ExpressionType::AND) {
+  } else if (type == ExpressionType::And) {
     std::string s(numOfVariables, 'd'); // initializing s
     generateMintermAnd(s, varIndex);
     // no null in the minterm -> minterm is valid
@@ -208,7 +209,7 @@ void BoolExpression::print(int space) {
   space += PRINTING_SPACE;
 
   // Process right child first
-  if (type == ExpressionType::OR || type == ExpressionType::AND) {
+  if (type == ExpressionType::Or || type == ExpressionType::And) {
     Operator *op = static_cast<Operator *>(this);
     op->right->print(space);
   }
@@ -219,23 +220,23 @@ void BoolExpression::print(int space) {
     llvm::errs() << " ";
 
   switch (type) {
-  case ExpressionType::VARIABLE: {
+  case ExpressionType::Variable: {
     SingleCond *singleCond = static_cast<SingleCond *>(this);
     if (singleCond->isNegated)
       llvm::errs() << "~";
     llvm::errs() << singleCond->id << "\n";
     break;
   }
-  case ExpressionType::ONE:
+  case ExpressionType::One:
     llvm::errs() << "1 \n";
     break;
-  case ExpressionType::ZERO:
+  case ExpressionType::Zero:
     llvm::errs() << "0 \n";
     break;
-  case ExpressionType::OR:
+  case ExpressionType::Or:
     llvm::errs() << "+ \n";
     break;
-  case ExpressionType::AND:
+  case ExpressionType::And:
     llvm::errs() << ". \n";
     break;
   default:
@@ -243,7 +244,7 @@ void BoolExpression::print(int space) {
   }
 
   // Process left child
-  if (type == ExpressionType::OR || type == ExpressionType::AND) {
+  if (type == ExpressionType::Or || type == ExpressionType::And) {
     Operator *op = static_cast<Operator *>(this);
     op->left->print(space);
   }
@@ -252,26 +253,26 @@ void BoolExpression::print(int space) {
 //--------------Library Helper Functions--------------
 
 BoolExpression *BoolExpression::propagateNegation(bool negated) {
-  if (this->type == ExpressionType::NOT) {
+  if (this->type == ExpressionType::Not) {
     Operator *op = static_cast<Operator *>(this);
     if (op->right)
       return op->right->propagateNegation(!negated);
   }
   if (negated) {
-    if (this->type == ExpressionType::AND) {
-      this->type = ExpressionType::OR;
-    } else if (this->type == ExpressionType::OR) {
-      this->type = ExpressionType::AND;
-    } else if (this->type == ExpressionType::VARIABLE) {
+    if (this->type == ExpressionType::And) {
+      this->type = ExpressionType::Or;
+    } else if (this->type == ExpressionType::Or) {
+      this->type = ExpressionType::And;
+    } else if (this->type == ExpressionType::Variable) {
       SingleCond *singleCond = static_cast<SingleCond *>(this);
       singleCond->isNegated = !singleCond->isNegated;
-    } else if (this->type == ExpressionType::ONE) {
-      this->type = ExpressionType::ZERO;
-    } else if (this->type == ExpressionType::ZERO) {
-      this->type = ExpressionType::ONE;
+    } else if (this->type == ExpressionType::One) {
+      this->type = ExpressionType::Zero;
+    } else if (this->type == ExpressionType::Zero) {
+      this->type = ExpressionType::One;
     }
   }
-  if (this->type == ExpressionType::AND || this->type == ExpressionType::OR) {
+  if (this->type == ExpressionType::And || this->type == ExpressionType::Or) {
     Operator *op = static_cast<Operator *>(this);
     if (op->left)
       op->left = op->left->propagateNegation(negated);
@@ -300,9 +301,8 @@ std::string BoolExpression::runEspresso() {
   std::set<std::string> truthTable = this->generateTruthTable();
   for (const std::string &row : truthTable)
     espressoInput += (row + "\n");
-  std::string result = "";
-  // char *r = run_espresso(espressoInput.data());
-  // std::string result = r;
+  char *r = run_espresso(espressoInput.data());
+  std::string result = r;
   if (result == "Failed to Minimize")
     return result;
   int start = result.find('=');
@@ -324,19 +324,19 @@ std::string BoolExpression::sopToString() { return this->toString(); }
 
 // returns a dynamically-allocated variable
 BoolExpression *BoolExpression::boolVar(std::string id) {
-  return new SingleCond(ExpressionType::VARIABLE, std::move(id), false);
+  return new SingleCond(ExpressionType::Variable, std::move(id), false);
 }
 
 // returns a dynamically-allocated variable
 BoolExpression *BoolExpression::boolAnd(BoolExpression *exp1,
                                         BoolExpression *exp2) {
-  return new Operator(ExpressionType::AND, exp1, exp2);
+  return new Operator(ExpressionType::And, exp1, exp2);
 }
 
 // returns a dynamically-allocated variable
 BoolExpression *BoolExpression::boolOr(BoolExpression *exp1,
                                        BoolExpression *exp2) {
-  return new Operator(ExpressionType::OR, exp1, exp2);
+  return new Operator(ExpressionType::Or, exp1, exp2);
 }
 
 BoolExpression *BoolExpression::boolNegate() {
@@ -350,9 +350,9 @@ BoolExpression *BoolExpression::boolMinimize() {
     return this;
   // if espresso returns " ", then f = 0
   if (espressoResult == " ")
-    return new BoolExpression(ExpressionType::ZERO);
+    return new BoolExpression(ExpressionType::Zero);
   // if espresso returns " ()", then f = 1
   if (espressoResult == " ()")
-    return new BoolExpression(ExpressionType::ONE);
+    return new BoolExpression(ExpressionType::One);
   return parseSop(espressoResult);
 }

@@ -165,14 +165,14 @@ void read_cube(StringStream *ss, pPLA PLA) {
     /* Read a symbolic multiple-valued variable */
     if (cube.part_size[var] < 0) {
 
-      if (equal(token, "-") || equal(token, "ANY")) {
+      if (equals(token, "-") || equals(token, "ANY")) {
         if (kiss && var == cube.num_vars - 2) {
           /* leave it empty */
         } else {
           /* make it full */
           set_or(cf, cf, cube.var_mask[var]);
         }
-      } else if (equal(token, "~")) {
+      } else if (equals(token, "~")) {
         ;
         /* leave it empty ... (?) */
       } else {
@@ -190,7 +190,7 @@ void read_cube(StringStream *ss, pPLA PLA) {
             PLA->label[i] = strdup(token); /* add new label */
             set_insert(cf, i + offset);
             break;
-          } else if (equal(PLA->label[i], token)) {
+          } else if (equals(PLA->label[i], token)) {
             set_insert(cf, i + offset); /* use column i */
             break;
           }
@@ -323,7 +323,7 @@ void parse_pla(StringStream *ss, pPLA PLA) {
       break;
     case '.':
       /* .i gives the cube input size (binary-functions only) */
-      if (equal(stringStreamGetWord(ss, word), "i")) {
+      if (equals(stringStreamGetWord(ss, word), "i")) {
         if (cube.fullset != NULL) {
           fprintf(stderr, "extra .i ignored\n");
           stringStreamSkipLine(ss);
@@ -335,7 +335,7 @@ void parse_pla(StringStream *ss, pPLA PLA) {
           cube.part_size = ALLOC(int, cube.num_vars);
         }
         /* .o gives the cube output size (binary-functions only) */
-      } else if (equal(word, "o")) {
+      } else if (equals(word, "o")) {
         if (cube.fullset != NULL) {
           fprintf(stderr, "extra .o ignored\n");
           stringStreamSkipLine(ss);
@@ -350,7 +350,7 @@ void parse_pla(StringStream *ss, pPLA PLA) {
           PLA_labels(PLA);
         }
         /* .mv gives the cube size for a multiple-valued function */
-      } else if (equal(word, "mv")) {
+      } else if (equals(word, "mv")) {
         if (cube.fullset != NULL) {
           fprintf(stderr, "extra .mv ignored\n");
           stringStreamSkipLine(ss);
@@ -372,24 +372,24 @@ void parse_pla(StringStream *ss, pPLA PLA) {
           PLA_labels(PLA);
         }
         /* .p gives the number of product terms -- we ignore it */
-      } else if (equal(word, "p")) {
+      } else if (equals(word, "p")) {
 
       }
       //(void) fscanf(fp, "%d", &np);
       /* .e and .end specify the end of the file */
-      else if (equal(word, "e") || equal(word, "end")) {
+      else if (equals(word, "e") || equals(word, "end")) {
         return;
       }
       /* .kiss turns on the kiss-hack option */
-      else if (equal(word, "kiss")) {
+      else if (equals(word, "kiss")) {
         kiss = TRUE;
       }
       /* .type specifies a logical type for the PLA */
-      else if (equal(word, "type")) {
+      else if (equals(word, "type")) {
         (void)stringStreamGetWord(ss, word);
 
         for (i = 0; pla_types[i].key != 0; i++)
-          if (equal(pla_types[i].key + 1, word)) {
+          if (equals(pla_types[i].key + 1, word)) {
             PLA->pla_type = pla_types[i].value;
             break;
           }
@@ -397,7 +397,7 @@ void parse_pla(StringStream *ss, pPLA PLA) {
         if (pla_types[i].key == 0)
           fatal("unknown type in .type command");
         /* parse the labels */
-      } else if (equal(word, "ilb")) {
+      } else if (equals(word, "ilb")) {
         if (cube.fullset == NULL)
           fatal("PLA size must be declared before .ilb or .ob");
 
@@ -411,7 +411,7 @@ void parse_pla(StringStream *ss, pPLA PLA) {
           PLA->label[i] = ALLOC(char, strlen(word) + 6);
           (void)sprintf(PLA->label[i], "%s.bar", word);
         }
-      } else if (equal(word, "ob")) {
+      } else if (equals(word, "ob")) {
         if (cube.fullset == NULL)
           fatal("PLA size must be declared before .ilb or .ob");
 
@@ -424,7 +424,7 @@ void parse_pla(StringStream *ss, pPLA PLA) {
           PLA->label[i] = strdup(word);
         }
         /* .label assigns labels to multiple-valued variables */
-      } else if (equal(word, "label")) {
+      } else if (equals(word, "label")) {
         if (cube.fullset == NULL)
           fatal("PLA size must be declared before .label");
 
@@ -435,7 +435,7 @@ void parse_pla(StringStream *ss, pPLA PLA) {
           (void)stringStreamGetWord(ss, word);
           PLA->label[i] = strdup(word);
         }
-      } else if (equal(word, "symbolic")) {
+      } else if (equals(word, "symbolic")) {
         symbolic_t *newlist, *p1;
 
         if (read_symbolic(ss, PLA, word, &newlist)) {
@@ -449,7 +449,7 @@ void parse_pla(StringStream *ss, pPLA PLA) {
         } else {
           fatal("error reading .symbolic");
         }
-      } else if (equal(word, "symbolic-output")) {
+      } else if (equals(word, "symbolic-output")) {
         symbolic_t *newlist, *p1;
 
         if (read_symbolic(ss, PLA, word, &newlist)) {
@@ -465,7 +465,7 @@ void parse_pla(StringStream *ss, pPLA PLA) {
           fatal("error reading .symbolic-output");
         }
         /* .phase allows a choice of output phases */
-      } else if (equal(word, "phase")) {
+      } else if (equals(word, "phase")) {
         if (cube.fullset == NULL)
           fatal("PLA size must be declared before .phase");
 
@@ -487,7 +487,7 @@ void parse_pla(StringStream *ss, pPLA PLA) {
               fatal("only 0 or 1 allowed in phase description");
         }
         /* .pair allows for bit-pairing input variables */
-      } else if (equal(word, "pair")) {
+      } else if (equals(word, "pair")) {
         int j;
 
         if (PLA->pair != NULL) {
@@ -830,7 +830,7 @@ int read_symbolic(StringStream *ss, pPLA PLA, char *word, symbolic_t **retval)
 
   for (;;) {
     (void)stringStreamGetWord(ss, word);
-    if (equal(word, ";"))
+    if (equals(word, ";"))
       break;
     if (label_index(PLA, word, &var, &i)) {
       listp = ALLOC(symbolic_list_t, 1);
@@ -851,7 +851,7 @@ int read_symbolic(StringStream *ss, pPLA PLA, char *word, symbolic_t **retval)
 
   for (;;) {
     (void)stringStreamGetWord(ss, word);
-    if (equal(word, ";"))
+    if (equals(word, ";"))
       break;
     labelp = ALLOC(symbolic_label_t, 1);
     labelp->label = strdup(word);
@@ -880,7 +880,7 @@ int label_index(pPLA PLA, char *word, int *varp, int *ip) {
   } else {
     for (var = 0; var < cube.num_vars; var++) {
       for (i = 0; i < cube.part_size[var]; i++) {
-        if (equal(PLA->label[cube.first_part[var] + i], word)) {
+        if (equals(PLA->label[cube.first_part[var] + i], word)) {
           *varp = var;
           *ip = i;
           return TRUE;

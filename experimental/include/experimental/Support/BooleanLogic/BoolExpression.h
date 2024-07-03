@@ -39,7 +39,7 @@ namespace boolean {
 // Boolean Expressions, it's not present. The NOT operator is only used in the
 // parsig procedure and is then removed from the BoolExpression by the function
 // propagateNegation which propagates a NOT operator by applying DeMorgan's Law.
-enum class ExpressionType { VARIABLE, OR, AND, NOT, ZERO, ONE, END };
+enum class ExpressionType { Variable, Or, And, Not, Zero, One, End };
 
 // recursie function that replaces don't cares with 0 and 1
 void replaceDontCaresRec(std::string s, std::set<std::string> &minterms);
