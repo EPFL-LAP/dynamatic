@@ -111,7 +111,7 @@ begin
         clk, '1', 
         ip_lhs, ip_rhs, ip_unordered, ip_result
       );
-    else generate -- cmp_predicate = "UNO"
+    elsif cmp_predicate = "UNO" generate
       -- This predicate only tests if any input is unordered,
       -- hence in principle any IP would work
       operator : entity work.FloatingPointComparatorEQ(arch)
@@ -119,6 +119,10 @@ begin
         clk, '1', 
         ip_lhs, ip_rhs, ip_unordered, ip_result
       );
+    else generate -- cmp_predicate = "UNO"
+      assert false
+      report "COMPARATOR is an invalid predicate!"
+      severity failure;
     end generate;
      
   gen_result_signal :
@@ -144,8 +148,13 @@ begin
     elsif
     cmp_predicate = "UNE" generate
       result(0) <= ip_unordered and not ip_result;
-    else generate -- cmp_predicate = UNO
+    elsif
+    cmp_predicate = "UNO" generate
       result(0) <= ip_unordered;
+    else generate 
+      assert false
+      report "COMPARATOR is an invalid predicate!"
+      severity failure;
     end generate;
 
 end architecture;
