@@ -26,7 +26,7 @@ namespace dynamatic {
 namespace experimental {
 namespace boolean {
 
-// Enumeration defining the types of tokens in the boolean logic expressions.
+/// Enumeration defining the types of tokens in the boolean logic expressions.
 enum class TokenType {
   NOT_TOKEN,
   AND_TOKEN,
@@ -37,42 +37,48 @@ enum class TokenType {
   END_TOKEN
 };
 
-// Struct representing an individual token, consisting of a lexeme and a token
-// type.
+/// Represents an individual token, consisting of a lexeme and a token
+/// type.
 struct Token {
-  std::string lexeme;  // The string representation of the token.
-  TokenType tokenType; // The type of the token.
+  /// The string representation of the token.
+  std::string lexeme;
+  /// The type of the token.
+  TokenType tokenType;
 
-  // Default constructor initializing lexeme to empty string and token type to
-  // EndToken.
+  /// Default constructor initializing lexeme to empty string and token type to
+  /// EndToken.
   Token() : tokenType(TokenType::END_TOKEN) {}
 
-  // Constructor initializing lexeme and token type.
+  /// Constructor initializing lexeme and token type.
   Token(std::string l, TokenType r) : lexeme(std::move(l)), tokenType(r) {}
 };
 
-// Function for reporting syntax errors encountered during lexical analysis.
+/// Reports syntax errors encountered during lexical analysis.
 void syntaxError(char current);
 
-// Class representing the Lexical Analyzer for boolean logic expressions.
+/// Class representing the Lexical Analyzer for boolean logic expressions.
 class LexicalAnalyzer {
 public:
-  // Constructor to initialize the lexical analyzer with an input string.
+  /// Constructor to initialize the lexical analyzer with an input string.
   LexicalAnalyzer(llvm::StringRef exp = "");
 
-  // tokenize the string
+  /// Processes a string expression, skipping whitespace and
+  /// identifying variable tokens from letter-digit sequences. It creates tokens
+  /// for operators and parentheses, storing all tokens in tokenList. An end
+  /// token is added to mark the completion of tokenization.
   mlir::LogicalResult tokenize();
 
-  // retrieve the next token from the token list.
+  /// Retrieves the next token from the token list.
   Token getToken();
 
-  // peek ahead in the token stream by 'i' places.
+  /// Peeks ahead in the token stream by 'i' places.
   Token peek(unsigned int i);
 
 private:
-  std::vector<Token>
-      tokenList;    // List of tokens extracted from the input expression.
-  size_t index = 0; // Current index in the token list.
+  // List of tokens extracted from the input expression.
+  std::vector<Token> tokenList;
+  // Current index in the token list.
+  size_t index = 0;
   std::string expression;
 };
 

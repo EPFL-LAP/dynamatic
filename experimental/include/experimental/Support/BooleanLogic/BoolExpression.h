@@ -31,20 +31,21 @@ namespace dynamatic {
 namespace experimental {
 namespace boolean {
 
-// Variable: x,y, z,...
-// AND: & or .
-// Or: | or +
-// Not: ! or ~
-// Remark: NOT perator is an INTEMEDIATE operator. That is, in all returned
-// Boolean Expressions, it's not present. The NOT operator is only used in the
-// parsig procedure and is then removed from the BoolExpression by the function
-// propagateNegation which propagates a NOT operator by applying DeMorgan's Law.
+/// Variable: x,y, z,...
+/// AND: & or .
+/// Or: | or +
+/// Not: ! or ~
+/// Remark: NOT perator is an INTEMEDIATE operator. That is, in all returned
+/// Boolean Expressions, it's not present. The NOT operator is only used in the
+/// parsig procedure and is then removed from the BoolExpression by the function
+/// propagateNegation which propagates a NOT operator by applying DeMorgan's
+/// Law.
 enum class ExpressionType { Variable, Or, And, Not, Zero, One, End };
 
-// recursie function that replaces don't cares with 0 and 1
+/// recursie function that replaces don't cares with 0 and 1
 void replaceDontCaresRec(std::string s, std::set<std::string> &minterms);
 
-// wrapper function that replaces all don't cares in a set of minterms
+/// wrapper function that replaces all don't cares in a set of minterms
 std::set<std::string> replaceDontCares(const std::set<std::string> &minterms);
 
 struct BoolExpression {
@@ -54,74 +55,86 @@ struct BoolExpression {
 
   virtual ~BoolExpression() = default;
 
-  // Function to print BooolExpression tree in inorder traversal
+  /// Prints BooolExpression tree in inorder traversal
+  /// Inspired from
+  /// https://www.geeksforgeeks.org/print-binary-tree-2-dimensions/
   void print(int space = 0);
 
-  // Function to convert a BoolExpression tree into its string representation
+  /// Converts a BoolExpression tree into its string representation
   std::string toString();
 
-  // function that gets all the variables inside a BoolExpression
+  /// Retrieve all the variables inside a BoolExpression
   std::set<std::string> getVariables();
 
   //---------Generating Truth Table based on Mintems (SOP Only)-----------
 
-  // Function that generates the minterms based n the variables
+  /// Generates the minterms based n the variables
+  /// 'd': don't care, 'n':null/void
+  /// If a variable is a don't care: it should be set to 0 if it's negated and
+  /// to 1 if it's non-negeated (for the minterm to be 1) If a variable is set
+  /// to 0: if it's present in non-negated form in the minterm, then the minterm
+  /// requires the variable to be both 0 and 1 for it to evaluate to 1, hence
+  /// the minterm is void (no setting of the values gives a 1) Similarly if a
+  /// variable is set to 1 and is present in negated form in the minterm
   void generateMintermVariable(std::string &s,
                                std::map<llvm::StringRef, int> varIndex);
 
-  // Function that generates the minterms of a specfic AND node
+  /// Generates the minterms of a specfic AND node
   void generateMintermAnd(std::string &s,
                           const std::map<llvm::StringRef, int> &varIndex);
 
-  // Function that generates the minterms of a BoolExpression
+  /// Function that generates the minterms of a BoolExpression
   void generateMintermsOr(unsigned numOfVariables,
                           const std::map<llvm::StringRef, int> &varIndex,
                           std::set<std::string> &minterms);
 
-  // Fuction that generates the truth table for a BoolExpression based on the
-  // minterms generated in generateMinterms
+  /// Generates the truth table for a BoolExpression based on the
+  /// minterms generated in generateMinterms
   std::set<std::string> generateTruthTable();
 
   //--------------Library Helper Functions--------------
 
-  // Recursive function that propagates a not operator in a BoolExpression tree
-  // by applying DeMorgan's law
+  /// Propagates a not operator recursively in a BoolExpression tree
+  /// by applying DeMorgan's law
   BoolExpression *propagateNegation(bool negated);
 
-  // function to run espresso logic minimzer on a BoolExpression
+  /// Runs espresso logic minimzer on a BoolExpression
   std::string runEspresso();
 
   //--------------Library APIs--------------
 
-  // Convert String to BoolExpression
-  // parses an expression such as c1. c2.c1+~c3 . c1 + c4. ~c1 and stores it in
-  // the tree structure
+  /// Converts String to BoolExpression
+  /// parses an expression such as c1. c2.c1+~c3 . c1 + c4. ~c1 and stores it in
+  /// the tree structure
   static BoolExpression *parseSop(llvm::StringRef strSop);
 
-  // Convert BoolExpression to String
+  /// Converts BoolExpression to String
   std::string sopToString();
 
-  // Create an expression of a single variable
+  /// Creates an expression of a single variable
+  /// Returns a dynamically-allocated variable
   static BoolExpression *boolVar(std::string id);
 
-  // AND two expressions
+  /// AND two expressions
+  /// Returns a dynamically-allocated variable
   static BoolExpression *boolAnd(BoolExpression *exp1, BoolExpression *exp2);
 
-  // OR two expressions
+  /// OR two expressions
+  /// Returns a dynamically-allocated variable
   static BoolExpression *boolOr(BoolExpression *exp1, BoolExpression *exp2);
 
-  // Negate an expression (apply DeMorgan's law)
+  /// Negate an expression (apply DeMorgan's law)
   BoolExpression *boolNegate();
 
-  // Minimize an expression based on the espresso logic minimizer algorithm
+  /// Minimize an expression based on the espresso logic minimizer algorithm
   BoolExpression *boolMinimize();
 
 private:
-  // recursive helper function for getVariables()
+  // recursive helper for getVariables()
   void getVariablesRec(std::set<std::string> &s);
 };
 
-// This struct is specifically for operators: And, Or, Not
+// This is specifically for operators: And, Or, Not
 struct Operator : public BoolExpression {
   BoolExpression *left;
   BoolExpression *right;
@@ -136,7 +149,7 @@ struct Operator : public BoolExpression {
   }
 };
 
-// This struct is specifically for signgle conditions: Variable, One, Zero
+// This is specifically for signgle conditions: Variable, One, Zero
 struct SingleCond : public BoolExpression {
   std::string id;
   bool isNegated;

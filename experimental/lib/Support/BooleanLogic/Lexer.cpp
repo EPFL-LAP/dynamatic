@@ -24,7 +24,6 @@ using namespace llvm;
 using namespace mlir;
 using namespace dynamatic::experimental::boolean;
 
-// Function for reporting syntax errors encountered during lexical analysis.
 void dynamatic::experimental::boolean::syntaxError(char current) {
   llvm::errs() << "Syntax error in expression! Invalid character " << current
                << '\n';
@@ -32,10 +31,6 @@ void dynamatic::experimental::boolean::syntaxError(char current) {
 
 LexicalAnalyzer::LexicalAnalyzer(StringRef exp) : expression(exp) {}
 
-// The function tokenize processes a string expression, skipping whitespace and
-// identifying variable tokens from letter-digit sequences. It creates tokens
-// for operators and parentheses, storing all tokens in tokenList. An end token
-// is added to mark the completion of tokenization.
 mlir::LogicalResult LexicalAnalyzer::tokenize() {
   size_t position = 0;
   while (position < expression.length()) {
@@ -44,8 +39,9 @@ mlir::LogicalResult LexicalAnalyzer::tokenize() {
       position++;
       continue;
     }
-    if (isalpha(current)) { // If the current character is a letter, it
-                            // indicates a variable.
+    // If the current character is a letter, it
+    // indicates a variable.
+    if (isalpha(current)) {
       size_t idIndex = position + 1;
       while (idIndex < expression.length() && isdigit(expression[idIndex]))
         idIndex++;

@@ -29,13 +29,13 @@ void StackNode::printError() {
   llvm::errs() << "Operator precedence logial error at ";
   if (expr)
     expr->print();
-  else
-    llvm::errs() << term.lexeme << "\n";
+  if (term.has_value())
+    llvm::errs() << term.value().lexeme << "\n";
 }
 
 enum class Compare { LESS_THAN, GREATER_THAN, EQUAL, ERROR, ACCEPT };
 
-// Define the static constexpr precedence tableS
+/// Defines the static constexpr precedence tableS
 static constexpr std::array<std::array<Compare, 7>, 7> PRECEDENCE_TABLE = {
     {{Compare::GREATER_THAN, Compare::GREATER_THAN, Compare::GREATER_THAN,
       Compare::LESS_THAN, Compare::GREATER_THAN, Compare::LESS_THAN,
@@ -58,12 +58,11 @@ static constexpr std::array<std::array<Compare, 7>, 7> PRECEDENCE_TABLE = {
       Compare::LESS_THAN, Compare::ERROR, Compare::LESS_THAN,
       Compare::ACCEPT}}};
 
-// returns a dynamically-allocated variable
 BoolExpression *dynamatic::experimental::boolean::constructNodeOperator(
     StackNode *operate, StackNode *s1, StackNode *s2) {
   assert((operate && s1 && s2) &&
          "cannot construct operator node with missing operand");
-  Token t = operate->term;
+  Token t = operate->term.value();
   ExpressionType oo;
   if (t.tokenType == TokenType::AND_TOKEN)
     oo = ExpressionType::And;
@@ -74,36 +73,31 @@ BoolExpression *dynamatic::experimental::boolean::constructNodeOperator(
   return new Operator(oo, e1, e2);
 }
 
-// returns a dynamically-allocated variable
 BoolExpression *
 dynamatic::experimental::boolean::constructNodeNegator(StackNode *s1) {
   assert(s1 && "cannot negate null node");
   return new Operator(ExpressionType::Not, nullptr, s1->expr);
 }
 
-// returns a dynamically-allocated variable
 StackNode *dynamatic::experimental::boolean::termToExpr(StackNode *s) {
   assert(s && "cannot convert a null term to an expression");
   ExpressionType t = ExpressionType::Variable;
-  if (s->term.lexeme == "0")
+  if (s->term.value().lexeme == "0")
     t = ExpressionType::Zero;
-  if (s->term.lexeme == "1")
+  if (s->term.value().lexeme == "1")
     t = ExpressionType::One;
-  return new StackNode(new SingleCond(t, s->term.lexeme));
+  return new StackNode(new SingleCond(t, s->term.value().lexeme));
 }
 
-// returns a dynamically-allocated variable
 StackNode *dynamatic::experimental::boolean::constructTermStackNode(Token t) {
   return new StackNode(std::move(t));
 }
 
-// returns a dynamically-allocated variable
 StackNode *dynamatic::experimental::boolean::constructOperatorStackNode(
     StackNode *operate, StackNode *s1, StackNode *s2) {
   return new StackNode(constructNodeOperator(operate, s1, s2));
 }
 
-// returns a dynamically-allocated variable
 StackNode *
 dynamatic::experimental::boolean::constructNegatorStackNode(StackNode *s1) {
   return new StackNode(constructNodeNegator(s1));
@@ -114,19 +108,19 @@ dynamatic::experimental::boolean::reduce(std::stack<StackNode *> stack) {
   // Case 1: Handling parentheses: expr --> ( expr )
   if (stack.size() == 3 &&
       (!stack.top()->expr &&
-       stack.top()->term.tokenType == TokenType::LPAREN_TOKEN)) {
+       stack.top()->term.value().tokenType == TokenType::LPAREN_TOKEN)) {
     stack.pop();
     StackNode *ex = stack.top();
     stack.pop();
     if (!stack.top()->expr &&
-        stack.top()->term.tokenType == TokenType::RPAREN_TOKEN)
+        stack.top()->term.value().tokenType == TokenType::RPAREN_TOKEN)
       return ex;
     stack.top()->printError();
     return nullptr;
   }
 
-  // Case 2: Handling binary operators: expr -> expr AND expr || expr OR expr
-  if (stack.size() == 3) { // expr -> expr AND expr || expr OR expr
+  /// Case 2: Handling binary operators: expr -> expr AND expr || expr OR expr
+  if (stack.size() == 3) {
     StackNode *s1 = stack.top();
     stack.pop();
     StackNode *operate = stack.top();
@@ -136,21 +130,22 @@ dynamatic::experimental::boolean::reduce(std::stack<StackNode *> stack) {
     return constructOperatorStackNode(operate, s1, s2);
   }
 
-  // Case 3: Handling negation: expr -> NOT expr
-  if (stack.size() == 2 && (!stack.top()->expr && stack.top()->term.tokenType ==
-                                                      TokenType::NOT_TOKEN)) {
+  /// Case 3: Handling negation: expr -> NOT expr
+  if (stack.size() == 2 &&
+      (!stack.top()->expr &&
+       stack.top()->term.value().tokenType == TokenType::NOT_TOKEN)) {
     stack.pop();
     StackNode *ex = stack.top();
     return constructNegatorStackNode(ex);
   }
 
-  // Case 4: Handling single variable: expr -> variable
+  /// Case 4: Handling single variable: expr -> variable
   if (stack.size() == 1 &&
-      stack.top()->term.tokenType == TokenType::VARIABLE_TOKEN) {
+      stack.top()->term.value().tokenType == TokenType::VARIABLE_TOKEN) {
     return termToExpr(stack.top());
   }
 
-  // If none of the above cases match, it's a syntax error
+  /// If none of the above cases match, it's a syntax error
   if (stack.size() > 0)
     stack.top()->printError();
   return nullptr;
@@ -174,18 +169,18 @@ BoolExpression *Parser::parseSop() {
   Token start;
   stack.push_back(constructTermStackNode(start));
   while (true) {
-    // Peek at the next token from the lexer.
+    /// Peek at the next token from the lexer.
     Token t1 = lexer.peek(1);
     int type1 = static_cast<int>(t1.tokenType);
 
-    // Peek at the top terminal node in the stack.
+    /// Peek at the top terminal node in the stack.
     StackNode *s2 = terminalPeek(stack);
     if (!s2)
       return nullptr;
-    Token t2 = s2->term;
+    Token t2 = s2->term.value();
     int type2 = static_cast<int>(t2.tokenType);
 
-    // Compare the precedence of the current top token with the next token.
+    /// Compare the precedence of the current top token with the next token.
     if (PRECEDENCE_TABLE[type2][type1] == Compare::LESS_THAN ||
         PRECEDENCE_TABLE[type2][type1] == Compare::EQUAL) {
       Token t3 = lexer.getToken();
@@ -194,13 +189,14 @@ BoolExpression *Parser::parseSop() {
       std::stack<StackNode *> rhs;
       StackNode *lastPoppedTerminal = terminalPeek(stack);
 
-      // Pop nodes from the stack until the precedence condition is met.
-      while (stack.at(stack.size() - 1)->expr ||
-             PRECEDENCE_TABLE[static_cast<int>(
-                 ((stack.at(stack.size() - 1))->term).tokenType)]
-                             [static_cast<int>(
-                                 (lastPoppedTerminal->term).tokenType)] !=
-                 Compare::LESS_THAN) {
+      /// Pop nodes from the stack until the precedence condition is met.
+      while (
+          stack.at(stack.size() - 1)->expr ||
+          PRECEDENCE_TABLE[static_cast<int>(
+              ((stack.at(stack.size() - 1))->term).value().tokenType)]
+                          [static_cast<int>(
+                              (lastPoppedTerminal->term).value().tokenType)] !=
+              Compare::LESS_THAN) {
         StackNode *s = stack.at(stack.size() - 1);
         stack.pop_back();
 
@@ -209,14 +205,15 @@ BoolExpression *Parser::parseSop() {
 
         rhs.push(s);
       }
-      // Reduce the right-hand side nodes into a single node.
+      /// Reduce the right-hand side nodes into a single node.
       StackNode *reduced = reduce(rhs);
       if (!reduced)
         return nullptr;
 
       stack.push_back(reduced);
     } else if (PRECEDENCE_TABLE[type2][type1] == Compare::ACCEPT) {
-      return stack.at(1)->expr; // Return the root of the expression tree.
+      /// Return the root of the expression tree.
+      return stack.at(1)->expr;
     } else {
       llvm::errs() << "Operator precedence logial error at " << t1.lexeme
                    << "n";

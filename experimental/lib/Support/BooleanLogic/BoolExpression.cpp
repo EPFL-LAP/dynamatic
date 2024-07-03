@@ -114,13 +114,6 @@ std::set<std::string> dynamatic::experimental::boolean::replaceDontCares(
   return mintermsWithoudDontCares;
 }
 
-// 'd': don't care, 'n':null/void
-// If a variable is a don't care: it should be set to 0 if it's negated and to 1
-// if it's non-negeated (for the minterm to be 1) If a variable is set to 0: if
-// it's present in non-negated form in the minterm, then the minterm requires
-// the variable to be both 0 and 1 for it to evaluate to 1, hence the minterm is
-// void (no setting of the values gives a 1) Similarly if a variable is set to 1
-// and is present in negated form in the minterm
 void BoolExpression::generateMintermVariable(
     std::string &s, std::map<StringRef, int> varIndex) {
   SingleCond *singleCond = static_cast<SingleCond *>(this);
@@ -137,7 +130,8 @@ void BoolExpression::generateMintermAnd(
     std::string &s, const std::map<StringRef, int> &varIndex) {
   if (type == ExpressionType::Variable) {
     generateMintermVariable(s, varIndex);
-  } else if (type == ExpressionType::Zero) { // 0 . exp =0 -> not a a minterm
+  } else if (type == ExpressionType::Zero) {
+    /// 0 . exp =0 -> not a a minterm
     s[0] = 'n';
   } else if (type == ExpressionType::And || type == ExpressionType::Or) {
     Operator *op = static_cast<Operator *>(this);
@@ -157,22 +151,19 @@ void BoolExpression::generateMintermsOr(
       op->left->generateMintermsOr(numOfVariables, varIndex, minterms);
     if (op->right)
       op->right->generateMintermsOr(numOfVariables, varIndex, minterms);
-  } else if (type == ExpressionType::One) { // 1 + exp = 1;
+  } else if (type == ExpressionType::One) {
+    /// 1 + exp = 1;
     std::string s(numOfVariables, 'd');
     minterms.insert(s);
   } else if (type == ExpressionType::And) {
-    std::string s(numOfVariables, 'd'); // initializing s
+    std::string s(numOfVariables, 'd');
     generateMintermAnd(s, varIndex);
-    // no null in the minterm -> minterm is valid
+    /// no null in the minterm -> minterm is valid
     if (s.find('n') == std::string::npos)
       minterms.insert(s);
   }
 }
 
-// 1- generate all the minterms with don't cars
-// 2- replace the don't cares wit 0s and 1s
-// 3- loop over all rows in the truth table and check wether it corresponds to a
-// minterm or not
 std::set<std::string> BoolExpression::generateTruthTable() {
   std::set<std::string> variables = BoolExpression::getVariables();
   unsigned numOfVariables = variables.size();
@@ -180,9 +171,10 @@ std::set<std::string> BoolExpression::generateTruthTable() {
   int index = 0;
   for (llvm::StringRef s : variables)
     varIndex[s] = index++;
-  // generate the minterms
+  /// generate all the minterms with don't cars
   std::set<std::string> minterms;
   generateMintermsOr(numOfVariables, varIndex, minterms);
+  /// replace the don't cares wit 0s and 1s
   std::set<std::string> mintermsWithoutDontCares = replaceDontCares(minterms);
   // generate the truth table
   std::string s(numOfVariables, 'd');
@@ -203,18 +195,16 @@ std::set<std::string> BoolExpression::generateTruthTable() {
 //--------Printing BoolExpresssion--------
 static constexpr unsigned PRINTING_SPACE = 10;
 
-// Inspired from https://www.geeksforgeeks.org/print-binary-tree-2-dimensions/
 void BoolExpression::print(int space) {
-  // Increase distance between levels
+  /// Increase distance between levels
   space += PRINTING_SPACE;
 
-  // Process right child first
+  /// Process right child first
   if (type == ExpressionType::Or || type == ExpressionType::And) {
     Operator *op = static_cast<Operator *>(this);
     op->right->print(space);
   }
-  // Print current node after space
-  // count
+
   llvm::errs() << "\n";
   for (int i = PRINTING_SPACE; i < space; i++)
     llvm::errs() << " ";
@@ -243,7 +233,7 @@ void BoolExpression::print(int space) {
     break;
   }
 
-  // Process left child
+  /// Process left child
   if (type == ExpressionType::Or || type == ExpressionType::And) {
     Operator *op = static_cast<Operator *>(this);
     op->left->print(space);
@@ -287,17 +277,17 @@ BoolExpression *BoolExpression::propagateNegation(bool negated) {
 std::string BoolExpression::runEspresso() {
   std::string espressoInput = "";
   std::set<std::string> vars = this->getVariables();
-  // adding the number of inputs and outputs to the file
+  /// adding the number of inputs and outputs to the file
   espressoInput += (".i " + std::to_string(vars.size()) + "\n");
   espressoInput += ".o 1\n";
-  // adding the names of the input variables to the file
+  /// adding the names of the input variables to the file
   espressoInput += ".ilb ";
   for (const std::string &var : vars)
     espressoInput += (var + " ");
   espressoInput += "\n";
-  // add the name of the output f to the file
+  /// add the name of the output f to the file
   espressoInput += ".ob f\n";
-  // generate and add the truth table
+  /// generate and add the truth table
   std::set<std::string> truthTable = this->generateTruthTable();
   for (const std::string &row : truthTable)
     espressoInput += (row + "\n");
@@ -322,18 +312,15 @@ BoolExpression *BoolExpression::parseSop(llvm::StringRef strSop) {
 
 std::string BoolExpression::sopToString() { return this->toString(); }
 
-// returns a dynamically-allocated variable
 BoolExpression *BoolExpression::boolVar(std::string id) {
   return new SingleCond(ExpressionType::Variable, std::move(id), false);
 }
 
-// returns a dynamically-allocated variable
 BoolExpression *BoolExpression::boolAnd(BoolExpression *exp1,
                                         BoolExpression *exp2) {
   return new Operator(ExpressionType::And, exp1, exp2);
 }
 
-// returns a dynamically-allocated variable
 BoolExpression *BoolExpression::boolOr(BoolExpression *exp1,
                                        BoolExpression *exp2) {
   return new Operator(ExpressionType::Or, exp1, exp2);
@@ -345,13 +332,13 @@ BoolExpression *BoolExpression::boolNegate() {
 
 BoolExpression *BoolExpression::boolMinimize() {
   std::string espressoResult = this->runEspresso();
-  // if espresso fails, return the expression as is
+  /// if espresso fails, return the expression as is
   if (espressoResult == "Failed to minimize")
     return this;
-  // if espresso returns " ", then f = 0
+  /// if espresso returns " ", then f = 0
   if (espressoResult == " ")
     return new BoolExpression(ExpressionType::Zero);
-  // if espresso returns " ()", then f = 1
+  /// if espresso returns " ()", then f = 1
   if (espressoResult == " ()")
     return new BoolExpression(ExpressionType::One);
   return parseSop(espressoResult);

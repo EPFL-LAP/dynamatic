@@ -23,11 +23,11 @@ namespace dynamatic {
 namespace experimental {
 namespace boolean {
 
-// The StackNode struct represents elements in the parsing stack,
+// Represents elements in the parsing stack,
 // which can be either expressions or terms (tokens).
 struct StackNode {
   BoolExpression *expr;
-  Token term;
+  std::optional<Token> term;
 
   // Constructors
   StackNode(Token tt) : term(std::move(tt)){};
@@ -38,53 +38,59 @@ struct StackNode {
     if (expr != nullptr)
       delete expr;
   }
-
+  /// Prints a StackNode in case of an error
   void printError();
 };
 
-// The Parser class provides
-// methods for parsing sum-of-products (SOP) expressions using a lexical
-// analyzer to generate tokens and a stack-based approach to construct the parse
-// tree.
+/// The Parser class provides
+/// methods for parsing sum-of-products (SOP) expressions using a lexical
+/// analyzer to generate tokens and a stack-based approach to construct the
+/// parse tree.
 class Parser {
 public:
   LexicalAnalyzer lexer;
 
-  // Function that implements the main parsing logic, using the precedence table
-  // to guide token processing and reduction.
+  /// Implements the main parsing logic, using the precedence table
+  /// to guide token processing and reduction.
   BoolExpression *parseSop();
 
-  // Constructor
+  /// Constructor
   Parser(llvm::StringRef s);
 
 private:
-  // This function ensures the correct terminal node is used for precedence
+  // Ensures the correct terminal node is used for precedence
   // comparison.
   StackNode *terminalPeek(std::vector<StackNode *> stack);
 };
 
-// create a new BoolExpression node for AND/OR operations.
+/// Creates a new BoolExpression node for AND/OR operations.
+/// Returns a dynamically-allocated variable
 BoolExpression *constructNodeOperator(StackNode *operate, StackNode *s1,
                                       StackNode *s2);
 
-// create a new BoolExpression node for NOT operations.
+/// Creates a new BoolExpression node for NOT operations.
+/// Returns a dynamically-allocated variable
 BoolExpression *constructNodeNegator(StackNode *s1);
 
-// wrap a variable token in a BoolExpression node.
+/// Wraps a variable token in a BoolExpression node.
+/// Returns a dynamically-allocated variable
 StackNode *termToExpr(StackNode *s);
 
-// term for ~, ( , ) , . , +
+/// term for ~, ( , ) , . , +
+/// Returns a dynamically-allocated variable
 StackNode *constructTermStackNode(Token t);
 
-// handle AND/OR operations in the parsing stack.
+/// Handles AND/OR operations in the parsing stack.
+/// Returns a dynamically-allocated variable
 StackNode *constructOperatorStackNode(StackNode *operate, StackNode *s1,
                                       StackNode *s2);
 
-// handle NOT operations in the parsing stack.
+/// Handles NOT operations in the parsing stack.
+/// Returns a dynamically-allocated variable
 StackNode *constructNegatorStackNode(StackNode *s1);
 
-// reduce a sequence of tokens based on operator precedence and returns the
-// resulting stack node.
+/// Reduces a sequence of tokens based on operator precedence and returns the
+/// resulting stack node.
 StackNode *reduce(std::stack<StackNode *> stack);
 
 } // namespace boolean
