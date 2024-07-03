@@ -9,6 +9,7 @@
   "files.associations": {
     "*.inc": "cpp"
   },
+  // CMake Configurations
   "cmake.configureSettings": {
     "MLIR_DIR": "${workspaceFolder}/polygeist/llvm-project/build/lib/cmake/mlir",
     "LLVM_DIR": "${workspaceFolder}/polygeist/llvm-project/build/lib/cmake/llvm",
