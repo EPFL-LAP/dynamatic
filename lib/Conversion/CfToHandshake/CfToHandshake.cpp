@@ -937,20 +937,16 @@ DenseMap<Block *, BlockLoopInfo> dynamatic::findLoopDetails(CFGLoopInfo &li,
 }
 
 // checks if the source and destination are in a loop
-
-bool sameLoop(Block *source, Block *dest) {
-  // blocks must be in same region
-  if (source->getParent() != dest->getParent())
-    return false;
-  Region *r = source->getParent();
+bool HandshakeLowering::sameLoop(Block *source, Block *dest) {
   // first run the following loop analysis
   DominanceInfo domInfo;
-  llvm::DominatorTreeBase<Block, false> &domTree = domInfo.getDomTree(r);
+  llvm::DominatorTreeBase<Block, false> &domTree = domInfo.getDomTree(&region);
   // CFGLoop nodes become invalid after CFGLoopInfo is destroyed.
   CFGLoopInfo li(domTree);
 
   // Call the function
-  DenseMap<Block *, BlockLoopInfo> blockToLoopInfoMap = findLoopDetails(li, *r);
+  DenseMap<Block *, BlockLoopInfo> blockToLoopInfoMap =
+      findLoopDetails(li, region);
 
   auto itSource = blockToLoopInfoMap.find(source);
   auto itDest = blockToLoopInfoMap.find(dest);
@@ -967,8 +963,9 @@ bool sameLoop(Block *source, Block *dest) {
 // Two types of hazards between the predecessors of one LSQ node:
 // (1) WAW between 2 Store operations,
 // (2) RAW and WAR between Load and Store operations
-void dynamatic::identifyMemDeps(SmallVector<Operation *> &operations,
-                                std::vector<ProdConsMemDep> &allMemDeps) {
+void HandshakeLowering::identifyMemDeps(
+    SmallVector<Operation *> &operations,
+    std::vector<ProdConsMemDep> &allMemDeps) {
   for (Operation *i : operations) {
     llvm::errs() << "In identifyMemDeps\n";
     // i: loop over the predecessors of the lsq_enode.. Skip those that are not
@@ -1011,9 +1008,9 @@ void dynamatic::identifyMemDeps(SmallVector<Operation *> &operations,
   }
 }
 
-void dynamatic::constructGroupsGraph(const SmallVector<Operation *> &operations,
-                                     std::vector<ProdConsMemDep> &allMemDeps,
-                                     std::set<Group> &groups) {
+void HandshakeLowering::constructGroupsGraph(
+    const SmallVector<Operation *> &operations,
+    std::vector<ProdConsMemDep> &allMemDeps, std::set<Group> &groups) {
   // loop over the preds of the LSQ that are memory operations,
   // create a Group object for each of them with the BB of the operation
   for (Operation *op : operations) {
@@ -1046,6 +1043,16 @@ void dynamatic::constructGroupsGraph(const SmallVector<Operation *> &operations,
     prodGroup.succs.insert(consGroup);
     consGroup.preds.insert(prodGroup);
   }
+}
+
+LogicalResult HandshakeLowering::print(ConversionPatternRewriter &rewriter) {
+  for (mlir::Block &block : region.getBlocks()) {
+    for (mlir::Block &block2 : region.getBlocks()) {
+      if (sameLoop(&block, &block2))
+        llvm::errs() << "Blocks in loop " << block << " and " << block2 << "\n";
+    }
+  }
+  return success();
 }
 
 //===-----------------------------------------------------------------------==//
@@ -1173,6 +1180,9 @@ static LogicalResult lowerRegion(HandshakeLowering &hl) {
 
   if (failed(runPartialLowering(
           hl, &HandshakeLowering::verifyAndCreateMemInterfaces, memInfo)))
+    return failure();
+
+  if (failed(runPartialLowering(hl, &HandshakeLowering::print)))
     return failure();
 
   if (failed(runPartialLowering(hl, &HandshakeLowering::addSmartControlForLSQ,

@@ -24,6 +24,36 @@
 #include <set>
 
 namespace dynamatic {
+// Represents a memory dependeency bteween 2 blocks: the producer basic block
+// prodBb, and the consumer basic block consBb isBackward is used to indicate if
+// the producer and the consumer are in a loop
+struct ProdConsMemDep {
+  Block *prodBb;
+  Block *consBb;
+  bool isBackward;
+
+  ProdConsMemDep(Block *prod, Block *cons, bool backward)
+      : prodBb(prod), consBb(cons), isBackward(backward) {}
+};
+
+// A group represents all operations belonging to the same basic block bb
+struct Group {
+  Block *bb;
+  std::set<Group> preds;
+  std::set<Group> succs;
+
+  Group(Block *b) : bb(b) {}
+
+  bool operator<(const Group &other) const { return bb < other.bb; }
+};
+
+// Structure that stores loop information of a Block.
+struct BlockLoopInfo {
+  mlir::CFGLoop *loop = nullptr;
+  bool isHeader = false;
+  bool isExit = false;
+  bool isLatch = false;
+};
 
 /// This class is strongly inspired by CIRCT's own `HandshakeLowering` class. It
 /// provides all the conversion steps necessary to concert a func-level function
@@ -134,10 +164,6 @@ public:
   /// function into a matching handshake-level function.
   LogicalResult createReturnNetwork(ConversionPatternRewriter &rewriter);
 
-  // interfaces dataflow circuits with LSQs
-  LogicalResult addSmartControlForLSQ(ConversionPatternRewriter &rewriter,
-                                      MemInterfacesInfo &memInfo);
-
   /// Returns the entry control value for operations contained within this
   /// block.
   Value getBlockEntryControl(Block *block) const {
@@ -154,6 +180,27 @@ public:
 
   /// Returns a reference to the region being lowered.
   Region &getRegion() { return region; }
+
+  //----------Construction of Allocation Network----------
+
+  // interfaces dataflow circuits with LSQs
+  LogicalResult addSmartControlForLSQ(ConversionPatternRewriter &rewriter,
+                                      MemInterfacesInfo &memInfo);
+
+  bool sameLoop(Block *source, Block *dest);
+
+  // identify all the memory dependencies between the predecessors of an LSQ.
+  // This
+  // is the first step towards making memory deps explicit
+  void identifyMemDeps(SmallVector<Operation *> &operations,
+                       std::vector<ProdConsMemDep> &allMemDeps);
+
+  // build a dependence graph betweeen the groups
+  void constructGroupsGraph(const SmallVector<Operation *> &operations,
+                            std::vector<ProdConsMemDep> &allMemDeps,
+                            std::set<Group> &groups);
+
+  LogicalResult print(ConversionPatternRewriter &rewriter);
 
 protected:
   /// The region being lowered.
@@ -210,50 +257,9 @@ static LogicalResult runPartialLowering(
 
 std::unique_ptr<dynamatic::DynamaticPass> createCfToHandshake();
 
-// Represents a memory dependeency bteween 2 blocks: the producer basic block
-// prodBb, and the consumer basic block consBb isBackward is used to indicate if
-// the producer and the consumer are in a loop
-struct ProdConsMemDep {
-  Block *prodBb;
-  Block *consBb;
-  bool isBackward;
-
-  ProdConsMemDep(Block *prod, Block *cons, bool backward)
-      : prodBb(prod), consBb(cons), isBackward(backward) {}
-};
-
-// A group represents all operations belonging to the same basic block bb
-struct Group {
-  Block *bb;
-  std::set<Group> preds;
-  std::set<Group> succs;
-
-  Group(Block *b) : bb(b) {}
-
-  bool operator<(const Group &other) const { return bb < other.bb; }
-};
-
-// Structure that stores loop information of a Block.
-struct BlockLoopInfo {
-  mlir::CFGLoop *loop = nullptr;
-  bool isHeader = false;
-  bool isExit = false;
-  bool isLatch = false;
-};
-
 // Function that runs loop analysis on the funcOp Region.
 DenseMap<Block *, BlockLoopInfo> findLoopDetails(mlir::CFGLoopInfo &li,
                                                  Region &funcReg);
-
-// identify all the memory dependencies between the predecessors of an LSQ. This
-// is the first step towards making memory deps explicit
-void identifyMemDeps(SmallVector<Operation *> &operations,
-                     std::vector<ProdConsMemDep> &allMemDeps);
-
-// build a dependence graph betweeen the groups
-void constructGroupsGraph(const SmallVector<Operation *> &operations,
-                          std::vector<ProdConsMemDep> &allMemDeps,
-                          std::set<Group> &groups);
 
 } // namespace dynamatic
 
