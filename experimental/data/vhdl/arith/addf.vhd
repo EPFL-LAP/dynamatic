@@ -33,10 +33,10 @@ architecture arch of addf is
   signal buff_valid, oehb_ready : std_logic;
 
   -- intermediate input signals for IEEE-754 to Flopoco-simple-float conversion
-  signal ip_lhs, ip_rhs : std_logic_vector(BITWIDTH downto 0);
+  signal ip_lhs, ip_rhs : std_logic_vector(BITWIDTH + 1 downto 0);
 
   -- intermediate output signal for Flopoco-simple-float to IEEE-754 conversion
-  signal ip_result : std_logic_vector(BITWIDTH downto 0);
+  signal ip_result : std_logic_vector(BITWIDTH + 1 downto 0);
 
 begin
   join_inputs : entity work.join(arch) generic map(2)
@@ -68,8 +68,8 @@ begin
       outs_ready => result_ready,
       outs_valid => result_valid,
       ins_ready  => oehb_ready,
-      ins(0)     => "0",
-      outs(0)    => open
+      ins(0)     => '0',
+      outs    => open
     );
 
   ieee2nfloat_lhs: entity work.InputIEEE_32bit(arch)
@@ -90,7 +90,7 @@ begin
         R => result
     );
 
-  ip : component work.FloatingPointAdder(arch)
+  ip : entity work.FloatingPointAdder(arch)
     port map (
         clk => clk,
         ce  => oehb_ready,

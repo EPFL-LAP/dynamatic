@@ -3,7 +3,7 @@
     "name": "arith.addf",
     "parameters": [{ "name": "DATA_WIDTH", "type": "unsigned" }],
     "generic": "$DYNAMATIC/experimental/data/vhdl/arith/addf.vhd",
-    "dependencies": ["join", "delay_buffer", "oehb"]
+    "dependencies": ["join", "delay_buffer", "oehb", "flopoco_ip_cores"]
   },
   {
     "name": "arith.addi",
@@ -24,7 +24,7 @@
       { "name": "DATA_WIDTH", "type": "unsigned", "generic": true }
     ],
     "generator": "\"$DYNAMATIC/bin/generators/rtl-cmpf-generator\" \"$DYNAMATIC/experimental/data/vhdl/arith/cmpf.vhd\" \"$OUTPUT_DIR/$MODULE_NAME.vhd\" $MODULE_NAME $PREDICATE",
-    "dependencies": ["join", "delay_buffer"]
+    "dependencies": ["join", "delay_buffer", "flopoco_ip_cores"]
   },
   {
     "name": "arith.cmpi",
@@ -85,7 +85,7 @@
     "name": "arith.mulf",
     "parameters": [{ "name": "DATA_WIDTH", "type": "unsigned" }],
     "generic": "$DYNAMATIC/experimental/data/vhdl/arith/mulf.vhd",
-    "dependencies": ["join", "delay_buffer", "oehb"]
+    "dependencies": ["join", "delay_buffer", "oehb", "flopoco_ip_cores"]
   },
   {
     "name": "arith.muli",
@@ -132,7 +132,7 @@
     "name": "arith.subf",
     "parameters": [{ "name": "DATA_WIDTH", "type": "unsigned" }],
     "generic": "$DYNAMATIC/experimental/data/vhdl/arith/subf.vhd",
-    "dependencies": ["join", "delay_buffer", "oehb"]
+    "dependencies": ["join", "delay_buffer", "oehb", "flopoco_ip_cores"]
   },
   {
     "name": "arith.subi",
@@ -528,6 +528,9 @@
   },
   {
     "generic": "$DYNAMATIC/experimental/data/vhdl/support/logic.vhd"
+  },
+  {
+    "generic": "$DYNAMATIC/experimental/data/vhdl/support/flopoco_ip_cores.vhd"
   },
   {
     "generic": "$DYNAMATIC/experimental/data/vhdl/support/mc_support.vhd",

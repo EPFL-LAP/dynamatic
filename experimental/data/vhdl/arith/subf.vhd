@@ -35,10 +35,10 @@ architecture arch of subf is
   signal rhs_neg : std_logic_vector(BITWIDTH - 1 downto 0);
 
   -- intermediate input signals for IEEE-754 to Flopoco-simple-float conversion
-  signal ip_lhs, ip_rhs : std_logic_vector(BITWIDTH downto 0);
+  signal ip_lhs, ip_rhs : std_logic_vector(BITWIDTH + 1 downto 0);
 
   -- intermediate output signal for Flopoco-simple-float to IEEE-754 conversion
-  signal ip_result : std_logic_vector(BITWIDTH downto 0);
+  signal ip_result : std_logic_vector(BITWIDTH + 1 downto 0);
 
 begin
 
@@ -71,8 +71,8 @@ begin
       outs_ready => result_ready,
       outs_valid => result_valid,
       ins_ready  => oehb_ready,
-      ins(0)     => "0",
-      outs(0)    => open
+      ins(0)     => '0',
+      outs    => open
     );
 
 
@@ -96,7 +96,7 @@ begin
         R => result
     );
 
-  operator :  component work.FloatingPointAdder(arch)
+  operator :  entity work.FloatingPointAdder(arch)
   port map (
       clk   => clk,
       ce => oehb_ready,
