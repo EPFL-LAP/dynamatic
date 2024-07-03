@@ -24,41 +24,39 @@ entity mux_dataless is
 end entity;
 
 architecture arch of mux_dataless is
-  signal tehb_pvalid : std_logic;
-  signal tehb_ready  : std_logic;
+  signal tehb_ins_valid, tehb_ins_ready : std_logic;
 begin
-  process (ins_valid, outs_ready, index, tehb_ready)
-    variable tmp_valid_out : std_logic;
+  process (ins_valid, outs_ready, index, index_valid, tehb_ins_ready)
+    variable selectedData_valid, indexEqual : std_logic;
   begin
-    tmp_valid_out := '0';
-    for I in SIZE - 1 downto 0 loop
-      if (unsigned(index) = to_unsigned(I, index'length) and index_valid = '1' and ins_valid(I) = '1') then
-        tmp_valid_out := '1';
+    selectedData_valid := '0';
+
+    for i in SIZE - 1 downto 0 loop
+      if unsigned(index) = to_unsigned(i, index'length) then
+        indexEqual := '1';
+      else
+        indexEqual := '0';
       end if;
 
-      if ((unsigned(index) = to_unsigned(I, index'length) and index_valid = '1' and tehb_ready = '1' and ins_valid(I) = '1') or ins_valid(I) = '0') then
-        ins_ready(I) <= '1';
-      else
-        ins_ready(I) <= '0';
+      if indexEqual and index_valid and ins_valid(i) then
+        selectedData_valid := '1';
       end if;
+      ins_ready(i) <= (indexEqual and index_valid and ins_valid(i) and tehb_ins_ready) or (not ins_valid(i));
     end loop;
 
-    if (index_valid = '0' or (tmp_valid_out = '1' and tehb_ready = '1')) then
-      index_ready <= '1';
-    else
-      index_ready <= '0';
-    end if;
-
-    tehb_pvalid <= tmp_valid_out;
+    index_ready    <= (not index_valid) or (selectedData_valid and tehb_ins_ready);
+    tehb_ins_valid <= selectedData_valid;
   end process;
 
   tehb : entity work.tehb_dataless(arch)
     port map(
-      clk        => clk,
-      rst        => rst,
-      ins_valid  => tehb_pvalid,
-      outs_ready => outs_ready,
+      clk => clk,
+      rst => rst,
+      -- input channel
+      ins_valid => tehb_ins_valid,
+      ins_ready => tehb_ins_ready,
+      -- output channel
       outs_valid => outs_valid,
-      ins_ready  => tehb_ready
+      outs_ready => outs_ready
     );
 end architecture;

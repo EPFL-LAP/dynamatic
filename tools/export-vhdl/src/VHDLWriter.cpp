@@ -2592,7 +2592,9 @@ static void writeEntity(const string &filename) {
     }
 
     bool mcLsq = false;
-    if (nodes[i].type.find("LSQ") != std::string::npos) {
+    bool lsq = (nodes[i].type.find("LSQ") != std::string::npos) ||
+               nodes[i].type.find("lsq") != std::string::npos;
+    if (lsq) {
       for (int indx = 0; indx < nodes[i].inputs.size; indx++) {
         if (nodes[i].inputs.input[indx].type == "x") {
           mcLsq = true;
@@ -2600,8 +2602,7 @@ static void writeEntity(const string &filename) {
         }
       }
     }
-    if ((nodes[i].type.find("LSQ") != std::string::npos && !mcLsq) ||
-        nodes[i].type.find("MC") != std::string::npos) {
+    if ((lsq && !mcLsq) || nodes[i].type.find("MC") != std::string::npos) {
       netlist << ";" << endl;
       netlist << "\t" << nodes[i].memory
               << "_address0 : out std_logic_vector (31 downto 0);" << endl;

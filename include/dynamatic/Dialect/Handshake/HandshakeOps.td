@@ -553,6 +553,21 @@ def JoinOp : Handshake_Op<"join", [
   let hasCustomAssemblyFormat = 1;
 }
 
+def NotOp : Handshake_Op<"not", [Pure, SameOperandsAndResultType]> {
+  let summary = "Logical negation";
+  let description = [{
+    Bitwise logical negation.
+
+    Example:
+    ```mlir
+    %neg = not %value : i32
+    ```
+  }];
+  let arguments = (ins AnyType : $operand);
+  let results = (outs AnyType : $result);
+  let assemblyFormat = [{ $operand attr-dict `:` qualified(type($result))}];
+}
+
 def MemoryControllerOp : Handshake_Op<"mem_controller", [
   DeclareOpInterfaceMethods<MemoryOpInterface>,
   DeclareOpInterfaceMethods<NamedIOInterface, ["getOperandName"]>,
@@ -987,16 +1002,16 @@ def SpeculatorOp : Handshake_Op<"speculator", [
     Example:
     ```mlir
     %dataOut, %saveCtrl, %commitCtrl, %SCSaveCtrl, 
-      %SCCommitCtrl, %SCBranchCtrl = speculator %dataIn : i1
+      %SCCommitCtrl, %SCBranchCtrl = speculator[enable] %dataIn : i1
     ```
   }];
 
-  let arguments = (ins AnyType : $dataIn);
+  let arguments = (ins AnyType : $dataIn, NoneType : $enable);
   let results = (outs AnyType : $dataOut,
                   I1 : $saveCtrl, I1 : $commitCtrl, 
                   I<3> : $SCSaveCtrl, I<3> : $SCCommitCtrl, 
                   I1 : $SCBranchCtrl);
-  let assemblyFormat = "$dataIn attr-dict `:` qualified(type($dataIn)) ";
+  let assemblyFormat = " `[` $enable `]` $dataIn attr-dict `:` qualified(type($dataIn)) ";
 }
 
 def SpecSaveOp : Handshake_Op<"spec_save", [

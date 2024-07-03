@@ -32,12 +32,14 @@ Thanks to MLIR's recursively nested structure, it is very easy to traverse the e
 
 ```cpp
 void traverseIRFromOperation(mlir::Operation *op) {
-  for (mlir::Region &region : op->getRegions())
-    for (mlir::Block &block : region.getBlocks())
+  for (mlir::Region &region : op->getRegions()) {
+    for (mlir::Block &block : region.getBlocks()) {
       for (mlir::Operation &nestedOp : block.getOperations()) {
         llvm::outs() << "Traversing operation " << op << "\n";
         traverseIRFromOperation(&nestedOp);
       }
+    }
+  }
 }
 ```
 
@@ -314,13 +316,13 @@ In summary, attributes are used to attach data/information to operations that ca
 
 For this section, you are also simply invited to read [the relevant part of the language reference](https://mlir.llvm.org/docs/LangRef/#dialects), which is very short.
 
-The *Handshake* dialect, defined in the `circt::handshake` namespace, is core to Dynamatic. *Handshake* allows us to represent dataflow circuits inside [graph regions](#regions). Throughout the repository, whenever we mention "*Handshake*-level IR", we are referring to an IR that contains *Handshake* operations (i.e., dataflow components), which together make up a dataflow circuit.
+The *Handshake* dialect, defined in the `dynamatic::handshake` namespace, is core to Dynamatic. *Handshake* allows us to represent dataflow circuits inside [graph regions](#regions). Throughout the repository, whenever we mention "*Handshake*-level IR", we are referring to an IR that contains *Handshake* operations (i.e., dataflow components), which together make up a dataflow circuit.
 
 ## Printing to the console
 
 ### Printing to stdout and stderr
 
-LLVM/MLIR has wrappers around the standard program output streams that you should use whenever you would like something displayed on the console. These are `llvm::outs()` (for stdout) and `llvm::errs()` (for stderr),see their usage below.
+LLVM/MLIR has wrappers around the standard program output streams that you should use whenever you would like something displayed on the console. These are `llvm::outs()` (for stdout) and `llvm::errs()` (for stderr), see their usage below.
 
 ```cpp
 // Let op be an Operation*
@@ -336,6 +338,9 @@ llvm::errs() << "This will be printed on stderr!\n"
              << "convertible to std::string, like the integer " << 10
              << " or an MLIR operation " << op << "\n";
 ```
+
+> [!CAUTION]
+> Dynamatic's optimizer prints the IR resulting from running all the passes it was asked to run to standard output. As a consequence **you should never explicitly print anything to stdout yourself**, as it will mix up with the IR text serialization. Instead, all error messages should go to stderr.
 
 ### Printing information related to an operation
 

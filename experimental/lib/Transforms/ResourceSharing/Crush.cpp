@@ -37,6 +37,7 @@
 #include "experimental/Transforms/ResourceSharing/SharingSupport.h"
 #include "mlir/IR/BuiltinAttributes.h"
 #include "mlir/Pass/PassManager.h"
+#include "llvm/Support/Path.h"
 #include <algorithm>
 #include <cassert>
 #include <cmath>
