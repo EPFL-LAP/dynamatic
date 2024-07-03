@@ -15,3 +15,5 @@ add_dynamatic_library(DynamaticSupport
   MLIRSupport
   MLIRAffineDialect
 )
+
+add_subdirectory(Espresso)

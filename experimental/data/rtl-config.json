@@ -217,7 +217,7 @@
     ],
     "generic": "$DYNAMATIC/experimental/data/vhdl/handshake/dataless/tfifo.vhd",
     "module-name": "tfifo_dataless",
-    "dependencies": ["elastic_fifo_inner"]
+    "dependencies": ["elastic_fifo_inner_dataless"]
   },
   {
     "name": "handshake.tehb",
@@ -226,7 +226,7 @@
       { "name": "DATA_WIDTH", "type": "unsigned", "lb": 1 }
     ],
     "generic": "$DYNAMATIC/experimental/data/vhdl/handshake/tfifo.vhd",
-    "dependencies": ["elastic_fifo_inner_dataless"]
+    "dependencies": ["elastic_fifo_inner"]
   },
   {
     "name": "handshake.fork",

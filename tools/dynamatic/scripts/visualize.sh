@@ -12,13 +12,17 @@ F_DOT=$2
 F_WLF=$3
 OUTPUT_DIR=$4
 KERNEL_NAME=$5
+EXPERIMENTAL=$6
 
 # Generated directories/files
 VISUAL_DIR="$OUTPUT_DIR/visual"
+F_CSV="$VISUAL_DIR/sim.csv"
 F_DOT_POS_TMP="$VISUAL_DIR/$KERNEL_NAME.tmp.dot"
 F_DOT_POS="$VISUAL_DIR/$KERNEL_NAME.dot"
 
 # Shortcuts
+COMP_DIR="$OUTPUT_DIR/comp"
+SIM_DIR="$OUTPUT_DIR/sim"
 WLF2CSV="$DYNAMATIC_DIR/visual-dataflow/wlf2csv.py"
 VISUAL_DATAFLOW_BIN="$DYNAMATIC_DIR/bin/visual-dataflow"
 
@@ -30,7 +34,12 @@ VISUAL_DATAFLOW_BIN="$DYNAMATIC_DIR/bin/visual-dataflow"
 rm -rf "$VISUAL_DIR" && mkdir -p "$VISUAL_DIR"
 
 # Convert the Modelsim waveform to a CSV for the visualizer 
-python3 "$WLF2CSV" "$F_DOT" "$F_WLF" "$VISUAL_DIR"
+if [[ $EXPERIMENTAL -eq 0 ]]; then
+  python3 "$WLF2CSV" "$F_DOT" "$F_WLF" "$VISUAL_DIR"
+else
+  "$DYNAMATIC_DIR/bin/wlf2csv" "$COMP_DIR/handshake_export.mlir" \
+    $SIM_DIR/HLS_VERIFY/vsim.wlf $KERNEL_NAME > $F_CSV
+fi
 exit_on_fail "Failed to generate channel changes from waveform" "Generated channel changes"
 
 # Generate a version of the DOT with positioning information
@@ -40,5 +49,6 @@ exit_on_fail "Failed to add positioning info. to DOT" "Added positioning info. t
 rm "$F_DOT_POS_TMP"
 
 # Launch the dataflow visualizer
-"$VISUAL_DATAFLOW_BIN" "--dot=$F_DOT_POS" "--csv=$VISUAL_DIR/sim.csv" \
-  2>&1 >/dev/null &
+echo_info "Launching visualizer..."
+"$VISUAL_DATAFLOW_BIN" "--dot=$F_DOT_POS" "--csv=$F_CSV" >/dev/null
+exit_on_fail "Failed to run visualizer" "Visualizer closed"

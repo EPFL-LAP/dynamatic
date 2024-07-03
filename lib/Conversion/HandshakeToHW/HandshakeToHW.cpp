@@ -300,7 +300,15 @@ static handshake::ChannelType channelWrapper(Type t) {
         return handshake::ChannelType::get(
             IntegerType::get(nt.getContext(), 0));
       })
-      .Default([](Type t) { return handshake::ChannelType::get(t); });
+      .Default([](Type t) {
+        if (isa<FloatType>(t)) {
+          // At the HW/RTL level we treat everything as opaque bitvectors, so we
+          // make everything IntegerType's (only the width matters)
+          return handshake::ChannelType::get(
+              IntegerType::get(t.getContext(), t.getIntOrFloatBitWidth()));
+        }
+        return handshake::ChannelType::get(t);
+      });
 }
 
 /// Attempts to find an external HW module in the MLIR module with the
