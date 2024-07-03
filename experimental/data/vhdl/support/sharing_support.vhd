@@ -5,7 +5,14 @@ use ieee.numeric_std.all;
 -- Simple request handling: it just takes whatever is more prioritized
 -- > request : a vector of requests encoded as 0/1
 -- > grant : a one-hot encoded signal indicates which request has been granted
--- The convention is that MSBs are more prioritized than LSBs
+-- The convention is that LSBs are more prioritized than MSBs
+
+-- for example, imagine you have 2 request lines have value "11", let's compute
+-- the corresponding grant signal
+-- => ("11" and (not ("11" - 1)))
+-- => ("11" and (not ("11" + "11")))
+-- => ("11" and (not ("10")))
+-- => ("11" and "01") => "01", this indicates the LSB is granted.
 
 entity bitscan is
   generic (
