@@ -104,12 +104,16 @@ begin
         ip_lhs, ip_rhs, ip_unordered, ip_result
       );
     elsif cmp_predicate = "ORD" generate 
+      -- This predicate only tests if all inputs are ordered,
+      -- hence in principle any IP would work
       operator : entity work.FloatingPointComparatorEQ(arch)
       port map(
         clk, '1', 
         ip_lhs, ip_rhs, ip_unordered, ip_result
       );
     else generate -- cmp_predicate = "UNO"
+      -- This predicate only tests if any input is unordered,
+      -- hence in principle any IP would work
       operator : entity work.FloatingPointComparatorEQ(arch)
       port map(
         clk, '1', 
