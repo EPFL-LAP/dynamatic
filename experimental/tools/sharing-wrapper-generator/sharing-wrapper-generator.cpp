@@ -7,6 +7,7 @@
 //===----------------------------------------------------------------------===//
 //
 // RTL generator for the `handshake.sharing_wrapper` MLIR operation.
+// See operation's TableGen entry for port convention and functionality.
 //
 //===----------------------------------------------------------------------===//
 
@@ -266,6 +267,7 @@ void printVhdlImpl(mlir::raw_indented_ostream &os, const unsigned &dataWidth,
   }
   os << "\n";
 
+  // Condition buffer
   os << "cond_buffer : entity work.ofifo(arch)\ngeneric map(" << latency << ", "
      << groupSize << ")\n";
   os << "port map(\n";
@@ -277,7 +279,7 @@ void printVhdlImpl(mlir::raw_indented_ostream &os, const unsigned &dataWidth,
   os << "outs_ready => cond_buffer_out0_ready\n";
   os << ");\n\n";
 
-  // -- Branch -- //
+  // Branch
   os << "branch : entity work.crush_oh_branch(arch)\ngeneric map(" << groupSize
      << ", " << dataWidth << ")\nport map(\n";
   os << "ins => ins(" << groupSize * numInputOperands << "),\n";
@@ -301,7 +303,7 @@ void printVhdlImpl(mlir::raw_indented_ostream &os, const unsigned &dataWidth,
   }
   os << ");\n\n";
 
-  // -- Output Buffers --//
+  // Output buffers
   for (unsigned i = 0; i < groupSize; i++) {
     os << "out_buffer" << i << " : entity work.tfifo(arch)\ngeneric map("
        << listOfCredits[i] << ", " << dataWidth << ")\n";
@@ -316,7 +318,7 @@ void printVhdlImpl(mlir::raw_indented_ostream &os, const unsigned &dataWidth,
     os << ");\n\n";
   }
 
-  // -- Output Forks -- //
+  // Output lazy forks
   for (unsigned i = 0; i < groupSize; i++) {
     os << "fork" << i << " : entity work.lazy_fork(arch)\ngeneric map(2, "
        << dataWidth << ")\n";
@@ -334,7 +336,7 @@ void printVhdlImpl(mlir::raw_indented_ostream &os, const unsigned &dataWidth,
     os << ");\n\n";
   }
 
-  // -- Credits -- //
+  // Credit counters
   for (unsigned i = 0; i < groupSize; i++) {
     os << "credit" << i
        << " : entity work.crush_credit_dataless(arch)\ngeneric map("
@@ -348,7 +350,7 @@ void printVhdlImpl(mlir::raw_indented_ostream &os, const unsigned &dataWidth,
     os << ");\n\n";
   }
 
-  // -- Output data
+  // Output data
   for (unsigned i = 0; i < groupSize; i++) {
     os << "outs(" << i << ") <= out_fork" << i << "_out0_data;\n";
     os << "outs_valid(" << i << ") <= out_fork" << i << "_out0_valid;\n";
