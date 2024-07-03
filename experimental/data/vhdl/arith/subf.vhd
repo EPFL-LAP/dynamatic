@@ -21,33 +21,27 @@ entity subf is
     lhs_ready    : out std_logic;
     rhs_ready    : out std_logic
   );
+begin
+  assert BITWIDTH=32
+  report "subf currently only support 32-bit floating point operands"
+  severity failure;
 end entity;
 
 architecture arch of subf is
-
-  component array_RAM_subf_32bkb is
-    generic (
-      ID         : integer := 1;
-      NUM_STAGE  : integer := 10;
-      din0_WIDTH : integer := 32;
-      din1_WIDTH : integer := 32;
-      dout_WIDTH : integer := 32
-    );
-    port (
-      clk   : in  std_logic;
-      reset : in  std_logic;
-      ce    : in  std_logic;
-      din0  : in  std_logic_vector(din0_WIDTH - 1 downto 0);
-      din1  : in  std_logic_vector(din1_WIDTH - 1 downto 0);
-      dout  : out std_logic_vector(dout_WIDTH - 1 downto 0)
-    );
-  end component;
-
   signal join_valid                         : std_logic;
   signal buff_valid, oehb_valid, oehb_ready : std_logic;
-  signal oehb_dataOut, oehb_datain          : std_logic;
+
+  -- subf is the same as addf, but we flip the sign bit of rhs
+  signal rhs_neg : std_logic_vector(BITWIDTH - 1 downto 0);
+
+  -- intermediate input signals for IEEE-754 to Flopoco-simple-float conversion
+  signal ip_lhs, ip_rhs : std_logic_vector(BITWIDTH downto 0);
+
+  -- intermediate output signal for Flopoco-simple-float to IEEE-754 conversion
+  signal ip_result : std_logic_vector(BITWIDTH downto 0);
 
 begin
+
   join_inputs : entity work.join(arch) generic map(2)
     port map(
       -- inputs
@@ -77,18 +71,39 @@ begin
       outs_ready => result_ready,
       outs_valid => result_valid,
       ins_ready  => oehb_ready,
-      ins(0)     => oehb_datain,
-      outs(0)    => oehb_dataOut
+      ins(0)     => "0",
+      outs(0)    => open
     );
 
-  array_RAM_fsub_32ns_32ns_32_10_full_dsp_1_U1 : component array_RAM_subf_32bkb
-    port map(
-      clk   => clk,
-      reset => rst,
-      ce    => oehb_ready,
-      din0  => lhs,
-      din1  => rhs,
-      dout  => result
+
+  ieee2nfloat_0: entity work.InputIEEE_32bit(arch)
+    port map (
+        X => lhs,
+        R => ip_lhs
     );
+
+  rhs_neg <= not rhs(BITWIDTH - 1) & rhs(BITWIDTH - 2 downto 0);
+
+  ieee2nfloat_1: entity work.InputIEEE_32bit(arch)
+    port map (
+        X => rhs_neg,
+        R => ip_rhs
+    );
+
+  nfloat2ieee : entity work.OutputIEEE_32bit(arch)
+    port map (
+        X => ip_result,
+        R => result
+    );
+
+  operator :  component work.FloatingPointAdder(arch)
+  port map (
+      clk   => clk,
+      ce => oehb_ready,
+      X  => ip_lhs,
+      Y  => ip_rhs,
+      R  => ip_result
+  );
+
 
 end architecture;
