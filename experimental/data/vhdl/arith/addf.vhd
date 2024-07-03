@@ -23,7 +23,7 @@ entity addf is
   );
 begin
   assert BITWIDTH=32
-  report "addf currently only support 32-bit floating point operands"
+  report "addf currently only supports 32-bit floating point operands"
   severity failure;
 end entity;
 

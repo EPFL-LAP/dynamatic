@@ -24,7 +24,7 @@
       { "name": "DATA_WIDTH", "type": "unsigned", "generic": true }
     ],
     "generator": "\"$DYNAMATIC/bin/generators/rtl-cmpf-generator\" \"$DYNAMATIC/experimental/data/vhdl/arith/cmpf.vhd\" \"$OUTPUT_DIR/$MODULE_NAME.vhd\" $MODULE_NAME $PREDICATE",
-    "dependencies": ["join", "delay_buffer", "flopoco_ip_cores"]
+    "dependencies": ["join", "flopoco_ip_cores"]
   },
   {
     "name": "arith.cmpi",
@@ -39,7 +39,7 @@
     "name": "arith.divf",
     "parameters": [{ "name": "DATA_WIDTH", "type": "unsigned" }],
     "generic": "$DYNAMATIC/experimental/data/vhdl/arith/divf.vhd",
-    "dependencies": ["join", "delay_buffer", "oehb"]
+    "dependencies": ["join", "delay_buffer", "oehb", "flopoco_ip_cores"]
   },
   {
     "name": "arith.divsi",

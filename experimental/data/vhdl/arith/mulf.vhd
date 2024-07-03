@@ -23,7 +23,7 @@ entity mulf is
   );
 begin
   assert BITWIDTH=32
-  report "mulf currently only support 32-bit floating point operands"
+  report "mulf currently only supports 32-bit floating point operands"
   severity failure;
 end entity;
 
