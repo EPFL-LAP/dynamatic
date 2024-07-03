@@ -23,7 +23,7 @@ entity ENTITY_NAME is
   );
 begin
   assert BITWIDTH=32
-  report "ENTITY_NAME currently only support 32-bit floating point operands"
+  report "ENTITY_NAME currently only supports 32-bit floating point operands"
   severity failure;
 end entity;
 
@@ -35,7 +35,7 @@ architecture arch of ENTITY_NAME is
   signal ip_unordered : std_logic;
   signal ip_result : std_logic;
 
-  constant alu_opcode : std_logic_vector(4 downto 0) := "COMPARATOR";
+  constant cmp_predicate : string := "COMPARATOR";
 
 begin
   join_inputs : entity work.join(arch) generic map(2)
@@ -67,49 +67,49 @@ begin
     );
 
   gen_flopoco_ip :
-    if alu_opcode = "00001" or alu_opcode = "01000" generate
+    if cmp_predicate = "OEQ" or cmp_predicate = "UEQ" generate
       operator : entity work.FloatingPointComparatorEQ(arch)
       port map(
         clk, '1', 
         ip_lhs, ip_rhs, ip_unordered, ip_result
       );
-    elsif alu_opcode = "00010" or alu_opcode = "01001" generate 
+    elsif cmp_predicate = "OGT" or cmp_predicate = "UGT" generate 
       operator : entity work.FloatingPointComparatorGT(arch)
       port map(
         clk, '1', 
         ip_lhs, ip_rhs, ip_unordered, ip_result
       );
-    elsif alu_opcode = "00011" or alu_opcode = "01010" generate 
+    elsif cmp_predicate = "OGE" or cmp_predicate = "UGE" generate 
       operator : entity work.FloatingPointComparatorGE(arch)
       port map(
         clk, '1', 
         ip_lhs, ip_rhs, ip_unordered, ip_result
       );
-    elsif alu_opcode = "00100" or alu_opcode = "01011" generate 
+    elsif cmp_predicate = "OLT" or cmp_predicate = "ULT" generate 
       operator : entity work.FloatingPointComparatorLT(arch)
       port map(
         clk, '1', 
         ip_lhs, ip_rhs, ip_unordered, ip_result
       );
-    elsif alu_opcode = "00101" or alu_opcode = "01100" generate 
+    elsif cmp_predicate = "OLE" or cmp_predicate = "ULE" generate 
       operator : entity work.FloatingPointComparatorLE(arch)
       port map(
         clk, '1', 
         ip_lhs, ip_rhs, ip_unordered, ip_result
       );
-    elsif alu_opcode = "00110" or alu_opcode = "01101" generate 
+    elsif cmp_predicate = "ONE" or cmp_predicate = "UNE" generate 
       operator : entity work.FloatingPointComparatorEQ(arch)
       port map(
         clk, '1', 
         ip_lhs, ip_rhs, ip_unordered, ip_result
       );
-    elsif alu_opcode = "00111" generate 
+    elsif cmp_predicate = "ORD" generate 
       operator : entity work.FloatingPointComparatorEQ(arch)
       port map(
         clk, '1', 
         ip_lhs, ip_rhs, ip_unordered, ip_result
       );
-    else generate 
+    else generate -- cmp_predicate = "UNO"
       operator : entity work.FloatingPointComparatorEQ(arch)
       port map(
         clk, '1', 
@@ -119,28 +119,28 @@ begin
      
   gen_result_signal :
     if
-    alu_opcode = "00001" or
-    alu_opcode = "00010" or
-    alu_opcode = "00011" or
-    alu_opcode = "00100" or
-    alu_opcode = "00101" generate
+    cmp_predicate = "OEQ" or
+    cmp_predicate = "OGT" or
+    cmp_predicate = "OGE" or
+    cmp_predicate = "OLT" or
+    cmp_predicate = "OLE" generate
       result(0) <= not ip_unordered and ip_result;
     elsif
-    alu_opcode = "00110" generate
+    cmp_predicate = "ONE" generate
       result(0) <= not ip_unordered and not ip_result;
-    elsif alu_opcode = "00111" generate
+    elsif cmp_predicate = "ORD" generate
       result(0) <= not ip_unordered;
     elsif 
-    alu_opcode = "01000" or
-    alu_opcode = "01001" or
-    alu_opcode = "01010" or
-    alu_opcode = "01011" or
-    alu_opcode = "01100" generate
+    cmp_predicate = "UEQ" or
+    cmp_predicate = "UGT" or
+    cmp_predicate = "UGE" or
+    cmp_predicate = "ULT" or
+    cmp_predicate = "ULE" generate
       result(0) <= ip_unordered and ip_result;
     elsif
-    alu_opcode = "01101" generate
+    cmp_predicate = "UNE" generate
       result(0) <= ip_unordered and not ip_result;
-    else generate -- "01110" UNO
+    else generate -- cmp_predicate = UNO
       result(0) <= ip_unordered;
     end generate;
 
