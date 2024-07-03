@@ -258,7 +258,7 @@ static void reconnectMergeOps(Region &region,
     }
   }
 
-  // Connect select operand of muxes to control merge's index result in all
+  // Connect  select operand of muxes to control merge's index result in all
   // blocks with more than one predecessor
   for (Block &block : region) {
     if (getBlockPredecessorCount(&block) > 1) {
@@ -948,6 +948,11 @@ bool HandshakeLowering::sameLoop(Block *source, Block *dest) {
   DenseMap<Block *, BlockLoopInfo> blockToLoopInfoMap =
       findLoopDetails(li, region);
 
+  for (auto [b, bi] : blockToLoopInfoMap) {
+    llvm::errs() << &b << "\n";
+    llvm::errs() << bi.isHeader << "\n";
+  }
+
   auto itSource = blockToLoopInfoMap.find(source);
   auto itDest = blockToLoopInfoMap.find(dest);
 
@@ -1046,9 +1051,14 @@ void HandshakeLowering::constructGroupsGraph(
 }
 
 LogicalResult HandshakeLowering::print(ConversionPatternRewriter &rewriter) {
+  llvm::errs() << "Printing region\n";
+  for (Block &block : region.getBlocks()) {
+    llvm::errs() << block << "\n";
+  }
+  llvm::errs() << "Now printing loop info\n";
   for (mlir::Block &block : region.getBlocks()) {
     for (mlir::Block &block2 : region.getBlocks()) {
-      if (sameLoop(&block, &block2))
+      if ((&block != &block2) && sameLoop(&block, &block2))
         llvm::errs() << "Blocks in loop " << block << " and " << block2 << "\n";
     }
   }

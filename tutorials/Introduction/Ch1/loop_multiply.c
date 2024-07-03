@@ -11,7 +11,7 @@ unsigned loop_multiply(in_int_t a[N]) {
   return x;
 }
 
-
+/*
 unsigned loop(in_int_t A[N],in_int_t B[N],in_int_t C[N], in_int_t addr[N]){
   unsigned sum = 0;
   for (unsigned i = 0; i < N; ++i) {
@@ -24,9 +24,9 @@ unsigned loop(in_int_t A[N],in_int_t B[N],in_int_t C[N], in_int_t addr[N]){
     A[j] = C[j]*2;
   }
   return sum;
-}
+}*/
 
-/*
+
 int main(void) {
   in_int_t a[N];
   // Initialize a to [0, 1, 0, 1, ...]
@@ -34,9 +34,9 @@ int main(void) {
     a[i] = i % 2;
   CALL_KERNEL(loop_multiply, a);
   return 0;
-}*/
+}
 
-
+/*
 int main(void){
   in_int_t A[N];
   in_int_t B[N];
@@ -50,4 +50,5 @@ int main(void){
   }
   CALL_KERNEL(loop, A,B,C,addr);
   return 0;
-}
+}*/
+
