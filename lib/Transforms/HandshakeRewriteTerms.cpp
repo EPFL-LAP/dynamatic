@@ -23,7 +23,6 @@
 #include "mlir/IR/ValueRange.h"
 #include "mlir/Support/LogicalResult.h"
 #include "mlir/Transforms/GreedyPatternRewriteDriver.h"
-#include "llvm/Support/Casting.h"
 #include <vector>
 
 using namespace mlir;
@@ -31,6 +30,9 @@ using namespace dynamatic;
 
 namespace {
 
+// Removes Conditional Branch and MUX operation pairs if both the inputs of the
+// MUX are outputs of the Conditional Branch and the select operand of the MUX
+// is the condition operand of the Conditional Branch.
 struct RemoveBranchMuxPairs
     : public OpRewritePattern<handshake::ConditionalBranchOp> {
   using OpRewritePattern<handshake::ConditionalBranchOp>::OpRewritePattern;
@@ -67,6 +69,9 @@ struct RemoveBranchMuxPairs
   }
 };
 
+// Removes Conditional Branch and Merge operation pairs if both the inputs of
+// the Merge are outputs of the Conditional Branch. The result of the Merge is
+// replaced with the data operand of the Conditional Branch.
 struct RemoveBranchMergePairs
     : public OpRewritePattern<handshake::ConditionalBranchOp> {
   using OpRewritePattern<handshake::ConditionalBranchOp>::OpRewritePattern;
@@ -101,6 +106,10 @@ struct RemoveBranchMergePairs
   }
 };
 
+// Removes Conditional Branch and Control Merge operation pairs if both the
+// inputs of the Control Merge are outputs of the Conditional Branch. The
+// results of the Merge are replaced with the data operand and condition
+// operands of the Conditional Branch.
 struct RemoveBranchCMergePairs
     : public OpRewritePattern<handshake::ConditionalBranchOp> {
   using OpRewritePattern<handshake::ConditionalBranchOp>::OpRewritePattern;
@@ -137,6 +146,9 @@ struct RemoveBranchCMergePairs
   }
 };
 
+// Removes Mux and Branch operation pairs there exits a loop between the Mux and
+// the Branch. The select operand of the Mux and the condition operand of the
+// Branch are sinked.
 struct RemoveMuxBranchLoopPairs : public OpRewritePattern<handshake::MuxOp> {
   using OpRewritePattern<handshake::MuxOp>::OpRewritePattern;
 
@@ -184,6 +196,8 @@ struct RemoveMuxBranchLoopPairs : public OpRewritePattern<handshake::MuxOp> {
   }
 };
 
+// Removes Merge and Branch operation pairs there exits a loop between the Merge
+// and the Branch. The condition operand of the Branch is sinked.
 struct RemoveMergeBranchLoopPairs
     : public OpRewritePattern<handshake::MergeOp> {
   using OpRewritePattern<handshake::MergeOp>::OpRewritePattern;
@@ -232,6 +246,9 @@ struct RemoveMergeBranchLoopPairs
   }
 };
 
+// Removes Control Merge and Branch operation pairs there exits a loop between
+// the Control Merge and the Branch. The index result of the Control Merge is
+// derived from a merge operation whose operands are case dependent.
 struct RemoveCMergeBranchLoopPairs
     : public OpRewritePattern<handshake::ControlMergeOp> {
   using OpRewritePattern<handshake::ControlMergeOp>::OpRewritePattern;
@@ -307,6 +324,8 @@ struct RemoveCMergeBranchLoopPairs
   }
 };
 
+// Removes Fork operations that are followed by another Fork operation. A new
+// fork is created with the same input as the first fork.
 struct RemoveConsecutiveForksPairs
     : public OpRewritePattern<handshake::ForkOp> {
   using OpRewritePattern<handshake::ForkOp>::OpRewritePattern;
@@ -358,6 +377,8 @@ struct RemoveConsecutiveForksPairs
   }
 };
 
+// Replaces Suppress operation followed by a fork operation with multiple fork
+// and suppress operation pairs.
 struct RemoveSupressForkPairs
     : public OpRewritePattern<handshake::ConditionalBranchOp> {
   using OpRewritePattern<handshake::ConditionalBranchOp>::OpRewritePattern;
@@ -419,6 +440,9 @@ struct RemoveSupressForkPairs
   }
 };
 
+// Replaces Suppress operation followed by another Suppress operation with a
+// mux operation followed by a suppress operation. The condition operand of the
+// new suppress operation is the output of the newly created mux operation.
 struct RemoveSuppressSuppressPairs
     : public OpRewritePattern<handshake::ConditionalBranchOp> {
   using OpRewritePattern<handshake::ConditionalBranchOp>::OpRewritePattern;
@@ -471,6 +495,8 @@ struct RemoveSuppressSuppressPairs
   }
 };
 
+//  Replaces a conditional branch operation with two fork and suppress operation
+//  pairs.
 struct BranchToSupressForkPairs
     : public OpRewritePattern<handshake::ConditionalBranchOp> {
   using OpRewritePattern<handshake::ConditionalBranchOp>::OpRewritePattern;
@@ -514,6 +540,10 @@ struct BranchToSupressForkPairs
   }
 };
 
+// Removes a mux operation if both its inputs are outputs of two different
+// suppress operations that are fed from the same fork operation and a few other
+// conditions on the condition operands of the two suppresses and the select
+// operand of the mux are met.
 struct RemoveForkSupressPairsMux : public OpRewritePattern<handshake::MuxOp> {
   using OpRewritePattern<handshake::MuxOp>::OpRewritePattern;
 
@@ -567,7 +597,6 @@ struct RemoveForkSupressPairsMux : public OpRewritePattern<handshake::MuxOp> {
     }
     if (!replace)
       return failure();
-    // rewriter.replaceOp(muxOp, branchIn2);
     eraseSinkUsers(suppress1.getTrueResult(), rewriter);
     eraseSinkUsers(suppress2.getTrueResult(), rewriter);
     rewriter.create<handshake::SinkOp>(forkC->getLoc(), select);
@@ -582,6 +611,8 @@ struct RemoveForkSupressPairsMux : public OpRewritePattern<handshake::MuxOp> {
   }
 };
 
+/// Simple driver for the Handshake Rewrite Terms pass, based on a greedy
+/// pattern rewriter.
 struct HandshakeRewriteTermsPass
     : public dynamatic::impl::HandshakeRewriteTermsBase<
           HandshakeRewriteTermsPass> {
@@ -595,9 +626,10 @@ struct HandshakeRewriteTermsPass
     config.enableRegionSimplification = false;
     RewritePatternSet patterns{ctx};
     patterns.add<RemoveBranchMuxPairs, RemoveBranchMergePairs,
-                 RemoveBranchCMergePairs,  RemoveConsecutiveForksPairs,
-                 RemoveMuxBranchLoopPairs, RemoveMergeBranchLoopPairs, BranchToSupressForkPairs,
-                 RemoveSuppressSuppressPairs, RemoveSupressForkPairs, RemoveForkSupressPairsMux>(ctx);
+                 RemoveBranchCMergePairs, RemoveConsecutiveForksPairs,
+                 RemoveMuxBranchLoopPairs, RemoveMergeBranchLoopPairs,
+                 BranchToSupressForkPairs, RemoveSuppressSuppressPairs,
+                 RemoveSupressForkPairs, RemoveForkSupressPairsMux>(ctx);
     if (failed(applyPatternsAndFoldGreedily(mod, std::move(patterns), config)))
       return signalPassFailure();
   };
