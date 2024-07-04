@@ -85,6 +85,4 @@ begin
       result_ready,
       result_valid
     );
-
-  result(0) <= '0';
 end architecture;

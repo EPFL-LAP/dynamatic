@@ -108,6 +108,37 @@ protected:
   Constraints *constraints = nullptr;
 };
 
+/// Boolean RTL type, mappable to a `bol` in C++.
+class RTLBooleanType : public RTLType {
+  using RTLType::RTLType;
+
+public:
+  /// Unsigned type constraints.
+  struct BoolConstraints : public Constraints {
+    /// Equality constraint.
+    std::optional<unsigned> eq;
+    /// Difference constraint.
+    std::optional<unsigned> ne;
+
+    bool verify(Attribute attr) const override;
+  };
+
+  bool constraintsFromJSON(const llvm::json::Object &object,
+                           Constraints *&constraints,
+                           llvm::json::Path path) override;
+
+  std::string serialize(Attribute attr) const override;
+
+private:
+  /// Keywords
+  static constexpr StringLiteral EQ = StringLiteral("eq"),
+                                 NE = StringLiteral("ne");
+
+  /// Errors
+  static constexpr StringLiteral ERR_UNSUPPORTED =
+      StringLiteral(R"(unknown unsigned constraint: options are "eq" or "ne")");
+};
+
 /// Unsigned RTL type, mappable to an `unsigned` in C++.
 class RTLUnsignedType : public RTLType {
   using RTLType::RTLType;
@@ -132,14 +163,6 @@ public:
                            llvm::json::Path path) override;
 
   std::string serialize(Attribute attr) const override;
-
-  /// Decodes a string into an optional unsigned if the string not represents a
-  /// valid non-negative number. Otherwise, `std::nullopt` is returned.
-  static std::optional<unsigned> decode(StringRef value) {
-    if (llvm::any_of(value.str(), [](char c) { return !isdigit(c); }))
-      return {};
-    return std::stoi(value.str());
-  }
 
 private:
   /// Keywords

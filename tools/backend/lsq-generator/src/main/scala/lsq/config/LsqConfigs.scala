@@ -30,7 +30,9 @@ case class LsqConfigs(
     numStores: List[Int],
     accessType: String,
     bufferDepth: Int,
-    name: String
+    name: String,
+    experimental: Boolean,
+    toMC: Boolean
 ) {
   def fifoDepth_M: Int = max(fifoDepth_S, fifoDepth_L)
   def loadPortIdWidth: Width = max(1, log2Ceil(numLoadPorts)).W

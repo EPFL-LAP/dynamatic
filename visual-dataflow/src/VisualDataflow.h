@@ -87,7 +87,8 @@ private:
   HSlider *cycleSlider;
 
   /// Creates a graph from the circuits corresponding DOT and CSV file
-  void createGraph(std::string inputDOTFile, std::string inputCSVFile);
+  dynamatic::LogicalResult createGraph(std::string inputDOTFile,
+                                       std::string inputCSVFile);
   /// Draws each component of the graph in Godot
   void drawGraph();
   /// Sets the color of all edges which change states at the given clock cycle

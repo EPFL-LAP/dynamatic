@@ -17,7 +17,6 @@
 #include "mlir/IR/OpDefinition.h"
 #include "mlir/IR/Value.h"
 #include "mlir/Transforms/InliningUtils.h"
-#include "llvm/Support/ErrorHandling.h"
 
 using namespace dynamatic;
 
@@ -131,17 +130,15 @@ std::string handshake::MemoryControllerOp::getOperandName(unsigned idx) {
   if (std::string name = getMemOperandName(mcPorts, idx); !name.empty())
     return name;
 
-  // Try to get the operand name from a potential LSQ port
-  if (mcPorts.hasConnectionToLSQ()) {
-    LSQLoadStorePort lsqPort = mcPorts.getLSQPort();
-    if (lsqPort.getLoadAddrInputIndex() == idx)
-      return "lsqLdAddr";
-    if (lsqPort.getStoreAddrInputIndex() == idx)
-      return "lsqStAddr";
-    if (lsqPort.getStoreDataInputIndex() == idx)
-      return "lsqStData";
-  }
-  llvm_unreachable("faulty port logic");
+  // Get the operand name from a port to an LSQ
+  assert(mcPorts.hasConnectionToLSQ() && "expected MC to connect to LSQ");
+  LSQLoadStorePort lsqPort = mcPorts.getLSQPort();
+  if (lsqPort.getLoadAddrInputIndex() == idx)
+    return getArrayElemName(LD_ADDR, mcPorts.getNumPorts<LoadPort>());
+  if (lsqPort.getStoreAddrInputIndex() == idx)
+    return getArrayElemName(ST_ADDR, mcPorts.getNumPorts<StorePort>());
+  assert(lsqPort.getStoreDataInputIndex() == idx && "unknown MC/LSQ operand");
+  return getArrayElemName(ST_DATA, mcPorts.getNumPorts<StorePort>());
 }
 
 std::string handshake::MemoryControllerOp::getResultName(unsigned idx) {
@@ -152,13 +149,11 @@ std::string handshake::MemoryControllerOp::getResultName(unsigned idx) {
   if (std::string name = getMemResultName(mcPorts, idx); !name.empty())
     return name;
 
-  // Try to get the result name from a potential LSQ port
-  if (mcPorts.hasConnectionToLSQ()) {
-    LSQLoadStorePort lsqPort = mcPorts.getLSQPort();
-    if (lsqPort.getLoadDataOutputIndex() == idx)
-      return "lsqLdData";
-  }
-  llvm_unreachable("faulty port logic");
+  // Get the operand name from a port to an LSQ
+  assert(mcPorts.hasConnectionToLSQ() && "expected MC to connect to LSQ");
+  LSQLoadStorePort lsqPort = mcPorts.getLSQPort();
+  assert(lsqPort.getLoadDataOutputIndex() == idx && "unknown MC/LSQ result");
+  return getArrayElemName(LD_DATA, mcPorts.getNumPorts<LoadPort>());
 }
 
 std::string handshake::LSQOp::getOperandName(unsigned idx) {
@@ -173,13 +168,11 @@ std::string handshake::LSQOp::getOperandName(unsigned idx) {
   if (std::string name = getMemOperandName(lsqPorts, idx); !name.empty())
     return name;
 
-  // Try to get the operand name from a potential MC port
-  if (connectsToMC) {
-    MCLoadStorePort mcPort = lsqPorts.getMCPort();
-    if (mcPort.getLoadDataInputIndex() == idx)
-      return "mcLdData";
-  }
-  llvm_unreachable("faulty port logic");
+  // Get the operand name from a port to a memory controller
+  assert(lsqPorts.hasConnectionToMC() && "expected LSQ to connect to MC");
+  assert(lsqPorts.getMCPort().getLoadDataInputIndex() == idx &&
+         "unknown LSQ/MC operand");
+  return "ldDataFromMC";
 }
 
 std::string handshake::LSQOp::getResultName(unsigned idx) {
@@ -190,18 +183,15 @@ std::string handshake::LSQOp::getResultName(unsigned idx) {
   if (std::string name = getMemResultName(lsqPorts, idx); !name.empty())
     return name;
 
-  // Go through ports to other memory interfaces
-  // Try to get the operand name from a potential MC port
-  if (lsqPorts.hasConnectionToMC()) {
-    MCLoadStorePort mcPort = lsqPorts.getMCPort();
-    if (mcPort.getLoadAddrOutputIndex() == idx)
-      return "mcLdAddr";
-    if (mcPort.getStoreAddrOutputIndex() == idx)
-      return "mcStAddr";
-    if (mcPort.getStoreDataOutputIndex() == idx)
-      return "mcStData";
-  }
-  llvm_unreachable("faulty port logic");
+  // Get the operand name from a port to a memory controller
+  assert(lsqPorts.hasConnectionToMC() && "expected LSQ to connect to MC");
+  MCLoadStorePort mcPort = lsqPorts.getMCPort();
+  if (mcPort.getLoadAddrOutputIndex() == idx)
+    return "ldAddrToMC";
+  if (mcPort.getStoreAddrOutputIndex() == idx)
+    return "stAddrToMC";
+  assert(mcPort.getStoreDataOutputIndex() == idx && "unknown LSQ/MC result");
+  return "stDataToMC";
 }
 
 //===----------------------------------------------------------------------===//

@@ -15,10 +15,8 @@
 #include "Graph.h"
 #include "GraphEdge.h"
 #include "GraphNode.h"
-#include "llvm/ADT/StringRef.h"
 #include <fstream>
 #include <iostream>
-#include <regex>
 #include <set>
 #include <sstream>
 #include <string>

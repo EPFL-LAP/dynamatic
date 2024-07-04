@@ -2,44 +2,40 @@ library ieee;
 use ieee.std_logic_1164.all;
 use work.types.all;
 
-entity lazy_fork is generic (
-  OUTPUTS  : integer;
-  BITWIDTH : integer);
-port (
-  -- inputs
-  ins        : in std_logic_vector(BITWIDTH - 1 downto 0);
-  ins_valid  : in std_logic;
-  clk        : in std_logic;
-  rst        : in std_logic;
-  outs_ready : in std_logic_vector(OUTPUTS - 1 downto 0);
-  -- outputs
-  ins_ready  : out std_logic;
-  outs       : out data_array (OUTPUTS - 1 downto 0)(BITWIDTH - 1 downto 0);
-  outs_valid : out std_logic_vector(OUTPUTS - 1 downto 0)
-);
-
+entity lazy_fork is
+  generic (
+    SIZE     : integer;
+    BITWIDTH : integer
+  );
+  port (
+    clk, rst : in std_logic;
+    -- input channel
+    ins       : in  std_logic_vector(BITWIDTH - 1 downto 0);
+    ins_valid : in  std_logic;
+    ins_ready : out std_logic;
+    -- output channels
+    outs       : out data_array (SIZE - 1 downto 0)(BITWIDTH - 1 downto 0);
+    outs_valid : out std_logic_vector(SIZE - 1 downto 0);
+    outs_ready : in  std_logic_vector(SIZE - 1 downto 0)
+  );
 end entity;
 
 architecture arch of lazy_fork is
-  signal allnReady : std_logic;
 begin
-
-  genericAnd : entity work.and_n generic map (OUTPUTS)
-    port map(outs_ready, allnReady);
-
-  valids : process (ins_valid, outs_ready, allnReady)
-  begin
-    for i in 0 to OUTPUTS - 1 loop
-      outs_valid(i) <= ins_valid and allnReady;
-    end loop;
-  end process;
-
-  ins_ready <= allnReady;
+  control : entity work.lazy_fork_dataless generic map (SIZE)
+    port map(
+      clk        => clk,
+      rst        => rst,
+      ins_valid  => ins_valid,
+      ins_ready  => ins_ready,
+      outs_valid => outs_valid,
+      outs_ready => outs_ready
+    );
 
   process (ins)
   begin
-    for I in 0 to OUTPUTS - 1 loop
-      outs(I) <= ins;
+    for i in 0 to SIZE - 1 loop
+      outs(i) <= ins;
     end loop;
   end process;
-end arch;
+end architecture;

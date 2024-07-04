@@ -3,23 +3,19 @@
     "name": "arith.addf",
     "parameters": [{ "name": "DATA_WIDTH", "type": "unsigned" }],
     "generic": "$DYNAMATIC/experimental/data/vhdl/arith/addf.vhd",
-    "dependencies": [
-      "handshake.join",
-      "support.delay_buffer",
-      "handshake.oehb_internal"
-    ]
+    "dependencies": ["join", "delay_buffer", "oehb"]
   },
   {
     "name": "arith.addi",
     "parameters": [{ "name": "DATA_WIDTH", "type": "unsigned" }],
     "generic": "$DYNAMATIC/experimental/data/vhdl/arith/addi.vhd",
-    "dependencies": ["handshake.join"]
+    "dependencies": ["join"]
   },
   {
     "name": "arith.andi",
     "parameters": [{ "name": "DATA_WIDTH", "type": "unsigned" }],
     "generic": "$DYNAMATIC/experimental/data/vhdl/arith/andi.vhd",
-    "dependencies": ["handshake.join"]
+    "dependencies": ["join"]
   },
   {
     "name": "arith.cmpf",
@@ -28,7 +24,7 @@
       { "name": "DATA_WIDTH", "type": "unsigned", "generic": true }
     ],
     "generator": "\"$DYNAMATIC/bin/generators/rtl-cmpf-generator\" \"$DYNAMATIC/experimental/data/vhdl/arith/cmpf.vhd\" \"$OUTPUT_DIR/$MODULE_NAME.vhd\" $MODULE_NAME $PREDICATE",
-    "dependencies": ["handshake.join", "support.delay_buffer"]
+    "dependencies": ["join", "delay_buffer"]
   },
   {
     "name": "arith.cmpi",
@@ -37,29 +33,25 @@
       { "name": "DATA_WIDTH", "type": "unsigned", "generic": true }
     ],
     "generator": "\"$DYNAMATIC/bin/generators/rtl-cmpi-generator\" \"$DYNAMATIC/experimental/data/vhdl/arith/cmpi.vhd\" \"$OUTPUT_DIR/$MODULE_NAME.vhd\" $MODULE_NAME $PREDICATE",
-    "dependencies": ["handshake.join"]
+    "dependencies": ["join"]
   },
   {
     "name": "arith.divf",
     "parameters": [{ "name": "DATA_WIDTH", "type": "unsigned" }],
     "generic": "$DYNAMATIC/experimental/data/vhdl/arith/divf.vhd",
-    "dependencies": [
-      "handshake.join",
-      "support.delay_buffer",
-      "handshake.oehb_internal"
-    ]
+    "dependencies": ["join", "delay_buffer", "oehb"]
   },
   {
     "name": "arith.divsi",
     "parameters": [{ "name": "DATA_WIDTH", "type": "unsigned" }],
     "generic": "$DYNAMATIC/experimental/data/vhdl/arith/divsi.vhd",
-    "dependencies": ["handshake.join", "support.delay_buffer"]
+    "dependencies": ["join", "delay_buffer"]
   },
   {
     "name": "arith.divui",
     "parameters": [{ "name": "DATA_WIDTH", "type": "unsigned" }],
     "generic": "$DYNAMATIC/experimental/data/vhdl/arith/divui.vhd",
-    "dependencies": ["handshake.join", "support.delay_buffer"]
+    "dependencies": ["join", "delay_buffer"]
   },
   {
     "name": "arith.extsi",
@@ -81,33 +73,25 @@
     "name": "arith.maximumf",
     "parameters": [{ "name": "DATA_WIDTH", "type": "unsigned" }],
     "generic": "$DYNAMATIC/experimental/data/vhdl/arith/maximumf.vhd",
-    "dependencies": ["handshake.join", "support.delay_buffer"]
+    "dependencies": ["join", "delay_buffer"]
   },
   {
     "name": "arith.minimumf",
     "parameters": [{ "name": "DATA_WIDTH", "type": "unsigned" }],
     "generic": "$DYNAMATIC/experimental/data/vhdl/arith/minimumf.vhd",
-    "dependencies": ["handshake.join", "support.delay_buffer"]
+    "dependencies": ["join", "delay_buffer"]
   },
   {
     "name": "arith.mulf",
     "parameters": [{ "name": "DATA_WIDTH", "type": "unsigned" }],
     "generic": "$DYNAMATIC/experimental/data/vhdl/arith/mulf.vhd",
-    "dependencies": [
-      "handshake.join",
-      "support.delay_buffer",
-      "handshake.oehb_internal"
-    ]
+    "dependencies": ["join", "delay_buffer", "oehb"]
   },
   {
     "name": "arith.muli",
     "parameters": [{ "name": "DATA_WIDTH", "type": "unsigned" }],
     "generic": "$DYNAMATIC/experimental/data/vhdl/arith/muli.vhd",
-    "dependencies": [
-      "handshake.join",
-      "support.delay_buffer",
-      "handshake.oehb_internal"
-    ]
+    "dependencies": ["join", "delay_buffer", "oehb"]
   },
   {
     "name": "arith.negf",
@@ -118,7 +102,7 @@
     "name": "arith.ori",
     "parameters": [{ "name": "DATA_WIDTH", "type": "unsigned" }],
     "generic": "$DYNAMATIC/experimental/data/vhdl/arith/ori.vhd",
-    "dependencies": ["handshake.join"]
+    "dependencies": ["join"]
   },
   {
     "name": "arith.select",
@@ -130,35 +114,31 @@
     "name": "arith.shli",
     "parameters": [{ "name": "DATA_WIDTH", "type": "unsigned" }],
     "generic": "$DYNAMATIC/experimental/data/vhdl/arith/shli.vhd",
-    "dependencies": ["handshake.join"]
+    "dependencies": ["join"]
   },
   {
     "name": "arith.shrsi",
     "parameters": [{ "name": "DATA_WIDTH", "type": "unsigned" }],
     "generic": "$DYNAMATIC/experimental/data/vhdl/arith/shrsi.vhd",
-    "dependencies": ["handshake.join"]
+    "dependencies": ["join"]
   },
   {
     "name": "arith.shrui",
     "parameters": [{ "name": "DATA_WIDTH", "type": "unsigned" }],
     "generic": "$DYNAMATIC/experimental/data/vhdl/arith/shrui.vhd",
-    "dependencies": ["handshake.join"]
+    "dependencies": ["join"]
   },
   {
     "name": "arith.subf",
     "parameters": [{ "name": "DATA_WIDTH", "type": "unsigned" }],
     "generic": "$DYNAMATIC/experimental/data/vhdl/arith/subf.vhd",
-    "dependencies": [
-      "handshake.join",
-      "support.delay_buffer",
-      "handshake.oehb_internal"
-    ]
+    "dependencies": ["join", "delay_buffer", "oehb"]
   },
   {
     "name": "arith.subi",
     "parameters": [{ "name": "DATA_WIDTH", "type": "unsigned" }],
     "generic": "$DYNAMATIC/experimental/data/vhdl/arith/subi.vhd",
-    "dependencies": ["handshake.join"]
+    "dependencies": ["join"]
   },
   {
     "name": "arith.trunci",
@@ -172,109 +152,221 @@
     "name": "arith.xori",
     "parameters": [{ "name": "DATA_WIDTH", "type": "unsigned" }],
     "generic": "$DYNAMATIC/experimental/data/vhdl/arith/xori.vhd",
-    "dependencies": ["handshake.join"]
+    "dependencies": ["join"]
   },
   {
     "name": "handshake.oehb",
     "parameters": [
       { "name": "SLOTS", "type": "unsigned", "eq": 1, "generic": false },
-      { "name": "DATA_WIDTH", "type": "unsigned" }
+      { "name": "DATA_WIDTH", "type": "unsigned", "eq": 0, "generic": false }
     ],
-    "generic": "$DYNAMATIC/experimental/data/vhdl/handshake/oehb.vhd"
+    "generic": "$DYNAMATIC/experimental/data/vhdl/handshake/dataless/oehb.vhd",
+    "module-name": "oehb_dataless"
+  },
+  {
+    "name": "handshake.oehb",
+    "parameters": [
+      { "name": "SLOTS", "type": "unsigned", "eq": 1, "generic": false },
+      { "name": "DATA_WIDTH", "type": "unsigned", "lb": 1 }
+    ],
+    "generic": "$DYNAMATIC/experimental/data/vhdl/handshake/oehb.vhd",
+    "dependencies": ["oehb_dataless"]
   },
   {
     "name": "handshake.oehb",
     "parameters": [
       { "name": "SLOTS", "type": "unsigned", "lb": 2 },
-      { "name": "DATA_WIDTH", "type": "unsigned" }
+      { "name": "DATA_WIDTH", "type": "unsigned", "eq": 0, "generic": false }
+    ],
+    "generic": "$DYNAMATIC/experimental/data/vhdl/handshake/dataless/ofifo.vhd",
+    "module-name": "ofifo_dataless",
+    "dependencies": ["tehb_dataless", "elastic_fifo_inner_dataless"]
+  },
+  {
+    "name": "handshake.oehb",
+    "parameters": [
+      { "name": "SLOTS", "type": "unsigned", "lb": 2 },
+      { "name": "DATA_WIDTH", "type": "unsigned", "lb": 1 }
     ],
     "generic": "$DYNAMATIC/experimental/data/vhdl/handshake/ofifo.vhd",
-    "dependencies": ["handshake.tehb_internal", "support.elastic_fifo_inner"]
+    "dependencies": ["tehb", "elastic_fifo_inner"]
   },
   {
     "name": "handshake.tehb",
     "parameters": [
       { "name": "SLOTS", "type": "unsigned", "eq": 1, "generic": false },
-      { "name": "DATA_WIDTH", "type": "unsigned" }
+      { "name": "DATA_WIDTH", "type": "unsigned", "eq": 0, "generic": false }
     ],
-    "generic": "$DYNAMATIC/experimental/data/vhdl/handshake/tehb.vhd"
+    "generic": "$DYNAMATIC/experimental/data/vhdl/handshake/dataless/tehb.vhd",
+    "module-name": "tehb_dataless"
+  },
+  {
+    "name": "handshake.tehb",
+    "parameters": [
+      { "name": "SLOTS", "type": "unsigned", "eq": 1, "generic": false },
+      { "name": "DATA_WIDTH", "type": "unsigned", "lb": 1 }
+    ],
+    "generic": "$DYNAMATIC/experimental/data/vhdl/handshake/tehb.vhd",
+    "dependencies": ["tehb_dataless"]
   },
   {
     "name": "handshake.tehb",
     "parameters": [
       { "name": "SLOTS", "type": "unsigned", "lb": 2 },
-      { "name": "DATA_WIDTH", "type": "unsigned" }
+      { "name": "DATA_WIDTH", "type": "unsigned", "eq": 0, "generic": false }
+    ],
+    "generic": "$DYNAMATIC/experimental/data/vhdl/handshake/dataless/tfifo.vhd",
+    "module-name": "tfifo_dataless",
+    "dependencies": ["elastic_fifo_inner_dataless"]
+  },
+  {
+    "name": "handshake.tehb",
+    "parameters": [
+      { "name": "SLOTS", "type": "unsigned", "lb": 2 },
+      { "name": "DATA_WIDTH", "type": "unsigned", "lb": 1 }
     ],
     "generic": "$DYNAMATIC/experimental/data/vhdl/handshake/tfifo.vhd",
-    "dependencies": ["support.elastic_fifo_inner"]
+    "dependencies": ["elastic_fifo_inner"]
   },
   {
     "name": "handshake.fork",
     "parameters": [
       { "name": "SIZE", "type": "unsigned", "lb": 1 },
-      { "name": "DATA_WIDTH", "type": "unsigned" }
+      { "name": "DATA_WIDTH", "type": "unsigned", "eq": 0, "generic": false }
+    ],
+    "generic": "$DYNAMATIC/experimental/data/vhdl/handshake/dataless/fork.vhd",
+    "module-name": "fork_dataless",
+    "dependencies": ["logic", "eager_fork_register_block"]
+  },
+  {
+    "name": "handshake.fork",
+    "parameters": [
+      { "name": "SIZE", "type": "unsigned", "lb": 1 },
+      { "name": "DATA_WIDTH", "type": "unsigned", "lb": 1 }
     ],
     "generic": "$DYNAMATIC/experimental/data/vhdl/handshake/fork.vhd",
-    "dependencies": ["support.types", "support.logic"]
+    "dependencies": ["types", "fork_dataless"]
   },
   {
     "name": "handshake.lazy_fork",
     "parameters": [
       { "name": "SIZE", "type": "unsigned", "lb": 1 },
-      { "name": "DATA_WIDTH", "type": "unsigned" }
+      { "name": "DATA_WIDTH", "type": "unsigned", "eq": 0, "generic": false }
+    ],
+    "generic": "$DYNAMATIC/experimental/data/vhdl/handshake/dataless/lazy_fork.vhd",
+    "module-name": "lazy_fork_dataless",
+    "dependencies": ["logic"]
+  },
+  {
+    "name": "handshake.lazy_fork",
+    "parameters": [
+      { "name": "SIZE", "type": "unsigned", "lb": 1 },
+      { "name": "DATA_WIDTH", "type": "unsigned", "lb": 1 }
     ],
     "generic": "$DYNAMATIC/experimental/data/vhdl/handshake/lazy_fork.vhd",
-    "dependencies": ["support.logic", "support.types"]
+    "dependencies": ["types", "lazy_fork_dataless"]
   },
   {
     "name": "handshake.sink",
-    "parameters": [{ "name": "DATA_WIDTH", "type": "unsigned" }],
+    "parameters": [
+      { "name": "DATA_WIDTH", "type": "unsigned", "eq": 0, "generic": false }
+    ],
+    "generic": "$DYNAMATIC/experimental/data/vhdl/handshake/dataless/sink.vhd",
+    "module-name": "sink_dataless"
+  },
+  {
+    "name": "handshake.sink",
+    "parameters": [{ "name": "DATA_WIDTH", "type": "unsigned", "lb": 1 }],
     "generic": "$DYNAMATIC/experimental/data/vhdl/handshake/sink.vhd"
   },
   {
     "name": "handshake.mux",
     "parameters": [
       { "name": "SIZE", "type": "unsigned", "lb": 1 },
-      { "name": "DATA_WIDTH", "type": "unsigned" },
-      { "name": "SELECT_WIDTH", "type": "unsigned" }
+      { "name": "DATA_WIDTH", "type": "unsigned", "eq": 0, "generic": false },
+      { "name": "SELECT_WIDTH", "type": "unsigned", "lb": 1 }
+    ],
+    "generic": "$DYNAMATIC/experimental/data/vhdl/handshake/dataless/mux.vhd",
+    "module-name": "mux_dataless",
+    "dependencies": ["tehb_dataless"]
+  },
+  {
+    "name": "handshake.mux",
+    "parameters": [
+      { "name": "SIZE", "type": "unsigned", "lb": 1 },
+      { "name": "DATA_WIDTH", "type": "unsigned", "lb": 1 },
+      { "name": "SELECT_WIDTH", "type": "unsigned", "lb": 1 }
     ],
     "generic": "$DYNAMATIC/experimental/data/vhdl/handshake/mux.vhd",
-    "dependencies": ["support.types", "handshake.tehb_internal"]
+    "dependencies": ["types", "tehb"]
   },
   {
     "name": "handshake.control_merge",
     "parameters": [
       { "name": "SIZE", "type": "unsigned", "lb": 1 },
-      { "name": "DATA_WIDTH", "type": "unsigned" },
-      { "name": "INDEX_WIDTH", "type": "unsigned" }
+      { "name": "DATA_WIDTH", "type": "unsigned", "eq": 0, "generic": false },
+      { "name": "INDEX_WIDTH", "type": "unsigned", "lb": 1 }
+    ],
+    "generic": "$DYNAMATIC/experimental/data/vhdl/handshake/dataless/control_merge.vhd",
+    "module-name": "control_merge_dataless",
+    "dependencies": ["merge_notehb_dataless", "tehb", "fork_dataless"]
+  },
+  {
+    "name": "handshake.control_merge",
+    "parameters": [
+      { "name": "SIZE", "type": "unsigned", "lb": 1 },
+      { "name": "DATA_WIDTH", "type": "unsigned", "lb": 1 },
+      { "name": "INDEX_WIDTH", "type": "unsigned", "lb": 1 }
     ],
     "generic": "$DYNAMATIC/experimental/data/vhdl/handshake/control_merge.vhd",
-    "dependencies": [
-      "support.types",
-      "support.merge_notehb",
-      "handshake.fork_internal",
-      "handshake.tehb_internal"
-    ]
+    "dependencies": ["types", "control_merge_dataless"]
   },
   {
     "name": "handshake.merge",
     "parameters": [
       { "name": "SIZE", "type": "unsigned", "lb": 1 },
-      { "name": "DATA_WIDTH", "type": "unsigned" }
+      { "name": "DATA_WIDTH", "type": "unsigned", "eq": 0, "generic": false }
+    ],
+    "generic": "$DYNAMATIC/experimental/data/vhdl/handshake/dataless/merge.vhd",
+    "module-name": "merge_dataless",
+    "dependencies": ["tehb_dataless"]
+  },
+  {
+    "name": "handshake.merge",
+    "parameters": [
+      { "name": "SIZE", "type": "unsigned", "lb": 1 },
+      { "name": "DATA_WIDTH", "type": "unsigned", "lb": 1 }
     ],
     "generic": "$DYNAMATIC/experimental/data/vhdl/handshake/merge.vhd",
-    "dependencies": ["support.types", "handshake.tehb_internal"]
+    "dependencies": ["types", "tehb"]
   },
   {
     "name": "handshake.br",
-    "parameters": [{ "name": "DATA_WIDTH", "type": "unsigned" }],
+    "parameters": [
+      { "name": "DATA_WIDTH", "type": "unsigned", "eq": 0, "generic": false }
+    ],
+    "generic": "$DYNAMATIC/experimental/data/vhdl/handshake/dataless/br.vhd",
+    "module-name": "br_dataless"
+  },
+  {
+    "name": "handshake.br",
+    "parameters": [{ "name": "DATA_WIDTH", "type": "unsigned", "lb": 1 }],
     "generic": "$DYNAMATIC/experimental/data/vhdl/handshake/br.vhd"
   },
   {
     "name": "handshake.cond_br",
-    "parameters": [{ "name": "DATA_WIDTH", "type": "unsigned" }],
+    "parameters": [
+      { "name": "DATA_WIDTH", "type": "unsigned", "eq": 0, "generic": false }
+    ],
+    "generic": "$DYNAMATIC/experimental/data/vhdl/handshake/dataless/cond_br.vhd",
+    "module-name": "cond_br_dataless",
+    "dependencies": ["join"]
+  },
+  {
+    "name": "handshake.cond_br",
+    "parameters": [{ "name": "DATA_WIDTH", "type": "unsigned", "lb": 1 }],
     "generic": "$DYNAMATIC/experimental/data/vhdl/handshake/cond_br.vhd",
-    "dependencies": ["handshake.join"]
+    "dependencies": ["cond_br"]
   },
   {
     "name": "handshake.source",
@@ -296,7 +388,7 @@
       { "name": "ADDR_WIDTH", "type": "unsigned", "lb": 1 }
     ],
     "generic": "$DYNAMATIC/experimental/data/vhdl/handshake/mc_load.vhd",
-    "dependencies": ["handshake.tehb_internal"]
+    "dependencies": ["tehb"]
   },
   {
     "name": "handshake.lsq_load",
@@ -313,7 +405,7 @@
       { "name": "ADDR_WIDTH", "type": "unsigned", "lb": 1 }
     ],
     "generic": "$DYNAMATIC/experimental/data/vhdl/handshake/mc_store.vhd",
-    "dependencies": ["handshake.join"]
+    "dependencies": ["join"]
   },
   {
     "name": "handshake.lsq_store",
@@ -327,25 +419,37 @@
     "name": "handshake.mem_controller",
     "parameters": [
       { "name": "NUM_CONTROL", "type": "unsigned", "eq": 0, "generic": false },
-      { "name": "NUM_LOAD", "type": "unsigned" },
+      { "name": "NUM_LOAD", "type": "unsigned", "lb": 1 },
       { "name": "NUM_STORE", "type": "unsigned", "eq": 0, "generic": false },
       { "name": "DATA_WIDTH", "type": "unsigned", "lb": 1 },
       { "name": "ADDR_WIDTH", "type": "unsigned", "lb": 1 }
     ],
-    "generic": "$DYNAMATIC/experimental/data/vhdl/handshake/mem_controller_no_store.vhd",
-    "dependencies": ["support.mc_support"]
+    "generic": "$DYNAMATIC/experimental/data/vhdl/handshake/mem_controller_storeless.vhd",
+    "dependencies": ["mc_support"]
   },
   {
     "name": "handshake.mem_controller",
     "parameters": [
-      { "name": "NUM_CONTROL", "type": "unsigned" },
-      { "name": "NUM_LOAD", "type": "unsigned" },
-      { "name": "NUM_STORE", "type": "unsigned" },
+      { "name": "NUM_CONTROL", "type": "unsigned", "lb": 1 },
+      { "name": "NUM_LOAD", "type": "unsigned", "eq": 0, "generic": false },
+      { "name": "NUM_STORE", "type": "unsigned", "lb": 1 },
+      { "name": "DATA_WIDTH", "type": "unsigned", "lb": 1 },
+      { "name": "ADDR_WIDTH", "type": "unsigned", "lb": 1 }
+    ],
+    "generic": "$DYNAMATIC/experimental/data/vhdl/handshake/mem_controller_loadless.vhd",
+    "dependencies": ["mc_support"]
+  },
+  {
+    "name": "handshake.mem_controller",
+    "parameters": [
+      { "name": "NUM_CONTROL", "type": "unsigned", "lb": 1 },
+      { "name": "NUM_LOAD", "type": "unsigned", "lb": 1 },
+      { "name": "NUM_STORE", "type": "unsigned", "lb": 1 },
       { "name": "DATA_WIDTH", "type": "unsigned", "lb": 1 },
       { "name": "ADDR_WIDTH", "type": "unsigned", "lb": 1 }
     ],
     "generic": "$DYNAMATIC/experimental/data/vhdl/handshake/mem_controller.vhd",
-    "dependencies": ["support.mc_support"]
+    "dependencies": ["mem_controller_loadless"]
   },
   {
     "name": "handshake.lsq",
@@ -361,69 +465,83 @@
   {
     "name": "handshake.end",
     "parameters": [
-      { "name": "DATA_WIDTH", "type": "unsigned" },
-      { "name": "NUM_MEMORIES", "type": "unsigned", "eq": 0 }
+      { "name": "DATA_WIDTH", "type": "unsigned", "eq": 0, "generic": false },
+      { "name": "NUM_MEMORIES", "type": "unsigned", "eq": 0, "generic": false }
     ],
-    "generic": "$DYNAMATIC/experimental/data/vhdl/handshake/end_no_mem.vhd",
-    "module-name": "end_sync_no_mem",
-    "dependencies": ["support.types"]
+    "generic": "$DYNAMATIC/experimental/data/vhdl/handshake/dataless/end_memless.vhd",
+    "module-name": "end_sync_memless_dataless",
+    "dependencies": ["types"]
   },
   {
     "name": "handshake.end",
     "parameters": [
-      { "name": "DATA_WIDTH", "type": "unsigned" },
-      { "name": "NUM_MEMORIES", "type": "unsigned" }
+      { "name": "DATA_WIDTH", "type": "unsigned", "lb": 1 },
+      { "name": "NUM_MEMORIES", "type": "unsigned", "eq": 0, "generic": false }
+    ],
+    "generic": "$DYNAMATIC/experimental/data/vhdl/handshake/end_memless.vhd",
+    "module-name": "end_sync_memless",
+    "dependencies": ["end_sync_memless_dataless"]
+  },
+  {
+    "name": "handshake.end",
+    "parameters": [
+      { "name": "DATA_WIDTH", "type": "unsigned", "eq": 0, "generic": false },
+      { "name": "NUM_MEMORIES", "type": "unsigned", "lb": 1 }
+    ],
+    "generic": "$DYNAMATIC/experimental/data/vhdl/handshake/dataless/end.vhd",
+    "module-name": "end_sync_dataless",
+    "dependencies": ["logic", "join"]
+  },
+  {
+    "name": "handshake.end",
+    "parameters": [
+      { "name": "DATA_WIDTH", "type": "unsigned", "lb": 1 },
+      { "name": "NUM_MEMORIES", "type": "unsigned", "lb": 1 }
     ],
     "generic": "$DYNAMATIC/experimental/data/vhdl/handshake/end.vhd",
     "module-name": "end_sync",
-    "dependencies": ["handshake.join", "support.logic", "support.types"]
-  },
-  {
-    "name": "handshake.oehb_internal",
-    "generic": "$DYNAMATIC/experimental/data/vhdl/handshake/oehb.vhd",
-    "module-name": "oehb"
-  },
-  {
-    "name": "handshake.tehb_internal",
-    "generic": "$DYNAMATIC/experimental/data/vhdl/handshake/tehb.vhd",
-    "module-name": "tehb"
-  },
-  {
-    "name": "handshake.fork_internal",
-    "generic": "$DYNAMATIC/experimental/data/vhdl/handshake/fork.vhd",
-    "module-name": "fork",
-    "dependencies": ["support.types", "support.logic"]
+    "dependencies": ["end_sync_dataless"]
   },
   {
     "name": "handshake.join",
     "generic": "$DYNAMATIC/experimental/data/vhdl/handshake/join.vhd",
-    "dependencies": ["support.logic"]
+    "dependencies": ["logic"]
   },
   {
-    "name": "support.delay_buffer",
+    "name": "handshake.not",
+    "parameters": [{ "name": "DATA_WIDTH", "type": "unsigned", "lb": 1 }],
+    "generic": "$DYNAMATIC/experimental/data/vhdl/handshake/not.vhd",
+    "module-name": "logic_not"
+  },
+  {
     "generic": "$DYNAMATIC/experimental/data/vhdl/support/delay_buffer.vhd"
   },
   {
-    "name": "support.elastic_fifo_inner",
+    "generic": "$DYNAMATIC/experimental/data/vhdl/support/eager_fork_register_block.vhd"
+  },
+  {
     "generic": "$DYNAMATIC/experimental/data/vhdl/support/elastic_fifo_inner.vhd"
   },
   {
-    "name": "support.logic",
-    "generic": "$DYNAMATIC/experimental/data/vhdl/support/logic.vhd",
-    "module-name": "logic_combinators"
+    "generic": "$DYNAMATIC/experimental/data/vhdl/support/dataless/elastic_fifo_inner.vhd",
+    "module-name": "elastic_fifo_inner_dataless"
   },
   {
-    "name": "support.mc_support",
+    "generic": "$DYNAMATIC/experimental/data/vhdl/support/logic.vhd"
+  },
+  {
     "generic": "$DYNAMATIC/experimental/data/vhdl/support/mc_support.vhd",
-    "dependencies": ["support.types"]
+    "dependencies": ["types"]
   },
   {
-    "name": "support.merge_notehb",
     "generic": "$DYNAMATIC/experimental/data/vhdl/support/merge_notehb.vhd",
-    "dependencies": ["support.types"]
+    "dependencies": ["types"]
   },
   {
-    "name": "support.types",
+    "generic": "$DYNAMATIC/experimental/data/vhdl/support/dataless/merge_notehb.vhd",
+    "module-name": "merge_notehb_dataless"
+  },
+  {
     "generic": "$DYNAMATIC/experimental/data/vhdl/support/types.vhd"
   },
   {

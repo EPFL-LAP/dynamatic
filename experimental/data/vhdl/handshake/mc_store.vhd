@@ -8,43 +8,49 @@ entity mc_store is
     ADDR_BITWIDTH : integer
   );
   port (
-    -- inputs
-    clk, rst        : in std_logic;
-    addrIn          : in std_logic_vector(ADDR_BITWIDTH - 1 downto 0);
-    addrIn_valid    : in std_logic;
-    dataIn          : in std_logic_vector(DATA_BITWIDTH - 1 downto 0);
-    dataIn_valid    : in std_logic;
-    addrOut_ready   : in std_logic;
-    dataToMem_ready : in std_logic;
-    -- outputs
-    addrOut         : out std_logic_vector(ADDR_BITWIDTH - 1 downto 0);
-    addrOut_valid   : out std_logic;
+    clk, rst : in std_logic;
+    -- data from circuit channel
+    dataIn       : in  std_logic_vector(DATA_BITWIDTH - 1 downto 0);
+    dataIn_valid : in  std_logic;
+    dataIn_ready : out std_logic;
+    -- address from circuit channel
+    addrIn       : in  std_logic_vector(ADDR_BITWIDTH - 1 downto 0);
+    addrIn_valid : in  std_logic;
+    addrIn_ready : out std_logic;
+    -- data to interface channel
     dataToMem       : out std_logic_vector(DATA_BITWIDTH - 1 downto 0);
     dataToMem_valid : out std_logic;
-    addrIn_ready    : out std_logic;
-    dataIn_ready    : out std_logic
+    dataToMem_ready : in  std_logic;
+    -- address to interface channel
+    addrOut       : out std_logic_vector(ADDR_BITWIDTH - 1 downto 0);
+    addrOut_valid : out std_logic;
+    addrOut_ready : in  std_logic
   );
 end entity;
 
 architecture arch of mc_store is
   signal single_ready : std_logic;
   signal join_valid   : std_logic;
-  signal out_array    : std_logic_vector(1 downto 0);
-
 begin
-  addrIn_ready <= out_array(0);
-  dataIn_ready <= out_array(1);
-
-  join_write : entity work.join(arch) generic map(2)
+  join : entity work.join(arch)
+    generic map(
+      SIZE => 2
+    )
     port map(
-    (addrIn_valid,
-      dataIn_valid),
-      addrIn_ready,
-      join_valid,
-      out_array);
+      -- input channels
+      ins_valid(0) => dataIn_valid,
+      ins_valid(1) => addrIn_valid,
+      ins_ready(0) => dataIn_ready,
+      ins_ready(1) => addrIn_ready,
+      -- output channel
+      outs_valid => join_valid,
+      outs_ready => dataToMem_ready
+    );
 
+  -- address
+  addrOut       <= addrIn;
+  addrOut_valid <= join_valid;
+  -- data
   dataToMem       <= dataIn;
-  addrOut_valid   <= join_valid;
-  addrOut         <= addrIn;
   dataToMem_valid <= join_valid;
 end architecture;

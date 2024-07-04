@@ -88,12 +88,15 @@ string commonTbBody =
     "begin\n"
     "   if (tb_rst = '1') then\n"
     "       tb_start_valid <= '0';\n"
+    "       tb_started <= '0';\n"
     "   elsif rising_edge(tb_clk) then\n"
-    "       if (tb_temp_idle = '1' and tb_start_ready = '1' and tb_start_valid "
-    "= '0') then\n"
-    "           tb_start_valid <= '1';\n"
-    "       else\n"
+    "       tb_start_valid <= tb_start_valid;\n"
+    "       if (tb_start_valid = '1' and tb_start_ready = '1') then\n"
     "           tb_start_valid <= '0';\n"
+    "           tb_started <= '1';\n"
+    "       elsif (tb_started = '0' and tb_temp_idle = '1' and tb_start_ready "
+    "= '1' and tb_start_valid = '0') then \n"
+    "           tb_start_valid <= '1';\n"
     "       end if;\n"
     "   end if;\n"
     "end process generate_start_signal;\n"
@@ -337,13 +340,14 @@ string HlsVhdlTb::getSignalDeclaration() {
   code << "\tsignal tb_rst : std_logic := '0';" << endl;
 
   code << "\tsignal tb_start_valid : std_logic := '0';" << endl;
-  code << "\tsignal tb_start_ready : std_logic;" << endl;
+  code << "\tsignal tb_start_ready, tb_started : std_logic;" << endl;
 
   code << "\tsignal tb_end_valid : std_logic;" << endl;
 
   code << endl;
 
   for (size_t i = 0; i < cDuvParams.size(); i++) {
+    CFunctionParameter p = cDuvParams[i];
     MemElem m = memElems[i];
 
     if (m.isArray) {
@@ -366,21 +370,19 @@ string HlsVhdlTb::getSignalDeclaration() {
       code << "\tsignal " << m.addr1SignalName << " : std_logic_vector("
            << m.addrWidthParamValue << " - 1 downto 0);" << endl
            << endl;
-
-      //   code << "\tsignal " << m.addr0SignalName + "_dummy" << " :
-      //   std_logic_vector(31 downto 0);" << endl; code << "\tsignal " <<
-      //   m.addr1SignalName + "_dummy" << " : std_logic_vector(31 downto 0);"
-      //   << endl;
-
     } else {
       if ((cDuvParams[i].isReturn && cDuvParams[i].isOutput) ||
           !cDuvParams[i].isReturn) {
         code << "\tsignal " << m.ce0SignalName << " : std_logic;" << endl;
         code << "\tsignal " << m.we0SignalName << " : std_logic;" << endl;
+
         code << "\tsignal " << m.dOut0SignalName << " : std_logic_vector("
              << m.dataWidthParamValue << " - 1 downto 0);" << endl;
         code << "\tsignal " << m.dIn0SignalName << " : std_logic_vector("
-             << m.dataWidthParamValue << " - 1 downto 0);" << endl
+             << m.dataWidthParamValue << " - 1 downto 0);" << endl;
+        code << "\tsignal " << m.dOut0SignalName << "_valid : std_logic;"
+             << endl;
+        code << "\tsignal " << m.dOut0SignalName << "_ready : std_logic;"
              << endl
              << endl;
       }
@@ -470,6 +472,10 @@ string HlsVhdlTb::getMemoryInstanceGeneration() {
              << "," << endl;
         code << "\t\t" << MemElem::dOut0PortName << " => " << m.dOut0SignalName
              << "," << endl;
+        code << "\t\t" << MemElem::dOut0PortName + "_valid => "
+             << m.dOut0SignalName << "_valid," << endl;
+        code << "\t\t" << MemElem::dOut0PortName + "_ready => "
+             << m.dOut0SignalName << "_ready," << endl;
         code << "\t\t" << MemElem::dIn0PortName << " => "
              << "(others => '0')"
              << "," << endl;
@@ -501,6 +507,10 @@ string HlsVhdlTb::getMemoryInstanceGeneration() {
              << "," << endl;
         code << "\t\t" << MemElem::dOut0PortName << " => " << m.dOut0SignalName
              << "," << endl;
+        code << "\t\t" << MemElem::dOut0PortName + "_valid => "
+             << m.dOut0SignalName << "_valid," << endl;
+        code << "\t\t" << MemElem::dOut0PortName + "_ready => "
+             << m.dOut0SignalName << "_ready," << endl;
         code << "\t\t" << MemElem::dIn0PortName << " => " << m.dIn0SignalName
              << "," << endl;
         code << "\t\t" << MemElem::donePortName << " => "
@@ -533,6 +543,10 @@ string HlsVhdlTb::getMemoryInstanceGeneration() {
              << "," << endl;
         code << "\t\t" << MemElem::dOut0PortName << " => " << m.dOut0SignalName
              << "," << endl;
+        code << "\t\t" << MemElem::dOut0PortName + "_valid => "
+             << m.dOut0SignalName << "_valid," << endl;
+        code << "\t\t" << MemElem::dOut0PortName + "_ready => "
+             << m.dOut0SignalName << "_ready," << endl;
         code << "\t\t" << MemElem::dIn0PortName << " => " << m.dIn0SignalName
              << "," << endl;
         code << "\t\t" << MemElem::donePortName << " => "
@@ -566,6 +580,10 @@ string HlsVhdlTb::getMemoryInstanceGeneration() {
              << "," << endl;
         code << "\t\t" << MemElem::dOut0PortName << " => " << m.dOut0SignalName
              << "," << endl;
+        code << "\t\t" << MemElem::dOut0PortName + "_valid => "
+             << m.dOut0SignalName << "_valid," << endl;
+        code << "\t\t" << MemElem::dOut0PortName + "_ready => "
+             << m.dOut0SignalName << "_ready," << endl;
         code << "\t\t" << MemElem::donePortName << " => "
              << "tb_temp_idle" << endl;
         code << "\t);" << endl << endl;
@@ -663,37 +681,51 @@ string HlsVhdlTb::getDuvInstanceGeneration() {
                               m.dOut1SignalName);
       duvPortMap.emplace_back(getDataOut1PortNameForCParam(p.parameterName),
                               m.dIn1SignalName);
-    }
+    } else {
+      if (p.isInput) {
+        if (ctx.experimental) {
+          duvPortMap.emplace_back(p.parameterName, m.dOut0SignalName);
+          duvPortMap.emplace_back(p.parameterName + "_valid",
+                                  m.dOut0SignalName + "_valid");
+          duvPortMap.emplace_back(p.parameterName + "_ready",
+                                  m.dOut0SignalName + "_ready");
+        } else {
+          duvPortMap.emplace_back(getValidInPortNameForCParam(p.parameterName),
+                                  "'1'");
+          duvPortMap.emplace_back(getDataInSaPortNameForCParam(p.parameterName),
+                                  m.dOut0SignalName);
+        }
+      }
 
-    if (!m.isArray && p.isInput) {
-      duvPortMap.emplace_back(getValidInPortNameForCParam(p.parameterName),
-                              "'1'");
-      duvPortMap.emplace_back(getDataInSaPortNameForCParam(p.parameterName),
-                              m.dOut0SignalName);
-    }
-
-    if (!m.isArray && p.isOutput && p.isReturn) {
-      duvPortMap.emplace_back("end_out", m.dIn0SignalName);
-      duvPortMap.emplace_back("end_valid", "tb_end_valid"); ///////
-      duvPortMap.emplace_back("end_ready", "'1'");
-    }
-
-    if (!m.isArray && !p.isOutput && p.isReturn) {
-      duvPortMap.emplace_back("end_valid", "tb_end_valid"); ///////
-      duvPortMap.emplace_back("end_ready", "'1'");
-    }
-
-    if (!m.isArray && p.isOutput && !p.isReturn) {
-      duvPortMap.emplace_back(getValidOutPortNameForCParam(p.parameterName),
-                              m.we0SignalName);
-      duvPortMap.emplace_back(getDataOutSaPortNameForCParam(p.parameterName),
-                              m.dIn0SignalName);
-      duvPortMap.emplace_back(getReadyInPortNameForCParam(p.parameterName),
-                              "'1'");
+      if (p.isOutput) {
+        if (p.isReturn) {
+          if (ctx.experimental) {
+            duvPortMap.emplace_back("out0", m.dIn0SignalName);
+            duvPortMap.emplace_back("out0_valid", "tb_end_valid");
+            duvPortMap.emplace_back("out0_ready", "'1'");
+          } else {
+            duvPortMap.emplace_back("end_out", m.dIn0SignalName);
+            duvPortMap.emplace_back("end_valid", "tb_end_valid");
+            duvPortMap.emplace_back("end_ready", "'1'");
+          }
+        } else {
+          duvPortMap.emplace_back(getValidOutPortNameForCParam(p.parameterName),
+                                  m.we0SignalName);
+          duvPortMap.emplace_back(
+              getDataOutSaPortNameForCParam(p.parameterName), m.dIn0SignalName);
+          duvPortMap.emplace_back(getReadyInPortNameForCParam(p.parameterName),
+                                  "'1'");
+        }
+      } else if (p.isReturn) {
+        duvPortMap.emplace_back("end_valid", "tb_end_valid");
+        duvPortMap.emplace_back("end_ready", "'1'");
+      }
     }
   }
 
-  duvPortMap.emplace_back("start_in", "(others => '0')");
+  // Start signal
+  if (!ctx.experimental)
+    duvPortMap.emplace_back("start_in", "(others => '0')");
   duvPortMap.emplace_back("start_ready", "tb_start_ready");
   duvPortMap.emplace_back("start_valid", "tb_start_valid");
 

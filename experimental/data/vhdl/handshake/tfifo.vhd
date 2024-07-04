@@ -8,15 +8,15 @@ entity tfifo is
     BITWIDTH : integer
   );
   port (
-    -- inputs
-    clk, rst   : in std_logic;
-    ins        : in std_logic_vector(BITWIDTH - 1 downto 0);
-    ins_valid  : in std_logic;
-    outs_ready : in std_logic;
-    -- outputs
+    clk, rst : in std_logic;
+    -- input channel
+    ins       : in  std_logic_vector(BITWIDTH - 1 downto 0);
+    ins_valid : in  std_logic;
+    ins_ready : out std_logic;
+    -- output channel
     outs       : out std_logic_vector(BITWIDTH - 1 downto 0);
     outs_valid : out std_logic;
-    ins_ready  : out std_logic
+    outs_ready : in  std_logic
   );
 end entity;
 
@@ -57,5 +57,4 @@ begin
       outs_valid => fifo_valid,
       ins_ready  => fifo_ready
     );
-
-end arch;
+end architecture;
