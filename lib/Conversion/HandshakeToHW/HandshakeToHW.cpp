@@ -19,6 +19,7 @@
 #include "dynamatic/Dialect/Handshake/HandshakeDialect.h"
 #include "dynamatic/Dialect/Handshake/HandshakeInterfaces.h"
 #include "dynamatic/Dialect/Handshake/HandshakeOps.h"
+#include "dynamatic/Dialect/Handshake/HandshakeTypes.h"
 #include "dynamatic/Dialect/Handshake/MemoryInterfaces.h"
 #include "dynamatic/Support/Backedge.h"
 #include "dynamatic/Support/RTL.h"
@@ -1836,6 +1837,7 @@ public:
         ConvertToHWInstance<handshake::LSQLoadOp>,
         ConvertToHWInstance<handshake::MCStoreOp>,
         ConvertToHWInstance<handshake::LSQStoreOp>,
+        ConvertToHWInstance<handshake::NotOp>,
         // Arith operations
         ConvertToHWInstance<arith::AddFOp>, ConvertToHWInstance<arith::AddIOp>,
         ConvertToHWInstance<arith::AndIOp>,

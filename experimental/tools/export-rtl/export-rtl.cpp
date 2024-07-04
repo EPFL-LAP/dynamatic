@@ -16,7 +16,7 @@
 #include "dynamatic/Dialect/HW/HWOpInterfaces.h"
 #include "dynamatic/Dialect/HW/HWOps.h"
 #include "dynamatic/Dialect/Handshake/HandshakeDialect.h"
-#include "dynamatic/Dialect/Handshake/HandshakeOps.h"
+#include "dynamatic/Dialect/Handshake/HandshakeTypes.h"
 #include "dynamatic/Support/RTL.h"
 #include "dynamatic/Support/System.h"
 #include "dynamatic/Support/TimingModels.h"
