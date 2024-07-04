@@ -1837,6 +1837,7 @@ public:
         ConvertToHWInstance<handshake::LSQLoadOp>,
         ConvertToHWInstance<handshake::MCStoreOp>,
         ConvertToHWInstance<handshake::LSQStoreOp>,
+        ConvertToHWInstance<handshake::NotOp>,
         // Arith operations
         ConvertToHWInstance<arith::AddFOp>, ConvertToHWInstance<arith::AddIOp>,
         ConvertToHWInstance<arith::AndIOp>,
