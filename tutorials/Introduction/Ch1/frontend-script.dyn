@@ -1,16 +1,16 @@
 # Set the source file to run
-set-src             tutorials/Introduction/Ch1/loop_multiply.c
+set-src             integration-test/binary_search/binary_search.c
 
 # Compile (from source to Handshake IR/DOT)
 # Provide the --simple-buffers flag to `compile` to use a simple buffering
 # strategy which does not require an MILP solver.
-compile             
+compile --simple-buffers           
 
 # Generate the VHDL design corresponding to the source code
-write-hdl
+write-hdl --experimental
 
 # Simulate and verify using Modelsim
-simulate
+simulate --experimental
 
 # Exit the frontend
 exit
