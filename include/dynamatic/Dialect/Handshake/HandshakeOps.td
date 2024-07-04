@@ -11,13 +11,12 @@
 //
 //===----------------------------------------------------------------------===//
 //
-// This file define Handshake ops in tablegen.
+// This file define Handshake operations in tablegen.
 //
 //===----------------------------------------------------------------------===//
 
-
-#ifndef DYNAMATIC_DIALECT_HANDSHAKE_HANDHSAKE_OPS_TD
-#define DYNAMATIC_DIALECT_HANDSHAKE_HANDHSAKE_OPS_TD
+#ifndef DYNAMATIC_DIALECT_HANDSHAKE_HANDSHAKE_OPS_TD
+#define DYNAMATIC_DIALECT_HANDSHAKE_HANDSHAKE_OPS_TD
 
 include "mlir/IR/EnumAttr.td"
 include "mlir/IR/OpAsmInterface.td"
@@ -25,6 +24,14 @@ include "mlir/IR/BuiltinTypes.td"
 include "mlir/IR/BuiltinAttributeInterfaces.td"
 include "mlir/Interfaces/InferTypeOpInterface.td"
 include "dynamatic/Dialect/Handshake/HandshakeAttributes.td"
+
+/// Base class for Handshake dialect operations.
+class Handshake_Op<string mnemonic, list<Trait> traits = []>
+    : Op<Handshake_Dialect, mnemonic,
+         traits #[HasParent<"handshake::FuncOp">,
+         DeclareOpInterfaceMethods<NamedIOInterface>,
+         DeclareOpInterfaceMethods<ControlInterface>]> {
+}
 
 // This is almost exactly like a standard FuncOp, except that it has some
 // extra verification conditions.  In particular, each Value must
@@ -1171,4 +1178,4 @@ SameOperandsAndResultType
 }
 
 
-#endif // DYNAMATIC_DIALECT_HANDSHAKE_HANDHSAKE_OPS_TD
+#endif // DYNAMATIC_DIALECT_HANDSHAKE_HANDSHAKE_OPS_TD
