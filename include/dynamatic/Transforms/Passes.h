@@ -27,6 +27,7 @@
 #include "dynamatic/Transforms/HandshakeHoistExtInstances.h"
 #include "dynamatic/Transforms/HandshakeInferBasicBlocks.h"
 #include "dynamatic/Transforms/HandshakeMaterialize.h"
+#include "dyanmatic/Transforms/HandshakeRewriteTerms.h"
 #include "dynamatic/Transforms/HandshakeMinimizeCstWidth.h"
 #include "dynamatic/Transforms/HandshakeMinimizeLSQUsage.h"
 #include "dynamatic/Transforms/HandshakeOptimizeBitwidths.h"
