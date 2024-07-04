@@ -152,7 +152,6 @@ void printVhdlImpl(mlir::raw_indented_ostream &os, const unsigned &dataWidth,
 
   for (unsigned i = 0; i < numInputOperands; i++) {
     declareDataSignal(os, "mux" + std::to_string(i), dataWidth, 1);
-    declareHandshakeSignals(os, "mux" + std::to_string(i), dataWidth, 1);
   }
 
   declareDataSignal(os, "branch0", dataWidth, groupSize);
@@ -340,7 +339,7 @@ void printVhdlImpl(mlir::raw_indented_ostream &os, const unsigned &dataWidth,
   for (unsigned i = 0; i < groupSize; i++) {
     os << "credit" << i
        << " : entity work.crush_credit_dataless(arch)\ngeneric map("
-       << listOfCredits[i] << ", " << dataWidth << ")\n";
+       << listOfCredits[i] << ")\n";
     os << "port map(\n";
     os << "clk => clk, rst => rst,\n";
     os << "ins_valid => out_fork" << i << "_out1_valid,\n";

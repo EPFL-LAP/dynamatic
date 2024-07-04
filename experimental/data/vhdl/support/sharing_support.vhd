@@ -199,7 +199,6 @@ use work.types.all;
 
 entity crush_credit_dataless is 
   generic (
-            DATA_WIDTH : integer;
             NUM_CREDITS : integer
           );
   port (
