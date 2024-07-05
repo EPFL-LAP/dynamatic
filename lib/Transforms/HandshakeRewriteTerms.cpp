@@ -539,14 +539,15 @@ struct RemoveSuppressSuppressPairs
     ValueRange operands = {result, dataOperand};
     suppress2->setOperands(operands);
     rewriter.setInsertionPointAfter(suppress2);
-    eraseSinkUsers(suppress2.getTrueResult(), rewriter);
-    rewriter.create<handshake::SinkOp>(suppress2.getLoc(),
-                                       suppress2.getTrueResult());
-    eraseSinkUsers(trueResult, rewriter);
-    // ValueRange replaceOperands = {dataOperand, dataOperand};
+    // eraseSinkUsers(suppress2.getTrueResult(), rewriter);
+    // rewriter.create<handshake::SinkOp>(suppress2.getLoc(),
+    //                                    suppress2.getTrueResult());
+    eraseSinkUsers(condBranchOp.getTrueResult(), rewriter);
     rewriter.replaceAllUsesWith(condBranchOp.getFalseResult(), dataOperand);
     rewriter.eraseOp(condBranchOp);
-    rewriter.replaceAllUsesWith(suppress2.getFalseResult(), suppress2.getDataOperand());
+    // ValueRange replaceOperands = {dataOperand, dataOperand};
+
+    // rewriter.eraseOp(condBranchOp);
     return success();
   }
 };
@@ -757,6 +758,7 @@ struct HandshakeRewriteTermsPass
                  RemoveMergeBranchLoopPairs, RemoveCMergeBranchLoopPairs,
                  RemoveConsecutiveForksPairs, RemoveForkSupressPairsMux,
                  RemoveSupressForkPairs, RemoveSuppressSuppressPairs,
+                 BranchToSupressForkPairs, 
                  MinimizeForkSizes, RemoveConsecutiveForksPairs,
                 MinimizeForkSizes, EraseSingleOutputForks>(ctx); 
 

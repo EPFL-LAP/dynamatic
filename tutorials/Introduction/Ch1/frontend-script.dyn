@@ -1,5 +1,5 @@
 # Set the source file to run
-set-src             integration-test/bicg/bicg.c
+set-src           integration-test/if_loop_1/if_loop_1.c
 # Compile (from source to Handshake IR/DOT)
 # Provide the --simple-buffers flag to `compile` to use a simple buffering
 # strategy which does not require an MILP solver.
