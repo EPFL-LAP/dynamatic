@@ -366,7 +366,7 @@
     "name": "handshake.cond_br",
     "parameters": [{ "name": "DATA_WIDTH", "type": "unsigned", "lb": 1 }],
     "generic": "$DYNAMATIC/experimental/data/vhdl/handshake/cond_br.vhd",
-    "dependencies": ["cond_br"]
+    "dependencies": ["cond_br_dataless"]
   },
   {
     "name": "handshake.source",
