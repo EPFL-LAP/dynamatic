@@ -13,17 +13,19 @@
 // circuit.
 //===----------------------------------------------------------------------===//
 
+
+#include "dynamatic/Support/CFG.h"
 #include "dynamatic/Transforms/HandshakeRewriteTerms.h"
 #include "dynamatic/Dialect/Handshake/HandshakeCanonicalize.h"
 #include "dynamatic/Dialect/Handshake/HandshakeOps.h"
 #include "dynamatic/Support/LLVM.h"
+#include "mlir/IR/Diagnostics.h"
 #include "mlir/IR/Operation.h"
 #include "mlir/IR/PatternMatch.h"
 #include "mlir/IR/Value.h"
 #include "mlir/IR/ValueRange.h"
 #include "mlir/Support/LogicalResult.h"
 #include "mlir/Transforms/GreedyPatternRewriteDriver.h"
-#include "llvm-c/DebugInfo.h"
 #include <vector>
 
 using namespace mlir;
@@ -187,12 +189,14 @@ struct RemoveMuxBranchLoopPairs : public OpRewritePattern<handshake::MuxOp> {
       return failure();
     Value dstVal =
         (trueResult == first || falseResult == first) ? second : first;
+
     rewriter.setInsertionPoint(muxOp);
     rewriter.create<handshake::SinkOp>(muxOp->getLoc(), select);
-    rewriter.replaceOp(muxOp, dstVal);
-    rewriter.replaceAllUsesWith(srcVal, dstVal);
+    rewriter.replaceAllUsesWith(resultMux,dstVal);
+    rewriter.eraseOp(muxOp);
     rewriter.setInsertionPoint(condBranchOp);
     rewriter.create<handshake::SinkOp>(condBranchOp->getLoc(), condition);
+    rewriter.replaceAllUsesWith(srcVal, condBranchOp.getDataOperand());
     rewriter.eraseOp(condBranchOp);
     return success();
   }
@@ -241,11 +245,13 @@ struct RemoveMergeBranchLoopPairs
     Value dstVal =
         (trueResult == first || falseResult == first) ? second : first;
 
-    rewriter.replaceOp(mergeOp, dstVal);
-    rewriter.replaceAllUsesWith(srcVal, dstVal);
+    rewriter.replaceAllUsesWith(resultMerge,dstVal);
+    rewriter.eraseOp(mergeOp);
     rewriter.setInsertionPoint(condBranchOp);
     rewriter.create<handshake::SinkOp>(condBranchOp->getLoc(), condition);
+    rewriter.replaceAllUsesWith(srcVal, condBranchOp.getDataOperand());
     rewriter.eraseOp(condBranchOp);
+
     return success();
   }
 };
@@ -261,24 +267,28 @@ struct RemoveCMergeBranchLoopPairs
                                 PatternRewriter &rewriter) const override {
     Block *parentBlock = cmergeOp->getBlock();
     MutableArrayRef<BlockArgument> l = parentBlock->getArguments();
+    // Obtain start signal from the last argument of the block
     if (l.empty())
       return failure();
     mlir::Value start = l.back();
     if (!isa<NoneType>(start.getType()))
       return failure();
     Operation *useOwner = nullptr;
-    auto resUsers = cmergeOp->getUsers();
+    auto resUsers = (cmergeOp.getResult()).getUsers();
     if (resUsers.empty())
       return failure();
+
+     
     useOwner = *resUsers.begin();
 
     if (cmergeOp->getNumOperands() != 2)
       return failure();
     if (!isa_and_nonnull<handshake::ConditionalBranchOp>(useOwner))
       return failure();
+
+
     handshake::ConditionalBranchOp condBranchOp =
         cast<handshake::ConditionalBranchOp>(useOwner);
-
     OperandRange dataOperands = cmergeOp.getDataOperands();
     Value first = dataOperands[0];
     Value second = dataOperands[1];
@@ -297,50 +307,71 @@ struct RemoveCMergeBranchLoopPairs
 
     Value srcVal;
     if (trueResult == first || trueResult == second)
+    {
+      llvm::errs() << "falseResult: \n";
       srcVal = falseResult;
+    }
     else if (falseResult == first || falseResult == second)
+    {
+      llvm::errs() << "trueResult: \n";
       srcVal = trueResult;
+    }
     else
       return failure();
-
+    // Identifying the backward edge
     Value dstVal =
         (trueResult == first || falseResult == first) ? second : first;
+
     Value valueOfConstant;
     Value startForConstant;
+    handshake::ForkOp forkForStart;
     auto startUsers = start.getUsers();
     if (startUsers.empty())
       startForConstant = start;
     else {
-      Value p = start; 
-      Operation* forkForStart = rewriter.create<handshake::ForkOp>(
-          cmergeOp->getLoc(), start, 2);
-      rewriter.replaceAllUsesWith(p, forkForStart->getResults()[0]);
-      startForConstant = forkForStart->getResults()[1];
-      }
+      llvm::errs()<<"I am here\n";
+      forkForStart =
+      rewriter.create<handshake::ForkOp>(cmergeOp->getLoc(), start, 2);
+      rewriter.replaceAllUsesExcept(start, forkForStart->getResults()[1],
+                                    forkForStart);
+      startForConstant = forkForStart->getResults()[0];
+      valueOfConstant = rewriter.create<handshake::ConstantOp>(
+        cmergeOp->getLoc(), constantType,
+        rewriter.getIntegerAttr(constantType, 0),forkForStart->getResults()[0]);
+      llvm::errs()<<"This is the fork\n\n";
+      forkForStart.emitWarning();
+    }
     if (trueResult == first || falseResult == first)
+      {llvm::errs()<<"I am here1\n";
       valueOfConstant = rewriter.create<handshake::ConstantOp>(
           cmergeOp->getLoc(), constantType,
-          rewriter.getIntegerAttr(constantType, 1), startForConstant);
+          rewriter.getIntegerAttr(constantType, 1), startForConstant);}
     else
+      {llvm::errs()<<"I am here1\n";
       valueOfConstant = rewriter.create<handshake::ConstantOp>(
           cmergeOp->getLoc(), constantType,
-          rewriter.getIntegerAttr(constantType, 0), startForConstant);
-
-    Value inputToMerge = (trueResult == first || falseResult == second)
-                             ? notOp.getResult()
-                             : condition;
-
-    rewriter.replaceAllUsesWith(srcVal, dstVal);
-    rewriter.replaceAllUsesWith(resultCMerge, dstVal);
+          rewriter.getIntegerAttr(constantType, 0), startForConstant);}
+    
+    Value inputToMerge =(trueResult ==second || falseResult == first) ?condition: notOp.getResult();
     ValueRange operands = {inputToMerge, valueOfConstant};
     rewriter.setInsertionPointAfter(cmergeOp);
     handshake::MergeOp mergeOp =
-        rewriter.create<handshake::MergeOp>(cmergeOp.getLoc(), operands);
+    rewriter.create<handshake::MergeOp>(cmergeOp.getLoc(), operands);
     Value mergeResult = mergeOp.getResult();
     rewriter.replaceAllUsesWith(index, mergeResult);
+    rewriter.replaceAllUsesWith(resultCMerge,dstVal);
     rewriter.eraseOp(cmergeOp);
+    rewriter.replaceAllUsesWith(srcVal, condBranchOp.getDataOperand());
     rewriter.eraseOp(condBranchOp);
     return success();
+
+    // Value inputToMerge =condition;
+    // ValueRange operands = {inputToMerge, valueOfConstant};
+    // rewriter.setInsertionPointAfter(cmergeOp);
+    // handshake::MergeOp mergeOp =
+    // rewriter.create<handshake::MergeOp>(cmergeOp.getLoc(), operands);
+    // Value mergeResult = mergeOp.getResult();
+
   }
 };
 
@@ -508,11 +539,14 @@ struct RemoveSuppressSuppressPairs
     ValueRange operands = {result, dataOperand};
     suppress2->setOperands(operands);
     rewriter.setInsertionPointAfter(suppress2);
+    eraseSinkUsers(suppress2.getTrueResult(), rewriter);
     rewriter.create<handshake::SinkOp>(suppress2.getLoc(),
                                        suppress2.getTrueResult());
     eraseSinkUsers(trueResult, rewriter);
-    ValueRange replaceOperands = {dataOperand, dataOperand};
-    rewriter.replaceOp(condBranchOp, replaceOperands);
+    // ValueRange replaceOperands = {dataOperand, dataOperand};
+    rewriter.replaceAllUsesWith(condBranchOp.getFalseResult(), dataOperand);
+    rewriter.eraseOp(condBranchOp);
+    rewriter.replaceAllUsesWith(suppress2.getFalseResult(), suppress2.getDataOperand());
     return success();
   }
 };
@@ -555,8 +589,8 @@ struct BranchToSupressForkPairs
     rewriter.setInsertionPointAfter(suppress2);
     rewriter.create<handshake::SinkOp>(condBranchOp->getLoc(),
                                        suppress2.getTrueResult());
-    ValueRange results = {suppress1.getFalseResult(),
-                          suppress2.getFalseResult()};
+    ValueRange results = {suppress2.getFalseResult(),
+                          suppress1.getFalseResult()};
     rewriter.replaceOp(condBranchOp, results);
     return success();
   }
@@ -595,7 +629,7 @@ struct RemoveForkSupressPairsMux : public OpRewritePattern<handshake::MuxOp> {
       return failure();
     handshake::ForkOp forkC =
         cast<handshake::ForkOp>(branchIn1.getDefiningOp());
-    Value in = forkC.getOperand();
+    // Value in = forkC.getOperand();
     if (!isa<handshake::ForkOp>(select.getDefiningOp()))
       return failure();
     handshake::ForkOp forkOp = cast<handshake::ForkOp>(select.getDefiningOp());
@@ -619,16 +653,87 @@ struct RemoveForkSupressPairsMux : public OpRewritePattern<handshake::MuxOp> {
     }
     if (!replace)
       return failure();
+    rewriter.replaceAllUsesWith(dataOperand, branchIn2);
+    rewriter.eraseOp(muxOp);
     eraseSinkUsers(suppress1.getTrueResult(), rewriter);
     eraseSinkUsers(suppress2.getTrueResult(), rewriter);
-    rewriter.create<handshake::SinkOp>(forkC->getLoc(), select);
-    rewriter.create<handshake::SinkOp>(forkC->getLoc(), condition1);
-    rewriter.create<handshake::SinkOp>(forkC->getLoc(), condition2);
+    rewriter.eraseOp(suppress1);
+    rewriter.eraseOp(suppress2);
+    // rewriter.create<handshake::SinkOp>(forkC->getLoc(), select);
+    // rewriter.create<handshake::SinkOp>(forkC->getLoc(), condition1);
+    // rewriter.create<handshake::SinkOp>(forkC->getLoc(), condition2);
 
-    rewriter.replaceOp(suppress1, {in, in});
-    rewriter.replaceOp(suppress2, {in, in});
-    rewriter.create<handshake::SinkOp>(suppress1->getLoc(), branchIn1);
-    rewriter.replaceAllUsesWith(dataOperand, branchIn2);
+    // rewriter.create<handshake::SinkOp>(forkC->getLoc(), branchIn1);
+    return success();
+  }
+};
+
+
+
+
+
+
+struct MinimizeForkSizes : OpRewritePattern<handshake::ForkOp> {
+  using OpRewritePattern<handshake::ForkOp>::OpRewritePattern;
+
+  LogicalResult matchAndRewrite(handshake::ForkOp forkOp,
+                                PatternRewriter &rewriter) const override {
+    // Compute the list of fork results that are actually used (erase any sink
+    // user along the way)
+    SmallVector<Value> usedForkResults;
+    for (OpResult res : forkOp.getResults()) {
+      if (hasRealUses(res)) {
+        usedForkResults.push_back(res);
+      } else if (!res.use_empty()) {
+        // The value has sink users, delete them as the fork producing their
+        // operand will be removed
+        for (Operation *sinkUser : llvm::make_early_inc_range(res.getUsers()))
+          rewriter.eraseOp(sinkUser);
+      }
+    }
+    // Fail if all fork results are used, since it means that no transformation
+    // is requires
+    if (usedForkResults.size() == forkOp->getNumResults())
+      return failure();
+
+    if (!usedForkResults.empty()) {
+      // Create a new fork operation
+      rewriter.setInsertionPoint(forkOp);
+      handshake::ForkOp newForkOp = rewriter.create<handshake::ForkOp>(
+          forkOp.getLoc(), forkOp.getOperand(), usedForkResults.size());
+      inheritBB(forkOp, newForkOp);
+
+      // Replace results with actual uses of the original fork with results from
+      // the new fork
+      ValueRange newResults = newForkOp.getResult();
+      for (auto [oldRes, newRes] : llvm::zip(usedForkResults, newResults))
+        rewriter.replaceAllUsesWith(oldRes, newRes);
+    }
+    rewriter.eraseOp(forkOp);
+    return success();
+  }
+};
+
+
+
+
+
+struct EraseSingleOutputForks : OpRewritePattern<handshake::ForkOp> {
+  using mlir::OpRewritePattern<handshake::ForkOp>::OpRewritePattern;
+
+  LogicalResult matchAndRewrite(handshake::ForkOp forkOp,
+                                PatternRewriter &rewriter) const override {
+    // The fork must have a single result
+    if (forkOp.getSize() != 1)
+      return failure();
+
+    // The defining operation must not be a lazy fork, otherwise the fork may be
+    // here to avoid a combination cycle between the valid and ready wires
+    if (forkOp.getOperand().getDefiningOp<handshake::LazyForkOp>())
+      return failure();
+
+    // Bypass the fork and succeed
+    rewriter.replaceOp(forkOp, forkOp.getOperand());
     return success();
   }
 };
@@ -647,18 +752,24 @@ struct HandshakeRewriteTermsPass
     config.useTopDownTraversal = true;
     config.enableRegionSimplification = false;
     RewritePatternSet patterns(ctx);
-    patterns.add<RemoveBranchMuxPairs, RemoveBranchMergePairs,
-                 RemoveBranchCMergePairs, RemoveConsecutiveForksPairs,
-                 RemoveMuxBranchLoopPairs, RemoveMergeBranchLoopPairs,
-                 BranchToSupressForkPairs, RemoveSuppressSuppressPairs,
-                 RemoveSupressForkPairs, RemoveForkSupressPairsMux,
-                 BranchToSupressForkPairs>(ctx);
+    patterns.add<RemoveBranchCMergePairs, RemoveBranchMergePairs,
+                 RemoveBranchMuxPairs, RemoveMuxBranchLoopPairs,
+                 RemoveMergeBranchLoopPairs, RemoveCMergeBranchLoopPairs,
+                 RemoveConsecutiveForksPairs, RemoveForkSupressPairsMux,
+                 RemoveSupressForkPairs, RemoveSuppressSuppressPairs,
+                 MinimizeForkSizes, RemoveConsecutiveForksPairs,
+                MinimizeForkSizes, EraseSingleOutputForks>(ctx); 
+
     if (failed(applyPatternsAndFoldGreedily(mod, std::move(patterns), config)))
       return signalPassFailure();
   };
 };
 }; // namespace
 
+// RemoveSuppressSuppressPairs, RemoveBranchMuxPairs, RemoveBranchMergePairs,
+//     RemoveBranchCMergePairs, RemoveMuxBranchLoopPairs, RemoveMergeBranchLoopPairs
+//     , RemoveSupressForkPairs, RemoveSuppressSuppressPairs, BranchToSupressForkPairs,
+//     RemoveConsecutiveForksPairs, RemoveForkSupressPairsMux, 
 std::unique_ptr<dynamatic::DynamaticPass> dynamatic::rewriteHandshakeTerms() {
   return std::make_unique<HandshakeRewriteTermsPass>();
 }
