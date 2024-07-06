@@ -22,10 +22,10 @@ using namespace dynamatic;
 void ControlDependenceAnalysis::identifyAllControlDeps(mlir::func::FuncOp &funcOp) {
   Region &funcReg = funcOp.getRegion();
 
-  // Initialize the control_deps_map by creating an entry for every block constituting the region
+  // Initialize the all_control_deps_map by creating an entry for every block constituting the region
   for (Block &block : funcReg.getBlocks()) {
     SmallVector<mlir::Block*, 4> deps;
-    control_deps_map.insert(std::make_pair(&block, deps));
+    all_control_deps_map.insert(std::make_pair(&block, deps));
   }
 
   if(funcReg.hasOneBlock()) {
@@ -48,8 +48,8 @@ void ControlDependenceAnalysis::identifyAllControlDeps(mlir::func::FuncOp &funcO
             // All nodes in the post-dominator tree on the path from the "block" to "block_succ" (including both "block" and "block_succ") should be control dependent on "block" 
 
             // easy case of block and block_succ
-            control_deps_map[&block].push_back(&block);  // loop case
-            control_deps_map[block_succ].push_back(&block);
+            all_control_deps_map[&block].push_back(&block);  // loop case
+            all_control_deps_map[block_succ].push_back(&block);
 
             // traverse the tree to get all nodes between "least_common_anc" and "block_succ"
             llvm::SmallVector<llvm::SmallVector<mlir::DominanceInfoNode*, 4> , 4> traversed_nodes; 
@@ -65,8 +65,8 @@ void ControlDependenceAnalysis::identifyAllControlDeps(mlir::func::FuncOp &funcO
                 if(b == &block || b == block_succ)
                   continue;  // skip the start and the end nodes because we have taken care of them above
 
-                if(std::find(control_deps_map[b].begin(), control_deps_map[b].end(), &block) == control_deps_map[b].end()) {
-                  control_deps_map[b].push_back(&block);
+                if(std::find(all_control_deps_map[b].begin(), all_control_deps_map[b].end(), &block) == all_control_deps_map[b].end()) {
+                  all_control_deps_map[b].push_back(&block);
                 }
               }
             }
@@ -74,7 +74,7 @@ void ControlDependenceAnalysis::identifyAllControlDeps(mlir::func::FuncOp &funcO
           } else {
             // All nodes in the post-dominator tree on the path from the "least_common_anc" to "block_succ" (including "block_succ") should be control dependent on "block"
             // easy case of block_succ
-            control_deps_map[block_succ].push_back(&block);  
+            all_control_deps_map[block_succ].push_back(&block);  
 
             // traverse the tree to get all nodes between "least_common_anc" and "block_succ"
             llvm::SmallVector<llvm::SmallVector<mlir::DominanceInfoNode*, 4> , 4> traversed_nodes; 
@@ -88,8 +88,8 @@ void ControlDependenceAnalysis::identifyAllControlDeps(mlir::func::FuncOp &funcO
                 Block* b = traversed_nodes[i][j]->getBlock();
                 if(b == &block || b == block_succ || b == least_common_anc)
                   continue;  // skip the start and the end nodes because we have taken care of them above
-                if(std::find(control_deps_map[b].begin(), control_deps_map[b].end(), &block) == control_deps_map[b].end()) {
-                  control_deps_map[b].push_back(&block);
+                if(std::find(all_control_deps_map[b].begin(), all_control_deps_map[b].end(), &block) == all_control_deps_map[b].end()) {
+                  all_control_deps_map[b].push_back(&block);
                 }
               }
             }
@@ -155,31 +155,98 @@ void ControlDependenceAnalysis::addDepsOfDeps(mlir::func::FuncOp &funcOp) {
   Region &funcReg = funcOp.getRegion();
   for(Block &block : funcReg.getBlocks()) {
     // loop on the dependencies of one block
-    for(size_t i = 0; i < control_deps_map[&block].size(); i++) {
-      Block* one_dep = control_deps_map[&block][i];
+    for(size_t i = 0; i < all_control_deps_map[&block].size(); i++) {
+      Block* one_dep = all_control_deps_map[&block][i];
       // loop on the dependencies of every one_dep
-      for(size_t j = 0; j < control_deps_map[one_dep].size(); j++) {
-        // add this dep if it is not already present in control_deps_map[&block]
-        if(std::find(control_deps_map[&block].begin(), control_deps_map[&block].end(), control_deps_map[one_dep][j]) == control_deps_map[&block].end()) {
-          control_deps_map[&block].push_back(control_deps_map[one_dep][j]);
+      for(size_t j = 0; j < all_control_deps_map[one_dep].size(); j++) {
+        // add this dep if it is not already present in all_control_deps_map[&block]
+        if(std::find(all_control_deps_map[&block].begin(), all_control_deps_map[&block].end(), all_control_deps_map[one_dep][j]) == all_control_deps_map[&block].end()) {
+          all_control_deps_map[&block].push_back(all_control_deps_map[one_dep][j]);
         }
       }
     }
   }
 }
 
-void ControlDependenceAnalysis::returnControlDeps(mlir::Block* block, llvm::SmallVector<mlir::Block*, 4>& returned_control_deps) {
-  returned_control_deps = control_deps_map[block];
+void ControlDependenceAnalysis::identifyForwardControlDeps(mlir::func::FuncOp &funcOp) {
+  Region &funcReg = funcOp.getRegion();
+
+  DominanceInfo domInfo;
+  llvm::DominatorTreeBase<Block, false> &domTree = domInfo.getDomTree(&funcReg);
+  // Get loop information to eliminate loop exits from the dependencies
+  CFGLoopInfo li(domTree);
+
+  for (Block &block : funcReg.getBlocks()) {
+    // loop over all_control_deps_map to selectively pick the forward dependencies
+    for(size_t i = 0; i < all_control_deps_map[&block].size(); i++) {
+      Block* one_dep = all_control_deps_map[&block][i];
+      CFGLoop *loop = li.getLoopFor(one_dep);
+      if (loop == nullptr) {
+        // indicating that the one_dep is not inside any loop, so it must be a forward dependency
+        forward_control_deps_map[&block].push_back(one_dep);
+      } else {
+        // indicating that the one_dep is inside a loop, 
+        // to decide if it is a forward dep or not, compare it against all of the exits and latches of this loop
+        bool not_forward = false;
+        // check if one_dep is an exit of the loop
+        llvm::SmallVector<Block *> loop_exitBlocks;
+        loop->getExitingBlocks(loop_exitBlocks);
+        for(auto &loop_exit : loop_exitBlocks) {
+          if(loop_exit == one_dep) {
+            not_forward = true;
+            break;  // it is not a forward dependency so no need to contiue looping
+          }
+        }
+        // check if one_dep is a latch of the loop 
+        llvm::SmallVector<Block *> loop_latchBlocks;
+        loop->getLoopLatches(loop_latchBlocks);
+        for(auto &loop_latch : loop_latchBlocks) {
+          if(loop_latch == one_dep) {
+            not_forward = true;
+            break;  // it is not a forward dependency so no need to contiue looping
+          }
+        }
+
+        if (!not_forward) {
+          forward_control_deps_map[&block].push_back(one_dep);
+        }
+      }
+    }
+  }
+
 }
 
-void ControlDependenceAnalysis::printBlocksDeps(mlir::func::FuncOp &funcOp) {
+void ControlDependenceAnalysis::returnAllControlDeps(mlir::Block* block, llvm::SmallVector<mlir::Block*, 4>& returned_all_control_deps) {
+  returned_all_control_deps = all_control_deps_map[block];
+}
+
+void ControlDependenceAnalysis::returnForwardControlDeps(mlir::Block* block, llvm::SmallVector<mlir::Block*, 4>& returned_forward_control_deps) {
+  returned_forward_control_deps = forward_control_deps_map[block];
+} 
+
+void ControlDependenceAnalysis::printAllBlocksDeps(mlir::func::FuncOp &funcOp) {
   Region &funcReg = funcOp.getRegion();
   llvm::errs() << "\n*********************************\n\n";
   for (Block &block : funcReg.getBlocks()) {
     block.printAsOperand(llvm::errs());
     llvm::errs() << " is control dependent on: ";
-    for(size_t i = 0; i < control_deps_map[&block].size(); i++) {
-      control_deps_map[&block][i]->printAsOperand(llvm::errs());
+    for(size_t i = 0; i < all_control_deps_map[&block].size(); i++) {
+      all_control_deps_map[&block][i]->printAsOperand(llvm::errs());
+      llvm::errs() << ", ";
+    }
+    llvm::errs() << "\n";
+  }
+  llvm::errs() << "\n*********************************\n";
+}
+
+void ControlDependenceAnalysis::printForwardBlocksDeps(mlir::func::FuncOp &funcOp) {
+  Region &funcReg = funcOp.getRegion();
+  llvm::errs() << "\n*********************************\n\n";
+  for (Block &block : funcReg.getBlocks()) {
+    block.printAsOperand(llvm::errs());
+    llvm::errs() << " is forward control dependent on: ";
+    for(size_t i = 0; i < forward_control_deps_map[&block].size(); i++) {
+      forward_control_deps_map[&block][i]->printAsOperand(llvm::errs());
       llvm::errs() << ", ";
     }
     llvm::errs() << "\n";
