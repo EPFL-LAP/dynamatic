@@ -99,6 +99,9 @@ void ControlDependenceAnalysis::identifyAllControlDeps(mlir::func::FuncOp &funcO
     }
   }
 
+  // up to this point, we have correct direct dependencies that do not include nested dependencies (i.e., dependencies of a block's dependencies) 
+  // call the following function to include nested dependencies
+  addDepsOfDeps(funcOp);
 }
 
 void ControlDependenceAnalysis::traversePostDomTree(mlir::Block *start_block, mlir::Block *end_block, Region *funcReg, llvm::DominatorTreeBase<mlir::Block, true> *postDomTree, llvm::SmallVector<llvm::SmallVector<mlir::DominanceInfoNode*, 4> , 4>*traversed_nodes) {
@@ -129,7 +132,7 @@ void ControlDependenceAnalysis::traversePostDomTreeUtil(DominanceInfoNode *start
   if(start_node == end_node) {
      // slice of the path from its beginning until the path_index
     llvm::SmallVector<mlir::DominanceInfoNode*, 4> actual_path;
-    for(int i = 0; i < path_index; i++) {
+    for(auto i = 0; i < path_index; i++) {
       actual_path.push_back(path[i]);
     }
     traversed_nodes->push_back(actual_path);
@@ -146,6 +149,23 @@ void ControlDependenceAnalysis::traversePostDomTreeUtil(DominanceInfoNode *start
   // remove this node from path and mark it as unvisited
   path_index--;
   is_visited[start_node] = false;
+}
+
+void ControlDependenceAnalysis::addDepsOfDeps(mlir::func::FuncOp &funcOp) {
+  Region &funcReg = funcOp.getRegion();
+  for(Block &block : funcReg.getBlocks()) {
+    // loop on the dependencies of one block
+    for(size_t i = 0; i < control_deps_map[&block].size(); i++) {
+      Block* one_dep = control_deps_map[&block][i];
+      // loop on the dependencies of every one_dep
+      for(size_t j = 0; j < control_deps_map[one_dep].size(); j++) {
+        // add this dep if it is not already present in control_deps_map[&block]
+        if(std::find(control_deps_map[&block].begin(), control_deps_map[&block].end(), control_deps_map[one_dep][j]) == control_deps_map[&block].end()) {
+          control_deps_map[&block].push_back(control_deps_map[one_dep][j]);
+        }
+      }
+    }
+  }
 }
 
 void ControlDependenceAnalysis::returnControlDeps(mlir::Block* block, llvm::SmallVector<mlir::Block*, 4>& returned_control_deps) {

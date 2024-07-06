@@ -66,6 +66,9 @@ private:
   // Returns all postDominator tree nodes between start_node and end_node in the postDominator tree
   void traversePostDomTree(mlir::Block *start_block, mlir::Block *end_block, mlir::Region *funcReg, llvm::DominatorTreeBase<mlir::Block, true> *postDomTree, llvm::SmallVector<llvm::SmallVector<mlir::DominanceInfoNode*, 4> , 4>*traversed_nodes);
 
+  // adjusts the dependencies of each block to include nested dependencies (i.e., the dependencies of its depenendencies)
+  void addDepsOfDeps(mlir::func::FuncOp &funcOp);
+
    // recursive function called inside traversePostDomTree
   void traversePostDomTreeUtil(mlir::DominanceInfoNode *start_node, mlir::DominanceInfoNode *end_node, llvm::DenseMap<mlir::DominanceInfoNode*, bool> is_visited, llvm::SmallVector<mlir::DominanceInfoNode*, 4> path, int path_index, llvm::SmallVector<llvm::SmallVector<mlir::DominanceInfoNode*, 4> , 4>*traversed_nodes);
 
