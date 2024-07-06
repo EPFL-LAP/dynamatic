@@ -16,6 +16,7 @@
 #include "mlir/Dialect/Func/IR/FuncOps.h"
 #include "mlir/Pass/AnalysisManager.h"
 #include "mlir/IR/Dominance.h"
+#include "mlir/Analysis/CFGLoopInfo.h"
 
 
 namespace dynamatic {
@@ -35,17 +36,23 @@ public:
     mlir::func::FuncOp funcOp = mlir::dyn_cast<mlir::func::FuncOp>(operation);
     if (funcOp) {
       identifyAllControlDeps(funcOp);
+      identifyForwardControlDeps(funcOp);
     } else {
       // report an error indicating that the anaylsis is instantiated over an inappropriate operation
       llvm::errs() << "ControlDependenceAnalysis is instantiated over an operation that is not FuncOp!\n";
     }
   };
 
-  // return all BBs that the argument block is control dependent on
-  void returnControlDeps(mlir::Block* block, llvm::SmallVector<mlir::Block*, 4>& returned_control_deps);
+  // return all BBs that the block in the argument is control dependent on
+  void returnAllControlDeps(mlir::Block* block, llvm::SmallVector<mlir::Block*, 4>& returned_all_control_deps);
+
+  // return only forward dependencies (i.e., excluding loop exits) that the block in the argument is control dependent on
+  void returnForwardControlDeps(mlir::Block* block, llvm::SmallVector<mlir::Block*, 4>& returned_forward_control_deps);
 
   // loops over the blocks and prints to the terminal the block's control dependencies
-  void printBlocksDeps(mlir::func::FuncOp &funcOp);
+  void printAllBlocksDeps(mlir::func::FuncOp &funcOp);
+
+  void printForwardBlocksDeps(mlir::func::FuncOp &funcOp);
 
   /// Invalidation hook to keep the analysis cached across passes. Returns true
   /// if the analysis should be invalidated and fully reconstructed the next
@@ -58,10 +65,16 @@ private:
   // Every basic block from the CFG is mapped to a vector containing all basic blocks that it is control dependent on
   // We are using SmallVector because it is more efficient than std::vector which use heap allocations
   // If the content of SmallVec tor exceeds 4, it will still be functional but will start using the heap
-  llvm::DenseMap<mlir::Block *, llvm::SmallVector<mlir::Block*, 4>> control_deps_map;
+  llvm::DenseMap<mlir::Block *, llvm::SmallVector<mlir::Block*, 4>> all_control_deps_map;
 
-  // Simply fill the control_deps_map 
+  // contains only the forward control dependencies, excluding the loop exit conditions 
+  llvm::DenseMap<mlir::Block *, llvm::SmallVector<mlir::Block*, 4>> forward_control_deps_map;
+
+  // Simply fill the all_control_deps_map 
   void identifyAllControlDeps(mlir::func::FuncOp &funcOp);  // called inside the constructor
+
+  // Simply extract the forward_control_deps_map from the all_control_deps_map
+  void identifyForwardControlDeps(mlir::func::FuncOp &funcOp);  // called inside the constructor
 
   // Returns all postDominator tree nodes between start_node and end_node in the postDominator tree
   void traversePostDomTree(mlir::Block *start_block, mlir::Block *end_block, mlir::Region *funcReg, llvm::DominatorTreeBase<mlir::Block, true> *postDomTree, llvm::SmallVector<llvm::SmallVector<mlir::DominanceInfoNode*, 4> , 4>*traversed_nodes);

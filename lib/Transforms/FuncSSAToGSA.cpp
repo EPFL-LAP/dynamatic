@@ -31,11 +31,12 @@ void FuncSSAToGSAPass::translate_ssa_to_gsa(func::FuncOp funcOp) {
   Region &funcReg = funcOp.getRegion();
   for (Block &block : funcReg.getBlocks()) {
     llvm::SmallVector<mlir::Block*, 4> returned_control_deps;
-    cdg_analysis.returnControlDeps(&block, returned_control_deps);  // given a block, it returns (by reference) all blocks it is control dependent on
+    cdg_analysis.returnAllControlDeps(&block, returned_control_deps);  // given a block, it returns (by reference) all blocks it is control dependent on
   }
 
   // uncomment this if you want to see control dependencies in terminal
-  cdg_analysis.printBlocksDeps(funcOp);
+  cdg_analysis.printAllBlocksDeps(funcOp);
+  cdg_analysis.printForwardBlocksDeps(funcOp);
 }
 
 std::unique_ptr<mlir::OperationPass<func::FuncOp>>
