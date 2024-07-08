@@ -24,6 +24,7 @@
 #include "experimental/Transforms/ResourceSharing/Crush.h"
 #include "dynamatic/Analysis/NameAnalysis.h"
 #include "dynamatic/Dialect/Handshake/HandshakeOps.h"
+#include "dynamatic/Support/CFG.h"
 #include "dynamatic/Support/DynamaticPass.h"
 #include "dynamatic/Support/LLVM.h"
 #include "dynamatic/Support/Logging.h"
@@ -667,6 +668,10 @@ LogicalResult CreditBasedSharingPass::sharingWrapperInsertion(
     for (Operation *op : group)
       if (op != sharedOp)
         op->erase();
+
+    // After sharing, BB ID becomes meaningless for the shared unit, so we
+    // simply remove it
+    sharedOp->removeAttr(dynamatic::BB_ATTR_NAME);
   }
 
   return success();
