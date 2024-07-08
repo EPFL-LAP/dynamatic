@@ -636,7 +636,8 @@ LogicalResult CreditBasedSharingPass::sharingWrapperInsertion(
         builder.create<handshake::SharingWrapperOp>(
             sharedOp->getLoc(), sharingWrapperOutputTypes, dataOperands,
             sharedOp->getResult(0), llvm::ArrayRef<int64_t>(credits),
-            sharedOp->getNumOperands(), (unsigned)round(latency));
+            credits.size(), sharedOp->getNumOperands(),
+            (unsigned)round(latency));
 
     // Replace original connection from op->successor to
     // sharingWrapper->successor
