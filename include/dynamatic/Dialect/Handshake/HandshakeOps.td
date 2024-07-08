@@ -1130,7 +1130,8 @@ def SpeculatingBranchOp : Handshake_Op<"speculating_branch", [
 //===----------------------------------------------------------------------===//
 
 def SharingWrapperOp : Handshake_Op<"sharing_wrapper", [
-SameOperandsAndResultType
+SameOperandsAndResultType, 
+  DeclareOpInterfaceMethods<NamedIOInterface, ["getOperandName", "getResultName"]>,
 ]> {
 
   let summary = "sharing wrapper operation";
@@ -1170,6 +1171,7 @@ SameOperandsAndResultType
   let arguments = (ins Variadic<AnyType> : $dataOperands,
     AnyType : $sharedOpResult,
     DefaultValuedAttr<DenseI64ArrayAttr, "{}">:$credits,
+    ConfinedAttr<I32Attr, [IntMinValue<2>]>:$numSharedOperations,
     ConfinedAttr<I32Attr, [IntMinValue<1>]>:$numSharedOperands,
     ConfinedAttr<I32Attr, [IntMinValue<1>]>:$latency);
   let results = (outs Variadic<AnyType> : $dataOut);
