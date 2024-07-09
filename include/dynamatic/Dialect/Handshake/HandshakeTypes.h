@@ -61,6 +61,12 @@ llvm::hash_code hash_value(const ExtraSignal &signal);
 } // namespace handshake
 } // namespace dynamatic
 
+namespace mlir {
+class IndexType;
+class IntegerType;
+class FloatType;
+} // namespace mlir
+
 #define GET_TYPEDEF_CLASSES
 #include "dynamatic/Dialect/Handshake/HandshakeTypes.h.inc"
 

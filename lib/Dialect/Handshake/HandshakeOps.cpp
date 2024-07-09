@@ -16,6 +16,7 @@
 //===----------------------------------------------------------------------===//
 
 #include "dynamatic/Dialect/Handshake/HandshakeOps.h"
+#include "dynamatic/Dialect/Handshake/HandshakeTypes.h"
 #include "dynamatic/Support/CFG.h"
 #include "dynamatic/Support/LLVM.h"
 #include "mlir/Dialect/Affine/Analysis/AffineAnalysis.h"
@@ -23,6 +24,7 @@
 #include "mlir/IR/Attributes.h"
 #include "mlir/IR/Builders.h"
 #include "mlir/IR/BuiltinTypes.h"
+#include "mlir/IR/Diagnostics.h"
 #include "mlir/IR/OpDefinition.h"
 #include "mlir/IR/OpImplementation.h"
 #include "mlir/IR/SymbolTable.h"
@@ -1766,6 +1768,172 @@ void ChannelBufPropsAttr::print(AsmPrinter &odsPrinter) const {
              << getInDelay().getValueAsDouble() << ", "
              << getOutDelay().getValueAsDouble() << ", "
              << getDelay().getValueAsDouble();
+}
+
+//===----------------------------------------------------------------------===//
+// BundleOp
+//===----------------------------------------------------------------------===//
+
+/// Common verifier for `handshake::BundleOp` and `handshake::UnbundleOp`
+/// operations, which have the same semantics. Emits an error and fails if the
+/// operation under verification has inconsistent operands/results; succeeds
+/// otherwise.
+static LogicalResult
+verifyBundlingOp(Type channelLikeType, ValueRange upstreams,
+                 ValueRange downstreams, bool isBundleOp,
+                 function_ref<InFlightDiagnostic()> emitError) {
+  // Define some keyword for error reporting based on whether the operation is a
+  // bundle or unbundle
+  StringRef downStr, upStr, actionStr;
+  if (isBundleOp) {
+    downStr = "operand";
+    upStr = "result";
+    actionStr = "bundling";
+  } else {
+    downStr = "result";
+    upStr = "operand";
+    actionStr = "unbundling";
+  }
+
+  if (auto channelType = dyn_cast<handshake::ChannelType>(channelLikeType)) {
+    // The first and second downstream values must be the channel's control and
+    // the data type, respectively
+    if (downstreams.size() < 2) {
+      return emitError() << "not enough " << downStr << "s, " << actionStr
+                         << " a !handshake.channel should "
+                            "produce at least two "
+                         << downStr << "s";
+    }
+    if (!isa<handshake::ControlType>(downstreams.front().getType())) {
+      return emitError()
+             << "type mistmatch between expected !handshake.control type and "
+                "operation's first "
+             << downStr << " (" << downstreams.front().getType() << ")";
+    }
+    downstreams = downstreams.drop_front();
+    if (channelType.getDataType() != downstreams.front().getType()) {
+      return emitError() << "type mismatch between channel's data type ("
+                         << channelType.getDataType()
+                         << ") and operation's second " << downStr << " ("
+                         << downstreams.front().getType() << ")";
+    }
+    downstreams = downstreams.drop_front();
+
+    // The channel's extra signals must be reflected in number and types in the
+    // operation's operands and results depending on their direction
+    auto downstreamIt = downstreams.begin();
+    auto upstreamIt = upstreams.begin();
+    for (const ExtraSignal &extra : channelType.getExtraSignals()) {
+      auto handleExtraSignal = [&](auto &it, ValueRange values,
+                                   StringRef valueType,
+                                   unsigned valOffset) -> LogicalResult {
+        if (it == values.end()) {
+          return emitError()
+                 << "not enough " << valueType
+                 << "s, no value for extra signal '" << extra.name << "'";
+        }
+        if (extra.type != (*it).getType()) {
+          unsigned valIdx = std::distance(values.begin(), it) + valOffset;
+          return emitError()
+                 << "type mismatch between extra signal '" << extra.name
+                 << "' (" << extra.type << ") and " << valIdx << "-th "
+                 << valueType << " (" << (*it).getType() << ")";
+        }
+        ++it;
+        return success();
+      };
+
+      if (extra.downstream) {
+        if (failed(handleExtraSignal(downstreamIt, downstreams, downStr, 2)))
+          return failure();
+      } else {
+        if (failed(handleExtraSignal(upstreamIt, upstreams, upStr, 1)))
+          return failure();
+      }
+    }
+    if (downstreamIt != downstreams.end()) {
+      return emitError()
+             << "too many extra downstream values provided, expected "
+             << std::distance(downstreams.begin(), downstreamIt) << " but got "
+             << downstreams.size();
+    }
+    if (upstreamIt != upstreams.end()) {
+      return emitError() << "too many extra upstream values provided, expected "
+                         << std::distance(upstreams.begin(), upstreamIt)
+                         << " but got " << upstreams.size();
+    }
+  } else {
+    assert(isa<handshake::ControlType>(channelLikeType) && "expected control");
+    OpBuilder builder(channelLikeType.getContext());
+    IntegerType i1Type = builder.getIntegerType(1);
+    if (upstreams.size() != 1 || upstreams.front().getType() != i1Type)
+      return emitError() << "expected single i1 " << upStr << " for ready";
+    if (downstreams.size() != 1 || downstreams.front().getType() != i1Type)
+      return emitError() << "expected single i1 " << downStr << " for valid";
+  }
+
+  return success();
+}
+
+void BundleOp::build(OpBuilder &odsBuilder, OperationState &odsState,
+                     Value ctrl, Value data, ValueRange downstreams,
+                     ChannelType channelType) {
+  assert(isa<handshake::ControlType>(ctrl.getType()) &&
+         "expected !handshake.control");
+  assert(handshake::ChannelType::isSupportedSignalType(data.getType()) &&
+         "unsupported data type");
+  assert(downstreams.size() == channelType.getNumDownstreamExtraSignals() &&
+         "incorrect number of extra downstream signals");
+
+  odsState.addOperands({ctrl, data});
+  odsState.addOperands(downstreams);
+
+  // The operation produces the bundled channel type as well as any upstream
+  // signal in the channel separately (in the order in which they are declared
+  // by the channel)
+  odsState.addTypes(channelType);
+  for (const ExtraSignal &extra : channelType.getExtraSignals()) {
+    if (!extra.downstream)
+      odsState.addTypes(extra.type);
+  }
+}
+
+LogicalResult BundleOp::verify() {
+  return verifyBundlingOp(getChannel().getType(), getUpstreams(), getSignals(),
+                          true, [&]() { return emitError(); });
+}
+
+//===----------------------------------------------------------------------===//
+// UnbundleOp
+//===----------------------------------------------------------------------===//
+
+LogicalResult UnbundleOp::inferReturnTypes(
+    MLIRContext *context, std::optional<Location> location, ValueRange operands,
+    DictionaryAttr attributes, mlir::OpaqueProperties properties,
+    mlir::RegionRange regions,
+    SmallVectorImpl<mlir::Type> &inferredReturnTypes) {
+
+  Type channelLikeType = operands.front().getType();
+  if (auto channelType = dyn_cast<handshake::ChannelType>(channelLikeType)) {
+    inferredReturnTypes.push_back(handshake::ControlType::get(context));
+    inferredReturnTypes.push_back(channelType.getDataType());
+    // All downstream extra signals get unbundled after the control/data
+    for (const ExtraSignal &extra : channelType.getExtraSignals()) {
+      if (extra.downstream)
+        inferredReturnTypes.push_back(extra.type);
+    }
+  } else {
+    assert(isa<handshake::ControlType>(channelLikeType) && "expected control");
+    OpBuilder builder(context);
+    inferredReturnTypes.push_back(builder.getIntegerType(1));
+  }
+
+  return success();
+}
+
+LogicalResult UnbundleOp::verify() {
+  return verifyBundlingOp(getChannel().getType(), getUpstreams(), getSignals(),
+                          false, [&]() { return emitError(); });
 }
 
 #define GET_OP_CLASSES

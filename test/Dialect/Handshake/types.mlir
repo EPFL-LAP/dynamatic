@@ -1,6 +1,6 @@
 // RUN: dynamatic-opt %s --split-input-file --verify-diagnostics
 
-handshake.func private @simpleControl(%arg0: !handshake.control) -> !handshake.control
+handshake.func @simpleControl(%arg0: !handshake.control) -> !handshake.control
 
 // -----
 

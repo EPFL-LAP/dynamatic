@@ -11,10 +11,10 @@
 //===----------------------------------------------------------------------===//
 
 #include "dynamatic/Dialect/Handshake/HandshakeTypes.h"
-#include "mlir/IR/BuiltinTypes.h"
 #include "mlir/IR/DialectImplementation.h"
 #include "mlir/IR/OpImplementation.h"
 #include "mlir/Support/LLVM.h"
+#include "llvm/ADT/STLExtras.h"
 #include "llvm/ADT/StringRef.h"
 #include <set>
 
@@ -27,10 +27,6 @@ using namespace dynamatic::handshake;
 //===----------------------------------------------------------------------===//
 
 constexpr llvm::StringLiteral UPSTREAM_SYMBOL("U");
-
-static inline bool isSupportedSignalType(Type type) {
-  return isa<IndexType, IntegerType, FloatType>(type);
-}
 
 Type ChannelType::parse(AsmParser &odsParser) {
   FailureOr<Type> dataType;
@@ -170,6 +166,12 @@ LogicalResult ChannelType::verify(function_ref<InFlightDiagnostic()> emitError,
     }
   }
   return success();
+}
+
+unsigned ChannelType::getNumDownstreamExtraSignals() const {
+  return llvm::count_if(getExtraSignals(), [](const ExtraSignal &extra) {
+    return extra.downstream;
+  });
 }
 
 ExtraSignal::Storage::Storage(StringRef name, mlir::Type type, bool downstream)
