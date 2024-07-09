@@ -6,8 +6,6 @@
 
 #include "dynamatic/Analysis/ControlDependenceAnalysis.h"
 
-#include "dynamatic/Analysis/ControlDependenceAnalysis.h"
-
 using namespace mlir;
 using namespace dynamatic;
 
@@ -25,7 +23,6 @@ struct FuncSSAToGSAPass
     void translate_ssa_to_gsa(func::FuncOp funcOp);  // the main function of the pass
   };
 }; // namespace
-
 
 void FuncSSAToGSAPass::translate_ssa_to_gsa(func::FuncOp funcOp) {
   // instantiate the control dependence graph analysis 
