@@ -35,6 +35,7 @@ F_PROFILER_INPUTS="$COMP_DIR/profiler-inputs.txt"
 F_HANDSHAKE="$COMP_DIR/handshake.mlir"
 F_HANDSHAKE_TRANSFORMED="$COMP_DIR/handshake_transformed.mlir"
 F_HANDSHAKE_BUFFERED="$COMP_DIR/handshake_buffered.mlir"
+F_HANDSHAKE_LSQ_SIZED="$COMP_DIR/handshake_lsq_sized.mlir"
 F_HANDSHAKE_EXPORT="$COMP_DIR/handshake_export.mlir"
 F_HW="$COMP_DIR/hw.mlir"
 F_FREQUENCIES="$COMP_DIR/frequencies.csv"
@@ -163,8 +164,14 @@ else
   cd - > /dev/null
 fi
 
-# handshake canonicalization
+# handshake lsq sizing
 "$DYNAMATIC_OPT_BIN" "$F_HANDSHAKE_BUFFERED" \
+  --handshake-size-lsqs \
+  > "$F_HANDSHAKE_LSQ_SIZED"
+exit_on_fail "Failed to size LSQs" "Sized LSQs"
+
+# handshake canonicalization
+"$DYNAMATIC_OPT_BIN" "$F_HANDSHAKE_LSQ_SIZED" \
   --handshake-canonicalize \
   --handshake-hoist-ext-instances \
   > "$F_HANDSHAKE_EXPORT"

@@ -291,6 +291,16 @@ def HandshakePlaceBuffers : DynamaticPass<"handshake-place-buffers"> {
     "'buffer-placement' at the binary's location.">];
 }
 
+def HandshakeSizeLSQs : DynamaticPass<"handshake-size-lsqs"> {
+  let summary = "Size the LSQs based on the buffer placement information.";
+  let description = [{
+    Sizes the Load-Store-Queues based on the buffer placement information to ensure
+    that the memory accesses are not restricting the circuits troughput, while 
+    trying to keep the area as low as possible. TODO  
+  }];
+  let constructor = "dynamatic::createHandshakeSizeLSQs()";
+}
+
 //===----------------------------------------------------------------------===//
 // Other passes
 //===----------------------------------------------------------------------===//

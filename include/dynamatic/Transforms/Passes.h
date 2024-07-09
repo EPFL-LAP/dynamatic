@@ -18,6 +18,7 @@
 #include "dynamatic/Transforms/BackAnnotate.h"
 #include "dynamatic/Transforms/BufferPlacement/HandshakePlaceBuffers.h"
 #include "dynamatic/Transforms/BufferPlacement/HandshakeSetBufferingProperties.h"
+#include "dynamatic/Transforms/LSQSizing/HandshakeSizeLSQs.h"
 #include "dynamatic/Transforms/FlattenMemRefRowMajor.h"
 #include "dynamatic/Transforms/ForceMemoryInterface.h"
 #include "dynamatic/Transforms/FuncMaximizeSSA.h"
