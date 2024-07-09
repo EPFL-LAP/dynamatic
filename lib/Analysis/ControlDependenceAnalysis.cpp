@@ -36,7 +36,7 @@ void ControlDependenceAnalysis::identifyAllControlDeps(mlir::func::FuncOp &funcO
   PostDominanceInfo postDomInfo;
   // Get the post-dominance tree
   llvm::DominatorTreeBase<Block, true> &postDomTree =
-      postDomInfo.getDomTree(funcReg);
+      postDomInfo.getDomTree(&funcReg);
 
   // Loop over the control flow edges connnecting the different blocks of this region
   for (Block& block : funcReg.getBlocks()) {
