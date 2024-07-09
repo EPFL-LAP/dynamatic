@@ -13,6 +13,8 @@
 #ifndef DYNAMATIC_DIALECT_HANDSHAKE_HANDSHAKE_TYPES_TD
 #define DYNAMATIC_DIALECT_HANDSHAKE_HANDSHAKE_TYPES_TD
 
+include "mlir/IR/AttrTypeBase.td"
+
 /// Base class for types in the Handshake dialect.
 class Handshake_Type<string name, string typeMnemonic, list<Trait> traits = []>
     : TypeDef<Handshake_Dialect, name, traits> {
@@ -30,30 +32,51 @@ def ControlType : Handshake_Type<"Control", "control"> {
   }];
 
   let parameters = (ins);
-  let assemblyFormat = "";
+}
+
+def ExtraSignals : TypeParameter<
+  "::llvm::ArrayRef<::dynamatic::handshake::ExtraSignal>", 
+  "An optional array of extra signals for a dataflow channel"> {
+  let allocator = [{
+    ::llvm::SmallVector<::dynamatic::handshake::ExtraSignal> tmpSignals;
+    for (const ::dynamatic::handshake::ExtraSignal &signal : $_self) {
+      ::dynamatic::handshake::ExtraSignal& tmp = tmpSignals.emplace_back(signal);
+      tmp.name = $_allocator.copyInto(tmp.name);
+    }
+    }] # "$_dst = $_allocator.copyInto(" # cppType # [{ (tmpSignals));
+  }];
+  let cppStorageType = "::llvm::SmallVector<::dynamatic::handshake::ExtraSignal::Storage>";
+  let convertFromStorage = [{convertExtraSignalsFromStorage($_self)}];
+  let comparator = cppType # "($_lhs) == " # cppType # "($_rhs)";
+
+  let defaultValue = cppType # "()";
 }
 
 def ChannelType : Handshake_Type<"Channel", "channel"> {
-  let summary = "A dataflow channel.";
+  let summary = "A dataflow channel with optional extra signals.";
   let description = [{
     Represents a dataflow channel, which is made up of
     - a data signal of arbitrary width and type going downstream (in the same
       direction as the natural SSA def-use relation's direction),
     - a 1-bit valid signal going downstream (in the same direction as the
-      natural SSA def-use relation's direction), and
+      natural SSA def-use relation's direction),
     - a 1-bit ready signal going upsteam (in the opposite direction as the
-      natural SSA def-use relation's direction).
+      natural SSA def-use relation's direction), and
+    - an optional list of named extra signals of arbitrary width and type which
+      may go downstream or upstream.
   }];
 
-  let parameters = (ins "::mlir::Type":$dataType);
+  let parameters = (ins "::mlir::Type":$dataType, ExtraSignals:$extraSignals);
 
   let builders = [
     TypeBuilderWithInferredContext<(ins "::mlir::Type":$dataType), [{
-        return Base::get(dataType.getContext(), dataType);
+        return ChannelType::get(dataType.getContext(), dataType, {});
       }]>
    ];
 
-  let assemblyFormat = "`<` $dataType `>`";
+  let hasCustomAssemblyFormat = 1;
+  let genVerifyDecl = 1;
+
 }
 
 #endif // DYNAMATIC_DIALECT_HANDSHAKE_HANDSHAKE_TYPES_TD
