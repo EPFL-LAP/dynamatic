@@ -36,6 +36,7 @@
 #include "dynamatic/Transforms/BufferPlacement/HandshakePlaceBuffers.h"
 #include "dynamatic/Transforms/HandshakeMaterialize.h"
 #include "experimental/Transforms/ResourceSharing/SharingSupport.h"
+#include "mlir/Dialect/Arith/IR/Arith.h"
 #include "mlir/IR/BuiltinAttributes.h"
 #include "mlir/Pass/PassManager.h"
 #include "llvm/Support/Path.h"
@@ -372,7 +373,8 @@ struct CreditBasedSharingPass
       // This is a list of sharable operations. To support more operation types,
       // simply add in the end of the list.
       if (isa<mlir::arith::MulFOp, mlir::arith::MulIOp, mlir::arith::AddFOp,
-              mlir::arith::SubFOp>(op)) {
+              mlir::arith::SubFOp, mlir::arith::DivFOp, mlir::arith::DivUIOp,
+              mlir::arith::DivSIOp>(op)) {
         assert(op.getNumOperands() > 1 && op.getNumResults() == 1 &&
                "Invalid sharing target is being added to the list of sharing "
                "targets! Currently operations with 1 input or more than 1 "
