@@ -10,8 +10,7 @@
 //
 //===----------------------------------------------------------------------===//
 #include "Graph.h"
-#include <functional>
-#include <iostream>
+#include "llvm/Support/raw_ostream.h"
 #include <utility>
 
 using namespace mlir;
@@ -19,30 +18,27 @@ using namespace dynamatic::visual;
 
 void Graph::addEdge(GraphEdge edge) {
   edges.push_back(edge);
-  std::pair<NodeId, size_t> srcInfo =
+  NodePortPair srcPort =
       std::pair(edge.getSrcNode().getNodeId(), edge.getOutPort());
-  std::pair<NodeId, size_t> dstInfo =
+  NodePortPair dstPort =
       std::pair(edge.getDstNode().getNodeId(), edge.getInPort());
-  std::pair<std::pair<NodeId, size_t>, std::pair<NodeId, size_t>> edgeInfo =
-      std::pair(srcInfo, dstInfo);
-  mapEdges.insert(std::pair(edgeInfo, edge.getEdgeId()));
+  EdgePorts edgePorts(srcPort, dstPort);
+  mapEdges.insert(std::pair(edgePorts, edge.getEdgeId()));
 }
 
 void Graph::addNode(GraphNode node) { nodes.insert({node.getNodeId(), node}); }
 
 LogicalResult Graph::getNode(NodeId &id, GraphNode &result) {
-  if (nodes.count(id)) {
-    result = nodes.at(id);
+  if (auto nodeIt = nodes.find(id); nodeIt != nodes.end()) {
+    result = nodeIt->second;
     return success();
   }
   return failure();
 }
 
-LogicalResult Graph::getEdgeId(
-    std::pair<std::pair<NodeId, size_t>, std::pair<NodeId, size_t>> &edgeInfo,
-    EdgeId &edgeId) {
-  if (mapEdges.count(edgeInfo)) {
-    edgeId = mapEdges.at(edgeInfo);
+LogicalResult Graph::getEdgeId(EdgePorts &edgeInfo, EdgeId &edgeId) {
+  if (auto edgeIt = mapEdges.find(edgeInfo); edgeIt != mapEdges.end()) {
+    edgeId = edgeIt->second;
     return success();
   }
   return failure();
@@ -61,7 +57,7 @@ void Graph::addEdgeState(CycleNb cycleNb, EdgeId edgeId, State state,
   }
 }
 
-CycleTransitions Graph::getCycleEdgeStates() { return cycleEdgeStates; }
+CycleTransitions &Graph::getCycleEdgeStates() { return cycleEdgeStates; }
 
 std::map<NodeId, GraphNode> Graph::getNodes() { return nodes; }
 

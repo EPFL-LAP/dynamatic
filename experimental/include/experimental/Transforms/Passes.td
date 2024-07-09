@@ -16,19 +16,6 @@
 include "dynamatic/Support/Passes.td"
 include "mlir/Pass/PassBase.td"
 
-def HandshakeFixArgNames : DynamaticPass<"handshake-fix-arg-names"> {
-  let summary = "Replace function argument names with original ones from C";
-  let description = [{
-    Extremely hacky pass that text parses the original source code from which
-    the IR was obtained and replaces the default argument names given by
-    Polygeist to all function arguments with the ones used in the source code.
-  }];
-  let constructor = "dynamatic::experimental::createHandshakeFixArgNames()";
-  let options =
-    [Option<"source", "source", "std::string", "",
-            "Path to source C file from which the IR was generated.">];
-}
-
 def HandshakeSpeculation : DynamaticPass<"handshake-speculation"> {
   let summary = "Place Speculation operations";
   let description = [{
@@ -47,8 +34,23 @@ def HandshakeSpeculation : DynamaticPass<"handshake-speculation"> {
   let constructor = "dynamatic::experimental::speculation::createHandshakeSpeculation()";
   let options = [
     Option<"jsonPath", "json-path", "std::string", "",
-    "Path to JSON-formatted file containing the positions for speculative "
-    "operations.">];
+           "Path to JSON-formatted file containing the positions for speculative "
+           "operations.">,
+    Option<"automatic", "automatic", "bool", "true",
+           "When the automatic mode is enabled, the speculative unit positions are "
+           "automatically detected. The speculator position still needs to be "
+           "specified in the JSON-formatted file.">];
+}
+
+def SpecAnnotatePaths : DynamaticPass<"spec-annotate-paths"> {
+  let summary = "Adds an attribute to mark operations in speculative regions";
+  let description = [{
+    The operations within speculative regions need to be marked for
+    VHDL exporting purposes. The pass adds the attribute "speculative" to
+    operations that are found within the speculative region, which is defined from
+    save units and the speculator, to commit units.
+  }];
+  let constructor = "dynamatic::experimental::speculation::createSpecAnnotatePaths()";
 }
 
 def HandshakePlaceBuffersCustom : DynamaticPass<"handshake-placebuffers-custom"> {
@@ -65,5 +67,34 @@ def HandshakePlaceBuffersCustom : DynamaticPass<"handshake-placebuffers-custom">
   ];
 }
 
+def CreditBasedSharing : DynamaticPass<"credit-based-sharing"> {
+  let summary = "Credit-Based Sharing of Functional Units";
+  let description = [{ Sharing functional units for better resource utilization.
+  This pass currently target maintaining the performance while using as few
+  functional units as possible.}];
+  let constructor = "dynamatic::experimental::sharing::createCreditBasedSharing()";
+
+  let options = [Option<"algorithm", "algorithm", "std::string", "\"fpga20\"",
+      "Algorithm to use for buffer placement. Choices are: 'fpga20' (default), "
+      "'fpga20-legacy' (same as fpga-20 but interprets the MILP's results as "
+      "legacy Dynamatic would, placing at most a single buffer type on any given "
+      "channel)">,
+      Option<"frequencies", "frequencies", "std::string", "",
+      "Path to CSV-formatted file containing estimated transition frequencies "
+      "between basic blocks in the kernel.">,
+      Option<"timingModels", "timing-models", "std::string", "",
+      "Path to JSON-formatted file containing timing models for dataflow "
+      "components.">,
+      Option<"firstCFDFC", "first-cfdfc", "bool", "false",
+      "If true, only extract the first CFDFC from the input file">,
+      Option<"targetCP", "target-period", "double", "4.0",
+      "Target clock period for the buffer placement CFDFC">,
+      Option<"timeout", "timeout", "unsigned", "180",
+      "Timeout (in seconds) for the buffer placement MILP (0 for no timeout)">,
+      Option<"dumpLogs", "dump-logs", "bool", "false",
+      "If true, dump debugging information (identified CFDFCs, MILP "
+      "placement decisions, solution summaries) into a directory named "
+      "'buffer-placement' at the binary's location.">];
+}
 
 #endif // EXPERIMENTAL_TRANSFORMS_PASSES_TD

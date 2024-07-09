@@ -13,6 +13,7 @@ This tutorial will introduce you to MLIR and its core constructs. It is intended
 - [Attributes](#attributes) | What are attributes and what are they used for?
 - [Dialects](#dialects) | What are MLIR dialects?
 - [Printing to the console](#printing-to-the-console) | What are the various ways of printing to the console?
+
 ## [High-level structure](https://mlir.llvm.org/docs/LangRef/#high-level-structure)
 
 From the [language reference](https://mlir.llvm.org/docs/LangRef):
@@ -31,12 +32,14 @@ Thanks to MLIR's recursively nested structure, it is very easy to traverse the e
 
 ```cpp
 void traverseIRFromOperation(mlir::Operation *op) {
-  for (mlir::Region &region : op->getRegions())
-    for (mlir::Block &block : region.getBlocks())
+  for (mlir::Region &region : op->getRegions()) {
+    for (mlir::Block &block : region.getBlocks()) {
       for (mlir::Operation &nestedOp : block.getOperations()) {
         llvm::outs() << "Traversing operation " << op << "\n";
         traverseIRFromOperation(&nestedOp);
       }
+    }
+  }
 }
 ```
 
@@ -123,7 +126,7 @@ mlir::Value value = ...;
 
 // Iterate over all uses of the value (i.e., over operation operands that equal
 // the value)
-for (mlir::OpOperand &use : val.getUses()) {
+for (mlir::OpOperand &use : value.getUses()) {
   // Get the owner of this particular use 
   mlir::Operation *useOwner = use.getOwner();
   llvm::outs() << "Value is used as operand number " 
@@ -132,16 +135,17 @@ for (mlir::OpOperand &use : val.getUses()) {
 }
 
 // Iterate over all users of the value
-for (mlir::Operation *user : val.getUsers())
+for (mlir::Operation *user : value.getUsers())
   llvm::outs() << "Value is used as an operand of operation " << user << "\n";
 ```
 
 ## [Operations](https://mlir.llvm.org/docs/LangRef/#operations)
 
-In MLIR, everything is about operations. Operations are like "opaque functions" to MLIR; they may represent some abstraction (e.g., a function, with a `mlir::func::FuncOp` operation) or perform some computation (e.g., an integer addition, with a `mlir::arith::AddIOp`). There is no fixed set of operations; users may define their own operations with custon semantics and use them at the same time as MLIR-defined operations. Operations:
+In MLIR, everything is about operations. Operations are like "opaque functions" to MLIR; they may represent some abstraction (e.g., a function, with a `mlir::func::FuncOp` operation) or perform some computation (e.g., an integer addition, with a `mlir::arith::AddIOp`). There is no fixed set of operations; users may define their own operations with custom semantics and use them at the same time as MLIR-defined operations. Operations:
+
 - are identified by a unique string
 - can take 0 or more operands
-- can return 0 or more results 
+- can return 0 or more results
 - can have [attributes](#attributes) (i.e., constant data stored in a dictionary)
 
 The C++ snippet below shows how to get an operation's information from C++.
@@ -191,7 +195,7 @@ As we saw above, you can manipulate any operation in MLIR using the "opaque" `Op
 
 > `Op` derived classes act as smart pointer wrapper around a `Operation*`, provide operation-specific accessor methods, and type-safe properties of operations. [...] A side effect of this design is that we always pass around `Op` derived classes “by-value”, instead of by reference or pointer.
 
-Whenever you want to manipulate an operation of a specific type, you should do so through its actual type that derives from `Op`. Fortunately, it is easy to identify the actual type of an `Operation*` using MLIR's casting infrastructure. The following snippet shows a few different methods to check whether an opaque `Operation*` is actually an integer addition (`mlir::arith::AddIOp`). 
+Whenever you want to manipulate an operation of a specific type, you should do so through its actual type that derives from `Op`. Fortunately, it is easy to identify the actual type of an `Operation*` using MLIR's casting infrastructure. The following snippet shows a few different methods to check whether an opaque `Operation*` is actually an integer addition (`mlir::arith::AddIOp`).
 
 ```cpp
 // Let op be an Operation*
@@ -292,10 +296,9 @@ Graph regions, on the other hand, can only contain a single basic block and are 
 
 > All values defined in the [graph] region as results of operations are in scope within the region and can be accessed by any other operation in the region. In graph regions, the order of operations within a block and the order of blocks in a region is not semantically meaningful and non-terminator operations may be freely reordered.
 
-
 ## [Blocks](https://mlir.llvm.org/docs/LangRef/#blocks)
 
-A block is an ordered list of MLIR operations. The last operation in a block must be a terminator operation, unless it is the single block of a region whose parent operation has the `NoTerminator` trait (`mlir::ModuleOp` is such an operation). 
+A block is an ordered list of MLIR operations. The last operation in a block must be a terminator operation, unless it is the single block of a region whose parent operation has the `NoTerminator` trait (`mlir::ModuleOp` is such an operation).
 
 As mentioned in the [prior section on MLIR values](#values), blocks may have block arguments. From the [language reference](https://mlir.llvm.org/docs/LangRef/#blocks):
 
@@ -307,20 +310,19 @@ In SSACFG regions, these block arguments often implicitly represent the passage 
 
 For this section, you are simply invited to read [the relevant part of the language reference](https://mlir.llvm.org/docs/LangRef/#attributes), which is very short.
 
-In summary, attributes are used to attach data/information to operations that cannot be expressed using a value operand. Additionally, attributes allow us to propagate meta-information about operations down the lowering pipeline. This is useful whenever, for example, some analysis can only be performed at a "high IR level" but its results only become relevant at a "low IR level". In these situations, the analysis's results would be attached to relevant operations using attributes, and these attributes would then be propagated through lowering passes until the IR reaches the level where the information must be acted upon.    
-
+In summary, attributes are used to attach data/information to operations that cannot be expressed using a value operand. Additionally, attributes allow us to propagate meta-information about operations down the lowering pipeline. This is useful whenever, for example, some analysis can only be performed at a "high IR level" but its results only become relevant at a "low IR level". In these situations, the analysis's results would be attached to relevant operations using attributes, and these attributes would then be propagated through lowering passes until the IR reaches the level where the information must be acted upon.
 
 ## [Dialects](https://mlir.llvm.org/docs/LangRef/#dialects)
 
 For this section, you are also simply invited to read [the relevant part of the language reference](https://mlir.llvm.org/docs/LangRef/#dialects), which is very short.
 
-The *Handshake* dialect, defined in the `circt::handshake` namespace, is core to Dynamatic. *Handshake* allows us to represent dataflow circuits inside [graph regions](#regions). Throughout the repository, whenever we mention "*Handshake*-level IR", we are referring to an IR that contains *Handshake* operations (i.e., dataflow components), which together make up a dataflow circuit. 
+The *Handshake* dialect, defined in the `dynamatic::handshake` namespace, is core to Dynamatic. *Handshake* allows us to represent dataflow circuits inside [graph regions](#regions). Throughout the repository, whenever we mention "*Handshake*-level IR", we are referring to an IR that contains *Handshake* operations (i.e., dataflow components), which together make up a dataflow circuit.
 
 ## Printing to the console
 
 ### Printing to stdout and stderr
 
-LLVM/MLIR has wrappers around the standard program output streams that you should use whenever you would like something displayed on the console. These are `llvm::outs()` (for stdout) and `llvm::errs()` (for stderr),see their usage below.
+LLVM/MLIR has wrappers around the standard program output streams that you should use whenever you would like something displayed on the console. These are `llvm::outs()` (for stdout) and `llvm::errs()` (for stderr), see their usage below.
 
 ```cpp
 // Let op be an Operation*
@@ -336,6 +338,9 @@ llvm::errs() << "This will be printed on stderr!\n"
              << "convertible to std::string, like the integer " << 10
              << " or an MLIR operation " << op << "\n";
 ```
+
+> [!CAUTION]
+> Dynamatic's optimizer prints the IR resulting from running all the passes it was asked to run to standard output. As a consequence **you should never explicitly print anything to stdout yourself**, as it will mix up with the IR text serialization. Instead, all error messages should go to stderr.
 
 ### Printing information related to an operation
 

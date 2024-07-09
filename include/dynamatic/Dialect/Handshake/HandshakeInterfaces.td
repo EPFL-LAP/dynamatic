@@ -152,31 +152,18 @@ def MemoryOpInterface : OpInterface<"MemoryOpInterface"> {
 
   let methods = [
     InterfaceMethod<
-        "Simulate the memory allocation in the memoryMap", "bool",
-        "allocateMemory",
-        (ins  "llvm::DenseMap<unsigned, unsigned> &" : $memoryMap, 
-              "std::vector<std::vector<llvm::Any>> &" : $store,
-              "std::vector<double> &" : $storeTimes),
-        "",
-        [{
-          return false;
-        }]>,
-    InterfaceMethod<
-        "Returns the memory interface's operands related to memory ports.",
-        "mlir::ValueRange", "getMemOperands", (ins),
+        "Returns the memref-typed SSA value that the interface references.",
+        "::mlir::TypedValue<::mlir::MemRefType>", "getMemRef", (ins)>,
+    InterfaceMethod<[{
+        Returns the type of the memref-typed SSA value that the interface
+        references.
+        }],
+        "::mlir::MemRefType", "getMemRefType", (ins),
         "",
         [{
           ConcreteOp concreteOp = cast<ConcreteOp>($_op);
-          return concreteOp.getMemInputs();
+          return concreteOp.getMemRef().getType().template cast<mlir::MemRefType>();
         }]>,
-    InterfaceMethod<
-        "Returns the memory interface's results related to memory ports.",
-        "mlir::ValueRange", "getMemResults", (ins),
-        "",
-        [{
-          ConcreteOp concreteOp = cast<ConcreteOp>($_op);
-          return concreteOp.getMemOutputs();
-        }]>
   ];
 }
 
@@ -186,6 +173,13 @@ def BufferOpInterface : OpInterface<"BufferOpInterface"> {
     Handshake operations which act as buffers with a strictly positive number
     of slots.
   }];
+
+  let methods = [
+    InterfaceMethod<
+      "Returns the number of buffer slots.",
+      "unsigned", "getSlots", (ins)
+    >
+  ];
 }
 
 def LoadOpInterface : OpInterface<"LoadOpInterface"> {
@@ -278,21 +272,55 @@ def NamedIOInterface : OpInterface<"NamedIOInterface"> {
       [{"Provides detailed names for the operands and results of an operation."}];
 
   let methods = [
+    StaticInterfaceMethod<
+        "Returns the default name of a specific operand.",
+        "std::string", "getDefaultOperandName", (ins "unsigned" : $idx),
+        "",
+        [{
+          return "ins_" + std::to_string(idx);
+        }]>,
+    StaticInterfaceMethod<
+        "Returns the default name of a specific result.",
+        "std::string", "getDefaultResultName", (ins "unsigned" : $idx),
+        "",
+        [{
+          return "outs_" + std::to_string(idx);
+        }]>,
     InterfaceMethod<
-        "Get the name of an operand.",
+        "Returns the name of a specific operand.",
         "std::string", "getOperandName", (ins "unsigned" : $idx),
         "",
         [{
-          // Return the default name of an operand.
-          return "in" + std::to_string(idx);
+          ConcreteOp concreteOp = mlir::cast<ConcreteOp>($_op);
+
+          // Operations which always have a single operand get a specific port
+          // name for it
+          if (concreteOp.template hasTrait<mlir::OpTrait::OneOperand>()) {
+            assert(idx == 0 && "index too high");
+            return "ins";
+          }
+
+          // Generic input name
+          assert(idx < concreteOp->getNumOperands() && "index too high");
+          return getDefaultOperandName(idx);
         }]>,
     InterfaceMethod<
-        "Get the name of a result.",
+        "Returns the name of a specific result.",
         "std::string", "getResultName", (ins "unsigned" : $idx),
         "",
         [{
-          // Return the default name of a result.
-          return "out" + std::to_string(idx);
+          ConcreteOp concreteOp = mlir::cast<ConcreteOp>($_op);
+          
+          // Operations which always have a single result get a specific port
+          // name for it
+          if (concreteOp.template hasTrait<mlir::OpTrait::OneResult>()) {
+            assert(idx == 0 && "index too high");
+            return "outs";
+          }
+
+          // Generic output name
+          assert(idx < concreteOp->getNumResults() && "index too high");
+          return getDefaultResultName(idx);
         }]>
   ];
 }
@@ -318,6 +346,13 @@ def ControlInterface : OpInterface<"ControlInterface"> {
 }
 
 def HasClock : NativeOpTrait<"HasClock">;
+
+def SpeculationOpInterface : OpInterface<"SpeculationOpInterface"> {
+  let cppNamespace = "::dynamatic::handshake";
+  let description = [{
+    Identifier for operations representing speculative units.
+  }];
+}
 
 #endif //DYNAMATIC_DIALECT_HANDSHAKE_HANDSHAKE_INTERFACES
 

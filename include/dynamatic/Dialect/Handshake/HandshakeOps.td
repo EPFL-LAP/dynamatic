@@ -11,13 +11,12 @@
 //
 //===----------------------------------------------------------------------===//
 //
-// This file define Handshake ops in tablegen.
+// This file define Handshake operations in tablegen.
 //
 //===----------------------------------------------------------------------===//
 
-
-#ifndef DYNAMATIC_DIALECT_HANDSHAKE_HANDHSAKE_OPS_TD
-#define DYNAMATIC_DIALECT_HANDSHAKE_HANDHSAKE_OPS_TD
+#ifndef DYNAMATIC_DIALECT_HANDSHAKE_HANDSHAKE_OPS_TD
+#define DYNAMATIC_DIALECT_HANDSHAKE_HANDSHAKE_OPS_TD
 
 include "mlir/IR/EnumAttr.td"
 include "mlir/IR/OpAsmInterface.td"
@@ -25,6 +24,14 @@ include "mlir/IR/BuiltinTypes.td"
 include "mlir/IR/BuiltinAttributeInterfaces.td"
 include "mlir/Interfaces/InferTypeOpInterface.td"
 include "dynamatic/Dialect/Handshake/HandshakeAttributes.td"
+
+/// Base class for Handshake dialect operations.
+class Handshake_Op<string mnemonic, list<Trait> traits = []>
+    : Op<Handshake_Dialect, mnemonic,
+         traits #[HasParent<"handshake::FuncOp">,
+         DeclareOpInterfaceMethods<NamedIOInterface>,
+         DeclareOpInterfaceMethods<ControlInterface>]> {
+}
 
 // This is almost exactly like a standard FuncOp, except that it has some
 // extra verification conditions.  In particular, each Value must
@@ -169,7 +176,6 @@ def InstanceOp : Handshake_Op<"instance", [
       $_state.addOperands(operands);
       $_state.addAttribute("module", module);
       $_state.addTypes(results);
-      $_state.addTypes({$_builder.getType<::mlir::NoneType>()});
   }]>, OpBuilder<
     (ins "StringRef":$module, "TypeRange":$results,
      CArg<"ValueRange", "{}">:$operands), [{
@@ -505,12 +511,12 @@ def SourceOp : Handshake_Op<"source", [
 ]> {
   let summary = "source operation";
   let description = [{
-    The source operation represents continuous token
-    source.  The source continously sets a 'valid' signal which the
-    successor can consume at any point in time.
+    The source operation represents a continuous control-only-token source. The
+    source continously sets a 'valid' signal which the successor can consume at
+    any point in time.
   }];
 
-  let results = (outs AnyType:$result);
+  let results = (outs NoneType:$result);
   let hasCustomAssemblyFormat = 1;
 }
 
@@ -552,6 +558,21 @@ def JoinOp : Handshake_Op<"join", [
   let arguments = (ins Variadic<AnyType> : $data);
   let results = (outs NoneType : $result);
   let hasCustomAssemblyFormat = 1;
+}
+
+def NotOp : Handshake_Op<"not", [Pure, SameOperandsAndResultType]> {
+  let summary = "Logical negation";
+  let description = [{
+    Bitwise logical negation.
+
+    Example:
+    ```mlir
+    %neg = not %value : i32
+    ```
+  }];
+  let arguments = (ins AnyType : $operand);
+  let results = (outs AnyType : $result);
+  let assemblyFormat = [{ $operand attr-dict `:` qualified(type($result))}];
 }
 
 def MemoryControllerOp : Handshake_Op<"mem_controller", [
@@ -622,16 +643,16 @@ def MemoryControllerOp : Handshake_Op<"mem_controller", [
     ```
   }];
   
-  let arguments = (ins  AnyMemRef : $memRef, Variadic<AnyType> : $memInputs,
+  let arguments = (ins  AnyMemRef : $memRef, Variadic<AnyType> : $inputs,
                         I32ArrayAttr : $connectedBlocks);
-  let results = (outs Variadic<AnyType> : $memOutputs, NoneType : $done);
+  let results = (outs Variadic<AnyType> : $outputs, NoneType : $done);
 
   let skipDefaultBuilders = 1;
   let builders = [OpBuilder<(ins  "Value":$memRef, "ValueRange":$inputs,
                                   "ArrayRef<unsigned>":$blocks, 
                                   "unsigned":$numLoads)>];
   let hasVerifier = 1;
-  let assemblyFormat = " `[` $memRef `:` qualified(type($memRef)) `]` `(` $memInputs `)` attr-dict `:` functional-type($memInputs, results)";
+  let assemblyFormat = " `[` $memRef `:` qualified(type($memRef)) `]` `(` $inputs `)` attr-dict `:` functional-type($inputs, results)";
 
   let extraClassDeclaration = [{
     /// Returns the list of basic block IDs the MC is connected to.
@@ -645,16 +666,11 @@ def MemoryControllerOp : Handshake_Op<"mem_controller", [
     /// Returns a convenient data-structure to go over the controls and memory
     /// accesses that are connected to the memory controller. 
     dynamatic::MCPorts getPorts();
-
-    /// Returns the type of the memref referenced by the memory interface.
-    mlir::MemRefType getMemRefType() {
-      return getMemRef().getType().cast<mlir::MemRefType>();
-    }
   }];
 }
 
 def LSQOp : Handshake_Op<"lsq", [
-  DeclareOpInterfaceMethods<MemoryOpInterface, ["getMemOperands"]>,
+  DeclareOpInterfaceMethods<MemoryOpInterface>,
   DeclareOpInterfaceMethods<NamedIOInterface, ["getOperandName"]>,
   DeclareOpInterfaceMethods<NamedIOInterface, ["getResultName"]>
 ]> {
@@ -721,8 +737,8 @@ def LSQOp : Handshake_Op<"lsq", [
     ```
   }];
   
-  let arguments = (ins Variadic<AnyType> : $memInputs, I32ArrayAttr : $groupSizes);
-  let results = (outs Variadic<AnyType> : $memOutputs, NoneType : $done);
+  let arguments = (ins Variadic<AnyType> : $inputs, I32ArrayAttr : $groupSizes);
+  let results = (outs Variadic<AnyType> : $outputs, NoneType : $done);
 
   let skipDefaultBuilders = 1;
   let builders = [
@@ -750,24 +766,17 @@ def LSQOp : Handshake_Op<"lsq", [
     
     /// Determines whether the LSQ is connected to an MC. 
     bool isConnectedToMC() {
-      return !isa<mlir::MemRefType>(getMemInputs().front().getType());
+      return !isa<mlir::MemRefType>(getInputs().front().getType());
     }
 
     /// Returns the MC connected to the LSQ, if it exists.
     handshake::MemoryControllerOp getConnectedMC();
-
-    /// Returns the memref referenced by the LSQ.
-    mlir::Value getMemRef();
-
-    /// Returns the type of the memref referenced by the LSQ.
-    mlir::MemRefType getMemRefType();
   }];
 }
 
 class Handshake_LoadOp<string mnemonic> : Handshake_Op<mnemonic, [
   LoadOpInterface,
-  DeclareOpInterfaceMethods<NamedIOInterface, ["getOperandName"]>,
-  DeclareOpInterfaceMethods<NamedIOInterface, ["getResultName"]>,
+  DeclareOpInterfaceMethods<NamedIOInterface, ["getOperandName", "getResultName"]>,
   DeclareOpInterfaceMethods<InferTypeOpInterface, ["inferReturnTypes"]>
 ]> {
   let arguments = (ins AnyType:$address, AnyType:$data);
@@ -776,11 +785,13 @@ class Handshake_LoadOp<string mnemonic> : Handshake_Op<mnemonic, [
   let assemblyFormat = " `[` $address `]` $data attr-dict `:` qualified(type($address)) `,` qualified(type($data)) ";
 
   let extraClassDefinition = [{
-    std::string $cppClass::getOperandName(unsigned int idx) {
+    std::string $cppClass::getOperandName(unsigned idx) {
+      assert(idx < getNumOperands() && "index too high");
       return (idx == 0) ? "addrIn" : "dataFromMem";
     }
 
-    std::string $cppClass::getResultName(unsigned int idx) {
+    std::string $cppClass::getResultName(unsigned idx) {
+      assert(idx < getNumResults() && "index too high");
       return (idx == 0) ? "addrOut" : "dataOut";
     }
 
@@ -846,8 +857,7 @@ def LSQLoadOp : Handshake_LoadOp<"lsq_load"> {
 
 class Handshake_StoreOp<string mnemonic> : Handshake_Op<mnemonic, [
   StoreOpInterface,
-  DeclareOpInterfaceMethods<NamedIOInterface, ["getOperandName"]>,
-  DeclareOpInterfaceMethods<NamedIOInterface, ["getResultName"]>,
+  DeclareOpInterfaceMethods<NamedIOInterface, ["getOperandName", "getResultName"]>,
   DeclareOpInterfaceMethods<InferTypeOpInterface, ["inferReturnTypes"]>
 ]> {
   let arguments = (ins AnyType:$address, AnyType:$data);
@@ -945,7 +955,10 @@ def ReturnOp : Handshake_Op<"return", [
   let assemblyFormat = [{ attr-dict ($inputs^ `:` type($inputs))? }];
 }
 
-def EndOp : Handshake_Op<"end", [Terminator]> {
+def EndOp : Handshake_Op<"end", [
+  DeclareOpInterfaceMethods<NamedIOInterface, ["getOperandName"]>,
+  Terminator
+]> {
   let summary = "function endpoint (dynamatic)";
   let description = [{
     This operation is the terminator of every handshake function in Dynamatic.
@@ -976,7 +989,8 @@ def EndOp : Handshake_Op<"end", [Terminator]> {
 // Speculation operations
 //===----------------------------------------------------------------------===//
 
-def SpeculatorOp : Handshake_Op<"speculator", [ 
+def SpeculatorOp : Handshake_Op<"speculator", [
+  SpeculationOpInterface,
   TypesMatchWith<"data operand type matches data result type",
                  "dataIn", "dataOut", "$_self">]> {
   let summary = "Central control unit of the speculative circuit.";
@@ -995,19 +1009,20 @@ def SpeculatorOp : Handshake_Op<"speculator", [
     Example:
     ```mlir
     %dataOut, %saveCtrl, %commitCtrl, %SCSaveCtrl, 
-      %SCCommitCtrl, %SCBranchCtrl = speculator %dataIn : i1
+      %SCCommitCtrl, %SCBranchCtrl = speculator[enable] %dataIn : i1
     ```
   }];
 
-  let arguments = (ins AnyType : $dataIn);
+  let arguments = (ins AnyType : $dataIn, NoneType : $enable);
   let results = (outs AnyType : $dataOut,
                   I1 : $saveCtrl, I1 : $commitCtrl, 
                   I<3> : $SCSaveCtrl, I<3> : $SCCommitCtrl, 
                   I1 : $SCBranchCtrl);
-  let assemblyFormat = "$dataIn attr-dict `:` qualified(type($dataIn)) ";
+  let assemblyFormat = " `[` $enable `]` $dataIn attr-dict `:` qualified(type($dataIn)) ";
 }
 
 def SpecSaveOp : Handshake_Op<"spec_save", [
+  SpeculationOpInterface,
   TypesMatchWith<"data operand type matches data result type",
                  "dataIn", "dataOut", "$_self">] > {
   let summary = "Saves data tokens that interact in the speculative region.";
@@ -1033,6 +1048,7 @@ def SpecSaveOp : Handshake_Op<"spec_save", [
 }
 
 def SpecCommitOp : Handshake_Op<"spec_commit", [
+  SpeculationOpInterface,
   TypesMatchWith<"data operand type matches data result type",
                     "dataIn", "dataOut", "$_self">] > {
   let summary = "Stall speculative data tokens until they are resolved.";
@@ -1059,6 +1075,7 @@ def SpecCommitOp : Handshake_Op<"spec_commit", [
 }
 
 def SpecSaveCommitOp : Handshake_Op<"spec_save_commit", [
+  SpeculationOpInterface,
   TypesMatchWith<"data operand type matches data result type",
                     "dataIn", "dataOut", "$_self">]> {
   let summary = "Lets all tokens pass and saves a copy of them.";
@@ -1080,6 +1097,7 @@ def SpecSaveCommitOp : Handshake_Op<"spec_save_commit", [
 }
 
 def SpeculatingBranchOp : Handshake_Op<"speculating_branch", [
+  SpeculationOpInterface,
   TypesMatchWith<"data operand type matches true branch result type",
                     "dataOperand", "trueResult", "$_self">,
   TypesMatchWith<"data operand type matches false branch result type",
@@ -1107,4 +1125,26 @@ def SpeculatingBranchOp : Handshake_Op<"speculating_branch", [
   let assemblyFormat = " `[` $tagFromOperand `]` $dataOperand attr-dict `:` qualified(type($tagFromOperand)) `,` qualified(type($dataOperand)) ";
 }
 
-#endif // DYNAMATIC_DIALECT_HANDSHAKE_HANDHSAKE_OPS_TD
+//===----------------------------------------------------------------------===//
+// Resource Sharing Operations
+//===----------------------------------------------------------------------===//
+
+def SharingWrapperOp : Handshake_Op<"sharing_wrapper", [
+SameOperandsAndResultType
+]> {
+
+  let summary = "sharing wrapper operation"; let description = [{
+    The sharing_wrapper operation represents the selecting & distributing logic
+    that wraps around a functional unit.}];
+
+  let arguments = (ins Variadic<AnyType> : $dataOperands,
+    AnyType : $sharedOpResult,
+    DefaultValuedAttr<DenseI64ArrayAttr, "{}">:$credits,
+    ConfinedAttr<I32Attr, [IntMinValue<1>]>:$numSharedOperands);
+  let results = (outs Variadic<AnyType> : $dataOut);
+
+  let assemblyFormat = " `[` $dataOperands `]` `,` `[` $sharedOpResult `]` attr-dict `:` `(` qualified(type($dataOperands)) `)` `,` `(` qualified(type($sharedOpResult)) `)` `->` `(` qualified(type($dataOut)) `)` ";
+}
+
+
+#endif // DYNAMATIC_DIALECT_HANDSHAKE_HANDSHAKE_OPS_TD

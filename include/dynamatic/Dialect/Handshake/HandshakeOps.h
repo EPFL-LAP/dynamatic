@@ -18,27 +18,12 @@
 #ifndef DYNAMATIC_DIALECT_HANDSHAKE_HANDSHAKE_OPS_H
 #define DYNAMATIC_DIALECT_HANDSHAKE_HANDSHAKE_OPS_H
 
-#include "dynamatic/Dialect/Handshake/HandshakeDialect.h"
 #include "dynamatic/Dialect/Handshake/HandshakeInterfaces.h"
 #include "dynamatic/Support/LLVM.h"
 #include "mlir/Dialect/Affine/Analysis/AffineAnalysis.h"
-#include "mlir/IR/Attributes.h"
-#include "mlir/IR/Builders.h"
-#include "mlir/IR/BuiltinOps.h"
-#include "mlir/IR/BuiltinTypes.h"
-#include "mlir/IR/Dialect.h"
 #include "mlir/IR/OpDefinition.h"
-#include "mlir/IR/OpImplementation.h"
 #include "mlir/IR/Operation.h"
 #include "mlir/IR/RegionKindInterface.h"
-#include "mlir/IR/TypeSupport.h"
-#include "mlir/IR/Types.h"
-#include "mlir/Interfaces/CallInterfaces.h"
-#include "mlir/Interfaces/FunctionInterfaces.h"
-#include "mlir/Interfaces/InferTypeOpInterface.h"
-#include "mlir/Interfaces/SideEffectInterfaces.h"
-#include "mlir/Pass/Pass.h"
-#include "llvm/ADT/Any.h"
 
 namespace dynamatic {
 namespace handshake {
@@ -113,19 +98,26 @@ public:
   /// Returns the memory port's kind.
   Kind getKind() const { return kind; }
 
+  /// Returns the list of operand indices associated to the port.
+  ArrayRef<unsigned> getOprdIndices() const { return oprdIndices; }
+
+  /// Returns the list of result indices associated to the port.
+  ArrayRef<unsigned> getResIndices() const { return resIndices; }
+
   explicit operator bool() const { return portOp != nullptr; }
 
   /// Virtual default destructor.
   virtual ~MemoryPort() = default;
 
 protected:
-  /// List of indices in the memory inputs/outputs of the memory interface the
-  /// port refers to. Their meaning is port-kind-dependent.
-  mlir::SmallVector<unsigned, 4> indices;
+  /// Operand indices of the memory interface that the port refers to.
+  mlir::SmallVector<unsigned, 4> oprdIndices;
+  /// Operand indices of the memory interface that the port refers to.
+  mlir::SmallVector<unsigned, 4> resIndices;
 
   /// Constructs a memory port "member-by-member".
-  MemoryPort(mlir::Operation *portOp, mlir::ArrayRef<unsigned> indices,
-             Kind kind);
+  MemoryPort(mlir::Operation *portOp, ArrayRef<unsigned> oprdIndices,
+             ArrayRef<unsigned> resIndices, Kind kind);
 
 private:
   /// Memory port's kind (used for LLVM-style RTTI).
@@ -149,7 +141,7 @@ public:
   mlir::Operation *getCtrlOp() const { return portOp; }
 
   /// Returns the index of the control value in the memory interface's inputs.
-  unsigned getCtrlInputIndex() const { return indices[0]; }
+  unsigned getCtrlInputIndex() const { return oprdIndices[0]; }
 
   /// Used by LLVM-style RTTI to establish `isa` relationships.
   static inline bool classof(const MemoryPort *port) {
@@ -176,11 +168,11 @@ public:
 
   /// Returns the index of the load address value in the memory interface's
   /// inputs.
-  unsigned getAddrInputIndex() const { return indices[0]; }
+  unsigned getAddrInputIndex() const { return oprdIndices[0]; }
 
   /// Returns the index of the load data value in the memory interface's
   /// outputs.
-  unsigned getDataOutputIndex() const { return indices[1]; }
+  unsigned getDataOutputIndex() const { return resIndices[0]; }
 
   /// Used by LLVM-style RTTI to establish `isa` relationships.
   static inline bool classof(const MemoryPort *port) {
@@ -257,11 +249,11 @@ public:
 
   /// Returns the index of the store address value in the memory interface's
   /// inputs.
-  unsigned getAddrInputIndex() const { return indices[0]; }
+  unsigned getAddrInputIndex() const { return oprdIndices[0]; }
 
   /// Returns the index of the store data value in the memory interface's
   /// inputs.
-  unsigned getDataInputIndex() const { return indices[1]; }
+  unsigned getDataInputIndex() const { return oprdIndices[1]; }
 
   /// Used by LLVM-style RTTI to establish `isa` relationships.
   static inline bool classof(const MemoryPort *port) {
@@ -349,19 +341,19 @@ public:
 
   /// Returns the index of the load address value in the memory interface's
   /// inputs.
-  unsigned getLoadAddrInputIndex() const { return indices[0]; }
+  unsigned getLoadAddrInputIndex() const { return oprdIndices[0]; }
 
   /// Returns the index of the load data value in the memory interface's
   /// outputs.
-  unsigned getLoadDataOutputIndex() const { return indices[1]; }
+  unsigned getLoadDataOutputIndex() const { return resIndices[0]; }
 
   /// Returns the index of the store address value in the memory interface's
   /// inputs.
-  unsigned getStoreAddrInputIndex() const { return indices[2]; }
+  unsigned getStoreAddrInputIndex() const { return oprdIndices[1]; }
 
   /// Returns the index of the store data value in the memory interface's
   /// inputs.
-  unsigned getStoreDataInputIndex() const { return indices[3]; }
+  unsigned getStoreDataInputIndex() const { return oprdIndices[2]; }
 
   /// Used by LLVM-style RTTI to establish `isa` relationships.
   static inline bool classof(const MemoryPort *port) {
@@ -377,7 +369,7 @@ public:
 /// (1) and output (3).
 /// 1. The load address value produced by the memory interface and consumed by
 /// the LSQ (output).
-/// 1. The load data value produced by the MC and consumed by the memory
+/// 2. The load data value produced by the MC and consumed by the memory
 /// interface (input).
 /// 3. The store address value produced by the memory interface and consumed by
 /// the LSQ (output).
@@ -403,19 +395,19 @@ public:
 
   /// Returns the index of the load address value in the memory interface's
   /// outputs.
-  unsigned getLoadAddrOutputIndex() const { return indices[0]; }
+  unsigned getLoadAddrOutputIndex() const { return resIndices[0]; }
 
   /// Returns the index of the load data value in the memory interface's
   /// inputs.
-  unsigned getLoadDataInputIndex() const { return indices[1]; }
+  unsigned getLoadDataInputIndex() const { return oprdIndices[0]; }
 
   /// Returns the index of the store address value in the memory interface's
   /// outputs.
-  unsigned getStoreAddrOutputIndex() const { return indices[2]; }
+  unsigned getStoreAddrOutputIndex() const { return resIndices[1]; }
 
   /// Returns the index of the store data value in the memory interface's
   /// outputs.
-  unsigned getStoreDataOutputIndex() const { return indices[3]; }
+  unsigned getStoreDataOutputIndex() const { return resIndices[2]; }
 
   /// Used by LLVM-style RTTI to establish `isa` relationships.
   static inline bool classof(const MemoryPort *port) {
@@ -455,6 +447,26 @@ public:
   /// Computes the number of results in the asociated memory interface that map
   /// to this group's ports.
   unsigned getNumResults() const;
+
+  /// Returns the first operand index that is associated with a port of the
+  /// group. If no port of the group has an operand associated with it, returns
+  /// std::string::npos.
+  size_t getFirstOperandIndex() const;
+
+  /// Returns the last operand index that is associated with a port of the
+  /// group. If no port of the group has an operand associated with it, returns
+  /// std::string::npos.
+  size_t getLastOperandIndex() const;
+
+  /// Returns the first result index that is associated with a port of the
+  /// group. If no port of the group has a result associated with it, returns
+  /// std::string::npos.
+  size_t getFirstResultIndex() const;
+
+  /// Returns the last result index that is associated with a port of the
+  /// group. If no port of the group has a result associated with it, returns
+  /// std::string::npos.
+  size_t getLastResultIndex() const;
 
   /// Determines whether the group contains any port of the provided kinds.
   template <typename... PortKinds>
@@ -513,6 +525,14 @@ public:
   /// Returns the continuous subrange of the memory interface's results which a
   /// group (indicated by its index in the list) maps to.
   mlir::ValueRange getGroupResults(unsigned groupIdx);
+
+  /// Returns the continuous subrange of the memory interface's inputs which
+  /// connect to other memory interfaces.
+  mlir::ValueRange getInterfacesInputs();
+
+  /// Returns the continuous subrange of the memory interface's results which
+  /// connect to other memory interfaces.
+  mlir::ValueRange getInterfacesResults();
 
   /// Returns the number of groups attached to the memory interface.
   unsigned getNumGroups() { return groups.size(); }
@@ -587,10 +607,7 @@ public:
 
   /// Returns the memory controller's LSQ ports (which must exist, check with
   /// `hasConnectionToLSQ`).
-  LSQLoadStorePort getLSQPort() const {
-    assert(hasConnectionToLSQ() && "no LSQ connected");
-    return llvm::cast<LSQLoadStorePort>(interfacePorts.front());
-  }
+  LSQLoadStorePort getLSQPort() const;
 };
 
 /// Smart-pointer around a `dynamatic::GroupMemoryPorts`, specializing it for
@@ -633,10 +650,7 @@ public:
 
   /// Returns the LSQ's memory controller ports (which must exist, check with
   /// `hasConnectionToMC`).
-  MCLoadStorePort getMCPort() const {
-    assert(hasConnectionToMC() && "no LSQ connected");
-    return llvm::cast<MCLoadStorePort>(interfacePorts.front());
-  }
+  MCLoadStorePort getMCPort() const;
 };
 
 /// Specifies how a handshake channel (i.e. a SSA value used once) may be
@@ -751,9 +765,6 @@ namespace affine {
 struct DependenceComponent;
 } // namespace affine
 } // namespace mlir
-
-#define GET_TYPEDEF_CLASSES
-#include "dynamatic/Dialect/Handshake/HandshakeTypes.h.inc"
 
 #define GET_ATTRDEF_CLASSES
 #include "dynamatic/Dialect/Handshake/HandshakeAttributes.h.inc"

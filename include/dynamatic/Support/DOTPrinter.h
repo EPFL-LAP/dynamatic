@@ -20,15 +20,13 @@
 #include "dynamatic/Support/TimingModels.h"
 #include "mlir/Support/IndentedOstream.h"
 #include <map>
-#include <set>
-#include <unordered_map>
 
 using namespace mlir;
 
 namespace dynamatic {
 
-struct NodeInfo;
-struct EdgeInfo;
+struct DOTNode;
+struct DOTEdge;
 
 /// Implements the logic to convert Handshake-level IR to a DOT. The only public
 /// method of this class, print, converts an MLIR module containing a single
@@ -143,7 +141,7 @@ private:
 };
 
 /// Holds information about data attributes for a DOT node.
-struct NodeInfo {
+struct DOTNode {
   /// The node's type.
   std::string type;
   /// A mapping between attribute name and value (printed between "").
@@ -152,7 +150,7 @@ struct NodeInfo {
   std::map<std::string, int> intAttr;
 
   /// Constructs a NodeInfo with a specific type.
-  NodeInfo(std::string type) : type(std::move(type)){};
+  DOTNode(std::string type) : type(std::move(type)){};
 
   /// Prints all stored data attributes on the output stream. The function
   /// doesn't insert [brackets] around the attributes; it is the responsibility
@@ -162,7 +160,7 @@ struct NodeInfo {
 };
 
 /// Holds information about data attributes for a DOT edge.
-struct EdgeInfo {
+struct DOTEdge {
   /// The port number of the edge's source node.
   size_t from;
   /// The port number of the edge's destination node.

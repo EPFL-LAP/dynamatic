@@ -1,25 +1,25 @@
 library ieee;
 use ieee.std_logic_1164.all;
 
-entity join is generic (SIZE : integer);
-port (
-  ins_valid  : in std_logic_vector(SIZE - 1 downto 0);
-  outs_ready : in std_logic;
-  outs_valid : out std_logic;
-  ins_ready  : out std_logic_vector(SIZE - 1 downto 0));
+entity join is
+  generic (
+    SIZE : integer
+  );
+  port (
+    -- inputs
+    ins_valid  : in std_logic_vector(SIZE - 1 downto 0);
+    outs_ready : in std_logic;
+    -- outputs
+    outs_valid : out std_logic;
+    ins_ready  : out std_logic_vector(SIZE - 1 downto 0)
+  );
 end join;
 
 architecture arch of join is
-  signal allPValid : std_logic;
-
+  signal allValid : std_logic;
 begin
-
-  allPValidAndGate : entity work.andN generic map(SIZE)
-    port map(
-      ins_valid,
-      allPValid);
-
-  outs_valid <= allPValid;
+  allValidAndGate : entity work.and_n generic map(SIZE) port map(ins_valid, allValid);
+  outs_valid <= allValid;
 
   process (ins_valid, outs_ready)
     variable singlePValid : std_logic_vector(SIZE - 1 downto 0);
@@ -36,4 +36,5 @@ begin
       ins_ready(i) <= (singlePValid(i) and outs_ready);
     end loop;
   end process;
+
 end architecture;

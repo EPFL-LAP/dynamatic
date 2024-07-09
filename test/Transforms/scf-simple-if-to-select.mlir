@@ -19,19 +19,18 @@ func.func @thenYieldElseYield(%arg0: i32, %arg1: i32, %cond: i1) -> i32 {
 // -----
 
 // CHECK-LABEL:   func.func @thenAddElseYield(
-// CHECK-SAME:                                %[[VAL_0:.*]]: i32, %[[VAL_1:.*]]: i32,
-// CHECK-SAME:                                %[[VAL_2:.*]]: i1) -> i32 {
-// CHECK:           %[[VAL_3:.*]] = arith.constant 0 : i32
-// CHECK:           %[[VAL_4:.*]] = arith.select %[[VAL_2]], %[[VAL_1]], %[[VAL_3]] : i32
-// CHECK:           %[[VAL_5:.*]] = arith.addi %[[VAL_0]], %[[VAL_4]] : i32
+// CHECK-SAME:                                %[[VAL_0:.*]]: i32, %[[VAL_1:.*]]: i32, %[[VAL_2:.*]]: i32,
+// CHECK-SAME:                                %[[VAL_3:.*]]: i1) -> i32 {
+// CHECK:           %[[VAL_4:.*]] = arith.addi %[[VAL_0]], %[[VAL_1]] : i32
+// CHECK:           %[[VAL_5:.*]] = arith.select %[[VAL_3]], %[[VAL_4]], %[[VAL_2]] : i32
 // CHECK:           return %[[VAL_5]] : i32
 // CHECK:         }
-func.func @thenAddElseYield(%arg0: i32, %arg1: i32, %cond: i1) -> i32 {
+func.func @thenAddElseYield(%arg0: i32, %arg1: i32, %arg2: i32, %cond: i1) -> i32 {
   %ifRes = scf.if %cond -> (i32) {
     %add = arith.addi %arg0, %arg1 : i32
     scf.yield %add : i32
   } else {
-    scf.yield %arg0 : i32
+    scf.yield %arg2 : i32
   }
   return %ifRes : i32
 }
@@ -41,10 +40,9 @@ func.func @thenAddElseYield(%arg0: i32, %arg1: i32, %cond: i1) -> i32 {
 // CHECK-LABEL:   func.func @thenYieldElseAdd(
 // CHECK-SAME:                                %[[VAL_0:.*]]: i32, %[[VAL_1:.*]]: i32,
 // CHECK-SAME:                                %[[VAL_2:.*]]: i1) -> i32 {
-// CHECK:           %[[VAL_3:.*]] = arith.constant 0 : i32
-// CHECK:           %[[VAL_4:.*]] = arith.select %[[VAL_2]], %[[VAL_3]], %[[VAL_1]] : i32
-// CHECK:           %[[VAL_5:.*]] = arith.addi %[[VAL_0]], %[[VAL_4]] : i32
-// CHECK:           return %[[VAL_5]] : i32
+// CHECK:           %[[VAL_3:.*]] = arith.addi %[[VAL_0]], %[[VAL_1]] : i32
+// CHECK:           %[[VAL_4:.*]] = arith.select %[[VAL_2]], %[[VAL_0]], %[[VAL_3]] : i32
+// CHECK:           return %[[VAL_4]] : i32
 // CHECK:         }
 func.func @thenYieldElseAdd(%arg0: i32, %arg1: i32, %cond: i1) -> i32 {
   %ifRes = scf.if %cond -> (i32) {
@@ -62,7 +60,7 @@ func.func @thenYieldElseAdd(%arg0: i32, %arg1: i32, %cond: i1) -> i32 {
 // CHECK-SAME:                              %[[VAL_0:.*]]: i32, %[[VAL_1:.*]]: i32, %[[VAL_2:.*]]: i32,
 // CHECK-SAME:                              %[[VAL_3:.*]]: i1) -> i32 {
 // CHECK:           %[[VAL_4:.*]] = arith.select %[[VAL_3]], %[[VAL_1]], %[[VAL_2]] : i32
-// CHECK:           %[[VAL_5:.*]] = arith.addi %[[VAL_4]], %[[VAL_0]] : i32
+// CHECK:           %[[VAL_5:.*]] = arith.addi %[[VAL_0]], %[[VAL_4]] : i32
 // CHECK:           return %[[VAL_5]] : i32
 // CHECK:         }
 func.func @thenAddElseAdd(%arg0: i32, %arg1: i32, %arg2: i32, %cond: i1) -> i32 {
@@ -76,6 +74,46 @@ func.func @thenAddElseAdd(%arg0: i32, %arg1: i32, %arg2: i32, %cond: i1) -> i32 
   return %ifRes : i32
 }
 
+// CHECK-LABEL:   func.func @thenSubElseSub(
+// CHECK-SAME:                              %[[VAL_0:.*]]: i32, %[[VAL_1:.*]]: i32, %[[VAL_2:.*]]: i32,
+// CHECK-SAME:                              %[[VAL_3:.*]]: i1) -> i32 {
+// CHECK:           %[[VAL_4:.*]] = arith.select %[[VAL_3]], %[[VAL_1]], %[[VAL_2]] : i32
+// CHECK:           %[[VAL_5:.*]] = arith.subi %[[VAL_0]], %[[VAL_4]] : i32
+// CHECK:           return %[[VAL_5]] : i32
+// CHECK:         }
+func.func @thenSubElseSub(%arg0: i32, %arg1: i32, %arg2: i32, %cond: i1) -> i32 {
+  %ifRes = scf.if %cond -> (i32) {
+    %add1 = arith.subi %arg0, %arg1 : i32
+    scf.yield %add1 : i32
+  } else {
+    %add2 = arith.subi %arg0, %arg2 : i32
+    scf.yield %add2 : i32
+  }
+  return %ifRes : i32
+}
+
+// -----
+
+// CHECK-LABEL:   func.func @thenYieldElseSub(
+// CHECK-SAME:                                %[[VAL_0:.*]]: i32, %[[VAL_1:.*]]: i32, %[[VAL_2:.*]]: i32,
+// CHECK-SAME:                                %[[VAL_3:.*]]: i1) -> i32 {
+// CHECK:           %[[VAL_4:.*]] = arith.constant 0 : i32
+// CHECK:           %[[VAL_5:.*]] = arith.subi %[[VAL_4]], %[[VAL_2]] : i32
+// CHECK:           %[[VAL_6:.*]] = arith.select %[[VAL_3]], %[[VAL_2]], %[[VAL_5]] : i32
+// CHECK:           return %[[VAL_6]] : i32
+// CHECK:         }
+func.func @thenYieldElseSub(%arg0: i32, %arg1: i32, %arg2: i32, %cond: i1) -> i32 {
+  %zero = arith.constant 0 : i32
+  %ifRes = scf.if %cond -> (i32) {
+    scf.yield %arg2 : i32
+  } else {
+    %add = arith.subi %zero, %arg2 : i32
+    scf.yield %add : i32
+  }
+  return %ifRes : i32
+}
+
+
 // -----
 
 // CHECK-LABEL:   func.func @incompatibleSubs(
@@ -88,7 +126,7 @@ func.func @thenAddElseAdd(%arg0: i32, %arg1: i32, %arg2: i32, %cond: i1) -> i32 
 // CHECK:             %[[VAL_6:.*]] = arith.subi %[[VAL_2]], %[[VAL_0]] : i32
 // CHECK:             scf.yield %[[VAL_6]] : i32
 // CHECK:           }
-// CHECK:           return %[[VAL_7:.*]] : i32
+// CHECK:           return %[[VAL_4]] : i32
 // CHECK:         }
 func.func @incompatibleSubs(%arg0: i32, %arg1: i32, %arg2: i32, %cond: i1) -> i32 {
   %ifRes = scf.if %cond -> (i32) {
@@ -97,29 +135,6 @@ func.func @incompatibleSubs(%arg0: i32, %arg1: i32, %arg2: i32, %cond: i1) -> i3
   } else {
     %sub2 = arith.subi %arg2, %arg0 : i32
     scf.yield %sub2 : i32
-  }
-  return %ifRes : i32
-}
-
-// -----
-
-// CHECK-LABEL:   func.func @incompatibleYields(
-// CHECK-SAME:                                  %[[VAL_0:.*]]: i32, %[[VAL_1:.*]]: i32, %[[VAL_2:.*]]: i32,
-// CHECK-SAME:                                  %[[VAL_3:.*]]: i1) -> i32 {
-// CHECK:           %[[VAL_4:.*]] = scf.if %[[VAL_3]] -> (i32) {
-// CHECK:             %[[VAL_5:.*]] = arith.addi %[[VAL_0]], %[[VAL_1]] : i32
-// CHECK:             scf.yield %[[VAL_5]] : i32
-// CHECK:           } else {
-// CHECK:             scf.yield %[[VAL_2]] : i32
-// CHECK:           }
-// CHECK:           return %[[VAL_6:.*]] : i32
-// CHECK:         }
-func.func @incompatibleYields(%arg0: i32, %arg1: i32, %arg2: i32, %cond: i1) -> i32 {
-  %ifRes = scf.if %cond -> (i32) {
-    %add = arith.addi %arg0, %arg1 : i32
-    scf.yield %add : i32
-  } else {
-    scf.yield %arg2 : i32
   }
   return %ifRes : i32
 }
@@ -136,7 +151,7 @@ func.func @incompatibleYields(%arg0: i32, %arg1: i32, %arg2: i32, %cond: i1) -> 
 // CHECK:           } else {
 // CHECK:             scf.yield %[[VAL_0]] : i32
 // CHECK:           }
-// CHECK:           return %[[VAL_7:.*]] : i32
+// CHECK:           return %[[VAL_4]] : i32
 // CHECK:         }
 func.func @invalidBranch(%arg0: i32, %arg1: i32, %arg2: i32, %cond: i1) -> i32 {
   %ifRes = scf.if %cond -> (i32) {

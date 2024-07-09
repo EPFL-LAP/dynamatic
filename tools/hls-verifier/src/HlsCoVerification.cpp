@@ -17,7 +17,7 @@ namespace hls_verify {
 const string LOG_TAG = "COVER";
 
 bool runCoverification(vector<string> args) {
-  if (args.size() < 3) {
+  if (args.size() < 6) {
     logErr(LOG_TAG, "Not enough arguments.");
     cout << getCoVerificationHelpMessage() << endl;
     return true;
@@ -40,14 +40,17 @@ bool runCoverification(vector<string> args) {
   string cTbPath = args[1];
   string cDuvPath = args[2];
   string cFuvFunctionName = args[3];
-  string vhdlDuvEntityName = args.size() > 4 ? args[4] : cFuvFunctionName;
+  string vhdlDuvEntityName = args[4];
+  bool experimental = (args[5] == "1");
+
   vector<string> otherCPaths;
-  for (size_t i = 5; i < args.size(); i++)
+  for (size_t i = 6; i < args.size(); i++)
     otherCPaths.push_back(args[i]);
 
   VerificationContext ctx(cTbPath, cDuvPath, cFuvFunctionName,
                           vhdlDuvEntityName, otherCPaths);
   ctx.useAddrWidth32 = useAddrWidth32;
+  ctx.experimental = experimental;
   executeVhdlTestbench(ctx, resourceDir);
   return compareCAndVhdlOutputs(ctx);
 }

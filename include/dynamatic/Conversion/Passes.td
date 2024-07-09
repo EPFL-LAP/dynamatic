@@ -67,17 +67,17 @@ def CfToHandshake : DynamaticPass<"lower-cf-to-handshake"> {
 }
 
 //===----------------------------------------------------------------------===//
-// HandshakeToNetlist
+// HandshakeToHW
 //===----------------------------------------------------------------------===//
 
-def HandshakeToNetlist : DynamaticPass< "lower-handshake-to-netlist",
-                                        [ "dynamatic::hw::HWDialect" ]> {
-  let summary = "Lower Handshake to HW (netlist)";
+def HandshakeToHW : DynamaticPass<"lower-handshake-to-hw",
+                                  ["dynamatic::hw::HWDialect"]> {
+  let summary = "Lowers Handshake to HW.";
   let description = [{
-    Lower Handshake IR into a "netlist-level" representation made up of HW
+    Lowers Handshake IR into a "netlist-style" representation made up of HW
     instances of external modules interconnected by dataflow channels.
   }];
-  let constructor = "dynamatic::createHandshakeToNetlistPass()";
+  let constructor = "dynamatic::createHandshakeToHWPass()";
 }
 
 #endif // DYNAMATIC_CONVERSION_PASSES_TD

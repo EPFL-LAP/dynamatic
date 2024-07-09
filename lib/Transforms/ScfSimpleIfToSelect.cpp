@@ -16,77 +16,8 @@
 #include "dynamatic/Transforms/ScfSimpleIfToSelect.h"
 #include "mlir/Dialect/SCF/IR/SCF.h"
 #include "mlir/Transforms/GreedyPatternRewriteDriver.h"
-#include "llvm/ADT/TypeSwitch.h"
 
 using namespace mlir;
-
-namespace {
-
-/// Holds information necessary to construct the flat operations equivalent to
-/// an if that has the right structure for our transformation
-struct MatchResult {
-  /// The name of the arithmetic operation present in at least one branch.
-  std::string opName;
-  /// Is the value common between both branches the LHS?
-  bool isCommonValLhs = false;
-  /// The value used by both branches (i.e, the one that won't be part of the
-  /// arith::SelectOp).
-  Value commonVal = nullptr;
-  /// The value from the "then" branch that will end up on the "true side" of
-  /// the inserted arith::SelectOp.
-  Value trueVal = nullptr;
-  /// The value from the "else" branch that will end up on the "false side" of
-  /// the inserted arith::SelectOp.
-  Value falseVal = nullptr;
-};
-
-/// Converts eligible scf::IfOp into an arith::SelectOp and an arithmetic
-/// operation, removing the associated control flow from the IR in the process.
-struct ConvertIfToSelect : public OpRewritePattern<scf::IfOp> {
-  using OpRewritePattern<scf::IfOp>::OpRewritePattern;
-
-  LogicalResult matchAndRewrite(scf::IfOp ifOp,
-                                PatternRewriter &rewriter) const override {
-    // Check whether the if has the right structure for our conversion
-    MatchResult matchRes;
-    if (!isLegalForConversion(ifOp, rewriter, matchRes))
-      return failure();
-
-    // Create the select operation
-    rewriter.setInsertionPoint(ifOp);
-    auto selectOp =
-        rewriter.create<arith::SelectOp>(ifOp->getLoc(), ifOp.getCondition(),
-                                         matchRes.trueVal, matchRes.falseVal);
-
-    // Create the arithmetic operation from its name
-    Value selRes = selectOp.getResult();
-    Value lhs, rhs;
-    if (matchRes.isCommonValLhs) {
-      lhs = matchRes.commonVal;
-      rhs = selRes;
-    } else {
-      lhs = selRes;
-      rhs = matchRes.commonVal;
-    }
-    Operation *arithOp = rewriter.create(
-        ifOp.getLoc(), StringAttr::get(getContext(), matchRes.opName),
-        {lhs, rhs}, {ifOp.getResult(0).getType()});
-
-    rewriter.replaceOp(ifOp, arithOp->getResult(0));
-    return success();
-  }
-
-private:
-  /// Determines whether the if has the right structure for our conversion. If
-  /// it has, the function returns true and the result struct is filled with all
-  /// the information necessary to construct the equivalent operations that will
-  /// replace the if. Note that, in the latter case, the function may create
-  /// constant operations in the IR next to the if to create "neutral elements"
-  /// to select with in case one of the if's branches only yields a value.
-  bool isLegalForConversion(scf::IfOp ifOp, PatternRewriter &rewriter,
-                            MatchResult &res) const;
-};
-} // namespace
 
 /// If the block is made up of two operations (op + yield), determines whether
 /// it has the right structure and whether the first operation is supported by
@@ -114,82 +45,156 @@ static Value getYieldedVal(Block &block) {
   return yieldOp.getOperand(0);
 }
 
-/// If both branches have an arithmetic operation, checks whether they are
-/// compatible. They must be of the same type and share an operand (which may or
-/// may not need to be in the same position, depending on the operation's
-/// commutativity trait). If branches are compatible, fills up the result struct
-/// with all relevant values (the common one, the true one, and the false one).
-static LogicalResult handleOpInEachBranch(Operation *thenOp, Operation *elseOp,
-                                          MatchResult &res) {
+namespace {
+
+/// Converts eligible scf::IfOp into an arith::SelectOp and an arithmetic
+/// operation, removing the associated control flow from the IR in the process.
+struct ConvertIfToSelect : public OpRewritePattern<scf::IfOp> {
+  using OpRewritePattern<scf::IfOp>::OpRewritePattern;
+
+  LogicalResult matchAndRewrite(scf::IfOp ifOp,
+                                PatternRewriter &rewriter) const override {
+    if (Value replaceWith = tryToConvert(ifOp, rewriter)) {
+      rewriter.replaceOp(ifOp, replaceWith);
+      return success();
+    }
+    return failure();
+  }
+
+private:
+  /// Hoists an arithmetic operation out of one of the if's branches, then
+  /// inserts a select operation (conditioned like the if) using its result and
+  /// another value. Returns the select's result.
+  Value hoistSingleArithOp(scf::IfOp ifOp, Operation *arithOp,
+                           Value otherSelectVal, bool otherValIsFalse,
+                           PatternRewriter &rewriter) const;
+
+  /// Creates a select operation (conditioned like the if) using two provided
+  /// values, and feeds the select's result to a two-operand arithmetic
+  /// operation referenced by its name. Returns the arithmetic operation's
+  /// result.
+  Value createSelectThenArithOp(scf::IfOp ifOp, Value trueVal, Value falseVal,
+                                StringRef arithOpName, Value otherArithVal,
+                                bool otherValIsRhs,
+                                PatternRewriter &rewriter) const;
+
+  /// If both if branches contain a single arithmetic operation, checks whether
+  /// they are eligible for conversion. If they are, convert them to the
+  /// appropriate equivalent operation and returns the value to replace the if's
+  /// result with.
+  Value combineArithOps(scf::IfOp ifOp, Operation *thenOp, Operation *elseOp,
+                        PatternRewriter &rewriter) const;
+
+  /// Attempts to convert the if to a control-less sequence of operations. If it
+  /// is possible, creates the equivalent operations above the if and returns
+  /// the value to replace the if's result with; otherwise returns nullptr.
+  Value tryToConvert(scf::IfOp ifOp, PatternRewriter &rewriter) const;
+};
+} // namespace
+
+Value ConvertIfToSelect::hoistSingleArithOp(scf::IfOp ifOp, Operation *arithOp,
+                                            Value otherSelectVal,
+                                            bool otherValIsFalse,
+                                            PatternRewriter &rewriter) const {
+  Value lhs = arithOp->getOperand(0);
+  Value rhs = arithOp->getOperand(1);
+
+  // Hoist the arithmetic operation above the converted if
+  Operation *clonedArithOp = rewriter.create(
+      ifOp.getLoc(),
+      StringAttr::get(getContext(), arithOp->getName().getStringRef()),
+      {lhs, rhs}, {arithOp->getResult(0).getType()});
+
+  Value trueVal = clonedArithOp->getResult(0);
+  Value falseVal = otherSelectVal;
+  if (!otherValIsFalse)
+    std::swap(trueVal, falseVal);
+
+  return rewriter
+      .create<arith::SelectOp>(ifOp->getLoc(), ifOp.getCondition(), trueVal,
+                               falseVal)
+      .getResult();
+};
+
+Value ConvertIfToSelect::createSelectThenArithOp(
+    scf::IfOp ifOp, Value trueVal, Value falseVal, StringRef arithOpName,
+    Value otherArithVal, bool otherValIsRhs, PatternRewriter &rewriter) const {
+  rewriter.setInsertionPoint(ifOp);
+
+  arith::SelectOp selectOp = rewriter.create<arith::SelectOp>(
+      ifOp->getLoc(), ifOp.getCondition(), trueVal, falseVal);
+  Value lhs = selectOp.getResult();
+  Value rhs = otherArithVal;
+  if (!otherValIsRhs)
+    std::swap(lhs, rhs);
+
+  return rewriter
+      .create(ifOp.getLoc(), StringAttr::get(getContext(), arithOpName),
+              {lhs, rhs}, {ifOp->getResult(0).getType()})
+      ->getResult(0);
+}
+
+Value ConvertIfToSelect::combineArithOps(scf::IfOp ifOp, Operation *thenOp,
+                                         Operation *elseOp,
+                                         PatternRewriter &rewriter) const {
   // Operations must be of the same type
   if (thenOp->getName() != elseOp->getName())
-    return failure();
+    return nullptr;
 
+  StringRef arithOpName = thenOp->getName().getStringRef();
   Value thenLhs = thenOp->getOperand(0), thenRhs = thenOp->getOperand(1),
         elseLhs = elseOp->getOperand(0), elseRhs = elseOp->getOperand(1);
+
+  /// Shortcut to call createSelectThenArithOp.
+  auto convert = [&](Value trueVal, Value falseVal, Value otherArithVal,
+                     bool otherValIsRhs) -> Value {
+    return createSelectThenArithOp(ifOp, trueVal, falseVal, arithOpName,
+                                   otherArithVal, otherValIsRhs, rewriter);
+  };
 
   if (thenOp->hasTrait<OpTrait::IsCommutative>()) {
     // If the operation is commutative, we care about finding the same operand
     // in both operations in any position. We can let the logic fall-through to
     // the logic for non-commutative operations and only check for swapped
     // common values here
-    if (thenLhs == elseRhs) {
-      res.trueVal = thenRhs;
-      res.falseVal = elseLhs;
-      res.commonVal = thenLhs;
-      return success();
-    }
-    if (thenRhs == elseLhs) {
-      res.trueVal = thenLhs;
-      res.falseVal = elseRhs;
-      res.commonVal = thenRhs;
-      return success();
-    }
+    if (thenLhs == elseRhs)
+      return convert(thenRhs, elseLhs, thenLhs, false);
+    if (thenRhs == elseLhs)
+      return convert(thenLhs, elseRhs, thenRhs, true);
   }
 
   // If the operations is NOT commutative, we need to find the same operand
   // in the same position
-  if (thenLhs == elseLhs) {
-    res.isCommonValLhs = true;
-    res.trueVal = thenRhs;
-    res.falseVal = elseRhs;
-    res.commonVal = thenLhs;
-    return success();
-  }
-  if (thenRhs == elseRhs) {
-    res.isCommonValLhs = false;
-    res.trueVal = thenLhs;
-    res.falseVal = elseLhs;
-    res.commonVal = thenRhs;
-    return success();
-  }
-  return failure();
+  if (thenLhs == elseLhs)
+    return convert(thenRhs, elseRhs, thenLhs, false);
+  if (thenRhs == elseRhs)
+    return convert(thenLhs, elseLhs, thenRhs, true);
+
+  return nullptr;
 }
 
-bool ConvertIfToSelect::isLegalForConversion(scf::IfOp ifOp,
-                                             PatternRewriter &rewriter,
-                                             MatchResult &res) const {
+Value ConvertIfToSelect::tryToConvert(scf::IfOp ifOp,
+                                      PatternRewriter &rewriter) const {
   // We only support if's with a single integer-like result
   if (ifOp->getNumResults() != 1)
-    return false;
+    return nullptr;
   Type resType = ifOp.getResult(0).getType();
   if (!isa<IntegerType, IndexType>(resType))
-    return false;
+    return nullptr;
 
   // Make sure the then block has at most 2 operations
   Block &thenBlock = ifOp.getThenRegion().front();
   auto &thenOps = thenBlock.getOperations();
   unsigned numThenOps = std::distance(thenOps.begin(), thenOps.end());
   if (numThenOps > 2)
-    return false;
+    return nullptr;
   Value thenYielded = getYieldedVal(thenBlock);
 
   // The then branch's structure must be valid for our transformation
   Operation *thenArithOp = nullptr;
   if (numThenOps == 2) {
     if (!(thenArithOp = getArithOpIfValid(thenBlock, thenYielded)))
-      return false;
-    res.opName = thenArithOp->getName().getStringRef().str();
+      return nullptr;
   }
 
   // The if must have an else block since it returns a value, so the following
@@ -198,77 +203,30 @@ bool ConvertIfToSelect::isLegalForConversion(scf::IfOp ifOp,
   auto &elseOps = elseBlock.getOperations();
   unsigned numElseOps = std::distance(elseOps.begin(), elseOps.end());
   if (numElseOps > 2)
-    return false;
+    return nullptr;
   Value elseYielded = getYieldedVal(elseBlock);
-
-  // Creates an arithmetic constant with the given constant attribute and
-  // returns its result.
-  auto createConstant = [&](IntegerAttr cstAttr) -> Value {
-    rewriter.setInsertionPoint(ifOp);
-    return rewriter.create<arith::ConstantOp>(ifOp.getLoc(), cstAttr)
-        .getResult();
-  };
-
-  // Creates an arithmetic constant that is the neutral value for the arithmetic
-  // operation that was identified.
-  auto getNeutralValue = [&]() -> Value {
-    // All supported operations have a 0 neutral value for now
-    return createConstant(IntegerAttr::get(resType, 0));
-  };
-
-  // Determines whether both branches are compatible for the transformation,
-  // assuming that one is only a yield and the other one a supported operation
-  // followed by a yield. If branches are compatible, fills up the result struct
-  // with all relevant values (the common one, the true one, and the false one)
-  // and succeeds, fails otherwise.
-  auto handleOneEmptyBranch = [&](Operation *arithOp, Value otherYielded,
-                                  bool thenIsYield) -> LogicalResult {
-    Value lhs = arithOp->getOperand(0);
-    Value rhs = arithOp->getOperand(1);
-
-    // The yielded value must appear in the operation
-    if (otherYielded != lhs && otherYielded != rhs)
-      return failure();
-
-    res.isCommonValLhs = otherYielded == lhs;
-    if (thenIsYield) {
-      res.trueVal = getNeutralValue();
-      res.falseVal = res.isCommonValLhs ? rhs : lhs;
-    } else {
-      res.trueVal = res.isCommonValLhs ? rhs : lhs;
-      res.falseVal = getNeutralValue();
-    }
-    res.commonVal = otherYielded;
-    return success();
-  };
 
   if (numElseOps == 2) {
     // The else block is an operation followed by a yield
     Operation *elseArithOp = getArithOpIfValid(elseBlock, elseYielded);
     if (!elseArithOp)
-      return false;
+      return nullptr;
 
     if (thenArithOp)
       // The then block has an arithmetic operation
-      return succeeded(handleOpInEachBranch(thenArithOp, elseArithOp, res));
+      return combineArithOps(ifOp, thenArithOp, elseArithOp, rewriter);
     // The then block is just a yield
-    res.opName = elseArithOp->getName().getStringRef().str();
-    return succeeded(handleOneEmptyBranch(elseArithOp, thenYielded, true));
+    return hoistSingleArithOp(ifOp, elseArithOp, thenYielded, false, rewriter);
   }
 
   // The else block is just a yield
   if (thenArithOp)
-    // The then block has an arithmetic operation
-    return succeeded(handleOneEmptyBranch(thenArithOp, elseYielded, false));
+    return hoistSingleArithOp(ifOp, thenArithOp, elseYielded, true, rewriter);
 
-  // If the then block is just a yield too, then the if is equivalent to a
-  // select at most. Fake an addition with 0 to flatten the if. The addition
-  // will be canonicalized away automatically
-  res.opName = arith::AddIOp::getOperationName().str();
-  res.trueVal = thenYielded;
-  res.falseVal = elseYielded;
-  res.commonVal = createConstant(IntegerAttr::get(resType, 0));
-  return true;
+  // If the then block is just a yield too, then the entire if is equivalent to
+  // a select
+  return rewriter.create<arith::SelectOp>(ifOp.getLoc(), ifOp.getCondition(),
+                                          thenYielded, elseYielded);
 }
 
 namespace {

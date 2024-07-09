@@ -17,9 +17,9 @@
 #define DYNAMATIC_SUPPORT_DYNAMATICPASS_H
 
 #include "dynamatic/Analysis/NameAnalysis.h"
+#include "dynamatic/Dialect/Handshake/HandshakeDialect.h"
 #include "mlir/IR/BuiltinOps.h"
 #include "mlir/Pass/Pass.h"
-#include <functional>
 
 namespace dynamatic {
 

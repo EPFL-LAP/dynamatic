@@ -12,7 +12,7 @@
 
 #include "dynamatic/Transforms/OperationNames.h"
 #include "dynamatic/Analysis/NameAnalysis.h"
-#include "dynamatic/Dialect/Handshake/HandshakeOps.h"
+#include "mlir/IR/BuiltinAttributes.h"
 
 using namespace dynamatic;
 
@@ -39,9 +39,8 @@ struct RemoveOperationNamesPass
 
   void runOnOperation() override {
     getOperation()->walk([&](Operation *op) {
-      if (op->hasAttrOfType<handshake::NameAttr>(
-              handshake::NameAttr::getMnemonic()))
-        op->removeAttr(handshake::NameAttr::getMnemonic());
+      if (op->hasAttrOfType<mlir::StringAttr>(NameAnalysis::ATTR_NAME))
+        op->removeAttr(NameAnalysis::ATTR_NAME);
     });
   };
 };

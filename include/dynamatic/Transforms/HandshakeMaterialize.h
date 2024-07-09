@@ -17,9 +17,12 @@
 
 #include "dynamatic/Support/DynamaticPass.h"
 #include "dynamatic/Support/LLVM.h"
-#include "mlir/Pass/Pass.h"
 
 namespace dynamatic {
+
+namespace handshake {
+class FuncOp;
+} // namespace handshake
 
 #define GEN_PASS_DECL_HANDSHAKEMATERIALIZE
 #define GEN_PASS_DEF_HANDSHAKEMATERIALIZE

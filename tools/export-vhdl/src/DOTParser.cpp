@@ -12,12 +12,15 @@
 #include "assert.h"
 #include <algorithm>
 #include <cctype>
+#include <cstdio>
+#include <cstdlib>
 #include <fstream>
 #include <iostream>
-#include <list>
 #include <stdlib.h>
 #include <string>
 #include <vector>
+
+using std::vector;
 
 using namespace std;
 
@@ -223,15 +226,14 @@ static string getInputType(const string &in) {
 static int getInputPort(const string &in) {
   vector<string> par;
   int retVal = 0;
-  string val;
 
   stringSplit(in, '*', par);
 
   if (!par.empty()) {
     par[1].erase(remove(par[1].begin(), par[1].end(), '"'), par[1].end());
     if (par[1].size() > 1) {
-      val = par[1].at(1);
-      retVal = stoiSubstr(val);
+      // Drop first chararacter which denotes the port type
+      retVal = stoiSubstr(par[1].substr(1));
     }
   }
   return retVal;
@@ -246,7 +248,8 @@ static string getInfoType(const string &in) {
   if (!par.empty()) {
     par[1].erase(remove(par[1].begin(), par[1].end(), '"'), par[1].end());
     if (par[1].size() > 2) {
-      retVal = par[1].at(2);
+      // Last character indicates whether this is an address or data bus
+      retVal = par[1].at(par[1].size() - 1);
     }
   }
 
@@ -773,32 +776,36 @@ static void parseComponents(const string &v0, const string &v1) {
   }
 }
 
-static void parseLine(string line) {
-  vector<string> v;
-  line = checkComments(line);
-  stringSplit(line, '[', v);
-  if (!v.empty()) {
-    if (isConnection(line))
-      parseConnections(line);
-    else
-      parseComponents(v[0], v[1]);
-  }
-}
-
 void parseDOT(const string &filename) {
-  ifstream inFile(filename);
-  string strline;
-
   componentsInNetlist = 0;
 
-  if (inFile.is_open()) {
-    while (inFile) {
-      getline(inFile, strline);
-      parseLine(strline);
-    }
-    inFile.close();
-  } else {
+  string line;
+  // the input .DOT file is read twice, because parseConnections assumes that
+  // the pred and succ of the connection are already parsed
+  ifstream inFile(filename);
+  if (!inFile.is_open()) {
     cerr << "File " << filename << " not found " << endl << endl << endl;
     exit(EXIT_FAILURE);
   }
+  while (getline(inFile, line, '\n')) {
+    line = checkComments(line);
+    vector<string> splittedStr;
+    stringSplit(line, '[', splittedStr);
+    if (!splittedStr.empty() && !isConnection(line))
+      parseComponents(splittedStr[0], splittedStr[1]);
+  }
+  inFile.close();
+  inFile.open(filename);
+  if (!inFile.is_open()) {
+    cerr << "File " << filename << " not found " << endl << endl << endl;
+    exit(EXIT_FAILURE);
+  }
+  while (getline(inFile, line, '\n')) {
+    line = checkComments(line);
+    vector<string> splittedStr;
+    stringSplit(line, '[', splittedStr);
+    if (!splittedStr.empty() && isConnection(line))
+      parseConnections(line);
+  }
+  inFile.close();
 }

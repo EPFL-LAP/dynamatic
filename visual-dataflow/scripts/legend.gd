@@ -18,3 +18,4 @@ func _on_show_legend_toggled(button_pressed):
 		panel.show()
 	else:
 		panel.hide()
+		

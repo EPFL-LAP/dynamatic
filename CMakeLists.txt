@@ -35,19 +35,25 @@ find_package(Python3 3.6 REQUIRED COMPONENTS Interpreter)
 # MLIR/LLVM configuration
 #-------------------------------------------------------------------------------
 
-find_package(MLIR REQUIRED CONFIG)
-message(STATUS "Using MLIRConfig.cmake in: ${MLIR_DIR}")
 message(STATUS "Using LLVMConfig.cmake in: ${LLVM_DIR}")
+message(STATUS "Using MLIRConfig.cmake in: ${MLIR_DIR}")
+message(STATUS "Using ClangConfig.cmake in: ${CLANG_DIR}")
+
+find_package(MLIR REQUIRED CONFIG)
+set(Clang_DIR ${CLANG_DIR})
+find_package(Clang REQUIRED CONFIG)
 
 set(LLVM_RUNTIME_OUTPUT_INTDIR ${CMAKE_BINARY_DIR}/bin)
 set(LLVM_LIBRARY_OUTPUT_INTDIR ${CMAKE_BINARY_DIR}/lib)
 
-list(APPEND CMAKE_MODULE_PATH "${MLIR_CMAKE_DIR}")
 list(APPEND CMAKE_MODULE_PATH "${LLVM_CMAKE_DIR}")
+list(APPEND CMAKE_MODULE_PATH "${MLIR_CMAKE_DIR}")
+list(APPEND CMAKE_MODULE_PATH "${CLANG_CMAKE_DIR}")
 
 include(TableGen)
 include(AddLLVM)
 include(AddMLIR)
+include(AddClang)
 include(HandleLLVMOptions)
 
 link_directories(${LLVM_BUILD_LIBRARY_DIR})
@@ -55,6 +61,7 @@ add_definitions(${LLVM_DEFINITIONS})
 
 include_directories(${LLVM_INCLUDE_DIRS})
 include_directories(${MLIR_INCLUDE_DIRS})
+include_directories(${CLANG_INCLUDE_DIRS})
 
 option(LLVM_BUILD_TOOLS "Build the LLVM tools. If OFF, just generate build targets." ON)
 
@@ -76,8 +83,6 @@ list(APPEND CMAKE_MODULE_PATH "${CMAKE_CURRENT_SOURCE_DIR}/cmake/modules")
 # Dynamatic include directories
 include_directories(${DYNAMATIC_INCLUDE_DIR})
 include_directories(${DYNAMATIC_BIN_INCLUDE_DIR})
-include_directories(${DYNAMATIC_SOURCE_DIR}/tutorials/include)
-include_directories(${DYNAMATIC_BINARY_DIR}/tutorials/include)
 include_directories(${DYNAMATIC_EXPERIMENTAL_DIR}/include)
 include_directories(${DYNAMATIC_BINARY_DIR}/experimental/include)
 

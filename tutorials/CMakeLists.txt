@@ -1,2 +1,1 @@
-add_subdirectory(include/tutorials)
-add_subdirectory(lib)
+add_subdirectory(CreatingPasses)
