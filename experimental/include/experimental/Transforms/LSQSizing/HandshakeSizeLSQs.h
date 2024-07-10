@@ -12,14 +12,18 @@
 #include "mlir/Pass/Pass.h"
 
 namespace dynamatic {
+namespace experimental {
+namespace lsqsizing {
 
 #define GEN_PASS_DECL_HANDSHAKESIZELSQS
 #define GEN_PASS_DEF_HANDSHAKESIZELSQS
-#include "dynamatic/Transforms/Passes.h.inc"
+#include "experimental/Transforms/Passes.h.inc"
 
 std::unique_ptr<dynamatic::DynamaticPass>
 createHandshakeSizeLSQs();
 
+} // namespace lsqsizing
+} // namespace experimental
 } // namespace dynamatic
 
 

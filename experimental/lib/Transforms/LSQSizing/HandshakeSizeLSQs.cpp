@@ -10,7 +10,7 @@
 //
 //===----------------------------------------------------------------------===//
 
-#include "dynamatic/Transforms/LSQSizing/HandshakeSizeLSQs.h"
+#include "experimental/Transforms/LSQSizing/HandshakeSizeLSQs.h"
 #include "dynamatic/Analysis/NameAnalysis.h"
 #include "dynamatic/Dialect/Handshake/HandshakeOps.h"
 #include "dynamatic/Dialect/Handshake/MemoryInterfaces.h"
@@ -30,11 +30,13 @@
 using namespace mlir;
 using namespace dynamatic;
 using namespace dynamatic::handshake;
+using namespace dynamatic::experimental;
+using namespace dynamatic::experimental::lsqsizing;
 
 namespace {
 
 struct HandshakeSizeLSQsPass
-    : public dynamatic::impl::HandshakeSizeLSQsBase<
+    : public dynamatic::experimental::lsqsizing::impl::HandshakeSizeLSQsBase<
           HandshakeSizeLSQsPass> {
 
   void runDynamaticPass() override;
@@ -44,12 +46,14 @@ private:
 };
 } // namespace
 
+
 void HandshakeSizeLSQsPass::runDynamaticPass() {
       llvm::dbgs() << "\t [DBG] LSQ Sizing Pass Called!\n";
 }
 
 
 std::unique_ptr<dynamatic::DynamaticPass>
-dynamatic::createHandshakeSizeLSQs() {
+dynamatic::experimental::lsqsizing::createHandshakeSizeLSQs() {
   return std::make_unique<HandshakeSizeLSQsPass>();
 }
+

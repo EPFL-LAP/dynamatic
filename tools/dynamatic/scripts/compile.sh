@@ -164,21 +164,22 @@ else
   cd - > /dev/null
 fi
 
-# handshake lsq sizing
-"$DYNAMATIC_OPT_BIN" "$F_HANDSHAKE_BUFFERED" \
-  --handshake-size-lsqs \
-  > "$F_HANDSHAKE_LSQ_SIZED"
-exit_on_fail "Failed to size LSQs" "Sized LSQs"
-
 # handshake canonicalization
-"$DYNAMATIC_OPT_BIN" "$F_HANDSHAKE_LSQ_SIZED" \
+"$DYNAMATIC_OPT_BIN" "$F_HANDSHAKE_TRANSFORMED" \
   --handshake-canonicalize \
   --handshake-hoist-ext-instances \
   > "$F_HANDSHAKE_EXPORT"
 exit_on_fail "Failed to canonicalize Handshake" "Canonicalized handshake"
 
+
+# handshake lsq sizing
+"$DYNAMATIC_OPT_BIN" "$F_HANDSHAKE_EXPORT" \
+  --handshake-size-lsqs \
+  > "$F_HANDSHAKE_LSQ_SIZED"
+exit_on_fail "Failed to size LSQs" "Sized LSQs"
+
 # handshake level -> hw level
-"$DYNAMATIC_OPT_BIN" "$F_HANDSHAKE_EXPORT" --lower-handshake-to-hw \
+"$DYNAMATIC_OPT_BIN" "$F_HANDSHAKE_LSQ_SIZED" --lower-handshake-to-hw \
   > "$F_HW"
 exit_on_fail "Failed to lower to HW" "Lowered to HW"
 
