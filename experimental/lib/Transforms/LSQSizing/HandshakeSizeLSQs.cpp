@@ -11,19 +11,14 @@
 //===----------------------------------------------------------------------===//
 
 #include "experimental/Transforms/LSQSizing/HandshakeSizeLSQs.h"
-#include "dynamatic/Analysis/NameAnalysis.h"
 #include "dynamatic/Dialect/Handshake/HandshakeOps.h"
-#include "dynamatic/Dialect/Handshake/MemoryInterfaces.h"
 #include "dynamatic/Support/Attribute.h"
 #include "dynamatic/Support/Backedge.h"
 #include "dynamatic/Support/CFG.h"
 #include "dynamatic/Support/DynamaticPass.h"
-#include "mlir/IR/PatternMatch.h"
-#include "mlir/IR/Visitors.h"
-#include "mlir/Transforms/GreedyPatternRewriteDriver.h"
-#include "llvm/ADT/STLExtras.h"
-#include "llvm/ADT/TypeSwitch.h"
 #include "llvm/Support/Debug.h"
+#include "dynamatic/Transforms/BufferPlacement/CFDFC.h"
+
 
 #define DEBUG_TYPE "handshake-size-lsqs"
 
@@ -32,6 +27,8 @@ using namespace dynamatic;
 using namespace dynamatic::handshake;
 using namespace dynamatic::experimental;
 using namespace dynamatic::experimental::lsqsizing;
+
+using LSQSizingResult = DenseMap<unsigned, std::tuple<unsigned, unsigned>>; //TUPLE: <load_size, store_size>
 
 namespace {
 
@@ -43,12 +40,54 @@ struct HandshakeSizeLSQsPass
 
 private:
 
+  llvm::SmallDenseSet<LSQSizingResult> sizing_results; //TODO datatype?
+
 };
 } // namespace
 
 
 void HandshakeSizeLSQsPass::runDynamaticPass() {
-      llvm::dbgs() << "\t [DBG] LSQ Sizing Pass Called!\n";
+  llvm::dbgs() << "\t [DBG] LSQ Sizing Pass Called!\n";
+
+  // 1. Read Attributes
+  // 2. Reconstruct CFDFCs
+  // 3. ???
+  // 4. Profit
+
+  mlir::ModuleOp mod = getOperation();
+  for (handshake::FuncOp funcOp : mod.getOps<handshake::FuncOp>()) {
+    llvm::dbgs() << "\t [DBG] Function: " << funcOp.getName() << "\n";
+
+    // Read Attributes
+    //DenseMap<unsigned, SmallVector<unsigned>> cfdfc_attribute = funcOp.getCFDFCs();
+    //DenseMap<unsigned, float> troughput_attribute = funcOp.getThroughput();
+
+    // TODO extract arch sets
+    SmallVector<experimental::ArchBB> archs;
+    buffer::ArchSet arch_set;
+
+    for(auto &arch: archs) {
+      buffer::CFDFC cfdfc = buffer::CFDFC(funcOp, arch_set, 0);
+      unsigned II = 0; //TODO get II from attr
+      sizing_results.insert(sizeLSQsForCFDFC(cfdfc, II));
+    }
+    
+    DenseMap<unsigned, unsigned> max_store_size;
+    DenseMap<unsigned, unsigned> max_load_size;
+    for(auto &result: sizing_results) {
+      for(auto &entry: result) {
+        max_store_size[entry.first] = std::max(max_store_size[entry.first], std::get<1>(entry.second));
+        max_load_size[entry.first] = std::max(max_load_size[entry.first], std::get<0>(entry.second));
+      }
+    }
+
+    // Add Sizing to Attributes
+  }
+}
+
+LSQSizingResult sizeLSQsForCFDFC(buffer::CFDFC cfdfc, unsigned II) {
+  //TODO implement algo
+  return DenseMap<unsigned, std::tuple<unsigned, unsigned>>();
 }
 
 
