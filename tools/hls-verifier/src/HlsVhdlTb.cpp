@@ -88,12 +88,15 @@ string commonTbBody =
     "begin\n"
     "   if (tb_rst = '1') then\n"
     "       tb_start_valid <= '0';\n"
+    "       tb_started <= '0';\n"
     "   elsif rising_edge(tb_clk) then\n"
-    "       if (tb_temp_idle = '1' and tb_start_ready = '1' and tb_start_valid "
-    "= '0') then\n"
-    "           tb_start_valid <= '1';\n"
-    "       else\n"
+    "       tb_start_valid <= tb_start_valid;\n"
+    "       if (tb_start_valid = '1' and tb_start_ready = '1') then\n"
     "           tb_start_valid <= '0';\n"
+    "           tb_started <= '1';\n"
+    "       elsif (tb_started = '0' and tb_temp_idle = '1' and tb_start_ready "
+    "= '1' and tb_start_valid = '0') then \n"
+    "           tb_start_valid <= '1';\n"
     "       end if;\n"
     "   end if;\n"
     "end process generate_start_signal;\n"
@@ -337,7 +340,7 @@ string HlsVhdlTb::getSignalDeclaration() {
   code << "\tsignal tb_rst : std_logic := '0';" << endl;
 
   code << "\tsignal tb_start_valid : std_logic := '0';" << endl;
-  code << "\tsignal tb_start_ready : std_logic;" << endl;
+  code << "\tsignal tb_start_ready, tb_started : std_logic;" << endl;
 
   code << "\tsignal tb_end_valid : std_logic;" << endl;
 
@@ -370,13 +373,16 @@ string HlsVhdlTb::getSignalDeclaration() {
     } else {
       if ((cDuvParams[i].isReturn && cDuvParams[i].isOutput) ||
           !cDuvParams[i].isReturn) {
-        code << "\tsignal " << p.parameterName << "_ready : std_logic;" << endl;
         code << "\tsignal " << m.ce0SignalName << " : std_logic;" << endl;
         code << "\tsignal " << m.we0SignalName << " : std_logic;" << endl;
+
         code << "\tsignal " << m.dOut0SignalName << " : std_logic_vector("
              << m.dataWidthParamValue << " - 1 downto 0);" << endl;
         code << "\tsignal " << m.dIn0SignalName << " : std_logic_vector("
-             << m.dataWidthParamValue << " - 1 downto 0);" << endl
+             << m.dataWidthParamValue << " - 1 downto 0);" << endl;
+        code << "\tsignal " << m.dOut0SignalName << "_valid : std_logic;"
+             << endl;
+        code << "\tsignal " << m.dOut0SignalName << "_ready : std_logic;"
              << endl
              << endl;
       }
@@ -466,6 +472,10 @@ string HlsVhdlTb::getMemoryInstanceGeneration() {
              << "," << endl;
         code << "\t\t" << MemElem::dOut0PortName << " => " << m.dOut0SignalName
              << "," << endl;
+        code << "\t\t" << MemElem::dOut0PortName + "_valid => "
+             << m.dOut0SignalName << "_valid," << endl;
+        code << "\t\t" << MemElem::dOut0PortName + "_ready => "
+             << m.dOut0SignalName << "_ready," << endl;
         code << "\t\t" << MemElem::dIn0PortName << " => "
              << "(others => '0')"
              << "," << endl;
@@ -497,6 +507,10 @@ string HlsVhdlTb::getMemoryInstanceGeneration() {
              << "," << endl;
         code << "\t\t" << MemElem::dOut0PortName << " => " << m.dOut0SignalName
              << "," << endl;
+        code << "\t\t" << MemElem::dOut0PortName + "_valid => "
+             << m.dOut0SignalName << "_valid," << endl;
+        code << "\t\t" << MemElem::dOut0PortName + "_ready => "
+             << m.dOut0SignalName << "_ready," << endl;
         code << "\t\t" << MemElem::dIn0PortName << " => " << m.dIn0SignalName
              << "," << endl;
         code << "\t\t" << MemElem::donePortName << " => "
@@ -529,6 +543,10 @@ string HlsVhdlTb::getMemoryInstanceGeneration() {
              << "," << endl;
         code << "\t\t" << MemElem::dOut0PortName << " => " << m.dOut0SignalName
              << "," << endl;
+        code << "\t\t" << MemElem::dOut0PortName + "_valid => "
+             << m.dOut0SignalName << "_valid," << endl;
+        code << "\t\t" << MemElem::dOut0PortName + "_ready => "
+             << m.dOut0SignalName << "_ready," << endl;
         code << "\t\t" << MemElem::dIn0PortName << " => " << m.dIn0SignalName
              << "," << endl;
         code << "\t\t" << MemElem::donePortName << " => "
@@ -562,6 +580,10 @@ string HlsVhdlTb::getMemoryInstanceGeneration() {
              << "," << endl;
         code << "\t\t" << MemElem::dOut0PortName << " => " << m.dOut0SignalName
              << "," << endl;
+        code << "\t\t" << MemElem::dOut0PortName + "_valid => "
+             << m.dOut0SignalName << "_valid," << endl;
+        code << "\t\t" << MemElem::dOut0PortName + "_ready => "
+             << m.dOut0SignalName << "_ready," << endl;
         code << "\t\t" << MemElem::donePortName << " => "
              << "tb_temp_idle" << endl;
         code << "\t);" << endl << endl;
@@ -663,9 +685,10 @@ string HlsVhdlTb::getDuvInstanceGeneration() {
       if (p.isInput) {
         if (ctx.experimental) {
           duvPortMap.emplace_back(p.parameterName, m.dOut0SignalName);
-          duvPortMap.emplace_back(p.parameterName + "_valid", "'1'");
+          duvPortMap.emplace_back(p.parameterName + "_valid",
+                                  m.dOut0SignalName + "_valid");
           duvPortMap.emplace_back(p.parameterName + "_ready",
-                                  p.parameterName + "_ready");
+                                  m.dOut0SignalName + "_ready");
         } else {
           duvPortMap.emplace_back(getValidInPortNameForCParam(p.parameterName),
                                   "'1'");

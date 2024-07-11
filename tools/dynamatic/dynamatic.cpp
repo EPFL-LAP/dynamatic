@@ -278,11 +278,15 @@ public:
 
 class Visualize : public Command {
 public:
+  static constexpr llvm::StringLiteral EXPERIMENTAL = "experimental";
+
   Visualize(FrontendState &state)
       : Command(
             "visualize",
             "Visualizes the execution of the circuit simulated by Modelsim.",
-            state) {}
+            state) {
+    addFlag({EXPERIMENTAL, "Use experimental backend"});
+  }
 
   CommandResult execute(CommandArguments &args) override;
 };
@@ -568,9 +572,10 @@ CommandResult Visualize::execute(CommandArguments &args) {
                         state.getKernelName() + ".dot";
   std::string wlfPath = state.getOutputDir() + sep + "sim" + sep +
                         "HLS_VERIFY" + sep + "vsim.wlf";
+  std::string experimental = args.flags.contains(EXPERIMENTAL) ? "1" : "0";
 
   return execCmd(script, state.dynamaticPath, dotPath, wlfPath,
-                 state.getOutputDir(), state.getKernelName());
+                 state.getOutputDir(), state.getKernelName(), experimental);
 }
 
 CommandResult Synthesize::execute(CommandArguments &args) {
@@ -722,9 +727,7 @@ int main(int argc, char **argv) {
   // Read from stdin, multiple commands in one line are separated by ';'
   // readline handles command history, allows user to repeat commands
   // with arrow keys
-  char *rawInput;
-  while (true) {
-    rawInput = readline(PROMPT.str().c_str());
+  while (char *rawInput = readline(PROMPT.str().c_str())) {
     add_history(rawInput);
     splitOnSemicolonAndHandle(std::string(rawInput), false);
     free(rawInput);

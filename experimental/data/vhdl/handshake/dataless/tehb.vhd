@@ -15,18 +15,19 @@ entity tehb_dataless is
 end entity;
 
 architecture arch of tehb_dataless is
-  signal full_reg, output_is_valid : std_logic;
+  signal fullReg, outputValid : std_logic;
 begin
+  outputValid <= ins_valid or fullReg;
+
   process (clk, rst) is
   begin
     if (rst = '1') then
-      full_reg <= '0';
+      fullReg <= '0';
     elsif (rising_edge(clk)) then
-      full_reg <= output_is_valid and not outs_ready;
+      fullReg <= outputValid and not outs_ready;
     end if;
   end process;
 
-  ins_ready       <= not full_reg;
-  output_is_valid <= ins_valid or full_reg;
-  outs_valid      <= output_is_valid;
+  ins_ready  <= not fullReg;
+  outs_valid <= outputValid;
 end architecture;

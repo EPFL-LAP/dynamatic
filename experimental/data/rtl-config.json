@@ -217,7 +217,7 @@
     ],
     "generic": "$DYNAMATIC/experimental/data/vhdl/handshake/dataless/tfifo.vhd",
     "module-name": "tfifo_dataless",
-    "dependencies": ["elastic_fifo_inner"]
+    "dependencies": ["elastic_fifo_inner_dataless"]
   },
   {
     "name": "handshake.tehb",
@@ -226,7 +226,7 @@
       { "name": "DATA_WIDTH", "type": "unsigned", "lb": 1 }
     ],
     "generic": "$DYNAMATIC/experimental/data/vhdl/handshake/tfifo.vhd",
-    "dependencies": ["elastic_fifo_inner_dataless"]
+    "dependencies": ["elastic_fifo_inner"]
   },
   {
     "name": "handshake.fork",
@@ -360,13 +360,13 @@
     ],
     "generic": "$DYNAMATIC/experimental/data/vhdl/handshake/dataless/cond_br.vhd",
     "module-name": "cond_br_dataless",
-    "dependencies": ["join", "branch_simple"]
+    "dependencies": ["join"]
   },
   {
     "name": "handshake.cond_br",
     "parameters": [{ "name": "DATA_WIDTH", "type": "unsigned", "lb": 1 }],
     "generic": "$DYNAMATIC/experimental/data/vhdl/handshake/cond_br.vhd",
-    "dependencies": ["cond_br"]
+    "dependencies": ["cond_br_dataless"]
   },
   {
     "name": "handshake.source",
@@ -508,6 +508,12 @@
     "dependencies": ["logic"]
   },
   {
+    "name": "handshake.not",
+    "parameters": [{ "name": "DATA_WIDTH", "type": "unsigned", "lb": 1 }],
+    "generic": "$DYNAMATIC/experimental/data/vhdl/handshake/not.vhd",
+    "module-name": "logic_not"
+  },
+  {
     "generic": "$DYNAMATIC/experimental/data/vhdl/support/delay_buffer.vhd"
   },
   {
@@ -519,9 +525,6 @@
   {
     "generic": "$DYNAMATIC/experimental/data/vhdl/support/dataless/elastic_fifo_inner.vhd",
     "module-name": "elastic_fifo_inner_dataless"
-  },
-  {
-    "generic": "$DYNAMATIC/experimental/data/vhdl/support/branch_simple.vhd"
   },
   {
     "generic": "$DYNAMATIC/experimental/data/vhdl/support/logic.vhd"

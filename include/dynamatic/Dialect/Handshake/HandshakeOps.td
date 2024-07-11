@@ -11,13 +11,12 @@
 //
 //===----------------------------------------------------------------------===//
 //
-// This file define Handshake ops in tablegen.
+// This file define Handshake operations in tablegen.
 //
 //===----------------------------------------------------------------------===//
 
-
-#ifndef DYNAMATIC_DIALECT_HANDSHAKE_HANDHSAKE_OPS_TD
-#define DYNAMATIC_DIALECT_HANDSHAKE_HANDHSAKE_OPS_TD
+#ifndef DYNAMATIC_DIALECT_HANDSHAKE_HANDSHAKE_OPS_TD
+#define DYNAMATIC_DIALECT_HANDSHAKE_HANDSHAKE_OPS_TD
 
 include "mlir/IR/EnumAttr.td"
 include "mlir/IR/OpAsmInterface.td"
@@ -25,6 +24,15 @@ include "mlir/IR/BuiltinTypes.td"
 include "mlir/IR/BuiltinAttributeInterfaces.td"
 include "mlir/Interfaces/InferTypeOpInterface.td"
 include "dynamatic/Dialect/Handshake/HandshakeAttributes.td"
+include "dynamatic/Dialect/Handshake/HandshakeTypes.td"
+
+/// Base class for Handshake dialect operations.
+class Handshake_Op<string mnemonic, list<Trait> traits = []>
+    : Op<Handshake_Dialect, mnemonic,
+         traits #[HasParent<"handshake::FuncOp">,
+         DeclareOpInterfaceMethods<NamedIOInterface>,
+         DeclareOpInterfaceMethods<ControlInterface>]> {
+}
 
 // This is almost exactly like a standard FuncOp, except that it has some
 // extra verification conditions.  In particular, each Value must
@@ -553,6 +561,21 @@ def JoinOp : Handshake_Op<"join", [
   let hasCustomAssemblyFormat = 1;
 }
 
+def NotOp : Handshake_Op<"not", [Pure, SameOperandsAndResultType]> {
+  let summary = "Logical negation";
+  let description = [{
+    Bitwise logical negation.
+
+    Example:
+    ```mlir
+    %neg = not %value : i32
+    ```
+  }];
+  let arguments = (ins AnyType : $operand);
+  let results = (outs AnyType : $result);
+  let assemblyFormat = [{ $operand attr-dict `:` qualified(type($result))}];
+}
+
 def MemoryControllerOp : Handshake_Op<"mem_controller", [
   DeclareOpInterfaceMethods<MemoryOpInterface>,
   DeclareOpInterfaceMethods<NamedIOInterface, ["getOperandName"]>,
@@ -987,16 +1010,16 @@ def SpeculatorOp : Handshake_Op<"speculator", [
     Example:
     ```mlir
     %dataOut, %saveCtrl, %commitCtrl, %SCSaveCtrl, 
-      %SCCommitCtrl, %SCBranchCtrl = speculator %dataIn : i1
+      %SCCommitCtrl, %SCBranchCtrl = speculator[enable] %dataIn : i1
     ```
   }];
 
-  let arguments = (ins AnyType : $dataIn);
+  let arguments = (ins AnyType : $dataIn, NoneType : $enable);
   let results = (outs AnyType : $dataOut,
                   I1 : $saveCtrl, I1 : $commitCtrl, 
                   I<3> : $SCSaveCtrl, I<3> : $SCCommitCtrl, 
                   I1 : $SCBranchCtrl);
-  let assemblyFormat = "$dataIn attr-dict `:` qualified(type($dataIn)) ";
+  let assemblyFormat = " `[` $enable `]` $dataIn attr-dict `:` qualified(type($dataIn)) ";
 }
 
 def SpecSaveOp : Handshake_Op<"spec_save", [
@@ -1124,5 +1147,131 @@ SameOperandsAndResultType
   let assemblyFormat = " `[` $dataOperands `]` `,` `[` $sharedOpResult `]` attr-dict `:` `(` qualified(type($dataOperands)) `)` `,` `(` qualified(type($sharedOpResult)) `)` `->` `(` qualified(type($dataOut)) `)` ";
 }
 
+//===----------------------------------------------------------------------===//
+// Type manipulation
+//===----------------------------------------------------------------------===//
 
-#endif // DYNAMATIC_DIALECT_HANDSHAKE_HANDHSAKE_OPS_TD
+def BundleOp : Handshake_Op<"bundle", [Pure]> {
+  let summary = [{
+    Bundles individual signals into a `handshake::ChannelType` or `handshake::ControlType`.
+  }];
+  let description = [{
+    Combines individual signals into a channel-like value, producing upstream
+    signals as results and taking downstream signals as arguments. Note
+    that combining individual signals into a `handshake::ChannelType` is a
+    two-step process.
+    1. First, bundle a `i1` value, which produces a `!handshake.control` and
+       `i1` (representing the upstream ready signal) as results. 
+    2. Then, bundle the `!handshake.control` along with a value representing the
+       data signal (of a compatible signal type e.g., `i32`), which produces
+       a `!handshake.channel<i32>`.
+
+    Example:
+    ```
+    // Bundling into a channel with a downstream extra signal
+    %channel = bundle %ctrl, %data, %extra :
+      (!handshake.control, i32, i1) -> (!handshake.channel<i32, [extra: i1]>)
+    
+    // -----
+    
+    // Bundling into a channel with an upstream extra signal
+    %channel, %extra = bundle %ctrl, %data :
+      (!handshake.control, i32) -> (!handshake.channel<i32, [extra: i1]>, i1)
+    
+    // -----
+
+    // Bundling into a control-only channel
+    %ctrl, %ready = unbundle %valid : (i1) -> (!handhsake.control, i1)
+    ```
+  }];
+
+  let arguments = (ins Variadic<AnyType>:$signals);
+  let results = (outs ChannelLikeType:$channel, Variadic<SignalType>: $upstreams);
+
+  let skipDefaultBuilders = 1;
+  let builders = [
+    OpBuilder<(ins "::mlir::Value":$valid), [{
+      mlir::Type validReadyType = $_builder.getIntegerType(1);
+      assert(valid.getType() == validReadyType && "incorrect valid signal");
+
+      $_state.addOperands(valid);
+      $_state.addTypes({
+        ::dynamatic::handshake::ControlType::get($_builder.getContext()),
+        validReadyType
+      });
+    }]>,
+    OpBuilder<(ins "::mlir::Value":$ctrl, "::mlir::Value":$data,
+                   "::mlir::ValueRange":$downstreams,
+                   "::dynamatic::handshake::ChannelType":$channelType)
+    >
+  ];
+
+  let assemblyFormat = "$signals attr-dict `:` functional-type(operands, results)";
+
+  let hasVerifier = 1;
+}
+
+def UnbundleOp : Handshake_Op<"unbundle", [
+  Pure,
+  DeclareOpInterfaceMethods<InferTypeOpInterface, ["inferReturnTypes"]>
+]> {
+  let summary = [{
+    Unbundles a `handshake::ChannelType` or `handshake::ControlType` into individual signals.
+  }];
+  let description = [{
+    Splits a channel-like value into its individual signals, producing
+    downstream signals as results and taking upstream signals as arguments. Note
+    that getting the individual valid and ready signals from a
+    `handshake::ChannelType` is a two-step process.
+    1. First, unbundle the `!handshake.channel`, which produces a
+       `!handshake.control` as result (i.e., the control is considered a
+       "downstream bundle").
+    2. Then, unbundle the `!handshake.control` along with an `i1` value
+       representing the ready signal, which produces an `i1` result representing
+       the valid signal. 
+
+    Example:
+    ```
+    // Unbundling a channel with a downstream extra signal
+    %ctrl, %data, %extra = unbundle %channel : 
+      (!handshake.channel<i32, [extra: i2]>) -> (!handshake.control, i32, i2)
+    
+    // -----
+    
+    // Unbundling a channel with an upstream extra signal
+    %ctrl, %data = unbundle %channel [%extra] : 
+      (!handshake.channel<i32, [extra: i2 (U)]>) -> (!handshake.control, i32, i2)
+
+    // -----
+
+    // Unbundling a control-only channel
+    %valid = unbundle %ctrl [%ready] : (!handshake.control, i1) -> i1
+    ```
+  }];
+
+  let arguments = (ins ChannelLikeType:$channel, Variadic<SignalType>: $upstreams);
+  let results = (outs Variadic<AnyType>:$signals);
+
+  let builders = [
+    OpBuilder<(ins "::mlir::Value":$channel), [{
+      $_state.addOperands(channel);
+
+      // Infer return types
+      ::llvm::SmallVector<::mlir::Type, 2> inferredReturnTypes;
+      if (::mlir::succeeded(UnbundleOp::inferReturnTypes($_builder.getContext(),
+                    $_state.location, $_state.operands,
+                    $_state.attributes.getDictionary($_state.getContext()),
+                    $_state.getRawProperties(),
+                    $_state.regions, inferredReturnTypes)))
+        $_state.addTypes(inferredReturnTypes);
+      else
+        ::llvm::report_fatal_error("Failed to infer result type(s).");
+    }]>
+  ];
+
+  let assemblyFormat = "$channel (`[` $upstreams^ `]`)? attr-dict `:` functional-type(operands, results)";
+
+  let hasVerifier = 1;
+}
+
+#endif // DYNAMATIC_DIALECT_HANDSHAKE_HANDSHAKE_OPS_TD

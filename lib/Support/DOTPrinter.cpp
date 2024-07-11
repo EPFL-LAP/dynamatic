@@ -668,6 +668,10 @@ LogicalResult DOTPrinter::annotateNode(Operation *op,
             /// know that the old backend doesn't support it.
             return DOTNode("Instance");
           })
+          .Case<handshake::NotOp>([&](auto) {
+            /// NOTE: this is not actually supported
+            return DOTNode("Not");
+          })
           .Case<handshake::MergeOp>([&](auto) { return DOTNode("Merge"); })
           .Case<handshake::MuxOp>([&](handshake::MuxOp op) {
             auto info = DOTNode("Mux");
@@ -1302,11 +1306,6 @@ LogicalResult DOTPrinter::printNode(Operation *op,
                                     mlir::raw_indented_ostream &os) {
   // The node's DOT name
   std::string opName = getUniqueName(op).str();
-  if (inLegacyMode()) {
-    // LSQ must be capitalized in legacy modes for dot2vhdl to recognize it
-    if (size_t idx = opName.find("lsq"); idx != std::string::npos)
-      opName = "LSQ" + opName.substr(3);
-  }
 
   // The node's DOT "mlir_op" attribute
   std::string mlirOpName = op->getName().getStringRef().str();
@@ -1359,13 +1358,6 @@ LogicalResult DOTPrinter::printEdge(OpOperand &oprd,
           ? getUniqueName(src->getOperand(0).getDefiningOp()).str()
           : getUniqueName(src).str();
   std::string dstNodeName = getUniqueName(dst).str();
-  if (inLegacyMode()) {
-    // LSQ must be capitalized in legacy modes for dot2vhdl to recognize it
-    if (size_t idx = srcNodeName.find("lsq"); idx != std::string::npos)
-      srcNodeName = "LSQ" + srcNodeName.substr(3);
-    if (size_t idx = dstNodeName.find("lsq"); idx != std::string::npos)
-      dstNodeName = "LSQ" + dstNodeName.substr(3);
-  }
 
   os << "\"" << srcNodeName << "\" -> \"" << dstNodeName << "\" ["
      << getEdgeStyle(oprd);

@@ -5,11 +5,11 @@ use work.types.all;
 
 entity mem_controller is
   generic (
-    CTRL_COUNT    : integer;
-    LOAD_COUNT    : integer;
-    STORE_COUNT   : integer;
-    DATA_BITWIDTH : integer;
-    ADDR_BITWIDTH : integer
+    CTRL_COUNT  : integer;
+    LOAD_COUNT  : integer;
+    STORE_COUNT : integer;
+    DATA_WIDTH  : integer;
+    ADDR_WIDTH  : integer
   );
   port (
     clk, rst : in std_logic;
@@ -18,39 +18,46 @@ entity mem_controller is
     ctrl_valid : in  std_logic_vector(CTRL_COUNT - 1 downto 0);
     ctrl_ready : out std_logic_vector(CTRL_COUNT - 1 downto 0);
     -- load address input channels
-    ldAddr       : in  data_array (LOAD_COUNT - 1 downto 0)(ADDR_BITWIDTH - 1 downto 0);
+    ldAddr       : in  data_array (LOAD_COUNT - 1 downto 0)(ADDR_WIDTH - 1 downto 0);
     ldAddr_valid : in  std_logic_vector(LOAD_COUNT - 1 downto 0);
     ldAddr_ready : out std_logic_vector(LOAD_COUNT - 1 downto 0);
     -- load data output channels
-    ldData       : out data_array (LOAD_COUNT - 1 downto 0)(DATA_BITWIDTH - 1 downto 0);
+    ldData       : out data_array (LOAD_COUNT - 1 downto 0)(DATA_WIDTH - 1 downto 0);
     ldData_valid : out std_logic_vector(LOAD_COUNT - 1 downto 0);
     ldData_ready : in  std_logic_vector(LOAD_COUNT - 1 downto 0);
     -- store address input channels
-    stAddr       : in  data_array (STORE_COUNT - 1 downto 0)(ADDR_BITWIDTH - 1 downto 0);
+    stAddr       : in  data_array (STORE_COUNT - 1 downto 0)(ADDR_WIDTH - 1 downto 0);
     stAddr_valid : in  std_logic_vector(STORE_COUNT - 1 downto 0);
     stAddr_ready : out std_logic_vector(STORE_COUNT - 1 downto 0);
     -- store data input channels
-    stData       : in  data_array (STORE_COUNT - 1 downto 0)(DATA_BITWIDTH - 1 downto 0);
+    stData       : in  data_array (STORE_COUNT - 1 downto 0)(DATA_WIDTH - 1 downto 0);
     stData_valid : in  std_logic_vector(STORE_COUNT - 1 downto 0);
     stData_ready : out std_logic_vector(STORE_COUNT - 1 downto 0);
     --- memory done channel
     memDone_valid : out std_logic;
     memDone_ready : in  std_logic;
     -- interface to dual-port BRAM
-    loadData  : in  std_logic_vector(DATA_BITWIDTH - 1 downto 0);
+    loadData  : in  std_logic_vector(DATA_WIDTH - 1 downto 0);
     loadEn    : out std_logic;
-    loadAddr  : out std_logic_vector(ADDR_BITWIDTH - 1 downto 0);
+    loadAddr  : out std_logic_vector(ADDR_WIDTH - 1 downto 0);
     storeEn   : out std_logic;
-    storeAddr : out std_logic_vector(ADDR_BITWIDTH - 1 downto 0);
-    storeData : out std_logic_vector(DATA_BITWIDTH - 1 downto 0)
+    storeAddr : out std_logic_vector(ADDR_WIDTH - 1 downto 0);
+    storeData : out std_logic_vector(DATA_WIDTH - 1 downto 0)
   );
 end entity;
 
 architecture arch of mem_controller is
-  signal dropLoadAddr, mcLoadAddrOut : std_logic_vector(ADDR_BITWIDTH - 1 downto 0);
-  signal mcLoadDataIn                : std_logic_vector(DATA_BITWIDTH - 1 downto 0);
+  signal dropLoadAddr : std_logic_vector(ADDR_WIDTH - 1 downto 0);
+  signal dropLoadData : std_logic_vector(DATA_WIDTH - 1 downto 0);
+  signal dropLoadEn   : std_logic;
 begin
-  stores : entity work.mem_controller_loadless generic map (CTRL_COUNT, STORE_COUNT, DATA_BITWIDTH, ADDR_BITWIDTH)
+
+  stores : entity work.mem_controller_loadless
+    generic map(
+      CTRL_COUNT  => CTRL_COUNT,
+      STORE_COUNT => STORE_COUNT,
+      DATA_WIDTH  => DATA_WIDTH,
+      ADDR_WIDTH  => ADDR_WIDTH)
     port map(
       clk           => clk,
       rst           => rst,
@@ -65,8 +72,8 @@ begin
       stData_ready  => stData_ready,
       memDone_valid => memDone_valid,
       memDone_ready => memDone_ready,
-      loadData      => loadData,
-      loadEn        => loadEn,
+      loadData      => dropLoadData,
+      loadEn        => dropLoadEn,
       loadAddr      => dropLoadAddr,
       storeEn       => storeEn,
       storeAddr     => storeAddr,
@@ -76,8 +83,8 @@ begin
   read_arbiter : entity work.read_memory_arbiter
     generic map(
       ARBITER_SIZE => LOAD_COUNT,
-      ADDR_WIDTH   => ADDR_BITWIDTH,
-      DATA_WIDTH   => DATA_BITWIDTH
+      ADDR_WIDTH   => ADDR_WIDTH,
+      DATA_WIDTH   => DATA_WIDTH
     )
     port map(
       rst              => rst,
@@ -89,10 +96,7 @@ begin
       valid            => ldData_valid,
       data_out         => ldData,
       read_enable      => loadEn,
-      read_address     => mcLoadAddrOut,
-      data_from_memory => mcLoadDataIn
+      read_address     => loadAddr,
+      data_from_memory => loadData
     );
-
-  loadAddr     <= mcLoadAddrOut;
-  mcLoadDataIn <= loadData;
 end architecture;

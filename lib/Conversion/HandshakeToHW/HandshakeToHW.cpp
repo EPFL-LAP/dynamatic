@@ -19,6 +19,7 @@
 #include "dynamatic/Dialect/Handshake/HandshakeDialect.h"
 #include "dynamatic/Dialect/Handshake/HandshakeInterfaces.h"
 #include "dynamatic/Dialect/Handshake/HandshakeOps.h"
+#include "dynamatic/Dialect/Handshake/HandshakeTypes.h"
 #include "dynamatic/Dialect/Handshake/MemoryInterfaces.h"
 #include "dynamatic/Support/Backedge.h"
 #include "dynamatic/Support/RTL.h"
@@ -291,7 +292,15 @@ static handshake::ChannelType channelWrapper(Type t) {
         return handshake::ChannelType::get(
             IntegerType::get(nt.getContext(), 0));
       })
-      .Default([](Type t) { return handshake::ChannelType::get(t); });
+      .Default([](Type t) {
+        if (isa<FloatType>(t)) {
+          // At the HW/RTL level we treat everything as opaque bitvectors, so we
+          // make everything IntegerType's (only the width matters)
+          return handshake::ChannelType::get(
+              IntegerType::get(t.getContext(), t.getIntOrFloatBitWidth()));
+        }
+        return handshake::ChannelType::get(t);
+      });
 }
 
 /// Attempts to find an external HW module in the MLIR module with the
@@ -510,6 +519,9 @@ ModuleDiscriminator::ModuleDiscriminator(Operation *op)
         addBitwidth("DATA_WIDTH", op->getOperand(0));
         addUnsigned("NUM_MEMORIES",
                     op->getNumOperands() - getNumExtInstanceArgs(endOp) - 1);
+      })
+      .Case<handshake::NotOp>([&](handshake::NotOp notOp) {
+        addBitwidth("DATA_WIDTH", op->getOperand(0));
       })
       .Case<arith::AddFOp, arith::AddIOp, arith::AndIOp, arith::DivFOp,
             arith::DivSIOp, arith::DivUIOp, arith::MaximumFOp,
@@ -1825,6 +1837,7 @@ public:
         ConvertToHWInstance<handshake::LSQLoadOp>,
         ConvertToHWInstance<handshake::MCStoreOp>,
         ConvertToHWInstance<handshake::LSQStoreOp>,
+        ConvertToHWInstance<handshake::NotOp>,
         // Arith operations
         ConvertToHWInstance<arith::AddFOp>, ConvertToHWInstance<arith::AddIOp>,
         ConvertToHWInstance<arith::AndIOp>,
