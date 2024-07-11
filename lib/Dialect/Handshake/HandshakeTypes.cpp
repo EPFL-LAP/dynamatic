@@ -124,7 +124,7 @@ void ChannelType::print(AsmPrinter &odsPrinter) const {
   odsPrinter << "<";
   odsPrinter.printStrippedAttrOrType(getDataType());
   if (!getExtraSignals().empty()) {
-    auto printSignal = [&](const ::dynamatic::handshake::ExtraSignal &signal) {
+    auto printSignal = [&](const ExtraSignal &signal) {
       odsPrinter << signal.name << ": " << signal.type;
       if (!signal.downstream)
         odsPrinter << "(" << UPSTREAM_SYMBOL << ")";
@@ -132,8 +132,7 @@ void ChannelType::print(AsmPrinter &odsPrinter) const {
 
     // Print all signals enclosed in square brackets
     odsPrinter << ", [";
-    for (const ::dynamatic::handshake::ExtraSignal &signal :
-         getExtraSignals().drop_back()) {
+    for (const ExtraSignal &signal : getExtraSignals().drop_back()) {
       printSignal(signal);
       odsPrinter << ", ";
     }
@@ -174,6 +173,13 @@ unsigned ChannelType::getNumDownstreamExtraSignals() const {
   });
 }
 
+unsigned ChannelType::getDataBitWidth() const {
+  Type dataType = getDataType();
+  assert(ChannelType::isSupportedSignalType(dataType) && "unsupported type");
+  return mlir::isa<IndexType>(dataType) ? IndexType::kInternalStorageBitWidth
+                                        : dataType.getIntOrFloatBitWidth();
+}
+
 ExtraSignal::Storage::Storage(StringRef name, mlir::Type type, bool downstream)
     : name(name), type(type), downstream(downstream) {}
 
@@ -182,6 +188,12 @@ ExtraSignal::ExtraSignal(StringRef name, mlir::Type type, bool downstream)
 
 ExtraSignal::ExtraSignal(const ExtraSignal::Storage &storage)
     : name(storage.name), type(storage.type), downstream(storage.downstream) {}
+
+unsigned ExtraSignal::getBitWidth() const {
+  assert(ChannelType::isSupportedSignalType(type) && "unsupported type");
+  return isa<IndexType>(type) ? IndexType::kInternalStorageBitWidth
+                              : type.getIntOrFloatBitWidth();
+}
 
 bool dynamatic::handshake::operator==(const ExtraSignal &lhs,
                                       const ExtraSignal &rhs) {

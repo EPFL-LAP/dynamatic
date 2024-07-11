@@ -1153,7 +1153,8 @@ SameOperandsAndResultType
 
 def BundleOp : Handshake_Op<"bundle", [Pure]> {
   let summary = [{
-    Bundles individual signals into a `handshake::ChannelType` or `handshake::ControlType`.
+    Bundles individual signals into a `handshake::ChannelType` or
+    `handshake::ControlType`.
   }];
   let description = [{
     Combines individual signals into a channel-like value, producing upstream
@@ -1216,7 +1217,8 @@ def UnbundleOp : Handshake_Op<"unbundle", [
   DeclareOpInterfaceMethods<InferTypeOpInterface, ["inferReturnTypes"]>
 ]> {
   let summary = [{
-    Unbundles a `handshake::ChannelType` or `handshake::ControlType` into individual signals.
+    Unbundles a `handshake::ChannelType` or `handshake::ControlType` into
+    individual signals.
   }];
   let description = [{
     Splits a channel-like value into its individual signals, producing
@@ -1272,6 +1274,81 @@ def UnbundleOp : Handshake_Op<"unbundle", [
   let assemblyFormat = "$channel (`[` $upstreams^ `]`)? attr-dict `:` functional-type(operands, results)";
 
   let hasVerifier = 1;
+}
+
+def ChannelReshapeTypeAttr : I32EnumAttr<
+    "ChannelReshapeType", "",
+    [
+      I32EnumAttrCase<"MergeData", 0>,
+      I32EnumAttrCase<"SplitData", 1>,
+      I32EnumAttrCase<"MergeExtra", 2>,
+      I32EnumAttrCase<"SplitExtra", 3>
+    ]> {
+  let cppNamespace = "::dynamatic::handshake";
+}
+
+def ReshapeOp : Handshake_Op<"reshape", [Pure]> {
+  let summary = "Reshapes the individual signals of a `handshake::ChannelType`.";
+  let description = [{
+    Reshapes a `ChannelType`'d value to a different form without modifying the
+    channel's actual payload, only rerouting bits to different extra signals or
+    to the channel's data signal. There are currently four reshaping types that
+    match two-by-two to perform reverse reshapings (each reshaping type pair has
+    a dedicated operation builder).
+
+    - `ChannelReshapeType::MergeData` merges all downstream extra signals into
+      the data signal, which becomes an `i<X>` where X is the sum of the
+      bitwidths of all downstream extra signals plus the data signal's bitwidth.
+      If there are no downstream extra signals, the data type is unchanged. All
+      upstream extra signals (if any) are merged into a single one named
+      `COMBINED_UP_NAME` with type `i<Y>`, where Y is the sum of the bitwidths
+      of all upstream extra signals. `ChannelReshapeType::SplitData` performs
+      the reverse transformation.
+      
+    - `ChannelReshapeType::MergeExtra` behaves identically to
+      `ChannelReshapeType::MergeData` for extra upstream signals. However,
+      all downstream extra signals (if any) are merged into a single one named
+      `COMBINED_DOWN_NAME` with type `i<Z>`, where Z is the sum of the bitwidths
+      of all downstream extra signals. The data type always remain unchanged.
+      `ChannelReshapeType::SplitExtra` performs the reverse transformation.  
+
+    Example:
+    ```
+    // Merging into data
+    %reshaped = reshape [MergeData] %channel :
+      (!handshake.channel<f32, [down1: i2, up1: i4 (U), up2: i4 (U), down2: i8]>)
+      -> (!handshake.channel<i42, [mergedUp: i8 (U)]>)
+    
+    // -----
+    
+    // Merging into extra
+    %reshaped = reshape [MergeExtra] %channel :
+      (!handshake.channel<f32, [down1: i2, up1: i4 (U), up2: i4 (U), down2: i8]>)
+      -> (!handshake.channel<f32, [mergedDowm: i10, mergedUp: i8 (U)]>)
+    ```
+  }];
+
+  let arguments = (ins ChannelReshapeTypeAttr:$reshapeType, ChannelType:$channel);
+  let results = (outs ChannelType:$reshaped);
+
+  let skipDefaultBuilders = 1;
+  let builders = [
+    OpBuilder<(ins 
+      "::mlir::TypedValue<::dynamatic::handshake::ChannelType>":$channel,
+      "bool":$mergeDownstreamIntoData)>,
+    OpBuilder<(ins
+      "::mlir::TypedValue<::dynamatic::handshake::ChannelType>":$channel,
+      "bool":$splitDownstreamFromData, "::mlir::Type":$reshapedType)>,
+  ];
+
+  let assemblyFormat = "`[` $reshapeType `]` $channel attr-dict `:` functional-type($channel, $reshaped)";
+  let hasVerifier = 1;
+  
+  let extraClassDeclaration = [{
+    static constexpr ::llvm::StringLiteral
+      COMBINED_DOWN_NAME = ::llvm::StringLiteral("mergedDown"),
+      COMBINED_UP_NAME = ::llvm::StringLiteral("mergedUp");
+  }];
 }
 
 #endif // DYNAMATIC_DIALECT_HANDSHAKE_HANDSHAKE_OPS_TD

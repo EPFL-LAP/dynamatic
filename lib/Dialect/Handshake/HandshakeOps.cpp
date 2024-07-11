@@ -16,6 +16,7 @@
 //===----------------------------------------------------------------------===//
 
 #include "dynamatic/Dialect/Handshake/HandshakeOps.h"
+#include "dynamatic/Dialect/Handshake/HandshakeDialect.h"
 #include "dynamatic/Dialect/Handshake/HandshakeTypes.h"
 #include "dynamatic/Support/CFG.h"
 #include "dynamatic/Support/LLVM.h"
@@ -1934,6 +1935,231 @@ LogicalResult UnbundleOp::inferReturnTypes(
 LogicalResult UnbundleOp::verify() {
   return verifyBundlingOp(getChannel().getType(), getUpstreams(), getSignals(),
                           false, [&]() { return emitError(); });
+}
+
+//===----------------------------------------------------------------------===//
+// ReshapeOp
+//===----------------------------------------------------------------------===//
+
+/// Returns the total number of bits needed to carry all extra downstream
+/// signals and all extra upstream signals.
+static std::pair<unsigned, unsigned> getTotalExtraWidths(ChannelType type) {
+  unsigned totalDownWidth = 0, totalUpWidth = 0;
+  for (const ExtraSignal &extra : type.getExtraSignals()) {
+    if (extra.downstream)
+      totalDownWidth += extra.getBitWidth();
+    else
+      totalUpWidth += extra.getBitWidth();
+  }
+  return {totalDownWidth, totalUpWidth};
+}
+
+void ReshapeOp::build(OpBuilder &odsBuilder, OperationState &odsState,
+                      TypedValue<ChannelType> channel,
+                      bool mergeDownstreamIntoData) {
+  // Set the operands/attributes
+  MLIRContext *ctx = odsBuilder.getContext();
+  ChannelReshapeType reshapeType = mergeDownstreamIntoData
+                                       ? ChannelReshapeType::MergeData
+                                       : ChannelReshapeType::MergeExtra;
+  odsState.addAttribute("reshapeType",
+                        ChannelReshapeTypeAttr::get(ctx, reshapeType));
+  odsState.addOperands(channel);
+
+  // All extra signals will be combined into at most one downstream combined
+  // signal and one upstream combined signal, compute their bitwidth
+  auto [totalDownWidth, totalUpWidth] = getTotalExtraWidths(channel.getType());
+
+  // The result channel type can be determined from the input channel type and
+  // reshaping type
+  SmallVector<ExtraSignal> extraSignals;
+  Type dataType = channel.getType().getDataType();
+  ;
+  if (mergeDownstreamIntoData) {
+    if (totalDownWidth) {
+      unsigned dataWidth = channel.getType().getDataBitWidth();
+      dataType = odsBuilder.getIntegerType(totalDownWidth + dataWidth);
+    }
+  } else {
+    // At most a single downstream extra signal should remain
+    if (totalDownWidth != 0) {
+      extraSignals.emplace_back(COMBINED_DOWN_NAME,
+                                odsBuilder.getIntegerType(totalUpWidth), false);
+    }
+  }
+  // At most a single upstream extra signal should remain
+  if (totalUpWidth != 0) {
+    extraSignals.emplace_back(COMBINED_UP_NAME,
+                              odsBuilder.getIntegerType(totalUpWidth), true);
+  }
+
+  odsState.addTypes(ChannelType::get(ctx, dataType, extraSignals));
+}
+
+void ReshapeOp::build(OpBuilder &odsBuilder, OperationState &odsState,
+                      TypedValue<ChannelType> channel,
+                      bool splitDownstreamFromData, Type reshapedType) {
+  // Set the operands/attributes
+  MLIRContext *ctx = odsBuilder.getContext();
+  ChannelReshapeType reshapeType = splitDownstreamFromData
+                                       ? ChannelReshapeType::SplitData
+                                       : ChannelReshapeType::SplitExtra;
+  odsState.addAttribute("reshapeType",
+                        ChannelReshapeTypeAttr::get(ctx, reshapeType));
+  odsState.addOperands(channel);
+
+  // The compatibility of this type with the input will be checked in the
+  // operation's verification function
+  odsState.addTypes(reshapedType);
+}
+
+LogicalResult ReshapeOp::verify() {
+  ChannelType srcType = getChannel().getType(),
+              dstType = getReshaped().getType();
+  std::pair<unsigned, unsigned> srcExtraWidths = getTotalExtraWidths(srcType),
+                                dstExtraWidths = getTotalExtraWidths(dstType);
+
+  // Fails if the merged type has at least one extra downstream signal.
+  auto checkNoExtraDownstreamSignal = [&](bool isMerge) -> LogicalResult {
+    ChannelType type = isMerge ? dstType : srcType;
+    unsigned numSignals = type.getNumDownstreamExtraSignals();
+    if (numSignals == 0)
+      return success();
+    return emitError() << "too many extra downstream signals in the "
+                       << (isMerge ? "destination" : "source")
+                       << " type, expected 0 but got " << numSignals;
+  };
+
+  // Fails if the merged type has more than one extra signal of the specified
+  // direction, or if the single extra signal of the direction is incompatible
+  // with the split type.
+  auto checkMergedExtraSignal = [&](bool isMerge,
+                                    bool isDownstream) -> LogicalResult {
+    ChannelType type = isMerge ? dstType : srcType;
+    unsigned expectedWidth, numExtra;
+    StringRef dirStr, combinedName;
+    if (isDownstream) {
+      expectedWidth = isMerge ? srcExtraWidths.first : dstExtraWidths.first;
+      numExtra = type.getNumDownstreamExtraSignals();
+      dirStr = "downstream";
+      combinedName = COMBINED_DOWN_NAME;
+    } else {
+      expectedWidth = isMerge ? srcExtraWidths.second : dstExtraWidths.second;
+      numExtra = type.getNumUpstreamExtraSignals();
+      dirStr = "uptream";
+      combinedName = COMBINED_UP_NAME;
+    }
+
+    // There must be either 0 or 1 extra signal of the specified direction
+    if (numExtra == 0)
+      return success();
+    if (numExtra > 1) {
+      return emitError() << "merged channel type should have at most one "
+                         << dirStr << " signal, but got " << numExtra;
+    }
+
+    // Retrieve the single extra signal of the correct direction, then check its
+    // name, bitwidth, and type
+    const ExtraSignal &extraSignal =
+        *llvm::find_if(type.getExtraSignals(), [&](const ExtraSignal &extra) {
+          return extra.downstream == isDownstream;
+        });
+
+    if (extraSignal.name != combinedName) {
+      return emitError() << "invalid name for merged extra " << dirStr
+                         << " signal, expected '" << combinedName
+                         << "' but got '" << extraSignal.name << "'";
+    }
+    if (extraSignal.getBitWidth() != expectedWidth) {
+      return emitError() << "invalid bitwidth for merged extra " << dirStr
+                         << " signal, expected " << expectedWidth << " but got "
+                         << extraSignal.getBitWidth();
+    }
+    if (!isa<IntegerType>(extraSignal.type)) {
+      return emitError() << "invalid type for merged extra " << dirStr
+                         << " signal, expected IntegerType but got "
+                         << extraSignal.type;
+    }
+    return success();
+  };
+
+  // Fails if the merged type's data type is incompatible with the split type.
+  auto checkCompatibleDataType = [&](bool isMerge) -> LogicalResult {
+    ChannelType splitType, mergeType;
+    unsigned extraWidth;
+    if (isMerge) {
+      splitType = srcType;
+      mergeType = dstType;
+      extraWidth = srcExtraWidths.first;
+    } else {
+      splitType = dstType;
+      mergeType = srcType;
+      extraWidth = dstExtraWidths.first;
+    }
+    Type mergedDataType = mergeType.getDataType();
+
+    unsigned expectedMergedDataWidth = extraWidth + splitType.getDataBitWidth();
+    if (expectedMergedDataWidth != mergeType.getDataBitWidth()) {
+      return emitError() << "invalid merged data type bitwidth, expected "
+                         << expectedMergedDataWidth << " but got "
+                         << mergeType.getDataBitWidth();
+    }
+    if (extraWidth) {
+      if (!isa<IntegerType>(mergedDataType)) {
+        return emitError() << "invalid merged data type, expected merged "
+                              "IntegerType but got "
+                           << mergedDataType;
+      }
+    } else {
+      if (splitType.getDataType() != mergedDataType) {
+        return emitError()
+               << "invalid destination data type, expected source data type "
+               << splitType.getDataType() << " but got " << mergedDataType;
+      }
+    }
+    return success();
+  };
+
+  // Fails if the merged type's and split type's data types are different.
+  auto checkSameDataType = [&]() -> LogicalResult {
+    if (srcType.getDataType() != dstType.getDataType()) {
+      return emitError() << "reshaping in this mode should not change "
+                            "the data type, expected "
+                         << srcType.getDataType() << " but got "
+                         << dstType.getDataType();
+    }
+    return success();
+  };
+
+  switch (getReshapeType()) {
+  case ChannelReshapeType::MergeData:
+    if (failed(checkNoExtraDownstreamSignal(true)) ||
+        failed(checkMergedExtraSignal(true, false)) ||
+        failed(checkCompatibleDataType(true)))
+      return failure();
+
+    break;
+  case ChannelReshapeType::MergeExtra:
+    if (failed(checkMergedExtraSignal(true, false)) ||
+        failed(checkMergedExtraSignal(true, true)) ||
+        failed(checkSameDataType()))
+      return failure();
+    break;
+  case ChannelReshapeType::SplitData:
+    if (failed(checkNoExtraDownstreamSignal(false)) ||
+        failed(checkMergedExtraSignal(false, false)) ||
+        failed(checkCompatibleDataType(false)))
+      return failure();
+    break;
+  case ChannelReshapeType::SplitExtra:
+    if (failed(checkMergedExtraSignal(false, false)) ||
+        failed(checkMergedExtraSignal(false, true)) ||
+        failed(checkSameDataType()))
+      return failure();
+    break;
+  }
+
+  return success();
 }
 
 #define GET_OP_CLASSES

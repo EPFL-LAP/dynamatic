@@ -90,11 +90,14 @@ def ChannelType : Handshake_Type<"Channel", "channel"> {
     unsigned getNumUpstreamExtraSignals() const {
       return getNumExtraSignals() - getNumDownstreamExtraSignals();
     }
+
+    /// Returns the data type's bitwidth.
+    unsigned getDataBitWidth() const;
     
     /// Determines whether a type is supported as the data type or as the type
     /// of an extra signal.
     static bool isSupportedSignalType(::mlir::Type type) {
-      return ::mlir::isa<::mlir::IndexType, ::mlir::IntegerType, ::mlir::FloatType>(type);
+      return type.isIntOrIndexOrFloat();
     }
   }];
 }
