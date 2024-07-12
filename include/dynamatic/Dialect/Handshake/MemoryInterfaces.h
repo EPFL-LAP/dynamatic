@@ -18,8 +18,32 @@
 #include "dynamatic/Analysis/NameAnalysis.h"
 #include "dynamatic/Dialect/Handshake/HandshakeOps.h"
 #include "dynamatic/Support/LLVM.h"
+#include "mlir/IR/Operation.h"
+#include <set>
 
 namespace dynamatic {
+// Represents a memory dependeency bteween 2 blocks: the producer basic block
+// prodBb, and the consumer basic block consBb isBackward is used to indicate if
+// the producer and the consumer are in a loop
+struct ProdConsMemDep {
+  Block *prodBb;
+  Block *consBb;
+  bool isBackward;
+
+  ProdConsMemDep(Block *prod, Block *cons, bool backward)
+      : prodBb(prod), consBb(cons), isBackward(backward) {}
+};
+
+// A group represents all operations belonging to the same basic block bb
+struct Group {
+  Block *bb;
+  std::set<Group *> preds;
+  std::set<Group *> succs;
+
+  Group(Block *b) : bb(b) {}
+
+  bool operator<(const Group &other) const { return bb < other.bb; }
+};
 
 /// Helper class to keep memory dependencies annotations consistent when
 /// lowering memory operations.
@@ -111,6 +135,14 @@ public:
                                       handshake::MemoryControllerOp &mcOp,
                                       handshake::LSQOp &lsqOp);
 
+  /// Similar to instantiateInterfaces but adds a fork graph analogous to
+  /// the group graph and connects the ork nodes to lsq input
+  LogicalResult instantiateInterfacesWithForks(
+      OpBuilder &builder, handshake::MemoryControllerOp &mcOp,
+      handshake::LSQOp &lsqOp, std::set<Group *> &groups,
+      DenseMap<Block *, Operation *> &forksGraph,
+      DenseMap<Operation *, std::set<Value>> &forkPreds, Value start);
+
   /// Returns results of load/store-like operations which are to be given as
   /// operands to a memory interface.
   static SmallVector<Value, 2> getMemResultsToInterface(Operation *memOp);
@@ -168,6 +200,11 @@ private:
   /// interfaces.
   LogicalResult determineInterfaceInputs(InterfaceInputs &inputs,
                                          OpBuilder &builder);
+
+  LogicalResult determineInterfaceInputsWithForks(
+      InterfaceInputs &inputs, OpBuilder &builder, std::set<Group *> &groups,
+      DenseMap<Block *, Operation *> &forksGraphs,
+      DenseMap<Operation *, std::set<Value>> &forkPreds, Value start);
 
   /// Returns the control signal for a specific block, as contained in the
   /// `ctrlVals` map. Produces an error on stderr and returns nullptr if no

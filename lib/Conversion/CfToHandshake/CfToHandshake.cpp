@@ -24,6 +24,8 @@
 #include "dynamatic/Dialect/Handshake/MemoryInterfaces.h"
 #include "dynamatic/Support/CFG.h"
 #include "dynamatic/Transforms/FuncMaximizeSSA.h"
+#include "experimental/Support/BooleanLogic/BoolExpression.h"
+#include "mlir/Analysis/CFGLoopInfo.h"
 #include "mlir/Dialect/Affine/Analysis/AffineAnalysis.h"
 #include "mlir/Dialect/Affine/Utils.h"
 #include "mlir/Dialect/ControlFlow/IR/ControlFlowOps.h"
@@ -33,14 +35,18 @@
 #include "mlir/IR/BuiltinAttributes.h"
 #include "mlir/IR/Dominance.h"
 #include "mlir/IR/MLIRContext.h"
+#include "mlir/IR/OpDefinition.h"
+#include "mlir/IR/Operation.h"
 #include "mlir/IR/PatternMatch.h"
 #include "mlir/Support/LogicalResult.h"
 #include "mlir/Transforms/DialectConversion.h"
 #include "mlir/Transforms/GreedyPatternRewriteDriver.h"
 #include "llvm/ADT/SmallVector.h"
 #include "llvm/ADT/TypeSwitch.h"
+#include "llvm/Support/Casting.h"
 #include "llvm/Support/raw_ostream.h"
 #include <iterator>
+#include <unordered_set>
 #include <utility>
 
 using namespace mlir;
@@ -48,6 +54,7 @@ using namespace mlir::func;
 using namespace mlir::affine;
 using namespace mlir::memref;
 using namespace dynamatic;
+using namespace dynamatic::experimental::boolean;
 
 //===-----------------------------------------------------------------------==//
 // Helper functions
@@ -598,6 +605,20 @@ LogicalResult HandshakeLowering::replaceMemoryOps(
   return success();
 }
 
+std::vector<Operation *> getLSQPredecessors(
+    const llvm::MapVector<unsigned, SmallVector<Operation *>> &lsqPorts) {
+  // Create a vector to hold all the Operation* pointers
+  std::vector<Operation *> combinedOperations;
+  // Iterate over the MapVector and add all Operation* to the combinedOperations
+  // vector
+  for (const auto &entry : lsqPorts) {
+    const SmallVector<Operation *> &operations = entry.second;
+    combinedOperations.insert(combinedOperations.end(), operations.begin(),
+                              operations.end());
+  }
+  return combinedOperations;
+}
+
 LogicalResult HandshakeLowering::verifyAndCreateMemInterfaces(
     ConversionPatternRewriter &rewriter, MemInterfacesInfo &memInfo) {
   // Create a mapping between each block and all the other blocks it properly
@@ -666,11 +687,25 @@ LogicalResult HandshakeLowering::verifyAndCreateMemInterfaces(
       }
     }
 
+    /// Construction of Allocation Network
+    std::vector<Operation *> allOperations =
+        getLSQPredecessors(memAccesses.lsqPorts);
+
+    std::vector<ProdConsMemDep> allMemDeps;
+    identifyMemDeps(allOperations, allMemDeps);
+
+    constructGroupsGraph(allOperations, allMemDeps);
+
+    minimizeGroupsConnections();
+
     // Build the memory interfaces
     handshake::MemoryControllerOp mcOp;
     handshake::LSQOp lsqOp;
-    if (failed(memBuilder.instantiateInterfaces(rewriter, mcOp, lsqOp)))
+    if (failed(memBuilder.instantiateInterfacesWithForks(
+            rewriter, mcOp, lsqOp, groups, forksGraph, forkPreds, startCtrl)))
       return failure();
+
+    addMergeLoop(rewriter);
   }
 
   return success();
@@ -849,54 +884,65 @@ HandshakeLowering::createReturnNetwork(ConversionPatternRewriter &rewriter) {
 
 //===-----------------------------------------------------------------------==//
 // Construction of Allocation Network
-//===-----------------------------------------------------------------------==//
-LogicalResult HandshakeLowering::addSmartControlForLSQ(
-    ConversionPatternRewriter &rewriter,
-    HandshakeLowering::MemInterfacesInfo &memInfo) {
-  llvm::errs() << "In add smart controller\n";
-  llvm::errs() << "Meminfo size: " << memInfo.size() << "\n";
-  // loop over the enode_dag searching for LSQ nodes, and for each LSQ node
-  for (auto &[memref, memAccess] : memInfo) {
-    llvm::errs() << "In outer loop\n";
-    llvm::errs() << "mcPOrts size: " << memAccess.mcPorts.size() << "\n";
-    llvm::errs() << "lsqPorts size: " << memAccess.lsqPorts.size() << "\n";
-    for (auto &[lsqid, operations] :
-         memAccess.lsqPorts) { // memory operations for an LSQ, grouped by
-                               // belonging LSQ group
-      // fills the all_mem_deps to identify the producer and consumer blocks and
-      // whether they are backward or not
-      llvm::errs() << "In loop\n";
-      std::vector<ProdConsMemDep> allMemDeps;
-      identifyMemDeps(operations, allMemDeps);
+//===-----------------------------------------------------------------------==/
+LogicalResult
+HandshakeLowering::getLoopInfo(ConversionPatternRewriter &rewriter) {
+  // first run the following loop analysis
+  DominanceInfo domInfo;
+  llvm::DominatorTreeBase<Block, false> &domTree = domInfo.getDomTree(&region);
+  // CFGLoop nodes become invalid after CFGLoopInfo is destroyed.
+  CFGLoopInfo li(domTree);
 
-      std::set<Group> groups;
-      constructGroupsGraph(operations, allMemDeps, groups);
-
-      // minimizeGroupsConnections(groups);
-    }
-  }
+  // Call the function
+  DenseMap<Block *, BlockLoopInfo> blockToLoopInfoMap =
+      findLoopDetails(li, region);
   return success();
 }
 
+/*
+LogicalResult HandshakeLowering::addSmartControlForLSQ(
+    ConversionPatternRewriter &rewriter,
+    HandshakeLowering::MemInterfacesInfo &memInfo) {
+
+  for (auto &[_, memAccess] : memInfo) {
+
+    std::vector<Operation *> allOperations =
+        getLSQPredecessors(memAccess.lsqPorts);
+
+    std::vector<ProdConsMemDep> allMemDeps;
+    identifyMemDeps(allOperations, allMemDeps);
+
+    constructGroupsGraph(allOperations, allMemDeps);
+
+    minimizeGroupsConnections();
+  }
+
+  return success();
+}*/
+
 // checks wether an operation is a mmory operation
 bool checkMemOp(Operation *op) {
-  StringRef attrName = handshake::MemInterfaceAttr::getMnemonic();
-  auto memAttr = op->getAttrOfType<handshake::MemInterfaceAttr>(attrName);
-  return (memAttr != nullptr);
+  // StringRef attrName = handshake::MemInterfaceAttr::getMnemonic();
+  // auto memAttr = op->getAttrOfType<handshake::MemInterfaceAttr>(attrName);
+  // return (memAttr != nullptr);
+  return isa<handshake::LSQStoreOp, handshake::LSQLoadOp>(op);
 }
 
 // checks wether 2 operations belong to the same BB
 bool checkSameBB(Operation *op1, Operation *op2) {
+  // std::optional<unsigned> block1 = getLogicBB(op1);
+  // std::optional<unsigned> block2 = getLogicBB(op2);
+  // return (*block1 == *block2);
   return (op1->getBlock() == op2->getBlock());
 }
 
 // checks wether 2 operations are both load operations
 bool checkBothLd(Operation *op1, Operation *op2) {
-  return (isa<memref::LoadOp>(op1) && isa<memref::LoadOp>(op2));
+  return (isa<handshake::LSQLoadOp>(op1) && isa<handshake::LSQLoadOp>(op2));
 }
-// Implementation of the function
-DenseMap<Block *, BlockLoopInfo> dynamatic::findLoopDetails(CFGLoopInfo &li,
-                                                            Region &funcReg) {
+
+DenseMap<Block *, BlockLoopInfo>
+HandshakeLowering::findLoopDetails(CFGLoopInfo &li, Region &funcReg) {
   // Finding all loops.
   std::set<CFGLoop *> loops;
   for (auto &block : funcReg.getBlocks()) {
@@ -936,23 +982,18 @@ DenseMap<Block *, BlockLoopInfo> dynamatic::findLoopDetails(CFGLoopInfo &li,
   return blockToLoopInfoMap;
 }
 
+// Recursively check weather 2 block belong to the same loop, starting from the
+// inner-most loops
+bool checkSameLoop(CFGLoop *loop1, CFGLoop *loop2) {
+  if (!loop1 || !loop2)
+    return false;
+  return (loop1 == loop2 || checkSameLoop(loop1->getParentLoop(), loop2) ||
+          checkSameLoop(loop1, loop2->getParentLoop()) ||
+          checkSameLoop(loop1->getParentLoop(), loop2->getParentLoop()));
+}
+
 // checks if the source and destination are in a loop
 bool HandshakeLowering::sameLoop(Block *source, Block *dest) {
-  // first run the following loop analysis
-  DominanceInfo domInfo;
-  llvm::DominatorTreeBase<Block, false> &domTree = domInfo.getDomTree(&region);
-  // CFGLoop nodes become invalid after CFGLoopInfo is destroyed.
-  CFGLoopInfo li(domTree);
-
-  // Call the function
-  DenseMap<Block *, BlockLoopInfo> blockToLoopInfoMap =
-      findLoopDetails(li, region);
-
-  for (auto [b, bi] : blockToLoopInfoMap) {
-    llvm::errs() << &b << "\n";
-    llvm::errs() << bi.isHeader << "\n";
-  }
-
   auto itSource = blockToLoopInfoMap.find(source);
   auto itDest = blockToLoopInfoMap.find(dest);
 
@@ -962,25 +1003,51 @@ bool HandshakeLowering::sameLoop(Block *source, Block *dest) {
     return false;
 
   // compare the loop pointers
-  return (itSource->second.loop == itDest->second.loop);
+  return checkSameLoop(itSource->second.loop, itDest->second.loop);
+}
+
+void checkCommonLoops(CFGLoop *loop1, CFGLoop *loop2,
+                      SmallVector<CFGLoop *> &common) {
+  if (!loop1 || !loop2)
+    return;
+  if (loop1 == loop2)
+    common.push_back(loop1);
+  checkCommonLoops(loop1->getParentLoop(), loop2, common);
+  checkCommonLoops(loop1, loop2->getParentLoop(), common);
+  checkCommonLoops(loop1->getParentLoop(), loop2->getParentLoop(), common);
+}
+
+SmallVector<CFGLoop *> HandshakeLowering::getCommonLoops(Block *block1,
+                                                         Block *block2) {
+  auto it1 = blockToLoopInfoMap.find(block1);
+  auto it2 = blockToLoopInfoMap.find(block2);
+
+  SmallVector<CFGLoop *> commonLoops;
+
+  if (it1 != blockToLoopInfoMap.end() && it2 != blockToLoopInfoMap.end())
+    checkCommonLoops(it1->second.loop, it2->second.loop, commonLoops);
+
+  return commonLoops;
 }
 
 // Two types of hazards between the predecessors of one LSQ node:
 // (1) WAW between 2 Store operations,
 // (2) RAW and WAR between Load and Store operations
 void HandshakeLowering::identifyMemDeps(
-    SmallVector<Operation *> &operations,
+    std::vector<Operation *> &operations,
     std::vector<ProdConsMemDep> &allMemDeps) {
   for (Operation *i : operations) {
-    llvm::errs() << "In identifyMemDeps\n";
-    // i: loop over the predecessors of the lsq_enode.. Skip those that are not
-    // memory operations (i.e., not load and not store)
-    if (!checkMemOp(i))
+    // i: loop over the predecessors of the lsq_enode.. Skip those that are
+    // not memory operations (i.e., not load and not store)
+    if (!checkMemOp(i)) {
       continue;
+    }
+
     for (Operation *j : operations) {
-      // j: loop over every other predecessor of the lsq_enode.. Skip (1) those
-      // that are not memory operations, (2) those in the same BB as the one
-      // currently in hand, (3) both preds are load if(BB_i > BB_j)
+      // j: loop over every other predecessor of the lsq_enode.. Skip (1)
+      // those that are not memory operations, (2) those in the same BB as the
+      // one currently in hand, (3) both preds are load if(BB_i > BB_j)
+
       if (!checkMemOp(j) || checkSameBB(i, j) || checkBothLd(i, j))
         continue;
 
@@ -1001,11 +1068,8 @@ void HandshakeLowering::identifyMemDeps(
 
       // Check if BB_i and BB_j are in the same loop
       if (sameLoop(prod, cons)) {
-        llvm::errs() << "Checking loop\n";
-        prod->printAsOperand(llvm::errs());
-        cons->printAsOperand(llvm::errs());
-        // add another entry in all_mem_deps with the opposite of prod, cons and
-        // mark is_backward to true
+        // add another entry in all_mem_deps with the opposite of prod, cons
+        // and mark is_backward to true
         ProdConsMemDep opp(cons, prod, true);
         allMemDeps.push_back(opp);
       }
@@ -1014,55 +1078,207 @@ void HandshakeLowering::identifyMemDeps(
 }
 
 void HandshakeLowering::constructGroupsGraph(
-    const SmallVector<Operation *> &operations,
-    std::vector<ProdConsMemDep> &allMemDeps, std::set<Group> &groups) {
-  // loop over the preds of the LSQ that are memory operations,
-  // create a Group object for each of them with the BB of the operation
+    std::vector<Operation *> &operations,
+    std::vector<ProdConsMemDep> &allMemDeps) {
+  // llvm::errs() << "In construct graph\n";
+  //  loop over the preds of the LSQ that are memory operations,
+  //  create a Group object for each of them with the BB of the operation
   for (Operation *op : operations) {
-    if (isMemoryOp(op)) {
+    if (checkMemOp(op)) {
       Block *b = op->getBlock();
-      Group g(b);
+      Group *g = new Group(b);
       groups.insert(g);
     }
   }
 
   // After creating all of the Group objects, it is the time to connet their
-  // preds andProdConsMemDep succs; each entry in allMemDeps should represent an
-  // edge in the graph of groups
+  // preds andProdConsMemDep succs; each entry in allMemDeps should represent
+  // an edge in the graph of groups
   for (ProdConsMemDep memDep : allMemDeps) {
     // Find group correspondig to the producer block
     auto itProd = std::find_if(
         groups.begin(), groups.end(),
-        [&memDep](const Group &group) { return group.bb == memDep.prodBb; });
+        [&memDep](const Group *group) { return group->bb == memDep.prodBb; });
 
-    Group prodGroup = *itProd;
+    Group *prodGroup = *itProd;
 
     // Find group correspondig to the consumer block
     auto itCons = std::find_if(
         groups.begin(), groups.end(),
-        [&memDep](const Group &group) { return group.bb == memDep.consBb; });
+        [&memDep](const Group *group) { return group->bb == memDep.consBb; });
 
-    Group consGroup = *itCons;
+    Group *consGroup = *itCons;
 
     // create edges to link the groups
-    prodGroup.succs.insert(consGroup);
-    consGroup.preds.insert(prodGroup);
+    prodGroup->succs.insert(consGroup);
+    consGroup->preds.insert(prodGroup);
   }
 }
 
-LogicalResult HandshakeLowering::print(ConversionPatternRewriter &rewriter) {
-  llvm::errs() << "Printing region\n";
-  for (Block &block : region.getBlocks()) {
-    llvm::errs() << block << "\n";
-  }
-  llvm::errs() << "Now printing loop info\n";
-  for (mlir::Block &block : region.getBlocks()) {
-    for (mlir::Block &block2 : region.getBlocks()) {
-      if ((&block != &block2) && sameLoop(&block, &block2))
-        llvm::errs() << "Blocks in loop " << block << " and " << block2 << "\n";
+void HandshakeLowering::minimizeGroupsConnections() {
+  /// Get the dominance info for the region
+  DominanceInfo domInfo;
+
+  /// For every group, compare every 2 of its preds, Cut the edge only if the
+  /// pred with the bigger idx dominates your group
+  for (auto group = groups.rbegin(); group != groups.rend(); ++group) {
+    std::set<Group *> predsToRemove;
+
+    for (auto bigPred = (*group)->preds.rbegin();
+         bigPred != (*group)->preds.rend(); ++bigPred) {
+      for (auto smallPred = (*group)->preds.rbegin();
+           smallPred != (*group)->preds.rend(); ++smallPred) {
+        if ((*bigPred != *smallPred) &&
+            ((*bigPred)->preds.find(*smallPred) != (*bigPred)->preds.end()) &&
+            domInfo.properlyDominates((*bigPred)->bb, (*group)->bb)) {
+          predsToRemove.insert(*smallPred);
+        }
+      }
+    }
+
+    for (auto *pred : predsToRemove) {
+      (*group)->preds.erase(pred);
     }
   }
-  return success();
+}
+// DFS to return all nodes in the path between the start_node and end_node (not
+// including start_node and end_node) in the postDom tree
+void traversePostDomTreeUtil(
+    DominanceInfoNode *start_node, DominanceInfoNode *end_node,
+    llvm::DenseMap<DominanceInfoNode *, bool> is_visited,
+    llvm::SmallVector<mlir::DominanceInfoNode *, 4> path, int path_index,
+    llvm::SmallVector<llvm::SmallVector<mlir::DominanceInfoNode *, 4>, 4>
+        *traversed_nodes) {
+  is_visited[start_node] = true;
+  path[path_index] = start_node;
+  path_index++;
+
+  // if start is same as end, we have completed one path so push it to
+  // traversed_nodes
+  if (start_node == end_node) {
+    // slice of the path from its beginning until the path_index
+    llvm::SmallVector<mlir::DominanceInfoNode *, 4> actual_path;
+    for (auto i = 0; i < path_index; i++) {
+      actual_path.push_back(path[i]);
+    }
+    traversed_nodes->push_back(actual_path);
+
+  } else {
+    // loop over the children of start_node
+    for (DominanceInfoNode::iterator iter = start_node->begin();
+         iter < start_node->end(); iter++) {
+      if (!is_visited[*iter]) {
+        traversePostDomTreeUtil(*iter, end_node, is_visited, path, path_index,
+                                traversed_nodes);
+      }
+    }
+  }
+
+  // remove this node from path and mark it as unvisited
+  path_index--;
+  is_visited[start_node] = false;
+}
+
+void dfsAllPaths(Block *start, Block *end, std::vector<Block *> &path,
+                 std::unordered_set<Block *> &visited,
+                 std::vector<std::vector<Block *>> &allPaths) {
+  path.push_back(start);
+  visited.insert(start);
+
+  if (start == end) {
+    allPaths.push_back(path);
+  } else {
+    for (Block *successor : start->getSuccessors()) {
+      if (visited.find(successor) == visited.end()) {
+        dfsAllPaths(successor, end, path, visited, allPaths);
+      }
+    }
+  }
+
+  path.pop_back();
+  visited.erase(start);
+}
+
+// Gets all the paths from a start block to and end block
+std::vector<std::vector<Block *>> findAllPaths(Block *start, Block *end) {
+  std::vector<std::vector<Block *>> allPaths;
+  std::vector<Block *> path;
+  std::unordered_set<Block *> visited;
+  dfsAllPaths(start, end, path, visited, allPaths);
+  return allPaths;
+}
+
+BoolExpression *pathToMinterm(const std::vector<Block *> &path) {
+  BoolExpression *exp = BoolExpression::parseSop("1");
+  for (unsigned i = 0; i < path.size() - 1; i++) {
+    Block *prod = path.at(i);
+    Block *cons = path.at(i + 1);
+    Operation *producerTerminator = prod->getTerminator();
+    auto condOp = dyn_cast<cf::CondBranchOp>(producerTerminator);
+    if (cons == condOp.getTrueDest()) {
+      std::string result;
+      llvm::raw_string_ostream os(result);
+      prod->printAsOperand(os);
+      std::string prodName = os.str();
+    }
+    // exp = BoolExpression::boolAnd(exp, prod.get);
+  }
+  return exp;
+}
+
+void HandshakeLowering::addMergeNonLoop(OpBuilder &builder) {
+  Block *startBlock = &region.front();
+  for (Group *consGroup : groups) {
+    Block *cons = consGroup->bb;
+    for (Group *prodGroup : consGroup->preds) {
+      Block *prod = prodGroup->bb;
+      Operation *term = prod->getTerminator();
+      auto condOp = dyn_cast<cf::CondBranchOp>(term);
+    }
+  }
+}
+
+void HandshakeLowering::addMergeLoop(OpBuilder &builder) {
+  for (Group *consGroup : groups) {
+    Block *cons = consGroup->bb;
+    for (Group *prodGroup : consGroup->preds) {
+      Block *prod = prodGroup->bb;
+      /// For every loop containing both prod and cons, insert a MERGE in the
+      /// loop header block
+      if (prod > cons) {
+        SmallVector<CFGLoop *> commonLoops = getCommonLoops(prod, cons);
+        for (CFGLoop *loop : commonLoops) {
+          /// Insert the MERGE at the beginning of the loop header with START
+          /// and the result of the producer as operands
+          Block *loopHeader = loop->getHeader();
+          builder.setInsertionPointToStart(loopHeader);
+          SmallVector<Value> operands;
+          operands.push_back(startCtrl);
+
+          /// Either add the result of the LazyFork on the result of the MERGE
+          /// If the LazyFork in the producer is feeding a non-loop MERGE, then
+          /// the resultf of the MERGE is added ans an operand to the loop MERGE
+          /// Else the result of the LazyFork is added as an operand to the loop
+          /// MERGE
+          Value mergeOperand = forksGraph[prod]->getResult(0);
+          for (mlir::OpOperand &use :
+               forksGraph[prod]->getResult(0).getUses()) {
+            // Get users of the LazyFork result
+            Operation *user = use.getOwner();
+            if (isa<handshake::MergeOp>(user))
+              mergeOperand = user->getResult(0);
+          }
+          operands.push_back(mergeOperand);
+          auto mergeOp = builder.create<handshake::MergeOp>(nullptr, operands);
+
+          /// The merge becomes the producer now, so connect the result of the
+          /// MERGE as an operand of the Consumer
+          forkPreds[forksGraph[cons]].erase(mergeOperand);
+          forkPreds[forksGraph[cons]].insert(mergeOp->getResult(0));
+        }
+      }
+    }
+  }
 }
 
 //===-----------------------------------------------------------------------==//
@@ -1109,7 +1325,8 @@ struct PartialLowerRegion : public ConversionPattern {
                   ConversionPatternRewriter &rewriter) const override {
     // Dialect conversion scheme requires the matched root operation to be
     // replaced or updated if the match was successful; this ensures that
-    // happens even if the lowering function does not modify the root operation
+    // happens even if the lowering function does not modify the root
+    // operation
     rewriter.updateRootInPlace(
         op, [&] { loweringRes = fun(target.region, rewriter); });
 
@@ -1163,6 +1380,9 @@ static LogicalResult lowerRegion(HandshakeLowering &hl) {
   if (failed(runPartialLowering(hl, &HandshakeLowering::createControlNetwork)))
     return failure();
 
+  if (failed(runPartialLowering(hl, &HandshakeLowering::getLoopInfo)))
+    return failure();
+
   //===--------------------------------------------------------------------===//
   // Merges and branches instantiation
   //===--------------------------------------------------------------------===//
@@ -1182,8 +1402,8 @@ static LogicalResult lowerRegion(HandshakeLowering &hl) {
                                 memInfo)))
     return failure();
 
-  // First round of bb-tagging so that newly inserted Dynamatic memory ports get
-  // tagged with the BB they belong to (required by memory interface
+  // First round of bb-tagging so that newly inserted Dynamatic memory ports
+  // get tagged with the BB they belong to (required by memory interface
   // instantiation logic)
   if (failed(runPartialLowering(hl, &HandshakeLowering::idBasicBlocks)))
     return failure();
@@ -1192,12 +1412,10 @@ static LogicalResult lowerRegion(HandshakeLowering &hl) {
           hl, &HandshakeLowering::verifyAndCreateMemInterfaces, memInfo)))
     return failure();
 
-  if (failed(runPartialLowering(hl, &HandshakeLowering::print)))
-    return failure();
-
-  if (failed(runPartialLowering(hl, &HandshakeLowering::addSmartControlForLSQ,
-                                memInfo)))
-    return failure();
+  // if (failed(runPartialLowering(hl,
+  // &HandshakeLowering::addSmartControlForLSQ,
+  //                               memInfo)))
+  //   return failure();
 
   //===--------------------------------------------------------------------===//
   // Simple final transformations
@@ -1220,6 +1438,9 @@ static LogicalResult lowerRegion(HandshakeLowering &hl) {
   // Create return/end logic and flatten IR (delete actual basic blocks)
   //===--------------------------------------------------------------------===//
 
+  // if (failed(runPartialLowering(hl, &HandshakeLowering::print)))
+  //   return failure();
+
   return runPartialLowering(hl, &HandshakeLowering::createReturnNetwork);
 }
 
@@ -1228,8 +1449,8 @@ namespace {
 /// Converts a func-level function into a handshake-level function, without
 /// modifying the function's body. The function signature gets an extra
 /// control-only argument to represent the starting point of the control
-/// network. If the function did not return any result, a control-only result is
-/// added to signal function completion.
+/// network. If the function did not return any result, a control-only result
+/// is added to signal function completion.
 struct ConvertFuncToHandshake : OpConversionPattern<func::FuncOp> {
   using OpConversionPattern<func::FuncOp>::OpConversionPattern;
 
@@ -1255,7 +1476,8 @@ struct ConvertFuncToHandshake : OpConversionPattern<func::FuncOp> {
           attrName == funcOp.getFunctionTypeAttrName())
         continue;
 
-      // Argument names need to be augmented with the additional start argument
+      // Argument names need to be augmented with the additional start
+      // argument
       if (attrName == funcOp.getArgAttrsAttrName()) {
         // Extracts the name key's value from the dictionary attribute
         // corresponding to each function's argument.

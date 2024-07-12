@@ -16,36 +16,16 @@
 
 #include "dynamatic/Analysis/NameAnalysis.h"
 #include "dynamatic/Dialect/Handshake/HandshakeInterfaces.h"
+#include "dynamatic/Dialect/Handshake/MemoryInterfaces.h"
 #include "dynamatic/Support/Backedge.h"
 #include "dynamatic/Support/DynamaticPass.h"
 #include "dynamatic/Support/LLVM.h"
 #include "mlir/Analysis/CFGLoopInfo.h"
 #include "mlir/Transforms/DialectConversion.h"
+#include "llvm/ADT/SmallVector.h"
 #include <set>
 
 namespace dynamatic {
-// Represents a memory dependeency bteween 2 blocks: the producer basic block
-// prodBb, and the consumer basic block consBb isBackward is used to indicate if
-// the producer and the consumer are in a loop
-struct ProdConsMemDep {
-  Block *prodBb;
-  Block *consBb;
-  bool isBackward;
-
-  ProdConsMemDep(Block *prod, Block *cons, bool backward)
-      : prodBb(prod), consBb(cons), isBackward(backward) {}
-};
-
-// A group represents all operations belonging to the same basic block bb
-struct Group {
-  Block *bb;
-  std::set<Group> preds;
-  std::set<Group> succs;
-
-  Group(Block *b) : bb(b) {}
-
-  bool operator<(const Group &other) const { return bb < other.bb; }
-};
 
 // Structure that stores loop information of a Block.
 struct BlockLoopInfo {
@@ -183,30 +163,61 @@ public:
 
   //----------Construction of Allocation Network----------
 
-  // interfaces dataflow circuits with LSQs
-  LogicalResult addSmartControlForLSQ(ConversionPatternRewriter &rewriter,
-                                      MemInterfacesInfo &memInfo);
+  /// Interfaces dataflow circuits with LSQs
+
+  LogicalResult getLoopInfo(ConversionPatternRewriter &rewriter);
+
+  // LogicalResult addSmartControlForLSQ(ConversionPatternRewriter &rewriter,
+  //                                    MemInterfacesInfo &memInfo);
 
   bool sameLoop(Block *source, Block *dest);
 
-  // identify all the memory dependencies between the predecessors of an LSQ.
-  // This
-  // is the first step towards making memory deps explicit
-  void identifyMemDeps(SmallVector<Operation *> &operations,
+  /// Gets all the common loops between 2 blocks
+  SmallVector<mlir::CFGLoop *> getCommonLoops(Block *block1, Block *block2);
+
+  /// Identifies all the memory dependencies between the predecessors of an LSQ.
+  /// This
+  /// is the first step towards making memory deps explicit
+  void identifyMemDeps(std::vector<Operation *> &operations,
                        std::vector<ProdConsMemDep> &allMemDeps);
 
-  // build a dependence graph betweeen the groups
-  void constructGroupsGraph(const SmallVector<Operation *> &operations,
-                            std::vector<ProdConsMemDep> &allMemDeps,
-                            std::set<Group> &groups);
+  /// Builds a dependence graph betweeen the groups
+  void constructGroupsGraph(std::vector<Operation *> &operations,
+                            std::vector<ProdConsMemDep> &allMemDeps);
 
-  LogicalResult print(ConversionPatternRewriter &rewriter);
+  /// Minimizes the connections between groups based on dominance info
+  void minimizeGroupsConnections();
+
+  /// Add MERGEs in the case where the consumer might consume but the producer
+  /// not necessarily poduce (the counsumer is being fed by another producer)
+  void addMergeNonLoop(OpBuilder &builder);
+
+  /// Add MERGEs in the case where the producer BB is after the consumer BB (the
+  /// producer and the consumer are in a loop)
+  void addMergeLoop(OpBuilder &builder);
+
+  /// If a Fork operation has more than 2 operands, then it creates a join for
+  /// the operands. The result of the JOIN becomes the operand of the ForkOp
+  void insertJoins(std::set<Operation *> forks);
 
 protected:
   /// The region being lowered.
   Region &region;
   /// Start point of the control-only network
   BlockArgument startCtrl;
+
+  /// Stores the Groups graph required for the allocation network analysis
+  std::set<Group *> groups;
+
+  /// Stores the loopinfo of blocks
+  DenseMap<Block *, BlockLoopInfo> blockToLoopInfoMap;
+
+  /// Associates basic blocks of the region being lowered to their
+  /// respective control value.
+  DenseMap<Block *, Operation *> forksGraph;
+
+  /// Associates each LazyFork with its predecessors
+  DenseMap<Operation *, std::set<Value>> forkPreds;
 
   /// Inserts a merge-like operation in the IR for the block argument and
   /// returns information necessary to rewire the IR around the new operation
@@ -224,6 +235,10 @@ private:
   /// Name analysis to name new memory operations as they are created and keep
   /// reference accesses in memory dependencies consistent.
   NameAnalysis &nameAnalysis;
+
+  // Function that runs loop analysis on the funcOp Region.
+  DenseMap<Block *, BlockLoopInfo> findLoopDetails(mlir::CFGLoopInfo &li,
+                                                   Region &funcReg);
 };
 
 /// Pointer to function lowering a region using a conversion pattern rewriter.
@@ -256,10 +271,6 @@ static LogicalResult runPartialLowering(
 #include "dynamatic/Conversion/Passes.h.inc"
 
 std::unique_ptr<dynamatic::DynamaticPass> createCfToHandshake();
-
-// Function that runs loop analysis on the funcOp Region.
-DenseMap<Block *, BlockLoopInfo> findLoopDetails(mlir::CFGLoopInfo &li,
-                                                 Region &funcReg);
 
 } // namespace dynamatic
 

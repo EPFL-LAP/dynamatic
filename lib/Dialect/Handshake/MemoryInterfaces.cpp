@@ -10,13 +10,19 @@
 //
 //===----------------------------------------------------------------------===//
 
-#include "dynamatic/Dialect/Handshake/MemoryInterfaces.h"
+#include <cstddef>
+#include <map>
+#include <utility>
+
 #include "dynamatic/Dialect/Handshake/HandshakeOps.h"
+#include "dynamatic/Dialect/Handshake/MemoryInterfaces.h"
 #include "dynamatic/Support/Attribute.h"
 #include "dynamatic/Support/Backedge.h"
 #include "dynamatic/Support/CFG.h"
 #include "mlir/Dialect/Affine/IR/AffineOps.h"
 #include "mlir/Dialect/MemRef/IR/MemRef.h"
+#include "mlir/IR/Location.h"
+#include "mlir/IR/Operation.h"
 #include "mlir/IR/Value.h"
 #include "llvm/ADT/SmallVector.h"
 #include "llvm/ADT/Twine.h"
@@ -171,6 +177,81 @@ LogicalResult MemoryInterfaceBuilder::instantiateInterfaces(
   return success();
 }
 
+LogicalResult MemoryInterfaceBuilder::instantiateInterfacesWithForks(
+    OpBuilder &builder, handshake::MemoryControllerOp &mcOp,
+    handshake::LSQOp &lsqOp, std::set<Group *> &groups,
+    DenseMap<Block *, Operation *> &forksGraph,
+    DenseMap<Operation *, std::set<Value>> &forkPreds, Value start) {
+
+  // Determine interfaces' inputs
+  InterfaceInputs inputs;
+
+  if (failed(determineInterfaceInputsWithForks(inputs, builder, groups,
+                                               forksGraph, forkPreds, start)))
+    return failure();
+  if (inputs.mcInputs.empty() && inputs.lsqInputs.empty())
+    return success();
+
+  mcOp = nullptr;
+  lsqOp = nullptr;
+
+  builder.setInsertionPointToStart(&funcOp.front());
+  Location loc = memref.getLoc();
+
+  if (!inputs.mcInputs.empty() && inputs.lsqInputs.empty()) {
+    // We only need a memory controller
+    mcOp = builder.create<handshake::MemoryControllerOp>(
+        loc, memref, inputs.mcInputs, inputs.mcBlocks, mcNumLoads);
+  } else if (inputs.mcInputs.empty() && !inputs.lsqInputs.empty()) {
+    // We only need an LSQ
+    lsqOp = builder.create<handshake::LSQOp>(loc, memref, inputs.lsqInputs,
+                                             inputs.lsqGroupSizes, lsqNumLoads);
+  } else {
+    // We need a MC and an LSQ. They need to be connected with 4 new channels
+    // so that the LSQ can forward its loads and stores to the MC. We need
+    // load address, store address, and store data channels from the LSQ to
+    // the MC and a load data channel from the MC to the LSQ
+    MemRefType memrefType = memref.getType().cast<MemRefType>();
+
+    // Create 3 backedges (load address, store address, store data) for the MC
+    // inputs that will eventually come from the LSQ.
+    BackedgeBuilder edgeBuilder(builder, loc);
+    Backedge ldAddr = edgeBuilder.get(builder.getIndexType());
+    Backedge stAddr = edgeBuilder.get(builder.getIndexType());
+    Backedge stData = edgeBuilder.get(memrefType.getElementType());
+    inputs.mcInputs.push_back(ldAddr);
+    inputs.mcInputs.push_back(stAddr);
+    inputs.mcInputs.push_back(stData);
+
+    // Create the memory controller, adding 1 to its load count so that it
+    // generates a load data result for the LSQ
+    mcOp = builder.create<handshake::MemoryControllerOp>(
+        loc, memref, inputs.mcInputs, inputs.mcBlocks, mcNumLoads + 1);
+
+    // Add the MC's load data result to the LSQ's inputs and create the LSQ,
+    // passing a flag to the builder so that it generates the necessary
+    // outputs that will go to the MC
+    inputs.lsqInputs.push_back(mcOp.getOutputs().back());
+    lsqOp = builder.create<handshake::LSQOp>(loc, mcOp, inputs.lsqInputs,
+                                             inputs.lsqGroupSizes, lsqNumLoads);
+
+    // Resolve the backedges to fully connect the MC and LSQ
+    ValueRange lsqMemResults = lsqOp.getOutputs().take_back(3);
+    ldAddr.setValue(lsqMemResults[0]);
+    stAddr.setValue(lsqMemResults[1]);
+    stData.setValue(lsqMemResults[2]);
+  }
+
+  // At this point, all load ports are missing their second operand which is the
+  // data value coming from a memory interface back to the port
+  if (mcOp)
+    addMemDataResultToLoads(mcPorts, mcOp);
+  if (lsqOp)
+    addMemDataResultToLoads(lsqPorts, lsqOp);
+
+  return success();
+}
+
 SmallVector<Value, 2>
 MemoryInterfaceBuilder::getMemResultsToInterface(Operation *memOp) {
   // For loads, address output go to memory
@@ -215,11 +296,138 @@ MemoryInterfaceBuilder::determineInterfaceInputs(InterfaceInputs &inputs,
     if (!block)
       return firstOpInGroup->emitError() << "LSQ port must belong to a BB.";
     Value groupCtrl = getCtrl(*block);
+    llvm::errs() << "HH\n";
+    llvm::errs() << groupCtrl.getDefiningOp()->getName();
+    llvm::errs() << "\n";
+    groupCtrl.getParentBlock()->printAsOperand(llvm::errs());
+    llvm::errs() << "end\n";
     if (!groupCtrl)
       return failure();
     inputs.lsqInputs.push_back(groupCtrl);
 
     // Them, add all memory port results that go the interface to the list of
+    // LSQ inputs
+    for (Operation *lsqOp : lsqGroupOps)
+      llvm::copy(getMemResultsToInterface(lsqOp),
+                 std::back_inserter(inputs.lsqInputs));
+
+    // Add the size of the group to our list
+    inputs.lsqGroupSizes.push_back(lsqGroupOps.size());
+  }
+
+  if (mcPorts.empty())
+    return success();
+
+  // The MC needs control signals from all blocks containing store ports
+  // connected to an LSQ, since these requests end up being forwarded to the MC,
+  // so we need to know the number of LSQ stores per basic block
+  DenseMap<unsigned, unsigned> lsqStoresPerBlock;
+  for (auto [_, lsqGroupOps] : lsqPorts) {
+    for (Operation *lsqOp : lsqGroupOps) {
+      if (isa<handshake::LSQStoreOp>(lsqOp)) {
+        std::optional<unsigned> block = getLogicBB(lsqOp);
+        if (!block)
+          return lsqOp->emitError() << "LSQ port must belong to a BB.";
+        ++lsqStoresPerBlock[*block];
+      }
+    }
+  }
+
+  // Inputs from blocks that have at least one direct load/store access port to
+  // the MC are added to the future MC's operands first
+  for (auto &[block, mcBlockOps] : mcPorts) {
+    // Count the total number of stores in the block, either directly connected
+    // to the MC or going through an LSQ
+    unsigned numStoresInBlock = lsqStoresPerBlock.lookup(block);
+    for (Operation *memOp : mcBlockOps) {
+      if (isa<handshake::MCStoreOp>(memOp))
+        ++numStoresInBlock;
+    }
+
+    // Blocks with at least one store need to provide a control signal fed
+    // through a constant indicating the number of stores in the block
+    if (numStoresInBlock > 0) {
+      Value blockCtrl = getCtrl(block);
+      if (!blockCtrl)
+        return failure();
+      inputs.mcInputs.push_back(
+          getMCControl(blockCtrl, numStoresInBlock, builder));
+    }
+
+    // Traverse the list of memory operations in the block once more and
+    // accumulate memory inputs coming from the block
+    for (Operation *mcOp : mcBlockOps)
+      llvm::copy(getMemResultsToInterface(mcOp),
+                 std::back_inserter(inputs.mcInputs));
+
+    inputs.mcBlocks.push_back(block);
+  }
+
+  // Control ports from blocks which do not have memory ports directly
+  // connected to the MC but from which the LSQ will forward store requests from
+  // are then added to the future MC's operands
+  for (auto &[lsqBlock, numStores] : lsqStoresPerBlock) {
+    // We only need to do something if the block has stores that have not yet
+    // been accounted for
+    if (mcPorts.contains(lsqBlock) || numStores == 0)
+      continue;
+
+    // Identically to before, blocks with stores need a cntrol signal
+    Value blockCtrl = getCtrl(lsqBlock);
+    if (!blockCtrl)
+      return failure();
+    inputs.mcInputs.push_back(getMCControl(blockCtrl, numStores, builder));
+
+    inputs.mcBlocks.push_back(lsqBlock);
+  }
+
+  return success();
+}
+
+LogicalResult MemoryInterfaceBuilder::determineInterfaceInputsWithForks(
+    InterfaceInputs &inputs, OpBuilder &builder, std::set<Group *> &groups,
+    DenseMap<Block *, Operation *> &forksGraph,
+    DenseMap<Operation *, std::set<Value>> &forkPreds, Value start) {
+
+  // Create the Fork nodes
+  for (Group *group : groups) {
+    Block *b = group->bb;
+    builder.setInsertionPointToStart(b);
+    auto forkOp =
+        builder.create<handshake::LazyForkOp>(memref.getLoc(), start, 1);
+    forksGraph[b] = forkOp;
+  }
+
+  // Create a LazyForks graph by connecting the operations if their
+  // corresponding BBs are conected in the Groups graph
+  for (Group *group : groups) {
+    std::set<Value> predecessors;
+    for (Group *pred : group->preds)
+      predecessors.insert(forksGraph[pred->bb]->getResult(0));
+    Operation *forkNode = forksGraph[group->bb];
+    forkPreds[forkNode] = predecessors;
+  }
+  /*
+    // JOIN Insertion
+    for (auto [forkNode, predecessors] : forkPreds) {
+      // Join all the results of the predecessors of the LazyFork
+      builder.setInsertionPointToStart(forkNode->getBlock());
+      auto joinOp = builder.create<handshake::JoinOp>(nullptr, predecessors);
+      // The result of the JoinOp becomes the input to the LazyFork
+      forkNode->setOperands(joinOp->getResult(0));
+    }*/
+
+  // for (auto [forkNode, predecessors] : forkPreds) {
+  //   forkNode->setOperands(predecessors);
+  // }
+
+  // Add the results of the LazyForks as inputs to the LSQ
+  for (auto [_, forkNode] : forksGraph)
+    inputs.lsqInputs.push_back(forkNode->getResult(0));
+
+  // Determine LSQ inputs
+  for (auto [group, lsqGroupOps] : lsqPorts) {
+    // Then, add all memory port results that go the interface to the list of
     // LSQ inputs
     for (Operation *lsqOp : lsqGroupOps)
       llvm::copy(getMemResultsToInterface(lsqOp),
