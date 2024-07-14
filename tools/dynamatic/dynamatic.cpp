@@ -81,6 +81,7 @@ namespace {
 struct FrontendState {
   std::string cwd;
   std::string dynamaticPath;
+  std::string polygeistPath = "-1";
   // By default, the clock period is 4 ns
   std::string targetCP = "4.0";
   std::optional<std::string> sourcePath = std::nullopt;
@@ -208,6 +209,18 @@ public:
 
   CommandResult execute(CommandArguments &args) override;
 };
+
+class SetPolygeistPath : public Command {
+public:
+  SetPolygeistPath(FrontendState &state)
+      : Command("set-polygeist-path",
+                "Sets the path to Polygeist installation directory", state) {
+    addPositionalArg({"path", "path to Polygeist installation directory"});
+  }
+
+  CommandResult execute(CommandArguments &args) override;
+};
+
 
 class SetSrc : public Command {
 public:
@@ -492,6 +505,32 @@ CommandResult SetDynamaticPath::execute(CommandArguments &args) {
   return CommandResult::SUCCESS;
 }
 
+CommandResult SetPolygeistPath::execute(CommandArguments &args) {
+  // Remove the separator at the end of the path if there is one
+  StringRef sep = sys::path::get_separator();
+  std::string polygeistPath = args.positionals.front().str();
+  if (StringRef(polygeistPath).ends_with(sep))
+    polygeistPath = polygeistPath.substr(0, polygeistPath.size() - 1);
+
+  // Check whether the path makes sense
+  if (!fs::exists(polygeistPath + sep + "llvm-project/")) {
+    llvm::outs() << ERR << "'" << polygeistPath
+                 << "' doesn't seem to point to Polygeist, expected to "
+                    "find, for example, a directory named 'llvm-project/' there.\n";
+    return CommandResult::FAIL;
+  }
+  if (!fs::exists(polygeistPath + sep + "build/bin/")) {
+    llvm::outs() << ERR
+                 << "No 'bin' directory in provided path, Polygeist doesn't "
+                    "seem to have been built.\n";
+    return CommandResult::FAIL;
+  }
+
+  state.polygeistPath = state.makeAbsolutePath(polygeistPath);
+  return CommandResult::SUCCESS;
+}
+
+
 CommandResult SetSrc::execute(CommandArguments &args) {
   std::string sourcePath = args.positionals.front().str();
   StringRef srcName = path::filename(sourcePath);
@@ -520,7 +559,7 @@ CommandResult Compile::execute(CommandArguments &args) {
   std::string script = state.getScriptsPath() + getSeparator() + "compile.sh";
   std::string buffers = args.flags.contains(SIMPLE_BUFFERS) ? "1" : "0";
 
-  return execCmd(script, state.dynamaticPath, state.getKernelDir(),
+  return execCmd(script, state.dynamaticPath, state.polygeistPath, state.getKernelDir(),
                  state.getOutputDir(), state.getKernelName(), buffers,
                  state.targetCP);
 }
@@ -642,6 +681,7 @@ int main(int argc, char **argv) {
   FrontendState state(cwd.str());
   FrontendCommands commands;
   commands.add<SetDynamaticPath>(state);
+  commands.add<SetPolygeistPath>(state);
   commands.add<SetSrc>(state);
   commands.add<SetCP>(state);
   commands.add<Compile>(state);

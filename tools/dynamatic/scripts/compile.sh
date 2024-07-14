@@ -8,14 +8,21 @@ source "$1"/tools/dynamatic/scripts/utils.sh
 
 # Script arguments
 DYNAMATIC_DIR=$1
-SRC_DIR=$2
-OUTPUT_DIR=$3
-KERNEL_NAME=$4
-USE_SIMPLE_BUFFERS=$5
-TARGET_CP=$6
+POLYGEIST_DIR=$2
+SRC_DIR=$3
+OUTPUT_DIR=$4
+KERNEL_NAME=$5
+USE_SIMPLE_BUFFERS=$6
+TARGET_CP=$7
 
 # Binaries used during compilation
-POLYGEIST_PATH="$DYNAMATIC_DIR/polygeist"
+# Check if POLYGEIST_DIR is null
+if [ "$POLYGEIST_DIR" == "-1" ]; then
+  POLYGEIST_PATH="$DYNAMATIC_DIR/polygeist"
+else
+  POLYGEIST_PATH="$POLYGEIST_DIR"
+  echo_info "Using Polygeist path: $POLYGEIST_PATH"
+fi
 POLYGEIST_CLANG_BIN="$DYNAMATIC_DIR/bin/cgeist"
 CLANGXX_BIN="$DYNAMATIC_DIR/bin/clang++"
 DYNAMATIC_OPT_BIN="$DYNAMATIC_DIR/bin/dynamatic-opt"
