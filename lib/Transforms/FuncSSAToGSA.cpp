@@ -17,26 +17,29 @@ struct FuncSSAToGSAPass
 
   public:
     void runOnOperation() override {
-      translate_ssa_to_gsa(getOperation());
+      translateSSAToGsa(getOperation());
     };
   public:
-    void translate_ssa_to_gsa(func::FuncOp funcOp);  // the main function of the pass
+    void translateSSAToGsa(func::FuncOp funcOp);  
   };
 }; // namespace
 
-void FuncSSAToGSAPass::translate_ssa_to_gsa(func::FuncOp funcOp) {
+void FuncSSAToGSAPass::translateSSAToGsa(func::FuncOp funcOp) {
   // instantiate the control dependence graph analysis 
   ControlDependenceAnalysis &cdg_analysis = getAnalysis<ControlDependenceAnalysis>();
 
   Region &funcReg = funcOp.getRegion();
   for (Block &block : funcReg.getBlocks()) {
     llvm::SmallVector<mlir::Block*, 4> returned_control_deps;
-    cdg_analysis.returnAllControlDeps(&block, returned_control_deps);  // given a block, it returns (by reference) all blocks it is control dependent on
+    // given a block, it returns (by reference) all blocks it is control dependent on
+    cdg_analysis.returnAllControlDeps(&block, returned_control_deps);  
   }
 
-  // uncomment this if you want to see control dependencies in terminal
+  // prints the CDG information only in debug mode
   cdg_analysis.printAllBlocksDeps(funcOp);
   cdg_analysis.printForwardBlocksDeps(funcOp);
+
+  // TODO: use the CDG analysis to create support GSA representation
 }
 
 std::unique_ptr<mlir::OperationPass<func::FuncOp>>

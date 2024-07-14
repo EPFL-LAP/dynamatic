@@ -104,5 +104,8 @@
     "random": "cpp",
     "system_error": "cpp",
     "thread": "cpp"
+  },
+  "[cpp]": {
+    "editor.defaultFormatter": "xaver.clang-format"
   }
 }
