@@ -152,12 +152,21 @@ else
     > $F_FREQUENCIES
   exit_on_fail "Failed to profile cf-level" "Profiled cf-level"
 
+  # Clock period formatted in 3 decimals
+  FULL_CLOCK=$(echo "scale=3; ${TARGET_CP} / 1" | bc -l)
+
+  # Check if TARGET_CP is actually a number
+  # The command above will not check if TARGET_CP is a number
+  echo "$TARGET_CP" | grep -qE '^[0-9]+([.][0-9]+)?$'
+  exit_on_fail "Input CP=${TARGET_CP} is illegal" \
+    "Using CP=$FULL_CLOCK for buffer placement"
+
   # Smart buffer placement
   echo_info "Running smart buffer placement"
   cd "$COMP_DIR"
   "$DYNAMATIC_OPT_BIN" "$F_HANDSHAKE_TRANSFORMED" \
     --handshake-set-buffering-properties="version=fpga20" \
-    --handshake-place-buffers="algorithm=fpl22 frequencies=$F_FREQUENCIES timing-models=$DYNAMATIC_DIR/data/components.json target-period=$TARGET_CP timeout=300 dump-logs" \
+    --handshake-place-buffers="algorithm=fpl22 frequencies=$F_FREQUENCIES timing-models=$DYNAMATIC_DIR/data/components.json target-period=$FULL_CLOCK timeout=300 dump-logs" \
     > "$F_HANDSHAKE_BUFFERED"
   exit_on_fail "Failed to place smart buffers" "Placed smart buffers"
   cd - > /dev/null

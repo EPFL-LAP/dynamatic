@@ -587,7 +587,7 @@ CommandResult Synthesize::execute(CommandArguments &args) {
       state.getScriptsPath() + getSeparator() + "synthesize.sh";
 
   return execCmd(script, state.dynamaticPath, state.getOutputDir(),
-                 state.getKernelName());
+                 state.getKernelName(), state.targetCP);
 }
 
 static StringRef removeComment(StringRef input) {
