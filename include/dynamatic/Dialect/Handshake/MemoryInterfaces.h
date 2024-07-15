@@ -141,7 +141,7 @@ public:
       OpBuilder &builder, handshake::MemoryControllerOp &mcOp,
       handshake::LSQOp &lsqOp, std::set<Group *> &groups,
       DenseMap<Block *, Operation *> &forksGraph,
-      DenseMap<Operation *, std::set<Value>> &forkPreds, Value start);
+      DenseMap<Operation *, SmallVector<Value>> &forkPreds, Value start);
 
   /// Returns results of load/store-like operations which are to be given as
   /// operands to a memory interface.
@@ -204,7 +204,7 @@ private:
   LogicalResult determineInterfaceInputsWithForks(
       InterfaceInputs &inputs, OpBuilder &builder, std::set<Group *> &groups,
       DenseMap<Block *, Operation *> &forksGraphs,
-      DenseMap<Operation *, std::set<Value>> &forkPreds, Value start);
+      DenseMap<Operation *, SmallVector<Value>> &forkPreds, Value start);
 
   /// Returns the control signal for a specific block, as contained in the
   /// `ctrlVals` map. Produces an error on stderr and returns nullptr if no

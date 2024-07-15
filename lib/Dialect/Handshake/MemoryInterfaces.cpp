@@ -181,7 +181,7 @@ LogicalResult MemoryInterfaceBuilder::instantiateInterfacesWithForks(
     OpBuilder &builder, handshake::MemoryControllerOp &mcOp,
     handshake::LSQOp &lsqOp, std::set<Group *> &groups,
     DenseMap<Block *, Operation *> &forksGraph,
-    DenseMap<Operation *, std::set<Value>> &forkPreds, Value start) {
+    DenseMap<Operation *, SmallVector<Value>> &forkPreds, Value start) {
 
   // Determine interfaces' inputs
   InterfaceInputs inputs;
@@ -387,7 +387,7 @@ MemoryInterfaceBuilder::determineInterfaceInputs(InterfaceInputs &inputs,
 LogicalResult MemoryInterfaceBuilder::determineInterfaceInputsWithForks(
     InterfaceInputs &inputs, OpBuilder &builder, std::set<Group *> &groups,
     DenseMap<Block *, Operation *> &forksGraph,
-    DenseMap<Operation *, std::set<Value>> &forkPreds, Value start) {
+    DenseMap<Operation *, SmallVector<Value>> &forkPreds, Value start) {
 
   // Create the Fork nodes
   for (Group *group : groups) {
@@ -401,25 +401,12 @@ LogicalResult MemoryInterfaceBuilder::determineInterfaceInputsWithForks(
   // Create a LazyForks graph by connecting the operations if their
   // corresponding BBs are conected in the Groups graph
   for (Group *group : groups) {
-    std::set<Value> predecessors;
+    SmallVector<Value> predecessors;
     for (Group *pred : group->preds)
-      predecessors.insert(forksGraph[pred->bb]->getResult(0));
+      predecessors.push_back(forksGraph[pred->bb]->getResult(0));
     Operation *forkNode = forksGraph[group->bb];
     forkPreds[forkNode] = predecessors;
   }
-  /*
-    // JOIN Insertion
-    for (auto [forkNode, predecessors] : forkPreds) {
-      // Join all the results of the predecessors of the LazyFork
-      builder.setInsertionPointToStart(forkNode->getBlock());
-      auto joinOp = builder.create<handshake::JoinOp>(nullptr, predecessors);
-      // The result of the JoinOp becomes the input to the LazyFork
-      forkNode->setOperands(joinOp->getResult(0));
-    }*/
-
-  // for (auto [forkNode, predecessors] : forkPreds) {
-  //   forkNode->setOperands(predecessors);
-  // }
 
   // Add the results of the LazyForks as inputs to the LSQ
   for (auto [_, forkNode] : forksGraph)

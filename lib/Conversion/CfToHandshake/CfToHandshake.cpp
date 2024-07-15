@@ -42,6 +42,7 @@
 #include "mlir/Transforms/DialectConversion.h"
 #include "mlir/Transforms/GreedyPatternRewriteDriver.h"
 #include "llvm/ADT/SmallVector.h"
+#include "llvm/ADT/StringRef.h"
 #include "llvm/ADT/TypeSwitch.h"
 #include "llvm/Support/Casting.h"
 #include "llvm/Support/raw_ostream.h"
@@ -694,18 +695,38 @@ LogicalResult HandshakeLowering::verifyAndCreateMemInterfaces(
     std::vector<ProdConsMemDep> allMemDeps;
     identifyMemDeps(allOperations, allMemDeps);
 
-    constructGroupsGraph(allOperations, allMemDeps);
+    /// Stores the Groups graph required for the allocation network analysis
+    std::set<Group *> groups;
+    constructGroupsGraph(allOperations, allMemDeps, groups);
 
-    minimizeGroupsConnections();
+    minimizeGroupsConnections(groups);
 
     // Build the memory interfaces
     handshake::MemoryControllerOp mcOp;
     handshake::LSQOp lsqOp;
+    // if (failed(memBuilder.instantiateInterfaces(rewriter, mcOp, lsqOp)))
+    //   return failure();
+
+    /// Associates basic blocks of the region being lowered to their
+    /// respective control value.
+    DenseMap<Block *, Operation *> forksGraph;
+
+    /// Associates each LazyFork with its predecessors
+    DenseMap<Operation *, SmallVector<Value>> forkPreds;
+
     if (failed(memBuilder.instantiateInterfacesWithForks(
             rewriter, mcOp, lsqOp, groups, forksGraph, forkPreds, startCtrl)))
       return failure();
 
-    addMergeLoop(rewriter);
+    if (failed(addMergeNonLoop(rewriter, allMemDeps, groups, forksGraph,
+                               forkPreds)))
+      return failure();
+
+    if (failed(addMergeLoop(rewriter, groups, forksGraph, forkPreds)))
+      return failure();
+
+    if (failed(joinInsertion(rewriter, forksGraph, forkPreds)))
+      return failure();
   }
 
   return success();
@@ -1079,7 +1100,7 @@ void HandshakeLowering::identifyMemDeps(
 
 void HandshakeLowering::constructGroupsGraph(
     std::vector<Operation *> &operations,
-    std::vector<ProdConsMemDep> &allMemDeps) {
+    std::vector<ProdConsMemDep> &allMemDeps, std::set<Group *> &groups) {
   // llvm::errs() << "In construct graph\n";
   //  loop over the preds of the LSQ that are memory operations,
   //  create a Group object for each of them with the BB of the operation
@@ -1115,7 +1136,7 @@ void HandshakeLowering::constructGroupsGraph(
   }
 }
 
-void HandshakeLowering::minimizeGroupsConnections() {
+void HandshakeLowering::minimizeGroupsConnections(std::set<Group *> &groups) {
   /// Get the dominance info for the region
   DominanceInfo domInfo;
 
@@ -1208,6 +1229,16 @@ std::vector<std::vector<Block *>> findAllPaths(Block *start, Block *end) {
   return allPaths;
 }
 
+// Gets the condition name of a blcok (^bb0 -> c0)
+std::string getBlockCondition(Block *block) {
+  std::string result;
+  llvm::raw_string_ostream os(result);
+  block->printAsOperand(os);
+  std::string blockName = os.str();
+  std::string blockCondition = "c" + blockName.substr(3);
+  return blockCondition;
+}
+
 BoolExpression *pathToMinterm(const std::vector<Block *> &path) {
   BoolExpression *exp = BoolExpression::parseSop("1");
   for (unsigned i = 0; i < path.size() - 1; i++) {
@@ -1215,30 +1246,85 @@ BoolExpression *pathToMinterm(const std::vector<Block *> &path) {
     Block *cons = path.at(i + 1);
     Operation *producerTerminator = prod->getTerminator();
     auto condOp = dyn_cast<cf::CondBranchOp>(producerTerminator);
-    if (cons == condOp.getTrueDest()) {
-      std::string result;
-      llvm::raw_string_ostream os(result);
-      prod->printAsOperand(os);
-      std::string prodName = os.str();
+    BoolExpression *prodCondition =
+        BoolExpression::parseSop(getBlockCondition(prod));
+    // If the following BB is on the FALSE side of the current BB, then negate
+    // the condition of the current BB
+    if (cons == condOp.getFalseDest()) {
+      prodCondition = prodCondition->boolNegate();
     }
-    // exp = BoolExpression::boolAnd(exp, prod.get);
+    exp = BoolExpression::boolAnd(exp, prodCondition);
   }
   return exp;
 }
 
-void HandshakeLowering::addMergeNonLoop(OpBuilder &builder) {
-  Block *startBlock = &region.front();
-  for (Group *consGroup : groups) {
-    Block *cons = consGroup->bb;
-    for (Group *prodGroup : consGroup->preds) {
-      Block *prod = prodGroup->bb;
-      Operation *term = prod->getTerminator();
-      auto condOp = dyn_cast<cf::CondBranchOp>(term);
-    }
+// Enmerates all paths from the start Block to the end Block in the CFG and
+// returns a SOP
+BoolExpression *enumeratePaths(Block *start, Block *end) {
+  BoolExpression *sop = BoolExpression::parseSop("0");
+  std::vector<std::vector<Block *>> allPaths = findAllPaths(start, end);
+  for (const std::vector<Block *> &path : allPaths) {
+    BoolExpression *minterm = pathToMinterm(path);
+    sop = BoolExpression::boolOr(sop, minterm);
   }
+  return sop->boolMinimize();
 }
 
-void HandshakeLowering::addMergeLoop(OpBuilder &builder) {
+LogicalResult HandshakeLowering::addMergeNonLoop(
+    OpBuilder &builder, std::vector<ProdConsMemDep> &allMemDeps,
+    std::set<Group *> &groups, DenseMap<Block *, Operation *> &forksGraph,
+    DenseMap<Operation *, SmallVector<Value>> &forkPreds) {
+  Block *entryBlock = &region.front();
+  for (Group *prodGroup : groups) {
+    Block *prod = prodGroup->bb;
+    BoolExpression *fProd = enumeratePaths(entryBlock, prod);
+    for (Group *consGroup : prodGroup->succs) {
+      Block *cons = consGroup->bb;
+      BoolExpression *fCons = enumeratePaths(entryBlock, cons);
+      BoolExpression *fGen =
+          BoolExpression::boolAnd(fCons, fProd->boolNegate());
+      fGen = fGen->boolMinimize();
+      if (fGen != BoolExpression::parseSop("0")) {
+        auto memDepIt =
+            std::find_if(allMemDeps.begin(), allMemDeps.end(),
+                         [prod, cons](const ProdConsMemDep &dep) {
+                           return dep.prodBb == prod && dep.consBb == cons;
+                         });
+        if (memDepIt == allMemDeps.end())
+          return failure();
+        ProdConsMemDep &memDep = *memDepIt;
+        if (memDep.isBackward)
+          builder.setInsertionPointToStart(prod);
+        else
+          builder.setInsertionPointToStart(cons);
+        SmallVector<Value> mergeOperands;
+        mergeOperands.push_back(startCtrl);
+        mergeOperands.push_back(forksGraph[prod]->getResult(0));
+        auto mergeOp =
+            builder.create<handshake::MergeOp>(nullptr, mergeOperands);
+
+        /// The merge becomes the producer now, so connect the result of the
+        /// MERGE as an operand of the Consumer
+        auto newEnd = std::remove(forkPreds[forksGraph[cons]].begin(),
+                                  forkPreds[forksGraph[cons]].end(),
+                                  forksGraph[prod]->getResult(0));
+
+        // Reove the old connection between the producer's LazyFork and the
+        // consumer's LazyFork
+        forkPreds[forksGraph[cons]].erase(newEnd,
+                                          forkPreds[forksGraph[cons]].end());
+        // Connect the MERGE to the consumer's LazyFork
+        forkPreds[forksGraph[cons]].push_back(mergeOp->getResult(0));
+      }
+    }
+  }
+  return success();
+}
+
+LogicalResult HandshakeLowering::addMergeLoop(
+    OpBuilder &builder, std::set<Group *> &groups,
+    DenseMap<Block *, Operation *> &forksGraph,
+    DenseMap<Operation *, SmallVector<Value>> &forkPreds) {
   for (Group *consGroup : groups) {
     Block *cons = consGroup->bb;
     for (Group *prodGroup : consGroup->preds) {
@@ -1273,12 +1359,40 @@ void HandshakeLowering::addMergeLoop(OpBuilder &builder) {
 
           /// The merge becomes the producer now, so connect the result of the
           /// MERGE as an operand of the Consumer
-          forkPreds[forksGraph[cons]].erase(mergeOperand);
-          forkPreds[forksGraph[cons]].insert(mergeOp->getResult(0));
+          auto newEnd =
+              std::remove(forkPreds[forksGraph[cons]].begin(),
+                          forkPreds[forksGraph[cons]].end(), mergeOperand);
+
+          // Reove the old connection between the producer's LazyFork and the
+          // consumer's LazyFork
+          forkPreds[forksGraph[cons]].erase(newEnd,
+                                            forkPreds[forksGraph[cons]].end());
+          // Connect the MERGE to the consumer's LazyFork
+          forkPreds[forksGraph[cons]].push_back(mergeOp->getResult(0));
         }
       }
     }
   }
+  return success();
+}
+
+LogicalResult HandshakeLowering::joinInsertion(
+    OpBuilder &builder, DenseMap<Block *, Operation *> &forksGraph,
+    DenseMap<Operation *, SmallVector<Value>> &forkPreds) {
+  for (auto [forkNode, predecessors] : forkPreds) {
+    if (predecessors.size() > 0) {
+      if (predecessors.size() == 1)
+        forkNode->setOperands(*predecessors.begin());
+      else {
+        /// Join all the results of the predecessors of the LazyFork
+        builder.setInsertionPointToStart(forkNode->getBlock());
+        auto joinOp = builder.create<handshake::JoinOp>(nullptr, predecessors);
+        /// The result of the JoinOp becomes the input to the LazyFork
+        forkNode->setOperands(joinOp->getResult(0));
+      }
+    }
+  }
+  return success();
 }
 
 //===-----------------------------------------------------------------------==//

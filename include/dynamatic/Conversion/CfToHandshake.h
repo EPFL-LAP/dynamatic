@@ -183,18 +183,31 @@ public:
 
   /// Builds a dependence graph betweeen the groups
   void constructGroupsGraph(std::vector<Operation *> &operations,
-                            std::vector<ProdConsMemDep> &allMemDeps);
+                            std::vector<ProdConsMemDep> &allMemDeps,
+                            std::set<Group *> &groups);
 
   /// Minimizes the connections between groups based on dominance info
-  void minimizeGroupsConnections();
+  void minimizeGroupsConnections(std::set<Group *> &groups);
 
   /// Add MERGEs in the case where the consumer might consume but the producer
   /// not necessarily poduce (the counsumer is being fed by another producer)
-  void addMergeNonLoop(OpBuilder &builder);
+  LogicalResult
+  addMergeNonLoop(OpBuilder &builder, std::vector<ProdConsMemDep> &allMemDeps,
+                  std::set<Group *> &groups,
+                  DenseMap<Block *, Operation *> &forksGraph,
+                  DenseMap<Operation *, SmallVector<Value>> &forkPreds);
 
   /// Add MERGEs in the case where the producer BB is after the consumer BB (the
   /// producer and the consumer are in a loop)
-  void addMergeLoop(OpBuilder &builder);
+  LogicalResult
+  addMergeLoop(OpBuilder &builder, std::set<Group *> &groups,
+               DenseMap<Block *, Operation *> &forksGraph,
+               DenseMap<Operation *, SmallVector<Value>> &forkPreds);
+
+  /// Join all the operands of the LazyForks
+  LogicalResult
+  joinInsertion(OpBuilder &builder, DenseMap<Block *, Operation *> &forksGraph,
+                DenseMap<Operation *, SmallVector<Value>> &forkPreds);
 
   /// If a Fork operation has more than 2 operands, then it creates a join for
   /// the operands. The result of the JOIN becomes the operand of the ForkOp
@@ -206,18 +219,8 @@ protected:
   /// Start point of the control-only network
   BlockArgument startCtrl;
 
-  /// Stores the Groups graph required for the allocation network analysis
-  std::set<Group *> groups;
-
   /// Stores the loopinfo of blocks
   DenseMap<Block *, BlockLoopInfo> blockToLoopInfoMap;
-
-  /// Associates basic blocks of the region being lowered to their
-  /// respective control value.
-  DenseMap<Block *, Operation *> forksGraph;
-
-  /// Associates each LazyFork with its predecessors
-  DenseMap<Operation *, std::set<Value>> forkPreds;
 
   /// Inserts a merge-like operation in the IR for the block argument and
   /// returns information necessary to rewire the IR around the new operation
