@@ -2162,5 +2162,35 @@ LogicalResult ReshapeOp::verify() {
   return success();
 }
 
+//===----------------------------------------------------------------------===//
+// CmpFOp
+//===----------------------------------------------------------------------===//
+
+LogicalResult
+CmpFOp::inferReturnTypes(MLIRContext *context, std::optional<Location> location,
+                         ValueRange operands, DictionaryAttr attributes,
+                         mlir::OpaqueProperties properties,
+                         mlir::RegionRange regions,
+                         SmallVectorImpl<mlir::Type> &inferredReturnTypes) {
+  OpBuilder builder(context);
+  inferredReturnTypes.push_back(ChannelType::get(builder.getIntegerType(1)));
+  return success();
+}
+
+//===----------------------------------------------------------------------===//
+// CmpIOp
+//===----------------------------------------------------------------------===//
+
+LogicalResult
+CmpIOp::inferReturnTypes(MLIRContext *context, std::optional<Location> location,
+                         ValueRange operands, DictionaryAttr attributes,
+                         mlir::OpaqueProperties properties,
+                         mlir::RegionRange regions,
+                         SmallVectorImpl<mlir::Type> &inferredReturnTypes) {
+  OpBuilder builder(context);
+  inferredReturnTypes.push_back(ChannelType::get(builder.getIntegerType(1)));
+  return success();
+}
+
 #define GET_OP_CLASSES
 #include "dynamatic/Dialect/Handshake/Handshake.cpp.inc"

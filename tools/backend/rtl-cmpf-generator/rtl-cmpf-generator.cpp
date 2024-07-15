@@ -45,33 +45,33 @@ static cl::opt<std::string>
 static StringRef getComparator(arith::CmpFPredicate pred) {
   switch (pred) {
   case arith::CmpFPredicate::OEQ:
-    return "00001";
+    return "OEQ";
   case arith::CmpFPredicate::OGT:
-    return "00010";
+    return "OGT";
   case arith::CmpFPredicate::OGE:
-    return "00011";
+    return "OGE";
   case arith::CmpFPredicate::OLT:
-    return "00100";
+    return "OLT";
   case arith::CmpFPredicate::OLE:
-    return "00101";
+    return "OLE";
   case arith::CmpFPredicate::ONE:
-    return "00110";
+    return "ONE";
   case arith::CmpFPredicate::ORD:
-    return "00111";
+    return "ORD";
   case arith::CmpFPredicate::UEQ:
-    return "01000";
+    return "UEQ";
   case arith::CmpFPredicate::UGT:
-    return "01001";
+    return "UGT";
   case arith::CmpFPredicate::UGE:
-    return "01010";
+    return "UGE";
   case arith::CmpFPredicate::ULT:
-    return "01011";
+    return "ULT";
   case arith::CmpFPredicate::ULE:
-    return "01100";
+    return "ULE";
   case arith::CmpFPredicate::UNE:
-    return "01101";
+    return "UNE";
   case arith::CmpFPredicate::UNO:
-    return "01110";
+    return "UNO";
   default:
     return "";
   }
