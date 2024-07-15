@@ -159,13 +159,13 @@ else
     > $F_FREQUENCIES
   exit_on_fail "Failed to profile cf-level" "Profiled cf-level"
 
-  # Clock period formatted in 3 decimals
-  FULL_CLOCK=$(echo "scale=3; ${TARGET_CP} / 1" | bc -l)
+  # Clock period formatted in 3 decimal places
+  FULL_CLOCK=$(echo "scale=3; $TARGET_CP / 1" | bc -l)
 
   # Check if TARGET_CP is actually a number
   # The command above will not check if TARGET_CP is a number
   echo "$TARGET_CP" | grep -qE '^[0-9]+([.][0-9]+)?$'
-  exit_on_fail "Input CP=${TARGET_CP} is illegal" \
+  exit_on_fail "Input CP=$TARGET_CP is illegal" \
     "Using CP=$FULL_CLOCK for buffer placement"
 
   # Smart buffer placement
