@@ -15,4 +15,6 @@ add_dynamatic_library(DynamaticCfToHandshake
   MLIRSupport
   MLIRTransforms
   MLIRAffineToStandard
+  DynamaticExperimentalSupportBooleanLogic
+  DynamaticSupportEspresso
   )

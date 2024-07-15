@@ -66,16 +66,27 @@ struct BoolExpression {
   /// Retrieve all the variables inside a BoolExpression
   std::set<std::string> getVariables();
 
+  //---------Generating Truth Table For any Boolean Expression-----------
+
+  /// EValuates a Boolean Expression baed on a cerain setting on the variables
+  bool evaluate(std::map<std::string, bool> row);
+
+  /// Generates the truth table for any BooleanExpression by evaluating each
+  /// row in it
+  std::vector<std::tuple<std::map<std::string, bool>, bool>>
+  generateTruthTable();
+
   //---------Generating Truth Table based on Mintems (SOP Only)-----------
 
-  /// Generates the minterms based n the variables
+  /// Generates the minterms based on the variables
   /// 'd': don't care, 'n':null/void
-  /// If a variable is a don't care: it should be set to 0 if it's negated and
-  /// to 1 if it's non-negeated (for the minterm to be 1) If a variable is set
-  /// to 0: if it's present in non-negated form in the minterm, then the minterm
-  /// requires the variable to be both 0 and 1 for it to evaluate to 1, hence
-  /// the minterm is void (no setting of the values gives a 1) Similarly if a
-  /// variable is set to 1 and is present in negated form in the minterm
+  /// If a variable is a don't care: it should be set to 0 if it's negated
+  /// and to 1 if it's non-negeated (for the minterm to be 1) If a variable
+  /// is set to 0: if it's present in non-negated form in the minterm, then
+  /// the minterm requires the variable to be both 0 and 1 for it to
+  /// evaluate to 1, hence the minterm is void (no setting of the values
+  /// gives a 1) Similarly if a variable is set to 1 and is present in
+  /// negated form in the minterm
   void generateMintermVariable(std::string &s,
                                std::map<llvm::StringRef, int> varIndex);
 
@@ -88,9 +99,9 @@ struct BoolExpression {
                           const std::map<llvm::StringRef, int> &varIndex,
                           std::set<std::string> &minterms);
 
-  /// Generates the truth table for a BoolExpression based on the
+  /// Generates the truth table for a SOP based on the
   /// minterms generated in generateMinterms
-  std::set<std::string> generateTruthTable();
+  std::set<std::string> generateTruthTableSop();
 
   //--------------Library Helper Functions--------------
 
@@ -101,6 +112,9 @@ struct BoolExpression {
   /// Runs espresso logic minimzer on a BoolExpression
   std::string runEspresso();
 
+  /// Runs espresso logic minimzer on a BoolExpression
+  std::string runEspressoSop();
+
   //--------------Library APIs--------------
 
   /// Converts String to BoolExpression
@@ -110,6 +124,14 @@ struct BoolExpression {
 
   /// Converts BoolExpression to String
   std::string sopToString();
+
+  /// Creates an expression of a Zero
+  /// Returns a dynamically-allocated variable
+  static BoolExpression *boolZero();
+
+  /// Creates an expression of a One
+  /// Returns a dynamically-allocated variable
+  static BoolExpression *boolOne();
 
   /// Creates an expression of a single variable
   /// Returns a dynamically-allocated variable
@@ -128,6 +150,9 @@ struct BoolExpression {
 
   /// Minimize an expression based on the espresso logic minimizer algorithm
   BoolExpression *boolMinimize();
+
+  /// Minimize a SOP based on the espresso logic minimizer algorithm
+  BoolExpression *boolMinimizeSop();
 
 private:
   // recursive helper for getVariables()
