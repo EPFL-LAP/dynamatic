@@ -81,7 +81,7 @@ namespace {
 struct FrontendState {
   std::string cwd;
   std::string dynamaticPath;
-  std::string polygeistPath = "-1";
+  std::string polygeistPath;
   // By default, the clock period is 4 ns
   std::string targetCP = "4.0";
   std::optional<std::string> sourcePath = std::nullopt;
@@ -559,9 +559,9 @@ CommandResult Compile::execute(CommandArguments &args) {
   std::string script = state.getScriptsPath() + getSeparator() + "compile.sh";
   std::string buffers = args.flags.contains(SIMPLE_BUFFERS) ? "1" : "0";
 
-  return execCmd(script, state.dynamaticPath, state.polygeistPath, state.getKernelDir(),
+  return execCmd(script, state.dynamaticPath, state.getKernelDir(),
                  state.getOutputDir(), state.getKernelName(), buffers,
-                 state.targetCP);
+                 state.targetCP, state.polygeistPath);
 }
 
 CommandResult WriteHDL::execute(CommandArguments &args) {

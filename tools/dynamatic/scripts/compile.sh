@@ -8,16 +8,16 @@ source "$1"/tools/dynamatic/scripts/utils.sh
 
 # Script arguments
 DYNAMATIC_DIR=$1
-POLYGEIST_DIR=$2
-SRC_DIR=$3
-OUTPUT_DIR=$4
-KERNEL_NAME=$5
-USE_SIMPLE_BUFFERS=$6
-TARGET_CP=$7
+SRC_DIR=$2
+OUTPUT_DIR=$3
+KERNEL_NAME=$4
+USE_SIMPLE_BUFFERS=$5
+TARGET_CP=$6
+POLYGEIST_DIR=$7
 
 # Binaries used during compilation
 # Check if POLYGEIST_DIR is null
-if [ "$POLYGEIST_DIR" == "-1" ]; then
+if [ -z "$POLYGEIST_DIR" ]; then
   POLYGEIST_PATH="$DYNAMATIC_DIR/polygeist"
 else
   POLYGEIST_PATH="$POLYGEIST_DIR"
