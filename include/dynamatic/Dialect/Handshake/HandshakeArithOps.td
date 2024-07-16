@@ -172,7 +172,7 @@ def Handshake_NegFOp : Handshake_Arith_FloatUnaryOp<"negf"> {
   let summary = "Floating-point sign negation.";
 }
 
-def Handshake_OrIOp : Handshake_Arith_IntBinaryOp<"muli", [Commutative]> {
+def Handshake_OrIOp : Handshake_Arith_IntBinaryOp<"ori", [Commutative]> {
   let summary = "Bitwise union.";
 }
 
