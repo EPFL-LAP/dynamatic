@@ -28,6 +28,7 @@
 #include "mlir/Support/LLVM.h"
 #include "mlir/Support/LogicalResult.h"
 #include "llvm/ADT/SmallVector.h"
+#include "llvm/ADT/StringExtras.h"
 #include "llvm/ADT/StringRef.h"
 #include "llvm/Support/CommandLine.h"
 #include "llvm/Support/FileSystem.h"
@@ -35,9 +36,11 @@
 #include "llvm/Support/Path.h"
 #include "llvm/Support/raw_ostream.h"
 #include <algorithm>
+#include <cstddef>
 #include <cstdio>
 #include <cstdlib>
 #include <fstream>
+#include <iomanip>
 #include <memory>
 #include <readline/history.h>
 #include <readline/readline.h>
@@ -76,6 +79,12 @@ static CommandResult execCmd(Tokens... tokens) {
   return exec({tokens...}) != 0 ? CommandResult::FAIL : CommandResult::SUCCESS;
 }
 
+std::string floatToString(double f, size_t nDecimalPlaces) {
+  std::stringstream ss;
+  ss << std::fixed << std::setprecision(nDecimalPlaces) << f;
+  return ss.str();
+}
+
 namespace {
 
 struct FrontendState {
@@ -83,7 +92,7 @@ struct FrontendState {
   std::string dynamaticPath;
   std::string polygeistPath;
   // By default, the clock period is 4 ns
-  std::string targetCP = "4.0";
+  double targetCP = 4.0;
   std::optional<std::string> sourcePath = std::nullopt;
 
   FrontendState(StringRef cwd) : cwd(cwd), dynamaticPath(cwd){};
@@ -220,7 +229,6 @@ public:
 
   CommandResult execute(CommandArguments &args) override;
 };
-
 
 class SetSrc : public Command {
 public:
@@ -514,9 +522,10 @@ CommandResult SetPolygeistPath::execute(CommandArguments &args) {
 
   // Check whether the path makes sense
   if (!fs::exists(polygeistPath + sep + "llvm-project/")) {
-    llvm::outs() << ERR << "'" << polygeistPath
-                 << "' doesn't seem to point to Polygeist, expected to "
-                    "find, for example, a directory named 'llvm-project/' there.\n";
+    llvm::outs()
+        << ERR << "'" << polygeistPath
+        << "' doesn't seem to point to Polygeist, expected to "
+           "find, for example, a directory named 'llvm-project/' there.\n";
     return CommandResult::FAIL;
   }
   if (!fs::exists(polygeistPath + sep + "build/bin/")) {
@@ -529,7 +538,6 @@ CommandResult SetPolygeistPath::execute(CommandArguments &args) {
   state.polygeistPath = state.makeAbsolutePath(polygeistPath);
   return CommandResult::SUCCESS;
 }
-
 
 CommandResult SetSrc::execute(CommandArguments &args) {
   std::string sourcePath = args.positionals.front().str();
@@ -546,9 +554,12 @@ CommandResult SetSrc::execute(CommandArguments &args) {
 }
 
 CommandResult SetCP::execute(CommandArguments &args) {
-  // Let dynamatic-opt check if the string is a legal float number
-  state.targetCP = args.positionals.front().str();
-  return CommandResult::SUCCESS;
+  // Parse the float argument and check if the argument is legal.
+  if (llvm::to_float(args.positionals.front().str(), state.targetCP))
+    return CommandResult::SUCCESS;
+  llvm::outs() << ERR << "Specified CP = " << args.positionals.front().str()
+               << " is illegal.\n";
+  return CommandResult::FAIL;
 }
 
 CommandResult Compile::execute(CommandArguments &args) {
@@ -559,9 +570,11 @@ CommandResult Compile::execute(CommandArguments &args) {
   std::string script = state.getScriptsPath() + getSeparator() + "compile.sh";
   std::string buffers = args.flags.contains(SIMPLE_BUFFERS) ? "1" : "0";
 
+  llvm::outs() << ERR << "CP = " << floatToString(state.targetCP, 3) << "\n";
+
   return execCmd(script, state.dynamaticPath, state.getKernelDir(),
                  state.getOutputDir(), state.getKernelName(), buffers,
-                 state.targetCP, state.polygeistPath);
+                 floatToString(state.targetCP, 3), state.polygeistPath);
 }
 
 CommandResult WriteHDL::execute(CommandArguments &args) {
@@ -626,7 +639,8 @@ CommandResult Synthesize::execute(CommandArguments &args) {
       state.getScriptsPath() + getSeparator() + "synthesize.sh";
 
   return execCmd(script, state.dynamaticPath, state.getOutputDir(),
-                 state.getKernelName());
+                 state.getKernelName(), floatToString(state.targetCP, 3),
+                 floatToString(state.targetCP / 2, 3));
 }
 
 static StringRef removeComment(StringRef input) {
