@@ -10,17 +10,8 @@ source "$1"/tools/dynamatic/scripts/utils.sh
 DYNAMATIC_DIR=$1
 OUTPUT_DIR=$2
 KERNEL_NAME=$3
-TARGET_CP=$4
-
-# Calculate CP in 3 decimal places
-FULL_CLOCK=$(echo "scale=3; $TARGET_CP / 1" | bc -l)
-HALF_CLOCK=$(echo "scale=3; $TARGET_CP / 2" | bc -l)
-
-# Check if TARGET_CP is actually a number
-# The commands above will not check if TARGET_CP is actually a number
-echo "$TARGET_CP" | grep -qE '^[0-9]+([.][0-9]+)?$'
-exit_on_fail "Input CP=$TARGET_CP is illegal" \
-  "Using CP=$FULL_CLOCK for Vivado synthesis"
+FULL_CLOCK=$4
+HALF_CLOCK=$5
 
 # Generated directories/files
 SYNTH_DIR="$OUTPUT_DIR/synth"
