@@ -569,9 +569,6 @@ CommandResult Compile::execute(CommandArguments &args) {
 
   std::string script = state.getScriptsPath() + getSeparator() + "compile.sh";
   std::string buffers = args.flags.contains(SIMPLE_BUFFERS) ? "1" : "0";
-
-  llvm::outs() << ERR << "CP = " << floatToString(state.targetCP, 3) << "\n";
-
   return execCmd(script, state.dynamaticPath, state.getKernelDir(),
                  state.getOutputDir(), state.getKernelName(), buffers,
                  floatToString(state.targetCP, 3), state.polygeistPath);
