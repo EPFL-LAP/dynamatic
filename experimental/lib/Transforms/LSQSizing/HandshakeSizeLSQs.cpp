@@ -46,6 +46,7 @@ struct HandshakeSizeLSQsPass
 
 private:
 
+  std::map<unsigned,buffer::CFDFC> cfdfcs;
   llvm::SmallVector<LSQSizingResult> sizing_results; //TODO datatype?
   LSQSizingResult sizeLSQsForCFDFC(buffer::CFDFC cfdfc, unsigned II, TimingDatabase timingDB);
 
@@ -92,13 +93,18 @@ void HandshakeSizeLSQsPass::runDynamaticPass() {
         arch_set.insert(&arch);
       }
 
-      buffer::CFDFC cfdfc = buffer::CFDFC(funcOp, arch_set, 0);
-      unsigned II = troughput_attribute[entry.first];
-      sizing_results.push_back(sizeLSQsForCFDFC(cfdfc, II, timingDB));
+      cfdfcs.insert_or_assign(entry.first, buffer::CFDFC(funcOp, arch_set, 0));
+    }
+
+    //TODO create adjacent list
+
+    for(auto &cfdfc : cfdfcs) {
+      unsigned II = troughput_attribute[cfdfc.first];
+      sizing_results.push_back(sizeLSQsForCFDFC(cfdfc.second, II, timingDB));
     }
     
-    DenseMap<unsigned, unsigned> max_store_sizes;
-    DenseMap<unsigned, unsigned> max_load_sizes;
+    std::map<unsigned, unsigned> max_store_sizes;
+    std::map<unsigned, unsigned> max_load_sizes;
     for(auto &result: sizing_results) {
       for(auto &entry: result) {
         max_store_sizes[entry.first] = std::max(max_store_sizes[entry.first], std::get<1>(entry.second));
@@ -106,12 +112,18 @@ void HandshakeSizeLSQsPass::runDynamaticPass() {
       }
     }
 
-    // Add Sizing to Attributes
+    //TODO Add Sizing to Attributes
   }
 }
 
 LSQSizingResult HandshakeSizeLSQsPass::sizeLSQsForCFDFC(buffer::CFDFC cfdfc, unsigned II, TimingDatabase timingDB) {
   //TODO implement algo
+
+  // Add additional edges for Allocation preceding Memory access
+  // Add additional nodes for backededge with -II latency
+  // Build Adjacency Lists
+  // 
+
   return DenseMap<unsigned, std::tuple<unsigned, unsigned>>();
 }
 
