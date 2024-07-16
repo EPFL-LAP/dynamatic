@@ -73,20 +73,24 @@ void HandshakeSizeLSQsPass::runDynamaticPass() {
   for (handshake::FuncOp funcOp : mod.getOps<handshake::FuncOp>()) {
     llvm::dbgs() << "\t [DBG] Function: " << funcOp.getName() << "\n";
 
-    // Read Attributes
-    DenseMap<unsigned, SmallVector<unsigned>> cfdfc_attribute; // = funcOp.getCFDFCs();
-    DenseMap<unsigned, float> troughput_attribute; // = funcOp.getThroughput();      
+    // Read Attributes -> hardcoded for bicg
+    DenseMap<unsigned, SmallVector<unsigned>> cfdfc_attribute = {{0, {2}}, {1, {3, 1, 2}}}; // = funcOp.getCFDFCs();
+    DenseMap<unsigned, float> troughput_attribute = {{0, 3.333333e-01}, {1, 2.000000e-01}}; // = funcOp.getThroughput();      
     
+
     // Extract Arch sets
     for(auto &entry: cfdfc_attribute) {
       SmallVector<experimental::ArchBB> arch_store;
       auto it = entry.second.begin();
       //TODO Implement more clean?
-      int prev_bb_id = *it++;      
+      int first_bb_id = *it++;
+      int curr_bb_id, prev_bb_id = first_bb_id;      
       for(; it != entry.second.end(); it++) {
-        arch_store.push_back(experimental::ArchBB(prev_bb_id, *it, 0, false));
-        prev_bb_id = *it;
+        curr_bb_id = *it;
+        arch_store.push_back(experimental::ArchBB(prev_bb_id, curr_bb_id, 0, false));
+        prev_bb_id = curr_bb_id;
       }
+      arch_store.push_back(experimental::ArchBB(prev_bb_id, first_bb_id, 0, false));
 
       buffer::ArchSet arch_set;
       for(auto &arch: arch_store) {
@@ -97,9 +101,9 @@ void HandshakeSizeLSQsPass::runDynamaticPass() {
     }
 
     //TODO create adjacent list
-
+    llvm::dbgs() << "\t [DBG] CFDFCs: " << cfdfcs.size() << "\n";
     for(auto &cfdfc : cfdfcs) {
-      unsigned II = troughput_attribute[cfdfc.first];
+      unsigned II = round(1 / troughput_attribute[cfdfc.first]);
       sizing_results.push_back(sizeLSQsForCFDFC(cfdfc.second, II, timingDB));
     }
     
@@ -118,6 +122,7 @@ void HandshakeSizeLSQsPass::runDynamaticPass() {
 
 LSQSizingResult HandshakeSizeLSQsPass::sizeLSQsForCFDFC(buffer::CFDFC cfdfc, unsigned II, TimingDatabase timingDB) {
   //TODO implement algo
+  llvm::dbgs() << "\t [DBG] sizeLSQsForCFDFC called for CFDFC with " << cfdfc.cycle.size() << " BBs and II of " << II << "\n";
 
   // Add additional edges for Allocation preceding Memory access
   // Add additional nodes for backededge with -II latency
