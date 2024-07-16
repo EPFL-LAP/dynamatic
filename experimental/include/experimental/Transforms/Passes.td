@@ -105,6 +105,10 @@ def HandshakeSizeLSQs : DynamaticPass<"handshake-size-lsqs"> {
     trying to keep the area as low as possible. TODO  
   }];
   let constructor = "dynamatic::experimental::lsqsizing::createHandshakeSizeLSQs()";
+  
+  let options = [Option<"timingModels", "timing-models", "std::string", "",
+      "Path to JSON-formatted file containing timing models for dataflow "
+      "components.">];
 }
 
 #endif // EXPERIMENTAL_TRANSFORMS_PASSES_TD

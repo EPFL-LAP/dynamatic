@@ -10,6 +10,8 @@
 #include "dynamatic/Support/DynamaticPass.h"
 #include "dynamatic/Support/LLVM.h"
 #include "mlir/Pass/Pass.h"
+#include "dynamatic/Support/TimingModels.h"
+
 
 namespace dynamatic {
 namespace experimental {
@@ -20,7 +22,7 @@ namespace lsqsizing {
 #include "experimental/Transforms/Passes.h.inc"
 
 std::unique_ptr<dynamatic::DynamaticPass>
-createHandshakeSizeLSQs();
+createHandshakeSizeLSQs(StringRef timingModels = "");
 
 } // namespace lsqsizing
 } // namespace experimental
