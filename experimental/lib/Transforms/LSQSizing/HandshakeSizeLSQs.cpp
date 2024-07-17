@@ -21,6 +21,7 @@
 #include "dynamatic/Support/TimingModels.h"
 #include "llvm/ADT/DenseMap.h"
 #include "mlir/Pass/PassManager.h"
+#include "mlir/IR/Value.h"
 
 #define DEBUG_TYPE "handshake-size-lsqs"
 
@@ -46,10 +47,8 @@ struct HandshakeSizeLSQsPass
 
 private:
 
-  std::map<unsigned,buffer::CFDFC> cfdfcs;
-  llvm::SmallVector<LSQSizingResult> sizing_results; //TODO datatype?
   LSQSizingResult sizeLSQsForCFDFC(buffer::CFDFC cfdfc, unsigned II, TimingDatabase timingDB);
-
+  AdjListGraph createAdjacencyList(buffer::CFDFC cfdfc, unsigned II, TimingDatabase timingDB);
 };
 } // namespace
 
@@ -57,11 +56,13 @@ private:
 void HandshakeSizeLSQsPass::runDynamaticPass() {
   llvm::dbgs() << "\t [DBG] LSQ Sizing Pass Called!\n";
 
+  std::map<unsigned,buffer::CFDFC> cfdfcs; //TODO chane to DenseMap?
+  llvm::SmallVector<LSQSizingResult> sizing_results; //TODO datatype?
+
   // 1. Read Attributes
   // 2. Reconstruct CFDFCs
   // 3. ???
   // 4. Profit
-
 
   // Read component latencies
   TimingDatabase timingDB(&getContext());
@@ -100,7 +101,6 @@ void HandshakeSizeLSQsPass::runDynamaticPass() {
       cfdfcs.insert_or_assign(entry.first, buffer::CFDFC(funcOp, arch_set, 0));
     }
 
-    //TODO create adjacent list
     llvm::dbgs() << "\t [DBG] CFDFCs: " << cfdfcs.size() << "\n";
     for(auto &cfdfc : cfdfcs) {
       unsigned II = round(1 / troughput_attribute[cfdfc.first]);
@@ -124,12 +124,49 @@ LSQSizingResult HandshakeSizeLSQsPass::sizeLSQsForCFDFC(buffer::CFDFC cfdfc, uns
   //TODO implement algo
   llvm::dbgs() << "\t [DBG] sizeLSQsForCFDFC called for CFDFC with " << cfdfc.cycle.size() << " BBs and II of " << II << "\n";
 
+  AdjListGraph graph = createAdjacencyList(cfdfc, II, timingDB);
+  
+
   // Add additional edges for Allocation preceding Memory access
   // Add additional nodes for backededge with -II latency
-  // Build Adjacency Lists
+  
+  
+  // Get Start Times of each BB 
   // 
 
   return DenseMap<unsigned, std::tuple<unsigned, unsigned>>();
+}
+
+
+AdjListGraph createAdjacencyList(buffer::CFDFC cfdfc, unsigned II, TimingDatabase timingDB) {
+  AdjListGraph graph;
+
+  for(auto &unit: cfdfc.units) {
+    double latency;
+    timingDB.getLatency(unit, SignalType::DATA, latency);
+    graph.addNode(std::string(unit->getName().getStringRef()), latency, unit);
+  }
+
+  for(auto &channel: cfdfc.channels) {
+    mlir::Operation *src_op = channel.getDefiningOp();
+    for(Operation *dest_op: channel.getUsers()) {
+      graph.addEdge(std::string(src_op->getName().getStringRef()), std::string(dest_op->getName().getStringRef()));
+    }
+  }
+
+  for(auto &backedge: cfdfc.backedges) {
+    mlir::Operation *src_op = backedge.getDefiningOp();
+    for(Operation *dest_op: backedge.getUsers()) {
+      llvm::dbgs() << "backedge: " << src_op->getName().getStringRef() << " -> " << dest_op->getName().getStringRef() << "\n";
+      //graph.addEdge(std::string(src_op->getName().getStringRef()), std::string(dest_op->getName().getStringRef()));
+    }
+  }
+
+  //TODO add backedge extra nodes with latency
+  //TODO add extra vertices for "allocation precedes memory access"  
+
+  return graph;
+
 }
 
 
