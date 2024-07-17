@@ -28,6 +28,7 @@
 #include "llvm/ADT/Twine.h"
 #include "llvm/ADT/TypeSwitch.h"
 #include "llvm/Support/ErrorHandling.h"
+#include "llvm/Support/raw_ostream.h"
 
 using namespace llvm;
 using namespace mlir;
@@ -180,14 +181,14 @@ LogicalResult MemoryInterfaceBuilder::instantiateInterfaces(
 LogicalResult MemoryInterfaceBuilder::instantiateInterfacesWithForks(
     OpBuilder &builder, handshake::MemoryControllerOp &mcOp,
     handshake::LSQOp &lsqOp, std::set<Group *> &groups,
-    DenseMap<Block *, Operation *> &forksGraph,
-    DenseMap<Operation *, SmallVector<Value>> &forkPreds, Value start) {
+    DenseMap<Block *, Operation *> &forksGraph, Value start,
+    std::vector<Operation *> &alloctionNetwork) {
 
   // Determine interfaces' inputs
   InterfaceInputs inputs;
 
-  if (failed(determineInterfaceInputsWithForks(inputs, builder, groups,
-                                               forksGraph, forkPreds, start)))
+  if (failed(determineInterfaceInputsWithForks(
+          inputs, builder, groups, forksGraph, start, alloctionNetwork)))
     return failure();
   if (inputs.mcInputs.empty() && inputs.lsqInputs.empty())
     return success();
@@ -248,6 +249,20 @@ LogicalResult MemoryInterfaceBuilder::instantiateInterfacesWithForks(
     addMemDataResultToLoads(mcPorts, mcOp);
   if (lsqOp)
     addMemDataResultToLoads(lsqPorts, lsqOp);
+
+  if (lsqOp) {
+    llvm::errs() << "Nb of operands: " << lsqOp.getOperands().size() << "\n";
+    llvm::errs() << "Operands producers:\n";
+    for (Value op : lsqOp.getOperands()) {
+      if (op.getDefiningOp()) {
+        Operation *prod = op.getDefiningOp();
+        llvm::errs() << prod->getName() << "\n";
+      } else {
+        BlockArgument ba = cast<mlir::BlockArgument>(op);
+        ba.getOwner()->printAsOperand(llvm::errs());
+      }
+    }
+  }
 
   return success();
 }
@@ -386,15 +401,16 @@ MemoryInterfaceBuilder::determineInterfaceInputs(InterfaceInputs &inputs,
 
 LogicalResult MemoryInterfaceBuilder::determineInterfaceInputsWithForks(
     InterfaceInputs &inputs, OpBuilder &builder, std::set<Group *> &groups,
-    DenseMap<Block *, Operation *> &forksGraph,
-    DenseMap<Operation *, SmallVector<Value>> &forkPreds, Value start) {
+    DenseMap<Block *, Operation *> &forksGraph, Value start,
+    std::vector<Operation *> &alloctionNetwork) {
 
   // Create the Fork nodes
   for (Group *group : groups) {
     Block *b = group->bb;
     builder.setInsertionPointToStart(b);
     auto forkOp =
-        builder.create<handshake::LazyForkOp>(memref.getLoc(), start, 1);
+        builder.create<handshake::LazyForkOp>(memref.getLoc(), start, 2);
+    alloctionNetwork.push_back(forkOp);
     forksGraph[b] = forkOp;
   }
 
@@ -405,15 +421,31 @@ LogicalResult MemoryInterfaceBuilder::determineInterfaceInputsWithForks(
     for (Group *pred : group->preds)
       predecessors.push_back(forksGraph[pred->bb]->getResult(0));
     Operation *forkNode = forksGraph[group->bb];
-    forkPreds[forkNode] = predecessors;
+
+    // added
+    if (predecessors.size() > 0)
+      forkNode->setOperands(predecessors);
   }
 
   // Add the results of the LazyForks as inputs to the LSQ
-  for (auto [_, forkNode] : forksGraph)
-    inputs.lsqInputs.push_back(forkNode->getResult(0));
+
+  // for (auto [_, forkNode] : forksGraph)
+  //   inputs.lsqInputs.push_back(forkNode->getResult(1));
 
   // Determine LSQ inputs
   for (auto [group, lsqGroupOps] : lsqPorts) {
+
+    Operation *firstOpInGroup = lsqGroupOps.front();
+    Operation *forkNode = forksGraph[firstOpInGroup->getBlock()];
+    inputs.lsqInputs.push_back(forkNode->getResult(1));
+    /*
+   if (!block)
+     return firstOpInGroup->emitError() << "LSQ port must belong to a BB.";
+   Value groupCtrl = getCtrl(*block);
+   if (!groupCtrl)
+     return failure();
+   inputs.lsqInputs.push_back(groupCtrl);*/
+
     // Then, add all memory port results that go the interface to the list of
     // LSQ inputs
     for (Operation *lsqOp : lsqGroupOps)

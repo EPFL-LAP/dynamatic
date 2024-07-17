@@ -154,10 +154,12 @@ dynamatic::experimental::boolean::reduce(std::stack<StackNode *> stack) {
 Parser::Parser(llvm::StringRef s) { lexer = LexicalAnalyzer(s); };
 
 StackNode *Parser::terminalPeek(std::vector<StackNode *> stack) {
-  if (!stack.at(stack.size() - 1)->expr)
+  if (stack.at(stack.size() - 1)->term)
     return stack.at(stack.size() - 1);
-  if (!stack.at(stack.size() - 2)->expr)
+
+  if (stack.at(stack.size() - 2)->term)
     return stack.at(stack.size() - 2);
+
   stack.at(0)->printError();
   return nullptr;
 }
@@ -191,7 +193,7 @@ BoolExpression *Parser::parseSop() {
 
       /// Pop nodes from the stack until the precedence condition is met.
       while (
-          stack.at(stack.size() - 1)->expr ||
+          !stack.at(stack.size() - 1)->term ||
           PRECEDENCE_TABLE[static_cast<int>(
               ((stack.at(stack.size() - 1))->term).value().tokenType)]
                           [static_cast<int>(

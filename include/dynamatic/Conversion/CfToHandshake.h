@@ -14,15 +14,16 @@
 #ifndef DYNAMATIC_CONVERSION_CF_TO_HANDSHAKE_H
 #define DYNAMATIC_CONVERSION_CF_TO_HANDSHAKE_H
 
+#include "dynamatic/Analysis/ControlDependenceAnalysis.h"
 #include "dynamatic/Analysis/NameAnalysis.h"
 #include "dynamatic/Dialect/Handshake/HandshakeInterfaces.h"
 #include "dynamatic/Dialect/Handshake/MemoryInterfaces.h"
 #include "dynamatic/Support/Backedge.h"
 #include "dynamatic/Support/DynamaticPass.h"
 #include "dynamatic/Support/LLVM.h"
+#include "experimental/Support/BooleanLogic/BoolExpression.h"
 #include "mlir/Analysis/CFGLoopInfo.h"
 #include "mlir/Transforms/DialectConversion.h"
-#include "llvm/ADT/SmallVector.h"
 #include <set>
 
 namespace dynamatic {
@@ -75,6 +76,9 @@ public:
 
   /// Constructor simply takes the region being lowered and a reference to the
   /// top-level name analysis.
+  // explicit HandshakeLowering(Region &region, NameAnalysis &nameAnalysis)
+  //     : region(region), nameAnalysis(nameAnalysis) {}
+
   explicit HandshakeLowering(Region &region, NameAnalysis &nameAnalysis)
       : region(region), nameAnalysis(nameAnalysis) {}
 
@@ -170,11 +174,6 @@ public:
   // LogicalResult addSmartControlForLSQ(ConversionPatternRewriter &rewriter,
   //                                    MemInterfacesInfo &memInfo);
 
-  bool sameLoop(Block *source, Block *dest);
-
-  /// Gets all the common loops between 2 blocks
-  SmallVector<mlir::CFGLoop *> getCommonLoops(Block *block1, Block *block2);
-
   /// Identifies all the memory dependencies between the predecessors of an LSQ.
   /// This
   /// is the first step towards making memory deps explicit
@@ -191,27 +190,25 @@ public:
 
   /// Add MERGEs in the case where the consumer might consume but the producer
   /// not necessarily poduce (the counsumer is being fed by another producer)
-  LogicalResult
-  addMergeNonLoop(OpBuilder &builder, std::vector<ProdConsMemDep> &allMemDeps,
-                  std::set<Group *> &groups,
-                  DenseMap<Block *, Operation *> &forksGraph,
-                  DenseMap<Operation *, SmallVector<Value>> &forkPreds);
+  LogicalResult addMergeNonLoop(OpBuilder &builder,
+                                std::vector<ProdConsMemDep> &allMemDeps,
+                                std::set<Group *> &groups,
+                                DenseMap<Block *, Operation *> &forksGraph);
 
   /// Add MERGEs in the case where the producer BB is after the consumer BB (the
   /// producer and the consumer are in a loop)
-  LogicalResult
-  addMergeLoop(OpBuilder &builder, std::set<Group *> &groups,
-               DenseMap<Block *, Operation *> &forksGraph,
-               DenseMap<Operation *, SmallVector<Value>> &forkPreds);
+  LogicalResult addMergeLoop(OpBuilder &builder, std::set<Group *> &groups,
+                             DenseMap<Block *, Operation *> &forksGraph);
 
   /// Join all the operands of the LazyForks
-  LogicalResult
-  joinInsertion(OpBuilder &builder, DenseMap<Block *, Operation *> &forksGraph,
-                DenseMap<Operation *, SmallVector<Value>> &forkPreds);
+  LogicalResult joinInsertion(OpBuilder &builder, std::set<Group *> &groups,
+                              DenseMap<Block *, Operation *> &forksGraph);
 
   /// If a Fork operation has more than 2 operands, then it creates a join for
   /// the operands. The result of the JOIN becomes the operand of the ForkOp
   void insertJoins(std::set<Operation *> forks);
+
+  LogicalResult addPhi(ConversionPatternRewriter &rewriter);
 
 protected:
   /// The region being lowered.
@@ -231,6 +228,15 @@ protected:
   MergeOpInfo insertMerge(BlockArgument blockArg, BackedgeBuilder &edgeBuilder,
                           ConversionPatternRewriter &rewriter);
 
+  bool sameLoop(Block *source, Block *dest);
+
+  /// Checks if all the blocks in the path are in the control dependency
+  bool checkControlDep(const SmallVector<Block *, 4> &controlDeps,
+                       const std::vector<Block *> &path);
+
+  std::vector<Operation *> alloctionNetwork;
+  std::vector<Operation *> loopMerges;
+
 private:
   /// Associates basic blocks of the region being lowered to their respective
   /// control value.
@@ -239,9 +245,20 @@ private:
   /// reference accesses in memory dependencies consistent.
   NameAnalysis &nameAnalysis;
 
+  // ControlDependenceAnalysis &cdgAnalysis;
+
   // Function that runs loop analysis on the funcOp Region.
   DenseMap<Block *, BlockLoopInfo> findLoopDetails(mlir::CFGLoopInfo &li,
                                                    Region &funcReg);
+  experimental::boolean::BoolExpression *enumeratePaths(Block *start,
+                                                        Block *end);
+
+  // Gets the innermost loop containing bpth block1 nd block 2
+  mlir::CFGLoop *getInnermostCommonLoop(Block *block1, Block *block2);
+
+  // Gets all the loops that the consumer is in but not te producer, in-order of
+  // outermost to innermost loop
+  SmallVector<mlir::CFGLoop *> getLoopsConsNotInProd(Block *cons, Block *prod);
 };
 
 /// Pointer to function lowering a region using a conversion pattern rewriter.
