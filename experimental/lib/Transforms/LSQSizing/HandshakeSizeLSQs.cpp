@@ -96,8 +96,10 @@ void HandshakeSizeLSQsPass::runDynamaticPass() {
       }
       arch_store.push_back(experimental::ArchBB(prev_bb_id, first_bb_id, 0, false));
 
+      llvm::dbgs() << "\t [DBG] CFDFC: " << entry.first << " with " << arch_store.size() << " arches\n";
       buffer::ArchSet arch_set;
       for(auto &arch: arch_store) {
+        llvm::dbgs() << "\t [DBG] Arch: " << arch.srcBB << " -> " << arch.dstBB << "\n";
         arch_set.insert(&arch);
       }
 
@@ -146,14 +148,19 @@ AdjListGraph HandshakeSizeLSQsPass::createAdjacencyList(buffer::CFDFC cfdfc, uns
 
   for(auto &unit: cfdfc.units) {
     double latency;
-    timingDB.getLatency(unit, SignalType::DATA, latency);
-    graph.addNode(std::string(unit->getName().getStringRef()), latency, unit);
+    if(failed(timingDB.getLatency(unit, SignalType::DATA, latency))) {
+      llvm::dbgs() << "No latency found for unit: " << unit->getName().getStringRef() << " found \n";
+      graph.addNode(unit, 0);
+    } 
+    else {
+      graph.addNode(unit, latency);
+    }
   }
 
   for(auto &channel: cfdfc.channels) {
     mlir::Operation *src_op = channel.getDefiningOp();
     for(Operation *dest_op: channel.getUsers()) {
-      graph.addEdge(std::string(src_op->getName().getStringRef()), std::string(dest_op->getName().getStringRef()));
+      graph.addEdge(src_op, dest_op);
     }
   }
 
