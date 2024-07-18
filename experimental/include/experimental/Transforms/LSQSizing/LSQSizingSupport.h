@@ -32,6 +32,11 @@ public:
     std::vector<std::vector<std::string>> findPaths(std::string start, std::string end);
     int getPathLatency(std::vector<std::string> path);
 
+    int findMaxPathLatency(mlir::Operation *start_op, mlir::Operation *end_op);
+    int findMinPathLatency(mlir::Operation *start_op, mlir::Operation *end_op);
+
+    std::vector<mlir::Operation*> getOperationsWithOpName(std::string op_name);
+
 private:
     std::unordered_map<std::string , AdjListNode> nodes; // Map to store nodes by their index
 };

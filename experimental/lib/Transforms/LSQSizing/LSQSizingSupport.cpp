@@ -93,3 +93,36 @@ int AdjListGraph::getPathLatency(std::vector<std::string> path) {
   }
   return latency;
 }
+
+std::vector<mlir::Operation*> AdjListGraph::getOperationsWithOpName(std::string op_name) {
+  std::vector<mlir::Operation*> ops;
+  for(auto &node: nodes) {
+    if(node.second.op && std::string(node.second.op.value()->getName().getStringRef()) == op_name)
+    {
+      ops.push_back(node.second.op.value());
+    }
+  }
+  return ops;
+}
+
+
+int AdjListGraph::findMaxPathLatency(mlir::Operation *start_op, mlir::Operation *end_op) {
+  std::vector<std::vector<std::string>> paths = findPaths(start_op, end_op);
+  int max_latency = 0;
+  for(auto &path: paths)
+  {
+    max_latency = std::max(max_latency, getPathLatency(path));
+  }
+  return max_latency;
+}
+
+int AdjListGraph::findMinPathLatency(mlir::Operation *start_op, mlir::Operation *end_op) {
+  std::vector<std::vector<std::string>> paths = findPaths(start_op, end_op);
+  int min_latency = INT_MAX;
+  for(auto &path: paths)
+  {
+    min_latency = std::min(min_latency, getPathLatency(path));
+  }
+  return min_latency;
+}
+

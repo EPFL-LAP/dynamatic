@@ -137,11 +137,35 @@ LSQSizingResult HandshakeSizeLSQsPass::sizeLSQsForCFDFC(buffer::CFDFC cfdfc, uns
   AdjListGraph graph = createAdjacencyList(cfdfc, II, timingDB);
   graph.printGraph();
 
-  // Get Start Times of each BB 
+  //TODO identify start nodes
+  // Find starting node for each BB
+  mlir::Operation * start_node = nullptr;
+  // Get Start Times of each BB (Alloc Times) 
   
-  // Get Dealloc Times
 
-  // Get End Times 
+  // Get Dealloc Times and End Times
+  std::vector<mlir::Operation *> load_ops = graph.getOperationsWithOpName("lsq_load");
+  std::unordered_map<mlir::Operation *, int> load_dealloc_times;
+  int load_end_time = 0;
+
+  for(auto &op: load_ops) {
+    int latency = graph.findMaxPathLatency(start_node, op);
+    load_dealloc_times.insert({op, latency});
+    load_end_time = std::max(load_end_time, latency);
+  }
+
+  std::vector<mlir::Operation *> store_ops = graph.getOperationsWithOpName("lsq_store");
+  std::unordered_map<mlir::Operation *, int> store_dealloc_times;
+  int store_end_time = 0;
+
+  for(auto &op: store_ops) {
+    int latency = graph.findMaxPathLatency(start_node, op);
+    store_dealloc_times.insert({op, latency});
+    store_end_time = std::max(store_end_time, latency);
+  }
+
+
+  // Get Load and Store Sizes
 
   return DenseMap<unsigned, std::tuple<unsigned, unsigned>>();
 }
@@ -188,4 +212,3 @@ std::unique_ptr<dynamatic::DynamaticPass>
 dynamatic::experimental::lsqsizing::createHandshakeSizeLSQs(StringRef timingModels) {
   return std::make_unique<HandshakeSizeLSQsPass>(timingModels);
 }
-
