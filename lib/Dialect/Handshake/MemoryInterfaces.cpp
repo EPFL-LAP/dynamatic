@@ -250,20 +250,6 @@ LogicalResult MemoryInterfaceBuilder::instantiateInterfacesWithForks(
   if (lsqOp)
     addMemDataResultToLoads(lsqPorts, lsqOp);
 
-  if (lsqOp) {
-    llvm::errs() << "Nb of operands: " << lsqOp.getOperands().size() << "\n";
-    llvm::errs() << "Operands producers:\n";
-    for (Value op : lsqOp.getOperands()) {
-      if (op.getDefiningOp()) {
-        Operation *prod = op.getDefiningOp();
-        llvm::errs() << prod->getName() << "\n";
-      } else {
-        BlockArgument ba = cast<mlir::BlockArgument>(op);
-        ba.getOwner()->printAsOperand(llvm::errs());
-      }
-    }
-  }
-
   return success();
 }
 

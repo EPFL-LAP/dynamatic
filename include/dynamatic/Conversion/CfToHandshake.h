@@ -23,6 +23,7 @@
 #include "dynamatic/Support/LLVM.h"
 #include "experimental/Support/BooleanLogic/BoolExpression.h"
 #include "mlir/Analysis/CFGLoopInfo.h"
+#include "mlir/Support/LogicalResult.h"
 #include "mlir/Transforms/DialectConversion.h"
 #include <set>
 
@@ -79,8 +80,10 @@ public:
   // explicit HandshakeLowering(Region &region, NameAnalysis &nameAnalysis)
   //     : region(region), nameAnalysis(nameAnalysis) {}
 
-  explicit HandshakeLowering(Region &region, NameAnalysis &nameAnalysis)
-      : region(region), nameAnalysis(nameAnalysis) {}
+  explicit HandshakeLowering(Region &region, NameAnalysis &nameAnalysis,
+                             mlir::DominanceInfo &domInfo)
+      : region(region), nameAnalysis(nameAnalysis),
+        li(domInfo.getDomTree(&region)) {}
 
   /// Creates the control-only network by adding a control-only argument to the
   /// region's entry block and forwarding it through all basic blocks.
@@ -140,7 +143,7 @@ public:
 
   /// Creates the region's return network by sequentially moving all blocks'
   /// operations to the entry block, replacing func::ReturnOp's with
-  /// handshake::ReturnOp's, deleting all block terminators and non-entry
+  /// handshloopsake::ReturnOp's, deleting all block terminators and non-entry
   /// blocks, merging the results of all return statements, and creating the
   /// region's end operation./// This class is strongly inspired by CIRCT's own
   /// `HandshakeLowering` class. It
@@ -245,11 +248,13 @@ private:
   /// reference accesses in memory dependencies consistent.
   NameAnalysis &nameAnalysis;
 
+  mlir::CFGLoopInfo li;
+
   // ControlDependenceAnalysis &cdgAnalysis;
 
   // Function that runs loop analysis on the funcOp Region.
-  DenseMap<Block *, BlockLoopInfo> findLoopDetails(mlir::CFGLoopInfo &li,
-                                                   Region &funcReg);
+  LogicalResult findLoopDetails(mlir::CFGLoopInfo &li, Region &funcReg);
+
   experimental::boolean::BoolExpression *enumeratePaths(Block *start,
                                                         Block *end);
 
