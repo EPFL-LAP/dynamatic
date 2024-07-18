@@ -2,6 +2,9 @@
 #include "experimental/Transforms/LSQSizing/HandshakeSizeLSQs.h"
 #include "dynamatic/Transforms/BufferPlacement/CFDFC.h"
 
+#include <unordered_set>
+#include <stack>
+#include <set>
 
 using namespace mlir;
 using namespace dynamatic;
@@ -20,9 +23,9 @@ void AdjListGraph::printGraph() {
     for (const auto& pair : nodes) {
         std::string op_name = pair.first;
         const AdjListNode& node = pair.second;
-        llvm::dbgs() << "Node " << op_name << " (latency: " << node.latency << "): ";
+        llvm::dbgs()  << op_name << " (lat: " << node.latency << "): ";
         for (std::string adj : node.adjList) {
-            llvm::dbgs() << adj << " ";
+            llvm::dbgs() << adj << ", ";
         }
         llvm::dbgs() << "\n";
     }
@@ -40,4 +43,54 @@ void AdjListGraph::insertArtificialNodeOnEdge(mlir::Operation* src, mlir::Operat
   // create node and add edge from src to new node and new node to dest
   nodes.insert({new_node_name, AdjListNode{latency, nullptr, {dest_name}}});
   nodes.at(src_name).adjList.push_back(new_node_name);
+}
+
+
+std::vector<std::vector<std::string>> AdjListGraph::findPaths(std::string start, std::string end) {
+  
+  std::vector<std::vector<std::string>> paths;
+  std::stack<std::pair<std::vector<std::string>, std::set<std::string>>> pathStack;
+
+  // Initialize the stack with the path containing the source node
+  pathStack.push({{start}, {start}});
+
+  while (!pathStack.empty()) {
+      // Get the current path and visited set from the stack
+      auto [currentPath, visited] = pathStack.top();
+      pathStack.pop();
+      // Get the last node in the current path
+      std::string currentNode = currentPath.back();
+      // If the current node is the target, add the path to allPaths
+      if (currentNode == end) {
+          paths.push_back(currentPath);
+          continue;
+      }
+
+      // Get all adjacent nodes of the current node
+      for (const std::string& neighbor : nodes.at(currentNode).adjList) {
+          // If the neighbor has not been visited in the current path, extend the path
+          if (visited.find(neighbor) == visited.end()) {
+              std::vector<std::string> newPath = currentPath;
+              newPath.push_back(neighbor);
+              std::set<std::string> newVisited = visited;
+              newVisited.insert(neighbor);
+              // Push the new path and updated visited set onto the stack
+              pathStack.push({newPath, newVisited});
+          }
+      }
+  }
+  return paths;
+}
+
+std::vector<std::vector<std::string>> AdjListGraph::findPaths(mlir::Operation *start_op, mlir::Operation *end_op) {
+  return findPaths(start_op->getAttrOfType<StringAttr>("handshake.name").str(), end_op->getAttrOfType<StringAttr>("handshake.name").str());
+}
+
+
+int AdjListGraph::getPathLatency(std::vector<std::string> path) {
+  int latency = 0;
+  for(auto &node: path) {
+    latency += nodes.at(node).latency;
+  }
+  return latency;
 }

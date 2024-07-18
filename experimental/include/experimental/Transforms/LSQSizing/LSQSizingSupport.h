@@ -28,6 +28,10 @@ public:
     void insertArtificialNodeOnEdge(mlir::Operation* src, mlir::Operation* dest, int latency);
     void printGraph();
 
+    std::vector<std::vector<std::string>> findPaths(mlir::Operation *start_op, mlir::Operation *end_op);
+    std::vector<std::vector<std::string>> findPaths(std::string start, std::string end);
+    int getPathLatency(std::vector<std::string> path);
+
 private:
     std::unordered_map<std::string , AdjListNode> nodes; // Map to store nodes by their index
 };

@@ -78,9 +78,14 @@ void HandshakeSizeLSQsPass::runDynamaticPass() {
     llvm::dbgs() << "\t [DBG] Function: " << funcOp.getName() << "\n";
 
     // Read Attributes -> hardcoded for bicg
-    DenseMap<unsigned, SmallVector<unsigned>> cfdfc_attribute = {{0, {2}}, {1, {3, 1, 2}}}; // = funcOp.getCFDFCs();
-    DenseMap<unsigned, float> troughput_attribute = {{0, 3.333333e-01}, {1, 2.000000e-01}}; // = funcOp.getThroughput();      
     
+    // BICG
+    //DenseMap<unsigned, SmallVector<unsigned>> cfdfc_attribute = {{0, {2}}, {1, {3, 1, 2}}}; // = funcOp.getCFDFCs();
+    //DenseMap<unsigned, float> troughput_attribute = {{0, 3.333333e-01}, {1, 2.000000e-01}}; // = funcOp.getThroughput();      
+
+    // FIR
+    DenseMap<unsigned, SmallVector<unsigned>> cfdfc_attribute = {{0, {1}}}; // = funcOp.getCFDFCs();
+    DenseMap<unsigned, float> troughput_attribute = {{0, 3.333333e-01}};   
 
     // Extract Arch sets
     for(auto &entry: cfdfc_attribute) {
@@ -131,6 +136,17 @@ LSQSizingResult HandshakeSizeLSQsPass::sizeLSQsForCFDFC(buffer::CFDFC cfdfc, uns
 
   AdjListGraph graph = createAdjacencyList(cfdfc, II, timingDB);
   graph.printGraph();
+
+  std::vector<std::vector<std::string>> paths = graph.findPaths("fork2", "muli0");
+  
+  llvm::dbgs() << "Found " << paths.size() <<" Paths\n";
+  for(auto &path: paths) {
+    for(auto &node: path) {
+      llvm::dbgs() << node << " -> ";
+    }
+    llvm::dbgs() << "\n";
+    llvm::dbgs() << "Path latency: " << graph.getPathLatency(path) << "\n\n";
+  }
 
   // Get Start Times of each BB 
   
