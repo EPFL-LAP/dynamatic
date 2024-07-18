@@ -18,6 +18,7 @@
 #include "mlir/Dialect/Affine/IR/AffineOps.h"
 #include "mlir/Dialect/MemRef/IR/MemRef.h"
 #include "mlir/IR/Value.h"
+#include "mlir/Transforms/DialectConversion.h"
 #include "llvm/ADT/SmallVector.h"
 #include "llvm/ADT/Twine.h"
 #include "llvm/ADT/TypeSwitch.h"
@@ -103,6 +104,20 @@ void MemoryInterfaceBuilder::addLSQPort(unsigned group, Operation *memOp) {
 LogicalResult MemoryInterfaceBuilder::instantiateInterfaces(
     OpBuilder &builder, handshake::MemoryControllerOp &mcOp,
     handshake::LSQOp &lsqOp) {
+  BackedgeBuilder edgeBuilder(builder, memref.getLoc());
+  return instantiateInterfaces(builder, edgeBuilder, mcOp, lsqOp);
+}
+
+LogicalResult MemoryInterfaceBuilder::instantiateInterfaces(
+    PatternRewriter &rewriter, handshake::MemoryControllerOp &mcOp,
+    handshake::LSQOp &lsqOp) {
+  BackedgeBuilder edgeBuilder(rewriter, memref.getLoc());
+  return instantiateInterfaces(rewriter, edgeBuilder, mcOp, lsqOp);
+}
+
+LogicalResult MemoryInterfaceBuilder::instantiateInterfaces(
+    OpBuilder &builder, BackedgeBuilder &edgeBuilder,
+    handshake::MemoryControllerOp &mcOp, handshake::LSQOp &lsqOp) {
 
   // Determine interfaces' inputs
   InterfaceInputs inputs;
@@ -134,7 +149,6 @@ LogicalResult MemoryInterfaceBuilder::instantiateInterfaces(
 
     // Create 3 backedges (load address, store address, store data) for the MC
     // inputs that will eventually come from the LSQ.
-    BackedgeBuilder edgeBuilder(builder, loc);
     Backedge ldAddr = edgeBuilder.get(builder.getIndexType());
     Backedge stAddr = edgeBuilder.get(builder.getIndexType());
     Backedge stData = edgeBuilder.get(memrefType.getElementType());
@@ -186,7 +200,10 @@ MemoryInterfaceBuilder::getMemResultsToInterface(Operation *memOp) {
 Value MemoryInterfaceBuilder::getMCControl(Value ctrl, unsigned numStores,
                                            OpBuilder &builder) {
   assert(isa<NoneType>(ctrl.getType()) && "control signal must have none type");
-  builder.setInsertionPointAfter(ctrl.getDefiningOp());
+  if (Operation *defOp = ctrl.getDefiningOp())
+    builder.setInsertionPointAfter(defOp);
+  else
+    builder.setInsertionPointToStart(ctrl.getParentBlock());
   handshake::ConstantOp cstOp = builder.create<handshake::ConstantOp>(
       ctrl.getLoc(), builder.getI32Type(), builder.getI32IntegerAttr(numStores),
       ctrl);
@@ -236,7 +253,7 @@ MemoryInterfaceBuilder::determineInterfaceInputs(InterfaceInputs &inputs,
   // connected to an LSQ, since these requests end up being forwarded to the MC,
   // so we need to know the number of LSQ stores per basic block
   DenseMap<unsigned, unsigned> lsqStoresPerBlock;
-  for (auto [_, lsqGroupOps] : lsqPorts) {
+  for (auto &[_, lsqGroupOps] : lsqPorts) {
     for (Operation *lsqOp : lsqGroupOps) {
       if (isa<handshake::LSQStoreOp>(lsqOp)) {
         std::optional<unsigned> block = getLogicBB(lsqOp);
