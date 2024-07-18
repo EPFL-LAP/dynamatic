@@ -23,9 +23,9 @@ struct AdjListNode {
 class AdjListGraph {
 public:
     AdjListGraph() = default;
-    void addArtificialNode(std::string name, int latency);
     void addNode(mlir::Operation* op, int latency);
     void addEdge(mlir::Operation* src, mlir::Operation* dest);
+    void insertArtificialNodeOnEdge(mlir::Operation* src, mlir::Operation* dest, int latency);
     void printGraph();
 
 private:

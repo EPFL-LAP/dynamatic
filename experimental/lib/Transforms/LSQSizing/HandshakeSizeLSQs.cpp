@@ -130,14 +130,13 @@ LSQSizingResult HandshakeSizeLSQsPass::sizeLSQsForCFDFC(buffer::CFDFC cfdfc, uns
   llvm::dbgs() << "\t [DBG] sizeLSQsForCFDFC called for CFDFC with " << cfdfc.cycle.size() << " BBs and II of " << II << "\n";
 
   AdjListGraph graph = createAdjacencyList(cfdfc, II, timingDB);
-  
+  graph.printGraph();
 
-  // Add additional edges for Allocation preceding Memory access
-  // Add additional nodes for backededge with -II latency
-  
-  
   // Get Start Times of each BB 
-  // 
+  
+  // Get Dealloc Times
+
+  // Get End Times 
 
   return DenseMap<unsigned, std::tuple<unsigned, unsigned>>();
 }
@@ -165,19 +164,18 @@ AdjListGraph HandshakeSizeLSQsPass::createAdjacencyList(buffer::CFDFC cfdfc, uns
     }
   }
 
+
+  // Add artificial nodes for backedges with -II latency
   for(auto &backedge: cfdfc.backedges) {
     mlir::Operation *src_op = backedge.getDefiningOp();
     for(Operation *dest_op: backedge.getUsers()) {
-      llvm::dbgs() << "backedge: " << src_op->getAttrOfType<StringAttr>("handshake.name") << " -> " << dest_op->getAttrOfType<StringAttr>("handshake.name") << "\n";
-      //graph.addEdge(std::string(src_op->getName().getStringRef()), std::string(dest_op->getName().getStringRef()));
+      graph.insertArtificialNodeOnEdge(src_op, dest_op, (II * -1));
     }
   }
 
-  //TODO add backedge extra nodes with latency
   //TODO add extra vertices for "allocation precedes memory access"  
 
   return graph;
-
 }
 
 
