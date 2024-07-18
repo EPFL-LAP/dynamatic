@@ -137,17 +137,6 @@ LSQSizingResult HandshakeSizeLSQsPass::sizeLSQsForCFDFC(buffer::CFDFC cfdfc, uns
   AdjListGraph graph = createAdjacencyList(cfdfc, II, timingDB);
   graph.printGraph();
 
-  std::vector<std::vector<std::string>> paths = graph.findPaths("fork2", "muli0");
-  
-  llvm::dbgs() << "Found " << paths.size() <<" Paths\n";
-  for(auto &path: paths) {
-    for(auto &node: path) {
-      llvm::dbgs() << node << " -> ";
-    }
-    llvm::dbgs() << "\n";
-    llvm::dbgs() << "Path latency: " << graph.getPathLatency(path) << "\n\n";
-  }
-
   // Get Start Times of each BB 
   
   // Get Dealloc Times

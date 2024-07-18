@@ -47,7 +47,7 @@ void AdjListGraph::insertArtificialNodeOnEdge(mlir::Operation* src, mlir::Operat
 
 
 std::vector<std::vector<std::string>> AdjListGraph::findPaths(std::string start, std::string end) {
-  
+
   std::vector<std::vector<std::string>> paths;
   std::stack<std::pair<std::vector<std::string>, std::set<std::string>>> pathStack;
 
@@ -55,29 +55,28 @@ std::vector<std::vector<std::string>> AdjListGraph::findPaths(std::string start,
   pathStack.push({{start}, {start}});
 
   while (!pathStack.empty()) {
-      // Get the current path and visited set from the stack
-      auto [currentPath, visited] = pathStack.top();
-      pathStack.pop();
-      // Get the last node in the current path
-      std::string currentNode = currentPath.back();
-      // If the current node is the target, add the path to allPaths
-      if (currentNode == end) {
-          paths.push_back(currentPath);
-          continue;
-      }
-
-      // Get all adjacent nodes of the current node
-      for (const std::string& neighbor : nodes.at(currentNode).adjList) {
-          // If the neighbor has not been visited in the current path, extend the path
-          if (visited.find(neighbor) == visited.end()) {
-              std::vector<std::string> newPath = currentPath;
-              newPath.push_back(neighbor);
-              std::set<std::string> newVisited = visited;
-              newVisited.insert(neighbor);
-              // Push the new path and updated visited set onto the stack
-              pathStack.push({newPath, newVisited});
-          }
-      }
+    // Get the current path and visited set from the stack
+    auto [currentPath, visited] = pathStack.top();
+    pathStack.pop();
+    // Get the last node in the current path
+    std::string currentNode = currentPath.back();
+    // If the current node is the target, add the path to allPaths
+    if (currentNode == end) {
+        paths.push_back(currentPath);
+        continue;
+    }
+    // Get all adjacent nodes of the current node
+    for (const std::string& neighbor : nodes.at(currentNode).adjList) {
+        // If the neighbor has not been visited in the current path, extend the path
+        if (visited.find(neighbor) == visited.end()) {
+            std::vector<std::string> newPath = currentPath;
+            newPath.push_back(neighbor);
+            std::set<std::string> newVisited = visited;
+            newVisited.insert(neighbor);
+            // Push the new path and updated visited set onto the stack
+            pathStack.push({newPath, newVisited});
+        }
+    }
   }
   return paths;
 }
