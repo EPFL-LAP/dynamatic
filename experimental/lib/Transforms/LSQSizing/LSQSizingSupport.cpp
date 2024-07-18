@@ -9,7 +9,7 @@ using namespace dynamatic::experimental::lsqsizing;
 
 
 void AdjListGraph::addNode(mlir::Operation *op, int latency) {
-    nodes.insert({std::string(op->getName().getStringRef()), AdjListNode{latency, op, {}}});
+    nodes.insert({op->getAttrOfType<StringAttr>("handshake.name").str(), AdjListNode{latency, op, {}}});
 }
 
 void AdjListGraph::addArtificialNode(std::string name, int latency) {
@@ -18,7 +18,7 @@ void AdjListGraph::addArtificialNode(std::string name, int latency) {
 
 // TODO get handshake.name attribute instead of op name
 void AdjListGraph::addEdge(mlir::Operation * src, mlir::Operation * dest) {
-    nodes.at(std::string(src->getName().getStringRef())).adjList.push_back(std::string(dest->getName().getStringRef())); // Add edge from node u to node v
+    nodes.at(src->getAttrOfType<StringAttr>("handshake.name").str()).adjList.push_back(dest->getAttrOfType<StringAttr>("handshake.name").str()); // Add edge from node u to node v
 }
 
 void AdjListGraph::printGraph() {

@@ -148,8 +148,9 @@ AdjListGraph HandshakeSizeLSQsPass::createAdjacencyList(buffer::CFDFC cfdfc, uns
 
   for(auto &unit: cfdfc.units) {
     double latency;
+    //llvm::dbgs() << "unit: " << unit->getAttrOfType<StringAttr>("handshake.name") << "\n";
     if(failed(timingDB.getLatency(unit, SignalType::DATA, latency))) {
-      llvm::dbgs() << "No latency found for unit: " << unit->getName().getStringRef() << " found \n";
+      //llvm::dbgs() << "No latency found for unit: " << unit->getName().getStringRef() << " found \n";
       graph.addNode(unit, 0);
     } 
     else {
@@ -167,7 +168,7 @@ AdjListGraph HandshakeSizeLSQsPass::createAdjacencyList(buffer::CFDFC cfdfc, uns
   for(auto &backedge: cfdfc.backedges) {
     mlir::Operation *src_op = backedge.getDefiningOp();
     for(Operation *dest_op: backedge.getUsers()) {
-      llvm::dbgs() << "backedge: " << src_op->getName().getStringRef() << " -> " << dest_op->getName().getStringRef() << "\n";
+      llvm::dbgs() << "backedge: " << src_op->getAttrOfType<StringAttr>("handshake.name") << " -> " << dest_op->getAttrOfType<StringAttr>("handshake.name") << "\n";
       //graph.addEdge(std::string(src_op->getName().getStringRef()), std::string(dest_op->getName().getStringRef()));
     }
   }
