@@ -1,5 +1,6 @@
 add_dynamatic_library(DynamaticLSQSizing
   HandshakeSizeLSQs.cpp
+  LSQSizingSupport.cpp
 
   DEPENDS
   DynamaticTransformsPassIncGen

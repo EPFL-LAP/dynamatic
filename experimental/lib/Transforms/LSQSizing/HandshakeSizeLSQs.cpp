@@ -23,11 +23,13 @@
 #include "mlir/Pass/PassManager.h"
 #include "mlir/IR/Value.h"
 //#include "experimental/Support/StdProfiler.h"
+#include "experimental/Transforms/LSQSizing/LSQSizingSupport.h"
 
 #define DEBUG_TYPE "handshake-size-lsqs"
 
 using namespace mlir;
 using namespace dynamatic;
+using namespace dynamatic::buffer;
 using namespace dynamatic::handshake;
 using namespace dynamatic::experimental;
 using namespace dynamatic::experimental::lsqsizing;
@@ -176,27 +178,3 @@ dynamatic::experimental::lsqsizing::createHandshakeSizeLSQs(StringRef timingMode
   return std::make_unique<HandshakeSizeLSQsPass>(timingModels);
 }
 
-
-void AdjListGraph::addNode(std::string op_name, int latency) {
-    nodes.insert({op_name, AdjListNode{latency, std::nullopt, {}}});
-}
-
-void AdjListGraph::addNode(std::string op_name, int latency, mlir::Operation *op) {
-    nodes.insert({op_name, AdjListNode{latency, op, {}}});
-}
-
-void AdjListGraph::addEdge(std::string src, std::string dest) {
-    nodes.at(src).adjList.push_back(dest); // Add edge from node u to node v
-}
-
-void AdjListGraph::printGraph() {
-    for (const auto& pair : nodes) {
-        std::string op_name = pair.first;
-        const AdjListNode& node = pair.second;
-        llvm::dbgs() << "Node " << op_name << " (latency: " << node.latency << "): ";
-        for (std::string adj : node.adjList) {
-            llvm::dbgs() << adj << " ";
-        }
-        llvm::dbgs() << "\n";
-    }
-}

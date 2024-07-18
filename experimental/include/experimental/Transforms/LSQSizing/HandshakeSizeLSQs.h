@@ -24,39 +24,11 @@ namespace lsqsizing {
 std::unique_ptr<dynamatic::DynamaticPass>
 createHandshakeSizeLSQs(StringRef timingModels = "");
 
-
-
 } // namespace lsqsizing
 } // namespace experimental
 } // namespace dynamatic
 
 
-#include <iostream>
-#include <vector>
-#include <unordered_map>
-#include <list>
-#include <string>
-
-// Define a structure for a graph node
-struct AdjListNode {
-    int latency; // Value stored in the node
-    std::optional<mlir::Operation*> op; // Pointer to the operation
-    std::list<std::string> adjList; // Adjacency list (stores indices of adjacent nodes)
-};
-
-class AdjListGraph {
-public:
-    AdjListGraph() = default;
-    void addNode(std::string op_name, int latency);
-    void addNode(std::string op_name, int latency, mlir::Operation* op);
-    void addEdge(std::string src, std::string dest);
-    void printGraph();
-
-private:
-    std::unordered_map<std::string , AdjListNode> nodes; // Map to store nodes by their index
-};
-
-//AdjListGraph::AdjListGraph();
 
 
 
