@@ -297,6 +297,26 @@ HandshakePlaceBuffersPass::placeBuffers(FuncInfo &info,
   for (CFDFC &cf : cfdfcs)
     info.cfdfcs[&cf] = true;
 
+  //! Testing Start, Jiantao, 18/07/2024
+  // Create a new map for the cfdfc extraction
+  llvm::MapVector<size_t, std::vector<unsigned>> cfdfcResult;
+
+  // Iterate through all extracted cfdfc
+  for (auto [idx, cfAndOpt] : llvm::enumerate(info.cfdfcs)) {
+    auto &[cf, _] = cfAndOpt;
+    for (size_t i = 0, e = cf->cycle.size() - 1; i < e; ++i) {
+      // Add the bb to the corresponding in the cfdfc result map
+      cfdfcResult[idx].push_back(cf->cycle[i]);
+    }
+    cfdfcResult[idx].push_back(cf->cycle.back());
+  }
+
+  // Create and add the handshake.cfdfc attribute
+  auto cfdfcMap = handshake::CFDFCToBBListAttr::get(info.funcOp.getContext(), cfdfcResult);
+  info.funcOp->setAttr("handshake.cfdfc", cfdfcMap);
+
+  //! Testing End
+
   if (dumpLogs)
     logFuncInfo(info, *logger);
 
