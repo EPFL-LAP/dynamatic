@@ -321,4 +321,71 @@ def ChannelBufPropsContainerAttr : OperandContainerAttr<"ChannelBufPropsContaine
   }];
 }
 
+//===----------------------------------------------------------------------===//
+// CFDFC Extraction Results
+//===----------------------------------------------------------------------===//
+def CFDFCToBBListAttr : Handshake_Attr<"CFDFCToBBList", "cfdfcToBBList"> {
+  let summary = "Maps CFDFC index to the list of BBs";
+  let description = [{
+    Holds a map from CFDFC index to the corresponding list of BB indices. For example
+    `{"0" : [1, 2], "1" : [3, 4, 5]}`, means CFDFC 0 contains BB 1 and BB 2 and CFDFC 1 contains BB 3,
+    BB 4 and BB 5.
+
+    For constructing this attribute, user can directly provide 
+    an llvm::MapVector<int, std::vector<int>>.
+  }];
+
+  let parameters = (ins "DictionaryAttr":$cfdfcMap);
+
+  let assemblyFormat = " $cfdfcMap ";
+
+  let builders = [
+    // Builder for llvm::MapVector<size_t, std::vector<unsigned>>
+    AttrBuilder<(ins "llvm::MapVector<size_t, std::vector<unsigned>>":$mapVector), [{
+      llvm::SmallVector<mlir::NamedAttribute, 10> attrs;
+      mlir::Builder builder(context);
+      for (const auto &pair: mapVector) {
+        llvm::SmallVector<mlir::Attribute, 10> bbList;
+        for (int val : pair.second) {
+          bbList.push_back(builder.getUI32IntegerAttr(val));
+        }
+        auto bbListAttr = builder.getArrayAttr(bbList);
+        attrs.push_back({builder.getStringAttr(std::to_string(pair.first)), bbListAttr});
+      }
+      return $_get(context, mlir::DictionaryAttr::get(context, attrs));
+    }]>
+  ];
+}
+
+def CFDFCThroughputAttr : Handshake_Attr<"CFDFCThroughput", "cfdfcThroughput"> {
+  let summary = "Maps CFDFC index to the throughput value";
+  let description = [{
+    Holds a map from CFDFC index to the corresponding throughput value (floating value). For example,
+    {"0" : 0.5, "1": 0.25}. This means CFDFC 0 has a throughput of 0.5 and CFDFC 1 has 
+    a throughput of 0.25.
+
+    For constructing this attribute, user can directly provide an
+    llvm::MapVector<int, double>
+  }];
+
+  let parameters = (ins "DictionaryAttr":$throughputMap);
+
+  let assemblyFormat = " $throughputMap ";
+
+  let builders = [
+    // Builder for llvm::MapVector<size_t, double>
+    AttrBuilder<(ins "llvm::MapVector<size_t, double>":$cfdfcThroughputMap), [{
+      llvm::SmallVector<mlir::NamedAttribute, 10> attrs;
+      mlir::Builder builder(context);
+      for (const auto &pair: cfdfcThroughputMap) {
+        mlir::Type doubleType = mlir::FloatType::getF64(context);
+        auto tmpCFDFCThroughputAttr = builder.getFloatAttr(doubleType, pair.second);
+        attrs.push_back({builder.getStringAttr(std::to_string(pair.first)), tmpCFDFCThroughputAttr});
+      }
+      return $_get(context, mlir::DictionaryAttr::get(context, attrs));
+    }]>
+  ];
+}
+
+
 #endif // DYNAMATIC_DIALECT_HANDSHAKE_HANDSHAKE_ATTRIBUTES_TD
