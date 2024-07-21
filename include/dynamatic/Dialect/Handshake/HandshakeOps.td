@@ -24,6 +24,7 @@ include "mlir/IR/BuiltinTypes.td"
 include "mlir/IR/BuiltinAttributeInterfaces.td"
 include "mlir/Interfaces/InferTypeOpInterface.td"
 include "dynamatic/Dialect/Handshake/HandshakeAttributes.td"
+include "dynamatic/Dialect/Handshake/HandshakeTypes.td"
 
 /// Base class for Handshake dialect operations.
 class Handshake_Op<string mnemonic, list<Trait> traits = []>
@@ -1179,5 +1180,208 @@ SameOperandsAndResultType,
   let assemblyFormat = " `[` $dataOperands `]` `,` `[` $sharedOpResult `]` attr-dict `:` `(` qualified(type($dataOperands)) `)` `,` `(` qualified(type($sharedOpResult)) `)` `->` `(` qualified(type($dataOut)) `)` ";
 }
 
+//===----------------------------------------------------------------------===//
+// Type manipulation
+//===----------------------------------------------------------------------===//
+
+def BundleOp : Handshake_Op<"bundle", [Pure]> {
+  let summary = [{
+    Bundles individual signals into a `handshake::ChannelType` or
+    `handshake::ControlType`.
+  }];
+  let description = [{
+    Combines individual signals into a channel-like value, producing upstream
+    signals as results and taking downstream signals as arguments. Note
+    that combining individual signals into a `handshake::ChannelType` is a
+    two-step process.
+    1. First, bundle a `i1` value, which produces a `!handshake.control` and
+       `i1` (representing the upstream ready signal) as results. 
+    2. Then, bundle the `!handshake.control` along with a value representing the
+       data signal (of a compatible signal type e.g., `i32`), which produces
+       a `!handshake.channel<i32>`.
+
+    Example:
+    ```
+    // Bundling into a channel with a downstream extra signal
+    %channel = bundle %ctrl, %data, %extra :
+      (!handshake.control, i32, i1) -> (!handshake.channel<i32, [extra: i1]>)
+    
+    // -----
+    
+    // Bundling into a channel with an upstream extra signal
+    %channel, %extra = bundle %ctrl, %data :
+      (!handshake.control, i32) -> (!handshake.channel<i32, [extra: i1]>, i1)
+    
+    // -----
+
+    // Bundling into a control-only channel
+    %ctrl, %ready = unbundle %valid : (i1) -> (!handhsake.control, i1)
+    ```
+  }];
+
+  let arguments = (ins Variadic<AnyType>:$signals);
+  let results = (outs ChannelLikeType:$channel, Variadic<SignalType>: $upstreams);
+
+  let skipDefaultBuilders = 1;
+  let builders = [
+    OpBuilder<(ins "::mlir::Value":$valid), [{
+      mlir::Type validReadyType = $_builder.getIntegerType(1);
+      assert(valid.getType() == validReadyType && "incorrect valid signal");
+
+      $_state.addOperands(valid);
+      $_state.addTypes({
+        ::dynamatic::handshake::ControlType::get($_builder.getContext()),
+        validReadyType
+      });
+    }]>,
+    OpBuilder<(ins "::mlir::Value":$ctrl, "::mlir::Value":$data,
+                   "::mlir::ValueRange":$downstreams,
+                   "::dynamatic::handshake::ChannelType":$channelType)
+    >
+  ];
+
+  let assemblyFormat = "$signals attr-dict `:` functional-type(operands, results)";
+
+  let hasVerifier = 1;
+}
+
+def UnbundleOp : Handshake_Op<"unbundle", [
+  Pure,
+  DeclareOpInterfaceMethods<InferTypeOpInterface, ["inferReturnTypes"]>
+]> {
+  let summary = [{
+    Unbundles a `handshake::ChannelType` or `handshake::ControlType` into
+    individual signals.
+  }];
+  let description = [{
+    Splits a channel-like value into its individual signals, producing
+    downstream signals as results and taking upstream signals as arguments. Note
+    that getting the individual valid and ready signals from a
+    `handshake::ChannelType` is a two-step process.
+    1. First, unbundle the `!handshake.channel`, which produces a
+       `!handshake.control` as result (i.e., the control is considered a
+       "downstream bundle").
+    2. Then, unbundle the `!handshake.control` along with an `i1` value
+       representing the ready signal, which produces an `i1` result representing
+       the valid signal. 
+
+    Example:
+    ```
+    // Unbundling a channel with a downstream extra signal
+    %ctrl, %data, %extra = unbundle %channel : 
+      (!handshake.channel<i32, [extra: i2]>) -> (!handshake.control, i32, i2)
+    
+    // -----
+    
+    // Unbundling a channel with an upstream extra signal
+    %ctrl, %data = unbundle %channel [%extra] : 
+      (!handshake.channel<i32, [extra: i2 (U)]>) -> (!handshake.control, i32, i2)
+
+    // -----
+
+    // Unbundling a control-only channel
+    %valid = unbundle %ctrl [%ready] : (!handshake.control, i1) -> i1
+    ```
+  }];
+
+  let arguments = (ins ChannelLikeType:$channel, Variadic<SignalType>: $upstreams);
+  let results = (outs Variadic<AnyType>:$signals);
+
+  let builders = [
+    OpBuilder<(ins "::mlir::Value":$channel), [{
+      $_state.addOperands(channel);
+
+      // Infer return types
+      ::llvm::SmallVector<::mlir::Type, 2> inferredReturnTypes;
+      if (::mlir::succeeded(UnbundleOp::inferReturnTypes($_builder.getContext(),
+                    $_state.location, $_state.operands,
+                    $_state.attributes.getDictionary($_state.getContext()),
+                    $_state.getRawProperties(),
+                    $_state.regions, inferredReturnTypes)))
+        $_state.addTypes(inferredReturnTypes);
+      else
+        ::llvm::report_fatal_error("Failed to infer result type(s).");
+    }]>
+  ];
+
+  let assemblyFormat = "$channel (`[` $upstreams^ `]`)? attr-dict `:` functional-type(operands, results)";
+
+  let hasVerifier = 1;
+}
+
+def ChannelReshapeTypeAttr : I32EnumAttr<
+    "ChannelReshapeType", "",
+    [
+      I32EnumAttrCase<"MergeData", 0>,
+      I32EnumAttrCase<"SplitData", 1>,
+      I32EnumAttrCase<"MergeExtra", 2>,
+      I32EnumAttrCase<"SplitExtra", 3>
+    ]> {
+  let cppNamespace = "::dynamatic::handshake";
+}
+
+def ReshapeOp : Handshake_Op<"reshape", [Pure]> {
+  let summary = "Reshapes the individual signals of a `handshake::ChannelType`.";
+  let description = [{
+    Reshapes a `ChannelType`'d value to a different form without modifying the
+    channel's actual payload, only rerouting bits to different extra signals or
+    to the channel's data signal. There are currently four reshaping types that
+    match two-by-two to perform reverse reshapings (each reshaping type pair has
+    a dedicated operation builder).
+
+    - `ChannelReshapeType::MergeData` merges all downstream extra signals into
+      the data signal, which becomes an `i<X>` where X is the sum of the
+      bitwidths of all downstream extra signals plus the data signal's bitwidth.
+      If there are no downstream extra signals, the data type is unchanged. All
+      upstream extra signals (if any) are merged into a single one named
+      `COMBINED_UP_NAME` with type `i<Y>`, where Y is the sum of the bitwidths
+      of all upstream extra signals. `ChannelReshapeType::SplitData` performs
+      the reverse transformation.
+      
+    - `ChannelReshapeType::MergeExtra` behaves identically to
+      `ChannelReshapeType::MergeData` for extra upstream signals. However,
+      all downstream extra signals (if any) are merged into a single one named
+      `COMBINED_DOWN_NAME` with type `i<Z>`, where Z is the sum of the bitwidths
+      of all downstream extra signals. The data type always remain unchanged.
+      `ChannelReshapeType::SplitExtra` performs the reverse transformation.  
+
+    Example:
+    ```
+    // Merging into data
+    %reshaped = reshape [MergeData] %channel :
+      (!handshake.channel<f32, [down1: i2, up1: i4 (U), up2: i4 (U), down2: i8]>)
+      -> (!handshake.channel<i42, [mergedUp: i8 (U)]>)
+    
+    // -----
+    
+    // Merging into extra
+    %reshaped = reshape [MergeExtra] %channel :
+      (!handshake.channel<f32, [down1: i2, up1: i4 (U), up2: i4 (U), down2: i8]>)
+      -> (!handshake.channel<f32, [mergedDowm: i10, mergedUp: i8 (U)]>)
+    ```
+  }];
+
+  let arguments = (ins ChannelReshapeTypeAttr:$reshapeType, ChannelType:$channel);
+  let results = (outs ChannelType:$reshaped);
+
+  let skipDefaultBuilders = 1;
+  let builders = [
+    OpBuilder<(ins 
+      "::mlir::TypedValue<::dynamatic::handshake::ChannelType>":$channel,
+      "bool":$mergeDownstreamIntoData)>,
+    OpBuilder<(ins
+      "::mlir::TypedValue<::dynamatic::handshake::ChannelType>":$channel,
+      "bool":$splitDownstreamFromData, "::mlir::Type":$reshapedType)>,
+  ];
+
+  let assemblyFormat = "`[` $reshapeType `]` $channel attr-dict `:` functional-type($channel, $reshaped)";
+  let hasVerifier = 1;
+  
+  let extraClassDeclaration = [{
+    static constexpr ::llvm::StringLiteral
+      COMBINED_DOWN_NAME = ::llvm::StringLiteral("mergedDown"),
+      COMBINED_UP_NAME = ::llvm::StringLiteral("mergedUp");
+  }];
+}
 
 #endif // DYNAMATIC_DIALECT_HANDSHAKE_HANDSHAKE_OPS_TD

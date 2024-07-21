@@ -144,10 +144,10 @@ begin
     cmp_predicate = "UGE" or
     cmp_predicate = "ULT" or
     cmp_predicate = "ULE" generate
-      result(0) <= ip_unordered and ip_result;
+      result(0) <= ip_unordered or ip_result;
     elsif
     cmp_predicate = "UNE" generate
-      result(0) <= ip_unordered and not ip_result;
+      result(0) <= ip_unordered or not ip_result;
     elsif
     cmp_predicate = "UNO" generate
       result(0) <= ip_unordered;

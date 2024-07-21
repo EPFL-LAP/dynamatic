@@ -10,13 +10,15 @@ source "$1"/tools/dynamatic/scripts/utils.sh
 DYNAMATIC_DIR=$1
 OUTPUT_DIR=$2
 KERNEL_NAME=$3
+FULL_CLOCK=$4
+HALF_CLOCK=$5
 
 # Generated directories/files
 SYNTH_DIR="$OUTPUT_DIR/synth"
 SYNTH_HDL_DIR="$SYNTH_DIR/hdl"
 F_REPORT="$SYNTH_DIR/report.txt"
 F_SCRIPT="$SYNTH_DIR/synthesize.tcl"
-F_PERIOD="$SYNTH_DIR/period_4.xdc"
+F_PERIOD="$SYNTH_DIR/period_${FULL_CLOCK}.xdc"
 F_UTILIZATION_SYN="$SYNTH_DIR/utilization_post_syn.rpt"
 F_TIMING_SYN="$SYNTH_DIR/timing_post_syn.rpt"
 F_UTILIZATION_PR="$SYNTH_DIR/utilization_post_pr.rpt"
@@ -70,7 +72,7 @@ report_timing > $F_TIMING_PR
 exit" > "$F_SCRIPT"
 
 echo -e \
-"create_clock -name clk -period 4.000 -waveform {0.000 2.000} [get_ports clk]
+"create_clock -name clk -period $FULL_CLOCK -waveform {0.000 $HALF_CLOCK} [get_ports clk]
 set_property HD.CLK_SRC BUFGCTRL_X0Y0 [get_ports clk]
 
 #set_input_delay 0 -clock CLK  [all_inputs]
