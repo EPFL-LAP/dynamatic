@@ -48,6 +48,9 @@ public:
     }
   };
 
+  // this function allows for changing the addresses of the blocks  
+  void adjustBlocksPtrs(Region &funcReg); 
+
   // return all BBs that the block in the argument is control dependent on
   void returnAllControlDeps(
       mlir::Block *block,
