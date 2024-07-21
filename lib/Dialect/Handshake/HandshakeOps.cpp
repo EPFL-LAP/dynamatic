@@ -163,6 +163,8 @@ ParseResult MergeOp::parse(OpAsmParser &parser, OperationState &result) {
 
 void MergeOp::print(OpAsmPrinter &p) { sostPrint(p, false); }
 
+OpResult MergeOp::getDataResult() { return cast<OpResult>(getResult()); }
+
 LogicalResult
 MuxOp::inferReturnTypes(MLIRContext *context, std::optional<Location> location,
                         ValueRange operands, DictionaryAttr attributes,
@@ -222,6 +224,8 @@ LogicalResult MuxOp::verify() {
                                getDataOperands().size());
 }
 
+OpResult MuxOp::getDataResult() { return cast<OpResult>(getResult()); }
+
 ParseResult ControlMergeOp::parse(OpAsmParser &parser, OperationState &result) {
   SmallVector<OpAsmParser::UnresolvedOperand, 4> allOperands;
   Type resultType, indexType;
@@ -258,6 +262,8 @@ LogicalResult ControlMergeOp::verify() {
     return emitOpError("type of first result should match type of operands");
   return verifyIndexWideEnough(*this, getIndex(), getNumOperands());
 }
+
+OpResult ControlMergeOp::getDataResult() { return cast<OpResult>(getResult()); }
 
 LogicalResult FuncOp::verify() {
   // If this function is external there is nothing to do.
@@ -1260,7 +1266,7 @@ handshake::LSQLoadOp LSQLoadPort::getLSQLoadOp() const {
 
 StorePort::StorePort(handshake::StoreOpInterface storeOp, unsigned addrInputIdx,
                      Kind kind)
-    : MemoryPort(storeOp, {addrInputIdx, addrInputIdx + 1}, {}, kind){};
+    : MemoryPort(storeOp, {addrInputIdx, addrInputIdx + 1}, {}, kind) {};
 
 handshake::StoreOpInterface StorePort::getStoreOp() const {
   return cast<handshake::StoreOpInterface>(portOp);
@@ -1311,7 +1317,8 @@ handshake::MemoryControllerOp MCLoadStorePort::getMCOp() const {
 // GroupMemoryPorts
 //===----------------------------------------------------------------------===//
 
-GroupMemoryPorts::GroupMemoryPorts(ControlPort ctrlPort) : ctrlPort(ctrlPort){};
+GroupMemoryPorts::GroupMemoryPorts(ControlPort ctrlPort)
+    : ctrlPort(ctrlPort) {};
 
 unsigned GroupMemoryPorts::getNumInputs() const {
   unsigned numInputs = hasControl() ? 1 : 0;
@@ -1419,9 +1426,9 @@ mlir::ValueRange FuncMemoryPorts::getInterfacesResults() {
 }
 
 MCBlock::MCBlock(GroupMemoryPorts *group, unsigned blockID)
-    : blockID(blockID), group(group){};
+    : blockID(blockID), group(group) {};
 
-MCPorts::MCPorts(handshake::MemoryControllerOp mcOp) : FuncMemoryPorts(mcOp){};
+MCPorts::MCPorts(handshake::MemoryControllerOp mcOp) : FuncMemoryPorts(mcOp) {};
 
 handshake::MemoryControllerOp MCPorts::getMCOp() const {
   return cast<handshake::MemoryControllerOp>(memOp);
@@ -1447,7 +1454,7 @@ LSQLoadStorePort MCPorts::getLSQPort() const {
   return *lsqPort;
 }
 
-LSQGroup::LSQGroup(GroupMemoryPorts *group) : group(group){};
+LSQGroup::LSQGroup(GroupMemoryPorts *group) : group(group) {};
 
 SmallVector<LSQGroup> LSQPorts::getGroups() {
   SmallVector<LSQGroup> lsqGroups;
@@ -1456,7 +1463,7 @@ SmallVector<LSQGroup> LSQPorts::getGroups() {
   return lsqGroups;
 }
 
-LSQPorts::LSQPorts(handshake::LSQOp lsqOp) : FuncMemoryPorts(lsqOp){};
+LSQPorts::LSQPorts(handshake::LSQOp lsqOp) : FuncMemoryPorts(lsqOp) {};
 
 handshake::LSQOp LSQPorts::getLSQOp() const {
   return cast<handshake::LSQOp>(memOp);
@@ -1696,7 +1703,7 @@ ChannelBufProps::ChannelBufProps(unsigned minTrans,
                                  double inDelay, double outDelay, double delay)
     : minTrans(minTrans), maxTrans(maxTrans), minOpaque(minOpaque),
       maxOpaque(maxOpaque), inDelay(inDelay), outDelay(outDelay),
-      delay(delay){};
+      delay(delay) {};
 
 bool ChannelBufProps::isSatisfiable() const {
   return (!maxTrans.has_value() || *maxTrans >= minTrans) &&

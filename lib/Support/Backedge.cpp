@@ -70,7 +70,8 @@ Backedge::Backedge(Operation *op, PatternRewriter *rewriter)
     : value(op->getResult(0)), rewriter(rewriter) {}
 
 void Backedge::setValue(mlir::Value newValue) {
-  assert(value.getType() == newValue.getType());
+  assert(value.getType() == newValue.getType() &&
+         "incorrect replacement value type");
   assert(!set && "backedge already set to a value!");
   if (rewriter)
     rewriter->replaceAllUsesWith(value, newValue);

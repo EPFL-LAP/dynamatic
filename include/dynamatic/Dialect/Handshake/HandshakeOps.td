@@ -354,7 +354,8 @@ def LazyForkOp : Handshake_Op<"lazy_fork", [
 }
 
 def MergeOp : Handshake_Op<"merge", [
-  Pure, MergeLikeOpInterface, SOSTInterface, SameOperandsAndResultType
+  Pure, SOSTInterface, SameOperandsAndResultType,
+  DeclareOpInterfaceMethods<MergeLikeOpInterface, ["getDataResult"]>
 ]> {
   let summary = "merge operation";
   let description = [{
@@ -375,7 +376,8 @@ def MergeOp : Handshake_Op<"merge", [
 }
 
 def MuxOp : Handshake_Op<"mux", [
-  Pure, MergeLikeOpInterface,
+  Pure,
+  DeclareOpInterfaceMethods<MergeLikeOpInterface, ["getDataResult"]>,
   DeclareOpInterfaceMethods<InferTypeOpInterface, ["inferReturnTypes"]>,
   DeclareOpInterfaceMethods<ControlInterface, ["isControl"]>,
   DeclareOpInterfaceMethods<NamedIOInterface, ["getOperandName"]>
@@ -405,7 +407,8 @@ def MuxOp : Handshake_Op<"mux", [
 }
 
 def ControlMergeOp : Handshake_Op<"control_merge", [
-  Pure, MergeLikeOpInterface, HasClock, SOSTInterface,
+  Pure, HasClock, SOSTInterface,
+  DeclareOpInterfaceMethods<MergeLikeOpInterface, ["getDataResult"]>,
   DeclareOpInterfaceMethods<NamedIOInterface, ["getResultName"]>
 ]> {
   let summary = "control merge operation";
