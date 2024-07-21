@@ -598,8 +598,9 @@ LogicalResult HandshakeLowering::replaceMemoryOps(
 
 LogicalResult HandshakeLowering::verifyAndCreateMemInterfaces(
     ConversionPatternRewriter &rewriter, MemInterfacesInfo &memInfo) {
-  // Create a mapping between each block and all the other blocks it properly
-  // dominates so that we can quickly determine whether LSQ groups make sense
+  // Create a mapping between each block and all the other blocks it
+  // properly dominates so that we can quickly determine whether LSQ groups
+  // make sense
   DominanceInfo domInfo;
   DenseMap<Block *, DenseSet<Block *>> dominations;
   for (Block &maybeDominator : region) {
@@ -1109,6 +1110,7 @@ struct CfToHandshakePass
     // Lower every function individually
     auto funcOps = modOp.getOps<handshake::FuncOp>();
     for (handshake::FuncOp funcOp : llvm::make_early_inc_range(funcOps)) {
+
       // Lower the region inside the function if it is not external
       if (!funcOp.isExternal()) {
         HandshakeLowering hl(funcOp.getBody(), getAnalysis<NameAnalysis>());

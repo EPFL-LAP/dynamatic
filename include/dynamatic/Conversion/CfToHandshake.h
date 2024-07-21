@@ -61,8 +61,9 @@ public:
   /// them.
   using MemInterfacesInfo = llvm::MapVector<Value, MemAccesses>;
 
-  /// Constructor simply takes the region being lowered and a reference to the
-  /// top-level name analysis.
+  /// Constructor simply takes the region being lowered, a reference to the
+  /// top-level name analysis, a reference to the control dependence analysis
+  /// and the index of the function being lowered
   explicit HandshakeLowering(Region &region, NameAnalysis &nameAnalysis)
       : region(region), nameAnalysis(nameAnalysis) {}
 
@@ -149,6 +150,7 @@ public:
 protected:
   /// The region being lowered.
   Region &region;
+
   /// Start point of the control-only network
   BlockArgument startCtrl;
 
