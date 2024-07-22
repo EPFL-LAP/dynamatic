@@ -26,6 +26,7 @@
 #include <set>
 #include <string>
 #include <utility>
+#include <vector>
 
 namespace dynamatic {
 namespace experimental {
