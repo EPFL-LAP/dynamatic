@@ -47,6 +47,7 @@
 #include "llvm/ADT/StringRef.h"
 #include "llvm/ADT/TypeSwitch.h"
 #include "llvm/Support/raw_ostream.h"
+#include <cstdlib>
 #include <iterator>
 #include <unordered_set>
 #include <utility>
@@ -695,14 +696,6 @@ LogicalResult HandshakeLowering::verifyAndCreateMemInterfaces(
       std::vector<Operation *> allOperations =
           getLSQPredecessors(memAccesses.lsqPorts);
 
-      llvm::errs() << "Number of operations: " << allOperations.size() << "\n";
-      for (Operation *op : allOperations) {
-        llvm::errs() << *op << "\n";
-        op->getBlock()->printAsOperand(llvm::errs());
-        llvm::errs() << " ";
-      }
-      llvm::errs() << "\n";
-
       std::vector<ProdConsMemDep> allMemDeps;
       identifyMemDeps(allOperations, allMemDeps);
 
@@ -1164,24 +1157,6 @@ void HandshakeLowering::constructGroupsGraph(
 }
 
 void HandshakeLowering::minimizeGroupsConnections(std::set<Group *> &groups) {
-  llvm::errs() << "Now printing groups graph before minimiztion\n";
-  for (Group *group : groups) {
-    llvm::errs() << "Getting info on: ";
-    group->bb->printAsOperand(llvm::errs());
-    llvm::errs() << "\n Preds: ";
-    for (Group *pred : group->preds) {
-      pred->bb->printAsOperand(llvm::errs());
-      llvm::errs() << "  ";
-    }
-    llvm::errs() << "\n Succs: ";
-    for (Group *succ : group->succs) {
-      succ->bb->printAsOperand(llvm::errs());
-      llvm::errs() << "  ";
-    }
-    llvm::errs() << "\n";
-    llvm::errs() << "\n";
-  }
-  llvm::errs() << "Done Printing groups graph\n";
   /// Get the dominance info for the region
   DominanceInfo domInfo;
 
@@ -1206,24 +1181,6 @@ void HandshakeLowering::minimizeGroupsConnections(std::set<Group *> &groups) {
       (*group)->preds.erase(pred);
     }
   }
-  llvm::errs() << "Now printing groups graph\n";
-  for (Group *group : groups) {
-    llvm::errs() << "Getting info on: ";
-    group->bb->printAsOperand(llvm::errs());
-    llvm::errs() << "\n Preds: ";
-    for (Group *pred : group->preds) {
-      pred->bb->printAsOperand(llvm::errs());
-      llvm::errs() << "  ";
-    }
-    llvm::errs() << "\n Succs: ";
-    for (Group *succ : group->succs) {
-      succ->bb->printAsOperand(llvm::errs());
-      llvm::errs() << "  ";
-    }
-    llvm::errs() << "\n";
-    llvm::errs() << "\n";
-  }
-  llvm::errs() << "Done Printing groups graph\n";
 }
 // DFS to return all nodes in the path between the start_node and end_node
 // (not including start_node and end_node) in the postDom tree
@@ -1322,6 +1279,7 @@ BoolExpression *pathToMinterm(const std::vector<Block *> &path) {
   return exp;
 }
 
+// Checks if every Block in the path is found in the control dependency list
 bool HandshakeLowering::checkControlDep(
     const SmallVector<Block *, 4> &controlDeps,
     const std::vector<Block *> &path) {
@@ -1333,33 +1291,22 @@ bool HandshakeLowering::checkControlDep(
 }
 
 // Enmerates all paths from the start Block to the end Block in the CFG and
-// returns a SOP
+// returns a minimized SOP
 BoolExpression *HandshakeLowering::enumeratePaths(Block *start, Block *end) {
   BoolExpression *sop = BoolExpression::parseSop("0");
   std::vector<std::vector<Block *>> allPaths = findAllPaths(start, end);
-
+  SmallVector<Block *, 4> blockControlDeps;
+  cdgAnalysis.calculateBlockForwardControlDeps(end, funcOpIdx,
+                                               blockControlDeps);
   for (const std::vector<Block *> &path : allPaths) {
-    SmallVector<Block *, 4> returnedControlDeps;
-    // given a block, it returns (by reference) all blocks it is control
-    // dependent on
-    // cdgAnalysis.returnAllControlDeps(end, returnedControlDeps);
-    // if (checkControlDep(returnedControlDeps, path)) {
-    BoolExpression *minterm = pathToMinterm(path);
-    sop = BoolExpression::boolOr(sop, minterm);
-    // }
-  }
-  return sop;
-}
-
-void replaceOperand(Operation *op, Value oldOperand, Value newOperand) {
-  int i = 0;
-  for (Value v : op->getOperands()) {
-    if (v == oldOperand) {
-      op->setOperand(i, newOperand);
-      return;
+    /// Check if the end block is control dependent on all the Blocks in the
+    /// path
+    if (checkControlDep(blockControlDeps, path)) {
+      BoolExpression *minterm = pathToMinterm(path);
+      sop = BoolExpression::boolOr(sop, minterm);
     }
-    i++;
   }
+  return sop->boolMinimize();
 }
 
 LogicalResult HandshakeLowering::addMergeNonLoop(
@@ -1404,8 +1351,8 @@ LogicalResult HandshakeLowering::addMergeNonLoop(
         // Remove the old connection between the producer's LazyFork and the
         // consumer's LazyFork
         // Connect the MERGE to the consumer's LazyFork
-        replaceOperand(forksGraph[cons], forksGraph[prod]->getResult(0),
-                       mergeOp->getResult(0));
+        forksGraph[cons]->replaceUsesOfWith(forksGraph[prod]->getResult(0),
+                                            mergeOp->getResult(0));
       }
     }
   }
@@ -1470,11 +1417,8 @@ HandshakeLowering::addMergeLoop(OpBuilder &builder, std::set<Group *> &groups,
         if (loop) {
           /// Insert the MERGE at the beginning of the loop header with START
           /// and the result of the producer as operands
-          llvm::errs() << "Before loopheader\n";
           Block *loopHeader = loop->getHeader();
           builder.setInsertionPointToStart(loopHeader);
-          llvm::errs() << "After loopheader\n";
-
           /*
           /// Either add the result of the LazyFork on the result of the MERGE
           /// If the LazyFork in the producer is feeding a non-loop MERGE,
@@ -1494,16 +1438,12 @@ HandshakeLowering::addMergeLoop(OpBuilder &builder, std::set<Group *> &groups,
 
           /// For each path from the producer to the consumer, add a MERGE
           /// right before the consumer
-          llvm::errs() << "Before findAllPaths\n";
           std::vector<std::vector<Operation *>> allPaths =
               findAllPaths(forksGraph[prod], forksGraph[cons]);
-          llvm::errs() << "After findAllPaths\n";
           for (std::vector<Operation *> path : allPaths) {
-            llvm::errs() << "Before mergeOperand\n";
             SmallVector<Value> operands;
             /// Get the result of the Operation right before the consumer
             Value mergeOperand = path.at(path.size() - 2)->getResult(0);
-            llvm::errs() << "After mergeOperand\n";
             operands.push_back(mergeOperand);
             operands.push_back(startCtrl);
             auto mergeOp = builder.create<handshake::MergeOp>(
@@ -1516,8 +1456,8 @@ HandshakeLowering::addMergeLoop(OpBuilder &builder, std::set<Group *> &groups,
             // Remove the old connection between the producer's LazyFork and
             // the consumer's LazyFork Connect the MERGE to the consumer's
             // LazyFork
-            replaceOperand(forksGraph[cons], mergeOperand,
-                           mergeOp->getResult(0));
+            forksGraph[cons]->replaceUsesOfWith(mergeOperand,
+                                                mergeOp->getResult(0));
           }
         }
       }
@@ -1614,7 +1554,7 @@ LogicalResult HandshakeLowering::addPhi(ConversionPatternRewriter &rewriter) {
           input = mergeOp.getResult();
           merges.push_back(mergeOp);
         }
-        replaceOperand(&consOp, operand, input);
+        consOp.replaceUsesOfWith(operand, input);
         for (auto *mergeOp : merges)
           mergeOp->insertOperands(1, mergeOp->getResult(0));
         allMerges.insert(allMerges.end(), merges.begin(), merges.end());
@@ -1623,6 +1563,79 @@ LogicalResult HandshakeLowering::addPhi(ConversionPatternRewriter &rewriter) {
   }
   alloctionNetwork.insert(alloctionNetwork.end(), allMerges.begin(),
                           allMerges.end());
+  return success();
+}
+
+LogicalResult HandshakeLowering::addSupp(ConversionPatternRewriter &rewriter) {
+  SmallVector<Operation *> allBranches;
+  for (Block &cons : region.getBlocks()) {
+    for (Operation &consOp : cons.getOperations()) {
+      if (std::find(alloctionNetwork.begin(), alloctionNetwork.end(),
+                    &consOp) == alloctionNetwork.end())
+        continue;
+      /// If the current consumer is a BRANCH that was added in addSupp, then
+      /// skip it to avoid an infinite loop
+      if (std::find(allBranches.begin(), allBranches.end(), &consOp) !=
+          allBranches.end())
+        continue;
+      for (Value operand : consOp.getOperands()) {
+        if (mlir::Operation *definingOp = operand.getDefiningOp()) {
+          /// If the operand is a result of a producer operation (not start),
+          /// then check if the producer is a BRANCH that was added in addSupp
+          /// If that is the case, then skip it to avoid an infinite loop
+          mlir::OpResult valueRes = cast<mlir::OpResult>(operand);
+          Operation *prodOp = valueRes.getOwner();
+          if (std::find(allBranches.begin(), allBranches.end(), prodOp) !=
+              allBranches.end())
+            continue;
+          Block *prod = getValueProducer(operand);
+          /// Skip producers and consumers that are in the same block
+          if (prod == &cons)
+            continue;
+
+          /// Innermost loop containig the producer doesn't contain the consumer
+          bool moreProdThanCons =
+              (li.getLoopFor(prod) && !li.getLoopFor(prod)->contains(&cons));
+
+          if (moreProdThanCons) {
+            if (failed(
+                    manageMoreProdThanCons(rewriter, prodOp, &consOp, operand)))
+              return failure();
+          }
+        }
+      }
+    }
+  }
+  alloctionNetwork.insert(alloctionNetwork.end(), allBranches.begin(),
+                          allBranches.end());
+  return success();
+}
+
+LogicalResult HandshakeLowering::manageMoreProdThanCons(
+    ConversionPatternRewriter &rewriter, Operation *producer,
+    Operation *consumer, Value connection) {
+  /// Identify every loop containing the producer and not the consumer
+  std::set<CFGLoop *> producerLoopsWithoutConsumer;
+  CFGLoop *loop = li.getLoopFor(producer->getBlock());
+  while (loop) {
+    if (!loop->contains(consumer->getBlock())) {
+      producerLoopsWithoutConsumer.insert(loop);
+    }
+    loop = loop->getParentLoop();
+  }
+
+  for (CFGLoop *loop : producerLoopsWithoutConsumer) {
+    Block *loopExit = loop->getExitingBlock();
+    if (loopExit) {
+      auto branchOp = rewriter.create<handshake::ConditionalBranchOp>(
+          loopExit->getOperations().front().getLoc(),
+          getBlockEntryControl(loopExit), connection);
+      consumer->replaceUsesOfWith(connection, branchOp.getTrueResult());
+    } else {
+      SmallVector<Block *> exitBlocks;
+      loop->getExitBlocks(exitBlocks);
+    }
+  }
   return success();
 }
 
@@ -1897,6 +1910,8 @@ struct CfToHandshakePass
     funcTarget.addLegalOp<handshake::FuncOp>();
 
     // Call the analysis hee and fill the structures from Func::FuncOp
+    ControlDependenceAnalysis cdgAnalysis =
+        getAnalysis<ControlDependenceAnalysis>();
 
     if (failed(applyPartialConversion(modOp, funcTarget, std::move(patterns))))
       return signalPassFailure();
@@ -1906,14 +1921,21 @@ struct CfToHandshakePass
 
     // Lower every function individually
     auto funcOps = modOp.getOps<handshake::FuncOp>();
+    int funcOpIdx = 0;
     for (handshake::FuncOp funcOp : llvm::make_early_inc_range(funcOps)) {
+      // Loop over the Blocks of this funcOp to update the ptrs of every Block
+      // in the control dependency strucute of this funcOp_idx
+      mlir::Region &funcReg = funcOp.getBody();
+      for (mlir::Block &block : funcReg.getBlocks()) {
+        cdgAnalysis.adjustBlockPtr(funcOpIdx, &block);
+      }
+
       // Lower the region inside the function if it is not external
       if (!funcOp.isExternal()) {
-        // ControlDependenceAnalysis cdgAnalysis =
-        //    getAnalysis<ControlDependenceAnalysis>();
         mlir::DominanceInfo domInfo;
-        HandshakeLowering hl(funcOp.getBody(), getAnalysis<NameAnalysis>(),
-                             domInfo);
+        HandshakeLowering hl(funcOp.getBody(), funcOpIdx,
+                             getAnalysis<NameAnalysis>(),
+                             getAnalysis<ControlDependenceAnalysis>(), domInfo);
 
         if (failed(lowerRegion(hl)))
           return signalPassFailure();

@@ -80,10 +80,12 @@ public:
   // explicit HandshakeLowering(Region &region, NameAnalysis &nameAnalysis)
   //     : region(region), nameAnalysis(nameAnalysis) {}
 
-  explicit HandshakeLowering(Region &region, NameAnalysis &nameAnalysis,
+  explicit HandshakeLowering(Region &region, int funcOpIdx,
+                             NameAnalysis &nameAnalysis,
+                             ControlDependenceAnalysis &cdgAnalysis,
                              mlir::DominanceInfo &domInfo)
-      : region(region), nameAnalysis(nameAnalysis),
-        li(domInfo.getDomTree(&region)) {}
+      : region(region), funcOpIdx(funcOpIdx), nameAnalysis(nameAnalysis),
+        cdgAnalysis(cdgAnalysis), li(domInfo.getDomTree(&region)) {}
 
   /// Creates the control-only network by adding a control-only argument to the
   /// region's entry block and forwarding it through all basic blocks.
@@ -211,11 +213,24 @@ public:
   /// the operands. The result of the JOIN becomes the operand of the ForkOp
   void insertJoins(std::set<Operation *> forks);
 
+  /// Adds MERGES in fast token delivery algorithm
   LogicalResult addPhi(ConversionPatternRewriter &rewriter);
+
+  /// Adds BRANCHES in fast token delivery algorithm
+  LogicalResult addSupp(ConversionPatternRewriter &rewriter);
+
+  LogicalResult manageMoreProdThanCons(ConversionPatternRewriter &rewriter,
+                                       Operation *producer, Operation *consumer,
+                                       Value connection);
 
 protected:
   /// The region being lowered.
   Region &region;
+
+  // The index of the funcOp containing the region being lowered in the list of
+  // funcOps in the ModuleOp
+  int funcOpIdx;
+
   /// Start point of the control-only network
   BlockArgument startCtrl;
 
@@ -247,6 +262,9 @@ private:
   /// Name analysis to name new memory operations as they are created and keep
   /// reference accesses in memory dependencies consistent.
   NameAnalysis &nameAnalysis;
+  // Control dependence analysis to identify the conditions of production and
+  // consumption of operations to implement fast token delivery
+  ControlDependenceAnalysis &cdgAnalysis;
 
   mlir::CFGLoopInfo li;
 

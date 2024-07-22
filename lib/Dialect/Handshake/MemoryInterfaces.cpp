@@ -183,7 +183,6 @@ LogicalResult MemoryInterfaceBuilder::instantiateInterfacesWithForks(
     handshake::LSQOp &lsqOp, std::set<Group *> &groups,
     DenseMap<Block *, Operation *> &forksGraph, Value start,
     std::vector<Operation *> &alloctionNetwork) {
-
   // Determine interfaces' inputs
   InterfaceInputs inputs;
 
@@ -297,11 +296,6 @@ MemoryInterfaceBuilder::determineInterfaceInputs(InterfaceInputs &inputs,
     if (!block)
       return firstOpInGroup->emitError() << "LSQ port must belong to a BB.";
     Value groupCtrl = getCtrl(*block);
-    llvm::errs() << "HH\n";
-    llvm::errs() << groupCtrl.getDefiningOp()->getName();
-    llvm::errs() << "\n";
-    groupCtrl.getParentBlock()->printAsOperand(llvm::errs());
-    llvm::errs() << "end\n";
     if (!groupCtrl)
       return failure();
     inputs.lsqInputs.push_back(groupCtrl);
@@ -420,8 +414,13 @@ LogicalResult MemoryInterfaceBuilder::determineInterfaceInputsWithForks(
 
   // Determine LSQ inputs
   for (auto [group, lsqGroupOps] : lsqPorts) {
-
     Operation *firstOpInGroup = lsqGroupOps.front();
+    std::optional<unsigned> block = getLogicBB(firstOpInGroup);
+    Value groupCtrl = getCtrl(*block);
+    llvm::errs() << "Printing ctrl: ";
+    llvm::errs() << groupCtrl << "\n";
+
+    // Operation *firstOpInGroup = lsqGroupOps.front();
     Operation *forkNode = forksGraph[firstOpInGroup->getBlock()];
     inputs.lsqInputs.push_back(forkNode->getResult(1));
     /*
