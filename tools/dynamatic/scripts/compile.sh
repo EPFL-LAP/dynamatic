@@ -13,17 +13,9 @@ OUTPUT_DIR=$3
 KERNEL_NAME=$4
 USE_SIMPLE_BUFFERS=$5
 TARGET_CP=$6
-POLYGEIST_DIR=$7
+POLYGEIST_PATH=$7
 USE_SHARING=$8
 
-# Binaries used during compilation
-# Check if POLYGEIST_DIR is null
-if [ -z "$POLYGEIST_DIR" ]; then
-  POLYGEIST_PATH="$DYNAMATIC_DIR/polygeist"
-else
-  POLYGEIST_PATH="$POLYGEIST_DIR"
-  echo_info "Using Polygeist path: $POLYGEIST_PATH"
-fi
 POLYGEIST_CLANG_BIN="$DYNAMATIC_DIR/bin/cgeist"
 CLANGXX_BIN="$DYNAMATIC_DIR/bin/clang++"
 DYNAMATIC_OPT_BIN="$DYNAMATIC_DIR/bin/dynamatic-opt"
