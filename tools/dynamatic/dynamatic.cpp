@@ -74,7 +74,8 @@ namespace {
 enum class CommandResult { SYNTAX_ERROR, FAIL, SUCCESS, EXIT, HELP };
 } // namespace
 
-template <typename... Tokens> static CommandResult execCmd(Tokens... tokens) {
+template <typename... Tokens>
+static CommandResult execCmd(Tokens... tokens) {
   return exec({tokens...}) != 0 ? CommandResult::FAIL : CommandResult::SUCCESS;
 }
 
@@ -329,7 +330,8 @@ public:
 
   FrontendCommands() = default;
 
-  template <typename Cmd> void add(FrontendState &state) {
+  template <typename Cmd>
+  void add(FrontendState &state) {
     std::unique_ptr<Cmd> newCmd = std::make_unique<Cmd>(state);
     if (cmds.contains(newCmd->keyword)) {
       llvm::errs() << "Multiple commands exist with keyword '"
@@ -573,7 +575,8 @@ CommandResult Compile::execute(CommandArguments &args) {
 
   return execCmd(script, state.dynamaticPath, state.getKernelDir(),
                  state.getOutputDir(), state.getKernelName(), buffers,
-                 floatToString(state.targetCP), state.polygeistPath, sharing);
+                 floatToString(state.targetCP, 3), state.polygeistPath,
+                 sharing);
 }
 
 CommandResult WriteHDL::execute(CommandArguments &args) {
