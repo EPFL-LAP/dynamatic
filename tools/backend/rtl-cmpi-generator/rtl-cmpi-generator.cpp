@@ -41,6 +41,10 @@ static cl::opt<std::string>
               cl::desc("<integer comparison predicate>"),
               cl::cat(mainCategory));
 
+static cl::opt<std::string> hdlType(cl::Positional, cl::Required,
+                                       cl::desc("<hdl type>"),
+                                       cl::cat(mainCategory));
+
 /// Returns the VHDL comparator corresponding to the comparison's predicate.
 static StringRef getComparator(arith::CmpIPredicate pred) {
   switch (pred) {
@@ -64,7 +68,7 @@ static StringRef getComparator(arith::CmpIPredicate pred) {
 }
 
 /// Returns the VHDL type modifier associated with the comparison's predicate.
-static StringRef getModifier(arith::CmpIPredicate pred) {
+static StringRef getModifierVHDL(arith::CmpIPredicate pred) {
   switch (pred) {
   case arith::CmpIPredicate::eq:
   case arith::CmpIPredicate::ne:
@@ -81,6 +85,25 @@ static StringRef getModifier(arith::CmpIPredicate pred) {
     return "unsigned";
   }
 }
+
+/// Returns the VHDL type modifier associated with the comparison's predicate.
+static StringRef getModifierVerilog(arith::CmpIPredicate pred) {
+  switch (pred) {
+  case arith::CmpIPredicate::eq:
+  case arith::CmpIPredicate::ne:
+  case arith::CmpIPredicate::ult:
+  case arith::CmpIPredicate::ule:
+  case arith::CmpIPredicate::ugt:
+  case arith::CmpIPredicate::uge:
+    return "";
+  case arith::CmpIPredicate::slt:
+  case arith::CmpIPredicate::sle:
+  case arith::CmpIPredicate::sgt:
+  case arith::CmpIPredicate::sge:
+    return "signed";
+  }
+}
+
 
 int main(int argc, char **argv) {
   InitLLVM y(argc, argv);
@@ -123,7 +146,14 @@ int main(int argc, char **argv) {
   std::map<std::string, std::string> replacementMap;
   replacementMap["ENTITY_NAME"] = entityName;
   replacementMap["COMPARATOR"] = getComparator(*pred);
-  replacementMap["MODIFIER"] = getModifier(*pred);
+  if(hdlType == "vhdl")
+    replacementMap["MODIFIER"] = getModifierVHDL(*pred);
+  else if (hdlType == "verilog")
+    replacementMap["MODIFIER"] = getModifierVerilog(*pred);
+  else {
+    llvm::errs() << "Unknown HDL type \"" << hdlType << "\"\n";
+    return 1;
+  }
 
   // Dump to the output file and return
   outputFile << dynamatic::replaceRegexes(inputData, replacementMap);

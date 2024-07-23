@@ -32,7 +32,7 @@
       { "name": "PREDICATE", "type": "string" },
       { "name": "DATA_WIDTH", "type": "unsigned", "generic": true }
     ],
-    "generator": "\"$DYNAMATIC/bin/generators/rtl-cmpi-generator\" \"$DYNAMATIC/experimental/data/verilog/arith/cmpi.v\" \"$OUTPUT_DIR/$MODULE_NAME.v\" $MODULE_NAME $PREDICATE",
+    "generator": "\"$DYNAMATIC/bin/generators/rtl-cmpi-generator\" \"$DYNAMATIC/experimental/data/verilog/arith/cmpi.v\" \"$OUTPUT_DIR/$MODULE_NAME.v\" $MODULE_NAME $PREDICATE verilog",
     "dependencies": ["join"]
   },
   {
