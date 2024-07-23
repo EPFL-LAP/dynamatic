@@ -1,5 +1,5 @@
 module ofifo_dataless #(
-  parameter SLOTS = 2;
+  parameter SLOTS = 2
 )(
   input  clk,
   input  rst,
