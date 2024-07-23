@@ -875,7 +875,21 @@ void VerilogWriter::writeModuleInstantiations(WriteData &data) const {
 
 void VerilogWriter::writeIOMap(hw::InstanceOp instOp, WriteData &data) const {
   IOMap ioMap(instOp, exportInfo, data.getSignalNameFunc());
-  size_t numIOLeft = ioMap.inputs.size() + ioMap.outputs.size();
+  //size_t numIOLeft = ioMap.inputs.size() + ioMap.outputs.size();
+  std::vector<std::string> totalPorts; 
+  for (auto &[modPortName, internalSignalName] : ioMap.inputs) {
+    if(std::find(totalPorts.begin(), totalPorts.end(), modPortName) != totalPorts.end()) {
+      continue;
+    }
+    totalPorts.push_back(modPortName);
+  }
+  for (auto &[modPortName, internalSignalName1] : ioMap.outputs) {
+    if(std::find(totalPorts.begin(), totalPorts.end(), modPortName) != totalPorts.end()) {
+      continue;
+    }
+    totalPorts.push_back(modPortName);
+  }
+  size_t numIOLeft = totalPorts.size();
 
   raw_indented_ostream &os = data.os;
   auto writePortsDir = [&](std::vector<PortMapPair> io, StringRef name) {
@@ -885,7 +899,24 @@ void VerilogWriter::writeIOMap(hw::InstanceOp instOp, WriteData &data) const {
 
     if (!io.empty())
       os << "// " << name << "\n";
-    for (auto &[modPortName, internalSignalName] : io) {
+    std::vector<PortMapPair> reformatted_io; // io with the same signal grouped
+    std::vector<std::string> traversedPorts; 
+    for (auto &[modPortName1, internalSignalName1] : io) {
+      if(std::find(traversedPorts.begin(), traversedPorts.end(), modPortName1) != traversedPorts.end()) {
+        continue;
+      }
+      traversedPorts.push_back(modPortName1);
+      // it assumes that the order in which the signals are traversed is from LSB to MSB
+      std::string reformattedSignalName = internalSignalName1 +"}";
+      for (auto &[modPortName2, internalSignalName2] : io) {
+        if(modPortName1 == modPortName2 && internalSignalName1 != internalSignalName2) {
+          reformattedSignalName = internalSignalName2 + "," + reformattedSignalName;
+        }
+      }
+      reformattedSignalName = "{" + reformattedSignalName;
+      reformatted_io.push_back(PortMapPair(modPortName1, reformattedSignalName));
+    }
+    for (auto &[modPortName, internalSignalName] : reformatted_io) {
       os << "." << modPortName << " (" << internalSignalName << ")";
       if (--numIOLeft != 0)
         os << ",";

@@ -751,7 +751,7 @@ static std::string getIndexedName(const Twine &name, size_t arrayIdx, HDL hdl) {
   case HDL::VHDL:
     return name.str() + "(" + std::to_string(arrayIdx) + ")";
   case HDL::VERILOG:
-    return name.str() + "[" + std::to_string(arrayIdx) + "]";
+    return name.str();
   }
 }
 
