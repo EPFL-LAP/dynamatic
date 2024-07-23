@@ -27,11 +27,6 @@ module merge_notehb_dataless #(
 	end
 
 	// Distribute the ready signal to all input channels
-	// TODO: Simplify the following always block, not needed I think
-	always @(*) begin
-		for (i = 0; i < INPUTS; i = i + 1) begin
-			ins_ready[i] = outs_ready;
-		end
-	end
+	assign ins_ready = {INPUTS{outs_ready}};
 
 endmodule
