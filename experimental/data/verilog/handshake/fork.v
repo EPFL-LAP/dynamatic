@@ -1,4 +1,4 @@
-module fork #(
+module fork_type #(
 	parameter SIZE = 2,
 	parameter BITWIDTH = 32
 )(

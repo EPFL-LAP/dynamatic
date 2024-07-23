@@ -25,7 +25,7 @@ module mc_store #(
   wire join_valid;
 
   // Instantiate join
-  join #(
+  join_type #(
     .SIZE(2)
   ) join_inst (
     .ins_valid  ({addrIn_valid, dataIn_valid}),

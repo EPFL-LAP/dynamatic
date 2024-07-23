@@ -850,6 +850,10 @@ void VerilogWriter::writeModuleInstantiations(WriteData &data) const {
         .Default([&](auto) { llvm_unreachable("unknown module type"); });
 
     raw_indented_ostream &os = data.os;
+    // join and fork are reserved keywords in verilog
+    if(moduleName.compare("join") == 0 || moduleName.compare("fork") == 0) {
+      moduleName = moduleName + "_type";
+    }
     os << moduleName << " ";
 
     // Write generic parameters if there are any

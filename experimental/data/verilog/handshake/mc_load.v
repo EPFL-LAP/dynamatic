@@ -5,19 +5,19 @@ module mc_load #(
   input clk,
   input rst,
   // Address from Circuit Channel
-  input  [ADDR_BITWIDTH - 1 : 0] addrIn,
+  input  [ADDR_WIDTH - 1 : 0] addrIn,
   input  addrIn_valid,
   output addrIn_ready,
   // Address to Interface Channel
-  output [ADDR_BITWIDTH - 1 : 0] addrOut,
+  output [ADDR_WIDTH - 1 : 0] addrOut,
   output addrOut_valid,
   input  addrOut_ready,
   // Data from Interface Channel
-  input  [DATA_BITWIDTH - 1 : 0] dataFromMem,
+  input  [DATA_WIDTH - 1 : 0] dataFromMem,
   input  dataFromMem_valid,
   output dataFromMem_ready,
   // Data from Memory Channel
-  output [DATA_BITWIDTH - 1 : 0] dataOut,
+  output [DATA_WIDTH - 1 : 0] dataOut,
   output dataOut_valid,
   input  dataOut_ready
 );

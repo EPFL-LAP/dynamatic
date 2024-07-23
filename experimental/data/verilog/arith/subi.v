@@ -17,7 +17,7 @@ module subi #(
 );
 
   // Instantiate the join node
-  join #(
+  join_type #(
     .SIZE(2)
   ) join_inputs (
     .ins_valid  ({rhs_valid, lhs_valid}),

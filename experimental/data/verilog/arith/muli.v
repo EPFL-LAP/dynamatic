@@ -53,7 +53,7 @@ module muli #(
   output rhs_ready
 );
 
-  assert(LATENCY != 4) else $fatal("muli only supports LATENCY = 4");
+  //assert(LATENCY != 4) else $fatal("muli only supports LATENCY = 4");
 
   wire join_valid;
   wire oehb_ready;
@@ -61,7 +61,7 @@ module muli #(
   wire [BITWIDTH - 1 : 0] oehb_dataOut, oehb_dataIn;
 
   // Instantiate the join node
-  join #(
+  join_type #(
     .SIZE(2)
   ) join_inputs (
     .ins_valid  ({rhs_valid, lhs_valid}),

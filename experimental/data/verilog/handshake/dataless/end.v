@@ -26,7 +26,7 @@ module end_sync_dataless #(
   );
 
   // Instantiate the join node
-  join #(
+  join_type #(
     .SIZE(2)
   ) join_ins_mem (
     .ins_valid  ({allMemDone, ins_valid}),

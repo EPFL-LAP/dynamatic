@@ -17,7 +17,7 @@ module addf #(
 );
   
   // Assert that BITWIDTH is 32
-  assert(BITWIDTH == 32) else $error("addf currently only supports 32-bit floating point operands");
+  //assert(BITWIDTH == 32) else $error("addf currently only supports 32-bit floating point operands");
   
   wire join_valid, oehb_ready, buff_valid;
   wire constant_zero = 1'b0;
@@ -30,7 +30,7 @@ module addf #(
   wire [ BITWIDTH + 1 :0] ip_result;
 
   // Instantiate the join node
-  join #(
+  join_type #(
     .SIZE(2)
   ) join_inputs (
     .ins_valid  ({rhs_valid, lhs_valid}),

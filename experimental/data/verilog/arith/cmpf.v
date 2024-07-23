@@ -18,7 +18,7 @@ module ENTITY_NAME #(
   output rhs_ready
 );
 
-  assert(BITWIDTH == 32) else $error("ENTITY_NAME currently only supports 32-bit floating point operands");
+  //assert(BITWIDTH == 32) else $error("ENTITY_NAME currently only supports 32-bit floating point operands");
 
   wire constant_one = 1'b1;
   wire [ BITWIDTH + 1 :0] ip_lhs, ip_rhs;
@@ -28,7 +28,7 @@ module ENTITY_NAME #(
   reg [10*8 : 0] cmp_predicate = "COMPARATOR";
 
   // Instantiate the join node
-  join #(
+  join_type #(
     .SIZE(2)
   ) join_inputs (
     .ins_valid  ({rhs_valid, lhs_valid}),

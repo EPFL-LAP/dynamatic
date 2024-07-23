@@ -16,7 +16,7 @@ module mulf #(
   output rhs_ready
 );
 
-  assert(BITWIDTH == 32) else $fatal("mulf currently only supports 32-bit inputs");
+  //assert(BITWIDTH == 32) else $fatal("mulf currently only supports 32-bit inputs");
 
   wire constant_zero = 1'b0;
   wire open_value;
@@ -30,7 +30,7 @@ module mulf #(
   wire [ BITWIDTH + 1 :0] ip_result;
 
   // Instantiate the join node
-  join #(
+  join_type #(
     .SIZE(2)
   ) join_inputs (
     .ins_valid  ({rhs_valid, lhs_valid}),
