@@ -23,7 +23,7 @@ module mux #(
   wire tehb_ins_valid;
 
   reg [DATA_WIDTH - 1 : 0] selectedData = 0;
-  reg selectedData_valid = 0
+  reg selectedData_valid = 0;
 
   integer i;
   always @(*) begin
