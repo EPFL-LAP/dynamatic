@@ -245,7 +245,7 @@
       { "name": "DATA_WIDTH", "type": "unsigned", "lb": 1 }
     ],
     "generic": "$DYNAMATIC/experimental/data/verilog/handshake/fork.v",
-    "dependencies": ["types", "fork_dataless"]
+    "dependencies": ["fork_dataless"]
   },
   {
     "name": "handshake.lazy_fork",
@@ -264,7 +264,7 @@
       { "name": "DATA_WIDTH", "type": "unsigned", "lb": 1 }
     ],
     "generic": "$DYNAMATIC/experimental/data/verilog/handshake/lazy_fork.v",
-    "dependencies": ["types", "lazy_fork_dataless"]
+    "dependencies": ["lazy_fork_dataless"]
   },
   {
     "name": "handshake.sink",
@@ -298,7 +298,7 @@
       { "name": "SELECT_WIDTH", "type": "unsigned", "lb": 1 }
     ],
     "generic": "$DYNAMATIC/experimental/data/verilog/handshake/mux.v",
-    "dependencies": ["types", "tehb"]
+    "dependencies": ["tehb"]
   },
   {
     "name": "handshake.control_merge",
@@ -319,7 +319,7 @@
       { "name": "INDEX_WIDTH", "type": "unsigned", "lb": 1 }
     ],
     "generic": "$DYNAMATIC/experimental/data/verilog/handshake/control_merge.v",
-    "dependencies": ["types", "control_merge_dataless"]
+    "dependencies": ["control_merge_dataless"]
   },
   {
     "name": "handshake.merge",
@@ -338,7 +338,7 @@
       { "name": "DATA_WIDTH", "type": "unsigned", "lb": 1 }
     ],
     "generic": "$DYNAMATIC/experimental/data/verilog/handshake/merge.v",
-    "dependencies": ["types", "tehb"]
+    "dependencies": ["tehb"]
   },
   {
     "name": "handshake.br",
@@ -469,8 +469,7 @@
       { "name": "NUM_MEMORIES", "type": "unsigned", "eq": 0, "generic": false }
     ],
     "generic": "$DYNAMATIC/experimental/data/verilog/handshake/dataless/end_memless.v",
-    "module-name": "end_sync_memless_dataless",
-    "dependencies": ["types"]
+    "module-name": "end_sync_memless_dataless"
   },
   {
     "name": "handshake.end",
@@ -533,19 +532,14 @@
     "generic": "$DYNAMATIC/experimental/data/verilog/support/flopoco_ip_cores.v"
   },
   {
-    "generic": "$DYNAMATIC/experimental/data/verilog/support/mc_support.v",
-    "dependencies": ["types"]
+    "generic": "$DYNAMATIC/experimental/data/verilog/support/mc_support.v"
   },
   {
-    "generic": "$DYNAMATIC/experimental/data/verilog/support/merge_notehb.v",
-    "dependencies": ["types"]
+    "generic": "$DYNAMATIC/experimental/data/verilog/support/merge_notehb.v"
   },
   {
     "generic": "$DYNAMATIC/experimental/data/verilog/support/dataless/merge_notehb.v",
     "module-name": "merge_notehb_dataless"
-  },
-  {
-    "generic": "$DYNAMATIC/experimental/data/verilog/support/types.v"
   },
   {
     "name": "mem_to_bram",
