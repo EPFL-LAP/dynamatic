@@ -1,32 +1,32 @@
 module merge # (
   parameter SIZE = 2,
-  parameter BITWIDTH = 32
+  parameter DATA_WIDTH = 32
 )(
   input  clk,
   input  rst,
   // Input channels
-  input  [SIZE * BITWIDTH - 1 : 0] ins, 
+  input  [SIZE * DATA_WIDTH - 1 : 0] ins, 
   input  [SIZE - 1 : 0] ins_valid,
   output [SIZE - 1 : 0] ins_ready,
   // Output channel
-  output [BITWIDTH - 1 : 0] outs,
+  output [DATA_WIDTH - 1 : 0] outs,
   output outs_valid,
   input  outs_ready
 );
-  wire [BITWIDTH - 1 : 0] tehb_data_in;
+  wire [DATA_WIDTH - 1 : 0] tehb_data_in;
   wire tehb_pvalid;
   wire tehb_ready;
 
-  reg [BITWIDTH - 1 : 0] tmp_data_out;
+  reg [DATA_WIDTH - 1 : 0] tmp_data_out;
   reg tmp_valid_out = 0;
   integer i;
 
   always @(*) begin
     tmp_valid_out = 0;
-    tmp_data_out = ins[0 +: BITWIDTH];
+    tmp_data_out = ins[0 +: DATA_WIDTH];
     for (i = SIZE - 1; i >= 0; i = i - 1) begin
       if (ins_valid[i]) begin
-        tmp_data_out = ins[i * BITWIDTH +: BITWIDTH];
+        tmp_data_out = ins[i * DATA_WIDTH +: DATA_WIDTH];
         tmp_valid_out = 1;
       end
     end
@@ -37,7 +37,7 @@ module merge # (
   assign ins_ready = {SIZE{tehb_ready}};
 
   tehb #(
-    .DATA_WIDTH(BITWIDTH)
+    .DATA_WIDTH(DATA_WIDTH)
   ) tehb_inst (
     .clk        (clk         ),
     .rst        (rst         ),

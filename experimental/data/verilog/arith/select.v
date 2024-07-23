@@ -39,20 +39,20 @@ endmodule
 
 
 module selector #(
-  parameter BITWIDTH = 32
+  parameter DATA_WIDTH = 32
 )(
   // inputs
   input  clk,
   input  rst,
   input  condition,
   input  condition_valid,
-  input  [BITWIDTH-1 : 0] trueValue,
+  input  [DATA_WIDTH-1 : 0] trueValue,
   input  trueValue_valid,
-  input  [BITWIDTH-1 : 0] falseValue,
+  input  [DATA_WIDTH-1 : 0] falseValue,
   input  falseValue_valid,
   input  result_ready,
   // outputs
-  output  [BITWIDTH-1 : 0] result,
+  output  [DATA_WIDTH-1 : 0] result,
   output  result_valid,
   output  condition_ready,
   output  trueValue_ready,

@@ -1,6 +1,6 @@
 module mem_controller #(
   parameter CTRL_COUNT  = 1,
-  parameter LOAD_COUNT  = 1,
+  parameter NUM_LOAD  = 1,
   parameter STORE_COUNT = 1,
   parameter DATA_WIDTH = 32,
   parameter ADDR_WIDTH = 32
@@ -12,13 +12,13 @@ module mem_controller #(
   input  [CTRL_COUNT - 1 : 0] ctrl_valid,
   output [CTRL_COUNT - 1 : 0] ctrl_ready,
   // Load address input channels
-  input  [(LOAD_COUNT * ADDR_WIDTH) - 1 : 0] ldAddr,
-  input  [LOAD_COUNT - 1 : 0] ldAddr_valid,
-  output [LOAD_COUNT - 1 : 0] ldAddr_ready,
+  input  [(NUM_LOAD * ADDR_WIDTH) - 1 : 0] ldAddr,
+  input  [NUM_LOAD - 1 : 0] ldAddr_valid,
+  output [NUM_LOAD - 1 : 0] ldAddr_ready,
   // Load data output channels
-  output [(LOAD_COUNT * DATA_WIDTH) - 1 : 0] ldData,
-  output [LOAD_COUNT - 1 : 0] ldData_valid,
-  input  [LOAD_COUNT - 1 : 0] ldData_ready,
+  output [(NUM_LOAD * DATA_WIDTH) - 1 : 0] ldData,
+  output [NUM_LOAD - 1 : 0] ldData_valid,
+  input  [NUM_LOAD - 1 : 0] ldData_ready,
   // Store address input channels
   input  [(STORE_COUNT * ADDR_WIDTH) - 1 : 0] stAddr,
   input  [STORE_COUNT - 1 : 0] stAddr_valid,
@@ -71,7 +71,7 @@ module mem_controller #(
   );
 
   read_memory_arbiter #(
-    .ARBITER_SIZE (LOAD_COUNT),
+    .ARBITER_SIZE (NUM_LOAD),
     .ADDR_WIDTH   (ADDR_WIDTH),
     .DATA_WIDTH   (DATA_WIDTH)
   ) read_arbiter (

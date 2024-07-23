@@ -1,14 +1,14 @@
 module elastic_fifo_inner #(
   parameter SIZE = 2,
-  parameter BITWIDTH = 32
+  parameter DATA_WIDTH = 32
 ) (
   input  clk,
   input  rst,
-  input  [BITWIDTH - 1 : 0] ins,
+  input  [DATA_WIDTH - 1 : 0] ins,
   input  ins_valid,
   input  outs_ready,
 
-  output [BITWIDTH - 1 : 0] outs,
+  output [DATA_WIDTH - 1 : 0] outs,
   output outs_valid,
   output ins_ready
 );
@@ -17,7 +17,7 @@ module elastic_fifo_inner #(
   reg [$clog2(SIZE) - 1 : 0] Tail = 0, Head = 0;
   reg Full = 0, Empty = 0, fifo_valid;
 
-  reg [BITWIDTH - 1 : 0] Memory[0 : SIZE - 1];
+  reg [DATA_WIDTH - 1 : 0] Memory[0 : SIZE - 1];
   
   // Ready if there is space in the FIFO
   assign ins_ready = ~Full | outs_ready;

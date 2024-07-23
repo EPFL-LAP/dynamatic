@@ -1,20 +1,20 @@
 module tfifo #(
   parameter SIZE = 2,
-  parameter BITWIDTH = 32
+  parameter DATA_WIDTH = 32
 )(
   input  clk,
   input  rst,
-  input  [BITWIDTH - 1 : 0] ins,
+  input  [DATA_WIDTH - 1 : 0] ins,
   input  ins_valid,
   input  outs_ready,
-  output [BITWIDTH - 1 : 0] outs,
+  output [DATA_WIDTH - 1 : 0] outs,
   output outs_valid,
   output ins_ready
 );
   wire mux_sel;
   wire fifo_valid, fifo_ready;
   wire fifo_pvalid, fifo_nready;
-  wire [BITWIDTH - 1 : 0] fifo_in, fifo_out;
+  wire [DATA_WIDTH - 1 : 0] fifo_in, fifo_out;
 
   // Dataout assignment
   assign outs = mux_sel ? fifo_out : ins;
@@ -29,7 +29,7 @@ module tfifo #(
 
   elastic_fifo_inner #(
     .SIZE     (SIZE    ), 
-    .BITWIDTH (BITWIDTH)
+    .DATA_WIDTH (DATA_WIDTH)
   ) fifo (
     .clk        (clk        ),
     .rst        (rst        ),

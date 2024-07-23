@@ -1,9 +1,9 @@
 module sink #(
-  parameter BITWIDTH = 32
+  parameter DATA_WIDTH = 32
 ) (
   input  clk,      
   input  rst,       
-  input  [BITWIDTH-1:0] ins, 
+  input  [DATA_WIDTH-1:0] ins, 
   input  ins_valid, 
   output ins_ready 
 );

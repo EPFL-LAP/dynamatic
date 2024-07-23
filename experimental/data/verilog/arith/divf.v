@@ -1,32 +1,32 @@
 module divf #(
-  parameter BITWIDTH = 32
+  parameter DATA_WIDTH = 32
 )(
   // inputs
   input  clk,
   input  rst,
-  input  [BITWIDTH - 1 : 0] lhs,
+  input  [DATA_WIDTH - 1 : 0] lhs,
   input  lhs_valid,
-  input  [BITWIDTH - 1 : 0] rhs,
+  input  [DATA_WIDTH - 1 : 0] rhs,
   input  rhs_valid,
   input  result_ready,
   // outputs
-  output [BITWIDTH - 1 : 0] result,
+  output [DATA_WIDTH - 1 : 0] result,
   output result_valid,
   output lhs_ready,
   output rhs_ready
 );
 
-  //assert(BITWIDTH == 32) else $error("divf currently only supports 32-bit floating point operands");
+  //assert(DATA_WIDTH == 32) else $error("divf currently only supports 32-bit floating point operands");
 
   wire join_valid, oehb_ready, buff_valid;
   wire constant_zero = 1'b0;
   wire open_value;
 
   // intermediate input signals for IEEE-754 to Flopoco-simple-float conversion
-  wire [ BITWIDTH + 1 :0] ip_lhs, ip_rhs;
+  wire [ DATA_WIDTH + 1 :0] ip_lhs, ip_rhs;
 
   // intermediate output signal for Flopoco-simple-float to IEEE-754 conversion
-  wire [ BITWIDTH + 1 :0] ip_result;
+  wire [ DATA_WIDTH + 1 :0] ip_result;
 
   // Instantiate the join node
   join_type #(

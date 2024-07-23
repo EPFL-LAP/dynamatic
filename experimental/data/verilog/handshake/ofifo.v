@@ -1,22 +1,22 @@
 module ofifo #(
   parameter SIZE = 2,
-  parameter BITWIDTH = 32
+  parameter DATA_WIDTH = 32
 ) (
   input  clk,
   input  rst,
-  input  [BITWIDTH - 1 : 0] ins,
+  input  [DATA_WIDTH - 1 : 0] ins,
   input  ins_valid,
   input  outs_ready,
-  output [BITWIDTH - 1 : 0] outs,
+  output [DATA_WIDTH - 1 : 0] outs,
   output outs_valid,
   output ins_ready
 );
-  wire [BITWIDTH - 1 : 0] tehb_dataOut, fifo_dataOut;
+  wire [DATA_WIDTH - 1 : 0] tehb_dataOut, fifo_dataOut;
   wire tehb_valid, tehb_ready;
   wire fifo_valid, fifo_ready;
   
   tehb #(
-    .BITWIDTH(BITWIDTH)
+    .DATA_WIDTH(DATA_WIDTH)
   ) tehb_module (
     .clk        (clk         ),
     .rst        (rst         ),
@@ -30,7 +30,7 @@ module ofifo #(
 
   elastic_fifo_inner #(
     .SIZE     (SIZE    ),
-    .BITWIDTH (BITWIDTH)
+    .DATA_WIDTH (DATA_WIDTH)
   ) fifo (
     .clk        (clk         ),
     .rst        (rst         ),

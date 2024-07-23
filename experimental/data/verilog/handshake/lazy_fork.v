@@ -1,15 +1,15 @@
 module lazy_fork_dataless #(
   parameter SIZE = 2,
-  parameter BITWIDTH = 32
+  parameter DATA_WIDTH = 32
 )(
   input  clk,
 	input  rst,
   // Input Channels
-  input  [BITWIDTH - 1 : 0] ins,
+  input  [DATA_WIDTH - 1 : 0] ins,
   input  ins_valid,
   output ins_ready,
   // Output Channel
-  output [SIZE * (BITWIDTH) - 1 : 0] outs,
+  output [SIZE * (DATA_WIDTH) - 1 : 0] outs,
 	output [SIZE - 1 : 0] outs_valid,
 	input  [SIZE - 1 : 0] outs_ready
 );

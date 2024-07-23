@@ -1,5 +1,5 @@
 module ENTITY_NAME #(
-	parameter BITWIDTH = 32 // Default set to 32 bits
+	parameter DATA_WIDTH = 32 // Default set to 32 bits
 )(
 	input  clk,
 	input  rst,
@@ -7,7 +7,7 @@ module ENTITY_NAME #(
 	input  ctrl_valid,
   output ctrl_ready,
   // Output Channel
-  output [BITWIDTH - 1 : 0] outs,
+  output [DATA_WIDTH - 1 : 0] outs,
   output outs_valid,
 	input  outs_ready
 );

@@ -1,18 +1,18 @@
 module mem_controller_storeless #(
-  parameter LOAD_COUNT = 1,
+  parameter NUM_LOAD = 1,
   parameter DATA_WIDTH = 32,
   parameter ADDR_WIDTH = 32
 )(
   input  clk,
   input  rst,
   // Load address input channels
-  input  [(LOAD_COUNT * ADDR_WIDTH) - 1 : 0] ldAddr,
-  input  [LOAD_COUNT - 1 : 0] ldAddr_valid,
-  output [LOAD_COUNT - 1 : 0] ldAddr_ready,
+  input  [(NUM_LOAD * ADDR_WIDTH) - 1 : 0] ldAddr,
+  input  [NUM_LOAD - 1 : 0] ldAddr_valid,
+  output [NUM_LOAD - 1 : 0] ldAddr_ready,
   // Load data output channels
-  output [(LOAD_COUNT * DATA_WIDTH) - 1 : 0] ldData,
-  output [LOAD_COUNT - 1 : 0] ldData_valid,
-  input  [LOAD_COUNT - 1 : 0] ldData_ready,
+  output [(NUM_LOAD * DATA_WIDTH) - 1 : 0] ldData,
+  output [NUM_LOAD - 1 : 0] ldData_valid,
+  input  [NUM_LOAD - 1 : 0] ldData_ready,
   // Memory done channel
   output memDone_valid,
   input  memDone_ready,
@@ -33,7 +33,7 @@ module mem_controller_storeless #(
   assign memDone_valid = 1'b1;
 
   read_memory_arbiter #(
-    .ARBITER_SIZE (LOAD_COUNT),
+    .ARBITER_SIZE (NUM_LOAD),
     .ADDR_WIDTH   (ADDR_WIDTH),
     .DATA_WIDTH   (DATA_WIDTH)
   ) read_arbiter (
