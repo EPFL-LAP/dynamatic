@@ -465,7 +465,7 @@ public:
   /// output directory while generated components are produced by the
   /// user-provided generator.
   LogicalResult concretize(const RTLRequest &request, StringRef dynamaticPath,
-                           StringRef outputDir) const;
+                           StringRef outputDir, HDL hdl) const;
 
 private:
   /// Concrete module name that the RTL component defines, derived from the

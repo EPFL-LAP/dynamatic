@@ -141,7 +141,7 @@ LogicalResult ExportInfo::concretizeExternalModules() {
     }
 
     // ...then generate the component itself
-    return match->concretize(request, dynamaticPath, outputPath);
+    return match->concretize(request, dynamaticPath, outputPath, hdl);
   };
 
   for (hw::HWModuleExternOp extOp : modOp.getOps<hw::HWModuleExternOp>()) {
