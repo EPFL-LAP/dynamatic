@@ -1,4 +1,4 @@
-module addf #(
+module addi #(
   parameter DATA_WIDTH = 32
 )(
   // inputs

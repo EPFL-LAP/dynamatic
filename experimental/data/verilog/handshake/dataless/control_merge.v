@@ -39,7 +39,7 @@ module control_merge_dataless #(
 
   // Instantiate Merge_dataless
   merge_notehb_dataless #(
-    .SIZE(SIZE)
+    .INPUTS(SIZE)
   ) merge_ins (
     .clk        (clk          ),
     .rst        (rst          ),

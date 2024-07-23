@@ -23,8 +23,8 @@ module merge_notehb_dataless #(
 				tmp_valid_out = 1;
 			end
 		end
-		outs_valid = tmp_valid_out;
 	end
+	assign	outs_valid = tmp_valid_out;
 
 	// Distribute the ready signal to all input channels
 	assign ins_ready = {INPUTS{outs_ready}};
