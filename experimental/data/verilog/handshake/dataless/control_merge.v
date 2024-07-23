@@ -66,7 +66,7 @@ module control_merge_dataless #(
   // Instantiate Fork_dataless
   fork_dataless #(
     .SIZE(2)
-  )(
+  ) fork_dataless (
     .clk        (clk                      ),
     .rst        (rst                      ),
     .ins_valid  (tehbOut_valid            ),
