@@ -10,8 +10,8 @@
 //
 //===----------------------------------------------------------------------===//
 
-#include "dynamatic/Conversion/HandshakeToHW.h"
 #include "dynamatic/Analysis/NameAnalysis.h"
+#include "dynamatic/Conversion/HandshakeToHW.h"
 #include "dynamatic/Dialect/HW/HWOpInterfaces.h"
 #include "dynamatic/Dialect/HW/HWOps.h"
 #include "dynamatic/Dialect/HW/HWTypes.h"
@@ -39,14 +39,23 @@
 #include "mlir/Support/LogicalResult.h"
 #include "mlir/Transforms/DialectConversion.h"
 #include "mlir/Transforms/GreedyPatternRewriteDriver.h"
+#include "llvm/ADT/ArrayRef.h"
 #include "llvm/ADT/STLExtras.h"
+#include "llvm/ADT/SmallVector.h"
+#include "llvm/ADT/StringExtras.h"
 #include "llvm/ADT/StringRef.h"
 #include "llvm/ADT/TypeSwitch.h"
+#include "llvm/Support/Debug.h"
 #include "llvm/Support/ErrorHandling.h"
 #include <algorithm>
 #include <bitset>
+#include <cctype>
+#include <charconv>
+#include <cstdint>
 #include <iterator>
 #include <string>
+
+#define DEBUG_TYPE "HandshakeToHW"
 
 using namespace mlir;
 using namespace dynamatic;
@@ -386,7 +395,14 @@ private:
   /// Adds a string parameter.
   void addString(const Twine &name, const Twine &txt) {
     addParam(name, StringAttr::get(ctx, txt));
-    modName += "_" + txt.str();
+
+    // Replace all non-alphanumeric characters by an underscore.
+    std::string cleanedName = txt.str();
+    std::replace_if(
+        cleanedName.begin(), cleanedName.end(),
+        [](char c) { return !std::isalnum(c); }, '_');
+
+    modName += "_" + cleanedName;
   };
 
   /// Returns the module name's prefix from the name of the operation it
@@ -460,6 +476,33 @@ ModuleDiscriminator::ModuleDiscriminator(Operation *op)
             // Data bitwidth and address bitwidth
             addBitwidth("DATA_WIDTH", storeOp.getDataInput());
             addBitwidth("ADDR_WIDTH", storeOp.getAddressInput());
+          })
+      .Case<handshake::SharingWrapperOp>(
+          [&](handshake::SharingWrapperOp sharingWrapperOp) {
+            addBitwidth("DATA_WIDTH", sharingWrapperOp.getDataOperands()[0]);
+
+            // In a sharing wrapper, we have the credits as a list of unsigned
+            // integers. This will be encoded as a space-separated string and
+            // passed to the sharing wrapper generator.
+
+            auto addSpaceSeparatedListOfInt =
+                [&](StringRef name, ArrayRef<int64_t> array) -> void {
+              std::string strAttr;
+              for (unsigned i = 0; i < array.size(); i++) {
+                if (i > 0)
+                  strAttr += " ";
+                strAttr += std::to_string(array[i]);
+              }
+              addString(name, strAttr);
+            };
+
+            addSpaceSeparatedListOfInt("CREDITS",
+                                       sharingWrapperOp.getCredits());
+
+            addUnsigned("NUM_SHARED_OPERANDS",
+                        sharingWrapperOp.getNumSharedOperands());
+
+            addUnsigned("LATENCY", sharingWrapperOp.getLatency());
           })
       .Case<handshake::ConstantOp>([&](handshake::ConstantOp cstOp) {
         // Bitwidth and binary-encoded constant value
@@ -1838,6 +1881,7 @@ public:
         ConvertToHWInstance<handshake::MCStoreOp>,
         ConvertToHWInstance<handshake::LSQStoreOp>,
         ConvertToHWInstance<handshake::NotOp>,
+        ConvertToHWInstance<handshake::SharingWrapperOp>,
         // Arith operations
         ConvertToHWInstance<arith::AddFOp>, ConvertToHWInstance<arith::AddIOp>,
         ConvertToHWInstance<arith::AndIOp>,

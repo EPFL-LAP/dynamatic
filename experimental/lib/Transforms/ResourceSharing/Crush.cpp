@@ -24,6 +24,7 @@
 #include "experimental/Transforms/ResourceSharing/Crush.h"
 #include "dynamatic/Analysis/NameAnalysis.h"
 #include "dynamatic/Dialect/Handshake/HandshakeOps.h"
+#include "dynamatic/Support/CFG.h"
 #include "dynamatic/Support/DynamaticPass.h"
 #include "dynamatic/Support/LLVM.h"
 #include "dynamatic/Support/Logging.h"
@@ -35,6 +36,7 @@
 #include "dynamatic/Transforms/BufferPlacement/HandshakePlaceBuffers.h"
 #include "dynamatic/Transforms/HandshakeMaterialize.h"
 #include "experimental/Transforms/ResourceSharing/SharingSupport.h"
+#include "mlir/Dialect/Arith/IR/Arith.h"
 #include "mlir/IR/BuiltinAttributes.h"
 #include "mlir/Pass/PassManager.h"
 #include "llvm/Support/Path.h"
@@ -359,10 +361,9 @@ struct CreditBasedSharingPass
                                 FuncPerfInfo &funcPerfInfo, NameAnalysis &namer,
                                 TimingDatabase &timingDB);
 
-  LogicalResult
-  sharingWrapperInsertion(handshake::FuncOp &funcOp,
-                          SharingGroups &sharingGroups,
-                          MapVector<Operation *, double> &opOccupancy);
+  LogicalResult sharingWrapperInsertion(
+      handshake::FuncOp &funcOp, SharingGroups &sharingGroups,
+      MapVector<Operation *, double> &opOccupancy, TimingDatabase &timingDB);
 
   // This class method finds all sharing targets for a given handshake function
   SmallVector<mlir::Operation *> getSharingTargets(handshake::FuncOp funcOp) {
@@ -372,7 +373,8 @@ struct CreditBasedSharingPass
       // This is a list of sharable operations. To support more operation types,
       // simply add in the end of the list.
       if (isa<mlir::arith::MulFOp, mlir::arith::MulIOp, mlir::arith::AddFOp,
-              mlir::arith::SubFOp>(op)) {
+              mlir::arith::SubFOp, mlir::arith::DivFOp, mlir::arith::DivUIOp,
+              mlir::arith::DivSIOp>(op)) {
         assert(op.getNumOperands() > 1 && op.getNumResults() == 1 &&
                "Invalid sharing target is being added to the list of sharing "
                "targets! Currently operations with 1 input or more than 1 "
@@ -567,7 +569,7 @@ static void replaceFirstUse(Operation *op, Value oldVal, Value newVal) {
 //    operations and dispatches the result to the correct outputs.
 LogicalResult CreditBasedSharingPass::sharingWrapperInsertion(
     handshake::FuncOp &funcOp, SharingGroups &sharingGroups,
-    MapVector<Operation *, double> &opOccupancy) {
+    MapVector<Operation *, double> &opOccupancy, TimingDatabase &timingDB) {
   MLIRContext *ctx = &getContext();
   OpBuilder builder(ctx);
   for (Group group : sharingGroups) {
@@ -579,6 +581,10 @@ LogicalResult CreditBasedSharingPass::sharingWrapperInsertion(
 
     // Elect one operation as the shared operation.
     Operation *sharedOp = *group.begin();
+
+    double latency;
+    if (failed(timingDB.getLatency(sharedOp, SignalType::DATA, latency)))
+      latency = 0.0;
 
     // Maps each original successor and the input operand (Value)
     std::vector<std::tuple<Operation *, Value>> succValueMap;
@@ -633,7 +639,8 @@ LogicalResult CreditBasedSharingPass::sharingWrapperInsertion(
         builder.create<handshake::SharingWrapperOp>(
             sharedOp->getLoc(), sharingWrapperOutputTypes, dataOperands,
             sharedOp->getResult(0), llvm::ArrayRef<int64_t>(credits),
-            sharedOp->getNumOperands());
+            credits.size(), sharedOp->getNumOperands(),
+            (unsigned)round(latency));
 
     // Replace original connection from op->successor to
     // sharingWrapper->successor
@@ -663,6 +670,10 @@ LogicalResult CreditBasedSharingPass::sharingWrapperInsertion(
     for (Operation *op : group)
       if (op != sharedOp)
         op->erase();
+
+    // After sharing, BB ID becomes meaningless for the shared unit, so we
+    // simply remove it
+    sharedOp->removeAttr(dynamatic::BB_ATTR_NAME);
   }
 
   return success();
@@ -717,7 +728,7 @@ LogicalResult CreditBasedSharingPass::sharingInFuncOp(
 
   // For each sharing group, unite them with a sharing wrapper and shared
   // operation.
-  return sharingWrapperInsertion(*funcOp, sharingGroups, opOccupancy);
+  return sharingWrapperInsertion(*funcOp, sharingGroups, opOccupancy, timingDB);
 }
 
 void CreditBasedSharingPass::runDynamaticPass() {
