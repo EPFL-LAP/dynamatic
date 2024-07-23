@@ -1,5 +1,5 @@
 module elastic_fifo_inner_dataless #(
-  parameter SIZE = 4
+  parameter SLOTS = 4
 )(
   input  clk,
   input  rst,
@@ -10,7 +10,7 @@ module elastic_fifo_inner_dataless #(
   output outs_valid
 );
   wire ReadEn, WriteEn;
-  reg [$clog2(SIZE) - 1 : 0] Tail = 0, Head = 0;
+  reg [$clog2(SLOTS) - 1 : 0] Tail = 0, Head = 0;
   reg Full = 0, Empty = 0, fifo_valid;
 
   // Ready if there is space in the FIFO
@@ -38,7 +38,7 @@ module elastic_fifo_inner_dataless #(
       Tail <= 0;
     end else begin
       if (WriteEn) begin
-        Tail <= (Tail + 1) % SIZE;
+        Tail <= (Tail + 1) % SLOTS;
       end
     end  
   end
@@ -49,7 +49,7 @@ module elastic_fifo_inner_dataless #(
       Head <= 0;
     end else begin
       if (ReadEn) begin
-        Head <= (Head + 1) % SIZE;
+        Head <= (Head + 1) % SLOTS;
       end
     end 
   end
@@ -62,7 +62,7 @@ module elastic_fifo_inner_dataless #(
       // If only filling but not emptying
       if (WriteEn & ~ReadEn) begin
         // If new tail index will reach head index
-        if ((Tail + 1) % SIZE == Head) begin
+        if ((Tail + 1) % SLOTS == Head) begin
           Full <= 1;
         end
       end else if (~WriteEn & ReadEn) begin
@@ -79,7 +79,7 @@ module elastic_fifo_inner_dataless #(
     end else begin
       // If only emptying but not filling
       if (~WriteEn & ReadEn) begin
-        if ((Head + 1) % SIZE == Tail) begin
+        if ((Head + 1) % SLOTS == Tail) begin
           Empty <= 1;
         end
       end else if (WriteEn & ~ReadEn) begin

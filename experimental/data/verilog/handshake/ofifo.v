@@ -1,5 +1,5 @@
 module ofifo #(
-  parameter SIZE = 2,
+  parameter SLOTS = 2,
   parameter DATA_WIDTH = 32
 ) (
   input  clk,
@@ -29,7 +29,7 @@ module ofifo #(
   );
 
   elastic_fifo_inner #(
-    .SIZE     (SIZE    ),
+    .SLOTS      (SLOTS    ),
     .DATA_WIDTH (DATA_WIDTH)
   ) fifo (
     .clk        (clk         ),

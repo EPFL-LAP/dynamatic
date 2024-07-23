@@ -1,5 +1,5 @@
 module tfifo_dataless #(
-  parameter SIZE = 2
+  parameter SLOTS = 2
 )(
   input  clk,
   input  rst,
@@ -21,7 +21,7 @@ module tfifo_dataless #(
   assign fifo_nready = outs_ready;
 
   elastic_fifo_inner_dataless #(
-    .SIZE(SIZE)
+    .SLOTS(SLOTS)
   ) fifo (
     .clk        (clk        ),
     .rst        (rst        ),

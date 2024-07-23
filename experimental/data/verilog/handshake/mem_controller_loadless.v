@@ -1,23 +1,23 @@
 module mem_controller_loadless #(
-  parameter CTRL_COUNT = 1,
-  parameter STORE_COUNT = 1,
+  parameter NUM_CONTROL = 1,
+  parameter NUM_STORE = 1,
   parameter DATA_WIDTH = 32,
   parameter ADDR_WIDTH = 32
 )(
   input  clk,
   input  rst,
   // Control Input Channels
-  input  [(CTRL_COUNT * 32) - 1 : 0] ctrl,
-  input  [CTRL_COUNT - 1 : 0] ctrl_valid,
-  output [CTRL_COUNT - 1 : 0] ctrl_ready,
+  input  [(NUM_CONTROL * 32) - 1 : 0] ctrl,
+  input  [NUM_CONTROL - 1 : 0] ctrl_valid,
+  output [NUM_CONTROL - 1 : 0] ctrl_ready,
   // Store Address Input Channels
-  input  [(STORE_COUNT * ADDR_WIDTH) - 1 : 0] stAddr,
-  input  [STORE_COUNT - 1 : 0] stAddr_valid,
-  output [STORE_COUNT - 1 : 0] stAddr_ready,
+  input  [(NUM_STORE * ADDR_WIDTH) - 1 : 0] stAddr,
+  input  [NUM_STORE - 1 : 0] stAddr_valid,
+  output [NUM_STORE - 1 : 0] stAddr_ready,
   // Store Data Input Channels
-  input  [(STORE_COUNT * DATA_WIDTH) - 1 : 0] stData,
-  input  [STORE_COUNT - 1 : 0] stData_valid,
-  output [STORE_COUNT - 1 : 0] stData_ready,
+  input  [(NUM_STORE * DATA_WIDTH) - 1 : 0] stData,
+  input  [NUM_STORE - 1 : 0] stData_valid,
+  output [NUM_STORE - 1 : 0] stData_ready,
   // Memory Done Channel
   output memDone_valid,
   input  memDone_ready,
@@ -31,14 +31,14 @@ module mem_controller_loadless #(
 );
   // Internal Signals
   reg remainingStores = 0;
-  wire [STORE_COUNT - 1 : 0] storePorts_valid, storePorts_ready;
+  wire [NUM_STORE - 1 : 0] storePorts_valid, storePorts_ready;
 
   assign loadEn = 0;
   assign loadAddr = {ADDR_WIDTH{1'b0}};
 
   // Instantiate write memory arbiter
   write_memory_arbiter #(
-    .ARBITER_SIZE (STORE_COUNT),
+    .ARBITER_SIZE (NUM_STORE),
     .ADDR_WIDTH   (ADDR_WIDTH),
     .DATA_WIDTH   (DATA_WIDTH)
   ) write_arbiter (
@@ -48,7 +48,7 @@ module mem_controller_loadless #(
     .ready          (storePorts_ready   ),
     .address_in     (stAddr             ),
     .data_in        (stData             ),
-    .nReady         ({STORE_COUNT{1'b1}}),
+    .nReady         ({NUM_STORE{1'b1}}),
     .valid          (storePorts_valid   ),
     .write_enable   (storeEn            ),
     .write_address  (storeAddr          ),
@@ -64,7 +64,7 @@ module mem_controller_loadless #(
       remainingStores <= 32'd0;
     end else begin
       integer i;
-      for (i = 0; i < CTRL_COUNT; i = i + 1) begin
+      for (i = 0; i < NUM_CONTROL; i = i + 1) begin
         if (ctrl_valid[i]) begin
           remainingStores <= remainingStores + ctrl[(i * 32) + 31 -: 32];
         end
@@ -77,6 +77,6 @@ module mem_controller_loadless #(
 
   // Memory Done logic
   assign memDone_valid = (~(|remainingStores)) & (~(|ctrl_valid));
-  assign ctrl_ready = {CTRL_COUNT{1'b1}};
+  assign ctrl_ready = {NUM_CONTROL{1'b1}};
 
 endmodule

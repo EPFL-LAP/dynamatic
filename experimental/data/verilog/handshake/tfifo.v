@@ -1,5 +1,5 @@
 module tfifo #(
-  parameter SIZE = 2,
+  parameter SLOTS = 2,
   parameter DATA_WIDTH = 32
 )(
   input  clk,
@@ -28,7 +28,7 @@ module tfifo #(
   assign fifo_in = ins;
 
   elastic_fifo_inner #(
-    .SIZE     (SIZE    ), 
+    .SLOTS      (SLOTS     ), 
     .DATA_WIDTH (DATA_WIDTH)
   ) fifo (
     .clk        (clk        ),

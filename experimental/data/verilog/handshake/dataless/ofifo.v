@@ -1,5 +1,5 @@
 module ofifo_dataless #(
-  parameter SIZE = 2;
+  parameter SLOTS = 2;
 )(
   input  clk,
   input  rst,
@@ -22,7 +22,7 @@ module ofifo_dataless #(
   );
 
   elastic_fifo_inner_dataless #(
-    .SIZE(SIZE)
+    .SLOTS(SLOTS)
   ) fifo(
     .clk        (clk       ),
     .rst        (rst       ),

@@ -1,5 +1,5 @@
 module end_sync_dataless #(
-  parameter MEM_INPUTS = 2
+  parameter NUM_MEMORIES = 2
 )(
   input  clk,
   input  rst,
@@ -7,19 +7,19 @@ module end_sync_dataless #(
   input  ins_valid,
   output ins_ready,
   // Memory Input Channels
-  input  [MEM_INPUTS - 1 : 0] memDone_valid,
-  output [MEM_INPUTS - 1 : 0] memDone_ready,
+  input  [NUM_MEMORIES - 1 : 0] memDone_valid,
+  output [NUM_MEMORIES - 1 : 0] memDone_ready,
   // Output Channel
   output outs_valid,
   input  outs_ready
 );
   wire memReady, allMemDone;  //! Dangling wire for memReady
 
-  assign memDone_ready = {MEM_INPUTS{1'b1}};
+  assign memDone_ready = {NUM_MEMORIES{1'b1}};
 
   // Instantiate of and_n
   and_n #(
-    .SIZE(MEM_INPUTS)
+    .SIZE(NUM_MEMORIES)
   ) mem_and (
     .ins  (memDone_valid),
     .outs (allMemDone   )

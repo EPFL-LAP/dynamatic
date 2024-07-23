@@ -1,6 +1,6 @@
 module lsq_load #(
-  parameter DATA_DATA_WIDTH = 32,
-  parameter ADDR_DATA_WIDTH = 32
+  parameter DATA_WIDTH = 32,
+  parameter ADDR_WIDTH = 32
 )(
   input  clk,
   input  rst,

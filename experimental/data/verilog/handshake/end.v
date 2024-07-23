@@ -1,6 +1,6 @@
 module end_sync #(
   parameter DATA_WIDTH = 32,
-  parameter MEM_INPUTS = 2
+  parameter NUM_MEMORIES = 2
 )(
   input  clk,
   input  rst,
@@ -9,17 +9,17 @@ module end_sync #(
   input  ins_valid,
   output ins_ready,
   // Memory Input Channels
-  input  [MEM_INPUTS - 1 : 0] memDone_valid,
-  output [MEM_INPUTS - 1 : 0] memDone_ready,
+  input  [NUM_MEMORIES - 1 : 0] memDone_valid,
+  output [NUM_MEMORIES - 1 : 0] memDone_ready,
   // Output Channel
   output [DATA_WIDTH - 1 : 0] outs,
   output outs_valid,
   input  outs_ready
 );
-  assign memDone_valid = {MEM_INPUTS{1'b1}};
+  assign memDone_valid = {NUM_MEMORIES{1'b1}};
 
   end_sync_dataless #(
-    .MEM_INPUTS(MEM_INPUTS)
+    .NUM_MEMORIES(NUM_MEMORIES)
   ) control (
     .clk            (clk          ),
     .rst            (rst          ),
