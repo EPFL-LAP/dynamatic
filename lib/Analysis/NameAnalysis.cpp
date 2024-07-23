@@ -148,6 +148,23 @@ std::string NameAnalysis::getName(OpOperand &oprd) {
   return defName + "_" + resName + "_" + oprName + "_" + userName;
 }
 
+bool NameAnalysis::replaceOp(Operation *op, Operation *newOp) {
+  assert(namesValid && "analysis invariant is broken");
+  mlir::StringAttr attr = getNameAttr(op);
+
+  // Derive an entirely new name for the operation
+  if (!attr) {
+    setName(newOp);
+    return false;
+  }
+
+  // Transfer the name to the new operation and update our internal mapping
+  op->removeAttr(ATTR_NAME);
+  newOp->setAttr(ATTR_NAME, attr);
+  namedOperations[attr.strref()] = newOp;
+  return true;
+}
+
 LogicalResult NameAnalysis::setName(Operation *op, StringRef name,
                                     bool uniqueWhenTaken) {
   assert(namesValid && "analysis invariant is broken");
@@ -226,12 +243,12 @@ LogicalResult NameAnalysis::walk(UnnamedBehavior onUnnamed) {
       return;
     }
 
-    // Check that the name is unqiue with respect to other knwon operations
+    // Check that the name is unique with respect to other knwon operations
     if (auto namedOp = namedOperations.find(attr);
         namedOp != namedOperations.end()) {
       if (namedOp->second != nestedOp) {
-        nestedOp->emitError() << "Operation has name '" << attr
-                              << "' but another operation already has this "
+        nestedOp->emitError() << "Operation has name " << attr
+                              << " but another operation already has this "
                                  "name. Names must be unique.";
         namesValid = false;
         return;
