@@ -90,11 +90,14 @@ def ChannelType : Handshake_Type<"Channel", "channel"> {
     unsigned getNumUpstreamExtraSignals() const {
       return getNumExtraSignals() - getNumDownstreamExtraSignals();
     }
+
+    /// Returns the data type's bitwidth.
+    unsigned getDataBitWidth() const;
     
     /// Determines whether a type is supported as the data type or as the type
     /// of an extra signal.
     static bool isSupportedSignalType(::mlir::Type type) {
-      return ::mlir::isa<::mlir::IndexType, ::mlir::IntegerType, ::mlir::FloatType>(type);
+      return type.isIntOrIndexOrFloat();
     }
   }];
 }
@@ -107,6 +110,32 @@ def SignalType : Type<
 def ChannelLikeType : Type<
   CPred<"::mlir::isa<::dynamatic::handshake::ControlType, ::dynamatic::handshake::ChannelType>($_self)">,
   "must be a `handshake::ControlType` or `handshake::ChannelType` type"> {
+}
+
+def IsChannel : CPred<"::mlir::isa<::dynamatic::handshake::ChannelType>($_self)">;
+
+def BoolChannelType : Type<
+  And<[
+    IsChannel,
+    CPred<"::mlir::cast<::dynamatic::handshake::ChannelType>($_self).getDataBitWidth() == 1">,
+  ]>,
+  "must be a `handshake::ChannelType` type whose data type's bitwidth is 1"> {
+}
+
+def IntChannelType : Type<
+  And<[
+    IsChannel,
+    CPred<"::mlir::isa<IndexType, IntegerType>(::mlir::cast<::dynamatic::handshake::ChannelType>($_self).getDataType())">,
+  ]>,
+  "must be a `handshake::ChannelType` type whose data type is integer-like"> {
+}
+
+def FloatChannelType : Type<
+  And<[
+    IsChannel,
+    CPred<"::mlir::isa<FloatType>(::mlir::cast<::dynamatic::handshake::ChannelType>($_self).getDataType())">,
+  ]>,
+  "must be a `handshake::ChannelType` type whose data type is float-like"> {
 }
 
 #endif // DYNAMATIC_DIALECT_HANDSHAKE_HANDSHAKE_TYPES_TD

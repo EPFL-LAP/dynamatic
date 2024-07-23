@@ -21,31 +21,21 @@ entity ENTITY_NAME is
     lhs_ready    : out std_logic;
     rhs_ready    : out std_logic
   );
+begin
+  assert BITWIDTH=32
+  report "ENTITY_NAME currently only supports 32-bit floating point operands"
+  severity failure;
 end entity;
 
 architecture arch of ENTITY_NAME is
 
-  component array_RAM_fcmp_32cud is
-    generic (
-      ID         : integer := 1;
-      NUM_STAGE  : integer := 2;
-      din0_WIDTH : integer := 32;
-      din1_WIDTH : integer := 32;
-      dout_WIDTH : integer := 1
-    );
-    port (
-      clk    : in  std_logic;
-      reset  : in  std_logic;
-      ce     : in  std_logic;
-      din0   : in  std_logic_vector(din0_WIDTH - 1 downto 0);
-      din1   : in  std_logic_vector(din1_WIDTH - 1 downto 0);
-      opcode : in  std_logic_vector(4 downto 0);
-      dout   : out std_logic_vector(dout_WIDTH - 1 downto 0)
-    );
-  end component;
+  signal ip_lhs : std_logic_vector(BITWIDTH + 1 downto 0);
+  signal ip_rhs : std_logic_vector(BITWIDTH + 1 downto 0);
 
-  signal join_valid   : std_logic;
-  constant alu_opcode : std_logic_vector(4 downto 0) := "COMPARATOR";
+  signal ip_unordered : std_logic;
+  signal ip_result : std_logic;
+
+  constant cmp_predicate : string := "COMPARATOR";
 
 begin
   join_inputs : entity work.join(arch) generic map(2)
@@ -55,34 +45,116 @@ begin
       ins_valid(1) => rhs_valid,
       outs_ready   => result_ready,
       -- outputs
-      outs_valid   => join_valid,
+      outs_valid   => result_valid,
       ins_ready(0) => lhs_ready,
       ins_ready(1) => rhs_ready
     );
 
-  array_RAM_fcmp_32ns_32ns_1_2_1_u1 : component array_RAM_fcmp_32cud
-    generic map(
-      ID         => 1,
-      NUM_STAGE  => 2,
-      din0_WIDTH => 32,
-      din1_WIDTH => 32,
-      dout_WIDTH => 1)
-    port map(
-      clk     => clk,
-      reset   => rst,
-      din0    => lhs,
-      din1    => rhs,
-      ce      => result_ready,
-      opcode  => alu_opcode,
-      dout(0) => result(0)
+  ieee2nfloat_0: entity work.InputIEEE_32bit(arch)
+    port map (
+        --input
+        X => lhs,
+        --output
+        R => ip_lhs
     );
 
-  buff : entity work.delay_buffer(arch) generic map(1)
-    port map(
-      clk,
-      rst,
-      join_valid,
-      result_ready,
-      result_valid
+  ieee2nfloat_1: entity work.InputIEEE_32bit(arch)
+    port map (
+        --input
+        X => rhs,
+        --output
+        R => ip_rhs
     );
+
+  gen_flopoco_ip :
+    if cmp_predicate = "OEQ" or cmp_predicate = "UEQ" generate
+      operator : entity work.FloatingPointComparatorEQ(arch)
+      port map(
+        clk, '1', 
+        ip_lhs, ip_rhs, ip_unordered, ip_result
+      );
+    elsif cmp_predicate = "OGT" or cmp_predicate = "UGT" generate 
+      operator : entity work.FloatingPointComparatorGT(arch)
+      port map(
+        clk, '1', 
+        ip_lhs, ip_rhs, ip_unordered, ip_result
+      );
+    elsif cmp_predicate = "OGE" or cmp_predicate = "UGE" generate 
+      operator : entity work.FloatingPointComparatorGE(arch)
+      port map(
+        clk, '1', 
+        ip_lhs, ip_rhs, ip_unordered, ip_result
+      );
+    elsif cmp_predicate = "OLT" or cmp_predicate = "ULT" generate 
+      operator : entity work.FloatingPointComparatorLT(arch)
+      port map(
+        clk, '1', 
+        ip_lhs, ip_rhs, ip_unordered, ip_result
+      );
+    elsif cmp_predicate = "OLE" or cmp_predicate = "ULE" generate 
+      operator : entity work.FloatingPointComparatorLE(arch)
+      port map(
+        clk, '1', 
+        ip_lhs, ip_rhs, ip_unordered, ip_result
+      );
+    elsif cmp_predicate = "ONE" or cmp_predicate = "UNE" generate 
+      operator : entity work.FloatingPointComparatorEQ(arch)
+      port map(
+        clk, '1', 
+        ip_lhs, ip_rhs, ip_unordered, ip_result
+      );
+    elsif cmp_predicate = "ORD" generate 
+      -- This predicate only tests if all inputs are ordered,
+      -- hence in principle any IP would work
+      operator : entity work.FloatingPointComparatorEQ(arch)
+      port map(
+        clk, '1', 
+        ip_lhs, ip_rhs, ip_unordered, ip_result
+      );
+    elsif cmp_predicate = "UNO" generate
+      -- This predicate only tests if any input is unordered,
+      -- hence in principle any IP would work
+      operator : entity work.FloatingPointComparatorEQ(arch)
+      port map(
+        clk, '1', 
+        ip_lhs, ip_rhs, ip_unordered, ip_result
+      );
+    else generate -- cmp_predicate = "UNO"
+      assert false
+      report "COMPARATOR is an invalid predicate!"
+      severity failure;
+    end generate;
+     
+  gen_result_signal :
+    if
+    cmp_predicate = "OEQ" or
+    cmp_predicate = "OGT" or
+    cmp_predicate = "OGE" or
+    cmp_predicate = "OLT" or
+    cmp_predicate = "OLE" generate
+      result(0) <= not ip_unordered and ip_result;
+    elsif
+    cmp_predicate = "ONE" generate
+      result(0) <= not ip_unordered and not ip_result;
+    elsif cmp_predicate = "ORD" generate
+      result(0) <= not ip_unordered;
+    elsif 
+    cmp_predicate = "UEQ" or
+    cmp_predicate = "UGT" or
+    cmp_predicate = "UGE" or
+    cmp_predicate = "ULT" or
+    cmp_predicate = "ULE" generate
+      result(0) <= ip_unordered or ip_result;
+    elsif
+    cmp_predicate = "UNE" generate
+      result(0) <= ip_unordered or not ip_result;
+    elsif
+    cmp_predicate = "UNO" generate
+      result(0) <= ip_unordered;
+    else generate 
+      assert false
+      report "COMPARATOR is an invalid predicate!"
+      severity failure;
+    end generate;
+
 end architecture;

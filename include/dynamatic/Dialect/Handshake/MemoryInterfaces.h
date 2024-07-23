@@ -17,6 +17,7 @@
 
 #include "dynamatic/Analysis/NameAnalysis.h"
 #include "dynamatic/Dialect/Handshake/HandshakeOps.h"
+#include "dynamatic/Support/Backedge.h"
 #include "dynamatic/Support/LLVM.h"
 #include "mlir/IR/Operation.h"
 #include <set>
@@ -214,6 +215,14 @@ private:
   /// For a provided memory interface and its memory ports, set the data operand
   /// of load-like operations with successive results of the memory interface.
   void addMemDataResultToLoads(InterfacePorts &ports, Operation *memIfaceOp);
+
+  /// Internal implementation of the interface instantiation logic, taking an
+  /// additional edge builder argument that was either created using a basic
+  /// operation builder or a conversion pattern rewriter.
+  LogicalResult instantiateInterfaces(OpBuilder &builder,
+                                      BackedgeBuilder &edgeBuilder,
+                                      handshake::MemoryControllerOp &mcOp,
+                                      handshake::LSQOp &lsqOp);
 };
 
 /// Aggregates LSQ generation information to be passed to the DOT printer under

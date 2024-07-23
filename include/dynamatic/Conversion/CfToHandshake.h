@@ -273,8 +273,9 @@ private:
   // Function that runs loop analysis on the funcOp Region.
   LogicalResult findLoopDetails(mlir::CFGLoopInfo &li, Region &funcReg);
 
-  experimental::boolean::BoolExpression *enumeratePaths(Block *start,
-                                                        Block *end);
+  experimental::boolean::BoolExpression *
+  enumeratePaths(Block *start, Block *end,
+                 const SmallVector<Block *, 4> &controlDeps);
 
   // Gets the innermost loop containing bpth block1 nd block 2
   mlir::CFGLoop *getInnermostCommonLoop(Block *block1, Block *block2);
@@ -282,6 +283,9 @@ private:
   // Gets all the loops that the consumer is in but not te producer, in-order of
   // outermost to innermost loop
   SmallVector<mlir::CFGLoop *> getLoopsConsNotInProd(Block *cons, Block *prod);
+
+  experimental::boolean::BoolExpression *
+  getBlockConditionForBranch(Block *loopExit, mlir::CFGLoop *loop);
 };
 
 /// Pointer to function lowering a region using a conversion pattern rewriter.

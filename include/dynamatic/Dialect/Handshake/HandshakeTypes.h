@@ -48,6 +48,9 @@ struct ExtraSignal {
 
   /// Constructs from the storage type (should not be used by client code).
   ExtraSignal(const Storage &storage);
+
+  /// Returns the signal type's bitwidth.
+  unsigned getBitWidth() const;
 };
 
 bool operator==(const ExtraSignal &lhs, const ExtraSignal &rhs);

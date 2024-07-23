@@ -107,12 +107,12 @@ StackNode *
 dynamatic::experimental::boolean::reduce(std::stack<StackNode *> stack) {
   // Case 1: Handling parentheses: expr --> ( expr )
   if (stack.size() == 3 &&
-      (!stack.top()->expr &&
+      (stack.top()->term &&
        stack.top()->term.value().tokenType == TokenType::LPAREN_TOKEN)) {
     stack.pop();
     StackNode *ex = stack.top();
     stack.pop();
-    if (!stack.top()->expr &&
+    if (stack.top()->term &&
         stack.top()->term.value().tokenType == TokenType::RPAREN_TOKEN)
       return ex;
     stack.top()->printError();
@@ -132,7 +132,7 @@ dynamatic::experimental::boolean::reduce(std::stack<StackNode *> stack) {
 
   /// Case 3: Handling negation: expr -> NOT expr
   if (stack.size() == 2 &&
-      (!stack.top()->expr &&
+      (stack.top()->term &&
        stack.top()->term.value().tokenType == TokenType::NOT_TOKEN)) {
     stack.pop();
     StackNode *ex = stack.top();
@@ -202,7 +202,7 @@ BoolExpression *Parser::parseSop() {
         StackNode *s = stack.at(stack.size() - 1);
         stack.pop_back();
 
-        if (!s->expr)
+        if (s->term)
           lastPoppedTerminal = s;
 
         rhs.push(s);

@@ -124,6 +124,11 @@ def MergeLikeOpInterface : OpInterface<"MergeLikeOpInterface"> {
       }],
       "mlir::OperandRange", "getDataOperands", (ins)
     >,
+    InterfaceMethod<[{
+        Returns the operation's result representing the selected data operand.
+      }],
+      "mlir::OpResult", "getDataResult", (ins)
+    >,
   ];
 
   let verify = [{

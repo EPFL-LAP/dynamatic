@@ -39,6 +39,7 @@
 #include "mlir/IR/OpDefinition.h"
 #include "mlir/IR/Operation.h"
 #include "mlir/IR/PatternMatch.h"
+#include "mlir/IR/Region.h"
 #include "mlir/IR/ValueRange.h"
 #include "mlir/Support/LogicalResult.h"
 #include "mlir/Transforms/DialectConversion.h"
@@ -46,6 +47,7 @@
 #include "llvm/ADT/SmallVector.h"
 #include "llvm/ADT/StringRef.h"
 #include "llvm/ADT/TypeSwitch.h"
+#include "llvm/Support/Casting.h"
 #include "llvm/Support/raw_ostream.h"
 #include <cstdlib>
 #include <iterator>
@@ -705,6 +707,40 @@ LogicalResult HandshakeLowering::verifyAndCreateMemInterfaces(
 
       minimizeGroupsConnections(groups);
 
+      llvm::errs() << "Now printing groups graph\n";
+      for (Group *group : groups) {
+        llvm::errs() << "Group ";
+        group->bb->printAsOperand(llvm::errs());
+        llvm::errs() << "\n";
+        llvm::errs() << "Preds: ";
+        for (Group *pred : group->preds) {
+          pred->bb->printAsOperand(llvm::errs());
+          llvm::errs() << ", ";
+        }
+        llvm::errs() << "\n";
+        llvm::errs() << "Succs: ";
+        for (Group *succ : group->succs) {
+          succ->bb->printAsOperand(llvm::errs());
+          llvm::errs() << ", ";
+        }
+        llvm::errs() << "\n";
+      }
+      llvm::errs() << "Done printing groups graph\n";
+
+      llvm::errs() << "Now printing term conds:\n";
+      for (Block &block : region.getBlocks()) {
+        Operation *term = block.getTerminator();
+        if (isa<cf::CondBranchOp>(term)) {
+          block.printAsOperand(llvm::errs());
+          llvm::errs() << " : ";
+          auto condOp = dyn_cast<cf::CondBranchOp>(term);
+          llvm::errs() << condOp.getCondition() << "\n";
+          Value v = condOp.getCondition();
+          llvm::errs() << "Type: :" << v.getType() << "\n";
+        }
+      }
+      llvm::errs() << "\n";
+
       // Build the memory interfaces
       handshake::MemoryControllerOp mcOp;
       handshake::LSQOp lsqOp;
@@ -1075,6 +1111,22 @@ bool lessThanBlocks(Block *block1, Block *block2) {
   return id1 < id2;
 }
 
+bool greaterThanBlocks(Block *block1, Block *block2) {
+  std::string result1;
+  llvm::raw_string_ostream os1(result1);
+  block1->printAsOperand(os1);
+  std::string block1id = os1.str();
+  int id1 = std::stoi(block1id.substr(3));
+
+  std::string result2;
+  llvm::raw_string_ostream os2(result2);
+  block2->printAsOperand(os2);
+  std::string block2id = os2.str();
+  int id2 = std::stoi(block2id.substr(3));
+
+  return id1 > id2;
+}
+
 // Two types of hazards between the predecessors of one LSQ node:
 // (1) WAW between 2 Store operations,
 // (2) RAW and WAR between Load and Store operations
@@ -1259,54 +1311,87 @@ std::string getBlockCondition(Block *block) {
   return blockCondition;
 }
 
-BoolExpression *pathToMinterm(const std::vector<Block *> &path) {
+BoolExpression *pathToMinterm(const std::vector<Block *> &path,
+                              const SmallVector<Block *, 4> &controlDeps) {
   BoolExpression *exp = BoolExpression::parseSop("1");
   for (unsigned i = 0; i < path.size() - 1; i++) {
     Block *prod = path.at(i);
-    Block *cons = path.at(i + 1);
-    Operation *producerTerminator = prod->getTerminator();
-    BoolExpression *prodCondition =
-        BoolExpression::parseSop(getBlockCondition(prod));
-    if (isa<cf::CondBranchOp>(producerTerminator)) {
-      auto condOp = dyn_cast<cf::CondBranchOp>(producerTerminator);
-      // If the following BB is on the FALSE side of the current BB, then
-      // negate the condition of the current BB
-      if (cons == condOp.getFalseDest())
-        prodCondition = prodCondition->boolNegate();
+    auto *it = std::find(controlDeps.begin(), controlDeps.end(), prod);
+    if (it != controlDeps.end()) {
+      Block *cons = path.at(i + 1);
+      Operation *producerTerminator = prod->getTerminator();
+      BoolExpression *prodCondition =
+          BoolExpression::parseSop(getBlockCondition(prod));
+      if (isa<cf::CondBranchOp>(producerTerminator)) {
+        auto condOp = dyn_cast<cf::CondBranchOp>(producerTerminator);
+        // If the following BB is on the FALSE side of the current BB, then
+        // negate the condition of the current BB
+        if (cons == condOp.getFalseDest())
+          prodCondition = prodCondition->boolNegate();
+      }
+      exp = BoolExpression::boolAnd(exp, prodCondition);
     }
-    exp = BoolExpression::boolAnd(exp, prodCondition);
   }
   return exp;
 }
 
-// Checks if every Block in the path is found in the control dependency list
-bool HandshakeLowering::checkControlDep(
-    const SmallVector<Block *, 4> &controlDeps,
-    const std::vector<Block *> &path) {
+// Function to eliminate common dependencies between the producer and the
+// consumer
+void eliminateCommonEntries(SmallVector<Block *, 4> &prodControlDeps,
+                            SmallVector<Block *, 4> &consControlDeps) {
+  // Lambda function to check if an element is present in the other vector
+  auto isCommon = [&prodControlDeps](Block *block) {
+    return std::find(prodControlDeps.begin(), prodControlDeps.end(), block) !=
+           prodControlDeps.end();
+  };
 
-  return std::all_of(path.begin(), path.end(), [&](Block *block) {
-    return std::find(controlDeps.begin(), controlDeps.end(), block) !=
-           controlDeps.end();
-  });
+  // Remove common entries from consControlDeps
+  consControlDeps.erase(
+      std::remove_if(consControlDeps.begin(), consControlDeps.end(), isCommon),
+      consControlDeps.end());
+
+  // Lambda function to check if an element is present in the other vector
+  auto isCommonInCons = [&consControlDeps](Block *block) {
+    return std::find(consControlDeps.begin(), consControlDeps.end(), block) !=
+           consControlDeps.end();
+  };
+
+  // Remove common entries from prodControlDeps
+  prodControlDeps.erase(std::remove_if(prodControlDeps.begin(),
+                                       prodControlDeps.end(), isCommonInCons),
+                        prodControlDeps.end());
 }
 
 // Enmerates all paths from the start Block to the end Block in the CFG and
-// returns a minimized SOP
-BoolExpression *HandshakeLowering::enumeratePaths(Block *start, Block *end) {
+// returns a minimizedSOP
+BoolExpression *
+HandshakeLowering::enumeratePaths(Block *start, Block *end,
+                                  const SmallVector<Block *, 4> &controlDeps) {
   BoolExpression *sop = BoolExpression::parseSop("0");
   std::vector<std::vector<Block *>> allPaths = findAllPaths(start, end);
-  SmallVector<Block *, 4> blockControlDeps;
-  cdgAnalysis.calculateBlockForwardControlDeps(end, funcOpIdx,
-                                               blockControlDeps);
-  for (const std::vector<Block *> &path : allPaths) {
-    /// Check if the end block is control dependent on all the Blocks in the
-    /// path
-    if (checkControlDep(blockControlDeps, path)) {
-      BoolExpression *minterm = pathToMinterm(path);
-      sop = BoolExpression::boolOr(sop, minterm);
+  /*
+  llvm::errs() << "Printing paths: \n";
+  for (std::vector<Block *> path : allPaths) {
+    llvm::errs() << "Path: ";
+    for (Block *b : path) {
+      b->printAsOperand(llvm::errs());
+      llvm::errs() << " -> ";
     }
+    llvm::errs() << "\n";
+    BoolExpression *minterm = pathToMinterm(path);
+    llvm::errs() << "In minterm form: " << minterm->toString() << "\n";
   }
-  return sop->boolMinimize();
+  llvm::errs() << "Done printing paths\n";*/
+  for (const std::vector<Block *> &path : allPaths) {
+    BoolExpression *minterm = pathToMinterm(path, controlDeps);
+    llvm::errs() << "Before ORing" << sop->toString() << "\n";
+    sop = BoolExpression::boolOr(sop, minterm);
+    llvm::errs() << "After ORing" << sop->toString() << "\n";
+  }
+  llvm::errs() << "Before minimization: " << sop->toString() << "\n";
+  sop = sop->boolMinimize();
+  llvm::errs() << "After minimization: " << sop->toString() << "\n";
+  return sop;
 }
 
 LogicalResult HandshakeLowering::addMergeNonLoop(
@@ -1314,19 +1399,40 @@ LogicalResult HandshakeLowering::addMergeNonLoop(
     std::set<Group *> &groups, DenseMap<Block *, Operation *> &forksGraph) {
   Block *entryBlock = &region.front();
   for (Group *prodGroup : groups) {
-
     Block *prod = prodGroup->bb;
-    BoolExpression *fProd = enumeratePaths(entryBlock, prod);
+    SmallVector<Block *, 4> prodControlDeps;
+    cdgAnalysis.calculateBlockForwardControlDeps(prod, funcOpIdx,
+                                                 prodControlDeps);
+    llvm::errs() << "\n";
+    llvm::errs() << "Calculating fProd: \n";
+    // BoolExpression *fProd = enumeratePaths(entryBlock, prod);
 
     for (Group *consGroup : prodGroup->succs) {
-
       Block *cons = consGroup->bb;
-      BoolExpression *fCons = enumeratePaths(entryBlock, cons);
+      SmallVector<Block *, 4> consControlDeps;
+      cdgAnalysis.calculateBlockForwardControlDeps(cons, funcOpIdx,
+                                                   consControlDeps);
+      eliminateCommonEntries(prodControlDeps, consControlDeps);
+      BoolExpression *fProd = enumeratePaths(entryBlock, prod, prodControlDeps);
+
+      llvm::errs() << "\n";
+      llvm::errs() << "Calculating fCons: \n";
+      BoolExpression *fCons = enumeratePaths(entryBlock, cons, consControlDeps);
       BoolExpression *fGen =
           BoolExpression::boolAnd(fCons, fProd->boolNegate());
-      // fGen = fGen->boolMinimize();
+      fGen = fGen->boolMinimize();
+      llvm::errs() << "\n";
+      llvm::errs() << "FGen for ";
+      prod->printAsOperand(llvm::errs());
+      llvm::errs() << " -> ";
+      cons->printAsOperand(llvm::errs());
+      llvm::errs() << " = " << fGen->toString();
+      llvm::errs() << "\n";
+      llvm::errs() << "fProd = " << fProd->toString() << "\n";
+      llvm::errs() << "fCons = " << fCons->toString() << "\n";
+      llvm::errs() << "\n";
 
-      if (fGen != BoolExpression::parseSop("0")) {
+      if (fGen->type != experimental::boolean::ExpressionType::Zero) {
         auto memDepIt =
             std::find_if(allMemDeps.begin(), allMemDeps.end(),
                          [prod, cons](const ProdConsMemDep &dep) {
@@ -1335,10 +1441,14 @@ LogicalResult HandshakeLowering::addMergeNonLoop(
         if (memDepIt == allMemDeps.end())
           return failure();
         ProdConsMemDep &memDep = *memDepIt;
-        if (memDep.isBackward)
+        if (memDep.isBackward) {
           builder.setInsertionPointToStart(prod);
-        else
+          llvm::errs() << "Added merge in prod (addMergeNonLoop)\n";
+        } else {
           builder.setInsertionPointToStart(cons);
+          llvm::errs() << "Added merge in cons (addMergeNonLoop)\n";
+        }
+
         SmallVector<Value> mergeOperands;
         mergeOperands.push_back(forksGraph[prod]->getResult(0));
         mergeOperands.push_back(startCtrl);
@@ -1412,7 +1522,10 @@ HandshakeLowering::addMergeLoop(OpBuilder &builder, std::set<Group *> &groups,
       Block *prod = prodGroup->bb;
       /// For every loop containing both prod and cons, insert a MERGE in
       /// the loop header block
-      if (prod > cons) {
+      if (greaterThanBlocks(prod, cons)) {
+        llvm::errs() << "HERE! PRODD: ";
+        prod->printAsOperand(llvm::errs());
+        llvm::errs() << "\n";
         CFGLoop *loop = getInnermostCommonLoop(prod, cons);
         if (loop) {
           /// Insert the MERGE at the beginning of the loop header with START
@@ -1444,6 +1557,13 @@ HandshakeLowering::addMergeLoop(OpBuilder &builder, std::set<Group *> &groups,
             SmallVector<Value> operands;
             /// Get the result of the Operation right before the consumer
             Value mergeOperand = path.at(path.size() - 2)->getResult(0);
+            llvm::errs() << "mergeOperand producer: "
+                         << (*mergeOperand.getDefiningOp()) << "\n";
+            llvm::errs() << "mergeOperand producer block: ";
+            (mergeOperand.getDefiningOp())
+                ->getBlock()
+                ->printAsOperand(llvm::errs());
+            llvm::errs() << "\n";
             operands.push_back(mergeOperand);
             operands.push_back(startCtrl);
             auto mergeOp = builder.create<handshake::MergeOp>(
@@ -1458,6 +1578,9 @@ HandshakeLowering::addMergeLoop(OpBuilder &builder, std::set<Group *> &groups,
             // LazyFork
             forksGraph[cons]->replaceUsesOfWith(mergeOperand,
                                                 mergeOp->getResult(0));
+            llvm::errs() << "Added merge in (addMergeLoop)";
+            loopHeader->printAsOperand(llvm::errs());
+            llvm::errs() << "\n";
           }
         }
       }
@@ -1611,6 +1734,22 @@ LogicalResult HandshakeLowering::addSupp(ConversionPatternRewriter &rewriter) {
   return success();
 }
 
+// If the true destination of the termiator of the loop exit exits the loop,
+// then negate the condition of the block
+BoolExpression *HandshakeLowering::getBlockConditionForBranch(Block *loopExit,
+                                                              CFGLoop *loop) {
+  BoolExpression *blockCond =
+      BoolExpression::parseSop(getBlockCondition(loopExit));
+  auto *terminatorOperation = loopExit->getTerminator();
+  assert(isa<cf::CondBranchOp>(terminatorOperation) &&
+         "Terminator condition of a loop exit must be a conditional branch.");
+  auto condBranch = dyn_cast<cf::CondBranchOp>(terminatorOperation);
+  Block *trueDest = condBranch.getTrueDest();
+  if (li.getLoopFor(trueDest) != loop)
+    blockCond->boolNegate();
+  return blockCond;
+}
+
 LogicalResult HandshakeLowering::manageMoreProdThanCons(
     ConversionPatternRewriter &rewriter, Operation *producer,
     Operation *consumer, Value connection) {
@@ -1621,6 +1760,7 @@ LogicalResult HandshakeLowering::manageMoreProdThanCons(
     if (!loop->contains(consumer->getBlock())) {
       producerLoopsWithoutConsumer.insert(loop);
     }
+
     loop = loop->getParentLoop();
   }
 
@@ -1634,6 +1774,11 @@ LogicalResult HandshakeLowering::manageMoreProdThanCons(
     } else {
       SmallVector<Block *> exitBlocks;
       loop->getExitBlocks(exitBlocks);
+      BoolExpression *branchCond = BoolExpression::boolZero();
+      for (Block *exitBlock : exitBlocks) {
+        BoolExpression *blockCond = getBlockConditionForBranch(exitBlock, loop);
+        branchCond = BoolExpression::boolOr(branchCond, blockCond);
+      }
     }
   }
   return success();

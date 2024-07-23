@@ -415,11 +415,6 @@ LogicalResult MemoryInterfaceBuilder::determineInterfaceInputsWithForks(
   // Determine LSQ inputs
   for (auto [group, lsqGroupOps] : lsqPorts) {
     Operation *firstOpInGroup = lsqGroupOps.front();
-    std::optional<unsigned> block = getLogicBB(firstOpInGroup);
-    Value groupCtrl = getCtrl(*block);
-    llvm::errs() << "Printing ctrl: ";
-    llvm::errs() << groupCtrl << "\n";
-
     // Operation *firstOpInGroup = lsqGroupOps.front();
     Operation *forkNode = forksGraph[firstOpInGroup->getBlock()];
     inputs.lsqInputs.push_back(forkNode->getResult(1));
