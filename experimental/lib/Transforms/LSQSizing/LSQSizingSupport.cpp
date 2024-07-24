@@ -143,33 +143,36 @@ std::vector<std::vector<std::string>> AdjListGraph::findPaths(mlir::Operation *s
 }
 
 
-std::vector<std::string> AdjListGraph::findLongestNonCyclicPath(mlir::Operation *start_op) {
-  std::vector<std::string> path;
-  std::stack<std::pair<std::vector<std::string>, int>> pathStack;
-  std::string start = start_op->getAttrOfType<StringAttr>("handshake.name").str();
 
+std::vector<std::string> AdjListGraph::findLongestNonCyclicPath(mlir::Operation *start_op) {
+  std::string start = start_op->getAttrOfType<StringAttr>("handshake.name").str();
+  std::vector<std::string> path;
+  std::stack<std::pair<std::vector<std::string>, std::set<std::string>>> pathStack;
   int maxLatency = 0;
-  // Initialize the stack with the path containing the source node and its latency
-  pathStack.push({{start}, 0});
+  // Initialize the stack with the path containing the source node and its visited set
+  pathStack.push({{start}, {start}});
   while (!pathStack.empty()) {
-    // Get the current path and latency from the stack
-    auto [currentPath, currentLatency] = pathStack.top();
+    // Get the current path and visited set from the stack
+    auto [currentPath, visited] = pathStack.top();
     pathStack.pop();
     // Get the last node in the current path
     std::string currentNode = currentPath.back();
     // If the current latency is higher than the max latency, update the max latency and path
-    if (currentLatency > maxLatency) {
-      maxLatency = currentLatency;
+    if (getPathLatency(currentPath) > maxLatency) {
+      maxLatency = getPathLatency(currentPath);
       path = currentPath;
     }
     // Get all adjacent nodes of the current node
     for (const std::string& neighbor : nodes.at(currentNode).edges) {
-      // Calculate the latency of the path to the neighbor node
-      int neighborLatency = currentLatency + nodes.at(neighbor).latency;
-      // Push the new path and updated latency onto the stack
-      std::vector<std::string> newPath = currentPath;
-      newPath.push_back(neighbor);
-      pathStack.push({newPath, neighborLatency});
+      // If the neighbor has not been visited in the current path, extend the path
+      if (visited.find(neighbor) == visited.end()) {
+          std::vector<std::string> newPath = currentPath;
+          newPath.push_back(neighbor);
+          std::set<std::string> newVisited = visited;
+          newVisited.insert(neighbor);
+          // Push the new path and updated visited set onto the stack
+          pathStack.push({newPath, newVisited});
+      }
     }
   }
   return path;

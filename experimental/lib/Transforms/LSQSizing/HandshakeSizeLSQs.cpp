@@ -140,9 +140,9 @@ LSQSizingResult HandshakeSizeLSQsPass::sizeLSQsForCFDFC(buffer::CFDFC cfdfc, uns
   graph.printGraph();
 
   // Find starting node, which will be the reference to the rest
-  /*mlir::Operation * start_node = findStartNode(graph);
+  mlir::Operation * start_node = findStartNode(graph);
   llvm::dbgs() << "\t [DBG] Start Node: " << start_node->getAttrOfType<StringAttr>("handshake.name").str()<< "\n";
-
+  /*
   // Find Phi node of each BB
   std::unordered_map<unsigned, mlir::Operation *> phi_nodes = getPhiNodes(graph, start_node);
 
