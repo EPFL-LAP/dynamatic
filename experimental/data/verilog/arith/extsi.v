@@ -14,7 +14,7 @@ module extsi #(
   output outs_ready
 );
 
-  assign outs = {ins, {OUTPUT_WIDTH - INPUT_WIDTH{ins[INPUT_WIDTH - 1]}}};
+  assign outs = {{(OUTPUT_WIDTH - INPUT_WIDTH){ins[INPUT_WIDTH - 1]}}, ins};
   assign outs_valid = ins_valid;
   assign ins_ready = outs_ready;
 

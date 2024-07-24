@@ -11,7 +11,7 @@ module ENTITY_NAME #(
   output outs_valid,
 	input  outs_ready
 );
-	assign outs = "VALUE";	//! What is this? This is not a valid HDL file, Jiantao 21/07/2024 
+	assign outs = "VALUE"; 
 	assign outs_valid = ctrl_valid;
 	assign ctrl_ready = outs_ready;
 

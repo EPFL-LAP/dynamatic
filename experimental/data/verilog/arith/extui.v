@@ -14,7 +14,7 @@ module extui #(
   output outs_ready
 );
 
-  assign outs = {ins, {OUTPUT_WIDTH - INPUT_WIDTH{1'b0}}};
+  assign outs = {{(OUTPUT_WIDTH - INPUT_WIDTH){1'b0}}, ins};
   assign outs_valid = ins_valid;
   assign ins_ready = outs_ready;
 
