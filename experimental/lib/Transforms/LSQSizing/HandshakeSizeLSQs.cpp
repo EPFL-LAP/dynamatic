@@ -24,6 +24,7 @@
 #include "mlir/IR/Value.h"
 //#include "experimental/Support/StdProfiler.h"
 #include "experimental/Transforms/LSQSizing/LSQSizingSupport.h"
+#include "dynamatic/Support/CFG.h"
 
 #define DEBUG_TYPE "handshake-size-lsqs"
 
@@ -52,7 +53,7 @@ private:
 
   LSQSizingResult sizeLSQsForCFDFC(buffer::CFDFC cfdfc, unsigned II, TimingDatabase timingDB);
   mlir::Operation *findStartNode(AdjListGraph graph);
-  std::unordered_map<std::string, int> getBBStartTimes(AdjListGraph graph, mlir::Operation *start_node);
+  std::unordered_map<unsigned, mlir::Operation *> getPhiNodes(AdjListGraph graph, mlir::Operation *start_node);
 };
 } // namespace
 
@@ -81,12 +82,12 @@ void HandshakeSizeLSQsPass::runDynamaticPass() {
     // Read Attributes -> hardcoded for bicg
     
     // BICG
-    //DenseMap<unsigned, SmallVector<unsigned>> cfdfc_attribute = {{0, {2}}, {1, {3, 1, 2}}}; // = funcOp.getCFDFCs();
-    //DenseMap<unsigned, float> troughput_attribute = {{0, 3.333333e-01}, {1, 2.000000e-01}}; // = funcOp.getThroughput();      
+    DenseMap<unsigned, SmallVector<unsigned>> cfdfc_attribute = {{0, {2}}, {1, {3, 1, 2}}}; // = funcOp.getCFDFCs();
+    DenseMap<unsigned, float> troughput_attribute = {{0, 3.333333e-01}, {1, 2.000000e-01}}; // = funcOp.getThroughput();      
 
     // FIR
-    DenseMap<unsigned, SmallVector<unsigned>> cfdfc_attribute = {{0, {1}}}; // = funcOp.getCFDFCs();
-    DenseMap<unsigned, float> troughput_attribute = {{0, 3.333333e-01}};   
+    //DenseMap<unsigned, SmallVector<unsigned>> cfdfc_attribute = {{0, {1}}}; // = funcOp.getCFDFCs();
+    //DenseMap<unsigned, float> troughput_attribute = {{0, 3.333333e-01}};   
 
     // Extract Arch sets
     for(auto &entry: cfdfc_attribute) {
@@ -138,13 +139,14 @@ LSQSizingResult HandshakeSizeLSQsPass::sizeLSQsForCFDFC(buffer::CFDFC cfdfc, uns
   AdjListGraph graph(cfdfc, timingDB, II);
   graph.printGraph();
 
-  //TODO identify start nodes
-  // Find starting node for each BB
+  // Find starting node, which will be the reference to the rest
   mlir::Operation * start_node = findStartNode(graph);
   llvm::dbgs() << "\t [DBG] Start Node: " << start_node->getAttrOfType<StringAttr>("handshake.name").str()<< "\n";
 
+  // Find Phi node of each BB
+  std::unordered_map<unsigned, mlir::Operation *> phi_nodes = getPhiNodes(graph, start_node);
+
   // Get Start Times of each BB (Alloc Times) 
-  //std::unordered_map<std::string, int> bb_start_times = getBBStartTimes(graph, start_node);
 
 
   // Get Dealloc Times and End Times
@@ -201,14 +203,25 @@ mlir::Operation * HandshakeSizeLSQsPass::findStartNode(AdjListGraph graph) {
 }
 
 
-std::unordered_map<std::string, int> HandshakeSizeLSQsPass::getBBStartTimes(AdjListGraph graph, mlir::Operation *start_node) {
-  std::unordered_map<std::string, int> start_times;
+std::unordered_map<unsigned, mlir::Operation *> HandshakeSizeLSQsPass::getPhiNodes(AdjListGraph graph, mlir::Operation *start_node) {
+  std::unordered_map<unsigned, mlir::Operation *> phi_nodes;
+  std::vector<mlir::Operation *> branch_ops = graph.getOperationsWithOpName("handshake.cond_br");
+  for(auto &branch_op: branch_ops) {
+    unsigned src_bb =branch_op->getAttrOfType<IntegerAttr>("handshake.bb").getUInt();
+    llvm::dbgs() << "\t [DBG] Branch Op: " << branch_op->getAttrOfType<StringAttr>("handshake.name").str() << " of BB " << src_bb <<"\n";
 
-  //TODO find starting nodes of each BB from cond branches
-
-  return start_times;
-
+    for(auto &dest_op: graph.getConnectedOps(branch_op)) {
+      llvm::dbgs() << "\t\t [DBG] connected to: " << dest_op->getAttrOfType<StringAttr>("handshake.name").str() << "\n";
+      unsigned dest_bb = dest_op->getAttrOfType<IntegerAttr>("handshake.bb").getUInt();
+      if(dest_bb != src_bb) {
+        llvm::dbgs() << "\t [DBG] Found Phi Node: " << dest_op->getAttrOfType<StringAttr>("handshake.name").str() << " for BB " << dest_bb << "\n";
+        phi_nodes.insert({dest_bb, dest_op});
+      }
+    }
+  }
+  return phi_nodes;
 }
+
 
 
 std::unique_ptr<dynamatic::DynamaticPass>

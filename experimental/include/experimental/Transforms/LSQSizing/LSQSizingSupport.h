@@ -40,6 +40,7 @@ public:
 
     std::vector<mlir::Operation*> getOperationsWithOpName(std::string op_name);
 
+    std::vector<mlir::Operation*> getConnectedOps(mlir::Operation *op);
 
 private:
     std::unordered_map<std::string , AdjListNode> nodes; // Map to store nodes by their index

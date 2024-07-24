@@ -222,3 +222,22 @@ int AdjListGraph::findMinPathLatency(mlir::Operation *start_op, mlir::Operation 
   return min_latency;
 }
 
+
+std::vector<mlir::Operation*> AdjListGraph::getConnectedOps(mlir::Operation *op) {
+  std::vector<mlir::Operation*> connected_ops;
+  std::string op_name = op->getAttrOfType<StringAttr>("handshake.name").str();
+
+  for(auto &node: nodes.at(op_name).edges) {
+    connected_ops.push_back(nodes.at(node).op);
+  }
+
+  //TODO cleanup
+  for(auto &artificial_node: nodes.at(op_name).backedges) {
+    for(auto &node: nodes.at(artificial_node).backedges) {
+      connected_ops.push_back(nodes.at(node).op);
+    }
+  }
+
+  return connected_ops;
+}
+
