@@ -11,6 +11,38 @@ using namespace dynamatic;
 using namespace dynamatic::experimental::lsqsizing;
 
 
+AdjListGraph::AdjListGraph(mlir::SetVector<Operation *> units,mlir::SetVector<Value> channels, TimingDatabase timingDB) {
+    for(auto &unit: units) {
+    double latency;
+    //llvm::dbgs() << "unit: " << unit->getAttrOfType<StringAttr>("handshake.name") << "\n";
+    if(failed(timingDB.getLatency(unit, SignalType::DATA, latency))) {
+      //llvm::dbgs() << "No latency found for unit: " << unit->getName().getStringRef() << " found \n";
+      addNode(unit, 0);
+    } 
+    else {
+      addNode(unit, latency);
+    }
+  }
+
+  for(auto &channel: channels) {
+    mlir::Operation *src_op = channel.getDefiningOp();
+    for(Operation *dest_op: channel.getUsers()) {
+      addEdge(src_op, dest_op);
+    }
+  }
+}
+
+void AdjListGraph::insertBackEdges(mlir::SetVector<Value> backedges, unsigned II) {
+  // Add artificial nodes for backedges with -II latency
+  for(auto &backedge: backedges) {
+    mlir::Operation *src_op = backedge.getDefiningOp();
+    for(Operation *dest_op: backedge.getUsers()) {
+      insertArtificialNodeOnEdge(src_op, dest_op, (II * -1));
+    }
+  }
+}
+
+
 void AdjListGraph::addNode(mlir::Operation *op, int latency) {
     nodes.insert({op->getAttrOfType<StringAttr>("handshake.name").str(), AdjListNode{latency, op, {}}});
 }
@@ -81,8 +113,48 @@ std::vector<std::vector<std::string>> AdjListGraph::findPaths(std::string start,
   return paths;
 }
 
+
 std::vector<std::vector<std::string>> AdjListGraph::findPaths(mlir::Operation *start_op, mlir::Operation *end_op) {
   return findPaths(start_op->getAttrOfType<StringAttr>("handshake.name").str(), end_op->getAttrOfType<StringAttr>("handshake.name").str());
+}
+
+
+std::vector<std::string> AdjListGraph::findPathWithHighestLatency(mlir::Operation *start_op) {
+  std::vector<std::string> path;
+  std::stack<std::pair<std::vector<std::string>, int>> pathStack;
+  std::string start = start_op->getAttrOfType<StringAttr>("handshake.name").str();
+
+  int maxLatency = 0;
+  // Initialize the stack with the path containing the source node and its latency
+  pathStack.push({{start}, 0});
+  while (!pathStack.empty()) {
+    // Get the current path and latency from the stack
+    auto [currentPath, currentLatency] = pathStack.top();
+    pathStack.pop();
+    // Get the last node in the current path
+    std::string currentNode = currentPath.back();
+    // If the current latency is higher than the max latency, update the max latency and path
+    if (currentLatency > maxLatency) {
+      maxLatency = currentLatency;
+      path = currentPath;
+    }
+    // Get all adjacent nodes of the current node
+    for (const std::string& neighbor : nodes.at(currentNode).adjList) {
+      // Calculate the latency of the path to the neighbor node
+      int neighborLatency = currentLatency + nodes.at(neighbor).latency;
+      // Push the new path and updated latency onto the stack
+      std::vector<std::string> newPath = currentPath;
+      newPath.push_back(neighbor);
+      pathStack.push({newPath, neighborLatency});
+    }
+  }
+  return path;
+}
+
+
+int AdjListGraph::findMaxLatencyFromStart(mlir::Operation *start_op) {
+  std::vector<std::string> path = findPathWithHighestLatency(start_op);
+  return getPathLatency(path);
 }
 
 

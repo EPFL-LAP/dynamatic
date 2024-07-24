@@ -51,7 +51,7 @@ struct HandshakeSizeLSQsPass
 private:
 
   LSQSizingResult sizeLSQsForCFDFC(buffer::CFDFC cfdfc, unsigned II, TimingDatabase timingDB);
-  AdjListGraph createAdjacencyList(buffer::CFDFC cfdfc, unsigned II, TimingDatabase timingDB);
+  mlir::Operation *findStartNode(AdjListGraph graph);
 };
 } // namespace
 
@@ -134,14 +134,17 @@ LSQSizingResult HandshakeSizeLSQsPass::sizeLSQsForCFDFC(buffer::CFDFC cfdfc, uns
   //TODO implement algo
   llvm::dbgs() << "\t [DBG] sizeLSQsForCFDFC called for CFDFC with " << cfdfc.cycle.size() << " BBs and II of " << II << "\n";
 
-  AdjListGraph graph = createAdjacencyList(cfdfc, II, timingDB);
+  AdjListGraph graph = AdjListGraph(cfdfc.units, cfdfc.channels, timingDB);
   graph.printGraph();
 
   //TODO identify start nodes
   // Find starting node for each BB
-  mlir::Operation * start_node = nullptr;
+  mlir::Operation * start_node = findStartNode(graph);
   // Get Start Times of each BB (Alloc Times) 
   
+
+
+  graph.insertBackEdges(cfdfc.backedges, II);
 
   // Get Dealloc Times and End Times
   std::vector<mlir::Operation *> load_ops = graph.getOperationsWithOpName("lsq_load");
@@ -171,40 +174,23 @@ LSQSizingResult HandshakeSizeLSQsPass::sizeLSQsForCFDFC(buffer::CFDFC cfdfc, uns
 }
 
 
-AdjListGraph HandshakeSizeLSQsPass::createAdjacencyList(buffer::CFDFC cfdfc, unsigned II, TimingDatabase timingDB) {
-  AdjListGraph graph;
+mlir::Operation * HandshakeSizeLSQsPass::findStartNode(AdjListGraph graph) {
+  std::vector<mlir::Operation *> mux_ops = graph.getOperationsWithOpName("mux");
+  std::vector<mlir::Operation *> cmerge_ops = graph.getOperationsWithOpName("control_merge");
 
-  for(auto &unit: cfdfc.units) {
-    double latency;
-    //llvm::dbgs() << "unit: " << unit->getAttrOfType<StringAttr>("handshake.name") << "\n";
-    if(failed(timingDB.getLatency(unit, SignalType::DATA, latency))) {
-      //llvm::dbgs() << "No latency found for unit: " << unit->getName().getStringRef() << " found \n";
-      graph.addNode(unit, 0);
-    } 
-    else {
-      graph.addNode(unit, latency);
-    }
+  std::vector<mlir::Operation *> potential_start_nodes = std::vector<mlir::Operation *>(mux_ops.size() + cmerge_ops.size());
+  std::merge(mux_ops.begin(), mux_ops.end(), cmerge_ops.begin(), cmerge_ops.end(), potential_start_nodes.begin());
+
+  std::unordered_map<mlir::Operation *, int> max_latencies;
+
+  for(auto &op: potential_start_nodes) {
+    max_latencies.insert({op, graph.findMaxLatencyFromStart(op)});
   }
 
-  for(auto &channel: cfdfc.channels) {
-    mlir::Operation *src_op = channel.getDefiningOp();
-    for(Operation *dest_op: channel.getUsers()) {
-      graph.addEdge(src_op, dest_op);
-    }
-  }
-
-
-  // Add artificial nodes for backedges with -II latency
-  for(auto &backedge: cfdfc.backedges) {
-    mlir::Operation *src_op = backedge.getDefiningOp();
-    for(Operation *dest_op: backedge.getUsers()) {
-      graph.insertArtificialNodeOnEdge(src_op, dest_op, (II * -1));
-    }
-  }
-
-  //TODO add extra vertices for "allocation precedes memory access"  
-
-  return graph;
+  return std::max_element(max_latencies.begin(), max_latencies.end(), 
+    [](const std::pair<mlir::Operation *, int> &a, const std::pair<mlir::Operation *, int> &b) {
+      return a.second < b.second;
+    })->first;
 }
 
 
