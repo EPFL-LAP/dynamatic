@@ -123,7 +123,7 @@ LogicalResult ExportInfo::concretizeExternalModules() {
     RTLMatch *match = config.getMatchingComponent(request);
     if (!match) {
       return emitError(request.loc)
-             << "Failed to find matching RTL component for external module";
+             << "Failed to find matching RTL component for external module " << extOp.getName() ;
     }
     if (extOp)
       externals[extOp] = match;
