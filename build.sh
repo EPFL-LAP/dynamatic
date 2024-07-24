@@ -1,4 +1,3 @@
-
 #!/bin/bash
 
 # Kill the whole script on Ctrl+C
