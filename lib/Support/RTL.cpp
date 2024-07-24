@@ -414,6 +414,15 @@ LogicalResult RTLMatch::concretize(const RTLRequest &request,
   allParams[RTLParameter::DYNAMATIC] = dynamaticPath;
   allParams[RTLParameter::OUTPUT_DIR] = outputDir;
 
+  // verilog does not accept constant values in string format
+  if( hdl == HDL::VERILOG ){
+    for(auto &[name_param, value] : allParams){
+      if( name_param.compare("VALUE") == 0){ // assuming that the value parameter is only for constant values
+        allParams[name_param] = std::to_string(value.size()) + "\\\'b" + value;  
+      }
+    }
+  }
+
   std::string extension;
   switch (hdl){
   case HDL::VERILOG:
