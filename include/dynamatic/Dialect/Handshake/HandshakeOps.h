@@ -19,6 +19,7 @@
 #define DYNAMATIC_DIALECT_HANDSHAKE_HANDSHAKE_OPS_H
 
 #include "dynamatic/Dialect/Handshake/HandshakeInterfaces.h"
+#include "dynamatic/Dialect/Handshake/HandshakeTypes.h"
 #include "dynamatic/Support/LLVM.h"
 #include "mlir/Dialect/Affine/Analysis/AffineAnalysis.h"
 #include "mlir/IR/OpDefinition.h"
@@ -765,9 +766,6 @@ namespace affine {
 struct DependenceComponent;
 } // namespace affine
 } // namespace mlir
-
-#define GET_TYPEDEF_CLASSES
-#include "dynamatic/Dialect/Handshake/HandshakeTypes.h.inc"
 
 #define GET_ATTRDEF_CLASSES
 #include "dynamatic/Dialect/Handshake/HandshakeAttributes.h.inc"

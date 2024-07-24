@@ -15,6 +15,7 @@
 #include "dynamatic/Transforms/BufferPlacement/HandshakePlaceBuffers.h"
 #include "dynamatic/Analysis/NameAnalysis.h"
 #include "dynamatic/Dialect/Handshake/HandshakeOps.h"
+#include "dynamatic/Support/Attribute.h"
 #include "dynamatic/Support/CFG.h"
 #include "dynamatic/Support/Logging.h"
 #include "dynamatic/Transforms/BufferPlacement/BufferingSupport.h"
@@ -296,6 +297,24 @@ HandshakePlaceBuffersPass::placeBuffers(FuncInfo &info,
   // All extracted CFDFCs must be optimized
   for (CFDFC &cf : cfdfcs)
     info.cfdfcs[&cf] = true;
+
+  // Create a new map for the cfdfc extraction
+  llvm::MapVector<size_t, std::vector<unsigned>> cfdfcResult;
+
+  // Iterate through all extracted cfdfc
+  for (auto [idx, cfAndOpt] : llvm::enumerate(info.cfdfcs)) {
+    auto &[cf, _] = cfAndOpt;
+    for (size_t i = 0, e = cf->cycle.size() - 1; i < e; ++i) {
+      // Add the bb to the corresponding in the cfdfc result map
+      cfdfcResult[idx].push_back(cf->cycle[i]);
+    }
+    cfdfcResult[idx].push_back(cf->cycle.back());
+  }
+
+  // Create and add the handshake.cfdfc attribute
+  auto cfdfcMap =
+      handshake::CFDFCToBBListAttr::get(info.funcOp.getContext(), cfdfcResult);
+  setUniqueAttr(info.funcOp, cfdfcMap);
 
   if (dumpLogs)
     logFuncInfo(info, *logger);

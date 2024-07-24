@@ -67,9 +67,9 @@ typedef struct set_family {
 
 /* # of ints needed to allocate a set with "size" elements */
 #if BPI == 32
-#define SET_SIZE(size) ((size) <= BPI ? 2 : (WHICH_WORD((size)-1) + 1))
+#define SET_SIZE(size) ((size) <= BPI ? 2 : (WHICH_WORD((size) - 1) + 1))
 #else
-#define SET_SIZE(size) ((size) <= BPI ? 3 : (WHICH_WORD((size)-1) + 2))
+#define SET_SIZE(size) ((size) <= BPI ? 3 : (WHICH_WORD((size) - 1) + 2))
 #endif
 
 /*
@@ -92,7 +92,7 @@ typedef struct set_family {
 #endif
 
 #define NELEM(set) (BPI * LOOP(set))
-#define LOOPINIT(size) ((size <= BPI) ? 1 : WHICH_WORD((size)-1))
+#define LOOPINIT(size) ((size <= BPI) ? 1 : WHICH_WORD((size) - 1))
 
 /*
  *      FLAGS store general information about the set
@@ -371,7 +371,7 @@ typedef struct {
   symbolic_t *symbolic_output; /* allow symbolic output mapping */
 } PLA_t, *pPLA;
 
-#define equal(a, b) (strcmp(a, b) == 0)
+#define equals(a, b) (strcmp(a, b) == 0)
 
 /* This is a hack which I wish I hadn't done, but too painful to change */
 #define CUBELISTSIZE(T) (((pcube *)T[1] - T) - 3)

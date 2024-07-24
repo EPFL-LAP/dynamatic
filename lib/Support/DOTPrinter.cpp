@@ -668,6 +668,10 @@ LogicalResult DOTPrinter::annotateNode(Operation *op,
             /// know that the old backend doesn't support it.
             return DOTNode("Instance");
           })
+          .Case<handshake::NotOp>([&](auto) {
+            /// NOTE: this is not actually supported
+            return DOTNode("Not");
+          })
           .Case<handshake::MergeOp>([&](auto) { return DOTNode("Merge"); })
           .Case<handshake::MuxOp>([&](handshake::MuxOp op) {
             auto info = DOTNode("Mux");
