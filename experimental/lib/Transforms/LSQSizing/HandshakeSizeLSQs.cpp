@@ -79,44 +79,44 @@ void HandshakeSizeLSQsPass::runDynamaticPass() {
   for (handshake::FuncOp funcOp : mod.getOps<handshake::FuncOp>()) {
     llvm::dbgs() << "\t [DBG] Function: " << funcOp.getName() << "\n";
 
-    // Read Attributes -> hardcoded for bicg
-    
-    // BICG
-    DenseMap<unsigned, SmallVector<unsigned>> cfdfc_attribute = {{0, {2}}, {1, {3, 1, 2}}}; // = funcOp.getCFDFCs();
-    DenseMap<unsigned, float> troughput_attribute = {{0, 3.333333e-01}, {1, 2.000000e-01}}; // = funcOp.getThroughput();      
-
-    // FIR
-    //DenseMap<unsigned, SmallVector<unsigned>> cfdfc_attribute = {{0, {1}}}; // = funcOp.getCFDFCs();
-    //DenseMap<unsigned, float> troughput_attribute = {{0, 3.333333e-01}};   
+    std::unordered_map<unsigned, float> II_per_cfdfc;
+    DictionaryAttr troughput_attr = getUniqueAttr<handshake::CFDFCThroughputAttr>(funcOp).getThroughputMap();
+    DictionaryAttr cfdfc_attr = getUniqueAttr<handshake::CFDFCToBBListAttr>(funcOp).getCfdfcMap();
 
     // Extract Arch sets
-    for(auto &entry: cfdfc_attribute) {
+    for(auto &entry: cfdfc_attr) {
       SmallVector<experimental::ArchBB> arch_store;
-      auto it = entry.second.begin();
-      //TODO Implement more clean?
-      int first_bb_id = *it++;
+
+      ArrayAttr bb_list = llvm::dyn_cast<ArrayAttr>(entry.getValue());
+      auto it = bb_list.begin();
+      int first_bb_id = (*it++).cast<IntegerAttr>().getUInt();
       int curr_bb_id, prev_bb_id = first_bb_id;      
-      for(; it != entry.second.end(); it++) {
-        curr_bb_id = *it;
+      for(; it != bb_list.end(); it++) {
+        curr_bb_id = (*it).cast<IntegerAttr>().getUInt();
         arch_store.push_back(experimental::ArchBB(prev_bb_id, curr_bb_id, 0, false));
         prev_bb_id = curr_bb_id;
       }
       arch_store.push_back(experimental::ArchBB(prev_bb_id, first_bb_id, 0, false));
 
-      llvm::dbgs() << "\t [DBG] CFDFC: " << entry.first << " with " << arch_store.size() << " arches\n";
+      llvm::dbgs() << "\t [DBG] CFDFC: " << entry.getName() << " with " << arch_store.size() << " arches\n";
       buffer::ArchSet arch_set;
       for(auto &arch: arch_store) {
         llvm::dbgs() << "\t [DBG] Arch: " << arch.srcBB << " -> " << arch.dstBB << "\n";
         arch_set.insert(&arch);
       }
 
-      cfdfcs.insert_or_assign(entry.first, buffer::CFDFC(funcOp, arch_set, 0));
+      cfdfcs.insert_or_assign(std::stoi(entry.getName().str()), buffer::CFDFC(funcOp, arch_set, 0));
+    }
+
+    //Extract II
+    for (const NamedAttribute attr : troughput_attr) {
+      FloatAttr throughput = llvm::dyn_cast<FloatAttr>(attr.getValue());
+      II_per_cfdfc.insert({std::stoi(attr.getName().str()), round(1 / throughput.getValueAsDouble())});
     }
 
     llvm::dbgs() << "\t [DBG] CFDFCs: " << cfdfcs.size() << "\n";
     for(auto &cfdfc : cfdfcs) {
-      unsigned II = round(1 / troughput_attribute[cfdfc.first]);
-      sizing_results.push_back(sizeLSQsForCFDFC(cfdfc.second, II, timingDB));
+      sizing_results.push_back(sizeLSQsForCFDFC(cfdfc.second, II_per_cfdfc[cfdfc.first], timingDB));
     }
     
     std::map<unsigned, unsigned> max_store_sizes;
@@ -140,7 +140,7 @@ LSQSizingResult HandshakeSizeLSQsPass::sizeLSQsForCFDFC(buffer::CFDFC cfdfc, uns
   graph.printGraph();
 
   // Find starting node, which will be the reference to the rest
-  mlir::Operation * start_node = findStartNode(graph);
+  /*mlir::Operation * start_node = findStartNode(graph);
   llvm::dbgs() << "\t [DBG] Start Node: " << start_node->getAttrOfType<StringAttr>("handshake.name").str()<< "\n";
 
   // Find Phi node of each BB
@@ -168,7 +168,7 @@ LSQSizingResult HandshakeSizeLSQsPass::sizeLSQsForCFDFC(buffer::CFDFC cfdfc, uns
     int latency = graph.findMaxPathLatency(start_node, op);
     store_dealloc_times.insert({op, latency});
     store_end_time = std::max(store_end_time, latency);
-  }
+  }*/
 
   // Get Load and Store Sizes
 

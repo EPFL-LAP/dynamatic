@@ -165,25 +165,25 @@ else
   cd "$COMP_DIR"
   "$DYNAMATIC_OPT_BIN" "$F_HANDSHAKE_TRANSFORMED" \
     --handshake-set-buffering-properties="version=fpga20" \
-    --handshake-place-buffers="algorithm=fpl22 frequencies=$F_FREQUENCIES timing-models=$DYNAMATIC_DIR/data/components.json target-period=$TARGET_CP timeout=300 dump-logs" \
+    --handshake-place-buffers="algorithm=fpga20-legacy frequencies=$F_FREQUENCIES timing-models=$DYNAMATIC_DIR/data/components.json target-period=$TARGET_CP timeout=300 dump-logs" \
     > "$F_HANDSHAKE_BUFFERED"
   exit_on_fail "Failed to place smart buffers" "Placed smart buffers"
   cd - > /dev/null
 fi
 
 # handshake canonicalization
-"$DYNAMATIC_OPT_BIN" "$F_HANDSHAKE_TRANSFORMED" \
+"$DYNAMATIC_OPT_BIN" "$F_HANDSHAKE_BUFFERED" \
   --handshake-canonicalize \
   --handshake-hoist-ext-instances \
   > "$F_HANDSHAKE_EXPORT"
 exit_on_fail "Failed to canonicalize Handshake" "Canonicalized handshake"
-
 
 # handshake lsq sizing
 "$DYNAMATIC_OPT_BIN" "$F_HANDSHAKE_EXPORT" \
   --handshake-size-lsqs="timing-models=$DYNAMATIC_DIR/data/components.json" \
   > "$F_HANDSHAKE_LSQ_SIZED"
 exit_on_fail "Failed to size LSQs" "Sized LSQs"
+
 
 # handshake level -> hw level
 "$DYNAMATIC_OPT_BIN" "$F_HANDSHAKE_LSQ_SIZED" --lower-handshake-to-hw \
