@@ -13,6 +13,13 @@ KERNEL_NAME=$3
 EXPERIMENTAL=$4
 HDL=$5
 
+# Set the correct config file
+if [ "$HDL" == "vhdl" ]; then
+  RTL_CONFIG="$DYNAMATIC_DIR/experimental/data/rtl-config.json"
+elif [ "$HDL" == "verilog" ]; then
+  RTL_CONFIG="$DYNAMATIC_DIR/experimental/data/rtl-config-verilog.json"
+fi
+
 # Generated directories/files
 HDL_DIR="$OUTPUT_DIR/hdl"
 
@@ -30,7 +37,7 @@ rm -rf "$HDL_DIR" && mkdir -p "$HDL_DIR"
 if [[ $EXPERIMENTAL -ne 0 ]]; then
   # Use experimental backend
   "$DYNAMATIC_DIR/build/bin/exp-export-rtl" "$COMP_DIR/hw.mlir" "$HDL_DIR" \
-    "$DYNAMATIC_DIR/experimental/data/rtl-config.json" \
+    $RTL_CONFIG \
     --dynamatic-path "$DYNAMATIC_DIR" --hdl $HDL
   exit_on_fail "Failed to export RTL ($HDL)" "Exported RTL ($HDL)"
 else
