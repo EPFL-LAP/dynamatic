@@ -5,21 +5,21 @@ module lsq_store #(
   input  clk,
   input  rst,
   // Data from Circuit Channel
-  input  [DATA_DATA_WIDTH - 1 : 0] dataIn,
+  input  [DATA_WIDTH - 1 : 0] dataIn,
   input  dataIn_valid,
   output dataIn_ready,
   // Address from Circuit Channel
-  input  [ADDR_DATA_WIDTH - 1 : 0] addrIn,
+  input  [ADDR_WIDTH - 1 : 0] addrIn,
   input  addrIn_valid,
   output addrIn_ready,
   // Data to Interface Channel
-  output [DATA_DATA_WIDTH - 1 : 0] dataToMem,
+  output [DATA_WIDTH - 1 : 0] dataToMem,
   output dataToMem_valid,
   input  dataToMem_ready,
   // Address to Interface Channel
-  output [ADDR_DATA_WIDTH - 1 : 0] addrOut,
+  output [ADDR_WIDTH - 1 : 0] addrOut,
   output addrOut_valid,
-  input  addrOut_ready, 
+  input  addrOut_ready
 );
   // Data assignment
   assign dataToMem = dataIn;
