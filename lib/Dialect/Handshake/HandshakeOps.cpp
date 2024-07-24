@@ -24,6 +24,7 @@
 #include "mlir/Dialect/Arith/IR/Arith.h"
 #include "mlir/IR/Attributes.h"
 #include "mlir/IR/Builders.h"
+#include "mlir/IR/BuiltinAttributeInterfaces.h"
 #include "mlir/IR/BuiltinTypes.h"
 #include "mlir/IR/Diagnostics.h"
 #include "mlir/IR/OpDefinition.h"
@@ -39,6 +40,12 @@
 using namespace mlir;
 using namespace dynamatic;
 using namespace dynamatic::handshake;
+
+IntegerType dynamatic::handshake::getOptimizedIndexType(OpBuilder &builder,
+                                                        unsigned numToIndex) {
+  return builder.getIntegerType(
+      APInt(APInt::APINT_BITS_PER_WORD, numToIndex).ceilLogBase2());
+}
 
 /// Parses an SOST operation. If the `explicitSize` parameter is set to true,
 /// then the method parses the operation's size (in the SOST sense) between
@@ -69,32 +76,31 @@ parseSOSTOp(bool explicitSize, OpAsmParser &parser,
 /// number of operands.
 static LogicalResult verifyIndexWideEnough(Operation *op, Value indexVal,
                                            uint64_t numOperands) {
-  auto indexType = indexVal.getType();
-  unsigned indexWidth;
-
-  // Determine the bitwidth of the indexing value
-  if (auto integerType = indexType.dyn_cast<IntegerType>())
-    indexWidth = integerType.getWidth();
-  else if (indexType.isIndex())
-    indexWidth = IndexType::kInternalStorageBitWidth;
-  else
-    return op->emitError("unsupported type for indexing value: ") << indexType;
+  auto idxType = dyn_cast<handshake::ChannelType>(indexVal.getType());
+  if (!idxType) {
+    return op->emitError() << "expected index value to be of type "
+                              "handshake::ChannelType, but got "
+                           << indexVal.getType();
+  }
+  unsigned idxWidth = idxType.getDataBitWidth();
 
   // Check whether the bitwidth can support the provided number of operands
-  if (indexWidth < 64) {
-    uint64_t maxNumOperands = (uint64_t)1 << indexWidth;
-    if (numOperands > maxNumOperands)
-      return op->emitError("bitwidth of indexing value is ")
-             << indexWidth << ", which can index into " << maxNumOperands
+  if (idxWidth < 64) {
+    uint64_t maxNumOperands = (uint64_t)1 << idxWidth;
+    if (numOperands > maxNumOperands) {
+      return op->emitError()
+             << "bitwidth of indexing value is " << idxWidth
+             << ", which can index into " << maxNumOperands
              << " operands, but found " << numOperands << " operands";
+    }
   }
   return success();
 }
 
 static bool isControlCheckTypeAndOperand(Type dataType, Value operand) {
   // The operation is a control operation if its operand data type is a
-  // NoneType.
-  if (dataType.isa<NoneType>())
+  // control-only channel
+  if (isa<handshake::ControlType>(dataType))
     return true;
 
   // Otherwise, the operation is a control operation if the operation's
@@ -180,7 +186,9 @@ MuxOp::inferReturnTypes(MLIRContext *context, std::optional<Location> location,
   return success();
 }
 
-bool MuxOp::isControl() { return getResult().getType().isa<NoneType>(); }
+bool MuxOp::isControl() {
+  return isa<handshake::ControlType>(getResult().getType());
+}
 
 ParseResult MuxOp::parse(OpAsmParser &parser, OperationState &result) {
   OpAsmParser::UnresolvedOperand selectOperand;
@@ -520,7 +528,8 @@ ParseResult ConditionalBranchOp::parse(OpAsmParser &parser,
                             "Expected exactly 2 operands");
 
   result.addTypes({dataType, dataType});
-  operandTypes.push_back(IntegerType::get(parser.getContext(), 1));
+  Type i1Type = IntegerType::get(parser.getContext(), 1);
+  operandTypes.push_back(handshake::ChannelType::get(i1Type));
   operandTypes.push_back(dataType);
   if (parser.resolveOperands(allOperands, operandTypes, allOperandLoc,
                              result.operands))
@@ -561,55 +570,33 @@ void SinkOp::print(OpAsmPrinter &p) { sostPrint(p, false); }
 Type SourceOp::getDataType() { return getResult().getType(); }
 unsigned SourceOp::getSize() { return 1; }
 
-ParseResult SourceOp::parse(OpAsmParser &parser, OperationState &result) {
-  if (parser.parseOptionalAttrDict(result.attributes))
-    return failure();
-  result.addTypes(NoneType::get(result.getContext()));
+LogicalResult ConstantOp::inferReturnTypes(
+    MLIRContext *context, std::optional<Location> location, ValueRange operands,
+    DictionaryAttr attributes, mlir::OpaqueProperties properties,
+    mlir::RegionRange regions,
+    SmallVectorImpl<mlir::Type> &inferredReturnTypes) {
+  OperationName opName = OperationName(getOperationName(), context);
+  StringAttr attrName = getValueAttrName(opName);
+  auto attr = cast<TypedAttr>(attributes.get(attrName));
+  inferredReturnTypes.push_back(handshake::ChannelType::get(attr.getType()));
   return success();
 }
 
-void SourceOp::print(OpAsmPrinter &p) {
-  p.printOptionalAttrDict((*this)->getAttrs());
-}
-
 LogicalResult ConstantOp::verify() {
-  // Verify that the type of the provided value is equal to the result type.
-  auto typedValue = getValue().dyn_cast<mlir::TypedAttr>();
+  // Verify that the type of the provided value is equal to the result channel's
+  // data type
+  auto typedValue = dyn_cast<mlir::TypedAttr>(getValue());
   if (!typedValue)
     return emitOpError("constant value must be a typed attribute; value is ")
            << getValue();
-  if (typedValue.getType() != getResult().getType())
+  if (typedValue.getType() != getResult().getType().getDataType())
     return emitOpError() << "constant value type " << typedValue.getType()
-                         << " differs from operation result type "
+                         << " differs from result channel's data type "
                          << getResult().getType();
-
   return success();
 }
 
 bool JoinOp::isControl() { return true; }
-
-ParseResult JoinOp::parse(OpAsmParser &parser, OperationState &result) {
-  SmallVector<OpAsmParser::UnresolvedOperand, 4> operands;
-  SmallVector<Type> types;
-
-  llvm::SMLoc allOperandLoc = parser.getCurrentLocation();
-  if (parser.parseOperandList(operands) ||
-      parser.parseOptionalAttrDict(result.attributes) || parser.parseColon() ||
-      parser.parseTypeList(types))
-    return failure();
-
-  if (parser.resolveOperands(operands, types, allOperandLoc, result.operands))
-    return failure();
-
-  result.addTypes(NoneType::get(result.getContext()));
-  return success();
-}
-
-void JoinOp::print(OpAsmPrinter &p) {
-  p << " " << getData();
-  p.printOptionalAttrDict((*this)->getAttrs(), {"control"});
-  p << " : " << getData().getTypes();
-}
 
 /// Based on mlir::func::CallOp::verifySymbolUses
 LogicalResult InstanceOp::verifySymbolUses(SymbolTableCollection &symbolTable) {
@@ -682,12 +669,15 @@ static LogicalResult checkAndSetBitwidth(Value memInput, unsigned &width) {
   // Determine the signal's width
   unsigned inputWidth;
   Type inType = memInput.getType();
-  if (isa<NoneType>(inType))
+  if (isa<handshake::ControlType>(inType)) {
     inputWidth = 0;
-  else if (isa<IndexType>(inType))
-    inputWidth = IndexType::kInternalStorageBitWidth;
-  else
-    inputWidth = inType.getIntOrFloatBitWidth();
+  } else if (auto channelTy = dyn_cast<handshake::ChannelType>(inType)) {
+    inputWidth = channelTy.getDataBitWidth();
+  } else {
+    return memInput.getUsers().begin()->emitError()
+           << "Invalid input type, expected handshake::ControlType or "
+              "handshake::ChannelType";
+  }
 
   if (width == 0) {
     // This is the first time we encounter a signal of this type, consider its
@@ -695,16 +685,22 @@ static LogicalResult checkAndSetBitwidth(Value memInput, unsigned &width) {
     width = inputWidth;
     return success();
   }
-  if (width != inputWidth)
+  if (width != inputWidth) {
     return memInput.getUsers().begin()->emitError()
            << "Inconsistent bitwidths in inputs, expected signal with " << width
            << " bits but got signal with " << inputWidth << " bits.";
+  }
   return success();
 };
 
 //===----------------------------------------------------------------------===//
 // MemoryControllerOp
 //===----------------------------------------------------------------------===//
+
+static handshake::ChannelType wrapChannel(Type type) {
+  assert(ChannelType::isSupportedSignalType(type) && "unsupported data type");
+  return handshake::ChannelType::get(type);
+}
 
 void MemoryControllerOp::build(OpBuilder &odsBuilder, OperationState &odsState,
                                Value memRef, ValueRange inputs,
@@ -715,8 +711,9 @@ void MemoryControllerOp::build(OpBuilder &odsBuilder, OperationState &odsState,
 
   // Data outputs (get their type from memref)
   MemRefType memrefType = memRef.getType().cast<MemRefType>();
-  odsState.types.append(numLoads, memrefType.getElementType());
-  odsState.types.push_back(odsBuilder.getNoneType());
+  MLIRContext *ctx = odsBuilder.getContext();
+  odsState.types.append(numLoads, wrapChannel(memrefType.getElementType()));
+  odsState.types.push_back(handshake::ControlType::get(ctx));
 
   // Set "connectedBlocks" attribute
   SmallVector<int> blocksAttribute;
@@ -917,6 +914,15 @@ dynamatic::MCPorts MemoryControllerOp::getPorts() {
 // LSQOp
 //===----------------------------------------------------------------------===//
 
+static void buildLSQGroupSizes(OpBuilder &odsBuilder, OperationState &odsState,
+                               ArrayRef<unsigned> groupSizes) {
+  SmallVector<int> sizesAttribute;
+  for (unsigned size : groupSizes)
+    sizesAttribute.push_back(size);
+  odsState.addAttribute(LSQOp::getGroupSizesAttrName(odsState.name).strref(),
+                        odsBuilder.getI32ArrayAttr(sizesAttribute));
+}
+
 void LSQOp::build(OpBuilder &odsBuilder, OperationState &odsState, Value memref,
                   ValueRange inputs, ArrayRef<unsigned> groupSizes,
                   unsigned numLoads) {
@@ -926,15 +932,11 @@ void LSQOp::build(OpBuilder &odsBuilder, OperationState &odsState, Value memref,
 
   // Data outputs (get their type from memref)
   MemRefType memrefType = memref.getType().cast<MemRefType>();
-  odsState.types.append(numLoads, memrefType.getElementType());
-  odsState.types.push_back(odsBuilder.getNoneType());
+  MLIRContext *ctx = odsBuilder.getContext();
+  odsState.types.append(numLoads, wrapChannel(memrefType.getElementType()));
+  odsState.types.push_back(handshake::ControlType::get(ctx));
 
-  // Set "groupSizes" attribute
-  SmallVector<int> sizesAttribute;
-  for (unsigned size : groupSizes)
-    sizesAttribute.push_back(size);
-  odsState.addAttribute("groupSizes",
-                        odsBuilder.getI32ArrayAttr(sizesAttribute));
+  buildLSQGroupSizes(odsBuilder, odsState, groupSizes);
 }
 
 void LSQOp::build(OpBuilder &odsBuilder, OperationState &odsState,
@@ -945,20 +947,18 @@ void LSQOp::build(OpBuilder &odsBuilder, OperationState &odsState,
 
   // Data outputs (get their type from memref)
   MemRefType memrefType = mcOp.getMemRefType();
-  odsState.types.append(numLoads, memrefType.getElementType());
+  MLIRContext *ctx = odsBuilder.getContext();
+  Type dataType = wrapChannel(memrefType.getElementType());
+  odsState.types.append(numLoads, dataType);
 
   // Add results for load/store address and store data
-  odsState.types.append(2, odsBuilder.getIndexType());
-  odsState.types.push_back(memrefType.getElementType());
+  Type addrType = handshake::ChannelType::getAddrChannel(ctx);
+  odsState.types.append(2, addrType);
+  odsState.types.push_back(dataType);
   // Completion signal to end
-  odsState.types.push_back(odsBuilder.getNoneType());
+  odsState.types.push_back(handshake::ControlType::get(ctx));
 
-  // Set "groupSizes" attribute
-  SmallVector<int> sizesAttribute;
-  for (unsigned size : groupSizes)
-    sizesAttribute.push_back(size);
-  odsState.addAttribute("groupSizes",
-                        odsBuilder.getI32ArrayAttr(sizesAttribute));
+  buildLSQGroupSizes(odsBuilder, odsState, groupSizes);
 }
 
 ParseResult LSQOp::parse(OpAsmParser &parser, OperationState &result) {
@@ -1490,7 +1490,7 @@ static void buildLoadPort(OperationState &odsState, MemRefType memrefType,
 
   // Data and address outputs
   odsState.types.push_back(address.getType());
-  odsState.types.push_back(memrefType.getElementType());
+  odsState.types.push_back(wrapChannel(memrefType.getElementType()));
 }
 
 void MCLoadOp::build(OpBuilder &odsBuilder, OperationState &odsState,
@@ -1518,9 +1518,8 @@ LogicalResult ReturnOp::inferReturnTypes(
 }
 
 LogicalResult ReturnOp::verify() {
-  auto funcOp = getOperation()->getParentOfType<handshake::FuncOp>();
-  if (!funcOp)
-    return emitOpError("must have a handshake.func parent");
+  if (getOperands().empty())
+    return emitOpError("must have at least one operand");
   return success();
 }
 
@@ -1776,6 +1775,81 @@ void ChannelBufPropsAttr::print(AsmPrinter &odsPrinter) const {
              << getInDelay().getValueAsDouble() << ", "
              << getOutDelay().getValueAsDouble() << ", "
              << getDelay().getValueAsDouble();
+}
+
+//===----------------------------------------------------------------------===//
+// SpeculatorOp
+//===----------------------------------------------------------------------===//
+
+ParseResult SpeculatorOp::parse(OpAsmParser &parser, OperationState &result) {
+  OpAsmParser::UnresolvedOperand enable, dataIn;
+  Type dataType;
+  SmallVector<Type> uniqueResTypes;
+  llvm::SMLoc allOperandLoc = parser.getCurrentLocation();
+  if (parser.parseLSquare() || parser.parseOperand(enable) ||
+      parser.parseRSquare() || parser.parseOperand(dataIn) ||
+      parser.parseOptionalAttrDict(result.attributes) || parser.parseColon() ||
+      parser.parseType(dataType) || parser.parseArrowTypeList(uniqueResTypes))
+    return failure();
+  if (uniqueResTypes.size() != 3)
+    return failure();
+
+  Type ctrlType = uniqueResTypes[1];
+  Type wideCtrlType = uniqueResTypes[2];
+  result.addTypes(
+      {dataType, ctrlType, ctrlType, wideCtrlType, wideCtrlType, ctrlType});
+
+  if (parser.resolveOperands({enable, dataIn},
+                             {ControlType::get(parser.getContext()), dataType},
+                             allOperandLoc, result.operands))
+    return failure();
+  return success();
+}
+
+void SpeculatorOp::print(OpAsmPrinter &p) {
+  p << " [" << getEnable() << "] " << getDataIn() << " ";
+  p.printOptionalAttrDict((*this)->getAttrs());
+  p << " : " << getDataIn().getType() << " -> (" << getDataOut().getType()
+    << ", " << getSaveCtrl().getType() << ", " << getSCSaveCtrl().getType()
+    << ")";
+}
+
+LogicalResult SpeculatorOp::inferReturnTypes(
+    MLIRContext *context, std::optional<Location> location, ValueRange operands,
+    DictionaryAttr attributes, mlir::OpaqueProperties properties,
+    mlir::RegionRange regions,
+    SmallVectorImpl<mlir::Type> &inferredReturnTypes) {
+
+  inferredReturnTypes.push_back(operands.front().getType());
+
+  OpBuilder builder(context);
+  ChannelType ctrlType = ChannelType::get(builder.getIntegerType(1));
+  ChannelType wideControlType = ChannelType::get(builder.getIntegerType(3));
+  inferredReturnTypes.push_back(ctrlType);
+  inferredReturnTypes.push_back(ctrlType);
+  inferredReturnTypes.push_back(wideControlType);
+  inferredReturnTypes.push_back(wideControlType);
+  inferredReturnTypes.push_back(ctrlType);
+  return success();
+}
+
+LogicalResult SpeculatorOp::verify() {
+  Type refBoolType = getSaveCtrl().getType();
+  if (refBoolType != getCommitCtrl().getType() ||
+      refBoolType != getSCBranchCtrl().getType()) {
+    return emitError() << "expected $saveCtrl, $commitCtrl, and $SCBranchCtrl "
+                          "to have the same type, but got "
+                       << refBoolType << ", " << getCommitCtrl().getType()
+                       << ", and " << getSCBranchCtrl().getType();
+  }
+
+  if (getSCSaveCtrl().getType() != getSCCommitCtrl().getType()) {
+    return emitError() << "expected $SCSaveCtrl and $SCCommitCtrl to have the "
+                          "same type, but got "
+                       << getSCSaveCtrl().getType() << " and "
+                       << getSCCommitCtrl().getType();
+  }
+  return success();
 }
 
 //===----------------------------------------------------------------------===//

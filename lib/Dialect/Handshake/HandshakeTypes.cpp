@@ -11,6 +11,7 @@
 //===----------------------------------------------------------------------===//
 
 #include "dynamatic/Dialect/Handshake/HandshakeTypes.h"
+#include "mlir/IR/Builders.h"
 #include "mlir/IR/DialectImplementation.h"
 #include "mlir/IR/OpImplementation.h"
 #include "mlir/Support/LLVM.h"
@@ -141,6 +142,12 @@ void ChannelType::print(AsmPrinter &odsPrinter) const {
     ;
   }
   odsPrinter << ">";
+}
+
+ChannelType ChannelType::getAddrChannel(MLIRContext *ctx) {
+  OpBuilder builder(ctx);
+  unsigned width = ::IndexType::kInternalStorageBitWidth;
+  return get(builder.getIntegerType(width));
 }
 
 LogicalResult ChannelType::verify(function_ref<InFlightDiagnostic()> emitError,

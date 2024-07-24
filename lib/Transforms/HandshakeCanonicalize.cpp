@@ -105,8 +105,8 @@ struct EraseSingleInputControlMerges
       // Build the attribute for the constant
       Type indexResType = indexRes.getType();
       handshake::ConstantOp cstOp = rewriter.create<handshake::ConstantOp>(
-          cmergeOp.getLoc(), indexResType,
-          rewriter.getIntegerAttr(indexResType, 0), srcOp.getResult());
+          cmergeOp.getLoc(), rewriter.getIntegerAttr(indexResType, 0),
+          srcOp.getResult());
       inheritBB(cmergeOp, cstOp);
 
       // Replace the cmerge's index result with a constant 0

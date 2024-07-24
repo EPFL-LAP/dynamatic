@@ -56,6 +56,14 @@ class Handshake_Arith_CompareOp<string mnemonic, list<Trait> traits = []> :
   let assemblyFormat = "$predicate `,` $lhs `,` $rhs attr-dict `:` type($lhs)";
 }
 
+class Handshake_Arith_IToICastOp<string mnemonic, list<Trait> traits = []> :
+  Handshake_Arith_Op<mnemonic, traits> {
+  let arguments = (ins IntChannelType:$in);
+  let results = (outs IntChannelType:$out);
+  
+  let assemblyFormat = "$in attr-dict `:` type($in) `to` type($out)";
+}
+
 //===----------------------------------------------------------------------===//
 // Operation definitions
 //===----------------------------------------------------------------------===//
@@ -140,12 +148,12 @@ def Handshake_DivUIOp : Handshake_Arith_IntBinaryOp<"divui"> {
   let summary = "Unsigned integer division.";
 }
 
-def Handshake_ExtSIOp : Handshake_Arith_IntBinaryOp<"extsi"> {
-  let summary = "Signed width extension.";
+def Handshake_ExtSIOp : Handshake_Arith_IToICastOp<"extsi"> {
+  let summary = "Integer unsigned width extension.";
 }
 
-def Handshake_ExtUIOp : Handshake_Arith_IntBinaryOp<"extui"> {
-  let summary = "Unsigned width extension.";
+def Handshake_ExtUIOp : Handshake_Arith_IToICastOp<"extui"> {
+  let summary = "Integer signed width extension.";
 }
 
 def Handshake_MaximumFOp : Handshake_Arith_FloatBinaryOp<"maximumf", [
@@ -203,12 +211,16 @@ def Handshake_ShRUIOp : Handshake_Arith_IntBinaryOp<"shrui"> {
   let summary = "Logical right shift.";
 }
 
+def Handshake_SubFOp : Handshake_Arith_FloatBinaryOp<"subf"> {
+  let summary = "Floating-point subtraction.";
+}
+
 def Handshake_SubIOp : Handshake_Arith_IntBinaryOp<"subi"> {
   let summary = "Integer subtraction.";
 }
 
-def Handshake_SubFOp : Handshake_Arith_FloatBinaryOp<"subf"> {
-  let summary = "Floating-point subtraction.";
+def Handshake_TruncIOp : Handshake_Arith_IToICastOp<"trunci"> {
+  let summary = "Integer truncation.";
 }
 
 def Handshake_XOrIOp : Handshake_Arith_IntBinaryOp<"xori", [Commutative]> {

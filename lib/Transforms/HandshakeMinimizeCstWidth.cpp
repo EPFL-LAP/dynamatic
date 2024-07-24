@@ -16,6 +16,7 @@
 #include "dynamatic/Transforms/HandshakeMinimizeCstWidth.h"
 #include "dynamatic/Analysis/ConstantAnalysis.h"
 #include "dynamatic/Dialect/Handshake/HandshakeOps.h"
+#include "dynamatic/Dialect/Handshake/HandshakeTypes.h"
 #include "dynamatic/Support/CFG.h"
 #include "mlir/Dialect/Arith/IR/Arith.h"
 #include "mlir/Transforms/GreedyPatternRewriteDriver.h"
@@ -70,7 +71,7 @@ struct MinimizeConstantBitwidth
 
   MinimizeConstantBitwidth(bool optNegatives, MLIRContext *ctx)
       : OpRewritePattern<handshake::ConstantOp>(ctx),
-        optNegatives(optNegatives){};
+        optNegatives(optNegatives) {};
 
   LogicalResult matchAndRewrite(handshake::ConstantOp cstOp,
                                 PatternRewriter &rewriter) const override {
@@ -106,7 +107,7 @@ struct MinimizeConstantBitwidth
 
     // Update the constant's result and attribute type
     rewriter.updateRootInPlace(cstOp, [&] {
-      cstOp.getResult().setType(newType);
+      cstOp.getResult().setType(handshake::ChannelType::get(newType));
       cstOp.setValueAttr(newAttr);
     });
 

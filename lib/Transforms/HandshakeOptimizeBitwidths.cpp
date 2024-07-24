@@ -378,7 +378,7 @@ class OptDataConfig {
 public:
   /// Constructs the configuration from the specific operation being
   /// transformed.
-  OptDataConfig(Op op) : op(op){};
+  OptDataConfig(Op op) : op(op) {};
 
   /// Returns the list of operands that carry data. The method must return at
   /// least one operand. If multiple operands are returned, they must all have
@@ -400,10 +400,9 @@ public:
                               SmallVector<Value> &minDataOperands,
                               PatternRewriter &rewriter,
                               SmallVector<Value> &newOperands) {
-    llvm::transform(minDataOperands, std::back_inserter(newOperands),
-                    [&](Value val) {
-                      return modVal({val, ext}, optWidth, rewriter);
-                    });
+    llvm::transform(
+        minDataOperands, std::back_inserter(newOperands),
+        [&](Value val) { return modVal({val, ext}, optWidth, rewriter); });
   }
 
   /// Determines the list of result types that will be given to the builder of
@@ -433,10 +432,9 @@ public:
   virtual void modResults(Op newOp, unsigned width, ExtType ext,
                           PatternRewriter &rewriter,
                           SmallVector<Value> &newResults) {
-    llvm::transform(newOp->getResults(), std::back_inserter(newResults),
-                    [&](OpResult res) {
-                      return modVal({res, ext}, width, rewriter);
-                    });
+    llvm::transform(
+        newOp->getResults(), std::back_inserter(newResults),
+        [&](OpResult res) { return modVal({res, ext}, width, rewriter); });
   }
 
   /// Default destructor declared virtual because of virtual methods.
@@ -451,7 +449,7 @@ protected:
 /// result which does not carry data.
 class CMergeDataConfig : public OptDataConfig<handshake::ControlMergeOp> {
 public:
-  CMergeDataConfig(handshake::ControlMergeOp op) : OptDataConfig(op){};
+  CMergeDataConfig(handshake::ControlMergeOp op) : OptDataConfig(op) {};
 
   SmallVector<Value> getDataResults() override {
     return SmallVector<Value>{op.getResult()};
@@ -476,7 +474,7 @@ public:
 /// which does not carry data.
 class MuxDataConfig : public OptDataConfig<handshake::MuxOp> {
 public:
-  MuxDataConfig(handshake::MuxOp op) : OptDataConfig(op){};
+  MuxDataConfig(handshake::MuxOp op) : OptDataConfig(op) {};
 
   SmallVector<Value> getDataOperands() override { return op.getDataOperands(); }
 
@@ -485,10 +483,9 @@ public:
                       PatternRewriter &rewriter,
                       SmallVector<Value> &newOperands) override {
     newOperands.push_back(op.getSelectOperand());
-    llvm::transform(minDataOperands, std::back_inserter(newOperands),
-                    [&](Value val) {
-                      return modVal({val, ext}, optWidth, rewriter);
-                    });
+    llvm::transform(
+        minDataOperands, std::back_inserter(newOperands),
+        [&](Value val) { return modVal({val, ext}, optWidth, rewriter); });
   }
 };
 
@@ -496,7 +493,7 @@ public:
 /// condition operand which does not carry data.
 class CBranchDataConfig : public OptDataConfig<handshake::ConditionalBranchOp> {
 public:
-  CBranchDataConfig(handshake::ConditionalBranchOp op) : OptDataConfig(op){};
+  CBranchDataConfig(handshake::ConditionalBranchOp op) : OptDataConfig(op) {};
 
   SmallVector<Value> getDataOperands() override {
     return SmallVector<Value>{op.getDataOperand()};
@@ -517,7 +514,7 @@ public:
 template <typename BufOp>
 class BufferDataConfig : public OptDataConfig<BufOp> {
 public:
-  BufferDataConfig(BufOp op) : OptDataConfig<BufOp>(op){};
+  BufferDataConfig(BufOp op) : OptDataConfig<BufOp>(op) {};
 
   SmallVector<Value> getDataOperands() override {
     return SmallVector<Value>{this->op.getOperand()};
@@ -741,8 +738,8 @@ struct DowngradeSingleInputControlMerges
       // Build the attribute for the constant
       Type indexResType = indexRes.getType();
       handshake::ConstantOp cstOp = rewriter.create<handshake::ConstantOp>(
-          cmergeOp.getLoc(), indexResType,
-          rewriter.getIntegerAttr(indexResType, 0), srcOp.getResult());
+          cmergeOp.getLoc(), rewriter.getIntegerAttr(indexResType, 0),
+          srcOp.getResult());
       inheritBB(cmergeOp, cstOp);
 
       // Replace the cmerge's index result with a constant 0

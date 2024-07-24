@@ -32,19 +32,7 @@
 namespace dynamatic {
 namespace handshake {
 
-struct MemLoadInterface {
-  unsigned index;
-  mlir::Value addressIn;
-  mlir::Value dataOut;
-  mlir::Value doneOut;
-};
-
-struct MemStoreInterface {
-  unsigned index;
-  mlir::Value addressIn;
-  mlir::Value dataIn;
-  mlir::Value doneOut;
-};
+class ControlType;
 
 /// Default implementation for checking whether an operation is a control
 /// operation. This function cannot be defined within ControlInterface

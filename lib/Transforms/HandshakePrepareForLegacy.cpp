@@ -35,8 +35,8 @@ static void createNewBranches(ArrayRef<handshake::BranchOp> branches,
   // Create constant source of true conditions
   builder.setInsertionPointAfterValue(ctrl);
   IntegerAttr cond = builder.getBoolAttr(true);
-  auto constOp = builder.create<handshake::ConstantOp>(
-      ctrl.getLoc(), cond.getType(), cond, ctrl);
+  auto constOp =
+      builder.create<handshake::ConstantOp>(ctrl.getLoc(), cond, ctrl);
 
   // Try to set the bb attribute on the merge
   if (auto defOp = ctrl.getDefiningOp())
@@ -168,8 +168,7 @@ struct SimplifyCMerges : public OpRewritePattern<handshake::ControlMergeOp> {
 
       // Create the constant and replace the cmerge's index result
       auto constantOp = rewriter.create<handshake::ConstantOp>(
-          cmergeOp.getLoc(), constantAttr.getType(), constantAttr,
-          mergeOp.getResult());
+          cmergeOp.getLoc(), constantAttr, mergeOp.getResult());
       inheritBB(cmergeOp, constantOp);
       cmergeOp.getIndex().replaceAllUsesWith(constantOp.getResult());
     });
