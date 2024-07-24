@@ -23,7 +23,6 @@
 #include "dynamatic/Dialect/Handshake/MemoryInterfaces.h"
 #include "dynamatic/Support/Backedge.h"
 #include "dynamatic/Support/RTL.h"
-#include "dynamatic/Transforms/HandshakeConcretizeIndexType.h"
 #include "dynamatic/Transforms/HandshakeMaterialize.h"
 #include "mlir/Dialect/Arith/IR/Arith.h"
 #include "mlir/Dialect/MemRef/IR/MemRef.h"
@@ -69,7 +68,7 @@ class ModuleBuilder {
 public:
   /// The MLIR context is used to create string attributes for port names
   /// and types for the clock and reset ports, should they be added.
-  ModuleBuilder(MLIRContext *ctx) : ctx(ctx){};
+  ModuleBuilder(MLIRContext *ctx) : ctx(ctx) {};
 
   /// Builds the module port information from the current list of inputs and
   /// outputs.
@@ -155,7 +154,7 @@ struct MemLoweringState {
   /// Constructs an instance of the object for the provided memory interface.
   MemLoweringState(handshake::MemoryOpInterface memOp, const Twine &name)
       : name(name.str()), dataType(memOp.getMemRefType().getElementType()),
-        ports(getMemoryPorts(memOp)), portNames(memOp){};
+        ports(getMemoryPorts(memOp)), portNames(memOp) {};
 
   /// Returns the module's input ports that connect to the memory interface.
   SmallVector<hw::ModulePort> getMemInputPorts(hw::HWModuleOp modOp);
@@ -195,7 +194,7 @@ struct ModuleLoweringState {
 
   /// Constructs the lowering state from the Handshake function to lower.
   ModuleLoweringState(handshake::FuncOp funcOp)
-      : endPorts(funcOp.getBodyBlock()->getTerminator()){};
+      : endPorts(funcOp.getBodyBlock()->getTerminator()) {};
 
   /// Computes the total number of module outputs that are fed by memory
   /// interfaces within the module.
@@ -282,7 +281,7 @@ MemLoweringState::getMemOutputPorts(hw::HWModuleOp modOp) {
 
 LoweringState::LoweringState(mlir::ModuleOp modOp, NameAnalysis &namer,
                              OpBuilder &builder)
-    : modOp(modOp), namer(namer), edgeBuilder(builder, modOp.getLoc()){};
+    : modOp(modOp), namer(namer), edgeBuilder(builder, modOp.getLoc()) {};
 
 /// Wraps a type into a handshake::ChannelType type.
 static handshake::ChannelType channelWrapper(Type t) {
@@ -664,7 +663,7 @@ namespace {
 class HWBuilder {
 public:
   /// Creates the hardware builder.
-  HWBuilder(MLIRContext *ctx) : modBuilder(ctx){};
+  HWBuilder(MLIRContext *ctx) : modBuilder(ctx) {};
 
   /// Adds a value to the list of operands for the future instance, and its type
   /// to the future external module's input port information.
@@ -1488,7 +1487,8 @@ public:
                      OpBuilder &builder)
       : ConverterBuilder(buildExternalModule(circuitMod, state, builder),
                          IOMapping(state.outputIdx, 0, 5), IOMapping(0, 0, 8),
-                         IOMapping(0, 5, 2), IOMapping(8, state.inputIdx, 1)){};
+                         IOMapping(0, 5, 2),
+                         IOMapping(8, state.inputIdx, 1)) {};
 
 private:
   /// Creates, inserts, and returns the external harware module corresponding to
@@ -1790,13 +1790,6 @@ public:
       // Check that some preconditions are met before doing anything
       if (failed(verifyIRMaterialized(funcOp))) {
         funcOp.emitError() << ERR_NON_MATERIALIZED_FUNC;
-        return signalPassFailure();
-      }
-      if (failed(verifyAllIndexConcretized(funcOp))) {
-        funcOp.emitError() << "Lowering to HW requires that all index "
-                              "types in the IR have "
-                              "been concretized."
-                           << ERR_RUN_CONCRETIZATION;
         return signalPassFailure();
       }
     }

@@ -18,7 +18,6 @@
 #include "dynamatic/Dialect/Handshake/MemoryInterfaces.h"
 #include "dynamatic/Support/CFG.h"
 #include "dynamatic/Support/TimingModels.h"
-#include "dynamatic/Transforms/HandshakeConcretizeIndexType.h"
 #include "dynamatic/Transforms/HandshakeMaterialize.h"
 #include "experimental/Transforms/Speculation/SpecAnnotatePaths.h"
 #include "mlir/Dialect/Arith/IR/Arith.h"
@@ -1264,12 +1263,6 @@ LogicalResult DOTPrinter::print(mlir::ModuleOp mod,
     // to be compatible with legacy Dynamatic
     if (failed(verifyIRMaterialized(funcOp)))
       return funcOp.emitOpError() << ERR_NON_MATERIALIZED_FUNC;
-    if (failed(verifyAllIndexConcretized(funcOp)))
-      return funcOp.emitOpError()
-             << "In legacy mode, all index types in the IR must be concretized "
-                "to ensure that the DOT is compatible with legacy Dynamatic. "
-             << ERR_RUN_CONCRETIZATION;
-
     if (mode == Mode::LEGACY_BUFFERS)
       patchUpIRForLegacyBuffers(funcOp);
   }
