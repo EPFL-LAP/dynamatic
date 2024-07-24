@@ -203,6 +203,7 @@ mlir::Operation * HandshakeSizeLSQsPass::findStartNode(AdjListGraph graph) {
 }
 
 
+// TODO identify phi node if there is only 1 bb and identify correctly if there are multiple cond_br pointing to a single bb
 std::unordered_map<unsigned, mlir::Operation *> HandshakeSizeLSQsPass::getPhiNodes(AdjListGraph graph, mlir::Operation *start_node) {
   std::unordered_map<unsigned, mlir::Operation *> phi_nodes;
   std::vector<mlir::Operation *> branch_ops = graph.getOperationsWithOpName("handshake.cond_br");
