@@ -4,6 +4,8 @@
 #include <string>
 #include <optional>
 #include <mlir/IR/Operation.h>
+#include "dynamatic/Support/TimingModels.h"
+#include "dynamatic/Transforms/BufferPlacement/CFDFC.h"
 
 
 #ifndef DYNAMATIC_TRANSFORMS_LSQSIZING_LSQSIZINGSUPPORT_H
@@ -16,19 +18,20 @@ namespace lsqsizing {
 // Define a structure for a graph node
 struct AdjListNode {
     int latency; // Value stored in the node
-    std::optional<mlir::Operation*> op; // Pointer to the operation
-    std::list<std::string> adjList; // Adjacency list (stores indices of adjacent nodes)
+    mlir::Operation* op; // Pointer to the operation
+    std::list<std::string> edges; // Adjacency list (stores indices of adjacent nodes)
+    std::list<std::string> backedges; // Backedge list (stores indices of backedges)
 };
 
 class AdjListGraph {
 public:
-    AdjListGraph(mlir::SetVector<Operation *> units,mlir::SetVector<Value> channels, TimingDatabase timingDB);
+    AdjListGraph(buffer::CFDFC cfdfc, TimingDatabase timingDB, unsigned II);
 
-    void insertBackEdges(mlir::SetVector<Value> backedges, unsigned II);
+    //TODO check if backedges are already in there and just saved extra in cfdfc structure
     void printGraph();
 
-    std::vector<std::vector<std::string>> findPaths(mlir::Operation *start_op, mlir::Operation *end_op);
-    std::vector<std::vector<std::string>> findPaths(std::string start, std::string end);
+    std::vector<std::vector<std::string>> findPaths(mlir::Operation *start_op, mlir::Operation *end_op, bool ignore_backedge = false);
+    std::vector<std::vector<std::string>> findPaths(std::string start, std::string end, bool ignore_backedge = false);
     int getPathLatency(std::vector<std::string> path);
 
     int findMaxPathLatency(mlir::Operation *start_op, mlir::Operation *end_op);
@@ -43,8 +46,9 @@ private:
     
     void addNode(mlir::Operation* op, int latency);
     void addEdge(mlir::Operation* src, mlir::Operation* dest);
-    void insertArtificialNodeOnEdge(mlir::Operation* src, mlir::Operation* dest, int latency);
-    std::vector<std::string> findPathWithHighestLatency(mlir::Operation *start_op);
+    void addBackedge(mlir::Operation* src, mlir::Operation* dest);
+    void insertArtificialNodeOnBackedge(mlir::Operation* src, mlir::Operation* dest, int latency);
+    std::vector<std::string> findLongestNonCyclicPath(mlir::Operation *start_op);
 
 };
 

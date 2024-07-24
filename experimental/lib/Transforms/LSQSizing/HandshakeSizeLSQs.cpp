@@ -52,6 +52,7 @@ private:
 
   LSQSizingResult sizeLSQsForCFDFC(buffer::CFDFC cfdfc, unsigned II, TimingDatabase timingDB);
   mlir::Operation *findStartNode(AdjListGraph graph);
+  std::unordered_map<std::string, int> getBBStartTimes(AdjListGraph graph, mlir::Operation *start_node);
 };
 } // namespace
 
@@ -134,20 +135,20 @@ LSQSizingResult HandshakeSizeLSQsPass::sizeLSQsForCFDFC(buffer::CFDFC cfdfc, uns
   //TODO implement algo
   llvm::dbgs() << "\t [DBG] sizeLSQsForCFDFC called for CFDFC with " << cfdfc.cycle.size() << " BBs and II of " << II << "\n";
 
-  AdjListGraph graph = AdjListGraph(cfdfc.units, cfdfc.channels, timingDB);
+  AdjListGraph graph(cfdfc, timingDB, II);
   graph.printGraph();
 
   //TODO identify start nodes
   // Find starting node for each BB
   mlir::Operation * start_node = findStartNode(graph);
+  llvm::dbgs() << "\t [DBG] Start Node: " << start_node->getAttrOfType<StringAttr>("handshake.name").str()<< "\n";
+
   // Get Start Times of each BB (Alloc Times) 
-  
+  //std::unordered_map<std::string, int> bb_start_times = getBBStartTimes(graph, start_node);
 
-
-  graph.insertBackEdges(cfdfc.backedges, II);
 
   // Get Dealloc Times and End Times
-  std::vector<mlir::Operation *> load_ops = graph.getOperationsWithOpName("lsq_load");
+  std::vector<mlir::Operation *> load_ops = graph.getOperationsWithOpName("handshake.lsq_load");
   std::unordered_map<mlir::Operation *, int> load_dealloc_times;
   int load_end_time = 0;
 
@@ -157,7 +158,7 @@ LSQSizingResult HandshakeSizeLSQsPass::sizeLSQsForCFDFC(buffer::CFDFC cfdfc, uns
     load_end_time = std::max(load_end_time, latency);
   }
 
-  std::vector<mlir::Operation *> store_ops = graph.getOperationsWithOpName("lsq_store");
+  std::vector<mlir::Operation *> store_ops = graph.getOperationsWithOpName("handshake.lsq_store");
   std::unordered_map<mlir::Operation *, int> store_dealloc_times;
   int store_end_time = 0;
 
@@ -167,7 +168,6 @@ LSQSizingResult HandshakeSizeLSQsPass::sizeLSQsForCFDFC(buffer::CFDFC cfdfc, uns
     store_end_time = std::max(store_end_time, latency);
   }
 
-
   // Get Load and Store Sizes
 
   return DenseMap<unsigned, std::tuple<unsigned, unsigned>>();
@@ -175,11 +175,18 @@ LSQSizingResult HandshakeSizeLSQsPass::sizeLSQsForCFDFC(buffer::CFDFC cfdfc, uns
 
 
 mlir::Operation * HandshakeSizeLSQsPass::findStartNode(AdjListGraph graph) {
-  std::vector<mlir::Operation *> mux_ops = graph.getOperationsWithOpName("mux");
-  std::vector<mlir::Operation *> cmerge_ops = graph.getOperationsWithOpName("control_merge");
+  std::vector<mlir::Operation *> mux_ops = graph.getOperationsWithOpName("handshake.mux");
+  std::vector<mlir::Operation *> cmerge_ops = graph.getOperationsWithOpName("handshake.control_merge");
 
   std::vector<mlir::Operation *> potential_start_nodes = std::vector<mlir::Operation *>(mux_ops.size() + cmerge_ops.size());
   std::merge(mux_ops.begin(), mux_ops.end(), cmerge_ops.begin(), cmerge_ops.end(), potential_start_nodes.begin());
+
+  llvm::dbgs() << "\t [DBG] Potential Start Nodes: ";
+  for(auto &op: potential_start_nodes) {
+    llvm::dbgs() << op->getAttrOfType<StringAttr>("handshake.name").str() << ", ";
+  }
+  llvm::dbgs() << "\n";
+
 
   std::unordered_map<mlir::Operation *, int> max_latencies;
 
@@ -191,6 +198,16 @@ mlir::Operation * HandshakeSizeLSQsPass::findStartNode(AdjListGraph graph) {
     [](const std::pair<mlir::Operation *, int> &a, const std::pair<mlir::Operation *, int> &b) {
       return a.second < b.second;
     })->first;
+}
+
+
+std::unordered_map<std::string, int> HandshakeSizeLSQsPass::getBBStartTimes(AdjListGraph graph, mlir::Operation *start_node) {
+  std::unordered_map<std::string, int> start_times;
+
+  //TODO find starting nodes of each BB from cond branches
+
+  return start_times;
+
 }
 
 
