@@ -1,3 +1,7 @@
+set(LLVM_TARGET_DEFINITIONS HandshakeCanonicalization.td)
+mlir_tablegen(HandshakeCanonicalization.inc -gen-rewriters)
+add_public_tablegen_target(DynamaticHandshakeCanonicalizationIncGen)
+
 add_dynamatic_dialect_library(DynamaticHandshake
   HandshakeCanonicalize.cpp
   HandshakeOps.cpp

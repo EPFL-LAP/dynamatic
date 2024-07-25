@@ -16,6 +16,7 @@
 
 include "dynamatic/Dialect/Handshake/HandshakeOps.td"
 include "dynamatic/Dialect/Handshake/HandshakeTypes.td"
+include "dynamatic/Dialect/Handshake/HandshakeInterfaces.td"
 
 class Handshake_Arith_Op<string mnemonic, list<Trait> traits = []> :
   Handshake_Op<mnemonic, traits # [Pure]> {
@@ -48,7 +49,7 @@ class Handshake_Arith_FloatUnaryOp<string mnemonic, list<Trait> traits = []> :
 
 class Handshake_Arith_CompareOp<string mnemonic, list<Trait> traits = []> :
   Handshake_Arith_Op<mnemonic, traits # [
-    AllTypesMatch<["lhs", "rhs"]>,
+    AllTypesMatch<["lhs", "rhs"]>, PreservesExtraSignals,
     DeclareOpInterfaceMethods<InferTypeOpInterface, ["inferReturnTypes"]>
   ]> {
   let results = (outs BoolChannelType:$result);
@@ -57,11 +58,14 @@ class Handshake_Arith_CompareOp<string mnemonic, list<Trait> traits = []> :
 }
 
 class Handshake_Arith_IToICastOp<string mnemonic, list<Trait> traits = []> :
-  Handshake_Arith_Op<mnemonic, traits> {
+  Handshake_Arith_Op<mnemonic, traits # [PreservesExtraSignals]> {
   let arguments = (ins IntChannelType:$in);
   let results = (outs IntChannelType:$out);
   
   let assemblyFormat = "$in attr-dict `:` type($in) `to` type($out)";
+
+  let hasFolder = 1;
+  let hasVerifier = 1;
 }
 
 //===----------------------------------------------------------------------===//
@@ -136,6 +140,29 @@ def Handshake_CmpIOp : Handshake_Arith_CompareOp<"cmpi"> {
                        IntChannelType:$rhs);
 }
 
+def Handshake_ConstantOp : Handshake_Arith_Op<"constant", [
+  DeclareOpInterfaceMethods<NamedIOInterface, ["getOperandName"]>,
+  DeclareOpInterfaceMethods<InferTypeOpInterface, ["inferReturnTypes"]>
+]> {
+  let summary = "constant operation";
+  let description = [{
+    The const has a constant value. When triggered by its
+    single `ctrl` input, it sends the constant value to its single
+    successor.
+
+    Example:
+
+    ```mlir
+    %0 = constant %ctrl {value = 42 : i32} : !handshake.channel<i32>
+    ```
+  }];
+
+  let arguments = (ins TypedAttrInterface:$value, ControlType:$ctrl);
+  let results = (outs ChannelType:$result);
+  let assemblyFormat = "$ctrl attr-dict `:` type($result)";
+  let hasVerifier = 1;
+}
+
 def Handshake_DivFOp : Handshake_Arith_FloatBinaryOp<"divf"> {
   let summary = "Floating-point division.";
 }
@@ -150,6 +177,7 @@ def Handshake_DivUIOp : Handshake_Arith_IntBinaryOp<"divui"> {
 
 def Handshake_ExtSIOp : Handshake_Arith_IToICastOp<"extsi"> {
   let summary = "Integer unsigned width extension.";
+  let hasCanonicalizer = 1;
 }
 
 def Handshake_ExtUIOp : Handshake_Arith_IToICastOp<"extui"> {
@@ -189,13 +217,13 @@ def Handshake_SelectOp : Handshake_Arith_Op<"select", [
 ]> {
   let summary = "Select a value based on a 1-bit predicate.";
  
-  let arguments = (ins BoolChannelType:$select, ChannelType:$trueValue,
+  let arguments = (ins BoolChannelType:$condition, ChannelType:$trueValue,
                        ChannelType:$falseValue);
   let results = (outs ChannelType:$result);
 
   let assemblyFormat = [{
-    $select `[` $trueValue `,` $falseValue `]` attr-dict
-    `:` type($select) `,` type($result)
+    $condition `[` $trueValue `,` $falseValue `]` attr-dict
+    `:` type($condition) `,` type($result)
   }];
 }
 
@@ -221,6 +249,7 @@ def Handshake_SubIOp : Handshake_Arith_IntBinaryOp<"subi"> {
 
 def Handshake_TruncIOp : Handshake_Arith_IToICastOp<"trunci"> {
   let summary = "Integer truncation.";
+  let hasCanonicalizer = 1;
 }
 
 def Handshake_XOrIOp : Handshake_Arith_IntBinaryOp<"xori", [Commutative]> {

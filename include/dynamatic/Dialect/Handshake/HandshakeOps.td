@@ -530,29 +530,6 @@ def SourceOp : Handshake_Op<"source", [
   let assemblyFormat = "attr-dict";
 }
 
-def ConstantOp : Handshake_Op<"constant", [
-  Pure, DeclareOpInterfaceMethods<NamedIOInterface, ["getOperandName"]>,
-  DeclareOpInterfaceMethods<InferTypeOpInterface, ["inferReturnTypes"]>
-]> {
-  let summary = "constant operation";
-  let description = [{
-    The const has a constant value. When triggered by its
-    single `ctrl` input, it sends the constant value to its single
-    successor.
-
-    Example:
-
-    ```mlir
-    %0 = constant %ctrl {value = 42 : i32} : !handshake.channel<i32>
-    ```
-  }];
-
-  let arguments = (ins TypedAttrInterface:$value, ControlType:$ctrl);
-  let results = (outs ChannelType:$result);
-  let assemblyFormat = "$ctrl attr-dict `:` type($result)";
-  let hasVerifier = 1;
-}
-
 def JoinOp : Handshake_Op<"join", [
   SameOperandsAndResultType,
   DeclareOpInterfaceMethods<ControlInterface, ["isControl"]>

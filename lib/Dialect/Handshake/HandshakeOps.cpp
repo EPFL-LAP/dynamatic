@@ -29,7 +29,7 @@
 #include "mlir/IR/Diagnostics.h"
 #include "mlir/IR/OpDefinition.h"
 #include "mlir/IR/OpImplementation.h"
-#include "mlir/IR/SymbolTable.h"
+#include "mlir/IR/PatternMatch.h"
 #include "mlir/IR/Value.h"
 #include "mlir/Interfaces/FunctionImplementation.h"
 #include "mlir/Transforms/InliningUtils.h"
@@ -40,12 +40,6 @@
 using namespace mlir;
 using namespace dynamatic;
 using namespace dynamatic::handshake;
-
-IntegerType dynamatic::handshake::getOptimizedIndexType(OpBuilder &builder,
-                                                        unsigned numToIndex) {
-  return builder.getIntegerType(
-      APInt(APInt::APINT_BITS_PER_WORD, numToIndex).ceilLogBase2());
-}
 
 /// Parses an SOST operation. If the `explicitSize` parameter is set to true,
 /// then the method parses the operation's size (in the SOST sense) between
@@ -108,6 +102,28 @@ static bool isControlCheckTypeAndOperand(Type dataType, Value operand) {
   auto *defOp = operand.getDefiningOp();
   return isa_and_nonnull<ControlMergeOp>(defOp) &&
          operand == defOp->getResult(0);
+}
+
+//===----------------------------------------------------------------------===//
+// TableGen'd canonicalization patterns
+//===----------------------------------------------------------------------===//
+
+static unsigned getDataBitWidth(Value val) {
+  return cast<handshake::ChannelType>(val.getType()).getDataBitWidth();
+}
+
+namespace {
+#include "lib/Dialect/Handshake/HandshakeCanonicalization.inc"
+} // namespace
+
+//===----------------------------------------------------------------------===//
+// ForkOp
+//===----------------------------------------------------------------------===//
+
+IntegerType dynamatic::handshake::getOptimizedIndexType(OpBuilder &builder,
+                                                        unsigned numToIndex) {
+  return builder.getIntegerType(
+      APInt(APInt::APINT_BITS_PER_WORD, numToIndex).ceilLogBase2());
 }
 
 unsigned ForkOp::getSize() { return getResults().size(); }
@@ -2270,6 +2286,111 @@ CmpIOp::inferReturnTypes(MLIRContext *context, std::optional<Location> location,
                          SmallVectorImpl<mlir::Type> &inferredReturnTypes) {
   OpBuilder builder(context);
   inferredReturnTypes.push_back(ChannelType::get(builder.getIntegerType(1)));
+  return success();
+}
+
+//===----------------------------------------------------------------------===//
+// ExtSIOp
+//===----------------------------------------------------------------------===//
+
+/// Extension operations can only extend to a channel with a wider data type and
+/// identical extra signals.
+template <typename Op>
+static LogicalResult verifyExtOp(Op op) {
+  ChannelType srcType = cast<ChannelType>(op.getIn().getType());
+  ChannelType dstType = cast<ChannelType>(op.getOut().getType());
+
+  if (srcType.getDataBitWidth() > dstType.getDataBitWidth()) {
+    return op.emitError() << "result channel's data type "
+                          << dstType.getDataType()
+                          << " must be wider than operand type "
+                          << srcType.getDataType();
+  }
+  return success();
+}
+
+/// Folds an extension operation if it is preceeded by another extension
+/// operation of the same type of if its operand/result types are the same.
+template <typename Op>
+static OpFoldResult foldExtOp(Op op) {
+  if (auto defExtOp = op.getIn().template getDefiningOp<Op>()) {
+    // Bypass the preceeding extension operation
+    op.getInMutable().assign(defExtOp.getIn());
+    return op.getOut();
+  }
+
+  unsigned srcWidth = cast<ChannelType>(op.getIn().getType()).getDataBitWidth();
+  unsigned dstWidth =
+      cast<ChannelType>(op.getOut().getType()).getDataBitWidth();
+  if (srcWidth == dstWidth)
+    return op.getIn();
+  return op.getOut();
+}
+
+void ExtSIOp::getCanonicalizationPatterns(RewritePatternSet &results,
+                                          MLIRContext *context) {
+  results.add<ExtSIOfExtUI>(context);
+}
+
+OpFoldResult ExtSIOp::fold(FoldAdaptor adaptor) { return foldExtOp(*this); }
+
+LogicalResult ExtSIOp::verify() { return verifyExtOp(*this); }
+
+//===----------------------------------------------------------------------===//
+// ExtUIOp
+//===----------------------------------------------------------------------===//
+
+OpFoldResult ExtUIOp::fold(FoldAdaptor adaptor) { return foldExtOp(*this); }
+
+LogicalResult ExtUIOp::verify() { return verifyExtOp(*this); }
+
+//===----------------------------------------------------------------------===//
+// TruncIOp
+//===----------------------------------------------------------------------===//
+
+void TruncIOp::getCanonicalizationPatterns(RewritePatternSet &results,
+                                           MLIRContext *context) {
+  results.add<TruncIExtSIToExtSI, TruncIExtUIToExtUI>(context);
+}
+
+OpFoldResult TruncIOp::fold(FoldAdaptor adaptor) {
+  if (auto defTruncOp = getIn().getDefiningOp<TruncIOp>()) {
+    // Bypass the preceeding truncation operation
+    getInMutable().assign(defTruncOp.getIn());
+    return getResult();
+  }
+
+  Operation *defOp = getIn().getDefiningOp();
+  if (isa_and_present<ExtSIOp, ExtUIOp>(defOp)) {
+    Value src = defOp->getOperand(0);
+    unsigned srcWidth = cast<ChannelType>(src.getType()).getDataBitWidth();
+    unsigned dstWidth = cast<ChannelType>(getOut().getType()).getDataBitWidth();
+    if (srcWidth > dstWidth) {
+      // Bypass the preceeding extension operation
+      getInMutable().assign(src);
+      return getResult();
+    }
+    // Bypass the preceeding extension operation and the truncation
+    return src;
+  }
+
+  // Identical operand and result types mean that the trunc is a no-op
+  unsigned srcWidth = cast<ChannelType>(getIn().getType()).getDataBitWidth();
+  unsigned dstWidth = cast<ChannelType>(getOut().getType()).getDataBitWidth();
+  if (srcWidth == dstWidth)
+    return getIn();
+  return getOut();
+}
+
+LogicalResult TruncIOp::verify() {
+  ChannelType srcType = cast<ChannelType>(getIn().getType());
+  ChannelType dstType = cast<ChannelType>(getOut().getType());
+
+  if (srcType.getDataBitWidth() < dstType.getDataBitWidth()) {
+    return emitError() << "result channel's data type " << dstType.getDataType()
+                       << " must be narrower than operand type "
+                       << srcType.getDataType();
+  }
   return success();
 }
 

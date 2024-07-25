@@ -359,5 +359,6 @@ def SpeculationOpInterface : OpInterface<"SpeculationOpInterface"> {
   }];
 }
 
-#endif //DYNAMATIC_DIALECT_HANDSHAKE_HANDSHAKE_INTERFACES
+def PreservesExtraSignals : NativeOpTrait<"PreservesExtraSignals">;
 
+#endif //DYNAMATIC_DIALECT_HANDSHAKE_HANDSHAKE_INTERFACES
