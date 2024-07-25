@@ -1,5 +1,5 @@
 module end_sync_memless #(
-  parameter DATA_WIDTH = 32;
+  parameter DATA_WIDTH = 32
 )(
   input  clk,
   input  rst,
