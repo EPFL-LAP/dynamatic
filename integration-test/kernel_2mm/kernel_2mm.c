@@ -17,7 +17,7 @@
 void kernel_2mm(in_int_t alpha, inout_int_t tmp[NI][NJ]) {
   /// for (unsigned i = 0; i < NI; i++) {
   for (unsigned j = 0; j < NJ; j++) {
-    tmp[j][j] = tmp[j][j] + 1;
+    // tmp[j][j] = tmp[j][j] + 1 + alpha;
     if (tmp[j][j] > 5)
       //  for (unsigned k = 0; k < NK; ++k)
       tmp[j][j] = tmp[j][j] * 2;

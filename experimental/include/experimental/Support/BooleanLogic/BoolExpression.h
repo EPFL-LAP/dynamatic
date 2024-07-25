@@ -56,6 +56,8 @@ struct BoolExpression {
 
   virtual ~BoolExpression() = default;
 
+  virtual BoolExpression *deepCopy() const;
+
   /// Prints BooolExpression tree in inorder traversal
   /// Inspired from
   /// https://www.geeksforgeeks.org/print-binary-tree-2-dimensions/
@@ -173,6 +175,10 @@ struct Operator : public BoolExpression {
     delete left;
     delete right;
   }
+
+  BoolExpression *deepCopy() const override {
+    return new Operator(type, left->deepCopy(), right->deepCopy());
+  }
 };
 
 // This is specifically for signgle conditions: Variable, One, Zero
@@ -183,6 +189,10 @@ struct SingleCond : public BoolExpression {
   // Constructor for single condition nodes
   SingleCond(ExpressionType t, std::string i = "", bool negated = false)
       : BoolExpression(t), id(std::move(i)), isNegated(negated) {}
+
+  BoolExpression *deepCopy() const override {
+    return new SingleCond(type, id, isNegated);
+  }
 };
 
 } // namespace boolean

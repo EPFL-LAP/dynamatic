@@ -415,16 +415,9 @@ LogicalResult MemoryInterfaceBuilder::determineInterfaceInputsWithForks(
   // Determine LSQ inputs
   for (auto [group, lsqGroupOps] : lsqPorts) {
     Operation *firstOpInGroup = lsqGroupOps.front();
-    // Operation *firstOpInGroup = lsqGroupOps.front();
+    // Connect the lazy forks created to the lsq
     Operation *forkNode = forksGraph[firstOpInGroup->getBlock()];
     inputs.lsqInputs.push_back(forkNode->getResult(1));
-    /*
-   if (!block)
-     return firstOpInGroup->emitError() << "LSQ port must belong to a BB.";
-   Value groupCtrl = getCtrl(*block);
-   if (!groupCtrl)
-     return failure();
-   inputs.lsqInputs.push_back(groupCtrl);*/
 
     // Then, add all memory port results that go the interface to the list of
     // LSQ inputs

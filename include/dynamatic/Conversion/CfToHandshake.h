@@ -22,6 +22,7 @@
 #include "dynamatic/Support/DynamaticPass.h"
 #include "dynamatic/Support/LLVM.h"
 #include "experimental/Support/BooleanLogic/BoolExpression.h"
+#include "experimental/Support/BooleanLogic/Shannon.h"
 #include "mlir/Analysis/CFGLoopInfo.h"
 #include "mlir/Support/LogicalResult.h"
 #include "mlir/Transforms/DialectConversion.h"
@@ -213,15 +214,45 @@ public:
   /// the operands. The result of the JOIN becomes the operand of the ForkOp
   void insertJoins(std::set<Operation *> forks);
 
+  ///----------Fast Token Delivery Algorithm----------
+
   /// Adds MERGES in fast token delivery algorithm
   LogicalResult addPhi(ConversionPatternRewriter &rewriter);
 
   /// Adds BRANCHES in fast token delivery algorithm
   LogicalResult addSupp(ConversionPatternRewriter &rewriter);
 
-  LogicalResult manageMoreProdThanCons(ConversionPatternRewriter &rewriter,
-                                       Operation *producer, Operation *consumer,
-                                       Value connection);
+  /// Inserts a BRANCH for each loop with condition depending on the exit blocks
+  void insertBranchesToLoops(ConversionPatternRewriter &rewriter,
+                             const std::set<mlir::CFGLoop *> &loops,
+                             Operation *producer, Operation *consumer,
+                             Value connection);
+
+  /// Adds BRANCHes in the case where the producer is in more loops than the
+  /// consumer (to solve token count mismatch problem)
+  void manageMoreProdThanCons(ConversionPatternRewriter &rewriter,
+                              Operation *producer, Operation *consumer,
+                              Value connection);
+
+  /// Adds BRANCHes in the case where an operation is feeding itself, i.e the
+  /// producer is the same as the consumer(to solve token count mismatch
+  /// problrm)
+  void manageSelfRegeneration(ConversionPatternRewriter &rewriter,
+                              Operation *producer, Value connection);
+
+  /// Adds BRANCHes in the case where the consumer is in more loops than the
+  /// producer
+  void manageNonLoop(ConversionPatternRewriter &rewriter, Operation *producer,
+                     Operation *consumer, Value connection);
+
+  ///----------Fast Token Delivery Cleanup----------
+
+  /// Converts te MERGEs created in fast token delivery to MUXes
+  LogicalResult convertMergesToMuxes(ConversionPatternRewriter &rewriter);
+
+  Value addInit(ConversionPatternRewriter &rewriter,
+                SmallVector<Operation *> &initMerges, Operation *oldMerge,
+                mlir::CFGLoop *loop);
 
 protected:
   /// The region being lowered.
@@ -253,7 +284,8 @@ protected:
                        const std::vector<Block *> &path);
 
   std::vector<Operation *> alloctionNetwork;
-  std::vector<Operation *> loopMerges;
+  std::vector<Operation *>
+      memDepLoopMerges; // contains all merges added in the straight LSQ
 
 private:
   /// Associates basic blocks of the region being lowered to their respective
@@ -266,6 +298,7 @@ private:
   // consumption of operations to implement fast token delivery
   ControlDependenceAnalysis &cdgAnalysis;
 
+  /// Stores the loop info of the control flow graph
   mlir::CFGLoopInfo li;
 
   // ControlDependenceAnalysis &cdgAnalysis;
@@ -286,6 +319,44 @@ private:
 
   experimental::boolean::BoolExpression *
   getBlockConditionForBranch(Block *loopExit, mlir::CFGLoop *loop);
+
+  //----------BooleanEXpression to Circuit----------
+
+  /// Fills conditionToValue map by getting the condition and the value of each
+  /// block
+
+  /// Associates the condition of the block in string format to its
+  /// corresponding control value. The control alue is given by the condition of
+  /// the terminator of the block
+  std::map<std::string, Value> conditionToValue;
+
+  void fillConditionToValueMapping();
+
+  // Converts a DATA (mux or boolean expression) in boolean logic library to
+  // actual circuitry
+  Value dataToCircuit(ConversionPatternRewriter &rewriter,
+                      experimental::boolean::Data *data, Block *block,
+                      Value trigger);
+
+  // Converts a mux in boolean logic library to actual circuitry
+  Value muxToCircuit(ConversionPatternRewriter &rewriter,
+                     experimental::boolean::MUX *mux, Block *block,
+                     Value trigger);
+
+  // Converts a boolean expession to actual circuitry
+  Value boolExpressionToCircuit(ConversionPatternRewriter &rewriter,
+                                experimental::boolean::BoolExpression *expr,
+                                Block *block, Value trigger);
+
+  // Converts a boolean variable to actual circuitry
+  Value boolVariableToCircuit(ConversionPatternRewriter &rewriter,
+                              experimental::boolean::BoolExpression *expr,
+                              Block *block);
+
+  // Converts a boolean operator to actual circuitry
+  Value boolOperatorToCircuit(ConversionPatternRewriter &rewriter,
+                              experimental::boolean::BoolExpression *expr,
+                              Block *block, Value trigger);
 };
 
 /// Pointer to function lowering a region using a conversion pattern rewriter.

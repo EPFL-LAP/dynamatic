@@ -36,7 +36,7 @@ struct Data {
   Data(MUX *m) : mux(m) {}
 
   /// Constructor for initializing with a boolean expression.
-  Data(BoolExpression *b) : boolexpression(b) {}
+  Data(BoolExpression *b) : mux(nullptr), boolexpression(b) {}
 
   /// Prints the content of the Data based on its type.
   void print();
@@ -44,12 +44,12 @@ struct Data {
 
 /// Represents a multiplexer for boolean logic expressions.
 struct MUX {
-  Data in0;  ///< Input 0 for the MUX.
-  Data in1;  ///< Input 1 for the MUX.
-  Data cond; ///< Condition for selecting the input.
+  Data *in0;  ///< Input 0 for the MUX.
+  Data *in1;  ///< Input 1 for the MUX.
+  Data *cond; ///< Condition for selecting the input.
 
   /// Constructor for initializing the MUX with inputs and condition.
-  MUX(Data input0, Data input1, Data condition)
+  MUX(Data *input0, Data *input1, Data *condition)
       : in0(input0), in1(input1), cond(condition) {}
 
   /// Prints the content of the MUX.
@@ -72,8 +72,9 @@ BoolExpression *shannonExpansionNegative(BoolExpression *exp,
 
 /// Applies Shannon decomposition on a boolean expression based on a list of
 /// cofactors.
-Data applyShannon(BoolExpression *exp,
-                  const std::vector<std::string> &cofactorList);
+/// Returns a dynamically-allocated variable
+Data *applyShannon(BoolExpression *exp,
+                   const std::vector<std::string> &cofactorList);
 
 } // namespace boolean
 } // namespace experimental
