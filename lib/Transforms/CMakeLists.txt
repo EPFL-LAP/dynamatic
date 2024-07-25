@@ -21,6 +21,7 @@ add_dynamatic_library(DynamaticTransforms
   RemovePolygeistAttributes.cpp
   ScfRotateForLoops.cpp
   ScfSimpleIfToSelect.cpp
+  FuncSSAToGSA.cpp
 
   DEPENDS
   DynamaticTransformsPassIncGen

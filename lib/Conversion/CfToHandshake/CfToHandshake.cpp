@@ -436,7 +436,10 @@ HandshakeLowering::addMergeOps(ConversionPatternRewriter &rewriter) {
   // and resolve all backedges that were created during merge insertion
   reconnectMergeOps(region, blockMerges, mergePairs);
 
-  // Remove all block arguments, which are no longer used
+  // AYA: the above logic will go away but I guess I should maintain the
+  // following code to remove the block args once we have correctly translated
+  // SSA Phis to actual Merges
+  //  Remove all block arguments, which are no longer used
   for (Block &block : region) {
     if (!block.isEntryBlock()) {
       for (unsigned idx = block.getNumArguments(); idx > 0; --idx)
@@ -908,6 +911,7 @@ private:
   PartialLoweringFunc fun;
 };
 
+/////// AYA TODO this class should be removed
 /// Strategy class for SSA maximization during std-to-handshake conversion.
 /// Block arguments of type MemRefType and allocation operations are not
 /// considered for SSA maximization.
@@ -921,6 +925,7 @@ class HandshakeLoweringSSAStrategy : public dynamatic::SSAMaximizationStrategy {
   bool maximizeOp(Operation &op) override { return !isAllocOp(&op); }
 };
 } // namespace
+////////// AYA the above should be removed and replaced with my SSA
 
 LogicalResult
 dynamatic::partiallyLowerRegion(const RegionLoweringFunc &loweringFunc,
@@ -1010,12 +1015,15 @@ struct ConvertFuncToHandshake : OpConversionPattern<func::FuncOp> {
   LogicalResult
   matchAndRewrite(func::FuncOp funcOp, OpAdaptor operands,
                   ConversionPatternRewriter &rewriter) const override {
+
+    // AYA TODOs: Replace this maximizeSSA with my explicit SSA stuff
     // Put the function into maximal SSA form if it is not external
     if (!funcOp.isExternal()) {
       HandshakeLoweringSSAStrategy strategy;
       if (failed(dynamatic::maximizeSSA(funcOp.getBody(), strategy)))
         return failure();
     }
+    ////////// AYA the above should be removed and replaced with my SSA
 
     // Derive attribute for the new function
     SmallVector<NamedAttribute, 4> attributes;
@@ -1118,6 +1126,9 @@ struct CfToHandshakePass
           return signalPassFailure();
       }
     }
+
+    // AYA: TODO: Call the function that makes SSA with explicit Merges... Will
+    // need to double check that pointers of the operations are unaffected..
   }
 };
 } // namespace
