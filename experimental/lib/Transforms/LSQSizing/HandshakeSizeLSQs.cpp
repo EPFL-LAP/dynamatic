@@ -66,7 +66,7 @@ private:
 void HandshakeSizeLSQsPass::runDynamaticPass() {
   llvm::dbgs() << "\t [DBG] LSQ Sizing Pass Called!\n";
 
-  std::map<unsigned,buffer::CFDFC> cfdfcs; //TODO chane to DenseMap?
+  std::map<unsigned,buffer::CFDFC> cfdfcs; //TODO change to DenseMap?
   llvm::SmallVector<LSQSizingResult> sizingResults; //TODO datatype?
 
   // 1. Read Attributes
@@ -186,6 +186,10 @@ LSQSizingResult HandshakeSizeLSQsPass::sizeLSQsForCFDFC(buffer::CFDFC cfdfc, uns
     if(result.find(entry.first) == result.end()) {
       result.insert({entry.first, std::make_tuple(0, entry.second)});
     }
+  }
+
+  for(auto &entry: result) {
+    llvm::dbgs() << "\t [DBG] LSQ " << entry.first->getAttrOfType<StringAttr>("handshake.name").str() << " Load Size: " << std::get<0>(entry.second) << " Store Size: " << std::get<1>(entry.second) << "\n";
   }
 
   return result;
@@ -327,9 +331,34 @@ std::unordered_map<mlir::Operation*, unsigned> HandshakeSizeLSQsPass::calcQueueS
   std::unordered_map<mlir::Operation*, unsigned> queueSizes;
 
 
-  //TODO extract which LSQ_op belongs to which lsq and loop over LSQs -> one LSQ can have multiple loads and stores
   std::unordered_map<mlir::Operation*, std::tuple<std::vector<int>, std::vector<int>>> allocDeallocTimesPerLSQ;
+  for(auto &allocTime: allocTimes) {
+    mlir::Operation *lsqOp = nullptr;
+    for(Operation *destOp: allocTime.first->getUsers()) {
+      if(destOp->getName().getStringRef().str() == "handshake.lsq") {
+        lsqOp = destOp;
+        break;
+      }
+    }
+    if(allocDeallocTimesPerLSQ.find(lsqOp) == allocDeallocTimesPerLSQ.end()) {
+      allocDeallocTimesPerLSQ.insert({lsqOp, std::make_tuple(std::vector<int>(), std::vector<int>())});
+    }
+    std::get<0>(allocDeallocTimesPerLSQ[lsqOp]).push_back(allocTime.second);
+  }
 
+  for(auto &deallocTime: deallocTimes) {
+    mlir::Operation *lsqOp = nullptr;
+    for(Operation *destOp: deallocTime.first->getUsers()) {
+      if(destOp->getName().getStringRef().str() == "handshake.lsq") {
+        lsqOp = destOp;
+        break;
+      }
+    }
+    if(allocDeallocTimesPerLSQ.find(lsqOp) == allocDeallocTimesPerLSQ.end()) {
+      allocDeallocTimesPerLSQ.insert({lsqOp, std::make_tuple(std::vector<int>(), std::vector<int>())});
+    }
+    std::get<1>(allocDeallocTimesPerLSQ[lsqOp]).push_back(deallocTime.second);
+  }
 
   //TODO Could be more efficient, but its easier to debug like this since it makes intermediate results visible
   for(auto &entry: allocDeallocTimesPerLSQ) {
@@ -339,10 +368,10 @@ std::unordered_map<mlir::Operation*, unsigned> HandshakeSizeLSQsPass::calcQueueS
     // Build array for how many slots are allocated and deallocated per cycle
     for(unsigned iter = 0; iter < iterMax; iter++) {
       for(auto &allocTime: std::get<0>(entry.second)) {
-        allocPerCycle[(allocTime - II * iter) % endTime]++;
+        allocPerCycle[(allocTime + II * iter) % endTime]++;
       }
       for(auto &deallocTime: std::get<1>(entry.second)) {
-        allocPerCycle[(deallocTime - II * iter) % endTime]--;
+        allocPerCycle[(deallocTime + II * iter) % endTime]--;
       }
     }
 
@@ -359,7 +388,7 @@ std::unordered_map<mlir::Operation*, unsigned> HandshakeSizeLSQsPass::calcQueueS
     queueSizes.insert({entry.first, maxSlots});
   }
 
-  return std::unordered_map<mlir::Operation*, unsigned>();
+  return queueSizes;
 }
 
 
