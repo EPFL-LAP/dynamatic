@@ -178,9 +178,8 @@ LSQSizingResult HandshakeSizeLSQsPass::sizeLSQsForCFDFC(buffer::CFDFC cfdfc, uns
 
   LSQSizingResult result;
   for(auto &entry: loadSizes) {
-    unsigned loadSize = entry.second;
     unsigned storeSize = storeSizes.find(entry.first) != storeSizes.end() ? storeSizes[entry.first] : 0;
-    result.insert({entry.first, std::make_tuple(entry.second, storeSizes[entry.first])});
+    result.insert({entry.first, std::make_tuple(entry.second, storeSize)});
   }
 
   for(auto &entry: storeSizes) {
