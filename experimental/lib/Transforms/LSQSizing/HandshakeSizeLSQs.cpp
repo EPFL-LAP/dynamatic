@@ -35,7 +35,7 @@ using namespace dynamatic::handshake;
 using namespace dynamatic::experimental;
 using namespace dynamatic::experimental::lsqsizing;
 
-using LSQSizingResult = DenseMap<unsigned, std::tuple<unsigned, unsigned>>; //TUPLE: <load_size, store_size>
+using LSQSizingResult = DenseMap<mlir::Operation*, std::tuple<unsigned, unsigned>>; //TUPLE: <load_size, store_size>
 
 namespace {
 
@@ -54,6 +54,11 @@ private:
   LSQSizingResult sizeLSQsForCFDFC(buffer::CFDFC cfdfc, unsigned II, TimingDatabase timingDB);
   mlir::Operation *findStartNode(AdjListGraph graph);
   std::unordered_map<unsigned, mlir::Operation *> getPhiNodes(AdjListGraph graph, mlir::Operation *startNode);
+  std::unordered_map<mlir::Operation *, int> getAllocTimes(AdjListGraph graph, mlir::Operation *startNode, std::vector<mlir::Operation *> ops,
+                                                           std::unordered_map<unsigned, mlir::Operation *> phiNodes);
+  std::unordered_map<mlir::Operation *, int> getDeallocTimes(AdjListGraph graph, mlir::Operation *startNode, std::vector<mlir::Operation *> ops);
+  int getEndTime(std::unordered_map<mlir::Operation *, int> deallocTimes);
+  std::unordered_map<mlir::Operation*, unsigned> calcQueueSize(std::unordered_map<mlir::Operation *, int> allocTimes, std::unordered_map<mlir::Operation *, int> deallocTimes, int endTime, unsigned II);
 };
 } // namespace
 
@@ -119,8 +124,8 @@ void HandshakeSizeLSQsPass::runDynamaticPass() {
       sizingResults.push_back(sizeLSQsForCFDFC(cfdfc.second, IIs[cfdfc.first], timingDB));
     }
     
-    std::map<unsigned, unsigned> maxStoreSizes;
-    std::map<unsigned, unsigned> maxLoadSizes;
+    std::map<mlir::Operation*, unsigned> maxStoreSizes;
+    std::map<mlir::Operation*, unsigned> maxLoadSizes;
     for(auto &result: sizingResults) {
       for(auto &entry: result) {
         maxStoreSizes[entry.first] = std::max(maxStoreSizes[entry.first], std::get<1>(entry.second));
@@ -133,11 +138,19 @@ void HandshakeSizeLSQsPass::runDynamaticPass() {
 }
 
 LSQSizingResult HandshakeSizeLSQsPass::sizeLSQsForCFDFC(buffer::CFDFC cfdfc, unsigned II, TimingDatabase timingDB) {
-  //TODO implement algo
   llvm::dbgs() << "\t [DBG] sizeLSQsForCFDFC called for CFDFC with " << cfdfc.cycle.size() << " BBs and II of " << II << "\n";
 
   AdjListGraph graph(cfdfc, timingDB, II);
+  std::vector<mlir::Operation *> loadOps = graph.getOperationsWithOpName("handshake.lsq_load");
+  std::vector<mlir::Operation *> storeOps = graph.getOperationsWithOpName("handshake.lsq_store");
+
   graph.printGraph();
+
+  //TODO return empty or make result std::optional?
+  /*if(loadOps.size() == 0 && storeOps.size() == 0) {
+    llvm::dbgs() << "\t [DBG] No LSQ Ops found in CFDFC\n";
+    return DenseMap<unsigned, std::tuple<unsigned, unsigned>>();
+  }*/
 
   // Find starting node, which will be the reference to the rest
   mlir::Operation * startNode = findStartNode(graph);
@@ -146,33 +159,37 @@ LSQSizingResult HandshakeSizeLSQsPass::sizeLSQsForCFDFC(buffer::CFDFC cfdfc, uns
   // Find Phi node of each BB
   std::unordered_map<unsigned, mlir::Operation *> phiNodes = getPhiNodes(graph, startNode);
 
-  // Get Start Times of each BB (Alloc Times) 
+  // TODO insert extra dependencies for alloc precedes memory access
+  // connect all phi nodes to the lsq ps in their BB
 
+  // Get Start Times of each BB (Alloc Times) 
+  std::unordered_map<mlir::Operation *, int> loadAllocTimes = getAllocTimes(graph, startNode, loadOps, phiNodes);
+  std::unordered_map<mlir::Operation *, int> storeAllocTimes = getAllocTimes(graph, startNode, storeOps, phiNodes);
 
   // Get Dealloc Times and End Times
-  std::vector<mlir::Operation *> loadOps = graph.getOperationsWithOpName("handshake.lsq_load");
-  std::unordered_map<mlir::Operation *, int> loadDeallocTimes;
-  int loadEndTime = 0;
-
-  for(auto &op: loadOps) {
-    int latency = graph.findMaxPathLatency(startNode, op);
-    loadDeallocTimes.insert({op, latency});
-    loadEndTime = std::max(loadEndTime, latency);
-  }
-
-  std::vector<mlir::Operation *> storeOps = graph.getOperationsWithOpName("handshake.lsq_store");
-  std::unordered_map<mlir::Operation *, int> storeDeallocTimes;
-  int storeEndTime = 0;
-
-  for(auto &op: storeOps) {
-    int latency = graph.findMaxPathLatency(startNode, op);
-    storeDeallocTimes.insert({op, latency});
-    storeEndTime = std::max(storeEndTime, latency);
-  }
+  std::unordered_map<mlir::Operation *, int> loadDeallocTimes = getDeallocTimes(graph, startNode, loadOps);
+  std::unordered_map<mlir::Operation *, int> storeDeallocTimes = getDeallocTimes(graph, startNode, storeOps);
+  int loadEndTime = getEndTime(loadDeallocTimes);
+  int storeEndTime = getEndTime(storeDeallocTimes);
 
   // Get Load and Store Sizes
+  std::unordered_map<mlir::Operation*, unsigned> loadSizes = calcQueueSize(loadAllocTimes, loadDeallocTimes, loadEndTime, II);
+  std::unordered_map<mlir::Operation*, unsigned> storeSizes = calcQueueSize(storeAllocTimes, storeDeallocTimes, storeEndTime, II);
 
-  return DenseMap<unsigned, std::tuple<unsigned, unsigned>>();
+  LSQSizingResult result;
+  for(auto &entry: loadSizes) {
+    unsigned loadSize = entry.second;
+    unsigned storeSize = storeSizes.find(entry.first) != storeSizes.end() ? storeSizes[entry.first] : 0;
+    result.insert({entry.first, std::make_tuple(entry.second, storeSizes[entry.first])});
+  }
+
+  for(auto &entry: storeSizes) {
+    if(result.find(entry.first) == result.end()) {
+      result.insert({entry.first, std::make_tuple(0, entry.second)});
+    }
+  }
+
+  return result;
 }
 
 
@@ -276,6 +293,42 @@ std::unordered_map<unsigned, mlir::Operation *> HandshakeSizeLSQsPass::getPhiNod
   }
 
   return phiNodes;
+}
+
+std::unordered_map<mlir::Operation *, int> HandshakeSizeLSQsPass::getAllocTimes(AdjListGraph graph, mlir::Operation *startNode, std::vector<mlir::Operation *> ops,
+                                                           std::unordered_map<unsigned, mlir::Operation *> phiNodes) {
+  std::unordered_map<mlir::Operation *, int> allocTimes;
+  for(auto &op: ops) {
+    int latency = graph.findMinPathLatency(startNode, phiNodes[op->getAttrOfType<IntegerAttr>("handshake.bb").getUInt()], true);
+    allocTimes.insert({op, latency});
+  }
+  return allocTimes;
+}
+
+std::unordered_map<mlir::Operation *, int> HandshakeSizeLSQsPass::getDeallocTimes(AdjListGraph graph, mlir::Operation *startNode, std::vector<mlir::Operation *> ops) {
+  std::unordered_map<mlir::Operation *, int> deallocTimes;
+  for(auto &op: ops) {
+    int latency = graph.findMaxPathLatency(startNode, op);
+    deallocTimes.insert({op, latency});
+  }
+  return deallocTimes;
+}
+
+int HandshakeSizeLSQsPass::getEndTime(std::unordered_map<mlir::Operation *, int> deallocTimes) {
+  int endTime = 0;
+  for(auto &entry : deallocTimes) {
+    if(entry.second > endTime) {
+      endTime = entry.second;
+    }
+  }
+  return endTime;
+}
+
+std::unordered_map<mlir::Operation*, unsigned> HandshakeSizeLSQsPass::calcQueueSize(std::unordered_map<mlir::Operation *, int> allocTimes, std::unordered_map<mlir::Operation *, int> deallocTimes, int endTime, unsigned II) {
+  //TODO extract which LSQ_op belongs to which lsq
+
+
+  return std::unordered_map<mlir::Operation*, unsigned>();
 }
 
 

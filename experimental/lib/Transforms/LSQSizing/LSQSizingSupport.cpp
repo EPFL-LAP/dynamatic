@@ -79,6 +79,7 @@ void AdjListGraph::insertArtificialNodeOnBackedge(mlir::Operation* src, mlir::Op
   std::string destName = dest->getAttrOfType<StringAttr>("handshake.name").str();
   std::string newNodeName = "backedge_" + srcName + "_" + destName;
 
+  //remove regular edge from src to dest
   nodes.at(srcName).edges.remove(destName);
 
   // create node and add edge from src to new node and new node to dest
