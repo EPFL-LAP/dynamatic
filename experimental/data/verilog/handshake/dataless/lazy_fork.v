@@ -7,7 +7,7 @@ module lazy_fork_dataless #(
   input  ins_valid,
   output ins_ready,
   // Output Channels
-  output [SIZE - 1 : 0] outs_valid,
+  output reg [SIZE - 1 : 0] outs_valid,
 	input  [SIZE - 1: 0] outs_ready
 );
   wire allnReady;
