@@ -22,26 +22,36 @@ module mux #(
   wire tehb_ins_ready;
   wire tehb_ins_valid;
 
-  reg [DATA_WIDTH - 1 : 0] selectedData = 0;
-  reg selectedData_valid = 0;
+  reg [DATA_WIDTH - 1 : 0] selectedData;
+  reg selectedData_valid;
 
   integer i;
   always @(*) begin
-    selectedData = ins[0 * DATA_WIDTH +: DATA_WIDTH];
-    selectedData_valid = 0;
-
-    for (i = SIZE - 1; i >= 0; i = i - 1) begin
-      if (((i[SELECT_WIDTH - 1 : 0] == index) & index_valid & tehb_ins_ready & ins_valid[i]) | ~ins_valid[i]) begin
-        ins_ready[i] = 1;
-      end else begin
+    if(rst) begin
+      selectedData_valid = 0;
+      for (i = DATA_WIDTH - 1; i >= 0; i = i - 1) begin
+        selectedData[i] = 0;
+      end
+      for (i = SIZE - 1; i >= 0; i = i - 1) begin
         ins_ready[i] = 0;
       end
+    end else begin
+      selectedData = ins[0 * DATA_WIDTH +: DATA_WIDTH];
+      selectedData_valid = 0;
 
-      if (index == i[SELECT_WIDTH - 1 : 0] && index_valid && ins_valid[i]) begin
-        selectedData = ins[i * DATA_WIDTH +: DATA_WIDTH];
-        selectedData_valid = 1;
+      for (i = SIZE - 1; i >= 0; i = i - 1) begin
+        if (((i[SELECT_WIDTH - 1 : 0] == index) & index_valid & tehb_ins_ready & ins_valid[i]) | ~ins_valid[i]) begin
+          ins_ready[i] = 1;
+        end else begin
+          ins_ready[i] = 0;
+        end
+
+        if (index == i[SELECT_WIDTH - 1 : 0] && index_valid && ins_valid[i]) begin
+          selectedData = ins[i * DATA_WIDTH +: DATA_WIDTH];
+          selectedData_valid = 1;
+        end
       end
-    end
+    end 
 
   end
 

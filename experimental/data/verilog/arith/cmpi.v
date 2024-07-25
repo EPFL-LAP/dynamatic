@@ -10,7 +10,7 @@ module ENTITY_NAME #(
   input  rhs_valid,
   input  result_ready,
   // outputs
-  output [DATA_WIDTH - 1 : 0] result,
+  output result,
   output result_valid,
   output lhs_ready,
   output rhs_ready
