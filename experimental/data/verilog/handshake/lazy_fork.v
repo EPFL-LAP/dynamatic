@@ -1,4 +1,4 @@
-module lazy_fork_dataless #(
+module lazy_fork #(
   parameter SIZE = 2,
   parameter DATA_WIDTH = 32
 )(

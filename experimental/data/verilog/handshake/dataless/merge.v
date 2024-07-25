@@ -1,5 +1,5 @@
 module merge_dataless #(
-  parameter SIZE = 2;
+  parameter SIZE = 2
 )(
   input  clk,
   input  rst,
@@ -25,7 +25,7 @@ module merge_dataless #(
   end
 
   // Handling input readiness
-  ins_ready = {SIZE{tehb_ready}};
+  assign ins_ready = {SIZE{tehb_ready}};
 
   tehb_dataless tehb (
     .clk        (clk         ),

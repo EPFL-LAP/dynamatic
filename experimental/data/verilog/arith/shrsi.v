@@ -1,4 +1,4 @@
-module shri #(
+module shrsi #(
   parameter DATA_WIDTH = 32
 )(
   // inputs
