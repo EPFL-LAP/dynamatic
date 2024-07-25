@@ -7,11 +7,11 @@ module extui #(
   input  rst,
   input  [INPUT_WIDTH - 1 : 0] ins,
   input  ins_valid,
-  input  ins_ready,
+  output  ins_ready,
   // outputs
   output [OUTPUT_WIDTH - 1 : 0] outs,
   output outs_valid,
-  output outs_ready
+  input outs_ready
 );
 
   assign outs = {{(OUTPUT_WIDTH - INPUT_WIDTH){1'b0}}, ins};

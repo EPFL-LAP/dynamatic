@@ -20,22 +20,17 @@ module control_merge_dataless #(
   wire tehbOut_valid;
   wire tehbOut_ready;
 
-  //! Is it possible that the unit has more than 2 inputs?, Jiantao, 21/07/2024
-  // reg [INDEX_WIDTH - 1 : 0] index_tehb;
-  // integer i;
-  // always @(ins_valid) begin
-  //   index_tehb = {INDEX_WIDTH{1'b0}};
-  //   for (i = 0; i < SIZE; i = i + 1) begin
-  //     if (ins_valid[i]) begin
-  //       index_tehb = i[INDEX_WIDTH - 1 : 0];
-  //       break;      // Exit the loop on the first valid
-  //     end
-  //   end
-  // end
-
-  //! Assuming SIZE = 2
-  wire [INDEX_WIDTH - 1 : 0] index_tehb;
-  assign index_tehb = ~ins_valid[0];
+  reg [INDEX_WIDTH - 1 : 0] index_tehb;
+  integer i;
+  always @(ins_valid) begin
+    index_tehb = {INDEX_WIDTH{1'b0}};
+    for (i = 0; i < SIZE; i = i + 1) begin
+      if (ins_valid[i]) begin
+        index_tehb = i[INDEX_WIDTH - 1 : 0];
+        i = SIZE;      // Exit the loop on the first valid
+      end
+    end
+  end
 
   // Instantiate Merge_dataless
   merge_notehb_dataless #(

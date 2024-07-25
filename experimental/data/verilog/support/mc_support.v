@@ -252,7 +252,7 @@ module write_data_signals #(
 	output reg [ARBITER_SIZE - 1 : 0] valid
 );
   integer i;
-  reg [DATA_WIDTH - 1 : 0] data_out_var;
+  reg [DATA_WIDTH - 1 : 0] data_out_var = 0;
 
   always @(*) begin
     data_out_var = {DATA_WIDTH{1'b0}};
@@ -260,6 +260,8 @@ module write_data_signals #(
       data_out_var = in_data[i * DATA_WIDTH +: DATA_WIDTH];
     end
   end
+
+  assign write_data = data_out_var;
 
   always @(posedge clk, posedge rst) begin
     if (rst) begin

@@ -30,8 +30,12 @@ module mem_controller_loadless #(
   output [DATA_WIDTH - 1 : 0] storeData
 );
   // Internal Signals
-  reg remainingStores = 0;
+  reg [31 : 0] remainingStores;
   wire [NUM_STORE - 1 : 0] storePorts_valid, storePorts_ready;
+
+  // Local Parameter
+  localparam [31:0] zeroStore = 32'b0;
+  localparam [NUM_CONTROL-1:0] zeroCtrl = {NUM_CONTROL{1'b0}};
 
   assign loadEn = 0;
   assign loadAddr = {ADDR_WIDTH{1'b0}};
@@ -76,7 +80,7 @@ module mem_controller_loadless #(
   end
 
   // Memory Done logic
-  assign memDone_valid = (~(|remainingStores)) & (~(|ctrl_valid));
+  assign memDone_valid = (remainingStores == zeroStore && ctrl_valid == zeroCtrl) ? 1'b1 : 1'b0;
   assign ctrl_ready = {NUM_CONTROL{1'b1}};
 
 endmodule
