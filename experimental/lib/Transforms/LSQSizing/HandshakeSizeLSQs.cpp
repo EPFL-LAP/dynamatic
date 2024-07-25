@@ -124,16 +124,22 @@ void HandshakeSizeLSQsPass::runDynamaticPass() {
       sizingResults.push_back(sizeLSQsForCFDFC(cfdfc.second, IIs[cfdfc.first], timingDB));
     }
     
-    std::map<mlir::Operation*, unsigned> maxStoreSizes;
-    std::map<mlir::Operation*, unsigned> maxLoadSizes;
+    std::map<mlir::Operation*, std::tuple<unsigned, unsigned>> maxLoadStoreSizes;
     for(auto &result: sizingResults) {
       for(auto &entry: result) {
-        maxStoreSizes[entry.first] = std::max(maxStoreSizes[entry.first], std::get<1>(entry.second));
-        maxLoadSizes[entry.first] = std::max(maxLoadSizes[entry.first], std::get<0>(entry.second));
+        int newMaxLoadSize = std::max(std::get<0>(maxLoadStoreSizes[entry.first]), std::get<0>(entry.second));
+        int newMaxStoreSize = std::max(std::get<1>(maxLoadStoreSizes[entry.first]), std::get<1>(entry.second));
+        maxLoadStoreSizes[entry.first] = std::make_tuple(newMaxLoadSize, newMaxStoreSize);
       }
     }
 
-    //TODO Add Sizing to Attributes
+    for(auto &maxLoadStoreSize: maxLoadStoreSizes) {
+      mlir::Operation *lsqOp = maxLoadStoreSize.first;
+      unsigned maxLoadSize = std::get<0>(maxLoadStoreSize.second);
+      unsigned maxStoreSize = std::get<1>(maxLoadStoreSize.second);
+
+      //TODO set Attribute in LSQ op
+    }
   }
 }
 
