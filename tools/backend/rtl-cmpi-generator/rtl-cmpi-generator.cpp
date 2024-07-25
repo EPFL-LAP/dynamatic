@@ -46,12 +46,33 @@ static cl::opt<std::string> hdlType(cl::Positional, cl::Required,
                                        cl::cat(mainCategory));
 
 /// Returns the VHDL comparator corresponding to the comparison's predicate.
-static StringRef getComparator(arith::CmpIPredicate pred) {
+static StringRef getComparatorVHDL(arith::CmpIPredicate pred) {
   switch (pred) {
   case arith::CmpIPredicate::eq:
     return "=";
   case arith::CmpIPredicate::ne:
     return "/=";
+  case arith::CmpIPredicate::slt:
+  case arith::CmpIPredicate::ult:
+    return "<";
+  case arith::CmpIPredicate::sle:
+  case arith::CmpIPredicate::ule:
+    return "<=";
+  case arith::CmpIPredicate::sgt:
+  case arith::CmpIPredicate::ugt:
+    return ">";
+  case arith::CmpIPredicate::sge:
+  case arith::CmpIPredicate::uge:
+    return ">=";
+  }
+}
+
+static StringRef getComparatorVerilog(arith::CmpIPredicate pred) {
+  switch (pred) {
+  case arith::CmpIPredicate::eq:
+    return "==";
+  case arith::CmpIPredicate::ne:
+    return "!=";
   case arith::CmpIPredicate::slt:
   case arith::CmpIPredicate::ult:
     return "<";
@@ -86,7 +107,7 @@ static StringRef getModifierVHDL(arith::CmpIPredicate pred) {
   }
 }
 
-/// Returns the VHDL type modifier associated with the comparison's predicate.
+/// Returns the Verilog type modifier associated with the comparison's predicate.
 static StringRef getModifierVerilog(arith::CmpIPredicate pred) {
   switch (pred) {
   case arith::CmpIPredicate::eq:
@@ -100,7 +121,7 @@ static StringRef getModifierVerilog(arith::CmpIPredicate pred) {
   case arith::CmpIPredicate::sle:
   case arith::CmpIPredicate::sgt:
   case arith::CmpIPredicate::sge:
-    return "signed";
+    return "$signed";
   }
 }
 
@@ -145,11 +166,15 @@ int main(int argc, char **argv) {
   // Record all replacements in a map
   std::map<std::string, std::string> replacementMap;
   replacementMap["ENTITY_NAME"] = entityName;
-  replacementMap["COMPARATOR"] = getComparator(*pred);
-  if(hdlType == "vhdl")
+  
+  if(hdlType == "vhdl") {
+    replacementMap["COMPARATOR"] = getComparatorVHDL(*pred);
     replacementMap["MODIFIER"] = getModifierVHDL(*pred);
-  else if (hdlType == "verilog")
+  }
+  else if (hdlType == "verilog") {
+    replacementMap["COMPARATOR"] = getComparatorVerilog(*pred);
     replacementMap["MODIFIER"] = getModifierVerilog(*pred);
+  }
   else {
     llvm::errs() << "Unknown HDL type \"" << hdlType << "\"\n";
     return 1;

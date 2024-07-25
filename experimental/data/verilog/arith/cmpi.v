@@ -29,6 +29,6 @@ module ENTITY_NAME #(
     .outs_valid (result_valid             )
   );
 
-  assign result = constant_one ? (MODIFIER(lhs) COMPARATOR MODIFIER(rhs)) : constant_zero;
+  assign result = (MODIFIER(lhs) COMPARATOR MODIFIER(rhs)) ? constant_one : constant_zero;
 
 endmodule
