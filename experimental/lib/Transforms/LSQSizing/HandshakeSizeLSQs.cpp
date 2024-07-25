@@ -324,8 +324,40 @@ int HandshakeSizeLSQsPass::getEndTime(std::unordered_map<mlir::Operation *, int>
 }
 
 std::unordered_map<mlir::Operation*, unsigned> HandshakeSizeLSQsPass::calcQueueSize(std::unordered_map<mlir::Operation *, int> allocTimes, std::unordered_map<mlir::Operation *, int> deallocTimes, int endTime, unsigned II) {
-  //TODO extract which LSQ_op belongs to which lsq
+  std::unordered_map<mlir::Operation*, unsigned> queueSizes;
 
+
+  //TODO extract which LSQ_op belongs to which lsq and loop over LSQs -> one LSQ can have multiple loads and stores
+  std::unordered_map<mlir::Operation*, std::tuple<std::vector<int>, std::vector<int>>> allocDeallocTimesPerLSQ;
+
+
+  //TODO Could be more efficient, but its easier to debug like this since it makes intermediate results visible
+  for(auto &entry: allocDeallocTimesPerLSQ) {
+    unsigned iterMax = endTime / II;
+    std::vector<int> allocPerCycle(endTime);
+
+    // Build array for how many slots are allocated and deallocated per cycle
+    for(unsigned iter = 0; iter < iterMax; iter++) {
+      for(auto &allocTime: std::get<0>(entry.second)) {
+        allocPerCycle[(allocTime - II * iter) % endTime]++;
+      }
+      for(auto &deallocTime: std::get<1>(entry.second)) {
+        allocPerCycle[(deallocTime - II * iter) % endTime]--;
+      }
+    }
+
+    // build array for many slots are actively allocated at which cycle
+    std::vector<int> slotsPerCycle(endTime);
+    int prevSlots = allocPerCycle[0];
+    for(int i=1; i < endTime; i++) {
+      slotsPerCycle[i] = prevSlots + allocPerCycle[i];
+      prevSlots = slotsPerCycle[i];
+    }
+
+    // get highest amount of slots from the array
+    unsigned maxSlots = *std::max_element(slotsPerCycle.begin(), slotsPerCycle.end());
+    queueSizes.insert({entry.first, maxSlots});
+  }
 
   return std::unordered_map<mlir::Operation*, unsigned>();
 }
