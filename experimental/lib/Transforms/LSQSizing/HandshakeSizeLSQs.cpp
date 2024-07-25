@@ -191,35 +191,90 @@ mlir::Operation * HandshakeSizeLSQsPass::findStartNode(AdjListGraph graph) {
 
 
   std::unordered_map<mlir::Operation *, int> maxLatencies;
+  std::unordered_map<mlir::Operation *, int> nodeCounts;
 
   for(auto &op: startNodeCandidates) {
-    maxLatencies.insert({op, graph.findMaxLatencyFromStart(op)});
+    std::vector<std::string> path = graph.findLongestNonCyclicPath(op);
+    maxLatencies.insert({op, graph.getPathLatency(path)});
+    nodeCounts.insert({op, path.size()});
+
+    llvm::dbgs() << "\t [DBG] Longest path from " << op->getAttrOfType<StringAttr>("handshake.name").str() << " lat: " << graph.getPathLatency(path) << " : ";
+    for(auto &node: path) {
+      llvm::dbgs() << node << " ";
+    }
+    llvm::dbgs() << "\n";
   }
 
-  return std::max_element(maxLatencies.begin(), maxLatencies.end(), 
-    [](const std::pair<mlir::Operation *, int> &a, const std::pair<mlir::Operation *, int> &b) {
-      return a.second < b.second;
-    })->first;
+  mlir::Operation *maxLatencyNode = nullptr;
+  int maxLatency = 0;
+  int maxNodeCount = 0;
+  for(auto &node: maxLatencies) {
+    if(node.second > maxLatency) {
+      maxLatency = node.second;
+      maxLatencyNode = node.first;
+      maxNodeCount = nodeCounts[node.first];
+    } else if(node.second == maxLatency && nodeCounts[node.first] > maxNodeCount) {
+      maxLatencyNode = node.first;
+      maxNodeCount = nodeCounts[node.first];
+    }
+  }
+
+  return maxLatencyNode;
 }
 
 
 // TODO identify phi node if there is only 1 bb and identify correctly if there are multiple cond_br pointing to a single bb
 std::unordered_map<unsigned, mlir::Operation *> HandshakeSizeLSQsPass::getPhiNodes(AdjListGraph graph, mlir::Operation *startNode) {
+  std::unordered_map<unsigned, std::vector<mlir::Operation *>> phiNodeCandidates;
   std::unordered_map<unsigned, mlir::Operation *> phiNodes;
   std::vector<mlir::Operation *> branchOps = graph.getOperationsWithOpName("handshake.cond_br");
-  for(auto &branchOp: branchOps) {
-    unsigned srcBB =branchOp->getAttrOfType<IntegerAttr>("handshake.bb").getUInt();
-    llvm::dbgs() << "\t [DBG] Branch Op: " << branchOp->getAttrOfType<StringAttr>("handshake.name").str() << " of BB " << srcBB <<"\n";
+  std::vector<mlir::Operation *> forkOps = graph.getOperationsWithOpName("handshake.fork");
 
-    for(auto &destOp: graph.getConnectedOps(branchOp)) {
-      llvm::dbgs() << "\t\t [DBG] connected to: " << destOp->getAttrOfType<StringAttr>("handshake.name").str() << "\n";
+  std::vector<mlir::Operation *> srcOps = std::vector<mlir::Operation *>(branchOps.size() + forkOps.size());
+  std::merge(branchOps.begin(), branchOps.end(), forkOps.begin(), forkOps.end(), srcOps.begin());
+
+  // Insert start_node as a candidate (will be choosen anyway, but looks cleaner then special handling)
+  phiNodeCandidates.insert({startNode->getAttrOfType<IntegerAttr>("handshake.bb").getUInt(), {startNode}});
+  //llvm::dbgs() << "\t [DBG] Inserted Start Node: " << startNode->getAttrOfType<StringAttr>("handshake.name").str() << " for BB " << startNode->getAttrOfType<IntegerAttr>("handshake.bb").getUInt() << "\n";
+
+  for(auto &srcOp: srcOps) {
+    unsigned srcBB =srcOp->getAttrOfType<IntegerAttr>("handshake.bb").getUInt();
+    //llvm::dbgs() << "\t [DBG] Branch Op: " << branchOp->getAttrOfType<StringAttr>("handshake.name").str() << " of BB " << srcBB <<"\n";
+
+    for(auto &destOp: graph.getConnectedOps(srcOp)) {
       unsigned destBB = destOp->getAttrOfType<IntegerAttr>("handshake.bb").getUInt();
+      //llvm::dbgs() << "\t\t [DBG] connected to: " << destOp->getAttrOfType<StringAttr>("handshake.name").str() << " of BB" << destBB << "\n";
       if(destBB != srcBB) {
-        llvm::dbgs() << "\t [DBG] Found Phi Node: " << destOp->getAttrOfType<StringAttr>("handshake.name").str() << " for BB " << destBB << "\n";
-        phiNodes.insert({destBB, destOp});
+        //llvm::dbgs() << "\t [DBG] Found Phi Node Candidate: " << destOp->getAttrOfType<StringAttr>("handshake.name").str() << " for BB " << destBB << "\n";
+        if(phiNodeCandidates.find(destBB) == phiNodeCandidates.end()) {
+          phiNodeCandidates.insert({destBB, std::vector<mlir::Operation *>()});
+        }
+        phiNodeCandidates.at(destBB).push_back(destOp);
       }
     }
   }
+
+
+  for(auto &entry: phiNodeCandidates) {
+    mlir::Operation *phiNode = nullptr;
+    int minLatency = INT_MAX;
+    llvm::dbgs() << "\t [DBG] Phi Node Candidates for BB " << entry.first << ":\n";
+    for(auto &op: entry.second) {
+      int latency = graph.findMinPathLatency(startNode, op, true); //TODO think about if backedges should be ignored or not
+      llvm::dbgs() << "\t\t [DBG] Latency from " << startNode->getAttrOfType<StringAttr>("handshake.name").str() << " to " << op->getAttrOfType<StringAttr>("handshake.name").str() << " is " << latency << "\n";
+      if (latency < minLatency)
+      {
+        phiNode = op;
+        minLatency = latency;
+      }
+    }
+    phiNodes.insert({entry.first, phiNode});
+  }
+
+  for(auto &nodes: phiNodes) {
+    llvm::dbgs() << "\t [DBG] Phi Node for BB " << nodes.first << ": " << nodes.second->getAttrOfType<StringAttr>("handshake.name").str() << "\n";
+  }
+
   return phiNodes;
 }
 

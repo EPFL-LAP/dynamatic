@@ -34,9 +34,10 @@ public:
     std::vector<std::vector<std::string>> findPaths(std::string start, std::string end, bool ignoreBackedge = false);
     int getPathLatency(std::vector<std::string> path);
 
-    int findMaxPathLatency(mlir::Operation *startOp, mlir::Operation *endOp);
-    int findMinPathLatency(mlir::Operation *startOp, mlir::Operation *endOp);
-    int findMaxLatencyFromStart(mlir::Operation *startOp);
+    int findMaxPathLatency(mlir::Operation *startOp, mlir::Operation *endOp, bool ignoreBackedge = false);
+    int findMinPathLatency(mlir::Operation *startOp, mlir::Operation *endOp, bool ignoreBackedge = false);
+
+    std::vector<std::string> findLongestNonCyclicPath(mlir::Operation *startOp);
 
     std::vector<mlir::Operation*> getOperationsWithOpName(std::string opName);
 
@@ -49,7 +50,6 @@ private:
     void addEdge(mlir::Operation* src, mlir::Operation* dest);
     void addBackedge(mlir::Operation* src, mlir::Operation* dest);
     void insertArtificialNodeOnBackedge(mlir::Operation* src, mlir::Operation* dest, int latency);
-    std::vector<std::string> findLongestNonCyclicPath(mlir::Operation *startOp);
 
 };
 

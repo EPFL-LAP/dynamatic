@@ -178,19 +178,6 @@ std::vector<std::string> AdjListGraph::findLongestNonCyclicPath(mlir::Operation 
 }
 
 
-int AdjListGraph::findMaxLatencyFromStart(mlir::Operation *startOp) {
-  int latency = 0;
-  std::vector<std::string> path = findLongestNonCyclicPath(startOp);
-  latency = getPathLatency(path);
-  llvm::dbgs() << "\t [DBG] Longest path from " << startOp->getAttrOfType<StringAttr>("handshake.name").str() << "lat: " << latency << " : ";
-  for(auto &node: path) {
-    llvm::dbgs() << node << " ";
-  }
-  llvm::dbgs() << "\n";
-  return latency;
-}
-
-
 int AdjListGraph::getPathLatency(std::vector<std::string> path) {
   int latency = 0;
   for(auto &node: path) {
@@ -211,8 +198,8 @@ std::vector<mlir::Operation*> AdjListGraph::getOperationsWithOpName(std::string 
 }
 
 
-int AdjListGraph::findMaxPathLatency(mlir::Operation *startOp, mlir::Operation *endOp) {
-  std::vector<std::vector<std::string>> paths = findPaths(startOp, endOp);
+int AdjListGraph::findMaxPathLatency(mlir::Operation *startOp, mlir::Operation *endOp, bool ignoreBackedge) {
+  std::vector<std::vector<std::string>> paths = findPaths(startOp, endOp, ignoreBackedge);
   int maxLatency = 0;
   for(auto &path: paths)
   {
@@ -221,8 +208,8 @@ int AdjListGraph::findMaxPathLatency(mlir::Operation *startOp, mlir::Operation *
   return maxLatency;
 }
 
-int AdjListGraph::findMinPathLatency(mlir::Operation *startOp, mlir::Operation *endOp) {
-  std::vector<std::vector<std::string>> paths = findPaths(startOp, endOp);
+int AdjListGraph::findMinPathLatency(mlir::Operation *startOp, mlir::Operation *endOp, bool ignoreBackedge) {
+  std::vector<std::vector<std::string>> paths = findPaths(startOp, endOp, ignoreBackedge);
   int minLatency = INT_MAX;
   for(auto &path: paths)
   {
