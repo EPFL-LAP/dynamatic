@@ -1,3 +1,4 @@
+`timescale 1ns/1ps
 module mem_controller_storeless #(
   parameter NUM_LOAD = 1,
   parameter DATA_WIDTH = 32,

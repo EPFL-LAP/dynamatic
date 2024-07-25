@@ -1,3 +1,4 @@
+`timescale 1ns/1ps
 module control_merge_dataless #(
   parameter SIZE = 2,
   parameter INDEX_WIDTH = 1

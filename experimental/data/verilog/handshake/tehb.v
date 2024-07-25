@@ -1,3 +1,4 @@
+`timescale 1ns/1ps
 // Jiantao, 21/07/2024
 // The original implementation has two more parameters INPUTS and OUTPUTs, removed
 //! Verilog implementation is wrong for TEHB, the logic in line 84 is wrong

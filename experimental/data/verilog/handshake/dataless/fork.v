@@ -1,3 +1,4 @@
+`timescale 1ns/1ps
 module fork_dataless #(
 	parameter SIZE = 2
 )(

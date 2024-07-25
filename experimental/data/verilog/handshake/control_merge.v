@@ -1,3 +1,4 @@
+`timescale 1ns/1ps
   module control_merge #(
     parameter SIZE = 2,
     parameter DATA_WIDTH = 1,

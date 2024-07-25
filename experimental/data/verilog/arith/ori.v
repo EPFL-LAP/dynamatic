@@ -1,3 +1,4 @@
+`timescale 1ns/1ps
 module ori #(
   parameter DATA_WIDTH = 32
 )(

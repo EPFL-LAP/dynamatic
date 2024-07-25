@@ -1,3 +1,4 @@
+`timescale 1ns/1ps
 module mem_controller #(
   parameter NUM_CONTROL  = 1,
   parameter NUM_LOAD  = 1,

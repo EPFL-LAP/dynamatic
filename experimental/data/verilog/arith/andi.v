@@ -1,3 +1,4 @@
+`timescale 1ns/1ps
 module andi #(
   parameter DATA_WIDTH = 32
 )(

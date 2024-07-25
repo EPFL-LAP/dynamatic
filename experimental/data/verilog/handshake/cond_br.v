@@ -1,3 +1,4 @@
+`timescale 1ns/1ps
 module cond_br #(
 	parameter DATA_WIDTH = 32 // Default set to 32 bits
 )(

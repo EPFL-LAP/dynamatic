@@ -1,3 +1,4 @@
+`timescale 1ns/1ps
 module mux_dataless #(
   parameter SIZE = 2,
   parameter SELECT_WIDTH = 2

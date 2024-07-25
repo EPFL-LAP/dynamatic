@@ -1,3 +1,4 @@
+`timescale 1ns/1ps
 module merge_notehb_dataless #(
 	parameter INPUTS = 2 // Default set to 2 inputs
 )(

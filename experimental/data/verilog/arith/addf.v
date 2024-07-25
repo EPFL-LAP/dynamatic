@@ -1,3 +1,4 @@
+`timescale 1ns/1ps
 module addf #(
   parameter DATA_WIDTH = 32
 )(

@@ -1,3 +1,4 @@
+`timescale 1ns/1ps
 module end_sync_memless_dataless (
   input  clk,
   input  rst,

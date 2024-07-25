@@ -1,3 +1,4 @@
+`timescale 1ns/1ps
 module delay_buffer #(
   parameter SIZE = 32
 ) (

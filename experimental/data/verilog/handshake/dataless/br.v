@@ -1,3 +1,4 @@
+`timescale 1ns/1ps
 module br_dataless (
 	input  clk,
 	input  rst,

@@ -1,3 +1,4 @@
+`timescale 1ns/1ps
 module tfifo #(
   parameter SLOTS = 2,
   parameter DATA_WIDTH = 32

@@ -1,3 +1,4 @@
+`timescale 1ns/1ps
 module shrsi #(
   parameter DATA_WIDTH = 32
 )(

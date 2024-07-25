@@ -1,3 +1,4 @@
+`timescale 1ns/1ps
 module divui #(
   parameter DATA_WIDTH = 32
 )(

@@ -1,3 +1,4 @@
+`timescale 1ns/1ps
 module extsi #(
   parameter INPUT_WIDTH = 32,
   parameter OUTPUT_WIDTH = 64

@@ -1,3 +1,4 @@
+`timescale 1ns/1ps
 module end_sync_memless #(
   parameter DATA_WIDTH = 32
 )(

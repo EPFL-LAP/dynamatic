@@ -1,3 +1,4 @@
+`timescale 1ns/1ps
 module xori #(
   parameter DATA_WIDTH = 32
 )(

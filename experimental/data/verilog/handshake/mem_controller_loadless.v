@@ -1,3 +1,4 @@
+`timescale 1ns/1ps
 module mem_controller_loadless #(
   parameter NUM_CONTROL = 1,
   parameter NUM_STORE = 1,

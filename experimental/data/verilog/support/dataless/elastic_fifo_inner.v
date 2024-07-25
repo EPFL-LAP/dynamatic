@@ -1,3 +1,4 @@
+`timescale 1ns/1ps
 module elastic_fifo_inner_dataless #(
   parameter SLOTS = 4
 )(

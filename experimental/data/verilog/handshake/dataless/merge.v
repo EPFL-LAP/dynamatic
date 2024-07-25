@@ -1,3 +1,4 @@
+`timescale 1ns/1ps
 module merge_dataless #(
   parameter SIZE = 2
 )(

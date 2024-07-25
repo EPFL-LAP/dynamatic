@@ -1,3 +1,4 @@
+`timescale 1ns/1ps
 module tehb_dataless (
 	input  clk,
 	input  rst,

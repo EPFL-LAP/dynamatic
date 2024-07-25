@@ -1,3 +1,4 @@
+`timescale 1ns/1ps
 module merge # (
   parameter SIZE = 2,
   parameter DATA_WIDTH = 32

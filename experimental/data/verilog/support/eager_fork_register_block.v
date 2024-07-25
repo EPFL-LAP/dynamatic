@@ -1,3 +1,4 @@
+`timescale 1ns/1ps
 module eager_fork_register_block (
 	input clk,
 	input rst,

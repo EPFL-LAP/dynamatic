@@ -1,3 +1,4 @@
+`timescale 1ns/1ps
 module sink #(
   parameter DATA_WIDTH = 32
 ) (

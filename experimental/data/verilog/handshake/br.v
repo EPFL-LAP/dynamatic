@@ -1,3 +1,4 @@
+`timescale 1ns/1ps
 // The original implementation has a parameter called INPUTS,
 // used to indicate the number of input channels. I removed
 // it. -- Jiantao, 21/07/2024

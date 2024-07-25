@@ -1,3 +1,4 @@
+`timescale 1ns/1ps
 module end_sync #(
   parameter DATA_WIDTH = 32,
   parameter NUM_MEMORIES = 2

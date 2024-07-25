@@ -1,3 +1,4 @@
+`timescale 1ns/1ps
 
 //
 //  read_address_mux Module

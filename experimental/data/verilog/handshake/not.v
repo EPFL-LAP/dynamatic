@@ -1,3 +1,4 @@
+`timescale 1ns/1ps
 module logic_not #(
   parameter DATA_WIDTH = 32
 )(

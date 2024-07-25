@@ -1,3 +1,4 @@
+`timescale 1ns/1ps
 module mul_4_stage #(
   parameter DATA_WIDTH = 32
 )(

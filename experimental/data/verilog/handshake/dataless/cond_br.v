@@ -1,3 +1,4 @@
+`timescale 1ns/1ps
 // In the original implementation
 // Data Organization: out2-:32, out1+:32
 // condition is implemeted as [0:0], I removed the redudancy

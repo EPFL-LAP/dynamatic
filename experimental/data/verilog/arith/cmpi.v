@@ -1,3 +1,4 @@
+`timescale 1ns/1ps
 module ENTITY_NAME #(
   parameter DATA_WIDTH = 32
 )(

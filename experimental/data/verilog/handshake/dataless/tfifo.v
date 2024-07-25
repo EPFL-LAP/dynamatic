@@ -1,3 +1,4 @@
+`timescale 1ns/1ps
 module tfifo_dataless #(
   parameter SLOTS = 2
 )(

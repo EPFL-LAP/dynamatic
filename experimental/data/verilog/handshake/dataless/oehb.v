@@ -1,3 +1,4 @@
+`timescale 1ns/1ps
 module oehb_dataless (
   input  clk,
   input  rst,
