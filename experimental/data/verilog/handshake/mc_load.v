@@ -44,7 +44,7 @@ module mc_load #(
     .ins_ready  (dataFromMem_ready  ),
     .outs       (dataOut            ),
     .outs_valid (dataOut_valid      ),
-    .outs_ready (dataFromMem_ready  )
+    .outs_ready (dataOut_ready      )
   );
 
 endmodule

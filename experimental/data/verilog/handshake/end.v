@@ -16,7 +16,7 @@ module end_sync #(
   output outs_valid,
   input  outs_ready
 );
-  assign memDone_valid = {NUM_MEMORIES{1'b1}};
+  // assign memDone_valid = {NUM_MEMORIES{1'b1}};
 
   end_sync_dataless #(
     .NUM_MEMORIES(NUM_MEMORIES)

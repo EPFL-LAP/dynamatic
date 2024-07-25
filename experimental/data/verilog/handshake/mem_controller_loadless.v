@@ -62,20 +62,22 @@ module mem_controller_loadless #(
   assign stData_ready = storePorts_ready;
   assign stAddr_ready = storePorts_ready;
   integer i;
+  reg [31 : 0] counter;
 
   // Counting Stores
   always @(posedge clk, posedge rst) begin
     if (rst) begin
-      remainingStores <= 32'd0;
+      counter <= 32'd0;
     end else begin
       for (i = 0; i < NUM_CONTROL; i = i + 1) begin
         if (ctrl_valid[i]) begin
-          remainingStores <= remainingStores + ctrl[(i * 32) + 31 -: 32];
+          counter <= remainingStores + ctrl[(i * 32) + 31 -: 32];
         end
       end
       if (storeEn) begin
-        remainingStores <= remainingStores - 1;
+        counter <= remainingStores - 1;
       end
+      remainingStores <= counter;
     end
   end
 
