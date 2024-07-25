@@ -43,11 +43,13 @@ public:
 
     std::vector<mlir::Operation*> getConnectedOps(mlir::Operation *op);
 
+    void addEdge(mlir::Operation* src, mlir::Operation* dest);
+
+
 private:
     std::unordered_map<std::string , AdjListNode> nodes; // Map to store nodes by their index
     
     void addNode(mlir::Operation* op, int latency);
-    void addEdge(mlir::Operation* src, mlir::Operation* dest);
     void addBackedge(mlir::Operation* src, mlir::Operation* dest);
     void insertArtificialNodeOnBackedge(mlir::Operation* src, mlir::Operation* dest, int latency);
 

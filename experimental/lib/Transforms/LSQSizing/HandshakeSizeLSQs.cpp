@@ -54,6 +54,7 @@ private:
   LSQSizingResult sizeLSQsForCFDFC(buffer::CFDFC cfdfc, unsigned II, TimingDatabase timingDB);
   mlir::Operation *findStartNode(AdjListGraph graph);
   std::unordered_map<unsigned, mlir::Operation *> getPhiNodes(AdjListGraph graph, mlir::Operation *startNode);
+  void insertAllocPrecedesMemoryAccessEdges(AdjListGraph graph, mlir::Operation *startNode, std::vector<mlir::Operation *> ops, std::unordered_map<unsigned, mlir::Operation *> phiNodes);
   std::unordered_map<mlir::Operation *, int> getAllocTimes(AdjListGraph graph, mlir::Operation *startNode, std::vector<mlir::Operation *> ops,
                                                            std::unordered_map<unsigned, mlir::Operation *> phiNodes);
   std::unordered_map<mlir::Operation *, int> getDeallocTimes(AdjListGraph graph, mlir::Operation *startNode, std::vector<mlir::Operation *> ops);
@@ -103,10 +104,10 @@ void HandshakeSizeLSQsPass::runDynamaticPass() {
       }
       arch_store.push_back(experimental::ArchBB(prevBBId, firstBBId, 0, false));
 
-      llvm::dbgs() << "\t [DBG] CFDFC: " << entry.getName() << " with " << arch_store.size() << " arches\n";
+      //llvm::dbgs() << "\t [DBG] CFDFC: " << entry.getName() << " with " << arch_store.size() << " arches\n";
       buffer::ArchSet archSet;
       for(auto &arch: arch_store) {
-        llvm::dbgs() << "\t [DBG] Arch: " << arch.srcBB << " -> " << arch.dstBB << "\n";
+        //llvm::dbgs() << "\t [DBG] Arch: " << arch.srcBB << " -> " << arch.dstBB << "\n";
         archSet.insert(&arch);
       }
 
@@ -119,7 +120,6 @@ void HandshakeSizeLSQsPass::runDynamaticPass() {
       IIs.insert({std::stoi(attr.getName().str()), round(1 / throughput.getValueAsDouble())});
     }
 
-    llvm::dbgs() << "\t [DBG] CFDFCs: " << cfdfcs.size() << "\n";
     for(auto &cfdfc : cfdfcs) {
       sizingResults.push_back(sizeLSQsForCFDFC(cfdfc.second, IIs[cfdfc.first], timingDB));
     }
@@ -137,20 +137,20 @@ void HandshakeSizeLSQsPass::runDynamaticPass() {
       mlir::Operation *lsqOp = maxLoadStoreSize.first;
       unsigned maxLoadSize = std::get<0>(maxLoadStoreSize.second);
       unsigned maxStoreSize = std::get<1>(maxLoadStoreSize.second);
-
+      llvm::dbgs() << " [DBG] final LSQ " << lsqOp->getAttrOfType<StringAttr>("handshake.name").str() << " Max Load Size: " << maxLoadSize << " Max Store Size: " << maxStoreSize << "\n";
       //TODO set Attribute in LSQ op
     }
   }
 }
 
 LSQSizingResult HandshakeSizeLSQsPass::sizeLSQsForCFDFC(buffer::CFDFC cfdfc, unsigned II, TimingDatabase timingDB) {
-  llvm::dbgs() << "\t [DBG] sizeLSQsForCFDFC called for CFDFC with " << cfdfc.cycle.size() << " BBs and II of " << II << "\n";
+  llvm::dbgs() << " [DBG] sizeLSQsForCFDFC called for CFDFC with " << cfdfc.cycle.size() << " BBs and II=" << II << "\n";
 
   AdjListGraph graph(cfdfc, timingDB, II);
   std::vector<mlir::Operation *> loadOps = graph.getOperationsWithOpName("handshake.lsq_load");
   std::vector<mlir::Operation *> storeOps = graph.getOperationsWithOpName("handshake.lsq_store");
 
-  graph.printGraph();
+  //graph.printGraph();
 
   //TODO return empty or make result std::optional?
   /*if(loadOps.size() == 0 && storeOps.size() == 0) {
@@ -165,8 +165,8 @@ LSQSizingResult HandshakeSizeLSQsPass::sizeLSQsForCFDFC(buffer::CFDFC cfdfc, uns
   // Find Phi node of each BB
   std::unordered_map<unsigned, mlir::Operation *> phiNodes = getPhiNodes(graph, startNode);
 
-  // TODO insert extra dependencies for alloc precedes memory access
   // connect all phi nodes to the lsq ps in their BB
+  insertAllocPrecedesMemoryAccessEdges(graph, startNode, loadOps, phiNodes);
 
   // Get Start Times of each BB (Alloc Times) 
   std::unordered_map<mlir::Operation *, int> loadAllocTimes = getAllocTimes(graph, startNode, loadOps, phiNodes);
@@ -224,11 +224,11 @@ mlir::Operation * HandshakeSizeLSQsPass::findStartNode(AdjListGraph graph) {
     maxLatencies.insert({op, graph.getPathLatency(path)});
     nodeCounts.insert({op, path.size()});
 
-    llvm::dbgs() << "\t [DBG] Longest path from " << op->getAttrOfType<StringAttr>("handshake.name").str() << " lat: " << graph.getPathLatency(path) << " : ";
+    /*llvm::dbgs() << "\t [DBG] Longest path from " << op->getAttrOfType<StringAttr>("handshake.name").str() << " lat: " << graph.getPathLatency(path) << " : ";
     for(auto &node: path) {
       llvm::dbgs() << node << " ";
     }
-    llvm::dbgs() << "\n";
+    llvm::dbgs() << "\n";*/
   }
 
   mlir::Operation *maxLatencyNode = nullptr;
@@ -284,10 +284,10 @@ std::unordered_map<unsigned, mlir::Operation *> HandshakeSizeLSQsPass::getPhiNod
   for(auto &entry: phiNodeCandidates) {
     mlir::Operation *phiNode = nullptr;
     int minLatency = INT_MAX;
-    llvm::dbgs() << "\t [DBG] Phi Node Candidates for BB " << entry.first << ":\n";
+    //llvm::dbgs() << "\t [DBG] Phi Node Candidates for BB " << entry.first << ":\n";
     for(auto &op: entry.second) {
       int latency = graph.findMinPathLatency(startNode, op, true); //TODO think about if backedges should be ignored or not
-      llvm::dbgs() << "\t\t [DBG] Latency from " << startNode->getAttrOfType<StringAttr>("handshake.name").str() << " to " << op->getAttrOfType<StringAttr>("handshake.name").str() << " is " << latency << "\n";
+      //llvm::dbgs() << "\t\t [DBG] Latency from " << startNode->getAttrOfType<StringAttr>("handshake.name").str() << " to " << op->getAttrOfType<StringAttr>("handshake.name").str() << " is " << latency << "\n";
       if (latency < minLatency)
       {
         phiNode = op;
@@ -397,6 +397,13 @@ std::unordered_map<mlir::Operation*, unsigned> HandshakeSizeLSQsPass::calcQueueS
   return queueSizes;
 }
 
+void HandshakeSizeLSQsPass::insertAllocPrecedesMemoryAccessEdges(AdjListGraph graph, mlir::Operation *startNode, std::vector<mlir::Operation *> ops, std::unordered_map<unsigned, mlir::Operation *> phiNodes) {
+  for(auto &op: ops) {
+    unsigned bb = op->getAttrOfType<IntegerAttr>("handshake.bb").getUInt();
+    mlir::Operation *phiNode = phiNodes[bb];
+    graph.addEdge(phiNode, op);
+  }
+}
 
 
 std::unique_ptr<dynamatic::DynamaticPass>
