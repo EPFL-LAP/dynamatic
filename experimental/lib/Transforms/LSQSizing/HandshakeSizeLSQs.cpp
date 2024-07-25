@@ -53,7 +53,7 @@ private:
 
   LSQSizingResult sizeLSQsForCFDFC(buffer::CFDFC cfdfc, unsigned II, TimingDatabase timingDB);
   mlir::Operation *findStartNode(AdjListGraph graph);
-  std::unordered_map<unsigned, mlir::Operation *> getPhiNodes(AdjListGraph graph, mlir::Operation *start_node);
+  std::unordered_map<unsigned, mlir::Operation *> getPhiNodes(AdjListGraph graph, mlir::Operation *startNode);
 };
 } // namespace
 
@@ -62,7 +62,7 @@ void HandshakeSizeLSQsPass::runDynamaticPass() {
   llvm::dbgs() << "\t [DBG] LSQ Sizing Pass Called!\n";
 
   std::map<unsigned,buffer::CFDFC> cfdfcs; //TODO chane to DenseMap?
-  llvm::SmallVector<LSQSizingResult> sizing_results; //TODO datatype?
+  llvm::SmallVector<LSQSizingResult> sizingResults; //TODO datatype?
 
   // 1. Read Attributes
   // 2. Reconstruct CFDFCs
@@ -79,52 +79,52 @@ void HandshakeSizeLSQsPass::runDynamaticPass() {
   for (handshake::FuncOp funcOp : mod.getOps<handshake::FuncOp>()) {
     llvm::dbgs() << "\t [DBG] Function: " << funcOp.getName() << "\n";
 
-    std::unordered_map<unsigned, float> II_per_cfdfc;
-    DictionaryAttr troughput_attr = getUniqueAttr<handshake::CFDFCThroughputAttr>(funcOp).getThroughputMap();
-    DictionaryAttr cfdfc_attr = getUniqueAttr<handshake::CFDFCToBBListAttr>(funcOp).getCfdfcMap();
+    std::unordered_map<unsigned, float> IIs;
+    DictionaryAttr troughputAttr = getUniqueAttr<handshake::CFDFCThroughputAttr>(funcOp).getThroughputMap();
+    DictionaryAttr cfdfcAttr = getUniqueAttr<handshake::CFDFCToBBListAttr>(funcOp).getCfdfcMap();
 
     // Extract Arch sets
-    for(auto &entry: cfdfc_attr) {
+    for(auto &entry: cfdfcAttr) {
       SmallVector<experimental::ArchBB> arch_store;
 
-      ArrayAttr bb_list = llvm::dyn_cast<ArrayAttr>(entry.getValue());
-      auto it = bb_list.begin();
-      int first_bb_id = (*it++).cast<IntegerAttr>().getUInt();
-      int curr_bb_id, prev_bb_id = first_bb_id;      
-      for(; it != bb_list.end(); it++) {
-        curr_bb_id = (*it).cast<IntegerAttr>().getUInt();
-        arch_store.push_back(experimental::ArchBB(prev_bb_id, curr_bb_id, 0, false));
-        prev_bb_id = curr_bb_id;
+      ArrayAttr bbList = llvm::dyn_cast<ArrayAttr>(entry.getValue());
+      auto it = bbList.begin();
+      int firstBBId = (*it++).cast<IntegerAttr>().getUInt();
+      int currBBId, prevBBId = firstBBId;      
+      for(; it != bbList.end(); it++) {
+        currBBId = (*it).cast<IntegerAttr>().getUInt();
+        arch_store.push_back(experimental::ArchBB(prevBBId, currBBId, 0, false));
+        prevBBId = currBBId;
       }
-      arch_store.push_back(experimental::ArchBB(prev_bb_id, first_bb_id, 0, false));
+      arch_store.push_back(experimental::ArchBB(prevBBId, firstBBId, 0, false));
 
       llvm::dbgs() << "\t [DBG] CFDFC: " << entry.getName() << " with " << arch_store.size() << " arches\n";
-      buffer::ArchSet arch_set;
+      buffer::ArchSet archSet;
       for(auto &arch: arch_store) {
         llvm::dbgs() << "\t [DBG] Arch: " << arch.srcBB << " -> " << arch.dstBB << "\n";
-        arch_set.insert(&arch);
+        archSet.insert(&arch);
       }
 
-      cfdfcs.insert_or_assign(std::stoi(entry.getName().str()), buffer::CFDFC(funcOp, arch_set, 0));
+      cfdfcs.insert_or_assign(std::stoi(entry.getName().str()), buffer::CFDFC(funcOp, archSet, 0));
     }
 
     //Extract II
-    for (const NamedAttribute attr : troughput_attr) {
+    for (const NamedAttribute attr : troughputAttr) {
       FloatAttr throughput = llvm::dyn_cast<FloatAttr>(attr.getValue());
-      II_per_cfdfc.insert({std::stoi(attr.getName().str()), round(1 / throughput.getValueAsDouble())});
+      IIs.insert({std::stoi(attr.getName().str()), round(1 / throughput.getValueAsDouble())});
     }
 
     llvm::dbgs() << "\t [DBG] CFDFCs: " << cfdfcs.size() << "\n";
     for(auto &cfdfc : cfdfcs) {
-      sizing_results.push_back(sizeLSQsForCFDFC(cfdfc.second, II_per_cfdfc[cfdfc.first], timingDB));
+      sizingResults.push_back(sizeLSQsForCFDFC(cfdfc.second, IIs[cfdfc.first], timingDB));
     }
     
-    std::map<unsigned, unsigned> max_store_sizes;
-    std::map<unsigned, unsigned> max_load_sizes;
-    for(auto &result: sizing_results) {
+    std::map<unsigned, unsigned> maxStoreSizes;
+    std::map<unsigned, unsigned> maxLoadSizes;
+    for(auto &result: sizingResults) {
       for(auto &entry: result) {
-        max_store_sizes[entry.first] = std::max(max_store_sizes[entry.first], std::get<1>(entry.second));
-        max_load_sizes[entry.first] = std::max(max_load_sizes[entry.first], std::get<0>(entry.second));
+        maxStoreSizes[entry.first] = std::max(maxStoreSizes[entry.first], std::get<1>(entry.second));
+        maxLoadSizes[entry.first] = std::max(maxLoadSizes[entry.first], std::get<0>(entry.second));
       }
     }
 
@@ -140,35 +140,35 @@ LSQSizingResult HandshakeSizeLSQsPass::sizeLSQsForCFDFC(buffer::CFDFC cfdfc, uns
   graph.printGraph();
 
   // Find starting node, which will be the reference to the rest
-  mlir::Operation * start_node = findStartNode(graph);
-  llvm::dbgs() << "\t [DBG] Start Node: " << start_node->getAttrOfType<StringAttr>("handshake.name").str()<< "\n";
-  /*
+  mlir::Operation * startNode = findStartNode(graph);
+  llvm::dbgs() << "\t [DBG] Start Node: " << startNode->getAttrOfType<StringAttr>("handshake.name").str()<< "\n";
+  
   // Find Phi node of each BB
-  std::unordered_map<unsigned, mlir::Operation *> phi_nodes = getPhiNodes(graph, start_node);
+  std::unordered_map<unsigned, mlir::Operation *> phiNodes = getPhiNodes(graph, startNode);
 
   // Get Start Times of each BB (Alloc Times) 
 
 
   // Get Dealloc Times and End Times
-  std::vector<mlir::Operation *> load_ops = graph.getOperationsWithOpName("handshake.lsq_load");
-  std::unordered_map<mlir::Operation *, int> load_dealloc_times;
-  int load_end_time = 0;
+  std::vector<mlir::Operation *> loadOps = graph.getOperationsWithOpName("handshake.lsq_load");
+  std::unordered_map<mlir::Operation *, int> loadDeallocTimes;
+  int loadEndTime = 0;
 
-  for(auto &op: load_ops) {
-    int latency = graph.findMaxPathLatency(start_node, op);
-    load_dealloc_times.insert({op, latency});
-    load_end_time = std::max(load_end_time, latency);
+  for(auto &op: loadOps) {
+    int latency = graph.findMaxPathLatency(startNode, op);
+    loadDeallocTimes.insert({op, latency});
+    loadEndTime = std::max(loadEndTime, latency);
   }
 
-  std::vector<mlir::Operation *> store_ops = graph.getOperationsWithOpName("handshake.lsq_store");
-  std::unordered_map<mlir::Operation *, int> store_dealloc_times;
-  int store_end_time = 0;
+  std::vector<mlir::Operation *> storeOps = graph.getOperationsWithOpName("handshake.lsq_store");
+  std::unordered_map<mlir::Operation *, int> storeDeallocTimes;
+  int storeEndTime = 0;
 
-  for(auto &op: store_ops) {
-    int latency = graph.findMaxPathLatency(start_node, op);
-    store_dealloc_times.insert({op, latency});
-    store_end_time = std::max(store_end_time, latency);
-  }*/
+  for(auto &op: storeOps) {
+    int latency = graph.findMaxPathLatency(startNode, op);
+    storeDeallocTimes.insert({op, latency});
+    storeEndTime = std::max(storeEndTime, latency);
+  }
 
   // Get Load and Store Sizes
 
@@ -177,26 +177,26 @@ LSQSizingResult HandshakeSizeLSQsPass::sizeLSQsForCFDFC(buffer::CFDFC cfdfc, uns
 
 
 mlir::Operation * HandshakeSizeLSQsPass::findStartNode(AdjListGraph graph) {
-  std::vector<mlir::Operation *> mux_ops = graph.getOperationsWithOpName("handshake.mux");
-  std::vector<mlir::Operation *> cmerge_ops = graph.getOperationsWithOpName("handshake.control_merge");
+  std::vector<mlir::Operation *> muxOps = graph.getOperationsWithOpName("handshake.mux");
+  std::vector<mlir::Operation *> cmergeOps = graph.getOperationsWithOpName("handshake.control_merge");
 
-  std::vector<mlir::Operation *> potential_start_nodes = std::vector<mlir::Operation *>(mux_ops.size() + cmerge_ops.size());
-  std::merge(mux_ops.begin(), mux_ops.end(), cmerge_ops.begin(), cmerge_ops.end(), potential_start_nodes.begin());
+  std::vector<mlir::Operation *> startNodeCandidates = std::vector<mlir::Operation *>(muxOps.size() + cmergeOps.size());
+  std::merge(muxOps.begin(), muxOps.end(), cmergeOps.begin(), cmergeOps.end(), startNodeCandidates.begin());
 
-  llvm::dbgs() << "\t [DBG] Potential Start Nodes: ";
-  for(auto &op: potential_start_nodes) {
+  llvm::dbgs() << "\t [DBG] Start Node Candidates: ";
+  for(auto &op: startNodeCandidates) {
     llvm::dbgs() << op->getAttrOfType<StringAttr>("handshake.name").str() << ", ";
   }
   llvm::dbgs() << "\n";
 
 
-  std::unordered_map<mlir::Operation *, int> max_latencies;
+  std::unordered_map<mlir::Operation *, int> maxLatencies;
 
-  for(auto &op: potential_start_nodes) {
-    max_latencies.insert({op, graph.findMaxLatencyFromStart(op)});
+  for(auto &op: startNodeCandidates) {
+    maxLatencies.insert({op, graph.findMaxLatencyFromStart(op)});
   }
 
-  return std::max_element(max_latencies.begin(), max_latencies.end(), 
+  return std::max_element(maxLatencies.begin(), maxLatencies.end(), 
     [](const std::pair<mlir::Operation *, int> &a, const std::pair<mlir::Operation *, int> &b) {
       return a.second < b.second;
     })->first;
@@ -204,23 +204,23 @@ mlir::Operation * HandshakeSizeLSQsPass::findStartNode(AdjListGraph graph) {
 
 
 // TODO identify phi node if there is only 1 bb and identify correctly if there are multiple cond_br pointing to a single bb
-std::unordered_map<unsigned, mlir::Operation *> HandshakeSizeLSQsPass::getPhiNodes(AdjListGraph graph, mlir::Operation *start_node) {
-  std::unordered_map<unsigned, mlir::Operation *> phi_nodes;
-  std::vector<mlir::Operation *> branch_ops = graph.getOperationsWithOpName("handshake.cond_br");
-  for(auto &branch_op: branch_ops) {
-    unsigned src_bb =branch_op->getAttrOfType<IntegerAttr>("handshake.bb").getUInt();
-    llvm::dbgs() << "\t [DBG] Branch Op: " << branch_op->getAttrOfType<StringAttr>("handshake.name").str() << " of BB " << src_bb <<"\n";
+std::unordered_map<unsigned, mlir::Operation *> HandshakeSizeLSQsPass::getPhiNodes(AdjListGraph graph, mlir::Operation *startNode) {
+  std::unordered_map<unsigned, mlir::Operation *> phiNodes;
+  std::vector<mlir::Operation *> branchOps = graph.getOperationsWithOpName("handshake.cond_br");
+  for(auto &branchOp: branchOps) {
+    unsigned srcBB =branchOp->getAttrOfType<IntegerAttr>("handshake.bb").getUInt();
+    llvm::dbgs() << "\t [DBG] Branch Op: " << branchOp->getAttrOfType<StringAttr>("handshake.name").str() << " of BB " << srcBB <<"\n";
 
-    for(auto &dest_op: graph.getConnectedOps(branch_op)) {
-      llvm::dbgs() << "\t\t [DBG] connected to: " << dest_op->getAttrOfType<StringAttr>("handshake.name").str() << "\n";
-      unsigned dest_bb = dest_op->getAttrOfType<IntegerAttr>("handshake.bb").getUInt();
-      if(dest_bb != src_bb) {
-        llvm::dbgs() << "\t [DBG] Found Phi Node: " << dest_op->getAttrOfType<StringAttr>("handshake.name").str() << " for BB " << dest_bb << "\n";
-        phi_nodes.insert({dest_bb, dest_op});
+    for(auto &destOp: graph.getConnectedOps(branchOp)) {
+      llvm::dbgs() << "\t\t [DBG] connected to: " << destOp->getAttrOfType<StringAttr>("handshake.name").str() << "\n";
+      unsigned destBB = destOp->getAttrOfType<IntegerAttr>("handshake.bb").getUInt();
+      if(destBB != srcBB) {
+        llvm::dbgs() << "\t [DBG] Found Phi Node: " << destOp->getAttrOfType<StringAttr>("handshake.name").str() << " for BB " << destBB << "\n";
+        phiNodes.insert({destBB, destOp});
       }
     }
   }
-  return phi_nodes;
+  return phiNodes;
 }
 
 

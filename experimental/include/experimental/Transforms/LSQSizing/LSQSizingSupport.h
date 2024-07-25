@@ -30,15 +30,15 @@ public:
     //TODO check if backedges are already in there and just saved extra in cfdfc structure
     void printGraph();
 
-    std::vector<std::vector<std::string>> findPaths(mlir::Operation *start_op, mlir::Operation *end_op, bool ignore_backedge = false);
-    std::vector<std::vector<std::string>> findPaths(std::string start, std::string end, bool ignore_backedge = false);
+    std::vector<std::vector<std::string>> findPaths(mlir::Operation *startOp, mlir::Operation *endOp, bool ignoreBackedge = false);
+    std::vector<std::vector<std::string>> findPaths(std::string start, std::string end, bool ignoreBackedge = false);
     int getPathLatency(std::vector<std::string> path);
 
-    int findMaxPathLatency(mlir::Operation *start_op, mlir::Operation *end_op);
-    int findMinPathLatency(mlir::Operation *start_op, mlir::Operation *end_op);
-    int findMaxLatencyFromStart(mlir::Operation *start_op);
+    int findMaxPathLatency(mlir::Operation *startOp, mlir::Operation *endOp);
+    int findMinPathLatency(mlir::Operation *startOp, mlir::Operation *endOp);
+    int findMaxLatencyFromStart(mlir::Operation *startOp);
 
-    std::vector<mlir::Operation*> getOperationsWithOpName(std::string op_name);
+    std::vector<mlir::Operation*> getOperationsWithOpName(std::string opName);
 
     std::vector<mlir::Operation*> getConnectedOps(mlir::Operation *op);
 
@@ -49,7 +49,7 @@ private:
     void addEdge(mlir::Operation* src, mlir::Operation* dest);
     void addBackedge(mlir::Operation* src, mlir::Operation* dest);
     void insertArtificialNodeOnBackedge(mlir::Operation* src, mlir::Operation* dest, int latency);
-    std::vector<std::string> findLongestNonCyclicPath(mlir::Operation *start_op);
+    std::vector<std::string> findLongestNonCyclicPath(mlir::Operation *startOp);
 
 };
 
