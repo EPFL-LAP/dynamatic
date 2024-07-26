@@ -252,14 +252,22 @@ public:
                      Operation *consumer, Value connection,
                      SmallVector<Operation *> &allBranches);
 
+  void manageDifferentRegeneration(ConversionPatternRewriter &rewriter,
+                                   Block *producerBlock, Operation *consumer,
+                                   Value connection,
+                                   SmallVector<Operation *> &allBranches);
+
   ///----------Fast Token Delivery Cleanup----------
 
   /// Converts te MERGEs created in fast token delivery to MUXes
   LogicalResult convertMergesToMuxes(ConversionPatternRewriter &rewriter);
 
   Value addInit(ConversionPatternRewriter &rewriter,
-                SmallVector<Operation *> &initMerges, Operation *oldMerge,
-                mlir::CFGLoop *loop);
+                SmallVector<Operation *> &initMerges, Operation *oldMerge);
+
+  /// Replaces the input of constants with the START value
+  // LogicalResult triggerConstantsFromStart(ConversionPatternRewriter
+  // &rewriter);
 
 protected:
   /// The region being lowered.
@@ -293,7 +301,10 @@ protected:
   std::vector<Operation *> alloctionNetwork;
 
   /// contains all merges added in the straight LSQ
-  std::vector<Operation *> memDepLoopMerges;
+  SmallVector<Operation *> memDepLoopMerges;
+
+  /// contains all MUXes created by Shannon
+  SmallVector<Operation *> shannonMUXes;
 
 private:
   /// Associates basic blocks of the region being lowered to their respective
@@ -325,9 +336,11 @@ private:
   // outermost to innermost loop
   SmallVector<mlir::CFGLoop *> getLoopsConsNotInProd(Block *cons, Block *prod);
 
+  bool isaMergeLoop(Operation *merge);
+
   // Gets the loop exit condition of the bck.
-  // If the loop exit is on the false side of the block, then the condition is
-  // negated
+  // If the loop exit is on the false side of the block, then the condition
+  // is negated
   experimental::boolean::BoolExpression *
   getBlockLoopExitCondition(Block *loopExit, mlir::CFGLoop *loop);
 

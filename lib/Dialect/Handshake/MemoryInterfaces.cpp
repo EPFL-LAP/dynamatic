@@ -249,15 +249,6 @@ LogicalResult MemoryInterfaceBuilder::instantiateInterfacesWithForks(
   if (lsqOp)
     addMemDataResultToLoads(lsqPorts, lsqOp);
 
-  llvm::errs() << "Printing lsq inputs\n";
-  for (Value operand : lsqOp->getOperands()) {
-    llvm::errs() << "Value:\n";
-    llvm::errs() << operand << "\n";
-    llvm::errs() << "Producer:\n";
-    llvm::errs() << operand.getDefiningOp() << "\n";
-  }
-  llvm::errs() << "Done printing lsq inputs\n";
-
   return success();
 }
 
