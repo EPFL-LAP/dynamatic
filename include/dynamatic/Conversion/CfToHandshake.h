@@ -223,27 +223,34 @@ public:
   LogicalResult addSupp(ConversionPatternRewriter &rewriter);
 
   /// Inserts a BRANCH for each loop with condition depending on the exit blocks
+  /// Loop convention followed is:
+  /// True Side --> loop exit
+  /// False Side --> iterate
   void insertBranchesToLoops(ConversionPatternRewriter &rewriter,
                              const std::set<mlir::CFGLoop *> &loops,
-                             Operation *producer, Operation *consumer,
-                             Value connection);
+                             Operation *consumer, Value connection,
+                             SmallVector<Operation *> &allBranches,
+                             bool selfReg);
 
   /// Adds BRANCHes in the case where the producer is in more loops than the
   /// consumer (to solve token count mismatch problem)
   void manageMoreProdThanCons(ConversionPatternRewriter &rewriter,
-                              Operation *producer, Operation *consumer,
-                              Value connection);
+                              Block *producerBlock, Operation *consumer,
+                              Value connection,
+                              SmallVector<Operation *> &allBranches);
 
   /// Adds BRANCHes in the case where an operation is feeding itself, i.e the
   /// producer is the same as the consumer(to solve token count mismatch
   /// problrm)
   void manageSelfRegeneration(ConversionPatternRewriter &rewriter,
-                              Operation *producer, Value connection);
+                              Operation *consumer, Value connection,
+                              SmallVector<Operation *> &allBranches);
 
   /// Adds BRANCHes in the case where the consumer is in more loops than the
   /// producer
-  void manageNonLoop(ConversionPatternRewriter &rewriter, Operation *producer,
-                     Operation *consumer, Value connection);
+  void manageNonLoop(ConversionPatternRewriter &rewriter, Block *producerBlock,
+                     Operation *consumer, Value connection,
+                     SmallVector<Operation *> &allBranches);
 
   ///----------Fast Token Delivery Cleanup----------
 
@@ -284,8 +291,9 @@ protected:
                        const std::vector<Block *> &path);
 
   std::vector<Operation *> alloctionNetwork;
-  std::vector<Operation *>
-      memDepLoopMerges; // contains all merges added in the straight LSQ
+
+  /// contains all merges added in the straight LSQ
+  std::vector<Operation *> memDepLoopMerges;
 
 private:
   /// Associates basic blocks of the region being lowered to their respective
@@ -317,8 +325,11 @@ private:
   // outermost to innermost loop
   SmallVector<mlir::CFGLoop *> getLoopsConsNotInProd(Block *cons, Block *prod);
 
+  // Gets the loop exit condition of the bck.
+  // If the loop exit is on the false side of the block, then the condition is
+  // negated
   experimental::boolean::BoolExpression *
-  getBlockConditionForBranch(Block *loopExit, mlir::CFGLoop *loop);
+  getBlockLoopExitCondition(Block *loopExit, mlir::CFGLoop *loop);
 
   //----------BooleanEXpression to Circuit----------
 
@@ -353,10 +364,10 @@ private:
                               experimental::boolean::BoolExpression *expr,
                               Block *block);
 
-  // Converts a boolean operator to actual circuitry
-  Value boolOperatorToCircuit(ConversionPatternRewriter &rewriter,
-                              experimental::boolean::BoolExpression *expr,
-                              Block *block, Value trigger);
+  // Fixes a MERGE operation to follow the loop convention
+  /// True Side --> loop exit
+  /// False Side --> iterate
+  void fixConvention(Operation *merge, mlir::CFGLoop *loop);
 };
 
 /// Pointer to function lowering a region using a conversion pattern rewriter.

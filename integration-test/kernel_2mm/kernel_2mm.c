@@ -16,12 +16,18 @@
 //                 inout_int_t D[NI][NL]) {
 void kernel_2mm(in_int_t alpha, inout_int_t tmp[NI][NJ]) {
   /// for (unsigned i = 0; i < NI; i++) {
+
+  // for (unsigned i = 0; i < NI; i++) {
   for (unsigned j = 0; j < NJ; j++) {
-    // tmp[j][j] = tmp[j][j] + 1 + alpha;
+    tmp[j][j] = tmp[j][j] + alpha + j;
     if (tmp[j][j] > 5)
-      //  for (unsigned k = 0; k < NK; ++k)
-      tmp[j][j] = tmp[j][j] * 2;
+      // int sum = tmp[j][j];
+      // if (sum > 5)
+      //    for (unsigned k = 0; k < NK; ++k)
+      tmp[j][j] = j; // tmp[j][j] * 2;
   }
+
+  //}
 
   //}
   // for (unsigned i = 0; i < NI; i++) {
