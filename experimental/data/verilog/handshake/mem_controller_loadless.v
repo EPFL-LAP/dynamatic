@@ -31,7 +31,7 @@ module mem_controller_loadless #(
   output [DATA_WIDTH - 1 : 0] storeData
 );
   // Internal Signals
-  reg [31 : 0] remainingStores;
+  wire [31 : 0] remainingStores;
   wire [NUM_STORE - 1 : 0] storePorts_valid, storePorts_ready;
 
   // Local Parameter
@@ -68,19 +68,20 @@ module mem_controller_loadless #(
   // Counting Stores
   always @(posedge clk, posedge rst) begin
     if (rst) begin
-      counter <= 32'd0;
+      counter = 32'd0;
     end else begin
-      for (i = 0; i < NUM_CONTROL; i = i + 1) begin
+      for (i = 0; i <= NUM_CONTROL - 1; i = i + 1) begin
         if (ctrl_valid[i]) begin
-          counter <= remainingStores + ctrl[(i * 32) + 31 -: 32];
-        end
+          counter = counter + ctrl[i * 32 +: 32];
+        end 
       end
       if (storeEn) begin
-        counter <= remainingStores - 1;
+          counter = counter - 1;
       end
-      remainingStores <= counter;
     end
   end
+
+  assign remainingStores = counter;
 
   // Memory Done logic
   assign memDone_valid = (remainingStores == zeroStore && ctrl_valid == zeroCtrl) ? 1'b1 : 1'b0;
