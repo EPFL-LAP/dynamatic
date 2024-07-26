@@ -27,6 +27,11 @@ module shrsi #(
       .outs_valid (result_valid             )
     );
   
-    assign result = lhs >> $signed(rhs);
+    wire signed [DATA_WIDTH - 1 : 0] signed_lhs;
+    wire signed [DATA_WIDTH - 1 : 0] temp_result;
+    assign signed_lhs = lhs;
+    assign temp_result = signed_lhs >>> rhs;
+  
+    assign result = temp_result;
 
 endmodule
