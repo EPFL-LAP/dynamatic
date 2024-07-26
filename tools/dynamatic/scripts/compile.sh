@@ -131,7 +131,7 @@ exit_on_fail "Failed to compile cf to handshake" "Compiled cf to handshake"
 exit_on_fail "Failed to apply 0"
 
 
-"$DYNAMATIC_OPT_BIN" "$F_HANDSHAKE"_0.mlir --handshake-minimize-cst-width > "$F_HANDSHAKE"_1.mlir
+"$DYNAMATIC_OPT_BIN" "$F_HANDSHAKE"_0.mlir --handshake-minimize-cst-width -debug-only=greedy-rewriter > "$F_HANDSHAKE"_1.mlir
 exit_on_fail "Failed to apply 1"
 
 
