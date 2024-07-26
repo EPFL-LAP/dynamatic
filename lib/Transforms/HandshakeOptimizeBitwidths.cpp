@@ -29,6 +29,7 @@
 
 #include "dynamatic/Transforms/HandshakeOptimizeBitwidths.h"
 #include "dynamatic/Dialect/Handshake/HandshakeOps.h"
+#include "dynamatic/Dialect/Handshake/HandshakeTypes.h"
 #include "dynamatic/Support/CFG.h"
 #include "dynamatic/Transforms/HandshakeMinimizeCstWidth.h"
 #include "mlir/Dialect/Arith/IR/Arith.h"
@@ -90,7 +91,7 @@ static Value getMinimalValue(Value val, ExtType *ext = nullptr) {
 
   // Only backtrack through values that were produced by extension operations
   while (Operation *defOp = val.getDefiningOp()) {
-    if (!isa<arith::ExtSIOp, arith::ExtUIOp>(defOp))
+    if (!isa<handshake::ExtSIOp, handshake::ExtUIOp>(defOp))
       return val;
 
     // Update the extension type using the nature of the current extension
@@ -98,15 +99,15 @@ static Value getMinimalValue(Value val, ExtType *ext = nullptr) {
     if (ext) {
       switch (*ext) {
       case ExtType::UNKNOWN:
-        *ext =
-            isa<arith::ExtSIOp>(defOp) ? ExtType::ARITHMETIC : ExtType::LOGICAL;
+        *ext = isa<handshake::ExtSIOp>(defOp) ? ExtType::ARITHMETIC
+                                              : ExtType::LOGICAL;
         break;
       case ExtType::LOGICAL:
-        if (isa<arith::ExtSIOp>(defOp))
+        if (isa<handshake::ExtSIOp>(defOp))
           *ext = ExtType::CONFLICT;
         break;
       case ExtType::ARITHMETIC:
-        if (isa<arith::ExtUIOp>(defOp))
+        if (isa<handshake::ExtUIOp>(defOp))
           *ext = ExtType::CONFLICT;
         break;
       default:
@@ -169,7 +170,7 @@ static unsigned getUsefulResultWidth(Value val) {
     // Ignore sinks, since they do not actually use their operand for anything
     if (isa<handshake::SinkOp>(user))
       continue;
-    if (!isa<arith::TruncIOp>(user))
+    if (!isa<handshake::TruncIOp>(user))
       return resType.getIntOrFloatBitWidth();
     unsigned truncWidth = user->getResult(0).getType().getIntOrFloatBitWidth();
     maxWidth = std::max(maxWidth.value_or(0), truncWidth);
@@ -218,13 +219,13 @@ static Value modVal(ExtValue extVal, unsigned targetWidth,
     }
     if (ext == ExtType::LOGICAL ||
         (ext == ExtType::UNKNOWN && type.isUnsignedInteger()))
-      newOp = rewriter.create<arith::ExtUIOp>(
+      newOp = rewriter.create<handshake::ExtUIOp>(
           val.getLoc(), rewriter.getIntegerType(targetWidth), val);
     else
-      newOp = rewriter.create<arith::ExtSIOp>(
+      newOp = rewriter.create<handshake::ExtSIOp>(
           val.getLoc(), rewriter.getIntegerType(targetWidth), val);
   } else
-    newOp = rewriter.create<arith::TruncIOp>(
+    newOp = rewriter.create<handshake::TruncIOp>(
         val.getLoc(), rewriter.getIntegerType(targetWidth), val);
 
   inheritBBFromValue(val, newOp);
@@ -254,8 +255,8 @@ static bool isOperandInCycle(Value val, OpResult res,
   // Backtrack through operations that end up "forwarding" one of their
   // inputs to the output
   if (isa<handshake::BufferOpInterface, handshake::ForkOp,
-          handshake::LazyForkOp, handshake::BranchOp, arith::ExtSIOp,
-          arith::ExtUIOp>(defOp))
+          handshake::LazyForkOp, handshake::BranchOp, handshake::ExtSIOp,
+          handshake::ExtUIOp>(defOp))
     return isOperandInCycle(defOp->getOperand(0), res, mergedValues,
                             visitedOps);
   if (auto condOp = dyn_cast<handshake::ConditionalBranchOp>(defOp))
@@ -285,7 +286,7 @@ static bool isOperandInCycle(Value val, OpResult res,
   // Recursively explore data operands of merge-like operations to find cycles
   if (auto mergeLikeOp = dyn_cast<handshake::MergeLikeOpInterface>(defOp))
     return recurseMergeLike(mergeLikeOp.getDataOperands());
-  if (auto selectOp = dyn_cast<arith::SelectOp>(defOp))
+  if (auto selectOp = dyn_cast<handshake::SelectOp>(defOp))
     return recurseMergeLike(
         ValueRange{selectOp.getTrueValue(), selectOp.getFalseValue()});
 
@@ -693,7 +694,7 @@ struct HandshakeCMergeIndex
     // Check whether we can reduce the bitwidth of the operation
     Value indexResult = cmergeOp.getIndex();
     Type indexType = indexResult.getType();
-    assert(isa<IntegerType>(indexType) &&
+    assert(isa<handshake::ChannelType>(indexType) &&
            "select operand must have integer type");
     unsigned indexWidth = indexType.getIntOrFloatBitWidth();
     if (optWidth >= indexWidth)
@@ -732,7 +733,7 @@ struct DowngradeSingleInputControlMerges
     if (!indexRes.use_empty()) {
       // If the index has uses, create a sourced 0 constant to replace it
       handshake::SourceOp srcOp = rewriter.create<handshake::SourceOp>(
-          cmergeOp->getLoc(), rewriter.getNoneType());
+          cmergeOp->getLoc(), handshake::ControlType::get(getContext()));
       inheritBB(cmergeOp, srcOp);
 
       // Build the attribute for the constant
@@ -1052,8 +1053,8 @@ struct ArithSingleType : public OpRewritePattern<Op> {
     // explicitly unsigned operations, othweise it is determined byt the
     // result's type
     ExtType extRes = ExtType::UNKNOWN;
-    if (isa<arith::AndIOp, arith::OrIOp, arith::XOrIOp, arith::DivUIOp,
-            arith::RemUIOp>((Operation *)op))
+    if (isa<handshake::AndIOp, handshake::OrIOp, handshake::XOrIOp,
+            handshake::DivUIOp>((Operation *)op))
       extRes = ExtType::LOGICAL;
     else
       extRes = ExtType::UNKNOWN;
@@ -1073,13 +1074,13 @@ private:
 /// ArithSingleType pattern. The latter cannot be used directly since the select
 /// operation has a third i1 operand to select which of the two others to
 /// forward to the output.
-struct ArithSelect : public OpRewritePattern<arith::SelectOp> {
-  using OpRewritePattern<arith::SelectOp>::OpRewritePattern;
+struct ArithSelect : public OpRewritePattern<handshake::SelectOp> {
+  using OpRewritePattern<handshake::SelectOp>::OpRewritePattern;
 
   ArithSelect(bool forward, MLIRContext *ctx)
-      : OpRewritePattern<arith::SelectOp>(ctx), forward(forward) {}
+      : OpRewritePattern<handshake::SelectOp>(ctx), forward(forward) {}
 
-  LogicalResult matchAndRewrite(arith::SelectOp selectOp,
+  LogicalResult matchAndRewrite(handshake::SelectOp selectOp,
                                 PatternRewriter &rewriter) const override {
     Type resType = selectOp.getResult().getType();
     if (!isValidType(resType))
@@ -1110,7 +1111,7 @@ struct ArithSelect : public OpRewritePattern<arith::SelectOp> {
     Value newLhs = modVal({minLhs, extLhs}, optWidth, rewriter);
     Value newRhs = modVal({minRhs, extRhs}, optWidth, rewriter);
     rewriter.setInsertionPoint(selectOp);
-    auto newOp = rewriter.create<arith::SelectOp>(
+    auto newOp = rewriter.create<handshake::SelectOp>(
         selectOp.getLoc(), selectOp.getCondition(), newLhs, newRhs);
     Value newRes = modVal({newOp->getResult(0), extLhs}, resWidth, rewriter);
     inheritBB(selectOp, newOp);
@@ -1127,8 +1128,8 @@ private:
 };
 
 /// Optimizes the bitwidth of shift-type operations. The first template
-/// parameter is meant to be either arith::ShLIOp, arith::ShRSIOp, or
-/// arith::ShRUIOp. In both modes (forward and backward), the matched
+/// parameter is meant to be either handshake::ShLIOp, handshake::ShRSIOp, or
+/// handshake::ShRUIOp. In both modes (forward and backward), the matched
 /// operation's bitwidth may only be reduced when the data operand is shifted by
 /// a known constant amount.
 template <typename Op>
@@ -1145,7 +1146,8 @@ struct ArithShift : public OpRewritePattern<Op> {
     ExtType extToShift = ExtType::UNKNOWN;
     Value minToShift = getMinimalValue(toShift, &extToShift);
     Value minShiftBy = backtrackToMinimalValue(shiftBy);
-    bool isRightShift = isa<arith::ShRSIOp, arith::ShRUIOp>((Operation *)op);
+    bool isRightShift =
+        isa<handshake::ShRSIOp, handshake::ShRUIOp>((Operation *)op);
 
     // Check whether we can reduce the bitwidth of the operation
     unsigned resWidth = op->getResult(0).getType().getIntOrFloatBitWidth();
@@ -1212,10 +1214,10 @@ private:
 /// Optimizes the bitwidth of integer comparisons by looking at the respective
 /// "minimal" value of their two operands. This is meant to be part of the
 /// forward pass.
-struct ArithCmpFW : public OpRewritePattern<arith::CmpIOp> {
-  using OpRewritePattern<arith::CmpIOp>::OpRewritePattern;
+struct ArithCmpFW : public OpRewritePattern<handshake::CmpIOp> {
+  using OpRewritePattern<handshake::CmpIOp>::OpRewritePattern;
 
-  LogicalResult matchAndRewrite(arith::CmpIOp cmpOp,
+  LogicalResult matchAndRewrite(handshake::CmpIOp cmpOp,
                                 PatternRewriter &rewriter) const override {
     // Check whether we can reduce the bitwidth of the operation
     Value lhs = cmpOp.getLhs();
@@ -1234,7 +1236,7 @@ struct ArithCmpFW : public OpRewritePattern<arith::CmpIOp> {
     Value newLhs = modVal({minLhs, extLhs}, optWidth, rewriter);
     Value newRhs = modVal({minRhs, extRhs}, optWidth, rewriter);
     rewriter.setInsertionPoint(cmpOp);
-    auto newOp = rewriter.create<arith::CmpIOp>(
+    auto newOp = rewriter.create<handshake::CmpIOp>(
         cmpOp.getLoc(), cmpOp.getPredicate(), newLhs, newRhs);
     inheritBB(cmpOp, newOp);
 
@@ -1247,10 +1249,10 @@ struct ArithCmpFW : public OpRewritePattern<arith::CmpIOp> {
 
 /// Removes truncation operations whose operand is produced by any sequence of
 /// extension operations with the same type (logical or arithmetic).
-struct ArithExtToTruncOpt : public OpRewritePattern<arith::TruncIOp> {
-  using OpRewritePattern<arith::TruncIOp>::OpRewritePattern;
+struct ArithExtToTruncOpt : public OpRewritePattern<handshake::TruncIOp> {
+  using OpRewritePattern<handshake::TruncIOp>::OpRewritePattern;
 
-  LogicalResult matchAndRewrite(arith::TruncIOp truncOp,
+  LogicalResult matchAndRewrite(handshake::TruncIOp truncOp,
                                 PatternRewriter &rewriter) const override {
     // Operand must be produced by an extension operation
     ExtType extType = ExtType::UNKNOWN;
@@ -1293,7 +1295,7 @@ struct ArithBoundOpt : public OpRewritePattern<handshake::ConditionalBranchOp> {
     // each branch outcome
     Value trueRes = condOp.getTrueResult(), falseRes = condOp.getFalseResult();
     std::optional<std::pair<unsigned, ExtType>> trueBranch, falseBranch;
-    for (arith::CmpIOp cmpOp : getCmpOps(condOp.getConditionOperand())) {
+    for (handshake::CmpIOp cmpOp : getCmpOps(condOp.getConditionOperand())) {
       ExtType extLhs = ExtType::UNKNOWN, extRhs = ExtType::UNKNOWN;
       Value minLhs = backtrackToMinimalValue(cmpOp.getLhs(), &extLhs);
       Value minRhs = backtrackToMinimalValue(cmpOp.getRhs(), &extRhs);
@@ -1348,7 +1350,7 @@ private:
   /// Returns the list of comparison operations involved in the computation of
   /// the given conditional value (which must have i1 type). All of the
   /// comparisons' respective result are ANDed to compute the given value.
-  SmallVector<arith::CmpIOp> getCmpOps(Value condVal) const;
+  SmallVector<handshake::CmpIOp> getCmpOps(Value condVal) const;
 
   /// Determines whether the bound that the data operand is compared with is
   /// tight, i.e. whether being strictly closer to 0 than it means we can
@@ -1358,12 +1360,12 @@ private:
   /// Determines which branch may be optimized based on the nature of the
   /// comparison and the side of the data operand to the conditional branch.
   Value getBranchToOptimize(handshake::ConditionalBranchOp condOp,
-                            arith::CmpIOp cmpOp, bool isDataLhs) const;
+                            handshake::CmpIOp cmpOp, bool isDataLhs) const;
 
   /// Returns the real optimized bitwidth assuming that the bound against which
   /// the comparison is performed is provably tight. The real optimized bitwidth
   /// may be one less than the one passed as argument or identical.
-  unsigned getRealOptWidth(arith::CmpIOp cmpOp, unsigned optWidth,
+  unsigned getRealOptWidth(handshake::CmpIOp cmpOp, unsigned optWidth,
                            bool isDataLhs) const;
 
   /// Optimizes the branch output provided as argument to the given bitwidth is
@@ -1375,7 +1377,7 @@ private:
 
 } // namespace
 
-SmallVector<arith::CmpIOp> ArithBoundOpt::getCmpOps(Value condVal) const {
+SmallVector<handshake::CmpIOp> ArithBoundOpt::getCmpOps(Value condVal) const {
   Value minVal = backtrackToMinimalValue(condVal);
 
   // Stop when reaching function arguments
@@ -1384,14 +1386,14 @@ SmallVector<arith::CmpIOp> ArithBoundOpt::getCmpOps(Value condVal) const {
     return {};
 
   // If we have reached a comparison operation, return it
-  if (arith::CmpIOp cmpOp = dyn_cast<arith::CmpIOp>(defOp))
+  if (handshake::CmpIOp cmpOp = dyn_cast<handshake::CmpIOp>(defOp))
     return {cmpOp};
 
   // If we have reached a logical and, backtrack through both its operands as it
   // means the branch condition will be more restrictive than the comparison
   // itself, which doesn't invalidate our optimization
-  if (arith::AndIOp andOp = dyn_cast<arith::AndIOp>(defOp)) {
-    SmallVector<arith::CmpIOp> cmpOps;
+  if (handshake::AndIOp andOp = dyn_cast<handshake::AndIOp>(defOp)) {
+    SmallVector<handshake::CmpIOp> cmpOps;
     llvm::copy(getCmpOps(andOp.getLhs()), std::back_inserter(cmpOps));
     llvm::copy(getCmpOps(andOp.getRhs()), std::back_inserter(cmpOps));
     return cmpOps;
@@ -1423,23 +1425,23 @@ bool ArithBoundOpt::isBoundTight(Value bound) const {
 }
 
 Value ArithBoundOpt::getBranchToOptimize(handshake::ConditionalBranchOp condOp,
-                                         arith::CmpIOp cmpOp,
+                                         handshake::CmpIOp cmpOp,
                                          bool isDataLhs) const {
   Value falseRes = condOp.getFalseResult(), trueRes = condOp.getTrueResult();
   switch (cmpOp.getPredicate()) {
-  case arith::CmpIPredicate::eq:
+  case handshake::CmpIPredicate::eq:
     // x == BOUND
     return trueRes;
-  case arith::CmpIPredicate::ne:
+  case handshake::CmpIPredicate::ne:
     // x != BOUND
     return falseRes;
-  case arith::CmpIPredicate::ult:
-  case arith::CmpIPredicate::ule:
+  case handshake::CmpIPredicate::ult:
+  case handshake::CmpIPredicate::ule:
     // x < BOUND / BOUND < x
     // x <= BOUND / BOUND <= x
     return isDataLhs ? trueRes : falseRes;
-  case arith::CmpIPredicate::ugt:
-  case arith::CmpIPredicate::uge:
+  case handshake::CmpIPredicate::ugt:
+  case handshake::CmpIPredicate::uge:
     // x > BOUND / BOUND > x
     // x >= BOUND / BOUND >= x
     return isDataLhs ? falseRes : trueRes;
@@ -1448,17 +1450,18 @@ Value ArithBoundOpt::getBranchToOptimize(handshake::ConditionalBranchOp condOp,
   }
 }
 
-unsigned ArithBoundOpt::getRealOptWidth(arith::CmpIOp cmpOp, unsigned optWidth,
+unsigned ArithBoundOpt::getRealOptWidth(handshake::CmpIOp cmpOp,
+                                        unsigned optWidth,
                                         bool isDataLhs) const {
   switch (cmpOp.getPredicate()) {
-  case arith::CmpIPredicate::ult:
+  case handshake::CmpIPredicate::ult:
     // x < BOUND / BOUND < x
-  case arith::CmpIPredicate::uge:
+  case handshake::CmpIPredicate::uge:
     // x >= BOUND / BOUND >= x
     return isDataLhs ? optWidth - 1 : optWidth;
-  case arith::CmpIPredicate::ule:
+  case handshake::CmpIPredicate::ule:
     // x <= BOUND / BOUND <= x
-  case arith::CmpIPredicate::ugt:
+  case handshake::CmpIPredicate::ugt:
     // x > BOUND / BOUND > x
     return isDataLhs ? optWidth : optWidth - 1;
   default:
@@ -1575,14 +1578,14 @@ void HandshakeOptimizeBitwidthsPass::addArithPatterns(
     RewritePatternSet &patterns, bool forward) {
   MLIRContext *ctx = patterns.getContext();
 
-  patterns.add<ArithSingleType<arith::AddIOp>, ArithSingleType<arith::SubIOp>>(
-      forward, addWidth, ctx);
-  patterns.add<ArithSingleType<arith::MulIOp>>(true, mulWidth, ctx);
-  patterns.add<ArithSingleType<arith::AndIOp>>(true, andWidth, ctx);
-  patterns.add<ArithSingleType<arith::OrIOp>, ArithSingleType<arith::XOrIOp>>(
-      true, orWidth, ctx);
-  patterns.add<ArithShift<arith::ShLIOp>, ArithShift<arith::ShRSIOp>,
-               ArithShift<arith::ShRUIOp>, ArithSelect>(forward, ctx);
+  patterns.add<ArithSingleType<handshake::AddIOp>,
+               ArithSingleType<handshake::SubIOp>>(forward, addWidth, ctx);
+  patterns.add<ArithSingleType<handshake::MulIOp>>(true, mulWidth, ctx);
+  patterns.add<ArithSingleType<handshake::AndIOp>>(true, andWidth, ctx);
+  patterns.add<ArithSingleType<handshake::OrIOp>,
+               ArithSingleType<handshake::XOrIOp>>(true, orWidth, ctx);
+  patterns.add<ArithShift<handshake::ShLIOp>, ArithShift<handshake::ShRSIOp>,
+               ArithShift<handshake::ShRUIOp>, ArithSelect>(forward, ctx);
   patterns.add<ArithExtToTruncOpt>(ctx);
 }
 
@@ -1619,10 +1622,8 @@ void HandshakeOptimizeBitwidthsPass::addForwardPatterns(
 
   // arith operations
   addArithPatterns(fwPatterns, true);
-  fwPatterns
-      .add<ArithSingleType<arith::DivUIOp>, ArithSingleType<arith::DivSIOp>,
-           ArithSingleType<arith::RemUIOp>, ArithSingleType<arith::RemSIOp>>(
-          true, divWidth, ctx);
+  fwPatterns.add<ArithSingleType<handshake::DivUIOp>,
+                 ArithSingleType<handshake::DivSIOp>>(true, divWidth, ctx);
   fwPatterns.add<ArithCmpFW, ArithBoundOpt>(ctx);
 }
 

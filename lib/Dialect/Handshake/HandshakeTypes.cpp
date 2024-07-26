@@ -17,6 +17,8 @@
 #include "mlir/Support/LLVM.h"
 #include "llvm/ADT/STLExtras.h"
 #include "llvm/ADT/StringRef.h"
+#include "llvm/ADT/TypeSwitch.h"
+#include "llvm/Support/ErrorHandling.h"
 #include <set>
 
 using namespace mlir;
@@ -26,6 +28,19 @@ using namespace dynamatic::handshake;
 //===----------------------------------------------------------------------===//
 // ChannelType
 //===----------------------------------------------------------------------===//
+
+unsigned dynamatic::handshake::getHandshakeTypeBitWidth(Type type) {
+  return llvm::TypeSwitch<Type, unsigned>(type)
+      .Case<handshake::ControlType>([](auto) { return 0; })
+      .Case<handshake::ChannelType>(
+          [](ChannelType channelType) { return channelType.getDataBitWidth(); })
+      .Case<IntegerType, FloatType>(
+          [](Type type) { return type.getIntOrFloatBitWidth(); })
+      .Default([](Type type) {
+        llvm_unreachable("unsupported type");
+        return 0;
+      });
+}
 
 constexpr llvm::StringLiteral UPSTREAM_SYMBOL("U");
 
@@ -46,10 +61,9 @@ Type ChannelType::parse(AsmParser &odsParser) {
     return nullptr;
   }
   if (!isSupportedSignalType(*dataType)) {
-    odsParser.emitError(
-        odsParser.getCurrentLocation(),
-        "failed to parse ChannelType parameter 'dataType' "
-        "which must be `IndexType`, `IntegerType`, or `FloatType`");
+    odsParser.emitError(odsParser.getCurrentLocation(),
+                        "failed to parse ChannelType parameter 'dataType' "
+                        "which must be `IntegerType` or `FloatType`");
     return nullptr;
   }
 
@@ -78,7 +92,7 @@ Type ChannelType::parse(AsmParser &odsParser) {
         if (!isSupportedSignalType(signal.type)) {
           odsParser.emitError(odsParser.getCurrentLocation(),
                               "failed to parse extra signal type which must be "
-                              "`IndexType`, `IntegerType`, or `FloatType`");
+                              "IntegerType or FloatType");
           return failure();
         }
 
@@ -154,9 +168,9 @@ LogicalResult ChannelType::verify(function_ref<InFlightDiagnostic()> emitError,
                                   Type dataType,
                                   ArrayRef<ExtraSignal> extraSignals) {
   if (!isSupportedSignalType(dataType)) {
-    return emitError() << "expected data type to be `IndexType`, "
-                          "`IntegerType`, or `FloatType`, but got "
-                       << dataType;
+    return emitError()
+           << "expected data type to be IntegerType or FloatType, but got "
+           << dataType;
   }
 
   DenseSet<StringRef> names;
@@ -166,8 +180,8 @@ LogicalResult ChannelType::verify(function_ref<InFlightDiagnostic()> emitError,
                          << signal.name << "' appears more than once";
     }
     if (!isSupportedSignalType(signal.type)) {
-      return emitError() << "expected extra signal type to be `IndexType`, "
-                            "`IntegerType`, or `FloatType`, but "
+      return emitError() << "expected extra signal type to be IntegerType or "
+                            "FloatType, but "
                          << signal.name << "' has type " << signal.type;
     }
   }
@@ -181,10 +195,7 @@ unsigned ChannelType::getNumDownstreamExtraSignals() const {
 }
 
 unsigned ChannelType::getDataBitWidth() const {
-  Type dataType = getDataType();
-  assert(ChannelType::isSupportedSignalType(dataType) && "unsupported type");
-  return mlir::isa<IndexType>(dataType) ? IndexType::kInternalStorageBitWidth
-                                        : dataType.getIntOrFloatBitWidth();
+  return getDataType().getIntOrFloatBitWidth();
 }
 
 ExtraSignal::Storage::Storage(StringRef name, mlir::Type type, bool downstream)
@@ -197,9 +208,7 @@ ExtraSignal::ExtraSignal(const ExtraSignal::Storage &storage)
     : name(storage.name), type(storage.type), downstream(storage.downstream) {}
 
 unsigned ExtraSignal::getBitWidth() const {
-  assert(ChannelType::isSupportedSignalType(type) && "unsupported type");
-  return isa<IndexType>(type) ? IndexType::kInternalStorageBitWidth
-                              : type.getIntOrFloatBitWidth();
+  return type.getIntOrFloatBitWidth();
 }
 
 bool dynamatic::handshake::operator==(const ExtraSignal &lhs,

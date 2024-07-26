@@ -120,8 +120,9 @@ namespace {
 // ForkOp
 //===----------------------------------------------------------------------===//
 
-IntegerType dynamatic::handshake::getOptimizedIndexType(OpBuilder &builder,
-                                                        unsigned numToIndex) {
+IntegerType
+dynamatic::handshake::getOptimizedIndexValType(OpBuilder &builder,
+                                               unsigned numToIndex) {
   return builder.getIntegerType(
       APInt(APInt::APINT_BITS_PER_WORD, numToIndex).ceilLogBase2());
 }
@@ -659,8 +660,8 @@ FunctionType InstanceOp::getModuleType() {
 /// operations.
 static Operation *backtrackToMemInput(Value input) {
   Operation *inputOp = input.getDefiningOp();
-  while (isa_and_present<arith::ExtSIOp, arith::ExtUIOp, arith::TruncIOp,
-                         handshake::ForkOp>(inputOp))
+  while (isa_and_present<handshake::ExtSIOp, handshake::ExtUIOp,
+                         handshake::TruncIOp, handshake::ForkOp>(inputOp))
     inputOp = inputOp->getOperand(0).getDefiningOp();
   return inputOp;
 }
@@ -683,17 +684,13 @@ static LogicalResult verifyMemOp(FuncMemoryPorts &ports) {
 /// the previously established bitwidth.
 static LogicalResult checkAndSetBitwidth(Value memInput, unsigned &width) {
   // Determine the signal's width
-  unsigned inputWidth;
   Type inType = memInput.getType();
-  if (isa<handshake::ControlType>(inType)) {
-    inputWidth = 0;
-  } else if (auto channelTy = dyn_cast<handshake::ChannelType>(inType)) {
-    inputWidth = channelTy.getDataBitWidth();
-  } else {
+  if (!isa<handshake::ControlType, handshake::ChannelType>(inType)) {
     return memInput.getUsers().begin()->emitError()
-           << "Invalid input type, expected handshake::ControlType or "
-              "handshake::ChannelType";
+           << "Invalid input type, expected !handshake.control or "
+              "!handshake.channel";
   }
+  unsigned inputWidth = getHandshakeTypeBitWidth(inType);
 
   if (width == 0) {
     // This is the first time we encounter a signal of this type, consider its
@@ -2297,8 +2294,8 @@ CmpIOp::inferReturnTypes(MLIRContext *context, std::optional<Location> location,
 /// identical extra signals.
 template <typename Op>
 static LogicalResult verifyExtOp(Op op) {
-  ChannelType srcType = cast<ChannelType>(op.getIn().getType());
-  ChannelType dstType = cast<ChannelType>(op.getOut().getType());
+  ChannelType srcType = op.getIn().getType();
+  ChannelType dstType = op.getOut().getType();
 
   if (srcType.getDataBitWidth() > dstType.getDataBitWidth()) {
     return op.emitError() << "result channel's data type "
@@ -2319,9 +2316,8 @@ static OpFoldResult foldExtOp(Op op) {
     return op.getOut();
   }
 
-  unsigned srcWidth = cast<ChannelType>(op.getIn().getType()).getDataBitWidth();
-  unsigned dstWidth =
-      cast<ChannelType>(op.getOut().getType()).getDataBitWidth();
+  unsigned srcWidth = op.getIn().getType().getDataBitWidth();
+  unsigned dstWidth = op.getOut().getType().getDataBitWidth();
   if (srcWidth == dstWidth)
     return op.getIn();
   return op.getOut();
@@ -2364,7 +2360,7 @@ OpFoldResult TruncIOp::fold(FoldAdaptor adaptor) {
   if (isa_and_present<ExtSIOp, ExtUIOp>(defOp)) {
     Value src = defOp->getOperand(0);
     unsigned srcWidth = cast<ChannelType>(src.getType()).getDataBitWidth();
-    unsigned dstWidth = cast<ChannelType>(getOut().getType()).getDataBitWidth();
+    unsigned dstWidth = getOut().getType().getDataBitWidth();
     if (srcWidth > dstWidth) {
       // Bypass the preceeding extension operation
       getInMutable().assign(src);
@@ -2375,16 +2371,16 @@ OpFoldResult TruncIOp::fold(FoldAdaptor adaptor) {
   }
 
   // Identical operand and result types mean that the trunc is a no-op
-  unsigned srcWidth = cast<ChannelType>(getIn().getType()).getDataBitWidth();
-  unsigned dstWidth = cast<ChannelType>(getOut().getType()).getDataBitWidth();
+  unsigned srcWidth = getIn().getType().getDataBitWidth();
+  unsigned dstWidth = getOut().getType().getDataBitWidth();
   if (srcWidth == dstWidth)
     return getIn();
   return getOut();
 }
 
 LogicalResult TruncIOp::verify() {
-  ChannelType srcType = cast<ChannelType>(getIn().getType());
-  ChannelType dstType = cast<ChannelType>(getOut().getType());
+  ChannelType srcType = getIn().getType();
+  ChannelType dstType = getOut().getType();
 
   if (srcType.getDataBitWidth() < dstType.getDataBitWidth()) {
     return emitError() << "result channel's data type " << dstType.getDataType()

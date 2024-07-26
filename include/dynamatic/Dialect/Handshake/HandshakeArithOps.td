@@ -22,22 +22,37 @@ class Handshake_Arith_Op<string mnemonic, list<Trait> traits = []> :
   Handshake_Op<mnemonic, traits # [Pure]> {
 }
 
+class Handshake_Arith_BinaryOp<string mnemonic, list<Trait> traits = []> :
+  Handshake_Arith_Op<mnemonic, traits # [
+    SameOperandsAndResultType,
+    DeclareOpInterfaceMethods<NamedIOInterface, ["getOperandName", "getResultName"]>,
+  ]> {
+  let assemblyFormat = "$lhs `,` $rhs attr-dict `:` type($result)";
+
+  let extraClassDefinition = [{
+    std::string $cppClass::getOperandName(unsigned idx) {
+      assert(idx < 2 && "index too high");
+      return (idx == 0) ? "lhs" : "rhs";
+    }
+
+    std::string $cppClass::getResultName(unsigned idx) {
+      assert(idx < 1 && "index too high");
+      return "result";
+    }
+  }];
+}
+
 class Handshake_Arith_IntBinaryOp<string mnemonic, list<Trait> traits = []> :
-  Handshake_Arith_Op<mnemonic, traits # [SameOperandsAndResultType]> {
+  Handshake_Arith_BinaryOp<mnemonic, traits> {
   let arguments = (ins IntChannelType:$lhs, IntChannelType:$rhs);
   let results = (outs IntChannelType:$result);
-
-  let assemblyFormat = "$lhs `,` $rhs attr-dict `:` type($result)";
 }
 
 class Handshake_Arith_FloatBinaryOp<string mnemonic, list<Trait> traits = []> :
-  Handshake_Arith_Op<mnemonic, traits # [SameOperandsAndResultType]> {
+  Handshake_Arith_BinaryOp<mnemonic, traits> {
   let arguments = (ins FloatChannelType:$lhs, FloatChannelType:$rhs);
   let results = (outs FloatChannelType:$result);
-
-  let assemblyFormat = "$lhs `,` $rhs attr-dict `:` type($result)";
 }
-
 
 class Handshake_Arith_FloatUnaryOp<string mnemonic, list<Trait> traits = []> :
   Handshake_Arith_Op<mnemonic, traits # [SameOperandsAndResultType]> {
@@ -50,11 +65,24 @@ class Handshake_Arith_FloatUnaryOp<string mnemonic, list<Trait> traits = []> :
 class Handshake_Arith_CompareOp<string mnemonic, list<Trait> traits = []> :
   Handshake_Arith_Op<mnemonic, traits # [
     AllTypesMatch<["lhs", "rhs"]>, PreservesExtraSignals,
-    DeclareOpInterfaceMethods<InferTypeOpInterface, ["inferReturnTypes"]>
+    DeclareOpInterfaceMethods<InferTypeOpInterface, ["inferReturnTypes"]>,
+    DeclareOpInterfaceMethods<NamedIOInterface, ["getOperandName", "getResultName"]>
   ]> {
-  let results = (outs BoolChannelType:$result);
+  let results = (outs BoolChannel:$result);
 
   let assemblyFormat = "$predicate `,` $lhs `,` $rhs attr-dict `:` type($lhs)";
+
+  let extraClassDefinition = [{
+    std::string $cppClass::getOperandName(unsigned idx) {
+      assert(idx < getNumOperands() && "index too high");
+      return (idx == 2) ? "lhs" : "rhs";
+    }
+
+    std::string $cppClass::getResultName(unsigned idx) {
+      assert(idx < 1 && "index too high");
+      return "result";
+    }
+  }];
 }
 
 class Handshake_Arith_IToICastOp<string mnemonic, list<Trait> traits = []> :
@@ -158,7 +186,7 @@ def Handshake_ConstantOp : Handshake_Arith_Op<"constant", [
   }];
 
   let arguments = (ins TypedAttrInterface:$value, ControlType:$ctrl);
-  let results = (outs ChannelType:$result);
+  let results = (outs SimpleChannel:$result);
   let assemblyFormat = "$ctrl attr-dict `:` type($result)";
   let hasVerifier = 1;
 }
@@ -217,7 +245,7 @@ def Handshake_SelectOp : Handshake_Arith_Op<"select", [
 ]> {
   let summary = "Select a value based on a 1-bit predicate.";
  
-  let arguments = (ins BoolChannelType:$condition, ChannelType:$trueValue,
+  let arguments = (ins BoolChannel:$condition, ChannelType:$trueValue,
                        ChannelType:$falseValue);
   let results = (outs ChannelType:$result);
 

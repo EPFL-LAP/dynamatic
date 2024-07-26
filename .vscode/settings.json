@@ -18,5 +18,8 @@
     "LLVM_TARGETS_TO_BUILD": "host",
     "CMAKE_BUILD_TYPE": "Debug",
     "CMAKE_EXPORT_COMPILE_COMMAND": "ON"
+  },
+  "files.watcherExclude": {
+    "**/target": true
   }
 }

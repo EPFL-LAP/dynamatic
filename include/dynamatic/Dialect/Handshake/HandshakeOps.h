@@ -31,7 +31,7 @@ namespace handshake {
 
 /// Returns an IntegerType that has the lowest possible number of bits necessary
 /// to index into a given number of elements.
-IntegerType getOptimizedIndexType(OpBuilder &builder, unsigned numToIndex);
+IntegerType getOptimizedIndexValType(OpBuilder &builder, unsigned numToIndex);
 
 // Forward declaration needed by memory ports data structures.
 class MCLoadOp;

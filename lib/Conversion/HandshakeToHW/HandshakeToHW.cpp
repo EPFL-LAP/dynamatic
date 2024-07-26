@@ -287,10 +287,6 @@ LoweringState::LoweringState(mlir::ModuleOp modOp, NameAnalysis &namer,
 static handshake::ChannelType channelWrapper(Type t) {
   return TypeSwitch<Type, handshake::ChannelType>(t)
       .Case<handshake::ChannelType>([](auto t) { return t; })
-      .Case<NoneType>([](NoneType nt) {
-        return handshake::ChannelType::get(
-            IntegerType::get(nt.getContext(), 0));
-      })
       .Default([](Type t) {
         if (isa<FloatType>(t)) {
           // At the HW/RTL level we treat everything as opaque bitvectors, so we
@@ -374,12 +370,12 @@ private:
 
   /// Adds a bitwdith parameter extracted from a type.
   void addBitwidth(const Twine &name, Type type) {
-    addUnsigned(name, getTypeWidth(type));
+    addUnsigned(name, handshake::getHandshakeTypeBitWidth(type));
   };
 
   /// Adds a bitwdith parameter extracted from a value's type.
   void addBitwidth(const Twine &name, Value val) {
-    addUnsigned(name, getTypeWidth(val.getType()));
+    addUnsigned(name, handshake::getHandshakeTypeBitWidth(val.getType()));
   };
 
   /// Adds a string parameter.
@@ -395,9 +391,6 @@ private:
     std::replace(prefixModName.begin(), prefixModName.end(), '.', '_');
     return prefixModName;
   }
-
-  /// Returns the bitwidth of a type.
-  static unsigned getTypeWidth(Type type);
 };
 } // namespace
 
@@ -522,33 +515,35 @@ ModuleDiscriminator::ModuleDiscriminator(Operation *op)
       .Case<handshake::NotOp>([&](handshake::NotOp notOp) {
         addBitwidth("DATA_WIDTH", op->getOperand(0));
       })
-      .Case<arith::AddFOp, arith::AddIOp, arith::AndIOp, arith::DivFOp,
-            arith::DivSIOp, arith::DivUIOp, arith::MaximumFOp,
-            arith::MinimumFOp, arith::MulFOp, arith::MulIOp, arith::NegFOp,
-            arith::OrIOp, arith::ShLIOp, arith::ShRSIOp, arith::ShRUIOp,
-            arith::SubFOp, arith::SubIOp, arith::XOrIOp>([&](auto) {
+      .Case<handshake::AddFOp, handshake::AddIOp, handshake::AndIOp,
+            handshake::DivFOp, handshake::DivSIOp, handshake::DivUIOp,
+            handshake::MaximumFOp, handshake::MinimumFOp, handshake::MulFOp,
+            handshake::MulIOp, handshake::NegFOp, handshake::OrIOp,
+            handshake::ShLIOp, handshake::ShRSIOp, handshake::ShRUIOp,
+            handshake::SubFOp, handshake::SubIOp, handshake::XOrIOp>([&](auto) {
         // Bitwidth
         addBitwidth("DATA_WIDTH", op->getOperand(0));
       })
-      .Case<arith::SelectOp>([&](arith::SelectOp selectOp) {
+      .Case<handshake::SelectOp>([&](handshake::SelectOp selectOp) {
         // Data bitwidth
         addBitwidth("DATA_WIDTH", selectOp.getTrueValue());
       })
-      .Case<arith::CmpFOp>([&](arith::CmpFOp cmpFOp) {
+      .Case<handshake::CmpFOp>([&](handshake::CmpFOp cmpFOp) {
         // Predicate and bitwidth
         addString("PREDICATE", stringifyEnum(cmpFOp.getPredicate()));
         addBitwidth("DATA_WIDTH", cmpFOp.getLhs());
       })
-      .Case<arith::CmpIOp>([&](arith::CmpIOp cmpIOp) {
+      .Case<handshake::CmpIOp>([&](handshake::CmpIOp cmpIOp) {
         // Predicate and bitwidth
         addString("PREDICATE", stringifyEnum(cmpIOp.getPredicate()));
         addBitwidth("DATA_WIDTH", cmpIOp.getLhs());
       })
-      .Case<arith::ExtSIOp, arith::ExtUIOp, arith::TruncIOp>([&](auto) {
-        // Input bitwidth and output bitwidth
-        addBitwidth("INPUT_WIDTH", op->getOperand(0));
-        addBitwidth("OUTPUT_WIDTH", op->getResult(0));
-      })
+      .Case<handshake::ExtSIOp, handshake::ExtUIOp, handshake::TruncIOp>(
+          [&](auto) {
+            // Input bitwidth and output bitwidth
+            addBitwidth("INPUT_WIDTH", op->getOperand(0));
+            addBitwidth("OUTPUT_WIDTH", op->getResult(0));
+          })
       .Default([&](auto) {
         op->emitError() << "This operation cannot be lowered to RTL "
                            "due to a lack of an RTL implementation for it.";
@@ -642,14 +637,6 @@ void ModuleDiscriminator::setParameters(hw::HWModuleExternOp modOp) {
   // component to instantiate
   modOp->setAttr(RTLRequest::PARAMETERS_ATTR,
                  DictionaryAttr::get(ctx, parameters));
-}
-
-unsigned ModuleDiscriminator::getTypeWidth(Type type) {
-  if (isa<IntegerType, FloatType>(type))
-    return type.getIntOrFloatBitWidth();
-  if (isa<NoneType>(type))
-    return 0;
-  llvm_unreachable("unsupported data type");
 }
 
 namespace {
@@ -1813,60 +1800,53 @@ public:
     RewritePatternSet patterns(ctx);
     patterns.insert<ConvertFunc, ConvertEnd, ConvertMemInterface>(
         typeConverter, ctx, lowerState);
-    patterns.insert<
-        ConvertInstance, ConvertToHWInstance<handshake::OEHBOp>,
-        ConvertToHWInstance<handshake::TEHBOp>,
-        ConvertToHWInstance<handshake::ConditionalBranchOp>,
-        ConvertToHWInstance<handshake::BranchOp>,
-        ConvertToHWInstance<handshake::MergeOp>,
-        ConvertToHWInstance<handshake::ControlMergeOp>,
-        ConvertToHWInstance<handshake::MuxOp>,
-        ConvertToHWInstance<handshake::SourceOp>,
-        ConvertToHWInstance<handshake::ConstantOp>,
-        ConvertToHWInstance<handshake::SinkOp>,
-        ConvertToHWInstance<handshake::ForkOp>,
-        ConvertToHWInstance<handshake::LazyForkOp>,
-        ConvertToHWInstance<handshake::MCLoadOp>,
-        ConvertToHWInstance<handshake::LSQLoadOp>,
-        ConvertToHWInstance<handshake::MCStoreOp>,
-        ConvertToHWInstance<handshake::LSQStoreOp>,
-        ConvertToHWInstance<handshake::NotOp>,
-        // Arith operations
-        ConvertToHWInstance<arith::AddFOp>, ConvertToHWInstance<arith::AddIOp>,
-        ConvertToHWInstance<arith::AndIOp>,
-        ConvertToHWInstance<arith::BitcastOp>,
-        ConvertToHWInstance<arith::CeilDivSIOp>,
-        ConvertToHWInstance<arith::CeilDivUIOp>,
-        ConvertToHWInstance<arith::CmpFOp>, ConvertToHWInstance<arith::CmpIOp>,
-        ConvertToHWInstance<arith::DivFOp>, ConvertToHWInstance<arith::DivSIOp>,
-        ConvertToHWInstance<arith::DivUIOp>, ConvertToHWInstance<arith::ExtFOp>,
-        ConvertToHWInstance<arith::ExtSIOp>,
-        ConvertToHWInstance<arith::ExtUIOp>,
-        ConvertToHWInstance<arith::FPToSIOp>,
-        ConvertToHWInstance<arith::FPToUIOp>,
-        ConvertToHWInstance<arith::FloorDivSIOp>,
-        ConvertToHWInstance<arith::IndexCastOp>,
-        ConvertToHWInstance<arith::IndexCastUIOp>,
-        ConvertToHWInstance<arith::MulFOp>, ConvertToHWInstance<arith::MulIOp>,
-        ConvertToHWInstance<arith::NegFOp>, ConvertToHWInstance<arith::OrIOp>,
-        ConvertToHWInstance<arith::RemFOp>, ConvertToHWInstance<arith::RemSIOp>,
-        ConvertToHWInstance<arith::RemUIOp>,
-        ConvertToHWInstance<arith::SelectOp>,
-        ConvertToHWInstance<arith::SIToFPOp>,
-        ConvertToHWInstance<arith::ShLIOp>, ConvertToHWInstance<arith::ShRSIOp>,
-        ConvertToHWInstance<arith::ShRUIOp>, ConvertToHWInstance<arith::SubFOp>,
-        ConvertToHWInstance<arith::SubIOp>,
-        ConvertToHWInstance<arith::TruncFOp>,
-        ConvertToHWInstance<arith::TruncIOp>,
-        ConvertToHWInstance<arith::UIToFPOp>,
-        ConvertToHWInstance<arith::XOrIOp>>(typeConverter,
-                                            funcOp->getContext());
+    patterns.insert<ConvertInstance, ConvertToHWInstance<handshake::OEHBOp>,
+                    ConvertToHWInstance<handshake::TEHBOp>,
+                    ConvertToHWInstance<handshake::ConditionalBranchOp>,
+                    ConvertToHWInstance<handshake::BranchOp>,
+                    ConvertToHWInstance<handshake::MergeOp>,
+                    ConvertToHWInstance<handshake::ControlMergeOp>,
+                    ConvertToHWInstance<handshake::MuxOp>,
+                    ConvertToHWInstance<handshake::SourceOp>,
+                    ConvertToHWInstance<handshake::ConstantOp>,
+                    ConvertToHWInstance<handshake::SinkOp>,
+                    ConvertToHWInstance<handshake::ForkOp>,
+                    ConvertToHWInstance<handshake::LazyForkOp>,
+                    ConvertToHWInstance<handshake::MCLoadOp>,
+                    ConvertToHWInstance<handshake::LSQLoadOp>,
+                    ConvertToHWInstance<handshake::MCStoreOp>,
+                    ConvertToHWInstance<handshake::LSQStoreOp>,
+                    ConvertToHWInstance<handshake::NotOp>,
+                    // Arith operations
+                    ConvertToHWInstance<handshake::AddFOp>,
+                    ConvertToHWInstance<handshake::AddIOp>,
+                    ConvertToHWInstance<handshake::AndIOp>,
+                    ConvertToHWInstance<handshake::CmpFOp>,
+                    ConvertToHWInstance<handshake::CmpIOp>,
+                    ConvertToHWInstance<handshake::DivFOp>,
+                    ConvertToHWInstance<handshake::DivSIOp>,
+                    ConvertToHWInstance<handshake::DivUIOp>,
+                    ConvertToHWInstance<handshake::ExtSIOp>,
+                    ConvertToHWInstance<handshake::ExtUIOp>,
+                    ConvertToHWInstance<handshake::MulFOp>,
+                    ConvertToHWInstance<handshake::MulIOp>,
+                    ConvertToHWInstance<handshake::NegFOp>,
+                    ConvertToHWInstance<handshake::OrIOp>,
+                    ConvertToHWInstance<handshake::SelectOp>,
+                    ConvertToHWInstance<handshake::ShLIOp>,
+                    ConvertToHWInstance<handshake::ShRSIOp>,
+                    ConvertToHWInstance<handshake::ShRUIOp>,
+                    ConvertToHWInstance<handshake::SubFOp>,
+                    ConvertToHWInstance<handshake::SubIOp>,
+                    ConvertToHWInstance<handshake::TruncIOp>,
+                    ConvertToHWInstance<handshake::XOrIOp>>(
+        typeConverter, funcOp->getContext());
 
     // Everything must be converted to operations in the hw dialect
     ConversionTarget target(*ctx);
     target.addLegalOp<hw::HWModuleOp, hw::HWModuleExternOp, hw::InstanceOp,
-                      hw::OutputOp, mlir::UnrealizedConversionCastOp>();
-    target.addIllegalDialect<handshake::HandshakeDialect, arith::ArithDialect,
+                      hw::OutputOp>();
+    target.addIllegalDialect<handshake::HandshakeDialect,
                              memref::MemRefDialect>();
 
     if (failed(applyPartialConversion(modOp, target, std::move(patterns))))

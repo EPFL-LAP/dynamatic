@@ -499,7 +499,7 @@ void LowerFuncToHandshake::insertMerge(BlockArgument blockArg,
     // while data operands will resolve to their respective values from each
     // block predecessor
     Type idxType =
-        handshake::getOptimizedIndexType(rewriter, predecessors.size());
+        handshake::getOptimizedIndexValType(rewriter, predecessors.size());
     iMerge.indexEdge = edgeBuilder.get(handshake::ChannelType::get(idxType));
     addFromAllPredecessors(blockArg.getType());
     Value index = *iMerge.indexEdge;

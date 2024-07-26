@@ -204,7 +204,7 @@ MemoryInterfaceBuilder::getMemResultsToInterface(Operation *memOp) {
 Value MemoryInterfaceBuilder::getMCControl(Value ctrl, unsigned numStores,
                                            OpBuilder &builder) {
   assert(isa<handshake::ControlType>(ctrl.getType()) &&
-         "control signal must have none type");
+         "control signal must have !handshake.control type");
   if (Operation *defOp = ctrl.getDefiningOp())
     builder.setInsertionPointAfter(defOp);
   else

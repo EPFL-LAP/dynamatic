@@ -429,7 +429,7 @@ def ControlMergeOp : Handshake_Op<"control_merge", [
       $_state.addOperands(operands);
       
       // Optimize the size of the index result based on the number of operands
-      auto dataType = ::dynamatic::handshake::getOptimizedIndexType(
+      auto dataType = ::dynamatic::handshake::getOptimizedIndexValType(
           $_builder, operands.size());
       auto idxType = ::dynamatic::handshake::ChannelType::get(dataType);
       $_state.addTypes({operands[0].getType(), idxType});
@@ -481,7 +481,7 @@ def ConditionalBranchOp : Handshake_Op<"cond_br", [
     ```
   }];
 
-  let arguments = (ins BoolChannelType:$conditionOperand,
+  let arguments = (ins BoolChannel:$conditionOperand,
                        ChannelLikeType:$dataOperand);
   let results = (outs ChannelLikeType:$trueResult,
                       ChannelLikeType:$falseResult);
@@ -1029,10 +1029,10 @@ def SpeculatorOp : Handshake_Op<"speculator", [
 
   let arguments = (ins ChannelType:$dataIn, ControlType:$enable);
   let results = (outs ChannelType:$dataOut,
-                      BoolChannelType:$saveCtrl, BoolChannelType:$commitCtrl, 
-                      IntChannelTypeOfWidth<3>:$SCSaveCtrl,
-                      IntChannelTypeOfWidth<3>:$SCCommitCtrl, 
-                      BoolChannelType:$SCBranchCtrl);
+                      BoolChannel:$saveCtrl, BoolChannel:$commitCtrl, 
+                      IntSizedChannel<3>:$SCSaveCtrl,
+                      IntSizedChannel<3>:$SCCommitCtrl, 
+                      BoolChannel:$SCBranchCtrl);
 
   let hasCustomAssemblyFormat = 1;
   let hasVerifier = 1;
@@ -1041,7 +1041,7 @@ def SpeculatorOp : Handshake_Op<"speculator", [
 class Handshake_SpecOp<string mnemonic> : Handshake_Op<mnemonic, [
   SpeculationOpInterface, AllTypesMatch<["dataIn", "dataOut"]>
 ]> {
-  let arguments = (ins ChannelType:$dataIn, BoolChannelType:$ctrl);
+  let arguments = (ins ChannelType:$dataIn, BoolChannel:$ctrl);
   let results = (outs ChannelType:$dataOut);
   let assemblyFormat = [{
     `[` $ctrl `]` $dataIn attr-dict `:` type($dataIn) `,` type($ctrl)
@@ -1127,7 +1127,7 @@ def SpeculatingBranchOp : Handshake_Op<"speculating_branch", [
     ```
   }];
 
-  let arguments = (ins BoolChannelType:$tagFromOperand, ChannelType:$dataOperand);
+  let arguments = (ins BoolChannel:$tagFromOperand, ChannelType:$dataOperand);
   let results = (outs ChannelType:$trueResult, ChannelType:$falseResult);
   let assemblyFormat = [{
     `[` $tagFromOperand `]` $dataOperand attr-dict `:` 

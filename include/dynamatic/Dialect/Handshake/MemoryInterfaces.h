@@ -125,7 +125,7 @@ public:
 
   /// Returns the result of a constant that serves as an MC control signal
   /// (indicating a non-zero number of stores in the block). Instantiates the
-  /// constant operation in the IR after the provided none-typed control signal.
+  /// constant operation in the IR after the provided control signal.
   static Value getMCControl(Value ctrl, unsigned numStores, OpBuilder &builder);
 
   /// Sets the data operand of a load-like operation, reusing the existing

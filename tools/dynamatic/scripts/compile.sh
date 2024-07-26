@@ -119,13 +119,32 @@ exit_on_fail "Failed to apply Dynamatic transformations to cf" \
 exit_on_fail "Failed to compile cf to handshake" "Compiled cf to handshake"
 
 # handshake transformations
-"$DYNAMATIC_OPT_BIN" "$F_HANDSHAKE" \
-  --handshake-minimize-lsq-usage \
-  --handshake-minimize-cst-width --handshake-optimize-bitwidths="legacy" \
-  --handshake-materialize --handshake-infer-basic-blocks \
-  > "$F_HANDSHAKE_TRANSFORMED"
-exit_on_fail "Failed to apply transformations to handshake" \
-  "Applied transformations to handshake"
+# "$DYNAMATIC_OPT_BIN" "$F_HANDSHAKE" \
+#   --handshake-minimize-lsq-usage \
+#   --handshake-minimize-cst-width --handshake-optimize-bitwidths="legacy" \
+#   --handshake-materialize --handshake-infer-basic-blocks \
+#   > "$F_HANDSHAKE_TRANSFORMED"
+# exit_on_fail "Failed to apply transformations to handshake" \
+#   "Applied transformations to handshake"
+
+"$DYNAMATIC_OPT_BIN" "$F_HANDSHAKE" --handshake-minimize-lsq-usage > "$F_HANDSHAKE"_0.mlir
+exit_on_fail "Failed to apply 0"
+
+
+"$DYNAMATIC_OPT_BIN" "$F_HANDSHAKE"_0.mlir --handshake-minimize-cst-width > "$F_HANDSHAKE"_1.mlir
+exit_on_fail "Failed to apply 1"
+
+
+"$DYNAMATIC_OPT_BIN" "$F_HANDSHAKE"_1.mlir --handshake-optimize-bitwidths="legacy" > "$F_HANDSHAKE"_2.mlir
+exit_on_fail "Failed to apply 2"
+
+
+"$DYNAMATIC_OPT_BIN" "$F_HANDSHAKE"_2.mlir --handshake-materialize > "$F_HANDSHAKE"_3.mlir
+exit_on_fail "Failed to apply 3"
+
+
+"$DYNAMATIC_OPT_BIN" "$F_HANDSHAKE"_3.mlir --handshake-infer-basic-blocks > "$F_HANDSHAKE_TRANSFORMED"
+exit_on_fail "Failed to apply 4"
 
 # Buffer placement
 if [[ $USE_SIMPLE_BUFFERS -ne 0 ]]; then

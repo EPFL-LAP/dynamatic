@@ -69,14 +69,17 @@ def ChannelType : Handshake_Type<"Channel", "channel"> {
   let parameters = (ins "::mlir::Type":$dataType, ExtraSignals:$extraSignals);
 
   let builders = [
-    TypeBuilderWithInferredContext<(ins "::mlir::Type":$dataType), [{
+    TypeBuilderWithInferredContext<(ins
+      "::mlir::Type":$dataType, 
+      CArg<"::mlir::ArrayRef<::dynamatic::handshake::ExtraSignal>", "{}">:$extras), 
+      [{
         if (::mlir::isa<::mlir::IndexType>(dataType)) {
           // Convert IndexType's to equivalent signless integers automatically
           ::mlir::OpBuilder builder(dataType.getContext());
           unsigned width = ::mlir::IndexType::kInternalStorageBitWidth;
           dataType = builder.getIntegerType(width);
         }
-        return ChannelType::get(dataType.getContext(), dataType, {});
+        return ChannelType::get(dataType.getContext(), dataType, extras);
       }]>
   ];
 
@@ -99,6 +102,12 @@ def ChannelType : Handshake_Type<"Channel", "channel"> {
 
     /// Returns the data type's bitwidth.
     unsigned getDataBitWidth() const;
+
+    /// Returns a channel type with identical extra signals but a potentially
+    /// different data type.
+    ChannelType withDataType(Type newDataType) {
+      return ChannelType::get(newDataType, getExtraSignals());
+    }
     
     /// Determines whether a type is supported as the data type or as the type
     /// of an extra signal.
@@ -116,6 +125,23 @@ def ChannelType : Handshake_Type<"Channel", "channel"> {
 // Type constraints
 //===----------------------------------------------------------------------===//
 
+def IsChannel : CPred<"::mlir::isa<::dynamatic::handshake::ChannelType>($_self)">;
+
+class ChannelHasDataType<string type> : CPred<
+  "::mlir::isa<" # type #
+  ">(::mlir::cast<::dynamatic::handshake::ChannelType>($_self).getDataType())"
+>;
+
+class ChannelHasDataWidth<int width> : CPred<
+  "::mlir::cast<::dynamatic::handshake::ChannelType>" #
+  "($_self).getDataBitWidth() == " # width
+>;
+
+class ChannelHasNumExtras<int numExtras> : CPred<
+  "::mlir::cast<::dynamatic::handshake::ChannelType>" #
+  "($_self).getNumExtraSignals() == " # numExtras
+>;
+
 def SignalType : Type<
   CPred<"::dynamatic::handshake::ChannelType::isSupportedSignalType($_self)">,
   "must be an `IntegerType` or `FloatType`"> {
@@ -129,40 +155,36 @@ def ChannelLikeType : Type<
   "must be a `handshake::ControlType` or `handshake::ChannelType` type"> {
 }
 
-def IsChannel : CPred<"::mlir::isa<::dynamatic::handshake::ChannelType>($_self)">;
-
-class IsChannelOfType<string type> : CPred<
-  "::mlir::isa<" # type #
-  ">(::mlir::cast<::dynamatic::handshake::ChannelType>($_self).getDataType())"
+class TypedChannel<string type> : TypeConstraint<
+  ChannelHasDataType<type>,
+  "must be a `handshake::ChannelType` type whose data is " # type,
+  "::dynamatic::handshake::ChannelType"
 >;
 
-class IsChannelOfDataWidth<int width> : CPred<
-  "::mlir::cast<::dynamatic::handshake::ChannelType>" #
-  "($_self).getDataBitWidth() == " # width
->;
+def IntChannelType : TypedChannel<"::mlir::IntegerType">;
+def FloatChannelType : TypedChannel<"::mlir::FloatType">;
 
-class ChannelTypeWithType<string type> : Type<
-  And<[IsChannel, IsChannelOfType<type>]>,
-  "must be a `handshake::ChannelType` type whose data is " # type # "}"
->;
-
-class ChannelTypeWithTypeAndWidth<string type, int width> : Type<
-  And<[IsChannel, IsChannelOfType<type>, IsChannelOfDataWidth<width>]>,
+class TypedSizedChannel<string type, int width> : TypeConstraint<
+  And<[ChannelHasDataType<type>, ChannelHasDataWidth<width>]>,
   "must be a `handshake::ChannelType` type whose data is " # type #
-  "} and whose bitwidth is " # width
+  " and whose bitwidth is " # width,
+  "::dynamatic::handshake::ChannelType"
 >;
 
-def IntChannelType : ChannelTypeWithType<"::mlir::IntegerType">;
-def FloatChannelType : ChannelTypeWithType<"::mlir::FloatType">;
-
-class IntChannelTypeOfWidth<int width> : ChannelTypeWithTypeAndWidth<
+class IntSizedChannel<int width> : TypedSizedChannel<
   "::mlir::IntegerType", width
 >;
 
-class FloatChannelTypeOfWidth<int width> : ChannelTypeWithTypeAndWidth<
+class FloatSizedChannel<int width> : TypedSizedChannel<
   "::mlir::FloatType", width
 >;
 
-def BoolChannelType : IntChannelTypeOfWidth<1>;
+def BoolChannel : IntSizedChannel<1>;
+
+def SimpleChannel : TypeConstraint<
+  ChannelHasNumExtras<0>,
+  "must be a `handshake::ChannelType` type with no extra signals",
+  "::dynamatic::handshake::ChannelType"
+>;
 
 #endif // DYNAMATIC_DIALECT_HANDSHAKE_HANDSHAKE_TYPES_TD

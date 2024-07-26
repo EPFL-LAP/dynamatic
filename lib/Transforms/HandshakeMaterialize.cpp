@@ -25,9 +25,18 @@
 using namespace mlir;
 using namespace dynamatic;
 
+/// Determines whether the value should be concerned by materialization rules;
+/// only SSA values with dataflow semantics must have a single use.
+static inline bool eligibleForMaterialization(Value val) {
+  return isa<handshake::ControlType, handshake::ChannelType>(val.getType());
+}
+
 LogicalResult dynamatic::verifyIRMaterialized(handshake::FuncOp funcOp) {
   auto checkUses = [&](Operation *op, Value val, StringRef desc,
                        unsigned idx) -> LogicalResult {
+    if (!eligibleForMaterialization(val))
+      return success();
+
     auto numUses = std::distance(val.getUses().begin(), val.getUses().end());
     if (numUses == 0)
       return op->emitError() << desc << " " << idx << " has no uses.";
@@ -77,6 +86,8 @@ static void replaceFirstUse(Operation *op, Value oldVal, Value newVal) {
 /// one uses) or a sink (if it has no uses) to ensure that it is used exactly
 /// once.
 static void materializeValue(Value val, OpBuilder &builder) {
+  if (!eligibleForMaterialization(val))
+    return;
   if (val.use_empty()) {
     builder.setInsertionPointAfterValue(val);
     builder.create<handshake::SinkOp>(val.getLoc(), val);

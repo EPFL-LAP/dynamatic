@@ -13,6 +13,7 @@
 
 #include "dynamatic/Transforms/HandshakePrepareForLegacy.h"
 #include "dynamatic/Dialect/Handshake/HandshakeOps.h"
+#include "dynamatic/Dialect/Handshake/HandshakeTypes.h"
 #include "dynamatic/Support/CFG.h"
 #include "dynamatic/Transforms/Passes.h"
 #include "mlir/Dialect/Arith/IR/Arith.h"
@@ -93,8 +94,11 @@ static void convertBranches(handshake::FuncOp funcOp, OpBuilder &builder) {
     else if (blockID == 0) {
       // If we are in the entry block, we can use the start input of the
       // function (last argument) as our control value
-      assert(funcOp.getArguments().back().getType().isa<NoneType>() &&
-             "expected last function argument to be a NoneType");
+      assert(funcOp.getArguments()
+                 .back()
+                 .getType()
+                 .isa<handshake::ControlType>() &&
+             "expected last function argument to be a !handshake.control");
       createNewBranches(blockBranchOps, funcOp.getArguments().back(), builder);
     } else
       // If we did not find a control merge with dataless inputs in the
@@ -115,7 +119,8 @@ static void convertBranches(handshake::FuncOp funcOp, OpBuilder &builder) {
     builder.setInsertionPointToStart(&funcOp.front());
     Value ctrl = builder
                      .create<handshake::SourceOp>(
-                         funcOp.front().front().getLoc(), builder.getNoneType())
+                         funcOp.front().front().getLoc(),
+                         handshake::ControlType::get(funcOp->getContext()))
                      .getResult();
     createNewBranches(branchesOutOfBlocks, ctrl, builder);
   }
@@ -135,7 +140,7 @@ struct SimplifyCMerges : public OpRewritePattern<handshake::ControlMergeOp> {
   LogicalResult matchAndRewrite(handshake::ControlMergeOp cmergeOp,
                                 PatternRewriter &rewriter) const override {
     // Only operate on control merges part of the control network
-    if (!cmergeOp.getResult().getType().isa<NoneType>())
+    if (!cmergeOp.getResult().getType().isa<handshake::ControlType>())
       return failure();
 
     auto numOperands = cmergeOp->getNumOperands();
@@ -160,11 +165,7 @@ struct SimplifyCMerges : public OpRewritePattern<handshake::ControlMergeOp> {
       // Create the attribute for the constant, whose type is derived from the
       // cmerge's index result (index or integer attribute)
       auto indexResType = cmergeOp.getIndex().getType();
-      TypedAttr constantAttr;
-      if (isa<IndexType>(indexResType))
-        constantAttr = rewriter.getIndexAttr(0);
-      else
-        constantAttr = rewriter.getIntegerAttr(indexResType, 0);
+      TypedAttr constantAttr = rewriter.getIntegerAttr(indexResType, 0);
 
       // Create the constant and replace the cmerge's index result
       auto constantOp = rewriter.create<handshake::ConstantOp>(

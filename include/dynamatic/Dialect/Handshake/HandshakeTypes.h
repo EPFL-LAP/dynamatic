@@ -20,6 +20,12 @@
 namespace dynamatic {
 namespace handshake {
 
+/// Returns the width of a type supported in Handshake-level IR. This is 0 for
+/// `handshake::ControlType`, the data type's width for
+/// `handshake::ChannelType`, or the regular width for the standard
+/// `IntegerType` and `FloatType`.
+unsigned getHandshakeTypeBitWidth(mlir::Type type);
+
 /// A dataflow channel's extra signal. The signal has a unique (within a
 /// channel's context) name, specific MLIR type, and a direction (downstream or
 /// upstream).

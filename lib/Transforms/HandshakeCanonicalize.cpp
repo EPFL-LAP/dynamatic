@@ -17,6 +17,7 @@
 #include "dynamatic/Transforms/HandshakeCanonicalize.h"
 #include "dynamatic/Dialect/Handshake/HandshakeCanonicalize.h"
 #include "dynamatic/Dialect/Handshake/HandshakeOps.h"
+#include "dynamatic/Dialect/Handshake/HandshakeTypes.h"
 #include "dynamatic/Support/CFG.h"
 #include "mlir/Transforms/GreedyPatternRewriteDriver.h"
 
@@ -94,7 +95,7 @@ struct EraseSingleInputControlMerges
 
       // Create a source operation for the constant
       handshake::SourceOp srcOp = rewriter.create<handshake::SourceOp>(
-          cmergeOp->getLoc(), rewriter.getNoneType());
+          cmergeOp->getLoc(), handshake::ControlType::get(getContext()));
       inheritBB(cmergeOp, srcOp);
 
       /// NOTE: Sourcing this value may cause problems with very exotic uses of

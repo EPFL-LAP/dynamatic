@@ -49,22 +49,24 @@ void PortNameGenerator::infer(Operation *op, IdxToStrF &inF, IdxToStrF &outF) {
 
 void PortNameGenerator::inferDefault(Operation *op) {
   llvm::TypeSwitch<Operation *, void>(op)
-      .Case<arith::AddFOp, arith::AddIOp, arith::AndIOp, arith::CmpIOp,
-            arith::CmpFOp, arith::DivFOp, arith::DivSIOp, arith::DivUIOp,
-            arith::MaximumFOp, arith::MinimumFOp, arith::MulFOp, arith::MulIOp,
-            arith::OrIOp, arith::ShLIOp, arith::ShRSIOp, arith::ShRUIOp,
-            arith::SubFOp, arith::SubIOp, arith::XOrIOp>([&](auto) {
+      .Case<handshake::AddFOp, handshake::AddIOp, handshake::AndIOp,
+            handshake::CmpIOp, handshake::CmpFOp, handshake::DivFOp,
+            handshake::DivSIOp, handshake::DivUIOp, handshake::MaximumFOp,
+            handshake::MinimumFOp, handshake::MulFOp, handshake::MulIOp,
+            handshake::OrIOp, handshake::ShLIOp, handshake::ShRSIOp,
+            handshake::ShRUIOp, handshake::SubFOp, handshake::SubIOp,
+            handshake::XOrIOp>([&](auto) {
         infer(
             op, [](unsigned idx) { return idx == 0 ? "lhs" : "rhs"; },
             [](unsigned idx) { return "result"; });
       })
-      .Case<arith::ExtSIOp, arith::ExtUIOp, arith::NegFOp, arith::TruncIOp>(
-          [&](auto) {
-            infer(
-                op, [](unsigned idx) { return "ins"; },
-                [](unsigned idx) { return "outs"; });
-          })
-      .Case<arith::SelectOp>([&](auto) {
+      .Case<handshake::ExtSIOp, handshake::ExtUIOp, handshake::NegFOp,
+            handshake::TruncIOp>([&](auto) {
+        infer(
+            op, [](unsigned idx) { return "ins"; },
+            [](unsigned idx) { return "outs"; });
+      })
+      .Case<handshake::SelectOp>([&](auto) {
         infer(
             op,
             [](unsigned idx) {
