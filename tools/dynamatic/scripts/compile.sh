@@ -13,9 +13,8 @@ OUTPUT_DIR=$3
 KERNEL_NAME=$4
 USE_SIMPLE_BUFFERS=$5
 TARGET_CP=$6
+POLYGEIST_PATH=$7
 
-# Binaries used during compilation
-POLYGEIST_PATH="$DYNAMATIC_DIR/polygeist"
 POLYGEIST_CLANG_BIN="$DYNAMATIC_DIR/bin/cgeist"
 CLANGXX_BIN="$DYNAMATIC_DIR/bin/clang++"
 DYNAMATIC_OPT_BIN="$DYNAMATIC_DIR/bin/dynamatic-opt"
@@ -153,7 +152,7 @@ else
   exit_on_fail "Failed to profile cf-level" "Profiled cf-level"
 
   # Smart buffer placement
-  echo_info "Running smart buffer placement"
+  echo_info "Running smart buffer placement with CP = $TARGET_CP"
   cd "$COMP_DIR"
   "$DYNAMATIC_OPT_BIN" "$F_HANDSHAKE_TRANSFORMED" \
     --handshake-set-buffering-properties="version=fpga20" \

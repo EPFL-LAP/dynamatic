@@ -17,6 +17,7 @@
 
 #include "dynamatic/Analysis/NameAnalysis.h"
 #include "dynamatic/Dialect/Handshake/HandshakeOps.h"
+#include "dynamatic/Support/Backedge.h"
 #include "dynamatic/Support/LLVM.h"
 
 namespace dynamatic {
@@ -37,7 +38,7 @@ class MemoryOpLowering {
 public:
   /// Constructs an instance of the class from a reference to a naming analysis
   /// that encompasses all memory accesses that are going to be replaced.
-  MemoryOpLowering(NameAnalysis &namer) : namer(namer){};
+  MemoryOpLowering(NameAnalysis &namer) : namer(namer) {};
 
   /// Records a replacement from the old operation to the new operation (both
   /// are meant to be memory accesses), naming both in the process if they were
@@ -87,7 +88,7 @@ public:
   /// trigger the start of memory access groups in the interface(s).
   MemoryInterfaceBuilder(handshake::FuncOp funcOp, Value memref,
                          const DenseMap<unsigned, Value> &ctrlVals)
-      : funcOp(funcOp), memref(memref), ctrlVals(ctrlVals){};
+      : funcOp(funcOp), memref(memref), ctrlVals(ctrlVals) {};
 
   /// Adds an access port to an MC. The operation must be a load or store
   /// access to an MC. The operation must be tagged with the basic block it
@@ -108,6 +109,13 @@ public:
   /// are set to nullptr if no interface of the type was created). Fails if the
   /// method could not determine memory inputs for the interface(s).
   LogicalResult instantiateInterfaces(OpBuilder &builder,
+                                      handshake::MemoryControllerOp &mcOp,
+                                      handshake::LSQOp &lsqOp);
+
+  /// Instantiates appropriate memory interfaces for all the ports that were
+  /// added to the builder so far using a pattern rewriter. See overload's
+  /// documentation for more details.
+  LogicalResult instantiateInterfaces(mlir::PatternRewriter &rewriter,
                                       handshake::MemoryControllerOp &mcOp,
                                       handshake::LSQOp &lsqOp);
 
@@ -177,6 +185,14 @@ private:
   /// For a provided memory interface and its memory ports, set the data operand
   /// of load-like operations with successive results of the memory interface.
   void addMemDataResultToLoads(InterfacePorts &ports, Operation *memIfaceOp);
+
+  /// Internal implementation of the interface instantiation logic, taking an
+  /// additional edge builder argument that was either created using a basic
+  /// operation builder or a conversion pattern rewriter.
+  LogicalResult instantiateInterfaces(OpBuilder &builder,
+                                      BackedgeBuilder &edgeBuilder,
+                                      handshake::MemoryControllerOp &mcOp,
+                                      handshake::LSQOp &lsqOp);
 };
 
 /// Aggregates LSQ generation information to be passed to the DOT printer under

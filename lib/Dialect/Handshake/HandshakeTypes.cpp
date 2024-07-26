@@ -11,10 +11,10 @@
 //===----------------------------------------------------------------------===//
 
 #include "dynamatic/Dialect/Handshake/HandshakeTypes.h"
-#include "mlir/IR/BuiltinTypes.h"
 #include "mlir/IR/DialectImplementation.h"
 #include "mlir/IR/OpImplementation.h"
 #include "mlir/Support/LLVM.h"
+#include "llvm/ADT/STLExtras.h"
 #include "llvm/ADT/StringRef.h"
 #include <set>
 
@@ -27,10 +27,6 @@ using namespace dynamatic::handshake;
 //===----------------------------------------------------------------------===//
 
 constexpr llvm::StringLiteral UPSTREAM_SYMBOL("U");
-
-static inline bool isSupportedSignalType(Type type) {
-  return isa<IndexType, IntegerType, FloatType>(type);
-}
 
 Type ChannelType::parse(AsmParser &odsParser) {
   FailureOr<Type> dataType;
@@ -128,7 +124,7 @@ void ChannelType::print(AsmPrinter &odsPrinter) const {
   odsPrinter << "<";
   odsPrinter.printStrippedAttrOrType(getDataType());
   if (!getExtraSignals().empty()) {
-    auto printSignal = [&](const ::dynamatic::handshake::ExtraSignal &signal) {
+    auto printSignal = [&](const ExtraSignal &signal) {
       odsPrinter << signal.name << ": " << signal.type;
       if (!signal.downstream)
         odsPrinter << "(" << UPSTREAM_SYMBOL << ")";
@@ -136,8 +132,7 @@ void ChannelType::print(AsmPrinter &odsPrinter) const {
 
     // Print all signals enclosed in square brackets
     odsPrinter << ", [";
-    for (const ::dynamatic::handshake::ExtraSignal &signal :
-         getExtraSignals().drop_back()) {
+    for (const ExtraSignal &signal : getExtraSignals().drop_back()) {
       printSignal(signal);
       odsPrinter << ", ";
     }
@@ -172,6 +167,19 @@ LogicalResult ChannelType::verify(function_ref<InFlightDiagnostic()> emitError,
   return success();
 }
 
+unsigned ChannelType::getNumDownstreamExtraSignals() const {
+  return llvm::count_if(getExtraSignals(), [](const ExtraSignal &extra) {
+    return extra.downstream;
+  });
+}
+
+unsigned ChannelType::getDataBitWidth() const {
+  Type dataType = getDataType();
+  assert(ChannelType::isSupportedSignalType(dataType) && "unsupported type");
+  return mlir::isa<IndexType>(dataType) ? IndexType::kInternalStorageBitWidth
+                                        : dataType.getIntOrFloatBitWidth();
+}
+
 ExtraSignal::Storage::Storage(StringRef name, mlir::Type type, bool downstream)
     : name(name), type(type), downstream(downstream) {}
 
@@ -180,6 +188,12 @@ ExtraSignal::ExtraSignal(StringRef name, mlir::Type type, bool downstream)
 
 ExtraSignal::ExtraSignal(const ExtraSignal::Storage &storage)
     : name(storage.name), type(storage.type), downstream(storage.downstream) {}
+
+unsigned ExtraSignal::getBitWidth() const {
+  assert(ChannelType::isSupportedSignalType(type) && "unsupported type");
+  return isa<IndexType>(type) ? IndexType::kInternalStorageBitWidth
+                              : type.getIntOrFloatBitWidth();
+}
 
 bool dynamatic::handshake::operator==(const ExtraSignal &lhs,
                                       const ExtraSignal &rhs) {
