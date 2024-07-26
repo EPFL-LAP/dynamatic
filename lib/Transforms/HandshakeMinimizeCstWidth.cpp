@@ -14,7 +14,6 @@
 //===----------------------------------------------------------------------===//
 
 #include "dynamatic/Transforms/HandshakeMinimizeCstWidth.h"
-#include "dynamatic/Analysis/ConstantAnalysis.h"
 #include "dynamatic/Dialect/Handshake/HandshakeOps.h"
 #include "dynamatic/Dialect/Handshake/HandshakeTypes.h"
 #include "dynamatic/Support/CFG.h"
@@ -28,6 +27,48 @@ STATISTIC(savedBits, "Number of saved bits");
 
 using namespace mlir;
 using namespace dynamatic;
+
+/// Determines whether the control value of two constants can be considered
+/// equivalent.
+static bool areCstCtrlEquivalent(Value ctrl, Value otherCtrl) {
+  if (ctrl == otherCtrl)
+    return true;
+
+  // Both controls are equivalent if they originate from sources in the same
+  // block
+  Operation *defOp = ctrl.getDefiningOp();
+  if (!defOp || !isa<handshake::SourceOp>(defOp))
+    return false;
+  Operation *otherDefOp = otherCtrl.getDefiningOp();
+  if (!otherDefOp || !isa<handshake::SourceOp>(otherDefOp))
+    return false;
+  std::optional<unsigned> block = getLogicBB(defOp);
+  std::optional<unsigned> otherBlock = getLogicBB(otherDefOp);
+  return block.has_value() && otherBlock.has_value() &&
+         block.value() == otherBlock.value();
+}
+
+handshake::ConstantOp
+dynamatic::findEquivalentCst(handshake::ConstantOp cstOp) {
+  auto cstAttr = cstOp.getValue();
+  auto funcOp = cstOp->getParentOfType<handshake::FuncOp>();
+  assert(funcOp && "constant should have parent function");
+
+  for (auto otherCstOp : funcOp.getOps<handshake::ConstantOp>()) {
+    // Don't match ourself
+    if (cstOp == otherCstOp)
+      continue;
+
+    // The constant operation needs to have the same value attribute and the
+    // same control
+    auto otherCstAttr = otherCstOp.getValue();
+    if (otherCstAttr == cstAttr &&
+        areCstCtrlEquivalent(cstOp.getCtrl(), otherCstOp.getCtrl()))
+      return otherCstOp;
+  }
+
+  return nullptr;
+}
 
 /// Inserts an extension op after the constant op that extends the constant's
 /// integer result to a provided destination type. The function assumes that it

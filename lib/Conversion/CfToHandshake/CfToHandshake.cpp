@@ -17,7 +17,6 @@
 //===----------------------------------------------------------------------===//
 
 #include "dynamatic/Conversion/CfToHandshake.h"
-#include "dynamatic/Analysis/ConstantAnalysis.h"
 #include "dynamatic/Analysis/NameAnalysis.h"
 #include "dynamatic/Dialect/Handshake/HandshakeDialect.h"
 #include "dynamatic/Dialect/Handshake/HandshakeInterfaces.h"
@@ -1096,6 +1095,24 @@ ConvertCalls::matchAndRewrite(func::CallOp callOp, OpAdaptor adaptor,
   else
     rewriter.replaceOp(callOp, instOp->getResults());
   return success();
+}
+
+/// Determines whether it is possible to transform an arith-level constant into
+/// a Handsahke-level constant that is triggered by an always-triggering source
+/// component without compromising the circuit semantics (e.g., without
+/// triggering a memory operation before the circuit "starts"). Returns false if
+/// the Handshake-level constant that replaces the input must instead be
+/// connected to the control-only network; returns true otherwise. This function
+/// assumes that the rest of the std-level operations have already been
+/// converted to their Handshake equivalent.
+/// NOTE: I doubt this works in half-degenerate cases, but this is the logic
+/// that legacy Dynamatic follows.
+static bool isCstSourcable(arith::ConstantOp cstOp) {
+  return llvm::all_of(cstOp->getUsers(), [](Operation *cstUser) {
+    return !isa<handshake::BranchOp, handshake::ConditionalBranchOp,
+                handshake::ReturnOp, handshake::LoadOpInterface,
+                handshake::StoreOpInterface>(cstUser);
+  });
 }
 
 LogicalResult
