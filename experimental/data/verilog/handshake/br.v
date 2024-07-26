@@ -26,6 +26,6 @@ module br #(
 		.outs_ready (outs_ready)
 	);
 	
-	assign outs = ints;
+	assign outs = ins;
 
 endmodule
