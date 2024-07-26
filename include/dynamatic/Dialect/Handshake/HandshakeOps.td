@@ -801,8 +801,8 @@ class Handshake_LoadOp<string mnemonic> : Handshake_Op<mnemonic, [
   AllTypesMatch<["data", "dataResult"]>,
   DeclareOpInterfaceMethods<NamedIOInterface, ["getOperandName", "getResultName"]>
 ]> {
-  let arguments = (ins ChannelType:$address, ChannelType:$data);
-  let results = (outs ChannelType:$addressResult, ChannelType:$dataResult);
+  let arguments = (ins IntChannelType:$address, ChannelType:$data);
+  let results = (outs IntChannelType:$addressResult, ChannelType:$dataResult);
   let builders = [OpBuilder<(ins "MemRefType":$memrefType, "Value":$address)>];
   let assemblyFormat = "`[` $address `]` $data attr-dict `:` type($address) `,` type($data)";
 
@@ -878,8 +878,8 @@ class Handshake_StoreOp<string mnemonic> : Handshake_Op<mnemonic, [
   AllTypesMatch<["data", "dataResult"]>,
   DeclareOpInterfaceMethods<NamedIOInterface, ["getOperandName", "getResultName"]>
 ]> {
-  let arguments = (ins ChannelType:$address, ChannelType:$data);
-  let results = (outs ChannelType:$addressResult, ChannelType:$dataResult);
+  let arguments = (ins IntChannelType:$address, ChannelType:$data);
+  let results = (outs IntChannelType:$addressResult, ChannelType:$dataResult);
   let assemblyFormat = "`[` $address `]` $data attr-dict `:` type($data) `,` type($address)";
 
   let extraClassDefinition = [{

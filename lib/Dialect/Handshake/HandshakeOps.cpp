@@ -2290,6 +2290,30 @@ CmpIOp::inferReturnTypes(MLIRContext *context, std::optional<Location> location,
 // ExtSIOp
 //===----------------------------------------------------------------------===//
 
+/// Folds an extension operation if it is preceeded by another extension
+/// operation of the same type of if its operand/result types are the same.
+template <typename Op>
+static OpFoldResult foldExtOp(Op op) {
+  if (auto defExtOp = op.getIn().template getDefiningOp<Op>()) {
+    // Bypass the preceeding extension operation
+    op.getInMutable().assign(defExtOp.getIn());
+    return op.getOut();
+  }
+
+  unsigned srcWidth = op.getIn().getType().getDataBitWidth();
+  unsigned dstWidth = op.getOut().getType().getDataBitWidth();
+  if (srcWidth == dstWidth)
+    return op.getIn();
+  return nullptr;
+}
+
+void ExtSIOp::getCanonicalizationPatterns(RewritePatternSet &results,
+                                          MLIRContext *context) {
+  results.add<ExtSIOfExtUI>(context);
+}
+
+OpFoldResult ExtSIOp::fold(FoldAdaptor adaptor) { return foldExtOp(*this); }
+
 /// Extension operations can only extend to a channel with a wider data type and
 /// identical extra signals.
 template <typename Op>
@@ -2305,30 +2329,6 @@ static LogicalResult verifyExtOp(Op op) {
   }
   return success();
 }
-
-/// Folds an extension operation if it is preceeded by another extension
-/// operation of the same type of if its operand/result types are the same.
-template <typename Op>
-static OpFoldResult foldExtOp(Op op) {
-  if (auto defExtOp = op.getIn().template getDefiningOp<Op>()) {
-    // Bypass the preceeding extension operation
-    op.getInMutable().assign(defExtOp.getIn());
-    return op.getOut();
-  }
-
-  unsigned srcWidth = op.getIn().getType().getDataBitWidth();
-  unsigned dstWidth = op.getOut().getType().getDataBitWidth();
-  if (srcWidth == dstWidth)
-    return op.getIn();
-  return op.getOut();
-}
-
-void ExtSIOp::getCanonicalizationPatterns(RewritePatternSet &results,
-                                          MLIRContext *context) {
-  results.add<ExtSIOfExtUI>(context);
-}
-
-OpFoldResult ExtSIOp::fold(FoldAdaptor adaptor) { return foldExtOp(*this); }
 
 LogicalResult ExtSIOp::verify() { return verifyExtOp(*this); }
 
