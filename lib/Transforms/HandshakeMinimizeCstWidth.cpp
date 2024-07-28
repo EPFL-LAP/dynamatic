@@ -156,13 +156,11 @@ struct MinimizeConstantBitwidth
         val.trunc(newWidth));
 
     if (auto otherCstOp = findEquivalentCst(newAttr, cstOp.getCtrl())) {
-      llvm::errs() << "Replacing with other constant\n";
       // Use the other constant's result and simply erase the matched constant
       rewriter.replaceOp(cstOp, insertExtOp(otherCstOp, cstOp, rewriter));
       return success();
     }
 
-    llvm::errs() << "Creating new constant\n";
     // Create a new constant to replace the matched one with
     auto newCstOp = rewriter.create<handshake::ConstantOp>(
         cstOp->getLoc(), newAttr, cstOp.getCtrl());
@@ -196,8 +194,6 @@ struct HandshakeMinimizeCstWidthPass
     patterns.add<MinimizeConstantBitwidth>(optNegatives, ctx);
     if (failed(applyPatternsAndFoldGreedily(mod, std::move(patterns), config)))
       return signalPassFailure();
-
-    mod->emitRemark();
 
     LLVM_DEBUG(llvm::dbgs() << "Number of saved bits is " << savedBits << "\n");
   };

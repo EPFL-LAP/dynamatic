@@ -2340,7 +2340,7 @@ OpFoldResult TruncIOp::fold(FoldAdaptor adaptor) {
   unsigned dstWidth = getOut().getType().getDataBitWidth();
   if (srcWidth == dstWidth)
     return getIn();
-  return getOut();
+  return nullptr;
 }
 
 LogicalResult TruncIOp::verify() {
