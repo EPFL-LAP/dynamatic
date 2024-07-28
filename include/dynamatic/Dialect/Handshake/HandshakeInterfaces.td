@@ -79,12 +79,12 @@ def SOSTInterface : OpInterface<"SOSTInterface"> {
       [{
         auto concreteOp = mlir::cast<ConcreteOp>($_op);
 
-        if (explicitSize) {
+        if (explicitSize)
           printer << " [" << concreteOp.getSize() << "]";
-        }
         printer << " " << concreteOp->getOperands();
         printer.printOptionalAttrDict(concreteOp->getAttrs());
-        printer << " : " << concreteOp.getDataType();
+        printer << " : ";
+        printer << concreteOp.getDataType();
       }]
     >
   ];

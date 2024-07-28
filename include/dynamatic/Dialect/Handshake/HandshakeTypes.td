@@ -33,6 +33,7 @@ def ControlType : Handshake_Type<"Control", "control"> {
   }];
 
   let parameters = (ins);
+  let assemblyFormat = "`<` `>`";
 }
 
 def ExtraSignals : TypeParameter<
@@ -147,7 +148,7 @@ def SignalType : Type<
   "must be an `IntegerType` or `FloatType`"> {
 }
 
-def ChannelLikeType : Type<
+def HandshakeType : Type<
   CPred<
     "::mlir::isa<::dynamatic::handshake::ControlType, " #
     "::dynamatic::handshake::ChannelType>($_self)"

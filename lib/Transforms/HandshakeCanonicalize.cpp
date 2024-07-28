@@ -34,7 +34,7 @@ struct EraseUnconditionalBranches
 
   LogicalResult matchAndRewrite(handshake::BranchOp brOp,
                                 PatternRewriter &rewriter) const override {
-    rewriter.replaceOp(brOp, brOp.getDataOperand());
+    rewriter.replaceOp(brOp, brOp.getOperand());
     return success();
   }
 };

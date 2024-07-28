@@ -32,14 +32,90 @@
 #include "mlir/IR/PatternMatch.h"
 #include "mlir/IR/Value.h"
 #include "mlir/Interfaces/FunctionImplementation.h"
+#include "mlir/Support/LogicalResult.h"
 #include "mlir/Transforms/InliningUtils.h"
 #include "llvm/ADT/STLExtras.h"
+#include "llvm/ADT/SmallVector.h"
 #include "llvm/ADT/TypeSwitch.h"
 #include "llvm/Support/ErrorHandling.h"
 
 using namespace mlir;
 using namespace dynamatic;
 using namespace dynamatic::handshake;
+
+static ParseResult parseHandshakeType(OpAsmParser &parser, Type &type) {
+  return parser.parseCustomTypeWithFallback(type, [&](Type &ty) -> ParseResult {
+    if ((ty = handshake::detail::jointHandshakeTypeParser(parser)))
+      return success();
+    return failure();
+  });
+}
+
+static ParseResult parseHandshakeTypes(OpAsmParser &parser,
+                                       SmallVectorImpl<Type> &types) {
+  do {
+    if (parseHandshakeType(parser, types.emplace_back()))
+      return failure();
+  } while (!parser.parseOptionalComma());
+  return success();
+}
+
+static void printHandshakeType(OpAsmPrinter &printer, Operation * /*op*/,
+                               Type type) {
+  if (auto controlType = dyn_cast<handshake::ControlType>(type)) {
+    controlType.print(printer);
+  } else if (auto channelType = dyn_cast<handshake::ChannelType>(type)) {
+    channelType.print(printer);
+  } else {
+    llvm_unreachable("not a handshake type");
+  }
+}
+
+static void printHandshakeTypes(OpAsmPrinter &printer, Operation * /*op*/,
+                                TypeRange types) {
+  if (types.empty())
+    return;
+  for (Type ty : types.drop_back()) {
+    printHandshakeType(printer, nullptr, ty);
+    printer << ", ";
+  }
+  printHandshakeType(printer, nullptr, types.back());
+}
+
+static void printHandshakeType(OpAsmPrinter &printer, Type type) {
+  printHandshakeType(printer, nullptr, type);
+}
+
+static ParseResult parseSingleTypedHandshakeOp(
+    OpAsmParser &parser, OpAsmParser::UnresolvedOperand &operand,
+    NamedAttrList &attributes, Type &type, SmallVectorImpl<Type> &resTypes) {
+  // Parse the operation's size between square brackets
+  unsigned size;
+  if (parser.parseLSquare() || parser.parseInteger(size) ||
+      parser.parseRSquare())
+    return failure();
+
+  // Parse the single operand and attribute dictionnary
+  if (parser.parseOperand(operand) || parser.parseOptionalAttrDict(attributes))
+    return failure();
+
+  // Parse the single handshake type common to all operands and results
+  if (parser.parseColon() || parseHandshakeType(parser, type))
+    return failure();
+  resTypes.assign(size, type);
+  return success();
+}
+
+static void printSingleTypedHandshakeOp(OpAsmPrinter &printer, Operation *op,
+                                        Value operand,
+                                        DictionaryAttr attributes, Type type,
+                                        TypeRange resTypes) {
+  printer << " [" << resTypes.size() << "]";
+  printer << " " << operand;
+  printer.printOptionalAttrDict(attributes.getValue());
+  printer << " : ";
+  printHandshakeType(printer, type);
+}
 
 /// Parses an SOST operation. If the `explicitSize` parameter is set to true,
 /// then the method parses the operation's size (in the SOST sense) between
@@ -58,7 +134,7 @@ parseSOSTOp(bool explicitSize, OpAsmParser &parser,
   }
   if (parser.parseOperandList(operands) ||
       parser.parseOptionalAttrDict(result.attributes) || parser.parseColon() ||
-      parser.parseType(type))
+      parseHandshakeType(parser, type))
     return failure();
 
   if (!explicitSize)
@@ -104,6 +180,13 @@ static bool isControlCheckTypeAndOperand(Type dataType, Value operand) {
          operand == defOp->getResult(0);
 }
 
+IntegerType
+dynamatic::handshake::getOptimizedIndexValType(OpBuilder &builder,
+                                               unsigned numToIndex) {
+  return builder.getIntegerType(std::max(
+      1U, APInt(APInt::APINT_BITS_PER_WORD, numToIndex).ceilLogBase2()));
+}
+
 //===----------------------------------------------------------------------===//
 // TableGen'd canonicalization patterns
 //===----------------------------------------------------------------------===//
@@ -117,76 +200,14 @@ namespace {
 } // namespace
 
 //===----------------------------------------------------------------------===//
-// ForkOp
+// MergeOp
 //===----------------------------------------------------------------------===//
 
-IntegerType
-dynamatic::handshake::getOptimizedIndexValType(OpBuilder &builder,
-                                               unsigned numToIndex) {
-  return builder.getIntegerType(
-      APInt(APInt::APINT_BITS_PER_WORD, numToIndex).ceilLogBase2());
-}
-
-unsigned ForkOp::getSize() { return getResults().size(); }
-
-static ParseResult parseForkOp(OpAsmParser &parser, OperationState &result) {
-  SmallVector<OpAsmParser::UnresolvedOperand, 4> allOperands;
-  Type type;
-  ArrayRef<Type> operandTypes(type);
-  SmallVector<Type, 1> resultTypes;
-  llvm::SMLoc allOperandLoc = parser.getCurrentLocation();
-  unsigned size;
-  if (parseSOSTOp(true, parser, allOperands, result, size, type))
-    return failure();
-
-  resultTypes.assign(size, type);
-  result.addTypes(resultTypes);
-  if (parser.resolveOperands(allOperands, operandTypes, allOperandLoc,
-                             result.operands))
-    return failure();
-  return success();
-}
-
-ParseResult ForkOp::parse(OpAsmParser &parser, OperationState &result) {
-  return parseForkOp(parser, result);
-}
-
-void ForkOp::print(OpAsmPrinter &p) { sostPrint(p, true); }
-
-unsigned LazyForkOp::getSize() { return getResults().size(); }
-
-bool LazyForkOp::sostIsControl() {
-  return isControlCheckTypeAndOperand(getDataType(), getOperand());
-}
-
-ParseResult LazyForkOp::parse(OpAsmParser &parser, OperationState &result) {
-  return parseForkOp(parser, result);
-}
-
-void LazyForkOp::print(OpAsmPrinter &p) { sostPrint(p, true); }
-
-ParseResult MergeOp::parse(OpAsmParser &parser, OperationState &result) {
-  SmallVector<OpAsmParser::UnresolvedOperand, 4> allOperands;
-  Type type;
-  ArrayRef<Type> operandTypes(type);
-  SmallVector<Type, 1> resultTypes, dataOperandsTypes;
-  llvm::SMLoc allOperandLoc = parser.getCurrentLocation();
-  unsigned size;
-  if (parseSOSTOp(false, parser, allOperands, result, size, type))
-    return failure();
-
-  dataOperandsTypes.assign(size, type);
-  resultTypes.push_back(type);
-  result.addTypes(resultTypes);
-  if (parser.resolveOperands(allOperands, dataOperandsTypes, allOperandLoc,
-                             result.operands))
-    return failure();
-  return success();
-}
-
-void MergeOp::print(OpAsmPrinter &p) { sostPrint(p, false); }
-
 OpResult MergeOp::getDataResult() { return cast<OpResult>(getResult()); }
+
+//===----------------------------------------------------------------------===//
+// MuxOp
+//===----------------------------------------------------------------------===//
 
 LogicalResult
 MuxOp::inferReturnTypes(MLIRContext *context, std::optional<Location> location,
@@ -210,14 +231,15 @@ bool MuxOp::isControl() {
 ParseResult MuxOp::parse(OpAsmParser &parser, OperationState &result) {
   OpAsmParser::UnresolvedOperand selectOperand;
   SmallVector<OpAsmParser::UnresolvedOperand, 4> allOperands;
-  Type selectType, dataType;
-  SmallVector<Type, 1> dataOperandsTypes;
+  handshake::ChannelType selectType;
+  Type dataType;
+  SmallVector<Type, 2> dataOperandsTypes;
   llvm::SMLoc allOperandLoc = parser.getCurrentLocation();
   if (parser.parseOperand(selectOperand) || parser.parseLSquare() ||
       parser.parseOperandList(allOperands) || parser.parseRSquare() ||
       parser.parseOptionalAttrDict(result.attributes) || parser.parseColon() ||
-      parser.parseType(selectType) || parser.parseComma() ||
-      parser.parseType(dataType))
+      parser.parseCustomTypeWithFallback(selectType) || parser.parseComma() ||
+      parseHandshakeType(parser, dataType))
     return failure();
 
   int size = allOperands.size();
@@ -234,14 +256,16 @@ ParseResult MuxOp::parse(OpAsmParser &parser, OperationState &result) {
 }
 
 void MuxOp::print(OpAsmPrinter &p) {
-  Type selectType = getSelectOperand().getType();
-  auto ops = getOperands();
-  p << ' ' << ops.front();
+  OperandRange operands = getOperands();
+  p << ' ' << operands.front();
   p << " [";
-  p.printOperands(ops.drop_front());
+  p.printOperands(operands.drop_front());
   p << "]";
   p.printOptionalAttrDict((*this)->getAttrs());
-  p << " : " << selectType << ", " << getResult().getType();
+  p << " : ";
+  p.printStrippedAttrOrType(getSelectOperand().getType());
+  p << ", ";
+  printHandshakeType(p, getResult().getType());
 }
 
 LogicalResult MuxOp::verify() {
@@ -251,16 +275,19 @@ LogicalResult MuxOp::verify() {
 
 OpResult MuxOp::getDataResult() { return cast<OpResult>(getResult()); }
 
+//===----------------------------------------------------------------------===//
+// ControlMergeOp
+//===----------------------------------------------------------------------===//
+
 ParseResult ControlMergeOp::parse(OpAsmParser &parser, OperationState &result) {
   SmallVector<OpAsmParser::UnresolvedOperand, 4> allOperands;
-  Type resultType, indexType;
+  handshake::ChannelType indexType;
+  Type resultType;
   SmallVector<Type> resultTypes, dataOperandsTypes;
   llvm::SMLoc allOperandLoc = parser.getCurrentLocation();
   unsigned size;
-  if (parseSOSTOp(false, parser, allOperands, result, size, resultType))
-    return failure();
-
-  if (parser.parseComma() || parser.parseType(indexType))
+  if (parseSOSTOp(false, parser, allOperands, result, size, resultType) ||
+      parser.parseComma() || parser.parseCustomTypeWithFallback(indexType))
     return failure();
 
   dataOperandsTypes.assign(size, resultType);
@@ -274,17 +301,25 @@ ParseResult ControlMergeOp::parse(OpAsmParser &parser, OperationState &result) {
 }
 
 void ControlMergeOp::print(OpAsmPrinter &p) {
-  sostPrint(p, false);
-  // Print type of index result
-  p << ", " << getIndex().getType();
+  p << " " << getOperands() << " ";
+  p.printOptionalAttrDict((*this)->getAttrs());
+  p << " : ";
+  printHandshakeType(p, getResult().getType());
+  p << ", ";
+  p.printStrippedAttrOrType(getIndex().getType());
 }
 
 LogicalResult ControlMergeOp::verify() {
-  auto operands = getOperands();
-  if (operands.empty())
+  TypeRange operandTypes = getOperandTypes();
+  if (operandTypes.empty())
     return emitOpError("operation must have at least one operand");
-  if (operands[0].getType() != getResult().getType())
-    return emitOpError("type of first result should match type of operands");
+  Type refType = operandTypes.front();
+  for (Type type : operandTypes.drop_front()) {
+    if (refType != type)
+      return emitOpError("all operands should have the same type");
+  }
+  if (refType != getResult().getType())
+    return emitOpError("type of data result should match type of operands");
   return verifyIndexWideEnough(*this, getIndex(), getNumOperands());
 }
 
@@ -509,80 +544,10 @@ bool BranchOp::sostIsControl() {
   return isControlCheckTypeAndOperand(getDataType(), getOperand());
 }
 
-ParseResult BranchOp::parse(OpAsmParser &parser, OperationState &result) {
-  SmallVector<OpAsmParser::UnresolvedOperand, 4> allOperands;
-  Type type;
-  ArrayRef<Type> operandTypes(type);
-  llvm::SMLoc allOperandLoc = parser.getCurrentLocation();
-  unsigned size;
-  if (parseSOSTOp(false, parser, allOperands, result, size, type))
-    return failure();
-
-  SmallVector<Type, 1> dataOperandsTypes;
-  dataOperandsTypes.push_back(type);
-  result.addTypes({type});
-  if (parser.resolveOperands(allOperands, dataOperandsTypes, allOperandLoc,
-                             result.operands))
-    return failure();
-  return success();
-}
-
-void BranchOp::print(OpAsmPrinter &p) { sostPrint(p, false); }
-
-ParseResult ConditionalBranchOp::parse(OpAsmParser &parser,
-                                       OperationState &result) {
-  SmallVector<OpAsmParser::UnresolvedOperand, 4> allOperands;
-  Type dataType;
-  SmallVector<Type> operandTypes;
-  llvm::SMLoc allOperandLoc = parser.getCurrentLocation();
-  if (parser.parseOperandList(allOperands) ||
-      parser.parseOptionalAttrDict(result.attributes) ||
-      parser.parseColonType(dataType))
-    return failure();
-
-  if (allOperands.size() != 2)
-    return parser.emitError(parser.getCurrentLocation(),
-                            "Expected exactly 2 operands");
-
-  result.addTypes({dataType, dataType});
-  Type i1Type = IntegerType::get(parser.getContext(), 1);
-  operandTypes.push_back(handshake::ChannelType::get(i1Type));
-  operandTypes.push_back(dataType);
-  if (parser.resolveOperands(allOperands, operandTypes, allOperandLoc,
-                             result.operands))
-    return failure();
-
-  return success();
-}
-
-void ConditionalBranchOp::print(OpAsmPrinter &p) {
-  Type type = getDataOperand().getType();
-  p << " " << getOperands();
-  p.printOptionalAttrDict((*this)->getAttrs());
-  p << " : " << type;
-}
-
 bool ConditionalBranchOp::isControl() {
   return isControlCheckTypeAndOperand(getDataOperand().getType(),
                                       getDataOperand());
 }
-
-ParseResult SinkOp::parse(OpAsmParser &parser, OperationState &result) {
-  SmallVector<OpAsmParser::UnresolvedOperand, 4> allOperands;
-  Type type;
-  ArrayRef<Type> operandTypes(type);
-  llvm::SMLoc allOperandLoc = parser.getCurrentLocation();
-  unsigned size;
-  if (parseSOSTOp(false, parser, allOperands, result, size, type))
-    return failure();
-
-  if (parser.resolveOperands(allOperands, operandTypes, allOperandLoc,
-                             result.operands))
-    return failure();
-  return success();
-}
-
-void SinkOp::print(OpAsmPrinter &p) { sostPrint(p, false); }
 
 Type SourceOp::getDataType() { return getResult().getType(); }
 unsigned SourceOp::getSize() { return 1; }

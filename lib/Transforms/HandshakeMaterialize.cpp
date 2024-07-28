@@ -145,7 +145,7 @@ static void makeLSQControlForksLazy(handshake::LSQOp lsqOp, Value lsqCtrl,
   // continues to other group allocations to the same LSQ.
   unsigned numControlPaths = controlValues.size();
   unsigned numLazyResults = numControlPaths;
-  bool createEagerFork = controlValues.size() < ctrlForkOp.getSize();
+  bool createEagerFork = controlValues.size() < ctrlForkOp->getNumResults();
   if (createEagerFork) {
     // To minimize the damage to performance, as many outputs of the control
     // fork as possible should remain "eager". We achieve this by creating an
@@ -168,7 +168,7 @@ static void makeLSQControlForksLazy(handshake::LSQOp lsqOp, Value lsqCtrl,
   if (createEagerFork) {
     // If some of the control fork's outputs go outside the memory control
     // network, create an eager fork fed by the lazy fork's last result
-    unsigned numEagerResults = ctrlForkOp.getSize() - numControlPaths;
+    unsigned numEagerResults = ctrlForkOp->getNumResults() - numControlPaths;
     handshake::ForkOp eagerForkOp = builder.create<handshake::ForkOp>(
         ctrlForkOp->getLoc(), lazyForkOp->getResults().back(), numEagerResults);
     inheritBB(ctrlForkOp, eagerForkOp);
@@ -258,7 +258,8 @@ struct EliminateForksToForks : OpRewritePattern<handshake::ForkOp> {
     bool isForkOprdSingleUse = forkOprd.hasOneUse();
 
     // Create a new combined fork to replace the two others
-    unsigned totalNumResults = forkOp.getSize() + defForkOp.getSize();
+    unsigned totalNumResults =
+        forkOp->getNumResults() + defForkOp.getNumResults();
     if (isForkOprdSingleUse)
       --totalNumResults;
     rewriter.setInsertionPoint(defForkOp);
@@ -278,7 +279,7 @@ struct EliminateForksToForks : OpRewritePattern<handshake::ForkOp> {
 
     // Replace the results of the matched fork with the corresponding results of
     // the new defining fork
-    rewriter.replaceOp(forkOp, newResults.take_back(forkOp.getSize()));
+    rewriter.replaceOp(forkOp, newResults.take_back(forkOp.getNumResults()));
     return success();
   }
 };
@@ -291,7 +292,7 @@ struct EraseSingleOutputForks : OpRewritePattern<handshake::ForkOp> {
   LogicalResult matchAndRewrite(handshake::ForkOp forkOp,
                                 PatternRewriter &rewriter) const override {
     // The fork must have a single result
-    if (forkOp.getSize() != 1)
+    if (forkOp.getNumResults() != 1)
       return failure();
 
     // The defining operation must not be a lazy fork, otherwise the fork may be

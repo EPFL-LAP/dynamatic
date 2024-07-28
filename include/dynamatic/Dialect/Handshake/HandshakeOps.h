@@ -30,7 +30,7 @@ namespace dynamatic {
 namespace handshake {
 
 /// Returns an IntegerType that has the lowest possible number of bits necessary
-/// to index into a given number of elements.
+/// to index into a given number of elements (minimum 1 bit).
 IntegerType getOptimizedIndexValType(OpBuilder &builder, unsigned numToIndex);
 
 // Forward declaration needed by memory ports data structures.

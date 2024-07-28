@@ -33,6 +33,7 @@ namespace dynamatic {
 namespace handshake {
 
 namespace detail {
+
 /// `PreservesExtraSignals` trait's verification function (defined as a free
 /// function to avoid instantiating an implementation for every concrete
 /// operation type).

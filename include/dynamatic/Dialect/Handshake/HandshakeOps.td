@@ -227,9 +227,9 @@ class Handshake_BufferOp<string mnemonic> : Handshake_Op<mnemonic, [
   BufferOpInterface, HasClock, SameOperandsAndResultType,
   DeclareOpInterfaceMethods<SOSTInterface, ["getSize"]>,
 ]> {
-  let arguments = (ins ChannelLikeType:$operand,
+  let arguments = (ins HandshakeType:$operand,
                        ConfinedAttr<I32Attr, [IntMinValue<1>]>:$slots);
-  let results = (outs ChannelLikeType:$result);
+  let results = (outs HandshakeType:$result);
 
   let extraClassDefinition = [{
     /// Custom implementation of the SOST::getSize method for buffers. Simply
@@ -298,24 +298,25 @@ def TEHBOp : Handshake_BufferOp<"tehb"> {
 class Handshake_ForkOp<string mnemonic, list<Trait> traits = []> : 
   Handshake_Op<mnemonic, traits # [Pure, HasClock, SameOperandsAndResultType]>
 {
-  let arguments = (ins ChannelLikeType:$operand);
-  let results = (outs Variadic<ChannelLikeType>:$result);
+  let arguments = (ins HandshakeType:$operand);
+  let results = (outs Variadic<HandshakeType>:$result);
 
   let builders = [OpBuilder<
     (ins "Value":$operand, "unsigned":$size), [{
       $_state.addOperands(operand);
       SmallVector<Type> resultTypes {size, operand.getType()};
       $_state.addTypes(resultTypes);
-  }]>];
+    }]>
+  ];
 
-  let hasCustomAssemblyFormat = 1;
+  let assemblyFormat = [{ 
+    custom<SingleTypedHandshakeOp>($operand, attr-dict,
+                                   type($operand), type($result))
+  }];
 }
 
-
-def ForkOp : Handshake_ForkOp<"fork", [
-  DeclareOpInterfaceMethods<SOSTInterface, ["getSize"]>
-]> {
-  let summary = "fork operation";
+def ForkOp : Handshake_ForkOp<"fork"> {
+  let summary = "eager fork operation";
   let description = [{
     A single input is replicated to N outputs and distributed to each
     output as soon as the corresponding successor is available.
@@ -328,9 +329,7 @@ def ForkOp : Handshake_ForkOp<"fork", [
   }];
 }
 
-def LazyForkOp : Handshake_ForkOp<"lazy_fork", [
-  DeclareOpInterfaceMethods<SOSTInterface, ["getSize", "sostIsControl"]>
-]> {
+def LazyForkOp : Handshake_ForkOp<"lazy_fork"> {
   let summary = "lazy fork operation";
   let description = [{
     A single input is replicated to N outputs and distributed to each
@@ -361,9 +360,12 @@ def MergeOp : Handshake_Op<"merge", [
     ```
   }];
 
-  let arguments = (ins Variadic<ChannelLikeType>:$dataOperands);
-  let results = (outs ChannelLikeType:$result);
-  let hasCustomAssemblyFormat = 1;
+  let arguments = (ins Variadic<HandshakeType>:$dataOperands);
+  let results = (outs HandshakeType:$result);
+  
+  let assemblyFormat = [{
+    $dataOperands attr-dict `:` custom<HandshakeType>(type($result))
+  }];
 }
 
 def MuxOp : Handshake_Op<"mux", [
@@ -394,8 +396,9 @@ def MuxOp : Handshake_Op<"mux", [
     ```
   }];
   let arguments = (ins IntChannelType:$selectOperand,
-                       Variadic<ChannelLikeType>:$dataOperands);
-  let results = (outs ChannelLikeType:$result);
+                       Variadic<HandshakeType>:$dataOperands);
+  let results = (outs HandshakeType:$result);
+
   let hasCustomAssemblyFormat = 1;
   let hasVerifier = 1;
 }
@@ -420,8 +423,8 @@ def ControlMergeOp : Handshake_Op<"control_merge", [
     ```
   }];
 
-  let arguments = (ins Variadic<ChannelLikeType>:$dataOperands);
-  let results = (outs ChannelLikeType:$result, ChannelType:$index);
+  let arguments = (ins Variadic<HandshakeType>:$dataOperands);
+  let results = (outs HandshakeType:$result, ChannelType:$index);
   
   let builders = [OpBuilder<
     (ins "ValueRange":$operands), [{
@@ -456,9 +459,12 @@ def BranchOp : Handshake_Op<"br", [
     %1 = br %0 : !handshake.channel<i32>
     ```
   }];
-  let arguments = (ins ChannelLikeType:$dataOperand);
-  let results = (outs ChannelLikeType:$dataResult);
-  let hasCustomAssemblyFormat = 1;
+  let arguments = (ins HandshakeType:$operand);
+  let results = (outs HandshakeType:$result);
+  
+  let assemblyFormat = [{
+    $operand attr-dict `:` custom<HandshakeType>(type($result))
+  }];
 }
 
 def ConditionalBranchOp : Handshake_Op<"cond_br", [
@@ -477,15 +483,20 @@ def ConditionalBranchOp : Handshake_Op<"cond_br", [
     Example:
 
     ```mlir
-    %true, %false = conditional_branch %cond, %data : !handshake.channel<i32>
+    %true, %false = cond_br %cond, %data : !handshake.control<i1>, 
+      !handshake.channel<i32>
     ```
   }];
 
   let arguments = (ins BoolChannel:$conditionOperand,
-                       ChannelLikeType:$dataOperand);
-  let results = (outs ChannelLikeType:$trueResult,
-                      ChannelLikeType:$falseResult);
-  let hasCustomAssemblyFormat = 1;
+                       HandshakeType:$dataOperand);
+  let results = (outs HandshakeType:$trueResult,
+                      HandshakeType:$falseResult);
+  
+  let assemblyFormat = [{
+    $conditionOperand `,` $dataOperand attr-dict
+      `:` type($conditionOperand) `,` custom<HandshakeType>(type($dataOperand))
+  }];
   let extraClassDeclaration = [{
     // These are the indices into the dests list.
     enum { trueIndex = 0, falseIndex = 1 };
@@ -505,8 +516,8 @@ def SinkOp : Handshake_Op<"sink", [SOSTInterface]> {
     ```
   }];
   
-  let arguments = (ins ChannelLikeType:$operand);
-  let hasCustomAssemblyFormat = 1;
+  let arguments = (ins HandshakeType:$operand);
+  let assemblyFormat = "$operand attr-dict `:` type($operand)";
 }
 
 def SourceOp : Handshake_Op<"source", [
@@ -960,9 +971,12 @@ def ReturnOp : Handshake_Op<"return", [
     ```
   }];
 
-  let arguments = (ins Variadic<ChannelLikeType>:$inputs);
-  let results = (outs Variadic<ChannelLikeType>:$outputs);
-  let assemblyFormat = "attr-dict ($inputs^ `:` type($inputs))? ";
+  let arguments = (ins Variadic<HandshakeType>:$inputs);
+  let results = (outs Variadic<HandshakeType>:$outputs);
+  let assemblyFormat = [{
+    attr-dict ($inputs^ `:` custom<HandshakeTypes>(type($inputs)))?
+  }];
+  
   let hasVerifier = 1;
 }
 
@@ -984,10 +998,12 @@ def EndOp : Handshake_Op<"end", [
     ```
   }];
 
-  let arguments = (ins Variadic<ChannelLikeType>:$inputs);
+  let arguments = (ins Variadic<HandshakeType>:$inputs);
 
-  let hasVerifier = 1;
-  let assemblyFormat = "attr-dict ($inputs^ `:` type($inputs))? ";
+  let assemblyFormat = [{
+    attr-dict ($inputs^ `:` custom<HandshakeTypes>(type($inputs)))?
+  }];
+  
   let extraClassDeclaration = [{
     /// Returns the range of operands that are actual function return values.
     mlir::ValueRange getReturnValues();
@@ -995,6 +1011,8 @@ def EndOp : Handshake_Op<"end", [
     /// Returns the range of operands that are memory control signals.
     mlir::ValueRange getMemoryControls();
   }];
+
+  let hasVerifier = 1;
 }
 
 //===----------------------------------------------------------------------===//
@@ -1201,7 +1219,7 @@ def BundleOp : Handshake_Op<"bundle", [Pure]> {
   }];
 
   let arguments = (ins Variadic<AnyType>:$signals);
-  let results = (outs ChannelLikeType:$channel, Variadic<SignalType>: $upstreams);
+  let results = (outs HandshakeType:$channel, Variadic<SignalType>: $upstreams);
 
   let skipDefaultBuilders = 1;
   let builders = [
@@ -1266,7 +1284,7 @@ def UnbundleOp : Handshake_Op<"unbundle", [
     ```
   }];
 
-  let arguments = (ins ChannelLikeType:$channel, Variadic<SignalType>: $upstreams);
+  let arguments = (ins HandshakeType:$channel, Variadic<SignalType>: $upstreams);
   let results = (outs Variadic<AnyType>:$signals);
 
   let builders = [

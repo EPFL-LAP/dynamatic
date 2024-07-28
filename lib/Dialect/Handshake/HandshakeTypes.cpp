@@ -25,6 +25,45 @@ using namespace mlir;
 using namespace dynamatic;
 using namespace dynamatic::handshake;
 
+// static OptionalParseResult generatedTypeParser(AsmParser &parser,
+//                                                ::llvm::StringRef *mnemonic,
+//                                                Type &value) {
+//   return AsmParser::KeywordSwitch<OptionalParseResult>(parser)
+//       .Case(::dynamatic::handshake::ChannelType::getMnemonic(),
+//             [&](llvm::StringRef, llvm::SMLoc) {
+//               value = ::dynamatic::handshake::ChannelType::parse(parser);
+//               return success(!!value);
+//             })
+//       .Case(::dynamatic::handshake::ControlType::getMnemonic(),
+//             [&](llvm::StringRef, llvm::SMLoc) {
+//               value =
+//                   ::dynamatic::handshake::ControlType::get(parser.getContext());
+//               return success(!!value);
+//             })
+//       .Default([&](llvm::StringRef keyword, llvm::SMLoc) {
+//         *mnemonic = keyword;
+//         return std::nullopt;
+//       });
+// }
+
+// static LogicalResult generatedTypePrinter(Type def, AsmPrinter &printer) {
+//   return ::llvm::TypeSwitch<Type, LogicalResult>(def)
+//       .Case<::dynamatic::handshake::ChannelType>([&](auto t) {
+//         printer << ::dynamatic::handshake::ChannelType::getMnemonic();
+//         t.print(printer);
+//         return success();
+//       })
+//       .Case<::dynamatic::handshake::ControlType>([&](auto t) {
+//         printer << ::dynamatic::handshake::ControlType::getMnemonic();
+//         return success();
+//       })
+//       .Default([](auto) { return failure(); });
+// }
+
+//===----------------------------------------------------------------------===//
+// ControlType
+//===----------------------------------------------------------------------===//
+
 //===----------------------------------------------------------------------===//
 // ChannelType
 //===----------------------------------------------------------------------===//
@@ -42,28 +81,24 @@ unsigned dynamatic::handshake::getHandshakeTypeBitWidth(Type type) {
       });
 }
 
-constexpr llvm::StringLiteral UPSTREAM_SYMBOL("U");
+static constexpr llvm::StringLiteral UPSTREAM_SYMBOL("U");
 
-Type ChannelType::parse(AsmParser &odsParser) {
+static Type parseChannelAfterLess(AsmParser &odsParser) {
   FailureOr<Type> dataType;
   FailureOr<SmallVector<ExtraSignal::Storage>> extraSignalsStorage;
-
-  // Parse literal '<'
-  if (odsParser.parseLess())
-    return {};
 
   // Parse variable 'dataType'
   dataType = FieldParser<Type>::parse(odsParser);
   if (failed(dataType)) {
     odsParser.emitError(odsParser.getCurrentLocation(),
                         "failed to parse ChannelType parameter 'dataType' "
-                        "which is to be a `Type`");
+                        "which is to be a Type");
     return nullptr;
   }
-  if (!isSupportedSignalType(*dataType)) {
+  if (!ChannelType::isSupportedSignalType(*dataType)) {
     odsParser.emitError(odsParser.getCurrentLocation(),
                         "failed to parse ChannelType parameter 'dataType' "
-                        "which must be `IntegerType` or `FloatType`");
+                        "which must be IntegerType or FloatType");
     return nullptr;
   }
 
@@ -89,7 +124,7 @@ Type ChannelType::parse(AsmParser &odsParser) {
         // Parse colon and type and check type legality
         if (odsParser.parseColon() || odsParser.parseType(signal.type))
           return failure();
-        if (!isSupportedSignalType(signal.type)) {
+        if (!ChannelType::isSupportedSignalType(signal.type)) {
           odsParser.emitError(odsParser.getCurrentLocation(),
                               "failed to parse extra signal type which must be "
                               "IntegerType or FloatType");
@@ -118,7 +153,7 @@ Type ChannelType::parse(AsmParser &odsParser) {
   if (failed(extraSignalsStorage)) {
     odsParser.emitError(odsParser.getCurrentLocation(),
                         "failed to parse ChannelType parameter 'extraSignals' "
-                        "which is to be a `ArrayRef<ExtraSignal>`");
+                        "which is to be a ArrayRef<ExtraSignal>");
     return nullptr;
   }
 
@@ -133,6 +168,13 @@ Type ChannelType::parse(AsmParser &odsParser) {
     extraSignals.emplace_back(signalStorage);
 
   return ChannelType::get(odsParser.getContext(), *dataType, extraSignals);
+}
+
+Type ChannelType::parse(AsmParser &odsParser) {
+  // Parse literal '<'
+  if (odsParser.parseLess())
+    return {};
+  return parseChannelAfterLess(odsParser);
 }
 
 void ChannelType::print(AsmPrinter &odsPrinter) const {
@@ -197,6 +239,18 @@ unsigned ChannelType::getNumDownstreamExtraSignals() const {
 unsigned ChannelType::getDataBitWidth() const {
   return getDataType().getIntOrFloatBitWidth();
 }
+
+Type dynamatic::handshake::detail::jointHandshakeTypeParser(AsmParser &parser) {
+  if (parser.parseOptionalLess())
+    return nullptr;
+  if (!parser.parseOptionalGreater())
+    return handshake::ControlType::get(parser.getContext());
+  return parseChannelAfterLess(parser);
+}
+
+//===----------------------------------------------------------------------===//
+// ExtraSignal
+//===----------------------------------------------------------------------===//
 
 ExtraSignal::Storage::Storage(StringRef name, mlir::Type type, bool downstream)
     : name(name), type(type), downstream(downstream) {}
