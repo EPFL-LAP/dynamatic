@@ -24,7 +24,6 @@
 #include "dynamatic/Support/Backedge.h"
 #include "dynamatic/Support/RTL.h"
 #include "dynamatic/Transforms/HandshakeMaterialize.h"
-#include "mlir/Dialect/Arith/IR/Arith.h"
 #include "mlir/Dialect/MemRef/IR/MemRef.h"
 #include "mlir/IR/Attributes.h"
 #include "mlir/IR/Builders.h"
@@ -39,6 +38,7 @@
 #include "mlir/Transforms/DialectConversion.h"
 #include "mlir/Transforms/GreedyPatternRewriteDriver.h"
 #include "llvm/ADT/STLExtras.h"
+#include "llvm/ADT/SmallVector.h"
 #include "llvm/ADT/StringRef.h"
 #include "llvm/ADT/TypeSwitch.h"
 #include "llvm/Support/ErrorHandling.h"
@@ -49,6 +49,7 @@
 
 using namespace mlir;
 using namespace dynamatic;
+using namespace dynamatic::handshake;
 
 /// Name of ports representing the clock and reset signals.
 static constexpr llvm::StringLiteral CLK_PORT("clk"), RST_PORT("rst");
@@ -283,19 +284,42 @@ LoweringState::LoweringState(mlir::ModuleOp modOp, NameAnalysis &namer,
                              OpBuilder &builder)
     : modOp(modOp), namer(namer), edgeBuilder(builder, modOp.getLoc()) {};
 
-/// Wraps a type into a handshake::ChannelType type.
-static handshake::ChannelType channelWrapper(Type t) {
-  return TypeSwitch<Type, handshake::ChannelType>(t)
-      .Case<handshake::ChannelType>([](auto t) { return t; })
-      .Default([](Type t) {
-        if (isa<FloatType>(t)) {
-          // At the HW/RTL level we treat everything as opaque bitvectors, so we
-          // make everything IntegerType's (only the width matters)
-          return handshake::ChannelType::get(
-              IntegerType::get(t.getContext(), t.getIntOrFloatBitWidth()));
+static Type channelWrapper(Type type) {
+  return TypeSwitch<Type, Type>(type)
+      .Case<handshake::ChannelType>([&](handshake::ChannelType channelType) {
+        // At the HW/RTL level we treat everything as opaque bitvectors, so we
+        // make the data type and all extra signals IntegerType's (only the
+        // width matters)
+        bool anyChange = false;
+
+        // Make sure the data type is IntegerType'd
+        Type dataType = channelType.getDataType();
+        if (isa<FloatType>(dataType)) {
+          dataType =
+              IntegerType::get(type.getContext(), type.getIntOrFloatBitWidth());
+          anyChange = true;
         }
-        return handshake::ChannelType::get(t);
-      });
+
+        // Make sure all extra signals are IntegerType'd
+        SmallVector<ExtraSignal> extraSignals;
+        for (const ExtraSignal &extra : channelType.getExtraSignals()) {
+          if (isa<FloatType>(extra.type)) {
+            Type newType = IntegerType::get(type.getContext(),
+                                            extra.type.getIntOrFloatBitWidth());
+            extraSignals.emplace_back(extra.name, newType, extra.downstream);
+            anyChange = true;
+          } else {
+            extraSignals.push_back(extra);
+          }
+        }
+
+        if (!anyChange)
+          return channelType;
+        return handshake::ChannelType::get(dataType, extraSignals);
+      })
+      .Case<handshake::ControlType, IntegerType, FloatType>(
+          [](auto type) { return type; })
+      .Default([](auto type) { return nullptr; });
 }
 
 /// Attempts to find an external HW module in the MLIR module with the
@@ -455,8 +479,8 @@ ModuleDiscriminator::ModuleDiscriminator(Operation *op)
           })
       .Case<handshake::ConstantOp>([&](handshake::ConstantOp cstOp) {
         // Bitwidth and binary-encoded constant value
-        Type cstType = cstOp.getResult().getType();
-        unsigned bitwidth = cstType.getIntOrFloatBitWidth();
+        ChannelType cstType = cstOp.getResult().getType();
+        unsigned bitwidth = cstType.getDataBitWidth();
         if (bitwidth > 64) {
           cstOp.emitError() << "Constant value has bitwidth " << bitwidth
                             << ", but we only support up to 64.";
@@ -468,18 +492,18 @@ ModuleDiscriminator::ModuleDiscriminator(Operation *op)
         // and convert it to a binary string value
         TypedAttr valueAttr = cstOp.getValueAttr();
         std::string bitValue;
-        if (isa<IntegerType>(cstType)) {
+        if (auto intType = dyn_cast<IntegerType>(cstType.getDataType())) {
           APInt value = cast<mlir::IntegerAttr>(valueAttr).getValue();
 
           // Bitset requires a compile-time constant, just use 64 and
           // manually truncate the value after so that it is the exact
           // bitwidth we need
-          if (cstType.isUnsignedInteger())
+          if (intType.isUnsignedInteger())
             bitValue = std::bitset<64>(value.getZExtValue()).to_string();
           else
             bitValue = std::bitset<64>(value.getSExtValue()).to_string();
           bitValue = bitValue.substr(64 - bitwidth);
-        } else if (isa<FloatType>(cstType)) {
+        } else if (isa<FloatType>(cstType.getDataType())) {
           mlir::FloatAttr attr = dyn_cast<mlir::FloatAttr>(valueAttr);
           // We only support specific bitwidths for floating point numbers
           if (bitwidth == 32) {

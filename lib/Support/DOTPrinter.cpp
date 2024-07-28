@@ -21,7 +21,6 @@
 #include "dynamatic/Support/TimingModels.h"
 #include "dynamatic/Transforms/HandshakeMaterialize.h"
 #include "experimental/Transforms/Speculation/SpecAnnotatePaths.h"
-#include "mlir/Dialect/Arith/IR/Arith.h"
 #include "mlir/Dialect/Math/IR/Math.h"
 #include "mlir/IR/BuiltinAttributes.h"
 #include "mlir/IR/BuiltinTypes.h"
@@ -761,8 +760,8 @@ LogicalResult DOTPrinter::annotateNode(Operation *op,
 
             // Convert the value to an hexadecimal string value
             std::stringstream stream;
-            Type cstType = cstOp.getResult().getType();
-            unsigned bitwidth = cstType.getIntOrFloatBitWidth();
+            ChannelType cstType = cstOp.getResult().getType();
+            unsigned bitwidth = cstType.getDataBitWidth();
             size_t hexLength =
                 (bitwidth >> 2) + ((bitwidth & 0b11) != 0 ? 1 : 0);
             stream << "0x" << std::setfill('0') << std::setw(hexLength)
@@ -770,13 +769,13 @@ LogicalResult DOTPrinter::annotateNode(Operation *op,
 
             // Determine the constant value based on the constant's return type
             TypedAttr valueAttr = cstOp.getValueAttr();
-            if (isa<IntegerType>(cstType)) {
+            if (auto intType = dyn_cast<IntegerType>(cstType.getDataType())) {
               APInt value = cast<mlir::IntegerAttr>(valueAttr).getValue();
-              if (cstType.isUnsignedInteger())
+              if (intType.isUnsignedInteger())
                 stream << value.getZExtValue();
               else
                 stream << value.getSExtValue();
-            } else if (isa<FloatType>(cstType)) {
+            } else if (isa<FloatType>(cstType.getDataType())) {
               mlir::FloatAttr attr = dyn_cast<mlir::FloatAttr>(valueAttr);
               stream << attr.getValue().convertToDouble();
             } else {
@@ -1077,20 +1076,20 @@ static std::string getPrettyNodeLabel(Operation *op) {
       // handshake operations
       .Case<handshake::ConstantOp>(
           [&](handshake::ConstantOp cstOp) -> std::string {
-            Type cstType = cstOp.getResult().getType();
+            ChannelType cstType = cstOp.getResult().getType();
             TypedAttr valueAttr = cstOp.getValueAttr();
-            if (isa<IntegerType>(cstType)) {
+            if (auto intType = dyn_cast<IntegerType>(cstType.getDataType())) {
               // Special case boolean attribute (which would result in an i1
               // constant integer results) to print true/false instead of 1/0
               if (auto boolAttr = dyn_cast<mlir::BoolAttr>(valueAttr))
                 return boolAttr.getValue() ? "true" : "false";
 
               APInt value = cast<mlir::IntegerAttr>(valueAttr).getValue();
-              if (cstType.isUnsignedInteger())
+              if (intType.isUnsignedInteger())
                 return std::to_string(value.getZExtValue());
               return std::to_string(value.getSExtValue());
             }
-            if (isa<FloatType>(cstType)) {
+            if (isa<FloatType>(cstType.getDataType())) {
               mlir::FloatAttr attr = dyn_cast<mlir::FloatAttr>(valueAttr);
               return std::to_string(attr.getValue().convertToDouble());
             }
@@ -1121,7 +1120,6 @@ static std::string getPrettyNodeLabel(Operation *op) {
       .Case<handshake::BranchOp>([&](auto) { return "branch"; })
       .Case<handshake::ConditionalBranchOp>([&](auto) { return "cbranch"; })
       .Case<handshake::ReturnOp>([&](auto) { return "return"; })
-      // arith operations
       .Case<handshake::AddIOp, handshake::AddFOp>([&](auto) { return "+"; })
       .Case<handshake::SubIOp, handshake::SubFOp>([&](auto) { return "-"; })
       .Case<handshake::AndIOp>([&](auto) { return "&"; })
@@ -1134,10 +1132,10 @@ static std::string getPrettyNodeLabel(Operation *op) {
       .Case<handshake::ShLIOp>([&](auto) { return "<<"; })
       .Case<handshake::ExtSIOp, handshake::ExtUIOp, handshake::TruncIOp>(
           [&](auto) {
-            unsigned opWidth =
-                op->getOperand(0).getType().getIntOrFloatBitWidth();
+            unsigned opWidth = cast<ChannelType>(op->getOperand(0).getType())
+                                   .getDataBitWidth();
             unsigned resWidth =
-                op->getResult(0).getType().getIntOrFloatBitWidth();
+                cast<ChannelType>(op->getResult(0).getType()).getDataBitWidth();
             return "[" + std::to_string(opWidth) + "..." +
                    std::to_string(resWidth) + "]";
           })
