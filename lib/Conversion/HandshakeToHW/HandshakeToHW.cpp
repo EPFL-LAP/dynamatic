@@ -284,41 +284,31 @@ LoweringState::LoweringState(mlir::ModuleOp modOp, NameAnalysis &namer,
                              OpBuilder &builder)
     : modOp(modOp), namer(namer), edgeBuilder(builder, modOp.getLoc()) {};
 
-static Type channelWrapper(Type type) {
+/// Makes all (nested) types signless IntegerType's of the same width as the
+/// original type. At the HW/RTL level we treat everything as opaque bitvectors,
+/// so we no longer want to differentiate types of the same width w.r.t. their
+/// intended interpretation.
+static Type lowerType(Type type) {
   return TypeSwitch<Type, Type>(type)
       .Case<handshake::ChannelType>([&](handshake::ChannelType channelType) {
-        // At the HW/RTL level we treat everything as opaque bitvectors, so we
-        // make the data type and all extra signals IntegerType's (only the
-        // width matters)
-        bool anyChange = false;
+        // Make sure the data type is signless IntegerType
+        unsigned width = channelType.getDataBitWidth();
+        Type dataType = IntegerType::get(type.getContext(), width);
 
-        // Make sure the data type is IntegerType'd
-        Type dataType = channelType.getDataType();
-        if (isa<FloatType>(dataType)) {
-          dataType =
-              IntegerType::get(type.getContext(), type.getIntOrFloatBitWidth());
-          anyChange = true;
-        }
-
-        // Make sure all extra signals are IntegerType'd
+        // Make sure all extra signals are signless IntegerType's as well
         SmallVector<ExtraSignal> extraSignals;
         for (const ExtraSignal &extra : channelType.getExtraSignals()) {
-          if (isa<FloatType>(extra.type)) {
-            Type newType = IntegerType::get(type.getContext(),
-                                            extra.type.getIntOrFloatBitWidth());
-            extraSignals.emplace_back(extra.name, newType, extra.downstream);
-            anyChange = true;
-          } else {
-            extraSignals.push_back(extra);
-          }
+          unsigned extraWidth = extra.type.getIntOrFloatBitWidth();
+          Type newType = IntegerType::get(type.getContext(), extraWidth);
+          extraSignals.emplace_back(extra.name, newType, extra.downstream);
         }
-
-        if (!anyChange)
-          return channelType;
         return handshake::ChannelType::get(dataType, extraSignals);
       })
-      .Case<handshake::ControlType, IntegerType, FloatType>(
-          [](auto type) { return type; })
+      .Case<FloatType, IntegerType>([](auto type) {
+        unsigned width = type.getIntOrFloatBitWidth();
+        return IntegerType::get(type.getContext(), width);
+      })
+      .Case<handshake::ControlType>([](auto type) { return type; })
       .Default([](auto type) { return nullptr; });
 }
 
@@ -924,7 +914,7 @@ hw::ModulePortInfo getFuncPortInfo(handshake::FuncOp funcOp,
 
   // Add all function outputs to the module
   for (auto [idx, res] : llvm::enumerate(funcOp.getResultTypes()))
-    modBuilder.addOutput(portNames.getOutputName(idx), channelWrapper(res));
+    modBuilder.addOutput(portNames.getOutputName(idx), lowerType(res));
 
   // Add all function inputs to the module, expanding memory references into a
   // set of individual ports for loads and stores
@@ -934,7 +924,7 @@ hw::ModulePortInfo getFuncPortInfo(handshake::FuncOp funcOp,
     if (TypedValue<MemRefType> memref = dyn_cast<TypedValue<MemRefType>>(arg))
       addMemIO(modBuilder, funcOp, memref, argName, state);
     else
-      modBuilder.addInput(portNames.getInputName(idx), channelWrapper(type));
+      modBuilder.addInput(portNames.getInputName(idx), lowerType(type));
   }
 
   modBuilder.addClkAndRst();
@@ -955,7 +945,7 @@ public:
     addConversion([](Type type) -> Type {
       if (isa<MemRefType>(type))
         return type;
-      return channelWrapper(type);
+      return lowerType(type);
     });
 
     addTargetMaterialization([&](OpBuilder &builder, Type resultType,
@@ -1087,7 +1077,7 @@ LogicalResult ConvertExternalFunc::matchAndRewrite(
 
   // Add all function outputs to the module
   for (auto [idx, res] : llvm::enumerate(funcOp.getResultTypes()))
-    modBuilder.addOutput(portNames.getOutputName(idx), channelWrapper(res));
+    modBuilder.addOutput(portNames.getOutputName(idx), lowerType(res));
 
   // Add all function inputs to the module
   for (auto [idx, type] : llvm::enumerate(funcOp.getArgumentTypes())) {
@@ -1096,7 +1086,7 @@ LogicalResult ConvertExternalFunc::matchAndRewrite(
              << "Memory interfaces are not supported for external "
                 "functions";
     }
-    modBuilder.addInput(portNames.getInputName(idx), channelWrapper(type));
+    modBuilder.addInput(portNames.getInputName(idx), lowerType(type));
   }
   modBuilder.addClkAndRst();
 
@@ -1231,7 +1221,7 @@ LogicalResult ConvertMemInterface::matchAndRewrite(
   auto addOutput = [&](size_t idx) -> void {
     StringRef resName = memState.portNames.getOutputName(idx);
     OpResult res = memOp->getResults()[idx];
-    converter.addOutput(resName, channelWrapper(res.getType()));
+    converter.addOutput(resName, lowerType(res.getType()));
   };
 
   // Add all input/output ports corresponding to the memory interface's groups
@@ -1312,7 +1302,7 @@ LogicalResult ConvertToHWInstance<T>::matchAndRewrite(
 
   // Add all operation results to the outputs
   for (auto [idx, type] : llvm::enumerate(op->getResultTypes()))
-    converter.addOutput(portNames.getOutputName(idx), channelWrapper(type));
+    converter.addOutput(portNames.getOutputName(idx), lowerType(type));
 
   hw::InstanceOp instOp = converter.convertToInstance(op, rewriter);
   return instOp ? success() : failure();
