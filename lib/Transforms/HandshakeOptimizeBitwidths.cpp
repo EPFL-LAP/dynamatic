@@ -636,10 +636,74 @@ private:
   bool forward;
 };
 
-/// Template specialization of data optimization rewrite pattern for Handshake
-/// operations that do not require a specific configuration.
-template <typename Op>
-using HandshakeOptDataNoCfg = HandshakeOptData<Op, OptDataConfig<Op>>;
+/// Optimizes the bitwidth of muxes' select operand so that it can just support
+/// the number of data operands. This pattern can be applied as part of a single
+/// greedy rewriting pass and doesn't need to be part of the forward/backward
+/// process.
+struct HandshakeMuxSelect : public OpRewritePattern<handshake::MuxOp> {
+  using OpRewritePattern<handshake::MuxOp>::OpRewritePattern;
+
+  LogicalResult matchAndRewrite(handshake::MuxOp muxOp,
+                                PatternRewriter &rewriter) const override {
+    // Compute the number of bits required to index into the mux data operands
+    unsigned optWidth = std::max(
+        1U, APInt(APInt::APINT_BITS_PER_WORD, muxOp.getDataOperands().size())
+                .ceilLogBase2());
+
+    // Check whether we can reduce the bitwidth of the operation
+    ChannelVal selectOperand = muxOp.getSelectOperand();
+    handshake::ChannelType selectType = selectOperand.getType();
+    unsigned selectWidth = selectType.getDataBitWidth();
+    if (optWidth >= selectWidth)
+      return failure();
+
+    // Replace the select operand with one with optimize bitwidth
+    Value newSelect =
+        modVal({selectOperand, ExtType::LOGICAL}, optWidth, rewriter);
+    rewriter.replaceUsesWithIf(selectOperand, newSelect, [&](OpOperand &oprd) {
+      return oprd.getOwner() == muxOp;
+    });
+    return success();
+  }
+};
+
+/// Optimizes the bitwidth of control merges' index result so that it can just
+/// support the number of data operands. This pattern can be applied as part of
+/// a single greedy rewriting pass and doesn't need to be part of the
+/// forward/backward process.
+struct HandshakeCMergeIndex
+    : public OpRewritePattern<handshake::ControlMergeOp> {
+  using OpRewritePattern<handshake::ControlMergeOp>::OpRewritePattern;
+
+  LogicalResult matchAndRewrite(handshake::ControlMergeOp cmergeOp,
+                                PatternRewriter &rewriter) const override {
+    // Compute the number of bits required to index into the mux data operands
+    unsigned optWidth = std::max(
+        1U, APInt(APInt::APINT_BITS_PER_WORD, cmergeOp->getNumOperands())
+                .ceilLogBase2());
+
+    // Check whether we can reduce the bitwidth of the operation
+    ChannelVal indexResult = cmergeOp.getIndex();
+    handshake::ChannelType indexType = indexResult.getType();
+    unsigned indexWidth = indexType.getDataBitWidth();
+    if (optWidth >= indexWidth)
+      return failure();
+
+    // Create a new control merge with whose index result is optimized
+    SmallVector<Type, 2> resTypes;
+    resTypes.push_back(cmergeOp.getDataType());
+    resTypes.push_back(
+        indexType.withDataType(rewriter.getIntegerType(optWidth)));
+    rewriter.setInsertionPoint(cmergeOp);
+    auto newOp = rewriter.create<handshake::ControlMergeOp>(
+        cmergeOp.getLoc(), resTypes, cmergeOp.getDataOperands());
+    inheritBB(cmergeOp, newOp);
+    Value modIndex =
+        modVal({newOp.getIndex(), ExtType::LOGICAL}, indexWidth, rewriter);
+    rewriter.replaceOp(cmergeOp, {newOp.getResult(), modIndex});
+    return success();
+  }
+};
 
 /// Optimizes the bitwidth of memory controller's address-carrying channels so
 /// that they can just support indexing into the memory region attached to the
@@ -1409,8 +1473,9 @@ struct HandshakeOptimizeBitwidthsPass
     // of erasing these operations entirely (which would be semantically
     // correct) because it is not this pass's job to perform this kind of
     // optimization, which down-the-line passes may be sensitive to.
+    RewritePatternSet patterns(ctx);
+    patterns.add<HandshakeMuxSelect, HandshakeCMergeIndex>(ctx);
     if (!legacy) {
-      RewritePatternSet patterns(ctx);
       patterns
           .add<HandshakeMCAddress, HandshakeMemPortAddress<handshake::MCLoadOp>,
                HandshakeMemPortAddress<handshake::LSQLoadOp>,
@@ -1450,6 +1515,9 @@ struct HandshakeOptimizeBitwidthsPass
   }
 
 private:
+  template <typename Op>
+  using HandshakeOptDataNoCfg = HandshakeOptData<Op, OptDataConfig<Op>>;
+
   /// Adds to the pattern set all patterns on arith operations that have both a
   /// forward and backward version.
   void addArithPatterns(RewritePatternSet &patterns, bool forward);

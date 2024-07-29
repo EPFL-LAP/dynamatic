@@ -517,7 +517,9 @@ def SinkOp : Handshake_Op<"sink", [SOSTInterface]> {
   }];
   
   let arguments = (ins HandshakeType:$operand);
-  let assemblyFormat = "$operand attr-dict `:` type($operand)";
+  let assemblyFormat = [{
+    $operand attr-dict `:` custom<HandshakeType>(type($operand))
+  }];
 }
 
 def SourceOp : Handshake_Op<"source", [

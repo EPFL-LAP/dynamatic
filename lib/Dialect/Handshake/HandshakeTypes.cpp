@@ -25,45 +25,6 @@ using namespace mlir;
 using namespace dynamatic;
 using namespace dynamatic::handshake;
 
-// static OptionalParseResult generatedTypeParser(AsmParser &parser,
-//                                                ::llvm::StringRef *mnemonic,
-//                                                Type &value) {
-//   return AsmParser::KeywordSwitch<OptionalParseResult>(parser)
-//       .Case(::dynamatic::handshake::ChannelType::getMnemonic(),
-//             [&](llvm::StringRef, llvm::SMLoc) {
-//               value = ::dynamatic::handshake::ChannelType::parse(parser);
-//               return success(!!value);
-//             })
-//       .Case(::dynamatic::handshake::ControlType::getMnemonic(),
-//             [&](llvm::StringRef, llvm::SMLoc) {
-//               value =
-//                   ::dynamatic::handshake::ControlType::get(parser.getContext());
-//               return success(!!value);
-//             })
-//       .Default([&](llvm::StringRef keyword, llvm::SMLoc) {
-//         *mnemonic = keyword;
-//         return std::nullopt;
-//       });
-// }
-
-// static LogicalResult generatedTypePrinter(Type def, AsmPrinter &printer) {
-//   return ::llvm::TypeSwitch<Type, LogicalResult>(def)
-//       .Case<::dynamatic::handshake::ChannelType>([&](auto t) {
-//         printer << ::dynamatic::handshake::ChannelType::getMnemonic();
-//         t.print(printer);
-//         return success();
-//       })
-//       .Case<::dynamatic::handshake::ControlType>([&](auto t) {
-//         printer << ::dynamatic::handshake::ControlType::getMnemonic();
-//         return success();
-//       })
-//       .Default([](auto) { return failure(); });
-// }
-
-//===----------------------------------------------------------------------===//
-// ControlType
-//===----------------------------------------------------------------------===//
-
 //===----------------------------------------------------------------------===//
 // ChannelType
 //===----------------------------------------------------------------------===//

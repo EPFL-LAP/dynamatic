@@ -87,7 +87,7 @@ struct EraseSingleInputControlMerges
       return failure();
 
     Value dataRes = cmergeOp.getOperand(0);
-    Value indexRes = cmergeOp.getIndex();
+    TypedValue<handshake::ChannelType> indexRes = cmergeOp.getIndex();
     if (hasRealUses(indexRes)) {
       // If the index result has uses, then replace it with a sourced constant
       // with value 0 (the index of the cmerge's single input)
@@ -104,7 +104,7 @@ struct EraseSingleInputControlMerges
       /// instead.
 
       // Build the attribute for the constant
-      Type indexResType = indexRes.getType();
+      Type indexResType = indexRes.getType().getDataType();
       handshake::ConstantOp cstOp = rewriter.create<handshake::ConstantOp>(
           cmergeOp.getLoc(), rewriter.getIntegerAttr(indexResType, 0),
           srcOp.getResult());

@@ -347,6 +347,7 @@ FailureOr<handshake::FuncOp> LowerFuncToHandshake::lowerSignature(
   SmallVector<NamedAttribute> attrs = deriveNewAttributes(funcOp);
   auto newFuncOp = rewriter.create<handshake::FuncOp>(
       funcOp.getLoc(), funcOp.getName(), funTy, attrs);
+  newFuncOp.resolveArgAndResNames();
   Region *oldBody = &funcOp.getBody();
   const TypeConverter *typeConv = getTypeConverter();
 
@@ -904,7 +905,7 @@ LogicalResult LowerFuncToHandshake::flattenAndTerminate(
   SmallVector<Value, 8> endOprds;
   endOprds.append(mergeFuncResults(funcOp, rewriter, newReturns, exitBlockID));
   endOprds.append(getFunctionEndControls(funcOp));
-  rewriter.setInsertionPointAfter(lastOp);
+  rewriter.setInsertionPointToEnd(funcOp.getBodyBlock());
   auto endOp = rewriter.create<handshake::EndOp>(lastOp->getLoc(), endOprds);
   endOp->setAttr(BB_ATTR_NAME, rewriter.getUI32IntegerAttr(exitBlockID));
   return success();
@@ -929,7 +930,7 @@ static Value getBlockControl(Operation *op) {
   std::optional<unsigned> bb = getLogicBB(op);
   assert(bb && "operation should be tagged with associated basic block");
 
-  if (bb == 0)
+  if (bb == ENTRY_BB)
     return funcOp.getArguments().back();
   for (auto cMergeOp : funcOp.getOps<handshake::ControlMergeOp>()) {
     if (auto cMergeBB = getLogicBB(cMergeOp); cMergeBB && cMergeBB == *bb)
@@ -1107,11 +1108,15 @@ ConvertCalls::matchAndRewrite(func::CallOp callOp, OpAdaptor adaptor,
 /// NOTE: I doubt this works in half-degenerate cases, but this is the logic
 /// that legacy Dynamatic follows.
 static bool isCstSourcable(arith::ConstantOp cstOp) {
-  return llvm::all_of(cstOp->getUsers(), [](Operation *cstUser) {
+  std::function<bool(Operation *)> isValidUser = [&](Operation *user) -> bool {
+    if (isa<UnrealizedConversionCastOp>(user))
+      return llvm::all_of(user->getUsers(), isValidUser);
     return !isa<handshake::BranchOp, handshake::ConditionalBranchOp,
                 handshake::ReturnOp, handshake::LoadOpInterface,
-                handshake::StoreOpInterface>(cstUser);
-  });
+                handshake::StoreOpInterface>(user);
+  };
+
+  return llvm::all_of(cstOp->getUsers(), isValidUser);
 }
 
 LogicalResult
