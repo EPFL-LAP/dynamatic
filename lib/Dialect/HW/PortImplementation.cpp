@@ -13,7 +13,6 @@
 #include "dynamatic/Dialect/HW/PortImplementation.h"
 #include "dynamatic/Dialect/Handshake/HandshakeInterfaces.h"
 #include "dynamatic/Dialect/Handshake/HandshakeOps.h"
-#include "mlir/Dialect/Arith/IR/Arith.h"
 #include "llvm/ADT/TypeSwitch.h"
 
 using namespace mlir;

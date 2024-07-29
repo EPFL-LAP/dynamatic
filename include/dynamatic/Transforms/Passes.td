@@ -203,23 +203,6 @@ def HandshakeOptimizeBitwidths : DynamaticPass< "handshake-optimize-bitwidths",
     "fail.">];
 }
 
-def HandshakeConcretizeIndexType : DynamaticPass<"handshake-concretize-index-type"> {
-  let summary = "Concretizes the IndexType to an IntegerType of machine-specific width.";
-  let description = [{
-    Replaces any IndexType throughout the Handhsake-level IR with an IntegerType
-    of machine-specific width. In particular, all SSA values of type IndexType
-    have their type changed to IntegerType.
-  }];
-  let constructor = "dynamatic::createHandshakeConcretizeIndexType()";
-  let options =
-    [Option<"width", "width", "unsigned", "64",
-            "The explicit bitwidth with which to concretize IndexType's. "
-            "Defaults to 64 since most machines have a 64-bit architecture. If "
-            "this value is such that a Handshake constant with an IndexType "
-            "result cannot fit its value in the new explicit bitwidth anymore, "
-            "the pass will fail.">];
-}
-
 def HandshakeMinimizeCstWidth : DynamaticPass<"handshake-minimize-cst-width",
                                               ["mlir::arith::ArithDialect"]> {
   let summary = "Minimizes the bitwidth of all Handshake constants.";

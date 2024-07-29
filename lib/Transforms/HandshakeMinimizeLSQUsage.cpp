@@ -19,9 +19,7 @@
 #include "dynamatic/Support/Backedge.h"
 #include "dynamatic/Support/CFG.h"
 #include "dynamatic/Support/DynamaticPass.h"
-#include "mlir/IR/PatternMatch.h"
 #include "mlir/IR/Visitors.h"
-#include "mlir/Transforms/GreedyPatternRewriteDriver.h"
 #include "llvm/ADT/STLExtras.h"
 #include "llvm/ADT/TypeSwitch.h"
 #include "llvm/Support/Debug.h"
@@ -163,6 +161,47 @@ static bool hasEnforcedWARs(handshake::LSQLoadOp loadOp,
   return true;
 }
 
+void HandshakeMinimizeLSQUsagePass::runDynamaticPass() {
+  mlir::ModuleOp modOp = getOperation();
+
+  // Check that memory access ports are named
+  NameAnalysis &namer = getAnalysis<NameAnalysis>();
+  WalkResult res = modOp.walk([&](Operation *op) {
+    if (!isa<handshake::LoadOpInterface, handshake::StoreOpInterface>(op))
+      return WalkResult::advance();
+    if (!namer.hasName(op)) {
+      op->emitError() << "Memory access port must be named.";
+      return WalkResult::interrupt();
+    }
+    return WalkResult::advance();
+  });
+  if (res.wasInterrupted())
+    return signalPassFailure();
+
+  // Check that all eligible operations within Handshake function belon to a
+  // basic block
+  for (handshake::FuncOp funcOp : modOp.getOps<handshake::FuncOp>()) {
+    for (Operation &op : funcOp.getOps()) {
+      if (!cannotBelongToCFG(&op) && !getLogicBB(&op)) {
+        op.emitError() << "Operation should have basic block "
+                          "attribute.";
+        return signalPassFailure();
+      }
+    }
+  }
+
+  // We are going do be modifying the IR a lot during LSQ optimization, so we
+  // first collect all LSQs in a vector to not have iterator issues
+  SmallVector<handshake::LSQOp> lsqs;
+  for (handshake::FuncOp funcOp : modOp.getOps<handshake::FuncOp>())
+    llvm::copy(funcOp.getOps<handshake::LSQOp>(), std::back_inserter(lsqs));
+
+  // Try to optimize each LSQ independently. We only need to attempt the
+  // optimization once for each because they are all independent
+  for (handshake::LSQOp lsqOp : lsqs)
+    tryToOptimizeLSQ(lsqOp);
+}
+
 HandshakeMinimizeLSQUsagePass::LSQInfo::LSQInfo(handshake::LSQOp lsqOp,
                                                 NameAnalysis &namer) {
 
@@ -297,47 +336,6 @@ void HandshakeMinimizeLSQUsagePass::replaceEndMemoryControls(
       builder.create<handshake::EndOp>(endOp.getLoc(), newEndOperands);
   inheritBB(endOp, newEndOp);
   endOp->erase();
-}
-
-void HandshakeMinimizeLSQUsagePass::runDynamaticPass() {
-  mlir::ModuleOp modOp = getOperation();
-
-  // Check that memory access ports are named
-  NameAnalysis &namer = getAnalysis<NameAnalysis>();
-  WalkResult res = modOp.walk([&](Operation *op) {
-    if (!isa<handshake::LoadOpInterface, handshake::StoreOpInterface>(op))
-      return WalkResult::advance();
-    if (!namer.hasName(op)) {
-      op->emitError() << "Memory access port must be named.";
-      return WalkResult::interrupt();
-    }
-    return WalkResult::advance();
-  });
-  if (res.wasInterrupted())
-    return signalPassFailure();
-
-  // Check that all eligible operations within Handshake function belon to a
-  // basic block
-  for (handshake::FuncOp funcOp : modOp.getOps<handshake::FuncOp>()) {
-    for (Operation &op : funcOp.getOps()) {
-      if (!cannotBelongToCFG(&op) && !getLogicBB(&op)) {
-        op.emitError() << "Operation should have basic block "
-                          "attribute.";
-        return signalPassFailure();
-      }
-    }
-  }
-
-  // We are going do be modifying the IR a lot during LSQ optimization, so we
-  // first collect all LSQs in a vector to not have iterator issues
-  SmallVector<handshake::LSQOp> lsqs;
-  for (handshake::FuncOp funcOp : modOp.getOps<handshake::FuncOp>())
-    llvm::copy(funcOp.getOps<handshake::LSQOp>(), std::back_inserter(lsqs));
-
-  // Try to optimize each LSQ independently. We only need to attempt the
-  // optimization once for each because they are all independent
-  for (handshake::LSQOp lsqOp : lsqs)
-    tryToOptimizeLSQ(lsqOp);
 }
 
 void HandshakeMinimizeLSQUsagePass::tryToOptimizeLSQ(handshake::LSQOp lsqOp) {

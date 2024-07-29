@@ -15,13 +15,12 @@
 #include "dynamatic/Support/DOTPrinter.h"
 #include "dynamatic/Analysis/NameAnalysis.h"
 #include "dynamatic/Dialect/Handshake/HandshakeOps.h"
+#include "dynamatic/Dialect/Handshake/HandshakeTypes.h"
 #include "dynamatic/Dialect/Handshake/MemoryInterfaces.h"
 #include "dynamatic/Support/CFG.h"
 #include "dynamatic/Support/TimingModels.h"
-#include "dynamatic/Transforms/HandshakeConcretizeIndexType.h"
 #include "dynamatic/Transforms/HandshakeMaterialize.h"
 #include "experimental/Transforms/Speculation/SpecAnnotatePaths.h"
-#include "mlir/Dialect/Arith/IR/Arith.h"
 #include "mlir/Dialect/Math/IR/Math.h"
 #include "mlir/IR/BuiltinAttributes.h"
 #include "mlir/IR/BuiltinTypes.h"
@@ -57,29 +56,24 @@ using RawPort = std::pair<std::string, unsigned>;
 
 /// Maps name of arith/math operations to "op" attribute.
 static llvm::StringMap<StringRef> compNameToOpName{
-    {arith::AddFOp::getOperationName(), "fadd_op"},
-    {arith::AddIOp::getOperationName(), "add_op"},
-    {arith::AndIOp::getOperationName(), "and_op"},
-    {arith::DivFOp::getOperationName(), "fdiv_op"},
-    {arith::DivSIOp::getOperationName(), "sdiv_op"},
-    {arith::DivUIOp::getOperationName(), "udiv_op"},
-    {arith::ExtSIOp::getOperationName(), "sext_op"},
-    {arith::ExtUIOp::getOperationName(), "zext_op"},
-    {arith::ExtFOp::getOperationName(), "fext_op"},
-    {arith::MulFOp::getOperationName(), "fmul_op"},
-    {arith::MulIOp::getOperationName(), "mul_op"},
-    {arith::OrIOp::getOperationName(), "or_op"},
-    {arith::RemFOp::getOperationName(), "frem_op"},
-    {arith::RemSIOp::getOperationName(), "srem_op"},
-    {arith::RemUIOp::getOperationName(), "urem_op"},
-    {arith::SelectOp::getOperationName(), "select_op"},
-    {arith::ShLIOp::getOperationName(), "shl_op"},
-    {arith::SubIOp::getOperationName(), "sub_op"},
-    {arith::SubFOp::getOperationName(), "fsub_op"},
-    {arith::ShRSIOp::getOperationName(), "ashr_op"},
-    {arith::SIToFPOp::getOperationName(), "sitofp_op"},
-    {arith::TruncIOp::getOperationName(), "trunc_op"},
-    {arith::XOrIOp::getOperationName(), "xor_op"},
+    {handshake::AddFOp::getOperationName(), "fadd_op"},
+    {handshake::AddIOp::getOperationName(), "add_op"},
+    {handshake::AndIOp::getOperationName(), "and_op"},
+    {handshake::DivFOp::getOperationName(), "fdiv_op"},
+    {handshake::DivSIOp::getOperationName(), "sdiv_op"},
+    {handshake::DivUIOp::getOperationName(), "udiv_op"},
+    {handshake::ExtSIOp::getOperationName(), "sext_op"},
+    {handshake::ExtUIOp::getOperationName(), "zext_op"},
+    {handshake::MulFOp::getOperationName(), "fmul_op"},
+    {handshake::MulIOp::getOperationName(), "mul_op"},
+    {handshake::OrIOp::getOperationName(), "or_op"},
+    {handshake::SelectOp::getOperationName(), "select_op"},
+    {handshake::ShLIOp::getOperationName(), "shl_op"},
+    {handshake::SubIOp::getOperationName(), "sub_op"},
+    {handshake::SubFOp::getOperationName(), "fsub_op"},
+    {handshake::ShRSIOp::getOperationName(), "ashr_op"},
+    {handshake::TruncIOp::getOperationName(), "trunc_op"},
+    {handshake::XOrIOp::getOperationName(), "xor_op"},
     {math::CosOp::getOperationName(), "cosf_op"},
     {math::ExpOp::getOperationName(), "expf_op"},
     {math::Exp2Op::getOperationName(), "exp2f_op"},
@@ -91,57 +85,46 @@ static llvm::StringMap<StringRef> compNameToOpName{
 };
 
 /// Maps name of integer comparison type to "op" attribute.
-static DenseMap<arith::CmpIPredicate, StringRef> cmpINameToOpName{
-    {arith::CmpIPredicate::eq, "icmp_eq_op"},
-    {arith::CmpIPredicate::ne, "icmp_ne_op"},
-    {arith::CmpIPredicate::slt, "icmp_slt_op"},
-    {arith::CmpIPredicate::sle, "icmp_sle_op"},
-    {arith::CmpIPredicate::sgt, "icmp_sgt_op"},
-    {arith::CmpIPredicate::sge, "icmp_sge_op"},
-    {arith::CmpIPredicate::ult, "icmp_ult_op"},
-    {arith::CmpIPredicate::ule, "icmp_ule_op"},
-    {arith::CmpIPredicate::ugt, "icmp_ugt_op"},
-    {arith::CmpIPredicate::uge, "icmp_uge_op"},
+static DenseMap<handshake::CmpIPredicate, StringRef> cmpINameToOpName{
+    {handshake::CmpIPredicate::eq, "icmp_eq_op"},
+    {handshake::CmpIPredicate::ne, "icmp_ne_op"},
+    {handshake::CmpIPredicate::slt, "icmp_slt_op"},
+    {handshake::CmpIPredicate::sle, "icmp_sle_op"},
+    {handshake::CmpIPredicate::sgt, "icmp_sgt_op"},
+    {handshake::CmpIPredicate::sge, "icmp_sge_op"},
+    {handshake::CmpIPredicate::ult, "icmp_ult_op"},
+    {handshake::CmpIPredicate::ule, "icmp_ule_op"},
+    {handshake::CmpIPredicate::ugt, "icmp_ugt_op"},
+    {handshake::CmpIPredicate::uge, "icmp_uge_op"},
 };
 
 /// Maps name of floating-point comparison type to "op" attribute.
-static DenseMap<arith::CmpFPredicate, StringRef> cmpFNameToOpName{
-    {arith::CmpFPredicate::AlwaysFalse, "fcmp_false_op"},
-    {arith::CmpFPredicate::OEQ, "fcmp_oeq_op"},
-    {arith::CmpFPredicate::OGT, "fcmp_ogt_op"},
-    {arith::CmpFPredicate::OGE, "fcmp_oge_op"},
-    {arith::CmpFPredicate::OLT, "fcmp_olt_op"},
-    {arith::CmpFPredicate::OLE, "fcmp_ole_op"},
-    {arith::CmpFPredicate::ONE, "fcmp_one_op"},
-    {arith::CmpFPredicate::ORD, "fcmp_orq_op"},
-    {arith::CmpFPredicate::UEQ, "fcmp_ueq_op"},
-    {arith::CmpFPredicate::UGT, "fcmp_ugt_op"},
-    {arith::CmpFPredicate::UGE, "fcmp_uge_op"},
-    {arith::CmpFPredicate::ULT, "fcmp_ult_op"},
-    {arith::CmpFPredicate::ULE, "fcmp_ule_op"},
-    {arith::CmpFPredicate::UNE, "fcmp_une_op"},
-    {arith::CmpFPredicate::UNO, "fcmp_uno_op"},
-    {arith::CmpFPredicate::AlwaysTrue, "fcmp_true_op"},
+static DenseMap<handshake::CmpFPredicate, StringRef> cmpFNameToOpName{
+    {handshake::CmpFPredicate::AlwaysFalse, "fcmp_false_op"},
+    {handshake::CmpFPredicate::OEQ, "fcmp_oeq_op"},
+    {handshake::CmpFPredicate::OGT, "fcmp_ogt_op"},
+    {handshake::CmpFPredicate::OGE, "fcmp_oge_op"},
+    {handshake::CmpFPredicate::OLT, "fcmp_olt_op"},
+    {handshake::CmpFPredicate::OLE, "fcmp_ole_op"},
+    {handshake::CmpFPredicate::ONE, "fcmp_one_op"},
+    {handshake::CmpFPredicate::ORD, "fcmp_orq_op"},
+    {handshake::CmpFPredicate::UEQ, "fcmp_ueq_op"},
+    {handshake::CmpFPredicate::UGT, "fcmp_ugt_op"},
+    {handshake::CmpFPredicate::UGE, "fcmp_uge_op"},
+    {handshake::CmpFPredicate::ULT, "fcmp_ult_op"},
+    {handshake::CmpFPredicate::ULE, "fcmp_ule_op"},
+    {handshake::CmpFPredicate::UNE, "fcmp_une_op"},
+    {handshake::CmpFPredicate::UNO, "fcmp_uno_op"},
+    {handshake::CmpFPredicate::AlwaysTrue, "fcmp_true_op"},
 };
-
-/// Returns the width of a "handshake type" (i.e., width of data signal). In
-/// particular, returns 0 for NoneType's.
-static unsigned getWidth(Type dataType) {
-  if (isa<NoneType>(dataType))
-    return 0;
-  return dataType.getIntOrFloatBitWidth();
-}
-
-/// Returns the width of a handshake value (i.e., width of data signal). In
-/// particular, returns 0 for NoneType's.
-static unsigned getWidth(Value value) { return getWidth(value.getType()); }
 
 /// Turns a list of ports into a string that can be used as the value for the
 /// "in" or "out" attribute of a node.
 static std::string getIOFromPorts(PortsData ports) {
   std::stringstream stream;
   for (auto [idx, port] : llvm::enumerate(ports)) {
-    stream << port.first << ":" << getWidth(port.second);
+    stream << port.first << ":"
+           << getHandshakeTypeBitWidth(port.second.getType());
     if (idx != (ports.size() - 1))
       stream << " ";
   }
@@ -153,7 +136,8 @@ static std::string getIOFromPorts(PortsData ports) {
 static std::string getIOFromPorts(MemPortsData ports) {
   std::stringstream stream;
   for (auto [idx, port] : llvm::enumerate(ports)) {
-    stream << std::get<0>(port) << ":" << getWidth(std::get<1>(port));
+    stream << std::get<0>(port) << ":"
+           << getHandshakeTypeBitWidth(std::get<1>(port).getType());
     if (auto suffix = std::get<2>(port); !suffix.empty())
       stream << "*" << suffix;
     if (idx != (ports.size() - 1))
@@ -182,7 +166,8 @@ static std::string getInputForMux(handshake::MuxOp op) {
 
 /// Produces the "out" attribute value of a handshake::ControlMergeOp.
 static std::string getOutputForControlMerge(handshake::ControlMergeOp op) {
-  return "out1:" + std::to_string(getWidth(op.getResult())) +
+  return "out1:" +
+         std::to_string(getHandshakeTypeBitWidth(op.getResult().getType())) +
          " out2?:" + std::to_string((int)ceil(log2(op->getNumOperands())));
 }
 
@@ -552,7 +537,7 @@ static size_t fixInputPortNumber(Operation *op, size_t idx) {
 /// operation or before a merge-like operation). Such bitwidth modifiers trip up
 /// legacy Dynamatic and should thus be ignore in the DOT.
 static bool isBitModBetweenBlocks(Operation *op) {
-  if (isa<arith::ExtSIOp, arith::ExtUIOp, arith::TruncIOp>(op)) {
+  if (isa<handshake::ExtSIOp, handshake::ExtUIOp, handshake::TruncIOp>(op)) {
     Operation *srcOp = op->getOperand(0).getDefiningOp();
     Operation *dstOp = *op->getResult(0).getUsers().begin();
     return (srcOp && dstOp) &&
@@ -579,7 +564,7 @@ static void patchUpIRForLegacyBuffers(handshake::FuncOp funcOp) {
     // Backtrack through extension operations
     Value val = forkOp.getOperand(0);
     while (Operation *defOp = val.getDefiningOp())
-      if (isa<arith::ExtSIOp, arith::ExtUIOp>(defOp))
+      if (isa<handshake::ExtSIOp, handshake::ExtUIOp>(defOp))
         val = defOp->getOperand(0);
       else
         break;
@@ -775,8 +760,8 @@ LogicalResult DOTPrinter::annotateNode(Operation *op,
 
             // Convert the value to an hexadecimal string value
             std::stringstream stream;
-            Type cstType = cstOp.getResult().getType();
-            unsigned bitwidth = cstType.getIntOrFloatBitWidth();
+            ChannelType cstType = cstOp.getResult().getType();
+            unsigned bitwidth = cstType.getDataBitWidth();
             size_t hexLength =
                 (bitwidth >> 2) + ((bitwidth & 0b11) != 0 ? 1 : 0);
             stream << "0x" << std::setfill('0') << std::setw(hexLength)
@@ -784,13 +769,13 @@ LogicalResult DOTPrinter::annotateNode(Operation *op,
 
             // Determine the constant value based on the constant's return type
             TypedAttr valueAttr = cstOp.getValueAttr();
-            if (isa<IntegerType>(cstType)) {
+            if (auto intType = dyn_cast<IntegerType>(cstType.getDataType())) {
               APInt value = cast<mlir::IntegerAttr>(valueAttr).getValue();
-              if (cstType.isUnsignedInteger())
+              if (intType.isUnsignedInteger())
                 stream << value.getZExtValue();
               else
                 stream << value.getSExtValue();
-            } else if (isa<FloatType>(cstType)) {
+            } else if (isa<FloatType>(cstType.getDataType())) {
               mlir::FloatAttr attr = dyn_cast<mlir::FloatAttr>(valueAttr);
               stream << attr.getValue().convertToDouble();
             } else {
@@ -819,16 +804,17 @@ LogicalResult DOTPrinter::annotateNode(Operation *op,
             std::stringstream stream;
             auto funcOp = op->getParentOfType<handshake::FuncOp>();
             for (auto [idx, res] : llvm::enumerate(funcOp.getResultTypes()))
-              stream << "out" << (idx + 1) << ":" << getWidth(res);
+              stream << "out" << (idx + 1) << ":"
+                     << getHandshakeTypeBitWidth(res);
             info.stringAttr["out"] = stream.str();
             return info;
           })
-          .Case<arith::CmpIOp>([&](arith::CmpIOp op) {
+          .Case<handshake::CmpIOp>([&](handshake::CmpIOp op) {
             auto info = DOTNode("Operator");
             info.stringAttr["op"] = cmpINameToOpName[op.getPredicate()];
             return info;
           })
-          .Case<arith::CmpFOp>([&](arith::CmpFOp op) {
+          .Case<handshake::CmpFOp>([&](handshake::CmpFOp op) {
             auto info = DOTNode("Operator");
             info.stringAttr["op"] = cmpFNameToOpName[op.getPredicate()];
             return info;
@@ -850,7 +836,7 @@ LogicalResult DOTPrinter::annotateNode(Operation *op,
 
             // Among mathematical operations, only the select operation has
             // special input port logic
-            if (arith::SelectOp selOp = dyn_cast<arith::SelectOp>(op)) {
+            if (handshake::SelectOp selOp = dyn_cast<handshake::SelectOp>(op)) {
               PortsData ports;
               ports.emplace_back("in1?", selOp.getCondition());
               ports.emplace_back("in2+", selOp.getTrueValue());
@@ -906,7 +892,7 @@ LogicalResult DOTPrinter::annotateArgumentNode(handshake::FuncOp funcOp,
   info.stringAttr["in"] = getIOFromValues(ValueRange(arg), "in");
   info.stringAttr["out"] = getIOFromValues(ValueRange(arg), "out");
   info.intAttr["bbID"] = 1;
-  if (isa<NoneType>(arg.getType()))
+  if (isa<handshake::ControlType>(arg.getType()))
     info.stringAttr["control"] = "true";
 
   info.print(os);
@@ -1031,7 +1017,8 @@ static StringRef getArrowheadStyle(OpOperand &oprd) {
 /// Determines cosmetic attributes of the edge corresponding to the operand.
 static std::string getEdgeStyle(OpOperand &oprd) {
   std::string attributes;
-  StringRef style = isa<NoneType>(oprd.get().getType()) ? DOTTED : SOLID;
+  StringRef style =
+      isa<handshake::ControlType>(oprd.get().getType()) ? DOTTED : SOLID;
   // StringRef arrowhead =
   return "style=\"" + style.str() +
          R"(", dir="both", arrowtail="none", arrowhead=")" +
@@ -1061,8 +1048,8 @@ static StringRef getMemNameForPort(Op memPortOp) {
   if (addrUsers.empty())
     return "";
   Operation *userOp = *addrUsers.begin();
-  while (isa_and_present<arith::ExtSIOp, arith::ExtUIOp, arith::TruncIOp,
-                         handshake::ForkOp>(userOp)) {
+  while (isa_and_present<handshake::ExtSIOp, handshake::ExtUIOp,
+                         handshake::TruncIOp, handshake::ForkOp>(userOp)) {
     auto users = userOp->getResult(0).getUsers();
     if (users.empty())
       return "";
@@ -1089,20 +1076,20 @@ static std::string getPrettyNodeLabel(Operation *op) {
       // handshake operations
       .Case<handshake::ConstantOp>(
           [&](handshake::ConstantOp cstOp) -> std::string {
-            Type cstType = cstOp.getResult().getType();
+            ChannelType cstType = cstOp.getResult().getType();
             TypedAttr valueAttr = cstOp.getValueAttr();
-            if (isa<IntegerType>(cstType)) {
+            if (auto intType = dyn_cast<IntegerType>(cstType.getDataType())) {
               // Special case boolean attribute (which would result in an i1
               // constant integer results) to print true/false instead of 1/0
               if (auto boolAttr = dyn_cast<mlir::BoolAttr>(valueAttr))
                 return boolAttr.getValue() ? "true" : "false";
 
               APInt value = cast<mlir::IntegerAttr>(valueAttr).getValue();
-              if (cstType.isUnsignedInteger())
+              if (intType.isUnsignedInteger())
                 return std::to_string(value.getZExtValue());
               return std::to_string(value.getSExtValue());
             }
-            if (isa<FloatType>(cstType)) {
+            if (isa<FloatType>(cstType.getDataType())) {
               mlir::FloatAttr attr = dyn_cast<mlir::FloatAttr>(valueAttr);
               return std::to_string(attr.getValue().convertToDouble());
             }
@@ -1133,71 +1120,72 @@ static std::string getPrettyNodeLabel(Operation *op) {
       .Case<handshake::BranchOp>([&](auto) { return "branch"; })
       .Case<handshake::ConditionalBranchOp>([&](auto) { return "cbranch"; })
       .Case<handshake::ReturnOp>([&](auto) { return "return"; })
-      // arith operations
-      .Case<arith::AddIOp, arith::AddFOp>([&](auto) { return "+"; })
-      .Case<arith::SubIOp, arith::SubFOp>([&](auto) { return "-"; })
-      .Case<arith::AndIOp>([&](auto) { return "&"; })
-      .Case<arith::OrIOp>([&](auto) { return "|"; })
-      .Case<arith::XOrIOp>([&](auto) { return "^"; })
-      .Case<arith::MulIOp, arith::MulFOp>([&](auto) { return "*"; })
-      .Case<arith::DivUIOp, arith::DivSIOp, arith::DivFOp>(
+      .Case<handshake::AddIOp, handshake::AddFOp>([&](auto) { return "+"; })
+      .Case<handshake::SubIOp, handshake::SubFOp>([&](auto) { return "-"; })
+      .Case<handshake::AndIOp>([&](auto) { return "&"; })
+      .Case<handshake::OrIOp>([&](auto) { return "|"; })
+      .Case<handshake::XOrIOp>([&](auto) { return "^"; })
+      .Case<handshake::MulIOp, handshake::MulFOp>([&](auto) { return "*"; })
+      .Case<handshake::DivUIOp, handshake::DivSIOp, handshake::DivFOp>(
           [&](auto) { return "div"; })
-      .Case<arith::ShRSIOp, arith::ShRUIOp>([&](auto) { return ">>"; })
-      .Case<arith::ShLIOp>([&](auto) { return "<<"; })
-      .Case<arith::ExtSIOp, arith::ExtUIOp, arith::ExtFOp, arith::TruncIOp,
-            arith::TruncFOp>([&](auto) {
-        unsigned opWidth = op->getOperand(0).getType().getIntOrFloatBitWidth();
-        unsigned resWidth = op->getResult(0).getType().getIntOrFloatBitWidth();
-        return "[" + std::to_string(opWidth) + "..." +
-               std::to_string(resWidth) + "]";
-      })
-      .Case<arith::CmpIOp>([&](arith::CmpIOp op) {
+      .Case<handshake::ShRSIOp, handshake::ShRUIOp>([&](auto) { return ">>"; })
+      .Case<handshake::ShLIOp>([&](auto) { return "<<"; })
+      .Case<handshake::ExtSIOp, handshake::ExtUIOp, handshake::TruncIOp>(
+          [&](auto) {
+            unsigned opWidth = cast<ChannelType>(op->getOperand(0).getType())
+                                   .getDataBitWidth();
+            unsigned resWidth =
+                cast<ChannelType>(op->getResult(0).getType()).getDataBitWidth();
+            return "[" + std::to_string(opWidth) + "..." +
+                   std::to_string(resWidth) + "]";
+          })
+      .Case<handshake::CmpIOp>([&](handshake::CmpIOp op) {
         switch (op.getPredicate()) {
-        case arith::CmpIPredicate::eq:
+        case handshake::CmpIPredicate::eq:
           return "==";
-        case arith::CmpIPredicate::ne:
+        case handshake::CmpIPredicate::ne:
           return "!=";
-        case arith::CmpIPredicate::uge:
-        case arith::CmpIPredicate::sge:
+        case handshake::CmpIPredicate::uge:
+        case handshake::CmpIPredicate::sge:
           return ">=";
-        case arith::CmpIPredicate::ugt:
-        case arith::CmpIPredicate::sgt:
+        case handshake::CmpIPredicate::ugt:
+        case handshake::CmpIPredicate::sgt:
           return ">";
-        case arith::CmpIPredicate::ule:
-        case arith::CmpIPredicate::sle:
+        case handshake::CmpIPredicate::ule:
+        case handshake::CmpIPredicate::sle:
           return "<=";
-        case arith::CmpIPredicate::ult:
-        case arith::CmpIPredicate::slt:
+        case handshake::CmpIPredicate::ult:
+        case handshake::CmpIPredicate::slt:
           return "<";
         }
       })
-      .Case<arith::CmpFOp>([&](arith::CmpFOp op) {
+      .Case<handshake::CmpFOp>([&](handshake::CmpFOp op) {
         switch (op.getPredicate()) {
-        case arith::CmpFPredicate::OEQ:
-        case arith::CmpFPredicate::UEQ:
+        case handshake::CmpFPredicate::OEQ:
+        case handshake::CmpFPredicate::UEQ:
           return "==";
-        case arith::CmpFPredicate::ONE:
-        case arith::CmpFPredicate::UNE:
+        case handshake::CmpFPredicate::ONE:
+        case handshake::CmpFPredicate::UNE:
           return "!=";
-        case arith::CmpFPredicate::OGE:
-        case arith::CmpFPredicate::UGE:
+        case handshake::CmpFPredicate::OGE:
+        case handshake::CmpFPredicate::UGE:
           return ">=";
-        case arith::CmpFPredicate::OGT:
-        case arith::CmpFPredicate::UGT:
+        case handshake::CmpFPredicate::OGT:
+        case handshake::CmpFPredicate::UGT:
           return ">";
-        case arith::CmpFPredicate::OLE:
-        case arith::CmpFPredicate::ULE:
+        case handshake::CmpFPredicate::OLE:
+        case handshake::CmpFPredicate::ULE:
           return "<=";
-        case arith::CmpFPredicate::OLT:
-        case arith::CmpFPredicate::ULT:
+        case handshake::CmpFPredicate::OLT:
+        case handshake::CmpFPredicate::ULT:
           return "<";
-        case arith::CmpFPredicate::ORD:
+        case handshake::CmpFPredicate::ORD:
           return "ordered?";
-        case arith::CmpFPredicate::UNO:
+        case handshake::CmpFPredicate::UNO:
           return "unordered?";
-        case arith::CmpFPredicate::AlwaysFalse:
+        case handshake::CmpFPredicate::AlwaysFalse:
           return "false";
-        case arith::CmpFPredicate::AlwaysTrue:
+        case handshake::CmpFPredicate::AlwaysTrue:
           return "true";
         }
       })
@@ -1264,12 +1252,6 @@ LogicalResult DOTPrinter::print(mlir::ModuleOp mod,
     // to be compatible with legacy Dynamatic
     if (failed(verifyIRMaterialized(funcOp)))
       return funcOp.emitOpError() << ERR_NON_MATERIALIZED_FUNC;
-    if (failed(verifyAllIndexConcretized(funcOp)))
-      return funcOp.emitOpError()
-             << "In legacy mode, all index types in the IR must be concretized "
-                "to ensure that the DOT is compatible with legacy Dynamatic. "
-             << ERR_RUN_CONCRETIZATION;
-
     if (mode == Mode::LEGACY_BUFFERS)
       patchUpIRForLegacyBuffers(funcOp);
   }
@@ -1310,7 +1292,7 @@ LogicalResult DOTPrinter::printNode(Operation *op,
   // The node's DOT "mlir_op" attribute
   std::string mlirOpName = op->getName().getStringRef().str();
   std::string prettyLabel = getPrettyNodeLabel(op);
-  if (isa<arith::CmpIOp, arith::CmpFOp>(op))
+  if (isa<handshake::CmpIOp, handshake::CmpFOp>(op))
     mlirOpName += prettyLabel;
 
   // The node's DOT "shape" attribute
@@ -1397,7 +1379,8 @@ LogicalResult DOTPrinter::printFunc(handshake::FuncOp funcOp,
         continue;
 
       std::string argLabel = getArgumentName(funcOp, arg.index());
-      StringRef style = isa<NoneType>(arg.value().getType()) ? DOTTED : SOLID;
+      StringRef style =
+          isa<handshake::ControlType>(arg.value().getType()) ? DOTTED : SOLID;
       os << "\"" << argLabel
          << R"(" [mlir_op="handshake.func", shape=diamond, )"
          << "label=\"" << argLabel << "\", style=\"" << style << "\", ";

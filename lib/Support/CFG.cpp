@@ -148,8 +148,8 @@ static bool followToBlock(Operation *op, unsigned &bb,
 /// Determines whether the operation is of a nature which can be traversed
 /// outside blocks during backedge identification.
 static inline bool canGoThroughOutsideBlocks(Operation *op) {
-  return isa<handshake::ForkOp, arith::ExtUIOp, arith::ExtSIOp,
-             arith::TruncIOp>(op);
+  return isa<handshake::ForkOp, handshake::ExtUIOp, handshake::ExtSIOp,
+             handshake::TruncIOp>(op);
 }
 
 /// Attempts to backtrack through forks and bitwidth modification operations
@@ -627,7 +627,7 @@ static GIIDStatus isGIIDRec(Value predecessor, OpOperand &oprd,
         // result depends on the predecessor
         return recurse(loadOp.getAddressInput());
       })
-      .Case<arith::SelectOp>([&](arith::SelectOp selectOp) {
+      .Case<handshake::SelectOp>([&](handshake::SelectOp selectOp) {
         // Similarly to the mux, if the select operand depends on the
         // predecessor, then the select depends on the predecessor
         if (recurse(selectOp.getCondition()) == GIIDStatus::SUCCEED)
@@ -638,14 +638,14 @@ static GIIDStatus isGIIDRec(Value predecessor, OpOperand &oprd,
         return foldGIIDStatusAnd(recurse, values);
       })
       .Case<handshake::ForkOp, handshake::LazyForkOp,
-            handshake::BufferOpInterface, handshake::BranchOp, arith::AddIOp,
-            arith::AndIOp, arith::CmpIOp, arith::DivSIOp, arith::DivUIOp,
-            arith::ExtSIOp, arith::ExtUIOp, arith::MulIOp, arith::OrIOp,
-            arith::RemUIOp, arith::RemSIOp, arith::ShLIOp, arith::ShRUIOp,
-            arith::SIToFPOp, arith::SubIOp, arith::TruncIOp, arith::UIToFPOp,
-            arith::XOrIOp, arith::AddFOp, arith::CmpFOp, arith::DivFOp,
-            arith::ExtFOp, arith::MulFOp, arith::RemFOp, arith::SubFOp,
-            arith::TruncFOp>([&](auto) {
+            handshake::BufferOpInterface, handshake::BranchOp,
+            handshake::AddIOp, handshake::AndIOp, handshake::CmpIOp,
+            handshake::DivSIOp, handshake::DivUIOp, handshake::ExtSIOp,
+            handshake::ExtUIOp, handshake::MulIOp, handshake::OrIOp,
+            handshake::ShLIOp, handshake::ShRUIOp, handshake::SubIOp,
+            handshake::TruncIOp, handshake::XOrIOp, handshake::AddFOp,
+            handshake::CmpFOp, handshake::DivFOp, handshake::MulFOp,
+            handshake::SubFOp>([&](auto) {
         // At least one operand must depend on the predecessor
         return foldGIIDStatusOr(recurse, defOp->getOperands());
       })
