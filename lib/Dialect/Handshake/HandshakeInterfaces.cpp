@@ -12,10 +12,12 @@
 //===----------------------------------------------------------------------===//
 
 #include "dynamatic/Dialect/Handshake/HandshakeOps.h"
+#include "dynamatic/Dialect/Handshake/HandshakeTypes.h"
 #include "dynamatic/Support/LLVM.h"
 #include "mlir/Dialect/Affine/Analysis/AffineAnalysis.h"
 #include "mlir/IR/OpDefinition.h"
 #include "mlir/IR/Value.h"
+#include "mlir/Support/LogicalResult.h"
 #include "mlir/Transforms/InliningUtils.h"
 
 using namespace dynamatic;
@@ -62,6 +64,18 @@ std::string handshake::EndOp::getOperandName(unsigned idx) {
   if (idx < numResults)
     return getDefaultOperandName(idx);
   return "memDone_" + std::to_string(idx - numResults);
+}
+
+std::string handshake::SelectOp::getOperandName(unsigned idx) {
+  assert(idx < getNumOperands() && "index too high");
+  if (idx == 0)
+    return "condition";
+  return (idx == 1) ? "lhs" : "rhs";
+}
+
+std::string handshake::SelectOp::getResultName(unsigned idx) {
+  assert(idx == 0 && "index too high");
+  return "result";
 }
 
 /// Load/Store base signal names common to all memory interfaces
@@ -202,6 +216,44 @@ bool dynamatic::handshake::isControlOpImpl(Operation *op) {
   if (SOSTInterface sostInterface = dyn_cast<SOSTInterface>(op); sostInterface)
     return sostInterface.sostIsControl();
   return false;
+}
+
+//===----------------------------------------------------------------------===//
+// PreservesExtraSignals
+//===----------------------------------------------------------------------===//
+
+LogicalResult
+dynamatic::handshake::detail::verifyPreservesExtraSignals(Operation *op) {
+  std::optional<ArrayRef<ExtraSignal>> refExtras;
+
+  /// Identify all channel-typed operands and results
+  auto checkCompatible = [&](ValueRange values) -> LogicalResult {
+    for (Value val : values) {
+      auto channelType = dyn_cast<handshake::ChannelType>(val.getType());
+      if (!channelType)
+        continue;
+      if (!refExtras) {
+        refExtras = channelType.getExtraSignals();
+        continue;
+      }
+      ArrayRef<ExtraSignal> extras = channelType.getExtraSignals();
+      if (refExtras->size() != extras.size())
+        return op->emitError() << "incompatible number of extra signals "
+                                  "between two operand/result channel types";
+      auto signalsZip = llvm::zip(*refExtras, extras);
+      for (const auto &[idx, signals] : llvm::enumerate(signalsZip)) {
+        auto &[refSig, sig] = signals;
+        if (refSig != sig)
+          return op->emitError()
+                 << "different " << idx
+                 << "-th extra signal between two operand/result channel types";
+      }
+    }
+    return success();
+  };
+
+  return failure(failed(checkCompatible(op->getOperands())) ||
+                 failed(checkCompatible(op->getResults())));
 }
 
 #include "dynamatic/Dialect/Handshake/HandshakeInterfaces.cpp.inc"

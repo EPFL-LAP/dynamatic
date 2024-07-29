@@ -1,24 +1,24 @@
 [
   {
-    "name": "arith.addf",
+    "name": "handshake.addf",
     "parameters": [{ "name": "DATA_WIDTH", "type": "unsigned" }],
     "generic": "$DYNAMATIC/experimental/data/vhdl/arith/addf.vhd",
     "dependencies": ["join", "delay_buffer", "oehb", "flopoco_ip_cores"]
   },
   {
-    "name": "arith.addi",
+    "name": "handshake.addi",
     "parameters": [{ "name": "DATA_WIDTH", "type": "unsigned" }],
     "generic": "$DYNAMATIC/experimental/data/vhdl/arith/addi.vhd",
     "dependencies": ["join"]
   },
   {
-    "name": "arith.andi",
+    "name": "handshake.andi",
     "parameters": [{ "name": "DATA_WIDTH", "type": "unsigned" }],
     "generic": "$DYNAMATIC/experimental/data/vhdl/arith/andi.vhd",
     "dependencies": ["join"]
   },
   {
-    "name": "arith.cmpf",
+    "name": "handshake.cmpf",
     "parameters": [
       { "name": "PREDICATE", "type": "string" },
       { "name": "DATA_WIDTH", "type": "unsigned", "generic": true }
@@ -27,7 +27,7 @@
     "dependencies": ["join", "flopoco_ip_cores"]
   },
   {
-    "name": "arith.cmpi",
+    "name": "handshake.cmpi",
     "parameters": [
       { "name": "PREDICATE", "type": "string" },
       { "name": "DATA_WIDTH", "type": "unsigned", "generic": true }
@@ -36,25 +36,25 @@
     "dependencies": ["join"]
   },
   {
-    "name": "arith.divf",
+    "name": "handshake.divf",
     "parameters": [{ "name": "DATA_WIDTH", "type": "unsigned" }],
     "generic": "$DYNAMATIC/experimental/data/vhdl/arith/divf.vhd",
     "dependencies": ["join", "delay_buffer", "oehb", "flopoco_ip_cores"]
   },
   {
-    "name": "arith.divsi",
+    "name": "handshake.divsi",
     "parameters": [{ "name": "DATA_WIDTH", "type": "unsigned" }],
     "generic": "$DYNAMATIC/experimental/data/vhdl/arith/divsi.vhd",
     "dependencies": ["join", "delay_buffer"]
   },
   {
-    "name": "arith.divui",
+    "name": "handshake.divui",
     "parameters": [{ "name": "DATA_WIDTH", "type": "unsigned" }],
     "generic": "$DYNAMATIC/experimental/data/vhdl/arith/divui.vhd",
     "dependencies": ["join", "delay_buffer"]
   },
   {
-    "name": "arith.extsi",
+    "name": "handshake.extsi",
     "parameters": [
       { "name": "INPUT_WIDTH", "type": "unsigned" },
       { "name": "OUTPUT_WIDTH", "type": "unsigned" }
@@ -62,7 +62,7 @@
     "generic": "$DYNAMATIC/experimental/data/vhdl/arith/extsi.vhd"
   },
   {
-    "name": "arith.extui",
+    "name": "handshake.extui",
     "parameters": [
       { "name": "INPUT_WIDTH", "type": "unsigned" },
       { "name": "OUTPUT_WIDTH", "type": "unsigned" }
@@ -70,78 +70,78 @@
     "generic": "$DYNAMATIC/experimental/data/vhdl/arith/extui.vhd"
   },
   {
-    "name": "arith.maximumf",
+    "name": "handshake.maximumf",
     "parameters": [{ "name": "DATA_WIDTH", "type": "unsigned" }],
     "generic": "$DYNAMATIC/experimental/data/vhdl/arith/maximumf.vhd",
     "dependencies": ["join", "delay_buffer"]
   },
   {
-    "name": "arith.minimumf",
+    "name": "handshake.minimumf",
     "parameters": [{ "name": "DATA_WIDTH", "type": "unsigned" }],
     "generic": "$DYNAMATIC/experimental/data/vhdl/arith/minimumf.vhd",
     "dependencies": ["join", "delay_buffer"]
   },
   {
-    "name": "arith.mulf",
+    "name": "handshake.mulf",
     "parameters": [{ "name": "DATA_WIDTH", "type": "unsigned" }],
     "generic": "$DYNAMATIC/experimental/data/vhdl/arith/mulf.vhd",
     "dependencies": ["join", "delay_buffer", "oehb", "flopoco_ip_cores"]
   },
   {
-    "name": "arith.muli",
+    "name": "handshake.muli",
     "parameters": [{ "name": "DATA_WIDTH", "type": "unsigned" }],
     "generic": "$DYNAMATIC/experimental/data/vhdl/arith/muli.vhd",
     "dependencies": ["join", "delay_buffer", "oehb"]
   },
   {
-    "name": "arith.negf",
+    "name": "handshake.negf",
     "parameters": [{ "name": "DATA_WIDTH", "type": "unsigned" }],
     "generic": "$DYNAMATIC/experimental/data/vhdl/arith/negf.vhd"
   },
   {
-    "name": "arith.ori",
+    "name": "handshake.ori",
     "parameters": [{ "name": "DATA_WIDTH", "type": "unsigned" }],
     "generic": "$DYNAMATIC/experimental/data/vhdl/arith/ori.vhd",
     "dependencies": ["join"]
   },
   {
-    "name": "arith.select",
+    "name": "handshake.select",
     "parameters": [{ "name": "DATA_WIDTH", "type": "unsigned" }],
     "generic": "$DYNAMATIC/experimental/data/vhdl/arith/select.vhd",
     "module-name": "selector"
   },
   {
-    "name": "arith.shli",
+    "name": "handshake.shli",
     "parameters": [{ "name": "DATA_WIDTH", "type": "unsigned" }],
     "generic": "$DYNAMATIC/experimental/data/vhdl/arith/shli.vhd",
     "dependencies": ["join"]
   },
   {
-    "name": "arith.shrsi",
+    "name": "handshake.shrsi",
     "parameters": [{ "name": "DATA_WIDTH", "type": "unsigned" }],
     "generic": "$DYNAMATIC/experimental/data/vhdl/arith/shrsi.vhd",
     "dependencies": ["join"]
   },
   {
-    "name": "arith.shrui",
+    "name": "handshake.shrui",
     "parameters": [{ "name": "DATA_WIDTH", "type": "unsigned" }],
     "generic": "$DYNAMATIC/experimental/data/vhdl/arith/shrui.vhd",
     "dependencies": ["join"]
   },
   {
-    "name": "arith.subf",
+    "name": "handshake.subf",
     "parameters": [{ "name": "DATA_WIDTH", "type": "unsigned" }],
     "generic": "$DYNAMATIC/experimental/data/vhdl/arith/subf.vhd",
     "dependencies": ["join", "delay_buffer", "oehb", "flopoco_ip_cores"]
   },
   {
-    "name": "arith.subi",
+    "name": "handshake.subi",
     "parameters": [{ "name": "DATA_WIDTH", "type": "unsigned" }],
     "generic": "$DYNAMATIC/experimental/data/vhdl/arith/subi.vhd",
     "dependencies": ["join"]
   },
   {
-    "name": "arith.trunci",
+    "name": "handshake.trunci",
     "parameters": [
       { "name": "INPUT_WIDTH", "type": "unsigned" },
       { "name": "OUTPUT_WIDTH", "type": "unsigned" }
@@ -149,7 +149,7 @@
     "generic": "$DYNAMATIC/experimental/data/vhdl/arith/trunci.vhd"
   },
   {
-    "name": "arith.xori",
+    "name": "handshake.xori",
     "parameters": [{ "name": "DATA_WIDTH", "type": "unsigned" }],
     "generic": "$DYNAMATIC/experimental/data/vhdl/arith/xori.vhd",
     "dependencies": ["join"]

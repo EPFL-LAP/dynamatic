@@ -17,6 +17,7 @@
 #include "dynamatic/Support/CFG.h"
 #include "mlir/Dialect/Affine/IR/AffineOps.h"
 #include "mlir/Dialect/MemRef/IR/MemRef.h"
+#include "mlir/IR/MLIRContext.h"
 #include "mlir/IR/Value.h"
 #include "mlir/Transforms/DialectConversion.h"
 #include "llvm/ADT/SmallVector.h"
@@ -149,9 +150,12 @@ LogicalResult MemoryInterfaceBuilder::instantiateInterfaces(
 
     // Create 3 backedges (load address, store address, store data) for the MC
     // inputs that will eventually come from the LSQ.
-    Backedge ldAddr = edgeBuilder.get(builder.getIndexType());
-    Backedge stAddr = edgeBuilder.get(builder.getIndexType());
-    Backedge stData = edgeBuilder.get(memrefType.getElementType());
+    MLIRContext *ctx = builder.getContext();
+    Type addrType = handshake::ChannelType::getAddrChannel(ctx);
+    Backedge ldAddr = edgeBuilder.get(addrType);
+    Backedge stAddr = edgeBuilder.get(addrType);
+    Backedge stData = edgeBuilder.get(
+        handshake::ChannelType::get(memrefType.getElementType()));
     inputs.mcInputs.push_back(ldAddr);
     inputs.mcInputs.push_back(stAddr);
     inputs.mcInputs.push_back(stData);
@@ -199,14 +203,14 @@ MemoryInterfaceBuilder::getMemResultsToInterface(Operation *memOp) {
 
 Value MemoryInterfaceBuilder::getMCControl(Value ctrl, unsigned numStores,
                                            OpBuilder &builder) {
-  assert(isa<NoneType>(ctrl.getType()) && "control signal must have none type");
+  assert(isa<handshake::ControlType>(ctrl.getType()) &&
+         "control signal must have !handshake.control type");
   if (Operation *defOp = ctrl.getDefiningOp())
     builder.setInsertionPointAfter(defOp);
   else
     builder.setInsertionPointToStart(ctrl.getParentBlock());
   handshake::ConstantOp cstOp = builder.create<handshake::ConstantOp>(
-      ctrl.getLoc(), builder.getI32Type(), builder.getI32IntegerAttr(numStores),
-      ctrl);
+      ctrl.getLoc(), builder.getI32IntegerAttr(numStores), ctrl);
   inheritBBFromValue(ctrl, cstOp);
   return cstOp.getResult();
 }
@@ -430,7 +434,7 @@ SmallVector<Value> dynamatic::getLSQControlPaths(handshake::LSQOp lsqOp,
   SmallPtrSet<Operation *, 4> controlOps;
   for (OpResult res : ctrlOp->getResults()) {
     // We only care for control-only channels
-    if (!isa<NoneType>(res.getType()))
+    if (!isa<handshake::ControlType>(res.getType()))
       continue;
 
     // Reset the list of control channels to explore and the list of control

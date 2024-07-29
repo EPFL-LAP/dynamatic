@@ -21,6 +21,7 @@
 
 using namespace llvm;
 using namespace mlir;
+using namespace dynamatic;
 
 static cl::OptionCategory mainCategory("Tool options");
 
@@ -42,42 +43,42 @@ static cl::opt<std::string>
               cl::cat(mainCategory));
 
 /// Returns the VHDL comparator corresponding to the comparison's predicate.
-static StringRef getComparator(arith::CmpIPredicate pred) {
+static StringRef getComparator(handshake::CmpIPredicate pred) {
   switch (pred) {
-  case arith::CmpIPredicate::eq:
+  case handshake::CmpIPredicate::eq:
     return "=";
-  case arith::CmpIPredicate::ne:
+  case handshake::CmpIPredicate::ne:
     return "/=";
-  case arith::CmpIPredicate::slt:
-  case arith::CmpIPredicate::ult:
+  case handshake::CmpIPredicate::slt:
+  case handshake::CmpIPredicate::ult:
     return "<";
-  case arith::CmpIPredicate::sle:
-  case arith::CmpIPredicate::ule:
+  case handshake::CmpIPredicate::sle:
+  case handshake::CmpIPredicate::ule:
     return "<=";
-  case arith::CmpIPredicate::sgt:
-  case arith::CmpIPredicate::ugt:
+  case handshake::CmpIPredicate::sgt:
+  case handshake::CmpIPredicate::ugt:
     return ">";
-  case arith::CmpIPredicate::sge:
-  case arith::CmpIPredicate::uge:
+  case handshake::CmpIPredicate::sge:
+  case handshake::CmpIPredicate::uge:
     return ">=";
   }
 }
 
 /// Returns the VHDL type modifier associated with the comparison's predicate.
-static StringRef getModifier(arith::CmpIPredicate pred) {
+static StringRef getModifier(handshake::CmpIPredicate pred) {
   switch (pred) {
-  case arith::CmpIPredicate::eq:
-  case arith::CmpIPredicate::ne:
+  case handshake::CmpIPredicate::eq:
+  case handshake::CmpIPredicate::ne:
     return "";
-  case arith::CmpIPredicate::slt:
-  case arith::CmpIPredicate::sle:
-  case arith::CmpIPredicate::sgt:
-  case arith::CmpIPredicate::sge:
+  case handshake::CmpIPredicate::slt:
+  case handshake::CmpIPredicate::sle:
+  case handshake::CmpIPredicate::sgt:
+  case handshake::CmpIPredicate::sge:
     return "signed";
-  case arith::CmpIPredicate::ult:
-  case arith::CmpIPredicate::ule:
-  case arith::CmpIPredicate::ugt:
-  case arith::CmpIPredicate::uge:
+  case handshake::CmpIPredicate::ult:
+  case handshake::CmpIPredicate::ule:
+  case handshake::CmpIPredicate::ugt:
+  case handshake::CmpIPredicate::uge:
     return "unsigned";
   }
 }
@@ -90,8 +91,8 @@ int main(int argc, char **argv) {
       "RTL generator for the `arith.cmpi` MLIR operation. Generates the "
       "correct RTL based on the integer comparison predicate.");
 
-  std::optional<arith::CmpIPredicate> pred =
-      arith::symbolizeCmpIPredicate(predicate);
+  std::optional<handshake::CmpIPredicate> pred =
+      handshake::symbolizeCmpIPredicate(predicate);
   if (!pred) {
     llvm::errs() << "Unknown integer comparison predicate \"" << predicate
                  << "\"\n";

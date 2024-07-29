@@ -32,19 +32,15 @@
 namespace dynamatic {
 namespace handshake {
 
-struct MemLoadInterface {
-  unsigned index;
-  mlir::Value addressIn;
-  mlir::Value dataOut;
-  mlir::Value doneOut;
-};
+namespace detail {
 
-struct MemStoreInterface {
-  unsigned index;
-  mlir::Value addressIn;
-  mlir::Value dataIn;
-  mlir::Value doneOut;
-};
+/// `PreservesExtraSignals` trait's verification function (defined as a free
+/// function to avoid instantiating an implementation for every concrete
+/// operation type).
+LogicalResult verifyPreservesExtraSignals(Operation *op);
+} // namespace detail
+
+class ControlType;
 
 /// Default implementation for checking whether an operation is a control
 /// operation. This function cannot be defined within ControlInterface
@@ -55,6 +51,23 @@ struct MemStoreInterface {
 bool isControlOpImpl(Operation *op);
 } // end namespace handshake
 } // end namespace dynamatic
+
+namespace mlir {
+namespace OpTrait {
+/// Operation trait guranteeing that all the operands and results of an
+/// operation that have the `handshake::ChannelType` have the exact same list of
+/// extra signals.
+template <typename ConcreteType>
+class PreservesExtraSignals
+    : public TraitBase<ConcreteType, PreservesExtraSignals> {
+public:
+  static LogicalResult verifyTrait(Operation *op) {
+    return dynamatic::handshake::detail::verifyPreservesExtraSignals(op);
+  }
+};
+
+} // namespace OpTrait
+} // namespace mlir
 
 #include "dynamatic/Dialect/Handshake/HandshakeInterfaces.h.inc"
 

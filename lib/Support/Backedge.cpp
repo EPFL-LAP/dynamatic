@@ -74,7 +74,7 @@ void Backedge::setValue(mlir::Value newValue) {
          "incorrect replacement value type");
   assert(!set && "backedge already set to a value!");
   if (rewriter)
-    rewriter->replaceAllUsesWith(value, newValue);
+    rewriter->replaceOp(value.getDefiningOp(), newValue);
   else
     value.replaceAllUsesWith(newValue);
   set = true;

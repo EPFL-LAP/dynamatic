@@ -14,7 +14,6 @@
 #ifndef DYNAMATIC_CONVERSION_CF_TO_HANDSHAKE_H
 #define DYNAMATIC_CONVERSION_CF_TO_HANDSHAKE_H
 
-#include "dynamatic/Analysis/NameAnalysis.h"
 #include "dynamatic/Dialect/Handshake/HandshakeInterfaces.h"
 #include "dynamatic/Dialect/Handshake/HandshakeOps.h"
 #include "dynamatic/Support/Backedge.h"
@@ -41,26 +40,13 @@ public:
 /// control-only result is added to signal function completion. All of the
 /// pattern's intermediate conversion steps are virtual, allowing other passes
 /// to reuse part of the conversion while defining custom behavior.
-class LowerFuncToHandshake : public OpConversionPattern<mlir::func::FuncOp> {
+class LowerFuncToHandshake : public DynOpConversionPattern<mlir::func::FuncOp> {
 public:
-  /// Constructs from a type converter and a reference to the englobing pass's
-  /// name analysis (to name new operations as they are inserted into the IR).
-  LowerFuncToHandshake(TypeConverter &typeConverter, NameAnalysis &namer,
-                       MLIRContext *ctx);
+  using DynOpConversionPattern<mlir::func::FuncOp>::DynOpConversionPattern;
 
   LogicalResult
   matchAndRewrite(mlir::func::FuncOp funcOp, OpAdaptor adaptor,
                   ConversionPatternRewriter &rewriter) const override;
-
-  /// Strategy to use when putting the matched func-level function into maximal
-  /// SSA form.
-  class FuncSSAStrategy : public dynamatic::SSAMaximizationStrategy {
-    /// Filters out block arguments of type MemRefType
-    bool maximizeArgument(BlockArgument arg) override;
-
-    /// Filters out allocation operations
-    bool maximizeOp(Operation &op) override;
-  };
 
   /// Groups memory operations by interface and group for a given memory region.
   struct MemAccesses {
@@ -135,7 +121,7 @@ public:
   /// handshake::ReturnOp's, deleting all block terminators and non-entry
   /// blocks, merging the results of all return statements, and creating the
   /// region's end operation.
-  virtual void flattenAndTerminate(
+  virtual LogicalResult flattenAndTerminate(
       handshake::FuncOp funcOp, ConversionPatternRewriter &rewriter,
       const DenseMap<BlockArgument, OpResult> &blockArgReplacements) const;
 
@@ -143,10 +129,6 @@ public:
   virtual Value getBlockControl(Block *block) const;
 
 private:
-  /// Name analysis to name new memory operations as they are created and keep
-  /// reference accesses in memory dependencies consistent.
-  NameAnalysis &namer;
-
   /// Groups information to "rewire the IR" around a particular merge-like
   /// operation.
   struct MergeOpInfo {
@@ -174,6 +156,16 @@ private:
   void insertMerge(BlockArgument blockArg, ConversionPatternRewriter &rewriter,
                    BackedgeBuilder &edgeBuilder,
                    LowerFuncToHandshake::MergeOpInfo &iMerge) const;
+};
+
+/// Strategy to use when putting the matched func-level function into maximal
+/// SSA form.
+class FuncSSAStrategy : public dynamatic::SSAMaximizationStrategy {
+  /// Filters out block arguments of type MemRefType
+  bool maximizeArgument(BlockArgument arg) override;
+
+  /// Filters out allocation operations
+  bool maximizeOp(Operation &op) override;
 };
 
 #define GEN_PASS_DECL_CFTOHANDSHAKE

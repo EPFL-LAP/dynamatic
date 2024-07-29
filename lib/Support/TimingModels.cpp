@@ -14,64 +14,55 @@
 
 #include "dynamatic/Support/TimingModels.h"
 #include "dynamatic/Dialect/Handshake/HandshakeOps.h"
-#include "mlir/Dialect/Arith/IR/Arith.h"
-#include "mlir/IR/Operation.h"
 #include "mlir/Support/LogicalResult.h"
 #include "llvm/ADT/TypeSwitch.h"
 #include "llvm/Support/JSON.h"
 #include <fstream>
-#include <iostream>
 
 using namespace llvm;
 using namespace mlir;
 using namespace dynamatic;
+using namespace dynamatic::handshake;
 
 //===----------------------------------------------------------------------===//
 // TimingDatabse definitions
 //===----------------------------------------------------------------------===//
 
-/// Returns the width of a type which must either be a NoneType, IntegerType, or
-/// FloatType.
-static unsigned getTypeWidth(Type type) {
-  if (isa<mlir::NoneType>(type))
-    return 0;
-  if (isa<IntegerType, FloatType>(type))
-    return type.getIntOrFloatBitWidth();
-  llvm_unreachable("unsupported channel type");
-}
-
 unsigned dynamatic::getOpDatawidth(Operation *op) {
   // All arithmetic operations are handled the same way
   if (op->getName().getDialectNamespace() == "arith")
-    return getTypeWidth(op->getOperand(0).getType());
+    return getHandshakeTypeBitWidth(op->getOperand(0).getType());
 
   // Handshake operations have various semantics and must be handled on a
   // case-by-case basis
   return llvm::TypeSwitch<Operation *, unsigned>(op)
       .Case<handshake::MergeLikeOpInterface>(
           [&](handshake::MergeLikeOpInterface mergeLikeOp) {
-            return getTypeWidth(
+            return getHandshakeTypeBitWidth(
                 mergeLikeOp.getDataOperands().front().getType());
           })
       .Case<handshake::BufferOpInterface, handshake::ForkOp,
             handshake::LazyForkOp, handshake::BranchOp, handshake::SinkOp>(
-          [&](auto) { return getTypeWidth(op->getOperand(0).getType()); })
+          [&](auto) {
+            return getHandshakeTypeBitWidth(op->getOperand(0).getType());
+          })
       .Case<handshake::ConditionalBranchOp>(
           [&](handshake::ConditionalBranchOp condOp) {
-            return getTypeWidth(condOp.getDataOperand().getType());
+            return getHandshakeTypeBitWidth(condOp.getDataOperand().getType());
           })
-      .Case<handshake::SourceOp, handshake::ConstantOp>(
-          [&](auto) { return getTypeWidth(op->getResult(0).getType()); })
+      .Case<handshake::SourceOp, handshake::ConstantOp>([&](auto) {
+        return getHandshakeTypeBitWidth(op->getResult(0).getType());
+      })
       .Case<handshake::ReturnOp, handshake::EndOp, handshake::JoinOp>(
           [&](auto) {
             unsigned maxWidth = 0;
             for (Type ty : op->getOperandTypes())
-              maxWidth = std::max(maxWidth, getTypeWidth(ty));
+              maxWidth = std::max(maxWidth, getHandshakeTypeBitWidth(ty));
             return maxWidth;
           })
       .Case<handshake::LoadOpInterface, handshake::StoreOpInterface>([&](auto) {
-        return std::max(getTypeWidth(op->getOperand(0).getType()),
-                        getTypeWidth(op->getOperand(1).getType()));
+        return std::max(getHandshakeTypeBitWidth(op->getOperand(0).getType()),
+                        getHandshakeTypeBitWidth(op->getOperand(1).getType()));
       })
       .Case<handshake::MemoryOpInterface>(
           [&](handshake::MemoryOpInterface memOp) {
