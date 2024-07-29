@@ -66,6 +66,18 @@ std::string handshake::EndOp::getOperandName(unsigned idx) {
   return "memDone_" + std::to_string(idx - numResults);
 }
 
+std::string handshake::SelectOp::getOperandName(unsigned idx) {
+  assert(idx < getNumOperands() && "index too high");
+  if (idx == 0)
+    return "condition";
+  return (idx == 1) ? "lhs" : "rhs";
+}
+
+std::string handshake::SelectOp::getResultName(unsigned idx) {
+  assert(idx == 0 && "index too high");
+  return "result";
+}
+
 /// Load/Store base signal names common to all memory interfaces
 static constexpr llvm::StringLiteral MEMREF("memref"), CTRL("ctrl"),
     LD_ADDR("ldAddr"), LD_DATA("ldData"), ST_ADDR("stAddr"), ST_DATA("stData");

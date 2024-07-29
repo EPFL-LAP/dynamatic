@@ -75,7 +75,7 @@ class Handshake_Arith_CompareOp<string mnemonic, list<Trait> traits = []> :
   let extraClassDefinition = [{
     std::string $cppClass::getOperandName(unsigned idx) {
       assert(idx < getNumOperands() && "index too high");
-      return (idx == 2) ? "lhs" : "rhs";
+      return (idx == 0) ? "lhs" : "rhs";
     }
 
     std::string $cppClass::getResultName(unsigned idx) {
@@ -241,7 +241,8 @@ def Handshake_OrIOp : Handshake_Arith_IntBinaryOp<"ori", [Commutative]> {
 }
 
 def Handshake_SelectOp : Handshake_Arith_Op<"select", [
-  AllTypesMatch<["trueValue", "falseValue", "result"]>
+  AllTypesMatch<["trueValue", "falseValue", "result"]>,
+  DeclareOpInterfaceMethods<NamedIOInterface, ["getOperandName", "getResultName"]>,
 ]> {
   let summary = "Select a value based on a 1-bit predicate.";
  

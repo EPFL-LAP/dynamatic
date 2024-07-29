@@ -77,8 +77,7 @@ def ChannelType : Handshake_Type<"Channel", "channel"> {
         if (::mlir::isa<::mlir::IndexType>(dataType)) {
           // Convert IndexType's to equivalent signless integers automatically
           ::mlir::OpBuilder builder(dataType.getContext());
-          unsigned width = ::mlir::IndexType::kInternalStorageBitWidth;
-          dataType = builder.getIntegerType(width);
+          dataType = builder.getIntegerType(32);
         }
         return ChannelType::get(dataType.getContext(), dataType, extras);
       }]>

@@ -202,8 +202,7 @@ void ChannelType::print(AsmPrinter &odsPrinter) const {
 
 ChannelType ChannelType::getAddrChannel(MLIRContext *ctx) {
   OpBuilder builder(ctx);
-  unsigned width = ::IndexType::kInternalStorageBitWidth;
-  return get(builder.getIntegerType(width));
+  return get(builder.getIntegerType(32));
 }
 
 LogicalResult ChannelType::verify(function_ref<InFlightDiagnostic()> emitError,

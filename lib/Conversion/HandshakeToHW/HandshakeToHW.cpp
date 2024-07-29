@@ -1877,7 +1877,7 @@ public:
       return signalPassFailure();
 
     // Create memory wrappers around all hardware modules
-    for (auto [circuitOp, _] : lowerState.modState)
+    for (auto &[circuitOp, _] : lowerState.modState)
       createWrapper(circuitOp, lowerState, builder);
 
     // At this level all operations already have an intrinsic name so we can

@@ -205,8 +205,7 @@ static Type channelifyType(Type type) {
         if (!isa<IndexType>(memrefType.getElementType()))
           return memrefType;
         OpBuilder builder(memrefType.getContext());
-        IntegerType elemType =
-            builder.getIntegerType(IndexType::kInternalStorageBitWidth);
+        IntegerType elemType = builder.getIntegerType(32);
         return MemRefType::get(memrefType.getShape(), elemType);
       })
       .Case<handshake::ChannelType, handshake::ControlType>(
@@ -1036,7 +1035,7 @@ LogicalResult ConvertIndexCast<CastOp, ExtOp>::matchAndRewrite(
 
   auto getWidth = [](Type type) -> unsigned {
     if (isa<IndexType>(type))
-      return IndexType::kInternalStorageBitWidth;
+      return 32;
     return type.getIntOrFloatBitWidth();
   };
 
@@ -1134,8 +1133,9 @@ ConvertConstants::matchAndRewrite(arith::ConstantOp cstOp,
   TypedAttr cstAttr = cstOp.getValue();
   // Convert IndexType'd values to equivalent signless integers
   if (isa<IndexType>(cstAttr.getType())) {
-    auto intType = rewriter.getIntegerType(IndexType::kInternalStorageBitWidth);
-    cstAttr = IntegerAttr::get(intType, cast<IntegerAttr>(cstAttr).getValue());
+    auto intType = rewriter.getIntegerType(32);
+    cstAttr = IntegerAttr::get(intType,
+                               cast<IntegerAttr>(cstAttr).getValue().trunc(32));
   }
   auto newCstOp = rewriter.create<handshake::ConstantOp>(cstOp.getLoc(),
                                                          cstAttr, controlVal);
@@ -1152,7 +1152,7 @@ LogicalResult ConvertUndefinedValues::matchAndRewrite(
   auto resType = undefOp.getRes().getType();
   TypedAttr cstAttr;
   if (isa<IndexType>(resType)) {
-    auto intType = rewriter.getIntegerType(IndexType::kInternalStorageBitWidth);
+    auto intType = rewriter.getIntegerType(32);
     cstAttr = rewriter.getIntegerAttr(intType, 0);
   } else if (isa<IntegerType>(resType)) {
     cstAttr = rewriter.getIntegerAttr(resType, 0);

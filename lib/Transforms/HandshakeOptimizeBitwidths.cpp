@@ -35,6 +35,7 @@
 #include "mlir/Dialect/Arith/IR/Arith.h"
 #include "mlir/IR/BuiltinTypes.h"
 #include "mlir/IR/MLIRContext.h"
+#include "mlir/IR/PatternMatch.h"
 #include "mlir/IR/Value.h"
 #include "mlir/Transforms/GreedyPatternRewriteDriver.h"
 #include <functional>
@@ -82,11 +83,6 @@ static ChannelVal asTypedIfLegal(Value val) {
       return cast<ChannelVal>(val);
   }
   return nullptr;
-}
-
-/// Retuns the ceiling of the logarithm in base 2 of the given value.
-static inline unsigned getOptAddrWidth(unsigned value) {
-  return APInt(APInt::APINT_BITS_PER_WORD, value).ceilLogBase2();
 }
 
 /// Backtracks through defining operations of the value as long as they are
@@ -656,8 +652,9 @@ struct HandshakeMCAddress
 
   LogicalResult matchAndRewrite(handshake::MemoryControllerOp mcOp,
                                 PatternRewriter &rewriter) const override {
-    unsigned optWidth =
-        getOptAddrWidth(mcOp.getMemRef().getType().getDimSize(0));
+    unsigned optWidth = APInt(APInt::APINT_BITS_PER_WORD,
+                              mcOp.getMemRef().getType().getDimSize(0))
+                            .ceilLogBase2();
 
     FuncMemoryPorts ports = mcOp.getPorts();
     if (ports.addrWidth == 0 || optWidth >= ports.addrWidth)
