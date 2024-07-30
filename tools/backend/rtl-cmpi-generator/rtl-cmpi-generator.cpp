@@ -46,10 +46,6 @@ static cl::opt<std::string> hdlType(cl::Positional, cl::Required,
                                        cl::desc("<hdl type>"),
                                        cl::cat(mainCategory));
 
-static cl::opt<std::string> hdlType(cl::Positional, cl::Required,
-                                       cl::desc("<hdl type>"),
-                                       cl::cat(mainCategory));
-
 /// Returns the VHDL comparator corresponding to the comparison's predicate.
 static StringRef getComparatorVHDL(handshake::CmpIPredicate pred) {
   switch (pred) {
