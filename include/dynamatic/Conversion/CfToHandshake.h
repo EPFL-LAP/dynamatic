@@ -222,40 +222,37 @@ public:
   /// Adds BRANCHES in fast token delivery algorithm
   LogicalResult addSupp(ConversionPatternRewriter &rewriter);
 
-  /// Inserts a BRANCH for each loop with condition depending on the exit blocks
-  /// Loop convention followed is:
-  /// True Side --> loop exit
-  /// False Side --> iterate
+  /// Adds BRANCHES in fast token delivery algorithm for the case where the
+  /// producr is START by doing back-propagation
+  LogicalResult addSuppForStart(ConversionPatternRewriter &rewriter);
+
+  /// Inserts a BRANCH for each loop with condition depending on the exit
+  /// blocks Loop convention followed is: True Side --> loop exit False Side
+  /// --> iterate
   void insertBranchesToLoops(ConversionPatternRewriter &rewriter,
                              const std::set<mlir::CFGLoop *> &loops,
                              Operation *consumer, Value connection,
-                             SmallVector<Operation *> &allBranches,
-                             bool selfReg);
+                             bool moreProdThanCons);
 
   /// Adds BRANCHes in the case where the producer is in more loops than the
   /// consumer (to solve token count mismatch problem)
   void manageMoreProdThanCons(ConversionPatternRewriter &rewriter,
                               Block *producerBlock, Operation *consumer,
-                              Value connection,
-                              SmallVector<Operation *> &allBranches);
+                              Value connection);
 
   /// Adds BRANCHes in the case where an operation is feeding itself, i.e the
   /// producer is the same as the consumer(to solve token count mismatch
   /// problrm)
   void manageSelfRegeneration(ConversionPatternRewriter &rewriter,
-                              Operation *consumer, Value connection,
-                              SmallVector<Operation *> &allBranches);
+                              Operation *consumer, Value connection);
 
   /// Adds BRANCHes in the case where the consumer is in more loops than the
   /// producer
   void manageNonLoop(ConversionPatternRewriter &rewriter, Block *producerBlock,
-                     Operation *consumer, Value connection,
-                     SmallVector<Operation *> &allBranches);
+                     Operation *consumer, Value connection);
 
   void manageDifferentRegeneration(ConversionPatternRewriter &rewriter,
-                                   Block *producerBlock, Operation *consumer,
-                                   Value connection,
-                                   SmallVector<Operation *> &allBranches);
+                                   Operation *consumer, Value connection);
 
   ///----------Fast Token Delivery Cleanup----------
 
@@ -266,8 +263,7 @@ public:
                 SmallVector<Operation *> &initMerges, Operation *oldMerge);
 
   /// Replaces the input of constants with the START value
-  // LogicalResult triggerConstantsFromStart(ConversionPatternRewriter
-  // &rewriter);
+  LogicalResult triggerConstantsFromStart(ConversionPatternRewriter &rewriter);
 
 protected:
   /// The region being lowered.
@@ -338,6 +334,9 @@ private:
 
   bool isaMergeLoop(Operation *merge);
 
+  // Checks if an operation is a Branch in a loop exit block
+  bool isBranchInLoopExit(Operation *op);
+
   // Gets the loop exit condition of the bck.
   // If the loop exit is on the false side of the block, then the condition
   // is negated
@@ -359,18 +358,16 @@ private:
   // Converts a DATA (mux or boolean expression) in boolean logic library to
   // actual circuitry
   Value dataToCircuit(ConversionPatternRewriter &rewriter,
-                      experimental::boolean::Data *data, Block *block,
-                      Value trigger);
+                      experimental::boolean::Data *data, Block *block);
 
   // Converts a mux in boolean logic library to actual circuitry
   Value muxToCircuit(ConversionPatternRewriter &rewriter,
-                     experimental::boolean::MUX *mux, Block *block,
-                     Value trigger);
+                     experimental::boolean::MUX *mux, Block *block);
 
   // Converts a boolean expession to actual circuitry
   Value boolExpressionToCircuit(ConversionPatternRewriter &rewriter,
                                 experimental::boolean::BoolExpression *expr,
-                                Block *block, Value trigger);
+                                Block *block);
 
   // Converts a boolean variable to actual circuitry
   Value boolVariableToCircuit(ConversionPatternRewriter &rewriter,

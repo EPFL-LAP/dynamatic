@@ -1,54 +1,50 @@
 #include "loop_multiply.h"
 #include "dynamatic/Integration.h"
 
-
-unsigned loop_multiply(in_int_t a[N]) {
-  unsigned x = 2;
-  for (unsigned i = 0; i < N; ++i) {
-    if (a[i] == 0)
-      x = x * x;
+void loop_multiply(in_int_t alpha, inout_int_t tmp[NI][NJ]) {
+  // unsigned x = 2;
+  // for (unsigned i = 0; i < N; ++i) {
+  //   if (a[i] == 0)
+  //     x = x * x;
+  // }
+  // return x;
+  for (unsigned j = 0; j < NJ; j++) {
+    tmp[j][j] = tmp[j][j] + alpha + j;
+    if (alpha > 5)
+      //  int sum = tmp[j][j];
+      //  if (sum > 5)
+      //     for (unsigned k = 0; k < NK; ++k)
+      tmp[j][j] = tmp[j][j] + alpha;
   }
-  return x;
 }
 
-
-unsigned loop(in_int_t A[N],in_int_t B[N],in_int_t C[N], in_int_t addr[N]){
-  unsigned sum = 0;
-  for (unsigned i = 0; i < N; ++i) {
-    sum = sum+A[addr[i]];
-  }
-  for (unsigned j = 0; j < N; ++j){
-    for (unsigned k = 0; k < N; ++k){
-       B[k] = A[addr[k]];
-    }
-    A[j] = C[j]*2;
-  }
-  return sum;
-}
-
-/*
 int main(void) {
-  in_int_t a[N];
-  // Initialize a to [0, 1, 0, 1, ...]
-  for (unsigned i = 0; i < N; ++i)
-    a[i] = i % 2;
-  CALL_KERNEL(loop_multiply, a);
-  return 0;
-}*/
+  in_int_t alpha;
+  in_int_t beta;
+  inout_int_t tmp[NI][NJ];
+  in_int_t A[NI][NK];
+  in_int_t B[NK][NJ];
+  in_int_t C[NK][NL];
+  inout_int_t D[NI][NL];
 
-
-int main(void){
-  in_int_t A[N];
-  in_int_t B[N];
-  in_int_t C[N];
-  in_int_t addr[N];
-  for (unsigned i = 0; i < N; ++i){
-    A[i] = i % 2;
-    B[i] = i % 2;
-    C[i] = i % 2;
-    addr[i] = i % 2;
+  alpha = 100;
+  beta = 100;
+  for (unsigned i = 0; i < NI; ++i) {
+    for (unsigned k = 0; k < NK; ++k)
+      A[i][k] = 100 % 100;
+    for (unsigned l = 0; l < NL; ++l)
+      D[i][l] = 100 % 100;
   }
-  CALL_KERNEL(loop, A,B,C,addr);
+
+  for (unsigned k = 0; k < NK; ++k) {
+    for (unsigned j = 0; j < NJ; ++j)
+      B[k][j] = 100 % 100;
+    for (unsigned l = 0; l < NL; ++l)
+      C[k][l] = 100 % 100;
+  }
+
+  CALL_KERNEL(loop_multiply, alpha, tmp);
+  // CALL_KERNEL(kernel_2mm, alpha, beta, tmp, A, B, C, D);
+
   return 0;
 }
-

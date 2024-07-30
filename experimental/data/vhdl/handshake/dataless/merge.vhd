@@ -4,7 +4,7 @@ use ieee.numeric_std.all;
 
 entity merge_dataless is
   generic (
-    SIZE : integer;
+    SIZE : integer
   );
   port (
     clk, rst : in std_logic;

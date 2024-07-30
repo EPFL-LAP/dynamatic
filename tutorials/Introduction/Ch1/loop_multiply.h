@@ -5,7 +5,15 @@
 
 typedef int in_int_t;
 
-unsigned loop_multiply(in_int_t a[N]);
-unsigned loop(in_int_t A[N],in_int_t B[N],in_int_t C[N], in_int_t addr[N]);
+#define NI 10
+#define NJ 10
+#define NK 10
+#define NL 10
+
+typedef int in_int_t;
+typedef int out_int_t;
+typedef int inout_int_t;
+
+void loop_multiply(in_int_t alpha, inout_int_t tmp[NI][NJ]);
 
 #endif // LOOP_MULTIPLY_H

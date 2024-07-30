@@ -73,7 +73,15 @@ rm -rf "$COMP_DIR" && mkdir -p "$COMP_DIR"
 
 # source -> affine level
 "$POLYGEIST_CLANG_BIN" "$SRC_DIR/$KERNEL_NAME.c" --function="$KERNEL_NAME" \
-  -I "$POLYGEIST_PATH/llvm-project/clang/lib/Headers" \
+  -I "$POLYGEIST_PATH/llvm-ing LSQ generator ---===
+[info] welcome to sbt 1.9.9 (Ubuntu Java 21.0.3)
+[info] loading settings for project lsq-generator-build from plugins.sbt ...
+[info] loading project definition from /home/kossayba/dynamatic/tools/backend/lsq-generator/project
+[info] loading settings for project root from build.sbt ...
+[info] set current project to lsq (in build file:/home/kossayba/dynamatic/tools/backend/lsq-generator/)
+[info] Assembly jar up to date: /home/kossayba/dynamatic/tools/backend/lsq-generator/target/scala-2.13/lsq-generator.jar
+[success] Total time: 1 s, completed Jul 30, 2024, 2:38:35 PM
+project/clang/lib/Headers" \
   -I "$DYNAMATIC_DIR/include" \
   -S -O3 --memref-fullrank --raise-scf-to-affine \
   > "$F_AFFINE"

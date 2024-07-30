@@ -8,7 +8,7 @@
 
 #include "kernel_2mm.h"
 #include "dynamatic/Integration.h"
-#include <stdio.h>
+// #include <stdio.h>
 #include <stdlib.h>
 
 // void kernel_2mm(in_int_t alpha, in_int_t beta, inout_int_t tmp[NI][NJ],
@@ -19,12 +19,12 @@ void kernel_2mm(in_int_t alpha, inout_int_t tmp[NI][NJ]) {
 
   // for (unsigned i = 0; i < NI; i++) {
   for (unsigned j = 0; j < NJ; j++) {
-    tmp[j][j] = tmp[j][j] + alpha + j;
+    tmp[j][j] = tmp[j][j] + alpha;
     if (tmp[j][j] > 5)
       // int sum = tmp[j][j];
       // if (sum > 5)
       //    for (unsigned k = 0; k < NK; ++k)
-      tmp[j][j] = j; // tmp[j][j] * 2;
+      tmp[j][j] = tmp[j][j] + alpha;
   }
 
   //}
