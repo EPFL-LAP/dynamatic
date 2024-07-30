@@ -691,7 +691,7 @@ struct HandshakeCMergeIndex
 
     // Create a new control merge with whose index result is optimized
     SmallVector<Type, 2> resTypes;
-    resTypes.push_back(cmergeOp.getDataType());
+    resTypes.push_back(cmergeOp->getOperandTypes().front());
     resTypes.push_back(
         indexType.withDataType(rewriter.getIntegerType(optWidth)));
     rewriter.setInsertionPoint(cmergeOp);
