@@ -17,6 +17,7 @@
 #include "dynamatic/Dialect/HW/HWOps.h"
 #include "dynamatic/Dialect/Handshake/HandshakeDialect.h"
 #include "dynamatic/Dialect/Handshake/HandshakeTypes.h"
+#include "dynamatic/Support/LLVM.h"
 #include "dynamatic/Support/RTL.h"
 #include "dynamatic/Support/System.h"
 #include "dynamatic/Support/TimingModels.h"
@@ -97,7 +98,7 @@ struct ExportInfo {
   /// Creates export information for the given module and RTL configuration.
   ExportInfo(mlir::ModuleOp modOp, RTLConfiguration &config,
              StringRef outputPath)
-      : modOp(modOp), config(config), outputPath(outputPath){};
+      : modOp(modOp), config(config), outputPath(outputPath) {};
 
   /// Associates every external hardware module to its match according to the
   /// RTL configuration and concretizes each of them inside the output
@@ -154,9 +155,6 @@ LogicalResult ExportInfo::concretizeExternalModules() {
 
 namespace {
 
-/// A value of channel type.
-using ChannelValue = TypedValue<handshake::ChannelType>;
-
 /// Maps a value to its internal signal name.
 using FGetValueName = std::function<StringRef(Value)>;
 
@@ -167,10 +165,6 @@ struct WriteData {
   hw::HWModuleOp modOp;
   /// Stream on which to write the RTL implementation.
   raw_indented_ostream &os;
-
-  /// Maps channel-typed SSA values to the base name of corresponding RTL
-  /// signals (data + valid + ready).
-  llvm::MapVector<ChannelValue, std::string> dataflowSignals;
   /// Maps non-channel-typed SSA values to the name of a corresponding RTL
   /// signal.
   llvm::MapVector<Value, std::string> signals;
@@ -187,11 +181,6 @@ struct WriteData {
   /// is unknown.
   FGetValueName getSignalNameFunc() const {
     return [&](Value val) -> StringRef {
-      if (auto channelVal = dyn_cast<ChannelValue>(val)) {
-        const auto *name = dataflowSignals.find(channelVal);
-        assert(name != dataflowSignals.end() && "unknown SSA value");
-        return name->second;
-      }
       const auto *name = signals.find(val);
       assert(name != signals.end() && "unknown SSA value");
       return name->second;
@@ -227,7 +216,7 @@ public:
 
     /// Creates the association.
     PortMapPair(StringRef portName, StringRef signalName)
-        : portName(portName), signalName(signalName){};
+        : portName(portName), signalName(signalName) {};
 
     // NOLINTBEGIN(*unused-function)
     // clang-tidy does not see that sorting a vector of `PortMapPair`'s requires
@@ -276,7 +265,7 @@ public:
   ExportInfo &exportInfo;
 
   /// Creates the RTL writer.
-  RTLWriter(ExportInfo &exportInfo) : exportInfo(exportInfo){};
+  RTLWriter(ExportInfo &exportInfo) : exportInfo(exportInfo) {};
 
   /// Writes the RTL implementation of the module to the output stream. On
   /// failure, the RTL implementation should be considered invalid and/or
@@ -303,11 +292,6 @@ std::optional<unsigned> getRawType(Type type) {
   return dataWidth - 1;
 }
 
-/// Returns the width of the channel's data bus.
-static inline unsigned getDataWidth(handshake::ChannelType type) {
-  return type.getDataType().getIntOrFloatBitWidth();
-}
-
 /// Returns the hardare module the hardware instance is of.
 static hw::HWModuleLike getHWModule(hw::InstanceOp instOp) {
   mlir::ModuleOp modOp = instOp->getParentOfType<mlir::ModuleOp>();
@@ -330,40 +314,36 @@ static std::string getInternalSignalName(StringRef baseName, SignalType type) {
 }
 
 RTLWriter::EntityIO::EntityIO(hw::HWModuleOp modOp) {
+  auto addValidAndReady = [&](StringRef portName, std::vector<IOPort> &down,
+                              std::vector<IOPort> &up) -> void {
+    down.emplace_back(getInternalSignalName(portName, SignalType::VALID),
+                      std::nullopt);
+    up.emplace_back(getInternalSignalName(portName, SignalType::READY),
+                    std::nullopt);
+  };
+
+  auto addPortType = [&](Type portType, StringRef portName,
+                         std::vector<IOPort> &down, std::vector<IOPort> &up) {
+    llvm::TypeSwitch<Type, void>(portType)
+        .Case<handshake::ChannelType>([&](handshake::ChannelType channelType) {
+          down.emplace_back(getInternalSignalName(portName, SignalType::DATA),
+                            channelType.getDataBitWidth() - 1);
+          addValidAndReady(portName, down, up);
+        })
+        .Case<handshake::ControlType>(
+            [&](auto type) { addValidAndReady(portName, down, up); })
+        .Case<IntegerType>([&](IntegerType intType) {
+          down.emplace_back(portName, getRawType(intType));
+        });
+  };
 
   for (auto [arg, portAttr] : llvm::zip_equal(
-           modOp.getBodyBlock()->getArguments(), modOp.getInputNamesStr())) {
-    std::string port = portAttr.str();
-    if (auto channelType = dyn_cast<handshake::ChannelType>(arg.getType())) {
-      if (unsigned width = getDataWidth(channelType)) {
-        inputs.emplace_back(getInternalSignalName(port, SignalType::DATA),
-                            width - 1);
-      }
-      inputs.emplace_back(getInternalSignalName(port, SignalType::VALID),
-                          std::nullopt);
-      outputs.emplace_back(getInternalSignalName(port, SignalType::READY),
-                           std::nullopt);
-    } else {
-      inputs.emplace_back(port, getRawType(arg.getType()));
-    }
-  }
+           modOp.getBodyBlock()->getArguments(), modOp.getInputNamesStr()))
+    addPortType(arg.getType(), portAttr.str(), inputs, outputs);
 
   for (auto [resType, portAttr] :
-       llvm::zip_equal(modOp.getOutputTypes(), modOp.getOutputNamesStr())) {
-    std::string port = portAttr.str();
-    if (auto channelType = dyn_cast<handshake::ChannelType>(resType)) {
-      if (unsigned width = getDataWidth(channelType)) {
-        outputs.emplace_back(getInternalSignalName(port, SignalType::DATA),
-                             width - 1);
-      }
-      outputs.emplace_back(getInternalSignalName(port, SignalType::VALID),
-                           std::nullopt);
-      inputs.emplace_back(getInternalSignalName(port, SignalType::READY),
-                          std::nullopt);
-    } else {
-      outputs.emplace_back(port, getRawType(resType));
-    }
-  }
+       llvm::zip_equal(modOp.getOutputTypes(), modOp.getOutputNamesStr()))
+    addPortType(resType, portAttr.str(), outputs, inputs);
 }
 
 RTLWriter::IOMap::IOMap(hw::InstanceOp instOp, const ExportInfo &info,
@@ -391,55 +371,50 @@ void RTLWriter::IOMap::construct(hw::InstanceOp instOp, hw::HWModuleLike modOp,
                                  const FGetValueName &getValueName,
                                  const FGetTypedSignalName &getTypedSignalName,
                                  const FGetSignalName &getSignalName) {
+  auto addValidAndReady = [&](StringRef port, StringRef signal,
+                              std::vector<PortMapPair> &down,
+                              std::vector<PortMapPair> &up) -> void {
+    down.emplace_back(getTypedSignalName(port, SignalType::VALID),
+                      getInternalSignalName(signal, SignalType::VALID));
+    up.emplace_back(getTypedSignalName(port, SignalType::READY),
+                    getInternalSignalName(signal, SignalType::READY));
+  };
+
+  auto addPortType = [&](Type portType, StringRef port, StringRef signal,
+                         std::vector<PortMapPair> &down,
+                         std::vector<PortMapPair> &up) {
+    llvm::TypeSwitch<Type, void>(portType)
+        .Case<handshake::ChannelType>([&](handshake::ChannelType channelType) {
+          down.emplace_back(getTypedSignalName(port, SignalType::DATA),
+                            getInternalSignalName(signal, SignalType::DATA));
+          addValidAndReady(port, signal, down, up);
+        })
+        .Case<handshake::ControlType>(
+            [&](auto type) { addValidAndReady(port, signal, down, up); })
+        .Case<IntegerType>([&](IntegerType intType) {
+          down.emplace_back(getSignalName(port), signal);
+        });
+  };
 
   auto ins = llvm::zip_equal(instOp.getOperands(), modOp.getInputNamesStr());
   for (auto [oprd, portAttr] : ins) {
-    std::string port = portAttr.str();
-    if (auto channelOprd = dyn_cast<ChannelValue>(oprd)) {
-      StringRef signal = getValueName(oprd);
-      if (getDataWidth(channelOprd.getType())) {
-        inputs.emplace_back(getTypedSignalName(port, SignalType::DATA),
-                            getInternalSignalName(signal, SignalType::DATA));
-      }
-      inputs.emplace_back(getTypedSignalName(port, SignalType::VALID),
-                          getInternalSignalName(signal, SignalType::VALID));
-      outputs.emplace_back(getTypedSignalName(port, SignalType::READY),
-                           getInternalSignalName(signal, SignalType::READY));
-    } else {
-      inputs.emplace_back(getSignalName(port), getValueName(oprd));
-    }
+    addPortType(oprd.getType(), portAttr.str(), getValueName(oprd), inputs,
+                outputs);
   }
 
   auto outs = llvm::zip_equal(instOp.getResults(), modOp.getOutputNamesStr());
   for (auto [oprd, portAttr] : outs) {
-    std::string port = portAttr.str();
-    if (auto channelOprd = dyn_cast<ChannelValue>(oprd)) {
-      StringRef signal = getValueName(oprd);
-      if (getDataWidth(channelOprd.getType())) {
-        outputs.emplace_back(getTypedSignalName(port, SignalType::DATA),
-                             getInternalSignalName(signal, SignalType::DATA));
-      }
-      outputs.emplace_back(getTypedSignalName(port, SignalType::VALID),
-                           getInternalSignalName(signal, SignalType::VALID));
-      inputs.emplace_back(getTypedSignalName(port, SignalType::READY),
-                          getInternalSignalName(signal, SignalType::READY));
-    } else {
-      outputs.emplace_back(getSignalName(port), getValueName(oprd));
-    }
+    addPortType(oprd.getType(), portAttr.str(), getValueName(oprd), outputs,
+                inputs);
   }
 }
 
 LogicalResult RTLWriter::createInternalSignals(WriteData &data) const {
-
   // Create signal names for all block arguments
   for (auto [arg, name] :
        llvm::zip_equal(data.modOp.getBodyBlock()->getArguments(),
-                       data.modOp.getInputNamesStr())) {
-    if (auto channelArg = dyn_cast<ChannelValue>(arg))
-      data.dataflowSignals[channelArg] = name.strref();
-    else
-      data.signals[arg] = name.strref();
-  }
+                       data.modOp.getInputNamesStr()))
+    data.signals[arg] = name.strref();
 
   // Create signal names for all operation results
   for (Operation &op : data.modOp.getBodyBlock()->getOperations()) {
@@ -452,13 +427,8 @@ LogicalResult RTLWriter::createInternalSignals(WriteData &data) const {
 
               // Associate each instance result with a signal name
               for (auto [res, name] : llvm::zip_equal(
-                       instOp->getResults(), refModOp.getOutputNamesStr())) {
-                const Twine &sigName = prefix + name.strref();
-                if (auto channelRes = dyn_cast<ChannelValue>(res))
-                  data.dataflowSignals[channelRes] = sigName.str();
-                else
-                  data.signals[res] = sigName.str();
-              }
+                       instOp->getResults(), refModOp.getOutputNamesStr()))
+                data.signals[res] = prefix + name.str();
               return success();
             })
             .Case<hw::OutputOp>([&](hw::OutputOp outputOp) {
@@ -473,7 +443,6 @@ LogicalResult RTLWriter::createInternalSignals(WriteData &data) const {
     if (failed(res))
       return failure();
   }
-
   return success();
 }
 
@@ -499,11 +468,12 @@ private:
   /// Writes the entry's IO ports.
   void writeEntityIO(WriteData &data) const;
 
-  /// Writes all internal signal declarations inside the entity's architecture.
+  /// Writes all internal signal declarations inside the entity's
+  /// architecture.
   void writeInternalSignals(WriteData &data) const;
 
-  /// Writes signal assignments betwween the top-level entity's outputs and the
-  /// architecture's internal signals.
+  /// Writes signal assignments betwween the top-level entity's outputs and
+  /// the architecture's internal signals.
   void writeSignalAssignments(WriteData &data) const;
 
   /// Writes all module instantiations inside the entity's architecture.
@@ -590,39 +560,54 @@ void VHDLWriter::writeInternalSignals(WriteData &data) const {
   };
 
   raw_indented_ostream &os = data.os;
-  for (auto [value, name] :
-       make_filter_range(data.dataflowSignals, isNotBlockArg)) {
-    if (unsigned width = getDataWidth(value.getType())) {
-      os << "signal " << getInternalSignalName(name, SignalType::DATA) << " : "
-         << getVHDLType(width - 1) << ";\n";
-    }
+  auto addValidReady = [&](StringRef name) -> void {
     os << "signal " << getInternalSignalName(name, SignalType::VALID)
        << " : std_logic;\n";
     os << "signal " << getInternalSignalName(name, SignalType::READY)
        << " : std_logic;\n";
-  }
+  };
 
-  for (auto [value, name] : make_filter_range(data.signals, isNotBlockArg)) {
-    std::string type = getVHDLType(getRawType(value.getType()));
-    os << "signal " << name << " : " << type << ";\n";
+  for (auto &valueAndName : make_filter_range(data.signals, isNotBlockArg)) {
+    llvm::TypeSwitch<Type, void>(valueAndName.first.getType())
+        .Case<handshake::ChannelType>([&](handshake::ChannelType channelType) {
+          os << "signal "
+             << getInternalSignalName(valueAndName.second, SignalType::DATA)
+             << " : " << getVHDLType(channelType.getDataBitWidth() - 1)
+             << ";\n";
+          addValidReady(valueAndName.second);
+        })
+        .Case<handshake::ControlType>(
+            [&](auto type) { addValidReady(valueAndName.second); })
+        .Case<IntegerType>([&](IntegerType intType) {
+          std::string type = getVHDLType(getRawType(intType));
+          os << "signal " << valueAndName.second << " : " << type << ";\n";
+        });
   }
 }
 
 void VHDLWriter::writeSignalAssignments(WriteData &data) const {
   raw_indented_ostream &os = data.os;
+  auto addValidReady = [&](StringRef name, StringRef signal) -> void {
+    os << name << VALID_SUFFIX << " <= " << signal << VALID_SUFFIX << ";\n";
+    os << signal << READY_SUFFIX << " <= " << name << READY_SUFFIX << ";\n";
+  };
+
   os << "-- entity outputs\n";
-  for (auto [val, outputName] :
+  for (auto valAndName :
        llvm::zip(data.outputs, data.modOp.getOutputNamesStr())) {
-    StringRef name = outputName.strref();
-    if (auto channelVal = dyn_cast<ChannelValue>(val)) {
-      StringRef signal = data.dataflowSignals[channelVal];
-      if (getDataWidth(channelVal.getType()))
-        os << name << " <= " << signal << ";\n";
-      os << name << VALID_SUFFIX << " <= " << signal << VALID_SUFFIX << ";\n";
-      os << signal << READY_SUFFIX << " <= " << name << READY_SUFFIX << ";\n";
-    } else {
-      os << name << " <= " << data.signals[val] << ";\n";
-    }
+    Value val = std::get<0>(valAndName);
+    StringRef name = std::get<1>(valAndName).strref();
+    StringRef signal = data.signals[val];
+    llvm::TypeSwitch<Type, void>(val.getType())
+        .Case<handshake::ChannelType>([&](handshake::ChannelType channelType) {
+          os << name << " <= " << signal << ";\n";
+          addValidReady(name, signal);
+        })
+        .Case<handshake::ControlType>(
+            [&](auto type) { addValidReady(name, signal); })
+        .Case<IntegerType>([&](IntegerType intType) {
+          os << name << " <= " << data.signals[val] << ";\n";
+        });
   }
 }
 
@@ -669,8 +654,8 @@ void VHDLWriter::writeModuleInstantiations(WriteData &data) const {
     os << "port map(\n";
     os.indent();
 
-    // Write IO mappings between the hardware instance and the module's internal
-    // signals
+    // Write IO mappings between the hardware instance and the module's
+    // internal signals
     writeIOMap(instOp, data);
 
     os.unindent();
@@ -686,9 +671,9 @@ void VHDLWriter::writeIOMap(hw::InstanceOp instOp, WriteData &data) const {
 
   raw_indented_ostream &os = data.os;
   auto writePortsDir = [&](std::vector<PortMapPair> io, StringRef name) {
-    // VHDL expects ports belonging to the same array to be mapped contiguously
-    // to each other, achieve this by string sorting array elements according to
-    // their module port name
+    // VHDL expects ports belonging to the same array to be mapped
+    // contiguously to each other, achieve this by string sorting array
+    // elements according to their module port name
     std::sort(io.begin(), io.end(),
               [](auto &firstIO, auto &secondIO) { return firstIO < secondIO; });
 
@@ -725,11 +710,12 @@ private:
   /// Writes the entry's IO ports.
   void writeEntityIO(WriteData &data) const;
 
-  /// Writes all internal signal declarations inside the entity's architecture.
+  /// Writes all internal signal declarations inside the entity's
+  /// architecture.
   void writeInternalSignals(WriteData &data) const;
 
-  /// Writes signal assignments betwween the top-level entity's outputs and the
-  /// architecture's internal signals.
+  /// Writes signal assignments betwween the top-level entity's outputs and
+  /// the architecture's internal signals.
   void writeSignalAssignments(WriteData &data) const;
 
   /// Writes all module instantiations inside the entity's architecture.
@@ -794,39 +780,54 @@ void VerilogWriter::writeInternalSignals(WriteData &data) const {
   };
 
   raw_indented_ostream &os = data.os;
-  for (auto [value, name] :
-       make_filter_range(data.dataflowSignals, isNotBlockArg)) {
-    if (unsigned width = getDataWidth(value.getType())) {
-      os << "wire " << getVerilogType(width - 1) << " "
-         << getInternalSignalName(name, SignalType::DATA) << ";\n";
-    }
+  auto addValidReady = [&](StringRef name) -> void {
     os << "wire " << getInternalSignalName(name, SignalType::VALID) << ";\n";
     os << "wire " << getInternalSignalName(name, SignalType::READY) << ";\n";
-  }
+  };
 
-  for (auto [value, name] : make_filter_range(data.signals, isNotBlockArg)) {
-    std::string type = getVerilogType(getRawType(value.getType()));
-    os << "wire " << type << " " << name << ";\n";
+  for (auto &valueAndName : make_filter_range(data.signals, isNotBlockArg)) {
+    llvm::TypeSwitch<Type, void>(valueAndName.first.getType())
+        .Case<handshake::ChannelType>([&](handshake::ChannelType channelType) {
+          os << "wire " << getVerilogType(channelType.getDataBitWidth() - 1)
+             << " "
+             << getInternalSignalName(valueAndName.second, SignalType::DATA)
+             << ";\n";
+          addValidReady(valueAndName.second);
+        })
+        .Case<handshake::ControlType>(
+            [&](auto type) { addValidReady(valueAndName.second); })
+        .Case<IntegerType>([&](IntegerType intType) {
+          std::string type = getVerilogType(getRawType(intType));
+          os << "wire " << type << " " << valueAndName.second << ";\n";
+        });
   }
 }
 
 void VerilogWriter::writeSignalAssignments(WriteData &data) const {
   raw_indented_ostream &os = data.os;
+  auto addValidReady = [&](StringRef name, StringRef signal) -> void {
+    os << "assign " << name << VALID_SUFFIX << " = " << signal << VALID_SUFFIX
+       << ";\n";
+    os << "assign " << signal << READY_SUFFIX << " = " << name << READY_SUFFIX
+       << ";\n";
+  };
+
   os << "// module outputs\n";
-  for (auto [val, outputName] :
+  for (auto valAndName :
        llvm::zip(data.outputs, data.modOp.getOutputNamesStr())) {
-    StringRef name = outputName.strref();
-    if (auto channelVal = dyn_cast<ChannelValue>(val)) {
-      StringRef signal = data.dataflowSignals[channelVal];
-      if (getDataWidth(channelVal.getType()))
-        os << "assign " << name << " = " << signal << ";\n";
-      os << "assign " << name << VALID_SUFFIX << " = " << signal << VALID_SUFFIX
-         << ";\n";
-      os << "assign " << signal << READY_SUFFIX << " = " << name << READY_SUFFIX
-         << ";\n";
-    } else {
-      os << "assign " << name << " = " << data.signals[val] << ";\n";
-    }
+    Value val = std::get<0>(valAndName);
+    StringRef name = std::get<1>(valAndName).strref();
+    StringRef signal = data.signals[val];
+    llvm::TypeSwitch<Type, void>(val.getType())
+        .Case<handshake::ChannelType>([&](handshake::ChannelType channelType) {
+          os << "assign " << name << " = " << signal << ";\n";
+          addValidReady(name, signal);
+        })
+        .Case<handshake::ControlType>(
+            [&](auto type) { addValidReady(name, signal); })
+        .Case<IntegerType>([&](IntegerType intType) {
+          os << "assign " << name << " = " << data.signals[val] << ";\n";
+        });
   }
 }
 
@@ -864,8 +865,8 @@ void VerilogWriter::writeModuleInstantiations(WriteData &data) const {
     os << instOp.getInstanceName() << "(\n";
     os.indent();
 
-    // Write IO mappings between the hardware instance and the module's internal
-    // signals
+    // Write IO mappings between the hardware instance and the module's
+    // internal signals
     writeIOMap(instOp, data);
 
     os.unindent();
@@ -928,10 +929,10 @@ void VerilogWriter::writeIOMap(hw::InstanceOp instOp, WriteData &data) const {
   writePortsDir(ioMap.outputs, "outputs");
 }
 
-/// Writes the RTL implementation corresponding to the hardware module in a file
-/// named like the module inside the output directory. Fails if the output file
-/// cannot be created or if the module cannot be converted to RTL; succeeds
-/// otherwise.
+/// Writes the RTL implementation corresponding to the hardware module in a
+/// file named like the module inside the output directory. Fails if the
+/// output file cannot be created or if the module cannot be converted to RTL;
+/// succeeds otherwise.
 static LogicalResult writeModule(RTLWriter &writer, hw::HWModuleOp modOp) {
   // Determine file extension
   StringRef ext;

@@ -14,11 +14,18 @@
 #ifndef DYNAMATIC_DIALECT_HANDSHAKE_HANDSHAKE_TYPES_H
 #define DYNAMATIC_DIALECT_HANDSHAKE_HANDSHAKE_TYPES_H
 
+#include "mlir/IR/OpImplementation.h"
 #include "mlir/IR/Types.h"
 #include "mlir/Support/LLVM.h"
 
 namespace dynamatic {
 namespace handshake {
+
+/// Returns the width of a type supported in Handshake-level IR. This is 0 for
+/// `handshake::ControlType`, the data type's width for
+/// `handshake::ChannelType`, or the regular width for the standard
+/// `IntegerType` and `FloatType`.
+unsigned getHandshakeTypeBitWidth(mlir::Type type);
 
 /// A dataflow channel's extra signal. The signal has a unique (within a
 /// channel's context) name, specific MLIR type, and a direction (downstream or
@@ -60,6 +67,12 @@ inline bool operator!=(const ExtraSignal &lhs, const ExtraSignal &rhs) {
 
 // NOLINTNEXTLINE(readability-identifier-naming)
 llvm::hash_code hash_value(const ExtraSignal &signal);
+
+namespace detail {
+/// Parses a handshake::ControlType or handshake::ChannelType and returns it as
+/// an opaque Type. Returns nullptr on a parsing failure.
+mlir::Type jointHandshakeTypeParser(mlir::AsmParser &parser);
+} // namespace detail
 
 } // namespace handshake
 } // namespace dynamatic

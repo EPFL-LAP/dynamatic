@@ -57,14 +57,14 @@ def SOSTInterface : OpInterface<"SOSTInterface"> {
         Determine whether the operation is a control operation.
         The default implementation of this method assumes that the operation
         is a control operation if and only if its associated data type is a
-        NoneType.
+        handshake::ControlType.
       }],
       "bool", "sostIsControl", (ins), "",
       [{
         auto concreteOp = mlir::cast<ConcreteOp>($_op);
         // The operation is a control operation if its single data type is a 
-        // NoneType.
-        return concreteOp.getDataType().template isa<mlir::NoneType>();
+        // control channel.
+        return concreteOp.getDataType().template isa<::dynamatic::handshake::ControlType>();
       }]
     >,
     InterfaceMethod<[{
@@ -79,12 +79,12 @@ def SOSTInterface : OpInterface<"SOSTInterface"> {
       [{
         auto concreteOp = mlir::cast<ConcreteOp>($_op);
 
-        if (explicitSize) {
+        if (explicitSize)
           printer << " [" << concreteOp.getSize() << "]";
-        }
         printer << " " << concreteOp->getOperands();
         printer.printOptionalAttrDict(concreteOp->getAttrs());
-        printer << " : " << concreteOp.getDataType();
+        printer << " : ";
+        printer << concreteOp.getDataType();
       }]
     >
   ];
@@ -359,5 +359,6 @@ def SpeculationOpInterface : OpInterface<"SpeculationOpInterface"> {
   }];
 }
 
-#endif //DYNAMATIC_DIALECT_HANDSHAKE_HANDSHAKE_INTERFACES
+def PreservesExtraSignals : NativeOpTrait<"PreservesExtraSignals">;
 
+#endif //DYNAMATIC_DIALECT_HANDSHAKE_HANDSHAKE_INTERFACES

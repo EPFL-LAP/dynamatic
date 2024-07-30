@@ -29,6 +29,10 @@
 namespace dynamatic {
 namespace handshake {
 
+/// Returns an IntegerType that has the lowest possible number of bits necessary
+/// to index into a given number of elements (minimum 1 bit).
+IntegerType getOptimizedIndexValType(OpBuilder &builder, unsigned numToIndex);
+
 // Forward declaration needed by memory ports data structures.
 class MCLoadOp;
 class LSQLoadOp;
@@ -136,7 +140,7 @@ public:
   ControlPort(mlir::Operation *ctrlOp, unsigned ctrlInputIdx);
 
   /// Copy-constructor from abstract memory port for LLVM-style RTTI.
-  ControlPort(const MemoryPort &memPort) : MemoryPort(memPort){};
+  ControlPort(const MemoryPort &memPort) : MemoryPort(memPort) {};
 
   /// Returns the control operation the port is associated to.
   mlir::Operation *getCtrlOp() const { return portOp; }
@@ -162,7 +166,7 @@ public:
   LoadPort(const LoadPort &other) = default;
 
   /// Copy-constructor from abstract memory port for LLVM-style RTTI.
-  LoadPort(const MemoryPort &memPort) : MemoryPort(memPort){};
+  LoadPort(const MemoryPort &memPort) : MemoryPort(memPort) {};
 
   /// Returns the load operation the port is associated to.
   dynamatic::handshake::LoadOpInterface getLoadOp() const;
@@ -194,7 +198,7 @@ protected:
 class MCLoadPort : public LoadPort {
 public:
   /// Copy-constructor from abstract memory port for LLVM-style RTTI.
-  MCLoadPort(const MemoryPort &memPort) : LoadPort(memPort){};
+  MCLoadPort(const MemoryPort &memPort) : LoadPort(memPort) {};
 
   /// Constructs the load port from an MC load operation, the index of the
   /// load's address output in the memory interface's inputs, and the index of
@@ -215,7 +219,7 @@ public:
 class LSQLoadPort : public LoadPort {
 public:
   /// Copy-constructor from abstract memory port for LLVM-style RTTI.
-  LSQLoadPort(const MemoryPort &memPort) : LoadPort(memPort){};
+  LSQLoadPort(const MemoryPort &memPort) : LoadPort(memPort) {};
 
   /// Same semantics as the `LoadPort` constructor but works specifically with a
   /// load operation that connects to an LSQ.
@@ -243,7 +247,7 @@ public:
   StorePort(const StorePort &other) = default;
 
   /// Copy-constructor from abstract memory port for LLVM-style RTTI.
-  StorePort(const MemoryPort &memPort) : MemoryPort(memPort){};
+  StorePort(const MemoryPort &memPort) : MemoryPort(memPort) {};
 
   /// Returns the store operation the port is associated to.
   dynamatic::handshake::StoreOpInterface getStoreOp() const;
@@ -274,7 +278,7 @@ protected:
 class MCStorePort : public StorePort {
 public:
   /// Copy-constructor from abstract memory port for LLVM-style RTTI.
-  MCStorePort(const MemoryPort &memPort) : StorePort(memPort){};
+  MCStorePort(const MemoryPort &memPort) : StorePort(memPort) {};
 
   /// Same semantics as the `LoadPort` constructor but works specifically with a
   /// load operation that connects to an MC.
@@ -293,7 +297,7 @@ public:
 class LSQStorePort : public StorePort {
 public:
   /// Copy-constructor from abstract memory port for LLVM-style RTTI.
-  LSQStorePort(const MemoryPort &memPort) : StorePort(memPort){};
+  LSQStorePort(const MemoryPort &memPort) : StorePort(memPort) {};
 
   /// Same semantics as the `LoadPort` constructor but works specifically with a
   /// load operation that connects to an LSQ.
@@ -335,7 +339,7 @@ public:
   LSQLoadStorePort(const LSQLoadStorePort &other) = default;
 
   /// Copy-constructor from abstract memory port for LLVM-style RTTI.
-  LSQLoadStorePort(const MemoryPort &memPort) : MemoryPort(memPort){};
+  LSQLoadStorePort(const MemoryPort &memPort) : MemoryPort(memPort) {};
 
   /// Returns the LSQ the port is associated to.
   dynamatic::handshake::LSQOp getLSQOp() const;
@@ -389,7 +393,7 @@ public:
   MCLoadStorePort(const MCLoadStorePort &other) = default;
 
   /// Copy-constructor from abstract memory port for LLVM-style RTTI.
-  MCLoadStorePort(const MemoryPort &memPort) : MemoryPort(memPort){};
+  MCLoadStorePort(const MemoryPort &memPort) : MemoryPort(memPort) {};
 
   /// Returns the MC the port is associated to.
   dynamatic::handshake::MemoryControllerOp getMCOp() const;
@@ -517,7 +521,7 @@ public:
   /// Initializes a function's memory ports from the memory interface it
   /// corresponds to (and without any port).
   FuncMemoryPorts(dynamatic::handshake::MemoryOpInterface memOp)
-      : memOp(memOp){};
+      : memOp(memOp) {};
 
   /// Returns the continuous subrange of the memory interface's inputs which a
   /// group (indicated by its index in the list) maps to.

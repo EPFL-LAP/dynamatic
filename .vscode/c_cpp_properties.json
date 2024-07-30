@@ -4,6 +4,7 @@
       "name": "Linux",
       "includePath": [
         "${workspaceFolder}/include/",
+        "${workspaceFolder}/build/",
         "${workspaceFolder}/build/include/",
         "${workspaceFolder}/experimental/include/",
         "${workspaceFolder}/build/experimental/include/",

@@ -141,7 +141,7 @@ struct Pin {
   SignalType type;
 
   /// Simple member-by-member constructor.
-  Pin(Value channel, SignalType type) : channel(channel), type(type){};
+  Pin(Value channel, SignalType type) : channel(channel), type(type) {};
 };
 
 /// Represents a mixed domain constraint between an input pin and an output pin,
@@ -156,7 +156,7 @@ struct MixedDomainConstraint {
 
   /// Simple member-by-member constructor.
   MixedDomainConstraint(Pin input, Pin output, double internalDelay)
-      : input(input), output(output), internalDelay(internalDelay){};
+      : input(input), output(output), internalDelay(internalDelay) {};
 };
 
 } // namespace
@@ -237,11 +237,12 @@ void FPL22BuffersBase::addUnitMixedPathConstraints(Operation *unit,
         }
       })
       .Case<handshake::MCLoadOp, handshake::LSQLoadOp, handshake::MCStoreOp,
-            handshake::LSQStoreOp, arith::AddIOp, arith::AddFOp, arith::SubIOp,
-            arith::SubFOp, arith::AndIOp, arith::OrIOp, arith::XOrIOp,
-            arith::MulIOp, arith::MulFOp, arith::DivUIOp, arith::DivSIOp,
-            arith::DivFOp, arith::SIToFPOp, arith::RemSIOp, arith::ShRSIOp,
-            arith::ShLIOp, arith::CmpIOp, arith::CmpFOp>(
+            handshake::LSQStoreOp, handshake::AddIOp, handshake::AddFOp,
+            handshake::SubIOp, handshake::SubFOp, handshake::AndIOp,
+            handshake::OrIOp, handshake::XOrIOp, handshake::MulIOp,
+            handshake::MulFOp, handshake::DivUIOp, handshake::DivSIOp,
+            handshake::DivFOp, handshake::ShRSIOp, handshake::ShLIOp,
+            handshake::CmpIOp, handshake::CmpFOp>(
           [&](auto) { addJoinedOprdConstraints(); });
 
   StringRef unitName = getUniqueName(unit);
