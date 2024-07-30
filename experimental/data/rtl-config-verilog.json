@@ -1,24 +1,24 @@
 [
   {
-    "name": "arith.addf",
+    "name": "handshake.addf",
     "parameters": [{ "name": "DATA_WIDTH", "type": "unsigned" }],
     "generic": "$DYNAMATIC/experimental/data/verilog/arith/addf.v",
     "dependencies": ["join", "delay_buffer", "oehb"]
   },
   {
-    "name": "arith.addi",
+    "name": "handshake.addi",
     "parameters": [{ "name": "DATA_WIDTH", "type": "unsigned" }],
     "generic": "$DYNAMATIC/experimental/data/verilog/arith/addi.v",
     "dependencies": ["join"]
   },
   {
-    "name": "arith.andi",
+    "name": "handshake.andi",
     "parameters": [{ "name": "DATA_WIDTH", "type": "unsigned" }],
     "generic": "$DYNAMATIC/experimental/data/verilog/arith/andi.v",
     "dependencies": ["join"]
   },
   {
-    "name": "arith.cmpf",
+    "name": "handshake.cmpf",
     "parameters": [
       { "name": "PREDICATE", "type": "string" },
       { "name": "DATA_WIDTH", "type": "unsigned", "generic": true }
@@ -27,7 +27,7 @@
     "dependencies": ["join"]
   },
   {
-    "name": "arith.cmpi",
+    "name": "handshake.cmpi",
     "parameters": [
       { "name": "PREDICATE", "type": "string" },
       { "name": "DATA_WIDTH", "type": "unsigned", "generic": true }
@@ -36,25 +36,25 @@
     "dependencies": ["join"]
   },
   {
-    "name": "arith.divf",
+    "name": "handshake.divf",
     "parameters": [{ "name": "DATA_WIDTH", "type": "unsigned" }],
     "generic": "$DYNAMATIC/experimental/data/verilog/arith/divf.v",
     "dependencies": ["join", "delay_buffer", "oehb"]
   },
   {
-    "name": "arith.divsi",
+    "name": "handshake.divsi",
     "parameters": [{ "name": "DATA_WIDTH", "type": "unsigned" }],
     "generic": "$DYNAMATIC/experimental/data/verilog/arith/divsi.v",
     "dependencies": ["join", "delay_buffer"]
   },
   {
-    "name": "arith.divui",
+    "name": "handshake.divui",
     "parameters": [{ "name": "DATA_WIDTH", "type": "unsigned" }],
     "generic": "$DYNAMATIC/experimental/data/verilog/arith/divui.v",
     "dependencies": ["join", "delay_buffer"]
   },
   {
-    "name": "arith.extsi",
+    "name": "handshake.extsi",
     "parameters": [
       { "name": "INPUT_WIDTH", "type": "unsigned" },
       { "name": "OUTPUT_WIDTH", "type": "unsigned" }
@@ -62,7 +62,7 @@
     "generic": "$DYNAMATIC/experimental/data/verilog/arith/extsi.v"
   },
   {
-    "name": "arith.extui",
+    "name": "handshake.extui",
     "parameters": [
       { "name": "INPUT_WIDTH", "type": "unsigned" },
       { "name": "OUTPUT_WIDTH", "type": "unsigned" }
@@ -70,78 +70,78 @@
     "generic": "$DYNAMATIC/experimental/data/verilog/arith/extui.v"
   },
   {
-    "name": "arith.maximumf",
+    "name": "handshake.maximumf",
     "parameters": [{ "name": "DATA_WIDTH", "type": "unsigned" }],
     "generic": "$DYNAMATIC/experimental/data/verilog/arith/maximumf.v",
     "dependencies": ["join", "delay_buffer"]
   },
   {
-    "name": "arith.minimumf",
+    "name": "handshake.minimumf",
     "parameters": [{ "name": "DATA_WIDTH", "type": "unsigned" }],
     "generic": "$DYNAMATIC/experimental/data/verilog/arith/minimumf.v",
     "dependencies": ["join", "delay_buffer"]
   },
   {
-    "name": "arith.mulf",
+    "name": "handshake.mulf",
     "parameters": [{ "name": "DATA_WIDTH", "type": "unsigned" }],
     "generic": "$DYNAMATIC/experimental/data/verilog/arith/mulf.v",
     "dependencies": ["join", "delay_buffer", "oehb"]
   },
   {
-    "name": "arith.muli",
+    "name": "handshake.muli",
     "parameters": [{ "name": "DATA_WIDTH", "type": "unsigned" }],
     "generic": "$DYNAMATIC/experimental/data/verilog/arith/muli.v",
     "dependencies": ["join", "delay_buffer", "oehb"]
   },
   {
-    "name": "arith.negf",
+    "name": "handshake.negf",
     "parameters": [{ "name": "DATA_WIDTH", "type": "unsigned" }],
     "generic": "$DYNAMATIC/experimental/data/verilog/arith/negf.v"
   },
   {
-    "name": "arith.ori",
+    "name": "handshake.ori",
     "parameters": [{ "name": "DATA_WIDTH", "type": "unsigned" }],
     "generic": "$DYNAMATIC/experimental/data/verilog/arith/ori.v",
     "dependencies": ["join"]
   },
   {
-    "name": "arith.select",
+    "name": "handshake.select",
     "parameters": [{ "name": "DATA_WIDTH", "type": "unsigned" }],
     "generic": "$DYNAMATIC/experimental/data/verilog/arith/select.v",
     "module-name": "selector"
   },
   {
-    "name": "arith.shli",
+    "name": "handshake.shli",
     "parameters": [{ "name": "DATA_WIDTH", "type": "unsigned" }],
     "generic": "$DYNAMATIC/experimental/data/verilog/arith/shli.v",
     "dependencies": ["join"]
   },
   {
-    "name": "arith.shrsi",
+    "name": "handshake.shrsi",
     "parameters": [{ "name": "DATA_WIDTH", "type": "unsigned" }],
     "generic": "$DYNAMATIC/experimental/data/verilog/arith/shrsi.v",
     "dependencies": ["join"]
   },
   {
-    "name": "arith.shrui",
+    "name": "handshake.shrui",
     "parameters": [{ "name": "DATA_WIDTH", "type": "unsigned" }],
     "generic": "$DYNAMATIC/experimental/data/verilog/arith/shrui.v",
     "dependencies": ["join"]
   },
   {
-    "name": "arith.subf",
+    "name": "handshake.subf",
     "parameters": [{ "name": "DATA_WIDTH", "type": "unsigned" }],
     "generic": "$DYNAMATIC/experimental/data/verilog/arith/subf.v",
     "dependencies": ["join", "delay_buffer", "oehb"]
   },
   {
-    "name": "arith.subi",
+    "name": "handshake.subi",
     "parameters": [{ "name": "DATA_WIDTH", "type": "unsigned" }],
     "generic": "$DYNAMATIC/experimental/data/verilog/arith/subi.v",
     "dependencies": ["join"]
   },
   {
-    "name": "arith.trunci",
+    "name": "handshake.trunci",
     "parameters": [
       { "name": "INPUT_WIDTH", "type": "unsigned" },
       { "name": "OUTPUT_WIDTH", "type": "unsigned" }
@@ -149,7 +149,7 @@
     "generic": "$DYNAMATIC/experimental/data/verilog/arith/trunci.v"
   },
   {
-    "name": "arith.xori",
+    "name": "handshake.xori",
     "parameters": [{ "name": "DATA_WIDTH", "type": "unsigned" }],
     "generic": "$DYNAMATIC/experimental/data/verilog/arith/xori.v",
     "dependencies": ["join"]
