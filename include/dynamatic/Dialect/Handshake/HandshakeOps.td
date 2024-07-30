@@ -1211,7 +1211,7 @@ def BundleOp : Handshake_Op<"bundle", [Pure]> {
     
     // Bundling into a channel with an upstream extra signal
     %channel, %extra = bundle %ctrl, %data :
-      (!handshake.control, i32) -> (!handshake.channel<i32, [extra: i1]>, i1)
+      (!handshake.control, i32) -> (!handshake.channel<i32, [extra: i1 (U)]>, i1)
     
     // -----
 
@@ -1221,7 +1221,8 @@ def BundleOp : Handshake_Op<"bundle", [Pure]> {
   }];
 
   let arguments = (ins Variadic<AnyType>:$signals);
-  let results = (outs HandshakeType:$channel, Variadic<SignalType>: $upstreams);
+  let results = (outs HandshakeType:$channelLike,
+                      Variadic<SignalType>: $upstreams);
 
   let skipDefaultBuilders = 1;
   let builders = [
@@ -1241,8 +1242,7 @@ def BundleOp : Handshake_Op<"bundle", [Pure]> {
     >
   ];
 
-  let assemblyFormat = "$signals attr-dict `:` functional-type(operands, results)";
-
+  let hasCustomAssemblyFormat = 1; 
   let hasVerifier = 1;
 }
 
@@ -1286,7 +1286,8 @@ def UnbundleOp : Handshake_Op<"unbundle", [
     ```
   }];
 
-  let arguments = (ins HandshakeType:$channel, Variadic<SignalType>: $upstreams);
+  let arguments = (ins HandshakeType:$channelLike,
+                       Variadic<SignalType>: $upstreams);
   let results = (outs Variadic<AnyType>:$signals);
 
   let builders = [
@@ -1306,8 +1307,7 @@ def UnbundleOp : Handshake_Op<"unbundle", [
     }]>
   ];
 
-  let assemblyFormat = "$channel (`[` $upstreams^ `]`)? attr-dict `:` functional-type(operands, results)";
-
+  let hasCustomAssemblyFormat = 1;
   let hasVerifier = 1;
 }
 

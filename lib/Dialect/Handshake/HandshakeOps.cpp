@@ -20,6 +20,7 @@
 #include "dynamatic/Dialect/Handshake/HandshakeTypes.h"
 #include "dynamatic/Support/CFG.h"
 #include "dynamatic/Support/LLVM.h"
+#include "dynamatic/Support/TimingModels.h"
 #include "mlir/Dialect/Affine/Analysis/AffineAnalysis.h"
 #include "mlir/Dialect/Arith/IR/Arith.h"
 #include "mlir/IR/Attributes.h"
@@ -1834,6 +1835,50 @@ LogicalResult SpeculatorOp::verify() {
 // BundleOp
 //===----------------------------------------------------------------------===//
 
+ParseResult BundleOp::parse(OpAsmParser &parser, OperationState &result) {
+  SmallVector<OpAsmParser::UnresolvedOperand, 4> signals;
+  Type dataflowType;
+  MLIRContext *ctx = parser.getContext();
+  llvm::SMLoc operandLoc = parser.getCurrentLocation();
+
+  if (parser.parseOperandList(signals) ||
+      parser.parseOptionalAttrDict(result.attributes) || parser.parseColon() ||
+      parser.parseKeyword("_") || parser.parseKeyword("to") ||
+      parseHandshakeType(parser, dataflowType))
+    return failure();
+  result.addTypes(dataflowType);
+
+  // Determine the type of all input signals and of all upstream signals based
+  // on the first result's type
+  SmallVector<Type, 4> signalTypes;
+  llvm::TypeSwitch<Type, void>(dataflowType)
+      .Case<ChannelType>([&](ChannelType channelType) {
+        signalTypes.push_back(ControlType::get(ctx));
+        signalTypes.push_back(channelType.getDataType());
+        for (const ExtraSignal &extra : channelType.getExtraSignals()) {
+          if (extra.downstream)
+            signalTypes.push_back(extra.type);
+          else
+            result.addTypes(extra.type);
+        }
+      })
+      .Case<ControlType>([&](auto) {
+        IntegerType i1Type = IntegerType::get(ctx, 1);
+        signalTypes.push_back(i1Type);
+        result.addTypes(i1Type);
+      });
+
+  return parser.resolveOperands(signals, signalTypes, operandLoc,
+                                result.operands);
+}
+
+void BundleOp::print(OpAsmPrinter &p) {
+  p << " " << getOperands() << " ";
+  p.printOptionalAttrDict((*this)->getAttrs());
+  p << " : _ to ";
+  printHandshakeType(p, getChannelLike().getType());
+}
+
 /// Common verifier for `handshake::BundleOp` and `handshake::UnbundleOp`
 /// operations, which have the same semantics. Emits an error and fails if the
 /// operation under verification has inconsistent operands/results; succeeds
@@ -1959,13 +2004,67 @@ void BundleOp::build(OpBuilder &odsBuilder, OperationState &odsState,
 }
 
 LogicalResult BundleOp::verify() {
-  return verifyBundlingOp(getChannel().getType(), getUpstreams(), getSignals(),
-                          true, [&]() { return emitError(); });
+  return verifyBundlingOp(getChannelLike().getType(), getUpstreams(),
+                          getSignals(), true, [&]() { return emitError(); });
 }
 
 //===----------------------------------------------------------------------===//
 // UnbundleOp
 //===----------------------------------------------------------------------===//
+
+ParseResult UnbundleOp::parse(OpAsmParser &parser, OperationState &result) {
+  SmallVector<OpAsmParser::UnresolvedOperand, 4> operands;
+  OpAsmParser::UnresolvedOperand &channelLike = operands.emplace_back();
+  Type dataflowType;
+  MLIRContext *ctx = parser.getContext();
+  llvm::SMLoc operandLoc = parser.getCurrentLocation();
+
+  // Parse operands
+  if (parser.parseOperand(channelLike))
+    return failure();
+  if (!parser.parseOptionalLSquare()) {
+    if (parser.parseOperandList(operands) || parser.parseRSquare())
+      return failure();
+  }
+
+  // Parse attribute dictionarry and type
+  if (parser.parseOptionalAttrDict(result.attributes) || parser.parseColon() ||
+      parseHandshakeType(parser, dataflowType) || parser.parseKeyword("to") ||
+      parser.parseKeyword("_"))
+    return failure();
+
+  // Determine the type of all output signals and of all upstream signals based
+  // on the first operand's type
+  SmallVector<Type, 4> operandTypes;
+  operandTypes.push_back(dataflowType);
+  llvm::TypeSwitch<Type, void>(dataflowType)
+      .Case<ChannelType>([&](ChannelType channelType) {
+        result.addTypes({ControlType::get(ctx), channelType.getDataType()});
+        for (const ExtraSignal &extra : channelType.getExtraSignals()) {
+          if (extra.downstream)
+            result.addTypes(extra.type);
+          else
+            operandTypes.push_back(extra.type);
+        }
+      })
+      .Case<ControlType>([&](auto) {
+        IntegerType i1Type = IntegerType::get(ctx, 1);
+        result.addTypes(i1Type);
+        operandTypes.push_back(i1Type);
+      });
+
+  return parser.resolveOperands(operands, operandTypes, operandLoc,
+                                result.operands);
+}
+
+void UnbundleOp::print(OpAsmPrinter &p) {
+  p << " " << getChannelLike() << " ";
+  if (OperandRange upstreams = getUpstreams(); !upstreams.empty())
+    p << "[ " << upstreams << " ] ";
+  p.printOptionalAttrDict((*this)->getAttrs());
+  printHandshakeType(p, getChannelLike().getType());
+  p << " : to _ ";
+}
 
 LogicalResult UnbundleOp::inferReturnTypes(
     MLIRContext *context, std::optional<Location> location, ValueRange operands,
@@ -1992,8 +2091,8 @@ LogicalResult UnbundleOp::inferReturnTypes(
 }
 
 LogicalResult UnbundleOp::verify() {
-  return verifyBundlingOp(getChannel().getType(), getUpstreams(), getSignals(),
-                          false, [&]() { return emitError(); });
+  return verifyBundlingOp(getChannelLike().getType(), getUpstreams(),
+                          getSignals(), false, [&]() { return emitError(); });
 }
 
 //===----------------------------------------------------------------------===//
@@ -2033,7 +2132,6 @@ void ReshapeOp::build(OpBuilder &odsBuilder, OperationState &odsState,
   // reshaping type
   SmallVector<ExtraSignal> extraSignals;
   Type dataType = channel.getType().getDataType();
-  ;
   if (mergeDownstreamIntoData) {
     if (totalDownWidth) {
       unsigned dataWidth = channel.getType().getDataBitWidth();
