@@ -423,7 +423,7 @@ LogicalResult RTLMatch::concretize(const RTLRequest &request,
     }
   }
 
-  std::string extension;
+  StringRef extension;
   switch (hdl){
   case HDL::VERILOG:
     extension = ".v";
