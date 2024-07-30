@@ -209,16 +209,6 @@ std::string handshake::LSQOp::getResultName(unsigned idx) {
 }
 
 //===----------------------------------------------------------------------===//
-// ControlInterface
-//===----------------------------------------------------------------------===//
-
-bool dynamatic::handshake::isControlOpImpl(Operation *op) {
-  if (SOSTInterface sostInterface = dyn_cast<SOSTInterface>(op); sostInterface)
-    return sostInterface.sostIsControl();
-  return false;
-}
-
-//===----------------------------------------------------------------------===//
 // PreservesExtraSignals
 //===----------------------------------------------------------------------===//
 

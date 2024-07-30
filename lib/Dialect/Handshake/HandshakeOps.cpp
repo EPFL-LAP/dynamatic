@@ -118,31 +118,6 @@ static void printSingleTypedHandshakeOp(OpAsmPrinter &printer, Operation *op,
   printHandshakeType(printer, type);
 }
 
-/// Parses an SOST operation. If the `explicitSize` parameter is set to true,
-/// then the method parses the operation's size (in the SOST sense) between
-/// square brackets before parsing the operation's operands, attributes, and
-/// data type. In this case the parsed size is also saved in the `size`
-/// argument, otherwise the number of argument is saved in `size`.
-static ParseResult
-parseSOSTOp(bool explicitSize, OpAsmParser &parser,
-            SmallVectorImpl<OpAsmParser::UnresolvedOperand> &operands,
-            OperationState &result, unsigned &size, Type &type) {
-  if (explicitSize) {
-    // Try to parse the operation's size between square brackets
-    if (parser.parseLSquare() || parser.parseInteger(size) ||
-        parser.parseRSquare())
-      return failure();
-  }
-  if (parser.parseOperandList(operands) ||
-      parser.parseOptionalAttrDict(result.attributes) || parser.parseColon() ||
-      parseHandshakeType(parser, type))
-    return failure();
-
-  if (!explicitSize)
-    size = operands.size();
-  return success();
-}
-
 /// Verifies whether an indexing value is wide enough to index into a provided
 /// number of operands.
 static LogicalResult verifyIndexWideEnough(Operation *op, Value indexVal,
@@ -199,6 +174,44 @@ static unsigned getDataBitWidth(Value val) {
 namespace {
 #include "lib/Dialect/Handshake/HandshakeCanonicalization.inc"
 } // namespace
+
+//===----------------------------------------------------------------------===//
+// BufferOp
+//===----------------------------------------------------------------------===//
+
+static ParseResult parseBufferOp(OpAsmParser &parser, OperationState &result) {
+  SmallVector<OpAsmParser::UnresolvedOperand, 4> allOperands;
+  llvm::SMLoc loc = parser.getCurrentLocation();
+  Type type;
+  unsigned numSlots;
+
+  // Parse the operation's size between square brackets
+  if (parser.parseLSquare() || parser.parseInteger(numSlots) ||
+      parser.parseRSquare())
+    return failure();
+
+  if (parser.parseOperandList(allOperands) ||
+      parser.parseOptionalAttrDict(result.attributes) || parser.parseColon() ||
+      parseHandshakeType(parser, type))
+    return failure();
+
+  result.addTypes(type);
+  result.addAttribute(
+      "slots",
+      IntegerAttr::get(IntegerType::get(result.getContext(), 32), numSlots));
+
+  if (parser.resolveOperands(allOperands, {type}, loc, result.operands))
+    return failure();
+  return success();
+}
+
+void printBufferOp(Operation *op, OpAsmPrinter &printer) {
+  BufferOpInterface bufferOp = cast<BufferOpInterface>(op);
+  Value oprd = op->getOperands().front();
+  printer << " [" << bufferOp.getSlots() << "] " << oprd;
+  printer.printOptionalAttrDict(op->getAttrs(), {"slots"});
+  printer << " : " << oprd.getType();
+}
 
 //===----------------------------------------------------------------------===//
 // MergeOp
@@ -281,24 +294,20 @@ OpResult MuxOp::getDataResult() { return cast<OpResult>(getResult()); }
 //===----------------------------------------------------------------------===//
 
 ParseResult ControlMergeOp::parse(OpAsmParser &parser, OperationState &result) {
-  SmallVector<OpAsmParser::UnresolvedOperand, 4> allOperands;
+  SmallVector<OpAsmParser::UnresolvedOperand, 4> operands;
+  Type dataType;
   handshake::ChannelType indexType;
-  Type resultType;
-  SmallVector<Type> resultTypes, dataOperandsTypes;
   llvm::SMLoc allOperandLoc = parser.getCurrentLocation();
-  unsigned size;
-  if (parseSOSTOp(false, parser, allOperands, result, size, resultType) ||
-      parser.parseComma() || parser.parseCustomTypeWithFallback(indexType))
+  if (parser.parseOperandList(operands) ||
+      parser.parseOptionalAttrDict(result.attributes) || parser.parseColon() ||
+      parseHandshakeType(parser, dataType) || parser.parseComma() ||
+      parser.parseCustomTypeWithFallback(indexType))
     return failure();
 
-  dataOperandsTypes.assign(size, resultType);
-  resultTypes.push_back(resultType);
-  resultTypes.push_back(indexType);
-  result.addTypes(resultTypes);
-  if (parser.resolveOperands(allOperands, dataOperandsTypes, allOperandLoc,
-                             result.operands))
-    return failure();
-  return success();
+  SmallVector<Type> operandTypes(operands.size(), dataType);
+  result.addTypes({dataType, indexType});
+  return parser.resolveOperands(operands, operandTypes, allOperandLoc,
+                                result.operands);
 }
 
 void ControlMergeOp::print(OpAsmPrinter &p) {
@@ -541,17 +550,10 @@ void FuncOp::print(OpAsmPrinter &p) {
       getArgAttrsAttrName(), getResAttrsAttrName());
 }
 
-bool BranchOp::sostIsControl() {
-  return isControlCheckTypeAndOperand(getDataType(), getOperand());
-}
-
 bool ConditionalBranchOp::isControl() {
   return isControlCheckTypeAndOperand(getDataOperand().getType(),
                                       getDataOperand());
 }
-
-Type SourceOp::getDataType() { return getResult().getType(); }
-unsigned SourceOp::getSize() { return 1; }
 
 LogicalResult ConstantOp::inferReturnTypes(
     MLIRContext *context, std::optional<Location> location, ValueRange operands,
