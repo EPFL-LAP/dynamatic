@@ -414,14 +414,6 @@ LogicalResult RTLMatch::concretize(const RTLRequest &request,
   allParams[RTLParameter::DYNAMATIC] = dynamaticPath;
   allParams[RTLParameter::OUTPUT_DIR] = outputDir;
 
-  // verilog does not accept constant values in string format
-  if( hdl == HDL::VERILOG ){
-    for(auto &[name_param, value] : allParams){
-      if( name_param.compare("VALUE") == 0){ // assuming that the value parameter is only for constant values
-        allParams[name_param] = std::to_string(value.size()) + "\\\'b" + value;  
-      }
-    }
-  }
 
   StringRef extension;
   switch (hdl){
@@ -437,7 +429,7 @@ LogicalResult RTLMatch::concretize(const RTLRequest &request,
     std::string inputFile = substituteParams(component->generic, allParams);
     std::string outputFile = outputDir.str() +
                              sys::path::get_separator().str() + moduleName +
-                             extension;
+                             extension.data();
 
     // Just copy the file to the output location
     if (auto ec = sys::fs::copy_file(inputFile, outputFile); ec.value() != 0) {
