@@ -224,45 +224,22 @@ def InstanceOp : Handshake_Op<"instance", [
 }
 
 class Handshake_BufferOp<string mnemonic> : Handshake_Op<mnemonic, [
-  BufferOpInterface, HasClock, SameOperandsAndResultType,
-  DeclareOpInterfaceMethods<SOSTInterface, ["getSize"]>,
+  BufferOpInterface, HasClock, SameOperandsAndResultType
 ]> {
   let arguments = (ins HandshakeType:$operand,
                        ConfinedAttr<I32Attr, [IntMinValue<1>]>:$slots);
   let results = (outs HandshakeType:$result);
 
   let extraClassDefinition = [{
-    /// Custom implementation of the SOST::getSize method for buffers. Simply
-    /// returns the number of buffer slots.
-    unsigned $cppClass::getSize() {
-      return getSlots();
-    }
-
     /// Prints the buffer operation.
     void $cppClass::print(mlir::OpAsmPrinter &p) {
-      p << " [" << getSize() << "] " << getOperand();
-      p.printOptionalAttrDict((*this)->getAttrs(), {"slots"});
-      p << " : " << getOperand().getType();
+      printBufferOp(*this, p);
     }
 
     /// Parses the buffer operation.
     mlir::ParseResult $cppClass::parse(mlir::OpAsmParser &parser,
                                        mlir::OperationState &result) {
-      mlir::SmallVector<OpAsmParser::UnresolvedOperand, 4> allOperands;
-      llvm::SMLoc loc = parser.getCurrentLocation();
-      mlir::Type type;
-      unsigned slots;
-      if (parseSOSTOp(true, parser, allOperands, result, slots, type))
-        return failure();
-
-      result.addTypes({type});
-      result.addAttribute(
-          "slots",
-          IntegerAttr::get(IntegerType::get(result.getContext(), 32), slots));
-
-      if (parser.resolveOperands(allOperands, {type}, loc, result.operands))
-        return failure();
-      return success();
+      return parseBufferOp(parser, result);
     }
   }];
 
@@ -344,7 +321,7 @@ def LazyForkOp : Handshake_ForkOp<"lazy_fork"> {
 }
 
 def MergeOp : Handshake_Op<"merge", [
-  Pure, SOSTInterface, SameOperandsAndResultType,
+  Pure, SameOperandsAndResultType,
   DeclareOpInterfaceMethods<MergeLikeOpInterface, ["getDataResult"]>
 ]> {
   let summary = "merge operation";
@@ -404,7 +381,7 @@ def MuxOp : Handshake_Op<"mux", [
 }
 
 def ControlMergeOp : Handshake_Op<"control_merge", [
-  Pure, HasClock, SOSTInterface,
+  Pure, HasClock,
   DeclareOpInterfaceMethods<MergeLikeOpInterface, ["getDataResult"]>,
   DeclareOpInterfaceMethods<NamedIOInterface, ["getResultName"]>
 ]> {
@@ -442,10 +419,7 @@ def ControlMergeOp : Handshake_Op<"control_merge", [
   let hasVerifier = 1;
 }
 
-def BranchOp : Handshake_Op<"br", [
-  Pure, SameOperandsAndResultType,
-  DeclareOpInterfaceMethods<SOSTInterface, ["sostIsControl"]>
-]> {
+def BranchOp : Handshake_Op<"br", [Pure, SameOperandsAndResultType]> {
   let summary = "branch operation";
   let description = [{
     The branch operation represents an unconditional
@@ -503,7 +477,7 @@ def ConditionalBranchOp : Handshake_Op<"cond_br", [
   }];
 }
 
-def SinkOp : Handshake_Op<"sink", [SOSTInterface]> {
+def SinkOp : Handshake_Op<"sink"> {
   let summary = "sink operation";
   let description = [{
     The sink operation discards any data that arrives at its
@@ -522,9 +496,7 @@ def SinkOp : Handshake_Op<"sink", [SOSTInterface]> {
   }];
 }
 
-def SourceOp : Handshake_Op<"source", [
-  Pure, DeclareOpInterfaceMethods<SOSTInterface, ["getDataType", "getSize"]> 
-]> {
+def SourceOp : Handshake_Op<"source", [Pure]> {
   let summary = "source operation";
   let description = [{
     The source operation represents a continuous control-only-token source. The
