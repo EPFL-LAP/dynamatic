@@ -1204,19 +1204,17 @@ def BundleOp : Handshake_Op<"bundle", [Pure]> {
 
     ```mlir
     // Bundling into a channel with a downstream extra signal
-    %channel = bundle %ctrl, %data, %extra :
-      (!handshake.control, i32, i1) -> (!handshake.channel<i32, [extra: i1]>)
+    %channel = bundle %ctrl, %data, %extra : _ to <i32, [extra: i1]>
     
     // -----
     
     // Bundling into a channel with an upstream extra signal
-    %channel, %extra = bundle %ctrl, %data :
-      (!handshake.control, i32) -> (!handshake.channel<i32, [extra: i1 (U)]>, i1)
+    %channel, %extra = bundle %ctrl, %data : _ to <i32, [extra: i1 (U)]>
     
     // -----
 
     // Bundling into a control-only channel
-    %ctrl, %ready = unbundle %valid : (i1) -> (!handhsake.control, i1)
+    %ctrl, %ready = unbundle %valid : (i1) -> _ to <>
     ```
   }];
 
@@ -1270,19 +1268,17 @@ def UnbundleOp : Handshake_Op<"unbundle", [
 
     ```mlir
     // Unbundling a channel with a downstream extra signal
-    %ctrl, %data, %extra = unbundle %channel : 
-      (!handshake.channel<i32, [extra: i2]>) -> (!handshake.control, i32, i2)
+    %ctrl, %data, %extra = unbundle %channel : <i32, [extra: i2]> to _
     
     // -----
     
     // Unbundling a channel with an upstream extra signal
-    %ctrl, %data = unbundle %channel [%extra] : 
-      (!handshake.channel<i32, [extra: i2 (U)]>) -> (!handshake.control, i32, i2)
+    %ctrl, %data = unbundle %channel [%extra] : <i32, [extra: i2 (U)]> to _
 
     // -----
 
     // Unbundling a control-only channel
-    %valid = unbundle %ctrl [%ready] : (!handshake.control, i1) -> i1
+    %valid = unbundle %ctrl [%ready] : <> to _
     ```
   }];
 
@@ -1352,15 +1348,15 @@ def ReshapeOp : Handshake_Op<"reshape", [Pure]> {
     ```mlir
     // Merging into data
     %reshaped = reshape [MergeData] %channel :
-      (!handshake.channel<f32, [down1: i2, up1: i4 (U), up2: i4 (U), down2: i8]>)
-      -> (!handshake.channel<i42, [mergedUp: i8 (U)]>)
+      <f32, [down1: i2, up1: i4 (U), up2: i4 (U), down2: i8]>
+      -> <i42, [mergedUp: i8 (U)]>
     
     // -----
     
     // Merging into extra
     %reshaped = reshape [MergeExtra] %channel :
-      (!handshake.channel<f32, [down1: i2, up1: i4 (U), up2: i4 (U), down2: i8]>)
-      -> (!handshake.channel<f32, [mergedDowm: i10, mergedUp: i8 (U)]>)
+      <f32, [down1: i2, up1: i4 (U), up2: i4 (U), down2: i8]>
+      -> <f32, [mergedDowm: i10, mergedUp: i8 (U)]>
     ```
   }];
 
@@ -1377,7 +1373,11 @@ def ReshapeOp : Handshake_Op<"reshape", [Pure]> {
       "bool":$splitDownstreamFromData, "::mlir::Type":$reshapedType)>,
   ];
 
-  let assemblyFormat = "`[` $reshapeType `]` $channel attr-dict `:` functional-type($channel, $reshaped)";
+  let assemblyFormat = [{
+    `[` $reshapeType `]` $channel attr-dict `:`
+      type($channel) `->` type($reshaped)
+  }];
+
   let hasVerifier = 1;
   
   let extraClassDeclaration = [{
