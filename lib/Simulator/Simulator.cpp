@@ -475,6 +475,48 @@ private:
 // Example model and main
 //===----------------------------------------------------------------------===//
 
+using BinaryCompFunc = std::function<llvm::Any(llvm::Any, llvm::Any)>;
+
+template <typename Op>
+class GenericBinaryOpModel : public OpExecutionModel<Op> {
+public:
+  GenericBinaryOpModel(Op op, InputReader &reader, OutputWriter &writer,
+                       const BinaryCompFunc &callback, unsigned latency)
+      : OpExecutionModel<Op>(op, reader, writer), callback(callback),
+        latency(latency) {
+
+    this->getChannelInputRW(op.getLhs(), lhsRead, lhsWrite);
+    this->getChannelInputRW(op.getRhs(), rhsRead, rhsWrite);
+    this->getChannelOutputRW(op.getResult(), resultRead, resultWrite);
+  }
+
+  void reset() override {
+    // Whatever
+  }
+
+  void exec(bool isClkRisingEdge) override {
+    // Compute the new result based on the current data input
+    llvm::Any newResult = callback(lhsRead->data, rhsRead->data);
+
+    // Use the standard join semantics to decide whether to put this result in
+    // an internal register that will eventually end up (with a delay determined
+    // by the latency) or directly on the output (if latency is 0)
+
+    // All of this is dependent on the valid/ready state of both inputs and the
+    // result of course
+  }
+
+private:
+  const BinaryCompFunc &callback;
+  unsigned latency;
+
+  const ChannelInputRead *lhsRead, *rhsRead;
+  ChannelInputWrite *lhsWrite, *rhsWrite;
+
+  ChannelOutputWrite *resultWrite;
+  const ChannelOutputRead *resultRead;
+};
+
 class MuxModel : public OpExecutionModel<handshake::MuxOp> {
 public:
   // If there is no internal state to initialize, this allows to directly use
@@ -571,6 +613,14 @@ int main(int argc, char **argv) {
   /// Associate an execution model to each function
   for (Operation &op : funcOp.getOps()) {
     llvm::TypeSwitch<Operation *, void>(&op)
+        .Case<handshake::MulIOp>([&](handshake::MulIOp mulIOp) {
+          BinaryCompFunc callback = [](llvm::Any lhs, llvm::Any rhs) {
+            APInt mul = any_cast<APInt>(lhs) * any_cast<APInt>(rhs);
+            return mul;
+          };
+          sim.registerModel<GenericBinaryOpModel<handshake::MulIOp>>(
+              mulIOp, callback, 4);
+        })
         .Case<handshake::MuxOp>(
             [&](handshake::MuxOp muxOp) { sim.registerModel<MuxModel>(muxOp); })
         .Default(
