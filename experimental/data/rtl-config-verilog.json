@@ -245,6 +245,7 @@
       { "name": "DATA_WIDTH", "type": "unsigned", "lb": 1 }
     ],
     "generic": "$DYNAMATIC/experimental/data/verilog/handshake/fork.v",
+    "module-name": "fork_type",
     "dependencies": ["fork_dataless"]
   },
   {
@@ -504,6 +505,7 @@
   {
     "name": "handshake.join",
     "generic": "$DYNAMATIC/experimental/data/verilog/handshake/join.v",
+    "module-name": "join_type",
     "dependencies": ["logic"]
   },
   {
