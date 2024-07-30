@@ -80,7 +80,7 @@ int main(int argc, char **argv) {
   for (size_t i = 0, e = replacements.size(); i < e; i += 2){
     if(replacements[i].compare("VALUE") == 0){
       StringRef value = replacements[i + 1]; // verilog does not accept constant values in string format
-      replacementMap[replacements[i]] = std::to_string(value.size()) + "\\\'b" + value.data(); 
+      replacementMap[replacements[i]] = std::to_string(value.size()) + "\'b" + value.data(); 
     }
     else{
       replacementMap[replacements[i]] = replacements[i + 1];

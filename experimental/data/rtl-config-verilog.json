@@ -3,19 +3,19 @@
     "name": "handshake.addf",
     "parameters": [{ "name": "DATA_WIDTH", "type": "unsigned" }],
     "generic": "$DYNAMATIC/experimental/data/verilog/arith/addf.v",
-    "dependencies": ["join", "delay_buffer", "oehb"]
+    "dependencies": ["join_type", "delay_buffer", "oehb"]
   },
   {
     "name": "handshake.addi",
     "parameters": [{ "name": "DATA_WIDTH", "type": "unsigned" }],
     "generic": "$DYNAMATIC/experimental/data/verilog/arith/addi.v",
-    "dependencies": ["join"]
+    "dependencies": ["join_type"]
   },
   {
     "name": "handshake.andi",
     "parameters": [{ "name": "DATA_WIDTH", "type": "unsigned" }],
     "generic": "$DYNAMATIC/experimental/data/verilog/arith/andi.v",
-    "dependencies": ["join"]
+    "dependencies": ["join_type"]
   },
   {
     "name": "handshake.cmpf",
@@ -24,7 +24,7 @@
       { "name": "DATA_WIDTH", "type": "unsigned", "generic": true }
     ],
     "generator": "\"$DYNAMATIC/bin/generators/rtl-cmpf-generator\" \"$DYNAMATIC/experimental/data/verilog/arith/cmpf.v\" \"$OUTPUT_DIR/$MODULE_NAME.v\" $MODULE_NAME $PREDICATE",
-    "dependencies": ["join"]
+    "dependencies": ["join_type"]
   },
   {
     "name": "handshake.cmpi",
@@ -33,25 +33,25 @@
       { "name": "DATA_WIDTH", "type": "unsigned", "generic": true }
     ],
     "generator": "\"$DYNAMATIC/bin/generators/rtl-cmpi-generator\" \"$DYNAMATIC/experimental/data/verilog/arith/cmpi.v\" \"$OUTPUT_DIR/$MODULE_NAME.v\" $MODULE_NAME $PREDICATE verilog",
-    "dependencies": ["join"]
+    "dependencies": ["join_type"]
   },
   {
     "name": "handshake.divf",
     "parameters": [{ "name": "DATA_WIDTH", "type": "unsigned" }],
     "generic": "$DYNAMATIC/experimental/data/verilog/arith/divf.v",
-    "dependencies": ["join", "delay_buffer", "oehb"]
+    "dependencies": ["join_type", "delay_buffer", "oehb"]
   },
   {
     "name": "handshake.divsi",
     "parameters": [{ "name": "DATA_WIDTH", "type": "unsigned" }],
     "generic": "$DYNAMATIC/experimental/data/verilog/arith/divsi.v",
-    "dependencies": ["join", "delay_buffer"]
+    "dependencies": ["join_type", "delay_buffer"]
   },
   {
     "name": "handshake.divui",
     "parameters": [{ "name": "DATA_WIDTH", "type": "unsigned" }],
     "generic": "$DYNAMATIC/experimental/data/verilog/arith/divui.v",
-    "dependencies": ["join", "delay_buffer"]
+    "dependencies": ["join_type", "delay_buffer"]
   },
   {
     "name": "handshake.extsi",
@@ -73,25 +73,25 @@
     "name": "handshake.maximumf",
     "parameters": [{ "name": "DATA_WIDTH", "type": "unsigned" }],
     "generic": "$DYNAMATIC/experimental/data/verilog/arith/maximumf.v",
-    "dependencies": ["join", "delay_buffer"]
+    "dependencies": ["join_type", "delay_buffer"]
   },
   {
     "name": "handshake.minimumf",
     "parameters": [{ "name": "DATA_WIDTH", "type": "unsigned" }],
     "generic": "$DYNAMATIC/experimental/data/verilog/arith/minimumf.v",
-    "dependencies": ["join", "delay_buffer"]
+    "dependencies": ["join_type", "delay_buffer"]
   },
   {
     "name": "handshake.mulf",
     "parameters": [{ "name": "DATA_WIDTH", "type": "unsigned" }],
     "generic": "$DYNAMATIC/experimental/data/verilog/arith/mulf.v",
-    "dependencies": ["join", "delay_buffer", "oehb"]
+    "dependencies": ["join_type", "delay_buffer", "oehb"]
   },
   {
     "name": "handshake.muli",
     "parameters": [{ "name": "DATA_WIDTH", "type": "unsigned" }],
     "generic": "$DYNAMATIC/experimental/data/verilog/arith/muli.v",
-    "dependencies": ["join", "delay_buffer", "oehb"]
+    "dependencies": ["join_type", "delay_buffer", "oehb"]
   },
   {
     "name": "handshake.negf",
@@ -102,7 +102,7 @@
     "name": "handshake.ori",
     "parameters": [{ "name": "DATA_WIDTH", "type": "unsigned" }],
     "generic": "$DYNAMATIC/experimental/data/verilog/arith/ori.v",
-    "dependencies": ["join"]
+    "dependencies": ["join_type"]
   },
   {
     "name": "handshake.select",
@@ -114,31 +114,31 @@
     "name": "handshake.shli",
     "parameters": [{ "name": "DATA_WIDTH", "type": "unsigned" }],
     "generic": "$DYNAMATIC/experimental/data/verilog/arith/shli.v",
-    "dependencies": ["join"]
+    "dependencies": ["join_type"]
   },
   {
     "name": "handshake.shrsi",
     "parameters": [{ "name": "DATA_WIDTH", "type": "unsigned" }],
     "generic": "$DYNAMATIC/experimental/data/verilog/arith/shrsi.v",
-    "dependencies": ["join"]
+    "dependencies": ["join_type"]
   },
   {
     "name": "handshake.shrui",
     "parameters": [{ "name": "DATA_WIDTH", "type": "unsigned" }],
     "generic": "$DYNAMATIC/experimental/data/verilog/arith/shrui.v",
-    "dependencies": ["join"]
+    "dependencies": ["join_type"]
   },
   {
     "name": "handshake.subf",
     "parameters": [{ "name": "DATA_WIDTH", "type": "unsigned" }],
     "generic": "$DYNAMATIC/experimental/data/verilog/arith/subf.v",
-    "dependencies": ["join", "delay_buffer", "oehb"]
+    "dependencies": ["join_type", "delay_buffer", "oehb"]
   },
   {
     "name": "handshake.subi",
     "parameters": [{ "name": "DATA_WIDTH", "type": "unsigned" }],
     "generic": "$DYNAMATIC/experimental/data/verilog/arith/subi.v",
-    "dependencies": ["join"]
+    "dependencies": ["join_type"]
   },
   {
     "name": "handshake.trunci",
@@ -152,7 +152,7 @@
     "name": "handshake.xori",
     "parameters": [{ "name": "DATA_WIDTH", "type": "unsigned" }],
     "generic": "$DYNAMATIC/experimental/data/verilog/arith/xori.v",
-    "dependencies": ["join"]
+    "dependencies": ["join_type"]
   },
   {
     "name": "handshake.oehb",
@@ -361,7 +361,7 @@
     ],
     "generic": "$DYNAMATIC/experimental/data/verilog/handshake/dataless/cond_br.v",
     "module-name": "cond_br_dataless",
-    "dependencies": ["join"]
+    "dependencies": ["join_type"]
   },
   {
     "name": "handshake.cond_br",
@@ -406,7 +406,7 @@
       { "name": "ADDR_WIDTH", "type": "unsigned", "lb": 1 }
     ],
     "generic": "$DYNAMATIC/experimental/data/verilog/handshake/mc_store.v",
-    "dependencies": ["join"]
+    "dependencies": ["join_type"]
   },
   {
     "name": "handshake.lsq_store",
@@ -490,7 +490,7 @@
     ],
     "generic": "$DYNAMATIC/experimental/data/verilog/handshake/dataless/end.v",
     "module-name": "end_sync_dataless",
-    "dependencies": ["logic", "join"]
+    "dependencies": ["logic", "join_type"]
   },
   {
     "name": "handshake.end",
