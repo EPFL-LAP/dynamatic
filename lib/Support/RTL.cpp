@@ -431,9 +431,6 @@ LogicalResult RTLMatch::concretize(const RTLRequest &request,
   case HDL::VHDL:
     extension = ".vhd";
     break;
-  default:
-    llvm_unreachable("unknown HDL");
-    break;
   }
 
   if (component->isGeneric()) {
