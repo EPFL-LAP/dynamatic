@@ -85,7 +85,7 @@ handshake.func @invalidUnbundleChannelExtraDown(%channel: !handshake.channel<i32
 
 handshake.func @invalidReshapeMergeDataExtraDown(%channel: !handshake.channel<f32, [down: i2]>) -> !handshake.channel<f32, [down: i2]> {
   // expected-error @below {{too many extra downstream signals in the destination type, expected 0 but got 1}}
-  %reshaped = reshape [MergeData] %channel : (!handshake.channel<f32, [down: i2]>) -> (!handshake.channel<f32, [down: i2]>)
+  %reshaped = reshape [MergeData] %channel : <f32, [down: i2]> -> <f32, [down: i2]>
   end %reshaped : !handshake.channel<f32, [down: i2]>
 }
 
@@ -93,7 +93,7 @@ handshake.func @invalidReshapeMergeDataExtraDown(%channel: !handshake.channel<f3
 
 handshake.func @invalidReshapeMergeDataManyUp(%channel: !handshake.channel<f32, [up1: i1 (U), up2: i2 (U)]>) -> !handshake.channel<f32, [up1: i1 (U), up2: i2 (U)]> {
   // expected-error @below {{merged channel type should have at most one uptream signal, but got 2}}
-  %reshaped = reshape [MergeData] %channel : (!handshake.channel<f32, [up1: i1 (U), up2: i2 (U)]>) -> (!handshake.channel<f32, [up1: i1 (U), up2: i2 (U)]>)
+  %reshaped = reshape [MergeData] %channel : <f32, [up1: i1 (U), up2: i2 (U)]> -> <f32, [up1: i1 (U), up2: i2 (U)]>
   end %reshaped : !handshake.channel<f32, [up1: i1 (U), up2: i2 (U)]>
 }
 
@@ -101,7 +101,7 @@ handshake.func @invalidReshapeMergeDataManyUp(%channel: !handshake.channel<f32, 
 
 handshake.func @invalidReshapeMergeDataUpName(%channel: !handshake.channel<f32, [up1: i1 (U)]>) -> !handshake.channel<f32, [up1: i1 (U)]> {
   // expected-error @below {{invalid name for merged extra uptream signal, expected 'mergedUp' but got 'up1'}}
-  %reshaped = reshape [MergeData] %channel : (!handshake.channel<f32, [up1: i1 (U)]>) -> (!handshake.channel<f32, [up1: i1 (U)]>)
+  %reshaped = reshape [MergeData] %channel : <f32, [up1: i1 (U)]> -> <f32, [up1: i1 (U)]>
   end %reshaped : !handshake.channel<f32, [up1: i1 (U)]>
 }
 
@@ -109,7 +109,7 @@ handshake.func @invalidReshapeMergeDataUpName(%channel: !handshake.channel<f32, 
 
 handshake.func @invalidReshapeMergeDataUpWidth(%channel: !handshake.channel<f32, [up1: i1 (U), up2: i2 (U)]>) -> !handshake.channel<f32, [mergedUp: i4 (U)]> {
   // expected-error @below {{invalid bitwidth for merged extra uptream signal, expected 3 but got 4}}
-  %reshaped = reshape [MergeData] %channel : (!handshake.channel<f32, [up1: i1 (U), up2: i2 (U)]>) -> (!handshake.channel<f32, [mergedUp: i4 (U)]>)
+  %reshaped = reshape [MergeData] %channel : <f32, [up1: i1 (U), up2: i2 (U)]> -> <f32, [mergedUp: i4 (U)]>
   end %reshaped : !handshake.channel<f32, [mergedUp: i4 (U)]>
 }
 
@@ -117,7 +117,7 @@ handshake.func @invalidReshapeMergeDataUpWidth(%channel: !handshake.channel<f32,
 
 handshake.func @invalidReshapeMergeDataUpType(%channel: !handshake.channel<f32, [up1: f16 (U), up2: f16 (U)]>) -> !handshake.channel<f32, [mergedUp: f32 (U)]> {
   // expected-error @below {{invalid type for merged extra uptream signal, expected IntegerType but got 'f32'}}
-  %reshaped = reshape [MergeData] %channel : (!handshake.channel<f32, [up1: f16 (U), up2: f16 (U)]>) -> (!handshake.channel<f32, [mergedUp: f32 (U)]>)
+  %reshaped = reshape [MergeData] %channel : <f32, [up1: f16 (U), up2: f16 (U)]> -> <f32, [mergedUp: f32 (U)]>
   end %reshaped : !handshake.channel<f32, [mergedUp: f32 (U)]>
 }
 
@@ -125,7 +125,7 @@ handshake.func @invalidReshapeMergeDataUpType(%channel: !handshake.channel<f32, 
 
 handshake.func @invalidReshapeMergeDataWidth(%channel: !handshake.channel<f32, [down1: i16, down2: i16]>) -> !handshake.channel<i65> {
   // expected-error @below {{invalid merged data type bitwidth, expected 64 but got 65}}
-  %reshaped = reshape [MergeData] %channel : (!handshake.channel<f32, [down1: i16, down2: i16]>) -> (!handshake.channel<i65>)
+  %reshaped = reshape [MergeData] %channel : <f32, [down1: i16, down2: i16]> -> <i65>
   end %reshaped : !handshake.channel<i65>
 }
 
@@ -133,7 +133,7 @@ handshake.func @invalidReshapeMergeDataWidth(%channel: !handshake.channel<f32, [
 
 handshake.func @invalidReshapeMergeDataWidth(%channel: !handshake.channel<f32, [down1: i16, down2: i16]>) -> !handshake.channel<i65> {
   // expected-error @below {{invalid merged data type, expected merged IntegerType but got 'f64'}}
-  %reshaped = reshape [MergeData] %channel : (!handshake.channel<f32, [down1: i16, down2: i16]>) -> (!handshake.channel<f64>)
+  %reshaped = reshape [MergeData] %channel : <f32, [down1: i16, down2: i16]> -> <f64>
   end %reshaped : !handshake.channel<f64>
 }
 
@@ -141,7 +141,7 @@ handshake.func @invalidReshapeMergeDataWidth(%channel: !handshake.channel<f32, [
 
 handshake.func @invalidReshapeMergeDataNoChange(%channel: !handshake.channel<f32>) -> !handshake.channel<i32> {
   // expected-error @below {{invalid destination data type, expected source data type 'f32' but got 'i32'}}
-  %reshaped = reshape [MergeData] %channel : (!handshake.channel<f32>) -> (!handshake.channel<i32>)
+  %reshaped = reshape [MergeData] %channel : <f32> -> <i32>
   end %reshaped : !handshake.channel<i32>
 }
 
@@ -149,6 +149,6 @@ handshake.func @invalidReshapeMergeDataNoChange(%channel: !handshake.channel<f32
 
 handshake.func @invalidReshapeMergeExtraSameData(%channel: !handshake.channel<f32, [down1: i16, down2: i16]>) -> !handshake.channel<i32, [mergedDown: i32]> {
   // expected-error @below {{reshaping in this mode should not change the data type, expected 'f32' but got 'i32'}}
-  %reshaped = reshape [MergeExtra] %channel : (!handshake.channel<f32, [down1: i16, down2: i16]>) -> (!handshake.channel<i32, [mergedDown: i32]>)
+  %reshaped = reshape [MergeExtra] %channel : <f32, [down1: i16, down2: i16]> -> <i32, [mergedDown: i32]>
   end %reshaped : !handshake.channel<i32, [mergedDown: i32]>
 }
