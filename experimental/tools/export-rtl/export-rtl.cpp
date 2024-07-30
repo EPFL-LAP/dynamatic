@@ -899,7 +899,7 @@ void VerilogWriter::writeIOMap(hw::InstanceOp instOp, WriteData &data) const {
 
     if (!io.empty())
       os << "// " << name << "\n";
-    std::vector<PortMapPair> reformatted_io; // io with the same signal grouped
+    std::vector<PortMapPair> reformattedIO; // io with the same signal grouped
     std::vector<std::string> traversedPorts; 
     for (auto &[modPortName1, internalSignalName1] : io) {
       if(std::find(traversedPorts.begin(), traversedPorts.end(), modPortName1) != traversedPorts.end()) {
@@ -914,9 +914,9 @@ void VerilogWriter::writeIOMap(hw::InstanceOp instOp, WriteData &data) const {
         }
       }
       reformattedSignalName = "{" + reformattedSignalName;
-      reformatted_io.push_back(PortMapPair(modPortName1, reformattedSignalName));
+      reformattedIO.push_back(PortMapPair(modPortName1, reformattedSignalName));
     }
-    for (auto &[modPortName, internalSignalName] : reformatted_io) {
+    for (auto &[modPortName, internalSignalName] : reformattedIO) {
       os << "." << modPortName << " (" << internalSignalName << ")";
       if (--numIOLeft != 0)
         os << ",";
