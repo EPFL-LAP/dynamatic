@@ -20,96 +20,6 @@
 
 include "mlir/IR/OpBase.td"
 
-def SOSTInterface : OpInterface<"SOSTInterface"> {
-  let cppNamespace = "::dynamatic::handshake";
-  let description = [{
-      Sized Operation with Single Type (SOST).
-      
-      These are operations whose operands all have the same type and which have
-      an integer size property, be it the number of operation operands (e.g.,
-      for a merge) or the number of operation results (e.g., for a fork).
-  }];
-
-  let methods = [
-    InterfaceMethod<[{
-        Get the data type associated to the operation.
-        The default implementation of this method simply returns the type of
-        the first operation operand.
-      }],
-      "mlir::Type", "getDataType", (ins), "",
-      [{
-        auto concreteOp = mlir::cast<ConcreteOp>($_op);
-        return concreteOp->getOperands().front().getType();
-      }]
-    >,
-    InterfaceMethod<[{
-        Get the size associated to the operation.
-        The default implementation of this method simply returns the number of
-        operation operands.
-      }],
-      "unsigned", "getSize", (ins), "",
-      [{
-        auto concreteOp = mlir::cast<ConcreteOp>($_op);
-        return concreteOp->getNumOperands();
-      }]
-    >,
-    InterfaceMethod<[{
-        Determine whether the operation is a control operation.
-        The default implementation of this method assumes that the operation
-        is a control operation if and only if its associated data type is a
-        handshake::ControlType.
-      }],
-      "bool", "sostIsControl", (ins), "",
-      [{
-        auto concreteOp = mlir::cast<ConcreteOp>($_op);
-        // The operation is a control operation if its single data type is a 
-        // control channel.
-        return concreteOp.getDataType().template isa<::dynamatic::handshake::ControlType>();
-      }]
-    >,
-    InterfaceMethod<[{
-        Prints an SOST operation. If the `explicitSize` parameter is set to
-        true, then the method prints the operation's size (in the SOST sense)
-        between square brackets before printing the operation's operands,
-        attributes, and data type.
-      }],
-      "void", "sostPrint", (ins 
-        "mlir::OpAsmPrinter &": $printer, "bool": $explicitSize
-      ), "", 
-      [{
-        auto concreteOp = mlir::cast<ConcreteOp>($_op);
-
-        if (explicitSize)
-          printer << " [" << concreteOp.getSize() << "]";
-        printer << " " << concreteOp->getOperands();
-        printer.printOptionalAttrDict(concreteOp->getAttrs());
-        printer << " : ";
-        printer << concreteOp.getDataType();
-      }]
-    >
-  ];
-
-  let verify = [{
-    auto concreteOp = mlir::cast<ConcreteOp>($_op);
-
-    // SOST operation's size must be at least one
-    if (concreteOp.getSize() < 1) {
-      return concreteOp.emitOpError(
-        "SOST operation's size must be at least 1, but has size ") 
-        << concreteOp.getSize();
-    }
-
-    // SOST operation's operands must all have the same type
-    auto dataType = concreteOp.getDataType();
-    for (auto operand : concreteOp->getOperands())
-      if (operand.getType() != dataType) 
-        return concreteOp.emitOpError("SOST operation reports having data type ")
-          << dataType << ", but one operand has type " << operand.getType();
-    
-    return mlir::success();
-  }];
-}
-
 def MergeLikeOpInterface : OpInterface<"MergeLikeOpInterface"> {
   let cppNamespace = "::dynamatic::handshake";
   let description = [{
@@ -337,17 +247,10 @@ def ControlInterface : OpInterface<"ControlInterface"> {
 
   let methods = [
     InterfaceMethod<
-        "Returns true if this operation is a control operation.",
-        "bool",
-        "isControl",
-        (ins),
-        "",
-        [{
-          // Implemented outside of interface due to dependency on
-          // SOSTInterface being declared at the time where this method is
-          // defined.
-          return isControlOpImpl($_op);
-        }]>];
+      "Returns true if this operation is a control operation.",
+      "bool", "isControl", (ins), "",
+      "return false;"
+    >];
 }
 
 def HasClock : NativeOpTrait<"HasClock">;
