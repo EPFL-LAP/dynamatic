@@ -1,5 +1,4 @@
 add_dynamatic_library(DynamaticAnalysis
-  ConstantAnalysis.cpp
   NameAnalysis.cpp
   NumericAnalysis.cpp
 

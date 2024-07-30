@@ -52,6 +52,8 @@ protected:
 
     // Run the actual pass
     runDynamaticPass();
+    if (getPassState().irAndPassFailed.getInt())
+      return;
 
     // Make sure all operation names are unique and haven't changed from what is
     // cached. Also name operations that do not currently have a name (unless

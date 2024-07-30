@@ -27,6 +27,6 @@ module shrui #(
       .outs_valid (result_valid             )
     );
   
-    assign result = lhs << rhs;
+    assign result = lhs >> rhs;
 
 endmodule
