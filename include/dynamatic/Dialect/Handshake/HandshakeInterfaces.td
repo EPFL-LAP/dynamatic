@@ -262,6 +262,31 @@ def SpeculationOpInterface : OpInterface<"SpeculationOpInterface"> {
   }];
 }
 
-def PreservesExtraSignals : NativeOpTrait<"PreservesExtraSignals">;
+def SameExtraSignalsInterface : OpInterface<"SameExtraSignalsInterface"> {
+  let cppNamespace = "::dynamatic::handshake";
+  let description = [{
+    Ensures that the extra signals of specific operand/result channels
+    (`handshake::ChannelType`) are identical (even if the channels' respective
+    data type may be different). 
+  }];
+
+  let methods = [
+    InterfaceMethod<[{
+        Returns the list of operand/result channels that should have the same
+        extra signals.
+      }], "::mlir::SmallVector<::mlir::TypedValue<::dynamatic::handshake::ChannelType>>",
+        "getChannelsWithSameExtraSignals", (ins), "", [{
+          return ::dynamatic::handshake::detail::getChannelsWithSameExtraSignals(
+            $_op
+          );
+      }]>
+  ];
+
+  let verify = [{
+    return ::dynamatic::handshake::detail::verifySameExtraSignalsInterface(
+      $_op, ::mlir::cast<ConcreteOp>($_op).getChannelsWithSameExtraSignals()
+    );
+  }];
+}
 
 #endif //DYNAMATIC_DIALECT_HANDSHAKE_HANDSHAKE_INTERFACES

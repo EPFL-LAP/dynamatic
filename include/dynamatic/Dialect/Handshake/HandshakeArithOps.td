@@ -64,7 +64,7 @@ class Handshake_Arith_FloatUnaryOp<string mnemonic, list<Trait> traits = []> :
 
 class Handshake_Arith_CompareOp<string mnemonic, list<Trait> traits = []> :
   Handshake_Arith_Op<mnemonic, traits # [
-    AllTypesMatch<["lhs", "rhs"]>, PreservesExtraSignals,
+    AllTypesMatch<["lhs", "rhs"]>, SameExtraSignalsInterface,
     DeclareOpInterfaceMethods<InferTypeOpInterface, ["inferReturnTypes"]>,
     DeclareOpInterfaceMethods<NamedIOInterface, ["getOperandName", "getResultName"]>
   ]> {
@@ -86,7 +86,7 @@ class Handshake_Arith_CompareOp<string mnemonic, list<Trait> traits = []> :
 }
 
 class Handshake_Arith_IToICastOp<string mnemonic, list<Trait> traits = []> :
-  Handshake_Arith_Op<mnemonic, traits # [PreservesExtraSignals]> {
+  Handshake_Arith_Op<mnemonic, traits # [SameExtraSignalsInterface]> {
   let arguments = (ins IntChannelType:$in);
   let results = (outs IntChannelType:$out);
   
@@ -242,6 +242,7 @@ def Handshake_OrIOp : Handshake_Arith_IntBinaryOp<"ori", [Commutative]> {
 
 def Handshake_SelectOp : Handshake_Arith_Op<"select", [
   AllTypesMatch<["trueValue", "falseValue", "result"]>,
+  DeclareOpInterfaceMethods<SameExtraSignalsInterface, ["getChannelsWithSameExtraSignals"]>,
   DeclareOpInterfaceMethods<NamedIOInterface, ["getOperandName", "getResultName"]>,
 ]> {
   let summary = "Select a value based on a 1-bit predicate.";

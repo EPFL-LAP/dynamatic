@@ -20,6 +20,7 @@
 #include "mlir/Support/LogicalResult.h"
 #include "mlir/Transforms/InliningUtils.h"
 
+using namespace mlir;
 using namespace dynamatic;
 
 //===----------------------------------------------------------------------===//
@@ -209,41 +210,50 @@ std::string handshake::LSQOp::getResultName(unsigned idx) {
 }
 
 //===----------------------------------------------------------------------===//
-// PreservesExtraSignals
+// SameExtraSignalsInterface
 //===----------------------------------------------------------------------===//
 
-LogicalResult
-dynamatic::handshake::detail::verifyPreservesExtraSignals(Operation *op) {
+SmallVector<TypedValue<handshake::ChannelType>>
+dynamatic::handshake::detail::getChannelsWithSameExtraSignals(Operation *op) {
+  SmallVector<TypedValue<handshake::ChannelType>> channels;
+  auto castToTyped = [](Value val) -> TypedValue<handshake::ChannelType> {
+    return ::mlir::cast<TypedValue<handshake::ChannelType>>(val);
+  };
+  llvm::transform(op->getOperands(), ::std::back_inserter(channels),
+                  castToTyped);
+  llvm::transform(op->getResults(), ::std::back_inserter(channels),
+                  castToTyped);
+  return channels;
+}
+
+LogicalResult dynamatic::handshake::detail::verifySameExtraSignalsInterface(
+    Operation *op, ArrayRef<mlir::TypedValue<ChannelType>> channels) {
   std::optional<ArrayRef<ExtraSignal>> refExtras;
 
-  /// Identify all channel-typed operands and results
-  auto checkCompatible = [&](ValueRange values) -> LogicalResult {
-    for (Value val : values) {
-      auto channelType = dyn_cast<handshake::ChannelType>(val.getType());
-      if (!channelType)
-        continue;
-      if (!refExtras) {
-        refExtras = channelType.getExtraSignals();
-        continue;
-      }
-      ArrayRef<ExtraSignal> extras = channelType.getExtraSignals();
-      if (refExtras->size() != extras.size())
-        return op->emitError() << "incompatible number of extra signals "
-                                  "between two operand/result channel types";
-      auto signalsZip = llvm::zip(*refExtras, extras);
-      for (const auto &[idx, signals] : llvm::enumerate(signalsZip)) {
-        auto &[refSig, sig] = signals;
-        if (refSig != sig)
-          return op->emitError()
-                 << "different " << idx
-                 << "-th extra signal between two operand/result channel types";
-      }
+  for (TypedValue<ChannelType> chan : channels) {
+    if (!refExtras) {
+      refExtras = chan.getType().getExtraSignals();
+      continue;
     }
-    return success();
-  };
+    ArrayRef<ExtraSignal> extras = chan.getType().getExtraSignals();
+    if (refExtras->size() != extras.size())
+      return op->emitError() << "incompatible number of extra signals "
+                                "between two operand/result channel types";
+    auto signalsZip = llvm::zip(*refExtras, extras);
+    for (const auto &[idx, signals] : llvm::enumerate(signalsZip)) {
+      auto &[refSig, sig] = signals;
+      if (refSig != sig)
+        return op->emitError()
+               << "different " << idx
+               << "-th extra signal between two operand/result channel types";
+    }
+  }
+  return success();
+}
 
-  return failure(failed(checkCompatible(op->getOperands())) ||
-                 failed(checkCompatible(op->getResults())));
+SmallVector<TypedValue<handshake::ChannelType>>
+handshake::SelectOp::getChannelsWithSameExtraSignals() {
+  return {getTrueValue(), getFalseValue(), getResult()};
 }
 
 #include "dynamatic/Dialect/Handshake/HandshakeInterfaces.cpp.inc"
