@@ -71,7 +71,7 @@ std::string handshake::SelectOp::getOperandName(unsigned idx) {
   assert(idx < getNumOperands() && "index too high");
   if (idx == 0)
     return "condition";
-  return (idx == 1) ? "lhs" : "rhs";
+  return (idx == 1) ? "trueValue" : "falseValue";
 }
 
 std::string handshake::SelectOp::getResultName(unsigned idx) {
