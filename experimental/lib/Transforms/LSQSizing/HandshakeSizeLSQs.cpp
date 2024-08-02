@@ -67,13 +67,8 @@ private:
 void HandshakeSizeLSQsPass::runDynamaticPass() {
   llvm::dbgs() << "\t [DBG] LSQ Sizing Pass Called!\n";
 
-  std::map<unsigned,buffer::CFDFC> cfdfcs; //TODO change to DenseMap?
-  llvm::SmallVector<LSQSizingResult> sizingResults; //TODO datatype?
-
-  // 1. Read Attributes
-  // 2. Reconstruct CFDFCs
-  // 3. ???
-  // 4. Profit
+  std::map<unsigned,buffer::CFDFC> cfdfcs;
+  llvm::SmallVector<LSQSizingResult> sizingResults;
 
   // Read component latencies
   TimingDatabase timingDB(&getContext());
@@ -114,16 +109,18 @@ void HandshakeSizeLSQsPass::runDynamaticPass() {
       cfdfcs.insert_or_assign(std::stoi(entry.getName().str()), buffer::CFDFC(funcOp, archSet, 0));
     }
 
-    //Extract II
+    // Extract II
     for (const NamedAttribute attr : troughputAttr) {
       FloatAttr throughput = llvm::dyn_cast<FloatAttr>(attr.getValue());
       IIs.insert({std::stoi(attr.getName().str()), round(1 / throughput.getValueAsDouble())});
     }
 
+    // Size LSQs for each CFDFC
     for(auto &cfdfc : cfdfcs) {
       sizingResults.push_back(sizeLSQsForCFDFC(cfdfc.second, IIs[cfdfc.first], timingDB));
     }
     
+    // Extract maximum Queue sizes for each LSQ
     std::map<mlir::Operation*, std::tuple<unsigned, unsigned>> maxLoadStoreSizes;
     for(auto &result: sizingResults) {
       for(auto &entry: result) {
@@ -133,10 +130,11 @@ void HandshakeSizeLSQsPass::runDynamaticPass() {
       }
     }
 
+    // Set the maximum Queue sizes as attributes for backend
     for(auto &maxLoadStoreSize: maxLoadStoreSizes) {
       mlir::Operation *lsqOp = maxLoadStoreSize.first;
-      unsigned maxLoadSize = std::get<0>(maxLoadStoreSize.second) + 15;
-      unsigned maxStoreSize = std::get<1>(maxLoadStoreSize.second) + 8;
+      unsigned maxLoadSize = std::get<0>(maxLoadStoreSize.second);
+      unsigned maxStoreSize = std::get<1>(maxLoadStoreSize.second);
       llvm::dbgs() << " [DBG] final LSQ " << lsqOp->getAttrOfType<StringAttr>("handshake.name").str() << " Max Load Size: " << maxLoadSize << " Max Store Size: " << maxStoreSize << "\n";
 
       LSQSizeAttr lsqSizeAttr = LSQSizeAttr::get(mod.getContext(), maxLoadSize, maxStoreSize);
@@ -205,9 +203,10 @@ LSQSizingResult HandshakeSizeLSQsPass::sizeLSQsForCFDFC(buffer::CFDFC cfdfc, uns
 
 
 mlir::Operation * HandshakeSizeLSQsPass::findStartNode(AdjListGraph graph) {
+
+  // Find all mux and control_merge ops as candidates for start node
   std::vector<mlir::Operation *> muxOps = graph.getOperationsWithOpName("handshake.mux");
   std::vector<mlir::Operation *> cmergeOps = graph.getOperationsWithOpName("handshake.control_merge");
-
   std::vector<mlir::Operation *> startNodeCandidates = std::vector<mlir::Operation *>(muxOps.size() + cmergeOps.size());
   std::merge(muxOps.begin(), muxOps.end(), cmergeOps.begin(), cmergeOps.end(), startNodeCandidates.begin());
 
@@ -221,6 +220,7 @@ mlir::Operation * HandshakeSizeLSQsPass::findStartNode(AdjListGraph graph) {
   std::unordered_map<mlir::Operation *, int> maxLatencies;
   std::unordered_map<mlir::Operation *, int> nodeCounts;
 
+  // Go trough all candidates and save the longest path, its latency and node count
   for(auto &op: startNodeCandidates) {
     std::vector<std::string> path = graph.findLongestNonCyclicPath(op);
     maxLatencies.insert({op, graph.getPathLatency(path)});
@@ -233,6 +233,7 @@ mlir::Operation * HandshakeSizeLSQsPass::findStartNode(AdjListGraph graph) {
     llvm::dbgs() << "\n";*/
   }
 
+  // Find the node with the highest latency, if there are multiple, choose the one with the most nodes
   mlir::Operation *maxLatencyNode = nullptr;
   int maxLatency = 0;
   int maxNodeCount = 0;
@@ -251,24 +252,26 @@ mlir::Operation * HandshakeSizeLSQsPass::findStartNode(AdjListGraph graph) {
 }
 
 
-// TODO identify phi node if there is only 1 bb and identify correctly if there are multiple cond_br pointing to a single bb
 std::unordered_map<unsigned, mlir::Operation *> HandshakeSizeLSQsPass::getPhiNodes(AdjListGraph graph, mlir::Operation *startNode) {
   std::unordered_map<unsigned, std::vector<mlir::Operation *>> phiNodeCandidates;
   std::unordered_map<unsigned, mlir::Operation *> phiNodes;
+
+  // Find all branch and fork ops as candidates for phi nodes
   std::vector<mlir::Operation *> branchOps = graph.getOperationsWithOpName("handshake.cond_br");
   std::vector<mlir::Operation *> forkOps = graph.getOperationsWithOpName("handshake.fork");
-
   std::vector<mlir::Operation *> srcOps = std::vector<mlir::Operation *>(branchOps.size() + forkOps.size());
   std::merge(branchOps.begin(), branchOps.end(), forkOps.begin(), forkOps.end(), srcOps.begin());
 
-  // Insert start_node as a candidate (will be choosen anyway, but looks cleaner then special handling)
+  // Insert start_node as a candidate for cases where there is only 1 bb (will be choosen anyway for other cases, but looks cleaner then special handling)
   phiNodeCandidates.insert({startNode->getAttrOfType<IntegerAttr>("handshake.bb").getUInt(), {startNode}});
   //llvm::dbgs() << "\t [DBG] Inserted Start Node: " << startNode->getAttrOfType<StringAttr>("handshake.name").str() << " for BB " << startNode->getAttrOfType<IntegerAttr>("handshake.bb").getUInt() << "\n";
 
+  // Go trought all branch and fork ops and find connected ops
   for(auto &srcOp: srcOps) {
     unsigned srcBB =srcOp->getAttrOfType<IntegerAttr>("handshake.bb").getUInt();
     //llvm::dbgs() << "\t [DBG] Branch Op: " << branchOp->getAttrOfType<StringAttr>("handshake.name").str() << " of BB " << srcBB <<"\n";
 
+    // For each connected Op, check if its in a different BB and add it to the candidates
     for(auto &destOp: graph.getConnectedOps(srcOp)) {
       unsigned destBB = destOp->getAttrOfType<IntegerAttr>("handshake.bb").getUInt();
       //llvm::dbgs() << "\t\t [DBG] connected to: " << destOp->getAttrOfType<StringAttr>("handshake.name").str() << " of BB" << destBB << "\n";
@@ -282,7 +285,7 @@ std::unordered_map<unsigned, mlir::Operation *> HandshakeSizeLSQsPass::getPhiNod
     }
   }
 
-
+  // Go trough all candidates and choose the one with the lowest latency to the start node, ignore backedges for the path
   for(auto &entry: phiNodeCandidates) {
     mlir::Operation *phiNode = nullptr;
     int minLatency = INT_MAX;
@@ -309,6 +312,8 @@ std::unordered_map<unsigned, mlir::Operation *> HandshakeSizeLSQsPass::getPhiNod
 std::unordered_map<mlir::Operation *, int> HandshakeSizeLSQsPass::getAllocTimes(AdjListGraph graph, mlir::Operation *startNode, std::vector<mlir::Operation *> ops,
                                                            std::unordered_map<unsigned, mlir::Operation *> phiNodes) {
   std::unordered_map<mlir::Operation *, int> allocTimes;
+  
+  // Go trough all ops and find the latency to the phi node of the ops BB
   for(auto &op: ops) {
     int latency = graph.findMinPathLatency(startNode, phiNodes[op->getAttrOfType<IntegerAttr>("handshake.bb").getUInt()], true);
     allocTimes.insert({op, latency});
@@ -318,6 +323,8 @@ std::unordered_map<mlir::Operation *, int> HandshakeSizeLSQsPass::getAllocTimes(
 
 std::unordered_map<mlir::Operation *, int> HandshakeSizeLSQsPass::getDeallocTimes(AdjListGraph graph, mlir::Operation *startNode, std::vector<mlir::Operation *> ops) {
   std::unordered_map<mlir::Operation *, int> deallocTimes;
+  
+  // Go trough all ops and find the maximum latency to the op node
   for(auto &op: ops) {
     int latency = graph.findMaxPathLatency(startNode, op);
     deallocTimes.insert({op, latency});
@@ -327,6 +334,8 @@ std::unordered_map<mlir::Operation *, int> HandshakeSizeLSQsPass::getDeallocTime
 
 int HandshakeSizeLSQsPass::getEndTime(std::unordered_map<mlir::Operation *, int> deallocTimes) {
   int endTime = 0;
+  
+  // Choose the maxium time of all dealloc times
   for(auto &entry : deallocTimes) {
     if(entry.second > endTime) {
       endTime = entry.second;
@@ -338,7 +347,7 @@ int HandshakeSizeLSQsPass::getEndTime(std::unordered_map<mlir::Operation *, int>
 std::unordered_map<mlir::Operation*, unsigned> HandshakeSizeLSQsPass::calcQueueSize(std::unordered_map<mlir::Operation *, int> allocTimes, std::unordered_map<mlir::Operation *, int> deallocTimes, int endTime, unsigned II) {
   std::unordered_map<mlir::Operation*, unsigned> queueSizes;
 
-
+  // Go trough all alloc ops find the corresponding LSQ and save the alloc times
   std::unordered_map<mlir::Operation*, std::tuple<std::vector<int>, std::vector<int>>> allocDeallocTimesPerLSQ;
   for(auto &allocTime: allocTimes) {
     mlir::Operation *lsqOp = nullptr;
@@ -354,6 +363,7 @@ std::unordered_map<mlir::Operation*, unsigned> HandshakeSizeLSQsPass::calcQueueS
     std::get<0>(allocDeallocTimesPerLSQ[lsqOp]).push_back(allocTime.second);
   }
 
+  // Go trough all dealloc times, find the corresponding LSQ and add all dealloc times
   for(auto &deallocTime: deallocTimes) {
     mlir::Operation *lsqOp = nullptr;
     for(Operation *destOp: deallocTime.first->getUsers()) {
@@ -368,7 +378,7 @@ std::unordered_map<mlir::Operation*, unsigned> HandshakeSizeLSQsPass::calcQueueS
     std::get<1>(allocDeallocTimesPerLSQ[lsqOp]).push_back(deallocTime.second);
   }
 
-  //TODO Could be more efficient, but its easier to debug like this since it makes intermediate results visible
+  // Go trough all LSQs and calculate the maximum amount of slots needed
   for(auto &entry: allocDeallocTimesPerLSQ) {
     unsigned iterMax = endTime / II;
     std::vector<int> allocPerCycle(endTime);
