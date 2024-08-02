@@ -133,7 +133,7 @@ void HandshakeSizeLSQsPass::runDynamaticPass() {
     // Set the maximum Queue sizes as attributes for backend
     for(auto &maxLoadStoreSize: maxLoadStoreSizes) {
       mlir::Operation *lsqOp = maxLoadStoreSize.first;
-      unsigned maxLoadSize = std::get<0>(maxLoadStoreSize.second);
+      unsigned maxLoadSize = std::get<0>(maxLoadStoreSize.second); //TODO remove +1 
       unsigned maxStoreSize = std::get<1>(maxLoadStoreSize.second);
       llvm::dbgs() << " [DBG] final LSQ " << lsqOp->getAttrOfType<StringAttr>("handshake.name").str() << " Max Load Size: " << maxLoadSize << " Max Store Size: " << maxStoreSize << "\n";
 
@@ -380,26 +380,68 @@ std::unordered_map<mlir::Operation*, unsigned> HandshakeSizeLSQsPass::calcQueueS
 
   // Go trough all LSQs and calculate the maximum amount of slots needed
   for(auto &entry: allocDeallocTimesPerLSQ) {
-    unsigned iterMax = endTime / II;
-    std::vector<int> allocPerCycle(endTime);
+    llvm::dbgs() << " [DBG] LSQ: " << entry.first->getAttrOfType<StringAttr>("handshake.name").str() << "\n";
+    unsigned iterMax = std::ceil((float)endTime / II);
+    llvm::dbgs() << "endTime: " << endTime << " II: " << II << " iterMax: " << iterMax << "\n";
+    std::vector<int> allocPerCycle(endTime + 1);
+    llvm::dbgs() << " [DBG] IterMax: " << iterMax << "\n";
+
+
+    llvm::dbgs() << " [DBG] Alloc Times: ";
+    for(auto &allocTime: std::get<0>(entry.second)) {
+      llvm::dbgs() << allocTime << ", ";
+    }
+    llvm::dbgs() << "\n";
+
+    llvm::dbgs() << " [DBG] Dealloc Times: ";
+    for(auto &deallocTime: std::get<1>(entry.second)) {
+      llvm::dbgs() << deallocTime << ", ";
+    }
+    llvm::dbgs() << "\n";
 
     // Build array for how many slots are allocated and deallocated per cycle
+    // TODO verify which one is correct
     for(unsigned iter = 0; iter < iterMax; iter++) {
-      for(auto &allocTime: std::get<0>(entry.second)) {
-        allocPerCycle[(allocTime + II * iter) % endTime]++;
+      /*for(auto &allocTime: std::get<0>(entry.second)) {
+        allocPerCycle[(allocTime + II * iter) % (endTime + 1)]++;
+        llvm::dbgs() << " \t [DBG] alloc " << (allocTime + II * iter) % (endTime + 1) << "\n";
       }
       for(auto &deallocTime: std::get<1>(entry.second)) {
-        allocPerCycle[(deallocTime + II * iter) % endTime]--;
+        allocPerCycle[(deallocTime + II * iter) % (endTime + 1)]--;
+        llvm::dbgs() << " \t [DBG] dealloc " << (deallocTime + II * iter) % (endTime + 1) << "\n";
+      }*/
+      
+      for(auto &allocTime: std::get<0>(entry.second)) {
+        int t = allocTime + II * iter;
+        llvm::dbgs() << " [DBG] Alloc Time: " << t << "\n";
+        if(t >= 0 && t <= endTime) {
+          allocPerCycle[t]++;
+        }
+      }
+      for(auto &deallocTime: std::get<1>(entry.second)) {
+        int t = deallocTime + II * iter;
+        llvm::dbgs() << " [DBG] Dealloc Time: " << t << "\n";
+        if(t >= 0 && t <= endTime) {
+          allocPerCycle[t]--;
+        }
       }
     }
 
-    // build array for many slots are actively allocated at which cycle
-    std::vector<int> slotsPerCycle(endTime);
-    int prevSlots = allocPerCycle[0];
-    for(int i=1; i < endTime; i++) {
-      slotsPerCycle[i] = prevSlots + allocPerCycle[i];
-      prevSlots = slotsPerCycle[i];
+    llvm::dbgs() << " [DBG] AllocsPerCycle: " << "\n";
+    for(auto &alloc: allocPerCycle) {
+      llvm::dbgs() << alloc << ", ";
     }
+    llvm::dbgs() << "\n";
+
+    // build array for many slots are actively allocated at which cycle
+    std::vector<int> slotsPerCycle(endTime + 1);
+    slotsPerCycle[0] = allocPerCycle[0];
+    llvm::dbgs() << " [DBG] Cycle " << 0 << " Slots: " << slotsPerCycle[0] << "\n";
+    for(int i=1; i <= endTime; i++) {
+      slotsPerCycle[i] = slotsPerCycle[i - 1] + allocPerCycle[i];
+      llvm::dbgs() << " [DBG] Cycle " << i << " Slots: " << slotsPerCycle[i] << "\n";
+    }
+  
 
     // get highest amount of slots from the array
     unsigned maxSlots = *std::max_element(slotsPerCycle.begin(), slotsPerCycle.end());
