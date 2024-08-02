@@ -1351,6 +1351,7 @@ def ReshapeOp : Handshake_Op<"reshape", [Pure]> {
   }];
 
   let hasVerifier = 1;
+  let hasFolder = 1;
   
   let extraClassDeclaration = [{
     static constexpr ::llvm::StringLiteral

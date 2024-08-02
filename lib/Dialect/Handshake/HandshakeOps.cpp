@@ -38,6 +38,7 @@
 #include "llvm/ADT/STLExtras.h"
 #include "llvm/ADT/SmallVector.h"
 #include "llvm/ADT/TypeSwitch.h"
+#include "llvm/Support/Casting.h"
 #include "llvm/Support/ErrorHandling.h"
 
 using namespace mlir;
@@ -2319,6 +2320,15 @@ LogicalResult ReshapeOp::verify() {
   }
 
   return success();
+}
+
+OpFoldResult ReshapeOp::fold(FoldAdaptor adaptor) {
+  Operation *defOp = getChannel().getDefiningOp();
+  if (auto reshapeOp = dyn_cast_if_present<ReshapeOp>(defOp)) {
+    if (getReshaped().getType() == reshapeOp.getChannel().getType())
+      return reshapeOp.getChannel();
+  }
+  return nullptr;
 }
 
 //===----------------------------------------------------------------------===//
