@@ -27,7 +27,6 @@ class AdjListGraph {
 public:
     AdjListGraph(buffer::CFDFC cfdfc, TimingDatabase timingDB, unsigned II);
 
-    //TODO check if backedges are already in there and just saved extra in cfdfc structure
     void printGraph();
 
     std::vector<std::vector<std::string>> findPaths(mlir::Operation *startOp, mlir::Operation *endOp, bool ignoreBackedge = false);

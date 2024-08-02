@@ -331,11 +331,15 @@ LSQGenerationInfo::LSQGenerationInfo(handshake::LSQOp lsqOp, StringRef name)
 LSQGenerationInfo::LSQGenerationInfo(FuncMemoryPorts &ports, StringRef name)
     : lsqOp(cast<handshake::LSQOp>(ports.memOp)), name(name) {
   fromPorts(ports);
+
 }
 
 void LSQGenerationInfo::fromPorts(FuncMemoryPorts &ports) {
   dataWidth = ports.dataWidth;
   addrWidth = ports.addrWidth;
+
+  depthLoad = getUniqueAttr<handshake::LSQSizeAttr>(lsqOp).getLoadQueueSize();
+  depthStore = getUniqueAttr<handshake::LSQSizeAttr>(lsqOp).getStoreQueueSize();
 
   numGroups = ports.getNumGroups();
   numLoads = ports.getNumPorts<LoadPort>();
@@ -390,10 +394,10 @@ void LSQGenerationInfo::fromPorts(FuncMemoryPorts &ports) {
   };
 
   // Port offsets and index arrays must have length equal to the depth
-  capBiArray(loadOffsets, depth);
-  capBiArray(storeOffsets, depth);
-  capBiArray(loadPorts, depth);
-  capBiArray(storePorts, depth);
+  capBiArray(loadOffsets, depthLoad);
+  capBiArray(storeOffsets, depthStore);
+  capBiArray(loadPorts, depthLoad);
+  capBiArray(storePorts, depthStore);
 }
 
 //===----------------------------------------------------------------------===//

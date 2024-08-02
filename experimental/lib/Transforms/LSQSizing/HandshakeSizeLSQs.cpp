@@ -135,10 +135,12 @@ void HandshakeSizeLSQsPass::runDynamaticPass() {
 
     for(auto &maxLoadStoreSize: maxLoadStoreSizes) {
       mlir::Operation *lsqOp = maxLoadStoreSize.first;
-      unsigned maxLoadSize = std::get<0>(maxLoadStoreSize.second);
-      unsigned maxStoreSize = std::get<1>(maxLoadStoreSize.second);
+      unsigned maxLoadSize = std::get<0>(maxLoadStoreSize.second) + 15;
+      unsigned maxStoreSize = std::get<1>(maxLoadStoreSize.second) + 8;
       llvm::dbgs() << " [DBG] final LSQ " << lsqOp->getAttrOfType<StringAttr>("handshake.name").str() << " Max Load Size: " << maxLoadSize << " Max Store Size: " << maxStoreSize << "\n";
-      //TODO set Attribute in LSQ op
+
+      LSQSizeAttr lsqSizeAttr = LSQSizeAttr::get(mod.getContext(), maxLoadSize, maxStoreSize);
+      setUniqueAttr(lsqOp, lsqSizeAttr);
     }
   }
 }

@@ -387,5 +387,18 @@ def CFDFCThroughputAttr : Handshake_Attr<"CFDFCThroughput", "cfdfcThroughput"> {
   ];
 }
 
+//===----------------------------------------------------------------------===//
+// LSQ Sizing Results
+//===----------------------------------------------------------------------===//
+def LSQSizeAttr : Handshake_Attr<"LSQSize", "lsqSize"> {
+  let summary = "Load-Queue and Store-Queue sizes";
+  let description = [{
+    Holds the Load-Queue and Store-Queue size for a LSQ.
+  }];
+
+  let parameters = (ins "unsigned":$loadQueueSize, "unsigned":$storeQueueSize);
+  let assemblyFormat = "`[` $loadQueueSize `,` $storeQueueSize `]`";
+}
+
 
 #endif // DYNAMATIC_DIALECT_HANDSHAKE_HANDSHAKE_ATTRIBUTES_TD

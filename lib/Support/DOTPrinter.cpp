@@ -725,6 +725,8 @@ LogicalResult DOTPrinter::annotateNode(Operation *op,
             // Set LSQ attributes
             LSQGenerationInfo gen(lsqOp);
             info.intAttr["fifoDepth"] = gen.depth;
+            info.intAttr["fifoDepth_L"] = gen.depthLoad;
+            info.intAttr["fifoDepth_S"] = gen.depthStore;
             info.stringAttr["numLoads"] = arrayToString(gen.loadsPerGroup);
             info.stringAttr["numStores"] = arrayToString(gen.storesPerGroup);
             info.stringAttr["loadOffsets"] = biArrayToString(gen.loadOffsets);

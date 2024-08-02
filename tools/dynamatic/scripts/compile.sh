@@ -61,7 +61,7 @@ export_dot() {
   local f_png="$COMP_DIR/$2.png"
 
   # Export to DOT
-  "$DYNAMATIC_EXPORT_DOT_BIN" "$F_HANDSHAKE_EXPORT" "--mode=$mode" \
+  "$DYNAMATIC_EXPORT_DOT_BIN" "$F_HANDSHAKE_LSQ_SIZED" "--mode=$mode" \
       "--edge-style=spline" \
       "--timing-models=$DYNAMATIC_DIR/data/components.json" \
       > "$f_dot"
