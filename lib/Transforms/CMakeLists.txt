@@ -13,6 +13,7 @@ add_dynamatic_library(DynamaticTransforms
   HandshakeOptimizeBitwidths.cpp
   HandshakePrepareForLegacy.cpp
   HandshakeInferBasicBlocks.cpp
+  HandshakeReshapeChannels.cpp
   MarkMemoryDependencies.cpp
   MarkMemoryInterfaces.cpp
   OperationNames.cpp

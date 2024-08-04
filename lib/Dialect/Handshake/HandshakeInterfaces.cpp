@@ -11,6 +11,7 @@
 //
 //===----------------------------------------------------------------------===//
 
+#include "dynamatic/Dialect/Handshake/HandshakeInterfaces.h"
 #include "dynamatic/Dialect/Handshake/HandshakeOps.h"
 #include "dynamatic/Dialect/Handshake/HandshakeTypes.h"
 #include "dynamatic/Support/LLVM.h"
@@ -22,6 +23,7 @@
 
 using namespace mlir;
 using namespace dynamatic;
+using namespace dynamatic::handshake;
 
 //===----------------------------------------------------------------------===//
 // NamedIOInterface (getOperandName/getResultName)
@@ -213,21 +215,30 @@ std::string handshake::LSQOp::getResultName(unsigned idx) {
 // SameExtraSignalsInterface
 //===----------------------------------------------------------------------===//
 
-SmallVector<TypedValue<handshake::ChannelType>>
+namespace {
+using ChannelVal = TypedValue<handshake::ChannelType>;
+} // namespace
+
+static inline ChannelVal toChannel(Value val) { return cast<ChannelVal>(val); }
+
+static void insertChannels(ValueRange values,
+                           SmallVectorImpl<ChannelVal> &channels) {
+  for (Value val : values) {
+    if (auto channelVal = dyn_cast<ChannelVal>(val))
+      channels.push_back(channelVal);
+  }
+}
+
+SmallVector<ChannelVal>
 dynamatic::handshake::detail::getChannelsWithSameExtraSignals(Operation *op) {
-  SmallVector<TypedValue<handshake::ChannelType>> channels;
-  auto castToTyped = [](Value val) -> TypedValue<handshake::ChannelType> {
-    return ::mlir::cast<TypedValue<handshake::ChannelType>>(val);
-  };
-  llvm::transform(op->getOperands(), ::std::back_inserter(channels),
-                  castToTyped);
-  llvm::transform(op->getResults(), ::std::back_inserter(channels),
-                  castToTyped);
+  SmallVector<ChannelVal> channels;
+  insertChannels(op->getOperands(), channels);
+  insertChannels(op->getResults(), channels);
   return channels;
 }
 
 LogicalResult dynamatic::handshake::detail::verifySameExtraSignalsInterface(
-    Operation *op, ArrayRef<mlir::TypedValue<ChannelType>> channels) {
+    Operation *op, ArrayRef<ChannelVal> channels) {
   std::optional<ArrayRef<ExtraSignal>> refExtras;
 
   for (TypedValue<ChannelType> chan : channels) {
@@ -251,9 +262,61 @@ LogicalResult dynamatic::handshake::detail::verifySameExtraSignalsInterface(
   return success();
 }
 
-SmallVector<TypedValue<handshake::ChannelType>>
-handshake::SelectOp::getChannelsWithSameExtraSignals() {
+SmallVector<ChannelVal> MuxOp::getChannelsWithSameExtraSignals() {
+  if (getResult().getType())
+    return {};
+
+  SmallVector<ChannelVal> channels;
+  llvm::transform(getDataOperands(), std::back_inserter(channels), toChannel);
+  channels.push_back(toChannel(getResult()));
+  return channels;
+}
+
+SmallVector<ChannelVal> ControlMergeOp::getChannelsWithSameExtraSignals() {
+  if (getResult().getType())
+    return {};
+
+  SmallVector<ChannelVal> channels;
+  llvm::transform(getDataOperands(), std::back_inserter(channels), toChannel);
+  channels.push_back(toChannel(getResult()));
+  return channels;
+}
+
+SmallVector<ChannelVal> SelectOp::getChannelsWithSameExtraSignals() {
   return {getTrueValue(), getFalseValue(), getResult()};
+}
+
+//===----------------------------------------------------------------------===//
+// ReshapableChannelsInterface
+//===----------------------------------------------------------------------===//
+
+std::pair<handshake::ChannelType, bool>
+dynamatic::handshake::detail::getReshapableChannelType(Operation *op) {
+  return {dyn_cast<ChannelType>(op->getOperands().front().getType()), false};
+}
+
+std::pair<ChannelType, bool> MergeOp::getReshapableChannelType() {
+  return {dyn_cast<ChannelType>(getDataOperands().front().getType()), true};
+}
+
+std::pair<ChannelType, bool> MuxOp::getReshapableChannelType() {
+  return {dyn_cast<ChannelType>(getDataOperands().front().getType()), true};
+}
+
+std::pair<ChannelType, bool> ControlMergeOp::getReshapableChannelType() {
+  return {dyn_cast<ChannelType>(getDataOperands().front().getType()), true};
+}
+
+std::pair<ChannelType, bool> BranchOp::getReshapableChannelType() {
+  return {dyn_cast<ChannelType>(getOperand().getType()), true};
+}
+
+std::pair<ChannelType, bool> ConditionalBranchOp::getReshapableChannelType() {
+  return {dyn_cast<ChannelType>(getDataOperand().getType()), true};
+}
+
+std::pair<ChannelType, bool> SelectOp::getReshapableChannelType() {
+  return {getTrueValue().getType(), true};
 }
 
 #include "dynamatic/Dialect/Handshake/HandshakeInterfaces.cpp.inc"

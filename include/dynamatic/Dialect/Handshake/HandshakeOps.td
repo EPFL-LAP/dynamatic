@@ -224,7 +224,8 @@ def InstanceOp : Handshake_Op<"instance", [
 }
 
 class Handshake_BufferOp<string mnemonic> : Handshake_Op<mnemonic, [
-  BufferOpInterface, HasClock, SameOperandsAndResultType
+  BufferOpInterface, HasClock, SameOperandsAndResultType,
+  DeclareOpInterfaceMethods<ReshapableChannelsInterface, ["getReshapableChannelType"]>,
 ]> {
   let arguments = (ins HandshakeType:$operand,
                        ConfinedAttr<I32Attr, [IntMinValue<1>]>:$slots);
@@ -240,6 +241,12 @@ class Handshake_BufferOp<string mnemonic> : Handshake_Op<mnemonic, [
     mlir::ParseResult $cppClass::parse(mlir::OpAsmParser &parser,
                                        mlir::OperationState &result) {
       return parseBufferOp(parser, result);
+    }
+
+    std::pair<handshake::ChannelType, bool>
+    $cppClass::getReshapableChannelType() {
+      return {mlir::dyn_cast<handshake::ChannelType>(getOperand().getType()), 
+              true};
     }
   }];
 
@@ -273,8 +280,10 @@ def TEHBOp : Handshake_BufferOp<"tehb"> {
 }
 
 class Handshake_ForkOp<string mnemonic, list<Trait> traits = []> : 
-  Handshake_Op<mnemonic, traits # [Pure, HasClock, SameOperandsAndResultType]>
-{
+  Handshake_Op<mnemonic, traits # [
+    Pure, HasClock, SameOperandsAndResultType,
+    DeclareOpInterfaceMethods<ReshapableChannelsInterface, ["getReshapableChannelType"]>
+]> {
   let arguments = (ins HandshakeType:$operand);
   let results = (outs Variadic<HandshakeType>:$result);
 
@@ -289,6 +298,14 @@ class Handshake_ForkOp<string mnemonic, list<Trait> traits = []> :
   let assemblyFormat = [{ 
     custom<SingleTypedHandshakeOp>($operand, attr-dict,
                                    type($operand), type($result))
+  }];
+
+  let extraClassDefinition = [{
+    std::pair<handshake::ChannelType, bool>
+    $cppClass::getReshapableChannelType() {
+      return {mlir::dyn_cast<handshake::ChannelType>(getOperand().getType()),
+              true};
+    }
   }];
 }
 
@@ -322,7 +339,8 @@ def LazyForkOp : Handshake_ForkOp<"lazy_fork"> {
 
 def MergeOp : Handshake_Op<"merge", [
   Pure, SameOperandsAndResultType,
-  DeclareOpInterfaceMethods<MergeLikeOpInterface, ["getDataResult"]>
+  DeclareOpInterfaceMethods<MergeLikeOpInterface, ["getDataResult"]>,
+  DeclareOpInterfaceMethods<ReshapableChannelsInterface, ["getReshapableChannelType"]>
 ]> {
   let summary = "merge operation";
   let description = [{
@@ -350,7 +368,9 @@ def MuxOp : Handshake_Op<"mux", [
   DeclareOpInterfaceMethods<MergeLikeOpInterface, ["getDataResult"]>,
   DeclareOpInterfaceMethods<InferTypeOpInterface, ["inferReturnTypes"]>,
   DeclareOpInterfaceMethods<ControlInterface, ["isControl"]>,
-  DeclareOpInterfaceMethods<NamedIOInterface, ["getOperandName"]>
+  DeclareOpInterfaceMethods<NamedIOInterface, ["getOperandName"]>,
+  DeclareOpInterfaceMethods<SameExtraSignalsInterface, ["getChannelsWithSameExtraSignals"]>,
+  DeclareOpInterfaceMethods<ReshapableChannelsInterface, ["getReshapableChannelType"]>
 ]> {
   let summary = "mux operation";
   let description = [{
@@ -383,7 +403,9 @@ def MuxOp : Handshake_Op<"mux", [
 def ControlMergeOp : Handshake_Op<"control_merge", [
   Pure, HasClock,
   DeclareOpInterfaceMethods<MergeLikeOpInterface, ["getDataResult"]>,
-  DeclareOpInterfaceMethods<NamedIOInterface, ["getResultName"]>
+  DeclareOpInterfaceMethods<NamedIOInterface, ["getResultName"]>,
+  DeclareOpInterfaceMethods<SameExtraSignalsInterface, ["getChannelsWithSameExtraSignals"]>,
+  DeclareOpInterfaceMethods<ReshapableChannelsInterface, ["getReshapableChannelType"]>
 ]> {
   let summary = "control merge operation";
   let description = [{
@@ -419,7 +441,10 @@ def ControlMergeOp : Handshake_Op<"control_merge", [
   let hasVerifier = 1;
 }
 
-def BranchOp : Handshake_Op<"br", [Pure, SameOperandsAndResultType]> {
+def BranchOp : Handshake_Op<"br", [
+  Pure, SameOperandsAndResultType,
+  DeclareOpInterfaceMethods<ReshapableChannelsInterface, ["getReshapableChannelType"]>
+]> {
   let summary = "branch operation";
   let description = [{
     The branch operation represents an unconditional
@@ -442,11 +467,11 @@ def BranchOp : Handshake_Op<"br", [Pure, SameOperandsAndResultType]> {
 }
 
 def ConditionalBranchOp : Handshake_Op<"cond_br", [
+  AllTypesMatch<["dataOperand", "trueResult", "falseResult"]>,
   DeclareOpInterfaceMethods<InferTypeOpInterface, ["inferReturnTypes"]>,
   DeclareOpInterfaceMethods<ControlInterface, ["isControl"]>,
-  DeclareOpInterfaceMethods<NamedIOInterface, ["getOperandName"]>,
-  DeclareOpInterfaceMethods<NamedIOInterface, ["getResultName"]>,
-  AllTypesMatch<["dataOperand", "trueResult", "falseResult"]>
+  DeclareOpInterfaceMethods<NamedIOInterface, ["getOperandName", "getResultName"]>,
+  DeclareOpInterfaceMethods<ReshapableChannelsInterface, ["getReshapableChannelType"]>
 ]> {
   let summary = "conditional branch operation";
   let description = [{
@@ -536,7 +561,8 @@ def JoinOp : Handshake_Op<"join", [
   let assemblyFormat = "$data attr-dict `:` type($result)";
 }
 
-def NotOp : Handshake_Op<"not", [Pure, SameOperandsAndResultType]> {
+def NotOp : Handshake_Op<"not", [Pure, SameOperandsAndResultType,
+                                 ReshapableChannelsInterface]> {
   let summary = "Logical negation";
   let description = [{
     Bitwise logical negation.
@@ -1217,8 +1243,7 @@ def BundleOp : Handshake_Op<"bundle", [Pure]> {
 }
 
 def UnbundleOp : Handshake_Op<"unbundle", [
-  Pure,
-  DeclareOpInterfaceMethods<InferTypeOpInterface, ["inferReturnTypes"]>
+  Pure, DeclareOpInterfaceMethods<InferTypeOpInterface, ["inferReturnTypes"]>
 ]> {
   let summary = [{
     Unbundles a `handshake::ChannelType` or `handshake::ControlType` into
@@ -1304,14 +1329,14 @@ def ReshapeOp : Handshake_Op<"reshape", [Pure]> {
       bitwidths of all downstream extra signals plus the data signal's bitwidth.
       If there are no downstream extra signals, the data type is unchanged. All
       upstream extra signals (if any) are merged into a single one named
-      `COMBINED_UP_NAME` with type `i<Y>`, where Y is the sum of the bitwidths
+      `MERGED_UP_NAME` with type `i<Y>`, where Y is the sum of the bitwidths
       of all upstream extra signals. `ChannelReshapeType::SplitData` performs
       the reverse transformation.
       
     - `ChannelReshapeType::MergeExtra` behaves identically to
       `ChannelReshapeType::MergeData` for extra upstream signals. However,
       all downstream extra signals (if any) are merged into a single one named
-      `COMBINED_DOWN_NAME` with type `i<Z>`, where Z is the sum of the bitwidths
+      `MERGED_DOWN_NAME` with type `i<Z>`, where Z is the sum of the bitwidths
       of all downstream extra signals. The data type always remain unchanged.
       `ChannelReshapeType::SplitExtra` performs the reverse transformation.  
 
@@ -1355,8 +1380,8 @@ def ReshapeOp : Handshake_Op<"reshape", [Pure]> {
   
   let extraClassDeclaration = [{
     static constexpr ::llvm::StringLiteral
-      COMBINED_DOWN_NAME = ::llvm::StringLiteral("mergedDown"),
-      COMBINED_UP_NAME = ::llvm::StringLiteral("mergedUp");
+      MERGED_DOWN_NAME = ::llvm::StringLiteral("mergedDown"),
+      MERGED_UP_NAME = ::llvm::StringLiteral("mergedUp");
   }];
 }
 
