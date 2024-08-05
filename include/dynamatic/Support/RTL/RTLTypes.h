@@ -19,175 +19,233 @@
 
 namespace dynamatic {
 
-class RTLParameter;
+/// Abstract base for RTL parameter type constraints. Each concrete RTL
+/// parameter type should derive from this to define its own custom constraints.
+struct RTLTypeConstraints {
+  /// Determines whether constraints are satisfied with a specific parameter
+  /// value stored in an MLIR attribute.
+  virtual bool verify(mlir::Attribute attr) const = 0;
 
-/// Abstract base class for RTL parameter types, with optional and customizable
-/// type constraints.
-class RTLType {
-public:
-  /// Abstract base class for RTL parameter type constraints. Each concrete RTL
-  /// parameter type should subclass it if it wants to define custom
-  /// constraints.
-  struct Constraints {
-    /// Determines whether constraints are satisfied with a specific parameter
-    /// value stored in an MLIR attribute.
-    virtual bool verify(mlir::Attribute attr) const { return true; };
+  /// Attempts to deserialize the constraints from a JSON value. Returns true
+  /// when parsing succeeded, false otherwise.
+  virtual bool fromJSON(const llvm::json::Object &object,
+                        llvm::json::Path path) = 0;
 
-    /// Necessary because of virtual method.
-    virtual ~Constraints() = default;
+  /// Necessary because of virtual methods.
+  virtual ~RTLTypeConstraints() = default;
+};
+
+/// Base for constrained RTL parameter types. This implements
+/// concept-based polymorphism to hide an instance of a templated concrete RTL
+/// type class under a non-templated API.
+struct RTLType {
+  /// Abstract concept for concrete RTL types.
+  struct Concept {
+    virtual bool fromJSON(const llvm::json::Object &object,
+                          llvm::json::Path path) = 0;
+    virtual bool constraintsFromJSON(const llvm::json::Object &object,
+                                     RTLTypeConstraints *&constraints,
+                                     llvm::json::Path path) = 0;
+    virtual bool verify(mlir::Attribute attr) const = 0;
+    virtual std::string serializeImpl(mlir::Attribute attr) const = 0;
+    virtual ~Concept() = default;
   };
 
-  /// Default constructor.
+  /// Base for concrete RTL parameter types. Each concrete RTL parameter type
+  /// should derive from this. The first template parameter should be the
+  /// derived type itself (in CRTP fashion) while the second template parameter
+  /// should be the concrete type constraints type for the RTL type.
+  template <typename DerivedType, typename ConstraintsType>
+  struct Model : public Concept {
+    bool fromJSON(const llvm::json::Object &object,
+                  llvm::json::Path path) override {
+      return constraints.fromJSON(object, path);
+    }
+    bool constraintsFromJSON(const llvm::json::Object &object,
+                             RTLTypeConstraints *&constraints,
+                             llvm::json::Path path) override {
+      ConstraintsType *cons = new ConstraintsType;
+      constraints = cons;
+      return cons->fromJSON(object, path);
+    }
+    bool verify(mlir::Attribute attr) const override {
+      return constraints.verify(attr);
+    }
+    std::string serializeImpl(mlir::Attribute attr) const override {
+      return DerivedType::serialize(attr);
+    }
+
+    /// Constraints on the concrete RTL type.
+    ConstraintsType constraints;
+  };
+
+  /// Creates an empty type.
   RTLType() = default;
 
-  /// Allocates the constraints object and attemps to deserialize its content
-  /// from the JSON object. Returns whether constraints were able to be
-  /// deserialized from the JSON data.
-  virtual bool constraintsFromJSON(const llvm::json::Object &object,
-                                   Constraints *&constraints,
-                                   llvm::json::Path path) = 0;
+  /// Attempts to deserialize the RTL type (including its constraints) from the
+  /// JSON object. Returns true when parsing succeeded, false otherwise.
+  bool fromJSON(const llvm::json::Object &object, llvm::json::Path path);
+
+  /// Attempts to deserialize a new set of RTL type constraints compatible with
+  /// the RTL type from the JSON object. On success, the `constraints` object is
+  /// allocated on the heap, initialized with the parsed constraints, and the
+  /// method returns true. On failure, nothing is allocated and the method
+  /// returns false.
+  bool constraintsFromJSON(const llvm::json::Object &object,
+                           RTLTypeConstraints *&constraints,
+                           llvm::json::Path path) {
+    return typeConcept->constraintsFromJSON(object, constraints, path);
+  }
 
   /// Serializes the attribute to a string and returns it unless the attribute
   /// is of an incorrect type, in which case the returned string is empty.
-  virtual std::string serialize(mlir::Attribute attr) const = 0;
+  std::string serialize(mlir::Attribute attr) const {
+    return typeConcept->serializeImpl(attr);
+  };
 
   /// Determines whether the type's constraints are satisfied with a specific
   /// parameter value stored in the MLIR attribute.
-  bool verify(mlir::Attribute attr) const { return constraints->verify(attr); };
+  bool verify(mlir::Attribute attr) const { return typeConcept->verify(attr); };
 
-  /// Prohibit copy due to dynamic allocation of constraints.
+  /// Prohibit copy due to dynamic allocation of the underlying concept.
   RTLType(const RTLType &) = delete;
 
   RTLType(RTLType &&other) noexcept
-      : constraints(std::exchange(other.constraints, nullptr)) {}
+      : typeConcept(std::exchange(other.typeConcept, nullptr)) {}
 
   RTLType &operator=(RTLType &&other) noexcept {
-    constraints = std::exchange(other.constraints, nullptr);
+    typeConcept = std::exchange(other.typeConcept, nullptr);
     return *this;
   }
 
-  /// Deallocates the constraints if they are not `nullptr`.
-  virtual ~RTLType();
-
-  /// RTL parameters need mutable access to their type constraints to initialize
-  /// them during JSON deserialization.
-  friend RTLParameter;
-
-protected:
-  /// Type constraints (dynamically allocated).
-  Constraints *constraints = nullptr;
-};
-
-/// Boolean RTL type, mappable to a `bol` in C++.
-class RTLBooleanType : public RTLType {
-  using RTLType::RTLType;
-
-public:
-  /// Unsigned type constraints.
-  struct BoolConstraints : public Constraints {
-    /// Equality constraint.
-    std::optional<unsigned> eq;
-    /// Difference constraint.
-    std::optional<unsigned> ne;
-
-    bool verify(mlir::Attribute attr) const override;
-  };
-
-  bool constraintsFromJSON(const llvm::json::Object &object,
-                           Constraints *&constraints,
-                           llvm::json::Path path) override;
-
-  std::string serialize(mlir::Attribute attr) const override;
+  virtual ~RTLType() { delete typeConcept; }
 
 private:
-  /// Keywords
-  static constexpr llvm::StringLiteral EQ = llvm::StringLiteral("eq"),
-                                       NE = llvm::StringLiteral("ne");
+  Concept *typeConcept = nullptr;
 
-  /// Errors
-  static constexpr llvm::StringLiteral ERR_UNSUPPORTED = llvm::StringLiteral(
-      R"(unknown unsigned constraint: options are "eq" or "ne")");
+  template <typename DerivedType>
+  bool allocIf(StringRef typeStr) {
+    if (typeStr != DerivedType::ID)
+      return false;
+    typeConcept = new DerivedType;
+    return true;
+  }
+
+  template <typename First, typename Second, typename... Others>
+  bool allocIf(StringRef typeStr) {
+    if (allocIf<First>(typeStr))
+      return true;
+    return allocIf<Second, Others...>(typeStr);
+  }
 };
 
-/// Unsigned RTL type, mappable to an `unsigned` in C++.
-class RTLUnsignedType : public RTLType {
-  using RTLType::RTLType;
+//===----------------------------------------------------------------------===//
+// RTLBooleanType
+//===----------------------------------------------------------------------===//
 
-public:
-  /// Unsigned type constraints.
-  struct UnsignedConstraints : public Constraints {
-    /// Lower bound (inclusive).
-    std::optional<unsigned> lb;
-    /// Upper bound (inclusive).
-    std::optional<unsigned> ub;
-    /// Equality constraint.
-    std::optional<unsigned> eq;
-    /// Difference constraint.
-    std::optional<unsigned> ne;
+/// Boolean type constraints.
+struct BooleanConstraints : public RTLTypeConstraints {
+  /// Equality constraint.
+  std::optional<bool> eq;
+  /// Difference constraint.
+  std::optional<bool> ne;
 
-    bool verify(mlir::Attribute attr) const override;
-  };
+  bool verify(mlir::Attribute attr) const override;
 
-  bool constraintsFromJSON(const llvm::json::Object &object,
-                           Constraints *&constraints,
-                           llvm::json::Path path) override;
-
-  std::string serialize(mlir::Attribute attr) const override;
+  bool fromJSON(const llvm::json::Object &object,
+                llvm::json::Path path) override;
 
 private:
-  /// Keywords
-  static constexpr llvm::StringLiteral LB = llvm::StringLiteral("lb"),
-                                       UB = llvm::StringLiteral("ub"),
-                                       RANGE = llvm::StringLiteral("range"),
-                                       EQ = llvm::StringLiteral("eq"),
-                                       NE = llvm::StringLiteral("ne");
+  /// Keywords.
+  static constexpr llvm::StringLiteral EQ = "eq", NE = "ne";
 
-  /// Errors
+  /// Errors.
+  static constexpr llvm::StringLiteral ERR_UNSUPPORTED =
+      R"(unknown unsigned constraint: options are "eq" or "ne")";
+};
+
+/// An RTL parameter representing a boolean, stored in the IR as a `BoolAttr`.
+struct RTLBooleanType
+    : public RTLType::Model<RTLBooleanType, BooleanConstraints> {
+  static constexpr llvm::StringLiteral ID = "boolean";
+
+  static std::string serialize(mlir::Attribute attr);
+};
+
+//===----------------------------------------------------------------------===//
+// RTLUnsignedType
+//===----------------------------------------------------------------------===//
+
+/// Unsigned type constraints.
+struct UnsignedConstraints : public RTLTypeConstraints {
+  /// Lower bound (inclusive).
+  std::optional<unsigned> lb;
+  /// Upper bound (inclusive).
+  std::optional<unsigned> ub;
+  /// Equality constraint.
+  std::optional<unsigned> eq;
+  /// Difference constraint.
+  std::optional<unsigned> ne;
+
+  bool verify(mlir::Attribute attr) const override;
+
+  bool fromJSON(const llvm::json::Object &object,
+                llvm::json::Path path) override;
+
+private:
+  /// Keywords.
+  static constexpr llvm::StringLiteral LB = "lb", UB = "ub", RANGE = "range",
+                                       EQ = "eq", NE = "ne";
+
+  /// Errors.
   static constexpr llvm::StringLiteral
-      ERR_ARRAY_FORMAT =
-          llvm::StringLiteral("expected array to have [lb, ub] format"),
-      ERR_LB = llvm::StringLiteral("lower bound already set"),
-      ERR_UB = llvm::StringLiteral("upper bound already set"),
-      ERR_UNSUPPORTED = llvm::StringLiteral(
+      ERR_ARRAY_FORMAT = "expected array to have [lb, ub] format",
+      ERR_LB = "lower bound already set", ERR_UB = "upper bound already set",
+      ERR_UNSUPPORTED =
           "unknown unsigned constraint: options are \"lb\", \"ub\", "
-          "\"range\", \"eq\", or \"ne\"");
+          "\"range\", \"eq\", or \"ne\"";
 };
 
-/// String RTL type, mappable to a `std::string` in C++.
-class RTLStringType : public RTLType {
-  using RTLType::RTLType;
+/// An RTL parameter representing a positive number, stored in the IR as a
+/// `IntegerAttr` with unsigned semantics.
+struct RTLUnsignedType
+    : public RTLType::Model<RTLUnsignedType, UnsignedConstraints> {
+  static constexpr llvm::StringLiteral ID = "unsigned";
 
-public:
-  /// String type constraints.
-  struct StringConstraints : public Constraints {
-    /// Equality constraint.
-    std::optional<std::string> eq;
-    /// Difference constraint.
-    std::optional<std::string> ne;
+  static std::string serialize(mlir::Attribute attr);
+};
 
-    bool verify(mlir::Attribute attr) const override;
-  };
+//===----------------------------------------------------------------------===//
+// RTLStringType
+//===----------------------------------------------------------------------===//
 
-  bool constraintsFromJSON(const llvm::json::Object &object,
-                           Constraints *&constraints,
-                           llvm::json::Path path) override;
+/// String type constraints.
+struct StringConstraints : public RTLTypeConstraints {
+  /// Equality constraint.
+  std::optional<std::string> eq;
+  /// Difference constraint.
+  std::optional<std::string> ne;
 
-  std::string serialize(mlir::Attribute attr) const override;
+  bool verify(mlir::Attribute attr) const override;
+
+  bool fromJSON(const llvm::json::Object &object,
+                llvm::json::Path path) override;
 
 private:
-  /// Keywords
-  static constexpr llvm::StringLiteral EQ = llvm::StringLiteral("eq"),
-                                       NE = llvm::StringLiteral("ne");
+  /// Keywords.
+  static constexpr llvm::StringLiteral EQ = "eq", NE = "ne";
 
-  /// Errors
-  static constexpr llvm::StringLiteral ERR_UNSUPPORTED = llvm::StringLiteral(
-      R"(unknown string constraint: options are "unsigned" or "string")");
+  /// Errors.
+  static constexpr llvm::StringLiteral ERR_UNSUPPORTED =
+      R"(unknown string constraint: options are "eq" or "ne")";
 };
 
-/// ADL-findable LLVM-standard JSON deserializer for an RTL parameter pointer.
-/// Allocates a concrete RTL type and stores its address in the type.
-bool fromJSON(const llvm::json::Value &value, RTLType *&type,
-              llvm::json::Path path);
+/// An RTL parameter representing a string, stored in the IR as a `StringAttr`.
+struct RTLStringType : public RTLType::Model<RTLStringType, StringConstraints> {
+  static constexpr llvm::StringLiteral ID = "string";
+
+  static std::string serialize(mlir::Attribute attr);
+};
 
 } // namespace dynamatic
 
