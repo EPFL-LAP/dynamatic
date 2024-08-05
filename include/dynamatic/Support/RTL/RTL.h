@@ -12,8 +12,8 @@
 //
 //===----------------------------------------------------------------------===//
 
-#ifndef DYNAMATIC_SUPPORT_RTL_H
-#define DYNAMATIC_SUPPORT_RTL_H
+#ifndef DYNAMATIC_SUPPORT_RTL_RTL_H
+#define DYNAMATIC_SUPPORT_RTL_RTL_H
 
 #include "dynamatic/Dialect/HW/HWOps.h"
 #include "dynamatic/Support/LLVM.h"
@@ -253,7 +253,7 @@ public:
   RTLParameter &operator=(const RTLParameter &) = delete;
 
   RTLParameter(RTLParameter &&other) noexcept
-      : name(other.name), type(std::exchange(other.type, nullptr)){};
+      : name(other.name), type(std::exchange(other.type, nullptr)) {};
 
   RTLParameter &operator=(RTLParameter &&other) noexcept {
     name = other.name;
@@ -321,7 +321,7 @@ protected:
   /// Construts a parameter match object from the state and an optional
   /// serialization for the parameter value.
   ParamMatch(State state, const llvm::Twine &serial = "")
-      : state(state), serialized(serial.str()){};
+      : state(state), serialized(serial.str()) {};
 };
 
 /// A parameterized request for RTL components that match certain properties.
@@ -340,7 +340,7 @@ public:
   Location loc;
 
   /// Creates an RTL request reporting errors at the provided location.
-  RTLRequest(Location loc) : loc(loc){};
+  RTLRequest(Location loc) : loc(loc) {};
 
   /// Returns the MLIR attribute holding the RTL parameter's value if it exists;
   /// otherwise returns nullptr.
@@ -707,4 +707,4 @@ inline bool fromJSON(const llvm::json::Value &value,
 } // namespace json
 } // namespace llvm
 
-#endif // DYNAMATIC_SUPPORT_RTL_H
+#endif // DYNAMATIC_SUPPORT_RTL_RTL_H

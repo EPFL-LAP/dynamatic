@@ -10,7 +10,7 @@
 //
 //===----------------------------------------------------------------------===//
 
-#include "dynamatic/Support/RTL.h"
+#include "dynamatic/Support/RTL/RTL.h"
 #include "dynamatic/Dialect/HW/HWOps.h"
 #include "dynamatic/Support/Attribute.h"
 #include "dynamatic/Support/TimingModels.h"
@@ -258,7 +258,7 @@ bool dynamatic::fromJSON(const llvm::json::Value &value, RTLType *&type,
 RTLRequestFromOp::RTLRequestFromOp(Operation *op, const llvm::Twine &name)
     : RTLRequest(op->getLoc()), name(name.str()), op(op),
       parameters(
-          op->getAttrOfType<DictionaryAttr>(RTLRequest::PARAMETERS_ATTR)){};
+          op->getAttrOfType<DictionaryAttr>(RTLRequest::PARAMETERS_ATTR)) {};
 
 Attribute RTLRequestFromOp::getParameter(const RTLParameter &param) const {
   if (!parameters)

@@ -11,7 +11,7 @@
 //
 //===----------------------------------------------------------------------===//
 
-#include "dynamatic/Support/RTL.h"
+#include "dynamatic/Support/RTL/RTL.h"
 #include "mlir/Dialect/Arith/IR/Arith.h"
 #include "llvm/Support/CommandLine.h"
 #include "llvm/Support/InitLLVM.h"
