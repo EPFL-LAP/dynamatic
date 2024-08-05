@@ -8,6 +8,7 @@ target_link_libraries(exp-export-rtl PRIVATE
   PRIVATE   
   MLIRIR
   MLIRParser
+  DynamaticSupport
   DynamaticSupportRTL
   DynamaticHandshake
   DynamaticHW

@@ -11,13 +11,12 @@
 //
 //===----------------------------------------------------------------------===//
 
+#include "dynamatic/Dialect/Handshake/HandshakeDialect.h"
 #include "dynamatic/Support/RTL/RTL.h"
-#include "mlir/Dialect/Arith/IR/Arith.h"
 #include "llvm/Support/CommandLine.h"
 #include "llvm/Support/InitLLVM.h"
 #include "llvm/Support/SourceMgr.h"
 #include <fstream>
-#include <map>
 
 using namespace llvm;
 using namespace mlir;

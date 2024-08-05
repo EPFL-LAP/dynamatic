@@ -1,4 +1,4 @@
-//===- Attribute.cpp - Support for Dynamatic (oprd) attributes --*- C++ -*-===//
+//===- JSON.h - JSON-related helpers ----------------------------*- C++ -*-===//
 //
 // Dynamatic is under the Apache License v2.0 with LLVM Exceptions.
 // See https://llvm.org/LICENSE.txt for license information.
@@ -6,16 +6,29 @@
 //
 //===----------------------------------------------------------------------===//
 //
-// Implements helpers to work with MLIR attributes.
+// Implementation of helper library to work with JSON files in Dynamatic.
 //
 //===----------------------------------------------------------------------===//
 
-#include "dynamatic/Support/Attribute.h"
+#include "dynamatic/Support/JSON/JSON.h"
+#include "dynamatic/Support/LLVM.h"
 #include "mlir/IR/BuiltinAttributes.h"
+#include "mlir/IR/Diagnostics.h"
+#include "mlir/IR/Location.h"
 #include "llvm/ADT/TypeSwitch.h"
-#include "llvm/Support/JSON.h"
 
 using namespace mlir;
+
+bool llvm::json::fromJSON(const json::Value &value, unsigned &number,
+                          json::Path path) {
+  std::optional<uint64_t> opt = value.getAsUINT64();
+  if (!opt.has_value()) {
+    path.report("expected unsigned number");
+    return false;
+  }
+  number = opt.value();
+  return true;
+}
 
 namespace {
 
@@ -26,7 +39,7 @@ public:
   /// Constructs the serializer from an intialized output stream and a location
   /// to report errors from.
   AttributeJSONSerializer(llvm::raw_fd_ostream &filestream, Location loc)
-      : os(filestream), loc(loc){};
+      : os(filestream), loc(loc) {};
 
   /// Attempts to serialize an attribute. If the key name is non-empty, uses it
   /// on failure to create a nicer error message denoting where the problem

@@ -14,6 +14,7 @@
 
 #include "dynamatic/Support/TimingModels.h"
 #include "dynamatic/Dialect/Handshake/HandshakeOps.h"
+#include "dynamatic/Support/JSON/JSON.h"
 #include "mlir/Support/LogicalResult.h"
 #include "llvm/ADT/TypeSwitch.h"
 #include "llvm/Support/JSON.h"
@@ -369,16 +370,5 @@ bool dynamatic::fromJSON(const json::Value &jsonValue, TimingDatabase &timingDB,
       return false;
     }
   }
-  return true;
-}
-
-bool llvm::json::fromJSON(const json::Value &value, unsigned &number,
-                          json::Path path) {
-  std::optional<uint64_t> opt = value.getAsUINT64();
-  if (!opt.has_value()) {
-    path.report("expected unsigned number");
-    return false;
-  }
-  number = opt.value();
   return true;
 }
