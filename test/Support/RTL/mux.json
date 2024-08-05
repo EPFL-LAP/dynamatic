@@ -1,0 +1,22 @@
+[
+  {
+    "name": "handshake.mux",
+    "parameters": [
+      { "name": "SIZE", "type": "unsigned", "lb": 1 },
+      { "name": "DATA_TYPE", "type": "unsigned", "eq": 0, "generic": false },
+      { "name": "SELECT_TYPE", "type": "unsigned", "lb": 1 }
+    ],
+    "generic": "$DYNAMATIC/experimental/data/vhdl/handshake/dataless/mux.vhd",
+    "module-name": "mux_dataless"
+  },
+  {
+    "name": "handshake.mux",
+    "parameters": [
+      { "name": "SIZE", "type": "unsigned", "lb": 1 },
+      { "name": "DATA_WIDTH", "type": "unsigned", "lb": 1 },
+      { "name": "SELECT_WIDTH", "type": "unsigned", "lb": 1 }
+    ],
+    "generic": "$DYNAMATIC/experimental/data/vhdl/handshake/mux.vhd",
+    "dependencies": ["mux_dataless"]
+  }
+]
