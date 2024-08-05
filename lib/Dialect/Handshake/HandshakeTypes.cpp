@@ -145,7 +145,7 @@ void ChannelType::print(AsmPrinter &odsPrinter) const {
     auto printSignal = [&](const ExtraSignal &signal) {
       odsPrinter << signal.name << ": " << signal.type;
       if (!signal.downstream)
-        odsPrinter << "(" << UPSTREAM_SYMBOL << ")";
+        odsPrinter << " (" << UPSTREAM_SYMBOL << ")";
     };
 
     // Print all signals enclosed in square brackets

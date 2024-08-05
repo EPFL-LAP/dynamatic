@@ -38,6 +38,7 @@
 #include "llvm/ADT/STLExtras.h"
 #include "llvm/ADT/SmallVector.h"
 #include "llvm/ADT/TypeSwitch.h"
+#include "llvm/Support/Casting.h"
 #include "llvm/Support/ErrorHandling.h"
 
 using namespace mlir;
@@ -2142,14 +2143,14 @@ void ReshapeOp::build(OpBuilder &odsBuilder, OperationState &odsState,
   } else {
     // At most a single downstream extra signal should remain
     if (totalDownWidth != 0) {
-      extraSignals.emplace_back(COMBINED_DOWN_NAME,
-                                odsBuilder.getIntegerType(totalUpWidth), false);
+      extraSignals.emplace_back(
+          MERGED_DOWN_NAME, odsBuilder.getIntegerType(totalDownWidth), true);
     }
   }
   // At most a single upstream extra signal should remain
   if (totalUpWidth != 0) {
-    extraSignals.emplace_back(COMBINED_UP_NAME,
-                              odsBuilder.getIntegerType(totalUpWidth), true);
+    extraSignals.emplace_back(MERGED_UP_NAME,
+                              odsBuilder.getIntegerType(totalUpWidth), false);
   }
 
   odsState.addTypes(ChannelType::get(ctx, dataType, extraSignals));
@@ -2201,12 +2202,12 @@ LogicalResult ReshapeOp::verify() {
       expectedWidth = isMerge ? srcExtraWidths.first : dstExtraWidths.first;
       numExtra = type.getNumDownstreamExtraSignals();
       dirStr = "downstream";
-      combinedName = COMBINED_DOWN_NAME;
+      combinedName = MERGED_DOWN_NAME;
     } else {
       expectedWidth = isMerge ? srcExtraWidths.second : dstExtraWidths.second;
       numExtra = type.getNumUpstreamExtraSignals();
       dirStr = "uptream";
-      combinedName = COMBINED_UP_NAME;
+      combinedName = MERGED_UP_NAME;
     }
 
     // There must be either 0 or 1 extra signal of the specified direction
@@ -2319,6 +2320,18 @@ LogicalResult ReshapeOp::verify() {
   }
 
   return success();
+}
+
+OpFoldResult ReshapeOp::fold(FoldAdaptor adaptor) {
+  if (getChannel().getType() == getReshaped().getType())
+    return getChannel();
+
+  Operation *defOp = getChannel().getDefiningOp();
+  if (auto reshapeOp = dyn_cast_if_present<ReshapeOp>(defOp)) {
+    if (getReshaped().getType() == reshapeOp.getChannel().getType())
+      return reshapeOp.getChannel();
+  }
+  return nullptr;
 }
 
 //===----------------------------------------------------------------------===//

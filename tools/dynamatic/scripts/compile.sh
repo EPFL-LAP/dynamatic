@@ -26,9 +26,9 @@ COMP_DIR="$OUTPUT_DIR/comp"
 F_AFFINE="$COMP_DIR/affine.mlir"
 F_AFFINE_MEM="$COMP_DIR/affine_mem.mlir"
 F_SCF="$COMP_DIR/scf.mlir"
-F_CF="$COMP_DIR/std.mlir"
-F_CF_TRANFORMED="$COMP_DIR/std_transformed.mlir"
-F_CF_DYN_TRANSFORMED="$COMP_DIR/std_dyn_transformed.mlir"
+F_CF="$COMP_DIR/cf.mlir"
+F_CF_TRANFORMED="$COMP_DIR/cf_transformed.mlir"
+F_CF_DYN_TRANSFORMED="$COMP_DIR/cf_dyn_transformed.mlir"
 F_PROFILER_BIN="$COMP_DIR/$KERNEL_NAME-profile"
 F_PROFILER_INPUTS="$COMP_DIR/profiler-inputs.txt"
 F_HANDSHAKE="$COMP_DIR/handshake.mlir"
@@ -165,6 +165,7 @@ fi
 "$DYNAMATIC_OPT_BIN" "$F_HANDSHAKE_BUFFERED" \
   --handshake-canonicalize \
   --handshake-hoist-ext-instances \
+  --handshake-reshape-channels \
   > "$F_HANDSHAKE_EXPORT"
 exit_on_fail "Failed to canonicalize Handshake" "Canonicalized handshake"
 
