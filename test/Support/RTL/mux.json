@@ -1,22 +1,31 @@
 [
   {
-    "name": "handshake.mux",
+    "name": "test_boolean",
     "parameters": [
-      { "name": "SIZE", "type": "unsigned", "lb": 1 },
-      { "name": "DATA_TYPE", "type": "unsigned", "eq": 0, "generic": false },
-      { "name": "SELECT_TYPE", "type": "unsigned", "lb": 1 }
+      { "name": "PARAM_1", "type": "boolean" },
+      { "name": "PARAM_2", "type": "boolean", "eq": true },
+      { "name": "PARAM_3", "type": "boolean", "ne": false }
     ],
-    "generic": "$DYNAMATIC/experimental/data/vhdl/handshake/dataless/mux.vhd",
-    "module-name": "mux_dataless"
+    "generic": "/path/to/test_boolean"
   },
   {
-    "name": "handshake.mux",
+    "name": "test_unsigned",
     "parameters": [
-      { "name": "SIZE", "type": "unsigned", "lb": 1 },
-      { "name": "DATA_WIDTH", "type": "unsigned", "lb": 1 },
-      { "name": "SELECT_WIDTH", "type": "unsigned", "lb": 1 }
+      { "name": "PARAM_1", "type": "unsigned" },
+      { "name": "PARAM_2", "type": "unsigned", "lb": 1, "ub": 5 },
+      { "name": "PARAM_3", "type": "unsigned", "range": [1, 5] },
+      { "name": "PARAM_4", "type": "unsigned", "eq": 1 },
+      { "name": "PARAM_5", "type": "unsigned", "ne": 1 }
     ],
-    "generic": "$DYNAMATIC/experimental/data/vhdl/handshake/mux.vhd",
-    "dependencies": ["mux_dataless"]
+    "generic": "/path/to/test_unsigned"
+  },
+  {
+    "name": "test_string",
+    "parameters": [
+      { "name": "PARAM_1", "type": "string" },
+      { "name": "PARAM_2", "type": "string", "eq": "my_string" },
+      { "name": "PARAM_3", "type": "string", "ne": "not_my_string" }
+    ],
+    "generic": "/path/to/test_string"
   }
 ]

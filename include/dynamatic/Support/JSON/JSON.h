@@ -35,7 +35,8 @@ static constexpr StringLiteral ERR_EXPECTED_OBJECT("expected object"),
     ERR_EXPECTED_ARRAY("expected array"),
     ERR_EXPECTED_STRING("expected string"),
     ERR_EXPECTED_NUMBER("expected number"),
-    ERR_EXPECTED_BOOLEAN("expected boolean");
+    ERR_EXPECTED_BOOLEAN("expected boolean"),
+    ERR_MISSING_VALUE("missing value");
 
 /// Attempts to serialize an MLIR attribute into a JSON file, which is
 /// created at the provided filepath. Succeeds when the attribute was of a

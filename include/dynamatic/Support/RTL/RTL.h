@@ -55,9 +55,8 @@ class RTLMatch;
 class RTLParameter;
 class RTLComponent;
 
-/// Represents a named RTL parameter of a specific type, with optional
-/// constraints on allowed values for it. This can be moved but not copied due
-/// to underlying dynamatic memory allocation.
+/// Represents a named RTL parameter of a specific constrained type. This can be
+/// moved but not copied due to underlying dynamatic memory allocation.
 class RTLParameter {
   /// RTL components need mutable access to their parameters to initialize them
   /// during JSON deserialization.
@@ -81,7 +80,7 @@ public:
   StringRef getName() const { return name; }
 
   /// Returns the parameter's type.
-  const RTLType &getType() const { return *type; }
+  const RTLType &getType() const { return type; }
 
   /// Prohibit copy due to dynamic allocation of the parameter type.
   RTLParameter(const RTLParameter &) = delete;
@@ -89,22 +88,19 @@ public:
   RTLParameter &operator=(const RTLParameter &) = delete;
 
   RTLParameter(RTLParameter &&other) noexcept
-      : name(other.name), type(std::exchange(other.type, nullptr)) {};
+      : name(std::move(other.name)), type(std::move(other.type)) {};
 
   RTLParameter &operator=(RTLParameter &&other) noexcept {
-    name = other.name;
-    type = std::exchange(other.type, nullptr);
+    name = std::move(other.name);
+    type = std::move(other.type);
     return *this;
   }
-
-  /// Deallocates the parameter if it is not `nullptr`.
-  ~RTLParameter();
 
 private:
   /// The parameter's name.
   std::string name;
   /// The parameter's type.
-  RTLType *type = nullptr;
+  RTLType type;
   /// Whether the parameter should be used as a generic parameter during
   /// component instantiation. If none, the RTL parameter will be used as a
   /// generic parameter if and only if the associated RTL component is marked
@@ -336,7 +332,7 @@ public:
   /// A timing model for the component, optionally constrained for specific RTL
   /// parameters.
   struct Model {
-    using AddConstraints = std::pair<RTLParameter *, RTLType::Constraints *>;
+    using AddConstraints = std::pair<RTLParameter *, RTLTypeConstraints *>;
 
     /// Path of the timing model on disk.
     std::string path;

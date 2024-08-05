@@ -33,10 +33,9 @@ using namespace dynamatic;
 /// Recognized keys in RTL configuration files.
 static constexpr StringLiteral KEY_PARAMETERS("parameters"),
     KEY_MODELS("models"), KEY_GENERIC("generic"), KEY_GENERATOR("generator"),
-    KEY_NAME("name"), KEY_TYPE("type"), KEY_PATH("path"),
-    KEY_CONSTRAINTS("constraints"), KEY_PARAMETER("parameter"),
-    KEY_DEPENDENCIES("dependencies"), KEY_MODULE_NAME("module-name"),
-    KEY_ARCH_NAME("arch-name"), KEY_HDL("hdl"),
+    KEY_NAME("name"), KEY_PATH("path"), KEY_CONSTRAINTS("constraints"),
+    KEY_PARAMETER("parameter"), KEY_DEPENDENCIES("dependencies"),
+    KEY_MODULE_NAME("module-name"), KEY_ARCH_NAME("arch-name"), KEY_HDL("hdl"),
     KEY_USE_JSON_CONFIG("use-json-config"), KEY_IO_KIND("io-kind"),
     KEY_IO_MAP("io-map"), KEY_IO_SIGNALS("io-signals");
 
@@ -269,7 +268,7 @@ LogicalResult RTLMatch::concretize(const RTLRequest &request,
 bool RTLParameter::fromJSON(const llvm::json::Value &value,
                             llvm::json::Path path) {
   json::ObjectMapper mapper(value, path);
-  if (!mapper || !mapper.map(KEY_NAME, name) || !mapper.map(KEY_TYPE, type) ||
+  if (!mapper || !mapper.map(KEY_NAME, name) ||
       !mapper.map(KEY_GENERIC, useAsGeneric))
     return false;
 
@@ -278,14 +277,8 @@ bool RTLParameter::fromJSON(const llvm::json::Value &value,
     return false;
   }
 
-  // The mapper ensures that this object is valid
-  const json::Object &object = *value.getAsObject();
-  return type->constraintsFromJSON(object, type->constraints, path);
-}
-
-RTLParameter::~RTLParameter() {
-  if (type)
-    delete type;
+  // The mapper ensures that the value is actually an object
+  return type.fromJSON(*value.getAsObject(), path);
 }
 
 RTLComponent::Model::~Model() {
@@ -452,7 +445,7 @@ bool RTLComponent::fromJSON(const llvm::json::Value &value,
 
       // The mapper ensures that this object is valid
       const json::Object &object = *value.getAsObject();
-      if (param->type->constraintsFromJSON(object, constraints, path))
+      if (constraints->fromJSON(object, path))
         return false;
     }
   }
