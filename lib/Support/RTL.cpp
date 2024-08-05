@@ -407,18 +407,29 @@ MapVector<StringRef, StringRef> RTLMatch::getGenericParameterValues() const {
 
 LogicalResult RTLMatch::concretize(const RTLRequest &request,
                                    StringRef dynamaticPath,
-                                   StringRef outputDir) const {
+                                   StringRef outputDir, HDL hdl) const {
   // Consolidate reserved and regular parameters in a single map to perform
   // text substitutions
   ParameterMappings allParams(serializedParams);
   allParams[RTLParameter::DYNAMATIC] = dynamaticPath;
   allParams[RTLParameter::OUTPUT_DIR] = outputDir;
 
+
+  StringRef extension;
+  switch (hdl){
+  case HDL::VERILOG:
+    extension = ".v";
+    break;
+  case HDL::VHDL:
+    extension = ".vhd";
+    break;
+  }
+
   if (component->isGeneric()) {
     std::string inputFile = substituteParams(component->generic, allParams);
     std::string outputFile = outputDir.str() +
                              sys::path::get_separator().str() + moduleName +
-                             ".vhd";
+                             extension.data();
 
     // Just copy the file to the output location
     if (auto ec = sys::fs::copy_file(inputFile, outputFile); ec.value() != 0) {
@@ -751,7 +762,7 @@ static std::string getIndexedName(const Twine &name, size_t arrayIdx, HDL hdl) {
   case HDL::VHDL:
     return name.str() + "(" + std::to_string(arrayIdx) + ")";
   case HDL::VERILOG:
-    return name.str() + "[" + std::to_string(arrayIdx) + "]";
+    return name.str();
   }
 }
 

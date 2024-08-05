@@ -1,4 +1,5 @@
 add_subdirectory(rtl-cmpf-generator)
 add_subdirectory(rtl-cmpi-generator)
+add_subdirectory(rtl-constant-generator-verilog)
 add_subdirectory(rtl-text-generator)
 add_subdirectory(wlf2csv)

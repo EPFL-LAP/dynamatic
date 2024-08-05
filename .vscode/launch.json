@@ -1,0 +1,20 @@
+{
+  "version": "0.2.0",
+  "configurations": [
+      {
+          "type": "cppdbg",
+          "request": "launch",
+          "name": "Launch Program",
+          "setupCommands": [
+              {
+                  "description": "Enable pretty-printing for gdb",
+                  "text": "-enable-pretty-printing",
+                  "ignoreFailures": true
+              }
+          ],
+          "args": ["--run", "tools/dynamatic/samples/fir.dyn"],
+          "cwd": "<current work directory>",
+          "program": "<dynamatic binary (dynamatic or dynamatic-opt or ...)>",
+      }
+  ]
+}

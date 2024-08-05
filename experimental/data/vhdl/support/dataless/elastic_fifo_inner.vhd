@@ -4,7 +4,7 @@ use ieee.numeric_std.all;
 
 entity elastic_fifo_inner_dataless is
   generic (
-    SIZE : integer;
+    SIZE : integer
   );
   port (
     -- inputs

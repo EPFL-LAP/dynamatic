@@ -274,7 +274,7 @@ LogicalResult LowerFuncToHandshake::matchAndRewrite(
 
 SmallVector<NamedAttribute>
 LowerFuncToHandshake::deriveNewAttributes(func::FuncOp funcOp) const {
-  SmallVector<NamedAttribute, 4> attributes;
+  SmallVector<NamedAttribute, 3> attributes;
   MLIRContext *ctx = getContext();
 
   for (const NamedAttribute &attr : funcOp->getAttrs()) {
