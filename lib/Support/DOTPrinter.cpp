@@ -18,7 +18,6 @@
 #include "dynamatic/Dialect/Handshake/HandshakeTypes.h"
 #include "dynamatic/Dialect/Handshake/MemoryInterfaces.h"
 #include "dynamatic/Support/CFG.h"
-#include "dynamatic/Support/TimingModels.h"
 #include "dynamatic/Transforms/HandshakeMaterialize.h"
 #include "experimental/Transforms/Speculation/SpecAnnotatePaths.h"
 #include "mlir/Dialect/Math/IR/Math.h"

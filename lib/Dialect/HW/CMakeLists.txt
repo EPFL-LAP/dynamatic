@@ -21,5 +21,6 @@ add_dynamatic_dialect_library(DynamaticHW
   LINK_LIBS PUBLIC
   MLIRIR
   MLIRControlFlowInterfaces
+  MLIRFunctionInterfaces
   MLIRInferTypeOpInterface
 )

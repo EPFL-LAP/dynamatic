@@ -32,8 +32,8 @@
 #include "dynamatic/Analysis/NameAnalysis.h"
 #include "dynamatic/Dialect/Handshake/HandshakeOps.h"
 #include "dynamatic/Support/Attribute.h"
+#include "dynamatic/Support/JSON/JSON.h"
 #include "dynamatic/Support/TimingModels.h"
-#include "mlir/IR/Attributes.h"
 #include "mlir/IR/MLIRContext.h"
 #include "mlir/Support/LLVM.h"
 #include "llvm/ADT/StringRef.h"
@@ -41,7 +41,6 @@
 #include <fstream>
 #include <functional>
 #include <memory>
-#include <unordered_map>
 
 using namespace llvm;
 using namespace mlir;
@@ -66,8 +65,6 @@ static constexpr StringLiteral
     ERR_EXPECTED_ATTR_NAME("expected \"attribute-name\" key"),
     ERR_EXPECTED_ATTR_TYPE("expected \"attribute-type\" key"),
     ERR_EXPECTED_DATA("expected \"attribute-data\" key"),
-    ERR_EXPECTED_OBJECT("expected value to be JSON object"),
-    ERR_EXPECTED_ARRAY("expected value to be JSON array"),
     ERR_EXPECTED_OP("expected operation to exist in the IR"),
     ERR_EXPECTED_OPRD(
         "expected operand index to be strictly less than number of "

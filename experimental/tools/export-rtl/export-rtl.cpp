@@ -20,7 +20,6 @@
 #include "dynamatic/Support/LLVM.h"
 #include "dynamatic/Support/RTL/RTL.h"
 #include "dynamatic/Support/System.h"
-#include "dynamatic/Support/TimingModels.h"
 #include "mlir/IR/BuiltinOps.h"
 #include "mlir/IR/MLIRContext.h"
 #include "mlir/IR/OwningOpRef.h"
