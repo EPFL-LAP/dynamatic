@@ -5,11 +5,11 @@ add_dynamatic_library(DynamaticSupport
   DOTPrinter.cpp
   Logging.cpp
   MILP.cpp
-  RTL.cpp
   System.cpp
   TimingModels.cpp
 
   LINK_LIBS PUBLIC
+  DynamaticHandshake
   DynamaticHW
   MLIRIR
   MLIRSupport
@@ -17,3 +17,4 @@ add_dynamatic_library(DynamaticSupport
 )
 
 add_subdirectory(Espresso)
+add_subdirectory(RTL)

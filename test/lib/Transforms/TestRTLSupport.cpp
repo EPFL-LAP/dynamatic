@@ -10,9 +10,8 @@
 //
 //===----------------------------------------------------------------------===//
 
-#include "dynamatic/Dialect/HW/HWOps.h"
 #include "dynamatic/Support/LLVM.h"
-#include "dynamatic/Support/RTL.h"
+#include "dynamatic/Support/RTL/RTL.h"
 #include "mlir/IR/BuiltinOps.h"
 #include "mlir/Pass/Pass.h"
 
