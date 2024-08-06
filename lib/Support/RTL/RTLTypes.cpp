@@ -14,26 +14,26 @@
 #include "dynamatic/Support/JSON/JSON.h"
 #include "mlir/IR/BuiltinAttributes.h"
 
-using namespace llvm;
 using namespace mlir;
 using namespace dynamatic;
+using namespace dynamatic::json;
 
-/// Recognized keys in RTL configuration files.
-static constexpr StringLiteral KEY_GENERIC("generic"), KEY_NAME("name"),
-    KEY_TYPE("type"), KEY_PARAMETER("parameter");
+namespace ljson = llvm::json;
+
+static constexpr StringLiteral KEY_TYPE("type");
 
 /// Reserved JSON keys when deserializing type constraints, should be ignored.
-static const mlir::DenseSet<StringRef> RESERVED_KEYS{
-    KEY_NAME, KEY_TYPE, KEY_PARAMETER, KEY_GENERIC};
+static const mlir::DenseSet<StringRef> RESERVED_KEYS{"name", KEY_TYPE,
+                                                     "parameter", "generic"};
 
 static constexpr StringLiteral ERR_UNKNOWN_TYPE(
     R"(unknown parameter type: options are "boolean", "unsigned", or "string")");
 
-bool RTLType::fromJSON(const json::Object &object, json::Path path) {
+bool RTLType::fromJSON(const ljson::Object &object, ljson::Path path) {
   if (typeConcept)
     delete typeConcept;
 
-  const json::Value *typeValue = object.get(KEY_TYPE);
+  const ljson::Value *typeValue = object.get(KEY_TYPE);
   if (!typeValue) {
     path.field(KEY_TYPE).report(ERR_MISSING_VALUE);
     return false;
@@ -61,20 +61,12 @@ bool BooleanConstraints::verify(Attribute attr) const {
   return (!eq || value == eq) && (!ne || value != ne);
 }
 
-bool BooleanConstraints::fromJSON(const json::Object &object, json::Path path) {
-  return llvm::all_of(object, [&](auto &keyAndVal) {
-    auto &[jsonKey, val] = keyAndVal;
-    std::string key = jsonKey.str();
-
-    if (RESERVED_KEYS.contains(key))
-      return true;
-    if (key == EQ)
-      return json::fromJSON(val, eq, path);
-    if (key == NE)
-      return json::fromJSON(val, ne, path);
-    path.field(key).report(ERR_UNSUPPORTED);
-    return false;
-  });
+bool BooleanConstraints::fromJSON(const ljson::Object &object,
+                                  ljson::Path path) {
+  return OptionalObjectMapper(object, path, RESERVED_KEYS)
+      .map("eq", eq)
+      .map("ne", ne)
+      .exhausted();
 }
 
 std::string RTLBooleanType::serialize(Attribute attr) {
@@ -95,50 +87,46 @@ bool UnsignedConstraints::verify(Attribute attr) const {
          (!ne || value != ne);
 }
 
-bool UnsignedConstraints::fromJSON(const json::Object &object,
-                                   json::Path path) {
-  auto boundFromJSON = [&](StringRef kw, StringLiteral err,
-                           const llvm::json::Value &value,
-                           std::optional<unsigned> &bound) -> bool {
+bool UnsignedConstraints::fromJSON(const ljson::Object &object,
+                                   ljson::Path path) {
+  auto boundFromJSON = [&](StringLiteral err, const ljson::Value &value,
+                           std::optional<unsigned> &bound,
+                           ljson::Path keyPath) -> bool {
     if (bound) {
       // The bound may be set by the "range" key or the dedicated bound key,
       // make sure there is no conflict
       path.report(err);
       return false;
     }
-    return json::fromJSON(value, bound, path);
+    return ljson::fromJSON(value, bound, keyPath);
   };
 
-  return llvm::all_of(object, [&](auto &keyAndVal) {
-    auto &[jsonKey, val] = keyAndVal;
-    std::string key = jsonKey.str();
-
-    if (RESERVED_KEYS.contains(key))
-      return true;
-    if (key == LB)
-      return boundFromJSON(LB, ERR_LB, val, lb);
-    if (key == UB)
-      return boundFromJSON(UB, ERR_UB, val, ub);
-    if (key == RANGE) {
-      const json::Array *array = val.getAsArray();
-      if (!array) {
-        path.report(ERR_EXPECTED_ARRAY);
-        return false;
-      }
-      if (array->size() != 2) {
-        path.report(ERR_ARRAY_FORMAT);
-        return false;
-      }
-      return boundFromJSON(LB, ERR_LB, (*array)[0], lb) &&
-             boundFromJSON(UB, ERR_UB, (*array)[1], ub);
-    }
-    if (key == EQ)
-      return json::fromJSON(val, eq, path);
-    if (key == NE)
-      return json::fromJSON(val, ne, path);
-    path.field(key).report(ERR_UNSUPPORTED);
-    return false;
-  });
+  return OptionalObjectMapper(object, path, RESERVED_KEYS)
+      .map("lb",
+           [&](auto &val, auto path) {
+             return boundFromJSON(ERR_LB, val, lb, path);
+           })
+      .map("ub",
+           [&](auto &val, auto path) {
+             return boundFromJSON(ERR_UB, val, ub, path);
+           })
+      .map("range",
+           [&](auto &val, auto path) {
+             const ljson::Array *array = val.getAsArray();
+             if (!array) {
+               path.report(ERR_EXPECTED_ARRAY);
+               return false;
+             }
+             if (array->size() != 2) {
+               path.report(ERR_ARRAY_FORMAT);
+               return false;
+             }
+             return boundFromJSON(ERR_LB, (*array)[0], lb, path) &&
+                    boundFromJSON(ERR_UB, (*array)[1], ub, path);
+           })
+      .map("eq", eq)
+      .map("ne", ne)
+      .exhausted();
 }
 
 std::string RTLUnsignedType::serialize(Attribute attr) {
@@ -155,20 +143,12 @@ bool StringConstraints::verify(Attribute attr) const {
   return (!eq || stringAttr == eq) && (!ne || stringAttr != ne);
 }
 
-bool StringConstraints::fromJSON(const json::Object &object, json::Path path) {
-  return llvm::all_of(object, [&](auto &keyAndVal) {
-    auto &[jsonKey, val] = keyAndVal;
-    std::string key = jsonKey.str();
-
-    if (RESERVED_KEYS.contains(key))
-      return true;
-    if (key == EQ)
-      return json::fromJSON(val, eq, path);
-    if (key == NE)
-      return json::fromJSON(val, ne, path);
-    path.field(key).report(ERR_UNSUPPORTED);
-    return false;
-  });
+bool StringConstraints::fromJSON(const ljson::Object &object,
+                                 ljson::Path path) {
+  return OptionalObjectMapper(object, path, RESERVED_KEYS)
+      .map("eq", eq)
+      .map("ne", ne)
+      .exhausted();
 }
 
 std::string RTLStringType::serialize(Attribute attr) {

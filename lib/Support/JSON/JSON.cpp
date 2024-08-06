@@ -18,6 +18,7 @@
 #include "llvm/ADT/TypeSwitch.h"
 
 using namespace mlir;
+using namespace dynamatic::json;
 
 bool llvm::json::fromJSON(const json::Value &value, unsigned &number,
                           json::Path path) {
@@ -164,8 +165,9 @@ private:
 };
 } // namespace
 
-LogicalResult dynamatic::serializeToJSON(Attribute attr, StringRef filepath,
-                                         Location loc) {
+LogicalResult dynamatic::json::serializeToJSON(Attribute attr,
+                                               StringRef filepath,
+                                               Location loc) {
   if (!attr)
     return emitError(loc) << "The attribute is null; cannot serialize to JSON.";
 
@@ -177,4 +179,36 @@ LogicalResult dynamatic::serializeToJSON(Attribute attr, StringRef filepath,
   }
   AttributeJSONSerializer serializer(filestream, loc);
   return serializer.serializeAttr(attr);
+}
+
+OptionalObjectMapper::OptionalObjectMapper(
+    const llvm::json::Object &obj, llvm::json::Path path,
+    const llvm::DenseSet<StringRef> &ignoredKeys)
+    : obj(obj), path(path), mappedKeys(ignoredKeys) {}
+
+bool OptionalObjectMapper::exhausted() {
+  if (!mapValid)
+    return false;
+  return llvm::all_of(obj, [&](auto &keyAndVal) {
+    std::string key = keyAndVal.first.str();
+    if (mappedKeys.contains(key))
+      return true;
+    path.field(key).report("unknown key in object");
+    return false;
+  });
+}
+
+OptionalObjectMapper &OptionalObjectMapper::map(StringRef key,
+                                                const MapFn &fn) {
+  if (!mapValid)
+    return *this;
+  if (const llvm::json::Value *val = obj.get(key)) {
+    if (auto [_, newKey] = mappedKeys.insert(key); !newKey) {
+      path.field(key).report(ERR_DUP_KEY);
+      mapValid = false;
+      return *this;
+    }
+    mapValid = fn(*val, path.field(key));
+  }
+  return *this;
 }
