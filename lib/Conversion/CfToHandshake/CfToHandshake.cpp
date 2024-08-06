@@ -626,6 +626,15 @@ std::vector<Operation *> getLSQPredecessors(
   return combinedOperations;
 }
 
+void printMemDep(ProdConsMemDep memDep) {
+  llvm::errs() << "Memdep between: ";
+  memDep.prodBb->printAsOperand(llvm::errs());
+  llvm::errs() << " and ";
+  memDep.consBb->printAsOperand(llvm::errs());
+  llvm::errs() << " with backward ";
+  llvm::errs() << memDep.isBackward << "\n";
+}
+
 LogicalResult HandshakeLowering::verifyAndCreateMemInterfaces(
     ConversionPatternRewriter &rewriter, MemInterfacesInfo &memInfo) {
   // Create a mapping between each block and all the other blocks it properly
@@ -703,9 +712,37 @@ LogicalResult HandshakeLowering::verifyAndCreateMemInterfaces(
       std::vector<ProdConsMemDep> allMemDeps;
       identifyMemDeps(allOperations, allMemDeps);
 
+      llvm::errs() << "Printing memDeps:\n";
+      for (ProdConsMemDep memDep : allMemDeps) {
+        printMemDep(memDep);
+      }
+      llvm::errs() << "Done printing memDeps:\n";
+
       /// Stores the Groups graph required for the allocation network analysis
       std::set<Group *> groups;
       constructGroupsGraph(allOperations, allMemDeps, groups);
+
+      llvm::errs() << "Now printing groups graph before minimization\n";
+      for (Group *group : groups) {
+        llvm::errs() << "Group ";
+        group->bb->printAsOperand(llvm::errs());
+        llvm::errs() << "\n";
+        llvm::errs() << "Preds: ";
+        for (Group *pred : group->preds) {
+          pred->bb->printAsOperand(llvm::errs());
+          llvm::errs() << ", ";
+        }
+        llvm::errs() << "\n";
+        llvm::errs() << "Succs: ";
+        for (Group *succ : group->succs) {
+          succ->bb->printAsOperand(llvm::errs());
+          llvm::errs() << ", ";
+        }
+        llvm::errs() << "\n";
+      }
+      llvm::errs() << "Done printing groups graph\n";
+
+      minimizeGroupsConnections(groups);
 
       llvm::errs() << "Now printing groups graph\n";
       for (Group *group : groups) {
@@ -726,6 +763,18 @@ LogicalResult HandshakeLowering::verifyAndCreateMemInterfaces(
         llvm::errs() << "\n";
       }
       llvm::errs() << "Done printing groups graph\n";
+
+      llvm::errs() << "Now printing loop exits\n";
+      for (Block &block : region.getBlocks()) {
+        CFGLoop *loop = li.getLoopFor(&block);
+        while (loop) {
+          SmallVector<Block *> loopExits;
+          loop->getExitBlocks(loopExits);
+          llvm::errs() << "Loop exits: " << loopExits.size() << "\n";
+          loop = loop->getParentLoop();
+        }
+      }
+      llvm::errs() << "Done printing loop exits\n";
 
       /*
 
@@ -1082,15 +1131,6 @@ CFGLoop *HandshakeLowering::getInnermostCommonLoop(Block *block1,
   return checkInnermostCommonLoop(li.getLoopFor(block1), li.getLoopFor(block2));
 }
 
-void printMemDEp(ProdConsMemDep memDep) {
-  llvm::errs() << "Memdep between: ";
-  memDep.prodBb->printAsOperand(llvm::errs());
-  llvm::errs() << " and ";
-  memDep.consBb->printAsOperand(llvm::errs());
-  llvm::errs() << " with backward ";
-  llvm::errs() << memDep.isBackward << "\n";
-}
-
 ///----------Overriding Operators for Blocks----------
 
 bool lessThanBlocks(Block *block1, Block *block2) {
@@ -1228,6 +1268,7 @@ void HandshakeLowering::minimizeGroupsConnections(std::set<Group *> &groups) {
 
     for (auto *pred : predsToRemove) {
       (*group)->preds.erase(pred);
+      pred->succs.erase(*group);
     }
   }
 }
