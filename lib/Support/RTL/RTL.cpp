@@ -21,6 +21,7 @@
 #include "llvm/Support/FileSystem.h"
 #include "llvm/Support/JSON.h"
 #include "llvm/Support/Path.h"
+#include <algorithm>
 #include <fstream>
 #include <regex>
 #include <string>
@@ -312,77 +313,8 @@ bool RTLComponent::fromJSON(const ljson::Value &value, ljson::Path path) {
     return false;
   }
 
-  // Make sure all parameter names are unique, and store name to parameter
-  // associations in the map for easy access later on
-  for (RTLParameter &param : parameters) {
-    StringRef name = param.getName();
-    if (nameToParam.contains(name)) {
-      path.field(KEY_PARAMETER).report(ERR_DUPLICATE_NAME);
-      return false;
-    }
-    nameToParam[name] = &param;
-  }
-
-  // Check that at least one concretization method was provided
-  if (generic.empty() && generator.empty()) {
-    path.report(ERR_MISSING_CONCRETIZATION);
+  if (!checkValidAndSetDefaults(path))
     return false;
-  }
-  if (!generic.empty() && !generator.empty()) {
-    path.report(ERR_MULTIPLE_CONCRETIZATION);
-    return false;
-  }
-
-  // Derive the module name if none was provided
-  if (moduleName.empty()) {
-    if (isGeneric()) {
-      // Get the filename and remove the extension
-      std::string filename = llvm::sys::path::filename(generic).str();
-      if (size_t idx = filename.find('.'); idx != std::string::npos)
-        filename = filename.substr(0, idx);
-      moduleName = filename;
-    } else {
-      // Component is generated, by default the name is the one provided during
-      // generation
-      moduleName = "$" + RTLParameter::MODULE_NAME.str();
-    }
-  }
-
-  /// Defines default signal type suffixes if they were not overriden
-  auto setDefaultSignalSuffix = [&](SignalType type, StringRef suffix) {
-    if (ioSignals.find(type) == ioSignals.end())
-      ioSignals[type] = suffix;
-  };
-  setDefaultSignalSuffix(SignalType::DATA, "");
-  setDefaultSignalSuffix(SignalType::VALID, "_valid");
-  setDefaultSignalSuffix(SignalType::READY, "_ready");
-
-  // Make sure the IO map makes sense
-  for (auto &[from, to] : ioMap) {
-    // At most one wildcard in the key
-    size_t keyNumWild = countWildcards(from);
-    if (keyNumWild > 1) {
-      path.field(KEY_IO_MAP)
-          .field(from)
-          .report("At most one wildcard is allowed in the key");
-      return false;
-    }
-
-    // At most one wildcard in the value, and no more than in the key
-    size_t valudNumWild = countWildcards(to);
-    if (valudNumWild > 1) {
-      path.field(KEY_IO_MAP)
-          .field(from)
-          .report("At most one wildcard is allowed in the value");
-      return false;
-    }
-    if (keyNumWild == 0 && valudNumWild == 1) {
-      path.field(KEY_IO_MAP)
-          .field(from)
-          .report("Value has wildcard but key does not, this is not allowed");
-      return false;
-    }
-  }
 
   // Timing models need access to the component's RTL parameters to verify
   // the sanity of constraints, so they are parsed separately and somewhat
@@ -390,36 +322,33 @@ bool RTLComponent::fromJSON(const ljson::Value &value, ljson::Path path) {
 
   // The mapper ensures that the object is valid
   const ljson::Value *jsonModelsValue = value.getAsObject()->get(KEY_MODELS);
-  ljson::Path modelsPath = path.field(KEY_MODELS);
   if (!jsonModelsValue)
     return true;
 
   const ljson::Array *jsonModelsArray = jsonModelsValue->getAsArray();
+  ljson::Path modelsPath = path.field(KEY_MODELS);
   if (!jsonModelsArray) {
     modelsPath.report(ERR_EXPECTED_ARRAY);
     return false;
   }
 
-  DenseSet<StringRef> skipped{KEY_PARAMETER};
   for (auto [modIdx, jsonModel] : llvm::enumerate(*jsonModelsArray)) {
-    Model &model = models.emplace_back();
     ljson::Path modPath = modelsPath.index(modIdx);
 
+    Model &model = models.emplace_back();
     ljson::ObjectMapper modelMapper(jsonModel, modPath);
     if (!modelMapper || !modelMapper.map(KEY_PATH, model.path))
       return false;
 
     // The mapper ensures that this object is valid
-    const ljson::Object &jsonModelObject = *value.getAsObject();
-
-    const ljson::Value *jsonConstraints = jsonModelObject.get(KEY_CONSTRAINTS);
-    ljson::Path constraintsPath = modPath.field(KEY_CONSTRAINTS);
+    auto *jsonConstraints = jsonModel.getAsObject()->get(KEY_CONSTRAINTS);
     if (!jsonConstraints) {
-      // Fallback model without constraints
+      // This model has no constraints
       continue;
     }
 
     const ljson::Array *jsonConstraintsArray = jsonConstraints->getAsArray();
+    ljson::Path constraintsPath = modPath.field(KEY_CONSTRAINTS);
     if (!jsonConstraintsArray) {
       constraintsPath.report(ERR_EXPECTED_ARRAY);
       return false;
@@ -431,22 +360,21 @@ bool RTLComponent::fromJSON(const ljson::Value &value, ljson::Path path) {
       // Retrieve the name of the parameter the constraint applies on
       ljson::ObjectMapper constMapper(jsonConst, constPath);
       std::string paramName;
-      if (!constMapper || !modelMapper.map(KEY_PARAMETER, paramName))
+      if (!constMapper || !constMapper.map(KEY_NAME, paramName))
         return false;
 
       // Add a new parameter/constraint vector pair to the model's list.
       auto &[param, constraints] = model.addConstraints.emplace_back();
 
       // Retrieve the parameter with this name, if it exists
-      param = getParameter(paramName);
-      if (!param) {
+      if (!(param = getParameter(paramName))) {
         constPath.field(KEY_NAME).report(ERR_UNKNOWN_PARAM);
         return false;
       }
 
       // The mapper ensures that this object is valid
-      const ljson::Object &object = *value.getAsObject();
-      if (constraints->fromJSON(object, path))
+      auto &constObj = *jsonConst.getAsObject();
+      if (!param->type.constraintsFromJSON(constObj, constraints, constPath))
         return false;
     }
   }
@@ -607,6 +535,79 @@ std::string RTLComponent::getRTLPortName(StringRef mlirPortName,
   if (!portNameIsIndexed(remappedName, baseName, arrayIdx))
     return remappedName + signalSuffix;
   return getIndexedName(baseName + signalSuffix, arrayIdx, hdl);
+}
+
+bool RTLComponent::checkValidAndSetDefaults(llvm::json::Path path) {
+  // Make sure all parameter names are unique, and store name to parameter
+  // associations in the map for easy access later on
+  for (RTLParameter &param : parameters) {
+    StringRef name = param.getName();
+    if (nameToParam.contains(name)) {
+      path.field(KEY_PARAMETER).report(ERR_DUPLICATE_NAME);
+      return false;
+    }
+    nameToParam[name] = &param;
+  }
+
+  // Check that at least one concretization method was provided
+  if (generic.empty() && generator.empty()) {
+    path.report(ERR_MISSING_CONCRETIZATION);
+    return false;
+  }
+  if (!generic.empty() && !generator.empty()) {
+    path.report(ERR_MULTIPLE_CONCRETIZATION);
+    return false;
+  }
+
+  // Derive the module name if none was provided
+  if (moduleName.empty()) {
+    if (isGeneric()) {
+      // Get the filename and remove the extension
+      std::string filename = llvm::sys::path::filename(generic).str();
+      if (size_t idx = filename.find('.'); idx != std::string::npos)
+        filename = filename.substr(0, idx);
+      moduleName = filename;
+    } else {
+      // Component is generated, by default the name is the one provided during
+      // generation
+      moduleName = "$" + RTLParameter::MODULE_NAME.str();
+    }
+  }
+
+  /// Defines default signal type suffixes if they were not overriden
+  auto setDefaultSignalSuffix = [&](SignalType type, StringRef suffix) {
+    if (ioSignals.find(type) == ioSignals.end())
+      ioSignals[type] = suffix;
+  };
+  setDefaultSignalSuffix(SignalType::DATA, "");
+  setDefaultSignalSuffix(SignalType::VALID, "_valid");
+  setDefaultSignalSuffix(SignalType::READY, "_ready");
+
+  // Make sure the IO map makes sense
+  return llvm::all_of(ioMap, [&](std::pair<std::string, std::string> &mapping) {
+    auto &[from, to] = mapping;
+    ljson::Path fromPath = path.field(KEY_IO_MAP).field(from);
+
+    // At most one wildcard in the key
+    size_t keyNumWild = countWildcards(from);
+    if (keyNumWild > 1) {
+      fromPath.report("At most one wildcard is allowed in the key");
+      return false;
+    }
+
+    // At most one wildcard in the value, and no more than in the key
+    size_t valudNumWild = countWildcards(to);
+    if (valudNumWild > 1) {
+      fromPath.report("At most one wildcard is allowed in the value");
+      return false;
+    }
+    if (keyNumWild == 0 && valudNumWild == 1) {
+      fromPath.report(
+          "Value has wildcard but key does not, this is not allowed");
+      return false;
+    }
+    return true;
+  });
 }
 
 inline bool ljson::fromJSON(const json::Value &value,

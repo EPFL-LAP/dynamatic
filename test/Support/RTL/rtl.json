@@ -27,5 +27,17 @@
       { "name": "PARAM_3", "type": "string", "ne": "not_my_string" }
     ],
     "generic": "/path/to/test_string"
+  },
+  {
+    "name": "test_models",
+    "parameters": [{ "name": "PARAM", "type": "unsigned" }],
+    "generic": "/path/to/test_models",
+    "models": [
+      {
+        "constraints": [{ "name": "PARAM", "range": [0, 10] }],
+        "path": "/path/to/specific/model"
+      },
+      { "path": "/path/to/fallback/model" }
+    ]
   }
 ]

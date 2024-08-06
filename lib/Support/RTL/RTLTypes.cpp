@@ -24,7 +24,7 @@ static constexpr StringLiteral KEY_TYPE("type");
 
 /// Reserved JSON keys when deserializing type constraints, should be ignored.
 static const mlir::DenseSet<StringRef> RESERVED_KEYS{"name", KEY_TYPE,
-                                                     "parameter", "generic"};
+                                                     "generic"};
 
 static constexpr StringLiteral ERR_UNKNOWN_TYPE(
     R"(unknown parameter type: options are "boolean", "unsigned", or "string")");
