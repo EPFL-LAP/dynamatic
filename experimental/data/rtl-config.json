@@ -504,8 +504,10 @@
   },
   {
     "name": "handshake.join",
+    "parameters": [{ "name": "SIZE", "type": "unsigned", "lb": 1 }],
     "generic": "$DYNAMATIC/experimental/data/vhdl/handshake/join.vhd",
-    "dependencies": ["logic"]
+    "module-name": "join_handshake",
+    "dependencies": ["join"]
   },
   {
     "name": "handshake.not",
@@ -531,6 +533,9 @@
   },
   {
     "generic": "$DYNAMATIC/experimental/data/vhdl/support/flopoco_ip_cores.vhd"
+  },
+  {
+    "generic": "$DYNAMATIC/experimental/data/vhdl/support/join.vhd"
   },
   {
     "generic": "$DYNAMATIC/experimental/data/vhdl/support/mc_support.vhd",

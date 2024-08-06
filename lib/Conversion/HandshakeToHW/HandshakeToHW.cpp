@@ -443,6 +443,10 @@ ModuleDiscriminator::ModuleDiscriminator(Operation *op)
         addUnsigned("SIZE", op->getNumOperands());
         addBitwidth("DATA_WIDTH", op->getResult(0));
       })
+      .Case<handshake::JoinOp>([&](auto) {
+        // Number of input channels
+        addUnsigned("SIZE", op->getNumOperands());
+      })
       .Case<handshake::BranchOp, handshake::SinkOp>([&](auto) {
         // Bitwidth
         addBitwidth("DATA_WIDTH", op->getOperand(0));
@@ -1821,6 +1825,7 @@ public:
                     ConvertToHWInstance<handshake::MergeOp>,
                     ConvertToHWInstance<handshake::ControlMergeOp>,
                     ConvertToHWInstance<handshake::MuxOp>,
+                    ConvertToHWInstance<handshake::JoinOp>,
                     ConvertToHWInstance<handshake::SourceOp>,
                     ConvertToHWInstance<handshake::ConstantOp>,
                     ConvertToHWInstance<handshake::SinkOp>,
