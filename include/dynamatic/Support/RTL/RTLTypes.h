@@ -154,14 +154,6 @@ struct BooleanConstraints : public RTLTypeConstraints {
 
   bool fromJSON(const llvm::json::Object &object,
                 llvm::json::Path path) override;
-
-private:
-  /// Keywords.
-  static constexpr llvm::StringLiteral EQ = "eq", NE = "ne";
-
-  /// Errors.
-  static constexpr llvm::StringLiteral ERR_UNSUPPORTED =
-      R"(unknown unsigned constraint: options are "eq" or "ne")";
 };
 
 /// An RTL parameter representing a boolean, stored in the IR as a `BoolAttr`.
@@ -193,17 +185,10 @@ struct UnsignedConstraints : public RTLTypeConstraints {
                 llvm::json::Path path) override;
 
 private:
-  /// Keywords.
-  static constexpr llvm::StringLiteral LB = "lb", UB = "ub", RANGE = "range",
-                                       EQ = "eq", NE = "ne";
-
-  /// Errors.
+  /// Deserialization errors.
   static constexpr llvm::StringLiteral
       ERR_ARRAY_FORMAT = "expected array to have [lb, ub] format",
-      ERR_LB = "lower bound already set", ERR_UB = "upper bound already set",
-      ERR_UNSUPPORTED =
-          "unknown unsigned constraint: options are \"lb\", \"ub\", "
-          "\"range\", \"eq\", or \"ne\"";
+      ERR_LB = "lower bound already set", ERR_UB = "upper bound already set";
 };
 
 /// An RTL parameter representing a positive number, stored in the IR as a
@@ -230,14 +215,6 @@ struct StringConstraints : public RTLTypeConstraints {
 
   bool fromJSON(const llvm::json::Object &object,
                 llvm::json::Path path) override;
-
-private:
-  /// Keywords.
-  static constexpr llvm::StringLiteral EQ = "eq", NE = "ne";
-
-  /// Errors.
-  static constexpr llvm::StringLiteral ERR_UNSUPPORTED =
-      R"(unknown string constraint: options are "eq" or "ne")";
 };
 
 /// An RTL parameter representing a string, stored in the IR as a `StringAttr`.

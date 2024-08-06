@@ -29,6 +29,9 @@
 
 using namespace llvm;
 using namespace dynamatic;
+using namespace dynamatic::json;
+
+namespace ljson = llvm::json;
 
 /// Recognized keys in RTL configuration files.
 static constexpr StringLiteral KEY_PARAMETERS("parameters"),
@@ -265,9 +268,8 @@ LogicalResult RTLMatch::concretize(const RTLRequest &request,
   return success();
 }
 
-bool RTLParameter::fromJSON(const llvm::json::Value &value,
-                            llvm::json::Path path) {
-  json::ObjectMapper mapper(value, path);
+bool RTLParameter::fromJSON(const ljson::Value &value, ljson::Path path) {
+  ljson::ObjectMapper mapper(value, path);
   if (!mapper || !mapper.map(KEY_NAME, name) ||
       !mapper.map(KEY_GENERIC, useAsGeneric))
     return false;
@@ -293,9 +295,8 @@ static inline size_t countWildcards(StringRef input) {
                        [](char c) { return c == '*'; });
 }
 
-bool RTLComponent::fromJSON(const llvm::json::Value &value,
-                            llvm::json::Path path) {
-  json::ObjectMapper mapper(value, path);
+bool RTLComponent::fromJSON(const ljson::Value &value, ljson::Path path) {
+  ljson::ObjectMapper mapper(value, path);
   if (!mapper || !mapper.mapOptional(KEY_NAME, name) ||
       !mapper.mapOptional(KEY_PARAMETERS, parameters) ||
       !mapper.mapOptional(KEY_GENERIC, generic) ||
@@ -388,12 +389,12 @@ bool RTLComponent::fromJSON(const llvm::json::Value &value,
   // differently
 
   // The mapper ensures that the object is valid
-  const json::Value *jsonModelsValue = value.getAsObject()->get(KEY_MODELS);
-  json::Path modelsPath = path.field(KEY_MODELS);
+  const ljson::Value *jsonModelsValue = value.getAsObject()->get(KEY_MODELS);
+  ljson::Path modelsPath = path.field(KEY_MODELS);
   if (!jsonModelsValue)
     return true;
 
-  const json::Array *jsonModelsArray = jsonModelsValue->getAsArray();
+  const ljson::Array *jsonModelsArray = jsonModelsValue->getAsArray();
   if (!jsonModelsArray) {
     modelsPath.report(ERR_EXPECTED_ARRAY);
     return false;
@@ -402,33 +403,33 @@ bool RTLComponent::fromJSON(const llvm::json::Value &value,
   DenseSet<StringRef> skipped{KEY_PARAMETER};
   for (auto [modIdx, jsonModel] : llvm::enumerate(*jsonModelsArray)) {
     Model &model = models.emplace_back();
-    json::Path modPath = modelsPath.index(modIdx);
+    ljson::Path modPath = modelsPath.index(modIdx);
 
-    json::ObjectMapper modelMapper(jsonModel, modPath);
+    ljson::ObjectMapper modelMapper(jsonModel, modPath);
     if (!modelMapper || !modelMapper.map(KEY_PATH, model.path))
       return false;
 
     // The mapper ensures that this object is valid
-    const json::Object &jsonModelObject = *value.getAsObject();
+    const ljson::Object &jsonModelObject = *value.getAsObject();
 
-    const json::Value *jsonConstraints = jsonModelObject.get(KEY_CONSTRAINTS);
-    json::Path constraintsPath = modPath.field(KEY_CONSTRAINTS);
+    const ljson::Value *jsonConstraints = jsonModelObject.get(KEY_CONSTRAINTS);
+    ljson::Path constraintsPath = modPath.field(KEY_CONSTRAINTS);
     if (!jsonConstraints) {
       // Fallback model without constraints
       continue;
     }
 
-    const json::Array *jsonConstraintsArray = jsonConstraints->getAsArray();
+    const ljson::Array *jsonConstraintsArray = jsonConstraints->getAsArray();
     if (!jsonConstraintsArray) {
       constraintsPath.report(ERR_EXPECTED_ARRAY);
       return false;
     }
 
     for (auto [constIdx, jsonConst] : llvm::enumerate(*jsonConstraintsArray)) {
-      json::Path constPath = constraintsPath.index(constIdx);
+      ljson::Path constPath = constraintsPath.index(constIdx);
 
       // Retrieve the name of the parameter the constraint applies on
-      json::ObjectMapper constMapper(jsonConst, constPath);
+      ljson::ObjectMapper constMapper(jsonConst, constPath);
       std::string paramName;
       if (!constMapper || !modelMapper.map(KEY_PARAMETER, paramName))
         return false;
@@ -444,7 +445,7 @@ bool RTLComponent::fromJSON(const llvm::json::Value &value,
       }
 
       // The mapper ensures that this object is valid
-      const json::Object &object = *value.getAsObject();
+      const ljson::Object &object = *value.getAsObject();
       if (constraints->fromJSON(object, path))
         return false;
     }
@@ -608,10 +609,9 @@ std::string RTLComponent::getRTLPortName(StringRef mlirPortName,
   return getIndexedName(baseName + signalSuffix, arrayIdx, hdl);
 }
 
-inline bool
-llvm::json::fromJSON(const json::Value &value,
-                     std::pair<std::string, std::string> &stringPair,
-                     json::Path path) {
+inline bool ljson::fromJSON(const json::Value &value,
+                            std::pair<std::string, std::string> &stringPair,
+                            json::Path path) {
   const json::Object *object = value.getAsObject();
   if (!object) {
     path.report(ERR_EXPECTED_OBJECT);
@@ -635,10 +635,10 @@ llvm::json::fromJSON(const json::Value &value,
   return true;
 }
 
-inline bool dynamatic::fromJSON(const json::Value &value,
+inline bool dynamatic::fromJSON(const ljson::Value &value,
                                 std::map<SignalType, std::string> &ioChannels,
-                                json::Path path) {
-  const json::Object *object = value.getAsObject();
+                                ljson::Path path) {
+  const ljson::Object *object = value.getAsObject();
   if (!object) {
     path.report(ERR_EXPECTED_OBJECT);
     return false;
@@ -668,8 +668,8 @@ inline bool dynamatic::fromJSON(const json::Value &value,
   return true;
 }
 
-inline bool dynamatic::fromJSON(const llvm::json::Value &value, HDL &hdl,
-                                llvm::json::Path path) {
+inline bool dynamatic::fromJSON(const ljson::Value &value, HDL &hdl,
+                                ljson::Path path) {
   std::optional<StringRef> hdlStr = value.getAsString();
   if (!hdlStr) {
     path.report(ERR_EXPECTED_STRING);
@@ -686,9 +686,8 @@ inline bool dynamatic::fromJSON(const llvm::json::Value &value, HDL &hdl,
   return true;
 }
 
-inline bool dynamatic::fromJSON(const llvm::json::Value &value,
-                                RTLComponent::IOKind &io,
-                                llvm::json::Path path) {
+inline bool dynamatic::fromJSON(const ljson::Value &value,
+                                RTLComponent::IOKind &io, ljson::Path path) {
   std::optional<StringRef> hdlStr = value.getAsString();
   if (!hdlStr) {
     path.report(ERR_EXPECTED_STRING);
@@ -721,17 +720,17 @@ LogicalResult RTLConfiguration::addComponentsFromJSON(StringRef filepath) {
     jsonString += line;
 
   // Try to parse the string as a JSON
-  llvm::Expected<json::Value> value = json::parse(jsonString);
+  llvm::Expected<ljson::Value> value = ljson::parse(jsonString);
   if (!value) {
     llvm::errs() << "Failed to parse RTL configuration file @ \"" << filepath
                  << "\" as JSON.\n-> " << toString(value.takeError()) << "\n";
     return failure();
   }
 
-  json::Path::Root jsonRoot(filepath);
-  json::Path jsonPath(jsonRoot);
+  ljson::Path::Root jsonRoot(filepath);
+  ljson::Path jsonPath(jsonRoot);
 
-  json::Array *jsonComponents = value->getAsArray();
+  ljson::Array *jsonComponents = value->getAsArray();
   if (!jsonComponents) {
     jsonPath.report(ERR_EXPECTED_ARRAY);
     jsonRoot.printErrorContext(*value, llvm::errs());
