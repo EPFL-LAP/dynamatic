@@ -184,5 +184,4 @@ exit_on_fail "Failed to lower to HW" "Lowered to HW"
 
 # Export to DOT (one clean for viewing and one compatible with legacy)
 export_dot "visual" "visual"
-export_dot "legacy" "$KERNEL_NAME"
 echo_info "Compilation succeeded"
