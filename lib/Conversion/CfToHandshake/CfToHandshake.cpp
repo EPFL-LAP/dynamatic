@@ -49,7 +49,6 @@
 #include "llvm/ADT/SmallVector.h"
 #include "llvm/ADT/StringRef.h"
 #include "llvm/ADT/TypeSwitch.h"
-#include "llvm/Support/Casting.h"
 #include "llvm/Support/raw_ostream.h"
 #include <cstdlib>
 #include <iterator>
@@ -1165,6 +1164,35 @@ bool greaterThanBlocks(Block *block1, Block *block2) {
   return id1 > id2;
 }
 
+void dfsAllPaths(Block *start, Block *end, std::vector<Block *> &path,
+                 std::unordered_set<Block *> &visited,
+                 std::vector<std::vector<Block *>> &allPaths) {
+  path.push_back(start);
+  visited.insert(start);
+
+  if (start == end) {
+    allPaths.push_back(path);
+  } else {
+    for (Block *successor : start->getSuccessors()) {
+      if (visited.find(successor) == visited.end()) {
+        dfsAllPaths(successor, end, path, visited, allPaths);
+      }
+    }
+  }
+
+  path.pop_back();
+  visited.erase(start);
+}
+
+// Gets all the paths from a start block to and end block
+std::vector<std::vector<Block *>> findAllPaths(Block *start, Block *end) {
+  std::vector<std::vector<Block *>> allPaths;
+  std::vector<Block *> path;
+  std::unordered_set<Block *> visited;
+  dfsAllPaths(start, end, path, visited, allPaths);
+  return allPaths;
+}
+
 // Two types of hazards between the predecessors of one LSQ node:
 // (1) WAW between 2 Store operations,
 // (2) RAW and WAR between Load and Store operations
@@ -1181,9 +1209,12 @@ void HandshakeLowering::identifyMemDeps(
     for (Operation *j : operations) {
       // j: loop over every other predecessor of the lsq_enode.. Skip (1)
       // those that are not memory operations, (2) those in the same BB as
-      // the one currently in hand, (3) both preds are load if(BB_i > BB_j)
+      // the one currently in hand, (3) both preds are load if(BB_i > BB_j), (4)
+      // those that are mutually exclusive
 
-      if (!checkMemOp(j) || checkSameBB(i, j) || checkBothLd(i, j))
+      if (!checkMemOp(j) || checkSameBB(i, j) || checkBothLd(i, j) ||
+          (findAllPaths(i->getBlock(), j->getBlock()).empty() &&
+           findAllPaths(j->getBlock(), i->getBlock()).empty()))
         continue;
 
       // Comparing BB_i and BB_j
@@ -1308,35 +1339,6 @@ void traversePostDomTreeUtil(
   // remove this node from path and mark it as unvisited
   pathIndex--;
   isVisited[startNode] = false;
-}
-
-void dfsAllPaths(Block *start, Block *end, std::vector<Block *> &path,
-                 std::unordered_set<Block *> &visited,
-                 std::vector<std::vector<Block *>> &allPaths) {
-  path.push_back(start);
-  visited.insert(start);
-
-  if (start == end) {
-    allPaths.push_back(path);
-  } else {
-    for (Block *successor : start->getSuccessors()) {
-      if (visited.find(successor) == visited.end()) {
-        dfsAllPaths(successor, end, path, visited, allPaths);
-      }
-    }
-  }
-
-  path.pop_back();
-  visited.erase(start);
-}
-
-// Gets all the paths from a start block to and end block
-std::vector<std::vector<Block *>> findAllPaths(Block *start, Block *end) {
-  std::vector<std::vector<Block *>> allPaths;
-  std::vector<Block *> path;
-  std::unordered_set<Block *> visited;
-  dfsAllPaths(start, end, path, visited, allPaths);
-  return allPaths;
 }
 
 // Gets the condition name of a block (^bb0 -> c0)
@@ -1483,18 +1485,21 @@ LogicalResult HandshakeLowering::addMergeNonLoop(
                            ->getOperations()
                            .front()
                            .getLoc();
+
         if (memDep.isBackward) {
           builder.setInsertionPointToStart(
               getPostDominantSuccessor(prod, cons));
         } else {
           builder.setInsertionPointToStart(cons);
           loc = forksGraph[cons]->getLoc();
+          llvm::errs() << "Merge added in consumer\n";
         }
 
         SmallVector<Value> mergeOperands;
         mergeOperands.push_back(startCtrl);
         mergeOperands.push_back(forksGraph[prod]->getResult(0));
         auto mergeOp = builder.create<handshake::MergeOp>(loc, mergeOperands);
+        llvm::errs() << "Added merge in addMergeNonLoop\n";
         alloctionNetwork.push_back(mergeOp);
 
         /// The merge becomes the producer now, so connect the result of the
@@ -2111,7 +2116,9 @@ HandshakeLowering::convertMergesToMuxes(ConversionPatternRewriter &rewriter) {
 
           llvm::errs() << "Select inputs: "
                        << select.getDefiningOp()->getOperands().size() << "\n";
-          llvm::errs() << "Merge inputs: " << merge.getOperands().size()
+          llvm::errs() << "Select in block: ";
+          select.getParentBlock()->printAsOperand(llvm::errs());
+          llvm::errs() << "\nMerge inputs: " << merge.getOperands().size()
                        << "\n";
 
           /// The set-src integration-test/kernel_2mm/kernel_2mm.cfirst input of

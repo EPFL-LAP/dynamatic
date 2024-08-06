@@ -402,7 +402,6 @@ LogicalResult MemoryInterfaceBuilder::determineInterfaceInputsWithForks(
       predecessors.push_back(forksGraph[pred->bb]->getResult(0));
     Operation *forkNode = forksGraph[group->bb];
 
-    // added
     if (predecessors.size() > 0)
       forkNode->setOperands(predecessors);
   }
