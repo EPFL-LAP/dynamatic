@@ -464,6 +464,11 @@ private:
   /// false.
   bool portNameIsIndexed(StringRef portName, StringRef &baseName,
                          size_t &arrayIdx) const;
+
+  /// After all top-level JSON entries of the component have been deserialized,
+  /// check that they are valid and set default values for some members. Returns
+  /// false when the JSON description of the component is invalid.
+  bool checkValidAndSetDefaults(llvm::json::Path path);
 };
 
 /// ADL-findable LLVM-standard JSON deserializer for a signal type to string
