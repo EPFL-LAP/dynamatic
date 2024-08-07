@@ -29,6 +29,22 @@
     "generic": "/path/to/test_string"
   },
   {
+    "name": "test_channels",
+    "parameters": [
+      { "name": "PARAM_1", "type": "channel" },
+      {
+        "name": "PARAM_2",
+        "type": "channel",
+        "data-ne": 4,
+        "data-range": [0, 10]
+      },
+      { "name": "PARAM_3", "type": "channel", "extra-eq": 0 },
+      { "name": "PARAM_4", "type": "channel", "down-lb": 1 },
+      { "name": "PARAM_5", "type": "channel", "up-ub": 1 }
+    ],
+    "generic": "/path/to/test_channels"
+  },
+  {
     "name": "test_models",
     "parameters": [{ "name": "PARAM", "type": "unsigned" }],
     "generic": "/path/to/test_models",

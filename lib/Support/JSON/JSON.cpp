@@ -15,6 +15,7 @@
 #include "mlir/IR/BuiltinAttributes.h"
 #include "mlir/IR/Diagnostics.h"
 #include "mlir/IR/Location.h"
+#include "llvm/ADT/STLExtras.h"
 #include "llvm/ADT/TypeSwitch.h"
 
 using namespace mlir;
@@ -192,15 +193,16 @@ ObjectDeserializer::ObjectDeserializer(const llvm::json::Object &obj,
                                        llvm::json::Path path)
     : obj(&obj), path(path) {}
 
-ObjectDeserializer &ObjectDeserializer::map(StringRef key, const MapFn &fn) {
+ObjectDeserializer &ObjectDeserializer::map(const Twine &key, const MapFn &fn) {
   if (!mapValid || !obj)
     return *this;
-  if (const llvm::json::Value *val = obj->get(key)) {
-    if (auto [_, newKey] = mappedKeys.insert(key); !newKey) {
-      path.field(key).report(ERR_DUP_KEY);
+  std::string keyStr = key.str();
+  if (const llvm::json::Value *val = obj->get(keyStr)) {
+    if (auto [_, newKey] = mappedKeys.insert(keyStr); !newKey) {
+      path.field(keyStr).report(ERR_DUP_KEY);
       mapValid = false;
     } else {
-      mapValid = fn(*val, path.field(key));
+      mapValid = fn(*val, path.field(keyStr));
     }
     return *this;
   }
@@ -208,17 +210,18 @@ ObjectDeserializer &ObjectDeserializer::map(StringRef key, const MapFn &fn) {
   return *this;
 }
 
-ObjectDeserializer &ObjectDeserializer::mapOptional(StringRef key,
+ObjectDeserializer &ObjectDeserializer::mapOptional(const Twine &key,
                                                     const MapFn &fn) {
   if (!mapValid || !obj)
     return *this;
-  if (const llvm::json::Value *val = obj->get(key)) {
-    if (auto [_, newKey] = mappedKeys.insert(key); !newKey) {
-      path.field(key).report(ERR_DUP_KEY);
+  std::string keyStr = key.str();
+  if (const llvm::json::Value *val = obj->get(keyStr)) {
+    if (auto [_, newKey] = mappedKeys.insert(keyStr); !newKey) {
+      path.field(keyStr).report(ERR_DUP_KEY);
       mapValid = false;
       return *this;
     }
-    mapValid = fn(*val, path.field(key));
+    mapValid = fn(*val, path.field(keyStr));
   }
   return *this;
 }
@@ -228,7 +231,8 @@ bool ObjectDeserializer::exhausted(const DenseSet<StringRef> &allowUnmapped) {
     return false;
   return llvm::all_of(*obj, [&](auto &keyAndVal) {
     std::string key = keyAndVal.first.str();
-    if (mappedKeys.contains(key) || allowUnmapped.contains(key))
+    if ((mappedKeys.find(key) != mappedKeys.end()) ||
+        allowUnmapped.contains(key))
       return true;
     path.field(key).report("unmapped key in object");
     return false;

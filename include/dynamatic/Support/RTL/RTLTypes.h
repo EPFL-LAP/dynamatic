@@ -10,6 +10,7 @@
 //
 //===----------------------------------------------------------------------===//
 
+#include "dynamatic/Support/JSON/JSON.h"
 #include "dynamatic/Support/LLVM.h"
 #include "mlir/IR/Attributes.h"
 #include "llvm/Support/JSON.h"
@@ -60,6 +61,15 @@ struct UnsignedConstraints : public RTLTypeConstraints {
   std::optional<unsigned> ne;
 
   bool verify(mlir::Attribute attr) const override;
+
+  /// Attempts to deserialize the unsigned constraints using the provided
+  /// deserializer. Exepcted key names are prefixed using the provided string.
+  /// The method does not check for the deserializer's validity.
+  json::ObjectDeserializer &deserialize(json::ObjectDeserializer &deserial,
+                                        StringRef keyPrefix = {});
+
+  /// Checks whether that the unsigned value honors the constraints.
+  bool verify(unsigned value) const;
 };
 
 /// ADL-findable LLVM-standard JSON deserializer for unsigned constraints.
@@ -78,6 +88,24 @@ struct StringConstraints : public RTLTypeConstraints {
 
 /// ADL-findable LLVM-standard JSON deserializer for string constraints.
 bool fromJSON(const llvm::json::Value &value, StringConstraints &cons,
+              llvm::json::Path path);
+
+/// Channel type constraints.
+struct ChannelConstraints : public RTLTypeConstraints {
+  /// Constraints on the data signal's width.
+  UnsignedConstraints dataWidth;
+  /// Constraints on the total number of extra signals.
+  UnsignedConstraints numExtras;
+  /// Constraints on the number of extra downstream signals.
+  UnsignedConstraints numDownstreams;
+  /// Constraints on the number of extra upstream signals.
+  UnsignedConstraints numUpstreams;
+
+  bool verify(mlir::Attribute attr) const override;
+};
+
+/// ADL-findable LLVM-standard JSON deserializer for channel constraints.
+bool fromJSON(const llvm::json::Value &value, ChannelConstraints &cons,
               llvm::json::Path path);
 
 //===----------------------------------------------------------------------===//
@@ -208,6 +236,15 @@ struct RTLUnsignedType
 /// An RTL parameter representing a string, stored in the IR as a `StringAttr`.
 struct RTLStringType : public RTLType::Model<RTLStringType, StringConstraints> {
   static constexpr llvm::StringLiteral ID = "string";
+
+  static std::string serialize(mlir::Attribute attr);
+};
+
+/// An RTL parameter representing a channel type, stored in the IR as a
+/// `TypeAttr`.
+struct RTLChannelType
+    : public RTLType::Model<RTLChannelType, ChannelConstraints> {
+  static constexpr llvm::StringLiteral ID = "channel";
 
   static std::string serialize(mlir::Attribute attr);
 };

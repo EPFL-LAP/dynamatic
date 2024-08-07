@@ -11,6 +11,7 @@
 //===----------------------------------------------------------------------===//
 
 #include "dynamatic/Support/RTL/RTLTypes.h"
+#include "dynamatic/Dialect/Handshake/HandshakeTypes.h"
 #include "dynamatic/Support/JSON/JSON.h"
 #include "mlir/IR/BuiltinAttributes.h"
 
@@ -27,7 +28,7 @@ static const mlir::DenseSet<StringRef> RESERVED_KEYS{"name", KEY_TYPE,
                                                      "generic"};
 
 static constexpr StringLiteral ERR_UNKNOWN_TYPE(
-    R"(unknown parameter type: options are "boolean", "unsigned", or "string")");
+    R"(unknown parameter type: options are "boolean", "unsigned", "string", or "channel")");
 
 bool RTLType::fromJSON(const ljson::Value &value, ljson::Path path) {
   if (typeConcept)
@@ -39,7 +40,8 @@ bool RTLType::fromJSON(const ljson::Value &value, ljson::Path path) {
     path.field(KEY_TYPE).report(ERR_MISSING_VALUE);
     return false;
   }
-  if (!allocIf<RTLBooleanType, RTLUnsignedType, RTLStringType>(paramType)) {
+  if (!allocIf<RTLBooleanType, RTLUnsignedType, RTLStringType, RTLChannelType>(
+          paramType)) {
     path.field(KEY_TYPE).report(ERR_UNKNOWN_TYPE);
     return false;
   }
@@ -76,9 +78,10 @@ bool UnsignedConstraints::verify(Attribute attr) const {
   IntegerAttr intAttr = dyn_cast_if_present<IntegerAttr>(attr);
   if (!intAttr || !intAttr.getType().isUnsignedInteger())
     return false;
+  return verify(intAttr.getUInt());
+}
 
-  // Check all constraints
-  unsigned value = intAttr.getUInt();
+bool UnsignedConstraints::verify(unsigned value) const {
   return (!lb || lb <= value) && (!ub || value <= ub) && (!eq || value == eq) &&
          (!ne || value != ne);
 }
@@ -88,50 +91,56 @@ static constexpr llvm::StringLiteral
     ERR_ARRAY_FORMAT = "expected array to have [lb, ub] format",
     ERR_LB = "lower bound already set", ERR_UB = "upper bound already set";
 
-bool dynamatic::fromJSON(const ljson::Value &value, UnsignedConstraints &cons,
-                         ljson::Path path) {
+json::ObjectDeserializer &
+UnsignedConstraints::deserialize(json::ObjectDeserializer &deserial,
+                                 StringRef keyPrefix) {
   auto boundFromJSON = [&](StringLiteral err, const ljson::Value &value,
                            std::optional<unsigned> &bound,
                            ljson::Path keyPath) -> bool {
     if (bound) {
       // The bound may be set by the "range" key or the dedicated bound key,
       // make sure there is no conflict
-      path.report(err);
+      keyPath.report(err);
       return false;
     }
     return ljson::fromJSON(value, bound, keyPath);
   };
 
-  return ObjectDeserializer(value, path)
-      .map("eq", cons.eq)
-      .map("ne", cons.ne)
-      .mapOptional("lb",
+  deserial.map(keyPrefix + "eq", eq)
+      .map(keyPrefix + "ne", ne)
+      .mapOptional(keyPrefix + "lb",
                    [&](auto &val, auto path) {
-                     return boundFromJSON(ERR_LB, val, cons.lb, path);
+                     return boundFromJSON(ERR_LB, val, lb, path);
                    })
-      .mapOptional("ub",
+      .mapOptional(keyPrefix + "ub",
                    [&](auto &val, auto path) {
-                     return boundFromJSON(ERR_UB, val, cons.ub, path);
+                     return boundFromJSON(ERR_UB, val, ub, path);
                    })
-      .mapOptional("range",
-                   [&](auto &val, auto path) {
-                     const ljson::Array *array = val.getAsArray();
-                     if (!array) {
-                       path.report(ERR_EXPECTED_ARRAY);
-                       return false;
-                     }
-                     if (array->size() != 2) {
-                       path.report(ERR_ARRAY_FORMAT);
-                       return false;
-                     }
-                     return boundFromJSON(ERR_LB, (*array)[0], cons.lb, path) &&
-                            boundFromJSON(ERR_UB, (*array)[1], cons.ub, path);
-                   })
-      .exhausted(RESERVED_KEYS);
+      .mapOptional(keyPrefix + "range", [&](auto &val, auto path) {
+        const ljson::Array *array = val.getAsArray();
+        if (!array) {
+          path.report(ERR_EXPECTED_ARRAY);
+          return false;
+        }
+        if (array->size() != 2) {
+          path.report(ERR_ARRAY_FORMAT);
+          return false;
+        }
+        return boundFromJSON(ERR_LB, (*array)[0], lb, path) &&
+               boundFromJSON(ERR_UB, (*array)[1], ub, path);
+      });
+
+  return deserial;
+}
+
+bool dynamatic::fromJSON(const ljson::Value &value, UnsignedConstraints &cons,
+                         ljson::Path path) {
+  ObjectDeserializer deserial(value, path);
+  return cons.deserialize(deserial).exhausted(RESERVED_KEYS);
 }
 
 std::string RTLUnsignedType::serialize(Attribute attr) {
-  IntegerAttr intAttr = dyn_cast_if_present<IntegerAttr>(attr);
+  auto intAttr = dyn_cast_if_present<IntegerAttr>(attr);
   if (!intAttr)
     return "";
   return std::to_string(intAttr.getUInt());
@@ -153,8 +162,45 @@ bool dynamatic::fromJSON(const ljson::Value &value, StringConstraints &cons,
 }
 
 std::string RTLStringType::serialize(Attribute attr) {
-  StringAttr stringAttr = dyn_cast_if_present<StringAttr>(attr);
+  auto stringAttr = dyn_cast_if_present<StringAttr>(attr);
   if (!stringAttr)
     return "";
   return stringAttr.str();
+}
+
+bool ChannelConstraints::verify(Attribute attr) const {
+  auto typeAttr = dyn_cast_if_present<TypeAttr>(attr);
+  if (!typeAttr)
+    return false;
+  auto channelType = dyn_cast<handshake::ChannelType>(typeAttr.getValue());
+  if (!channelType)
+    return false;
+
+  return dataWidth.verify(channelType.getDataBitWidth());
+}
+
+bool dynamatic::fromJSON(const ljson::Value &value, ChannelConstraints &cons,
+                         ljson::Path path) {
+  ObjectDeserializer deserial(value, path);
+  cons.dataWidth.deserialize(deserial, "data-");
+  cons.numExtras.deserialize(deserial, "extra-");
+  cons.numDownstreams.deserialize(deserial, "down-");
+  cons.numUpstreams.deserialize(deserial, "up-");
+  return deserial.exhausted(RESERVED_KEYS);
+}
+
+std::string RTLChannelType::serialize(Attribute attr) {
+  auto typeAttr = dyn_cast_if_present<TypeAttr>(attr);
+  if (!typeAttr)
+    return "";
+  auto channelType = dyn_cast<handshake::ChannelType>(typeAttr.getValue());
+  if (!channelType)
+    return "";
+
+  // Convert the channel type to a string
+  std::stringstream ss;
+  ss << channelType.getDataBitWidth();
+  for (const handshake::ExtraSignal &extra : channelType.getExtraSignals())
+    ss << "-" << extra.name.str() << "-" << extra.getBitWidth();
+  return ss.str();
 }
