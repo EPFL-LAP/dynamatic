@@ -17,6 +17,7 @@
 #include "dynamatic/Support/LLVM.h"
 #include "llvm/ADT/DenseSet.h"
 #include "llvm/Support/JSON.h"
+#include <set>
 
 namespace llvm {
 namespace json {
@@ -85,15 +86,16 @@ public:
   /// receiver object to allow chaining. A missing key is considered a mapping
   /// failure.
   template <typename T>
-  ObjectDeserializer &map(StringRef key, T &out) {
+  ObjectDeserializer &map(const llvm::Twine &key, T &out) {
     if (!mapValid || !obj)
       return *this;
-    if (const llvm::json::Value *val = obj->get(key)) {
-      if (auto [_, newKey] = mappedKeys.insert(key); !newKey) {
-        path.field(key).report(ERR_DUP_KEY);
+    std::string keyStr = key.str();
+    if (const llvm::json::Value *val = obj->get(keyStr)) {
+      if (auto [_, newKey] = mappedKeys.insert(keyStr); !newKey) {
+        path.field(keyStr).report(ERR_DUP_KEY);
         mapValid = false;
       } else {
-        mapValid = fromJSON(*val, out, path.field(key));
+        mapValid = fromJSON(*val, out, path.field(keyStr));
       }
       return *this;
     }
@@ -106,7 +108,7 @@ public:
   /// receiver object to allow chaining. A missing key is *not* considered a
   /// mapping failure.
   template <typename T>
-  ObjectDeserializer &map(StringRef key, std::optional<T> &out) {
+  ObjectDeserializer &map(const llvm::Twine &key, std::optional<T> &out) {
     return mapOptional(key, out);
   }
 
@@ -115,16 +117,17 @@ public:
   /// receiver object to allow chaining. A missing key is *not* considered a
   /// mapping failure.
   template <typename T>
-  ObjectDeserializer &mapOptional(StringRef key, T &out) {
+  ObjectDeserializer &mapOptional(const llvm::Twine &key, T &out) {
     if (!mapValid || !obj)
       return *this;
-    if (const llvm::json::Value *val = obj->get(key)) {
-      if (auto [_, newKey] = mappedKeys.insert(key); !newKey) {
-        path.field(key).report(ERR_DUP_KEY);
+    std::string keyStr = key.str();
+    if (const llvm::json::Value *val = obj->get(keyStr)) {
+      if (auto [_, newKey] = mappedKeys.insert(keyStr); !newKey) {
+        path.field(keyStr).report(ERR_DUP_KEY);
         mapValid = false;
         return *this;
       }
-      mapValid = fromJSON(*val, out, path.field(key));
+      mapValid = fromJSON(*val, out, path.field(keyStr));
     }
     return *this;
   }
@@ -132,12 +135,12 @@ public:
   /// If the key exists, invoke the callback with its value and updated path.
   /// Returns the receiver object to allow chaining. A missing key is
   /// considered a mapping failure.
-  ObjectDeserializer &map(StringRef key, const MapFn &fn);
+  ObjectDeserializer &map(const llvm::Twine &key, const MapFn &fn);
 
   /// If the key exists, invoke the callback with its value and updated path.
   /// Returns the receiver object to allow chaining. A missing key is *not*
   /// considered a mapping failure.
-  ObjectDeserializer &mapOptional(StringRef key, const MapFn &fn);
+  ObjectDeserializer &mapOptional(const llvm::Twine &key, const MapFn &fn);
 
   /// Terminates a sequence of mappings. Returns true if all mappings succeeded
   /// and if all keys in the object were mapped (excluding those present in the
@@ -154,7 +157,7 @@ private:
   llvm::json::Path path;
 
   /// The set of keys that have already been mapped.
-  llvm::DenseSet<StringRef> mappedKeys;
+  std::set<std::string> mappedKeys;
   /// Whether all mappings so far were successful. If `map` is invoked and this
   /// is false then the method will not even look for the key in the object.
   bool mapValid = true;
