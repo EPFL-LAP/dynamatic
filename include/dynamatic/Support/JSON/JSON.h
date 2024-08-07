@@ -50,8 +50,8 @@ LogicalResult serializeToJSON(Attribute attr, StringRef filepath, Location loc);
 
 /// Helper for deserializing JSON objects into arbitrary data. Similar to
 /// `llvm::json::ObjectMapper` in purpose but
-/// 1. all keys are considered optional,
-/// 2. keys can be associated to a callback instead of a reference to a value,
+/// 1. keys can be associated to a callback instead of a reference to a value,
+/// 2. all mapping functions return the objet itself to allow call chaining,
 /// 3. the mapper tracks which objet keys have been read throuhgout the object's
 /// lifetime, and can detect whether all keys have been mapped.
 ///
@@ -67,31 +67,58 @@ LogicalResult serializeToJSON(Attribute attr, StringRef filepath, Location loc);
 ///         .exhaustedObject();
 ///   }
 /// \endcode
-class OptionalObjectMapper {
+class ObjectDeserializer {
   using MapFn =
       std::function<bool(const llvm::json::Value &, llvm::json::Path)>;
 
 public:
-  /// Creates the mapper from a JSON object and the current path. A set of
-  /// potential object keys can be delcared "ignored" (they will be considered
-  /// as "already mapped", even if they do not exist).
-  OptionalObjectMapper(const llvm::json::Object &obj, llvm::json::Path path,
-                       const llvm::DenseSet<StringRef> &ignoredKeys = {});
+  /// Creates the mapper from a JSON value which must be convertible to a JSON
+  /// object and the current path. If the value is not an object, any call to a
+  /// method terminating a sequence of mapping will return false.
+  ObjectDeserializer(const llvm::json::Value &val, llvm::json::Path path);
 
-  /// If the key exists, invoke the callback with its value and updated path.
-  /// Returns the receiver object to allow chaining. A missing key is not
-  /// considered a mapping failure.
-  OptionalObjectMapper &map(StringRef key, const MapFn &fn);
+  /// Creates the mapper from a JSON object and the current path.
+  ObjectDeserializer(const llvm::json::Object &obj, llvm::json::Path path);
 
   /// If the key exists, attempts to deserialize it into a value of a given type
   /// by looking for a matching standard `fromJSON` function. Returns the
-  /// receiver object to allow chaining. A missing key is not considered a
+  /// receiver object to allow chaining. A missing key is considered a mapping
+  /// failure.
+  template <typename T>
+  ObjectDeserializer &map(StringRef key, T &out) {
+    if (!mapValid || !obj)
+      return *this;
+    if (const llvm::json::Value *val = obj->get(key)) {
+      if (auto [_, newKey] = mappedKeys.insert(key); !newKey) {
+        path.field(key).report(ERR_DUP_KEY);
+        mapValid = false;
+      } else {
+        mapValid = fromJSON(*val, out, path.field(key));
+      }
+      return *this;
+    }
+    mapValid = false;
+    return *this;
+  }
+
+  /// If the key exists, attempts to deserialize it into a value of a given type
+  /// by looking for a matching standard `fromJSON` function. Returns the
+  /// receiver object to allow chaining. A missing key is *not* considered a
   /// mapping failure.
   template <typename T>
-  OptionalObjectMapper &map(StringRef key, T &out) {
-    if (!mapValid)
+  ObjectDeserializer &map(StringRef key, std::optional<T> &out) {
+    return mapOptional(key, out);
+  }
+
+  /// If the key exists, attempts to deserialize it into a value of a given type
+  /// by looking for a matching standard `fromJSON` function. Returns the
+  /// receiver object to allow chaining. A missing key is *not* considered a
+  /// mapping failure.
+  template <typename T>
+  ObjectDeserializer &mapOptional(StringRef key, T &out) {
+    if (!mapValid || !obj)
       return *this;
-    if (const llvm::json::Value *val = obj.get(key)) {
+    if (const llvm::json::Value *val = obj->get(key)) {
       if (auto [_, newKey] = mappedKeys.insert(key); !newKey) {
         path.field(key).report(ERR_DUP_KEY);
         mapValid = false;
@@ -102,16 +129,27 @@ public:
     return *this;
   }
 
+  /// If the key exists, invoke the callback with its value and updated path.
+  /// Returns the receiver object to allow chaining. A missing key is
+  /// considered a mapping failure.
+  ObjectDeserializer &map(StringRef key, const MapFn &fn);
+
+  /// If the key exists, invoke the callback with its value and updated path.
+  /// Returns the receiver object to allow chaining. A missing key is *not*
+  /// considered a mapping failure.
+  ObjectDeserializer &mapOptional(StringRef key, const MapFn &fn);
+
   /// Terminates a sequence of mappings. Returns true if all mappings succeeded
-  /// and if all keys in the object were mapped; returns false otherwise.
-  bool exhausted();
+  /// and if all keys in the object were mapped (excluding those present in the
+  /// allowede set); returns false otherwise.
+  bool exhausted(const llvm::DenseSet<StringRef> &allowUnmapped = {});
 
   /// Terminates a sequence of mappings. Returns whether all mappings succeeded.
-  bool valid() { return mapValid; }
+  bool valid() { return mapValid && obj; }
 
 private:
   /// The JSON object to map on.
-  const llvm::json::Object &obj;
+  const llvm::json::Object *obj;
   /// The JSON object's path.
   llvm::json::Path path;
 
