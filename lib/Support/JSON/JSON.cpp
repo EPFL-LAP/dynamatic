@@ -181,28 +181,38 @@ LogicalResult dynamatic::json::serializeToJSON(Attribute attr,
   return serializer.serializeAttr(attr);
 }
 
-OptionalObjectMapper::OptionalObjectMapper(
-    const llvm::json::Object &obj, llvm::json::Path path,
-    const llvm::DenseSet<StringRef> &ignoredKeys)
-    : obj(obj), path(path), mappedKeys(ignoredKeys) {}
-
-bool OptionalObjectMapper::exhausted() {
-  if (!mapValid)
-    return false;
-  return llvm::all_of(obj, [&](auto &keyAndVal) {
-    std::string key = keyAndVal.first.str();
-    if (mappedKeys.contains(key))
-      return true;
-    path.field(key).report("unknown key in object");
-    return false;
-  });
+ObjectDeserializer::ObjectDeserializer(const llvm::json::Value &val,
+                                       llvm::json::Path path)
+    : obj(val.getAsObject()), path(path) {
+  if (!obj)
+    path.report(ERR_EXPECTED_OBJECT);
 }
 
-OptionalObjectMapper &OptionalObjectMapper::map(StringRef key,
-                                                const MapFn &fn) {
-  if (!mapValid)
+ObjectDeserializer::ObjectDeserializer(const llvm::json::Object &obj,
+                                       llvm::json::Path path)
+    : obj(&obj), path(path) {}
+
+ObjectDeserializer &ObjectDeserializer::map(StringRef key, const MapFn &fn) {
+  if (!mapValid || !obj)
     return *this;
-  if (const llvm::json::Value *val = obj.get(key)) {
+  if (const llvm::json::Value *val = obj->get(key)) {
+    if (auto [_, newKey] = mappedKeys.insert(key); !newKey) {
+      path.field(key).report(ERR_DUP_KEY);
+      mapValid = false;
+    } else {
+      mapValid = fn(*val, path.field(key));
+    }
+    return *this;
+  }
+  mapValid = false;
+  return *this;
+}
+
+ObjectDeserializer &ObjectDeserializer::mapOptional(StringRef key,
+                                                    const MapFn &fn) {
+  if (!mapValid || !obj)
+    return *this;
+  if (const llvm::json::Value *val = obj->get(key)) {
     if (auto [_, newKey] = mappedKeys.insert(key); !newKey) {
       path.field(key).report(ERR_DUP_KEY);
       mapValid = false;
@@ -211,4 +221,16 @@ OptionalObjectMapper &OptionalObjectMapper::map(StringRef key,
     mapValid = fn(*val, path.field(key));
   }
   return *this;
+}
+
+bool ObjectDeserializer::exhausted(const DenseSet<StringRef> &allowUnmapped) {
+  if (!mapValid || !obj)
+    return false;
+  return llvm::all_of(*obj, [&](auto &keyAndVal) {
+    std::string key = keyAndVal.first.str();
+    if (mappedKeys.contains(key) || allowUnmapped.contains(key))
+      return true;
+    path.field(key).report("unmapped key in object");
+    return false;
+  });
 }

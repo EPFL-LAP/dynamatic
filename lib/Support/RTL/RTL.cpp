@@ -280,8 +280,7 @@ bool RTLParameter::fromJSON(const ljson::Value &value, ljson::Path path) {
     return false;
   }
 
-  // The mapper ensures that the value is actually an object
-  return type.fromJSON(*value.getAsObject(), path);
+  return type.fromJSON(value, path);
 }
 
 RTLComponent::Model::~Model() {
@@ -372,9 +371,7 @@ bool RTLComponent::fromJSON(const ljson::Value &value, ljson::Path path) {
         return false;
       }
 
-      // The mapper ensures that this object is valid
-      auto &constObj = *jsonConst.getAsObject();
-      if (!param->type.constraintsFromJSON(constObj, constraints, constPath))
+      if (!param->type.constraintsFromJSON(jsonConst, constraints, constPath))
         return false;
     }
   }
