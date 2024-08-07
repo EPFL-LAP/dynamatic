@@ -711,69 +711,51 @@ LogicalResult HandshakeLowering::verifyAndCreateMemInterfaces(
       std::vector<ProdConsMemDep> allMemDeps;
       identifyMemDeps(allOperations, allMemDeps);
 
-      llvm::errs() << "Printing memDeps:\n";
-      for (ProdConsMemDep memDep : allMemDeps) {
-        printMemDep(memDep);
-      }
-      llvm::errs() << "Done printing memDeps:\n";
+      /*
+            llvm::errs() << "Printing memDeps:\n";
+            for (ProdConsMemDep memDep : allMemDeps) {
+              printMemDep(memDep);
+            }
+            llvm::errs() << "Done printing memDeps:\n";*/
 
       /// Stores the Groups graph required for the allocation network analysis
       std::set<Group *> groups;
       constructGroupsGraph(allOperations, allMemDeps, groups);
 
-      llvm::errs() << "Now printing groups graph before minimization\n";
-      for (Group *group : groups) {
-        llvm::errs() << "Group ";
-        group->bb->printAsOperand(llvm::errs());
-        llvm::errs() << "\n";
-        llvm::errs() << "Preds: ";
-        for (Group *pred : group->preds) {
-          pred->bb->printAsOperand(llvm::errs());
-          llvm::errs() << ", ";
-        }
-        llvm::errs() << "\n";
-        llvm::errs() << "Succs: ";
-        for (Group *succ : group->succs) {
-          succ->bb->printAsOperand(llvm::errs());
-          llvm::errs() << ", ";
-        }
-        llvm::errs() << "\n";
-      }
-      llvm::errs() << "Done printing groups graph\n";
-
       minimizeGroupsConnections(groups);
 
-      llvm::errs() << "Now printing groups graph\n";
-      for (Group *group : groups) {
-        llvm::errs() << "Group ";
-        group->bb->printAsOperand(llvm::errs());
-        llvm::errs() << "\n";
-        llvm::errs() << "Preds: ";
-        for (Group *pred : group->preds) {
-          pred->bb->printAsOperand(llvm::errs());
-          llvm::errs() << ", ";
-        }
-        llvm::errs() << "\n";
-        llvm::errs() << "Succs: ";
-        for (Group *succ : group->succs) {
-          succ->bb->printAsOperand(llvm::errs());
-          llvm::errs() << ", ";
-        }
-        llvm::errs() << "\n";
-      }
-      llvm::errs() << "Done printing groups graph\n";
+      /**
+            llvm::errs() << "Now printing groups graph\n";
+            for (Group *group : groups) {
+              llvm::errs() << "Group ";
+              group->bb->printAsOperand(llvm::errs());
+              llvm::errs() << "\n";
+              llvm::errs() << "Preds: ";
+              for (Group *pred : group->preds) {
+                pred->bb->printAsOperand(llvm::errs());
+                llvm::errs() << ", ";
+              }
+              llvm::errs() << "\n";
+              llvm::errs() << "Succs: ";
+              for (Group *succ : group->succs) {
+                succ->bb->printAsOperand(llvm::errs());
+                llvm::errs() << ", ";
+              }
+              llvm::errs() << "\n";
+            }
+            llvm::errs() << "Done printing groups graph\n";
 
-      llvm::errs() << "Now printing loop exits\n";
-      for (Block &block : region.getBlocks()) {
-        CFGLoop *loop = li.getLoopFor(&block);
-        while (loop) {
-          SmallVector<Block *> loopExits;
-          loop->getExitBlocks(loopExits);
-          llvm::errs() << "Loop exits: " << loopExits.size() << "\n";
-          loop = loop->getParentLoop();
-        }
-      }
-      llvm::errs() << "Done printing loop exits\n";
+            llvm::errs() << "Now printing loop exits\n";
+            for (Block &block : region.getBlocks()) {
+              CFGLoop *loop = li.getLoopFor(&block);
+              while (loop) {
+                SmallVector<Block *> loopExits;
+                loop->getExitBlocks(loopExits);
+                llvm::errs() << "Loop exits: " << loopExits.size() << "\n";
+                loop = loop->getParentLoop();
+              }
+            }
+            llvm::errs() << "Done printing loop exits\n";*/
 
       /*
 
@@ -1720,7 +1702,11 @@ LogicalResult HandshakeLowering::addSupp(ConversionPatternRewriter &rewriter) {
         continue;
 
       for (Value res : prodOp.getResults()) {
-        for (Operation *consOp : res.getUsers()) {
+        std::vector<Operation *> users(res.getUsers().begin(),
+                                       res.getUsers().end());
+        for (Operation *consOp : users) {
+          Block *cons = consOp->getBlock();
+
           if (std::find(alloctionNetwork.begin(), alloctionNetwork.end(),
                         consOp) == alloctionNetwork.end())
             continue;
@@ -1740,8 +1726,6 @@ LogicalResult HandshakeLowering::addSupp(ConversionPatternRewriter &rewriter) {
           if (isa<handshake::ConditionalBranchOp>(consOp))
             continue;
 
-          Block *cons = consOp->getBlock();
-
           /// Innermost loop containig the producer doesn't contain the
           /// consumer
           bool moreProdThanCons = false;
@@ -1757,18 +1741,14 @@ LogicalResult HandshakeLowering::addSupp(ConversionPatternRewriter &rewriter) {
                 llvm::any_of(consOp->getResults(),
                              [&res](const Value &v) { return v == res; });
 
-            if (selfRegeneration) {
-              llvm::errs() << "manageSelfRegeneration\n";
+            if (selfRegeneration)
               manageSelfRegeneration(rewriter, consOp, res);
-            } else if (greaterThanBlocks(&prod, cons) ||
-                       (isa<handshake::MergeOp>(consOp) && &prod == cons &&
-                        isaMergeLoop(consOp))) {
-              llvm::errs() << "manageDifferentRegeneration\n";
+            else if (greaterThanBlocks(&prod, cons) ||
+                     (isa<handshake::MergeOp>(consOp) && &prod == cons &&
+                      isaMergeLoop(consOp)))
               manageDifferentRegeneration(rewriter, consOp, res);
-            } else {
-              llvm::errs() << "manageNonLoop\n";
+            else
               manageNonLoop(rewriter, &prod, consOp, res);
-            }
           }
         }
       }
@@ -1967,10 +1947,10 @@ void HandshakeLowering::insertBranchesToLoops(
       /// function (manageMoreProdThanCons or manageSelfRegeneration /
       /// manageDifferentRegeneration)
       /// It is used to connect either the:
-      /// (1) manageSelfRegeneration / manageDifferentRegeneration: True side of
-      /// the BRANCH to sink and False side to the consumer
-      /// (2) manageMoreProdThanCons: True side of the BRANCH to the consumer
-      /// and False side to sink
+      /// (1) manageSelfRegeneration / manageDifferentRegeneration: True side
+      /// of the BRANCH to sink and False side to the consumer (2)
+      /// manageMoreProdThanCons: True side of the BRANCH to the consumer and
+      /// False side to sink
       Value newConnection = branchOp.getTrueResult();
       if (!moreProdThanCons)
         newConnection = branchOp.getFalseResult();
@@ -2094,7 +2074,6 @@ HandshakeLowering::convertMergesToMuxes(ConversionPatternRewriter &rewriter) {
         /// If the operation block is loop header && one input is outside the
         /// loop and the other input is inside the loop
         if (loopHeader) {
-          llvm::errs() << "In if:\n";
           fixConvention(&merge, li.getLoopFor(&block));
           Value select = addInit(rewriter, initMerges, &merge);
 
@@ -2102,27 +2081,14 @@ HandshakeLowering::convertMergesToMuxes(ConversionPatternRewriter &rewriter) {
           rewriter.setInsertionPointAfter(&merge);
           auto mux = rewriter.create<handshake::MuxOp>(merge.getLoc(), select,
                                                        merge.getOperands());
-          llvm::errs() << "Mux added in block ";
-          block.printAsOperand(llvm::errs());
-          llvm::errs() << "\n";
-          llvm::errs() << "\n";
           rewriter.replaceOp(&merge, mux);
 
         } else {
-          llvm::errs() << "In else:\n";
           Value select =
               getBlockEntryControl(&block).getDefiningOp()->getResult(1);
-          llvm::errs() << "Block entry: " << select << "\n";
-
-          llvm::errs() << "Select inputs: "
-                       << select.getDefiningOp()->getOperands().size() << "\n";
-          llvm::errs() << "Select in block: ";
-          select.getParentBlock()->printAsOperand(llvm::errs());
-          llvm::errs() << "\nMerge inputs: " << merge.getOperands().size()
-                       << "\n";
-
-          /// The set-src integration-test/kernel_2mm/kernel_2mm.cfirst input of
-          /// the CMerge and the first input of the Mux are in the same block
+          /// The set-src integration-test/kernel_2mm/kernel_2mm.cfirst input
+          /// of the CMerge and the first input of the Mux are in the same
+          /// block
           bool firstSameBlock =
               select.getDefiningOp()->getOperand(0).getParentBlock() ==
               merge.getOperand(0).getParentBlock();
@@ -2151,12 +2117,6 @@ HandshakeLowering::convertMergesToMuxes(ConversionPatternRewriter &rewriter) {
             auto notOp =
                 rewriter.create<handshake::NotOp>(select.getLoc(), select);
             select = notOp->getResult(0);
-          }
-
-          llvm::errs() << "Select: " << select << "\n";
-          llvm::errs() << "Merge  Operands:\n";
-          for (Value v : merge.getOperands()) {
-            llvm::errs() << v << "\n";
           }
 
           // Convert to Mux with the calculated select
@@ -2188,8 +2148,6 @@ Value HandshakeLowering::addInit(ConversionPatternRewriter &rewriter,
                                  SmallVector<Operation *> &initMerges,
                                  Operation *oldMerge) {
   SmallVector<Value, 4> mergeOperands;
-
-  llvm::errs() << "In  addInit\n";
 
   // assert that one of the inputs of the Merge that we are currently
   // translating to Mux is a Branch in a loop exit block

@@ -14,9 +14,9 @@ entity join_handshake is
     outs_valid : out std_logic;
     outs_ready : in  std_logic
   );
-end join_handshake;
+end entity;
 
-architecture arch of join is
+architecture arch of join_handshake is
 begin
   join_inner : entity work.join(arch) generic map(SIZE)
     port map(

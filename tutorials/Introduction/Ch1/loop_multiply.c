@@ -49,7 +49,7 @@ int main(void) {
   in_int_t C[NK][NL];
   inout_int_t D[NI][NL];
 
-  alpha = 100;
+  alpha = 6;
   beta = 100;
   for (unsigned i = 0; i < NI; ++i) {
     for (unsigned k = 0; k < NK; ++k)
