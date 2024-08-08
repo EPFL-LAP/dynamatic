@@ -18,6 +18,7 @@
 
 #include "dynamatic/Conversion/CfToHandshake.h"
 #include "dynamatic/Analysis/ConstantAnalysis.h"
+#include "dynamatic/Analysis/GsaAnalysis.h"
 #include "dynamatic/Analysis/NameAnalysis.h"
 #include "dynamatic/Dialect/Handshake/HandshakeInterfaces.h"
 #include "dynamatic/Dialect/Handshake/HandshakeOps.h"
@@ -1112,18 +1113,33 @@ struct CfToHandshakePass
     funcTarget.addIllegalOp<func::FuncOp>();
     funcTarget.addLegalOp<handshake::FuncOp>();
 
+    // Call the analysis hee and fill the structures from Func::FuncOp
+    GsaAnalysis gsaAnalysis = getAnalysis<GsaAnalysis>();
+
     if (failed(applyPartialConversion(modOp, funcTarget, std::move(patterns))))
       return signalPassFailure();
 
     // Lower every function individually
     auto funcOps = modOp.getOps<handshake::FuncOp>();
+    int funcOpIdx = 0;
     for (handshake::FuncOp funcOp : llvm::make_early_inc_range(funcOps)) {
+
+      // Loop over the Blocks of this funcOp to update the ptrs of every
+      // Block in the control dependency strucute of this funcOp_idx
+      mlir::Region &funcReg = funcOp.getBody();
+      for (mlir::Block &block : funcReg.getBlocks()) {
+        gsaAnalysis.adjustBlockPtr(funcOpIdx, &block);
+        for (Operation &prodOp : block.getOperations())
+          gsaAnalysis.adjustOperationPtr(funcOpIdx, &block);
+      }
 
       // Lower the region inside the function if it is not external
       if (!funcOp.isExternal()) {
         HandshakeLowering hl(funcOp.getBody(), getAnalysis<NameAnalysis>());
         if (failed(lowerRegion(hl)))
           return signalPassFailure();
+
+        funcOpIdx++;
       }
     }
 

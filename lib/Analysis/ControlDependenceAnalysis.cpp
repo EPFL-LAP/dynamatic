@@ -7,9 +7,9 @@
 //
 //===----------------------------------------------------------------------===//
 //
-// Declares some utility functions useful to analyzing the control dependencies
-// between basic blocks of the CFG. The control dependendies are calculated
-// using the algorithm from the following paper
+// Implements some utility functions useful to analyzing the control
+// dependencies between basic blocks of the CFG. The control dependendies are
+// calculated using the algorithm from the following paper
 //   J.Ferrante, K.J. Ottenstein, and J. D. Warren, "The Program Dependence
 //   Graph and its Use in Optimizations", ACM Trans. Program. Lang. Syst., vol.
 //   9, pp. 319-349, 1987.
