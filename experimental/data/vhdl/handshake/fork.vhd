@@ -2,7 +2,7 @@ library ieee;
 use ieee.std_logic_1164.all;
 use work.types.all;
 
-entity fork is
+entity handshake_fork is
   generic (
     SIZE     : integer;
     BITWIDTH : integer
@@ -20,7 +20,7 @@ entity fork is
   );
 end entity;
 
-architecture arch of fork is
+architecture arch of handshake_fork is
 begin
   control : entity work.fork_dataless generic map (SIZE)
     port map(

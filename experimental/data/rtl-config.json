@@ -245,6 +245,7 @@
       { "name": "DATA_WIDTH", "type": "unsigned", "lb": 1 }
     ],
     "generic": "$DYNAMATIC/experimental/data/vhdl/handshake/fork.vhd",
+    "module-name": "handshake_fork",
     "dependencies": ["types", "fork_dataless"]
   },
   {
