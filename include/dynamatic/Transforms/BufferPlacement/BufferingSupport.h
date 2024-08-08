@@ -13,6 +13,7 @@
 #ifndef DYNAMATIC_TRANSFORMS_BUFFERPLACEMENT_BUFFERINGSUPPORT_H
 #define DYNAMATIC_TRANSFORMS_BUFFERPLACEMENT_BUFFERINGSUPPORT_H
 
+#include "dynamatic/Dialect/Handshake/HandshakeAttributes.h"
 #include "dynamatic/Dialect/Handshake/HandshakeOps.h"
 #include "dynamatic/Support/LLVM.h"
 #include "dynamatic/Support/TimingModels.h"
@@ -36,11 +37,11 @@ struct FuncInfo {
 
   /// Argument-less constructor so that we can use the struct as a value type
   /// for maps.
-  FuncInfo() : funcOp(nullptr){};
+  FuncInfo() : funcOp(nullptr) {};
 
   /// Constructs an instance from the function it refers to. Other struct
   /// members start empty.
-  FuncInfo(handshake::FuncOp funcOp) : funcOp(funcOp){};
+  FuncInfo(handshake::FuncOp funcOp) : funcOp(funcOp) {};
 };
 
 /// Acts as a "smart and lazy getter" around a channel's buffering properties.
@@ -57,7 +58,7 @@ public:
   /// Constructs an instance from the channel whose buffering properties will be
   /// managed by the object.
   inline LazyChannelBufProps(Value val, bool updateOnDestruction = false)
-      : val(val), updateOnDestruction(updateOnDestruction){};
+      : val(val), updateOnDestruction(updateOnDestruction) {};
 
   /// Returns the underlying channel the object was created with.
   inline mlir::Value getChannel() { return val; }
@@ -68,11 +69,11 @@ public:
 
   /// Returns a reference to the channel's buffering properties through which
   /// they can be manipulated.
-  ChannelBufProps &operator*();
+  handshake::ChannelBufProps &operator*();
 
   /// Returns a pointer to the channel's buffering properties through which
   /// they can be manipulated.
-  ChannelBufProps *operator->();
+  handshake::ChannelBufProps *operator->();
 
   /// Since the class destructor may go update the IR, it's safer to prevent
   /// object copies.
@@ -95,11 +96,11 @@ private:
   /// Lazily-loaded buffering properties (std::nullopt by default, initialized
   /// on first read), which are given reference/pointer access to by the class's
   /// -> and * operators.
-  std::optional<ChannelBufProps> props;
+  std::optional<handshake::ChannelBufProps> props;
   /// Same as props, but is never modified from the moment it is lazily-laoaded.
   /// This allows us to avoid replacing the IR attribute on object destruction
   /// if no modification has been made.
-  std::optional<ChannelBufProps> unchangedProps;
+  std::optional<handshake::ChannelBufProps> unchangedProps;
 
   /// Attempts to read the channel's buffering properties from the defining
   /// operation's IR attribute and sets props to them (or to a set of properties
@@ -140,7 +141,7 @@ struct Channel {
   Channel(Value value, Operation *producer, Operation *consumer,
           bool updateProps = false)
       : value(value), producer(producer), consumer(consumer),
-        props(value, updateProps){};
+        props(value, updateProps) {};
 
   /// Constructs a channel from its associated SSA value alone.
   Channel(Value value, bool updateProps = false);
@@ -198,10 +199,9 @@ Operation *getChannelProducer(Value channel, size_t *idx = nullptr);
 /// adjusting for buffers within units as described by the timing models. Fails
 /// if the buffering properties of a channel are unsatisfiable or become
 /// unsatisfiable after adjustment.
-LogicalResult
-mapChannelsToProperties(handshake::FuncOp funcOp,
-                        const TimingDatabase &timingDB,
-                        llvm::MapVector<Value, ChannelBufProps> &channelProps);
+LogicalResult mapChannelsToProperties(
+    handshake::FuncOp funcOp, const TimingDatabase &timingDB,
+    llvm::MapVector<Value, handshake::ChannelBufProps> &channelProps);
 
 } // namespace buffer
 } // namespace dynamatic

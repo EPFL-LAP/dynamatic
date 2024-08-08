@@ -68,7 +68,7 @@ void FPGA20Buffers::extractResult(BufferPlacement &placement) {
     bool placeOpaque = channelVars.signalVars[SignalType::DATA].bufPresent.get(
                            GRB_DoubleAttr_X) > 0;
 
-    ChannelBufProps &props = channelProps[channel];
+    handshake::ChannelBufProps &props = channelProps[channel];
 
     PlacementResult result;
     if (placeOpaque) {
@@ -104,7 +104,7 @@ void FPGA20Buffers::extractResult(BufferPlacement &placement) {
 
 void FPGA20Buffers::addCustomChannelConstraints(Value channel) {
   ChannelVars &chVars = vars.channelVars[channel];
-  ChannelBufProps &props = channelProps[channel];
+  handshake::ChannelBufProps &props = channelProps[channel];
   GRBVar &dataBuf = chVars.signalVars[SignalType::DATA].bufPresent;
 
   if (props.minOpaque > 0) {

@@ -52,7 +52,7 @@ void FPL22BuffersBase::extractResult(BufferPlacement &placement) {
         channelVars.signalVars[SignalType::READY].bufPresent.get(
             GRB_DoubleAttr_X) > 0;
 
-    ChannelBufProps &props = channelProps[channel];
+    handshake::ChannelBufProps &props = channelProps[channel];
     PlacementResult result;
     if (placeOpaque && placeTransparent) {
       // Place at least one opaque slot and satisfy the opaque slot requirement,
@@ -78,7 +78,7 @@ void FPL22BuffersBase::extractResult(BufferPlacement &placement) {
 
 void FPL22BuffersBase::addCustomChannelConstraints(Value channel) {
   // Get channel-specific buffering properties and channel's variables
-  ChannelBufProps &props = channelProps[channel];
+  handshake::ChannelBufProps &props = channelProps[channel];
   ChannelVars &chVars = vars.channelVars[channel];
 
   // Force buffer presence if at least one slot is requested

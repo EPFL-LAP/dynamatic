@@ -13,6 +13,7 @@
 
 #include "dynamatic/Transforms/HandshakeMinimizeLSQUsage.h"
 #include "dynamatic/Analysis/NameAnalysis.h"
+#include "dynamatic/Dialect/Handshake/HandshakeAttributes.h"
 #include "dynamatic/Dialect/Handshake/HandshakeOps.h"
 #include "dynamatic/Dialect/Handshake/MemoryInterfaces.h"
 #include "dynamatic/Support/Attribute.h"

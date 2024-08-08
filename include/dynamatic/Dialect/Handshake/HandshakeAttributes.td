@@ -268,7 +268,7 @@ def ChannelBufPropsAttr : Handshake_Attr<"ChannelBufProps", "channelBufProps"> {
     delay (`delay`) when it is unbuffered, all in ns.
 
     Users of this attribute may wish to interact with it through the
-    dynamatic::ChannelBufProps struct, which represents the same information and
+    dynamatic::handshake::ChannelBufProps struct, which represents the same information and
     is easier to manipulate than the raw MLIR attribute.
   }];
   
@@ -282,7 +282,7 @@ def ChannelBufPropsAttr : Handshake_Attr<"ChannelBufProps", "channelBufProps"> {
                         );
 
   let builders = [
-    AttrBuilder<(ins "dynamatic::ChannelBufProps&":$props), [{
+    AttrBuilder<(ins "dynamatic::handshake::ChannelBufProps&":$props), [{
       return $_get(context, props.minTrans, props.maxTrans, props.minOpaque, 
         props.maxOpaque, 
         FloatAttr::get(mlir::Float32Type::get(context), props.inDelay), 
@@ -299,15 +299,17 @@ def ChannelBufPropsAttr : Handshake_Attr<"ChannelBufProps", "channelBufProps"> {
 
     /// Gets a ChannelBufProps instance that holds the same information as this
     /// attribute for easier data manipulation.
-    inline dynamatic::ChannelBufProps getProps() {
-      return dynamatic::ChannelBufProps(getMinTrans(), getMaxTrans(),
+    inline dynamatic::handshake::ChannelBufProps getProps() {
+      return dynamatic::handshake::ChannelBufProps(getMinTrans(), getMaxTrans(),
         getMinOpaque(), getMaxOpaque(), getInDelay().getValueAsDouble(),
         getOutDelay().getValueAsDouble(), getDelay().getValueAsDouble());
     }
   }];
 }
 
-def ChannelBufPropsContainerAttr : OperandContainerAttr<"ChannelBufPropsContainer", "bufProps"> {
+def ChannelBufPropsContainerAttr : OperandContainerAttr<
+  "ChannelBufPropsContainer", "bufProps"
+> {
   let summary = "Container around the `ChannelBufPropsAttr` operand attribute.";
   let description = [{
     Maps operands of an operation to their `ChannelBufPropsAttr` attribute, if

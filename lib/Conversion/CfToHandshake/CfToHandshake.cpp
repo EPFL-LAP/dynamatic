@@ -18,6 +18,7 @@
 
 #include "dynamatic/Conversion/CfToHandshake.h"
 #include "dynamatic/Analysis/NameAnalysis.h"
+#include "dynamatic/Dialect/Handshake/HandshakeAttributes.h"
 #include "dynamatic/Dialect/Handshake/HandshakeDialect.h"
 #include "dynamatic/Dialect/Handshake/HandshakeInterfaces.h"
 #include "dynamatic/Dialect/Handshake/HandshakeOps.h"
