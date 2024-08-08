@@ -850,7 +850,7 @@ void VerilogWriter::writeModuleInstantiations(WriteData &data) const {
         .Default([&](auto) { llvm_unreachable("unknown module type"); });
 
     raw_indented_ostream &os = data.os;
-    os << instOp.getInstanceName() << " ";
+    os << moduleName << " ";
 
     // Write generic parameters if there are any
     if (!genericParams.empty()) {
@@ -861,7 +861,7 @@ void VerilogWriter::writeModuleInstantiations(WriteData &data) const {
       os << "." << name << "(" << val << ")) ";
     }
 
-    os << moduleName << "(\n";
+    os << instOp.getInstanceName() << "(\n";
     os.indent();
 
     // Write IO mappings between the hardware instance and the module's
