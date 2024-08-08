@@ -5,20 +5,20 @@ use work.types.all;
 
 entity mem_controller_storeless is
   generic (
-    LOAD_COUNT : integer;
+    NUM_LOADS : integer;
     DATA_WIDTH : integer;
     ADDR_WIDTH : integer
   );
   port (
     clk, rst : in std_logic;
     -- load address input channels
-    ldAddr       : in  data_array (LOAD_COUNT - 1 downto 0)(ADDR_WIDTH - 1 downto 0);
-    ldAddr_valid : in  std_logic_vector(LOAD_COUNT - 1 downto 0);
-    ldAddr_ready : out std_logic_vector(LOAD_COUNT - 1 downto 0);
+    ldAddr       : in  data_array (NUM_LOADS - 1 downto 0)(ADDR_WIDTH - 1 downto 0);
+    ldAddr_valid : in  std_logic_vector(NUM_LOADS - 1 downto 0);
+    ldAddr_ready : out std_logic_vector(NUM_LOADS - 1 downto 0);
     -- load data output channels
-    ldData       : out data_array (LOAD_COUNT - 1 downto 0)(DATA_WIDTH - 1 downto 0);
-    ldData_valid : out std_logic_vector(LOAD_COUNT - 1 downto 0);
-    ldData_ready : in  std_logic_vector(LOAD_COUNT - 1 downto 0);
+    ldData       : out data_array (NUM_LOADS - 1 downto 0)(DATA_WIDTH - 1 downto 0);
+    ldData_valid : out std_logic_vector(NUM_LOADS - 1 downto 0);
+    ldData_ready : in  std_logic_vector(NUM_LOADS - 1 downto 0);
     --- memory done channel
     memDone_valid : out std_logic;
     memDone_ready : in  std_logic;
@@ -44,7 +44,7 @@ begin
 
   read_arbiter : entity work.read_memory_arbiter
     generic map(
-      ARBITER_SIZE => LOAD_COUNT,
+      ARBITER_SIZE => NUM_LOADS,
       ADDR_WIDTH   => ADDR_WIDTH,
       DATA_WIDTH   => DATA_WIDTH
     )

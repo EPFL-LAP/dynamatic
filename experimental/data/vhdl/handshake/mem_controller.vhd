@@ -5,34 +5,34 @@ use work.types.all;
 
 entity mem_controller is
   generic (
-    CTRL_COUNT  : integer;
-    LOAD_COUNT  : integer;
-    STORE_COUNT : integer;
+    NUM_CONTROLS  : integer;
+    NUM_LOADS  : integer;
+    NUM_STORES : integer;
     DATA_WIDTH  : integer;
     ADDR_WIDTH  : integer
   );
   port (
     clk, rst : in std_logic;
     -- control input channels
-    ctrl       : in  data_array (CTRL_COUNT - 1 downto 0)(31 downto 0);
-    ctrl_valid : in  std_logic_vector(CTRL_COUNT - 1 downto 0);
-    ctrl_ready : out std_logic_vector(CTRL_COUNT - 1 downto 0);
+    ctrl       : in  data_array (NUM_CONTROLS - 1 downto 0)(31 downto 0);
+    ctrl_valid : in  std_logic_vector(NUM_CONTROLS - 1 downto 0);
+    ctrl_ready : out std_logic_vector(NUM_CONTROLS - 1 downto 0);
     -- load address input channels
-    ldAddr       : in  data_array (LOAD_COUNT - 1 downto 0)(ADDR_WIDTH - 1 downto 0);
-    ldAddr_valid : in  std_logic_vector(LOAD_COUNT - 1 downto 0);
-    ldAddr_ready : out std_logic_vector(LOAD_COUNT - 1 downto 0);
+    ldAddr       : in  data_array (NUM_LOADS - 1 downto 0)(ADDR_WIDTH - 1 downto 0);
+    ldAddr_valid : in  std_logic_vector(NUM_LOADS - 1 downto 0);
+    ldAddr_ready : out std_logic_vector(NUM_LOADS - 1 downto 0);
     -- load data output channels
-    ldData       : out data_array (LOAD_COUNT - 1 downto 0)(DATA_WIDTH - 1 downto 0);
-    ldData_valid : out std_logic_vector(LOAD_COUNT - 1 downto 0);
-    ldData_ready : in  std_logic_vector(LOAD_COUNT - 1 downto 0);
+    ldData       : out data_array (NUM_LOADS - 1 downto 0)(DATA_WIDTH - 1 downto 0);
+    ldData_valid : out std_logic_vector(NUM_LOADS - 1 downto 0);
+    ldData_ready : in  std_logic_vector(NUM_LOADS - 1 downto 0);
     -- store address input channels
-    stAddr       : in  data_array (STORE_COUNT - 1 downto 0)(ADDR_WIDTH - 1 downto 0);
-    stAddr_valid : in  std_logic_vector(STORE_COUNT - 1 downto 0);
-    stAddr_ready : out std_logic_vector(STORE_COUNT - 1 downto 0);
+    stAddr       : in  data_array (NUM_STORES - 1 downto 0)(ADDR_WIDTH - 1 downto 0);
+    stAddr_valid : in  std_logic_vector(NUM_STORES - 1 downto 0);
+    stAddr_ready : out std_logic_vector(NUM_STORES - 1 downto 0);
     -- store data input channels
-    stData       : in  data_array (STORE_COUNT - 1 downto 0)(DATA_WIDTH - 1 downto 0);
-    stData_valid : in  std_logic_vector(STORE_COUNT - 1 downto 0);
-    stData_ready : out std_logic_vector(STORE_COUNT - 1 downto 0);
+    stData       : in  data_array (NUM_STORES - 1 downto 0)(DATA_WIDTH - 1 downto 0);
+    stData_valid : in  std_logic_vector(NUM_STORES - 1 downto 0);
+    stData_ready : out std_logic_vector(NUM_STORES - 1 downto 0);
     --- memory done channel
     memDone_valid : out std_logic;
     memDone_ready : in  std_logic;
@@ -54,8 +54,8 @@ begin
 
   stores : entity work.mem_controller_loadless
     generic map(
-      CTRL_COUNT  => CTRL_COUNT,
-      STORE_COUNT => STORE_COUNT,
+      NUM_CONTROLS  => NUM_CONTROLS,
+      NUM_STORES => NUM_STORES,
       DATA_WIDTH  => DATA_WIDTH,
       ADDR_WIDTH  => ADDR_WIDTH)
     port map(
@@ -82,7 +82,7 @@ begin
 
   read_arbiter : entity work.read_memory_arbiter
     generic map(
-      ARBITER_SIZE => LOAD_COUNT,
+      ARBITER_SIZE => NUM_LOADS,
       ADDR_WIDTH   => ADDR_WIDTH,
       DATA_WIDTH   => DATA_WIDTH
     )

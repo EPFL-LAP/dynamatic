@@ -5,20 +5,20 @@ use work.types.all;
 
 entity end_sync is
   generic (
-    BITWIDTH   : integer;
-    MEM_INPUTS : integer
+    DATA_WIDTH   : integer;
+    NUM_MEMORIES : integer
   );
   port (
     clk, rst : in std_logic;
     -- input channel
-    ins       : in  data_array(0 downto 0)(BITWIDTH - 1 downto 0);
+    ins       : in  data_array(0 downto 0)(DATA_WIDTH - 1 downto 0);
     ins_valid : in  std_logic_vector(0 downto 0);
     ins_ready : out std_logic_vector(0 downto 0);
     -- memory input channels
-    memDone_valid : in  std_logic_vector(MEM_INPUTS - 1 downto 0) := (others => '1');
-    memDone_ready : out std_logic_vector(MEM_INPUTS - 1 downto 0);
+    memDone_valid : in  std_logic_vector(NUM_MEMORIES - 1 downto 0) := (others => '1');
+    memDone_ready : out std_logic_vector(NUM_MEMORIES - 1 downto 0);
     -- output channel
-    outs       : out data_array(0 downto 0)(BITWIDTH - 1 downto 0);
+    outs       : out data_array(0 downto 0)(DATA_WIDTH - 1 downto 0);
     outs_valid : out std_logic_vector(0 downto 0);
     outs_ready : in  std_logic_vector(0 downto 0)
   );
@@ -26,7 +26,7 @@ end entity;
 
 architecture arch of end_sync is
 begin
-  control : entity work.end_sync_dataless(arch) generic map (MEM_INPUTS)
+  control : entity work.end_sync_dataless(arch) generic map (NUM_MEMORIES)
     port map(
       clk           => clk,
       rst           => rst,

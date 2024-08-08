@@ -4,12 +4,12 @@ use ieee.numeric_std.all;
 
 entity cond_br is
   generic (
-    BITWIDTH : integer
+    DATA_WIDTH : integer
   );
   port (
     clk, rst : in std_logic;
     -- data input channel
-    data       : in  std_logic_vector(BITWIDTH - 1 downto 0);
+    data       : in  std_logic_vector(DATA_WIDTH - 1 downto 0);
     data_valid : in  std_logic;
     data_ready : out std_logic;
     -- condition input channel
@@ -17,11 +17,11 @@ entity cond_br is
     condition_valid : in  std_logic;
     condition_ready : out std_logic;
     -- true output channel
-    trueOut       : out std_logic_vector(BITWIDTH - 1 downto 0);
+    trueOut       : out std_logic_vector(DATA_WIDTH - 1 downto 0);
     trueOut_valid : out std_logic;
     trueOut_ready : in  std_logic;
     -- false output channel
-    falseOut       : out std_logic_vector(BITWIDTH - 1 downto 0);
+    falseOut       : out std_logic_vector(DATA_WIDTH - 1 downto 0);
     falseOut_valid : out std_logic;
     falseOut_ready : in  std_logic
   );

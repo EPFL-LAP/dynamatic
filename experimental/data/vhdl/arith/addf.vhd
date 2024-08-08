@@ -4,25 +4,25 @@ use ieee.numeric_std.all;
 
 entity addf is
   generic (
-    BITWIDTH : integer
+    DATA_WIDTH : integer
   );
   port (
     -- inputs
     clk          : in std_logic;
     rst          : in std_logic;
-    lhs          : in std_logic_vector(BITWIDTH - 1 downto 0);
+    lhs          : in std_logic_vector(DATA_WIDTH - 1 downto 0);
     lhs_valid    : in std_logic;
-    rhs          : in std_logic_vector(BITWIDTH - 1 downto 0);
+    rhs          : in std_logic_vector(DATA_WIDTH - 1 downto 0);
     rhs_valid    : in std_logic;
     result_ready : in std_logic;
     -- outputs
-    result       : out std_logic_vector(BITWIDTH - 1 downto 0);
+    result       : out std_logic_vector(DATA_WIDTH - 1 downto 0);
     result_valid : out std_logic;
     lhs_ready    : out std_logic;
     rhs_ready    : out std_logic
   );
 begin
-  assert BITWIDTH=32
+  assert DATA_WIDTH=32
   report "addf currently only supports 32-bit floating point operands"
   severity failure;
 end entity;
@@ -33,10 +33,10 @@ architecture arch of addf is
   signal buff_valid, oehb_ready : std_logic;
 
   -- intermediate input signals for IEEE-754 to Flopoco-simple-float conversion
-  signal ip_lhs, ip_rhs : std_logic_vector(BITWIDTH + 1 downto 0);
+  signal ip_lhs, ip_rhs : std_logic_vector(DATA_WIDTH + 1 downto 0);
 
   -- intermediate output signal for Flopoco-simple-float to IEEE-754 conversion
-  signal ip_result : std_logic_vector(BITWIDTH + 1 downto 0);
+  signal ip_result : std_logic_vector(DATA_WIDTH + 1 downto 0);
 
 begin
   join_inputs : entity work.join(arch) generic map(2)

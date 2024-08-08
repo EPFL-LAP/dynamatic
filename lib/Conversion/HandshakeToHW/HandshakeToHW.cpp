@@ -579,9 +579,9 @@ ModuleDiscriminator::ModuleDiscriminator(FuncMemoryPorts &ports)
 
         // Control port count, load port count, store port count, data
         // bitwidth, and address bitwidth
-        addUnsigned("NUM_CONTROL", ports.getNumPorts<ControlPort>());
-        addUnsigned("NUM_LOAD", ports.getNumPorts<LoadPort>() + lsqPort);
-        addUnsigned("NUM_STORE", ports.getNumPorts<StorePort>() + lsqPort);
+        addUnsigned("NUM_CONTROLS", ports.getNumPorts<ControlPort>());
+        addUnsigned("NUM_LOADS", ports.getNumPorts<LoadPort>() + lsqPort);
+        addUnsigned("NUM_STORES", ports.getNumPorts<StorePort>() + lsqPort);
         addUnsigned("DATA_WIDTH", ports.dataWidth);
         addUnsigned("ADDR_WIDTH", ports.addrWidth);
       })

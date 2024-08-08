@@ -4,28 +4,28 @@ use ieee.numeric_std.all;
 
 entity mul_4_stage is
   generic (
-    BITWIDTH : integer
+    DATA_WIDTH : integer
   );
   port (
     clk : in  std_logic;
     ce  : in  std_logic;
-    a   : in  std_logic_vector(BITWIDTH - 1 downto 0);
-    b   : in  std_logic_vector(BITWIDTH - 1 downto 0);
-    p   : out std_logic_vector(BITWIDTH - 1 downto 0));
+    a   : in  std_logic_vector(DATA_WIDTH - 1 downto 0);
+    b   : in  std_logic_vector(DATA_WIDTH - 1 downto 0);
+    p   : out std_logic_vector(DATA_WIDTH - 1 downto 0));
 end entity;
 
 architecture behav of mul_4_stage is
 
-  signal a_reg : std_logic_vector(BITWIDTH - 1 downto 0);
-  signal b_reg : std_logic_vector(BITWIDTH - 1 downto 0);
-  signal q0    : std_logic_vector(BITWIDTH - 1 downto 0);
-  signal q1    : std_logic_vector(BITWIDTH - 1 downto 0);
-  signal q2    : std_logic_vector(BITWIDTH - 1 downto 0);
-  signal mul   : std_logic_vector(BITWIDTH - 1 downto 0);
+  signal a_reg : std_logic_vector(DATA_WIDTH - 1 downto 0);
+  signal b_reg : std_logic_vector(DATA_WIDTH - 1 downto 0);
+  signal q0    : std_logic_vector(DATA_WIDTH - 1 downto 0);
+  signal q1    : std_logic_vector(DATA_WIDTH - 1 downto 0);
+  signal q2    : std_logic_vector(DATA_WIDTH - 1 downto 0);
+  signal mul   : std_logic_vector(DATA_WIDTH - 1 downto 0);
 
 begin
 
-  mul <= std_logic_vector(resize(unsigned(std_logic_vector(signed(a_reg) * signed(b_reg))), BITWIDTH));
+  mul <= std_logic_vector(resize(unsigned(std_logic_vector(signed(a_reg) * signed(b_reg))), DATA_WIDTH));
 
   process (clk)
   begin
@@ -49,18 +49,18 @@ use ieee.numeric_std.all;
 
 entity muli is
   generic (
-    BITWIDTH : integer
+    DATA_WIDTH : integer
   );
   port (
     -- inputs
     clk, rst     : in std_logic;
-    lhs          : in std_logic_vector(BITWIDTH - 1 downto 0);
+    lhs          : in std_logic_vector(DATA_WIDTH - 1 downto 0);
     lhs_valid    : in std_logic;
-    rhs          : in std_logic_vector(BITWIDTH - 1 downto 0);
+    rhs          : in std_logic_vector(DATA_WIDTH - 1 downto 0);
     rhs_valid    : in std_logic;
     result_ready : in std_logic;
     -- outputs
-    result       : out std_logic_vector(BITWIDTH - 1 downto 0);
+    result       : out std_logic_vector(DATA_WIDTH - 1 downto 0);
     result_valid : out std_logic;
     lhs_ready    : out std_logic;
     rhs_ready    : out std_logic
@@ -71,7 +71,7 @@ architecture arch of muli is
   constant LATENCY                          : integer := 4;
   signal join_valid                         : std_logic;
   signal buff_valid, oehb_valid, oehb_ready : std_logic;
-  signal oehb_dataOut, oehb_datain          : std_logic_vector(BITWIDTH - 1 downto 0);
+  signal oehb_dataOut, oehb_datain          : std_logic_vector(DATA_WIDTH - 1 downto 0);
 begin
   join_inputs : entity work.join(arch) generic map(2)
     port map(
@@ -85,7 +85,7 @@ begin
       ins_ready(1) => rhs_ready
     );
 
-  multiply_unit : entity work.mul_4_stage(behav) generic map(BITWIDTH)
+  multiply_unit : entity work.mul_4_stage(behav) generic map(DATA_WIDTH)
     port map(
       clk => clk,
       ce  => oehb_ready,
@@ -103,7 +103,7 @@ begin
       buff_valid
     );
 
-  oehb : entity work.oehb(arch) generic map (BITWIDTH)
+  oehb : entity work.oehb(arch) generic map (DATA_WIDTH)
     port map(
       clk        => clk,
       rst        => rst,

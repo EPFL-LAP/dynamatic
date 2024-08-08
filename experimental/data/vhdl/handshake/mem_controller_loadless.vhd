@@ -5,25 +5,25 @@ use work.types.all;
 
 entity mem_controller_loadless is
   generic (
-    CTRL_COUNT  : integer;
-    STORE_COUNT : integer;
+    NUM_CONTROLS  : integer;
+    NUM_STORES : integer;
     DATA_WIDTH  : integer;
     ADDR_WIDTH  : integer
   );
   port (
     clk, rst : in std_logic;
     -- control input channels
-    ctrl       : in  data_array (CTRL_COUNT - 1 downto 0)(31 downto 0);
-    ctrl_valid : in  std_logic_vector(CTRL_COUNT - 1 downto 0);
-    ctrl_ready : out std_logic_vector(CTRL_COUNT - 1 downto 0);
+    ctrl       : in  data_array (NUM_CONTROLS - 1 downto 0)(31 downto 0);
+    ctrl_valid : in  std_logic_vector(NUM_CONTROLS - 1 downto 0);
+    ctrl_ready : out std_logic_vector(NUM_CONTROLS - 1 downto 0);
     -- store address input channels
-    stAddr       : in  data_array (STORE_COUNT - 1 downto 0)(ADDR_WIDTH - 1 downto 0);
-    stAddr_valid : in  std_logic_vector(STORE_COUNT - 1 downto 0);
-    stAddr_ready : out std_logic_vector(STORE_COUNT - 1 downto 0);
+    stAddr       : in  data_array (NUM_STORES - 1 downto 0)(ADDR_WIDTH - 1 downto 0);
+    stAddr_valid : in  std_logic_vector(NUM_STORES - 1 downto 0);
+    stAddr_ready : out std_logic_vector(NUM_STORES - 1 downto 0);
     -- store data input channels
-    stData       : in  data_array (STORE_COUNT - 1 downto 0)(DATA_WIDTH - 1 downto 0);
-    stData_valid : in  std_logic_vector(STORE_COUNT - 1 downto 0);
-    stData_ready : out std_logic_vector(STORE_COUNT - 1 downto 0);
+    stData       : in  data_array (NUM_STORES - 1 downto 0)(DATA_WIDTH - 1 downto 0);
+    stData_valid : in  std_logic_vector(NUM_STORES - 1 downto 0);
+    stData_ready : out std_logic_vector(NUM_STORES - 1 downto 0);
     --- memory done channel
     memDone_valid : out std_logic;
     memDone_ready : in  std_logic;
@@ -39,9 +39,9 @@ end entity;
 
 architecture arch of mem_controller_loadless is
   signal remainingStores                    : std_logic_vector(31 downto 0);
-  signal storePorts_valid, storePorts_ready : std_logic_vector(STORE_COUNT - 1 downto 0);
+  signal storePorts_valid, storePorts_ready : std_logic_vector(NUM_STORES - 1 downto 0);
   constant zeroStore                        : std_logic_vector(31 downto 0)             := (others => '0');
-  constant zeroCtrl                         : std_logic_vector(CTRL_COUNT - 1 downto 0) := (others => '0');
+  constant zeroCtrl                         : std_logic_vector(NUM_CONTROLS - 1 downto 0) := (others => '0');
 
 begin
   loadEn   <= '0';
@@ -49,7 +49,7 @@ begin
 
   write_arbiter : entity work.write_memory_arbiter
     generic map(
-      ARBITER_SIZE => STORE_COUNT,
+      ARBITER_SIZE => NUM_STORES,
       ADDR_WIDTH   => ADDR_WIDTH,
       DATA_WIDTH   => DATA_WIDTH
     )
@@ -76,7 +76,7 @@ begin
     if (rst = '1') then
       counter := (31 downto 0 => '0');
     elsif rising_edge(clk) then
-      for i in 0 to CTRL_COUNT - 1 loop
+      for i in 0 to NUM_CONTROLS - 1 loop
         if ctrl_valid(i) then
           counter := std_logic_vector(unsigned(counter) + unsigned(ctrl(i)));
         end if;

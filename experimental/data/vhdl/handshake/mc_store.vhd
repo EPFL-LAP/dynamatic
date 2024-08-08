@@ -4,25 +4,25 @@ use ieee.numeric_std.all;
 
 entity mc_store is
   generic (
-    DATA_BITWIDTH : integer;
-    ADDR_BITWIDTH : integer
+    DATA_WIDTH : integer;
+    ADDR_WIDTH : integer
   );
   port (
     clk, rst : in std_logic;
     -- data from circuit channel
-    dataIn       : in  std_logic_vector(DATA_BITWIDTH - 1 downto 0);
+    dataIn       : in  std_logic_vector(DATA_WIDTH - 1 downto 0);
     dataIn_valid : in  std_logic;
     dataIn_ready : out std_logic;
     -- address from circuit channel
-    addrIn       : in  std_logic_vector(ADDR_BITWIDTH - 1 downto 0);
+    addrIn       : in  std_logic_vector(ADDR_WIDTH - 1 downto 0);
     addrIn_valid : in  std_logic;
     addrIn_ready : out std_logic;
     -- data to interface channel
-    dataToMem       : out std_logic_vector(DATA_BITWIDTH - 1 downto 0);
+    dataToMem       : out std_logic_vector(DATA_WIDTH - 1 downto 0);
     dataToMem_valid : out std_logic;
     dataToMem_ready : in  std_logic;
     -- address to interface channel
-    addrOut       : out std_logic_vector(ADDR_BITWIDTH - 1 downto 0);
+    addrOut       : out std_logic_vector(ADDR_WIDTH - 1 downto 0);
     addrOut_valid : out std_logic;
     addrOut_ready : in  std_logic
   );

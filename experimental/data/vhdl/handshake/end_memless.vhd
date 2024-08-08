@@ -5,16 +5,16 @@ use work.types.all;
 
 entity end_sync_memless is
   generic (
-    BITWIDTH : integer
+    DATA_WIDTH : integer
   );
   port (
     clk, rst : in std_logic;
     -- input channel
-    ins       : in  data_array(0 downto 0)(BITWIDTH - 1 downto 0);
+    ins       : in  data_array(0 downto 0)(DATA_WIDTH - 1 downto 0);
     ins_valid : in  std_logic_vector(0 downto 0);
     ins_ready : out std_logic_vector(0 downto 0);
     -- output channel
-    outs       : out data_array(0 downto 0)(BITWIDTH - 1 downto 0);
+    outs       : out data_array(0 downto 0)(DATA_WIDTH - 1 downto 0);
     outs_valid : out std_logic_vector(0 downto 0);
     outs_ready : in  std_logic_vector(0 downto 0)
   );

@@ -4,15 +4,15 @@ use ieee.numeric_std.all;
 
 entity ENTITY_NAME is
   generic (
-    BITWIDTH : integer
+    DATA_WIDTH : integer
   );
   port (
     -- inputs
     clk          : in std_logic;
     rst          : in std_logic;
-    lhs          : in std_logic_vector(BITWIDTH - 1 downto 0);
+    lhs          : in std_logic_vector(DATA_WIDTH - 1 downto 0);
     lhs_valid    : in std_logic;
-    rhs          : in std_logic_vector(BITWIDTH - 1 downto 0);
+    rhs          : in std_logic_vector(DATA_WIDTH - 1 downto 0);
     rhs_valid    : in std_logic;
     result_ready : in std_logic;
     -- outputs
@@ -22,15 +22,15 @@ entity ENTITY_NAME is
     rhs_ready    : out std_logic
   );
 begin
-  assert BITWIDTH=32
+  assert DATA_WIDTH=32
   report "ENTITY_NAME currently only supports 32-bit floating point operands"
   severity failure;
 end entity;
 
 architecture arch of ENTITY_NAME is
 
-  signal ip_lhs : std_logic_vector(BITWIDTH + 1 downto 0);
-  signal ip_rhs : std_logic_vector(BITWIDTH + 1 downto 0);
+  signal ip_lhs : std_logic_vector(DATA_WIDTH + 1 downto 0);
+  signal ip_rhs : std_logic_vector(DATA_WIDTH + 1 downto 0);
 
   signal ip_unordered : std_logic;
   signal ip_result : std_logic;

@@ -4,19 +4,19 @@ use ieee.numeric_std.all;
 
 entity xori is
   generic (
-    BITWIDTH : integer
+    DATA_WIDTH : integer
   );
   port (
     -- inputs
     clk          : in std_logic;
     rst          : in std_logic;
-    lhs          : in std_logic_vector(BITWIDTH - 1 downto 0);
+    lhs          : in std_logic_vector(DATA_WIDTH - 1 downto 0);
     lhs_valid    : in std_logic;
-    rhs          : in std_logic_vector(BITWIDTH - 1 downto 0);
+    rhs          : in std_logic_vector(DATA_WIDTH - 1 downto 0);
     rhs_valid    : in std_logic;
     result_ready : in std_logic;
     -- outputs
-    result       : out std_logic_vector(BITWIDTH - 1 downto 0);
+    result       : out std_logic_vector(DATA_WIDTH - 1 downto 0);
     result_valid : out std_logic;
     lhs_ready    : out std_logic;
     rhs_ready    : out std_logic

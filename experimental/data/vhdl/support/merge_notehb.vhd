@@ -6,28 +6,28 @@ use work.types.all;
 entity merge_notehb is
   generic (
     INPUTS   : integer;
-    BITWIDTH : integer
+    DATA_WIDTH : integer
   );
   port (
     clk, rst : in std_logic;
     -- input channels
-    ins       : in  data_array(INPUTS - 1 downto 0)(BITWIDTH - 1 downto 0);
+    ins       : in  data_array(INPUTS - 1 downto 0)(DATA_WIDTH - 1 downto 0);
     ins_valid : in  std_logic_vector(INPUTS - 1 downto 0);
     ins_ready : out std_logic_vector(INPUTS - 1 downto 0)
     -- output channel
-    outs       : out std_logic_vector(BITWIDTH - 1 downto 0);
+    outs       : out std_logic_vector(DATA_WIDTH - 1 downto 0);
     outs_valid : out std_logic;
     outs_ready : in  std_logic
   );
 end entity;
 
 architecture arch of merge_notehb is
-  signal tehb_data_in : std_logic_vector(BITWIDTH - 1 downto 0);
+  signal tehb_data_in : std_logic_vector(DATA_WIDTH - 1 downto 0);
   signal tehb_pvalid  : std_logic;
   signal tehb_ready   : std_logic;
 begin
   process (ins_valid, ins)
-    variable tmp_data_out  : unsigned(BITWIDTH - 1 downto 0);
+    variable tmp_data_out  : unsigned(DATA_WIDTH - 1 downto 0);
     variable tmp_valid_out : std_logic;
   begin
     tmp_data_out  := unsigned(ins(0));
@@ -39,7 +39,7 @@ begin
       end if;
     end loop;
 
-    tehb_data_in <= std_logic_vector(resize(tmp_data_out, BITWIDTH));
+    tehb_data_in <= std_logic_vector(resize(tmp_data_out, DATA_WIDTH));
     tehb_pvalid  <= tmp_valid_out;
 
   end process;

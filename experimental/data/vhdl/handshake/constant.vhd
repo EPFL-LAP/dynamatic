@@ -4,7 +4,7 @@ use ieee.numeric_std.all;
 
 entity ENTITY_NAME is
   generic (
-    BITWIDTH : integer
+    DATA_WIDTH : integer
   );
   port (
     clk, rst : in std_logic;
@@ -12,7 +12,7 @@ entity ENTITY_NAME is
     ctrl_valid : in  std_logic;
     ctrl_ready : out std_logic;
     -- output channel
-    outs       : out std_logic_vector(BITWIDTH - 1 downto 0);
+    outs       : out std_logic_vector(DATA_WIDTH - 1 downto 0);
     outs_valid : out std_logic;
     outs_ready : in  std_logic
   );

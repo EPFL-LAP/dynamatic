@@ -4,12 +4,12 @@ use ieee.numeric_std.all;
 
 entity sink is
   generic (
-    BITWIDTH : integer
+    DATA_WIDTH : integer
   );
   port (
     clk, rst : in std_logic;
     -- input channel
-    ins       : in  std_logic_vector(BITWIDTH - 1 downto 0);
+    ins       : in  std_logic_vector(DATA_WIDTH - 1 downto 0);
     ins_valid : in  std_logic;
     ins_ready : out std_logic
 

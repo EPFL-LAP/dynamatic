@@ -5,16 +5,16 @@ use ieee.numeric_std.all;
 entity tfifo is
   generic (
     SIZE     : integer;
-    BITWIDTH : integer
+    DATA_WIDTH : integer
   );
   port (
     clk, rst : in std_logic;
     -- input channel
-    ins       : in  std_logic_vector(BITWIDTH - 1 downto 0);
+    ins       : in  std_logic_vector(DATA_WIDTH - 1 downto 0);
     ins_valid : in  std_logic;
     ins_ready : out std_logic;
     -- output channel
-    outs       : out std_logic_vector(BITWIDTH - 1 downto 0);
+    outs       : out std_logic_vector(DATA_WIDTH - 1 downto 0);
     outs_valid : out std_logic;
     outs_ready : in  std_logic
   );
@@ -24,7 +24,7 @@ architecture arch of tfifo is
   signal mux_sel                  : std_logic;
   signal fifo_valid, fifo_ready   : std_logic;
   signal fifo_pvalid, fifo_nready : std_logic;
-  signal fifo_in, fifo_out        : std_logic_vector(BITWIDTH - 1 downto 0);
+  signal fifo_in, fifo_out        : std_logic_vector(DATA_WIDTH - 1 downto 0);
 begin
 
   process (mux_sel, fifo_out, ins) is
@@ -44,7 +44,7 @@ begin
   fifo_nready <= outs_ready;
   fifo_in     <= ins;
 
-  fifo : entity work.elastic_fifo_inner(arch) generic map (SIZE, BITWIDTH)
+  fifo : entity work.elastic_fifo_inner(arch) generic map (SIZE, DATA_WIDTH)
     port map(
       -- inputs
       clk        => clk,

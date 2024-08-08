@@ -419,9 +419,9 @@
   {
     "name": "handshake.mem_controller",
     "parameters": [
-      { "name": "NUM_CONTROL", "type": "unsigned", "eq": 0, "generic": false },
-      { "name": "NUM_LOAD", "type": "unsigned", "lb": 1 },
-      { "name": "NUM_STORE", "type": "unsigned", "eq": 0, "generic": false },
+      { "name": "NUM_CONTROLS", "type": "unsigned", "eq": 0, "generic": false },
+      { "name": "NUM_LOADS", "type": "unsigned", "lb": 1 },
+      { "name": "NUM_STORES", "type": "unsigned", "eq": 0, "generic": false },
       { "name": "DATA_WIDTH", "type": "unsigned", "lb": 1 },
       { "name": "ADDR_WIDTH", "type": "unsigned", "lb": 1 }
     ],
@@ -431,9 +431,9 @@
   {
     "name": "handshake.mem_controller",
     "parameters": [
-      { "name": "NUM_CONTROL", "type": "unsigned", "lb": 1 },
-      { "name": "NUM_LOAD", "type": "unsigned", "eq": 0, "generic": false },
-      { "name": "NUM_STORE", "type": "unsigned", "lb": 1 },
+      { "name": "NUM_CONTROLS", "type": "unsigned", "lb": 1 },
+      { "name": "NUM_LOADS", "type": "unsigned", "eq": 0, "generic": false },
+      { "name": "NUM_STORES", "type": "unsigned", "lb": 1 },
       { "name": "DATA_WIDTH", "type": "unsigned", "lb": 1 },
       { "name": "ADDR_WIDTH", "type": "unsigned", "lb": 1 }
     ],
@@ -443,9 +443,9 @@
   {
     "name": "handshake.mem_controller",
     "parameters": [
-      { "name": "NUM_CONTROL", "type": "unsigned", "lb": 1 },
-      { "name": "NUM_LOAD", "type": "unsigned", "lb": 1 },
-      { "name": "NUM_STORE", "type": "unsigned", "lb": 1 },
+      { "name": "NUM_CONTROLS", "type": "unsigned", "lb": 1 },
+      { "name": "NUM_LOADS", "type": "unsigned", "lb": 1 },
+      { "name": "NUM_STORES", "type": "unsigned", "lb": 1 },
       { "name": "DATA_WIDTH", "type": "unsigned", "lb": 1 },
       { "name": "ADDR_WIDTH", "type": "unsigned", "lb": 1 }
     ],

@@ -5,16 +5,16 @@ use ieee.numeric_std.all;
 entity elastic_fifo_inner is
   generic (
     SIZE     : integer;
-    BITWIDTH : integer
+    DATA_WIDTH : integer
   );
   port (
     -- inputs
     clk, rst   : in std_logic;
-    ins        : in std_logic_vector(BITWIDTH - 1 downto 0);
+    ins        : in std_logic_vector(DATA_WIDTH - 1 downto 0);
     ins_valid  : in std_logic;
     outs_ready : in std_logic;
     -- outputs
-    outs       : out std_logic_vector(BITWIDTH - 1 downto 0);
+    outs       : out std_logic_vector(DATA_WIDTH - 1 downto 0);
     outs_valid : out std_logic;
     ins_ready  : out std_logic
   );
@@ -30,7 +30,7 @@ architecture arch of elastic_fifo_inner is
   signal Full       : std_logic;
   signal Bypass     : std_logic;
   signal fifo_valid : std_logic;
-  type FIFO_Memory is array (0 to SIZE - 1) of std_logic_vector (BITWIDTH - 1 downto 0);
+  type FIFO_Memory is array (0 to SIZE - 1) of std_logic_vector (DATA_WIDTH - 1 downto 0);
   signal Memory : FIFO_Memory;
 
 begin
