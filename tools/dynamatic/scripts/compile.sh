@@ -123,6 +123,7 @@ exit_on_fail "Failed to compile cf to handshake" "Compiled cf to handshake"
   --handshake-minimize-lsq-usage \
   --handshake-minimize-cst-width --handshake-optimize-bitwidths="legacy" \
   --handshake-materialize --handshake-infer-basic-blocks \
+  --handshake-rewrite-terms \
   > "$F_HANDSHAKE_TRANSFORMED"
 exit_on_fail "Failed to apply transformations to handshake" \
   "Applied transformations to handshake"

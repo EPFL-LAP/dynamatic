@@ -120,6 +120,19 @@ def HandshakeCanonicalize : DynamaticPass<"handshake-canonicalize"> {
   let constructor = "dynamatic::createHandshakeCanonicalize()";
 }
 
+def HandshakeRewriteTerms : DynamaticPass< "handshake-rewrite-terms", 
+                                                ["mlir::arith::ArithDialect"]>  {
+  let summary = "Rewrite terms in Handshake operation sequences.";
+  let description = [{
+      Removes redundant operations and simplifies the IR by applying a series
+      of optimizations. The pass uses a greedy pattern rewriter to apply the
+      optimizations, which are based on the specific semantics of Handshake
+      operations. The pass is conservative and does not perform any aggressive
+      transformations that could potentially change the behavior of the circuit.
+  }];
+  let constructor = "dynamatic::rewriteHandshakeTerms()";
+}
+
 def HandshakeHoistExtInstances : DynamaticPass<"handshake-hoist-ext-instances"> {
   let summary = "Hoist external function instances into top-level IO.";
   let description = [{
