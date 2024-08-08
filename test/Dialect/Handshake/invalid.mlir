@@ -1,19 +1,27 @@
 // RUN: dynamatic-opt %s --split-input-file --verify-diagnostics
 
-// expected-error @below {{failed to parse ChannelType parameter 'dataType' which must be IntegerType or FloatType}}
-handshake.func @invalidDataType(%arg0: !handshake.channel<!handshake.control<>>) -> !handshake.control<>
+// expected-error @below {{expected data type to be IntegerType or FloatType, but got 'index'}}
+handshake.func @invalidDataType(%arg0: !handshake.channel<index>) 
 
 // -----
 
-// expected-error @below {{failed to parse extra signal type which must be IntegerType or FloatType}}
-// expected-error @below {{failed to parse ChannelType parameter 'extraSignals' which is to be a ArrayRef<ExtraSignal>}}
-handshake.func @invalidExtraType(%arg0: !handshake.channel<i32, [extra: !handshake.control<>]>) -> !handshake.control<> 
+// expected-error @below {{expected data type to have strictly positive bitwidth, but got 'i0'}}
+handshake.func @invalidZeroWidthDataType(%arg0: !handshake.channel<i0>) 
 
 // -----
 
-// expected-error @below {{duplicated extra signal name, signal names must be unique}}
-// expected-error @below {{failed to parse ChannelType parameter 'extraSignals' which is to be a ArrayRef<ExtraSignal>}}
-handshake.func @duplicateExtraNames(%arg0: !handshake.channel<i32, [extra: i16, extra: f16]>) -> !handshake.control<>
+// expected-error @below {{expected extra signal type to be IntegerType or FloatType, but extra' has type 'index'}}
+handshake.func @invalidExtraType(%arg0: !handshake.channel<i32, [extra: index]>)  
+
+// -----
+
+// expected-error @below {{expected all signal names to be unique but 'extra' appears more than once}}
+handshake.func @duplicateExtraNames(%arg0: !handshake.channel<i32, [extra: i16, extra: f16]>) 
+
+// -----
+
+// expected-error @below {{'valid' is a reserved name, it cannot be used as an extra signal name}}
+handshake.func @reservedExtraSignalName(%arg0: !handshake.channel<i32, [valid: i1]>)  
 
 // -----
 
