@@ -485,16 +485,6 @@ std::string RTLComponent::portRemap(StringRef mlirPortName) const {
   return mlirPortName.str();
 }
 
-/// Returns the indexed version of a vector-like RTL signal for a specfic HDL.
-static std::string getIndexedName(const Twine &name, size_t arrayIdx, HDL hdl) {
-  switch (hdl) {
-  case HDL::VHDL:
-    return name.str() + "(" + std::to_string(arrayIdx) + ")";
-  case HDL::VERILOG:
-    return name.str() + "[" + std::to_string(arrayIdx) + "]";
-  }
-}
-
 bool RTLComponent::portNameIsIndexed(StringRef portName, StringRef &baseName,
                                      size_t &arrayIdx) const {
   // IO kind must be hierarchical and port name must contain an underscore to
@@ -513,25 +503,21 @@ bool RTLComponent::portNameIsIndexed(StringRef portName, StringRef &baseName,
   return false;
 }
 
-std::string RTLComponent::getRTLPortName(StringRef mlirPortName,
-                                         HDL hdl) const {
+std::pair<std::string, bool>
+RTLComponent::getRTLPortName(StringRef mlirPortName, HDL hdl) const {
   std::string remappedName = portRemap(mlirPortName);
   StringRef baseName;
   size_t arrayIdx;
-  if (!portNameIsIndexed(remappedName, baseName, arrayIdx))
-    return remappedName;
-  return getIndexedName(baseName, arrayIdx, hdl);
+  if (portNameIsIndexed(remappedName, baseName, arrayIdx))
+    return {baseName.str(), true};
+  return {remappedName, false};
 }
 
-std::string RTLComponent::getRTLPortName(StringRef mlirPortName,
-                                         SignalType type, HDL hdl) const {
-  std::string signalSuffix = ioSignals.at(type);
-  std::string remappedName = portRemap(mlirPortName);
-  StringRef baseName;
-  size_t arrayIdx;
-  if (!portNameIsIndexed(remappedName, baseName, arrayIdx))
-    return remappedName + signalSuffix;
-  return getIndexedName(baseName + signalSuffix, arrayIdx, hdl);
+std::pair<std::string, bool>
+RTLComponent::getRTLPortName(StringRef mlirPortName, SignalType type,
+                             HDL hdl) const {
+  auto portName = getRTLPortName(mlirPortName, hdl);
+  return {portName.first + ioSignals.at(type), portName.second};
 }
 
 bool RTLComponent::checkValidAndSetDefaults(llvm::json::Path path) {
