@@ -31,6 +31,7 @@
 #include "llvm/ADT/DenseMap.h"
 #include "llvm/ADT/MapVector.h"
 #include "llvm/ADT/STLExtras.h"
+#include "llvm/ADT/StringRef.h"
 #include "llvm/ADT/TypeSwitch.h"
 #include "llvm/Support/CommandLine.h"
 #include "llvm/Support/ErrorHandling.h"
@@ -207,24 +208,33 @@ public:
   };
 
   /// An association between a component port name and an internal signal name.
-  struct PortMapPair {
+  struct PortMap {
     /// The component port name.
     std::string portName;
-    /// The internal signal name.
-    std::string signalName;
+    /// The internal signal names which should connect to the component's port.
+    /// If multiple signals connet, then the first signal in the vector should
+    /// go the port's lowest index, then the second-highest, etc.
+    SmallVector<std::string> signalNames;
 
-    /// Creates the association.
-    PortMapPair(StringRef portName, StringRef signalName)
-        : portName(portName), signalName(signalName) {};
+    /// Creates the mapping from the port name alone.
+    PortMap(StringRef portName) : portName(portName) {}
+
+    void addSignal(StringRef signalName) {
+      signalNames.push_back(signalName.str());
+    }
 
     // NOLINTBEGIN(*unused-function)
     // clang-tidy does not see that sorting a vector of `PortMapPair`'s requires
     // the < operator
 
     /// Makes the struct sortable in a vector.
-    friend bool operator<(const PortMapPair &lhs, const PortMapPair &rhs) {
+    friend bool operator<(const PortMap &lhs, const PortMap &rhs) {
       return lhs.portName < rhs.portName;
     }
+
+    // Writes the list of signal names to the output stream as a comma-separeted
+    // list surrounded by curly brackets.
+    void writeBracketedSignals(raw_indented_ostream &os);
 
     // NOLINTEND(*unused-function)
   };
@@ -233,9 +243,9 @@ public:
   /// useful when instantiating components.
   struct IOMap {
     /// Associations for the component's input ports.
-    std::vector<PortMapPair> inputs;
+    std::vector<PortMap> inputs;
     /// Associations for the component's output ports.
-    std::vector<PortMapPair> outputs;
+    std::vector<PortMap> outputs;
 
     /// Constructs from the hardware instance of interest, the export
     /// information, and a function to retrieve the internal signal name
@@ -262,9 +272,12 @@ public:
 
   /// Export information (external modules must have already been concretized).
   ExportInfo &exportInfo;
+  // The HDL in which to write the module.
+  HDL hdl;
 
   /// Creates the RTL writer.
-  RTLWriter(ExportInfo &exportInfo) : exportInfo(exportInfo) {};
+  RTLWriter(ExportInfo &exportInfo, HDL hdl)
+      : exportInfo(exportInfo), hdl(hdl) {};
 
   /// Writes the RTL implementation of the module to the output stream. On
   /// failure, the RTL implementation should be considered invalid and/or
@@ -282,9 +295,48 @@ public:
 };
 } // namespace
 
+static StringRef getComment(HDL hdl) {
+  switch (hdl) {
+  case HDL::VHDL:
+    return "--";
+  case HDL::VERILOG:
+    return "//";
+  }
+}
+
+using PortMapWriter = void (*)(RTLWriter::PortMap &, raw_indented_ostream &);
+
+/// Writes IO mappings to the output stream. Provided with a correct
+/// port-mapping function, this works for both VHDL and Verilog.
+static void writeIOMap(const RTLWriter::IOMap &map, PortMapWriter writePortMap,
+                       raw_indented_ostream &os) {
+  size_t numIOLeft = map.inputs.size() + map.outputs.size();
+
+  auto writePortsDir = [&](std::vector<RTLWriter::PortMap> ios,
+                           StringRef name) {
+    // VHDL expects ports belonging to the same array to be mapped
+    // contiguously to each other, achieve this by string sorting array
+    // elements according to their module port name
+    std::sort(ios.begin(), ios.end(),
+              [](auto &firstIO, auto &secondIO) { return firstIO < secondIO; });
+
+    if (!ios.empty())
+      os << getComment(hdl) << " " << name << "\n";
+    for (RTLWriter::PortMap &portMap : ios) {
+      writePortMap(portMap, os);
+      if (--numIOLeft != 0)
+        os << ",";
+      os << "\n";
+    }
+  };
+
+  writePortsDir(map.inputs, "inputs");
+  writePortsDir(map.outputs, "outputs");
+}
+
 /// Returns the type's "raw" RTL type.
-std::optional<unsigned> getRawType(Type type) {
-  unsigned dataWidth = type.getIntOrFloatBitWidth();
+static std::optional<unsigned> getRawType(IntegerType intType) {
+  unsigned dataWidth = intType.getIntOrFloatBitWidth();
   assert(dataWidth != 0 && "0-width signals are not allowed");
   if (dataWidth == 1)
     return std::nullopt;
@@ -345,16 +397,35 @@ RTLWriter::EntityIO::EntityIO(hw::HWModuleOp modOp) {
     addPortType(resType, portAttr.str(), outputs, inputs);
 }
 
+void RTLWriter::PortMap::writeBracketedSignals(raw_indented_ostream &os) {
+  assert(!signalNames.empty() && "no signal name associated to port");
+  if (signalNames.size() == 1) {
+    os << signalNames.front();
+    return;
+  }
+
+  // VHDL and Verilog expect the first signal in the list to map to the port's
+  // higest index but we them in the opposite order, so we need to iterate on
+  // the ports in the reverse order
+  os << "{";
+  ArrayRef<std::string> signals(signalNames);
+  for (StringRef sig : llvm::reverse(signals.drop_front()))
+    os << sig << ", ";
+  os << signalNames.front();
+  os << "}";
+}
+
 RTLWriter::IOMap::IOMap(hw::InstanceOp instOp, const ExportInfo &info,
                         const FGetValueName &getValueName) {
+
   hw::HWModuleLike modOp = getHWModule(instOp);
   if (auto extModOp = dyn_cast<hw::HWModuleExternOp>(modOp.getOperation())) {
     const RTLMatch &match = *info.externals.at(extModOp);
     FGetTypedSignalName getTypedSignalName = [&](auto port, auto type) {
-      return match.component->getRTLPortName(port, type, hdl);
+      return match.component->getRTLPortName(port, type, ::hdl);
     };
     FGetSignalName getSignalName = [&](auto port) {
-      return match.component->getRTLPortName(port, hdl);
+      return match.component->getRTLPortName(port, ::hdl);
     };
     construct(instOp, modOp, getValueName, getTypedSignalName, getSignalName);
   } else {
@@ -371,27 +442,26 @@ void RTLWriter::IOMap::construct(hw::InstanceOp instOp, hw::HWModuleLike modOp,
                                  const FGetTypedSignalName &getTypedSignalName,
                                  const FGetSignalName &getSignalName) {
   auto addValidAndReady = [&](StringRef port, StringRef signal,
-                              std::vector<PortMapPair> &down,
-                              std::vector<PortMapPair> &up) -> void {
-    down.emplace_back(getTypedSignalName(port, SignalType::VALID),
-                      getInternalSignalName(signal, SignalType::VALID));
-    up.emplace_back(getTypedSignalName(port, SignalType::READY),
-                    getInternalSignalName(signal, SignalType::READY));
+                              std::vector<PortMap> &down,
+                              std::vector<PortMap> &up) -> void {
+    down.emplace_back(getTypedSignalName(port, SignalType::VALID))
+        .addSignal(getInternalSignalName(signal, SignalType::VALID));
+    up.emplace_back(getTypedSignalName(port, SignalType::READY))
+        .addSignal(getInternalSignalName(signal, SignalType::READY));
   };
 
   auto addPortType = [&](Type portType, StringRef port, StringRef signal,
-                         std::vector<PortMapPair> &down,
-                         std::vector<PortMapPair> &up) {
+                         std::vector<PortMap> &down, std::vector<PortMap> &up) {
     llvm::TypeSwitch<Type, void>(portType)
         .Case<handshake::ChannelType>([&](handshake::ChannelType channelType) {
-          down.emplace_back(getTypedSignalName(port, SignalType::DATA),
-                            getInternalSignalName(signal, SignalType::DATA));
+          down.emplace_back(getTypedSignalName(port, SignalType::DATA))
+              .addSignal(getInternalSignalName(signal, SignalType::DATA));
           addValidAndReady(port, signal, down, up);
         })
         .Case<handshake::ControlType>(
             [&](auto type) { addValidAndReady(port, signal, down, up); })
         .Case<IntegerType>([&](IntegerType intType) {
-          down.emplace_back(getSignalName(port), signal);
+          down.emplace_back(getSignalName(port)).addSignal(signal);
         });
   };
 
@@ -445,6 +515,10 @@ LogicalResult RTLWriter::createInternalSignals(WriteData &data) const {
   return success();
 }
 
+//===----------------------------------------------------------------------===//
+// VHDLWriter
+//===----------------------------------------------------------------------===//
+
 namespace {
 
 struct VHDLWriter : public RTLWriter {
@@ -478,8 +552,8 @@ private:
   /// Writes all module instantiations inside the entity's architecture.
   void writeModuleInstantiations(WriteData &data) const;
 
-  /// Writes IO mappings for a component instantiation.
-  void writeIOMap(hw::InstanceOp instOp, WriteData &data) const;
+  /// Writes a VHDL port mapping.
+  static void writePortMap(RTLWriter::PortMap &map, raw_indented_ostream &os);
 };
 
 } // namespace
@@ -610,6 +684,12 @@ void VHDLWriter::writeSignalAssignments(WriteData &data) const {
   }
 }
 
+void VHDLWriter::writePortMap(RTLWriter::PortMap &map,
+                              raw_indented_ostream &os) {
+  os << map.portName << " => ";
+  map.writeBracketedSignals(os);
+}
+
 void VHDLWriter::writeModuleInstantiations(WriteData &data) const {
   using KeyValuePair = std::pair<StringRef, StringRef>;
 
@@ -649,14 +729,12 @@ void VHDLWriter::writeModuleInstantiations(WriteData &data) const {
     }
     os << "\n";
 
+    // Write IO mappings
     os.indent();
     os << "port map(\n";
     os.indent();
-
-    // Write IO mappings between the hardware instance and the module's
-    // internal signals
-    writeIOMap(instOp, data);
-
+    writeIOMap(IOMap(instOp, exportInfo, data.getSignalNameFunc()),
+               writePortMap, os);
     os.unindent();
     os << ");\n";
     os.unindent();
@@ -664,31 +742,9 @@ void VHDLWriter::writeModuleInstantiations(WriteData &data) const {
   }
 }
 
-void VHDLWriter::writeIOMap(hw::InstanceOp instOp, WriteData &data) const {
-  IOMap ioMap(instOp, exportInfo, data.getSignalNameFunc());
-  size_t numIOLeft = ioMap.inputs.size() + ioMap.outputs.size();
-
-  raw_indented_ostream &os = data.os;
-  auto writePortsDir = [&](std::vector<PortMapPair> io, StringRef name) {
-    // VHDL expects ports belonging to the same array to be mapped
-    // contiguously to each other, achieve this by string sorting array
-    // elements according to their module port name
-    std::sort(io.begin(), io.end(),
-              [](auto &firstIO, auto &secondIO) { return firstIO < secondIO; });
-
-    if (!io.empty())
-      os << "-- " << name << "\n";
-    for (auto &[modPortName, internalSignalName] : io) {
-      os << modPortName << " => " << internalSignalName;
-      if (--numIOLeft != 0)
-        os << ",";
-      os << "\n";
-    }
-  };
-
-  writePortsDir(ioMap.inputs, "inputs");
-  writePortsDir(ioMap.outputs, "outputs");
-}
+//===----------------------------------------------------------------------===//
+// VerilogWriter
+//===----------------------------------------------------------------------===//
 
 namespace {
 
@@ -720,8 +776,8 @@ private:
   /// Writes all module instantiations inside the entity's architecture.
   void writeModuleInstantiations(WriteData &data) const;
 
-  /// Writes IO mappings for a component instantiation.
-  void writeIOMap(hw::InstanceOp instOp, WriteData &data) const;
+  /// Writes a Verilog port mapping.
+  static void writePortMap(RTLWriter::PortMap &map, raw_indented_ostream &os);
 };
 
 } // namespace
@@ -830,6 +886,13 @@ void VerilogWriter::writeSignalAssignments(WriteData &data) const {
   }
 }
 
+void VerilogWriter::writePortMap(RTLWriter::PortMap &map,
+                                 raw_indented_ostream &os) {
+  os << "." << map.portName << "(";
+  map.writeBracketedSignals(os);
+  os << ")";
+}
+
 void VerilogWriter::writeModuleInstantiations(WriteData &data) const {
   using KeyValuePair = std::pair<StringRef, StringRef>;
 
@@ -860,41 +923,15 @@ void VerilogWriter::writeModuleInstantiations(WriteData &data) const {
       auto [name, val] = genericParams.back();
       os << "." << name << "(" << val << ")) ";
     }
-
     os << instOp.getInstanceName() << "(\n";
+
+    // Write IO mappings
     os.indent();
-
-    // Write IO mappings between the hardware instance and the module's
-    // internal signals
-    writeIOMap(instOp, data);
-
+    writeIOMap(IOMap(instOp, exportInfo, data.getSignalNameFunc()),
+               writePortMap, os);
     os.unindent();
     os << ");\n\n";
   }
-}
-
-void VerilogWriter::writeIOMap(hw::InstanceOp instOp, WriteData &data) const {
-  IOMap ioMap(instOp, exportInfo, data.getSignalNameFunc());
-  size_t numIOLeft = ioMap.inputs.size() + ioMap.outputs.size();
-
-  raw_indented_ostream &os = data.os;
-  auto writePortsDir = [&](std::vector<PortMapPair> io, StringRef name) {
-    // Just to be consistent with the VHDL writer
-    std::sort(io.begin(), io.end(),
-              [](auto &firstIO, auto &secondIO) { return firstIO < secondIO; });
-
-    if (!io.empty())
-      os << "// " << name << "\n";
-    for (auto &[modPortName, internalSignalName] : io) {
-      os << "." << modPortName << " (" << internalSignalName << ")";
-      if (--numIOLeft != 0)
-        os << ",";
-      os << "\n";
-    }
-  };
-
-  writePortsDir(ioMap.inputs, "inputs");
-  writePortsDir(ioMap.outputs, "outputs");
 }
 
 /// Writes the RTL implementation corresponding to the hardware module in a
@@ -981,10 +1018,10 @@ int main(int argc, char **argv) {
   RTLWriter *writer;
   switch (hdl) {
   case HDL::VHDL:
-    writer = new VHDLWriter(info);
+    writer = new VHDLWriter(info, hdl);
     break;
   case HDL::VERILOG:
-    writer = new VerilogWriter(info);
+    writer = new VerilogWriter(info, hdl);
     break;
   }
 
