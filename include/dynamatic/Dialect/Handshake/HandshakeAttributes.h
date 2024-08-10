@@ -14,13 +14,36 @@
 #ifndef DYNAMATIC_DIALECT_HANDSHAKE_HANDSHAKE_ATTRIBUTES_H
 #define DYNAMATIC_DIALECT_HANDSHAKE_HANDSHAKE_ATTRIBUTES_H
 
-// #include "mlir/Dialect/Affine/Analysis/AffineAnalysis.h"
-#include "mlir/IR/Attributes.h"
+#include "dynamatic/Support/Utils/Utils.h"
 #include "mlir/IR/BuiltinAttributes.h"
+#include "mlir/IR/OpImplementation.h"
 #include "mlir/Support/LLVM.h"
+#include "llvm/ADT/StringRef.h"
 
 namespace dynamatic {
 namespace handshake {
+
+struct TimingInfo {
+  std::optional<unsigned> dataLatency;
+  std::optional<unsigned> validLatency;
+  std::optional<unsigned> readyLatency;
+
+  std::optional<unsigned> getLatency(SignalType type);
+
+  TimingInfo &setLatency(SignalType type, unsigned latency);
+
+  mlir::ParseResult parseKey(mlir::AsmParser &odsParser, mlir::StringRef key);
+
+private:
+  static constexpr llvm::StringLiteral DATA = "D", VALID = "V", READY = "R";
+
+  std::optional<SignalType> getCorrespondingSignalType(mlir::StringRef key);
+};
+
+bool operator==(const TimingInfo &lhs, const TimingInfo &rhs);
+
+// NOLINTNEXTLINE(readability-identifier-naming)
+llvm::hash_code hash_value(const TimingInfo &timing);
 
 /// Specifies how a handshake channel (i.e. a SSA value used once) may be
 /// buffered. Backing data-structure for the ChannelBufPropsAttr attribute.

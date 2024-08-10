@@ -20,6 +20,23 @@ namespace dynamatic {
 enum class SignalType { DATA, VALID, READY };
 /// The type of a port: IN or OUT.
 enum class PortType { IN, OUT };
+
+template <typename Os>
+Os &operator<<(Os &os, SignalType &type) {
+  switch (type) {
+  case SignalType::DATA:
+    os << "D";
+    break;
+  case SignalType::VALID:
+    os << "V";
+    break;
+  case SignalType::READY:
+    os << "R";
+    break;
+  }
+  return os;
+}
+
 } // namespace dynamatic
 
 #endif // DYNAMATIC_SUPPORT_UTILS_UTILS_H

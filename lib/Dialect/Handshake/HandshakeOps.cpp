@@ -176,40 +176,9 @@ namespace {
 // BufferOp
 //===----------------------------------------------------------------------===//
 
-static ParseResult parseBufferOp(OpAsmParser &parser, OperationState &result) {
-  SmallVector<OpAsmParser::UnresolvedOperand, 4> allOperands;
-  llvm::SMLoc loc = parser.getCurrentLocation();
-  Type type;
-  unsigned numSlots;
-
-  // Parse the operation's size between square brackets
-  if (parser.parseLSquare() || parser.parseInteger(numSlots) ||
-      parser.parseRSquare())
-    return failure();
-
-  if (parser.parseOperandList(allOperands) ||
-      parser.parseOptionalAttrDict(result.attributes) || parser.parseColon() ||
-      parseHandshakeType(parser, type))
-    return failure();
-
-  result.addTypes(type);
-  result.addAttribute(
-      "slots",
-      IntegerAttr::get(IntegerType::get(result.getContext(), 32), numSlots));
-
-  if (parser.resolveOperands(allOperands, {type}, loc, result.operands))
-    return failure();
-  return success();
+std::pair<handshake::ChannelType, bool> BufferOp::getReshapableChannelType() {
+  return {dyn_cast<handshake::ChannelType>(getOperand().getType()), true};
 }
-
-void printBufferOp(Operation *op, OpAsmPrinter &printer) {
-  BufferOpInterface bufferOp = cast<BufferOpInterface>(op);
-  Value oprd = op->getOperands().front();
-  printer << " [" << bufferOp.getSlots() << "] " << oprd;
-  printer.printOptionalAttrDict(op->getAttrs(), {"slots"});
-  printer << " : " << oprd.getType();
-}
-
 //===----------------------------------------------------------------------===//
 // MergeOp
 //===----------------------------------------------------------------------===//

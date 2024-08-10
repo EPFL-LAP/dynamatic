@@ -229,14 +229,6 @@ struct DefaultConstant : public ExecutableModel {
   bool tryExecute(ExecutableData &data, Operation &op) override;
 };
 
-struct DefaultOEHB : public ExecutableModel {
-  bool tryExecute(ExecutableData &data, Operation &op) override;
-};
-
-struct DefaultTEHB : public ExecutableModel {
-  bool tryExecute(ExecutableData &data, Operation &op) override;
-};
-
 /// Manages all store and load requests and answers them back
 struct DynamaticMemController : public ExecutableModel {
   bool tryExecute(ExecutableData &data, Operation &op) override;

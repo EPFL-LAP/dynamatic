@@ -235,8 +235,6 @@ dynamatic::experimental::initialiseMap(llvm::StringMap<std::string> &funcMap,
   addDefault<handshake::BranchOp, DefaultBranch>(modelStructuresMap);
   addDefault<handshake::SinkOp, DefaultSink>(modelStructuresMap);
   addDefault<handshake::ConstantOp, DefaultConstant>(modelStructuresMap);
-  addDefault<handshake::OEHBOp, DefaultOEHB>(modelStructuresMap);
-  addDefault<handshake::TEHBOp, DefaultTEHB>(modelStructuresMap);
   addDefault<handshake::ConditionalBranchOp, DefaultConditionalBranch>(
       modelStructuresMap);
   addDefault<handshake::ControlMergeOp, DefaultControlMerge>(
@@ -420,102 +418,6 @@ bool DefaultConstant::tryExecute(ExecutableData &data, Operation &opArg) {
   };
   return tryToExecute(op.getOperation(), data.circuitState, data.models,
                       executeFunc);
-}
-
-bool DefaultOEHB::tryExecute(ExecutableData &data, Operation &opArg) {
-  auto op = dyn_cast<handshake::OEHBOp>(opArg);
-
-  OEHBdata oehbData;
-  if (!internalDataExists(opArg, data.internalDataMap)) {
-    oehbData.registerEnable = false;
-    oehbData.content = std::nullopt;
-    setInternalData<OEHBdata>(opArg, oehbData, data.internalDataMap);
-  } else {
-    getInternalData<OEHBdata>(opArg, oehbData, data.internalDataMap);
-  }
-
-  oehbData.registerEnable =
-      data.circuitState.channelMap[op.getOperand()].isReady &&
-      data.circuitState.channelMap[op.getOperand()].isValid;
-
-  bool outsValid =
-      data.circuitState.channelMap[op.getResult()].isValid; // useless right ?
-  bool insReady = !data.circuitState.channelMap[op.getResult()].isValid ||
-                  data.circuitState.channelMap[op.getResult()].isReady;
-  // On rising edge
-  if (data.circuitState.onRisingEdge(opArg)) {
-    outsValid = data.circuitState.channelMap[op.getOperand()].isValid &&
-                !data.circuitState.channelMap[op.getOperand()].isReady;
-    // If input is ready and valid, store the data
-    if (oehbData.registerEnable)
-      oehbData.content = data.circuitState.getDataOpt(op.getOperand());
-  }
-
-  // Update dataflow
-  data.circuitState.channelMap[op.getOperand()].isReady = insReady;
-  data.circuitState.channelMap[op.getResult()].isValid = outsValid;
-
-  // Whatsoever, the data is pushed
-  data.circuitState.channelMap[op.getResult()].data = oehbData.content;
-
-  // Re-store data
-  setInternalData(opArg, oehbData, data.internalDataMap);
-
-  auto executeFunc = [](std::vector<llvm::Any> &ins,
-                        std::vector<llvm::Any> &outs,
-                        Operation &op) { outs[0] = ins[0]; };
-  return tryToExecute(op, data.circuitState, data.models, executeFunc);
-}
-
-bool DefaultTEHB::tryExecute(ExecutableData &data, Operation &opArg) {
-  auto op = dyn_cast<handshake::TEHBOp>(opArg);
-
-  // Instanciates registers
-  TEHBdata tehbData;
-  if (!internalDataExists(opArg, data.internalDataMap))
-    tehbData.slots = op.getSlots();
-  else
-    getInternalData<TEHBdata>(opArg, tehbData, data.internalDataMap);
-
-  bool alreadySent = false;
-
-  // On rising edge
-  if (data.circuitState.onRisingEdge(opArg)) {
-    alreadySent = data.circuitState.channelMap[op.getResult()].isValid &&
-                  !data.circuitState.channelMap[op.getResult()].isReady;
-
-    // If something is being done this cycle, stack the data
-    if (alreadySent) {
-      assert((tehbData.queue.size() + 1) <= tehbData.slots &&
-             "FIFO buffer is full!");
-      tehbData.queue.push(
-          llvm::any_cast<APInt>(data.circuitState.getData(op.getOperand())));
-      // Otherwise, let is pass and live
-    } else {
-      // Either get the data from the input or from the queue
-      if (tehbData.queue.empty()) {
-        data.circuitState.storeValueOnRisingEdge(
-            op.getResult(), data.circuitState.getDataOpt(op.getOperand()));
-      } else {
-        APInt fifoOut = tehbData.queue.front();
-        tehbData.queue.pop();
-        data.circuitState.storeValueOnRisingEdge(op.getResult(), fifoOut);
-      }
-    }
-  }
-
-  // Update dataflow states (fifo updates ins ready and outs valid)
-  data.circuitState.channelMap[op.getOperand()].isReady = !alreadySent;
-  data.circuitState.channelMap[op.getResult()].isValid =
-      data.circuitState.channelMap[op.getOperand()].isReady || alreadySent;
-
-  // Re-store data
-  setInternalData<TEHBdata>(opArg, tehbData, data.internalDataMap);
-
-  auto executeFunc = [](std::vector<llvm::Any> &ins,
-                        std::vector<llvm::Any> &outs,
-                        Operation &op) { outs[0] = ins[0]; };
-  return tryToExecute(op, data.circuitState, data.models, executeFunc);
 }
 
 //--- Dynamatic models -------------------------------------------------------//

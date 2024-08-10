@@ -251,8 +251,22 @@ def MemDependenceArrayAttr : Handshake_Attr<"MemDependenceArray", "deps"> {
 }
 
 //===----------------------------------------------------------------------===//
-// Buffer placement annotations
+// Buffer annotations
 //===----------------------------------------------------------------------===//
+
+def TimingInfo : TypeParameter<
+  "::dynamatic::handshake::TimingInfo", "timing information"> {
+}
+
+def TimingAttr : Handshake_Attr<"Timing", "timing"> {
+ let summary = "the timing characteristics of an operation";
+  let description = [{
+  }];
+  
+  let parameters = (ins TimingInfo:$info);
+  
+  let hasCustomAssemblyFormat = 1; 
+}
 
 def ChannelBufPropsAttr : Handshake_Attr<"ChannelBufProps", "channelBufProps"> {
   let summary = "Buffering properties of a single channel";
