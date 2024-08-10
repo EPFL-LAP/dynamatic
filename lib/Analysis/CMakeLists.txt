@@ -3,7 +3,6 @@ add_dynamatic_library(DynamaticAnalysis
   NameAnalysis.cpp
   NumericAnalysis.cpp
   ControlDependenceAnalysis.cpp
-  GsaAnalysis.cpp
 
   LINK_LIBS PUBLIC
   MLIRIR
