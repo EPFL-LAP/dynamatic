@@ -337,7 +337,6 @@ create_symlink "$POLYGEIST_DIR"/llvm-project/build/bin/clang++
 create_symlink ../build/bin/dynamatic
 create_symlink ../build/bin/dynamatic-opt
 create_symlink ../build/bin/export-dot
-create_symlink ../build/bin/export-vhdl
 create_symlink ../build/bin/exp-frequency-profiler
 create_symlink ../build/bin/handshake-simulator
 create_symlink ../build/bin/hls-verifier

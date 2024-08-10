@@ -95,7 +95,7 @@ struct FrontendState {
   double targetCP = 4.0;
   std::optional<std::string> sourcePath = std::nullopt;
 
-  FrontendState(StringRef cwd) : cwd(cwd), dynamaticPath(cwd){};
+  FrontendState(StringRef cwd) : cwd(cwd), dynamaticPath(cwd) {};
 
   bool sourcePathIsSet(StringRef keyword);
 
@@ -130,7 +130,7 @@ struct Argument {
 
   Argument() = default;
 
-  Argument(StringRef name, StringRef desc) : name(name), desc(desc){};
+  Argument(StringRef name, StringRef desc) : name(name), desc(desc) {};
 };
 
 struct CommandArguments {
@@ -195,7 +195,7 @@ private:
 class Exit : public Command {
 public:
   Exit(FrontendState &state)
-      : Command("exit", "Exits the Dynamatic frontend", state){};
+      : Command("exit", "Exits the Dynamatic frontend", state) {};
 
   CommandResult execute(CommandArguments &args) override;
 };
@@ -203,7 +203,7 @@ public:
 class Help : public Command {
 public:
   Help(FrontendState &state)
-      : Command("help", "Displays this help message", state){};
+      : Command("help", "Displays this help message", state) {};
 
   CommandResult execute(CommandArguments &args) override;
 };
@@ -266,8 +266,7 @@ public:
 
 class WriteHDL : public Command {
 public:
-  static constexpr llvm::StringLiteral EXPERIMENTAL = "experimental",
-                                       HDL = "hdl";
+  static constexpr llvm::StringLiteral HDL = "hdl";
 
   WriteHDL(FrontendState &state)
       : Command(
@@ -275,7 +274,6 @@ public:
             "Converts the DOT file produced after compile to VHDL using the "
             "export-dot tool",
             state) {
-    addFlag({EXPERIMENTAL, "Use experimental backend"});
     addOption({HDL, "HDL to use for design's top-level"});
   }
 
@@ -284,30 +282,22 @@ public:
 
 class Simulate : public Command {
 public:
-  static constexpr llvm::StringLiteral EXPERIMENTAL = "experimental";
-
   Simulate(FrontendState &state)
       : Command("simulate",
                 "Simulates the VHDL produced during HDL writing using Modelsim "
                 "and the hls-verifier tool",
-                state) {
-    addFlag({EXPERIMENTAL, "Use experimental backend"});
-  }
+                state) {}
 
   CommandResult execute(CommandArguments &args) override;
 };
 
 class Visualize : public Command {
 public:
-  static constexpr llvm::StringLiteral EXPERIMENTAL = "experimental";
-
   Visualize(FrontendState &state)
       : Command(
             "visualize",
             "Visualizes the execution of the circuit simulated by Modelsim.",
-            state) {
-    addFlag({EXPERIMENTAL, "Use experimental backend"});
-  }
+            state) {}
 
   CommandResult execute(CommandArguments &args) override;
 };
@@ -585,7 +575,6 @@ CommandResult WriteHDL::execute(CommandArguments &args) {
     return CommandResult::FAIL;
 
   std::string script = state.getScriptsPath() + getSeparator() + "write-hdl.sh";
-  std::string experimental = args.flags.contains(EXPERIMENTAL) ? "1" : "0";
   std::string hdl = "vhdl";
 
   if (auto it = args.options.find(HDL); it != args.options.end()) {
@@ -600,7 +589,7 @@ CommandResult WriteHDL::execute(CommandArguments &args) {
   }
 
   return execCmd(script, state.dynamaticPath, state.getOutputDir(),
-                 state.getKernelName(), experimental, hdl);
+                 state.getKernelName(), hdl);
 }
 
 CommandResult Simulate::execute(CommandArguments &args) {
@@ -609,10 +598,8 @@ CommandResult Simulate::execute(CommandArguments &args) {
     return CommandResult::FAIL;
 
   std::string script = state.getScriptsPath() + getSeparator() + "simulate.sh";
-  std::string experimental = args.flags.contains(EXPERIMENTAL) ? "1" : "0";
-
   return execCmd(script, state.dynamaticPath, state.getKernelDir(),
-                 state.getOutputDir(), state.getKernelName(), experimental);
+                 state.getOutputDir(), state.getKernelName());
 }
 
 CommandResult Visualize::execute(CommandArguments &args) {
@@ -626,10 +613,9 @@ CommandResult Visualize::execute(CommandArguments &args) {
                         state.getKernelName() + ".dot";
   std::string wlfPath = state.getOutputDir() + sep + "sim" + sep +
                         "HLS_VERIFY" + sep + "vsim.wlf";
-  std::string experimental = args.flags.contains(EXPERIMENTAL) ? "1" : "0";
 
   return execCmd(script, state.dynamaticPath, dotPath, wlfPath,
-                 state.getOutputDir(), state.getKernelName(), experimental);
+                 state.getOutputDir(), state.getKernelName());
 }
 
 CommandResult Synthesize::execute(CommandArguments &args) {

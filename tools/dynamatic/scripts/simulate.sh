@@ -11,7 +11,6 @@ DYNAMATIC_DIR=$1
 SRC_DIR=$2
 OUTPUT_DIR=$3
 KERNEL_NAME=$4
-EXPERIMENTAL=$5
 
 # Generated directories/files
 SIM_DIR="$OUTPUT_DIR/sim"
@@ -49,9 +48,6 @@ cp "$DYNAMATIC_DIR/include/dynamatic/Integration.h" "$DYN_INCLUDE_DIR"
 # Copy VHDL module and VHDL components to dedicated folder
 cp "$HDL_DIR/"*.vhd "$VHDL_SRC_DIR" 2> /dev/null
 cp "$HDL_DIR/"*.v "$VHDL_SRC_DIR" 2> /dev/null
-if [[ $EXPERIMENTAL -eq 0 ]]; then
-  cp "$DYNAMATIC_DIR"/data/vhdl/*.vhd "$VHDL_SRC_DIR"
-fi
 
 # Copy sources to dedicated folder
 cp "$SRC_DIR/$KERNEL_NAME.c" "$C_SRC_DIR" 
@@ -68,15 +64,10 @@ exit_on_fail "Failed to build kernel for IO gen." "Built kernel for IO gen."
 "$IO_GEN_BIN"
 exit_on_fail "Failed to run kernel for IO gen." "Ran kernel for IO gen." 
 
-MODULE_NAME="$KERNEL_NAME"
-if [[ $EXPERIMENTAL -ne 0 ]]; then
-  MODULE_NAME="$KERNEL_NAME"_wrapper
-fi
-
 # Simulate and verify design
 echo_info "Launching Modelsim simulation"
 cd "$HLS_VERIFY_DIR"
 "$HLS_VERIFIER_BIN" cover -aw32 "$RESOURCE_DIR" "../C_SRC/$KERNEL_NAME.c" \
-  "../C_SRC/$KERNEL_NAME.c" "$KERNEL_NAME" "$MODULE_NAME" "$EXPERIMENTAL" \
+  "../C_SRC/$KERNEL_NAME.c" "$KERNEL_NAME" "$KERNEL_NAME"_wrapper \
   > "../report.txt"
 exit_on_fail "Simulation failed" "Simulation succeeded"
