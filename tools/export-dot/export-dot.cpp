@@ -17,7 +17,6 @@
 //===----------------------------------------------------------------------===//
 
 #include "dynamatic/Support/DOTPrinter.h"
-#include "dynamatic/Support/TimingModels.h"
 #include "mlir/Dialect/Math/IR/Math.h"
 #include "mlir/Dialect/MemRef/IR/MemRef.h"
 #include "mlir/IR/BuiltinOps.h"
@@ -47,19 +46,6 @@ static cl::opt<std::string> timingDBFilepath(
         "the relative path (from the project's top-level directory) to the "
         "file defining the default timing models in Dynamatic."),
     cl::init("data/components.json"), cl::cat(mainCategory));
-
-static cl::opt<std::string> modeArg(
-    "mode", cl::Optional,
-    cl::desc(
-        "Mode in which to run the export tool. This allows to control the "
-        "structure of the resulting DOT. In particular, the tool's output "
-        "can be made compatible with some of legacy Dynamatic's tools, at "
-        "the cost of added constraints on the input IR (which may be "
-        "\"too general\" for legacy Dynamatic). Available modes are:\n"
-        "\t- visual (cleanest to look at, default)\n"
-        "\t- legacy (compatible with legacy dot2vhdl tool)\n"
-        "\t- legacy-buffers (compatible with legacy Buffers/dot2vhdl tools)"),
-    cl::init("visual"), cl::cat(mainCategory));
 
 static cl::opt<std::string> edgeStyleArg(
     "edge-style", cl::Optional,
@@ -103,48 +89,18 @@ int main(int argc, char **argv) {
   if (!module)
     return 1;
 
-  // Decode the "mode" argument
-  DOTPrinter::Mode mode;
-  if (modeArg == "visual")
-    mode = DOTPrinter::Mode::VISUAL;
-  else if (modeArg == "legacy")
-    mode = DOTPrinter::Mode::LEGACY;
-  else if (modeArg == "legacy-buffers")
-    mode = DOTPrinter::Mode::LEGACY_BUFFERS;
-  else {
-    llvm::errs() << "Unkwown mode \"" << modeArg
-                 << "\" provided, must be one of \"visual\", \"legacy\", "
-                    "\"legacy-buffers\".\n";
-    return 1;
-  }
-
   // Decode the "edgeStyle" argument
   DOTPrinter::EdgeStyle edgeStyle;
-  if (edgeStyleArg == "spline")
+  if (edgeStyleArg == "spline") {
     edgeStyle = DOTPrinter::EdgeStyle::SPLINE;
-  else if (edgeStyleArg == "ortho")
+  } else if (edgeStyleArg == "ortho") {
     edgeStyle = DOTPrinter::EdgeStyle::ORTHO;
-  else {
+  } else {
     llvm::errs() << "Unkwown edge style \"" << edgeStyleArg
                  << "\" provided, must be one of \"spline\", \"ortho\".\n";
     return 1;
   }
 
-  bool legacyCompMode = mode == DOTPrinter::Mode::LEGACY ||
-                        mode == DOTPrinter::Mode::LEGACY_BUFFERS;
-  if (legacyCompMode) {
-    // In legacy mode, read timing models for dataflow components from a
-    // JSON-formatted database
-    TimingDatabase timingDB(&context);
-    if (failed(TimingDatabase::readFromJSON(timingDBFilepath, timingDB))) {
-      llvm::errs() << "Failed to read timing database at \"" << timingDBFilepath
-                   << "\"\n";
-      return 1;
-    }
-    DOTPrinter printer(mode, edgeStyle, &timingDB);
-    return failed(printer.print(*module));
-  }
-
-  DOTPrinter printer(mode, edgeStyle);
+  DOTPrinter printer(edgeStyle);
   return failed(printer.print(*module));
 }
