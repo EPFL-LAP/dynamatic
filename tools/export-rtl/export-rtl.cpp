@@ -6,9 +6,9 @@
 //
 //===----------------------------------------------------------------------===//
 //
-// Experimental tool that exports RTL from HW-level IR. Files corresponding to
-// internal and external modules are written inside a provided output directory
-// (which is created if necessary).
+// Exports RTL from HW-level IR. Files corresponding to internal and external
+// modules are written inside a provided output directory (which is created if
+// necessary).
 //
 //===----------------------------------------------------------------------===//
 

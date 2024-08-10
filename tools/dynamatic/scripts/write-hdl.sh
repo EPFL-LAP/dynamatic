@@ -14,10 +14,7 @@ HDL=$4
 
 # Generated directories/files
 HDL_DIR="$OUTPUT_DIR/hdl"
-
-# Shortcuts
 COMP_DIR="$OUTPUT_DIR/comp"
-LSQ_JAR="$DYNAMATIC_DIR/bin/generators/lsq-generator.jar"
 
 # ============================================================================ #
 # HDL writing flow
@@ -26,9 +23,9 @@ LSQ_JAR="$DYNAMATIC_DIR/bin/generators/lsq-generator.jar"
 # Reset output directory
 rm -rf "$HDL_DIR" && mkdir -p "$HDL_DIR"
 
-"$DYNAMATIC_DIR/build/bin/exp-export-rtl" "$COMP_DIR/hw.mlir" "$HDL_DIR" \
-  "$DYNAMATIC_DIR/experimental/data/rtl-config.json" \
-  --dynamatic-path "$DYNAMATIC_DIR" --hdl $HDL
+"$DYNAMATIC_DIR/bin/export-rtl" "$COMP_DIR/hw.mlir" "$HDL_DIR" \
+  "$DYNAMATIC_DIR/data/rtl-config.json" --dynamatic-path "$DYNAMATIC_DIR" \
+  --hdl $HDL
 exit_on_fail "Failed to export RTL ($HDL)" "Exported RTL ($HDL)"
 
 echo_info "HDL generation succeeded"
