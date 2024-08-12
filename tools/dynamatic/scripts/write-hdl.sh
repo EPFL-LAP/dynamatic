@@ -14,9 +14,9 @@ HDL=$4
 
 # Set the correct config file
 if [ "$HDL" == "vhdl" ]; then
-  RTL_CONFIG="$DYNAMATIC_DIR/experimental/data/rtl-config.json"
+  RTL_CONFIG="$DYNAMATIC_DIR/data/rtl-config.json"
 elif [ "$HDL" == "verilog" ]; then
-  RTL_CONFIG="$DYNAMATIC_DIR/experimental/data/rtl-config-verilog.json"
+  RTL_CONFIG="$DYNAMATIC_DIR/data/rtl-config-verilog.json"
 fi
 
 # Generated directories/files
