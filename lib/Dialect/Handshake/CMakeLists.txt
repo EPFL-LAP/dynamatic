@@ -3,6 +3,7 @@ mlir_tablegen(HandshakeCanonicalization.inc -gen-rewriters)
 add_public_tablegen_target(DynamaticHandshakeCanonicalizationIncGen)
 
 add_dynamatic_dialect_library(DynamaticHandshake
+  HandshakeAttributes.cpp
   HandshakeCanonicalize.cpp
   HandshakeOps.cpp
   HandshakeDialect.cpp

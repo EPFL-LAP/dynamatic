@@ -14,6 +14,7 @@
 
 #include "dynamatic/Transforms/BufferPlacement/HandshakePlaceBuffers.h"
 #include "dynamatic/Analysis/NameAnalysis.h"
+#include "dynamatic/Dialect/Handshake/HandshakeAttributes.h"
 #include "dynamatic/Dialect/Handshake/HandshakeOps.h"
 #include "dynamatic/Support/CFG.h"
 #include "dynamatic/Support/Logging.h"
@@ -23,7 +24,6 @@
 #include "dynamatic/Transforms/BufferPlacement/FPL22Buffers.h"
 #include "dynamatic/Transforms/HandshakeMaterialize.h"
 #include "experimental/Support/StdProfiler.h"
-#include "mlir/IR/BuiltinTypes.h"
 #include "mlir/IR/OperationSupport.h"
 #include "mlir/Support/IndentedOstream.h"
 #include "llvm/ADT/StringRef.h"
@@ -520,21 +520,18 @@ void HandshakePlaceBuffersPass::instantiateBuffers(BufferPlacement &placement) {
   MLIRContext *ctx = &getContext();
   OpBuilder builder(ctx);
   NameAnalysis &nameAnalysis = getAnalysis<NameAnalysis>();
-  StringAttr slotName = StringAttr::get(ctx, "slots");
+
   for (auto &[channel, placeRes] : placement) {
     Operation *opDst = *channel.getUsers().begin();
     builder.setInsertionPoint(opDst);
 
     Value bufferIn = channel;
-    auto placeBuffer = [&](StringRef bufName, unsigned numSlots) {
+    auto placeBuffer = [&](const TimingInfo &timing, unsigned numSlots) {
       if (numSlots == 0)
         return;
 
-      // Insert an opaque buffer
-      NamedAttribute slots(slotName, builder.getI32IntegerAttr(numSlots));
-      StringAttr opName = StringAttr::get(ctx, bufName);
-      auto *bufOp = builder.create(bufferIn.getLoc(), opName, bufferIn,
-                                   {bufferIn.getType()}, {slots});
+      auto bufOp = builder.create<handshake::BufferOp>(
+          bufferIn.getLoc(), bufferIn, timing, numSlots);
       inheritBB(opDst, bufOp);
       nameAnalysis.setName(bufOp);
 
@@ -544,11 +541,11 @@ void HandshakePlaceBuffersPass::instantiateBuffers(BufferPlacement &placement) {
     };
 
     if (placeRes.opaqueBeforeTrans) {
-      placeBuffer(handshake::OEHBOp::getOperationName(), placeRes.numOpaque);
-      placeBuffer(handshake::TEHBOp::getOperationName(), placeRes.numTrans);
+      placeBuffer(TimingInfo::oehb(), placeRes.numOpaque);
+      placeBuffer(TimingInfo::tehb(), placeRes.numTrans);
     } else {
-      placeBuffer(handshake::TEHBOp::getOperationName(), placeRes.numTrans);
-      placeBuffer(handshake::OEHBOp::getOperationName(), placeRes.numOpaque);
+      placeBuffer(TimingInfo::tehb(), placeRes.numTrans);
+      placeBuffer(TimingInfo::oehb(), placeRes.numOpaque);
     }
   }
 }

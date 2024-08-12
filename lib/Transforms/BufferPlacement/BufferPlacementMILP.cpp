@@ -321,7 +321,7 @@ void BufferPlacementMILP::addChannelElasticityConstraints(
   // If there is at least one slot, there must be a buffer
   model.addConstr(0.01 * bufNumSlots <= bufPresent, "elastic_presence");
 
-  for (auto [sig, signalVars] : channelVars.signalVars) {
+  for (auto &[sig, signalVars] : channelVars.signalVars) {
     // If there is a buffer present on a signal, then there is a buffer present
     // on the channel
     model.addConstr(signalVars.bufPresent <= bufPresent,

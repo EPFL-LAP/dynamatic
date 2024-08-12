@@ -1,0 +1,75 @@
+[
+  {
+    "name": "test_boolean",
+    "parameters": [
+      { "name": "PARAM_1", "type": "boolean" },
+      { "name": "PARAM_2", "type": "boolean", "eq": true },
+      { "name": "PARAM_3", "type": "boolean", "ne": false }
+    ],
+    "generic": "/path/to/test_boolean"
+  },
+  {
+    "name": "test_unsigned",
+    "parameters": [
+      { "name": "PARAM_1", "type": "unsigned" },
+      { "name": "PARAM_2", "type": "unsigned", "lb": 1, "ub": 5 },
+      { "name": "PARAM_3", "type": "unsigned", "range": [1, 5] },
+      { "name": "PARAM_4", "type": "unsigned", "eq": 1 },
+      { "name": "PARAM_5", "type": "unsigned", "ne": 1 }
+    ],
+    "generic": "/path/to/test_unsigned"
+  },
+  {
+    "name": "test_string",
+    "parameters": [
+      { "name": "PARAM_1", "type": "string" },
+      { "name": "PARAM_2", "type": "string", "eq": "my_string" },
+      { "name": "PARAM_3", "type": "string", "ne": "not_my_string" }
+    ],
+    "generic": "/path/to/test_string"
+  },
+  {
+    "name": "test_channel",
+    "parameters": [
+      { "name": "PARAM_1", "type": "channel" },
+      {
+        "name": "PARAM_2",
+        "type": "channel",
+        "data-ne": 4,
+        "data-range": [0, 10]
+      },
+      { "name": "PARAM_3", "type": "channel", "extra-eq": 0 },
+      { "name": "PARAM_4", "type": "channel", "down-lb": 1 },
+      { "name": "PARAM_5", "type": "channel", "up-ub": 1 }
+    ],
+    "generic": "/path/to/test_channel"
+  },
+  {
+    "name": "test_timing",
+    "parameters": [
+      { "name": "PARAM_1", "type": "timing" },
+      {
+        "name": "PARAM_2",
+        "type": "timing",
+        "data-lat-ne": 4,
+        "data-lat-range": [0, 10]
+      },
+      { "name": "PARAM_3", "type": "timing", "valid-lat-eq": 0 },
+      { "name": "PARAM_4", "type": "timing", "valid-lat-lb": 1 },
+      { "name": "PARAM_5", "type": "timing", "ready-lat-ub": 1 }
+    ],
+    "generic": "/path/to/test_channels"
+  },
+  {
+    "name": "test_models",
+    "parameters": [{ "name": "PARAM", "type": "unsigned" }],
+    "generic": "/path/to/test_models",
+    "models": [
+      {
+        "constraints": [{ "name": "PARAM", "range": [0, 10] }],
+        "path": "/path/to/specific/model"
+      },
+      { "path": "/path/to/fallback/model" }
+    ]
+  }
+]

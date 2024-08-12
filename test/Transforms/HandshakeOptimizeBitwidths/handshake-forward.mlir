@@ -134,14 +134,14 @@ handshake.func @condBrFw(%arg0: !handshake.channel<i16>, %cond: !handshake.chann
 // CHECK-LABEL:   handshake.func @bufferFW(
 // CHECK-SAME:                             %[[VAL_0:.*]]: !handshake.channel<i16>,
 // CHECK-SAME:                             %[[VAL_1:.*]]: !handshake.control<>, ...) -> !handshake.channel<i32> attributes {argNames = ["arg0", "start"], resNames = ["out0"]} {
-// CHECK:           %[[VAL_2:.*]] = oehb [2] %[[VAL_0]] : !handshake.channel<i16>
+// CHECK:           %[[VAL_2:.*]] = buffer %[[VAL_0]] : <i16>
 // CHECK:           %[[VAL_3:.*]] = extsi %[[VAL_2]] : <i16> to <i32>
 // CHECK:           %[[VAL_4:.*]] = return %[[VAL_3]] : <i32>
 // CHECK:           end %[[VAL_4]] : <i32>
 // CHECK:         }
 handshake.func @bufferFW(%arg0: !handshake.channel<i16>, %start: !handshake.control<>) -> !handshake.channel<i32> {
   %ext0 = extsi %arg0 : <i16> to <i32>
-  %buf = oehb [2] %ext0 : <i32>
+  %buf = buffer %ext0 : <i32>
   %returnVal = return %buf : <i32>
   end %returnVal : <i32>
 }

@@ -16,13 +16,14 @@
 #include "dynamatic/Dialect/HW/HWOps.h"
 #include "dynamatic/Dialect/HW/HWTypes.h"
 #include "dynamatic/Dialect/HW/PortImplementation.h"
+#include "dynamatic/Dialect/Handshake/HandshakeAttributes.h"
 #include "dynamatic/Dialect/Handshake/HandshakeDialect.h"
 #include "dynamatic/Dialect/Handshake/HandshakeInterfaces.h"
 #include "dynamatic/Dialect/Handshake/HandshakeOps.h"
 #include "dynamatic/Dialect/Handshake/HandshakeTypes.h"
 #include "dynamatic/Dialect/Handshake/MemoryInterfaces.h"
 #include "dynamatic/Support/Backedge.h"
-#include "dynamatic/Support/RTL.h"
+#include "dynamatic/Support/Utils/Utils.h"
 #include "dynamatic/Transforms/HandshakeMaterialize.h"
 #include "mlir/Dialect/MemRef/IR/MemRef.h"
 #include "mlir/IR/Attributes.h"
@@ -336,8 +337,51 @@ public:
   ModuleDiscriminator(FuncMemoryPorts &ports);
 
   /// Returns the unique external module name for the operation. Two operations
-  /// with different parameter values will never received the same name.
-  std::string getDiscriminatedModName() { return modName; }
+  /// with different parameter values will never receive the same name.
+  std::string getDiscriminatedModName() {
+    if (modName)
+      return *modName;
+
+    auto modOp = op->getParentOfType<mlir::ModuleOp>();
+    StringRef opName = op->getName().getStringRef();
+
+    // Try to find an external module with the same RTL name and parameters. If
+    // we find one, then we can assign the same external module name to the
+    // operation
+    auto externalModules = modOp.getOps<hw::HWModuleExternOp>();
+    auto extModOp = llvm::find_if(externalModules, [&](auto extModOp) {
+      auto nameAttr =
+          extModOp->template getAttrOfType<StringAttr>(RTL_NAME_ATTR_NAME);
+      if (!nameAttr || nameAttr != opName)
+        return false;
+
+      auto paramsAttr = extModOp->template getAttrOfType<DictionaryAttr>(
+          RTL_PARAMETERS_ATTR_NAME);
+      if (!paramsAttr)
+        return false;
+
+      if (paramsAttr.size() != parameters.size())
+        return false;
+      for (NamedAttribute param : parameters) {
+        auto modParam = paramsAttr.getNamed(param.getName());
+        if (!modParam || param.getValue() != modParam->getValue())
+          return false;
+      }
+      return true;
+    });
+    if (extModOp != externalModules.end())
+      return (*extModOp).getName().str();
+
+    // Generate a unique name
+    std::string name = getOpName() + "_";
+    for (size_t i = 0;; ++i) {
+      std::string candidateName = name + std::to_string(i);
+      if (!modOp.lookupSymbol<hw::HWModuleExternOp>(candidateName))
+        return candidateName;
+    }
+    llvm_unreachable("cannot generate unique name");
+    return name;
+  }
 
   /// Sets attribute on the external module (corresponding to the operation the
   /// object was constructed with) to tell the backend how to instantiate the
@@ -356,8 +400,9 @@ private:
   Operation *op;
   /// MLIR context to create attributes with.
   MLIRContext *ctx;
-  /// Discriminated module name.
-  std::string modName;
+  /// The module name may be set explicitly for some operation types or
+  /// derived/uniqued automatically based on the RTL parameters.
+  std::optional<std::string> modName;
   /// The operation's parameters, as a list of named attributes.
   SmallVector<NamedAttribute> parameters;
 
@@ -372,14 +417,12 @@ private:
   /// Adds a boolean-type parameter.
   void addBoolean(const Twine &name, bool value) {
     addParam(name, BoolAttr::get(ctx, value));
-    modName += "_" + std::to_string(value);
   };
 
   /// Adds a scalar-type parameter.
   void addUnsigned(const Twine &name, unsigned scalar) {
     Type intType = IntegerType::get(ctx, 32, IntegerType::Unsigned);
     addParam(name, IntegerAttr::get(intType, scalar));
-    modName += "_" + std::to_string(scalar);
   };
 
   /// Adds a bitwdith parameter extracted from a type.
@@ -395,31 +438,33 @@ private:
   /// Adds a string parameter.
   void addString(const Twine &name, const Twine &txt) {
     addParam(name, StringAttr::get(ctx, txt));
-    modName += "_" + txt.str();
   };
 
-  /// Returns the module name's prefix from the name of the operation it
-  /// represents.
-  std::string setModPrefix(Operation *op) {
-    std::string prefixModName = op->getName().getStringRef().str();
-    std::replace(prefixModName.begin(), prefixModName.end(), '.', '_');
-    return prefixModName;
+  std::string getOpName() const {
+    std::string opName = op->getName().getStringRef().str();
+    std::replace(opName.begin(), opName.end(), '.', '_');
+    return opName;
+  }
+
+  /// Initializes private fields from the input operation.
+  void init(Operation *op) {
+    this->op = op;
+    ctx = op->getContext();
+    auto paramsAttr =
+        op->getAttrOfType<DictionaryAttr>(RTL_PARAMETERS_ATTR_NAME);
+    if (!paramsAttr)
+      return;
+    llvm::copy(paramsAttr.getValue(), std::back_inserter(parameters));
   }
 };
 } // namespace
 
-ModuleDiscriminator::ModuleDiscriminator(Operation *op)
-    : op(op), ctx(op->getContext()), modName(setModPrefix(op)) {
+ModuleDiscriminator::ModuleDiscriminator(Operation *op) {
+  init(op);
 
   llvm::TypeSwitch<Operation *, void>(op)
       .Case<handshake::InstanceOp>(
           [&](handshake::InstanceOp instOp) { modName = instOp.getModule(); })
-      .Case<handshake::BufferOpInterface>(
-          [&](handshake::BufferOpInterface bufOp) {
-            // Number of slots and bitwdith
-            addUnsigned("SLOTS", bufOp.getSlots());
-            addBitwidth("DATA_WIDTH", op->getResult(0));
-          })
       .Case<handshake::ForkOp, handshake::LazyForkOp>([&](auto) {
         // Number of output channels and bitwidth
         addUnsigned("SIZE", op->getNumResults());
@@ -443,10 +488,15 @@ ModuleDiscriminator::ModuleDiscriminator(Operation *op)
         addUnsigned("SIZE", op->getNumOperands());
         addBitwidth("DATA_WIDTH", op->getResult(0));
       })
-      .Case<handshake::BranchOp, handshake::SinkOp>([&](auto) {
-        // Bitwidth
-        addBitwidth("DATA_WIDTH", op->getOperand(0));
+      .Case<handshake::JoinOp>([&](auto) {
+        // Number of input channels
+        addUnsigned("SIZE", op->getNumOperands());
       })
+      .Case<handshake::BranchOp, handshake::SinkOp, handshake::BufferOp>(
+          [&](auto) {
+            // Bitwidth
+            addBitwidth("DATA_WIDTH", op->getOperand(0));
+          })
       .Case<handshake::ConditionalBranchOp>(
           [&](handshake::ConditionalBranchOp cbrOp) {
             // Bitwidth
@@ -565,8 +615,8 @@ ModuleDiscriminator::ModuleDiscriminator(Operation *op)
       });
 }
 
-ModuleDiscriminator::ModuleDiscriminator(FuncMemoryPorts &ports)
-    : op(ports.memOp), ctx(op->getContext()), modName(setModPrefix(op)) {
+ModuleDiscriminator::ModuleDiscriminator(FuncMemoryPorts &ports) {
+  init(ports.memOp);
 
   llvm::TypeSwitch<Operation *, void>(op)
       .Case<handshake::MemoryControllerOp>([&](auto) {
@@ -575,15 +625,15 @@ ModuleDiscriminator::ModuleDiscriminator(FuncMemoryPorts &ports)
 
         // Control port count, load port count, store port count, data
         // bitwidth, and address bitwidth
-        addUnsigned("NUM_CONTROL", ports.getNumPorts<ControlPort>());
-        addUnsigned("NUM_LOAD", ports.getNumPorts<LoadPort>() + lsqPort);
-        addUnsigned("NUM_STORE", ports.getNumPorts<StorePort>() + lsqPort);
+        addUnsigned("NUM_CONTROLS", ports.getNumPorts<ControlPort>());
+        addUnsigned("NUM_LOADS", ports.getNumPorts<LoadPort>() + lsqPort);
+        addUnsigned("NUM_STORES", ports.getNumPorts<StorePort>() + lsqPort);
         addUnsigned("DATA_WIDTH", ports.dataWidth);
         addUnsigned("ADDR_WIDTH", ports.addrWidth);
       })
       .Case<handshake::LSQOp>([&](auto) {
         LSQGenerationInfo genInfo(ports, getUniqueName(op).str());
-        std::string lsqName = modName + "_" + genInfo.name;
+        modName = getOpName() + "_" + genInfo.name;
 
         /// Converts an array into an equivalent MLIR attribute.
         Type intType = IntegerType::get(ctx, 32);
@@ -611,7 +661,7 @@ ModuleDiscriminator::ModuleDiscriminator(FuncMemoryPorts &ports)
           addParam(name, ArrayAttr::get(ctx, biArrayAttr));
         };
 
-        addString("name", lsqName);
+        addString("name", *modName);
         addBoolean("experimental", true);
         addBoolean("toMC", !ports.interfacePorts.empty());
         addUnsigned("fifoDepth", genInfo.depth);
@@ -630,9 +680,6 @@ ModuleDiscriminator::ModuleDiscriminator(FuncMemoryPorts &ports)
         addBiArrayIntAttr("storeOffsets", genInfo.storeOffsets);
         addBiArrayIntAttr("loadPorts", genInfo.loadPorts);
         addBiArrayIntAttr("storePorts", genInfo.storePorts);
-
-        // Override the module's name
-        modName = lsqName;
       })
       .Default([&](auto) {
         op->emitError() << "Unsupported memory interface type.";
@@ -645,11 +692,11 @@ void ModuleDiscriminator::setParameters(hw::HWModuleExternOp modOp) {
 
   // The name is used to determine which RTL component to instantiate
   StringRef opName = op->getName().getStringRef();
-  modOp->setAttr(RTLRequest::NAME_ATTR, StringAttr::get(ctx, opName));
+  modOp->setAttr(RTL_NAME_ATTR_NAME, StringAttr::get(ctx, opName));
 
   // Parameters are used to determine the concrete version of the RTL
   // component to instantiate
-  modOp->setAttr(RTLRequest::PARAMETERS_ATTR,
+  modOp->setAttr(RTL_PARAMETERS_ATTR_NAME,
                  DictionaryAttr::get(ctx, parameters));
 }
 
@@ -1093,7 +1140,7 @@ LogicalResult ConvertExternalFunc::matchAndRewrite(
   rewriter.setInsertionPoint(funcOp);
   auto modOp = rewriter.replaceOpWithNewOp<hw::HWModuleExternOp>(
       funcOp, name, modBuilder.getPortInfo());
-  modOp->setAttr(StringAttr::get(getContext(), RTLRequest::NAME_ATTR),
+  modOp->setAttr(StringAttr::get(getContext(), RTL_NAME_ATTR_NAME),
                  funcOp.getNameAttr());
   return success();
 }
@@ -1586,7 +1633,7 @@ MemToBRAMConverter::buildExternalModule(hw::HWModuleOp circuitMod,
   extModOp = builder.create<hw::HWModuleExternOp>(
       circuitMod->getLoc(), modNameAttr, modBuilder.getPortInfo());
 
-  extModOp->setAttr(RTLRequest::NAME_ATTR, StringAttr::get(ctx, HW_NAME));
+  extModOp->setAttr(RTL_NAME_ATTR_NAME, StringAttr::get(ctx, HW_NAME));
   SmallVector<NamedAttribute> parameters;
   Type i32 = IntegerType::get(ctx, 32, IntegerType::Unsigned);
   parameters.emplace_back(
@@ -1594,7 +1641,7 @@ MemToBRAMConverter::buildExternalModule(hw::HWModuleOp circuitMod,
       IntegerAttr::get(i32, memState.dataType.getIntOrFloatBitWidth()));
   parameters.emplace_back(StringAttr::get(ctx, "ADDR_WIDTH"),
                           IntegerAttr::get(i32, memState.ports.addrWidth));
-  extModOp->setAttr(RTLRequest::PARAMETERS_ATTR,
+  extModOp->setAttr(RTL_PARAMETERS_ATTR_NAME,
                     DictionaryAttr::get(ctx, parameters));
   return extModOp;
 }
@@ -1753,9 +1800,9 @@ struct ReplaceReturnWithTEHB : public OpRewritePattern<handshake::ReturnOp> {
     rewriter.setInsertionPoint(returnOp);
     SmallVector<Value> tehbOutputs;
     for (Value oprd : returnOp->getOperands()) {
-      auto tehbOp =
-          rewriter.create<handshake::TEHBOp>(returnOp.getLoc(), oprd, 1);
-      tehbOutputs.push_back(tehbOp.getResult());
+      auto bufOp = rewriter.create<handshake::BufferOp>(returnOp.getLoc(), oprd,
+                                                        TimingInfo::tehb(), 1);
+      tehbOutputs.push_back(bufOp.getResult());
     }
     rewriter.replaceOp(returnOp, tehbOutputs);
     return success();
@@ -1814,13 +1861,13 @@ public:
     RewritePatternSet patterns(ctx);
     patterns.insert<ConvertFunc, ConvertEnd, ConvertMemInterface>(
         typeConverter, ctx, lowerState);
-    patterns.insert<ConvertInstance, ConvertToHWInstance<handshake::OEHBOp>,
-                    ConvertToHWInstance<handshake::TEHBOp>,
+    patterns.insert<ConvertInstance, ConvertToHWInstance<handshake::BufferOp>,
                     ConvertToHWInstance<handshake::ConditionalBranchOp>,
                     ConvertToHWInstance<handshake::BranchOp>,
                     ConvertToHWInstance<handshake::MergeOp>,
                     ConvertToHWInstance<handshake::ControlMergeOp>,
                     ConvertToHWInstance<handshake::MuxOp>,
+                    ConvertToHWInstance<handshake::JoinOp>,
                     ConvertToHWInstance<handshake::SourceOp>,
                     ConvertToHWInstance<handshake::ConstantOp>,
                     ConvertToHWInstance<handshake::SinkOp>,

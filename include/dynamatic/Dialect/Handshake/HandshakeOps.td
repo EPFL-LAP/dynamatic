@@ -223,59 +223,31 @@ def InstanceOp : Handshake_Op<"instance", [
   }];
 }
 
-class Handshake_BufferOp<string mnemonic> : Handshake_Op<mnemonic, [
-  BufferOpInterface, HasClock, SameOperandsAndResultType,
+def BufferOp : Handshake_Op<"buffer", [
+  HasClock, SameOperandsAndResultType,
   DeclareOpInterfaceMethods<ReshapableChannelsInterface, ["getReshapableChannelType"]>,
 ]> {
-  let arguments = (ins HandshakeType:$operand,
-                       ConfinedAttr<I32Attr, [IntMinValue<1>]>:$slots);
+  let summary = "buffer operation";
+  let description = [{
+    Represents an arbitrary buffer whose properties (e.g., latencies, number of
+    slots) are dictated by HW parameters. 
+  }];
+  
+  let arguments = (ins HandshakeType:$operand);
   let results = (outs HandshakeType:$result);
 
-  let extraClassDefinition = [{
-    /// Prints the buffer operation.
-    void $cppClass::print(mlir::OpAsmPrinter &p) {
-      printBufferOp(*this, p);
-    }
+  let builders = [OpBuilder<
+    (ins "Value":$operand, "const ::dynamatic::handshake::TimingInfo &":$timing,
+         "std::optional<unsigned>":$numSlots)>
+  ];
 
-    /// Parses the buffer operation.
-    mlir::ParseResult $cppClass::parse(mlir::OpAsmParser &parser,
-                                       mlir::OperationState &result) {
-      return parseBufferOp(parser, result);
-    }
-
-    std::pair<handshake::ChannelType, bool>
-    $cppClass::getReshapableChannelType() {
-      return {mlir::dyn_cast<handshake::ChannelType>(getOperand().getType()), 
-              true};
-    }
+  let extraClassDeclaration = [{
+    static constexpr ::llvm::StringLiteral NUM_SLOTS_ATTR_NAME = "NUM_SLOTS",
+                                           TIMING_ATTR_NAME = "TIMING";
   }];
 
-  let hasCustomAssemblyFormat = 1;
-}
-
-def OEHBOp : Handshake_BufferOp<"oehb"> {
-  let summary = "opaque elastic half buffer";
-  let description = [{
-    An OEHB (opaque elastic half buffer) is a type of buffer that breaks
-    combinatinal paths in the downstream data/valid network.
-
-    Example:
-    ```mlir
-    %result = oehb [2] %operand : !handshake.chanel<i32>
-    ```
-  }];
-}
-
-def TEHBOp : Handshake_BufferOp<"tehb"> {
-  let summary = "transparent elastic half buffer";
-  let description = [{
-    A TEHB (transparent elastic half buffer) is a type of buffer that breaks
-    combinatinal paths in the upstream ready network.
-
-    Example:
-    ```mlir
-    %result = tehb [2] %operand : !handshake.channel<i32>
-    ```
+  let assemblyFormat = [{
+    $operand attr-dict `:` custom<HandshakeType>(type($operand))
   }];
 }
 

@@ -12,14 +12,16 @@
 
 #include "dynamatic/Dialect/Handshake/HandshakeTypes.h"
 #include "mlir/IR/Builders.h"
+#include "mlir/IR/Diagnostics.h"
 #include "mlir/IR/DialectImplementation.h"
 #include "mlir/IR/OpImplementation.h"
 #include "mlir/Support/LLVM.h"
+#include "mlir/Support/LogicalResult.h"
 #include "llvm/ADT/STLExtras.h"
 #include "llvm/ADT/StringRef.h"
 #include "llvm/ADT/TypeSwitch.h"
 #include "llvm/Support/ErrorHandling.h"
-#include <set>
+#include <cctype>
 
 using namespace mlir;
 using namespace dynamatic;
@@ -44,9 +46,66 @@ unsigned dynamatic::handshake::getHandshakeTypeBitWidth(Type type) {
 
 static constexpr llvm::StringLiteral UPSTREAM_SYMBOL("U");
 
+/// Checks the validity of a channel's data type.
+static LogicalResult
+checkChannelData(function_ref<InFlightDiagnostic()> emitError, Type dataType) {
+  if (!ChannelType::isSupportedSignalType(dataType)) {
+    return emitError()
+           << "expected data type to be IntegerType or FloatType, but got "
+           << dataType;
+  }
+  if (dataType.getIntOrFloatBitWidth() == 0) {
+    return emitError()
+           << "expected data type to have strictly positive bitwidth, but got "
+           << dataType;
+  }
+  return success();
+}
+
+/// Checks the validity of a channel's extra signals.
+static LogicalResult
+checkChannelExtra(function_ref<InFlightDiagnostic()> emitError,
+                  const ArrayRef<ExtraSignal> &extraSignals) {
+  DenseSet<StringRef> names;
+  for (const ExtraSignal &extra : extraSignals) {
+    if (auto [_, newName] = names.insert(extra.name); !newName) {
+      return emitError() << "expected all signal names to be unique but '"
+                         << extra.name << "' appears more than once";
+    }
+    if (!ChannelType::isSupportedSignalType(extra.type)) {
+      return emitError() << "expected extra signal type to be IntegerType or "
+                            "FloatType, but "
+                         << extra.name << "' has type " << extra.type;
+    }
+    for (char c : extra.name) {
+      if (!std::isalnum(c) && c != '_') {
+        return emitError() << "expected only alphanumeric characters and '_' "
+                              "in extra signal name, but got "
+                           << extra.name;
+      }
+    }
+
+    auto checkReserved = [&](StringRef reserved) -> LogicalResult {
+      if (reserved == extra.name) {
+        return emitError() << "'" << reserved
+                           << "' is a reserved name, it cannot be used as "
+                              "an extra signal name";
+      }
+      return success();
+    };
+    if (failed(checkReserved("valid")) || failed(checkReserved("ready")))
+      return failure();
+  }
+  return success();
+}
+
 static Type parseChannelAfterLess(AsmParser &odsParser) {
   FailureOr<Type> dataType;
   FailureOr<SmallVector<ExtraSignal::Storage>> extraSignalsStorage;
+
+  function_ref<InFlightDiagnostic()> emitError = [&]() {
+    return odsParser.emitError(odsParser.getCurrentLocation());
+  };
 
   // Parse variable 'dataType'
   dataType = FieldParser<Type>::parse(odsParser);
@@ -56,15 +115,10 @@ static Type parseChannelAfterLess(AsmParser &odsParser) {
                         "which is to be a Type");
     return nullptr;
   }
-  if (!ChannelType::isSupportedSignalType(*dataType)) {
-    odsParser.emitError(odsParser.getCurrentLocation(),
-                        "failed to parse ChannelType parameter 'dataType' "
-                        "which must be IntegerType or FloatType");
+  if (failed(checkChannelData(emitError, *dataType)))
     return nullptr;
-  }
 
   // Parse variable 'extraSignals'
-  std::set<std::string> extraNames;
   extraSignalsStorage = [&]() -> FailureOr<SmallVector<ExtraSignal::Storage>> {
     SmallVector<ExtraSignal::Storage> storage;
 
@@ -72,25 +126,9 @@ static Type parseChannelAfterLess(AsmParser &odsParser) {
       auto parseSignal = [&]() -> ParseResult {
         auto &signal = storage.emplace_back();
 
-        // Parse name and check for uniqueness
-        if (odsParser.parseKeywordOrString(&signal.name))
+        if (odsParser.parseKeywordOrString(&signal.name) ||
+            odsParser.parseColon() || odsParser.parseType(signal.type))
           return failure();
-        if (auto [_, newName] = extraNames.insert(signal.name); !newName) {
-          odsParser.emitError(
-              odsParser.getCurrentLocation(),
-              "duplicated extra signal name, signal names must be unique");
-          return failure();
-        }
-
-        // Parse colon and type and check type legality
-        if (odsParser.parseColon() || odsParser.parseType(signal.type))
-          return failure();
-        if (!ChannelType::isSupportedSignalType(signal.type)) {
-          odsParser.emitError(odsParser.getCurrentLocation(),
-                              "failed to parse extra signal type which must be "
-                              "IntegerType or FloatType");
-          return failure();
-        }
 
         // Attempt to parse the optional upstream symbol
         if (!odsParser.parseOptionalLParen()) {
@@ -127,6 +165,8 @@ static Type parseChannelAfterLess(AsmParser &odsParser) {
   SmallVector<ExtraSignal> extraSignals;
   for (const ExtraSignal::Storage &signalStorage : *extraSignalsStorage)
     extraSignals.emplace_back(signalStorage);
+  if (failed(checkChannelExtra(emitError, extraSignals)))
+    return nullptr;
 
   return ChannelType::get(odsParser.getContext(), *dataType, extraSignals);
 }
@@ -169,25 +209,8 @@ ChannelType ChannelType::getAddrChannel(MLIRContext *ctx) {
 LogicalResult ChannelType::verify(function_ref<InFlightDiagnostic()> emitError,
                                   Type dataType,
                                   ArrayRef<ExtraSignal> extraSignals) {
-  if (!isSupportedSignalType(dataType)) {
-    return emitError()
-           << "expected data type to be IntegerType or FloatType, but got "
-           << dataType;
-  }
-
-  DenseSet<StringRef> names;
-  for (const ExtraSignal &signal : extraSignals) {
-    if (auto [_, newName] = names.insert(signal.name); !newName) {
-      return emitError() << "expected all signal names to be unique but '"
-                         << signal.name << "' appears more than once";
-    }
-    if (!isSupportedSignalType(signal.type)) {
-      return emitError() << "expected extra signal type to be IntegerType or "
-                            "FloatType, but "
-                         << signal.name << "' has type " << signal.type;
-    }
-  }
-  return success();
+  return failure(failed(checkChannelData(emitError, dataType)) ||
+                 failed(checkChannelExtra(emitError, extraSignals)));
 }
 
 unsigned ChannelType::getNumDownstreamExtraSignals() const {

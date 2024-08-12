@@ -21,15 +21,12 @@
 // supply the producer--consumer pair as arguments
 //===----------------------------------------------------------------------===//
 
+#include "experimental/Transforms/HandshakePlaceBuffersCustom.h"
 #include "dynamatic/Analysis/NameAnalysis.h"
-#include "dynamatic/Dialect/Handshake/HandshakeDialect.h"
+#include "dynamatic/Dialect/Handshake/HandshakeAttributes.h"
 #include "dynamatic/Dialect/Handshake/HandshakeOps.h"
-#include "dynamatic/Support/Attribute.h"
 #include "dynamatic/Support/CFG.h"
 #include "dynamatic/Transforms/HandshakeMaterialize.h"
-#include "experimental/Transforms/HandshakePlaceBuffersCustom.h"
-#include "mlir/Dialect/Func/IR/FuncOps.h"
-#include "llvm/ADT/StringRef.h"
 
 using namespace llvm;
 using namespace dynamatic;
@@ -77,24 +74,17 @@ struct HandshakePlaceBuffersCustomPass
     // channel.
     Operation *succ = *channel.getUsers().begin();
     builder.setInsertionPoint(succ);
-    StringAttr slotName = StringAttr::get(ctx, "slots");
-    StringRef bufOpType;
+    handshake::TimingInfo timing;
     if (type == "oehb") {
-      // if the specified type is "oehb", then we add a Opaque buffer with
-      // number of slots = slots.
-      bufOpType = handshake::OEHBOp::getOperationName();
+      timing = handshake::TimingInfo::oehb();
     } else if (type == "tehb") {
-      // If the specified type is "tehb", then we add a Transparent buffer
-      // with number of slots = slots.
-      bufOpType = handshake::TEHBOp::getOperationName();
+      timing = handshake::TimingInfo::tehb();
     } else {
       llvm::errs() << "Unknown buffer type: \"" << type << "\"!\n";
       return signalPassFailure();
     }
-    NamedAttribute namedSlots(slotName, builder.getI32IntegerAttr(slots));
-    auto *bufOp =
-        builder.create(channel.getLoc(), StringAttr::get(ctx, bufOpType),
-                       channel, {channel.getType()}, {namedSlots});
+    auto bufOp = builder.create<handshake::BufferOp>(channel.getLoc(), channel,
+                                                     timing, slots);
     inheritBB(succ, bufOp);
     Value bufferRes = bufOp->getResult(0);
     succ->replaceUsesOfWith(channel, bufferRes);
