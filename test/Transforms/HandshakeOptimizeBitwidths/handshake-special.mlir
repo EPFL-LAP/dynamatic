@@ -6,14 +6,12 @@
 // CHECK-SAME:                                        %[[VAL_2:.*]]: !handshake.control<>, ...) -> (!handshake.channel<i32>, !handshake.channel<i32>) attributes {argNames = ["arg0", "arg1", "start"], resNames = ["out0", "out1"]} {
 // CHECK:           %[[VAL_3:.*]], %[[VAL_4:.*]] = control_merge %[[VAL_0]], %[[VAL_1]]  : <i32>, <i1>
 // CHECK:           %[[VAL_5:.*]] = mux %[[VAL_4]] {{\[}}%[[VAL_0]], %[[VAL_1]]] : <i1>, <i32>
-// CHECK:           %[[VAL_6:.*]]:2 = return %[[VAL_3]], %[[VAL_5]] : <i32>, <i32>
-// CHECK:           end %[[VAL_6]]#0, %[[VAL_6]]#1 : <i32>, <i32>
+// CHECK:           end %[[VAL_3]], %[[VAL_5]] : <i32>, <i32>
 // CHECK:         }
 handshake.func @cmergeToMuxIndexOpt(%arg0: !handshake.channel<i32>, %arg1: !handshake.channel<i32>, %start: !handshake.control<>) -> (!handshake.channel<i32>, !handshake.channel<i32>) {
   %result, %index = control_merge %arg0, %arg1 : <i32>, <i32>
   %mux = mux %index [%arg0, %arg1] : <i32>, <i32>
-  %returnVals:2 = return %result, %mux : <i32>, <i32>
-  end %returnVals#0, %returnVals#1 : <i32>, <i32>
+  end %result, %mux : <i32>, <i32>
 }
 
 // -----
@@ -26,8 +24,7 @@ handshake.func @cmergeToMuxIndexOpt(%arg0: !handshake.channel<i32>, %arg1: !hand
 // CHECK:           %[[VAL_7:.*]] = extui %[[VAL_6]] : <i1> to <i32>
 // CHECK:           %[[VAL_8:.*]] = addi %[[VAL_5]], %[[VAL_7]] : <i32>
 // CHECK:           %[[VAL_9:.*]] = addi %[[VAL_8]], %[[VAL_3]] : <i32>
-// CHECK:           %[[VAL_10:.*]] = return %[[VAL_9]] : <i32>
-// CHECK:           end %[[VAL_10]] : <i32>
+// CHECK:           end %[[VAL_9]] : <i32>
 // CHECK:         }
 handshake.func @cmergeToMuxIndexOpt(%arg0: !handshake.channel<i32>, %arg1: !handshake.channel<i32>, %start: !handshake.control<>) -> !handshake.channel<i32> {
   %result, %index = control_merge %arg0 : <i32>, <i32>
@@ -35,8 +32,7 @@ handshake.func @cmergeToMuxIndexOpt(%arg0: !handshake.channel<i32>, %arg1: !hand
   %otherResult, %otherIndex = control_merge %arg1 : <i32>, <i32>
   %add1 = addi %otherResult, %otherIndex : <i32>
   %add2 = addi %add1, %result : <i32>
-  %ret = return %add2 : <i32>
-  end %ret : <i32>
+  end %add2 : <i32>
 }
 
 
@@ -57,8 +53,7 @@ handshake.func @cmergeToMuxIndexOpt(%arg0: !handshake.channel<i32>, %arg1: !hand
 // CHECK:           %[[VAL_5]], %[[VAL_17:.*]] = mc_load{{\[}}%[[VAL_11]]] %[[VAL_2]] {handshake.bb = 0 : ui32} : <i10>, <i32>
 // CHECK:           %[[VAL_6]], %[[VAL_7]] = mc_store{{\[}}%[[VAL_13]]] %[[VAL_16]] {handshake.bb = 0 : ui32} : <i32>, <i10>
 // CHECK:           %[[VAL_8]], %[[VAL_9]] = mc_store{{\[}}%[[VAL_15]]] %[[VAL_16]] {handshake.bb = 0 : ui32} : <i32>, <i10>
-// CHECK:           %[[VAL_18:.*]] = return %[[VAL_17]] : <i32>
-// CHECK:           end %[[VAL_18]], %[[VAL_3]] : <i32>, <>
+// CHECK:           end %[[VAL_17]], %[[VAL_3]] : <i32>, <>
 // CHECK:         }
 handshake.func @memAddrOpt(%mem: memref<1000xi32>, %start: !handshake.control<>) -> !handshake.channel<i32> {
   %ldData1, %done = mem_controller[%mem : memref<1000xi32>] (%ctrl1, %ldAddr1, %stAddr1, %stData1, %stAddr2, %stData2) {connectedBlocks = [0 : i32]} : (!handshake.channel<i32>, !handshake.channel<i32>, !handshake.channel<i32>, !handshake.channel<i32>, !handshake.channel<i32>, !handshake.channel<i32>) -> (!handshake.channel<i32>, !handshake.control<>)
@@ -72,8 +67,7 @@ handshake.func @memAddrOpt(%mem: memref<1000xi32>, %start: !handshake.control<>)
   %ldAddr1, %ldVal = mc_load[%addr1Ext] %ldData1 {handshake.bb = 0 : ui32} : <i32>, <i32>
   %stAddr1, %stData1 = mc_store[%addr2Ext] %dataStore {handshake.bb = 0 : ui32} : <i32>, <i32>
   %stAddr2, %stData2 = mc_store[%addr3] %dataStore {handshake.bb = 0 : ui32} : <i32>, <i32>
-  %returnVal = return %ldVal : <i32>
-  end %returnVal, %done : <i32>, <>
+  end %ldVal, %done : <i32>, <>
 }
 
 // -----
@@ -84,15 +78,13 @@ handshake.func @memAddrOpt(%mem: memref<1000xi32>, %start: !handshake.control<>)
 // CHECK:           %[[VAL_4:.*]] = mux %[[VAL_1]] {{\[}}%[[VAL_0]], %[[VAL_5:.*]]] : <i1>, <i8>
 // CHECK:           %[[VAL_5]], %[[VAL_6:.*]] = cond_br %[[VAL_2]], %[[VAL_4]] : <i1>, <i8>
 // CHECK:           %[[VAL_7:.*]] = extsi %[[VAL_6]] : <i8> to <i32>
-// CHECK:           %[[VAL_8:.*]] = return %[[VAL_7]] : <i32>
-// CHECK:           end %[[VAL_8]] : <i32>
+// CHECK:           end %[[VAL_7]] : <i32>
 // CHECK:         }
 handshake.func @simpleCycle(%arg0: !handshake.channel<i8>, %index: !handshake.channel<i1>, %cond: !handshake.channel<i1>, %start: !handshake.control<>) -> !handshake.channel<i32> {
   %ext = extsi %arg0 : <i8> to <i32>
   %muxOut = mux %index [%ext, %true] : <i1>, <i32>
   %true, %false = cond_br %cond, %muxOut : <i1>, <i32>
-  %returnVal = return %false : <i32>
-  end %returnVal : <i32>
+  end %false : <i32>
 }
 
 // -----
@@ -109,8 +101,7 @@ handshake.func @simpleCycle(%arg0: !handshake.channel<i8>, %index: !handshake.ch
 // CHECK:           %[[VAL_16:.*]] = mux %[[VAL_4]] {{\[}}%[[VAL_2]], %[[VAL_15]]] : <i1>, <i24>
 // CHECK:           %[[VAL_12]], %[[VAL_17:.*]] = cond_br %[[VAL_5]], %[[VAL_16]] : <i1>, <i24>
 // CHECK:           %[[VAL_18:.*]] = extsi %[[VAL_17]] : <i24> to <i32>
-// CHECK:           %[[VAL_19:.*]] = return %[[VAL_18]] : <i32>
-// CHECK:           end %[[VAL_19]] : <i32>
+// CHECK:           end %[[VAL_18]] : <i32>
 // CHECK:         }
 handshake.func @complexCycle(%arg0: !handshake.channel<i8>, %arg1: !handshake.channel<i16>, %arg2: !handshake.channel<i24>, %bigIndex: !handshake.channel<i2>, %index: !handshake.channel<i1>, %cond: !handshake.channel<i1>, %start: !handshake.control<>) -> !handshake.channel<i32> {
   %ext0 = extsi %arg0 : <i8> to <i32>
@@ -122,6 +113,5 @@ handshake.func @complexCycle(%arg0: !handshake.channel<i8>, %arg1: !handshake.ch
   %condTrue1, %condFalse1 = cond_br %cond, %mux1 : <i1>, <i32>
   %mux2 = mux %index [%ext2, %condFalse1] : <i1>, <i32>
   %condTrue2, %condFalse2 = cond_br %cond, %mux2 : <i1>, <i32>
-  %returnVal = return %condFalse2 : <i32>
-  end %returnVal : <i32>
+  end %condFalse2 : <i32>
 }

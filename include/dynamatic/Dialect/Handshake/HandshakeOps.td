@@ -925,33 +925,6 @@ def LSQStoreOp : Handshake_StoreOp<"lsq_store"> {
   }];
 }
 
-def ReturnOp : Handshake_Op<"return", [
-  DeclareOpInterfaceMethods<InferTypeOpInterface, ["inferReturnTypes"]>
-]> {
-  let summary = "handshake-level return";
-  let description = [{
-    This return operation represents the handshake equivalent of a 
-    func::ReturnOp (i.e., the latter is converted to the former one-to-one,
-    preserving operands). This operation also outputs a list of values that
-    correspond one-to-one to its own operands (i.e., same type and semantic
-    value).
-
-    Example:
-
-    ```mlir
-    %out1, %out2 = return %in1, %in2 : !handshake.channel<i32>, !handshake.channel<i64>
-    ```
-  }];
-
-  let arguments = (ins Variadic<HandshakeType>:$inputs);
-  let results = (outs Variadic<HandshakeType>:$outputs);
-  let assemblyFormat = [{
-    attr-dict ($inputs^ `:` custom<HandshakeTypes>(type($inputs)))?
-  }];
-  
-  let hasVerifier = 1;
-}
-
 def EndOp : Handshake_Op<"end", [
   DeclareOpInterfaceMethods<NamedIOInterface, ["getOperandName"]>,
   Terminator

@@ -12,12 +12,9 @@
 
 #include "dynamatic/Support/CFG.h"
 #include "dynamatic/Dialect/Handshake/HandshakeOps.h"
-#include "mlir/Dialect/Arith/IR/Arith.h"
 #include "mlir/Support/LogicalResult.h"
-#include "llvm/ADT/SetVector.h"
 #include "llvm/ADT/SmallPtrSet.h"
 #include "llvm/ADT/TypeSwitch.h"
-#include <queue>
 
 using namespace llvm;
 using namespace mlir;
@@ -611,12 +608,6 @@ static GIIDStatus isGIIDRec(Value predecessor, OpOperand &oprd,
 
         // Otherwise, data inputs on the path must depend on the predecessor
         return foldGIIDStatusAnd(recurse, defOp->getOperands());
-      })
-      .Case<handshake::ReturnOp>([&](auto) {
-        // Just recurse the call on the return operand corresponding to the
-        // value
-        Value oprd = defOp->getOperand(cast<OpResult>(val).getResultNumber());
-        return recurse(oprd);
       })
       .Case<handshake::MCLoadOp, handshake::LSQLoadOp>([&](auto) {
         auto loadOp = cast<handshake::LoadOpInterface>(defOp);

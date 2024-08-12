@@ -117,10 +117,9 @@ public:
                              ConversionPatternRewriter &rewriter) const;
 
   /// Creates the region's return network by sequentially moving all blocks'
-  /// operations to the entry block, replacing func::ReturnOp's with
-  /// handshake::ReturnOp's, deleting all block terminators and non-entry
-  /// blocks, merging the results of all return statements, and creating the
-  /// region's end operation.
+  /// operations to the entry block, deleting all block terminators and
+  /// non-entry blocks, merging the results of all return statements, and
+  /// creating the region's end operation.
   virtual LogicalResult flattenAndTerminate(
       handshake::FuncOp funcOp, ConversionPatternRewriter &rewriter,
       const DenseMap<BlockArgument, OpResult> &blockArgReplacements) const;

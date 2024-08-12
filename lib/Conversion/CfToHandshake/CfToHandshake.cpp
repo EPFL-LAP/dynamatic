@@ -101,30 +101,28 @@ static LogicalResult getOpMemRef(Operation *op, Value &out) {
 }
 
 /// Returns the list of data inputs to be passed as operands to the
-/// handshake::EndOp of a handshake::FuncOp. In the case of a single return
-/// statement, this is simply the return's outputs. In the case of multiple
-/// returns, this is the list of individually merged outputs of all returns.
-/// In the latter case, the function inserts the required handshake::MergeOp's
+/// `handshake::EndOp` of a `handshake::FuncOp`. In the case of a single return
+/// statement, this is simply the return's inputs. In the case of multiple
+/// returns, this is the list of individually merged inputs of all returns.
+/// In the latter case, the function inserts the required `handshake::MergeOp`'s
 /// in the region.
-static SmallVector<Value, 8>
+static SmallVector<Value>
 mergeFuncResults(handshake::FuncOp funcOp, ConversionPatternRewriter &rewriter,
-                 SmallVector<Operation *, 4> &newReturnOps,
+                 ArrayRef<SmallVector<Value>> returnsOperands,
                  size_t exitBlockID) {
   Block *entryBlock = &funcOp.front();
-  if (newReturnOps.size() == 1) {
-    // No need to merge results in case of single return
-    return SmallVector<Value, 8>(newReturnOps[0]->getResults());
-  }
+  // No need to merge results in case of a single return
+  if (returnsOperands.size() == 1)
+    return returnsOperands.front();
 
   // Return values from multiple returns need to be merged together
-  SmallVector<Value, 8> results;
+  SmallVector<Value, 4> results;
   Location loc = entryBlock->getOperations().back().getLoc();
   rewriter.setInsertionPointToEnd(entryBlock);
-  for (unsigned i = 0, e = newReturnOps[0]->getNumResults(); i < e; i++) {
+  for (unsigned i = 0, e = returnsOperands.front().size(); i < e; i++) {
     SmallVector<Value, 4> mergeOperands;
-    for (auto *retOp : newReturnOps) {
-      mergeOperands.push_back(retOp->getResult(i));
-    }
+    for (ValueRange operands : returnsOperands)
+      mergeOperands.push_back(operands[i]);
     auto mergeOp = rewriter.create<handshake::MergeOp>(loc, mergeOperands);
     results.push_back(mergeOp.getResult());
     // Merge operation inherits from the bb atttribute of the latest (in program
@@ -844,31 +842,31 @@ void LowerFuncToHandshake::idBasicBlocks(
 LogicalResult LowerFuncToHandshake::flattenAndTerminate(
     handshake::FuncOp funcOp, ConversionPatternRewriter &rewriter,
     const ArgReplacements &argReplacements) const {
-  // Erase all cf-level terminators, creating Handshake-level returns next to
-  // cf-level returns as necessary as we go
-  SmallVector<Operation *, 4> newReturns;
+  // Erase all cf-level terminators, accumulating operands to func-level returns
+  // as we go
+  SmallVector<SmallVector<Value>> returnsOperands;
   for (Block &block : funcOp) {
     Operation *termOp = &block.back();
     if (auto retOp = dyn_cast<func::ReturnOp>(termOp)) {
-      SmallVector<Value, 8> retOperands;
+      auto &retOperands = returnsOperands.emplace_back();
       if (failed(rewriter.getRemappedValues(retOp->getOperands(), retOperands)))
         return failure();
-
       // When the enclosing function only returns a control value (no data
       // results), return statements must take exactly one control-only input
       if (retOperands.empty())
         retOperands.push_back(getBlockControl(retOp->getBlock()));
-
-      // Insert new return operation next to the old one
-      rewriter.setInsertionPoint(retOp);
-      Location loc = retOp->getLoc();
-      auto newRet = rewriter.create<handshake::ReturnOp>(loc, retOperands);
-      newReturns.push_back(newRet);
-      inheritBB(retOp, newRet);
     }
     rewriter.eraseOp(termOp);
   }
-  assert(!newReturns.empty() && "function must have at least one return");
+  assert(!returnsOperands.empty() && "function must have at least one return");
+
+  // When identifying basic blocks, the end node is either put in the same
+  // block as the function's single return statement or, in the case of
+  // multiple return statements, it is put in a "fake block" along with the
+  // merges that feed it its data inputs
+  size_t exitBlockID = funcOp.getBlocks().size();
+  if (returnsOperands.size() == 1)
+    exitBlockID -= 1;
 
   // Inline all non-entry blocks into the entry block, erasing them as we go
   Operation *lastOp = &funcOp.front().back();
@@ -888,23 +886,12 @@ LogicalResult LowerFuncToHandshake::flattenAndTerminate(
     rewriter.inlineBlockBefore(&block, lastOp, replacements);
   }
 
-  // When identifying basic blocks, the end node is either put in the same
-  // block as the function's single return statement or, in the case of
-  // multiple return statements, it is put in a "fake block" along with the
-  // merges that feed it its data inputs
-  size_t exitBlockID;
-  if (newReturns.size() > 1) {
-    exitBlockID = funcOp.getBlocks().size();
-  } else {
-    auto retBB = newReturns[0]->getAttrOfType<IntegerAttr>(BB_ATTR_NAME);
-    exitBlockID = retBB.getValue().getZExtValue();
-  }
-
   // Insert an end node at the end of the function that merges results from
   // all handshake-level return operations and wait for all memory controllers
   // to signal completion
   SmallVector<Value, 8> endOprds;
-  endOprds.append(mergeFuncResults(funcOp, rewriter, newReturns, exitBlockID));
+  endOprds.append(
+      mergeFuncResults(funcOp, rewriter, returnsOperands, exitBlockID));
   endOprds.append(getFunctionEndControls(funcOp));
   rewriter.setInsertionPointToEnd(funcOp.getBodyBlock());
   auto endOp = rewriter.create<handshake::EndOp>(lastOp->getLoc(), endOprds);
@@ -1099,7 +1086,7 @@ ConvertCalls::matchAndRewrite(func::CallOp callOp, OpAdaptor adaptor,
 }
 
 /// Determines whether it is possible to transform an arith-level constant into
-/// a Handsahke-level constant that is triggered by an always-triggering source
+/// a Handshake-level constant that is triggered by an always-triggering source
 /// component without compromising the circuit semantics (e.g., without
 /// triggering a memory operation before the circuit "starts"). Returns false if
 /// the Handshake-level constant that replaces the input must instead be
@@ -1113,8 +1100,7 @@ static bool isCstSourcable(arith::ConstantOp cstOp) {
     if (isa<UnrealizedConversionCastOp>(user))
       return llvm::all_of(user->getUsers(), isValidUser);
     return !isa<handshake::BranchOp, handshake::ConditionalBranchOp,
-                handshake::ReturnOp, handshake::LoadOpInterface,
-                handshake::StoreOpInterface>(user);
+                handshake::LoadOpInterface, handshake::StoreOpInterface>(user);
   };
 
   return llvm::all_of(cstOp->getUsers(), isValidUser);
