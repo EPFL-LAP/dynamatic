@@ -798,65 +798,6 @@ struct HandshakeMemPortAddress : public OpRewritePattern<Op> {
   }
 };
 
-/// Moves any extension operation feeding into a return operation past the
-/// latter to optimize the bitwidth occupied by the return operation itself.
-/// This is meant to be part of the forward pass.
-/// NOTE: (lucas) This rewrite pattern is unused at the moment because applying
-/// it sucessfully makes the return operation's verification function fail
-/// (different return result types and enclosing function return types).
-/// When we eventually formalize and rework our circuit's interfaces, this may
-/// become useful, so here it stays.
-struct HandshakeReturnFW : public OpRewritePattern<handshake::ReturnOp> {
-  using OpRewritePattern<handshake::ReturnOp>::OpRewritePattern;
-
-  LogicalResult matchAndRewrite(handshake::ReturnOp retOp,
-                                PatternRewriter &rewriter) const override {
-
-    // Try to move potential extension operations after the return
-    SmallVector<Value> newOperands;
-    SmallVector<ExtType> extTypes;
-    bool changed = false;
-    for (Value oprd : retOp->getOperands()) {
-      ChannelVal channelVal = asTypedIfLegal(oprd);
-      ExtType ext = ExtType::UNKNOWN;
-      ChannelVal minVal = channelVal;
-      if (channelVal) {
-        minVal = getMinimalValue(channelVal, &ext);
-        changed |= minVal.getType().getDataBitWidth() <
-                   channelVal.getType().getDataBitWidth();
-      }
-      newOperands.push_back(minVal);
-      extTypes.push_back(ext);
-    }
-
-    // Check whether the transformation would change anything
-    if (!changed)
-      return failure();
-
-    // Insert an optimized return operation that moves eventual value extensions
-    // after itself
-    rewriter.setInsertionPoint(retOp);
-    auto newOp =
-        rewriter.create<handshake::ReturnOp>(retOp->getLoc(), newOperands);
-    inheritBB(retOp, newOp);
-
-    // Create required extension operations on the new return's results so that
-    // the rest of the IR stays valid
-    SmallVector<Value> newResults;
-    for (auto [newRes, ogRes, ext] :
-         llvm::zip_equal(newOp->getResults(), retOp.getResults(), extTypes)) {
-      if (ChannelVal channelVal = asTypedIfLegal(ogRes)) {
-        unsigned targetWidth = channelVal.getType().getDataBitWidth();
-        newResults.push_back(
-            modVal({cast<ChannelVal>(newRes), ext}, targetWidth, rewriter));
-      } else
-        newResults.push_back(newRes);
-    }
-    rewriter.replaceOp(retOp, newResults);
-    return success();
-  }
-};
-
 /// Optimizes the bitwidth of channels contained inside "forwarding cycles".
 /// These are values that generally circulate between branch-like and merge-like
 /// operations without modification (i.e., in a block that branches to itself).

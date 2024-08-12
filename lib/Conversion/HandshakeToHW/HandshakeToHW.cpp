@@ -16,7 +16,6 @@
 #include "dynamatic/Dialect/HW/HWOps.h"
 #include "dynamatic/Dialect/HW/HWTypes.h"
 #include "dynamatic/Dialect/HW/PortImplementation.h"
-#include "dynamatic/Dialect/Handshake/HandshakeAttributes.h"
 #include "dynamatic/Dialect/Handshake/HandshakeDialect.h"
 #include "dynamatic/Dialect/Handshake/HandshakeInterfaces.h"
 #include "dynamatic/Dialect/Handshake/HandshakeOps.h"
@@ -37,7 +36,6 @@
 #include "mlir/IR/Value.h"
 #include "mlir/Support/LogicalResult.h"
 #include "mlir/Transforms/DialectConversion.h"
-#include "mlir/Transforms/GreedyPatternRewriteDriver.h"
 #include "llvm/ADT/STLExtras.h"
 #include "llvm/ADT/SmallVector.h"
 #include "llvm/ADT/StringRef.h"
@@ -1790,24 +1788,6 @@ static void createWrapper(hw::HWModuleOp circuitOp, LoweringState &state,
 }
 
 namespace {
-/// Replaces Handshake return operations into a sequence of TEHBs, one for
-/// each return operand.
-struct ReplaceReturnWithTEHB : public OpRewritePattern<handshake::ReturnOp> {
-  using OpRewritePattern<handshake::ReturnOp>::OpRewritePattern;
-
-  LogicalResult matchAndRewrite(handshake::ReturnOp returnOp,
-                                PatternRewriter &rewriter) const override {
-    rewriter.setInsertionPoint(returnOp);
-    SmallVector<Value> tehbOutputs;
-    for (Value oprd : returnOp->getOperands()) {
-      auto bufOp = rewriter.create<handshake::BufferOp>(returnOp.getLoc(), oprd,
-                                                        TimingInfo::tehb(), 1);
-      tehbOutputs.push_back(bufOp.getResult());
-    }
-    rewriter.replaceOp(returnOp, tehbOutputs);
-    return success();
-  }
-};
 
 /// Conversion pass driver. The conversion only works on modules containing
 /// a single handshake function (handshake::FuncOp) at the moment. The
@@ -1841,9 +1821,6 @@ public:
         return signalPassFailure();
       }
     }
-
-    if (failed(runPreprocessing()))
-      return signalPassFailure();
 
     // Make sure all operations are named
     NameAnalysis &namer = getAnalysis<NameAnalysis>();
@@ -1923,21 +1900,6 @@ public:
   }
 
 private:
-  /// Runs a pre-processiong greedy pattern rewriter on the input module to get
-  /// rid of constructs that have no hardware mapping.
-  LogicalResult runPreprocessing() {
-    mlir::ModuleOp modOp = getOperation();
-    MLIRContext *ctx = &getContext();
-
-    RewritePatternSet patterns{ctx};
-    patterns.add<ReplaceReturnWithTEHB>(ctx);
-    mlir::GreedyRewriteConfig config;
-    config.useTopDownTraversal = true;
-    config.enableRegionSimplification = false;
-
-    return applyPatternsAndFoldGreedily(modOp, std::move(patterns), config);
-  }
-
   /// Converts all external `handshake::FuncOp` operations into corresponding
   /// `hw::HWModuleExternOp` operations using a partial IR conversion.
   LogicalResult convertExternalFunctions(ChannelTypeConverter &typeConverter) {

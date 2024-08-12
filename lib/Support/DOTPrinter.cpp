@@ -263,7 +263,6 @@ static std::string getPrettyNodeLabel(Operation *op) {
       .Case<handshake::ControlMergeOp>([&](auto) { return "cmerge"; })
       .Case<handshake::BranchOp>([&](auto) { return "branch"; })
       .Case<handshake::ConditionalBranchOp>([&](auto) { return "cbranch"; })
-      .Case<handshake::ReturnOp>([&](auto) { return "return"; })
       .Case<handshake::AddIOp, handshake::AddFOp>([&](auto) { return "+"; })
       .Case<handshake::SubIOp, handshake::SubFOp>([&](auto) { return "-"; })
       .Case<handshake::AndIOp>([&](auto) { return "&"; })
@@ -346,7 +345,7 @@ static StringRef getNodeColor(Operation *op) {
       .Case<handshake::ForkOp, handshake::LazyForkOp, handshake::JoinOp>(
           [&](auto) { return "lavender"; })
       .Case<handshake::BufferOp>([&](auto) { return "lightgreen"; })
-      .Case<handshake::ReturnOp, handshake::EndOp>([&](auto) { return "gold"; })
+      .Case<handshake::EndOp>([&](auto) { return "gold"; })
       .Case<handshake::SourceOp, handshake::SinkOp>(
           [&](auto) { return "gainsboro"; })
       .Case<handshake::ConstantOp>([&](auto) { return "plum"; })

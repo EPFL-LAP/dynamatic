@@ -15,8 +15,7 @@
 // CHECK:           %[[VAL_10]], %[[VAL_15:.*]] = cond_br %[[VAL_13]], %[[VAL_9]] {handshake.bb = 1 : ui32} : <i1>, <i32>
 // CHECK:           %[[VAL_12]], %[[VAL_16:.*]] = cond_br %[[VAL_13]], %[[VAL_11]] {handshake.bb = 1 : ui32} : <i1>, <>
 // CHECK:           %[[VAL_17:.*]], %[[VAL_18:.*]] = control_merge %[[VAL_16]]  {handshake.bb = 2 : ui32} : <>, <i1>
-// CHECK:           %[[VAL_19:.*]] = return {handshake.bb = 2 : ui32} %[[VAL_17]] : <>
-// CHECK:           end {handshake.bb = 2 : ui32} %[[VAL_19]] : <>
+// CHECK:           end {handshake.bb = 2 : ui32} %[[VAL_17]] : <>
 // CHECK:         }
 func.func @selfLoop(%arg0: i32, %arg1: i32) {
   cf.br ^bb1(%arg0: i32)
@@ -40,8 +39,7 @@ func.func @selfLoop(%arg0: i32, %arg1: i32) {
 // CHECK:           %[[VAL_12:.*]] = mux %[[VAL_11]] {{\[}}%[[VAL_6]], %[[VAL_6]]] {handshake.bb = 1 : ui32} : <i1>, <i32>
 // CHECK:           %[[VAL_13:.*]] = mux %[[VAL_11]] {{\[}}%[[VAL_4]], %[[VAL_6]]] {handshake.bb = 1 : ui32} : <i1>, <i32>
 // CHECK:           %[[VAL_14:.*]], %[[VAL_11]] = control_merge %[[VAL_8]], %[[VAL_8]]  {handshake.bb = 1 : ui32} : <>, <i1>
-// CHECK:           %[[VAL_15:.*]] = return {handshake.bb = 1 : ui32} %[[VAL_14]] : <>
-// CHECK:           end {handshake.bb = 1 : ui32} %[[VAL_15]] : <>
+// CHECK:           end {handshake.bb = 1 : ui32} %[[VAL_14]] : <>
 // CHECK:         }
 func.func @duplicateLiveOut(%arg0: i1, %arg1: i32, %arg2: i32) {
   cf.cond_br %arg0, ^bb1(%arg1, %arg2, %arg1: i32, i32, i32), ^bb1(%arg2, %arg2, %arg2: i32, i32, i32)
@@ -64,8 +62,7 @@ func.func @duplicateLiveOut(%arg0: i1, %arg1: i32, %arg2: i32) {
 // CHECK:           %[[VAL_12:.*]], %[[VAL_13:.*]] = control_merge %[[VAL_6]]  {handshake.bb = 2 : ui32} : <>, <i1>
 // CHECK:           %[[VAL_14:.*]] = br %[[VAL_12]] {handshake.bb = 2 : ui32} : <>
 // CHECK:           %[[VAL_15:.*]], %[[VAL_16:.*]] = control_merge %[[VAL_10]], %[[VAL_14]]  {handshake.bb = 3 : ui32} : <>, <i1>
-// CHECK:           %[[VAL_17:.*]] = return {handshake.bb = 3 : ui32} %[[VAL_15]] : <>
-// CHECK:           end {handshake.bb = 3 : ui32} %[[VAL_17]] : <>
+// CHECK:           end {handshake.bb = 3 : ui32} %[[VAL_15]] : <>
 // CHECK:         }
 func.func @divergeSameArg(%arg0: i1, %arg1: i32) {
   cf.cond_br %arg0, ^bb1(%arg1: i32), ^bb2(%arg1: i32)
