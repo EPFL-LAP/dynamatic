@@ -199,7 +199,10 @@ bool ChannelConstraints::verify(Attribute attr) const {
   if (!channelType)
     return false;
 
-  return dataWidth.verify(channelType.getDataBitWidth());
+  return dataWidth.verify(channelType.getDataBitWidth()) &&
+         numExtras.verify(channelType.getNumExtraSignals()) &&
+         numDownstreams.verify(channelType.getNumDownstreamExtraSignals()) &&
+         numUpstreams.verify(channelType.getNumUpstreamExtraSignals());
 }
 
 bool dynamatic::fromJSON(const ljson::Value &value, ChannelConstraints &cons,
@@ -223,8 +226,10 @@ std::string RTLChannelType::serialize(Attribute attr) {
   // Convert the channel type to a string
   std::stringstream ss;
   ss << channelType.getDataBitWidth();
-  for (const handshake::ExtraSignal &extra : channelType.getExtraSignals())
-    ss << "-" << extra.name.str() << "-" << extra.getBitWidth();
+  for (const handshake::ExtraSignal &extra : channelType.getExtraSignals()) {
+    ss << "-" << extra.name.str() << "-" << extra.getBitWidth()
+       << (extra.downstream ? "-D" : "-U");
+  }
   return ss.str();
 }
 

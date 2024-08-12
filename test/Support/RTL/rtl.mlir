@@ -24,6 +24,15 @@ hw.module.extern @test_string() attributes {hw.name = "test_string", hw.paramete
   PARAM_3 = "my_string"
 }}
 
+// CHECK-LABEL:   hw.module.extern @test_channel
+hw.module.extern @test_channel() attributes {hw.name = "test_channel", hw.parameters = {
+  PARAM_1 = !handshake.channel<i32>,
+  PARAM_2 = !handshake.channel<i5, [up1: i1 (U)]>,
+  PARAM_3 = !handshake.channel<i32>,
+  PARAM_4 = !handshake.channel<i32, [down1: i1, down2: i4]>,
+  PARAM_5 = !handshake.channel<i32, [down1: i4, up1: i1 (U)]>
+}}
+
 // CHECK-LABEL:   hw.module.extern @test_timing
 hw.module.extern @test_timing() attributes {hw.name = "test_timing", hw.parameters = {
   PARAM_1 = #handshake<timing {}>,

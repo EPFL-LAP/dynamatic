@@ -29,7 +29,7 @@
     "generic": "/path/to/test_string"
   },
   {
-    "name": "test_channels",
+    "name": "test_channel",
     "parameters": [
       { "name": "PARAM_1", "type": "channel" },
       {
@@ -42,7 +42,7 @@
       { "name": "PARAM_4", "type": "channel", "down-lb": 1 },
       { "name": "PARAM_5", "type": "channel", "up-ub": 1 }
     ],
-    "generic": "/path/to/test_channels"
+    "generic": "/path/to/test_channel"
   },
   {
     "name": "test_timing",
