@@ -30,13 +30,15 @@ void loop_multiply(in_int_t alpha, inout_int_t tmp[NI][NJ]) {
 
   for (int j = 0; j < NJ; j++) {
     tmp[j][j] = tmp[j][j] + alpha + j;
+    for (int i = 0; i < NJ; i++)
+      tmp[i][i] = tmp[i][i] + alpha + i;
 
-    if (alpha > 5) {
-      if (alpha > 7)
-        tmp[j][j] = tmp[j][j] + alpha;
-    } else {
-      tmp[j][j] = tmp[j][j] + alpha + j;
-    }
+    // if (alpha > 5) {
+    //  if (alpha > 7)
+    //  tmp[j][j] = tmp[j][j] + alpha;
+    //} // else {
+    //  tmp[j][j] = tmp[j][j] + alpha + j;
+    //}
   }
 }
 

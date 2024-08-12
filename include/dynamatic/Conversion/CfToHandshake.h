@@ -24,7 +24,6 @@
 #include "experimental/Support/BooleanLogic/BoolExpression.h"
 #include "experimental/Support/BooleanLogic/Shannon.h"
 #include "mlir/Analysis/CFGLoopInfo.h"
-#include "mlir/Support/LogicalResult.h"
 #include "mlir/Transforms/DialectConversion.h"
 #include <set>
 
@@ -265,6 +264,9 @@ public:
   /// Replaces the input of constants with the START value
   LogicalResult triggerConstantsFromStart(ConversionPatternRewriter &rewriter);
 
+  /// Adds BRANCHes in the case where the consumer is a mux and the cdg is empty
+  LogicalResult addSuppGSA(ConversionPatternRewriter &rewriter);
+
 protected:
   /// The region being lowered.
   Region &region;
@@ -318,9 +320,11 @@ private:
 
   // ControlDependenceAnalysis &cdgAnalysis;
 
-  // Function that runs loop analysis on the funcOp Region.
+  // Runs loop analysis on the funcOp Region.
   LogicalResult findLoopDetails(mlir::CFGLoopInfo &li, Region &funcReg);
 
+  // Enumerates all paths from the start Block to the end Block in the CFG and
+  // returns a minimizedSOP while respecting the control dependencies
   experimental::boolean::BoolExpression *
   enumeratePaths(Block *start, Block *end,
                  const SmallVector<Block *, 4> &controlDeps);
