@@ -13,16 +13,9 @@
 #include "dynamatic/Transforms/BufferPlacement/FPL22Buffers.h"
 #include "dynamatic/Analysis/NameAnalysis.h"
 #include "dynamatic/Dialect/Handshake/HandshakeOps.h"
-#include "dynamatic/Support/CFG.h"
 #include "dynamatic/Support/TimingModels.h"
 #include "dynamatic/Transforms/BufferPlacement/BufferingSupport.h"
 #include "dynamatic/Transforms/BufferPlacement/CFDFC.h"
-#include "mlir/Dialect/Arith/IR/Arith.h"
-#include "mlir/Dialect/Func/IR/FuncOps.h"
-#include "mlir/IR/BuiltinTypes.h"
-#include "mlir/Support/IndentedOstream.h"
-#include "mlir/Support/LogicalResult.h"
-#include "llvm/ADT/SetOperations.h"
 #include "llvm/ADT/TypeSwitch.h"
 #include <iterator>
 #include <optional>
@@ -294,18 +287,15 @@ void CFDFCUnionBuffers::setup() {
   signals.push_back(SignalType::VALID);
   signals.push_back(SignalType::READY);
 
-  // Create buffering groups. In this MILP we care for all signals, but the data
-  // and valid paths are always cut together.
-  OperationName oehbName = OperationName(handshake::OEHBOp::getOperationName(),
-                                         funcInfo.funcOp->getContext());
-  const TimingModel *oehbModel = timingDB.getModel(oehbName);
-  BufferingGroup dataValidGroup({SignalType::DATA, SignalType::VALID},
-                                oehbModel);
+  /// NOTE: (lucas-rami) For each buffering group this should be the timing
+  /// model of the buffer that will be inserted by the MILP for this group. We
+  /// don't have models for these buffers at the moment therefore we provide a
+  /// null-model to each group, but this hurts our placement's accuracy.
+  const TimingModel *bufModel = nullptr;
 
-  OperationName tehbName = OperationName(handshake::TEHBOp::getOperationName(),
-                                         funcInfo.funcOp->getContext());
-  const TimingModel *tehbModel = timingDB.getModel(tehbName);
-  BufferingGroup readyGroup({SignalType::READY}, tehbModel);
+  BufferingGroup dataValidGroup({SignalType::DATA, SignalType::VALID},
+                                bufModel);
+  BufferingGroup readyGroup({SignalType::READY}, bufModel);
 
   SmallVector<BufferingGroup> bufGroups;
   bufGroups.push_back(dataValidGroup);
@@ -326,11 +316,11 @@ void CFDFCUnionBuffers::setup() {
     addCustomChannelConstraints(channel);
 
     // Add single-domain path constraints
-    addChannelPathConstraints(channel, SignalType::DATA, oehbModel, {},
+    addChannelPathConstraints(channel, SignalType::DATA, bufModel, {},
                               readyGroup);
-    addChannelPathConstraints(channel, SignalType::VALID, oehbModel, {},
+    addChannelPathConstraints(channel, SignalType::VALID, bufModel, {},
                               readyGroup);
-    addChannelPathConstraints(channel, SignalType::READY, tehbModel,
+    addChannelPathConstraints(channel, SignalType::READY, bufModel,
                               dataValidGroup, {});
 
     // Elasticity constraints
@@ -395,18 +385,15 @@ void OutOfCycleBuffers::setup() {
   signals.push_back(SignalType::VALID);
   signals.push_back(SignalType::READY);
 
-  // Create buffering groups. In this MILP we care for all signals, but the data
-  // and valid paths are always cut together.
-  OperationName oehbName = OperationName(handshake::OEHBOp::getOperationName(),
-                                         funcInfo.funcOp->getContext());
-  const TimingModel *oehbModel = timingDB.getModel(oehbName);
-  BufferingGroup dataValidGroup({SignalType::DATA, SignalType::VALID},
-                                oehbModel);
+  /// NOTE: (lucas-rami) For each buffering group this should be the timing
+  /// model of the buffer that will be inserted by the MILP for this group. We
+  /// don't have models for these buffers at the moment therefore we provide a
+  /// null-model to each group, but this hurts our placement's accuracy.
+  const TimingModel *bufModel = nullptr;
 
-  OperationName tehbName = OperationName(handshake::TEHBOp::getOperationName(),
-                                         funcInfo.funcOp->getContext());
-  const TimingModel *tehbModel = timingDB.getModel(tehbName);
-  BufferingGroup readyGroup({SignalType::READY}, tehbModel);
+  BufferingGroup dataValidGroup({SignalType::DATA, SignalType::VALID},
+                                bufModel);
+  BufferingGroup readyGroup({SignalType::READY}, bufModel);
 
   SmallVector<BufferingGroup> bufGroups;
   bufGroups.push_back(dataValidGroup);
@@ -444,11 +431,11 @@ void OutOfCycleBuffers::setup() {
     addCustomChannelConstraints(channel);
 
     // Add single-domain path constraints
-    addChannelPathConstraints(channel, SignalType::DATA, oehbModel, {},
+    addChannelPathConstraints(channel, SignalType::DATA, bufModel, {},
                               readyGroup);
-    addChannelPathConstraints(channel, SignalType::VALID, oehbModel, {},
+    addChannelPathConstraints(channel, SignalType::VALID, bufModel, {},
                               readyGroup);
-    addChannelPathConstraints(channel, SignalType::READY, tehbModel,
+    addChannelPathConstraints(channel, SignalType::READY, bufModel,
                               dataValidGroup, {});
 
     // Add elasticity constraints

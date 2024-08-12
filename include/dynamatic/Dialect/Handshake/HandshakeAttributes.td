@@ -251,8 +251,25 @@ def MemDependenceArrayAttr : Handshake_Attr<"MemDependenceArray", "deps"> {
 }
 
 //===----------------------------------------------------------------------===//
-// Buffer placement annotations
+// Buffer annotations
 //===----------------------------------------------------------------------===//
+
+def TimingInfo : TypeParameter<
+  "::dynamatic::handshake::TimingInfo", "timing information"> {
+}
+
+def TimingAttr : Handshake_Attr<"Timing", "timing"> {
+ let summary = "the timing characteristics of an operation";
+  let description = [{
+    Holds an operation's timing characteristics such as latencies between input
+    and output ports. Usually stored as an RTL parameter to guide the backend in
+    selecting an appropriate RTL module to implement the operation. 
+  }];
+  
+  let parameters = (ins TimingInfo:$info);
+  
+  let hasCustomAssemblyFormat = 1; 
+}
 
 def ChannelBufPropsAttr : Handshake_Attr<"ChannelBufProps", "channelBufProps"> {
   let summary = "Buffering properties of a single channel";

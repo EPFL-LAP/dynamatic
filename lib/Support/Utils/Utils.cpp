@@ -11,3 +11,9 @@
 //===----------------------------------------------------------------------===//
 
 #include "dynamatic/Support/Utils/Utils.h"
+
+using namespace dynamatic;
+
+std::array<SignalType, 3> dynamatic::getSignalTypes() {
+  return {SignalType::DATA, SignalType::VALID, SignalType::READY};
+}

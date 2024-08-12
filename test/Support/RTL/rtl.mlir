@@ -23,3 +23,12 @@ hw.module.extern @test_string() attributes {hw.name = "test_string", hw.paramete
   PARAM_2 = "my_string",
   PARAM_3 = "my_string"
 }}
+
+// CHECK-LABEL:   hw.module.extern @test_timing
+hw.module.extern @test_timing() attributes {hw.name = "test_timing", hw.parameters = {
+  PARAM_1 = #handshake<timing {}>,
+  PARAM_2 = #handshake<timing {D: 5, V: 1}>,
+  PARAM_3 = #handshake<timing {D: 0, V: 0, R: 0}>,
+  PARAM_4 = #handshake<timing {V: 1}>,
+  PARAM_5 = #handshake<timing {R: 1, V: 2}>
+}}

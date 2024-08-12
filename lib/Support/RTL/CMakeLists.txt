@@ -5,6 +5,7 @@ add_dynamatic_library(DynamaticSupportRTL
   LINK_LIBS PUBLIC
   DynamaticSupportUtils
   DynamaticSupportJSON
+  DynamaticHandshake
   DynamaticHW
   MLIRIR
   LLVMSupport

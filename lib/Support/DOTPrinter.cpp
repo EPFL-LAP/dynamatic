@@ -14,9 +14,11 @@
 
 #include "dynamatic/Support/DOTPrinter.h"
 #include "dynamatic/Analysis/NameAnalysis.h"
+#include "dynamatic/Dialect/Handshake/HandshakeAttributes.h"
 #include "dynamatic/Dialect/Handshake/HandshakeOps.h"
 #include "dynamatic/Dialect/Handshake/HandshakeTypes.h"
 #include "dynamatic/Support/CFG.h"
+#include "dynamatic/Support/Utils/Utils.h"
 #include "dynamatic/Transforms/HandshakeMaterialize.h"
 #include "experimental/Transforms/Speculation/SpecAnnotatePaths.h"
 #include "mlir/Dialect/Math/IR/Math.h"
@@ -216,12 +218,34 @@ static std::string getPrettyNodeLabel(Operation *op) {
             // Fallback on an empty string
             return std::string("");
           })
-      .Case<handshake::OEHBOp>([&](handshake::OEHBOp oehbOp) {
-        return "oehb [" + std::to_string(oehbOp.getSlots()) + "]";
-      })
-      .Case<handshake::TEHBOp>([&](handshake::TEHBOp tehbOp) {
-        return "tehb [" + std::to_string(tehbOp.getSlots()) + "]";
-      })
+      .Case<handshake::BufferOp>(
+          [&](handshake::BufferOp bufferOp) -> std::string {
+            // Try to infer the buffer type from HW parameters, if present
+            auto params = bufferOp->getAttrOfType<DictionaryAttr>(
+                RTL_PARAMETERS_ATTR_NAME);
+            if (!params)
+              return "buffer";
+            auto optSlots = params.getNamed(BufferOp::NUM_SLOTS_ATTR_NAME);
+            std::string numSlotsStr = "";
+            if (optSlots) {
+              if (auto numSlots = dyn_cast<IntegerAttr>(optSlots->getValue())) {
+                if (numSlots.getType().isUnsignedInteger())
+                  numSlotsStr = " [" + std::to_string(numSlots.getUInt()) + "]";
+              }
+            }
+            auto optTiming = params.getNamed(BufferOp::TIMING_ATTR_NAME);
+            if (!optTiming)
+              return "buffer" + numSlotsStr;
+            if (auto timing =
+                    dyn_cast<handshake::TimingAttr>(optTiming->getValue())) {
+              TimingInfo info = timing.getInfo();
+              if (info == TimingInfo::oehb())
+                return "oehb" + numSlotsStr;
+              if (info == TimingInfo::tehb())
+                return "tehb" + numSlotsStr;
+            }
+            return "buffer" + numSlotsStr;
+          })
       .Case<handshake::MemoryControllerOp>([&](MemoryControllerOp mcOp) {
         return getMemLabel("MC", getMemName(mcOp.getMemRef()));
       })
@@ -321,7 +345,7 @@ static StringRef getNodeColor(Operation *op) {
   return llvm::TypeSwitch<Operation *, StringRef>(op)
       .Case<handshake::ForkOp, handshake::LazyForkOp, handshake::JoinOp>(
           [&](auto) { return "lavender"; })
-      .Case<handshake::BufferOpInterface>([&](auto) { return "lightgreen"; })
+      .Case<handshake::BufferOp>([&](auto) { return "lightgreen"; })
       .Case<handshake::ReturnOp, handshake::EndOp>([&](auto) { return "gold"; })
       .Case<handshake::SourceOp, handshake::SinkOp>(
           [&](auto) { return "gainsboro"; })

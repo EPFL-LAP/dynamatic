@@ -32,6 +32,8 @@ namespace handshake {
 /// to index into a given number of elements (minimum 1 bit).
 IntegerType getOptimizedIndexValType(OpBuilder &builder, unsigned numToIndex);
 
+struct TimingInfo;
+
 // Forward declaration needed by memory ports data structures.
 class MCLoadOp;
 class LSQLoadOp;

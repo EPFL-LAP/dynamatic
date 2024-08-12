@@ -400,12 +400,12 @@ HandshakeCFG::getControlValues(DenseMap<unsigned, Value> &ctrlVals) {
     // their outputs
     LogicalResult res =
         llvm::TypeSwitch<Operation *, LogicalResult>(ctrlOp)
-            .Case<handshake::ForkOp, handshake::LazyForkOp,
-                  handshake::BufferOpInterface, handshake::BranchOp,
-                  handshake::ConditionalBranchOp>([&](auto) {
-              addToCtrlOps(ctrlOp->getUsers());
-              return success();
-            })
+            .Case<handshake::ForkOp, handshake::LazyForkOp, handshake::BufferOp,
+                  handshake::BranchOp, handshake::ConditionalBranchOp>(
+                [&](auto) {
+                  addToCtrlOps(ctrlOp->getUsers());
+                  return success();
+                })
             .Case<handshake::MergeLikeOpInterface>([&](auto) {
               OpResult mergeRes = ctrlOp->getResult(0);
               addToCtrlOps(mergeRes.getUsers());
@@ -637,15 +637,14 @@ static GIIDStatus isGIIDRec(Value predecessor, OpOperand &oprd,
         ValueRange values{selectOp.getTrueValue(), selectOp.getFalseValue()};
         return foldGIIDStatusAnd(recurse, values);
       })
-      .Case<handshake::ForkOp, handshake::LazyForkOp,
-            handshake::BufferOpInterface, handshake::BranchOp,
-            handshake::AddIOp, handshake::AndIOp, handshake::CmpIOp,
-            handshake::DivSIOp, handshake::DivUIOp, handshake::ExtSIOp,
-            handshake::ExtUIOp, handshake::MulIOp, handshake::OrIOp,
-            handshake::ShLIOp, handshake::ShRUIOp, handshake::SubIOp,
-            handshake::TruncIOp, handshake::XOrIOp, handshake::AddFOp,
-            handshake::CmpFOp, handshake::DivFOp, handshake::MulFOp,
-            handshake::SubFOp>([&](auto) {
+      .Case<handshake::ForkOp, handshake::LazyForkOp, handshake::BufferOp,
+            handshake::BranchOp, handshake::AddIOp, handshake::AndIOp,
+            handshake::CmpIOp, handshake::DivSIOp, handshake::DivUIOp,
+            handshake::ExtSIOp, handshake::ExtUIOp, handshake::MulIOp,
+            handshake::OrIOp, handshake::ShLIOp, handshake::ShRUIOp,
+            handshake::SubIOp, handshake::TruncIOp, handshake::XOrIOp,
+            handshake::AddFOp, handshake::CmpFOp, handshake::DivFOp,
+            handshake::MulFOp, handshake::SubFOp>([&](auto) {
         // At least one operand must depend on the predecessor
         return foldGIIDStatusOr(recurse, defOp->getOperands());
       })

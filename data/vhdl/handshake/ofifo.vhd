@@ -4,7 +4,7 @@ use ieee.numeric_std.all;
 
 entity ofifo is
   generic (
-    SIZE     : integer;
+    NUM_SLOTS  : integer;
     DATA_WIDTH : integer
   );
   port (
@@ -39,7 +39,7 @@ begin
       ins_ready  => tehb_ready
     );
 
-  fifo : entity work.elastic_fifo_inner(arch) generic map (SIZE, DATA_WIDTH)
+  fifo : entity work.elastic_fifo_inner(arch) generic map (NUM_SLOTS, DATA_WIDTH)
     port map(
       --inputs
       clk        => clk,

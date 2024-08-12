@@ -32,7 +32,6 @@
 #include "dynamatic/Dialect/Handshake/HandshakeTypes.h"
 #include "dynamatic/Support/CFG.h"
 #include "dynamatic/Transforms/HandshakeMinimizeCstWidth.h"
-#include "mlir/Dialect/Arith/IR/Arith.h"
 #include "mlir/IR/BuiltinTypes.h"
 #include "mlir/IR/MLIRContext.h"
 #include "mlir/IR/PatternMatch.h"
@@ -140,8 +139,8 @@ static ChannelVal backtrack(ChannelVal val) {
     if (auto [_, isNewOp] = visitedOps.insert(defOp); !isNewOp)
       return val;
 
-    if (isa<handshake::BufferOpInterface, handshake::ForkOp,
-            handshake::LazyForkOp, handshake::BranchOp>(defOp))
+    if (isa<handshake::BufferOp, handshake::ForkOp, handshake::LazyForkOp,
+            handshake::BranchOp>(defOp))
       val = cast<ChannelVal>(defOp->getOperand(0));
     if (auto condOp = dyn_cast<handshake::ConditionalBranchOp>(defOp))
       val = cast<ChannelVal>(condOp.getDataOperand());
@@ -259,9 +258,8 @@ static bool isOperandInCycle(Value val, Value res,
 
   // Backtrack through operations that end up "forwarding" one of their
   // inputs to the output
-  if (isa<handshake::BufferOpInterface, handshake::ForkOp,
-          handshake::LazyForkOp, handshake::BranchOp, handshake::ExtSIOp,
-          handshake::ExtUIOp>(defOp))
+  if (isa<handshake::BufferOp, handshake::ForkOp, handshake::LazyForkOp,
+          handshake::BranchOp, handshake::ExtSIOp, handshake::ExtUIOp>(defOp))
     return isOperandInCycle(defOp->getOperand(0), res, mergedValues,
                             visitedOps);
   if (auto condOp = dyn_cast<handshake::ConditionalBranchOp>(defOp))
@@ -519,10 +517,10 @@ public:
 
 /// Special configuration for buffers required because of the buffer type
 /// attribute and custom builder.
-template <typename BufOp>
-class BufferDataConfig : public OptDataConfig<BufOp> {
+class BufferDataConfig : public OptDataConfig<handshake::BufferOp> {
 public:
-  BufferDataConfig(BufOp op) : OptDataConfig<BufOp>(op) {};
+  BufferDataConfig(handshake::BufferOp op)
+      : OptDataConfig<handshake::BufferOp>(op) {};
 
   SmallVector<Value> getDataOperands() override {
     return SmallVector<Value>{this->op.getOperand()};
@@ -536,10 +534,12 @@ public:
         modVal({minDataOperands[0], ext}, optWidth, rewriter));
   }
 
-  BufOp createOp(ArrayRef<Type> newResTypes, ArrayRef<Value> newOperands,
-                 PatternRewriter &rewriter) override {
-    return rewriter.create<BufOp>(this->op.getLoc(), newOperands[0],
-                                  this->op.getSlots());
+  handshake::BufferOp createOp(ArrayRef<Type> newResTypes,
+                               ArrayRef<Value> newOperands,
+                               PatternRewriter &rewriter) override {
+    return rewriter.create<handshake::BufferOp>(
+        op.getLoc(), newOperands[0].getType(), newOperands[0],
+        op->getAttrDictionary().getValue());
   }
 };
 
@@ -1562,10 +1562,8 @@ void HandshakeOptimizeBitwidthsPass::addHandshakeDataPatterns(
   patterns
       .add<HandshakeOptData<handshake::ConditionalBranchOp, CBranchDataConfig>>(
           forward, ctx);
-  patterns.add<
-      HandshakeOptData<handshake::OEHBOp, BufferDataConfig<handshake::OEHBOp>>,
-      HandshakeOptData<handshake::TEHBOp, BufferDataConfig<handshake::TEHBOp>>>(
-      forward, ctx);
+  patterns.add<HandshakeOptData<handshake::BufferOp, BufferDataConfig>>(forward,
+                                                                        ctx);
 }
 
 void HandshakeOptimizeBitwidthsPass::addForwardPatterns(

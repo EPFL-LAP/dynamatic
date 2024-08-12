@@ -162,12 +162,6 @@ protected:
 /// from.
 class RTLRequest {
 public:
-  /// Attribute names under which the RTL component's name and parameters are
-  /// stored on an MLIR operation, respectively.
-  static constexpr StringLiteral NAME_ATTR = StringLiteral("hw.name"),
-                                 PARAMETERS_ATTR =
-                                     StringLiteral("hw.parameters");
-
   /// Location to report errors from.
   Location loc;
 

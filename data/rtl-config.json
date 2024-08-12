@@ -155,75 +155,127 @@
     "dependencies": ["join"]
   },
   {
-    "name": "handshake.oehb",
+    "name": "handshake.buffer",
     "parameters": [
-      { "name": "SLOTS", "type": "unsigned", "eq": 1, "generic": false },
-      { "name": "DATA_WIDTH", "type": "unsigned", "eq": 0, "generic": false }
+      { "name": "NUM_SLOTS", "type": "unsigned", "eq": 1, "generic": false },
+      { "name": "DATA_WIDTH", "type": "unsigned", "eq": 0, "generic": false },
+      {
+        "name": "TIMING",
+        "type": "timing",
+        "data-lat-eq": 1,
+        "valid-lat-eq": 1,
+        "generic": false
+      }
     ],
     "generic": "$DYNAMATIC/data/vhdl/handshake/dataless/oehb.vhd",
     "module-name": "oehb_dataless"
   },
   {
-    "name": "handshake.oehb",
+    "name": "handshake.buffer",
     "parameters": [
-      { "name": "SLOTS", "type": "unsigned", "eq": 1, "generic": false },
-      { "name": "DATA_WIDTH", "type": "unsigned", "lb": 1 }
+      { "name": "NUM_SLOTS", "type": "unsigned", "eq": 1, "generic": false },
+      { "name": "DATA_WIDTH", "type": "unsigned", "lb": 1 },
+      {
+        "name": "TIMING",
+        "type": "timing",
+        "data-lat-eq": 1,
+        "valid-lat-eq": 1,
+        "generic": false
+      }
     ],
     "generic": "$DYNAMATIC/data/vhdl/handshake/oehb.vhd",
     "dependencies": ["oehb_dataless"]
   },
   {
-    "name": "handshake.oehb",
+    "name": "handshake.buffer",
     "parameters": [
-      { "name": "SLOTS", "type": "unsigned", "lb": 2 },
-      { "name": "DATA_WIDTH", "type": "unsigned", "eq": 0, "generic": false }
+      { "name": "NUM_SLOTS", "type": "unsigned", "lb": 2 },
+      { "name": "DATA_WIDTH", "type": "unsigned", "eq": 0, "generic": false },
+      {
+        "name": "TIMING",
+        "type": "timing",
+        "data-lat-eq": 1,
+        "valid-lat-eq": 1,
+        "generic": false
+      }
     ],
     "generic": "$DYNAMATIC/data/vhdl/handshake/dataless/ofifo.vhd",
     "module-name": "ofifo_dataless",
     "dependencies": ["tehb_dataless", "elastic_fifo_inner_dataless"]
   },
   {
-    "name": "handshake.oehb",
+    "name": "handshake.buffer",
     "parameters": [
-      { "name": "SLOTS", "type": "unsigned", "lb": 2 },
-      { "name": "DATA_WIDTH", "type": "unsigned", "lb": 1 }
+      { "name": "NUM_SLOTS", "type": "unsigned", "lb": 2 },
+      { "name": "DATA_WIDTH", "type": "unsigned", "lb": 1 },
+      {
+        "name": "TIMING",
+        "type": "timing",
+        "data-lat-eq": 1,
+        "valid-lat-eq": 1,
+        "generic": false
+      }
     ],
     "generic": "$DYNAMATIC/data/vhdl/handshake/ofifo.vhd",
     "dependencies": ["tehb", "elastic_fifo_inner"]
   },
   {
-    "name": "handshake.tehb",
+    "name": "handshake.buffer",
     "parameters": [
-      { "name": "SLOTS", "type": "unsigned", "eq": 1, "generic": false },
-      { "name": "DATA_WIDTH", "type": "unsigned", "eq": 0, "generic": false }
+      { "name": "NUM_SLOTS", "type": "unsigned", "eq": 1, "generic": false },
+      { "name": "DATA_WIDTH", "type": "unsigned", "eq": 0, "generic": false },
+      {
+        "name": "TIMING",
+        "type": "timing",
+        "ready-lat-eq": 1,
+        "generic": false
+      }
     ],
     "generic": "$DYNAMATIC/data/vhdl/handshake/dataless/tehb.vhd",
     "module-name": "tehb_dataless"
   },
   {
-    "name": "handshake.tehb",
+    "name": "handshake.buffer",
     "parameters": [
-      { "name": "SLOTS", "type": "unsigned", "eq": 1, "generic": false },
-      { "name": "DATA_WIDTH", "type": "unsigned", "lb": 1 }
+      { "name": "NUM_SLOTS", "type": "unsigned", "eq": 1, "generic": false },
+      { "name": "DATA_WIDTH", "type": "unsigned", "lb": 1 },
+      {
+        "name": "TIMING",
+        "type": "timing",
+        "ready-lat-eq": 1,
+        "generic": false
+      }
     ],
     "generic": "$DYNAMATIC/data/vhdl/handshake/tehb.vhd",
     "dependencies": ["tehb_dataless"]
   },
   {
-    "name": "handshake.tehb",
+    "name": "handshake.buffer",
     "parameters": [
-      { "name": "SLOTS", "type": "unsigned", "lb": 2 },
-      { "name": "DATA_WIDTH", "type": "unsigned", "eq": 0, "generic": false }
+      { "name": "NUM_SLOTS", "type": "unsigned", "lb": 2 },
+      { "name": "DATA_WIDTH", "type": "unsigned", "eq": 0, "generic": false },
+      {
+        "name": "TIMING",
+        "type": "timing",
+        "ready-lat-eq": 1,
+        "generic": false
+      }
     ],
     "generic": "$DYNAMATIC/data/vhdl/handshake/dataless/tfifo.vhd",
     "module-name": "tfifo_dataless",
     "dependencies": ["elastic_fifo_inner_dataless"]
   },
   {
-    "name": "handshake.tehb",
+    "name": "handshake.buffer",
     "parameters": [
-      { "name": "SLOTS", "type": "unsigned", "lb": 2 },
-      { "name": "DATA_WIDTH", "type": "unsigned", "lb": 1 }
+      { "name": "NUM_SLOTS", "type": "unsigned", "lb": 2 },
+      { "name": "DATA_WIDTH", "type": "unsigned", "lb": 1 },
+      {
+        "name": "TIMING",
+        "type": "timing",
+        "ready-lat-eq": 1,
+        "generic": false
+      }
     ],
     "generic": "$DYNAMATIC/data/vhdl/handshake/tfifo.vhd",
     "dependencies": ["elastic_fifo_inner"]

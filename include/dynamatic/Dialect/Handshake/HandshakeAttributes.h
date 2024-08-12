@@ -14,13 +14,62 @@
 #ifndef DYNAMATIC_DIALECT_HANDSHAKE_HANDSHAKE_ATTRIBUTES_H
 #define DYNAMATIC_DIALECT_HANDSHAKE_HANDSHAKE_ATTRIBUTES_H
 
-// #include "mlir/Dialect/Affine/Analysis/AffineAnalysis.h"
-#include "mlir/IR/Attributes.h"
+#include "dynamatic/Support/Utils/Utils.h"
 #include "mlir/IR/BuiltinAttributes.h"
+#include "mlir/IR/OpImplementation.h"
 #include "mlir/Support/LLVM.h"
+#include "llvm/ADT/StringRef.h"
 
 namespace dynamatic {
 namespace handshake {
+
+/// Holds timing characteristics for an operation. Right now these are just
+/// optional latencies between identically-typed (data, valid, ready) input and
+/// output ports, but many other data characteristics can be added in the
+/// future, eventually representing a "full" timing model for the operation.
+/// This is the backing data-structure for the `handshake::TimingAttr`
+/// attribute, therefore MLIR's memory management constraints will need to be
+/// explcitly honored as soon as we add dynamically-allocated members.
+///
+/// NOTE: (lucas-rami) I am really not sure that even this minimal
+/// representation of latencies is very meaningful. Here are my concerns.
+/// 1. No notion of bypassability (e.g., the TEHB cuts the ready path but is
+/// bypassable, which is not encodable in the current members).
+/// 2. A `std::nullopt` latency is interpreted as "don't care". In practice
+/// though I'm not sure anyone will ever not care. Most likely if someone does
+/// not specify a latency on a path then they want 0 latency.
+struct TimingInfo {
+  /// Data-to-data latency.
+  std::optional<unsigned> dataLatency;
+  /// Valid-to-valid latency.
+  std::optional<unsigned> validLatency;
+  /// Ready-to-ready latency.
+  std::optional<unsigned> readyLatency;
+
+  /// Returns the optional latency associated to a signal type.
+  std::optional<unsigned> getLatency(SignalType type);
+
+  /// Sets the latency associated to a signal type.
+  TimingInfo &setLatency(SignalType type, unsigned latency);
+
+  /// During parsing of attributes storing instances of this type, attempts to
+  /// parse the data after a key and colon were parsed (<key> <:>
+  /// <data_to_parse>) and modifies the timing characteristics accordingly.
+  mlir::ParseResult parseKey(mlir::AsmParser &odsParser, mlir::StringRef key);
+
+  /// Returns timing information for a standard OEHB.
+  /// NOTE: (lucas-rami) I am not sure these make sense, see type's note above.
+  static TimingInfo oehb();
+
+  /// Returns timing information for a standard TEHB.
+  /// NOTE: (lucas-rami) I am not sure these make sense, see type's note above.
+  static TimingInfo tehb();
+};
+
+bool operator==(const TimingInfo &lhs, const TimingInfo &rhs);
+
+// NOLINTNEXTLINE(readability-identifier-naming)
+llvm::hash_code hash_value(const TimingInfo &timing);
 
 /// Specifies how a handshake channel (i.e. a SSA value used once) may be
 /// buffered. Backing data-structure for the ChannelBufPropsAttr attribute.

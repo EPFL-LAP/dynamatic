@@ -16,10 +16,12 @@
 //===----------------------------------------------------------------------===//
 
 #include "dynamatic/Dialect/Handshake/HandshakeOps.h"
+#include "dynamatic/Dialect/Handshake/HandshakeAttributes.h"
 #include "dynamatic/Dialect/Handshake/HandshakeDialect.h"
 #include "dynamatic/Dialect/Handshake/HandshakeTypes.h"
 #include "dynamatic/Support/CFG.h"
 #include "dynamatic/Support/LLVM.h"
+#include "dynamatic/Support/Utils/Utils.h"
 #include "mlir/IR/Attributes.h"
 #include "mlir/IR/Builders.h"
 #include "mlir/IR/BuiltinAttributeInterfaces.h"
@@ -176,40 +178,31 @@ namespace {
 // BufferOp
 //===----------------------------------------------------------------------===//
 
-static ParseResult parseBufferOp(OpAsmParser &parser, OperationState &result) {
-  SmallVector<OpAsmParser::UnresolvedOperand, 4> allOperands;
-  llvm::SMLoc loc = parser.getCurrentLocation();
-  Type type;
-  unsigned numSlots;
+void BufferOp::build(OpBuilder &odsBuilder, OperationState &odsState,
+                     Value operand, const TimingInfo &timing,
+                     std::optional<unsigned> numSlots) {
+  odsState.addOperands(operand);
+  odsState.addTypes(operand.getType());
 
-  // Parse the operation's size between square brackets
-  if (parser.parseLSquare() || parser.parseInteger(numSlots) ||
-      parser.parseRSquare())
-    return failure();
+  // Create attribute dictionary
+  SmallVector<NamedAttribute> attributes;
+  MLIRContext *ctx = odsState.getContext();
+  attributes.emplace_back(StringAttr::get(ctx, TIMING_ATTR_NAME),
+                          TimingAttr::get(ctx, timing));
+  if (numSlots) {
+    attributes.emplace_back(
+        StringAttr::get(ctx, NUM_SLOTS_ATTR_NAME),
+        IntegerAttr::get(IntegerType::get(ctx, 32, IntegerType::Unsigned),
+                         *numSlots));
+  }
 
-  if (parser.parseOperandList(allOperands) ||
-      parser.parseOptionalAttrDict(result.attributes) || parser.parseColon() ||
-      parseHandshakeType(parser, type))
-    return failure();
-
-  result.addTypes(type);
-  result.addAttribute(
-      "slots",
-      IntegerAttr::get(IntegerType::get(result.getContext(), 32), numSlots));
-
-  if (parser.resolveOperands(allOperands, {type}, loc, result.operands))
-    return failure();
-  return success();
+  odsState.addAttribute(RTL_PARAMETERS_ATTR_NAME,
+                        DictionaryAttr::get(ctx, attributes));
 }
 
-void printBufferOp(Operation *op, OpAsmPrinter &printer) {
-  BufferOpInterface bufferOp = cast<BufferOpInterface>(op);
-  Value oprd = op->getOperands().front();
-  printer << " [" << bufferOp.getSlots() << "] " << oprd;
-  printer.printOptionalAttrDict(op->getAttrs(), {"slots"});
-  printer << " : " << oprd.getType();
+std::pair<handshake::ChannelType, bool> BufferOp::getReshapableChannelType() {
+  return {dyn_cast<handshake::ChannelType>(getOperand().getType()), true};
 }
-
 //===----------------------------------------------------------------------===//
 // MergeOp
 //===----------------------------------------------------------------------===//
@@ -913,7 +906,6 @@ void LSQOp::build(OpBuilder &odsBuilder, OperationState &odsState, Value memref,
   MLIRContext *ctx = odsBuilder.getContext();
   odsState.types.append(numLoads, wrapChannel(memrefType.getElementType()));
   odsState.types.push_back(handshake::ControlType::get(ctx));
-
   buildLSQGroupSizes(odsBuilder, odsState, groupSizes);
 }
 

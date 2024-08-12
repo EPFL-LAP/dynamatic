@@ -11,6 +11,7 @@
 //===----------------------------------------------------------------------===//
 
 #include "dynamatic/Dialect/Handshake/HandshakeAttributes.h"
+#include "dynamatic/Support/Utils/Utils.h"
 #include "mlir/IR/Attributes.h"
 #include "mlir/IR/OpImplementation.h"
 #include "mlir/Support/LogicalResult.h"
@@ -147,6 +148,142 @@ Attribute MemDependenceAttr::parse(AsmParser &odsParser, Type odsType) {
   if (odsParser.parseGreater())
     return nullptr;
   return MemDependenceAttr::get(ctx, dstAccess, loopDepth, components);
+}
+
+//===----------------------------------------------------------------------===//
+// TimingInfo(Attr)
+//===----------------------------------------------------------------------===//
+
+std::optional<unsigned> TimingInfo::getLatency(SignalType type) {
+  switch (type) {
+  case SignalType::DATA:
+    return dataLatency;
+  case SignalType::VALID:
+    return validLatency;
+  case SignalType::READY:
+    return readyLatency;
+  }
+}
+
+TimingInfo &TimingInfo::setLatency(SignalType type, unsigned latency) {
+  switch (type) {
+  case SignalType::DATA:
+    dataLatency = latency;
+    break;
+  case SignalType::VALID:
+    validLatency = latency;
+    break;
+  case SignalType::READY:
+    readyLatency = latency;
+    break;
+  }
+  return *this;
+}
+
+/// Keys used during parsing/printing of `TimingInfo` objects.
+static constexpr llvm::StringLiteral KEY_DATA = "D", KEY_VALID = "V",
+                                     KEY_READY = "R";
+
+/// Returns the signal type associated to a key when parsing a `TimingInfo`
+/// object.
+static std::optional<SignalType>
+getCorrespondingSignalType(mlir::StringRef key) {
+  if (key == KEY_DATA)
+    return SignalType::DATA;
+  if (key == KEY_VALID)
+    return SignalType::VALID;
+  if (key == KEY_READY)
+    return SignalType::READY;
+  return std::nullopt;
+}
+
+mlir::ParseResult TimingInfo::parseKey(mlir::AsmParser &odsParser,
+                                       mlir::StringRef key) {
+  std::optional<SignalType> signalType = getCorrespondingSignalType(key);
+  if (!signalType) {
+    return odsParser.emitError(odsParser.getCurrentLocation())
+           << "'" << key.str()
+           << "' is not a recognized timing information type";
+  }
+
+  // Parse the latency associated to the signal type
+  unsigned latency;
+  if (odsParser.parseColon() || odsParser.parseInteger(latency))
+    return failure();
+  setLatency(*signalType, latency);
+  return success();
+}
+
+TimingInfo TimingInfo::oehb() {
+  return TimingInfo()
+      .setLatency(SignalType::DATA, 1)
+      .setLatency(SignalType::VALID, 1)
+      .setLatency(SignalType::READY, 0);
+}
+
+TimingInfo TimingInfo::tehb() {
+  return TimingInfo().setLatency(SignalType::READY, 1);
+}
+
+bool dynamatic::handshake::operator==(const TimingInfo &lhs,
+                                      const TimingInfo &rhs) {
+  return lhs.dataLatency == rhs.dataLatency &&
+         lhs.validLatency == rhs.validLatency &&
+         lhs.readyLatency == rhs.readyLatency;
+}
+
+llvm::hash_code dynamatic::handshake::hash_value(const TimingInfo &timing) {
+  return llvm::hash_combine(timing.dataLatency, timing.validLatency,
+                            timing.dataLatency);
+}
+
+void TimingAttr::print(AsmPrinter &odsPrinter) const {
+  odsPrinter << " {";
+
+  TimingInfo info = getInfo();
+  auto printIfPresent = [&](StringRef name, SignalType type,
+                            bool &firstData) -> void {
+    std::optional<unsigned> latency = info.getLatency(type);
+    if (!latency)
+      return;
+    if (!firstData)
+      odsPrinter << ", ";
+    else
+      firstData = false;
+    odsPrinter << name << ": " << *latency;
+  };
+  bool firstData = true;
+  printIfPresent(KEY_DATA, SignalType::DATA, firstData);
+  printIfPresent(KEY_VALID, SignalType::VALID, firstData);
+  printIfPresent(KEY_READY, SignalType::READY, firstData);
+
+  odsPrinter << "}";
+}
+
+Attribute TimingAttr::parse(AsmParser &odsParser, Type odsType) {
+  TimingInfo info;
+  DenseSet<StringRef> parsedKeys;
+
+  if (odsParser.parseLBrace())
+    return nullptr;
+
+  bool expectKey = false;
+  while (expectKey || odsParser.parseOptionalRBrace()) {
+    StringRef key;
+    if (odsParser.parseKeyword(&key))
+      return nullptr;
+    if (auto [_, newKey] = parsedKeys.insert(key.str()); !newKey) {
+      odsParser.emitError(odsParser.getCurrentLocation())
+          << "'" << key << "' was specified multiple times";
+      return nullptr;
+    }
+    if (failed(info.parseKey(odsParser, key)))
+      return nullptr;
+
+    expectKey = succeeded(odsParser.parseOptionalComma());
+  }
+
+  return TimingAttr::get(odsParser.getContext(), info);
 }
 
 //===----------------------------------------------------------------------===//
