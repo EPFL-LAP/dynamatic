@@ -82,8 +82,7 @@ std::string dynamatic::substituteParams(StringRef input,
 
 RTLRequestFromOp::RTLRequestFromOp(Operation *op, const llvm::Twine &name)
     : RTLRequest(op->getLoc()), name(name.str()), op(op),
-      parameters(op->getAttrOfType<DictionaryAttr>(RTL_PARAMETERS_ATTR_NAME)) {
-      };
+      parameters(op->getAttrOfType<DictionaryAttr>(RTL_PARAMETERS_ATTR_NAME)){};
 
 Attribute RTLRequestFromOp::getParameter(const RTLParameter &param) const {
   if (!parameters)
@@ -241,9 +240,16 @@ LogicalResult RTLMatch::concretize(const RTLRequest &request,
 
   if (component->isGeneric()) {
     std::string inputFile = substituteParams(component->generic, allParams);
-    std::string outputFile = outputDir.str() +
-                             sys::path::get_separator().str() + moduleName +
-                             ".vhd";
+    HDL hdl = component->hdl;
+    std::string outputFile = "";
+    switch (hdl) {
+    case HDL::VHDL:
+      outputFile = outputDir.str() + sys::path::get_separator().str() +
+                   moduleName + ".vhd";
+    case HDL::VERILOG:
+      outputFile = outputDir.str() + sys::path::get_separator().str() +
+                   moduleName + ".v";
+    }
 
     // Just copy the file to the output location
     if (auto ec = sys::fs::copy_file(inputFile, outputFile); ec.value() != 0) {

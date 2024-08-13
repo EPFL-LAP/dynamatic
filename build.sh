@@ -345,6 +345,7 @@ create_symlink ../build/bin/wlf2csv
 create_generator_symlink build/bin/rtl-cmpf-generator
 create_generator_symlink build/bin/rtl-cmpi-generator
 create_generator_symlink build/bin/rtl-text-generator
+create_generator_symlink build/bin/rtl-constant-generator-verilog
 create_generator_symlink "$LSQ_GEN_PATH/$LSQ_GEN_JAR"
 if [[ $GODOT_PATH != "" ]]; then
   create_symlink ../visual-dataflow/bin/visual-dataflow

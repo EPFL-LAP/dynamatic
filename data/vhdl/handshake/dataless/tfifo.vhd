@@ -4,7 +4,7 @@ use ieee.numeric_std.all;
 
 entity tfifo_dataless is
   generic (
-    NUM_SLOTS : integer;
+    NUM_SLOTS : integer
   );
   port (
     clk, rst : in std_logic;

@@ -91,7 +91,7 @@ begin
         R => result
     );
 
-  ip : entity work.FloatingPointAdder(arch)
+  ip : entity work.FloatingPointDivider(arch)
     port map (
         clk => clk,
         ce  => oehb_ready,
