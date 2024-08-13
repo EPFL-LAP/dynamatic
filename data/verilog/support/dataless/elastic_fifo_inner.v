@@ -1,6 +1,6 @@
 `timescale 1ns/1ps
 module elastic_fifo_inner_dataless #(
-  parameter NUM_NUM_SLOTS = 4
+  parameter NUM_SLOTS = 4
 )(
   input  clk,
   input  rst,
@@ -11,7 +11,7 @@ module elastic_fifo_inner_dataless #(
   output outs_valid
 );
   wire ReadEn, WriteEn;
-  reg [$clog2(NUM_NUM_SLOTS) - 1 : 0] Tail = 0, Head = 0;
+  reg [$clog2(NUM_SLOTS) - 1 : 0] Tail = 0, Head = 0;
   reg Full = 0, Empty = 0, fifo_valid;
 
   // Ready if there is space in the FIFO
