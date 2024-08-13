@@ -64,6 +64,14 @@ static const mlir::DenseSet<StringRef> RESERVED_PARAMETER_NAMES{
     RTLParameter::DYNAMATIC, RTLParameter::OUTPUT_DIR,
     RTLParameter::MODULE_NAME};
 
+StringRef dynamatic::getHDLExtension(HDL hdl) {
+  switch (hdl) {
+  case HDL::VHDL:
+    return ".vhd";
+  case HDL::VERILOG:
+    return ".v";
+  }
+}
 std::string dynamatic::replaceRegexes(
     StringRef input, const std::map<std::string, std::string> &replacements) {
   std::string result(input);
@@ -82,7 +90,8 @@ std::string dynamatic::substituteParams(StringRef input,
 
 RTLRequestFromOp::RTLRequestFromOp(Operation *op, const llvm::Twine &name)
     : RTLRequest(op->getLoc()), name(name.str()), op(op),
-      parameters(op->getAttrOfType<DictionaryAttr>(RTL_PARAMETERS_ATTR_NAME)){};
+      parameters(op->getAttrOfType<DictionaryAttr>(RTL_PARAMETERS_ATTR_NAME)) {
+      };
 
 Attribute RTLRequestFromOp::getParameter(const RTLParameter &param) const {
   if (!parameters)
@@ -241,15 +250,9 @@ LogicalResult RTLMatch::concretize(const RTLRequest &request,
   if (component->isGeneric()) {
     std::string inputFile = substituteParams(component->generic, allParams);
     HDL hdl = component->hdl;
-    std::string outputFile = "";
-    switch (hdl) {
-    case HDL::VHDL:
-      outputFile = outputDir.str() + sys::path::get_separator().str() +
-                   moduleName + ".vhd";
-    case HDL::VERILOG:
-      outputFile = outputDir.str() + sys::path::get_separator().str() +
-                   moduleName + ".v";
-    }
+    std::string outputFile = outputDir.str() +
+                             sys::path::get_separator().str() + moduleName +
+                             "." + getHDLExtension(hdl).str();
 
     // Just copy the file to the output location
     if (auto ec = sys::fs::copy_file(inputFile, outputFile); ec.value() != 0) {
