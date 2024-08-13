@@ -881,22 +881,12 @@ void VerilogWriter::writeModuleInstantiations(WriteData &data) const {
 /// output file cannot be created or if the module cannot be converted to RTL;
 /// succeeds otherwise.
 static LogicalResult writeModule(RTLWriter &writer, hw::HWModuleOp modOp) {
-  // Determine file extension
-  StringRef ext;
-  switch (hdl) {
-  case HDL::VHDL:
-    ext = ".vhd";
-    break;
-  case HDL::VERILOG:
-    ext = ".v";
-    break;
-  }
-
   // Open the file in which we will create the module, it is named like the
   // module itself
-  std::string filepath = writer.exportInfo.outputPath.str() +
-                         sys::path::get_separator().str() +
-                         modOp.getSymName().str() + ext.str();
+  std::string filepath =
+      writer.exportInfo.outputPath.str() + sys::path::get_separator().str() +
+      modOp.getSymName().str() + "." + getHDLExtension(hdl).str();
+
   std::error_code ec;
   llvm::raw_fd_ostream fileStream(filepath, ec);
   if (ec.value() != 0) {

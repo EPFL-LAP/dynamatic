@@ -30,9 +30,16 @@ COMP_DIR="$OUTPUT_DIR/comp"
 # Reset output directory
 rm -rf "$HDL_DIR" && mkdir -p "$HDL_DIR"
 
-"$DYNAMATIC_DIR/bin/export-rtl" "$COMP_DIR/hw.mlir" "$HDL_DIR" \
-  $RTL_CONFIG --dynamatic-path "$DYNAMATIC_DIR" \
-  --hdl $HDL
+# Set the correct config file
+RTL_CONFIG=""
+if [ "$HDL" == "vhdl" ]; then
+  RTL_CONFIG="$DYNAMATIC_DIR/data/rtl-config.json"
+elif [ "$HDL" == "verilog" ]; then
+  RTL_CONFIG="$DYNAMATIC_DIR/data/rtl-config-verilog.json"
+fi
+
+"$DYNAMATIC_DIR/bin/export-rtl" "$COMP_DIR/hw.mlir" "$HDL_DIR" $RTL_CONFIG \
+  --dynamatic-path "$DYNAMATIC_DIR" --hdl $HDL
 exit_on_fail "Failed to export RTL ($HDL)" "Exported RTL ($HDL)"
 
 echo_info "HDL generation succeeded"
