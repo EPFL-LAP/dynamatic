@@ -187,14 +187,20 @@ struct ModuleLoweringState {
   /// must be set, in order, with the original arguments to external function
   /// calls inside the Handshake function.
   SmallVector<Backedge> extInstBackedges;
+  /// Number of distinct memories in the function's arguments.
+  unsigned numMemories = 0;
 
   /// Default constructor required because we use the class as a map's value,
-  /// which must be default cosntructible.
+  /// which must be default constructible.
   ModuleLoweringState() = default;
 
   /// Constructs the lowering state from the Handshake function to lower.
   ModuleLoweringState(handshake::FuncOp funcOp)
-      : endPorts(funcOp.getBodyBlock()->getTerminator()) {};
+      : endPorts(funcOp.getBodyBlock()->getTerminator()) {
+    numMemories = llvm::count_if(funcOp.getArgumentTypes(), [](Type ty) {
+      return isa<mlir::MemRefType>(ty);
+    });
+  };
 
   /// Computes the total number of module outputs that are fed by memory
   /// interfaces within the module.
@@ -929,21 +935,8 @@ static void addMemIO(ModuleBuilder &modBuilder, handshake::FuncOp funcOp,
       continue;
 
     MemLoweringState info = MemLoweringState(memOp, memName);
-    llvm::TypeSwitch<Operation *, void>(memOp.getOperation())
-        .Case<handshake::MemoryControllerOp>(
-            [&](handshake::MemoryControllerOp mcOp) {
-              info.connectWithCircuit(modBuilder);
-            })
-        .Case<handshake::LSQOp>([&](handshake::LSQOp lsqOp) {
-          if (lsqOp.isConnectedToMC())
-            return;
-
-          // If the LSQ does not connect to an MC, then it connects directly to
-          // a dual-port BRAM through the top-level module IO
-          info.connectWithCircuit(modBuilder);
-        })
-        .Default([&](auto) { llvm_unreachable("unknown memory interface"); });
-
+    if (memOp.isMasterInterface())
+      info.connectWithCircuit(modBuilder);
     state.memInterfaces.insert({memOp, info});
   }
 }
@@ -1066,18 +1059,13 @@ ConvertFunc::matchAndRewrite(handshake::FuncOp funcOp, OpAdaptor adaptor,
   rewriter.inlineBlockBefore(funcBlock, termOp, modBlockArgs);
   rewriter.eraseOp(funcOp);
 
-  // Collect output ports of the top-level module for indexed access
-  SmallVector<const hw::PortInfo *> outputPorts;
-  for (const hw::PortInfo &outPort : modInfo.getOutputs())
-    outputPorts.push_back(&outPort);
-
   // Create backege inputs for the module's output operation and associate
   // them to the future operations whose conversion will resolve them
   SmallVector<Value> outputOperands;
-  size_t portIdx = 0;
+  auto moduleOutputs = modInfo.getOutputs().begin();
   auto addBackedge = [&](SmallVector<Backedge> &backedges) -> void {
-    const hw::PortInfo *port = outputPorts[portIdx++];
-    Backedge backedge = lowerState.edgeBuilder.get(port->type);
+    const hw::PortInfo &port = *(moduleOutputs++);
+    Backedge backedge = lowerState.edgeBuilder.get(port.type);
     outputOperands.push_back(backedge);
     backedges.push_back(backedge);
   };
@@ -1192,19 +1180,17 @@ ConvertEnd::matchAndRewrite(handshake::EndOp endOp, OpAdaptor adaptor,
            modState.extInstBackedges, endOperands.take_back(numExtInstArgs)))
     backedge.setValue(oprd);
 
-  // The end operation has one input per memory interface in the function
+  // The end operation has one input per master memory interface in the function
   // which should not be forwarded to its output ports
-  unsigned numMemOperands = modState.memInterfaces.size();
-  auto numReturnValues = endOperands.size() - numMemOperands - numExtInstArgs;
-  auto returnValOperands = endOperands.take_front(numReturnValues);
+  auto numOutputs = endOperands.size() - modState.numMemories - numExtInstArgs;
+  ValueRange returnValOperands = endOperands.take_front(numOutputs);
 
   // All non-memory inputs to the Handshake end operations should be forwarded
   // to its outputs
   for (auto [idx, oprd] : llvm::enumerate(returnValOperands))
     converter.addOutput(modState.endPorts.getOutputName(idx), oprd.getType());
 
-  hw::InstanceOp instOp =
-      converter.convertToInstance(endOp, modState, rewriter);
+  auto instOp = converter.convertToInstance(endOp, modState, rewriter);
   return instOp ? success() : failure();
 }
 
@@ -1294,20 +1280,18 @@ LogicalResult ConvertMemInterface::matchAndRewrite(
     for (size_t outputIdx : memPort.getResIndices())
       addOutput(outputIdx);
   }
-
-  // Finish inputs by clock and reset ports
   converter.addClkAndRst(parentModOp);
 
-  // Add output port corresponding to the interface's done signal
-  addOutput(memOp->getNumResults() - 1);
+  if (memOp.isMasterInterface()) {
+    // Output port corresponding to the interface's done signal
+    addOutput(memOp->getNumResults() - 1);
+  }
 
   // Add output ports going to the parent HW module
   auto outputModPorts = memState.getMemOutputPorts(parentModOp);
   for (const hw::ModulePort &outputPort : outputModPorts)
     converter.addOutput(removePortNamePrefix(outputPort), outputPort.type);
 
-  // Create the instance, then replace the original memory interface's result
-  // uses with matching results in the instance
   hw::InstanceOp instOp = converter.convertToInstance(memState, rewriter);
   return instOp ? success() : failure();
 }

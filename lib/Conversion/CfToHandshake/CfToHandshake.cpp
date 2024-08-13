@@ -132,12 +132,15 @@ mergeFuncResults(handshake::FuncOp funcOp, ConversionPatternRewriter &rewriter,
   return results;
 }
 
-/// Returns a vector of control signals, one from each memory interface in the
-/// circuit, to be passed as operands to the `handshake::EndOp` operation.
-static SmallVector<Value, 8> getFunctionEndControls(handshake::FuncOp funcOp) {
-  SmallVector<Value, 8> controls;
-  for (auto memOp : funcOp.getOps<handshake::MemoryOpInterface>())
-    controls.push_back(memOp->getResults().back());
+/// Returns a vector of control signals, one from each master memory interface
+/// in the circuit, to be passed as operands to the `handshake::EndOp`
+/// operation.
+static SmallVector<Value> getFunctionEndControls(handshake::FuncOp funcOp) {
+  SmallVector<Value, 4> controls;
+  for (auto memOp : funcOp.getOps<handshake::MemoryOpInterface>()) {
+    if (memOp.isMasterInterface())
+      controls.push_back(memOp->getResults().back());
+  }
   return controls;
 }
 

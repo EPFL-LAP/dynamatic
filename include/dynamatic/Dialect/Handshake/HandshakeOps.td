@@ -742,7 +742,7 @@ def LSQOp : Handshake_Op<"lsq", [
   }];
   
   let arguments = (ins Variadic<AnyType>:$inputs, I32ArrayAttr:$groupSizes);
-  let results = (outs Variadic<ChannelType>:$outputs, ControlType:$done);
+  let results = (outs Variadic<HandshakeType>:$outputs);
 
   let skipDefaultBuilders = 1;
   let builders = [
