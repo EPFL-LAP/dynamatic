@@ -432,7 +432,7 @@
       { "name": "VALUE", "type": "string" },
       { "name": "DATA_WIDTH", "type": "unsigned", "generic": true }
     ],
-    "generator": "\"$DYNAMATIC/bin/generators/rtl-constant-generator-verilog\" \"$DYNAMATIC/data/verilog/handshake/constant.v\" \"$OUTPUT_DIR/$MODULE_NAME.v\" ENTITY_NAME $MODULE_NAME VALUE $VALUE"
+    "generator": "\"$DYNAMATIC/bin/generators/rtl-constant-generator-verilog\" \"$DYNAMATIC/data/verilog/handshake/constant.v\" \"$OUTPUT_DIR/$MODULE_NAME.v\" $MODULE_NAME $VALUE"
   },
   {
     "name": "handshake.mc_load",
