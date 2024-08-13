@@ -67,9 +67,9 @@ static const mlir::DenseSet<StringRef> RESERVED_PARAMETER_NAMES{
 StringRef dynamatic::getHDLExtension(HDL hdl) {
   switch (hdl) {
   case HDL::VHDL:
-    return ".vhd";
+    return "vhd";
   case HDL::VERILOG:
-    return ".v";
+    return "v";
   }
 }
 std::string dynamatic::replaceRegexes(
