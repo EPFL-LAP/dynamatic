@@ -155,75 +155,127 @@
     "dependencies": ["join_type"]
   },
   {
-    "name": "handshake.oehb",
+    "name": "handshake.buffer",
     "parameters": [
-      { "name": "SLOTS", "type": "unsigned", "eq": 1, "generic": false },
-      { "name": "DATA_WIDTH", "type": "unsigned", "eq": 0, "generic": false }
+      { "name": "NUM_SLOTS", "type": "unsigned", "eq": 1, "generic": false },
+      { "name": "DATA_WIDTH", "type": "unsigned", "eq": 0, "generic": false },
+      {
+        "name": "TIMING",
+        "type": "timing",
+        "data-lat-eq": 1,
+        "valid-lat-eq": 1,
+        "generic": false
+      }
     ],
     "generic": "$DYNAMATIC/data/verilog/handshake/dataless/oehb.v",
     "module-name": "oehb_dataless"
   },
   {
-    "name": "handshake.oehb",
+    "name": "handshake.buffer",
     "parameters": [
-      { "name": "SLOTS", "type": "unsigned", "eq": 1, "generic": false },
-      { "name": "DATA_WIDTH", "type": "unsigned", "lb": 1 }
+      { "name": "NUM_SLOTS", "type": "unsigned", "eq": 1, "generic": false },
+      { "name": "DATA_WIDTH", "type": "unsigned", "lb": 1 },
+      {
+        "name": "TIMING",
+        "type": "timing",
+        "data-lat-eq": 1,
+        "valid-lat-eq": 1,
+        "generic": false
+      }
     ],
     "generic": "$DYNAMATIC/data/verilog/handshake/oehb.v",
     "dependencies": ["oehb_dataless"]
   },
   {
-    "name": "handshake.oehb",
+    "name": "handshake.buffer",
     "parameters": [
-      { "name": "SLOTS", "type": "unsigned", "lb": 2 },
-      { "name": "DATA_WIDTH", "type": "unsigned", "eq": 0, "generic": false }
+      { "name": "NUM_SLOTS", "type": "unsigned", "lb": 2 },
+      { "name": "DATA_WIDTH", "type": "unsigned", "eq": 0, "generic": false },
+      {
+        "name": "TIMING",
+        "type": "timing",
+        "data-lat-eq": 1,
+        "valid-lat-eq": 1,
+        "generic": false
+      }
     ],
     "generic": "$DYNAMATIC/data/verilog/handshake/dataless/ofifo.v",
     "module-name": "ofifo_dataless",
     "dependencies": ["tehb_dataless", "elastic_fifo_inner_dataless"]
   },
   {
-    "name": "handshake.oehb",
+    "name": "handshake.buffer",
     "parameters": [
-      { "name": "SLOTS", "type": "unsigned", "lb": 2 },
-      { "name": "DATA_WIDTH", "type": "unsigned", "lb": 1 }
+      { "name": "NUM_SLOTS", "type": "unsigned", "lb": 2 },
+      { "name": "DATA_WIDTH", "type": "unsigned", "lb": 1 },
+      {
+        "name": "TIMING",
+        "type": "timing",
+        "data-lat-eq": 1,
+        "valid-lat-eq": 1,
+        "generic": false
+      }
     ],
     "generic": "$DYNAMATIC/data/verilog/handshake/ofifo.v",
     "dependencies": ["tehb", "elastic_fifo_inner"]
   },
   {
-    "name": "handshake.tehb",
+    "name": "handshake.buffer",
     "parameters": [
-      { "name": "SLOTS", "type": "unsigned", "eq": 1, "generic": false },
-      { "name": "DATA_WIDTH", "type": "unsigned", "eq": 0, "generic": false }
+      { "name": "NUM_SLOTS", "type": "unsigned", "eq": 1, "generic": false },
+      { "name": "DATA_WIDTH", "type": "unsigned", "eq": 0, "generic": false },
+      {
+        "name": "TIMING",
+        "type": "timing",
+        "ready-lat-eq": 1,
+        "generic": false
+      }
     ],
     "generic": "$DYNAMATIC/data/verilog/handshake/dataless/tehb.v",
     "module-name": "tehb_dataless"
   },
   {
-    "name": "handshake.tehb",
+    "name": "handshake.buffer",
     "parameters": [
-      { "name": "SLOTS", "type": "unsigned", "eq": 1, "generic": false },
-      { "name": "DATA_WIDTH", "type": "unsigned", "lb": 1 }
+      { "name": "NUM_SLOTS", "type": "unsigned", "eq": 1, "generic": false },
+      { "name": "DATA_WIDTH", "type": "unsigned", "lb": 1 },
+      {
+        "name": "TIMING",
+        "type": "timing",
+        "ready-lat-eq": 1,
+        "generic": false
+      }
     ],
     "generic": "$DYNAMATIC/data/verilog/handshake/tehb.v",
     "dependencies": ["tehb_dataless"]
   },
   {
-    "name": "handshake.tehb",
+    "name": "handshake.buffer",
     "parameters": [
-      { "name": "SLOTS", "type": "unsigned", "lb": 2 },
-      { "name": "DATA_WIDTH", "type": "unsigned", "eq": 0, "generic": false }
+      { "name": "NUM_SLOTS", "type": "unsigned", "lb": 2 },
+      { "name": "DATA_WIDTH", "type": "unsigned", "eq": 0, "generic": false },
+      {
+        "name": "TIMING",
+        "type": "timing",
+        "ready-lat-eq": 1,
+        "generic": false
+      }
     ],
     "generic": "$DYNAMATIC/data/verilog/handshake/dataless/tfifo.v",
     "module-name": "tfifo_dataless",
     "dependencies": ["elastic_fifo_inner_dataless"]
   },
   {
-    "name": "handshake.tehb",
+    "name": "handshake.buffer",
     "parameters": [
-      { "name": "SLOTS", "type": "unsigned", "lb": 2 },
-      { "name": "DATA_WIDTH", "type": "unsigned", "lb": 1 }
+      { "name": "NUM_SLOTS", "type": "unsigned", "lb": 2 },
+      { "name": "DATA_WIDTH", "type": "unsigned", "lb": 1 },
+      {
+        "name": "TIMING",
+        "type": "timing",
+        "ready-lat-eq": 1,
+        "generic": false
+      }
     ],
     "generic": "$DYNAMATIC/data/verilog/handshake/tfifo.v",
     "dependencies": ["elastic_fifo_inner"]
@@ -419,9 +471,9 @@
   {
     "name": "handshake.mem_controller",
     "parameters": [
-      { "name": "NUM_CONTROL", "type": "unsigned", "eq": 0, "generic": false },
-      { "name": "NUM_LOAD", "type": "unsigned", "lb": 1 },
-      { "name": "NUM_STORE", "type": "unsigned", "eq": 0, "generic": false },
+      { "name": "NUM_CONTROLS", "type": "unsigned", "eq": 0, "generic": false },
+      { "name": "NUM_LOADS", "type": "unsigned", "lb": 1 },
+      { "name": "NUM_STORES", "type": "unsigned", "eq": 0, "generic": false },
       { "name": "DATA_WIDTH", "type": "unsigned", "lb": 1 },
       { "name": "ADDR_WIDTH", "type": "unsigned", "lb": 1 }
     ],
@@ -431,9 +483,9 @@
   {
     "name": "handshake.mem_controller",
     "parameters": [
-      { "name": "NUM_CONTROL", "type": "unsigned", "lb": 1 },
-      { "name": "NUM_LOAD", "type": "unsigned", "eq": 0, "generic": false },
-      { "name": "NUM_STORE", "type": "unsigned", "lb": 1 },
+      { "name": "NUM_CONTROLS", "type": "unsigned", "lb": 1 },
+      { "name": "NUM_LOADS", "type": "unsigned", "eq": 0, "generic": false },
+      { "name": "NUM_STORES", "type": "unsigned", "lb": 1 },
       { "name": "DATA_WIDTH", "type": "unsigned", "lb": 1 },
       { "name": "ADDR_WIDTH", "type": "unsigned", "lb": 1 }
     ],
@@ -443,9 +495,9 @@
   {
     "name": "handshake.mem_controller",
     "parameters": [
-      { "name": "NUM_CONTROL", "type": "unsigned", "lb": 1 },
-      { "name": "NUM_LOAD", "type": "unsigned", "lb": 1 },
-      { "name": "NUM_STORE", "type": "unsigned", "lb": 1 },
+      { "name": "NUM_CONTROLS", "type": "unsigned", "lb": 1 },
+      { "name": "NUM_LOADS", "type": "unsigned", "lb": 1 },
+      { "name": "NUM_STORES", "type": "unsigned", "lb": 1 },
       { "name": "DATA_WIDTH", "type": "unsigned", "lb": 1 },
       { "name": "ADDR_WIDTH", "type": "unsigned", "lb": 1 }
     ],
@@ -504,6 +556,7 @@
   },
   {
     "name": "handshake.join",
+    "parameters": [{ "name": "SIZE", "type": "unsigned", "lb": 1 }],
     "generic": "$DYNAMATIC/data/verilog/handshake/join.v",
     "module-name": "join_type",
     "dependencies": ["logic"]
