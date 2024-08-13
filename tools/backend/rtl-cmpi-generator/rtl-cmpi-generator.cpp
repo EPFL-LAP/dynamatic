@@ -42,8 +42,8 @@ static cl::opt<std::string>
               cl::cat(mainCategory));
 
 static cl::opt<std::string> hdlType(cl::Positional, cl::Required,
-                                       cl::desc("<hdl type>"),
-                                       cl::cat(mainCategory));
+                                    cl::desc("<hdl type>"),
+                                    cl::cat(mainCategory));
 
 /// Returns the VHDL comparator corresponding to the comparison's predicate.
 static StringRef getComparatorVHDL(handshake::CmpIPredicate pred) {
@@ -107,7 +107,8 @@ static StringRef getModifierVHDL(handshake::CmpIPredicate pred) {
   }
 }
 
-/// Returns the Verilog type modifier associated with the comparison's predicate.
+/// Returns the Verilog type modifier associated with the comparison's
+/// predicate.
 static StringRef getModifierVerilog(handshake::CmpIPredicate pred) {
   switch (pred) {
   case handshake::CmpIPredicate::eq:
@@ -124,7 +125,6 @@ static StringRef getModifierVerilog(handshake::CmpIPredicate pred) {
     return "$signed";
   }
 }
-
 
 int main(int argc, char **argv) {
   InitLLVM y(argc, argv);
@@ -166,16 +166,14 @@ int main(int argc, char **argv) {
   // Record all replacements in a map
   std::map<std::string, std::string> replacementMap;
   replacementMap["ENTITY_NAME"] = entityName;
-  
-  if(hdlType == "vhdl") {
+
+  if (hdlType == "vhdl") {
     replacementMap["COMPARATOR"] = getComparatorVHDL(*pred);
     replacementMap["MODIFIER"] = getModifierVHDL(*pred);
-  }
-  else if (hdlType == "verilog") {
+  } else if (hdlType == "verilog") {
     replacementMap["COMPARATOR"] = getComparatorVerilog(*pred);
     replacementMap["MODIFIER"] = getModifierVerilog(*pred);
-  }
-  else {
+  } else {
     llvm::errs() << "Unknown HDL type \"" << hdlType << "\"\n";
     return 1;
   }
