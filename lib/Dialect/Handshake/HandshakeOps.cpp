@@ -110,8 +110,7 @@ static void printSingleTypedHandshakeOp(OpAsmPrinter &printer, Operation *op,
                                         Value operand,
                                         DictionaryAttr attributes, Type type,
                                         TypeRange resTypes) {
-  printer << " [" << resTypes.size() << "]";
-  printer << " " << operand;
+  printer << "[" << resTypes.size() << "] " << operand;
   printer.printOptionalAttrDict(attributes.getValue());
   printer << " : ";
   printHandshakeType(printer, type);
@@ -925,8 +924,9 @@ void LSQOp::build(OpBuilder &odsBuilder, OperationState &odsState,
   Type addrType = handshake::ChannelType::getAddrChannel(ctx);
   odsState.types.append(2, addrType);
   odsState.types.push_back(dataType);
-  // Completion signal to end
-  odsState.types.push_back(handshake::ControlType::get(ctx));
+
+  // The LSQ is a slave interface in this case (the MC is the master), so it
+  // doesn't produce a completion signal
 
   buildLSQGroupSizes(odsBuilder, odsState, groupSizes);
 }
@@ -1124,10 +1124,13 @@ static LogicalResult getLSQPorts(LSQPorts &lsqPorts) {
     return lsqPorts.memOp->emitError()
            << "LSQ declares more groups than it connects to.";
   // Check that all memory results have been accounted for
-  if (resIdx != memResults.size() - 1)
+  unsigned expectedResIdx = memResults.size();
+  if (lsqPorts.memOp.isMasterInterface())
+    expectedResIdx -= 1;
+  if (resIdx != expectedResIdx) {
     return lsqPorts.memOp->emitError()
-           << "When identifying memory ports, some memory results were "
-              "unnacounted for, this is not normal!";
+           << "Some memory results were unnacounted for when identifying ports";
+  }
   return success();
 }
 
@@ -1165,12 +1168,6 @@ dynamatic::LSQPorts LSQOp::getPorts() {
 handshake::MemoryControllerOp LSQOp::getConnectedMC() {
   return dyn_cast<dynamatic::handshake::MemoryControllerOp>(
       *getInputs().back().getDefiningOp());
-}
-
-TypedValue<MemRefType> LSQOp::getMemRef() {
-  if (handshake::MemoryControllerOp mcOp = getConnectedMC())
-    return mcOp.getMemRef();
-  return cast<TypedValue<MemRefType>>(getInputs().front());
 }
 
 //===----------------------------------------------------------------------===//

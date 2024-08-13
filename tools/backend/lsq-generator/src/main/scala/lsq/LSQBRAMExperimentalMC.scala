@@ -48,9 +48,6 @@ class LSQBRAMExperimentalMC(lsqConfig: LsqConfigs) extends Module {
       lsqConfig.numStorePorts,
       Flipped(Decoupled(UInt(lsqConfig.dataWidth.W)))
     )
-    
-    // Memory done signal
-    val memDone = Decoupled(UInt(0.W))
   })
 
   require(lsqConfig.fifoDepth_L > 1)
@@ -149,9 +146,6 @@ class LSQBRAMExperimentalMC(lsqConfig: LsqConfigs) extends Module {
   // Store data to MC (ignore ready)
   io.stDataToMC.bits := storeQ.io.storeDataToMem
   io.stDataToMC.valid := storeQ.io.storeEnableToMem
-  
-  io.memDone.bits := DontCare
-  io.memDone.valid := storeEmpty && loadEmpty
   
   // Group Allocator assignments
   bbLoadOffsets := GA.io.bbLoadOffsets
