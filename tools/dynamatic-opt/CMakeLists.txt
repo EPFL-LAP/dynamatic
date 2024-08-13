@@ -18,6 +18,7 @@ target_link_libraries(dynamatic-opt
   DynamaticBufferPlacement
   DynamaticSpeculation
   DynamaticExperimentalResourceSharing
+  DynamaticExperimentalSwitchingEstimation
   DynamaticCfToHandshake
   DynamaticHandshake
   DynamaticHandshakeToHW

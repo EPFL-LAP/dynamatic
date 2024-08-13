@@ -97,4 +97,19 @@ def CreditBasedSharing : DynamaticPass<"credit-based-sharing"> {
       "'buffer-placement' at the binary's location.">];
 }
 
+def SwitchingEstimation : DynamaticPass<"switching-estimation"> {
+  let summary = "Estimate the switching of different dataflow units after buffer placement";
+  let description = [{
+    This pass estimates the swithcing/transition number of all PIs and POs of all
+    dataflow units during the entire circuit execution.
+  }];
+  let constructor = "dynamatic::experimental::switching::createSwitchingEstimation()";
+  let options = [
+    Option<"resultFolderPath", "result-folder-path", "std::string", "",
+           "Path to the result folder of the dynamatic run">,
+    Option<"timingModels", "timing-models", "std::string", "",
+      "Path to JSON-formatted file containing timing models for dataflow "
+      "components.">];
+}
+
 #endif // EXPERIMENTAL_TRANSFORMS_PASSES_TD
