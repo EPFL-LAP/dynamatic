@@ -31,10 +31,14 @@ static cl::opt<std::string> outputRTLPath(cl::Positional, cl::Required,
                                           cl::desc("<output file>"),
                                           cl::cat(mainCategory));
 
-static cl::list<std::string> replacements(
-    cl::Positional, cl::ZeroOrMore,
-    cl::desc(
-        "<text replacements, two-by-two (text to replace, then replacement)>"),
+static cl::opt<std::string> entityName(
+    cl::Positional, cl::Required,
+    cl::desc("<Entity name to be put in the constant template file>"),
+    cl::cat(mainCategory));
+
+static cl::opt<std::string> constantValue(
+    cl::Positional, cl::Required,
+    cl::desc("<constant value to be put in the constant template file>"),
     cl::cat(mainCategory));
 
 int main(int argc, char **argv) {
@@ -45,14 +49,6 @@ int main(int argc, char **argv) {
       "Simple generator for RTL components, which takes as input an RTL file, "
       "replaces user-provided string within it, and dumps the result at a "
       "specified location.");
-
-  // It only makes sense to have an even number of "replacement" arguments
-  // because they go two-by-two
-  if ((replacements.size() & 1) != 0) {
-    llvm::errs() << "Expected an even number of replacement parameters, got "
-                 << replacements.size() << "\n";
-    return 1;
-  }
 
   // Open the input file
   std::ifstream inputFile(inputRTLPath);
@@ -77,16 +73,11 @@ int main(int argc, char **argv) {
 
   // Record all replacements in a map
   std::map<std::string, std::string> replacementMap;
-  for (size_t i = 0, e = replacements.size(); i < e; i += 2) {
-    if (replacements[i].compare("VALUE") == 0) {
-      StringRef value = replacements[i + 1]; // verilog does not accept constant
-                                             // values in string format
-      replacementMap[replacements[i]] =
-          std::to_string(value.size()) + "\'b" + value.data();
-    } else {
-      replacementMap[replacements[i]] = replacements[i + 1];
-    }
-  }
+
+  // Get the replacement value
+  replacementMap["ENTITY_NAME"] = entityName;
+  replacementMap["VALUE"] =
+      std::to_string(constantValue.size()) + "\'b" + constantValue;
 
   // Dump to the output file and return
   outputFile << dynamatic::replaceRegexes(inputData, replacementMap);
