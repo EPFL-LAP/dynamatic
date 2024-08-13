@@ -1,6 +1,6 @@
 `timescale 1ns/1ps
 module ofifo #(
-  parameter SLOTS = 2,
+  parameter NUM_SLOTS = 2,
   parameter DATA_WIDTH = 32
 ) (
   input  clk,
@@ -30,7 +30,7 @@ module ofifo #(
   );
 
   elastic_fifo_inner #(
-    .SLOTS      (SLOTS    ),
+    .NUM_SLOTS  (NUM_SLOTS ),
     .DATA_WIDTH (DATA_WIDTH)
   ) fifo (
     .clk        (clk         ),

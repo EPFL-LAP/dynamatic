@@ -1,24 +1,24 @@
 `timescale 1ns/1ps
 module mem_controller_loadless #(
-  parameter NUM_CONTROL = 1,
-  parameter NUM_STORE = 1,
+  parameter NUM_CONTROLS = 1,
+  parameter NUM_STORES = 1,
   parameter DATA_WIDTH = 32,
   parameter ADDR_WIDTH = 32
 )(
   input  clk,
   input  rst,
   // Control Input Channels
-  input  [(NUM_CONTROL * 32) - 1 : 0] ctrl,
-  input  [NUM_CONTROL - 1 : 0] ctrl_valid,
-  output [NUM_CONTROL - 1 : 0] ctrl_ready,
+  input  [(NUM_CONTROLS * 32) - 1 : 0] ctrl,
+  input  [NUM_CONTROLS - 1 : 0] ctrl_valid,
+  output [NUM_CONTROLS - 1 : 0] ctrl_ready,
   // Store Address Input Channels
-  input  [(NUM_STORE * ADDR_WIDTH) - 1 : 0] stAddr,
-  input  [NUM_STORE - 1 : 0] stAddr_valid,
-  output [NUM_STORE - 1 : 0] stAddr_ready,
+  input  [(NUM_STORES * ADDR_WIDTH) - 1 : 0] stAddr,
+  input  [NUM_STORES - 1 : 0] stAddr_valid,
+  output [NUM_STORES - 1 : 0] stAddr_ready,
   // Store Data Input Channels
-  input  [(NUM_STORE * DATA_WIDTH) - 1 : 0] stData,
-  input  [NUM_STORE - 1 : 0] stData_valid,
-  output [NUM_STORE - 1 : 0] stData_ready,
+  input  [(NUM_STORES * DATA_WIDTH) - 1 : 0] stData,
+  input  [NUM_STORES - 1 : 0] stData_valid,
+  output [NUM_STORES - 1 : 0] stData_ready,
   // Memory Done Channel
   output memDone_valid,
   input  memDone_ready,
@@ -32,18 +32,18 @@ module mem_controller_loadless #(
 );
   // Internal Signals
   wire [31 : 0] remainingStores;
-  wire [NUM_STORE - 1 : 0] storePorts_valid, storePorts_ready;
+  wire [NUM_STORES - 1 : 0] storePorts_valid, storePorts_ready;
 
   // Local Parameter
   localparam [31:0] zeroStore = 32'b0;
-  localparam [NUM_CONTROL-1:0] zeroCtrl = {NUM_CONTROL{1'b0}};
+  localparam [NUM_CONTROLS-1:0] zeroCtrl = {NUM_CONTROLS{1'b0}};
 
   assign loadEn = 0;
   assign loadAddr = {ADDR_WIDTH{1'b0}};
 
   // Instantiate write memory arbiter
   write_memory_arbiter #(
-    .ARBITER_SIZE (NUM_STORE),
+    .ARBITER_SIZE (NUM_STORES),
     .ADDR_WIDTH   (ADDR_WIDTH),
     .DATA_WIDTH   (DATA_WIDTH)
   ) write_arbiter (
@@ -53,7 +53,7 @@ module mem_controller_loadless #(
     .ready          (storePorts_ready   ),
     .address_in     (stAddr             ),
     .data_in        (stData             ),
-    .nReady         ({NUM_STORE{1'b1}}),
+    .nReady         ({NUM_STORES{1'b1}}),
     .valid          (storePorts_valid   ),
     .write_enable   (storeEn            ),
     .write_address  (storeAddr          ),
@@ -70,7 +70,7 @@ module mem_controller_loadless #(
     if (rst) begin
       counter = 32'd0;
     end else begin
-      for (i = 0; i <= NUM_CONTROL - 1; i = i + 1) begin
+      for (i = 0; i <= NUM_CONTROLS - 1; i = i + 1) begin
         if (ctrl_valid[i]) begin
           counter = counter + ctrl[i * 32 +: 32];
         end 
@@ -85,6 +85,6 @@ module mem_controller_loadless #(
 
   // Memory Done logic
   assign memDone_valid = (remainingStores == zeroStore && ctrl_valid == zeroCtrl) ? 1'b1 : 1'b0;
-  assign ctrl_ready = {NUM_CONTROL{1'b1}};
+  assign ctrl_ready = {NUM_CONTROLS{1'b1}};
 
 endmodule

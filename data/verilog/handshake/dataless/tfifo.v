@@ -1,6 +1,6 @@
 `timescale 1ns/1ps
 module tfifo_dataless #(
-  parameter SLOTS = 2
+  parameter NUM_SLOTS = 2
 )(
   input  clk,
   input  rst,
@@ -22,7 +22,7 @@ module tfifo_dataless #(
   assign fifo_nready = outs_ready;
 
   elastic_fifo_inner_dataless #(
-    .SLOTS(SLOTS)
+    .NUM_SLOTS(NUM_SLOTS)
   ) fifo (
     .clk        (clk        ),
     .rst        (rst        ),

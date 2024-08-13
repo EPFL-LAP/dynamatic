@@ -1,33 +1,33 @@
 `timescale 1ns/1ps
 module mem_controller #(
-  parameter NUM_CONTROL  = 1,
-  parameter NUM_LOAD  = 1,
-  parameter NUM_STORE = 1,
+  parameter NUM_CONTROLS  = 1,
+  parameter NUM_LOADS  = 1,
+  parameter NUM_STORES = 1,
   parameter DATA_WIDTH = 32,
   parameter ADDR_WIDTH = 32
 )(
   input  clk,
   input  rst,
   // Control input channels
-  input  [(NUM_CONTROL * 32) - 1 : 0] ctrl,
-  input  [NUM_CONTROL - 1 : 0] ctrl_valid,
-  output [NUM_CONTROL - 1 : 0] ctrl_ready,
+  input  [(NUM_CONTROLS * 32) - 1 : 0] ctrl,
+  input  [NUM_CONTROLS - 1 : 0] ctrl_valid,
+  output [NUM_CONTROLS - 1 : 0] ctrl_ready,
   // Load address input channels
-  input  [(NUM_LOAD * ADDR_WIDTH) - 1 : 0] ldAddr,
-  input  [NUM_LOAD - 1 : 0] ldAddr_valid,
-  output [NUM_LOAD - 1 : 0] ldAddr_ready,
+  input  [(NUM_LOADS * ADDR_WIDTH) - 1 : 0] ldAddr,
+  input  [NUM_LOADS - 1 : 0] ldAddr_valid,
+  output [NUM_LOADS - 1 : 0] ldAddr_ready,
   // Load data output channels
-  output [(NUM_LOAD * DATA_WIDTH) - 1 : 0] ldData,
-  output [NUM_LOAD - 1 : 0] ldData_valid,
-  input  [NUM_LOAD - 1 : 0] ldData_ready,
+  output [(NUM_LOADS * DATA_WIDTH) - 1 : 0] ldData,
+  output [NUM_LOADS - 1 : 0] ldData_valid,
+  input  [NUM_LOADS - 1 : 0] ldData_ready,
   // Store address input channels
-  input  [(NUM_STORE * ADDR_WIDTH) - 1 : 0] stAddr,
-  input  [NUM_STORE - 1 : 0] stAddr_valid,
-  output [NUM_STORE - 1 : 0] stAddr_ready,
+  input  [(NUM_STORES * ADDR_WIDTH) - 1 : 0] stAddr,
+  input  [NUM_STORES - 1 : 0] stAddr_valid,
+  output [NUM_STORES - 1 : 0] stAddr_ready,
   // Store data input channels
-  input  [(NUM_STORE * DATA_WIDTH) - 1 : 0] stData,
-  input  [NUM_STORE - 1 : 0] stData_valid,
-  output [NUM_STORE - 1 : 0] stData_ready,
+  input  [(NUM_STORES * DATA_WIDTH) - 1 : 0] stData,
+  input  [NUM_STORES - 1 : 0] stData_valid,
+  output [NUM_STORES - 1 : 0] stData_ready,
   // Memory done channel
   output memDone_valid,
   input  memDone_ready,
@@ -45,10 +45,10 @@ module mem_controller #(
   wire [DATA_WIDTH - 1 : 0] dropLoadData;
 
   mem_controller_loadless #(
-    .NUM_CONTROL  (NUM_CONTROL ),
-    .NUM_STORE (NUM_STORE),
-    .DATA_WIDTH  (DATA_WIDTH ),
-    .ADDR_WIDTH  (ADDR_WIDTH )
+    .NUM_CONTROLS (NUM_CONTROLS ),
+    .NUM_STORES   (NUM_STORES),
+    .DATA_WIDTH   (DATA_WIDTH ),
+    .ADDR_WIDTH   (ADDR_WIDTH )
   ) stores (
     .clk           (clk          ),
     .rst           (rst          ),
@@ -72,7 +72,7 @@ module mem_controller #(
   );
 
   read_memory_arbiter #(
-    .ARBITER_SIZE (NUM_LOAD),
+    .ARBITER_SIZE (NUM_LOADS),
     .ADDR_WIDTH   (ADDR_WIDTH),
     .DATA_WIDTH   (DATA_WIDTH)
   ) read_arbiter (
