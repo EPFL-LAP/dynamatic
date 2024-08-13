@@ -241,9 +241,18 @@ LogicalResult RTLMatch::concretize(const RTLRequest &request,
 
   if (component->isGeneric()) {
     std::string inputFile = substituteParams(component->generic, allParams);
-    std::string outputFile = outputDir.str() +
+    HDL hdl = component->hdl;
+    std::string outputFile = "";
+    switch (hdl) {
+      case HDL::VHDL:
+        outputFile = outputDir.str() +
                              sys::path::get_separator().str() + moduleName +
                              ".vhd";
+      case HDL::VERILOG:
+        outputFile = outputDir.str() +
+                             sys::path::get_separator().str() + moduleName +
+                             ".v";
+    }
 
     // Just copy the file to the output location
     if (auto ec = sys::fs::copy_file(inputFile, outputFile); ec.value() != 0) {
