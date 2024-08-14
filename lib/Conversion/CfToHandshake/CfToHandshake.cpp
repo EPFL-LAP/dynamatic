@@ -1473,6 +1473,7 @@ LogicalResult HandshakeLowering::addMergeNonLoop(
           return failure();
         ProdConsMemDep &memDep = *memDepIt;
 
+        Block *insert = cons;
         builder.setInsertionPointToStart(cons);
         Location loc = forksGraph[cons]->getLoc();
 
@@ -1483,11 +1484,13 @@ LogicalResult HandshakeLowering::addMergeNonLoop(
                     ->getOperations()
                     .front()
                     .getLoc();
+          insert = getPostDominantSuccessor(prod, cons);
         } else {
           Block *block = getPredecessorDominatingAndPostDominating(prod, cons);
           if (block) {
             builder.setInsertionPointToStart(block);
             loc = block->getOperations().front().getLoc();
+            insert = block;
           }
         }
 
@@ -1495,6 +1498,9 @@ LogicalResult HandshakeLowering::addMergeNonLoop(
         mergeOperands.push_back(startCtrl);
         mergeOperands.push_back(forksGraph[prod]->getResult(0));
         auto mergeOp = builder.create<handshake::MergeOp>(loc, mergeOperands);
+        llvm::errs() << "Added merge in addMergeNonLoop in block: ";
+        insert->printAsOperand(llvm::errs());
+        llvm::errs() << "\n";
         alloctionNetwork.push_back(mergeOp);
 
         /// The merge becomes the producer now, so connect the result of the
@@ -1583,6 +1589,9 @@ HandshakeLowering::addMergeLoop(OpBuilder &builder, std::set<Group *> &groups,
             operands.push_back(mergeOperand);
             auto mergeOp = builder.create<handshake::MergeOp>(
                 mergeOperand.getLoc(), operands);
+            llvm::errs() << "Added merge in addMergeLoop in block: ";
+            loopHeader->printAsOperand(llvm::errs());
+            llvm::errs() << "\n";
             alloctionNetwork.push_back(mergeOp);
             memDepLoopMerges.push_back(mergeOp);
 
@@ -1756,11 +1765,12 @@ LogicalResult HandshakeLowering::addSupp(ConversionPatternRewriter &rewriter) {
                 llvm::any_of(consOp->getResults(),
                              [&res](const Value &v) { return v == res; });
 
-            if (selfRegeneration)
+            if (selfRegeneration) {
+              llvm::errs() << "Calling self gen " << *consOp << "\n";
               manageSelfRegeneration(rewriter, consOp, res);
-            else if (greaterThanBlocks(&prod, cons) ||
-                     (isa<handshake::MergeOp>(consOp) && &prod == cons &&
-                      isaMergeLoop(consOp)))
+            } else if (greaterThanBlocks(&prod, cons) ||
+                       (isa<handshake::MergeOp>(consOp) && &prod == cons &&
+                        isaMergeLoop(consOp)))
               manageDifferentRegeneration(rewriter, consOp, res);
             else
               manageNonLoop(rewriter, &prod, consOp, res);
@@ -1822,7 +1832,7 @@ BoolExpression *HandshakeLowering::getBlockLoopExitCondition(Block *loopExit,
   return blockCond;
 }
 
-//----------BooleanEXpression to Circuit----------
+//----------BooleanExpression to Circuit----------
 void HandshakeLowering::fillConditionToValueMapping() {
   for (Block &block : region.getBlocks()) {
     Operation *terminator = block.getTerminator();
@@ -1908,11 +1918,88 @@ Value HandshakeLowering::boolVariableToCircuit(
   return conditionToValue[singleCond->id];
 }
 
+Value HandshakeLowering::insertBranchToLoop(ConversionPatternRewriter &rewriter,
+                                            CFGLoop *loop, Operation *consumer,
+                                            Value connection,
+                                            bool moreProdThanCons) {
+  Block *loopExit = loop->getExitingBlock();
+  llvm::errs() << "loopExit: ";
+  loopExit->printAsOperand(llvm::errs());
+  llvm::errs() << "\n";
+  if (loopExit) {
+    Operation *loopTerminator = loopExit->getTerminator();
+    assert(isa<cf::CondBranchOp>(loopTerminator) &&
+           "Terminator condition of a loop exit must be a conditional "
+           "branch.");
+
+    rewriter.setInsertionPointToStart(loopExit);
+    llvm::errs() << "Added branch in insertBranchToLoop in ";
+    loopExit->printAsOperand(llvm::errs());
+    llvm::errs() << "\n";
+    auto branchOp = rewriter.create<handshake::ConditionalBranchOp>(
+        loopExit->getOperations().front().getLoc(),
+        boolVariableToCircuit(
+            rewriter, getBlockLoopExitCondition(loopExit, loop), loopExit),
+        connection);
+    llvm::errs() << "Branch added: " << branchOp << "\n";
+
+    Value newConnection = branchOp.getTrueResult();
+    if (!moreProdThanCons)
+      newConnection = branchOp.getFalseResult();
+    consumer->replaceUsesOfWith(connection, newConnection);
+    return newConnection;
+  }
+  std::vector<std::string> cofactorList;
+  SmallVector<Block *> exitBlocks;
+  loop->getExitingBlocks(exitBlocks);
+  llvm::errs() << "EXit blocks " << exitBlocks.size() << "\n";
+  loopExit = exitBlocks.front();
+  BoolExpression *fLoopExit = BoolExpression::boolZero();
+
+  for (Block *exitBlock : exitBlocks) {
+    BoolExpression *blockCond = getBlockLoopExitCondition(exitBlock, loop);
+    fLoopExit = BoolExpression::boolOr(fLoopExit, blockCond);
+    cofactorList.push_back(getBlockCondition(exitBlock));
+  }
+
+  std::sort(cofactorList.begin(), cofactorList.end());
+  Data *shannonResult = applyShannon(fLoopExit, cofactorList);
+
+  /// Convert the result of shannon from BoolExpression to circuitry
+  Operation *loopTerminator = loopExit->getTerminator();
+  assert(isa<cf::CondBranchOp>(loopTerminator) &&
+         "Terminator condition of a loop exit must be a conditional "
+         "branch.");
+  Value branchCond = dataToCircuit(rewriter, shannonResult, loopExit);
+
+  rewriter.setInsertionPointToStart(loopExit);
+  auto branchOp = rewriter.create<handshake::ConditionalBranchOp>(
+      loopExit->getOperations().front().getLoc(), branchCond, connection);
+  alloctionNetwork.push_back(branchOp);
+
+  /// moreProdThanCons flag is used to discern between the caller of the
+  /// function (manageMoreProdThanCons or manageSelfRegeneration /
+  /// manageDifferentRegeneration)
+  /// It is used to connect either the:
+  /// (1) manageSelfRegeneration / manageDifferentRegeneration: True side
+  /// of the BRANCH to sink and False side to the consumer (2)
+  /// manageMoreProdThanCons: True side of the BRANCH to the consumer and
+  /// False side to sink
+  Value newConnection = branchOp.getTrueResult();
+  if (!moreProdThanCons)
+    newConnection = branchOp.getFalseResult();
+  consumer->replaceUsesOfWith(connection, newConnection);
+  return newConnection;
+}
+
 void HandshakeLowering::insertBranchesToLoops(
     ConversionPatternRewriter &rewriter, const std::set<CFGLoop *> &loops,
     Operation *consumer, Value connection, bool moreProdThanCons) {
   for (CFGLoop *loop : loops) {
     Block *loopExit = loop->getExitingBlock();
+    llvm::errs() << "loopExit: ";
+    loopExit->printAsOperand(llvm::errs());
+    llvm::errs() << "\n";
     if (loopExit) {
       Operation *loopTerminator = loopExit->getTerminator();
       assert(isa<cf::CondBranchOp>(loopTerminator) &&
@@ -1920,11 +2007,17 @@ void HandshakeLowering::insertBranchesToLoops(
              "branch.");
 
       rewriter.setInsertionPointToStart(loopExit);
+      llvm::errs() << "Added branch in insertBranchesToLoops in ";
+      loopExit->printAsOperand(llvm::errs());
+      llvm::errs() << "\n";
       auto branchOp = rewriter.create<handshake::ConditionalBranchOp>(
           loopExit->getOperations().front().getLoc(),
           boolVariableToCircuit(
               rewriter, getBlockLoopExitCondition(loopExit, loop), loopExit),
           connection);
+      llvm::errs() << "Fed from block: ";
+      connection.getParentBlock()->printAsOperand(llvm::errs());
+      llvm::errs() << "\n";
 
       Value newConnection = branchOp.getTrueResult();
       if (!moreProdThanCons)
@@ -1979,30 +2072,35 @@ void HandshakeLowering::manageMoreProdThanCons(
     ConversionPatternRewriter &rewriter, Block *producerBlock,
     Operation *consumer, Value connection) {
   /// Identify every loop containing the producer and not the consumer
-  std::set<CFGLoop *> producerLoopsWithoutConsumer;
+  Value con = connection;
+  // std::set<CFGLoop *> producerLoopsWithoutConsumer;
   CFGLoop *loop = li.getLoopFor(producerBlock);
   while (loop) {
     if (!loop->contains(consumer->getBlock())) {
-      producerLoopsWithoutConsumer.insert(loop);
+      llvm::errs() << "In manageMoreProdThanCons\n";
+      con = insertBranchToLoop(rewriter, loop, consumer, con, true);
     }
-
     loop = loop->getParentLoop();
   }
-  insertBranchesToLoops(rewriter, producerLoopsWithoutConsumer, consumer,
-                        connection, true);
+  // llvm::errs() << "In manageMoreProdThanCons\n";
+  //  insertBranchesToLoops(rewriter, producerLoopsWithoutConsumer, consumer,
+  //                       connection, true);
 }
 
 void HandshakeLowering::manageSelfRegeneration(
     ConversionPatternRewriter &rewriter, Operation *consumer,
     Value connection) {
   /// Identify every loop containing the producer is in
-  std::set<CFGLoop *> loops;
+  llvm::errs() << "SelfGen Block: ";
+  consumer->getBlock()->printAsOperand(llvm::errs());
+  llvm::errs() << "\n";
   CFGLoop *loop = li.getLoopFor(consumer->getBlock());
-  while (loop) {
-    loops.insert(loop);
-    loop = loop->getParentLoop();
+  if (loop) {
+    llvm::errs() << "In manageSelfRegeneration\n";
+    insertBranchToLoop(rewriter, loop, consumer, connection, false);
   }
-  insertBranchesToLoops(rewriter, loops, consumer, connection, false);
+
+  // insertBranchesToLoops(rewriter, loops, consumer, connection, false);
 }
 
 void HandshakeLowering::manageNonLoop(ConversionPatternRewriter &rewriter,
@@ -2039,6 +2137,9 @@ void HandshakeLowering::manageNonLoop(ConversionPatternRewriter &rewriter,
     rewriter.setInsertionPointToStart(consumer->getBlock());
     auto branchOp = rewriter.create<handshake::ConditionalBranchOp>(
         consumer->getLoc(), branchCond, connection);
+    llvm::errs() << "Added branch in manageNonLoop in ";
+    consumer->getBlock()->printAsOperand(llvm::errs());
+    llvm::errs() << "\n";
     alloctionNetwork.push_back(branchOp);
     consumer->replaceUsesOfWith(connection, branchOp.getFalseResult());
   }
@@ -2047,11 +2148,12 @@ void HandshakeLowering::manageNonLoop(ConversionPatternRewriter &rewriter,
 void HandshakeLowering::manageDifferentRegeneration(
     ConversionPatternRewriter &rewriter, Operation *consumer,
     Value connection) {
-  // loop rxit of cons
+  // loop exit of cons
   if (li.getLoopFor(consumer->getBlock())) {
-    std::set<CFGLoop *> loops;
-    loops.insert(li.getLoopFor(consumer->getBlock()));
-    insertBranchesToLoops(rewriter, loops, consumer, connection, false);
+    llvm::errs() << "In manageDifferentRegeneration\n";
+    insertBranchToLoop(rewriter, li.getLoopFor(consumer->getBlock()), consumer,
+                       connection, false);
+    // insertBranchesToLoops(rewriter, loops, consumer, connection, false);
   }
 }
 
@@ -2166,36 +2268,52 @@ Value HandshakeLowering::addInit(ConversionPatternRewriter &rewriter,
                                  Operation *oldMerge) {
   SmallVector<Value, 4> mergeOperands;
 
-  // assert that one of the inputs of the Merge that we are currently
-  // translating to Mux is a Branch in a loop exit block
-  bool inputIsBranchInLoopExit = false;
-  Value mergeOperandFromMux;
-  handshake::ConditionalBranchOp branchOp;
-  for (Value operand : oldMerge->getOperands()) {
-    if (Operation *producer = operand.getDefiningOp()) {
-      if (isBranchInLoopExit(producer)) {
-        branchOp = dyn_cast<handshake::ConditionalBranchOp>(producer);
-        mergeOperandFromMux = branchOp.getConditionOperand();
-        if (isa<handshake::NotOp>(mergeOperandFromMux.getDefiningOp())) {
-          mergeOperandFromMux =
-              mergeOperandFromMux.getDefiningOp()->getOperand(0);
+  /*
+    // assert that one of the inputs of the Merge that we are currently
+    // translating to Mux is a Branch in a loop exit block
+    bool inputIsBranchInLoopExit = false;
+    Value mergeOperandFromMux;
+    handshake::ConditionalBranchOp branchOp;
+    for (Value operand : oldMerge->getOperands()) {
+      if (Operation *producer = operand.getDefiningOp()) {
+        if (isBranchInLoopExit(producer)) {
+          branchOp = dyn_cast<handshake::ConditionalBranchOp>(producer);
+          mergeOperandFromMux = branchOp.getConditionOperand();
+          if (isa<handshake::NotOp>(mergeOperandFromMux.getDefiningOp())) {
+            mergeOperandFromMux =
+                mergeOperandFromMux.getDefiningOp()->getOperand(0);
+          }
+          llvm::errs() << "Taking condition of " << branchOp
+                       << " to ffed merge in ";
+          oldMerge->getBlock()->printAsOperand(llvm::errs());
+          llvm::errs() << "\n";
+          inputIsBranchInLoopExit = true;
         }
-        inputIsBranchInLoopExit = true;
       }
     }
-  }
-  assert(inputIsBranchInLoopExit &&
-         "An input of the Merge must be a Branch in a loop exit block");
+    assert(inputIsBranchInLoopExit &&
+           "An input of the Merge must be a Branch in a loop exit block");
 
-  if (branchOp.getResult(0) == oldMerge->getOperand(1) ||
-      branchOp.getResult(1) == oldMerge->getOperand(0)) {
-    rewriter.setInsertionPointAfterValue(mergeOperandFromMux);
-    auto notOp = rewriter.create<handshake::NotOp>(mergeOperandFromMux.getLoc(),
-                                                   mergeOperandFromMux);
-    mergeOperandFromMux = notOp->getResult(0);
-  }
+    if (branchOp.getResult(0) == oldMerge->getOperand(1) ||
+        branchOp.getResult(1) == oldMerge->getOperand(0)) {
+      rewriter.setInsertionPointAfterValue(mergeOperandFromMux);
+      auto notOp =
+    rewriter.create<handshake::NotOp>(mergeOperandFromMux.getLoc(),
+                                                     mergeOperandFromMux);
+      mergeOperandFromMux = notOp->getResult(0);
+    }
 
-  mergeOperands.push_back(mergeOperandFromMux);
+    mergeOperands.push_back(mergeOperandFromMux);*/
+
+  for (Value operand : oldMerge->getOperands()) {
+    if (Operation *producer = operand.getDefiningOp()) {
+      CFGLoop *loop =
+          getInnermostCommonLoop(oldMerge->getBlock(), producer->getBlock());
+      mergeOperands.push_back(boolVariableToCircuit(
+          rewriter, getBlockLoopExitCondition(loop->getExitingBlock(), loop),
+          loop->getExitingBlock()));
+    }
+  }
 
   /// Insert a new constant in the same block as that of the new Merge and
   /// feed
@@ -2332,6 +2450,9 @@ HandshakeLowering::addSuppGSA(ConversionPatternRewriter &rewriter) {
         rewriter.setInsertionPointAfterValue(dominatingInput);
         auto branchOp = rewriter.create<handshake::ConditionalBranchOp>(
             dominatingInput.getLoc(), desiredCond, dominatingInput);
+        llvm::errs() << "Added branch in addSuppGSA in ";
+        dominatingInput.getParentBlock()->printAsOperand(llvm::errs());
+        llvm::errs() << "\n";
         Value newInput = branchOp.getFalseResult();
         if (getTrueSuccessor)
           newInput = branchOp.getTrueResult();

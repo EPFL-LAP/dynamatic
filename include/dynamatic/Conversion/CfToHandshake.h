@@ -225,6 +225,13 @@ public:
   /// producr is START by doing back-propagation
   LogicalResult addSuppForStart(ConversionPatternRewriter &rewriter);
 
+  /// Inserts a BRANCH for in the loop with condition depending on the exit
+  /// blocks Loop convention followed is: True Side --> loop exit False Side
+  /// --> iterate
+  Value insertBranchToLoop(ConversionPatternRewriter &rewriter,
+                           mlir::CFGLoop *loop, Operation *consumer,
+                           Value connection, bool moreProdThanCons);
+
   /// Inserts a BRANCH for each loop with condition depending on the exit
   /// blocks Loop convention followed is: True Side --> loop exit False Side
   /// --> iterate
