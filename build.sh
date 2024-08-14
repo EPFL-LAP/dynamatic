@@ -340,6 +340,7 @@ create_symlink ../build/bin/export-dot
 create_symlink ../build/bin/export-rtl
 create_symlink ../build/bin/exp-frequency-profiler
 create_symlink ../build/bin/handshake-simulator
+create_symlink ../build/bin/data-profiler
 create_symlink ../build/bin/hls-verifier
 create_symlink ../build/bin/wlf2csv
 create_generator_symlink build/bin/rtl-cmpf-generator
