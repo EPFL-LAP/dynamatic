@@ -579,6 +579,11 @@ void BufferPlacementMILP::logResults(BufferPlacement &placement) {
     for (auto [val, channelTh] : cfVars.channelThroughputs) {
       os << getUniqueName(*val.getUses().begin()) << ": "
          << channelTh.get(GRB_DoubleAttr_X) << "\n";
+      // Check the existence of buffers
+      if (placement[val].numOpaque > 0 || placement[val].numTrans > 0) {
+        // Store the per CFDFC channel throughput into the placement resutlt
+        placement[val].bufOccupancyMap[idx] = channelTh.get(GRB_DoubleAttr_X);
+      }
     }
     os.unindent();
     os << "\n";
