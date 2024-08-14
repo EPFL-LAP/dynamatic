@@ -12,6 +12,7 @@
 
 #include "dynamatic/Transforms/BufferPlacement/FPGA20Buffers.h"
 #include "dynamatic/Dialect/Handshake/HandshakeOps.h"
+#include "dynamatic/Support/Attribute.h"
 #include "dynamatic/Support/TimingModels.h"
 #include "dynamatic/Transforms/BufferPlacement/BufferingSupport.h"
 #include "mlir/IR/Value.h"
@@ -90,6 +91,19 @@ void FPGA20Buffers::extractResult(BufferPlacement &placement) {
 
   if (logger)
     logResults(placement);
+  
+  llvm::MapVector<size_t, double> cfdfcTPResult;
+  for (auto [idx, cfdfcWithVars] : llvm::enumerate(vars.cfVars)) {
+    auto [cf, cfVars] = cfdfcWithVars;
+    double tmpThroughput = cfVars.throughput.get(GRB_DoubleAttr_X);
+
+    cfdfcTPResult[idx] = tmpThroughput;
+  }
+
+  // Create and add the handshake.tp attribute
+  auto cfdfcTPMap = handshake::CFDFCThroughputAttr::get(
+      funcInfo.funcOp.getContext(), cfdfcTPResult);
+  setUniqueAttr(funcInfo.funcOp, cfdfcTPMap);
 }
 
 void FPGA20Buffers::addCustomChannelConstraints(Value channel) {

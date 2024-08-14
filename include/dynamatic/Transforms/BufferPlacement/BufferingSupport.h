@@ -176,6 +176,8 @@ struct PlacementResult {
   /// Whether opaque slots should be placed transparent slots for placement
   /// results that include both.
   bool opaqueBeforeTrans = true;
+  /// Store the map from CFDFC index to the corresponding buffer occupancy 
+  llvm::MapVector<size_t, double> bufOccupancyMap;
 
   /// Removes pre-existing buffers that may exist as part of the units the
   /// channel connects to from the placement results. These are deducted from

@@ -16,6 +16,7 @@
 #include "dynamatic/Analysis/NameAnalysis.h"
 #include "dynamatic/Dialect/Handshake/HandshakeAttributes.h"
 #include "dynamatic/Dialect/Handshake/HandshakeOps.h"
+#include "dynamatic/Support/Attribute.h"
 #include "dynamatic/Support/CFG.h"
 #include "dynamatic/Support/Logging.h"
 #include "dynamatic/Transforms/BufferPlacement/BufferingSupport.h"
@@ -296,6 +297,24 @@ HandshakePlaceBuffersPass::placeBuffers(FuncInfo &info,
   // All extracted CFDFCs must be optimized
   for (CFDFC &cf : cfdfcs)
     info.cfdfcs[&cf] = true;
+  
+  // Create a new map for the cfdfc extraction
+  llvm::MapVector<size_t, std::vector<unsigned>> cfdfcResult;
+
+  // Iterate through all extracted cfdfc
+  for (auto [idx, cfAndOpt] : llvm::enumerate(info.cfdfcs)) {
+    auto &[cf, _] = cfAndOpt;
+    for (size_t i = 0, e = cf->cycle.size() - 1; i < e; ++i) {
+      // Add the bb to the corresponding in the cfdfc result map
+      cfdfcResult[idx].push_back(cf->cycle[i]);
+    }
+    cfdfcResult[idx].push_back(cf->cycle.back());
+  }
+
+  // Create and add the handshake.cfdfc attribute
+  auto cfdfcMap =
+      handshake::CFDFCToBBListAttr::get(info.funcOp.getContext(), cfdfcResult);
+  setUniqueAttr(info.funcOp, cfdfcMap);
 
   if (dumpLogs)
     logFuncInfo(info, *logger);
@@ -526,7 +545,7 @@ void HandshakePlaceBuffersPass::instantiateBuffers(BufferPlacement &placement) {
     builder.setInsertionPoint(opDst);
 
     Value bufferIn = channel;
-    auto placeBuffer = [&](const TimingInfo &timing, unsigned numSlots) {
+    auto placeBuffer = [&](const TimingInfo &timing, unsigned numSlots, buffer::PlacementResult& channelPlaceRes) {
       if (numSlots == 0)
         return;
 
@@ -538,14 +557,21 @@ void HandshakePlaceBuffersPass::instantiateBuffers(BufferPlacement &placement) {
       Value bufferRes = bufOp->getResult(0);
       opDst->replaceUsesOfWith(bufferIn, bufferRes);
       bufferIn = bufferRes;
+
+      if (channelPlaceRes.bufOccupancyMap.size() > 0) {
+        // Create and add handshake.bufOcc attribute for all buffer operations
+        auto bufOccAttr = handshake::BufferOccupancyAttr::get(bufOp->getContext(), channelPlaceRes.bufOccupancyMap);
+        // Set unique buffer occupancy attribute
+        setUniqueAttr(bufOp, bufOccAttr);
+      }
     };
 
     if (placeRes.opaqueBeforeTrans) {
-      placeBuffer(TimingInfo::oehb(), placeRes.numOpaque);
-      placeBuffer(TimingInfo::tehb(), placeRes.numTrans);
+      placeBuffer(TimingInfo::oehb(), placeRes.numOpaque, placeRes);
+      placeBuffer(TimingInfo::tehb(), placeRes.numTrans, placeRes);
     } else {
-      placeBuffer(TimingInfo::tehb(), placeRes.numTrans);
-      placeBuffer(TimingInfo::oehb(), placeRes.numOpaque);
+      placeBuffer(TimingInfo::tehb(), placeRes.numTrans, placeRes);
+      placeBuffer(TimingInfo::oehb(), placeRes.numOpaque, placeRes);
     }
   }
 }
