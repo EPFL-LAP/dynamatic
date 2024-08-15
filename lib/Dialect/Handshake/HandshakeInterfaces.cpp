@@ -116,9 +116,9 @@ static std::string getMemOperandName(const FuncMemoryPorts &ports,
 }
 
 /// Common result naming logic for memory controllers and LSQs.
-static std::string getMemResultName(const FuncMemoryPorts &ports,
-                                    unsigned idx) {
-  if (idx == ports.memOp->getNumResults() - 1)
+static std::string getMemResultName(FuncMemoryPorts &ports, unsigned idx) {
+  if (ports.memOp.isMasterInterface() &&
+      idx == ports.memOp->getNumResults() - 1)
     return "memDone";
 
   // Iterate through all memory ports to find out the type of the
@@ -209,6 +209,20 @@ std::string handshake::LSQOp::getResultName(unsigned idx) {
     return "stAddrToMC";
   assert(mcPort.getStoreDataOutputIndex() == idx && "unknown LSQ/MC result");
   return "stDataToMC";
+}
+
+//===----------------------------------------------------------------------===//
+// MemoryOpInterface
+//===----------------------------------------------------------------------===//
+
+bool MemoryControllerOp::isMasterInterface() { return true; }
+
+bool LSQOp::isMasterInterface() { return !isConnectedToMC(); }
+
+TypedValue<MemRefType> LSQOp::getMemRef() {
+  if (handshake::MemoryControllerOp mcOp = getConnectedMC())
+    return mcOp.getMemRef();
+  return cast<TypedValue<MemRefType>>(getInputs().front());
 }
 
 //===----------------------------------------------------------------------===//

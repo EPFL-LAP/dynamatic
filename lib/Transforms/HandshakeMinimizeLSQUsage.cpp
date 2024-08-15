@@ -13,6 +13,7 @@
 
 #include "dynamatic/Transforms/HandshakeMinimizeLSQUsage.h"
 #include "dynamatic/Analysis/NameAnalysis.h"
+#include "dynamatic/Dialect/Handshake/HandshakeAttributes.h"
 #include "dynamatic/Dialect/Handshake/HandshakeOps.h"
 #include "dynamatic/Dialect/Handshake/MemoryInterfaces.h"
 #include "dynamatic/Support/Attribute.h"
@@ -77,13 +78,10 @@ private:
   /// may or may not exist prior.
   void tryToOptimizeLSQ(handshake::LSQOp lsqOp);
 
-  /// Updates the parent function's terminator's operands to reflect the changes
-  /// in memory interfaces, which all produce a done signal consumed by the
-  /// terminator. New memory interfaces may be nullptr.
-  void replaceEndMemoryControls(handshake::LSQOp lsqOp,
-                                handshake::LSQOp newLSQOp,
-                                handshake::MemoryControllerOp newMCOp,
-                                OpBuilder &builder) const;
+  /// Replaces the parent function terminator's operand that represents the
+  /// memory completion signal associated to the LSQ's memory.
+  void replaceMemoryEnd(handshake::LSQOp oldLSQOp, Value newDone,
+                        OpBuilder &builder) const;
 };
 } // namespace
 
@@ -294,48 +292,25 @@ HandshakeMinimizeLSQUsagePass::LSQInfo::LSQInfo(handshake::LSQOp lsqOp,
   optimizable = true;
 }
 
-void HandshakeMinimizeLSQUsagePass::replaceEndMemoryControls(
-    handshake::LSQOp lsqOp, handshake::LSQOp newLSQOp,
-    handshake::MemoryControllerOp newMCOp, OpBuilder &builder) const {
-  // We must update control signals going out of the memory interfaces and to
-  // the function's terminator. The number of total memory interfaces may have
-  // changed (a new MC may have appeared, an LSQ may have disappeared) and
-  // consequently the number of operands to the function's terminator may change
-  // too
-  handshake::FuncOp funcOp = lsqOp->getParentOfType<handshake::FuncOp>();
-  handshake::EndOp endOp = dyn_cast<EndOp>(funcOp.front().getTerminator());
-  assert(endOp && "expected end operation in Handshake function");
-  handshake::MemoryControllerOp mcOp = lsqOp.getConnectedMC();
+void HandshakeMinimizeLSQUsagePass::replaceMemoryEnd(handshake::LSQOp oldLSQOp,
+                                                     Value newDone,
+                                                     OpBuilder &builder) const {
+  auto funcOp = oldLSQOp->getParentOfType<handshake::FuncOp>();
+  auto endOp = dyn_cast<EndOp>(funcOp.front().getTerminator());
+  handshake::MemoryControllerOp mcOp = oldLSQOp.getConnectedMC();
 
-  // Derive new memory control operands for the end operation
-  SmallVector<Value> newEndOperands;
-  bool needNewMCControl = newMCOp != nullptr;
-  for (Value memCtrl : endOp.getOperands()) {
-    if (mcOp && memCtrl == mcOp.getDone()) {
-      // In this case we are guaranteed to have instantiated a new MC, as we
-      // never modify MC ports as part of the optimization
-      newEndOperands.push_back(newMCOp.getDone());
-      needNewMCControl = false;
-    } else if (memCtrl == lsqOp.getDone()) {
-      // Skip the control signal if we did not reinstantiate an LSQ due to the
-      // optimization
-      if (newLSQOp)
-        newEndOperands.push_back(newLSQOp.getDone());
-    } else {
-      newEndOperands.push_back(memCtrl);
-    }
-  }
-  // If we have inserted a MC that was not present before, then its done signal
-  // need to be added to the list of memory control signals
-  if (needNewMCControl)
-    newEndOperands.push_back(newMCOp.getDone());
+  // Look for the memory completion signal of the memory referenced by the LSQ
+  // in the function terminator's operands
+  Value done =
+      mcOp ? cast<Value>(mcOp.getDone()) : oldLSQOp->getResults().back();
+  auto indexedTermOperands = llvm::enumerate(endOp->getOperands());
+  auto oprdIt = llvm::find_if(indexedTermOperands, [&](auto idxOprd) {
+    return idxOprd.value() == done;
+  });
+  assert(oprdIt != indexedTermOperands.end() && "no memory completion signal");
 
-  // Replace the end operation
-  builder.setInsertionPoint(endOp);
-  auto newEndOp =
-      builder.create<handshake::EndOp>(endOp.getLoc(), newEndOperands);
-  inheritBB(endOp, newEndOp);
-  endOp->erase();
+  auto [idx, _] = *oprdIt;
+  endOp->setOperand(idx, newDone);
 }
 
 void HandshakeMinimizeLSQUsagePass::tryToOptimizeLSQ(handshake::LSQOp lsqOp) {
@@ -438,7 +413,7 @@ void HandshakeMinimizeLSQUsagePass::tryToOptimizeLSQ(handshake::LSQOp lsqOp) {
         })
         .Case<handshake::MCLoadOp>([&](handshake::MCLoadOp mcLoadOp) {
           // The data operand coming from the current memory interface will be
-          // replaced during interface creation by the `MemoryInterfaceBuilder`
+          // replaced during interface creation by the MemoryInterfaceBuilder
           if (lsqInfo.mcOps.contains(mcLoadOp))
             memBuilder.addMCPort(mcLoadOp);
         })
@@ -459,6 +434,7 @@ void HandshakeMinimizeLSQUsagePass::tryToOptimizeLSQ(handshake::LSQOp lsqOp) {
     LLVM_DEBUG(llvm::dbgs() << "\tFailed to instantiate memory interfaces\n");
     return;
   }
+  assert(newMCOp && "lsq minimization did not generate a new MC");
 
   LLVM_DEBUG({
     llvm::dbgs() << "\t[SUCCESS] LSQ ";
@@ -473,7 +449,7 @@ void HandshakeMinimizeLSQUsagePass::tryToOptimizeLSQ(handshake::LSQOp lsqOp) {
   });
 
   // Replace memory control signals consumed by the end operation
-  replaceEndMemoryControls(lsqOp, newLSQOp, newMCOp, builder);
+  replaceMemoryEnd(lsqOp, newMCOp.getDone(), builder);
 
   // If the LSQ is connected to an MC, we delete it first. The second to last
   // result of the MC is a load data signal going to the LSQ, which needs to be

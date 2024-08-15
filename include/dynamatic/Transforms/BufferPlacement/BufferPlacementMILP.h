@@ -174,7 +174,7 @@ protected:
   /// After construction, maps all channels (i.e, values) defined in the
   /// function to their specific channel buffering properties (unconstraining
   /// properties if none were explicitly specified).
-  llvm::MapVector<Value, ChannelBufProps> channelProps;
+  llvm::MapVector<Value, handshake::ChannelBufProps> channelProps;
   /// Logger; if not null the class may log setup and result information to it.
   Logger *logger;
   /// Contains all variables used throughout the MILP. Variables can be added to

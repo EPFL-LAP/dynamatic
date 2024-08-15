@@ -44,11 +44,10 @@ unsigned dynamatic::getOpDatawidth(Operation *op) {
             return getHandshakeTypeBitWidth(
                 mergeLikeOp.getDataOperands().front().getType());
           })
-      .Case<handshake::BufferOpInterface, handshake::ForkOp,
-            handshake::LazyForkOp, handshake::BranchOp, handshake::SinkOp>(
-          [&](auto) {
-            return getHandshakeTypeBitWidth(op->getOperand(0).getType());
-          })
+      .Case<handshake::BufferOp, handshake::ForkOp, handshake::LazyForkOp,
+            handshake::BranchOp, handshake::SinkOp>([&](auto) {
+        return getHandshakeTypeBitWidth(op->getOperand(0).getType());
+      })
       .Case<handshake::ConditionalBranchOp>(
           [&](handshake::ConditionalBranchOp condOp) {
             return getHandshakeTypeBitWidth(condOp.getDataOperand().getType());
@@ -56,13 +55,12 @@ unsigned dynamatic::getOpDatawidth(Operation *op) {
       .Case<handshake::SourceOp, handshake::ConstantOp>([&](auto) {
         return getHandshakeTypeBitWidth(op->getResult(0).getType());
       })
-      .Case<handshake::ReturnOp, handshake::EndOp, handshake::JoinOp>(
-          [&](auto) {
-            unsigned maxWidth = 0;
-            for (Type ty : op->getOperandTypes())
-              maxWidth = std::max(maxWidth, getHandshakeTypeBitWidth(ty));
-            return maxWidth;
-          })
+      .Case<handshake::EndOp, handshake::JoinOp>([&](auto) {
+        unsigned maxWidth = 0;
+        for (Type ty : op->getOperandTypes())
+          maxWidth = std::max(maxWidth, getHandshakeTypeBitWidth(ty));
+        return maxWidth;
+      })
       .Case<handshake::LoadOpInterface, handshake::StoreOpInterface>([&](auto) {
         return std::max(getHandshakeTypeBitWidth(op->getOperand(0).getType()),
                         getHandshakeTypeBitWidth(op->getOperand(1).getType()));

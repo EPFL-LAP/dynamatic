@@ -7,15 +7,13 @@
 // CHECK:           %[[VAL_2:.*]] = trunci %[[VAL_0]] {handshake.bb = 0 : ui32} : <i32> to <i16>
 // CHECK:           %[[VAL_3:.*]]:2 = fork  [2] %[[VAL_2]] : <i16>
 // CHECK:           %[[VAL_4:.*]] = trunci %[[VAL_3]]#1 : <i16> to <i8>
-// CHECK:           %[[VAL_5:.*]]:2 = return %[[VAL_3]]#0, %[[VAL_4]] : <i16>, <i8>
-// CHECK:           end %[[VAL_5]]#0, %[[VAL_5]]#1 : <i16>, <i8>
+// CHECK:           end %[[VAL_3]]#0, %[[VAL_4]] : <i16>, <i8>
 // CHECK:         }
 handshake.func @forkBW(%arg0: !handshake.channel<i32>, %start: !handshake.control<>) -> (!handshake.channel<i16>, !handshake.channel<i8>) {
   %results:2 = fork [2] %arg0 : <i32>
   %trunc0 = trunci %results#0 : <i32> to <i16>
   %trunc1 = trunci %results#1 : <i32> to <i8>
-  %returnVals:2 = return %trunc0, %trunc1 : <i16>, <i8>
-  end %returnVals#0, %returnVals#1 : <i16>, <i8>
+  end %trunc0, %trunc1 : <i16>, <i8>
 }
 
 // -----
@@ -26,15 +24,13 @@ handshake.func @forkBW(%arg0: !handshake.channel<i32>, %start: !handshake.contro
 // CHECK:           %[[VAL_2:.*]] = trunci %[[VAL_0]] {handshake.bb = 0 : ui32} : <i32> to <i16>
 // CHECK:           %[[VAL_3:.*]]:2 = lazy_fork  [2] %[[VAL_2]] : <i16>
 // CHECK:           %[[VAL_4:.*]] = trunci %[[VAL_3]]#1 : <i16> to <i8>
-// CHECK:           %[[VAL_5:.*]]:2 = return %[[VAL_3]]#0, %[[VAL_4]] : <i16>, <i8>
-// CHECK:           end %[[VAL_5]]#0, %[[VAL_5]]#1 : <i16>, <i8>
+// CHECK:           end %[[VAL_3]]#0, %[[VAL_4]] : <i16>, <i8>
 // CHECK:         }
 handshake.func @lazyForkBW(%arg0: !handshake.channel<i32>, %start: !handshake.control<>) -> (!handshake.channel<i16>, !handshake.channel<i8>) {
   %results:2 = lazy_fork [2] %arg0 : <i32>
   %trunc0 = trunci %results#0 : <i32> to <i16>
   %trunc1 = trunci %results#1 : <i32> to <i8>
-  %returnVals:2 = return %trunc0, %trunc1 : <i16>, <i8>
-  end %returnVals#0, %returnVals#1 : <i16>, <i8>
+  end %trunc0, %trunc1 : <i16>, <i8>
 }
 
 // -----
@@ -45,14 +41,12 @@ handshake.func @lazyForkBW(%arg0: !handshake.channel<i32>, %start: !handshake.co
 // CHECK:           %[[VAL_3:.*]] = trunci %[[VAL_1]] {handshake.bb = 0 : ui32} : <i32> to <i16>
 // CHECK:           %[[VAL_4:.*]] = trunci %[[VAL_0]] {handshake.bb = 0 : ui32} : <i32> to <i16>
 // CHECK:           %[[VAL_5:.*]] = merge %[[VAL_4]], %[[VAL_3]] : <i16>
-// CHECK:           %[[VAL_6:.*]] = return %[[VAL_5]] : <i16>
-// CHECK:           end %[[VAL_6]] : <i16>
+// CHECK:           end %[[VAL_5]] : <i16>
 // CHECK:         }
 handshake.func @mergeBW(%arg0: !handshake.channel<i32>, %arg1: !handshake.channel<i32>, %start: !handshake.control<>) -> !handshake.channel<i16> {
   %merge = merge %arg0, %arg1 : <i32>
   %trunc = trunci %merge : <i32> to <i16>
-  %returnVal = return %trunc : <i16>
-  end %returnVal : <i16>
+  end %trunc : <i16>
 }
 
 // -----
@@ -62,14 +56,12 @@ handshake.func @mergeBW(%arg0: !handshake.channel<i32>, %arg1: !handshake.channe
 // CHECK-SAME:                             %[[VAL_1:.*]]: !handshake.control<>, ...) -> !handshake.channel<i16> attributes {argNames = ["arg0", "start"], resNames = ["out0"]} {
 // CHECK:           %[[VAL_2:.*]] = trunci %[[VAL_0]] {handshake.bb = 0 : ui32} : <i32> to <i16>
 // CHECK:           %[[VAL_3:.*]] = br %[[VAL_2]] : <i16>
-// CHECK:           %[[VAL_4:.*]] = return %[[VAL_3]] : <i16>
-// CHECK:           end %[[VAL_4]] : <i16>
+// CHECK:           end %[[VAL_3]] : <i16>
 // CHECK:         }
 handshake.func @branchBW(%arg0: !handshake.channel<i32>, %start: !handshake.control<>) -> !handshake.channel<i16> {
   %branch = br %arg0 : <i32>
   %trunc = trunci %branch : <i32> to <i16>
-  %returnVal = return %trunc : <i16>
-  end %returnVal : <i16>
+  end %trunc : <i16>
 }
 
 // -----
@@ -81,15 +73,13 @@ handshake.func @branchBW(%arg0: !handshake.channel<i32>, %start: !handshake.cont
 // CHECK:           %[[VAL_4:.*]] = trunci %[[VAL_0]] {handshake.bb = 0 : ui32} : <i32> to <i16>
 // CHECK:           %[[VAL_5:.*]], %[[VAL_6:.*]] = control_merge %[[VAL_4]], %[[VAL_3]]  : <i16>, <i1>
 // CHECK:           %[[VAL_7:.*]] = extui %[[VAL_6]] : <i1> to <i16>
-// CHECK:           %[[VAL_8:.*]]:2 = return %[[VAL_5]], %[[VAL_7]] : <i16>, <i16>
-// CHECK:           end %[[VAL_8]]#0, %[[VAL_8]]#1 : <i16>, <i16>
+// CHECK:           end %[[VAL_5]], %[[VAL_7]] : <i16>, <i16>
 // CHECK:         }
 handshake.func @cmergeBW(%arg0: !handshake.channel<i32>, %arg1: !handshake.channel<i32>, %start: !handshake.control<>) -> (!handshake.channel<i16>, !handshake.channel<i16>) {
   %merge, %index = control_merge %arg0, %arg1 : <i32>, <i32>
   %truncMerge = trunci %merge : <i32> to <i16>
   %truncIndex = trunci %index : <i32> to <i16>
-  %returnVals:2 = return %truncMerge, %truncIndex : <i16>, <i16>
-  end %returnVals#0, %returnVals#1 : <i16>, <i16>
+  end %truncMerge, %truncIndex : <i16>, <i16>
 }
 
 // -----
@@ -101,14 +91,12 @@ handshake.func @cmergeBW(%arg0: !handshake.channel<i32>, %arg1: !handshake.chann
 // CHECK:           %[[VAL_5:.*]] = trunci %[[VAL_0]] {handshake.bb = 0 : ui32} : <i32> to <i16>
 // CHECK:           %[[VAL_6:.*]] = trunci %[[VAL_2]] {handshake.bb = 0 : ui32} : <i32> to <i1>
 // CHECK:           %[[VAL_7:.*]] = mux %[[VAL_6]] {{\[}}%[[VAL_5]], %[[VAL_4]]] : <i1>, <i16>
-// CHECK:           %[[VAL_8:.*]] = return %[[VAL_7]] : <i16>
-// CHECK:           end %[[VAL_8]] : <i16>
+// CHECK:           end %[[VAL_7]] : <i16>
 // CHECK:         }
 handshake.func @muxBW(%arg0: !handshake.channel<i32>, %arg1: !handshake.channel<i32>, %index: !handshake.channel<i32>, %start: !handshake.control<>) -> !handshake.channel<i16> {
   %mux = mux %index [%arg0, %arg1] : <i32>, <i32>
   %trunc = trunci %mux : <i32> to <i16>
-  %returnVal = return %trunc : <i16>
-  end %returnVal : <i16>
+  end %trunc : <i16>
 }
 
 // -----
@@ -119,15 +107,13 @@ handshake.func @muxBW(%arg0: !handshake.channel<i32>, %arg1: !handshake.channel<
 // CHECK:           %[[VAL_3:.*]] = trunci %[[VAL_0]] {handshake.bb = 0 : ui32} : <i32> to <i16>
 // CHECK:           %[[VAL_4:.*]], %[[VAL_5:.*]] = cond_br %[[VAL_1]], %[[VAL_3]] : <i1>, <i16>
 // CHECK:           %[[VAL_6:.*]] = trunci %[[VAL_5]] : <i16> to <i8>
-// CHECK:           %[[VAL_7:.*]]:2 = return %[[VAL_4]], %[[VAL_6]] : <i16>, <i8>
-// CHECK:           end %[[VAL_7]]#0, %[[VAL_7]]#1 : <i16>, <i8>
+// CHECK:           end %[[VAL_4]], %[[VAL_6]] : <i16>, <i8>
 // CHECK:         }
 handshake.func @condBrBW(%arg0: !handshake.channel<i32>, %cond: !handshake.channel<i1>, %start: !handshake.control<>) -> (!handshake.channel<i16>, !handshake.channel<i8>) {
   %true, %false = cond_br %cond, %arg0 : <i1>, <i32>
   %truncTrue = trunci %true : <i32> to <i16>
   %truncFalse = trunci %false : <i32> to <i8>
-  %returnVals:2 = return %truncTrue, %truncFalse : <i16>, <i8>
-  end %returnVals#0, %returnVals#1 : <i16>, <i8>
+  end %truncTrue, %truncFalse : <i16>, <i8>
 }
 
 // -----
@@ -136,13 +122,11 @@ handshake.func @condBrBW(%arg0: !handshake.channel<i32>, %cond: !handshake.chann
 // CHECK-SAME:                             %[[VAL_0:.*]]: !handshake.channel<i32>,
 // CHECK-SAME:                             %[[VAL_1:.*]]: !handshake.control<>, ...) -> !handshake.channel<i16> attributes {argNames = ["arg0", "start"], resNames = ["out0"]} {
 // CHECK:           %[[VAL_2:.*]] = trunci %[[VAL_0]] {handshake.bb = 0 : ui32} : <i32> to <i16>
-// CHECK:           %[[VAL_3:.*]] = oehb [2] %[[VAL_2]] : !handshake.channel<i16>
-// CHECK:           %[[VAL_4:.*]] = return %[[VAL_3]] : <i16>
-// CHECK:           end %[[VAL_4]] : <i16>
+// CHECK:           %[[VAL_3:.*]] = buffer %[[VAL_2]] : <i16>
+// CHECK:           end %[[VAL_3]] : <i16>
 // CHECK:         }
 handshake.func @bufferBW(%arg0: !handshake.channel<i32>, %start: !handshake.control<>) -> !handshake.channel<i16> {
-  %buf = oehb [2] %arg0 : <i32>
+  %buf = buffer %arg0 : <i32>
   %trunc = trunci %buf : <i32> to <i16>
-  %returnVal = return %trunc : <i16>
-  end %returnVal : <i16>
+  end %trunc : <i16>
 }

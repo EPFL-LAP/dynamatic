@@ -30,7 +30,7 @@
 
 #include "dynamatic/Transforms/BackAnnotate.h"
 #include "dynamatic/Analysis/NameAnalysis.h"
-#include "dynamatic/Dialect/Handshake/HandshakeOps.h"
+#include "dynamatic/Dialect/Handshake/HandshakeAttributes.h"
 #include "dynamatic/Support/Attribute.h"
 #include "dynamatic/Support/JSON/JSON.h"
 #include "dynamatic/Support/TimingModels.h"
@@ -149,7 +149,7 @@ static bool fromJSON(const ljson::Value &value,
     return false;
   }
 
-  ChannelBufProps props;
+  handshake::ChannelBufProps props;
   // Map all supported keys to a callback to set the corresponding field in the
   // channel buffering properties
   std::map<StringRef, std::function<bool()>> keys;

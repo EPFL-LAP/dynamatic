@@ -31,6 +31,9 @@ namespace dynamatic {
 /// Hardware description languages.
 enum class HDL { VHDL, VERILOG };
 
+/// Returns the file extension (without a leading '.') for files of the HDL.
+StringRef getHDLExtension(HDL hdl);
+
 /// Mapping between parameter names and their respective values.
 using ParameterMappings = llvm::StringMap<std::string>;
 
@@ -162,12 +165,6 @@ protected:
 /// from.
 class RTLRequest {
 public:
-  /// Attribute names under which the RTL component's name and parameters are
-  /// stored on an MLIR operation, respectively.
-  static constexpr StringLiteral NAME_ATTR = StringLiteral("hw.name"),
-                                 PARAMETERS_ATTR =
-                                     StringLiteral("hw.parameters");
-
   /// Location to report errors from.
   Location loc;
 
@@ -385,18 +382,21 @@ public:
   /// Returns the component's list of RTL dependencies.
   ArrayRef<std::string> getDependencies() const { return dependencies; }
 
-  /// Returns the name of the component port matching the MLIR port name. If the
-  /// component does not define any port name remapping this is simply the input
-  /// MLIR port name.
-  std::string getRTLPortName(StringRef mlirPortName, HDL hdl) const;
+  /// Returns the name of the component port matching the MLIR port name and
+  /// whether the port name indicates that is part of an array. If the component
+  /// does not define any port name remapping this is simply the input MLIR port
+  /// name.
+  std::pair<std::string, bool> getRTLPortName(StringRef mlirPortName,
+                                              HDL hdl) const;
 
   /// Returns the name of the component port matching the MLIR port name for the
-  /// specific signal type. This is the remapped port name returned by the
+  /// specific signal type and whether the port name indicates that it is part
+  /// of an array. This is the remapped port name returned by the
   /// non-signal-specific version of that method suffixed by a string
   /// identifying the signal type (e.g., "_valid" for valid signals). Default
   /// suffixes may be overriden on a per-component basis.
-  std::string getRTLPortName(StringRef mlirPortName, SignalType type,
-                             HDL hdl) const;
+  std::pair<std::string, bool> getRTLPortName(StringRef mlirPortName,
+                                              SignalType type, HDL hdl) const;
 
   RTLComponent(RTLComponent &&) noexcept = default;
   RTLComponent &operator=(RTLComponent &&) noexcept = default;

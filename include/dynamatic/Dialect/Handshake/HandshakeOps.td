@@ -223,59 +223,31 @@ def InstanceOp : Handshake_Op<"instance", [
   }];
 }
 
-class Handshake_BufferOp<string mnemonic> : Handshake_Op<mnemonic, [
-  BufferOpInterface, HasClock, SameOperandsAndResultType,
+def BufferOp : Handshake_Op<"buffer", [
+  HasClock, SameOperandsAndResultType,
   DeclareOpInterfaceMethods<ReshapableChannelsInterface, ["getReshapableChannelType"]>,
 ]> {
-  let arguments = (ins HandshakeType:$operand,
-                       ConfinedAttr<I32Attr, [IntMinValue<1>]>:$slots);
+  let summary = "buffer operation";
+  let description = [{
+    Represents an arbitrary buffer whose properties (e.g., latencies, number of
+    slots) are dictated by HW parameters. 
+  }];
+  
+  let arguments = (ins HandshakeType:$operand);
   let results = (outs HandshakeType:$result);
 
-  let extraClassDefinition = [{
-    /// Prints the buffer operation.
-    void $cppClass::print(mlir::OpAsmPrinter &p) {
-      printBufferOp(*this, p);
-    }
+  let builders = [OpBuilder<
+    (ins "Value":$operand, "const ::dynamatic::handshake::TimingInfo &":$timing,
+         "std::optional<unsigned>":$numSlots)>
+  ];
 
-    /// Parses the buffer operation.
-    mlir::ParseResult $cppClass::parse(mlir::OpAsmParser &parser,
-                                       mlir::OperationState &result) {
-      return parseBufferOp(parser, result);
-    }
-
-    std::pair<handshake::ChannelType, bool>
-    $cppClass::getReshapableChannelType() {
-      return {mlir::dyn_cast<handshake::ChannelType>(getOperand().getType()), 
-              true};
-    }
+  let extraClassDeclaration = [{
+    static constexpr ::llvm::StringLiteral NUM_SLOTS_ATTR_NAME = "NUM_SLOTS",
+                                           TIMING_ATTR_NAME = "TIMING";
   }];
 
-  let hasCustomAssemblyFormat = 1;
-}
-
-def OEHBOp : Handshake_BufferOp<"oehb"> {
-  let summary = "opaque elastic half buffer";
-  let description = [{
-    An OEHB (opaque elastic half buffer) is a type of buffer that breaks
-    combinatinal paths in the downstream data/valid network.
-
-    Example:
-    ```mlir
-    %result = oehb [2] %operand : !handshake.chanel<i32>
-    ```
-  }];
-}
-
-def TEHBOp : Handshake_BufferOp<"tehb"> {
-  let summary = "transparent elastic half buffer";
-  let description = [{
-    A TEHB (transparent elastic half buffer) is a type of buffer that breaks
-    combinatinal paths in the upstream ready network.
-
-    Example:
-    ```mlir
-    %result = tehb [2] %operand : !handshake.channel<i32>
-    ```
+  let assemblyFormat = [{
+    $operand attr-dict `:` custom<HandshakeType>(type($operand))
   }];
 }
 
@@ -327,7 +299,7 @@ def LazyForkOp : Handshake_ForkOp<"lazy_fork"> {
   let summary = "lazy fork operation";
   let description = [{
     A single input is replicated to N outputs and distributed to each
-    output when all successors are available.
+    output as soon as the corresponding successor is available.
 
     Example:
 
@@ -770,7 +742,7 @@ def LSQOp : Handshake_Op<"lsq", [
   }];
   
   let arguments = (ins Variadic<AnyType>:$inputs, I32ArrayAttr:$groupSizes);
-  let results = (outs Variadic<ChannelType>:$outputs, ControlType:$done);
+  let results = (outs Variadic<HandshakeType>:$outputs);
 
   let skipDefaultBuilders = 1;
   let builders = [
@@ -951,33 +923,6 @@ def LSQStoreOp : Handshake_StoreOp<"lsq_store"> {
       !handshake.channel<i32>, !handshake.channel<i32>
     ```
   }];
-}
-
-def ReturnOp : Handshake_Op<"return", [
-  DeclareOpInterfaceMethods<InferTypeOpInterface, ["inferReturnTypes"]>
-]> {
-  let summary = "handshake-level return";
-  let description = [{
-    This return operation represents the handshake equivalent of a 
-    func::ReturnOp (i.e., the latter is converted to the former one-to-one,
-    preserving operands). This operation also outputs a list of values that
-    correspond one-to-one to its own operands (i.e., same type and semantic
-    value).
-
-    Example:
-
-    ```mlir
-    %out1, %out2 = return %in1, %in2 : !handshake.channel<i32>, !handshake.channel<i64>
-    ```
-  }];
-
-  let arguments = (ins Variadic<HandshakeType>:$inputs);
-  let results = (outs Variadic<HandshakeType>:$outputs);
-  let assemblyFormat = [{
-    attr-dict ($inputs^ `:` custom<HandshakeTypes>(type($inputs)))?
-  }];
-  
-  let hasVerifier = 1;
 }
 
 def EndOp : Handshake_Op<"end", [

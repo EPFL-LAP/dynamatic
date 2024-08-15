@@ -11,8 +11,7 @@
 // CHECK:           %[[VAL_4]], %[[VAL_12:.*]] = lsq_load{{\[}}%[[VAL_9]]] %[[VAL_2]] {handshake.bb = 0 : ui32} : <i32>, <i32>
 // CHECK:           %[[VAL_5]], %[[VAL_6]] = lsq_store{{\[}}%[[VAL_10]]] %[[VAL_12]] {handshake.bb = 0 : ui32} : <i32>, <i32>
 // CHECK:           %[[VAL_7]], %[[VAL_8]] = lsq_store{{\[}}%[[VAL_11]]] %[[VAL_12]] {handshake.bb = 0 : ui32} : <i32>, <i32>
-// CHECK:           %[[VAL_13:.*]] = return {handshake.bb = 0 : ui32} %[[VAL_12]] : <i32>
-// CHECK:           end {handshake.bb = 0 : ui32} %[[VAL_13]], %[[VAL_3]] : <i32>, <>
+// CHECK:           end {handshake.bb = 0 : ui32} %[[VAL_12]], %[[VAL_3]] : <i32>, <>
 // CHECK:         }
 func.func @simpleOneGroupLSQ(%mem: memref<64xi32>) -> i32 {
   %c0 = arith.constant 0 : index
@@ -47,8 +46,7 @@ func.func @simpleOneGroupLSQ(%mem: memref<64xi32>) -> i32 {
 // CHECK:           %[[VAL_6]], %[[VAL_25:.*]] = control_merge %[[VAL_20]]  {handshake.bb = 1 : ui32} : <>, <i1>
 // CHECK:           %[[VAL_7]], %[[VAL_8]] = lsq_store{{\[}}%[[VAL_23]]] %[[VAL_21]] {handshake.bb = 1 : ui32} : <i32>, <i32>
 // CHECK:           %[[VAL_9]], %[[VAL_10]] = lsq_store{{\[}}%[[VAL_24]]] %[[VAL_22]] {handshake.bb = 1 : ui32} : <i32>, <i32>
-// CHECK:           %[[VAL_26:.*]] = return {handshake.bb = 1 : ui32} %[[VAL_21]] : <i32>
-// CHECK:           end {handshake.bb = 1 : ui32} %[[VAL_26]], %[[VAL_3]] : <i32>, <>
+// CHECK:           end {handshake.bb = 1 : ui32} %[[VAL_21]], %[[VAL_3]] : <i32>, <>
 // CHECK:         }
 func.func @simpleMultiGroupLSQ(%mem: memref<64xi32>) -> i32 {
   %c0 = arith.constant 0 : index
@@ -84,8 +82,7 @@ func.func @simpleMultiGroupLSQ(%mem: memref<64xi32>) -> i32 {
 // CHECK:           %[[VAL_10]], %[[VAL_22:.*]] = lsq_load{{\[}}%[[VAL_19]]] %[[VAL_6]]#1 {handshake.bb = 1 : ui32} : <i32>, <i32>
 // CHECK:           %[[VAL_5]], %[[VAL_23:.*]] = mc_load{{\[}}%[[VAL_20]]] %[[VAL_2]]#1 {handshake.bb = 1 : ui32} : <i32>, <i32>
 // CHECK:           %[[VAL_24:.*]] = addi %[[VAL_22]], %[[VAL_23]] {handshake.bb = 1 : ui32} : <i32>
-// CHECK:           %[[VAL_25:.*]] = return {handshake.bb = 1 : ui32} %[[VAL_24]] : <i32>
-// CHECK:           end {handshake.bb = 1 : ui32} %[[VAL_25]], %[[VAL_3]], %[[VAL_7]] : <i32>, <>, <>
+// CHECK:           end {handshake.bb = 1 : ui32} %[[VAL_24]], %[[VAL_3]], %[[VAL_7]] : <i32>, <>, <>
 // CHECK:         }
 func.func @mixLSQAndMCLoads(%mem: memref<64xi32>) -> i32 {
   %c0 = arith.constant 0 : index
@@ -123,8 +120,7 @@ func.func @mixLSQAndMCLoads(%mem: memref<64xi32>) -> i32 {
 // CHECK:           %[[VAL_23:.*]] = merge %[[VAL_20]] {handshake.bb = 1 : ui32} : <i32>
 // CHECK:           %[[VAL_13]], %[[VAL_24:.*]] = control_merge %[[VAL_21]]  {handshake.bb = 1 : ui32} : <>, <i1>
 // CHECK:           %[[VAL_14]], %[[VAL_15]] = lsq_store{{\[}}%[[VAL_23]]] %[[VAL_22]] {handshake.bb = 1 : ui32} : <i32>, <i32>
-// CHECK:           %[[VAL_25:.*]] = return {handshake.bb = 1 : ui32} %[[VAL_22]] : <i32>
-// CHECK:           end {handshake.bb = 1 : ui32} %[[VAL_25]], %[[VAL_4]], %[[VAL_10]] : <i32>, <>, <>
+// CHECK:           end {handshake.bb = 1 : ui32} %[[VAL_22]], %[[VAL_4]], %[[VAL_10]] : <i32>, <>, <>
 // CHECK:         }
 func.func @mixLSQAndMCStores(%mem: memref<64xi32>, %data : i32) -> i32 {
   %c0 = arith.constant 0 : index
@@ -175,8 +171,7 @@ func.func @mixLSQAndMCStores(%mem: memref<64xi32>, %data : i32) -> i32 {
 // CHECK:           %[[VAL_44:.*]] = mux %[[VAL_43]] {{\[}}%[[VAL_29]], %[[VAL_39]]] {handshake.bb = 3 : ui32} : <i1>, <i32>
 // CHECK:           %[[VAL_41]], %[[VAL_43]] = control_merge %[[VAL_30]], %[[VAL_40]]  {handshake.bb = 3 : ui32} : <>, <i1>
 // CHECK:           %[[VAL_11]], %[[VAL_12]] = lsq_store{{\[}}%[[VAL_44]]] %[[VAL_42]] {handshake.bb = 3 : ui32} : <i32>, <i32>
-// CHECK:           %[[VAL_45:.*]] = return {handshake.bb = 3 : ui32} %[[VAL_42]] : <i32>
-// CHECK:           end {handshake.bb = 3 : ui32} %[[VAL_45]], %[[VAL_4]], %[[VAL_9]] : <i32>, <>, <>
+// CHECK:           end {handshake.bb = 3 : ui32} %[[VAL_42]], %[[VAL_4]], %[[VAL_9]] : <i32>, <>, <>
 // CHECK:         }
 func.func @ifThenElseSameLSQGroup(%mem: memref<64xi32>, %idx: index) -> i32 {
   %c0 = arith.constant 0 : i32

@@ -29,7 +29,7 @@
     "generic": "/path/to/test_string"
   },
   {
-    "name": "test_channels",
+    "name": "test_channel",
     "parameters": [
       { "name": "PARAM_1", "type": "channel" },
       {
@@ -41,6 +41,22 @@
       { "name": "PARAM_3", "type": "channel", "extra-eq": 0 },
       { "name": "PARAM_4", "type": "channel", "down-lb": 1 },
       { "name": "PARAM_5", "type": "channel", "up-ub": 1 }
+    ],
+    "generic": "/path/to/test_channel"
+  },
+  {
+    "name": "test_timing",
+    "parameters": [
+      { "name": "PARAM_1", "type": "timing" },
+      {
+        "name": "PARAM_2",
+        "type": "timing",
+        "data-lat-ne": 4,
+        "data-lat-range": [0, 10]
+      },
+      { "name": "PARAM_3", "type": "timing", "valid-lat-eq": 0 },
+      { "name": "PARAM_4", "type": "timing", "valid-lat-lb": 1 },
+      { "name": "PARAM_5", "type": "timing", "ready-lat-ub": 1 }
     ],
     "generic": "/path/to/test_channels"
   },

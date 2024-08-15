@@ -12,6 +12,7 @@
 
 #include "dynamatic/Support/JSON/JSON.h"
 #include "dynamatic/Support/LLVM.h"
+#include "dynamatic/Support/Utils/Utils.h"
 #include "mlir/IR/Attributes.h"
 #include "llvm/Support/JSON.h"
 
@@ -70,6 +71,9 @@ struct UnsignedConstraints : public RTLTypeConstraints {
 
   /// Checks whether that the unsigned value honors the constraints.
   bool verify(unsigned value) const;
+
+  /// Returns whether no constraint is set on the object.
+  bool unconstrained() const;
 };
 
 /// ADL-findable LLVM-standard JSON deserializer for unsigned constraints.
@@ -106,6 +110,20 @@ struct ChannelConstraints : public RTLTypeConstraints {
 
 /// ADL-findable LLVM-standard JSON deserializer for channel constraints.
 bool fromJSON(const llvm::json::Value &value, ChannelConstraints &cons,
+              llvm::json::Path path);
+
+/// Timing constraints.
+struct TimingConstraints : public RTLTypeConstraints {
+  /// Latency constraints between input/output ports of the same signal type.
+  std::map<SignalType, UnsignedConstraints> latencies;
+
+  TimingConstraints();
+
+  bool verify(mlir::Attribute attr) const override;
+};
+
+/// ADL-findable LLVM-standard JSON deserializer for channel constraints.
+bool fromJSON(const llvm::json::Value &value, TimingConstraints &cons,
               llvm::json::Path path);
 
 //===----------------------------------------------------------------------===//
@@ -247,6 +265,16 @@ struct RTLChannelType
   static constexpr llvm::StringLiteral ID = "channel";
 
   static std::string serialize(mlir::Attribute attr);
+};
+
+/// An RTL parameter representing timing information, stored in the IR as a
+/// `handshake::TimingAttr`.
+struct RTLTimingType : public RTLType::Model<RTLTimingType, TimingConstraints> {
+  static constexpr llvm::StringLiteral ID = "timing", LATENCY = "-lat";
+
+  /// There is no implementation for serializing the timing type to a string;
+  /// this always returns the "timing" string.
+  static std::string serialize(mlir::Attribute attr) { return ID.str(); }
 };
 
 } // namespace dynamatic

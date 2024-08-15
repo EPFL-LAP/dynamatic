@@ -19,7 +19,6 @@
 #define DYNAMATIC_DIALECT_HANDSHAKE_HANDSHAKE_OPS_H
 
 #include "dynamatic/Dialect/Handshake/HandshakeInterfaces.h"
-#include "dynamatic/Dialect/Handshake/HandshakeTypes.h"
 #include "dynamatic/Support/LLVM.h"
 #include "mlir/Dialect/Affine/Analysis/AffineAnalysis.h"
 #include "mlir/IR/OpDefinition.h"
@@ -32,6 +31,8 @@ namespace handshake {
 /// Returns an IntegerType that has the lowest possible number of bits necessary
 /// to index into a given number of elements (minimum 1 bit).
 IntegerType getOptimizedIndexValType(OpBuilder &builder, unsigned numToIndex);
+
+struct TimingInfo;
 
 // Forward declaration needed by memory ports data structures.
 class MCLoadOp;
@@ -658,58 +659,11 @@ public:
   MCLoadStorePort getMCPort() const;
 };
 
-/// Specifies how a handshake channel (i.e. a SSA value used once) may be
-/// buffered. Backing data-structure for the ChannelBufPropsAttr attribute.
-struct ChannelBufProps {
-  /// Minimum number of transparent slots allowed on the channel (inclusive).
-  unsigned minTrans;
-  /// Maximum number of transparent slots allowed on the channel (inclusive).
-  std::optional<unsigned> maxTrans;
-  /// Minimum number of opaque slots allowed on the channel (inclusive).
-  unsigned minOpaque;
-  /// Maximum number of opaque slots allowed on the channel (inclusive).
-  std::optional<unsigned> maxOpaque;
-  /// Combinational delay (in ns) from the output port to the buffer's input, if
-  /// a buffer is placed on the channel.
-  double inDelay;
-  /// Combinational delay (in ns) from the buffer's output to the input port, if
-  /// a buffer is placed on the channel.
-  double outDelay;
-  /// Total combinational channel delay (in ns) if no buffer is placed on the
-  /// channel.
-  double delay;
-
-  /// Simple constructor that takes the same parameters as the struct's members.
-  /// By default, all the channel is "unconstrained" w.r.t. what kind of buffers
-  /// can be placed and is assumed to have 0 delay.
-  ChannelBufProps(unsigned minTrans = 0,
-                  std::optional<unsigned> maxTrans = std::nullopt,
-                  unsigned minOpaque = 0,
-                  std::optional<unsigned> maxOpaque = std::nullopt,
-                  double inDelay = 0.0, double outDelay = 0.0,
-                  double delay = 0.0);
-
-  /// Determines whether these buffering properties are satisfiable i.e.,
-  /// whether it's possible to create a buffer that respects them.
-  bool isSatisfiable() const;
-
-  /// Determines whether these buffering properties forbid the placement of
-  /// any buffer on the associated channel.
-  bool isBufferizable() const;
-
-  /// Computes member-wise equality.
-  bool operator==(const ChannelBufProps &rhs) const;
-};
-
 /// Identifies the type of all ports in a memory interface's memory inputs by
 /// backtracking their def-use chain till reaching specific operation types.
 FuncMemoryPorts getMemoryPorts(dynamatic::handshake::MemoryOpInterface memOp);
 
 } // namespace dynamatic
-
-static inline std::string getMaxStr(std::optional<unsigned> optMax) {
-  return optMax.has_value() ? (std::to_string(optMax.value()) + "]") : "inf]";
-};
 
 // Structs to enable LLVM-style RTTI for the memory port hierarchy.
 namespace llvm {
@@ -725,19 +679,6 @@ struct CastInfo<T, const dynamatic::MemoryPort>
     : OptionalValueCast<T, const dynamatic::MemoryPort> {};
 
 } // namespace llvm
-
-/// Prints the buffering properties as two closed or semi-open intervals
-/// (depending on whether maximums are defined), one for tranparent slots and
-/// one for opaque slots.
-template <typename Os>
-Os &operator<<(Os &os, dynamatic::ChannelBufProps &props) {
-  os << "{\n\ttransparent slots: [" << props.minTrans << ", "
-     << getMaxStr(props.maxTrans) << "\n\topaque slots: [" << props.minOpaque
-     << ", " << getMaxStr(props.maxOpaque) << "\n\tin/out delays: ("
-     << props.inDelay << ", " << props.outDelay << ")"
-     << "\n\ttotal delay: " << props.delay << "\n}\n";
-  return os;
-}
 
 namespace mlir {
 namespace OpTrait {
@@ -765,14 +706,7 @@ public:
 };
 
 } // namespace OpTrait
-
-namespace affine {
-struct DependenceComponent;
-} // namespace affine
 } // namespace mlir
-
-#define GET_ATTRDEF_CLASSES
-#include "dynamatic/Dialect/Handshake/HandshakeAttributes.h.inc"
 
 #define GET_OP_CLASSES
 #include "dynamatic/Dialect/Handshake/Handshake.h.inc"

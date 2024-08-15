@@ -66,34 +66,24 @@ def MemoryOpInterface : OpInterface<"MemoryOpInterface"> {
       [{"Allocate the memory to the meory map in the simulation. "}];
 
   let methods = [
-    InterfaceMethod<
-        "Returns the memref-typed SSA value that the interface references.",
-        "::mlir::TypedValue<::mlir::MemRefType>", "getMemRef", (ins)>,
     InterfaceMethod<[{
-        Returns the type of the memref-typed SSA value that the interface
-        references.
-        }],
-        "::mlir::MemRefType", "getMemRefType", (ins),
-        "",
-        [{
-          ConcreteOp concreteOp = cast<ConcreteOp>($_op);
-          return concreteOp.getMemRef().getType().template cast<mlir::MemRefType>();
-        }]>,
-  ];
-}
-
-def BufferOpInterface : OpInterface<"BufferOpInterface"> {
-  let cppNamespace = "::dynamatic::handshake";
-  let description = [{
-    Handshake operations which act as buffers with a strictly positive number
-    of slots.
-  }];
-
-  let methods = [
+        Returns whether the interface is a \"master\" interface i.e., one that
+        directly connects to an external memory through its parent Handshake
+        function's ports.
+      }], "bool", "isMasterInterface", (ins)>,
     InterfaceMethod<
-      "Returns the number of buffer slots.",
-      "unsigned", "getSlots", (ins)
-    >
+      "Returns the memref-typed SSA value that the interface references.",
+      "::mlir::TypedValue<::mlir::MemRefType>", "getMemRef", (ins)>,
+    InterfaceMethod<[{
+      Returns the type of the memref-typed SSA value that the interface
+      references.
+      }],
+      "::mlir::MemRefType", "getMemRefType", (ins),
+      "",
+      [{
+        ConcreteOp concreteOp = cast<ConcreteOp>($_op);
+        return concreteOp.getMemRef().getType().template cast<mlir::MemRefType>();
+      }]>
   ];
 }
 

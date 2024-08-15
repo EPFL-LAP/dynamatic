@@ -44,18 +44,16 @@ F_FREQUENCIES="$COMP_DIR/frequencies.csv"
 
 # Exports Handshake-level IR to DOT using Dynamatic, then converts the DOT to
 # a PNG using dot.
-#   $1: mode to run the tool in; options are "visual", "legacy", "legacy-buffers"
-#   $2: output filename, without extension (will use .dot and .png)
+#   $1: input handshake-level IR filename
+#   $1: output filename, without extension (will use .dot and .png)
 export_dot() {
-  local mode=$1
+  local f_handshake="$1"
   local f_dot="$COMP_DIR/$2.dot"
   local f_png="$COMP_DIR/$2.png"
 
   # Export to DOT
-  "$DYNAMATIC_EXPORT_DOT_BIN" "$F_HANDSHAKE_EXPORT" "--mode=$mode" \
-      "--edge-style=spline" \
-      "--timing-models=$DYNAMATIC_DIR/data/components.json" \
-      > "$f_dot"
+  "$DYNAMATIC_EXPORT_DOT_BIN" "$f_handshake" "--edge-style=spline" \
+    > "$f_dot"
   exit_on_fail "Failed to create $2 DOT" "Created $2 DOT"
 
   # Convert DOT graph to PNG
@@ -169,12 +167,12 @@ fi
   > "$F_HANDSHAKE_EXPORT"
 exit_on_fail "Failed to canonicalize Handshake" "Canonicalized handshake"
 
+# Export to DOT
+export_dot "$F_HANDSHAKE_EXPORT" "$KERNEL_NAME"
+
 # handshake level -> hw level
 "$DYNAMATIC_OPT_BIN" "$F_HANDSHAKE_EXPORT" --lower-handshake-to-hw \
   > "$F_HW"
 exit_on_fail "Failed to lower to HW" "Lowered to HW"
 
-# Export to DOT (one clean for viewing and one compatible with legacy)
-export_dot "visual" "visual"
-export_dot "legacy" "$KERNEL_NAME"
 echo_info "Compilation succeeded"
