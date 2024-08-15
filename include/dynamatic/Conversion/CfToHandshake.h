@@ -221,6 +221,8 @@ public:
   /// Adds BRANCHES in fast token delivery algorithm
   LogicalResult addSupp(ConversionPatternRewriter &rewriter);
 
+  LogicalResult addSuppBranches(ConversionPatternRewriter &rewriter);
+
   /// Adds BRANCHES in fast token delivery algorithm for the case where the
   /// producr is START by doing back-propagation
   LogicalResult addSuppForStart(ConversionPatternRewriter &rewriter);
@@ -230,15 +232,8 @@ public:
   /// --> iterate
   Value insertBranchToLoop(ConversionPatternRewriter &rewriter,
                            mlir::CFGLoop *loop, Operation *consumer,
-                           Value connection, bool moreProdThanCons);
-
-  /// Inserts a BRANCH for each loop with condition depending on the exit
-  /// blocks Loop convention followed is: True Side --> loop exit False Side
-  /// --> iterate
-  void insertBranchesToLoops(ConversionPatternRewriter &rewriter,
-                             const std::set<mlir::CFGLoop *> &loops,
-                             Operation *consumer, Value connection,
-                             bool moreProdThanCons);
+                           Value connection, bool moreProdThanCons,
+                           bool manageDifferentRegeneration);
 
   /// Adds BRANCHes in the case where the producer is in more loops than the
   /// consumer (to solve token count mismatch problem)
@@ -304,6 +299,8 @@ protected:
                        const std::vector<Block *> &path);
 
   std::vector<Operation *> alloctionNetwork;
+
+  std::vector<Operation *> suppBranches;
 
   /// contains all merges added in the straight LSQ
   SmallVector<Operation *> memDepLoopMerges;

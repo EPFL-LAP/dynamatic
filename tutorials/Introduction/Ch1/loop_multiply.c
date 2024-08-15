@@ -10,30 +10,33 @@ void loop_multiply(in_int_t alpha, inout_int_t tmp[NI][NJ]) {
   // return x;
 
   /*
-  for (unsigned j = 0; j < NJ; j++) {
+    for (unsigned j = 0; j < NJ; j++) {
 
-    tmp[j][j] = tmp[j][j] + alpha + j;
-
-    if (alpha > 5) {
-      // if (alpha > 7)
-      //     int sum = tmp[j][j];
-      //     if (sum > 5)
-      //        for (unsigned k = 0; k < NK; ++k)
-      tmp[j][j] = tmp[j][j] + alpha;
-    } else {
       tmp[j][j] = tmp[j][j] + alpha + j;
-    }
-  }*/
+      for (unsigned i = 0; i < NJ; i++)
+
+        tmp[i][j] = tmp[i][i] + alpha + i;
+    }*/
+
+  for (unsigned j = 0; j < NJ; j++) {
+    tmp[j][j] = tmp[j][j] + alpha + j;
+    if (alpha > 5)
+      tmp[j][j] = tmp[j][j] + alpha;
+    else
+      tmp[j][j] = tmp[j][j] + alpha + j;
+  }
   //} // else {
   // tmp[j][j] = tmp[j][j] + alpha;
-  //}*/
+  //}
+
+  /*
   for (int j = 0; j < NJ; j++) {
     tmp[j][j] = tmp[j][j] + alpha + j;
     for (int i = 0; i < NJ; i++)
       tmp[i][i] = tmp[i][i] + alpha + i;
-  }
+  }*/
 
-  /*
+  /*li
     for (int j = 0; j < NJ; j++) {
       tmp[j][j] = tmp[j][j] + alpha + j;
       for (int i = 0; i < NJ; i++)
