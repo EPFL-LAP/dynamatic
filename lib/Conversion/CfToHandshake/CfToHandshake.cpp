@@ -2131,7 +2131,7 @@ void HandshakeLowering::manageNonLoop(ConversionPatternRewriter &rewriter,
     Value branchCond =
         dataToCircuit(rewriter, shannonResult, consumer->getBlock());
 
-    rewriter.setInsertionPointToEnd(consumer->getBlock());
+    rewriter.setInsertionPointToStart(consumer->getBlock());
     auto branchOp = rewriter.create<handshake::ConditionalBranchOp>(
         consumer->getLoc(), branchCond, connection);
     llvm::errs() << "Added branch in manageNonLoop in ";
@@ -2391,9 +2391,14 @@ HandshakeLowering::addSuppGSA(ConversionPatternRewriter &rewriter) {
       }
 
       if (inputDominting) {
+        llvm::errs() << "Dominating input: " << dominatingInput << "\n";
+        llvm::errs() << "NonDominating input: " << nonDominatingInput << "\n";
         llvm::errs() << "Printinng operands: \n";
         for (Value oper : mux->getOperands()) {
           llvm::errs() << oper << '\n';
+          llvm::errs() << "In block: ";
+          oper.getParentBlock()->printAsOperand(llvm::errs());
+          llvm::errs() << "\n";
         }
         llvm::errs() << "Printinng Data operands: \n";
         for (Value oper : mux.getDataOperands()) {
@@ -2406,9 +2411,9 @@ HandshakeLowering::addSuppGSA(ConversionPatternRewriter &rewriter) {
         /// Assert that the BB of the other input is not dominating the BB
         /// of the Mux
         llvm::errs() << "Dom block: ";
-        nonDominatingInput.getParentBlock()->printAsOperand(llvm::errs());
+        dominatingInput.getParentBlock()->printAsOperand(llvm::errs());
         llvm::errs() << "\n";
-        llvm::errs() << (domInfo.dominates(nonDominatingInput.getParentBlock(),
+        llvm::errs() << (domInfo.dominates(dominatingInput.getParentBlock(),
                                            &block)
                              ? "Dominates\n"
                              : "Doesn't dominate\n");
@@ -2422,8 +2427,7 @@ HandshakeLowering::addSuppGSA(ConversionPatternRewriter &rewriter) {
                              : "Doesn't dominate\n");
         assert(
             !domInfo.dominates(nonDominatingInput.getParentBlock(), &block) &&
-            "The BB of the other input of the Mux should not dominate "
-            "the BB "
+            "The BB of the other input of the Mux should not dominate the BB "
             "of the Mux");
 
         /// Assert that the predecessors of the other input must all be
