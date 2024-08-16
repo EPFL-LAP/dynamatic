@@ -1772,7 +1772,8 @@ LogicalResult HandshakeLowering::addSupp(ConversionPatternRewriter &rewriter) {
               manageSelfRegeneration(rewriter, consOp, res);
             } else if (greaterThanBlocks(&prod, cons) ||
                        (isa<handshake::MergeOp>(consOp) && &prod == cons &&
-                        isaMergeLoop(consOp)))
+                        isaMergeLoop(consOp) &&
+                        !isa<handshake::ConditionalBranchOp>(prodOp)))
               manageDifferentRegeneration(rewriter, consOp, res);
             else
               manageNonLoop(rewriter, &prod, consOp, res);
@@ -2365,6 +2366,10 @@ HandshakeLowering::addSuppGSA(ConversionPatternRewriter &rewriter) {
     for (Operation &op : block.getOperations()) {
       if (std::find(alloctionNetwork.begin(), alloctionNetwork.end(), &op) ==
           alloctionNetwork.end())
+        continue;
+
+      if (std::find(shannonMUXes.begin(), shannonMUXes.end(), &op) !=
+          shannonMUXes.end())
         continue;
 
       if (!isa<handshake::MuxOp>(op) ||
