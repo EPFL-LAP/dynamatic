@@ -966,6 +966,7 @@ HandshakeLowering::createReturnNetwork(ConversionPatternRewriter &rewriter) {
 //===-----------------------------------------------------------------------==//
 // Construction of Allocation Network
 //===-----------------------------------------------------------------------==/
+
 LogicalResult
 HandshakeLowering::getLoopInfo(ConversionPatternRewriter &rewriter) {
   if (failed(findLoopDetails(li, region)))
@@ -1727,6 +1728,14 @@ LogicalResult HandshakeLowering::addSupp(ConversionPatternRewriter &rewriter) {
           shannonMUXes.end())
         continue;
 
+      if (std::find(suppBranches.begin(), suppBranches.end(), &prodOp) !=
+          suppBranches.end())
+        continue;
+
+      if (std::find(selfGenBranches.begin(), selfGenBranches.end(), &prodOp) !=
+          selfGenBranches.end())
+        continue;
+
       for (Value res : prodOp.getResults()) {
         res.getUsers();
         std::vector<Operation *> users(res.getUsers().begin(),
@@ -2011,6 +2020,8 @@ Value HandshakeLowering::insertBranchToLoop(ConversionPatternRewriter &rewriter,
     alloctionNetwork.push_back(branchOp);
     if (moreProdThanCons || manageDifferentRegeneration)
       suppBranches.push_back(branchOp);
+    else
+      selfGenBranches.push_back(branchOp);
 
     llvm::errs() << "Branch added: " << branchOp << "\n";
 
@@ -2050,6 +2061,8 @@ Value HandshakeLowering::insertBranchToLoop(ConversionPatternRewriter &rewriter,
 
   if (moreProdThanCons || manageDifferentRegeneration)
     suppBranches.push_back(branchOp);
+  else
+    selfGenBranches.push_back(branchOp);
 
   /// moreProdThanCons flag is used to discern between the caller of the
   /// function (manageMoreProdThanCons or manageSelfRegeneration /
@@ -2360,6 +2373,7 @@ LogicalResult HandshakeLowering::triggerConstantsFromStart(
 
 LogicalResult
 HandshakeLowering::addSuppGSA(ConversionPatternRewriter &rewriter) {
+  llvm::errs() << "In addSuppGSA\n";
   for (Block &block : region.getBlocks()) {
     /// (1) Loop through all operations searching for Muxes not at loop
     /// headers

@@ -302,6 +302,8 @@ protected:
 
   std::vector<Operation *> suppBranches;
 
+  std::vector<Operation *> selfGenBranches;
+
   /// contains all merges added in the straight LSQ
   SmallVector<Operation *> memDepLoopMerges;
 

@@ -137,7 +137,7 @@ public:
                                       handshake::LSQOp &lsqOp);
 
   /// Similar to instantiateInterfaces but adds a fork graph analogous to
-  /// the group graph and connects the ork nodes to lsq input
+  /// the group graph and connects the fork nodes to lsq input
   LogicalResult instantiateInterfacesWithForks(
       OpBuilder &builder, handshake::MemoryControllerOp &mcOp,
       handshake::LSQOp &lsqOp, std::set<Group *> &groups,
