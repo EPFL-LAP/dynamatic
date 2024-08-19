@@ -46,6 +46,7 @@
 #include "mlir/Support/LogicalResult.h"
 #include "mlir/Transforms/DialectConversion.h"
 #include "mlir/Transforms/GreedyPatternRewriteDriver.h"
+#include "llvm/ADT/STLExtras.h"
 #include "llvm/ADT/SmallVector.h"
 #include "llvm/ADT/StringRef.h"
 #include "llvm/ADT/TypeSwitch.h"
@@ -867,7 +868,7 @@ HandshakeLowering::replaceUndefinedValues(ConversionPatternRewriter &rewriter) {
       // Create a constant with a default value and replace the undefined value
       rewriter.setInsertionPoint(undefOp);
       auto cstOp = rewriter.create<handshake::ConstantOp>(
-          undefOp.getLoc(), resType, cstAttr, getBlockEntryControl(&block));
+          undefOp.getLoc(), resType, cstAttr, startCtrl);
       rewriter.replaceOp(undefOp, cstOp.getResult());
     }
   }
@@ -967,85 +968,19 @@ HandshakeLowering::createReturnNetwork(ConversionPatternRewriter &rewriter) {
 // Construction of Allocation Network
 //===-----------------------------------------------------------------------==/
 
-LogicalResult
-HandshakeLowering::getLoopInfo(ConversionPatternRewriter &rewriter) {
-  if (failed(findLoopDetails(li, region)))
-    return failure();
-  return success();
-}
-
 // checks wether an operation is a mmory operation
 bool checkMemOp(Operation *op) {
-  // StringRef attrName = handshake::MemInterfaceAttr::getMnemonic();
-  // auto memAttr =
-  // op->getAttrOfType<handshake::MemInterfaceAttr>(attrName); return
-  // (memAttr != nullptr);
   return isa<handshake::LSQStoreOp, handshake::LSQLoadOp>(op);
 }
 
 // checks wether 2 operations belong to the same BB
 bool checkSameBB(Operation *op1, Operation *op2) {
-  // std::optional<unsigned> block1 = getLogicBB(op1);
-  // std::optional<unsigned> block2 = getLogicBB(op2);
-  // return (*block1 == *block2);
   return (op1->getBlock() == op2->getBlock());
 }
 
 // checks wether 2 operations are both load operations
 bool checkBothLd(Operation *op1, Operation *op2) {
   return (isa<handshake::LSQLoadOp>(op1) && isa<handshake::LSQLoadOp>(op2));
-}
-
-LogicalResult HandshakeLowering::findLoopDetails(CFGLoopInfo &li,
-                                                 Region &funcReg) {
-  // Finding all loops.
-  std::set<CFGLoop *> loops;
-  for (auto &block : funcReg.getBlocks()) {
-    CFGLoop *loop = li.getLoopFor(&block);
-    while (loop) {
-      loops.insert(loop);
-      loop = loop->getParentLoop();
-    }
-  }
-
-  // Iterating over blocks of each loop, and attaching loop info.
-  // DenseMap<Block *, BlockLoopInfo> blockToLoopInfoMap;
-  for (auto &block : funcReg.getBlocks())
-    blockToLoopInfoMap.insert(std::make_pair(&block, BlockLoopInfo{}));
-
-  for (auto &loop : loops) {
-    Block *loopHeader = loop->getHeader();
-    blockToLoopInfoMap[loopHeader].isHeader = true;
-    blockToLoopInfoMap[loopHeader].loop = loop;
-
-    llvm::SmallVector<Block *> exitBlocks;
-    loop->getExitingBlocks(exitBlocks);
-    for (auto &block : exitBlocks) {
-      blockToLoopInfoMap[block].isExit = true;
-      blockToLoopInfoMap[block].loop = loop;
-    }
-
-    // A latch block is a block that contains a branch back to the header.
-    llvm::SmallVector<Block *> latchBlocks;
-    loop->getLoopLatches(latchBlocks);
-    for (auto &block : latchBlocks) {
-      blockToLoopInfoMap[block].isLatch = true;
-      blockToLoopInfoMap[block].loop = loop;
-    }
-  }
-  /*
-    for (auto &block : funcReg.getBlocks()) {
-      if (!blockToLoopInfoMap[&block].loop) {
-        for (CFGLoop *loop : loops) {
-          if (loop->contains(&block)) {
-            blockToLoopInfoMap[&block].loop = loop;
-            break;
-          }
-        }
-      }
-    }*/
-
-  return success();
 }
 
 // Recursively check weather 2 block belong to the same loop, starting from
@@ -1210,8 +1145,7 @@ void HandshakeLowering::constructGroupsGraph(
     if (checkMemOp(op)) {
       Block *b = op->getBlock();
       Group *g = new Group(b);
-      auto it = std::find_if(groups.begin(), groups.end(),
-                             [b](Group *g) { return g->bb == b; });
+      auto it = llvm::find_if(groups, [b](Group *g) { return g->bb == b; });
       if (it == groups.end()) {
         groups.insert(g);
       }
@@ -1223,16 +1157,16 @@ void HandshakeLowering::constructGroupsGraph(
   /// represent an edge in the graph of groups
   for (ProdConsMemDep memDep : allMemDeps) {
     // Find group correspondig to the producer block
-    auto itProd = std::find_if(
-        groups.begin(), groups.end(),
-        [&memDep](const Group *group) { return group->bb == memDep.prodBb; });
+    auto itProd = llvm::find_if(groups, [&memDep](const Group *group) {
+      return group->bb == memDep.prodBb;
+    });
 
     Group *prodGroup = *itProd;
 
     // Find group correspondig to the consumer block
-    auto itCons = std::find_if(
-        groups.begin(), groups.end(),
-        [&memDep](const Group *group) { return group->bb == memDep.consBb; });
+    auto itCons = llvm::find_if(groups, [&memDep](const Group *group) {
+      return group->bb == memDep.consBb;
+    });
 
     Group *consGroup = *itCons;
 
@@ -1324,7 +1258,7 @@ BoolExpression *pathToMinterm(const std::vector<Block *> &path,
   BoolExpression *exp = BoolExpression::parseSop("1");
   for (unsigned i = 0; i < path.size() - 1; i++) {
     Block *prod = path.at(i);
-    auto *it = std::find(controlDeps.begin(), controlDeps.end(), prod);
+    auto *it = llvm::find(controlDeps, prod);
     if (it != controlDeps.end()) {
       Block *cons = path.at(i + 1);
       Operation *producerTerminator = prod->getTerminator();
@@ -1466,10 +1400,9 @@ LogicalResult HandshakeLowering::addMergeNonLoop(
 
       if (fGen->type != experimental::boolean::ExpressionType::Zero) {
         auto memDepIt =
-            std::find_if(allMemDeps.begin(), allMemDeps.end(),
-                         [prod, cons](const ProdConsMemDep &dep) {
-                           return dep.prodBb == prod && dep.consBb == cons;
-                         });
+            llvm::find_if(allMemDeps, [prod, cons](const ProdConsMemDep &dep) {
+              return dep.prodBb == prod && dep.consBb == cons;
+            });
         if (memDepIt == allMemDeps.end())
           return failure();
         ProdConsMemDep &memDep = *memDepIt;
@@ -1518,9 +1451,8 @@ LogicalResult HandshakeLowering::addMergeNonLoop(
 }
 
 bool mergeFeedingCurrentConsumer(Operation *merge, Operation *consumer) {
-  return std::any_of(
-      merge->getResult(0).getUses().begin(),
-      merge->getResult(0).getUses().end(),
+  return llvm::any_of(
+      merge->getResult(0).getUses(),
       [consumer](OpOperand &use) { return use.getOwner() == consumer; });
 }
 
@@ -1655,13 +1587,17 @@ LogicalResult HandshakeLowering::addPhi(ConversionPatternRewriter &rewriter) {
   SmallVector<Operation *> allMerges;
   for (Block &cons : region.getBlocks()) {
     for (Operation &consOp : cons.getOperations()) {
-      if (std::find(alloctionNetwork.begin(), alloctionNetwork.end(),
-                    &consOp) == alloctionNetwork.end())
+      if (llvm::find(alloctionNetwork, &consOp) == alloctionNetwork.end() &&
+          (!isa<handshake::ConstantOp>(consOp) ||
+           llvm::find(networkConstants, &consOp) != networkConstants.end()))
+        continue;
+      if (llvm::find(alloctionNetwork, &consOp) == alloctionNetwork.end() &&
+          (!isa<handshake::ConstantOp>(consOp) ||
+           llvm::find(networkConstants, &consOp) != networkConstants.end()))
         continue;
       /// If the current consumer is a MERGE that was added in addPhi, then
       /// skip it to avoid an infinite loop
-      if (std::find(allMerges.begin(), allMerges.end(), &consOp) !=
-          allMerges.end())
+      if (llvm::find(allMerges, &consOp) != allMerges.end())
         continue;
       for (Value operand : consOp.getOperands()) {
         if (mlir::Operation *prodOp = operand.getDefiningOp()) {
@@ -1669,8 +1605,7 @@ LogicalResult HandshakeLowering::addPhi(ConversionPatternRewriter &rewriter) {
           /// start), then check if the producer is a MERGE that was added
           /// in addPhi If that is the case, then skip it to avoid an
           /// infinite loop
-          if (std::find(allMerges.begin(), allMerges.end(), prodOp) !=
-              allMerges.end())
+          if (llvm::find(allMerges, prodOp) != allMerges.end())
             continue;
         }
         Block *prod = operand.getParentBlock();
@@ -1681,8 +1616,7 @@ LogicalResult HandshakeLowering::addPhi(ConversionPatternRewriter &rewriter) {
           // If we are at the innermost loop and the consumer is a loop
           // merge, stop
           if (std::next(it) == loops.end() &&
-              std::find(memDepLoopMerges.begin(), memDepLoopMerges.end(),
-                        &consOp) != memDepLoopMerges.end())
+              llvm::find(memDepLoopMerges, &consOp) != memDepLoopMerges.end())
             break;
           rewriter.setInsertionPointToStart((*it)->getHeader());
           auto mergeOp =
@@ -1717,23 +1651,18 @@ LogicalResult HandshakeLowering::addSupp(ConversionPatternRewriter &rewriter) {
 
   for (Block &prod : region.getBlocks()) {
     for (Operation &prodOp : prod.getOperations()) {
-
-      if (std::find(alloctionNetwork.begin(), alloctionNetwork.end(),
-                    &prodOp) == alloctionNetwork.end())
+      if (llvm::find(alloctionNetwork, &prodOp) == alloctionNetwork.end())
         continue;
 
       /// (2) If the current producer is a MUX added by Shannon, then skip
       /// it
-      if (std::find(shannonMUXes.begin(), shannonMUXes.end(), &prodOp) !=
-          shannonMUXes.end())
+      if (llvm::find(shannonMUXes, &prodOp) != shannonMUXes.end())
         continue;
 
-      if (std::find(suppBranches.begin(), suppBranches.end(), &prodOp) !=
-          suppBranches.end())
+      if (llvm::find(suppBranches, &prodOp) != suppBranches.end())
         continue;
 
-      if (std::find(selfGenBranches.begin(), selfGenBranches.end(), &prodOp) !=
-          selfGenBranches.end())
+      if (llvm::find(selfGenBranches, &prodOp) != selfGenBranches.end())
         continue;
 
       for (Value res : prodOp.getResults()) {
@@ -1743,8 +1672,7 @@ LogicalResult HandshakeLowering::addSupp(ConversionPatternRewriter &rewriter) {
         for (Operation *consOp : users) {
           Block *cons = consOp->getBlock();
 
-          if (std::find(alloctionNetwork.begin(), alloctionNetwork.end(),
-                        consOp) == alloctionNetwork.end())
+          if (llvm::find(alloctionNetwork, consOp) == alloctionNetwork.end())
             continue;
 
           /// (1) Skip if the consumer and the producer are in the same block
@@ -1754,8 +1682,7 @@ LogicalResult HandshakeLowering::addSupp(ConversionPatternRewriter &rewriter) {
 
           /// (2) If the current consumer is a MUX added by Shannon, then skip
           /// it
-          if (std::find(shannonMUXes.begin(), shannonMUXes.end(), consOp) !=
-              shannonMUXes.end())
+          if (llvm::find(shannonMUXes, consOp) != shannonMUXes.end())
             continue;
 
           ///(3) Skip if the consumer is a Branch
@@ -1811,8 +1738,7 @@ HandshakeLowering::addSuppBranches(ConversionPatternRewriter &rewriter) {
 
         Block *cons = consOp->getBlock();
 
-        if (std::find(alloctionNetwork.begin(), alloctionNetwork.end(),
-                      consOp) == alloctionNetwork.end())
+        if (llvm::find(alloctionNetwork, consOp) == alloctionNetwork.end())
           continue;
 
         /// (1) Skip if the consumer and the producer are in the same
@@ -1822,8 +1748,7 @@ HandshakeLowering::addSuppBranches(ConversionPatternRewriter &rewriter) {
 
         /// (2) If the current consumer is a MUX added by Shannon, then
         /// skip it
-        if (std::find(shannonMUXes.begin(), shannonMUXes.end(), consOp) !=
-            shannonMUXes.end())
+        if (llvm::find(shannonMUXes, consOp) != shannonMUXes.end())
           continue;
 
         ///(3) Skip if the consumer is a Branch
@@ -1860,13 +1785,13 @@ LogicalResult
 HandshakeLowering::addSuppForStart(ConversionPatternRewriter &rewriter) {
   for (Block &cons : region.getBlocks()) {
     for (Operation &consOp : cons.getOperations()) {
-      if (std::find(alloctionNetwork.begin(), alloctionNetwork.end(),
-                    &consOp) == alloctionNetwork.end())
+      if (llvm::find(alloctionNetwork, &consOp) == alloctionNetwork.end() &&
+          (!isa<handshake::ConstantOp>(consOp) ||
+           llvm::find(networkConstants, &consOp) != networkConstants.end()))
         continue;
 
       /// (2) If the current consumer is a MUX added by Shannon, then skip it
-      if (std::find(shannonMUXes.begin(), shannonMUXes.end(), &consOp) !=
-          shannonMUXes.end())
+      if (llvm::find(shannonMUXes, &consOp) != shannonMUXes.end())
         continue;
 
       ///(3) Skip if the consumer is a Branch
@@ -1958,12 +1883,12 @@ Value HandshakeLowering::boolExpressionToCircuit(
     Value cnstTrigger = sourceOp.getResult();
     TypedAttr constantAttr =
         rewriter.getIntegerAttr(rewriter.getIntegerType(1), 1);
-    Value trueValue = rewriter
-                          .create<handshake::ConstantOp>(
-                              block->getOperations().front().getLoc(),
-                              constantAttr.getType(), constantAttr, cnstTrigger)
-                          .getResult();
-    return trueValue;
+
+    auto constOp = rewriter.create<handshake::ConstantOp>(
+        block->getOperations().front().getLoc(), constantAttr.getType(),
+        constantAttr, cnstTrigger);
+    networkConstants.push_back(constOp);
+    return constOp.getResult();
   }
   rewriter.setInsertionPointToStart(block);
   auto sourceOp = rewriter.create<handshake::SourceOp>(
@@ -1971,12 +1896,11 @@ Value HandshakeLowering::boolExpressionToCircuit(
   Value cnstTrigger = sourceOp.getResult();
   TypedAttr constantAttr =
       rewriter.getIntegerAttr(rewriter.getIntegerType(1), 0);
-  Value falseValue = rewriter
-                         .create<handshake::ConstantOp>(
-                             block->getOperations().front().getLoc(),
-                             constantAttr.getType(), constantAttr, cnstTrigger)
-                         .getResult();
-  return falseValue;
+  auto constOp = rewriter.create<handshake::ConstantOp>(
+      block->getOperations().front().getLoc(), constantAttr.getType(),
+      constantAttr, cnstTrigger);
+  networkConstants.push_back(constOp);
+  return constOp.getResult();
 }
 
 Value HandshakeLowering::boolVariableToCircuit(
@@ -2005,7 +1929,7 @@ Value HandshakeLowering::insertBranchToLoop(ConversionPatternRewriter &rewriter,
            "Terminator condition of a loop exit must be a conditional "
            "branch.");
 
-    rewriter.setInsertionPointToEnd(loopExit);
+    rewriter.setInsertionPointToStart(loopExit);
     llvm::errs() << "Added branch in insertBranchToLoop in ";
     loopExit->printAsOperand(llvm::errs());
     llvm::errs() << "\n";
@@ -2199,13 +2123,11 @@ HandshakeLowering::convertMergesToMuxes(ConversionPatternRewriter &rewriter) {
 
   for (Block &block : region.getBlocks()) {
     for (Operation &merge : block.getOperations()) {
-      if (std::find(alloctionNetwork.begin(), alloctionNetwork.end(), &merge) ==
-          alloctionNetwork.end())
+      if (llvm::find(alloctionNetwork, &merge) == alloctionNetwork.end())
         continue;
       /// If the current operation is a Merge but is not an INIT Merge
       if (isa<handshake::MergeOp>(merge) &&
-          std::find(initMerges.begin(), initMerges.end(), &merge) ==
-              initMerges.end()) {
+          llvm::find(initMerges, &merge) == initMerges.end()) {
 
         bool loopHeader = false;
         if (li.getLoopFor(&block))
@@ -2282,8 +2204,7 @@ bool HandshakeLowering::isBranchInLoopExit(Operation *op) {
     if (loop) {
       llvm::SmallVector<Block *> exitBlocks;
       loop->getExitingBlocks(exitBlocks);
-      return std::find(exitBlocks.begin(), exitBlocks.end(), op->getBlock()) !=
-             exitBlocks.end();
+      return llvm::find(exitBlocks, op->getBlock()) != exitBlocks.end();
     }
   }
   return false;
@@ -2343,13 +2264,11 @@ Value HandshakeLowering::addInit(ConversionPatternRewriter &rewriter,
   /// coming from outside of the loop, the value of the constant should be
   /// 1
   rewriter.setInsertionPointToStart(oldMerge->getBlock());
-  Value constValue =
-      rewriter
-          .create<handshake::ConstantOp>(
-              oldMerge->getLoc(), rewriter.getIntegerType(1),
-              rewriter.getIntegerAttr(rewriter.getIntegerType(1), 0), startCtrl)
-          .getResult();
-  mergeOperands.push_back(constValue);
+  auto constOp = rewriter.create<handshake::ConstantOp>(
+      oldMerge->getLoc(), rewriter.getIntegerType(1),
+      rewriter.getIntegerAttr(rewriter.getIntegerType(1), 0), startCtrl);
+  networkConstants.push_back(constOp);
+  mergeOperands.push_back(constOp.getResult());
 
   auto mergeOp =
       rewriter.create<handshake::MergeOp>(oldMerge->getLoc(), mergeOperands);
@@ -2360,13 +2279,12 @@ Value HandshakeLowering::addInit(ConversionPatternRewriter &rewriter,
 
 LogicalResult HandshakeLowering::triggerConstantsFromStart(
     ConversionPatternRewriter &rewriter) {
-  for (Block &block : region.getBlocks()) {
-    for (Operation &op : block.getOperations()) {
-      if (isa<handshake::ConstantOp>(op)) {
-        handshake::ConstantOp constant = dyn_cast<handshake::ConstantOp>(op);
-        constant->setOperand(0, startCtrl);
-      }
-    }
+  auto constants = region.getOps<mlir::arith::ConstantOp>();
+  for (auto cstOp : llvm::make_early_inc_range(constants)) {
+    rewriter.setInsertionPoint(cstOp);
+    TypedAttr cstAttr = cstOp.getValue();
+    rewriter.replaceOpWithNewOp<handshake::ConstantOp>(cstOp, cstAttr.getType(),
+                                                       cstAttr, startCtrl);
   }
   return success();
 }
@@ -2378,12 +2296,10 @@ HandshakeLowering::addSuppGSA(ConversionPatternRewriter &rewriter) {
     /// (1) Loop through all operations searching for Muxes not at loop
     /// headers
     for (Operation &op : block.getOperations()) {
-      if (std::find(alloctionNetwork.begin(), alloctionNetwork.end(), &op) ==
-          alloctionNetwork.end())
+      if (llvm::find(alloctionNetwork, &op) == alloctionNetwork.end())
         continue;
 
-      if (std::find(shannonMUXes.begin(), shannonMUXes.end(), &op) !=
-          shannonMUXes.end())
+      if (llvm::find(shannonMUXes, &op) != shannonMUXes.end())
         continue;
 
       if (!isa<handshake::MuxOp>(op) ||
@@ -2595,9 +2511,6 @@ static LogicalResult lowerRegion(HandshakeLowering &hl) {
   if (failed(runPartialLowering(hl, &HandshakeLowering::createControlNetwork)))
     return failure();
 
-  if (failed(runPartialLowering(hl, &HandshakeLowering::getLoopInfo)))
-    return failure();
-
   //===--------------------------------------------------------------------===//
   // Merges and branches instantiation
   //===--------------------------------------------------------------------===//
@@ -2631,6 +2544,14 @@ static LogicalResult lowerRegion(HandshakeLowering &hl) {
   // Fast Token Delivery
   //===--------------------------------------------------------------------===//
 
+  if (failed(runPartialLowering(hl,
+                                &HandshakeLowering::triggerConstantsFromStart)))
+    return failure();
+
+  if (failed(
+          runPartialLowering(hl, &HandshakeLowering::replaceUndefinedValues)))
+    return failure();
+
   if (failed(runPartialLowering(hl, &HandshakeLowering::addPhi)))
     return failure();
 
@@ -2646,10 +2567,6 @@ static LogicalResult lowerRegion(HandshakeLowering &hl) {
   if (failed(runPartialLowering(hl, &HandshakeLowering::convertMergesToMuxes)))
     return failure();
 
-  if (failed(runPartialLowering(hl,
-                                &HandshakeLowering::triggerConstantsFromStart)))
-    return failure();
-
   if (failed(runPartialLowering(hl, &HandshakeLowering::addSuppGSA)))
     return failure();
 
@@ -2660,12 +2577,8 @@ static LogicalResult lowerRegion(HandshakeLowering &hl) {
   if (failed(runPartialLowering(hl, &HandshakeLowering::convertCalls)))
     return failure();
 
-  if (failed(runPartialLowering(hl, &HandshakeLowering::connectConstants)))
-    return failure();
-
-  if (failed(
-          runPartialLowering(hl, &HandshakeLowering::replaceUndefinedValues)))
-    return failure();
+  // if (failed(runPartialLowering(hl, &HandshakeLowering::connectConstants)))
+  //   return failure();
 
   if (failed(runPartialLowering(hl, &HandshakeLowering::idBasicBlocks)))
     return failure();

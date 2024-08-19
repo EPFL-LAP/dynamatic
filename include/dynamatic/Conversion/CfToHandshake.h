@@ -174,11 +174,6 @@ public:
 
   /// Interfaces dataflow circuits with LSQs
 
-  LogicalResult getLoopInfo(ConversionPatternRewriter &rewriter);
-
-  // LogicalResult addSmartControlForLSQ(ConversionPatternRewriter &rewriter,
-  //                                    MemInterfacesInfo &memInfo);
-
   /// Identifies all the memory dependencies between the predecessors of an LSQ.
   /// This
   /// is the first step towards making memory deps explicit
@@ -300,15 +295,21 @@ protected:
 
   std::vector<Operation *> alloctionNetwork;
 
+  /// contains all Branches created by manageMoreProdThanCons or
+  /// manageDifferentRegeneration
   std::vector<Operation *> suppBranches;
 
-  std::vector<Operation *> selfGenBranches;
+  /// contains all Branches created by manageSelfRegeneration
+  SmallVector<Operation *> selfGenBranches;
 
   /// contains all merges added in the straight LSQ
   SmallVector<Operation *> memDepLoopMerges;
 
   /// contains all MUXes created by Shannon
   SmallVector<Operation *> shannonMUXes;
+
+  /// contains all constants created by addINIT or for Shannon’s
+  SmallVector<Operation *> networkConstants;
 
 private:
   /// Associates basic blocks of the region being lowered to their respective
@@ -325,9 +326,6 @@ private:
   mlir::CFGLoopInfo li;
 
   // ControlDependenceAnalysis &cdgAnalysis;
-
-  // Runs loop analysis on the funcOp Region.
-  LogicalResult findLoopDetails(mlir::CFGLoopInfo &li, Region &funcReg);
 
   // Enumerates all paths from the start Block to the end Block in the CFG and
   // returns a minimizedSOP while respecting the control dependencies
