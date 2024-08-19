@@ -1,4 +1,4 @@
-//===- LSQBRAMExperimentalMC.scala ----------------------------*- Scala -*-===//
+//===- LSQSlave.scala -----------------------------------------*- Scala -*-===//
 //
 // Dynamatic is under the Apache License v2.0 with LLVM Exceptions.
 // See https://llvm.org/LICENSE.txt for license information.
@@ -17,7 +17,7 @@ import lsq.queues._
 
 import scala.math.{max, min}
 
-class LSQBRAMExperimentalMC(lsqConfig: LsqConfigs) extends Module {
+class LSQSlave(lsqConfig: LsqConfigs) extends Module {
   override def desiredName: String = lsqConfig.name
 
   val io = IO(new Bundle {

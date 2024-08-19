@@ -666,13 +666,11 @@ ModuleDiscriminator::ModuleDiscriminator(FuncMemoryPorts &ports) {
         };
 
         addString("name", *modName);
-        addBoolean("experimental", true);
-        addBoolean("toMC", !ports.interfacePorts.empty());
+        addBoolean("master", ports.interfacePorts.empty());
         addUnsigned("fifoDepth", genInfo.depth);
         addUnsigned("fifoDepth_L", genInfo.depthLoad);
         addUnsigned("fifoDepth_S", genInfo.depthStore);
         addUnsigned("bufferDepth", genInfo.bufferDepth);
-        addString("accessType", genInfo.accessType);
         addUnsigned("dataWidth", genInfo.dataWidth);
         addUnsigned("addrWidth", genInfo.addrWidth);
         addUnsigned("numBBs", genInfo.numGroups);

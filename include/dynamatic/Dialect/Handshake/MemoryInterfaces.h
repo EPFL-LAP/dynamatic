@@ -216,10 +216,6 @@ struct LSQGenerationInfo {
   SmallVector<SmallVector<unsigned>> loadPorts, storePorts;
   /// Depth of queues within the LSQ.
   unsigned depth = 16, depthLoad = 16, depthStore = 16, bufferDepth = 0;
-  /// Type of memory interface used to connect the LSQ to an external memory.
-  std::string accessType = "BRAM";
-  /// Whether to enable speculation.
-  bool speculation = false;
 
   /// Derives generation information for the provided LSQ.
   LSQGenerationInfo(handshake::LSQOp lsqOp, StringRef name = "LSQ");
