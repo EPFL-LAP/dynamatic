@@ -367,11 +367,8 @@ HandshakeCFG::getControlValues(DenseMap<unsigned, Value> &ctrlVals) {
   // succeeds otherwise.
   auto updateCtrl = [&](unsigned bb, Value newCtrl) -> LogicalResult {
     if (auto ctrlOfBB = ctrlVals.find(bb); ctrlOfBB != ctrlVals.end()) {
-      if (ctrlOfBB->second != newCtrl) {
-        return funcOp->emitError()
-               << "Inconsistent control value identified for basic block "
-               << bb;
-      }
+      if (ctrlOfBB->second != newCtrl)
+        return failure();
     }
     ctrlVals[bb] = newCtrl;
     return success();
