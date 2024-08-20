@@ -216,7 +216,9 @@ public:
   /// Adds BRANCHES in fast token delivery algorithm
   LogicalResult addSupp(ConversionPatternRewriter &rewriter);
 
-  LogicalResult addSuppBranches(ConversionPatternRewriter &rewriter);
+  LogicalResult addSuppBranches(ConversionPatternRewriter &rewriter,
+                                std::set<Operation *> &oldBranches,
+                                size_t &count);
 
   /// Adds BRANCHES in fast token delivery algorithm for the case where the
   /// producr is START by doing back-propagation
@@ -228,7 +230,7 @@ public:
   Value insertBranchToLoop(ConversionPatternRewriter &rewriter,
                            mlir::CFGLoop *loop, Operation *consumer,
                            Value connection, bool moreProdThanCons,
-                           bool manageDifferentRegeneration);
+                           bool selfRegeneration);
 
   /// Adds BRANCHes in the case where the producer is in more loops than the
   /// consumer (to solve token count mismatch problem)
