@@ -9,7 +9,6 @@
 
 #include "covariance.h"
 #include "dynamatic/Integration.h"
-#include <math.h>
 #include <stdlib.h>
 
 #define AMOUNT_OF_TEST 1
