@@ -27,10 +27,10 @@
 #define PO_RELU(i, h, w, po)                                                   \
   index_c = (po)*ParallelOut + (h)*OutImSize + (w);                            \
   tmp1 = C[index_c];                                                           \
-  if (tmp1 > 0.0)                                                              \
+  if (tmp1 > 0)                                                                \
     tmp2 = tmp1;                                                               \
   else                                                                         \
-    tmp2 = 0.0;                                                                \
+    tmp2 = 0;                                                                  \
   index_out = (i) * (NumOut / ParallelOut) + (h)*OutImSize + (w);              \
   output[index_out] = tmp2;
 
