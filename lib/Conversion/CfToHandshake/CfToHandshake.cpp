@@ -1667,6 +1667,9 @@ LogicalResult HandshakeLowering::addSupp(ConversionPatternRewriter &rewriter) {
           if (isa<handshake::ConditionalBranchOp>(consOp))
             continue;
 
+          llvm::errs() << "Prod: " << prodOp << "\n";
+          llvm::errs() << "Cons: " << *consOp << "\n";
+
           /// Innermost loop containig the producer doesn't contain the
           /// consumer
           bool moreProdThanCons = false;
@@ -1688,8 +1691,10 @@ LogicalResult HandshakeLowering::addSupp(ConversionPatternRewriter &rewriter) {
                       isaMergeLoop(consOp) &&
                       !isa<handshake::ConditionalBranchOp>(prodOp)))
               manageDifferentRegeneration(rewriter, consOp, res);
-            else
+            else {
+              llvm::errs() << "Calling manageNonLoop";
               manageNonLoop(rewriter, &prod, consOp, res);
+            }
           }
         }
       }
@@ -2008,9 +2013,21 @@ void HandshakeLowering::manageNonLoop(ConversionPatternRewriter &rewriter,
   cdgAnalysis.calculateBlockForwardControlDeps(producerBlock, funcOpIdx,
                                                prodControlDeps);
 
+  llvm::errs() << "prodControlDeps\n";
+  for (Block *block : prodControlDeps) {
+    block->printAsOperand(llvm::errs());
+    llvm::errs() << "\n";
+  }
+
   SmallVector<Block *, 4> consControlDeps;
   cdgAnalysis.calculateBlockForwardControlDeps(consumer->getBlock(), funcOpIdx,
                                                consControlDeps);
+
+  llvm::errs() << "consControlDeps\n";
+  for (Block *block : consControlDeps) {
+    block->printAsOperand(llvm::errs());
+    llvm::errs() << "\n";
+  }
 
   eliminateCommonEntries(prodControlDeps, consControlDeps);
 
@@ -2228,6 +2245,51 @@ LogicalResult HandshakeLowering::triggerConstantsFromStart(
   return success();
 }
 
+bool findClosestBranchPredecessor(Value input, DominanceInfo &domInfo,
+                                  Block &block, Value &desiredCond,
+                                  bool &getTrueSuccessor,
+                                  std::unordered_set<Operation *> &visited) {
+  Operation *defOp = input.getDefiningOp();
+  if (!defOp || visited.count(defOp))
+    return false;
+
+  visited.insert(defOp);
+
+  for (Value pred : defOp->getOperands()) {
+    Operation *predOp = pred.getDefiningOp();
+    if (!predOp)
+      continue;
+
+    if (isa<handshake::ConditionalBranchOp>(predOp)) {
+      auto branch = dyn_cast<handshake::ConditionalBranchOp>(predOp);
+      for (Value branchPred : branch->getOperands()) {
+        if (domInfo.dominates(branchPred.getParentBlock(), &block)) {
+          desiredCond = branch.getConditionOperand();
+          if (pred == branch.getFalseResult()) {
+            getTrueSuccessor = true;
+          }
+          return true;
+        }
+      }
+    }
+
+    if (findClosestBranchPredecessor(pred, domInfo, block, desiredCond,
+                                     getTrueSuccessor, visited)) {
+      return true;
+    }
+  }
+
+  return false;
+}
+
+bool findClosestBranchPredecessor(Value input, DominanceInfo &domInfo,
+                                  Block &block, Value &desiredCond,
+                                  bool &getTrueSuccessor) {
+  std::unordered_set<Operation *> visited;
+  return findClosestBranchPredecessor(input, domInfo, block, desiredCond,
+                                      getTrueSuccessor, visited);
+}
+
 LogicalResult
 HandshakeLowering::addSuppGSA(ConversionPatternRewriter &rewriter) {
   for (Block &block : region.getBlocks()) {
@@ -2251,6 +2313,10 @@ HandshakeLowering::addSuppGSA(ConversionPatternRewriter &rewriter) {
 
       auto mux = dyn_cast<handshake::MuxOp>(op);
       DominanceInfo domInfo;
+
+      llvm::errs() << mux << "\n";
+      for (Value v : mux->getOperands())
+        llvm::errs() << v << "\n";
 
       bool inputDominting = false;
       auto it = mux.getDataOperands().begin();
@@ -2279,26 +2345,34 @@ HandshakeLowering::addSuppGSA(ConversionPatternRewriter &rewriter) {
 
         /// Assert that the predecessors of the other input must all be
         /// Branches
-        bool hasPredBranch = false;
-        bool getTrueSuccessor = false;
-        if (nonDominatingInput.getDefiningOp()) {
-          for (Value pred : nonDominatingInput.getDefiningOp()->getOperands()) {
-            Operation *predOp = pred.getDefiningOp();
-            if (predOp) {
-              if (isa<handshake::ConditionalBranchOp>(predOp)) {
-                auto branch = dyn_cast<handshake::ConditionalBranchOp>(predOp);
-                for (Value branchPred : branch->getOperands()) {
-                  if (domInfo.dominates(branchPred.getParentBlock(), &block)) {
-                    hasPredBranch = true;
-                    desiredCond = branch.getConditionOperand();
-                    if (pred == branch.getFalseResult())
-                      getTrueSuccessor = true;
+        /*
+              bool hasPredBranch = false;
+              bool getTrueSuccessor = false;
+
+              if (nonDominatingInput.getDefiningOp()) {
+                for (Value pred :
+           nonDominatingInput.getDefiningOp()->getOperands()) { Operation
+           *predOp = pred.getDefiningOp(); if (predOp) { if
+           (isa<handshake::ConditionalBranchOp>(predOp)) { auto branch =
+           dyn_cast<handshake::ConditionalBranchOp>(predOp); for (Value
+           branchPred : branch->getOperands()) { if
+           (domInfo.dominates(branchPred.getParentBlock(), &block)) {
+                          hasPredBranch = true;
+                          desiredCond = branch.getConditionOperand();
+                          if (pred == branch.getFalseResult())
+                            getTrueSuccessor = true;
+                        }
+                      }
+                    }
                   }
                 }
               }
-            }
-          }
-        }
+              */
+
+        bool getTrueSuccessor = false;
+        bool hasPredBranch = findClosestBranchPredecessor(
+            nonDominatingInput, domInfo, block, desiredCond, getTrueSuccessor);
+
         assert(hasPredBranch &&
                "At least one predecessor of the non-dominating "
                "input must be a Branch");

@@ -42,10 +42,10 @@ void loop_multiply(in_int_t alpha, inout_int_t tmp[NI][NJ]) {
       } else
         tmp[j][j] = tmp[j][j] + alpha + j;
     }*/
-
-  for (int j = 1; j < NJ; j++) {
-    tmp[j][j] = tmp[j - 1][j - 1] + alpha + j;
-  }
+  unsigned j = 0;
+  if (alpha > 5)
+    tmp[j][j] = tmp[j][j] + alpha + j;
+  tmp[j][j] = tmp[j][j] + alpha;
 
   /*
     for (unsigned j = 0; j < NJ; j++) {
