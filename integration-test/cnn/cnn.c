@@ -1,4 +1,4 @@
-//===- cnn.c - Inner-most layers of the CNN ------------------------*- C -*===//
+//===- cnn.c - One layer in CNN -----------------------------------*- C -*===//
 //
 // Source:
 // https://github.com/UCLA-VAST/AutoBridge/tree/master/archive/benchmarks/CNN
