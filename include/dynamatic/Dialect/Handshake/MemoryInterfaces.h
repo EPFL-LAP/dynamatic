@@ -17,6 +17,7 @@
 
 #include "dynamatic/Analysis/NameAnalysis.h"
 #include "dynamatic/Dialect/Handshake/HandshakeOps.h"
+#include "dynamatic/Support/Backedge.h"
 #include "dynamatic/Support/LLVM.h"
 
 namespace dynamatic {
@@ -37,7 +38,7 @@ class MemoryOpLowering {
 public:
   /// Constructs an instance of the class from a reference to a naming analysis
   /// that encompasses all memory accesses that are going to be replaced.
-  MemoryOpLowering(NameAnalysis &namer) : namer(namer){};
+  MemoryOpLowering(NameAnalysis &namer) : namer(namer) {};
 
   /// Records a replacement from the old operation to the new operation (both
   /// are meant to be memory accesses), naming both in the process if they were
@@ -87,7 +88,7 @@ public:
   /// trigger the start of memory access groups in the interface(s).
   MemoryInterfaceBuilder(handshake::FuncOp funcOp, Value memref,
                          const DenseMap<unsigned, Value> &ctrlVals)
-      : funcOp(funcOp), memref(memref), ctrlVals(ctrlVals){};
+      : funcOp(funcOp), memref(memref), ctrlVals(ctrlVals) {};
 
   /// Adds an access port to an MC. The operation must be a load or store
   /// access to an MC. The operation must be tagged with the basic block it
@@ -111,13 +112,20 @@ public:
                                       handshake::MemoryControllerOp &mcOp,
                                       handshake::LSQOp &lsqOp);
 
+  /// Instantiates appropriate memory interfaces for all the ports that were
+  /// added to the builder so far using a pattern rewriter. See overload's
+  /// documentation for more details.
+  LogicalResult instantiateInterfaces(mlir::PatternRewriter &rewriter,
+                                      handshake::MemoryControllerOp &mcOp,
+                                      handshake::LSQOp &lsqOp);
+
   /// Returns results of load/store-like operations which are to be given as
   /// operands to a memory interface.
   static SmallVector<Value, 2> getMemResultsToInterface(Operation *memOp);
 
   /// Returns the result of a constant that serves as an MC control signal
   /// (indicating a non-zero number of stores in the block). Instantiates the
-  /// constant operation in the IR after the provided none-typed control signal.
+  /// constant operation in the IR after the provided control signal.
   static Value getMCControl(Value ctrl, unsigned numStores, OpBuilder &builder);
 
   /// Sets the data operand of a load-like operation, reusing the existing
@@ -177,6 +185,14 @@ private:
   /// For a provided memory interface and its memory ports, set the data operand
   /// of load-like operations with successive results of the memory interface.
   void addMemDataResultToLoads(InterfacePorts &ports, Operation *memIfaceOp);
+
+  /// Internal implementation of the interface instantiation logic, taking an
+  /// additional edge builder argument that was either created using a basic
+  /// operation builder or a conversion pattern rewriter.
+  LogicalResult instantiateInterfaces(OpBuilder &builder,
+                                      BackedgeBuilder &edgeBuilder,
+                                      handshake::MemoryControllerOp &mcOp,
+                                      handshake::LSQOp &lsqOp);
 };
 
 /// Aggregates LSQ generation information to be passed to the DOT printer under
@@ -200,10 +216,6 @@ struct LSQGenerationInfo {
   SmallVector<SmallVector<unsigned>> loadPorts, storePorts;
   /// Depth of queues within the LSQ.
   unsigned depth = 16, depthLoad = 16, depthStore = 16, bufferDepth = 0;
-  /// Type of memory interface used to connect the LSQ to an external memory.
-  std::string accessType = "BRAM";
-  /// Whether to enable speculation.
-  bool speculation = false;
 
   /// Derives generation information for the provided LSQ.
   LSQGenerationInfo(handshake::LSQOp lsqOp, StringRef name = "LSQ");
@@ -220,11 +232,11 @@ private:
 
 /// Identifies the subset of the control operation's results that are part of
 /// the control path to the LSQ interface. The control operations' results
-/// that are not of type `NoneType` are ignored and will never be part of the
-/// returned vector. Typically, one would call this function on a (lazy-)fork
-/// directly providing a group allocation signal to the LSQ to inquire about
-/// other fork results that would trigger other group allocations. The
-/// returned values are guaranteed to be in the same order as the control
+/// that are not of type `handshake::ControlType` are ignored and will never be
+/// part of the returned vector. Typically, one would call this function on a
+/// (lazy-)fork directly providing a group allocation signal to the LSQ to
+/// inquire about other fork results that would trigger other group allocations.
+/// The returned values are guaranteed to be in the same order as the control
 /// operation's results.
 SmallVector<Value> getLSQControlPaths(handshake::LSQOp lsqOp,
                                       Operation *ctrlOp);

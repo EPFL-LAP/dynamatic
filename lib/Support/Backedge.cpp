@@ -66,12 +66,17 @@ Backedge BackedgeBuilder::get(Type resultType, mlir::LocationAttr optionalLoc) {
   return Backedge(op);
 }
 
-Backedge::Backedge(mlir::Operation *op) : value(op->getResult(0)) {}
+Backedge::Backedge(Operation *op, PatternRewriter *rewriter)
+    : value(op->getResult(0)), rewriter(rewriter) {}
 
 void Backedge::setValue(mlir::Value newValue) {
-  assert(value.getType() == newValue.getType());
+  assert(value.getType() == newValue.getType() &&
+         "incorrect replacement value type");
   assert(!set && "backedge already set to a value!");
-  value.replaceAllUsesWith(newValue);
+  if (rewriter)
+    rewriter->replaceOp(value.getDefiningOp(), newValue);
+  else
+    value.replaceAllUsesWith(newValue);
   set = true;
   value = newValue;
 }

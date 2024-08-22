@@ -12,7 +12,6 @@ F_DOT=$2
 F_WLF=$3
 OUTPUT_DIR=$4
 KERNEL_NAME=$5
-EXPERIMENTAL=$6
 
 # Generated directories/files
 VISUAL_DIR="$OUTPUT_DIR/visual"
@@ -34,12 +33,8 @@ VISUAL_DATAFLOW_BIN="$DYNAMATIC_DIR/bin/visual-dataflow"
 rm -rf "$VISUAL_DIR" && mkdir -p "$VISUAL_DIR"
 
 # Convert the Modelsim waveform to a CSV for the visualizer 
-if [[ $EXPERIMENTAL -eq 0 ]]; then
-  python3 "$WLF2CSV" "$F_DOT" "$F_WLF" "$VISUAL_DIR"
-else
-  "$DYNAMATIC_DIR/bin/wlf2csv" "$COMP_DIR/handshake_export.mlir" \
-    $SIM_DIR/HLS_VERIFY/vsim.wlf $KERNEL_NAME > $F_CSV
-fi
+"$DYNAMATIC_DIR/bin/wlf2csv" "$COMP_DIR/handshake_export.mlir" \
+  $SIM_DIR/HLS_VERIFY/vsim.wlf $KERNEL_NAME > $F_CSV
 exit_on_fail "Failed to generate channel changes from waveform" "Generated channel changes"
 
 # Generate a version of the DOT with positioning information

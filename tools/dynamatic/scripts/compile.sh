@@ -13,9 +13,8 @@ OUTPUT_DIR=$3
 KERNEL_NAME=$4
 USE_SIMPLE_BUFFERS=$5
 TARGET_CP=$6
+POLYGEIST_PATH=$7
 
-# Binaries used during compilation
-POLYGEIST_PATH="$DYNAMATIC_DIR/polygeist"
 POLYGEIST_CLANG_BIN="$DYNAMATIC_DIR/bin/cgeist"
 CLANGXX_BIN="$DYNAMATIC_DIR/bin/clang++"
 DYNAMATIC_OPT_BIN="$DYNAMATIC_DIR/bin/dynamatic-opt"
@@ -27,9 +26,9 @@ COMP_DIR="$OUTPUT_DIR/comp"
 F_AFFINE="$COMP_DIR/affine.mlir"
 F_AFFINE_MEM="$COMP_DIR/affine_mem.mlir"
 F_SCF="$COMP_DIR/scf.mlir"
-F_CF="$COMP_DIR/std.mlir"
-F_CF_TRANFORMED="$COMP_DIR/std_transformed.mlir"
-F_CF_DYN_TRANSFORMED="$COMP_DIR/std_dyn_transformed.mlir"
+F_CF="$COMP_DIR/cf.mlir"
+F_CF_TRANFORMED="$COMP_DIR/cf_transformed.mlir"
+F_CF_DYN_TRANSFORMED="$COMP_DIR/cf_dyn_transformed.mlir"
 F_PROFILER_BIN="$COMP_DIR/$KERNEL_NAME-profile"
 F_PROFILER_INPUTS="$COMP_DIR/profiler-inputs.txt"
 F_HANDSHAKE="$COMP_DIR/handshake.mlir"
@@ -45,18 +44,16 @@ F_FREQUENCIES="$COMP_DIR/frequencies.csv"
 
 # Exports Handshake-level IR to DOT using Dynamatic, then converts the DOT to
 # a PNG using dot.
-#   $1: mode to run the tool in; options are "visual", "legacy", "legacy-buffers"
-#   $2: output filename, without extension (will use .dot and .png)
+#   $1: input handshake-level IR filename
+#   $1: output filename, without extension (will use .dot and .png)
 export_dot() {
-  local mode=$1
+  local f_handshake="$1"
   local f_dot="$COMP_DIR/$2.dot"
   local f_png="$COMP_DIR/$2.png"
 
   # Export to DOT
-  "$DYNAMATIC_EXPORT_DOT_BIN" "$F_HANDSHAKE_EXPORT" "--mode=$mode" \
-      "--edge-style=spline" \
-      "--timing-models=$DYNAMATIC_DIR/data/components.json" \
-      > "$f_dot"
+  "$DYNAMATIC_EXPORT_DOT_BIN" "$f_handshake" "--edge-style=spline" \
+    > "$f_dot"
   exit_on_fail "Failed to create $2 DOT" "Created $2 DOT"
 
   # Convert DOT graph to PNG
@@ -122,7 +119,6 @@ exit_on_fail "Failed to compile cf to handshake" "Compiled cf to handshake"
 # handshake transformations
 "$DYNAMATIC_OPT_BIN" "$F_HANDSHAKE" \
   --handshake-minimize-lsq-usage \
-  --handshake-concretize-index-type="width=32" \
   --handshake-minimize-cst-width --handshake-optimize-bitwidths="legacy" \
   --handshake-materialize --handshake-infer-basic-blocks \
   > "$F_HANDSHAKE_TRANSFORMED"
@@ -153,7 +149,7 @@ else
   exit_on_fail "Failed to profile cf-level" "Profiled cf-level"
 
   # Smart buffer placement
-  echo_info "Running smart buffer placement"
+  echo_info "Running smart buffer placement with CP = $TARGET_CP"
   cd "$COMP_DIR"
   "$DYNAMATIC_OPT_BIN" "$F_HANDSHAKE_TRANSFORMED" \
     --handshake-set-buffering-properties="version=fpga20" \
@@ -167,15 +163,16 @@ fi
 "$DYNAMATIC_OPT_BIN" "$F_HANDSHAKE_BUFFERED" \
   --handshake-canonicalize \
   --handshake-hoist-ext-instances \
+  --handshake-reshape-channels \
   > "$F_HANDSHAKE_EXPORT"
 exit_on_fail "Failed to canonicalize Handshake" "Canonicalized handshake"
+
+# Export to DOT
+export_dot "$F_HANDSHAKE_EXPORT" "$KERNEL_NAME"
 
 # handshake level -> hw level
 "$DYNAMATIC_OPT_BIN" "$F_HANDSHAKE_EXPORT" --lower-handshake-to-hw \
   > "$F_HW"
 exit_on_fail "Failed to lower to HW" "Lowered to HW"
 
-# Export to DOT (one clean for viewing and one compatible with legacy)
-export_dot "visual" "visual"
-export_dot "legacy" "$KERNEL_NAME"
 echo_info "Compilation succeeded"

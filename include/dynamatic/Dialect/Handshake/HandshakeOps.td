@@ -24,6 +24,7 @@ include "mlir/IR/BuiltinTypes.td"
 include "mlir/IR/BuiltinAttributeInterfaces.td"
 include "mlir/Interfaces/InferTypeOpInterface.td"
 include "dynamatic/Dialect/Handshake/HandshakeAttributes.td"
+include "dynamatic/Dialect/Handshake/HandshakeTypes.td"
 
 /// Base class for Handshake dialect operations.
 class Handshake_Op<string mnemonic, list<Trait> traits = []>
@@ -157,8 +158,9 @@ def InstanceOp : Handshake_Op<"instance", [
     and returns a control output as its last result.
 
     Example:
+    
     ```mlir
-    %2:2 = handshake.instance @my_add(%0, %1, %ctrl) : (f32, f32, none) -> (f32, none)
+    %2:2 = handshake.instance @my_add(%0, %1, %ctrl) : (f32, f32, !handshake.control) -> (f32, !handshake.control)
     ```
   }];
 
@@ -221,163 +223,126 @@ def InstanceOp : Handshake_Op<"instance", [
   }];
 }
 
-class Handshake_BufferOp<string mnemonic> : Handshake_Op<mnemonic, [
-  BufferOpInterface, HasClock, SameOperandsAndResultType,
-  DeclareOpInterfaceMethods<SOSTInterface, ["getSize"]>,
+def BufferOp : Handshake_Op<"buffer", [
+  HasClock, SameOperandsAndResultType,
+  DeclareOpInterfaceMethods<ReshapableChannelsInterface, ["getReshapableChannelType"]>,
 ]> {
-  let arguments = (ins  AnyType:$operand,
-                        ConfinedAttr<I32Attr, [IntMinValue<1>]>:$slots);
-  let results = (outs AnyType:$result);
-
-  let extraClassDefinition = [{
-    /// Custom implementation of the SOST::getSize method for buffers. Simply
-    /// returns the number of buffer slots.
-    unsigned $cppClass::getSize() {
-      return getSlots();
-    }
-
-    /// Prints the buffer operation.
-    void $cppClass::print(mlir::OpAsmPrinter &p) {
-      p << " [" << getSize() << "] " << getOperand();
-      p.printOptionalAttrDict((*this)->getAttrs(), {"slots"});
-      p << " : " << getOperand().getType();
-    }
-
-    /// Parses the buffer operation.
-    mlir::ParseResult $cppClass::parse(mlir::OpAsmParser &parser,
-                                       mlir::OperationState &result) {
-      mlir::SmallVector<OpAsmParser::UnresolvedOperand, 4> allOperands;
-      llvm::SMLoc loc = parser.getCurrentLocation();
-      mlir::Type type;
-      unsigned slots;
-      if (parseSOSTOp(true, parser, allOperands, result, slots, type))
-        return failure();
-
-      result.addTypes({type});
-      result.addAttribute(
-          "slots",
-          IntegerAttr::get(IntegerType::get(result.getContext(), 32), slots));
-
-      if (parser.resolveOperands(allOperands, {type}, loc, result.operands))
-        return failure();
-      return success();
-    }
-  }];
-
-  let hasCustomAssemblyFormat = 1;
-}
-
-def OEHBOp : Handshake_BufferOp<"oehb"> {
-  let summary = "opaque elastic half buffer";
+  let summary = "buffer operation";
   let description = [{
-    An OEHB (opaque elastic half buffer) is a type of buffer that breaks
-    combinatinal paths in the downstream data/valid network.
-
-    Example:
-    ```mlir
-    %result = oehb [2] %operand : i32
-    ```
+    Represents an arbitrary buffer whose properties (e.g., latencies, number of
+    slots) are dictated by HW parameters. 
   }];
-}
-
-def TEHBOp : Handshake_BufferOp<"tehb"> {
-  let summary = "transparent elastic half buffer";
-  let description = [{
-    A TEHB (transparent elastic half buffer) is a type of buffer that breaks
-    combinatinal paths in the upstream ready network.
-
-    Example:
-    ```mlir
-    %result = tehb [2] %operand : i32
-    ```
-  }];
-}
-
-def ForkOp : Handshake_Op<"fork", [
-  Pure, HasClock, SameOperandsAndResultType,
-  DeclareOpInterfaceMethods<SOSTInterface, ["getSize"]>
-]> {
-  let summary = "fork operation";
-
-  let description = [{
-    The fork operation represents a fork operation.  A
-    single input is replicated to N outputs and distributed to each
-    output as soon as the corresponding successor is available.
-
-    Example:
-    ```mlir
-    %1:2 = fork [2] %0 : i32
-    ```
-  }];
-
-  let arguments = (ins AnyType : $operand);
-  let results = (outs Variadic<AnyType> : $result);
   
+  let arguments = (ins HandshakeType:$operand);
+  let results = (outs HandshakeType:$result);
+
+  let builders = [OpBuilder<
+    (ins "Value":$operand, "const ::dynamatic::handshake::TimingInfo &":$timing,
+         "std::optional<unsigned>":$numSlots)>
+  ];
+
+  let extraClassDeclaration = [{
+    static constexpr ::llvm::StringLiteral NUM_SLOTS_ATTR_NAME = "NUM_SLOTS",
+                                           TIMING_ATTR_NAME = "TIMING";
+  }];
+
+  let assemblyFormat = [{
+    $operand attr-dict `:` custom<HandshakeType>(type($operand))
+  }];
+}
+
+class Handshake_ForkOp<string mnemonic, list<Trait> traits = []> : 
+  Handshake_Op<mnemonic, traits # [
+    Pure, HasClock, SameOperandsAndResultType,
+    DeclareOpInterfaceMethods<ReshapableChannelsInterface, ["getReshapableChannelType"]>
+]> {
+  let arguments = (ins HandshakeType:$operand);
+  let results = (outs Variadic<HandshakeType>:$result);
+
   let builders = [OpBuilder<
     (ins "Value":$operand, "unsigned":$size), [{
       $_state.addOperands(operand);
       SmallVector<Type> resultTypes {size, operand.getType()};
       $_state.addTypes(resultTypes);
-  }]>];
+    }]>
+  ];
 
-  let hasCustomAssemblyFormat = 1;
+  let assemblyFormat = [{ 
+    custom<SingleTypedHandshakeOp>($operand, attr-dict,
+                                   type($operand), type($result))
+  }];
+
+  let extraClassDefinition = [{
+    std::pair<handshake::ChannelType, bool>
+    $cppClass::getReshapableChannelType() {
+      return {mlir::dyn_cast<handshake::ChannelType>(getOperand().getType()),
+              true};
+    }
+  }];
 }
 
-def LazyForkOp : Handshake_Op<"lazy_fork", [
-  Pure, SameOperandsAndResultType,
-  DeclareOpInterfaceMethods<SOSTInterface, ["getSize", "sostIsControl"]>
-]> {
+def ForkOp : Handshake_ForkOp<"fork"> {
+  let summary = "eager fork operation";
+  let description = [{
+    A single input is replicated to N outputs and distributed to each
+    output as soon as the corresponding successor is available.
+
+    Example:
+
+    ```mlir
+    %1:2 = fork [2] %0 : !handshake.channel<i32>
+    ```
+  }];
+}
+
+def LazyForkOp : Handshake_ForkOp<"lazy_fork"> {
   let summary = "lazy fork operation";
   let description = [{
-    The lazy_fork operation represents a lazy fork operation.
     A single input is replicated to N outputs and distributed to each
     output when all successors are available.
 
     Example:
+
     ```mlir
-    %1:2 = lazy_fork [2] %0 : i32
+    %1:2 = lazy_fork [2] %0 : !handshake.channel<i32>
     ```
   }];
-
-  let arguments = (ins AnyType : $operand);
-  let results = (outs Variadic<AnyType> : $result);
-
-  let builders = [OpBuilder<
-    (ins "Value":$operand, "unsigned":$size), [{
-      $_state.addOperands(operand);
-      SmallVector<Type> resultTypes {size, operand.getType()};
-      $_state.addTypes(resultTypes);
-  }]>];
-
-  let hasCustomAssemblyFormat = 1;
 }
 
 def MergeOp : Handshake_Op<"merge", [
-  Pure, MergeLikeOpInterface, SOSTInterface, SameOperandsAndResultType
+  Pure, SameOperandsAndResultType,
+  DeclareOpInterfaceMethods<MergeLikeOpInterface, ["getDataResult"]>,
+  DeclareOpInterfaceMethods<ReshapableChannelsInterface, ["getReshapableChannelType"]>
 ]> {
   let summary = "merge operation";
   let description = [{
-    The merge operation represents a (nondeterministic)
-    merge operation. Any input is propagated to the single output. The
-    number of inputs corresponds to the number of predecessor
-    blocks.
+    The merge operation represents a (nondeterministic) merge operation. Any
+    input is propagated to the single output. The number of inputs corresponds
+    to the number of predecessor blocks.
 
     Example:
-    ```
-    %0 = merge %a, %b, %c : i32
+
+    ```mlir
+    %0 = merge %a, %b, %c : !handshake.channel<i32>
     ```
   }];
 
-  let arguments = (ins Variadic<AnyType>:$dataOperands);
-  let results = (outs AnyType:$result);
-  let hasCustomAssemblyFormat = 1;
+  let arguments = (ins Variadic<HandshakeType>:$dataOperands);
+  let results = (outs HandshakeType:$result);
+  
+  let assemblyFormat = [{
+    $dataOperands attr-dict `:` custom<HandshakeType>(type($result))
+  }];
 }
 
 def MuxOp : Handshake_Op<"mux", [
-  Pure, MergeLikeOpInterface,
+  Pure,
+  DeclareOpInterfaceMethods<MergeLikeOpInterface, ["getDataResult"]>,
   DeclareOpInterfaceMethods<InferTypeOpInterface, ["inferReturnTypes"]>,
   DeclareOpInterfaceMethods<ControlInterface, ["isControl"]>,
-  DeclareOpInterfaceMethods<NamedIOInterface, ["getOperandName"]>
+  DeclareOpInterfaceMethods<NamedIOInterface, ["getOperandName"]>,
+  DeclareOpInterfaceMethods<SameExtraSignalsInterface, ["getChannelsWithSameExtraSignals"]>,
+  DeclareOpInterfaceMethods<ReshapableChannelsInterface, ["getReshapableChannelType"]>
 ]> {
   let summary = "mux operation";
   let description = [{
@@ -393,19 +358,26 @@ def MuxOp : Handshake_Op<"mux", [
     For purely dataflow selection, use the 'select' operation instead.
 
     Example:
+
     ```mlir
-    %0 = mux %select [%data0, %data1, %data2] {attributes}: index, i32
+    %res = mux %select [%data0, %data1, %data2] :
+      !handshake.channel<i32>, !handshake.channel<i32>
     ```
   }];
-  let arguments = (ins AnyType : $selectOperand, Variadic<AnyType> : $dataOperands);
-  let results = (outs AnyType : $result);
+  let arguments = (ins IntChannelType:$selectOperand,
+                       Variadic<HandshakeType>:$dataOperands);
+  let results = (outs HandshakeType:$result);
+
   let hasCustomAssemblyFormat = 1;
   let hasVerifier = 1;
 }
 
 def ControlMergeOp : Handshake_Op<"control_merge", [
-  Pure, MergeLikeOpInterface, HasClock, SOSTInterface,
-  DeclareOpInterfaceMethods<NamedIOInterface, ["getResultName"]>
+  Pure, HasClock,
+  DeclareOpInterfaceMethods<MergeLikeOpInterface, ["getDataResult"]>,
+  DeclareOpInterfaceMethods<NamedIOInterface, ["getResultName"]>,
+  DeclareOpInterfaceMethods<SameExtraSignalsInterface, ["getChannelsWithSameExtraSignals"]>,
+  DeclareOpInterfaceMethods<ReshapableChannelsInterface, ["getReshapableChannelType"]>
 ]> {
   let summary = "control merge operation";
   let description = [{
@@ -417,20 +389,24 @@ def ControlMergeOp : Handshake_Op<"control_merge", [
 
     Example:
     ```
-    %0, %idx = control_merge %a, %b, %c {attributes} : i32, index
+    %res, %idx = control_merge %a, %b, %c : 
+      !handshake.channel<i32>, !handshake.channel<i32>
     ```
   }];
 
-  let arguments = (ins Variadic<AnyType> : $dataOperands);
-  let results = (outs AnyType : $result, AnyType : $index);
+  let arguments = (ins Variadic<HandshakeType>:$dataOperands);
+  let results = (outs HandshakeType:$result, ChannelType:$index);
   
   let builders = [OpBuilder<
     (ins "ValueRange":$operands), [{
       assert(!operands.empty() && "cmerge needs at least one operand");
       $_state.addOperands(operands);
-      // By default, the index result has an Index type
-      $_state.addTypes(ArrayRef<Type>{operands[0].getType(),
-                                      $_builder.getIndexType()});
+      
+      // Optimize the size of the index result based on the number of operands
+      auto dataType = ::dynamatic::handshake::getOptimizedIndexValType(
+          $_builder, operands.size());
+      auto idxType = ::dynamatic::handshake::ChannelType::get(dataType);
+      $_state.addTypes({operands[0].getType(), idxType});
   }]>];
   
   let hasCustomAssemblyFormat = 1;
@@ -439,110 +415,105 @@ def ControlMergeOp : Handshake_Op<"control_merge", [
 
 def BranchOp : Handshake_Op<"br", [
   Pure, SameOperandsAndResultType,
-  DeclareOpInterfaceMethods<SOSTInterface, ["sostIsControl"]>, 
-  AllTypesMatch<["dataOperand", "dataResult"]>
+  DeclareOpInterfaceMethods<ReshapableChannelsInterface, ["getReshapableChannelType"]>
 ]> {
   let summary = "branch operation";
   let description = [{
-      The branch operation represents an unconditional
-      branch.  The single data input is propagated to the single
-      successor.  The input must be triggered by some predecessor to
-      avoid continous triggering of a successor block.
+    The branch operation represents an unconditional
+    branch.  The single data input is propagated to the single
+    successor.  The input must be triggered by some predecessor to
+    avoid continous triggering of a successor block.
 
-      Example:
-      ```mlir
-      %1 = br %0 : i32
-      ```
+    Example:
+
+    ```mlir
+    %1 = br %0 : !handshake.channel<i32>
+    ```
   }];
-  let arguments = (ins AnyType : $dataOperand);
-  let results = (outs AnyType : $dataResult);
-  let hasCustomAssemblyFormat = 1;
+  let arguments = (ins HandshakeType:$operand);
+  let results = (outs HandshakeType:$result);
+  
+  let assemblyFormat = [{
+    $operand attr-dict `:` custom<HandshakeType>(type($result))
+  }];
 }
 
 def ConditionalBranchOp : Handshake_Op<"cond_br", [
+  AllTypesMatch<["dataOperand", "trueResult", "falseResult"]>,
   DeclareOpInterfaceMethods<InferTypeOpInterface, ["inferReturnTypes"]>,
   DeclareOpInterfaceMethods<ControlInterface, ["isControl"]>,
-  DeclareOpInterfaceMethods<NamedIOInterface, ["getOperandName"]>,
-  DeclareOpInterfaceMethods<NamedIOInterface, ["getResultName"]>,
-  TypesMatchWith<"data operand type matches true branch result type",
-                    "dataOperand", "trueResult", "$_self">,
-  TypesMatchWith<"data operand type matches false branch result type",
-                    "dataOperand", "falseResult", "$_self">
+  DeclareOpInterfaceMethods<NamedIOInterface, ["getOperandName", "getResultName"]>,
+  DeclareOpInterfaceMethods<ReshapableChannelsInterface, ["getReshapableChannelType"]>
 ]> {
   let summary = "conditional branch operation";
   let description = [{
-     The cbranch operation represents a conditional
-     branch.  The data input is propagated to one of the two outputs
-     based on the condition input.
+    The cbranch operation represents a conditional
+    branch.  The data input is propagated to one of the two outputs
+    based on the condition input.
 
-     Example:
-     ```mlir
-     %true, %false = conditional_branch %cond, %data : i32
-     ```
+    Example:
+
+    ```mlir
+    %true, %false = cond_br %cond, %data : !handshake.control<i1>, 
+      !handshake.channel<i32>
+    ```
   }];
 
-  let arguments = (ins I1 : $conditionOperand, AnyType : $dataOperand);
-  let results = (outs AnyType : $trueResult, AnyType : $falseResult);
-  let hasCustomAssemblyFormat = 1;
+  let arguments = (ins BoolChannel:$conditionOperand,
+                       HandshakeType:$dataOperand);
+  let results = (outs HandshakeType:$trueResult,
+                      HandshakeType:$falseResult);
+  
+  let assemblyFormat = [{
+    $conditionOperand `,` $dataOperand attr-dict
+      `:` type($conditionOperand) `,` custom<HandshakeType>(type($dataOperand))
+  }];
   let extraClassDeclaration = [{
     // These are the indices into the dests list.
     enum { trueIndex = 0, falseIndex = 1 };
   }];
 }
 
-def SinkOp : Handshake_Op<"sink", [SOSTInterface]> {
+def SinkOp : Handshake_Op<"sink"> {
   let summary = "sink operation";
   let description = [{
     The sink operation discards any data that arrives at its
-         input.The sink has no successors and it can continuously consume data.
+    input. The sink has no successors and it can continuously consume data.
 
     Example:
+
     ```mlir
-    sink %data : i32
+    sink %data : !handshake.channel<i32>
     ```
   }];
   
-  let arguments = (ins AnyType:$operand);
-  let hasCustomAssemblyFormat = 1;
+  let arguments = (ins HandshakeType:$operand);
+  let assemblyFormat = [{
+    $operand attr-dict `:` custom<HandshakeType>(type($operand))
+  }];
 }
 
-def SourceOp : Handshake_Op<"source", [
-  Pure, DeclareOpInterfaceMethods<SOSTInterface, ["getDataType", "getSize"]> 
-]> {
+def SourceOp : Handshake_Op<"source", [Pure]> {
   let summary = "source operation";
   let description = [{
     The source operation represents a continuous control-only-token source. The
     source continously sets a 'valid' signal which the successor can consume at
     any point in time.
-  }];
-
-  let results = (outs NoneType:$result);
-  let hasCustomAssemblyFormat = 1;
-}
-
-def ConstantOp : Handshake_Op<"constant", [
-  Pure, DeclareOpInterfaceMethods<NamedIOInterface, ["getOperandName"]>
-]> {
-  let summary = "constant operation";
-  let description = [{
-    The const has a constant value. When triggered by its
-    single `ctrl` input, it sends the constant value to its single
-    successor.
 
     Example:
+
     ```mlir
-    %0 = constant %ctrl {value = 42 : i32} : i32
+    %ctrl = source
     ```
   }];
 
-  let arguments = (ins TypedAttrInterface:$value, NoneType:$ctrl);
-  let results = (outs AnyType : $result);
-  let assemblyFormat = [{ $ctrl attr-dict `:` qualified(type($result))}];
-  let hasVerifier = 1;
+  let results = (outs ControlType:$result);
+  
+  let assemblyFormat = "attr-dict";
 }
 
 def JoinOp : Handshake_Op<"join", [
-  DeclareOpInterfaceMethods<InferTypeOpInterface, ["inferReturnTypes"]>,
+  SameOperandsAndResultType,
   DeclareOpInterfaceMethods<ControlInterface, ["isControl"]>
 ]> {
   let summary = "join operation";
@@ -551,29 +522,37 @@ def JoinOp : Handshake_Op<"join", [
     inputs become available.
 
     Example:
+
     ```mlir
-    %0 = join %a, %b, %c : i32, i1, none
+    %0 = join %a, %b, %c : !handshake.control
     ```
   }];
-  let arguments = (ins Variadic<AnyType> : $data);
-  let results = (outs NoneType : $result);
-  let hasCustomAssemblyFormat = 1;
+
+  let arguments = (ins Variadic<ControlType>:$data);
+  let results = (outs ControlType:$result);
+  let assemblyFormat = "$data attr-dict `:` type($result)";
 }
 
-def NotOp : Handshake_Op<"not", [Pure, SameOperandsAndResultType]> {
+def NotOp : Handshake_Op<"not", [Pure, SameOperandsAndResultType,
+                                 ReshapableChannelsInterface]> {
   let summary = "Logical negation";
   let description = [{
     Bitwise logical negation.
 
     Example:
+
     ```mlir
-    %neg = not %value : i32
+    %neg = not %value : !handshake.channel<i32>
     ```
   }];
-  let arguments = (ins AnyType : $operand);
-  let results = (outs AnyType : $result);
-  let assemblyFormat = [{ $operand attr-dict `:` qualified(type($result))}];
+  let arguments = (ins ChannelType:$operand);
+  let results = (outs ChannelType:$result);
+  let assemblyFormat = "$operand attr-dict `:` type($result)";
 }
+
+//===----------------------------------------------------------------------===//
+// Memory interfaces and access ports
+//===----------------------------------------------------------------------===//
 
 def MemoryControllerOp : Handshake_Op<"mem_controller", [
   DeclareOpInterfaceMethods<MemoryOpInterface>,
@@ -622,15 +601,21 @@ def MemoryControllerOp : Handshake_Op<"mem_controller", [
     3. Control signal indicating completion.
 
     Example (without LSQ):
+
     ```mlir
     %ldData1, %ldData2, %ctrl = mem_controller[%mem : memref<16xi32>] (
         %bb0, %stAddr1, %stData1, %ldAddr1, %ldAddr2,
         %bb1, %stAddr2, %stData2
       ) {connectedBlocks = [0 : i32, 1 : i32]} :
-      (i32, index, i32, index, index, i32, index, i32) -> (i32, i32, none)
+      (!handshake.channel<i32>, !handshake.channel<i32>, 
+       !handshake.channel<i32>, !handshake.channel<i32>, 
+       !handshake.channel<i32>, !handshake.channel<i32>, 
+       !handshake.channel<i32>, !handshake.channel<i32>) -> 
+      (!handshake.channel<i32>, !handshake.channel<i32>, !handshake.control)
     ```
 
     Example (with LSQ):
+
     ```mlir
     %ldData1, %ldData2, %ldDataToLSQ, %ctrl = mem_controller[memref<16xi32>] (
         %bb0, %stAddr1, %stData1, %ldAddr1, %ldAddr2,
@@ -638,21 +623,30 @@ def MemoryControllerOp : Handshake_Op<"mem_controller", [
         %group3,
         %ldAddrFromLSQ, %stAddrFromLSQ, %stDataFromLSQ
       ) {connectedBlocks = [0 : i32, 1 : i32, 2 : i32]} :
-      (i32, index, i32, index, index, i32, index, i32, i32, index, index, i32) ->
-        (i32, i32, i32, none)
+      (!handshake.channel<i32>, !handshake.channel<i32>,
+       !handshake.channel<i32>, !handshake.channel<i32>,
+       !handshake.channel<i32>, !handshake.channel<i32>,
+       !handshake.channel<i32>, !handshake.channel<i32>,
+       !handshake.channel<i32>, !handshake.channel<i32>,
+       !handshake.channel<i32>, !handshake.channel<i32>) ->
+      (!handshake.channel<i32>, !handshake.channel<i32>,
+       !handshake.channel<i32>, !handshake.control)
     ```
   }];
   
-  let arguments = (ins  AnyMemRef : $memRef, Variadic<AnyType> : $inputs,
-                        I32ArrayAttr : $connectedBlocks);
-  let results = (outs Variadic<AnyType> : $outputs, NoneType : $done);
+  let arguments = (ins AnyMemRef:$memRef, Variadic<ChannelType>:$inputs,
+                       I32ArrayAttr:$connectedBlocks);
+  let results = (outs Variadic<ChannelType>:$outputs, ControlType:$done);
 
   let skipDefaultBuilders = 1;
-  let builders = [OpBuilder<(ins  "Value":$memRef, "ValueRange":$inputs,
-                                  "ArrayRef<unsigned>":$blocks, 
-                                  "unsigned":$numLoads)>];
+  let builders = [OpBuilder<(ins "Value":$memRef, "ValueRange":$inputs,
+                                 "ArrayRef<unsigned>":$blocks, 
+                                 "unsigned":$numLoads)>];
   let hasVerifier = 1;
-  let assemblyFormat = " `[` $memRef `:` qualified(type($memRef)) `]` `(` $inputs `)` attr-dict `:` functional-type($inputs, results)";
+  let assemblyFormat = [{
+    `[` $memRef `:` type($memRef) `]` `(` $inputs `)` attr-dict `:` 
+    functional-type($inputs, results)
+  }];
 
   let extraClassDeclaration = [{
     /// Returns the list of basic block IDs the MC is connected to.
@@ -717,36 +711,46 @@ def LSQOp : Handshake_Op<"lsq", [
     3. Control signal indicating completion.
 
     Example (without MC):
+
     ```mlir
     %ldData1, %ldData2, %ctrl = lsq[%mem : memref<16xi32>] (
         %group1, %stAddr1, %stData1, %ldAddr1, %ldAddr2,
         %group2, %stAddr2, %stData2
       ) {groupSizes = [3 : i32, 1 : i32]} :
-      (none, index, i32, index, index, none, index, i32) -> (i32, i32, none)
+      (!handshake.control, !handshake.channel<i32>, !handshake.channel<i32>,
+       !handshake.channel<i32>, !handshake.channel<i32>, !handshake.control,
+       !handshake.channel<i32>, !handshake.channel<i32>) ->
+      (!handshake.channel<i32>, !handshake.channel<i32>, !handshake.control)
     ```
 
     Example (with MC):
+
     ```mlir
     %ldData1, %ldData2, %ldAddrToMC, %stAddrToMC, %stDataToMC, %ctrl =
       lsq[MC] (
         %group1, %stAddr1, %stData1, %ldAddr1, %ldAddr2,
         %group2, %stAddr2, %stData2, %ldDataFromMC
       ) {groupSizes = [3 : i32, 1 : i32]} :
-      (none, index, i32, index, index, none, index, i32, i32) ->
-        (i32, i32, index, index, i32, none)
+      (!handshake.control, !handshake.channel<i32>, !handshake.channel<i32>,
+       !handshake.channel<i32>, !handshake.channel<i32>, !handshake.control,
+       !handshake.channel<i32>, !handshake.channel<i32>,
+       !handshake.channel<i32>) ->
+      (!handshake.channel<i32>, !handshake.channel<i32>,
+       !handshake.channel<i32>, !handshake.channel<i32>,
+      !handshake.channel<i32>, !handshake.control)
     ```
   }];
   
-  let arguments = (ins Variadic<AnyType> : $inputs, I32ArrayAttr : $groupSizes);
-  let results = (outs Variadic<AnyType> : $outputs, NoneType : $done);
+  let arguments = (ins Variadic<AnyType>:$inputs, I32ArrayAttr:$groupSizes);
+  let results = (outs Variadic<HandshakeType>:$outputs);
 
   let skipDefaultBuilders = 1;
   let builders = [
-    OpBuilder<(ins  "Value":$memref, "ValueRange":$inputs, 
-                    "ArrayRef<unsigned>":$groupSizes, "unsigned":$numLoads)>,
-    OpBuilder<(ins  "::dynamatic::handshake::MemoryControllerOp":$mcOp, 
-                    "ValueRange":$inputs, "ArrayRef<unsigned>":$groupSizes, 
-                    "unsigned":$numLoads)>,
+    OpBuilder<(ins "Value":$memref, "ValueRange":$inputs, 
+                   "ArrayRef<unsigned>":$groupSizes, "unsigned":$numLoads)>,
+    OpBuilder<(ins "::dynamatic::handshake::MemoryControllerOp":$mcOp, 
+                   "ValueRange":$inputs, "ArrayRef<unsigned>":$groupSizes, 
+                   "unsigned":$numLoads)>,
   ];
   let hasVerifier = 1;
   let hasCustomAssemblyFormat = 1;
@@ -776,13 +780,14 @@ def LSQOp : Handshake_Op<"lsq", [
 
 class Handshake_LoadOp<string mnemonic> : Handshake_Op<mnemonic, [
   LoadOpInterface,
-  DeclareOpInterfaceMethods<NamedIOInterface, ["getOperandName", "getResultName"]>,
-  DeclareOpInterfaceMethods<InferTypeOpInterface, ["inferReturnTypes"]>
+  AllTypesMatch<["address", "addressResult"]>,
+  AllTypesMatch<["data", "dataResult"]>,
+  DeclareOpInterfaceMethods<NamedIOInterface, ["getOperandName", "getResultName"]>
 ]> {
-  let arguments = (ins AnyType:$address, AnyType:$data);
-  let results = (outs AnyType:$addressResult, AnyType:$dataResult);
+  let arguments = (ins IntChannelType:$address, ChannelType:$data);
+  let results = (outs IntChannelType:$addressResult, ChannelType:$dataResult);
   let builders = [OpBuilder<(ins "MemRefType":$memrefType, "Value":$address)>];
-  let assemblyFormat = " `[` $address `]` $data attr-dict `:` qualified(type($address)) `,` qualified(type($data)) ";
+  let assemblyFormat = "`[` $address `]` $data attr-dict `:` type($address) `,` type($data)";
 
   let extraClassDefinition = [{
     std::string $cppClass::getOperandName(unsigned idx) {
@@ -794,16 +799,6 @@ class Handshake_LoadOp<string mnemonic> : Handshake_Op<mnemonic, [
       assert(idx < getNumResults() && "index too high");
       return (idx == 0) ? "addrOut" : "dataOut";
     }
-
-    mlir::LogicalResult $cppClass::inferReturnTypes(
-        mlir::MLIRContext *context, std::optional<Location> location,
-        mlir::ValueRange operands, mlir:: DictionaryAttr attributes,
-        mlir::OpaqueProperties properties, mlir::RegionRange regions,
-        mlir::SmallVectorImpl<mlir::Type> &inferredReturnTypes) {
-      auto oprdTypes = operands.getTypes();
-      inferredReturnTypes.append(oprdTypes.begin(), oprdTypes.end());
-      return success();
-    }
   }];
 }
 
@@ -811,10 +806,11 @@ def MCLoadOp : Handshake_LoadOp<"mc_load"> {
   let summary = "load operation for memory controller (MC)";
   let description = [{
     Represents a load memory port which sends load requests to a memory
-    controller (`dynamatic::handshake::MemoryControllerOp`). It receives an address
-    from a dataflow predecessor and a data value from the memory interface that
-    eventually holds the loaded data. It returns an address that is sent to the
-    memory interface as well as a data value that is sent to its dataflow successor.
+    controller (`dynamatic::handshake::MemoryControllerOp`). It receives an
+    address from a dataflow predecessor and a data value from the memory
+    interface that eventually holds the loaded data. It returns an address that
+    is sent to the memory interface as well as a data value that is sent to its
+    dataflow successor.
 
     The order of operands is
     1. address (from predecessor)
@@ -825,8 +821,10 @@ def MCLoadOp : Handshake_LoadOp<"mc_load"> {
     2. data value (to successor)
 
     Example:
+
     ```mlir
-    %addrToMem, %dataToSucc = mc_load [%addrFromPred] %dataFromMem : i32, index
+    %addrToMem, %dataToSucc = mc_load [%addrFromPred] %dataFromMem :
+      !handshake.channel<i32>, !handshake.channel<i32>
     ```
   }];
 }
@@ -849,20 +847,23 @@ def LSQLoadOp : Handshake_LoadOp<"lsq_load"> {
     2. data value (to successor)
 
     Example:
+
     ```mlir
-    %addrToMem, %dataToSucc = lsq_load [%addrFromPred] %dataFromMem : i32, index
+    %addrToMem, %dataToSucc = lsq_load [%addrFromPred] %dataFromMem :
+      !handshake.channel<i32>, !handshake.channel<i32>
     ```
   }];
 }
 
 class Handshake_StoreOp<string mnemonic> : Handshake_Op<mnemonic, [
   StoreOpInterface,
-  DeclareOpInterfaceMethods<NamedIOInterface, ["getOperandName", "getResultName"]>,
-  DeclareOpInterfaceMethods<InferTypeOpInterface, ["inferReturnTypes"]>
+  AllTypesMatch<["address", "addressResult"]>,
+  AllTypesMatch<["data", "dataResult"]>,
+  DeclareOpInterfaceMethods<NamedIOInterface, ["getOperandName", "getResultName"]>
 ]> {
-  let arguments = (ins AnyType:$address, AnyType:$data);
-  let results = (outs AnyType:$addressResult, AnyType:$dataResult);
-  let assemblyFormat = " `[` $address `]` $data attr-dict `:` qualified(type($data)) `,` qualified(type($address)) ";
+  let arguments = (ins IntChannelType:$address, ChannelType:$data);
+  let results = (outs IntChannelType:$addressResult, ChannelType:$dataResult);
+  let assemblyFormat = "`[` $address `]` $data attr-dict `:` type($data) `,` type($address)";
 
   let extraClassDefinition = [{
     std::string $cppClass::getOperandName(unsigned int idx) {
@@ -872,16 +873,6 @@ class Handshake_StoreOp<string mnemonic> : Handshake_Op<mnemonic, [
     std::string $cppClass::getResultName(unsigned int idx) {
       return (idx == 0) ? "addrOut" : "dataToMem";
     }
-
-    mlir::LogicalResult $cppClass::inferReturnTypes(
-        mlir::MLIRContext *context, std::optional<Location> location,
-        mlir::ValueRange operands, mlir:: DictionaryAttr attributes,
-        mlir::OpaqueProperties properties, mlir::RegionRange regions,
-        mlir::SmallVectorImpl<mlir::Type> &inferredReturnTypes) {
-      auto oprdTypes = operands.getTypes();
-      inferredReturnTypes.append(oprdTypes.begin(), oprdTypes.end());
-      return success();
-    }
   }];
 }
 
@@ -889,9 +880,9 @@ def MCStoreOp : Handshake_StoreOp<"mc_store"> {
   let summary = "store operation for memory controller (MC)";
   let description = [{
     Represents a store memory port which sends store requests to a memory
-    controller (`dynamatic::handshake::MemoryControllerOp`). It receives an address
-    and a data value to store in memory from its dataflow predecessors. It
-    returns the value to store and an address, both of which are sent to the
+    controller (`dynamatic::handshake::MemoryControllerOp`). It receives an
+    address and a data value to store in memory from its dataflow predecessors.
+    It returns the value to store and an address, both of which are sent to the
     memory interface.
 
     The order of operands is
@@ -904,7 +895,8 @@ def MCStoreOp : Handshake_StoreOp<"mc_store"> {
 
     Example:
     ```mlir
-     %addrToMem, %dataToMem = mc_store [%addrFromPred] %dataFromPred : i32, index
+    %addrToMem, %dataToMem = mc_store [%addrFromPred] %dataFromPred :
+      !handshake.channel<i32>, !handshake.channel<i32>
     ```
   }];
 }
@@ -927,32 +919,10 @@ def LSQStoreOp : Handshake_StoreOp<"lsq_store"> {
 
     Example:
     ```mlir
-     %addrToMem, %dataToMem = lsq_store [%addrFromPred] %dataFromPred : i32, index
+    %addrToMem, %dataToMem = lsq_store [%addrFromPred] %dataFromPred :
+      !handshake.channel<i32>, !handshake.channel<i32>
     ```
   }];
-}
-
-def ReturnOp : Handshake_Op<"return", [
-  DeclareOpInterfaceMethods<InferTypeOpInterface, ["inferReturnTypes"]>
-]> {
-  let summary = "handshake-level return";
-  let description = [{
-    This return operation represents the handshake equivalent of a 
-    func::ReturnOp (i.e., the latter is converted to the former one-to-one,
-    preserving operands). This operation also outputs a list of values that
-    correspond one-to-one to its own operands (i.e., same type and semantic
-    value).
-
-    Example:
-    ```mlir
-    %out1, %out2 = return %in1, %in2 : i32, i64
-    ```
-  }];
-
-  let arguments = (ins Variadic<AnyType> : $inputs);
-  let results = (outs Variadic<AnyType> : $outputs);
-  let hasVerifier = 1;
-  let assemblyFormat = [{ attr-dict ($inputs^ `:` type($inputs))? }];
 }
 
 def EndOp : Handshake_Op<"end", [
@@ -967,15 +937,18 @@ def EndOp : Handshake_Op<"end", [
     control signals of all memory interfaces in the function.
 
     Example:
+
     ```mlir
-    end %res1, %res2, %ctrl1, %ctrl2 : i32, i64, none, none
+    end %res1, %res2, %ctrl1, %ctrl2 : !handshake.channel<i32>, !handshake.channel<i64>, !handshake.control, !handshake.control
     ```
   }];
 
-  let arguments = (ins Variadic<AnyType> : $inputs);
+  let arguments = (ins Variadic<HandshakeType>:$inputs);
 
-  let hasVerifier = 1;
-  let assemblyFormat = [{ attr-dict ($inputs^ `:` type($inputs))? }];
+  let assemblyFormat = [{
+    attr-dict ($inputs^ `:` custom<HandshakeTypes>(type($inputs)))?
+  }];
+  
   let extraClassDeclaration = [{
     /// Returns the range of operands that are actual function return values.
     mlir::ValueRange getReturnValues();
@@ -983,16 +956,19 @@ def EndOp : Handshake_Op<"end", [
     /// Returns the range of operands that are memory control signals.
     mlir::ValueRange getMemoryControls();
   }];
+
+  let hasVerifier = 1;
 }
 
 //===----------------------------------------------------------------------===//
-// Speculation operations
+// Speculation
 //===----------------------------------------------------------------------===//
 
 def SpeculatorOp : Handshake_Op<"speculator", [
   SpeculationOpInterface,
-  TypesMatchWith<"data operand type matches data result type",
-                 "dataIn", "dataOut", "$_self">]> {
+  AllTypesMatch<["dataIn", "dataOut"]>,
+  DeclareOpInterfaceMethods<InferTypeOpInterface, ["inferReturnTypes"]>
+]> {
   let summary = "Central control unit of the speculative circuit.";
   let description = [{
     The speculator produces speculative tokens when real data has
@@ -1007,24 +983,35 @@ def SpeculatorOp : Handshake_Op<"speculator", [
     in the replicated branches to discard the latter signal.
 
     Example:
+
     ```mlir
-    %dataOut, %saveCtrl, %commitCtrl, %SCSaveCtrl, 
-      %SCCommitCtrl, %SCBranchCtrl = speculator[enable] %dataIn : i1
+    %dataOut, %saveCtrl, %commitCtrl, %SCSaveCtrl, %SCCommitCtrl, %SCBranchCtrl
+      = speculator[enable] %dataIn : !handshake.channel<i1>
     ```
   }];
 
-  let arguments = (ins AnyType : $dataIn, NoneType : $enable);
-  let results = (outs AnyType : $dataOut,
-                  I1 : $saveCtrl, I1 : $commitCtrl, 
-                  I<3> : $SCSaveCtrl, I<3> : $SCCommitCtrl, 
-                  I1 : $SCBranchCtrl);
-  let assemblyFormat = " `[` $enable `]` $dataIn attr-dict `:` qualified(type($dataIn)) ";
+  let arguments = (ins ChannelType:$dataIn, ControlType:$enable);
+  let results = (outs ChannelType:$dataOut,
+                      BoolChannel:$saveCtrl, BoolChannel:$commitCtrl, 
+                      IntSizedChannel<3>:$SCSaveCtrl,
+                      IntSizedChannel<3>:$SCCommitCtrl, 
+                      BoolChannel:$SCBranchCtrl);
+
+  let hasCustomAssemblyFormat = 1;
+  let hasVerifier = 1;
 }
 
-def SpecSaveOp : Handshake_Op<"spec_save", [
-  SpeculationOpInterface,
-  TypesMatchWith<"data operand type matches data result type",
-                 "dataIn", "dataOut", "$_self">] > {
+class Handshake_SpecOp<string mnemonic> : Handshake_Op<mnemonic, [
+  SpeculationOpInterface, AllTypesMatch<["dataIn", "dataOut"]>
+]> {
+  let arguments = (ins ChannelType:$dataIn, BoolChannel:$ctrl);
+  let results = (outs ChannelType:$dataOut);
+  let assemblyFormat = [{
+    `[` $ctrl `]` $dataIn attr-dict `:` type($dataIn) `,` type($ctrl)
+  }];
+}
+
+def SpecSaveOp : Handshake_SpecOp<"spec_save"> {
   let summary = "Saves data tokens that interact in the speculative region.";
   let description = [{
     Save units are used to mark the beginning of the speculation region. 
@@ -1037,20 +1024,14 @@ def SpecSaveOp : Handshake_Op<"spec_save", [
     miscalculated computations.
 
     Example:
+
     ```mlir
-    %dataOut = spec_save[%ctrl] %dataIn : i11
+    %dataOut = spec_save[%ctrl] %dataIn : !handshake.channel<i11>
     ```
   }];
-
-  let arguments = (ins AnyType : $dataIn, I1 : $ctrl);
-  let results = (outs AnyType : $dataOut);
-  let assemblyFormat = " `[` $ctrl `]` $dataIn attr-dict `:` qualified(type($dataIn)) ";
 }
 
-def SpecCommitOp : Handshake_Op<"spec_commit", [
-  SpeculationOpInterface,
-  TypesMatchWith<"data operand type matches data result type",
-                    "dataIn", "dataOut", "$_self">] > {
+def SpecCommitOp : Handshake_SpecOp<"spec_commit"> {
   let summary = "Stall speculative data tokens until they are resolved.";
   let description = [{
     Commit units are used to mark the end of the speculation region. 
@@ -1064,20 +1045,15 @@ def SpecCommitOp : Handshake_Op<"spec_commit", [
     without any stall.
 
     Example:
+
     ```mlir
-    %dataOut = spec_commit[%ctrl] %dataIn : i11
+    %dataOut = spec_commit[%ctrl] %dataIn : !handshake.channel<i11>
     ```
   }];
 
-  let arguments = (ins AnyType : $dataIn, I1 : $ctrl);
-  let results = (outs AnyType : $dataOut);
-  let assemblyFormat = " `[` $ctrl `]` $dataIn attr-dict `:` qualified(type($dataIn)) ";
 }
 
-def SpecSaveCommitOp : Handshake_Op<"spec_save_commit", [
-  SpeculationOpInterface,
-  TypesMatchWith<"data operand type matches data result type",
-                    "dataIn", "dataOut", "$_self">]> {
+def SpecSaveCommitOp : Handshake_SpecOp<"spec_save_commit"> {
   let summary = "Lets all tokens pass and saves a copy of them.";
   let description = [{
     Save-Commits are used when speculation occurs in a loop.
@@ -1086,65 +1062,272 @@ def SpecSaveCommitOp : Handshake_Op<"spec_save_commit", [
     a copy of them.
  
     Example:
+
     ```mlir
     %dataOut = spec_save_commit[%ctrl] %dataIn : i11
     ```
   }];
-
-  let arguments = (ins AnyType : $dataIn, I<3> : $ctrl);
-  let results = (outs AnyType : $dataOut);
-  let assemblyFormat = " `[` $ctrl `]` $dataIn attr-dict `:` qualified(type($dataIn)) ";
 }
 
 def SpeculatingBranchOp : Handshake_Op<"speculating_branch", [
   SpeculationOpInterface,
-  TypesMatchWith<"data operand type matches true branch result type",
-                    "dataOperand", "trueResult", "$_self">,
-  TypesMatchWith<"data operand type matches false branch result type",
-                    "dataOperand", "falseResult", "$_self">
+  AllTypesMatch<["dataOperand", "trueResult", "falseResult"]>
 ]> {
   let summary = "speculating branch operation";
   let description = [{
-     The speculating branch operation represents a conditional
-     branch that decides the condition based on if a token Value is
-     speculative or not. 
+    The speculating branch operation represents a conditional
+    branch that decides the condition based on if a token Value is
+    speculative or not. 
 
-     The $tagFromOperand field is the condition. Depending on wether the data
-     is speculative or not, $dataOperand will be send to $trueResult or 
-     $falseResult. The speculative tag is a fictious attribute.
+    The $tagFromOperand field is the condition. Depending on wether the data
+    is speculative or not, $dataOperand will be send to $trueResult or 
+    $falseResult. The speculative tag is a fictious attribute.
 
-     Example:
-     ```mlir
-     %trueResult, %falseResult = 
-       speculating_branch[%tagFromOperand] %dataOperand : i32, i1
-     ```
+    Example:
+    ```mlir
+    %trueResult, %falseResult = speculating_branch[%tagFromOperand]
+      %dataOperand : !handshake.channel<i1>, !handshake.channel<i32>
+    ```
   }];
 
-  let arguments = (ins AnyType : $tagFromOperand, AnyType : $dataOperand);
-  let results = (outs AnyType : $trueResult, AnyType : $falseResult);
-  let assemblyFormat = " `[` $tagFromOperand `]` $dataOperand attr-dict `:` qualified(type($tagFromOperand)) `,` qualified(type($dataOperand)) ";
+  let arguments = (ins BoolChannel:$tagFromOperand, ChannelType:$dataOperand);
+  let results = (outs ChannelType:$trueResult, ChannelType:$falseResult);
+  let assemblyFormat = [{
+    `[` $tagFromOperand `]` $dataOperand attr-dict `:` 
+      type($tagFromOperand) `,` type($dataOperand)
+  }];
 }
 
 //===----------------------------------------------------------------------===//
-// Resource Sharing Operations
+// Resource sharing
 //===----------------------------------------------------------------------===//
 
 def SharingWrapperOp : Handshake_Op<"sharing_wrapper", [
-SameOperandsAndResultType
+  SameOperandsAndResultType
 ]> {
-
-  let summary = "sharing wrapper operation"; let description = [{
+  let summary = "sharing wrapper operation";
+  let description = [{
     The sharing_wrapper operation represents the selecting & distributing logic
-    that wraps around a functional unit.}];
+    that wraps around a functional unit.
+  }];
 
-  let arguments = (ins Variadic<AnyType> : $dataOperands,
-    AnyType : $sharedOpResult,
-    DefaultValuedAttr<DenseI64ArrayAttr, "{}">:$credits,
-    ConfinedAttr<I32Attr, [IntMinValue<1>]>:$numSharedOperands);
-  let results = (outs Variadic<AnyType> : $dataOut);
+  let arguments = (ins Variadic<ChannelType>:$dataOperands,
+                       ChannelType:$sharedOpResult,
+                       DefaultValuedAttr<DenseI64ArrayAttr, "{}">:$credits,
+                       ConfinedAttr<I32Attr, [IntMinValue<1>]>:$numSharedOperands);
+  let results = (outs Variadic<ChannelType>:$dataOut);
 
-  let assemblyFormat = " `[` $dataOperands `]` `,` `[` $sharedOpResult `]` attr-dict `:` `(` qualified(type($dataOperands)) `)` `,` `(` qualified(type($sharedOpResult)) `)` `->` `(` qualified(type($dataOut)) `)` ";
+  let assemblyFormat = [{
+    `[` $dataOperands `]` `,` `[` $sharedOpResult `]` attr-dict `:`
+      functional-type(operands, results)
+  }];
 }
 
+//===----------------------------------------------------------------------===//
+// Type manipulation
+//===----------------------------------------------------------------------===//
+
+def BundleOp : Handshake_Op<"bundle", [Pure]> {
+  let summary = [{
+    Bundles individual signals into a `handshake::ChannelType` or
+    `handshake::ControlType`.
+  }];
+  let description = [{
+    Combines individual signals into a channel-like value, producing upstream
+    signals as results and taking downstream signals as arguments. Note
+    that combining individual signals into a `handshake::ChannelType` is a
+    two-step process.
+    1. First, bundle a `i1` value, which produces a `!handshake.control` and
+       `i1` (representing the upstream ready signal) as results. 
+    2. Then, bundle the `!handshake.control` along with a value representing the
+       data signal (of a compatible signal type e.g., `i32`), which produces
+       a `!handshake.channel<i32>`.
+
+    Example:
+
+    ```mlir
+    // Bundling into a channel with a downstream extra signal
+    %channel = bundle %ctrl, %data, %extra : _ to <i32, [extra: i1]>
+    
+    // -----
+    
+    // Bundling into a channel with an upstream extra signal
+    %channel, %extra = bundle %ctrl, %data : _ to <i32, [extra: i1 (U)]>
+    
+    // -----
+
+    // Bundling into a control-only channel
+    %ctrl, %ready = unbundle %valid : (i1) -> _ to <>
+    ```
+  }];
+
+  let arguments = (ins Variadic<AnyType>:$signals);
+  let results = (outs HandshakeType:$channelLike,
+                      Variadic<SignalType>: $upstreams);
+
+  let skipDefaultBuilders = 1;
+  let builders = [
+    OpBuilder<(ins "::mlir::Value":$valid), [{
+      mlir::Type validReadyType = $_builder.getIntegerType(1);
+      assert(valid.getType() == validReadyType && "incorrect valid signal");
+
+      $_state.addOperands(valid);
+      $_state.addTypes({
+        ::dynamatic::handshake::ControlType::get($_builder.getContext()),
+        validReadyType
+      });
+    }]>,
+    OpBuilder<(ins "::mlir::Value":$ctrl, "::mlir::Value":$data,
+                   "::mlir::ValueRange":$downstreams,
+                   "::dynamatic::handshake::ChannelType":$channelType)
+    >
+  ];
+
+  let hasCustomAssemblyFormat = 1; 
+  let hasVerifier = 1;
+}
+
+def UnbundleOp : Handshake_Op<"unbundle", [
+  Pure, DeclareOpInterfaceMethods<InferTypeOpInterface, ["inferReturnTypes"]>
+]> {
+  let summary = [{
+    Unbundles a `handshake::ChannelType` or `handshake::ControlType` into
+    individual signals.
+  }];
+  let description = [{
+    Splits a channel-like value into its individual signals, producing
+    downstream signals as results and taking upstream signals as arguments. Note
+    that getting the individual valid and ready signals from a
+    `handshake::ChannelType` is a two-step process.
+    1. First, unbundle the `!handshake.channel`, which produces a
+       `!handshake.control` as result (i.e., the control is considered a
+       "downstream bundle").
+    2. Then, unbundle the `!handshake.control` along with an `i1` value
+       representing the ready signal, which produces an `i1` result representing
+       the valid signal. 
+
+    Example:
+
+    ```mlir
+    // Unbundling a channel with a downstream extra signal
+    %ctrl, %data, %extra = unbundle %channel : <i32, [extra: i2]> to _
+    
+    // -----
+    
+    // Unbundling a channel with an upstream extra signal
+    %ctrl, %data = unbundle %channel [%extra] : <i32, [extra: i2 (U)]> to _
+
+    // -----
+
+    // Unbundling a control-only channel
+    %valid = unbundle %ctrl [%ready] : <> to _
+    ```
+  }];
+
+  let arguments = (ins HandshakeType:$channelLike,
+                       Variadic<SignalType>: $upstreams);
+  let results = (outs Variadic<AnyType>:$signals);
+
+  let builders = [
+    OpBuilder<(ins "::mlir::Value":$channel), [{
+      $_state.addOperands(channel);
+
+      // Infer return types
+      ::llvm::SmallVector<::mlir::Type, 2> inferredReturnTypes;
+      if (::mlir::succeeded(UnbundleOp::inferReturnTypes($_builder.getContext(),
+                    $_state.location, $_state.operands,
+                    $_state.attributes.getDictionary($_state.getContext()),
+                    $_state.getRawProperties(),
+                    $_state.regions, inferredReturnTypes)))
+        $_state.addTypes(inferredReturnTypes);
+      else
+        ::llvm::report_fatal_error("Failed to infer result type(s).");
+    }]>
+  ];
+
+  let hasCustomAssemblyFormat = 1;
+  let hasVerifier = 1;
+}
+
+def ChannelReshapeTypeAttr : I32EnumAttr<
+    "ChannelReshapeType", "",
+    [
+      I32EnumAttrCase<"MergeData", 0>,
+      I32EnumAttrCase<"SplitData", 1>,
+      I32EnumAttrCase<"MergeExtra", 2>,
+      I32EnumAttrCase<"SplitExtra", 3>
+    ]> {
+  let cppNamespace = "::dynamatic::handshake";
+}
+
+def ReshapeOp : Handshake_Op<"reshape", [Pure]> {
+  let summary = "Reshapes the individual signals of a `handshake::ChannelType`.";
+  let description = [{
+    Reshapes a `ChannelType`'d value to a different form without modifying the
+    channel's actual payload, only rerouting bits to different extra signals or
+    to the channel's data signal. There are currently four reshaping types that
+    match two-by-two to perform reverse reshapings (each reshaping type pair has
+    a dedicated operation builder).
+
+    - `ChannelReshapeType::MergeData` merges all downstream extra signals into
+      the data signal, which becomes an `i<X>` where X is the sum of the
+      bitwidths of all downstream extra signals plus the data signal's bitwidth.
+      If there are no downstream extra signals, the data type is unchanged. All
+      upstream extra signals (if any) are merged into a single one named
+      `MERGED_UP_NAME` with type `i<Y>`, where Y is the sum of the bitwidths
+      of all upstream extra signals. `ChannelReshapeType::SplitData` performs
+      the reverse transformation.
+      
+    - `ChannelReshapeType::MergeExtra` behaves identically to
+      `ChannelReshapeType::MergeData` for extra upstream signals. However,
+      all downstream extra signals (if any) are merged into a single one named
+      `MERGED_DOWN_NAME` with type `i<Z>`, where Z is the sum of the bitwidths
+      of all downstream extra signals. The data type always remain unchanged.
+      `ChannelReshapeType::SplitExtra` performs the reverse transformation.  
+
+    Example:
+
+    ```mlir
+    // Merging into data
+    %reshaped = reshape [MergeData] %channel :
+      <f32, [down1: i2, up1: i4 (U), up2: i4 (U), down2: i8]>
+      -> <i42, [mergedUp: i8 (U)]>
+    
+    // -----
+    
+    // Merging into extra
+    %reshaped = reshape [MergeExtra] %channel :
+      <f32, [down1: i2, up1: i4 (U), up2: i4 (U), down2: i8]>
+      -> <f32, [mergedDowm: i10, mergedUp: i8 (U)]>
+    ```
+  }];
+
+  let arguments = (ins ChannelReshapeTypeAttr:$reshapeType, ChannelType:$channel);
+  let results = (outs ChannelType:$reshaped);
+
+  let skipDefaultBuilders = 1;
+  let builders = [
+    OpBuilder<(ins 
+      "::mlir::TypedValue<::dynamatic::handshake::ChannelType>":$channel,
+      "bool":$mergeDownstreamIntoData)>,
+    OpBuilder<(ins
+      "::mlir::TypedValue<::dynamatic::handshake::ChannelType>":$channel,
+      "bool":$splitDownstreamFromData, "::mlir::Type":$reshapedType)>,
+  ];
+
+  let assemblyFormat = [{
+    `[` $reshapeType `]` $channel attr-dict `:`
+      type($channel) `->` type($reshaped)
+  }];
+
+  let hasVerifier = 1;
+  let hasFolder = 1;
+  
+  let extraClassDeclaration = [{
+    static constexpr ::llvm::StringLiteral
+      MERGED_DOWN_NAME = ::llvm::StringLiteral("mergedDown"),
+      MERGED_UP_NAME = ::llvm::StringLiteral("mergedUp");
+  }];
+}
 
 #endif // DYNAMATIC_DIALECT_HANDSHAKE_HANDSHAKE_OPS_TD

@@ -47,5 +47,6 @@ include "dynamatic/Dialect/Handshake/HandshakeAttributes.td"
 include "dynamatic/Dialect/Handshake/HandshakeTypes.td"
 include "dynamatic/Dialect/Handshake/HandshakeInterfaces.td"
 include "dynamatic/Dialect/Handshake/HandshakeOps.td"
+include "dynamatic/Dialect/Handshake/HandshakeArithOps.td"
 
 #endif // DYNAMATIC_DIALECT_HANDSHAKE_HANDSHAKE_TD

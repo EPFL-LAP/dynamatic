@@ -28,6 +28,7 @@
 #include "mlir/Support/LLVM.h"
 #include "mlir/Support/LogicalResult.h"
 #include "llvm/ADT/SmallVector.h"
+#include "llvm/ADT/StringExtras.h"
 #include "llvm/ADT/StringRef.h"
 #include "llvm/Support/CommandLine.h"
 #include "llvm/Support/FileSystem.h"
@@ -35,9 +36,11 @@
 #include "llvm/Support/Path.h"
 #include "llvm/Support/raw_ostream.h"
 #include <algorithm>
+#include <cstddef>
 #include <cstdio>
 #include <cstdlib>
 #include <fstream>
+#include <iomanip>
 #include <memory>
 #include <readline/history.h>
 #include <readline/readline.h>
@@ -76,16 +79,23 @@ static CommandResult execCmd(Tokens... tokens) {
   return exec({tokens...}) != 0 ? CommandResult::FAIL : CommandResult::SUCCESS;
 }
 
+std::string floatToString(double f, size_t nDecimalPlaces) {
+  std::stringstream ss;
+  ss << std::fixed << std::setprecision(nDecimalPlaces) << f;
+  return ss.str();
+}
+
 namespace {
 
 struct FrontendState {
   std::string cwd;
   std::string dynamaticPath;
+  std::string polygeistPath;
   // By default, the clock period is 4 ns
-  std::string targetCP = "4.0";
+  double targetCP = 4.0;
   std::optional<std::string> sourcePath = std::nullopt;
 
-  FrontendState(StringRef cwd) : cwd(cwd), dynamaticPath(cwd){};
+  FrontendState(StringRef cwd) : cwd(cwd), dynamaticPath(cwd) {};
 
   bool sourcePathIsSet(StringRef keyword);
 
@@ -120,7 +130,7 @@ struct Argument {
 
   Argument() = default;
 
-  Argument(StringRef name, StringRef desc) : name(name), desc(desc){};
+  Argument(StringRef name, StringRef desc) : name(name), desc(desc) {};
 };
 
 struct CommandArguments {
@@ -185,7 +195,7 @@ private:
 class Exit : public Command {
 public:
   Exit(FrontendState &state)
-      : Command("exit", "Exits the Dynamatic frontend", state){};
+      : Command("exit", "Exits the Dynamatic frontend", state) {};
 
   CommandResult execute(CommandArguments &args) override;
 };
@@ -193,7 +203,7 @@ public:
 class Help : public Command {
 public:
   Help(FrontendState &state)
-      : Command("help", "Displays this help message", state){};
+      : Command("help", "Displays this help message", state) {};
 
   CommandResult execute(CommandArguments &args) override;
 };
@@ -204,6 +214,17 @@ public:
       : Command("set-dynamatic-path",
                 "Sets the path to Dynamatic's top-level directory", state) {
     addPositionalArg({"path", "path to Dynamatic's top-level directory"});
+  }
+
+  CommandResult execute(CommandArguments &args) override;
+};
+
+class SetPolygeistPath : public Command {
+public:
+  SetPolygeistPath(FrontendState &state)
+      : Command("set-polygeist-path",
+                "Sets the path to Polygeist installation directory", state) {
+    addPositionalArg({"path", "path to Polygeist installation directory"});
   }
 
   CommandResult execute(CommandArguments &args) override;
@@ -245,8 +266,7 @@ public:
 
 class WriteHDL : public Command {
 public:
-  static constexpr llvm::StringLiteral EXPERIMENTAL = "experimental",
-                                       HDL = "hdl";
+  static constexpr llvm::StringLiteral HDL = "hdl";
 
   WriteHDL(FrontendState &state)
       : Command(
@@ -254,7 +274,6 @@ public:
             "Converts the DOT file produced after compile to VHDL using the "
             "export-dot tool",
             state) {
-    addFlag({EXPERIMENTAL, "Use experimental backend"});
     addOption({HDL, "HDL to use for design's top-level"});
   }
 
@@ -263,30 +282,22 @@ public:
 
 class Simulate : public Command {
 public:
-  static constexpr llvm::StringLiteral EXPERIMENTAL = "experimental";
-
   Simulate(FrontendState &state)
       : Command("simulate",
                 "Simulates the VHDL produced during HDL writing using Modelsim "
                 "and the hls-verifier tool",
-                state) {
-    addFlag({EXPERIMENTAL, "Use experimental backend"});
-  }
+                state) {}
 
   CommandResult execute(CommandArguments &args) override;
 };
 
 class Visualize : public Command {
 public:
-  static constexpr llvm::StringLiteral EXPERIMENTAL = "experimental";
-
   Visualize(FrontendState &state)
       : Command(
             "visualize",
             "Visualizes the execution of the circuit simulated by Modelsim.",
-            state) {
-    addFlag({EXPERIMENTAL, "Use experimental backend"});
-  }
+            state) {}
 
   CommandResult execute(CommandArguments &args) override;
 };
@@ -492,6 +503,32 @@ CommandResult SetDynamaticPath::execute(CommandArguments &args) {
   return CommandResult::SUCCESS;
 }
 
+CommandResult SetPolygeistPath::execute(CommandArguments &args) {
+  // Remove the separator at the end of the path if there is one
+  StringRef sep = sys::path::get_separator();
+  std::string polygeistPath = args.positionals.front().str();
+  if (StringRef(polygeistPath).ends_with(sep))
+    polygeistPath = polygeistPath.substr(0, polygeistPath.size() - 1);
+
+  // Check whether the path makes sense
+  if (!fs::exists(polygeistPath + sep + "llvm-project/")) {
+    llvm::outs()
+        << ERR << "'" << polygeistPath
+        << "' doesn't seem to point to Polygeist, expected to "
+           "find, for example, a directory named 'llvm-project/' there.\n";
+    return CommandResult::FAIL;
+  }
+  if (!fs::exists(polygeistPath + sep + "build/bin/")) {
+    llvm::outs() << ERR
+                 << "No 'bin' directory in provided path, Polygeist doesn't "
+                    "seem to have been built.\n";
+    return CommandResult::FAIL;
+  }
+
+  state.polygeistPath = state.makeAbsolutePath(polygeistPath);
+  return CommandResult::SUCCESS;
+}
+
 CommandResult SetSrc::execute(CommandArguments &args) {
   std::string sourcePath = args.positionals.front().str();
   StringRef srcName = path::filename(sourcePath);
@@ -507,9 +544,12 @@ CommandResult SetSrc::execute(CommandArguments &args) {
 }
 
 CommandResult SetCP::execute(CommandArguments &args) {
-  // Let dynamatic-opt check if the string is a legal float number
-  state.targetCP = args.positionals.front().str();
-  return CommandResult::SUCCESS;
+  // Parse the float argument and check if the argument is legal.
+  if (llvm::to_float(args.positionals.front().str(), state.targetCP))
+    return CommandResult::SUCCESS;
+  llvm::outs() << ERR << "Specified CP = " << args.positionals.front().str()
+               << " is illegal.\n";
+  return CommandResult::FAIL;
 }
 
 CommandResult Compile::execute(CommandArguments &args) {
@@ -520,9 +560,13 @@ CommandResult Compile::execute(CommandArguments &args) {
   std::string script = state.getScriptsPath() + getSeparator() + "compile.sh";
   std::string buffers = args.flags.contains(SIMPLE_BUFFERS) ? "1" : "0";
 
+  state.polygeistPath = state.polygeistPath.empty()
+                            ? state.dynamaticPath + getSeparator() + "polygeist"
+                            : state.polygeistPath;
+
   return execCmd(script, state.dynamaticPath, state.getKernelDir(),
                  state.getOutputDir(), state.getKernelName(), buffers,
-                 state.targetCP);
+                 floatToString(state.targetCP, 3), state.polygeistPath);
 }
 
 CommandResult WriteHDL::execute(CommandArguments &args) {
@@ -531,7 +575,6 @@ CommandResult WriteHDL::execute(CommandArguments &args) {
     return CommandResult::FAIL;
 
   std::string script = state.getScriptsPath() + getSeparator() + "write-hdl.sh";
-  std::string experimental = args.flags.contains(EXPERIMENTAL) ? "1" : "0";
   std::string hdl = "vhdl";
 
   if (auto it = args.options.find(HDL); it != args.options.end()) {
@@ -546,7 +589,7 @@ CommandResult WriteHDL::execute(CommandArguments &args) {
   }
 
   return execCmd(script, state.dynamaticPath, state.getOutputDir(),
-                 state.getKernelName(), experimental, hdl);
+                 state.getKernelName(), hdl);
 }
 
 CommandResult Simulate::execute(CommandArguments &args) {
@@ -555,10 +598,8 @@ CommandResult Simulate::execute(CommandArguments &args) {
     return CommandResult::FAIL;
 
   std::string script = state.getScriptsPath() + getSeparator() + "simulate.sh";
-  std::string experimental = args.flags.contains(EXPERIMENTAL) ? "1" : "0";
-
   return execCmd(script, state.dynamaticPath, state.getKernelDir(),
-                 state.getOutputDir(), state.getKernelName(), experimental);
+                 state.getOutputDir(), state.getKernelName());
 }
 
 CommandResult Visualize::execute(CommandArguments &args) {
@@ -572,10 +613,9 @@ CommandResult Visualize::execute(CommandArguments &args) {
                         state.getKernelName() + ".dot";
   std::string wlfPath = state.getOutputDir() + sep + "sim" + sep +
                         "HLS_VERIFY" + sep + "vsim.wlf";
-  std::string experimental = args.flags.contains(EXPERIMENTAL) ? "1" : "0";
 
   return execCmd(script, state.dynamaticPath, dotPath, wlfPath,
-                 state.getOutputDir(), state.getKernelName(), experimental);
+                 state.getOutputDir(), state.getKernelName());
 }
 
 CommandResult Synthesize::execute(CommandArguments &args) {
@@ -587,7 +627,8 @@ CommandResult Synthesize::execute(CommandArguments &args) {
       state.getScriptsPath() + getSeparator() + "synthesize.sh";
 
   return execCmd(script, state.dynamaticPath, state.getOutputDir(),
-                 state.getKernelName());
+                 state.getKernelName(), floatToString(state.targetCP, 3),
+                 floatToString(state.targetCP / 2, 3));
 }
 
 static StringRef removeComment(StringRef input) {
@@ -642,6 +683,7 @@ int main(int argc, char **argv) {
   FrontendState state(cwd.str());
   FrontendCommands commands;
   commands.add<SetDynamaticPath>(state);
+  commands.add<SetPolygeistPath>(state);
   commands.add<SetSrc>(state);
   commands.add<SetCP>(state);
   commands.add<Compile>(state);

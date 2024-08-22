@@ -16,6 +16,7 @@
 #include "DOTReformat.h"
 #include "Graph.h"
 #include "MLIRMapper.h"
+#include "dynamatic/Dialect/Handshake/HandshakeDialect.h"
 #include "mlir/Dialect/Func/IR/FuncOps.h"
 #include "mlir/Dialect/LLVMIR/LLVMDialect.h"
 #include "mlir/Dialect/MemRef/IR/MemRef.h"

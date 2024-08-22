@@ -1,0 +1,22 @@
+{
+  "editor.detectIndentation": false,
+  "editor.tabSize": 2,
+  "editor.insertSpaces": true,
+  "editor.useTabStops": true,
+  "editor.formatOnSave": true,
+  "editor.defaultFormatter": "llvm-vs-code-extensions.vscode-clangd",
+  "files.associations": {
+    "*.inc": "cpp"
+  },
+  "cmake.configureSettings": {
+    "MLIR_DIR": "${workspaceFolder}/polygeist/llvm-project/build/lib/cmake/mlir",
+    "LLVM_DIR": "${workspaceFolder}/polygeist/llvm-project/build/lib/cmake/llvm",
+    "CLANG_DIR": "${workspaceFolder}/polygeist/llvm-project/build/lib/cmake/clang",
+    "CMAKE_C_COMPILER": "clang++",
+    "CMAKE_CXX_COMPILER": "clang++",
+    "LLVM_ENABLE_LLD": "ON",
+    "LLVM_TARGETS_TO_BUILD": "host",
+    "CMAKE_BUILD_TYPE": "Debug",
+    "CMAKE_EXPORT_COMPILE_COMMAND": "ON"
+  }
+}

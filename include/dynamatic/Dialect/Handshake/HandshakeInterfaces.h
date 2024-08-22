@@ -19,6 +19,7 @@
 #define DYNAMATIC_DIALECT_HANDSHAKE_HANDSHAKE_INTERFACES_H
 
 #include "dynamatic/Dialect/Handshake/HandshakeDialect.h"
+#include "dynamatic/Dialect/Handshake/HandshakeTypes.h"
 #include "dynamatic/Support/LLVM.h"
 #include "mlir/IR/OpDefinition.h"
 #include "mlir/IR/OpImplementation.h"
@@ -32,27 +33,28 @@
 namespace dynamatic {
 namespace handshake {
 
-struct MemLoadInterface {
-  unsigned index;
-  mlir::Value addressIn;
-  mlir::Value dataOut;
-  mlir::Value doneOut;
-};
+namespace detail {
+/// `SameExtraSignalsInterface`'s default `getChannelsWithSameExtraSignals`'s
+/// function (defined as a free function to avoid instantiating an
+/// implementation for every concrete operation type).
+SmallVector<mlir::TypedValue<handshake::ChannelType>>
+getChannelsWithSameExtraSignals(Operation *op);
 
-struct MemStoreInterface {
-  unsigned index;
-  mlir::Value addressIn;
-  mlir::Value dataIn;
-  mlir::Value doneOut;
-};
+/// `SameExtraSignalsInterface`'s verification function (defined as a free
+/// function to avoid instantiating an implementation for every concrete
+/// operation type).
+LogicalResult verifySameExtraSignalsInterface(
+    Operation *op, ArrayRef<mlir::TypedValue<ChannelType>> channels);
 
-/// Default implementation for checking whether an operation is a control
-/// operation. This function cannot be defined within ControlInterface
-/// because its implementation attempts to cast the operation to an
-/// SOSTInterface, which may not be declared at the point where the default
-/// trait's method is defined. Therefore, the default implementation of
-/// ControlInterface's isControl method simply calls this function.
-bool isControlOpImpl(Operation *op);
+/// `ReshapableChannelsInterface`'s default `getReshapableChannelType` method
+/// implementation (defined as a free function to avoid instantiating an
+/// implementation for every concrete operation type).
+std::pair<handshake::ChannelType, bool> getReshapableChannelType(Operation *op);
+
+} // namespace detail
+
+class ControlType;
+
 } // end namespace handshake
 } // end namespace dynamatic
 

@@ -13,6 +13,7 @@
 #include "experimental/Transforms/Speculation/HandshakeSpeculation.h"
 #include "dynamatic/Analysis/NameAnalysis.h"
 #include "dynamatic/Dialect/Handshake/HandshakeOps.h"
+#include "dynamatic/Dialect/Handshake/HandshakeTypes.h"
 #include "dynamatic/Support/Backedge.h"
 #include "dynamatic/Support/CFG.h"
 #include "dynamatic/Support/DynamaticPass.h"
@@ -342,8 +343,8 @@ std::optional<Value> findControlInputToBB(Operation *op) {
     // Iterate the operands in the edge
     for (mlir::OpOperand *p : arc.edges) {
       Value inEdge = p->get();
-      // The control signal should be the only NoneType input to the BB
-      if (inEdge.getType().isa<mlir::NoneType>())
+      // The control signal should be the only control input to the BB
+      if (inEdge.getType().isa<handshake::ControlType>())
         return inEdge;
     }
   }

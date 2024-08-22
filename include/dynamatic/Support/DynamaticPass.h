@@ -19,9 +19,31 @@
 #include "dynamatic/Analysis/NameAnalysis.h"
 #include "dynamatic/Dialect/Handshake/HandshakeDialect.h"
 #include "mlir/IR/BuiltinOps.h"
+#include "mlir/IR/PatternMatch.h"
 #include "mlir/Pass/Pass.h"
 
 namespace dynamatic {
+
+/// Regular OpConversionPattern which additionally references a live naming
+/// analysis.
+template <typename SourceOp>
+struct DynOpConversionPattern : public OpConversionPattern<SourceOp> {
+public:
+  using OpAdaptor = typename SourceOp::Adaptor;
+
+  DynOpConversionPattern(NameAnalysis &namer, MLIRContext *ctx,
+                         mlir::PatternBenefit benefit = 1)
+      : OpConversionPattern<SourceOp>(ctx, benefit), namer(namer) {}
+
+  DynOpConversionPattern(NameAnalysis &namer,
+                         const TypeConverter &typeConverter, MLIRContext *ctx,
+                         mlir::PatternBenefit benefit = 1)
+      : OpConversionPattern<SourceOp>(typeConverter, ctx), namer(namer) {}
+
+protected:
+  /// Reference to the running pass's naming analysis.
+  NameAnalysis &namer;
+};
 
 /// Abstract base class for Dynamatic passes, performing domain-specific
 /// pass pre/post-conditions verification on demand around a user-implemented
@@ -52,6 +74,8 @@ protected:
 
     // Run the actual pass
     runDynamaticPass();
+    if (getPassState().irAndPassFailed.getInt())
+      return;
 
     // Make sure all operation names are unique and haven't changed from what is
     // cached. Also name operations that do not currently have a name (unless

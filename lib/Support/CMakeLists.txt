@@ -1,15 +1,15 @@
 add_dynamatic_library(DynamaticSupport
-  Attribute.cpp  
   Backedge.cpp
   CFG.cpp
   DOTPrinter.cpp
   Logging.cpp
   MILP.cpp
-  RTL.cpp
   System.cpp
   TimingModels.cpp
 
   LINK_LIBS PUBLIC
+  DynamaticSupportJSON
+  DynamaticHandshake
   DynamaticHW
   MLIRIR
   MLIRSupport
@@ -17,3 +17,6 @@ add_dynamatic_library(DynamaticSupport
 )
 
 add_subdirectory(Espresso)
+add_subdirectory(JSON)
+add_subdirectory(RTL)
+add_subdirectory(Utils)

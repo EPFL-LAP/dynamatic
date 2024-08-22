@@ -11,8 +11,8 @@
 //
 //===----------------------------------------------------------------------===//
 
-#include "dynamatic/Support/RTL.h"
-#include "mlir/Dialect/Arith/IR/Arith.h"
+#include "dynamatic/Dialect/Handshake/HandshakeDialect.h"
+#include "dynamatic/Support/RTL/RTL.h"
 #include "llvm/Support/CommandLine.h"
 #include "llvm/Support/InitLLVM.h"
 #include "llvm/Support/SourceMgr.h"
@@ -21,6 +21,7 @@
 
 using namespace llvm;
 using namespace mlir;
+using namespace dynamatic;
 
 static cl::OptionCategory mainCategory("Tool options");
 
@@ -42,36 +43,36 @@ static cl::opt<std::string>
               cl::cat(mainCategory));
 
 /// Returns the ALU opcode corresponding to the comparison's predicate.
-static StringRef getComparator(arith::CmpFPredicate pred) {
+static StringRef getComparator(handshake::CmpFPredicate pred) {
   switch (pred) {
-  case arith::CmpFPredicate::OEQ:
-    return "00001";
-  case arith::CmpFPredicate::OGT:
-    return "00010";
-  case arith::CmpFPredicate::OGE:
-    return "00011";
-  case arith::CmpFPredicate::OLT:
-    return "00100";
-  case arith::CmpFPredicate::OLE:
-    return "00101";
-  case arith::CmpFPredicate::ONE:
-    return "00110";
-  case arith::CmpFPredicate::ORD:
-    return "00111";
-  case arith::CmpFPredicate::UEQ:
-    return "01000";
-  case arith::CmpFPredicate::UGT:
-    return "01001";
-  case arith::CmpFPredicate::UGE:
-    return "01010";
-  case arith::CmpFPredicate::ULT:
-    return "01011";
-  case arith::CmpFPredicate::ULE:
-    return "01100";
-  case arith::CmpFPredicate::UNE:
-    return "01101";
-  case arith::CmpFPredicate::UNO:
-    return "01110";
+  case handshake::CmpFPredicate::OEQ:
+    return "OEQ";
+  case handshake::CmpFPredicate::OGT:
+    return "OGT";
+  case handshake::CmpFPredicate::OGE:
+    return "OGE";
+  case handshake::CmpFPredicate::OLT:
+    return "OLT";
+  case handshake::CmpFPredicate::OLE:
+    return "OLE";
+  case handshake::CmpFPredicate::ONE:
+    return "ONE";
+  case handshake::CmpFPredicate::ORD:
+    return "ORD";
+  case handshake::CmpFPredicate::UEQ:
+    return "UEQ";
+  case handshake::CmpFPredicate::UGT:
+    return "UGT";
+  case handshake::CmpFPredicate::UGE:
+    return "UGE";
+  case handshake::CmpFPredicate::ULT:
+    return "ULT";
+  case handshake::CmpFPredicate::ULE:
+    return "ULE";
+  case handshake::CmpFPredicate::UNE:
+    return "UNE";
+  case handshake::CmpFPredicate::UNO:
+    return "UNO";
   default:
     return "";
   }
@@ -85,8 +86,8 @@ int main(int argc, char **argv) {
       "RTL generator for the `arith.cmpf` MLIR operation. Generates the "
       "correct RTL based on the floating comparison predicate.");
 
-  std::optional<arith::CmpFPredicate> pred =
-      arith::symbolizeCmpFPredicate(predicate);
+  std::optional<handshake::CmpFPredicate> pred =
+      handshake::symbolizeCmpFPredicate(predicate);
   if (!pred) {
     llvm::errs() << "Unknown floating comparison predicate \"" << predicate
                  << "\"\n";

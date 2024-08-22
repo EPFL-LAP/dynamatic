@@ -2,272 +2,257 @@
 // RUN: dynamatic-opt --handshake-optimize-bitwidths --remove-operation-names %s --split-input-file | FileCheck %s
 
 // CHECK-LABEL:   handshake.func @boundEqCst(
-// CHECK-SAME:                               %[[VAL_0:.*]]: i32,
-// CHECK-SAME:                               %[[VAL_1:.*]]: none, ...) -> i32 attributes {argNames = ["arg0", "start"], resNames = ["out0"]} {
-// CHECK:           %[[VAL_2:.*]] = arith.trunci %[[VAL_0]] {handshake.bb = 0 : ui32} : i32 to i6
-// CHECK:           %[[VAL_3:.*]] = constant %[[VAL_1]] {value = 16 : i6} : i6
-// CHECK:           %[[VAL_4:.*]] = arith.extsi %[[VAL_3]] : i6 to i32
-// CHECK:           %[[VAL_5:.*]] = arith.cmpi eq, %[[VAL_0]], %[[VAL_4]] : i32
-// CHECK:           %[[VAL_6:.*]], %[[VAL_7:.*]] = cond_br %[[VAL_5]], %[[VAL_2]] : i6
-// CHECK:           %[[VAL_8:.*]] = arith.extsi %[[VAL_6]] : i6 to i32
-// CHECK:           %[[VAL_9:.*]] = return %[[VAL_8]] : i32
-// CHECK:           end %[[VAL_9]] : i32
+// CHECK-SAME:                               %[[VAL_0:.*]]: !handshake.channel<i32>,
+// CHECK-SAME:                               %[[VAL_1:.*]]: !handshake.control<>, ...) -> !handshake.channel<i32> attributes {argNames = ["arg0", "start"], resNames = ["out0"]} {
+// CHECK:           %[[VAL_2:.*]] = trunci %[[VAL_0]] {handshake.bb = 0 : ui32} : <i32> to <i6>
+// CHECK:           %[[VAL_3:.*]] = constant %[[VAL_1]] {value = 16 : i6} : <i6>
+// CHECK:           %[[VAL_4:.*]] = extsi %[[VAL_3]] : <i6> to <i32>
+// CHECK:           %[[VAL_5:.*]] = cmpi eq, %[[VAL_0]], %[[VAL_4]] : <i32>
+// CHECK:           %[[VAL_6:.*]], %[[VAL_7:.*]] = cond_br %[[VAL_5]], %[[VAL_2]] : <i1>, <i6>
+// CHECK:           %[[VAL_8:.*]] = extsi %[[VAL_6]] : <i6> to <i32>
+// CHECK:           end %[[VAL_8]] : <i32>
 // CHECK:         }
-handshake.func @boundEqCst(%arg0: i32, %start: none) -> i32 {
-  %bound = constant %start {value = 16 : i6} : i6
-  %boundExt = arith.extsi %bound : i6 to i32
-  %cond = arith.cmpi eq, %arg0, %boundExt : i32
-  %true, %false = cond_br %cond, %arg0 : i32
-  %returnVal = return %true : i32
-  end %returnVal : i32
+handshake.func @boundEqCst(%arg0: !handshake.channel<i32>, %start: !handshake.control<>) -> !handshake.channel<i32> {
+  %bound = constant %start {value = 16 : i6} : <i6>
+  %boundExt = extsi %bound : <i6> to <i32>
+  %cond = cmpi eq, %arg0, %boundExt : <i32>
+  %true, %false = cond_br %cond, %arg0 : <i1>, <i32>
+  end %true : <i32>
 }
 
 // -----
 
 // CHECK-LABEL:   handshake.func @boundUleCst(
-// CHECK-SAME:                                %[[VAL_0:.*]]: i32,
-// CHECK-SAME:                                %[[VAL_1:.*]]: none, ...) -> i32 attributes {argNames = ["arg0", "start"], resNames = ["out0"]} {
-// CHECK:           %[[VAL_2:.*]] = arith.trunci %[[VAL_0]] {handshake.bb = 0 : ui32} : i32 to i6
-// CHECK:           %[[VAL_3:.*]] = constant %[[VAL_1]] {value = 16 : i6} : i6
-// CHECK:           %[[VAL_4:.*]] = arith.extsi %[[VAL_3]] : i6 to i32
-// CHECK:           %[[VAL_5:.*]] = arith.cmpi ule, %[[VAL_0]], %[[VAL_4]] : i32
-// CHECK:           %[[VAL_6:.*]], %[[VAL_7:.*]] = cond_br %[[VAL_5]], %[[VAL_2]] : i6
-// CHECK:           %[[VAL_8:.*]] = arith.extsi %[[VAL_6]] : i6 to i32
-// CHECK:           %[[VAL_9:.*]] = return %[[VAL_8]] : i32
-// CHECK:           end %[[VAL_9]] : i32
+// CHECK-SAME:                                %[[VAL_0:.*]]: !handshake.channel<i32>,
+// CHECK-SAME:                                %[[VAL_1:.*]]: !handshake.control<>, ...) -> !handshake.channel<i32> attributes {argNames = ["arg0", "start"], resNames = ["out0"]} {
+// CHECK:           %[[VAL_2:.*]] = trunci %[[VAL_0]] {handshake.bb = 0 : ui32} : <i32> to <i6>
+// CHECK:           %[[VAL_3:.*]] = constant %[[VAL_1]] {value = 16 : i6} : <i6>
+// CHECK:           %[[VAL_4:.*]] = extsi %[[VAL_3]] : <i6> to <i32>
+// CHECK:           %[[VAL_5:.*]] = cmpi ule, %[[VAL_0]], %[[VAL_4]] : <i32>
+// CHECK:           %[[VAL_6:.*]], %[[VAL_7:.*]] = cond_br %[[VAL_5]], %[[VAL_2]] : <i1>, <i6>
+// CHECK:           %[[VAL_8:.*]] = extsi %[[VAL_6]] : <i6> to <i32>
+// CHECK:           end %[[VAL_8]] : <i32>
 // CHECK:         }
-handshake.func @boundUleCst(%arg0: i32, %start: none) -> i32 {
-  %bound = constant %start {value = 16 : i6} : i6
-  %boundExt = arith.extsi %bound : i6 to i32
-  %cond = arith.cmpi ule, %arg0, %boundExt : i32
-  %true, %false = cond_br %cond, %arg0 : i32
-  %returnVal = return %true : i32
-  end %returnVal : i32
+handshake.func @boundUleCst(%arg0: !handshake.channel<i32>, %start: !handshake.control<>) -> !handshake.channel<i32> {
+  %bound = constant %start {value = 16 : i6} : <i6>
+  %boundExt = extsi %bound : <i6> to <i32>
+  %cond = cmpi ule, %arg0, %boundExt : <i32>
+  %true, %false = cond_br %cond, %arg0 : <i1>, <i32>
+  end %true : <i32>
 }
 
 // -----
 
 // CHECK-LABEL:   handshake.func @boundUleCstFlip(
-// CHECK-SAME:                                    %[[VAL_0:.*]]: i32,
-// CHECK-SAME:                                    %[[VAL_1:.*]]: none, ...) -> i32 attributes {argNames = ["arg0", "start"], resNames = ["out0"]} {
-// CHECK:           %[[VAL_2:.*]] = arith.trunci %[[VAL_0]] {handshake.bb = 0 : ui32} : i32 to i5
-// CHECK:           %[[VAL_3:.*]] = constant %[[VAL_1]] {value = 16 : i6} : i6
-// CHECK:           %[[VAL_4:.*]] = arith.extsi %[[VAL_3]] : i6 to i32
-// CHECK:           %[[VAL_5:.*]] = arith.cmpi ule, %[[VAL_4]], %[[VAL_0]] : i32
-// CHECK:           %[[VAL_6:.*]], %[[VAL_7:.*]] = cond_br %[[VAL_5]], %[[VAL_2]] : i5
-// CHECK:           %[[VAL_8:.*]] = arith.extsi %[[VAL_7]] : i5 to i32
-// CHECK:           %[[VAL_9:.*]] = return %[[VAL_8]] : i32
-// CHECK:           end %[[VAL_9]] : i32
+// CHECK-SAME:                                    %[[VAL_0:.*]]: !handshake.channel<i32>,
+// CHECK-SAME:                                    %[[VAL_1:.*]]: !handshake.control<>, ...) -> !handshake.channel<i32> attributes {argNames = ["arg0", "start"], resNames = ["out0"]} {
+// CHECK:           %[[VAL_2:.*]] = trunci %[[VAL_0]] {handshake.bb = 0 : ui32} : <i32> to <i5>
+// CHECK:           %[[VAL_3:.*]] = constant %[[VAL_1]] {value = 16 : i6} : <i6>
+// CHECK:           %[[VAL_4:.*]] = extsi %[[VAL_3]] : <i6> to <i32>
+// CHECK:           %[[VAL_5:.*]] = cmpi ule, %[[VAL_4]], %[[VAL_0]] : <i32>
+// CHECK:           %[[VAL_6:.*]], %[[VAL_7:.*]] = cond_br %[[VAL_5]], %[[VAL_2]] : <i1>, <i5>
+// CHECK:           %[[VAL_8:.*]] = extsi %[[VAL_7]] : <i5> to <i32>
+// CHECK:           end %[[VAL_8]] : <i32>
 // CHECK:         }
-handshake.func @boundUleCstFlip(%arg0: i32, %start: none) -> i32 {
-  %bound = constant %start {value = 16 : i6} : i6
-  %boundExt = arith.extsi %bound : i6 to i32
-  %cond = arith.cmpi ule, %boundExt, %arg0 : i32
-  %true, %false = cond_br %cond, %arg0 : i32
-  %returnVal = return %false : i32
-  end %returnVal : i32
+handshake.func @boundUleCstFlip(%arg0: !handshake.channel<i32>, %start: !handshake.control<>) -> !handshake.channel<i32> {
+  %bound = constant %start {value = 16 : i6} : <i6>
+  %boundExt = extsi %bound : <i6> to <i32>
+  %cond = cmpi ule, %boundExt, %arg0 : <i32>
+  %true, %false = cond_br %cond, %arg0 : <i1>, <i32>
+  end %false : <i32>
 }
 
 // -----
 
 // CHECK-LABEL:   handshake.func @argUleArg(
-// CHECK-SAME:                              %[[VAL_0:.*]]: i32,
-// CHECK-SAME:                              %[[VAL_1:.*]]: i8,
-// CHECK-SAME:                              %[[VAL_2:.*]]: none, ...) -> i32 attributes {argNames = ["arg0", "bound", "start"], resNames = ["out0"]} {
-// CHECK:           %[[VAL_3:.*]] = arith.trunci %[[VAL_0]] {handshake.bb = 0 : ui32} : i32 to i8
-// CHECK:           %[[VAL_4:.*]] = arith.extsi %[[VAL_1]] : i8 to i32
-// CHECK:           %[[VAL_5:.*]] = arith.cmpi ule, %[[VAL_0]], %[[VAL_4]] : i32
-// CHECK:           %[[VAL_6:.*]], %[[VAL_7:.*]] = cond_br %[[VAL_5]], %[[VAL_3]] : i8
-// CHECK:           %[[VAL_8:.*]] = arith.extsi %[[VAL_6]] : i8 to i32
-// CHECK:           %[[VAL_9:.*]] = return %[[VAL_8]] : i32
-// CHECK:           end %[[VAL_9]] : i32
+// CHECK-SAME:                              %[[VAL_0:.*]]: !handshake.channel<i32>, %[[VAL_1:.*]]: !handshake.channel<i8>,
+// CHECK-SAME:                              %[[VAL_2:.*]]: !handshake.control<>, ...) -> !handshake.channel<i32> attributes {argNames = ["arg0", "bound", "start"], resNames = ["out0"]} {
+// CHECK:           %[[VAL_3:.*]] = trunci %[[VAL_0]] {handshake.bb = 0 : ui32} : <i32> to <i8>
+// CHECK:           %[[VAL_4:.*]] = extsi %[[VAL_1]] : <i8> to <i32>
+// CHECK:           %[[VAL_5:.*]] = cmpi ule, %[[VAL_0]], %[[VAL_4]] : <i32>
+// CHECK:           %[[VAL_6:.*]], %[[VAL_7:.*]] = cond_br %[[VAL_5]], %[[VAL_3]] : <i1>, <i8>
+// CHECK:           %[[VAL_8:.*]] = extsi %[[VAL_6]] : <i8> to <i32>
+// CHECK:           end %[[VAL_8]] : <i32>
 // CHECK:         }
-handshake.func @argUleArg(%arg0: i32, %bound: i8, %start: none) -> i32 {
-  %boundExt = arith.extsi %bound : i8 to i32
-  %cond = arith.cmpi ule, %arg0, %boundExt : i32
-  %true, %false = cond_br %cond, %arg0 : i32
-  %returnVal = return %true : i32
-  end %returnVal : i32
+handshake.func @argUleArg(%arg0: !handshake.channel<i32>, %bound: !handshake.channel<i8>, %start: !handshake.control<>) -> !handshake.channel<i32> {
+  %boundExt = extsi %bound : <i8> to <i32>
+  %cond = cmpi ule, %arg0, %boundExt : <i32>
+  %true, %false = cond_br %cond, %arg0 : <i1>, <i32>
+  end %true : <i32>
 }
 
 // -----
 
 // CHECK-LABEL:   handshake.func @mulCmps(
-// CHECK-SAME:                            %[[VAL_0:.*]]: i32, %[[VAL_1:.*]]: i4,
-// CHECK-SAME:                            %[[VAL_2:.*]]: none, ...) -> i32 attributes {argNames = ["arg0", "bound", "start"], resNames = ["out0"]} {
-// CHECK:           %[[VAL_3:.*]] = arith.trunci %[[VAL_0]] {handshake.bb = 0 : ui32} : i32 to i4
-// CHECK:           %[[VAL_4:.*]] = constant %[[VAL_2]] {value = false} : i1
-// CHECK:           %[[VAL_5:.*]] = constant %[[VAL_2]] {value = 50 : i7} : i7
-// CHECK:           %[[VAL_6:.*]] = constant %[[VAL_2]] {value = 100 : i8} : i8
-// CHECK:           %[[VAL_7:.*]] = arith.extsi %[[VAL_4]] : i1 to i32
-// CHECK:           %[[VAL_8:.*]] = arith.extsi %[[VAL_5]] : i7 to i32
-// CHECK:           %[[VAL_9:.*]] = arith.extsi %[[VAL_6]] : i8 to i32
-// CHECK:           %[[VAL_10:.*]] = arith.extsi %[[VAL_1]] : i4 to i32
-// CHECK:           %[[VAL_11:.*]] = arith.cmpi uge, %[[VAL_0]], %[[VAL_7]] : i32
-// CHECK:           %[[VAL_12:.*]] = arith.cmpi ult, %[[VAL_0]], %[[VAL_9]] : i32
-// CHECK:           %[[VAL_13:.*]] = arith.cmpi ne, %[[VAL_0]], %[[VAL_8]] : i32
-// CHECK:           %[[VAL_14:.*]] = arith.cmpi ult, %[[VAL_0]], %[[VAL_10]] : i32
-// CHECK:           %[[VAL_15:.*]] = arith.andi %[[VAL_11]], %[[VAL_12]] : i1
-// CHECK:           %[[VAL_16:.*]] = arith.andi %[[VAL_13]], %[[VAL_14]] : i1
-// CHECK:           %[[VAL_17:.*]] = arith.andi %[[VAL_15]], %[[VAL_16]] : i1
-// CHECK:           %[[VAL_18:.*]], %[[VAL_19:.*]] = cond_br %[[VAL_17]], %[[VAL_3]] : i4
-// CHECK:           %[[VAL_20:.*]] = arith.extsi %[[VAL_18]] : i4 to i32
-// CHECK:           %[[VAL_21:.*]] = return %[[VAL_20]] : i32
-// CHECK:           end %[[VAL_21]] : i32
+// CHECK-SAME:                            %[[VAL_0:.*]]: !handshake.channel<i32>, %[[VAL_1:.*]]: !handshake.channel<i4>,
+// CHECK-SAME:                            %[[VAL_2:.*]]: !handshake.control<>, ...) -> !handshake.channel<i32> attributes {argNames = ["arg0", "bound", "start"], resNames = ["out0"]} {
+// CHECK:           %[[VAL_3:.*]] = trunci %[[VAL_0]] {handshake.bb = 0 : ui32} : <i32> to <i4>
+// CHECK:           %[[VAL_4:.*]] = constant %[[VAL_2]] {value = false} : <i1>
+// CHECK:           %[[VAL_5:.*]] = constant %[[VAL_2]] {value = 50 : i7} : <i7>
+// CHECK:           %[[VAL_6:.*]] = constant %[[VAL_2]] {value = 100 : i8} : <i8>
+// CHECK:           %[[VAL_7:.*]] = extsi %[[VAL_4]] : <i1> to <i32>
+// CHECK:           %[[VAL_8:.*]] = extsi %[[VAL_5]] : <i7> to <i32>
+// CHECK:           %[[VAL_9:.*]] = extsi %[[VAL_6]] : <i8> to <i32>
+// CHECK:           %[[VAL_10:.*]] = extsi %[[VAL_1]] : <i4> to <i32>
+// CHECK:           %[[VAL_11:.*]] = cmpi uge, %[[VAL_0]], %[[VAL_7]] : <i32>
+// CHECK:           %[[VAL_12:.*]] = cmpi ult, %[[VAL_0]], %[[VAL_9]] : <i32>
+// CHECK:           %[[VAL_13:.*]] = cmpi ne, %[[VAL_0]], %[[VAL_8]] : <i32>
+// CHECK:           %[[VAL_14:.*]] = cmpi ult, %[[VAL_0]], %[[VAL_10]] : <i32>
+// CHECK:           %[[VAL_15:.*]] = andi %[[VAL_11]], %[[VAL_12]] : <i1>
+// CHECK:           %[[VAL_16:.*]] = andi %[[VAL_13]], %[[VAL_14]] : <i1>
+// CHECK:           %[[VAL_17:.*]] = andi %[[VAL_15]], %[[VAL_16]] : <i1>
+// CHECK:           %[[VAL_18:.*]], %[[VAL_19:.*]] = cond_br %[[VAL_17]], %[[VAL_3]] : <i1>, <i4>
+// CHECK:           %[[VAL_20:.*]] = extsi %[[VAL_18]] : <i4> to <i32>
+// CHECK:           end %[[VAL_20]] : <i32>
 // CHECK:         }
-handshake.func @mulCmps(%arg0: i32, %bound: i4, %start: none) -> i32 {
-  %0 = constant %start {value = 0 : i1} : i1
-  %50 = constant %start {value = 50 : i7} : i7
-  %100 = constant %start {value = 100 : i8} : i8
-  %ext0 = arith.extsi %0 : i1 to i32
-  %ext50 = arith.extsi %50 : i7 to i32
-  %ext100 = arith.extsi %100 : i8 to i32
-  %extBound = arith.extsi %bound : i4 to i32
-  %ge0 = arith.cmpi uge, %arg0, %ext0 : i32
-  %lt100 = arith.cmpi ult, %arg0, %ext100 : i32
-  %ne50 = arith.cmpi ne, %arg0, %ext50 : i32
-  %ltBound = arith.cmpi ult, %arg0, %extBound : i32
-  %and1 = arith.andi %ge0, %lt100 : i1
-  %and2 = arith.andi %ne50, %ltBound : i1
-  %cond = arith.andi %and1, %and2 : i1
-  %true, %false = cond_br %cond, %arg0 : i32
-  %returnVal = return %true : i32
-  end %returnVal : i32
+handshake.func @mulCmps(%arg0: !handshake.channel<i32>, %bound: !handshake.channel<i4>, %start: !handshake.control<>) -> !handshake.channel<i32> {
+  %0 = constant %start {value = 0 : i1} : <i1>
+  %50 = constant %start {value = 50 : i7} : <i7>
+  %100 = constant %start {value = 100 : i8} : <i8>
+  %ext0 = extsi %0 : <i1> to <i32>
+  %ext50 = extsi %50 : <i7> to <i32>
+  %ext100 = extsi %100 : <i8> to <i32>
+  %extBound = extsi %bound : <i4> to <i32>
+  %ge0 = cmpi uge, %arg0, %ext0 : <i32>
+  %lt100 = cmpi ult, %arg0, %ext100 : <i32>
+  %ne50 = cmpi ne, %arg0, %ext50 : <i32>
+  %ltBound = cmpi ult, %arg0, %extBound : <i32>
+  %and1 = andi %ge0, %lt100 : <i1>
+  %and2 = andi %ne50, %ltBound : <i1>
+  %cond = andi %and1, %and2 : <i1>
+  %true, %false = cond_br %cond, %arg0 : <i1>, <i32>
+  end %true : <i32>
 }
 
 // -----
 
 // CHECK-LABEL:   handshake.func @simpleLoop(
-// CHECK-SAME:                               %[[VAL_0:.*]]: none, ...) -> i32 attributes {argNames = ["start"], resNames = ["out0"]} {
+// CHECK-SAME:                               %[[VAL_0:.*]]: !handshake.control<>, ...) -> !handshake.channel<i32> attributes {argNames = ["start"], resNames = ["out0"]} {
 // CHECK:           %[[VAL_1:.*]] = source
-// CHECK:           %[[VAL_2:.*]] = constant %[[VAL_0]] {value = false} : i1
-// CHECK:           %[[VAL_3:.*]] = arith.extsi %[[VAL_2]] : i1 to i5
-// CHECK:           %[[VAL_4:.*]] = constant %[[VAL_1]] {value = 16 : i6} : i6
-// CHECK:           %[[VAL_5:.*]] = constant %[[VAL_1]] {value = 1 : i2} : i2
-// CHECK:           %[[VAL_6:.*]] = arith.extsi %[[VAL_5]] : i2 to i6
-// CHECK:           %[[VAL_7:.*]] = merge %[[VAL_3]], %[[VAL_8:.*]] : i5
-// CHECK:           %[[VAL_9:.*]] = arith.extsi %[[VAL_7]] : i5 to i6
-// CHECK:           %[[VAL_10:.*]] = arith.addi %[[VAL_9]], %[[VAL_6]] : i6
-// CHECK:           %[[VAL_11:.*]] = arith.cmpi ult, %[[VAL_10]], %[[VAL_4]] : i6
-// CHECK:           %[[VAL_12:.*]], %[[VAL_13:.*]] = cond_br %[[VAL_11]], %[[VAL_10]] : i6
-// CHECK:           %[[VAL_14:.*]] = arith.extsi %[[VAL_13]] : i6 to i32
-// CHECK:           %[[VAL_8]] = arith.trunci %[[VAL_12]] : i6 to i5
-// CHECK:           %[[VAL_15:.*]] = return %[[VAL_14]] : i32
-// CHECK:           end %[[VAL_15]] : i32
+// CHECK:           %[[VAL_2:.*]] = constant %[[VAL_0]] {value = false} : <i1>
+// CHECK:           %[[VAL_3:.*]] = extsi %[[VAL_2]] : <i1> to <i5>
+// CHECK:           %[[VAL_4:.*]] = constant %[[VAL_1]] {value = 16 : i6} : <i6>
+// CHECK:           %[[VAL_5:.*]] = constant %[[VAL_1]] {value = 1 : i2} : <i2>
+// CHECK:           %[[VAL_6:.*]] = extsi %[[VAL_5]] : <i2> to <i6>
+// CHECK:           %[[VAL_7:.*]] = merge %[[VAL_3]], %[[VAL_8:.*]] : <i5>
+// CHECK:           %[[VAL_9:.*]] = extsi %[[VAL_7]] : <i5> to <i6>
+// CHECK:           %[[VAL_10:.*]] = addi %[[VAL_9]], %[[VAL_6]] : <i6>
+// CHECK:           %[[VAL_11:.*]] = cmpi ult, %[[VAL_10]], %[[VAL_4]] : <i6>
+// CHECK:           %[[VAL_12:.*]], %[[VAL_13:.*]] = cond_br %[[VAL_11]], %[[VAL_10]] : <i1>, <i6>
+// CHECK:           %[[VAL_14:.*]] = extsi %[[VAL_13]] : <i6> to <i32>
+// CHECK:           %[[VAL_8]] = trunci %[[VAL_12]] : <i6> to <i5>
+// CHECK:           end %[[VAL_14]] : <i32>
 // CHECK:         }
-handshake.func @simpleLoop(%start: none) -> i32 {
+handshake.func @simpleLoop(%start: !handshake.control<>) -> !handshake.channel<i32> {
   %source = source
-  %zeroMin = constant %start {value = 0 : i1} : i1
-  %zero = arith.extsi %zeroMin : i1 to i32
-  %boundMin = constant %source {value = 16 : i6} : i6
-  %bound = arith.extsi %boundMin : i6 to i32
-  %oneMin = constant %source {value = 1 : i2} : i2
-  %one = arith.extsi %oneMin : i2 to i32
-  %iter = merge %zero, %lt : i32
-  %add = arith.addi %iter, %one : i32
-  %cond = arith.cmpi ult, %add, %bound : i32
-  %lt, %ge = cond_br %cond, %add : i32
-  %returnVal = return %ge : i32
-  end %returnVal : i32
+  %zeroMin = constant %start {value = 0 : i1} : <i1>
+  %zero = extsi %zeroMin : <i1> to <i32>
+  %boundMin = constant %source {value = 16 : i6} : <i6>
+  %bound = extsi %boundMin : <i6> to <i32>
+  %oneMin = constant %source {value = 1 : i2} : <i2>
+  %one = extsi %oneMin : <i2> to <i32>
+  %iter = merge %zero, %lt : <i32>
+  %add = addi %iter, %one : <i32>
+  %cond = cmpi ult, %add, %bound : <i32>
+  %lt, %ge = cond_br %cond, %add : <i1>, <i32>
+  end %ge : <i32>
 }
 
 // -----
 
 // CHECK-LABEL:   handshake.func @nestedLoop(
-// CHECK-SAME:                               %[[VAL_0:.*]]: none, ...) -> i32 attributes {argNames = ["start"], resNames = ["out0"]} {
+// CHECK-SAME:                               %[[VAL_0:.*]]: !handshake.control<>, ...) -> !handshake.channel<i32> attributes {argNames = ["start"], resNames = ["out0"]} {
 // CHECK:           %[[VAL_1:.*]] = source {handshake.bb = 0 : ui32}
-// CHECK:           %[[VAL_2:.*]] = constant %[[VAL_1]] {value = 16 : i6} : i6
-// CHECK:           %[[VAL_3:.*]] = constant %[[VAL_1]] {value = false} : i1
-// CHECK:           %[[VAL_4:.*]] = arith.extsi %[[VAL_3]] : i1 to i5
-// CHECK:           %[[VAL_5:.*]] = arith.extsi %[[VAL_3]] : i1 to i32
-// CHECK:           %[[VAL_6:.*]] = constant %[[VAL_1]] {value = 1 : i2} : i2
-// CHECK:           %[[VAL_7:.*]] = arith.extsi %[[VAL_6]] : i2 to i6
-// CHECK:           %[[VAL_8:.*]], %[[VAL_9:.*]] = control_merge %[[VAL_0]], %[[VAL_10:.*]] : none, i1
-// CHECK:           %[[VAL_11:.*]] = mux %[[VAL_9]] {{\[}}%[[VAL_4]], %[[VAL_12:.*]]] : i1, i5
-// CHECK:           %[[VAL_13:.*]] = arith.extsi %[[VAL_11]] : i5 to i6
-// CHECK:           %[[VAL_14:.*]] = mux %[[VAL_9]] {{\[}}%[[VAL_5]], %[[VAL_15:.*]]] : i1, i32
-// CHECK:           %[[VAL_16:.*]] = arith.addi %[[VAL_13]], %[[VAL_7]] : i6
-// CHECK:           %[[VAL_17:.*]] = arith.trunci %[[VAL_16]] : i6 to i5
-// CHECK:           %[[VAL_18:.*]] = arith.cmpi ult, %[[VAL_16]], %[[VAL_2]] : i6
-// CHECK:           %[[VAL_12]], %[[VAL_19:.*]] = cond_br %[[VAL_18]], %[[VAL_17]] : i5
-// CHECK:           %[[VAL_20:.*]], %[[VAL_21:.*]] = cond_br %[[VAL_18]], %[[VAL_14]] : i32
-// CHECK:           %[[VAL_22:.*]], %[[VAL_23:.*]] = cond_br %[[VAL_18]], %[[VAL_8]] : none
+// CHECK:           %[[VAL_2:.*]] = constant %[[VAL_1]] {value = 16 : i6} : <i6>
+// CHECK:           %[[VAL_3:.*]] = constant %[[VAL_1]] {value = false} : <i1>
+// CHECK:           %[[VAL_4:.*]] = extsi %[[VAL_3]] : <i1> to <i5>
+// CHECK:           %[[VAL_5:.*]] = extsi %[[VAL_3]] : <i1> to <i32>
+// CHECK:           %[[VAL_6:.*]] = constant %[[VAL_1]] {value = 1 : i2} : <i2>
+// CHECK:           %[[VAL_7:.*]] = extsi %[[VAL_6]] : <i2> to <i6>
+// CHECK:           %[[VAL_8:.*]], %[[VAL_9:.*]] = control_merge %[[VAL_0]], %[[VAL_10:.*]]  : <>, <i1>
+// CHECK:           %[[VAL_11:.*]] = mux %[[VAL_9]] {{\[}}%[[VAL_4]], %[[VAL_12:.*]]] : <i1>, <i5>
+// CHECK:           %[[VAL_13:.*]] = extsi %[[VAL_11]] : <i5> to <i6>
+// CHECK:           %[[VAL_14:.*]] = mux %[[VAL_9]] {{\[}}%[[VAL_5]], %[[VAL_15:.*]]] : <i1>, <i32>
+// CHECK:           %[[VAL_16:.*]] = addi %[[VAL_13]], %[[VAL_7]] : <i6>
+// CHECK:           %[[VAL_17:.*]] = trunci %[[VAL_16]] : <i6> to <i5>
+// CHECK:           %[[VAL_18:.*]] = cmpi ult, %[[VAL_16]], %[[VAL_2]] : <i6>
+// CHECK:           %[[VAL_12]], %[[VAL_19:.*]] = cond_br %[[VAL_18]], %[[VAL_17]] : <i1>, <i5>
+// CHECK:           %[[VAL_20:.*]], %[[VAL_21:.*]] = cond_br %[[VAL_18]], %[[VAL_14]] : <i1>, <i32>
+// CHECK:           %[[VAL_22:.*]], %[[VAL_23:.*]] = cond_br %[[VAL_18]], %[[VAL_8]] : <i1>, <>
 // CHECK:           %[[VAL_24:.*]] = source
-// CHECK:           %[[VAL_25:.*]] = constant %[[VAL_24]] {value = 32 : i7} : i7
-// CHECK:           %[[VAL_26:.*]] = constant %[[VAL_24]] {value = false} : i1
-// CHECK:           %[[VAL_27:.*]] = arith.extsi %[[VAL_26]] : i1 to i6
-// CHECK:           %[[VAL_28:.*]] = constant %[[VAL_24]] {value = 1 : i2} : i2
-// CHECK:           %[[VAL_29:.*]] = arith.extsi %[[VAL_28]] : i2 to i7
-// CHECK:           %[[VAL_30:.*]], %[[VAL_31:.*]] = control_merge %[[VAL_22]], %[[VAL_32:.*]] : none, i1
-// CHECK:           %[[VAL_33:.*]] = mux %[[VAL_31]] {{\[}}%[[VAL_27]], %[[VAL_34:.*]]] : i1, i6
-// CHECK:           %[[VAL_35:.*]] = arith.extsi %[[VAL_33]] : i6 to i7
-// CHECK:           %[[VAL_36:.*]] = mux %[[VAL_31]] {{\[}}%[[VAL_20]], %[[VAL_37:.*]]] : i1, i32
-// CHECK:           %[[VAL_38:.*]] = arith.addi %[[VAL_35]], %[[VAL_29]] : i7
-// CHECK:           %[[VAL_39:.*]] = arith.trunci %[[VAL_38]] : i7 to i6
-// CHECK:           %[[VAL_40:.*]] = arith.cmpi ult, %[[VAL_38]], %[[VAL_25]] : i7
-// CHECK:           %[[VAL_34]], %[[VAL_41:.*]] = cond_br %[[VAL_40]], %[[VAL_39]] : i6
-// CHECK:           %[[VAL_42:.*]], %[[VAL_15]] = cond_br %[[VAL_40]], %[[VAL_36]] : i32
-// CHECK:           %[[VAL_43:.*]], %[[VAL_10]] = cond_br %[[VAL_40]], %[[VAL_30]] : none
+// CHECK:           %[[VAL_25:.*]] = constant %[[VAL_24]] {value = 32 : i7} : <i7>
+// CHECK:           %[[VAL_26:.*]] = constant %[[VAL_24]] {value = false} : <i1>
+// CHECK:           %[[VAL_27:.*]] = extsi %[[VAL_26]] : <i1> to <i6>
+// CHECK:           %[[VAL_28:.*]] = constant %[[VAL_24]] {value = 1 : i2} : <i2>
+// CHECK:           %[[VAL_29:.*]] = extsi %[[VAL_28]] : <i2> to <i7>
+// CHECK:           %[[VAL_30:.*]], %[[VAL_31:.*]] = control_merge %[[VAL_22]], %[[VAL_32:.*]]  : <>, <i1>
+// CHECK:           %[[VAL_33:.*]] = mux %[[VAL_31]] {{\[}}%[[VAL_27]], %[[VAL_34:.*]]] : <i1>, <i6>
+// CHECK:           %[[VAL_35:.*]] = extsi %[[VAL_33]] : <i6> to <i7>
+// CHECK:           %[[VAL_36:.*]] = mux %[[VAL_31]] {{\[}}%[[VAL_20]], %[[VAL_37:.*]]] : <i1>, <i32>
+// CHECK:           %[[VAL_38:.*]] = addi %[[VAL_35]], %[[VAL_29]] : <i7>
+// CHECK:           %[[VAL_39:.*]] = trunci %[[VAL_38]] : <i7> to <i6>
+// CHECK:           %[[VAL_40:.*]] = cmpi ult, %[[VAL_38]], %[[VAL_25]] : <i7>
+// CHECK:           %[[VAL_34]], %[[VAL_41:.*]] = cond_br %[[VAL_40]], %[[VAL_39]] : <i1>, <i6>
+// CHECK:           %[[VAL_42:.*]], %[[VAL_15]] = cond_br %[[VAL_40]], %[[VAL_36]] : <i1>, <i32>
+// CHECK:           %[[VAL_43:.*]], %[[VAL_10]] = cond_br %[[VAL_40]], %[[VAL_30]] : <i1>, <>
 // CHECK:           %[[VAL_44:.*]] = source
-// CHECK:           %[[VAL_45:.*]] = constant %[[VAL_44]] {value = 10 : i5} : i5
-// CHECK:           %[[VAL_46:.*]] = arith.extsi %[[VAL_45]] : i5 to i32
-// CHECK:           %[[VAL_47:.*]] = merge %[[VAL_43]] : none
-// CHECK:           %[[VAL_48:.*]] = merge %[[VAL_42]] : i32
-// CHECK:           %[[VAL_49:.*]] = arith.addi %[[VAL_48]], %[[VAL_46]] : i32
-// CHECK:           %[[VAL_37]] = br %[[VAL_49]] : i32
-// CHECK:           %[[VAL_32]] = br %[[VAL_47]] : none
-// CHECK:           %[[VAL_50:.*]] = merge %[[VAL_21]] : i32
-// CHECK:           %[[VAL_51:.*]] = return %[[VAL_50]] : i32
-// CHECK:           end %[[VAL_51]] : i32
+// CHECK:           %[[VAL_45:.*]] = constant %[[VAL_44]] {value = 10 : i5} : <i5>
+// CHECK:           %[[VAL_46:.*]] = extsi %[[VAL_45]] : <i5> to <i32>
+// CHECK:           %[[VAL_47:.*]], %[[VAL_48:.*]] = control_merge %[[VAL_43]]  : <>, <i1>
+// CHECK:           %[[VAL_49:.*]] = merge %[[VAL_42]] : <i32>
+// CHECK:           %[[VAL_50:.*]] = addi %[[VAL_49]], %[[VAL_46]] : <i32>
+// CHECK:           %[[VAL_37]] = br %[[VAL_50]] : <i32>
+// CHECK:           %[[VAL_32]] = br %[[VAL_47]] : <>
+// CHECK:           %[[VAL_51:.*]] = merge %[[VAL_21]] : <i32>
+// CHECK:           end %[[VAL_51]] : <i32>
 // CHECK:         }
-handshake.func @nestedLoop(%start: none) -> i32 {
+handshake.func @nestedLoop(%start: !handshake.control<>) -> !handshake.channel<i32> {
 // ^^entry outer loop:
   %sourceOut = source {handshake.bb = 0 : ui32}
-  %boundMinOut = constant %sourceOut {value = 16 : i6} : i6
-  %boundOut = arith.extsi %boundMinOut : i6 to i32
-  %zeroMinOut = constant %sourceOut {value = 0 : i1} : i1
-  %zeroOut = arith.extsi %zeroMinOut : i1 to i32
-  %oneMinOut = constant %sourceOut {value = 1 : i2} : i2
-  %oneOut = arith.extsi %oneMinOut : i2 to i32
+  %boundMinOut = constant %sourceOut {value = 16 : i6} : <i6>
+  %boundOut = extsi %boundMinOut : <i6> to <i32>
+  %zeroMinOut = constant %sourceOut {value = 0 : i1} : <i1>
+  %zeroOut = extsi %zeroMinOut : <i1> to <i32>
+  %oneMinOut = constant %sourceOut {value = 1 : i2} : <i2>
+  %oneOut = extsi %oneMinOut : <i2> to <i32>
 // begin block
-  %ctrlOut, %indexOut = control_merge %start, %ctrlToOut : none, i32
-  %iterOut = mux %indexOut [%zeroOut, %ltOut] : i32, i32
-  %accOut = mux %indexOut [%zeroOut, %accToOut] : i32, i32
-  %addOut = arith.addi %iterOut, %oneOut : i32
-  %condOut = arith.cmpi ult, %addOut, %boundOut : i32
-  %ltOut, %geOut = cond_br %condOut, %addOut : i32
-  %accToIn, %accToExit = cond_br %condOut, %accOut : i32
-  %ctrlToIn, %ctrlToExit = cond_br %condOut, %ctrlOut : none
+  %ctrlOut, %indexOut = control_merge %start, %ctrlToOut : <>, <i32>
+  %iterOut = mux %indexOut [%zeroOut, %ltOut] : <i32>, <i32>
+  %accOut = mux %indexOut [%zeroOut, %accToOut] : <i32>, <i32>
+  %addOut = addi %iterOut, %oneOut : <i32>
+  %condOut = cmpi ult, %addOut, %boundOut : <i32>
+  %ltOut, %geOut = cond_br %condOut, %addOut : <i1>, <i32>
+  %accToIn, %accToExit = cond_br %condOut, %accOut : <i1>, <i32>
+  %ctrlToIn, %ctrlToExit = cond_br %condOut, %ctrlOut : <i1>, <>
 // ^^body outer loop / entry inner loop:
   %sourceIn = source
-  %boundMinIn = constant %sourceIn {value = 32 : i7} : i7
-  %boundIn = arith.extsi %boundMinIn  : i7 to i32
-  %zeroMinIn = constant %sourceIn {value = 0 : i1} : i1
-  %zeroIn = arith.extsi %zeroMinIn : i1 to i32
-  %oneMinIn = constant %sourceIn {value = 1 : i2} : i2
-  %oneIn = arith.extsi %oneMinIn : i2 to i32
+  %boundMinIn = constant %sourceIn {value = 32 : i7} : <i7>
+  %boundIn = extsi %boundMinIn  : <i7> to <i32>
+  %zeroMinIn = constant %sourceIn {value = 0 : i1} : <i1>
+  %zeroIn = extsi %zeroMinIn : <i1> to <i32>
+  %oneMinIn = constant %sourceIn {value = 1 : i2} : <i2>
+  %oneIn = extsi %oneMinIn : <i2> to <i32>
 // begin block
-  %ctrlIn, %indexIn = control_merge %ctrlToIn, %ctrlToInFromBody : none, i32
-  %iterIn = mux %indexIn [%zeroIn, %ltIn] : i32, i32
-  %accIn = mux %indexIn [%accToIn, %accToInFromBody]  : i32, i32
-  %addIn = arith.addi %iterIn, %oneIn : i32
-  %condIn = arith.cmpi ult, %addIn, %boundIn : i32
-  %ltIn, %geIn = cond_br %condIn, %addIn : i32
-  %accToInBody, %accToOut = cond_br %condIn, %accIn : i32
-  %ctrlToInBody, %ctrlToOut = cond_br %condIn, %ctrlIn : none
+  %ctrlIn, %indexIn = control_merge %ctrlToIn, %ctrlToInFromBody : <>, <i32>
+  %iterIn = mux %indexIn [%zeroIn, %ltIn] : <i32>, <i32>
+  %accIn = mux %indexIn [%accToIn, %accToInFromBody]  : <i32>, <i32>
+  %addIn = addi %iterIn, %oneIn : <i32>
+  %condIn = cmpi ult, %addIn, %boundIn : <i32>
+  %ltIn, %geIn = cond_br %condIn, %addIn : <i1>, <i32>
+  %accToInBody, %accToOut = cond_br %condIn, %accIn : <i1>, <i32>
+  %ctrlToInBody, %ctrlToOut = cond_br %condIn, %ctrlIn : <i1>, <>
 // ^^body inner loop:
   %sourceInBody = source
-  %tenMinInBody = constant %sourceInBody {value = 10 : i5} : i5
-  %tenInBody = arith.extsi %tenMinInBody : i5 to i32
+  %tenMinInBody = constant %sourceInBody {value = 10 : i5} : <i5>
+  %tenInBody = extsi %tenMinInBody : <i5> to <i32>
 // begin block
-  %ctrlInBody, %indexInBody = control_merge %ctrlToInBody : none, i32
-  %accInBody = merge %accToInBody : i32
-  %accInc = arith.addi %accInBody, %tenInBody : i32
-  %accToInFromBody = br %accInc : i32
-  %ctrlToInFromBody = br %ctrlInBody : none
+  %ctrlInBody, %indexInBody = control_merge %ctrlToInBody : <>, <i32>
+  %accInBody = merge %accToInBody : <i32>
+  %accInc = addi %accInBody, %tenInBody : <i32>
+  %accToInFromBody = br %accInc : <i32>
+  %ctrlToInFromBody = br %ctrlInBody : <>
 // ^^exit:
-  %ctrlEnd, %indexEnd = control_merge %ctrlToExit : none, i32
-  %accExit = merge %accToExit : i32
-  %returnVal = return %accExit : i32
-  end %returnVal : i32
+  %ctrlEnd, %indexEnd = control_merge %ctrlToExit : <>, <i32>
+  %accExit = merge %accToExit : <i32>
+  end %accExit : <i32>
 }
