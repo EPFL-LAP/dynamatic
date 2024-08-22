@@ -186,6 +186,9 @@ void ControlDependenceAnalysis::identifyForwardControlDeps(FuncOp &funcOp) {
   // Get loop information to eliminate loop exits from the dependencies
   CFGLoopInfo li(domTree);
 
+  // Get information about post-dominance
+  PostDominanceInfo postDomInfo;
+
   DenseMap<Block *, SmallVector<Block *, 4>> control_deps_map;
 
   // Initialize the control_deps_maps by creating an entry for every block
@@ -205,7 +208,7 @@ void ControlDependenceAnalysis::identifyForwardControlDeps(FuncOp &funcOp) {
     SmallVector<Block *, 4> block_deps =
         all_control_deps_maps[all_control_deps_maps.size() - 1][&block];
 
-    for (auto &one_dep : block_deps) {
+    for (Block* one_dep : block_deps) {
       CFGLoop *loop = li.getLoopFor(one_dep);
       if (loop == nullptr) {
         // indicating that the one_dep is not inside any loop, so it must be a
@@ -219,8 +222,8 @@ void ControlDependenceAnalysis::identifyForwardControlDeps(FuncOp &funcOp) {
         // check if one_dep is an exit of the loop
         SmallVector<Block *> loop_exitBlocks;
         loop->getExitingBlocks(loop_exitBlocks);
-        for (auto &loop_exit : loop_exitBlocks) {
-          if (loop_exit == one_dep) {
+        for (Block* loop_exit : loop_exitBlocks) {
+          if (loop_exit == one_dep && !postDomInfo.properlyPostDominates(loop_exit, &block)) {
             not_forward = true;
             break; // it is not a forward dependency so no need to contiue
                    // looping
