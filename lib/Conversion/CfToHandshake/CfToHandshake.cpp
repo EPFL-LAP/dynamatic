@@ -628,15 +628,6 @@ std::vector<Operation *> getLSQPredecessors(
   return combinedOperations;
 }
 
-void printMemDep(ProdConsMemDep memDep) {
-  llvm::errs() << "Memdep between: ";
-  memDep.prodBb->printAsOperand(llvm::errs());
-  llvm::errs() << " and ";
-  memDep.consBb->printAsOperand(llvm::errs());
-  llvm::errs() << " with backward ";
-  llvm::errs() << memDep.isBackward << "\n";
-}
-
 LogicalResult HandshakeLowering::verifyAndCreateMemInterfaces(
     ConversionPatternRewriter &rewriter, MemInterfacesInfo &memInfo) {
   // Create a mapping between each block and all the other blocks it properly
@@ -718,47 +709,7 @@ LogicalResult HandshakeLowering::verifyAndCreateMemInterfaces(
       std::set<Group *, GroupsComparator> groups;
       constructGroupsGraph(allOperations, allMemDeps, groups);
 
-      llvm::errs() << "Printing groups graph before minimization:\n";
-      for (Group *group : groups) {
-        llvm::errs() << "Group of: ";
-        group->bb->printAsOperand(llvm::errs());
-        llvm::errs() << "\n";
-        llvm::errs() << "Preds: ";
-        for (Group *pred : group->preds) {
-          pred->bb->printAsOperand(llvm::errs());
-          llvm::errs() << ", ";
-        }
-        llvm::errs() << "\n";
-        llvm::errs() << "Succs: ";
-        for (Group *succ : group->succs) {
-          succ->bb->printAsOperand(llvm::errs());
-          llvm::errs() << ", ";
-        }
-        llvm::errs() << "\n";
-      }
-      llvm::errs() << "Done printing groups graph:\n";
-
       minimizeGroupsConnections(groups);
-
-      llvm::errs() << "Printing groups graph:\n";
-      for (Group *group : groups) {
-        llvm::errs() << "Group of: ";
-        group->bb->printAsOperand(llvm::errs());
-        llvm::errs() << "\n";
-        llvm::errs() << "Preds: ";
-        for (Group *pred : group->preds) {
-          pred->bb->printAsOperand(llvm::errs());
-          llvm::errs() << ", ";
-        }
-        llvm::errs() << "\n";
-        llvm::errs() << "Succs: ";
-        for (Group *succ : group->succs) {
-          succ->bb->printAsOperand(llvm::errs());
-          llvm::errs() << ", ";
-        }
-        llvm::errs() << "\n";
-      }
-      llvm::errs() << "Done printing groups graph:\n";
 
       // Build the memory interfaces
       handshake::MemoryControllerOp mcOp;
@@ -1111,15 +1062,11 @@ void HandshakeLowering::identifyMemDeps(
       // those that are not memory operations, (2) those in the same BB as
       // the one currently in hand, (3) both preds are load if(BB_i > BB_j), (4)
       // those that are mutually exclusive
-      llvm::errs() << "i: " << *i << "\n";
-      llvm::errs() << "j: " << *j << "\n";
 
       if (!checkMemOp(j) || checkSameBB(i, j) || checkBothLd(i, j) ||
           (findAllPaths(i->getBlock(), j->getBlock()).empty() &&
            findAllPaths(j->getBlock(), i->getBlock()).empty()))
         continue;
-
-      llvm::errs() << "Not skipped\n";
 
       // Comparing BB_i and BB_j
       Block *bbI = i->getBlock();
@@ -1626,7 +1573,6 @@ LogicalResult HandshakeLowering::addPhi(ConversionPatternRewriter &rewriter) {
               rewriter.create<handshake::MergeOp>(input.getLoc(), input);
           input = mergeOp.getResult();
           merges.push_back(mergeOp);
-          llvm::errs() << "added merge\n";
         }
         consOp.replaceUsesOfWith(operand, input);
         for (auto *mergeOp : merges)
