@@ -60,6 +60,34 @@ static unsigned getNumExtInstanceArgs(handshake::EndOp endOp) {
   return 0;
 }
 
+/// Makes all (nested) types signless IntegerType's of the same width as the
+/// original type. At the HW/RTL level we treat everything as opaque bitvectors,
+/// so we no longer want to differentiate types of the same width w.r.t. their
+/// intended interpretation.
+static Type lowerType(Type type) {
+  return TypeSwitch<Type, Type>(type)
+      .Case<handshake::ChannelType>([&](handshake::ChannelType channelType) {
+        // Make sure the data type is signless IntegerType
+        unsigned width = channelType.getDataBitWidth();
+        Type dataType = IntegerType::get(type.getContext(), width);
+
+        // Make sure all extra signals are signless IntegerType's as well
+        SmallVector<ExtraSignal> extraSignals;
+        for (const ExtraSignal &extra : channelType.getExtraSignals()) {
+          unsigned extraWidth = extra.type.getIntOrFloatBitWidth();
+          Type newType = IntegerType::get(type.getContext(), extraWidth);
+          extraSignals.emplace_back(extra.name, newType, extra.downstream);
+        }
+        return handshake::ChannelType::get(dataType, extraSignals);
+      })
+      .Case<FloatType, IntegerType>([](auto type) {
+        unsigned width = type.getIntOrFloatBitWidth();
+        return IntegerType::get(type.getContext(), width);
+      })
+      .Case<handshake::ControlType>([](auto type) { return type; })
+      .Default([](auto type) { return nullptr; });
+}
+
 namespace {
 
 /// Helper class to build HW modules progressively by adding inputs/outputs
@@ -153,8 +181,11 @@ struct MemLoweringState {
 
   /// Constructs an instance of the object for the provided memory interface.
   MemLoweringState(handshake::MemoryOpInterface memOp, const Twine &name)
-      : name(name.str()), dataType(memOp.getMemRefType().getElementType()),
-        ports(getMemoryPorts(memOp)), portNames(memOp) {};
+      : name(name.str()),
+        dataType(lowerType(memOp.getMemRefType().getElementType())),
+        ports(getMemoryPorts(memOp)), portNames(memOp) {
+    assert(dataType && "unsupported memory element type");
+  };
 
   /// Returns the module's input ports that connect to the memory interface.
   SmallVector<hw::ModulePort> getMemInputPorts(hw::HWModuleOp modOp);
@@ -288,34 +319,6 @@ MemLoweringState::getMemOutputPorts(hw::HWModuleOp modOp) {
 LoweringState::LoweringState(mlir::ModuleOp modOp, NameAnalysis &namer,
                              OpBuilder &builder)
     : modOp(modOp), namer(namer), edgeBuilder(builder, modOp.getLoc()) {};
-
-/// Makes all (nested) types signless IntegerType's of the same width as the
-/// original type. At the HW/RTL level we treat everything as opaque bitvectors,
-/// so we no longer want to differentiate types of the same width w.r.t. their
-/// intended interpretation.
-static Type lowerType(Type type) {
-  return TypeSwitch<Type, Type>(type)
-      .Case<handshake::ChannelType>([&](handshake::ChannelType channelType) {
-        // Make sure the data type is signless IntegerType
-        unsigned width = channelType.getDataBitWidth();
-        Type dataType = IntegerType::get(type.getContext(), width);
-
-        // Make sure all extra signals are signless IntegerType's as well
-        SmallVector<ExtraSignal> extraSignals;
-        for (const ExtraSignal &extra : channelType.getExtraSignals()) {
-          unsigned extraWidth = extra.type.getIntOrFloatBitWidth();
-          Type newType = IntegerType::get(type.getContext(), extraWidth);
-          extraSignals.emplace_back(extra.name, newType, extra.downstream);
-        }
-        return handshake::ChannelType::get(dataType, extraSignals);
-      })
-      .Case<FloatType, IntegerType>([](auto type) {
-        unsigned width = type.getIntOrFloatBitWidth();
-        return IntegerType::get(type.getContext(), width);
-      })
-      .Case<handshake::ControlType>([](auto type) { return type; })
-      .Default([](auto type) { return nullptr; });
-}
 
 /// Attempts to find an external HW module in the MLIR module with the
 /// provided name. Returns it if it exists, otherwise returns `nullptr`.
