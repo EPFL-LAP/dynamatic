@@ -74,9 +74,6 @@ public:
       Block *block, int funcOp_idx,
       SmallVector<Block *, 4> &returned_forward_control_deps);
 
-  // this function allows for changing the addresses of the blocks
-  void adjustBlockPtr(int funcOp_idx, Block *new_block);
-
   // loops over the blocks and prints to the terminal the block's control
   // dependencies of the passed function
   void printAllBlocksDeps(int funcOp_idx);
@@ -134,10 +131,6 @@ private:
   void
   addDepsOfDeps(mlir::func::FuncOp &funcOp,
                 DenseMap<Block *, SmallVector<Block *, 4>> &control_deps_map);
-
-  // helper function called inside adjustBlockPtr() function
-  void compareNamesAndModifyBlockPtr(Block *new_block, Block *old_block,
-                                     SmallVector<Block *, 4> old_block_deps);
 };
 
 } // namespace dynamatic

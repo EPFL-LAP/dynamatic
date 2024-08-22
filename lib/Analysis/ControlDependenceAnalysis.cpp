@@ -259,52 +259,6 @@ void ControlDependenceAnalysis::calculateBlockForwardControlDeps(
   returned_forward_control_deps = forward_control_deps_maps[funcOp_idx][block];
 }
 
-// takes a function ID and a Block* and searches for this Block's name in the
-// all_deps of this function and overwrites its pointer value
-void ControlDependenceAnalysis::adjustBlockPtr(int funcOp_idx,
-                                               Block *new_block) {
-  // use the name to search for this block in all dependencies and update its
-  // ptr
-  for (auto &one_block_deps : all_control_deps_maps[funcOp_idx]) {
-    Block *old_block = one_block_deps.first;
-    SmallVector<Block *, 4> old_block_deps;
-    compareNamesAndModifyBlockPtr(new_block, old_block, old_block_deps);
-  }
-
-  // use the name to search for this block in forward dependencies and update
-  // its ptr
-  for (auto &one_block_deps : forward_control_deps_maps[funcOp_idx]) {
-    Block *old_block = one_block_deps.first;
-    SmallVector<Block *, 4> old_block_deps;
-    compareNamesAndModifyBlockPtr(new_block, old_block, old_block_deps);
-  }
-}
-
-void ControlDependenceAnalysis::compareNamesAndModifyBlockPtr(
-    Block *new_block, Block *old_block,
-    SmallVector<Block *, 4> old_block_deps) {
-  // get the name of the new_block
-  std::string name;
-  llvm::raw_string_ostream os(name);
-  new_block->printAsOperand(os);
-  std::string new_block_name = os.str();
-
-  // check if the new_block_name is the same as the name of the block in the key
-  // of one_block_deps
-  old_block->printAsOperand(os);
-  std::string old_block_name = os.str();
-  if (old_block_name == new_block_name)
-    old_block = new_block;
-
-  // check if the block_name is the same as any of the dependencies names
-  for (auto &one_dep : old_block_deps) {
-    one_dep->printAsOperand(os);
-    std::string one_dep_name = os.str();
-    if (one_dep_name == new_block_name)
-      one_dep = new_block;
-  }
-}
-
 void ControlDependenceAnalysis::printAllBlocksDeps(int funcOp_idx) {
   LLVM_DEBUG(llvm::dbgs() << "\n*********************************\n\n";);
   for (auto &elem : all_control_deps_maps[funcOp_idx]) {
