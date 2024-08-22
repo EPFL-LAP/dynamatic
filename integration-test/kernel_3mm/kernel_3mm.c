@@ -8,8 +8,6 @@
 
 #include "kernel_3mm.h"
 #include "dynamatic/Integration.h"
-#include <stdio.h>
-#include <stdlib.h>
 
 void kernel_3mm(in_int_t A[NI][NK], in_int_t B[NK][NJ], in_int_t C[NJ][NM],
                 in_int_t D[NM][NL], inout_int_t E[NI][NJ],
@@ -50,28 +48,28 @@ int main(void) {
 
   for (unsigned i = 0; i < NI; ++i) {
     for (unsigned k = 0; k < NK; ++k)
-      A[i][k] = rand() % 10;
+      A[i][k] = 100 % 10;
     for (unsigned j = 0; j < NJ; ++j)
-      E[i][j] = rand() % 10;
+      E[i][j] = 100 % 10;
     for (unsigned l = 0; l < NL; ++l)
-      G[i][l] = rand() % 10;
+      G[i][l] = 100 % 10;
   }
 
   for (unsigned j = 0; j < NJ; ++j) {
     for (unsigned m = 0; m < NM; ++m)
-      C[j][m] = rand() % 10;
+      C[j][m] = 100 % 10;
     for (unsigned l = 0; l < NL; ++l)
-      F[j][l] = rand() % 10;
+      F[j][l] = 100 % 10;
   }
 
   for (unsigned k = 0; k < NK; ++k) {
     for (unsigned j = 0; j < NJ; ++j)
-      B[k][j] = rand() % 10;
+      B[k][j] = 100 % 10;
   }
 
   for (unsigned m = 0; m < NM; ++m) {
     for (unsigned l = 0; l < NL; ++l)
-      D[m][l] = rand() % 10;
+      D[m][l] = 100 % 10;
   }
 
   CALL_KERNEL(kernel_3mm, A, B, C, D, E, F, G);

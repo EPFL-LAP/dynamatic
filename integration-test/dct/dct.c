@@ -8,7 +8,6 @@
 #include "dct.h"
 #include "dynamatic/Integration.h"
 #include <math.h>
-#include <stdlib.h>
 
 void dct(out_double_t output_matrix[N][M], in_double_t input_matrix[N][M]) {
 

@@ -9,7 +9,6 @@
 
 #include "kernel_2mm_float.h"
 #include "dynamatic/Integration.h"
-#include <stdlib.h>
 
 void kernel_2mm_float(in_float_t alpha, in_float_t beta,
                       inout_float_t tmp[N][N], in_float_t A[N][N],
@@ -47,10 +46,10 @@ int main(void) {
   beta = 1;
   for (int i = 0; i < N; ++i) {
     for (int j = 0; j < N; ++j) {
-      A[i][j] = rand() % 2;
-      B[i][j] = rand() % 2;
-      C[i][j] = rand() % 2;
-      D[i][j] = rand() % 2;
+      A[i][j] = 100 % 2;
+      B[i][j] = 100 % 2;
+      C[i][j] = 100 % 2;
+      D[i][j] = 100 % 2;
     }
   }
 

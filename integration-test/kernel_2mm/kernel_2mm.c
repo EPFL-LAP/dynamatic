@@ -12,6 +12,7 @@
 void kernel_2mm(in_int_t alpha, in_int_t beta, inout_int_t tmp[NI][NJ],
                 in_int_t A[NI][NK], in_int_t B[NK][NJ], in_int_t C[NK][NL],
                 inout_int_t D[NI][NL]) {
+
   for (unsigned i = 0; i < NI; i++) {
     for (unsigned j = 0; j < NJ; j++) {
       tmp[i][j] = 0;

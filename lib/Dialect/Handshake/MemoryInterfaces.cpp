@@ -180,7 +180,7 @@ LogicalResult MemoryInterfaceBuilder::instantiateInterfaces(
 
 LogicalResult MemoryInterfaceBuilder::instantiateInterfacesWithForks(
     OpBuilder &builder, handshake::MemoryControllerOp &mcOp,
-    handshake::LSQOp &lsqOp, std::set<Group *> &groups,
+    handshake::LSQOp &lsqOp, std::set<Group *, GroupsComparator> &groups,
     DenseMap<Block *, Operation *> &forksGraph, Value start,
     std::vector<Operation *> &alloctionNetwork) {
   // Determine interfaces' inputs
@@ -380,7 +380,8 @@ MemoryInterfaceBuilder::determineInterfaceInputs(InterfaceInputs &inputs,
 }
 
 LogicalResult MemoryInterfaceBuilder::determineInterfaceInputsWithForks(
-    InterfaceInputs &inputs, OpBuilder &builder, std::set<Group *> &groups,
+    InterfaceInputs &inputs, OpBuilder &builder,
+    std::set<Group *, GroupsComparator> &groups,
     DenseMap<Block *, Operation *> &forksGraph, Value start,
     std::vector<Operation *> &alloctionNetwork) {
 

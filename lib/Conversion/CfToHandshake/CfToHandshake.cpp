@@ -51,6 +51,7 @@
 #include "llvm/ADT/StringRef.h"
 #include "llvm/ADT/TypeSwitch.h"
 #include "llvm/Support/raw_ostream.h"
+#include <alloca.h>
 #include <cstddef>
 #include <cstdlib>
 #include <iterator>
@@ -714,10 +715,50 @@ LogicalResult HandshakeLowering::verifyAndCreateMemInterfaces(
       identifyMemDeps(allOperations, allMemDeps);
 
       /// Stores the Groups graph required for the allocation network analysis
-      std::set<Group *> groups;
+      std::set<Group *, GroupsComparator> groups;
       constructGroupsGraph(allOperations, allMemDeps, groups);
 
+      llvm::errs() << "Printing groups graph before minimization:\n";
+      for (Group *group : groups) {
+        llvm::errs() << "Group of: ";
+        group->bb->printAsOperand(llvm::errs());
+        llvm::errs() << "\n";
+        llvm::errs() << "Preds: ";
+        for (Group *pred : group->preds) {
+          pred->bb->printAsOperand(llvm::errs());
+          llvm::errs() << ", ";
+        }
+        llvm::errs() << "\n";
+        llvm::errs() << "Succs: ";
+        for (Group *succ : group->succs) {
+          succ->bb->printAsOperand(llvm::errs());
+          llvm::errs() << ", ";
+        }
+        llvm::errs() << "\n";
+      }
+      llvm::errs() << "Done printing groups graph:\n";
+
       minimizeGroupsConnections(groups);
+
+      llvm::errs() << "Printing groups graph:\n";
+      for (Group *group : groups) {
+        llvm::errs() << "Group of: ";
+        group->bb->printAsOperand(llvm::errs());
+        llvm::errs() << "\n";
+        llvm::errs() << "Preds: ";
+        for (Group *pred : group->preds) {
+          pred->bb->printAsOperand(llvm::errs());
+          llvm::errs() << ", ";
+        }
+        llvm::errs() << "\n";
+        llvm::errs() << "Succs: ";
+        for (Group *succ : group->succs) {
+          succ->bb->printAsOperand(llvm::errs());
+          llvm::errs() << ", ";
+        }
+        llvm::errs() << "\n";
+      }
+      llvm::errs() << "Done printing groups graph:\n";
 
       // Build the memory interfaces
       handshake::MemoryControllerOp mcOp;
@@ -731,7 +772,7 @@ LogicalResult HandshakeLowering::verifyAndCreateMemInterfaces(
 
       if (failed(memBuilder.instantiateInterfacesWithForks(
               rewriter, mcOp, lsqOp, groups, forksGraph, startCtrl,
-              alloctionNetwork)))
+              allocationNetwork)))
         return failure();
 
       if (failed(addMergeNonLoop(rewriter, allMemDeps, groups, forksGraph)))
@@ -959,11 +1000,9 @@ bool HandshakeLowering::sameLoop(Block *source, Block *dest) {
 }
 
 CFGLoop *checkInnermostCommonLoop(CFGLoop *loop1, CFGLoop *loop2) {
-  // Base case: if either loop is null, there's no common loop
   if (!loop1 || !loop2)
     return nullptr;
 
-  // If the loops are the same, return the loop
   if (loop1 == loop2)
     return loop1;
 
@@ -1072,11 +1111,15 @@ void HandshakeLowering::identifyMemDeps(
       // those that are not memory operations, (2) those in the same BB as
       // the one currently in hand, (3) both preds are load if(BB_i > BB_j), (4)
       // those that are mutually exclusive
+      llvm::errs() << "i: " << *i << "\n";
+      llvm::errs() << "j: " << *j << "\n";
 
       if (!checkMemOp(j) || checkSameBB(i, j) || checkBothLd(i, j) ||
           (findAllPaths(i->getBlock(), j->getBlock()).empty() &&
            findAllPaths(j->getBlock(), i->getBlock()).empty()))
         continue;
+
+      llvm::errs() << "Not skipped\n";
 
       // Comparing BB_i and BB_j
       Block *bbI = i->getBlock();
@@ -1098,7 +1141,8 @@ void HandshakeLowering::identifyMemDeps(
 
 void HandshakeLowering::constructGroupsGraph(
     std::vector<Operation *> &operations,
-    std::vector<ProdConsMemDep> &allMemDeps, std::set<Group *> &groups) {
+    std::vector<ProdConsMemDep> &allMemDeps,
+    std::set<Group *, GroupsComparator> &groups) {
   //  loop over the preds of the LSQ that are memory operations,
   //  create a Group object for each of them with the BB of the operation
   for (Operation *op : operations) {
@@ -1136,7 +1180,8 @@ void HandshakeLowering::constructGroupsGraph(
   }
 }
 
-void HandshakeLowering::minimizeGroupsConnections(std::set<Group *> &groups) {
+void HandshakeLowering::minimizeGroupsConnections(
+    std::set<Group *, GroupsComparator> &groups) {
   /// Get the dominance info for the region
   DominanceInfo domInfo;
 
@@ -1147,8 +1192,12 @@ void HandshakeLowering::minimizeGroupsConnections(std::set<Group *> &groups) {
 
     for (auto bigPred = (*group)->preds.rbegin();
          bigPred != (*group)->preds.rend(); ++bigPred) {
+      if (llvm::find(predsToRemove, *bigPred) != predsToRemove.end())
+        continue;
       for (auto smallPred = (*group)->preds.rbegin();
            smallPred != (*group)->preds.rend(); ++smallPred) {
+        if (llvm::find(predsToRemove, *smallPred) != predsToRemove.end())
+          continue;
         if ((*bigPred != *smallPred) &&
             ((*bigPred)->preds.find(*smallPred) != (*bigPred)->preds.end()) &&
             domInfo.properlyDominates((*bigPred)->bb, (*group)->bb)) {
@@ -1335,9 +1384,11 @@ Block *getPredecessorDominatingAndPostDominating(Block *prod, Block *cons) {
                                                    postDomInfo);
 }
 
-LogicalResult HandshakeLowering::addMergeNonLoop(
-    OpBuilder &builder, std::vector<ProdConsMemDep> &allMemDeps,
-    std::set<Group *> &groups, DenseMap<Block *, Operation *> &forksGraph) {
+LogicalResult
+HandshakeLowering::addMergeNonLoop(OpBuilder &builder,
+                                   std::vector<ProdConsMemDep> &allMemDeps,
+                                   std::set<Group *, GroupsComparator> &groups,
+                                   DenseMap<Block *, Operation *> &forksGraph) {
   Block *entryBlock = &region.front();
   for (Group *prodGroup : groups) {
     Block *prod = prodGroup->bb;
@@ -1389,7 +1440,7 @@ LogicalResult HandshakeLowering::addMergeNonLoop(
         mergeOperands.push_back(startCtrl);
         mergeOperands.push_back(forksGraph[prod]->getResult(0));
         auto mergeOp = builder.create<handshake::MergeOp>(loc, mergeOperands);
-        alloctionNetwork.push_back(mergeOp);
+        allocationNetwork.push_back(mergeOp);
 
         /// The merge becomes the producer now, so connect the result of the
         /// MERGE as an operand of the Consumer
@@ -1448,7 +1499,8 @@ std::vector<std::vector<Operation *>> findAllPaths(Operation *start,
 }
 
 LogicalResult
-HandshakeLowering::addMergeLoop(OpBuilder &builder, std::set<Group *> &groups,
+HandshakeLowering::addMergeLoop(OpBuilder &builder,
+                                std::set<Group *, GroupsComparator> &groups,
                                 DenseMap<Block *, Operation *> &forksGraph) {
   for (Group *consGroup : groups) {
     Block *cons = consGroup->bb;
@@ -1476,7 +1528,7 @@ HandshakeLowering::addMergeLoop(OpBuilder &builder, std::set<Group *> &groups,
             operands.push_back(mergeOperand);
             auto mergeOp = builder.create<handshake::MergeOp>(
                 mergeOperand.getLoc(), operands);
-            alloctionNetwork.push_back(mergeOp);
+            allocationNetwork.push_back(mergeOp);
             memDepLoopMerges.push_back(mergeOp);
 
             /// The merge becomes the producer now, so connect the result of
@@ -1495,7 +1547,8 @@ HandshakeLowering::addMergeLoop(OpBuilder &builder, std::set<Group *> &groups,
 }
 
 LogicalResult
-HandshakeLowering::joinInsertion(OpBuilder &builder, std::set<Group *> &groups,
+HandshakeLowering::joinInsertion(OpBuilder &builder,
+                                 std::set<Group *, GroupsComparator> &groups,
                                  DenseMap<Block *, Operation *> &forksGraph) {
   for (Group *group : groups) {
     Operation *forkNode = forksGraph[group->bb];
@@ -1505,7 +1558,7 @@ HandshakeLowering::joinInsertion(OpBuilder &builder, std::set<Group *> &groups,
       builder.setInsertionPointToStart(forkNode->getBlock());
       auto joinOp =
           builder.create<handshake::JoinOp>(forkNode->getLoc(), operands);
-      alloctionNetwork.push_back(joinOp);
+      allocationNetwork.push_back(joinOp);
       /// The result of the JoinOp becomes the input to the LazyFork
       forkNode->setOperands(joinOp.getResult());
     }
@@ -1535,20 +1588,19 @@ SmallVector<CFGLoop *> HandshakeLowering::getLoopsConsNotInProd(Block *cons,
 }
 
 LogicalResult HandshakeLowering::addPhi(ConversionPatternRewriter &rewriter) {
-  SmallVector<Operation *> allMerges;
   for (Block &cons : region.getBlocks()) {
     for (Operation &consOp : cons.getOperations()) {
-      if (llvm::find(alloctionNetwork, &consOp) == alloctionNetwork.end() &&
+      if (llvm::find(allocationNetwork, &consOp) == allocationNetwork.end() &&
           (!isa<handshake::ConstantOp>(consOp) ||
            llvm::find(networkConstants, &consOp) != networkConstants.end()))
         continue;
-      if (llvm::find(alloctionNetwork, &consOp) == alloctionNetwork.end() &&
+      if (llvm::find(allocationNetwork, &consOp) == allocationNetwork.end() &&
           (!isa<handshake::ConstantOp>(consOp) ||
            llvm::find(networkConstants, &consOp) != networkConstants.end()))
         continue;
       /// If the current consumer is a MERGE that was added in addPhi, then
       /// skip it to avoid an infinite loop
-      if (llvm::find(allMerges, &consOp) != allMerges.end())
+      if (llvm::find(phiMerges, &consOp) != phiMerges.end())
         continue;
       for (Value operand : consOp.getOperands()) {
         if (mlir::Operation *prodOp = operand.getDefiningOp()) {
@@ -1556,7 +1608,7 @@ LogicalResult HandshakeLowering::addPhi(ConversionPatternRewriter &rewriter) {
           /// start), then check if the producer is a MERGE that was added
           /// in addPhi If that is the case, then skip it to avoid an
           /// infinite loop
-          if (llvm::find(allMerges, prodOp) != allMerges.end())
+          if (llvm::find(phiMerges, prodOp) != phiMerges.end())
             continue;
         }
         Block *prod = operand.getParentBlock();
@@ -1574,17 +1626,45 @@ LogicalResult HandshakeLowering::addPhi(ConversionPatternRewriter &rewriter) {
               rewriter.create<handshake::MergeOp>(input.getLoc(), input);
           input = mergeOp.getResult();
           merges.push_back(mergeOp);
+          llvm::errs() << "added merge\n";
         }
         consOp.replaceUsesOfWith(operand, input);
         for (auto *mergeOp : merges)
           mergeOp->insertOperands(1, mergeOp->getResult(0));
 
-        allMerges.insert(allMerges.end(), merges.begin(), merges.end());
+        phiMerges.insert(phiMerges.end(), merges.begin(), merges.end());
       }
     }
   }
-  alloctionNetwork.insert(alloctionNetwork.end(), allMerges.begin(),
-                          allMerges.end());
+  allocationNetwork.insert(allocationNetwork.end(), phiMerges.begin(),
+                           phiMerges.end());
+  return success();
+}
+
+/// Check whether 2 merges are being fed by teh same producer
+bool sameProducer(Operation *merge1, Operation *merge2) {
+  if (merge1->getOperand(0).getDefiningOp() &&
+      merge2->getOperand(0).getDefiningOp())
+    return merge1->getOperand(0).getDefiningOp() ==
+           merge2->getOperand(0).getDefiningOp();
+
+  return false;
+}
+
+LogicalResult
+HandshakeLowering::removeRedundantPhis(ConversionPatternRewriter &rewriter) {
+  for (Operation *merge : phiMerges) {
+    for (Operation &op : merge->getBlock()->getOperations()) {
+      // if the other operation is a Merge and is having the same producer
+      if (&op != merge && isa<handshake::MergeOp>(op) &&
+          sameProducer(merge, &op)) {
+        auto it = llvm::find(allocationNetwork, &op);
+        if (it != allocationNetwork.end())
+          allocationNetwork.erase(it);
+        rewriter.replaceOp(&op, merge);
+      }
+    }
+  }
   return success();
 }
 
@@ -1598,7 +1678,7 @@ LogicalResult HandshakeLowering::addSupp(ConversionPatternRewriter &rewriter) {
 
   for (Block &prod : region.getBlocks()) {
     for (Operation &prodOp : prod.getOperations()) {
-      if (llvm::find(alloctionNetwork, &prodOp) == alloctionNetwork.end() &&
+      if (llvm::find(allocationNetwork, &prodOp) == allocationNetwork.end() &&
           (!isa<handshake::ConstantOp>(prodOp) ||
            llvm::find(networkConstants, &prodOp) != networkConstants.end()))
         continue;
@@ -1621,7 +1701,8 @@ LogicalResult HandshakeLowering::addSupp(ConversionPatternRewriter &rewriter) {
         for (Operation *consOp : users) {
           Block *cons = consOp->getBlock();
 
-          if (llvm::find(alloctionNetwork, consOp) == alloctionNetwork.end() &&
+          if (llvm::find(allocationNetwork, consOp) ==
+                  allocationNetwork.end() &&
               (!isa<handshake::ConstantOp>(consOp) ||
                llvm::find(networkConstants, consOp) != networkConstants.end()))
             continue;
@@ -1691,7 +1772,7 @@ HandshakeLowering::addSuppBranches(ConversionPatternRewriter &rewriter,
 
         Block *cons = consOp->getBlock();
 
-        if (llvm::find(alloctionNetwork, consOp) == alloctionNetwork.end() &&
+        if (llvm::find(allocationNetwork, consOp) == allocationNetwork.end() &&
             (!isa<handshake::ConstantOp>(consOp) ||
              llvm::find(networkConstants, consOp) != networkConstants.end()))
           continue;
@@ -1740,7 +1821,7 @@ LogicalResult
 HandshakeLowering::addSuppForStart(ConversionPatternRewriter &rewriter) {
   for (Block &cons : region.getBlocks()) {
     for (Operation &consOp : cons.getOperations()) {
-      if (llvm::find(alloctionNetwork, &consOp) == alloctionNetwork.end() &&
+      if (llvm::find(allocationNetwork, &consOp) == allocationNetwork.end() &&
           (!isa<handshake::ConstantOp>(consOp) ||
            llvm::find(networkConstants, &consOp) != networkConstants.end()))
         continue;
@@ -1822,7 +1903,7 @@ Value HandshakeLowering::muxToCircuit(ConversionPatternRewriter &rewriter,
   auto muxOp = rewriter.create<handshake::MuxOp>(
       block->getOperations().front().getLoc(), muxCond, muxOperands);
   shannonMUXes.push_back(muxOp);
-  alloctionNetwork.push_back(muxOp);
+  allocationNetwork.push_back(muxOp);
   return muxOp.getResult();
 }
 
@@ -1890,7 +1971,7 @@ Value HandshakeLowering::insertBranchToLoop(ConversionPatternRewriter &rewriter,
         boolVariableToCircuit(
             rewriter, getBlockLoopExitCondition(loopExit, loop), loopExit),
         connection);
-    alloctionNetwork.push_back(branchOp);
+    allocationNetwork.push_back(branchOp);
     if (moreProdThanCons)
       suppBranches.push_back(branchOp);
     if (selfRegeneration)
@@ -1927,7 +2008,7 @@ Value HandshakeLowering::insertBranchToLoop(ConversionPatternRewriter &rewriter,
   rewriter.setInsertionPointToStart(loopExit);
   auto branchOp = rewriter.create<handshake::ConditionalBranchOp>(
       loopExit->getOperations().front().getLoc(), branchCond, connection);
-  alloctionNetwork.push_back(branchOp);
+  allocationNetwork.push_back(branchOp);
 
   if (moreProdThanCons)
     suppBranches.push_back(branchOp);
@@ -2007,7 +2088,7 @@ void HandshakeLowering::manageNonLoop(ConversionPatternRewriter &rewriter,
     rewriter.setInsertionPointToStart(consumer->getBlock());
     auto branchOp = rewriter.create<handshake::ConditionalBranchOp>(
         consumer->getLoc(), branchCond, connection);
-    alloctionNetwork.push_back(branchOp);
+    allocationNetwork.push_back(branchOp);
     consumer->replaceUsesOfWith(connection, branchOp.getFalseResult());
   }
 }
@@ -2041,7 +2122,7 @@ HandshakeLowering::convertMergesToMuxes(ConversionPatternRewriter &rewriter) {
 
   for (Block &block : region.getBlocks()) {
     for (Operation &merge : block.getOperations()) {
-      if (llvm::find(alloctionNetwork, &merge) == alloctionNetwork.end())
+      if (llvm::find(allocationNetwork, &merge) == allocationNetwork.end())
         continue;
       /// If the current operation is a Merge but is not an INIT Merge
       if (isa<handshake::MergeOp>(merge) &&
@@ -2064,7 +2145,7 @@ HandshakeLowering::convertMergesToMuxes(ConversionPatternRewriter &rewriter) {
           rewriter.setInsertionPointAfter(&merge);
           auto mux = rewriter.create<handshake::MuxOp>(merge.getLoc(), select,
                                                        merge.getOperands());
-          alloctionNetwork.push_back(mux);
+          allocationNetwork.push_back(mux);
           rewriter.replaceOp(&merge, mux);
 
         } else {
@@ -2107,7 +2188,7 @@ HandshakeLowering::convertMergesToMuxes(ConversionPatternRewriter &rewriter) {
           rewriter.setInsertionPointAfter(&merge);
           auto mux = rewriter.create<handshake::MuxOp>(merge.getLoc(), select,
                                                        merge.getOperands());
-          alloctionNetwork.push_back(mux);
+          allocationNetwork.push_back(mux);
 
           rewriter.replaceOp(&merge, mux);
         }
@@ -2185,7 +2266,7 @@ Value HandshakeLowering::addInit(ConversionPatternRewriter &rewriter,
   auto mergeOp =
       rewriter.create<handshake::MergeOp>(oldMerge->getLoc(), mergeOperands);
   initMerges.push_back(mergeOp);
-  alloctionNetwork.push_back(mergeOp);
+  allocationNetwork.push_back(mergeOp);
   return mergeOp->getResult(0);
 }
 
@@ -2207,7 +2288,7 @@ HandshakeLowering::addSuppGSA(ConversionPatternRewriter &rewriter) {
     /// (1) Loop through all operations searching for Muxes not at loop
     /// headers
     for (Operation &op : block.getOperations()) {
-      if (llvm::find(alloctionNetwork, &op) == alloctionNetwork.end() &&
+      if (llvm::find(allocationNetwork, &op) == allocationNetwork.end() &&
           (!isa<handshake::ConstantOp>(op) ||
            llvm::find(networkConstants, &op) != networkConstants.end()))
         continue;
@@ -2279,7 +2360,7 @@ HandshakeLowering::addSuppGSA(ConversionPatternRewriter &rewriter) {
         rewriter.setInsertionPointAfterValue(dominatingInput);
         auto branchOp = rewriter.create<handshake::ConditionalBranchOp>(
             dominatingInput.getLoc(), desiredCond, dominatingInput);
-        alloctionNetwork.push_back(branchOp);
+        allocationNetwork.push_back(branchOp);
 
         Value newInput = branchOp.getFalseResult();
         if (getTrueSuccessor)
@@ -2475,9 +2556,6 @@ static LogicalResult lowerRegion(HandshakeLowering &hl) {
   //===--------------------------------------------------------------------===//
   // Create return/end logic and flatten IR (delete actual basic blocks)
   //===--------------------------------------------------------------------===//
-
-  // if (failed(runPartialLowering(hl, &HandshakeLowering::print)))
-  //   return failure();
 
   return runPartialLowering(hl, &HandshakeLowering::createReturnNetwork);
 }

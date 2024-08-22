@@ -35,16 +35,27 @@ struct ProdConsMemDep {
       : prodBb(prod), consBb(cons), isBackward(backward) {}
 };
 
+struct Group;
+
+struct GroupsComparator {
+  bool operator()(const Group *l, const Group *r) const;
+};
+
 // A group represents all operations belonging to the same basic block bb
 struct Group {
   Block *bb;
-  std::set<Group *> preds;
-  std::set<Group *> succs;
+
+  std::set<Group *, GroupsComparator> preds;
+  std::set<Group *, GroupsComparator> succs;
 
   Group(Block *b) : bb(b) {}
 
   bool operator<(const Group &other) const { return bb < other.bb; }
 };
+
+inline bool GroupsComparator::operator()(const Group *l, const Group *r) const {
+  return l->bb < r->bb;
+}
 
 /// Helper class to keep memory dependencies annotations consistent when
 /// lowering memory operations.
@@ -140,7 +151,7 @@ public:
   /// the group graph and connects the fork nodes to lsq input
   LogicalResult instantiateInterfacesWithForks(
       OpBuilder &builder, handshake::MemoryControllerOp &mcOp,
-      handshake::LSQOp &lsqOp, std::set<Group *> &groups,
+      handshake::LSQOp &lsqOp, std::set<Group *, GroupsComparator> &groups,
       DenseMap<Block *, Operation *> &forksGraph, Value start,
       std::vector<Operation *> &alloctionNetwork);
 
@@ -202,10 +213,12 @@ private:
   LogicalResult determineInterfaceInputs(InterfaceInputs &inputs,
                                          OpBuilder &builder);
 
-  LogicalResult determineInterfaceInputsWithForks(
-      InterfaceInputs &inputs, OpBuilder &builder, std::set<Group *> &groups,
-      DenseMap<Block *, Operation *> &forksGraphs, Value start,
-      std::vector<Operation *> &alloctionNetwork);
+  LogicalResult
+  determineInterfaceInputsWithForks(InterfaceInputs &inputs, OpBuilder &builder,
+                                    std::set<Group *, GroupsComparator> &groups,
+                                    DenseMap<Block *, Operation *> &forksGraphs,
+                                    Value start,
+                                    std::vector<Operation *> &alloctionNetwork);
 
   /// Returns the control signal for a specific block, as contained in the
   /// `ctrlVals` map. Produces an error on stderr and returns nullptr if no

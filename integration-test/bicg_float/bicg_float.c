@@ -8,6 +8,7 @@
 //===-------------------------------------------------------------------===//
 
 #include "bicg_float.h"
+#include "dynamatic/Integration.h"
 
 #define NX 30
 #define NY 30

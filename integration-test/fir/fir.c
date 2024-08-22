@@ -7,7 +7,6 @@
 
 #include "fir.h"
 #include "dynamatic/Integration.h"
-#include "stdlib.h"
 
 int fir(in_int_t di[N], in_int_t idx[N]) {
   int tmp = 0;
@@ -20,10 +19,9 @@ int main(void) {
   in_int_t di[N];
   in_int_t idx[N];
 
-  srand(13);
   for (int j = 0; j < N; ++j) {
-    di[j] = rand() % 100;
-    idx[j] = rand() % 100;
+    di[j] = 100 % 100;
+    idx[j] = 100 % 100;
   }
 
   CALL_KERNEL(fir, di, idx);

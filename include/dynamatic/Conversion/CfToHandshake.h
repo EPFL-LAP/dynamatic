@@ -24,18 +24,11 @@
 #include "experimental/Support/BooleanLogic/BoolExpression.h"
 #include "experimental/Support/BooleanLogic/Shannon.h"
 #include "mlir/Analysis/CFGLoopInfo.h"
+#include "mlir/Support/LogicalResult.h"
 #include "mlir/Transforms/DialectConversion.h"
 #include <set>
 
 namespace dynamatic {
-
-// Structure that stores loop information of a Block.
-struct BlockLoopInfo {
-  mlir::CFGLoop *loop = nullptr;
-  bool isHeader = false;
-  bool isExit = false;
-  bool isLatch = false;
-};
 
 /// This class is strongly inspired by CIRCT's own `HandshakeLowering` class. It
 /// provides all the conversion steps necessary to concert a func-level function
@@ -183,25 +176,27 @@ public:
   /// Builds a dependence graph betweeen the groups
   void constructGroupsGraph(std::vector<Operation *> &operations,
                             std::vector<ProdConsMemDep> &allMemDeps,
-                            std::set<Group *> &groups);
+                            std::set<Group *, GroupsComparator> &groups);
 
   /// Minimizes the connections between groups based on dominance info
-  void minimizeGroupsConnections(std::set<Group *> &groups);
+  void minimizeGroupsConnections(std::set<Group *, GroupsComparator> &groups);
 
   /// Add MERGEs in the case where the consumer might consume but the producer
   /// not necessarily poduce (the counsumer is being fed by another producer)
   LogicalResult addMergeNonLoop(OpBuilder &builder,
                                 std::vector<ProdConsMemDep> &allMemDeps,
-                                std::set<Group *> &groups,
+                                std::set<Group *, GroupsComparator> &groups,
                                 DenseMap<Block *, Operation *> &forksGraph);
 
   /// Add MERGEs in the case where the producer BB is after the consumer BB (the
   /// producer and the consumer are in a loop)
-  LogicalResult addMergeLoop(OpBuilder &builder, std::set<Group *> &groups,
+  LogicalResult addMergeLoop(OpBuilder &builder,
+                             std::set<Group *, GroupsComparator> &groups,
                              DenseMap<Block *, Operation *> &forksGraph);
 
   /// Join all the operands of the LazyForks
-  LogicalResult joinInsertion(OpBuilder &builder, std::set<Group *> &groups,
+  LogicalResult joinInsertion(OpBuilder &builder,
+                              std::set<Group *, GroupsComparator> &groups,
                               DenseMap<Block *, Operation *> &forksGraph);
 
   /// If a Fork operation has more than 2 operands, then it creates a join for
@@ -213,15 +208,20 @@ public:
   /// Adds MERGES in fast token delivery algorithm
   LogicalResult addPhi(ConversionPatternRewriter &rewriter);
 
+  /// Removes redundant MERGEs that were created by addPhi
+  LogicalResult removeRedundantPhis(ConversionPatternRewriter &rewriter);
+
   /// Adds BRANCHES in fast token delivery algorithm
   LogicalResult addSupp(ConversionPatternRewriter &rewriter);
 
+  /// Adds BRANCHES in fast token delivery algorithm for the case where the
+  /// producer is a BRANCH added by addSupp
   LogicalResult addSuppBranches(ConversionPatternRewriter &rewriter,
                                 std::set<Operation *> &oldBranches,
                                 size_t &count);
 
   /// Adds BRANCHES in fast token delivery algorithm for the case where the
-  /// producr is START by doing back-propagation
+  /// producer is START by doing back-propagation
   LogicalResult addSuppForStart(ConversionPatternRewriter &rewriter);
 
   /// Inserts a BRANCH for in the loop with condition depending on the exit
@@ -277,9 +277,6 @@ protected:
   /// Start point of the control-only network
   BlockArgument startCtrl;
 
-  /// Stores the loopinfo of blocks
-  DenseMap<Block *, BlockLoopInfo> blockToLoopInfoMap;
-
   /// Inserts a merge-like operation in the IR for the block argument and
   /// returns information necessary to rewire the IR around the new operation
   /// once all merges have been inserted. A control-merge is inserted for
@@ -294,24 +291,6 @@ protected:
   /// Checks if all the blocks in the path are in the control dependency
   bool checkControlDep(const SmallVector<Block *, 4> &controlDeps,
                        const std::vector<Block *> &path);
-
-  std::vector<Operation *> alloctionNetwork;
-
-  /// contains all Branches created by manageMoreProdThanCons or
-  /// manageDifferentRegeneration
-  std::vector<Operation *> suppBranches;
-
-  /// contains all Branches created by manageSelfRegeneration
-  SmallVector<Operation *> selfGenBranches;
-
-  /// contains all merges added in the straight LSQ
-  SmallVector<Operation *> memDepLoopMerges;
-
-  /// contains all MUXes created by Shannon
-  SmallVector<Operation *> shannonMUXes;
-
-  /// contains all constants created by addINIT or for Shannon’s
-  SmallVector<Operation *> networkConstants;
 
 private:
   /// Associates basic blocks of the region being lowered to their respective
@@ -353,16 +332,15 @@ private:
   experimental::boolean::BoolExpression *
   getBlockLoopExitCondition(Block *loopExit, mlir::CFGLoop *loop);
 
-  //----------BooleanEXpression to Circuit----------
-
-  /// Fills conditionToValue map by getting the condition and the value of each
-  /// block
+  //----------BooleanExpression to Circuit----------
 
   /// Associates the condition of the block in string format to its
   /// corresponding control value. The control alue is given by the condition of
   /// the terminator of the block
   std::map<std::string, Value> conditionToValue;
 
+  /// Fills conditionToValue map by getting the condition and the value of each
+  /// block
   void fillConditionToValueMapping();
 
   // Converts a DATA (mux or boolean expression) in boolean logic library to
@@ -388,6 +366,28 @@ private:
   /// True Side --> loop exit
   /// False Side --> iterate
   void fixConvention(Operation *merge, mlir::CFGLoop *loop);
+
+  /// contains all operations created by fast token delivery algorithm
+  std::vector<Operation *> allocationNetwork;
+
+  /// contains all Merges created by addPhi
+  SmallVector<Operation *> phiMerges;
+
+  /// contains all Branches created by manageMoreProdThanCons or
+  /// manageDifferentRegeneration
+  std::vector<Operation *> suppBranches;
+
+  /// contains all Branches created by manageSelfRegeneration
+  SmallVector<Operation *> selfGenBranches;
+
+  /// contains all merges added in the straight LSQ
+  SmallVector<Operation *> memDepLoopMerges;
+
+  /// contains all MUXes created by Shannon
+  SmallVector<Operation *> shannonMUXes;
+
+  /// contains all constants created by addINIT or for Shannon’s
+  SmallVector<Operation *> networkConstants;
 };
 
 /// Pointer to function lowering a region using a conversion pattern rewriter.
