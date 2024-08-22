@@ -2265,6 +2265,7 @@ bool findClosestBranchPredecessor(Value input, DominanceInfo &domInfo,
   return false;
 }
 
+/// Gets the closest Branch predecessor to the input and accesses its condition
 bool findClosestBranchPredecessor(Value input, DominanceInfo &domInfo,
                                   Block &block, Value &desiredCond,
                                   bool &getTrueSuccessor) {
