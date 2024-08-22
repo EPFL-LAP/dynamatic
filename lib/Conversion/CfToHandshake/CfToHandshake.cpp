@@ -1667,9 +1667,6 @@ LogicalResult HandshakeLowering::addSupp(ConversionPatternRewriter &rewriter) {
           if (isa<handshake::ConditionalBranchOp>(consOp))
             continue;
 
-          llvm::errs() << "Prod: " << prodOp << "\n";
-          llvm::errs() << "Cons: " << *consOp << "\n";
-
           /// Innermost loop containig the producer doesn't contain the
           /// consumer
           bool moreProdThanCons = false;
@@ -1691,10 +1688,8 @@ LogicalResult HandshakeLowering::addSupp(ConversionPatternRewriter &rewriter) {
                       isaMergeLoop(consOp) &&
                       !isa<handshake::ConditionalBranchOp>(prodOp)))
               manageDifferentRegeneration(rewriter, consOp, res);
-            else {
-              llvm::errs() << "Calling manageNonLoop";
+            else
               manageNonLoop(rewriter, &prod, consOp, res);
-            }
           }
         }
       }
@@ -2013,21 +2008,9 @@ void HandshakeLowering::manageNonLoop(ConversionPatternRewriter &rewriter,
   cdgAnalysis.calculateBlockForwardControlDeps(producerBlock, funcOpIdx,
                                                prodControlDeps);
 
-  llvm::errs() << "prodControlDeps\n";
-  for (Block *block : prodControlDeps) {
-    block->printAsOperand(llvm::errs());
-    llvm::errs() << "\n";
-  }
-
   SmallVector<Block *, 4> consControlDeps;
   cdgAnalysis.calculateBlockForwardControlDeps(consumer->getBlock(), funcOpIdx,
                                                consControlDeps);
-
-  llvm::errs() << "consControlDeps\n";
-  for (Block *block : consControlDeps) {
-    block->printAsOperand(llvm::errs());
-    llvm::errs() << "\n";
-  }
 
   eliminateCommonEntries(prodControlDeps, consControlDeps);
 
@@ -2314,10 +2297,6 @@ HandshakeLowering::addSuppGSA(ConversionPatternRewriter &rewriter) {
       auto mux = dyn_cast<handshake::MuxOp>(op);
       DominanceInfo domInfo;
 
-      llvm::errs() << mux << "\n";
-      for (Value v : mux->getOperands())
-        llvm::errs() << v << "\n";
-
       bool inputDominting = false;
       auto it = mux.getDataOperands().begin();
       Value firstInput = *it;
@@ -2345,29 +2324,6 @@ HandshakeLowering::addSuppGSA(ConversionPatternRewriter &rewriter) {
 
         /// Assert that the predecessors of the other input must all be
         /// Branches
-        /*
-              bool hasPredBranch = false;
-              bool getTrueSuccessor = false;
-
-              if (nonDominatingInput.getDefiningOp()) {
-                for (Value pred :
-           nonDominatingInput.getDefiningOp()->getOperands()) { Operation
-           *predOp = pred.getDefiningOp(); if (predOp) { if
-           (isa<handshake::ConditionalBranchOp>(predOp)) { auto branch =
-           dyn_cast<handshake::ConditionalBranchOp>(predOp); for (Value
-           branchPred : branch->getOperands()) { if
-           (domInfo.dominates(branchPred.getParentBlock(), &block)) {
-                          hasPredBranch = true;
-                          desiredCond = branch.getConditionOperand();
-                          if (pred == branch.getFalseResult())
-                            getTrueSuccessor = true;
-                        }
-                      }
-                    }
-                  }
-                }
-              }
-              */
 
         bool getTrueSuccessor = false;
         bool hasPredBranch = findClosestBranchPredecessor(
