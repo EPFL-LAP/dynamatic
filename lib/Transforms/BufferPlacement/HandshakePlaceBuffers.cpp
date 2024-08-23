@@ -16,6 +16,7 @@
 #include "dynamatic/Analysis/NameAnalysis.h"
 #include "dynamatic/Dialect/Handshake/HandshakeAttributes.h"
 #include "dynamatic/Dialect/Handshake/HandshakeOps.h"
+#include "dynamatic/Dialect/Handshake/HandshakeTypes.h"
 #include "dynamatic/Support/CFG.h"
 #include "dynamatic/Support/Logging.h"
 #include "dynamatic/Transforms/BufferPlacement/BufferingSupport.h"
@@ -212,10 +213,12 @@ LogicalResult HandshakePlaceBuffersPass::checkFuncInvariants(FuncInfo &info) {
     // Most operations should belong to a basic block for buffer placement to
     // work correctly. Don't outright fail in case one operation is outside of
     // all blocks but warn the user
-    if (!isa<handshake::SinkOp, handshake::MemoryOpInterface>(&op))
-      if (!getLogicBB(&op).has_value())
+    if (!isa<handshake::SinkOp, handshake::MemoryOpInterface>(&op)) {
+      if (!getLogicBB(&op).has_value()) {
         op.emitWarning() << "Operation does not belong to any block, MILP "
                             "behavior may be suboptimal or incorrect.";
+      }
+    }
 
     std::optional<unsigned> srcBB = opBlocks[&op];
     for (OpResult res : op.getResults()) {
@@ -223,14 +226,24 @@ LogicalResult HandshakePlaceBuffersPass::checkFuncInvariants(FuncInfo &info) {
       std::optional<unsigned> dstBB = opBlocks[user];
 
       // All transitions between blocks must exist in the original CFG
-      if (srcBB.has_value() && dstBB.has_value() && *srcBB != *dstBB &&
-          !transitions[*srcBB].contains(*dstBB))
+      if (srcBB && dstBB && *srcBB != *dstBB &&
+          !transitions[*srcBB].contains(*dstBB)) {
+        auto endBB = *opBlocks.at(info.funcOp.getBodyBlock()->getTerminator());
+        if (isa<ControlType>(res.getType()) && srcBB == ENTRY_BB &&
+            dstBB == endBB) {
+          /// NOTE: (lucas-rami) This is probably the start->end control channel
+          /// which goes from the entry block to the exit block. This is fine in
+          /// general so we let this pass without triggering a warning or error
+          continue;
+        }
+
         return op.emitError()
                << "Result " << res.getResultNumber() << " defined in block "
                << *srcBB << " is used in block " << *dstBB
                << ". This connection does not exist according to the CFG "
                   "graph. Solving the buffer placement MILP would yield an "
                   "incorrect placement.";
+      }
     }
   }
   return success();

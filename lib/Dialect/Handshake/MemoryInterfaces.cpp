@@ -137,10 +137,12 @@ LogicalResult MemoryInterfaceBuilder::instantiateInterfaces(
   if (!inputs.mcInputs.empty() && inputs.lsqInputs.empty()) {
     // We only need a memory controller
     mcOp = builder.create<handshake::MemoryControllerOp>(
-        loc, memref, inputs.mcInputs, inputs.mcBlocks, mcNumLoads);
+        loc, memref, memStart, inputs.mcInputs, ctrlEnd, inputs.mcBlocks,
+        mcNumLoads);
   } else if (inputs.mcInputs.empty() && !inputs.lsqInputs.empty()) {
     // We only need an LSQ
-    lsqOp = builder.create<handshake::LSQOp>(loc, memref, inputs.lsqInputs,
+    lsqOp = builder.create<handshake::LSQOp>(loc, memref, memStart,
+                                             inputs.lsqInputs, ctrlEnd,
                                              inputs.lsqGroupSizes, lsqNumLoads);
   } else {
     // We need a MC and an LSQ. They need to be connected with 4 new channels
@@ -164,7 +166,8 @@ LogicalResult MemoryInterfaceBuilder::instantiateInterfaces(
     // Create the memory controller, adding 1 to its load count so that it
     // generates a load data result for the LSQ
     mcOp = builder.create<handshake::MemoryControllerOp>(
-        loc, memref, inputs.mcInputs, inputs.mcBlocks, mcNumLoads + 1);
+        loc, memref, memStart, inputs.mcInputs, ctrlEnd, inputs.mcBlocks,
+        mcNumLoads + 1);
 
     // Add the MC's load data result to the LSQ's inputs and create the LSQ,
     // passing a flag to the builder so that it generates the necessary

@@ -106,11 +106,6 @@ def FuncOp : Op<Handshake_Dialect, "func", [
       return getResNames()[idx].cast<StringAttr>();
     }
 
-    /// Resolve argument and result names. This can be used during building of
-    /// a handshake.func operation to ensure that names provided by an incoming
-    /// operation fulfills the name requirements of the handshake function.
-    void resolveArgAndResNames();
-
     /// Hook for FunctionOpInterface, called after verifying that the 'type'
     /// attribute is present and checks if it holds a function type.  Ensures
     /// getType, getNumFuncArguments, and getNumFuncResults can be called
@@ -599,53 +594,23 @@ def MemoryControllerOp : Handshake_Op<"mem_controller", [
     2. If an LSQ references the same memory region, a data result for load
        accesses.
     3. Control signal indicating completion.
-
-    Example (without LSQ):
-
-    ```mlir
-    %ldData1, %ldData2, %ctrl = mem_controller[%mem : memref<16xi32>] (
-        %bb0, %stAddr1, %stData1, %ldAddr1, %ldAddr2,
-        %bb1, %stAddr2, %stData2
-      ) {connectedBlocks = [0 : i32, 1 : i32]} :
-      (!handshake.channel<i32>, !handshake.channel<i32>, 
-       !handshake.channel<i32>, !handshake.channel<i32>, 
-       !handshake.channel<i32>, !handshake.channel<i32>, 
-       !handshake.channel<i32>, !handshake.channel<i32>) -> 
-      (!handshake.channel<i32>, !handshake.channel<i32>, !handshake.control)
-    ```
-
-    Example (with LSQ):
-
-    ```mlir
-    %ldData1, %ldData2, %ldDataToLSQ, %ctrl = mem_controller[memref<16xi32>] (
-        %bb0, %stAddr1, %stData1, %ldAddr1, %ldAddr2,
-        %bb1, %stAddr2, %stData2,
-        %group3,
-        %ldAddrFromLSQ, %stAddrFromLSQ, %stDataFromLSQ
-      ) {connectedBlocks = [0 : i32, 1 : i32, 2 : i32]} :
-      (!handshake.channel<i32>, !handshake.channel<i32>,
-       !handshake.channel<i32>, !handshake.channel<i32>,
-       !handshake.channel<i32>, !handshake.channel<i32>,
-       !handshake.channel<i32>, !handshake.channel<i32>,
-       !handshake.channel<i32>, !handshake.channel<i32>,
-       !handshake.channel<i32>, !handshake.channel<i32>) ->
-      (!handshake.channel<i32>, !handshake.channel<i32>,
-       !handshake.channel<i32>, !handshake.control)
     ```
   }];
   
-  let arguments = (ins AnyMemRef:$memRef, Variadic<ChannelType>:$inputs,
+  let arguments = (ins AnyMemRef:$memRef, ControlType:$memStart,
+                       Variadic<ChannelType>:$inputs, ControlType:$ctrlEnd,
                        I32ArrayAttr:$connectedBlocks);
-  let results = (outs Variadic<ChannelType>:$outputs, ControlType:$done);
+  let results = (outs Variadic<ChannelType>:$outputs, ControlType:$memEnd);
 
   let skipDefaultBuilders = 1;
-  let builders = [OpBuilder<(ins "Value":$memRef, "ValueRange":$inputs,
+  let builders = [OpBuilder<(ins "Value":$memRef, "Value":$memStart,
+                                 "ValueRange":$inputs, "Value":$ctrlEnd,
                                  "ArrayRef<unsigned>":$blocks, 
                                  "unsigned":$numLoads)>];
   let hasVerifier = 1;
   let assemblyFormat = [{
-    `[` $memRef `:` type($memRef) `]` `(` $inputs `)` attr-dict `:` 
-    functional-type($inputs, results)
+    `[` $memRef `:` type($memRef) `]` $memStart ` ` `(` $inputs `)` $ctrlEnd
+    attr-dict `:` functional-type($inputs, $outputs)
   }];
 
   let extraClassDeclaration = [{
@@ -709,36 +674,6 @@ def LSQOp : Handshake_Op<"lsq", [
        load accesses and a single pair of address/data operands for store
        accesses going to the external memory through the MC. 
     3. Control signal indicating completion.
-
-    Example (without MC):
-
-    ```mlir
-    %ldData1, %ldData2, %ctrl = lsq[%mem : memref<16xi32>] (
-        %group1, %stAddr1, %stData1, %ldAddr1, %ldAddr2,
-        %group2, %stAddr2, %stData2
-      ) {groupSizes = [3 : i32, 1 : i32]} :
-      (!handshake.control, !handshake.channel<i32>, !handshake.channel<i32>,
-       !handshake.channel<i32>, !handshake.channel<i32>, !handshake.control,
-       !handshake.channel<i32>, !handshake.channel<i32>) ->
-      (!handshake.channel<i32>, !handshake.channel<i32>, !handshake.control)
-    ```
-
-    Example (with MC):
-
-    ```mlir
-    %ldData1, %ldData2, %ldAddrToMC, %stAddrToMC, %stDataToMC, %ctrl =
-      lsq[MC] (
-        %group1, %stAddr1, %stData1, %ldAddr1, %ldAddr2,
-        %group2, %stAddr2, %stData2, %ldDataFromMC
-      ) {groupSizes = [3 : i32, 1 : i32]} :
-      (!handshake.control, !handshake.channel<i32>, !handshake.channel<i32>,
-       !handshake.channel<i32>, !handshake.channel<i32>, !handshake.control,
-       !handshake.channel<i32>, !handshake.channel<i32>,
-       !handshake.channel<i32>) ->
-      (!handshake.channel<i32>, !handshake.channel<i32>,
-       !handshake.channel<i32>, !handshake.channel<i32>,
-      !handshake.channel<i32>, !handshake.control)
-    ```
   }];
   
   let arguments = (ins Variadic<AnyType>:$inputs, I32ArrayAttr:$groupSizes);
@@ -746,8 +681,8 @@ def LSQOp : Handshake_Op<"lsq", [
 
   let skipDefaultBuilders = 1;
   let builders = [
-    OpBuilder<(ins "Value":$memref, "ValueRange":$inputs, 
-                   "ArrayRef<unsigned>":$groupSizes, "unsigned":$numLoads)>,
+    OpBuilder<(ins "Value":$memref, "Value":$memStart, "ValueRange":$inputs, 
+                   "Value":$ctrlEnd, "ArrayRef<unsigned>":$groupSizes, "unsigned":$numLoads)>,
     OpBuilder<(ins "::dynamatic::handshake::MemoryControllerOp":$mcOp, 
                    "ValueRange":$inputs, "ArrayRef<unsigned>":$groupSizes, 
                    "unsigned":$numLoads)>,
@@ -931,15 +866,13 @@ def EndOp : Handshake_Op<"end", [
 ]> {
   let summary = "function endpoint (dynamatic)";
   let description = [{
-    This operation is the terminator of every handshake function in Dynamatic.
-    Its operands are the merged results of all return operations in the function
-    (or simply the forwarded results of a single return) followed by the output
-    control signals of all memory interfaces in the function.
+    Terminator of every Handshake function. Its operands represent the parent
+    Handshake function's results and must thefore match their types.
 
     Example:
 
     ```mlir
-    end %res1, %res2, %ctrl1, %ctrl2 : !handshake.channel<i32>, !handshake.channel<i64>, !handshake.control, !handshake.control
+    end %res1, %res2, %res3 : <i32>, <i64>, <>
     ```
   }];
 
@@ -947,14 +880,6 @@ def EndOp : Handshake_Op<"end", [
 
   let assemblyFormat = [{
     attr-dict ($inputs^ `:` custom<HandshakeTypes>(type($inputs)))?
-  }];
-  
-  let extraClassDeclaration = [{
-    /// Returns the range of operands that are actual function return values.
-    mlir::ValueRange getReturnValues();
-
-    /// Returns the range of operands that are memory control signals.
-    mlir::ValueRange getMemoryControls();
   }];
 
   let hasVerifier = 1;

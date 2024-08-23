@@ -346,7 +346,7 @@ bool CAnalyser::parseCFunction(const string &cSrc, const string &fuvName,
   string paramList = m[4];
 
   CFunctionParameter fuvRet;
-  fuvRet.parameterName = "end";
+  fuvRet.parameterName = "out0";
   fuvRet.isPointer = false;
   fuvRet.isReturn = true;
   fuvRet.isInput = false;

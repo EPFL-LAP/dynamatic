@@ -1,4 +1,4 @@
-//===- LSQBRAM.scala ------------------------------------------*- Scala -*-===//
+//===- LSQMaster.scala ----------------------------------------*- Scala -*-===//
 //
 // Dynamatic is under the Apache License v2.0 with LLVM Exceptions.
 // See https://llvm.org/LICENSE.txt for license information.
@@ -17,45 +17,46 @@ import lsq.queues._
 
 import scala.math.{max, min}
 
-class LSQBRAM(lsqConfig: LsqConfigs) extends Module {
+class LSQMaster(lsqConfig: LsqConfigs) extends Module {
   override def desiredName: String = lsqConfig.name
 
   val io = IO(new Bundle {
-    // store queue related
-    val storeDataOut = Output(UInt(lsqConfig.dataWidth.W)) // storeDataToMem
-    val storeAddrOut = Output(UInt(lsqConfig.addrWidth.W)) // storeAddressToMem
-    val storeEnable = Output(Bool()) // storeEnableToMem
-    val memIsReadyForStores = Input(Bool()) // memIsReadyForStores
-    // load queue related
-    val loadDataIn = Input(UInt(lsqConfig.dataWidth.W)) // loadDataFromMem
-    val loadAddrOut = Output(UInt(lsqConfig.addrWidth.W)) // loadAddressToMem
-    val loadEnable = Output(Bool()) // loadEnableToMem
-    val memIsReadyForLoads = Input(Bool()) // memIsReadyForLoads
+    // Stores to BRAM
+    val storeData = Output(UInt(lsqConfig.dataWidth.W)) 
+    val storeAddr = Output(UInt(lsqConfig.addrWidth.W)) 
+    val storeEn = Output(Bool()) 
+    // Loads to BRAM
+    val loadData = Input(UInt(lsqConfig.dataWidth.W)) 
+    val loadAddr = Output(UInt(lsqConfig.addrWidth.W))
+    val loadEn = Output(Bool()) 
 
-    // previous interface related
-    val bbpValids = Input(Vec(lsqConfig.numBBs, Bool())) // bbStartSignals
-    val bbReadyToPrevs =
-      Output(Vec(lsqConfig.numBBs, Bool())) // bbReadyToPrevious
-    // load ports related
-    val rdPortsPrev = Vec(
+    // Control signals
+    val ctrl = Vec(lsqConfig.numBBs, Flipped(Decoupled(UInt(0.W))))
+
+    // Load ports
+    val ldAddr = Vec(
       lsqConfig.numLoadPorts,
       Flipped(Decoupled(UInt(lsqConfig.addrWidth.W)))
-    ) // previousAndLoadPorts
-    val rdPortsNext = Vec(
+    ) 
+    val ldData = Vec(
       lsqConfig.numLoadPorts,
       Decoupled(UInt(lsqConfig.dataWidth.W))
-    ) // nextAndLoadPorts
-    // store ports related
-    val wrAddrPorts = Vec(
+    ) 
+
+    // Store ports
+    val stAddr = Vec(
       lsqConfig.numStorePorts,
       Flipped(Decoupled(UInt(lsqConfig.addrWidth.W)))
-    ) // previousAndStoreAddressPorts
-    val wrDataPorts = Vec(
+    ) 
+    val stData = Vec(
       lsqConfig.numStorePorts,
       Flipped(Decoupled(UInt(lsqConfig.dataWidth.W)))
-    ) // previousAndStoreDataPorts
-    val Empty_Valid = Output(Bool()) // queueIsEmpty
-
+    )
+    
+    // Controls
+    val memStart = Flipped(Decoupled(UInt(0.W)))
+    val ctrlEnd = Flipped(Decoupled(UInt(0.W)))
+    val memEnd = Decoupled(UInt(0.W))
   })
 
   require(lsqConfig.fifoDepth_L > 1)
@@ -141,7 +142,33 @@ class LSQBRAM(lsqConfig: LsqConfigs) extends Module {
     Module(new StoreAddrPort(lsqConfig)).io
   })
 
-  io.Empty_Valid := storeEmpty && loadEmpty
+  val memStartReady = RegInit(1.B)
+  val memEndValid = RegInit(0.B)
+  val ctrlEndReady = RegInit(0.B)
+
+  when (io.ctrlEnd.valid && storeEmpty && loadEmpty)  {
+      memEndValid := 1.B
+      ctrlEndReady := 1.B
+  }
+  when (io.ctrlEnd.valid && ctrlEndReady) {
+    ctrlEndReady := 0.B
+  }
+  when (io.memStart.valid && memStartReady) {
+    memStartReady := 0.B
+  }
+  when (io.memEnd.valid && io.memEnd.ready) {
+    memStartReady := 1.B
+    io.memEnd.valid := 0.B
+  } 
+
+  io.memStart.ready := memStartReady
+  io.memEnd.valid := memEndValid
+  io.ctrlEnd.ready := ctrlEndReady
+
+  io.memStart.bits := DontCare
+  io.memEnd.bits := DontCare
+  io.ctrlEnd.bits := DontCare
+
   // Group Allocator assignments
   bbLoadOffsets := GA.io.bbLoadOffsets
   bbLoadPorts := GA.io.bbLoadPorts
@@ -156,8 +183,6 @@ class LSQBRAM(lsqConfig: LsqConfigs) extends Module {
   GA.io.storeHead := storeHead
   GA.io.storeEmpty := storeEmpty
   bbStart := GA.io.bbStart
-  GA.io.bbStartSignals := io.bbpValids
-  io.bbReadyToPrevs := GA.io.readyToPrevious
   loadPortsEnable := GA.io.loadPortsEnable
   storePortsEnable := GA.io.storePortsEnable
   // load queue assignments
@@ -178,6 +203,14 @@ class LSQBRAM(lsqConfig: LsqConfigs) extends Module {
   loadAddressDone := loadQ.io.loadAddrDone
   loadDataDone := loadQ.io.loadDataDone
   loadAddressQueue := loadQ.io.loadAddrQueue
+  
+  io.ctrl.zip(GA.io.bbStartSignals).zip(GA.io.readyToPrevious).foreach{
+    case ((groupStart, allocatorStart), allocatorReady) => {
+      allocatorStart := groupStart.valid
+      groupStart.ready := allocatorReady
+      groupStart.bits := DontCare
+    }
+  }  
 
   for (i <- 0 until lsqConfig.numLoadPorts) {
     dataFromLoadQueue(i).valid := loadQ.io.loadPorts(i).valid
@@ -188,10 +221,10 @@ class LSQBRAM(lsqConfig: LsqConfigs) extends Module {
     loadQ.io.loadAddrEnable(i) := loadAddressEnable(i)
   }
 
-  loadQ.io.loadDataFromMem := io.loadDataIn
-  loadQ.io.memIsReadyForLoads := io.memIsReadyForLoads
-  io.loadAddrOut := loadQ.io.loadAddrToMem
-  io.loadEnable := loadQ.io.loadEnableToMem
+  loadQ.io.loadDataFromMem := io.loadData
+  loadQ.io.memIsReadyForLoads := 1.B
+  io.loadAddr := loadQ.io.loadAddrToMem
+  io.loadEn := loadQ.io.loadEnableToMem
 
   // store queue assignments
   storeQ.io.loadTail := loadTail
@@ -215,15 +248,16 @@ class LSQBRAM(lsqConfig: LsqConfigs) extends Module {
   storeQ.io.dataFromStorePorts := dataToStoreQueue
   storeQ.io.storeAddrEnable := storeAddressEnable
   storeQ.io.addressFromStorePorts := addressToStoreQueue
-  io.storeAddrOut := storeQ.io.storeAddrToMem
-  io.storeDataOut := storeQ.io.storeDataToMem
-  io.storeEnable := storeQ.io.storeEnableToMem
-  storeQ.io.memIsReadyForStores := io.memIsReadyForStores
+  
+  io.storeAddr := storeQ.io.storeAddrToMem
+  io.storeData := storeQ.io.storeDataToMem
+  io.storeEn := storeQ.io.storeEnableToMem
+  storeQ.io.memIsReadyForStores := 1.B
 
   for (i <- 0 until lsqConfig.numLoadPorts) {
-    readPorts(i).addrFromPrev <> io.rdPortsPrev(i)
+    readPorts(i).addrFromPrev <> io.ldAddr(i)
     readPorts(i).portEnable := loadPortsEnable(i)
-    io.rdPortsNext(i) <> readPorts(i).dataToNext
+    io.ldData(i) <> readPorts(i).dataToNext
     loadAddressEnable(i) := readPorts(i).loadAddrEnable
     addressToLoadQueue(i) := readPorts(i).addrToLoadQueue
     dataFromLoadQueue(i).ready := readPorts(i).dataFromLoadQueue.ready
@@ -232,12 +266,12 @@ class LSQBRAM(lsqConfig: LsqConfigs) extends Module {
   }
 
   for (i <- 0 until lsqConfig.numStorePorts) {
-    writeDataPorts(i).dataFromPrev <> io.wrDataPorts(i)
+    writeDataPorts(i).dataFromPrev <> io.stData(i)
     writeDataPorts(i).portEnable := storePortsEnable(i)
     storeDataEnable(i) := writeDataPorts(i).storeDataEnable
     dataToStoreQueue(i) := writeDataPorts(i).dataToStoreQueue
 
-    writeAddressPorts(i).addrFromPrev <> io.wrAddrPorts(i)
+    writeAddressPorts(i).addrFromPrev <> io.stAddr(i)
     writeAddressPorts(i).portEnable := storePortsEnable(i)
     storeAddressEnable(i) := writeAddressPorts(i).storeAddrEnable
     addressToStoreQueue(i) := writeAddressPorts(i).addrToStoreQueue

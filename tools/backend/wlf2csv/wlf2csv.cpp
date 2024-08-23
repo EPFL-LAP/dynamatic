@@ -109,13 +109,6 @@ struct SignalInfo {
           // Legacy Dynamatic has the data operand before the condition operand
           return idx;
         })
-        .Case<handshake::EndOp>([&](handshake::EndOp endOp) {
-          // Legacy Dynamatic has the memory controls before the return values
-          auto numReturnValues = endOp.getReturnValues().size();
-          auto numMemoryControls = endOp.getMemoryControls().size();
-          return (idx < numReturnValues) ? idx + numMemoryControls
-                                         : idx - numReturnValues;
-        })
         .Case<handshake::LoadOpInterface, handshake::StoreOpInterface>(
             [&](auto) {
               // Legacy Dynamatic has the data operand/result before the address
@@ -150,13 +143,6 @@ struct SignalInfo {
         .Case<handshake::ConditionalBranchOp>([&](auto) {
           // Legacy Dynamatic has the data operand before the condition operand
           return 1 - idx;
-        })
-        .Case<handshake::EndOp>([&](handshake::EndOp endOp) {
-          // Legacy Dynamatic has the memory controls before the return values
-          auto numReturnValues = endOp.getReturnValues().size();
-          auto numMemoryControls = endOp.getMemoryControls().size();
-          return (idx < numReturnValues) ? idx + numMemoryControls
-                                         : idx - numReturnValues;
         })
         .Case<handshake::LoadOpInterface, handshake::StoreOpInterface>(
             [&](auto) {

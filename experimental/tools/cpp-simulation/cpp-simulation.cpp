@@ -1,7 +1,12 @@
+#include "dynamatic/Dialect/Handshake/HandshakeAttributes.h"
 #include "dynamatic/Dialect/Handshake/HandshakeOps.h"
 #include "dynamatic/Dialect/Handshake/HandshakeTypes.h"
 #include "dynamatic/Support/LLVM.h"
+#include "dynamatic/Transforms/HandshakeMaterialize.h"
+#include "mlir/IR/Attributes.h"
+#include "mlir/IR/BuiltinAttributes.h"
 #include "mlir/IR/BuiltinOps.h"
+#include "mlir/IR/BuiltinTypes.h"
 #include "mlir/IR/Diagnostics.h"
 #include "mlir/IR/Operation.h"
 #include "mlir/IR/OperationSupport.h"
@@ -11,16 +16,23 @@
 #include "llvm/ADT/APFloat.h"
 #include "llvm/ADT/APInt.h"
 #include "llvm/ADT/Any.h"
+#include "llvm/ADT/Hashing.h"
 #include "llvm/ADT/SmallVector.h"
+#include "llvm/ADT/StringRef.h"
 #include "llvm/ADT/TypeSwitch.h"
+#include "llvm/IR/Attributes.h"
 #include "llvm/Support/Casting.h"
 #include "llvm/Support/CommandLine.h"
+#include "llvm/Support/ErrorHandling.h"
 #include "llvm/Support/InitLLVM.h"
 #include "llvm/Support/MemoryBuffer.h"
 #include "llvm/Support/SourceMgr.h"
 #include "llvm/Support/raw_ostream.h"
+#include <algorithm>
 #include <cstddef>
 #include <functional>
+#include <map>
+#include <string>
 #include <utility>
 #include <vector>
 
@@ -36,6 +48,75 @@ static cl::opt<std::string> inputFilename(cl::Positional, cl::Required,
 
 static cl::list<std::string> inputArgs(cl::Positional, cl::desc("<input args>"),
                                        cl::ZeroOrMore, cl::cat(mainCategory));
+
+// Binding for llvm::Any that lets the user check if the value was changed
+// It's required for updaters to stop the internal loop
+struct Data {
+  llvm::Any data;
+  llvm::hash_code hash;
+  unsigned bitwidth;
+
+  Data() = default;
+
+  Data(const APInt &other) {
+    data = other;
+    hash = llvm::hash_value(other);
+    bitwidth = other.getBitWidth();
+  }
+  Data(const APFloat &other) {
+    data = other;
+    hash = llvm::hash_value(other);
+    bitwidth = other.getSizeInBits(other.getSemantics());
+  }
+
+  Data &operator=(const APInt &other) {
+    this->data = other;
+    hash = llvm::hash_value(other);
+    bitwidth = other.getBitWidth();
+    return *this;
+  }
+
+  Data &operator=(const APFloat &other) {
+    this->data = other;
+    hash = llvm::hash_value(other);
+    bitwidth = other.getSizeInBits(other.getSemantics());
+    return *this;
+  }
+
+  bool hasValue() const { return data.has_value(); }
+
+  template <class T>
+  friend T dataCast(const Data &value);
+  template <class T>
+  friend T dataCast(Data &value);
+  template <class T>
+  friend T dataCast(Data &&value);
+  template <class T>
+  friend const T *dataCast(const Data *value);
+  template <class T>
+  friend T *dataCast(Data *value);
+};
+
+template <class T>
+T dataCast(const Data &value) {
+  return llvm::any_cast<T>(value.data);
+}
+template <class T>
+T dataCast(Data &value) {
+  return llvm::any_cast<T>(value.data);
+}
+template <class T>
+T dataCast(Data &&value) {
+  return llvm::any_cast<T>(value.data);
+}
+template <class T>
+const T *dataCast(const Data *value) {
+  return llvm::any_cast<T>(value->data);
+}
+template <class T>
+T *dataCast(Data *value) {
+  return llvm::any_cast<T>(value->data);
+}
 
 //===----------------------------------------------------------------------===//
 // States
@@ -73,9 +154,6 @@ class ChannelState : public TypedValueState<handshake::ChannelType> {
   friend struct ChannelProducerRW;
   // Give the corresponding Updater an access to data members
   friend class ChannelUpdater;
-  // Temporary solution for the testing function printValueStates() function
-  // (which one will be removed in the future)
-  friend class Simulator;
 
 public:
   using TypedValueState<handshake::ChannelType>::TypedValueState;
@@ -83,9 +161,10 @@ public:
   ChannelState(TypedValue<handshake::ChannelType> channel)
       : TypedValueState<handshake::ChannelType>(channel) {
 
-    llvm::TypeSwitch<Type>(channel.getType().getDataType())
+    llvm::TypeSwitch<mlir::Type>(channel.getType().getDataType())
         .Case<IntegerType>([&](IntegerType intType) {
-          data = APInt(intType.getWidth(), 0, intType.isSigned());
+          data = APInt(std::max(1, (int)intType.getWidth()), 0,
+                       intType.isSigned());
         })
         .Case<FloatType>([&](FloatType floatType) {
           data = APFloat(floatType.getFloatSemantics());
@@ -100,7 +179,7 @@ public:
 protected:
   bool valid = false;
   bool ready = false;
-  llvm::Any data = {};
+  Data data = {};
   // Maybe some additional data signals here
 };
 
@@ -110,9 +189,6 @@ class ControlState : public TypedValueState<handshake::ControlType> {
   friend struct ControlProducerRW;
   // Give the corresponding Updater an access to data members
   friend class ControlUpdater;
-  // Temporary solution for the testing function printValueStates() function
-  // (which one will be removed in the future)
-  friend class Simulator;
 
 public:
   using TypedValueState<handshake::ControlType>::TypedValueState;
@@ -169,7 +245,9 @@ public:
   ChannelUpdater(ChannelState &oldState, ChannelState &newState)
       : DoubleUpdater<ChannelState>(oldState, newState) {}
   bool check() override {
-    return newState.valid == oldState.valid && newState.ready == oldState.ready;
+    return newState.valid == oldState.valid &&
+           newState.ready == oldState.ready &&
+           newState.data.hash == oldState.data.hash;
   }
   void setValid() override {
     newState.valid = true;
@@ -231,17 +309,19 @@ public:
 };
 
 class ProducerRW : public RW {
-public:
-  bool &valid;
-  const bool &ready;
-
 protected:
   enum ProducerDescendants { D_ChannelProducerRW, D_ControlProducerRW };
 
 public:
+  bool &valid;
+  const bool &ready;
+
+public:
   ProducerDescendants getType() const { return prod; }
-  ProducerRW(ProducerDescendants p, bool &valid, bool &ready)
+  ProducerRW(bool &valid, const bool &ready,
+             ProducerDescendants p = D_ControlProducerRW)
       : valid(valid), ready(ready), prod(p) {}
+  ProducerRW(ProducerRW &p) : valid(p.valid), ready(p.ready), prod(p.prod) {}
 
   virtual ~ProducerRW() {}
 
@@ -260,8 +340,12 @@ protected:
 public:
   ConsumerDescendants getType() const { return cons; }
 
-  ConsumerRW(ConsumerDescendants c, bool &valid, bool &ready)
+  ConsumerRW(const bool &valid, bool &ready,
+             ConsumerDescendants c = D_ControlConsumerRW)
       : valid(valid), ready(ready), cons(c) {}
+
+  ConsumerRW(ConsumerRW &c) : valid(c.valid), ready(c.ready), cons(c.cons) {}
+
   virtual ~ConsumerRW() {};
 
 private:
@@ -274,7 +358,7 @@ private:
 /// ReadOnly access to the valid one.
 struct ControlConsumerRW : public ConsumerRW {
   ControlConsumerRW(ControlState &reader, ControlState &writer)
-      : ConsumerRW(D_ControlConsumerRW, reader.valid, writer.ready) {}
+      : ConsumerRW(reader.valid, writer.ready, D_ControlConsumerRW) {}
 
   static bool classof(const ConsumerRW *c) {
     return c->getType() == D_ControlConsumerRW;
@@ -285,7 +369,7 @@ struct ControlConsumerRW : public ConsumerRW {
 /// ReadOnly access to the ready one.
 struct ControlProducerRW : public ProducerRW {
   ControlProducerRW(ControlState &reader, ControlState &writer)
-      : ProducerRW(D_ControlProducerRW, writer.valid, reader.ready) {}
+      : ProducerRW(writer.valid, reader.ready, D_ControlProducerRW) {}
 
   static bool classof(const ProducerRW *c) {
     return c->getType() == D_ControlProducerRW;
@@ -297,10 +381,10 @@ struct ControlProducerRW : public ProducerRW {
 /// In this case the user can change the valid signal, but has ReadOnly access
 /// to the valid and data ones.
 struct ChannelConsumerRW : public ConsumerRW {
-  const Any &data;
+  const Data &data;
 
   ChannelConsumerRW(ChannelState &reader, ChannelState &writer)
-      : ConsumerRW(D_ChannelConsumerRW, reader.valid, writer.ready),
+      : ConsumerRW(reader.valid, writer.ready, D_ChannelConsumerRW),
         data(reader.data) {}
 
   static bool classof(const ConsumerRW *c) {
@@ -311,15 +395,59 @@ struct ChannelConsumerRW : public ConsumerRW {
 /// In this case the user can change the valid and data signals, but has
 /// ReadOnly access to the ready one.
 struct ChannelProducerRW : public ProducerRW {
-  Any &data;
+  Data &data;
 
   ChannelProducerRW(ChannelState &reader, ChannelState &writer)
-      : ProducerRW(D_ChannelProducerRW, writer.valid, reader.ready),
+      : ProducerRW(writer.valid, reader.ready, D_ChannelProducerRW),
         data(writer.data) {}
 
   static bool classof(const ProducerRW *c) {
     return c->getType() == D_ChannelProducerRW;
   }
+};
+
+//===----------------------------------------------------------------------===//
+// Readers & writers
+//===----------------------------------------------------------------------===//
+/// The following structures are used to represent components that can be
+/// either datafull or dataless. They store a pointer to Data and some
+/// user-friendly functions.
+
+/// A struct to represent consumer's data
+struct ConsumerData {
+  Data const *data = nullptr;
+  unsigned dataWidth = 0;
+
+  ConsumerData(ConsumerRW *ins) {
+    if (auto *p = dyn_cast<ChannelConsumerRW>(ins)) {
+      data = &p->data;
+      dataWidth = data->bitwidth;
+    } else
+      data = nullptr;
+  }
+
+  bool hasValue() const { return data != nullptr; }
+};
+
+/// A struct to represent producer's data
+struct ProducerData {
+  Data *data = nullptr;
+  unsigned dataWidth = 0;
+
+  ProducerData(ProducerRW *outs) {
+    if (auto *p = dyn_cast<ChannelProducerRW>(outs)) {
+      data = &p->data;
+    } else
+      data = nullptr;
+  }
+
+  ProducerData &operator=(const ConsumerData &other) {
+    if (data)
+      *data = *other.data;
+    return *this;
+  }
+
+  bool hasValue() const { return data != nullptr; }
 };
 
 //===----------------------------------------------------------------------===//
@@ -336,6 +464,7 @@ public:
   // otherwise
   virtual void reset() = 0;
   virtual void exec(bool isClkRisingEdge) = 0;
+  virtual void printStates() = 0;
 
   virtual ~ExecutionModel() {}
 
@@ -346,19 +475,34 @@ protected:
 /// Typed execution model
 template <typename Op>
 class OpExecutionModel : public ExecutionModel {
-  // Give an access to the getState function for the simulator
-  friend class Simulator;
-
 public:
   OpExecutionModel(Op op) : ExecutionModel(op.getOperation()) {}
 
 protected:
   Op getOperation() { return cast<Op>(op); }
+
   // Get exact RW state type (ChannelProducerRW / ChannelConsumerRW /
   // ControlProducerRW / ControlConsumerRW)
   template <typename State>
   static State *getState(Value val, mlir::DenseMap<Value, RW *> &rws) {
     return static_cast<State *>(rws[val]);
+  }
+
+  // Just a temporary function to print models' states
+  template <typename State, typename Data>
+  void printValue(const std::string &name, State *ins, Data *insData) {
+    llvm::outs() << name << ": ";
+    if (insData) {
+      APInt t = dataCast<APInt>(*insData);
+      auto val = t.reverseBits().getZExtValue();
+      for (unsigned i = 0; i < t.getBitWidth(); ++i) {
+        llvm::outs() << (val & 1);
+        val >>= 1;
+      }
+      llvm::outs() << " ";
+    }
+
+    llvm::outs() << ins->valid << " " << ins->ready << "\n";
   }
 };
 
@@ -369,86 +513,90 @@ protected:
 
 class ForkSupport {
 public:
-  ForkSupport() = default;
+  ForkSupport(unsigned size, unsigned datawidth = 0)
+      : size(size), datawidth(datawidth) {
+    transmitValue.resize(size, false);
+    keepValue.resize(size, false);
+    blockStopArray.resize(size, false);
+  }
 
-  void resetDataless(bool insValid, const std::vector<bool> &outsReady,
-                     bool &insReady,
-                     std::vector<std::reference_wrapper<bool>> &outsValid) {
-    for (bool outR : outsReady) {
-      transmitValue.push_back(true);
-      keepValue.push_back(!outR);
-      outsValid.emplace_back(insValid);
-      blockStopArray.push_back(!outR);
+  void resetDataless(ConsumerRW *ins, std::vector<ProducerRW *> &outs) {
+    for (unsigned i = 0; i < size; ++i) {
+      transmitValue[i] = true;
+      keepValue[i] = !outs[i]->ready;
+      outs[i]->valid = ins->valid;
+      blockStopArray[i] = !outs[i]->ready;
     }
+
+    // or_n
     anyBlockStop = false;
     for (bool c : blockStopArray)
       anyBlockStop = anyBlockStop || c;
-    insReady = !anyBlockStop;
-    backpressure = insValid && anyBlockStop;
+
+    ins->ready = !anyBlockStop;
+    backpressure = ins->valid && anyBlockStop;
   }
 
-  void execDataless(bool isClkRisingEdge, bool insValid,
-                    const std::vector<bool> &outsReady, bool &insReady,
-                    std::vector<std::reference_wrapper<bool>> &outsValid) {
-
-    for (unsigned i = 0; i < outsReady.size(); ++i) {
-      keepValue[i] = !outsReady[i] && transmitValue[i];
+  void execDataless(bool isClkRisingEdge, ConsumerRW *ins,
+                    std::vector<ProducerRW *> &outs) {
+    for (unsigned i = 0; i < outs.size(); ++i) {
+      keepValue[i] = !outs[i]->ready && transmitValue[i];
       if (isClkRisingEdge)
         transmitValue[i] = keepValue[i] || !backpressure;
-      outsValid[i].get() = transmitValue[i] && insValid;
+      outs[i]->valid = transmitValue[i] && ins->valid;
       blockStopArray[i] = keepValue[i];
     }
+
+    // or_n
     anyBlockStop = false;
     for (bool c : blockStopArray)
       anyBlockStop = anyBlockStop || c;
-    insReady = !anyBlockStop;
-    backpressure = insValid && anyBlockStop;
-  }
-  void reset(bool insValid, const std::vector<bool> &outsReady, bool &insReady,
-             std::vector<std::reference_wrapper<bool>> &outsValid,
-             std::vector<Any *> &outsData, const Any &insData = {}) {
-    resetDataless(insValid, outsReady, insReady, outsValid);
-    if (!insData.has_value())
-      return;
-    for (auto &out : outsData)
-      *out = insData;
-  };
 
-  void exec(bool isClkRisingEdge, bool insValid,
-            const std::vector<bool> &outsReady, bool &insReady,
-            std::vector<std::reference_wrapper<bool>> &outsValid,
-            std::vector<Any *> &outsData, const Any &insData = {}) {
-    execDataless(isClkRisingEdge, insValid, outsReady, insReady, outsValid);
-    if (!insData.has_value())
-      return;
+    ins->ready = !anyBlockStop;
+    backpressure = ins->valid && anyBlockStop;
+  }
+
+  void reset(ConsumerRW *ins, std::vector<ProducerRW *> &outs,
+             const ConsumerData &insData, std::vector<ProducerData> &outsData) {
+    resetDataless(ins, outs);
     for (auto &out : outsData)
-      *out = insData;
+      out = insData;
+  }
+
+  void exec(bool isClkRisingEdge, ConsumerRW *ins,
+            std::vector<ProducerRW *> &outs, const ConsumerData &insData,
+            std::vector<ProducerData> &outsData) {
+    execDataless(isClkRisingEdge, ins, outs);
+    for (auto &out : outsData)
+      out = insData;
   }
 
 private:
+  unsigned size;
   // eager fork
   std::vector<bool> transmitValue, keepValue;
-  // fork
+  // fork dataless
   std::vector<bool> blockStopArray;
   bool anyBlockStop = false, backpressure = false;
+
+public:
+  unsigned datawidth;
 };
 
-class Join {
+class JoinSupport {
 public:
-  Join(unsigned size) : size(size) {}
+  JoinSupport(unsigned size) : size(size) {}
 
-  void exec(const std::vector<bool> &insValid, bool outsReady,
-            std::vector<std::reference_wrapper<bool>> &insReady,
-            bool &outsValid) {
-    outsValid = true;
+  void exec(std::vector<ConsumerRW *> &ins, ProducerRW *outs) {
+    outs->valid = true;
     for (unsigned i = 0; i < size; ++i)
-      outsValid = outsValid && insValid[i];
+      outs->valid = outs->valid && ins[i]->valid;
 
     for (unsigned i = 0; i < size; ++i) {
-      insReady[i].get() = outsReady;
+      ins[i]->ready = outs->ready;
       for (unsigned j = 0; j < size; ++j)
         if (i != j)
-          insReady[i].get() = insReady[i].get() && insValid[j];
+          ins[i]->ready = ins[i]->ready && ins[j]->valid;
     }
   }
 
@@ -456,152 +604,206 @@ private:
   unsigned size;
 };
 
-class OEHBSupport {
+// Not used at the moment
+class DelayBuffer {
 public:
-  OEHBSupport() = default;
-
-  void resetDataless(bool insValid, bool outsReady, bool &insReady,
-                     bool &outsValid) {
-    outputValid = false;
-    insReady = true;
-    outsValid = outputValid;
-  }
-  void execDataless(bool isClkRisingEdge, bool insValid, bool outsReady,
-                    bool &insReady, bool &outsValid) {
-    if (isClkRisingEdge)
-      outputValid = insValid || (outputValid && !outsReady);
-    insReady = !outputValid || outsReady;
-    outsValid = outputValid;
-  }
-
-  void reset(bool insValid, bool outsReady, bool &insReady, bool &outsValid,
-             Any &outsData, const Any &insData = {}) {
-    if (!insData.has_value()) {
-      resetDataless(insValid, outsReady, insReady, outsValid);
-      return;
+  DelayBuffer(unsigned size = 32) : size(size) { regs.resize(size, false); }
+  void reset(const bool &validIn, const bool &readyIn, bool &validOut) {
+    for (unsigned i = 0; i < size; ++i) {
+      if (i == 0) {
+        regs[i] = validIn;
+      } else if (i > 0) {
+        regs[i] = false;
+      }
     }
-    resetDataless(insValid, outsReady, inputReady, outsValid);
-    outsData = APInt(llvm::any_cast<APInt>(insData).getBitWidth(), 0);
-    insReady = inputReady;
-    regEn = inputReady && insValid;
-  };
-
-  void exec(bool isClkRisingEdge, bool insValid, bool outsReady, bool &insReady,
-            bool &outsValid, Any &outsData, const Any &insData = {}) {
-    if (!insData.has_value()) {
-      execDataless(isClkRisingEdge, insValid, outsReady, insReady, outsValid);
-      return;
+    validOut = regs[size - 1];
+  }
+  void exec(bool isClkRisingEdge, const bool &validIn, const bool &readyIn,
+            bool &validOut) {
+    for (unsigned i = 0; i < size; ++i) {
+      if (i == 0) {
+        if (isClkRisingEdge && readyIn)
+          regs[i] = validIn;
+      } else if (i > 0) {
+        if (isClkRisingEdge && readyIn)
+          regs[i] = regs[i - 1];
+      }
     }
-    execDataless(isClkRisingEdge, insValid, outsReady, inputReady, outsValid);
-    if (isClkRisingEdge && regEn)
-      outsData = insData;
-    insReady = inputReady;
-    regEn = inputReady && insValid;
+    validOut = regs[size - 1];
   }
 
 private:
-  bool outputValid = false, regEn = false, inputReady = false;
+  unsigned size;
+  std::vector<bool> regs;
+};
+
+class OEHBSupport {
+public:
+  OEHBSupport(unsigned datawidth = 0) : datawidth(datawidth) {}
+
+  void resetDataless(ConsumerRW *ins, ProducerRW *outs) {
+    outputValid = false;
+    ins->ready = true;
+    outs->valid = false;
+  }
+
+  void execDataless(bool isClkRisingEdge, ConsumerRW *ins, ProducerRW *outs) {
+    if (isClkRisingEdge)
+      outputValid = ins->valid || (outputValid && !outs->ready);
+
+    ins->ready = !outputValid || outs->ready;
+    outs->valid = outputValid;
+  }
+
+  void reset(ConsumerRW *ins, ProducerRW *outs, const Data *insData,
+             Data *outsData) {
+    resetDataless(ins, outs);
+    if (insData)
+      *outsData = APInt(datawidth, 0);
+    regEn = ins->ready && ins->valid;
+  }
+
+  void exec(bool isClkRisingEdge, ConsumerRW *ins, ProducerRW *outs,
+            const Data *insData, Data *outsData) {
+    execDataless(isClkRisingEdge, ins, outs);
+    if (isClkRisingEdge && regEn && insData)
+      *outsData = *insData;
+    regEn = ins->ready && ins->valid;
+  }
+
+  unsigned datawidth;
+
+private:
+  // oehb dataless
+  bool outputValid = false;
+  // oehb datafull
+  bool regEn = false;
 };
 
 class TEHBSupport {
 public:
-  TEHBSupport() = default;
-  void resetDataless(bool insValid, bool outsReady, bool &insReady,
-                     bool &outsValid) {
-    outputValid = insValid;
+  TEHBSupport(unsigned datawidth = 0) : datawidth(datawidth) {}
+  void resetDataless(ConsumerRW *ins, ProducerRW *outs) {
+    outputValid = ins->valid;
     fullReg = false;
-    insReady = true;
-    outsValid = outputValid;
+    ins->ready = true;
+    outs->valid = ins->valid;
   }
-  void execDataless(bool isClkRisingEdge, bool insValid, bool outsReady,
-                    bool &insReady, bool &outsValid) {
+
+  void execDataless(bool isClkRisingEdge, ConsumerRW *ins, ProducerRW *outs) {
     if (isClkRisingEdge)
-      fullReg = outputValid && !outsReady;
-    outputValid = insValid || fullReg;
-    insReady = !fullReg;
-    outsValid = outputValid;
+      fullReg = outputValid && !outs->ready;
+    outputValid = ins->valid || fullReg;
+    ins->ready = !fullReg;
+    outs->valid = outputValid;
   }
 
-  void reset(bool insValid, bool outsReady, bool &insReady, bool &outsValid,
-             Any &outsData, const Any &insData = {}) {
-    if (!insData.has_value()) {
-      resetDataless(insValid, outsReady, insReady, outsValid);
-      return;
-    }
-    resetDataless(insValid, outsReady, regNotFull, outsValid);
-    regEnable = regNotFull && insValid && !outsReady;
-    dataReg = APInt(llvm::any_cast<APInt>(insData).getBitWidth(), 0);
-
-    if (regNotFull)
-      outsData = insData;
+  void reset(ConsumerRW *ins, ProducerRW *outs, const Data *insData,
+             Data *outsData) {
+    if (insData)
+      resetDataFull(ins, outs, insData, outsData);
     else
-      outsData = dataReg;
-
-    insReady = regNotFull;
-  };
-
-  void exec(bool isClkRisingEdge, bool insValid, bool outsReady, bool &insReady,
-            bool &outsValid, Any &outsData, const Any &insData = {}) {
-    if (!insData.has_value()) {
-      execDataless(isClkRisingEdge, insValid, outsReady, insReady, outsValid);
-      return;
-    }
-    execDataless(isClkRisingEdge, insValid, outsReady, regNotFull, outsValid);
-    regEnable = regNotFull && insValid && !outsReady;
-
-    if (isClkRisingEdge && regEnable)
-      dataReg = insData;
-
-    if (regNotFull)
-      outsData = insData;
-    else
-      outsData = dataReg;
-
-    insReady = regNotFull;
+      resetDataless(ins, outs);
   }
+
+  void exec(bool isClkRisingEdge, ConsumerRW *ins, ProducerRW *outs,
+            const Data *insData, Data *outsData) {
+    if (insData)
+      execDataFull(isClkRisingEdge, ins, outs, insData, outsData);
+    else
+      execDataless(isClkRisingEdge, ins, outs);
+  }
+
+  unsigned datawidth = 0;
 
 private:
+  // tehb dataless
   bool fullReg = false, outputValid = false;
+  // tehb datafull
   bool regNotFull = false, regEnable = false;
-  Any dataReg;
+  Data dataReg;
+
+  void resetDataFull(ConsumerRW *ins, ProducerRW *outs, const Data *insData,
+                     Data *outsData) {
+    regEnable = regNotFull && ins->valid && !outs->ready;
+
+    // tehb dataless
+    ConsumerRW c(ins->valid, regNotFull);
+    resetDataless(&c, outs);
+
+    // process datareg
+    dataReg = APInt(datawidth, 0);
+
+    if (regNotFull)
+      *outsData = *insData;
+    else
+      *outsData = dataReg;
+
+    ins->ready = regNotFull;
+  };
+
+  void execDataFull(bool isClkRisingEdge, ConsumerRW *ins, ProducerRW *outs,
+                    const Data *insData, Data *outsData) {
+    regEnable = regNotFull && ins->valid && !outs->ready;
+
+    // tehb dataless
+    ConsumerRW c(ins->valid, regNotFull);
+    execDataless(isClkRisingEdge, &c, outs);
+
+    // process datareg
+    if (isClkRisingEdge && regEnable)
+      dataReg = *insData;
+
+    // process (regNotFull, dataReg, ins)
+    if (regNotFull)
+      *outsData = *insData;
+    else
+      *outsData = dataReg;
+
+    ins->ready = regNotFull;
+  }
 };
 
 //===----------------------------------------------------------------------===//
 // Handshake
 //===----------------------------------------------------------------------===//
+/// Handshake components. Some of them can represent both datafull and dataless
+/// options.
 
+/// Example of a model that can be initialized with o without data.
 class BranchModel : public OpExecutionModel<handshake::BranchOp> {
 public:
   using OpExecutionModel<handshake::BranchOp>::OpExecutionModel;
   BranchModel(handshake::BranchOp branchOp, mlir::DenseMap<Value, RW *> &subset)
-      : OpExecutionModel<handshake::BranchOp>(branchOp), op(branchOp) {
-    ins = getState<ConsumerRW>(op.getOperand(), subset);
-    outs = getState<ProducerRW>(op.getResult(), subset);
-    if (auto *p = dyn_cast<ChannelProducerRW>(outs)) {
-      outsData = &p->data;
-    } else {
-      outsData = nullptr;
-    }
-    if (auto *p = dyn_cast<ChannelConsumerRW>(ins)) {
-      insData = &p->data;
-    } else {
-      insData = nullptr;
-    }
-  }
+      : OpExecutionModel<handshake::BranchOp>(branchOp), op(branchOp),
+        // get the exact structure for the particular value
+        ins(getState<ConsumerRW>(op.getOperand(), subset)),
+        outs(getState<ProducerRW>(op.getResult(), subset)),
+        // initialize data (nullptr if dataless)
+        insData(ins), outsData(outs) {}
+
   void reset() override {
     outs->valid = ins->valid;
     ins->ready = outs->ready;
-    if (insData)
-      *outsData = *insData;
+    outsData = insData;
   };
+
   void exec(bool isClkRisingEdge) override { reset(); }
+
+  void printStates() override {
+    printValue<ConsumerRW, const Data>("ins", ins, insData.data);
+    printValue<ProducerRW, Data>("outs", outs, outsData.data);
+  }
 
 private:
   handshake::BranchOp op;
+
+  // ports
   ConsumerRW *ins;
   ProducerRW *outs;
-  Any const *insData = nullptr;
-  Any *outsData = nullptr;
+
+  ConsumerData insData;
+  ProducerData outsData;
 };
 
 class CondBranchModel
@@ -611,56 +813,90 @@ public:
   CondBranchModel(handshake::ConditionalBranchOp condBranchOp,
                   mlir::DenseMap<Value, RW *> &subset)
       : OpExecutionModel<handshake::ConditionalBranchOp>(condBranchOp),
-        op(condBranchOp), condBrJoin(2) {
-    data = getState<ConsumerRW>(op.getDataOperand(), subset);
-    condition = getState<ChannelConsumerRW>(op.getConditionOperand(), subset);
-    trueOut = getState<ProducerRW>(op.getTrueResult(), subset);
-    falseOut = getState<ProducerRW>(op.getFalseResult(), subset);
+        op(condBranchOp),
+        data(getState<ConsumerRW>(op.getDataOperand(), subset)),
+        condition(
+            getState<ChannelConsumerRW>(op.getConditionOperand(), subset)),
+        trueOut(getState<ProducerRW>(op.getTrueResult(), subset)),
+        falseOut(getState<ProducerRW>(op.getFalseResult(), subset)),
+        dataData(data), trueOutData(trueOut), falseOutData(falseOut),
+        condBrJoin(2) {}
 
-    if (auto *p = dyn_cast<ChannelProducerRW>(trueOut)) {
-      trueOutData = &p->data;
-    } else {
-      trueOutData = nullptr;
-    }
-    if (auto *p = dyn_cast<ChannelProducerRW>(falseOut)) {
-      falseOutData = &p->data;
-    } else {
-      falseOutData = nullptr;
-    }
-    if (auto *p = dyn_cast<ChannelConsumerRW>(data)) {
-      dataData = &p->data;
-    } else {
-      dataData = nullptr;
-    }
-  }
   void reset() override {
-    std::vector<bool> insValid{data->valid, condition->valid};
-    bool cond = llvm::any_cast<APInt>(condition->data).getBoolValue();
-    std::vector<std::reference_wrapper<bool>> insReady{data->ready,
-                                                       condition->ready};
-    condBrJoin.exec(insValid,
-                    (falseOut->ready && !cond) || (trueOut->ready && cond),
-                    insReady, brInpValid);
+    auto k = dataCast<APInt>(condition->data);
+
+    auto cond = k.getBoolValue();
+    // join
+    std::vector<ConsumerRW *> insJoin = {data, condition};
+    ProducerRW outsJoin(brInpValid,
+                        (falseOut->ready && !cond) || (trueOut->ready && cond));
+    condBrJoin.exec(insJoin, &outsJoin);
+
     trueOut->valid = cond && brInpValid;
     falseOut->valid = !cond && brInpValid;
-    if (dataData) {
-      *trueOutData = *dataData;
-      *falseOutData = *dataData;
-    }
-  };
+    trueOutData = dataData;
+    falseOutData = dataData;
+  }
+
   void exec(bool isClkRisingEdge) override { reset(); }
+
+  void printStates() override {
+    printValue<ConsumerRW, const Data>("data", data, dataData.data);
+    printValue<ChannelConsumerRW, const Data>("condition", condition,
+                                              &condition->data);
+    printValue<ProducerRW, Data>("trueOut", trueOut, trueOutData.data);
+    printValue<ProducerRW, Data>("falseOut", falseOut, falseOutData.data);
+  }
 
 private:
   handshake::ConditionalBranchOp op;
-  ChannelConsumerRW *condition;
+
+  // ports
   ConsumerRW *data;
+  ChannelConsumerRW *condition;
   ProducerRW *trueOut, *falseOut;
 
-  Any const *dataData = nullptr;
-  Any *trueOutData = nullptr, *falseOutData = nullptr;
+  ConsumerData dataData;
+  ProducerData trueOutData, falseOutData;
 
+  // cond br dataless
   bool brInpValid = false;
-  Join condBrJoin;
+
+  // internal components
+  JoinSupport condBrJoin;
+};
+
+class ConstantModel : public OpExecutionModel<handshake::ConstantOp> {
+public:
+  using OpExecutionModel<handshake::ConstantOp>::OpExecutionModel;
+  ConstantModel(handshake::ConstantOp constOp,
+                mlir::DenseMap<Value, RW *> &subset)
+      : OpExecutionModel<handshake::ConstantOp>(constOp), op(constOp),
+        value(dyn_cast<mlir::IntegerAttr>(op.getValue()).getValue()) {
+    ctrl = getState<ControlConsumerRW>(op.getCtrl(), subset);
+    outs = getState<ChannelProducerRW>(op.getResult(), subset);
+  }
+
+  void reset() override {
+    outs->data = value;
+    outs->valid = ctrl->valid;
+    ctrl->ready = outs->ready;
+  }
+
+  void exec(bool isClkRisingEdge) override { reset(); }
+
+  void printStates() override {
+    llvm::outs() << "ctrl: " << ctrl->valid << " " << ctrl->ready << "\n";
+    printValue<ChannelProducerRW, Data>("outs", outs, &outs->data);
+  }
+
+private:
+  handshake::ConstantOp op;
+
+  // ports
+  Data value;
+  ControlConsumerRW *ctrl;
+  ChannelProducerRW *outs;
 };
 
 class ControlMergeModel : public OpExecutionModel<handshake::ControlMergeOp> {
@@ -670,126 +906,114 @@ public:
                     mlir::DenseMap<Value, RW *> &subset)
       : OpExecutionModel<handshake::ControlMergeOp>(cMergeOp), op(cMergeOp),
         size(op->getNumOperands()),
-        indexWidth(op.getIndex().getType().getIntOrFloatBitWidth()),
-        cMergeTEHB() {
+        indexWidth(op.getIndex().getType().getDataBitWidth()),
+        cMergeTEHB(indexWidth), cMergeFork(2),
+        outs(getState<ProducerRW>(op.getResult(), subset)),
+        index(getState<ChannelProducerRW>(op.getIndex(), subset)),
+        outsData(outs), insTEHB(dataAvailable, tehbOutReady),
+        outsTEHB(tehbOutValid, readyToFork),
+        insFork(tehbOutValid, readyToFork) {
     for (auto oper : op->getOperands())
       ins.push_back(getState<ConsumerRW>(oper, subset));
 
-    outs = getState<ProducerRW>(op.getResult(), subset);
-    index = getState<ChannelProducerRW>(op.getIndex(), subset);
-
-    if (auto *p = dyn_cast<ChannelProducerRW>(outs)) {
-      outsData = &p->data;
-    } else {
-      outsData = nullptr;
-    }
+    outsFork = {outs, index};
 
     for (unsigned i = 0; i < size; ++i)
-      if (auto *p = dyn_cast<ChannelConsumerRW>(ins[i])) {
-        insData.push_back(&p->data);
-      } else {
-        insData.push_back(nullptr);
-      }
+      insData.emplace_back(ins[i]);
+
+    cMergeFork.datawidth = outsData.dataWidth;
   }
 
   void reset() override {
     indexTEHB = APInt(indexWidth, 0);
+
+    // process (ins_valid)
     for (unsigned i = 0; i < size; ++i)
       if (ins[i]->valid) {
-        indexTEHB = i;
+        indexTEHB = APInt(indexWidth, i);
         break;
       }
 
     // mergeNotehbDataless
     dataAvailable = false;
-    for (auto &in : ins) {
+    for (auto &in : ins)
       dataAvailable = dataAvailable || in->valid;
-    }
 
-    cMergeTEHB.reset(dataAvailable, readyToFork, tehbOutReady, tehbOutValid,
-                     index->data, indexTEHB);
-    for (auto &in : ins) {
+    // tehb
+    cMergeTEHB.reset(&insTEHB, &outsTEHB, &indexTEHB, &index->data);
+
+    // mergeNotehbDataless
+    for (auto &in : ins)
       in->ready = tehbOutReady;
-    }
-    std::vector<bool> outsReady{outs->ready, index->ready};
-    std::vector<std::reference_wrapper<bool>> outsValid{outs->valid,
-                                                        index->valid};
 
-    cMergeFork.resetDataless(tehbOutValid, outsReady, readyToFork, outsValid);
-    auto ind = any_cast<APInt>(index->data).getZExtValue();
-    if (insData[ind])
-      *outsData = *insData[ind];
-  };
+    // fork dataless
+    cMergeFork.resetDataless(&insFork, outsFork);
+
+    outsData = insData[dataCast<APInt>(index->data).getZExtValue()];
+  }
+
   void exec(bool isClkRisingEdge) override {
     indexTEHB = APInt(indexWidth, 0);
+
+    // process (ins_valid)
     for (unsigned i = 0; i < size; ++i)
       if (ins[i]->valid) {
-        indexTEHB = i;
+        indexTEHB = APInt(indexWidth, i);
         break;
       }
 
     // mergeNotehbDataless
     dataAvailable = false;
-    for (auto &in : ins) {
+    for (auto &in : ins)
       dataAvailable = dataAvailable || in->valid;
-    }
 
-    cMergeTEHB.exec(isClkRisingEdge, dataAvailable, readyToFork, tehbOutReady,
-                    tehbOutValid, index->data, indexTEHB);
-    for (auto &in : ins) {
+    // tehb
+    cMergeTEHB.exec(isClkRisingEdge, &insTEHB, &outsTEHB, &indexTEHB,
+                    &index->data);
+
+    // mergeNotehbDataless
+    for (auto &in : ins)
       in->ready = tehbOutReady;
-    }
-    std::vector<bool> outsReady{outs->ready, index->ready};
-    std::vector<std::reference_wrapper<bool>> outsValid{outs->valid,
-                                                        index->valid};
 
-    cMergeFork.execDataless(isClkRisingEdge, tehbOutValid, outsReady,
-                            readyToFork, outsValid);
-    auto ind = any_cast<APInt>(index->data).getZExtValue();
-    if (insData[ind])
-      *outsData = *insData[ind];
+    // fork dataless
+    cMergeFork.execDataless(isClkRisingEdge, &insFork, outsFork);
+
+    outsData = insData[dataCast<APInt>(index->data).getZExtValue()];
+  }
+
+  void printStates() override {
+    for (unsigned i = 0; i < size; ++i)
+      printValue<ConsumerRW, const Data>("ins", ins[i], insData[i].data);
+    printValue<ProducerRW, Data>("outs", outs, outsData.data);
+    printValue<ChannelProducerRW, Data>("index", index, &index->data);
   }
 
 private:
   handshake::ControlMergeOp op;
+
+  // parameters
   unsigned size, indexWidth;
+
+  // internal components
   TEHBSupport cMergeTEHB;
   ForkSupport cMergeFork;
 
+  // ports
   std::vector<ConsumerRW *> ins;
   ProducerRW *outs;
   ChannelProducerRW *index;
 
-  std::vector<Any const *> insData;
-  Any *outsData = nullptr;
+  std::vector<ConsumerData> insData;
+  ProducerData outsData;
 
-  Any indexTEHB = APInt(indexWidth, 0);
+  // control merge dataless
+  Data indexTEHB = APInt(indexWidth, 0);
   bool dataAvailable = false, readyToFork = false, tehbOutValid = false,
        tehbOutReady = false;
-};
-
-class ConstantModel : public OpExecutionModel<handshake::ConstantOp> {
-public:
-  using OpExecutionModel<handshake::ConstantOp>::OpExecutionModel;
-  ConstantModel(handshake::ConstantOp constOp,
-                mlir::DenseMap<Value, RW *> &subset)
-      : OpExecutionModel<handshake::ConstantOp>(constOp), op(constOp),
-        value(op.getValue()) {
-    ctrl = getState<ControlConsumerRW>(op.getCtrl(), subset);
-    outs = getState<ChannelProducerRW>(op.getResult(), subset);
-  }
-  void reset() override {
-    outs->data = value;
-    outs->valid = ctrl->valid;
-    ctrl->ready = outs->ready;
-  };
-  void exec(bool isClkRisingEdge) override { reset(); }
-
-private:
-  handshake::ConstantOp op;
-  Any value;
-  ControlConsumerRW *ctrl;
-  ChannelProducerRW *outs;
+  ConsumerRW insTEHB;
+  ProducerRW outsTEHB;
+  ConsumerRW insFork;
+  std::vector<ProducerRW *> outsFork;
 };
 
 class ForkModel : public OpExecutionModel<handshake::ForkOp> {
@@ -797,57 +1021,75 @@ public:
   using OpExecutionModel<handshake::ForkOp>::OpExecutionModel;
   ForkModel(handshake::ForkOp forkOp, mlir::DenseMap<Value, RW *> &subset)
       : OpExecutionModel<handshake::ForkOp>(forkOp), op(forkOp),
-        size(op->getNumResults()) {
-    ins = getState<ConsumerRW>(op.getOperand(), subset);
+        size(op->getNumResults()), forkSupport(size),
+        ins(getState<ConsumerRW>(op.getOperand(), subset)), insData(ins) {
     for (unsigned i = 0; i < size; ++i)
       outs.push_back(getState<ProducerRW>(op->getResult(i), subset));
 
-    if (auto *p = dyn_cast<ChannelConsumerRW>(ins)) {
-      insData = &p->data;
-    } else {
-      insData = nullptr;
-    }
-
     for (unsigned i = 0; i < size; ++i)
-      if (auto *p = dyn_cast<ChannelProducerRW>(outs[i])) {
-        outsData.push_back(&p->data);
-      } else {
-        outsData.push_back(nullptr);
-      }
+      outsData.emplace_back(outs[i]);
+
+    forkSupport.datawidth = insData.dataWidth;
   }
-  void reset() override {
-    std::vector<bool> outsReady;
-    std::vector<std::reference_wrapper<bool>> outsValid;
-    for (auto &b : outs) {
-      outsReady.push_back(b->ready);
-      outsValid.emplace_back(b->valid);
-    }
 
-    forkSupport.reset(ins->valid, outsReady, ins->ready, outsValid, outsData,
-                      *insData);
-  };
+  void reset() override { forkSupport.reset(ins, outs, insData, outsData); }
+
   void exec(bool isClkRisingEdge) override {
-    std::vector<bool> outsReady;
-    std::vector<std::reference_wrapper<bool>> outsValid;
-    for (auto &b : outs) {
-      outsReady.push_back(b->ready);
-      outsValid.emplace_back(b->valid);
-    }
+    forkSupport.exec(isClkRisingEdge, ins, outs, insData, outsData);
+  }
 
-    forkSupport.exec(isClkRisingEdge, ins->valid, outsReady, ins->ready,
-                     outsValid, outsData, *insData);
+  void printStates() override {
+    printValue<ConsumerRW, const Data>("ins", ins, insData.data);
+    for (unsigned i = 0; i < size; ++i)
+      printValue<ProducerRW, Data>("outs", outs[i], outsData[i].data);
   }
 
 private:
   handshake::ForkOp op;
+
+  // parameters
   unsigned size;
   ForkSupport forkSupport;
 
+  // ports
   ConsumerRW *ins;
   std::vector<ProducerRW *> outs;
 
-  Any const *insData = nullptr;
-  std::vector<Any *> outsData;
+  ConsumerData insData;
+  std::vector<ProducerData> outsData;
+};
+
+// Never used but let it be
+class JoinModel : public OpExecutionModel<handshake::JoinOp> {
+public:
+  using OpExecutionModel<handshake::JoinOp>::OpExecutionModel;
+  JoinModel(handshake::JoinOp joinOp, mlir::DenseMap<Value, RW *> &subset)
+      : OpExecutionModel<handshake::JoinOp>(joinOp), op(joinOp),
+        join(op->getNumOperands()) {
+    for (auto oper : op->getOperands())
+      ins.push_back(getState<ConsumerRW>(oper, subset));
+    outs = getState<ProducerRW>(op.getResult(), subset);
+  }
+
+  void reset() override { join.exec(ins, outs); }
+
+  void exec(bool isClkRisingEdge) override { reset(); }
+
+  void printStates() override {
+    for (auto *in : ins)
+      llvm::outs() << "Ins: " << in->valid << " " << in->ready << "\n";
+    llvm::outs() << "Outs: " << outs->valid << " " << outs->ready << "\n";
+  }
+
+private:
+  handshake::JoinOp op;
+
+  // ports
+  std::vector<ConsumerRW *> ins;
+  ProducerRW *outs;
+
+  // internal components
+  JoinSupport join;
 };
 
 class LazyForkModel : public OpExecutionModel<handshake::LazyForkOp> {
@@ -856,49 +1098,51 @@ public:
   LazyForkModel(handshake::LazyForkOp lazyForkOp,
                 mlir::DenseMap<Value, RW *> &subset)
       : OpExecutionModel<handshake::LazyForkOp>(lazyForkOp), op(lazyForkOp),
-        size(op->getNumResults()) {
-    ins = getState<ConsumerRW>(op.getOperand(), subset);
-    for (unsigned i = 0; i < size; ++i)
-      outs.push_back(getState<ProducerRW>(op->getResult(i), subset));
-    if (auto *p = dyn_cast<ChannelConsumerRW>(ins)) {
-      insData = &p->data;
-    } else {
-      insData = nullptr;
-    }
+        size(op->getNumResults()),
+        ins(getState<ConsumerRW>(op.getOperand(), subset)), insData(ins) {
 
     for (unsigned i = 0; i < size; ++i)
-      if (auto *p = dyn_cast<ChannelProducerRW>(outs[i])) {
-        outsData.push_back(&p->data);
-      } else {
-        outsData.push_back(nullptr);
-      }
+      outs.push_back(getState<ProducerRW>(op->getResult(i), subset));
+
+    for (unsigned i = 0; i < size; ++i)
+      outsData.emplace_back(outs[i]);
   }
+
   void reset() override {
     ins->ready = true;
     for (unsigned i = 0; i < size; ++i) {
       bool tempReady = true;
-      for (unsigned j = 0; j < size; ++j) {
+      for (unsigned j = 0; j < size; ++j)
         if (i != j)
           tempReady = tempReady && outs[j]->ready;
-      }
+
       ins->ready = ins->ready && outs[i]->ready;
       outs[i]->valid = ins->valid && tempReady;
     }
     for (unsigned i = 0; i < size; ++i)
-      if (outsData[i])
-        *outsData[i] = *insData;
-  };
+      outsData[i] = insData;
+  }
+
   void exec(bool isClkRisingEdge) override { reset(); }
+
+  void printStates() override {
+    printValue<ConsumerRW, const Data>("ins", ins, insData.data);
+    for (unsigned i = 0; i < size; ++i)
+      printValue<ProducerRW, Data>("outs", outs[i], outsData[i].data);
+  }
 
 private:
   handshake::ForkOp op;
+
+  // parameters
   unsigned size;
 
+  // ports
   ConsumerRW *ins;
   std::vector<ProducerRW *> outs;
 
-  Any const *insData = nullptr;
-  std::vector<Any *> outsData;
+  ConsumerData insData;
+  std::vector<ProducerData> outsData;
 };
 
 class MergeModel : public OpExecutionModel<handshake::MergeOp> {
@@ -906,79 +1150,118 @@ public:
   using OpExecutionModel<handshake::MergeOp>::OpExecutionModel;
   MergeModel(handshake::MergeOp mergeOp, mlir::DenseMap<Value, RW *> &subset)
       : OpExecutionModel<handshake::MergeOp>(mergeOp), op(mergeOp),
-        size(op->getNumOperands()) {
+        size(op->getNumOperands()),
+        outs(getState<ProducerRW>(op.getResult(), subset)), outsData(outs),
+        insTEHB(tehbValid, tehbReady) {
     for (unsigned i = 0; i < size; ++i)
       ins.push_back(getState<ConsumerRW>(op->getOperand(i), subset));
-    outs = getState<ProducerRW>(op.getResult(), subset);
-
-    if (auto *p = dyn_cast<ChannelProducerRW>(outs)) {
-      outsData = &p->data;
-    } else {
-      outsData = nullptr;
-    }
 
     for (unsigned i = 0; i < size; ++i)
-      if (auto *p = dyn_cast<ChannelConsumerRW>(ins[i])) {
-        insData.push_back(&p->data);
-      } else {
-        insData.push_back(nullptr);
-      }
+      insData.emplace_back(ins[i]);
+    mergeTEHB.datawidth = outsData.dataWidth;
   }
 
   void reset() override {
-    tehbValid = false;
-    if (insData[0])
-      tehbDataIn = *insData[0];
-
-    for (unsigned i = 0; i < size; ++i) {
-      if (ins[i]->valid) {
-        tehbValid = true;
-        tehbDataIn = *insData[i];
-        break;
-      }
-    }
-
-    mergeTEHB.reset(tehbValid, outs->ready, tehbReady, outs->valid, *outsData,
-                    tehbDataIn);
-
-    for (unsigned i = 0; i < size; ++i)
-      ins[i]->ready = tehbReady;
-  };
+    if (outsData.hasValue())
+      resetDataFull(ins, outs, insData, outsData);
+    else
+      resetDataless(ins, outs);
+  }
 
   void exec(bool isClkRisingEdge) override {
-    tehbValid = false;
-    if (insData[0])
-      tehbDataIn = *insData[0];
+    if (outsData.hasValue())
+      execDataFull(isClkRisingEdge, ins, outs, insData, outsData);
+    else
+      execDataless(isClkRisingEdge, ins, outs);
+  }
 
-    for (unsigned i = 0; i < size; ++i) {
-      if (ins[i]->valid) {
-        tehbValid = true;
-        if (insData[i])
-          tehbDataIn = *insData[i];
-        break;
-      }
-    }
-
-    mergeTEHB.exec(isClkRisingEdge, tehbValid, outs->ready, tehbReady,
-                   outs->valid, *outsData, tehbDataIn);
-
+  void printStates() override {
     for (unsigned i = 0; i < size; ++i)
-      ins[i]->ready = tehbReady;
+      printValue<ConsumerRW, const Data>("ins", ins[i], insData[i].data);
+    printValue<ProducerRW, Data>("outs", outs, outsData.data);
   }
 
 private:
   handshake::MergeOp op;
+
+  // parameters
   unsigned size;
-  bool tehbValid = false, tehbReady = false;
-  Any tehbDataIn;
 
-  TEHBSupport mergeTEHB;
-
+  // ports
   std::vector<ConsumerRW *> ins;
   ProducerRW *outs;
 
-  std::vector<Any const *> insData;
-  Any *outsData = nullptr;
+  std::vector<ConsumerData> insData;
+  ProducerData outsData;
+
+  // merge dataless
+  bool tehbValid = false, tehbReady = false;
+  ConsumerRW insTEHB;
+  // merge datafull
+  Data tehbDataIn;
+
+  // internal components
+  TEHBSupport mergeTEHB;
+
+  void resetDataless(std::vector<ConsumerRW *> &ins, ProducerRW *outs) {
+    tehbValid = false;
+    for (unsigned i = 0; i < size; ++i)
+      tehbValid = tehbValid || ins[i]->valid;
+
+    for (unsigned i = 0; i < size; ++i)
+      ins[i]->ready = tehbReady;
+
+    mergeTEHB.resetDataless(&insTEHB, outs);
+  }
+
+  void execDataless(bool isClkRisingEdge, std::vector<ConsumerRW *> &ins,
+                    ProducerRW *outs) {
+    tehbValid = false;
+    for (unsigned i = 0; i < size; ++i)
+      tehbValid = tehbValid || ins[i]->valid;
+
+    for (unsigned i = 0; i < size; ++i)
+      ins[i]->ready = tehbReady;
+
+    mergeTEHB.execDataless(isClkRisingEdge, &insTEHB, outs);
+  }
+
+  void resetDataFull(std::vector<ConsumerRW *> &ins, ProducerRW *outs,
+                     std::vector<ConsumerData> &insData,
+                     ProducerData &outsData) {
+    tehbValid = false;
+    tehbDataIn = *insData[0].data;
+    for (unsigned i = 0; i < size; ++i) {
+      if (ins[i]->valid) {
+        tehbValid = true;
+        tehbDataIn = *insData[i].data;
+        break;
+      }
+    }
+
+    for (unsigned i = 0; i < size; ++i)
+      ins[i]->ready = tehbReady;
+
+    mergeTEHB.reset(&insTEHB, outs, &tehbDataIn, outsData.data);
+  }
+
+  void execDataFull(bool isClkRisingEdge, std::vector<ConsumerRW *> &ins,
+                    ProducerRW *outs, std::vector<ConsumerData> &insData,
+                    ProducerData &outsData) {
+    tehbValid = false;
+    tehbDataIn = *insData[0].data;
+    for (unsigned i = 0; i < size; ++i) {
+      if (ins[i]->valid) {
+        tehbValid = true;
+        tehbDataIn = *insData[i].data;
+        break;
+      }
+    }
+    for (unsigned i = 0; i < size; ++i)
+      ins[i]->ready = tehbReady;
+
+    mergeTEHB.exec(isClkRisingEdge, &insTEHB, outs, &tehbDataIn, outsData.data);
+  }
 };
 
 class MuxModel : public OpExecutionModel<handshake::MuxOp> {
@@ -987,127 +1270,210 @@ public:
   MuxModel(handshake::MuxOp muxOp, mlir::DenseMap<Value, RW *> &subset)
       : OpExecutionModel<handshake::MuxOp>(muxOp), op(muxOp),
         size(op.getDataOperands().size()),
-        dataWidth(op.getSelectOperand().getType().getIntOrFloatBitWidth()),
-        selectWidth(op.getSelectOperand().getType().getIntOrFloatBitWidth()),
-        muxTEHB() {
+        selectWidth(op.getSelectOperand().getType().getDataBitWidth()),
+        outs(getState<ProducerRW>(op.getResult(), subset)), outsData(outs),
+        insTEHB(tehbValid, tehbReady) {
     for (auto oper : op.getDataOperands())
       ins.push_back(getState<ChannelConsumerRW>(oper, subset));
     index = getState<ChannelConsumerRW>(op.getSelectOperand(), subset);
     outs = getState<ProducerRW>(op.getDataResult(), subset);
 
-    if (auto *p = dyn_cast<ChannelProducerRW>(outs)) {
-      outsData = &p->data;
-    } else {
-      outsData = nullptr;
-    }
-
     for (unsigned i = 0; i < size; ++i)
-      if (auto *p = dyn_cast<ChannelConsumerRW>(ins[i])) {
-        insData.push_back(&p->data);
-      } else {
-        insData.push_back(nullptr);
-      }
+      insData.emplace_back(ins[i]);
+    muxTEHB.datawidth = outsData.dataWidth;
   }
+
   void reset() override {
-    muxTEHB.reset(tehbInsValid, outs->ready, tehbInsReady, outs->valid,
-                  *outsData, tehbIns);
-    chooseInput();
-  };
+    indexNum = dataCast<APInt>(index->data).getZExtValue();
+    if (outsData.hasValue())
+      resetDataFull(ins, index, indexNum, outs, insData, outsData);
+    else
+      resetDataless(ins, index, indexNum, outs);
+  }
+
   void exec(bool isClkRisingEdge) override {
-    muxTEHB.exec(isClkRisingEdge, tehbInsValid, outs->ready, tehbInsReady,
-                 outs->valid, *outsData, tehbIns);
-    chooseInput();
+    indexNum = dataCast<APInt>(index->data).getZExtValue();
+    if (outsData.hasValue())
+      execDataFull(isClkRisingEdge, ins, index, indexNum, outs, insData,
+                   outsData);
+    else
+      execDataless(isClkRisingEdge, ins, index, indexNum, outs);
+  }
+
+  void printStates() override {
+    for (unsigned i = 0; i < size; ++i)
+      printValue<ConsumerRW, const Data>("ins", ins[i], insData[i].data);
+    printValue<ProducerRW, Data>("outs", outs, outsData.data);
+    printValue<ChannelConsumerRW, const Data>("index", index, &index->data);
   }
 
 private:
   handshake::MuxOp op;
-  unsigned size, dataWidth, selectWidth;
-  TEHBSupport muxTEHB;
 
+  // parameters
+  unsigned size, selectWidth;
+  unsigned indexNum = 0;
+
+  // ports
   std::vector<ConsumerRW *> ins;
   ChannelConsumerRW *index;
   ProducerRW *outs;
 
-  std::vector<Any const *> insData;
-  Any *outsData = nullptr;
+  std::vector<ConsumerData> insData;
+  ProducerData outsData;
 
-  Any tehbIns = {};
-  bool tehbInsValid = false, tehbInsReady = false;
+  // merge dataless
+  bool tehbValid = false, tehbReady = false;
+  ConsumerRW insTEHB;
+  // merge datafull
+  Data tehbDataIn;
 
-  void chooseInput() {
-    Any selectedData;
-    bool indexEqual = false, selectedDataValid = false;
-    for (unsigned i = size - 1; i >= 0; --i) {
-      indexEqual = llvm::any_cast<APInt>(index->data) == i;
-      if (indexEqual && index->valid && ins[i]->valid) {
-        if (insData[i])
-          selectedData = *insData[i];
+  // internal components
+  TEHBSupport muxTEHB;
+
+  void resetDataless(std::vector<ConsumerRW *> &ins, ConsumerRW *index,
+                     unsigned indexNum, ProducerRW *outs) {
+    bool selectedDataValid = false, indexEqual = false;
+    for (unsigned i = 0; i < size; ++i) {
+      indexEqual = (i == indexNum);
+
+      if (indexEqual && index->valid && ins[i]->valid)
         selectedDataValid = true;
+      ins[i]->ready =
+          (indexEqual && index->valid && ins[i]->valid && tehbReady) ||
+          !ins[i]->valid;
+    }
+    index->ready = !index->valid || (selectedDataValid && tehbReady);
+    tehbValid = selectedDataValid;
+    muxTEHB.resetDataless(&insTEHB, outs);
+  }
+
+  void execDataless(bool isClkRisingEdge, std::vector<ConsumerRW *> &ins,
+                    ConsumerRW *index, unsigned indexNum, ProducerRW *outs) {
+    bool selectedDataValid = false, indexEqual = false;
+    for (unsigned i = 0; i < size; ++i) {
+      indexEqual = (i == indexNum);
+
+      if (indexEqual && index->valid && ins[i]->valid)
+        selectedDataValid = true;
+      ins[i]->ready =
+          (indexEqual && index->valid && ins[i]->valid && tehbReady) ||
+          !ins[i]->valid;
+    }
+    index->ready = !index->valid || (selectedDataValid && tehbReady);
+    tehbValid = selectedDataValid;
+    muxTEHB.execDataless(isClkRisingEdge, &insTEHB, outs);
+  }
+
+  void resetDataFull(std::vector<ConsumerRW *> &ins, ConsumerRW *index,
+                     unsigned indexNum, ProducerRW *outs,
+                     std::vector<ConsumerData> &insData,
+                     ProducerData &outsData) {
+    bool selectedDataValid = false, indexEqual = false;
+    Data selectedData = *insData[0].data;
+    for (unsigned i = 0; i < size; ++i) {
+      indexEqual = (i == indexNum);
+
+      if (indexEqual && index->valid && ins[i]->valid) {
+        selectedDataValid = true;
+        selectedData = *insData[i].data;
       }
       ins[i]->ready =
-          (indexEqual && index->valid && ins[i]->valid && tehbInsReady) ||
-          (!ins[i]->valid);
+          (indexEqual && index->valid && ins[i]->valid && tehbReady) ||
+          !ins[i]->valid;
     }
-    index->ready = !index->valid || (selectedDataValid && tehbInsReady);
-    if (selectedData.has_value())
-      tehbIns = selectedData;
-    tehbInsValid = selectedDataValid;
+    index->ready = !index->valid || (selectedDataValid && tehbReady);
+    tehbValid = selectedDataValid;
+    tehbDataIn = selectedData;
+
+    muxTEHB.reset(&insTEHB, outs, &tehbDataIn, outsData.data);
+  }
+
+  void execDataFull(bool isClkRisingEdge, std::vector<ConsumerRW *> &ins,
+                    ConsumerRW *index, unsigned indexNum, ProducerRW *outs,
+                    std::vector<ConsumerData> &insData,
+                    ProducerData &outsData) {
+    bool selectedDataValid = false, indexEqual = false;
+    Data selectedData = *insData[0].data;
+    for (unsigned i = 0; i < size; ++i) {
+      indexEqual = (i == indexNum);
+
+      if (indexEqual && index->valid && ins[i]->valid) {
+        selectedDataValid = true;
+        selectedData = *insData[i].data;
+      }
+      ins[i]->ready =
+          (indexEqual && index->valid && ins[i]->valid && tehbReady) ||
+          !ins[i]->valid;
+    }
+    index->ready = !index->valid || (selectedDataValid && tehbReady);
+    tehbValid = selectedDataValid;
+    tehbDataIn = selectedData;
+
+    muxTEHB.exec(isClkRisingEdge, &insTEHB, outs, &tehbDataIn, outsData.data);
   }
 };
 
-class OEHBModel : public OpExecutionModel<handshake::OEHBOp> {
+class OEHBModel : public OpExecutionModel<handshake::BufferOp> {
 public:
-  using OpExecutionModel<handshake::OEHBOp>::OpExecutionModel;
+  using OpExecutionModel<handshake::BufferOp>::OpExecutionModel;
 
-  OEHBModel(handshake::OEHBOp oehbOp, mlir::DenseMap<Value, RW *> &subset)
-      : OpExecutionModel<handshake::OEHBOp>(oehbOp), op(oehbOp), oehbDl() {
-    ins = getState<ConsumerRW>(op.getOperand(), subset);
-    outs = getState<ProducerRW>(op.getResult(), subset);
-
-    if (auto *p = dyn_cast<ChannelProducerRW>(outs)) {
-      outsData = &p->data;
-    } else {
-      outsData = nullptr;
-    }
-    if (auto *p = dyn_cast<ChannelConsumerRW>(ins)) {
-      insData = &p->data;
-    } else {
-      insData = nullptr;
-    }
+  OEHBModel(handshake::BufferOp oehbOp, mlir::DenseMap<Value, RW *> &subset)
+      : OpExecutionModel<handshake::BufferOp>(oehbOp), op(oehbOp),
+        ins(getState<ConsumerRW>(op.getOperand(), subset)),
+        outs(getState<ProducerRW>(op.getResult(), subset)), insData(ins),
+        outsData(outs), oehbDl() {
+    oehbDl.datawidth = insData.dataWidth;
   }
+
   void reset() override {
-    oehbDl.reset(ins->valid, outs->ready, ins->ready, outs->valid, *outsData,
-                 *insData);
-  };
+    oehbDl.reset(ins, outs, insData.data, outsData.data);
+  }
+
   void exec(bool isClkRisingEdge) override {
-    oehbDl.exec(isClkRisingEdge, ins->valid, outs->ready, ins->ready,
-                outs->valid, *outsData, *insData);
+    oehbDl.exec(isClkRisingEdge, ins, outs, insData.data, outsData.data);
+  }
+
+  void printStates() override {
+    printValue<ConsumerRW, const Data>("ins", ins, insData.data);
+    printValue<ProducerRW, Data>("outs", outs, outsData.data);
   }
 
 private:
-  handshake::OEHBOp op;
-  OEHBSupport oehbDl;
+  handshake::BufferOp op;
 
+  // ports
   ConsumerRW *ins;
   ProducerRW *outs;
 
-  Any const *insData = nullptr;
-  Any *outsData = nullptr;
+  ConsumerData insData;
+  ProducerData outsData;
+
+  // internal components
+  OEHBSupport oehbDl;
 };
 
 class SinkModel : public OpExecutionModel<handshake::SinkOp> {
 public:
   using OpExecutionModel<handshake::SinkOp>::OpExecutionModel;
   SinkModel(handshake::SinkOp sinkOp, mlir::DenseMap<Value, RW *> &subset)
-      : OpExecutionModel<handshake::SinkOp>(sinkOp), op(sinkOp) {
-    ins = getState<ConsumerRW>(op.getOperand(), subset);
-  }
-  void reset() override { ins->ready = true; };
+      : OpExecutionModel<handshake::SinkOp>(sinkOp), op(sinkOp),
+        ins(getState<ConsumerRW>(op.getOperand(), subset)), insData(ins) {}
+
+  void reset() override { ins->ready = true; }
+
   void exec(bool isClkRisingEdge) override { reset(); }
+
+  void printStates() override {
+    printValue<ConsumerRW, const Data>("ins", ins, insData.data);
+  }
 
 private:
   handshake::SinkOp op;
+
+  // ports
   ConsumerRW *ins;
+  ConsumerData insData;
 };
 
 class SourceModel : public OpExecutionModel<handshake::SourceOp> {
@@ -1117,119 +1483,153 @@ public:
       : OpExecutionModel<handshake::SourceOp>(sourceOp), op(sourceOp) {
     outs = getState<ProducerRW>(op.getResult(), subset);
   }
-  void reset() override { outs->valid = true; };
+
+  void reset() override { outs->valid = true; }
+
   void exec(bool isClkRisingEdge) override { reset(); }
+
+  void printStates() override {
+    llvm::outs() << "Outs: " << outs->valid << " " << outs->ready << "\n";
+  }
 
 private:
   handshake::SourceOp op;
+
+  // ports
   ProducerRW *outs;
 };
 
-class TEHBModel : public OpExecutionModel<handshake::TEHBOp> {
+class TEHBModel : public OpExecutionModel<handshake::BufferOp> {
 public:
-  using OpExecutionModel<handshake::TEHBOp>::OpExecutionModel;
+  using OpExecutionModel<handshake::BufferOp>::OpExecutionModel;
 
-  TEHBModel(handshake::TEHBOp returnOp, mlir::DenseMap<Value, RW *> &subset)
-      : OpExecutionModel<handshake::TEHBOp>(returnOp), op(returnOp),
-        returnTEHB() {
+  TEHBModel(handshake::BufferOp tehbOp, mlir::DenseMap<Value, RW *> &subset)
+      : OpExecutionModel<handshake::BufferOp>(tehbOp), op(tehbOp),
+        ins(getState<ConsumerRW>(op.getOperand(), subset)),
+        outs(getState<ProducerRW>(op.getResult(), subset)), insData(ins),
+        outsData(outs), returnTEHB() {
 
-    ins = getState<ConsumerRW>(op.getOperand(), subset);
-    outs = getState<ProducerRW>(op.getResult(), subset);
-    if (auto *p = dyn_cast<ChannelProducerRW>(outs)) {
-      outsData = &p->data;
-    } else {
-      outsData = nullptr;
-    }
-    if (auto *p = dyn_cast<ChannelConsumerRW>(ins)) {
-      insData = &p->data;
-    } else {
-      insData = nullptr;
-    }
+    returnTEHB.datawidth = insData.dataWidth;
   }
+
   void reset() override {
-    returnTEHB.reset(ins->valid, outs->ready, ins->ready, outs->valid,
-                     *outsData, *insData);
-  };
+    returnTEHB.reset(ins, outs, insData.data, outsData.data);
+  }
 
   void exec(bool isClkRisingEdge) override {
-    returnTEHB.exec(isClkRisingEdge, ins->valid, outs->ready, ins->ready,
-                    outs->valid, *outsData, *insData);
+    returnTEHB.exec(isClkRisingEdge, ins, outs, insData.data, outsData.data);
+  }
+
+  void printStates() override {
+    printValue<ConsumerRW, const Data>("ins", ins, insData.data);
+    printValue<ProducerRW, Data>("outs", outs, outsData.data);
   }
 
 private:
-  handshake::TEHBOp op;
+  handshake::BufferOp op;
 
+  // ports
   ConsumerRW *ins;
   ProducerRW *outs;
 
-  Any const *insData = nullptr;
-  Any *outsData = nullptr;
+  ConsumerData insData;
+  ProducerData outsData;
 
+  // internal components
   TEHBSupport returnTEHB;
 };
 
-/// In fact, there's no need in a specific class for End - it just sets
-/// the ready for the circuit on reset (e.g. once). To be refactored later
 class EndMemlessModel : public OpExecutionModel<handshake::EndOp> {
 public:
   using OpExecutionModel<handshake::EndOp>::OpExecutionModel;
-  EndMemlessModel(handshake::EndOp endOp, mlir::DenseMap<Value, RW *> &subset)
-      : OpExecutionModel<handshake::EndOp>(endOp), op(endOp) {
+  EndMemlessModel(handshake::EndOp endOp, mlir::DenseMap<Value, RW *> &subset,
+                  bool &resValid, const bool &resReady, Data &resData)
+      : OpExecutionModel<handshake::EndOp>(endOp), op(endOp),
+        outs(resValid, resReady), outsData(resData) {
     ins = getState<ChannelConsumerRW>(op.getInputs().front(), subset);
 
     auto temp =
         cast<handshake::ChannelType>(endOp.getInputs().front().getType());
     bitwidth = temp.getDataBitWidth();
   }
-  void reset() override { ins->ready = true; };
-  void exec(bool isClkRisingEdge) override {}
+
+  void reset() override {
+    outs.valid = ins->valid;
+    ins->ready = ins->valid && outs.ready;
+    outsData = ins->data;
+  }
+
+  void exec(bool isClkRisingEdge) override { reset(); }
+
+  void printStates() override {
+    printValue<ConsumerRW, const Data>("ins", ins, &ins->data);
+  }
 
 private:
   handshake::EndOp op;
+  // parameters
   unsigned bitwidth;
 
+  // ports
   ChannelConsumerRW *ins;
+  ProducerRW outs;
+  Data &outsData;
 };
 
-// negf - not
+//===----------------------------------------------------------------------===//
+// Arithmetic
+//===----------------------------------------------------------------------===//
+/// Arithmetic and generic components
+
 class TruncIModel : public OpExecutionModel<handshake::TruncIOp> {
 public:
   using OpExecutionModel<handshake::TruncIOp>::OpExecutionModel;
   TruncIModel(handshake::TruncIOp trunciOp, mlir::DenseMap<Value, RW *> &subset)
       : OpExecutionModel<handshake::TruncIOp>(trunciOp), op(trunciOp),
-        inputWidth(op.getOperand().getType().getIntOrFloatBitWidth()),
-        outputWidth(op.getResult().getType().getIntOrFloatBitWidth()) {
+        inputWidth(op.getIn().getType().getDataBitWidth()),
+        outputWidth(op.getResult().getType().getDataBitWidth()) {
     ins = getState<ChannelConsumerRW>(op.getOperand(), subset);
     outs = getState<ChannelProducerRW>(op.getResult(), subset);
   }
+
   void reset() override {
-    APInt insData =
-        llvm::any_cast<APInt>(ins->data).getBitsSetFrom(outputWidth, 0);
-    outs->data = insData;
+    const APInt k = dataCast<const APInt>(ins->data);
+    outs->data = k.trunc(outputWidth);
     outs->valid = ins->valid;
     ins->ready = !ins->valid || (ins->valid && outs->ready);
-  };
+  }
+
   void exec(bool isClkRisingEdge) override { reset(); }
+
+  void printStates() override {
+    printValue<ConsumerRW, const Data>("ins", ins, &ins->data);
+    printValue<ProducerRW, Data>("outs", outs, &outs->data);
+  }
 
 private:
   handshake::TruncIOp op;
-  unsigned inputWidth, outputWidth;
 
+  // parameters
+  unsigned inputWidth;
+  unsigned outputWidth;
+
+  // ports
   ChannelConsumerRW *ins;
   ChannelProducerRW *outs;
 };
 
-using UnaryCompFunc = std::function<llvm::Any(const llvm::Any &, unsigned)>;
+using UnaryCompFunc = std::function<Data(const Data &, unsigned)>;
 
-// NEGF, NOT, EXTSI, EXTUI
+/// Class to represent NEGF, NOT, EXTSI, EXTUI
 template <typename Op>
 class GenericUnaryOpModel : public OpExecutionModel<Op> {
 public:
   using OpExecutionModel<Op>::OpExecutionModel;
   GenericUnaryOpModel(Op op, mlir::DenseMap<Value, RW *> &subset,
                       const UnaryCompFunc &callback)
-      : OpExecutionModel<Op>(op), op(op), callback(callback),
-        outputWidth(op.getResult().getType().getDataBitWidth()) {
+      : OpExecutionModel<Op>(op), op(op),
+        outputWidth(op.getResult().getType().getDataBitWidth()),
+        callback(callback) {
     ins = OpExecutionModel<Op>::template getState<ChannelConsumerRW>(
         op.getOperand(), subset);
     outs = OpExecutionModel<Op>::template getState<ChannelProducerRW>(
@@ -1241,92 +1641,118 @@ public:
     outs->valid = ins->valid;
     ins->ready = outs->ready;
   }
-  void exec(bool isClkRisingEdge) override {
-    outs->data = callback(ins->data, outputWidth);
-    outs->valid = ins->valid;
-    ins->ready = outs->ready;
+
+  void exec(bool isClkRisingEdge) override { reset(); }
+
+  void printStates() override {
+    OpExecutionModel<Op>::template printValue<ConsumerRW, const Data>(
+        "ins", ins, &ins->data);
+    OpExecutionModel<Op>::template printValue<ProducerRW, Data>("outs", outs,
+                                                                &outs->data);
   }
 
 private:
   Op op;
-  UnaryCompFunc callback;
-  unsigned outputWidth;
 
+  // parameters
+  unsigned outputWidth;
+  UnaryCompFunc callback;
+
+  // ports
   ChannelConsumerRW *ins;
   ChannelProducerRW *outs;
 };
 
-// Mutual component for binary operations: AddI, AndI, CmpI, MulI, OrI,
-// ShlI, ShrsI, ShruI, SubI, XorI
-using BinaryCompFunc =
-    std::function<llvm::Any(const llvm::Any &, const llvm::Any &)>;
+/// Mutual component for binary operations: AddI, AndI, CmpI, MulI, OrI,
+/// ShlI, ShrsI, ShruI, SubI, XorI...
+using BinaryCompFunc = std::function<Data(const Data &, const Data &)>;
 template <typename Op>
 class GenericBinaryOpModel : public OpExecutionModel<Op> {
 public:
   using OpExecutionModel<Op>::OpExecutionModel;
   GenericBinaryOpModel(Op op, mlir::DenseMap<Value, RW *> &subset,
-                       const BinaryCompFunc &callback, unsigned latency)
+                       const BinaryCompFunc &callback, unsigned latency = 0)
       : OpExecutionModel<Op>(op), op(op), callback(callback), latency(latency),
         bitwidth(cast<handshake::ChannelType>(op.getResult().getType())
                      .getDataBitWidth()),
-        binJoin(2),
+
         lhs(OpExecutionModel<Op>::template getState<ChannelConsumerRW>(
             op.getLhs(), subset)),
         rhs(OpExecutionModel<Op>::template getState<ChannelConsumerRW>(
             op.getRhs(), subset)),
         result(OpExecutionModel<Op>::template getState<ChannelProducerRW>(
-            op.getResult(), subset)) {}
+            op.getResult(), subset)),
+        outsJoin(joinValid, result->ready), binJoin(2) {
+    insJoin = {lhs, rhs};
+  }
+
   void reset() override {
-    std::vector<bool> insValid{lhs->valid, rhs->valid};
-    std::vector<std::reference_wrapper<bool>> insReady{lhs->ready, rhs->ready};
-    binJoin.exec(insValid, result->ready, insReady, result->valid);
-    resData = APInt(bitwidth, 0);
-    hasData = false;
-    counter = 0;
-  };
+    binJoin.exec(insJoin, result);
+    result->data = callback(lhs->data, rhs->data);
+  }
+
   void exec(bool isClkRisingEdge) override {
-    std::vector<bool> insValid{lhs->valid, rhs->valid};
-    std::vector<std::reference_wrapper<bool>> insReady{lhs->ready, rhs->ready};
-    binJoin.exec(insValid, result->ready, insReady, joinValid);
+    if (!latency)
+      reset();
+    else {
+      binJoin.exec(insJoin, &outsJoin);
 
-    // increase counter if the component stores data
-    if (hasData && isClkRisingEdge) {
-      ++counter;
-    }
-
-    // read data
-    if (lhs->ready && rhs->ready && lhs->valid && rhs->valid && !hasData) {
-      resData = any_cast<APInt>(callback(lhs->data, rhs->data));
-      hasData = true;
-      ++counter;
-    }
-
-    // ready to transfer data
-    if (counter > latency && hasData) {
-      result->valid = true;
-      result->data = resData;
-      // reset counter if the consumer is ready to transfer
-      if (result->ready) {
-        counter = 0;
-        resData = APInt(bitwidth, 0);
-        hasData = false;
+      if (isClkRisingEdge) {
+        if (lhs->valid && rhs->valid && !hasData) {
+          // collect
+          hasData = true;
+          counter = 1;
+          tempData = callback(lhs->data, rhs->data);
+          result->valid = false;
+        } else if (hasData && counter < latency - 1) {
+          // wait
+          ++counter;
+          if (counter == latency - 1)
+            result->data = tempData;
+        } else if (hasData && counter >= latency - 1 && !result->valid) {
+          result->data = tempData;
+          result->valid = true;
+        } else if (!lhs->valid && !rhs->valid && hasData && result->valid &&
+                   result->ready) {
+          result->valid = false;
+          hasData = false;
+          counter = 0;
+        }
       }
     }
   }
 
+  void printStates() override {
+    OpExecutionModel<Op>::template printValue<ConsumerRW, const Data>(
+        "lhs", lhs, &lhs->data);
+    OpExecutionModel<Op>::template printValue<ConsumerRW, const Data>(
+        "rhs", rhs, &rhs->data);
+    OpExecutionModel<Op>::template printValue<ProducerRW, Data>(
+        "result", result, &result->data);
+  }
+
 private:
   Op op;
+
+  // parameters
   BinaryCompFunc callback;
   unsigned latency = 0;
   unsigned bitwidth;
-  Join binJoin;
+
+  // ports
   ChannelConsumerRW *lhs, *rhs;
   ChannelProducerRW *result;
 
-  APInt resData = APInt(bitwidth, 0);
+  // latency parameters
+  std::vector<ConsumerRW *> insJoin;
+  ProducerRW outsJoin;
+  bool joinValid = false;
   unsigned counter = 0;
   bool hasData = false;
-  bool joinValid = false;
+  Data tempData = APInt(bitwidth, 0);
+
+  // internal components
+  JoinSupport binJoin;
 };
 
 //===----------------------------------------------------------------------===//
@@ -1347,18 +1773,28 @@ public:
     // register models for all ops of the funcOp
     for (Operation &op : funcOp.getOps())
       associateModel(&op);
+
+    reset();
   }
 
   void reset() {
-    // Collect all the states
-    for (auto &[op, model] : opModels)
-      model->reset();
+    while (true) {
+      for (auto &[op, model] : opModels)
+        model->reset();
 
-    // update old values with collected ones
+      bool isFin = true;
+      // Check if states have changed
+      for (auto [val, state] : updaters)
+        isFin = isFin && state->check();
+      if (isFin)
+        break;
+
+      // Update oldStates
+      for (auto [val, state] : updaters)
+        state->update();
+    }
     for (auto [val, state] : updaters)
       state->update();
-    llvm::outs() << "======= reset =========\n";
-    printValuesStates();
   }
 
   void simulate(llvm::ArrayRef<std::string> inputArg) {
@@ -1384,7 +1820,7 @@ public:
       auto channel = cast<TypedValue<handshake::ChannelType>>(val);
       auto *channelArg = static_cast<ChannelProducerRW *>(producerViews[val]);
       // ...and update the corresponding data fields
-      llvm::TypeSwitch<Type>(channel.getType().getDataType())
+      llvm::TypeSwitch<mlir::Type>(channel.getType().getDataType())
           .Case<IntegerType>([&](IntegerType intType) {
             auto argNumVal = APInt(intType.getWidth(), inputArgs[k], 10);
             channelArg->data = argNumVal;
@@ -1407,55 +1843,25 @@ public:
     for (BlockArgument arg : funcOp.getArguments())
       updaters[arg]->setValid();
 
-    auto returnOp = *funcOp.getOps<handshake::TEHBOp>().begin();
-    // auto *channelArg = static_cast<ChannelProducerRW
-    // *>(producerViews[returnOp.getOutputs().front()]);
-
-    auto *res =
-        static_cast<ChannelProducerRW *>(producerViews[returnOp.getResult()]);
-    /*
-        for (unsigned temp = 0; temp < 10; temp++) {
-          bool isClock = true;
-          llvm::outs() << "Clock " << temp << "\n";
-          llvm::outs() << "Before:\n";
-          printValuesStates();
-          for (int i = 0; i < 6; ++i) {
-            llvm::outs() << "Propagate\n";
-            // Execute each model
-            for (auto &[op, model] : opModels)
-              model->exec(isClock);
-
-            for (auto [val, state] : updaters)
-              state->update();
-            isClock = false;
-            printValuesStates();
-            llvm::outs() << "++++++++++++++\n";
-          }
-          llvm::outs() << "After:\n";
-          printValuesStates();
-          llvm::outs() << "----------------\n";
-          for (auto [val, state] : updaters)
-            state->resetValid();
-        }
-        */
+    auto returnOp = *funcOp.getOps<handshake::EndOp>().begin();
+    auto *res = static_cast<ChannelConsumerRW *>(
+        consumerViews[&returnOp->getOpOperand(0)]);
 
     unsigned eqStateCount = 0;
-    unsigned temp = 0;
+    iterNum = 0;
     // Outer loop: for clock cycles
     // Stops when return.input->valid becomes true or limit of cycles is reached
     while (true) {
-      llvm::outs() << "Clock " << ++temp << "\n At the beginning\n";
-
-      printValuesStates();
+      ++iterNum;
       //  True only once on each clkRisingEdge
       bool isClock = true;
       // Inner loop: for signal propagation within one clkRisingEdge
       // Stops when there's no change in valueStates
       while (true) {
-        llvm::outs() << "[[[[[[[[[[[  Propagate  ]]]]]]]]]]]]\n";
         // Execute each model
         for (auto &[op, model] : opModels)
           model->exec(isClock);
+
         bool isFin = true;
         // Check if states have changed
         for (auto [val, state] : updaters)
@@ -1466,11 +1872,7 @@ public:
         for (auto [val, state] : updaters)
           state->update();
         isClock = false;
-        printValuesStates();
-        llvm::outs() << "++++++++++++++\n";
       }
-      llvm::outs() << "At the end\n";
-      printValuesStates();
 
       if (res->valid) {
         for (auto [val, state] : updaters)
@@ -1491,51 +1893,36 @@ public:
 
       // At the end of each cycle reset each input's valid signal to false if
       // the corresponding ready was true
-      for (auto [val, state] : updaters)
-        state->resetValid();
+      for (BlockArgument arg : funcOp.getArguments())
+        updaters[arg]->resetValid();
     }
   }
 
   // Just a temporary function to print the results of the simulation to
   // standart output
   void printResults() {
-    auto returnOp = *funcOp.getOps<handshake::TEHBOp>().begin();
-    llvm::outs() << "Result:\n";
-    for (auto res : returnOp->getResults()) {
+    llvm::outs() << "Results\n";
 
-      auto *state = static_cast<ChannelProducerRW *>(producerViews[res]);
-      if (state->data.has_value())
-        llvm::outs() << llvm::any_cast<APInt>(state->data);
-      llvm::outs() << "\n";
-    }
+    llvm::outs() << resValid << " " << resReady << " "
+                 << dataCast<APInt>(resData) << "\n";
+    llvm::outs() << "Number of iterations: " << iterNum << "\n";
   }
 
-  // Just a temporary function to print the current valueStates to
-  // standart output
-  void printValuesStates() {
-    for (auto x : newValuesStates) {
-      auto val = x.first;
-      auto *state = x.second;
-      llvm::outs() << val << ":\n";
-      llvm::TypeSwitch<Type>(val.getType())
-          .Case<handshake::ChannelType>(
-              [&](handshake::ChannelType channelType) {
-                auto *cl = static_cast<ChannelState *>(state);
-                llvm::outs() << cl->valid << " " << cl->ready << " ";
-                if (cl->data.has_value())
-                  llvm::outs() << llvm::any_cast<APInt>(cl->data);
-                llvm::outs() << "\n";
-              })
-          .Case<handshake::ControlType>(
-              [&](handshake::ControlType controlType) {
-                auto *cl = static_cast<ControlState *>(state);
-                llvm::outs() << cl->valid << " " << cl->ready << "\n";
-              })
-          .Default([&](auto) {
-            llvm::outs() << "Value " << val
-                         << " has11 unsupported type, we should probably "
-                            "report an error and stop";
-          });
+  // The temporary function
+  void printModelStates() {
+    std::map<std::string, ExecutionModel *> names;
+    for (auto &[op, model] : opModels) {
+      auto j = op->getAttr("handshake.name");
+      std::string str;
+      llvm::raw_string_ostream output(str);
+      j.print(output, true);
+      names.insert({str, model});
+    }
+
+    for (auto &[name, model] : names) {
+      llvm::outs() << "=================== ===================\n";
+      llvm::outs() << name << "\n";
+      model->printStates();
     }
   }
 
@@ -1557,6 +1944,11 @@ public:
 private:
   // Maybe need it some day, let it be the part of simulator class
   handshake::FuncOp funcOp;
+  // Results of the simulation
+  bool resValid = false, resReady = true;
+  Data resData;
+  // Number of iterations during the simulation
+  unsigned iterNum = 0;
   // Map for execution models
   mlir::DenseMap<Operation *, ExecutionModel *> opModels;
   // Map the stores RW API classes
@@ -1586,12 +1978,11 @@ private:
     mlir::DenseMap<Value, RW *> subset;
     auto opOperands = op->getOpOperands();
     auto results = op->getResults();
-    for (auto &opOp : opOperands) {
+    for (auto &opOp : opOperands)
       subset.insert({opOp.get(), consumerViews[&opOp]});
-    }
-    for (auto res : results) {
+
+    for (auto res : results)
       subset.insert({res, producerViews[res]});
-    }
 
     ExecutionModel *model =
         new Model(op, subset, std::forward<Args>(modelArgs)...);
@@ -1600,7 +1991,6 @@ private:
 
   // Determine the concrete Model type
   void associateModel(Operation *op) {
-    llvm::outs() << op->getAttr("handshake.name") << "\n";
     llvm::TypeSwitch<Operation *>(op)
         .Case<handshake::SinkOp>([&](handshake::SinkOp sinkOp) {
           registerModel<SinkModel, handshake::SinkOp>(sinkOp);
@@ -1612,9 +2002,9 @@ private:
           registerModel<ConstantModel, handshake::ConstantOp>(constOp);
         })
         .Case<handshake::ExtSIOp>([&](handshake::ExtSIOp extsiOp) {
-          UnaryCompFunc callback = [](const llvm::Any &lhs, unsigned outWidth) {
-            auto temp = llvm::any_cast<APInt>(lhs).getSExtValue();
-            APInt ext(temp, outWidth);
+          UnaryCompFunc callback = [](const Data &lhs, unsigned outWidth) {
+            auto temp = dataCast<APInt>(lhs).getSExtValue();
+            APInt ext(outWidth, temp, true);
             return ext;
           };
 
@@ -1622,8 +2012,8 @@ private:
                                                                  callback);
         })
         .Case<handshake::ShLIOp>([&](handshake::ShLIOp shliOp) {
-          BinaryCompFunc callback = [](llvm::Any lhs, llvm::Any rhs) {
-            APInt shli = any_cast<APInt>(lhs) << any_cast<APInt>(rhs);
+          BinaryCompFunc callback = [](Data lhs, Data rhs) {
+            APInt shli = dataCast<APInt>(lhs) << dataCast<APInt>(rhs);
             return shli;
           };
           registerModel<GenericBinaryOpModel<handshake::ShLIOp>>(shliOp,
@@ -1643,72 +2033,72 @@ private:
 
           switch (cmpiOp.getPredicate()) {
           case handshake::CmpIPredicate::eq:
-            callback = [](llvm::Any lhs, llvm::Any rhs) {
-              bool comp = any_cast<APInt>(lhs).getRawData() ==
-                          any_cast<APInt>(rhs).getRawData();
+            callback = [](Data lhs, Data rhs) {
+              APInt comp(1, dataCast<APInt>(lhs).getRawData() ==
+                                dataCast<APInt>(rhs).getRawData());
               return comp;
             };
             break;
           case handshake::CmpIPredicate::ne:
-            callback = [](llvm::Any lhs, llvm::Any rhs) {
-              bool comp = any_cast<APInt>(lhs).getRawData() !=
-                          any_cast<APInt>(rhs).getRawData();
+            callback = [](Data lhs, Data rhs) {
+              APInt comp(1, dataCast<APInt>(lhs).getRawData() !=
+                                dataCast<APInt>(rhs).getRawData());
               return comp;
             };
             break;
           case handshake::CmpIPredicate::uge:
-            callback = [](llvm::Any lhs, llvm::Any rhs) {
-              bool comp = any_cast<APInt>(lhs).getZExtValue() >=
-                          any_cast<APInt>(rhs).getZExtValue();
+            callback = [](Data lhs, Data rhs) {
+              APInt comp(1, dataCast<APInt>(lhs).getZExtValue() >=
+                                dataCast<APInt>(rhs).getZExtValue());
               return comp;
             };
             break;
           case handshake::CmpIPredicate::sge:
-            callback = [](llvm::Any lhs, llvm::Any rhs) {
-              bool comp = any_cast<APInt>(lhs).getSExtValue() >=
-                          any_cast<APInt>(rhs).getSExtValue();
+            callback = [](Data lhs, Data rhs) {
+              APInt comp(1, dataCast<APInt>(lhs).getSExtValue() >=
+                                dataCast<APInt>(rhs).getSExtValue());
               return comp;
             };
             break;
           case handshake::CmpIPredicate::ugt:
-            callback = [](llvm::Any lhs, llvm::Any rhs) {
-              bool comp = any_cast<APInt>(lhs).getZExtValue() >
-                          any_cast<APInt>(rhs).getZExtValue();
+            callback = [](Data lhs, Data rhs) {
+              APInt comp(1, dataCast<APInt>(lhs).getZExtValue() >
+                                dataCast<APInt>(rhs).getZExtValue());
               return comp;
             };
             break;
           case handshake::CmpIPredicate::sgt:
-            callback = [](llvm::Any lhs, llvm::Any rhs) {
-              bool comp = any_cast<APInt>(lhs).getSExtValue() >
-                          any_cast<APInt>(rhs).getSExtValue();
+            callback = [](Data lhs, Data rhs) {
+              APInt comp(1, dataCast<APInt>(lhs).getSExtValue() >
+                                dataCast<APInt>(rhs).getSExtValue());
               return comp;
             };
             break;
           case handshake::CmpIPredicate::ule:
-            callback = [](llvm::Any lhs, llvm::Any rhs) {
-              bool comp = any_cast<APInt>(lhs).getZExtValue() <=
-                          any_cast<APInt>(rhs).getZExtValue();
+            callback = [](Data lhs, Data rhs) {
+              APInt comp(1, dataCast<APInt>(lhs).getZExtValue() <=
+                                dataCast<APInt>(rhs).getZExtValue());
               return comp;
             };
             break;
           case handshake::CmpIPredicate::sle:
-            callback = [](llvm::Any lhs, llvm::Any rhs) {
-              bool comp = any_cast<APInt>(lhs).getSExtValue() <=
-                          any_cast<APInt>(rhs).getSExtValue();
+            callback = [](Data lhs, Data rhs) {
+              APInt comp(1, dataCast<APInt>(lhs).getSExtValue() <=
+                                dataCast<APInt>(rhs).getSExtValue());
               return comp;
             };
             break;
           case handshake::CmpIPredicate::ult:
-            callback = [](llvm::Any lhs, llvm::Any rhs) {
-              bool comp = any_cast<APInt>(lhs).getZExtValue() <
-                          any_cast<APInt>(rhs).getZExtValue();
+            callback = [](Data lhs, Data rhs) {
+              APInt comp(1, dataCast<APInt>(lhs).getZExtValue() <
+                                dataCast<APInt>(rhs).getZExtValue());
               return comp;
             };
             break;
           case handshake::CmpIPredicate::slt:
-            callback = [](llvm::Any lhs, llvm::Any rhs) {
-              bool comp = any_cast<APInt>(lhs).getSExtValue() <
-                          any_cast<APInt>(rhs).getSExtValue();
+            callback = [](Data lhs, Data rhs) {
+              APInt comp(1, dataCast<APInt>(lhs).getSExtValue() <
+                                dataCast<APInt>(rhs).getSExtValue());
               return comp;
             };
             break;
@@ -1716,9 +2106,6 @@ private:
 
           registerModel<GenericBinaryOpModel<handshake::CmpIOp>>(cmpiOp,
                                                                  callback, 0);
-        })
-        .Case<handshake::OEHBOp>([&](handshake::OEHBOp oehbOp) {
-          registerModel<OEHBModel, handshake::OEHBOp>(oehbOp);
         })
         .Case<handshake::MuxOp>([&](handshake::MuxOp muxOp) {
           registerModel<MuxModel, handshake::MuxOp>(muxOp);
@@ -1732,22 +2119,34 @@ private:
           registerModel<SourceModel, handshake::SourceOp>(sourceOp);
         })
         .Case<handshake::MulIOp>([&](handshake::MulIOp muliOp) {
-          BinaryCompFunc callback = [](llvm::Any lhs, llvm::Any rhs) {
-            APInt mul = any_cast<APInt>(lhs) * any_cast<APInt>(rhs);
+          BinaryCompFunc callback = [](Data lhs, Data rhs) {
+            APInt mul = dataCast<APInt>(lhs) * dataCast<APInt>(rhs);
             return mul;
           };
           registerModel<GenericBinaryOpModel<handshake::MulIOp>>(muliOp,
                                                                  callback, 4);
         })
-        .Case<handshake::TEHBOp>([&](handshake::TEHBOp returnOp) {
-          registerModel<TEHBModel, handshake::TEHBOp>(returnOp);
+        .Case<handshake::BufferOp>([&](handshake::BufferOp bufferOp) {
+          auto params =
+              bufferOp->getAttrOfType<DictionaryAttr>(RTL_PARAMETERS_ATTR_NAME);
+          auto optTiming =
+              params.getNamed(handshake::BufferOp::TIMING_ATTR_NAME);
+          if (auto timing =
+                  dyn_cast<handshake::TimingAttr>(optTiming->getValue())) {
+            auto info = timing.getInfo();
+            if (info == handshake::TimingInfo::oehb())
+              registerModel<OEHBModel, handshake::BufferOp>(bufferOp);
+            if (info == handshake::TimingInfo::tehb())
+              registerModel<TEHBModel, handshake::BufferOp>(bufferOp);
+          }
         })
         .Case<handshake::EndOp>([&](handshake::EndOp endOp) {
-          registerModel<EndMemlessModel, handshake::EndOp>(endOp);
+          registerModel<EndMemlessModel, handshake::EndOp>(endOp, resValid,
+                                                           resReady, resData);
         })
         .Case<handshake::AddIOp>([&](handshake::AddIOp addiOp) {
-          BinaryCompFunc callback = [](llvm::Any lhs, llvm::Any rhs) {
-            APInt add = any_cast<APInt>(lhs) + any_cast<APInt>(rhs);
+          BinaryCompFunc callback = [](Data lhs, Data rhs) {
+            APInt add = dataCast<APInt>(lhs) + dataCast<APInt>(rhs);
             return add;
           };
           registerModel<GenericBinaryOpModel<handshake::AddIOp>>(addiOp,
@@ -1785,7 +2184,7 @@ private:
 
   // Determine if the state belongs to channel or control
   void associateState(Value val, Operation *producerOp, Location loc) {
-    llvm::TypeSwitch<Type>(val.getType())
+    llvm::TypeSwitch<mlir::Type>(val.getType())
         .Case<handshake::ChannelType>([&](handshake::ChannelType channelType) {
           registerState<ChannelState, ChannelUpdater, ChannelProducerRW,
                         ChannelConsumerRW>(val, producerOp, channelType);
@@ -1833,7 +2232,6 @@ int main(int argc, char **argv) {
 
   Simulator sim(funcOp);
 
-  // sim.reset();
-  // sim.simulate(inputArgs);
-  // sim.printResults();
+  sim.simulate(inputArgs);
+  sim.printResults();
 }

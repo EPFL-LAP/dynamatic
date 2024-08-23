@@ -71,7 +71,7 @@ private:
 /// accesses. This abstracts away the complexity of determining the kind of
 /// memory interface(s) one needs for a set of memory accesses, the somewhat
 /// convoluted creation of SSA inputs for these interface(s), and the "circuit
-/// rewiring" requires to connect accesses to interfaces.
+/// rewiring" required to connect accesses to interfaces.
 ///
 /// Add memory ports (i.e., load/store-like operations) to the future memory
 /// interfaces using `MemoryInterfaceBuilder::addMCPort` and
@@ -83,12 +83,15 @@ class MemoryInterfaceBuilder {
 public:
   /// Constructs the memory interface builder from the function in which to
   /// instantiate the interface(s), the memory region that the interface(s) must
-  /// reference, and a mapping between basic block IDs within the function and
-  /// their respective control value, the latter of which which will be used to
-  /// trigger the start of memory access groups in the interface(s).
-  MemoryInterfaceBuilder(handshake::FuncOp funcOp, Value memref,
+  /// reference, the memory start and control end signals, and a mapping between
+  /// basic block IDs within the function and their respective control value,
+  /// the latter of which which will be used to trigger the start of memory
+  /// access groups in the interface(s).
+  MemoryInterfaceBuilder(handshake::FuncOp funcOp, Value memref, Value memStart,
+                         Value ctrlEnd,
                          const DenseMap<unsigned, Value> &ctrlVals)
-      : funcOp(funcOp), memref(memref), ctrlVals(ctrlVals) {};
+      : funcOp(funcOp), memref(memref), memStart(memStart), ctrlEnd(ctrlEnd),
+        ctrlVals(ctrlVals) {};
 
   /// Adds an access port to an MC. The operation must be a load or store
   /// access to an MC. The operation must be tagged with the basic block it
@@ -156,6 +159,10 @@ private:
   handshake::FuncOp funcOp;
   /// Memory region that interface will reference.
   Value memref;
+  /// Memory start signal.
+  Value memStart;
+  /// Control end signal, indicating that no more request will come.
+  Value ctrlEnd;
   /// Mapping between basic block ID and their respective entry control signal,
   /// for connecting the interface(s)'s control ports.
   DenseMap<unsigned, Value> ctrlVals;
@@ -216,10 +223,6 @@ struct LSQGenerationInfo {
   SmallVector<SmallVector<unsigned>> loadPorts, storePorts;
   /// Depth of queues within the LSQ.
   unsigned depth = 16, depthLoad = 16, depthStore = 16, bufferDepth = 0;
-  /// Type of memory interface used to connect the LSQ to an external memory.
-  std::string accessType = "BRAM";
-  /// Whether to enable speculation.
-  bool speculation = false;
 
   /// Derives generation information for the provided LSQ.
   LSQGenerationInfo(handshake::LSQOp lsqOp, StringRef name = "LSQ");
