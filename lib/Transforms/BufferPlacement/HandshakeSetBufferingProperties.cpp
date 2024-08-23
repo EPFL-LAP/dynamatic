@@ -19,15 +19,13 @@
 
 #include "dynamatic/Transforms/BufferPlacement/HandshakeSetBufferingProperties.h"
 #include "dynamatic/Analysis/NameAnalysis.h"
-#include "dynamatic/Dialect/Handshake/HandshakeDialect.h"
+#include "dynamatic/Dialect/Handshake/HandshakeInterfaces.h"
 #include "dynamatic/Dialect/Handshake/HandshakeOps.h"
 #include "dynamatic/Dialect/Handshake/MemoryInterfaces.h"
 #include "dynamatic/Transforms/BufferPlacement/BufferingSupport.h"
-#include "dynamatic/Transforms/BufferPlacement/HandshakePlaceBuffers.h"
 #include "dynamatic/Transforms/HandshakeMaterialize.h"
 #include "mlir/IR/Value.h"
 #include "llvm/ADT/STLExtras.h"
-#include "llvm/ADT/TypeSwitch.h"
 
 using namespace dynamatic;
 using namespace dynamatic::buffer;
@@ -38,23 +36,11 @@ static const llvm::StringLiteral
     ERR_CONFLICT("but previous channel constraints prevent buffering. "
                  "Resulting circuit may deadlock.");
 
-/// Makes all channels adjacent to operations of the given type inside the
-/// function unbufferizable.
-template <typename Op>
-static void makeUnbufferizable(handshake::FuncOp funcOp) {
-  // Channels connected to memory interfaces are not bufferizable
-  for (Op op : funcOp.getOps<Op>()) {
-    for (Value oprd : op->getOperands()) {
-      Channel channel(oprd, true);
-      channel.props->maxOpaque = 0;
-      channel.props->maxTrans = 0;
-    }
-    for (OpResult res : op->getResults()) {
-      Channel channel(res, true);
-      channel.props->maxOpaque = 0;
-      channel.props->maxTrans = 0;
-    }
-  }
+/// Makes the channel unbufferizable.
+static void makeUnbufferizable(Value val) {
+  Channel channel(val, true);
+  channel.props->maxOpaque = 0;
+  channel.props->maxTrans = 0;
 }
 
 /// Contain-like query on a `SmallVector`. Runs in linear time in the vector's
@@ -136,9 +122,24 @@ void dynamatic::buffer::setFPGA20Properties(handshake::FuncOp funcOp) {
     }
   }
 
-  // Channels connected to memory interfaces are not bufferizable
-  makeUnbufferizable<handshake::MemoryControllerOp>(funcOp);
-  makeUnbufferizable<handshake::LSQOp>(funcOp);
+  // Memrefs are not real edges in the graph and are therefore unbufferizable
+  for (BlockArgument arg : funcOp.getArguments())
+    makeUnbufferizable(arg);
+
+  // Ports of memory interfaces are unbufferizable
+  for (auto memOp : funcOp.getOps<handshake::MemoryOpInterface>()) {
+    FuncMemoryPorts ports = getMemoryPorts(memOp);
+    for (size_t i = 0, e = ports.getNumGroups(); i < e; ++i) {
+      for (Value inputVal : ports.getGroupInputs(i))
+        makeUnbufferizable(inputVal);
+      for (Value outputVal : ports.getGroupResults(i))
+        makeUnbufferizable(outputVal);
+    }
+    for (Value inputVal : ports.getInterfacesInputs())
+      makeUnbufferizable(inputVal);
+    for (Value outputVal : ports.getInterfacesResults())
+      makeUnbufferizable(outputVal);
+  }
 
   // Control paths to LSQs have specific properties
   for (handshake::LSQOp lsqOp : funcOp.getOps<handshake::LSQOp>())

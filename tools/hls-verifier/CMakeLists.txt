@@ -20,4 +20,5 @@ find_package(Boost REQUIRED regex)
 target_link_libraries(hls-verifier
   PRIVATE
   ${Boost_REGEX_LIBRARY}
+  LLVMSupport
 )

@@ -422,43 +422,6 @@ void handshake::FuncOp::build(OpBuilder &builder, OperationState &state,
   state.addRegion();
 }
 
-/// Helper function for appending a string to an array attribute, and
-/// rewriting the attribute back to the operation.
-static void addStringToStringArrayAttr(Builder &builder, Operation *op,
-                                       StringRef attrName, StringAttr str) {
-  llvm::SmallVector<Attribute> attrs;
-  llvm::copy(op->getAttrOfType<ArrayAttr>(attrName).getValue(),
-             std::back_inserter(attrs));
-  attrs.push_back(str);
-  op->setAttr(attrName, builder.getArrayAttr(attrs));
-}
-
-void handshake::FuncOp::resolveArgAndResNames() {
-  Builder builder(getContext());
-
-  /// Generate a set of fallback names. These are used in case names are
-  /// missing from the currently set arg- and res name attributes.
-  SmallVector<Attribute> fallbackArgNames =
-      getFuncOpNames(builder, getNumArguments(), "in");
-  SmallVector<Attribute> fallbackResNames =
-      getFuncOpNames(builder, getNumResults(), "out");
-  ArrayRef<Attribute> argNames = getArgNames().getValue();
-  ArrayRef<Attribute> resNames = getResNames().getValue();
-
-  /// Use fallback names where actual names are missing.
-  auto resolveNames = [&](ArrayRef<Attribute> fallbackNames,
-                          ArrayRef<Attribute> actualNames, StringRef attrName) {
-    for (auto [idx, fallbackName] : llvm::enumerate(fallbackNames)) {
-      if (actualNames.size() <= idx) {
-        addStringToStringArrayAttr(builder, this->getOperation(), attrName,
-                                   fallbackName.cast<StringAttr>());
-      }
-    }
-  };
-  resolveNames(fallbackArgNames, argNames, "argNames");
-  resolveNames(fallbackResNames, resNames, "resNames");
-}
-
 ParseResult FuncOp::parse(OpAsmParser &parser, OperationState &result) {
   auto &builder = parser.getBuilder();
   StringAttr nameAttr;
@@ -673,11 +636,13 @@ static handshake::ChannelType wrapChannel(Type type) {
 }
 
 void MemoryControllerOp::build(OpBuilder &odsBuilder, OperationState &odsState,
-                               Value memRef, ValueRange inputs,
-                               ArrayRef<unsigned> blocks, unsigned numLoads) {
+                               Value memRef, Value memStart, ValueRange inputs,
+                               Value ctrlEnd, ArrayRef<unsigned> blocks,
+                               unsigned numLoads) {
   // Memory operands
-  odsState.addOperands(memRef);
+  odsState.addOperands({memRef, memStart});
   odsState.addOperands(inputs);
+  odsState.addOperands(ctrlEnd);
 
   // Data outputs (get their type from memref)
   MemRefType memrefType = memRef.getType().cast<MemRefType>();
@@ -716,11 +681,13 @@ static LogicalResult getMCPorts(MCPorts &mcPorts) {
   auto inputIter = llvm::enumerate(mcPorts.memOp->getOperands());
   auto currentIt = inputIter.begin();
 
-  // Skip the first memref operand
-  ++currentIt;
-
+  // Skip the memref and memory start signals as well as the control end signal
+  ++(++currentIt);
+  unsigned lastIterOprd = mcPorts.memOp->getNumOperands() - 1;
   for (; currentIt != inputIter.end(); ++currentIt) {
     auto input = *currentIt;
+    if (input.index() == lastIterOprd)
+      break;
     Operation *portOp = backtrackToMemInput(input.value());
 
     // Identify the block the input operation belongs to
@@ -894,11 +861,12 @@ static void buildLSQGroupSizes(OpBuilder &odsBuilder, OperationState &odsState,
 }
 
 void LSQOp::build(OpBuilder &odsBuilder, OperationState &odsState, Value memref,
-                  ValueRange inputs, ArrayRef<unsigned> groupSizes,
-                  unsigned numLoads) {
+                  Value memStart, ValueRange inputs, Value ctrlEnd,
+                  ArrayRef<unsigned> groupSizes, unsigned numLoads) {
   // Memory operands
-  odsState.addOperands(memref);
+  odsState.addOperands({memref, memStart});
   odsState.addOperands(inputs);
+  odsState.addOperands(ctrlEnd);
 
   // Data outputs (get their type from memref)
   MemRefType memrefType = memref.getType().cast<MemRefType>();
@@ -1029,13 +997,18 @@ static LogicalResult getLSQPorts(LSQPorts &lsqPorts) {
   // the memory controller
   auto inputIter = llvm::enumerate(lsqPorts.memOp->getOperands());
   auto currentIt = inputIter.begin();
+  auto iterEnd = inputIter.end();
 
-  // If the first operand is a memref, skip it
-  if (!cast<handshake::LSQOp>(lsqPorts.memOp).isConnectedToMC())
-    ++currentIt;
-
-  for (; currentIt != inputIter.end(); ++currentIt) {
+  unsigned lastIterOprd = lsqPorts.memOp->getNumOperands();
+  if (lsqPorts.memOp.isMasterInterface()) {
+    // Skip the memref and memory start signals as well as the ctrl end signal
+    ++(++currentIt);
+    --lastIterOprd;
+  }
+  for (; currentIt != iterEnd; ++currentIt) {
     auto input = *currentIt;
+    if (input.index() == lastIterOprd)
+      break;
 
     auto handleLoad = [&](handshake::LSQLoadOp loadOp) -> LogicalResult {
       if (failed(checkAndSetBitwidth(input.value(), lsqPorts.addrWidth)) ||
@@ -1166,8 +1139,8 @@ dynamatic::LSQPorts LSQOp::getPorts() {
 }
 
 handshake::MemoryControllerOp LSQOp::getConnectedMC() {
-  return dyn_cast<dynamatic::handshake::MemoryControllerOp>(
-      *getInputs().back().getDefiningOp());
+  return dyn_cast_if_present<dynamatic::handshake::MemoryControllerOp>(
+      *getResults().back().getDefiningOp());
 }
 
 //===----------------------------------------------------------------------===//
@@ -1349,7 +1322,7 @@ size_t GroupMemoryPorts::getLastResultIndex() const {
 //===----------------------------------------------------------------------===//
 
 mlir::ValueRange FuncMemoryPorts::getGroupInputs(unsigned groupIdx) {
-  assert(groupIdx < groups.size() && "index higher than number of blocks");
+  assert(groupIdx < groups.size() && "index higher than number of groups");
   size_t firstIdx = groups[groupIdx].getFirstOperandIndex();
   if (firstIdx == std::string::npos)
     return {};
@@ -1358,7 +1331,7 @@ mlir::ValueRange FuncMemoryPorts::getGroupInputs(unsigned groupIdx) {
 }
 
 mlir::ValueRange FuncMemoryPorts::getGroupResults(unsigned groupIdx) {
-  assert(groupIdx < groups.size() && "index higher than number of blocks");
+  assert(groupIdx < groups.size() && "index higher than number of groups");
   size_t firstIdx = groups[groupIdx].getFirstResultIndex();
   if (firstIdx == std::string::npos)
     return {};
@@ -1474,38 +1447,28 @@ void LSQLoadOp::build(OpBuilder &odsBuilder, OperationState &odsState,
 // EndOp
 //===----------------------------------------------------------------------===//
 
-LogicalResult EndOp::verify() { return success(); }
+LogicalResult EndOp::verify() {
+  // Number of operands must match number of function results
+  TypeRange oprdTypes = getOperandTypes();
+  TypeRange resTypes = getParentOp().getFunctionType().getResults();
+  if (oprdTypes.size() != resTypes.size()) {
+    return emitError() << "number of operands must match number of "
+                          "function results, expected "
+                       << resTypes.size() << " but got " << oprdTypes.size();
+  }
 
-ValueRange EndOp::getReturnValues() {
-  auto funcOp = getOperation()->getParentOfType<handshake::FuncOp>();
-  assert(funcOp && "EndOp must be child of handshake function");
+  // Operand types must match function result types
+  for (auto [idx, types] :
+       llvm::enumerate(llvm::zip_equal(oprdTypes, resTypes))) {
+    auto &[oprd, res] = types;
+    if (oprd != res) {
+      return emitError() << "operand " << idx << "'s type must match result "
+                         << idx << "'s type, expected " << res << " but got "
+                         << oprd;
+    }
+  }
 
-  auto numResults = funcOp.getFunctionType().getResults().size();
-
-  // When the function returns more than one value (including the control
-  // signal), the end operation will not receive a value for the control
-  // signal (it will be inferred from the other returned values). Therefore,
-  // the operation will take one less argument than the function has return
-  // values
-  if (numResults > 1)
-    numResults--;
-  return getOperands().take_front(numResults);
-}
-
-ValueRange EndOp::getMemoryControls() {
-  auto funcOp = getOperation()->getParentOfType<handshake::FuncOp>();
-  assert(funcOp && "EndOp must be child of handshake function");
-
-  auto numResults = funcOp.getFunctionType().getResults().size();
-
-  // When the function returns more than one value (including the control
-  // signal), the end operation will not receive a value for the control
-  // signal (it will be inferred from the other returned values). Therefore,
-  // the operation will take one less argument than the function has return
-  // values
-  if (numResults > 1)
-    numResults--;
-  return getOperands().drop_front(numResults);
+  return success();
 }
 
 //===----------------------------------------------------------------------===//

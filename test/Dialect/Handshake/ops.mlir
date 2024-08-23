@@ -8,7 +8,7 @@ handshake.func @unbundleControl(%ctrl: !handshake.control<>) -> !handshake.contr
 
 // -----
 
-handshake.func @unbundleChannelSimple(%channel: !handshake.channel<i32>) -> (i1, i32) {
+handshake.func @unbundleChannelSimple(%channel: !handshake.channel<i32>) -> !handshake.channel<i32> {
   %ctrl, %data = unbundle %channel : <i32> to _
   %valid = unbundle %ctrl [%ready] : <> to _
   %ctrlAgain, %ready = bundle %valid : _ to <>

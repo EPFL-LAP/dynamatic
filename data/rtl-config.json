@@ -516,46 +516,6 @@
     }
   },
   {
-    "name": "handshake.end",
-    "parameters": [
-      { "name": "DATA_WIDTH", "type": "unsigned", "eq": 0, "generic": false },
-      { "name": "NUM_MEMORIES", "type": "unsigned", "eq": 0, "generic": false }
-    ],
-    "generic": "$DYNAMATIC/data/vhdl/handshake/dataless/end_memless.vhd",
-    "module-name": "end_sync_memless_dataless",
-    "dependencies": ["types"]
-  },
-  {
-    "name": "handshake.end",
-    "parameters": [
-      { "name": "DATA_WIDTH", "type": "unsigned", "lb": 1 },
-      { "name": "NUM_MEMORIES", "type": "unsigned", "eq": 0, "generic": false }
-    ],
-    "generic": "$DYNAMATIC/data/vhdl/handshake/end_memless.vhd",
-    "module-name": "end_sync_memless",
-    "dependencies": ["end_sync_memless_dataless"]
-  },
-  {
-    "name": "handshake.end",
-    "parameters": [
-      { "name": "DATA_WIDTH", "type": "unsigned", "eq": 0, "generic": false },
-      { "name": "NUM_MEMORIES", "type": "unsigned", "lb": 1 }
-    ],
-    "generic": "$DYNAMATIC/data/vhdl/handshake/dataless/end.vhd",
-    "module-name": "end_sync_dataless",
-    "dependencies": ["logic", "join"]
-  },
-  {
-    "name": "handshake.end",
-    "parameters": [
-      { "name": "DATA_WIDTH", "type": "unsigned", "lb": 1 },
-      { "name": "NUM_MEMORIES", "type": "unsigned", "lb": 1 }
-    ],
-    "generic": "$DYNAMATIC/data/vhdl/handshake/end.vhd",
-    "module-name": "end_sync",
-    "dependencies": ["end_sync_dataless"]
-  },
-  {
     "name": "handshake.join",
     "parameters": [{ "name": "SIZE", "type": "unsigned", "lb": 1 }],
     "generic": "$DYNAMATIC/data/vhdl/handshake/join.vhd",

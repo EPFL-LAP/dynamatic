@@ -5,14 +5,23 @@ use work.types.all;
 
 entity mem_controller is
   generic (
-    NUM_CONTROLS  : integer;
-    NUM_LOADS  : integer;
-    NUM_STORES : integer;
-    DATA_WIDTH  : integer;
-    ADDR_WIDTH  : integer
+    NUM_CONTROLS : integer;
+    NUM_LOADS    : integer;
+    NUM_STORES   : integer;
+    DATA_WIDTH   : integer;
+    ADDR_WIDTH   : integer
   );
   port (
     clk, rst : in std_logic;
+    -- start input control
+    memStart_valid : in  std_logic;
+    memStart_ready : out std_logic;
+    -- end output control
+    memEnd_valid : out std_logic;
+    memEnd_ready : in  std_logic;
+    -- "no more requests" input control
+    ctrlEnd_valid : in  std_logic;
+    ctrlEnd_ready : out std_logic;
     -- control input channels
     ctrl       : in  data_array (NUM_CONTROLS - 1 downto 0)(31 downto 0);
     ctrl_valid : in  std_logic_vector(NUM_CONTROLS - 1 downto 0);
@@ -33,9 +42,6 @@ entity mem_controller is
     stData       : in  data_array (NUM_STORES - 1 downto 0)(DATA_WIDTH - 1 downto 0);
     stData_valid : in  std_logic_vector(NUM_STORES - 1 downto 0);
     stData_ready : out std_logic_vector(NUM_STORES - 1 downto 0);
-    --- memory done channel
-    memDone_valid : out std_logic;
-    memDone_ready : in  std_logic;
     -- interface to dual-port BRAM
     loadData  : in  std_logic_vector(DATA_WIDTH - 1 downto 0);
     loadEn    : out std_logic;
@@ -54,30 +60,34 @@ begin
 
   stores : entity work.mem_controller_loadless
     generic map(
-      NUM_CONTROLS  => NUM_CONTROLS,
-      NUM_STORES => NUM_STORES,
-      DATA_WIDTH  => DATA_WIDTH,
-      ADDR_WIDTH  => ADDR_WIDTH)
+      NUM_CONTROLS => NUM_CONTROLS,
+      NUM_STORES   => NUM_STORES,
+      DATA_WIDTH   => DATA_WIDTH,
+      ADDR_WIDTH   => ADDR_WIDTH)
     port map(
-      clk           => clk,
-      rst           => rst,
-      ctrl          => ctrl,
-      ctrl_valid    => ctrl_valid,
-      ctrl_ready    => ctrl_ready,
-      stAddr        => stAddr,
-      stAddr_valid  => stAddr_valid,
-      stAddr_ready  => stAddr_ready,
-      stData        => stData,
-      stData_valid  => stData_valid,
-      stData_ready  => stData_ready,
-      memDone_valid => memDone_valid,
-      memDone_ready => memDone_ready,
-      loadData      => dropLoadData,
-      loadEn        => dropLoadEn,
-      loadAddr      => dropLoadAddr,
-      storeEn       => storeEn,
-      storeAddr     => storeAddr,
-      storeData     => storeData
+      clk            => clk,
+      rst            => rst,
+      memStart_valid => memStart_valid,
+      memStart_ready => memStart_ready,
+      memEnd_valid   => memEnd_valid,
+      memEnd_ready   => memEnd_ready,
+      ctrlEnd_valid  => ctrlEnd_valid,
+      ctrlEnd_ready  => ctrlEnd_ready,
+      ctrl           => ctrl,
+      ctrl_valid     => ctrl_valid,
+      ctrl_ready     => ctrl_ready,
+      stAddr         => stAddr,
+      stAddr_valid   => stAddr_valid,
+      stAddr_ready   => stAddr_ready,
+      stData         => stData,
+      stData_valid   => stData_valid,
+      stData_ready   => stData_ready,
+      loadData       => dropLoadData,
+      loadEn         => dropLoadEn,
+      loadAddr       => dropLoadAddr,
+      storeEn        => storeEn,
+      storeAddr      => storeAddr,
+      storeData      => storeData
     );
 
   read_arbiter : entity work.read_memory_arbiter

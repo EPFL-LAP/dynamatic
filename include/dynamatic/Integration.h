@@ -268,14 +268,14 @@ static void callKernel(void (*kernel)(void)) { return kernel(); }
 template <typename Res, typename... FunArgs, typename... RealArgs>
 static void callKernel(Res (*kernel)(FunArgs...), RealArgs &&...args) {
   Res res = kernel(std::forward<RealArgs>(args)...);
-  dumpHLSArg(res, "end");
+  dumpHLSArg(res, "out0");
 }
 
 /// Calls the kernel and dumps the function's result to a file.
 template <typename Res>
 static void callKernel(Res (*kernel)(void)) {
   Res res = kernel();
-  dumpHLSArg(res, "end");
+  dumpHLSArg(res, "out0");
 }
 
 // Following macro definitions strongly inspired by
