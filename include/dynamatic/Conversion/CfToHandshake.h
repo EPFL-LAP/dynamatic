@@ -55,6 +55,11 @@ public:
     llvm::MapVector<Block *, SmallVector<Operation *>> mcPorts;
     /// Memory operations for an LSQ, grouped by belonging LSQ group.
     llvm::MapVector<unsigned, SmallVector<Operation *>> lsqPorts;
+    /// Function argument corresponding to the memory start signal for that
+    /// interface.
+    BlockArgument memStart;
+
+    MemAccesses(BlockArgument memStart);
   };
 
   /// Stores a mapping between memory regions (identified by the function
@@ -90,9 +95,11 @@ public:
   /// function, converts all load/store-like operations by their handshake
   /// counterparts, and fills `memInfo` with information about which operations
   /// use which interface.
-  virtual LogicalResult convertMemoryOps(handshake::FuncOp funcOp,
-                                         ConversionPatternRewriter &rewriter,
-                                         MemInterfacesInfo &memInfo) const;
+  virtual LogicalResult
+  convertMemoryOps(handshake::FuncOp funcOp,
+                   ConversionPatternRewriter &rewriter,
+                   const DenseMap<Value, unsigned> &memrefIndices,
+                   MemInterfacesInfo &memInfo) const;
 
   /// Verifies that LSQ groups derived from input IR annotations make sense
   /// (check for linear dominance property within each group and cross-group
@@ -162,9 +169,6 @@ private:
 class FuncSSAStrategy : public dynamatic::SSAMaximizationStrategy {
   /// Filters out block arguments of type MemRefType
   bool maximizeArgument(BlockArgument arg) override;
-
-  /// Filters out allocation operations
-  bool maximizeOp(Operation &op) override;
 };
 
 #define GEN_PASS_DECL_CFTOHANDSHAKE

@@ -756,7 +756,8 @@ struct HandshakeMCAddress
     // Replace the existing memory controller with the optimized one
     rewriter.setInsertionPoint(mcOp);
     auto newOp = rewriter.create<handshake::MemoryControllerOp>(
-        mcOp.getLoc(), mcOp.getMemRef(), newInputs, mcOp.getMCBlocks(),
+        mcOp.getLoc(), mcOp.getMemRef(), mcOp.getMemStart(), newInputs,
+        mcOp.getCtrlEnd(), mcOp.getMCBlocks(),
         mcOp.getPorts().getNumPorts<LoadPort, LSQLoadStorePort>());
     inheritBB(mcOp, newOp);
     rewriter.replaceOp(mcOp, newOp.getResults());

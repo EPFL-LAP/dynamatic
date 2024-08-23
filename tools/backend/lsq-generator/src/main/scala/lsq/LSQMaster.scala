@@ -53,8 +53,10 @@ class LSQMaster(lsqConfig: LsqConfigs) extends Module {
       Flipped(Decoupled(UInt(lsqConfig.dataWidth.W)))
     )
     
-    // Memory done signal
-    val memDone = Decoupled(UInt(0.W))
+    // Controls
+    val memStart = Flipped(Decoupled(UInt(0.W)))
+    val ctrlEnd = Flipped(Decoupled(UInt(0.W)))
+    val memEnd = Decoupled(UInt(0.W))
   })
 
   require(lsqConfig.fifoDepth_L > 1)
@@ -140,9 +142,33 @@ class LSQMaster(lsqConfig: LsqConfigs) extends Module {
     Module(new StoreAddrPort(lsqConfig)).io
   })
 
-  io.memDone.bits := DontCare
-  io.memDone.valid := storeEmpty && loadEmpty
-  
+  val memStartReady = RegInit(1.B)
+  val memEndValid = RegInit(0.B)
+  val ctrlEndReady = RegInit(0.B)
+
+  when (io.ctrlEnd.valid && storeEmpty && loadEmpty)  {
+      memEndValid := 1.B
+      ctrlEndReady := 1.B
+  }
+  when (io.ctrlEnd.valid && ctrlEndReady) {
+    ctrlEndReady := 0.B
+  }
+  when (io.memStart.valid && memStartReady) {
+    memStartReady := 0.B
+  }
+  when (io.memEnd.valid && io.memEnd.ready) {
+    memStartReady := 1.B
+    io.memEnd.valid := 0.B
+  } 
+
+  io.memStart.ready := memStartReady
+  io.memEnd.valid := memEndValid
+  io.ctrlEnd.ready := ctrlEndReady
+
+  io.memStart.bits := DontCare
+  io.memEnd.bits := DontCare
+  io.ctrlEnd.bits := DontCare
+
   // Group Allocator assignments
   bbLoadOffsets := GA.io.bbLoadOffsets
   bbLoadPorts := GA.io.bbLoadPorts

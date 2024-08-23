@@ -490,3 +490,60 @@ begin
     enable       <= write_en_var;
   end process;
 end architecture;
+
+library ieee;
+use ieee.std_logic_1164.all;
+use ieee.numeric_std.all;
+
+entity mc_control is
+  port (
+    clk, rst : in std_logic;
+    -- start input control
+    memStart_valid : in  std_logic;
+    memStart_ready : out std_logic;
+    -- end output control
+    memEnd_valid : out std_logic;
+    memEnd_ready : in  std_logic;
+    -- "no more requests" input control
+    ctrlEnd_valid : in  std_logic;
+    ctrlEnd_ready : out std_logic;
+    -- all requests completed
+    allRequestsDone : in std_logic
+  );
+end entity;
+
+architecture arch of mc_control is
+begin
+  process (rst, clk)
+  begin
+    if rst then
+      memStart_ready <= '1';
+      memEnd_valid   <= '0';
+      ctrlEnd_ready  <= '0';
+    elsif rising_edge(clk) then
+      memStart_ready <= memStart_ready;
+      memEnd_valid   <= memEnd_valid;
+      ctrlEnd_ready  <= ctrlEnd_ready;
+
+      -- determine when the memory has completed all requests
+      if ctrlEnd_valid and allRequestsDone then
+        memEnd_valid  <= '1';
+        ctrlEnd_ready <= '1';
+      end if;
+
+      -- acknowledge the 'ctrlEnd' control
+      if ctrlEnd_valid and ctrlEnd_ready then
+        ctrlEnd_ready <= '0';
+      end if;
+
+      -- determine when the memory is idle
+      if memStart_valid and memStart_ready then
+        memStart_ready <= '0';
+      end if;
+      if memEnd_valid and memEnd_ready then
+        memStart_ready <= '1';
+        memEnd_valid   <= '0';
+      end if;
+    end if;
+  end process;
+end architecture;

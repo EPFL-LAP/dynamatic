@@ -302,7 +302,7 @@ void HandshakeMinimizeLSQUsagePass::replaceMemoryEnd(handshake::LSQOp oldLSQOp,
   // Look for the memory completion signal of the memory referenced by the LSQ
   // in the function terminator's operands
   Value done =
-      mcOp ? cast<Value>(mcOp.getDone()) : oldLSQOp->getResults().back();
+      mcOp ? cast<Value>(mcOp.getMemEnd()) : oldLSQOp->getResults().back();
   auto indexedTermOperands = llvm::enumerate(endOp->getOperands());
   auto oprdIt = llvm::find_if(indexedTermOperands, [&](auto idxOprd) {
     return idxOprd.value() == done;
@@ -330,16 +330,17 @@ void HandshakeMinimizeLSQUsagePass::tryToOptimizeLSQ(handshake::LSQOp lsqOp) {
   MLIRContext *ctx = &getContext();
   OpBuilder builder(ctx);
 
-  // Used to keep track of memory replacements so that dependencies between
-  // accesses stay consistent
+  // Keep track of memory replacements so that dependencies between accesses
+  // stay consistent
   MemoryOpLowering memOpLowering(namer);
 
-  // Used to instantiate new memory interfaces after transforming some of our
+  // Builder to instantiate new memory interfaces after transforming some of our
   // LSQ ports into MC ports
   handshake::FuncOp funcOp = lsqOp->getParentOfType<handshake::FuncOp>();
-  Value memref = lsqOp.getMemRef();
-  MemRefType memType = cast<MemRefType>(memref.getType());
-  MemoryInterfaceBuilder memBuilder(funcOp, memref, lsqInfo.ctrlVals);
+  MemRefType memType = cast<MemRefType>(lsqOp.getMemRef().getType());
+  MemoryInterfaceBuilder memBuilder(funcOp, lsqOp.getMemRef(),
+                                    lsqOp.getMemStart(), lsqOp.getCtrlEnd(),
+                                    lsqInfo.ctrlVals);
 
   // Existing memory ports and memory interface(s) reference each other's
   // results/operands, which makes them un-earasable since it's disallowed to
@@ -449,7 +450,7 @@ void HandshakeMinimizeLSQUsagePass::tryToOptimizeLSQ(handshake::LSQOp lsqOp) {
   });
 
   // Replace memory control signals consumed by the end operation
-  replaceMemoryEnd(lsqOp, newMCOp.getDone(), builder);
+  replaceMemoryEnd(lsqOp, newMCOp.getMemEnd(), builder);
 
   // If the LSQ is connected to an MC, we delete it first. The second to last
   // result of the MC is a load data signal going to the LSQ, which needs to be

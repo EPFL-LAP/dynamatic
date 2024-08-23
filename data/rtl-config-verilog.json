@@ -573,49 +573,6 @@
     }
   },
   {
-    "name": "handshake.end",
-    "parameters": [
-      { "name": "DATA_WIDTH", "type": "unsigned", "eq": 0, "generic": false },
-      { "name": "NUM_MEMORIES", "type": "unsigned", "eq": 0, "generic": false }
-    ],
-    "generic": "$DYNAMATIC/data/verilog/handshake/dataless/end_memless.v",
-    "module-name": "end_sync_memless_dataless",
-    "hdl": "verilog"
-  },
-  {
-    "name": "handshake.end",
-    "parameters": [
-      { "name": "DATA_WIDTH", "type": "unsigned", "lb": 1 },
-      { "name": "NUM_MEMORIES", "type": "unsigned", "eq": 0, "generic": false }
-    ],
-    "generic": "$DYNAMATIC/data/verilog/handshake/end_memless.v",
-    "module-name": "end_sync_memless",
-    "dependencies": ["end_sync_memless_dataless"],
-    "hdl": "verilog"
-  },
-  {
-    "name": "handshake.end",
-    "parameters": [
-      { "name": "DATA_WIDTH", "type": "unsigned", "eq": 0, "generic": false },
-      { "name": "NUM_MEMORIES", "type": "unsigned", "lb": 1 }
-    ],
-    "generic": "$DYNAMATIC/data/verilog/handshake/dataless/end.v",
-    "module-name": "end_sync_dataless",
-    "dependencies": ["logic", "join_type"],
-    "hdl": "verilog"
-  },
-  {
-    "name": "handshake.end",
-    "parameters": [
-      { "name": "DATA_WIDTH", "type": "unsigned", "lb": 1 },
-      { "name": "NUM_MEMORIES", "type": "unsigned", "lb": 1 }
-    ],
-    "generic": "$DYNAMATIC/data/verilog/handshake/end.v",
-    "module-name": "end_sync",
-    "dependencies": ["end_sync_dataless"],
-    "hdl": "verilog"
-  },
-  {
     "name": "handshake.join",
     "parameters": [{ "name": "SIZE", "type": "unsigned", "lb": 1 }],
     "generic": "$DYNAMATIC/data/verilog/handshake/join.v",

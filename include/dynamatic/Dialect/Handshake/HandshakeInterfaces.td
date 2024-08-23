@@ -67,23 +67,46 @@ def MemoryOpInterface : OpInterface<"MemoryOpInterface"> {
 
   let methods = [
     InterfaceMethod<[{
-        Returns whether the interface is a \"master\" interface i.e., one that
+        Returns whether the interface is a "master" interface i.e., one that
         directly connects to an external memory through its parent Handshake
         function's ports.
-      }], "bool", "isMasterInterface", (ins)>,
+      }], "bool", "isMasterInterface", (ins)
+    >,
     InterfaceMethod<
       "Returns the memref-typed SSA value that the interface references.",
-      "::mlir::TypedValue<::mlir::MemRefType>", "getMemRef", (ins)>,
+      "::mlir::TypedValue<::mlir::MemRefType>", "getMemRef", (ins)
+    >,
     InterfaceMethod<[{
       Returns the type of the memref-typed SSA value that the interface
       references.
       }],
       "::mlir::MemRefType", "getMemRefType", (ins),
-      "",
-      [{
+      "", [{
         ConcreteOp concreteOp = cast<ConcreteOp>($_op);
         return concreteOp.getMemRef().getType().template cast<mlir::MemRefType>();
-      }]>
+      }]
+    >,
+    InterfaceMethod<[{
+        Returns the memory start signal associated to the memory region this
+        interfaces to.
+      }],
+      "::mlir::TypedValue<::dynamatic::handshake::ControlType>", "getMemStart",
+      (ins)
+    >,
+    InterfaceMethod<[{
+        Returns the memory end signal associated to the memory region this
+        interfaces to.
+      }],
+      "::mlir::TypedValue<::dynamatic::handshake::ControlType>", "getMemEnd",
+      (ins)
+    >,
+    InterfaceMethod<[{
+        Returns the control end signal associated to the memory region this
+        interfaces to.
+      }],
+      "::mlir::TypedValue<::dynamatic::handshake::ControlType>", "getCtrlEnd",
+      (ins)
+    >
   ];
 }
 
