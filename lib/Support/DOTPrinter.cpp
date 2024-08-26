@@ -136,13 +136,15 @@ static StringRef getArrowheadStyle(OpOperand &oprd) {
   return NORMAL;
 }
 
+static StringRef getStyle(Value val) {
+  return isa<handshake::ControlType>(val.getType()) ? DOTTED : SOLID;
+}
+
 /// Determines cosmetic attributes of the edge corresponding to the operand.
 static std::string getEdgeStyle(OpOperand &oprd) {
   std::string attributes;
-  StringRef style =
-      isa<handshake::ControlType>(oprd.get().getType()) ? DOTTED : SOLID;
   // StringRef arrowhead =
-  return "style=\"" + style.str() +
+  return "style=\"" + getStyle(oprd.get()).str() +
          R"(", dir="both", arrowtail="none", arrowhead=")" +
          getArrowheadStyle(oprd).str() + "\", ";
 }
@@ -399,6 +401,12 @@ std::string DOTPrinter::getArgumentName(handshake::FuncOp funcOp, size_t idx) {
   return funcOp.getArgName(idx).getValue().str();
 }
 
+std::string DOTPrinter::getResultName(handshake::FuncOp funcOp, size_t idx) {
+  auto numResults = funcOp.getFunctionType().getNumResults();
+  assert(idx < numResults && "result index too high");
+  return funcOp.getResName(idx).getValue().str();
+}
+
 void DOTPrinter::openSubgraph(std::string &name, std::string &label,
                               mlir::raw_indented_ostream &os) {
   os << "subgraph \"" << name << "\" {\n";
@@ -413,6 +421,9 @@ void DOTPrinter::closeSubgraph(mlir::raw_indented_ostream &os) {
 
 LogicalResult DOTPrinter::printNode(Operation *op,
                                     mlir::raw_indented_ostream &os) {
+  if (isa<handshake::EndOp>(op))
+    return success();
+
   // The node's DOT name
   std::string opName = getUniqueName(op).str();
 
@@ -423,8 +434,11 @@ LogicalResult DOTPrinter::printNode(Operation *op,
     mlirOpName += prettyLabel;
 
   // The node's DOT "shape" attribute
-  StringRef dialect = op->getDialect()->getNamespace();
-  StringRef shape = dialect == "handshake" ? "box" : "oval";
+  StringRef shape;
+  if (isa<handshake::ArithOpInterface>(op))
+    shape = "oval";
+  else
+    shape = "box";
 
   // The node's DOT "style" attribute
   std::string style = "filled";
@@ -447,10 +461,14 @@ LogicalResult DOTPrinter::printEdge(OpOperand &oprd,
   Operation *src = val.getDefiningOp();
   Operation *dst = oprd.getOwner();
 
-  // "Jump over" bitwidth modification operations that go to a merge-like
-  // operation in a different block
   std::string srcNodeName = getUniqueName(src).str();
-  std::string dstNodeName = getUniqueName(dst).str();
+  std::string dstNodeName;
+  if (isa<handshake::EndOp>(dst)) {
+    dstNodeName = getResultName(dst->getParentOfType<handshake::FuncOp>(),
+                                oprd.getOperandNumber());
+  } else {
+    dstNodeName = getUniqueName(dst).str();
+  }
 
   os << "\"" << srcNodeName << "\" -> \"" << dstNodeName << "\" ["
      << getEdgeStyle(oprd);
@@ -476,50 +494,32 @@ LogicalResult DOTPrinter::printFunc(handshake::FuncOp funcOp,
   os << "splines=" << splines << ";\n";
   os << "compound=true; // Allow edges between clusters\n";
 
-  /// Prints all nodes corresponding to function arguments.
-  auto printArgNodes = [&]() -> LogicalResult {
-    os << "// Units from function arguments\n";
-    for (const auto &arg : enumerate(funcOp.getArguments())) {
-      if (isa<MemRefType>(arg.value().getType()))
-        // Arguments with memref types are represented by memory interfaces
-        // inside the function so they are not displayed
-        continue;
+  // Function arguments do not belong to any basic block
+  os << "// Function arguments\n";
+  for (const auto &[idx, arg] : llvm::enumerate(funcOp.getArguments())) {
+    if (isa<MemRefType>(arg.getType()))
+      // Arguments with memref types are represented by memory interfaces
+      // inside the function so they are not displayed
+      continue;
 
-      std::string argLabel = getArgumentName(funcOp, arg.index());
-      StringRef style =
-          isa<handshake::ControlType>(arg.value().getType()) ? DOTTED : SOLID;
-      os << "\"" << argLabel
-         << R"(" [mlir_op="handshake.func", shape=diamond, )"
-         << "label=\"" << argLabel << "\", style=\"" << style << "\"]\n";
-    }
-    return success();
-  };
+    std::string argLabel = getArgumentName(funcOp, idx);
+    os << "\"" << argLabel << R"(" [mlir_op="handshake.func", shape=diamond, )"
+       << "label=\"" << argLabel << "\", style=\"" << getStyle(arg) << "\"]\n";
+  }
 
-  /// Prints all edges incoming from function arguments.
-  auto printArgEdges = [&]() -> LogicalResult {
-    os << "// Channels from function arguments\n";
-    for (auto [idx, arg] : llvm::enumerate(funcOp.getArguments())) {
-      if (isa<MemRefType>(arg.getType()))
-        continue;
-
-      for (OpOperand &oprd : arg.getUses()) {
-        Operation *ownerOp = oprd.getOwner();
-        std::string argLabel = getArgumentName(funcOp, idx);
-        os << "\"" << argLabel << "\" -> \"" << getUniqueName(ownerOp) << "\" ["
-           << getEdgeStyle(oprd) << "]\n";
-      }
-    }
-    return success();
-  };
+  // Function results do not belong to any basic block
+  os << "// Function results\n";
+  ValueRange results = funcOp.getBodyBlock()->getTerminator()->getOperands();
+  for (const auto &[idx, res] : llvm::enumerate(results)) {
+    std::string resLabel = getResultName(funcOp, idx);
+    os << "\"" << resLabel << R"(" [mlir_op="handshake.func", shape=diamond, )"
+       << "label=\"" << resLabel << "\", style=\"" << getStyle(res) << "\"]\n";
+  }
 
   // Get function's "blocks". These leverage the "bb" attributes attached to
   // operations in handshake functions to display operations belonging to the
   // same original basic block together
   LogicBBs blocks = getLogicBBs(funcOp);
-
-  // Whether nodes and edges corresponding to function arguments have already
-  // been handled
-  bool areArgsHandled = false;
 
   // Collect all edges that do not connect two nodes in the same block
   llvm::MapVector<unsigned, std::vector<OpOperand *>> outgoingEdges;
@@ -527,17 +527,11 @@ LogicalResult DOTPrinter::printFunc(handshake::FuncOp funcOp,
   // We print the function "block-by-block" by grouping nodes in the same block
   // (as well as edges between nodes of the same block) within DOT clusters
   for (auto &[blockID, blockOps] : blocks.blocks) {
-    areArgsHandled |= blockID == ENTRY_BB;
-
     // Open the subgraph
     os << "// Units/Channels in BB " << blockID << "\n";
     std::string graphName = "cluster" + std::to_string(blockID);
     std::string graphLabel = "block" + std::to_string(blockID);
     openSubgraph(graphName, graphLabel, os);
-
-    // For entry block, also add all nodes corresponding to function arguments
-    if (blockID == ENTRY_BB && failed(printArgNodes()))
-      return failure();
 
     os << "// Units in BB " << blockID << "\n";
     for (Operation *op : blockOps) {
@@ -545,17 +539,13 @@ LogicalResult DOTPrinter::printFunc(handshake::FuncOp funcOp,
         return failure();
     }
 
-    // For entry block, also add all edges incoming from function arguments
-    if (blockID == ENTRY_BB && failed(printArgEdges()))
-      return failure();
-
     os << "// Channels in BB " << blockID << "\n";
     for (Operation *op : blockOps) {
       for (OpResult res : op->getResults()) {
         for (OpOperand &oprd : res.getUses()) {
           Operation *userOp = oprd.getOwner();
           std::optional<unsigned> bb = getLogicBB(userOp);
-          if (bb && *bb == blockID) {
+          if (bb && *bb == blockID && !isa<handshake::EndOp>(userOp)) {
             if (failed(printEdge(oprd, os)))
               return failure();
           } else {
@@ -569,14 +559,24 @@ LogicalResult DOTPrinter::printFunc(handshake::FuncOp funcOp,
     closeSubgraph(os);
   }
 
-  // Print edges coming from function arguments if they haven't been so far
-  if (!areArgsHandled && failed(printArgNodes()))
-    return failure();
-
   os << "// Units outside of all basic blocks\n";
   for (Operation *op : blocks.outOfBlocks) {
     if (failed(printNode(op, os)))
       return failure();
+  }
+
+  // Print edges coming from function arguments if they haven't been so far
+  os << "// Channels from function arguments\n";
+  for (auto [idx, arg] : llvm::enumerate(funcOp.getArguments())) {
+    if (isa<MemRefType>(arg.getType()))
+      continue;
+
+    for (OpOperand &oprd : arg.getUses()) {
+      Operation *ownerOp = oprd.getOwner();
+      std::string argLabel = getArgumentName(funcOp, idx);
+      os << "\"" << argLabel << "\" -> \"" << getUniqueName(ownerOp) << "\" ["
+         << getEdgeStyle(oprd) << "]\n";
+    }
   }
 
   // Print outgoing edges for each block
@@ -587,10 +587,6 @@ LogicalResult DOTPrinter::printFunc(handshake::FuncOp funcOp,
         return failure();
     }
   }
-
-  // Print edges coming from function arguments if they haven't been so far
-  if (!areArgsHandled && failed(printArgEdges()))
-    return failure();
 
   os << "// Channels outside of all basic blocks\n";
   for (Operation *op : blocks.outOfBlocks) {
