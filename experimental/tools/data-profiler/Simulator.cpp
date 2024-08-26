@@ -50,7 +50,8 @@ public:
               std::vector<Any> &results, std::vector<double> &resultTimes,
               std::vector<std::vector<Any>> &store,
               std::vector<double> &storeTimes, StdProfiler &prof,
-              dynamatic::Logger &trace_logger);
+              dynamatic::Logger &trace_logger,
+              dynamatic::Logger &bbList_logger);
 
   LogicalResult succeeded() const {
     return successFlag ? success() : failure();
@@ -114,14 +115,14 @@ private:
                         std::vector<Any> &);
   LogicalResult execute(mlir::cf::BranchOp, std::vector<Any> &,
                         std::vector<Any> &, DominanceInfo &,
-                        dynamatic::Logger &);
+                        dynamatic::Logger &, dynamatic::Logger &);
   LogicalResult execute(mlir::cf::CondBranchOp, std::vector<Any> &,
                         std::vector<Any> &, DominanceInfo &,
-                        dynamatic::Logger &);
+                        dynamatic::Logger &, dynamatic::Logger &);
   LogicalResult execute(func::ReturnOp, std::vector<Any> &, std::vector<Any> &);
   LogicalResult execute(mlir::CallOpInterface, std::vector<Any> &,
                         std::vector<Any> &, DominanceInfo &,
-                        dynamatic::Logger &);
+                        dynamatic::Logger &, dynamatic::Logger &);
 
 private:
   /// Execution context variables.
@@ -549,7 +550,7 @@ LogicalResult StdExecuterData::execute(mlir::memref::AllocOp op,
 
 LogicalResult StdExecuterData::execute(mlir::cf::BranchOp branchOp,
                                    std::vector<Any> &in, std::vector<Any> &, DominanceInfo &DomInfo,
-                                   dynamatic::Logger &trace_logger) {
+                                   dynamatic::Logger &trace_logger, dynamatic::Logger &bbList_logger) {
   mlir::Block *dest = branchOp.getDest();
   for (auto out : enumerate(dest->getArguments())) {
     LLVM_DEBUG(debugArg("ARG", out.value(), in[out.index()], time));
@@ -562,9 +563,11 @@ LogicalResult StdExecuterData::execute(mlir::cf::BranchOp branchOp,
   if (DomInfo.dominates(dest, branchOp->getBlock())) {
     // This is a back edge
     *trace_logger << "[BEdge] " << num_edges << " (" << BlocktoIDs[branchOp->getBlock()] << "," << BlocktoIDs[dest] << ")\n";
+    *bbList_logger << "[BEdge] " << num_edges << " (" << BlocktoIDs[branchOp->getBlock()] << "," << BlocktoIDs[dest] << ")\n";
   } else {
     // This is not a backedge
     *trace_logger << "[Edge] "<< num_edges << " (" << BlocktoIDs[branchOp->getBlock()] << "," << BlocktoIDs[dest] << ")\n";
+    *bbList_logger << "[Edge] "<< num_edges << " (" << BlocktoIDs[branchOp->getBlock()] << "," << BlocktoIDs[dest] << ")\n";
   }
 
   // Update edge status
@@ -576,7 +579,7 @@ LogicalResult StdExecuterData::execute(mlir::cf::BranchOp branchOp,
 
 LogicalResult StdExecuterData::execute(mlir::cf::CondBranchOp condBranchOp,
                                    std::vector<Any> &in, std::vector<Any> &, DominanceInfo &DomInfo,
-                                   dynamatic::Logger &trace_logger) {
+                                   dynamatic::Logger &trace_logger, dynamatic::Logger &bbList_logger) {
   APInt condition = any_cast<APInt>(in[0]);
   mlir::Block *dest;
   std::vector<Any> inArgs;
@@ -612,9 +615,11 @@ LogicalResult StdExecuterData::execute(mlir::cf::CondBranchOp condBranchOp,
   if (DomInfo.dominates(dest, condBranchOp->getBlock())) {
     // This is a backedge
     *trace_logger << "[BEdge] " << num_edges << " (" << BlocktoIDs[condBranchOp->getBlock()] << "," << BlocktoIDs[dest] << ")\n";
+    *bbList_logger << "[BEdge] " << num_edges << " (" << BlocktoIDs[condBranchOp->getBlock()] << "," << BlocktoIDs[dest] << ")\n";
   } else {
     // This is not a backedge
     *trace_logger << "[Edge] " << num_edges << " (" << BlocktoIDs[condBranchOp->getBlock()] << "," << BlocktoIDs[dest] << ")\n";
+    *bbList_logger << "[Edge] " << num_edges << " (" << BlocktoIDs[condBranchOp->getBlock()] << "," << BlocktoIDs[dest] << ")\n";
   }
 
   // Update edge status
@@ -634,7 +639,7 @@ LogicalResult StdExecuterData::execute(func::ReturnOp op, std::vector<Any> &in,
 
 LogicalResult StdExecuterData::execute(mlir::CallOpInterface callOp,
                                    std::vector<Any> &in, std::vector<Any> &, DominanceInfo &DomInfo,
-                                   dynamatic::Logger &trace_logger) {
+                                   dynamatic::Logger &trace_logger, dynamatic::Logger &bbList_logger) {
   // implement function calls.
   auto *op = callOp.getOperation();
   mlir::Operation *calledOp = callOp.resolveCallable();
@@ -678,7 +683,7 @@ StdExecuterData::StdExecuterData(mlir::func::FuncOp &toplevel,
                          std::vector<double> &resultTimes,
                          std::vector<std::vector<Any>> &store,
                          std::vector<double> &storeTimes, StdProfiler &prof,
-                         dynamatic::Logger &trace_logger)
+                         dynamatic::Logger &trace_logger, dynamatic::Logger &bbList_logger)
     : valueMap(valueMap), timeMap(timeMap), results(results),
       resultTimes(resultTimes), store(store), storeTimes(storeTimes),
       prof(prof) {
@@ -732,7 +737,7 @@ StdExecuterData::StdExecuterData(mlir::func::FuncOp &toplevel,
             .Case<mlir::cf::BranchOp, mlir::cf::CondBranchOp,
                   mlir::CallOpInterface>([&](auto op) {
               strat = ExecuteStrategy::Continue;
-              return execute(op, inValues, outValues, domInfo, trace_logger);
+              return execute(op, inValues, outValues, domInfo, trace_logger, bbList_logger);
             })
             .Case<func::ReturnOp>([&](auto op) {
               strat = ExecuteStrategy::Return;
@@ -758,10 +763,16 @@ StdExecuterData::StdExecuterData(mlir::func::FuncOp &toplevel,
       valueMap[out.value()] = outValues[out.index()];
       timeMap[out.value()] = time + 1;
 
-      *trace_logger << "[DATA] (" << op.getAttr("handshake.name");
+      // Skip Constant Operations
+      // TODO: Merge ConstantIndex and ConstantIndex op;
+      if (!isa<mlir::arith::ConstantIntOp>(op) && !isa<mlir::arith::ConstantIndexOp>(op)) {
+        *trace_logger << "[DATA] (" << op.getAttr("handshake.name");
 
-      //! At this stage we only allow APInt
-      *trace_logger << "," << any_cast<APInt>(outValues[out.index()]) << ")\n";
+        //! At this stage we only allow APInt
+        // TODO: Support APFloat
+        *trace_logger << "," << any_cast<APInt>(outValues[out.index()]) << ")\n";
+      }
+      
     }
     ++instIter;
     ++instructionsExecuted;
@@ -769,7 +780,7 @@ StdExecuterData::StdExecuterData(mlir::func::FuncOp &toplevel,
 }
 
 LogicalResult simulate(func::FuncOp funcOp, ArrayRef<std::string> inputArgs,
-                       StdProfiler &prof, dynamatic::Logger &trace_logger) {
+                       StdProfiler &prof, dynamatic::Logger &trace_logger, dynamatic::Logger &bbList_logger) {
   // The store associates each allocation in the program
   // (represented by a int) with a vector of values which can be
   // accessed by it.   Currently values are assumed to be an integer.
@@ -833,6 +844,6 @@ LogicalResult simulate(func::FuncOp funcOp, ArrayRef<std::string> inputArgs,
   std::vector<double> resultTimes(numOutputs);
 
   return StdExecuterData(funcOp, valueMap, timeMap, results, resultTimes, store,
-                     storeTimes, prof, trace_logger)
+                     storeTimes, prof, trace_logger, bbList_logger)
       .succeeded();
 }

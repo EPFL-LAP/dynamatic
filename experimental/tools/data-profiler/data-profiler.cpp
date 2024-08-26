@@ -41,7 +41,8 @@ using namespace dynamatic::experimental;
 mlir::LogicalResult simulate(func::FuncOp funcOp,
                              ArrayRef<std::string> inputArgs,
                              StdProfiler &prof,
-                             dynamatic::Logger &trace_logger);
+                             dynamatic::Logger &trace_logger,
+                             dynamatic::Logger &bbList_logger);
 
 static cl::OptionCategory mainCategory("Application options");
 
@@ -73,6 +74,12 @@ static cl::opt<std::string>
 static cl::opt<std::string>
   traceLogFile("trace-log-file", cl::Optional,
                cl::desc("Where to store the execution trace log"),
+               cl::init(" "),
+               cl::cat(mainCategory));
+
+static cl::opt<std::string>
+  bbListLogFile("bb-list-log-file", cl::Optional,
+               cl::desc("Where to store the bb execution trace log"),
                cl::init(" "),
                cl::cat(mainCategory));
 
@@ -149,13 +156,17 @@ int main(int argc, char **argv) {
   std::error_code overall_ec;
   dynamatic::Logger trace_logger(traceLogFile.c_str(), overall_ec);
 
+  // Create bbList logger
+  std::error_code bblist_ec;
+  dynamatic::Logger bbList_logger(bbListLogFile.c_str(), bblist_ec);
+
   // Run the std-level simulator
   dynamatic::experimental::StdProfiler prof(funcOp);
   bool simFailed = false;
   if (fileArgs.empty())
-    simFailed = failed(simulate(funcOp, clArgs, prof, trace_logger));
+    simFailed = failed(simulate(funcOp, clArgs, prof, trace_logger, bbList_logger));
   else
-    simFailed = failed(simulate(funcOp, fetchArgsFromFile(), prof, trace_logger));
+    simFailed = failed(simulate(funcOp, fetchArgsFromFile(), prof, trace_logger, bbList_logger));
 
   // Print statistics to stdout and return
   if (!simFailed)
