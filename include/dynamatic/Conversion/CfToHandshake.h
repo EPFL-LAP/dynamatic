@@ -306,8 +306,6 @@ private:
   /// Stores the loop info of the control flow graph
   mlir::CFGLoopInfo li;
 
-  // ControlDependenceAnalysis &cdgAnalysis;
-
   // Enumerates all paths from the start Block to the end Block in the CFG and
   // returns a minimizedSOP while respecting the control dependencies
   experimental::boolean::BoolExpression *

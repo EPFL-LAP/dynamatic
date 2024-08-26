@@ -7,7 +7,7 @@
 //===----------------------------------------------------------------------===//
 //
 // This file contains the implementation of the elastic pass, as introduced in
-// https://dl.acm.org/doi/abs/10.1145/3174243.3174264.
+// https://ieeexplore.ieee.org/abstract/document/10035134.
 //
 // Pars of the implementation are taken from CIRCT's cf-to-handshake conversion
 // pass with modifications. Other parts of the implementation are significantly
@@ -279,7 +279,7 @@ static void reconnectMergeOps(Region &region,
   for (Block &block : region) {
     if (getBlockPredecessorCount(&block) > 1) {
       auto ctrlMergeOp = getFirstOp<handshake::ControlMergeOp>(&block);
-      assert(ctrlMergeOp != nullptr);
+      assert(!ctrlMergeOp);
 
       for (HandshakeLowering::MergeOpInfo &mergeInfo : blockMerges[&block]) {
         if (mergeInfo.mergeLikeOp != ctrlMergeOp) {
@@ -2493,9 +2493,6 @@ static LogicalResult lowerRegion(HandshakeLowering &hl) {
   if (failed(runPartialLowering(hl, &HandshakeLowering::convertCalls)))
     return failure();
 
-  // if (failed(runPartialLowering(hl, &HandshakeLowering::connectConstants)))
-  //   return failure();
-
   if (failed(runPartialLowering(hl, &HandshakeLowering::idBasicBlocks)))
     return failure();
 
@@ -2591,7 +2588,7 @@ struct ConvertFuncToHandshake : OpConversionPattern<func::FuncOp> {
   }
 };
 
-/// FPGA18's elastic pass. Runs elastic pass on every function
+/// FPL'22's elastic pass. Runs elastic pass on every function
 /// (func::FuncOp) of the module it is applied on. Succeeds whenever all
 /// functions in the module were succesfully lowered to handshake.
 struct CfToHandshakePass
@@ -2621,10 +2618,6 @@ struct CfToHandshakePass
 
     if (failed(applyPartialConversion(modOp, funcTarget, std::move(patterns))))
       return signalPassFailure();
-
-    // Loop over the structures to change the pointer addresses to those
-    // from the handshake:FuncOp  (AYA: might need to add write functions
-    // to your)
 
     // Lower every function individually
     auto funcOps = modOp.getOps<handshake::FuncOp>();
