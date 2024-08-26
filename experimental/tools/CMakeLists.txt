@@ -1,2 +1,2 @@
 add_subdirectory(frequency-profiler)
-add_subdirectory(cpp-simulation)
+add_subdirectory(handshake-simulator)
