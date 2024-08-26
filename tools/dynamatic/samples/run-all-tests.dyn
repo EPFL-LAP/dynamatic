@@ -110,7 +110,7 @@ compile
 write-hdl
 simulate
 synthesize
-set-src           integration-test/simple_example/simple_example.c
+set-src           integration-test/simple_example_1/simple_example_1.c
 compile
 write-hdl
 simulate
