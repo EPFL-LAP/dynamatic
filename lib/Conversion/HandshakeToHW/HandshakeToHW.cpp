@@ -533,15 +533,14 @@ ModuleDiscriminator::ModuleDiscriminator(Operation *op) {
             bitValue = std::bitset<64>(value.getSExtValue()).to_string();
           bitValue = bitValue.substr(64 - bitwidth);
         } else if (isa<FloatType>(cstType.getDataType())) {
-          mlir::FloatAttr attr = dyn_cast<mlir::FloatAttr>(valueAttr);
+          mlir::FloatAttr attr = cast<mlir::FloatAttr>(valueAttr);
+          APInt floatInt = attr.getValue().bitcastToAPInt();
+
           // We only support specific bitwidths for floating point numbers
-          if (bitwidth == 32) {
-            bitValue =
-                std::bitset<32>(attr.getValue().convertToFloat()).to_string();
-          } else if (bitwidth == 64) {
-            bitValue =
-                std::bitset<64>(attr.getValue().convertToDouble()).to_string();
-          } else {
+          bitValue = std::bitset<64>(floatInt.getZExtValue()).to_string();
+          if (floatInt.getBitWidth() == 32) {
+            bitValue = bitValue.substr(32);
+          } else if (floatInt.getBitWidth() != 64) {
             cstOp.emitError() << "Constant has unsupported floating point "
                                  "bitwidth. Expected 32 or 64 but got "
                               << bitwidth << ".";
@@ -558,15 +557,13 @@ ModuleDiscriminator::ModuleDiscriminator(Operation *op) {
         addString("VALUE", bitValue);
         addUnsigned("DATA_WIDTH", bitwidth);
       })
-      .Case<handshake::NotOp>([&](handshake::NotOp notOp) {
-        addType("DATA_TYPE", op->getOperand(0));
-      })
       .Case<handshake::AddFOp, handshake::AddIOp, handshake::AndIOp,
             handshake::DivFOp, handshake::DivSIOp, handshake::DivUIOp,
             handshake::MaximumFOp, handshake::MinimumFOp, handshake::MulFOp,
-            handshake::MulIOp, handshake::NegFOp, handshake::OrIOp,
-            handshake::ShLIOp, handshake::ShRSIOp, handshake::ShRUIOp,
-            handshake::SubFOp, handshake::SubIOp, handshake::XOrIOp>([&](auto) {
+            handshake::MulIOp, handshake::NegFOp, handshake::NotOp,
+            handshake::OrIOp, handshake::ShLIOp, handshake::ShRSIOp,
+            handshake::ShRUIOp, handshake::SubFOp, handshake::SubIOp,
+            handshake::XOrIOp>([&](auto) {
         // Bitwidth
         addType("DATA_TYPE", op->getOperand(0));
       })
