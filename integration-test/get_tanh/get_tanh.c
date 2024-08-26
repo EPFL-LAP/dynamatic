@@ -33,16 +33,16 @@ void get_tanh(inout_float_t A[1000], in_int_t addr[1000]) {
 }
 
 int main(void) {
-  inout_float_t a[1000];
-  in_int_t b[1000];
+  inout_float_t A[1000];
+  in_int_t addr[1000];
 
   for (int i = 0; i < 1000; ++i) {
-    a[i] = (float)i;
-    b[i] = i;
+    A[i] = (float)i;
+    addr[i] = i;
 
     if (i % 100 == 0)
-      a[i] = 0;
+      A[i] = 0;
   }
 
-  CALL_KERNEL(get_tanh, a, b);
+  CALL_KERNEL(get_tanh, A, addr);
 }
