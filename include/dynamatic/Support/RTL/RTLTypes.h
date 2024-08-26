@@ -95,7 +95,7 @@ bool fromJSON(const llvm::json::Value &value, StringConstraints &cons,
               llvm::json::Path path);
 
 /// Channel type constraints.
-struct ChannelConstraints : public RTLTypeConstraints {
+struct DataflowConstraints : public RTLTypeConstraints {
   /// Constraints on the data signal's width.
   UnsignedConstraints dataWidth;
   /// Constraints on the total number of extra signals.
@@ -109,7 +109,7 @@ struct ChannelConstraints : public RTLTypeConstraints {
 };
 
 /// ADL-findable LLVM-standard JSON deserializer for channel constraints.
-bool fromJSON(const llvm::json::Value &value, ChannelConstraints &cons,
+bool fromJSON(const llvm::json::Value &value, DataflowConstraints &cons,
               llvm::json::Path path);
 
 /// Timing constraints.
@@ -258,11 +258,11 @@ struct RTLStringType : public RTLType::Model<RTLStringType, StringConstraints> {
   static std::string serialize(mlir::Attribute attr);
 };
 
-/// An RTL parameter representing a channel type, stored in the IR as a
-/// `TypeAttr`.
-struct RTLChannelType
-    : public RTLType::Model<RTLChannelType, ChannelConstraints> {
-  static constexpr llvm::StringLiteral ID = "channel";
+/// An RTL parameter representing a dataflow type (`handshake::ControlType` or
+/// `handshake::ChannelType`), stored in the IR as a `TypeAttr`.
+struct RTLDataflowType
+    : public RTLType::Model<RTLDataflowType, DataflowConstraints> {
+  static constexpr llvm::StringLiteral ID = "dataflow";
 
   static std::string serialize(mlir::Attribute attr);
 };

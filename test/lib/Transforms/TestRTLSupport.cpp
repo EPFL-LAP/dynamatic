@@ -45,8 +45,10 @@ struct TestRTLSupport
 
     for (auto modOp : getOperation().getOps<hw::HWModuleExternOp>()) {
       RTLRequestFromHWModule request(modOp);
-      if (!config.hasMatchingComponent(request))
+      if (!config.hasMatchingComponent(request)) {
+        modOp->emitError() << "no matching component";
         return signalPassFailure();
+      }
     }
   }
 

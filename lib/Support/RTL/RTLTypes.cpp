@@ -31,7 +31,7 @@ static const mlir::DenseSet<StringRef> RESERVED_KEYS{"name", KEY_TYPE,
 
 static constexpr StringLiteral ERR_UNKNOWN_TYPE(
     R"(unknown parameter type: options are "boolean", "unsigned", "string", )"
-    R"("channel", or "timing")");
+    R"("dataflow", or "timing")");
 
 bool RTLType::fromJSON(const ljson::Value &value, ljson::Path path) {
   if (typeConcept)
@@ -43,7 +43,7 @@ bool RTLType::fromJSON(const ljson::Value &value, ljson::Path path) {
     path.field(KEY_TYPE).report(ERR_MISSING_VALUE);
     return false;
   }
-  if (!allocIf<RTLBooleanType, RTLUnsignedType, RTLStringType, RTLChannelType,
+  if (!allocIf<RTLBooleanType, RTLUnsignedType, RTLStringType, RTLDataflowType,
                RTLTimingType>(paramType)) {
     path.field(KEY_TYPE).report(ERR_UNKNOWN_TYPE);
     return false;
@@ -188,24 +188,28 @@ std::string RTLStringType::serialize(Attribute attr) {
 }
 
 //===----------------------------------------------------------------------===//
-// ChannelConstraints / RTLChannelType
+// DataflowConstraints / RTLDataflowType
 //===----------------------------------------------------------------------===//
 
-bool ChannelConstraints::verify(Attribute attr) const {
+bool DataflowConstraints::verify(Attribute attr) const {
   auto typeAttr = dyn_cast_if_present<TypeAttr>(attr);
   if (!typeAttr)
     return false;
-  auto channelType = dyn_cast<handshake::ChannelType>(typeAttr.getValue());
-  if (!channelType)
-    return false;
-
-  return dataWidth.verify(channelType.getDataBitWidth()) &&
-         numExtras.verify(channelType.getNumExtraSignals()) &&
-         numDownstreams.verify(channelType.getNumDownstreamExtraSignals()) &&
-         numUpstreams.verify(channelType.getNumUpstreamExtraSignals());
+  Type ty = typeAttr.getValue();
+  if (auto channelType = dyn_cast<handshake::ChannelType>(ty)) {
+    return dataWidth.verify(channelType.getDataBitWidth()) &&
+           numExtras.verify(channelType.getNumExtraSignals()) &&
+           numDownstreams.verify(channelType.getNumDownstreamExtraSignals()) &&
+           numUpstreams.verify(channelType.getNumUpstreamExtraSignals());
+  }
+  if (isa<handshake::ControlType>(ty)) {
+    return dataWidth.verify(0) && numExtras.verify(0) &&
+           numDownstreams.verify(0) && numUpstreams.verify(0);
+  }
+  return false;
 }
 
-bool dynamatic::fromJSON(const ljson::Value &value, ChannelConstraints &cons,
+bool dynamatic::fromJSON(const ljson::Value &value, DataflowConstraints &cons,
                          ljson::Path path) {
   ObjectDeserializer deserial(value, path);
   cons.dataWidth.deserialize(deserial, "data-");
@@ -215,22 +219,22 @@ bool dynamatic::fromJSON(const ljson::Value &value, ChannelConstraints &cons,
   return deserial.exhausted(RESERVED_KEYS);
 }
 
-std::string RTLChannelType::serialize(Attribute attr) {
+std::string RTLDataflowType::serialize(Attribute attr) {
   auto typeAttr = dyn_cast_if_present<TypeAttr>(attr);
   if (!typeAttr)
     return "";
-  auto channelType = dyn_cast<handshake::ChannelType>(typeAttr.getValue());
-  if (!channelType)
-    return "";
-
-  // Convert the channel type to a string
-  std::stringstream ss;
-  ss << channelType.getDataBitWidth();
-  for (const handshake::ExtraSignal &extra : channelType.getExtraSignals()) {
-    ss << "-" << extra.name.str() << "-" << extra.getBitWidth()
-       << (extra.downstream ? "-D" : "-U");
+  if (auto ty = dyn_cast<handshake::ChannelType>(typeAttr.getValue())) {
+    std::stringstream ss;
+    ss << ty.getDataBitWidth();
+    for (const handshake::ExtraSignal &extra : ty.getExtraSignals()) {
+      ss << "-" << extra.name.str() << "-" << extra.getBitWidth()
+         << (extra.downstream ? "-D" : "-U");
+    }
+    return ss.str();
   }
-  return ss.str();
+  if (isa<handshake::ControlType>(typeAttr.getValue()))
+    return "0";
+  return "";
 }
 
 //===----------------------------------------------------------------------===//

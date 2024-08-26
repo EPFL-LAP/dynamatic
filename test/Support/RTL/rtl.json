@@ -29,20 +29,20 @@
     "generic": "/path/to/test_string"
   },
   {
-    "name": "test_channel",
+    "name": "test_dataflow",
     "parameters": [
-      { "name": "PARAM_1", "type": "channel" },
+      { "name": "PARAM_1", "type": "dataflow" },
       {
         "name": "PARAM_2",
-        "type": "channel",
+        "type": "dataflow",
         "data-ne": 4,
         "data-range": [0, 10]
       },
-      { "name": "PARAM_3", "type": "channel", "extra-eq": 0 },
-      { "name": "PARAM_4", "type": "channel", "down-lb": 1 },
-      { "name": "PARAM_5", "type": "channel", "up-ub": 1 }
+      { "name": "PARAM_3", "type": "dataflow", "extra-eq": 0 },
+      { "name": "PARAM_4", "type": "dataflow", "down-lb": 1 },
+      { "name": "PARAM_5", "type": "dataflow", "up-ub": 1 }
     ],
-    "generic": "/path/to/test_channel"
+    "generic": "/path/to/test_dataflow"
   },
   {
     "name": "test_timing",
