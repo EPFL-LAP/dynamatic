@@ -1,5 +1,4 @@
-//===- ControlDependenceAnalysis.h - Control dependence analyis utilities
-//----------*- C++ -*-===//
+//===- ControlDependenceAnalysis.h - Control dependence analyis *--- C++-*-===//
 //
 // Dynamatic is under the Apache License v2.0 with LLVM Exceptions.
 // See https://llvm.org/LICENSE.txt for license information.
@@ -25,18 +24,16 @@ using namespace mlir;
 using namespace mlir::func;
 using namespace dynamatic;
 
-#define DEBUG_TYPE "cdg-analysis"
-
-using PathInDomTree = SmallVector<DominanceInfoNode *, 4>;
+using PathInDomTree = SmallVector<DominanceInfoNode *, 6>;
 
 void ControlDependenceAnalysis::identifyAllControlDeps(FuncOp &funcOp) {
   Region &funcReg = funcOp.getRegion();
-  DenseMap<Block *, llvm::SmallVector<Block *, 4>> control_deps_map;
+  DenseMap<Block *, llvm::SmallVector<Block *, 6>> control_deps_map;
 
   // Initialize the all_control_deps_maps by creating an entry for every block
   // constituting the region
   for (Block &block : funcReg.getBlocks()) {
-    SmallVector<Block *, 4> deps;
+    SmallVector<Block *, 6> deps;
     control_deps_map.insert(std::make_pair(&block, deps));
   }
 
@@ -58,9 +55,10 @@ void ControlDependenceAnalysis::identifyAllControlDeps(FuncOp &funcOp) {
         Block *least_common_anc =
             postDomInfo.findNearestCommonDominator(block_succ, &block);
 
-        if (least_common_anc == &block)
+        if (least_common_anc == &block) {
           // Loop case
           control_deps_map[&block].push_back(&block);
+        }
 
         // All nodes in the post-dominator tree on the path from the
         // "least_common_anc" to "block_succ" (including "block_succ") should
@@ -68,12 +66,12 @@ void ControlDependenceAnalysis::identifyAllControlDeps(FuncOp &funcOp) {
         // Easy case of block_succ
         control_deps_map[block_succ].push_back(&block);
         // Enumerate all paths between "least_common_anc" and "block_succ"
-        SmallVector<PathInDomTree, 4> allPathsFromLeastCommonAncToBlockSucc;
+        SmallVector<PathInDomTree, 6> allPathsFromLeastCommonAncToBlockSucc;
         enumeratePathsInPostDomTree(least_common_anc, block_succ, &funcReg,
                                     &postDomTree,
                                     &allPathsFromLeastCommonAncToBlockSucc);
 
-        for (PathInDomTree path : allPathsFromLeastCommonAncToBlockSucc)
+        for (PathInDomTree path : allPathsFromLeastCommonAncToBlockSucc) {
           for (DominanceInfoNode *domInfo : path) {
             Block *blockInPath = domInfo->getBlock();
 
@@ -89,6 +87,7 @@ void ControlDependenceAnalysis::identifyAllControlDeps(FuncOp &funcOp) {
                           &block) == control_deps_map[blockInPath].end())
               control_deps_map[blockInPath].push_back(&block);
           }
+        }
       }
     }
   }
@@ -106,7 +105,7 @@ void ControlDependenceAnalysis::identifyAllControlDeps(FuncOp &funcOp) {
 void ControlDependenceAnalysis::enumeratePathsInPostDomTree(
     Block *start_block, Block *end_block, Region *funcReg,
     llvm::DominatorTreeBase<Block, true> *postDomTree,
-    SmallVector<PathInDomTree, 4> *traversed_nodes) {
+    SmallVector<PathInDomTree, 6> *traversed_nodes) {
 
   DominanceInfoNode *start_node = postDomTree->getNode(start_block);
   DominanceInfoNode *end_node = postDomTree->getNode(end_block);
@@ -117,7 +116,7 @@ void ControlDependenceAnalysis::enumeratePathsInPostDomTree(
 
   PathInDomTree path;
   path.resize(funcReg->getBlocks().size());
-  int path_index = 0;
+  unsigned path_index = 0;
 
   enumeratePathsInPostDomTreeUtil(start_node, end_node, is_visited, path,
                                   path_index, traversed_nodes);
@@ -128,7 +127,7 @@ void ControlDependenceAnalysis::enumeratePathsInPostDomTree(
 void ControlDependenceAnalysis::enumeratePathsInPostDomTreeUtil(
     DominanceInfoNode *start_node, DominanceInfoNode *end_node,
     DenseMap<DominanceInfoNode *, bool> is_visited, PathInDomTree path,
-    int path_index, SmallVector<PathInDomTree, 4> *traversed_nodes) {
+    int path_index, SmallVector<PathInDomTree, 6> *traversed_nodes) {
   is_visited[start_node] = true;
   path[path_index] = start_node;
   path_index++;
@@ -159,15 +158,14 @@ void ControlDependenceAnalysis::enumeratePathsInPostDomTreeUtil(
 }
 
 void ControlDependenceAnalysis::addDepsOfDeps(
-    FuncOp &funcOp,
-    DenseMap<Block *, SmallVector<Block *, 4>> &control_deps_map) {
+    FuncOp &funcOp, DenseMap<Block *, SmallVector<Block *>> &control_deps_map) {
   Region &funcReg = funcOp.getRegion();
 
   for (Block &block : funcReg.getBlocks()) {
-    SmallVector<Block *, 4> block_deps = control_deps_map[&block];
+    SmallVector<Block *, 6> block_deps = control_deps_map[&block];
     // loop on the dependencies of one block
     for (auto &one_dep : block_deps) {
-      SmallVector<Block *, 4> one_dep_deps = control_deps_map[one_dep];
+      SmallVector<Block *, 6> one_dep_deps = control_deps_map[one_dep];
       // loop on the dependencies of one_dep
       for (auto &one_dep_dep : one_dep_deps) {
         // add this dep if it is not already present
@@ -186,12 +184,15 @@ void ControlDependenceAnalysis::identifyForwardControlDeps(FuncOp &funcOp) {
   // Get loop information to eliminate loop exits from the dependencies
   CFGLoopInfo li(domTree);
 
-  DenseMap<Block *, SmallVector<Block *, 4>> control_deps_map;
+  // Get information about post-dominance
+  PostDominanceInfo postDomInfo;
+
+  DenseMap<Block *, SmallVector<Block *, 6>> control_deps_map;
 
   // Initialize the control_deps_maps by creating an entry for every block
   // constituting the region
   for (Block &block : funcReg.getBlocks()) {
-    SmallVector<Block *, 4> deps;
+    SmallVector<Block *, 6> deps;
     control_deps_map.insert(std::make_pair(&block, deps));
   }
 
@@ -202,12 +203,12 @@ void ControlDependenceAnalysis::identifyForwardControlDeps(FuncOp &funcOp) {
     // because we only call this function at the end of
     // identifyAllControlDeps() right after it adds a new entry to
     // all_control_deps_maps
-    SmallVector<Block *, 4> block_deps =
+    SmallVector<Block *, 6> block_deps =
         all_control_deps_maps[all_control_deps_maps.size() - 1][&block];
 
-    for (auto &one_dep : block_deps) {
+    for (Block *one_dep : block_deps) {
       CFGLoop *loop = li.getLoopFor(one_dep);
-      if (loop == nullptr) {
+      if (loop) {
         // indicating that the one_dep is not inside any loop, so it must be a
         // forward dependency
         control_deps_map[&block].push_back(one_dep);
@@ -219,11 +220,13 @@ void ControlDependenceAnalysis::identifyForwardControlDeps(FuncOp &funcOp) {
         // check if one_dep is an exit of the loop
         SmallVector<Block *> loop_exitBlocks;
         loop->getExitingBlocks(loop_exitBlocks);
-        for (auto &loop_exit : loop_exitBlocks) {
-          if (loop_exit == one_dep) {
+        for (Block *loop_exit : loop_exitBlocks) {
+          if (loop_exit == one_dep &&
+              !postDomInfo.properlyPostDominates(loop_exit, &block)) {
             not_forward = true;
-            break; // it is not a forward dependency so no need to contiue
-                   // looping
+            // it is not a forward dependency so no need to contiue
+            // looping
+            break;
           }
         }
         // check if one_dep is a latch of the loop
@@ -237,9 +240,8 @@ void ControlDependenceAnalysis::identifyForwardControlDeps(FuncOp &funcOp) {
           }
         }
 
-        if (!not_forward) {
+        if (!not_forward)
           control_deps_map[&block].push_back(one_dep);
-        }
       }
     }
   }
@@ -248,51 +250,12 @@ void ControlDependenceAnalysis::identifyForwardControlDeps(FuncOp &funcOp) {
 }
 
 void ControlDependenceAnalysis::calculateBlockControlDeps(
-    Block *block, int funcOp_idx,
-    SmallVector<Block *, 4> &returned_control_deps) {
+    Block *block, int funcOp_idx, SmallVector<Block *> &returned_control_deps) {
   returned_control_deps = all_control_deps_maps[funcOp_idx][block];
 }
 
 void ControlDependenceAnalysis::calculateBlockForwardControlDeps(
     Block *block, int funcOp_idx,
-    SmallVector<Block *, 4> &returned_forward_control_deps) {
+    SmallVector<Block *> &returned_forward_control_deps) {
   returned_forward_control_deps = forward_control_deps_maps[funcOp_idx][block];
-}
-
-void ControlDependenceAnalysis::printAllBlocksDeps(int funcOp_idx) {
-  LLVM_DEBUG(llvm::dbgs() << "\n*********************************\n\n";);
-  for (auto &elem : all_control_deps_maps[funcOp_idx]) {
-    Block *block = elem.first;
-    LLVM_DEBUG(block->printAsOperand(llvm::dbgs()););
-    LLVM_DEBUG(llvm::dbgs() << " is control dependent on: ";);
-
-    SmallVector<Block *, 4> block_deps = elem.second;
-
-    for (auto &one_dep : block_deps) {
-      LLVM_DEBUG(one_dep->printAsOperand(llvm::dbgs()););
-      LLVM_DEBUG(llvm::dbgs() << ", ";);
-    }
-
-    LLVM_DEBUG(llvm::dbgs() << "\n";);
-  }
-  LLVM_DEBUG(llvm::dbgs() << "\n*********************************\n";);
-}
-
-void ControlDependenceAnalysis::printForwardBlocksDeps(int funcOp_idx) {
-  LLVM_DEBUG(llvm::dbgs() << "\n*********************************\n\n";);
-  for (auto &elem : forward_control_deps_maps[funcOp_idx]) {
-    Block *block = elem.first;
-    LLVM_DEBUG(block->printAsOperand(llvm::dbgs()););
-    LLVM_DEBUG(llvm::dbgs() << " is control dependent on: ";);
-
-    llvm::SmallVector<Block *, 4> block_deps = elem.second;
-
-    for (auto &one_dep : block_deps) {
-      LLVM_DEBUG(one_dep->printAsOperand(llvm::dbgs()););
-      LLVM_DEBUG(llvm::dbgs() << ", ";);
-    }
-
-    LLVM_DEBUG(llvm::dbgs() << "\n";);
-  }
-  LLVM_DEBUG(llvm::dbgs() << "\n*********************************\n";);
 }
