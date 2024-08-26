@@ -11,4 +11,5 @@ target_link_libraries(handshake-simulator PRIVATE
   DynamaticSupport
   DynamaticHandshake
   DynamaticHW
+  DynamaticExperimentalSupport
 )
