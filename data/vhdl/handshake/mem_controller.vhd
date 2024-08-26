@@ -8,8 +8,8 @@ entity mem_controller is
     NUM_CONTROLS : integer;
     NUM_LOADS    : integer;
     NUM_STORES   : integer;
-    DATA_WIDTH   : integer;
-    ADDR_WIDTH   : integer
+    DATA_TYPE   : integer;
+    ADDR_TYPE   : integer
   );
   port (
     clk, rst : in std_logic;
@@ -27,34 +27,34 @@ entity mem_controller is
     ctrl_valid : in  std_logic_vector(NUM_CONTROLS - 1 downto 0);
     ctrl_ready : out std_logic_vector(NUM_CONTROLS - 1 downto 0);
     -- load address input channels
-    ldAddr       : in  data_array (NUM_LOADS - 1 downto 0)(ADDR_WIDTH - 1 downto 0);
+    ldAddr       : in  data_array (NUM_LOADS - 1 downto 0)(ADDR_TYPE - 1 downto 0);
     ldAddr_valid : in  std_logic_vector(NUM_LOADS - 1 downto 0);
     ldAddr_ready : out std_logic_vector(NUM_LOADS - 1 downto 0);
     -- load data output channels
-    ldData       : out data_array (NUM_LOADS - 1 downto 0)(DATA_WIDTH - 1 downto 0);
+    ldData       : out data_array (NUM_LOADS - 1 downto 0)(DATA_TYPE - 1 downto 0);
     ldData_valid : out std_logic_vector(NUM_LOADS - 1 downto 0);
     ldData_ready : in  std_logic_vector(NUM_LOADS - 1 downto 0);
     -- store address input channels
-    stAddr       : in  data_array (NUM_STORES - 1 downto 0)(ADDR_WIDTH - 1 downto 0);
+    stAddr       : in  data_array (NUM_STORES - 1 downto 0)(ADDR_TYPE - 1 downto 0);
     stAddr_valid : in  std_logic_vector(NUM_STORES - 1 downto 0);
     stAddr_ready : out std_logic_vector(NUM_STORES - 1 downto 0);
     -- store data input channels
-    stData       : in  data_array (NUM_STORES - 1 downto 0)(DATA_WIDTH - 1 downto 0);
+    stData       : in  data_array (NUM_STORES - 1 downto 0)(DATA_TYPE - 1 downto 0);
     stData_valid : in  std_logic_vector(NUM_STORES - 1 downto 0);
     stData_ready : out std_logic_vector(NUM_STORES - 1 downto 0);
     -- interface to dual-port BRAM
-    loadData  : in  std_logic_vector(DATA_WIDTH - 1 downto 0);
+    loadData  : in  std_logic_vector(DATA_TYPE - 1 downto 0);
     loadEn    : out std_logic;
-    loadAddr  : out std_logic_vector(ADDR_WIDTH - 1 downto 0);
+    loadAddr  : out std_logic_vector(ADDR_TYPE - 1 downto 0);
     storeEn   : out std_logic;
-    storeAddr : out std_logic_vector(ADDR_WIDTH - 1 downto 0);
-    storeData : out std_logic_vector(DATA_WIDTH - 1 downto 0)
+    storeAddr : out std_logic_vector(ADDR_TYPE - 1 downto 0);
+    storeData : out std_logic_vector(DATA_TYPE - 1 downto 0)
   );
 end entity;
 
 architecture arch of mem_controller is
-  signal dropLoadAddr : std_logic_vector(ADDR_WIDTH - 1 downto 0);
-  signal dropLoadData : std_logic_vector(DATA_WIDTH - 1 downto 0);
+  signal dropLoadAddr : std_logic_vector(ADDR_TYPE - 1 downto 0);
+  signal dropLoadData : std_logic_vector(DATA_TYPE - 1 downto 0);
   signal dropLoadEn   : std_logic;
 begin
 
@@ -62,8 +62,8 @@ begin
     generic map(
       NUM_CONTROLS => NUM_CONTROLS,
       NUM_STORES   => NUM_STORES,
-      DATA_WIDTH   => DATA_WIDTH,
-      ADDR_WIDTH   => ADDR_WIDTH)
+      DATA_TYPE   => DATA_TYPE,
+      ADDR_TYPE   => ADDR_TYPE)
     port map(
       clk            => clk,
       rst            => rst,
@@ -93,8 +93,8 @@ begin
   read_arbiter : entity work.read_memory_arbiter
     generic map(
       ARBITER_SIZE => NUM_LOADS,
-      ADDR_WIDTH   => ADDR_WIDTH,
-      DATA_WIDTH   => DATA_WIDTH
+      ADDR_TYPE   => ADDR_TYPE,
+      DATA_TYPE   => DATA_TYPE
     )
     port map(
       rst              => rst,

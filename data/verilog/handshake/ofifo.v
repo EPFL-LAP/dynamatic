@@ -1,23 +1,23 @@
 `timescale 1ns/1ps
 module ofifo #(
   parameter NUM_SLOTS = 2,
-  parameter DATA_WIDTH = 32
+  parameter DATA_TYPE = 32
 ) (
   input  clk,
   input  rst,
-  input  [DATA_WIDTH - 1 : 0] ins,
+  input  [DATA_TYPE - 1 : 0] ins,
   input  ins_valid,
   input  outs_ready,
-  output [DATA_WIDTH - 1 : 0] outs,
+  output [DATA_TYPE - 1 : 0] outs,
   output outs_valid,
   output ins_ready
 );
-  wire [DATA_WIDTH - 1 : 0] tehb_dataOut, fifo_dataOut;
+  wire [DATA_TYPE - 1 : 0] tehb_dataOut, fifo_dataOut;
   wire tehb_valid, tehb_ready;
   wire fifo_valid, fifo_ready;
   
   tehb #(
-    .DATA_WIDTH(DATA_WIDTH)
+    .DATA_TYPE(DATA_TYPE)
   ) tehb_module (
     .clk        (clk         ),
     .rst        (rst         ),
@@ -31,7 +31,7 @@ module ofifo #(
 
   elastic_fifo_inner #(
     .NUM_SLOTS  (NUM_SLOTS ),
-    .DATA_WIDTH (DATA_WIDTH)
+    .DATA_TYPE (DATA_TYPE)
   ) fifo (
     .clk        (clk         ),
     .rst        (rst         ),

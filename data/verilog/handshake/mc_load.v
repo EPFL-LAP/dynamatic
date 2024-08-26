@@ -1,29 +1,29 @@
 `timescale 1ns/1ps
 module mc_load #(
-  parameter DATA_WIDTH = 32,
-  parameter ADDR_WIDTH = 32
+  parameter DATA_TYPE = 32,
+  parameter ADDR_TYPE = 32
 )(
   input clk,
   input rst,
   // Address from Circuit Channel
-  input  [ADDR_WIDTH - 1 : 0] addrIn,
+  input  [ADDR_TYPE - 1 : 0] addrIn,
   input  addrIn_valid,
   output addrIn_ready,
   // Address to Interface Channel
-  output [ADDR_WIDTH - 1 : 0] addrOut,
+  output [ADDR_TYPE - 1 : 0] addrOut,
   output addrOut_valid,
   input  addrOut_ready,
   // Data from Interface Channel
-  input  [DATA_WIDTH - 1 : 0] dataFromMem,
+  input  [DATA_TYPE - 1 : 0] dataFromMem,
   input  dataFromMem_valid,
   output dataFromMem_ready,
   // Data from Memory Channel
-  output [DATA_WIDTH - 1 : 0] dataOut,
+  output [DATA_TYPE - 1 : 0] dataOut,
   output dataOut_valid,
   input  dataOut_ready
 );
   tehb #(
-    .DATA_WIDTH(ADDR_WIDTH)
+    .DATA_TYPE(ADDR_TYPE)
   ) addr_tehb (
     .clk        (clk            ),
     .rst        (rst            ),
@@ -36,7 +36,7 @@ module mc_load #(
   );
 
   tehb #(
-    .DATA_WIDTH(DATA_WIDTH)
+    .DATA_TYPE(DATA_TYPE)
   ) data_tehb (
     .clk        (clk                ),
     .rst        (rst                ),

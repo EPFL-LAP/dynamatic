@@ -1,21 +1,21 @@
 `timescale 1ns/1ps
 module tfifo #(
   parameter NUM_SLOTS = 2,
-  parameter DATA_WIDTH = 32
+  parameter DATA_TYPE = 32
 )(
   input  clk,
   input  rst,
-  input  [DATA_WIDTH - 1 : 0] ins,
+  input  [DATA_TYPE - 1 : 0] ins,
   input  ins_valid,
   input  outs_ready,
-  output [DATA_WIDTH - 1 : 0] outs,
+  output [DATA_TYPE - 1 : 0] outs,
   output outs_valid,
   output ins_ready
 );
   wire mux_sel;
   wire fifo_valid, fifo_ready;
   wire fifo_pvalid, fifo_nready;
-  wire [DATA_WIDTH - 1 : 0] fifo_in, fifo_out;
+  wire [DATA_TYPE - 1 : 0] fifo_in, fifo_out;
 
   // Dataout assignment
   assign outs = mux_sel ? fifo_out : ins;
@@ -30,7 +30,7 @@ module tfifo #(
 
   elastic_fifo_inner #(
     .NUM_SLOTS  (NUM_SLOTS ), 
-    .DATA_WIDTH (DATA_WIDTH)
+    .DATA_TYPE (DATA_TYPE)
   ) fifo (
     .clk        (clk        ),
     .rst        (rst        ),

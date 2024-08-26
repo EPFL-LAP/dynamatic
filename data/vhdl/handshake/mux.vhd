@@ -7,32 +7,32 @@ use work.types.all;
 entity mux is
   generic (
     SIZE         : integer;
-    DATA_WIDTH   : integer;
-    SELECT_WIDTH : integer
+    DATA_TYPE   : integer;
+    SELECT_TYPE : integer
   );
   port (
     clk, rst : in std_logic;
     -- data input channels
-    ins       : in  data_array(SIZE - 1 downto 0)(DATA_WIDTH - 1 downto 0);
+    ins       : in  data_array(SIZE - 1 downto 0)(DATA_TYPE - 1 downto 0);
     ins_valid : in  std_logic_vector(SIZE - 1 downto 0);
     ins_ready : out std_logic_vector(SIZE - 1 downto 0);
     -- index input channel
-    index       : in  std_logic_vector(SELECT_WIDTH - 1 downto 0);
+    index       : in  std_logic_vector(SELECT_TYPE - 1 downto 0);
     index_valid : in  std_logic;
     index_ready : out std_logic;
     -- output channel
-    outs       : out std_logic_vector(DATA_WIDTH - 1 downto 0);
+    outs       : out std_logic_vector(DATA_TYPE - 1 downto 0);
     outs_valid : out std_logic;
     outs_ready : in  std_logic
   );
 end entity;
 
 architecture arch of mux is
-  signal tehb_ins                       : std_logic_vector(DATA_WIDTH - 1 downto 0);
+  signal tehb_ins                       : std_logic_vector(DATA_TYPE - 1 downto 0);
   signal tehb_ins_valid, tehb_ins_ready : std_logic;
 begin
   process (ins, ins_valid, outs_ready, index, index_valid, tehb_ins_ready)
-    variable selectedData                   : std_logic_vector(DATA_WIDTH - 1 downto 0);
+    variable selectedData                   : std_logic_vector(DATA_TYPE - 1 downto 0);
     variable selectedData_valid, indexEqual : std_logic;
   begin
     selectedData       := ins(0);
@@ -58,7 +58,7 @@ begin
 
   tehb : entity work.tehb(arch)
     generic map(
-      DATA_WIDTH => DATA_WIDTH
+      DATA_TYPE => DATA_TYPE
     )
     port map(
       clk => clk,

@@ -4,19 +4,19 @@ use ieee.numeric_std.all;
 
 entity shli is
   generic (
-    DATA_WIDTH : integer
+    DATA_TYPE : integer
   );
   port (
     -- inputs
     clk          : in std_logic;
     rst          : in std_logic;
-    lhs          : in std_logic_vector(DATA_WIDTH - 1 downto 0);
+    lhs          : in std_logic_vector(DATA_TYPE - 1 downto 0);
     lhs_valid    : in std_logic;
-    rhs          : in std_logic_vector(DATA_WIDTH - 1 downto 0);
+    rhs          : in std_logic_vector(DATA_TYPE - 1 downto 0);
     rhs_valid    : in std_logic;
     result_ready : in std_logic;
     -- outputs
-    result       : out std_logic_vector(DATA_WIDTH - 1 downto 0);
+    result       : out std_logic_vector(DATA_TYPE - 1 downto 0);
     result_valid : out std_logic;
     lhs_ready    : out std_logic;
     rhs_ready    : out std_logic
@@ -37,5 +37,5 @@ begin
       ins_ready(1) => rhs_ready
     );
 
-  result <= std_logic_vector(shift_left(unsigned(lhs), to_integer(unsigned('0' & rhs(DATA_WIDTH - 2 downto 0)))));
+  result <= std_logic_vector(shift_left(unsigned(lhs), to_integer(unsigned('0' & rhs(DATA_TYPE - 2 downto 0)))));
 end architecture;

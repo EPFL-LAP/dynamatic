@@ -7,12 +7,12 @@ use work.types.all;
 entity read_address_mux is
   generic (
     ARBITER_SIZE : natural;
-    ADDR_WIDTH   : natural
+    ADDR_TYPE   : natural
   );
   port (
     sel      : in  std_logic_vector(ARBITER_SIZE - 1 downto 0);
-    addr_in  : in  data_array(ARBITER_SIZE - 1 downto 0)(ADDR_WIDTH - 1 downto 0);
-    addr_out : out std_logic_vector(ADDR_WIDTH - 1 downto 0)
+    addr_in  : in  data_array(ARBITER_SIZE - 1 downto 0)(ADDR_TYPE - 1 downto 0);
+    addr_out : out std_logic_vector(ADDR_TYPE - 1 downto 0)
   );
 end entity;
 
@@ -20,7 +20,7 @@ architecture arch of read_address_mux is
 
 begin
   process (sel, addr_in)
-    variable addr_out_var : std_logic_vector(ADDR_WIDTH - 1 downto 0);
+    variable addr_out_var : std_logic_vector(ADDR_TYPE - 1 downto 0);
   begin
     addr_out_var := (others => '0');
     for I in 0 to ARBITER_SIZE - 1 loop
@@ -62,14 +62,14 @@ use work.types.all;
 entity read_data_signals is
   generic (
     ARBITER_SIZE : natural;
-    DATA_WIDTH   : natural
+    DATA_TYPE   : natural
   );
   port (
     rst       : in  std_logic;
     clk       : in  std_logic;
     sel       : in  std_logic_vector(ARBITER_SIZE - 1 downto 0);
-    read_data : in  std_logic_vector(DATA_WIDTH - 1 downto 0);
-    out_data  : out data_array(ARBITER_SIZE - 1 downto 0)(DATA_WIDTH - 1 downto 0);
+    read_data : in  std_logic_vector(DATA_TYPE - 1 downto 0);
+    out_data  : out data_array(ARBITER_SIZE - 1 downto 0)(DATA_TYPE - 1 downto 0);
     valid     : out std_logic_vector(ARBITER_SIZE - 1 downto 0);
     nReady    : in  std_logic_vector(ARBITER_SIZE - 1 downto 0)
   );
@@ -77,7 +77,7 @@ end entity;
 
 architecture arch of read_data_signals is
   signal sel_prev : std_logic_vector(ARBITER_SIZE - 1 downto 0);
-  signal out_reg  : data_array(ARBITER_SIZE - 1 downto 0)(DATA_WIDTH - 1 downto 0);
+  signal out_reg  : data_array(ARBITER_SIZE - 1 downto 0)(DATA_TYPE - 1 downto 0);
 begin
 
   process (clk, rst) is
@@ -166,8 +166,8 @@ use work.types.all;
 entity read_memory_arbiter is
   generic (
     ARBITER_SIZE : natural := 2;
-    ADDR_WIDTH   : natural := 32;
-    DATA_WIDTH   : natural := 32
+    ADDR_TYPE   : natural := 32;
+    DATA_TYPE   : natural := 32
   );
   port (
     rst : in std_logic;
@@ -175,16 +175,16 @@ entity read_memory_arbiter is
     --- interface to previous
     pValid     : in  std_logic_vector(ARBITER_SIZE - 1 downto 0); -- read requests
     ready      : out std_logic_vector(ARBITER_SIZE - 1 downto 0); -- ready to process read
-    address_in : in  data_array(ARBITER_SIZE - 1 downto 0)(ADDR_WIDTH - 1 downto 0);
+    address_in : in  data_array(ARBITER_SIZE - 1 downto 0)(ADDR_TYPE - 1 downto 0);
     ---interface to next
     nReady   : in  std_logic_vector(ARBITER_SIZE - 1 downto 0); -- next component can accept data
     valid    : out std_logic_vector(ARBITER_SIZE - 1 downto 0); -- sending data to next component
-    data_out : out data_array(ARBITER_SIZE - 1 downto 0)(DATA_WIDTH - 1 downto 0); -- data to next components
+    data_out : out data_array(ARBITER_SIZE - 1 downto 0)(DATA_TYPE - 1 downto 0); -- data to next components
 
     ---interface to memory
     read_enable      : out std_logic;
-    read_address     : out std_logic_vector(ADDR_WIDTH - 1 downto 0);
-    data_from_memory : in  std_logic_vector(DATA_WIDTH - 1 downto 0));
+    read_address     : out std_logic_vector(ADDR_TYPE - 1 downto 0);
+    data_from_memory : in  std_logic_vector(DATA_TYPE - 1 downto 0));
 
 end entity;
 
@@ -206,7 +206,7 @@ begin
   addressing : entity work.read_address_mux
     generic map(
       ARBITER_SIZE => ARBITER_SIZE,
-      ADDR_WIDTH   => ADDR_WIDTH
+      ADDR_TYPE   => ADDR_TYPE
     )
     port map(
       sel      => priorityOut,
@@ -227,7 +227,7 @@ begin
   data : entity work.read_data_signals
     generic map(
       ARBITER_SIZE => ARBITER_SIZE,
-      DATA_WIDTH   => DATA_WIDTH
+      DATA_TYPE   => DATA_TYPE
     )
     port map(
       rst       => rst,
@@ -259,12 +259,12 @@ use work.types.all;
 entity write_address_mux is
   generic (
     ARBITER_SIZE : natural;
-    ADDR_WIDTH   : natural
+    ADDR_TYPE   : natural
   );
   port (
     sel      : in  std_logic_vector(ARBITER_SIZE - 1 downto 0);
-    addr_in  : in  data_array(ARBITER_SIZE - 1 downto 0)(ADDR_WIDTH - 1 downto 0);
-    addr_out : out std_logic_vector(ADDR_WIDTH - 1 downto 0)
+    addr_in  : in  data_array(ARBITER_SIZE - 1 downto 0)(ADDR_TYPE - 1 downto 0);
+    addr_out : out std_logic_vector(ADDR_TYPE - 1 downto 0)
   );
 end entity;
 
@@ -272,7 +272,7 @@ architecture arch of write_address_mux is
 
 begin
   process (sel, addr_in)
-    variable addr_out_var : std_logic_vector(ADDR_WIDTH - 1 downto 0);
+    variable addr_out_var : std_logic_vector(ADDR_TYPE - 1 downto 0);
   begin
     addr_out_var := (others => '0');
     for I in 0 to ARBITER_SIZE - 1 loop
@@ -318,14 +318,14 @@ use work.types.all;
 entity write_data_signals is
   generic (
     ARBITER_SIZE : natural;
-    DATA_WIDTH   : natural
+    DATA_TYPE   : natural
   );
   port (
     rst        : in  std_logic;
     clk        : in  std_logic;
     sel        : in  std_logic_vector(ARBITER_SIZE - 1 downto 0);
-    write_data : out std_logic_vector(DATA_WIDTH - 1 downto 0);
-    in_data    : in  data_array(ARBITER_SIZE - 1 downto 0)(DATA_WIDTH - 1 downto 0);
+    write_data : out std_logic_vector(DATA_TYPE - 1 downto 0);
+    in_data    : in  data_array(ARBITER_SIZE - 1 downto 0)(DATA_TYPE - 1 downto 0);
     valid      : out std_logic_vector(ARBITER_SIZE - 1 downto 0)
   );
 
@@ -336,7 +336,7 @@ architecture arch of write_data_signals is
 begin
 
   process (sel, in_data)
-    variable data_out_var : std_logic_vector(DATA_WIDTH - 1 downto 0);
+    variable data_out_var : std_logic_vector(DATA_TYPE - 1 downto 0);
   begin
     data_out_var := (others => '0');
 
@@ -405,8 +405,8 @@ use work.types.all;
 entity write_memory_arbiter is
   generic (
     ARBITER_SIZE : natural := 2;
-    ADDR_WIDTH   : natural := 32;
-    DATA_WIDTH   : natural := 32
+    ADDR_TYPE   : natural := 32;
+    DATA_TYPE   : natural := 32
   );
   port (
     rst : in std_logic;
@@ -414,8 +414,8 @@ entity write_memory_arbiter is
     --- interface to previous
     pValid     : in  std_logic_vector(ARBITER_SIZE - 1 downto 0); --write requests
     ready      : out std_logic_vector(ARBITER_SIZE - 1 downto 0); -- ready
-    address_in : in  data_array(ARBITER_SIZE - 1 downto 0)(ADDR_WIDTH - 1 downto 0);
-    data_in    : in  data_array(ARBITER_SIZE - 1 downto 0)(DATA_WIDTH - 1 downto 0); -- data from previous that want to write
+    address_in : in  data_array(ARBITER_SIZE - 1 downto 0)(ADDR_TYPE - 1 downto 0);
+    data_in    : in  data_array(ARBITER_SIZE - 1 downto 0)(DATA_TYPE - 1 downto 0); -- data from previous that want to write
 
     ---interface to next
     nReady : in  std_logic_vector(ARBITER_SIZE - 1 downto 0); -- next component can continue after write
@@ -424,8 +424,8 @@ entity write_memory_arbiter is
     ---interface to memory
     write_enable   : out std_logic;
     enable         : out std_logic;
-    write_address  : out std_logic_vector(ADDR_WIDTH - 1 downto 0);
-    data_to_memory : out std_logic_vector(DATA_WIDTH - 1 downto 0)
+    write_address  : out std_logic_vector(ADDR_TYPE - 1 downto 0);
+    data_to_memory : out std_logic_vector(DATA_TYPE - 1 downto 0)
   );
 
 end entity;
@@ -448,7 +448,7 @@ begin
   addressing : entity work.write_address_mux
     generic map(
       ARBITER_SIZE => ARBITER_SIZE,
-      ADDR_WIDTH   => ADDR_WIDTH
+      ADDR_TYPE   => ADDR_TYPE
     )
     port map(
       sel      => priorityOut,
@@ -468,7 +468,7 @@ begin
   data : entity work.write_data_signals
     generic map(
       ARBITER_SIZE => ARBITER_SIZE,
-      DATA_WIDTH   => DATA_WIDTH
+      DATA_TYPE   => DATA_TYPE
     )
     port map(
       rst        => rst,

@@ -1,17 +1,17 @@
 `timescale 1ns/1ps
 module divsi #(
-  parameter DATA_WIDTH = 32
+  parameter DATA_TYPE = 32
 )(
   // inputs
   input  clk,
   input  rst,
-  input  [DATA_WIDTH - 1 : 0] lhs,
+  input  [DATA_TYPE - 1 : 0] lhs,
   input  lhs_valid,
-  input  [DATA_WIDTH - 1 : 0] rhs,
+  input  [DATA_TYPE - 1 : 0] rhs,
   input  rhs_valid,
   input  result_ready,
   // outputs
-  output [DATA_WIDTH - 1 : 0] result,
+  output [DATA_TYPE - 1 : 0] result,
   output result_valid,
   output lhs_ready,
   output rhs_ready
@@ -32,9 +32,9 @@ module divsi #(
   array_RAM_sdiv_32ns_32ns_32_36_1 #(
     .ID(1),
     .NUM_STAGE(36),
-    .din0_WIDTH(32),
-    .din1_WIDTH(32),
-    .dout_WIDTH(32)
+    .din0_TYPE(32),
+    .din1_TYPE(32),
+    .dout_TYPE(32)
   ) array_RAM_sdiv_32ns_32ns_32_36_1_U1 (
     .clk(clk),
     .reset(rst),

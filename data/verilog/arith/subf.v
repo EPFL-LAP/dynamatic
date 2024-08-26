@@ -1,36 +1,36 @@
 `timescale 1ns/1ps
 module subf #(
-  parameter DATA_WIDTH = 32
+  parameter DATA_TYPE = 32
 )(
   // inputs
   input  clk,
   input  rst,
-  input  [DATA_WIDTH - 1 : 0] lhs,
+  input  [DATA_TYPE - 1 : 0] lhs,
   input  lhs_valid,
-  input  [DATA_WIDTH - 1 : 0] rhs,
+  input  [DATA_TYPE - 1 : 0] rhs,
   input  rhs_valid,
   input  result_ready,
   // outputs
-  output [DATA_WIDTH - 1 : 0] result,
+  output [DATA_TYPE - 1 : 0] result,
   output result_valid,
   output lhs_ready,
   output rhs_ready
 );
 
-  //assert(DATA_WIDTH == 32) else $fatal("subf currently only supports 32-bit operands");
+  //assert(DATA_TYPE == 32) else $fatal("subf currently only supports 32-bit operands");
 
   wire join_valid, oehb_ready, buff_valid;
   wire constant_zero = 1'b0;
   wire open_value;
 
   // subf is the same as addf, but we flip the sign bit of rhs
-  wire [DATA_WIDTH - 1 : 0] rhs_neg;
+  wire [DATA_TYPE - 1 : 0] rhs_neg;
 
   // intermediate input signals for IEEE-754 to Flopoco-simple-float conversion
-  wire [ DATA_WIDTH + 1 :0] ip_lhs, ip_rhs;
+  wire [ DATA_TYPE + 1 :0] ip_lhs, ip_rhs;
 
   // intermediate output signal for Flopoco-simple-float to IEEE-754 conversion
-  wire [ DATA_WIDTH + 1 :0] ip_result;
+  wire [ DATA_TYPE + 1 :0] ip_result;
 
   // Instantiate the join node
   join_type #(
@@ -53,7 +53,7 @@ module subf #(
   );
 
   oehb #(
-    .DATA_WIDTH(1)
+    .DATA_TYPE(1)
   ) oehb_lhs (
     .clk(clk),
     .rst(rst),

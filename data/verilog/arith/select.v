@@ -40,20 +40,20 @@ endmodule
 
 
 module selector #(
-  parameter DATA_WIDTH = 32
+  parameter DATA_TYPE = 32
 )(
   // inputs
   input  clk,
   input  rst,
   input  condition,
   input  condition_valid,
-  input  [DATA_WIDTH-1 : 0] trueValue,
+  input  [DATA_TYPE-1 : 0] trueValue,
   input  trueValue_valid,
-  input  [DATA_WIDTH-1 : 0] falseValue,
+  input  [DATA_TYPE-1 : 0] falseValue,
   input  falseValue_valid,
   input  result_ready,
   // outputs
-  output  [DATA_WIDTH-1 : 0] result,
+  output  [DATA_TYPE-1 : 0] result,
   output  result_valid,
   output  condition_ready,
   output  trueValue_ready,

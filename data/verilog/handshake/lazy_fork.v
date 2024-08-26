@@ -1,16 +1,16 @@
 `timescale 1ns/1ps
 module lazy_fork #(
   parameter SIZE = 2,
-  parameter DATA_WIDTH = 32
+  parameter DATA_TYPE = 32
 )(
   input  clk,
 	input  rst,
   // Input Channels
-  input  [DATA_WIDTH - 1 : 0] ins,
+  input  [DATA_TYPE - 1 : 0] ins,
   input  ins_valid,
   output ins_ready,
   // Output Channel
-  output [SIZE * (DATA_WIDTH) - 1 : 0] outs,
+  output [SIZE * (DATA_TYPE) - 1 : 0] outs,
 	output [SIZE - 1 : 0] outs_valid,
 	input  [SIZE - 1 : 0] outs_ready
 );

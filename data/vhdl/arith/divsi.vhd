@@ -4,19 +4,19 @@ use ieee.numeric_std.all;
 
 entity divsi is
   generic (
-    DATA_WIDTH : integer
+    DATA_TYPE : integer
   );
   port (
     -- inputs
     clk          : in std_logic;
     rst          : in std_logic;
-    lhs          : in std_logic_vector(DATA_WIDTH - 1 downto 0);
+    lhs          : in std_logic_vector(DATA_TYPE - 1 downto 0);
     lhs_valid    : in std_logic;
-    rhs          : in std_logic_vector(DATA_WIDTH - 1 downto 0);
+    rhs          : in std_logic_vector(DATA_TYPE - 1 downto 0);
     rhs_valid    : in std_logic;
     result_ready : in std_logic;
     -- outputs
-    result       : out std_logic_vector(DATA_WIDTH - 1 downto 0);
+    result       : out std_logic_vector(DATA_TYPE - 1 downto 0);
     result_valid : out std_logic;
     lhs_ready    : out std_logic;
     rhs_ready    : out std_logic
@@ -29,16 +29,16 @@ architecture arch of divsi is
     generic (
       ID         : integer;
       NUM_STAGE  : integer;
-      din0_WIDTH : integer;
-      din1_WIDTH : integer;
-      dout_WIDTH : integer);
+      din0_TYPE : integer;
+      din1_TYPE : integer;
+      dout_TYPE : integer);
     port (
       clk   : in  std_logic;
       reset : in  std_logic;
       ce    : in  std_logic;
-      din0  : in  std_logic_vector(din0_WIDTH - 1 downto 0);
-      din1  : in  std_logic_vector(din1_WIDTH - 1 downto 0);
-      dout  : out std_logic_vector(dout_WIDTH - 1 downto 0));
+      din0  : in  std_logic_vector(din0_TYPE - 1 downto 0);
+      din1  : in  std_logic_vector(din1_TYPE - 1 downto 0);
+      dout  : out std_logic_vector(dout_TYPE - 1 downto 0));
   end component;
 
   signal join_valid : std_logic;
@@ -60,9 +60,9 @@ begin
     generic map(
       ID         => 1,
       NUM_STAGE  => 36,
-      din0_WIDTH => 32,
-      din1_WIDTH => 32,
-      dout_WIDTH => 32)
+      din0_TYPE => 32,
+      din1_TYPE => 32,
+      dout_TYPE => 32)
     port map(
       clk   => clk,
       reset => rst,

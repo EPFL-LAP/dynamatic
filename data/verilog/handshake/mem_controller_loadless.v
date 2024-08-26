@@ -2,8 +2,8 @@
 module mem_controller_loadless #(
   parameter NUM_CONTROLS = 1,
   parameter NUM_STORES   = 1,
-  parameter DATA_WIDTH   = 32,
-  parameter ADDR_WIDTH   = 32
+  parameter DATA_TYPE   = 32,
+  parameter ADDR_TYPE   = 32
 ) (
   input                                      clk,
   input                                      rst,
@@ -21,20 +21,20 @@ module mem_controller_loadless #(
   input  [             NUM_CONTROLS - 1 : 0] ctrl_valid,
   output [             NUM_CONTROLS - 1 : 0] ctrl_ready,
   // Store Address Input Channels
-  input  [(NUM_STORES * ADDR_WIDTH) - 1 : 0] stAddr,
+  input  [(NUM_STORES * ADDR_TYPE) - 1 : 0] stAddr,
   input  [               NUM_STORES - 1 : 0] stAddr_valid,
   output [               NUM_STORES - 1 : 0] stAddr_ready,
   // Store Data Input Channels
-  input  [(NUM_STORES * DATA_WIDTH) - 1 : 0] stData,
+  input  [(NUM_STORES * DATA_TYPE) - 1 : 0] stData,
   input  [               NUM_STORES - 1 : 0] stData_valid,
   output [               NUM_STORES - 1 : 0] stData_ready,
   // Interface to Dual-port BRAM
-  input  [               DATA_WIDTH - 1 : 0] loadData,
+  input  [               DATA_TYPE - 1 : 0] loadData,
   output                                     loadEn,
-  output [               ADDR_WIDTH - 1 : 0] loadAddr,
+  output [               ADDR_TYPE - 1 : 0] loadAddr,
   output                                     storeEn,
-  output [               ADDR_WIDTH - 1 : 0] storeAddr,
-  output [               DATA_WIDTH - 1 : 0] storeData
+  output [               ADDR_TYPE - 1 : 0] storeAddr,
+  output [               DATA_TYPE - 1 : 0] storeData
 );
   // Internal Signals
   wire [31 : 0] remainingStores;
@@ -46,13 +46,13 @@ module mem_controller_loadless #(
   localparam [NUM_CONTROLS-1:0] zeroCtrl = {NUM_CONTROLS{1'b0}};
 
   assign loadEn   = 0;
-  assign loadAddr = {ADDR_WIDTH{1'b0}};
+  assign loadAddr = {ADDR_TYPE{1'b0}};
 
   // Instantiate write memory arbiter
   write_memory_arbiter #(
     .ARBITER_SIZE(NUM_STORES),
-    .ADDR_WIDTH  (ADDR_WIDTH),
-    .DATA_WIDTH  (DATA_WIDTH)
+    .ADDR_TYPE  (ADDR_TYPE),
+    .DATA_TYPE  (DATA_TYPE)
   ) write_arbiter (
     .rst           (rst),
     .clk           (clk),

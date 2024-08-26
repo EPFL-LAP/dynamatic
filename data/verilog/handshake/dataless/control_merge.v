@@ -1,7 +1,7 @@
 `timescale 1ns/1ps
 module control_merge_dataless #(
   parameter SIZE = 2,
-  parameter INDEX_WIDTH = 1
+  parameter INDEX_TYPE = 1
 )(
   input  clk,
   input  rst,
@@ -12,7 +12,7 @@ module control_merge_dataless #(
   output outs_valid,
   input  outs_ready,            
   // Index output Channel
-  output [INDEX_WIDTH - 1 : 0] index,
+  output [INDEX_TYPE - 1 : 0] index,
   output index_valid,
   input  index_ready
 );
@@ -21,13 +21,13 @@ module control_merge_dataless #(
   wire tehbOut_valid;
   wire tehbOut_ready;
 
-  reg [INDEX_WIDTH - 1 : 0] index_tehb;
+  reg [INDEX_TYPE - 1 : 0] index_tehb;
   integer i;
   always @(ins_valid) begin
-    index_tehb = {INDEX_WIDTH{1'b0}};
+    index_tehb = {INDEX_TYPE{1'b0}};
     for (i = 0; i < SIZE; i = i + 1) begin
       if (ins_valid[i]) begin
-        index_tehb = i[INDEX_WIDTH - 1 : 0];
+        index_tehb = i[INDEX_TYPE - 1 : 0];
         i = SIZE;      // Exit the loop on the first valid
       end
     end
@@ -47,7 +47,7 @@ module control_merge_dataless #(
 
   // Instantiate TEHB
   tehb #(
-    .DATA_WIDTH(INDEX_WIDTH)
+    .DATA_TYPE(INDEX_TYPE)
   ) tehb (
     .clk        (clk          ),
     .rst        (rst          ),

@@ -5,16 +5,16 @@ use work.types.all;
 entity handshake_fork is
   generic (
     SIZE     : integer;
-    DATA_WIDTH : integer
+    DATA_TYPE : integer
   );
   port (
     clk, rst : in std_logic;
     -- input channel
-    ins       : in  std_logic_vector(DATA_WIDTH - 1 downto 0);
+    ins       : in  std_logic_vector(DATA_TYPE - 1 downto 0);
     ins_valid : in  std_logic;
     ins_ready : out std_logic;
     -- output channels
-    outs       : out data_array (SIZE - 1 downto 0)(DATA_WIDTH - 1 downto 0);
+    outs       : out data_array (SIZE - 1 downto 0)(DATA_TYPE - 1 downto 0);
     outs_valid : out std_logic_vector(SIZE - 1 downto 0);
     outs_ready : in  std_logic_vector(SIZE - 1 downto 0)
   );

@@ -1,24 +1,24 @@
 `timescale 1ns/1ps
 module lsq_store #(
-  parameter DATA_WIDTH = 32,
-  parameter ADDR_WIDTH = 32
+  parameter DATA_TYPE = 32,
+  parameter ADDR_TYPE = 32
 )(
   input  clk,
   input  rst,
   // Data from Circuit Channel
-  input  [DATA_WIDTH - 1 : 0] dataIn,
+  input  [DATA_TYPE - 1 : 0] dataIn,
   input  dataIn_valid,
   output dataIn_ready,
   // Address from Circuit Channel
-  input  [ADDR_WIDTH - 1 : 0] addrIn,
+  input  [ADDR_TYPE - 1 : 0] addrIn,
   input  addrIn_valid,
   output addrIn_ready,
   // Data to Interface Channel
-  output [DATA_WIDTH - 1 : 0] dataToMem,
+  output [DATA_TYPE - 1 : 0] dataToMem,
   output dataToMem_valid,
   input  dataToMem_ready,
   // Address to Interface Channel
-  output [ADDR_WIDTH - 1 : 0] addrOut,
+  output [ADDR_TYPE - 1 : 0] addrOut,
   output addrOut_valid,
   input  addrOut_ready
 );

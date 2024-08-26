@@ -2,27 +2,27 @@
 
 
 module ENTITY_NAME #(
-  parameter DATA_WIDTH = 32
+  parameter DATA_TYPE = 32
 )(
   // inputs
   input  clk,
   input  rst,
-  input  [DATA_WIDTH - 1 : 0] lhs,
+  input  [DATA_TYPE - 1 : 0] lhs,
   input  lhs_valid,
-  input  [DATA_WIDTH - 1 : 0] rhs,
+  input  [DATA_TYPE - 1 : 0] rhs,
   input  rhs_valid,
   input  result_ready,
   // outputs
-  output [DATA_WIDTH - 1 : 0] result,
+  output [DATA_TYPE - 1 : 0] result,
   output result_valid,
   output lhs_ready,
   output rhs_ready
 );
 
-  //assert(DATA_WIDTH == 32) else $error("ENTITY_NAME currently only supports 32-bit floating point operands");
+  //assert(DATA_TYPE == 32) else $error("ENTITY_NAME currently only supports 32-bit floating point operands");
 
   wire constant_one = 1'b1;
-  wire [ DATA_WIDTH + 1 :0] ip_lhs, ip_rhs;
+  wire [ DATA_TYPE + 1 :0] ip_lhs, ip_rhs;
 
   wire ip_unordered, ip_result;
 

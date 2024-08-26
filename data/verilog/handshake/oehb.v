@@ -1,15 +1,15 @@
 `timescale 1ns/1ps
 module oehb #(
-  parameter DATA_WIDTH = 32
+  parameter DATA_TYPE = 32
 ) (
   input  clk,
   input  rst,
   // Input channel
-  input  [DATA_WIDTH - 1 : 0] ins,
+  input  [DATA_TYPE - 1 : 0] ins,
   input  ins_valid,
   output ins_ready,
   // Output channel
-  output reg [DATA_WIDTH - 1 : 0] outs,
+  output reg [DATA_TYPE - 1 : 0] outs,
   output outs_valid,
   input  outs_ready
 );
@@ -27,7 +27,7 @@ module oehb #(
 
   always @(posedge clk, posedge rst) begin
     if (rst) begin
-      outs <= {DATA_WIDTH{1'b0}};
+      outs <= {DATA_TYPE{1'b0}};
     end else if (regEn) begin
       outs <= ins;
     end

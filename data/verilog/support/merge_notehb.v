@@ -1,25 +1,25 @@
 `timescale 1ns/1ps
 module merge_notehb #(
   parameter INPUTS = 2,
-  parameter DATA_WIDTH = 32
+  parameter DATA_TYPE = 32
 ) (
   input  clk,
   input  rst,
-  input  [INPUTS * DATA_WIDTH - 1 : 0] ins,   
+  input  [INPUTS * DATA_TYPE - 1 : 0] ins,   
   input  [INPUTS - 1 : 0] ins_valid,           
   output [INPUTS - 1 : 0] ins_ready,           
-  output [DATA_WIDTH - 1 : 0] outs,              
+  output [DATA_TYPE - 1 : 0] outs,              
   output outs_valid,                      
   input  outs_ready                     
 );
-  reg [DATA_WIDTH - 1 : 0] tmp_data_out = 0;
+  reg [DATA_TYPE - 1 : 0] tmp_data_out = 0;
   reg tmp_valid_out = 0;
 
   integer i;
 
   always @(*) begin
 		tmp_valid_out = 0;
-		tmp_data_out = data_in_bus[0 * DATA_WIDTH +: DATA_WIDTH];
+		tmp_data_out = data_in_bus[0 * DATA_TYPE +: DATA_TYPE];
 		for(i = INPUTS - 1; i >= 0; i = i - 1) begin
 			if(ins_valid[i])begin
 				tmp_data_out = ins[i * DATA_IN_SIZE +: DATA_IN_SIZE];
@@ -28,7 +28,7 @@ module merge_notehb #(
 		end
 	end
 
-  wire [DATA_WIDTH - 1 : 0] tehb_data_in;
+  wire [DATA_TYPE - 1 : 0] tehb_data_in;
   wire tehb_pvalid;
   wire tehb_ready;
 

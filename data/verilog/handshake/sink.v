@@ -1,10 +1,10 @@
 `timescale 1ns/1ps
 module sink #(
-  parameter DATA_WIDTH = 32
+  parameter DATA_TYPE = 32
 ) (
   input  clk,      
   input  rst,       
-  input  [DATA_WIDTH-1:0] ins, 
+  input  [DATA_TYPE-1:0] ins, 
   input  ins_valid, 
   output ins_ready 
 );

@@ -413,15 +413,16 @@ private:
     addParam(name, IntegerAttr::get(intType, scalar));
   };
 
-  /// Adds a bitwdith parameter extracted from a type.
-  void addBitwidth(const Twine &name, Type type) {
-    addUnsigned(name, handshake::getHandshakeTypeBitWidth(type));
+  /// Adds a dataflow-type parameter.
+  void addType(const Twine &name, Type type) {
+    assert((isa<handshake::ControlType>(type) ||
+            isa<handshake::ChannelType>(type)) &&
+           "incompatible type");
+    addParam(name, TypeAttr::get(type));
   };
 
-  /// Adds a bitwdith parameter extracted from a value's type.
-  void addBitwidth(const Twine &name, Value val) {
-    addUnsigned(name, handshake::getHandshakeTypeBitWidth(val.getType()));
-  };
+  /// Adds the value's type as a dataflow-type parameter.
+  void addType(const Twine &name, Value val) { addType(name, val.getType()); };
 
   /// Adds a string parameter.
   void addString(const Twine &name, const Twine &txt) {
@@ -456,25 +457,25 @@ ModuleDiscriminator::ModuleDiscriminator(Operation *op) {
       .Case<handshake::ForkOp, handshake::LazyForkOp>([&](auto) {
         // Number of output channels and bitwidth
         addUnsigned("SIZE", op->getNumResults());
-        addBitwidth("DATA_WIDTH", op->getOperand(0));
+        addType("DATA_TYPE", op->getOperand(0));
       })
       .Case<handshake::MuxOp>([&](handshake::MuxOp muxOp) {
         // Number of input data channels, data bitwidth, and select bitwidth
         addUnsigned("SIZE", muxOp.getDataOperands().size());
-        addBitwidth("DATA_WIDTH", muxOp.getResult());
-        addBitwidth("SELECT_WIDTH", muxOp.getSelectOperand());
+        addType("DATA_TYPE", muxOp.getResult());
+        addType("SELECT_TYPE", muxOp.getSelectOperand());
       })
       .Case<handshake::ControlMergeOp>([&](handshake::ControlMergeOp cmergeOp) {
         // Number of input data channels, data bitwidth, and index
         // bitwidth
         addUnsigned("SIZE", cmergeOp.getDataOperands().size());
-        addBitwidth("DATA_WIDTH", cmergeOp.getResult());
-        addBitwidth("INDEX_WIDTH", cmergeOp.getIndex());
+        addType("DATA_TYPE", cmergeOp.getResult());
+        addType("INDEX_TYPE", cmergeOp.getIndex());
       })
       .Case<handshake::MergeOp>([&](auto) {
         // Number of input data channels and data bitwidth
         addUnsigned("SIZE", op->getNumOperands());
-        addBitwidth("DATA_WIDTH", op->getResult(0));
+        addType("DATA_TYPE", op->getResult(0));
       })
       .Case<handshake::JoinOp>([&](auto) {
         // Number of input channels
@@ -483,12 +484,12 @@ ModuleDiscriminator::ModuleDiscriminator(Operation *op) {
       .Case<handshake::BranchOp, handshake::SinkOp, handshake::BufferOp>(
           [&](auto) {
             // Bitwidth
-            addBitwidth("DATA_WIDTH", op->getOperand(0));
+            addType("DATA_TYPE", op->getOperand(0));
           })
       .Case<handshake::ConditionalBranchOp>(
           [&](handshake::ConditionalBranchOp cbrOp) {
             // Bitwidth
-            addBitwidth("DATA_WIDTH", cbrOp.getDataOperand());
+            addType("DATA_TYPE", cbrOp.getDataOperand());
           })
       .Case<handshake::SourceOp>([&](auto) {
         // No discrimianting parameters, just to avoid falling into the
@@ -496,14 +497,14 @@ ModuleDiscriminator::ModuleDiscriminator(Operation *op) {
       })
       .Case<handshake::LoadOpInterface>([&](handshake::LoadOpInterface loadOp) {
         // Data bitwidth and address bitwidth
-        addBitwidth("DATA_WIDTH", loadOp.getDataInput());
-        addBitwidth("ADDR_WIDTH", loadOp.getAddressInput());
+        addType("DATA_TYPE", loadOp.getDataInput());
+        addType("ADDR_TYPE", loadOp.getAddressInput());
       })
       .Case<handshake::StoreOpInterface>(
           [&](handshake::StoreOpInterface storeOp) {
             // Data bitwidth and address bitwidth
-            addBitwidth("DATA_WIDTH", storeOp.getDataInput());
-            addBitwidth("ADDR_WIDTH", storeOp.getAddressInput());
+            addType("DATA_TYPE", storeOp.getDataInput());
+            addType("ADDR_TYPE", storeOp.getAddressInput());
           })
       .Case<handshake::ConstantOp>([&](handshake::ConstantOp cstOp) {
         // Bitwidth and binary-encoded constant value
@@ -558,7 +559,7 @@ ModuleDiscriminator::ModuleDiscriminator(Operation *op) {
         addUnsigned("DATA_WIDTH", bitwidth);
       })
       .Case<handshake::NotOp>([&](handshake::NotOp notOp) {
-        addBitwidth("DATA_WIDTH", op->getOperand(0));
+        addType("DATA_TYPE", op->getOperand(0));
       })
       .Case<handshake::AddFOp, handshake::AddIOp, handshake::AndIOp,
             handshake::DivFOp, handshake::DivSIOp, handshake::DivUIOp,
@@ -567,27 +568,27 @@ ModuleDiscriminator::ModuleDiscriminator(Operation *op) {
             handshake::ShLIOp, handshake::ShRSIOp, handshake::ShRUIOp,
             handshake::SubFOp, handshake::SubIOp, handshake::XOrIOp>([&](auto) {
         // Bitwidth
-        addBitwidth("DATA_WIDTH", op->getOperand(0));
+        addType("DATA_TYPE", op->getOperand(0));
       })
       .Case<handshake::SelectOp>([&](handshake::SelectOp selectOp) {
         // Data bitwidth
-        addBitwidth("DATA_WIDTH", selectOp.getTrueValue());
+        addType("DATA_TYPE", selectOp.getTrueValue());
       })
       .Case<handshake::CmpFOp>([&](handshake::CmpFOp cmpFOp) {
         // Predicate and bitwidth
         addString("PREDICATE", stringifyEnum(cmpFOp.getPredicate()));
-        addBitwidth("DATA_WIDTH", cmpFOp.getLhs());
+        addType("DATA_TYPE", cmpFOp.getLhs());
       })
       .Case<handshake::CmpIOp>([&](handshake::CmpIOp cmpIOp) {
         // Predicate and bitwidth
         addString("PREDICATE", stringifyEnum(cmpIOp.getPredicate()));
-        addBitwidth("DATA_WIDTH", cmpIOp.getLhs());
+        addType("DATA_TYPE", cmpIOp.getLhs());
       })
       .Case<handshake::ExtSIOp, handshake::ExtUIOp, handshake::TruncIOp>(
           [&](auto) {
             // Input bitwidth and output bitwidth
-            addBitwidth("INPUT_WIDTH", op->getOperand(0));
-            addBitwidth("OUTPUT_WIDTH", op->getResult(0));
+            addType("INPUT_TYPE", op->getOperand(0));
+            addType("OUTPUT_TYPE", op->getResult(0));
           })
       .Default([&](auto) {
         op->emitError() << "This operation cannot be lowered to RTL "
@@ -599,18 +600,21 @@ ModuleDiscriminator::ModuleDiscriminator(Operation *op) {
 ModuleDiscriminator::ModuleDiscriminator(FuncMemoryPorts &ports) {
   init(ports.memOp);
 
+  MLIRContext *ctx = op->getContext();
   llvm::TypeSwitch<Operation *, void>(op)
       .Case<handshake::MemoryControllerOp>([&](auto) {
         // There can be at most one of those, and it is a load/store port
         unsigned lsqPort = ports.getNumPorts<LSQLoadStorePort>();
+        Type dataType = IntegerType::get(ctx, ports.dataWidth);
+        Type addrType = IntegerType::get(ctx, ports.addrWidth);
 
         // Control port count, load port count, store port count, data
         // bitwidth, and address bitwidth
         addUnsigned("NUM_CONTROLS", ports.getNumPorts<ControlPort>());
         addUnsigned("NUM_LOADS", ports.getNumPorts<LoadPort>() + lsqPort);
         addUnsigned("NUM_STORES", ports.getNumPorts<StorePort>() + lsqPort);
-        addUnsigned("DATA_WIDTH", ports.dataWidth);
-        addUnsigned("ADDR_WIDTH", ports.addrWidth);
+        addType("DATA_TYPE", ChannelType::get(dataType));
+        addType("ADDR_TYPE", ChannelType::get(addrType));
       })
       .Case<handshake::LSQOp>([&](auto) {
         LSQGenerationInfo genInfo(ports, getUniqueName(op).str());

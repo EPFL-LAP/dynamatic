@@ -1,26 +1,26 @@
-`timescale 1ns/1ps
+`timescale 1ns / 1ps
 module mem_to_bram #(
   parameter DATA_WIDTH = 32,
   parameter ADDR_WIDTH = 32
 ) (
   // Inputs from circuit
-  input  loadEn,
+  input                       loadEn,
   input  [ADDR_WIDTH - 1 : 0] loadAddr,
-  input  storeEn,
+  input                       storeEn,
   input  [ADDR_WIDTH - 1 : 0] storeAddr,
   input  [DATA_WIDTH - 1 : 0] storeData,
   // Inputs from BRAM
   input  [DATA_WIDTH - 1 : 0] din0,
   input  [DATA_WIDTH - 1 : 0] din1,
   // Outputs to BRAM
-  output ce0,
-  output we0,
+  output                      ce0,
+  output                      we0,
   output [ADDR_WIDTH - 1 : 0] address0,
   output [DATA_WIDTH - 1 : 0] dout0,
-  output ce1,
-  output we1,
+  output                      ce1,
+  output                      we1,
   output [ADDR_WIDTH - 1 : 0] address1,
-  output [DATA_WIDTH - 1 : 0 ] dout1,
+  output [DATA_WIDTH - 1 : 0] dout1,
   // Outputs back to circuit
   output [DATA_WIDTH - 1 : 0] loadData
 );
@@ -38,5 +38,5 @@ module mem_to_bram #(
 
   // Data back to circuit from BRAM
   assign loadData = din1;
-  
+
 endmodule

@@ -4,15 +4,15 @@ use ieee.numeric_std.all;
 
 entity ENTITY_NAME is
   generic (
-    DATA_WIDTH : integer
+    DATA_TYPE : integer
   );
   port (
     -- inputs
     clk          : in std_logic;
     rst          : in std_logic;
-    lhs          : in std_logic_vector(DATA_WIDTH - 1 downto 0);
+    lhs          : in std_logic_vector(DATA_TYPE - 1 downto 0);
     lhs_valid    : in std_logic;
-    rhs          : in std_logic_vector(DATA_WIDTH - 1 downto 0);
+    rhs          : in std_logic_vector(DATA_TYPE - 1 downto 0);
     rhs_valid    : in std_logic;
     result_ready : in std_logic;
     -- outputs

@@ -1,32 +1,32 @@
 `timescale 1ns/1ps
   module control_merge #(
     parameter SIZE = 2,
-    parameter DATA_WIDTH = 1,
-    parameter INDEX_WIDTH = 1
+    parameter DATA_TYPE = 1,
+    parameter INDEX_TYPE = 1
   )(
     input  clk,
     input  rst,
     // Input Channels
-    input  [SIZE * (DATA_WIDTH) - 1 : 0] ins,    // Input Channel
+    input  [SIZE * (DATA_TYPE) - 1 : 0] ins,    // Input Channel
     input  [SIZE - 1 : 0] ins_valid,
     output [SIZE - 1 : 0] ins_ready,
     // Data Output Channel
-    output [DATA_WIDTH - 1 : 0] outs,
+    output [DATA_TYPE - 1 : 0] outs,
     output outs_valid,
     input  outs_ready,
     // Index Output Channel
-    output [INDEX_WIDTH - 1 : 0] index,
+    output [INDEX_TYPE - 1 : 0] index,
     output index_valid,
     input  index_ready
   );
     //! Specified the length of the vector compared with the original implementation.
     //! Jiantao, 21/07/2024
-    wire [INDEX_WIDTH - 1 : 0] index_internal;
+    wire [INDEX_TYPE - 1 : 0] index_internal;
 
     // Instantiate control_merge_dataless
     control_merge_dataless #(
       .SIZE(SIZE),
-      .INDEX_WIDTH(INDEX_WIDTH)
+      .INDEX_TYPE(INDEX_TYPE)
     ) control (
       .clk          (clk            ),
       .rst          (rst            ),

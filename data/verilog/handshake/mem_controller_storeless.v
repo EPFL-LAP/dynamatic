@@ -1,8 +1,8 @@
 `timescale 1ns / 1ps
 module mem_controller_storeless #(
   parameter NUM_LOADS  = 1,
-  parameter DATA_WIDTH = 32,
-  parameter ADDR_WIDTH = 32
+  parameter DATA_TYPE = 32,
+  parameter ADDR_TYPE = 32
 ) (
   input                                     clk,
   input                                     rst,
@@ -16,34 +16,34 @@ module mem_controller_storeless #(
   input                                     ctrlEnd_valid,
   output                                    ctrlEnd_ready,
   // Load address input channels
-  input  [(NUM_LOADS * ADDR_WIDTH) - 1 : 0] ldAddr,
+  input  [(NUM_LOADS * ADDR_TYPE) - 1 : 0] ldAddr,
   input  [               NUM_LOADS - 1 : 0] ldAddr_valid,
   output [               NUM_LOADS - 1 : 0] ldAddr_ready,
   // Load data output channels
-  output [(NUM_LOADS * DATA_WIDTH) - 1 : 0] ldData,
+  output [(NUM_LOADS * DATA_TYPE) - 1 : 0] ldData,
   output [               NUM_LOADS - 1 : 0] ldData_valid,
   input  [               NUM_LOADS - 1 : 0] ldData_ready,
   // Interface to dual-port BRAM
-  input  [              DATA_WIDTH - 1 : 0] loadData,
+  input  [              DATA_TYPE - 1 : 0] loadData,
   output                                    loadEn,
-  output [              ADDR_WIDTH - 1 : 0] loadAddr,
+  output [              ADDR_TYPE - 1 : 0] loadAddr,
   output                                    storeEn,
-  output [              ADDR_WIDTH - 1 : 0] storeAddr,
-  output [              DATA_WIDTH - 1 : 0] storeData
+  output [              ADDR_TYPE - 1 : 0] storeAddr,
+  output [              DATA_TYPE - 1 : 0] storeData
 );
   wire allRequestsDone;
 
   // No stores will ever be issused
-  assign storeAddr = {ADDR_WIDTH{1'b0}};
-  assign storeData = {DATA_WIDTH{1'b0}};
+  assign storeAddr = {ADDR_TYPE{1'b0}};
+  assign storeData = {DATA_TYPE{1'b0}};
   assign storeEn   = 1'b0;
 
   // MC is "always done with stores"
 
   read_memory_arbiter #(
     .ARBITER_SIZE(NUM_LOADS),
-    .ADDR_WIDTH  (ADDR_WIDTH),
-    .DATA_WIDTH  (DATA_WIDTH)
+    .ADDR_TYPE  (ADDR_TYPE),
+    .DATA_TYPE  (DATA_TYPE)
   ) read_arbiter (
     .rst             (rst),
     .clk             (clk),

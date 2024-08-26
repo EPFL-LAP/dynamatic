@@ -4,16 +4,16 @@ use ieee.numeric_std.all;
 
 entity logic_not is
   generic (
-    DATA_WIDTH : integer
+    DATA_TYPE : integer
   );
   port (
     clk, rst : in std_logic;
     -- input channel
-    ins       : in  std_logic_vector(DATA_WIDTH - 1 downto 0);
+    ins       : in  std_logic_vector(DATA_TYPE - 1 downto 0);
     ins_valid : in  std_logic;
     ins_ready : out std_logic;
     -- output channel
-    outs       : out std_logic_vector(DATA_WIDTH - 1 downto 0);
+    outs       : out std_logic_vector(DATA_TYPE - 1 downto 0);
     outs_valid : out std_logic;
     outs_ready : in  std_logic
   );

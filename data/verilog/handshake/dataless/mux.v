@@ -1,7 +1,7 @@
 `timescale 1ns/1ps
 module mux_dataless #(
   parameter SIZE = 2,
-  parameter SELECT_WIDTH = 2
+  parameter SELECT_TYPE = 2
 )(
   input  clk,
   input  rst,
@@ -9,7 +9,7 @@ module mux_dataless #(
   input  [SIZE - 1 : 0] ins_valid,
   output reg [SIZE - 1 : 0] ins_ready,
   // Index input channel
-  input  [SELECT_WIDTH - 1 : 0] index,
+  input  [SELECT_TYPE - 1 : 0] index,
   input  index_valid,
   output index_ready,
   // Output channel
@@ -27,12 +27,12 @@ module mux_dataless #(
     selectedData_valid = 0;
 
     for (i = SIZE - 1; i >= 0 ; i = i - 1) begin
-      if (((i[SELECT_WIDTH - 1 : 0] == index) & index_valid & ins_valid[i] & tehb_ins_ready) | ~ins_valid[i])
+      if (((i[SELECT_TYPE - 1 : 0] == index) & index_valid & ins_valid[i] & tehb_ins_ready) | ~ins_valid[i])
         ins_ready[i] = 1;
       else
         ins_ready[i] = 0;
 
-      if (index == i[SELECT_WIDTH - 1 : 0] && index_valid && ins_valid[i]) begin
+      if (index == i[SELECT_TYPE - 1 : 0] && index_valid && ins_valid[i]) begin
         selectedData_valid = 1;
       end    
     end

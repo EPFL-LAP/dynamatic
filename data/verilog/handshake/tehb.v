@@ -1,21 +1,21 @@
 `timescale 1ns/1ps
 module tehb #(
-	parameter DATA_WIDTH = 32 // Default set to 32 bits
+	parameter DATA_TYPE = 32 // Default set to 32 bits
 )(
 	input  clk,
 	input  rst,
   // Input Channel
-	input  [DATA_WIDTH - 1 : 0] ins,
+	input  [DATA_TYPE - 1 : 0] ins,
 	input  ins_valid,
   output ins_ready,
   // Output Channel
-  output [DATA_WIDTH - 1 : 0]	outs,
+  output [DATA_TYPE - 1 : 0]	outs,
   output outs_valid,
 	input  outs_ready
 );
 	// Signal Definition
 	wire regEnable, regNotFull;
-	reg [DATA_WIDTH - 1 : 0] dataReg = 0;
+	reg [DATA_TYPE - 1 : 0] dataReg = 0;
 
 	// Instantiate control logic part
 	tehb_dataless control (

@@ -6,7 +6,7 @@ use ieee.math_real.all;
 entity mux_dataless is
   generic (
     SIZE         : integer;
-    SELECT_WIDTH : integer
+    SELECT_TYPE : integer
   );
   port (
     clk, rst : in std_logic;
@@ -14,7 +14,7 @@ entity mux_dataless is
     ins_valid : in  std_logic_vector(SIZE - 1 downto 0);
     ins_ready : out std_logic_vector(SIZE - 1 downto 0);
     -- index input channel
-    index       : in  std_logic_vector(SELECT_WIDTH - 1 downto 0);
+    index       : in  std_logic_vector(SELECT_TYPE - 1 downto 0);
     index_valid : in  std_logic;
     index_ready : out std_logic;
     -- output channel

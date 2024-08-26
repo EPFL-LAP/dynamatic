@@ -1,22 +1,22 @@
 `timescale 1ns/1ps
 module mul_4_stage #(
-  parameter DATA_WIDTH = 32
+  parameter DATA_TYPE = 32
 )(
   // inputs
   input  clk,
   input  ce,
-  input  [DATA_WIDTH - 1 : 0] a,
-  input  [DATA_WIDTH - 1 : 0] b,
+  input  [DATA_TYPE - 1 : 0] a,
+  input  [DATA_TYPE - 1 : 0] b,
   // outputs
-  output [DATA_WIDTH - 1 : 0] p
+  output [DATA_TYPE - 1 : 0] p
 );
 
-  reg  [DATA_WIDTH - 1 : 0] a_reg;
-  reg  [DATA_WIDTH - 1 : 0] b_reg;
-  reg  [DATA_WIDTH - 1 : 0] q0;
-  reg  [DATA_WIDTH - 1 : 0] q1;
-  reg  [DATA_WIDTH - 1 : 0] q2;
-  wire  [DATA_WIDTH - 1 : 0] mul;
+  reg  [DATA_TYPE - 1 : 0] a_reg;
+  reg  [DATA_TYPE - 1 : 0] b_reg;
+  reg  [DATA_TYPE - 1 : 0] q0;
+  reg  [DATA_TYPE - 1 : 0] q1;
+  reg  [DATA_TYPE - 1 : 0] q2;
+  wire  [DATA_TYPE - 1 : 0] mul;
 
   assign mul = a_reg * b_reg;
 
@@ -36,19 +36,19 @@ endmodule
 
 
 module muli #(
-  parameter DATA_WIDTH = 32,
+  parameter DATA_TYPE = 32,
   parameter LATENCY = 4
 )(
   // inputs
   input  clk,
   input  rst,
-  input  [DATA_WIDTH - 1 : 0] lhs,
+  input  [DATA_TYPE - 1 : 0] lhs,
   input  lhs_valid,
-  input  [DATA_WIDTH - 1 : 0] rhs,
+  input  [DATA_TYPE - 1 : 0] rhs,
   input  rhs_valid,
   input  result_ready,
   // outputs
-  output [DATA_WIDTH - 1 : 0] result,
+  output [DATA_TYPE - 1 : 0] result,
   output result_valid,
   output lhs_ready,
   output rhs_ready
@@ -59,7 +59,7 @@ module muli #(
   wire join_valid;
   wire oehb_ready;
   wire buff_valid;
-  wire [DATA_WIDTH - 1 : 0] oehb_dataOut, oehb_dataIn;
+  wire [DATA_TYPE - 1 : 0] oehb_dataOut, oehb_dataIn;
 
   // Instantiate the join node
   join_type #(
@@ -72,7 +72,7 @@ module muli #(
   );
 
   mul_4_stage #(
-    .DATA_WIDTH(DATA_WIDTH)
+    .DATA_TYPE(DATA_TYPE)
   ) mul_4_stage_inst (
     .clk(clk),
     .ce(oehb_ready),
@@ -92,7 +92,7 @@ module muli #(
   );
 
   oehb #(
-    .DATA_WIDTH(DATA_WIDTH)
+    .DATA_TYPE(DATA_TYPE)
   ) oehb_inst (
     .clk(clk),
     .rst(rst),

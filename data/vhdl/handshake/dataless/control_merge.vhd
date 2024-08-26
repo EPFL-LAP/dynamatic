@@ -5,7 +5,7 @@ use ieee.numeric_std.all;
 entity control_merge_dataless is
   generic (
     SIZE        : integer;
-    INDEX_WIDTH : integer
+    INDEX_TYPE : integer
   );
   port (
     clk, rst : in std_logic;
@@ -16,22 +16,22 @@ entity control_merge_dataless is
     outs_valid : out std_logic;
     outs_ready : in  std_logic;
     -- index output channel
-    index       : out std_logic_vector(INDEX_WIDTH - 1 downto 0);
+    index       : out std_logic_vector(INDEX_TYPE - 1 downto 0);
     index_valid : out std_logic;
     index_ready : in  std_logic
   );
 end entity;
 
 architecture arch of control_merge_dataless is
-  signal index_tehb                                               : std_logic_vector (INDEX_WIDTH - 1 downto 0);
+  signal index_tehb                                               : std_logic_vector (INDEX_TYPE - 1 downto 0);
   signal dataAvailable, readyToFork, tehbOut_valid, tehbOut_ready : std_logic;
 begin
   process (ins_valid)
   begin
-    index_tehb <= (INDEX_WIDTH - 1 downto 0 => '0');
+    index_tehb <= (INDEX_TYPE - 1 downto 0 => '0');
     for i in 0 to (SIZE - 1) loop
       if (ins_valid(i) = '1') then
-        index_tehb <= std_logic_vector(to_unsigned(i, INDEX_WIDTH));
+        index_tehb <= std_logic_vector(to_unsigned(i, INDEX_TYPE));
         exit;
       end if;
     end loop;
@@ -47,7 +47,7 @@ begin
       outs_valid => dataAvailable
     );
 
-  tehb : entity work.tehb(arch) generic map (INDEX_WIDTH)
+  tehb : entity work.tehb(arch) generic map (INDEX_TYPE)
     port map(
       clk        => clk,
       rst        => rst,

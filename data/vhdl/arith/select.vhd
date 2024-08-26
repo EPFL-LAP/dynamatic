@@ -53,20 +53,20 @@ use ieee.numeric_std.all;
 
 entity selector is
   generic (
-    DATA_WIDTH : integer
+    DATA_TYPE : integer
   );
   port (
     -- inputs
     clk, rst         : in std_logic;
     condition        : in std_logic_vector(0 downto 0);
     condition_valid  : in std_logic;
-    trueValue        : in std_logic_vector(DATA_WIDTH - 1 downto 0);
+    trueValue        : in std_logic_vector(DATA_TYPE - 1 downto 0);
     trueValue_valid  : in std_logic;
-    falseValue       : in std_logic_vector(DATA_WIDTH - 1 downto 0);
+    falseValue       : in std_logic_vector(DATA_TYPE - 1 downto 0);
     falseValue_valid : in std_logic;
     result_ready     : in std_logic;
     -- outputs
-    result           : out std_logic_vector(DATA_WIDTH - 1 downto 0);
+    result           : out std_logic_vector(DATA_TYPE - 1 downto 0);
     result_valid     : out std_logic;
     condition_ready  : out std_logic;
     trueValue_ready  : out std_logic;

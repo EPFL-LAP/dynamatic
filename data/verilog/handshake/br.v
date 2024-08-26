@@ -3,16 +3,16 @@
 // used to indicate the number of input channels. I removed
 // it. -- Jiantao, 21/07/2024
 module br #(
-	parameter DATA_WIDTH = 32 // Default bit width set to 32
+	parameter DATA_TYPE = 32 // Default bit width set to 32
 )(
 	input clk,
 	input rst,
   // Input Channel
-	input [DATA_WIDTH - 1 : 0] ins,   
+	input [DATA_TYPE - 1 : 0] ins,   
 	input ins_valid,
   output ins_ready,
   // Output Channel 	
-  output [DATA_WIDTH - 1 : 0] outs,
+  output [DATA_TYPE - 1 : 0] outs,
   output outs_valid	,
 	input outs_ready			        
 );
