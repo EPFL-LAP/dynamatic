@@ -1,5 +1,5 @@
 # Set the source file to run
-set-src             integration-test/loop_array/loop_array.c
+set-src             tutorials/Introduction/Ch1/loop_multiply.c
 
 
 # Compile (from source to Handshake IR/DOT)

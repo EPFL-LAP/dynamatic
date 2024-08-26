@@ -2228,6 +2228,52 @@ LogicalResult HandshakeLowering::triggerConstantsFromStart(
   return success();
 }
 
+bool findClosestBranchPredecessor(Value input, DominanceInfo &domInfo,
+                                  Block &block, Value &desiredCond,
+                                  bool &getTrueSuccessor,
+                                  std::unordered_set<Operation *> &visited) {
+  Operation *defOp = input.getDefiningOp();
+  if (!defOp || visited.count(defOp))
+    return false;
+
+  visited.insert(defOp);
+
+  for (Value pred : defOp->getOperands()) {
+    Operation *predOp = pred.getDefiningOp();
+    if (!predOp)
+      continue;
+
+    if (isa<handshake::ConditionalBranchOp>(predOp)) {
+      auto branch = dyn_cast<handshake::ConditionalBranchOp>(predOp);
+      for (Value branchPred : branch->getOperands()) {
+        if (domInfo.dominates(branchPred.getParentBlock(), &block)) {
+          desiredCond = branch.getConditionOperand();
+          if (pred == branch.getFalseResult()) {
+            getTrueSuccessor = true;
+          }
+          return true;
+        }
+      }
+    }
+
+    if (findClosestBranchPredecessor(pred, domInfo, block, desiredCond,
+                                     getTrueSuccessor, visited)) {
+      return true;
+    }
+  }
+
+  return false;
+}
+
+/// Gets the closest Branch predecessor to the input and accesses its condition
+bool findClosestBranchPredecessor(Value input, DominanceInfo &domInfo,
+                                  Block &block, Value &desiredCond,
+                                  bool &getTrueSuccessor) {
+  std::unordered_set<Operation *> visited;
+  return findClosestBranchPredecessor(input, domInfo, block, desiredCond,
+                                      getTrueSuccessor, visited);
+}
+
 LogicalResult
 HandshakeLowering::addSuppGSA(ConversionPatternRewriter &rewriter) {
   for (Block &block : region.getBlocks()) {
@@ -2279,26 +2325,11 @@ HandshakeLowering::addSuppGSA(ConversionPatternRewriter &rewriter) {
 
         /// Assert that the predecessors of the other input must all be
         /// Branches
-        bool hasPredBranch = false;
+
         bool getTrueSuccessor = false;
-        if (nonDominatingInput.getDefiningOp()) {
-          for (Value pred : nonDominatingInput.getDefiningOp()->getOperands()) {
-            Operation *predOp = pred.getDefiningOp();
-            if (predOp) {
-              if (isa<handshake::ConditionalBranchOp>(predOp)) {
-                auto branch = dyn_cast<handshake::ConditionalBranchOp>(predOp);
-                for (Value branchPred : branch->getOperands()) {
-                  if (domInfo.dominates(branchPred.getParentBlock(), &block)) {
-                    hasPredBranch = true;
-                    desiredCond = branch.getConditionOperand();
-                    if (pred == branch.getFalseResult())
-                      getTrueSuccessor = true;
-                  }
-                }
-              }
-            }
-          }
-        }
+        bool hasPredBranch = findClosestBranchPredecessor(
+            nonDominatingInput, domInfo, block, desiredCond, getTrueSuccessor);
+
         assert(hasPredBranch &&
                "At least one predecessor of the non-dominating "
                "input must be a Branch");
