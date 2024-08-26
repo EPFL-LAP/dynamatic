@@ -20,6 +20,14 @@
 
 include "mlir/IR/OpBase.td"
 
+def ArithOpInterface : OpInterface<"ArithOpInterface"> {
+  let cppNamespace = "::dynamatic::handshake";
+  let description = [{
+     Handshake operations which semantically correspond to an operation from the
+     `ArithDialect`.
+  }];
+}
+
 def MergeLikeOpInterface : OpInterface<"MergeLikeOpInterface"> {
   let cppNamespace = "::dynamatic::handshake";
   let description = [{
