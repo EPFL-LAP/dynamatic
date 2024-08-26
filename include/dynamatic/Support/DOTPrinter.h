@@ -56,6 +56,9 @@ private:
   /// Returns the name of a function's argument given its index.
   std::string getArgumentName(handshake::FuncOp funcOp, size_t idx);
 
+  /// Returns the name of a function's result given its index.
+  std::string getResultName(handshake::FuncOp funcOp, size_t idx);
+
   /// Prints a node corresponding to an operation and, on success, returns a
   /// unique name for the operation in the outName argument.
   LogicalResult printNode(Operation *op, mlir::raw_indented_ostream &os);

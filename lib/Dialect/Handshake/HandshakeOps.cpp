@@ -1139,8 +1139,11 @@ dynamatic::LSQPorts LSQOp::getPorts() {
 }
 
 handshake::MemoryControllerOp LSQOp::getConnectedMC() {
+  auto storeDataUsers = getResults().back().getUsers();
+  if (storeDataUsers.empty())
+    return nullptr;
   return dyn_cast_if_present<dynamatic::handshake::MemoryControllerOp>(
-      *getResults().back().getDefiningOp());
+      *storeDataUsers.begin());
 }
 
 //===----------------------------------------------------------------------===//
