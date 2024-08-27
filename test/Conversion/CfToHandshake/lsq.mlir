@@ -16,9 +16,9 @@ func.func @simpleOneGroupLSQ(%mem: memref<64xi32>) -> i32 {
   %c0 = arith.constant 0 : index
   %c1 = arith.constant 1 : index
   %c2 = arith.constant 2 : index
-  %ldData1 = memref.load %mem[%c0] {mem_interface = #handshake.mem_interface<LSQ: 0>} : memref<64xi32>
-  memref.store %ldData1, %mem[%c1] {mem_interface = #handshake.mem_interface<LSQ: 0>} : memref<64xi32>
-  memref.store %ldData1, %mem[%c2] {mem_interface = #handshake.mem_interface<LSQ: 0>} : memref<64xi32>
+  %ldData1 = memref.load %mem[%c0] {handshake.mem_interface = #handshake.mem_interface<LSQ: 0>} : memref<64xi32>
+  memref.store %ldData1, %mem[%c1] {handshake.mem_interface = #handshake.mem_interface<LSQ: 0>} : memref<64xi32>
+  memref.store %ldData1, %mem[%c2] {handshake.mem_interface = #handshake.mem_interface<LSQ: 0>} : memref<64xi32>
   return %ldData1 : i32
 }
 
@@ -50,12 +50,12 @@ func.func @simpleMultiGroupLSQ(%mem: memref<64xi32>) -> i32 {
   %c0 = arith.constant 0 : index
   %c1 = arith.constant 1 : index
   %c2 = arith.constant 2 : index
-  %ldData1 = memref.load %mem[%c0] {mem_interface = #handshake.mem_interface<LSQ: 0>} : memref<64xi32>
-  %ldData2 = memref.load %mem[%c1] {mem_interface = #handshake.mem_interface<LSQ: 0>} : memref<64xi32>
+  %ldData1 = memref.load %mem[%c0] {handshake.mem_interface = #handshake.mem_interface<LSQ: 0>} : memref<64xi32>
+  %ldData2 = memref.load %mem[%c1] {handshake.mem_interface = #handshake.mem_interface<LSQ: 0>} : memref<64xi32>
   cf.br ^bb1(%ldData1, %ldData2 : i32, i32)
 ^bb1(%stData1: i32, %stData2: i32):
-  memref.store %stData1, %mem[%c1] {mem_interface = #handshake.mem_interface<LSQ: 1>} : memref<64xi32>
-  memref.store %stData2, %mem[%c2] {mem_interface = #handshake.mem_interface<LSQ: 1>} : memref<64xi32>
+  memref.store %stData1, %mem[%c1] {handshake.mem_interface = #handshake.mem_interface<LSQ: 1>} : memref<64xi32>
+  memref.store %stData2, %mem[%c2] {handshake.mem_interface = #handshake.mem_interface<LSQ: 1>} : memref<64xi32>
   return %stData1 : i32
 }
 
@@ -85,12 +85,12 @@ func.func @mixLSQAndMCLoads(%mem: memref<64xi32>) -> i32 {
   %c0 = arith.constant 0 : index
   %c1 = arith.constant 1 : index
   %c2 = arith.constant 2 : index
-  %ldData1 = memref.load %mem[%c0] {mem_interface = #handshake.mem_interface<LSQ: 0>} : memref<64xi32>
-  %ldData2 = memref.load %mem[%c1] {mem_interface = #handshake.mem_interface<MC>} : memref<64xi32>
+  %ldData1 = memref.load %mem[%c0] {handshake.mem_interface = #handshake.mem_interface<LSQ: 0>} : memref<64xi32>
+  %ldData2 = memref.load %mem[%c1] {handshake.mem_interface = #handshake.mem_interface<MC>} : memref<64xi32>
   cf.br ^bb1
 ^bb1:
-  %ldData3 = memref.load %mem[%c0] {mem_interface = #handshake.mem_interface<LSQ: 1>} : memref<64xi32>
-  %ldData4 = memref.load %mem[%c2] {mem_interface = #handshake.mem_interface<MC>} : memref<64xi32>
+  %ldData3 = memref.load %mem[%c0] {handshake.mem_interface = #handshake.mem_interface<LSQ: 1>} : memref<64xi32>
+  %ldData4 = memref.load %mem[%c2] {handshake.mem_interface = #handshake.mem_interface<MC>} : memref<64xi32>
   %add = arith.addi %ldData3, %ldData4 : i32
   return %add : i32
 }
@@ -121,11 +121,11 @@ func.func @mixLSQAndMCStores(%mem: memref<64xi32>, %data : i32) -> i32 {
   %c0 = arith.constant 0 : index
   %c1 = arith.constant 1 : index
   %c2 = arith.constant 2 : index
-  memref.store %data, %mem[%c0] {mem_interface = #handshake.mem_interface<LSQ: 0>} : memref<64xi32>
-  memref.store %data, %mem[%c1] {mem_interface = #handshake.mem_interface<MC>} : memref<64xi32>
+  memref.store %data, %mem[%c0] {handshake.mem_interface = #handshake.mem_interface<LSQ: 0>} : memref<64xi32>
+  memref.store %data, %mem[%c1] {handshake.mem_interface = #handshake.mem_interface<MC>} : memref<64xi32>
   cf.br ^bb1(%data : i32)
 ^bb1(%stData : i32):
-  memref.store %stData, %mem[%c2] {mem_interface = #handshake.mem_interface<LSQ: 1>} : memref<64xi32>
+  memref.store %stData, %mem[%c2] {handshake.mem_interface = #handshake.mem_interface<LSQ: 1>} : memref<64xi32>
   return %stData : i32
 }
 
@@ -168,20 +168,20 @@ func.func @mixLSQAndMCStores(%mem: memref<64xi32>, %data : i32) -> i32 {
 // CHECK:         }
 func.func @ifThenElseSameLSQGroup(%mem: memref<64xi32>, %idx: index) -> i32 {
   %c0 = arith.constant 0 : i32
-  %ldData = memref.load %mem[%idx] {mem_interface = #handshake.mem_interface<LSQ: 0>} : memref<64xi32>
+  %ldData = memref.load %mem[%idx] {handshake.mem_interface = #handshake.mem_interface<LSQ: 0>} : memref<64xi32>
   %isEq = arith.cmpi eq, %ldData, %c0 : i32
   cf.cond_br %isEq, ^bb1, ^bb2
 ^bb1:
   %c1 = arith.constant 1 : index
   %add1 = arith.addi %c1, %idx : index
-  %ldData1 = memref.load %mem[%add1] {mem_interface = #handshake.mem_interface<MC>} : memref<64xi32>
+  %ldData1 = memref.load %mem[%add1] {handshake.mem_interface = #handshake.mem_interface<MC>} : memref<64xi32>
   cf.br ^bb3(%ldData1 : i32)
 ^bb2:
   %c2 = arith.constant 1 : index
   %add2 = arith.addi %c2, %idx : index
-  %ldData2 = memref.load %mem[%add2] {mem_interface = #handshake.mem_interface<MC>}: memref<64xi32>
+  %ldData2 = memref.load %mem[%add2] {handshake.mem_interface = #handshake.mem_interface<MC>}: memref<64xi32>
   cf.br ^bb3(%ldData2 : i32)
 ^bb3(%stData : i32):
-  memref.store %stData, %mem[%idx] {mem_interface = #handshake.mem_interface<LSQ: 0>} : memref<64xi32>
+  memref.store %stData, %mem[%idx] {handshake.mem_interface = #handshake.mem_interface<LSQ: 0>} : memref<64xi32>
   return %stData : i32
 }

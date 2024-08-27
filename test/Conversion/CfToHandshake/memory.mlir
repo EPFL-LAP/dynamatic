@@ -12,8 +12,8 @@
 // CHECK:         }
 func.func @simpleLoadStore(%arg0 : index, %arg1 : memref<4xi32>) {
   %c1 = arith.constant 1 : i32
-  memref.store %c1, %arg1[%arg0] {mem_interface = #handshake.mem_interface<MC>} : memref<4xi32>
-  %0 = memref.load %arg1[%arg0] {mem_interface = #handshake.mem_interface<MC>} : memref<4xi32>
+  memref.store %c1, %arg1[%arg0] {handshake.mem_interface = #handshake.mem_interface<MC>} : memref<4xi32>
+  %0 = memref.load %arg1[%arg0] {handshake.mem_interface = #handshake.mem_interface<MC>} : memref<4xi32>
   return
 }
 
@@ -43,11 +43,11 @@ func.func @storeMulBlocks(%arg0 : i1, %arg1 : index, %arg2 : memref<4xi32>) {
   cf.cond_br %arg0, ^bb1, ^bb2
 ^bb1:
   %c1 = arith.constant 1 : i32
-  memref.store %c1, %arg2[%arg1] {mem_interface = #handshake.mem_interface<MC>} : memref<4xi32>
+  memref.store %c1, %arg2[%arg1] {handshake.mem_interface = #handshake.mem_interface<MC>} : memref<4xi32>
   cf.br ^bb3
 ^bb2:
   %c2 = arith.constant 2 : i32
-  memref.store %c2, %arg2[%arg1] {mem_interface = #handshake.mem_interface<MC>} : memref<4xi32>
+  memref.store %c2, %arg2[%arg1] {handshake.mem_interface = #handshake.mem_interface<MC>} : memref<4xi32>
   cf.br ^bb3
 ^bb3:
   return
@@ -71,7 +71,7 @@ func.func @storeMulBlocks(%arg0 : i1, %arg1 : index, %arg2 : memref<4xi32>) {
 // CHECK:           end {handshake.bb = 2 : ui32} %[[VAL_6]], %[[VAL_4]] : <>, <>
 // CHECK:         }
 func.func @forwardLoadToBB(%arg0 : i1, %arg1 : index, %arg2: memref<4xi32>) {
-  %0 = memref.load %arg2[%arg1] {mem_interface = #handshake.mem_interface<MC>} : memref<4xi32>
+  %0 = memref.load %arg2[%arg1] {handshake.mem_interface = #handshake.mem_interface<MC>} : memref<4xi32>
   cf.cond_br %arg0, ^bb1, ^bb2
 ^bb1:
   %c1 = arith.constant 1 : i32
@@ -110,11 +110,11 @@ func.func @multipleMemories(%arg0 : i1, %arg1: memref<4xi32>, %arg2: memref<4xi3
   %c1 = arith.constant 0 : index
   cf.cond_br %arg0, ^bb1, ^bb2
 ^bb1:
-  %1 = memref.load %arg2[%c0] {mem_interface = #handshake.mem_interface<MC>} : memref<4xi32>
-  memref.store %1, %arg1[%c0] {mem_interface = #handshake.mem_interface<MC>} : memref<4xi32>
+  %1 = memref.load %arg2[%c0] {handshake.mem_interface = #handshake.mem_interface<MC>} : memref<4xi32>
+  memref.store %1, %arg1[%c0] {handshake.mem_interface = #handshake.mem_interface<MC>} : memref<4xi32>
   return
 ^bb2:
-  %2 = memref.load %arg1[%c1] {mem_interface = #handshake.mem_interface<MC>} : memref<4xi32>
-  memref.store %2, %arg2[%c1] {mem_interface = #handshake.mem_interface<MC>} : memref<4xi32>
+  %2 = memref.load %arg1[%c1] {handshake.mem_interface = #handshake.mem_interface<MC>} : memref<4xi32>
+  memref.store %2, %arg2[%c1] {handshake.mem_interface = #handshake.mem_interface<MC>} : memref<4xi32>
   return
 }

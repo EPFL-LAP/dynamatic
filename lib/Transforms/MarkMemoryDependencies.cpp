@@ -17,6 +17,7 @@
 #include "dynamatic/Transforms/MarkMemoryDependencies.h"
 #include "dynamatic/Analysis/NameAnalysis.h"
 #include "dynamatic/Dialect/Handshake/HandshakeAttributes.h"
+#include "dynamatic/Support/Attribute.h"
 #include "mlir/Dialect/Affine/Analysis/AffineAnalysis.h"
 #include "mlir/Dialect/Affine/Analysis/AffineStructures.h"
 #include "mlir/Dialect/Affine/Analysis/Utils.h"
@@ -143,9 +144,8 @@ MarkMemoryDependenciesPass::analyzeMemAccesses(func::FuncOp funcOp) {
   // For each memory operation with dependencies to other memory operations, set
   // the MemDependenceArrayAttr attribute on the operation
   MLIRContext *ctx = &getContext();
-  StringRef mnemonic = MemDependenceArrayAttr::getMnemonic();
   for (auto &[op, deps] : opDeps)
-    op->setAttr(mnemonic, MemDependenceArrayAttr::get(ctx, deps));
+    setDialectAttr<MemDependenceArrayAttr>(op, ctx, deps);
   return success();
 }
 

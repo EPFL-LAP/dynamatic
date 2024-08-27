@@ -23,6 +23,7 @@
 #include "dynamatic/Dialect/Handshake/HandshakeInterfaces.h"
 #include "dynamatic/Dialect/Handshake/HandshakeOps.h"
 #include "dynamatic/Dialect/Handshake/MemoryInterfaces.h"
+#include "dynamatic/Support/Attribute.h"
 #include "dynamatic/Support/CFG.h"
 #include "mlir/Dialect/Affine/Analysis/AffineAnalysis.h"
 #include "mlir/Dialect/Affine/Utils.h"
@@ -719,13 +720,12 @@ LogicalResult LowerFuncToHandshake::convertMemoryOps(
     Block *block = op.getBlock();
 
     // The memory operation must have a MemInterfaceAttr attribute attached
-    StringRef attrName = handshake::MemInterfaceAttr::getMnemonic();
-    auto memAttr = op.getAttrOfType<handshake::MemInterfaceAttr>(attrName);
-    if (!memAttr)
-      return op.emitError()
-             << "Memory operation must have attribute " << attrName
-             << " of type dynamatic::handshake::MemInterfaceAttr to decide "
-                "which memory interface it should connect to.";
+    auto memAttr = getDialectAttr<handshake::MemInterfaceAttr>(&op);
+    if (!memAttr) {
+      return op.emitError() << "memory operation must have attribute of type "
+                               "'handshake::MemInterfaceAttr' to encode "
+                               "which memory interface it should connect to.";
+    }
     bool connectToMC = memAttr.connectsToMC();
 
     // Replace memref operation with corresponding handshake operation

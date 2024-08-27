@@ -37,9 +37,9 @@ using namespace dynamatic::handshake;
 
 void MemoryOpLowering::recordReplacement(Operation *oldOp, Operation *newOp,
                                          bool forwardInterface) {
-  copyAttr<MemDependenceArrayAttr>(oldOp, newOp);
+  copyDialectAttr<MemDependenceArrayAttr>(oldOp, newOp);
   if (forwardInterface)
-    copyAttr<MemInterfaceAttr>(oldOp, newOp);
+    copyDialectAttr<MemInterfaceAttr>(oldOp, newOp);
   nameChanges[namer.getName(oldOp)] = namer.getName(newOp);
 }
 
@@ -54,7 +54,7 @@ bool MemoryOpLowering::renameDependencies(Operation *topLevelOp) {
       return;
 
     // Read potential memory dependencies stored on the memory operation
-    auto oldMemDeps = getUniqueAttr<MemDependenceArrayAttr>(memOp);
+    auto oldMemDeps = getDialectAttr<MemDependenceArrayAttr>(memOp);
     if (!oldMemDeps)
       return;
 
@@ -74,7 +74,7 @@ bool MemoryOpLowering::renameDependencies(Operation *topLevelOp) {
         newMemDeps.push_back(oldDep);
       }
     }
-    setUniqueAttr(memOp, MemDependenceArrayAttr::get(ctx, newMemDeps));
+    setDialectAttr<MemDependenceArrayAttr>(memOp, ctx, newMemDeps);
   });
 
   return anyChange;

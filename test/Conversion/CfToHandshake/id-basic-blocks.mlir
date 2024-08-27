@@ -8,7 +8,7 @@
 // CHECK:           end {handshake.bb = 0 : ui32} %[[VAL_7]], %[[VAL_5]], %[[VAL_3]] : <i32>, <>, <>
 // CHECK:         }
 func.func @simpleLoad(%arg0: memref<4xi32>, %arg1: index) -> i32 {
-  %0 = memref.load %arg0[%arg1] {mem_interface = #handshake.mem_interface<MC>} : memref<4xi32>
+  %0 = memref.load %arg0[%arg1] {handshake.mem_interface = #handshake.mem_interface<MC>} : memref<4xi32>
   return %0 : i32
 }
 

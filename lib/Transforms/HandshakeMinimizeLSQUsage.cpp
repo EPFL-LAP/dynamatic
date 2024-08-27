@@ -91,7 +91,7 @@ static bool hasRAW(handshake::LSQLoadOp loadOp,
                    SetVector<handshake::LSQStoreOp> &storeOps) {
   StringRef loadName = getUniqueName(loadOp);
   for (handshake::LSQStoreOp storeOp : storeOps) {
-    if (auto deps = getUniqueAttr<MemDependenceArrayAttr>(storeOp)) {
+    if (auto deps = getDialectAttr<MemDependenceArrayAttr>(storeOp)) {
       for (MemDependenceAttr dependency : deps.getDependencies()) {
         if (dependency.getDstAccess() == loadName) {
           LLVM_DEBUG(llvm::dbgs()
@@ -143,7 +143,7 @@ static bool hasEnforcedWARs(handshake::LSQLoadOp loadOp,
   // We only need to check stores that depend on the load (WAR dependencies) as
   // others are already provably independent. We may check a single store
   // multiple times if it depends on the load at multiple loop depths
-  if (auto deps = getUniqueAttr<MemDependenceArrayAttr>(loadOp)) {
+  if (auto deps = getDialectAttr<MemDependenceArrayAttr>(loadOp)) {
     for (MemDependenceAttr dependency : deps.getDependencies()) {
       handshake::LSQStoreOp storeOp = storesByName[dependency.getDstAccess()];
       assert(storeOp && "unknown store operation");
@@ -242,7 +242,7 @@ HandshakeMinimizeLSQUsagePass::LSQInfo::LSQInfo(handshake::LSQOp lsqOp,
   // now that we know that some loads are out
   DenseSet<handshake::LSQStoreOp> storesStillInSet;
   for (handshake::LSQStoreOp storeOp : lsqStoreOps) {
-    auto deps = getUniqueAttr<MemDependenceArrayAttr>(storeOp);
+    auto deps = getDialectAttr<MemDependenceArrayAttr>(storeOp);
     if (!deps)
       continue;
     StringRef storeName = getUniqueName(storeOp);
@@ -373,7 +373,7 @@ void HandshakeMinimizeLSQUsagePass::tryToOptimizeLSQ(handshake::LSQOp lsqOp) {
 
           // Record operation replacement (change interface to MC)
           memOpLowering.recordReplacement(lsqLoadOp, mcLoadOp, false);
-          setUniqueAttr(mcLoadOp, handshake::MemInterfaceAttr::get(ctx));
+          setDialectAttr<MemInterfaceAttr>(mcLoadOp, ctx);
           memBuilder.addMCPort(mcLoadOp);
 
           // Replace the original port operation's results and erase it
@@ -402,7 +402,7 @@ void HandshakeMinimizeLSQUsagePass::tryToOptimizeLSQ(handshake::LSQOp lsqOp) {
 
           // Record operation replacement (change interface to MC)
           memOpLowering.recordReplacement(lsqStoreOp, mcStoreOp, false);
-          setUniqueAttr(mcStoreOp, handshake::MemInterfaceAttr::get(ctx));
+          setDialectAttr<MemInterfaceAttr>(mcStoreOp, ctx);
           memBuilder.addMCPort(mcStoreOp);
 
           // Replace the original port operation's results and erase it
