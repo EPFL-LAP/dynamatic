@@ -29,7 +29,6 @@
 #include "dynamatic/Transforms/HandshakeMinimizeCstWidth.h"
 #include "dynamatic/Transforms/HandshakeMinimizeLSQUsage.h"
 #include "dynamatic/Transforms/HandshakeOptimizeBitwidths.h"
-#include "dynamatic/Transforms/HandshakePrepareForLegacy.h"
 #include "dynamatic/Transforms/HandshakeReshapeChannels.h"
 #include "dynamatic/Transforms/MarkMemoryDependencies.h"
 #include "dynamatic/Transforms/MarkMemoryInterfaces.h"

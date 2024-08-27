@@ -11,7 +11,6 @@ add_dynamatic_library(DynamaticTransforms
   HandshakeMinimizeCstWidth.cpp
   HandshakeMinimizeLSQUsage.cpp
   HandshakeOptimizeBitwidths.cpp
-  HandshakePrepareForLegacy.cpp
   HandshakeInferBasicBlocks.cpp
   HandshakeReshapeChannels.cpp
   MarkMemoryDependencies.cpp
