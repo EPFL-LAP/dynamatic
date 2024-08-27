@@ -25,7 +25,9 @@ namespace switching {
 #include "experimental/Transforms/Passes.h.inc"
 
 std::unique_ptr<dynamatic::DynamaticPass> 
-createSwitchingEstimation(StringRef resultFolderPath = "",
+createSwitchingEstimation(StringRef dataTrace = "",
+                          StringRef bbList = "",
+                          StringRef frequencies = "",
                           StringRef timingModels = "");
 
 } // namespace switching

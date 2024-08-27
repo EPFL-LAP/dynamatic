@@ -105,8 +105,12 @@ def SwitchingEstimation : DynamaticPass<"switching-estimation"> {
   }];
   let constructor = "dynamatic::experimental::switching::createSwitchingEstimation()";
   let options = [
-    Option<"resultFolderPath", "result-folder-path", "std::string", "",
-           "Path to the result folder of the dynamatic run">,
+    Option<"dataTrace", "data-trace", "std::string", "",
+           "Path to the scf data profiling results">,
+    Option<"bbList", "bb-list", "std::string", "",
+           "Path to the scf bb execution list profiling result">,
+    Option<"frequencies", "frequencies", "std::string", "",
+           "Path to the scf level frequency profiling result, a csv file generated during the buffer placement process">,
     Option<"timingModels", "timing-models", "std::string", "",
       "Path to JSON-formatted file containing timing models for dataflow "
       "components.">];

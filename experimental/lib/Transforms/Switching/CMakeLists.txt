@@ -1,5 +1,6 @@
 add_dynamatic_library(DynamaticExperimentalSwitchingEstimation
   SwitchingEstimation.cpp
+  SwitchingSupport.cpp
 
   DEPENDS
   DynamaticExperimentalTransformsPassIncGen
