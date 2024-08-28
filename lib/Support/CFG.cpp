@@ -366,17 +366,20 @@ HandshakeCFG::getControlValues(DenseMap<unsigned, Value> &ctrlVals) {
   // Fails if a control already existed and is different from the new value,
   // succeeds otherwise.
   auto updateCtrl = [&](unsigned bb, Value newCtrl) -> LogicalResult {
-    if (auto ctrlOfBB = ctrlVals.find(bb); ctrlOfBB != ctrlVals.end()) {
-      if (ctrlOfBB->second != newCtrl)
+    if (auto [it, newBB] = ctrlVals.insert({bb, newCtrl}); !newBB) {
+      if (it->second != newCtrl)
         return failure();
     }
-    ctrlVals[bb] = newCtrl;
     return success();
   };
 
   // Explore the control network one operation at a time till we've iterated
   // over all of it
   Value ctrl = funcOp.getArguments().back();
+  if (failed(updateCtrl(ENTRY_BB, ctrl))) {
+    assert(false && "cannot set control for entry BB");
+  }
+
   addToCtrlOps(ctrl.getUsers());
   while (!ctrlOps.empty()) {
     Operation *ctrlOp = ctrlOps.pop_back_val();
