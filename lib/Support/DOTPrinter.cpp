@@ -21,7 +21,6 @@
 #include "dynamatic/Support/Utils/Utils.h"
 #include "dynamatic/Transforms/HandshakeMaterialize.h"
 #include "experimental/Transforms/Speculation/SpecAnnotatePaths.h"
-#include "mlir/Dialect/Math/IR/Math.h"
 #include "mlir/IR/BuiltinAttributes.h"
 #include "mlir/IR/BuiltinTypes.h"
 #include "mlir/IR/OperationSupport.h"
@@ -48,78 +47,6 @@ using MemPortsData = std::vector<std::tuple<std::string, Value, std::string>>;
 using RawPort = std::pair<std::string, unsigned>;
 
 } // namespace
-
-// ============================================================================
-// Legacy node/edge attributes
-// ============================================================================
-
-/// Maps name of arith/math operations to "op" attribute.
-static llvm::StringMap<StringRef> compNameToOpName{
-    {handshake::AddFOp::getOperationName(), "fadd_op"},
-    {handshake::AddIOp::getOperationName(), "add_op"},
-    {handshake::AndIOp::getOperationName(), "and_op"},
-    {handshake::DivFOp::getOperationName(), "fdiv_op"},
-    {handshake::DivSIOp::getOperationName(), "sdiv_op"},
-    {handshake::DivUIOp::getOperationName(), "udiv_op"},
-    {handshake::ExtSIOp::getOperationName(), "sext_op"},
-    {handshake::ExtUIOp::getOperationName(), "zext_op"},
-    {handshake::MulFOp::getOperationName(), "fmul_op"},
-    {handshake::MulIOp::getOperationName(), "mul_op"},
-    {handshake::OrIOp::getOperationName(), "or_op"},
-    {handshake::SelectOp::getOperationName(), "select_op"},
-    {handshake::ShLIOp::getOperationName(), "shl_op"},
-    {handshake::SubIOp::getOperationName(), "sub_op"},
-    {handshake::SubFOp::getOperationName(), "fsub_op"},
-    {handshake::ShRSIOp::getOperationName(), "ashr_op"},
-    {handshake::TruncIOp::getOperationName(), "trunc_op"},
-    {handshake::XOrIOp::getOperationName(), "xor_op"},
-    {math::CosOp::getOperationName(), "cosf_op"},
-    {math::ExpOp::getOperationName(), "expf_op"},
-    {math::Exp2Op::getOperationName(), "exp2f_op"},
-    {math::LogOp::getOperationName(), "logf_op"},
-    {math::Log2Op::getOperationName(), "log2f_op"},
-    {math::Log10Op::getOperationName(), "log10f_op"},
-    {math::SinOp::getOperationName(), "sinf_op"},
-    {math::SqrtOp::getOperationName(), "sqrtf_op"},
-};
-
-/// Maps name of integer comparison type to "op" attribute.
-static DenseMap<handshake::CmpIPredicate, StringRef> cmpINameToOpName{
-    {handshake::CmpIPredicate::eq, "icmp_eq_op"},
-    {handshake::CmpIPredicate::ne, "icmp_ne_op"},
-    {handshake::CmpIPredicate::slt, "icmp_slt_op"},
-    {handshake::CmpIPredicate::sle, "icmp_sle_op"},
-    {handshake::CmpIPredicate::sgt, "icmp_sgt_op"},
-    {handshake::CmpIPredicate::sge, "icmp_sge_op"},
-    {handshake::CmpIPredicate::ult, "icmp_ult_op"},
-    {handshake::CmpIPredicate::ule, "icmp_ule_op"},
-    {handshake::CmpIPredicate::ugt, "icmp_ugt_op"},
-    {handshake::CmpIPredicate::uge, "icmp_uge_op"},
-};
-
-/// Maps name of floating-point comparison type to "op" attribute.
-static DenseMap<handshake::CmpFPredicate, StringRef> cmpFNameToOpName{
-    {handshake::CmpFPredicate::AlwaysFalse, "fcmp_false_op"},
-    {handshake::CmpFPredicate::OEQ, "fcmp_oeq_op"},
-    {handshake::CmpFPredicate::OGT, "fcmp_ogt_op"},
-    {handshake::CmpFPredicate::OGE, "fcmp_oge_op"},
-    {handshake::CmpFPredicate::OLT, "fcmp_olt_op"},
-    {handshake::CmpFPredicate::OLE, "fcmp_ole_op"},
-    {handshake::CmpFPredicate::ONE, "fcmp_one_op"},
-    {handshake::CmpFPredicate::ORD, "fcmp_orq_op"},
-    {handshake::CmpFPredicate::UEQ, "fcmp_ueq_op"},
-    {handshake::CmpFPredicate::UGT, "fcmp_ugt_op"},
-    {handshake::CmpFPredicate::UGE, "fcmp_uge_op"},
-    {handshake::CmpFPredicate::ULT, "fcmp_ult_op"},
-    {handshake::CmpFPredicate::ULE, "fcmp_ule_op"},
-    {handshake::CmpFPredicate::UNE, "fcmp_une_op"},
-    {handshake::CmpFPredicate::UNO, "fcmp_uno_op"},
-    {handshake::CmpFPredicate::AlwaysTrue, "fcmp_true_op"},
-};
-
-// ============================================================================
-// Printing
-// ============================================================================
 
 static constexpr StringLiteral DOTTED("dotted"), SOLID("solid"), DOT("dot"),
     NORMAL("normal");
