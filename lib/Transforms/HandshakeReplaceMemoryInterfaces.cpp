@@ -28,7 +28,6 @@
 #include "llvm/ADT/STLExtras.h"
 #include "llvm/ADT/StringRef.h"
 #include "llvm/ADT/TypeSwitch.h"
-#include "llvm/Support/Debug.h"
 
 using namespace mlir;
 using namespace dynamatic;
@@ -295,10 +294,8 @@ LogicalResult HandshakeReplaceMemoryInterfacesPass::replaceForMemRef(
   // Instantiate new memory interfaces
   handshake::MemoryControllerOp newMCOp;
   handshake::LSQOp newLSQOp;
-  if (failed(memBuilder.instantiateInterfaces(builder, newMCOp, newLSQOp))) {
-    LLVM_DEBUG(llvm::dbgs() << "\tFailed to instantiate memory interfaces\n");
+  if (failed(memBuilder.instantiateInterfaces(builder, newMCOp, newLSQOp)))
     return failure();
-  }
   assert(newMCOp || newLSQOp && "no new interface instantiated");
 
   // The memory completiong signal needs to come from the new interfaces
