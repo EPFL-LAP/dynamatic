@@ -202,10 +202,20 @@ std::vector<mlir::Operation*> AdjListGraph::getOperationsWithOpName(std::string 
 int AdjListGraph::findMaxPathLatency(mlir::Operation *startOp, mlir::Operation *endOp, bool ignoreBackedge) {
   std::vector<std::vector<std::string>> paths = findPaths(startOp, endOp, ignoreBackedge);
   int maxLatency = 0;
+  std::vector<std::string> maxPath;
   for(auto &path: paths)
   {
-    maxLatency = std::max(maxLatency, getPathLatency(path));
+    if(maxLatency < getPathLatency(path)) {
+      maxLatency = getPathLatency(path);
+      maxPath = path;
+    }
   }
+  llvm::dbgs() << "Max path: ";
+  for(auto &node: maxPath) {
+    llvm::dbgs() << node << " ";
+  }
+  llvm::dbgs() << "\n";
+
   return maxLatency;
 }
 
