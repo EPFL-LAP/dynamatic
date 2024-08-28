@@ -129,14 +129,14 @@ inline OperandAttr toOperandAttr(const NamedAttribute &attr) {
 template <typename Attr, typename Dialect = handshake::HandshakeDialect>
 inline Attr getDialectAttr(Operation *op) {
   std::string name = detail::getDialectAttrName<Dialect, Attr>();
-  return op->getAttrOfType<Attr>(name);
+  return mlir::dyn_cast_if_present<Attr>(op->getDiscardableAttr(name));
 }
 
 /// Sets a dialect attribute of the given type.
 template <typename Attr>
 inline void setDialectAttr(Operation *op, Attr attr) {
   std::string name = detail::getDialectAttrName<Attr>(attr);
-  return op->setAttr(name, attr);
+  op->setDiscardableAttr(name, attr);
 }
 
 /// Sets a dialect attribute of the given type. Arguments are forwarded to the
@@ -145,7 +145,15 @@ template <typename Attr, typename... Args>
 inline void setDialectAttr(Operation *op, Args... args) {
   Attr attr = Attr::get(std::forward<Args>(args)...);
   std::string name = detail::getDialectAttrName<Attr>(attr);
-  return op->setAttr(name, attr);
+  op->setDiscardableAttr(name, attr);
+}
+
+/// Removes a dialect attribute of the given type. If the attribute existed,
+/// returns it; otherwise returns `nullptr`.
+template <typename Attr, typename Dialect = handshake::HandshakeDialect>
+inline Attribute removeDialectAttr(Operation *op) {
+  std::string name = detail::getDialectAttrName<Dialect, Attr>();
+  return op->removeDiscardableAttr(name);
 }
 
 /// Attempts to copy a dialect attribute of the given type from the source
@@ -155,7 +163,7 @@ template <typename Attr, typename Dialect = handshake::HandshakeDialect>
 inline bool copyDialectAttr(Operation *srcOp, Operation *dstOp) {
   std::string name = detail::getDialectAttrName<Dialect, Attr>();
   if (Attr attr = srcOp->getAttrOfType<Attr>(name)) {
-    dstOp->setAttr(name, attr);
+    dstOp->setDiscardableAttr(name, attr);
     return true;
   }
   return false;
@@ -166,22 +174,16 @@ inline bool copyDialectAttr(Operation *srcOp, Operation *dstOp) {
 /// exists.
 template <typename OperandAttr, typename Dialect = handshake::HandshakeDialect>
 inline typename OperandAttr::ContainerAttr getContainerAttr(Operation *op) {
-  std::string name =
-      detail::getDialectAttrName<Dialect,
-                                 typename OperandAttr::ContainerAttr>();
-  return op->getAttrOfType<typename OperandAttr::ContainerAttr>(name);
+  return getDialectAttr<typename OperandAttr::ContainerAttr, Dialect>(op);
 }
 
 /// Sets the container dialect attribute that corresponds to the operand
 /// attribute of the given type.
-template <typename OperandAttr, typename Dialect = handshake::HandshakeDialect>
+template <typename OperandAttr>
 inline void
 setContainerAttr(Operation *op,
                  typename OperandAttr::ContainerAttr containerAttr) {
-  std::string name =
-      detail::getDialectAttrName<Dialect,
-                                 typename OperandAttr::ContainerAttr>();
-  return op->setAttr(name, containerAttr);
+  setDialectAttr<typename OperandAttr::ContainerAttr>(op, containerAttr);
 }
 
 /// Returns the operand's attribute of the given template type, if it exists.
