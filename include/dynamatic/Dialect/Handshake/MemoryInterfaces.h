@@ -16,6 +16,7 @@
 #define DYNAMATIC_DIALECT_HANDSHAKE_MEMORY_INTERFACES_H
 
 #include "dynamatic/Analysis/NameAnalysis.h"
+#include "dynamatic/Dialect/Handshake/HandshakeInterfaces.h"
 #include "dynamatic/Dialect/Handshake/HandshakeOps.h"
 #include "dynamatic/Support/Backedge.h"
 #include "dynamatic/Support/LLVM.h"
@@ -131,11 +132,6 @@ public:
   /// constant operation in the IR after the provided control signal.
   static Value getMCControl(Value ctrl, unsigned numStores, OpBuilder &builder);
 
-  /// Sets the data operand of a load-like operation, reusing the existing
-  /// address operand.
-  static void setLoadDataOperand(handshake::LoadOpInterface loadOp,
-                                 Value dataIn);
-
 private:
   /// Wraps all inputs for instantiating an MC and/or an LSQ for the recorded
   /// memory ports. An empty list of inputs for the MC indicates that no MC is
@@ -189,15 +185,21 @@ private:
   /// value exists for the block.
   Value getCtrl(unsigned block);
 
-  /// For a provided memory interface and its memory ports, set the data operand
-  /// of load-like operations with successive results of the memory interface.
-  void addMemDataResultToLoads(InterfacePorts &ports, Operation *memIfaceOp);
+  using FConnectLoad = std::function<void(handshake::LoadOpInterface, Value)>;
+
+  /// For a provided memory interface and its memory ports, invoke the load
+  /// connection callback for all load-like operations with successive results
+  /// of the memory interface.
+  void reconnectLoads(InterfacePorts &ports, Operation *memIfaceOp,
+                      const FConnectLoad &connect);
 
   /// Internal implementation of the interface instantiation logic, taking an
   /// additional edge builder argument that was either created using a basic
-  /// operation builder or a conversion pattern rewriter.
+  /// operation builder or a conversion pattern rewriter as well as a callback
+  /// to connect the data input of loads to the newly created memory interfaces.
   LogicalResult instantiateInterfaces(OpBuilder &builder,
                                       BackedgeBuilder &edgeBuilder,
+                                      const FConnectLoad &connect,
                                       handshake::MemoryControllerOp &mcOp,
                                       handshake::LSQOp &lsqOp);
 };

@@ -12,6 +12,7 @@
 
 #include "dynamatic/Dialect/Handshake/MemoryInterfaces.h"
 #include "dynamatic/Dialect/Handshake/HandshakeAttributes.h"
+#include "dynamatic/Dialect/Handshake/HandshakeInterfaces.h"
 #include "dynamatic/Dialect/Handshake/HandshakeOps.h"
 #include "dynamatic/Support/Attribute.h"
 #include "dynamatic/Support/Backedge.h"
@@ -107,19 +108,27 @@ LogicalResult MemoryInterfaceBuilder::instantiateInterfaces(
     OpBuilder &builder, handshake::MemoryControllerOp &mcOp,
     handshake::LSQOp &lsqOp) {
   BackedgeBuilder edgeBuilder(builder, memref.getLoc());
-  return instantiateInterfaces(builder, edgeBuilder, mcOp, lsqOp);
+
+  FConnectLoad connect = [&](LoadOpInterface loadOp, Value dataIn) {
+    loadOp->setOperand(1, dataIn);
+  };
+  return instantiateInterfaces(builder, edgeBuilder, connect, mcOp, lsqOp);
 }
 
 LogicalResult MemoryInterfaceBuilder::instantiateInterfaces(
     PatternRewriter &rewriter, handshake::MemoryControllerOp &mcOp,
     handshake::LSQOp &lsqOp) {
   BackedgeBuilder edgeBuilder(rewriter, memref.getLoc());
-  return instantiateInterfaces(rewriter, edgeBuilder, mcOp, lsqOp);
+  FConnectLoad connect = [&](LoadOpInterface loadOp, Value dataIn) {
+    rewriter.updateRootInPlace(loadOp, [&] { loadOp->setOperand(1, dataIn); });
+  };
+  return instantiateInterfaces(rewriter, edgeBuilder, connect, mcOp, lsqOp);
 }
 
 LogicalResult MemoryInterfaceBuilder::instantiateInterfaces(
     OpBuilder &builder, BackedgeBuilder &edgeBuilder,
-    handshake::MemoryControllerOp &mcOp, handshake::LSQOp &lsqOp) {
+    const FConnectLoad &connect, handshake::MemoryControllerOp &mcOp,
+    handshake::LSQOp &lsqOp) {
 
   // Determine interfaces' inputs
   InterfaceInputs inputs;
@@ -186,16 +195,16 @@ LogicalResult MemoryInterfaceBuilder::instantiateInterfaces(
   // At this point, all load ports are missing their second operand which is the
   // data value coming from a memory interface back to the port
   if (mcOp)
-    addMemDataResultToLoads(mcPorts, mcOp);
+    reconnectLoads(mcPorts, mcOp, connect);
   if (lsqOp)
-    addMemDataResultToLoads(lsqPorts, lsqOp);
+    reconnectLoads(lsqPorts, lsqOp, connect);
 
   return success();
 }
 
 SmallVector<Value, 2>
 MemoryInterfaceBuilder::getMemResultsToInterface(Operation *memOp) {
-  // For loads, address output go to memory
+  // For loads, address output goes to memory
   if (auto loadOp = dyn_cast<handshake::LoadOpInterface>(memOp))
     return SmallVector<Value, 2>{loadOp.getAddressOutput()};
 
@@ -219,14 +228,6 @@ Value MemoryInterfaceBuilder::getMCControl(Value ctrl, unsigned numStores,
   return cstOp.getResult();
 }
 
-void MemoryInterfaceBuilder::setLoadDataOperand(
-    handshake::LoadOpInterface loadOp, Value dataIn) {
-  SmallVector<Value, 2> operands;
-  operands.push_back(loadOp->getOperand(0));
-  operands.push_back(dataIn);
-  loadOp->setOperands(operands);
-}
-
 LogicalResult
 MemoryInterfaceBuilder::determineInterfaceInputs(InterfaceInputs &inputs,
                                                  OpBuilder &builder) {
@@ -244,12 +245,12 @@ MemoryInterfaceBuilder::determineInterfaceInputs(InterfaceInputs &inputs,
       return failure();
     inputs.lsqInputs.push_back(groupCtrl);
 
-    // Them, add all memory port results that go the interface to the list of
+    // Then, add all memory port results that go the interface to the list of
     // LSQ inputs
-    for (Operation *lsqOp : lsqGroupOps)
+    for (Operation *lsqOp : lsqGroupOps) {
       llvm::copy(getMemResultsToInterface(lsqOp),
                  std::back_inserter(inputs.lsqInputs));
-
+    }
     // Add the size of the group to our list
     inputs.lsqGroupSizes.push_back(lsqGroupOps.size());
   }
@@ -332,13 +333,14 @@ Value MemoryInterfaceBuilder::getCtrl(unsigned block) {
   return groupCtrl->second;
 }
 
-void MemoryInterfaceBuilder::addMemDataResultToLoads(InterfacePorts &ports,
-                                                     Operation *memIfaceOp) {
+void MemoryInterfaceBuilder::reconnectLoads(InterfacePorts &ports,
+                                            Operation *memIfaceOp,
+                                            const FConnectLoad &connect) {
   unsigned resIdx = 0;
   for (auto &[_, memGroupOps] : ports) {
     for (Operation *memOp : memGroupOps) {
       if (auto loadOp = dyn_cast<handshake::LoadOpInterface>(memOp))
-        setLoadDataOperand(loadOp, memIfaceOp->getResult(resIdx++));
+        connect(loadOp, memIfaceOp->getResult(resIdx++));
     }
   }
 }

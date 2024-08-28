@@ -24,6 +24,7 @@
 #include "dynamatic/Dialect/Handshake/HandshakeOps.h"
 #include "dynamatic/Dialect/Handshake/MemoryInterfaces.h"
 #include "dynamatic/Support/Attribute.h"
+#include "dynamatic/Support/Backedge.h"
 #include "dynamatic/Support/CFG.h"
 #include "mlir/Dialect/Affine/Analysis/AffineAnalysis.h"
 #include "mlir/Dialect/Affine/Utils.h"
@@ -233,8 +234,10 @@ LogicalResult LowerFuncToHandshake::matchAndRewrite(
   addMergeOps(funcOp, rewriter, argReplacements);
   addBranchOps(funcOp, rewriter);
 
+  BackedgeBuilder edgeBuilder(rewriter, funcOp->getLoc());
   LowerFuncToHandshake::MemInterfacesInfo memInfo;
-  if (failed(convertMemoryOps(funcOp, rewriter, memrefToArgIdx, memInfo)))
+  if (failed(convertMemoryOps(funcOp, rewriter, memrefToArgIdx, edgeBuilder,
+                              memInfo)))
     return failure();
 
   // First round of bb-tagging so that newly inserted Dynamatic memory ports get
@@ -680,6 +683,7 @@ LowerFuncToHandshake::MemAccesses::MemAccesses(BlockArgument memStart)
 LogicalResult LowerFuncToHandshake::convertMemoryOps(
     handshake::FuncOp funcOp, ConversionPatternRewriter &rewriter,
     const DenseMap<Value, unsigned> &memrefIndices,
+    BackedgeBuilder &edgeBuilder,
     LowerFuncToHandshake::MemInterfacesInfo &memInfo) const {
   // Count the number of memory regions in the function, and derive the starting
   // index of memory start arguments
@@ -734,16 +738,17 @@ LogicalResult LowerFuncToHandshake::convertMemoryOps(
             .Case<memref::LoadOp>([&](memref::LoadOp loadOp) {
               OperandRange indices = loadOp.getIndices();
               assert(indices.size() == 1 && "load must be unidimensional");
-              MemRefType type = cast<MemRefType>(memref.getType());
 
               Value addr = rewriter.getRemappedValue(indices.front());
               assert(addr && "failed to remap address");
+              Type dataTy = cast<MemRefType>(memref.getType()).getElementType();
+              Value data = edgeBuilder.get(channelifyType(dataTy));
 
               Operation *newOp;
               if (connectToMC)
-                newOp = rewriter.create<handshake::MCLoadOp>(loc, type, addr);
+                newOp = rewriter.create<handshake::MCLoadOp>(loc, addr, data);
               else
-                newOp = rewriter.create<handshake::LSQLoadOp>(loc, type, addr);
+                newOp = rewriter.create<handshake::LSQLoadOp>(loc, addr, data);
 
               // Record the memory access replacement
               memOpLowering.recordReplacement(loadOp, newOp, false);

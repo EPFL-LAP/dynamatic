@@ -94,12 +94,12 @@ public:
   /// Identifies all memory interfaces and their associated operations in the
   /// function, converts all load/store-like operations by their handshake
   /// counterparts, and fills `memInfo` with information about which operations
-  /// use which interface.
-  virtual LogicalResult
-  convertMemoryOps(handshake::FuncOp funcOp,
-                   ConversionPatternRewriter &rewriter,
-                   const DenseMap<Value, unsigned> &memrefIndices,
-                   MemInterfacesInfo &memInfo) const;
+  /// use which interface. The backedge builder is used to create temporary
+  /// values for the data input to converted load ports.
+  virtual LogicalResult convertMemoryOps(
+      handshake::FuncOp funcOp, ConversionPatternRewriter &rewriter,
+      const DenseMap<Value, unsigned> &memrefIndices,
+      BackedgeBuilder &edgeBuilder, MemInterfacesInfo &memInfo) const;
 
   /// Verifies that LSQ groups derived from input IR annotations make sense
   /// (check for linear dominance property within each group and cross-group

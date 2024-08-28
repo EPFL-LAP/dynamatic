@@ -1390,19 +1390,20 @@ SmallVector<MCBlock> MCPorts::getBlocks() {
 }
 
 LSQLoadStorePort MCPorts::getLSQPort() const {
-  assert(hasConnectionToLSQ() && "no LSQ connected");
+  assert(connectsToLSQ() && "no LSQ connected");
   std::optional<LSQLoadStorePort> lsqPort =
       dyn_cast<LSQLoadStorePort>(interfacePorts.front());
   assert(lsqPort && "lsq load/store port undefined");
   return *lsqPort;
 }
 
-LSQGroup::LSQGroup(GroupMemoryPorts *group) : group(group) {};
+LSQGroup::LSQGroup(GroupMemoryPorts *group, unsigned groupID)
+    : groupID(groupID), group(group) {}
 
 SmallVector<LSQGroup> LSQPorts::getGroups() {
   SmallVector<LSQGroup> lsqGroups;
-  for (GroupMemoryPorts &ports : groups)
-    lsqGroups.emplace_back(&ports);
+  for (auto [idx, ports] : llvm::enumerate(groups))
+    lsqGroups.emplace_back(&ports, idx);
   return lsqGroups;
 }
 
@@ -1413,7 +1414,7 @@ handshake::LSQOp LSQPorts::getLSQOp() const {
 }
 
 MCLoadStorePort LSQPorts::getMCPort() const {
-  assert(hasConnectionToMC() && "no LSQ connected");
+  assert(connectsToMC() && "no MC connected");
   std::optional<MCLoadStorePort> mcPort =
       dyn_cast<MCLoadStorePort>(interfacePorts.front());
   assert(mcPort && "mc load/store port undefined");

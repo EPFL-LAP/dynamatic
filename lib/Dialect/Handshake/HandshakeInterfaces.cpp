@@ -165,7 +165,7 @@ std::string handshake::MemoryControllerOp::getOperandName(unsigned idx) {
     return name;
 
   // Get the operand name from a port to an LSQ
-  assert(mcPorts.hasConnectionToLSQ() && "expected MC to connect to LSQ");
+  assert(mcPorts.connectsToLSQ() && "expected MC to connect to LSQ");
   LSQLoadStorePort lsqPort = mcPorts.getLSQPort();
   if (lsqPort.getLoadAddrInputIndex() == idx)
     return getArrayElemName(LD_ADDR, mcPorts.getNumPorts<LoadPort>());
@@ -187,7 +187,7 @@ std::string handshake::MemoryControllerOp::getResultName(unsigned idx) {
     return name;
 
   // Get the operand name from a port to an LSQ
-  assert(mcPorts.hasConnectionToLSQ() && "expected MC to connect to LSQ");
+  assert(mcPorts.connectsToLSQ() && "expected MC to connect to LSQ");
   LSQLoadStorePort lsqPort = mcPorts.getLSQPort();
   assert(lsqPort.getLoadDataOutputIndex() == idx && "unknown MC/LSQ result");
   return getArrayElemName(LD_DATA, mcPorts.getNumPorts<LoadPort>());
@@ -205,7 +205,7 @@ std::string handshake::LSQOp::getOperandName(unsigned idx) {
     return name;
 
   // Get the operand name from a port to a memory controller
-  assert(lsqPorts.hasConnectionToMC() && "expected LSQ to connect to MC");
+  assert(lsqPorts.connectsToMC() && "expected LSQ to connect to MC");
   assert(lsqPorts.getMCPort().getLoadDataInputIndex() == idx &&
          "unknown LSQ/MC operand");
   return "ldDataFromMC";
@@ -223,7 +223,7 @@ std::string handshake::LSQOp::getResultName(unsigned idx) {
     return name;
 
   // Get the operand name from a port to a memory controller
-  assert(lsqPorts.hasConnectionToMC() && "expected LSQ to connect to MC");
+  assert(lsqPorts.connectsToMC() && "expected LSQ to connect to MC");
   MCLoadStorePort mcPort = lsqPorts.getMCPort();
   if (mcPort.getLoadAddrOutputIndex() == idx)
     return "ldAddrToMC";

@@ -522,7 +522,7 @@ public:
   /// Initializes a function's memory ports from the memory interface it
   /// corresponds to (and without any port).
   FuncMemoryPorts(dynamatic::handshake::MemoryOpInterface memOp)
-      : memOp(memOp) {};
+      : memOp(memOp) {}
 
   /// Returns the continuous subrange of the memory interface's inputs which a
   /// group (indicated by its index in the list) maps to.
@@ -609,10 +609,10 @@ public:
   mlir::SmallVector<MCBlock> getBlocks();
 
   /// Determines whether the memory controller connects to an LSQ.
-  bool hasConnectionToLSQ() const { return !interfacePorts.empty(); }
+  bool connectsToLSQ() const { return !interfacePorts.empty(); }
 
   /// Returns the memory controller's LSQ ports (which must exist, check with
-  /// `hasConnectionToLSQ`).
+  /// `connectsToLSQ`).
   LSQLoadStorePort getLSQPort() const;
 };
 
@@ -620,8 +620,11 @@ public:
 /// the `dynamatic::handshake::LSQOp` memory interface.
 class LSQGroup {
 public:
+  /// ID of the group the MC group corresponds to.
+  unsigned groupID;
+
   /// Wraps a pointer to a `dynamatic::GroupMemoryPorts`.
-  LSQGroup(GroupMemoryPorts *groups);
+  LSQGroup(GroupMemoryPorts *groups, unsigned groupID);
 
   /// Returns a reference to the underlying group.
   GroupMemoryPorts &operator*() { return *group; };
@@ -645,17 +648,19 @@ public:
   dynamatic::handshake::LSQOp getLSQOp() const;
 
   /// Returns the ports corresponding to a single LSQ groups.
-  LSQGroup getGroup(unsigned groupIdx) { return LSQGroup(&groups[groupIdx]); }
+  LSQGroup getGroup(unsigned groupIdx) {
+    return LSQGroup(&groups[groupIdx], groupIdx);
+  }
 
   /// Returns a list of all LSQ groups, in definition order in the memory
   /// interface's inputs.
   mlir::SmallVector<LSQGroup> getGroups();
 
   /// Determines whether the LSQ connects to a memory controller.
-  bool hasConnectionToMC() const { return !interfacePorts.empty(); }
+  bool connectsToMC() const { return !interfacePorts.empty(); }
 
   /// Returns the LSQ's memory controller ports (which must exist, check with
-  /// `hasConnectionToMC`).
+  /// `connectsToMC`).
   MCLoadStorePort getMCPort() const;
 };
 
