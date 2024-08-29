@@ -101,6 +101,28 @@ class Handshake_Arith_IToICastOp<string mnemonic, list<Trait> traits = []> :
   let hasVerifier = 1;
 }
 
+class Handshake_Arith_IToFCastOp<string mnemonic, list<Trait> traits = []> :
+  Handshake_Arith_Op<mnemonic, traits # [ReshapableChannelsInterface]
+> {
+  let arguments = (ins IntChannelType:$in);
+  let results = (outs FloatChannelType:$out);
+  
+  let assemblyFormat = "$in attr-dict `:` type($in) `to` type($out)";
+
+  let hasVerifier = 1;
+}
+
+class Handshake_Arith_FToICastOp<string mnemonic, list<Trait> traits = []> :
+  Handshake_Arith_Op<mnemonic, traits # [ReshapableChannelsInterface]
+> {
+  let arguments = (ins FloatChannelType:$in);
+  let results = (outs IntChannelType:$out);
+  
+  let assemblyFormat = "$in attr-dict `:` type($in) `to` type($out)";
+
+  let hasVerifier = 1;
+}
+
 //===----------------------------------------------------------------------===//
 // Operation definitions
 //===----------------------------------------------------------------------===//
@@ -290,6 +312,14 @@ def Handshake_TruncIOp : Handshake_Arith_IToICastOp<"trunci"> {
 
 def Handshake_XOrIOp : Handshake_Arith_IntBinaryOp<"xori", [Commutative]> {
   let summary = "Bitwise exclusive union.";
+}
+
+def Handshake_SIToFPOp : Handshake_Arith_IToFCastOp<"sitofp"> {
+  let summary = "Converts a signed integer to float.";
+}
+
+def Handshake_FPToSIOp : Handshake_Arith_FToICastOp<"fptosi"> {
+  let summary = "Converts a float to signed integer.";
 }
 
 #endif // DYNAMATIC_DIALECT_HANDSHAKE_HANDSHAKE_ARTIH_OPS_TD
