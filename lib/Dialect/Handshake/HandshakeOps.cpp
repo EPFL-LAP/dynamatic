@@ -2214,5 +2214,20 @@ LogicalResult SIToFPOp::verify() {
   return success();
 }
 
+//===----------------------------------------------------------------------===//
+// ExtFOp
+//===----------------------------------------------------------------------===//
+LogicalResult ExtFOp::verify() {
+  ChannelType srcType = getIn().getType();
+  ChannelType dstType = getOut().getType();
+
+  if (srcType.getDataBitWidth() < dstType.getDataBitWidth()) {
+    return emitError() << "result channel's data type " << dstType.getDataType()
+                       << " must be narrower than operand type "
+                       << srcType.getDataType();
+  }
+  return success();
+}
+
 #define GET_OP_CLASSES
 #include "dynamatic/Dialect/Handshake/Handshake.cpp.inc"
