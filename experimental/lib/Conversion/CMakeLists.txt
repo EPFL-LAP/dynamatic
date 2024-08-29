@@ -1,6 +1,9 @@
 add_dynamatic_library(DynamaticExperimentalConversion
   FtdCfToHandshake.cpp
+<<<<<<< HEAD
   FtdMemoryInterface.cpp
+=======
+>>>>>>> 1762f18 (Skeleton of FTD `cf` to `handshake` conversion pass)
 
   DEPENDS
   DynamaticConversionPassIncGen
@@ -16,8 +19,11 @@ add_dynamatic_library(DynamaticExperimentalConversion
   MLIRSupport
   MLIRTransforms
   MLIRAffineToStandard
+<<<<<<< HEAD
   DynamaticExperimentalSupportBooleanLogic
   DynamaticSupportEspresso
   DynamaticExperimentalSupport
+=======
+>>>>>>> 1762f18 (Skeleton of FTD `cf` to `handshake` conversion pass)
   )
 

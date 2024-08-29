@@ -1,5 +1,9 @@
+<<<<<<< HEAD
 //===- FtdCfToHandhsake.h - Convert func/cf to handhsake dialect -*- C++
 //-*-===//
+=======
+//===- FtdCfToHandhsake.h - Convert func/cf to handhsake dialect -*- C++ -*-===//
+>>>>>>> 1762f18 (Skeleton of FTD `cf` to `handshake` conversion pass)
 //
 // Dynamatic is under the Apache License v2.0 with LLVM Exceptions.
 // See https://llvm.org/LICENSE.txt for license information.
@@ -16,6 +20,7 @@
 #define DYNAMATIC_CONVERSION_FTD_CF_TO_HANDSHAKE_H
 
 #include "dynamatic/Conversion/CfToHandshake.h"
+<<<<<<< HEAD
 #include "dynamatic/Dialect/Handshake/HandshakeInterfaces.h"
 #include "dynamatic/Dialect/Handshake/HandshakeOps.h"
 #include "dynamatic/Support/DynamaticPass.h"
@@ -23,11 +28,18 @@
 #include "experimental/Analysis/GsaAnalysis.h"
 #include "experimental/Conversion/FtdMemoryInterface.h"
 #include "mlir/Analysis/CFGLoopInfo.h"
+=======
+#include "dynamatic/Support/LLVM.h"
+#include "mlir/Dialect/Func/IR/FuncOps.h"
+#include "mlir/IR/Attributes.h"
+#include "mlir/Transforms/DialectConversion.h"
+>>>>>>> 1762f18 (Skeleton of FTD `cf` to `handshake` conversion pass)
 
 namespace dynamatic {
 namespace experimental {
 namespace ftd {
 
+<<<<<<< HEAD
 enum BranchToLoopType {
   MoreProducerThanConsumers,
   SelfRegeneration,
@@ -169,6 +181,8 @@ protected:
                                ConversionPatternRewriter &rewriter,
                                FtdStoredOperations &ftdOps) const;
 };
+=======
+>>>>>>> 1762f18 (Skeleton of FTD `cf` to `handshake` conversion pass)
 #define GEN_PASS_DECL_FTDCFTOHANDSHAKE
 #define GEN_PASS_DEF_FTDCFTOHANDSHAKE
 #include "experimental/Conversion/Passes.h.inc"
