@@ -28,6 +28,7 @@ public:
     AdjListGraph(buffer::CFDFC cfdfc, TimingDatabase timingDB, unsigned II);
 
     void printGraph();
+    void printPath(std::vector<std::string> path);
 
     std::vector<std::vector<std::string>> findPaths(mlir::Operation *startOp, mlir::Operation *endOp, bool ignoreBackedge = false);
     std::vector<std::vector<std::string>> findPaths(std::string start, std::string end, bool ignoreBackedge = false);

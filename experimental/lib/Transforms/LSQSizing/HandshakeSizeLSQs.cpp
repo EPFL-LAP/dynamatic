@@ -84,6 +84,11 @@ void HandshakeSizeLSQsPass::runDynamaticPass() {
     DictionaryAttr troughputAttr = getUniqueAttr<handshake::CFDFCThroughputAttr>(funcOp).getThroughputMap();
     DictionaryAttr cfdfcAttr = getUniqueAttr<handshake::CFDFCToBBListAttr>(funcOp).getCfdfcMap();
 
+
+    // TODO this part will be rewritten to not use the CFDFC constructor, ArchSet and ArchBB class from buffer placement (line 96 - 114)
+    // Some of the features are not needed and it would look more clean to make my own constructor instead to directly build
+    // the data strucuture i work with instead of converting it from the buffer placement data structure
+      
     // Extract Arch sets
     for(auto &entry: cfdfcAttr) {
       SmallVector<experimental::ArchBB> archStore;
@@ -108,6 +113,7 @@ void HandshakeSizeLSQsPass::runDynamaticPass() {
 
       cfdfcs.insert_or_assign(std::stoi(entry.getName().str()), buffer::CFDFC(funcOp, archSet, 0));
     }
+
 
     // Extract II
     for (const NamedAttribute attr : troughputAttr) {
@@ -168,11 +174,10 @@ LSQSizingResult HandshakeSizeLSQsPass::sizeLSQsForCFDFC(buffer::CFDFC cfdfc, uns
 
   // connect all phi nodes to the lsq ps in their BB
   insertAllocPrecedesMemoryAccessEdges(graph, loadOps, phiNodes);
-  insertLoadStoreEdge(graph, loadOps, storeOps);
 
-  //llvm::dbgs() << "============================\n";
-  //graph.printGraph();
-  //llvm::dbgs() << "============================\n";
+  llvm::dbgs() << "============================\n";
+  graph.printGraph();
+  llvm::dbgs() << "============================\n";
 
   // Get Alloc Time of each Op (Start time of BB) 
   std::unordered_map<mlir::Operation *, int> loadAllocTimes = getAllocTimes(graph, startNode, loadOps, phiNodes);
@@ -288,7 +293,6 @@ std::unordered_map<unsigned, mlir::Operation *> HandshakeSizeLSQsPass::getPhiNod
   for(auto &entry: phiNodeCandidates) {
     mlir::Operation *phiNode = nullptr;
     int minLatency = INT_MAX;
-    //llvm::dbgs() << "\t [DBG] Phi Node Candidates for BB " << entry.first << ":\n";
     for(auto &op: entry.second) {
       int latency = graph.findMinPathLatency(startNode, op, true); //TODO think about if backedges should be ignored or not
       //llvm::dbgs() << "\t\t [DBG] Latency from " << startNode->getAttrOfType<StringAttr>("handshake.name").str() << " to " << op->getAttrOfType<StringAttr>("handshake.name").str() << " is " << latency << "\n";

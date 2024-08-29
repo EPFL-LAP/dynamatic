@@ -12,6 +12,7 @@ using namespace dynamatic;
 using namespace dynamatic::experimental::lsqsizing;
 
 
+// TODO will be rewritten to not use the buffer placement cfdfc class, but directly construct the adjaceny list from the mlir graph and the cfdfc attribute
 AdjListGraph::AdjListGraph(buffer::CFDFC cfdfc, TimingDatabase timingDB, unsigned II) {
 
     for(auto &unit: cfdfc.units) {
@@ -71,6 +72,13 @@ void AdjListGraph::printGraph() {
         }
         llvm::dbgs() << "\n";
     }
+}
+
+void AdjListGraph::printPath(std::vector<std::string> path) {
+    for (std::string node : path) {
+        llvm::dbgs() << node << "(" << nodes.at(node).latency << ") - ";
+    }
+    llvm::dbgs() << "\n";
 }
 
 void AdjListGraph::insertArtificialNodeOnBackedge(mlir::Operation* src, mlir::Operation* dest, int latency) {
@@ -205,16 +213,14 @@ int AdjListGraph::findMaxPathLatency(mlir::Operation *startOp, mlir::Operation *
   std::vector<std::string> maxPath;
   for(auto &path: paths)
   {
-    if(maxLatency < getPathLatency(path)) {
-      maxLatency = getPathLatency(path);
+    int latency = getPathLatency(path);
+    llvm::dbgs() << "latency: " << latency << " path: ";
+    printPath(path);
+    if(maxLatency < latency) {
+      maxLatency = latency;
       maxPath = path;
     }
   }
-  llvm::dbgs() << "Max path: ";
-  for(auto &node: maxPath) {
-    llvm::dbgs() << node << " ";
-  }
-  llvm::dbgs() << "\n";
 
   return maxLatency;
 }
@@ -238,7 +244,6 @@ std::vector<mlir::Operation*> AdjListGraph::getConnectedOps(mlir::Operation *op)
     connectedOps.push_back(nodes.at(node).op);
   }
 
-  //TODO cleanup (make more general?)
   for(auto &aritificalNode: nodes.at(opName).backedges) {
     for(auto &node: nodes.at(aritificalNode).backedges) {
       connectedOps.push_back(nodes.at(node).op);
