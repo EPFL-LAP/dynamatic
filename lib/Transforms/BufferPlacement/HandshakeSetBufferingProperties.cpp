@@ -21,7 +21,6 @@
 #include "dynamatic/Analysis/NameAnalysis.h"
 #include "dynamatic/Dialect/Handshake/HandshakeInterfaces.h"
 #include "dynamatic/Dialect/Handshake/HandshakeOps.h"
-#include "dynamatic/Dialect/Handshake/MemoryInterfaces.h"
 #include "dynamatic/Transforms/BufferPlacement/BufferingSupport.h"
 #include "dynamatic/Transforms/HandshakeMaterialize.h"
 #include "mlir/IR/Value.h"
@@ -41,12 +40,6 @@ static void makeUnbufferizable(Value val) {
   Channel channel(val, true);
   channel.props->maxOpaque = 0;
   channel.props->maxTrans = 0;
-}
-
-/// Contain-like query on a `SmallVector`. Runs in linear time in the vector's
-/// size.
-static bool vectorContains(Value find, SmallVector<Value> &values) {
-  return llvm::any_of(values, [&](Value path) { return path == find; });
 }
 
 /// Sets buffering constraints related to the LSQ's control path. Output
@@ -71,41 +64,42 @@ static void setLSQControlConstraints(handshake::LSQOp lsqOp) {
     // Force placement of an opaque buffer slot on other fork output channels
     // triggering group allocations to the same LSQ. Other output channels not
     // part of the control paths to the LSQ get a transparent buffer slot
-    SmallVector<Value> ctrlPaths = getLSQControlPaths(lsqOp, ctrlDefOp);
+    SmallVector<Value> ctrlPaths = lsqOp.getControlPaths(ctrlDefOp);
+    llvm::SmallSetVector<Value, 4> ctrlPathSet(ctrlPaths.begin(),
+                                               ctrlPaths.end());
     for (OpResult forkRes : ctrlDefOp->getResults()) {
-      if (forkRes != ctrlVal) {
-        if (vectorContains(forkRes, ctrlPaths)) {
-          // Path goes to other group allocation to the same LSQ
-          Channel channel(forkRes, true);
-          if (channel.props->maxOpaque.value_or(1) > 0) {
-            channel.props->minOpaque = std::max(channel.props->minOpaque, 1U);
-          } else {
-            // Do nothing but warn that circuit behavior may be incorrect
-            OpOperand &oprd = channel.getOperand();
-            ctrlDefOp->emitWarning()
-                << "Fork result " << forkRes.getResultNumber() << " ("
-                << getUniqueName(oprd)
-                << ") is on path to other LSQ group allocation and should "
-                   "have its data/valid paths cut, "
-                << ERR_CONFLICT;
-          }
+      // Channels connecting directly to LSQs should be left alone (group
+      // allocation signals have already been rendered unbufferizable before)
+      if (isa<handshake::LSQOp>(*forkRes.getUsers().begin()))
+        continue;
+
+      if (ctrlPathSet.contains(forkRes)) {
+        // Path goes to other group allocation to the same LSQ
+        Channel channel(forkRes, true);
+        if (channel.props->maxOpaque.value_or(1) > 0) {
+          channel.props->minOpaque = std::max(channel.props->minOpaque, 1U);
         } else {
-          // Path does not go to the same LSQ
-          Channel channel(forkRes, true);
-          if (channel.props->maxTrans.value_or(1) > 0) {
-            channel.props->minTrans = std::max(channel.props->minTrans, 1U);
-          } else if (!isa<handshake::LSQOp>(channel.consumer)) {
-            // Unless the channel's consumer is another LSQ (which may happen
-            // in legally formed circuits), warn that circuit behavior may be
-            // incorrect
-            OpOperand &oprd = channel.getOperand();
-            ctrlDefOp->emitWarning()
-                << "Fork result " << forkRes.getResultNumber() << " ("
-                << getUniqueName(oprd)
-                << ") is *not* on path to other LSQ group allocation and "
-                   "should have its ready path cut, "
-                << ERR_CONFLICT;
-          }
+          OpOperand &oprd = channel.getOperand();
+          ctrlDefOp->emitWarning()
+              << "Fork result " << forkRes.getResultNumber() << " ("
+              << getUniqueName(oprd)
+              << ") is on path to other LSQ group allocation and should "
+                 "have its data/valid paths cut, "
+              << ERR_CONFLICT;
+        }
+      } else {
+        // Path does not go to the same LSQ
+        Channel channel(forkRes, true);
+        if (channel.props->maxTrans.value_or(1) > 0) {
+          channel.props->minTrans = std::max(channel.props->minTrans, 1U);
+        } else {
+          OpOperand &oprd = channel.getOperand();
+          ctrlDefOp->emitWarning()
+              << "Fork result " << forkRes.getResultNumber() << " ("
+              << getUniqueName(oprd)
+              << ") is *not* on path to other LSQ group allocation and "
+                 "should have its ready path cut, "
+              << ERR_CONFLICT;
         }
       }
     }
