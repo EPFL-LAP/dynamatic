@@ -95,7 +95,7 @@ struct FrontendState {
   double targetCP = 4.0;
   std::optional<std::string> sourcePath = std::nullopt;
 
-  FrontendState(StringRef cwd) : cwd(cwd), dynamaticPath(cwd) {};
+  FrontendState(StringRef cwd) : cwd(cwd), dynamaticPath(cwd){};
 
   bool sourcePathIsSet(StringRef keyword);
 
@@ -130,7 +130,7 @@ struct Argument {
 
   Argument() = default;
 
-  Argument(StringRef name, StringRef desc) : name(name), desc(desc) {};
+  Argument(StringRef name, StringRef desc) : name(name), desc(desc){};
 };
 
 struct CommandArguments {
@@ -195,7 +195,7 @@ private:
 class Exit : public Command {
 public:
   Exit(FrontendState &state)
-      : Command("exit", "Exits the Dynamatic frontend", state) {};
+      : Command("exit", "Exits the Dynamatic frontend", state){};
 
   CommandResult execute(CommandArguments &args) override;
 };
@@ -203,7 +203,7 @@ public:
 class Help : public Command {
 public:
   Help(FrontendState &state)
-      : Command("help", "Displays this help message", state) {};
+      : Command("help", "Displays this help message", state){};
 
   CommandResult execute(CommandArguments &args) override;
 };
@@ -252,6 +252,8 @@ public:
 class Compile : public Command {
 public:
   static constexpr llvm::StringLiteral SIMPLE_BUFFERS = "simple-buffers";
+  static constexpr llvm::StringLiteral FAST_TOKEN_DELIVERY =
+      "fast-token-delivery";
 
   Compile(FrontendState &state)
       : Command("compile",
@@ -259,6 +261,7 @@ public:
                 "produces both handshake-level IR and an equivalent DOT file",
                 state) {
     addFlag({SIMPLE_BUFFERS, "Use simple buffer placement"});
+    addFlag({FAST_TOKEN_DELIVERY, "Use fast token delivery strategy"});
   }
 
   CommandResult execute(CommandArguments &args) override;
@@ -559,6 +562,8 @@ CommandResult Compile::execute(CommandArguments &args) {
 
   std::string script = state.getScriptsPath() + getSeparator() + "compile.sh";
   std::string buffers = args.flags.contains(SIMPLE_BUFFERS) ? "1" : "0";
+  std::string fastTokenDelivery =
+      args.flags.contains(FAST_TOKEN_DELIVERY) ? "1" : "0";
 
   state.polygeistPath = state.polygeistPath.empty()
                             ? state.dynamaticPath + getSeparator() + "polygeist"
@@ -566,7 +571,8 @@ CommandResult Compile::execute(CommandArguments &args) {
 
   return execCmd(script, state.dynamaticPath, state.getKernelDir(),
                  state.getOutputDir(), state.getKernelName(), buffers,
-                 floatToString(state.targetCP, 3), state.polygeistPath);
+                 floatToString(state.targetCP, 3), state.polygeistPath,
+                 fastTokenDelivery);
 }
 
 CommandResult WriteHDL::execute(CommandArguments &args) {

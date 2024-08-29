@@ -24,6 +24,7 @@ target_link_libraries(dynamatic-opt
   DynamaticTestTransforms
   DynamaticTransforms
   DynamaticTutorialsCreatingPasses
+  DynamaticExperimentalConversion
   DynamaticExperimentalTestTransforms
   DynamaticExperimentalSupport
   DynamaticExperimentalTransforms

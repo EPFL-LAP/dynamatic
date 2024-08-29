@@ -21,6 +21,7 @@
 #include "dynamatic/Support/LLVM.h"
 #include "dynamatic/Transforms/FuncMaximizeSSA.h"
 #include "mlir/Dialect/Func/IR/FuncOps.h"
+#include "mlir/Dialect/LLVMIR/LLVMDialect.h"
 #include "mlir/IR/Attributes.h"
 #include "mlir/Transforms/DialectConversion.h"
 
@@ -169,6 +170,79 @@ private:
 class FuncSSAStrategy : public dynamatic::SSAMaximizationStrategy {
   /// Filters out block arguments of type MemRefType
   bool maximizeArgument(BlockArgument arg) override;
+};
+
+template <typename SrcOp, typename DstOp>
+struct OneToOneConversion : public OpConversionPattern<SrcOp> {
+public:
+  using OpAdaptor = typename SrcOp::Adaptor;
+
+  OneToOneConversion(NameAnalysis &namer, const TypeConverter &typeConverter,
+                     MLIRContext *ctx)
+      : OpConversionPattern<SrcOp>(typeConverter, ctx), namer(namer) {}
+
+  LogicalResult
+  matchAndRewrite(SrcOp srcOp, OpAdaptor adaptor,
+                  ConversionPatternRewriter &rewriter) const override;
+
+protected:
+  /// Reference to the running pass's naming analysis.
+  NameAnalysis &namer;
+};
+
+template <typename CastOp, typename ExtOp>
+struct ConvertIndexCast : public OpConversionPattern<CastOp> {
+public:
+  using OpAdaptor = typename CastOp::Adaptor;
+
+  ConvertIndexCast(NameAnalysis &namer, const TypeConverter &typeConverter,
+                   MLIRContext *ctx)
+      : OpConversionPattern<CastOp>(typeConverter, ctx), namer(namer) {}
+
+  LogicalResult
+  matchAndRewrite(CastOp castOp, OpAdaptor adaptor,
+                  ConversionPatternRewriter &rewriter) const override;
+
+protected:
+  /// Reference to the running pass's naming analysis.
+  NameAnalysis &namer;
+};
+
+/// Converts each `func::CallOp` operation to an equivalent
+/// `handshake::InstanceOp` operation.
+struct ConvertCalls : public DynOpConversionPattern<mlir::func::CallOp> {
+public:
+  using DynOpConversionPattern<mlir::func::CallOp>::DynOpConversionPattern;
+
+  LogicalResult
+  matchAndRewrite(mlir::func::CallOp callOp, OpAdaptor adaptor,
+                  ConversionPatternRewriter &rewriter) const override;
+};
+
+/// Convers arith-level constants to handshake-level constants. Constants are
+/// triggered by a source if their successor is not a branch/return or memory
+/// operation. Otherwise they are triggered by the control-only network.
+struct ConvertConstants
+    : public DynOpConversionPattern<mlir::arith::ConstantOp> {
+public:
+  using DynOpConversionPattern<mlir::arith::ConstantOp>::DynOpConversionPattern;
+
+  LogicalResult
+  matchAndRewrite(mlir::arith::ConstantOp cstOp, OpAdaptor adaptor,
+                  ConversionPatternRewriter &rewriter) const override;
+};
+
+/// Converts undefined operations (LLVM::UndefOp) with a default "0" constant
+/// triggered by the control merge of the block associated to the matched
+/// operation.
+struct ConvertUndefinedValues
+    : public DynOpConversionPattern<mlir::LLVM::UndefOp> {
+public:
+  using DynOpConversionPattern<mlir::LLVM::UndefOp>::DynOpConversionPattern;
+
+  LogicalResult
+  matchAndRewrite(mlir::LLVM::UndefOp undefOp, OpAdaptor adaptor,
+                  ConversionPatternRewriter &rewriter) const override;
 };
 
 #define GEN_PASS_DECL_CFTOHANDSHAKE
