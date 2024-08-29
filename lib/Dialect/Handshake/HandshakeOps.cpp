@@ -31,6 +31,7 @@
 #include "mlir/IR/OpImplementation.h"
 #include "mlir/IR/PatternMatch.h"
 #include "mlir/IR/Value.h"
+#include "mlir/IR/ValueRange.h"
 #include "mlir/Interfaces/FunctionImplementation.h"
 #include "mlir/Support/LogicalResult.h"
 #include "mlir/Transforms/InliningUtils.h"
@@ -1409,30 +1410,39 @@ mlir::ValueRange FuncMemoryPorts::getGroupResults(unsigned groupIdx) {
   return memOp->getResults().slice(firstIdx, lastIdx - firstIdx + 1);
 }
 
-mlir::ValueRange FuncMemoryPorts::getInterfacesInputs() {
-  ValueRange memResults = memOp->getOperands();
-  for (const MemoryPort &port : interfacePorts) {
-    if (std::optional<MCLoadStorePort> mc = dyn_cast<MCLoadStorePort>(port)) {
-      return memResults.drop_front(mc->getLoadDataInputIndex());
+namespace {
+using FGetIndices = std::function<ArrayRef<unsigned>(const MemoryPort &)>;
+} // namespace
+
+static ValueRange getInterfaceValueRange(const FuncMemoryPorts &ports,
+                                         ValueRange allValues,
+                                         const FGetIndices &fGetIndices) {
+  size_t firstIdx = std::string::npos;
+  for (const MemoryPort &port : ports.interfacePorts) {
+    if (auto indices = fGetIndices(port); !indices.empty()) {
+      firstIdx = indices.front();
+      break;
     }
-    std::optional<LSQLoadStorePort> lsq = dyn_cast<LSQLoadStorePort>(port);
-    assert(lsq && "port must be mc load/store or lsq load/store");
-    return memResults.drop_front(lsq->getLoadAddrInputIndex());
   }
+  if (firstIdx == std::string::npos)
+    return {};
+
+  for (const MemoryPort &port : llvm::reverse(ports.interfacePorts)) {
+    if (auto indices = fGetIndices(port); !indices.empty())
+      return allValues.slice(firstIdx, indices.back() - firstIdx + 1);
+  }
+  llvm_unreachable("no last index, this is impossible");
   return {};
 }
 
-mlir::ValueRange FuncMemoryPorts::getInterfacesResults() {
-  ValueRange memOperands = memOp->getResults();
-  for (const MemoryPort &port : interfacePorts) {
-    if (std::optional<MCLoadStorePort> mc = dyn_cast<MCLoadStorePort>(port)) {
-      return memOperands.drop_front(mc->getLoadAddrOutputIndex());
-    }
-    std::optional<LSQLoadStorePort> lsq = dyn_cast<LSQLoadStorePort>(port);
-    assert(lsq && "port must be mc load/store or lsq load/store");
-    return memOperands.drop_front(lsq->getLoadDataOutputIndex());
-  }
-  return {};
+ValueRange FuncMemoryPorts::getInterfacesInputs() {
+  return getInterfaceValueRange(*this, memOp->getOperands(),
+                                &MemoryPort::getOprdIndices);
+}
+
+ValueRange FuncMemoryPorts::getInterfacesResults() {
+  return getInterfaceValueRange(*this, memOp->getResults(),
+                                &MemoryPort::getResIndices);
 }
 
 MCBlock::MCBlock(GroupMemoryPorts *group, unsigned blockID)
