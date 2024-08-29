@@ -54,21 +54,16 @@ public:
     }
   };
 
-  // All public functions are accessible from outside of the pass and require
-  // the outside to specify the index of the funcOp of interest. If the outside
-  // has a func::FuncOp rather than a ModuleOp, they should just pass a 0
-
   // return all BBs that the block in the argument, belonging to the funcOp of
   // the passed idx, is control dependent on
-  void calculateBlockControlDeps(Block *block, int funcOp_idx,
-                                 SmallVector<Block *> &returned_control_deps);
+  void getBlockAllControlDeps(Block *block, mlir::func::FuncOp &funcOp,
+                              DenseSet<Block *> &all_control_deps);
 
   // return only forward dependencies (i.e., excluding loop exits) that the
   // block in the argument, belonging to the funcOp of the passed idx, is
   // control dependent on
-  void calculateBlockForwardControlDeps(
-      Block *block, int funcOp_idx,
-      SmallVector<Block *> &returned_forward_control_deps);
+  void getBlockForwardControlDeps(Block *block, mlir::func::FuncOp &funcOp,
+                                  DenseSet<Block *> &forward_control_deps);
 
   /// Invalidation hook to keep the analysis cached across passes. Returns true
   /// if the analysis should be invalidated and fully reconstructed the next
@@ -78,25 +73,26 @@ public:
   }
 
 private:
-  SmallVector<DenseMap<Block *, SmallVector<Block *, 6>>, 6>
-      all_control_deps_maps;
+  // structure to hold the control dependence information of every block
+  struct BlockControlDeps {
+    DenseSet<Block *> all_control_deps;
+    DenseSet<Block *> forward_control_deps;
+  };
+  using BlockControlDepsMap = DenseMap<Block *, BlockControlDeps>;
+  DenseMap<mlir::func::FuncOp, BlockControlDepsMap> func_blocks_control_deps;
 
-  // For every func::FuncOp, contains only the forward control dependencies,
-  // excluding the loop exit conditions
-  SmallVector<DenseMap<Block *, SmallVector<Block *, 6>>, 6>
-      forward_control_deps_maps;
-
-  // Simply fill one entry of all_control_deps_maps, corresponding to one funcOp
+  // fill the all_control_deps field of the entry in func_blocks_control_deps
+  // corresponding to one funcOp
   void identifyAllControlDeps(mlir::func::FuncOp &funcOp);
 
   // helper function called inside identifyAllControlDeps
   void addDepsFromPostDomTree();
 
-  // Simply extract one entry of forward_control_deps_maps from the
-  // all_control_deps_maps, corresponding to one funcOp
+  // fill the forward_control_deps field of the entry in
+  // func_blocks_control_deps corresponding to one funcOp
   void identifyForwardControlDeps(mlir::func::FuncOp &funcOp);
 
-  // Returns all postDominator tree nodes between start_node and end_node in the
+  // returns all postDominator tree nodes between start_node and end_node in the
   // postDominator tree
   void enumeratePathsInPostDomTree(
       Block *start_block, Block *end_block, Region *funcReg,
@@ -115,7 +111,7 @@ private:
   // adjusts the dependencies of each block to include nested dependencies
   // (i.e., the dependencies of its depenendencies)
   void addDepsOfDeps(mlir::func::FuncOp &funcOp,
-                     DenseMap<Block *, SmallVector<Block *>> &control_deps_map);
+                     BlockControlDepsMap &block_control_deps_map);
 };
 
 } // namespace dynamatic
