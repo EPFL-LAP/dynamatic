@@ -10,9 +10,8 @@
 #include <math.h>
 
 void lu(in_float_t A[N][N], inout_float_t L[N][N], inout_float_t U[N][N],
-        inout_float_t P[N][N]) {
+        inout_float_t P[N][N], in_float_t A_prime[N][N]) {
 
-  float A_prime[N][N];
   // Pivot
   for (int i = 0; i < N; i++) {
     for (int j = 0; j < N; j++) {
@@ -70,15 +69,16 @@ int main() {
   inout_float_t L[N][N];
   inout_float_t U[N][N];
   inout_float_t P[N][N];
+  inout_float_t A_prime[N][N];
 
   for (int i = 0; i < N; i++) {
     for (int j = 0; j < N; j++) {
-      // A[i][j] = i + j;
       L[i][j] = 0.0;
       U[i][j] = 0.0;
+      A_prime[i][j] = 0.0;
     }
   }
-  lu(A, L, U, P);
+  lu(A, L, U, P, A_prime);
 
 #ifdef VERBOSE
   _PRINT(A);
