@@ -1,4 +1,5 @@
-//===- FtdCfToHandhsake.h - Convert func/cf to handhsake dialect -*- C++ -*-===//
+//===- FtdCfToHandhsake.h - Convert func/cf to handhsake dialect -*- C++
+//-*-===//
 //
 // Dynamatic is under the Apache License v2.0 with LLVM Exceptions.
 // See https://llvm.org/LICENSE.txt for license information.
@@ -15,14 +16,33 @@
 #define DYNAMATIC_CONVERSION_FTD_CF_TO_HANDSHAKE_H
 
 #include "dynamatic/Conversion/CfToHandshake.h"
+#include "dynamatic/Dialect/Handshake/HandshakeInterfaces.h"
+#include "dynamatic/Dialect/Handshake/HandshakeOps.h"
+#include "dynamatic/Support/Backedge.h"
+#include "dynamatic/Support/DynamaticPass.h"
 #include "dynamatic/Support/LLVM.h"
+#include "dynamatic/Transforms/FuncMaximizeSSA.h"
 #include "mlir/Dialect/Func/IR/FuncOps.h"
+#include "mlir/Dialect/LLVMIR/LLVMDialect.h"
 #include "mlir/IR/Attributes.h"
 #include "mlir/Transforms/DialectConversion.h"
 
 namespace dynamatic {
 namespace experimental {
 namespace ftd {
+
+/// Convert a func-level function into an handshake-level function. A custom
+/// behavior is defined so that the functionalities of the `fast delivery token`
+/// methodology can be implemented.
+class FtdLowerFuncToHandshake : public LowerFuncToHandshake {
+
+  // Use the same constructors from the base class
+  using LowerFuncToHandshake::LowerFuncToHandshake;
+
+  LogicalResult
+  matchAndRewrite(mlir::func::FuncOp funcOp, OpAdaptor adaptor,
+                  ConversionPatternRewriter &rewriter) const override;
+};
 
 #define GEN_PASS_DECL_FTDCFTOHANDSHAKE
 #define GEN_PASS_DEF_FTDCFTOHANDSHAKE

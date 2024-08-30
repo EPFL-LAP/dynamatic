@@ -52,8 +52,8 @@ struct FtdCfToHandshakePass
 
     CfToHandshakeTypeConverter converter;
     RewritePatternSet patterns(ctx);
-    patterns.add<LowerFuncToHandshake, ConvertConstants, ConvertCalls,
-                 ConvertUndefinedValues,
+    patterns.add<experimental::ftd::FtdLowerFuncToHandshake, ConvertConstants,
+                 ConvertCalls, ConvertUndefinedValues,
                  ConvertIndexCast<arith::IndexCastOp, handshake::ExtSIOp>,
                  ConvertIndexCast<arith::IndexCastUIOp, handshake::ExtUIOp>,
                  OneToOneConversion<arith::AddFOp, handshake::AddFOp>,
@@ -99,6 +99,52 @@ struct FtdCfToHandshakePass
 namespace dynamatic {
 namespace experimental {
 namespace ftd {
+
+using ArgReplacements = DenseMap<BlockArgument, OpResult>;
+
+LogicalResult FtdLowerFuncToHandshake::matchAndRewrite(
+    func::FuncOp lowerFuncOp, OpAdaptor /*adaptor*/,
+    ConversionPatternRewriter &rewriter) const {
+
+  // Map all memory accesses in the matched function to the index of their
+  // memref in the function's arguments
+  DenseMap<Value, unsigned> memrefToArgIdx;
+  for (auto [idx, arg] : llvm::enumerate(lowerFuncOp.getArguments())) {
+    if (isa<mlir::MemRefType>(arg.getType()))
+      memrefToArgIdx.insert({arg, idx});
+  }
+
+  // First lower the parent function itself, without modifying its body (except
+  // the block arguments and terminators)
+  auto funcOrFailure = lowerSignature(lowerFuncOp, rewriter);
+  if (failed(funcOrFailure))
+    return failure();
+  handshake::FuncOp funcOp = *funcOrFailure;
+  if (funcOp.isExternal())
+    return success();
+
+  // Stores mapping from each value that passes through a merge-like operation
+  // to the data result of that merge operation
+  ArgReplacements argReplacements;
+  addMergeOps(funcOp, rewriter, argReplacements);
+  addBranchOps(funcOp, rewriter);
+
+  BackedgeBuilder edgeBuilder(rewriter, funcOp->getLoc());
+  LowerFuncToHandshake::MemInterfacesInfo memInfo;
+  if (failed(convertMemoryOps(funcOp, rewriter, memrefToArgIdx, edgeBuilder,
+                              memInfo)))
+    return failure();
+
+  // First round of bb-tagging so that newly inserted Dynamatic memory ports get
+  // tagged with the BB they belong to (required by memory interface
+  // instantiation logic)
+  idBasicBlocks(funcOp, rewriter);
+  if (failed(verifyAndCreateMemInterfaces(funcOp, rewriter, memInfo)))
+    return failure();
+
+  idBasicBlocks(funcOp, rewriter);
+  return flattenAndTerminate(funcOp, rewriter, argReplacements);
+}
 
 std::unique_ptr<dynamatic::DynamaticPass> createFtdCfToHandshake() {
   return std::make_unique<FtdCfToHandshakePass>();

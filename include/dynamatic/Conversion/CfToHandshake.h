@@ -43,7 +43,17 @@ public:
 /// to reuse part of the conversion while defining custom behavior.
 class LowerFuncToHandshake : public DynOpConversionPattern<mlir::func::FuncOp> {
 public:
-  using DynOpConversionPattern<mlir::func::FuncOp>::DynOpConversionPattern;
+  // Explicit constructors from base class, so that extended classes can benefit
+  // from them. Without an explicit definition, the extended class cannot use
+  // the constructor of a non-base class.
+  LowerFuncToHandshake(NameAnalysis &namer, MLIRContext *ctx,
+                       mlir::PatternBenefit benefit = 1)
+      : DynOpConversionPattern<mlir::func::FuncOp>(namer, ctx, benefit){};
+
+  LowerFuncToHandshake(NameAnalysis &namer, const TypeConverter &typeConverter,
+                       MLIRContext *ctx, mlir::PatternBenefit benefit = 1)
+      : DynOpConversionPattern<mlir::func::FuncOp>(namer, typeConverter, ctx,
+                                                   benefit){};
 
   LogicalResult
   matchAndRewrite(mlir::func::FuncOp funcOp, OpAdaptor adaptor,
