@@ -238,17 +238,6 @@ private:
   /// passed through its port information.
   void fromPorts(FuncMemoryPorts &ports);
 };
-
-/// Identifies the subset of the control operation's results that are part of
-/// the control path to the LSQ interface. The control operations' results
-/// that are not of type `handshake::ControlType` are ignored and will never be
-/// part of the returned vector. Typically, one would call this function on a
-/// (lazy-)fork directly providing a group allocation signal to the LSQ to
-/// inquire about other fork results that would trigger other group allocations.
-/// The returned values are guaranteed to be in the same order as the control
-/// operation's results.
-SmallVector<Value> getLSQControlPaths(handshake::LSQOp lsqOp,
-                                      Operation *ctrlOp);
 }; // namespace dynamatic
 
 #endif // DYNAMATIC_DIALECT_HANDSHAKE_MEMORY_INTERFACES_H

@@ -32,6 +32,7 @@
 #include "mlir/IR/OpImplementation.h"
 #include "mlir/IR/PatternMatch.h"
 #include "mlir/IR/Value.h"
+#include "mlir/IR/ValueRange.h"
 #include "mlir/Interfaces/FunctionImplementation.h"
 #include "mlir/Support/LogicalResult.h"
 #include "mlir/Transforms/InliningUtils.h"
@@ -1147,6 +1148,73 @@ handshake::MemoryControllerOp LSQOp::getConnectedMC() {
       *storeDataUsers.begin());
 }
 
+SmallVector<Value> LSQOp::getControlPaths(Operation *ctrlOp) {
+  // Compute the set of group allocation signals to the LSQ
+  DenseSet<Value> lsqGroupAllocs;
+  LSQPorts ports = getPorts();
+  ValueRange lsqInputs = getOperands();
+  for (LSQGroup &group : ports.getGroups())
+    lsqGroupAllocs.insert(lsqInputs[group->ctrlPort->getCtrlInputIndex()]);
+
+  // Accumulate all outputs of the control operation that are part of the memory
+  // control network; there are typically at most two for any given LSQ
+  SmallVector<Value, 2> resultsToAlloc;
+  // Control channels to explore, starting from the control operation's results
+  SmallVector<Value, 4> controlNet;
+  // Control operations already explored from the control operation's results
+  // (to avoid looping in the dataflow graph)
+  SmallPtrSet<Operation *, 4> controlOps;
+
+  for (OpResult res : ctrlOp->getResults()) {
+    // We only care for control-only channels
+    if (!isa<handshake::ControlType>(res.getType()))
+      continue;
+
+    // Reset the list of control channels to explore and the list of control
+    // operations that we have already visited
+    controlNet.clear();
+    controlOps.clear();
+
+    controlNet.push_back(res);
+    controlOps.insert(ctrlOp);
+    do {
+      Value val = controlNet.pop_back_val();
+      auto users = val.getUsers();
+      assert(std::distance(users.begin(), users.end()) == 1 &&
+             "IR is not materialized");
+      Operation *succOp = *users.begin();
+
+      if (lsqGroupAllocs.contains(val)) {
+        // We have reached a group allocation to the same LSQ, stop the search
+        // along this path
+        resultsToAlloc.push_back(res);
+        break;
+      }
+
+      // Make sure that we do not loop forever over the same control operations
+      if (auto [_, newOp] = controlOps.insert(succOp); !newOp)
+        continue;
+
+      llvm::TypeSwitch<Operation *, void>(succOp)
+          .Case<handshake::ConditionalBranchOp, handshake::BranchOp,
+                handshake::MergeOp, handshake::MuxOp, handshake::ForkOp,
+                handshake::LazyForkOp, handshake::BufferOp>([&](auto) {
+            // If the successor just propagates the control path, add
+            // all its results to the list of control channels to
+            // explore
+            llvm::copy(succOp->getResults(), std::back_inserter(controlNet));
+          })
+          .Case<handshake::ControlMergeOp>(
+              [&](handshake::ControlMergeOp cmergeOp) {
+                // Only the control merge's data output forwards the input
+                controlNet.push_back(cmergeOp.getResult());
+              });
+    } while (!controlNet.empty());
+  }
+
+  return resultsToAlloc;
+}
+
 //===----------------------------------------------------------------------===//
 // Specific port kinds
 //===----------------------------------------------------------------------===//
@@ -1342,30 +1410,39 @@ mlir::ValueRange FuncMemoryPorts::getGroupResults(unsigned groupIdx) {
   return memOp->getResults().slice(firstIdx, lastIdx - firstIdx + 1);
 }
 
-mlir::ValueRange FuncMemoryPorts::getInterfacesInputs() {
-  ValueRange memResults = memOp->getOperands();
-  for (const MemoryPort &port : interfacePorts) {
-    if (std::optional<MCLoadStorePort> mc = dyn_cast<MCLoadStorePort>(port)) {
-      return memResults.drop_front(mc->getLoadDataInputIndex());
+namespace {
+using FGetIndices = std::function<ArrayRef<unsigned>(const MemoryPort &)>;
+} // namespace
+
+static ValueRange getInterfaceValueRange(const FuncMemoryPorts &ports,
+                                         ValueRange allValues,
+                                         const FGetIndices &fGetIndices) {
+  size_t firstIdx = std::string::npos;
+  for (const MemoryPort &port : ports.interfacePorts) {
+    if (auto indices = fGetIndices(port); !indices.empty()) {
+      firstIdx = indices.front();
+      break;
     }
-    std::optional<LSQLoadStorePort> lsq = dyn_cast<LSQLoadStorePort>(port);
-    assert(lsq && "port must be mc load/store or lsq load/store");
-    return memResults.drop_front(lsq->getLoadAddrInputIndex());
   }
+  if (firstIdx == std::string::npos)
+    return {};
+
+  for (const MemoryPort &port : llvm::reverse(ports.interfacePorts)) {
+    if (auto indices = fGetIndices(port); !indices.empty())
+      return allValues.slice(firstIdx, indices.back() - firstIdx + 1);
+  }
+  llvm_unreachable("no last index, this is impossible");
   return {};
 }
 
-mlir::ValueRange FuncMemoryPorts::getInterfacesResults() {
-  ValueRange memOperands = memOp->getResults();
-  for (const MemoryPort &port : interfacePorts) {
-    if (std::optional<MCLoadStorePort> mc = dyn_cast<MCLoadStorePort>(port)) {
-      return memOperands.drop_front(mc->getLoadAddrOutputIndex());
-    }
-    std::optional<LSQLoadStorePort> lsq = dyn_cast<LSQLoadStorePort>(port);
-    assert(lsq && "port must be mc load/store or lsq load/store");
-    return memOperands.drop_front(lsq->getLoadDataOutputIndex());
-  }
-  return {};
+ValueRange FuncMemoryPorts::getInterfacesInputs() {
+  return getInterfaceValueRange(*this, memOp->getOperands(),
+                                &MemoryPort::getOprdIndices);
+}
+
+ValueRange FuncMemoryPorts::getInterfacesResults() {
+  return getInterfaceValueRange(*this, memOp->getResults(),
+                                &MemoryPort::getResIndices);
 }
 
 MCBlock::MCBlock(GroupMemoryPorts *group, unsigned blockID)
