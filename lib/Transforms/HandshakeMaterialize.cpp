@@ -113,85 +113,91 @@ static void materializeValue(Value val, OpBuilder &builder) {
     replaceFirstUse(user, val, forkRes);
 }
 
-/// Transforms the potential eager fork feeding a control signal to the LSQ into
-/// a lazy fork if other results of the eager fork are part of the memory
-/// control network. This assumes that every value is used exactly once.
-static void makeLSQControlForksLazy(handshake::LSQOp lsqOp, Value lsqCtrl,
-                                    OpBuilder &builder) {
-  Operation *ctrlDefOp = lsqCtrl.getDefiningOp();
-  // Nothing to do if the control signal comes from a function argument since we
-  // know it is used exclusively by the LSQ. If it already comes from a lazy
-  // fork, assume that somebody else did the job correctly before
-  if (isa_and_present<handshake::LazyForkOp>(ctrlDefOp))
-    return;
+/// Promotes some eager forks to lazy forks to ensure that different group
+/// allocations to the same LSQ do not arrive to the LSQ on the same cycle. This
+/// assumes that the IR is materialized.
+static void promoteEagerToLazyForks(handshake::FuncOp funcOp) {
+  // Associate all eager forks feeding group allocation signals to any LSQ to
+  // the set of their results that must become lazy
+  DenseMap<handshake::ForkOp, SetVector<Value>> lazyChannels;
+  for (auto lsqOp : funcOp.getOps<handshake::LSQOp>()) {
+    LSQPorts lsqPorts = lsqOp.getPorts();
+    ValueRange lsqInputs = lsqOp.getOperands();
+    for (LSQGroup &group : lsqPorts.getGroups()) {
+      Value groupCtrl = lsqInputs[group->ctrlPort->getCtrlInputIndex()];
+      Operation *ctrlDefOp = groupCtrl.getDefiningOp();
 
-  // There can only be other control paths to the same LSQ if the defining
-  // operation is a fork
-  auto ctrlForkOp = dyn_cast_if_present<handshake::ForkOp>(ctrlDefOp);
-  if (!ctrlForkOp)
-    return;
+      // There can only be other control paths to the same LSQ if the defining
+      // operation is a fork (eager or lazy). The defining operation is allowed
+      // to be `nullptr` if the control value is a function argument
+      if (isa_and_present<handshake::LazyForkOp>(ctrlDefOp)) {
+        // If there is already a lazy fork in the IR for some reason, assume
+        // someone knows what they are doing and do not demote any result
+        continue;
+      }
+      auto forkOp = dyn_cast_if_present<handshake::ForkOp>(ctrlDefOp);
+      if (!forkOp)
+        continue;
 
-  // Find outputs of the control fork which are part of the memory control
-  // network. Usually there would be at most two but the implementation is
-  // general enough to support any number of control values. If there is a
-  // single control path it must be the one between the fork and the LSQ control
-  // value passed as argument, in which case there is no need for a lazy fork
-  SmallVector<Value> controlValues = getLSQControlPaths(lsqOp, ctrlForkOp);
-  assert(!controlValues.empty() && "at least one control path must exist");
-  if (controlValues.size() == 1)
-    return;
-
-  // We need to ensure that the control fork is lazy if the control path
-  // continues to other group allocations to the same LSQ.
-  unsigned numControlPaths = controlValues.size();
-  unsigned numLazyResults = numControlPaths;
-  bool createEagerFork = controlValues.size() < ctrlForkOp->getNumResults();
-  if (createEagerFork) {
-    // To minimize the damage to performance, as many outputs of the control
-    // fork as possible should remain "eager". We achieve this by creating an
-    // eager fork after the lazy fork that handles token duplication outside the
-    // memory control network. The lazy fork needs an extra output to feed the
-    // eager fork
-    ++numLazyResults;
-  }
-  builder.setInsertionPoint(ctrlForkOp);
-  handshake::LazyForkOp lazyForkOp = builder.create<handshake::LazyForkOp>(
-      ctrlForkOp->getLoc(), ctrlForkOp.getOperand(), numLazyResults);
-  inheritBB(ctrlForkOp, lazyForkOp);
-
-  // Replace the original fork's outputs that are part of the memory control
-  // network with the first lazy fork's outputs
-  ValueRange lazyForkResults = lazyForkOp->getResults();
-  for (auto [oldRes, newRes] : llvm::zip(controlValues, lazyForkResults))
-    oldRes.replaceAllUsesWith(newRes);
-
-  if (createEagerFork) {
-    // If some of the control fork's outputs go outside the memory control
-    // network, create an eager fork fed by the lazy fork's last result
-    unsigned numEagerResults = ctrlForkOp->getNumResults() - numControlPaths;
-    handshake::ForkOp eagerForkOp = builder.create<handshake::ForkOp>(
-        ctrlForkOp->getLoc(), lazyForkOp->getResults().back(), numEagerResults);
-    inheritBB(ctrlForkOp, eagerForkOp);
-
-    // Convert the list of control values to a set for easy lookup
-    llvm::SmallSetVector<Value, 4> ctrlValSet(controlValues.begin(),
-                                              controlValues.end());
-
-    // Replace the control fork's outputs that do not belong to the memory
-    // control network with the eager fork's results
-    ValueRange eagerResults = eagerForkOp.getResult();
-    auto eagerForkResIt = eagerResults.begin();
-    for (OpResult res : ctrlForkOp.getResults()) {
-      if (!ctrlValSet.contains(res))
-        res.replaceAllUsesWith(*(eagerForkResIt++));
+      // Find outputs of the control fork which are part of the memory network
+      // and add them to the set of fork results that must be lazy. A single
+      // control path means that no other group allocation is reachable from the
+      // fork, so the result can be eager
+      SmallVector<Value> ctrlResults = lsqOp.getControlPaths(forkOp);
+      assert(!ctrlResults.empty() && "at least one control path must exist");
+      if (ctrlResults.size() > 1)
+        lazyChannels[forkOp].insert(ctrlResults.begin(), ctrlResults.end());
     }
-    assert(eagerForkResIt == eagerResults.end() && "did not exhaust iterator");
   }
 
-  // Erase the original control fork, whose results are now unused
-  ctrlForkOp->erase();
-}
+  // Promote eager fork results to lazy where necessary
+  OpBuilder builder(funcOp->getContext());
+  for (auto &[forkOp, lazyResults] : lazyChannels) {
+    unsigned numLazyResults = lazyResults.size();
+    bool createEagerFork = numLazyResults < forkOp->getNumResults();
+    if (createEagerFork) {
+      // To minimize damage to performance, as many outputs of the control fork
+      // as possible should remain "eager". We achieve this by creating an eager
+      // fork after the lazy fork that handles token duplication outside the
+      // memory control network. The lazy fork needs an extra output to feed the
+      // eager fork
+      ++numLazyResults;
+    }
 
+    builder.setInsertionPoint(forkOp);
+    handshake::LazyForkOp lazyForkOp = builder.create<handshake::LazyForkOp>(
+        forkOp->getLoc(), forkOp.getOperand(), numLazyResults);
+    inheritBB(forkOp, lazyForkOp);
+
+    // Replace the original fork's outputs that are part of the memory control
+    // network with the first lazy fork's outputs
+    for (auto [from, to] : llvm::zip(lazyResults, lazyForkOp->getResults()))
+      from.replaceAllUsesWith(to);
+
+    if (createEagerFork) {
+      // If some of the control fork's result go outside the memory control
+      // network, create an eager fork fed by the lazy fork's last result
+      unsigned numEagerResults = forkOp->getNumResults() - lazyResults.size();
+      handshake::ForkOp eagerForkOp = builder.create<handshake::ForkOp>(
+          forkOp->getLoc(), lazyForkOp->getResults().back(), numEagerResults);
+      inheritBB(forkOp, eagerForkOp);
+
+      // Replace the control fork's outputs that do not belong to the memory
+      // control network with the eager fork's results
+      ValueRange eagerResults = eagerForkOp.getResult();
+      auto eagerForkResIt = eagerResults.begin();
+      for (OpResult res : forkOp.getResults()) {
+        if (!lazyResults.contains(res))
+          res.replaceAllUsesWith(*(eagerForkResIt++));
+      }
+      assert(eagerForkResIt == eagerResults.end() &&
+             "did not exhaust iterator");
+    }
+
+    // Erase the original fork whose results are now unused
+    forkOp->erase();
+  }
+}
 namespace {
 
 /// Removes outputs of forks that do not have real uses. This can result in the
@@ -349,17 +355,9 @@ struct HandshakeMaterializePass
             applyPatternsAndFoldGreedily(modOp, std::move(patterns), config)))
       return signalPassFailure();
 
-    // Finally, make forks to LSQ control ports lazy
-    for (handshake::FuncOp funcOp : modOp.getOps<handshake::FuncOp>()) {
-      for (handshake::LSQOp lsqOp : funcOp.getOps<handshake::LSQOp>()) {
-        LSQPorts lsqPorts = lsqOp.getPorts();
-        ValueRange lsqInputs = lsqOp.getOperands();
-        for (LSQGroup &group : lsqPorts.getGroups()) {
-          Value ctrlValue = lsqInputs[group->ctrlPort->getCtrlInputIndex()];
-          makeLSQControlForksLazy(lsqOp, ctrlValue, builder);
-        }
-      }
-    }
+    // Finally, promote forks to lazy wherever necessary
+    for (handshake::FuncOp funcOp : modOp.getOps<handshake::FuncOp>())
+      promoteEagerToLazyForks(funcOp);
 
     assert(succeeded(verifyIRMaterialized(modOp)) && "IR is not materialized");
   }
