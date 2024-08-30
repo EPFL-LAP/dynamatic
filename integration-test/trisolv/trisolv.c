@@ -23,7 +23,7 @@ void trisolv(out_int_t x[N], in_int_t A[N][N], in_int_t c[N]) {
 }
 
 int main(void) {
-  out_int_t x[N];
+  out_int_t xArray[N];
   in_int_t A[N][N];
   in_int_t c[N];
 
@@ -34,5 +34,5 @@ int main(void) {
     }
   }
 
-  CALL_KERNEL(trisolv, x, A, c);
+  CALL_KERNEL(trisolv, xArray, A, c);
 }
