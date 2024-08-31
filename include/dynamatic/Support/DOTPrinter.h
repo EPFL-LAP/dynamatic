@@ -44,36 +44,28 @@ public:
 
   DOTPrinter(EdgeStyle edgeStyle = EdgeStyle::SPLINE);
 
-  /// Prints Handshake-level IR to the provided output stream (or to stdout if
-  /// `os` is nullptr).
-  LogicalResult print(mlir::ModuleOp mod,
-                      mlir::raw_indented_ostream *os = nullptr);
+  /// Writes the DOT representation of the module to the provided output stream.
+  LogicalResult write(mlir::ModuleOp mod, mlir::raw_indented_ostream &os);
 
 private:
   /// Style of edges in the resulting DOTs.
   EdgeStyle edgeStyle;
 
-  /// Returns the name of a function's argument given its index.
-  std::string getArgumentName(handshake::FuncOp funcOp, size_t idx);
+  using PortNames = DenseMap<Operation *, handshake::PortNamer>;
 
-  /// Returns the name of a function's result given its index.
-  std::string getResultName(handshake::FuncOp funcOp, size_t idx);
+  /// Writes the node corresponding to an operation.
+  void writeNode(Operation *op, mlir::raw_indented_ostream &os);
 
-  /// Prints a node corresponding to an operation and, on success, returns a
-  /// unique name for the operation in the outName argument.
-  LogicalResult printNode(Operation *op, mlir::raw_indented_ostream &os);
+  /// Writes the edge corresponding to an operation operand. The edge links an
+  /// operation result's or block argument to an operation that uses the value.
+  void writeEdge(OpOperand &oprd, const PortNames &portNames,
+                 mlir::raw_indented_ostream &os);
 
-  /// Prints an edge between a source and destination operation, which are
-  /// linked by a result of the source that the destination uses as an
-  /// operand.
-  LogicalResult printEdge(OpOperand &oprd, mlir::raw_indented_ostream &os);
-
-  /// Prints an instance of a handshake.func to the graph.
-  LogicalResult printFunc(handshake::FuncOp funcOp,
-                          mlir::raw_indented_ostream &os);
+  /// Writes the graph corresponding to the Handshake function.
+  void writeFunc(handshake::FuncOp funcOp, mlir::raw_indented_ostream &os);
 
   /// Opens a subgraph in the DOT file using the provided name and label.
-  void openSubgraph(std::string &name, std::string &label,
+  void openSubgraph(StringRef name, StringRef label,
                     mlir::raw_indented_ostream &os);
 
   /// Closes a subgraph in the DOT file.

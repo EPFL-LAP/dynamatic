@@ -11,7 +11,6 @@ add_dynamatic_dialect_library(DynamaticHW
   HWTypes.cpp
   InnerSymbolTable.cpp
   ModuleImplementation.cpp
-  PortImplementation.cpp
   
   DEPENDS
   MLIRHWIncGen
