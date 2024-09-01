@@ -48,6 +48,14 @@ AdjListGraph::AdjListGraph(buffer::CFDFC cfdfc, TimingDatabase timingDB, unsigne
 }
 
 
+
+
+AdjListGraph::AdjListGraph(handshake::FuncOp funcOp, std::vector<int> cfdfcBBs, unsigned II) {
+  //TODO implement
+}
+
+
+
 void AdjListGraph::addNode(mlir::Operation *op, int latency) {
     nodes.insert({op->getAttrOfType<StringAttr>("handshake.name").str(), AdjListNode{latency, op, {}, {}}});
 }
