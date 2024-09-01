@@ -7,6 +7,7 @@
 
 #include "experimental/Transforms/Switching/SwitchingEstimation.h"
 #include "experimental/Transforms/Switching/SwitchingSupport.h"
+#include "experimental/Transforms/Switching/ProfilingAnalyzer.h"
 #include "dynamatic/Dialect/Handshake/HandshakeOps.h"
 #include "dynamatic/Dialect/Handshake/HandshakeAttributes.h"
 #include "dynamatic/Support/DynamaticPass.h"
@@ -61,6 +62,9 @@ struct SwitchingEstimationPass
   // This function extract all CFDFCs from the bbList attribute and the corresponding II from CFDFCThroughputAttr
   LogicalResult extractAllCFDFCs(mlir::ModuleOp& topModule);
 
+  // Extract all op names of the alus in order
+  void extractHandshakeOpNames(handshake::FuncOp& topFunc);
+
 
 };
 } // namespace 
@@ -79,10 +83,14 @@ void SwitchingEstimationPass::runDynamaticPass() {
   }
 
   // Step 1: Parse the SCF level profiling results
+  llvm::dbgs() << "[DEBUG] [Step 1] Parsing Profiling Results\n";
+  llvm::dbgs() << "[DEBUG] \tBBList Log file: " << bbList << "\n";
+  llvm::dbgs() << "[DEBUG] \tData Profiling Log file: " << dataTrace << "\n";
+  SCFProfilingResult profilingResults(dataTrace, bbList, switchInfo);
 
   // Step 2: Build Adjacency graph for each CFDFC
+  llvm::dbgs() << "[DEBUG] [Step 2] Build Adjacency Graph for Each Segment\n";
   
-
 }
 
 
@@ -91,6 +99,19 @@ void SwitchingEstimationPass::runDynamaticPass() {
 // Internal Function Definitions
 //
 //===----------------------------------------------------------------------===//
+void SwitchingEstimationPass::extractHandshakeOpNames(handshake::FuncOp& topFunc) {
+  for (Operation& op : topFunc.getOps()) {
+    // Get the handshake.name attribute
+    // TODO: Make the retrieving of name attribute more natural
+    std::string opName = op.getAttrOfType<StringAttr>("handshake.name").str();
+    std::string opType = removeDigits(opName);
+
+    if (NAME_SENSE_LIST.find(opType) != NAME_SENSE_LIST.end()) {
+      switchInfo.funcOpNames.push_back(opName);
+    }
+  }
+}
+
 llvm::SmallVector<std::pair<unsigned, unsigned>> SwitchingEstimationPass::extractBackedges(llvm::SmallVector<experimental::ArchBB> archs) {
   llvm::SmallVector<std::pair<unsigned, unsigned>> backEdgeList;
 
@@ -107,6 +128,9 @@ llvm::SmallVector<std::pair<unsigned, unsigned>> SwitchingEstimationPass::extrac
 LogicalResult SwitchingEstimationPass::extractAllCFDFCs(mlir::ModuleOp& topModule) {
   for (handshake::FuncOp funcOp : topModule.getOps<handshake::FuncOp>()) {
     llvm::dbgs() << "[DEBUG] Entering Func: " << funcOp.getName() << "\n";
+
+    // Get all ALU names in the selected FuncOp
+    extractHandshakeOpNames(funcOp);
 
     // Get the CFDFC throughput and bb list from attributes
     llvm::dbgs() << "[DEBUG] [Step 0] Extracting CFDFCs\n";
@@ -141,7 +165,7 @@ LogicalResult SwitchingEstimationPass::extractAllCFDFCs(mlir::ModuleOp& topModul
         if (auto IIValue = IIValueAttr.dyn_cast<mlir::FloatAttr>()) {
           cfdfcII = 1.0 / IIValue.getValueAsDouble();
 
-          switchInfo.cfdfcIIs[std::stoi(cfdfcIndex)] = cfdfcII;
+          switchInfo.cfdfcIIs[std::stoul(cfdfcIndex)] = cfdfcII;
         }
       }
 
@@ -213,11 +237,12 @@ LogicalResult SwitchingEstimationPass::extractAllCFDFCs(mlir::ModuleOp& topModul
       }
 
       // Since we don't care about the execution number of each CFDFC, it's set to 0
-      buffer::CFDFC tmpMG = buffer::CFDFC(funcOp, archSet, 0);
-      switchInfo.cfdfcs.insert_or_assign(std::stoi(cfdfcIndex), tmpMG);
+      buffer::CFDFC tmpMG(funcOp, archSet, 0);
+      switchInfo.cfdfcs.insert_or_assign(std::stoul(cfdfcIndex), &tmpMG);
 
-      // Insert to the segment map aswell
-      switchInfo.segToBBListMap[cfdfcIndex] = tmpMG.cycle;
+      // Insert to the segment map as well
+      std::vector<unsigned> newVector(tmpMG.cycle.begin(), tmpMG.cycle.end());
+      switchInfo.segToBBListMap[cfdfcIndex] = newVector;
     }
   }
   

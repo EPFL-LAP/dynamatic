@@ -31,14 +31,38 @@
 #include <map>
 #include <set>
 #include <sstream>
+#include <filesystem>
 
 using namespace mlir;
 using namespace dynamatic;
 using namespace dynamatic::handshake;
 
+//===----------------------------------------------------------------------===//
+//
+//  Helper Class
+//
+//===----------------------------------------------------------------------===//
+
+class SCFFile {
+public:
+  SCFFile(StringRef scfFile);
+
+  // Vector storing all SCF level op names in the mlir file
+  std::vector<std::string> opNameList;
+
+};
+
+//===----------------------------------------------------------------------===//
+//
+//  Profiler Analyzer Class
+//
+//===----------------------------------------------------------------------===//
+
 // Class used to analyze the scf-level software profiling
 // 
 class SCFProfilingResult {
+public:
+
   SCFProfilingResult(StringRef dataTrace,
                      StringRef bbList,
                      SwitchingInfo& switchInfo);
@@ -47,17 +71,30 @@ class SCFProfilingResult {
   void parseBBListFile(StringRef bbList, SwitchingInfo& switchInfo);
 
   // Parse the actual data profiling log file
-  void parseDataLogFile(StringRef dataTrace, SwitchingInfo& switchInfo );
+  void parseDataLogFile(StringRef dataTrace, SwitchingInfo& switchInfo);
+
+  // Construct the map from scf level profiling to handshake level IR
+  void buildScfToHSMap(SwitchingInfo& switchInfo, SCFFile& scfFile);
+
+  // This function insert new (value, iter index) pair to the value list
+  void insertValuePair(int opValue, unsigned iterIndex, std::string opName);
+
+  // This function constructs the overall segment execution counts
+  void constructSegExeCount();
 
   //
   //  Global Storing Structure for analyzing the profiling results
   //
-  std::vector<std::string> executed_bb_trace;   // Vector used to store the execution trace of BB labels
-  std::vector<int> iter_end_index;              // Vector storing the ending edge index on the boundary of different segments
-  std::vector<std::string> execution_trace;     // Vector used to store the execution trace consists of segment labels
-
-
+  std::vector<unsigned> executedBBTrace;                      // Vector used to store the execution trace of BB labels
+  std::vector<unsigned> iterEndIndex;                         // Vector storing the ending edge index on the boundary of different segments
+  std::vector<std::string> executedSegTrace;                  // Vector used to store the execution trace consists of segment labels
+  std::map<unsigned, unsigned> bbToIterMap;                   // Map from BB index to the corresponding Iteration index
+  std::map<unsigned, std::pair<std::string, unsigned>> execPhaseToSegExecNumMap;     // Map from execution stage to (segLabel, numExec) pair
+  std::map<std::string, std::vector<std::pair<int, unsigned>>> opNameToValueListMap; // Map from Hndshake level opName to the list of value in the data profiling process
   
+  // Map from SCF level op name to Handshake level op name
+  std::map<std::string, std::string> scfToHandshakeNameMap;
+
 };
 
 

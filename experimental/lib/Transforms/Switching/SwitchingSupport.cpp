@@ -58,4 +58,46 @@ void printSegToBBListMap(const std::map<std::string, mlir::SetVector<unsigned>>&
   }
 }
 
+std::string removeDigits(const std::string& inStr) {
+  std::regex digitsRegex("\\d");
 
+  std::string outStr = std::regex_replace(inStr, digitsRegex, "");
+
+  return outStr;
+}
+
+std::vector<std::string> split(const std::string& s, const std::string& delimiter) {
+  std::vector<std::string> tokens;
+  std::regex re(delimiter);
+  std::sregex_token_iterator it(s.begin(), s.end(), re, -1);
+  std::sregex_token_iterator end;
+
+  for (; it != end; ++it) {
+    tokens.push_back(it->str());
+  }
+
+  return tokens;
+}
+
+std::string strip(const std::string &inputStr, const std::string &toRemove) {
+  // Trim leading and trailing whitespace
+  size_t start = inputStr.find_first_not_of(" \t\n\r\f\v");
+  if (start == std::string::npos) {
+      return "";  // Return an empty string if there are only whitespaces
+  }
+  size_t end = inputStr.find_last_not_of(" \t\n\r\f\v");
+  std::string stripped = inputStr.substr(start, end - start + 1);
+
+  if (toRemove == "") {
+    return stripped;
+  }
+
+  // Remove all occurrences of the specified substring 'toRemove'
+  size_t pos = stripped.find(toRemove);
+  while (pos != std::string::npos) {
+      stripped.erase(pos, toRemove.length());
+      pos = stripped.find(toRemove, pos);
+  }
+
+  return stripped;
+}
