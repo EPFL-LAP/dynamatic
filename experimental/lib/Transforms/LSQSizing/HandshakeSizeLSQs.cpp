@@ -173,7 +173,7 @@ LSQSizingResult HandshakeSizeLSQsPass::sizeLSQsForCFDFC(buffer::CFDFC cfdfc, uns
   std::unordered_map<unsigned, mlir::Operation *> phiNodes = getPhiNodes(graph, startNode);
 
   // connect all phi nodes to the lsq ps in their BB
-  insertAllocPrecedesMemoryAccessEdges(graph, loadOps, phiNodes);
+  insertAllocPrecedesMemoryAccessEdges(graph, loadOps, phiNodes);  
 
   llvm::dbgs() << "============================\n";
   graph.printGraph();

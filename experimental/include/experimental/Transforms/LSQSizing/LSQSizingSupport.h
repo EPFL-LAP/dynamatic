@@ -3,6 +3,7 @@
 #include <list>
 #include <string>
 #include <optional>
+#include <set>
 #include <mlir/IR/Operation.h>
 #include "dynamatic/Support/TimingModels.h"
 #include "dynamatic/Transforms/BufferPlacement/CFDFC.h"
@@ -32,6 +33,8 @@ public:
 
     std::vector<std::vector<std::string>> findPaths(mlir::Operation *startOp, mlir::Operation *endOp, bool ignoreBackedge = false);
     std::vector<std::vector<std::string>> findPaths(std::string start, std::string end, bool ignoreBackedge = false);
+
+
     int getPathLatency(std::vector<std::string> path);
 
     int findMaxPathLatency(mlir::Operation *startOp, mlir::Operation *endOp, bool ignoreBackedge = false);
@@ -52,6 +55,7 @@ private:
     void addNode(mlir::Operation* op, int latency);
     void addBackedge(mlir::Operation* src, mlir::Operation* dest);
     void insertArtificialNodeOnBackedge(mlir::Operation* src, mlir::Operation* dest, int latency);
+    void dfs(std::string& currentNode, std::string& end, std::vector<std::string>& currentPath, std::set<std::string>& visited, std::vector<std::vector<std::string>>& paths, bool ignoreBackedges = false);
 
 };
 

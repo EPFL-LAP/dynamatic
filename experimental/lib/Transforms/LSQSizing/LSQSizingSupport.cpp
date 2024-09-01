@@ -19,8 +19,12 @@ AdjListGraph::AdjListGraph(buffer::CFDFC cfdfc, TimingDatabase timingDB, unsigne
     double latency;
     //llvm::dbgs() << "unit: " << unit->getAttrOfType<StringAttr>("handshake.name") << "\n";
     if(failed(timingDB.getLatency(unit, SignalType::DATA, latency))) {
-      //llvm::dbgs() << "No latency found for unit: " << unit->getName().getStringRef() << " found \n";
-      addNode(unit, 0);
+      if(unit->getName().getStringRef() == "handshake.oehb") { // TODO maybe instead add it to database?
+        addNode(unit, 1);
+      } 
+      else {
+        addNode(unit, 0);
+      }
     } 
     else {
       addNode(unit, latency);
@@ -96,54 +100,49 @@ void AdjListGraph::insertArtificialNodeOnBackedge(mlir::Operation* src, mlir::Op
 }
 
 
-std::vector<std::vector<std::string>> AdjListGraph::findPaths(std::string start, std::string end, bool ignoreBackedge) {
-
-  std::vector<std::vector<std::string>> paths;
-  std::stack<std::pair<std::vector<std::string>, std::set<std::string>>> pathStack;
-
-  // Initialize the stack with the path containing the source node
-  pathStack.push({{start}, {start}});
-
-  while (!pathStack.empty()) {
-    // Get the current path and visited set from the stack
-    auto [currentPath, visited] = pathStack.top();
-    pathStack.pop();
-    // Get the last node in the current path
-    std::string currentNode = currentPath.back();
-    // If the current node is the target, add the path to allPaths
+void AdjListGraph::dfs(std::string& currentNode, std::string& end, std::vector<std::string>& currentPath, std::set<std::string>& visited, std::vector<std::vector<std::string>>& paths, bool ignoreBackedges) {
+    // If the current node is the target, add the current path to paths and return.
     if (currentNode == end) {
         paths.push_back(currentPath);
-        continue;
-    }
-    // Get all adjacent nodes of the current node
-    for (const std::string& neighbor : nodes.at(currentNode).edges) {
-      // If the neighbor has not been visited in the current path, extend the path
-      if (visited.find(neighbor) == visited.end()) {
-          std::vector<std::string> newPath = currentPath;
-          newPath.push_back(neighbor);
-          std::set<std::string> newVisited = visited;
-          newVisited.insert(neighbor);
-          // Push the new path and updated visited set onto the stack
-          pathStack.push({newPath, newVisited});
-      }
+        return;
     }
 
-    if(!ignoreBackedge) {
-      for (const std::string& neighbor : nodes.at(currentNode).backedges) {
-        // If the neighbor has not been visited in the current path, extend the path
+    // Iterate over all adjacent nodes
+    for (std::string& neighbor : nodes.at(currentNode).edges) {
+        // If the neighbor has not been visited, visit it
         if (visited.find(neighbor) == visited.end()) {
-            std::vector<std::string> newPath = currentPath;
-            newPath.push_back(neighbor);
-            std::set<std::string> newVisited = visited;
-            newVisited.insert(neighbor);
-            // Push the new path and updated visited set onto the stack
-            pathStack.push({newPath, newVisited});
+            visited.insert(neighbor); // Mark as visited
+            currentPath.push_back(neighbor); // Add to the current pat
+            // Recursively visit the neighbor
+            dfs(neighbor, end, currentPath, visited, paths, ignoreBackedges);
+            // Backtrack: remove the neighbor from the current path and visited set for other paths
+            currentPath.pop_back();
+            visited.erase(neighbor);
         }
-      }
     }
 
-  }
-  return paths;
+    if(!ignoreBackedges) {
+        for (std::string& neighbor : nodes.at(currentNode).backedges) {
+        // If the neighbor has not been visited, visit it
+        if (visited.find(neighbor) == visited.end()) {
+            visited.insert(neighbor); // Mark as visited
+            currentPath.push_back(neighbor); // Add to the current pat
+            // Recursively visit the neighbor
+            dfs(neighbor, end, currentPath, visited, paths, ignoreBackedges);
+            // Backtrack: remove the neighbor from the current path and visited set for other paths
+            currentPath.pop_back();
+            visited.erase(neighbor);
+        }
+    }
+    }
+}
+
+std::vector<std::vector<std::string>> AdjListGraph::findPaths(std::string start, std::string end, bool ignoreBackedge) {
+    std::vector<std::vector<std::string>> paths;
+    std::vector<std::string> currentPath{start};
+    std::set<std::string> visited{start};
+    dfs(start, end, currentPath, visited, paths, false);
+    return paths;
 }
 
 
