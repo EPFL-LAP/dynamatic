@@ -12,12 +12,9 @@
 
 #include "dynamatic/Support/CFG.h"
 #include "dynamatic/Dialect/Handshake/HandshakeOps.h"
-#include "mlir/Dialect/Arith/IR/Arith.h"
 #include "mlir/Support/LogicalResult.h"
-#include "llvm/ADT/SetVector.h"
 #include "llvm/ADT/SmallPtrSet.h"
 #include "llvm/ADT/TypeSwitch.h"
-#include <queue>
 
 using namespace llvm;
 using namespace mlir;
@@ -148,8 +145,8 @@ static bool followToBlock(Operation *op, unsigned &bb,
 /// Determines whether the operation is of a nature which can be traversed
 /// outside blocks during backedge identification.
 static inline bool canGoThroughOutsideBlocks(Operation *op) {
-  return isa<handshake::ForkOp, arith::ExtUIOp, arith::ExtSIOp,
-             arith::TruncIOp>(op);
+  return isa<handshake::ForkOp, handshake::ExtUIOp, handshake::ExtSIOp,
+             handshake::TruncIOp>(op);
 }
 
 /// Attempts to backtrack through forks and bitwidth modification operations
@@ -369,20 +366,20 @@ HandshakeCFG::getControlValues(DenseMap<unsigned, Value> &ctrlVals) {
   // Fails if a control already existed and is different from the new value,
   // succeeds otherwise.
   auto updateCtrl = [&](unsigned bb, Value newCtrl) -> LogicalResult {
-    if (auto ctrlOfBB = ctrlVals.find(bb); ctrlOfBB != ctrlVals.end()) {
-      if (ctrlOfBB->second != newCtrl) {
-        return funcOp->emitError()
-               << "Inconsistent control value identified for basic block "
-               << bb;
-      }
+    if (auto [it, newBB] = ctrlVals.insert({bb, newCtrl}); !newBB) {
+      if (it->second != newCtrl)
+        return failure();
     }
-    ctrlVals[bb] = newCtrl;
     return success();
   };
 
   // Explore the control network one operation at a time till we've iterated
   // over all of it
   Value ctrl = funcOp.getArguments().back();
+  if (failed(updateCtrl(ENTRY_BB, ctrl))) {
+    assert(false && "cannot set control for entry BB");
+  }
+
   addToCtrlOps(ctrl.getUsers());
   while (!ctrlOps.empty()) {
     Operation *ctrlOp = ctrlOps.pop_back_val();
@@ -400,12 +397,12 @@ HandshakeCFG::getControlValues(DenseMap<unsigned, Value> &ctrlVals) {
     // their outputs
     LogicalResult res =
         llvm::TypeSwitch<Operation *, LogicalResult>(ctrlOp)
-            .Case<handshake::ForkOp, handshake::LazyForkOp,
-                  handshake::BufferOpInterface, handshake::BranchOp,
-                  handshake::ConditionalBranchOp>([&](auto) {
-              addToCtrlOps(ctrlOp->getUsers());
-              return success();
-            })
+            .Case<handshake::ForkOp, handshake::LazyForkOp, handshake::BufferOp,
+                  handshake::BranchOp, handshake::ConditionalBranchOp>(
+                [&](auto) {
+                  addToCtrlOps(ctrlOp->getUsers());
+                  return success();
+                })
             .Case<handshake::MergeLikeOpInterface>([&](auto) {
               OpResult mergeRes = ctrlOp->getResult(0);
               addToCtrlOps(mergeRes.getUsers());
@@ -612,12 +609,6 @@ static GIIDStatus isGIIDRec(Value predecessor, OpOperand &oprd,
         // Otherwise, data inputs on the path must depend on the predecessor
         return foldGIIDStatusAnd(recurse, defOp->getOperands());
       })
-      .Case<handshake::ReturnOp>([&](auto) {
-        // Just recurse the call on the return operand corresponding to the
-        // value
-        Value oprd = defOp->getOperand(cast<OpResult>(val).getResultNumber());
-        return recurse(oprd);
-      })
       .Case<handshake::MCLoadOp, handshake::LSQLoadOp>([&](auto) {
         auto loadOp = cast<handshake::LoadOpInterface>(defOp);
         if (loadOp.getDataOutput() != val)
@@ -627,7 +618,7 @@ static GIIDStatus isGIIDRec(Value predecessor, OpOperand &oprd,
         // result depends on the predecessor
         return recurse(loadOp.getAddressInput());
       })
-      .Case<arith::SelectOp>([&](arith::SelectOp selectOp) {
+      .Case<handshake::SelectOp>([&](handshake::SelectOp selectOp) {
         // Similarly to the mux, if the select operand depends on the
         // predecessor, then the select depends on the predecessor
         if (recurse(selectOp.getCondition()) == GIIDStatus::SUCCEED)
@@ -637,15 +628,14 @@ static GIIDStatus isGIIDRec(Value predecessor, OpOperand &oprd,
         ValueRange values{selectOp.getTrueValue(), selectOp.getFalseValue()};
         return foldGIIDStatusAnd(recurse, values);
       })
-      .Case<handshake::ForkOp, handshake::LazyForkOp,
-            handshake::BufferOpInterface, handshake::BranchOp, arith::AddIOp,
-            arith::AndIOp, arith::CmpIOp, arith::DivSIOp, arith::DivUIOp,
-            arith::ExtSIOp, arith::ExtUIOp, arith::MulIOp, arith::OrIOp,
-            arith::RemUIOp, arith::RemSIOp, arith::ShLIOp, arith::ShRUIOp,
-            arith::SIToFPOp, arith::SubIOp, arith::TruncIOp, arith::UIToFPOp,
-            arith::XOrIOp, arith::AddFOp, arith::CmpFOp, arith::DivFOp,
-            arith::ExtFOp, arith::MulFOp, arith::RemFOp, arith::SubFOp,
-            arith::TruncFOp>([&](auto) {
+      .Case<handshake::ForkOp, handshake::LazyForkOp, handshake::BufferOp,
+            handshake::BranchOp, handshake::AddIOp, handshake::AndIOp,
+            handshake::CmpIOp, handshake::DivSIOp, handshake::DivUIOp,
+            handshake::ExtSIOp, handshake::ExtUIOp, handshake::MulIOp,
+            handshake::OrIOp, handshake::ShLIOp, handshake::ShRUIOp,
+            handshake::SubIOp, handshake::TruncIOp, handshake::XOrIOp,
+            handshake::AddFOp, handshake::CmpFOp, handshake::DivFOp,
+            handshake::MulFOp, handshake::SubFOp>([&](auto) {
         // At least one operand must depend on the predecessor
         return foldGIIDStatusOr(recurse, defOp->getOperands());
       })

@@ -19,7 +19,6 @@
 #define DYNAMATIC_DIALECT_HANDSHAKE_HANDSHAKE_OPS_H
 
 #include "dynamatic/Dialect/Handshake/HandshakeInterfaces.h"
-#include "dynamatic/Dialect/Handshake/HandshakeTypes.h"
 #include "dynamatic/Support/LLVM.h"
 #include "mlir/Dialect/Affine/Analysis/AffineAnalysis.h"
 #include "mlir/IR/OpDefinition.h"
@@ -28,6 +27,12 @@
 
 namespace dynamatic {
 namespace handshake {
+
+/// Returns an IntegerType that has the lowest possible number of bits necessary
+/// to index into a given number of elements (minimum 1 bit).
+IntegerType getOptimizedIndexValType(OpBuilder &builder, unsigned numToIndex);
+
+struct TimingInfo;
 
 // Forward declaration needed by memory ports data structures.
 class MCLoadOp;
@@ -136,7 +141,7 @@ public:
   ControlPort(mlir::Operation *ctrlOp, unsigned ctrlInputIdx);
 
   /// Copy-constructor from abstract memory port for LLVM-style RTTI.
-  ControlPort(const MemoryPort &memPort) : MemoryPort(memPort){};
+  ControlPort(const MemoryPort &memPort) : MemoryPort(memPort) {};
 
   /// Returns the control operation the port is associated to.
   mlir::Operation *getCtrlOp() const { return portOp; }
@@ -162,7 +167,7 @@ public:
   LoadPort(const LoadPort &other) = default;
 
   /// Copy-constructor from abstract memory port for LLVM-style RTTI.
-  LoadPort(const MemoryPort &memPort) : MemoryPort(memPort){};
+  LoadPort(const MemoryPort &memPort) : MemoryPort(memPort) {};
 
   /// Returns the load operation the port is associated to.
   dynamatic::handshake::LoadOpInterface getLoadOp() const;
@@ -194,7 +199,7 @@ protected:
 class MCLoadPort : public LoadPort {
 public:
   /// Copy-constructor from abstract memory port for LLVM-style RTTI.
-  MCLoadPort(const MemoryPort &memPort) : LoadPort(memPort){};
+  MCLoadPort(const MemoryPort &memPort) : LoadPort(memPort) {};
 
   /// Constructs the load port from an MC load operation, the index of the
   /// load's address output in the memory interface's inputs, and the index of
@@ -215,7 +220,7 @@ public:
 class LSQLoadPort : public LoadPort {
 public:
   /// Copy-constructor from abstract memory port for LLVM-style RTTI.
-  LSQLoadPort(const MemoryPort &memPort) : LoadPort(memPort){};
+  LSQLoadPort(const MemoryPort &memPort) : LoadPort(memPort) {};
 
   /// Same semantics as the `LoadPort` constructor but works specifically with a
   /// load operation that connects to an LSQ.
@@ -243,7 +248,7 @@ public:
   StorePort(const StorePort &other) = default;
 
   /// Copy-constructor from abstract memory port for LLVM-style RTTI.
-  StorePort(const MemoryPort &memPort) : MemoryPort(memPort){};
+  StorePort(const MemoryPort &memPort) : MemoryPort(memPort) {};
 
   /// Returns the store operation the port is associated to.
   dynamatic::handshake::StoreOpInterface getStoreOp() const;
@@ -274,7 +279,7 @@ protected:
 class MCStorePort : public StorePort {
 public:
   /// Copy-constructor from abstract memory port for LLVM-style RTTI.
-  MCStorePort(const MemoryPort &memPort) : StorePort(memPort){};
+  MCStorePort(const MemoryPort &memPort) : StorePort(memPort) {};
 
   /// Same semantics as the `LoadPort` constructor but works specifically with a
   /// load operation that connects to an MC.
@@ -293,7 +298,7 @@ public:
 class LSQStorePort : public StorePort {
 public:
   /// Copy-constructor from abstract memory port for LLVM-style RTTI.
-  LSQStorePort(const MemoryPort &memPort) : StorePort(memPort){};
+  LSQStorePort(const MemoryPort &memPort) : StorePort(memPort) {};
 
   /// Same semantics as the `LoadPort` constructor but works specifically with a
   /// load operation that connects to an LSQ.
@@ -335,7 +340,7 @@ public:
   LSQLoadStorePort(const LSQLoadStorePort &other) = default;
 
   /// Copy-constructor from abstract memory port for LLVM-style RTTI.
-  LSQLoadStorePort(const MemoryPort &memPort) : MemoryPort(memPort){};
+  LSQLoadStorePort(const MemoryPort &memPort) : MemoryPort(memPort) {};
 
   /// Returns the LSQ the port is associated to.
   dynamatic::handshake::LSQOp getLSQOp() const;
@@ -389,7 +394,7 @@ public:
   MCLoadStorePort(const MCLoadStorePort &other) = default;
 
   /// Copy-constructor from abstract memory port for LLVM-style RTTI.
-  MCLoadStorePort(const MemoryPort &memPort) : MemoryPort(memPort){};
+  MCLoadStorePort(const MemoryPort &memPort) : MemoryPort(memPort) {};
 
   /// Returns the MC the port is associated to.
   dynamatic::handshake::MemoryControllerOp getMCOp() const;
@@ -517,7 +522,7 @@ public:
   /// Initializes a function's memory ports from the memory interface it
   /// corresponds to (and without any port).
   FuncMemoryPorts(dynamatic::handshake::MemoryOpInterface memOp)
-      : memOp(memOp){};
+      : memOp(memOp) {}
 
   /// Returns the continuous subrange of the memory interface's inputs which a
   /// group (indicated by its index in the list) maps to.
@@ -604,10 +609,10 @@ public:
   mlir::SmallVector<MCBlock> getBlocks();
 
   /// Determines whether the memory controller connects to an LSQ.
-  bool hasConnectionToLSQ() const { return !interfacePorts.empty(); }
+  bool connectsToLSQ() const { return !interfacePorts.empty(); }
 
   /// Returns the memory controller's LSQ ports (which must exist, check with
-  /// `hasConnectionToLSQ`).
+  /// `connectsToLSQ`).
   LSQLoadStorePort getLSQPort() const;
 };
 
@@ -615,8 +620,11 @@ public:
 /// the `dynamatic::handshake::LSQOp` memory interface.
 class LSQGroup {
 public:
+  /// ID of the group the MC group corresponds to.
+  unsigned groupID;
+
   /// Wraps a pointer to a `dynamatic::GroupMemoryPorts`.
-  LSQGroup(GroupMemoryPorts *groups);
+  LSQGroup(GroupMemoryPorts *groups, unsigned groupID);
 
   /// Returns a reference to the underlying group.
   GroupMemoryPorts &operator*() { return *group; };
@@ -640,61 +648,20 @@ public:
   dynamatic::handshake::LSQOp getLSQOp() const;
 
   /// Returns the ports corresponding to a single LSQ groups.
-  LSQGroup getGroup(unsigned groupIdx) { return LSQGroup(&groups[groupIdx]); }
+  LSQGroup getGroup(unsigned groupIdx) {
+    return LSQGroup(&groups[groupIdx], groupIdx);
+  }
 
   /// Returns a list of all LSQ groups, in definition order in the memory
   /// interface's inputs.
   mlir::SmallVector<LSQGroup> getGroups();
 
   /// Determines whether the LSQ connects to a memory controller.
-  bool hasConnectionToMC() const { return !interfacePorts.empty(); }
+  bool connectsToMC() const { return !interfacePorts.empty(); }
 
   /// Returns the LSQ's memory controller ports (which must exist, check with
-  /// `hasConnectionToMC`).
+  /// `connectsToMC`).
   MCLoadStorePort getMCPort() const;
-};
-
-/// Specifies how a handshake channel (i.e. a SSA value used once) may be
-/// buffered. Backing data-structure for the ChannelBufPropsAttr attribute.
-struct ChannelBufProps {
-  /// Minimum number of transparent slots allowed on the channel (inclusive).
-  unsigned minTrans;
-  /// Maximum number of transparent slots allowed on the channel (inclusive).
-  std::optional<unsigned> maxTrans;
-  /// Minimum number of opaque slots allowed on the channel (inclusive).
-  unsigned minOpaque;
-  /// Maximum number of opaque slots allowed on the channel (inclusive).
-  std::optional<unsigned> maxOpaque;
-  /// Combinational delay (in ns) from the output port to the buffer's input, if
-  /// a buffer is placed on the channel.
-  double inDelay;
-  /// Combinational delay (in ns) from the buffer's output to the input port, if
-  /// a buffer is placed on the channel.
-  double outDelay;
-  /// Total combinational channel delay (in ns) if no buffer is placed on the
-  /// channel.
-  double delay;
-
-  /// Simple constructor that takes the same parameters as the struct's members.
-  /// By default, all the channel is "unconstrained" w.r.t. what kind of buffers
-  /// can be placed and is assumed to have 0 delay.
-  ChannelBufProps(unsigned minTrans = 0,
-                  std::optional<unsigned> maxTrans = std::nullopt,
-                  unsigned minOpaque = 0,
-                  std::optional<unsigned> maxOpaque = std::nullopt,
-                  double inDelay = 0.0, double outDelay = 0.0,
-                  double delay = 0.0);
-
-  /// Determines whether these buffering properties are satisfiable i.e.,
-  /// whether it's possible to create a buffer that respects them.
-  bool isSatisfiable() const;
-
-  /// Determines whether these buffering properties forbid the placement of
-  /// any buffer on the associated channel.
-  bool isBufferizable() const;
-
-  /// Computes member-wise equality.
-  bool operator==(const ChannelBufProps &rhs) const;
 };
 
 /// Identifies the type of all ports in a memory interface's memory inputs by
@@ -702,10 +669,6 @@ struct ChannelBufProps {
 FuncMemoryPorts getMemoryPorts(dynamatic::handshake::MemoryOpInterface memOp);
 
 } // namespace dynamatic
-
-static inline std::string getMaxStr(std::optional<unsigned> optMax) {
-  return optMax.has_value() ? (std::to_string(optMax.value()) + "]") : "inf]";
-};
 
 // Structs to enable LLVM-style RTTI for the memory port hierarchy.
 namespace llvm {
@@ -721,19 +684,6 @@ struct CastInfo<T, const dynamatic::MemoryPort>
     : OptionalValueCast<T, const dynamatic::MemoryPort> {};
 
 } // namespace llvm
-
-/// Prints the buffering properties as two closed or semi-open intervals
-/// (depending on whether maximums are defined), one for tranparent slots and
-/// one for opaque slots.
-template <typename Os>
-Os &operator<<(Os &os, dynamatic::ChannelBufProps &props) {
-  os << "{\n\ttransparent slots: [" << props.minTrans << ", "
-     << getMaxStr(props.maxTrans) << "\n\topaque slots: [" << props.minOpaque
-     << ", " << getMaxStr(props.maxOpaque) << "\n\tin/out delays: ("
-     << props.inDelay << ", " << props.outDelay << ")"
-     << "\n\ttotal delay: " << props.delay << "\n}\n";
-  return os;
-}
 
 namespace mlir {
 namespace OpTrait {
@@ -761,14 +711,7 @@ public:
 };
 
 } // namespace OpTrait
-
-namespace affine {
-struct DependenceComponent;
-} // namespace affine
 } // namespace mlir
-
-#define GET_ATTRDEF_CLASSES
-#include "dynamatic/Dialect/Handshake/HandshakeAttributes.h.inc"
 
 #define GET_OP_CLASSES
 #include "dynamatic/Dialect/Handshake/Handshake.h.inc"

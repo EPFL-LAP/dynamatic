@@ -25,17 +25,27 @@
 #include "mlir/Transforms/Passes.h"
 #include "tutorials/CreatingPasses/InitAllPasses.h"
 
-// Defined in the test directory, no public header.
+// Test passes, no public header.
+namespace dynamatic {
+namespace test {
+void registerTestRTLSuppport();
+} // namespace test
+} // namespace dynamatic
+
+// Experimental test passes, no public header.
 namespace dynamatic {
 namespace experimental {
 namespace test {
 void registerTestCDGAnalysisPass();
+void registerTestHandshakeSimulator();
 } // namespace test
 } // namespace experimental
 } // namespace dynamatic
 
 void registerTestPasses() {
+  dynamatic::test::registerTestRTLSuppport();
   dynamatic::experimental::test::registerTestCDGAnalysisPass();
+  dynamatic::experimental::test::registerTestHandshakeSimulator();
 }
 
 int main(int argc, char **argv) {

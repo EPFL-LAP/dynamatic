@@ -41,9 +41,6 @@ public:
   static string addrWidthParamName;
   static string dataDepthParamName;
 
-  string clkSignalName;
-  string rstSignalName;
-  string doneSignalName;
   string ce0SignalName;
   string we0SignalName;
   string dIn0SignalName;
@@ -59,6 +56,9 @@ public:
   string dataWidthParamValue;
   string addrWidthParamValue;
   string dataDepthParamValue;
+
+  string memStartSignalName;
+  string memEndSignalName;
 };
 
 class Constant {
@@ -93,8 +93,6 @@ private:
   string getMemoryInstanceGeneration();
   string getDuvInstanceGeneration();
   string getDuvComponentDeclaration();
-  string getMemComponentDeclration();
-  string getArgComponentDeclration();
   string getCommonBody();
   string getArchitectureEnd();
   string getOutputTagGeneration();

@@ -11,14 +11,101 @@
 //
 //===----------------------------------------------------------------------===//
 
+#include "dynamatic/Dialect/Handshake/HandshakeInterfaces.h"
 #include "dynamatic/Dialect/Handshake/HandshakeOps.h"
+#include "dynamatic/Dialect/Handshake/HandshakeTypes.h"
 #include "dynamatic/Support/LLVM.h"
 #include "mlir/Dialect/Affine/Analysis/AffineAnalysis.h"
+#include "mlir/IR/Diagnostics.h"
 #include "mlir/IR/OpDefinition.h"
 #include "mlir/IR/Value.h"
+#include "mlir/Support/LogicalResult.h"
 #include "mlir/Transforms/InliningUtils.h"
+#include "llvm/ADT/TypeSwitch.h"
 
+using namespace mlir;
 using namespace dynamatic;
+using namespace dynamatic::handshake;
+
+//===----------------------------------------------------------------------===//
+// PortNameGenerator (uses NamedIOInterface)
+//===----------------------------------------------------------------------===//
+
+PortNamer::PortNamer(Operation *op) {
+  assert(op && "cannot generate port names for null operation");
+  if (auto namedOpInterface = dyn_cast<handshake::NamedIOInterface>(op))
+    inferFromNamedOpInterface(namedOpInterface);
+  else if (auto funcOp = dyn_cast<handshake::FuncOp>(op))
+    inferFromFuncOp(funcOp);
+  else
+    inferDefault(op);
+}
+
+void PortNamer::infer(Operation *op, IdxToStrF &inF, IdxToStrF &outF) {
+  for (size_t idx = 0, e = op->getNumOperands(); idx < e; ++idx)
+    inputs.push_back(inF(idx));
+  for (size_t idx = 0, e = op->getNumResults(); idx < e; ++idx)
+    outputs.push_back(outF(idx));
+
+  // The Handshake terminator forwards its non-memory inputs to its outputs, so
+  // it needs port names for them
+  if (handshake::EndOp endOp = dyn_cast<handshake::EndOp>(op)) {
+    handshake::FuncOp funcOp = endOp->getParentOfType<handshake::FuncOp>();
+    assert(funcOp && "end must be child of handshake function");
+    size_t numResults = funcOp.getFunctionType().getNumResults();
+    for (size_t idx = 0, e = numResults; idx < e; ++idx)
+      outputs.push_back(endOp.getDefaultResultName(idx));
+  }
+}
+
+void PortNamer::inferDefault(Operation *op) {
+  llvm::TypeSwitch<Operation *, void>(op)
+      .Case<arith::AddFOp, arith::AddIOp, arith::AndIOp, arith::CmpIOp,
+            arith::CmpFOp, arith::DivFOp, arith::DivSIOp, arith::DivUIOp,
+            arith::MaximumFOp, arith::MinimumFOp, arith::MulFOp, arith::MulIOp,
+            arith::OrIOp, arith::ShLIOp, arith::ShRSIOp, arith::ShRUIOp,
+            arith::SubFOp, arith::SubIOp, arith::XOrIOp>([&](auto) {
+        infer(
+            op, [](unsigned idx) { return idx == 0 ? "lhs" : "rhs"; },
+            [](unsigned idx) { return "result"; });
+      })
+      .Case<arith::ExtSIOp, arith::ExtUIOp, arith::NegFOp, arith::TruncIOp>(
+          [&](auto) {
+            infer(
+                op, [](unsigned idx) { return "ins"; },
+                [](unsigned idx) { return "outs"; });
+          })
+      .Case<arith::SelectOp>([&](auto) {
+        infer(
+            op,
+            [](unsigned idx) {
+              if (idx == 0)
+                return "condition";
+              if (idx == 1)
+                return "trueValue";
+              return "falseValue";
+            },
+            [](unsigned idx) { return "result"; });
+      })
+      .Default([&](auto) {
+        infer(
+            op, [](unsigned idx) { return "in" + std::to_string(idx); },
+            [](unsigned idx) { return "out" + std::to_string(idx); });
+      });
+}
+
+void PortNamer::inferFromNamedOpInterface(handshake::NamedIOInterface namedIO) {
+  auto inF = [&](unsigned idx) { return namedIO.getOperandName(idx); };
+  auto outF = [&](unsigned idx) { return namedIO.getResultName(idx); };
+  infer(namedIO, inF, outF);
+}
+
+void PortNamer::inferFromFuncOp(handshake::FuncOp funcOp) {
+  llvm::transform(funcOp.getArgNames(), std::back_inserter(inputs),
+                  [](Attribute arg) { return cast<StringAttr>(arg).str(); });
+  llvm::transform(funcOp.getResNames(), std::back_inserter(outputs),
+                  [](Attribute res) { return cast<StringAttr>(res).str(); });
+}
 
 //===----------------------------------------------------------------------===//
 // NamedIOInterface (getOperandName/getResultName)
@@ -64,9 +151,41 @@ std::string handshake::EndOp::getOperandName(unsigned idx) {
   return "memDone_" + std::to_string(idx - numResults);
 }
 
+std::string handshake::SelectOp::getOperandName(unsigned idx) {
+  assert(idx < getNumOperands() && "index too high");
+  if (idx == 0)
+    return "condition";
+  return (idx == 1) ? "trueValue" : "falseValue";
+}
+
+std::string handshake::SelectOp::getResultName(unsigned idx) {
+  assert(idx == 0 && "index too high");
+  return "result";
+}
+
 /// Load/Store base signal names common to all memory interfaces
-static constexpr llvm::StringLiteral MEMREF("memref"), CTRL("ctrl"),
-    LD_ADDR("ldAddr"), LD_DATA("ldData"), ST_ADDR("stAddr"), ST_DATA("stData");
+static constexpr llvm::StringLiteral MEMREF("memref"), MEM_START("memStart"),
+    MEM_END("memEnd"), CTRL_END("ctrlEnd"), CTRL("ctrl"), LD_ADDR("ldAddr"),
+    LD_DATA("ldData"), ST_ADDR("stAddr"), ST_DATA("stData");
+
+static StringRef getIfControlOprd(MemoryOpInterface memOp, unsigned idx) {
+  if (!memOp.isMasterInterface())
+    return "";
+  switch (idx) {
+  case 0:
+    return MEMREF;
+  case 1:
+    return MEM_START;
+  default:
+    return idx == memOp->getNumOperands() - 1 ? CTRL_END : "";
+  }
+}
+
+static StringRef getIfControlRes(MemoryOpInterface memOp, unsigned idx) {
+  if (memOp.isMasterInterface() && idx == memOp->getNumResults() - 1)
+    return MEM_END;
+  return "";
+}
 
 /// Common operand naming logic for memory controllers and LSQs.
 static std::string getMemOperandName(const FuncMemoryPorts &ports,
@@ -99,11 +218,7 @@ static std::string getMemOperandName(const FuncMemoryPorts &ports,
 }
 
 /// Common result naming logic for memory controllers and LSQs.
-static std::string getMemResultName(const FuncMemoryPorts &ports,
-                                    unsigned idx) {
-  if (idx == ports.memOp->getNumResults() - 1)
-    return "memDone";
-
+static std::string getMemResultName(FuncMemoryPorts &ports, unsigned idx) {
   // Iterate through all memory ports to find out the type of the
   // operand
   unsigned loadIdx = 0;
@@ -122,8 +237,8 @@ static std::string getMemResultName(const FuncMemoryPorts &ports,
 std::string handshake::MemoryControllerOp::getOperandName(unsigned idx) {
   assert(idx < getNumOperands() && "index too high");
 
-  if (idx == 0)
-    return MEMREF.str();
+  if (StringRef name = getIfControlOprd(*this, idx); !name.empty())
+    return name.str();
 
   // Try to get the operand name from the regular ports
   MCPorts mcPorts = getPorts();
@@ -131,7 +246,7 @@ std::string handshake::MemoryControllerOp::getOperandName(unsigned idx) {
     return name;
 
   // Get the operand name from a port to an LSQ
-  assert(mcPorts.hasConnectionToLSQ() && "expected MC to connect to LSQ");
+  assert(mcPorts.connectsToLSQ() && "expected MC to connect to LSQ");
   LSQLoadStorePort lsqPort = mcPorts.getLSQPort();
   if (lsqPort.getLoadAddrInputIndex() == idx)
     return getArrayElemName(LD_ADDR, mcPorts.getNumPorts<LoadPort>());
@@ -144,13 +259,16 @@ std::string handshake::MemoryControllerOp::getOperandName(unsigned idx) {
 std::string handshake::MemoryControllerOp::getResultName(unsigned idx) {
   assert(idx < getNumResults() && "index too high");
 
+  if (StringRef name = getIfControlRes(*this, idx); !name.empty())
+    return name.str();
+
   // Try to get the operand name from the regular ports
   MCPorts mcPorts = getPorts();
   if (std::string name = getMemResultName(mcPorts, idx); !name.empty())
     return name;
 
   // Get the operand name from a port to an LSQ
-  assert(mcPorts.hasConnectionToLSQ() && "expected MC to connect to LSQ");
+  assert(mcPorts.connectsToLSQ() && "expected MC to connect to LSQ");
   LSQLoadStorePort lsqPort = mcPorts.getLSQPort();
   assert(lsqPort.getLoadDataOutputIndex() == idx && "unknown MC/LSQ result");
   return getArrayElemName(LD_DATA, mcPorts.getNumPorts<LoadPort>());
@@ -159,9 +277,8 @@ std::string handshake::MemoryControllerOp::getResultName(unsigned idx) {
 std::string handshake::LSQOp::getOperandName(unsigned idx) {
   assert(idx < getNumOperands() && "index too high");
 
-  bool connectsToMC = isConnectedToMC();
-  if (idx == 0 && !connectsToMC)
-    return MEMREF.str();
+  if (StringRef name = getIfControlOprd(*this, idx); !name.empty())
+    return name.str();
 
   // Try to get the operand name from the regular ports
   LSQPorts lsqPorts = getPorts();
@@ -169,7 +286,7 @@ std::string handshake::LSQOp::getOperandName(unsigned idx) {
     return name;
 
   // Get the operand name from a port to a memory controller
-  assert(lsqPorts.hasConnectionToMC() && "expected LSQ to connect to MC");
+  assert(lsqPorts.connectsToMC() && "expected LSQ to connect to MC");
   assert(lsqPorts.getMCPort().getLoadDataInputIndex() == idx &&
          "unknown LSQ/MC operand");
   return "ldDataFromMC";
@@ -178,13 +295,16 @@ std::string handshake::LSQOp::getOperandName(unsigned idx) {
 std::string handshake::LSQOp::getResultName(unsigned idx) {
   assert(idx < getNumResults() && "index too high");
 
+  if (StringRef name = getIfControlRes(*this, idx); !name.empty())
+    return name.str();
+
   // Try to get the operand name from the regular ports
   LSQPorts lsqPorts = getPorts();
   if (std::string name = getMemResultName(lsqPorts, idx); !name.empty())
     return name;
 
   // Get the operand name from a port to a memory controller
-  assert(lsqPorts.hasConnectionToMC() && "expected LSQ to connect to MC");
+  assert(lsqPorts.connectsToMC() && "expected LSQ to connect to MC");
   MCLoadStorePort mcPort = lsqPorts.getMCPort();
   if (mcPort.getLoadAddrOutputIndex() == idx)
     return "ldAddrToMC";
@@ -195,13 +315,143 @@ std::string handshake::LSQOp::getResultName(unsigned idx) {
 }
 
 //===----------------------------------------------------------------------===//
-// ControlInterface
+// MemoryOpInterface
 //===----------------------------------------------------------------------===//
 
-bool dynamatic::handshake::isControlOpImpl(Operation *op) {
-  if (SOSTInterface sostInterface = dyn_cast<SOSTInterface>(op); sostInterface)
-    return sostInterface.sostIsControl();
-  return false;
+bool MemoryControllerOp::isMasterInterface() { return true; }
+
+bool LSQOp::isMasterInterface() { return !isConnectedToMC(); }
+
+TypedValue<MemRefType> LSQOp::getMemRef() {
+  if (handshake::MemoryControllerOp mcOp = getConnectedMC())
+    return mcOp.getMemRef();
+  return cast<TypedValue<MemRefType>>(getInputs().front());
+}
+
+TypedValue<ControlType> LSQOp::getMemStart() {
+  if (MemoryControllerOp mcOp = getConnectedMC())
+    return mcOp.getMemStart();
+  return cast<TypedValue<ControlType>>(getOperand(1));
+}
+
+TypedValue<ControlType> LSQOp::getMemEnd() {
+  if (MemoryControllerOp mcOp = getConnectedMC())
+    return mcOp.getMemStart();
+  return cast<TypedValue<ControlType>>(getResults().back());
+}
+
+TypedValue<ControlType> LSQOp::getCtrlEnd() {
+  if (MemoryControllerOp mcOp = getConnectedMC())
+    return mcOp.getCtrlEnd();
+  return cast<TypedValue<ControlType>>(getOperands().back());
+}
+
+//===----------------------------------------------------------------------===//
+// SameExtraSignalsInterface
+//===----------------------------------------------------------------------===//
+
+namespace {
+using ChannelVal = TypedValue<handshake::ChannelType>;
+} // namespace
+
+static inline ChannelVal toChannel(Value val) { return cast<ChannelVal>(val); }
+
+static void insertChannels(ValueRange values,
+                           SmallVectorImpl<ChannelVal> &channels) {
+  for (Value val : values) {
+    if (auto channelVal = dyn_cast<ChannelVal>(val))
+      channels.push_back(channelVal);
+  }
+}
+
+SmallVector<ChannelVal>
+dynamatic::handshake::detail::getChannelsWithSameExtraSignals(Operation *op) {
+  SmallVector<ChannelVal> channels;
+  insertChannels(op->getOperands(), channels);
+  insertChannels(op->getResults(), channels);
+  return channels;
+}
+
+LogicalResult dynamatic::handshake::detail::verifySameExtraSignalsInterface(
+    Operation *op, ArrayRef<ChannelVal> channels) {
+  std::optional<ArrayRef<ExtraSignal>> refExtras;
+
+  for (TypedValue<ChannelType> chan : channels) {
+    if (!refExtras) {
+      refExtras = chan.getType().getExtraSignals();
+      continue;
+    }
+    ArrayRef<ExtraSignal> extras = chan.getType().getExtraSignals();
+    if (refExtras->size() != extras.size())
+      return op->emitError() << "incompatible number of extra signals "
+                                "between two operand/result channel types";
+    auto signalsZip = llvm::zip(*refExtras, extras);
+    for (const auto &[idx, signals] : llvm::enumerate(signalsZip)) {
+      auto &[refSig, sig] = signals;
+      if (refSig != sig)
+        return op->emitError()
+               << "different " << idx
+               << "-th extra signal between two operand/result channel types";
+    }
+  }
+  return success();
+}
+
+SmallVector<ChannelVal> MuxOp::getChannelsWithSameExtraSignals() {
+  if (getResult().getType())
+    return {};
+
+  SmallVector<ChannelVal> channels;
+  llvm::transform(getDataOperands(), std::back_inserter(channels), toChannel);
+  channels.push_back(toChannel(getResult()));
+  return channels;
+}
+
+SmallVector<ChannelVal> ControlMergeOp::getChannelsWithSameExtraSignals() {
+  if (getResult().getType())
+    return {};
+
+  SmallVector<ChannelVal> channels;
+  llvm::transform(getDataOperands(), std::back_inserter(channels), toChannel);
+  channels.push_back(toChannel(getResult()));
+  return channels;
+}
+
+SmallVector<ChannelVal> SelectOp::getChannelsWithSameExtraSignals() {
+  return {getTrueValue(), getFalseValue(), getResult()};
+}
+
+//===----------------------------------------------------------------------===//
+// ReshapableChannelsInterface
+//===----------------------------------------------------------------------===//
+
+std::pair<handshake::ChannelType, bool>
+dynamatic::handshake::detail::getReshapableChannelType(Operation *op) {
+  return {dyn_cast<ChannelType>(op->getOperands().front().getType()), false};
+}
+
+std::pair<ChannelType, bool> MergeOp::getReshapableChannelType() {
+  return {dyn_cast<ChannelType>(getDataOperands().front().getType()), true};
+}
+
+std::pair<ChannelType, bool> MuxOp::getReshapableChannelType() {
+  return {dyn_cast<ChannelType>(getDataOperands().front().getType()), true};
+}
+
+std::pair<ChannelType, bool> ControlMergeOp::getReshapableChannelType() {
+  return {dyn_cast<ChannelType>(getDataOperands().front().getType()), true};
+}
+
+std::pair<ChannelType, bool> BranchOp::getReshapableChannelType() {
+  return {dyn_cast<ChannelType>(getOperand().getType()), true};
+}
+
+std::pair<ChannelType, bool> ConditionalBranchOp::getReshapableChannelType() {
+  return {dyn_cast<ChannelType>(getDataOperand().getType()), true};
+}
+
+std::pair<ChannelType, bool> SelectOp::getReshapableChannelType() {
+  return {getTrueValue().getType(), true};
 }
 
 #include "dynamatic/Dialect/Handshake/HandshakeInterfaces.cpp.inc"

@@ -16,6 +16,7 @@
 //===----------------------------------------------------------------------===//
 
 #include "dynamatic/Dialect/Handshake/HandshakeDialect.h"
+#include "dynamatic/Dialect/Handshake/HandshakeAttributes.h"
 #include "dynamatic/Dialect/Handshake/HandshakeOps.h"
 #include "dynamatic/Dialect/Handshake/HandshakeTypes.h"
 #include "mlir/IR/DialectImplementation.h"

@@ -141,12 +141,6 @@ void HandshakeHoistExtInstancesPass::hoistInstances(handshake::FuncOp funcOp,
   funcOp->setAttr("argNames", ArrayAttr::get(ctx, argNames));
   funcOp->setAttr("resNames", ArrayAttr::get(ctx, resNames));
 
-  /// NOTE: this is hacky, but we need to remember the original number of
-  /// operands the end operation had before the transformation so that the
-  /// operands we add here can then directly connect to the RTL module's outputs
-  endOp->setAttr("hw.funcCutoff",
-                 builder.getUI32IntegerAttr(endOp->getNumOperands()));
-
   // Replace the terminator's operands
   endOp->setOperands(endOperands);
 }

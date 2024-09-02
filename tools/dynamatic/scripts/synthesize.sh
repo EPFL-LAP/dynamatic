@@ -37,7 +37,8 @@ rm -rf "$SYNTH_DIR" && mkdir -p "$SYNTH_DIR"
 # Copy all synthesizable components to specific folder for Vivado
 mkdir -p "$SYNTH_HDL_DIR"
 cp "$HDL_DIR/$KERNEL_NAME.vhd" "$SYNTH_HDL_DIR"
-cp "$DYNAMATIC_DIR"/data/vhdl/*.vhd "$SYNTH_HDL_DIR"
+cp "$HDL_DIR/"*.vhd "$SYNTH_HDL_DIR" 2> /dev/null
+cp "$HDL_DIR/"*.v "$SYNTH_HDL_DIR" 2> /dev/null
 
 # See if we should include any VHDL in the synthesis script
 READ_VHDL=""

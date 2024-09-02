@@ -11,21 +11,12 @@
 //===----------------------------------------------------------------------===//
 
 #include "dynamatic/Transforms/BufferPlacement/FPGA20Buffers.h"
-#include "dynamatic/Analysis/NameAnalysis.h"
-#include "dynamatic/Dialect/Handshake/HandshakeDialect.h"
 #include "dynamatic/Dialect/Handshake/HandshakeOps.h"
 #include "dynamatic/Support/Attribute.h"
 #include "dynamatic/Support/CFG.h"
 #include "dynamatic/Support/TimingModels.h"
 #include "dynamatic/Transforms/BufferPlacement/BufferingSupport.h"
-#include "mlir/Dialect/Arith/IR/Arith.h"
-#include "mlir/Dialect/Func/IR/FuncOps.h"
-#include "mlir/IR/BuiltinTypes.h"
-#include "mlir/IR/OperationSupport.h"
-#include "mlir/IR/PatternMatch.h"
 #include "mlir/IR/Value.h"
-#include "mlir/Support/IndentedOstream.h"
-#include "mlir/Support/LogicalResult.h"
 
 #ifndef DYNAMATIC_GUROBI_NOT_INSTALLED
 #include "gurobi_c++.h"
@@ -69,7 +60,7 @@ void FPGA20Buffers::extractResult(BufferPlacement &placement) {
     bool placeOpaque = channelVars.signalVars[SignalType::DATA].bufPresent.get(
                            GRB_DoubleAttr_X) > 0;
 
-    ChannelBufProps &props = channelProps[channel];
+    handshake::ChannelBufProps &props = channelProps[channel];
 
     PlacementResult result;
     if (placeOpaque) {
@@ -118,7 +109,7 @@ void FPGA20Buffers::extractResult(BufferPlacement &placement) {
 
 void FPGA20Buffers::addCustomChannelConstraints(Value channel) {
   ChannelVars &chVars = vars.channelVars[channel];
-  ChannelBufProps &props = channelProps[channel];
+  handshake::ChannelBufProps &props = channelProps[channel];
   GRBVar &dataBuf = chVars.signalVars[SignalType::DATA].bufPresent;
 
   if (props.minOpaque > 0) {
@@ -168,12 +159,15 @@ void FPGA20Buffers::setup() {
   SmallVector<SignalType, 1> signals;
   signals.push_back(SignalType::DATA);
 
+  /// NOTE: (lucas-rami) For each buffering group this should be the timing
+  /// model of the buffer that will be inserted by the MILP for this group. We
+  /// don't have models for these buffers at the moment therefore we provide a
+  /// null-model to each group, but this hurts our placement's accuracy.
+  const TimingModel *bufModel = nullptr;
+
   // Create buffering groups. In this MILP we only care for the data signal
   SmallVector<BufferingGroup> bufGroups;
-  OperationName oehbName = OperationName(handshake::OEHBOp::getOperationName(),
-                                         funcInfo.funcOp->getContext());
-  const TimingModel *dataBufModel = timingDB.getModel(oehbName);
-  bufGroups.emplace_back(ArrayRef<SignalType>{SignalType::DATA}, dataBufModel);
+  bufGroups.emplace_back(ArrayRef<SignalType>{SignalType::DATA}, bufModel);
 
   // Create channel variables and constraints
   std::vector<Value> allChannels;
@@ -186,7 +180,7 @@ void FPGA20Buffers::setup() {
     // that are not adjacent to a memory interface
     if (!channel.getDefiningOp<handshake::MemoryOpInterface>() &&
         !isa<handshake::MemoryOpInterface>(*channel.getUsers().begin())) {
-      addChannelPathConstraints(channel, SignalType::DATA, dataBufModel);
+      addChannelPathConstraints(channel, SignalType::DATA, bufModel);
       addChannelElasticityConstraints(channel, bufGroups);
     }
   }

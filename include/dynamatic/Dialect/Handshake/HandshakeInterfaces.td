@@ -20,93 +20,11 @@
 
 include "mlir/IR/OpBase.td"
 
-def SOSTInterface : OpInterface<"SOSTInterface"> {
+def ArithOpInterface : OpInterface<"ArithOpInterface"> {
   let cppNamespace = "::dynamatic::handshake";
   let description = [{
-      Sized Operation with Single Type (SOST).
-      
-      These are operations whose operands all have the same type and which have
-      an integer size property, be it the number of operation operands (e.g.,
-      for a merge) or the number of operation results (e.g., for a fork).
-  }];
-
-  let methods = [
-    InterfaceMethod<[{
-        Get the data type associated to the operation.
-        The default implementation of this method simply returns the type of
-        the first operation operand.
-      }],
-      "mlir::Type", "getDataType", (ins), "",
-      [{
-        auto concreteOp = mlir::cast<ConcreteOp>($_op);
-        return concreteOp->getOperands().front().getType();
-      }]
-    >,
-    InterfaceMethod<[{
-        Get the size associated to the operation.
-        The default implementation of this method simply returns the number of
-        operation operands.
-      }],
-      "unsigned", "getSize", (ins), "",
-      [{
-        auto concreteOp = mlir::cast<ConcreteOp>($_op);
-        return concreteOp->getNumOperands();
-      }]
-    >,
-    InterfaceMethod<[{
-        Determine whether the operation is a control operation.
-        The default implementation of this method assumes that the operation
-        is a control operation if and only if its associated data type is a
-        NoneType.
-      }],
-      "bool", "sostIsControl", (ins), "",
-      [{
-        auto concreteOp = mlir::cast<ConcreteOp>($_op);
-        // The operation is a control operation if its single data type is a 
-        // NoneType.
-        return concreteOp.getDataType().template isa<mlir::NoneType>();
-      }]
-    >,
-    InterfaceMethod<[{
-        Prints an SOST operation. If the `explicitSize` parameter is set to
-        true, then the method prints the operation's size (in the SOST sense)
-        between square brackets before printing the operation's operands,
-        attributes, and data type.
-      }],
-      "void", "sostPrint", (ins 
-        "mlir::OpAsmPrinter &": $printer, "bool": $explicitSize
-      ), "", 
-      [{
-        auto concreteOp = mlir::cast<ConcreteOp>($_op);
-
-        if (explicitSize) {
-          printer << " [" << concreteOp.getSize() << "]";
-        }
-        printer << " " << concreteOp->getOperands();
-        printer.printOptionalAttrDict(concreteOp->getAttrs());
-        printer << " : " << concreteOp.getDataType();
-      }]
-    >
-  ];
-
-  let verify = [{
-    auto concreteOp = mlir::cast<ConcreteOp>($_op);
-
-    // SOST operation's size must be at least one
-    if (concreteOp.getSize() < 1) {
-      return concreteOp.emitOpError(
-        "SOST operation's size must be at least 1, but has size ") 
-        << concreteOp.getSize();
-    }
-
-    // SOST operation's operands must all have the same type
-    auto dataType = concreteOp.getDataType();
-    for (auto operand : concreteOp->getOperands())
-      if (operand.getType() != dataType) 
-        return concreteOp.emitOpError("SOST operation reports having data type ")
-          << dataType << ", but one operand has type " << operand.getType();
-    
-    return mlir::success();
+     Handshake operations which semantically correspond to an operation from the
+     `ArithDialect`.
   }];
 }
 
@@ -123,6 +41,11 @@ def MergeLikeOpInterface : OpInterface<"MergeLikeOpInterface"> {
         Returns an operand range over the data signals being merged.
       }],
       "mlir::OperandRange", "getDataOperands", (ins)
+    >,
+    InterfaceMethod<[{
+        Returns the operation's result representing the selected data operand.
+      }],
+      "mlir::OpResult", "getDataResult", (ins)
     >,
   ];
 
@@ -151,33 +74,46 @@ def MemoryOpInterface : OpInterface<"MemoryOpInterface"> {
       [{"Allocate the memory to the meory map in the simulation. "}];
 
   let methods = [
-    InterfaceMethod<
-        "Returns the memref-typed SSA value that the interface references.",
-        "::mlir::TypedValue<::mlir::MemRefType>", "getMemRef", (ins)>,
     InterfaceMethod<[{
-        Returns the type of the memref-typed SSA value that the interface
-        references.
-        }],
-        "::mlir::MemRefType", "getMemRefType", (ins),
-        "",
-        [{
-          ConcreteOp concreteOp = cast<ConcreteOp>($_op);
-          return concreteOp.getMemRef().getType().template cast<mlir::MemRefType>();
-        }]>,
-  ];
-}
-
-def BufferOpInterface : OpInterface<"BufferOpInterface"> {
-  let cppNamespace = "::dynamatic::handshake";
-  let description = [{
-    Handshake operations which act as buffers with a strictly positive number
-    of slots.
-  }];
-
-  let methods = [
+        Returns whether the interface is a "master" interface i.e., one that
+        directly connects to an external memory through its parent Handshake
+        function's ports.
+      }], "bool", "isMasterInterface", (ins)
+    >,
     InterfaceMethod<
-      "Returns the number of buffer slots.",
-      "unsigned", "getSlots", (ins)
+      "Returns the memref-typed SSA value that the interface references.",
+      "::mlir::TypedValue<::mlir::MemRefType>", "getMemRef", (ins)
+    >,
+    InterfaceMethod<[{
+      Returns the type of the memref-typed SSA value that the interface
+      references.
+      }],
+      "::mlir::MemRefType", "getMemRefType", (ins),
+      "", [{
+        ConcreteOp concreteOp = cast<ConcreteOp>($_op);
+        return concreteOp.getMemRef().getType().template cast<mlir::MemRefType>();
+      }]
+    >,
+    InterfaceMethod<[{
+        Returns the memory start signal associated to the memory region this
+        interfaces to.
+      }],
+      "::mlir::TypedValue<::dynamatic::handshake::ControlType>", "getMemStart",
+      (ins)
+    >,
+    InterfaceMethod<[{
+        Returns the memory end signal associated to the memory region this
+        interfaces to.
+      }],
+      "::mlir::TypedValue<::dynamatic::handshake::ControlType>", "getMemEnd",
+      (ins)
+    >,
+    InterfaceMethod<[{
+        Returns the control end signal associated to the memory region this
+        interfaces to.
+      }],
+      "::mlir::TypedValue<::dynamatic::handshake::ControlType>", "getCtrlEnd",
+      (ins)
     >
   ];
 }
@@ -332,17 +268,10 @@ def ControlInterface : OpInterface<"ControlInterface"> {
 
   let methods = [
     InterfaceMethod<
-        "Returns true if this operation is a control operation.",
-        "bool",
-        "isControl",
-        (ins),
-        "",
-        [{
-          // Implemented outside of interface due to dependency on
-          // SOSTInterface being declared at the time where this method is
-          // defined.
-          return isControlOpImpl($_op);
-        }]>];
+      "Returns true if this operation is a control operation.",
+      "bool", "isControl", (ins), "",
+      "return false;"
+    >];
 }
 
 def HasClock : NativeOpTrait<"HasClock">;
@@ -354,5 +283,56 @@ def SpeculationOpInterface : OpInterface<"SpeculationOpInterface"> {
   }];
 }
 
-#endif //DYNAMATIC_DIALECT_HANDSHAKE_HANDSHAKE_INTERFACES
+def SameExtraSignalsInterface : OpInterface<"SameExtraSignalsInterface"> {
+  let cppNamespace = "::dynamatic::handshake";
+  let description = [{
+    Ensures that the extra signals of specific operand/result channels
+    (`handshake::ChannelType`) are identical (even if the channels' respective
+    data type may be different). 
+  }];
 
+  let methods = [
+    InterfaceMethod<[{
+        Returns the list of operand/result channels that should have the same
+        extra signals. By default these are all channel-typed operands/results.
+      }], "::mlir::SmallVector<::mlir::TypedValue<::dynamatic::handshake::ChannelType>>",
+        "getChannelsWithSameExtraSignals", (ins), "", [{
+          return ::dynamatic::handshake::detail::getChannelsWithSameExtraSignals(
+            $_op
+          );
+      }]>
+  ];
+
+  let verify = [{
+    return ::dynamatic::handshake::detail::verifySameExtraSignalsInterface(
+      $_op, ::mlir::cast<ConcreteOp>($_op).getChannelsWithSameExtraSignals()
+    );
+  }];
+}
+
+def ReshapableChannelsInterface : OpInterface<"ReshapableChannelsInterface"> {
+  let cppNamespace = "::dynamatic::handshake";
+  let description = [{
+    Handshake operations which do not care for the content of all extra signals
+    (and optionally, the data signal) of specific operand channels
+    (`handshake::ChannelType`) may implement this interface to let the backend
+    know that it is free to reshape these channel-typed operands. Reshaping
+    tends to simplify RTL generation. 
+  }];
+
+  let methods = [
+    InterfaceMethod<[{
+        Returns the operand channel type which can be reshaped, as well as a
+        boolean indicating whether the channel type's data signal is also
+        ignored by the operation. The returned type may be `nullptr` if no such
+        channel type exists. By default, returns the type of the first operand
+        if it is channel-typed and `false`; otherwise returns `nullptr` and an
+        unspecified boolean.
+      }], "::std::pair<::dynamatic::handshake::ChannelType, bool>",
+      "getReshapableChannelType", (ins), "", [{
+        return ::dynamatic::handshake::detail::getReshapableChannelType($_op);
+      }]>
+  ];
+}
+
+#endif //DYNAMATIC_DIALECT_HANDSHAKE_HANDSHAKE_INTERFACES

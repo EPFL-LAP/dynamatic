@@ -170,12 +170,12 @@ public:
                        Logger &logger, StringRef milpName)
       : FPGA20Buffers(env, funcInfo, timingDB, targetPeriod, legacyPlacement,
                       logger, milpName),
-        sharingInfo(sharingInfo){};
+        sharingInfo(sharingInfo) {};
   FPGA20BuffersWrapper(SharingInfo &sharingInfo, GRBEnv &env,
                        FuncInfo &funcInfo, const TimingDatabase &timingDB,
                        double targetPeriod, bool legacyPlacement)
       : FPGA20Buffers(env, funcInfo, timingDB, targetPeriod, legacyPlacement),
-        sharingInfo(sharingInfo){};
+        sharingInfo(sharingInfo) {};
 
 private:
   SharingInfo &sharingInfo;
@@ -198,12 +198,12 @@ public:
                      CFDFCUnion &cfUnion, Logger &logger, StringRef milpName)
       : CFDFCUnionBuffers(env, funcInfo, timingDB, targetPeriod, cfUnion,
                           logger, milpName),
-        sharingInfo(sharingInfo){};
+        sharingInfo(sharingInfo) {};
   FPL22BuffersWraper(SharingInfo &sharingInfo, GRBEnv &env, FuncInfo &funcInfo,
                      const TimingDatabase &timingDB, double targetPeriod,
                      CFDFCUnion &cfUnion)
       : CFDFCUnionBuffers(env, funcInfo, timingDB, targetPeriod, cfUnion),
-        sharingInfo(sharingInfo){};
+        sharingInfo(sharingInfo) {};
 
 private:
   SharingInfo &sharingInfo;
@@ -288,7 +288,7 @@ struct HandshakePlaceBuffersPassWrapper : public HandshakePlaceBuffersPass {
                                    bool dumpLogs)
       : HandshakePlaceBuffersPass(algorithm, frequencies, timingModels,
                                   firstCFDFC, targetCP, timeout, dumpLogs),
-        sharingInfo(sharingInfo){};
+        sharingInfo(sharingInfo) {};
   SharingInfo &sharingInfo;
 
 #ifndef DYNAMATIC_GUROBI_NOT_INSTALLED
@@ -371,8 +371,8 @@ struct CreditBasedSharingPass
     for (Operation &op : funcOp.getOps()) {
       // This is a list of sharable operations. To support more operation types,
       // simply add in the end of the list.
-      if (isa<mlir::arith::MulFOp, mlir::arith::MulIOp, mlir::arith::AddFOp,
-              mlir::arith::SubFOp>(op)) {
+      if (isa<handshake::MulFOp, handshake::MulIOp, handshake::AddFOp,
+              handshake::SubFOp>(op)) {
         assert(op.getNumOperands() > 1 && op.getNumResults() == 1 &&
                "Invalid sharing target is being added to the list of sharing "
                "targets! Currently operations with 1 input or more than 1 "

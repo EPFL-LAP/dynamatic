@@ -98,6 +98,13 @@ public:
   /// erased.
   Operation *getOp(StringRef name) { return namedOperations[name]; };
 
+  /// Transfers the first operation's name to the second operation, with the
+  /// assumption that the first operation will be removed from the IR before the
+  /// analysis makes its next IR walk. Returns false if `op` did not have a
+  /// name, in which case the new operation gets an entirely new name; returns
+  /// true otherwise.
+  bool replaceOp(Operation *op, Operation *newOp);
+
   /// This is simply an alias for `getName(Operation*)` for when the
   /// programmer's intent is to just set a unique name without reading it back.
   void setName(Operation *op) { getName(op); };
