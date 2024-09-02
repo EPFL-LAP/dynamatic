@@ -15,7 +15,7 @@ module eager_fork_register_block (
 
 	assign keepValue = ~outs_ready & transmitValue;
 
-	always @(posedge clk, posedge rst) begin
+	always @(posedge clk) begin
 		if (rst) begin
 			transmitValue <= 1;
 		end else begin

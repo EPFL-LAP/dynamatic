@@ -25,7 +25,7 @@ module oehb #(
     .outs_ready (outs_ready)
   );
 
-  always @(posedge clk, posedge rst) begin
+  always @(posedge clk) begin
     if (rst) begin
       outs <= {DATA_TYPE{1'b0}};
     end else if (regEn) begin

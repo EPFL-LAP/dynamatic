@@ -65,7 +65,7 @@ module read_data_signals #(
 
   integer                                      i;
 
-  always @(posedge clk, posedge rst) begin
+  always @(posedge clk) begin
     if (rst) begin
       valid    <= 0;
       sel_prev <= 0;
@@ -79,8 +79,11 @@ module read_data_signals #(
 
   always @(posedge clk) begin
     for (i = 0; i <= ARBITER_SIZE - 1; i = i + 1)
-    if (sel_prev[i]) out_reg[i*DATA_TYPE+:DATA_TYPE] <= read_data;
-  end
+      if (rst)
+        out_reg[i*DATA_TYPE+:DATA_TYPE] <= 0;
+      else if (sel_prev[i])
+        out_reg[i*DATA_TYPE+:DATA_TYPE] <= read_data;
+    end
 
   always @(*) begin
     for (i = 0; i <= ARBITER_SIZE - 1; i = i + 1) begin
@@ -258,7 +261,7 @@ module write_data_signals #(
 
   assign write_data = data_out_var;
 
-  always @(posedge clk, posedge rst) begin
+  always @(posedge clk) begin
     if (rst) begin
       valid <= 0;
     end else begin
@@ -394,7 +397,7 @@ module mc_control (
   assign memEnd_valid   = memDone;
   assign ctrlEnd_ready  = memAckCtrl;
 
-  always @(posedge clk, posedge rst) begin
+  always @(posedge clk) begin
     if (rst) begin
       memIdle    <= 1;
       memDone    <= 0;

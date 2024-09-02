@@ -75,7 +75,7 @@ module mem_controller_loadless #(
   reg     [31 : 0] counter;
 
   // Counting Stores
-  always @(posedge clk, posedge rst) begin
+  always @(posedge clk) begin
     if (rst) begin
       counter = 32'd0;
     end else begin
