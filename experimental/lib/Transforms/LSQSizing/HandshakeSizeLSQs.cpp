@@ -174,6 +174,7 @@ LSQSizingResult HandshakeSizeLSQsPass::sizeLSQsForCFDFC(buffer::CFDFC cfdfc, uns
 
   // connect all phi nodes to the lsq ps in their BB
   insertAllocPrecedesMemoryAccessEdges(graph, loadOps, phiNodes);  
+  //insertLoadStoreEdge(graph, loadOps, storeOps);
 
   llvm::dbgs() << "============================\n";
   graph.printGraph();

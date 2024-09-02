@@ -221,13 +221,14 @@ int AdjListGraph::findMaxPathLatency(mlir::Operation *startOp, mlir::Operation *
   for(auto &path: paths)
   {
     int latency = getPathLatency(path);
-    llvm::dbgs() << "latency: " << latency << " path: ";
-    printPath(path);
     if(maxLatency < latency) {
       maxLatency = latency;
       maxPath = path;
     }
   }
+  
+  llvm::dbgs() << "latency: " << maxLatency << " path: ";
+  printPath(maxPath);
 
   return maxLatency;
 }
