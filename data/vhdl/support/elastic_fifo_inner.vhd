@@ -64,7 +64,7 @@ begin
     if rising_edge(clk) then
       if (rst = '1') then
         for i in Memory'range loop
-          Memory(i) <= (others = '0');
+          Memory(i) <= (others => '0');
         end loop;
       else
         if (WriteEn = '1') then
