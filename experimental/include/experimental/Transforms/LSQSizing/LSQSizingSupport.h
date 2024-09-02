@@ -29,12 +29,13 @@ public:
     AdjListGraph(buffer::CFDFC cfdfc, TimingDatabase timingDB, unsigned II);
     AdjListGraph(handshake::FuncOp funcOp, llvm::SetVector<unsigned> cfdfcBBs, TimingDatabase timingDB, unsigned II);
 
+    void addEdge(mlir::Operation* src, mlir::Operation* dest);
+
     void printGraph();
     void printPath(std::vector<std::string> path);
 
     std::vector<std::vector<std::string>> findPaths(mlir::Operation *startOp, mlir::Operation *endOp, bool ignoreBackedge = false);
     std::vector<std::vector<std::string>> findPaths(std::string start, std::string end, bool ignoreBackedge = false);
-
 
     int getPathLatency(std::vector<std::string> path);
 
@@ -47,10 +48,6 @@ public:
 
     std::vector<mlir::Operation*> getConnectedOps(mlir::Operation *op);
 
-    void addEdge(mlir::Operation* src, mlir::Operation* dest);
-
-    void addChannelEdges(mlir::OpResult);
-    void addChannelBackedges(mlir::OpResult, int latency);
 
 
 private:
@@ -60,7 +57,8 @@ private:
     void addBackedge(mlir::Operation* src, mlir::Operation* dest);
     void insertArtificialNodeOnBackedge(mlir::Operation* src, mlir::Operation* dest, int latency);
     void dfs(std::string& currentNode, std::string& end, std::vector<std::string>& currentPath, std::set<std::string>& visited, std::vector<std::vector<std::string>>& paths, bool ignoreBackedges = false);
-
+    void addChannelEdges(mlir::Value);
+    void addChannelBackedges(mlir::Value, int latency);
 };
 
 } // namespace lsqsizing

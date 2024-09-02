@@ -69,9 +69,6 @@ private:
 void HandshakeSizeLSQsPass::runDynamaticPass() {
   llvm::dbgs() << "\t [DBG] LSQ Sizing Pass Called!\n";
 
-  //std::map<unsigned,buffer::CFDFC> cfdfcs;
-  std::map<unsigned,llvm::SetVector<unsigned>> cfdfcBBLists;
-
   llvm::SmallVector<LSQSizingResult> sizingResults;
 
   // Read component latencies
@@ -84,13 +81,10 @@ void HandshakeSizeLSQsPass::runDynamaticPass() {
   for (handshake::FuncOp funcOp : mod.getOps<handshake::FuncOp>()) {
     llvm::dbgs() << "\t [DBG] Function: " << funcOp.getName() << "\n";
 
+    std::unordered_map<unsigned,llvm::SetVector<unsigned>> cfdfcBBLists;
     std::unordered_map<unsigned, float> IIs;
     DictionaryAttr troughputAttr = getUniqueAttr<handshake::CFDFCThroughputAttr>(funcOp).getThroughputMap();
     DictionaryAttr cfdfcAttr = getUniqueAttr<handshake::CFDFCToBBListAttr>(funcOp).getCfdfcMap();
-
-    // TODO this part will be rewritten to not use the CFDFC constructor, ArchSet and ArchBB class from buffer placement (line 96 - 114)
-    // Some of the features are not needed and it would look more clean to make my own constructor instead to directly build
-    // the data strucuture i work with instead of converting it from the buffer placement data structure
 
     for(auto &attr: cfdfcAttr) {
       ArrayAttr bbList = llvm::dyn_cast<ArrayAttr>(attr.getValue());
@@ -101,31 +95,6 @@ void HandshakeSizeLSQsPass::runDynamaticPass() {
       cfdfcBBLists.insert({std::stoi(attr.getName().str()),cfdfcBBs});
     }
 
-    // Extract Arch sets
-    /*for(auto &entry: cfdfcAttr) {
-      SmallVector<experimental::ArchBB> archStore;
-
-      ArrayAttr bbList = llvm::dyn_cast<ArrayAttr>(entry.getValue());
-      auto it = bbList.begin();
-      int firstBBId = it->cast<IntegerAttr>().getUInt();
-      int currBBId, prevBBId = firstBBId;      
-      for(std::advance(it, 1); it != bbList.end(); it++) {
-        currBBId = it->cast<IntegerAttr>().getUInt();
-        archStore.push_back(experimental::ArchBB(prevBBId, currBBId, 0, false));
-        prevBBId = currBBId;
-      }
-      archStore.push_back(experimental::ArchBB(prevBBId, firstBBId, 0, false));
-
-      llvm::dbgs() << "\t [DBG] CFDFC: " << entry.getName() << " with " << archStore.size() << " arches\n";
-      buffer::ArchSet archSet;
-      for(auto &arch: archStore) {
-        llvm::dbgs() << "\t [DBG] Arch: " << arch.srcBB << " -> " << arch.dstBB << "\n";
-        archSet.insert(&arch);
-      }
-
-      cfdfcs.insert_or_assign(std::stoi(entry.getName().str()), buffer::CFDFC(funcOp, archSet, 0));
-    }*/
-
 
     // Extract II
     for (const NamedAttribute attr : troughputAttr) {
@@ -133,16 +102,9 @@ void HandshakeSizeLSQsPass::runDynamaticPass() {
       IIs.insert({std::stoi(attr.getName().str()), round(1 / throughput.getValueAsDouble())});
     }
 
-    // Size LSQs for each CFDFC
-    /*for(auto &cfdfc : cfdfcs) {
-      sizingResults.push_back(sizeLSQsForCFDFC(cfdfc.second, IIs[cfdfc.first], timingDB));
-    }*/
-
     for(auto &entry: cfdfcBBLists) {
       sizingResults.push_back(sizeLSQsForGraph(AdjListGraph(funcOp, entry.second, timingDB, IIs[entry.first]), IIs[entry.first]));
     }
-    
-    
     
     // Extract maximum Queue sizes for each LSQ
     std::map<mlir::Operation*, std::tuple<unsigned, unsigned>> maxLoadStoreSizes;

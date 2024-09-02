@@ -13,44 +13,6 @@ using namespace dynamatic;
 using namespace dynamatic::experimental::lsqsizing;
 
 
-// TODO will be rewritten to not use the buffer placement cfdfc class, but directly construct the adjaceny list from the mlir graph and the cfdfc attribute
-AdjListGraph::AdjListGraph(buffer::CFDFC cfdfc, TimingDatabase timingDB, unsigned II) {
-
-    for(auto &unit: cfdfc.units) {
-    double latency;
-    //llvm::dbgs() << "unit: " << unit->getAttrOfType<StringAttr>("handshake.name") << "\n";
-    if(failed(timingDB.getLatency(unit, SignalType::DATA, latency))) {
-      if(unit->getName().getStringRef() == "handshake.oehb") { // TODO maybe instead add it to database?
-        addNode(unit, 1);
-      } 
-      else {
-        addNode(unit, 0);
-      }
-    } 
-    else {
-      addNode(unit, latency);
-    }
-  }
-
-  for(auto &channel: cfdfc. channels) {
-    mlir::Operation *srcOp = channel.getDefiningOp();
-    for(Operation *destOp: channel.getUsers()) {
-      addEdge(srcOp, destOp);
-    }
-  }
-
-  for(auto &backedge: cfdfc.backedges) {
-    mlir::Operation *srcOp = backedge.getDefiningOp();
-    for(Operation *destOp: backedge.getUsers()) {
-      insertArtificialNodeOnBackedge(srcOp, destOp, (II * -1));
-    }
-  }
-
-}
-
-
-
-
 AdjListGraph::AdjListGraph(handshake::FuncOp funcOp, llvm::SetVector<unsigned> cfdfcBBs, TimingDatabase timingDB, unsigned II) {
 
   for (Operation &op : funcOp.getOps()) {
@@ -110,7 +72,6 @@ AdjListGraph::AdjListGraph(handshake::FuncOp funcOp, llvm::SetVector<unsigned> c
             addChannelEdges(res);
             if (buffer::CFDFC::isCFDFCBackedge(res))
               addChannelBackedges(res, (II * -1));
-            break;
       } else if (!isBackedge(res)) {
         // The channel is in the CFDFC if its producer/consumer belong to the
         // same basic block and the channel is not a backedge
@@ -136,14 +97,14 @@ void AdjListGraph::addBackedge(mlir::Operation * src, mlir::Operation * dest) {
     nodes.at(src->getAttrOfType<StringAttr>("handshake.name").str()).backedges.push_back(dest->getAttrOfType<StringAttr>("handshake.name").str()); // Add edge from node u to node v
 }
 
-void AdjListGraph::addChannelEdges(mlir::OpResult res) {
+void AdjListGraph::addChannelEdges(mlir::Value res) {
     mlir::Operation *srcOp = res.getDefiningOp();
     for(Operation *destOp: res.getUsers()) {
       addEdge(srcOp, destOp);
     }
 }
 
-void AdjListGraph::addChannelBackedges(mlir::OpResult res, int latency) {
+void AdjListGraph::addChannelBackedges(mlir::Value res, int latency) {
     mlir::Operation *srcOp = res.getDefiningOp();
     for(Operation *destOp: res.getUsers()) {
       insertArtificialNodeOnBackedge(srcOp, destOp, latency);
