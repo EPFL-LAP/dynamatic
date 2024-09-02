@@ -2,6 +2,7 @@
 #include "experimental/Transforms/LSQSizing/HandshakeSizeLSQs.h"
 #include "dynamatic/Transforms/BufferPlacement/CFDFC.h"
 #include "dynamatic/Support/TimingModels.h"
+#include "dynamatic/Support/CFG.h"
 
 #include <unordered_set>
 #include <stack>
@@ -50,8 +51,75 @@ AdjListGraph::AdjListGraph(buffer::CFDFC cfdfc, TimingDatabase timingDB, unsigne
 
 
 
-AdjListGraph::AdjListGraph(handshake::FuncOp funcOp, std::vector<int> cfdfcBBs, unsigned II) {
-  //TODO implement
+AdjListGraph::AdjListGraph(handshake::FuncOp funcOp, llvm::SetVector<unsigned> cfdfcBBs, TimingDatabase timingDB, unsigned II) {
+
+  for (Operation &op : funcOp.getOps()) {
+    // Get operation's basic block
+    unsigned srcBB;
+    if (auto optBB = getLogicBB(&op); !optBB.has_value())
+      continue;
+    else
+      srcBB = *optBB;
+
+    // The basic block the operation belongs to must be selected
+    if (!cfdfcBBs.contains(srcBB))
+      continue;
+
+    // Add the unit and valid outgoing channels to the CFDFC
+    double latency;
+    //llvm::dbgs() << "unit: " << unit->getAttrOfType<StringAttr>("handshake.name") << "\n";
+    if(failed(timingDB.getLatency(&op, SignalType::DATA, latency))) {
+      if(op.getName().getStringRef() == "handshake.oehb") {
+        addNode(&op, 1); // TODO update logic for new buffer parameter when merging
+      } 
+      else {
+        addNode(&op, 0);
+      }
+    } 
+    else {
+      addNode(&op, latency);
+    }
+
+    for (OpResult res : op.getResults()) {
+      assert(std::distance(res.getUsers().begin(), res.getUsers().end()) == 1 &&
+             "value must have unique user");
+
+      // Get the value's unique user and its basic block
+      Operation *user = *res.getUsers().begin();
+      unsigned dstBB;
+      if (std::optional<unsigned> optBB = getLogicBB(user); !optBB.has_value())
+        continue;
+      else
+        dstBB = *optBB;
+
+      if (srcBB != dstBB) {
+        // The channel is in the CFDFC if it belongs belong to a selected arch
+        // between two basic blocks
+        for (size_t i = 0; i < cfdfcBBs.size(); ++i) {
+          unsigned nextBB = i == cfdfcBBs.size() - 1 ? 0 : i + 1;
+          if (srcBB == cfdfcBBs[i] && dstBB == cfdfcBBs[nextBB]) {
+            addChannelEdges(res);
+            if (buffer::CFDFC::isCFDFCBackedge(res))
+              addChannelBackedges(res, (II * -1));
+            break;
+          }
+        }
+      } else if (cfdfcBBs.size() == 1) {
+        // The channel is in the CFDFC if its producer/consumer belong to the
+        // same basic block and the CFDFC is just a block looping to itself
+            addChannelEdges(res);
+            if (buffer::CFDFC::isCFDFCBackedge(res))
+              addChannelBackedges(res, (II * -1));
+            break;
+      } else if (!isBackedge(res)) {
+        // The channel is in the CFDFC if its producer/consumer belong to the
+        // same basic block and the channel is not a backedge
+        addChannelEdges(res);
+      }
+    }
+  }
+
+  
 }
 
 
@@ -67,6 +135,21 @@ void AdjListGraph::addEdge(mlir::Operation * src, mlir::Operation * dest) {
 void AdjListGraph::addBackedge(mlir::Operation * src, mlir::Operation * dest) {
     nodes.at(src->getAttrOfType<StringAttr>("handshake.name").str()).backedges.push_back(dest->getAttrOfType<StringAttr>("handshake.name").str()); // Add edge from node u to node v
 }
+
+void AdjListGraph::addChannelEdges(mlir::OpResult res) {
+    mlir::Operation *srcOp = res.getDefiningOp();
+    for(Operation *destOp: res.getUsers()) {
+      addEdge(srcOp, destOp);
+    }
+}
+
+void AdjListGraph::addChannelBackedges(mlir::OpResult res, int latency) {
+    mlir::Operation *srcOp = res.getDefiningOp();
+    for(Operation *destOp: res.getUsers()) {
+      insertArtificialNodeOnBackedge(srcOp, destOp, latency);
+    }
+}
+
 
 void AdjListGraph::printGraph() {
     for (const auto& pair : nodes) {

@@ -50,7 +50,6 @@ struct CFDFC {
   /// function. Assumes that every value in the function is used exactly once.
   CFDFC(handshake::FuncOp funcOp, ArchSet &archs, unsigned numExec);
 
-private:
   // Determines whether the channel is a "CFDFC backedge" i.e., the first
   // channel along a sequence of backedges from a source block to a destination
   // block. The distinction is important for the buffer placement MILP, which

@@ -52,6 +52,8 @@ struct HandshakeSizeLSQsPass
 private:
 
   LSQSizingResult sizeLSQsForCFDFC(buffer::CFDFC cfdfc, unsigned II, TimingDatabase timingDB);
+  LSQSizingResult sizeLSQsForGraph(AdjListGraph, unsigned II);
+
   mlir::Operation *findStartNode(AdjListGraph graph);
   std::unordered_map<unsigned, mlir::Operation *> getPhiNodes(AdjListGraph graph, mlir::Operation *startNode);
   void insertAllocPrecedesMemoryAccessEdges(AdjListGraph &graph, std::vector<mlir::Operation *> ops, std::unordered_map<unsigned, mlir::Operation *> phiNodes);
@@ -67,7 +69,9 @@ private:
 void HandshakeSizeLSQsPass::runDynamaticPass() {
   llvm::dbgs() << "\t [DBG] LSQ Sizing Pass Called!\n";
 
-  std::map<unsigned,buffer::CFDFC> cfdfcs;
+  //std::map<unsigned,buffer::CFDFC> cfdfcs;
+  std::map<unsigned,llvm::SetVector<unsigned>> cfdfcBBLists;
+
   llvm::SmallVector<LSQSizingResult> sizingResults;
 
   // Read component latencies
@@ -87,9 +91,18 @@ void HandshakeSizeLSQsPass::runDynamaticPass() {
     // TODO this part will be rewritten to not use the CFDFC constructor, ArchSet and ArchBB class from buffer placement (line 96 - 114)
     // Some of the features are not needed and it would look more clean to make my own constructor instead to directly build
     // the data strucuture i work with instead of converting it from the buffer placement data structure
-      
+
+    for(auto &attr: cfdfcAttr) {
+      ArrayAttr bbList = llvm::dyn_cast<ArrayAttr>(attr.getValue());
+      llvm::SetVector<unsigned> cfdfcBBs; 
+      for(auto &bb: bbList) {
+        cfdfcBBs.insert(bb.cast<IntegerAttr>().getUInt());
+      }
+      cfdfcBBLists.insert({std::stoi(attr.getName().str()),cfdfcBBs});
+    }
+
     // Extract Arch sets
-    for(auto &entry: cfdfcAttr) {
+    /*for(auto &entry: cfdfcAttr) {
       SmallVector<experimental::ArchBB> archStore;
 
       ArrayAttr bbList = llvm::dyn_cast<ArrayAttr>(entry.getValue());
@@ -111,7 +124,7 @@ void HandshakeSizeLSQsPass::runDynamaticPass() {
       }
 
       cfdfcs.insert_or_assign(std::stoi(entry.getName().str()), buffer::CFDFC(funcOp, archSet, 0));
-    }
+    }*/
 
 
     // Extract II
@@ -121,9 +134,14 @@ void HandshakeSizeLSQsPass::runDynamaticPass() {
     }
 
     // Size LSQs for each CFDFC
-    for(auto &cfdfc : cfdfcs) {
+    /*for(auto &cfdfc : cfdfcs) {
       sizingResults.push_back(sizeLSQsForCFDFC(cfdfc.second, IIs[cfdfc.first], timingDB));
+    }*/
+
+    for(auto &entry: cfdfcBBLists) {
+      sizingResults.push_back(sizeLSQsForGraph(AdjListGraph(funcOp, entry.second, timingDB, IIs[entry.first]), IIs[entry.first]));
     }
+    
     
     
     // Extract maximum Queue sizes for each LSQ
@@ -149,10 +167,9 @@ void HandshakeSizeLSQsPass::runDynamaticPass() {
   }
 }
 
-LSQSizingResult HandshakeSizeLSQsPass::sizeLSQsForCFDFC(buffer::CFDFC cfdfc, unsigned II, TimingDatabase timingDB) {
-  llvm::dbgs() << " [DBG] sizeLSQsForCFDFC called for CFDFC with " << cfdfc.cycle.size() << " BBs and II=" << II << "\n";
 
-  AdjListGraph graph(cfdfc, timingDB, II);
+LSQSizingResult HandshakeSizeLSQsPass::sizeLSQsForGraph(AdjListGraph graph, unsigned II) {
+
   std::vector<mlir::Operation *> loadOps = graph.getOperationsWithOpName("handshake.lsq_load");
   std::vector<mlir::Operation *> storeOps = graph.getOperationsWithOpName("handshake.lsq_store");
 
@@ -210,6 +227,11 @@ LSQSizingResult HandshakeSizeLSQsPass::sizeLSQsForCFDFC(buffer::CFDFC cfdfc, uns
   return result;
 }
 
+LSQSizingResult HandshakeSizeLSQsPass::sizeLSQsForCFDFC(buffer::CFDFC cfdfc, unsigned II, TimingDatabase timingDB) {
+  llvm::dbgs() << " [DBG] sizeLSQsForCFDFC called for CFDFC with " << cfdfc.cycle.size() << " BBs and II=" << II << "\n";
+  AdjListGraph graph(cfdfc, timingDB, II);
+  return HandshakeSizeLSQsPass::sizeLSQsForGraph(graph, II);
+}
 
 mlir::Operation * HandshakeSizeLSQsPass::findStartNode(AdjListGraph graph) {
 

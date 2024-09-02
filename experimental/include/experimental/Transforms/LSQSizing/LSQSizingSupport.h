@@ -27,7 +27,7 @@ struct AdjListNode {
 class AdjListGraph {
 public:
     AdjListGraph(buffer::CFDFC cfdfc, TimingDatabase timingDB, unsigned II);
-    AdjListGraph(handshake::FuncOp funcOp, std::vector<int> cfdfcBBs, unsigned II);
+    AdjListGraph(handshake::FuncOp funcOp, llvm::SetVector<unsigned> cfdfcBBs, TimingDatabase timingDB, unsigned II);
 
     void printGraph();
     void printPath(std::vector<std::string> path);
@@ -48,6 +48,9 @@ public:
     std::vector<mlir::Operation*> getConnectedOps(mlir::Operation *op);
 
     void addEdge(mlir::Operation* src, mlir::Operation* dest);
+
+    void addChannelEdges(mlir::OpResult);
+    void addChannelBackedges(mlir::OpResult, int latency);
 
 
 private:
