@@ -149,12 +149,14 @@ std::vector<std::vector<std::string>> AdjListGraph::findPaths(std::string start,
     std::vector<std::vector<std::string>> paths;
     std::vector<std::string> currentPath{start};
     std::set<std::string> visited{start};
-    dfs(start, end, currentPath, visited, paths, false);
+    dfs(start, end, currentPath, visited, paths, ignoreBackedge);
     return paths;
 }
 
 
 std::vector<std::vector<std::string>> AdjListGraph::findPaths(mlir::Operation *startOp, mlir::Operation *endOp, bool ignoreBackedge) {
+  assert(startOp && endOp && "Start and end operations must not be null");
+  llvm::dbgs() << "Finding paths from " << startOp->getAttrOfType<StringAttr>("handshake.name").str() << " to " << endOp->getAttrOfType<StringAttr>("handshake.name").str() << "\n";
   return findPaths(startOp->getAttrOfType<StringAttr>("handshake.name").str(), endOp->getAttrOfType<StringAttr>("handshake.name").str(), ignoreBackedge);
 }
 
@@ -215,6 +217,7 @@ std::vector<mlir::Operation*> AdjListGraph::getOperationsWithOpName(std::string 
 
 
 int AdjListGraph::findMaxPathLatency(mlir::Operation *startOp, mlir::Operation *endOp, bool ignoreBackedge) {
+  assert(startOp && endOp && "Start and end operations must not be null");
   std::vector<std::vector<std::string>> paths = findPaths(startOp, endOp, ignoreBackedge);
   int maxLatency = 0;
   std::vector<std::string> maxPath;
@@ -234,6 +237,7 @@ int AdjListGraph::findMaxPathLatency(mlir::Operation *startOp, mlir::Operation *
 }
 
 int AdjListGraph::findMinPathLatency(mlir::Operation *startOp, mlir::Operation *endOp, bool ignoreBackedge) {
+  assert(startOp && endOp && "Start and end operations must not be null");
   std::vector<std::vector<std::string>> paths = findPaths(startOp, endOp, ignoreBackedge);
   int minLatency = INT_MAX;
   for(auto &path: paths)

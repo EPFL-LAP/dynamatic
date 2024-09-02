@@ -84,7 +84,6 @@ void HandshakeSizeLSQsPass::runDynamaticPass() {
     DictionaryAttr troughputAttr = getUniqueAttr<handshake::CFDFCThroughputAttr>(funcOp).getThroughputMap();
     DictionaryAttr cfdfcAttr = getUniqueAttr<handshake::CFDFCToBBListAttr>(funcOp).getCfdfcMap();
 
-
     // TODO this part will be rewritten to not use the CFDFC constructor, ArchSet and ArchBB class from buffer placement (line 96 - 114)
     // Some of the features are not needed and it would look more clean to make my own constructor instead to directly build
     // the data strucuture i work with instead of converting it from the buffer placement data structure
@@ -319,7 +318,11 @@ std::unordered_map<mlir::Operation *, int> HandshakeSizeLSQsPass::getAllocTimes(
   
   // Go trough all ops and find the latency to the phi node of the ops BB
   for(auto &op: ops) {
-    int latency = graph.findMinPathLatency(startNode, phiNodes[op->getAttrOfType<IntegerAttr>("handshake.bb").getUInt()], true); //TODO ignore backedges?
+    int bb = op->getAttrOfType<IntegerAttr>("handshake.bb").getUInt();
+    llvm::dbgs() << "\t\t [DBG] " << op->getAttrOfType<StringAttr>("handshake.name").str() << " BB: " << bb << "\n";
+    mlir::Operation *phiNode = phiNodes[op->getAttrOfType<IntegerAttr>("handshake.bb").getUInt()];
+    assert(phiNode && "Phi node not found for BB");
+    int latency = graph.findMinPathLatency(startNode, phiNode, true); //TODO ignore backedges?
     allocTimes.insert({op, latency});
     llvm::dbgs() << "\t\t [DBG] " << op->getAttrOfType<StringAttr>("handshake.name").str() << " alloc time: " << latency << "\n";
   }
