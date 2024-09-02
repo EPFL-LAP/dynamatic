@@ -24,13 +24,14 @@ begin
     first_assignment : if i = 0 generate
       process (clk) begin
         if rising_edge(clk) then
-          if (ready_in = '1' or rst = '1') then
+          if (rst = '1') then
+            regs(i) <= '0';
+          elsif (ready_in = '1') then
             regs(i) <= valid_in;
           end if;
         end if;
       end process;
     end generate first_assignment;
-
     other_assignments : if i > 0 generate
       process (clk) begin
         if rising_edge(clk) then
@@ -42,7 +43,6 @@ begin
         end if;
       end process;
     end generate other_assignments;
-
   end generate gen_assignements;
 
   valid_out <= regs(SIZE - 1);
