@@ -343,7 +343,9 @@ def ChannelBufPropsContainerAttr : OperandContainerAttr<
 //===----------------------------------------------------------------------===//
 // CFDFC Extraction Results
 //===----------------------------------------------------------------------===//
-def CFDFCToBBListAttr : Handshake_Attr<"CFDFCToBBList", "cfdfcToBBList"> {
+def CFDFCToBBListAttr : Handshake_Attr<
+  "CFDFCToBBList", "cfdfcToBBList"
+> {
   let summary = "Maps CFDFC index to the list of BBs";
   let description = [{
     Holds a map from CFDFC index to the corresponding list of BB indices. For example
@@ -354,7 +356,7 @@ def CFDFCToBBListAttr : Handshake_Attr<"CFDFCToBBList", "cfdfcToBBList"> {
     an llvm::MapVector<int, std::vector<int>>.
   }];
 
-  let parameters = (ins "DictionaryAttr":$cfdfcMap);
+  let parameters = (ins "mlir::DictionaryAttr":$cfdfcMap);
 
   let assemblyFormat = " $cfdfcMap ";
 
@@ -376,7 +378,9 @@ def CFDFCToBBListAttr : Handshake_Attr<"CFDFCToBBList", "cfdfcToBBList"> {
   ];
 }
 
-def CFDFCThroughputAttr : Handshake_Attr<"CFDFCThroughput", "cfdfcThroughput"> {
+def CFDFCThroughputAttr : Handshake_Attr<
+  "CFDFCThroughput", "cfdfcThroughput"
+> {
   let summary = "Maps CFDFC index to the throughput value";
   let description = [{
     Holds a map from CFDFC index to the corresponding throughput value (floating value). For example,
@@ -387,7 +391,7 @@ def CFDFCThroughputAttr : Handshake_Attr<"CFDFCThroughput", "cfdfcThroughput"> {
     llvm::MapVector<int, double>
   }];
 
-  let parameters = (ins "DictionaryAttr":$throughputMap);
+  let parameters = (ins "mlir::DictionaryAttr":$throughputMap);
 
   let assemblyFormat = " $throughputMap ";
 

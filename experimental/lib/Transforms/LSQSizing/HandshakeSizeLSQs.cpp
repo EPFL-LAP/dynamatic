@@ -22,7 +22,6 @@
 #include "llvm/ADT/DenseMap.h"
 #include "mlir/Pass/PassManager.h"
 #include "mlir/IR/Value.h"
-//#include "experimental/Support/StdProfiler.h"
 #include "experimental/Transforms/LSQSizing/LSQSizingSupport.h"
 #include "dynamatic/Support/CFG.h"
 
@@ -84,6 +83,9 @@ void HandshakeSizeLSQsPass::runDynamaticPass() {
     DictionaryAttr troughputAttr = getUniqueAttr<handshake::CFDFCThroughputAttr>(funcOp).getThroughputMap();
     DictionaryAttr cfdfcAttr = getUniqueAttr<handshake::CFDFCToBBListAttr>(funcOp).getCfdfcMap();
 
+    //DictionaryAttr troughputAttr = dyn_cast<DictionaryAttr>(funcOp->getAttr("handshake.throughput"));
+    //DictionaryAttr cfdfcAttr = dyn_cast<DictionaryAttr>(funcOp->getAttr("handshake.cfdfc"));
+
     // TODO this part will be rewritten to not use the CFDFC constructor, ArchSet and ArchBB class from buffer placement (line 96 - 114)
     // Some of the features are not needed and it would look more clean to make my own constructor instead to directly build
     // the data strucuture i work with instead of converting it from the buffer placement data structure
@@ -143,7 +145,7 @@ void HandshakeSizeLSQsPass::runDynamaticPass() {
       unsigned maxStoreSize = std::get<1>(maxLoadStoreSize.second);
       llvm::dbgs() << " [DBG] final LSQ " << lsqOp->getAttrOfType<StringAttr>("handshake.name").str() << " Max Load Size: " << maxLoadSize << " Max Store Size: " << maxStoreSize << "\n";
 
-      LSQSizeAttr lsqSizeAttr = LSQSizeAttr::get(mod.getContext(), maxLoadSize, maxStoreSize);
+      handshake::LSQSizeAttr lsqSizeAttr = handshake::LSQSizeAttr::get(mod.getContext(), maxLoadSize, maxStoreSize);
       setUniqueAttr(lsqOp, lsqSizeAttr);
     }
   }
