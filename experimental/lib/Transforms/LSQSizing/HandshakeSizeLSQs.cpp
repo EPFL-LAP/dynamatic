@@ -83,6 +83,8 @@ void HandshakeSizeLSQsPass::runDynamaticPass() {
 
     std::unordered_map<unsigned,llvm::SetVector<unsigned>> cfdfcBBLists;
     std::unordered_map<unsigned, float> IIs;
+
+    //TODO error handling when there are no attributes
     DictionaryAttr troughputAttr = getUniqueAttr<handshake::CFDFCThroughputAttr>(funcOp).getThroughputMap();
     DictionaryAttr cfdfcAttr = getUniqueAttr<handshake::CFDFCToBBListAttr>(funcOp).getCfdfcMap();
 
