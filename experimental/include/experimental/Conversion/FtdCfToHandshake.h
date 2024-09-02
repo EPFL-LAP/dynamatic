@@ -15,6 +15,7 @@
 #ifndef DYNAMATIC_CONVERSION_FTD_CF_TO_HANDSHAKE_H
 #define DYNAMATIC_CONVERSION_FTD_CF_TO_HANDSHAKE_H
 
+#include "dynamatic/Analysis/ControlDependenceAnalysis.h"
 #include "dynamatic/Conversion/CfToHandshake.h"
 #include "dynamatic/Dialect/Handshake/HandshakeInterfaces.h"
 #include "dynamatic/Dialect/Handshake/HandshakeOps.h"
@@ -35,13 +36,26 @@ namespace ftd {
 /// behavior is defined so that the functionalities of the `fast delivery token`
 /// methodology can be implemented.
 class FtdLowerFuncToHandshake : public LowerFuncToHandshake {
-
+public:
   // Use the same constructors from the base class
-  using LowerFuncToHandshake::LowerFuncToHandshake;
+  FtdLowerFuncToHandshake(NameAnalysis &namer,
+                          ControlDependenceAnalysis &cdgAnalysis,
+                          MLIRContext *ctx, mlir::PatternBenefit benefit = 1)
+      : LowerFuncToHandshake(namer, ctx, benefit), cdgAnalysis(cdgAnalysis){};
+
+  FtdLowerFuncToHandshake(NameAnalysis &namer,
+                          ControlDependenceAnalysis &cdgAnalysis,
+                          const TypeConverter &typeConverter, MLIRContext *ctx,
+                          mlir::PatternBenefit benefit = 1)
+      : LowerFuncToHandshake(namer, typeConverter, ctx, benefit),
+        cdgAnalysis(cdgAnalysis){};
 
   LogicalResult
   matchAndRewrite(mlir::func::FuncOp funcOp, OpAdaptor adaptor,
                   ConversionPatternRewriter &rewriter) const override;
+
+protected:
+  ControlDependenceAnalysis cdgAnalysis;
 };
 
 #define GEN_PASS_DECL_FTDCFTOHANDSHAKE

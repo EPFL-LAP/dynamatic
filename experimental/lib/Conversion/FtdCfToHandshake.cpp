@@ -7,6 +7,7 @@
 //===----------------------------------------------------------------------===//
 
 #include "experimental/Conversion/FtdCfToHandshake.h"
+#include "dynamatic/Analysis/ControlDependenceAnalysis.h"
 #include "dynamatic/Analysis/NameAnalysis.h"
 #include "dynamatic/Conversion/CfToHandshake.h"
 #include "dynamatic/Dialect/Handshake/HandshakeDialect.h"
@@ -38,9 +39,6 @@ struct FtdCfToHandshakePass
     MLIRContext *ctx = &getContext();
     ModuleOp modOp = getOperation();
 
-    // Print a message on stdout to prove that the pass is running
-    // llvm::outs() << "FTD pass is running as expected";
-
     // Put all non-external functions into maximal SSA form
     for (auto funcOp : modOp.getOps<func::FuncOp>()) {
       if (!funcOp.isExternal()) {
@@ -52,8 +50,12 @@ struct FtdCfToHandshakePass
 
     CfToHandshakeTypeConverter converter;
     RewritePatternSet patterns(ctx);
-    patterns.add<experimental::ftd::FtdLowerFuncToHandshake, ConvertConstants,
-                 ConvertCalls, ConvertUndefinedValues,
+
+    patterns.add<experimental::ftd::FtdLowerFuncToHandshake>(
+        getAnalysis<NameAnalysis>(), getAnalysis<ControlDependenceAnalysis>(),
+        converter, ctx);
+
+    patterns.add<ConvertConstants, ConvertCalls, ConvertUndefinedValues,
                  ConvertIndexCast<arith::IndexCastOp, handshake::ExtSIOp>,
                  ConvertIndexCast<arith::IndexCastUIOp, handshake::ExtUIOp>,
                  OneToOneConversion<arith::AddFOp, handshake::AddFOp>,
@@ -105,6 +107,9 @@ using ArgReplacements = DenseMap<BlockArgument, OpResult>;
 LogicalResult FtdLowerFuncToHandshake::matchAndRewrite(
     func::FuncOp lowerFuncOp, OpAdaptor /*adaptor*/,
     ConversionPatternRewriter &rewriter) const {
+
+  if (failed(cdgAnalysis.printAllBlocksDeps(lowerFuncOp)))
+    return failure();
 
   // Map all memory accesses in the matched function to the index of their
   // memref in the function's arguments
