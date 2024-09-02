@@ -24,6 +24,92 @@ void SwitchingInfo::insertBE(unsigned srcBB, unsigned dstBB, StringRef mgLabel) 
 
 //===----------------------------------------------------------------------===//
 //
+// Definitions of AdjNode
+//
+//===----------------------------------------------------------------------===//
+AdjNode::AdjNode(mlir::Operation* selOp, 
+          const std::vector<std::string>& predecessors, const std::vector<std::string>& successors, 
+          const std::map<std::string, unsigned>& sucDataWidthMap, const unsigned& latency) {
+  // Initialize all variables
+  this->op = selOp;
+  this->pres = predecessors;
+  this->sucs = successors;
+  this->sucsDataWidthMap = sucDataWidthMap;
+  this->nodeLatency = latency;
+
+  // Initialize toggle count map
+  for (auto& [key, value] : sucsDataWidthMap) {
+    std::map<unsigned, unsigned> tmpMap;
+
+    for (int i = 0; i < value; i++) {
+      tmpMap[i] = 0;
+    }
+
+    perChannelToggle[key] = tmpMap;
+  }
+}
+
+//===----------------------------------------------------------------------===//
+//
+// Definitions of AdjGraph
+//
+//===----------------------------------------------------------------------===//
+// Initialize the whole adjacency graph for the selected segment
+AdjGraph::AdjGraph(const buffer::CFDFC& cfdfc, const TimingDatabase& timingDB, unsigned II) {
+  // TODO: Need to check whether invalid backedges are removed from the CFDFC or not
+
+  // Traverse all units in the mg
+  for (auto& unit: cfdfc.units) {
+    unsigned latency = 0;
+    std::string unitType = unit->getName().getStringRef().str();
+    std::string unitName = unit->getAttrOfType<StringAttr>("handshake.name").str();
+    unsigned numSlots = 0;
+
+    // Get the unit latency
+    if (unitType == "handshake.buffer") {
+      // Buffer node encountered, need to retrieve the buffer attributes
+      auto hwAttr = unit->getAttrOfType<DictionaryAttr>("hw.parameters");
+
+      for (auto& namedAttr : hwAttr.getValue()) {
+        mlir::Attribute value = namedAttr.getValue();
+        mlir::StringAttr name = namedAttr.getName().cast<mlir::StringAttr>();
+
+        if (name.str() == "TIMING") {
+          // Timing information
+          auto timingInfo = value.dyn_cast<TimingAttr>().getInfo();
+
+          if (timingInfo.getLatency(SignalType::DATA)) {
+            latency = timingInfo.getLatency(SignalType::DATA).value();
+          } else {
+            latency = 0;
+          }
+        } else {
+          // Get the number of slots
+          if (auto actualValue = value.dyn_cast<mlir::IntegerAttr>()) {
+            numSlots = static_cast<unsigned>(actualValue.getValue().getZExtValue());
+          }
+        }
+
+      }
+      
+
+    } else {
+      // Check the existence of the key
+      if (OP_DELAY_MAP.find(unitType) != OP_DELAY_MAP.end()) {
+        latency = OP_DELAY_MAP.at(unitType);
+      } else {
+        llvm::errs() << "[ERROR] Unit Type not found in OP_DELAY_MAP: " << unitType << "\n";
+      }
+    }
+
+
+
+  }
+}
+
+
+//===----------------------------------------------------------------------===//
+//
 // Helper Functions
 //
 //===----------------------------------------------------------------------===//

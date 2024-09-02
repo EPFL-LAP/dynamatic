@@ -91,6 +91,12 @@ void SwitchingEstimationPass::runDynamaticPass() {
   // Step 2: Build Adjacency graph for each CFDFC
   llvm::dbgs() << "[DEBUG] [Step 2] Build Adjacency Graph for Each Segment\n";
   
+  for (const auto& [mgIndex, mgInstance]: switchInfo.cfdfcs) {
+    llvm::dbgs() << "[DEBUG] \tMG : " << mgIndex << "\n";
+    
+    AdjGraph tmpAdjGraph(mgInstance, timingDB, switchInfo.cfdfcIIs[mgIndex]);
+    switchInfo.segToAdjGraphMap.insert_or_assign(std::to_string(mgIndex), &tmpAdjGraph);
+  }
 }
 
 
@@ -99,6 +105,7 @@ void SwitchingEstimationPass::runDynamaticPass() {
 // Internal Function Definitions
 //
 //===----------------------------------------------------------------------===//
+
 void SwitchingEstimationPass::extractHandshakeOpNames(handshake::FuncOp& topFunc) {
   for (Operation& op : topFunc.getOps()) {
     // Get the handshake.name attribute
@@ -238,7 +245,7 @@ LogicalResult SwitchingEstimationPass::extractAllCFDFCs(mlir::ModuleOp& topModul
 
       // Since we don't care about the execution number of each CFDFC, it's set to 0
       buffer::CFDFC tmpMG(funcOp, archSet, 0);
-      switchInfo.cfdfcs.insert_or_assign(std::stoul(cfdfcIndex), &tmpMG);
+      switchInfo.cfdfcs.insert_or_assign(std::stoul(cfdfcIndex), tmpMG);
 
       // Insert to the segment map as well
       std::vector<unsigned> newVector(tmpMG.cycle.begin(), tmpMG.cycle.end());

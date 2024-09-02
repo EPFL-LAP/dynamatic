@@ -25,9 +25,11 @@ SCFProfilingResult::SCFProfilingResult(StringRef dataTrace, StringRef bbList, Sw
 
   // Step 1: Parse the BBlist file and reconstruct the execution BBlist
   parseBBListFile(bbList, switchInfo);
+  llvm::dbgs() << "[DEBUG] \t\tDONE\n";
 
   // Step 2: Parse the actual data log file
   parseDataLogFile(dataTrace, switchInfo);
+  llvm::dbgs() << "[DEBUG] \t\tDONE\n";
 
   // Step 3: Construct the map for seg execution count
   constructSegExeCount();
