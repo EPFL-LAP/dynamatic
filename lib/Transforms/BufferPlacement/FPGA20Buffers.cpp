@@ -104,7 +104,7 @@ void FPGA20Buffers::extractResult(BufferPlacement &placement) {
   // Create and add the handshake.tp attribute
   auto cfdfcTPMap = handshake::CFDFCThroughputAttr::get(
       funcInfo.funcOp.getContext(), cfdfcTPResult);
-  setUniqueAttr(funcInfo.funcOp, cfdfcTPMap);
+  setDialectAttr(funcInfo.funcOp, cfdfcTPMap);
 }
 
 void FPGA20Buffers::addCustomChannelConstraints(Value channel) {

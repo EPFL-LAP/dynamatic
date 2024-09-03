@@ -53,15 +53,8 @@ export_dot() {
   local f_png="$COMP_DIR/$2.png"
 
   # Export to DOT
-<<<<<<< HEAD
-  "$DYNAMATIC_EXPORT_DOT_BIN" "$F_HANDSHAKE_LSQ_SIZED" "--mode=$mode" \
-      "--edge-style=spline" \
-      "--timing-models=$DYNAMATIC_DIR/data/components.json" \
-      > "$f_dot"
-=======
   "$DYNAMATIC_EXPORT_DOT_BIN" "$f_handshake" "--edge-style=spline" \
     > "$f_dot"
->>>>>>> main
   exit_on_fail "Failed to create $2 DOT" "Created $2 DOT"
 
   # Convert DOT graph to PNG

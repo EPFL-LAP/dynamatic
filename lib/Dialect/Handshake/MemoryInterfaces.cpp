@@ -365,7 +365,7 @@ void LSQGenerationInfo::fromPorts(FuncMemoryPorts &ports) {
   dataWidth = ports.dataWidth;
   addrWidth = ports.addrWidth;
 
-  handshake::LSQSizeAttr lsqSizeAttr = getUniqueAttr<handshake::LSQSizeAttr>(lsqOp);
+  handshake::LSQSizeAttr lsqSizeAttr = getDialectAttr<handshake::LSQSizeAttr>(lsqOp);
   if(lsqSizeAttr) {
     depthLoad = lsqSizeAttr.getLoadQueueSize();
     depthStore = lsqSizeAttr.getStoreQueueSize();

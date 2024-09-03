@@ -327,7 +327,7 @@ HandshakePlaceBuffersPass::placeBuffers(FuncInfo &info,
   // Create and add the handshake.cfdfc attribute
   auto cfdfcMap =
       handshake::CFDFCToBBListAttr::get(info.funcOp.getContext(), cfdfcResult);
-  setUniqueAttr(info.funcOp, cfdfcMap);
+  setDialectAttr(info.funcOp, cfdfcMap);
 
   if (dumpLogs)
     logFuncInfo(info, *logger);

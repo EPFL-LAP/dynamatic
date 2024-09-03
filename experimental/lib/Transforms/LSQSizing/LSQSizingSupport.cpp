@@ -2,6 +2,9 @@
 #include "experimental/Transforms/LSQSizing/HandshakeSizeLSQs.h"
 #include "dynamatic/Transforms/BufferPlacement/CFDFC.h"
 #include "dynamatic/Support/TimingModels.h"
+#include "dynamatic/Dialect/Handshake/HandshakeOps.h"
+#include "dynamatic/Dialect/Handshake/HandshakeAttributes.h"
+
 
 #include <unordered_set>
 #include <stack>
@@ -11,24 +14,74 @@ using namespace mlir;
 using namespace dynamatic;
 using namespace dynamatic::experimental::lsqsizing;
 
+int extractNodeLatency(mlir::Operation *op, TimingDatabase timingDB) {
+  double latency = 0;
+
+  if(!failed(timingDB.getLatency(op, SignalType::DATA, latency)))
+    return latency;
+
+  if(op->getName().getStringRef() == "handshake.buffer") { // TODO use some build in class method instead of name?
+    auto params = op->getAttrOfType<DictionaryAttr>(RTL_PARAMETERS_ATTR_NAME);
+    if (!params) {
+      llvm::dbgs() << "BufferOp" << op->getAttrOfType<StringAttr>("handshake.name").str() << " does not have parameters\n";
+    }
+
+    auto optTiming = params.getNamed(handshake::BufferOp::TIMING_ATTR_NAME);
+    if (!optTiming) {
+      llvm::dbgs() << "BufferOp" << op->getAttrOfType<StringAttr>("handshake.name").str() << " does not have timing\n";
+    }
+
+    if (auto timing =dyn_cast<handshake::TimingAttr>(optTiming->getValue())) {
+      handshake::TimingInfo info = timing.getInfo();
+      latency = info.getLatency(SignalType::DATA).value_or(0);
+    }   
+  }
+  else if(op->getName().getStringRef() == "handshake.muli") { // TODO Remove Hardcoding once this is fixed in the handshake dialect
+    llvm::dbgs() << "Operation " << op->getName().getStringRef() << " does not have latency, using hardcoded latency of 4\n";
+    latency = 4;
+  }
+  else if(op->getName().getStringRef() == "handshake.mulf") { // TODO Remove Hardcoding once this is fixed in the handshake dialect
+    llvm::dbgs() << "Operation " << op->getName().getStringRef() << " does not have latency, using hardcoded latency of 6\n";
+    latency = 6;
+  }
+  else if(op->getName().getStringRef() == "handshake.addf") { // TODO Remove Hardcoding once this is fixed in the handshake dialect
+    llvm::dbgs() << "Operation " << op->getName().getStringRef() << " does not have latency, using hardcoded latency of 10\n";
+    latency = 10;
+  } 
+  else if(op->getName().getStringRef() == "handshake.subf") { // TODO Remove Hardcoding once this is fixed in the handshake dialect
+    llvm::dbgs() << "Operation " << op->getName().getStringRef() << " does not have latency, using hardcoded latency of 10\n";
+    latency = 10;
+  } 
+  else if(op->getName().getStringRef() == "handshake.divui") { // TODO Remove Hardcoding once this is fixed in the handshake dialect
+    llvm::dbgs() << "Operation " << op->getName().getStringRef() << " does not have latency, using hardcoded latency of 36\n";
+    latency = 36;
+  }
+  else if(op->getName().getStringRef() == "handshake.divsi") { // TODO Remove Hardcoding once this is fixed in the handshake dialect
+    llvm::dbgs() << "Operation " << op->getName().getStringRef() << " does not have latency, using hardcoded latency of 36\n";
+    latency = 36;
+  } 
+  else if(op->getName().getStringRef() == "handshake.divf") { // TODO Remove Hardcoding once this is fixed in the handshake dialect
+    llvm::dbgs() << "Operation " << op->getName().getStringRef() << " does not have latency, using hardcoded latency of 30\n";
+    latency = 30;
+  } 
+  else if(op->getName().getStringRef() == "handshake.cmpf") { // TODO Remove Hardcoding once this is fixed in the handshake dialect
+    llvm::dbgs() << "Operation " << op->getName().getStringRef() << " does not have latency, using hardcoded latency of 2\n";
+    latency = 2;
+  }
+  else {
+    llvm::dbgs() << "Operation " << op->getName().getStringRef() << " does not have latency\n";
+    latency = 0;
+  }
+  
+  return latency;
+}
 
 // TODO will be rewritten to not use the buffer placement cfdfc class, but directly construct the adjaceny list from the mlir graph and the cfdfc attribute
 AdjListGraph::AdjListGraph(buffer::CFDFC cfdfc, TimingDatabase timingDB, unsigned II) {
 
-    for(auto &unit: cfdfc.units) {
-    double latency;
-    //llvm::dbgs() << "unit: " << unit->getAttrOfType<StringAttr>("handshake.name") << "\n";
-    if(failed(timingDB.getLatency(unit, SignalType::DATA, latency))) {
-      if(unit->getName().getStringRef() == "handshake.oehb") { // TODO maybe instead add it to database?
-        addNode(unit, 1);
-      } 
-      else {
-        addNode(unit, 0);
-      }
-    } 
-    else {
-      addNode(unit, latency);
-    }
+  for(auto &unit: cfdfc.units) {
+    int latency = extractNodeLatency(unit, timingDB);
+    addNode(unit, latency);
   }
 
   for(auto &channel: cfdfc. channels) {

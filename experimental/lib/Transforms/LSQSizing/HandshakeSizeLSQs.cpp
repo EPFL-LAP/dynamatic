@@ -11,6 +11,7 @@
 //===----------------------------------------------------------------------===//
 
 #include "experimental/Transforms/LSQSizing/HandshakeSizeLSQs.h"
+#include "dynamatic/Dialect/Handshake/HandshakeAttributes.h"
 #include "dynamatic/Dialect/Handshake/HandshakeOps.h"
 #include "dynamatic/Support/Attribute.h"
 #include "dynamatic/Support/Backedge.h"
@@ -27,6 +28,7 @@
 
 #define DEBUG_TYPE "handshake-size-lsqs"
 
+using namespace llvm;
 using namespace mlir;
 using namespace dynamatic;
 using namespace dynamatic::buffer;
@@ -34,7 +36,7 @@ using namespace dynamatic::handshake;
 using namespace dynamatic::experimental;
 using namespace dynamatic::experimental::lsqsizing;
 
-using LSQSizingResult = DenseMap<mlir::Operation*, std::tuple<unsigned, unsigned>>; //TUPLE: <load_size, store_size>
+using LSQSizingResult = mlir::DenseMap<mlir::Operation*, std::tuple<unsigned, unsigned>>; //TUPLE: <load_size, store_size>
 
 namespace {
 
@@ -65,7 +67,6 @@ private:
 
 void HandshakeSizeLSQsPass::runDynamaticPass() {
   llvm::dbgs() << "\t [DBG] LSQ Sizing Pass Called!\n";
-
   std::map<unsigned,buffer::CFDFC> cfdfcs;
   llvm::SmallVector<LSQSizingResult> sizingResults;
 
@@ -80,11 +81,9 @@ void HandshakeSizeLSQsPass::runDynamaticPass() {
     llvm::dbgs() << "\t [DBG] Function: " << funcOp.getName() << "\n";
 
     std::unordered_map<unsigned, float> IIs;
-    DictionaryAttr troughputAttr = getUniqueAttr<handshake::CFDFCThroughputAttr>(funcOp).getThroughputMap();
-    DictionaryAttr cfdfcAttr = getUniqueAttr<handshake::CFDFCToBBListAttr>(funcOp).getCfdfcMap();
+    DictionaryAttr troughputAttr = getDialectAttr<handshake::CFDFCThroughputAttr>(funcOp).getThroughputMap();
+    DictionaryAttr cfdfcAttr = getDialectAttr<handshake::CFDFCToBBListAttr>(funcOp).getCfdfcMap();
 
-    //DictionaryAttr troughputAttr = dyn_cast<DictionaryAttr>(funcOp->getAttr("handshake.throughput"));
-    //DictionaryAttr cfdfcAttr = dyn_cast<DictionaryAttr>(funcOp->getAttr("handshake.cfdfc"));
 
     // TODO this part will be rewritten to not use the CFDFC constructor, ArchSet and ArchBB class from buffer placement (line 96 - 114)
     // Some of the features are not needed and it would look more clean to make my own constructor instead to directly build
@@ -146,7 +145,7 @@ void HandshakeSizeLSQsPass::runDynamaticPass() {
       llvm::dbgs() << " [DBG] final LSQ " << lsqOp->getAttrOfType<StringAttr>("handshake.name").str() << " Max Load Size: " << maxLoadSize << " Max Store Size: " << maxStoreSize << "\n";
 
       handshake::LSQSizeAttr lsqSizeAttr = handshake::LSQSizeAttr::get(mod.getContext(), maxLoadSize, maxStoreSize);
-      setUniqueAttr(lsqOp, lsqSizeAttr);
+      setDialectAttr(lsqOp, lsqSizeAttr);
     }
   }
 }
