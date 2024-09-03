@@ -60,7 +60,6 @@ int main(int argc, char **argv) {
   handshake::FuncOp funcOp = *modOp->getOps<handshake::FuncOp>().begin();
 
   Simulator sim(funcOp);
-
   sim.simulate(inputArgs);
   sim.printResults();
 }

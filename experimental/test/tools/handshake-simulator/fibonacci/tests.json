@@ -1,0 +1,9 @@
+[
+  { "arguments": [ "0" ], "results": [ "0" ], "iterations": 2 },
+  { "arguments": [ "1" ], "results": [ "1" ], "iterations": 3 },
+  { "arguments": [ "2" ], "results": [ "1" ], "iterations": 5 },
+  { "arguments": [ "3" ], "results": [ "2" ], "iterations": 7 },
+  { "arguments": [ "8" ], "results": [ "21" ], "iterations": 17 },
+  { "arguments": [ "46" ], "results": [ "1836311903" ], "iterations": 93 },
+  { "arguments": [ "47" ], "results": [ "-1323752223" ], "iterations": 95 }
+]

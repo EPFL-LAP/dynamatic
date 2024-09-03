@@ -25,7 +25,7 @@
 #include "llvm/Support/ErrorHandling.h"
 #include "llvm/Support/SourceMgr.h"
 #include "llvm/Support/raw_ostream.h"
-#include <algorithm>
+#include <cassert>
 #include <cstddef>
 #include <functional>
 #include <map>
@@ -39,6 +39,11 @@ using namespace dynamatic;
 
 using namespace dynamatic::experimental;
 
+Data::Data(const Data &other) {
+  data = other.data;
+  hash = other.hash;
+}
+
 Data::Data(const APInt &value) {
   data = value;
   hash = llvm::hash_value(value);
@@ -51,6 +56,12 @@ Data::Data(const APFloat &value) {
   bitwidth = value.getSizeInBits(value.getSemantics());
 }
 
+Data &Data::operator=(const Data &other) {
+  data = other.data;
+  hash = other.hash;
+  return *this;
+};
+
 Data &Data::operator=(const APInt &value) {
   this->data = value;
   hash = llvm::hash_value(value);
@@ -61,7 +72,7 @@ Data &Data::operator=(const APInt &value) {
 Data &Data::operator=(const APFloat &value) {
   this->data = value;
   hash = llvm::hash_value(value);
-  Data::bitwidth = value.getSizeInBits(value.getSemantics());
+  bitwidth = value.getSizeInBits(value.getSemantics());
   return *this;
 }
 
@@ -95,24 +106,51 @@ TypedValueState<Ty>::TypedValueState(TypedValue<Ty> val) : ValueState(val) {}
 
 ChannelState::ChannelState(TypedValue<handshake::ChannelType> channel)
     : TypedValueState<handshake::ChannelType>(channel) {
-
   llvm::TypeSwitch<mlir::Type>(channel.getType().getDataType())
       .Case<IntegerType>([&](IntegerType intType) {
         data =
-            APInt(std::max(1, (int)intType.getWidth()), 0, intType.isSigned());
+            APInt(channel.getType().getDataBitWidth(), 0, intType.isSigned());
       })
       .Case<FloatType>([&](FloatType floatType) {
-        data = APFloat(floatType.getFloatSemantics());
+        data = APFloat(floatType.getFloatSemantics(),
+                       APInt(channel.getType().getDataBitWidth(), 0,
+                             floatType.isSignedInteger()));
       })
       .Default([&](auto) {
         emitError(channel.getLoc())
             << "Unsuported date type " << channel.getType()
-            << ", we111 should probably report an error and stop";
+            << ", we should probably report an error and stop";
+      });
+}
+
+void ChannelState::reset() {
+  valid = false;
+  ready = false;
+  auto channel = cast<TypedValue<handshake::ChannelType>>(val);
+  llvm::TypeSwitch<mlir::Type>(channel.getType().getDataType())
+      .Case<IntegerType>([&](IntegerType intType) {
+        data =
+            APInt(channel.getType().getDataBitWidth(), 0, intType.isSigned());
+      })
+      .Case<FloatType>([&](FloatType floatType) {
+        data = APFloat(floatType.getFloatSemantics(),
+                       APInt(channel.getType().getDataBitWidth(), 0,
+                             floatType.isSignedInteger()));
+      })
+      .Default([&](auto) {
+        emitError(channel.getLoc())
+            << "Unsuported date type " << channel.getType()
+            << ", we should probably report an error and stop";
       });
 }
 
 ControlState::ControlState(TypedValue<handshake::ControlType> control)
     : TypedValueState<handshake::ControlType>(control) {}
+
+void ControlState::reset() {
+  valid = false;
+  ready = false;
+}
 
 template <typename State>
 DoubleUpdater<State>::DoubleUpdater(State &oldState, State &newState)
@@ -132,16 +170,19 @@ void ChannelUpdater::setValid() {
 }
 
 void ChannelUpdater::resetValid() {
-  if (newState.ready) {
+  if (newState.ready)
     newState.valid = false;
-  }
-  update();
 }
 
 void ChannelUpdater::update() {
   oldState.valid = newState.valid;
   oldState.ready = newState.ready;
   oldState.data = newState.data;
+}
+
+void ChannelUpdater::reset() {
+  newState.reset();
+  update();
 }
 
 ControlUpdater::ControlUpdater(ControlState &oldState, ControlState &newState)
@@ -159,12 +200,16 @@ void ControlUpdater::setValid() {
 void ControlUpdater::resetValid() {
   if (newState.ready)
     newState.valid = false;
-  update();
 }
 
 void ControlUpdater::update() {
   oldState.valid = newState.valid;
   oldState.ready = newState.ready;
+}
+
+void ControlUpdater::reset() {
+  newState.reset();
+  update();
 }
 
 ProducerRW::ProducerDescendants ProducerRW::getType() const { return prod; }
@@ -215,26 +260,51 @@ bool ChannelProducerRW::classof(const ProducerRW *c) {
 
 ConsumerData::ConsumerData(ConsumerRW *ins) {
   if (auto *p = dyn_cast<ChannelConsumerRW>(ins)) {
+    // auto *k = &p->data;
     data = &p->data;
     dataWidth = data->bitwidth;
-  } else
+  } else {
     data = nullptr;
+    dataWidth = 0;
+  }
 }
+
+unsigned ConsumerData::getBitwidth() const { return dataWidth; }
 
 bool ConsumerData::hasValue() const { return data != nullptr; }
 
 ProducerData::ProducerData(ProducerRW *outs) {
   if (auto *p = dyn_cast<ChannelProducerRW>(outs)) {
     data = &p->data;
-  } else
+    dataWidth = data->bitwidth;
+  } else {
     data = nullptr;
+    dataWidth = 0;
+  }
+}
+
+ProducerData::ProducerData(const ProducerData &other) {
+  if (other.hasValue()) {
+    data = other.data;
+    dataWidth = data->bitwidth;
+  }
 }
 
 ProducerData &ProducerData::operator=(const ConsumerData &value) {
-  if (data)
+  if (value.hasValue()) {
     *data = *value.data;
+  }
   return *this;
 }
+
+ProducerData &ProducerData::operator=(const ProducerData &other) {
+  if (other.hasValue()) {
+    *data = *other.data;
+  }
+  return *this;
+}
+
+unsigned ProducerData::getBitwidth() const { return dataWidth; }
 
 bool ProducerData::hasValue() const { return data != nullptr; }
 
@@ -257,26 +327,20 @@ State *OpExecutionModel<Op>::getState(Value val,
 }
 
 template <typename Op>
-template <typename State, typename Data>
+template <typename State>
 void OpExecutionModel<Op>::printValue(const std::string &name, State *ins,
-                                      Data *insData) {
+                                      const Data *val) {
   llvm::outs() << name << ": ";
-  if (insData) {
-    APInt t = dataCast<APInt>(*insData);
-    auto val = t.reverseBits().getZExtValue();
-    for (unsigned i = 0; i < t.getBitWidth(); ++i) {
-      llvm::outs() << (val & 1);
-      val >>= 1;
-    }
-    llvm::outs() << " ";
-  }
 
   llvm::outs() << ins->valid << " " << ins->ready << "\n";
 }
 
-void Antotokens::reset(const bool &pvalid1, const bool &pvalid0, bool &kill1,
+void Antitokens::reset(const bool &pvalid1, const bool &pvalid0, bool &kill1,
                        bool &kill0, const bool &generateAt1,
                        const bool &generateAt0, bool &stopValid) {
+  // default values on reset
+  regIn0 = false;
+  regIn1 = false;
   regOut0 = false;
   regOut1 = false;
 
@@ -289,7 +353,7 @@ void Antotokens::reset(const bool &pvalid1, const bool &pvalid0, bool &kill1,
   kill1 = generateAt1 || regOut1;
 }
 
-void Antotokens::exec(bool isClkRisingEdge, const bool &pvalid1,
+void Antitokens::exec(bool isClkRisingEdge, const bool &pvalid1,
                       const bool &pvalid0, bool &kill1, bool &kill0,
                       const bool &generateAt1, const bool &generateAt0,
                       bool &stopValid) {
@@ -401,6 +465,7 @@ void OEHBSupport::execDataless(bool isClkRisingEdge, ConsumerRW *ins,
 
 void OEHBSupport::reset(ConsumerRW *ins, ProducerRW *outs, const Data *insData,
                         Data *outsData) {
+  regEn = false;
   resetDataless(ins, outs);
   if (insData)
     *outsData = APInt(datawidth, 0);
@@ -451,6 +516,8 @@ void TEHBSupport::exec(bool isClkRisingEdge, ConsumerRW *ins, ProducerRW *outs,
 
 void TEHBSupport::resetDataFull(ConsumerRW *ins, ProducerRW *outs,
                                 const Data *insData, Data *outsData) {
+  regNotFull = false;
+  regEnable = false;
   regEnable = regNotFull && ins->valid && !outs->ready;
 
   // tehb dataless
@@ -508,8 +575,8 @@ void BranchModel::reset() {
 void BranchModel::exec(bool isClkRisingEdge) { reset(); }
 
 void BranchModel::printStates() {
-  printValue<ConsumerRW, const Data>("ins", ins, insData.data);
-  printValue<ProducerRW, Data>("outs", outs, outsData.data);
+  printValue<ConsumerRW>("ins", ins, insData.data);
+  printValue<ProducerRW>("outs", outs, outsData.data);
 }
 
 CondBranchModel::CondBranchModel(handshake::ConditionalBranchOp condBranchOp,
@@ -524,6 +591,7 @@ CondBranchModel::CondBranchModel(handshake::ConditionalBranchOp condBranchOp,
       condBrJoin(2) {}
 
 void CondBranchModel::reset() {
+  brInpValid = false;
   auto k = dataCast<APInt>(condition->data);
 
   auto cond = k.getBoolValue();
@@ -542,19 +610,26 @@ void CondBranchModel::reset() {
 void CondBranchModel::exec(bool isClkRisingEdge) { reset(); }
 
 void CondBranchModel::printStates() {
-  printValue<ConsumerRW, const Data>("data", data, dataData.data);
-  printValue<ChannelConsumerRW, const Data>("condition", condition,
-                                            &condition->data);
-  printValue<ProducerRW, Data>("trueOut", trueOut, trueOutData.data);
-  printValue<ProducerRW, Data>("falseOut", falseOut, falseOutData.data);
+  printValue<ConsumerRW>("data", data, dataData.data);
+  printValue<ChannelConsumerRW>("condition", condition, &condition->data);
+  printValue<ProducerRW>("trueOut", trueOut, trueOutData.data);
+  printValue<ProducerRW>("falseOut", falseOut, falseOutData.data);
 }
 
 ConstantModel::ConstantModel(handshake::ConstantOp constOp,
                              mlir::DenseMap<Value, RW *> &subset)
     : OpExecutionModel<handshake::ConstantOp>(constOp),
-      value(dyn_cast<mlir::IntegerAttr>(constOp.getValue()).getValue()),
       ctrl(getState<ControlConsumerRW>(constOp.getCtrl(), subset)),
-      outs(getState<ChannelProducerRW>(constOp.getResult(), subset)) {}
+      outs(getState<ChannelProducerRW>(constOp.getResult(), subset)) {
+  llvm::TypeSwitch<mlir::Type>(constOp.getValue().getType())
+      .Case<IntegerType>([&](IntegerType intType) {
+        value = dyn_cast<mlir::IntegerAttr>(constOp.getValue()).getValue();
+      })
+      .Case<FloatType>([&](FloatType floatType) {
+        value = dyn_cast<mlir::FloatAttr>(constOp.getValue()).getValue();
+      })
+      .Default([&](auto) {});
+}
 
 void ConstantModel::reset() {
   outs->data = value;
@@ -566,7 +641,7 @@ void ConstantModel::exec(bool isClkRisingEdge) { reset(); }
 
 void ConstantModel::printStates() {
   llvm::outs() << "ctrl: " << ctrl->valid << " " << ctrl->ready << "\n";
-  printValue<ChannelProducerRW, Data>("outs", outs, &outs->data);
+  printValue<ChannelProducerRW>("outs", outs, &outs->data);
 }
 
 ControlMergeModel::ControlMergeModel(handshake::ControlMergeOp cMergeOp,
@@ -574,7 +649,7 @@ ControlMergeModel::ControlMergeModel(handshake::ControlMergeOp cMergeOp,
     : OpExecutionModel<handshake::ControlMergeOp>(cMergeOp),
       size(op->getNumOperands()),
       indexWidth(cMergeOp.getIndex().getType().getDataBitWidth()),
-      cMergeTEHB(indexWidth), cMergeFork(2),
+      cMergeTEHB(indexWidth), cMergeFork(2, 0),
       outs(getState<ProducerRW>(cMergeOp.getResult(), subset)),
       index(getState<ChannelProducerRW>(cMergeOp.getIndex(), subset)),
       outsData(outs), insTEHB(dataAvailable, tehbOutReady),
@@ -586,12 +661,14 @@ ControlMergeModel::ControlMergeModel(handshake::ControlMergeOp cMergeOp,
 
   for (unsigned i = 0; i < size; ++i)
     insData.emplace_back(ins[i]);
-
-  cMergeFork.datawidth = outsData.dataWidth;
 }
 
 void ControlMergeModel::reset() {
   indexTEHB = APInt(indexWidth, 0);
+  dataAvailable = false;
+  readyToFork = false;
+  tehbOutValid = false;
+  tehbOutReady = false;
 
   // process (ins_valid)
   for (unsigned i = 0; i < size; ++i)
@@ -649,23 +726,21 @@ void ControlMergeModel::exec(bool isClkRisingEdge) {
 
 void ControlMergeModel::printStates() {
   for (unsigned i = 0; i < size; ++i)
-    printValue<ConsumerRW, const Data>("ins", ins[i], insData[i].data);
-  printValue<ProducerRW, Data>("outs", outs, outsData.data);
-  printValue<ChannelProducerRW, Data>("index", index, &index->data);
+    printValue<ConsumerRW>("ins", ins[i], insData[i].data);
+  printValue<ProducerRW>("outs", outs, outsData.data);
+  printValue<ChannelProducerRW>("index", index, &index->data);
 }
 
 ForkModel::ForkModel(handshake::ForkOp forkOp,
                      mlir::DenseMap<Value, RW *> &subset)
     : OpExecutionModel<handshake::ForkOp>(forkOp), size(op->getNumResults()),
-      forkSupport(size), ins(getState<ConsumerRW>(forkOp.getOperand(), subset)),
-      insData(ins) {
+      ins(getState<ConsumerRW>(forkOp.getOperand(), subset)), insData(ins),
+      forkSupport(size, insData.getBitwidth()) {
   for (unsigned i = 0; i < size; ++i)
     outs.push_back(getState<ProducerRW>(forkOp->getResult(i), subset));
 
   for (unsigned i = 0; i < size; ++i)
     outsData.emplace_back(outs[i]);
-
-  forkSupport.datawidth = insData.dataWidth;
 }
 
 void ForkModel::reset() { forkSupport.reset(ins, outs, insData, outsData); }
@@ -675,9 +750,9 @@ void ForkModel::exec(bool isClkRisingEdge) {
 }
 
 void ForkModel::printStates() {
-  printValue<ConsumerRW, const Data>("ins", ins, insData.data);
+  printValue<ConsumerRW>("ins", ins, insData.data);
   for (unsigned i = 0; i < size; ++i)
-    printValue<ProducerRW, Data>("outs", outs[i], outsData[i].data);
+    printValue<ProducerRW>("outs", outs[i], outsData[i].data);
 }
 
 JoinModel::JoinModel(handshake::JoinOp joinOp,
@@ -730,9 +805,9 @@ void LazyForkModel::reset() {
 void LazyForkModel::exec(bool isClkRisingEdge) { reset(); }
 
 void LazyForkModel::printStates() {
-  printValue<ConsumerRW, const Data>("ins", ins, insData.data);
+  printValue<ConsumerRW>("ins", ins, insData.data);
   for (unsigned i = 0; i < size; ++i)
-    printValue<ProducerRW, Data>("outs", outs[i], outsData[i].data);
+    printValue<ProducerRW>("outs", outs[i], outsData[i].data);
 }
 
 MergeModel::MergeModel(handshake::MergeOp mergeOp,
@@ -740,16 +815,18 @@ MergeModel::MergeModel(handshake::MergeOp mergeOp,
     : OpExecutionModel<handshake::MergeOp>(mergeOp),
       size(mergeOp->getNumOperands()),
       outs(getState<ProducerRW>(mergeOp.getResult(), subset)), outsData(outs),
-      insTEHB(tehbValid, tehbReady) {
+      insTEHB(tehbValid, tehbReady), mergeTEHB(outsData.getBitwidth()) {
   for (unsigned i = 0; i < size; ++i)
     ins.push_back(getState<ConsumerRW>(mergeOp->getOperand(i), subset));
+
   for (unsigned i = 0; i < size; ++i)
     insData.emplace_back(ins[i]);
-
-  mergeTEHB.datawidth = outsData.dataWidth;
 }
 
 void MergeModel::reset() {
+  tehbValid = false;
+  tehbReady = false;
+  tehbDataIn = APInt(outsData.getBitwidth(), 0);
   if (outsData.hasValue()) {
     execDataFull();
     mergeTEHB.reset(&insTEHB, outs, &tehbDataIn, outsData.data);
@@ -771,8 +848,8 @@ void MergeModel::exec(bool isClkRisingEdge) {
 
 void MergeModel::printStates() {
   for (unsigned i = 0; i < size; ++i)
-    printValue<ConsumerRW, const Data>("ins", ins[i], insData[i].data);
-  printValue<ProducerRW, Data>("outs", outs, outsData.data);
+    printValue<ConsumerRW>("ins", ins[i], insData[i].data);
+  printValue<ProducerRW>("outs", outs, outsData.data);
 }
 
 void MergeModel::execDataless() {
@@ -804,16 +881,18 @@ MuxModel::MuxModel(handshake::MuxOp muxOp, mlir::DenseMap<Value, RW *> &subset)
       selectWidth(muxOp.getSelectOperand().getType().getDataBitWidth()),
       index(getState<ChannelConsumerRW>(muxOp.getSelectOperand(), subset)),
       outs(getState<ProducerRW>(muxOp.getResult(), subset)), outsData(outs),
-      insTEHB(tehbValid, tehbReady) {
+      insTEHB(tehbValid, tehbReady), muxTEHB(outsData.getBitwidth()) {
   for (auto oper : muxOp.getDataOperands())
     ins.push_back(getState<ChannelConsumerRW>(oper, subset));
+
   for (unsigned i = 0; i < size; ++i)
     insData.emplace_back(ins[i]);
-
-  muxTEHB.datawidth = outsData.dataWidth;
 }
 
 void MuxModel::reset() {
+  tehbValid = false;
+  tehbReady = false;
+  tehbDataIn = APInt(outsData.getBitwidth(), 0);
   indexNum = dataCast<APInt>(index->data).getZExtValue();
   if (outsData.hasValue()) {
     execDataFull();
@@ -837,9 +916,9 @@ void MuxModel::exec(bool isClkRisingEdge) {
 
 void MuxModel::printStates() {
   for (unsigned i = 0; i < size; ++i)
-    printValue<ConsumerRW, const Data>("ins", ins[i], insData[i].data);
-  printValue<ProducerRW, Data>("outs", outs, outsData.data);
-  printValue<ChannelConsumerRW, const Data>("index", index, &index->data);
+    printValue<ConsumerRW>("ins", ins[i], insData[i].data);
+  printValue<ProducerRW>("outs", outs, outsData.data);
+  printValue<ChannelConsumerRW>("index", index, &index->data);
 }
 
 void MuxModel::execDataless() {
@@ -881,7 +960,7 @@ OEHBModel::OEHBModel(handshake::BufferOp oehbOp,
     : OpExecutionModel<handshake::BufferOp>(oehbOp),
       ins(getState<ConsumerRW>(oehbOp.getOperand(), subset)),
       outs(getState<ProducerRW>(oehbOp.getResult(), subset)), insData(ins),
-      outsData(outs), oehbDl(insData.dataWidth) {}
+      outsData(outs), oehbDl(insData.getBitwidth()) {}
 
 void OEHBModel::reset() {
   oehbDl.reset(ins, outs, insData.data, outsData.data);
@@ -892,8 +971,8 @@ void OEHBModel::exec(bool isClkRisingEdge) {
 }
 
 void OEHBModel::printStates() {
-  printValue<ConsumerRW, const Data>("ins", ins, insData.data);
-  printValue<ProducerRW, Data>("outs", outs, outsData.data);
+  printValue<ConsumerRW>("ins", ins, insData.data);
+  printValue<ProducerRW>("outs", outs, outsData.data);
 }
 
 SinkModel::SinkModel(handshake::SinkOp sinkOp,
@@ -906,7 +985,7 @@ void SinkModel::reset() { ins->ready = true; }
 void SinkModel::exec(bool isClkRisingEdge) { reset(); }
 
 void SinkModel::printStates() {
-  printValue<ConsumerRW, const Data>("ins", ins, insData.data);
+  printValue<ConsumerRW>("ins", ins, insData.data);
 }
 
 SourceModel::SourceModel(handshake::SourceOp sourceOp,
@@ -927,7 +1006,7 @@ TEHBModel::TEHBModel(handshake::BufferOp tehbOp,
     : OpExecutionModel<handshake::BufferOp>(tehbOp),
       ins(getState<ConsumerRW>(tehbOp.getOperand(), subset)),
       outs(getState<ProducerRW>(tehbOp.getResult(), subset)), insData(ins),
-      outsData(outs), returnTEHB(insData.dataWidth) {}
+      outsData(outs), returnTEHB(insData.getBitwidth()) {}
 
 void TEHBModel::reset() {
   returnTEHB.reset(ins, outs, insData.data, outsData.data);
@@ -938,33 +1017,29 @@ void TEHBModel::exec(bool isClkRisingEdge) {
 }
 
 void TEHBModel::printStates() {
-  printValue<ConsumerRW, const Data>("ins", ins, insData.data);
-  printValue<ProducerRW, Data>("outs", outs, outsData.data);
+  printValue<ConsumerRW>("ins", ins, insData.data);
+  printValue<ProducerRW>("outs", outs, outsData.data);
 }
 
 EndModel::EndModel(handshake::EndOp endOp, mlir::DenseMap<Value, RW *> &subset,
                    bool &resValid, const bool &resReady, Data &resData)
     : OpExecutionModel<handshake::EndOp>(endOp),
-      ins(getState<ChannelConsumerRW>(endOp.getInputs().front(), subset)),
-      outs(resValid, resReady), outsData(resData) {}
+      ins(getState<ConsumerRW>(endOp.getInputs().front(), subset)),
+      outs(resValid, resReady), insData(ins), outsData(resData) {}
 
 void EndModel::reset() {
   outs.valid = ins->valid;
-  ins->ready = ins->valid && outs.ready;
-  outsData = ins->data;
+  ins->ready = outs.ready;
+  if (insData.hasValue()) {
+    outsData = *insData.data;
+  }
 }
 
 void EndModel::exec(bool isClkRisingEdge) { reset(); }
 
 void EndModel::printStates() {
-  printValue<ConsumerRW, const Data>("ins", ins, &ins->data);
-  printValue<ProducerRW, Data>("outs", &outs, &outsData);
+  printValue<ConsumerRW>("ins", ins, insData.data);
 }
-
-//===----------------------------------------------------------------------===//
-// Arithmetic
-//===----------------------------------------------------------------------===//
-/// Arithmetic and generic components
 
 TruncIModel::TruncIModel(handshake::TruncIOp trunciOp,
                          mlir::DenseMap<Value, RW *> &subset)
@@ -982,8 +1057,8 @@ void TruncIModel::reset() {
 void TruncIModel::exec(bool isClkRisingEdge) { reset(); }
 
 void TruncIModel::printStates() {
-  printValue<ConsumerRW, const Data>("ins", ins, &ins->data);
-  printValue<ProducerRW, Data>("outs", outs, &outs->data);
+  printValue<ChannelConsumerRW>("ins", ins, &ins->data);
+  printValue<ChannelProducerRW>("outs", outs, &outs->data);
 }
 
 SelectModel::SelectModel(handshake::SelectOp selectOp,
@@ -995,6 +1070,13 @@ SelectModel::SelectModel(handshake::SelectOp selectOp,
       result(getState<ChannelProducerRW>(selectOp.getResult(), subset)) {}
 
 void SelectModel::reset() {
+  ee = false;
+  validInternal = false;
+  kill0 = false;
+  kill1 = false;
+  antitokenStop = false;
+  g0 = false;
+  g1 = false;
   selectExec();
   anti.reset(falseValue->valid, trueValue->valid, kill1, kill0, g1, g0,
              antitokenStop);
@@ -1007,11 +1089,10 @@ void SelectModel::exec(bool isClkRisingEdge) {
 }
 
 void SelectModel::printStates() {
-  printValue<ConsumerRW, const Data>("condition", condition, &condition->data);
-  printValue<ConsumerRW, const Data>("trueValue", trueValue, &trueValue->data);
-  printValue<ConsumerRW, const Data>("falseValue", falseValue,
-                                     &falseValue->data);
-  printValue<ProducerRW, Data>("result", result, &result->data);
+  printValue<ChannelConsumerRW>("condition", condition, &condition->data);
+  printValue<ChannelConsumerRW>("trueValue", trueValue, &trueValue->data);
+  printValue<ChannelConsumerRW>("falseValue", falseValue, &falseValue->data);
+  printValue<ChannelProducerRW>("result", result, &result->data);
 }
 
 void SelectModel::selectExec() {
@@ -1061,10 +1142,10 @@ void GenericUnaryOpModel<Op>::exec(bool isClkRisingEdge) {
 
 template <typename Op>
 void GenericUnaryOpModel<Op>::printStates() {
-  OpExecutionModel<Op>::template printValue<ConsumerRW, const Data>("ins", ins,
-                                                                    &ins->data);
-  OpExecutionModel<Op>::template printValue<ProducerRW, Data>("outs", outs,
-                                                              &outs->data);
+  OpExecutionModel<Op>::template printValue<ChannelConsumerRW>("ins", ins,
+                                                               &ins->data);
+  OpExecutionModel<Op>::template printValue<ChannelProducerRW>("outs", outs,
+                                                               &outs->data);
 }
 
 template <typename Op>
@@ -1080,40 +1161,54 @@ template <typename Op>
           op.getRhs(), subset)),
       result(OpExecutionModel<Op>::template getState<ChannelProducerRW>(
           op.getResult(), subset)),
-      insJoin({lhs, rhs}), outsJoin(joinValid, result->ready), binJoin(2) {}
+      insJoin({lhs, rhs}), outsJoin(joinValid, oehbReady),
+      insTEHB(buffValid, oehbReady), outsTEHB(oehbValid, result->ready),
+      binJoin(2), binOEHB(bitwidth) {}
 
 template <typename Op>
 void ::GenericBinaryOpModel<Op>::reset() {
-  binJoin.exec(insJoin, result);
-  result->data = callback(lhs->data, rhs->data);
+  if (!latency) {
+    binJoin.exec(insJoin, result);
+    result->data = callback(lhs->data, rhs->data);
+  } else {
+    binOEHB.resetDataless(&insTEHB, &outsTEHB);
+    result->valid = oehbValid;
+    binJoin.exec(insJoin, &outsJoin);
+  }
+  hasData = false;
+  counter = 0;
 }
 
 template <typename Op>
 void ::GenericBinaryOpModel<Op>::exec(bool isClkRisingEdge) {
-  if (!latency)
-    reset();
-  else {
+  if (!latency) {
+    binJoin.exec(insJoin, result);
+    result->data = callback(lhs->data, rhs->data);
+  } else {
     binJoin.exec(insJoin, &outsJoin);
-
     if (isClkRisingEdge) {
-      if (lhs->valid && rhs->valid && !hasData) {
-        // collect
+      if (joinValid && !hasData) {
+        // get data
+        tempData = callback(lhs->data, rhs->data);
         hasData = true;
         counter = 1;
-        tempData = callback(lhs->data, rhs->data);
         result->valid = false;
-      } else if (hasData && counter < latency - 1) {
-        // wait
-        ++counter;
-        if (counter == latency - 1)
-          result->data = tempData;
-      } else if (hasData && counter >= latency - 1 && !result->valid) {
+      } else if (buffValid && hasData) {
+        // transfer or wait to transfer
         result->valid = true;
-      } else if (!lhs->valid && !rhs->valid && hasData && result->valid &&
-                 result->ready) {
-        result->valid = false;
-        hasData = false;
+        result->data = tempData;
+        buffValid = false;
         counter = 0;
+      } else if (hasData) {
+        if (result->valid && result->ready) {
+          hasData = false;
+          result->valid = false;
+        } else
+          ++counter;
+      }
+
+      if (counter == latency - 1) {
+        buffValid = true;
       }
     }
   }
@@ -1121,17 +1216,13 @@ void ::GenericBinaryOpModel<Op>::exec(bool isClkRisingEdge) {
 
 template <typename Op>
 void ::GenericBinaryOpModel<Op>::printStates() {
-  OpExecutionModel<Op>::template printValue<ConsumerRW, const Data>("lhs", lhs,
-                                                                    &lhs->data);
-  OpExecutionModel<Op>::template printValue<ConsumerRW, const Data>("rhs", rhs,
-                                                                    &rhs->data);
-  OpExecutionModel<Op>::template printValue<ProducerRW, Data>("result", result,
-                                                              &result->data);
+  OpExecutionModel<Op>::template printValue<ChannelConsumerRW>("lhs", lhs,
+                                                               &lhs->data);
+  OpExecutionModel<Op>::template printValue<ChannelConsumerRW>("rhs", rhs,
+                                                               &rhs->data);
+  OpExecutionModel<Op>::template printValue<ChannelProducerRW>("result", result,
+                                                               &result->data);
 }
-
-//===----------------------------------------------------------------------===//
-// Simulator
-//===----------------------------------------------------------------------===//
 
 Simulator::Simulator(handshake::FuncOp funcOp, unsigned cyclesLimit)
     : funcOp(funcOp), cyclesLimit(cyclesLimit) {
@@ -1152,6 +1243,14 @@ Simulator::Simulator(handshake::FuncOp funcOp, unsigned cyclesLimit)
 }
 
 void Simulator::reset() {
+  producerViews[endOp->getOpOperand(0).get()]->valid = false;
+
+  resReady = false;
+  resValid = false;
+  resData = {};
+  for (auto [val, state] : updaters)
+    state->reset();
+
   // Loop until the models' states stop changing
   while (true) {
     // Reset all models
@@ -1172,6 +1271,9 @@ void Simulator::reset() {
 }
 
 void Simulator::simulate(llvm::ArrayRef<std::string> inputArgs) {
+
+  resReady = true;
+  resValid = false;
   /// First, process simulator's current inputs. The user is only expected to
   /// enter data values.
 
@@ -1185,14 +1287,10 @@ void Simulator::simulate(llvm::ArrayRef<std::string> inputArgs) {
       channelArgs.push_back(arg);
     }
 
-  // Check if the number of data values is divisible by the number of
+  // Check if the number of data values is equal to the number of
   // ChannelStates
-  if (channelCount == 0 || inputArgs.size() % channelCount != 0) {
-    llvm::errs() << "The amount of input data values must be divisible by "
-                    "the number of the input channels!";
-    exit(1);
-  }
-
+  assert(channelCount == inputArgs.size() &&
+         "The number of arguments is not equal to the number of channels!\n");
   // Iterate through all the collected channel values...
   size_t inputCount = 0;
   for (auto val : channelArgs) {
@@ -1212,7 +1310,7 @@ void Simulator::simulate(llvm::ArrayRef<std::string> inputArgs) {
         .Default([&](auto) {
           emitError(channel.getLoc())
               << "Unsuported date type " << channel.getType()
-              << ", we111 should probably report an error and stop";
+              << ", we should probably report an error and stop";
         });
     ++inputCount;
     updaters[val]->update();
@@ -1256,6 +1354,7 @@ void Simulator::simulate(llvm::ArrayRef<std::string> inputArgs) {
         isFin = isFin && state->check();
       if (isFin)
         break;
+
       // Update oldStates
       for (auto [val, state] : updaters)
         state->update();
@@ -1283,38 +1382,42 @@ void Simulator::simulate(llvm::ArrayRef<std::string> inputArgs) {
       eqStateCount = 0;
 
     // At the end of each cycle reset each input's valid signal to false if
-    // the corresponding ready was true (The arguments have already been read)
+    // the corresponding ready was true (The arguments have already been
+    // read)
     for (BlockArgument arg : funcOp.getArguments())
       updaters[arg]->resetValid();
   }
 }
 
-// Just a temporary function to print the results of the simulation to
-// standart output
 void Simulator::printResults() {
   llvm::outs() << "Results\n";
   llvm::outs() << resValid << " " << resReady << " ";
   SmallVector<char> outData;
-
-  auto channel = cast<TypedValue<handshake::ChannelType>>(endOp->getOperand(0));
-  llvm::TypeSwitch<mlir::Type>(channel.getType().getDataType())
-      .Case<IntegerType>([&](IntegerType intType) {
-        llvm::outs() << dataCast<APInt>(resData) << "\n";
-      })
-      .Case<FloatType>([&](FloatType floatType) {
-        dataCast<APFloat>(resData).toString(outData);
-        llvm::outs() << outData << "\n";
-      })
-      .Default([&](auto) {
-        emitError(channel.getLoc())
-            << "Unsuported date type " << channel.getType()
-            << ", we111 should probably report an error and stop";
-      });
-
+  if (resData.hasValue()) {
+    auto channel =
+        cast<TypedValue<handshake::ChannelType>>(endOp->getOperand(0));
+    llvm::TypeSwitch<mlir::Type>(channel.getType().getDataType())
+        .Case<IntegerType>([&](IntegerType intType) {
+          llvm::outs() << dataCast<APInt>(resData);
+        })
+        .Case<FloatType>([&](FloatType floatType) {
+          dataCast<APFloat>(resData).toString(outData);
+          llvm::outs() << outData;
+        })
+        .Default([&](auto) {
+          emitError(channel.getLoc())
+              << "Unsuported date type " << channel.getType()
+              << ", we111 should probably report an error and stop";
+        });
+  }
+  llvm::outs() << "\n";
   llvm::outs() << "Number of iterations: " << iterNum << "\n";
 }
 
-// A temporary function
+unsigned long Simulator::getIterNum() { return iterNum; }
+
+Any Simulator::getResData() { return resData.data; }
+
 void Simulator::printModelStates() {
   std::map<std::string, ExecutionModel *> names;
   for (auto &[op, model] : opModels) {
@@ -1363,7 +1466,6 @@ void Simulator::registerModel(Op op, Args &&...modelArgs) {
   opModels.insert({op, model});
 }
 
-// Determine the concrete Model type
 void Simulator::associateModel(Operation *op) {
   llvm::TypeSwitch<Operation *>(op)
       // handshake
@@ -1425,7 +1527,7 @@ void Simulator::associateModel(Operation *op) {
       // arithmetic
       .Case<handshake::AddFOp>([&](handshake::AddFOp addfOp) {
         BinaryCompFunc callback = [](Data lhs, Data rhs) {
-          APFloat res = dataCast<APFloat>(lhs) + dataCast<APFloat>(rhs);
+          auto res = dataCast<APFloat>(lhs) + dataCast<APFloat>(rhs);
           return res;
         };
         registerModel<GenericBinaryOpModel<handshake::AddFOp>>(addfOp, callback,
@@ -1441,7 +1543,7 @@ void Simulator::associateModel(Operation *op) {
       })
       .Case<handshake::AndIOp>([&](handshake::AndIOp andiOp) {
         BinaryCompFunc callback = [](Data lhs, Data rhs) {
-          APInt x = dataCast<APInt>(lhs) & dataCast<APInt>(rhs);
+          auto x = dataCast<APInt>(lhs) & dataCast<APInt>(rhs);
           return x;
         };
         registerModel<GenericBinaryOpModel<handshake::AndIOp>>(andiOp, callback,
@@ -1603,7 +1705,8 @@ void Simulator::associateModel(Operation *op) {
       })
       .Case<handshake::DivSIOp>([&](handshake::DivSIOp divsIOp) {
         BinaryCompFunc callback = [](Data lhs, Data rhs) {
-          auto res = dataCast<APInt>(lhs).sdiv(dataCast<APInt>(rhs));
+          auto res =
+              dataCast<APInt>(lhs).sdiv(dataCast<APInt>(rhs).getSExtValue());
           return res;
         };
         registerModel<GenericBinaryOpModel<handshake::DivSIOp>>(divsIOp,
@@ -1611,7 +1714,8 @@ void Simulator::associateModel(Operation *op) {
       })
       .Case<handshake::DivUIOp>([&](handshake::DivUIOp divuIOp) {
         BinaryCompFunc callback = [](Data lhs, Data rhs) {
-          auto res = dataCast<APInt>(lhs).udiv(dataCast<APInt>(rhs));
+          auto res =
+              dataCast<APInt>(lhs).udiv(dataCast<APInt>(rhs).getZExtValue());
           return res;
         };
         registerModel<GenericBinaryOpModel<handshake::DivUIOp>>(divuIOp,
@@ -1713,7 +1817,7 @@ void Simulator::associateModel(Operation *op) {
       })
       .Case<handshake::SubFOp>([&](handshake::SubFOp subFOp) {
         BinaryCompFunc callback = [](Data lhs, Data rhs) {
-          auto res = dataCast<APFloat>(lhs) - dataCast<APFloat>(rhs);
+          APFloat res = dataCast<APFloat>(lhs) - dataCast<APFloat>(rhs);
           return res;
         };
         registerModel<GenericBinaryOpModel<handshake::SubFOp>>(subFOp, callback,
@@ -1750,8 +1854,6 @@ void Simulator::associateModel(Operation *op) {
       });
 }
 
-// Register the State state where needed (oldValueStates, newValueStates,
-// updaters, rws).
 template <typename State, typename Updater, typename Producer,
           typename Consumer, typename Ty>
 void Simulator::registerState(Value val, Operation *producerOp, Ty type) {
@@ -1772,7 +1874,6 @@ void Simulator::registerState(Value val, Operation *producerOp, Ty type) {
     consumerViews.insert({&opOp, consumerRW});
 }
 
-// Determine if the state belongs to channel or control
 void Simulator::associateState(Value val, Operation *producerOp, Location loc) {
   llvm::TypeSwitch<mlir::Type>(val.getType())
       .Case<handshake::ChannelType>([&](handshake::ChannelType channelType) {

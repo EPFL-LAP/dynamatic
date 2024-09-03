@@ -27,19 +27,24 @@ namespace experimental {
 struct Data {
   llvm::Any data;
   llvm::hash_code hash;
-  unsigned bitwidth;
 
   Data() = default;
+
+  Data(const Data &other);
 
   Data(const APInt &value);
 
   Data(const APFloat &value);
+
+  Data &operator=(const Data &other);
 
   Data &operator=(const APInt &value);
 
   Data &operator=(const APFloat &value);
 
   bool hasValue() const;
+
+  unsigned bitwidth;
 };
 
 //===----------------------------------------------------------------------===//
@@ -58,7 +63,8 @@ struct Data {
 class ValueState {
 public:
   ValueState(Value val);
-
+  // set default values
+  virtual void reset() = 0;
   virtual ~ValueState() = default;
 
 protected:
@@ -84,6 +90,8 @@ public:
 
   ChannelState(TypedValue<handshake::ChannelType> channel);
 
+  void reset() override;
+
 protected:
   bool valid = false;
   bool ready = false;
@@ -102,6 +110,8 @@ public:
   using TypedValueState<handshake::ControlType>::TypedValueState;
 
   ControlState(TypedValue<handshake::ControlType> control);
+
+  void reset() override;
 
 protected:
   bool valid = false;
@@ -132,6 +142,8 @@ public:
   virtual void setValid() = 0;
   // For the particular valueState, remove valid if ready is set
   virtual void resetValid() = 0;
+  // set default values
+  virtual void reset() = 0;
 };
 
 /// Templated updater class that contains pair <oldValueState, newValueState>
@@ -153,6 +165,7 @@ public:
   void setValid() override;
   void resetValid() override;
   void update() override;
+  void reset() override;
 };
 
 /// Update valueStates with "Control type": valid, ready
@@ -163,6 +176,7 @@ public:
   void setValid() override;
   void resetValid() override;
   void update() override;
+  void reset() override;
 };
 
 //===----------------------------------------------------------------------===//
@@ -281,22 +295,33 @@ struct ChannelProducerRW : public ProducerRW {
 
 /// A struct to represent consumer's data
 struct ConsumerData {
-  Data const *data = nullptr;
+private:
   unsigned dataWidth = 0;
 
+public:
+  Data const *data = nullptr;
+
   ConsumerData(ConsumerRW *ins);
+
+  unsigned getBitwidth() const;
 
   bool hasValue() const;
 };
 
 /// A struct to represent producer's data
 struct ProducerData {
-  Data *data = nullptr;
+private:
   unsigned dataWidth = 0;
 
+public:
+  Data *data = nullptr;
   ProducerData(ProducerRW *outs);
+  ProducerData(const ProducerData &other);
 
   ProducerData &operator=(const ConsumerData &value);
+  ProducerData &operator=(const ProducerData &other);
+
+  unsigned getBitwidth() const;
 
   bool hasValue() const;
 };
@@ -336,8 +361,8 @@ protected:
   static State *getState(Value val, mlir::DenseMap<Value, RW *> &rws);
 
   // Just a temporary function to print models' states
-  template <typename State, typename Data>
-  void printValue(const std::string &name, State *ins, Data *insData);
+  template <typename State>
+  void printValue(const std::string &name, State *ins, const Data *val);
 };
 
 //===----------------------------------------------------------------------===//
@@ -345,9 +370,9 @@ protected:
 //===----------------------------------------------------------------------===//
 /// Components required for the internal state.
 
-class Antotokens {
+class Antitokens {
 public:
-  Antotokens() = default;
+  Antitokens() = default;
 
   void reset(const bool &pvalid1, const bool &pvalid0, bool &kill1, bool &kill0,
              const bool &generateAt1, const bool &generateAt0, bool &stopValid);
@@ -362,7 +387,7 @@ private:
 
 class ForkSupport {
 public:
-  ForkSupport(unsigned size, unsigned datawidth = 0);
+  ForkSupport(unsigned size, unsigned datawidth);
 
   void resetDataless(ConsumerRW *ins, std::vector<ProducerRW *> &outs);
 
@@ -481,6 +506,7 @@ public:
                   mlir::DenseMap<Value, RW *> &subset);
 
   void reset() override;
+
   void exec(bool isClkRisingEdge) override;
 
   void printStates() override;
@@ -572,7 +598,6 @@ public:
 private:
   // parameters
   unsigned size;
-  ForkSupport forkSupport;
 
   // ports
   ConsumerRW *ins;
@@ -580,6 +605,8 @@ private:
 
   ConsumerData insData;
   std::vector<ProducerData> outsData;
+
+  ForkSupport forkSupport;
 };
 
 // Never used but let it be
@@ -686,10 +713,10 @@ private:
   std::vector<ConsumerData> insData;
   ProducerData outsData;
 
-  // merge dataless
+  // mux dataless
   bool tehbValid = false, tehbReady = false;
   ConsumerRW insTEHB;
-  // merge datafull
+  // mux datafull
   Data tehbDataIn;
 
   // internal components
@@ -796,8 +823,9 @@ public:
 
 private:
   // ports
-  ChannelConsumerRW *ins;
+  ConsumerRW *ins;
   ProducerRW outs;
+  ConsumerData insData;
   Data &outsData;
 };
 
@@ -847,7 +875,7 @@ private:
   bool ee = false, validInternal = false, kill0 = false, kill1 = false,
        antitokenStop = false, g0 = false, g1 = false;
   // internal components
-  Antotokens anti;
+  Antitokens anti;
 
   void selectExec();
 };
@@ -907,14 +935,22 @@ private:
 
   // latency parameters
   std::vector<ConsumerRW *> insJoin;
+
   ProducerRW outsJoin;
-  bool joinValid = false;
+
+  ConsumerRW insTEHB;
+  ProducerRW outsTEHB;
+
   unsigned counter = 0;
   bool hasData = false;
   Data tempData = APInt(bitwidth, 0);
 
   // internal components
   JoinSupport binJoin;
+  OEHBSupport binOEHB;
+
+  bool joinValid = false, buffValid = false, oehbReady = false,
+       oehbValid = false;
 };
 
 //===----------------------------------------------------------------------===//
@@ -923,7 +959,7 @@ private:
 
 class Simulator {
 public:
-  Simulator(handshake::FuncOp funcOp, unsigned cyclesLimit = 100);
+  Simulator(handshake::FuncOp funcOp, unsigned cyclesLimit = 100000);
 
   void reset();
 
@@ -936,6 +972,12 @@ public:
   // A temporary function
   void printModelStates();
 
+  // Get number of iterations
+  unsigned long getIterNum();
+
+  // Get the result of the simulation
+  Any getResData();
+
   ~Simulator();
 
 private:
@@ -943,11 +985,11 @@ private:
   handshake::FuncOp funcOp;
   // Results of the simulation
   bool resValid = false, resReady = true;
-  Data resData;
+  Data resData = {};
   // End operation to extract results
   handshake::EndOp endOp;
   // Number of iterations during the simulation
-  unsigned iterNum = 0;
+  unsigned long iterNum = 0;
   // Map for execution models
   mlir::DenseMap<Operation *, ExecutionModel *> opModels;
   // Map the stores RW API classes

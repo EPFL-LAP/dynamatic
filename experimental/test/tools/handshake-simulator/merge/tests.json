@@ -1,0 +1,5 @@
+[
+  { "arguments": [ "0" , "2", "3"], "results": [ "0" ], "iterations": 1 },
+  { "arguments": [ "778"], "results": [ "778" ], "iterations": 1 },
+  { "arguments": [ "1345" , "909", "3", "31296", "2319238", "318298", "2731"], "results": [ "1345" ], "iterations": 1 }
+]

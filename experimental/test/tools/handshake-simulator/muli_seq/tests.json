@@ -1,0 +1,6 @@
+[
+  { "arguments": [ "13", "34" ], "results": [ "-38434" ], "iterations": 9 },
+  { "arguments": [ "7", "80" ], "results": [ "-506118" ], "iterations": 9 },
+  { "arguments": [ "0", "0" ], "results": [ "0" ], "iterations": 9 },
+  { "arguments": [ "10000", "8903224" ], "results": [ "1344195760" ], "iterations": 9 }
+]

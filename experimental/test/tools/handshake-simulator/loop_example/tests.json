@@ -1,0 +1,11 @@
+[
+  { "arguments": [ "13", "100" ], "results": [ "470675084" ], "iterations": 602 },
+  { "arguments": [ "13", "0" ], "results": [ "13" ], "iterations": 2 },
+  { "arguments": [ "3", "100" ], "results": [ "-1699604298" ], "iterations": 602 },
+  { "arguments": [ "3", "99" ], "results": [ "106757690" ], "iterations": 596 },
+  { "arguments": [ "7", "1" ], "results": [ "94" ], "iterations": 8 },
+  { "arguments": [ "7", "2" ], "results": [ "9490" ], "iterations": 14 },
+  { "arguments": [ "7", "3" ], "results": [ "90126526" ], "iterations": 20 },
+  { "arguments": [ "2146524124", "10" ], "results": [ "762363564" ], "iterations": 62 },
+  { "arguments": [ "2146524124", "333" ], "results": [ "89179696" ], "iterations": 2000}
+]
