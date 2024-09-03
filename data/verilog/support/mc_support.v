@@ -390,9 +390,9 @@ module mc_control (
   // all requests completed
   input  allRequestsDone
 );
-  reg memIdle <= 1;
-  reg memDone <= 0;
-  reg memAckCtrl <= 0;
+  reg memIdle = 1;
+  reg memDone = 0;
+  reg memAckCtrl = 0;
 
   assign memStart_ready = memIdle;
   assign memEnd_valid   = memDone;
