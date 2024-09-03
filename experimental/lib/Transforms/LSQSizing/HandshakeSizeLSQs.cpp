@@ -250,26 +250,30 @@ std::unordered_map<unsigned, mlir::Operation *> HandshakeSizeLSQsPass::getPhiNod
 
   std::vector<mlir::Operation *> srcOps = std::vector<mlir::Operation *>(branchOps.size() + forkOps.size());
   std::merge(branchOps.begin(), branchOps.end(), forkOps.begin(), forkOps.end(), srcOps.begin());
-
+  
   // Insert start_node as a candidate for cases where there is only 1 bb (will be choosen anyway for other cases, but looks cleaner then special handling)
-  phiNodeCandidates.insert({startNode->getAttrOfType<IntegerAttr>("handshake.bb").getUInt(), {startNode}});
+  std::optional<unsigned> startNodeBB = getLogicBB(startNode);
+  assert(startNodeBB && "Start Node must belong to basic block");
+  phiNodeCandidates.insert({*startNodeBB, {startNode}});
   //llvm::dbgs() << "\t [DBG] Inserted Start Node: " << startNode->getAttrOfType<StringAttr>("handshake.name").str() << " for BB " << startNode->getAttrOfType<IntegerAttr>("handshake.bb").getUInt() << "\n";
 
   // Go trought all branch and fork ops and find connected ops
   for(auto &srcOp: srcOps) {
-    unsigned srcBB =srcOp->getAttrOfType<IntegerAttr>("handshake.bb").getUInt();
+    std::optional<unsigned> srcBB = getLogicBB(srcOp);
+    assert(srcBB && "Src Op must belong to basic block");    
     //llvm::dbgs() << "\t [DBG] Branch Op: " << branchOp->getAttrOfType<StringAttr>("handshake.name").str() << " of BB " << srcBB <<"\n";
 
     // For each connected Op, check if its in a different BB and add it to the candidates
     for(auto &destOp: graph.getConnectedOps(srcOp)) {
-      unsigned destBB = destOp->getAttrOfType<IntegerAttr>("handshake.bb").getUInt();
+      std::optional<unsigned> destBB = getLogicBB(destOp);
+      assert(destBB && "Dest Op must belong to basic block");  
       //llvm::dbgs() << "\t\t [DBG] connected to: " << destOp->getAttrOfType<StringAttr>("handshake.name").str() << " of BB" << destBB << "\n";
-      if(destBB != srcBB) {
+      if(*destBB != *srcBB) {
         //llvm::dbgs() << "\t [DBG] Found Phi Node Candidate: " << destOp->getAttrOfType<StringAttr>("handshake.name").str() << " for BB " << destBB << "\n";
-        if(phiNodeCandidates.find(destBB) == phiNodeCandidates.end()) {
-          phiNodeCandidates.insert({destBB, std::vector<mlir::Operation *>()});
+        if(phiNodeCandidates.find(*destBB) == phiNodeCandidates.end()) {
+          phiNodeCandidates.insert({*destBB, std::vector<mlir::Operation *>()});
         }
-        phiNodeCandidates.at(destBB).push_back(destOp);
+        phiNodeCandidates.at(*destBB).push_back(destOp);
       }
     }
   }
@@ -303,9 +307,10 @@ std::unordered_map<mlir::Operation *, int> HandshakeSizeLSQsPass::getAllocTimes(
   
   // Go trough all ops and find the latency to the phi node of the ops BB
   for(auto &op: ops) {
-    int bb = op->getAttrOfType<IntegerAttr>("handshake.bb").getUInt();
-    llvm::dbgs() << "\t\t [DBG] " << getUniqueName(op).str() << " BB: " << bb << "\n";
-    mlir::Operation *phiNode = phiNodes[op->getAttrOfType<IntegerAttr>("handshake.bb").getUInt()];
+    std::optional<unsigned> bb = getLogicBB(op);
+    assert(bb && "Load/Store Op must belong to basic block");
+    llvm::dbgs() << "\t\t [DBG] " << getUniqueName(op).str() << " BB: " << *bb << "\n";
+    mlir::Operation *phiNode = phiNodes[*bb];
     assert(phiNode && "Phi node not found for BB");
     int latency = graph.findMinPathLatency(startNode, phiNode, true); //TODO ignore backedges?
     allocTimes.insert({op, latency});
@@ -416,8 +421,9 @@ std::unordered_map<mlir::Operation*, unsigned> HandshakeSizeLSQsPass::calcQueueS
 
 void HandshakeSizeLSQsPass::insertAllocPrecedesMemoryAccessEdges(AdjListGraph &graph, std::vector<mlir::Operation *> ops, std::unordered_map<unsigned, mlir::Operation *> phiNodes) {
   for(auto &op: ops) {
-    unsigned bb = op->getAttrOfType<IntegerAttr>("handshake.bb").getUInt();
-    mlir::Operation *phiNode = phiNodes[bb];
+    std::optional<unsigned> bb = getLogicBB(op);
+    assert(bb && "Load/Store Op must belong to basic block");
+    mlir::Operation *phiNode = phiNodes[*bb];
     graph.addEdge(phiNode, op);
     llvm::dbgs() << " [DBG] Added edge from " << getUniqueName(phiNode).str() << " to " << getUniqueName(op).str() << "\n";
   }
