@@ -265,6 +265,70 @@ static void constructGroupsGraph(SmallVector<Operation *> &operations,
   }
 }
 
+/// Minimizes the connections between groups based on dominance info. Let's
+/// consider the graph
+///
+/// B -> C -> D
+/// |         ^
+/// |---------|
+///
+/// having B, C and D as groups, B being predecessor of both C and D, C of D.
+/// Since C has to wait for B to be done, and D has to wait for C to be done,
+/// there is no point in D waiting for C to be done. For this reason, the graph
+/// can be simplified, saving and edge:
+///
+/// B -> C -> D
+static void minimizeGroupsConnections(DenseSet<Group *> &groupsGraph) {
+
+  // Get the dominance info for the region
+  DominanceInfo domInfo;
+
+  // For each group, compare all the pairs of its predecessors. Cut the edge
+  // between them iff the predecessor with the bigger index dominates the whole
+  // group
+  for (auto &group : groupsGraph) {
+    // List of predecessors to remove
+    DenseSet<Group *> predsToRemove;
+    for (auto &bp : group->preds) {
+      // If the big predecessor is alreay in the list to remove, ignore it
+      if (llvm::find(predsToRemove, bp) != predsToRemove.end())
+        continue;
+      for (auto &sp : group->preds) {
+        // If the small predecessor has bigger index than the big predecessor,
+        // ignore it
+        if (lessThanBlocks(bp->bb, sp->bb))
+          continue;
+        // If the small predecessor is alreay in the list to remove, ignore it
+        if (llvm::find(predsToRemove, sp) != predsToRemove.end())
+          continue;
+        // if we are considering the same elements, ignore them
+        if (sp->bb == bp->bb)
+          continue;
+
+        // Add the small predecessors to the list of elements to remove in
+        // case the big predecessor has the small one among its
+        // predecessors, and the big precessor's BB properly dominates the
+        // BB of the group currently under analysis
+        if ((bp->preds.find(sp) != bp->preds.end()) &&
+            domInfo.properlyDominates(bp->bb, group->bb)) {
+          llvm::dbgs() << "removing ";
+          sp->bb->printAsOperand(llvm::dbgs());
+          llvm::dbgs() << " from ";
+          group->bb->printAsOperand(llvm::dbgs());
+          llvm::dbgs() << "\n";
+          predsToRemove.insert(sp);
+        }
+        llvm::dbgs() << "\n";
+      }
+    }
+
+    for (auto *pred : predsToRemove) {
+      group->preds.erase(pred);
+      pred->succs.erase(group);
+    }
+  }
+}
+
 // --- End helper functions ---
 
 using ArgReplacements = DenseMap<BlockArgument, OpResult>;
@@ -284,8 +348,8 @@ LogicalResult FtdLowerFuncToHandshake::matchAndRewrite(
       memrefToArgIdx.insert({arg, idx});
   }
 
-  // First lower the parent function itself, without modifying its body (except
-  // the block arguments and terminators)
+  // First lower the parent function itself, without modifying its body
+  // (except the block arguments and terminators)
   auto funcOrFailure = lowerSignature(lowerFuncOp, rewriter);
   if (failed(funcOrFailure))
     return failure();
@@ -293,8 +357,12 @@ LogicalResult FtdLowerFuncToHandshake::matchAndRewrite(
   if (funcOp.isExternal())
     return success();
 
-  // Stores mapping from each value that passes through a merge-like operation
-  // to the data result of that merge operation
+  // Get the initial start signal, which is the last argument of the
+  // function
+  auto startValue = (Value)funcOp.getArguments().back();
+
+  // Stores mapping from each value that passes through a merge-like
+  // operation to the data result of that merge operation
   ArgReplacements argReplacements;
   addMergeOps(funcOp, rewriter, argReplacements);
   addBranchOps(funcOp, rewriter);
@@ -307,8 +375,8 @@ LogicalResult FtdLowerFuncToHandshake::matchAndRewrite(
                               memInfo)))
     return failure();
 
-  // First round of bb-tagging so that newly inserted Dynamatic memory ports get
-  // tagged with the BB they belong to (required by memory interface
+  // First round of bb-tagging so that newly inserted Dynamatic memory ports
+  // get tagged with the BB they belong to (required by memory interface
   // instantiation logic)
   idBasicBlocks(funcOp, rewriter);
 
@@ -331,12 +399,14 @@ LogicalResult FtdLowerFuncToHandshake::ftdVerifyAndCreateMemInterfaces(
   if (memInfo.empty())
     return success();
 
-  // Create a mapping between each block and all the other blocks it properly
-  // dominates so that we can quickly determine whether LSQ groups make sense
+  // Create a mapping between each block and all the other blocks it
+  // properly dominates so that we can quickly determine whether LSQ groups
+  // make sense
   DominanceInfo domInfo;
   DenseMap<Block *, DenseSet<Block *>> dominations;
   for (Block &maybeDominator : funcOp) {
-    // Start with an empty set of dominated blocks for each potential dominator
+    // Start with an empty set of dominated blocks for each potential
+    // dominator
     dominations[&maybeDominator] = {};
     for (Block &maybeDominated : funcOp) {
       if (&maybeDominator == &maybeDominated)
@@ -355,8 +425,8 @@ LogicalResult FtdLowerFuncToHandshake::ftdVerifyAndCreateMemInterfaces(
   if (std::distance(returns.begin(), returns.end()) == 1) {
     ctrlEnd = getBlockControl((*returns.begin())->getBlock());
   } else {
-    // Merge the control signals of all blocks with a return to create a control
-    // representing the final control flow decision
+    // Merge the control signals of all blocks with a return to create a
+    // control representing the final control flow decision
     SmallVector<Value> controls;
     func::ReturnOp lastRetOp;
     for (func::ReturnOp retOp : returns) {
@@ -368,8 +438,8 @@ LogicalResult FtdLowerFuncToHandshake::ftdVerifyAndCreateMemInterfaces(
         rewriter.create<handshake::MergeOp>(lastRetOp.getLoc(), controls);
     ctrlEnd = mergeOp.getResult();
 
-    // The merge goes into an extra "end block" after all others, this will be
-    // where the function end terminator will be located as well
+    // The merge goes into an extra "end block" after all others, this will
+    // be where the function end terminator will be located as well
     mergeOp->setAttr(BB_ATTR_NAME,
                      rewriter.getUI32IntegerAttr(funcOp.getBlocks().size()));
   }
@@ -393,8 +463,8 @@ LogicalResult FtdLowerFuncToHandshake::ftdVerifyAndCreateMemInterfaces(
         memBuilder.addMCPort(mcOp);
     }
 
-    // Determine LSQ group validity and add ports the the interface builder at
-    // the same time
+    // Determine LSQ group validity and add ports the the interface builder
+    // at the same time
     for (auto &[group, groupOps] : memAccesses.lsqPorts) {
       assert(!groupOps.empty() && "group cannot be empty");
 
@@ -403,8 +473,9 @@ LogicalResult FtdLowerFuncToHandshake::ftdVerifyAndCreateMemInterfaces(
       for (Operation *op : groupOps)
         opsPerBlock[op->getBlock()].push_back(op);
 
-      // Check whether there is a clear "linear dominance" relationship between
-      // all blocks, and derive a port ordering for the group from it
+      // Check whether there is a clear "linear dominance" relationship
+      // between all blocks, and derive a port ordering for the group from
+      // it
       SmallVector<Block *> order;
       if (failed(computeLinearDominance(dominations, opsPerBlock, order)))
         return failure();
@@ -412,13 +483,15 @@ LogicalResult FtdLowerFuncToHandshake::ftdVerifyAndCreateMemInterfaces(
       // Verify that no two groups have the same control signal
       if (auto [_, newCtrl] = controlBlocks.insert(order.front()); !newCtrl)
         return groupOps.front()->emitError()
-               << "Inconsistent LSQ group for memory interface the operation "
-                  "references. No two groups can have the same control signal.";
+               << "Inconsistent LSQ group for memory interface the "
+                  "operation "
+                  "references. No two groups can have the same control "
+                  "signal.";
 
-      // Add all group ports in the correct order to the builder. Within each
-      // block operations are naturally in program order since we always use
-      // ordered maps and iterated over the operations in program order to begin
-      // with
+      // Add all group ports in the correct order to the builder. Within
+      // each block operations are naturally in program order since we
+      // always use ordered maps and iterated over the operations in program
+      // order to begin with
       for (Block *block : order) {
         for (Operation *lsqOp : opsPerBlock[block])
           memBuilder.addLSQPort(group, lsqOp);
@@ -427,10 +500,10 @@ LogicalResult FtdLowerFuncToHandshake::ftdVerifyAndCreateMemInterfaces(
 
     // Build the memory interfaces.
     // If the memory accesses require an LSQ, then the Fast Load-Store queue
-    // allocation method from FPGA'23 is used. In particular, first the groups
-    // allocation is performed together with the creation of the fork graph.
-    // Afterwards, the FTD methodology is used to interconnect the elements
-    // correctly.
+    // allocation method from FPGA'23 is used. In particular, first the
+    // groups allocation is performed together with the creation of the fork
+    // graph. Afterwards, the FTD methodology is used to interconnect the
+    // elements correctly.
     if (memAccesses.lsqPorts.size() > 0) {
       // Get all the operations associated to an LSQ
       SmallVector<Operation *> allOperations =
@@ -447,9 +520,11 @@ LogicalResult FtdLowerFuncToHandshake::ftdVerifyAndCreateMemInterfaces(
       for (auto &dep : allMemDeps)
         dep.printDependency();
 
-      /// Stores the Groups graph required for the allocation network analysis
+      /// Stores the Groups graph required for the allocation network
+      /// analysis
       DenseSet<Group *> groupsGraph;
       constructGroupsGraph(allOperations, allMemDeps, groupsGraph);
+      minimizeGroupsConnections(groupsGraph);
 
       for (auto &g : groupsGraph)
         g->printDependenices();
@@ -471,18 +546,19 @@ void FtdLowerFuncToHandshake::identifyMemoryDependencies(
     SmallVector<ProdConsMemDep> &allMemDeps,
     const mlir::CFGLoopInfo &li) const {
 
-  // Given all the operations which are assigned to an LSQ, loop over them and
-  // skip those which are not memory operations
+  // Given all the operations which are assigned to an LSQ, loop over them
+  // and skip those which are not memory operations
   for (Operation *i : operations) {
 
     if (!isHandhsakeLSQOperation(i)) {
       continue;
     }
 
-    // Loop over all the other operations in the LSQ. There is no dependency in
-    // the following cases:
+    // Loop over all the other operations in the LSQ. There is no dependency
+    // in the following cases:
     // 1. One of them is not a memory operation;
-    // 2. The two operation are in the same group, thus they are in the same BB;
+    // 2. The two operation are in the same group, thus they are in the same
+    // BB;
     // 3. They are both load operations;
     // 4. The operations are mutually exclusive (i.e. there is no path which
     // goes from i to j and vice-versa);
@@ -496,7 +572,8 @@ void FtdLowerFuncToHandshake::identifyMemoryDependencies(
       Block *bbI = i->getBlock();
       Block *bbJ = j->getBlock();
 
-      // If the relationship was already present, then skip the pairs of blocks
+      // If the relationship was already present, then skip the pairs of
+      // blocks
       auto *it = llvm::find_if(allMemDeps, [bbI, bbJ](ProdConsMemDep p) {
         return p.prodBb == bbJ && p.consBb == bbI;
       });
@@ -504,10 +581,10 @@ void FtdLowerFuncToHandshake::identifyMemoryDependencies(
       if (it != allMemDeps.end())
         continue;
 
-      // Insert a dependency only if index _j is smaller than index _i: in this
-      // case i is the producer, j is the consumer. If this doesn't hold, the
-      // dependency will be added when the two blocks are analyzed in the
-      // opposite direction
+      // Insert a dependency only if index _j is smaller than index _i: in
+      // this case i is the producer, j is the consumer. If this doesn't
+      // hold, the dependency will be added when the two blocks are analyzed
+      // in the opposite direction
       if (lessThanBlocks(bbJ, bbI)) {
 
         // bbI is the producer, bbJ is the consumer: create a new dependency
@@ -515,8 +592,8 @@ void FtdLowerFuncToHandshake::identifyMemoryDependencies(
         ProdConsMemDep oneMemDep(bbJ, bbI, false);
         allMemDeps.push_back(oneMemDep);
 
-        // If the two blocks are in the same loop, then bbI is also a consumer,
-        // while bbJ is a producer. This relationship is backward.
+        // If the two blocks are in the same loop, then bbI is also a
+        // consumer, while bbJ is a producer. This relationship is backward.
         if (isSameLoopBlocks(bbI, bbJ, li)) {
           ProdConsMemDep opp(bbI, bbJ, true);
           allMemDeps.push_back(opp);
