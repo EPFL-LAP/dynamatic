@@ -6,8 +6,6 @@
 #include "dynamatic/Dialect/Handshake/HandshakeOps.h"
 #include "dynamatic/Dialect/Handshake/HandshakeAttributes.h"
 
-
-#include <unordered_set>
 #include <stack>
 #include <set>
 
@@ -21,6 +19,7 @@ using namespace dynamatic::experimental::lsqsizing;
 // 1. If the operation is in the timingDB, the latency is extracted from the timingDB
 // 2. If the operation is a buffer operation, the latency is extracted from the timing attribute
 // 3. If the operation is neither, then its latency is set to 0
+// TODO cleanup after handshake dialect/component.json mismatch is fixed
 int extractNodeLatency(mlir::Operation *op, TimingDatabase timingDB) {
   double latency = 0;
 
@@ -339,6 +338,7 @@ int AdjListGraph::findMaxPathLatency(mlir::Operation *startOp, mlir::Operation *
   // Iterate over all paths and keep track of the path with the highest latency
   for(auto &path: paths)
   {
+    // TODO cleanup after everything is verified (std::max instead of if statement)
     int latency = getPathLatency(path);
     if(maxLatency < latency) {
       maxLatency = latency;

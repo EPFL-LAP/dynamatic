@@ -20,7 +20,6 @@
 #include "llvm/Support/Debug.h"
 #include "dynamatic/Transforms/BufferPlacement/CFDFC.h"
 #include "dynamatic/Support/TimingModels.h"
-#include "llvm/ADT/DenseMap.h"
 #include "mlir/Pass/PassManager.h"
 #include "mlir/IR/Value.h"
 #include "experimental/Transforms/LSQSizing/LSQSizingSupport.h"
@@ -36,7 +35,7 @@ using namespace dynamatic::handshake;
 using namespace dynamatic::experimental;
 using namespace dynamatic::experimental::lsqsizing;
 
-using LSQSizingResult = mlir::DenseMap<mlir::Operation*, std::tuple<unsigned, unsigned>>; //TUPLE: <load_size, store_size>
+using LSQSizingResult = std::unordered_map<mlir::Operation*, std::tuple<unsigned, unsigned>>; //TUPLE: <load_size, store_size>
 
 namespace {
 
@@ -181,7 +180,6 @@ std::optional<LSQSizingResult> HandshakeSizeLSQsPass::sizeLSQsForGraph(AdjListGr
 
   // connect all phi nodes to the lsq ps in their BB
   insertAllocPrecedesMemoryAccessEdges(graph, loadOps, phiNodes);  
-  //insertLoadStoreEdge(graph, loadOps, storeOps);
 
   llvm::dbgs() << "============================\n";
   graph.printGraph();
@@ -236,12 +234,6 @@ mlir::Operation * HandshakeSizeLSQsPass::findStartNode(AdjListGraph graph) {
     std::vector<std::string> path = graph.findLongestNonCyclicPath(op);
     maxLatencies.insert({op, graph.getPathLatency(path)});
     nodeCounts.insert({op, path.size()});
-
-    /*llvm::dbgs() << "\t [DBG] Longest path from " << op->getAttrOfType<StringAttr>("handshake.name").str() << " lat: " << graph.getPathLatency(path) << " : ";
-    for(auto &node: path) {
-      llvm::dbgs() << node << " ";
-    }
-    llvm::dbgs() << "\n";*/
   }
 
   // Find the node with the highest latency, if there are multiple, choose the one with the most nodes
