@@ -24,12 +24,12 @@ int extractNodeLatency(mlir::Operation *op, TimingDatabase timingDB) {
   if(op->getName().getStringRef() == "handshake.buffer") { // TODO use some build in class method instead of name?
     auto params = op->getAttrOfType<DictionaryAttr>(RTL_PARAMETERS_ATTR_NAME);
     if (!params) {
-      llvm::dbgs() << "BufferOp" << op->getAttrOfType<StringAttr>("handshake.name").str() << " does not have parameters\n";
+      llvm::dbgs() << "BufferOp" << getUniqueName(op).str() << " does not have parameters\n";
     }
 
     auto optTiming = params.getNamed(handshake::BufferOp::TIMING_ATTR_NAME);
     if (!optTiming) {
-      llvm::dbgs() << "BufferOp" << op->getAttrOfType<StringAttr>("handshake.name").str() << " does not have timing\n";
+      llvm::dbgs() << "BufferOp" << getUniqueName(op).str() << " does not have timing\n";
     }
 
     if (auto timing =dyn_cast<handshake::TimingAttr>(optTiming->getValue())) {
@@ -138,15 +138,15 @@ AdjListGraph::AdjListGraph(handshake::FuncOp funcOp, llvm::SetVector<unsigned> c
 
 
 void AdjListGraph::addNode(mlir::Operation *op, int latency) {
-    nodes.insert({op->getAttrOfType<StringAttr>("handshake.name").str(), AdjListNode{latency, op, {}, {}}});
+    nodes.insert({getUniqueName(op).str(), AdjListNode{latency, op, {}, {}}});
 }
 
 void AdjListGraph::addEdge(mlir::Operation * src, mlir::Operation * dest) {
-    nodes.at(src->getAttrOfType<StringAttr>("handshake.name").str()).edges.push_back(dest->getAttrOfType<StringAttr>("handshake.name").str()); // Add edge from node u to node v
+    nodes.at(getUniqueName(src).str()).edges.push_back(getUniqueName(dest).str()); // Add edge from node u to node v
 }
 
 void AdjListGraph::addBackedge(mlir::Operation * src, mlir::Operation * dest) {
-    nodes.at(src->getAttrOfType<StringAttr>("handshake.name").str()).backedges.push_back(dest->getAttrOfType<StringAttr>("handshake.name").str()); // Add edge from node u to node v
+    nodes.at(getUniqueName(src).str()).backedges.push_back(getUniqueName(dest).str()); // Add edge from node u to node v
 }
 
 void AdjListGraph::addChannelEdges(mlir::Value res) {
@@ -191,8 +191,8 @@ void AdjListGraph::printPath(std::vector<std::string> path) {
 
 void AdjListGraph::insertArtificialNodeOnBackedge(mlir::Operation* src, mlir::Operation* dest, int latency) {
   // create new node name from src and dest name
-  std::string srcName = src->getAttrOfType<StringAttr>("handshake.name").str();
-  std::string destName = dest->getAttrOfType<StringAttr>("handshake.name").str();
+  std::string srcName = getUniqueName(src).str();
+  std::string destName = getUniqueName(dest).str();
   std::string newNodeName = "backedge_" + srcName + "_" + destName;
 
   //remove regular edge from src to dest
@@ -252,13 +252,13 @@ std::vector<std::vector<std::string>> AdjListGraph::findPaths(std::string start,
 
 std::vector<std::vector<std::string>> AdjListGraph::findPaths(mlir::Operation *startOp, mlir::Operation *endOp, bool ignoreBackedge) {
   assert(startOp && endOp && "Start and end operations must not be null");
-  llvm::dbgs() << "Finding paths from " << startOp->getAttrOfType<StringAttr>("handshake.name").str() << " to " << endOp->getAttrOfType<StringAttr>("handshake.name").str() << "\n";
-  return findPaths(startOp->getAttrOfType<StringAttr>("handshake.name").str(), endOp->getAttrOfType<StringAttr>("handshake.name").str(), ignoreBackedge);
+  llvm::dbgs() << "Finding paths from " << getUniqueName(startOp).str() << " to " << getUniqueName(endOp).str() << "\n";
+  return findPaths(getUniqueName(startOp).str(), getUniqueName(endOp).str(), ignoreBackedge);
 }
 
 
 std::vector<std::string> AdjListGraph::findLongestNonCyclicPath(mlir::Operation *startOp) {
-  std::string start = startOp->getAttrOfType<StringAttr>("handshake.name").str();
+  std::string start = getUniqueName(startOp).str();
   std::vector<std::string> path;
   std::stack<std::pair<std::vector<std::string>, std::set<std::string>>> pathStack;
   int maxLatency = 0;
@@ -346,7 +346,7 @@ int AdjListGraph::findMinPathLatency(mlir::Operation *startOp, mlir::Operation *
 
 std::vector<mlir::Operation*> AdjListGraph::getConnectedOps(mlir::Operation *op) {
   std::vector<mlir::Operation*> connectedOps;
-  std::string opName = op->getAttrOfType<StringAttr>("handshake.name").str();
+  std::string opName = getUniqueName(op).str();
 
   for(auto &node: nodes.at(opName).edges) {
     connectedOps.push_back(nodes.at(node).op);

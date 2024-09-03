@@ -122,7 +122,7 @@ void HandshakeSizeLSQsPass::runDynamaticPass() {
       mlir::Operation *lsqOp = maxLoadStoreSize.first;
       unsigned maxLoadSize = std::get<0>(maxLoadStoreSize.second);
       unsigned maxStoreSize = std::get<1>(maxLoadStoreSize.second);
-      llvm::dbgs() << " [DBG] final LSQ " << lsqOp->getAttrOfType<StringAttr>("handshake.name").str() << " Max Load Size: " << maxLoadSize << " Max Store Size: " << maxStoreSize << "\n";
+      llvm::dbgs() << " [DBG] final LSQ " << getUniqueName(lsqOp).str() << " Max Load Size: " << maxLoadSize << " Max Store Size: " << maxStoreSize << "\n";
 
       handshake::LSQSizeAttr lsqSizeAttr = handshake::LSQSizeAttr::get(mod.getContext(), maxLoadSize, maxStoreSize);
       setDialectAttr(lsqOp, lsqSizeAttr);
@@ -146,7 +146,7 @@ LSQSizingResult HandshakeSizeLSQsPass::sizeLSQsForGraph(AdjListGraph graph, unsi
 
   // Find starting node, which will be the reference to the rest
   mlir::Operation * startNode = findStartNode(graph);
-  llvm::dbgs() << "\t [DBG] Start Node: " << startNode->getAttrOfType<StringAttr>("handshake.name").str()<< "\n";
+  llvm::dbgs() << "\t [DBG] Start Node: " << getUniqueName(startNode).str() << "\n";
   
   // Find Phi node of each BB
   std::unordered_map<unsigned, mlir::Operation *> phiNodes = getPhiNodes(graph, startNode);
@@ -184,7 +184,7 @@ LSQSizingResult HandshakeSizeLSQsPass::sizeLSQsForGraph(AdjListGraph graph, unsi
   }
 
   for(auto &entry: result) {
-    llvm::dbgs() << "\t [DBG] LSQ " << entry.first->getAttrOfType<StringAttr>("handshake.name").str() << " Load Size: " << std::get<0>(entry.second) << " Store Size: " << std::get<1>(entry.second) << "\n";
+    llvm::dbgs() << "\t [DBG] LSQ " << getUniqueName(entry.first).str() << " Load Size: " << std::get<0>(entry.second) << " Store Size: " << std::get<1>(entry.second) << "\n";
   }
 
   return result;
@@ -291,7 +291,7 @@ std::unordered_map<unsigned, mlir::Operation *> HandshakeSizeLSQsPass::getPhiNod
   }
 
   for(auto &nodes: phiNodes) {
-    llvm::dbgs() << "\t [DBG] Phi Node for BB " << nodes.first << ": " << nodes.second->getAttrOfType<StringAttr>("handshake.name").str() << "\n";
+    llvm::dbgs() << "\t [DBG] Phi Node for BB " << nodes.first << ": " << getUniqueName(nodes.second).str() << "\n";
   }
 
   return phiNodes;
@@ -304,12 +304,12 @@ std::unordered_map<mlir::Operation *, int> HandshakeSizeLSQsPass::getAllocTimes(
   // Go trough all ops and find the latency to the phi node of the ops BB
   for(auto &op: ops) {
     int bb = op->getAttrOfType<IntegerAttr>("handshake.bb").getUInt();
-    llvm::dbgs() << "\t\t [DBG] " << op->getAttrOfType<StringAttr>("handshake.name").str() << " BB: " << bb << "\n";
+    llvm::dbgs() << "\t\t [DBG] " << getUniqueName(op).str() << " BB: " << bb << "\n";
     mlir::Operation *phiNode = phiNodes[op->getAttrOfType<IntegerAttr>("handshake.bb").getUInt()];
     assert(phiNode && "Phi node not found for BB");
     int latency = graph.findMinPathLatency(startNode, phiNode, true); //TODO ignore backedges?
     allocTimes.insert({op, latency});
-    llvm::dbgs() << "\t\t [DBG] " << op->getAttrOfType<StringAttr>("handshake.name").str() << " alloc time: " << latency << "\n";
+    llvm::dbgs() << "\t\t [DBG] " << getUniqueName(op).str() << " alloc time: " << latency << "\n";
   }
   return allocTimes;
 }
@@ -321,7 +321,7 @@ std::unordered_map<mlir::Operation *, int> HandshakeSizeLSQsPass::getDeallocTime
   for(auto &op: ops) {
     int latency = graph.findMaxPathLatency(startNode, op);
     deallocTimes.insert({op, latency});
-    llvm::dbgs() << "\t\t [DBG] " << op->getAttrOfType<StringAttr>("handshake.name").str() << " dealloc time: " << latency << "\n";
+    llvm::dbgs() << "\t\t [DBG] " << getUniqueName(op).str() << " dealloc time: " << latency << "\n";
   }
   return deallocTimes;
 }
@@ -419,7 +419,7 @@ void HandshakeSizeLSQsPass::insertAllocPrecedesMemoryAccessEdges(AdjListGraph &g
     unsigned bb = op->getAttrOfType<IntegerAttr>("handshake.bb").getUInt();
     mlir::Operation *phiNode = phiNodes[bb];
     graph.addEdge(phiNode, op);
-    llvm::dbgs() << " [DBG] Added edge from " << phiNode->getAttrOfType<StringAttr>("handshake.name").str() << " to " << op->getAttrOfType<StringAttr>("handshake.name").str() << "\n";
+    llvm::dbgs() << " [DBG] Added edge from " << getUniqueName(phiNode).str() << " to " << getUniqueName(op).str() << "\n";
   }
 }
 
@@ -443,8 +443,8 @@ void HandshakeSizeLSQsPass::insertLoadStoreEdge(AdjListGraph &graph, std::vector
       for(Operation *destOp: storeOp->getUsers()) {
         if(destOp == LsqOp) {
           graph.addEdge(storeOp, loadOp);
-          llvm::dbgs() << " [DBG] Added edge from " << storeOp->getAttrOfType<StringAttr>("handshake.name").str() << " to " << loadOp->getAttrOfType<StringAttr>("handshake.name").str()
-          << " for LSQ:" << LsqOp->getAttrOfType<StringAttr>("handshake.name") << "\n";
+          llvm::dbgs() << " [DBG] Added edge from " << getUniqueName(storeOp).str() << " to " << getUniqueName(loadOp).str()
+          << " for LSQ:" << getUniqueName(LsqOp).str() << "\n";
           break;
         }
       }
