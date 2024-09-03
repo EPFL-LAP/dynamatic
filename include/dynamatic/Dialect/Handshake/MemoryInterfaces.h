@@ -39,7 +39,7 @@ class MemoryOpLowering {
 public:
   /// Constructs an instance of the class from a reference to a naming analysis
   /// that encompasses all memory accesses that are going to be replaced.
-  MemoryOpLowering(NameAnalysis &namer) : namer(namer) {};
+  MemoryOpLowering(NameAnalysis &namer) : namer(namer){};
 
   /// Records a replacement from the old operation to the new operation (both
   /// are meant to be memory accesses), naming both in the process if they were
@@ -92,7 +92,7 @@ public:
                          Value ctrlEnd,
                          const DenseMap<unsigned, Value> &ctrlVals)
       : funcOp(funcOp), memref(memref), memStart(memStart), ctrlEnd(ctrlEnd),
-        ctrlVals(ctrlVals) {};
+        ctrlVals(ctrlVals){};
 
   /// Adds an access port to an MC. The operation must be a load or store
   /// access to an MC. The operation must be tagged with the basic block it
@@ -132,7 +132,7 @@ public:
   /// constant operation in the IR after the provided control signal.
   static Value getMCControl(Value ctrl, unsigned numStores, OpBuilder &builder);
 
-private:
+protected:
   /// Wraps all inputs for instantiating an MC and/or an LSQ for the recorded
   /// memory ports. An empty list of inputs for the MC indicates that no MC is
   /// necessary for the recorded ports. The same is true for the LSQ.

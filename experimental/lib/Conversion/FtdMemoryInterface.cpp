@@ -1,0 +1,280 @@
+//===- FtdMemoryInterfaces.cpp - FTD Memory interface helpers ----------*- C++
+//-*-===//
+//
+// Dynamatic is under the Apache License v2.0 with LLVM Exceptions.
+// See https://llvm.org/LICENSE.txt for license information.
+// SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
+//
+//===----------------------------------------------------------------------===//
+//
+// Implements support to work with Handshake memory interfaces.
+//
+//===----------------------------------------------------------------------===//
+
+#include <utility>
+
+#include "dynamatic/Dialect/Handshake/HandshakeOps.h"
+#include "dynamatic/Dialect/Handshake/MemoryInterfaces.h"
+#include "dynamatic/Support/Backedge.h"
+#include "dynamatic/Support/CFG.h"
+#include "experimental/Conversion/FtdMemoryInterface.h"
+#include "mlir/Dialect/MemRef/IR/MemRef.h"
+#include "mlir/IR/Location.h"
+#include "mlir/IR/Operation.h"
+#include "mlir/IR/Value.h"
+#include "llvm/ADT/SmallVector.h"
+
+using namespace llvm;
+using namespace mlir;
+using namespace dynamatic;
+using namespace dynamatic::handshake;
+
+using namespace mlir;
+using namespace dynamatic;
+
+namespace dynamatic {
+namespace experimental {
+namespace ftd {
+
+LogicalResult FtdMemoryInterfaceBuilder::instantiateInterfacesWithForks(
+    OpBuilder &builder, handshake::MemoryControllerOp &mcOp,
+    handshake::LSQOp &lsqOp, DenseSet<Group *> &groups,
+    DenseMap<Block *, Operation *> &forksGraph, Value start,
+    SmallVector<Operation *> &alloctionNetwork) {
+
+  // Determine interfaces' inputs
+  InterfaceInputs inputs;
+
+  if (failed(determineInterfaceInputsWithForks(
+          inputs, builder, groups, forksGraph, start, alloctionNetwork)))
+    return failure();
+  if (inputs.mcInputs.empty() && inputs.lsqInputs.empty())
+    return success();
+  mcOp = nullptr;
+  lsqOp = nullptr;
+
+  builder.setInsertionPointToStart(&funcOp.front());
+  Location loc = memref.getLoc();
+
+  if (!inputs.mcInputs.empty() && inputs.lsqInputs.empty()) {
+    // We only need a memory controller
+    mcOp = builder.create<handshake::MemoryControllerOp>(
+        loc, memref, memStart, inputs.mcInputs, ctrlEnd, inputs.mcBlocks,
+        mcNumLoads);
+  } else if (inputs.mcInputs.empty() && !inputs.lsqInputs.empty()) {
+    // We only need an LSQ
+    lsqOp = builder.create<handshake::LSQOp>(loc, memref, memStart,
+                                             inputs.lsqInputs, ctrlEnd,
+                                             inputs.lsqGroupSizes, lsqNumLoads);
+  } else {
+    // We need a MC and an LSQ. They need to be connected with 4 new channels
+    // so that the LSQ can forward its loads and stores to the MC. We need
+    // load address, store address, and store data channels from the LSQ to
+    // the MC and a load data channel from the MC to the LSQ
+    MemRefType memrefType = memref.getType().cast<MemRefType>();
+
+    // Create 3 backedges (load address, store address, store data) for the MC
+    // inputs that will eventually come from the LSQ.
+    BackedgeBuilder edgeBuilder(builder, loc);
+    Backedge ldAddr = edgeBuilder.get(builder.getIndexType());
+    Backedge stAddr = edgeBuilder.get(builder.getIndexType());
+    Backedge stData = edgeBuilder.get(memrefType.getElementType());
+    inputs.mcInputs.push_back(ldAddr);
+    inputs.mcInputs.push_back(stAddr);
+    inputs.mcInputs.push_back(stData);
+
+    // Create the memory controller, adding 1 to its load count so that it
+    // generates a load data result for the LSQ
+    mcOp = builder.create<handshake::MemoryControllerOp>(
+        loc, memref, memStart, inputs.mcInputs, ctrlEnd, inputs.mcBlocks,
+        mcNumLoads + 1);
+
+    // Add the MC's load data result to the LSQ's inputs and create the LSQ,
+    // passing a flag to the builder so that it generates the necessary
+    // outputs that will go to the MC
+    inputs.lsqInputs.push_back(mcOp.getOutputs().back());
+    lsqOp = builder.create<handshake::LSQOp>(loc, mcOp, inputs.lsqInputs,
+                                             inputs.lsqGroupSizes, lsqNumLoads);
+
+    // Resolve the backedges to fully connect the MC and LSQ
+    ValueRange lsqMemResults = lsqOp.getOutputs().take_back(3);
+    ldAddr.setValue(lsqMemResults[0]);
+    stAddr.setValue(lsqMemResults[1]);
+    stData.setValue(lsqMemResults[2]);
+  }
+
+  // At this point, all load ports are missing their second operand which is the
+  // data value coming from a memory interface back to the port
+  if (mcOp)
+    addMemDataResultToLoads(mcPorts, mcOp);
+  if (lsqOp)
+    addMemDataResultToLoads(lsqPorts, lsqOp);
+
+  return success();
+}
+
+void FtdMemoryInterfaceBuilder::addMemDataResultToLoads(InterfacePorts &ports,
+                                                        Operation *memIfaceOp) {
+  unsigned resIdx = 0;
+  for (auto &[_, memGroupOps] : ports) {
+    for (Operation *memOp : memGroupOps) {
+      if (auto loadOp = dyn_cast<handshake::LoadOpInterface>(memOp)) {
+        Value dataIn = memIfaceOp->getResult(resIdx);
+        SmallVector<Value, 2> operands;
+        operands.push_back(loadOp->getOperand(0));
+        operands.push_back(dataIn);
+        loadOp->setOperands(operands);
+        resIdx++;
+      }
+    }
+  }
+}
+
+LogicalResult FtdMemoryInterfaceBuilder::determineInterfaceInputsWithForks(
+    InterfaceInputs &inputs, OpBuilder &builder, DenseSet<Group *> &groups,
+    DenseMap<Block *, Operation *> &forksGraph, Value start,
+    SmallVector<Operation *> &alloctionNetwork) {
+
+  // Create the Fork nodes
+  for (Group *group : groups) {
+    Block *b = group->bb;
+    builder.setInsertionPointToStart(b);
+    auto forkOp =
+        builder.create<handshake::LazyForkOp>(memref.getLoc(), start, 2);
+    alloctionNetwork.push_back(forkOp);
+    forksGraph[b] = forkOp;
+  }
+
+  // Create a LazyForks graph by connecting the operations if their
+  // corresponding BBs are conected in the Groups graph
+  for (Group *group : groups) {
+    SmallVector<Value> predecessors;
+    for (Group *pred : group->preds)
+      predecessors.push_back(forksGraph[pred->bb]->getResult(0));
+    Operation *forkNode = forksGraph[group->bb];
+
+    if (predecessors.size() > 0)
+      forkNode->setOperands(predecessors);
+  }
+
+  // Add the results of the LazyForks as inputs to the LSQ
+
+  // for (auto [_, forkNode] : forksGraph)
+  //   inputs.lsqInputs.push_back(forkNode->getResult(1));
+
+  // Determine LSQ inputs
+  for (auto [group, lsqGroupOps] : lsqPorts) {
+    Operation *firstOpInGroup = lsqGroupOps.front();
+    // Connect the lazy forks created to the lsq
+    Operation *forkNode = forksGraph[firstOpInGroup->getBlock()];
+    inputs.lsqInputs.push_back(forkNode->getResult(1));
+
+    // Then, add all memory port results that go the interface to the list of
+    // LSQ inputs
+    for (Operation *lsqOp : lsqGroupOps)
+      llvm::copy(getMemResultsToInterface(lsqOp),
+                 std::back_inserter(inputs.lsqInputs));
+
+    // Add the size of the group to our list
+    inputs.lsqGroupSizes.push_back(lsqGroupOps.size());
+  }
+
+  if (mcPorts.empty())
+    return success();
+
+  // The MC needs control signals from all blocks containing store ports
+  // connected to an LSQ, since these requests end up being forwarded to the MC,
+  // so we need to know the number of LSQ stores per basic block
+  DenseMap<unsigned, unsigned> lsqStoresPerBlock;
+  for (const auto &[_, lsqGroupOps] : lsqPorts) {
+    for (Operation *lsqOp : lsqGroupOps) {
+      if (isa<handshake::LSQStoreOp>(lsqOp)) {
+        std::optional<unsigned> block = getLogicBB(lsqOp);
+        if (!block)
+          return lsqOp->emitError() << "LSQ port must belong to a BB.";
+        ++lsqStoresPerBlock[*block];
+      }
+    }
+  }
+
+  // Inputs from blocks that have at least one direct load/store access port to
+  // the MC are added to the future MC's operands first
+  for (auto &[block, mcBlockOps] : mcPorts) {
+    // Count the total number of stores in the block, either directly connected
+    // to the MC or going through an LSQ
+    unsigned numStoresInBlock = lsqStoresPerBlock.lookup(block);
+    for (Operation *memOp : mcBlockOps) {
+      if (isa<handshake::MCStoreOp>(memOp))
+        ++numStoresInBlock;
+    }
+
+    // Blocks with at least one store need to provide a control signal fed
+    // through a constant indicating the number of stores in the block
+    if (numStoresInBlock > 0) {
+      Value blockCtrl = getCtrl(block);
+      if (!blockCtrl)
+        return failure();
+      inputs.mcInputs.push_back(
+          getMCControl(blockCtrl, numStoresInBlock, builder));
+    }
+
+    // Traverse the list of memory operations in the block once more and
+    // accumulate memory inputs coming from the block
+    for (Operation *mcOp : mcBlockOps)
+      llvm::copy(getMemResultsToInterface(mcOp),
+                 std::back_inserter(inputs.mcInputs));
+
+    inputs.mcBlocks.push_back(block);
+  }
+
+  // Control ports from blocks which do not have memory ports directly
+  // connected to the MC but from which the LSQ will forward store requests from
+  // are then added to the future MC's operands
+  for (auto &[lsqBlock, numStores] : lsqStoresPerBlock) {
+    // We only need to do something if the block has stores that have not yet
+    // been accounted for
+    if (mcPorts.contains(lsqBlock) || numStores == 0)
+      continue;
+
+    // Identically to before, blocks with stores need a cntrol signal
+    Value blockCtrl = getCtrl(lsqBlock);
+    if (!blockCtrl)
+      return failure();
+    inputs.mcInputs.push_back(getMCControl(blockCtrl, numStores, builder));
+
+    inputs.mcBlocks.push_back(lsqBlock);
+  }
+
+  return success();
+}
+
+void Group::printDependenices() {
+  llvm::dbgs() << "[MEM_GROUP] Group for [";
+  bb->printAsOperand(llvm::dbgs());
+  llvm::dbgs() << "]; predecessors = {";
+  for (auto &gp : preds) {
+    gp->bb->printAsOperand(llvm::dbgs());
+    llvm::dbgs() << ", ";
+  }
+  llvm::dbgs() << "}; successors = {";
+  for (auto &gp : succs) {
+    gp->bb->printAsOperand(llvm::dbgs());
+    llvm::dbgs() << ", ";
+  }
+  llvm::dbgs() << "} \n";
+}
+
+void ProdConsMemDep::printDependency() {
+  llvm::dbgs() << "[PROD_CONS_MEM_DEP] Dependency from [";
+  prodBb->printAsOperand(llvm::dbgs());
+  llvm::dbgs() << "] to [";
+  consBb->printAsOperand(llvm::dbgs());
+  llvm::dbgs() << "]";
+  if (isBackward)
+    llvm::dbgs() << " (backward)";
+  llvm::dbgs() << "\n";
+}
+
+} // namespace ftd
+} // namespace experimental
+} // namespace dynamatic

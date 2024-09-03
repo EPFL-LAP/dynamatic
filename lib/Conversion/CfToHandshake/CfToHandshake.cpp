@@ -121,18 +121,10 @@ mergeFuncResults(handshake::FuncOp funcOp, ConversionPatternRewriter &rewriter,
   return results;
 }
 
-/// Checks whether the blocks in `opsPerBlock`'s keys exhibit a "linear
-/// dominance relationship" i.e., whether the execution of the "most dominant"
-/// block necessarily triggers the execution of all others in a deterministic
-/// order. This verification happens in linear time thanks to the cached
-/// dominator/dominated relationships in `dominations`. On success, stores the
-/// blocks' execution order in `dominanceOrder` ("most dominant" block first,
-/// then "second most dominant", etc.). Fails when the blocks do not exhibit
-/// that property.
-static LogicalResult computeLinearDominance(
+LogicalResult LowerFuncToHandshake::computeLinearDominance(
     DenseMap<Block *, DenseSet<Block *>> &dominations,
     llvm::MapVector<Block *, SmallVector<Operation *>> &opsPerBlock,
-    SmallVector<Block *> &dominanceOrder) {
+    SmallVector<Block *> &dominanceOrder) const {
   // Initialize the dominance order to the proper size, setting each element to
   // nullptr initially
   size_t numBlocks = opsPerBlock.size();

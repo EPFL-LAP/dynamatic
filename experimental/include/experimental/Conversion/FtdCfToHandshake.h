@@ -23,6 +23,8 @@
 #include "dynamatic/Support/DynamaticPass.h"
 #include "dynamatic/Support/LLVM.h"
 #include "dynamatic/Transforms/FuncMaximizeSSA.h"
+#include "experimental/Conversion/FtdMemoryInterface.h"
+#include "mlir/Analysis/CFGLoopInfo.h"
 #include "mlir/Dialect/Func/IR/FuncOps.h"
 #include "mlir/Dialect/LLVMIR/LLVMDialect.h"
 #include "mlir/IR/Attributes.h"
@@ -56,6 +58,20 @@ public:
 
 protected:
   ControlDependenceAnalysis cdgAnalysis;
+
+  LogicalResult ftdVerifyAndCreateMemInterfaces(
+      handshake::FuncOp funcOp, ConversionPatternRewriter &rewriter,
+      MemInterfacesInfo &memInfo, mlir::CFGLoopInfo &li) const;
+
+  /// Given a list of operations, return the list of memory dependencies for
+  /// each block. This allows to build the group graph, which allows to
+  /// determine the dependencies between memory access inside basic blocks.
+  // Two types of hazards between the predecessors of one LSQ node:
+  // (1) WAW between 2 Store operations,
+  // (2) RAW and WAR between Load and Store operations
+  void identifyMemoryDependencies(const SmallVector<Operation *> &operations,
+                                  SmallVector<ProdConsMemDep> &allMemDeps,
+                                  const mlir::CFGLoopInfo &li) const;
 };
 
 #define GEN_PASS_DECL_FTDCFTOHANDSHAKE

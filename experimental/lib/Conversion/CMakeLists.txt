@@ -1,5 +1,6 @@
 add_dynamatic_library(DynamaticExperimentalConversion
   FtdCfToHandshake.cpp
+  FtdMemoryInterface.cpp
 
   DEPENDS
   DynamaticConversionPassIncGen

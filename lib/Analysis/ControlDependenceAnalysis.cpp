@@ -251,16 +251,22 @@ LogicalResult ControlDependenceAnalysis::getBlockForwardControlDeps(
   return success();
 }
 
-LogicalResult
-ControlDependenceAnalysis::printAllBlocksDeps(mlir::func::FuncOp &func) const {
+LogicalResult ControlDependenceAnalysis::printAllBlocksDeps(
+    mlir::func::FuncOp &funcOp) const {
 
-  if (!funcBlocksControlDeps.contains(func))
-    return func->emitError()
+  Region &funcReg = funcOp.getRegion();
+
+  // functions made up of 1 basic block do not have any dependencies
+  if (funcReg.hasOneBlock())
+    return success();
+
+  if (!funcBlocksControlDeps.contains(funcOp))
+    return funcOp->emitError()
            << "call to ControlDependenceAnalysis::printAllBlocksDeps on a "
               "FuncOp which was not analyzed";
 
   llvm::dbgs() << "\n*********************************\n\n";
-  for (auto &elem : funcBlocksControlDeps.lookup(func)) {
+  for (auto &elem : funcBlocksControlDeps.lookup(funcOp)) {
 
     Block *block = elem.first;
     block->printAsOperand(llvm::dbgs());

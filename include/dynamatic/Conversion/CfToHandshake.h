@@ -145,7 +145,7 @@ public:
   /// Returns the value representing the block's control signal.
   virtual Value getBlockControl(Block *block) const;
 
-private:
+protected:
   /// Groups information to "rewire the IR" around a particular merge-like
   /// operation.
   struct MergeOpInfo {
@@ -173,6 +173,19 @@ private:
   void insertMerge(BlockArgument blockArg, ConversionPatternRewriter &rewriter,
                    BackedgeBuilder &edgeBuilder,
                    LowerFuncToHandshake::MergeOpInfo &iMerge) const;
+
+  /// Checks whether the blocks in `opsPerBlock`'s keys exhibit a "linear
+  /// dominance relationship" i.e., whether the execution of the "most dominant"
+  /// block necessarily triggers the execution of all others in a deterministic
+  /// order. This verification happens in linear time thanks to the cached
+  /// dominator/dominated relationships in `dominations`. On success, stores the
+  /// blocks' execution order in `dominanceOrder` ("most dominant" block first,
+  /// then "second most dominant", etc.). Fails when the blocks do not exhibit
+  /// that property.
+  LogicalResult computeLinearDominance(
+      DenseMap<Block *, DenseSet<Block *>> &dominations,
+      llvm::MapVector<Block *, SmallVector<Operation *>> &opsPerBlock,
+      SmallVector<Block *> &dominanceOrder) const;
 };
 
 /// Strategy to use when putting the matched func-level function into maximal
