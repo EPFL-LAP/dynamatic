@@ -52,16 +52,31 @@ struct HandshakeSizeLSQsPass
 
 private:
 
-  LSQSizingResult sizeLSQsForCFDFC(buffer::CFDFC cfdfc, unsigned II, TimingDatabase timingDB);
-  LSQSizingResult sizeLSQsForGraph(AdjListGraph, unsigned II);
+  // Determines the LSQ sizes, given a CFDFC and its II
+  LSQSizingResult sizeLSQsForGraph(AdjListGraph graph, unsigned II);
 
+  // Finds the Start Node in a CFDFC
+  // The start node, is the node with the longest non-cyclic path to any other node
   mlir::Operation *findStartNode(AdjListGraph graph);
+
+  // Finds the Phi Node for each Basic Block in a CFDFC
+  // TODO
   std::unordered_map<unsigned, mlir::Operation *> getPhiNodes(AdjListGraph graph, mlir::Operation *startNode);
+
+  // Inserts edges to make sure that sizing is done correctly
+  // These edges make sure that in the timing analysis, the allocation precedes the memory access
+  // Edges are inserted from the Phi Node of a BB to the LSQ operations in the BB
+  // Therefore the LSQ operations will be allocated at the start of the BB
   void insertAllocPrecedesMemoryAccessEdges(AdjListGraph &graph, std::vector<mlir::Operation *> ops, std::unordered_map<unsigned, mlir::Operation *> phiNodes);
-  void insertLoadStoreEdge(AdjListGraph &graph, std::vector<mlir::Operation *> loadOps, std::vector<mlir::Operation *> storeOps);
+
+  // Finds the allocation time of each operation, which is the latency to the Phi Node of the BB
   std::unordered_map<mlir::Operation *, int> getAllocTimes(AdjListGraph graph, mlir::Operation *startNode, std::vector<mlir::Operation *> ops,
                                                            std::unordered_map<unsigned, mlir::Operation *> phiNodes);
+
+  // Finds the deallocation time of each operation, which is the maximum latency to the operation (the latency of the last argument arriving)                                                       
   std::unordered_map<mlir::Operation *, int> getDeallocTimes(AdjListGraph graph, mlir::Operation *startNode, std::vector<mlir::Operation *> ops);
+
+  // Given the alloc and dealloc times of each operation, calculates the maximum queue size needed for each LSQ
   std::unordered_map<mlir::Operation*, unsigned> calcQueueSize(std::unordered_map<mlir::Operation *, int> allocTimes, std::unordered_map<mlir::Operation *, int> deallocTimes, unsigned II);
 };
 } // namespace
@@ -83,11 +98,21 @@ void HandshakeSizeLSQsPass::runDynamaticPass() {
 
     std::unordered_map<unsigned,llvm::SetVector<unsigned>> cfdfcBBLists;
     std::unordered_map<unsigned, float> IIs;
-    DictionaryAttr troughputAttr = getDialectAttr<handshake::CFDFCThroughputAttr>(funcOp).getThroughputMap();
-    DictionaryAttr cfdfcAttr = getDialectAttr<handshake::CFDFCToBBListAttr>(funcOp).getCfdfcMap();
 
+    // Extract CFDFCs and II from the Attributes
+    // TODO error handling when there are no attributes
+    handshake::CFDFCThroughputAttr throughputAttr = getDialectAttr<handshake::CFDFCThroughputAttr>(funcOp);
+    handshake::CFDFCToBBListAttr cfdfcAttr = getDialectAttr<handshake::CFDFCToBBListAttr>(funcOp);
 
-    for(auto &attr: cfdfcAttr) {
+    if(throughputAttr == nullptr || cfdfcAttr == nullptr) {
+      llvm::dbgs() << "\t [DBG] No CFDFCThroughputAttr or CFDFCToBBListAttr found\n";
+      continue;
+    }
+
+    DictionaryAttr throughputDict = throughputAttr.getThroughputMap();
+    DictionaryAttr cfdfcDict = cfdfcAttr.getCfdfcMap();
+
+    for(auto &attr: cfdfcDict) {
       ArrayAttr bbList = llvm::dyn_cast<ArrayAttr>(attr.getValue());
       llvm::SetVector<unsigned> cfdfcBBs; 
       for(auto &bb: bbList) {
@@ -98,7 +123,7 @@ void HandshakeSizeLSQsPass::runDynamaticPass() {
 
 
     // Extract II
-    for (const NamedAttribute attr : troughputAttr) {
+    for (const NamedAttribute attr : throughputDict) {
       FloatAttr throughput = llvm::dyn_cast<FloatAttr>(attr.getValue());
       IIs.insert({std::stoi(attr.getName().str()), round(1 / throughput.getValueAsDouble())});
     }
@@ -190,11 +215,6 @@ LSQSizingResult HandshakeSizeLSQsPass::sizeLSQsForGraph(AdjListGraph graph, unsi
   return result;
 }
 
-LSQSizingResult HandshakeSizeLSQsPass::sizeLSQsForCFDFC(buffer::CFDFC cfdfc, unsigned II, TimingDatabase timingDB) {
-  llvm::dbgs() << " [DBG] sizeLSQsForCFDFC called for CFDFC with " << cfdfc.cycle.size() << " BBs and II=" << II << "\n";
-  AdjListGraph graph(cfdfc, timingDB, II);
-  return HandshakeSizeLSQsPass::sizeLSQsForGraph(graph, II);
-}
 
 mlir::Operation * HandshakeSizeLSQsPass::findStartNode(AdjListGraph graph) {
 
@@ -435,26 +455,4 @@ dynamatic::experimental::lsqsizing::createHandshakeSizeLSQs(StringRef timingMode
   return std::make_unique<HandshakeSizeLSQsPass>(timingModels);
 }
 
-
-void HandshakeSizeLSQsPass::insertLoadStoreEdge(AdjListGraph &graph, std::vector<mlir::Operation *> loadOps, std::vector<mlir::Operation *> storeOps) {
-  for(Operation *storeOp: storeOps) {
-    mlir::Operation *LsqOp = nullptr;
-    for(Operation *destOp: storeOp->getUsers()) {
-      if(destOp->getName().getStringRef().str() == "handshake.lsq") {
-        LsqOp = destOp;
-        break;
-      }
-    }
-    for(Operation *loadOp: loadOps) {
-      for(Operation *destOp: storeOp->getUsers()) {
-        if(destOp == LsqOp) {
-          graph.addEdge(storeOp, loadOp);
-          llvm::dbgs() << " [DBG] Added edge from " << getUniqueName(storeOp).str() << " to " << getUniqueName(loadOp).str()
-          << " for LSQ:" << getUniqueName(LsqOp).str() << "\n";
-          break;
-        }
-      }
-    }
-  }
-}
 

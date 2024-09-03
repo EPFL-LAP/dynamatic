@@ -15,6 +15,12 @@ using namespace mlir;
 using namespace dynamatic;
 using namespace dynamatic::experimental::lsqsizing;
 
+
+// Extracts the latency for each operation
+// This is done in 3 ways:
+// 1. If the operation is in the timingDB, the latency is extracted from the timingDB
+// 2. If the operation is a buffer operation, the latency is extracted from the timing attribute
+// 3. If the operation is neither, then its latency is set to 0
 int extractNodeLatency(mlir::Operation *op, TimingDatabase timingDB) {
   double latency = 0;
 
@@ -78,6 +84,12 @@ int extractNodeLatency(mlir::Operation *op, TimingDatabase timingDB) {
 }
 
 AdjListGraph::AdjListGraph(handshake::FuncOp funcOp, llvm::SetVector<unsigned> cfdfcBBs, TimingDatabase timingDB, unsigned II) {
+
+  llvm::dbgs() << "Creating AdjListGraph for CFDFC: ";
+  for(auto &bb: cfdfcBBs) {
+    llvm::dbgs() << bb << " ";
+  }
+  llvm::dbgs() << "with II: " << II << "\n";
 
   for (Operation &op : funcOp.getOps()) {
     // Get operation's basic block
@@ -195,8 +207,9 @@ void AdjListGraph::insertArtificialNodeOnBackedge(mlir::Operation* src, mlir::Op
   std::string destName = getUniqueName(dest).str();
   std::string newNodeName = "backedge_" + srcName + "_" + destName;
 
-  //remove regular edge from src to dest
+  //remove existing edges from src to dest
   nodes.at(srcName).edges.remove(destName);
+  nodes.at(srcName).backedges.remove(destName);
 
   // create node and add edge from src to new node and new node to dest
   nodes.insert({newNodeName, AdjListNode{latency, nullptr, {}, {destName}}});
@@ -242,11 +255,14 @@ void AdjListGraph::dfs(std::string& currentNode, std::string& end, std::vector<s
 }
 
 std::vector<std::vector<std::string>> AdjListGraph::findPaths(std::string start, std::string end, bool ignoreBackedge) {
-    std::vector<std::vector<std::string>> paths;
-    std::vector<std::string> currentPath{start};
-    std::set<std::string> visited{start};
-    dfs(start, end, currentPath, visited, paths, ignoreBackedge);
-    return paths;
+  // Initialize the vectors for DFS
+  std::vector<std::vector<std::string>> paths;
+  std::vector<std::string> currentPath{start};
+  std::set<std::string> visited{start};
+  
+  // Call DFS to find all paths
+  dfs(start, end, currentPath, visited, paths, ignoreBackedge);
+  return paths;
 }
 
 
@@ -293,6 +309,7 @@ std::vector<std::string> AdjListGraph::findLongestNonCyclicPath(mlir::Operation 
 
 
 int AdjListGraph::getPathLatency(std::vector<std::string> path) {
+  // Sum up the latencies of all nodes in the path
   int latency = 0;
   for(auto &node: path) {
     latency += nodes.at(node).latency;
@@ -302,6 +319,7 @@ int AdjListGraph::getPathLatency(std::vector<std::string> path) {
 
 std::vector<mlir::Operation*> AdjListGraph::getOperationsWithOpName(std::string opName) {
   std::vector<mlir::Operation*> ops;
+  // Iterate over all nodes and return the operations with the specified operation name
   for(auto &node: nodes) {
     if(node.second.op && std::string(node.second.op->getName().getStringRef()) == opName)
     {
@@ -313,10 +331,12 @@ std::vector<mlir::Operation*> AdjListGraph::getOperationsWithOpName(std::string 
 
 
 int AdjListGraph::findMaxPathLatency(mlir::Operation *startOp, mlir::Operation *endOp, bool ignoreBackedge) {
-  assert(startOp && endOp && "Start and end operations must not be null");
+  // Find all paths between the start and end node    
   std::vector<std::vector<std::string>> paths = findPaths(startOp, endOp, ignoreBackedge);
   int maxLatency = 0;
   std::vector<std::string> maxPath;
+
+  // Iterate over all paths and keep track of the path with the highest latency
   for(auto &path: paths)
   {
     int latency = getPathLatency(path);
@@ -333,9 +353,10 @@ int AdjListGraph::findMaxPathLatency(mlir::Operation *startOp, mlir::Operation *
 }
 
 int AdjListGraph::findMinPathLatency(mlir::Operation *startOp, mlir::Operation *endOp, bool ignoreBackedge) {
-  assert(startOp && endOp && "Start and end operations must not be null");
+  // Find all paths between the start and end node    
   std::vector<std::vector<std::string>> paths = findPaths(startOp, endOp, ignoreBackedge);
   int minLatency = INT_MAX;
+  // Iterate over all paths and keep track of the path with the lowest latency
   for(auto &path: paths)
   {
     minLatency = std::min(minLatency, getPathLatency(path));
@@ -348,10 +369,13 @@ std::vector<mlir::Operation*> AdjListGraph::getConnectedOps(mlir::Operation *op)
   std::vector<mlir::Operation*> connectedOps;
   std::string opName = getUniqueName(op).str();
 
+  // Get all Ops which are connected via a regular edge
   for(auto &node: nodes.at(opName).edges) {
     connectedOps.push_back(nodes.at(node).op);
   }
 
+  // Get all Ops which are connected via a backedge, by skipping the artificial nodes
+  // and going over the nodes connected to the artificial nodes
   for(auto &aritificalNode: nodes.at(opName).backedges) {
     for(auto &node: nodes.at(aritificalNode).backedges) {
       connectedOps.push_back(nodes.at(node).op);
