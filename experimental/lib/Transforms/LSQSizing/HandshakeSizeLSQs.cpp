@@ -53,7 +53,7 @@ struct HandshakeSizeLSQsPass
 private:
 
   // Determines the LSQ sizes, given a CFDFC and its II
-  LSQSizingResult sizeLSQsForGraph(AdjListGraph graph, unsigned II);
+  std::optional<LSQSizingResult> sizeLSQsForGraph(AdjListGraph graph, unsigned II);
 
   // Finds the Start Node in a CFDFC
   // The start node, is the node with the longest non-cyclic path to any other node
@@ -129,7 +129,10 @@ void HandshakeSizeLSQsPass::runDynamaticPass() {
     }
 
     for(auto &entry: cfdfcBBLists) {
-      sizingResults.push_back(sizeLSQsForGraph(AdjListGraph(funcOp, entry.second, timingDB, IIs[entry.first]), IIs[entry.first]));
+      std::optional<LSQSizingResult> result = sizeLSQsForGraph(AdjListGraph(funcOp, entry.second, timingDB, IIs[entry.first]), IIs[entry.first]);
+      if(result) {
+        sizingResults.push_back(result.value());
+      }
     }
     
     // Extract maximum Queue sizes for each LSQ
@@ -156,18 +159,18 @@ void HandshakeSizeLSQsPass::runDynamaticPass() {
 }
 
 
-LSQSizingResult HandshakeSizeLSQsPass::sizeLSQsForGraph(AdjListGraph graph, unsigned II) {
+std::optional<LSQSizingResult> HandshakeSizeLSQsPass::sizeLSQsForGraph(AdjListGraph graph, unsigned II) {
 
   std::vector<mlir::Operation *> loadOps = graph.getOperationsWithOpName("handshake.lsq_load");
   std::vector<mlir::Operation *> storeOps = graph.getOperationsWithOpName("handshake.lsq_store");
 
   //graph.printGraph();
 
-  //TODO return empty or make result std::optional?
-  /*if(loadOps.size() == 0 && storeOps.size() == 0) {
+
+  if(loadOps.size() == 0 && storeOps.size() == 0) {
     llvm::dbgs() << "\t [DBG] No LSQ Ops found in CFDFC\n";
-    return DenseMap<unsigned, std::tuple<unsigned, unsigned>>();
-  }*/
+    return std::nullopt;
+  }
 
   // Find starting node, which will be the reference to the rest
   mlir::Operation * startNode = findStartNode(graph);
