@@ -64,6 +64,7 @@ module read_data_signals #(
   reg     [ARBITER_SIZE * DATA_TYPE  - 1 : 0] out_reg = 0;
 
   integer                                      i;
+  initial valid = 0;
 
   always @(posedge clk) begin
     if (rst) begin
@@ -389,9 +390,9 @@ module mc_control (
   // all requests completed
   input  allRequestsDone
 );
-  reg memIdle;
-  reg memDone;
-  reg memAckCtrl;
+  reg memIdle <= 1;
+  reg memDone <= 0;
+  reg memAckCtrl <= 0;
 
   assign memStart_ready = memIdle;
   assign memEnd_valid   = memDone;
