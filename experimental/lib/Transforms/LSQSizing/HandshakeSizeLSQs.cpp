@@ -11,6 +11,7 @@
 //===----------------------------------------------------------------------===//
 
 #include "experimental/Transforms/LSQSizing/HandshakeSizeLSQs.h"
+#include "dynamatic/Dialect/Handshake/HandshakeAttributes.h"
 #include "dynamatic/Dialect/Handshake/HandshakeOps.h"
 #include "dynamatic/Support/Attribute.h"
 #include "dynamatic/Support/Backedge.h"
@@ -22,12 +23,12 @@
 #include "llvm/ADT/DenseMap.h"
 #include "mlir/Pass/PassManager.h"
 #include "mlir/IR/Value.h"
-//#include "experimental/Support/StdProfiler.h"
 #include "experimental/Transforms/LSQSizing/LSQSizingSupport.h"
 #include "dynamatic/Support/CFG.h"
 
 #define DEBUG_TYPE "handshake-size-lsqs"
 
+using namespace llvm;
 using namespace mlir;
 using namespace dynamatic;
 using namespace dynamatic::buffer;
@@ -35,7 +36,7 @@ using namespace dynamatic::handshake;
 using namespace dynamatic::experimental;
 using namespace dynamatic::experimental::lsqsizing;
 
-using LSQSizingResult = DenseMap<mlir::Operation*, std::tuple<unsigned, unsigned>>; //TUPLE: <load_size, store_size>
+using LSQSizingResult = mlir::DenseMap<mlir::Operation*, std::tuple<unsigned, unsigned>>; //TUPLE: <load_size, store_size>
 
 namespace {
 
@@ -68,7 +69,6 @@ private:
 
 void HandshakeSizeLSQsPass::runDynamaticPass() {
   llvm::dbgs() << "\t [DBG] LSQ Sizing Pass Called!\n";
-
   llvm::SmallVector<LSQSizingResult> sizingResults;
 
   // Read component latencies
@@ -83,10 +83,9 @@ void HandshakeSizeLSQsPass::runDynamaticPass() {
 
     std::unordered_map<unsigned,llvm::SetVector<unsigned>> cfdfcBBLists;
     std::unordered_map<unsigned, float> IIs;
+    DictionaryAttr troughputAttr = getDialectAttr<handshake::CFDFCThroughputAttr>(funcOp).getThroughputMap();
+    DictionaryAttr cfdfcAttr = getDialectAttr<handshake::CFDFCToBBListAttr>(funcOp).getCfdfcMap();
 
-    //TODO error handling when there are no attributes
-    DictionaryAttr troughputAttr = getUniqueAttr<handshake::CFDFCThroughputAttr>(funcOp).getThroughputMap();
-    DictionaryAttr cfdfcAttr = getUniqueAttr<handshake::CFDFCToBBListAttr>(funcOp).getCfdfcMap();
 
     for(auto &attr: cfdfcAttr) {
       ArrayAttr bbList = llvm::dyn_cast<ArrayAttr>(attr.getValue());
@@ -125,8 +124,8 @@ void HandshakeSizeLSQsPass::runDynamaticPass() {
       unsigned maxStoreSize = std::get<1>(maxLoadStoreSize.second);
       llvm::dbgs() << " [DBG] final LSQ " << lsqOp->getAttrOfType<StringAttr>("handshake.name").str() << " Max Load Size: " << maxLoadSize << " Max Store Size: " << maxStoreSize << "\n";
 
-      LSQSizeAttr lsqSizeAttr = LSQSizeAttr::get(mod.getContext(), maxLoadSize, maxStoreSize);
-      setUniqueAttr(lsqOp, lsqSizeAttr);
+      handshake::LSQSizeAttr lsqSizeAttr = handshake::LSQSizeAttr::get(mod.getContext(), maxLoadSize, maxStoreSize);
+      setDialectAttr(lsqOp, lsqSizeAttr);
     }
   }
 }

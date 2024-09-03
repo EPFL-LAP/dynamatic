@@ -21,6 +21,7 @@
 #include "dynamatic/Support/Espresso/main.h"
 #include "experimental/Support/BooleanLogic/Parser.h"
 #include "llvm/Support/raw_ostream.h"
+#include <cmath>
 #include <set>
 #include <string>
 
@@ -88,6 +89,75 @@ std::set<std::string> BoolExpression::getVariables() {
   std::set<std::string> s;
   getVariablesRec(s);
   return s;
+}
+
+//---------Generating Truth Table For any Boolean Expression-----------
+
+bool BoolExpression::evaluate(std::map<std::string, bool> row) {
+  switch (type) {
+  case (ExpressionType::Variable): {
+    SingleCond *singleCond = static_cast<SingleCond *>(this);
+    return (singleCond->isNegated && !(row[singleCond->id])) ||
+           (!(singleCond->isNegated) && row[singleCond->id]);
+    break;
+  }
+  case (ExpressionType::One):
+    return true;
+  case (ExpressionType::Zero):
+    return false;
+  case (ExpressionType::Or): {
+    Operator *op = static_cast<Operator *>(this);
+    bool left = false;
+    if (op->left)
+      left = op->left->evaluate(row);
+    bool right = false;
+    if (op->right)
+      right = op->right->evaluate(row);
+    return left || right;
+  }
+  case (ExpressionType::And): {
+    Operator *op = static_cast<Operator *>(this);
+    bool left = true;
+    if (op->left)
+      left = op->left->evaluate(row);
+    bool right = true;
+    if (op->right)
+      right = op->right->evaluate(row);
+    return left && right;
+  }
+  case (ExpressionType::Not): {
+    Operator *op = static_cast<Operator *>(this);
+    return !op->right->evaluate(row);
+  }
+
+  default:
+    return false;
+  }
+}
+
+std::vector<std::tuple<std::map<std::string, bool>, bool>>
+BoolExpression::generateTruthTable() {
+  std::vector<std::tuple<std::map<std::string, bool>, bool>> truthTable;
+  std::set<std::string> variables = getVariables();
+  int numOfRows = pow(2, variables.size());
+  for (int i = 0; i < numOfRows; i++) {
+    std::map<std::string, bool> row;
+
+    // Iterate over the variables and set their truth values based on the
+    // current combination
+    int j = 0;
+    for (const std::string &variable : variables) {
+      // Extract the truth value of the current variable from the bit
+      // representation of 'i'
+      bool truthValue = (i >> j) & 1;
+      // Map the variable to its truth value in the current row
+      row[variable] = truthValue;
+      j++;
+    }
+    bool res = evaluate(row);
+    truthTable.emplace_back(row, res);
+  }
+  return truthTable;
 }
 
 //---------Generating Truth Table based on Mintems (SOP Only)-----------
@@ -164,7 +234,7 @@ void BoolExpression::generateMintermsOr(
   }
 }
 
-std::set<std::string> BoolExpression::generateTruthTable() {
+std::set<std::string> BoolExpression::generateTruthTableSop() {
   std::set<std::string> variables = BoolExpression::getVariables();
   unsigned numOfVariables = variables.size();
   std::map<StringRef, int> varIndex;
@@ -288,7 +358,41 @@ std::string BoolExpression::runEspresso() {
   /// add the name of the output f to the file
   espressoInput += ".ob f\n";
   /// generate and add the truth table
-  std::set<std::string> truthTable = this->generateTruthTable();
+  std::vector<std::tuple<std::map<std::string, bool>, bool>> truthTable =
+      generateTruthTable();
+  for (std::tuple<std::map<std::string, bool>, bool> row : truthTable) {
+    std::map<std::string, bool> value = std::get<0>(row);
+    for (const std::string &s : vars) {
+      espressoInput += (std::string(value[s] ? "1" : "0") + " ");
+    }
+    bool res = std::get<1>(row);
+    espressoInput += (std::string(res ? "1" : "0") + "\n");
+  }
+  /// run espresso
+  char *r = run_espresso(espressoInput.data());
+  std::string result = r;
+  if (result == "Failed to Minimize")
+    return result;
+  int start = result.find('=');
+  int end = result.find(';');
+  return result.substr(start + 1, end - start - 1);
+}
+
+std::string BoolExpression::runEspressoSop() {
+  std::string espressoInput = "";
+  std::set<std::string> vars = this->getVariables();
+  /// adding the number of inputs and outputs to the file
+  espressoInput += (".i " + std::to_string(vars.size()) + "\n");
+  espressoInput += ".o 1\n";
+  /// adding the names of the input variables to the file
+  espressoInput += ".ilb ";
+  for (const std::string &var : vars)
+    espressoInput += (var + " ");
+  espressoInput += "\n";
+  /// add the name of the output f to the file
+  espressoInput += ".ob f\n";
+  /// generate and add the truth table
+  std::set<std::string> truthTable = this->generateTruthTableSop();
   for (const std::string &row : truthTable)
     espressoInput += (row + "\n");
   char *r = run_espresso(espressoInput.data());
@@ -312,6 +416,14 @@ BoolExpression *BoolExpression::parseSop(llvm::StringRef strSop) {
 
 std::string BoolExpression::sopToString() { return this->toString(); }
 
+BoolExpression *BoolExpression::boolZero() {
+  return new SingleCond(ExpressionType::Zero, "0", false);
+}
+
+BoolExpression *BoolExpression::boolOne() {
+  return new SingleCond(ExpressionType::One, "1", false);
+}
+
 BoolExpression *BoolExpression::boolVar(std::string id) {
   return new SingleCond(ExpressionType::Variable, std::move(id), false);
 }
@@ -332,6 +444,20 @@ BoolExpression *BoolExpression::boolNegate() {
 
 BoolExpression *BoolExpression::boolMinimize() {
   std::string espressoResult = this->runEspresso();
+  /// if espresso fails, return the expression as is
+  if (espressoResult == "Failed to minimize")
+    return this;
+  /// if espresso returns " ", then f = 0
+  if (espressoResult == " ")
+    return new BoolExpression(ExpressionType::Zero);
+  /// if espresso returns " ()", then f = 1
+  if (espressoResult == " ()")
+    return new BoolExpression(ExpressionType::One);
+  return parseSop(espressoResult);
+}
+
+BoolExpression *BoolExpression::boolMinimizeSop() {
+  std::string espressoResult = this->runEspressoSop();
   /// if espresso fails, return the expression as is
   if (espressoResult == "Failed to minimize")
     return this;

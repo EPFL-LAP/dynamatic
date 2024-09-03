@@ -12,9 +12,9 @@
 //    the new attribute type.
 // 2. Create a `fromJSON` function similar to
 //    ```cpp
-//    static bool fromJSON(const json::Value &value,
+//    static bool fromJSON(const ljson::Value &value,
 //                         handshake::ChannelBufPropsAttr &attr,
-//                         json::Path path,
+//                         ljson::Path path,
 //                         MLIRContext *ctx);
 //    ```
 //    which creates an instance of the new attribute from the data contained
@@ -30,10 +30,10 @@
 
 #include "dynamatic/Transforms/BackAnnotate.h"
 #include "dynamatic/Analysis/NameAnalysis.h"
-#include "dynamatic/Dialect/Handshake/HandshakeOps.h"
+#include "dynamatic/Dialect/Handshake/HandshakeAttributes.h"
 #include "dynamatic/Support/Attribute.h"
+#include "dynamatic/Support/JSON/JSON.h"
 #include "dynamatic/Support/TimingModels.h"
-#include "mlir/IR/Attributes.h"
 #include "mlir/IR/MLIRContext.h"
 #include "mlir/Support/LLVM.h"
 #include "llvm/ADT/StringRef.h"
@@ -41,11 +41,13 @@
 #include <fstream>
 #include <functional>
 #include <memory>
-#include <unordered_map>
 
 using namespace llvm;
 using namespace mlir;
 using namespace dynamatic;
+using namespace dynamatic::json;
+
+namespace ljson = llvm::json;
 
 /// Recognized keys in back-annotation files (excluded attribute-specific data).
 static constexpr StringLiteral KEY_OPERATIONS("operations"),
@@ -66,8 +68,6 @@ static constexpr StringLiteral
     ERR_EXPECTED_ATTR_NAME("expected \"attribute-name\" key"),
     ERR_EXPECTED_ATTR_TYPE("expected \"attribute-type\" key"),
     ERR_EXPECTED_DATA("expected \"attribute-data\" key"),
-    ERR_EXPECTED_OBJECT("expected value to be JSON object"),
-    ERR_EXPECTED_ARRAY("expected value to be JSON array"),
     ERR_EXPECTED_OP("expected operation to exist in the IR"),
     ERR_EXPECTED_OPRD(
         "expected operand index to be strictly less than number of "
@@ -79,50 +79,50 @@ static constexpr StringLiteral
 /// template type. Returns false if the key does not exist of if the value
 /// cannot be deserialized to the template type; otherwise, returns true.
 template <typename T>
-static bool fromJSONUnderKey(const json::Object &object, StringRef key,
-                             T &value, json::Path path, StringLiteral errKey) {
-  const json::Value *jsonValue = object.get(key);
+static bool fromJSONUnderKey(const ljson::Object &object, StringRef key,
+                             T &value, ljson::Path path, StringLiteral errKey) {
+  const ljson::Value *jsonValue = object.get(key);
   if (!jsonValue) {
     path.report(errKey);
     return false;
   }
-  return json::fromJSON(*jsonValue, value, path);
+  return ljson::fromJSON(*jsonValue, value, path);
 }
 
 /// Deserializes a JSON value under a provided JSON key into a value of the
 /// template type if the key exists. Returns false if the key exists but the
 /// value cannot be deserialized to the template type; otherwise, returns true.
 template <typename T>
-static bool fromJSONIfPresent(const json::Object &object, StringRef key,
-                              T &value, json::Path path) {
-  if (const json::Value *jsonValue = object.get(key))
-    return json::fromJSON(*jsonValue, value, path.field(key));
+static bool fromJSONIfPresent(const ljson::Object &object, StringRef key,
+                              T &value, ljson::Path path) {
+  if (const ljson::Value *jsonValue = object.get(key))
+    return ljson::fromJSON(*jsonValue, value, path.field(key));
   return true;
 }
 
 /// Returns the array of annotations (for operations or operands) located
 /// directly under the top-level JSON value at the provided JSON key. Returns
 /// nullptr if the array does not exist.
-static const json::Array *getAnnotationArray(const json::Value &topValue,
-                                             StringRef key, json::Path path,
-                                             StringLiteral errKey) {
+static const ljson::Array *getAnnotationArray(const ljson::Value &topValue,
+                                              StringRef key, ljson::Path path,
+                                              StringLiteral errKey) {
   // Top-level value must be an object
-  const json::Object *topObject = topValue.getAsObject();
+  const ljson::Object *topObject = topValue.getAsObject();
   if (!topObject) {
     path.report(ERR_EXPECTED_OBJECT);
     return nullptr;
   }
 
   // Look for the key at the top-level
-  const json::Value *opsValue = topObject->get(key);
-  json::Path opsPath = path.field(key);
+  const ljson::Value *opsValue = topObject->get(key);
+  ljson::Path opsPath = path.field(key);
   if (!opsValue) {
     opsPath.report(errKey);
     return nullptr;
   }
 
   // The value at the key must be an array
-  const json::Array *opsArray = opsValue->getAsArray();
+  const ljson::Array *opsArray = opsValue->getAsArray();
   if (!opsArray) {
     opsPath.field(key).report(ERR_EXPECTED_ARRAY);
     return nullptr;
@@ -137,19 +137,19 @@ static const StringLiteral MINIMUM_TRANS("minimum-trans"),
     OUTPUT_DELAY("output-delay"), UNBUF_DELAY("unbuf-delay");
 
 /// Deserializes a JSON value into a handshake::ChannelBufPropsAttr. See
-/// ::llvm::json::Value's documentation for a longer description of this
+/// ::llvm::ljson::Value's documentation for a longer description of this
 /// function's behavior.
-static bool fromJSON(const json::Value &value,
-                     handshake::ChannelBufPropsAttr &attr, json::Path path,
+static bool fromJSON(const ljson::Value &value,
+                     handshake::ChannelBufPropsAttr &attr, ljson::Path path,
                      MLIRContext *ctx) {
   // Under the "attribute-data" key must be a JSON object
-  const json::Object *data = value.getAsObject();
+  const ljson::Object *data = value.getAsObject();
   if (!data) {
     path.report(ERR_EXPECTED_OBJECT);
     return false;
   }
 
-  ChannelBufProps props;
+  handshake::ChannelBufProps props;
   // Map all supported keys to a callback to set the corresponding field in the
   // channel buffering properties
   std::map<StringRef, std::function<bool()>> keys;
@@ -217,7 +217,7 @@ struct BackAnnotatePass
       jsonString += line;
 
     // Try to parse the string as a JSON
-    llvm::Expected<json::Value> value = json::parse(jsonString);
+    llvm::Expected<ljson::Value> value = ljson::parse(jsonString);
     if (!value) {
       llvm::errs() << "Failed to parse back-annotation file at \"" << filepath
                    << "\"\n";
@@ -225,9 +225,9 @@ struct BackAnnotatePass
     }
 
     // Parse operation annotations and operand annotations
-    json::Path::Root jsonRoot(filepath);
-    if (failed(parseOpAnnotations(*value, json::Path(jsonRoot))) ||
-        failed(parseOprdAnnotations(*value, json::Path(jsonRoot)))) {
+    ljson::Path::Root jsonRoot(filepath);
+    if (failed(parseOpAnnotations(*value, ljson::Path(jsonRoot))) ||
+        failed(parseOprdAnnotations(*value, ljson::Path(jsonRoot)))) {
       jsonRoot.printErrorContext(*value, llvm::errs());
       return signalPassFailure();
     }
@@ -237,55 +237,55 @@ private:
   /// Parses operation annotations from the JSON and sets attributes on
   /// operations as requested. Fails if the JSON is badly formatted or if a
   /// referenced operation does not exist in the IR, succeeds otherwise.
-  LogicalResult parseOpAnnotations(const json::Value &topValue,
-                                   json::Path path);
+  LogicalResult parseOpAnnotations(const ljson::Value &topValue,
+                                   ljson::Path path);
 
   /// Parses operand annotations from the JSON and sets attributes on
   /// operands as requested. Fails if the JSON is badly formatted or if a
   /// referenced operand does not exist in the IR, succeeds otherwise.
-  LogicalResult parseOprdAnnotations(const json::Value &topValue,
-                                     json::Path path);
+  LogicalResult parseOprdAnnotations(const ljson::Value &topValue,
+                                     ljson::Path path);
 
   /// Looks for the operation referenced by the JSON object in the IR. `object`
   /// must contain a key "operation-name" whose value is the unique operation
   /// name to look for. Reports an error and returns nullptr on failure.
-  Operation *findOperation(const json::Object &object, json::Path path);
+  Operation *findOperation(const ljson::Object &object, ljson::Path path);
 
   /// Sets an attribute of the template type and of the provided name on the
   /// operation. The `value` should be the "attribute-data" key's value in the
   /// JSON file.
   template <typename Attr>
   LogicalResult setOpAttribute(Operation *op, StringRef attrName,
-                               const json::Value &value, json::Path path);
+                               const ljson::Value &value, ljson::Path path);
 
   /// Sets an attribute of the template type on the operand (internally stored
   /// on the owning operation). The attribute name is determined automatically
   /// based on the attribute type's container attribute type. The `value` should
   /// be the "attribute-data" key's value in the JSON file.
   template <typename Attr>
-  LogicalResult setOprdAttribute(OpOperand &oprd, const json::Value &value,
-                                 json::Path path);
+  LogicalResult setOprdAttribute(OpOperand &oprd, const ljson::Value &value,
+                                 ljson::Path path);
 };
 
 } // namespace
 
-LogicalResult BackAnnotatePass::parseOpAnnotations(const json::Value &topValue,
-                                                   json::Path path) {
+LogicalResult BackAnnotatePass::parseOpAnnotations(const ljson::Value &topValue,
+                                                   ljson::Path path) {
   // Try to get the "operations" array
-  const json::Array *opsArray = getAnnotationArray(
+  const ljson::Array *opsArray = getAnnotationArray(
       topValue, KEY_OPERATIONS, path, ERR_EXPECTED_OPERATIONS);
   if (!opsArray)
     return failure();
 
   // Initialize the path
-  json::Path arrayPath = path.field(KEY_OPERATIONS);
+  ljson::Path arrayPath = path.field(KEY_OPERATIONS);
 
   // Loop over the operation annotations
   for (auto [idx, opAnnotation] : llvm::enumerate(*opsArray)) {
-    json::Path opPath = arrayPath.index(idx);
+    ljson::Path opPath = arrayPath.index(idx);
 
     // Every operation annotation must be an object
-    const json::Object *opObject = opAnnotation.getAsObject();
+    const ljson::Object *opObject = opAnnotation.getAsObject();
     if (!opObject) {
       opPath.report(ERR_EXPECTED_OBJECT);
       return failure();
@@ -305,8 +305,8 @@ LogicalResult BackAnnotatePass::parseOpAnnotations(const json::Value &topValue,
       return failure();
 
     // Data key must exist
-    const json::Value *dataValue = opObject->get(KEY_DATA);
-    json::Path dataPath = opPath.field(KEY_DATA);
+    const ljson::Value *dataValue = opObject->get(KEY_DATA);
+    ljson::Path dataPath = opPath.field(KEY_DATA);
     if (!dataValue) {
       dataPath.report(ERR_EXPECTED_DATA);
       return failure();
@@ -318,7 +318,7 @@ LogicalResult BackAnnotatePass::parseOpAnnotations(const json::Value &topValue,
               op, attrName, *dataValue, dataPath)))
         return failure();
     } else {
-      json::Path attrTypePath = opPath.field(KEY_ATTR_TYPE);
+      ljson::Path attrTypePath = opPath.field(KEY_ATTR_TYPE);
       attrTypePath.report(ERR_UNKNOWN_ATTR_TYPE);
       return failure();
     }
@@ -328,23 +328,23 @@ LogicalResult BackAnnotatePass::parseOpAnnotations(const json::Value &topValue,
 }
 
 LogicalResult
-BackAnnotatePass::parseOprdAnnotations(const json::Value &topValue,
-                                       json::Path path) {
+BackAnnotatePass::parseOprdAnnotations(const ljson::Value &topValue,
+                                       ljson::Path path) {
   // Try to get the "operands" array
-  const json::Array *oprdsArray =
+  const ljson::Array *oprdsArray =
       getAnnotationArray(topValue, KEY_OPERANDS, path, ERR_EXPECTED_OPERANDS);
   if (!oprdsArray)
     return failure();
 
   // Initialize the path
-  json::Path arrayPath = path.field(KEY_OPERANDS);
+  ljson::Path arrayPath = path.field(KEY_OPERANDS);
 
   // Loop over the operand annotations
   for (auto [idx, oprdAnnotation] : llvm::enumerate(*oprdsArray)) {
-    json::Path oprdPath = arrayPath.index(idx);
+    ljson::Path oprdPath = arrayPath.index(idx);
 
     // Every operand annotation must be an object
-    const json::Object *opObject = oprdAnnotation.getAsObject();
+    const ljson::Object *opObject = oprdAnnotation.getAsObject();
     if (!opObject) {
       oprdPath.report(ERR_EXPECTED_OBJECT);
       return failure();
@@ -372,8 +372,8 @@ BackAnnotatePass::parseOprdAnnotations(const json::Value &topValue,
     OpOperand &oprd = op->getOpOperand(oprdIdx);
 
     // Data key must exist
-    const json::Value *dataValue = opObject->get(KEY_DATA);
-    json::Path dataPath = oprdPath.field(KEY_DATA);
+    const ljson::Value *dataValue = opObject->get(KEY_DATA);
+    ljson::Path dataPath = oprdPath.field(KEY_DATA);
     if (!dataValue) {
       dataPath.report(ERR_EXPECTED_DATA);
       return failure();
@@ -385,7 +385,7 @@ BackAnnotatePass::parseOprdAnnotations(const json::Value &topValue,
               oprd, *dataValue, dataPath)))
         return failure();
     } else {
-      json::Path attrTypePath = oprdPath.field(KEY_ATTR_TYPE);
+      ljson::Path attrTypePath = oprdPath.field(KEY_ATTR_TYPE);
       attrTypePath.report(ERR_UNKNOWN_ATTR_TYPE);
       return failure();
     }
@@ -394,8 +394,8 @@ BackAnnotatePass::parseOprdAnnotations(const json::Value &topValue,
   return success();
 }
 
-Operation *BackAnnotatePass::findOperation(const json::Object &object,
-                                           json::Path path) {
+Operation *BackAnnotatePass::findOperation(const ljson::Object &object,
+                                           ljson::Path path) {
   // Annotation must reference an operation name
   std::string opName;
   if (!fromJSONUnderKey(object, KEY_OPNAME, opName, path, ERR_EXPECTED_OPNAME))
@@ -413,7 +413,7 @@ Operation *BackAnnotatePass::findOperation(const json::Object &object,
 template <typename Attr>
 LogicalResult
 BackAnnotatePass::setOpAttribute(Operation *op, StringRef attrName,
-                                 const json::Value &value, json::Path path) {
+                                 const ljson::Value &value, ljson::Path path) {
   Attr attr;
   if (!fromJSON(value, attr, path, &getContext()))
     return failure();
@@ -423,8 +423,8 @@ BackAnnotatePass::setOpAttribute(Operation *op, StringRef attrName,
 
 template <typename Attr>
 LogicalResult BackAnnotatePass::setOprdAttribute(OpOperand &oprd,
-                                                 const json::Value &value,
-                                                 json::Path path) {
+                                                 const ljson::Value &value,
+                                                 ljson::Path path) {
   Attr attr;
   if (!fromJSON(value, attr, path, &getContext()))
     return failure();

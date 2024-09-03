@@ -17,6 +17,7 @@
 #include "dynamatic/Transforms/HandshakeCanonicalize.h"
 #include "dynamatic/Dialect/Handshake/HandshakeCanonicalize.h"
 #include "dynamatic/Dialect/Handshake/HandshakeOps.h"
+#include "dynamatic/Dialect/Handshake/HandshakeTypes.h"
 #include "dynamatic/Support/CFG.h"
 #include "mlir/Transforms/GreedyPatternRewriteDriver.h"
 
@@ -33,7 +34,7 @@ struct EraseUnconditionalBranches
 
   LogicalResult matchAndRewrite(handshake::BranchOp brOp,
                                 PatternRewriter &rewriter) const override {
-    rewriter.replaceOp(brOp, brOp.getDataOperand());
+    rewriter.replaceOp(brOp, brOp.getOperand());
     return success();
   }
 };
@@ -86,7 +87,7 @@ struct EraseSingleInputControlMerges
       return failure();
 
     Value dataRes = cmergeOp.getOperand(0);
-    Value indexRes = cmergeOp.getIndex();
+    TypedValue<handshake::ChannelType> indexRes = cmergeOp.getIndex();
     if (hasRealUses(indexRes)) {
       // If the index result has uses, then replace it with a sourced constant
       // with value 0 (the index of the cmerge's single input)
@@ -94,7 +95,7 @@ struct EraseSingleInputControlMerges
 
       // Create a source operation for the constant
       handshake::SourceOp srcOp = rewriter.create<handshake::SourceOp>(
-          cmergeOp->getLoc(), rewriter.getNoneType());
+          cmergeOp->getLoc(), handshake::ControlType::get(getContext()));
       inheritBB(cmergeOp, srcOp);
 
       /// NOTE: Sourcing this value may cause problems with very exotic uses of
@@ -103,10 +104,10 @@ struct EraseSingleInputControlMerges
       /// instead.
 
       // Build the attribute for the constant
-      Type indexResType = indexRes.getType();
+      Type indexResType = indexRes.getType().getDataType();
       handshake::ConstantOp cstOp = rewriter.create<handshake::ConstantOp>(
-          cmergeOp.getLoc(), indexResType,
-          rewriter.getIntegerAttr(indexResType, 0), srcOp.getResult());
+          cmergeOp.getLoc(), rewriter.getIntegerAttr(indexResType, 0),
+          srcOp.getResult());
       inheritBB(cmergeOp, cstOp);
 
       // Replace the cmerge's index result with a constant 0

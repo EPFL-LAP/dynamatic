@@ -28,10 +28,10 @@ int main(void) {
   inout_float_t x[30];
 
   for (int j = 0; j < 30; ++j) {
-    x[j] = (in_float_t)rand() / RAND_MAX;
+    x[j] = (float)(rand() / RAND_MAX);
     for (int k = 0; k < 30; ++k) {
-      A[j][k] = (in_float_t)rand() / RAND_MAX * 10;
-      B[j][k] = (in_float_t)rand() / RAND_MAX * 10;
+      A[j][k] = (float)(rand() / RAND_MAX * 10);
+      B[j][k] = (float)(rand() / RAND_MAX * 10);
     }
   }
 

@@ -251,8 +251,25 @@ def MemDependenceArrayAttr : Handshake_Attr<"MemDependenceArray", "deps"> {
 }
 
 //===----------------------------------------------------------------------===//
-// Buffer placement annotations
+// Buffer annotations
 //===----------------------------------------------------------------------===//
+
+def TimingInfo : TypeParameter<
+  "::dynamatic::handshake::TimingInfo", "timing information"> {
+}
+
+def TimingAttr : Handshake_Attr<"Timing", "timing"> {
+ let summary = "the timing characteristics of an operation";
+  let description = [{
+    Holds an operation's timing characteristics such as latencies between input
+    and output ports. Usually stored as an RTL parameter to guide the backend in
+    selecting an appropriate RTL module to implement the operation. 
+  }];
+  
+  let parameters = (ins TimingInfo:$info);
+  
+  let hasCustomAssemblyFormat = 1; 
+}
 
 def ChannelBufPropsAttr : Handshake_Attr<"ChannelBufProps", "channelBufProps"> {
   let summary = "Buffering properties of a single channel";
@@ -268,7 +285,7 @@ def ChannelBufPropsAttr : Handshake_Attr<"ChannelBufProps", "channelBufProps"> {
     delay (`delay`) when it is unbuffered, all in ns.
 
     Users of this attribute may wish to interact with it through the
-    dynamatic::ChannelBufProps struct, which represents the same information and
+    dynamatic::handshake::ChannelBufProps struct, which represents the same information and
     is easier to manipulate than the raw MLIR attribute.
   }];
   
@@ -282,7 +299,7 @@ def ChannelBufPropsAttr : Handshake_Attr<"ChannelBufProps", "channelBufProps"> {
                         );
 
   let builders = [
-    AttrBuilder<(ins "dynamatic::ChannelBufProps&":$props), [{
+    AttrBuilder<(ins "dynamatic::handshake::ChannelBufProps&":$props), [{
       return $_get(context, props.minTrans, props.maxTrans, props.minOpaque, 
         props.maxOpaque, 
         FloatAttr::get(mlir::Float32Type::get(context), props.inDelay), 
@@ -299,15 +316,17 @@ def ChannelBufPropsAttr : Handshake_Attr<"ChannelBufProps", "channelBufProps"> {
 
     /// Gets a ChannelBufProps instance that holds the same information as this
     /// attribute for easier data manipulation.
-    inline dynamatic::ChannelBufProps getProps() {
-      return dynamatic::ChannelBufProps(getMinTrans(), getMaxTrans(),
+    inline dynamatic::handshake::ChannelBufProps getProps() {
+      return dynamatic::handshake::ChannelBufProps(getMinTrans(), getMaxTrans(),
         getMinOpaque(), getMaxOpaque(), getInDelay().getValueAsDouble(),
         getOutDelay().getValueAsDouble(), getDelay().getValueAsDouble());
     }
   }];
 }
 
-def ChannelBufPropsContainerAttr : OperandContainerAttr<"ChannelBufPropsContainer", "bufProps"> {
+def ChannelBufPropsContainerAttr : OperandContainerAttr<
+  "ChannelBufPropsContainer", "bufProps"
+> {
   let summary = "Container around the `ChannelBufPropsAttr` operand attribute.";
   let description = [{
     Maps operands of an operation to their `ChannelBufPropsAttr` attribute, if
@@ -324,7 +343,9 @@ def ChannelBufPropsContainerAttr : OperandContainerAttr<"ChannelBufPropsContaine
 //===----------------------------------------------------------------------===//
 // CFDFC Extraction Results
 //===----------------------------------------------------------------------===//
-def CFDFCToBBListAttr : Handshake_Attr<"CFDFCToBBList", "cfdfcToBBList"> {
+def CFDFCToBBListAttr : Handshake_Attr<
+  "CFDFCToBBList", "cfdfcToBBList"
+> {
   let summary = "Maps CFDFC index to the list of BBs";
   let description = [{
     Holds a map from CFDFC index to the corresponding list of BB indices. For example
@@ -335,7 +356,7 @@ def CFDFCToBBListAttr : Handshake_Attr<"CFDFCToBBList", "cfdfcToBBList"> {
     an llvm::MapVector<int, std::vector<int>>.
   }];
 
-  let parameters = (ins "DictionaryAttr":$cfdfcMap);
+  let parameters = (ins "mlir::DictionaryAttr":$cfdfcMap);
 
   let assemblyFormat = " $cfdfcMap ";
 
@@ -357,7 +378,9 @@ def CFDFCToBBListAttr : Handshake_Attr<"CFDFCToBBList", "cfdfcToBBList"> {
   ];
 }
 
-def CFDFCThroughputAttr : Handshake_Attr<"CFDFCThroughput", "cfdfcThroughput"> {
+def CFDFCThroughputAttr : Handshake_Attr<
+  "CFDFCThroughput", "cfdfcThroughput"
+> {
   let summary = "Maps CFDFC index to the throughput value";
   let description = [{
     Holds a map from CFDFC index to the corresponding throughput value (floating value). For example,
@@ -368,7 +391,7 @@ def CFDFCThroughputAttr : Handshake_Attr<"CFDFCThroughput", "cfdfcThroughput"> {
     llvm::MapVector<int, double>
   }];
 
-  let parameters = (ins "DictionaryAttr":$throughputMap);
+  let parameters = (ins "mlir::DictionaryAttr":$throughputMap);
 
   let assemblyFormat = " $throughputMap ";
 

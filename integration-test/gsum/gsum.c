@@ -3,13 +3,13 @@
 // Implements a kernel with long-latency--loop-carried dependency in the loop
 // body
 //
-// Author: Jianyi Cheng, DSS
+// Author: Jianyi Cheng
 // https://zenodo.org/record/3561115
 //
 //===------------------------------------------------------------------===//
 
-#include "gsum.h"
 #include "dynamatic/Integration.h"
+#include "gsum.h"
 
 float gsum(in_float_t a[N]) {
   int i;

@@ -130,6 +130,7 @@ void executeVhdlTestbench(const VerificationContext &ctx,
     executeCommand(command);
   };
 
+  copyToVHDLDir("template_tb_join.vhd", "tb_join.vhd");
   copyToVHDLDir("template_two_port_RAM.vhd", "two_port_RAM.vhd");
   copyToVHDLDir("template_single_argument.vhd", "single_argument.vhd");
   copyToVHDLDir("template_simpackage.vhd", "simpackage.vhd");

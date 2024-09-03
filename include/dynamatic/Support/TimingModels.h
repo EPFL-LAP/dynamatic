@@ -19,12 +19,8 @@
 #ifndef DYNAMATIC_SUPPORT_TIMINGMODELS_H
 #define DYNAMATIC_SUPPORT_TIMINGMODELS_H
 
-#include "dynamatic/Dialect/Handshake/HandshakeOps.h"
 #include "dynamatic/Support/LLVM.h"
-#include "mlir/Dialect/Func/IR/FuncOps.h"
-#include "mlir/IR/MLIRContext.h"
-#include "mlir/Support/LogicalResult.h"
-#include "llvm/ADT/StringMap.h"
+#include "dynamatic/Support/Utils/Utils.h"
 #include "llvm/Support/JSON.h"
 #include <unordered_map>
 
@@ -32,12 +28,6 @@ namespace dynamatic {
 
 /// Maximum datawidth supported by the timing models.
 const unsigned MAX_DATAWIDTH = 64;
-
-/// The type of a signal in a handshake channel: DATA, VALID, or READY.
-enum class SignalType { DATA, VALID, READY };
-
-/// The type of a port: IN or OUT.
-enum class PortType { IN, OUT };
 
 /// Gets the datawidth of an operation, for use in determining which data point
 /// of a bitwidth-dependent metric to pick.
@@ -242,16 +232,5 @@ bool fromJSON(const llvm::json::Value &jsonValue, TimingDatabase &timingDB,
               llvm::json::Path path);
 
 } // namespace dynamatic
-
-namespace llvm {
-namespace json {
-/// Deserializes a JSON value into an unsigned number. This function is placed
-/// inside of the ::llvm::json namespace since the deserialization target type
-/// is a standard type. See ::llvm::json::Value's documentation for a longer
-/// description of this function's behavior.
-bool fromJSON(const llvm::json::Value &value, unsigned &number,
-              llvm::json::Path path);
-} // namespace json
-} // namespace llvm
 
 #endif // DYNAMATIC_SUPPORT_TIMINGMODELS_H

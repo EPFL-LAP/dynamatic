@@ -14,8 +14,10 @@
 
 #include "dynamatic/Transforms/BufferPlacement/HandshakePlaceBuffers.h"
 #include "dynamatic/Analysis/NameAnalysis.h"
+#include "dynamatic/Dialect/Handshake/HandshakeAttributes.h"
 #include "dynamatic/Dialect/Handshake/HandshakeOps.h"
 #include "dynamatic/Support/Attribute.h"
+#include "dynamatic/Dialect/Handshake/HandshakeTypes.h"
 #include "dynamatic/Support/CFG.h"
 #include "dynamatic/Support/Logging.h"
 #include "dynamatic/Transforms/BufferPlacement/BufferingSupport.h"
@@ -24,7 +26,6 @@
 #include "dynamatic/Transforms/BufferPlacement/FPL22Buffers.h"
 #include "dynamatic/Transforms/HandshakeMaterialize.h"
 #include "experimental/Support/StdProfiler.h"
-#include "mlir/IR/BuiltinTypes.h"
 #include "mlir/IR/OperationSupport.h"
 #include "mlir/Support/IndentedOstream.h"
 #include "llvm/ADT/StringRef.h"
@@ -213,10 +214,12 @@ LogicalResult HandshakePlaceBuffersPass::checkFuncInvariants(FuncInfo &info) {
     // Most operations should belong to a basic block for buffer placement to
     // work correctly. Don't outright fail in case one operation is outside of
     // all blocks but warn the user
-    if (!isa<handshake::SinkOp, handshake::MemoryOpInterface>(&op))
-      if (!getLogicBB(&op).has_value())
+    if (!isa<handshake::SinkOp, handshake::MemoryOpInterface>(&op)) {
+      if (!getLogicBB(&op).has_value()) {
         op.emitWarning() << "Operation does not belong to any block, MILP "
                             "behavior may be suboptimal or incorrect.";
+      }
+    }
 
     std::optional<unsigned> srcBB = opBlocks[&op];
     for (OpResult res : op.getResults()) {
@@ -224,14 +227,24 @@ LogicalResult HandshakePlaceBuffersPass::checkFuncInvariants(FuncInfo &info) {
       std::optional<unsigned> dstBB = opBlocks[user];
 
       // All transitions between blocks must exist in the original CFG
-      if (srcBB.has_value() && dstBB.has_value() && *srcBB != *dstBB &&
-          !transitions[*srcBB].contains(*dstBB))
+      if (srcBB && dstBB && *srcBB != *dstBB &&
+          !transitions[*srcBB].contains(*dstBB)) {
+        auto endBB = *opBlocks.at(info.funcOp.getBodyBlock()->getTerminator());
+        if (isa<ControlType>(res.getType()) && srcBB == ENTRY_BB &&
+            dstBB == endBB) {
+          /// NOTE: (lucas-rami) This is probably the start->end control channel
+          /// which goes from the entry block to the exit block. This is fine in
+          /// general so we let this pass without triggering a warning or error
+          continue;
+        }
+
         return op.emitError()
                << "Result " << res.getResultNumber() << " defined in block "
                << *srcBB << " is used in block " << *dstBB
                << ". This connection does not exist according to the CFG "
                   "graph. Solving the buffer placement MILP would yield an "
                   "incorrect placement.";
+      }
     }
   }
   return success();
@@ -314,7 +327,7 @@ HandshakePlaceBuffersPass::placeBuffers(FuncInfo &info,
   // Create and add the handshake.cfdfc attribute
   auto cfdfcMap =
       handshake::CFDFCToBBListAttr::get(info.funcOp.getContext(), cfdfcResult);
-  setUniqueAttr(info.funcOp, cfdfcMap);
+  setDialectAttr(info.funcOp, cfdfcMap);
 
   if (dumpLogs)
     logFuncInfo(info, *logger);
@@ -539,21 +552,18 @@ void HandshakePlaceBuffersPass::instantiateBuffers(BufferPlacement &placement) {
   MLIRContext *ctx = &getContext();
   OpBuilder builder(ctx);
   NameAnalysis &nameAnalysis = getAnalysis<NameAnalysis>();
-  StringAttr slotName = StringAttr::get(ctx, "slots");
+
   for (auto &[channel, placeRes] : placement) {
     Operation *opDst = *channel.getUsers().begin();
     builder.setInsertionPoint(opDst);
 
     Value bufferIn = channel;
-    auto placeBuffer = [&](StringRef bufName, unsigned numSlots) {
+    auto placeBuffer = [&](const TimingInfo &timing, unsigned numSlots) {
       if (numSlots == 0)
         return;
 
-      // Insert an opaque buffer
-      NamedAttribute slots(slotName, builder.getI32IntegerAttr(numSlots));
-      StringAttr opName = StringAttr::get(ctx, bufName);
-      auto *bufOp = builder.create(bufferIn.getLoc(), opName, bufferIn,
-                                   {bufferIn.getType()}, {slots});
+      auto bufOp = builder.create<handshake::BufferOp>(
+          bufferIn.getLoc(), bufferIn, timing, numSlots);
       inheritBB(opDst, bufOp);
       nameAnalysis.setName(bufOp);
 
@@ -563,11 +573,11 @@ void HandshakePlaceBuffersPass::instantiateBuffers(BufferPlacement &placement) {
     };
 
     if (placeRes.opaqueBeforeTrans) {
-      placeBuffer(handshake::OEHBOp::getOperationName(), placeRes.numOpaque);
-      placeBuffer(handshake::TEHBOp::getOperationName(), placeRes.numTrans);
+      placeBuffer(TimingInfo::oehb(), placeRes.numOpaque);
+      placeBuffer(TimingInfo::tehb(), placeRes.numTrans);
     } else {
-      placeBuffer(handshake::TEHBOp::getOperationName(), placeRes.numTrans);
-      placeBuffer(handshake::OEHBOp::getOperationName(), placeRes.numOpaque);
+      placeBuffer(TimingInfo::tehb(), placeRes.numTrans);
+      placeBuffer(TimingInfo::oehb(), placeRes.numOpaque);
     }
   }
 }

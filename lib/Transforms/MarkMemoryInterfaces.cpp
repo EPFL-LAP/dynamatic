@@ -14,8 +14,9 @@
 
 #include "dynamatic/Transforms/MarkMemoryInterfaces.h"
 #include "dynamatic/Analysis/NameAnalysis.h"
-#include "dynamatic/Dialect/Handshake/HandshakeOps.h"
+#include "dynamatic/Dialect/Handshake/HandshakeAttributes.h"
 #include "dynamatic/Support/Attribute.h"
+#include "mlir/Dialect/Affine/Analysis/AffineAnalysis.h"
 #include "mlir/Dialect/Affine/IR/AffineOps.h"
 #include "mlir/Dialect/Func/IR/FuncOps.h"
 #include "mlir/Dialect/MemRef/IR/MemRef.h"
@@ -122,7 +123,6 @@ void MarkMemoryInterfacesPass::markMemoryInterfaces(func::FuncOp funcOp) {
   // Find all memory operations and figure out whether they should connect to an
   // MC or an LSQ (if the latter, also figure out which LSQ group)
   NameAnalysis &nameAnalysis = getAnalysis<NameAnalysis>();
-  StringRef depAttrName = MemDependenceArrayAttr::getMnemonic();
   getOperation()->walk([&](Operation *op) {
     Value memref = getMemrefFromOp(op);
     if (!memref)
@@ -130,7 +130,7 @@ void MarkMemoryInterfacesPass::markMemoryInterfaces(func::FuncOp funcOp) {
 
     StringRef srcOpName = nameAnalysis.getName(op);
     bool connectToMC = true;
-    if (auto allDeps = op->getAttrOfType<MemDependenceArrayAttr>(depAttrName)) {
+    if (auto allDeps = getDialectAttr<MemDependenceArrayAttr>(op)) {
       for (MemDependenceAttr memDep : allDeps.getDependencies()) {
         // Both the source and destination operation need to connect to an LSQ
         StringRef dstOpName = memDep.getDstAccess();
@@ -158,11 +158,9 @@ void MarkMemoryInterfacesPass::markMemoryInterfaces(func::FuncOp funcOp) {
   MLIRContext *ctx = &getContext();
   for (auto &[_, regionInterfaces] : interfaces) {
     for (Operation *mcMemOp : regionInterfaces.connectToMC)
-      setUniqueAttr<MemInterfaceAttr>(mcMemOp, MemInterfaceAttr::get(ctx));
-    for (auto &[lsqMemOp, groupID] : regionInterfaces.connectToLSQ) {
-      MemInterfaceAttr attr = MemInterfaceAttr::get(ctx, groupID);
-      setUniqueAttr<MemInterfaceAttr>(lsqMemOp, attr);
-    }
+      setDialectAttr<MemInterfaceAttr>(mcMemOp, ctx);
+    for (auto &[lsqMemOp, groupID] : regionInterfaces.connectToLSQ)
+      setDialectAttr<MemInterfaceAttr>(lsqMemOp, ctx, groupID);
   }
 }
 

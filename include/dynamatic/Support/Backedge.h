@@ -99,9 +99,12 @@ private:
   Value value = nullptr;
   /// Whether the backedge was already assigned a real value.
   bool set = false;
+  // Optional pattern rewriter to replace uses of the edge with.
+  PatternRewriter *rewriter = nullptr;
 
-  /// `Backedge` is constructed exclusively by `BackedgeBuilder`.
-  Backedge(mlir::Operation *op);
+  /// `Backedge` is constructed exclusively by `BackedgeBuilder`, with an
+  /// optional pattern rewriter.
+  Backedge(mlir::Operation *op, PatternRewriter *rewriter = nullptr);
 };
 
 } // namespace dynamatic

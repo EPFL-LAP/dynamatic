@@ -11,13 +11,17 @@
 //===----------------------------------------------------------------------===//
 
 #include "dynamatic/Dialect/Handshake/MemoryInterfaces.h"
+#include "dynamatic/Dialect/Handshake/HandshakeAttributes.h"
+#include "dynamatic/Dialect/Handshake/HandshakeInterfaces.h"
 #include "dynamatic/Dialect/Handshake/HandshakeOps.h"
 #include "dynamatic/Support/Attribute.h"
 #include "dynamatic/Support/Backedge.h"
 #include "dynamatic/Support/CFG.h"
 #include "mlir/Dialect/Affine/IR/AffineOps.h"
 #include "mlir/Dialect/MemRef/IR/MemRef.h"
+#include "mlir/IR/MLIRContext.h"
 #include "mlir/IR/Value.h"
+#include "mlir/Transforms/DialectConversion.h"
 #include "llvm/ADT/SmallVector.h"
 #include "llvm/ADT/Twine.h"
 #include "llvm/ADT/TypeSwitch.h"
@@ -34,9 +38,9 @@ using namespace dynamatic::handshake;
 
 void MemoryOpLowering::recordReplacement(Operation *oldOp, Operation *newOp,
                                          bool forwardInterface) {
-  copyAttr<MemDependenceArrayAttr>(oldOp, newOp);
+  copyDialectAttr<MemDependenceArrayAttr>(oldOp, newOp);
   if (forwardInterface)
-    copyAttr<MemInterfaceAttr>(oldOp, newOp);
+    copyDialectAttr<MemInterfaceAttr>(oldOp, newOp);
   nameChanges[namer.getName(oldOp)] = namer.getName(newOp);
 }
 
@@ -51,7 +55,7 @@ bool MemoryOpLowering::renameDependencies(Operation *topLevelOp) {
       return;
 
     // Read potential memory dependencies stored on the memory operation
-    auto oldMemDeps = getUniqueAttr<MemDependenceArrayAttr>(memOp);
+    auto oldMemDeps = getDialectAttr<MemDependenceArrayAttr>(memOp);
     if (!oldMemDeps)
       return;
 
@@ -71,7 +75,7 @@ bool MemoryOpLowering::renameDependencies(Operation *topLevelOp) {
         newMemDeps.push_back(oldDep);
       }
     }
-    setUniqueAttr(memOp, MemDependenceArrayAttr::get(ctx, newMemDeps));
+    setDialectAttr<MemDependenceArrayAttr>(memOp, ctx, newMemDeps);
   });
 
   return anyChange;
@@ -103,6 +107,28 @@ void MemoryInterfaceBuilder::addLSQPort(unsigned group, Operation *memOp) {
 LogicalResult MemoryInterfaceBuilder::instantiateInterfaces(
     OpBuilder &builder, handshake::MemoryControllerOp &mcOp,
     handshake::LSQOp &lsqOp) {
+  BackedgeBuilder edgeBuilder(builder, memref.getLoc());
+
+  FConnectLoad connect = [&](LoadOpInterface loadOp, Value dataIn) {
+    loadOp->setOperand(1, dataIn);
+  };
+  return instantiateInterfaces(builder, edgeBuilder, connect, mcOp, lsqOp);
+}
+
+LogicalResult MemoryInterfaceBuilder::instantiateInterfaces(
+    PatternRewriter &rewriter, handshake::MemoryControllerOp &mcOp,
+    handshake::LSQOp &lsqOp) {
+  BackedgeBuilder edgeBuilder(rewriter, memref.getLoc());
+  FConnectLoad connect = [&](LoadOpInterface loadOp, Value dataIn) {
+    rewriter.updateRootInPlace(loadOp, [&] { loadOp->setOperand(1, dataIn); });
+  };
+  return instantiateInterfaces(rewriter, edgeBuilder, connect, mcOp, lsqOp);
+}
+
+LogicalResult MemoryInterfaceBuilder::instantiateInterfaces(
+    OpBuilder &builder, BackedgeBuilder &edgeBuilder,
+    const FConnectLoad &connect, handshake::MemoryControllerOp &mcOp,
+    handshake::LSQOp &lsqOp) {
 
   // Determine interfaces' inputs
   InterfaceInputs inputs;
@@ -120,10 +146,12 @@ LogicalResult MemoryInterfaceBuilder::instantiateInterfaces(
   if (!inputs.mcInputs.empty() && inputs.lsqInputs.empty()) {
     // We only need a memory controller
     mcOp = builder.create<handshake::MemoryControllerOp>(
-        loc, memref, inputs.mcInputs, inputs.mcBlocks, mcNumLoads);
+        loc, memref, memStart, inputs.mcInputs, ctrlEnd, inputs.mcBlocks,
+        mcNumLoads);
   } else if (inputs.mcInputs.empty() && !inputs.lsqInputs.empty()) {
     // We only need an LSQ
-    lsqOp = builder.create<handshake::LSQOp>(loc, memref, inputs.lsqInputs,
+    lsqOp = builder.create<handshake::LSQOp>(loc, memref, memStart,
+                                             inputs.lsqInputs, ctrlEnd,
                                              inputs.lsqGroupSizes, lsqNumLoads);
   } else {
     // We need a MC and an LSQ. They need to be connected with 4 new channels
@@ -134,10 +162,12 @@ LogicalResult MemoryInterfaceBuilder::instantiateInterfaces(
 
     // Create 3 backedges (load address, store address, store data) for the MC
     // inputs that will eventually come from the LSQ.
-    BackedgeBuilder edgeBuilder(builder, loc);
-    Backedge ldAddr = edgeBuilder.get(builder.getIndexType());
-    Backedge stAddr = edgeBuilder.get(builder.getIndexType());
-    Backedge stData = edgeBuilder.get(memrefType.getElementType());
+    MLIRContext *ctx = builder.getContext();
+    Type addrType = handshake::ChannelType::getAddrChannel(ctx);
+    Backedge ldAddr = edgeBuilder.get(addrType);
+    Backedge stAddr = edgeBuilder.get(addrType);
+    Backedge stData = edgeBuilder.get(
+        handshake::ChannelType::get(memrefType.getElementType()));
     inputs.mcInputs.push_back(ldAddr);
     inputs.mcInputs.push_back(stAddr);
     inputs.mcInputs.push_back(stData);
@@ -145,7 +175,8 @@ LogicalResult MemoryInterfaceBuilder::instantiateInterfaces(
     // Create the memory controller, adding 1 to its load count so that it
     // generates a load data result for the LSQ
     mcOp = builder.create<handshake::MemoryControllerOp>(
-        loc, memref, inputs.mcInputs, inputs.mcBlocks, mcNumLoads + 1);
+        loc, memref, memStart, inputs.mcInputs, ctrlEnd, inputs.mcBlocks,
+        mcNumLoads + 1);
 
     // Add the MC's load data result to the LSQ's inputs and create the LSQ,
     // passing a flag to the builder so that it generates the necessary
@@ -164,16 +195,16 @@ LogicalResult MemoryInterfaceBuilder::instantiateInterfaces(
   // At this point, all load ports are missing their second operand which is the
   // data value coming from a memory interface back to the port
   if (mcOp)
-    addMemDataResultToLoads(mcPorts, mcOp);
+    reconnectLoads(mcPorts, mcOp, connect);
   if (lsqOp)
-    addMemDataResultToLoads(lsqPorts, lsqOp);
+    reconnectLoads(lsqPorts, lsqOp, connect);
 
   return success();
 }
 
 SmallVector<Value, 2>
 MemoryInterfaceBuilder::getMemResultsToInterface(Operation *memOp) {
-  // For loads, address output go to memory
+  // For loads, address output goes to memory
   if (auto loadOp = dyn_cast<handshake::LoadOpInterface>(memOp))
     return SmallVector<Value, 2>{loadOp.getAddressOutput()};
 
@@ -185,21 +216,16 @@ MemoryInterfaceBuilder::getMemResultsToInterface(Operation *memOp) {
 
 Value MemoryInterfaceBuilder::getMCControl(Value ctrl, unsigned numStores,
                                            OpBuilder &builder) {
-  assert(isa<NoneType>(ctrl.getType()) && "control signal must have none type");
-  builder.setInsertionPointAfter(ctrl.getDefiningOp());
+  assert(isa<handshake::ControlType>(ctrl.getType()) &&
+         "control signal must have !handshake.control type");
+  if (Operation *defOp = ctrl.getDefiningOp())
+    builder.setInsertionPointAfter(defOp);
+  else
+    builder.setInsertionPointToStart(ctrl.getParentBlock());
   handshake::ConstantOp cstOp = builder.create<handshake::ConstantOp>(
-      ctrl.getLoc(), builder.getI32Type(), builder.getI32IntegerAttr(numStores),
-      ctrl);
+      ctrl.getLoc(), builder.getI32IntegerAttr(numStores), ctrl);
   inheritBBFromValue(ctrl, cstOp);
   return cstOp.getResult();
-}
-
-void MemoryInterfaceBuilder::setLoadDataOperand(
-    handshake::LoadOpInterface loadOp, Value dataIn) {
-  SmallVector<Value, 2> operands;
-  operands.push_back(loadOp->getOperand(0));
-  operands.push_back(dataIn);
-  loadOp->setOperands(operands);
 }
 
 LogicalResult
@@ -219,12 +245,12 @@ MemoryInterfaceBuilder::determineInterfaceInputs(InterfaceInputs &inputs,
       return failure();
     inputs.lsqInputs.push_back(groupCtrl);
 
-    // Them, add all memory port results that go the interface to the list of
+    // Then, add all memory port results that go the interface to the list of
     // LSQ inputs
-    for (Operation *lsqOp : lsqGroupOps)
+    for (Operation *lsqOp : lsqGroupOps) {
       llvm::copy(getMemResultsToInterface(lsqOp),
                  std::back_inserter(inputs.lsqInputs));
-
+    }
     // Add the size of the group to our list
     inputs.lsqGroupSizes.push_back(lsqGroupOps.size());
   }
@@ -236,7 +262,7 @@ MemoryInterfaceBuilder::determineInterfaceInputs(InterfaceInputs &inputs,
   // connected to an LSQ, since these requests end up being forwarded to the MC,
   // so we need to know the number of LSQ stores per basic block
   DenseMap<unsigned, unsigned> lsqStoresPerBlock;
-  for (auto [_, lsqGroupOps] : lsqPorts) {
+  for (auto &[_, lsqGroupOps] : lsqPorts) {
     for (Operation *lsqOp : lsqGroupOps) {
       if (isa<handshake::LSQStoreOp>(lsqOp)) {
         std::optional<unsigned> block = getLogicBB(lsqOp);
@@ -307,13 +333,14 @@ Value MemoryInterfaceBuilder::getCtrl(unsigned block) {
   return groupCtrl->second;
 }
 
-void MemoryInterfaceBuilder::addMemDataResultToLoads(InterfacePorts &ports,
-                                                     Operation *memIfaceOp) {
+void MemoryInterfaceBuilder::reconnectLoads(InterfacePorts &ports,
+                                            Operation *memIfaceOp,
+                                            const FConnectLoad &connect) {
   unsigned resIdx = 0;
   for (auto &[_, memGroupOps] : ports) {
     for (Operation *memOp : memGroupOps) {
       if (auto loadOp = dyn_cast<handshake::LoadOpInterface>(memOp))
-        setLoadDataOperand(loadOp, memIfaceOp->getResult(resIdx++));
+        connect(loadOp, memIfaceOp->getResult(resIdx++));
     }
   }
 }
@@ -338,7 +365,7 @@ void LSQGenerationInfo::fromPorts(FuncMemoryPorts &ports) {
   dataWidth = ports.dataWidth;
   addrWidth = ports.addrWidth;
 
-  handshake::LSQSizeAttr lsqSizeAttr = getUniqueAttr<handshake::LSQSizeAttr>(lsqOp);
+  handshake::LSQSizeAttr lsqSizeAttr = getDialectAttr<handshake::LSQSizeAttr>(lsqOp);
   if(lsqSizeAttr) {
     depthLoad = lsqSizeAttr.getLoadQueueSize();
     depthStore = lsqSizeAttr.getStoreQueueSize();
@@ -404,68 +431,4 @@ void LSQGenerationInfo::fromPorts(FuncMemoryPorts &ports) {
   capBiArray(storeOffsets, depthStore);
   capBiArray(loadPorts, depthLoad);
   capBiArray(storePorts, depthStore);
-}
-
-//===----------------------------------------------------------------------===//
-// Misc functions
-//===----------------------------------------------------------------------===//
-
-SmallVector<Value> dynamatic::getLSQControlPaths(handshake::LSQOp lsqOp,
-                                                 Operation *ctrlOp) {
-  // Accumulate all outputs of the control operation that are part of the memory
-  // control network
-  SmallVector<Value> controlValues;
-  // List of control channels to explore, starting from the control operation's
-  // results
-  SmallVector<Value, 4> controlChannels;
-  // Set of control operations already explored from the control operation's
-  // results (to avoid looping in the dataflow graph)
-  SmallPtrSet<Operation *, 4> controlOps;
-  for (OpResult res : ctrlOp->getResults()) {
-    // We only care for control-only channels
-    if (!isa<NoneType>(res.getType()))
-      continue;
-
-    // Reset the list of control channels to explore and the list of control
-    // operations that we have already visited
-    controlChannels.clear();
-    controlOps.clear();
-
-    controlChannels.push_back(res);
-    controlOps.insert(ctrlOp);
-    do {
-      Value val = controlChannels.pop_back_val();
-      for (Operation *succOp : val.getUsers()) {
-        // Make sure that we do not loop forever over the same control
-        // operations
-        if (auto [_, newOp] = controlOps.insert(succOp); !newOp)
-          continue;
-
-        if (succOp == lsqOp) {
-          // We have found a control path triggering a different group
-          // allocation to the LSQ, add it to our list
-          controlValues.push_back(res);
-          break;
-        }
-        llvm::TypeSwitch<Operation *, void>(succOp)
-            .Case<handshake::ConditionalBranchOp, handshake::BranchOp,
-                  handshake::MergeOp, handshake::MuxOp, handshake::ForkOp,
-                  handshake::LazyForkOp, handshake::BufferOpInterface>(
-                [&](auto) {
-                  // If the successor just propagates the control path, add
-                  // all its results to the list of control channels to
-                  // explore
-                  for (OpResult succRes : succOp->getResults())
-                    controlChannels.push_back(succRes);
-                })
-            .Case<handshake::ControlMergeOp>(
-                [&](handshake::ControlMergeOp cmergeOp) {
-                  // Only the control merge's data output forwards the input
-                  controlChannels.push_back(cmergeOp.getResult());
-                });
-      }
-    } while (!controlChannels.empty());
-  }
-
-  return controlValues;
 }
