@@ -386,6 +386,11 @@ FailureOr<handshake::FuncOp> LowerFuncToHandshake::lowerSignature(
   SmallVector<NamedAttribute> attrs = deriveNewAttributes(funcOp);
   auto newFuncOp = rewriter.create<handshake::FuncOp>(
       funcOp.getLoc(), funcOp.getName(), funTy, attrs);
+  if(funcOp.isExternal()){
+    rewriter.eraseOp(funcOp);
+    return newFuncOp;
+  }
+
   Region *oldBody = &funcOp.getBody();
 
   const TypeConverter *typeConv = getTypeConverter();
@@ -1165,22 +1170,41 @@ ConvertCalls::matchAndRewrite(func::CallOp callOp, OpAdaptor adaptor,
   Operation *lookup = modOp.lookupSymbol(symbol);
   if (!lookup)
     return callOp->emitError() << "call references unknown function";
-  auto calledFuncOp = dyn_cast<handshake::FuncOp>(lookup);
-  if (!calledFuncOp)
-    return callOp->emitError() << "call does not reference a function";
-  TypeRange resultTypes = calledFuncOp.getFunctionType().getResults();
+  TypeRange tmp_resultTypes;
+  // check if the function is a handshake function
+  auto calledFuncOp = dyn_cast<handshake::FuncOp>(lookup);  
+  if (!calledFuncOp){
+    // if this is not the case, the function might have been not traversed yet during the conversion
+    auto _calledFuncOp = dyn_cast<func::FuncOp>(lookup);
+    if(!_calledFuncOp)
+      return callOp->emitError() << "call does not reference a function";
+    tmp_resultTypes = _calledFuncOp.getFunctionType().getResults();
+  } else {
+    tmp_resultTypes = calledFuncOp.getFunctionType().getResults();
+  }
+  std::vector<mlir::Type> customTypeVector;
+  for (auto type : tmp_resultTypes){
+    customTypeVector.push_back( channelifyType(type) );
+  }
+  // add control type to the result types for the end output signal
+  customTypeVector.push_back( handshake::ControlType::get(rewriter.getContext()) );
+  TypeRange resultTypes( customTypeVector );
 
-  // Replace the call with the Handshake instance
   rewriter.setInsertionPoint(callOp);
   auto instOp = rewriter.create<handshake::InstanceOp>(
       callOp.getLoc(), callOp.getCallee(), resultTypes, operands);
   instOp->setDialectAttrs(callOp->getDialectAttrs());
   namer.replaceOp(callOp, instOp);
+  std::vector<Value> newResults;
+  for (auto result : instOp.getResults())
+    newResults.push_back(result);
+  newResults.pop_back(); 
   if (callOp->getNumResults() == 0)
     rewriter.eraseOp(callOp);
   else
-    rewriter.replaceOp(callOp, instOp->getResults());
+    rewriter.replaceOp(callOp, newResults);
   return success();
+
 }
 
 /// Determines whether it is possible to transform an arith-level constant into
