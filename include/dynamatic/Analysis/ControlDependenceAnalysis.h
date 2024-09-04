@@ -19,6 +19,7 @@
 #include "mlir/IR/Dominance.h"
 #include "mlir/Pass/AnalysisManager.h"
 #include "mlir/Transforms/DialectConversion.h"
+#include "llvm/ADT/StringMap.h"
 
 namespace dynamatic {
 
@@ -59,14 +60,14 @@ public:
 
   // given a FuncOp and a BB within that function, return all the BBs the bloc
   // is control dependant on.
-  LogicalResult getBlockAllControlDeps(Block *block, mlir::func::FuncOp &funcOp,
+  LogicalResult getBlockAllControlDeps(Block *block, std::string &funcOp,
                                        DenseSet<Block *> &allControlDeps) const;
 
   // given a FuncOp and a BB within that function, return all the BBs the bloc
   // is control dependant on, without taking into account backward dependencies
   // (i.e. excluding loop exits)
   LogicalResult
-  getBlockForwardControlDeps(Block *block, mlir::func::FuncOp &funcOp,
+  getBlockForwardControlDeps(Block *block, std::string &funcOp,
                              DenseSet<Block *> &forwardControlDeps) const;
 
   /// Invalidation hook to keep the analysis cached across passes. Returns true
@@ -76,7 +77,7 @@ public:
     return !pa.isPreserved<ControlDependenceAnalysis>();
   }
 
-  LogicalResult printAllBlocksDeps(mlir::func::FuncOp &) const;
+  LogicalResult printAllBlocksDeps(std::string &funcName) const;
 
 private:
   // Each block has a structure of type `BlockControlDeps` containing the list
@@ -90,7 +91,7 @@ private:
 
   // For each FuncOp, `funcBlocksControlDeps` stores a `BlockControlDeps` for
   // each block.
-  DenseMap<mlir::func::FuncOp, BlockControlDepsMap> funcBlocksControlDeps;
+  llvm::StringMap<BlockControlDepsMap> funcBlocksControlDeps;
 
   // Fill the `allControlDeps` field of the entry in `funcBlocksControlDeps`
   // corresponding to the input `funcOp`

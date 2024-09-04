@@ -29,9 +29,9 @@ using PathInDomTree = SmallVector<DominanceInfoNode *, 6>;
 
 void ControlDependenceAnalysis::identifyAllControlDeps(FuncOp &funcOp) {
   Region &funcReg = funcOp.getRegion();
-  // functions made up of 1 basic block do not have any dependencies
-  if (funcReg.hasOneBlock())
-    return;
+
+  // Get function name
+  std::string funcName = (std::string)funcOp.getName();
 
   // Get information about post-dominance
   PostDominanceInfo postDomInfo;
@@ -93,7 +93,7 @@ void ControlDependenceAnalysis::identifyAllControlDeps(FuncOp &funcOp) {
 
   // We are done calculating the dependencies of all blocks of this funcOp so
   // store them in the map
-  funcBlocksControlDeps[funcOp] = blockControlDepsMap;
+  funcBlocksControlDeps[funcName] = blockControlDepsMap;
 
   // Extract the forward dependencies for this function
   identifyForwardControlDeps(funcOp);
@@ -181,18 +181,22 @@ void ControlDependenceAnalysis::identifyForwardControlDeps(FuncOp &funcOp) {
   // Get information about post-dominance
   PostDominanceInfo postDomInfo;
 
+  // Get function name
+  std::string funcName = (std::string)funcOp.getName();
+
   for (Block &block : funcReg.getBlocks()) {
     // Extract the dependencies of this block to adjust them by removing
     // loop exit conditions, if any
     DenseSet<Block *> &allControlDeps =
-        funcBlocksControlDeps[funcOp][&block].allControlDeps;
+        funcBlocksControlDeps[funcName][&block].allControlDeps;
 
     for (Block *oneDep : allControlDeps) {
       CFGLoop *loop = li.getLoopFor(oneDep);
       if (!loop) {
         // indicating that the one_dep is not inside any loop, so it must be
         // a forward dependency
-        funcBlocksControlDeps[funcOp][&block].forwardControlDeps.insert(oneDep);
+        funcBlocksControlDeps[funcName][&block].forwardControlDeps.insert(
+            oneDep);
       } else {
         // indicating that the one_dep is inside a loop,
         // to decide if it is a forward dep or not, compare it against all
@@ -223,7 +227,7 @@ void ControlDependenceAnalysis::identifyForwardControlDeps(FuncOp &funcOp) {
         }
 
         if (!notForward)
-          funcBlocksControlDeps[funcOp][&block].forwardControlDeps.insert(
+          funcBlocksControlDeps[funcName][&block].forwardControlDeps.insert(
               oneDep);
       }
     }
@@ -231,39 +235,41 @@ void ControlDependenceAnalysis::identifyForwardControlDeps(FuncOp &funcOp) {
 }
 
 LogicalResult ControlDependenceAnalysis::getBlockAllControlDeps(
-    Block *block, FuncOp &funcOp, DenseSet<Block *> &allControlDeps) const {
-  if (!funcBlocksControlDeps.contains(funcOp))
-    return funcOp->emitError()
-           << "call to ControlDependenceAnalysis::getBlockAllControlDeps "
-              "on a FuncOp which was not analyzed";
+    Block *block, std::string &funcOp,
+    DenseSet<Block *> &allControlDeps) const {
+  if (!funcBlocksControlDeps.contains(funcOp)) {
+    llvm::errs() << "call to ControlDependenceAnalysis::getBlockAllControlDeps "
+                    "on a FuncOp which was not analyzed";
+    return failure();
+  }
   allControlDeps = funcBlocksControlDeps.lookup(funcOp)[block].allControlDeps;
   return success();
 }
 
 LogicalResult ControlDependenceAnalysis::getBlockForwardControlDeps(
-    Block *block, FuncOp &funcOp, DenseSet<Block *> &forwardControlDeps) const {
-  if (!funcBlocksControlDeps.contains(funcOp))
-    return funcOp->emitError()
-           << "call to ControlDependenceAnalysis::getBlockForwardControlDeps "
-              "on a FuncOp which was not analyzed";
+    Block *block, std::string &funcOp,
+    DenseSet<Block *> &forwardControlDeps) const {
+  if (!funcBlocksControlDeps.contains(funcOp)) {
+    llvm::errs()
+        << "call to ControlDependenceAnalysis::getBlockAllControlDeps "
+        << "call to ControlDependenceAnalysis::getBlockForwardControlDeps "
+           "on a FuncOp which was not analyzed";
+    return failure();
+  }
   forwardControlDeps =
       funcBlocksControlDeps.lookup(funcOp)[block].forwardControlDeps;
   return success();
 }
 
-LogicalResult ControlDependenceAnalysis::printAllBlocksDeps(
-    mlir::func::FuncOp &funcOp) const {
+LogicalResult
+ControlDependenceAnalysis::printAllBlocksDeps(std::string &funcOp) const {
 
-  Region &funcReg = funcOp.getRegion();
-
-  // functions made up of 1 basic block do not have any dependencies
-  if (funcReg.hasOneBlock())
-    return success();
-
-  if (!funcBlocksControlDeps.contains(funcOp))
-    return funcOp->emitError()
-           << "call to ControlDependenceAnalysis::printAllBlocksDeps on a "
-              "FuncOp which was not analyzed";
+  if (!funcBlocksControlDeps.contains(funcOp)) {
+    llvm::errs()
+        << "call to ControlDependenceAnalysis::printAllBlocksDeps on a "
+           "FuncOp which was not analyzed";
+    return failure();
+  }
 
   llvm::dbgs() << "\n*********************************\n\n";
   for (auto &elem : funcBlocksControlDeps.lookup(funcOp)) {
