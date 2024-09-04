@@ -19,7 +19,6 @@
 #include "mlir/IR/Dominance.h"
 #include "mlir/Pass/AnalysisManager.h"
 #include "mlir/Transforms/DialectConversion.h"
-#include "llvm/ADT/StringMap.h"
 
 namespace dynamatic {
 
@@ -28,15 +27,15 @@ namespace dynamatic {
 /// `getAnalysis<ControlDependenceAnalysis>()` and cache it to avoid
 /// recomputations for further passes using
 /// `markAnalysesPreserved<ControlDependenceAnalysis>()` at the end.
-///
+template <typename FunctionTypeIn>
 class ControlDependenceAnalysis {
 public:
   /// Constructor called automatically by
   /// `getAnalysis<ControlDependenceAnalysis>()` if the analysis is not already
   /// cached.
   ControlDependenceAnalysis(Operation *operation) {
-    // type-cast it into mlir::func::FuncOp
-    mlir::func::FuncOp funcOp = dyn_cast<mlir::func::FuncOp>(operation);
+    // type-cast it into FunctionTypeIn
+    FunctionTypeIn funcOp = dyn_cast<FunctionTypeIn>(operation);
     if (funcOp) {
       // if the operation is a function, then identify all the control
       // dependencies among its BBs
@@ -46,8 +45,8 @@ public:
       if (modOp) {
         // If the operation is a module, then analyze all the control
         // dependencies among the functions in contains
-        auto funcOps = modOp.getOps<mlir::func::FuncOp>();
-        for (mlir::func::FuncOp funcOp : llvm::make_early_inc_range(funcOps))
+        auto funcOps = modOp.getOps<FunctionTypeIn>();
+        for (FunctionTypeIn funcOp : llvm::make_early_inc_range(funcOps))
           identifyAllControlDeps(funcOp);
       } else {
         // report an error indicating that the analysis is instantiated over
@@ -60,14 +59,14 @@ public:
 
   // given a FuncOp and a BB within that function, return all the BBs the bloc
   // is control dependant on.
-  LogicalResult getBlockAllControlDeps(Block *block, std::string &funcOp,
+  LogicalResult getBlockAllControlDeps(Block *block, FunctionTypeIn &funcOp,
                                        DenseSet<Block *> &allControlDeps) const;
 
   // given a FuncOp and a BB within that function, return all the BBs the bloc
   // is control dependant on, without taking into account backward dependencies
   // (i.e. excluding loop exits)
   LogicalResult
-  getBlockForwardControlDeps(Block *block, std::string &funcOp,
+  getBlockForwardControlDeps(Block *block, FunctionTypeIn &funcOp,
                              DenseSet<Block *> &forwardControlDeps) const;
 
   /// Invalidation hook to keep the analysis cached across passes. Returns true
@@ -77,7 +76,7 @@ public:
     return !pa.isPreserved<ControlDependenceAnalysis>();
   }
 
-  LogicalResult printAllBlocksDeps(std::string &funcName) const;
+  LogicalResult printAllBlocksDeps(FunctionTypeIn &funcOp) const;
 
 private:
   // Each block has a structure of type `BlockControlDeps` containing the list
@@ -91,15 +90,15 @@ private:
 
   // For each FuncOp, `funcBlocksControlDeps` stores a `BlockControlDeps` for
   // each block.
-  llvm::StringMap<BlockControlDepsMap> funcBlocksControlDeps;
+  DenseMap<FunctionTypeIn, BlockControlDepsMap> funcBlocksControlDeps;
 
   // Fill the `allControlDeps` field of the entry in `funcBlocksControlDeps`
   // corresponding to the input `funcOp`
-  void identifyAllControlDeps(mlir::func::FuncOp &funcOp);
+  void identifyAllControlDeps(FunctionTypeIn &funcOp);
 
   // Fill the `forwardControlDeps` field of the entry in `funcBlocksControlDeps`
   // corresponding to the input `funcOp`
-  void identifyForwardControlDeps(mlir::func::FuncOp &funcOp);
+  void identifyForwardControlDeps(FunctionTypeIn &funcOp);
 
   // Given a start block and en end block withing a function region, return all
   // the post dominator trees
@@ -119,7 +118,7 @@ private:
 
   // adjusts the dependencies of each block to include nested dependencies
   // (i.e., the dependencies of its depenendencies)
-  void addDepsOfDeps(mlir::func::FuncOp &funcOp,
+  void addDepsOfDeps(FunctionTypeIn &funcOp,
                      BlockControlDepsMap &blockControlDepsMap);
 };
 

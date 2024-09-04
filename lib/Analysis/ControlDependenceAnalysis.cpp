@@ -16,6 +16,7 @@
 //===----------------------------------------------------------------------===//
 
 #include "dynamatic/Analysis/ControlDependenceAnalysis.h"
+#include "dynamatic/Dialect/Handshake/HandshakeOps.h"
 #include "mlir/Analysis/CFGLoopInfo.h"
 #include "mlir/IR/Dominance.h"
 #include "mlir/IR/Region.h"
@@ -27,11 +28,10 @@ using namespace dynamatic;
 
 using PathInDomTree = SmallVector<DominanceInfoNode *, 6>;
 
-void ControlDependenceAnalysis::identifyAllControlDeps(FuncOp &funcOp) {
+template <typename FunctionTypeIn>
+void ControlDependenceAnalysis<FunctionTypeIn>::identifyAllControlDeps(
+    FunctionTypeIn &funcOp) {
   Region &funcReg = funcOp.getRegion();
-
-  // Get function name
-  std::string funcName = (std::string)funcOp.getName();
 
   // Get information about post-dominance
   PostDominanceInfo postDomInfo;
@@ -93,13 +93,14 @@ void ControlDependenceAnalysis::identifyAllControlDeps(FuncOp &funcOp) {
 
   // We are done calculating the dependencies of all blocks of this funcOp so
   // store them in the map
-  funcBlocksControlDeps[funcName] = blockControlDepsMap;
+  funcBlocksControlDeps[funcOp] = blockControlDepsMap;
 
   // Extract the forward dependencies for this function
   identifyForwardControlDeps(funcOp);
 }
 
-void ControlDependenceAnalysis::enumeratePathsInPostDomTree(
+template <typename FunctionTypeIn>
+void ControlDependenceAnalysis<FunctionTypeIn>::enumeratePathsInPostDomTree(
     Block *startBlock, Block *endBlock, Region *funcReg,
     llvm::DominatorTreeBase<Block, true> *postDomTree,
     SmallVector<PathInDomTree, 6> *traversedNodes) {
@@ -121,7 +122,8 @@ void ControlDependenceAnalysis::enumeratePathsInPostDomTree(
 
 // DFS to return all nodes in the path between the start_node and end_node
 // (not including start_node and end_node) in the postDom tree
-void ControlDependenceAnalysis::enumeratePathsInPostDomTreeUtil(
+template <typename FunctionTypeIn>
+void ControlDependenceAnalysis<FunctionTypeIn>::enumeratePathsInPostDomTreeUtil(
     DominanceInfoNode *startNode, DominanceInfoNode *endNode,
     DenseMap<DominanceInfoNode *, bool> isVisited, PathInDomTree path,
     int pathIndex, SmallVector<PathInDomTree, 6> *traversedNodes) {
@@ -154,8 +156,9 @@ void ControlDependenceAnalysis::enumeratePathsInPostDomTreeUtil(
   isVisited[startNode] = false;
 }
 
-void ControlDependenceAnalysis::addDepsOfDeps(
-    FuncOp &funcOp, BlockControlDepsMap &blockControlDepsMap) {
+template <typename FunctionTypeIn>
+void ControlDependenceAnalysis<FunctionTypeIn>::addDepsOfDeps(
+    FunctionTypeIn &funcOp, BlockControlDepsMap &blockControlDepsMap) {
   Region &funcReg = funcOp.getRegion();
 
   for (Block &block : funcReg.getBlocks()) {
@@ -171,7 +174,9 @@ void ControlDependenceAnalysis::addDepsOfDeps(
   }
 }
 
-void ControlDependenceAnalysis::identifyForwardControlDeps(FuncOp &funcOp) {
+template <typename FunctionTypeIn>
+void ControlDependenceAnalysis<FunctionTypeIn>::identifyForwardControlDeps(
+    FunctionTypeIn &funcOp) {
   Region &funcReg = funcOp.getRegion();
   DominanceInfo domInfo;
   llvm::DominatorTreeBase<Block, false> &domTree = domInfo.getDomTree(&funcReg);
@@ -181,22 +186,18 @@ void ControlDependenceAnalysis::identifyForwardControlDeps(FuncOp &funcOp) {
   // Get information about post-dominance
   PostDominanceInfo postDomInfo;
 
-  // Get function name
-  std::string funcName = (std::string)funcOp.getName();
-
   for (Block &block : funcReg.getBlocks()) {
     // Extract the dependencies of this block to adjust them by removing
     // loop exit conditions, if any
     DenseSet<Block *> &allControlDeps =
-        funcBlocksControlDeps[funcName][&block].allControlDeps;
+        funcBlocksControlDeps[funcOp][&block].allControlDeps;
 
     for (Block *oneDep : allControlDeps) {
       CFGLoop *loop = li.getLoopFor(oneDep);
       if (!loop) {
         // indicating that the one_dep is not inside any loop, so it must be
         // a forward dependency
-        funcBlocksControlDeps[funcName][&block].forwardControlDeps.insert(
-            oneDep);
+        funcBlocksControlDeps[funcOp][&block].forwardControlDeps.insert(oneDep);
       } else {
         // indicating that the one_dep is inside a loop,
         // to decide if it is a forward dep or not, compare it against all
@@ -227,33 +228,36 @@ void ControlDependenceAnalysis::identifyForwardControlDeps(FuncOp &funcOp) {
         }
 
         if (!notForward)
-          funcBlocksControlDeps[funcName][&block].forwardControlDeps.insert(
+          funcBlocksControlDeps[funcOp][&block].forwardControlDeps.insert(
               oneDep);
       }
     }
   }
 }
 
-LogicalResult ControlDependenceAnalysis::getBlockAllControlDeps(
-    Block *block, std::string &funcOp,
+template <typename FunctionTypeIn>
+LogicalResult ControlDependenceAnalysis<FunctionTypeIn>::getBlockAllControlDeps(
+    Block *block, FunctionTypeIn &funcOp,
     DenseSet<Block *> &allControlDeps) const {
   if (!funcBlocksControlDeps.contains(funcOp)) {
     llvm::errs() << "call to ControlDependenceAnalysis::getBlockAllControlDeps "
-                    "on a FuncOp which was not analyzed";
+                    "on a FunctionTypeIn which was not analyzed";
     return failure();
   }
   allControlDeps = funcBlocksControlDeps.lookup(funcOp)[block].allControlDeps;
   return success();
 }
 
-LogicalResult ControlDependenceAnalysis::getBlockForwardControlDeps(
-    Block *block, std::string &funcOp,
+template <typename FunctionTypeIn>
+LogicalResult
+ControlDependenceAnalysis<FunctionTypeIn>::getBlockForwardControlDeps(
+    Block *block, FunctionTypeIn &funcOp,
     DenseSet<Block *> &forwardControlDeps) const {
   if (!funcBlocksControlDeps.contains(funcOp)) {
     llvm::errs()
         << "call to ControlDependenceAnalysis::getBlockAllControlDeps "
         << "call to ControlDependenceAnalysis::getBlockForwardControlDeps "
-           "on a FuncOp which was not analyzed";
+           "on a FunctionTypeIn which was not analyzed";
     return failure();
   }
   forwardControlDeps =
@@ -261,13 +265,14 @@ LogicalResult ControlDependenceAnalysis::getBlockForwardControlDeps(
   return success();
 }
 
-LogicalResult
-ControlDependenceAnalysis::printAllBlocksDeps(std::string &funcOp) const {
+template <typename FunctionTypeIn>
+LogicalResult ControlDependenceAnalysis<FunctionTypeIn>::printAllBlocksDeps(
+    FunctionTypeIn &funcOp) const {
 
   if (!funcBlocksControlDeps.contains(funcOp)) {
     llvm::errs()
         << "call to ControlDependenceAnalysis::printAllBlocksDeps on a "
-           "FuncOp which was not analyzed";
+           "FunctionTypeIn which was not analyzed";
     return failure();
   }
 
@@ -291,3 +296,11 @@ ControlDependenceAnalysis::printAllBlocksDeps(std::string &funcOp) const {
 
   return success();
 }
+
+namespace dynamatic {
+
+// Explicit template instantiation
+template class ControlDependenceAnalysis<mlir::func::FuncOp>;
+template class ControlDependenceAnalysis<handshake::FuncOp>;
+
+} // namespace dynamatic
