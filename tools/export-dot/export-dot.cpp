@@ -22,6 +22,7 @@
 #include "mlir/IR/BuiltinOps.h"
 #include "mlir/IR/MLIRContext.h"
 #include "mlir/Parser/Parser.h"
+#include "mlir/Support/IndentedOstream.h"
 #include "llvm/Support/CommandLine.h"
 #include "llvm/Support/InitLLVM.h"
 #include "llvm/Support/SourceMgr.h"
@@ -102,5 +103,6 @@ int main(int argc, char **argv) {
   }
 
   DOTPrinter printer(edgeStyle);
-  return failed(printer.print(*module));
+  raw_indented_ostream os(llvm::outs());
+  return failed(printer.write(*module, os));
 }

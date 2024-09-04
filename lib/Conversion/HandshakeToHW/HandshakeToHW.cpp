@@ -151,7 +151,7 @@ struct MemLoweringState {
   FuncMemoryPorts ports;
   /// Generates and stores the interface's port names before starting the
   /// conversion, when those are still queryable.
-  hw::PortNameGenerator portNames;
+  handshake::PortNamer portNames;
   /// Backedges to the containing module's `hw::OutputOp` operation, which
   /// must be set, in order, with the memory interface's results that connect
   /// to the top-level module IO.
@@ -897,7 +897,7 @@ static void addMemIO(ModuleBuilder &modBuilder, handshake::FuncOp funcOp,
 hw::ModulePortInfo getFuncPortInfo(handshake::FuncOp funcOp,
                                    ModuleLoweringState &state) {
   ModuleBuilder modBuilder(funcOp.getContext());
-  hw::PortNameGenerator portNames(funcOp);
+  handshake::PortNamer portNames(funcOp);
 
   // Add all function outputs to the module
   for (auto [idx, res] : llvm::enumerate(funcOp.getResultTypes()))
@@ -1053,7 +1053,7 @@ LogicalResult ConvertExternalFunc::matchAndRewrite(
 
   StringAttr name = rewriter.getStringAttr(funcOp.getName());
   ModuleBuilder modBuilder(funcOp.getContext());
-  hw::PortNameGenerator portNames(funcOp);
+  handshake::PortNamer portNames(funcOp);
 
   // Add all function outputs to the module
   for (auto [idx, res] : llvm::enumerate(funcOp.getResultTypes()))
@@ -1175,7 +1175,7 @@ template <typename T>
 LogicalResult ConvertToHWInstance<T>::matchAndRewrite(
     T op, OpAdaptor adaptor, ConversionPatternRewriter &rewriter) const {
   HWConverter converter(this->getContext());
-  hw::PortNameGenerator portNames(op);
+  handshake::PortNamer portNames(op);
 
   // Add all operation operands to the inputs
   for (auto [idx, oprd] : llvm::enumerate(adaptor.getOperands()))

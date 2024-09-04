@@ -15,6 +15,7 @@
 #include "dynamatic/Support/DOTPrinter.h"
 #include "dynamatic/Analysis/NameAnalysis.h"
 #include "dynamatic/Dialect/Handshake/HandshakeAttributes.h"
+#include "dynamatic/Dialect/Handshake/HandshakeInterfaces.h"
 #include "dynamatic/Dialect/Handshake/HandshakeOps.h"
 #include "dynamatic/Dialect/Handshake/HandshakeTypes.h"
 #include "dynamatic/Support/CFG.h"
@@ -45,6 +46,8 @@ using PortsData = std::vector<std::pair<std::string, Value>>;
 using MemPortsData = std::vector<std::tuple<std::string, Value, std::string>>;
 /// In legacy mode, a port represented with a unique name and a bitwidth
 using RawPort = std::pair<std::string, unsigned>;
+/// Output stream type.
+using OS = mlir::raw_indented_ostream;
 
 } // namespace
 
@@ -290,66 +293,50 @@ static StringRef getNodeColor(Operation *op) {
 
 DOTPrinter::DOTPrinter(EdgeStyle edgeStyle) : edgeStyle(edgeStyle) {}
 
-LogicalResult DOTPrinter::print(mlir::ModuleOp mod,
-                                mlir::raw_indented_ostream *os) {
+LogicalResult DOTPrinter::write(mlir::ModuleOp modOp, OS &os) {
   // We support at most one function per module
-  auto funcs = mod.getOps<handshake::FuncOp>();
+  auto funcs = modOp.getOps<handshake::FuncOp>();
   if (funcs.empty())
     return success();
 
   // We only support one function per module
   handshake::FuncOp funcOp = nullptr;
-  for (auto op : mod.getOps<handshake::FuncOp>()) {
+  for (auto op : modOp.getOps<handshake::FuncOp>()) {
     if (op.isExternal())
       continue;
     if (funcOp) {
-      return mod->emitOpError() << "we currently only support one non-external "
-                                   "handshake function per module";
+      return modOp->emitOpError()
+             << "we currently only support one non-external "
+                "handshake function per module";
     }
     funcOp = op;
   }
 
   // Name all operations in the IR
-  NameAnalysis nameAnalysis = NameAnalysis(mod);
+  NameAnalysis nameAnalysis = NameAnalysis(modOp);
   if (!nameAnalysis.isAnalysisValid())
     return failure();
   nameAnalysis.nameAllUnnamedOps();
 
   // Print the graph
-  if (os)
-    return printFunc(funcOp, *os);
-  mlir::raw_indented_ostream stdOs(llvm::outs());
-  return printFunc(funcOp, stdOs);
+  writeFunc(funcOp, os);
+  return success();
 }
 
-std::string DOTPrinter::getArgumentName(handshake::FuncOp funcOp, size_t idx) {
-  auto numArgs = funcOp.getNumArguments();
-  assert(idx < numArgs && "argument index too high");
-  return funcOp.getArgName(idx).getValue().str();
-}
-
-std::string DOTPrinter::getResultName(handshake::FuncOp funcOp, size_t idx) {
-  auto numResults = funcOp.getFunctionType().getNumResults();
-  assert(idx < numResults && "result index too high");
-  return funcOp.getResName(idx).getValue().str();
-}
-
-void DOTPrinter::openSubgraph(std::string &name, std::string &label,
-                              mlir::raw_indented_ostream &os) {
+void DOTPrinter::openSubgraph(StringRef name, StringRef label, OS &os) {
   os << "subgraph \"" << name << "\" {\n";
   os.indent();
   os << "label=\"" << label << "\"\n";
 }
 
-void DOTPrinter::closeSubgraph(mlir::raw_indented_ostream &os) {
+void DOTPrinter::closeSubgraph(OS &os) {
   os.unindent();
   os << "}\n";
 }
 
-LogicalResult DOTPrinter::printNode(Operation *op,
-                                    mlir::raw_indented_ostream &os) {
+void DOTPrinter::writeNode(Operation *op, OS &os) {
   if (isa<handshake::EndOp>(op))
-    return success();
+    return;
 
   // The node's DOT name
   std::string opName = getUniqueName(op).str();
@@ -379,37 +366,52 @@ LogicalResult DOTPrinter::printNode(Operation *op,
      << " [mlir_op=\"" << mlirOpName << "\", label=\"" << prettyLabel
      << "\", fillcolor=" << getNodeColor(op) << ", shape=\"" << shape
      << "\", style=\"" << style << "\"]\n";
-  return success();
 }
 
-LogicalResult DOTPrinter::printEdge(OpOperand &oprd,
-                                    mlir::raw_indented_ostream &os) {
+void DOTPrinter::writeEdge(OpOperand &oprd, const PortNames &portNames,
+                           OS &os) {
   Value val = oprd.get();
-  Operation *src = val.getDefiningOp();
-  Operation *dst = oprd.getOwner();
+  Operation *dstOp = oprd.getOwner();
 
-  std::string srcNodeName = getUniqueName(src).str();
-  std::string dstNodeName;
-  if (isa<handshake::EndOp>(dst)) {
-    dstNodeName = getResultName(dst->getParentOfType<handshake::FuncOp>(),
-                                oprd.getOperandNumber());
+  // Determine the edge's source
+  std::string srcNodeName, srcPortName;
+  unsigned srcIdx;
+  if (auto res = dyn_cast<OpResult>(val)) {
+    Operation *srcOp = res.getDefiningOp();
+    srcNodeName = getUniqueName(srcOp).str();
+    srcIdx = res.getResultNumber();
+    srcPortName = portNames.at(srcOp).getOutputName(srcIdx);
   } else {
-    dstNodeName = getUniqueName(dst).str();
+    Operation *parentOp = val.getParentBlock()->getParentOp();
+    srcIdx = cast<BlockArgument>(val).getArgNumber();
+    srcNodeName = srcPortName = portNames.at(parentOp).getInputName(srcIdx);
   }
 
-  os << "\"" << srcNodeName << "\" -> \"" << dstNodeName << "\" ["
-     << getEdgeStyle(oprd);
-  if (isBackedge(val, dst))
+  // Determine the edge's destination
+  std::string dstNodeName, dstPortName;
+  unsigned dstIdx;
+  if (isa<handshake::EndOp>(dstOp)) {
+    Operation *parentOp = dstOp->getParentOp();
+    dstIdx = oprd.getOperandNumber();
+    dstNodeName = dstPortName = portNames.at(parentOp).getOutputName(dstIdx);
+  } else {
+    dstNodeName = getUniqueName(dstOp).str();
+    dstIdx = oprd.getOperandNumber();
+    dstPortName = portNames.at(dstOp).getInputName(dstIdx);
+  }
+
+  os << "\"" << srcNodeName << "\" -> \"" << dstNodeName << "\" [from=\""
+     << srcPortName << "\", from_idx=\"" << srcIdx << "\" to=\"" << dstPortName
+     << "\", to_idx=\"" << dstIdx << "\", " << getEdgeStyle(oprd);
+  if (isBackedge(val, dstOp))
     os << " color=\"blue\"";
   // Print speculative edge attribute
   if (experimental::speculation::isSpeculative(oprd, true))
-    os << ((isBackedge(val, dst)) ? ", " : "") << " speculative=1";
+    os << ((isBackedge(val, dstOp)) ? ", " : "") << " speculative=1";
   os << "]\n";
-  return success();
 }
 
-LogicalResult DOTPrinter::printFunc(handshake::FuncOp funcOp,
-                                    mlir::raw_indented_ostream &os) {
+void DOTPrinter::writeFunc(handshake::FuncOp funcOp, OS &os) {
   std::string splines;
   if (edgeStyle == EdgeStyle::SPLINE)
     splines = "spline";
@@ -418,8 +420,13 @@ LogicalResult DOTPrinter::printFunc(handshake::FuncOp funcOp,
 
   os << "Digraph G {\n";
   os.indent();
-  os << "splines=" << splines << ";\n";
-  os << "compound=true; // Allow edges between clusters\n";
+  os << "splines=" << splines << "\ncompound=true\n";
+
+  // Collect port names for all operations and the top-level function
+  PortNames portNames;
+  portNames.try_emplace(funcOp, funcOp);
+  for (Operation &op : funcOp.getOps())
+    portNames.try_emplace(&op, &op);
 
   // Function arguments do not belong to any basic block
   os << "// Function arguments\n";
@@ -429,7 +436,7 @@ LogicalResult DOTPrinter::printFunc(handshake::FuncOp funcOp,
       // inside the function so they are not displayed
       continue;
 
-    std::string argLabel = getArgumentName(funcOp, idx);
+    StringRef argLabel = portNames.at(funcOp).getInputName(idx);
     os << "\"" << argLabel << R"(" [mlir_op="handshake.func", shape=diamond, )"
        << "label=\"" << argLabel << "\", style=\"" << getStyle(arg) << "\"]\n";
   }
@@ -438,7 +445,7 @@ LogicalResult DOTPrinter::printFunc(handshake::FuncOp funcOp,
   os << "// Function results\n";
   ValueRange results = funcOp.getBodyBlock()->getTerminator()->getOperands();
   for (const auto &[idx, res] : llvm::enumerate(results)) {
-    std::string resLabel = getResultName(funcOp, idx);
+    StringRef resLabel = portNames.at(funcOp).getOutputName(idx);
     os << "\"" << resLabel << R"(" [mlir_op="handshake.func", shape=diamond, )"
        << "label=\"" << resLabel << "\", style=\"" << getStyle(res) << "\"]\n";
   }
@@ -457,14 +464,12 @@ LogicalResult DOTPrinter::printFunc(handshake::FuncOp funcOp,
     // Open the subgraph
     os << "// Units/Channels in BB " << blockID << "\n";
     std::string graphName = "cluster" + std::to_string(blockID);
-    std::string graphLabel = "block" + std::to_string(blockID);
+    std::string graphLabel = "BB " + std::to_string(blockID);
     openSubgraph(graphName, graphLabel, os);
 
     os << "// Units in BB " << blockID << "\n";
-    for (Operation *op : blockOps) {
-      if (failed(printNode(op, os)))
-        return failure();
-    }
+    for (Operation *op : blockOps)
+      writeNode(op, os);
 
     os << "// Channels in BB " << blockID << "\n";
     for (Operation *op : blockOps) {
@@ -472,12 +477,10 @@ LogicalResult DOTPrinter::printFunc(handshake::FuncOp funcOp,
         for (OpOperand &oprd : res.getUses()) {
           Operation *userOp = oprd.getOwner();
           std::optional<unsigned> bb = getLogicBB(userOp);
-          if (bb && *bb == blockID && !isa<handshake::EndOp>(userOp)) {
-            if (failed(printEdge(oprd, os)))
-              return failure();
-          } else {
+          if (bb && *bb == blockID && !isa<handshake::EndOp>(userOp))
+            writeEdge(oprd, portNames, os);
+          else
             outgoingEdges[blockID].push_back(&oprd);
-          }
         }
       }
     }
@@ -487,49 +490,38 @@ LogicalResult DOTPrinter::printFunc(handshake::FuncOp funcOp,
   }
 
   os << "// Units outside of all basic blocks\n";
-  for (Operation *op : blocks.outOfBlocks) {
-    if (failed(printNode(op, os)))
-      return failure();
-  }
+  for (Operation *op : blocks.outOfBlocks)
+    writeNode(op, os);
 
   // Print edges coming from function arguments if they haven't been so far
   os << "// Channels from function arguments\n";
   for (auto [idx, arg] : llvm::enumerate(funcOp.getArguments())) {
     if (isa<MemRefType>(arg.getType()))
       continue;
-
-    for (OpOperand &oprd : arg.getUses()) {
-      Operation *ownerOp = oprd.getOwner();
-      std::string argLabel = getArgumentName(funcOp, idx);
-      os << "\"" << argLabel << "\" -> \"" << getUniqueName(ownerOp) << "\" ["
-         << getEdgeStyle(oprd) << "]\n";
-    }
+    for (OpOperand &oprd : arg.getUses())
+      writeEdge(oprd, portNames, os);
   }
 
   // Print outgoing edges for each block
   for (auto &[blockID, blockEdges] : outgoingEdges) {
     os << "// Channels outgoing of BB " << blockID << "\n";
-    for (OpOperand *oprd : blockEdges) {
-      if (failed(printEdge(*oprd, os)))
-        return failure();
-    }
+    for (OpOperand *oprd : blockEdges)
+      writeEdge(*oprd, portNames, os);
   }
 
   os << "// Channels outside of all basic blocks\n";
   for (Operation *op : blocks.outOfBlocks) {
     for (OpResult res : op->getResults()) {
-      for (OpOperand &oprd : res.getUses()) {
-        if (failed(printEdge(oprd, os)))
-          return failure();
-      }
+      for (OpOperand &oprd : res.getUses())
+        writeEdge(oprd, portNames, os);
     }
   }
+
   os.unindent();
   os << "}\n";
-  return success();
 }
 
-void DOTNode::print(mlir::raw_indented_ostream &os) {
+void DOTNode::print(OS &os) {
   // Print type
   os << "type=\"" << type << "\"";
   if (!stringAttr.empty() || !intAttr.empty())
@@ -552,7 +544,7 @@ void DOTNode::print(mlir::raw_indented_ostream &os) {
   }
 }
 
-void DOTEdge::print(mlir::raw_indented_ostream &os) {
+void DOTEdge::print(OS &os) {
   os << "from=\"out" << from << "\", to=\"in" << to << "\"";
   if (memAddress.has_value())
     os << ", mem_address=\"" << (memAddress.value() ? "true" : "false") << "\"";

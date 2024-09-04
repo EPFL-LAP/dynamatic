@@ -14,6 +14,7 @@
 #include "dynamatic/Analysis/NameAnalysis.h"
 #include "dynamatic/Dialect/HW/PortImplementation.h"
 #include "dynamatic/Dialect/Handshake/HandshakeDialect.h"
+#include "dynamatic/Dialect/Handshake/HandshakeInterfaces.h"
 #include "dynamatic/Dialect/Handshake/HandshakeOps.h"
 #include "dynamatic/Support/System.h"
 #include "dynamatic/Support/Utils/Utils.h"
@@ -30,7 +31,6 @@
 #include "llvm/ADT/APInt.h"
 #include "llvm/ADT/STLExtras.h"
 #include "llvm/ADT/StringRef.h"
-#include "llvm/ADT/TypeSwitch.h"
 #include "llvm/Support/CommandLine.h"
 #include "llvm/Support/ErrorHandling.h"
 #include "llvm/Support/InitLLVM.h"
@@ -76,133 +76,6 @@ struct SignalInfo {
   unsigned dstPortID;
 
   SignalInfo(Value val, StringRef signalName);
-
-  /// Finds the position (block index and operand index) of a value in the
-  /// inputs of a memory interface.
-  static std::pair<size_t, size_t> findValueInGroups(FuncMemoryPorts &ports,
-                                                     Value val) {
-    unsigned numGroups = ports.getNumGroups();
-    unsigned accInputIdx = 0;
-    for (size_t groupIdx = 0; groupIdx < numGroups; ++groupIdx) {
-      ValueRange groupInputs = ports.getGroupInputs(groupIdx);
-      accInputIdx += groupInputs.size();
-      for (auto [inputIdx, input] : llvm::enumerate(groupInputs)) {
-        if (input == val)
-          return std::make_pair(groupIdx, inputIdx);
-      }
-    }
-
-    // Value must belong to a port with another memory interface, find the one
-    for (auto [inputIdx, input] :
-         llvm::enumerate(ports.getInterfacesInputs())) {
-      if (input == val)
-        return std::make_pair(numGroups, inputIdx + accInputIdx);
-    }
-    llvm_unreachable("value should be an operand to the memory interface");
-  }
-
-  /// Corrects for different output port ordering conventions with legacy
-  /// Dynamatic.
-  static size_t fixOutputPortNumber(Operation *op, size_t idx) {
-    return llvm::TypeSwitch<Operation *, size_t>(op)
-        .Case<handshake::ConditionalBranchOp>([&](auto) {
-          // Legacy Dynamatic has the data operand before the condition operand
-          return idx;
-        })
-        .Case<handshake::LoadOpInterface, handshake::StoreOpInterface>(
-            [&](auto) {
-              // Legacy Dynamatic has the data operand/result before the address
-              // operand/result
-              return 1 - idx;
-            })
-        .Case<handshake::LSQOp>([&](handshake::LSQOp lsqOp) {
-          // Legacy Dynamatic places the end control signal before the signals
-          // going to the MC, if one is connected
-          LSQPorts lsqPorts = lsqOp.getPorts();
-          if (!lsqPorts.hasAnyPort<MCLoadStorePort>())
-            return idx;
-
-          // End control signal succeeded by laad address, store address, store
-          // data
-          if (idx == lsqOp.getNumResults() - 1)
-            return idx - 3;
-
-          // Signals to MC preceeded by end control signal
-          unsigned numLoads = lsqPorts.getNumPorts<LSQLoadPort>();
-          if (idx >= numLoads)
-            return idx + 1;
-          return idx;
-        })
-        .Default([&](auto) { return idx; });
-  }
-
-  /// Corrects for different input port ordering conventions with legacy
-  /// Dynamatic.
-  static size_t fixInputPortNumber(Operation *op, size_t idx) {
-    return llvm::TypeSwitch<Operation *, size_t>(op)
-        .Case<handshake::ConditionalBranchOp>([&](auto) {
-          // Legacy Dynamatic has the data operand before the condition operand
-          return 1 - idx;
-        })
-        .Case<handshake::LoadOpInterface, handshake::StoreOpInterface>(
-            [&](auto) {
-              // Legacy Dynamatic has the data operand/result before the address
-              // operand/result
-              return 1 - idx;
-            })
-        .Case<handshake::MemoryOpInterface>(
-            [&](handshake::MemoryOpInterface memOp) {
-              Value val = op->getOperand(idx);
-
-              // Legacy Dynamatic puts all control operands before all data
-              // operands, whereas for us each control operand appears just
-              // before the data inputs of the group it corresponds to
-              FuncMemoryPorts ports = getMemoryPorts(memOp);
-
-              // Determine total number of control operands
-              unsigned ctrlCount = ports.getNumPorts<ControlPort>();
-
-              // Figure out where the value lies
-              auto [groupIDx, opIdx] = findValueInGroups(ports, val);
-
-              if (groupIDx == ports.getNumGroups()) {
-                // If the group index is equal to the number of connected
-                // groups, then the operand index points directly to the
-                // matching port in legacy Dynamatic's conventions
-                return opIdx;
-              }
-
-              // Figure out at which index the value would be in legacy
-              // Dynamatic's interface
-              bool valGroupHasControl = ports.groups[groupIDx].hasControl();
-              if (opIdx == 0 && valGroupHasControl) {
-                // Value is a control input
-                size_t fixedIdx = 0;
-                for (size_t i = 0; i < groupIDx; i++)
-                  if (ports.groups[i].hasControl())
-                    fixedIdx++;
-                return fixedIdx;
-              }
-
-              // Value is a data input
-              size_t fixedIdx = ctrlCount;
-              for (size_t i = 0; i < groupIDx; i++) {
-                // Add number of data inputs corresponding to the group, minus
-                // the control input which was already accounted for (if
-                // present)
-                fixedIdx += ports.groups[i].getNumInputs();
-                if (ports.groups[i].hasControl())
-                  --fixedIdx;
-              }
-              // Add index offset in the group the value belongs to
-              if (valGroupHasControl)
-                fixedIdx += opIdx - 1;
-              else
-                fixedIdx += opIdx;
-              return fixedIdx;
-            })
-        .Default([&](auto) { return idx; });
-  }
 };
 
 struct ChannelState {
@@ -266,7 +139,7 @@ SignalInfo::SignalInfo(Value val, StringRef signalName)
   // Derive the source component's name and ID
   if (auto res = dyn_cast<OpResult>(val)) {
     Operation *producerOp = res.getOwner();
-    srcPortID = fixOutputPortNumber(producerOp, res.getResultNumber());
+    srcPortID = res.getResultNumber();
     srcComponent = getUniqueName(producerOp);
   } else {
     auto arg = cast<BlockArgument>(val);
@@ -284,7 +157,7 @@ SignalInfo::SignalInfo(Value val, StringRef signalName)
   OpOperand &oprd = *val.getUses().begin();
   Operation *consumerOp = oprd.getOwner();
   if (!isa<MemRefType>(oprd.get().getType()))
-    dstPortID = fixInputPortNumber(consumerOp, oprd.getOperandNumber());
+    dstPortID = oprd.getOperandNumber();
   dstComponent = getUniqueName(consumerOp);
 }
 
@@ -363,13 +236,13 @@ static LogicalResult mapSignalsToValues(mlir::ModuleOp modOp,
   }
 
   // First associate names to all function arguments
-  hw::PortNameGenerator argNameGen(funcOp);
+  handshake::PortNamer argNameGen(funcOp);
   for (auto [idx, arg] : llvm::enumerate(funcOp.getArguments()))
     ports.insert({argNameGen.getInputName(idx), arg});
 
   // First associate names to each operation's results
   for (Operation &op : funcOp.getOps()) {
-    hw::PortNameGenerator resNameGen(&op);
+    handshake::PortNamer resNameGen(&op);
     for (auto [idx, res] : llvm::enumerate(op.getResults())) {
       std::string signalName =
           getUniqueName(&op).str() + "_" + resNameGen.getOutputName(idx).str();

@@ -246,46 +246,6 @@ private:
   MLIRContext *ctx;
 };
 
-/// Provides an opaque interface for generating the port names of an operation;
-/// handshake operations generate names by the `handshake::NamedIOInterface`;
-/// other operations, such as arithmetic ones, are assigned default names.
-class PortNameGenerator {
-public:
-  /// Does nohting; no port name will be generated.
-  PortNameGenerator() = default;
-
-  /// Derives port names for the operation on object creation.
-  PortNameGenerator(Operation *op);
-
-  /// Returs the port name of the input at the specified index.
-  StringRef getInputName(unsigned idx) { return inputs[idx]; }
-
-  /// Returs the port name of the output at the specified index.
-  StringRef getOutputName(unsigned idx) { return outputs[idx]; }
-
-private:
-  /// Maps the index of an input or output to its port name.
-  using IdxToStrF = const std::function<std::string(unsigned)> &;
-
-  /// Infers port names for the operation using the provided callbacks.
-  void infer(Operation *op, IdxToStrF &inF, IdxToStrF &outF);
-
-  /// Infers default port names when nothing better can be achieved.
-  void inferDefault(Operation *op);
-
-  /// Infers port names for an operation implementing the
-  /// `handshake::NamedIOInterface` interface.
-  void inferFromNamedOpInterface(handshake::NamedIOInterface namedIO);
-
-  /// Infers port names for a Handshake function.
-  void inferFromFuncOp(handshake::FuncOp funcOp);
-
-  /// List of input port names.
-  SmallVector<std::string> inputs;
-  /// List of output port names.
-  SmallVector<std::string> outputs;
-};
-
 } // namespace hw
 } // namespace dynamatic
 
