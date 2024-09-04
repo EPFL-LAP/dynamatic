@@ -2262,36 +2262,6 @@ LogicalResult TruncIOp::verify() {
 }
 
 //===----------------------------------------------------------------------===//
-// FPToSIOp
-//===----------------------------------------------------------------------===//
-LogicalResult FPToSIOp::verify() {
-  ChannelType srcType = getIn().getType();
-  ChannelType dstType = getOut().getType();
-
-  if (srcType.getDataBitWidth() < dstType.getDataBitWidth()) {
-    return emitError() << "result channel's data type " << dstType.getDataType()
-                       << " must be narrower than operand type "
-                       << srcType.getDataType();
-  }
-  return success();
-}
-
-//===----------------------------------------------------------------------===//
-// FPToSIOp
-//===----------------------------------------------------------------------===//
-LogicalResult SIToFPOp::verify() {
-  ChannelType srcType = getIn().getType();
-  ChannelType dstType = getOut().getType();
-
-  if (srcType.getDataBitWidth() < dstType.getDataBitWidth()) {
-    return emitError() << "result channel's data type " << dstType.getDataType()
-                       << " must be narrower than operand type "
-                       << srcType.getDataType();
-  }
-  return success();
-}
-
-//===----------------------------------------------------------------------===//
 // ExtFOp
 //===----------------------------------------------------------------------===//
 LogicalResult ExtFOp::verify() {

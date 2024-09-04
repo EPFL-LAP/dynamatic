@@ -111,7 +111,6 @@ class Handshake_Arith_FToFCastOp<string mnemonic, list<Trait> traits = []> :
   let assemblyFormat = "$in attr-dict `:` type($in) `to` type($out)";
 
   // TODO: add folding operation
-  let hasVerifier = 1;
 }
 
 class Handshake_Arith_IToFCastOp<string mnemonic, list<Trait> traits = []> :
@@ -124,7 +123,6 @@ class Handshake_Arith_IToFCastOp<string mnemonic, list<Trait> traits = []> :
   let assemblyFormat = "$in attr-dict `:` type($in) `to` type($out)";
 
   // TODO: add folding operation
-  let hasVerifier = 1;
 }
 
 class Handshake_Arith_FToICastOp<string mnemonic, list<Trait> traits = []> :
@@ -137,7 +135,6 @@ class Handshake_Arith_FToICastOp<string mnemonic, list<Trait> traits = []> :
   let assemblyFormat = "$in attr-dict `:` type($in) `to` type($out)";
 
   // TODO: add folding operation
-  let hasVerifier = 1;
 }
 
 //===----------------------------------------------------------------------===//
@@ -342,6 +339,7 @@ def Handshake_FPToSIOp : Handshake_Arith_FToICastOp<"fptosi"> {
 def Handshake_ExtFOp : Handshake_Arith_FToFCastOp<"extf"> {
   let summary = "Floating point extension.";
   // TODO: add canonicalizer
+  let hasVerifier = 1;
 }
 
 #endif // DYNAMATIC_DIALECT_HANDSHAKE_HANDSHAKE_ARTIH_OPS_TD
