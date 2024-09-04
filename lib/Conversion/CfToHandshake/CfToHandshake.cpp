@@ -377,6 +377,11 @@ FailureOr<handshake::FuncOp> LowerFuncToHandshake::lowerSignature(
   SmallVector<NamedAttribute> attrs = deriveNewAttributes(funcOp);
   auto newFuncOp = rewriter.create<handshake::FuncOp>(
       funcOp.getLoc(), funcOp.getName(), funTy, attrs);
+  if (funcOp.isExternal()) {
+    rewriter.eraseOp(funcOp);
+    return newFuncOp;
+  }
+
   Region *oldBody = &funcOp.getBody();
 
   const TypeConverter *typeConv = getTypeConverter();
@@ -1086,21 +1091,35 @@ ConvertCalls::matchAndRewrite(func::CallOp callOp, OpAdaptor adaptor,
   Operation *lookup = modOp.lookupSymbol(symbol);
   if (!lookup)
     return callOp->emitError() << "call references unknown function";
-  auto calledFuncOp = dyn_cast<handshake::FuncOp>(lookup);
-  if (!calledFuncOp)
-    return callOp->emitError() << "call does not reference a function";
-  TypeRange resultTypes = calledFuncOp.getFunctionType().getResults();
+  TypeRange resultTypes;
+  // check if the function is a handshake function
+  auto calledHandshakeFuncOp = dyn_cast<handshake::FuncOp>(lookup);
+  if (!calledHandshakeFuncOp) {
+    // if this is not the case, the function might have been not traversed yet
+    // during the conversion
+    auto calledFuncOp = dyn_cast<func::FuncOp>(lookup);
+    if (!calledFuncOp)
+      return callOp->emitError() << "call does not reference a function";
+    resultTypes = calledFuncOp.getFunctionType().getResults();
+  } else {
+    resultTypes = calledHandshakeFuncOp.getFunctionType().getResults();
+  }
+  SmallVector<Type> handshakeResultTypes;
+  for (auto type : resultTypes)
+    handshakeResultTypes.push_back(channelifyType(type));
+  // add control type to the result types for the end output signal
+  handshakeResultTypes.push_back(
+      handshake::ControlType::get(rewriter.getContext()));
 
-  // Replace the call with the Handshake instance
   rewriter.setInsertionPoint(callOp);
   auto instOp = rewriter.create<handshake::InstanceOp>(
-      callOp.getLoc(), callOp.getCallee(), resultTypes, operands);
+      callOp.getLoc(), callOp.getCallee(), handshakeResultTypes, operands);
   instOp->setDialectAttrs(callOp->getDialectAttrs());
   namer.replaceOp(callOp, instOp);
   if (callOp->getNumResults() == 0)
     rewriter.eraseOp(callOp);
   else
-    rewriter.replaceOp(callOp, instOp->getResults());
+    rewriter.replaceOp(callOp, instOp.getResults().drop_back());
   return success();
 }
 
