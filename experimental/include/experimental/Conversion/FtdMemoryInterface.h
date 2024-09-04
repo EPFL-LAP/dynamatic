@@ -101,13 +101,6 @@ public:
       InterfaceInputs &inputs, OpBuilder &builder, DenseSet<Group *> &groups,
       DenseMap<Block *, Operation *> &forksGraphs, Value start,
       SmallVector<Operation *> &alloctionNetwork);
-
-  /// For a provided memory interface and its memory ports, set the data operand
-  /// of load-like operations with successive results of the memory interface.
-  /// Given a memory interface and its memory ports, set the data operands of
-  /// load-like operations with successive results of the memory inteface. The
-  /// address operand is reused across the different operations.
-  void addMemDataResultToLoads(InterfacePorts &ports, Operation *memIfaceOp);
 };
 
 } // namespace ftd

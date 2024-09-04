@@ -14,9 +14,11 @@
 #include "dynamatic/Dialect/Handshake/HandshakeOps.h"
 #include "dynamatic/Dialect/Handshake/MemoryInterfaces.h"
 #include "dynamatic/Support/CFG.h"
+#include "experimental/Support/BooleanLogic/BoolExpression.h"
 #include "mlir/Dialect/Affine/Utils.h"
 #include "mlir/Dialect/Arith/IR/Arith.h"
 #include "mlir/Dialect/ControlFlow/IR/ControlFlow.h"
+#include "mlir/Dialect/ControlFlow/IR/ControlFlowOps.h"
 #include "mlir/Dialect/Func/IR/FuncOps.h"
 #include "mlir/Dialect/Math/IR/Math.h"
 #include "mlir/IR/Block.h"
@@ -105,6 +107,8 @@ struct FtdCfToHandshakePass
 namespace dynamatic {
 namespace experimental {
 namespace ftd {
+
+using namespace boolean;
 
 // --- Helper functions ---
 
@@ -311,14 +315,8 @@ static void minimizeGroupsConnections(DenseSet<Group *> &groupsGraph) {
         // BB of the group currently under analysis
         if ((bp->preds.find(sp) != bp->preds.end()) &&
             domInfo.properlyDominates(bp->bb, group->bb)) {
-          llvm::dbgs() << "removing ";
-          sp->bb->printAsOperand(llvm::dbgs());
-          llvm::dbgs() << " from ";
-          group->bb->printAsOperand(llvm::dbgs());
-          llvm::dbgs() << "\n";
           predsToRemove.insert(sp);
         }
-        llvm::dbgs() << "\n";
       }
     }
 
@@ -329,7 +327,35 @@ static void minimizeGroupsConnections(DenseSet<Group *> &groupsGraph) {
   }
 }
 
-// --- End helper functions ---
+/// Allocate some joins in front of each lazy fork, so that the number of inputs
+/// for each of them is exactly one. The current inputs of the lazy forks become
+/// inputs for the joins.
+static LogicalResult
+joinInsertion(OpBuilder &builder, DenseSet<Group *> &groups,
+              DenseMap<Block *, Operation *> &forksGraph,
+              SmallVector<Operation *> &allocationNetwork) {
+  // For each group
+  for (Group *group : groups) {
+    // Get the corresponding fork and operands
+    Operation *forkNode = forksGraph[group->bb];
+    ValueRange operands = forkNode->getOperands();
+    // If the number of inputs is higher than one
+    if (operands.size() > 1) {
+
+      // Join all the inputs, and set the ouptut of this new element as input of
+      // the lazy fork
+      builder.setInsertionPointToStart(forkNode->getBlock());
+      auto joinOp =
+          builder.create<handshake::JoinOp>(forkNode->getLoc(), operands);
+      allocationNetwork.push_back(joinOp);
+      /// The result of the JoinOp becomes the input to the LazyFork
+      forkNode->setOperands(joinOp.getResult());
+    }
+  }
+  return success();
+}
+
+// -- -End helper functions-- -
 
 using ArgReplacements = DenseMap<BlockArgument, OpResult>;
 
@@ -337,7 +363,11 @@ LogicalResult FtdLowerFuncToHandshake::matchAndRewrite(
     func::FuncOp lowerFuncOp, OpAdaptor /*adaptor*/,
     ConversionPatternRewriter &rewriter) const {
 
-  if (failed(cdgAnalysis.printAllBlocksDeps(lowerFuncOp)))
+  FtdStoredOperations ftdOps;
+
+  std::string funcName = (std::string)lowerFuncOp.getName();
+
+  if (failed(cdgAnalysis.printAllBlocksDeps(funcName)))
     return failure();
 
   // Map all memory accesses in the matched function to the index of their
@@ -356,10 +386,6 @@ LogicalResult FtdLowerFuncToHandshake::matchAndRewrite(
   handshake::FuncOp funcOp = *funcOrFailure;
   if (funcOp.isExternal())
     return success();
-
-  // Get the initial start signal, which is the last argument of the
-  // function
-  auto startValue = (Value)funcOp.getArguments().back();
 
   // Stores mapping from each value that passes through a merge-like
   // operation to the data result of that merge operation
@@ -380,12 +406,8 @@ LogicalResult FtdLowerFuncToHandshake::matchAndRewrite(
   // instantiation logic)
   idBasicBlocks(funcOp, rewriter);
 
-  // Get the CFG loop information
-  mlir::DominanceInfo domInfo;
-  mlir::CFGLoopInfo loopInfo(domInfo.getDomTree(&funcOp.getBody()));
-
   if (failed(
-          ftdVerifyAndCreateMemInterfaces(funcOp, rewriter, memInfo, loopInfo)))
+          ftdVerifyAndCreateMemInterfaces(funcOp, rewriter, memInfo, ftdOps)))
     return failure();
 
   idBasicBlocks(funcOp, rewriter);
@@ -394,15 +416,18 @@ LogicalResult FtdLowerFuncToHandshake::matchAndRewrite(
 
 LogicalResult FtdLowerFuncToHandshake::ftdVerifyAndCreateMemInterfaces(
     handshake::FuncOp funcOp, ConversionPatternRewriter &rewriter,
-    MemInterfacesInfo &memInfo, mlir::CFGLoopInfo &li) const {
+    MemInterfacesInfo &memInfo, FtdStoredOperations &ftdOps) const {
 
   if (memInfo.empty())
     return success();
 
+  // Get the CFG loop information
+  mlir::DominanceInfo domInfo;
+  mlir::CFGLoopInfo loopInfo(domInfo.getDomTree(&funcOp.getBody()));
+
   // Create a mapping between each block and all the other blocks it
   // properly dominates so that we can quickly determine whether LSQ groups
   // make sense
-  DominanceInfo domInfo;
   DenseMap<Block *, DenseSet<Block *>> dominations;
   for (Block &maybeDominator : funcOp) {
     // Start with an empty set of dominated blocks for each potential
@@ -515,19 +540,42 @@ LogicalResult FtdLowerFuncToHandshake::ftdVerifyAndCreateMemInterfaces(
       // 2. One of them is a write operations;
       // 3. They are not mutually exclusive.
       SmallVector<ProdConsMemDep> allMemDeps;
-      identifyMemoryDependencies(allOperations, allMemDeps, li);
+      identifyMemoryDependencies(allOperations, allMemDeps, loopInfo);
 
       for (auto &dep : allMemDeps)
         dep.printDependency();
 
-      /// Stores the Groups graph required for the allocation network
-      /// analysis
+      // Get the initial start signal, which is the last argument of the
+      // function
+      auto startValue = (Value)funcOp.getArguments().back();
+
+      // Stores the Groups graph required for the allocation network
+      // analysis
       DenseSet<Group *> groupsGraph;
       constructGroupsGraph(allOperations, allMemDeps, groupsGraph);
       minimizeGroupsConnections(groupsGraph);
 
       for (auto &g : groupsGraph)
         g->printDependenices();
+
+      // Build the memory interfaces
+      handshake::MemoryControllerOp mcOp;
+      handshake::LSQOp lsqOp;
+
+      // As we instantiate the interfaces for the LSQ for each memory operation,
+      // we need to add some forks in order for the control input to be
+      // propagated. In particular, we want to keep track of the control valuea
+      // associated to each basic block in the region
+      DenseMap<Block *, Operation *> forksGraph;
+
+      if (failed(memBuilder.instantiateInterfacesWithForks(
+              rewriter, mcOp, lsqOp, groupsGraph, forksGraph, startValue,
+              ftdOps.allocationNetwork)))
+        return failure();
+
+      if (failed(joinInsertion(rewriter, groupsGraph, forksGraph,
+                               ftdOps.allocationNetwork)))
+        return failure();
 
       // [TODO] This branch is not completed yet...
     }

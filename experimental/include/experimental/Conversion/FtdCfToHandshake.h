@@ -34,6 +34,31 @@ namespace dynamatic {
 namespace experimental {
 namespace ftd {
 
+struct FtdStoredOperations {
+
+  /// contains all operations created by fast token delivery algorithm
+  SmallVector<Operation *> allocationNetwork;
+
+  /// contains all `handshake::MergeOp` created by `addPhi`
+  SmallVector<Operation *> phiMerges;
+
+  /// contains all `handshake::BranchOp` created by `manageMoreProdThanCons`
+  /// or `manageDifferentRegeneration`
+  std::vector<Operation *> suppBranches;
+
+  /// contains all `handshake::BranchOp` created by `manageSelfRegeneration`
+  SmallVector<Operation *> selfGenBranches;
+
+  /// contains all `handshake::MergeOp` added in the straight LSQ
+  SmallVector<Operation *> memDepLoopMerges;
+
+  /// contains all `handshake::MuxOp` created by Shannon
+  SmallVector<Operation *> shannonMUXes;
+
+  /// contains all constants created by `addInit` or for Shannon’s
+  SmallVector<Operation *> networkConstants;
+};
+
 /// Convert a func-level function into an handshake-level function. A custom
 /// behavior is defined so that the functionalities of the `fast delivery token`
 /// methodology can be implemented.
@@ -57,11 +82,15 @@ public:
                   ConversionPatternRewriter &rewriter) const override;
 
 protected:
+  /// Throughout the execution of the fast delivery token, some operations have
+  /// to be saved so that they can be looked up afterwards. These information
+  /// are all local to each `func::funcOp`/`handshake::funcOp`, so they can be
+  /// created within each call to `matchAndRewrite`.
   ControlDependenceAnalysis cdgAnalysis;
 
   LogicalResult ftdVerifyAndCreateMemInterfaces(
       handshake::FuncOp funcOp, ConversionPatternRewriter &rewriter,
-      MemInterfacesInfo &memInfo, mlir::CFGLoopInfo &li) const;
+      MemInterfacesInfo &memInfo, FtdStoredOperations &ftdOps) const;
 
   /// Given a list of operations, return the list of memory dependencies for
   /// each block. This allows to build the group graph, which allows to
@@ -72,6 +101,12 @@ protected:
   void identifyMemoryDependencies(const SmallVector<Operation *> &operations,
                                   SmallVector<ProdConsMemDep> &allMemDeps,
                                   const mlir::CFGLoopInfo &li) const;
+
+  LogicalResult
+  addMergeNonLoop(handshake::FuncOp &funcOp, OpBuilder &builder,
+                  std::vector<ProdConsMemDep> &allMemDeps,
+                  DenseSet<Group *> &groups,
+                  DenseMap<Block *, Operation *> &forksGraph) const;
 };
 
 #define GEN_PASS_DECL_FTDCFTOHANDSHAKE

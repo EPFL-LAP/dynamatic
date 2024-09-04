@@ -42,30 +42,46 @@ LogicalResult FtdMemoryInterfaceBuilder::instantiateInterfacesWithForks(
     DenseMap<Block *, Operation *> &forksGraph, Value start,
     SmallVector<Operation *> &alloctionNetwork) {
 
-  // Determine interfaces' inputs
-  InterfaceInputs inputs;
+  // Get the edgeBuilder
+  BackedgeBuilder edgeBuilder(builder, memref.getLoc());
 
-  if (failed(determineInterfaceInputsWithForks(
-          inputs, builder, groups, forksGraph, start, alloctionNetwork)))
+  // Connect function
+  FConnectLoad connect = [&](LoadOpInterface loadOp, Value dataIn) {
+    loadOp->setOperand(1, dataIn);
+  };
+
+  // Determine interfaces' inputs
+  InterfaceInputs interfaceInputs;
+  if (failed(determineInterfaceInputsWithForks(interfaceInputs, builder, groups,
+                                               forksGraph, start,
+                                               alloctionNetwork)))
     return failure();
-  if (inputs.mcInputs.empty() && inputs.lsqInputs.empty())
+
+  // If we need no inputs both for the standard memory controller and the LSQ,
+  // then nothing has to be instantiated.
+  if (interfaceInputs.mcInputs.empty() && interfaceInputs.lsqInputs.empty())
     return success();
+
   mcOp = nullptr;
   lsqOp = nullptr;
 
   builder.setInsertionPointToStart(&funcOp.front());
   Location loc = memref.getLoc();
 
-  if (!inputs.mcInputs.empty() && inputs.lsqInputs.empty()) {
-    // We only need a memory controller
+  if (!interfaceInputs.mcInputs.empty() && interfaceInputs.lsqInputs.empty()) {
+    // We only need a memory controller if the LSQ is not necessary (number of
+    // inputs is zero)
     mcOp = builder.create<handshake::MemoryControllerOp>(
-        loc, memref, memStart, inputs.mcInputs, ctrlEnd, inputs.mcBlocks,
-        mcNumLoads);
-  } else if (inputs.mcInputs.empty() && !inputs.lsqInputs.empty()) {
-    // We only need an LSQ
-    lsqOp = builder.create<handshake::LSQOp>(loc, memref, memStart,
-                                             inputs.lsqInputs, ctrlEnd,
-                                             inputs.lsqGroupSizes, lsqNumLoads);
+        loc, memref, memStart, interfaceInputs.mcInputs, ctrlEnd,
+        interfaceInputs.mcBlocks, mcNumLoads);
+  } else if (interfaceInputs.mcInputs.empty() &&
+             !interfaceInputs.lsqInputs.empty()) {
+    // We only need an LSQ if the memory controller is not necessary (number of
+    // inputs is zero)
+    lsqOp = builder.create<handshake::LSQOp>(
+        loc, memref, memStart, interfaceInputs.lsqInputs, ctrlEnd,
+        interfaceInputs.lsqGroupSizes, lsqNumLoads);
+
   } else {
     // We need a MC and an LSQ. They need to be connected with 4 new channels
     // so that the LSQ can forward its loads and stores to the MC. We need
@@ -75,26 +91,30 @@ LogicalResult FtdMemoryInterfaceBuilder::instantiateInterfacesWithForks(
 
     // Create 3 backedges (load address, store address, store data) for the MC
     // inputs that will eventually come from the LSQ.
-    BackedgeBuilder edgeBuilder(builder, loc);
-    Backedge ldAddr = edgeBuilder.get(builder.getIndexType());
-    Backedge stAddr = edgeBuilder.get(builder.getIndexType());
-    Backedge stData = edgeBuilder.get(memrefType.getElementType());
-    inputs.mcInputs.push_back(ldAddr);
-    inputs.mcInputs.push_back(stAddr);
-    inputs.mcInputs.push_back(stData);
+
+    MLIRContext *ctx = builder.getContext();
+    Type addrType = handshake::ChannelType::getAddrChannel(ctx);
+    Backedge ldAddr = edgeBuilder.get(addrType);
+    Backedge stAddr = edgeBuilder.get(addrType);
+    Backedge stData = edgeBuilder.get(
+        handshake::ChannelType::get(memrefType.getElementType()));
+    interfaceInputs.mcInputs.push_back(ldAddr);
+    interfaceInputs.mcInputs.push_back(stAddr);
+    interfaceInputs.mcInputs.push_back(stData);
 
     // Create the memory controller, adding 1 to its load count so that it
     // generates a load data result for the LSQ
     mcOp = builder.create<handshake::MemoryControllerOp>(
-        loc, memref, memStart, inputs.mcInputs, ctrlEnd, inputs.mcBlocks,
-        mcNumLoads + 1);
+        loc, memref, memStart, interfaceInputs.mcInputs, ctrlEnd,
+        interfaceInputs.mcBlocks, mcNumLoads + 1);
 
     // Add the MC's load data result to the LSQ's inputs and create the LSQ,
     // passing a flag to the builder so that it generates the necessary
     // outputs that will go to the MC
-    inputs.lsqInputs.push_back(mcOp.getOutputs().back());
-    lsqOp = builder.create<handshake::LSQOp>(loc, mcOp, inputs.lsqInputs,
-                                             inputs.lsqGroupSizes, lsqNumLoads);
+    interfaceInputs.lsqInputs.push_back(mcOp.getOutputs().back());
+    lsqOp = builder.create<handshake::LSQOp>(
+        loc, mcOp, interfaceInputs.lsqInputs, interfaceInputs.lsqGroupSizes,
+        lsqNumLoads);
 
     // Resolve the backedges to fully connect the MC and LSQ
     ValueRange lsqMemResults = lsqOp.getOutputs().take_back(3);
@@ -106,28 +126,11 @@ LogicalResult FtdMemoryInterfaceBuilder::instantiateInterfacesWithForks(
   // At this point, all load ports are missing their second operand which is the
   // data value coming from a memory interface back to the port
   if (mcOp)
-    addMemDataResultToLoads(mcPorts, mcOp);
+    reconnectLoads(mcPorts, mcOp, connect);
   if (lsqOp)
-    addMemDataResultToLoads(lsqPorts, lsqOp);
+    reconnectLoads(lsqPorts, lsqOp, connect);
 
   return success();
-}
-
-void FtdMemoryInterfaceBuilder::addMemDataResultToLoads(InterfacePorts &ports,
-                                                        Operation *memIfaceOp) {
-  unsigned resIdx = 0;
-  for (auto &[_, memGroupOps] : ports) {
-    for (Operation *memOp : memGroupOps) {
-      if (auto loadOp = dyn_cast<handshake::LoadOpInterface>(memOp)) {
-        Value dataIn = memIfaceOp->getResult(resIdx);
-        SmallVector<Value, 2> operands;
-        operands.push_back(loadOp->getOperand(0));
-        operands.push_back(dataIn);
-        loadOp->setOperands(operands);
-        resIdx++;
-      }
-    }
-  }
 }
 
 LogicalResult FtdMemoryInterfaceBuilder::determineInterfaceInputsWithForks(
@@ -135,41 +138,56 @@ LogicalResult FtdMemoryInterfaceBuilder::determineInterfaceInputsWithForks(
     DenseMap<Block *, Operation *> &forksGraph, Value start,
     SmallVector<Operation *> &alloctionNetwork) {
 
-  // Create the Fork nodes
+  // Create the fork nodes: for each group among the set of groups
   for (Group *group : groups) {
-    Block *b = group->bb;
-    builder.setInsertionPointToStart(b);
+    Block *bb = group->bb;
+    builder.setInsertionPointToStart(bb);
+
+    // Add a lazy fork with two outputs, having the start control value as input
+    // and two output ports, one for the LSQ and one for the subsequent buffer
     auto forkOp =
         builder.create<handshake::LazyForkOp>(memref.getLoc(), start, 2);
+
+    // Add the new component to the list of components create for FTD and to the
+    // fork graph
     alloctionNetwork.push_back(forkOp);
-    forksGraph[b] = forkOp;
+    forksGraph[bb] = forkOp;
   }
 
-  // Create a LazyForks graph by connecting the operations if their
-  // corresponding BBs are conected in the Groups graph
+  // For each group, its fork has as inputs the ouput of the forks of all its
+  // predecssors. Each lazy fork will be then updated so that its only input is
+  // the result of a `handshake::JoinOp` having the current values as inptus.
   for (Group *group : groups) {
-    SmallVector<Value> predecessors;
-    for (Group *pred : group->preds)
-      predecessors.push_back(forksGraph[pred->bb]->getResult(0));
-    Operation *forkNode = forksGraph[group->bb];
+    SmallVector<Value> predForkOuput;
 
-    if (predecessors.size() > 0)
-      forkNode->setOperands(predecessors);
+    // For each predecessor of the current group, get their fork output
+    for (Group *pred : group->preds)
+      predForkOuput.push_back(forksGraph[pred->bb]->getResult(0));
+
+    // If the node has more than one predecessor, set the collected values as
+    // inputs of the lazy fork. Otherwise, the input of the lazy fork remains
+    // the `start` control value
+    Operation *forkNode = forksGraph[group->bb];
+    if (predForkOuput.size() > 0)
+      forkNode->setOperands(predForkOuput);
   }
 
-  // Add the results of the LazyForks as inputs to the LSQ
+  // The second output of each lazy fork must be connected to the LSQ, so that
+  // they can activate the allocation for the operations of the corresponding
+  // basic block
 
-  // for (auto [_, forkNode] : forksGraph)
-  //   inputs.lsqInputs.push_back(forkNode->getResult(1));
+  // For each LSQ port, consider their groups and the related operations
+  for (auto &[_, lsqGroupOps] : lsqPorts) {
 
-  // Determine LSQ inputs
-  for (auto [group, lsqGroupOps] : lsqPorts) {
+    // Get the first operations in the group associated to a single LSQ port
     Operation *firstOpInGroup = lsqGroupOps.front();
-    // Connect the lazy forks created to the lsq
+
+    // The output of the lazy fork associated to the group containing that
+    // operation is now an input for the LSQ port
     Operation *forkNode = forksGraph[firstOpInGroup->getBlock()];
     inputs.lsqInputs.push_back(forkNode->getResult(1));
 
-    // Then, add all memory port results that go the interface to the list of
+    // All memory ports resuts that go to the interface are added to the list of
     // LSQ inputs
     for (Operation *lsqOp : lsqGroupOps)
       llvm::copy(getMemResultsToInterface(lsqOp),
@@ -179,6 +197,8 @@ LogicalResult FtdMemoryInterfaceBuilder::determineInterfaceInputsWithForks(
     inputs.lsqGroupSizes.push_back(lsqGroupOps.size());
   }
 
+  // The rest of the function is identical to `determineInterfaceInputs` from
+  // the base class `MemoryInterfaceBuilder`
   if (mcPorts.empty())
     return success();
 
@@ -186,7 +206,7 @@ LogicalResult FtdMemoryInterfaceBuilder::determineInterfaceInputsWithForks(
   // connected to an LSQ, since these requests end up being forwarded to the MC,
   // so we need to know the number of LSQ stores per basic block
   DenseMap<unsigned, unsigned> lsqStoresPerBlock;
-  for (const auto &[_, lsqGroupOps] : lsqPorts) {
+  for (auto &[_, lsqGroupOps] : lsqPorts) {
     for (Operation *lsqOp : lsqGroupOps) {
       if (isa<handshake::LSQStoreOp>(lsqOp)) {
         std::optional<unsigned> block = getLogicBB(lsqOp);
