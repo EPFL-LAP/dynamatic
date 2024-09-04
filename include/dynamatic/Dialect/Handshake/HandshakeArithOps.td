@@ -105,8 +105,8 @@ class Handshake_Arith_FToFCastOp<string mnemonic, list<Trait> traits = []> :
   Handshake_Arith_Op<mnemonic, traits # [SameExtraSignalsInterface,
                                          ReshapableChannelsInterface]
 > {
-  let arguments = (ins IntChannelType:$in);
-  let results = (outs IntChannelType:$out);
+  let arguments = (ins FloatChannelType:$in);
+  let results = (outs FloatChannelType:$out);
   
   let assemblyFormat = "$in attr-dict `:` type($in) `to` type($out)";
 
@@ -115,7 +115,8 @@ class Handshake_Arith_FToFCastOp<string mnemonic, list<Trait> traits = []> :
 }
 
 class Handshake_Arith_IToFCastOp<string mnemonic, list<Trait> traits = []> :
-  Handshake_Arith_Op<mnemonic, traits # [ReshapableChannelsInterface]
+  Handshake_Arith_Op<mnemonic, traits # [SameExtraSignalsInterface,
+                                         ReshapableChannelsInterface]
 > {
   let arguments = (ins IntChannelType:$in);
   let results = (outs FloatChannelType:$out);
@@ -127,7 +128,8 @@ class Handshake_Arith_IToFCastOp<string mnemonic, list<Trait> traits = []> :
 }
 
 class Handshake_Arith_FToICastOp<string mnemonic, list<Trait> traits = []> :
-  Handshake_Arith_Op<mnemonic, traits # [ReshapableChannelsInterface]
+  Handshake_Arith_Op<mnemonic, traits # [SameExtraSignalsInterface,
+                                          ReshapableChannelsInterface]
 > {
   let arguments = (ins FloatChannelType:$in);
   let results = (outs IntChannelType:$out);
