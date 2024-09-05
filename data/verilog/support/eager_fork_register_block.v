@@ -10,12 +10,12 @@ module eager_fork_register_block (
 	output outs_valid,
 	output blockStop
 );
-	reg transmitValue = 0;
+	reg transmitValue = 1;
 	wire keepValue;
 
 	assign keepValue = ~outs_ready & transmitValue;
 
-	always @(posedge clk, posedge rst) begin
+	always @(posedge clk) begin
 		if (rst) begin
 			transmitValue <= 1;
 		end else begin

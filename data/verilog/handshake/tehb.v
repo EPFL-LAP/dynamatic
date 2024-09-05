@@ -29,7 +29,7 @@ module tehb #(
 
 	assign regEnable = regNotFull & ins_valid & ~outs_ready;
 
-	always @(posedge clk, posedge rst) begin
+	always @(posedge clk) begin
 		if (rst) begin
 			dataReg <= 0;
 		end else if (regEnable) begin

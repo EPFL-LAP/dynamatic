@@ -4,7 +4,7 @@ use ieee.numeric_std.all;
 
 entity antitokens is
   port (
-    clk, reset                 : in  std_logic;
+    clk, rst                   : in  std_logic;
     pvalid1, pvalid0           : in  std_logic;
     kill1, kill0               : out std_logic;
     generate_at1, generate_at0 : in  std_logic;
@@ -16,23 +16,23 @@ architecture arch of antitokens is
   signal reg_in0, reg_in1, reg_out0, reg_out1 : std_logic;
 begin
 
-  reg0 : process (clk, reset, reg_in0)
+  reg0 : process (clk)
   begin
-    if (reset = '1') then
-      reg_out0 <= '0';
-    else
-      if (rising_edge(clk)) then
+    if (rising_edge(clk)) then
+      if (rst = '1') then
+        reg_out0 <= '0';
+      else
         reg_out0 <= reg_in0;
       end if;
     end if;
   end process reg0;
 
-  reg1 : process (clk, reset, reg_in1)
+  reg1 : process (clk)
   begin
-    if (reset = '1') then
-      reg_out1 <= '0';
-    else
-      if (rising_edge(clk)) then
+    if (rising_edge(clk)) then
+      if (rst = '1') then
+        reg_out1 <= '0';
+      else
         reg_out1 <= reg_in1;
       end if;
     end if;
