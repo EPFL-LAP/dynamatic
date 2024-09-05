@@ -11,7 +11,7 @@ module tehb_dataless (
 );
 	reg fullReg = 0;
 	
-	always @(posedge clk, posedge rst) begin
+	always @(posedge clk) begin
 		if (rst) begin
 			fullReg <= 0;
 		end else begin

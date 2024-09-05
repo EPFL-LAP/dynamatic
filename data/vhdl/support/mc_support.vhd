@@ -80,37 +80,45 @@ architecture arch of read_data_signals is
   signal out_reg  : data_array(ARBITER_SIZE - 1 downto 0)(DATA_TYPE - 1 downto 0);
 begin
 
-  process (clk, rst) is
+  process (clk) is
   begin
-    if (rst = '1') then
-      for I in 0 to ARBITER_SIZE - 1 loop
-        valid(I)    <= '0';
-        sel_prev(I) <= '0';
-      end loop;
-    elsif (rising_edge(clk)) then
-      for I in 0 to ARBITER_SIZE - 1 loop
-        sel_prev(I) <= sel(I);
-        if (sel(I) = '1') then
-          valid(I) <= '1'; --or not nReady(I); -- just sel(I) ??
-          --sel_prev(I) <= '1';
-        else
-          if (nReady(I) = '1') then
-            valid(I) <= '0';
-            ---sel_prev(I) <= '0';
+    if (rising_edge(clk)) then
+      if (rst = '1') then
+        for I in 0 to ARBITER_SIZE - 1 loop
+          valid(I)    <= '0';
+          sel_prev(I) <= '0';
+        end loop;
+      else
+        for I in 0 to ARBITER_SIZE - 1 loop
+          sel_prev(I) <= sel(I);
+          if (sel(I) = '1') then
+            valid(I) <= '1'; --or not nReady(I); -- just sel(I) ??
+            --sel_prev(I) <= '1';
+          else
+            if (nReady(I) = '1') then
+              valid(I) <= '0';
+              ---sel_prev(I) <= '0';
+            end if;
           end if;
-        end if;
-      end loop;
+        end loop;
+      end if;
     end if;
   end process;
 
-  process (clk, rst) is
+  process (clk) is
   begin
     if (rising_edge(clk)) then
-      for I in 0 to ARBITER_SIZE - 1 loop
-        if (sel_prev(I) = '1') then
-          out_reg(I) <= read_data;
-        end if;
-      end loop;
+      if (rst = '1') then
+        for I in 0 to ARBITER_SIZE - 1 loop
+          out_reg(I) <= (others => '0');
+        end loop;
+      else
+        for I in 0 to ARBITER_SIZE - 1 loop
+          if (sel_prev(I) = '1') then
+            out_reg(I) <= read_data;
+          end if;
+        end loop;
+      end if;
     end if;
   end process;
 
@@ -348,17 +356,18 @@ begin
     write_data <= data_out_var;
   end process;
 
-  process (clk, rst) is
+  process (clk) is
   begin
-    if (rst = '1') then
-      for I in 0 to ARBITER_SIZE - 1 loop
-        valid(I) <= '0';
-      end loop;
-
-    elsif (rising_edge(clk)) then
-      for I in 0 to ARBITER_SIZE - 1 loop
-        valid(I) <= sel(I);
-      end loop;
+    if (rising_edge(clk)) then
+      if (rst = '1') then
+        for I in 0 to ARBITER_SIZE - 1 loop
+          valid(I) <= '0';
+        end loop;
+      else
+        for I in 0 to ARBITER_SIZE - 1 loop
+          valid(I) <= sel(I);
+        end loop;
+      end if;
     end if;
   end process;
 end architecture;
@@ -514,35 +523,33 @@ end entity;
 
 architecture arch of mc_control is
 begin
-  process (rst, clk)
-  begin
-    if rst then
-      memStart_ready <= '1';
-      memEnd_valid   <= '0';
-      ctrlEnd_ready  <= '0';
-    elsif rising_edge(clk) then
-      memStart_ready <= memStart_ready;
-      memEnd_valid   <= memEnd_valid;
-      ctrlEnd_ready  <= ctrlEnd_ready;
-
-      -- determine when the memory has completed all requests
-      if ctrlEnd_valid and allRequestsDone then
-        memEnd_valid  <= '1';
-        ctrlEnd_ready <= '1';
-      end if;
-
-      -- acknowledge the 'ctrlEnd' control
-      if ctrlEnd_valid and ctrlEnd_ready then
-        ctrlEnd_ready <= '0';
-      end if;
-
-      -- determine when the memory is idle
-      if memStart_valid and memStart_ready then
-        memStart_ready <= '0';
-      end if;
-      if memEnd_valid and memEnd_ready then
+  process (clk) begin
+    if rising_edge(clk) then
+      if (rst = '1') then
         memStart_ready <= '1';
         memEnd_valid   <= '0';
+        ctrlEnd_ready  <= '0';
+      else
+        memStart_ready <= memStart_ready;
+        memEnd_valid   <= memEnd_valid;
+        ctrlEnd_ready  <= ctrlEnd_ready;
+        -- determine when the memory has completed all requests
+        if ctrlEnd_valid and allRequestsDone then
+          memEnd_valid  <= '1';
+          ctrlEnd_ready <= '1';
+        end if;
+        -- acknowledge the 'ctrlEnd' control
+        if ctrlEnd_valid and ctrlEnd_ready then
+          ctrlEnd_ready <= '0';
+        end if;
+        -- determine when the memory is idle
+        if memStart_valid and memStart_ready then
+          memStart_ready <= '0';
+        end if;
+        if memEnd_valid and memEnd_ready then
+          memStart_ready <= '1';
+          memEnd_valid   <= '0';
+        end if;
       end if;
     end if;
   end process;
