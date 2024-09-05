@@ -92,7 +92,6 @@ public:
 
   void reset() override;
 
-protected:
   bool valid = false;
   bool ready = false;
   Data data = {};
@@ -113,7 +112,6 @@ public:
 
   void reset() override;
 
-protected:
   bool valid = false;
   bool ready = false;
 };
@@ -956,6 +954,11 @@ private:
 //===----------------------------------------------------------------------===//
 // Simulator
 //===----------------------------------------------------------------------===//
+using ValueFunc =
+    std::function<void(const ValueState *, const ValueState *, unsigned long)>;
+
+using ClkFunc =
+    std::function<void(const mlir::DenseMap<Value, ValueState *> &)>;
 
 class Simulator {
 public:
@@ -975,6 +978,12 @@ public:
   // Get number of iterations
   unsigned long getIterNum();
 
+  // Register a listener for a change in the particular value
+  void onStateChange(Value, const ValueFunc &callback);
+
+  // Register a listener on clkRisingEdge
+  void onClkRisingEdge(const ClkFunc &callback);
+
   // Get the result of the simulation
   Any getResData();
 
@@ -992,8 +1001,6 @@ private:
   unsigned long iterNum = 0;
   // Map for execution models
   mlir::DenseMap<Operation *, ExecutionModel *> opModels;
-  // Map the stores RW API classes
-  // mlir::DenseMap<std::pair<Value, Operation *>, RW *> rws;
   // Map that stores the oldValuesStates we read on the current iteration (to
   // collect new outputs)
   mlir::DenseMap<Value, ValueState *> oldValuesStates;
@@ -1007,11 +1014,15 @@ private:
   // Set the number of the iterations for the simulator to execute before force
   // break
   unsigned cyclesLimit = 100;
-  /// Maps all value uses to their *consumer*'s RW object.
+  // Maps all value uses to their *consumer*'s RW object.
   mlir::DenseMap<OpOperand *, ConsumerRW *> consumerViews;
-  /// Maps all operation results (OpResult) and block arguments
-  /// (BlockArgument) to their *producer*'s RW object.
+  // Maps all operation results (OpResult) and block arguments
+  // (BlockArgument) to their *producer*'s RW object.
   mlir::DenseMap<Value, ProducerRW *> producerViews;
+  // Map that stores callbacks for the valueChange event
+  mlir::DenseMap<Value, std::vector<ValueFunc>> valueChangeEvents;
+  // Vector that stores callbacks for the clkRisingEdge event
+  std::vector<ClkFunc> clkEvents;
 
   // Register the Model inside opNodels
   template <typename Model, typename Op, typename... Args>

@@ -1260,6 +1260,7 @@ void Simulator::reset() {
     bool isFin = true;
     for (auto [val, state] : updaters)
       isFin = isFin && state->check();
+
     if (isFin)
       break;
     // Update oldStates
@@ -1323,7 +1324,6 @@ void Simulator::simulate(llvm::ArrayRef<std::string> inputArgs) {
   /// Second, locate the results
 
   // Pointer to the struct containing results
-
   auto *res =
       static_cast<ChannelConsumerRW *>(consumerViews[&endOp->getOpOperand(0)]);
 
@@ -1342,6 +1342,8 @@ void Simulator::simulate(llvm::ArrayRef<std::string> inputArgs) {
     ++iterNum;
     // True only once on each clkRisingEdge
     bool isClock = true;
+    for (auto &u : clkEvents)
+      u(newValuesStates);
     // The inner loop: for signal propagation within one clkRisingEdge
     // It stops when there's no more change in valueStates
     while (true) {
@@ -1350,8 +1352,15 @@ void Simulator::simulate(llvm::ArrayRef<std::string> inputArgs) {
         model->exec(isClock);
       // Check if states have changed
       bool isFin = true;
-      for (auto [val, state] : updaters)
+      for (auto [val, state] : updaters) {
         isFin = isFin && state->check();
+        if (!state->check() &&
+            valueChangeEvents.find(val) != valueChangeEvents.end()) {
+          for (auto &u : valueChangeEvents[val]) {
+            u(oldValuesStates[val], newValuesStates[val], iterNum);
+          }
+        }
+      }
       if (isFin)
         break;
 
@@ -1370,8 +1379,15 @@ void Simulator::simulate(llvm::ArrayRef<std::string> inputArgs) {
 
     // Check if states have changed
     bool isFin = true;
-    for (auto [val, state] : updaters)
+    for (auto [val, state] : updaters) {
       isFin = isFin && state->check();
+      if (!state->check() &&
+          valueChangeEvents.find(val) != valueChangeEvents.end()) {
+        for (auto &u : valueChangeEvents[val]) {
+          u(oldValuesStates[val], newValuesStates[val], iterNum);
+        }
+      }
+    }
     // Stop iterating if the limit of cycles is reached. In general this means
     // a deadlock
     if (isFin) {
@@ -1448,6 +1464,14 @@ Simulator::~Simulator() {
     delete rw;
   for (auto [_, rw] : producerViews)
     delete rw;
+}
+
+void Simulator::onStateChange(Value val, const ValueFunc &callback) {
+  valueChangeEvents[val].push_back(callback);
+};
+
+void Simulator::onClkRisingEdge(const ClkFunc &callback) {
+  clkEvents.push_back(callback);
 }
 
 template <typename Model, typename Op, typename... Args>
