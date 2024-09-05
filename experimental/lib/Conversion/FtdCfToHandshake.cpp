@@ -34,6 +34,7 @@
 
 using namespace mlir;
 using namespace dynamatic;
+using namespace dynamatic::experimental::boolean;
 
 namespace {
 
@@ -57,11 +58,8 @@ struct FtdCfToHandshakePass
     CfToHandshakeTypeConverter converter;
     RewritePatternSet patterns(ctx);
 
-    patterns.add<experimental::ftd::FtdLowerFuncToHandshake>(
-        getAnalysis<NameAnalysis>(), getAnalysis<ControlDependenceAnalysis>(),
-        converter, ctx);
-
-    patterns.add<ConvertConstants, ConvertCalls, ConvertUndefinedValues,
+    patterns.add<experimental::ftd::FtdLowerFuncToHandshake, ConvertConstants,
+                 ConvertCalls, ConvertUndefinedValues,
                  ConvertIndexCast<arith::IndexCastOp, handshake::ExtSIOp>,
                  ConvertIndexCast<arith::IndexCastUIOp, handshake::ExtUIOp>,
                  OneToOneConversion<arith::AddFOp, handshake::AddFOp>,
@@ -107,8 +105,6 @@ struct FtdCfToHandshakePass
 namespace dynamatic {
 namespace experimental {
 namespace ftd {
-
-using namespace boolean;
 
 // --- Helper functions ---
 
@@ -355,6 +351,311 @@ joinInsertion(OpBuilder &builder, DenseSet<Group *> &groups,
   return success();
 }
 
+/// Given two sets containing object of type `Type`, remove the common entries
+template <typename Type>
+void eliminateCommonEntries(DenseSet<Type> &s1, DenseSet<Type> &s2) {
+
+  std::vector<Type> intersection;
+  set_intersection(s1.begin(), s1.end(), s2.begin(), s2.end(),
+                   back_inserter(intersection));
+
+  for (auto &bb : intersection) {
+    s1.erase(bb);
+    s2.erase(bb);
+  }
+}
+
+/// Given a block whose name is `^BBN` (where N is an integer) return a string
+/// in the format `cN`, used to identify the condition which allows the block to
+/// be executed.
+static std::string getBlockCondition(Block *block) {
+  std::string result;
+  llvm::raw_string_ostream os(result);
+  block->printAsOperand(os);
+  std::string blockName = os.str();
+  std::string blockCondition = "c" + blockName.substr(3);
+  return blockCondition;
+}
+
+/// Given a path in the DFG of the basic blocks, compute the minterm which
+/// defines whether that path will be covered or not.This correspond to the
+/// product of all the boolean conditions associated to each basic block.
+static BoolExpression *pathToMinterm(const std::vector<Block *> &path,
+                                     const DenseSet<Block *> &controlDeps) {
+
+  // Start from 1 as minterm. If no path exist, the result will be `1` as well
+  BoolExpression *exp = BoolExpression::boolOne();
+
+  // Consider each element of the path from 0 to N-2, so that pairs of
+  // consecutive blocks can be analyzed. Multiply `exp` for a new minterm if the
+  // there is a conditional branch to go from element `i` to `i+1`.
+  for (unsigned i = 0; i < path.size() - 1; i++) {
+
+    // Get the first block
+    Block *prod = path.at(i);
+
+    // A condition should be taken into account only if the following block is
+    // control dependent on the previous one. Otherwise, the following is always
+    // executed
+    if (controlDeps.contains(prod)) {
+
+      // Get the next
+      Block *cons = path.at(i + 1);
+
+      // Get last operation of the block, also called `terminator`
+      Operation *producerTerminator = prod->getTerminator();
+
+      // Get the condition which allows the execution of the producer
+      llvm::dbgs() << "[COND] " << getBlockCondition(prod) << "\n";
+      BoolExpression *prodCondition =
+          BoolExpression::parseSop(getBlockCondition(prod));
+
+      // If the terminator operation of the consumer is a conditional branch,
+      // then its condition must be taken into account to know if the following
+      // block will be executed or not.
+      if (isa<cf::CondBranchOp>(producerTerminator)) {
+
+        auto condOp = dyn_cast<cf::CondBranchOp>(producerTerminator);
+
+        // If the following BB is on the FALSE side of the current BB, then
+        // negate the condition of the current BB
+        if (cons == condOp.getFalseDest())
+          prodCondition = prodCondition->boolNegate();
+      }
+      // Modify the resulting expression
+      exp = BoolExpression::boolAnd(exp, prodCondition);
+    }
+  }
+  return exp;
+}
+
+/// The boolean condition to either generate or suppress a token are computed by
+/// considering all the paths from the producer (`start`) to the consumer
+/// (`end`). "Each path identifies a Boolean product of elementary conditions
+/// expressing the reaching of the target BB from the corresponding member of
+/// the set; the product of all such paths are added".
+static BoolExpression *enumeratePaths(Block *start, Block *end,
+                                      const DenseSet<Block *> &controlDeps) {
+  // Start with a boolean expression of zero (so that new conditions can be
+  // added)
+  BoolExpression *sop = BoolExpression::boolZero();
+
+  // Find all the paths from the producer to the consumer, using a DFS
+  std::vector<std::vector<Block *>> allPaths = findAllPaths(start, end);
+
+  // For each path
+  for (const std::vector<Block *> &path : allPaths) {
+
+    // Compute the product of the conditions which allow that path to be
+    // executed
+    BoolExpression *minterm = pathToMinterm(path, controlDeps);
+
+    // Add the value to the result
+    sop = BoolExpression::boolOr(sop, minterm);
+  }
+  return sop->boolMinimizeSop();
+}
+
+/// Helper recursive function for getPostDominantSuccessor
+static Block *getPostDominantSuccessor(Block *prod, Block *cons,
+                                       std::unordered_set<Block *> &visited,
+                                       PostDominanceInfo &postDomInfo) {
+  // If the producer is not valid, return, otherwise insert it among the visited
+  // ones.
+  if (!prod)
+    return nullptr;
+  visited.insert(prod);
+
+  // For each successor of the producer
+  for (Block *successor : prod->getSuccessors()) {
+
+    // Check if the successor post-dominates cons
+    if (successor != cons && postDomInfo.postDominates(successor, cons))
+      return successor;
+
+    // If not visited, recursively search successors of the current successor
+    if (visited.find(successor) == visited.end()) {
+      Block *result =
+          getPostDominantSuccessor(successor, cons, visited, postDomInfo);
+      if (result)
+        return result;
+    }
+  }
+  return nullptr;
+}
+
+/// Given a pair of consumer and producer, we are interested in a basic block
+/// which is a successor of the producer and post-dominates the consumer.
+/// If this block exists, the MERGE/GENERATE block can be put right after it,
+/// since all paths between the producer and the consumer pass through it.
+static Block *getPostDominantSuccessor(Block *prod, Block *cons) {
+  std::unordered_set<Block *> visited;
+  PostDominanceInfo postDomInfo;
+  return getPostDominantSuccessor(prod, cons, visited, postDomInfo);
+}
+
+/// Helper recursive function for getPredecessorDominatingAndPostDominating
+static Block *getPredecessorDominatingAndPostDominating(
+    Block *producer, Block *consumer, std::unordered_set<Block *> &visited,
+    DominanceInfo &domInfo, PostDominanceInfo &postDomInfo) {
+
+  // If the consumer is not valid, return, otherwise insert it in the visited
+  // ones
+  if (!consumer)
+    return nullptr;
+  visited.insert(consumer);
+
+  // For each predecessor of the consumer
+  for (Block *predecessor : consumer->getPredecessors()) {
+
+    // If the current predecessor is not the producer itself, and this block
+    // both dominates the consumer and post-dominates the producer, return it
+    if (predecessor != producer &&
+        postDomInfo.postDominates(predecessor, producer) &&
+        domInfo.dominates(predecessor, consumer))
+      return predecessor;
+
+    // If not visited, recursively search predecessors of the current
+    // predecessor
+    if (visited.find(predecessor) == visited.end()) {
+      Block *result = getPredecessorDominatingAndPostDominating(
+          producer, predecessor, visited, domInfo, postDomInfo);
+      if (result)
+        return result;
+    }
+  }
+  return nullptr;
+}
+
+/// Given a pair of consumer and producer, we are interested in a basic block
+/// which both dominates the consumer and post-dominates the producer. If this
+/// block exists, the MERGE/GENERATE block can be put right after it, since all
+/// paths between the producer and the consumer pass through it.
+static Block *getPredecessorDominatingAndPostDominating(Block *prod,
+                                                        Block *cons) {
+  std::unordered_set<Block *> visited;
+  DominanceInfo domInfo;
+  PostDominanceInfo postDomInfo;
+  return getPredecessorDominatingAndPostDominating(prod, cons, visited, domInfo,
+                                                   postDomInfo);
+}
+
+LogicalResult FtdLowerFuncToHandshake::addMergeNonLoop(
+    handshake::FuncOp &funcOp, OpBuilder &builder,
+    SmallVector<ProdConsMemDep> &allMemDeps, DenseSet<Group *> &groups,
+    DenseMap<Block *, Operation *> &forksGraph, FtdStoredOperations &ftdOps,
+    Value startCtrl) const {
+
+  // Get entry block of the function to lower
+  Block *entryBlock = &funcOp.getRegion().front();
+
+  // Stores the information related to the control dependencies ob basic blocks
+  // within an handshake::funcOp object
+  ControlDependenceAnalysis<dynamatic::handshake::FuncOp> cdgAnalysis(funcOp);
+
+  // For each group within the groups graph
+  for (Group *producerGroup : groups) {
+
+    // Get the block associated to that same group
+    Block *producerBlock = producerGroup->bb;
+
+    // Compute all the forward dependencies of that block
+    DenseSet<Block *> producerControlDeps;
+    if (failed(cdgAnalysis.getBlockForwardControlDeps(producerBlock,
+                                                      producerControlDeps)))
+      return failure();
+
+    // For each successor (which is now considered as a consumer)
+    for (Group *consumerGroup : producerGroup->succs) {
+
+      // Get its basic block
+      Block *consumerBlock = consumerGroup->bb;
+
+      // Compute all the forward dependencies of that block
+      DenseSet<Block *> consumerControlDeps;
+      if (failed(cdgAnalysis.getBlockForwardControlDeps(consumerBlock,
+                                                        consumerControlDeps)))
+        return failure();
+
+      // Remove the common forward dependencies among the two blocks
+      eliminateCommonEntries<Block *>(producerControlDeps, consumerControlDeps);
+
+      // Compute the boolean function `fProd`, that is true when the producer is
+      // going to produce the token (cfr. FPGA'22, IV.C: Generating and
+      // Suppressing Tokens)
+      BoolExpression *fProd =
+          enumeratePaths(entryBlock, producerBlock, producerControlDeps);
+
+      // Compute the boolean function `fCons`, that is true when the consumer is
+      // going to consume the token (cfr. FPGA'22, IV.C: Generating and
+      // Suppressing Tokens)
+      BoolExpression *fCons =
+          enumeratePaths(entryBlock, consumerBlock, consumerControlDeps);
+
+      // A token needs to be generated when the consumer consumes  but the
+      // producer does not producer. Compute the corresponding function and
+      // minimize it.
+      BoolExpression *fGen =
+          BoolExpression::boolAnd(fCons, fProd->boolNegate())->boolMinimize();
+
+      // If the condition for the generation is not zero a `GENERATE` block
+      // needs to be inserted, which is a multiplexer/mux
+      if (fGen->type != experimental::boolean::ExpressionType::Zero) {
+
+        // Find the memory dependence related to the current producer and
+        // consumer
+        auto *memDepIt = llvm::find_if(
+            allMemDeps,
+            [producerBlock, consumerBlock](const ProdConsMemDep &dep) {
+              return dep.prodBb == producerBlock && dep.consBb == consumerBlock;
+            });
+        if (memDepIt == allMemDeps.end())
+          return failure();
+        ProdConsMemDep &memDep = *memDepIt;
+
+        // The merge needs to be inserted before the consumer and its fork
+        builder.setInsertionPointToStart(consumerBlock);
+        Location loc = forksGraph[consumerBlock]->getLoc();
+
+        // Adjust insertion position: if there is a block which is always
+        // traversed between the producer and the consumer, the merge/generate
+        // block can be put right after it.
+        //
+        // If the relationship between consumer and producer is backward, we are
+        // interested in a block which is a successor of the producer and
+        // post-dominates the consumer. If the relationship is forward, we are
+        // interested in a block which dominates the consumer and post-dominates
+        // the consumer.
+        Block *bbNewLoc = nullptr;
+        if (memDep.isBackward) {
+          bbNewLoc = getPostDominantSuccessor(producerBlock, consumerBlock);
+        } else {
+          bbNewLoc = getPredecessorDominatingAndPostDominating(producerBlock,
+                                                               consumerBlock);
+        }
+        if (bbNewLoc) {
+          builder.setInsertionPointToStart(bbNewLoc);
+          loc = bbNewLoc->getOperations().front().getLoc();
+        }
+
+        // The possible inputs of the merge are the start value and the first
+        // output of the producer fork
+        SmallVector<Value> mergeOperands;
+        mergeOperands.push_back(startCtrl);
+        mergeOperands.push_back(forksGraph[producerBlock]->getResult(0));
+        auto mergeOp = builder.create<handshake::MergeOp>(loc, mergeOperands);
+        ftdOps.allocationNetwork.push_back(mergeOp);
+
+        // At this point, the output of the merge is the new producer, which
+        // becomes an input for the consumer.
+        forksGraph[consumerBlock]->replaceUsesOfWith(
+            forksGraph[producerBlock]->getResult(0), mergeOp->getResult(0));
+      }
+    }
+  }
+  return success();
+}
+
 // -- -End helper functions-- -
 
 using ArgReplacements = DenseMap<BlockArgument, OpResult>;
@@ -364,11 +665,6 @@ LogicalResult FtdLowerFuncToHandshake::matchAndRewrite(
     ConversionPatternRewriter &rewriter) const {
 
   FtdStoredOperations ftdOps;
-
-  std::string funcName = (std::string)lowerFuncOp.getName();
-
-  if (failed(cdgAnalysis.printAllBlocksDeps(funcName)))
-    return failure();
 
   // Map all memory accesses in the matched function to the index of their
   // memref in the function's arguments
@@ -562,10 +858,10 @@ LogicalResult FtdLowerFuncToHandshake::ftdVerifyAndCreateMemInterfaces(
       handshake::MemoryControllerOp mcOp;
       handshake::LSQOp lsqOp;
 
-      // As we instantiate the interfaces for the LSQ for each memory operation,
-      // we need to add some forks in order for the control input to be
-      // propagated. In particular, we want to keep track of the control valuea
-      // associated to each basic block in the region
+      // As we instantiate the interfaces for the LSQ for each memory
+      // operation, we need to add some forks in order for the control input
+      // to be propagated. In particular, we want to keep track of the control
+      // valuea associated to each basic block in the region
       DenseMap<Block *, Operation *> forksGraph;
 
       if (failed(memBuilder.instantiateInterfacesWithForks(
@@ -573,11 +869,16 @@ LogicalResult FtdLowerFuncToHandshake::ftdVerifyAndCreateMemInterfaces(
               ftdOps.allocationNetwork)))
         return failure();
 
+      if (failed(addMergeNonLoop(funcOp, rewriter, allMemDeps, groupsGraph,
+                                 forksGraph, ftdOps, startValue)))
+        return failure();
+
+      // if (failed(addMergeLoop(rewriter, groupsGraph, forksGraph)))
+      //   return failure();
+
       if (failed(joinInsertion(rewriter, groupsGraph, forksGraph,
                                ftdOps.allocationNetwork)))
         return failure();
-
-      // [TODO] This branch is not completed yet...
     }
 
     handshake::MemoryControllerOp mcOp;

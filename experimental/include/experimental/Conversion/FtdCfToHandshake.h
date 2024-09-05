@@ -24,6 +24,7 @@
 #include "dynamatic/Support/LLVM.h"
 #include "dynamatic/Transforms/FuncMaximizeSSA.h"
 #include "experimental/Conversion/FtdMemoryInterface.h"
+#include "experimental/Support/BooleanLogic/BoolExpression.h"
 #include "mlir/Analysis/CFGLoopInfo.h"
 #include "mlir/Dialect/Func/IR/FuncOps.h"
 #include "mlir/Dialect/LLVMIR/LLVMDialect.h"
@@ -65,29 +66,20 @@ struct FtdStoredOperations {
 class FtdLowerFuncToHandshake : public LowerFuncToHandshake {
 public:
   // Use the same constructors from the base class
-  FtdLowerFuncToHandshake(NameAnalysis &namer,
-                          ControlDependenceAnalysis &cdgAnalysis,
-                          MLIRContext *ctx, mlir::PatternBenefit benefit = 1)
-      : LowerFuncToHandshake(namer, ctx, benefit), cdgAnalysis(cdgAnalysis){};
+  FtdLowerFuncToHandshake(NameAnalysis &namer, MLIRContext *ctx,
+                          mlir::PatternBenefit benefit = 1)
+      : LowerFuncToHandshake(namer, ctx, benefit){};
 
   FtdLowerFuncToHandshake(NameAnalysis &namer,
-                          ControlDependenceAnalysis &cdgAnalysis,
                           const TypeConverter &typeConverter, MLIRContext *ctx,
                           mlir::PatternBenefit benefit = 1)
-      : LowerFuncToHandshake(namer, typeConverter, ctx, benefit),
-        cdgAnalysis(cdgAnalysis){};
+      : LowerFuncToHandshake(namer, typeConverter, ctx, benefit){};
 
   LogicalResult
   matchAndRewrite(mlir::func::FuncOp funcOp, OpAdaptor adaptor,
                   ConversionPatternRewriter &rewriter) const override;
 
 protected:
-  /// Throughout the execution of the fast delivery token, some operations have
-  /// to be saved so that they can be looked up afterwards. These information
-  /// are all local to each `func::funcOp`/`handshake::funcOp`, so they can be
-  /// created within each call to `matchAndRewrite`.
-  ControlDependenceAnalysis cdgAnalysis;
-
   LogicalResult ftdVerifyAndCreateMemInterfaces(
       handshake::FuncOp funcOp, ConversionPatternRewriter &rewriter,
       MemInterfacesInfo &memInfo, FtdStoredOperations &ftdOps) const;
@@ -102,11 +94,15 @@ protected:
                                   SmallVector<ProdConsMemDep> &allMemDeps,
                                   const mlir::CFGLoopInfo &li) const;
 
-  LogicalResult
-  addMergeNonLoop(handshake::FuncOp &funcOp, OpBuilder &builder,
-                  std::vector<ProdConsMemDep> &allMemDeps,
-                  DenseSet<Group *> &groups,
-                  DenseMap<Block *, Operation *> &forksGraph) const;
+  /// For each pair of producer and consumer which are not in loop (thus
+  /// considering, for each producer, only its forward dependenices) possibly
+  /// add a merge between the pair, so that the
+  LogicalResult addMergeNonLoop(handshake::FuncOp &funcOp, OpBuilder &builder,
+                                SmallVector<ProdConsMemDep> &allMemDeps,
+                                DenseSet<Group *> &groups,
+                                DenseMap<Block *, Operation *> &forksGraph,
+                                FtdStoredOperations &ftdOps,
+                                Value startCtrl) const;
 };
 
 #define GEN_PASS_DECL_FTDCFTOHANDSHAKE
