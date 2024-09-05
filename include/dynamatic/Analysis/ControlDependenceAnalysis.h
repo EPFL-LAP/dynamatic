@@ -27,56 +27,48 @@ namespace dynamatic {
 /// `getAnalysis<ControlDependenceAnalysis>()` and cache it to avoid
 /// recomputations for further passes using
 /// `markAnalysesPreserved<ControlDependenceAnalysis>()` at the end.
-template <typename FunctionTypeIn>
+template <typename FunctionType>
 class ControlDependenceAnalysis {
 public:
   /// Constructor called automatically by
   /// `getAnalysis<ControlDependenceAnalysis>()` if the analysis is not already
   /// cached.
   ControlDependenceAnalysis(Operation *operation) {
-    // type-cast it into FunctionTypeIn
-    FunctionTypeIn funcOp = dyn_cast<FunctionTypeIn>(operation);
+    // type-cast it into FunctionType
+    FunctionType funcOp = dyn_cast<FunctionType>(operation);
     if (funcOp) {
       // if the operation is a function, then identify all the control
       // dependencies among its BBs
       identifyAllControlDeps(funcOp);
     } else {
-      ModuleOp modOp = dyn_cast<ModuleOp>(operation);
-      if (modOp) {
-        // If the operation is a module, then analyze all the control
-        // dependencies among the functions in contains
-        auto funcOps = modOp.getOps<FunctionTypeIn>();
-        for (FunctionTypeIn funcOp : llvm::make_early_inc_range(funcOps))
-          identifyAllControlDeps(funcOp);
-      } else {
-        // report an error indicating that the analysis is instantiated over
-        // an inappropriate operation
-        llvm::errs() << "ControlDependenceAnalysis is instantiated over an "
-                        "operation that is not FuncOp or ModuleOp!\n";
-      }
+      // report an error indicating that the analysis is instantiated over
+      // an inappropriate operation
+      llvm::errs() << "ControlDependenceAnalysis is instantiated over an "
+                      "operation that is not FuncOp!\n";
     }
   };
 
-  // given a FuncOp and a BB within that function, return all the BBs the bloc
-  // is control dependant on.
-  LogicalResult getBlockAllControlDeps(Block *block, FunctionTypeIn &funcOp,
+  // given a BB within that function, return all the BBs the block is control
+  // dependant on.
+  LogicalResult getBlockAllControlDeps(Block *block,
                                        DenseSet<Block *> &allControlDeps) const;
 
-  // given a FuncOp and a BB within that function, return all the BBs the bloc
+  // given a BB within that function, return all the BBs the bloc
   // is control dependant on, without taking into account backward dependencies
   // (i.e. excluding loop exits)
   LogicalResult
-  getBlockForwardControlDeps(Block *block, FunctionTypeIn &funcOp,
+  getBlockForwardControlDeps(Block *block,
                              DenseSet<Block *> &forwardControlDeps) const;
 
   /// Invalidation hook to keep the analysis cached across passes. Returns true
   /// if the analysis should be invalidated and fully reconstructed the next
-  /// time it is queried.
+  /// time it is queried. This is useful in case the analysis is integrated in
+  /// the MLIR conversion pass
   bool isInvalidated(const mlir::AnalysisManager::PreservedAnalyses &pa) const {
     return !pa.isPreserved<ControlDependenceAnalysis>();
   }
 
-  LogicalResult printAllBlocksDeps(FunctionTypeIn &funcOp) const;
+  void printAllBlocksDeps() const;
 
 private:
   // Each block has a structure of type `BlockControlDeps` containing the list
@@ -88,17 +80,16 @@ private:
   };
   using BlockControlDepsMap = DenseMap<Block *, BlockControlDeps>;
 
-  // For each FuncOp, `funcBlocksControlDeps` stores a `BlockControlDeps` for
-  // each block.
-  DenseMap<FunctionTypeIn, BlockControlDepsMap> funcBlocksControlDeps;
+  // Store the list of dependencies for each block
+  BlockControlDepsMap blocksControlDeps;
 
   // Fill the `allControlDeps` field of the entry in `funcBlocksControlDeps`
   // corresponding to the input `funcOp`
-  void identifyAllControlDeps(FunctionTypeIn &funcOp);
+  void identifyAllControlDeps(FunctionType &funcOp);
 
   // Fill the `forwardControlDeps` field of the entry in `funcBlocksControlDeps`
   // corresponding to the input `funcOp`
-  void identifyForwardControlDeps(FunctionTypeIn &funcOp);
+  void identifyForwardControlDeps(FunctionType &funcOp);
 
   // Given a start block and en end block withing a function region, return all
   // the post dominator trees
@@ -118,7 +109,7 @@ private:
 
   // adjusts the dependencies of each block to include nested dependencies
   // (i.e., the dependencies of its depenendencies)
-  void addDepsOfDeps(FunctionTypeIn &funcOp,
+  void addDepsOfDeps(FunctionType &funcOp,
                      BlockControlDepsMap &blockControlDepsMap);
 };
 
