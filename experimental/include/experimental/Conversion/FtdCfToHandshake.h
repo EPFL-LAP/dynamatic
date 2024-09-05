@@ -103,6 +103,14 @@ protected:
                                 DenseMap<Block *, Operation *> &forksGraph,
                                 FtdStoredOperations &ftdOps,
                                 Value startCtrl) const;
+  /// For each pair of producer and consumer which are in loop possibly
+  /// add a merge between the pair, so that the
+  LogicalResult addMergeLoop(handshake::FuncOp &funcOp, OpBuilder &builder,
+                             SmallVector<ProdConsMemDep> &allMemDeps,
+                             DenseSet<Group *> &groups,
+                             DenseMap<Block *, Operation *> &forksGraph,
+                             FtdStoredOperations &ftdOps,
+                             Value startCtrl) const;
 };
 
 #define GEN_PASS_DECL_FTDCFTOHANDSHAKE

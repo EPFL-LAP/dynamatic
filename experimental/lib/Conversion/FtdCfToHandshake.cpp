@@ -152,6 +152,45 @@ static void dfsAllPaths(Block *start, Block *end, std::vector<Block *> &path,
   visited.erase(start);
 }
 
+/// Recursive function which allows to obtain all the paths from operation
+/// `start` to operation `end` using a DFS
+void dfsAllPaths(Operation *current, Operation *end,
+                 std::unordered_set<Operation *> &visited,
+                 std::vector<Operation *> &path,
+                 std::vector<std::vector<Operation *>> &allPaths) {
+  visited.insert(current);
+  path.push_back(current);
+
+  if (current == end) {
+    // If the current operation is the end, add the path to allPaths
+    allPaths.push_back(path);
+  } else {
+    // Otherwise, explore the successors
+    for (auto result : current->getResults()) {
+      for (auto *successor : result.getUsers()) {
+        if (visited.find(successor) == visited.end()) {
+          dfsAllPaths(successor, end, visited, path, allPaths);
+        }
+      }
+    }
+  }
+
+  // Backtrack
+  path.pop_back();
+  visited.erase(current);
+}
+
+/// Gets all the paths from operation `start` to operation `end` using a dfs
+/// search
+static std::vector<std::vector<Operation *>> findAllPaths(Operation *start,
+                                                          Operation *end) {
+  std::vector<std::vector<Operation *>> allPaths;
+  std::unordered_set<Operation *> visited;
+  std::vector<Operation *> path;
+  dfsAllPaths(start, end, visited, path, allPaths);
+  return allPaths;
+}
+
 /// Gets all the paths from block `start` to block `end` using a dfs search
 static std::vector<std::vector<Block *>> findAllPaths(Block *start,
                                                       Block *end) {
@@ -162,33 +201,30 @@ static std::vector<std::vector<Block *>> findAllPaths(Block *start,
   return allPaths;
 }
 
-/// Returns true if two operations are both load
+/// Returns true if there exist a path between `op1` and `op2`
 static bool isThereAPath(Operation *op1, Operation *op2) {
   return !findAllPaths(op1->getBlock(), op2->getBlock()).empty();
 }
 
-/// Check whether the index of `block1` is less than the one of `block2`
-static bool lessThanBlocks(Block *block1, Block *block2) {
-  // Get the name of block 1
+/// Get the index of a basic block
+static int getBlockIndex(Block *bb) {
   std::string result1;
   llvm::raw_string_ostream os1(result1);
-  block1->printAsOperand(os1);
+  bb->printAsOperand(os1);
   std::string block1id = os1.str();
+  return std::stoi(block1id.substr(3));
+}
 
-  // Obtain the index of the block as integer
-  int id1 = std::stoi(block1id.substr(3));
-
-  // Get the name of block 2
-  std::string result2;
-  llvm::raw_string_ostream os2(result2);
-  block2->printAsOperand(os2);
-  std::string block2id = os2.str();
-
-  // Obtain the index of the block as integer
-  int id2 = std::stoi(block2id.substr(3));
-
+/// Check whether the index of `block1` is less than the one of `block2`
+static bool lessThanBlocks(Block *block1, Block *block2) {
   // Compare the two integers
-  return id1 < id2;
+  return getBlockIndex(block1) < getBlockIndex(block2);
+}
+
+/// Check whether the index of `block1` is greater than the one of `block2`
+bool greaterThanBlocks(Block *block1, Block *block2) {
+  // Compare the two integers
+  return getBlockIndex(block1) > getBlockIndex(block2);
 }
 
 /// Recursively check weather 2 blocks belong to the same loop, starting from
@@ -369,11 +405,7 @@ void eliminateCommonEntries(DenseSet<Type> &s1, DenseSet<Type> &s2) {
 /// in the format `cN`, used to identify the condition which allows the block to
 /// be executed.
 static std::string getBlockCondition(Block *block) {
-  std::string result;
-  llvm::raw_string_ostream os(result);
-  block->printAsOperand(os);
-  std::string blockName = os.str();
-  std::string blockCondition = "c" + blockName.substr(3);
+  std::string blockCondition = "c" + std::to_string(getBlockIndex(block));
   return blockCondition;
 }
 
@@ -406,7 +438,6 @@ static BoolExpression *pathToMinterm(const std::vector<Block *> &path,
       Operation *producerTerminator = prod->getTerminator();
 
       // Get the condition which allows the execution of the producer
-      llvm::dbgs() << "[COND] " << getBlockCondition(prod) << "\n";
       BoolExpression *prodCondition =
           BoolExpression::parseSop(getBlockCondition(prod));
 
@@ -656,6 +687,113 @@ LogicalResult FtdLowerFuncToHandshake::addMergeNonLoop(
   return success();
 }
 
+/// Helper recursive function to get the innermost common loop
+static CFGLoop *checkInnermostCommonLoop(CFGLoop *loop1, CFGLoop *loop2) {
+
+  // None of them is a loop
+  if (!loop1 || !loop2)
+    return nullptr;
+
+  // Same loop
+  if (loop1 == loop2)
+    return loop1;
+
+  // Check whether the parent loop of `loop1` is `loop2`
+  if (CFGLoop *pl = checkInnermostCommonLoop(loop1->getParentLoop(), loop2); pl)
+    return pl;
+
+  // Check whether the parent loop of `loop2` is `loop1`
+  if (CFGLoop *pl = checkInnermostCommonLoop(loop2->getParentLoop(), loop1); pl)
+    return pl;
+
+  // Check whether the parent loop of `loop1` is identical to the parent loop of
+  // `loop1`
+  if (CFGLoop *pl = checkInnermostCommonLoop(loop2->getParentLoop(),
+                                             loop1->getParentLoop());
+      pl)
+    return pl;
+
+  // If no common loop is found, return nullptr
+  return nullptr;
+}
+
+/// Given two blocks, return a reference to the innermost common loop. The
+/// result is `nullptr` if the two blocks are not within a loop
+static CFGLoop *getInnermostCommonLoop(Block *block1, Block *block2,
+                                       mlir::CFGLoopInfo &li) {
+  return checkInnermostCommonLoop(li.getLoopFor(block1), li.getLoopFor(block2));
+}
+
+LogicalResult FtdLowerFuncToHandshake::addMergeLoop(
+    handshake::FuncOp &funcOp, OpBuilder &builder,
+    SmallVector<ProdConsMemDep> &allMemDeps, DenseSet<Group *> &groups,
+    DenseMap<Block *, Operation *> &forksGraph, FtdStoredOperations &ftdOps,
+    Value startCtrl) const {
+
+  // Get the dominance info about the current region, in order to compute the
+  // properties of loop
+  mlir::DominanceInfo domInfo;
+  mlir::CFGLoopInfo loopInfo(domInfo.getDomTree(&funcOp.getBody()));
+
+  // For each group within the groups graph
+  for (Group *consGroup : groups) {
+
+    // Get the block associated to that same group
+    Block *cons = consGroup->bb;
+
+    // For each predecessor (which is now considered as a producer)
+    for (Group *prodGroup : consGroup->preds) {
+
+      // Get its basic block
+      Block *prod = prodGroup->bb;
+
+      // If the consumer comes before a producer, it might mean the two basic
+      // blocks are within a loop
+      if (greaterThanBlocks(prod, cons)) {
+
+        if (auto *loop = getInnermostCommonLoop(prod, cons, loopInfo); loop) {
+
+          // A merge is inserted at the beginning of teh loop, getting as
+          // operands both `start` and the result of the producer as operand. As
+          // many merges must be added as the number of paths from teh producer
+          // to the consumer (corresponding to the amount of loops which involve
+          // both of them).
+          Block *loopHeader = loop->getHeader();
+          builder.setInsertionPointToStart(loopHeader);
+
+          std::vector<std::vector<Operation *>> allPaths =
+              findAllPaths(forksGraph[prod], forksGraph[cons]);
+
+          // For each path
+          for (std::vector<Operation *> path : allPaths) {
+            SmallVector<Value> operands;
+
+            // Get the result of the operaiton before the cosumer (this will
+            // become an input of the merge)
+            Value mergeOperand = path.at(path.size() - 2)->getResult(0);
+            operands.push_back(startCtrl);
+            operands.push_back(mergeOperand);
+
+            // Add the merge and updpate the FTD data structures
+            auto mergeOp = builder.create<handshake::MergeOp>(
+                mergeOperand.getLoc(), operands);
+            ftdOps.allocationNetwork.push_back(mergeOp);
+            ftdOps.memDepLoopMerges.push_back(mergeOp);
+
+            // The merge becomes the producer now, so connect the result of
+            // the MERGE as an operand of the Consumer. Also remove the old
+            // connection between the producer's LazyFork and the consumer's
+            // LazyFork Connect the MERGE to the consumer's LazyFork
+            forksGraph[cons]->replaceUsesOfWith(mergeOperand,
+                                                mergeOp->getResult(0));
+          }
+        }
+      }
+    }
+  }
+  return success();
+}
+
 // -- -End helper functions-- -
 
 using ArgReplacements = DenseMap<BlockArgument, OpResult>;
@@ -873,8 +1011,9 @@ LogicalResult FtdLowerFuncToHandshake::ftdVerifyAndCreateMemInterfaces(
                                  forksGraph, ftdOps, startValue)))
         return failure();
 
-      // if (failed(addMergeLoop(rewriter, groupsGraph, forksGraph)))
-      //   return failure();
+      if (failed(addMergeLoop(funcOp, rewriter, allMemDeps, groupsGraph,
+                              forksGraph, ftdOps, startValue)))
+        return failure();
 
       if (failed(joinInsertion(rewriter, groupsGraph, forksGraph,
                                ftdOps.allocationNetwork)))
