@@ -16,5 +16,7 @@ add_dynamatic_library(DynamaticExperimentalConversion
   MLIRSupport
   MLIRTransforms
   MLIRAffineToStandard
+  DynamaticExperimentalSupportBooleanLogic
+  DynamaticSupportEspresso
   )
 
