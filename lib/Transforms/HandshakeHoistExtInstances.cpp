@@ -17,8 +17,13 @@
 #include "dynamatic/Transforms/HandshakeHoistExtInstances.h"
 #include "dynamatic/Analysis/NameAnalysis.h"
 #include "dynamatic/Dialect/Handshake/HandshakeOps.h"
+#include "dynamatic/Support/LLVM.h"
 #include "mlir/IR/MLIRContext.h"
+#include "mlir/IR/Value.h"
+#include "mlir/IR/ValueRange.h"
 #include "llvm/ADT/STLExtras.h"
+#include "llvm/ADT/SmallVector.h"
+#include <cstddef>
 #include <iterator>
 
 using namespace mlir;
@@ -82,6 +87,9 @@ void HandshakeHoistExtInstancesPass::hoistInstances(handshake::FuncOp funcOp,
   // First function results will stay the same
   SmallVector<Type, 16> resTypes(funcOp.getResultTypes());
   SmallVector<Attribute> resNames(funcOp.getResNames().getValue());
+  // Save the results of the hoist instance that are used in the function
+  SmallVector<Type, 16> resHoistTypes;
+  SmallVector<OpResult> resHoistValues;
 
   // First end operands will stay the same
   auto endOp = cast<handshake::EndOp>(funcOp.getBodyBlock()->getTerminator());
@@ -114,23 +122,44 @@ void HandshakeHoistExtInstancesPass::hoistInstances(handshake::FuncOp funcOp,
 
     // Iterate over the instance's results and add them to the function's
     // arguments
-    auto namedResults =
-        llvm::zip_equal(instFuncOp.getResNames(), instOp.getResultTypes());
-    for (auto [argNameAttr, resType] : namedResults) {
+    auto namedResults = llvm::zip_equal(
+        instFuncOp.getResNames(), instOp.getResultTypes(), instOp.getResults());
+    for (auto [argNameAttr, resType, resValue] : namedResults) {
+      // If the result goes to a sink, skip it and remove the sink op
+      auto usersRes = resValue.getUsers();
+      if (resValue.hasOneUse() && isa<handshake::SinkOp>(*usersRes.begin())) {
+        auto sinkOp = cast<handshake::SinkOp>(*usersRes.begin());
+        sinkOp.erase();
+        continue;
+      }
+      // Keep track of the results that are used in the function
       StringRef argName = argNameAttr.cast<StringAttr>().strref();
       argTypes.push_back(resType);
       argNames.push_back(StringAttr::get(ctx, instName + "_" + argName));
+      resHoistTypes.push_back(resType);
+      resHoistValues.push_back(resValue);
     }
 
     // Instance arguments will exit the function through the end terminator
     llvm::copy(instOp.getOperands(), std::back_inserter(endOperands));
 
     // Instance results will come from the function's arguments
-    size_t numResults = instOp.getNumResults();
+    // only for the results that are used in the function
+    size_t numResults = resHoistTypes.size();
+    if (numResults == 0) {
+      instOp->erase();
+      continue;
+    }
     SmallVector<Location> locs(numResults, instOp.getLoc());
-    bodyBlock->addArguments(instOp->getResultTypes(), locs);
-    instOp->replaceAllUsesWith(bodyBlock->getArguments().take_back(numResults));
+    bodyBlock->addArguments(resHoistTypes, locs);
+    auto assignResults = llvm::zip_equal(
+        bodyBlock->getArguments().take_back(numResults), resHoistValues);
+    for (auto [blockArg, resValue] : assignResults) {
+      resValue.replaceAllUsesWith(blockArg);
+    }
     instOp->erase();
+    resHoistTypes.clear();
+    resHoistValues.clear();
   }
 
   if (!anyInstance)
