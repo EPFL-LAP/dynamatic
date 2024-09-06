@@ -43,117 +43,91 @@ begin
   -- valid 
   process (clk)
   begin
-    if (rst = '1') then
-      fifo_valid <= '0';
-    elsif (rising_edge(clk)) then
-      if (ReadEn = '1') then
-        fifo_valid <= '1';
-      elsif (outs_ready = '1') then
+    if (rising_edge(clk)) then
+      if (rst = '1') then
         fifo_valid <= '0';
+      else
+        if (ReadEn = '1') then
+          fifo_valid <= '1';
+        elsif (outs_ready = '1') then
+          fifo_valid <= '0';
+        end if;
       end if;
-
     end if;
   end process;
 
   -------------------------------------------
   -- process for updating tail
-  TailUpdate_proc : process (CLK)
-
+  TailUpdate_proc : process (clk)
   begin
-    if rising_edge(CLK) then
-
-      if RST = '1' then
+    if rising_edge(clk) then
+      if (rst = '1') then
         Tail <= 0;
       else
-
         if (WriteEn = '1') then
-
           Tail <= (Tail + 1) mod SIZE;
-
         end if;
-
       end if;
     end if;
   end process;
 
   -------------------------------------------
   -- process for updating head
-  HeadUpdate_proc : process (CLK)
-
+  HeadUpdate_proc : process (clk)
   begin
-    if rising_edge(CLK) then
-
-      if RST = '1' then
+    if rising_edge(clk) then
+      if (rst = '1') then
         Head <= 0;
       else
-
         if (ReadEn = '1') then
-
           Head <= (Head + 1) mod SIZE;
-
         end if;
-
       end if;
     end if;
   end process;
 
   -------------------------------------------
   -- process for updating full
-  FullUpdate_proc : process (CLK)
-
+  FullUpdate_proc : process (clk)
   begin
-    if rising_edge(CLK) then
-
-      if RST = '1' then
+    if rising_edge(clk) then
+      if (rst = '1') then
         Full <= '0';
       else
-
         -- if only filling but not emptying
         if (WriteEn = '1') and (ReadEn = '0') then
-
           -- if new tail index will reach head index
           if ((Tail + 1) mod SIZE = Head) then
-
             Full <= '1';
-
           end if;
           -- if only emptying but not filling
         elsif (WriteEn = '0') and (ReadEn = '1') then
           Full <= '0';
           -- otherwise, nothing is happening or simultaneous read and write
-
         end if;
-
       end if;
     end if;
   end process;
 
   -------------------------------------------
   -- process for updating full
-  EmptyUpdate_proc : process (CLK)
-
+  EmptyUpdate_proc : process (clk)
   begin
-    if rising_edge(CLK) then
-
-      if RST = '1' then
+    if rising_edge(clk) then
+      if (rst = '1') then
         Empty <= '1';
       else
         -- if only emptying but not filling
         if (WriteEn = '0') and (ReadEn = '1') then
-
           -- if new head index will reach tail index
           if ((Head + 1) mod SIZE = Tail) then
-
             Empty <= '1';
-
           end if;
           -- if only filling but not emptying
         elsif (WriteEn = '1') and (ReadEn = '0') then
           Empty <= '0';
           -- otherwise, nothing is happening or simultaneous read and write
-
         end if;
-
       end if;
     end if;
   end process;

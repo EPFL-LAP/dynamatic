@@ -30,7 +30,7 @@ module elastic_fifo_inner #(
   assign outs = Memory[Head];
 
   // Update FIFO valid
-  always @(posedge clk, posedge rst) begin
+  always @(posedge clk) begin
     if (rst) begin
       fifo_valid <= 0;
     end else if (ReadEn) begin
@@ -40,7 +40,7 @@ module elastic_fifo_inner #(
     end
   end
 
-  always @(posedge clk, posedge rst) begin
+  always @(posedge clk) begin
     if (rst) begin
       
     end else if (WriteEn) begin
@@ -49,7 +49,7 @@ module elastic_fifo_inner #(
   end
 
   // Update Tail
-  always @(posedge clk, posedge rst) begin
+  always @(posedge clk) begin
     if (rst) begin
       Tail <= 0;
     end else begin
@@ -60,7 +60,7 @@ module elastic_fifo_inner #(
   end
 
   // Update Head
-  always @(posedge clk, posedge rst) begin
+  always @(posedge clk) begin
     if (rst) begin
       Head <= 0;
     end else begin
@@ -71,7 +71,7 @@ module elastic_fifo_inner #(
   end
 
   // Update Full
-  always @(posedge clk, posedge rst) begin
+  always @(posedge clk) begin
     if (rst) begin
       Full <= 0;
     end else begin
@@ -89,7 +89,7 @@ module elastic_fifo_inner #(
   end
 
   // Update Empty
-  always @(posedge clk, posedge rst) begin
+  always @(posedge clk) begin
     if (rst) begin
       Empty <= 1;
     end else begin

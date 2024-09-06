@@ -33,12 +33,12 @@ begin
       outs_ready => outs_ready
     );
 
-  process (clk, rst) is
+  process (clk) is
   begin
-    if (rst = '1') then
-      outs <= (others => '0');
-    elsif (rising_edge(clk)) then
-      if (regEn) then
+    if (rising_edge(clk)) then
+      if (rst = '1') then
+        outs <= (others => '0');
+      elsif (regEn) then
         outs <= ins;
       end if;
     end if;

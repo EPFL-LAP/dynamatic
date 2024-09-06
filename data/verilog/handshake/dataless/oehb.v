@@ -12,7 +12,7 @@ module oehb_dataless (
   // Define internal signals
   reg outputValid = 0;
 
-  always @(posedge clk, posedge rst) begin
+  always @(posedge clk) begin
     if (rst) begin
       outputValid <= 0;
     end else begin
