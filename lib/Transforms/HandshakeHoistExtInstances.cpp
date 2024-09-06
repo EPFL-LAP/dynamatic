@@ -97,6 +97,8 @@ void HandshakeHoistExtInstancesPass::hoistInstances(handshake::FuncOp funcOp,
 
   Block *bodyBlock = funcOp.getBodyBlock();
 
+  // Verify that each external function is instantiated a single time
+  SmallVector<StringRef> externalFunctionNames;
   // Collect all instances inside the function that reference an external
   // Handshake functions
   bool anyInstance = false;
@@ -108,7 +110,14 @@ void HandshakeHoistExtInstancesPass::hoistInstances(handshake::FuncOp funcOp,
       continue;
 
     anyInstance = true;
-    StringRef instName = getUniqueName(instOp);
+    StringRef instFuncName = instFuncOp.getNameAttr().strref();
+
+    assert(std::find(externalFunctionNames.begin(), externalFunctionNames.end(),
+                     instFuncName) == externalFunctionNames.end() &&
+           "External function instantiated multiple times. Each external "
+           "function refers to one output and input port.");
+
+    externalFunctionNames.push_back(instFuncName);
 
     // Iterate over the instance's arguments and add them to the function's
     // results
@@ -117,7 +126,7 @@ void HandshakeHoistExtInstancesPass::hoistInstances(handshake::FuncOp funcOp,
     for (auto [argNameAttr, argType] : namedArguments) {
       StringRef argName = argNameAttr.cast<StringAttr>().strref();
       resTypes.push_back(argType);
-      resNames.push_back(StringAttr::get(ctx, instName + "_" + argName));
+      resNames.push_back(StringAttr::get(ctx, instFuncName + "_" + argName));
     }
 
     // Iterate over the instance's results and add them to the function's
@@ -135,7 +144,7 @@ void HandshakeHoistExtInstancesPass::hoistInstances(handshake::FuncOp funcOp,
       // Keep track of the results that are used in the function
       StringRef argName = argNameAttr.cast<StringAttr>().strref();
       argTypes.push_back(resType);
-      argNames.push_back(StringAttr::get(ctx, instName + "_" + argName));
+      argNames.push_back(StringAttr::get(ctx, instFuncName + "_" + argName));
       resHoistTypes.push_back(resType);
       resHoistValues.push_back(resValue);
     }
