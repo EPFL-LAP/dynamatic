@@ -88,7 +88,7 @@ public:
       OpBuilder &builder, handshake::MemoryControllerOp &mcOp,
       handshake::LSQOp &lsqOp, DenseSet<Group *> &groups,
       DenseMap<Block *, Operation *> &forksGraph, Value start,
-      SmallVector<Operation *> &alloctionNetwork);
+      DenseSet<Operation *> &alloctionNetwork);
 
   /// Determines the list of inputs for the memory interface(s) to instantiate
   /// from the sets of recorded ports. This performs no verification of the
@@ -100,7 +100,7 @@ public:
   LogicalResult determineInterfaceInputsWithForks(
       InterfaceInputs &inputs, OpBuilder &builder, DenseSet<Group *> &groups,
       DenseMap<Block *, Operation *> &forksGraphs, Value start,
-      SmallVector<Operation *> &alloctionNetwork);
+      DenseSet<Operation *> &alloctionNetwork);
 };
 
 } // namespace ftd

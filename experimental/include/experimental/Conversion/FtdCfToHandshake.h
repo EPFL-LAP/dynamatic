@@ -38,26 +38,26 @@ namespace ftd {
 struct FtdStoredOperations {
 
   /// contains all operations created by fast token delivery algorithm
-  SmallVector<Operation *> allocationNetwork;
+  DenseSet<Operation *> allocationNetwork;
 
   /// contains all `handshake::MergeOp` created by `addPhi`
-  SmallVector<Operation *> phiMerges;
+  DenseSet<Operation *> phiMerges;
 
   /// contains all `handshake::BranchOp` created by `manageMoreProdThanCons`
   /// or `manageDifferentRegeneration`
   std::vector<Operation *> suppBranches;
 
   /// contains all `handshake::BranchOp` created by `manageSelfRegeneration`
-  SmallVector<Operation *> selfGenBranches;
+  DenseSet<Operation *> selfGenBranches;
 
   /// contains all `handshake::MergeOp` added in the straight LSQ
-  SmallVector<Operation *> memDepLoopMerges;
+  DenseSet<Operation *> memDepLoopMerges;
 
   /// contains all `handshake::MuxOp` created by Shannon
-  SmallVector<Operation *> shannonMUXes;
+  DenseSet<Operation *> shannonMUXes;
 
   /// contains all constants created by `addInit` or for Shannon’s
-  SmallVector<Operation *> networkConstants;
+  DenseSet<Operation *> networkConstants;
 };
 
 /// Convert a func-level function into an handshake-level function. A custom
@@ -81,7 +81,7 @@ public:
 
 protected:
   LogicalResult ftdVerifyAndCreateMemInterfaces(
-      handshake::FuncOp funcOp, ConversionPatternRewriter &rewriter,
+      handshake::FuncOp &funcOp, ConversionPatternRewriter &rewriter,
       MemInterfacesInfo &memInfo, FtdStoredOperations &ftdOps) const;
 
   /// Given a list of operations, return the list of memory dependencies for
@@ -103,6 +103,7 @@ protected:
                                 DenseMap<Block *, Operation *> &forksGraph,
                                 FtdStoredOperations &ftdOps,
                                 Value startCtrl) const;
+
   /// For each pair of producer and consumer which are in loop possibly
   /// add a merge between the pair, so that the
   LogicalResult addMergeLoop(handshake::FuncOp &funcOp, OpBuilder &builder,
@@ -111,8 +112,28 @@ protected:
                              DenseMap<Block *, Operation *> &forksGraph,
                              FtdStoredOperations &ftdOps,
                              Value startCtrl) const;
-};
 
+  /// Convers arith-level constants to handshake-level constants. Constants are
+  /// triggered by the start value of the corresponding function. The FTD
+  /// algorithm is then in charge of connecting the constants to the rest of the
+  /// network, in order for them to be re-generated
+  LogicalResult convertConstants(ConversionPatternRewriter &rewriter,
+                                 handshake::FuncOp &funcOp) const;
+
+  /// Converts undefined operations (LLVM::UndefOp) with a default "0" constant
+  /// triggered by the start signal of the corresponding function.
+  LogicalResult convertUndefinedValues(ConversionPatternRewriter &rewriter,
+                                       handshake::FuncOp &funcOp) const;
+
+  /// When the consumer is in a loop while the producer is not, the value must
+  /// be regenerated as many times as needed. This function is in charge of
+  /// adding some merges to the network, to that this can be done. The new merge
+  /// is moved inside of the loop, and it works like a reassignment (cfr.
+  /// FPGA'22, Section V.C).
+  LogicalResult addPhi(ConversionPatternRewriter &rewriter,
+                       handshake::FuncOp &funcOp,
+                       FtdStoredOperations &ftdOps) const;
+};
 #define GEN_PASS_DECL_FTDCFTOHANDSHAKE
 #define GEN_PASS_DEF_FTDCFTOHANDSHAKE
 #include "experimental/Conversion/Passes.h.inc"

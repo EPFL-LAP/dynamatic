@@ -40,7 +40,7 @@ LogicalResult FtdMemoryInterfaceBuilder::instantiateInterfacesWithForks(
     OpBuilder &builder, handshake::MemoryControllerOp &mcOp,
     handshake::LSQOp &lsqOp, DenseSet<Group *> &groups,
     DenseMap<Block *, Operation *> &forksGraph, Value start,
-    SmallVector<Operation *> &alloctionNetwork) {
+    DenseSet<Operation *> &alloctionNetwork) {
 
   // Get the edgeBuilder
   BackedgeBuilder edgeBuilder(builder, memref.getLoc());
@@ -136,7 +136,7 @@ LogicalResult FtdMemoryInterfaceBuilder::instantiateInterfacesWithForks(
 LogicalResult FtdMemoryInterfaceBuilder::determineInterfaceInputsWithForks(
     InterfaceInputs &inputs, OpBuilder &builder, DenseSet<Group *> &groups,
     DenseMap<Block *, Operation *> &forksGraph, Value start,
-    SmallVector<Operation *> &alloctionNetwork) {
+    DenseSet<Operation *> &alloctionNetwork) {
 
   // Create the fork nodes: for each group among the set of groups
   for (Group *group : groups) {
@@ -150,7 +150,7 @@ LogicalResult FtdMemoryInterfaceBuilder::determineInterfaceInputsWithForks(
 
     // Add the new component to the list of components create for FTD and to the
     // fork graph
-    alloctionNetwork.push_back(forkOp);
+    alloctionNetwork.insert(forkOp);
     forksGraph[bb] = forkOp;
   }
 

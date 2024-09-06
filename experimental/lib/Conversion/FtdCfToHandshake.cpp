@@ -58,8 +58,7 @@ struct FtdCfToHandshakePass
     CfToHandshakeTypeConverter converter;
     RewritePatternSet patterns(ctx);
 
-    patterns.add<experimental::ftd::FtdLowerFuncToHandshake, ConvertConstants,
-                 ConvertCalls, ConvertUndefinedValues,
+    patterns.add<experimental::ftd::FtdLowerFuncToHandshake, ConvertCalls,
                  ConvertIndexCast<arith::IndexCastOp, handshake::ExtSIOp>,
                  ConvertIndexCast<arith::IndexCastUIOp, handshake::ExtUIOp>,
                  OneToOneConversion<arith::AddFOp, handshake::AddFOp>,
@@ -326,7 +325,7 @@ static void minimizeGroupsConnections(DenseSet<Group *> &groupsGraph) {
     // List of predecessors to remove
     DenseSet<Group *> predsToRemove;
     for (auto &bp : group->preds) {
-      // If the big predecessor is alreay in the list to remove, ignore it
+      // If the big predecessor is already in the list to remove, ignore it
       if (llvm::find(predsToRemove, bp) != predsToRemove.end())
         continue;
       for (auto &sp : group->preds) {
@@ -334,7 +333,7 @@ static void minimizeGroupsConnections(DenseSet<Group *> &groupsGraph) {
         // ignore it
         if (lessThanBlocks(bp->bb, sp->bb))
           continue;
-        // If the small predecessor is alreay in the list to remove, ignore it
+        // If the small predecessor is already in the list to remove, ignore it
         if (llvm::find(predsToRemove, sp) != predsToRemove.end())
           continue;
         // if we are considering the same elements, ignore them
@@ -362,10 +361,10 @@ static void minimizeGroupsConnections(DenseSet<Group *> &groupsGraph) {
 /// Allocate some joins in front of each lazy fork, so that the number of inputs
 /// for each of them is exactly one. The current inputs of the lazy forks become
 /// inputs for the joins.
-static LogicalResult
-joinInsertion(OpBuilder &builder, DenseSet<Group *> &groups,
-              DenseMap<Block *, Operation *> &forksGraph,
-              SmallVector<Operation *> &allocationNetwork) {
+static LogicalResult joinInsertion(OpBuilder &builder,
+                                   DenseSet<Group *> &groups,
+                                   DenseMap<Block *, Operation *> &forksGraph,
+                                   DenseSet<Operation *> &allocationNetwork) {
   // For each group
   for (Group *group : groups) {
     // Get the corresponding fork and operands
@@ -374,12 +373,12 @@ joinInsertion(OpBuilder &builder, DenseSet<Group *> &groups,
     // If the number of inputs is higher than one
     if (operands.size() > 1) {
 
-      // Join all the inputs, and set the ouptut of this new element as input of
+      // Join all the inputs, and set the output of this new element as input of
       // the lazy fork
       builder.setInsertionPointToStart(forkNode->getBlock());
       auto joinOp =
           builder.create<handshake::JoinOp>(forkNode->getLoc(), operands);
-      allocationNetwork.push_back(joinOp);
+      allocationNetwork.insert(joinOp);
       /// The result of the JoinOp becomes the input to the LazyFork
       forkNode->setOperands(joinOp.getResult());
     }
@@ -675,7 +674,7 @@ LogicalResult FtdLowerFuncToHandshake::addMergeNonLoop(
         mergeOperands.push_back(startCtrl);
         mergeOperands.push_back(forksGraph[producerBlock]->getResult(0));
         auto mergeOp = builder.create<handshake::MergeOp>(loc, mergeOperands);
-        ftdOps.allocationNetwork.push_back(mergeOp);
+        ftdOps.allocationNetwork.insert(mergeOp);
 
         // At this point, the output of the merge is the new producer, which
         // becomes an input for the consumer.
@@ -768,17 +767,17 @@ LogicalResult FtdLowerFuncToHandshake::addMergeLoop(
           for (std::vector<Operation *> path : allPaths) {
             SmallVector<Value> operands;
 
-            // Get the result of the operaiton before the cosumer (this will
+            // Get the result of the operation before the consumer (this will
             // become an input of the merge)
             Value mergeOperand = path.at(path.size() - 2)->getResult(0);
             operands.push_back(startCtrl);
             operands.push_back(mergeOperand);
 
-            // Add the merge and updpate the FTD data structures
+            // Add the merge and update the FTD data structures
             auto mergeOp = builder.create<handshake::MergeOp>(
                 mergeOperand.getLoc(), operands);
-            ftdOps.allocationNetwork.push_back(mergeOp);
-            ftdOps.memDepLoopMerges.push_back(mergeOp);
+            ftdOps.allocationNetwork.insert(mergeOp);
+            ftdOps.memDepLoopMerges.insert(mergeOp);
 
             // The merge becomes the producer now, so connect the result of
             // the MERGE as an operand of the Consumer. Also remove the old
@@ -840,16 +839,220 @@ LogicalResult FtdLowerFuncToHandshake::matchAndRewrite(
   // instantiation logic)
   idBasicBlocks(funcOp, rewriter);
 
+  // Create the memory interface according to the algorithm from FPGA'23. The
+  // data dependencies which are created in this way will be then modified by
+  // the FTD methodology.
   if (failed(
           ftdVerifyAndCreateMemInterfaces(funcOp, rewriter, memInfo, ftdOps)))
     return failure();
 
+  // Convert the constants from the `arith` dialect to the `handshake` dialect,
+  // while also using the start value as their control value. While the usage of
+  // the `MatchAndRewrite` system is effective for most of the conversions,
+  // since the FTD algorithm requires the constants to be already converted
+  // before it can run effectively, this operation has to be done in here.
+  if (failed(convertConstants(rewriter, funcOp)))
+    return failure();
+
+  // For the same reason as above, the conversion of the undefined values should
+  // happen before the FTD algorithm. Since they now are constants, each value
+  // has to be activated by the function start value as well.
+  if (failed(convertUndefinedValues(rewriter, funcOp)))
+    return failure();
+
+  // Add phi
+  if (failed(addPhi(rewriter, funcOp, ftdOps)))
+    return failure();
+
+  // Add supp
+  //
+  // Add supp branches
+  //
+  // Add supp for start
+  //
+  // Convert merges to muxes
+  //
+  // Add supp GSA
+  //
+  // Convert calls
+  //
+  // id basic block
   idBasicBlocks(funcOp, rewriter);
+
   return flattenAndTerminate(funcOp, rewriter, argReplacements);
 }
 
+/// Get all the loops the consumer is in while the producer is not, from the
+/// outermost to the innermost
+static SmallVector<CFGLoop *> getLoopsConsNotInProd(Block *cons, Block *prod,
+                                                    mlir::CFGLoopInfo &li) {
+
+  SmallVector<CFGLoop *> result;
+
+  // Get all the loops in which the consumer is but the producer is not
+  CFGLoop *loop = li.getLoopFor(cons);
+  while (loop) {
+    if (!loop->contains(prod))
+      result.push_back(loop);
+    loop = loop->getParentLoop();
+  }
+
+  // Reverse to the get the loops from outermost to innermost
+  std::reverse(result.begin(), result.end());
+  return result;
+}
+
+LogicalResult
+FtdLowerFuncToHandshake::addPhi(ConversionPatternRewriter &rewriter,
+                                handshake::FuncOp &funcOp,
+                                FtdStoredOperations &ftdOps) const {
+
+  Region &region = funcOp.getBody();
+  mlir::DominanceInfo domInfo;
+  mlir::CFGLoopInfo loopInfo(domInfo.getDomTree(&region));
+
+  for (Block &consumerBlock : region.getBlocks()) {
+    for (Operation &consumerOp : consumerBlock.getOperations()) {
+
+      // Skip if the operation was not added by the FTD algorithm AND either it
+      // is not a constant or it is a constant related to the network of
+      // constants (for MUX select signals)
+      if (!ftdOps.allocationNetwork.contains(&consumerOp) &&
+          (!isa<handshake::ConstantOp>(consumerOp) ||
+           ftdOps.networkConstants.contains(&consumerOp))) {
+        continue;
+      }
+
+      // Skip consumers which were were added by the `addPhi` function, to avoid
+      // inifinte loops
+      if (ftdOps.phiMerges.contains(&consumerOp))
+        continue;
+
+      for (Value operand : consumerOp.getOperands()) {
+
+        // Skip the anlaysis of the current operand if it is produced by a MERGE
+        // produced by `addPhi`, to avoid infinite loops
+        if (mlir::Operation *producerOp = operand.getDefiningOp();
+            ftdOps.phiMerges.contains(producerOp))
+          continue;
+
+        // Get the parent block of the operand
+        Block *producerBlock = operand.getParentBlock();
+        Value producerOperand = operand;
+
+        // Get all the loops for which we need to regenerate the corresponding
+        // value
+        SmallVector<CFGLoop *> loops =
+            getLoopsConsNotInProd(&consumerBlock, producerBlock, loopInfo);
+
+        // For each of the loop, from the outermost to the innermost
+        for (auto *it = loops.begin(); it != loops.end(); ++it) {
+
+          // If we are in the innermost loop (thus the iterator is at its end)
+          // and the the consumer is a loop merge, stop
+          if (std::next(it) == loops.end() &&
+              ftdOps.memDepLoopMerges.contains(&consumerOp))
+            break;
+
+          // Add the merge to the network, by substituting the operand iwth the
+          // output of the merge, and forwarding the output of the merge to its
+          // inputs.
+          rewriter.setInsertionPointToStart((*it)->getHeader());
+          auto mergeOp = rewriter.create<handshake::MergeOp>(
+              producerOperand.getLoc(), producerOperand);
+          producerOperand = mergeOp.getResult();
+          ftdOps.phiMerges.insert(mergeOp);
+          ftdOps.allocationNetwork.insert(mergeOp);
+          mergeOp->insertOperands(1, mergeOp->getResult(0));
+        }
+        consumerOp.replaceUsesOfWith(operand, producerOperand);
+      }
+    }
+  }
+  return success();
+}
+
+LogicalResult FtdLowerFuncToHandshake::convertUndefinedValues(
+    ConversionPatternRewriter &rewriter, handshake::FuncOp &funcOp) const {
+
+  // Get all the undefined value in the function
+  auto undefinedValues = funcOp.getBody().getOps<LLVM::UndefOp>();
+
+  // Get the start value of the current function
+  auto startValue = (Value)funcOp.getArguments().back();
+
+  // For each constant
+  for (auto undefOp : llvm::make_early_inc_range(undefinedValues)) {
+    // Create an attribute of the appropriate type for the constant
+    auto resType = undefOp.getRes().getType();
+    TypedAttr cstAttr;
+    if (isa<IndexType>(resType)) {
+      auto intType = rewriter.getIntegerType(32);
+      cstAttr = rewriter.getIntegerAttr(intType, 0);
+    } else if (isa<IntegerType>(resType)) {
+      cstAttr = rewriter.getIntegerAttr(resType, 0);
+    } else if (FloatType floatType = dyn_cast<FloatType>(resType)) {
+      cstAttr = rewriter.getFloatAttr(floatType, 0.0);
+    } else {
+      return undefOp->emitError() << "operation has unsupported result type";
+    }
+
+    // Create a constant with a default value and replace the undefined value
+    rewriter.setInsertionPoint(undefOp);
+    auto cstOp = rewriter.create<handshake::ConstantOp>(undefOp.getLoc(),
+                                                        cstAttr, startValue);
+    // Move attributes and replace the usage of the value
+    cstOp->setDialectAttrs(undefOp->getAttrDictionary());
+    namer.replaceOp(cstOp, cstOp);
+    rewriter.replaceOp(undefOp, cstOp.getResult());
+  }
+
+  return success();
+}
+
+LogicalResult
+FtdLowerFuncToHandshake::convertConstants(ConversionPatternRewriter &rewriter,
+                                          handshake::FuncOp &funcOp) const {
+
+  // Get the start value of the current function
+  auto startValue = (Value)funcOp.getArguments().back();
+
+  // Get all the constants in the function
+  auto constants = funcOp.getBody().getOps<mlir::arith::ConstantOp>();
+
+  // For each constant
+  for (auto cstOp : llvm::make_early_inc_range(constants)) {
+
+    // Set the insertion point after the specified operation
+    rewriter.setInsertionPoint(cstOp);
+
+    // Get the value of the constant
+    TypedAttr cstAttr = cstOp.getValue();
+
+    // Convert IndexType'd values to equivalent signless integers
+    if (isa<IndexType>(cstAttr.getType())) {
+      auto intType = rewriter.getIntegerType(32);
+      cstAttr = IntegerAttr::get(
+          intType, cast<IntegerAttr>(cstAttr).getValue().trunc(32));
+    }
+
+    // Create the new constant with the same value and attributes, trigger each
+    // of them using the start signal of the function
+    auto newCstOp = rewriter.create<handshake::ConstantOp>(cstOp.getLoc(),
+                                                           cstAttr, startValue);
+
+    // Move the attributes to the new constant
+    newCstOp->setDialectAttrs(cstOp->getDialectAttrs());
+
+    // Replace the constant and the usage of its result
+    namer.replaceOp(cstOp, newCstOp);
+    rewriter.replaceOp(cstOp, newCstOp->getResults());
+  }
+  return success();
+}
+
 LogicalResult FtdLowerFuncToHandshake::ftdVerifyAndCreateMemInterfaces(
-    handshake::FuncOp funcOp, ConversionPatternRewriter &rewriter,
+    handshake::FuncOp &funcOp, ConversionPatternRewriter &rewriter,
     MemInterfacesInfo &memInfo, FtdStoredOperations &ftdOps) const {
 
   if (memInfo.empty())
@@ -922,7 +1125,7 @@ LogicalResult FtdLowerFuncToHandshake::ftdVerifyAndCreateMemInterfaces(
         memBuilder.addMCPort(mcOp);
     }
 
-    // Determine LSQ group validity and add ports the the interface builder
+    // Determine LSQ group validity and add ports the interface builder
     // at the same time
     for (auto &[group, groupOps] : memAccesses.lsqPorts) {
       assert(!groupOps.empty() && "group cannot be empty");
@@ -999,7 +1202,7 @@ LogicalResult FtdLowerFuncToHandshake::ftdVerifyAndCreateMemInterfaces(
       // As we instantiate the interfaces for the LSQ for each memory
       // operation, we need to add some forks in order for the control input
       // to be propagated. In particular, we want to keep track of the control
-      // valuea associated to each basic block in the region
+      // value associated to each basic block in the region
       DenseMap<Block *, Operation *> forksGraph;
 
       if (failed(memBuilder.instantiateInterfacesWithForks(
@@ -1018,12 +1221,12 @@ LogicalResult FtdLowerFuncToHandshake::ftdVerifyAndCreateMemInterfaces(
       if (failed(joinInsertion(rewriter, groupsGraph, forksGraph,
                                ftdOps.allocationNetwork)))
         return failure();
+    } else {
+      handshake::MemoryControllerOp mcOp;
+      handshake::LSQOp lsqOp;
+      if (failed(memBuilder.instantiateInterfaces(rewriter, mcOp, lsqOp)))
+        return failure();
     }
-
-    handshake::MemoryControllerOp mcOp;
-    handshake::LSQOp lsqOp;
-    if (failed(memBuilder.instantiateInterfaces(rewriter, mcOp, lsqOp)))
-      return failure();
   }
 
   return success();
@@ -1075,7 +1278,6 @@ void FtdLowerFuncToHandshake::identifyMemoryDependencies(
       // in the opposite direction
       if (lessThanBlocks(bbJ, bbI)) {
 
-        // bbI is the producer, bbJ is the consumer: create a new dependency
         // and add it to the list of dependencies
         ProdConsMemDep oneMemDep(bbJ, bbI, false);
         allMemDeps.push_back(oneMemDep);
