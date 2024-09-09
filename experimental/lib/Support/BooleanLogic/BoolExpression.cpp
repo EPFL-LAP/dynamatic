@@ -469,3 +469,23 @@ BoolExpression *BoolExpression::boolMinimizeSop() {
     return new BoolExpression(ExpressionType::One);
   return parseSop(espressoResult);
 }
+
+BoolExpression *BoolExpression::deepCopy() const {
+  switch (type) {
+  case ExpressionType::And:
+  case ExpressionType::Or:
+  case ExpressionType::Not: {
+    const Operator *op = static_cast<const Operator *>(this);
+    return new Operator(type, op->left->deepCopy(),
+                        op->right ? op->right->deepCopy() : nullptr);
+  }
+  case ExpressionType::Variable:
+  case ExpressionType::Zero:
+  case ExpressionType::One: {
+    const SingleCond *sc = static_cast<const SingleCond *>(this);
+    return new SingleCond(type, sc->id, sc->isNegated);
+  }
+  case ExpressionType::End:
+    return new SingleCond(ExpressionType::End);
+  }
+}
