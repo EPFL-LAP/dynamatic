@@ -369,6 +369,7 @@ void LSQGenerationInfo::fromPorts(FuncMemoryPorts &ports) {
   if(lsqSizeAttr) {
     depthLoad = lsqSizeAttr.getLoadQueueSize();
     depthStore = lsqSizeAttr.getStoreQueueSize();
+    depth = std::max(depthLoad, depthStore); // TODO parameter should not be necessary in theory, but lsq generator would need to be changed to not use it
   } else {
     depthLoad = 16;
     depthStore = 16;
