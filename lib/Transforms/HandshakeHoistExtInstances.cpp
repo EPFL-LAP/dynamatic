@@ -21,7 +21,9 @@
 #include "mlir/IR/MLIRContext.h"
 #include "mlir/IR/Value.h"
 #include "mlir/IR/ValueRange.h"
+#include "mlir/Support/LogicalResult.h"
 #include "llvm/ADT/STLExtras.h"
+#include "llvm/ADT/SmallSet.h"
 #include "llvm/ADT/SmallVector.h"
 #include <cstddef>
 #include <iterator>
@@ -52,7 +54,8 @@ struct HandshakeHoistExtInstancesPass
     auto funcOps = modOp.getOps<handshake::FuncOp>();
     for (auto funcOp : llvm::make_early_inc_range(funcOps)) {
       if (!funcOp.isExternal())
-        hoistInstances(funcOp, symbols);
+        if (failed(hoistInstances(funcOp, symbols)))
+          return signalPassFailure();
     }
 
     // Remove unused external functions
@@ -68,15 +71,16 @@ private:
   /// hoist it "outside" the function and add arguments/results to the
   /// function's signature to represent the removed instance's
   /// results/arguments, respectively.
-  void hoistInstances(handshake::FuncOp funcOp, SymbolTable &symbols);
+  LogicalResult hoistInstances(handshake::FuncOp funcOp, SymbolTable &symbols);
 
   /// Erases the external function if is never referenced elsewhere in the IR.
   void eraseIfUnused(handshake::FuncOp funcOp);
 };
 } // namespace
 
-void HandshakeHoistExtInstancesPass::hoistInstances(handshake::FuncOp funcOp,
-                                                    SymbolTable &symbols) {
+LogicalResult
+HandshakeHoistExtInstancesPass::hoistInstances(handshake::FuncOp funcOp,
+                                               SymbolTable &symbols) {
   MLIRContext *ctx = &getContext();
   OpBuilder builder(ctx);
 
@@ -95,7 +99,7 @@ void HandshakeHoistExtInstancesPass::hoistInstances(handshake::FuncOp funcOp,
   Block *bodyBlock = funcOp.getBodyBlock();
 
   // Verify that each external function is instantiated a single time
-  SmallVector<StringRef> externalFunctionNames;
+  llvm::SmallSet<handshake::FuncOp, 4> calledFunctions;
   // Collect all instances inside the function that reference an external
   // Handshake functions
   bool anyInstance = false;
@@ -109,12 +113,12 @@ void HandshakeHoistExtInstancesPass::hoistInstances(handshake::FuncOp funcOp,
     anyInstance = true;
     StringRef instFuncName = instFuncOp.getNameAttr().strref();
 
-    assert(std::find(externalFunctionNames.begin(), externalFunctionNames.end(),
-                     instFuncName) == externalFunctionNames.end() &&
-           "External function instantiated multiple times. Each external "
-           "function refers to one output and input port.");
-
-    externalFunctionNames.push_back(instFuncName);
+    if (auto [_, newFunc] = calledFunctions.insert(instFuncOp); !newFunc) {
+      return instFuncOp.emitError() << "External function is instantiated "
+                                    << "multiple times, but we only support "
+                                       "a single instantation in any "
+                                    << "given kernel";
+    }
 
     // Iterate over the instance's arguments and add them to the function's
     // results
@@ -148,7 +152,7 @@ void HandshakeHoistExtInstancesPass::hoistInstances(handshake::FuncOp funcOp,
   }
 
   if (!anyInstance)
-    return;
+    return success();
 
   // Change the function's signature
   funcOp.setFunctionType(builder.getFunctionType(argTypes, resTypes));
@@ -157,6 +161,7 @@ void HandshakeHoistExtInstancesPass::hoistInstances(handshake::FuncOp funcOp,
 
   // Replace the terminator's operands
   endOp->setOperands(endOperands);
+  return success();
 }
 
 void HandshakeHoistExtInstancesPass::eraseIfUnused(handshake::FuncOp funcOp) {
