@@ -20,6 +20,7 @@ using namespace dynamatic::experimental::lsqsizing;
 // 2. If the operation is a buffer operation, the latency is extracted from the timing attribute
 // 3. If the operation is neither, then its latency is set to 0
 // TODO cleanup after handshake dialect/component.json mismatch is fixed
+//TODO regex matching
 int extractNodeLatency(mlir::Operation *op, TimingDatabase timingDB) {
   double latency = 0;
 
