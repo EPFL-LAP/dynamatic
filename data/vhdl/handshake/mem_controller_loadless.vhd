@@ -79,21 +79,23 @@ begin
   stAddr_ready <= storePorts_ready;
   ctrl_ready   <= (others => '1');
 
-  count_stores : process (rst, clk)
+  count_stores : process (clk)
     variable counter : std_logic_vector(31 downto 0);
   begin
-    if (rst = '1') then
-      counter := (31 downto 0 => '0');
-    elsif rising_edge(clk) then
-      for i in 0 to NUM_CONTROLS - 1 loop
-        if ctrl_valid(i) then
-          counter := std_logic_vector(unsigned(counter) + unsigned(ctrl(i)));
+    if rising_edge(clk) then
+      if (rst = '1') then
+        counter := (31 downto 0 => '0');
+      else
+        for i in 0 to NUM_CONTROLS - 1 loop
+          if ctrl_valid(i) then
+            counter := std_logic_vector(unsigned(counter) + unsigned(ctrl(i)));
+          end if;
+        end loop;
+        if storeEn then
+          counter := std_logic_vector(unsigned(counter) - 1);
         end if;
-      end loop;
-      if storeEn then
-        counter := std_logic_vector(unsigned(counter) - 1);
+        remainingStores <= counter;
       end if;
-      remainingStores <= counter;
     end if;
   end process;
 

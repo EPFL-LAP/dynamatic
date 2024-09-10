@@ -19,12 +19,14 @@ architecture arch of eager_fork_register_block is
 begin
   keepValue <= (not outs_ready) and transmitValue;
 
-  process (rst, clk)
+  process (clk)
   begin
-    if (rst = '1') then
-      transmitValue <= '1';
-    elsif (rising_edge(clk)) then
-      transmitValue <= keepValue or (not backpressure);
+    if (rising_edge(clk)) then
+      if (rst = '1') then
+        transmitValue <= '1';
+      else
+        transmitValue <= keepValue or (not backpressure);
+      end if;
     end if;
   end process;
 
