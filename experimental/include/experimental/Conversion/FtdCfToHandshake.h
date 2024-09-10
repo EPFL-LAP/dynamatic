@@ -45,7 +45,7 @@ struct FtdStoredOperations {
 
   /// contains all `handshake::BranchOp` created by `manageMoreProdThanCons`
   /// or `manageDifferentRegeneration`
-  std::vector<Operation *> suppBranches;
+  DenseSet<Operation *> suppBranches;
 
   /// contains all `handshake::BranchOp` created by `manageSelfRegeneration`
   DenseSet<Operation *> selfGenBranches;
@@ -58,6 +58,13 @@ struct FtdStoredOperations {
 
   /// contains all constants created by `addInit` or for Shannon’s
   DenseSet<Operation *> networkConstants;
+
+  /// For each condition of the block, represented in abstract as `cN` where `N`
+  /// is the index of the basic block, associate its corresponding control
+  /// value, Associates the condition of the block in string format to its
+  /// corresponding control value. This is given by the condition of the
+  /// terminator of the block, in case it's a conditional branch
+  std::map<std::string, Value> conditionToValue;
 };
 
 /// Convert a func-level function into an handshake-level function. A custom
@@ -120,19 +127,36 @@ protected:
   LogicalResult convertConstants(ConversionPatternRewriter &rewriter,
                                  handshake::FuncOp &funcOp) const;
 
-  /// Converts undefined operations (LLVM::UndefOp) with a default "0" constant
-  /// triggered by the start signal of the corresponding function.
+  /// Converts undefined operations (LLVM::UndefOp) with a default "0"
+  /// constant triggered by the start signal of the corresponding function.
   LogicalResult convertUndefinedValues(ConversionPatternRewriter &rewriter,
                                        handshake::FuncOp &funcOp) const;
 
+  /// [TEMP]
+  /// Anticipate the conversion of some operation from the `arith` dialect to
+  /// the `handshake` dialect
+  template <typename SrcType, typename DstType>
+  LogicalResult convertOperations(ConversionPatternRewriter &rewriter,
+                                  OpAdaptor adaptor,
+                                  handshake::FuncOp &funcOp) const;
+
   /// When the consumer is in a loop while the producer is not, the value must
   /// be regenerated as many times as needed. This function is in charge of
-  /// adding some merges to the network, to that this can be done. The new merge
-  /// is moved inside of the loop, and it works like a reassignment (cfr.
-  /// FPGA'22, Section V.C).
+  /// adding some merges to the network, to that this can be done. The new
+  /// merge is moved inside of the loop, and it works like a reassignment
+  /// (cfr. FPGA'22, Section V.C).
   LogicalResult addPhi(ConversionPatternRewriter &rewriter,
                        handshake::FuncOp &funcOp,
                        FtdStoredOperations &ftdOps) const;
+
+  /// Given each pairs of producers and consumers within the circuit, the
+  /// producer might create a token which is never used by the corresponding
+  /// consumer, because of the control decisions. In this scenario, the token
+  /// must be suprressed. This function inserts a `SUPPRESS` block whenever it
+  /// is necessary, according to FPGA'22 (IV.C and V)
+  LogicalResult addSupp(ConversionPatternRewriter &rewriter,
+                        handshake::FuncOp &funcOp,
+                        FtdStoredOperations &ftdOps) const;
 };
 #define GEN_PASS_DECL_FTDCFTOHANDSHAKE
 #define GEN_PASS_DEF_FTDCFTOHANDSHAKE
