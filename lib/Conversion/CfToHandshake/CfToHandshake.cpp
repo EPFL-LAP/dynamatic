@@ -1027,6 +1027,10 @@ LogicalResult OneToOneConversion<SrcOp, DstOp>::matchAndRewrite(
   auto newOp =
       rewriter.create<DstOp>(srcOp->getLoc(), newTypes, adaptor.getOperands(),
                              srcOp->getAttrDictionary().getValue());
+
+  for (auto [from, to] : llvm::zip(srcOp->getResults(), newOp->getResults()))
+    from.replaceAllUsesWith(to);
+
   namer.replaceOp(srcOp, newOp);
   rewriter.replaceOp(srcOp, newOp);
   return success();
