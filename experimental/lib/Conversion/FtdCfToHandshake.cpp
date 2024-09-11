@@ -12,7 +12,6 @@
 #include "dynamatic/Conversion/CfToHandshake.h"
 #include "dynamatic/Dialect/Handshake/HandshakeDialect.h"
 #include "dynamatic/Dialect/Handshake/HandshakeOps.h"
-#include "dynamatic/Dialect/Handshake/MemoryInterfaces.h"
 #include "dynamatic/Support/CFG.h"
 #include "experimental/Support/BooleanLogic/BoolExpression.h"
 #include "experimental/Support/BooleanLogic/Shannon.h"
@@ -64,10 +63,10 @@ struct FtdCfToHandshakePass
                  ConvertIndexCast<arith::IndexCastOp, handshake::ExtSIOp>,
                  ConvertIndexCast<arith::IndexCastUIOp, handshake::ExtUIOp>,
                  OneToOneConversion<arith::AddFOp, handshake::AddFOp>,
-                 // OneToOneConversion<arith::AddIOp, handshake::AddIOp>,
+                 OneToOneConversion<arith::AddIOp, handshake::AddIOp>,
                  OneToOneConversion<arith::AndIOp, handshake::AndIOp>,
                  OneToOneConversion<arith::CmpFOp, handshake::CmpFOp>,
-                 // OneToOneConversion<arith::CmpIOp, handshake::CmpIOp>,
+                 OneToOneConversion<arith::CmpIOp, handshake::CmpIOp>,
                  OneToOneConversion<arith::DivFOp, handshake::DivFOp>,
                  OneToOneConversion<arith::DivSIOp, handshake::DivSIOp>,
                  OneToOneConversion<arith::DivUIOp, handshake::DivUIOp>,
@@ -813,6 +812,353 @@ LogicalResult FtdLowerFuncToHandshake::addMergeLoop(
   return success();
 }
 
+/// Checks if an operation is a Branch in a loop exit block
+static bool isBranchInLoopExit(Operation *op, CFGLoopInfo &loopInfo) {
+  if (isa<handshake::ConditionalBranchOp>(op)) {
+    // Get the loop in which the corresponding basic block is
+    CFGLoop *loop = loopInfo.getLoopFor(op->getBlock());
+    if (loop) {
+      llvm::SmallVector<Block *> exitBlocks;
+      // check whether the basic block is in one of the exit blocks of the loop
+      loop->getExitingBlocks(exitBlocks);
+      return llvm::find(exitBlocks, op->getBlock()) != exitBlocks.end();
+    }
+  }
+  return false;
+}
+
+/// Modify a merge operation related to the INIT process of a variable, so that
+/// input number 0 comes from outside of the loop, while input numer 1 comes
+/// from the loop itself
+static void fixMergeConvention(Operation *merge, CFGLoop *loop,
+                               CFGLoopInfo &li) {
+  // Swap if the operand 0 comes from the loop itself
+  Value firstOperand = merge->getOperand(0);
+  if (li.getLoopFor(merge->getOperand(0).getParentBlock()) == loop) {
+    Value secondOperand = merge->getOperand(1);
+    merge->setOperand(0, secondOperand);
+    merge->setOperand(1, firstOperand);
+  }
+}
+
+/// Add an INIT merge, so that the initialization value of a loop is generated
+/// only at the first iteration of the loop. This merge cannot be replaced by a
+/// mux
+static Value addInit(ConversionPatternRewriter &rewriter,
+                     DenseSet<Operation *> &initMerges, Operation *oldMerge,
+                     FtdStoredOperations &ftdOps, Value &startValue,
+                     CFGLoopInfo &li) {
+
+  SmallVector<Value> mergeOperands;
+
+  // Given the merge we are currently translating, one of its inputs must be a
+  // branch in a loop exit block (that is, the regeneration of the loop
+  // variable)
+  bool inputIsBranchInLoopExit = false;
+  Value mergeOperandFromMux;
+  handshake::ConditionalBranchOp branchOp;
+
+  // For each operand
+  for (Value operand : oldMerge->getOperands()) {
+    // For each of its producers
+    if (Operation *producer = operand.getDefiningOp()) {
+      // If it is the branch on a loop exit
+      if (isBranchInLoopExit(producer, li)) {
+        // Get the branch, which is supposed to exist
+        branchOp = dyn_cast<handshake::ConditionalBranchOp>(producer);
+        mergeOperandFromMux = branchOp.getConditionOperand();
+        if (isa<handshake::NotOp>(mergeOperandFromMux.getDefiningOp()))
+          mergeOperandFromMux =
+              mergeOperandFromMux.getDefiningOp()->getOperand(0);
+        inputIsBranchInLoopExit = true;
+        break;
+      }
+    }
+  }
+  assert(inputIsBranchInLoopExit &&
+         "An input of the Merge must be a Branch in a loop exit block");
+
+  // The value of the constant we need to addis either 0 or 1, depending on
+  // which input of the merge we are currently translating to mux is coming from
+  // outsize of the loop:
+  // 1. If the first input of the merge that we are translating to mux is coming
+  // from outside of the loop, the value of the constant should be 0;
+  // 2. If the second input of the merge that we are translating to mux is
+  // coming from the outside of the loop, the value of the constant should be 1.
+  if (branchOp.getResult(0) == oldMerge->getOperand(1) ||
+      branchOp.getResult(1) == oldMerge->getOperand(0)) {
+    rewriter.setInsertionPointAfterValue(mergeOperandFromMux);
+    auto notOp = rewriter.create<handshake::NotOp>(mergeOperandFromMux.getLoc(),
+                                                   mergeOperandFromMux);
+    mergeOperandFromMux = notOp->getResult(0);
+  }
+
+  // Insert a new constant in the same block as that of the new merge and feed
+  // its input from the start value.
+
+  auto cstType = rewriter.getIntegerType(1);
+  auto cstAttr = IntegerAttr::get(cstType, 0);
+  rewriter.setInsertionPointToStart(oldMerge->getBlock());
+  auto constOp = rewriter.create<handshake::ConstantOp>(oldMerge->getLoc(),
+                                                        cstAttr, startValue);
+
+  ftdOps.networkConstants.insert(constOp);
+
+  mergeOperands.push_back(constOp.getResult());
+  mergeOperands.push_back(mergeOperandFromMux);
+
+  // Create the merge
+  auto mergeOp =
+      rewriter.create<handshake::MergeOp>(oldMerge->getLoc(), mergeOperands);
+  initMerges.insert(mergeOp);
+  ftdOps.allocationNetwork.insert(mergeOp);
+  return mergeOp->getResult(0);
+}
+
+LogicalResult FtdLowerFuncToHandshake::convertMergesToMuxes(
+    ConversionPatternRewriter &rewriter, handshake::FuncOp &funcOp,
+    FtdStoredOperations &ftdOps) const {
+
+  // Some merges are the INIT components for loops, so that the initial value of
+  // a phi function can be used. In this case, the merge should not be modified
+  DenseSet<Operation *> initMerges;
+
+  // Get information about the loop and start value of the function
+  mlir::DominanceInfo domInfo;
+  mlir::CFGLoopInfo loopInfo(domInfo.getDomTree(&funcOp.getBody()));
+  auto startValue = (Value)funcOp.getArguments().back();
+
+  Region &region = funcOp.getBody();
+
+  // For each merge withing each block
+  for (Block &block : region.getBlocks()) {
+    for (Operation &merge : block.getOperations()) {
+
+      // Skip if the operation is not related to the allocation network
+      if (!ftdOps.allocationNetwork.contains(&merge))
+        continue;
+
+      // Skip if it is not a marge or if it is an INIT merge
+      if (!isa<handshake::MergeOp>(merge) || initMerges.contains(&merge))
+        continue;
+
+      bool loopHeader = false;
+
+      // Check whether we have a loop header, thus we need to insert an INIT
+      // merge. This happens if the block is inside a loop, its block is the
+      // header one and one of the inputs of the merge is not coming from the
+      // same block (on the contrary, it might happen that the merge has two
+      // operands from the same input)
+      if (loopInfo.getLoopFor(&block))
+        loopHeader =
+            (loopInfo.getLoopFor(&block)->getHeader() == &block &&
+             loopInfo.getLoopFor(merge.getOperand(0).getParentBlock()) !=
+                 loopInfo.getLoopFor(merge.getOperand(1).getParentBlock()));
+
+      // Case of a loop header
+      if (loopHeader) {
+
+        // We want the first operand of the merge is the one coming from outside
+        // the loop.
+        fixMergeConvention(&merge, loopInfo.getLoopFor(&block), loopInfo);
+
+        // The INIT component is in charge of choosing the value 0 of the
+        // mux only in case of the first loop iteration
+        Value select =
+            addInit(rewriter, initMerges, &merge, ftdOps, startValue, loopInfo);
+
+        // The merge itself is transformed into a mux driven by the INIT
+        // signal
+        rewriter.setInsertionPointAfter(&merge);
+
+        auto mux = rewriter.create<handshake::MuxOp>(merge.getLoc(), select,
+                                                     merge.getOperands());
+        ftdOps.allocationNetwork.insert(mux);
+        rewriter.replaceOp(&merge, mux);
+
+      } else {
+        // Pick the select signal as output of a cmerge
+        Value select = getBlockControl(&block);
+
+        // [TODO]
+        // The first input of the cmerge and the first input of the mux are in
+        // the same block
+        // bool firstSameBlock =
+        //     select.getDefiningOp()->getOperand(0).getParentBlock() ==
+        //     merge.getOperand(0).getParentBlock();
+
+        // // The block of the mux first input dominates the block of the cmerge
+        // // first input
+        // bool firstMuxDominateMerge = domInfo.properlyDominates(
+        //     merge.getOperand(0).getParentBlock(),
+        //     select.getDefiningOp()->getOperand(0).getParentBlock());
+
+        // // The second input of the cmerge and the second input of the mux are
+        // // in the same block
+        // bool secondSameBlock =
+        //     select.getDefiningOp()->getOperand(1).getParentBlock() ==
+        //     merge.getOperand(1).getParentBlock();
+
+        // // The block of the mux second input dominates the block of the
+        // cmerge
+        // // second input
+        // bool secondMuxDominateMerge = domInfo.properlyDominates(
+        //     merge.getOperand(1).getParentBlock(),
+        //     select.getDefiningOp()->getOperand(1).getParentBlock());
+
+        // // In case one the two conditions do not hold at the same time, the
+        // // select signal needs to undergoes a not
+        // if (!((firstSameBlock || firstMuxDominateMerge) &&
+        //       (secondSameBlock || secondMuxDominateMerge))) {
+        //   rewriter.setInsertionPointAfterValue(select);
+        //   auto notOp =
+        //       rewriter.create<handshake::NotOp>(select.getLoc(), select);
+        //   select = notOp->getResult(0);
+        // }
+
+        // Convert to a mux
+        rewriter.setInsertionPointAfter(&merge);
+        auto mux = rewriter.create<handshake::MuxOp>(merge.getLoc(), select,
+                                                     merge.getOperands());
+        ftdOps.allocationNetwork.insert(mux);
+        rewriter.replaceOp(&merge, mux);
+
+        llvm::dbgs() << "\n[BLOCK] ";
+        block.printAsOperand(llvm::dbgs());
+        llvm::dbgs() << "\n[FUNC]\n";
+        funcOp.print(llvm::dbgs());
+      }
+    }
+  }
+  return success();
+}
+
+static bool
+findClosestBranchPredecessor(Value input, DominanceInfo &domInfo, Block &block,
+                             Value &desiredCond, bool &getTrueSuccessor,
+                             std::unordered_set<Operation *> &visited) {
+  Operation *defOp = input.getDefiningOp();
+  if (!defOp || visited.count(defOp))
+    return false;
+
+  visited.insert(defOp);
+
+  for (Value pred : defOp->getOperands()) {
+    Operation *predOp = pred.getDefiningOp();
+    if (!predOp)
+      continue;
+
+    if (isa<handshake::ConditionalBranchOp>(predOp)) {
+      auto branch = dyn_cast<handshake::ConditionalBranchOp>(predOp);
+      for (Value branchPred : branch->getOperands()) {
+        if (domInfo.dominates(branchPred.getParentBlock(), &block)) {
+          desiredCond = branch.getConditionOperand();
+          if (pred == branch.getFalseResult()) {
+            getTrueSuccessor = true;
+          }
+          return true;
+        }
+      }
+    }
+
+    if (findClosestBranchPredecessor(pred, domInfo, block, desiredCond,
+                                     getTrueSuccessor, visited)) {
+      return true;
+    }
+  }
+
+  return false;
+}
+
+/// Gets the closest Branch predecessor to the input and accesses its condition
+static bool findClosestBranchPredecessor(Value input, DominanceInfo &domInfo,
+                                         Block &block, Value &desiredCond,
+                                         bool &getTrueSuccessor) {
+  std::unordered_set<Operation *> visited;
+  return findClosestBranchPredecessor(input, domInfo, block, desiredCond,
+                                      getTrueSuccessor, visited);
+}
+
+LogicalResult
+FtdLowerFuncToHandshake::addSuppGSA(ConversionPatternRewriter &rewriter,
+                                    handshake::FuncOp &funcOp,
+                                    FtdStoredOperations &ftdOps) const {
+  Region &region = funcOp.getBody();
+
+  mlir::DominanceInfo domInfo;
+  mlir::CFGLoopInfo loopInfo(domInfo.getDomTree(&funcOp.getBody()));
+  auto startValue = (Value)funcOp.getArguments().back();
+
+  for (Block &block : region.getBlocks()) {
+
+    // Loop thorugh all the operations, looking for muxes which do not relate to
+    // loop headers
+    for (Operation &op : block.getOperations()) {
+
+      if (!ftdOps.allocationNetwork.contains(&op) &&
+          (!isa<handshake::ConstantOp>(op) ||
+           ftdOps.networkConstants.contains(&op)))
+        continue;
+
+      // Skip if it is a mux introduced by shannon, if it is not a multiplexer
+      // or if it is a loop header multiplexer
+      if (ftdOps.shannonMUXes.contains(&op))
+        continue;
+
+      bool loopHeader = loopInfo.getLoopFor(&block) &&
+                        (loopInfo.getLoopFor(&block)->getHeader() == &block);
+
+      if (!isa<handshake::MuxOp>(op) || loopHeader)
+        continue;
+
+      auto mux = dyn_cast<handshake::MuxOp>(op);
+
+      // We want to check whether one input is dominating the mux's block
+      bool inputIsDominating = false;
+      Value firstInputMux = mux.getOperand(1);
+      Value secondInputMux = mux.getOperand(2);
+      Value dominatingInput = firstInputMux;
+      Value nonDominatingInput = secondInputMux;
+
+      if (domInfo.dominates(firstInputMux.getParentBlock(), &block)) {
+        inputIsDominating = true;
+      } else if (domInfo.dominates(secondInputMux.getParentBlock(), &block)) {
+        inputIsDominating = true;
+        dominatingInput = secondInputMux;
+        nonDominatingInput = firstInputMux;
+      }
+
+      if (!inputIsDominating)
+        continue;
+
+      // We don't want both the inputs to dominate the mux
+      assert(!domInfo.dominates(nonDominatingInput.getParentBlock(), &block) &&
+             "The BB of the other input of the Mux should not dominate the BB "
+             "of the Mux");
+
+      Value desiredCond;
+      bool getTrueSuccessor = false;
+      bool hasPredBranch = findClosestBranchPredecessor(
+          nonDominatingInput, domInfo, block, desiredCond, getTrueSuccessor);
+
+      assert(hasPredBranch && "At least one predecessor of the non-dominating "
+                              "input must be a Branch");
+
+      rewriter.setInsertionPointAfterValue(dominatingInput);
+      auto branchOp = rewriter.create<handshake::ConditionalBranchOp>(
+          dominatingInput.getLoc(), desiredCond, dominatingInput);
+      ftdOps.allocationNetwork.insert(branchOp);
+
+      Value newInput = branchOp.getFalseResult();
+      if (getTrueSuccessor)
+        newInput = branchOp.getTrueResult();
+
+      mux->replaceUsesOfWith(dominatingInput, newInput);
+    }
+  }
+  return success();
+}
+
 // -- -End helper functions-- -
 
 using ArgReplacements = DenseMap<BlockArgument, OpResult>;
@@ -881,16 +1227,6 @@ LogicalResult FtdLowerFuncToHandshake::matchAndRewrite(
   if (failed(convertUndefinedValues(rewriter, funcOp)))
     return failure();
 
-  // Convert operations to `handshake::CmpIOP`
-  if (failed(convertOperations<arith::CmpIOp, handshake::CmpIOp>(
-          rewriter, adaptor, funcOp)))
-    return failure();
-
-  // Convert operations to `handshake::AddIOP`
-  if (failed(convertOperations<arith::AddIOp, handshake::AddIOp>(
-          rewriter, adaptor, funcOp)))
-    return failure();
-
   // Add phi
   if (failed(addPhi(rewriter, funcOp, ftdOps)))
     return failure();
@@ -900,15 +1236,28 @@ LogicalResult FtdLowerFuncToHandshake::matchAndRewrite(
     return failure();
 
   // Add supp branches
-  //
+  DenseSet<Operation *> oldBranches;
+  while (true) {
+    size_t counter = ftdOps.suppBranches.size();
+    if (failed(addSuppBranches(rewriter, funcOp, ftdOps, oldBranches)))
+      return failure();
+    if (ftdOps.suppBranches.size() == counter)
+      break;
+  }
+
   // Add supp for start
-  //
+  if (failed(addSuppForStart(rewriter, funcOp, ftdOps)))
+    return failure();
+
+  // [TODO] Fix the transformation from merges to mux
   // Convert merges to muxes
-  //
+  // if (failed(convertMergesToMuxes(rewriter, funcOp, ftdOps)))
+  //   return failure();
+
   // Add supp GSA
-  //
-  // Convert calls
-  //
+  if (failed(addSuppGSA(rewriter, funcOp, ftdOps)))
+    return failure();
+
   // id basic block
   idBasicBlocks(funcOp, rewriter);
 
@@ -1253,6 +1602,131 @@ static LogicalResult manageNonLoop(ConversionPatternRewriter &rewriter,
 }
 
 LogicalResult
+FtdLowerFuncToHandshake::addSuppForStart(ConversionPatternRewriter &rewriter,
+                                         handshake::FuncOp &funcOp,
+                                         FtdStoredOperations &ftdOps) const {
+
+  Region &region = funcOp.getBody();
+  auto startValue = (Value)funcOp.getArguments().back();
+  for (Block &consumerBlock : region.getBlocks()) {
+    for (Operation &consumerOp : consumerBlock.getOperations()) {
+
+      // At this point, we are only interested in applying the algorithm to
+      // constants which were not inserted by the FTD algorithm
+      if (!ftdOps.allocationNetwork.contains(&consumerOp) &&
+          (!isa<handshake::ConstantOp>(consumerOp) ||
+           ftdOps.networkConstants.contains(&consumerOp)))
+        continue;
+
+      // Skip if the consumer is a shannon's mux
+      if (ftdOps.shannonMUXes.contains(&consumerOp))
+        continue;
+
+      // Skip if the consumer is a conditional branch
+      if (isa<handshake::ConditionalBranchOp>(consumerOp))
+        continue;
+
+      // For all the operands of the consumer, take into account only the start
+      // value if exists
+      for (Value operand : consumerOp.getOperands()) {
+        if (operand == startValue) {
+          if (operand.getParentBlock() == &consumerBlock &&
+              !isa<handshake::MergeOp>(consumerOp))
+            continue;
+
+          if (failed(manageNonLoop(rewriter, funcOp, operand.getParentBlock(),
+                                   &consumerOp, operand, ftdOps)))
+            return failure();
+        }
+      }
+    }
+  }
+  return success();
+}
+
+LogicalResult FtdLowerFuncToHandshake::addSuppBranches(
+    ConversionPatternRewriter &rewriter, handshake::FuncOp &funcOp,
+    FtdStoredOperations &ftdOps, DenseSet<Operation *> &oldBranches) const {
+
+  Region &region = funcOp.getBody();
+  mlir::DominanceInfo domInfo;
+  mlir::CFGLoopInfo loopInfo(domInfo.getDomTree(&region));
+  DenseSet<Operation *> suppBranchesCopy = ftdOps.suppBranches;
+
+  // For each branch inserted through FTD which was not already analyzed (not in
+  // `oldBranches`)
+  for (Operation *producerOp : ftdOps.suppBranches) {
+
+    if (oldBranches.contains(producerOp))
+      continue;
+
+    Block *producerBlock = producerOp->getBlock();
+
+    // Consider individually each result and each possible consumer
+    for (Value res : producerOp->getResults()) {
+
+      for (Operation *consumerOp : res.getUsers()) {
+
+        Block *consumerBlock = consumerOp->getBlock();
+
+        // Apply the FTD insertion algorithm on each pair
+
+        if (!ftdOps.allocationNetwork.contains(producerOp) &&
+            (!isa<handshake::ConstantOp>(producerOp) ||
+             ftdOps.networkConstants.contains(producerOp)))
+          continue;
+
+        // Skip if the consumer and the producer are in the same block and
+        // the consumer is not a merge
+        if (consumerBlock == producerBlock &&
+            !isa<handshake::MergeOp>(consumerOp))
+          continue;
+
+        // Skip if the current consumer is a MUX added by Shannon
+        if (ftdOps.shannonMUXes.contains(consumerOp))
+          continue;
+
+        // Skip if the current consumer is a conditional branch
+        if (isa<handshake::ConditionalBranchOp>(consumerOp))
+          continue;
+
+        // In case the innermost loop containing the producer does not contains
+        // the consumer, then we are in a situation of more producer than
+        // consumers
+        bool moreProdThanCons = false;
+        if (loopInfo.getLoopFor(producerBlock))
+          moreProdThanCons =
+              !loopInfo.getLoopFor(producerBlock)->contains(consumerBlock);
+
+        // Scenario of more producer than consumers
+        if (moreProdThanCons && !isBranchInLoopExit(producerOp, loopInfo))
+          manageMoreProdThanCons(rewriter, producerBlock, consumerOp, res,
+                                 loopInfo, ftdOps);
+
+        // Scenario of backward edge
+        else if (greaterThanBlocks(producerBlock, consumerBlock) ||
+                 (isa<handshake::MergeOp>(consumerOp) &&
+                  producerBlock == consumerBlock &&
+                  isaMergeLoop(consumerOp, loopInfo)))
+          manageDifferentRegeneration(rewriter, consumerOp, res, loopInfo,
+                                      ftdOps);
+        else {
+          if (failed(manageNonLoop(rewriter, funcOp, producerBlock, consumerOp,
+                                   res, ftdOps)))
+            return failure();
+        }
+      }
+    }
+  }
+
+  // Update the value of `oldBranches` so that it contains the set of branches
+  // as it was before the current iteration of the algorithm
+  oldBranches = suppBranchesCopy;
+
+  return success();
+}
+
+LogicalResult
 FtdLowerFuncToHandshake::addSupp(ConversionPatternRewriter &rewriter,
                                  handshake::FuncOp &funcOp,
                                  FtdStoredOperations &ftdOps) const {
@@ -1488,41 +1962,6 @@ LogicalResult FtdLowerFuncToHandshake::convertUndefinedValues(
     cstOp->setDialectAttrs(undefOp->getAttrDictionary());
     namer.replaceOp(cstOp, cstOp);
     rewriter.replaceOp(undefOp, cstOp.getResult());
-  }
-
-  return success();
-}
-
-/// Implement a conversion of the operation from one type to another
-template <typename SrcType, typename DstType>
-LogicalResult
-FtdLowerFuncToHandshake::convertOperations(ConversionPatternRewriter &rewriter,
-                                           OpAdaptor adaptor,
-                                           handshake::FuncOp &funcOp) const {
-
-  auto ops = funcOp.getBody().getOps<SrcType>();
-
-  for (auto srcOp : llvm::make_early_inc_range(ops)) {
-
-    if (((Operation *)srcOp)->getNumResults() != 1) {
-      return funcOp->emitError()
-             << "operation to convert has more than one result";
-    }
-
-    rewriter.setInsertionPoint(srcOp);
-    SmallVector<Type> newTypes;
-
-    for (Type resType : srcOp->getResultTypes())
-      newTypes.push_back(channelifyType(resType));
-
-    auto newOp = rewriter.create<DstType>(
-        srcOp->getLoc(), newTypes, srcOp->getOperands(),
-        srcOp->getAttrDictionary().getValue());
-
-    srcOp->getResult(0).replaceAllUsesWith(newOp->getResult(0));
-    rewriter.replaceOp(srcOp, newOp);
-    namer.replaceOp(srcOp, newOp);
-    rewriter.eraseOp(srcOp);
   }
 
   return success();

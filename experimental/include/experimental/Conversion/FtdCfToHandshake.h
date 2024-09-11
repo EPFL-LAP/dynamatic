@@ -65,6 +65,8 @@ struct FtdStoredOperations {
   /// corresponding control value. This is given by the condition of the
   /// terminator of the block, in case it's a conditional branch
   std::map<std::string, Value> conditionToValue;
+
+  DenseMap<Block *, Value> blockControls;
 };
 
 /// Convert a func-level function into an handshake-level function. A custom
@@ -132,14 +134,6 @@ protected:
   LogicalResult convertUndefinedValues(ConversionPatternRewriter &rewriter,
                                        handshake::FuncOp &funcOp) const;
 
-  /// [TEMP]
-  /// Anticipate the conversion of some operation from the `arith` dialect to
-  /// the `handshake` dialect
-  template <typename SrcType, typename DstType>
-  LogicalResult convertOperations(ConversionPatternRewriter &rewriter,
-                                  OpAdaptor adaptor,
-                                  handshake::FuncOp &funcOp) const;
-
   /// When the consumer is in a loop while the producer is not, the value must
   /// be regenerated as many times as needed. This function is in charge of
   /// adding some merges to the network, to that this can be done. The new
@@ -157,6 +151,36 @@ protected:
   LogicalResult addSupp(ConversionPatternRewriter &rewriter,
                         handshake::FuncOp &funcOp,
                         FtdStoredOperations &ftdOps) const;
+
+  /// The relationship between a producer and a consumer might pass through many
+  /// basic blocks with many entering conditions. All of them should be taken
+  /// into account when handling the suprression mechanism. This function is
+  /// called iteratively many times until all the relationships have been taken
+  /// into account. In concrete, this means that the branches introduced in
+  /// `addSupp` are now new producers which have to undergo the requirements of
+  /// the FTD algorithm.
+  LogicalResult addSuppBranches(ConversionPatternRewriter &rewriter,
+                                handshake::FuncOp &funcOp,
+                                FtdStoredOperations &ftdOps,
+                                DenseSet<Operation *> &oldBranches) const;
+
+  /// The suppression mechanism must be used for the start token as well.
+  /// However, in the handshake IR, the signal is considered as a value, so it
+  /// cannot be handled by the prevvious `addSupp` functions. This funciton is
+  /// in charge of handling this scenario, by adding appropriate suppressions
+  /// for the start token.
+  LogicalResult addSuppForStart(ConversionPatternRewriter &rewriter,
+                                handshake::FuncOp &funcOp,
+                                FtdStoredOperations &ftdOps) const;
+
+  /// Convert all the merges in the circuit to muxes
+  LogicalResult convertMergesToMuxes(ConversionPatternRewriter &rewriter,
+                                     handshake::FuncOp &funcOp,
+                                     FtdStoredOperations &ftdOps) const;
+
+  LogicalResult addSuppGSA(ConversionPatternRewriter &rewriter,
+                           handshake::FuncOp &funcOp,
+                           FtdStoredOperations &ftdOps) const;
 };
 #define GEN_PASS_DECL_FTDCFTOHANDSHAKE
 #define GEN_PASS_DEF_FTDCFTOHANDSHAKE
