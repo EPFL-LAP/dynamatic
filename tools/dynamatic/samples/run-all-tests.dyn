@@ -243,5 +243,12 @@ write-hdl
 simulate
 synthesize
 
+# test external integration feature
+set-src           integration-test/external_integration/external_integration.c
+compile
+write-hdl
+simulate
+synthesize
+
 # Exit the frontend
 exit 
