@@ -161,17 +161,16 @@ protected:
   /// the FTD algorithm.
   LogicalResult addSuppBranches(ConversionPatternRewriter &rewriter,
                                 handshake::FuncOp &funcOp,
-                                FtdStoredOperations &ftdOps,
-                                DenseSet<Operation *> &oldBranches) const;
+                                FtdStoredOperations &ftdOps) const;
 
   /// The suppression mechanism must be used for the start token as well.
   /// However, in the handshake IR, the signal is considered as a value, so it
   /// cannot be handled by the prevvious `addSupp` functions. This funciton is
   /// in charge of handling this scenario, by adding appropriate suppressions
   /// for the start token.
-  LogicalResult addSuppForStart(ConversionPatternRewriter &rewriter,
-                                handshake::FuncOp &funcOp,
-                                FtdStoredOperations &ftdOps) const;
+  LogicalResult addSuppStart(ConversionPatternRewriter &rewriter,
+                             handshake::FuncOp &funcOp,
+                             FtdStoredOperations &ftdOps) const;
 
   /// Convert all the merges in the circuit to muxes
   LogicalResult convertMergesToMuxes(ConversionPatternRewriter &rewriter,

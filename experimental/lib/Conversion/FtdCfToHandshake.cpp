@@ -60,6 +60,7 @@ struct FtdCfToHandshakePass
     RewritePatternSet patterns(ctx);
 
     patterns.add<experimental::ftd::FtdLowerFuncToHandshake, ConvertCalls,
+                 ConvertConstants, ConvertUndefinedValues,
                  ConvertIndexCast<arith::IndexCastOp, handshake::ExtSIOp>,
                  ConvertIndexCast<arith::IndexCastUIOp, handshake::ExtUIOp>,
                  OneToOneConversion<arith::AddFOp, handshake::AddFOp>,
@@ -125,20 +126,24 @@ static Type channelifyType(Type type) {
       .Default([](auto type) { return nullptr; });
 }
 
+/// Given an operation, returns true if the operation is a conditional branch
+/// which terminates a for loop (it might be that the conditional branch is
+/// just at the end of an if/forward branch)
+static bool isBranchLoopExit(Operation *op, CFGLoopInfo &li) {
+  if (isa<handshake::ConditionalBranchOp>(op)) {
+    if (CFGLoop *loop = li.getLoopFor(op->getBlock()); loop) {
+      llvm::SmallVector<Block *> exitBlocks;
+      loop->getExitingBlocks(exitBlocks);
+      return llvm::find(exitBlocks, op->getBlock()) != exitBlocks.end();
+    }
+  }
+  return false;
+}
+
 /// Returns true if the provided operation is either of they `LSQLoad` or
 /// `LSQStore`
 static bool isHandhsakeLSQOperation(Operation *op) {
   return isa<handshake::LSQStoreOp, handshake::LSQLoadOp>(op);
-}
-
-/// Returns true if two operations belong to the same block
-static bool isSameBlock(Operation *op1, Operation *op2) {
-  return (op1->getBlock() == op2->getBlock());
-}
-
-/// Returns true if two operations are both load
-static bool areBothLoad(Operation *op1, Operation *op2) {
-  return (isa<handshake::LSQLoadOp>(op1) && isa<handshake::LSQLoadOp>(op2));
 }
 
 /// Recursive function which allows to obtain all the paths from block `start`
@@ -216,11 +221,6 @@ static std::vector<std::vector<Block *>> findAllPaths(Block *start,
   std::unordered_set<Block *> visited;
   dfsAllPaths(start, end, path, visited, allPaths);
   return allPaths;
-}
-
-/// Returns true if there exist a path between `op1` and `op2`
-static bool isThereAPath(Operation *op1, Operation *op2) {
-  return !findAllPaths(op1->getBlock(), op2->getBlock()).empty();
 }
 
 /// Get the index of a basic block
@@ -755,76 +755,57 @@ LogicalResult FtdLowerFuncToHandshake::addMergeLoop(
 
   // For each group within the groups graph
   for (Group *consGroup : groups) {
-
-    // Get the block associated to that same group
     Block *cons = consGroup->bb;
 
     // For each predecessor (which is now considered as a producer)
     for (Group *prodGroup : consGroup->preds) {
-
-      // Get its basic block
       Block *prod = prodGroup->bb;
 
       // If the consumer comes before a producer, it might mean the two basic
       // blocks are within a loop
-      if (greaterThanBlocks(prod, cons)) {
+      if (!greaterThanBlocks(prod, cons))
+        continue;
 
-        if (auto *loop = getInnermostCommonLoop(prod, cons, loopInfo); loop) {
+      if (auto *loop = getInnermostCommonLoop(prod, cons, loopInfo); loop) {
 
-          // A merge is inserted at the beginning of the loop, getting as
-          // operands both `start` and the result of the producer as operand.
-          // As many merges must be added as the number of paths from the
-          // producer to the consumer (corresponding to the amount of loops
-          // which involve both of them).
-          Block *loopHeader = loop->getHeader();
-          builder.setInsertionPointToStart(loopHeader);
+        // A merge is inserted at the beginning of the loop, getting as
+        // operands both `start` and the result of the producer as operand.
+        // As many merges must be added as the number of paths from the
+        // producer to the consumer (corresponding to the amount of loops
+        // which involve both of them).
+        Block *loopHeader = loop->getHeader();
+        builder.setInsertionPointToStart(loopHeader);
 
-          std::vector<std::vector<Operation *>> allPaths =
-              findAllPaths(forksGraph[prod], forksGraph[cons]);
+        std::vector<std::vector<Operation *>> allPaths =
+            findAllPaths(forksGraph[prod], forksGraph[cons]);
 
-          // For each path
-          for (std::vector<Operation *> path : allPaths) {
-            SmallVector<Value> operands;
+        // For each path
+        for (std::vector<Operation *> path : allPaths) {
+          SmallVector<Value> operands;
 
-            // Get the result of the operation before the consumer (this will
-            // become an input of the merge)
-            Value mergeOperand = path.at(path.size() - 2)->getResult(0);
-            operands.push_back(startCtrl);
-            operands.push_back(mergeOperand);
+          // Get the result of the operation before the consumer (this will
+          // become an input of the merge)
+          Value mergeOperand = path.at(path.size() - 2)->getResult(0);
+          operands.push_back(startCtrl);
+          operands.push_back(mergeOperand);
 
-            // Add the merge and update the FTD data structures
-            auto mergeOp = builder.create<handshake::MergeOp>(
-                mergeOperand.getLoc(), operands);
-            ftdOps.allocationNetwork.insert(mergeOp);
-            ftdOps.memDepLoopMerges.insert(mergeOp);
+          // Add the merge and update the FTD data structures
+          auto mergeOp = builder.create<handshake::MergeOp>(
+              mergeOperand.getLoc(), operands);
+          ftdOps.allocationNetwork.insert(mergeOp);
+          ftdOps.memDepLoopMerges.insert(mergeOp);
 
-            // The merge becomes the producer now, so connect the result of
-            // the MERGE as an operand of the Consumer. Also remove the old
-            // connection between the producer's LazyFork and the consumer's
-            // LazyFork Connect the MERGE to the consumer's LazyFork
-            forksGraph[cons]->replaceUsesOfWith(mergeOperand,
-                                                mergeOp->getResult(0));
-          }
+          // The merge becomes the producer now, so connect the result of
+          // the MERGE as an operand of the Consumer. Also remove the old
+          // connection between the producer's LazyFork and the consumer's
+          // LazyFork Connect the MERGE to the consumer's LazyFork
+          forksGraph[cons]->replaceUsesOfWith(mergeOperand,
+                                              mergeOp->getResult(0));
         }
       }
     }
   }
   return success();
-}
-
-/// Checks if an operation is a Branch in a loop exit block
-static bool isBranchInLoopExit(Operation *op, CFGLoopInfo &loopInfo) {
-  if (isa<handshake::ConditionalBranchOp>(op)) {
-    // Get the loop in which the corresponding basic block is
-    CFGLoop *loop = loopInfo.getLoopFor(op->getBlock());
-    if (loop) {
-      llvm::SmallVector<Block *> exitBlocks;
-      // check whether the basic block is in one of the exit blocks of the loop
-      loop->getExitingBlocks(exitBlocks);
-      return llvm::find(exitBlocks, op->getBlock()) != exitBlocks.end();
-    }
-  }
-  return false;
 }
 
 /// Modify a merge operation related to the INIT process of a variable, so that
@@ -863,7 +844,7 @@ static Value addInit(ConversionPatternRewriter &rewriter,
     // For each of its producers
     if (Operation *producer = operand.getDefiningOp()) {
       // If it is the branch on a loop exit
-      if (isBranchInLoopExit(producer, li)) {
+      if (isBranchLoopExit(producer, li)) {
         // Get the branch, which is supposed to exist
         branchOp = dyn_cast<handshake::ConditionalBranchOp>(producer);
         mergeOperandFromMux = branchOp.getConditionOperand();
@@ -1212,6 +1193,7 @@ LogicalResult FtdLowerFuncToHandshake::matchAndRewrite(
           ftdVerifyAndCreateMemInterfaces(funcOp, rewriter, memInfo, ftdOps)))
     return failure();
 
+#ifdef NOT_DEFINED
   // Convert the constants from the `arith` dialect to the `handshake`
   // dialect, while also using the start value as their control value. While
   // the usage of the `MatchAndRewrite` system is effective for most of the
@@ -1236,17 +1218,11 @@ LogicalResult FtdLowerFuncToHandshake::matchAndRewrite(
     return failure();
 
   // Add supp branches
-  DenseSet<Operation *> oldBranches;
-  while (true) {
-    size_t counter = ftdOps.suppBranches.size();
-    if (failed(addSuppBranches(rewriter, funcOp, ftdOps, oldBranches)))
-      return failure();
-    if (ftdOps.suppBranches.size() == counter)
-      break;
-  }
+  if (failed(addSuppBranches(rewriter, funcOp, ftdOps)))
+    return failure();
 
   // Add supp for start
-  if (failed(addSuppForStart(rewriter, funcOp, ftdOps)))
+  if (failed(addSuppStart(rewriter, funcOp, ftdOps)))
     return failure();
 
   // [TODO] Fix the transformation from merges to mux
@@ -1257,14 +1233,17 @@ LogicalResult FtdLowerFuncToHandshake::matchAndRewrite(
   // Add supp GSA
   if (failed(addSuppGSA(rewriter, funcOp, ftdOps)))
     return failure();
+}
+#endif
 
-  // id basic block
-  idBasicBlocks(funcOp, rewriter);
+// id basic block
+idBasicBlocks(funcOp, rewriter);
 
-  if (failed(flattenAndTerminate(funcOp, rewriter, argReplacements)))
-    return failure();
+if (failed(flattenAndTerminate(funcOp, rewriter, argReplacements)))
+  return failure();
 
-  return success();
+return success();
+
 }
 
 static void mapConditionsToValues(Region &region, FtdStoredOperations &ftdOps) {
@@ -1279,20 +1258,6 @@ static void mapConditionsToValues(Region &region, FtdStoredOperations &ftdOps) {
       }
     }
   }
-}
-
-/// Given an operation, returns true if the operation is a conditional branch
-/// which terminates a for loop (it might be that the conditional branch is
-/// just at the end of an if/forward branch)
-static bool isBrachExitLoop(Operation *op, CFGLoopInfo &li) {
-  if (isa<handshake::ConditionalBranchOp>(op)) {
-    if (CFGLoop *loop = li.getLoopFor(op->getBlock()); loop) {
-      llvm::SmallVector<Block *> exitBlocks;
-      loop->getExitingBlocks(exitBlocks);
-      return llvm::find(exitBlocks, op->getBlock()) != exitBlocks.end();
-    }
-  }
-  return false;
 }
 
 /// Given an operation, return true if the two operands of a merge come from
@@ -1413,6 +1378,8 @@ static Value insertBranchToLoop(ConversionPatternRewriter &rewriter,
                                 bool selfRegeneration,
                                 FtdStoredOperations &ftdOps, CFGLoopInfo &li) {
 
+  handshake::ConditionalBranchOp branchOp;
+
   // Case in which there is only one termination block
   if (Block *loopExit = loop->getExitingBlock(); loopExit) {
 
@@ -1432,78 +1399,66 @@ static Value insertBranchToLoop(ConversionPatternRewriter &rewriter,
 
     // Since only one output is used, the other one will be optimized to a
     // sink, as we expect from a suppress branch
-    auto branchOp = rewriter.create<handshake::ConditionalBranchOp>(
+    branchOp = rewriter.create<handshake::ConditionalBranchOp>(
         loopExit->getOperations().back().getLoc(), conditionValue, connection);
 
-    // Keep track of the new component in the circuit
-    ftdOps.allocationNetwork.insert(branchOp);
-    if (moreProdThanCons)
-      ftdOps.suppBranches.insert(branchOp);
-    if (selfRegeneration)
-      ftdOps.selfGenBranches.insert(branchOp);
+    // Case in which there are more than one terminal blocks
+  } else {
 
-    // Modify the usage of the previous value
-    Value newConnection =
-        moreProdThanCons ? branchOp.getTrueResult() : branchOp.getFalseResult();
-    consumer->replaceUsesOfWith(connection, newConnection);
+    std::vector<std::string> cofactorList;
+    SmallVector<Block *> exitBlocks;
+    loop->getExitingBlocks(exitBlocks);
+    loopExit = exitBlocks.front();
 
-    // Return the output of the new component related to the regeneration
-    return newConnection;
+    BoolExpression *fLoopExit = BoolExpression::boolZero();
+
+    // Get the list of all the cofactors related to possible exit conditions
+    for (Block *exitBlock : exitBlocks) {
+      BoolExpression *blockCond =
+          getBlockLoopExitCondition(exitBlock, loop, li);
+      fLoopExit = BoolExpression::boolOr(fLoopExit, blockCond);
+      cofactorList.push_back(getBlockCondition(exitBlock));
+    }
+
+    // Sort the cofactors alphabetically
+    std::sort(cofactorList.begin(), cofactorList.end());
+
+    // Apply shannon expansion to the loop exit expression and the list of
+    // cofactors
+    MultiplexerIn *shannonResult = applyShannon(fLoopExit, cofactorList);
+
+    // Convert the boolean expression obtained through Shannon to a circuit
+    Value branchCond = dataToCircuit(rewriter, shannonResult, loopExit, ftdOps);
+
+    Operation *loopTerminator = loopExit->getTerminator();
+    assert(isa<cf::CondBranchOp>(loopTerminator) &&
+           "Terminator condition of a loop exit must be a conditional "
+           "branch.");
+
+    rewriter.setInsertionPointToStart(loopExit);
+
+    branchOp = rewriter.create<handshake::ConditionalBranchOp>(
+        loopExit->getOperations().front().getLoc(), branchCond, connection);
   }
 
-  // Case in which there are more than one terminal blocks
-  std::vector<std::string> cofactorList;
-  SmallVector<Block *> exitBlocks;
-  loop->getExitingBlocks(exitBlocks);
-  Block *loopExit = exitBlocks.front();
-
-  BoolExpression *fLoopExit = BoolExpression::boolZero();
-
-  // Get the list of all the cofactors related to possible exit conditions
-  for (Block *exitBlock : exitBlocks) {
-    BoolExpression *blockCond = getBlockLoopExitCondition(exitBlock, loop, li);
-    fLoopExit = BoolExpression::boolOr(fLoopExit, blockCond);
-    cofactorList.push_back(getBlockCondition(exitBlock));
-  }
-
-  // Sort the cofactors alphabetically
-  std::sort(cofactorList.begin(), cofactorList.end());
-
-  // Apply shannon expansion to the loop exit expression and the list of
-  // cofactors
-  MultiplexerIn *shannonResult = applyShannon(fLoopExit, cofactorList);
-
-  // Convert the boolean expression obtained through Shannon to a circuit
-  Value branchCond = dataToCircuit(rewriter, shannonResult, loopExit, ftdOps);
-
-  Operation *loopTerminator = loopExit->getTerminator();
-  assert(isa<cf::CondBranchOp>(loopTerminator) &&
-         "Terminator condition of a loop exit must be a conditional "
-         "branch.");
-
-  rewriter.setInsertionPointToStart(loopExit);
-  auto branchOp = rewriter.create<handshake::ConditionalBranchOp>(
-      loopExit->getOperations().front().getLoc(), branchCond, connection);
   ftdOps.allocationNetwork.insert(branchOp);
-
   if (moreProdThanCons)
     ftdOps.suppBranches.insert(branchOp);
   if (selfRegeneration)
     ftdOps.selfGenBranches.insert(branchOp);
 
-  Value newConnection = branchOp.getTrueResult();
-  if (!moreProdThanCons)
-    newConnection = branchOp.getFalseResult();
+  Value newConnection =
+      moreProdThanCons ? branchOp.getTrueResult() : branchOp.getFalseResult();
   consumer->replaceUsesOfWith(connection, newConnection);
   return newConnection;
 }
 
-/// For each loop which contains the producer and does not contains a
+/// For each loop which contains the producer and does not contain a
 /// consumer, we need to insert a branch to possibly suppress its value
-static void manageMoreProdThanCons(ConversionPatternRewriter &rewriter,
-                                   Block *producerBlock, Operation *consumer,
-                                   Value connection, CFGLoopInfo &li,
-                                   FtdStoredOperations &ftdOps) {
+static void addSuppMoreProdThanCons(ConversionPatternRewriter &rewriter,
+                                    Block *producerBlock, Operation *consumer,
+                                    Value connection, CFGLoopInfo &li,
+                                    FtdStoredOperations &ftdOps) {
 
   Value con = connection;
   for (CFGLoop *loop = li.getLoopFor(producerBlock); loop;
@@ -1520,10 +1475,10 @@ static void manageMoreProdThanCons(ConversionPatternRewriter &rewriter,
 /// Self regeneration is necessary in case a value is inside of a loop, so
 /// that the value should be used more than one time. This function is in
 /// charge of implementing this behaviour
-static void manageSelfRegeneration(ConversionPatternRewriter &rewriter,
-                                   Operation *consumer, Value connection,
-                                   CFGLoopInfo &li,
-                                   FtdStoredOperations &ftdOps) {
+static void addSuppSelfRegeneration(ConversionPatternRewriter &rewriter,
+                                    Operation *consumer, Value connection,
+                                    CFGLoopInfo &li,
+                                    FtdStoredOperations &ftdOps) {
 
   if (CFGLoop *loop = li.getLoopFor(consumer->getBlock()); loop)
     insertBranchToLoop(rewriter, loop, consumer, connection, false, true,
@@ -1532,10 +1487,10 @@ static void manageSelfRegeneration(ConversionPatternRewriter &rewriter,
 
 /// This kind of regeneration is for loop values which are not
 /// self-regenerations (mainly backward edges in a CFG)
-static void manageDifferentRegeneration(ConversionPatternRewriter &rewriter,
-                                        Operation *consumer, Value connection,
-                                        CFGLoopInfo &li,
-                                        FtdStoredOperations &ftdOps) {
+static void addSuppDifferentRegeneration(ConversionPatternRewriter &rewriter,
+                                         Operation *consumer, Value connection,
+                                         CFGLoopInfo &li,
+                                         FtdStoredOperations &ftdOps) {
   // Regenerate only if a loop is involved
   if (li.getLoopFor(consumer->getBlock())) {
     // Get all the possible exist blocks
@@ -1548,11 +1503,11 @@ static void manageDifferentRegeneration(ConversionPatternRewriter &rewriter,
 
 /// Apply the algorithm from FPGA'22 to handle a non-loop situation of
 /// producer and consumer
-static LogicalResult manageNonLoop(ConversionPatternRewriter &rewriter,
-                                   handshake::FuncOp &funcOp,
-                                   Block *producerBlock, Operation *consumer,
-                                   Value connection,
-                                   FtdStoredOperations &ftdOps) {
+static LogicalResult addSuppNonLoop(ConversionPatternRewriter &rewriter,
+                                    handshake::FuncOp &funcOp,
+                                    Block *producerBlock, Operation *consumer,
+                                    Value connection,
+                                    FtdStoredOperations &ftdOps) {
   Block *entryBlock = &funcOp.getBody().front();
   ControlDependenceAnalysis<dynamatic::handshake::FuncOp> cdgAnalysis(funcOp);
 
@@ -1602,12 +1557,13 @@ static LogicalResult manageNonLoop(ConversionPatternRewriter &rewriter,
 }
 
 LogicalResult
-FtdLowerFuncToHandshake::addSuppForStart(ConversionPatternRewriter &rewriter,
-                                         handshake::FuncOp &funcOp,
-                                         FtdStoredOperations &ftdOps) const {
+FtdLowerFuncToHandshake::addSuppStart(ConversionPatternRewriter &rewriter,
+                                      handshake::FuncOp &funcOp,
+                                      FtdStoredOperations &ftdOps) const {
 
   Region &region = funcOp.getBody();
   auto startValue = (Value)funcOp.getArguments().back();
+
   for (Block &consumerBlock : region.getBlocks()) {
     for (Operation &consumerOp : consumerBlock.getOperations()) {
 
@@ -1626,35 +1582,39 @@ FtdLowerFuncToHandshake::addSuppForStart(ConversionPatternRewriter &rewriter,
       if (isa<handshake::ConditionalBranchOp>(consumerOp))
         continue;
 
-      // For all the operands of the consumer, take into account only the start
-      // value if exists
+      // For all the operands of the consumer, take into account only the
+      // start value if exists
       for (Value operand : consumerOp.getOperands()) {
-        if (operand == startValue) {
-          if (operand.getParentBlock() == &consumerBlock &&
-              !isa<handshake::MergeOp>(consumerOp))
-            continue;
+        if (operand != startValue)
+          continue;
 
-          if (failed(manageNonLoop(rewriter, funcOp, operand.getParentBlock(),
-                                   &consumerOp, operand, ftdOps)))
-            return failure();
-        }
+        if (operand.getParentBlock() == &consumerBlock &&
+            !isa<handshake::MergeOp>(consumerOp))
+          continue;
+
+        // Handle the regeneration
+        if (failed(addSuppNonLoop(rewriter, funcOp, operand.getParentBlock(),
+                                  &consumerOp, operand, ftdOps)))
+          return failure();
       }
     }
   }
   return success();
 }
 
-LogicalResult FtdLowerFuncToHandshake::addSuppBranches(
-    ConversionPatternRewriter &rewriter, handshake::FuncOp &funcOp,
-    FtdStoredOperations &ftdOps, DenseSet<Operation *> &oldBranches) const {
+/// Internal handler to add suppression elements to branches
+static LogicalResult
+addSuppBranchesInternal(ConversionPatternRewriter &rewriter,
+                        handshake::FuncOp &funcOp, FtdStoredOperations &ftdOps,
+                        DenseSet<Operation *> &oldBranches) {
 
   Region &region = funcOp.getBody();
   mlir::DominanceInfo domInfo;
   mlir::CFGLoopInfo loopInfo(domInfo.getDomTree(&region));
   DenseSet<Operation *> suppBranchesCopy = ftdOps.suppBranches;
 
-  // For each branch inserted through FTD which was not already analyzed (not in
-  // `oldBranches`)
+  // For each branch inserted through FTD which was not already analyzed (not
+  // in `oldBranches`)
   for (Operation *producerOp : ftdOps.suppBranches) {
 
     if (oldBranches.contains(producerOp))
@@ -1690,29 +1650,29 @@ LogicalResult FtdLowerFuncToHandshake::addSuppBranches(
         if (isa<handshake::ConditionalBranchOp>(consumerOp))
           continue;
 
-        // In case the innermost loop containing the producer does not contains
-        // the consumer, then we are in a situation of more producer than
-        // consumers
+        // In case the innermost loop containing the producer does not
+        // contains the consumer, then we are in a situation of more producer
+        // than consumers
         bool moreProdThanCons = false;
         if (loopInfo.getLoopFor(producerBlock))
           moreProdThanCons =
               !loopInfo.getLoopFor(producerBlock)->contains(consumerBlock);
 
         // Scenario of more producer than consumers
-        if (moreProdThanCons && !isBranchInLoopExit(producerOp, loopInfo))
-          manageMoreProdThanCons(rewriter, producerBlock, consumerOp, res,
-                                 loopInfo, ftdOps);
+        if (moreProdThanCons && !isBranchLoopExit(producerOp, loopInfo))
+          addSuppMoreProdThanCons(rewriter, producerBlock, consumerOp, res,
+                                  loopInfo, ftdOps);
 
         // Scenario of backward edge
         else if (greaterThanBlocks(producerBlock, consumerBlock) ||
                  (isa<handshake::MergeOp>(consumerOp) &&
                   producerBlock == consumerBlock &&
                   isaMergeLoop(consumerOp, loopInfo)))
-          manageDifferentRegeneration(rewriter, consumerOp, res, loopInfo,
-                                      ftdOps);
+          addSuppDifferentRegeneration(rewriter, consumerOp, res, loopInfo,
+                                       ftdOps);
         else {
-          if (failed(manageNonLoop(rewriter, funcOp, producerBlock, consumerOp,
-                                   res, ftdOps)))
+          if (failed(addSuppNonLoop(rewriter, funcOp, producerBlock, consumerOp,
+                                    res, ftdOps)))
             return failure();
         }
       }
@@ -1723,6 +1683,20 @@ LogicalResult FtdLowerFuncToHandshake::addSuppBranches(
   // as it was before the current iteration of the algorithm
   oldBranches = suppBranchesCopy;
 
+  return success();
+}
+
+LogicalResult
+FtdLowerFuncToHandshake::addSuppBranches(ConversionPatternRewriter &rewriter,
+                                         handshake::FuncOp &funcOp,
+                                         FtdStoredOperations &ftdOps) const {
+  DenseSet<Operation *> oldBranches;
+  size_t counter;
+  do {
+    counter = ftdOps.suppBranches.size();
+    if (failed(addSuppBranchesInternal(rewriter, funcOp, ftdOps, oldBranches)))
+      return failure();
+  } while (ftdOps.suppBranches.size() != counter);
   return success();
 }
 
@@ -1793,10 +1767,12 @@ FtdLowerFuncToHandshake::addSupp(ConversionPatternRewriter &rewriter,
           // self-regeneration;
           // 3. If the consumer and the producer are in different basic blocks
           // OR the consumer is a merge in the same block, then we need to
-          // handle a loop case without self-regeneration;
+          // handle a backward edge;
           // 4. Else, the components are in the same basic block and we add
           // a normal suppression-generation mechanism.
 
+          // Set true if the producer is in a loop which does not contains the
+          // consumer
           bool producingGtUsing =
               loopInfo.getLoopFor(&producerBlock) &&
               !loopInfo.getLoopFor(&producerBlock)->contains(consumerBlock);
@@ -1805,59 +1781,43 @@ FtdLowerFuncToHandshake::addSupp(ConversionPatternRewriter &rewriter,
           // used outside each time a new iteration starts, excluding those
           // related to the final branches, since they are fundamental to
           // determine the loop execution
-          if (producingGtUsing && !isBrachExitLoop(&producerOp, loopInfo)) {
-            manageMoreProdThanCons(rewriter, &producerBlock, consumerOp, result,
-                                   loopInfo, ftdOps);
-          } else {
-
-            // Self regeneration case: the token is reused by the operation
-            // itself
-            bool selfRegeneration =
-                llvm::any_of(consumerOp->getResults(),
-                             [&result](const Value &v) { return v == result; });
-            if (selfRegeneration) {
-              manageSelfRegeneration(rewriter, consumerOp, result, loopInfo,
-                                     ftdOps);
-            }
-
-            // Regeneration in loop case
-            else if (greaterThanBlocks(&producerBlock, consumerBlock) ||
-                     (isa<handshake::MergeOp>(consumerOp) &&
-                      &producerBlock == consumerBlock &&
-                      isaMergeLoop(consumerOp, loopInfo) &&
-                      !isa<handshake::ConditionalBranchOp>(producerOp))) {
-              manageDifferentRegeneration(rewriter, consumerOp, result,
-                                          loopInfo, ftdOps);
-            } else {
-              if (failed(manageNonLoop(rewriter, funcOp, &producerBlock,
-                                       consumerOp, result, ftdOps)))
-                return failure();
-            }
+          if (producingGtUsing && !isBranchLoopExit(&producerOp, loopInfo)) {
+            addSuppMoreProdThanCons(rewriter, &producerBlock, consumerOp,
+                                    result, loopInfo, ftdOps);
+            continue;
           }
+
+          // Self regeneration case: the token is reused by the operation
+          // itself
+          bool selfRegeneration =
+              llvm::any_of(consumerOp->getResults(),
+                           [&result](const Value &v) { return v == result; });
+
+          if (selfRegeneration) {
+            addSuppSelfRegeneration(rewriter, consumerOp, result, loopInfo,
+                                    ftdOps);
+            continue;
+          }
+
+          // Regeneration in loop case
+          if (greaterThanBlocks(&producerBlock, consumerBlock) ||
+              (isa<handshake::MergeOp>(consumerOp) &&
+               &producerBlock == consumerBlock &&
+               isaMergeLoop(consumerOp, loopInfo) &&
+               !isa<handshake::ConditionalBranchOp>(producerOp))) {
+            addSuppDifferentRegeneration(rewriter, consumerOp, result, loopInfo,
+                                         ftdOps);
+            continue;
+          }
+
+          if (failed(addSuppNonLoop(rewriter, funcOp, &producerBlock,
+                                    consumerOp, result, ftdOps)))
+            return failure();
         }
       }
     }
   }
   return success();
-}
-
-/// Get all the loops the consumer is in while the producer is not, from the
-/// outermost to the innermost
-static SmallVector<CFGLoop *> getLoopsConsNotInProd(Block *cons, Block *prod,
-                                                    mlir::CFGLoopInfo &li) {
-
-  SmallVector<CFGLoop *> result;
-
-  // Get all the loops in which the consumer is but the producer is not
-  for (CFGLoop *loop = li.getLoopFor(cons); loop;
-       loop = loop->getParentLoop()) {
-    if (!loop->contains(prod))
-      result.push_back(loop);
-  }
-
-  // Reverse to the get the loops from outermost to innermost
-  std::reverse(result.begin(), result.end());
-  return result;
 }
 
 LogicalResult
@@ -1897,10 +1857,30 @@ FtdLowerFuncToHandshake::addPhi(ConversionPatternRewriter &rewriter,
         Block *producerBlock = operand.getParentBlock();
         Value producerOperand = operand;
 
-        // Get all the loops for which we need to regenerate the corresponding
-        // value
+        // Function to obtain all the loops in which the consumer is but the
+        // producer is not (which specifies how many times a value has to be
+        // regenerated)
+        auto getLoopsConsNotInProd =
+            [&](Block *cons, Block *prod) -> SmallVector<CFGLoop *> {
+          SmallVector<CFGLoop *> result;
+
+          // Get all the loops in which the consumer is but the producer is
+          // not
+          for (CFGLoop *loop = loopInfo.getLoopFor(cons); loop;
+               loop = loop->getParentLoop()) {
+            if (!loop->contains(prod))
+              result.push_back(loop);
+          }
+
+          // Reverse to the get the loops from outermost to innermost
+          std::reverse(result.begin(), result.end());
+          return result;
+        };
+
+        // Get all the loops for which we need to regenerate the
+        // corresponding value
         SmallVector<CFGLoop *> loops =
-            getLoopsConsNotInProd(&consumerBlock, producerBlock, loopInfo);
+            getLoopsConsNotInProd(&consumerBlock, producerBlock);
 
         // For each of the loop, from the outermost to the innermost
         for (auto *it = loops.begin(); it != loops.end(); ++it) {
@@ -1932,14 +1912,14 @@ FtdLowerFuncToHandshake::addPhi(ConversionPatternRewriter &rewriter,
 LogicalResult FtdLowerFuncToHandshake::convertUndefinedValues(
     ConversionPatternRewriter &rewriter, handshake::FuncOp &funcOp) const {
 
-  // Get all the undefined value in the function
-  auto undefinedValues = funcOp.getBody().getOps<LLVM::UndefOp>();
-
   // Get the start value of the current function
   auto startValue = (Value)funcOp.getArguments().back();
 
-  // For each constant
+  // For each undefined value
+  auto undefinedValues = funcOp.getBody().getOps<LLVM::UndefOp>();
+
   for (auto undefOp : llvm::make_early_inc_range(undefinedValues)) {
+
     // Create an attribute of the appropriate type for the constant
     auto resType = undefOp.getRes().getType();
     TypedAttr cstAttr;
@@ -1974,31 +1954,25 @@ FtdLowerFuncToHandshake::convertConstants(ConversionPatternRewriter &rewriter,
   // Get the start value of the current function
   auto startValue = (Value)funcOp.getArguments().back();
 
-  // Get all the constants in the function
-  auto constants = funcOp.getBody().getOps<mlir::arith::ConstantOp>();
-
   // For each constant
+  auto constants = funcOp.getBody().getOps<mlir::arith::ConstantOp>();
   for (auto cstOp : llvm::make_early_inc_range(constants)) {
 
-    // Set the insertion point after the specified operation
     rewriter.setInsertionPoint(cstOp);
 
-    // Get the value of the constant
+    // Convert the constant to the handshake equivalent, using the start value
+    // as control signal
     TypedAttr cstAttr = cstOp.getValue();
 
-    // Convert IndexType'd values to equivalent signless integers
     if (isa<IndexType>(cstAttr.getType())) {
       auto intType = rewriter.getIntegerType(32);
       cstAttr = IntegerAttr::get(
           intType, cast<IntegerAttr>(cstAttr).getValue().trunc(32));
     }
 
-    // Create the new constant with the same value and attributes, trigger
-    // each of them using the start signal of the function
     auto newCstOp = rewriter.create<handshake::ConstantOp>(cstOp.getLoc(),
                                                            cstAttr, startValue);
 
-    // Move the attributes to the new constant
     newCstOp->setDialectAttrs(cstOp->getDialectAttrs());
 
     // Replace the constant and the usage of its result
@@ -2018,7 +1992,6 @@ LogicalResult FtdLowerFuncToHandshake::ftdVerifyAndCreateMemInterfaces(
 
   // Get the CFG loop information
   mlir::DominanceInfo domInfo;
-  mlir::CFGLoopInfo loopInfo(domInfo.getDomTree(&funcOp.getBody()));
 
   // Create a mapping between each block and all the other blocks it
   // properly dominates so that we can quickly determine whether LSQ groups
@@ -2125,6 +2098,9 @@ LogicalResult FtdLowerFuncToHandshake::ftdVerifyAndCreateMemInterfaces(
     // graph. Afterwards, the FTD methodology is used to interconnect the
     // elements correctly.
     if (memAccesses.lsqPorts.size() > 0) {
+
+      mlir::CFGLoopInfo loopInfo(domInfo.getDomTree(&funcOp.getBody()));
+
       // Get all the operations associated to an LSQ
       SmallVector<Operation *> allOperations =
           getLSQOperations(memAccesses.lsqPorts);
@@ -2195,13 +2171,27 @@ void FtdLowerFuncToHandshake::identifyMemoryDependencies(
     SmallVector<ProdConsMemDep> &allMemDeps,
     const mlir::CFGLoopInfo &li) const {
 
+  // Returns true if there exist a path between `op1` and `op2`
+  auto isThereAPath = [](Operation *op1, Operation *op2) -> bool {
+    return !findAllPaths(op1->getBlock(), op2->getBlock()).empty();
+  };
+
+  // Returns true if two operations are both load
+  auto areBothLoad = [](Operation *op1, Operation *op2) {
+    return (isa<handshake::LSQLoadOp>(op1) && isa<handshake::LSQLoadOp>(op2));
+  };
+
+  // Returns true if two operations belong to the same block
+  auto isSameBlock = [](Operation *op1, Operation *op2) {
+    return (op1->getBlock() == op2->getBlock());
+  };
+
   // Given all the operations which are assigned to an LSQ, loop over them
   // and skip those which are not memory operations
   for (Operation *i : operations) {
 
-    if (!isHandhsakeLSQOperation(i)) {
+    if (!isHandhsakeLSQOperation(i))
       continue;
-    }
 
     // Loop over all the other operations in the LSQ. There is no dependency
     // in the following cases:

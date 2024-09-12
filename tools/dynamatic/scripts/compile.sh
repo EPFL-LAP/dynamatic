@@ -114,23 +114,35 @@ exit_on_fail "Failed to apply Dynamatic transformations to cf" \
 
 # cf level -> handshake level
 if [[ $FAST_TOKEN_DELIVERY -ne 0 ]]; then
+
   "$DYNAMATIC_OPT_BIN" "$F_CF_DYN_TRANSFORMED" --ftd-lower-cf-to-handshake \
     > "$F_HANDSHAKE"
   exit_on_fail "Failed to compile cf to handshake with FTD" "Compiled cf to handshake with FTD"
+
+  # handshake transformations
+  "$DYNAMATIC_OPT_BIN" "$F_HANDSHAKE" \
+    --handshake-analyze-lsq-usage \
+    --handshake-minimize-cst-width --handshake-optimize-bitwidths="legacy" \
+    --handshake-materialize --handshake-infer-basic-blocks \
+    > "$F_HANDSHAKE_TRANSFORMED"
+  exit_on_fail "Failed to apply transformations to handshake with FTD" \
+    "Applied transformations to handshake with FTD"
+
 else
   "$DYNAMATIC_OPT_BIN" "$F_CF_DYN_TRANSFORMED" --lower-cf-to-handshake \
     > "$F_HANDSHAKE"
   exit_on_fail "Failed to compile cf to handshake" "Compiled cf to handshake"
+
+  # handshake transformations
+  "$DYNAMATIC_OPT_BIN" "$F_HANDSHAKE" \
+    --handshake-analyze-lsq-usage --handshake-replace-memory-interfaces \
+    --handshake-minimize-cst-width --handshake-optimize-bitwidths="legacy" \
+    --handshake-materialize --handshake-infer-basic-blocks \
+    > "$F_HANDSHAKE_TRANSFORMED"
+  exit_on_fail "failed to apply transformations to handshake" \
+    "applied transformations to handshake"
 fi
 
-# handshake transformations
-"$DYNAMATIC_OPT_BIN" "$F_HANDSHAKE" \
-  --handshake-analyze-lsq-usage --handshake-replace-memory-interfaces \
-  --handshake-minimize-cst-width --handshake-optimize-bitwidths="legacy" \
-  --handshake-materialize --handshake-infer-basic-blocks \
-  > "$F_HANDSHAKE_TRANSFORMED"
-exit_on_fail "Failed to apply transformations to handshake" \
-  "Applied transformations to handshake"
 
 # Buffer placement
 if [[ $USE_SIMPLE_BUFFERS -ne 0 ]]; then
