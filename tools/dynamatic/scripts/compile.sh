@@ -126,17 +126,41 @@ exit_on_fail "Failed to apply Dynamatic transformations to cf" \
 # cf level -> handshake level
 if [[ $FAST_TOKEN_DELIVERY -ne 0 ]]; then
 <<<<<<< HEAD
+<<<<<<< HEAD
 =======
+=======
+
+>>>>>>> e641cbb ([FTD][Integration] Small fixes and refactoring)
   "$DYNAMATIC_OPT_BIN" "$F_CF_DYN_TRANSFORMED" --ftd-lower-cf-to-handshake \
     > "$F_HANDSHAKE"
   exit_on_fail "Failed to compile cf to handshake with FTD" "Compiled cf to handshake with FTD"
+
+  # handshake transformations
+  "$DYNAMATIC_OPT_BIN" "$F_HANDSHAKE" \
+    --handshake-analyze-lsq-usage \
+    --handshake-minimize-cst-width --handshake-optimize-bitwidths="legacy" \
+    --handshake-materialize --handshake-infer-basic-blocks \
+    > "$F_HANDSHAKE_TRANSFORMED"
+  exit_on_fail "Failed to apply transformations to handshake with FTD" \
+    "Applied transformations to handshake with FTD"
+
 else
   "$DYNAMATIC_OPT_BIN" "$F_CF_DYN_TRANSFORMED" --lower-cf-to-handshake \
     > "$F_HANDSHAKE"
   exit_on_fail "Failed to compile cf to handshake" "Compiled cf to handshake"
+
+  # handshake transformations
+  "$DYNAMATIC_OPT_BIN" "$F_HANDSHAKE" \
+    --handshake-analyze-lsq-usage --handshake-replace-memory-interfaces \
+    --handshake-minimize-cst-width --handshake-optimize-bitwidths="legacy" \
+    --handshake-materialize --handshake-infer-basic-blocks \
+    > "$F_HANDSHAKE_TRANSFORMED"
+  exit_on_fail "failed to apply transformations to handshake" \
+    "applied transformations to handshake"
 fi
 >>>>>>> 1762f18 (Skeleton of FTD `cf` to `handshake` conversion pass)
 
+<<<<<<< HEAD
   "$DYNAMATIC_OPT_BIN" "$F_CF_DYN_TRANSFORMED" --ftd-lower-cf-to-handshake \
     > "$F_HANDSHAKE"
   exit_on_fail "Failed to compile cf to handshake with FTD" "Compiled cf to handshake with FTD"
@@ -167,6 +191,9 @@ fi
 
 <<<<<<< HEAD
 =======
+=======
+<<<<<<< HEAD
+>>>>>>> e641cbb ([FTD][Integration] Small fixes and refactoring)
 # handshake transformations
 "$DYNAMATIC_OPT_BIN" "$F_HANDSHAKE" \
   --handshake-analyze-lsq-usage --handshake-replace-memory-interfaces \
@@ -175,7 +202,12 @@ fi
   > "$F_HANDSHAKE_TRANSFORMED"
 exit_on_fail "Failed to apply transformations to handshake" \
   "Applied transformations to handshake"
+<<<<<<< HEAD
 >>>>>>> 2b5761a ([Handshake] Optimize width of address-carrying channels (#157))
+=======
+=======
+>>>>>>> 142748e ([FTD][Integration] Small fixes and refactoring)
+>>>>>>> e641cbb ([FTD][Integration] Small fixes and refactoring)
 
 
 # Credit-based sharing
