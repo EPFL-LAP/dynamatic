@@ -653,8 +653,8 @@
     "parameters": [
       { "name": "CREDITS", "type": "string" },
       { "name": "NUM_SHARED_OPERANDS", "type": "unsigned", "lb" : 1},
-      { "name": "DATA_WIDTH", "type": "unsigned", "lb": 1 },
-      { "name": "LATENCY", "type": "unsigned", "lb": 1 }
+      { "name": "DATA_WIDTH", "type": "dataflow", "data-lb": 1, "extra-eq" : 0},
+      { "name": "LATENCY", "type": "unsigned", "lb": 1}
     ],
     "dependencies": ["logic", "types", "sharing_support", "ofifo", "tfifo", "lazy_fork"]
   },
@@ -719,7 +719,7 @@
     "generic": "$DYNAMATIC/data/vhdl/support/mem_to_bram.vhd"
   },
   {
-    "generic": "$DYNAMATIC/experimental/data/vhdl/support/sharing_support.vhd",
+    "generic": "$DYNAMATIC/data/vhdl/support/sharing_support.vhd",
     "dependencies" : ["types"]
   }
 ]

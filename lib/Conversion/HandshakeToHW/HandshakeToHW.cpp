@@ -440,7 +440,13 @@ private:
         cleanedName.begin(), cleanedName.end(),
         [](char c) { return !std::isalnum(c); }, '_');
 
-    modName = *modName + "_" + cleanedName;
+    if (modName) {
+      cleanedName = *modName + "_" + cleanedName;
+    } else {
+      cleanedName = getOpName() + "_" + cleanedName;
+    }
+
+    modName = cleanedName;
   };
 
   std::string getOpName() const {
