@@ -60,6 +60,8 @@ using namespace dynamatic::experimental;
 using namespace dynamatic::experimental::sharing;
 using namespace dynamatic::buffer;
 
+#define MAX_GROUP_SIZE 20
+
 /// Algorithms that do not require solving an MILP.
 static constexpr llvm::StringLiteral ON_MERGES("on-merges");
 #ifndef DYNAMATIC_GUROBI_NOT_INSTALLED
@@ -372,8 +374,7 @@ struct CreditBasedSharingPass
     for (Operation &op : funcOp.getOps()) {
       // This is a list of sharable operations. To support more operation types,
       // simply add in the end of the list.
-      if (isa<handshake::MulFOp, handshake::MulIOp, handshake::AddFOp,
-              handshake::SubFOp>(op)) {
+      if (isa<handshake::MulFOp, handshake::AddFOp, handshake::SubFOp>(op)) {
         assert(op.getNumOperands() > 1 && op.getNumResults() == 1 &&
                "Invalid sharing target is being added to the list of sharing "
                "targets! Currently operations with 1 input or more than 1 "
@@ -414,6 +415,10 @@ bool checkGroupMergable(const Group &g1, const Group &g2,
   std::set<Operation *> gMerged;
   gMerged.insert(g1.begin(), g1.end());
   gMerged.insert(g2.begin(), g2.end());
+
+  if (gMerged.size() > MAX_GROUP_SIZE) {
+    return false;
+  }
 
   OperationName opName = (*(gMerged.begin()))->getName();
 
