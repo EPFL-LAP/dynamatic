@@ -1,0 +1,767 @@
+[
+  {
+    "name": "handshake.addf",
+    "parameters": [
+      { "name": "DATA_TYPE", "type": "dataflow", "data-lb": 1, "extra-eq": 0 }
+    ],
+    "generic": "$DYNAMATIC/data/verilog/arith/addf.v",
+    "dependencies": ["join_type", "delay_buffer", "oehb"],
+    "hdl": "verilog"
+  },
+  {
+    "name": "handshake.addi",
+    "parameters": [
+      { "name": "DATA_TYPE", "type": "dataflow", "data-lb": 1, "extra-eq": 0 }
+    ],
+    "generic": "$DYNAMATIC/data/verilog/arith/addi.v",
+    "dependencies": ["join_type"],
+    "hdl": "verilog"
+  },
+  {
+    "name": "handshake.andi",
+    "parameters": [
+      { "name": "DATA_TYPE", "type": "dataflow", "data-lb": 1, "extra-eq": 0 }
+    ],
+    "generic": "$DYNAMATIC/data/verilog/arith/andi.v",
+    "dependencies": ["join_type"],
+    "hdl": "verilog"
+  },
+  {
+    "name": "handshake.cmpf",
+    "parameters": [
+      { "name": "PREDICATE", "type": "string" },
+      {
+        "name": "DATA_TYPE",
+        "type": "dataflow",
+        "data-lb": 1,
+        "extra-eq": 0,
+        "generic": true
+      }
+    ],
+    "generator": "\"$DYNAMATIC/bin/generators/rtl-cmpf-generator\" \"$DYNAMATIC/data/verilog/arith/cmpf.v\" \"$OUTPUT_DIR/$MODULE_NAME.v\" $MODULE_NAME $PREDICATE",
+    "dependencies": ["join_type"],
+    "hdl": "verilog"
+  },
+  {
+    "name": "handshake.cmpi",
+    "parameters": [
+      { "name": "PREDICATE", "type": "string" },
+      {
+        "name": "DATA_TYPE",
+        "type": "dataflow",
+        "data-lb": 1,
+        "extra-eq": 0,
+        "generic": true
+      }
+    ],
+    "generator": "\"$DYNAMATIC/bin/generators/rtl-cmpi-generator\" \"$DYNAMATIC/data/verilog/arith/cmpi.v\" \"$OUTPUT_DIR/$MODULE_NAME.v\" $MODULE_NAME $PREDICATE verilog",
+    "dependencies": ["join_type"],
+    "hdl": "verilog"
+  },
+  {
+    "name": "handshake.divf",
+    "parameters": [
+      { "name": "DATA_TYPE", "type": "dataflow", "data-lb": 1, "extra-eq": 0 }
+    ],
+    "generic": "$DYNAMATIC/data/verilog/arith/divf.v",
+    "dependencies": ["join_type", "delay_buffer", "oehb"],
+    "hdl": "verilog"
+  },
+  {
+    "name": "handshake.divsi",
+    "parameters": [
+      { "name": "DATA_TYPE", "type": "dataflow", "data-lb": 1, "extra-eq": 0 }
+    ],
+    "generic": "$DYNAMATIC/data/verilog/arith/divsi.v",
+    "dependencies": ["join_type", "delay_buffer"],
+    "hdl": "verilog"
+  },
+  {
+    "name": "handshake.divui",
+    "parameters": [
+      { "name": "DATA_TYPE", "type": "dataflow", "data-lb": 1, "extra-eq": 0 }
+    ],
+    "generic": "$DYNAMATIC/data/verilog/arith/divui.v",
+    "dependencies": ["join_type", "delay_buffer"],
+    "hdl": "verilog"
+  },
+  {
+    "name": "handshake.extsi",
+    "parameters": [
+      { "name": "INPUT_TYPE", "type": "dataflow", "data-lb": 1, "extra-eq": 0 },
+      { "name": "OUTPUT_TYPE", "type": "dataflow", "data-lb": 1, "extra-eq": 0 }
+    ],
+    "generic": "$DYNAMATIC/data/verilog/arith/extsi.v",
+    "hdl": "verilog"
+  },
+  {
+    "name": "handshake.extui",
+    "parameters": [
+      { "name": "INPUT_TYPE", "type": "dataflow", "data-lb": 1, "extra-eq": 0 },
+      { "name": "OUTPUT_TYPE", "type": "dataflow", "data-lb": 1, "extra-eq": 0 }
+    ],
+    "generic": "$DYNAMATIC/data/verilog/arith/extui.v",
+    "hdl": "verilog"
+  },
+  {
+    "name": "handshake.maximumf",
+    "parameters": [
+      { "name": "DATA_TYPE", "type": "dataflow", "data-lb": 1, "extra-eq": 0 }
+    ],
+    "generic": "$DYNAMATIC/data/verilog/arith/maximumf.v",
+    "dependencies": ["join_type", "delay_buffer"],
+    "hdl": "verilog"
+  },
+  {
+    "name": "handshake.minimumf",
+    "parameters": [
+      { "name": "DATA_TYPE", "type": "dataflow", "data-lb": 1, "extra-eq": 0 }
+    ],
+    "generic": "$DYNAMATIC/data/verilog/arith/minimumf.v",
+    "dependencies": ["join_type", "delay_buffer"],
+    "hdl": "verilog"
+  },
+  {
+    "name": "handshake.mulf",
+    "parameters": [
+      { "name": "DATA_TYPE", "type": "dataflow", "data-lb": 1, "extra-eq": 0 }
+    ],
+    "generic": "$DYNAMATIC/data/verilog/arith/mulf.v",
+    "dependencies": ["join_type", "delay_buffer", "oehb"],
+    "hdl": "verilog"
+  },
+  {
+    "name": "handshake.muli",
+    "parameters": [
+      { "name": "DATA_TYPE", "type": "dataflow", "data-lb": 1, "extra-eq": 0 }
+    ],
+    "generic": "$DYNAMATIC/data/verilog/arith/muli.v",
+    "dependencies": ["join_type", "delay_buffer", "oehb"],
+    "hdl": "verilog"
+  },
+  {
+    "name": "handshake.negf",
+    "parameters": [
+      { "name": "DATA_TYPE", "type": "dataflow", "data-lb": 1, "extra-eq": 0 }
+    ],
+    "generic": "$DYNAMATIC/data/verilog/arith/negf.v",
+    "hdl": "verilog"
+  },
+  {
+    "name": "handshake.ori",
+    "parameters": [
+      { "name": "DATA_TYPE", "type": "dataflow", "data-lb": 1, "extra-eq": 0 }
+    ],
+    "generic": "$DYNAMATIC/data/verilog/arith/ori.v",
+    "dependencies": ["join_type"],
+    "hdl": "verilog"
+  },
+  {
+    "name": "handshake.select",
+    "parameters": [
+      { "name": "DATA_TYPE", "type": "dataflow", "data-lb": 1, "extra-eq": 0 }
+    ],
+    "generic": "$DYNAMATIC/data/verilog/arith/select.v",
+    "module-name": "selector",
+    "hdl": "verilog"
+  },
+  {
+    "name": "handshake.shli",
+    "parameters": [
+      { "name": "DATA_TYPE", "type": "dataflow", "data-lb": 1, "extra-eq": 0 }
+    ],
+    "generic": "$DYNAMATIC/data/verilog/arith/shli.v",
+    "dependencies": ["join_type"],
+    "hdl": "verilog"
+  },
+  {
+    "name": "handshake.shrsi",
+    "parameters": [
+      { "name": "DATA_TYPE", "type": "dataflow", "data-lb": 1, "extra-eq": 0 }
+    ],
+    "generic": "$DYNAMATIC/data/verilog/arith/shrsi.v",
+    "dependencies": ["join_type"],
+    "hdl": "verilog"
+  },
+  {
+    "name": "handshake.shrui",
+    "parameters": [
+      { "name": "DATA_TYPE", "type": "dataflow", "data-lb": 1, "extra-eq": 0 }
+    ],
+    "generic": "$DYNAMATIC/data/verilog/arith/shrui.v",
+    "dependencies": ["join_type"],
+    "hdl": "verilog"
+  },
+  {
+    "name": "handshake.subf",
+    "parameters": [
+      { "name": "DATA_TYPE", "type": "dataflow", "data-lb": 1, "extra-eq": 0 }
+    ],
+    "generic": "$DYNAMATIC/data/verilog/arith/subf.v",
+    "dependencies": ["join_type", "delay_buffer", "oehb"],
+    "hdl": "verilog"
+  },
+  {
+    "name": "handshake.subi",
+    "parameters": [
+      { "name": "DATA_TYPE", "type": "dataflow", "data-lb": 1, "extra-eq": 0 }
+    ],
+    "generic": "$DYNAMATIC/data/verilog/arith/subi.v",
+    "dependencies": ["join_type"],
+    "hdl": "verilog"
+  },
+  {
+    "name": "handshake.trunci",
+    "parameters": [
+      { "name": "INPUT_TYPE", "type": "dataflow", "data-lb": 1, "extra-eq": 0 },
+      { "name": "OUTPUT_TYPE", "type": "dataflow", "data-lb": 1, "extra-eq": 0 }
+    ],
+    "generic": "$DYNAMATIC/data/verilog/arith/trunci.v",
+    "hdl": "verilog"
+  },
+  {
+    "name": "handshake.xori",
+    "parameters": [
+      { "name": "DATA_TYPE", "type": "dataflow", "data-lb": 1, "extra-eq": 0 }
+    ],
+    "generic": "$DYNAMATIC/data/verilog/arith/xori.v",
+    "dependencies": ["join_type"],
+    "hdl": "verilog"
+  },
+  {
+    "name": "handshake.buffer",
+    "parameters": [
+      { "name": "NUM_SLOTS", "type": "unsigned", "eq": 1, "generic": false },
+      {
+        "name": "DATA_TYPE",
+        "type": "dataflow",
+        "data-eq": 0,
+        "extra-eq": 0,
+        "generic": false
+      },
+      {
+        "name": "TIMING",
+        "type": "timing",
+        "data-lat-eq": 1,
+        "valid-lat-eq": 1,
+        "generic": false
+      }
+    ],
+    "generic": "$DYNAMATIC/data/verilog/handshake/dataless/oehb.v",
+    "module-name": "oehb_dataless",
+    "hdl": "verilog"
+  },
+  {
+    "name": "handshake.buffer",
+    "parameters": [
+      { "name": "NUM_SLOTS", "type": "unsigned", "eq": 1, "generic": false },
+      { "name": "DATA_TYPE", "type": "dataflow", "data-lb": 1, "extra-eq": 0 },
+      {
+        "name": "TIMING",
+        "type": "timing",
+        "data-lat-eq": 1,
+        "valid-lat-eq": 1,
+        "generic": false
+      }
+    ],
+    "generic": "$DYNAMATIC/data/verilog/handshake/oehb.v",
+    "dependencies": ["oehb_dataless"],
+    "hdl": "verilog"
+  },
+  {
+    "name": "handshake.buffer",
+    "parameters": [
+      { "name": "NUM_SLOTS", "type": "unsigned", "lb": 2 },
+      {
+        "name": "DATA_TYPE",
+        "type": "dataflow",
+        "data-eq": 0,
+        "extra-eq": 0,
+        "generic": false
+      },
+      {
+        "name": "TIMING",
+        "type": "timing",
+        "data-lat-eq": 1,
+        "valid-lat-eq": 1,
+        "generic": false
+      }
+    ],
+    "generic": "$DYNAMATIC/data/verilog/handshake/dataless/ofifo.v",
+    "module-name": "ofifo_dataless",
+    "dependencies": ["tehb_dataless", "elastic_fifo_inner_dataless"],
+    "hdl": "verilog"
+  },
+  {
+    "name": "handshake.buffer",
+    "parameters": [
+      { "name": "NUM_SLOTS", "type": "unsigned", "lb": 2 },
+      { "name": "DATA_TYPE", "type": "dataflow", "data-lb": 1, "extra-eq": 0 },
+      {
+        "name": "TIMING",
+        "type": "timing",
+        "data-lat-eq": 1,
+        "valid-lat-eq": 1,
+        "generic": false
+      }
+    ],
+    "generic": "$DYNAMATIC/data/verilog/handshake/ofifo.v",
+    "dependencies": ["tehb", "elastic_fifo_inner"],
+    "hdl": "verilog"
+  },
+  {
+    "name": "handshake.buffer",
+    "parameters": [
+      { "name": "NUM_SLOTS", "type": "unsigned", "eq": 1, "generic": false },
+      {
+        "name": "DATA_TYPE",
+        "type": "dataflow",
+        "data-eq": 0,
+        "extra-eq": 0,
+        "generic": false
+      },
+      {
+        "name": "TIMING",
+        "type": "timing",
+        "ready-lat-eq": 1,
+        "generic": false
+      }
+    ],
+    "generic": "$DYNAMATIC/data/verilog/handshake/dataless/tehb.v",
+    "module-name": "tehb_dataless",
+    "hdl": "verilog"
+  },
+  {
+    "name": "handshake.buffer",
+    "parameters": [
+      { "name": "NUM_SLOTS", "type": "unsigned", "eq": 1, "generic": false },
+      { "name": "DATA_TYPE", "type": "dataflow", "data-lb": 1, "extra-eq": 0 },
+      {
+        "name": "TIMING",
+        "type": "timing",
+        "ready-lat-eq": 1,
+        "generic": false
+      }
+    ],
+    "generic": "$DYNAMATIC/data/verilog/handshake/tehb.v",
+    "dependencies": ["tehb_dataless"],
+    "hdl": "verilog"
+  },
+  {
+    "name": "handshake.buffer",
+    "parameters": [
+      { "name": "NUM_SLOTS", "type": "unsigned", "lb": 2 },
+      {
+        "name": "DATA_TYPE",
+        "type": "dataflow",
+        "data-eq": 0,
+        "extra-eq": 0,
+        "generic": false
+      },
+      {
+        "name": "TIMING",
+        "type": "timing",
+        "ready-lat-eq": 1,
+        "generic": false
+      }
+    ],
+    "generic": "$DYNAMATIC/data/verilog/handshake/dataless/tfifo.v",
+    "module-name": "tfifo_dataless",
+    "dependencies": ["elastic_fifo_inner_dataless"],
+    "hdl": "verilog"
+  },
+  {
+    "name": "handshake.buffer",
+    "parameters": [
+      { "name": "NUM_SLOTS", "type": "unsigned", "lb": 2 },
+      { "name": "DATA_TYPE", "type": "dataflow", "data-lb": 1, "extra-eq": 0 },
+      {
+        "name": "TIMING",
+        "type": "timing",
+        "ready-lat-eq": 1,
+        "generic": false
+      }
+    ],
+    "generic": "$DYNAMATIC/data/verilog/handshake/tfifo.v",
+    "dependencies": ["elastic_fifo_inner"],
+    "hdl": "verilog"
+  },
+  {
+    "name": "handshake.fork",
+    "parameters": [
+      { "name": "SIZE", "type": "unsigned", "lb": 1 },
+      {
+        "name": "DATA_TYPE",
+        "type": "dataflow",
+        "data-eq": 0,
+        "extra-eq": 0,
+        "generic": false
+      }
+    ],
+    "generic": "$DYNAMATIC/data/verilog/handshake/dataless/fork.v",
+    "module-name": "fork_dataless",
+    "dependencies": ["logic", "eager_fork_register_block"],
+    "hdl": "verilog"
+  },
+  {
+    "name": "handshake.fork",
+    "parameters": [
+      { "name": "SIZE", "type": "unsigned", "lb": 1 },
+      { "name": "DATA_TYPE", "type": "dataflow", "data-lb": 1, "extra-eq": 0 }
+    ],
+    "generic": "$DYNAMATIC/data/verilog/handshake/fork.v",
+    "module-name": "fork_type",
+    "dependencies": ["fork_dataless"],
+    "hdl": "verilog"
+  },
+  {
+    "name": "handshake.lazy_fork",
+    "parameters": [
+      { "name": "SIZE", "type": "unsigned", "lb": 1 },
+      {
+        "name": "DATA_TYPE",
+        "type": "dataflow",
+        "data-eq": 0,
+        "extra-eq": 0,
+        "generic": false
+      }
+    ],
+    "generic": "$DYNAMATIC/data/verilog/handshake/dataless/lazy_fork.v",
+    "module-name": "lazy_fork_dataless",
+    "dependencies": ["logic"],
+    "hdl": "verilog"
+  },
+  {
+    "name": "handshake.lazy_fork",
+    "parameters": [
+      { "name": "SIZE", "type": "unsigned", "lb": 1 },
+      { "name": "DATA_TYPE", "type": "dataflow", "data-lb": 1, "extra-eq": 0 }
+    ],
+    "generic": "$DYNAMATIC/data/verilog/handshake/lazy_fork.v",
+    "dependencies": ["lazy_fork_dataless"],
+    "hdl": "verilog"
+  },
+  {
+    "name": "handshake.sink",
+    "parameters": [
+      {
+        "name": "DATA_TYPE",
+        "type": "dataflow",
+        "data-eq": 0,
+        "extra-eq": 0,
+        "generic": false
+      }
+    ],
+    "generic": "$DYNAMATIC/data/verilog/handshake/dataless/sink.v",
+    "module-name": "sink_dataless",
+    "hdl": "verilog"
+  },
+  {
+    "name": "handshake.sink",
+    "parameters": [
+      { "name": "DATA_TYPE", "type": "dataflow", "data-lb": 1, "extra-eq": 0 }
+    ],
+    "generic": "$DYNAMATIC/data/verilog/handshake/sink.v",
+    "hdl": "verilog"
+  },
+  {
+    "name": "handshake.mux",
+    "parameters": [
+      { "name": "SIZE", "type": "unsigned", "lb": 1 },
+      {
+        "name": "DATA_TYPE",
+        "type": "dataflow",
+        "data-eq": 0,
+        "extra-eq": 0,
+        "generic": false
+      },
+      { "name": "SELECT_TYPE", "type": "dataflow", "data-lb": 1, "extra-eq": 0 }
+    ],
+    "generic": "$DYNAMATIC/data/verilog/handshake/dataless/mux.v",
+    "module-name": "mux_dataless",
+    "dependencies": ["tehb_dataless"],
+    "hdl": "verilog"
+  },
+  {
+    "name": "handshake.mux",
+    "parameters": [
+      { "name": "SIZE", "type": "unsigned", "lb": 1 },
+      { "name": "DATA_TYPE", "type": "dataflow", "data-lb": 1, "extra-eq": 0 },
+      { "name": "SELECT_TYPE", "type": "dataflow", "data-lb": 1, "extra-eq": 0 }
+    ],
+    "generic": "$DYNAMATIC/data/verilog/handshake/mux.v",
+    "dependencies": ["tehb"],
+    "hdl": "verilog"
+  },
+  {
+    "name": "handshake.control_merge",
+    "parameters": [
+      { "name": "SIZE", "type": "unsigned", "lb": 1 },
+      {
+        "name": "DATA_TYPE",
+        "type": "dataflow",
+        "data-eq": 0,
+        "extra-eq": 0,
+        "generic": false
+      },
+      { "name": "INDEX_TYPE", "type": "dataflow", "data-lb": 1, "extra-eq": 0 }
+    ],
+    "generic": "$DYNAMATIC/data/verilog/handshake/dataless/control_merge.v",
+    "module-name": "control_merge_dataless",
+    "dependencies": ["merge_notehb_dataless", "tehb", "fork_dataless"],
+    "hdl": "verilog"
+  },
+  {
+    "name": "handshake.control_merge",
+    "parameters": [
+      { "name": "SIZE", "type": "unsigned", "lb": 1 },
+      { "name": "DATA_TYPE", "type": "dataflow", "data-lb": 1, "extra-eq": 0 },
+      { "name": "INDEX_TYPE", "type": "dataflow", "data-lb": 1, "extra-eq": 0 }
+    ],
+    "generic": "$DYNAMATIC/data/verilog/handshake/control_merge.v",
+    "dependencies": ["control_merge_dataless"],
+    "hdl": "verilog"
+  },
+  {
+    "name": "handshake.merge",
+    "parameters": [
+      { "name": "SIZE", "type": "unsigned", "lb": 1 },
+      {
+        "name": "DATA_TYPE",
+        "type": "dataflow",
+        "data-eq": 0,
+        "extra-eq": 0,
+        "generic": false
+      }
+    ],
+    "generic": "$DYNAMATIC/data/verilog/handshake/dataless/merge.v",
+    "module-name": "merge_dataless",
+    "dependencies": ["tehb_dataless"],
+    "hdl": "verilog"
+  },
+  {
+    "name": "handshake.merge",
+    "parameters": [
+      { "name": "SIZE", "type": "unsigned", "lb": 1 },
+      { "name": "DATA_TYPE", "type": "dataflow", "data-lb": 1, "extra-eq": 0 }
+    ],
+    "generic": "$DYNAMATIC/data/verilog/handshake/merge.v",
+    "dependencies": ["tehb"],
+    "hdl": "verilog"
+  },
+  {
+    "name": "handshake.br",
+    "parameters": [
+      {
+        "name": "DATA_TYPE",
+        "type": "dataflow",
+        "data-eq": 0,
+        "extra-eq": 0,
+        "generic": false
+      }
+    ],
+    "generic": "$DYNAMATIC/data/verilog/handshake/dataless/br.v",
+    "module-name": "br_dataless",
+    "hdl": "verilog"
+  },
+  {
+    "name": "handshake.br",
+    "parameters": [
+      { "name": "DATA_TYPE", "type": "dataflow", "data-lb": 1, "extra-eq": 0 }
+    ],
+    "generic": "$DYNAMATIC/data/verilog/handshake/br.v",
+    "hdl": "verilog"
+  },
+  {
+    "name": "handshake.cond_br",
+    "parameters": [
+      {
+        "name": "DATA_TYPE",
+        "type": "dataflow",
+        "data-eq": 0,
+        "extra-eq": 0,
+        "generic": false
+      }
+    ],
+    "generic": "$DYNAMATIC/data/verilog/handshake/dataless/cond_br.v",
+    "module-name": "cond_br_dataless",
+    "dependencies": ["join_type"],
+    "hdl": "verilog"
+  },
+  {
+    "name": "handshake.cond_br",
+    "parameters": [
+      { "name": "DATA_TYPE", "type": "dataflow", "data-lb": 1, "extra-eq": 0 }
+    ],
+    "generic": "$DYNAMATIC/data/verilog/handshake/cond_br.v",
+    "dependencies": ["cond_br_dataless"],
+    "hdl": "verilog"
+  },
+  {
+    "name": "handshake.source",
+    "parameters": [],
+    "generic": "$DYNAMATIC/data/verilog/handshake/source.v",
+    "hdl": "verilog"
+  },
+  {
+    "name": "handshake.constant",
+    "parameters": [
+      { "name": "VALUE", "type": "string" },
+      { "name": "DATA_WIDTH", "type": "unsigned", "generic": true }
+    ],
+    "generator": "\"$DYNAMATIC/bin/generators/rtl-constant-generator-verilog\" \"$DYNAMATIC/data/verilog/handshake/constant.v\" \"$OUTPUT_DIR/$MODULE_NAME.v\" $MODULE_NAME $VALUE",
+    "hdl": "verilog"
+  },
+  {
+    "name": "handshake.mc_load",
+    "parameters": [
+      { "name": "DATA_TYPE", "type": "dataflow", "data-lb": 1, "extra-eq": 0 },
+      { "name": "ADDR_TYPE", "type": "dataflow", "data-lb": 1, "extra-eq": 0 }
+    ],
+    "generic": "$DYNAMATIC/data/verilog/handshake/mc_load.v",
+    "dependencies": ["tehb"],
+    "hdl": "verilog"
+  },
+  {
+    "name": "handshake.lsq_load",
+    "parameters": [
+      { "name": "DATA_TYPE", "type": "dataflow", "data-lb": 1, "extra-eq": 0 },
+      { "name": "ADDR_TYPE", "type": "dataflow", "data-lb": 1, "extra-eq": 0 }
+    ],
+    "generic": "$DYNAMATIC/data/verilog/handshake/lsq_load.v",
+    "hdl": "verilog"
+  },
+  {
+    "name": "handshake.mc_store",
+    "parameters": [
+      { "name": "DATA_TYPE", "type": "dataflow", "data-lb": 1, "extra-eq": 0 },
+      { "name": "ADDR_TYPE", "type": "dataflow", "data-lb": 1, "extra-eq": 0 }
+    ],
+    "generic": "$DYNAMATIC/data/verilog/handshake/mc_store.v",
+    "dependencies": ["join_type"],
+    "hdl": "verilog"
+  },
+  {
+    "name": "handshake.lsq_store",
+    "parameters": [
+      { "name": "DATA_TYPE", "type": "dataflow", "data-lb": 1, "extra-eq": 0 },
+      { "name": "ADDR_TYPE", "type": "dataflow", "data-lb": 1, "extra-eq": 0 }
+    ],
+    "generic": "$DYNAMATIC/data/verilog/handshake/lsq_store.v",
+    "hdl": "verilog"
+  },
+  {
+    "name": "handshake.mem_controller",
+    "parameters": [
+      { "name": "NUM_CONTROLS", "type": "unsigned", "eq": 0, "generic": false },
+      { "name": "NUM_LOADS", "type": "unsigned", "lb": 1 },
+      { "name": "NUM_STORES", "type": "unsigned", "eq": 0, "generic": false },
+      { "name": "DATA_TYPE", "type": "dataflow", "data-lb": 1, "extra-eq": 0 },
+      { "name": "ADDR_TYPE", "type": "dataflow", "data-lb": 1, "extra-eq": 0 }
+    ],
+    "generic": "$DYNAMATIC/data/verilog/handshake/mem_controller_storeless.v",
+    "dependencies": ["mc_support"],
+    "hdl": "verilog"
+  },
+  {
+    "name": "handshake.mem_controller",
+    "parameters": [
+      { "name": "NUM_CONTROLS", "type": "unsigned", "lb": 1 },
+      { "name": "NUM_LOADS", "type": "unsigned", "eq": 0, "generic": false },
+      { "name": "NUM_STORES", "type": "unsigned", "lb": 1 },
+      { "name": "DATA_TYPE", "type": "dataflow", "data-lb": 1, "extra-eq": 0 },
+      { "name": "ADDR_TYPE", "type": "dataflow", "data-lb": 1, "extra-eq": 0 }
+    ],
+    "generic": "$DYNAMATIC/data/verilog/handshake/mem_controller_loadless.v",
+    "dependencies": ["mc_support"],
+    "hdl": "verilog"
+  },
+  {
+    "name": "handshake.mem_controller",
+    "parameters": [
+      { "name": "NUM_CONTROLS", "type": "unsigned", "lb": 1 },
+      { "name": "NUM_LOADS", "type": "unsigned", "lb": 1 },
+      { "name": "NUM_STORES", "type": "unsigned", "lb": 1 },
+      { "name": "DATA_TYPE", "type": "dataflow", "data-lb": 1, "extra-eq": 0 },
+      { "name": "ADDR_TYPE", "type": "dataflow", "data-lb": 1, "extra-eq": 0 }
+    ],
+    "generic": "$DYNAMATIC/data/verilog/handshake/mem_controller.v",
+    "dependencies": ["mem_controller_loadless"],
+    "hdl": "verilog"
+  },
+  {
+    "name": "handshake.lsq",
+    "generator": "java -jar -Xmx7G \"$DYNAMATIC/bin/generators/lsq-generator.jar\" --target-dir \"$OUTPUT_DIR\" --spec-file \"$OUTPUT_DIR/$MODULE_NAME.json\" > /dev/null",
+    "use-json-config": "$OUTPUT_DIR/$MODULE_NAME.json",
+    "hdl": "verilog",
+    "io-kind": "flat",
+    "io-map": [{ "clk": "clock" }, { "rst": "reset" }, { "*": "io_*" }],
+    "io-signals": {
+      "data": "_bits"
+    }
+  },
+  {
+    "name": "handshake.join",
+    "parameters": [{ "name": "SIZE", "type": "unsigned", "lb": 1 }],
+    "generic": "$DYNAMATIC/data/verilog/handshake/join.v",
+    "module-name": "join_type",
+    "dependencies": ["logic"],
+    "hdl": "verilog"
+  },
+  {
+    "name": "handshake.not",
+    "parameters": [
+      { "name": "DATA_TYPE", "type": "dataflow", "data-lb": 1, "extra-eq": 0 }
+    ],
+    "generic": "$DYNAMATIC/data/verilog/handshake/not.v",
+    "module-name": "logic_not",
+    "hdl": "verilog"
+  },
+  {
+    "generic": "$DYNAMATIC/data/verilog/support/delay_buffer.v",
+    "hdl": "verilog"
+  },
+  {
+    "generic": "$DYNAMATIC/data/verilog/support/eager_fork_register_block.v",
+    "hdl": "verilog"
+  },
+  {
+    "generic": "$DYNAMATIC/data/verilog/support/elastic_fifo_inner.v",
+    "hdl": "verilog"
+  },
+  {
+    "generic": "$DYNAMATIC/data/verilog/support/dataless/elastic_fifo_inner.v",
+    "module-name": "elastic_fifo_inner_dataless",
+    "hdl": "verilog"
+  },
+  {
+    "generic": "$DYNAMATIC/data/verilog/support/logic.v",
+    "hdl": "verilog"
+  },
+  {
+    "generic": "$DYNAMATIC/data/verilog/support/flopoco_ip_cores.v",
+    "hdl": "verilog"
+  },
+  {
+    "generic": "$DYNAMATIC/data/verilog/support/mc_support.v",
+    "hdl": "verilog"
+  },
+  {
+    "generic": "$DYNAMATIC/data/verilog/support/merge_notehb.v",
+    "hdl": "verilog"
+  },
+  {
+    "generic": "$DYNAMATIC/data/verilog/support/dataless/merge_notehb.v",
+    "module-name": "merge_notehb_dataless",
+    "hdl": "verilog"
+  },
+  {
+    "name": "mem_to_bram",
+    "parameters": [
+      { "name": "DATA_WIDTH", "type": "unsigned", "lb": 1 },
+      { "name": "ADDR_WIDTH", "type": "unsigned", "lb": 1 }
+    ],
+    "generic": "$DYNAMATIC/data/verilog/support/mem_to_bram.v",
+    "hdl": "verilog"
+  }
+]

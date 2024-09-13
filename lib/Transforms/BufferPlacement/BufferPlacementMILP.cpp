@@ -15,7 +15,6 @@
 #include "dynamatic/Support/CFG.h"
 #include "dynamatic/Transforms/BufferPlacement/BufferingSupport.h"
 #include "mlir/Dialect/Arith/IR/Arith.h"
-#include "mlir/IR/BuiltinTypes.h"
 #include "mlir/IR/OperationSupport.h"
 #include "mlir/IR/Value.h"
 #include "mlir/Support/IndentedOstream.h"
@@ -30,6 +29,7 @@
 using namespace mlir;
 using namespace dynamatic;
 using namespace dynamatic::buffer;
+using namespace dynamatic::handshake;
 
 /// Returns a textual name for a signal type.
 static StringRef getSignalName(SignalType type) {
@@ -41,18 +41,6 @@ static StringRef getSignalName(SignalType type) {
   case SignalType::READY:
     return "ready";
   }
-}
-
-/// Returns the bitwidth of a channel.
-static unsigned getChannelBitwidth(Value channel) {
-  Type channelType = channel.getType();
-  if (isa<NoneType>(channelType))
-    return 0;
-  if (isa<IntegerType, FloatType>(channelType))
-    return channelType.getIntOrFloatBitWidth();
-  if (isa<IndexType>(channelType))
-    return IndexType::kInternalStorageBitWidth;
-  llvm_unreachable("unsupported channel type");
 }
 
 /// Returns the input and output port delays of the model for a specific signal
@@ -68,7 +56,7 @@ static std::pair<double, double> getPortDelays(Value channel, SignalType signal,
   unsigned bitwidth;
   switch (signal) {
   case SignalType::DATA:
-    bitwidth = getChannelBitwidth(channel);
+    bitwidth = getHandshakeTypeBitWidth(channel.getType());
     /// TODO: It's bad to discard these results, needs a safer way of querying
     /// for these delays
     (void)model->inputModel.dataDelay.getCeilMetric(bitwidth, inBufDelay);
@@ -90,7 +78,7 @@ double BufferPlacementMILP::BufferingGroup::getCombinationalDelay(
   double delay = 0.0;
   switch (type) {
   case SignalType::DATA:
-    bitwidth = getChannelBitwidth(channel);
+    bitwidth = getHandshakeTypeBitWidth(channel.getType());
     /// TODO: It's bad to discard this result, needs a safer way of querying for
     /// this delay
     (void)bufModel->getTotalDataDelay(bitwidth, delay);
@@ -333,7 +321,7 @@ void BufferPlacementMILP::addChannelElasticityConstraints(
   // If there is at least one slot, there must be a buffer
   model.addConstr(0.01 * bufNumSlots <= bufPresent, "elastic_presence");
 
-  for (auto [sig, signalVars] : channelVars.signalVars) {
+  for (auto &[sig, signalVars] : channelVars.signalVars) {
     // If there is a buffer present on a signal, then there is a buffer present
     // on the channel
     model.addConstr(signalVars.bufPresent <= bufPresent,
@@ -401,7 +389,7 @@ void BufferPlacementMILP::addChannelThroughputConstraints(CFDFC &cfdfc) {
     /// executed. Temporarily, emulate the same behavior obtained from passing
     /// our DOTs to the old buffer pass by assuming the "true" input is always
     /// the least executed one
-    if (arith::SelectOp selOp = dyn_cast<arith::SelectOp>(dstOp))
+    if (auto selOp = dyn_cast<handshake::SelectOp>(dstOp))
       if (channel == selOp.getTrueValue())
         continue;
 

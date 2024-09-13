@@ -70,41 +70,21 @@ object Main extends App {
     "--disable-all-randomization"
   )
 
-  if (config.accessType == "AXI") {
+  if (config.master){
     (new ChiselStage).execute(
       chiselArgs,
-      Seq(ChiselGeneratorAnnotation(() => new LSQAXI(config))) ++ firtoolArgs
+      Seq(ChiselGeneratorAnnotation(() => new LSQMaster(config))) ++ firtoolArgs
         .map(
           FirtoolOption(_)
         )
     )
-  } else if (config.accessType == "BRAM") {
-    if (config.experimental) {
-      if (config.toMC){
-        (new ChiselStage).execute(
-          chiselArgs,
-          Seq(ChiselGeneratorAnnotation(() => new LSQBRAMExperimentalMC(config))) ++ firtoolArgs
-            .map(
-              FirtoolOption(_)
-            )
+  } else {
+    (new ChiselStage).execute(
+      chiselArgs,
+      Seq(ChiselGeneratorAnnotation(() => new LSQSlave(config))) ++ firtoolArgs
+        .map(
+          FirtoolOption(_)
         )
-      } else {
-        (new ChiselStage).execute(
-          chiselArgs,
-          Seq(ChiselGeneratorAnnotation(() => new LSQBRAMExperimental(config))) ++ firtoolArgs
-            .map(
-              FirtoolOption(_)
-            )
-        )
-      }
-    } else {
-      (new ChiselStage).execute(
-        chiselArgs,
-        Seq(ChiselGeneratorAnnotation(() => new LSQBRAM(config))) ++ firtoolArgs
-          .map(
-            FirtoolOption(_)
-          )
-      )
-    }
+    )
   }
 }

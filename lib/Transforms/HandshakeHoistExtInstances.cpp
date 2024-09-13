@@ -17,8 +17,15 @@
 #include "dynamatic/Transforms/HandshakeHoistExtInstances.h"
 #include "dynamatic/Analysis/NameAnalysis.h"
 #include "dynamatic/Dialect/Handshake/HandshakeOps.h"
+#include "dynamatic/Support/LLVM.h"
 #include "mlir/IR/MLIRContext.h"
+#include "mlir/IR/Value.h"
+#include "mlir/IR/ValueRange.h"
+#include "mlir/Support/LogicalResult.h"
 #include "llvm/ADT/STLExtras.h"
+#include "llvm/ADT/SmallSet.h"
+#include "llvm/ADT/SmallVector.h"
+#include <cstddef>
 #include <iterator>
 
 using namespace mlir;
@@ -47,7 +54,8 @@ struct HandshakeHoistExtInstancesPass
     auto funcOps = modOp.getOps<handshake::FuncOp>();
     for (auto funcOp : llvm::make_early_inc_range(funcOps)) {
       if (!funcOp.isExternal())
-        hoistInstances(funcOp, symbols);
+        if (failed(hoistInstances(funcOp, symbols)))
+          return signalPassFailure();
     }
 
     // Remove unused external functions
@@ -63,15 +71,16 @@ private:
   /// hoist it "outside" the function and add arguments/results to the
   /// function's signature to represent the removed instance's
   /// results/arguments, respectively.
-  void hoistInstances(handshake::FuncOp funcOp, SymbolTable &symbols);
+  LogicalResult hoistInstances(handshake::FuncOp funcOp, SymbolTable &symbols);
 
   /// Erases the external function if is never referenced elsewhere in the IR.
   void eraseIfUnused(handshake::FuncOp funcOp);
 };
 } // namespace
 
-void HandshakeHoistExtInstancesPass::hoistInstances(handshake::FuncOp funcOp,
-                                                    SymbolTable &symbols) {
+LogicalResult
+HandshakeHoistExtInstancesPass::hoistInstances(handshake::FuncOp funcOp,
+                                               SymbolTable &symbols) {
   MLIRContext *ctx = &getContext();
   OpBuilder builder(ctx);
 
@@ -89,6 +98,8 @@ void HandshakeHoistExtInstancesPass::hoistInstances(handshake::FuncOp funcOp,
 
   Block *bodyBlock = funcOp.getBodyBlock();
 
+  // Verify that each external function is instantiated a single time
+  llvm::SmallSet<handshake::FuncOp, 4> calledFunctions;
   // Collect all instances inside the function that reference an external
   // Handshake functions
   bool anyInstance = false;
@@ -100,7 +111,14 @@ void HandshakeHoistExtInstancesPass::hoistInstances(handshake::FuncOp funcOp,
       continue;
 
     anyInstance = true;
-    StringRef instName = getUniqueName(instOp);
+    StringRef instFuncName = instFuncOp.getNameAttr().strref();
+
+    if (auto [_, newFunc] = calledFunctions.insert(instFuncOp); !newFunc) {
+      return instFuncOp.emitError() << "External function is instantiated "
+                                    << "multiple times, but we only support "
+                                       "a single instantation in any "
+                                    << "given kernel";
+    }
 
     // Iterate over the instance's arguments and add them to the function's
     // results
@@ -109,7 +127,7 @@ void HandshakeHoistExtInstancesPass::hoistInstances(handshake::FuncOp funcOp,
     for (auto [argNameAttr, argType] : namedArguments) {
       StringRef argName = argNameAttr.cast<StringAttr>().strref();
       resTypes.push_back(argType);
-      resNames.push_back(StringAttr::get(ctx, instName + "_" + argName));
+      resNames.push_back(StringAttr::get(ctx, instFuncName + "_" + argName));
     }
 
     // Iterate over the instance's results and add them to the function's
@@ -119,7 +137,7 @@ void HandshakeHoistExtInstancesPass::hoistInstances(handshake::FuncOp funcOp,
     for (auto [argNameAttr, resType] : namedResults) {
       StringRef argName = argNameAttr.cast<StringAttr>().strref();
       argTypes.push_back(resType);
-      argNames.push_back(StringAttr::get(ctx, instName + "_" + argName));
+      argNames.push_back(StringAttr::get(ctx, instFuncName + "_" + argName));
     }
 
     // Instance arguments will exit the function through the end terminator
@@ -134,21 +152,16 @@ void HandshakeHoistExtInstancesPass::hoistInstances(handshake::FuncOp funcOp,
   }
 
   if (!anyInstance)
-    return;
+    return success();
 
   // Change the function's signature
   funcOp.setFunctionType(builder.getFunctionType(argTypes, resTypes));
   funcOp->setAttr("argNames", ArrayAttr::get(ctx, argNames));
   funcOp->setAttr("resNames", ArrayAttr::get(ctx, resNames));
 
-  /// NOTE: this is hacky, but we need to remember the original number of
-  /// operands the end operation had before the transformation so that the
-  /// operands we add here can then directly connect to the RTL module's outputs
-  endOp->setAttr("hw.funcCutoff",
-                 builder.getUI32IntegerAttr(endOp->getNumOperands()));
-
   // Replace the terminator's operands
   endOp->setOperands(endOperands);
+  return success();
 }
 
 void HandshakeHoistExtInstancesPass::eraseIfUnused(handshake::FuncOp funcOp) {

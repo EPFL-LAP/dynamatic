@@ -9,11 +9,7 @@
 
 #include "bicg_float.h"
 
-#define NX 30
-#define NY 30
-#define N 30
-
-#include <math.h>
+#include "dynamatic/Integration.h"
 #include <stdlib.h>
 
 float bicg_float(in_float_t A[N][N], inout_float_t s[N], inout_float_t q[N],
@@ -22,9 +18,9 @@ float bicg_float(in_float_t A[N][N], inout_float_t s[N], inout_float_t q[N],
 
   float tmp_q = 0;
 
-  for (i = 0; i < NX; i++) {
+  for (i = 0; i < N; i++) {
     tmp_q = q[i];
-    for (j = 0; j < NY; j++) {
+    for (j = 0; j < N; j++) {
       float tmp = A[i][j];
       s[j] = s[j] + r[i] * tmp;
       tmp_q = tmp_q + tmp * p[j];

@@ -17,7 +17,6 @@
 
 #include "dynamatic/Dialect/Handshake/HandshakeOps.h"
 #include "dynamatic/Support/LLVM.h"
-#include "dynamatic/Support/TimingModels.h"
 #include "mlir/Support/IndentedOstream.h"
 #include <map>
 
@@ -35,15 +34,6 @@ struct DOTEdge;
 /// Dynamatic.
 class DOTPrinter {
 public:
-  /// Printing mode, dictating the structure and content of the printed DOTs.
-  enum class Mode {
-    /// Optimized for visualizing the circuit's structure (default).
-    VISUAL,
-    /// Compatible with legacy dot2vhdl tool.
-    LEGACY,
-    /// Compatible with legacy buffers and dot2vhdl tools.
-    LEGACY_BUFFERS
-  };
   /// Style in which to render edges in the printed DOTs.
   enum class EdgeStyle {
     /// Render edges as splines (default).
@@ -52,92 +42,34 @@ public:
     ORTHO
   };
 
-  /// Constructs a DOTPrinter whose behavior is controlled by an overall
-  /// printing mode and an edge style. A valid pointer to a timing database must
-  /// be provided in any legacy-compatible mode to include node timing
-  /// annotations, otherwise the constructor will assert.
-  DOTPrinter(Mode mode = Mode::VISUAL, EdgeStyle edgeStyle = EdgeStyle::SPLINE,
-             TimingDatabase *timingDB = nullptr);
+  DOTPrinter(EdgeStyle edgeStyle = EdgeStyle::SPLINE);
 
-  /// Prints Handshake-level IR to the provided output stream (or to stdout if
-  /// `os` is nullptr).
-  LogicalResult print(mlir::ModuleOp mod,
-                      mlir::raw_indented_ostream *os = nullptr);
+  /// Writes the DOT representation of the module to the provided output stream.
+  LogicalResult write(mlir::ModuleOp mod, mlir::raw_indented_ostream &os);
 
 private:
-  /// Printing mode (e.g., compatible with legacy tools or not).
-  Mode mode;
   /// Style of edges in the resulting DOTs.
   EdgeStyle edgeStyle;
-  /// Timing models for dataflow components (required in any legacy-compatible
-  /// mode, can safely be nullptr when not in legacy mode).
-  TimingDatabase *timingDB = nullptr;
 
-  /// Returns the name of a function's argument given its index.
-  std::string getArgumentName(handshake::FuncOp funcOp, size_t idx);
+  using PortNames = DenseMap<Operation *, handshake::PortNamer>;
 
-  /// Computes all data attributes of a function argument (indicated by its
-  /// index) for use in legacy Dynamatic and prints them to the output stream;
-  /// it is the responsibility of the caller of this method to insert an opening
-  /// bracket before the call and a closing bracket after the call.
-  LogicalResult annotateArgumentNode(handshake::FuncOp funcOp, size_t idx,
-                                     mlir::raw_indented_ostream &os);
+  /// Writes the node corresponding to an operation.
+  void writeNode(Operation *op, mlir::raw_indented_ostream &os);
 
-  /// Computes all data attributes of an edge between a function argument
-  /// (indicated by its index) and an operation for use in legacy Dynamatic and
-  /// prints them to the output stream; it is the responsibility of the caller
-  /// of this method to insert an opening bracket before the call and a closing
-  /// bracket after the call.
-  LogicalResult annotateArgumentEdge(handshake::FuncOp funcOp, size_t idx,
-                                     Operation *dst,
-                                     mlir::raw_indented_ostream &os);
+  /// Writes the edge corresponding to an operation operand. The edge links an
+  /// operation result's or block argument to an operation that uses the value.
+  void writeEdge(OpOperand &oprd, const PortNames &portNames,
+                 mlir::raw_indented_ostream &os);
 
-  /// Returns the content of the "delay" attribute associated to every graph
-  /// node in legacy mode. Requires that `timingDB` points to a valid memory
-  /// location.
-  std::string getNodeDelayAttr(Operation *op);
-
-  /// Returns the content of the "latency" attribute associated to every graph
-  /// node in legacy mode. Requires that `timingDB` points to a valid memory
-  /// location.
-  std::string getNodeLatencyAttr(Operation *op);
-
-  /// Computes all data attributes of an operation for use in legacy Dynamatic
-  /// and prints them to the output stream; it is the responsibility of the
-  /// caller of this method to insert an opening bracket before the call and a
-  /// closing bracket after the call.
-  LogicalResult annotateNode(Operation *op, mlir::raw_indented_ostream &os);
-
-  /// Prints a node corresponding to an operation and, on success, returns a
-  /// unique name for the operation in the outName argument.
-  LogicalResult printNode(Operation *op, mlir::raw_indented_ostream &os);
-
-  /// Computes all data attributes of an edge for use in legacy Dynamatic and
-  /// prints them to the output; it is the responsibility of the caller
-  /// of this method to insert an opening bracket before the call and a closing
-  /// bracket after the call.
-  LogicalResult annotateEdge(OpOperand &oprd, mlir::raw_indented_ostream &os);
-
-  /// Prints an edge between a source and destination operation, which are
-  /// linked by a result of the source that the destination uses as an
-  /// operand.
-  LogicalResult printEdge(OpOperand &oprd, mlir::raw_indented_ostream &os);
-
-  /// Prints an instance of a handshake.func to the graph.
-  LogicalResult printFunc(handshake::FuncOp funcOp,
-                          mlir::raw_indented_ostream &os);
+  /// Writes the graph corresponding to the Handshake function.
+  void writeFunc(handshake::FuncOp funcOp, mlir::raw_indented_ostream &os);
 
   /// Opens a subgraph in the DOT file using the provided name and label.
-  void openSubgraph(std::string &name, std::string &label,
+  void openSubgraph(StringRef name, StringRef label,
                     mlir::raw_indented_ostream &os);
 
   /// Closes a subgraph in the DOT file.
   void closeSubgraph(mlir::raw_indented_ostream &os);
-
-  /// Returns whether the DOT printer was setup in a legacy-compatible mode.
-  inline bool inLegacyMode() {
-    return mode == Mode::LEGACY || mode == Mode::LEGACY_BUFFERS;
-  }
 };
 
 /// Holds information about data attributes for a DOT node.
@@ -150,7 +82,7 @@ struct DOTNode {
   std::map<std::string, int> intAttr;
 
   /// Constructs a NodeInfo with a specific type.
-  DOTNode(std::string type) : type(std::move(type)){};
+  DOTNode(std::string type) : type(std::move(type)) {};
 
   /// Prints all stored data attributes on the output stream. The function
   /// doesn't insert [brackets] around the attributes; it is the responsibility

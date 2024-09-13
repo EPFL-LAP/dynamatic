@@ -15,7 +15,6 @@
 #include "GraphEdge.h"
 #include "GraphNode.h"
 #include "dynamatic/Dialect/Handshake/HandshakeOps.h"
-#include "dynamatic/Transforms/HandshakeConcretizeIndexType.h"
 #include "mlir/Dialect/Arith/IR/Arith.h"
 #include "mlir/IR/BuiltinTypes.h"
 #include "mlir/IR/OperationSupport.h"

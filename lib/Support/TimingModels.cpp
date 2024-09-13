@@ -14,64 +14,56 @@
 
 #include "dynamatic/Support/TimingModels.h"
 #include "dynamatic/Dialect/Handshake/HandshakeOps.h"
-#include "mlir/Dialect/Arith/IR/Arith.h"
-#include "mlir/IR/Operation.h"
+#include "dynamatic/Support/JSON/JSON.h"
 #include "mlir/Support/LogicalResult.h"
 #include "llvm/ADT/TypeSwitch.h"
 #include "llvm/Support/JSON.h"
 #include <fstream>
-#include <iostream>
 
 using namespace llvm;
 using namespace mlir;
 using namespace dynamatic;
+using namespace dynamatic::handshake;
+
+namespace ljson = llvm::json;
 
 //===----------------------------------------------------------------------===//
 // TimingDatabse definitions
 //===----------------------------------------------------------------------===//
 
-/// Returns the width of a type which must either be a NoneType, IntegerType, or
-/// FloatType.
-static unsigned getTypeWidth(Type type) {
-  if (isa<mlir::NoneType>(type))
-    return 0;
-  if (isa<IntegerType, FloatType>(type))
-    return type.getIntOrFloatBitWidth();
-  llvm_unreachable("unsupported channel type");
-}
-
 unsigned dynamatic::getOpDatawidth(Operation *op) {
   // All arithmetic operations are handled the same way
   if (op->getName().getDialectNamespace() == "arith")
-    return getTypeWidth(op->getOperand(0).getType());
+    return getHandshakeTypeBitWidth(op->getOperand(0).getType());
 
   // Handshake operations have various semantics and must be handled on a
   // case-by-case basis
   return llvm::TypeSwitch<Operation *, unsigned>(op)
       .Case<handshake::MergeLikeOpInterface>(
           [&](handshake::MergeLikeOpInterface mergeLikeOp) {
-            return getTypeWidth(
+            return getHandshakeTypeBitWidth(
                 mergeLikeOp.getDataOperands().front().getType());
           })
-      .Case<handshake::BufferOpInterface, handshake::ForkOp,
-            handshake::LazyForkOp, handshake::BranchOp, handshake::SinkOp>(
-          [&](auto) { return getTypeWidth(op->getOperand(0).getType()); })
+      .Case<handshake::BufferOp, handshake::ForkOp, handshake::LazyForkOp,
+            handshake::BranchOp, handshake::SinkOp>([&](auto) {
+        return getHandshakeTypeBitWidth(op->getOperand(0).getType());
+      })
       .Case<handshake::ConditionalBranchOp>(
           [&](handshake::ConditionalBranchOp condOp) {
-            return getTypeWidth(condOp.getDataOperand().getType());
+            return getHandshakeTypeBitWidth(condOp.getDataOperand().getType());
           })
-      .Case<handshake::SourceOp, handshake::ConstantOp>(
-          [&](auto) { return getTypeWidth(op->getResult(0).getType()); })
-      .Case<handshake::ReturnOp, handshake::EndOp, handshake::JoinOp>(
-          [&](auto) {
-            unsigned maxWidth = 0;
-            for (Type ty : op->getOperandTypes())
-              maxWidth = std::max(maxWidth, getTypeWidth(ty));
-            return maxWidth;
-          })
+      .Case<handshake::SourceOp, handshake::ConstantOp>([&](auto) {
+        return getHandshakeTypeBitWidth(op->getResult(0).getType());
+      })
+      .Case<handshake::EndOp, handshake::JoinOp>([&](auto) {
+        unsigned maxWidth = 0;
+        for (Type ty : op->getOperandTypes())
+          maxWidth = std::max(maxWidth, getHandshakeTypeBitWidth(ty));
+        return maxWidth;
+      })
       .Case<handshake::LoadOpInterface, handshake::StoreOpInterface>([&](auto) {
-        return std::max(getTypeWidth(op->getOperand(0).getType()),
-                        getTypeWidth(op->getOperand(1).getType()));
+        return std::max(getHandshakeTypeBitWidth(op->getOperand(0).getType()),
+                        getHandshakeTypeBitWidth(op->getOperand(1).getType()));
       })
       .Case<handshake::MemoryOpInterface>(
           [&](handshake::MemoryOpInterface memOp) {
@@ -201,15 +193,15 @@ LogicalResult TimingDatabase::readFromJSON(std::string &jsonpath,
     jsonString += line;
 
   // Try to parse the string as a JSON
-  llvm::Expected<json::Value> value = json::parse(jsonString);
+  llvm::Expected<ljson::Value> value = ljson::parse(jsonString);
   if (!value) {
     llvm::errs() << "Failed to parse timing models in \"" << jsonpath << "\"\n";
     return failure();
   }
 
   // Deserialize into a timing database
-  json::Path::Root jsonRoot(jsonpath);
-  return success(fromJSON(*value, timingDB, json::Path(jsonRoot)));
+  ljson::Path::Root jsonRoot(jsonpath);
+  return success(fromJSON(*value, timingDB, ljson::Path(jsonRoot)));
 }
 
 //===----------------------------------------------------------------------===//
@@ -225,8 +217,8 @@ LogicalResult TimingDatabase::readFromJSON(std::string &jsonpath,
 /// Parses an unsigned number representing a bitwidth from a JSON key. Returns
 /// true and sets the second argument to the parsed number if the key represents
 /// a valid unsigned number; returns false otherwise.
-static bool bitwidthFromJSON(const json::ObjectKey &value, unsigned &bitwidth,
-                             json::Path path) {
+static bool bitwidthFromJSON(const ljson::ObjectKey &value, unsigned &bitwidth,
+                             ljson::Path path) {
   StringRef key = value;
   if (std::any_of(key.begin(), key.end(),
                   [](char c) { return !std::isdigit(c); })) {
@@ -242,22 +234,22 @@ static bool bitwidthFromJSON(const json::ObjectKey &value, unsigned &bitwidth,
 /// ::llvm::json::Value's documentation).
 template <typename T>
 static bool deserializeNested(ArrayRef<std::string> keys,
-                              const json::Object *object, T &out,
-                              json::Path path) {
+                              const ljson::Object *object, T &out,
+                              ljson::Path path) {
   assert(!keys.empty() && "list of keys must be non-empty");
 
   size_t lastElem = keys.size() - 1;
-  const json::Object *currentObj = object;
-  json::Path currentPath = path;
+  const ljson::Object *currentObj = object;
+  ljson::Path currentPath = path;
   for (auto [idx, k] : llvm::enumerate(keys)) {
     currentPath = currentPath.field(k);
     if (idx == lastElem) {
-      if (const json::Value *value = currentObj->get(k))
+      if (const ljson::Value *value = currentObj->get(k))
         return fromJSON(*value, out, currentPath);
       path.report("expected last key in path to exist");
       return false;
     }
-    if (const json::Object *nextObject = currentObj->getObject(k))
+    if (const ljson::Object *nextObject = currentObj->getObject(k))
       currentObj = nextObject;
     else {
       path.report("expected last key in path to exist");
@@ -268,9 +260,9 @@ static bool deserializeNested(ArrayRef<std::string> keys,
   return true;
 }
 
-bool dynamatic::fromJSON(const json::Value &value,
-                         BitwidthDepMetric<double> &metric, json::Path path) {
-  const json::Object *object = value.getAsObject();
+bool dynamatic::fromJSON(const ljson::Value &value,
+                         BitwidthDepMetric<double> &metric, ljson::Path path) {
+  const ljson::Object *object = value.getAsObject();
   if (!object) {
     path.report("expected JSON object");
     return false;
@@ -301,9 +293,9 @@ static const std::string DELAY_CR[] = {"delay", "CR"};
 static const std::string DELAY_VC[] = {"delay", "VC"};
 static const std::string DELAY_VD[] = {"delay", "VD"};
 
-bool dynamatic::fromJSON(const json::Value &value,
-                         TimingModel::PortModel &model, json::Path path) {
-  const json::Object *object = value.getAsObject();
+bool dynamatic::fromJSON(const ljson::Value &value,
+                         TimingModel::PortModel &model, ljson::Path path) {
+  const ljson::Object *object = value.getAsObject();
   if (!object) {
     path.report("expected JSON object");
     return false;
@@ -320,10 +312,10 @@ bool dynamatic::fromJSON(const json::Value &value,
   return true;
 }
 
-bool dynamatic::fromJSON(const json::Value &value, TimingModel &model,
-                         json::Path path) {
+bool dynamatic::fromJSON(const ljson::Value &value, TimingModel &model,
+                         ljson::Path path) {
 
-  const json::Object *object = value.getAsObject();
+  const ljson::Object *object = value.getAsObject();
   if (!object) {
     path.report("expected JSON object");
     return false;
@@ -345,7 +337,7 @@ bool dynamatic::fromJSON(const json::Value &value, TimingModel &model,
   FW_FALSE(deserializeNested(DELAY_VD, object, model.validToData, path));
 
   // Deserialize the input ports' model
-  if (const json::Value *value = object->get("inport")) {
+  if (const ljson::Value *value = object->get("inport")) {
     FW_FALSE(fromJSON(*value, model.inputModel, path.field("inport")));
   } else {
     path.report("expected to find \"inport\" key");
@@ -353,7 +345,7 @@ bool dynamatic::fromJSON(const json::Value &value, TimingModel &model,
   }
 
   // Deserialize the output ports' model
-  if (const json::Value *value = object->get("outport")) {
+  if (const ljson::Value *value = object->get("outport")) {
     FW_FALSE(fromJSON(*value, model.outputModel, path.field("outport")));
   } else {
     path.report("expected to find \"outport\" key");
@@ -363,31 +355,20 @@ bool dynamatic::fromJSON(const json::Value &value, TimingModel &model,
   return true;
 }
 
-bool dynamatic::fromJSON(const json::Value &jsonValue, TimingDatabase &timingDB,
-                         json::Path path) {
-  const json::Object *components = jsonValue.getAsObject();
+bool dynamatic::fromJSON(const ljson::Value &jsonValue,
+                         TimingDatabase &timingDB, ljson::Path path) {
+  const ljson::Object *components = jsonValue.getAsObject();
   if (!components)
     return false;
 
   for (const auto &[opName, cmpInfo] : *components) {
     TimingModel model;
-    json::Path opPath = path.field(opName);
+    ljson::Path opPath = path.field(opName);
     fromJSON(cmpInfo, model, opPath);
     if (!timingDB.insertTimingModel(opName, model)) {
       opPath.report("Overriding existing timing model for operation");
       return false;
     }
   }
-  return true;
-}
-
-bool llvm::json::fromJSON(const json::Value &value, unsigned &number,
-                          json::Path path) {
-  std::optional<uint64_t> opt = value.getAsUINT64();
-  if (!opt.has_value()) {
-    path.report("expected unsigned number");
-    return false;
-  }
-  number = opt.value();
   return true;
 }

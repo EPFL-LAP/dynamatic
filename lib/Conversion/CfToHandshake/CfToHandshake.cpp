@@ -17,12 +17,14 @@
 //===----------------------------------------------------------------------===//
 
 #include "dynamatic/Conversion/CfToHandshake.h"
-#include "dynamatic/Analysis/ConstantAnalysis.h"
 #include "dynamatic/Analysis/NameAnalysis.h"
+#include "dynamatic/Dialect/Handshake/HandshakeAttributes.h"
 #include "dynamatic/Dialect/Handshake/HandshakeDialect.h"
 #include "dynamatic/Dialect/Handshake/HandshakeInterfaces.h"
 #include "dynamatic/Dialect/Handshake/HandshakeOps.h"
 #include "dynamatic/Dialect/Handshake/MemoryInterfaces.h"
+#include "dynamatic/Support/Attribute.h"
+#include "dynamatic/Support/Backedge.h"
 #include "dynamatic/Support/CFG.h"
 #include "mlir/Dialect/Affine/Analysis/AffineAnalysis.h"
 #include "mlir/Dialect/Affine/Utils.h"
@@ -36,6 +38,7 @@
 #include "mlir/IR/Attributes.h"
 #include "mlir/IR/BuiltinAttributes.h"
 #include "mlir/IR/BuiltinDialect.h"
+#include "mlir/IR/BuiltinOps.h"
 #include "mlir/IR/BuiltinTypes.h"
 #include "mlir/IR/Dominance.h"
 #include "mlir/IR/MLIRContext.h"
@@ -47,7 +50,6 @@
 #include "llvm/ADT/SmallVector.h"
 #include "llvm/ADT/TypeSwitch.h"
 #include "llvm/Support/ErrorHandling.h"
-#include <iterator>
 #include <utility>
 
 using namespace mlir;
@@ -62,13 +64,7 @@ using namespace dynamatic;
 
 /// Determines whether an operation is akin to a load or store memory operation.
 static bool isMemoryOp(Operation *op) {
-  return isa<memref::LoadOp, memref::StoreOp, AffineReadOpInterface,
-             AffineWriteOpInterface>(op);
-}
-
-/// Determines whether an operation is akin to a memory allocation operation.
-static bool isAllocOp(Operation *op) {
-  return isa<memref::AllocOp, memref::AllocaOp>(op);
+  return isa<memref::LoadOp, memref::StoreOp>(op);
 }
 
 /// Determines whether a memref type is suitable for covnersion in the context
@@ -83,63 +79,47 @@ static bool isValidMemrefType(Location loc, mlir::MemRefType type) {
 }
 
 /// Extracts the memref argument to a memory operation and puts it in out.
-/// Returns an error whenever the passed operation is not a memory operation.
-static LogicalResult getOpMemRef(Operation *op, Value &out) {
-  out = Value();
+/// Returns an error whenever the passed operation is not a supported memory
+/// operation.
+static Value getOpMemRef(Operation *op) {
   if (auto memOp = dyn_cast<memref::LoadOp>(op))
-    out = memOp.getMemRef();
-  else if (auto memOp = dyn_cast<memref::StoreOp>(op))
-    out = memOp.getMemRef();
-  else if (isa<AffineReadOpInterface, AffineWriteOpInterface>(op)) {
-    affine::MemRefAccess access(op);
-    out = access.memref;
-  }
-  if (out != Value())
-    return success();
-  return op->emitOpError() << "Unknown operation type.";
+    return memOp.getMemRef();
+  if (auto memOp = dyn_cast<memref::StoreOp>(op))
+    return memOp.getMemRef();
+  return nullptr;
 }
 
 /// Returns the list of data inputs to be passed as operands to the
-/// handshake::EndOp of a handshake::FuncOp. In the case of a single return
-/// statement, this is simply the return's outputs. In the case of multiple
-/// returns, this is the list of individually merged outputs of all returns.
-/// In the latter case, the function inserts the required handshake::MergeOp's
+/// `handshake::EndOp` of a `handshake::FuncOp`. In the case of a single return
+/// statement, this is simply the return's inputs. In the case of multiple
+/// returns, this is the list of individually merged inputs of all returns.
+/// In the latter case, the function inserts the required `handshake::MergeOp`'s
 /// in the region.
-static SmallVector<Value, 8>
+static SmallVector<Value>
 mergeFuncResults(handshake::FuncOp funcOp, ConversionPatternRewriter &rewriter,
-                 SmallVector<Operation *, 4> &newReturnOps,
+                 ArrayRef<SmallVector<Value>> returnsOperands,
                  size_t exitBlockID) {
-  Block *entryBlock = &funcOp.front();
-  if (newReturnOps.size() == 1) {
-    // No need to merge results in case of single return
-    return SmallVector<Value, 8>(newReturnOps[0]->getResults());
-  }
+  // No need to merge results in case of a single return
+  if (returnsOperands.size() == 1)
+    return returnsOperands.front();
+  unsigned numReturnValues = returnsOperands.front().size();
+  if (numReturnValues == 0)
+    return {};
 
   // Return values from multiple returns need to be merged together
-  SmallVector<Value, 8> results;
+  SmallVector<Value, 4> results;
+  Block *entryBlock = funcOp.getBodyBlock();
   Location loc = entryBlock->getOperations().back().getLoc();
   rewriter.setInsertionPointToEnd(entryBlock);
-  for (unsigned i = 0, e = newReturnOps[0]->getNumResults(); i < e; i++) {
+  for (unsigned i = 0, e = numReturnValues; i < e; i++) {
     SmallVector<Value, 4> mergeOperands;
-    for (auto *retOp : newReturnOps) {
-      mergeOperands.push_back(retOp->getResult(i));
-    }
+    for (ValueRange operands : returnsOperands)
+      mergeOperands.push_back(operands[i]);
     auto mergeOp = rewriter.create<handshake::MergeOp>(loc, mergeOperands);
     results.push_back(mergeOp.getResult());
-    // Merge operation inherits from the bb atttribute of the latest (in program
-    // order) return operation
     mergeOp->setAttr(BB_ATTR_NAME, rewriter.getUI32IntegerAttr(exitBlockID));
   }
   return results;
-}
-
-/// Returns a vector of control signals, one from each memory interface in the
-/// circuit, to be passed as operands to the `handshake::EndOp` operation.
-static SmallVector<Value, 8> getFunctionEndControls(handshake::FuncOp funcOp) {
-  SmallVector<Value, 8> controls;
-  for (auto memOp : funcOp.getOps<handshake::MemoryOpInterface>())
-    controls.push_back(memOp->getResults().back());
-  return controls;
 }
 
 /// Checks whether the blocks in `opsPerBlock`'s keys exhibit a "linear
@@ -197,8 +177,25 @@ static std::optional<Value> oneToOneVoidMaterialization(OpBuilder &builder,
   return inputs[0];
 }
 
+static Type channelifyType(Type type) {
+  return llvm::TypeSwitch<Type, Type>(type)
+      .Case<IndexType, IntegerType, FloatType>(
+          [](auto type) { return handshake::ChannelType::get(type); })
+      .Case<MemRefType>([](MemRefType memrefType) {
+        if (!isa<IndexType>(memrefType.getElementType()))
+          return memrefType;
+        OpBuilder builder(memrefType.getContext());
+        IntegerType elemType = builder.getIntegerType(32);
+        return MemRefType::get(memrefType.getShape(), elemType);
+      })
+      .Case<handshake::ChannelType, handshake::ControlType>(
+          [](auto type) { return type; })
+
+      .Default([](auto type) { return nullptr; });
+}
+
 CfToHandshakeTypeConverter::CfToHandshakeTypeConverter() {
-  addConversion([](Type type) -> Type { return type; });
+  addConversion(channelifyType);
   addArgumentMaterialization(oneToOneVoidMaterialization);
   addSourceMaterialization(oneToOneVoidMaterialization);
   addTargetMaterialization(oneToOneVoidMaterialization);
@@ -208,14 +205,19 @@ CfToHandshakeTypeConverter::CfToHandshakeTypeConverter() {
 // LowerFuncToHandshake
 //===-----------------------------------------------------------------------==//
 
-LowerFuncToHandshake::LowerFuncToHandshake(TypeConverter &typeConverter,
-                                           NameAnalysis &namer,
-                                           MLIRContext *ctx)
-    : OpConversionPattern<func::FuncOp>(typeConverter, ctx), namer(namer) {}
+using ArgReplacements = DenseMap<BlockArgument, OpResult>;
 
 LogicalResult LowerFuncToHandshake::matchAndRewrite(
     func::FuncOp lowerFuncOp, OpAdaptor /*adaptor*/,
     ConversionPatternRewriter &rewriter) const {
+
+  // Map all memory accesses in the matched function to the index of their
+  // memref in the function's arguments
+  DenseMap<Value, unsigned> memrefToArgIdx;
+  for (auto [idx, arg] : llvm::enumerate(lowerFuncOp.getArguments())) {
+    if (isa<mlir::MemRefType>(arg.getType()))
+      memrefToArgIdx.insert({arg, idx});
+  }
 
   // First lower the parent function itself, without modifying its body (except
   // the block arguments and terminators)
@@ -228,12 +230,14 @@ LogicalResult LowerFuncToHandshake::matchAndRewrite(
 
   // Stores mapping from each value that passes through a merge-like operation
   // to the data result of that merge operation
-  DenseMap<BlockArgument, OpResult> blockArgReplacements;
-  addMergeOps(funcOp, rewriter, blockArgReplacements);
+  ArgReplacements argReplacements;
+  addMergeOps(funcOp, rewriter, argReplacements);
   addBranchOps(funcOp, rewriter);
 
+  BackedgeBuilder edgeBuilder(rewriter, funcOp->getLoc());
   LowerFuncToHandshake::MemInterfacesInfo memInfo;
-  if (failed(convertMemoryOps(funcOp, rewriter, memInfo)))
+  if (failed(convertMemoryOps(funcOp, rewriter, memrefToArgIdx, edgeBuilder,
+                              memInfo)))
     return failure();
 
   // First round of bb-tagging so that newly inserted Dynamatic memory ports get
@@ -244,25 +248,15 @@ LogicalResult LowerFuncToHandshake::matchAndRewrite(
     return failure();
 
   idBasicBlocks(funcOp, rewriter);
-  flattenAndTerminate(funcOp, rewriter, blockArgReplacements);
-  return success();
-}
-
-/// Filters out block arguments of type MemRefType
-bool LowerFuncToHandshake::FuncSSAStrategy::maximizeArgument(
-    BlockArgument arg) {
-  return !arg.getType().isa<mlir::MemRefType>();
-}
-
-/// Filters out allocation operations
-bool LowerFuncToHandshake::FuncSSAStrategy::maximizeOp(Operation &op) {
-  return !isAllocOp(&op);
+  return flattenAndTerminate(funcOp, rewriter, argReplacements);
 }
 
 SmallVector<NamedAttribute>
 LowerFuncToHandshake::deriveNewAttributes(func::FuncOp funcOp) const {
   SmallVector<NamedAttribute, 4> attributes;
   MLIRContext *ctx = getContext();
+  SmallVector<std::string> memRegionNames;
+  bool hasArgNames = false;
 
   for (const NamedAttribute &attr : funcOp->getAttrs()) {
     StringAttr attrName = attr.getName();
@@ -275,19 +269,23 @@ LowerFuncToHandshake::deriveNewAttributes(func::FuncOp funcOp) const {
 
     // Argument names need to be augmented with the additional start argument
     if (attrName == funcOp.getArgAttrsAttrName()) {
+      hasArgNames = true;
+
       // Extracts the name key's value from the dictionary attribute
       // corresponding to each function's argument.
-      auto extractNames = [&](Attribute argAttr) -> Attribute {
+      SmallVector<Attribute> argNames;
+      for (auto [argType, argAttr] :
+           llvm::zip(funcOp.getArgumentTypes(), funcOp.getArgAttrsAttr())) {
         DictionaryAttr argDict = cast<DictionaryAttr>(argAttr);
         std::optional<NamedAttribute> name =
             argDict.getNamed("handshake.arg_name");
         assert(name && "missing name key in arg attribute");
-        return name->getValue();
-      };
-
-      SmallVector<Attribute> argNames;
-      llvm::transform(funcOp.getArgAttrsAttr(), std::back_inserter(argNames),
-                      extractNames);
+        if (isa<mlir::MemRefType>(argType))
+          memRegionNames.push_back(cast<StringAttr>(name->getValue()).str());
+        argNames.push_back(name->getValue());
+      }
+      for (StringRef mem : memRegionNames)
+        argNames.push_back(StringAttr::get(ctx, mem + "_start"));
       argNames.push_back(StringAttr::get(ctx, "start"));
       attributes.emplace_back(StringAttr::get(ctx, "argNames"),
                               ArrayAttr::get(ctx, argNames));
@@ -298,48 +296,89 @@ LowerFuncToHandshake::deriveNewAttributes(func::FuncOp funcOp) const {
     attributes.push_back(attr);
   }
 
-  // Create the attribute for result names
-  ArrayAttr resNamesArray;
+  // Regular function results have default names
+  SmallVector<Attribute> resNames;
   unsigned numFuncResults = funcOp.getFunctionType().getNumResults();
-  if (numFuncResults == 0) {
-    resNamesArray = ArrayAttr::get(ctx, StringAttr::get(ctx, "end"));
-  } else {
-    SmallVector<Attribute> resNames;
-    for (size_t idx = 0; idx < numFuncResults; ++idx)
-      resNames.push_back(StringAttr::get(ctx, "out" + std::to_string(idx)));
-    resNamesArray = ArrayAttr::get(ctx, resNames);
-  }
-  attributes.emplace_back(StringAttr::get(ctx, "resNames"), resNamesArray);
+  for (size_t idx = 0; idx < numFuncResults; ++idx)
+    resNames.push_back(StringAttr::get(ctx, "out" + std::to_string(idx)));
 
+  if (!hasArgNames) {
+    SmallVector<Attribute> argNames;
+
+    // Create attributes for arguments and result names
+    unsigned argNum = 0, memNum = 0;
+    for (BlockArgument arg : funcOp.getArguments()) {
+      if (isa<mlir::MemRefType>(arg.getType())) {
+        std::string name = "mem" + std::to_string(memNum++);
+        memRegionNames.push_back(name);
+        argNames.push_back(StringAttr::get(ctx, name));
+      } else {
+        argNames.push_back(
+            StringAttr::get(ctx, "in" + std::to_string(argNum++)));
+      }
+    }
+    for (StringRef memName : memRegionNames)
+      argNames.push_back(StringAttr::get(ctx, memName + "_start"));
+    argNames.push_back(StringAttr::get(ctx, "start"));
+    attributes.emplace_back(StringAttr::get(ctx, "argNames"),
+                            ArrayAttr::get(ctx, argNames));
+  }
+
+  // Use the same memory names as the arguments as the base for the result names
+  for (StringRef memName : memRegionNames)
+    resNames.push_back(StringAttr::get(ctx, memName + "_end"));
+  resNames.push_back(StringAttr::get(ctx, "end"));
+  attributes.emplace_back(StringAttr::get(ctx, "resNames"),
+                          ArrayAttr::get(ctx, resNames));
   return attributes;
+}
+
+static void
+setupEntryBlockConversion(Block *entryBlock, unsigned numMemories,
+                          PatternRewriter &rewriter,
+                          TypeConverter::SignatureConversion &conv) {
+  // All func-level function arguments map one-to-one to the handshake-level
+  // function arguments and get channelified in the process
+  for (auto [idx, type] : llvm::enumerate(entryBlock->getArgumentTypes()))
+    conv.addInputs(idx, channelifyType(type));
+
+  // Add a new control argument for each memory and one for the start signal
+  Type ctrlType = handshake::ControlType::get(rewriter.getContext());
+  conv.addInputs(SmallVector<Type>{numMemories + 1, ctrlType});
 }
 
 static void setupBlockConversion(Block *block, PatternRewriter &rewriter,
                                  TypeConverter::SignatureConversion &conv) {
-  // All func-level block arguments remap one-to-one to the handshake-level
-  // arguments
+  // All func-level block arguments map one-to-one to the handshake-level
+  // arguments and get channelified in the process
   for (auto [idx, type] : llvm::enumerate(block->getArgumentTypes()))
-    conv.addInputs(idx, type);
+    conv.addInputs(idx, channelifyType(type));
 
   // Add a new argument for the start in each block
-  conv.addInputs(rewriter.getNoneType());
+  conv.addInputs(handshake::ControlType::get(rewriter.getContext()));
 }
 
 FailureOr<handshake::FuncOp> LowerFuncToHandshake::lowerSignature(
     func::FuncOp funcOp, ConversionPatternRewriter &rewriter) const {
-  // Put the function into maximal SSA form if it is not external
-  if (!funcOp.isExternal()) {
-    FuncSSAStrategy strategy;
-    if (failed(dynamatic::maximizeSSA(funcOp.getBody(), strategy)))
-      return failure();
+  // The Handshake function's first inputs and outputs match the original
+  // function's arguments and results
+  SmallVector<Type, 8> argTypes;
+  SmallVector<Type, 2> resTypes;
+  unsigned numMemories = 0;
+  for (Type ogArgType : funcOp.getArgumentTypes()) {
+    if (isa<mlir::MemRefType>(ogArgType))
+      ++numMemories;
+    argTypes.push_back(channelifyType(ogArgType));
   }
+  for (Type ogResType : funcOp.getResultTypes())
+    resTypes.push_back(channelifyType(ogResType));
 
-  // Derive function argument and result types
-  SmallVector<Type, 8> argTypes(funcOp.getArgumentTypes());
-  SmallVector<Type, 2> resTypes(funcOp.getResultTypes());
-  argTypes.push_back(rewriter.getNoneType());
-  if (resTypes.empty())
-    resTypes.push_back(rewriter.getNoneType());
+  // In addition to the original function's arguments and results, the Handshake
+  // function has an extra control-only output port for each memory region and
+  // one for the global start/end signals
+  auto ctrlType = handshake::ControlType::get(rewriter.getContext());
+  argTypes.append(numMemories + 1, ctrlType);
+  resTypes.append(numMemories + 1, ctrlType);
 
   // Create a handshake-level function corresponding to the cf-level function
   rewriter.setInsertionPoint(funcOp);
@@ -347,14 +386,20 @@ FailureOr<handshake::FuncOp> LowerFuncToHandshake::lowerSignature(
   SmallVector<NamedAttribute> attrs = deriveNewAttributes(funcOp);
   auto newFuncOp = rewriter.create<handshake::FuncOp>(
       funcOp.getLoc(), funcOp.getName(), funTy, attrs);
+  if (funcOp.isExternal()) {
+    rewriter.eraseOp(funcOp);
+    return newFuncOp;
+  }
+
   Region *oldBody = &funcOp.getBody();
+
   const TypeConverter *typeConv = getTypeConverter();
 
   // Convert the entry block's signature
   Block *entryBlock = &funcOp.getBody().front();
   TypeConverter::SignatureConversion entryConversion(
       entryBlock->getNumArguments());
-  setupBlockConversion(entryBlock, rewriter, entryConversion);
+  setupEntryBlockConversion(entryBlock, numMemories, rewriter, entryConversion);
   rewriter.applySignatureConversion(oldBody, entryConversion, typeConv);
 
   // Convert the non entry blocks' signatures
@@ -374,8 +419,13 @@ FailureOr<handshake::FuncOp> LowerFuncToHandshake::lowerSignature(
     Value blockCtrl = block.getArguments().back();
     rewriter.setInsertionPointToEnd(&block);
     if (auto condBrOp = dyn_cast<cf::CondBranchOp>(termOp)) {
-      SmallVector<Value> trueOperands(condBrOp.getTrueDestOperands());
-      SmallVector<Value> falseOperands(condBrOp.getFalseDestOperands());
+      SmallVector<Value> trueOperands, falseOperands;
+      if (failed(rewriter.getRemappedValues(condBrOp.getTrueDestOperands(),
+                                            trueOperands)) ||
+          failed(rewriter.getRemappedValues(condBrOp.getFalseDestOperands(),
+                                            falseOperands)))
+        return failure();
+
       trueOperands.push_back(blockCtrl);
       falseOperands.push_back(blockCtrl);
       rewriter.replaceOp(termOp,
@@ -383,8 +433,11 @@ FailureOr<handshake::FuncOp> LowerFuncToHandshake::lowerSignature(
                              condBrOp->getLoc(), condBrOp.getCondition(),
                              condBrOp.getTrueDest(), trueOperands,
                              condBrOp.getFalseDest(), falseOperands));
+
     } else if (auto brOp = dyn_cast<cf::BranchOp>(termOp)) {
-      SmallVector<Value> operands(brOp.getDestOperands());
+      SmallVector<Value> operands;
+      if (failed(rewriter.getRemappedValues(brOp.getDestOperands(), operands)))
+        return failure();
       operands.push_back(blockCtrl);
       rewriter.replaceOp(termOp, rewriter.create<cf::BranchOp>(
                                      brOp->getLoc(), brOp.getDest(), operands));
@@ -478,7 +531,7 @@ void LowerFuncToHandshake::insertMerge(BlockArgument blockArg,
 
   // Every block needs to feed it's entry control into a control merge
   if (blockArg == getBlockControl(block)) {
-    addFromAllPredecessors(rewriter.getNoneType());
+    addFromAllPredecessors(handshake::ControlType::get(rewriter.getContext()));
     iMerge.op = rewriter.create<handshake::ControlMergeOp>(loc, operands);
   } else if (predecessors.size() == 1) {
     addFromAllPredecessors(blockArg.getType());
@@ -486,18 +539,21 @@ void LowerFuncToHandshake::insertMerge(BlockArgument blockArg,
   } else {
     // Create a backedge for the index operand, and another one for each data
     // operand. The index operand will eventually resolve to the current block's
-    // control merge index output, while data operands will resolve to their
-    // respective values from each block predecessor
-    iMerge.indexEdge = edgeBuilder.get(rewriter.getIndexType());
+    // control merge index output (which will have the optimized index width),
+    // while data operands will resolve to their respective values from each
+    // block predecessor
+    Type idxType =
+        handshake::getOptimizedIndexValType(rewriter, predecessors.size());
+    iMerge.indexEdge = edgeBuilder.get(handshake::ChannelType::get(idxType));
     addFromAllPredecessors(blockArg.getType());
     Value index = *iMerge.indexEdge;
     iMerge.op = rewriter.create<handshake::MuxOp>(loc, index, operands);
   }
 }
 
-void LowerFuncToHandshake::addMergeOps(
-    handshake::FuncOp funcOp, ConversionPatternRewriter &rewriter,
-    DenseMap<BlockArgument, OpResult> &blockArgReplacements) const {
+void LowerFuncToHandshake::addMergeOps(handshake::FuncOp funcOp,
+                                       ConversionPatternRewriter &rewriter,
+                                       ArgReplacements &argReplacements) const {
   // Create backedge builder to manage operands of merge operations between
   // insertion and reconnection
   BackedgeBuilder edgeBuilder(rewriter, funcOp.getLoc());
@@ -513,7 +569,7 @@ void LowerFuncToHandshake::addMergeOps(
     for (BlockArgument arg : block.getArguments()) {
       MergeOpInfo &iMerge = blockMerges[&block].emplace_back(arg);
       insertMerge(arg, rewriter, edgeBuilder, iMerge);
-      blockArgReplacements.insert({arg, iMerge.op.getDataResult()});
+      argReplacements.insert({arg, iMerge.op.getDataResult()});
     }
   }
 
@@ -579,10 +635,13 @@ void LowerFuncToHandshake::addBranchOps(
     rewriter.setInsertionPoint(termOp);
 
     Value cond = nullptr;
-    if (cf::CondBranchOp condBranchOp = dyn_cast<cf::CondBranchOp>(termOp))
+    if (cf::CondBranchOp condBranchOp = dyn_cast<cf::CondBranchOp>(termOp)) {
       cond = condBranchOp.getCondition();
-    else if (isa<func::ReturnOp>(termOp))
+      cond = rewriter.getRemappedValue(cond);
+      assert(cond && "Failed to remap branch operand");
+    } else if (isa<func::ReturnOp>(termOp)) {
       continue;
+    }
 
     // Insert a branch-like operation for each live-out and replace the original
     // branch operand value in successor blocks with the result(s) of the new
@@ -623,18 +682,30 @@ void LowerFuncToHandshake::addBranchOps(
   }
 }
 
+LowerFuncToHandshake::MemAccesses::MemAccesses(BlockArgument memStart)
+    : memStart(memStart) {}
+
 LogicalResult LowerFuncToHandshake::convertMemoryOps(
     handshake::FuncOp funcOp, ConversionPatternRewriter &rewriter,
+    const DenseMap<Value, unsigned> &memrefIndices,
+    BackedgeBuilder &edgeBuilder,
     LowerFuncToHandshake::MemInterfacesInfo &memInfo) const {
+  // Count the number of memory regions in the function, and derive the starting
+  // index of memory start arguments
+  auto funcArgs = funcOp.getArguments();
+  unsigned numMemories = llvm::count_if(
+      funcArgs, [](auto arg) { return isa<mlir::MemRefType>(arg.getType()); });
+  unsigned memStartOffset = funcArgs.size() - numMemories - 1;
 
-  // Make sure to record external memories passed as function arguments, even if
-  // they aren't used by any memory operation
-  for (BlockArgument arg : funcOp.getArguments()) {
-    if (mlir::MemRefType memref = dyn_cast<mlir::MemRefType>(arg.getType())) {
-      // Ensure that this is a valid memref-typed value.
-      if (!isValidMemrefType(arg.getLoc(), memref))
+  // Make sure to record external memories passed as function arguments,
+  // even if they aren't used by any memory operation
+  unsigned memIdx = 0;
+  for (BlockArgument arg : funcArgs) {
+    if (auto memrefTy = dyn_cast<mlir::MemRefType>(arg.getType())) {
+      if (!isValidMemrefType(arg.getLoc(), memrefTy))
         return failure();
-      memInfo.insert({arg, {}});
+      unsigned memStartIdx = memStartOffset + (memIdx++);
+      memInfo.insert({arg, {funcArgs[memStartIdx]}});
     }
   }
 
@@ -649,84 +720,81 @@ LogicalResult LowerFuncToHandshake::convertMemoryOps(
     if (!isMemoryOp(&op))
       continue;
 
-    // For now we don't support memory allocations within the kernels
-    if (isAllocOp(&op))
-      return op.emitOpError()
-             << "Allocation operations are not supported during "
-                "cf-to-handshake lowering.";
-
     // Extract the reference to the memory region from the memory operation
     rewriter.setInsertionPoint(&op);
-    Value memref;
-    if (getOpMemRef(&op, memref).failed())
-      return failure();
-    Operation *newOp = nullptr;
+    Value memref = getOpMemRef(&op);
+    if (!memref)
+      continue;
     Location loc = op.getLoc();
+    Block *block = op.getBlock();
 
     // The memory operation must have a MemInterfaceAttr attribute attached
-    StringRef attrName = handshake::MemInterfaceAttr::getMnemonic();
-    auto memAttr = op.getAttrOfType<handshake::MemInterfaceAttr>(attrName);
-    if (!memAttr)
-      return op.emitError()
-             << "Memory operation must have attribute " << attrName
-             << " of type dynamatic::handshake::MemInterfaceAttr to decide "
-                "which memory interface it should connect to.";
+    auto memAttr = getDialectAttr<handshake::MemInterfaceAttr>(&op);
+    if (!memAttr) {
+      return op.emitError() << "memory operation must have attribute of type "
+                               "'handshake::MemInterfaceAttr' to encode "
+                               "which memory interface it should connect to.";
+    }
     bool connectToMC = memAttr.connectsToMC();
 
     // Replace memref operation with corresponding handshake operation
-    LogicalResult res =
-        llvm::TypeSwitch<Operation *, LogicalResult>(&op)
+    Operation *newOp =
+        llvm::TypeSwitch<Operation *, Operation *>(&op)
             .Case<memref::LoadOp>([&](memref::LoadOp loadOp) {
               OperandRange indices = loadOp.getIndices();
               assert(indices.size() == 1 && "load must be unidimensional");
-              Value addr = indices.front();
-              MemRefType type = cast<MemRefType>(memref.getType());
 
+              Value addr = rewriter.getRemappedValue(indices.front());
+              assert(addr && "failed to remap address");
+              Type dataTy = cast<MemRefType>(memref.getType()).getElementType();
+              Value data = edgeBuilder.get(channelifyType(dataTy));
+
+              Operation *newOp;
               if (connectToMC)
-                newOp = rewriter.create<handshake::MCLoadOp>(loc, type, addr);
+                newOp = rewriter.create<handshake::MCLoadOp>(loc, addr, data);
               else
-                newOp = rewriter.create<handshake::LSQLoadOp>(loc, type, addr);
+                newOp = rewriter.create<handshake::LSQLoadOp>(loc, addr, data);
 
-              // Replace uses of old load result with data result of new load
-              rewriter.replaceAllUsesWith(
-                  op.getResult(0),
-                  dyn_cast<handshake::LoadOpInterface>(newOp).getDataOutput());
-              return success();
+              // Record the memory access replacement
+              memOpLowering.recordReplacement(loadOp, newOp, false);
+              Value dataOut =
+                  cast<handshake::LoadOpInterface>(newOp).getDataOutput();
+              rewriter.replaceOp(loadOp, dataOut);
+              return newOp;
             })
             .Case<memref::StoreOp>([&](memref::StoreOp storeOp) {
               OperandRange indices = storeOp.getIndices();
               assert(indices.size() == 1 && "store must be unidimensional");
-              Value addr = indices.front();
-              Value data = storeOp.getValueToStore();
 
+              Value addr = rewriter.getRemappedValue(indices.front());
+              Value data = rewriter.getRemappedValue(storeOp.getValueToStore());
+              assert((addr && data) && "failed to remap address or data");
+
+              Operation *newOp;
               if (connectToMC)
                 newOp = rewriter.create<handshake::MCStoreOp>(loc, addr, data);
               else
                 newOp = rewriter.create<handshake::LSQStoreOp>(loc, addr, data);
-              return success();
-            })
-            .Default([&](auto) {
-              return op.emitError() << "Memory operation type unsupported.";
-            });
-    if (failed(res))
-      return failure();
 
-    // Record the memory access replacement
-    memOpLowering.recordReplacement(&op, newOp, false);
+              // Record the memory access replacement
+              memOpLowering.recordReplacement(storeOp, newOp, false);
+              rewriter.eraseOp(storeOp);
+              return newOp;
+            })
+            .Default([&](auto) { return nullptr; });
+    if (!newOp)
+      return op.emitError() << "Memory operation type unsupported.";
 
     // Associate the new operation with the memory region it references and
-    // information about the memory interface it should connect to
+    // the memory interface it should connect to
+    auto *accessesIt = memInfo.find(funcArgs[memrefIndices.at(memref)]);
+    assert(accessesIt != memInfo.end() && "unknown memref");
     if (memAttr.connectsToMC())
-      memInfo[memref].mcPorts[op.getBlock()].push_back(newOp);
+      accessesIt->second.mcPorts[block].push_back(newOp);
     else
-      memInfo[memref].lsqPorts[*memAttr.getLsqGroup()].push_back(newOp);
-
-    // Erase the original operation
-    rewriter.eraseOp(&op);
+      accessesIt->second.lsqPorts[*memAttr.getLsqGroup()].push_back(newOp);
   }
 
-  // Change the name of destination memory acceses in all stored memory
-  // dependencies to reflect the new access names
   memOpLowering.renameDependencies(funcOp);
   return success();
 }
@@ -734,6 +802,10 @@ LogicalResult LowerFuncToHandshake::convertMemoryOps(
 LogicalResult LowerFuncToHandshake::verifyAndCreateMemInterfaces(
     handshake::FuncOp funcOp, ConversionPatternRewriter &rewriter,
     MemInterfacesInfo &memInfo) const {
+
+  if (memInfo.empty())
+    return success();
+
   // Create a mapping between each block and all the other blocks it properly
   // dominates so that we can quickly determine whether LSQ groups make sense
   DominanceInfo domInfo;
@@ -749,17 +821,46 @@ LogicalResult LowerFuncToHandshake::verifyAndCreateMemInterfaces(
     }
   }
 
+  // Find the control value indicating the last control flow decision in the
+  // function; it will be fed to memory interfaces to indicate that no more
+  // group allocations will be coming
+  Value ctrlEnd;
+  auto returns = funcOp.getOps<func::ReturnOp>();
+  assert(!returns.empty() && "no returns in function");
+  if (std::distance(returns.begin(), returns.end()) == 1) {
+    ctrlEnd = getBlockControl((*returns.begin())->getBlock());
+  } else {
+    // Merge the control signals of all blocks with a return to create a control
+    // representing the final control flow decision
+    SmallVector<Value> controls;
+    func::ReturnOp lastRetOp;
+    for (func::ReturnOp retOp : returns) {
+      lastRetOp = retOp;
+      controls.push_back(getBlockControl(retOp->getBlock()));
+    }
+    rewriter.setInsertionPointToStart(lastRetOp->getBlock());
+    auto mergeOp =
+        rewriter.create<handshake::MergeOp>(lastRetOp.getLoc(), controls);
+    ctrlEnd = mergeOp.getResult();
+
+    // The merge goes into an extra "end block" after all others, this will be
+    // where the function end terminator will be located as well
+    mergeOp->setAttr(BB_ATTR_NAME,
+                     rewriter.getUI32IntegerAttr(funcOp.getBlocks().size()));
+  }
+
   // Create a mapping between each block and its control value in the right
   // format for the memory interface builder
   DenseMap<unsigned, Value> ctrlVals;
   for (auto [blockIdx, block] : llvm::enumerate(funcOp))
-    ctrlVals[blockIdx] = getBlockControl(&block);
+    ctrlVals.insert({blockIdx, getBlockControl(&block)});
 
   // Each memory region is independent from the others
   for (auto &[memref, memAccesses] : memInfo) {
     SmallPtrSet<Block *, 4> controlBlocks;
 
-    MemoryInterfaceBuilder memBuilder(funcOp, memref, ctrlVals);
+    MemoryInterfaceBuilder memBuilder(funcOp, memref, memAccesses.memStart,
+                                      ctrlEnd, ctrlVals);
 
     // Add MC ports to the interface builder
     for (auto &[_, mcBlockOps] : memAccesses.mcPorts) {
@@ -822,31 +923,30 @@ void LowerFuncToHandshake::idBasicBlocks(
   }
 }
 
-void LowerFuncToHandshake::flattenAndTerminate(
+LogicalResult LowerFuncToHandshake::flattenAndTerminate(
     handshake::FuncOp funcOp, ConversionPatternRewriter &rewriter,
-    const DenseMap<BlockArgument, OpResult> &blockArgReplacements) const {
-  // Erase all cf-level terminators, creating Handshake-level returns next to
-  // cf-level returns as necessary as we go
-  SmallVector<Operation *, 4> newReturns;
+    const ArgReplacements &argReplacements) const {
+  // Erase all cf-level terminators, accumulating operands to func-level returns
+  // as we go
+  SmallVector<SmallVector<Value>> returnsOperands;
   for (Block &block : funcOp) {
     Operation *termOp = &block.back();
     if (auto retOp = dyn_cast<func::ReturnOp>(termOp)) {
-      SmallVector<Value, 8> operands(retOp->getOperands());
-      // When the enclosing function only returns a control value (no data
-      // results), return statements must take exactly one control-only input
-      if (operands.empty())
-        operands.push_back(getBlockControl(retOp->getBlock()));
-
-      // Insert new return operation next to the old one
-      rewriter.setInsertionPoint(retOp);
-      Location loc = retOp->getLoc();
-      auto newRet = rewriter.create<handshake::ReturnOp>(loc, operands);
-      newReturns.push_back(newRet);
-      inheritBB(retOp, newRet);
+      auto &retOperands = returnsOperands.emplace_back();
+      if (failed(rewriter.getRemappedValues(retOp->getOperands(), retOperands)))
+        return failure();
     }
     rewriter.eraseOp(termOp);
   }
-  assert(!newReturns.empty() && "function must have at least one return");
+  assert(!returnsOperands.empty() && "function must have at least one return");
+
+  // When identifying basic blocks, the end node is either put in the same
+  // block as the function's single return statement or, in the case of
+  // multiple return statements, it is put in a "fake block" along with the
+  // merges that feed it its data inputs
+  size_t exitBlockID = funcOp.getBlocks().size();
+  if (returnsOperands.size() == 1)
+    exitBlockID -= 1;
 
   // Inline all non-entry blocks into the entry block, erasing them as we go
   Operation *lastOp = &funcOp.front().back();
@@ -854,37 +954,52 @@ void LowerFuncToHandshake::flattenAndTerminate(
     if (block.isEntryBlock())
       continue;
 
-    // Replace all block arguments with the data result of merge-like operations
-    SmallVector<Value> argReplacements;
+    // Replace all block arguments with the data result of merge-like
+    // operations; this effectively connects all merges to the rest of the
+    // circuit
+    SmallVector<Value> replacements;
     for (BlockArgument blockArg : block.getArguments()) {
-      Value mergeRes = blockArgReplacements.at(blockArg);
-      argReplacements.push_back(mergeRes);
+      Value mergeRes = argReplacements.at(blockArg);
+      replacements.push_back(mergeRes);
       rewriter.replaceAllUsesWith(blockArg, mergeRes);
     }
-    rewriter.inlineBlockBefore(&block, lastOp, argReplacements);
+    rewriter.inlineBlockBefore(&block, lastOp, replacements);
   }
 
-  // When identifying basic blocks, the end node is either put in the same
-  // block as the function's single return statement or, in the case of
-  // multiple return statements, it is put in a "fake block" along with the
-  // merges that feed it its data inputs
-  size_t exitBlockID;
-  if (newReturns.size() > 1) {
-    exitBlockID = funcOp.getBlocks().size();
-  } else {
-    auto retBB = newReturns[0]->getAttrOfType<IntegerAttr>(BB_ATTR_NAME);
-    exitBlockID = retBB.getValue().getZExtValue();
-  }
-
-  // Insert an end node at the end of the function that merges results from
-  // all handshake-level return operations and wait for all memory controllers
-  // to signal completion
+  // The terminator's operands are, in order
+  // 1. the original function's results
+  // 2. a control for each memory region signaling completion
+  // 3. a control signaling eventual function completion (the function's start)
   SmallVector<Value, 8> endOprds;
-  endOprds.append(mergeFuncResults(funcOp, rewriter, newReturns, exitBlockID));
-  endOprds.append(getFunctionEndControls(funcOp));
-  rewriter.setInsertionPointAfter(lastOp);
+  endOprds.append(
+      mergeFuncResults(funcOp, rewriter, returnsOperands, exitBlockID));
+
+  rewriter.setInsertionPointToEnd(funcOp.getBodyBlock());
+  for (BlockArgument arg : funcOp.getArguments()) {
+    if (!isa<mlir::MemRefType>(arg.getType()))
+      continue;
+
+    if (arg.getUsers().empty()) {
+      // When the memory region is not accessed, just a create a constant source
+      // of valid "memory end" tokens for ir
+      auto sourceOp = rewriter.create<handshake::SourceOp>(lastOp->getLoc());
+      sourceOp->setAttr(BB_ATTR_NAME, rewriter.getUI32IntegerAttr(exitBlockID));
+      endOprds.push_back(sourceOp.getResult());
+    } else {
+      for (Operation *userOp : arg.getUsers()) {
+        auto memOp = cast<handshake::MemoryOpInterface>(userOp);
+        if (memOp.isMasterInterface()) {
+          endOprds.push_back(memOp.getMemEnd());
+          break;
+        }
+      }
+    }
+  }
+  endOprds.push_back(getBlockControl(funcOp.getBodyBlock()));
+
   auto endOp = rewriter.create<handshake::EndOp>(lastOp->getLoc(), endOprds);
   endOp->setAttr(BB_ATTR_NAME, rewriter.getUI32IntegerAttr(exitBlockID));
+  return success();
 }
 
 Value LowerFuncToHandshake::getBlockControl(Block *block) const {
@@ -906,7 +1021,7 @@ static Value getBlockControl(Operation *op) {
   std::optional<unsigned> bb = getLogicBB(op);
   assert(bb && "operation should be tagged with associated basic block");
 
-  if (bb == 0)
+  if (bb == ENTRY_BB)
     return funcOp.getArguments().back();
   for (auto cMergeOp : funcOp.getOps<handshake::ControlMergeOp>()) {
     if (auto cMergeBB = getLogicBB(cMergeOp); cMergeBB && cMergeBB == *bb)
@@ -917,11 +1032,48 @@ static Value getBlockControl(Operation *op) {
 }
 
 namespace {
+
+template <typename SrcOp, typename DstOp>
+struct OneToOneConversion : public OpConversionPattern<SrcOp> {
+public:
+  using OpAdaptor = typename SrcOp::Adaptor;
+
+  OneToOneConversion(NameAnalysis &namer, const TypeConverter &typeConverter,
+                     MLIRContext *ctx)
+      : OpConversionPattern<SrcOp>(typeConverter, ctx), namer(namer) {}
+
+  LogicalResult
+  matchAndRewrite(SrcOp srcOp, OpAdaptor adaptor,
+                  ConversionPatternRewriter &rewriter) const override;
+
+protected:
+  /// Reference to the running pass's naming analysis.
+  NameAnalysis &namer;
+};
+
+template <typename CastOp, typename ExtOp>
+struct ConvertIndexCast : public OpConversionPattern<CastOp> {
+public:
+  using OpAdaptor = typename CastOp::Adaptor;
+
+  ConvertIndexCast(NameAnalysis &namer, const TypeConverter &typeConverter,
+                   MLIRContext *ctx)
+      : OpConversionPattern<CastOp>(typeConverter, ctx), namer(namer) {}
+
+  LogicalResult
+  matchAndRewrite(CastOp castOp, OpAdaptor adaptor,
+                  ConversionPatternRewriter &rewriter) const override;
+
+protected:
+  /// Reference to the running pass's naming analysis.
+  NameAnalysis &namer;
+};
+
 /// Converts each `func::CallOp` operation to an equivalent
 /// `handshake::InstanceOp` operation.
-struct ConvertCalls : public OpConversionPattern<func::CallOp> {
+struct ConvertCalls : public DynOpConversionPattern<func::CallOp> {
 public:
-  using OpConversionPattern<func::CallOp>::OpConversionPattern;
+  using DynOpConversionPattern<func::CallOp>::DynOpConversionPattern;
 
   LogicalResult
   matchAndRewrite(func::CallOp callOp, OpAdaptor adaptor,
@@ -931,9 +1083,9 @@ public:
 /// Convers arith-level constants to handshake-level constants. Constants are
 /// triggered by a source if their successor is not a branch/return or memory
 /// operation. Otherwise they are triggered by the control-only network.
-struct ConvertConstants : public OpConversionPattern<arith::ConstantOp> {
+struct ConvertConstants : public DynOpConversionPattern<arith::ConstantOp> {
 public:
-  using OpConversionPattern<arith::ConstantOp>::OpConversionPattern;
+  using DynOpConversionPattern<arith::ConstantOp>::DynOpConversionPattern;
 
   LogicalResult
   matchAndRewrite(arith::ConstantOp cstOp, OpAdaptor adaptor,
@@ -943,15 +1095,61 @@ public:
 /// Converts undefined operations (LLVM::UndefOp) with a default "0" constant
 /// triggered by the control merge of the block associated to the matched
 /// operation.
-struct ConvertUndefinedValues : public OpConversionPattern<LLVM::UndefOp> {
+struct ConvertUndefinedValues : public DynOpConversionPattern<LLVM::UndefOp> {
 public:
-  using OpConversionPattern<LLVM::UndefOp>::OpConversionPattern;
+  using DynOpConversionPattern<LLVM::UndefOp>::DynOpConversionPattern;
 
   LogicalResult
   matchAndRewrite(LLVM::UndefOp undefOp, OpAdaptor adaptor,
                   ConversionPatternRewriter &rewriter) const override;
 };
 } // namespace
+
+template <typename SrcOp, typename DstOp>
+LogicalResult OneToOneConversion<SrcOp, DstOp>::matchAndRewrite(
+    SrcOp srcOp, OpAdaptor adaptor, ConversionPatternRewriter &rewriter) const {
+  rewriter.setInsertionPoint(srcOp);
+  SmallVector<Type> newTypes;
+  for (Type resType : srcOp->getResultTypes())
+    newTypes.push_back(channelifyType(resType));
+  auto newOp =
+      rewriter.create<DstOp>(srcOp->getLoc(), newTypes, adaptor.getOperands(),
+                             srcOp->getAttrDictionary().getValue());
+  namer.replaceOp(srcOp, newOp);
+  rewriter.replaceOp(srcOp, newOp);
+  return success();
+}
+
+template <typename CastOp, typename ExtOp>
+LogicalResult ConvertIndexCast<CastOp, ExtOp>::matchAndRewrite(
+    CastOp castOp, OpAdaptor adaptor,
+    ConversionPatternRewriter &rewriter) const {
+
+  auto getWidth = [](Type type) -> unsigned {
+    if (isa<IndexType>(type))
+      return 32;
+    return type.getIntOrFloatBitWidth();
+  };
+
+  unsigned srcWidth = getWidth(castOp.getOperand().getType());
+  unsigned dstWidth = getWidth(castOp.getResult().getType());
+  Type dstType = handshake::ChannelType::get(rewriter.getIntegerType(dstWidth));
+  Operation *newOp;
+  if (srcWidth < dstWidth) {
+    // This is an extension
+    newOp =
+        rewriter.create<ExtOp>(castOp.getLoc(), dstType, adaptor.getOperands(),
+                               castOp->getAttrDictionary().getValue());
+  } else {
+    // This is a truncation
+    newOp = rewriter.create<handshake::TruncIOp>(
+        castOp.getLoc(), dstType, adaptor.getOperands(),
+        castOp->getAttrDictionary().getValue());
+  }
+  namer.replaceOp(castOp, newOp);
+  rewriter.replaceOp(castOp, newOp);
+  return success();
+}
 
 LogicalResult
 ConvertCalls::matchAndRewrite(func::CallOp callOp, OpAdaptor adaptor,
@@ -972,21 +1170,57 @@ ConvertCalls::matchAndRewrite(func::CallOp callOp, OpAdaptor adaptor,
   Operation *lookup = modOp.lookupSymbol(symbol);
   if (!lookup)
     return callOp->emitError() << "call references unknown function";
-  auto calledFuncOp = dyn_cast<handshake::FuncOp>(lookup);
-  if (!calledFuncOp)
-    return callOp->emitError() << "call does not reference a function";
-  TypeRange resultTypes = calledFuncOp.getFunctionType().getResults();
+  TypeRange resultTypes;
+  // check if the function is a handshake function
+  auto calledHandshakeFuncOp = dyn_cast<handshake::FuncOp>(lookup);
+  if (!calledHandshakeFuncOp) {
+    // if this is not the case, the function might have been not traversed yet
+    // during the conversion
+    auto calledFuncOp = dyn_cast<func::FuncOp>(lookup);
+    if (!calledFuncOp)
+      return callOp->emitError() << "call does not reference a function";
+    resultTypes = calledFuncOp.getFunctionType().getResults();
+  } else {
+    resultTypes = calledHandshakeFuncOp.getFunctionType().getResults();
+  }
+  SmallVector<Type> handshakeResultTypes;
+  for (auto type : resultTypes)
+    handshakeResultTypes.push_back(channelifyType(type));
+  // add control type to the result types for the end output signal
+  handshakeResultTypes.push_back(
+      handshake::ControlType::get(rewriter.getContext()));
 
-  // Replace the call with the Handshake instance
   rewriter.setInsertionPoint(callOp);
   auto instOp = rewriter.create<handshake::InstanceOp>(
-      callOp.getLoc(), callOp.getCallee(), resultTypes, operands);
-  inheritBB(callOp, instOp);
+      callOp.getLoc(), callOp.getCallee(), handshakeResultTypes, operands);
+  instOp->setDialectAttrs(callOp->getDialectAttrs());
+  namer.replaceOp(callOp, instOp);
   if (callOp->getNumResults() == 0)
     rewriter.eraseOp(callOp);
   else
-    rewriter.replaceOp(callOp, instOp->getResults());
+    rewriter.replaceOp(callOp, instOp.getResults().drop_back());
   return success();
+}
+
+/// Determines whether it is possible to transform an arith-level constant into
+/// a Handshake-level constant that is triggered by an always-triggering source
+/// component without compromising the circuit semantics (e.g., without
+/// triggering a memory operation before the circuit "starts"). Returns false if
+/// the Handshake-level constant that replaces the input must instead be
+/// connected to the control-only network; returns true otherwise. This function
+/// assumes that the rest of the std-level operations have already been
+/// converted to their Handshake equivalent.
+/// NOTE: I doubt this works in half-degenerate cases, but this is the logic
+/// that legacy Dynamatic follows.
+static bool isCstSourcable(arith::ConstantOp cstOp) {
+  std::function<bool(Operation *)> isValidUser = [&](Operation *user) -> bool {
+    if (isa<UnrealizedConversionCastOp>(user))
+      return llvm::all_of(user->getUsers(), isValidUser);
+    return !isa<handshake::BranchOp, handshake::ConditionalBranchOp,
+                handshake::LoadOpInterface, handshake::StoreOpInterface>(user);
+  };
+
+  return llvm::all_of(cstOp->getUsers(), isValidUser);
 }
 
 LogicalResult
@@ -994,19 +1228,28 @@ ConvertConstants::matchAndRewrite(arith::ConstantOp cstOp,
                                   OpAdaptor /*adaptor*/,
                                   ConversionPatternRewriter &rewriter) const {
   rewriter.setInsertionPoint(cstOp);
-  TypedAttr cstAttr = cstOp.getValue();
+
+  // Determine the new constant's control input
   Value controlVal;
   if (isCstSourcable(cstOp)) {
-    auto sourceOp = rewriter.create<handshake::SourceOp>(
-        cstOp.getLoc(), rewriter.getNoneType());
+    auto sourceOp = rewriter.create<handshake::SourceOp>(cstOp.getLoc());
     inheritBB(cstOp, sourceOp);
     controlVal = sourceOp.getResult();
   } else {
     controlVal = getBlockControl(cstOp);
   }
-  auto newCstOp = rewriter.create<handshake::ConstantOp>(
-      cstOp.getLoc(), cstAttr.getType(), cstAttr, controlVal);
-  inheritBB(cstOp, newCstOp);
+
+  TypedAttr cstAttr = cstOp.getValue();
+  // Convert IndexType'd values to equivalent signless integers
+  if (isa<IndexType>(cstAttr.getType())) {
+    auto intType = rewriter.getIntegerType(32);
+    cstAttr = IntegerAttr::get(intType,
+                               cast<IntegerAttr>(cstAttr).getValue().trunc(32));
+  }
+  auto newCstOp = rewriter.create<handshake::ConstantOp>(cstOp.getLoc(),
+                                                         cstAttr, controlVal);
+  newCstOp->setDialectAttrs(cstOp->getDialectAttrs());
+  namer.replaceOp(cstOp, newCstOp);
   rewriter.replaceOp(cstOp, newCstOp->getResults());
   return success();
 }
@@ -1017,20 +1260,23 @@ LogicalResult ConvertUndefinedValues::matchAndRewrite(
   // Create an attribute of the appropriate type for the constant
   auto resType = undefOp.getRes().getType();
   TypedAttr cstAttr;
-  if (isa<IndexType>(resType))
-    cstAttr = rewriter.getIndexAttr(0);
-  else if (isa<IntegerType>(resType))
+  if (isa<IndexType>(resType)) {
+    auto intType = rewriter.getIntegerType(32);
+    cstAttr = rewriter.getIntegerAttr(intType, 0);
+  } else if (isa<IntegerType>(resType)) {
     cstAttr = rewriter.getIntegerAttr(resType, 0);
-  else if (FloatType floatType = dyn_cast<FloatType>(resType))
+  } else if (FloatType floatType = dyn_cast<FloatType>(resType)) {
     cstAttr = rewriter.getFloatAttr(floatType, 0.0);
-  else
+  } else {
     return undefOp->emitError() << "operation has unsupported result type";
+  }
 
   // Create a constant with a default value and replace the undefined value
   rewriter.setInsertionPoint(undefOp);
-  auto cstOp = rewriter.create<handshake::ConstantOp>(
-      undefOp.getLoc(), resType, cstAttr, getBlockControl(undefOp));
-  inheritBB(undefOp, cstOp);
+  auto cstOp = rewriter.create<handshake::ConstantOp>(undefOp.getLoc(), cstAttr,
+                                                      getBlockControl(undefOp));
+  cstOp->setDialectAttrs(undefOp->getAttrDictionary());
+  namer.replaceOp(cstOp, cstOp);
   rewriter.replaceOp(undefOp, cstOp.getResult());
   return success();
 }
@@ -1038,6 +1284,11 @@ LogicalResult ConvertUndefinedValues::matchAndRewrite(
 //===-----------------------------------------------------------------------==//
 // Pass driver
 //===-----------------------------------------------------------------------==//
+
+/// Filters out block arguments of type MemRefType
+bool FuncSSAStrategy::maximizeArgument(BlockArgument arg) {
+  return !arg.getType().isa<mlir::MemRefType>();
+}
 
 namespace {
 
@@ -1051,21 +1302,54 @@ struct CfToHandshakePass
     MLIRContext *ctx = &getContext();
     ModuleOp modOp = getOperation();
 
+    // Put all non-external functions into maximal SSA form
+    for (auto funcOp : modOp.getOps<func::FuncOp>()) {
+      if (!funcOp.isExternal()) {
+        FuncSSAStrategy strategy;
+        if (failed(dynamatic::maximizeSSA(funcOp.getBody(), strategy)))
+          return signalPassFailure();
+      }
+    }
+
     CfToHandshakeTypeConverter converter;
     RewritePatternSet patterns(ctx);
-    patterns.add<LowerFuncToHandshake>(converter, getAnalysis<NameAnalysis>(),
-                                       ctx);
-    patterns.add<ConvertConstants, ConvertCalls, ConvertUndefinedValues>(
-        converter, ctx);
+    patterns.add<LowerFuncToHandshake, ConvertConstants, ConvertCalls,
+                 ConvertUndefinedValues,
+                 ConvertIndexCast<arith::IndexCastOp, handshake::ExtSIOp>,
+                 ConvertIndexCast<arith::IndexCastUIOp, handshake::ExtUIOp>,
+                 OneToOneConversion<arith::AddFOp, handshake::AddFOp>,
+                 OneToOneConversion<arith::AddIOp, handshake::AddIOp>,
+                 OneToOneConversion<arith::AndIOp, handshake::AndIOp>,
+                 OneToOneConversion<arith::CmpFOp, handshake::CmpFOp>,
+                 OneToOneConversion<arith::CmpIOp, handshake::CmpIOp>,
+                 OneToOneConversion<arith::DivFOp, handshake::DivFOp>,
+                 OneToOneConversion<arith::DivSIOp, handshake::DivSIOp>,
+                 OneToOneConversion<arith::DivUIOp, handshake::DivUIOp>,
+                 OneToOneConversion<arith::ExtSIOp, handshake::ExtSIOp>,
+                 OneToOneConversion<arith::ExtUIOp, handshake::ExtUIOp>,
+                 OneToOneConversion<arith::MaximumFOp, handshake::MaximumFOp>,
+                 OneToOneConversion<arith::MinimumFOp, handshake::MinimumFOp>,
+                 OneToOneConversion<arith::MulFOp, handshake::MulFOp>,
+                 OneToOneConversion<arith::MulIOp, handshake::MulIOp>,
+                 OneToOneConversion<arith::NegFOp, handshake::NegFOp>,
+                 OneToOneConversion<arith::OrIOp, handshake::OrIOp>,
+                 OneToOneConversion<arith::SelectOp, handshake::SelectOp>,
+                 OneToOneConversion<arith::ShLIOp, handshake::ShLIOp>,
+                 OneToOneConversion<arith::ShRSIOp, handshake::ShRSIOp>,
+                 OneToOneConversion<arith::ShRUIOp, handshake::ShRUIOp>,
+                 OneToOneConversion<arith::SubFOp, handshake::SubFOp>,
+                 OneToOneConversion<arith::SubIOp, handshake::SubIOp>,
+                 OneToOneConversion<arith::TruncIOp, handshake::TruncIOp>,
+                 OneToOneConversion<arith::XOrIOp, handshake::XOrIOp>>(
+        getAnalysis<NameAnalysis>(), converter, ctx);
 
     // All func-level functions must become handshake-level functions
     ConversionTarget target(*ctx);
     target.addLegalOp<mlir::ModuleOp>();
-    target.addLegalDialect<handshake::HandshakeDialect, arith::ArithDialect,
-                           math::MathDialect>();
+    target.addLegalDialect<handshake::HandshakeDialect>();
     target.addIllegalDialect<func::FuncDialect, cf::ControlFlowDialect,
+                             arith::ArithDialect, math::MathDialect,
                              BuiltinDialect>();
-    target.addIllegalOp<arith::ConstantOp>();
 
     if (failed(applyFullConversion(modOp, target, std::move(patterns))))
       return signalPassFailure();

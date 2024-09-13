@@ -10,8 +10,8 @@
 //
 //===----------------------------------------------------------------------===//
 
-#include "dynamatic/Analysis/NameAnalysis.h"
 #include "dynamatic/Conversion/HandshakeToHW.h"
+#include "dynamatic/Analysis/NameAnalysis.h"
 #include "dynamatic/Dialect/HW/HWOpInterfaces.h"
 #include "dynamatic/Dialect/HW/HWOps.h"
 #include "dynamatic/Dialect/HW/HWTypes.h"
@@ -22,10 +22,8 @@
 #include "dynamatic/Dialect/Handshake/HandshakeTypes.h"
 #include "dynamatic/Dialect/Handshake/MemoryInterfaces.h"
 #include "dynamatic/Support/Backedge.h"
-#include "dynamatic/Support/RTL.h"
-#include "dynamatic/Transforms/HandshakeConcretizeIndexType.h"
+#include "dynamatic/Support/Utils/Utils.h"
 #include "dynamatic/Transforms/HandshakeMaterialize.h"
-#include "mlir/Dialect/Arith/IR/Arith.h"
 #include "mlir/Dialect/MemRef/IR/MemRef.h"
 #include "mlir/IR/Attributes.h"
 #include "mlir/IR/Builders.h"
@@ -38,11 +36,8 @@
 #include "mlir/IR/Value.h"
 #include "mlir/Support/LogicalResult.h"
 #include "mlir/Transforms/DialectConversion.h"
-#include "mlir/Transforms/GreedyPatternRewriteDriver.h"
-#include "llvm/ADT/ArrayRef.h"
 #include "llvm/ADT/STLExtras.h"
 #include "llvm/ADT/SmallVector.h"
-#include "llvm/ADT/StringExtras.h"
 #include "llvm/ADT/StringRef.h"
 #include "llvm/ADT/TypeSwitch.h"
 #include "llvm/Support/Debug.h"
@@ -59,15 +54,37 @@
 
 using namespace mlir;
 using namespace dynamatic;
+using namespace dynamatic::handshake;
 
 /// Name of ports representing the clock and reset signals.
 static constexpr llvm::StringLiteral CLK_PORT("clk"), RST_PORT("rst");
 
-/// NOTE: temporary hack to support external functions as top-level IO.
-static unsigned getNumExtInstanceArgs(handshake::EndOp endOp) {
-  if (auto attr = endOp->getAttrOfType<IntegerAttr>("hw.funcCutoff"))
-    return endOp->getNumOperands() - attr.getUInt();
-  return 0;
+/// Makes all (nested) types signless IntegerType's of the same width as the
+/// original type. At the HW/RTL level we treat everything as opaque bitvectors,
+/// so we no longer want to differentiate types of the same width w.r.t. their
+/// intended interpretation.
+static Type lowerType(Type type) {
+  return TypeSwitch<Type, Type>(type)
+      .Case<handshake::ChannelType>([&](handshake::ChannelType channelType) {
+        // Make sure the data type is signless IntegerType
+        unsigned width = channelType.getDataBitWidth();
+        Type dataType = IntegerType::get(type.getContext(), width);
+
+        // Make sure all extra signals are signless IntegerType's as well
+        SmallVector<ExtraSignal> extraSignals;
+        for (const ExtraSignal &extra : channelType.getExtraSignals()) {
+          unsigned extraWidth = extra.type.getIntOrFloatBitWidth();
+          Type newType = IntegerType::get(type.getContext(), extraWidth);
+          extraSignals.emplace_back(extra.name, newType, extra.downstream);
+        }
+        return handshake::ChannelType::get(dataType, extraSignals);
+      })
+      .Case<FloatType, IntegerType>([](auto type) {
+        unsigned width = type.getIntOrFloatBitWidth();
+        return IntegerType::get(type.getContext(), width);
+      })
+      .Case<handshake::ControlType>([](auto type) { return type; })
+      .Default([](auto type) { return nullptr; });
 }
 
 namespace {
@@ -140,7 +157,7 @@ struct MemLoweringState {
   FuncMemoryPorts ports;
   /// Generates and stores the interface's port names before starting the
   /// conversion, when those are still queryable.
-  hw::PortNameGenerator portNames;
+  handshake::PortNamer portNames;
   /// Backedges to the containing module's `hw::OutputOp` operation, which
   /// must be set, in order, with the memory interface's results that connect
   /// to the top-level module IO.
@@ -163,8 +180,11 @@ struct MemLoweringState {
 
   /// Constructs an instance of the object for the provided memory interface.
   MemLoweringState(handshake::MemoryOpInterface memOp, const Twine &name)
-      : name(name.str()), dataType(memOp.getMemRefType().getElementType()),
-        ports(getMemoryPorts(memOp)), portNames(memOp){};
+      : name(name.str()),
+        dataType(lowerType(memOp.getMemRefType().getElementType())),
+        ports(getMemoryPorts(memOp)), portNames(memOp) {
+    assert(dataType && "unsupported memory element type");
+  };
 
   /// Returns the module's input ports that connect to the memory interface.
   SmallVector<hw::ModulePort> getMemInputPorts(hw::HWModuleOp modOp);
@@ -186,25 +206,19 @@ struct ModuleLoweringState {
   /// Maps each Handshake memory interface in the module with information on
   /// how to convert it into equivalent HW constructs.
   llvm::MapVector<handshake::MemoryOpInterface, MemLoweringState> memInterfaces;
-  /// Generates and stores the end operations's port names before starting the
-  /// conversion, when those are still queryable.
-  hw::PortNameGenerator endPorts;
-  /// Backedges to the containing module's `hw::OutputOp` operation, which
-  /// must be set, in order, with the results of the `hw::InstanceOp`
-  /// operation to which the `handshake::EndOp` operation was converted to.
-  SmallVector<Backedge> endBackedges;
-  /// Backedges to the containing module's `hw::OutputOp` operation, which
-  /// must be set, in order, with the original arguments to external function
-  /// calls inside the Handshake function.
-  SmallVector<Backedge> extInstBackedges;
+  /// Number of distinct memories in the function's arguments.
+  unsigned numMemories = 0;
 
   /// Default constructor required because we use the class as a map's value,
-  /// which must be default cosntructible.
+  /// which must be default constructible.
   ModuleLoweringState() = default;
 
   /// Constructs the lowering state from the Handshake function to lower.
-  ModuleLoweringState(handshake::FuncOp funcOp)
-      : endPorts(funcOp.getBodyBlock()->getTerminator()){};
+  ModuleLoweringState(handshake::FuncOp funcOp) {
+    numMemories = llvm::count_if(funcOp.getArgumentTypes(), [](Type ty) {
+      return isa<mlir::MemRefType>(ty);
+    });
+  };
 
   /// Computes the total number of module outputs that are fed by memory
   /// interfaces within the module.
@@ -293,25 +307,6 @@ LoweringState::LoweringState(mlir::ModuleOp modOp, NameAnalysis &namer,
                              OpBuilder &builder)
     : modOp(modOp), namer(namer), edgeBuilder(builder, modOp.getLoc()){};
 
-/// Wraps a type into a handshake::ChannelType type.
-static handshake::ChannelType channelWrapper(Type t) {
-  return TypeSwitch<Type, handshake::ChannelType>(t)
-      .Case<handshake::ChannelType>([](auto t) { return t; })
-      .Case<NoneType>([](NoneType nt) {
-        return handshake::ChannelType::get(
-            IntegerType::get(nt.getContext(), 0));
-      })
-      .Default([](Type t) {
-        if (isa<FloatType>(t)) {
-          // At the HW/RTL level we treat everything as opaque bitvectors, so we
-          // make everything IntegerType's (only the width matters)
-          return handshake::ChannelType::get(
-              IntegerType::get(t.getContext(), t.getIntOrFloatBitWidth()));
-        }
-        return handshake::ChannelType::get(t);
-      });
-}
-
 /// Attempts to find an external HW module in the MLIR module with the
 /// provided name. Returns it if it exists, otherwise returns `nullptr`.
 static hw::HWModuleExternOp findExternMod(mlir::ModuleOp modOp,
@@ -336,8 +331,51 @@ public:
   ModuleDiscriminator(FuncMemoryPorts &ports);
 
   /// Returns the unique external module name for the operation. Two operations
-  /// with different parameter values will never received the same name.
-  std::string getDiscriminatedModName() { return modName; }
+  /// with different parameter values will never receive the same name.
+  std::string getDiscriminatedModName() {
+    if (modName)
+      return *modName;
+
+    auto modOp = op->getParentOfType<mlir::ModuleOp>();
+    StringRef opName = op->getName().getStringRef();
+
+    // Try to find an external module with the same RTL name and parameters. If
+    // we find one, then we can assign the same external module name to the
+    // operation
+    auto externalModules = modOp.getOps<hw::HWModuleExternOp>();
+    auto extModOp = llvm::find_if(externalModules, [&](auto extModOp) {
+      auto nameAttr =
+          extModOp->template getAttrOfType<StringAttr>(RTL_NAME_ATTR_NAME);
+      if (!nameAttr || nameAttr != opName)
+        return false;
+
+      auto paramsAttr = extModOp->template getAttrOfType<DictionaryAttr>(
+          RTL_PARAMETERS_ATTR_NAME);
+      if (!paramsAttr)
+        return false;
+
+      if (paramsAttr.size() != parameters.size())
+        return false;
+      for (NamedAttribute param : parameters) {
+        auto modParam = paramsAttr.getNamed(param.getName());
+        if (!modParam || param.getValue() != modParam->getValue())
+          return false;
+      }
+      return true;
+    });
+    if (extModOp != externalModules.end())
+      return (*extModOp).getName().str();
+
+    // Generate a unique name
+    std::string name = getOpName() + "_";
+    for (size_t i = 0;; ++i) {
+      std::string candidateName = name + std::to_string(i);
+      if (!modOp.lookupSymbol<hw::HWModuleExternOp>(candidateName))
+        return candidateName;
+    }
+    llvm_unreachable("cannot generate unique name");
+    return name;
+  }
 
   /// Sets attribute on the external module (corresponding to the operation the
   /// object was constructed with) to tell the backend how to instantiate the
@@ -356,8 +394,9 @@ private:
   Operation *op;
   /// MLIR context to create attributes with.
   MLIRContext *ctx;
-  /// Discriminated module name.
-  std::string modName;
+  /// The module name may be set explicitly for some operation types or
+  /// derived/uniqued automatically based on the RTL parameters.
+  std::optional<std::string> modName;
   /// The operation's parameters, as a list of named attributes.
   SmallVector<NamedAttribute> parameters;
 
@@ -372,25 +411,24 @@ private:
   /// Adds a boolean-type parameter.
   void addBoolean(const Twine &name, bool value) {
     addParam(name, BoolAttr::get(ctx, value));
-    modName += "_" + std::to_string(value);
   };
 
   /// Adds a scalar-type parameter.
   void addUnsigned(const Twine &name, unsigned scalar) {
     Type intType = IntegerType::get(ctx, 32, IntegerType::Unsigned);
     addParam(name, IntegerAttr::get(intType, scalar));
-    modName += "_" + std::to_string(scalar);
   };
 
-  /// Adds a bitwdith parameter extracted from a type.
-  void addBitwidth(const Twine &name, Type type) {
-    addUnsigned(name, getTypeWidth(type));
+  /// Adds a dataflow-type parameter.
+  void addType(const Twine &name, Type type) {
+    assert((isa<handshake::ControlType>(type) ||
+            isa<handshake::ChannelType>(type)) &&
+           "incompatible type");
+    addParam(name, TypeAttr::get(type));
   };
 
-  /// Adds a bitwdith parameter extracted from a value's type.
-  void addBitwidth(const Twine &name, Value val) {
-    addUnsigned(name, getTypeWidth(val.getType()));
-  };
+  /// Adds the value's type as a dataflow-type parameter.
+  void addType(const Twine &name, Value val) { addType(name, val.getType()); };
 
   /// Adds a string parameter.
   void addString(const Twine &name, const Twine &txt) {
@@ -405,62 +443,67 @@ private:
     modName += "_" + cleanedName;
   };
 
-  /// Returns the module name's prefix from the name of the operation it
-  /// represents.
-  std::string setModPrefix(Operation *op) {
-    std::string prefixModName = op->getName().getStringRef().str();
-    std::replace(prefixModName.begin(), prefixModName.end(), '.', '_');
-    return prefixModName;
+  std::string getOpName() const {
+    std::string opName = op->getName().getStringRef().str();
+    std::replace(opName.begin(), opName.end(), '.', '_');
+    return opName;
   }
 
-  /// Returns the bitwidth of a type.
-  static unsigned getTypeWidth(Type type);
+  /// Initializes private fields from the input operation.
+  void init(Operation *op) {
+    this->op = op;
+    ctx = op->getContext();
+    auto paramsAttr =
+        op->getAttrOfType<DictionaryAttr>(RTL_PARAMETERS_ATTR_NAME);
+    if (!paramsAttr)
+      return;
+    llvm::copy(paramsAttr.getValue(), std::back_inserter(parameters));
+  }
 };
 } // namespace
 
-ModuleDiscriminator::ModuleDiscriminator(Operation *op)
-    : op(op), ctx(op->getContext()), modName(setModPrefix(op)) {
+ModuleDiscriminator::ModuleDiscriminator(Operation *op) {
+  init(op);
 
   llvm::TypeSwitch<Operation *, void>(op)
       .Case<handshake::InstanceOp>(
           [&](handshake::InstanceOp instOp) { modName = instOp.getModule(); })
-      .Case<handshake::BufferOpInterface>(
-          [&](handshake::BufferOpInterface bufOp) {
-            // Number of slots and bitwdith
-            addUnsigned("SLOTS", bufOp.getSlots());
-            addBitwidth("DATA_WIDTH", op->getResult(0));
-          })
       .Case<handshake::ForkOp, handshake::LazyForkOp>([&](auto) {
         // Number of output channels and bitwidth
         addUnsigned("SIZE", op->getNumResults());
-        addBitwidth("DATA_WIDTH", op->getOperand(0));
+        addType("DATA_TYPE", op->getOperand(0));
       })
       .Case<handshake::MuxOp>([&](handshake::MuxOp muxOp) {
         // Number of input data channels, data bitwidth, and select bitwidth
         addUnsigned("SIZE", muxOp.getDataOperands().size());
-        addBitwidth("DATA_WIDTH", muxOp.getResult());
-        addBitwidth("SELECT_WIDTH", muxOp.getSelectOperand());
+        addType("DATA_TYPE", muxOp.getResult());
+        addType("SELECT_TYPE", muxOp.getSelectOperand());
       })
       .Case<handshake::ControlMergeOp>([&](handshake::ControlMergeOp cmergeOp) {
         // Number of input data channels, data bitwidth, and index
         // bitwidth
         addUnsigned("SIZE", cmergeOp.getDataOperands().size());
-        addBitwidth("DATA_WIDTH", cmergeOp.getResult());
-        addBitwidth("INDEX_WIDTH", cmergeOp.getIndex());
+        addType("DATA_TYPE", cmergeOp.getResult());
+        addType("INDEX_TYPE", cmergeOp.getIndex());
       })
       .Case<handshake::MergeOp>([&](auto) {
         // Number of input data channels and data bitwidth
         addUnsigned("SIZE", op->getNumOperands());
-        addBitwidth("DATA_WIDTH", op->getResult(0));
+        addType("DATA_TYPE", op->getResult(0));
       })
-      .Case<handshake::BranchOp, handshake::SinkOp>([&](auto) {
-        // Bitwidth
-        addBitwidth("DATA_WIDTH", op->getOperand(0));
+      .Case<handshake::JoinOp>([&](auto) {
+        // Number of input channels
+        addUnsigned("SIZE", op->getNumOperands());
       })
+      .Case<handshake::BranchOp, handshake::SinkOp, handshake::BufferOp>(
+          [&](auto) {
+            // Bitwidth
+            addType("DATA_TYPE", op->getOperand(0));
+          })
       .Case<handshake::ConditionalBranchOp>(
           [&](handshake::ConditionalBranchOp cbrOp) {
             // Bitwidth
-            addBitwidth("DATA_WIDTH", cbrOp.getDataOperand());
+            addType("DATA_TYPE", cbrOp.getDataOperand());
           })
       .Case<handshake::SourceOp>([&](auto) {
         // No discrimianting parameters, just to avoid falling into the
@@ -468,14 +511,14 @@ ModuleDiscriminator::ModuleDiscriminator(Operation *op)
       })
       .Case<handshake::LoadOpInterface>([&](handshake::LoadOpInterface loadOp) {
         // Data bitwidth and address bitwidth
-        addBitwidth("DATA_WIDTH", loadOp.getDataInput());
-        addBitwidth("ADDR_WIDTH", loadOp.getAddressInput());
+        addType("DATA_TYPE", loadOp.getDataInput());
+        addType("ADDR_TYPE", loadOp.getAddressInput());
       })
       .Case<handshake::StoreOpInterface>(
           [&](handshake::StoreOpInterface storeOp) {
             // Data bitwidth and address bitwidth
-            addBitwidth("DATA_WIDTH", storeOp.getDataInput());
-            addBitwidth("ADDR_WIDTH", storeOp.getAddressInput());
+            addType("DATA_TYPE", storeOp.getDataInput());
+            addType("ADDR_TYPE", storeOp.getAddressInput());
           })
       .Case<handshake::SharingWrapperOp>(
           [&](handshake::SharingWrapperOp sharingWrapperOp) {
@@ -506,8 +549,8 @@ ModuleDiscriminator::ModuleDiscriminator(Operation *op)
           })
       .Case<handshake::ConstantOp>([&](handshake::ConstantOp cstOp) {
         // Bitwidth and binary-encoded constant value
-        Type cstType = cstOp.getResult().getType();
-        unsigned bitwidth = cstType.getIntOrFloatBitWidth();
+        ChannelType cstType = cstOp.getResult().getType();
+        unsigned bitwidth = cstType.getDataBitWidth();
         if (bitwidth > 64) {
           cstOp.emitError() << "Constant value has bitwidth " << bitwidth
                             << ", but we only support up to 64.";
@@ -519,27 +562,26 @@ ModuleDiscriminator::ModuleDiscriminator(Operation *op)
         // and convert it to a binary string value
         TypedAttr valueAttr = cstOp.getValueAttr();
         std::string bitValue;
-        if (isa<IntegerType>(cstType)) {
+        if (auto intType = dyn_cast<IntegerType>(cstType.getDataType())) {
           APInt value = cast<mlir::IntegerAttr>(valueAttr).getValue();
 
           // Bitset requires a compile-time constant, just use 64 and
           // manually truncate the value after so that it is the exact
           // bitwidth we need
-          if (cstType.isUnsignedInteger())
+          if (intType.isUnsignedInteger())
             bitValue = std::bitset<64>(value.getZExtValue()).to_string();
           else
             bitValue = std::bitset<64>(value.getSExtValue()).to_string();
           bitValue = bitValue.substr(64 - bitwidth);
-        } else if (isa<FloatType>(cstType)) {
-          mlir::FloatAttr attr = dyn_cast<mlir::FloatAttr>(valueAttr);
+        } else if (isa<FloatType>(cstType.getDataType())) {
+          mlir::FloatAttr attr = cast<mlir::FloatAttr>(valueAttr);
+          APInt floatInt = attr.getValue().bitcastToAPInt();
+
           // We only support specific bitwidths for floating point numbers
-          if (bitwidth == 32) {
-            bitValue =
-                std::bitset<32>(attr.getValue().convertToFloat()).to_string();
-          } else if (bitwidth == 64) {
-            bitValue =
-                std::bitset<64>(attr.getValue().convertToDouble()).to_string();
-          } else {
+          bitValue = std::bitset<64>(floatInt.getZExtValue()).to_string();
+          if (floatInt.getBitWidth() == 32) {
+            bitValue = bitValue.substr(32);
+          } else if (floatInt.getBitWidth() != 64) {
             cstOp.emitError() << "Constant has unsupported floating point "
                                  "bitwidth. Expected 32 or 64 but got "
                               << bitwidth << ".";
@@ -556,43 +598,36 @@ ModuleDiscriminator::ModuleDiscriminator(Operation *op)
         addString("VALUE", bitValue);
         addUnsigned("DATA_WIDTH", bitwidth);
       })
-      .Case<handshake::EndOp>([&](handshake::EndOp endOp) {
-        // Number of memory inputs and bitwidth (we assume that there is
-        // a single function return value due to our current RTL limitation)
-        addBitwidth("DATA_WIDTH", op->getOperand(0));
-        addUnsigned("NUM_MEMORIES",
-                    op->getNumOperands() - getNumExtInstanceArgs(endOp) - 1);
-      })
-      .Case<handshake::NotOp>([&](handshake::NotOp notOp) {
-        addBitwidth("DATA_WIDTH", op->getOperand(0));
-      })
-      .Case<arith::AddFOp, arith::AddIOp, arith::AndIOp, arith::DivFOp,
-            arith::DivSIOp, arith::DivUIOp, arith::MaximumFOp,
-            arith::MinimumFOp, arith::MulFOp, arith::MulIOp, arith::NegFOp,
-            arith::OrIOp, arith::ShLIOp, arith::ShRSIOp, arith::ShRUIOp,
-            arith::SubFOp, arith::SubIOp, arith::XOrIOp>([&](auto) {
+      .Case<handshake::AddFOp, handshake::AddIOp, handshake::AndIOp,
+            handshake::DivFOp, handshake::DivSIOp, handshake::DivUIOp,
+            handshake::MaximumFOp, handshake::MinimumFOp, handshake::MulFOp,
+            handshake::MulIOp, handshake::NegFOp, handshake::NotOp,
+            handshake::OrIOp, handshake::ShLIOp, handshake::ShRSIOp,
+            handshake::ShRUIOp, handshake::SubFOp, handshake::SubIOp,
+            handshake::XOrIOp>([&](auto) {
         // Bitwidth
-        addBitwidth("DATA_WIDTH", op->getOperand(0));
+        addType("DATA_TYPE", op->getOperand(0));
       })
-      .Case<arith::SelectOp>([&](arith::SelectOp selectOp) {
+      .Case<handshake::SelectOp>([&](handshake::SelectOp selectOp) {
         // Data bitwidth
-        addBitwidth("DATA_WIDTH", selectOp.getTrueValue());
+        addType("DATA_TYPE", selectOp.getTrueValue());
       })
-      .Case<arith::CmpFOp>([&](arith::CmpFOp cmpFOp) {
+      .Case<handshake::CmpFOp>([&](handshake::CmpFOp cmpFOp) {
         // Predicate and bitwidth
         addString("PREDICATE", stringifyEnum(cmpFOp.getPredicate()));
-        addBitwidth("DATA_WIDTH", cmpFOp.getLhs());
+        addType("DATA_TYPE", cmpFOp.getLhs());
       })
-      .Case<arith::CmpIOp>([&](arith::CmpIOp cmpIOp) {
+      .Case<handshake::CmpIOp>([&](handshake::CmpIOp cmpIOp) {
         // Predicate and bitwidth
         addString("PREDICATE", stringifyEnum(cmpIOp.getPredicate()));
-        addBitwidth("DATA_WIDTH", cmpIOp.getLhs());
+        addType("DATA_TYPE", cmpIOp.getLhs());
       })
-      .Case<arith::ExtSIOp, arith::ExtUIOp, arith::TruncIOp>([&](auto) {
-        // Input bitwidth and output bitwidth
-        addBitwidth("INPUT_WIDTH", op->getOperand(0));
-        addBitwidth("OUTPUT_WIDTH", op->getResult(0));
-      })
+      .Case<handshake::ExtSIOp, handshake::ExtUIOp, handshake::TruncIOp>(
+          [&](auto) {
+            // Input bitwidth and output bitwidth
+            addType("INPUT_TYPE", op->getOperand(0));
+            addType("OUTPUT_TYPE", op->getResult(0));
+          })
       .Default([&](auto) {
         op->emitError() << "This operation cannot be lowered to RTL "
                            "due to a lack of an RTL implementation for it.";
@@ -600,25 +635,28 @@ ModuleDiscriminator::ModuleDiscriminator(Operation *op)
       });
 }
 
-ModuleDiscriminator::ModuleDiscriminator(FuncMemoryPorts &ports)
-    : op(ports.memOp), ctx(op->getContext()), modName(setModPrefix(op)) {
+ModuleDiscriminator::ModuleDiscriminator(FuncMemoryPorts &ports) {
+  init(ports.memOp);
 
+  MLIRContext *ctx = op->getContext();
   llvm::TypeSwitch<Operation *, void>(op)
       .Case<handshake::MemoryControllerOp>([&](auto) {
         // There can be at most one of those, and it is a load/store port
         unsigned lsqPort = ports.getNumPorts<LSQLoadStorePort>();
+        Type dataType = IntegerType::get(ctx, ports.dataWidth);
+        Type addrType = IntegerType::get(ctx, ports.addrWidth);
 
         // Control port count, load port count, store port count, data
         // bitwidth, and address bitwidth
-        addUnsigned("NUM_CONTROL", ports.getNumPorts<ControlPort>());
-        addUnsigned("NUM_LOAD", ports.getNumPorts<LoadPort>() + lsqPort);
-        addUnsigned("NUM_STORE", ports.getNumPorts<StorePort>() + lsqPort);
-        addUnsigned("DATA_WIDTH", ports.dataWidth);
-        addUnsigned("ADDR_WIDTH", ports.addrWidth);
+        addUnsigned("NUM_CONTROLS", ports.getNumPorts<ControlPort>());
+        addUnsigned("NUM_LOADS", ports.getNumPorts<LoadPort>() + lsqPort);
+        addUnsigned("NUM_STORES", ports.getNumPorts<StorePort>() + lsqPort);
+        addType("DATA_TYPE", ChannelType::get(dataType));
+        addType("ADDR_TYPE", ChannelType::get(addrType));
       })
       .Case<handshake::LSQOp>([&](auto) {
         LSQGenerationInfo genInfo(ports, getUniqueName(op).str());
-        std::string lsqName = modName + "_" + genInfo.name;
+        modName = getOpName() + "_" + genInfo.name;
 
         /// Converts an array into an equivalent MLIR attribute.
         Type intType = IntegerType::get(ctx, 32);
@@ -646,14 +684,12 @@ ModuleDiscriminator::ModuleDiscriminator(FuncMemoryPorts &ports)
           addParam(name, ArrayAttr::get(ctx, biArrayAttr));
         };
 
-        addString("name", lsqName);
-        addBoolean("experimental", true);
-        addBoolean("toMC", !ports.interfacePorts.empty());
+        addString("name", *modName);
+        addBoolean("master", ports.interfacePorts.empty());
         addUnsigned("fifoDepth", genInfo.depth);
         addUnsigned("fifoDepth_L", genInfo.depthLoad);
         addUnsigned("fifoDepth_S", genInfo.depthStore);
         addUnsigned("bufferDepth", genInfo.bufferDepth);
-        addString("accessType", genInfo.accessType);
         addUnsigned("dataWidth", genInfo.dataWidth);
         addUnsigned("addrWidth", genInfo.addrWidth);
         addUnsigned("numBBs", genInfo.numGroups);
@@ -665,9 +701,6 @@ ModuleDiscriminator::ModuleDiscriminator(FuncMemoryPorts &ports)
         addBiArrayIntAttr("storeOffsets", genInfo.storeOffsets);
         addBiArrayIntAttr("loadPorts", genInfo.loadPorts);
         addBiArrayIntAttr("storePorts", genInfo.storePorts);
-
-        // Override the module's name
-        modName = lsqName;
       })
       .Default([&](auto) {
         op->emitError() << "Unsupported memory interface type.";
@@ -680,20 +713,12 @@ void ModuleDiscriminator::setParameters(hw::HWModuleExternOp modOp) {
 
   // The name is used to determine which RTL component to instantiate
   StringRef opName = op->getName().getStringRef();
-  modOp->setAttr(RTLRequest::NAME_ATTR, StringAttr::get(ctx, opName));
+  modOp->setAttr(RTL_NAME_ATTR_NAME, StringAttr::get(ctx, opName));
 
   // Parameters are used to determine the concrete version of the RTL
   // component to instantiate
-  modOp->setAttr(RTLRequest::PARAMETERS_ATTR,
+  modOp->setAttr(RTL_PARAMETERS_ATTR_NAME,
                  DictionaryAttr::get(ctx, parameters));
-}
-
-unsigned ModuleDiscriminator::getTypeWidth(Type type) {
-  if (isa<IntegerType, FloatType>(type))
-    return type.getIntOrFloatBitWidth();
-  if (isa<NoneType>(type))
-    return 0;
-  llvm_unreachable("unsupported data type");
 }
 
 namespace {
@@ -783,33 +808,6 @@ protected:
     StringRef name = getUniqueName(op);
     Location loc = op->getLoc();
     return createInstance(discriminator, name, loc, rewriter);
-  }
-};
-
-/// Specialization of the hardware builder for the `handshake::EndOp`
-/// operations.
-class HWEndConverter : public HWConverter {
-public:
-  using HWConverter::HWConverter;
-
-  /// Replaces the end operation with an equivalent instance using all the
-  /// inputs added so far as operands. If no external module matching the
-  /// current port information currently exists, one is added at the bottom of
-  /// the top-level MLIR module. Returns the instance on success, nullptr on
-  /// failure.
-  hw::InstanceOp convertToInstance(handshake::EndOp endOp,
-                                   ModuleLoweringState &state,
-                                   ConversionPatternRewriter &rewriter) {
-    hw::InstanceOp instOp = createInstanceFromOp(endOp, rewriter);
-    if (!instOp)
-      return nullptr;
-
-    // Resolve backedges in the module's terminator that are coming from the end
-    ValueRange results = instOp.getResults();
-    for (auto [backedge, res] : llvm::zip_equal(state.endBackedges, results))
-      backedge.setValue(res);
-    rewriter.eraseOp(endOp);
-    return instOp;
   }
 };
 
@@ -927,21 +925,8 @@ static void addMemIO(ModuleBuilder &modBuilder, handshake::FuncOp funcOp,
       continue;
 
     MemLoweringState info = MemLoweringState(memOp, memName);
-    llvm::TypeSwitch<Operation *, void>(memOp.getOperation())
-        .Case<handshake::MemoryControllerOp>(
-            [&](handshake::MemoryControllerOp mcOp) {
-              info.connectWithCircuit(modBuilder);
-            })
-        .Case<handshake::LSQOp>([&](handshake::LSQOp lsqOp) {
-          if (lsqOp.isConnectedToMC())
-            return;
-
-          // If the LSQ does not connect to an MC, then it connects directly to
-          // a dual-port BRAM through the top-level module IO
-          info.connectWithCircuit(modBuilder);
-        })
-        .Default([&](auto) { llvm_unreachable("unknown memory interface"); });
-
+    if (memOp.isMasterInterface())
+      info.connectWithCircuit(modBuilder);
     state.memInterfaces.insert({memOp, info});
   }
 }
@@ -953,11 +938,11 @@ static void addMemIO(ModuleBuilder &modBuilder, handshake::FuncOp funcOp,
 hw::ModulePortInfo getFuncPortInfo(handshake::FuncOp funcOp,
                                    ModuleLoweringState &state) {
   ModuleBuilder modBuilder(funcOp.getContext());
-  hw::PortNameGenerator portNames(funcOp);
+  handshake::PortNamer portNames(funcOp);
 
   // Add all function outputs to the module
   for (auto [idx, res] : llvm::enumerate(funcOp.getResultTypes()))
-    modBuilder.addOutput(portNames.getOutputName(idx), channelWrapper(res));
+    modBuilder.addOutput(portNames.getOutputName(idx), lowerType(res));
 
   // Add all function inputs to the module, expanding memory references into a
   // set of individual ports for loads and stores
@@ -967,7 +952,7 @@ hw::ModulePortInfo getFuncPortInfo(handshake::FuncOp funcOp,
     if (TypedValue<MemRefType> memref = dyn_cast<TypedValue<MemRefType>>(arg))
       addMemIO(modBuilder, funcOp, memref, argName, state);
     else
-      modBuilder.addInput(portNames.getInputName(idx), channelWrapper(type));
+      modBuilder.addInput(portNames.getInputName(idx), lowerType(type));
   }
 
   modBuilder.addClkAndRst();
@@ -988,7 +973,7 @@ public:
     addConversion([](Type type) -> Type {
       if (isa<MemRefType>(type))
         return type;
-      return channelWrapper(type);
+      return lowerType(type);
     });
 
     addTargetMaterialization([&](OpBuilder &builder, Type resultType,
@@ -1064,47 +1049,40 @@ ConvertFunc::matchAndRewrite(handshake::FuncOp funcOp, OpAdaptor adaptor,
   rewriter.inlineBlockBefore(funcBlock, termOp, modBlockArgs);
   rewriter.eraseOp(funcOp);
 
-  // Collect output ports of the top-level module for indexed access
-  SmallVector<const hw::PortInfo *> outputPorts;
-  for (const hw::PortInfo &outPort : modInfo.getOutputs())
-    outputPorts.push_back(&outPort);
+  // Operands for the module's terminators; they are the module's outputs
+  SmallVector<Value> outOperands;
 
-  // Create backege inputs for the module's output operation and associate
-  // them to the future operations whose conversion will resolve them
-  SmallVector<Value> outputOperands;
-  size_t portIdx = 0;
-  auto addBackedge = [&](SmallVector<Backedge> &backedges) -> void {
-    const hw::PortInfo *port = outputPorts[portIdx++];
-    Backedge backedge = lowerState.edgeBuilder.get(port->type);
-    outputOperands.push_back(backedge);
-    backedges.push_back(backedge);
-  };
-
-  /// NOTE: this is hacky, but only the end arguments that correspond to the
-  /// original function results and memory completion signals should go to the
-  /// end synchronizer, the rest of the operands go directly to the module's
-  /// outputs
+  // First outputs operands are identical to the end's, modulo type conversion
   auto endOp = *modOp.getBodyBlock()->getOps<handshake::EndOp>().begin();
-  unsigned numExtInstArgs = getNumExtInstanceArgs(endOp);
-  size_t numEndResults =
-      modInfo.sizeOutputs() - state.getNumMemOutputs() - numExtInstArgs;
-  for (size_t i = 0; i < numEndResults; ++i)
-    addBackedge(state.endBackedges);
-  for (size_t i = 0; i < numExtInstArgs; ++i)
-    addBackedge(state.extInstBackedges);
-
-  // Outgoing memory signals will come through memory interfaces
-  for (auto &[_, memState] : state.memInterfaces) {
-    for (size_t i = 0; i < memState.numOutputs; ++i)
-      addBackedge(memState.backedges);
+  if (failed((rewriter.getRemappedValues(endOp.getOperands(), outOperands)))) {
+    return funcOp->emitError()
+           << "failed to remap function terminator's operands";
   }
 
+  // Remaining output operands will eventually come from master memory
+  // interfaces' outputs; create backedges and resolve them during memory
+  // lowering
+  auto moduleOutputs = modInfo.getOutputs().begin();
+  for (size_t i = 0, e = endOp->getNumOperands(); i < e; ++i, ++moduleOutputs)
+    ;
+  for (auto &[_, memState] : state.memInterfaces) {
+    for (size_t i = 0; i < memState.numOutputs; ++i) {
+      const hw::PortInfo &port = *(moduleOutputs++);
+      Backedge backedge = lowerState.edgeBuilder.get(port.type);
+      outOperands.push_back(backedge);
+      memState.backedges.push_back(backedge);
+    }
+  }
+
+  // Replace the default terminator with one with our operands, and delete the
+  // Handshake function's terminator
   Operation *outputOp = modOp.getBodyBlock()->getTerminator();
   rewriter.setInsertionPoint(outputOp);
-  rewriter.replaceOpWithNewOp<hw::OutputOp>(outputOp, outputOperands);
+  rewriter.replaceOpWithNewOp<hw::OutputOp>(outputOp, outOperands);
+  rewriter.eraseOp(endOp);
 
   // Associate the newly created module to its lowering state object
-  lowerState.modState[modOp] = state;
+  lowerState.modState.insert({modOp, state});
   return success();
 }
 
@@ -1116,11 +1094,11 @@ LogicalResult ConvertExternalFunc::matchAndRewrite(
 
   StringAttr name = rewriter.getStringAttr(funcOp.getName());
   ModuleBuilder modBuilder(funcOp.getContext());
-  hw::PortNameGenerator portNames(funcOp);
+  handshake::PortNamer portNames(funcOp);
 
   // Add all function outputs to the module
   for (auto [idx, res] : llvm::enumerate(funcOp.getResultTypes()))
-    modBuilder.addOutput(portNames.getOutputName(idx), channelWrapper(res));
+    modBuilder.addOutput(portNames.getOutputName(idx), lowerType(res));
 
   // Add all function inputs to the module
   for (auto [idx, type] : llvm::enumerate(funcOp.getArgumentTypes())) {
@@ -1129,81 +1107,16 @@ LogicalResult ConvertExternalFunc::matchAndRewrite(
              << "Memory interfaces are not supported for external "
                 "functions";
     }
-    modBuilder.addInput(portNames.getInputName(idx), channelWrapper(type));
+    modBuilder.addInput(portNames.getInputName(idx), lowerType(type));
   }
   modBuilder.addClkAndRst();
 
   rewriter.setInsertionPoint(funcOp);
   auto modOp = rewriter.replaceOpWithNewOp<hw::HWModuleExternOp>(
       funcOp, name, modBuilder.getPortInfo());
-  modOp->setAttr(StringAttr::get(getContext(), RTLRequest::NAME_ATTR),
+  modOp->setAttr(StringAttr::get(getContext(), RTL_NAME_ATTR_NAME),
                  funcOp.getNameAttr());
   return success();
-}
-
-namespace {
-/// Converts the Handshake-level terminator into a HW instance (and an
-/// external HW module, potentially). This is special-cased because (1) the
-/// operation's IO changes during conversion (essentially copying a subset
-/// of its inputs to outputs) and (2) outputs of the HW instance need to
-/// connect to the HW-level terminator.
-class ConvertEnd : public OpConversionPattern<handshake::EndOp> {
-public:
-  ConvertEnd(ChannelTypeConverter &typeConverter, MLIRContext *ctx,
-             LoweringState &lowerState)
-      : OpConversionPattern<handshake::EndOp>(typeConverter, ctx),
-        lowerState(lowerState) {}
-
-  LogicalResult
-  matchAndRewrite(handshake::EndOp endOp, OpAdaptor adaptor,
-                  ConversionPatternRewriter &rewriter) const override;
-
-private:
-  /// Shared lowering state.
-  LoweringState &lowerState;
-};
-} // namespace
-
-LogicalResult
-ConvertEnd::matchAndRewrite(handshake::EndOp endOp, OpAdaptor adaptor,
-                            ConversionPatternRewriter &rewriter) const {
-  hw::HWModuleOp parentModOp = endOp->getParentOfType<hw::HWModuleOp>();
-  ModuleLoweringState &modState = lowerState.modState[parentModOp];
-  HWEndConverter converter(getContext());
-
-  // Inputs to the module are identical the the original Handshake end
-  // operation, plus clock and reset
-
-  /// NOTE: this is hacky, but only the end arguments that correspond to the
-  /// original function results and memory completion signals should go to the
-  /// end synchronizer, the rest of the operands go directly to the module's
-  /// outputs
-  ValueRange endOperands = adaptor.getOperands();
-  unsigned numExtInstArgs = getNumExtInstanceArgs(endOp);
-  for (auto [idx, oprd] :
-       llvm::enumerate(endOperands.drop_back(numExtInstArgs)))
-    converter.addInput(modState.endPorts.getInputName(idx), oprd);
-  converter.addClkAndRst(parentModOp);
-
-  // Remaining inputs to the end terminator go directly to the module's outputs
-  for (auto [backedge, oprd] : llvm::zip_equal(
-           modState.extInstBackedges, endOperands.take_back(numExtInstArgs)))
-    backedge.setValue(oprd);
-
-  // The end operation has one input per memory interface in the function
-  // which should not be forwarded to its output ports
-  unsigned numMemOperands = modState.memInterfaces.size();
-  auto numReturnValues = endOperands.size() - numMemOperands - numExtInstArgs;
-  auto returnValOperands = endOperands.take_front(numReturnValues);
-
-  // All non-memory inputs to the Handshake end operations should be forwarded
-  // to its outputs
-  for (auto [idx, oprd] : llvm::enumerate(returnValOperands))
-    converter.addOutput(modState.endPorts.getOutputName(idx), oprd.getType());
-
-  hw::InstanceOp instOp =
-      converter.convertToInstance(endOp, modState, rewriter);
-  return instOp ? success() : failure();
 }
 
 namespace {
@@ -1250,62 +1163,29 @@ LogicalResult ConvertMemInterface::matchAndRewrite(
   };
 
   // The HW instance will be connected to the top-level module through a
-  // number of input ports, add those first
+  // number of input ports, add those first, then the regular interface ports,
+  // and finally clock and reset
   ValueRange blockArgs = parentModOp.getBodyBlock()->getArguments();
   ValueRange memArgs = blockArgs.slice(memState.inputIdx, memState.numInputs);
   auto inputModPorts = memState.getMemInputPorts(parentModOp);
   for (auto [port, arg] : llvm::zip_equal(inputModPorts, memArgs))
     converter.addInput(removePortNamePrefix(port), arg);
-
-  auto addInput = [&](size_t idx) -> void {
-    Value oprd = operands[idx];
-    converter.addInput(memState.portNames.getInputName(idx), oprd);
-  };
-  auto addOutput = [&](size_t idx) -> void {
-    StringRef resName = memState.portNames.getOutputName(idx);
-    OpResult res = memOp->getResults()[idx];
-    converter.addOutput(resName, channelWrapper(res.getType()));
-  };
-
-  // Add all input/output ports corresponding to the memory interface's groups
-  for (GroupMemoryPorts &groupPorts : memState.ports.groups) {
-    size_t inputIdx = groupPorts.getFirstOperandIndex();
-    if (inputIdx != std::string::npos) {
-      size_t lastInputIdx = groupPorts.getLastOperandIndex();
-      for (; inputIdx <= lastInputIdx; ++inputIdx)
-        addInput(inputIdx);
-    }
-
-    size_t outputIdx = groupPorts.getFirstResultIndex();
-    if (outputIdx != std::string::npos) {
-      size_t lastOutputIdx = groupPorts.getLastResultIndex();
-      for (; outputIdx <= lastOutputIdx; ++outputIdx)
-        addOutput(outputIdx);
-    }
+  for (auto [idx, oprd] : llvm::enumerate(operands)) {
+    if (!isa<mlir::MemRefType>(oprd.getType()))
+      converter.addInput(memState.portNames.getInputName(idx), oprd);
   }
-
-  // Add all input/output ports corresponding to the memory interface's ports
-  // with other memory interfaces
-  for (MemoryPort &memPort : memState.ports.interfacePorts) {
-    for (size_t inputIdx : memPort.getOprdIndices())
-      addInput(inputIdx);
-    for (size_t outputIdx : memPort.getResIndices())
-      addOutput(outputIdx);
-  }
-
-  // Finish inputs by clock and reset ports
   converter.addClkAndRst(parentModOp);
 
-  // Add output port corresponding to the interface's done signal
-  addOutput(memOp->getNumResults() - 1);
-
-  // Add output ports going to the parent HW module
+  // The HW instance will be connected to the top-level module through a
+  // number of output ports, add those last after the regular interface ports
+  for (auto [idx, res] : llvm::enumerate(memOp->getResults())) {
+    converter.addOutput(memState.portNames.getOutputName(idx),
+                        lowerType(res.getType()));
+  }
   auto outputModPorts = memState.getMemOutputPorts(parentModOp);
   for (const hw::ModulePort &outputPort : outputModPorts)
     converter.addOutput(removePortNamePrefix(outputPort), outputPort.type);
 
-  // Create the instance, then replace the original memory interface's result
-  // uses with matching results in the instance
   hw::InstanceOp instOp = converter.convertToInstance(memState, rewriter);
   return instOp ? success() : failure();
 }
@@ -1336,7 +1216,7 @@ template <typename T>
 LogicalResult ConvertToHWInstance<T>::matchAndRewrite(
     T op, OpAdaptor adaptor, ConversionPatternRewriter &rewriter) const {
   HWConverter converter(this->getContext());
-  hw::PortNameGenerator portNames(op);
+  handshake::PortNamer portNames(op);
 
   // Add all operation operands to the inputs
   for (auto [idx, oprd] : llvm::enumerate(adaptor.getOperands()))
@@ -1345,7 +1225,7 @@ LogicalResult ConvertToHWInstance<T>::matchAndRewrite(
 
   // Add all operation results to the outputs
   for (auto [idx, type] : llvm::enumerate(op->getResultTypes()))
-    converter.addOutput(portNames.getOutputName(idx), channelWrapper(type));
+    converter.addOutput(portNames.getOutputName(idx), lowerType(type));
 
   hw::InstanceOp instOp = converter.convertToInstance(op, rewriter);
   return instOp ? success() : failure();
@@ -1628,7 +1508,7 @@ MemToBRAMConverter::buildExternalModule(hw::HWModuleOp circuitMod,
   extModOp = builder.create<hw::HWModuleExternOp>(
       circuitMod->getLoc(), modNameAttr, modBuilder.getPortInfo());
 
-  extModOp->setAttr(RTLRequest::NAME_ATTR, StringAttr::get(ctx, HW_NAME));
+  extModOp->setAttr(RTL_NAME_ATTR_NAME, StringAttr::get(ctx, HW_NAME));
   SmallVector<NamedAttribute> parameters;
   Type i32 = IntegerType::get(ctx, 32, IntegerType::Unsigned);
   parameters.emplace_back(
@@ -1636,7 +1516,7 @@ MemToBRAMConverter::buildExternalModule(hw::HWModuleOp circuitMod,
       IntegerAttr::get(i32, memState.dataType.getIntOrFloatBitWidth()));
   parameters.emplace_back(StringAttr::get(ctx, "ADDR_WIDTH"),
                           IntegerAttr::get(i32, memState.ports.addrWidth));
-  extModOp->setAttr(RTLRequest::PARAMETERS_ATTR,
+  extModOp->setAttr(RTL_PARAMETERS_ATTR_NAME,
                     DictionaryAttr::get(ctx, parameters));
   return extModOp;
 }
@@ -1785,24 +1665,6 @@ static void createWrapper(hw::HWModuleOp circuitOp, LoweringState &state,
 }
 
 namespace {
-/// Replaces Handshake return operations into a sequence of TEHBs, one for
-/// each return operand.
-struct ReplaceReturnWithTEHB : public OpRewritePattern<handshake::ReturnOp> {
-  using OpRewritePattern<handshake::ReturnOp>::OpRewritePattern;
-
-  LogicalResult matchAndRewrite(handshake::ReturnOp returnOp,
-                                PatternRewriter &rewriter) const override {
-    rewriter.setInsertionPoint(returnOp);
-    SmallVector<Value> tehbOutputs;
-    for (Value oprd : returnOp->getOperands()) {
-      auto tehbOp =
-          rewriter.create<handshake::TEHBOp>(returnOp.getLoc(), oprd, 1);
-      tehbOutputs.push_back(tehbOp.getResult());
-    }
-    rewriter.replaceOp(returnOp, tehbOutputs);
-    return success();
-  }
-};
 
 /// Conversion pass driver. The conversion only works on modules containing
 /// a single handshake function (handshake::FuncOp) at the moment. The
@@ -1835,17 +1697,7 @@ public:
         funcOp.emitError() << ERR_NON_MATERIALIZED_FUNC;
         return signalPassFailure();
       }
-      if (failed(verifyAllIndexConcretized(funcOp))) {
-        funcOp.emitError() << "Lowering to HW requires that all index "
-                              "types in the IR have "
-                              "been concretized."
-                           << ERR_RUN_CONCRETIZATION;
-        return signalPassFailure();
-      }
     }
-
-    if (failed(runPreprocessing()))
-      return signalPassFailure();
 
     // Make sure all operations are named
     NameAnalysis &namer = getAnalysis<NameAnalysis>();
@@ -1861,70 +1713,63 @@ public:
 
     // Create pattern set
     RewritePatternSet patterns(ctx);
-    patterns.insert<ConvertFunc, ConvertEnd, ConvertMemInterface>(
-        typeConverter, ctx, lowerState);
-    patterns.insert<
-        ConvertInstance, ConvertToHWInstance<handshake::OEHBOp>,
-        ConvertToHWInstance<handshake::TEHBOp>,
-        ConvertToHWInstance<handshake::ConditionalBranchOp>,
-        ConvertToHWInstance<handshake::BranchOp>,
-        ConvertToHWInstance<handshake::MergeOp>,
-        ConvertToHWInstance<handshake::ControlMergeOp>,
-        ConvertToHWInstance<handshake::MuxOp>,
-        ConvertToHWInstance<handshake::SourceOp>,
-        ConvertToHWInstance<handshake::ConstantOp>,
-        ConvertToHWInstance<handshake::SinkOp>,
-        ConvertToHWInstance<handshake::ForkOp>,
-        ConvertToHWInstance<handshake::LazyForkOp>,
-        ConvertToHWInstance<handshake::MCLoadOp>,
-        ConvertToHWInstance<handshake::LSQLoadOp>,
-        ConvertToHWInstance<handshake::MCStoreOp>,
-        ConvertToHWInstance<handshake::LSQStoreOp>,
-        ConvertToHWInstance<handshake::NotOp>,
-        ConvertToHWInstance<handshake::SharingWrapperOp>,
-        // Arith operations
-        ConvertToHWInstance<arith::AddFOp>, ConvertToHWInstance<arith::AddIOp>,
-        ConvertToHWInstance<arith::AndIOp>,
-        ConvertToHWInstance<arith::BitcastOp>,
-        ConvertToHWInstance<arith::CeilDivSIOp>,
-        ConvertToHWInstance<arith::CeilDivUIOp>,
-        ConvertToHWInstance<arith::CmpFOp>, ConvertToHWInstance<arith::CmpIOp>,
-        ConvertToHWInstance<arith::DivFOp>, ConvertToHWInstance<arith::DivSIOp>,
-        ConvertToHWInstance<arith::DivUIOp>, ConvertToHWInstance<arith::ExtFOp>,
-        ConvertToHWInstance<arith::ExtSIOp>,
-        ConvertToHWInstance<arith::ExtUIOp>,
-        ConvertToHWInstance<arith::FPToSIOp>,
-        ConvertToHWInstance<arith::FPToUIOp>,
-        ConvertToHWInstance<arith::FloorDivSIOp>,
-        ConvertToHWInstance<arith::IndexCastOp>,
-        ConvertToHWInstance<arith::IndexCastUIOp>,
-        ConvertToHWInstance<arith::MulFOp>, ConvertToHWInstance<arith::MulIOp>,
-        ConvertToHWInstance<arith::NegFOp>, ConvertToHWInstance<arith::OrIOp>,
-        ConvertToHWInstance<arith::RemFOp>, ConvertToHWInstance<arith::RemSIOp>,
-        ConvertToHWInstance<arith::RemUIOp>,
-        ConvertToHWInstance<arith::SelectOp>,
-        ConvertToHWInstance<arith::SIToFPOp>,
-        ConvertToHWInstance<arith::ShLIOp>, ConvertToHWInstance<arith::ShRSIOp>,
-        ConvertToHWInstance<arith::ShRUIOp>, ConvertToHWInstance<arith::SubFOp>,
-        ConvertToHWInstance<arith::SubIOp>,
-        ConvertToHWInstance<arith::TruncFOp>,
-        ConvertToHWInstance<arith::TruncIOp>,
-        ConvertToHWInstance<arith::UIToFPOp>,
-        ConvertToHWInstance<arith::XOrIOp>>(typeConverter,
-                                            funcOp->getContext());
+    patterns.insert<ConvertFunc, ConvertMemInterface>(typeConverter, ctx,
+                                                      lowerState);
+    patterns.insert<ConvertInstance, ConvertToHWInstance<handshake::BufferOp>,
+                    ConvertToHWInstance<handshake::ConditionalBranchOp>,
+                    ConvertToHWInstance<handshake::BranchOp>,
+                    ConvertToHWInstance<handshake::MergeOp>,
+                    ConvertToHWInstance<handshake::ControlMergeOp>,
+                    ConvertToHWInstance<handshake::MuxOp>,
+                    ConvertToHWInstance<handshake::JoinOp>,
+                    ConvertToHWInstance<handshake::SourceOp>,
+                    ConvertToHWInstance<handshake::ConstantOp>,
+                    ConvertToHWInstance<handshake::SinkOp>,
+                    ConvertToHWInstance<handshake::ForkOp>,
+                    ConvertToHWInstance<handshake::LazyForkOp>,
+                    ConvertToHWInstance<handshake::MCLoadOp>,
+                    ConvertToHWInstance<handshake::LSQLoadOp>,
+                    ConvertToHWInstance<handshake::MCStoreOp>,
+                    ConvertToHWInstance<handshake::LSQStoreOp>,
+                    ConvertToHWInstance<handshake::NotOp>,
+                    ConvertToHWInstance<handshake::SharingWrapperOp>,
+                    // Arith operations
+                    ConvertToHWInstance<handshake::AddFOp>,
+                    ConvertToHWInstance<handshake::AddIOp>,
+                    ConvertToHWInstance<handshake::AndIOp>,
+                    ConvertToHWInstance<handshake::CmpFOp>,
+                    ConvertToHWInstance<handshake::CmpIOp>,
+                    ConvertToHWInstance<handshake::DivFOp>,
+                    ConvertToHWInstance<handshake::DivSIOp>,
+                    ConvertToHWInstance<handshake::DivUIOp>,
+                    ConvertToHWInstance<handshake::ExtSIOp>,
+                    ConvertToHWInstance<handshake::ExtUIOp>,
+                    ConvertToHWInstance<handshake::MulFOp>,
+                    ConvertToHWInstance<handshake::MulIOp>,
+                    ConvertToHWInstance<handshake::NegFOp>,
+                    ConvertToHWInstance<handshake::OrIOp>,
+                    ConvertToHWInstance<handshake::SelectOp>,
+                    ConvertToHWInstance<handshake::ShLIOp>,
+                    ConvertToHWInstance<handshake::ShRSIOp>,
+                    ConvertToHWInstance<handshake::ShRUIOp>,
+                    ConvertToHWInstance<handshake::SubFOp>,
+                    ConvertToHWInstance<handshake::SubIOp>,
+                    ConvertToHWInstance<handshake::TruncIOp>,
+                    ConvertToHWInstance<handshake::XOrIOp>>(
+        typeConverter, funcOp->getContext());
 
     // Everything must be converted to operations in the hw dialect
     ConversionTarget target(*ctx);
     target.addLegalOp<hw::HWModuleOp, hw::HWModuleExternOp, hw::InstanceOp,
-                      hw::OutputOp, mlir::UnrealizedConversionCastOp>();
-    target.addIllegalDialect<handshake::HandshakeDialect, arith::ArithDialect,
+                      hw::OutputOp>();
+    target.addIllegalDialect<handshake::HandshakeDialect,
                              memref::MemRefDialect>();
 
     if (failed(applyPartialConversion(modOp, target, std::move(patterns))))
       return signalPassFailure();
 
     // Create memory wrappers around all hardware modules
-    for (auto [circuitOp, _] : lowerState.modState)
+    for (auto &[circuitOp, _] : lowerState.modState)
       createWrapper(circuitOp, lowerState, builder);
 
     // At this level all operations already have an intrinsic name so we can
@@ -1933,21 +1778,6 @@ public:
   }
 
 private:
-  /// Runs a pre-processiong greedy pattern rewriter on the input module to get
-  /// rid of constructs that have no hardware mapping.
-  LogicalResult runPreprocessing() {
-    mlir::ModuleOp modOp = getOperation();
-    MLIRContext *ctx = &getContext();
-
-    RewritePatternSet patterns{ctx};
-    patterns.add<ReplaceReturnWithTEHB>(ctx);
-    mlir::GreedyRewriteConfig config;
-    config.useTopDownTraversal = true;
-    config.enableRegionSimplification = false;
-
-    return applyPatternsAndFoldGreedily(modOp, std::move(patterns), config);
-  }
-
   /// Converts all external `handshake::FuncOp` operations into corresponding
   /// `hw::HWModuleExternOp` operations using a partial IR conversion.
   LogicalResult convertExternalFunctions(ChannelTypeConverter &typeConverter) {

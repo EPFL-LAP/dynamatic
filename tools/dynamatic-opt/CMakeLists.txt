@@ -21,6 +21,7 @@ target_link_libraries(dynamatic-opt
   DynamaticCfToHandshake
   DynamaticHandshake
   DynamaticHandshakeToHW
+  DynamaticTestTransforms
   DynamaticTransforms
   DynamaticTutorialsCreatingPasses
   DynamaticExperimentalTestTransforms

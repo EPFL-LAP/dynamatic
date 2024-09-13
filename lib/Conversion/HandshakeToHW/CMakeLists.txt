@@ -5,6 +5,7 @@ add_dynamatic_library(DynamaticHandshakeToHW
   DynamaticConversionPassIncGen
 
   LINK_LIBS PUBLIC
+  DynamaticSupportRTL
   DynamaticHandshake
   DynamaticHW
   MLIRIR

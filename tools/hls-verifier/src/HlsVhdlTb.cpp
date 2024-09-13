@@ -6,9 +6,11 @@
 //
 //===----------------------------------------------------------------------===//
 
+#include <algorithm>
 #include <cmath>
 #include <sstream>
 
+#include "CAnalyser.h"
 #include "HlsLogging.h"
 #include "HlsVhdlTb.h"
 
@@ -67,7 +69,21 @@ string commonTbBody =
     "\n"
     "--------------------------------------------------------------------------"
     "--\n"
-
+    "acknowledge_tb_end: process(tb_clk,tb_rst)\n"
+    "begin\n"
+    "   if (tb_rst = '1') then\n"
+    "       tb_global_ready <= '1';\n"
+    "       tb_stop <= '0';\n"
+    "   elsif rising_edge(tb_clk) then\n"
+    "       if (tb_global_valid = '1') then\n"
+    "           tb_global_ready <= '0';\n"
+    "           tb_stop <= '1';\n"
+    "       end if;\n"
+    "   end if;\n"
+    "end process;\n"
+    "\n"
+    "--------------------------------------------------------------------------"
+    "--\n"
     "generate_idle_signal: process(tb_clk,tb_rst)\n"
     "begin\n"
     "   if (tb_rst = '1') then\n"
@@ -76,7 +92,8 @@ string commonTbBody =
     "       tb_temp_idle <= tb_temp_idle;\n"
     "       if (tb_start_valid = '1') then\n"
     "           tb_temp_idle <= '0';\n"
-    "       elsif(tb_end_valid = '1') then\n"
+    "       end if;\n"
+    "       if(tb_stop = '1') then\n"
     "           tb_temp_idle <= '1';\n"
     "       end if;\n"
     "   end if;\n"
@@ -215,7 +232,9 @@ HlsVhdlTb::HlsVhdlTb(const VerificationContext &ctx) : ctx(ctx) {
     mElem.we1SignalName = p.parameterName + "_mem_" + mElem.we1PortName;
     mElem.ce1SignalName = p.parameterName + "_mem_" + mElem.ce1PortName;
     mElem.addr1SignalName = p.parameterName + "_mem_" + mElem.addr1PortName;
-    mElem.doneSignalName = "tb_temp_idle";
+
+    mElem.memStartSignalName = p.parameterName + "_memStart";
+    mElem.memEndSignalName = p.parameterName + "_memEnd";
 
     memElems.push_back(mElem);
   }
@@ -340,7 +359,10 @@ string HlsVhdlTb::getSignalDeclaration() {
   code << "\tsignal tb_start_valid : std_logic := '0';" << endl;
   code << "\tsignal tb_start_ready, tb_started : std_logic;" << endl;
 
-  code << "\tsignal tb_end_valid : std_logic;" << endl;
+  code << "\tsignal tb_end_valid, tb_end_ready : std_logic;" << endl;
+  code << "\tsignal tb_out0_valid, tb_out0_ready : std_logic;" << endl;
+  code << "\tsignal tb_global_valid, tb_global_ready, tb_stop : std_logic;"
+       << endl;
 
   code << endl;
 
@@ -368,6 +390,16 @@ string HlsVhdlTb::getSignalDeclaration() {
       code << "\tsignal " << m.addr1SignalName << " : std_logic_vector("
            << m.addrWidthParamValue << " - 1 downto 0);" << endl
            << endl;
+
+      code << "\tsignal " << m.memStartSignalName << "_valid : std_logic;"
+           << endl;
+      code << "\tsignal " << m.memStartSignalName << "_ready : std_logic;"
+           << endl;
+      code << "\tsignal " << m.memEndSignalName << "_valid : std_logic;"
+           << endl;
+      code << "\tsignal " << m.memEndSignalName << "_ready : std_logic;" << endl
+           << endl;
+
     } else {
       if ((cDuvParams[i].isReturn && cDuvParams[i].isOutput) ||
           !cDuvParams[i].isReturn) {
@@ -389,7 +421,7 @@ string HlsVhdlTb::getSignalDeclaration() {
 
   code << endl;
 
-  code << "\tsignal tb_temp_idle : std_logic:= '1';" << endl;
+  code << "\tsignal tb_temp_idle : std_logic := '1';" << endl;
   code << "\tshared variable transaction_idx : INTEGER := 0;" << endl;
 
   return code.str();
@@ -441,7 +473,7 @@ string HlsVhdlTb::getMemoryInstanceGeneration() {
       code << "\t\t" << MemElem::dIn1PortName << " => " << m.dIn1SignalName
            << "," << endl;
       code << "\t\t" << MemElem::donePortName << " => "
-           << "tb_temp_idle" << endl;
+           << "tb_stop" << endl;
       code << "\t);" << endl << endl;
     } else {
 
@@ -518,7 +550,7 @@ string HlsVhdlTb::getMemoryInstanceGeneration() {
 
       if (!p.isInput && p.isOutput && p.isReturn) {
 
-        code << "arg_inst_" << p.parameterName
+        code << "res_inst_" << p.parameterName
              << ":\t entity work.single_argument" << endl;
         code << "\tgeneric map(" << endl;
         code << "\t\t" << MemElem::inFileParamName << " => "
@@ -537,7 +569,7 @@ string HlsVhdlTb::getMemoryInstanceGeneration() {
              << "'1'"
              << "," << endl;
         code << "\t\t" << MemElem::we0PortName << " => "
-             << "tb_end_valid"
+             << "tb_out0_valid"
              << "," << endl;
         code << "\t\t" << MemElem::dOut0PortName << " => " << m.dOut0SignalName
              << "," << endl;
@@ -588,64 +620,43 @@ string HlsVhdlTb::getMemoryInstanceGeneration() {
       }
     }
   }
-  return code.str();
-}
 
-string HlsVhdlTb::getMemComponentDeclration() {
-  stringstream code;
-  code << "\tcomponent two_port_RAM is" << endl;
-  code << "\tgeneric(" << endl;
-  code << "\t\t" << MemElem::inFileParamName << " : STRING;" << endl;
-  code << "\t\t" << MemElem::outFileParamName << " : STRING;" << endl;
-  code << "\t\t" << MemElem::dataWidthParamName << " : INTEGER;" << endl;
-  code << "\t\t" << MemElem::addrWidthParamName << " : INTEGER;" << endl;
-  code << "\t\t" << MemElem::dataDepthParamName << " : INTEGER" << endl;
-  code << "\t);" << endl;
-  code << "\tport(" << endl;
-  code << "\t\t" << MemElem::clkPortName << " : in std_logic;" << endl;
-  code << "\t\t" << MemElem::rstPortName << " : in std_logic;" << endl;
-  code << "\t\t" << MemElem::ce0PortName << " : in std_logic;" << endl;
-  code << "\t\t" << MemElem::we0PortName << " : in std_logic;" << endl;
-  code << "\t\t" << MemElem::addr0PortName << " : in std_logic_vector("
-       << MemElem::addrWidthParamName << " - 1 downto 0);" << endl;
-  code << "\t\t" << MemElem::dOut0PortName << " : out std_logic_vector("
-       << MemElem::dataWidthParamName << " - 1 downto 0);" << endl;
-  code << "\t\t" << MemElem::dIn0PortName << " : in std_logic_vector("
-       << MemElem::dataWidthParamName << " - 1 downto 0);" << endl;
-  code << "\t\t" << MemElem::ce1PortName << " : in std_logic;" << endl;
-  code << "\t\t" << MemElem::we1PortName << " : in std_logic;" << endl;
-  code << "\t\t" << MemElem::addr1PortName << " : in std_logic_vector("
-       << MemElem::addrWidthParamName << " - 1 downto 0);" << endl;
-  code << "\t\t" << MemElem::dOut1PortName << " : out std_logic_vector("
-       << MemElem::dataWidthParamName << " - 1 downto 0);" << endl;
-  code << "\t\t" << MemElem::dIn1PortName << " : in std_logic_vector("
-       << MemElem::dataWidthParamName << " - 1 downto 0);" << endl;
-  code << "\t\t" << MemElem::donePortName << " : in std_logic" << endl;
-  code << "\t);" << endl;
-  code << "\tend component two_port_RAM;" << endl;
-  return code.str();
-}
+  // Join all output valid signals into a global simulation end signal to
+  // stop the simulation
+  unsigned joinSize = 1 + std::count_if(memElems.begin(), memElems.end(),
+                                        [](MemElem &m) { return m.isArray; });
+  bool hasReturnVal = std::any_of(
+      cDuvParams.begin(), cDuvParams.end(),
+      [](CFunctionParameter &p) { return p.isOutput && p.isReturn; });
+  if (hasReturnVal)
+    joinSize += 1;
 
-string HlsVhdlTb::getArgComponentDeclration() {
-  stringstream code;
-  code << "\tcomponent single_argument is" << endl;
-  code << "\tgeneric(" << endl;
-  code << "\t\t" << MemElem::inFileParamName << " : STRING;" << endl;
-  code << "\t\t" << MemElem::outFileParamName << " : STRING;" << endl;
-  code << "\t\t" << MemElem::dataWidthParamName << " : INTEGER" << endl;
-  code << "\t);" << endl;
-  code << "\tport(" << endl;
-  code << "\t\t" << MemElem::clkPortName << " : in std_logic;" << endl;
-  code << "\t\t" << MemElem::rstPortName << " : in std_logic;" << endl;
-  code << "\t\t" << MemElem::ce0PortName << " : in std_logic;" << endl;
-  code << "\t\t" << MemElem::we0PortName << " : in std_logic;" << endl;
-  code << "\t\t" << MemElem::dIn0PortName << " : in std_logic_vector("
-       << MemElem::dataWidthParamName << " - 1 downto 0);" << endl;
-  code << "\t\t" << MemElem::dOut0PortName << " : out std_logic_vector("
-       << MemElem::dataWidthParamName << " - 1 downto 0);" << endl;
-  code << "\t\t" << MemElem::donePortName << " : in std_logic" << endl;
-  code << "\t);" << endl;
-  code << "\tend component single_argument;" << endl;
+  unsigned idx = 0;
+  code << "join_valids: entity work.tb_join(arch) generic map(" << joinSize
+       << ")\n\tport map(\n";
+  if (hasReturnVal)
+    code << "\t\tins_valid(" << idx++ << ") => tb_out0_valid,\n";
+  for (MemElem &m : memElems) {
+    if (m.isArray) {
+      code << "\t\tins_valid(" << idx++ << ") => " << m.memEndSignalName
+           << "_valid,\n";
+    }
+  }
+  code << "\t\tins_valid(" << idx++ << ") => tb_end_valid,\n";
+
+  idx = 0;
+  if (hasReturnVal)
+    code << "\t\tins_ready(" << idx++ << ") => tb_out0_ready,\n";
+  for (MemElem &m : memElems) {
+    if (m.isArray) {
+      code << "\t\tins_ready(" << idx++ << ") => " << m.memEndSignalName
+           << "_ready,\n";
+    }
+  }
+  code << "\t\tins_ready(" << idx++ << ") => tb_end_ready,\n";
+  code << "\t\touts_valid => tb_global_valid,\n";
+  code << "\t\touts_ready => tb_global_ready\n\t);";
+
   return code.str();
 }
 
@@ -679,33 +690,32 @@ string HlsVhdlTb::getDuvInstanceGeneration() {
                               m.dOut1SignalName);
       duvPortMap.emplace_back(getDataOut1PortNameForCParam(p.parameterName),
                               m.dIn1SignalName);
+
+      // Memory start signal
+      duvPortMap.emplace_back(p.parameterName + "_start_valid", "'1'");
+      duvPortMap.emplace_back(p.parameterName + "_start_ready",
+                              m.memStartSignalName + "_ready");
+
+      // Memory completion signal
+      duvPortMap.emplace_back(p.parameterName + "_end_valid",
+                              m.memEndSignalName + "_valid");
+      duvPortMap.emplace_back(p.parameterName + "_end_ready",
+                              m.memEndSignalName + "_ready");
+
     } else {
       if (p.isInput) {
-        if (ctx.experimental) {
-          duvPortMap.emplace_back(p.parameterName, m.dOut0SignalName);
-          duvPortMap.emplace_back(p.parameterName + "_valid",
-                                  m.dOut0SignalName + "_valid");
-          duvPortMap.emplace_back(p.parameterName + "_ready",
-                                  m.dOut0SignalName + "_ready");
-        } else {
-          duvPortMap.emplace_back(getValidInPortNameForCParam(p.parameterName),
-                                  "'1'");
-          duvPortMap.emplace_back(getDataInSaPortNameForCParam(p.parameterName),
-                                  m.dOut0SignalName);
-        }
+        duvPortMap.emplace_back(p.parameterName, m.dOut0SignalName);
+        duvPortMap.emplace_back(p.parameterName + "_valid",
+                                m.dOut0SignalName + "_valid");
+        duvPortMap.emplace_back(p.parameterName + "_ready",
+                                m.dOut0SignalName + "_ready");
       }
 
       if (p.isOutput) {
         if (p.isReturn) {
-          if (ctx.experimental) {
-            duvPortMap.emplace_back("out0", m.dIn0SignalName);
-            duvPortMap.emplace_back("out0_valid", "tb_end_valid");
-            duvPortMap.emplace_back("out0_ready", "'1'");
-          } else {
-            duvPortMap.emplace_back("end_out", m.dIn0SignalName);
-            duvPortMap.emplace_back("end_valid", "tb_end_valid");
-            duvPortMap.emplace_back("end_ready", "'1'");
-          }
+          duvPortMap.emplace_back(p.parameterName, m.dIn0SignalName);
+          duvPortMap.emplace_back(p.parameterName + "_valid", "tb_out0_valid");
+          duvPortMap.emplace_back(p.parameterName + "_ready", "tb_out0_ready");
         } else {
           duvPortMap.emplace_back(getValidOutPortNameForCParam(p.parameterName),
                                   m.we0SignalName);
@@ -714,18 +724,15 @@ string HlsVhdlTb::getDuvInstanceGeneration() {
           duvPortMap.emplace_back(getReadyInPortNameForCParam(p.parameterName),
                                   "'1'");
         }
-      } else if (p.isReturn) {
-        duvPortMap.emplace_back("end_valid", "tb_end_valid");
-        duvPortMap.emplace_back("end_ready", "'1'");
       }
     }
   }
 
-  // Start signal
-  if (!ctx.experimental)
-    duvPortMap.emplace_back("start_in", "(others => '0')");
-  duvPortMap.emplace_back("start_ready", "tb_start_ready");
+  // Start and end signal
   duvPortMap.emplace_back("start_valid", "tb_start_valid");
+  duvPortMap.emplace_back("start_ready", "tb_start_ready");
+  duvPortMap.emplace_back("end_valid", "tb_end_valid");
+  duvPortMap.emplace_back("end_ready", "tb_end_ready");
 
   stringstream code;
   code << "duv: \t entity work." << duvName << endl;
@@ -736,91 +743,6 @@ string HlsVhdlTb::getDuvInstanceGeneration() {
          << ((i < duvPortMap.size() - 1) ? "," : "") << endl;
   }
   code << "\t\t);" << endl << endl;
-  return code.str();
-}
-
-string HlsVhdlTb::getDuvComponentDeclaration() {
-  stringstream code;
-  code << "\tcomponent " << duvName << " is" << endl;
-  code << "\tport(" << endl;
-  code << "\t\tclk : in std_logic;" << endl;
-  code << "\t\trst : in std_logic;" << endl;
-
-  for (size_t i = 0; i < cDuvParams.size(); i++) {
-    CFunctionParameter p = cDuvParams[i];
-    MemElem m = memElems[i];
-
-    if (m.isArray) {
-      code << "\t\t" << getAddr0PortNameForCParam(p.parameterName)
-           << " : out std_logic_vector(" << ((int)ceil(log2(p.arrayLength)) - 1)
-           << " downto 0);" << endl;
-      code << "\t\t" << getCe0PortNameForCParam(p.parameterName)
-           << " : out std_logic;" << endl;
-      code << "\t\t" << getWe0PortNameForCParam(p.parameterName)
-           << " : out std_logic;" << endl;
-      code << "\t\t" << getDataOut0PortNameForCParam(p.parameterName)
-           << " : out std_logic_vector(" << ((int)p.dtWidth - 1)
-           << " downto 0);" << endl;
-      code << "\t\t" << getDataIn0PortNameForCParam(p.parameterName)
-           << " : in std_logic_vector(" << ((int)p.dtWidth - 1) << " downto 0);"
-           << endl;
-
-      code << "\t\t" << getAddr1PortNameForCParam(p.parameterName)
-           << " : out std_logic_vector(" << ((int)ceil(log2(p.arrayLength)) - 1)
-           << " downto 0);" << endl;
-      code << "\t\t" << getCe1PortNameForCParam(p.parameterName)
-           << " : out std_logic;" << endl;
-      code << "\t\t" << getWe1PortNameForCParam(p.parameterName)
-           << " : out std_logic;" << endl;
-      code << "\t\t" << getDataOut1PortNameForCParam(p.parameterName)
-           << " : out std_logic_vector(" << ((int)p.dtWidth - 1)
-           << " downto 0);" << endl;
-      code << "\t\t" << getDataIn1PortNameForCParam(p.parameterName)
-           << " : in std_logic_vector(" << ((int)p.dtWidth - 1) << " downto 0);"
-           << endl;
-
-    } else {
-
-      if (!m.isArray && p.isInput) {
-        code << "\t\t" << getValidInPortNameForCParam(p.parameterName)
-             << " : in std_logic;" << endl;
-        code << "\t\t" << getDataIn0PortNameForCParam(p.parameterName)
-             << " : in std_logic_vector(" << ((int)p.dtWidth - 1)
-             << " downto 0);" << endl;
-      }
-
-      if (!m.isArray && p.isOutput && p.isReturn) {
-        code << "\t\t"
-             << "end_out : out std_logic_vector(" << ((int)p.dtWidth - 1)
-             << " downto 0);" << endl;
-        code << "\t\t"
-             << "end_valid : out std_logic;" << endl;
-        code << "\t\t"
-             << "end_ready : in std_logic;" << endl;
-      }
-
-      if (!m.isArray && !p.isOutput && p.isReturn) {
-        code << "\t\t"
-             << "end_valid : out std_logic;" << endl;
-        code << "\t\t"
-             << "end_ready : in std_logic;" << endl;
-      }
-
-      if (!m.isArray && p.isOutput && !p.isReturn) {
-        code << "\t\t" << getValidOutPortNameForCParam(p.parameterName)
-             << " : out std_logic;" << endl;
-        code << "\t\t" << getDataOut0PortNameForCParam(p.parameterName)
-             << " : out std_logic_vector(" << ((int)p.dtWidth - 1)
-             << " downto 0);" << endl;
-        code << "\t\t" << getReadyInPortNameForCParam(p.parameterName)
-             << " : in std_logic;" << endl;
-      }
-    }
-  }
-  code << "\t\tstart_valid : in std_logic;" << endl;
-  code << "\t\tstart_ready : out std_logic" << endl;
-  code << "\t);" << endl;
-  code << "\tend component " << duvName << ";" << endl;
   return code.str();
 }
 
