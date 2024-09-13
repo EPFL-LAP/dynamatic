@@ -1039,8 +1039,7 @@ def SpeculatingBranchOp : Handshake_Op<"speculating_branch", [
 //===----------------------------------------------------------------------===//
 
 def SharingWrapperOp : Handshake_Op<"sharing_wrapper", [
-<<<<<<< HEAD
-SameOperandsAndResultType, 
+  SameOperandsAndResultType, 
   DeclareOpInterfaceMethods<NamedIOInterface, ["getOperandName", "getResultName"]>,
 ]> {
 
@@ -1078,28 +1077,13 @@ SameOperandsAndResultType,
       custom interface printing for different operand/result types).
     }];
 
-  let arguments = (ins Variadic<AnyType> : $dataOperands,
-    AnyType : $sharedOpResult,
+  let arguments = (ins Variadic<ChannelType> : $dataOperands,
+    ChannelType : $sharedOpResult,
     DefaultValuedAttr<DenseI64ArrayAttr, "{}">:$credits,
     ConfinedAttr<I32Attr, [IntMinValue<2>]>:$numSharedOperations,
     ConfinedAttr<I32Attr, [IntMinValue<1>]>:$numSharedOperands,
     ConfinedAttr<I32Attr, [IntMinValue<1>]>:$latency);
-  let results = (outs Variadic<AnyType> : $dataOut);
-=======
-  SameOperandsAndResultType
-]> {
-  let summary = "sharing wrapper operation";
-  let description = [{
-    The sharing_wrapper operation represents the selecting & distributing logic
-    that wraps around a functional unit.
-  }];
-
-  let arguments = (ins Variadic<ChannelType>:$dataOperands,
-                       ChannelType:$sharedOpResult,
-                       DefaultValuedAttr<DenseI64ArrayAttr, "{}">:$credits,
-                       ConfinedAttr<I32Attr, [IntMinValue<1>]>:$numSharedOperands);
-  let results = (outs Variadic<ChannelType>:$dataOut);
->>>>>>> main
+  let results = (outs Variadic<ChannelType> : $dataOut);
 
   let assemblyFormat = [{
     `[` $dataOperands `]` `,` `[` $sharedOpResult `]` attr-dict `:`

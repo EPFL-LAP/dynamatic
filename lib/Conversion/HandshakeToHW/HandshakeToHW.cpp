@@ -440,7 +440,7 @@ private:
         cleanedName.begin(), cleanedName.end(),
         [](char c) { return !std::isalnum(c); }, '_');
 
-    modName += "_" + cleanedName;
+    modName = *modName + "_" + cleanedName;
   };
 
   std::string getOpName() const {
@@ -522,7 +522,7 @@ ModuleDiscriminator::ModuleDiscriminator(Operation *op) {
           })
       .Case<handshake::SharingWrapperOp>(
           [&](handshake::SharingWrapperOp sharingWrapperOp) {
-            addBitwidth("DATA_WIDTH", sharingWrapperOp.getDataOperands()[0]);
+            addType("DATA_WIDTH", sharingWrapperOp.getDataOperands()[0]);
 
             // In a sharing wrapper, we have the credits as a list of unsigned
             // integers. This will be encoded as a space-separated string and
