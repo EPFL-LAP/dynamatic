@@ -21,11 +21,8 @@
 #include "mlir/IR/Value.h"
 #include "mlir/Support/LogicalResult.h"
 #include "mlir/Transforms/InliningUtils.h"
-<<<<<<< HEAD
-#include <string>
-=======
 #include "llvm/ADT/TypeSwitch.h"
->>>>>>> main
+#include <string>
 
 using namespace mlir;
 using namespace dynamatic;
