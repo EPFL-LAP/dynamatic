@@ -32,13 +32,20 @@ namespace ljson = llvm::json;
 //===----------------------------------------------------------------------===//
 
 unsigned dynamatic::getOpDatawidth(Operation *op) {
-  // All arithmetic operations are handled the same way
-  if (op->getName().getDialectNamespace() == "arith")
-    return getHandshakeTypeBitWidth(op->getOperand(0).getType());
-
   // Handshake operations have various semantics and must be handled on a
   // case-by-case basis
   return llvm::TypeSwitch<Operation *, unsigned>(op)
+      .Case<handshake::ExtSIOp, handshake::ExtUIOp, handshake::AddFOp,
+            handshake::AddIOp, handshake::AndIOp, handshake::CmpFOp,
+            handshake::CmpIOp, handshake::DivFOp, handshake::DivSIOp,
+            handshake::DivUIOp, handshake::ExtSIOp, handshake::ExtUIOp,
+            handshake::MaximumFOp, handshake::MinimumFOp, handshake::MulFOp,
+            handshake::MulIOp, handshake::NegFOp, handshake::OrIOp,
+            handshake::SelectOp, handshake::ShLIOp, handshake::ShRSIOp,
+            handshake::ShRUIOp, handshake::SubFOp, handshake::SubIOp,
+            handshake::TruncIOp, handshake::XOrIOp>([&](auto) {
+        return getHandshakeTypeBitWidth(op->getOperand(0).getType());
+      })
       .Case<handshake::MergeLikeOpInterface>(
           [&](handshake::MergeLikeOpInterface mergeLikeOp) {
             return getHandshakeTypeBitWidth(
