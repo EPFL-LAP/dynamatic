@@ -392,7 +392,7 @@ std::unordered_map<mlir::Operation*, unsigned> HandshakeSizeLSQsPass::calcQueueS
   // Go trough all LSQs and calculate the maximum amount of slots needed
   for(auto &entry: allocDeallocTimesPerLSQ) {
     unsigned iterMax = std::ceil((float)endTime / II);
-    std::vector<int> allocPerCycle(endTime + 1);
+    std::vector<int> allocPerCycle(endTime);
 
 
     // Build array for how many slots are allocated and deallocated per cycle
@@ -400,25 +400,25 @@ std::unordered_map<mlir::Operation*, unsigned> HandshakeSizeLSQsPass::calcQueueS
       
       for(auto &allocTime: std::get<0>(entry.second)) {
         int t = allocTime + II * iter;
-        if(t >= 0 && t <= endTime) {
+        if(t >= 0 && t < endTime) {
           allocPerCycle[t]++;
         }
       }
       for(auto &deallocTime: std::get<1>(entry.second)) {
         int t = deallocTime + II * iter;
-        if(t >= 0 && t <= endTime) {
+        if(t >= 0 && t < endTime) {
           allocPerCycle[t]--;
         }
       }
     }
     // build array for many slots are actively allocated at which cycle
-    std::vector<int> slotsPerCycle(endTime + 1);
+    std::vector<int> slotsPerCycle(endTime);
     slotsPerCycle[0] = allocPerCycle[0];
-    for(int i=1; i <= endTime; i++) {
+    for(int i=1; i < endTime; i++) {
       slotsPerCycle[i] = slotsPerCycle[i - 1] + allocPerCycle[i];
     }
 
-    llvm::dbgs() << " \t [DBG] slots[" << (endTime + 1) << "]:";
+    llvm::dbgs() << " \t [DBG] slots[" << (endTime) << "]:";
     for(auto &slot: slotsPerCycle) {
       llvm::dbgs() << slot << " ";
     }
