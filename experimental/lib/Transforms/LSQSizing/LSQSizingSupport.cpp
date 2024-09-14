@@ -388,3 +388,13 @@ std::vector<mlir::Operation*> AdjListGraph::getConnectedOps(mlir::Operation *op)
   return connectedOps;
 }
 
+std::vector<mlir::Operation*> AdjListGraph::getOperations() {
+  std::vector<mlir::Operation*> ops;
+  for(auto &node: nodes) {
+    if(node.second.op)
+    {
+      ops.push_back(node.second.op);
+    }
+  }
+  return ops;
+}

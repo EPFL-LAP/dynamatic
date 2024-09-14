@@ -64,6 +64,7 @@ public:
 
     std::vector<std::string> findLongestNonCyclicPath2(mlir::Operation* startOp);
 
+    std::vector<mlir::Operation*> getOperations();
 
 private:
     // Map to store the nodes by their Operations unique name

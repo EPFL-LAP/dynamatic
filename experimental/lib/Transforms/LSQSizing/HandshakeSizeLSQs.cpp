@@ -59,7 +59,7 @@ private:
   mlir::Operation *findStartNode(AdjListGraph graph);
 
   // Finds the Phi Node for each Basic Block in a CFDFC
-  // TODO
+  // Checks all operations which get their input from a different BB and chooses the one with the lowest latency from the start node
   std::unordered_map<unsigned, mlir::Operation *> getPhiNodes(AdjListGraph graph, mlir::Operation *startNode);
 
   // Inserts edges to make sure that sizing is done correctly
@@ -99,7 +99,6 @@ void HandshakeSizeLSQsPass::runDynamaticPass() {
     std::unordered_map<unsigned, float> IIs;
 
     // Extract CFDFCs and II from the Attributes
-    // TODO error handling when there are no attributes
     handshake::CFDFCThroughputAttr throughputAttr = getDialectAttr<handshake::CFDFCThroughputAttr>(funcOp);
     handshake::CFDFCToBBListAttr cfdfcAttr = getDialectAttr<handshake::CFDFCToBBListAttr>(funcOp);
 
@@ -149,8 +148,15 @@ void HandshakeSizeLSQsPass::runDynamaticPass() {
       mlir::Operation *lsqOp = maxLoadStoreSize.first;
       unsigned maxLoadSize = std::get<0>(maxLoadStoreSize.second);
       unsigned maxStoreSize = std::get<1>(maxLoadStoreSize.second);
+      if(maxLoadSize < 2) {
+        llvm::dbgs() << " [DBG] LSQ " << getUniqueName(lsqOp).str() << " Load Size: " << maxLoadSize << " is too small, setting to 2\n";
+        maxLoadSize = 2;
+      }
+      if(maxStoreSize < 2) {
+        llvm::dbgs() << " [DBG] LSQ " << getUniqueName(lsqOp).str() << " Store Size: " << maxStoreSize << " is too small, setting to 2\n";
+        maxStoreSize = 2;
+      }
       llvm::dbgs() << " [DBG] final LSQ " << getUniqueName(lsqOp).str() << " Max Load Size: " << maxLoadSize << " Max Store Size: " << maxStoreSize << "\n";
-
       handshake::LSQSizeAttr lsqSizeAttr = handshake::LSQSizeAttr::get(mod.getContext(), maxLoadSize, maxStoreSize);
       setDialectAttr(lsqOp, lsqSizeAttr);
     }
@@ -259,14 +265,6 @@ std::unordered_map<unsigned, mlir::Operation *> HandshakeSizeLSQsPass::getPhiNod
   std::unordered_map<unsigned, std::vector<mlir::Operation *>> phiNodeCandidates;
   std::unordered_map<unsigned, mlir::Operation *> phiNodes;
 
-  //TODO find entries from all nodes, not just branch and fork ops
-  // Find all branch and fork ops as candidates for phi nodes
-  std::vector<mlir::Operation *> branchOps = graph.getOperationsWithOpName("handshake.cond_br");
-  std::vector<mlir::Operation *> forkOps = graph.getOperationsWithOpName("handshake.fork");
-
-  std::vector<mlir::Operation *> srcOps = std::vector<mlir::Operation *>(branchOps.size() + forkOps.size());
-  std::merge(branchOps.begin(), branchOps.end(), forkOps.begin(), forkOps.end(), srcOps.begin());
-  
   // Insert start_node as a candidate for cases where there is only 1 bb (will be choosen anyway for other cases, but looks cleaner then special handling)
   std::optional<unsigned> startNodeBB = getLogicBB(startNode);
   assert(startNodeBB && "Start Node must belong to basic block");
@@ -274,7 +272,7 @@ std::unordered_map<unsigned, mlir::Operation *> HandshakeSizeLSQsPass::getPhiNod
   //llvm::dbgs() << "\t [DBG] Inserted Start Node: " << startNode->getAttrOfType<StringAttr>("handshake.name").str() << " for BB " << startNode->getAttrOfType<IntegerAttr>("handshake.bb").getUInt() << "\n";
 
   // Go trought all branch and fork ops and find connected ops
-  for(auto &srcOp: srcOps) {
+  for(auto &srcOp: graph.getOperations()) {
     std::optional<unsigned> srcBB = getLogicBB(srcOp);
     assert(srcBB && "Src Op must belong to basic block");    
     //llvm::dbgs() << "\t [DBG] Branch Op: " << branchOp->getAttrOfType<StringAttr>("handshake.name").str() << " of BB " << srcBB <<"\n";
