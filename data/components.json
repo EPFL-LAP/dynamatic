@@ -1,5 +1,5 @@
 {
-  "arith.cmpi": {
+  "handshake.cmpi": {
     "latency": {
       "64": 0.0
     },
@@ -66,7 +66,7 @@
       }
     }
   },
-  "arith.addi": {
+  "handshake.addi": {
     "latency": {
       "64": 0.0
     },
@@ -133,7 +133,7 @@
       }
     }
   },
-  "arith.subi": {
+  "handshake.subi": {
     "latency": {
       "64": 0.0
     },
@@ -200,7 +200,7 @@
       }
     }
   },
-  "arith.muli": {
+  "handshake.muli": {
     "latency": {
       "64": 4.0
     },
@@ -572,7 +572,7 @@
       }
     }
   },
-  "arith.addf": {
+  "handshake.addf": {
     "latency": {
       "64": 10.0
     },
@@ -633,7 +633,7 @@
       }
     }
   },
-  "arith.subf": {
+  "handshake.subf": {
     "latency": {
       "64": 10.0
     },
@@ -694,7 +694,7 @@
       }
     }
   },
-  "arith.mulf": {
+  "handshake.mulf": {
     "latency": {
       "64": 6.0
     },
@@ -755,7 +755,7 @@
       }
     }
   },
-  "arith.divui": {
+  "handshake.divui": {
     "latency": {
       "64": 36.0
     },
@@ -816,7 +816,7 @@
       }
     }
   },
-  "arith.divsi": {
+  "handshake.divsi": {
     "latency": {
       "64": 36.0
     },
@@ -877,7 +877,7 @@
       }
     }
   },
-  "arith.divf": {
+  "handshake.divf": {
     "latency": {
       "64": 30.0
     },
@@ -938,7 +938,7 @@
       }
     }
   },
-  "arith.cmpf": {
+  "handshake.cmpf": {
     "latency": {
       "64": 2.0
     },
@@ -1316,7 +1316,7 @@
       }
     }
   },
-  "arith.andi": {
+  "handshake.andi": {
     "latency": {
       "64": 0.0
     },
@@ -1378,7 +1378,7 @@
       }
     }
   },
-  "arith.ori": {
+  "handshake.ori": {
     "latency": {
       "64": 0.0
     },
@@ -1440,7 +1440,7 @@
       }
     }
   },
-  "arith.xori": {
+  "handshake.xori": {
     "latency": {
       "64": 0.0
     },
@@ -1502,7 +1502,7 @@
       }
     }
   },
-  "arith.shli": {
+  "handshake.shli": {
     "latency": {
       "64": 0.0
     },
@@ -1569,7 +1569,7 @@
       }
     }
   },
-  "arith.shrsi": {
+  "handshake.shrsi": {
     "latency": {
       "64": 0.0
     },
@@ -1636,7 +1636,7 @@
       }
     }
   },
-  "arith.shrui": {
+  "handshake.shrui": {
     "latency": {
       "64": 0.0
     },
@@ -1703,7 +1703,7 @@
       }
     }
   },
-  "arith.select": {
+  "handshake.select": {
     "latency": {
       "64": 0.0
     },
