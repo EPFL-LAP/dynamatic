@@ -307,6 +307,41 @@ std::vector<std::string> AdjListGraph::findLongestNonCyclicPath(mlir::Operation 
   return path;
 }
 
+// Recursive helper function
+void AdjListGraph::dfsHelper(const std::string& currentNode, std::set<std::string>& visited, 
+               std::vector<std::string>& currentPath, int& maxLatency, std::vector<std::string>& bestPath) {
+    visited.insert(currentNode);
+    currentPath.push_back(currentNode);
+    // Update the best path if current path latency is greater than maxLatency
+    int currentLatency = getPathLatency(currentPath);
+    if (currentLatency > maxLatency) {
+        maxLatency = currentLatency;
+        bestPath = currentPath;
+    }
+    // Recursively explore neighbors
+    for (const std::string& neighbor : nodes[currentNode].edges) {
+        if (visited.find(neighbor) == visited.end()) {
+            dfsHelper(neighbor, visited, currentPath, maxLatency, bestPath);
+        }
+    }
+    // Backtrack: remove the current node from the path and visited set
+    visited.erase(currentNode);
+    currentPath.pop_back();
+}
+// Main function to find the longest non-cyclic path
+std::vector<std::string> AdjListGraph::findLongestNonCyclicPath2(mlir::Operation* startOp) {
+    std::string start = getUniqueName(startOp).str();
+    std::vector<std::string> bestPath;
+    std::vector<std::string> currentPath;
+    std::set<std::string> visited;
+    int maxLatency = 0;
+    // Start DFS from the start node
+    dfsHelper(start, visited, currentPath, maxLatency, bestPath);
+    return bestPath;
+}
+
+
+
 
 int AdjListGraph::getPathLatency(std::vector<std::string> path) {
   // Sum up the latencies of all nodes in the path

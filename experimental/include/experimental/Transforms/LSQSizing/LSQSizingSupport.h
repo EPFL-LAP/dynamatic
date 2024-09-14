@@ -62,6 +62,7 @@ public:
     // Returns all operations which are connected to a specific operation (includes backedges, but skips the artificial nodes)
     std::vector<mlir::Operation*> getConnectedOps(mlir::Operation *op);
 
+    std::vector<std::string> findLongestNonCyclicPath2(mlir::Operation* startOp);
 
 
 private:
@@ -80,6 +81,9 @@ private:
     // Depth first search algorithm for Path finding between two nodes
     void dfs(std::string& currentNode, std::string& end, std::vector<std::string>& currentPath, std::set<std::string>& visited, std::vector<std::vector<std::string>>& paths, bool ignoreBackedges = false);
     
+    
+    void dfsHelper(const std::string& currentNode, std::set<std::string>& visited, std::vector<std::string>& currentPath, int& maxLatency, std::vector<std::string>& bestPath);
+
     // Adds the edges between nodes for a result value of an operation
     void addChannelEdges(mlir::Value);
 

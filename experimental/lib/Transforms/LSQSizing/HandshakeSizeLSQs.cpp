@@ -231,7 +231,7 @@ mlir::Operation * HandshakeSizeLSQsPass::findStartNode(AdjListGraph graph) {
 
   // Go trough all candidates and save the longest path, its latency and node count
   for(auto &op: startNodeCandidates) {
-    std::vector<std::string> path = graph.findLongestNonCyclicPath(op);
+    std::vector<std::string> path = graph.findLongestNonCyclicPath2(op);
     maxLatencies.insert({op, graph.getPathLatency(path)});
     nodeCounts.insert({op, path.size()});
   }
@@ -259,6 +259,7 @@ std::unordered_map<unsigned, mlir::Operation *> HandshakeSizeLSQsPass::getPhiNod
   std::unordered_map<unsigned, std::vector<mlir::Operation *>> phiNodeCandidates;
   std::unordered_map<unsigned, mlir::Operation *> phiNodes;
 
+  //TODO find entries from all nodes, not just branch and fork ops
   // Find all branch and fork ops as candidates for phi nodes
   std::vector<mlir::Operation *> branchOps = graph.getOperationsWithOpName("handshake.cond_br");
   std::vector<mlir::Operation *> forkOps = graph.getOperationsWithOpName("handshake.fork");
