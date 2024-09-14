@@ -31,56 +31,23 @@ int extractNodeLatency(mlir::Operation *op, TimingDatabase timingDB) {
     auto params = op->getAttrOfType<DictionaryAttr>(RTL_PARAMETERS_ATTR_NAME);
     if (!params) {
       llvm::dbgs() << "BufferOp" << getUniqueName(op).str() << " does not have parameters\n";
+      return 0;
     }
 
     auto optTiming = params.getNamed(handshake::BufferOp::TIMING_ATTR_NAME);
     if (!optTiming) {
       llvm::dbgs() << "BufferOp" << getUniqueName(op).str() << " does not have timing\n";
+      return 0;
     }
 
     if (auto timing =dyn_cast<handshake::TimingAttr>(optTiming->getValue())) {
       handshake::TimingInfo info = timing.getInfo();
-      latency = info.getLatency(SignalType::DATA).value_or(0);
+      return info.getLatency(SignalType::DATA).value_or(0);
     }   
   }
-  else if(op->getName().getStringRef() == "handshake.muli") { // TODO Remove Hardcoding once this is fixed in the handshake dialect
-    llvm::dbgs() << "Operation " << op->getName().getStringRef() << " does not have latency, using hardcoded latency of 4\n";
-    latency = 4;
-  }
-  else if(op->getName().getStringRef() == "handshake.mulf") { // TODO Remove Hardcoding once this is fixed in the handshake dialect
-    llvm::dbgs() << "Operation " << op->getName().getStringRef() << " does not have latency, using hardcoded latency of 6\n";
-    latency = 6;
-  }
-  else if(op->getName().getStringRef() == "handshake.addf") { // TODO Remove Hardcoding once this is fixed in the handshake dialect
-    llvm::dbgs() << "Operation " << op->getName().getStringRef() << " does not have latency, using hardcoded latency of 10\n";
-    latency = 10;
-  } 
-  else if(op->getName().getStringRef() == "handshake.subf") { // TODO Remove Hardcoding once this is fixed in the handshake dialect
-    llvm::dbgs() << "Operation " << op->getName().getStringRef() << " does not have latency, using hardcoded latency of 10\n";
-    latency = 10;
-  } 
-  else if(op->getName().getStringRef() == "handshake.divui") { // TODO Remove Hardcoding once this is fixed in the handshake dialect
-    llvm::dbgs() << "Operation " << op->getName().getStringRef() << " does not have latency, using hardcoded latency of 36\n";
-    latency = 36;
-  }
-  else if(op->getName().getStringRef() == "handshake.divsi") { // TODO Remove Hardcoding once this is fixed in the handshake dialect
-    llvm::dbgs() << "Operation " << op->getName().getStringRef() << " does not have latency, using hardcoded latency of 36\n";
-    latency = 36;
-  } 
-  else if(op->getName().getStringRef() == "handshake.divf") { // TODO Remove Hardcoding once this is fixed in the handshake dialect
-    llvm::dbgs() << "Operation " << op->getName().getStringRef() << " does not have latency, using hardcoded latency of 30\n";
-    latency = 30;
-  } 
-  else if(op->getName().getStringRef() == "handshake.cmpf") { // TODO Remove Hardcoding once this is fixed in the handshake dialect
-    llvm::dbgs() << "Operation " << op->getName().getStringRef() << " does not have latency, using hardcoded latency of 2\n";
-    latency = 2;
-  }
-  else {
-    llvm::dbgs() << "Operation " << op->getName().getStringRef() << " does not have latency\n";
-    latency = 0;
-  }
-  
-  return latency;
+
+  llvm::dbgs() << "Operation " << op->getName().getStringRef() << " does not have latency\n";
+  return 0;
 }
 
 AdjListGraph::AdjListGraph(handshake::FuncOp funcOp, llvm::SetVector<unsigned> cfdfcBBs, TimingDatabase timingDB, unsigned II) {
