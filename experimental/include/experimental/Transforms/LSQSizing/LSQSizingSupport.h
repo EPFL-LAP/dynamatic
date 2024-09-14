@@ -56,15 +56,18 @@ public:
     // Finds the longest non-cyclic path starting from a node (ignores backedges)
     std::vector<std::string> findLongestNonCyclicPath(mlir::Operation *startOp);
 
+    // Returns all operations in the graph 
+    std::vector<mlir::Operation*> getOperations();
+
     // Returns all operations in the graph with a specific operation name (not unique name, but type of operation e.g. "handshake.mux")
     std::vector<mlir::Operation*> getOperationsWithOpName(std::string opName);
 
     // Returns all operations which are connected to a specific operation (includes backedges, but skips the artificial nodes)
     std::vector<mlir::Operation*> getConnectedOps(mlir::Operation *op);
 
+    // TODO: decide if keep recrusive or stack based version
     std::vector<std::string> findLongestNonCyclicPath2(mlir::Operation* startOp);
 
-    std::vector<mlir::Operation*> getOperations();
 
 private:
     // Map to store the nodes by their Operations unique name
@@ -82,7 +85,7 @@ private:
     // Depth first search algorithm for Path finding between two nodes
     void dfs(std::string& currentNode, std::string& end, std::vector<std::string>& currentPath, std::set<std::string>& visited, std::vector<std::vector<std::string>>& paths, bool ignoreBackedges = false);
     
-    
+    // TODO: decide if keep recrusive or stack based version    
     void dfsHelper(const std::string& currentNode, std::set<std::string>& visited, std::vector<std::string>& currentPath, int& maxLatency, std::vector<std::string>& bestPath);
 
     // Adds the edges between nodes for a result value of an operation
