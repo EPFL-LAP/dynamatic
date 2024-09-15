@@ -1024,7 +1024,7 @@ LogicalResult FtdLowerFuncToHandshake::convertMergesToMuxes(
   return success();
 }
 
-/// Internal recursive function to find the closes branch predecessor
+/// Internal recursive function to find the closest branch predecessor
 static bool
 findClosestBranchPredecessor(Value input, DominanceInfo &domInfo, Block &block,
                              Value &desiredCond, bool &getTrueSuccessor,
@@ -1232,29 +1232,32 @@ LogicalResult FtdLowerFuncToHandshake::matchAndRewrite(
   if (failed(convertUndefinedValues(rewriter, funcOp)))
     return failure();
 
-  // Add phi
-  if (failed(addPhi(rewriter, funcOp, ftdOps)))
-    return failure();
+  if (funcOp.getBlocks().size() != 1) {
 
-  // Add suppression blocks between each pair of producer and consumer
-  if (failed(addSupp(rewriter, funcOp, ftdOps)))
-    return failure();
+    // Add phi
+    if (failed(addPhi(rewriter, funcOp, ftdOps)))
+      return failure();
 
-  // Add supp branches
-  if (failed(addSuppBranches(rewriter, funcOp, ftdOps)))
-    return failure();
+    // Add suppression blocks between each pair of producer and consumer
+    if (failed(addSupp(rewriter, funcOp, ftdOps)))
+      return failure();
 
-  // Add supp for start
-  if (failed(addSuppStart(rewriter, funcOp, ftdOps)))
-    return failure();
+    // Add supp branches
+    if (failed(addSuppBranches(rewriter, funcOp, ftdOps)))
+      return failure();
 
-  // Convert merges to muxes
-  if (failed(convertMergesToMuxes(rewriter, funcOp, ftdOps)))
-    return failure();
+    // Add supp for start
+    if (failed(addSuppStart(rewriter, funcOp, ftdOps)))
+      return failure();
 
-  // Add supp GSA
-  if (failed(addSuppGSA(rewriter, funcOp, ftdOps)))
-    return failure();
+    // Convert merges to muxes
+    if (failed(convertMergesToMuxes(rewriter, funcOp, ftdOps)))
+      return failure();
+
+    // Add supp GSA
+    if (failed(addSuppGSA(rewriter, funcOp, ftdOps)))
+      return failure();
+  }
 
   // id basic block
   idBasicBlocks(funcOp, rewriter);
@@ -1367,13 +1370,12 @@ static Value boolExpressionToCircuit(ConversionPatternRewriter &rewriter,
       block->getOperations().front().getLoc());
   Value cnstTrigger = sourceOp.getResult();
 
-  auto cstType = rewriter.getI1Type();
-  auto cstAttr =
-      IntegerAttr::get(cstType, (expr->type == ExpressionType::One ? 1 : 0));
+  auto intType = rewriter.getIntegerType(1);
+  auto cstAttr = rewriter.getIntegerAttr(
+      intType, (expr->type == ExpressionType::One ? 1 : 0));
 
   auto constOp = rewriter.create<handshake::ConstantOp>(
-      block->getOperations().front().getLoc(), cstAttr.getType(), cstAttr,
-      cnstTrigger);
+      block->getOperations().front().getLoc(), cstAttr, cnstTrigger);
   ftdOps.networkConstants.insert(constOp);
 
   return constOp.getResult();
@@ -1401,7 +1403,7 @@ static Value insertBranchToLoop(ConversionPatternRewriter &rewriter,
 
   handshake::ConditionalBranchOp branchOp;
 
-  // [TODO] Discuss with aya
+  // discuss with aya
   if (isa<handshake::LSQOp>(consumer))
     return connection;
 
@@ -1751,7 +1753,8 @@ FtdLowerFuncToHandshake::addSupp(ConversionPatternRewriter &rewriter,
       // For each value coming out of the producer, consider all its users
       for (Value result : producerOp.getResults()) {
 
-        auto users = result.getUsers();
+        std::vector<Operation *> users(result.getUsers().begin(),
+                                       result.getUsers().end());
 
         for (Operation *consumerOp : users) {
           Block *consumerBlock = consumerOp->getBlock();
@@ -1780,17 +1783,17 @@ FtdLowerFuncToHandshake::addSupp(ConversionPatternRewriter &rewriter,
           // Different scenarios about the relationship between consumer and
           // producer should be handled:
           // 1. If the producer is in a loop and the consumer is not in that
-          // same loop, then the token produced needs to be suppressed as long
-          // as the loop is executed;
-          // 2. If the consumer uses its own result, then we need to handle a
-          // self-regeneration;
-          // 3. If the consumer precedes the producer, then we have a backward
-          // regeneration;
+          // same loop, then the token produced needs to be suppressed as
+          // long as the loop is executed;
+          // 2. If the consumer uses its own result, then we need to handle
+          // a self-regeneration;
+          // 3. If the consumer precedes the producer, then we have a
+          // backward regeneration;
           // 4. Else, the components are in the same basic block and we add
           // a normal suppression-generation mechanism.
 
-          // Set true if the producer is in a loop which does not contains the
-          // consumer
+          // Set true if the producer is in a loop which does not contains
+          // the consumer
           bool producingGtUsing =
               loopInfo.getLoopFor(&producerBlock) &&
               !loopInfo.getLoopFor(&producerBlock)->contains(consumerBlock);
