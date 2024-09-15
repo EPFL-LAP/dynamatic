@@ -11,11 +11,11 @@ module mul_4_stage #(
   output [DATA_TYPE - 1 : 0] p
 );
 
-  reg  [DATA_TYPE - 1 : 0] a_reg;
-  reg  [DATA_TYPE - 1 : 0] b_reg;
-  reg  [DATA_TYPE - 1 : 0] q0;
-  reg  [DATA_TYPE - 1 : 0] q1;
-  reg  [DATA_TYPE - 1 : 0] q2;
+  reg  [DATA_TYPE - 1 : 0] a_reg = 0;
+  reg  [DATA_TYPE - 1 : 0] b_reg = 0;
+  reg  [DATA_TYPE - 1 : 0] q0 = 0;
+  reg  [DATA_TYPE - 1 : 0] q1 = 0;
+  reg  [DATA_TYPE - 1 : 0] q2 = 0;
   wire  [DATA_TYPE - 1 : 0] mul;
 
   assign mul = a_reg * b_reg;

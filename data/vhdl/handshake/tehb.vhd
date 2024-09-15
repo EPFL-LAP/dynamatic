@@ -35,12 +35,12 @@ begin
       outs_ready => outs_ready
     );
 
-  process (clk, rst) is
+  process (clk) is
   begin
-    if (rst = '1') then
-      dataReg <= (others => '0');
-    elsif (rising_edge(clk)) then
-      if (regEnable) then
+    if (rising_edge(clk)) then
+      if (rst = '1') then
+        dataReg <= (others => '0');
+      elsif (regEnable) then
         dataReg <= ins;
       end if;
     end if;

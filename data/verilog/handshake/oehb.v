@@ -9,11 +9,12 @@ module oehb #(
   input  ins_valid,
   output ins_ready,
   // Output channel
-  output reg [DATA_TYPE - 1 : 0] outs,
+  output [DATA_TYPE - 1 : 0] outs,
   output outs_valid,
   input  outs_ready
 );
   wire regEn, inputReady;
+  reg [DATA_TYPE - 1 : 0] dataReg = 0;
   
   // Instance of oehb_dataless to manage handshaking
   oehb_dataless control (
@@ -25,15 +26,16 @@ module oehb #(
     .outs_ready (outs_ready)
   );
 
-  always @(posedge clk, posedge rst) begin
+  always @(posedge clk) begin
     if (rst) begin
-      outs <= {DATA_TYPE{1'b0}};
+      dataReg <= {DATA_TYPE{1'b0}};
     end else if (regEn) begin
-      outs <= ins;
+      dataReg <= ins;
     end
   end
 
   assign ins_ready = inputReady;
   assign regEn = inputReady & ins_valid;
+  assign outs = dataReg;
 
 endmodule
