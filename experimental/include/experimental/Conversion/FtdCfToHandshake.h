@@ -35,6 +35,8 @@ namespace dynamatic {
 namespace experimental {
 namespace ftd {
 
+/// Structure to store a set of data structures useful for the whole FTD
+/// algorithm.
 struct FtdStoredOperations {
 
   /// contains all operations created by fast token delivery algorithm
@@ -154,7 +156,7 @@ protected:
 
   /// The relationship between a producer and a consumer might pass through many
   /// basic blocks with many entering conditions. All of them should be taken
-  /// into account when handling the suprression mechanism. This function is
+  /// into account when handling the suppression mechanism. This function is
   /// called iteratively many times until all the relationships have been taken
   /// into account. In concrete, this means that the branches introduced in
   /// `addSupp` are now new producers which have to undergo the requirements of
@@ -177,6 +179,9 @@ protected:
                                      handshake::FuncOp &funcOp,
                                      FtdStoredOperations &ftdOps) const;
 
+  /// After the merges have been converted into muxes, a suppress is to be added
+  /// so there we get rid of the possibility of the consumer executing when the
+  /// input connected to its producer is not activated
   LogicalResult addSuppGSA(ConversionPatternRewriter &rewriter,
                            handshake::FuncOp &funcOp,
                            FtdStoredOperations &ftdOps) const;
