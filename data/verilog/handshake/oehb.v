@@ -9,7 +9,7 @@ module oehb #(
   input  ins_valid,
   output ins_ready,
   // Output channel
-  output reg [DATA_TYPE - 1 : 0] outs,
+  output [DATA_TYPE - 1 : 0] outs,
   output outs_valid,
   input  outs_ready
 );
