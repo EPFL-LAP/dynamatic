@@ -279,7 +279,6 @@ static void reconnectMergeOps(Region &region,
   for (Block &block : region) {
     if (getBlockPredecessorCount(&block) > 1) {
       auto ctrlMergeOp = getFirstOp<handshake::ControlMergeOp>(&block);
-      assert(!ctrlMergeOp);
 
       for (HandshakeLowering::MergeOpInfo &mergeInfo : blockMerges[&block]) {
         if (mergeInfo.mergeLikeOp != ctrlMergeOp) {
