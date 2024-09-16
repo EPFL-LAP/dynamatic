@@ -94,8 +94,8 @@ begin
         if storeEn then
           counter := std_logic_vector(unsigned(counter) - 1);
         end if;
-        remainingStores <= counter;
       end if;
+      remainingStores <= counter;
     end if;
   end process;
 
