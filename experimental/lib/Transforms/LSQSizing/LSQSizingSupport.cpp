@@ -330,7 +330,7 @@ std::vector<mlir::Operation*> AdjListGraph::getOperationsWithOpName(std::string 
 }
 
 
-int AdjListGraph::findMaxPathLatency(mlir::Operation *startOp, mlir::Operation *endOp, bool ignoreBackedge) {
+int AdjListGraph::findMaxPathLatency(mlir::Operation *startOp, mlir::Operation *endOp, bool ignoreBackedge, bool excludeLastNodeLatency) {
   // Find all paths between the start and end node    
   std::vector<std::vector<std::string>> paths = findPaths(startOp, endOp, ignoreBackedge);
   int maxLatency = 0;
@@ -339,6 +339,9 @@ int AdjListGraph::findMaxPathLatency(mlir::Operation *startOp, mlir::Operation *
   // Iterate over all paths and keep track of the path with the highest latency
   for(auto &path: paths)
   {
+    if(excludeLastNodeLatency) {
+      path.pop_back();
+    }
     // TODO cleanup after everything is verified (std::max instead of if statement)
     int latency = getPathLatency(path);
     if(maxLatency < latency) {

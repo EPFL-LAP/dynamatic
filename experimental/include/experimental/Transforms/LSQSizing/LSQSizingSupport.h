@@ -48,7 +48,7 @@ public:
     int getPathLatency(std::vector<std::string> path);
 
     // Finds the path with the highest latency between two nodes
-    int findMaxPathLatency(mlir::Operation *startOp, mlir::Operation *endOp, bool ignoreBackedge = false);
+    int findMaxPathLatency(mlir::Operation *startOp, mlir::Operation *endOp, bool ignoreBackedge = false, bool excludeLastNodeLatency = false);
 
     // Finds the path with the lowest latency between two nodes
     int findMinPathLatency(mlir::Operation *startOp, mlir::Operation *endOp, bool ignoreBackedge = false);

@@ -72,8 +72,12 @@ private:
   std::unordered_map<mlir::Operation *, int> getAllocTimes(AdjListGraph graph, mlir::Operation *startNode, std::vector<mlir::Operation *> ops,
                                                            std::unordered_map<unsigned, mlir::Operation *> phiNodes);
 
-  // Finds the deallocation time of each operation, which is the maximum latency to the operation (the latency of the last argument arriving)                                                       
-  std::unordered_map<mlir::Operation *, int> getDeallocTimes(AdjListGraph graph, mlir::Operation *startNode, std::vector<mlir::Operation *> ops);
+  // Finds the deallocation time of each store operation, which is the the latency of the last argument arriving
+  std::unordered_map<mlir::Operation *, int> getStoreDeallocTimes(AdjListGraph graph, mlir::Operation *startNode, std::vector<mlir::Operation *> storeOps);
+
+  // Finds the deallocation time of each load operation, which is the latest argument arriving at the operation succeding the load operation
+  // This is due to to the fact that the load operation frees the queue entry as soon as the load result is passed on to the succeeding operation                                                     
+  std::unordered_map<mlir::Operation *, int> getLoadDeallocTimes(AdjListGraph graph, mlir::Operation *startNode, std::vector<mlir::Operation *> loadOps);
 
   // Given the alloc and dealloc times of each operation, calculates the maximum queue size needed for each LSQ
   std::unordered_map<mlir::Operation*, unsigned> calcQueueSize(std::unordered_map<mlir::Operation *, int> allocTimes, std::unordered_map<mlir::Operation *, int> deallocTimes, unsigned II);
@@ -202,8 +206,8 @@ std::optional<LSQSizingResult> HandshakeSizeLSQsPass::sizeLSQsForGraph(AdjListGr
   std::unordered_map<mlir::Operation *, int> storeAllocTimes = getAllocTimes(graph, startNode, storeOps, phiNodes);
 
   // Get Dealloc Time of each Op
-  std::unordered_map<mlir::Operation *, int> loadDeallocTimes = getDeallocTimes(graph, startNode, loadOps);
-  std::unordered_map<mlir::Operation *, int> storeDeallocTimes = getDeallocTimes(graph, startNode, storeOps);
+  std::unordered_map<mlir::Operation *, int> loadDeallocTimes = getLoadDeallocTimes(graph, startNode, loadOps);
+  std::unordered_map<mlir::Operation *, int> storeDeallocTimes = getStoreDeallocTimes(graph, startNode, storeOps);
 
   // Get Load and Store Sizes
   std::unordered_map<mlir::Operation*, unsigned> loadSizes = calcQueueSize(loadAllocTimes, loadDeallocTimes, II);
@@ -339,7 +343,7 @@ std::unordered_map<mlir::Operation *, int> HandshakeSizeLSQsPass::getAllocTimes(
   return allocTimes;
 }
 
-std::unordered_map<mlir::Operation *, int> HandshakeSizeLSQsPass::getDeallocTimes(AdjListGraph graph, mlir::Operation *startNode, std::vector<mlir::Operation *> ops) {
+std::unordered_map<mlir::Operation *, int> HandshakeSizeLSQsPass::getStoreDeallocTimes(AdjListGraph graph, mlir::Operation *startNode, std::vector<mlir::Operation *> ops) {
   std::unordered_map<mlir::Operation *, int> deallocTimes;
   
   // Go trough all ops and find the maximum latency to the op node
@@ -347,6 +351,23 @@ std::unordered_map<mlir::Operation *, int> HandshakeSizeLSQsPass::getDeallocTime
     int latency = graph.findMaxPathLatency(startNode, op);
     deallocTimes.insert({op, latency});
     llvm::dbgs() << "\t\t [DBG] " << getUniqueName(op).str() << " dealloc time: " << latency << "\n";
+  }
+  return deallocTimes;
+}
+
+std::unordered_map<mlir::Operation *, int> HandshakeSizeLSQsPass::getLoadDeallocTimes(AdjListGraph graph, mlir::Operation *startNode, std::vector<mlir::Operation *> ops) {
+  std::unordered_map<mlir::Operation *, int> deallocTimes;
+  
+  // Go trough all ops which directly succeed the load op and therefore need its result
+  // Check every succeeding nodes for the maximum latency (latest argument arrival), excluding the latency of the operation itself
+  for(auto &op: ops) {
+    int maxLatency = 0;
+    for(auto &succedingOp: graph.getConnectedOps(op)) {
+      llvm::dbgs() << "\t\t [DBG] " << getUniqueName(op).str() << " connected to " << getUniqueName(succedingOp).str() << "with latency: " << graph.findMaxPathLatency(startNode, succedingOp, false, true) << "\n";
+      maxLatency = std::max(graph.findMaxPathLatency(startNode, succedingOp, false, true), maxLatency);
+    }
+    deallocTimes.insert({op, maxLatency});
+    llvm::dbgs() << "\t\t [DBG] " << getUniqueName(op).str() << " dealloc time: " << maxLatency << "\n";
   }
   return deallocTimes;
 }
