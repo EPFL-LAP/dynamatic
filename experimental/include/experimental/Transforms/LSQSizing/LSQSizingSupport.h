@@ -20,8 +20,8 @@ namespace lsqsizing {
 struct AdjListNode {
     int latency; // Latency of the operation
     mlir::Operation* op; // Pointer to the operation
-    std::list<std::string> edges; // Adjacency list (stores keys of adjacent nodes)
-    std::list<std::string> backedges; // Backedge list (stores keys of adjacent nodes connected by backedges)
+    std::set<std::string> edges; // Adjacency list (stores keys of adjacent nodes)
+    std::set<std::string> backedges; // Backedge list (stores keys of adjacent nodes connected by backedges)
 };
 
 class AdjListGraph {

@@ -19,8 +19,6 @@ using namespace dynamatic::experimental::lsqsizing;
 // 1. If the operation is in the timingDB, the latency is extracted from the timingDB
 // 2. If the operation is a buffer operation, the latency is extracted from the timing attribute
 // 3. If the operation is neither, then its latency is set to 0
-// TODO cleanup after handshake dialect/component.json mismatch is fixed
-//TODO regex matching
 int extractNodeLatency(mlir::Operation *op, TimingDatabase timingDB) {
   double latency = 0;
 
@@ -30,13 +28,13 @@ int extractNodeLatency(mlir::Operation *op, TimingDatabase timingDB) {
   if(op->getName().getStringRef() == "handshake.buffer") { // TODO use some build in class method instead of name?
     auto params = op->getAttrOfType<DictionaryAttr>(RTL_PARAMETERS_ATTR_NAME);
     if (!params) {
-      llvm::dbgs() << "BufferOp" << getUniqueName(op).str() << " does not have parameters\n";
+      //llvm::dbgs() << "BufferOp" << getUniqueName(op).str() << " does not have parameters\n";
       return 0;
     }
 
     auto optTiming = params.getNamed(handshake::BufferOp::TIMING_ATTR_NAME);
     if (!optTiming) {
-      llvm::dbgs() << "BufferOp" << getUniqueName(op).str() << " does not have timing\n";
+      //llvm::dbgs() << "BufferOp" << getUniqueName(op).str() << " does not have timing\n";
       return 0;
     }
 
@@ -46,7 +44,7 @@ int extractNodeLatency(mlir::Operation *op, TimingDatabase timingDB) {
     }   
   }
 
-  llvm::dbgs() << "Operation " << op->getName().getStringRef() << " does not have latency\n";
+  //llvm::dbgs() << "Operation " << op->getName().getStringRef() << " does not have latency\n";
   return 0;
 }
 
@@ -121,11 +119,11 @@ void AdjListGraph::addNode(mlir::Operation *op, int latency) {
 }
 
 void AdjListGraph::addEdge(mlir::Operation * src, mlir::Operation * dest) {
-    nodes.at(getUniqueName(src).str()).edges.push_back(getUniqueName(dest).str()); // Add edge from node u to node v
+    nodes.at(getUniqueName(src).str()).edges.insert(getUniqueName(dest).str()); // Add edge from node u to node v
 }
 
 void AdjListGraph::addBackedge(mlir::Operation * src, mlir::Operation * dest) {
-    nodes.at(getUniqueName(src).str()).backedges.push_back(getUniqueName(dest).str()); // Add edge from node u to node v
+    nodes.at(getUniqueName(src).str()).backedges.insert(getUniqueName(dest).str()); // Add edge from node u to node v
 }
 
 void AdjListGraph::addChannelEdges(mlir::Value res) {
@@ -175,12 +173,12 @@ void AdjListGraph::insertArtificialNodeOnBackedge(mlir::Operation* src, mlir::Op
   std::string newNodeName = "backedge_" + srcName + "_" + destName;
 
   //remove existing edges from src to dest
-  nodes.at(srcName).edges.remove(destName);
-  nodes.at(srcName).backedges.remove(destName);
+  nodes.at(srcName).edges.erase(destName);
+  nodes.at(srcName).backedges.erase(destName);
 
   // create node and add edge from src to new node and new node to dest
   nodes.insert({newNodeName, AdjListNode{latency, nullptr, {}, {destName}}});
-  nodes.at(srcName).backedges.push_back(newNodeName);
+  nodes.at(srcName).backedges.insert(newNodeName);
 }
 
 
@@ -192,7 +190,7 @@ void AdjListGraph::dfs(std::string& currentNode, std::string& end, std::vector<s
     }
 
     // Iterate over all adjacent nodes
-    for (std::string& neighbor : nodes.at(currentNode).edges) {
+    for (auto neighbor : nodes.at(currentNode).edges) {
         // If the neighbor has not been visited, visit it
         if (visited.find(neighbor) == visited.end()) {
             visited.insert(neighbor); // Mark as visited
@@ -206,7 +204,7 @@ void AdjListGraph::dfs(std::string& currentNode, std::string& end, std::vector<s
     }
 
     if(!ignoreBackedges) {
-        for (std::string& neighbor : nodes.at(currentNode).backedges) {
+        for (auto neighbor : nodes.at(currentNode).backedges) {
         // If the neighbor has not been visited, visit it
         if (visited.find(neighbor) == visited.end()) {
             visited.insert(neighbor); // Mark as visited
@@ -235,7 +233,7 @@ std::vector<std::vector<std::string>> AdjListGraph::findPaths(std::string start,
 
 std::vector<std::vector<std::string>> AdjListGraph::findPaths(mlir::Operation *startOp, mlir::Operation *endOp, bool ignoreBackedge) {
   assert(startOp && endOp && "Start and end operations must not be null");
-  llvm::dbgs() << "Finding paths from " << getUniqueName(startOp).str() << " to " << getUniqueName(endOp).str() << "\n";
+  //llvm::dbgs() << "Finding paths from " << getUniqueName(startOp).str() << " to " << getUniqueName(endOp).str() << "\n";
   return findPaths(getUniqueName(startOp).str(), getUniqueName(endOp).str(), ignoreBackedge);
 }
 
