@@ -984,9 +984,8 @@ LogicalResult FtdLowerFuncToHandshake::convertMergesToMuxes(
 
         bool swap = false;
 
-        // aya
-        swap = domInfo.dominates(mergeFirstBlock, cmergeSecondBlock);
-        swap = domInfo.dominates(mergeSecondBlock, cmergeFirstBlock);
+        swap = (domInfo.dominates(mergeFirstBlock, cmergeSecondBlock));
+        swap = (domInfo.dominates(mergeSecondBlock, cmergeFirstBlock));
 
         if (swap) {
           rewriter.setInsertionPointAfterValue(select);
@@ -1255,7 +1254,6 @@ LogicalResult FtdLowerFuncToHandshake::matchAndRewrite(
   if (failed(flattenAndTerminate(funcOp, rewriter, argReplacements)))
     return failure();
 
-  funcOp.print(llvm::dbgs());
   return success();
 }
 
@@ -1394,7 +1392,6 @@ static Value insertBranchToLoop(ConversionPatternRewriter &rewriter,
 
   handshake::ConditionalBranchOp branchOp;
 
-  // discuss with aya
   if (isa<handshake::LSQOp>(consumer))
     return connection;
 
