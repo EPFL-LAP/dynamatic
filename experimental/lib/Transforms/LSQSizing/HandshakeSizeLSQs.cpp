@@ -51,6 +51,12 @@ struct HandshakeSizeLSQsPass
 
 private:
 
+  // There is a offset between the arrival time of the arguments and the actual allocation/deallocation time inside the LSQ
+  // For allocation it is the same for both load and stores, for deallocation it is different between loads and stores
+  static const int allocEntryLatency = 1;
+  static const int storeDeallocEntryLatency = 2;
+  static const int loadDeallocEntryLatency = 1;
+
   // Determines the LSQ sizes, given a CFDFC and its II
   std::optional<LSQSizingResult> sizeLSQsForGraph(AdjListGraph graph, unsigned II);
 
@@ -68,14 +74,14 @@ private:
   // Therefore the LSQ operations will be allocated at the start of the BB
   void insertAllocPrecedesMemoryAccessEdges(AdjListGraph &graph, std::vector<mlir::Operation *> ops, std::unordered_map<unsigned, mlir::Operation *> phiNodes);
 
-  // Finds the allocation time of each operation, which is the latency to the Phi Node of the BB
+  // Finds the allocation time of each operation, which is the latency to the Phi Node of the BB plus a fixed additional latency
   std::unordered_map<mlir::Operation *, int> getAllocTimes(AdjListGraph graph, mlir::Operation *startNode, std::vector<mlir::Operation *> ops,
                                                            std::unordered_map<unsigned, mlir::Operation *> phiNodes);
 
-  // Finds the deallocation time of each store operation, which is the the latency of the last argument arriving
+  // Finds the deallocation time of each store operation, which is the the latency of the last argument arriving plus a fixed additional latency
   std::unordered_map<mlir::Operation *, int> getStoreDeallocTimes(AdjListGraph graph, mlir::Operation *startNode, std::vector<mlir::Operation *> storeOps);
 
-  // Finds the deallocation time of each load operation, which is the latest argument arriving at the operation succeding the load operation
+  // Finds the deallocation time of each load operation, which is the latest argument arriving at the operation succeding the load operation plus a fixed additional latency
   // This is due to to the fact that the load operation frees the queue entry as soon as the load result is passed on to the succeeding operation                                                     
   std::unordered_map<mlir::Operation *, int> getLoadDeallocTimes(AdjListGraph graph, mlir::Operation *startNode, std::vector<mlir::Operation *> loadOps);
 
@@ -133,6 +139,7 @@ void HandshakeSizeLSQsPass::runDynamaticPass() {
 
     // Size LSQs for each CFDFC
     for(auto &entry: cfdfcBBLists) {
+      llvm::dbgs() << "\n\n ==========================\n";
       std::optional<LSQSizingResult> result = sizeLSQsForGraph(AdjListGraph(funcOp, entry.second, timingDB, IIs[entry.first]), IIs[entry.first]);
       if(result) {
         sizingResults.push_back(result.value());
@@ -197,9 +204,9 @@ std::optional<LSQSizingResult> HandshakeSizeLSQsPass::sizeLSQsForGraph(AdjListGr
   // connect all phi nodes to the lsq ps in their BB
   insertAllocPrecedesMemoryAccessEdges(graph, loadOps, phiNodes);  
 
-  llvm::dbgs() << "============================\n";
+  llvm::dbgs() << "----------------------------\n";
   graph.printGraph();
-  llvm::dbgs() << "============================\n";
+  llvm::dbgs() << "----------------------------\n";
 
   // Get Alloc Time of each Op (Start time of BB) 
   std::unordered_map<mlir::Operation *, int> loadAllocTimes = getAllocTimes(graph, startNode, loadOps, phiNodes);
@@ -229,6 +236,7 @@ std::optional<LSQSizingResult> HandshakeSizeLSQsPass::sizeLSQsForGraph(AdjListGr
     llvm::dbgs() << "\t [DBG] LSQ " << getUniqueName(entry.first).str() << " Load Size: " << std::get<0>(entry.second) << " Store Size: " << std::get<1>(entry.second) << "\n";
   }
 
+  llvm::dbgs() << "==========================\n";
   return result;
 }
 
@@ -333,10 +341,9 @@ std::unordered_map<mlir::Operation *, int> HandshakeSizeLSQsPass::getAllocTimes(
   for(auto &op: ops) {
     std::optional<unsigned> bb = getLogicBB(op);
     assert(bb && "Load/Store Op must belong to basic block");
-    llvm::dbgs() << "\t\t [DBG] " << getUniqueName(op).str() << " BB: " << *bb << "\n";
     mlir::Operation *phiNode = phiNodes[*bb];
     assert(phiNode && "Phi node not found for BB");
-    int latency = graph.findMinPathLatency(startNode, phiNode, true); //TODO ignore backedges?
+    int latency = graph.findMinPathLatency(startNode, phiNode, true) + allocEntryLatency;
     allocTimes.insert({op, latency});
     llvm::dbgs() << "\t\t [DBG] " << getUniqueName(op).str() << " alloc time: " << latency << "\n";
   }
@@ -348,7 +355,7 @@ std::unordered_map<mlir::Operation *, int> HandshakeSizeLSQsPass::getStoreDeallo
   
   // Go trough all ops and find the maximum latency to the op node
   for(auto &op: ops) {
-    int latency = graph.findMaxPathLatency(startNode, op);
+    int latency = graph.findMaxPathLatency(startNode, op) + storeDeallocEntryLatency;
     deallocTimes.insert({op, latency});
     llvm::dbgs() << "\t\t [DBG] " << getUniqueName(op).str() << " dealloc time: " << latency << "\n";
   }
@@ -363,8 +370,7 @@ std::unordered_map<mlir::Operation *, int> HandshakeSizeLSQsPass::getLoadDealloc
   for(auto &op: ops) {
     int maxLatency = 0;
     for(auto &succedingOp: graph.getConnectedOps(op)) {
-      llvm::dbgs() << "\t\t [DBG] " << getUniqueName(op).str() << " connected to " << getUniqueName(succedingOp).str() << "with latency: " << graph.findMaxPathLatency(startNode, succedingOp, false, true) << "\n";
-      maxLatency = std::max(graph.findMaxPathLatency(startNode, succedingOp, false, true), maxLatency);
+      maxLatency = std::max(graph.findMaxPathLatency(startNode, succedingOp, false, true) + loadDeallocEntryLatency, maxLatency);
     }
     deallocTimes.insert({op, maxLatency});
     llvm::dbgs() << "\t\t [DBG] " << getUniqueName(op).str() << " dealloc time: " << maxLatency << "\n";
@@ -467,7 +473,6 @@ void HandshakeSizeLSQsPass::insertAllocPrecedesMemoryAccessEdges(AdjListGraph &g
     assert(bb && "Load/Store Op must belong to basic block");
     mlir::Operation *phiNode = phiNodes[*bb];
     graph.addEdge(phiNode, op);
-    llvm::dbgs() << " [DBG] Added edge from " << getUniqueName(phiNode).str() << " to " << getUniqueName(op).str() << "\n";
   }
 }
 
