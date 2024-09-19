@@ -280,7 +280,7 @@ static SmallVector<Operation *> getLSQOperations(
 /// information among them, crate a group graph.
 static void constructGroupsGraph(SmallVector<Operation *> &operations,
                                  SmallVector<ProdConsMemDep> &allMemDeps,
-                                 DenseSet<Group *> &groups) {
+                                 std::set<Group *> &groups) {
 
   //  Given the operations related to the LSQ, create a group for each of the
   //  correspondent basic block
@@ -330,48 +330,36 @@ static void constructGroupsGraph(SmallVector<Operation *> &operations,
 /// graph can be simplified, saving and edge:
 ///
 /// B -> C -> D
-static void minimizeGroupsConnections(DenseSet<Group *> &groupsGraph) {
+static void minimizeGroupsConnections(std::set<Group *> &groupsGraph) {
 
   // Get the dominance info for the region
   DominanceInfo domInfo;
 
-  // For each group, compare all the pairs of its predecessors. Cut the edge
-  // between them iff the predecessor with the bigger index dominates the
-  // whole group
-  for (auto &group : groupsGraph) {
-    // List of predecessors to remove
-    DenseSet<Group *> predsToRemove;
-    for (auto &bp : group->preds) {
-      // If the big predecessor is already in the list to remove, ignore it
-      if (llvm::find(predsToRemove, bp) != predsToRemove.end())
-        continue;
-      for (auto &sp : group->preds) {
-        // If the small predecessor has bigger index than the big predecessor,
-        // ignore it
-        if (lessThanBlocks(bp->bb, sp->bb))
-          continue;
-        // If the small predecessor is already in the list to remove, ignore
-        // it
-        if (llvm::find(predsToRemove, sp) != predsToRemove.end())
-          continue;
-        // if we are considering the same elements, ignore them
-        if (sp->bb == bp->bb)
-          continue;
+  // For every group, compare every 2 of its preds, Cut the edge only if
+  // the pred with the bigger idx dominates your group
+  for (auto group = groupsGraph.rbegin(); group != groupsGraph.rend();
+       ++group) {
+    std::set<Group *> predsToRemove;
 
-        // Add the small predecessors to the list of elements to remove in
-        // case the big predecessor has the small one among its
-        // predecessors, and the big precessor's BB properly dominates the
-        // BB of the group currently under analysis
-        if ((bp->preds.find(sp) != bp->preds.end()) &&
-            domInfo.properlyDominates(bp->bb, group->bb)) {
-          predsToRemove.insert(sp);
+    for (auto bigPred = (*group)->preds.rbegin();
+         bigPred != (*group)->preds.rend(); ++bigPred) {
+      if (llvm::find(predsToRemove, *bigPred) != predsToRemove.end())
+        continue;
+      for (auto smallPred = (*group)->preds.rbegin();
+           smallPred != (*group)->preds.rend(); ++smallPred) {
+        if (llvm::find(predsToRemove, *smallPred) != predsToRemove.end())
+          continue;
+        if ((*bigPred != *smallPred) &&
+            ((*bigPred)->preds.find(*smallPred) != (*bigPred)->preds.end()) &&
+            domInfo.properlyDominates((*bigPred)->bb, (*group)->bb)) {
+          predsToRemove.insert(*smallPred);
         }
       }
     }
 
     for (auto *pred : predsToRemove) {
-      group->preds.erase(pred);
-      pred->succs.erase(group);
+      (*group)->preds.erase(pred);
+      pred->succs.erase(*group);
     }
   }
 }
@@ -410,9 +398,8 @@ void eliminateCommonEntries(DenseSet<Type> &s1, DenseSet<Type> &s2) {
 
   std::vector<Type> intersection;
   for (auto &e1 : s1) {
-    if (s2.contains(e1)) {
+    if (s2.contains(e1))
       intersection.push_back(e1);
-    }
   }
 
   for (auto &bb : intersection) {
@@ -1564,7 +1551,7 @@ static LogicalResult addSuppNonLoop(ConversionPatternRewriter &rewriter,
     Value branchCond =
         dataToCircuit(rewriter, shannonResult, consumer->getBlock(), ftdOps);
 
-    rewriter.setInsertionPointToStart(consumer->getBlock());
+    rewriter.setInsertionPointToStart(producerBlock);
     auto branchOp = rewriter.create<handshake::ConditionalBranchOp>(
         consumer->getLoc(), branchCond, connection);
     ftdOps.allocationNetwork.insert(branchOp);
@@ -2139,7 +2126,7 @@ LogicalResult FtdLowerFuncToHandshake::ftdVerifyAndCreateMemInterfaces(
 
       // Stores the Groups graph required for the allocation network
       // analysis
-      DenseSet<Group *> groupsGraph;
+      std::set<Group *> groupsGraph;
       constructGroupsGraph(allOperations, allMemDeps, groupsGraph);
       minimizeGroupsConnections(groupsGraph);
 
@@ -2155,21 +2142,25 @@ LogicalResult FtdLowerFuncToHandshake::ftdVerifyAndCreateMemInterfaces(
       // to be propagated. In particular, we want to keep track of the control
       // value associated to each basic block in the region
       DenseMap<Block *, Operation *> forksGraph;
+      DenseSet<Group *> groupsGraphDS;
+
+      for (auto *p : groupsGraph)
+        groupsGraphDS.insert(p);
 
       if (failed(memBuilder.instantiateInterfacesWithForks(
-              rewriter, mcOp, lsqOp, groupsGraph, forksGraph, startValue,
+              rewriter, mcOp, lsqOp, groupsGraphDS, forksGraph, startValue,
               ftdOps.allocationNetwork)))
         return failure();
 
-      if (failed(addMergeNonLoop(funcOp, rewriter, allMemDeps, groupsGraph,
+      if (failed(addMergeNonLoop(funcOp, rewriter, allMemDeps, groupsGraphDS,
                                  forksGraph, ftdOps, startValue)))
         return failure();
 
-      if (failed(addMergeLoop(funcOp, rewriter, allMemDeps, groupsGraph,
+      if (failed(addMergeLoop(funcOp, rewriter, allMemDeps, groupsGraphDS,
                               forksGraph, ftdOps, startValue)))
         return failure();
 
-      if (failed(joinInsertion(rewriter, groupsGraph, forksGraph,
+      if (failed(joinInsertion(rewriter, groupsGraphDS, forksGraph,
                                ftdOps.allocationNetwork)))
         return failure();
     } else {
