@@ -9,9 +9,8 @@
 
 #include "dynamatic/Support/DynamaticPass.h"
 #include "dynamatic/Support/LLVM.h"
-#include "mlir/Pass/Pass.h"
 #include "dynamatic/Support/TimingModels.h"
-
+#include "mlir/Pass/Pass.h"
 
 namespace dynamatic {
 namespace experimental {
@@ -27,9 +26,5 @@ createHandshakeSizeLSQs(StringRef timingModels = "", StringRef collisions = "");
 } // namespace lsqsizing
 } // namespace experimental
 } // namespace dynamatic
-
-
-
-
 
 #endif // DYNAMATIC_TRANSFORMS_SIZE_LSQS_H
