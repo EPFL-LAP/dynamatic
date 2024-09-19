@@ -60,7 +60,7 @@ private:
   static const int loadDeallocEntryLatency = 1; //1
 
   // Determines the LSQ sizes, given a CFDFC and its II
-  std::optional<LSQSizingResult> sizeLSQsForGraph(AdjListGraph graph, unsigned II);
+  std::optional<LSQSizingResult> sizeLSQsForGraph(AdjListGraph graph, unsigned II, std::string collisions);
 
   // Finds the Start Node in a CFDFC
   // The start node, is the node with the longest non-cyclic path to any other node
@@ -90,7 +90,7 @@ private:
   std::unordered_map<mlir::Operation *, int> getLoadDeallocTimes(AdjListGraph graph, mlir::Operation *startNode, std::vector<mlir::Operation *> loadOps);
 
   // Given the alloc and dealloc times of each operation, calculates the maximum queue size needed for each LSQ
-  std::unordered_map<mlir::Operation*, unsigned> calcQueueSize(std::unordered_map<mlir::Operation *, int> allocTimes, std::unordered_map<mlir::Operation *, int> deallocTimes, unsigned II, bool isLoadQueue);
+  std::unordered_map<mlir::Operation*, unsigned> calcQueueSize(std::unordered_map<mlir::Operation *, int> allocTimes, std::unordered_map<mlir::Operation *, int> deallocTimes, unsigned II, std::string collisions);
 };
 } // namespace
 
@@ -144,7 +144,7 @@ void HandshakeSizeLSQsPass::runDynamaticPass() {
     // Size LSQs for each CFDFC
     for(auto &entry: cfdfcBBLists) {
       llvm::dbgs() << "\n\n ==========================\n";
-      std::optional<LSQSizingResult> result = sizeLSQsForGraph(AdjListGraph(funcOp, entry.second, timingDB, IIs[entry.first]), IIs[entry.first]);
+      std::optional<LSQSizingResult> result = sizeLSQsForGraph(AdjListGraph(funcOp, entry.second, timingDB, IIs[entry.first]), IIs[entry.first], collisions);
       if(result) {
         sizingResults.push_back(result.value());
       }
@@ -185,7 +185,7 @@ void HandshakeSizeLSQsPass::runDynamaticPass() {
 }
 
 
-std::optional<LSQSizingResult> HandshakeSizeLSQsPass::sizeLSQsForGraph(AdjListGraph graph, unsigned II) {
+std::optional<LSQSizingResult> HandshakeSizeLSQsPass::sizeLSQsForGraph(AdjListGraph graph, unsigned II, std::string collisions) {
 
   std::vector<mlir::Operation *> loadOps = graph.getOperationsWithOpName("handshake.lsq_load");
   std::vector<mlir::Operation *> storeOps = graph.getOperationsWithOpName("handshake.lsq_store");
@@ -224,8 +224,8 @@ std::optional<LSQSizingResult> HandshakeSizeLSQsPass::sizeLSQsForGraph(AdjListGr
   std::unordered_map<mlir::Operation *, int> storeDeallocTimes = getStoreDeallocTimes(graph, startNode, storeOps);
 
   // Get Load and Store Sizes
-  std::unordered_map<mlir::Operation*, unsigned> loadSizes = calcQueueSize(loadAllocTimes, loadDeallocTimes, II, true);
-  std::unordered_map<mlir::Operation*, unsigned> storeSizes = calcQueueSize(storeAllocTimes, storeDeallocTimes, II, false);
+  std::unordered_map<mlir::Operation*, unsigned> loadSizes = calcQueueSize(loadAllocTimes, loadDeallocTimes, II, collisions);
+  std::unordered_map<mlir::Operation*, unsigned> storeSizes = calcQueueSize(storeAllocTimes, storeDeallocTimes, II, collisions);
 
   LSQSizingResult result;
   for(auto &entry: loadSizes) {
@@ -412,7 +412,7 @@ std::unordered_map<mlir::Operation *, int> HandshakeSizeLSQsPass::getLoadDealloc
 }
 
 
-std::unordered_map<mlir::Operation*, unsigned> HandshakeSizeLSQsPass::calcQueueSize(std::unordered_map<mlir::Operation *, int> allocTimes, std::unordered_map<mlir::Operation *, int> deallocTimes, unsigned II, bool isLoadQueue) {
+std::unordered_map<mlir::Operation*, unsigned> HandshakeSizeLSQsPass::calcQueueSize(std::unordered_map<mlir::Operation *, int> allocTimes, std::unordered_map<mlir::Operation *, int> deallocTimes, unsigned II, std::string collisions) {
   std::unordered_map<mlir::Operation*, unsigned> queueSizes;
 
   int endTime = 0;
@@ -423,7 +423,6 @@ std::unordered_map<mlir::Operation*, unsigned> HandshakeSizeLSQsPass::calcQueueS
       endTime = entry.second;
     }
   }
-
 
   // Go trough all alloc ops find the corresponding LSQ and save the alloc times
   std::unordered_map<mlir::Operation*, std::tuple<std::vector<int>, std::vector<int>>> allocDeallocTimesPerLSQ;
@@ -458,6 +457,7 @@ std::unordered_map<mlir::Operation*, unsigned> HandshakeSizeLSQsPass::calcQueueS
 
   // Go trough all LSQs and calculate the maximum amount of slots needed
   for(auto &entry: allocDeallocTimesPerLSQ) {
+
     int iterMax = std::ceil((float)(endTime) / II) - 1;
     std::vector<int> slotsPerCycle(endTime);
 

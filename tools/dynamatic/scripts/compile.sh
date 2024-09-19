@@ -170,7 +170,7 @@ exit_on_fail "Failed to canonicalize Handshake" "Canonicalized handshake"
 
 # handshake lsq sizing
 "$DYNAMATIC_OPT_BIN" "$F_HANDSHAKE_EXPORT" \
-  --handshake-size-lsqs="timing-models=$DYNAMATIC_DIR/data/components.json" \
+  --handshake-size-lsqs="timing-models=$DYNAMATIC_DIR/data/components.json collisions=none" \
   > "$F_HANDSHAKE_LSQ_SIZED"
 exit_on_fail "Failed to size LSQs" "Sized LSQs"
 
