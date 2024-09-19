@@ -1157,7 +1157,7 @@ SmallVector<Value> LSQOp::getControlPaths(Operation *ctrlOp) {
 
   // Accumulate all outputs of the control operation that are part of the memory
   // control network; there are typically at most two for any given LSQ
-  SmallVector<Value, 2> resultsToAlloc;
+  SmallVector<Value> resultsToAlloc;
   // Control channels to explore, starting from the control operation's results
   SmallVector<Value, 4> controlNet;
   // Control operations already explored from the control operation's results
