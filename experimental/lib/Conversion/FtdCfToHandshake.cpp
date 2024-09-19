@@ -409,8 +409,11 @@ template <typename Type>
 void eliminateCommonEntries(DenseSet<Type> &s1, DenseSet<Type> &s2) {
 
   std::vector<Type> intersection;
-  set_intersection(s1.begin(), s1.end(), s2.begin(), s2.end(),
-                   back_inserter(intersection));
+  for (auto &e1 : s1) {
+    if (s2.contains(e1)) {
+      intersection.push_back(e1);
+    }
+  }
 
   for (auto &bb : intersection) {
     s1.erase(bb);
