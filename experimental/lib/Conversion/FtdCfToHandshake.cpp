@@ -30,6 +30,7 @@
 #include "mlir/Support/LogicalResult.h"
 #include "mlir/Transforms/DialectConversion.h"
 #include "llvm/ADT/TypeSwitch.h"
+#include "llvm/Support/Casting.h"
 #include <unordered_set>
 #include <utility>
 
@@ -974,6 +975,10 @@ LogicalResult FtdLowerFuncToHandshake::convertMergesToMuxes(
 
         Value select =
             getCmergeBlock((Operation *)&merge).getDefiningOp()->getResult(1);
+
+        // aya
+        // if (select.getDefiningOp()->getOperands().size() > 2)
+        //   continue;
 
         auto *mergeFirstBlock = merge.getOperand(0).getParentBlock();
         auto *cmergeFirstBlock =

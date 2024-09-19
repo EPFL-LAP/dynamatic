@@ -43,11 +43,13 @@ LogicalResult FtdMemoryInterfaceBuilder::instantiateInterfacesWithForks(
     DenseSet<Operation *> &alloctionNetwork) {
 
   // Get the edgeBuilder
-  BackedgeBuilder edgeBuilder(builder, memref.getLoc());
+  BackedgeBuilder edgeBuilder((PatternRewriter &)builder, memref.getLoc());
 
   // Connect function
   FConnectLoad connect = [&](LoadOpInterface loadOp, Value dataIn) {
-    loadOp->setOperand(1, dataIn);
+    ((PatternRewriter &)builder).updateRootInPlace(loadOp, [&] {
+      loadOp->setOperand(1, dataIn);
+    });
   };
 
   // Determine interfaces' inputs
