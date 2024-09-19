@@ -36,6 +36,7 @@ using namespace dynamatic::experimental;
 using namespace dynamatic::experimental::lsqsizing;
 
 using LSQSizingResult = std::unordered_map<mlir::Operation*, std::tuple<unsigned, unsigned>>; //TUPLE: <load_size, store_size>
+using StartTimes = std::vector<std::tuple<mlir::Operation *, int>>; //TUPLE: <Operation, time>
 
 namespace {
 
@@ -43,8 +44,9 @@ struct HandshakeSizeLSQsPass
     : public dynamatic::experimental::lsqsizing::impl::HandshakeSizeLSQsBase<
           HandshakeSizeLSQsPass> {
 
-  HandshakeSizeLSQsPass(StringRef timingModels) {
+  HandshakeSizeLSQsPass(StringRef timingModels, StringRef collisions) {
     this->timingModels = timingModels.str();
+    this->collisions = collisions.str();
   }
 
   void runDynamaticPass() override;
@@ -54,15 +56,17 @@ private:
   // There is a offset between the arrival time of the arguments and the actual allocation/deallocation time inside the LSQ
   // For allocation it is the same for both load and stores, for deallocation it is different between loads and stores
   static const int allocEntryLatency = 1;
-  static const int storeDeallocEntryLatency = 2;
-  static const int loadDeallocEntryLatency = 1;
+  static const int storeDeallocEntryLatency = 2; //2
+  static const int loadDeallocEntryLatency = 1; //1
 
   // Determines the LSQ sizes, given a CFDFC and its II
   std::optional<LSQSizingResult> sizeLSQsForGraph(AdjListGraph graph, unsigned II);
 
   // Finds the Start Node in a CFDFC
   // The start node, is the node with the longest non-cyclic path to any other node
-  mlir::Operation *findStartNode(AdjListGraph graph);
+  std::tuple<mlir::Operation*, StartTimes> findStartTimes(AdjListGraph graph);
+
+  void insertStartnodeShiftingEdges(AdjListGraph &graph, mlir::Operation* startNode, StartTimes startTimes);
 
   // Finds the Phi Node for each Basic Block in a CFDFC
   // Checks all operations which get their input from a different BB and chooses the one with the lowest latency from the start node
@@ -86,7 +90,7 @@ private:
   std::unordered_map<mlir::Operation *, int> getLoadDeallocTimes(AdjListGraph graph, mlir::Operation *startNode, std::vector<mlir::Operation *> loadOps);
 
   // Given the alloc and dealloc times of each operation, calculates the maximum queue size needed for each LSQ
-  std::unordered_map<mlir::Operation*, unsigned> calcQueueSize(std::unordered_map<mlir::Operation *, int> allocTimes, std::unordered_map<mlir::Operation *, int> deallocTimes, unsigned II);
+  std::unordered_map<mlir::Operation*, unsigned> calcQueueSize(std::unordered_map<mlir::Operation *, int> allocTimes, std::unordered_map<mlir::Operation *, int> deallocTimes, unsigned II, bool isLoadQueue);
 };
 } // namespace
 
@@ -186,23 +190,26 @@ std::optional<LSQSizingResult> HandshakeSizeLSQsPass::sizeLSQsForGraph(AdjListGr
   std::vector<mlir::Operation *> loadOps = graph.getOperationsWithOpName("handshake.lsq_load");
   std::vector<mlir::Operation *> storeOps = graph.getOperationsWithOpName("handshake.lsq_store");
 
-  //graph.printGraph();
 
 
-  if(loadOps.size() == 0 && storeOps.size() == 0) {
+  /*if(loadOps.size() == 0 && storeOps.size() == 0) {
     llvm::dbgs() << "\t [DBG] No LSQ Ops found in CFDFC\n";
     return std::nullopt;
-  }
+  }*/
 
   // Find starting node, which will be the reference to the rest
-  mlir::Operation * startNode = findStartNode(graph);
+  std::tuple<mlir::Operation*, StartTimes> startNodeAndTimes = findStartTimes(graph);
+  mlir::Operation *startNode = get<0>(startNodeAndTimes);
+  StartTimes startTimes = get<1>(startNodeAndTimes);
+
   llvm::dbgs() << "\t [DBG] Start Node: " << getUniqueName(startNode).str() << "\n";
   
   // Find Phi node of each BB
   std::unordered_map<unsigned, mlir::Operation *> phiNodes = getPhiNodes(graph, startNode);
 
   // connect all phi nodes to the lsq ps in their BB
-  insertAllocPrecedesMemoryAccessEdges(graph, loadOps, phiNodes);  
+  insertAllocPrecedesMemoryAccessEdges(graph, loadOps, phiNodes);  // TODO check if necessary?
+  //insertStartnodeShiftingEdges(graph, startNode, startTimes);
 
   llvm::dbgs() << "----------------------------\n";
   graph.printGraph();
@@ -217,8 +224,8 @@ std::optional<LSQSizingResult> HandshakeSizeLSQsPass::sizeLSQsForGraph(AdjListGr
   std::unordered_map<mlir::Operation *, int> storeDeallocTimes = getStoreDeallocTimes(graph, startNode, storeOps);
 
   // Get Load and Store Sizes
-  std::unordered_map<mlir::Operation*, unsigned> loadSizes = calcQueueSize(loadAllocTimes, loadDeallocTimes, II);
-  std::unordered_map<mlir::Operation*, unsigned> storeSizes = calcQueueSize(storeAllocTimes, storeDeallocTimes, II);
+  std::unordered_map<mlir::Operation*, unsigned> loadSizes = calcQueueSize(loadAllocTimes, loadDeallocTimes, II, true);
+  std::unordered_map<mlir::Operation*, unsigned> storeSizes = calcQueueSize(storeAllocTimes, storeDeallocTimes, II, false);
 
   LSQSizingResult result;
   for(auto &entry: loadSizes) {
@@ -241,14 +248,15 @@ std::optional<LSQSizingResult> HandshakeSizeLSQsPass::sizeLSQsForGraph(AdjListGr
 }
 
 
-mlir::Operation * HandshakeSizeLSQsPass::findStartNode(AdjListGraph graph) {
 
-  // Find all mux and control_merge ops as candidates for start node
+std::tuple<mlir::Operation*, StartTimes> HandshakeSizeLSQsPass::findStartTimes(AdjListGraph graph) {
+  StartTimes startTimes;
+
+   // Find all mux and control_merge ops as candidates for start node
   std::vector<mlir::Operation *> muxOps = graph.getOperationsWithOpName("handshake.mux");
   std::vector<mlir::Operation *> cmergeOps = graph.getOperationsWithOpName("handshake.control_merge");
   std::vector<mlir::Operation *> startNodeCandidates = std::vector<mlir::Operation *>(muxOps.size() + cmergeOps.size());
   std::merge(muxOps.begin(), muxOps.end(), cmergeOps.begin(), cmergeOps.end(), startNodeCandidates.begin());
-
 
   std::unordered_map<mlir::Operation *, int> maxLatencies;
   std::unordered_map<mlir::Operation *, int> nodeCounts;
@@ -258,6 +266,8 @@ mlir::Operation * HandshakeSizeLSQsPass::findStartNode(AdjListGraph graph) {
     std::vector<std::string> path = graph.findLongestNonCyclicPath2(op);
     maxLatencies.insert({op, graph.getPathLatency(path)});
     nodeCounts.insert({op, path.size()});
+    llvm::dbgs() << "\t [DBG] Longest Path Candidate: " << op->getAttrOfType<StringAttr>("handshake.name").str() << " Latency: " << graph.getPathLatency(path) << " Node Count: " << path.size() << "\n";
+    graph.printPath(path);
   }
 
   // Find the node with the highest latency, if there are multiple, choose the one with the most nodes
@@ -275,7 +285,30 @@ mlir::Operation * HandshakeSizeLSQsPass::findStartNode(AdjListGraph graph) {
     }
   }
 
-  return maxLatencyNode;
+  for(auto &entry: maxLatencies) {
+    startTimes.push_back({entry.first, maxLatency - entry.second});
+    llvm::dbgs() << "\t [DBG] Start Node Candidate: " << entry.first->getAttrOfType<StringAttr>("handshake.name").str() << " Shifting: " << maxLatency - entry.second << "\n";
+  }
+
+  return {maxLatencyNode, startTimes};
+}
+
+
+void HandshakeSizeLSQsPass::insertStartnodeShiftingEdges(AdjListGraph &graph, mlir::Operation* startNode, StartTimes startTimes) {
+  for(auto &entry: startTimes) {
+    // Ignore if it is the startNode itself
+    if(get<0>(entry) != startNode) {
+      // Check if there is already a Path connecting the Nodes, if not insert an edge with an artifical node
+      // The artificial node has the shifting latency as latency
+      std::vector<std::vector<std::string>> paths = graph.findPaths(startNode, get<0>(entry), true);
+      if(paths.size() == 0) {
+        llvm::dbgs() << "\t [DBG] Inserting Shifting Edge from " << startNode->getAttrOfType<StringAttr>("handshake.name").str() << " to " << get<0>(entry)->getAttrOfType<StringAttr>("handshake.name").str() << " with latency " << get<1>(entry) << "\n";
+        graph.addShiftingEdge(startNode, get<0>(entry), get<1>(entry));
+      } else {
+        llvm::dbgs() << "\t [DBG] Shifting not necessary: " << paths.size() << " paths found between " << startNode->getAttrOfType<StringAttr>("handshake.name").str() << " and " << get<0>(entry)->getAttrOfType<StringAttr>("handshake.name").str() << "\n"; 
+      }
+    }
+  }
 }
 
 
@@ -289,7 +322,7 @@ std::unordered_map<unsigned, mlir::Operation *> HandshakeSizeLSQsPass::getPhiNod
   phiNodeCandidates.insert({*startNodeBB, {startNode}});
   //llvm::dbgs() << "\t [DBG] Inserted Start Node: " << startNode->getAttrOfType<StringAttr>("handshake.name").str() << " for BB " << startNode->getAttrOfType<IntegerAttr>("handshake.bb").getUInt() << "\n";
 
-  // Go trought all branch and fork ops and find connected ops
+  // Go trought ops and find connected ops
   for(auto &srcOp: graph.getOperations()) {
     std::optional<unsigned> srcBB = getLogicBB(srcOp);
     assert(srcBB && "Src Op must belong to basic block");    
@@ -379,7 +412,7 @@ std::unordered_map<mlir::Operation *, int> HandshakeSizeLSQsPass::getLoadDealloc
 }
 
 
-std::unordered_map<mlir::Operation*, unsigned> HandshakeSizeLSQsPass::calcQueueSize(std::unordered_map<mlir::Operation *, int> allocTimes, std::unordered_map<mlir::Operation *, int> deallocTimes, unsigned II) {
+std::unordered_map<mlir::Operation*, unsigned> HandshakeSizeLSQsPass::calcQueueSize(std::unordered_map<mlir::Operation *, int> allocTimes, std::unordered_map<mlir::Operation *, int> deallocTimes, unsigned II, bool isLoadQueue) {
   std::unordered_map<mlir::Operation*, unsigned> queueSizes;
 
   int endTime = 0;
@@ -390,6 +423,7 @@ std::unordered_map<mlir::Operation*, unsigned> HandshakeSizeLSQsPass::calcQueueS
       endTime = entry.second;
     }
   }
+
 
   // Go trough all alloc ops find the corresponding LSQ and save the alloc times
   std::unordered_map<mlir::Operation*, std::tuple<std::vector<int>, std::vector<int>>> allocDeallocTimesPerLSQ;
@@ -424,39 +458,26 @@ std::unordered_map<mlir::Operation*, unsigned> HandshakeSizeLSQsPass::calcQueueS
 
   // Go trough all LSQs and calculate the maximum amount of slots needed
   for(auto &entry: allocDeallocTimesPerLSQ) {
-    unsigned iterMax = std::ceil((float)endTime / II);
-    std::vector<int> allocPerCycle(endTime);
-
-
-    // Build array for how many slots are allocated and deallocated per cycle
-    for(unsigned iter = 0; iter < iterMax; iter++) {
-      
-      for(auto &allocTime: std::get<0>(entry.second)) {
-        int t = allocTime + II * iter;
-        if(t >= 0 && t < endTime) {
-          allocPerCycle[t]++;
-        }
-      }
-      for(auto &deallocTime: std::get<1>(entry.second)) {
-        int t = deallocTime + II * iter;
-        if(t >= 0 && t < endTime) {
-          allocPerCycle[t]--;
-        }
-      }
-    }
-    // build array for many slots are actively allocated at which cycle
+    int iterMax = std::ceil((float)(endTime) / II) - 1;
     std::vector<int> slotsPerCycle(endTime);
-    slotsPerCycle[0] = allocPerCycle[0];
-    for(int i=1; i < endTime; i++) {
-      slotsPerCycle[i] = slotsPerCycle[i - 1] + allocPerCycle[i];
-    }
 
-    llvm::dbgs() << " \t [DBG] slots[" << (endTime) << "]:";
-    for(auto &slot: slotsPerCycle) {
-      llvm::dbgs() << slot << " ";
-    }
-    llvm::dbgs() << "\n";
+    for(int t = 0; t < endTime; t++) {
+    // Build array for how many slots are allocated and deallocated per cycle
+      for(int iter = 0; iter < iterMax; iter++) {
 
+        for(auto &allocTime: std::get<0>(entry.second)) {
+          if((allocTime - (int)II * iter) <= t) {
+            slotsPerCycle[t]++;
+          }
+        }
+
+        for(auto &deallocTime: std::get<1>(entry.second)) {
+          if((deallocTime - (int)II * iter) <= t) {
+            slotsPerCycle[t]--;
+          }
+        }   
+      }
+    }
 
     // get highest amount of slots from the array
     unsigned maxSlots = *std::max_element(slotsPerCycle.begin(), slotsPerCycle.end());
@@ -478,8 +499,8 @@ void HandshakeSizeLSQsPass::insertAllocPrecedesMemoryAccessEdges(AdjListGraph &g
 
 
 std::unique_ptr<dynamatic::DynamaticPass>
-dynamatic::experimental::lsqsizing::createHandshakeSizeLSQs(StringRef timingModels) {
-  return std::make_unique<HandshakeSizeLSQsPass>(timingModels);
+dynamatic::experimental::lsqsizing::createHandshakeSizeLSQs(StringRef timingModels, StringRef collisions) {
+  return std::make_unique<HandshakeSizeLSQsPass>(timingModels, collisions);
 }
 
 

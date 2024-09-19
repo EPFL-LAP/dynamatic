@@ -108,7 +108,9 @@ def HandshakeSizeLSQs : DynamaticPass<"handshake-size-lsqs"> {
   
   let options = [Option<"timingModels", "timing-models", "std::string", "",
       "Path to JSON-formatted file containing timing models for dataflow "
-      "components.">];
+      "components.">,
+      Option<"collisions", "collisions", "std::string", "",
+      "Three different cases for memory collsions: no/half/full">];
 }
 
 #endif // EXPERIMENTAL_TRANSFORMS_PASSES_TD

@@ -29,6 +29,9 @@ public:
     // Constructor for the graph, which takes a Vector of BBs, which make up a single CFDFC
     AdjListGraph(handshake::FuncOp funcOp, llvm::SetVector<unsigned> cfdfcBBs, TimingDatabase timingDB, unsigned II);
 
+
+    void addShiftingEdge(mlir::Operation *src, mlir::Operation *dest, int shiftingLatency);
+
     // adds an Edge between src and dest
     void addEdge(mlir::Operation* src, mlir::Operation* dest);
 
@@ -76,11 +79,8 @@ private:
     // Adds a operation with its latency to the graph as a node
     void addNode(mlir::Operation* op, int latency);
 
-    // Adds a backedge between two nodes
-    void addBackedge(mlir::Operation* src, mlir::Operation* dest);
-
     // Adds an artificial node on a backedge, If there is already an edge it will be removed and replaced by a backedge
-    void insertArtificialNodeOnBackedge(mlir::Operation* src, mlir::Operation* dest, int latency);
+    void addBackedge(mlir::Operation* src, mlir::Operation* dest, int latency);
 
     // Depth first search algorithm for Path finding between two nodes
     void dfs(std::string& currentNode, std::string& end, std::vector<std::string>& currentPath, std::set<std::string>& visited, std::vector<std::vector<std::string>>& paths, bool ignoreBackedges = false);

@@ -122,9 +122,6 @@ void AdjListGraph::addEdge(mlir::Operation * src, mlir::Operation * dest) {
     nodes.at(getUniqueName(src).str()).edges.insert(getUniqueName(dest).str()); // Add edge from node u to node v
 }
 
-void AdjListGraph::addBackedge(mlir::Operation * src, mlir::Operation * dest) {
-    nodes.at(getUniqueName(src).str()).backedges.insert(getUniqueName(dest).str()); // Add edge from node u to node v
-}
 
 void AdjListGraph::addChannelEdges(mlir::Value res) {
     mlir::Operation *srcOp = res.getDefiningOp();
@@ -136,7 +133,7 @@ void AdjListGraph::addChannelEdges(mlir::Value res) {
 void AdjListGraph::addChannelBackedges(mlir::Value res, int latency) {
     mlir::Operation *srcOp = res.getDefiningOp();
     for(Operation *destOp: res.getUsers()) {
-      insertArtificialNodeOnBackedge(srcOp, destOp, latency);
+      addBackedge(srcOp, destOp, latency);
     }
 }
 
@@ -166,7 +163,7 @@ void AdjListGraph::printPath(std::vector<std::string> path) {
     llvm::dbgs() << "\n";
 }
 
-void AdjListGraph::insertArtificialNodeOnBackedge(mlir::Operation* src, mlir::Operation* dest, int latency) {
+void AdjListGraph::addBackedge(mlir::Operation* src, mlir::Operation* dest, int latency) {
   // create new node name from src and dest name
   std::string srcName = getUniqueName(src).str();
   std::string destName = getUniqueName(dest).str();
@@ -179,6 +176,20 @@ void AdjListGraph::insertArtificialNodeOnBackedge(mlir::Operation* src, mlir::Op
   // create node and add edge from src to new node and new node to dest
   nodes.insert({newNodeName, AdjListNode{latency, nullptr, {}, {destName}}});
   nodes.at(srcName).backedges.insert(newNodeName);
+}
+
+void AdjListGraph::addShiftingEdge(mlir::Operation *src, mlir::Operation *dest, int shiftingLatency) {
+  // create new node name from src and dest name
+  std::string srcName = getUniqueName(src).str();
+  std::string destName = getUniqueName(dest).str();
+  std::string newNodeName = "shifting_" + srcName + "_" + destName;
+
+  //remove existing edges from src to 
+  assert(nodes.at(srcName).edges.find(destName) == nodes.at(srcName).edges.end() && "Nodes are already connected -> should not add shifting edge");
+
+  // create node and add edge from src to new node and new node to dest
+  nodes.insert({newNodeName, AdjListNode{shiftingLatency, nullptr, {}, {destName}}});
+  nodes.at(srcName).edges.insert(newNodeName);
 }
 
 
