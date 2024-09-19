@@ -1,57 +1,65 @@
 #include "experimental/Transforms/LSQSizing/LSQSizingSupport.h"
-#include "experimental/Transforms/LSQSizing/HandshakeSizeLSQs.h"
-#include "dynamatic/Transforms/BufferPlacement/CFDFC.h"
-#include "dynamatic/Support/TimingModels.h"
-#include "dynamatic/Support/CFG.h"
-#include "dynamatic/Dialect/Handshake/HandshakeOps.h"
 #include "dynamatic/Dialect/Handshake/HandshakeAttributes.h"
+#include "dynamatic/Dialect/Handshake/HandshakeOps.h"
+#include "dynamatic/Support/CFG.h"
+#include "dynamatic/Support/TimingModels.h"
+#include "dynamatic/Transforms/BufferPlacement/CFDFC.h"
+#include "experimental/Transforms/LSQSizing/HandshakeSizeLSQs.h"
 
-#include <stack>
 #include <set>
+#include <stack>
 
 using namespace mlir;
 using namespace dynamatic;
 using namespace dynamatic::experimental::lsqsizing;
 
-
 // Extracts the latency for each operation
 // This is done in 3 ways:
-// 1. If the operation is in the timingDB, the latency is extracted from the timingDB
-// 2. If the operation is a buffer operation, the latency is extracted from the timing attribute
+// 1. If the operation is in the timingDB, the latency is extracted from the
+// timingDB
+// 2. If the operation is a buffer operation, the latency is extracted from the
+// timing attribute
 // 3. If the operation is neither, then its latency is set to 0
 int extractNodeLatency(mlir::Operation *op, TimingDatabase timingDB) {
   double latency = 0;
 
-  if(!failed(timingDB.getLatency(op, SignalType::DATA, latency)))
+  if (!failed(timingDB.getLatency(op, SignalType::DATA, latency)))
     return latency;
 
-  if(op->getName().getStringRef() == "handshake.buffer") { // TODO use some build in class method instead of name?
+  if (op->getName().getStringRef() ==
+      "handshake.buffer") { // TODO use some build in class method instead of
+                            // name?
     auto params = op->getAttrOfType<DictionaryAttr>(RTL_PARAMETERS_ATTR_NAME);
     if (!params) {
-      //llvm::dbgs() << "BufferOp" << getUniqueName(op).str() << " does not have parameters\n";
+      // llvm::dbgs() << "BufferOp" << getUniqueName(op).str() << " does not
+      // have parameters\n";
       return 0;
     }
 
     auto optTiming = params.getNamed(handshake::BufferOp::TIMING_ATTR_NAME);
     if (!optTiming) {
-      //llvm::dbgs() << "BufferOp" << getUniqueName(op).str() << " does not have timing\n";
+      // llvm::dbgs() << "BufferOp" << getUniqueName(op).str() << " does not
+      // have timing\n";
       return 0;
     }
 
-    if (auto timing =dyn_cast<handshake::TimingAttr>(optTiming->getValue())) {
+    if (auto timing = dyn_cast<handshake::TimingAttr>(optTiming->getValue())) {
       handshake::TimingInfo info = timing.getInfo();
       return info.getLatency(SignalType::DATA).value_or(0);
-    }   
+    }
   }
 
-  //llvm::dbgs() << "Operation " << op->getName().getStringRef() << " does not have latency\n";
+  // llvm::dbgs() << "Operation " << op->getName().getStringRef() << " does not
+  // have latency\n";
   return 0;
 }
 
-AdjListGraph::AdjListGraph(handshake::FuncOp funcOp, llvm::SetVector<unsigned> cfdfcBBs, TimingDatabase timingDB, unsigned II) {
+AdjListGraph::AdjListGraph(handshake::FuncOp funcOp,
+                           llvm::SetVector<unsigned> cfdfcBBs,
+                           TimingDatabase timingDB, unsigned II) {
 
   llvm::dbgs() << "Creating AdjListGraph for CFDFC: ";
-  for(auto &bb: cfdfcBBs) {
+  for (auto &bb : cfdfcBBs) {
     llvm::dbgs() << bb << " ";
   }
   llvm::dbgs() << "with II: " << II << "\n";
@@ -98,9 +106,9 @@ AdjListGraph::AdjListGraph(handshake::FuncOp funcOp, llvm::SetVector<unsigned> c
       } else if (cfdfcBBs.size() == 1) {
         // The channel is in the CFDFC if its producer/consumer belong to the
         // same basic block and the CFDFC is just a block looping to itself
-            addChannelEdges(res);
-            if (buffer::CFDFC::isCFDFCBackedge(res))
-              addChannelBackedges(res, (II * -1));
+        addChannelEdges(res);
+        if (buffer::CFDFC::isCFDFCBackedge(res))
+          addChannelBackedges(res, (II * -1));
       } else if (!isBackedge(res)) {
         // The channel is in the CFDFC if its producer/consumer belong to the
         // same basic block and the channel is not a backedge
@@ -108,153 +116,188 @@ AdjListGraph::AdjListGraph(handshake::FuncOp funcOp, llvm::SetVector<unsigned> c
       }
     }
   }
-
-  
 }
-
-
 
 void AdjListGraph::addNode(mlir::Operation *op, int latency) {
-    nodes.insert({getUniqueName(op).str(), AdjListNode{latency, op, {}, {}}});
+  nodes.insert({getUniqueName(op).str(), AdjListNode{latency, op, {}, {}, {}}});
 }
 
-void AdjListGraph::addEdge(mlir::Operation * src, mlir::Operation * dest) {
-    nodes.at(getUniqueName(src).str()).edges.insert(getUniqueName(dest).str()); // Add edge from node u to node v
+void AdjListGraph::addEdge(mlir::Operation *src, mlir::Operation *dest) {
+  nodes.at(getUniqueName(src).str())
+      .edges.insert(
+          getUniqueName(dest).str()); // Add edge from node u to node v
 }
-
 
 void AdjListGraph::addChannelEdges(mlir::Value res) {
-    mlir::Operation *srcOp = res.getDefiningOp();
-    for(Operation *destOp: res.getUsers()) {
-      addEdge(srcOp, destOp);
-    }
+  mlir::Operation *srcOp = res.getDefiningOp();
+  for (Operation *destOp : res.getUsers()) {
+    addEdge(srcOp, destOp);
+  }
 }
 
 void AdjListGraph::addChannelBackedges(mlir::Value res, int latency) {
-    mlir::Operation *srcOp = res.getDefiningOp();
-    for(Operation *destOp: res.getUsers()) {
-      addBackedge(srcOp, destOp, latency);
-    }
+  mlir::Operation *srcOp = res.getDefiningOp();
+  for (Operation *destOp : res.getUsers()) {
+    addBackedge(srcOp, destOp, latency);
+  }
 }
 
-
 void AdjListGraph::printGraph() {
-    for (const auto& pair : nodes) {
-        std::string opName = pair.first;
-        const AdjListNode& node = pair.second;
-        llvm::dbgs()  << opName << " (lat: " << node.latency << "): ";
-        for (std::string edge : node.edges) {
-            llvm::dbgs() << edge << ", ";
-        }
-        if(node.backedges.size() > 0) {
-          llvm::dbgs() << " || ";
-          for(std::string backedge : node.backedges) {
-              llvm::dbgs() << backedge << ", ";
-          }
-        }
-        llvm::dbgs() << "\n";
+  for (const auto &pair : nodes) {
+    std::string opName = pair.first;
+    const AdjListNode &node = pair.second;
+    llvm::dbgs() << opName << " (lat: " << node.latency << "): ";
+    for (std::string edge : node.edges) {
+      llvm::dbgs() << edge << ", ";
     }
+    if (node.backedges.size() > 0) {
+      llvm::dbgs() << " || ";
+      for (std::string backedge : node.backedges) {
+        llvm::dbgs() << backedge << ", ";
+      }
+    }
+    llvm::dbgs() << "\n";
+  }
 }
 
 void AdjListGraph::printPath(std::vector<std::string> path) {
-    for (std::string node : path) {
-        llvm::dbgs() << node << "(" << nodes.at(node).latency << ") - ";
-    }
-    llvm::dbgs() << "\n";
+  for (std::string node : path) {
+    llvm::dbgs() << node << "(" << nodes.at(node).latency << ") - ";
+  }
+  llvm::dbgs() << "\n";
 }
 
-void AdjListGraph::addBackedge(mlir::Operation* src, mlir::Operation* dest, int latency) {
+void AdjListGraph::addBackedge(mlir::Operation *src, mlir::Operation *dest,
+                               int latency) {
   // create new node name from src and dest name
   std::string srcName = getUniqueName(src).str();
   std::string destName = getUniqueName(dest).str();
   std::string newNodeName = backedgePrefix + srcName + "_" + destName;
 
-  //remove existing edges from src to dest
+  // remove existing edges from src to dest
   nodes.at(srcName).edges.erase(destName);
   nodes.at(srcName).backedges.erase(destName);
 
   // create node and add edge from src to new node and new node to dest
-  nodes.insert({newNodeName, AdjListNode{latency, nullptr, {}, {destName}}});
+  nodes.insert(
+      {newNodeName, AdjListNode{latency, nullptr, {}, {destName}, {}}});
   nodes.at(srcName).backedges.insert(newNodeName);
 }
 
-void AdjListGraph::addShiftingEdge(mlir::Operation *src, mlir::Operation *dest, int shiftingLatency) {
+void AdjListGraph::addShiftingEdge(mlir::Operation *src, mlir::Operation *dest,
+                                   int shiftingLatency) {
   // create new node name from src and dest name
   std::string srcName = getUniqueName(src).str();
   std::string destName = getUniqueName(dest).str();
   std::string newNodeName = "shifting_" + srcName + "_" + destName;
 
-  //remove existing edges from src to 
-  assert(nodes.at(srcName).edges.find(destName) == nodes.at(srcName).edges.end() && "Nodes are already connected -> should not add shifting edge");
+  // remove existing edges from src to
+  assert(nodes.at(srcName).edges.find(destName) ==
+             nodes.at(srcName).edges.end() &&
+         "Nodes are already connected -> should not add shifting edge");
 
   // create node and add edge from src to new node and new node to dest
-  nodes.insert({newNodeName, AdjListNode{shiftingLatency, nullptr, {}, {destName}}});
-  nodes.at(srcName).edges.insert(newNodeName);
+  nodes.insert(
+      {newNodeName, AdjListNode{shiftingLatency, nullptr, {}, {}, {destName}}});
+  nodes.at(srcName).shiftingEdges.insert(newNodeName);
 }
 
+void AdjListGraph::dfs(std::string &currentNode, std::string &end,
+                       std::vector<std::string> &currentPath,
+                       std::set<std::string> &visited,
+                       std::vector<std::vector<std::string>> &paths,
+                       bool ignoreBackedges, bool ignoreShiftingEdge) {
+  // If the current node is the target, add the current path to paths and
+  // return.
+  if (currentNode == end) {
+    paths.push_back(currentPath);
+    return;
+  }
 
-void AdjListGraph::dfs(std::string& currentNode, std::string& end, std::vector<std::string>& currentPath, std::set<std::string>& visited, std::vector<std::vector<std::string>>& paths, bool ignoreBackedges) {
-    // If the current node is the target, add the current path to paths and return.
-    if (currentNode == end) {
-        paths.push_back(currentPath);
-        return;
+  // Iterate over all adjacent nodes
+  for (auto neighbor : nodes.at(currentNode).edges) {
+    // If the neighbor has not been visited, visit it
+    if (visited.find(neighbor) == visited.end()) {
+      visited.insert(neighbor);        // Mark as visited
+      currentPath.push_back(neighbor); // Add to the current pat
+      // Recursively visit the neighbor
+      dfs(neighbor, end, currentPath, visited, paths, ignoreBackedges,
+          ignoreShiftingEdge);
+      // Backtrack: remove the neighbor from the current path and visited set
+      // for other paths
+      currentPath.pop_back();
+      visited.erase(neighbor);
     }
+  }
 
-    // Iterate over all adjacent nodes
-    for (auto neighbor : nodes.at(currentNode).edges) {
-        // If the neighbor has not been visited, visit it
-        if (visited.find(neighbor) == visited.end()) {
-            visited.insert(neighbor); // Mark as visited
-            currentPath.push_back(neighbor); // Add to the current pat
-            // Recursively visit the neighbor
-            dfs(neighbor, end, currentPath, visited, paths, ignoreBackedges);
-            // Backtrack: remove the neighbor from the current path and visited set for other paths
-            currentPath.pop_back();
-            visited.erase(neighbor);
-        }
+  if (!ignoreBackedges) {
+    for (auto neighbor : nodes.at(currentNode).backedges) {
+      // If the neighbor has not been visited, visit it
+      if (visited.find(neighbor) == visited.end()) {
+        visited.insert(neighbor);        // Mark as visited
+        currentPath.push_back(neighbor); // Add to the current pat
+        // Recursively visit the neighbor
+        dfs(neighbor, end, currentPath, visited, paths, ignoreBackedges,
+            ignoreShiftingEdge);
+        // Backtrack: remove the neighbor from the current path and visited set
+        // for other paths
+        currentPath.pop_back();
+        visited.erase(neighbor);
+      }
     }
+  }
 
-    if(!ignoreBackedges) {
-        for (auto neighbor : nodes.at(currentNode).backedges) {
-        // If the neighbor has not been visited, visit it
-        if (visited.find(neighbor) == visited.end()) {
-            visited.insert(neighbor); // Mark as visited
-            currentPath.push_back(neighbor); // Add to the current pat
-            // Recursively visit the neighbor
-            dfs(neighbor, end, currentPath, visited, paths, ignoreBackedges);
-            // Backtrack: remove the neighbor from the current path and visited set for other paths
-            currentPath.pop_back();
-            visited.erase(neighbor);
-        }
+  if (!ignoreShiftingEdge) {
+    for (auto neighbor : nodes.at(currentNode).shiftingEdges) {
+      // If the neighbor has not been visited, visit it
+      if (visited.find(neighbor) == visited.end()) {
+        visited.insert(neighbor);        // Mark as visited
+        currentPath.push_back(neighbor); // Add to the current pat
+        // Recursively visit the neighbor
+        dfs(neighbor, end, currentPath, visited, paths, ignoreBackedges,
+            ignoreShiftingEdge);
+        // Backtrack: remove the neighbor from the current path and visited set
+        // for other paths
+        currentPath.pop_back();
+        visited.erase(neighbor);
+      }
     }
-    }
+  }
 }
 
-std::vector<std::vector<std::string>> AdjListGraph::findPaths(std::string start, std::string end, bool ignoreBackedge) {
+std::vector<std::vector<std::string>>
+AdjListGraph::findPaths(std::string start, std::string end, bool ignoreBackedge,
+                        bool ignoreShiftingEdge) {
   // Initialize the vectors for DFS
   std::vector<std::vector<std::string>> paths;
   std::vector<std::string> currentPath{start};
   std::set<std::string> visited{start};
-  
+
   // Call DFS to find all paths
-  dfs(start, end, currentPath, visited, paths, ignoreBackedge);
+  dfs(start, end, currentPath, visited, paths, ignoreBackedge,
+      ignoreShiftingEdge);
   return paths;
 }
 
-
-std::vector<std::vector<std::string>> AdjListGraph::findPaths(mlir::Operation *startOp, mlir::Operation *endOp, bool ignoreBackedge) {
+std::vector<std::vector<std::string>>
+AdjListGraph::findPaths(mlir::Operation *startOp, mlir::Operation *endOp,
+                        bool ignoreBackedge, bool ignoreShiftingEdge) {
   assert(startOp && endOp && "Start and end operations must not be null");
-  //llvm::dbgs() << "Finding paths from " << getUniqueName(startOp).str() << " to " << getUniqueName(endOp).str() << "\n";
-  return findPaths(getUniqueName(startOp).str(), getUniqueName(endOp).str(), ignoreBackedge);
+  // llvm::dbgs() << "Finding paths from " << getUniqueName(startOp).str() << "
+  // to " << getUniqueName(endOp).str() << "\n";
+  return findPaths(getUniqueName(startOp).str(), getUniqueName(endOp).str(),
+                   ignoreBackedge, ignoreShiftingEdge);
 }
 
-
-std::vector<std::string> AdjListGraph::findLongestNonCyclicPath(mlir::Operation *startOp) {
+std::vector<std::string>
+AdjListGraph::findLongestNonCyclicPath(mlir::Operation *startOp) {
   std::string start = getUniqueName(startOp).str();
   std::vector<std::string> path;
-  std::stack<std::pair<std::vector<std::string>, std::set<std::string>>> pathStack;
+  std::stack<std::pair<std::vector<std::string>, std::set<std::string>>>
+      pathStack;
   int maxLatency = 0;
-  // Initialize the stack with the path containing the source node and its visited set
+  // Initialize the stack with the path containing the source node and its
+  // visited set
   pathStack.push({{start}, {start}});
   while (!pathStack.empty()) {
     // Get the current path and visited set from the stack
@@ -262,21 +305,23 @@ std::vector<std::string> AdjListGraph::findLongestNonCyclicPath(mlir::Operation 
     pathStack.pop();
     // Get the last node in the current path
     std::string currentNode = currentPath.back();
-    // If the current latency is higher than the max latency, update the max latency and path
+    // If the current latency is higher than the max latency, update the max
+    // latency and path
     if (getPathLatency(currentPath) >= maxLatency) {
       maxLatency = getPathLatency(currentPath);
       path = currentPath;
     }
     // Get all adjacent nodes of the current node
-    for (const std::string& neighbor : nodes.at(currentNode).edges) {
-      // If the neighbor has not been visited in the current path, extend the path
+    for (const std::string &neighbor : nodes.at(currentNode).edges) {
+      // If the neighbor has not been visited in the current path, extend the
+      // path
       if (visited.find(neighbor) == visited.end()) {
-          std::vector<std::string> newPath = currentPath;
-          newPath.push_back(neighbor);
-          std::set<std::string> newVisited = visited;
-          newVisited.insert(neighbor);
-          // Push the new path and updated visited set onto the stack
-          pathStack.push({newPath, newVisited});
+        std::vector<std::string> newPath = currentPath;
+        newPath.push_back(neighbor);
+        std::set<std::string> newVisited = visited;
+        newVisited.insert(neighbor);
+        // Push the new path and updated visited set onto the stack
+        pathStack.push({newPath, newVisited});
       }
     }
   }
@@ -284,115 +329,139 @@ std::vector<std::string> AdjListGraph::findLongestNonCyclicPath(mlir::Operation 
 }
 
 // Recursive helper function
-void AdjListGraph::dfsHelper(const std::string& currentNode, std::set<std::string>& visited, 
-               std::vector<std::string>& currentPath, int& maxLatency, std::vector<std::string>& bestPath) {
-    visited.insert(currentNode);
-    currentPath.push_back(currentNode);
-    // Update the best path if current path latency is greater than maxLatency
-    int currentLatency = getPathLatency(currentPath);
-    if (currentLatency > maxLatency) {
-        maxLatency = currentLatency;
-        bestPath = currentPath;
+void AdjListGraph::dfsHelper(const std::string &currentNode,
+                             std::set<std::string> &visited,
+                             std::vector<std::string> &currentPath,
+                             int &maxLatency,
+                             std::vector<std::string> &bestPath) {
+  visited.insert(currentNode);
+  currentPath.push_back(currentNode);
+  // Update the best path if current path latency is greater than maxLatency
+  int currentLatency = getPathLatency(currentPath);
+  if (currentLatency > maxLatency) {
+    maxLatency = currentLatency;
+    bestPath = currentPath;
+  }
+  // Recursively explore neighbors
+  for (const std::string &neighbor : nodes[currentNode].edges) {
+    if (visited.find(neighbor) == visited.end()) {
+      dfsHelper(neighbor, visited, currentPath, maxLatency, bestPath);
     }
-    // Recursively explore neighbors
-    for (const std::string& neighbor : nodes[currentNode].edges) {
-        if (visited.find(neighbor) == visited.end()) {
-            dfsHelper(neighbor, visited, currentPath, maxLatency, bestPath);
-        }
-    }
-    // Backtrack: remove the current node from the path and visited set
-    visited.erase(currentNode);
-    currentPath.pop_back();
+  }
+  // Backtrack: remove the current node from the path and visited set
+  visited.erase(currentNode);
+  currentPath.pop_back();
 }
 // Main function to find the longest non-cyclic path
-std::vector<std::string> AdjListGraph::findLongestNonCyclicPath2(mlir::Operation* startOp) {
-    std::string start = getUniqueName(startOp).str();
-    std::vector<std::string> bestPath;
-    std::vector<std::string> currentPath;
-    std::set<std::string> visited;
-    int maxLatency = 0;
-    // Start DFS from the start node
-    dfsHelper(start, visited, currentPath, maxLatency, bestPath);
-    return bestPath;
+std::vector<std::string>
+AdjListGraph::findLongestNonCyclicPath2(mlir::Operation *startOp) {
+  std::string start = getUniqueName(startOp).str();
+  std::vector<std::string> bestPath;
+  std::vector<std::string> currentPath;
+  std::set<std::string> visited;
+  int maxLatency = 0;
+  // Start DFS from the start node
+  dfsHelper(start, visited, currentPath, maxLatency, bestPath);
+  return bestPath;
 }
-
-
-
 
 int AdjListGraph::getPathLatency(std::vector<std::string> path) {
   // Sum up the latencies of all nodes in the path
   int latency = 0;
-  for(auto &node: path) {
+  for (auto &node : path) {
     latency += nodes.at(node).latency;
   }
   return latency;
 }
 
-std::vector<mlir::Operation*> AdjListGraph::getOperationsWithOpName(std::string opName) {
-  std::vector<mlir::Operation*> ops;
-  // Iterate over all nodes and return the operations with the specified operation name
-  for(auto &node: nodes) {
-    if(node.second.op && std::string(node.second.op->getName().getStringRef()) == opName)
-    {
+std::vector<mlir::Operation *>
+AdjListGraph::getOperationsWithOpName(std::string opName) {
+  std::vector<mlir::Operation *> ops;
+  // Iterate over all nodes and return the operations with the specified
+  // operation name
+  for (auto &node : nodes) {
+    if (node.second.op &&
+        std::string(node.second.op->getName().getStringRef()) == opName) {
       ops.push_back(node.second.op);
     }
   }
   return ops;
 }
 
+int AdjListGraph::findMaxPathLatency(mlir::Operation *startOp,
+                                     mlir::Operation *endOp,
+                                     bool ignoreBackedge,
+                                     bool ignoreShiftingEdge,
+                                     bool excludeLastNodeLatency) {
 
-int AdjListGraph::findMaxPathLatency(mlir::Operation *startOp, mlir::Operation *endOp, bool ignoreBackedge, bool excludeLastNodeLatency) {
-  // Find all paths between the start and end node    
-  std::vector<std::vector<std::string>> paths = findPaths(startOp, endOp, ignoreBackedge);
+  std::vector<std::vector<std::string>> paths;
+
+  // Find all paths between the start and end node
+  if (!ignoreBackedge && !ignoreShiftingEdge) {
+    std::vector<std::vector<std::string>> paths1 =
+        findPaths(startOp, endOp, false, true);
+    std::vector<std::vector<std::string>> paths2 =
+        findPaths(startOp, endOp, true, false);
+    paths.insert(paths.end(), paths1.begin(), paths1.end());
+    paths.insert(paths.end(), paths2.begin(), paths2.end());
+  } else {
+    std::vector<std::vector<std::string>> paths1 =
+        findPaths(startOp, endOp, ignoreBackedge, ignoreShiftingEdge);
+    paths.insert(paths.end(), paths1.begin(), paths1.end());
+  }
+
   int maxLatency = 0;
   std::vector<std::string> maxPath;
 
   // Iterate over all paths and keep track of the path with the highest latency
-  for(auto &path: paths)
-  {
-    if(excludeLastNodeLatency) {
+  for (auto &path : paths) {
+    if (excludeLastNodeLatency) {
       path.pop_back();
     }
-    // TODO cleanup after everything is verified (std::max instead of if statement)
+    // TODO cleanup after everything is verified (std::max instead of if
+    // statement)
     int latency = getPathLatency(path);
-    if(maxLatency < latency) {
+    if (maxLatency < latency) {
       maxLatency = latency;
       maxPath = path;
     }
   }
-  
+
   llvm::dbgs() << "latency: " << maxLatency << " path: ";
   printPath(maxPath);
 
   return maxLatency;
 }
 
-int AdjListGraph::findMinPathLatency(mlir::Operation *startOp, mlir::Operation *endOp, bool ignoreBackedge) {
-  // Find all paths between the start and end node    
-  std::vector<std::vector<std::string>> paths = findPaths(startOp, endOp, ignoreBackedge);
+int AdjListGraph::findMinPathLatency(mlir::Operation *startOp,
+                                     mlir::Operation *endOp,
+                                     bool ignoreBackedge,
+                                     bool ignoreShiftingEdge) {
+  // Find all paths between the start and end node
+  std::vector<std::vector<std::string>> paths =
+      findPaths(startOp, endOp, ignoreBackedge, ignoreShiftingEdge);
   int minLatency = INT_MAX;
   // Iterate over all paths and keep track of the path with the lowest latency
-  for(auto &path: paths)
-  {
+  for (auto &path : paths) {
     minLatency = std::min(minLatency, getPathLatency(path));
   }
   return minLatency;
 }
 
-
-std::vector<mlir::Operation*> AdjListGraph::getConnectedOps(mlir::Operation *op) {
-  std::vector<mlir::Operation*> connectedOps;
+std::vector<mlir::Operation *>
+AdjListGraph::getConnectedOps(mlir::Operation *op) {
+  std::vector<mlir::Operation *> connectedOps;
   std::string opName = getUniqueName(op).str();
 
   // Get all Ops which are connected via a regular edge
-  for(auto &node: nodes.at(opName).edges) {
+  for (auto &node : nodes.at(opName).edges) {
     connectedOps.push_back(nodes.at(node).op);
   }
 
-  // Get all Ops which are connected via a backedge, by skipping the artificial nodes
-  // and going over the nodes connected to the artificial nodes
-  for(auto &aritificalNode: nodes.at(opName).backedges) {
-    for(auto &node: nodes.at(aritificalNode).backedges) {
+  // Get all Ops which are connected via a backedge, by skipping the artificial
+  // nodes and going over the nodes connected to the artificial nodes
+  for (auto &aritificalNode : nodes.at(opName).backedges) {
+    for (auto &node : nodes.at(aritificalNode).backedges) {
       connectedOps.push_back(nodes.at(node).op);
     }
   }
@@ -400,21 +469,19 @@ std::vector<mlir::Operation*> AdjListGraph::getConnectedOps(mlir::Operation *op)
   return connectedOps;
 }
 
-std::vector<mlir::Operation*> AdjListGraph::getOperations() {
-  std::vector<mlir::Operation*> ops;
-  for(auto &node: nodes) {
-    if(node.second.op)
-    {
+std::vector<mlir::Operation *> AdjListGraph::getOperations() {
+  std::vector<mlir::Operation *> ops;
+  for (auto &node : nodes) {
+    if (node.second.op) {
       ops.push_back(node.second.op);
     }
   }
   return ops;
 }
 
-
 void AdjListGraph::setNewII(unsigned II) {
-  for(auto &node: nodes) {
-    if(node.first.find(backedgePrefix) != std::string::npos){
+  for (auto &node : nodes) {
+    if (node.first.find(backedgePrefix) != std::string::npos) {
       node.second.latency = II * -1;
     }
   }
@@ -422,24 +489,30 @@ void AdjListGraph::setNewII(unsigned II) {
 
 unsigned AdjListGraph::getWorstCaseII() {
 
-  std::unordered_map<mlir::Operation*, std::tuple<std::vector<mlir::Operation*>, std::vector<mlir::Operation*>>> loadStoreOpsPerLSQ;
-  for(auto &node: nodes) {
+  std::unordered_map<mlir::Operation *,
+                     std::tuple<std::vector<mlir::Operation *>,
+                                std::vector<mlir::Operation *>>>
+      loadStoreOpsPerLSQ;
+  for (auto &node : nodes) {
     mlir::Operation *lsqOp = nullptr;
-    if(node.second.op) {
-      for(Operation *destOp: node.second.op->getUsers()) {
-        if(destOp->getName().getStringRef().str() == "handshake.lsq") {
+    if (node.second.op) {
+      for (Operation *destOp : node.second.op->getUsers()) {
+        if (destOp->getName().getStringRef().str() == "handshake.lsq") {
           lsqOp = destOp;
           break;
         }
       }
 
-      if(loadStoreOpsPerLSQ.find(lsqOp) == loadStoreOpsPerLSQ.end()) {
-        loadStoreOpsPerLSQ.insert({lsqOp, std::make_tuple(std::vector<mlir::Operation*>(), std::vector<mlir::Operation*>())});
+      if (loadStoreOpsPerLSQ.find(lsqOp) == loadStoreOpsPerLSQ.end()) {
+        loadStoreOpsPerLSQ.insert(
+            {lsqOp, std::make_tuple(std::vector<mlir::Operation *>(),
+                                    std::vector<mlir::Operation *>())});
       }
 
-      if(node.second.op->getName().getStringRef() == "handshake.lsq_load") {
+      if (node.second.op->getName().getStringRef() == "handshake.lsq_load") {
         std::get<0>(loadStoreOpsPerLSQ[lsqOp]).push_back(node.second.op);
-      } else if(node.second.op->getName().getStringRef()  == "handshake.lsq_store") {
+      } else if (node.second.op->getName().getStringRef() ==
+                 "handshake.lsq_store") {
         std::get<1>(loadStoreOpsPerLSQ[lsqOp]).push_back(node.second.op);
       }
     }
@@ -447,13 +520,15 @@ unsigned AdjListGraph::getWorstCaseII() {
 
   int maxLatency = 0;
 
-  for(auto &lsq: loadStoreOpsPerLSQ) {
-    for(auto &load: std::get<0>(lsq.second)) {
-      for(auto &store: std::get<1>(lsq.second)) {
-        maxLatency = std::max(findMaxPathLatency(load, store, true, true), maxLatency);
+  for (auto &lsq : loadStoreOpsPerLSQ) {
+    for (auto &load : std::get<0>(lsq.second)) {
+      for (auto &store : std::get<1>(lsq.second)) {
+        maxLatency =
+            std::max(findMaxPathLatency(load, store, true, true), maxLatency);
       }
     }
   }
-  // The maximal Latency between any load and store of the same LSQ is the worst case II
+  // The maximal Latency between any load and store of the same LSQ is the worst
+  // case II
   return (unsigned)maxLatency;
 }

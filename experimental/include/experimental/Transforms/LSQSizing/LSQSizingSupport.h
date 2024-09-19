@@ -22,6 +22,7 @@ struct AdjListNode {
     mlir::Operation* op; // Pointer to the operation
     std::set<std::string> edges; // Adjacency list (stores keys of adjacent nodes)
     std::set<std::string> backedges; // Backedge list (stores keys of adjacent nodes connected by backedges)
+    std::set<std::string> shiftingEdges; // Shifting edge list (stores keys of adjacent nodes connected by shifting edges)
 };
 
 class AdjListGraph {
@@ -44,19 +45,19 @@ public:
     void printPath(std::vector<std::string> path);
 
     // Finds all paths between two nodes, given the Operation pointers
-    std::vector<std::vector<std::string>> findPaths(mlir::Operation *startOp, mlir::Operation *endOp, bool ignoreBackedge = false);
+    std::vector<std::vector<std::string>> findPaths(mlir::Operation *startOp, mlir::Operation *endOp, bool ignoreBackedge = false, bool ignoreShiftingEdge = true);
 
     // Finds all paths between two nodes, given the Operations unique names
-    std::vector<std::vector<std::string>> findPaths(std::string start, std::string end, bool ignoreBackedge = false);
+    std::vector<std::vector<std::string>> findPaths(std::string start, std::string end, bool ignoreBackedge = false, bool ignoreShiftingEdge = true);
 
     // Returns the latency of a path
     int getPathLatency(std::vector<std::string> path);
 
     // Finds the path with the highest latency between two nodes
-    int findMaxPathLatency(mlir::Operation *startOp, mlir::Operation *endOp, bool ignoreBackedge = false, bool excludeLastNodeLatency = false);
+    int findMaxPathLatency(mlir::Operation *startOp, mlir::Operation *endOp, bool ignoreBackedge = false, bool ignoreShiftingEdge = true, bool excludeLastNodeLatency = false);
 
     // Finds the path with the lowest latency between two nodes
-    int findMinPathLatency(mlir::Operation *startOp, mlir::Operation *endOp, bool ignoreBackedge = false);
+    int findMinPathLatency(mlir::Operation *startOp, mlir::Operation *endOp, bool ignoreBackedge = false, bool ignoreShiftingEdge = true);
 
     // Finds the longest non-cyclic path starting from a node (ignores backedges)
     std::vector<std::string> findLongestNonCyclicPath(mlir::Operation *startOp);
@@ -96,7 +97,7 @@ private:
     void addBackedge(mlir::Operation* src, mlir::Operation* dest, int latency);
 
     // Depth first search algorithm for Path finding between two nodes
-    void dfs(std::string& currentNode, std::string& end, std::vector<std::string>& currentPath, std::set<std::string>& visited, std::vector<std::vector<std::string>>& paths, bool ignoreBackedges = false);
+    void dfs(std::string& currentNode, std::string& end, std::vector<std::string>& currentPath, std::set<std::string>& visited, std::vector<std::vector<std::string>>& paths, bool ignoreBackedges = false, bool ignoreShiftingEdge = true);
     
     // TODO: decide if keep recrusive or stack based version    
     void dfsHelper(const std::string& currentNode, std::set<std::string>& visited, std::vector<std::string>& currentPath, int& maxLatency, std::vector<std::string>& bestPath);
