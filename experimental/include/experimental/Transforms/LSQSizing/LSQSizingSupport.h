@@ -29,7 +29,9 @@ public:
     // Constructor for the graph, which takes a Vector of BBs, which make up a single CFDFC
     AdjListGraph(handshake::FuncOp funcOp, llvm::SetVector<unsigned> cfdfcBBs, TimingDatabase timingDB, unsigned II);
 
-
+    // Adds the edges between the start node and the start node candidates, with their respective shifting in the start time
+    // These edges are necessary to account for the case, that the latest argument arrival time, is not from a path
+    // which starts at the start node, but from a path which is not connected to the start node
     void addShiftingEdge(mlir::Operation *src, mlir::Operation *dest, int shiftingLatency);
 
     // adds an Edge between src and dest
@@ -71,8 +73,19 @@ public:
     // TODO: decide if keep recrusive or stack based version
     std::vector<std::string> findLongestNonCyclicPath2(mlir::Operation* startOp);
 
+    // Finds the path with the highest latency between two any memory dependencies
+    // This path is the worst case II, in case of collisions
+    unsigned getWorstCaseII();
+
+    // Updates the graph to use a different II for the latency of the backedges
+    void setNewII(unsigned II);
 
 private:
+
+    static constexpr const char* backedgePrefix = "backedge_"; // Prefix for backedges
+    static constexpr const char* shiftingPrefix = "shifting_"; // Prefix for shifting edges
+
+
     // Map to store the nodes by their Operations unique name
     std::unordered_map<std::string , AdjListNode> nodes; 
     

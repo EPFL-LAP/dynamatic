@@ -167,7 +167,7 @@ void AdjListGraph::addBackedge(mlir::Operation* src, mlir::Operation* dest, int 
   // create new node name from src and dest name
   std::string srcName = getUniqueName(src).str();
   std::string destName = getUniqueName(dest).str();
-  std::string newNodeName = "backedge_" + srcName + "_" + destName;
+  std::string newNodeName = backedgePrefix + srcName + "_" + destName;
 
   //remove existing edges from src to dest
   nodes.at(srcName).edges.erase(destName);
@@ -409,4 +409,51 @@ std::vector<mlir::Operation*> AdjListGraph::getOperations() {
     }
   }
   return ops;
+}
+
+
+void AdjListGraph::setNewII(unsigned II) {
+  for(auto &node: nodes) {
+    if(node.first.find(backedgePrefix) != std::string::npos){
+      node.second.latency = II * -1;
+    }
+  }
+}
+
+unsigned AdjListGraph::getWorstCaseII() {
+
+  std::unordered_map<mlir::Operation*, std::tuple<std::vector<mlir::Operation*>, std::vector<mlir::Operation*>>> loadStoreOpsPerLSQ;
+  for(auto &node: nodes) {
+    mlir::Operation *lsqOp = nullptr;
+    if(node.second.op) {
+      for(Operation *destOp: node.second.op->getUsers()) {
+        if(destOp->getName().getStringRef().str() == "handshake.lsq") {
+          lsqOp = destOp;
+          break;
+        }
+      }
+
+      if(loadStoreOpsPerLSQ.find(lsqOp) == loadStoreOpsPerLSQ.end()) {
+        loadStoreOpsPerLSQ.insert({lsqOp, std::make_tuple(std::vector<mlir::Operation*>(), std::vector<mlir::Operation*>())});
+      }
+
+      if(node.second.op->getName().getStringRef() == "handshake.lsq_load") {
+        std::get<0>(loadStoreOpsPerLSQ[lsqOp]).push_back(node.second.op);
+      } else if(node.second.op->getName().getStringRef()  == "handshake.lsq_store") {
+        std::get<1>(loadStoreOpsPerLSQ[lsqOp]).push_back(node.second.op);
+      }
+    }
+  }
+
+  int maxLatency = 0;
+
+  for(auto &lsq: loadStoreOpsPerLSQ) {
+    for(auto &load: std::get<0>(lsq.second)) {
+      for(auto &store: std::get<1>(lsq.second)) {
+        maxLatency = std::max(findMaxPathLatency(load, store, true, true), maxLatency);
+      }
+    }
+  }
+  // The maximal Latency between any load and store of the same LSQ is the worst case II
+  return (unsigned)maxLatency;
 }
