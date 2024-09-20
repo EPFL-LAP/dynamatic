@@ -197,6 +197,14 @@
     "generic": "$DYNAMATIC/data/vhdl/arith/trunci.vhd"
   },
   {
+    "name": "handshake.truncf",
+    "parameters": [
+      { "name": "INPUT_TYPE", "type": "dataflow", "data-lb": 1, "extra-eq": 0 },
+      { "name": "OUTPUT_TYPE", "type": "dataflow", "data-lb": 1, "extra-eq": 0 }
+    ],
+    "generic": "$DYNAMATIC/data/vhdl/arith/truncf.vhd"
+  },
+  {
     "name": "handshake.xori",
     "parameters": [
       { "name": "DATA_TYPE", "type": "dataflow", "data-lb": 1, "extra-eq": 0 }
@@ -210,6 +218,13 @@
       { "name": "DATA_TYPE", "type": "dataflow", "data-lb": 1, "extra-eq": 0 }
     ],
     "generic": "$DYNAMATIC/data/vhdl/arith/sitofp.vhd"
+  },
+  {
+    "name": "handshake.fptosi",
+    "parameters": [
+      { "name": "DATA_TYPE", "type": "dataflow", "data-lb": 1, "extra-eq": 0 }
+    ],
+    "generic": "$DYNAMATIC/data/vhdl/arith/fptosi.vhd"
   },
   {
     "name": "handshake.absf",
