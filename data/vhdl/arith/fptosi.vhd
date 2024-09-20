@@ -39,10 +39,11 @@ architecture arch of fptosi is
 begin
 
   float_value <= to_float(ins);
-  converted <= std_logic_vector(to_signed(float_value));
+  converted <= std_logic_vector(to_signed(float_value, 32));
   outs <= q4;
 
   process (clk)
+  begin
     if (clk'event and clk = '1') then
       if (rst) then
         q0 <= (others => '0');
@@ -58,9 +59,8 @@ begin
         q4 <= q3;
       end if;
     end if;
-  begin
-
   end process;
+
   buff : entity work.delay_buffer(arch) generic map(LATENCY - 1)
     port map(
       clk,

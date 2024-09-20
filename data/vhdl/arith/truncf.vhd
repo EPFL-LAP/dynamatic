@@ -4,9 +4,9 @@ use ieee.numeric_std.all;
 
 entity double_to_single is
   port (
-    ins  : std_logic_vector(63 downto 0);
-    outs : std_logic_vector(31 downto 0)
-  )
+    ins  : in std_logic_vector(63 downto 0);
+    outs : out std_logic_vector(31 downto 0)
+  );
 end entity;
 
 architecture arch of double_to_single is
@@ -25,9 +25,9 @@ begin
   -- The exponent of IEEE-754 double has a different bias added to the 
   -- original exponent compared with IEEE-754 single (1023 vs 127).
   -- When converting double to single , we sub the difference 896 = 1023 - 127.
-  out_exponent <= std_logic_vector(unsigned(in_exponent) - 896);
+  out_exponent <= std_logic_vector(resize(unsigned(in_exponent) - 896, 8));
   -- TODO: here rounding is not considered.
-  out_mantissa <= in_mantissa(51 downto 30);
+  out_mantissa <= in_mantissa(51 downto 29);
 end architecture;
 
 library ieee;
@@ -61,7 +61,7 @@ end entity;
 
 architecture arch of truncf is
 begin
-  converter: work.double_to_single(arch)
+  converter: entity work.double_to_single(arch)
     port map (
       ins => ins,
       outs => outs

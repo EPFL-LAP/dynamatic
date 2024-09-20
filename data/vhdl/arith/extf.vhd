@@ -4,9 +4,9 @@ use ieee.numeric_std.all;
 
 entity single_to_double is
   port (
-    ins  : std_logic_vector(31 downto 0);
-    outs : std_logic_vector(63 downto 0)
-  )
+    ins  : in std_logic_vector(31 downto 0);
+    outs : out std_logic_vector(63 downto 0)
+  );
 end entity;
 
 architecture arch of single_to_double is
@@ -26,7 +26,7 @@ begin
   -- The exponent of IEEE-754 double has a different bias added to the 
   -- original exponent compared with IEEE-754 single (1023 vs 127).
   -- When converting single to double , we add the difference 896 = 1023 - 127.
-  out_exponent <= std_logic_vector(unsigned(in_exponent) + 896);
+  out_exponent <= std_logic_vector(resize(unsigned(in_exponent) + 896, 11));
   out_mantissa <= in_mantissa & mantissa_padding;
 end architecture;
 
@@ -61,7 +61,7 @@ end entity;
 
 architecture arch of extf is
 begin
-  converter: work.single_to_double(arch)
+  converter: entity work.single_to_double(arch)
     port map (
       ins => ins,
       outs => outs

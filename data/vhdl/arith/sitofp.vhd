@@ -38,11 +38,12 @@ architecture arch of sitofp is
   signal float_value : float32;
 begin
 
-  float_value <= to_float(to_signed(ins, DATA_TYPE), float_value);
+  float_value <= to_float(signed(ins));
   converted <= to_std_logic_vector(float_value);
   outs <= q4;
 
   process (clk)
+  begin
     if (clk'event and clk = '1') then
       if (rst) then
         q0 <= (others => '0');
@@ -58,9 +59,8 @@ begin
         q4 <= q3;
       end if;
     end if;
-  begin
-
   end process;
+
   buff : entity work.delay_buffer(arch) generic map(LATENCY - 1)
     port map(
       clk,

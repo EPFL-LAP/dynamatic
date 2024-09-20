@@ -3885,6 +3885,7 @@ begin
 end architecture;
 
 
+
 --------------------------------------------------------------------------------
 --                       IntComparator_63_111_F500_uid5
 -- VHDL generated for Kintex7 @ 500MHz
@@ -3907,7 +3908,7 @@ use std.textio.all;
 library work;
 
 entity IntComparator_63_111_F500_uid5 is
-    port (clk : in std_logic;
+    port (clk, ce : in std_logic;
           X : in  std_logic_vector(62 downto 0);
           Y : in  std_logic_vector(62 downto 0);
           XltY : out  std_logic;
@@ -3929,7 +3930,7 @@ begin
 end architecture;
 
 --------------------------------------------------------------------------------
---                        FPComparator_double_precision
+--                        FPComparator_11_52_F500_uid3
 -- VHDL generated for Kintex7 @ 500MHz
 -- This operator is part of the Infinite Virtual Library FloPoCoLib
 -- All rights reserved 
@@ -3949,8 +3950,8 @@ library std;
 use std.textio.all;
 library work;
 
-entity FPComparator_double_precision is
-    port (clk : in std_logic;
+entity FPComparator_11_52_F500_uid3 is
+    port (clk, ce : in std_logic;
           X : in  std_logic_vector(11+52+2 downto 0);
           Y : in  std_logic_vector(11+52+2 downto 0);
           unordered : out  std_logic;
@@ -3961,9 +3962,9 @@ entity FPComparator_double_precision is
           XgeY : out  std_logic   );
 end entity;
 
-architecture arch of FPComparator_double_precision is
+architecture arch of FPComparator_11_52_F500_uid3 is
    component IntComparator_63_111_F500_uid5 is
-      port ( clk : in std_logic;
+      port ( clk, ce : in std_logic;
              X : in  std_logic_vector(62 downto 0);
              Y : in  std_logic_vector(62 downto 0);
              XltY : out  std_logic;
@@ -4006,20 +4007,22 @@ begin
    process(clk)
       begin
          if clk'event and clk = '1' then
-            isZeroX_d1 <=  isZeroX;
-            isZeroY_d1 <=  isZeroY;
-            isNormalX_d1 <=  isNormalX;
-            isNormalY_d1 <=  isNormalY;
-            isInfX_d1 <=  isInfX;
-            isInfY_d1 <=  isInfY;
-            negativeX_d1 <=  negativeX;
-            positiveX_d1 <=  positiveX;
-            negativeY_d1 <=  negativeY;
-            positiveY_d1 <=  positiveY;
-            ExpFracXltExpFracY_d1 <=  ExpFracXltExpFracY;
-            ExpFracXgtExpFracY_d1 <=  ExpFracXgtExpFracY;
-            XeqYNum_d1 <=  XeqYNum;
-            unorderedR_d1 <=  unorderedR;
+            if ce = '1' then
+               isZeroX_d1 <=  isZeroX;
+               isZeroY_d1 <=  isZeroY;
+               isNormalX_d1 <=  isNormalX;
+               isNormalY_d1 <=  isNormalY;
+               isInfX_d1 <=  isInfX;
+               isInfY_d1 <=  isInfY;
+               negativeX_d1 <=  negativeX;
+               positiveX_d1 <=  positiveX;
+               negativeY_d1 <=  negativeY;
+               positiveY_d1 <=  positiveY;
+               ExpFracXltExpFracY_d1 <=  ExpFracXltExpFracY;
+               ExpFracXgtExpFracY_d1 <=  ExpFracXgtExpFracY;
+               XeqYNum_d1 <=  XeqYNum;
+               unorderedR_d1 <=  unorderedR;
+            end if;
          end if;
       end process;
    excX <= X(65 downto 64);
@@ -4048,6 +4051,7 @@ begin
    -- expfrac comparisons 
    ExpFracCmp: IntComparator_63_111_F500_uid5
       port map ( clk  => clk,
+                 ce => ce,
                  X => ExpFracX,
                  Y => ExpFracY,
                  XeqY => ExpFracXeqExpFracY,
@@ -4109,7 +4113,7 @@ use std.textio.all;
 library work;
 
 entity IntComparator_31_111_F500_uid9 is
-    port (clk : in std_logic;
+    port (clk, ce : in std_logic;
           X : in  std_logic_vector(30 downto 0);
           Y : in  std_logic_vector(30 downto 0);
           XltY : out  std_logic;
@@ -4131,7 +4135,7 @@ begin
 end architecture;
 
 --------------------------------------------------------------------------------
---                        FPComparator_single_precision
+--                        FPComparator_8_23_F500_uid7
 -- VHDL generated for Kintex7 @ 500MHz
 -- This operator is part of the Infinite Virtual Library FloPoCoLib
 -- All rights reserved 
@@ -4151,8 +4155,8 @@ library std;
 use std.textio.all;
 library work;
 
-entity FPComparator_single_precision is
-    port (clk : in std_logic;
+entity FPComparator_8_23_F500_uid7 is
+    port (clk, ce : in std_logic;
           X : in  std_logic_vector(8+23+2 downto 0);
           Y : in  std_logic_vector(8+23+2 downto 0);
           unordered : out  std_logic;
@@ -4163,9 +4167,9 @@ entity FPComparator_single_precision is
           XgeY : out  std_logic   );
 end entity;
 
-architecture arch of FPComparator_single_precision is
+architecture arch of FPComparator_8_23_F500_uid7 is
    component IntComparator_31_111_F500_uid9 is
-      port ( clk : in std_logic;
+      port ( clk, ce : in std_logic;
              X : in  std_logic_vector(30 downto 0);
              Y : in  std_logic_vector(30 downto 0);
              XltY : out  std_logic;
@@ -4231,6 +4235,7 @@ begin
    -- expfrac comparisons 
    ExpFracCmp: IntComparator_31_111_F500_uid9
       port map ( clk  => clk,
+                 ce => ce,
                  X => ExpFracX,
                  Y => ExpFracY,
                  XeqY => ExpFracXeqExpFracY,
