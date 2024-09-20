@@ -6,6 +6,7 @@
 //
 //===----------------------------------------------------------------------===//
 
+#include "dynamatic/Integration.h"
 #include "lu.h"
 #include <math.h>
 
@@ -78,7 +79,7 @@ int main() {
       A_prime[i][j] = 0.0;
     }
   }
-  lu(A, L, U, P, A_prime);
+  CALL_KERNEL(lu, A, L, U, P, A_prime);
 
 #ifdef VERBOSE
   _PRINT(A);
