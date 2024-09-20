@@ -662,8 +662,6 @@ HandshakeSizeLSQsPass::calcQueueSize(
     }
   }
 
-  // Find the minimum II of all IIs
-  unsigned minII = std::min_element(IIs.begin(), IIs.end()).operator*();
   int maxEndTime = 0;
   // Choose the maxiumm time of all dealloc times for analysis time scope
   for (auto &II : IIs) {
@@ -677,17 +675,14 @@ HandshakeSizeLSQsPass::calcQueueSize(
   // determine)
   maxEndTime = maxEndTime * 2;
 
-  // Calculate the maximum amount of iterations which are relevant for the time
-  // scope
-  unsigned iterMax = std::ceil((float)maxEndTime / minII);
-
   // Go trough all LSQs and calculate the maximum amount of slots needed
   for (auto &entry : allocDeallocTimesPerIIPerLSQ) {
     std::vector<int> allocPerCycle(maxEndTime);
     unsigned startOffset = 0;
+    unsigned iter = 0;
     // Build array for how many slots are allocated and deallocated per cycle
-    for (unsigned iter = 0; iter < iterMax; iter++) {
-      // Alternate trough the different IIs in the order they are in the array
+    // Alternate trough the different IIs in the order they are in the array
+    while (startOffset < maxEndTime) {
       unsigned II = IIs[iter % IIs.size()];
 
       for (auto &allocTime : std::get<0>(entry.second.at(II))) {
