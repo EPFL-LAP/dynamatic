@@ -1340,6 +1340,7 @@ struct CfToHandshakePass
                  OneToOneConversion<arith::SubFOp, handshake::SubFOp>,
                  OneToOneConversion<arith::SubIOp, handshake::SubIOp>,
                  OneToOneConversion<arith::TruncIOp, handshake::TruncIOp>,
+                 OneToOneConversion<arith::TruncFOp, handshake::TruncFOp>,
                  OneToOneConversion<arith::XOrIOp, handshake::XOrIOp>,
                  OneToOneConversion<arith::SIToFPOp, handshake::SIToFPOp>,
                  OneToOneConversion<arith::FPToSIOp, handshake::FPToSIOp>,
