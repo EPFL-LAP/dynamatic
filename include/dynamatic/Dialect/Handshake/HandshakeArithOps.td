@@ -324,6 +324,12 @@ def Handshake_TruncIOp : Handshake_Arith_IToICastOp<"trunci"> {
   let hasCanonicalizer = 1;
 }
 
+def Handshake_TruncFOp : Handshake_Arith_FToFCastOp<"truncf"> {
+  let summary = "Floating-point truncation.";
+  // TODO: add canonicalizer
+  let hasVerifier = 1;
+}
+
 def Handshake_XOrIOp : Handshake_Arith_IntBinaryOp<"xori", [Commutative]> {
   let summary = "Bitwise exclusive union.";
 }
