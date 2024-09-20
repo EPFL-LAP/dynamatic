@@ -57,9 +57,9 @@ struct Group {
   Block *bb;
 
   // List of predecessors of the group
-  std::set<Group *> preds;
+  DenseSet<Group *> preds;
   // List of successors of the group
-  std::set<Group *> succs;
+  DenseSet<Group *> succs;
 
   // Constructor for the group
   Group(Block *b) : bb(b) {}
