@@ -24,8 +24,9 @@ begin
   out_sign <= in_sign;
   -- The exponent of IEEE-754 double has a different bias added to the 
   -- original exponent compared with IEEE-754 single (1023 vs 127).
-  -- When converting single to double , we add the difference 896 = 1023 - 127.
+  -- When converting double to single , we sub the difference 896 = 1023 - 127.
   out_exponent <= std_logic_vector(unsigned(in_exponent) - 896);
+  -- TODO: here rounding is not considered.
   out_mantissa <= in_mantissa(51 downto 30);
 end architecture;
 
