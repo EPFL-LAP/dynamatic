@@ -7,13 +7,13 @@ entity cmpf_single_precision is
     -- inputs
     clk          : in std_logic;
     rst          : in std_logic;
-    lhs          : in std_logic_vector(DATA_TYPE - 1 downto 0);
+    lhs          : in std_logic_vector(32 - 1 downto 0);
     lhs_valid    : in std_logic;
-    rhs          : in std_logic_vector(DATA_TYPE - 1 downto 0);
+    rhs          : in std_logic_vector(32 - 1 downto 0);
     rhs_valid    : in std_logic;
     result_ready : in std_logic;
     -- outputs
-    unordered    : out std_logic_vector(0 downto 0);
+    unordered    : out std_logic;
     XltY         : out std_logic;
     XeqY         : out std_logic;
     XgtY         : out std_logic;
@@ -22,12 +22,12 @@ entity cmpf_single_precision is
     result_valid : out std_logic;
     lhs_ready    : out std_logic;
     rhs_ready    : out std_logic
-  )
+  );
 end entity;
 
 architecture arch of cmpf_single_precision is
-  signal ip_lhs : std_logic_vector(DATA_TYPE + 1 downto 0);
-  signal ip_rhs : std_logic_vector(DATA_TYPE + 1 downto 0);
+  signal ip_lhs : std_logic_vector(32 + 1 downto 0);
+  signal ip_rhs : std_logic_vector(32 + 1 downto 0);
 begin
   join_inputs : entity work.join(arch) generic map(2)
     port map(
@@ -58,6 +58,7 @@ begin
     );
   operator : entity work.FPComparator_8_23_F500_uid7(arch)
   port map (clk => clk,
+        ce => '1',
         X => ip_lhs,
         Y => ip_rhs,
         unordered => unordered,
@@ -68,19 +69,22 @@ begin
         XgeY => XgeY);
 end architecture;
 
+library ieee;
+use ieee.std_logic_1164.all;
+use ieee.numeric_std.all;
 
 entity cmpf_double_precision is
   port (
     -- inputs
     clk          : in std_logic;
     rst          : in std_logic;
-    lhs          : in std_logic_vector(DATA_TYPE - 1 downto 0);
+    lhs          : in std_logic_vector(64 - 1 downto 0);
     lhs_valid    : in std_logic;
-    rhs          : in std_logic_vector(DATA_TYPE - 1 downto 0);
+    rhs          : in std_logic_vector(64 - 1 downto 0);
     rhs_valid    : in std_logic;
     result_ready : in std_logic;
     -- outputs
-    unordered    : out std_logic_vector(0 downto 0);
+    unordered    : out std_logic;
     XltY         : out std_logic;
     XeqY         : out std_logic;
     XgtY         : out std_logic;
@@ -89,13 +93,15 @@ entity cmpf_double_precision is
     result_valid : out std_logic;
     lhs_ready    : out std_logic;
     rhs_ready    : out std_logic
-  )
+  );
 end cmpf_double_precision;
 
 architecture arch of cmpf_double_precision is
   signal join_valid : std_logic;
 	signal buff_valid, oehb_valid, oehb_ready : std_logic;
 	signal oehb_dataOut, oehb_datain : std_logic_vector(0 downto 0);
+  signal ip_lhs : std_logic_vector(64 + 1 downto 0);
+  signal ip_rhs : std_logic_vector(64 + 1 downto 0);
 begin
 
  oehb : entity work.oehb(arch) generic map(1)
@@ -121,7 +127,7 @@ begin
       ins_ready(1) => rhs_ready
     );
 
-  ieee2nfloat_0: entity work.InputIEEE_32bit(arch)
+  ieee2nfloat_0: entity work.InputIEEE_64bit(arch)
     port map (
         --input
         X => lhs,
@@ -129,7 +135,7 @@ begin
         R => ip_lhs
     );
 
-  ieee2nfloat_1: entity work.InputIEEE_32bit(arch)
+  ieee2nfloat_1: entity work.InputIEEE_64bit(arch)
     port map (
         --input
         X => rhs,
@@ -215,31 +221,31 @@ begin
 
   gen_result_signal :
     if cmp_predicate = "OEQ" generate
-      result(0) <= not ip_unordered and XeqY;
+      result(0) <= not unordered and XeqY;
     elsif cmp_predicate = "OGT" generate
-      result(0) <= not ip_unordered and XgtY;
+      result(0) <= not unordered and XgtY;
     elsif cmp_predicate = "OGE" generate
-      result(0) <= not ip_unordered and XgeY;
+      result(0) <= not unordered and XgeY;
     elsif cmp_predicate = "OLT" generate
-      result(0) <= not ip_unordered and XltY;
+      result(0) <= not unordered and XltY;
     elsif cmp_predicate = "OLE" generate
-      result(0) <= not ip_unordered and XleY;
+      result(0) <= not unordered and XleY;
     elsif cmp_predicate = "ONE" generate
-      result(0) <= not ip_unordered and not XeqY;
+      result(0) <= not unordered and not XeqY;
     elsif cmp_predicate = "UEQ" generate
-      result(0) <= ip_unordered or XeqY;
+      result(0) <= unordered or XeqY;
     elsif cmp_predicate = "UGT" generate
-      result(0) <= ip_unordered or XgtY;
+      result(0) <= unordered or XgtY;
     elsif cmp_predicate = "UGE" generate
-      result(0) <= ip_unordered or XgeY;
+      result(0) <= unordered or XgeY;
     elsif cmp_predicate = "ULT" generate
-      result(0) <= ip_unordered or XltY;
+      result(0) <= unordered or XltY;
     elsif cmp_predicate = "ULE" generate
-      result(0) <= ip_unordered or XleY;
+      result(0) <= unordered or XleY;
     elsif cmp_predicate = "UNE" generate
-      result(0) <= ip_unordered or not XeqY;
+      result(0) <= unordered or not XeqY;
     elsif cmp_predicate = "UNO" generate
-      result(0) <= ip_unordered;
+      result(0) <= unordered;
     else generate 
       assert false
       report "COMPARATOR is an invalid predicate!"
