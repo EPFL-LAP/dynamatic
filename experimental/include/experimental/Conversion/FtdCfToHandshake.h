@@ -15,21 +15,15 @@
 #ifndef DYNAMATIC_CONVERSION_FTD_CF_TO_HANDSHAKE_H
 #define DYNAMATIC_CONVERSION_FTD_CF_TO_HANDSHAKE_H
 
-#include "dynamatic/Analysis/ControlDependenceAnalysis.h"
 #include "dynamatic/Conversion/CfToHandshake.h"
 #include "dynamatic/Dialect/Handshake/HandshakeInterfaces.h"
 #include "dynamatic/Dialect/Handshake/HandshakeOps.h"
-#include "dynamatic/Support/Backedge.h"
 #include "dynamatic/Support/DynamaticPass.h"
 #include "dynamatic/Support/LLVM.h"
-#include "dynamatic/Transforms/FuncMaximizeSSA.h"
+#include "experimental/Analysis/GsaAnalysis.h"
 #include "experimental/Conversion/FtdMemoryInterface.h"
-#include "experimental/Support/BooleanLogic/BoolExpression.h"
 #include "mlir/Analysis/CFGLoopInfo.h"
 #include "mlir/Dialect/Func/IR/FuncOps.h"
-#include "mlir/Dialect/LLVMIR/LLVMDialect.h"
-#include "mlir/IR/Attributes.h"
-#include "mlir/Transforms/DialectConversion.h"
 
 namespace dynamatic {
 namespace experimental {
@@ -77,20 +71,25 @@ struct FtdStoredOperations {
 class FtdLowerFuncToHandshake : public LowerFuncToHandshake {
 public:
   // Use the same constructors from the base class
-  FtdLowerFuncToHandshake(NameAnalysis &namer, MLIRContext *ctx,
+  FtdLowerFuncToHandshake(gsa::GsaAnalysis<mlir::func::FuncOp> &gsa,
+                          NameAnalysis &namer, MLIRContext *ctx,
                           mlir::PatternBenefit benefit = 1)
-      : LowerFuncToHandshake(namer, ctx, benefit){};
+      : LowerFuncToHandshake(namer, ctx, benefit), gsaAnalysis(gsa){};
 
-  FtdLowerFuncToHandshake(NameAnalysis &namer,
+  FtdLowerFuncToHandshake(gsa::GsaAnalysis<mlir::func::FuncOp> &gsa,
+                          NameAnalysis &namer,
                           const TypeConverter &typeConverter, MLIRContext *ctx,
                           mlir::PatternBenefit benefit = 1)
-      : LowerFuncToHandshake(namer, typeConverter, ctx, benefit){};
+      : LowerFuncToHandshake(namer, typeConverter, ctx, benefit),
+        gsaAnalysis(gsa){};
 
   LogicalResult
   matchAndRewrite(mlir::func::FuncOp funcOp, OpAdaptor adaptor,
                   ConversionPatternRewriter &rewriter) const override;
 
 protected:
+  gsa::GsaAnalysis<mlir::func::FuncOp> &gsaAnalysis;
+
   LogicalResult ftdVerifyAndCreateMemInterfaces(
       handshake::FuncOp &funcOp, ConversionPatternRewriter &rewriter,
       MemInterfacesInfo &memInfo, FtdStoredOperations &ftdOps) const;

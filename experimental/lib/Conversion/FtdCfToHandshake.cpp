@@ -13,6 +13,7 @@
 #include "dynamatic/Dialect/Handshake/HandshakeDialect.h"
 #include "dynamatic/Dialect/Handshake/HandshakeOps.h"
 #include "dynamatic/Support/CFG.h"
+#include "experimental/Analysis/GsaAnalysis.h"
 #include "experimental/Support/BooleanLogic/BoolExpression.h"
 #include "experimental/Support/BooleanLogic/Shannon.h"
 #include "mlir/Dialect/Affine/Utils.h"
@@ -30,7 +31,6 @@
 #include "mlir/Support/LogicalResult.h"
 #include "mlir/Transforms/DialectConversion.h"
 #include "llvm/ADT/TypeSwitch.h"
-#include "llvm/Support/Casting.h"
 #include <unordered_set>
 #include <utility>
 
@@ -60,7 +60,11 @@ struct FtdCfToHandshakePass
     CfToHandshakeTypeConverter converter;
     RewritePatternSet patterns(ctx);
 
-    patterns.add<experimental::ftd::FtdLowerFuncToHandshake, ConvertCalls,
+    patterns.add<experimental::ftd::FtdLowerFuncToHandshake>(
+        getAnalysis<experimental::gsa::GsaAnalysis<func::FuncOp>>(),
+        getAnalysis<NameAnalysis>(), converter, ctx);
+
+    patterns.add<ConvertCalls,
                  ConvertIndexCast<arith::IndexCastOp, handshake::ExtSIOp>,
                  ConvertIndexCast<arith::IndexCastUIOp, handshake::ExtUIOp>,
                  OneToOneConversion<arith::AddFOp, handshake::AddFOp>,
@@ -342,18 +346,9 @@ static void minimizeGroupsConnections(DenseSet<Group *> &groupsGraph) {
     // List of predecessors to remove
     DenseSet<Group *> predsToRemove;
     for (auto &bp : group->preds) {
-      // If the big predecessor is already in the list to remove, ignore it
-      if (llvm::find(predsToRemove, bp) != predsToRemove.end())
-        continue;
+
       for (auto &sp : group->preds) {
-        // If the small predecessor has bigger index than the big predecessor,
-        // ignore it
-        if (lessThanBlocks(bp->bb, sp->bb))
-          continue;
-        // If the small predecessor is already in the list to remove, ignore
-        // it
-        if (llvm::find(predsToRemove, sp) != predsToRemove.end())
-          continue;
+
         // if we are considering the same elements, ignore them
         if (sp->bb == bp->bb)
           continue;

@@ -12,6 +12,7 @@ add_dynamatic_library(DynamaticExperimentalTransforms
   MLIRTransformUtils
   DynamaticSupport
   DynamaticAnalysis
+  DynamaticExperimentalAnalysis
 )
 
 add_subdirectory(Speculation)
