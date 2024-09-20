@@ -1344,7 +1344,8 @@ struct CfToHandshakePass
                  OneToOneConversion<arith::XOrIOp, handshake::XOrIOp>,
                  OneToOneConversion<arith::SIToFPOp, handshake::SIToFPOp>,
                  OneToOneConversion<arith::FPToSIOp, handshake::FPToSIOp>,
-                 OneToOneConversion<arith::ExtFOp, handshake::ExtFOp>>(
+                 OneToOneConversion<arith::ExtFOp, handshake::ExtFOp>,
+                 OneToOneConversion<math::AbsFOp, handshake::AbsFOp>>(
         getAnalysis<NameAnalysis>(), converter, ctx);
 
     // All func-level functions must become handshake-level functions

@@ -348,4 +348,9 @@ def Handshake_ExtFOp : Handshake_Arith_FToFCastOp<"extf"> {
   let hasVerifier = 1;
 }
 
+def Handshake_AbsFOp : Handshake_Arith_FToFCastOp<"absf"> {
+  let summary = "floating point absolute-value operation";
+  // TODO: add folder
+}
+
 #endif // DYNAMATIC_DIALECT_HANDSHAKE_HANDSHAKE_ARTIH_OPS_TD
