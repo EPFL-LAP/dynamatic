@@ -276,6 +276,14 @@ std::optional<LSQSizingResult> HandshakeSizeLSQsPass::sizeLSQsForCFDFC(
   } else if (collisions == "half") {
     IIs.push_back(initialII);
     IIs.push_back(graph.getWorstCaseII());
+  } else if (collisions == "gaussian_test") {
+    if (initialII == 2)
+      IIs.push_back(6);
+    else
+      IIs.push_back(10);
+  } else if (collisions == "matrix_power_test") {
+    IIs.push_back(2);
+    IIs.push_back(3);
   } else {
     IIs.push_back(initialII);
   }
@@ -542,10 +550,45 @@ HandshakeSizeLSQsPass::getLoadDeallocTimes(AdjListGraph graph,
   for (auto &op : ops) {
     int maxLatency = 0;
     for (auto &succedingOp : graph.getConnectedOps(op)) {
+
       maxLatency = std::max(
           graph.findMaxPathLatency(startNode, succedingOp, false, false, true) +
               loadDeallocEntryLatency,
           maxLatency);
+
+      if (succedingOp->getName().getStringRef().str() == "handshake.buffer") {
+        auto params = succedingOp->getAttrOfType<DictionaryAttr>(
+            RTL_PARAMETERS_ATTR_NAME);
+
+        if (!params) {
+          continue;
+        }
+
+        auto optTiming = params.getNamed(handshake::BufferOp::TIMING_ATTR_NAME);
+        if (!optTiming) {
+          continue;
+        }
+
+        auto timing = dyn_cast<handshake::TimingAttr>(optTiming->getValue());
+        if (!timing) {
+          continue;
+        }
+
+        handshake::TimingInfo info = timing.getInfo();
+
+        if (info == TimingInfo::tehb()) {
+          llvm::dbgs() << "\t\t [DBG] " << getUniqueName(op).str()
+                       << " is a tehb (" << getUniqueName(succedingOp)
+                       << ") after load\n";
+          for (auto &succedingOp2 : graph.getConnectedOps(succedingOp)) {
+            maxLatency = std::max(
+                graph.findMaxPathLatency(startNode, succedingOp2, false, false,
+                                         true) +
+                    loadDeallocEntryLatency - 1,
+                maxLatency); // -1 because buffer can read it 1 cycle earlier
+          }
+        }
+      }
     }
     deallocTimes.insert({op, maxLatency});
     llvm::dbgs() << "\t\t [DBG] " << getUniqueName(op).str()
@@ -628,12 +671,14 @@ HandshakeSizeLSQsPass::calcQueueSize(
   // Go trough all LSQs and calculate the maximum amount of slots needed
   for (auto &entry : allocDeallocTimesPerIIPerLSQ) {
 
-    int iterMax = std::ceil((float)(endTime) / IIs[0]) -
-                  1; // TODO determine end time and iterMax correctly
+    int iterMax =
+        std::ceil((float)(endTime) /
+                  IIs[0]); // TODO determine end time and iterMax correctly
     std::vector<int> slotsPerCycle(endTime);
 
     for (int t = 0; t < endTime; t++) {
-      // Build array for how many slots are allocated and deallocated per cycle
+      // Build array for how many slots are allocated and deallocated per
+      // cycle
       for (int iter = 0; iter < iterMax; iter++) {
         unsigned II = IIs[iter % IIs.size()];
 
@@ -670,8 +715,8 @@ HandshakeSizeLSQsPass::calcQueueSize(
 void HandshakeSizeLSQsPass::insertAllocPrecedesMemoryAccessEdges(
     AdjListGraph &graph, std::vector<mlir::Operation *> ops,
     std::unordered_map<unsigned, mlir::Operation *> phiNodes) {
-  // Iterate over all provided ops and add an edge from the phi node of the ops
-  // BB to the op
+  // Iterate over all provided ops and add an edge from the phi node of the
+  // ops BB to the op
   for (auto &op : ops) {
     std::optional<unsigned> bb = getLogicBB(op);
     assert(bb && "Load/Store Op must belong to basic block");
