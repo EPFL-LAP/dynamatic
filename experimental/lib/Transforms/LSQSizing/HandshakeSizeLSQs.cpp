@@ -264,12 +264,25 @@ std::optional<LSQSizingResult> HandshakeSizeLSQsPass::sizeLSQsForCFDFC(
   // candidate and that the start time of the candidate is not zero
   insertStartnodeShiftingEdges(graph, startNode, startTimes);
 
-  /*if(loadOps.size() == 0 && storeOps.size() == 0) {
+  if (loadOps.size() == 0 && storeOps.size() == 0) {
     llvm::dbgs() << "\t [DBG] No LSQ Ops found in CFDFC\n";
     return std::nullopt;
-  }*/
+  }
 
   std::vector<unsigned> IIs;
+
+  // The collisions argument can be passed in the compile script
+  // For now there are 3 defined cases: full, half, none
+  // full: determines the worst case II, for the case that all lsq ops have
+  // memory collisions
+  // half: determines the worst case II and alternate it with
+  // the best case II (from buffer placement), for the case that half of the lsq
+  // ops have memory collisions
+  // none: gets the best case II(from buffer
+  // placement), for the case that no lsq ops have memory collisions
+  //
+  // It would also easily be possible to add more cases, by just pushing the IIs
+  // into the IIs vector in the order they are occuring
 
   if (collisions == "full") {
     IIs.push_back(graph.getWorstCaseII());
@@ -362,7 +375,7 @@ HandshakeSizeLSQsPass::findStartTimes(AdjListGraph graph) {
   // Go trough all candidates and save the longest path, its latency and node
   // count
   for (auto &op : startNodeCandidates) {
-    std::vector<std::string> path = graph.findLongestNonCyclicPath2(op);
+    std::vector<std::string> path = graph.findLongestNonCyclicPath(op);
     maxLatencies.insert({op, graph.getPathLatency(path)});
     nodeCounts.insert({op, path.size()});
     llvm::dbgs() << "\t [DBG] Longest Path Candidate: "
@@ -443,30 +456,17 @@ HandshakeSizeLSQsPass::getPhiNodes(AdjListGraph graph,
   std::optional<unsigned> startNodeBB = getLogicBB(startNode);
   assert(startNodeBB && "Start Node must belong to basic block");
   phiNodeCandidates.insert({*startNodeBB, {startNode}});
-  // llvm::dbgs() << "\t [DBG] Inserted Start Node: " <<
-  // startNode->getAttrOfType<StringAttr>("handshake.name").str() << " for BB "
-  // << startNode->getAttrOfType<IntegerAttr>("handshake.bb").getUInt() << "\n";
 
   // Go trought ops and find connected ops
   for (auto &srcOp : graph.getOperations()) {
     std::optional<unsigned> srcBB = getLogicBB(srcOp);
     assert(srcBB && "Src Op must belong to basic block");
-    // llvm::dbgs() << "\t [DBG] Branch Op: " <<
-    // branchOp->getAttrOfType<StringAttr>("handshake.name").str() << " of BB "
-    // << srcBB <<"\n";
-
     // For each connected Op, check if its in a different BB and add it to the
     // candidates
     for (auto &destOp : graph.getConnectedOps(srcOp)) {
       std::optional<unsigned> destBB = getLogicBB(destOp);
       assert(destBB && "Dest Op must belong to basic block");
-      // llvm::dbgs() << "\t\t [DBG] connected to: " <<
-      // destOp->getAttrOfType<StringAttr>("handshake.name").str() << " of BB"
-      // << destBB << "\n";
       if (*destBB != *srcBB) {
-        // llvm::dbgs() << "\t [DBG] Found Phi Node Candidate: " <<
-        // destOp->getAttrOfType<StringAttr>("handshake.name").str() << " for BB
-        // " << destBB << "\n";
         if (phiNodeCandidates.find(*destBB) == phiNodeCandidates.end()) {
           phiNodeCandidates.insert({*destBB, std::vector<mlir::Operation *>()});
         }
@@ -481,13 +481,8 @@ HandshakeSizeLSQsPass::getPhiNodes(AdjListGraph graph,
     mlir::Operation *phiNode = nullptr;
     int minLatency = INT_MAX;
     for (auto &op : entry.second) {
-      int latency = graph.findMinPathLatency(
-          startNode, op,
-          true); // TODO think about if backedges should be ignored or not
-      // llvm::dbgs() << "\t\t [DBG] Latency from " <<
-      // startNode->getAttrOfType<StringAttr>("handshake.name").str() << " to "
-      // << op->getAttrOfType<StringAttr>("handshake.name").str() << " is " <<
-      // latency << "\n";
+      int latency = graph.findMinPathLatency(startNode, op, true);
+
       if (latency < minLatency) {
         phiNode = op;
         minLatency = latency;
@@ -560,6 +555,9 @@ HandshakeSizeLSQsPass::getLoadDeallocTimes(AdjListGraph graph,
               loadDeallocEntryLatency,
           maxLatency);
 
+      // If the node is a buffer, check if it is a tehb buffer and if so, check
+      // the latency of the nodes connected to the buffer
+      // TODO maybe also to the same for all buffers
       if (succedingOp->getName().getStringRef().str() == "handshake.buffer") {
         auto params = succedingOp->getAttrOfType<DictionaryAttr>(
             RTL_PARAMETERS_ATTR_NAME);
@@ -581,15 +579,15 @@ HandshakeSizeLSQsPass::getLoadDeallocTimes(AdjListGraph graph,
         handshake::TimingInfo info = timing.getInfo();
 
         if (info == TimingInfo::tehb()) {
-          llvm::dbgs() << "\t\t [DBG] " << getUniqueName(op).str()
-                       << " is a tehb (" << getUniqueName(succedingOp)
-                       << ") after load\n";
           for (auto &succedingOp2 : graph.getConnectedOps(succedingOp)) {
-            maxLatency = std::max(
-                graph.findMaxPathLatency(startNode, succedingOp2, false, false,
-                                         true) +
-                    loadDeallocEntryLatency - 1,
-                maxLatency); // -1 because buffer can read it 1 cycle earlier
+            // -1 because buffer can get the load result 1 cycle earlier
+            // Maybe it could also be earlier for a buffer with multiple slots
+            // But its not clear for now
+            maxLatency =
+                std::max(graph.findMaxPathLatency(startNode, succedingOp2,
+                                                  false, false, true) +
+                             loadDeallocEntryLatency - 1,
+                         maxLatency);
           }
         }
       }
@@ -611,9 +609,9 @@ HandshakeSizeLSQsPass::calcQueueSize(
   std::unordered_map<mlir::Operation *, AllocDeallocTimesPerII>
       allocDeallocTimesPerIIPerLSQ;
 
+  // Go trough all alloc times and sort them by LSQ and II
   for (auto &entry : allocTimes) {
     TimePerOpMap allocTimeMapForII = entry.second;
-
     for (auto &timeForOp : allocTimeMapForII) {
       mlir::Operation *lsqOp = nullptr;
       for (Operation *destOp : timeForOp.first->getUsers()) {
@@ -637,6 +635,7 @@ HandshakeSizeLSQsPass::calcQueueSize(
     }
   }
 
+  // Go trough all dealloc times and sort them by LSQ and II
   for (auto &entry : deallocTimes) {
     TimePerOpMap deallocTimeMapForII = entry.second;
 
@@ -688,6 +687,7 @@ HandshakeSizeLSQsPass::calcQueueSize(
     unsigned startOffset = 0;
     // Build array for how many slots are allocated and deallocated per cycle
     for (unsigned iter = 0; iter < iterMax; iter++) {
+      // Alternate trough the different IIs in the order they are in the array
       unsigned II = IIs[iter % IIs.size()];
 
       for (auto &allocTime : std::get<0>(entry.second.at(II))) {
@@ -702,6 +702,7 @@ HandshakeSizeLSQsPass::calcQueueSize(
           allocPerCycle[t]--;
         }
       }
+      // Increase the start offset for the next iteration by the II
       startOffset += II;
     }
 

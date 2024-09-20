@@ -202,11 +202,11 @@ void AdjListGraph::addShiftingEdge(mlir::Operation *src, mlir::Operation *dest,
   nodes.at(srcName).shiftingEdges.insert(newNodeName);
 }
 
-void AdjListGraph::dfs(std::string &currentNode, std::string &end,
-                       std::vector<std::string> &currentPath,
-                       std::set<std::string> &visited,
-                       std::vector<std::vector<std::string>> &paths,
-                       bool ignoreBackedges, bool ignoreShiftingEdge) {
+void AdjListGraph::dfsAllPaths(std::string &currentNode, std::string &end,
+                               std::vector<std::string> &currentPath,
+                               std::set<std::string> &visited,
+                               std::vector<std::vector<std::string>> &paths,
+                               bool ignoreBackedges, bool ignoreShiftingEdge) {
   // If the current node is the target, add the current path to paths and
   // return.
   if (currentNode == end) {
@@ -221,8 +221,8 @@ void AdjListGraph::dfs(std::string &currentNode, std::string &end,
       visited.insert(neighbor);        // Mark as visited
       currentPath.push_back(neighbor); // Add to the current pat
       // Recursively visit the neighbor
-      dfs(neighbor, end, currentPath, visited, paths, ignoreBackedges,
-          ignoreShiftingEdge);
+      dfsAllPaths(neighbor, end, currentPath, visited, paths, ignoreBackedges,
+                  ignoreShiftingEdge);
       // Backtrack: remove the neighbor from the current path and visited set
       // for other paths
       currentPath.pop_back();
@@ -237,8 +237,8 @@ void AdjListGraph::dfs(std::string &currentNode, std::string &end,
         visited.insert(neighbor);        // Mark as visited
         currentPath.push_back(neighbor); // Add to the current pat
         // Recursively visit the neighbor
-        dfs(neighbor, end, currentPath, visited, paths, ignoreBackedges,
-            ignoreShiftingEdge);
+        dfsAllPaths(neighbor, end, currentPath, visited, paths, ignoreBackedges,
+                    ignoreShiftingEdge);
         // Backtrack: remove the neighbor from the current path and visited set
         // for other paths
         currentPath.pop_back();
@@ -254,8 +254,8 @@ void AdjListGraph::dfs(std::string &currentNode, std::string &end,
         visited.insert(neighbor);        // Mark as visited
         currentPath.push_back(neighbor); // Add to the current pat
         // Recursively visit the neighbor
-        dfs(neighbor, end, currentPath, visited, paths, ignoreBackedges,
-            ignoreShiftingEdge);
+        dfsAllPaths(neighbor, end, currentPath, visited, paths, ignoreBackedges,
+                    ignoreShiftingEdge);
         // Backtrack: remove the neighbor from the current path and visited set
         // for other paths
         currentPath.pop_back();
@@ -274,8 +274,8 @@ AdjListGraph::findPaths(std::string start, std::string end, bool ignoreBackedge,
   std::set<std::string> visited{start};
 
   // Call DFS to find all paths
-  dfs(start, end, currentPath, visited, paths, ignoreBackedge,
-      ignoreShiftingEdge);
+  dfsAllPaths(start, end, currentPath, visited, paths, ignoreBackedge,
+              ignoreShiftingEdge);
   return paths;
 }
 
@@ -289,51 +289,12 @@ AdjListGraph::findPaths(mlir::Operation *startOp, mlir::Operation *endOp,
                    ignoreBackedge, ignoreShiftingEdge);
 }
 
-std::vector<std::string>
-AdjListGraph::findLongestNonCyclicPath(mlir::Operation *startOp) {
-  std::string start = getUniqueName(startOp).str();
-  std::vector<std::string> path;
-  std::stack<std::pair<std::vector<std::string>, std::set<std::string>>>
-      pathStack;
-  int maxLatency = 0;
-  // Initialize the stack with the path containing the source node and its
-  // visited set
-  pathStack.push({{start}, {start}});
-  while (!pathStack.empty()) {
-    // Get the current path and visited set from the stack
-    auto [currentPath, visited] = pathStack.top();
-    pathStack.pop();
-    // Get the last node in the current path
-    std::string currentNode = currentPath.back();
-    // If the current latency is higher than the max latency, update the max
-    // latency and path
-    if (getPathLatency(currentPath) >= maxLatency) {
-      maxLatency = getPathLatency(currentPath);
-      path = currentPath;
-    }
-    // Get all adjacent nodes of the current node
-    for (const std::string &neighbor : nodes.at(currentNode).edges) {
-      // If the neighbor has not been visited in the current path, extend the
-      // path
-      if (visited.find(neighbor) == visited.end()) {
-        std::vector<std::string> newPath = currentPath;
-        newPath.push_back(neighbor);
-        std::set<std::string> newVisited = visited;
-        newVisited.insert(neighbor);
-        // Push the new path and updated visited set onto the stack
-        pathStack.push({newPath, newVisited});
-      }
-    }
-  }
-  return path;
-}
-
 // Recursive helper function
-void AdjListGraph::dfsHelper(const std::string &currentNode,
-                             std::set<std::string> &visited,
-                             std::vector<std::string> &currentPath,
-                             int &maxLatency,
-                             std::vector<std::string> &bestPath) {
+void AdjListGraph::dfsLongestAcyclicPath(const std::string &currentNode,
+                                         std::set<std::string> &visited,
+                                         std::vector<std::string> &currentPath,
+                                         int &maxLatency,
+                                         std::vector<std::string> &bestPath) {
   visited.insert(currentNode);
   currentPath.push_back(currentNode);
   // Update the best path if current path latency is greater than maxLatency
@@ -345,7 +306,8 @@ void AdjListGraph::dfsHelper(const std::string &currentNode,
   // Recursively explore neighbors
   for (const std::string &neighbor : nodes[currentNode].edges) {
     if (visited.find(neighbor) == visited.end()) {
-      dfsHelper(neighbor, visited, currentPath, maxLatency, bestPath);
+      dfsLongestAcyclicPath(neighbor, visited, currentPath, maxLatency,
+                            bestPath);
     }
   }
   // Backtrack: remove the current node from the path and visited set
@@ -354,14 +316,14 @@ void AdjListGraph::dfsHelper(const std::string &currentNode,
 }
 // Main function to find the longest non-cyclic path
 std::vector<std::string>
-AdjListGraph::findLongestNonCyclicPath2(mlir::Operation *startOp) {
+AdjListGraph::findLongestNonCyclicPath(mlir::Operation *startOp) {
   std::string start = getUniqueName(startOp).str();
   std::vector<std::string> bestPath;
   std::vector<std::string> currentPath;
   std::set<std::string> visited;
   int maxLatency = 0;
   // Start DFS from the start node
-  dfsHelper(start, visited, currentPath, maxLatency, bestPath);
+  dfsLongestAcyclicPath(start, visited, currentPath, maxLatency, bestPath);
   return bestPath;
 }
 

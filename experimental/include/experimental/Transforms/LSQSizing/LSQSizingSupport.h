@@ -89,9 +89,6 @@ public:
   // (includes backedges, but skips the artificial nodes)
   std::vector<mlir::Operation *> getConnectedOps(mlir::Operation *op);
 
-  // TODO: decide if keep recrusive or stack based version
-  std::vector<std::string> findLongestNonCyclicPath2(mlir::Operation *startOp);
-
   // Finds the path with the highest latency between two any memory dependencies
   // This path is the worst case II, in case of collisions
   unsigned getWorstCaseII();
@@ -116,16 +113,18 @@ private:
   void addBackedge(mlir::Operation *src, mlir::Operation *dest, int latency);
 
   // Depth first search algorithm for Path finding between two nodes
-  void dfs(std::string &currentNode, std::string &end,
-           std::vector<std::string> &currentPath,
-           std::set<std::string> &visited,
-           std::vector<std::vector<std::string>> &paths,
-           bool ignoreBackedges = false, bool ignoreShiftingEdge = true);
+  void dfsAllPaths(std::string &currentNode, std::string &end,
+                   std::vector<std::string> &currentPath,
+                   std::set<std::string> &visited,
+                   std::vector<std::vector<std::string>> &paths,
+                   bool ignoreBackedges = false,
+                   bool ignoreShiftingEdge = true);
 
-  // TODO: decide if keep recrusive or stack based version
-  void dfsHelper(const std::string &currentNode, std::set<std::string> &visited,
-                 std::vector<std::string> &currentPath, int &maxLatency,
-                 std::vector<std::string> &bestPath);
+  void dfsLongestAcyclicPath(const std::string &currentNode,
+                             std::set<std::string> &visited,
+                             std::vector<std::string> &currentPath,
+                             int &maxLatency,
+                             std::vector<std::string> &bestPath);
 
   // Adds the edges between nodes for a result value of an operation
   void addChannelEdges(mlir::Value);
