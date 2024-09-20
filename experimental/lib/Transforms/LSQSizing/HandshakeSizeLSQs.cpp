@@ -282,8 +282,12 @@ std::optional<LSQSizingResult> HandshakeSizeLSQsPass::sizeLSQsForCFDFC(
     else
       IIs.push_back(10);
   } else if (collisions == "matrix_power_test") {
-    IIs.push_back(2);
-    IIs.push_back(3);
+    if (initialII == 2) {
+      IIs.push_back(2);
+      IIs.push_back(3);
+    } else {
+      IIs.push_back(10);
+    }
   } else {
     IIs.push_back(initialII);
   }
@@ -604,15 +608,6 @@ HandshakeSizeLSQsPass::calcQueueSize(
     std::vector<unsigned> IIs) {
   std::unordered_map<mlir::Operation *, unsigned> queueSizes;
 
-  int endTime = 0;
-
-  // Choose the maxiumm time of all dealloc times
-  for (auto &entry : deallocTimes.at(IIs[0])) {
-    if (entry.second > endTime) {
-      endTime = entry.second;
-    }
-  }
-
   std::unordered_map<mlir::Operation *, AllocDeallocTimesPerII>
       allocDeallocTimesPerIIPerLSQ;
 
@@ -668,32 +663,53 @@ HandshakeSizeLSQsPass::calcQueueSize(
     }
   }
 
+  // Find the minimum II of all IIs
+  unsigned minII = std::min_element(IIs.begin(), IIs.end()).operator*();
+  int maxEndTime = 0;
+  // Choose the maxiumm time of all dealloc times for analysis time scope
+  for (auto &II : IIs) {
+    for (auto &entry : deallocTimes.at(II)) {
+      maxEndTime = std::max(maxEndTime, entry.second);
+    }
+  }
+
+  // Double the time for the analysis scope to make sure that all deallocations
+  // are included (necessary scope actually is lower, but not trivial to
+  // determine)
+  maxEndTime = maxEndTime * 2;
+
+  // Calculate the maximum amount of iterations which are relevant for the time
+  // scope
+  unsigned iterMax = std::ceil((float)maxEndTime / minII);
+
   // Go trough all LSQs and calculate the maximum amount of slots needed
   for (auto &entry : allocDeallocTimesPerIIPerLSQ) {
+    std::vector<int> allocPerCycle(maxEndTime);
+    unsigned startOffset = 0;
+    // Build array for how many slots are allocated and deallocated per cycle
+    for (unsigned iter = 0; iter < iterMax; iter++) {
+      unsigned II = IIs[iter % IIs.size()];
 
-    int iterMax =
-        std::ceil((float)(endTime) /
-                  IIs[0]); // TODO determine end time and iterMax correctly
-    std::vector<int> slotsPerCycle(endTime);
-
-    for (int t = 0; t < endTime; t++) {
-      // Build array for how many slots are allocated and deallocated per
-      // cycle
-      for (int iter = 0; iter < iterMax; iter++) {
-        unsigned II = IIs[iter % IIs.size()];
-
-        for (auto &allocTime : std::get<0>(entry.second.at(II))) {
-          if ((allocTime - (int)II * iter) <= t) {
-            slotsPerCycle[t]++;
-          }
-        }
-
-        for (auto &deallocTime : std::get<1>(entry.second.at(II))) {
-          if ((deallocTime - (int)II * iter) <= t) {
-            slotsPerCycle[t]--;
-          }
+      for (auto &allocTime : std::get<0>(entry.second.at(II))) {
+        int t = allocTime + startOffset;
+        if (t >= 0 && t < maxEndTime) {
+          allocPerCycle[t]++;
         }
       }
+      for (auto &deallocTime : std::get<1>(entry.second.at(II))) {
+        int t = deallocTime + startOffset;
+        if (t >= 0 && t < maxEndTime) {
+          allocPerCycle[t]--;
+        }
+      }
+      startOffset += II;
+    }
+
+    // build array for many slots are actively allocated at which cycle
+    std::vector<int> slotsPerCycle(maxEndTime);
+    slotsPerCycle[0] = allocPerCycle[0];
+    for (int i = 1; i < maxEndTime; i++) {
+      slotsPerCycle[i] = slotsPerCycle[i - 1] + allocPerCycle[i];
     }
 
     llvm::dbgs() << "Slots per cycle for LSQ "
