@@ -16,7 +16,7 @@ entity join_handshake is
   );
 end join_handshake;
 
-architecture arch of join is
+architecture arch of join_handshake is
 begin
   join_inner : entity work.join(arch) generic map(SIZE)
     port map(
