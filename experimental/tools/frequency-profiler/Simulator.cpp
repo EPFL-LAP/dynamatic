@@ -20,6 +20,7 @@
 #include "mlir/IR/BuiltinTypes.h"
 #include "mlir/IR/Dominance.h"
 #include "llvm/ADT/APFloat.h"
+#include "llvm/ADT/APInt.h"
 #include "llvm/ADT/Any.h"
 #include "llvm/ADT/STLExtras.h"
 #include "llvm/ADT/SmallPtrSet.h"
@@ -27,6 +28,7 @@
 #include "llvm/ADT/TypeSwitch.h"
 #include "llvm/Support/Debug.h"
 #include <cmath>
+#include <cstdlib>
 #include <list>
 
 #define DEBUG_TYPE "simulator"
@@ -71,11 +73,17 @@ private:
                         std::vector<Any> &);
   LogicalResult execute(mlir::arith::TruncIOp, std::vector<Any> &,
                         std::vector<Any> &);
+  LogicalResult execute(mlir::arith::TruncFOp, std::vector<Any> &,
+                        std::vector<Any> &);
   LogicalResult execute(mlir::arith::AndIOp, std::vector<Any> &,
                         std::vector<Any> &);
   LogicalResult execute(mlir::arith::XOrIOp, std::vector<Any> &,
                         std::vector<Any> &);
   LogicalResult execute(mlir::arith::AddFOp, std::vector<Any> &,
+                        std::vector<Any> &);
+  LogicalResult execute(mlir::arith::SIToFPOp, std::vector<Any> &,
+                        std::vector<Any> &);
+  LogicalResult execute(mlir::arith::FPToSIOp, std::vector<Any> &,
                         std::vector<Any> &);
   LogicalResult execute(mlir::arith::CmpIOp, std::vector<Any> &,
                         std::vector<Any> &);
@@ -107,6 +115,8 @@ private:
                         std::vector<Any> &);
   LogicalResult execute(mlir::arith::ExtUIOp, std::vector<Any> &,
                         std::vector<Any> &);
+  LogicalResult execute(mlir::arith::ExtFOp, std::vector<Any> &,
+                        std::vector<Any> &);
   LogicalResult execute(mlir::math::CosOp, std::vector<Any> &,
                         std::vector<Any> &);
   LogicalResult execute(mlir::math::ExpOp, std::vector<Any> &,
@@ -122,6 +132,8 @@ private:
   LogicalResult execute(mlir::math::SinOp, std::vector<Any> &,
                         std::vector<Any> &);
   LogicalResult execute(mlir::math::SqrtOp, std::vector<Any> &,
+                        std::vector<Any> &);
+  LogicalResult execute(mlir::math::AbsFOp, std::vector<Any> &,
                         std::vector<Any> &);
   LogicalResult execute(memref::LoadOp, std::vector<Any> &, std::vector<Any> &);
   LogicalResult execute(memref::StoreOp, std::vector<Any> &,
@@ -372,6 +384,14 @@ LogicalResult StdExecuter::execute(mlir::arith::TruncIOp op,
   out[0] = any_cast<APInt>(in[0]).trunc(width);
   return success();
 }
+LogicalResult StdExecuter::execute(mlir::arith::TruncFOp op,
+                                   std::vector<Any> &in,
+                                   std::vector<Any> &out) {
+  auto width = dyn_cast<mlir::FloatType>(op.getResult().getType()).getWidth();
+  assert(width == 32 && "We assume that TruncFOp converts double to float.");
+  out[0] = APFloat(float(any_cast<APFloat>(in[0]).convertToDouble()));
+  return success();
+}
 
 LogicalResult StdExecuter::execute(mlir::arith::AndIOp, std::vector<Any> &in,
                                    std::vector<Any> &out) {
@@ -517,6 +537,31 @@ LogicalResult StdExecuter::execute(mlir::arith::ExtUIOp op,
   return success();
 }
 
+LogicalResult StdExecuter::execute(mlir::arith::ExtFOp op, std::vector<Any> &in,
+                                   std::vector<Any> &out) {
+  auto width = dyn_cast<mlir::FloatType>(op.getResult().getType()).getWidth();
+  assert(width == 64 && "We assume that ExtFOp converts float to double.");
+  out[0] = APFloat(any_cast<APFloat>(in[0]).convertToDouble());
+  return success();
+}
+
+LogicalResult StdExecuter::execute(mlir::arith::SIToFPOp op,
+                                   std::vector<Any> &in,
+                                   std::vector<Any> &out) {
+  out[0] = APFloat(APIntOps::RoundSignedAPIntToFloat(any_cast<APInt>(in[0])));
+  return success();
+}
+
+LogicalResult StdExecuter::execute(mlir::arith::FPToSIOp op,
+                                   std::vector<Any> &in,
+                                   std::vector<Any> &out) {
+  int64_t width = op.getType().getIntOrFloatBitWidth();
+
+  out[0] = any_cast<APInt>(APIntOps::RoundDoubleToAPInt(
+      any_cast<APFloat>(in[0]).convertToDouble(), width));
+  return success();
+}
+
 LogicalResult StdExecuter::execute(mlir::math::CosOp op, std::vector<Any> &in,
                                    std::vector<Any> &out) {
   out[0] = APFloat(std::cos(any_cast<APFloat>(in[0]).convertToDouble()));
@@ -562,6 +607,12 @@ LogicalResult StdExecuter::execute(mlir::math::SinOp op, std::vector<Any> &in,
 LogicalResult StdExecuter::execute(mlir::math::SqrtOp op, std::vector<Any> &in,
                                    std::vector<Any> &out) {
   out[0] = APFloat(std::sqrt(any_cast<APFloat>(in[0]).convertToDouble()));
+  return success();
+}
+
+LogicalResult StdExecuter::execute(mlir::math::AbsFOp op, std::vector<Any> &in,
+                                   std::vector<Any> &out) {
+  out[0] = APFloat(std::abs(any_cast<APFloat>(in[0]).convertToDouble()));
   return success();
 }
 
@@ -756,16 +807,17 @@ StdExecuter::StdExecuter(mlir::func::FuncOp &toplevel,
                   arith::CmpIOp, arith::CmpFOp, arith::SubIOp, arith::SubFOp,
                   arith::MulIOp, arith::MulFOp, arith::DivSIOp, arith::DivUIOp,
                   arith::DivFOp, arith::RemFOp, arith::RemSIOp, arith::RemUIOp,
-                  arith::IndexCastOp, arith::TruncIOp, arith::AndIOp,
-                  arith::OrIOp, arith::XOrIOp, arith::SelectOp, LLVM::UndefOp,
-                  arith::ShRSIOp, arith::ShLIOp, arith::ExtSIOp, arith::ExtUIOp,
+                  arith::SIToFPOp, arith::FPToSIOp, arith::IndexCastOp,
+                  arith::TruncIOp, arith::TruncFOp, arith::AndIOp, arith::OrIOp,
+                  arith::XOrIOp, arith::SelectOp, LLVM::UndefOp, arith::ShRSIOp,
+                  arith::ShLIOp, arith::ExtSIOp, arith::ExtUIOp, arith::ExtFOp,
                   math::SqrtOp, math::CosOp, math::ExpOp, math::Exp2Op,
                   math::LogOp, math::Log2Op, math::Log10Op, math::SqrtOp,
-                  memref::AllocOp, memref::LoadOp, memref::StoreOp>(
-                [&](auto op) {
-                  strat = ExecuteStrategy::Default;
-                  return execute(op, inValues, outValues);
-                })
+                  math::AbsFOp, memref::AllocOp, memref::LoadOp,
+                  memref::StoreOp>([&](auto op) {
+              strat = ExecuteStrategy::Default;
+              return execute(op, inValues, outValues);
+            })
             .Case<cf::BranchOp, cf::CondBranchOp, CallOpInterface>(
                 [&](auto op) {
                   strat = ExecuteStrategy::Continue;
