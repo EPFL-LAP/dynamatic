@@ -40,11 +40,17 @@
 #include "llvm/ADT/SmallVector.h"
 #include "llvm/ADT/StringRef.h"
 #include "llvm/ADT/TypeSwitch.h"
+#include "llvm/Support/Debug.h"
 #include "llvm/Support/ErrorHandling.h"
 #include <algorithm>
 #include <bitset>
+#include <cctype>
+#include <charconv>
+#include <cstdint>
 #include <iterator>
 #include <string>
+
+#define DEBUG_TYPE "HandshakeToHW"
 
 using namespace mlir;
 using namespace dynamatic;
@@ -505,6 +511,33 @@ ModuleDiscriminator::ModuleDiscriminator(Operation *op) {
             // Data bitwidth and address bitwidth
             addType("DATA_TYPE", storeOp.getDataInput());
             addType("ADDR_TYPE", storeOp.getAddressInput());
+          })
+      .Case<handshake::SharingWrapperOp>(
+          [&](handshake::SharingWrapperOp sharingWrapperOp) {
+            addType("DATA_WIDTH", sharingWrapperOp.getDataOperands()[0]);
+
+            // In a sharing wrapper, we have the credits as a list of unsigned
+            // integers. This will be encoded as a space-separated string and
+            // passed to the sharing wrapper generator.
+
+            auto addSpaceSeparatedListOfInt =
+                [&](StringRef name, ArrayRef<int64_t> array) -> void {
+              std::string strAttr;
+              for (unsigned i = 0; i < array.size(); i++) {
+                if (i > 0)
+                  strAttr += " ";
+                strAttr += std::to_string(array[i]);
+              }
+              addString(name, strAttr);
+            };
+
+            addSpaceSeparatedListOfInt("CREDITS",
+                                       sharingWrapperOp.getCredits());
+
+            addUnsigned("NUM_SHARED_OPERANDS",
+                        sharingWrapperOp.getNumSharedOperands());
+
+            addUnsigned("LATENCY", sharingWrapperOp.getLatency());
           })
       .Case<handshake::ConstantOp>([&](handshake::ConstantOp cstOp) {
         // Bitwidth and binary-encoded constant value
@@ -1692,6 +1725,7 @@ public:
                     ConvertToHWInstance<handshake::MCStoreOp>,
                     ConvertToHWInstance<handshake::LSQStoreOp>,
                     ConvertToHWInstance<handshake::NotOp>,
+                    ConvertToHWInstance<handshake::SharingWrapperOp>,
                     // Arith operations
                     ConvertToHWInstance<handshake::AddFOp>,
                     ConvertToHWInstance<handshake::AddIOp>,

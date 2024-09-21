@@ -252,8 +252,12 @@ public:
 class Compile : public Command {
 public:
   static constexpr llvm::StringLiteral SIMPLE_BUFFERS = "simple-buffers";
+<<<<<<< HEAD
   static constexpr llvm::StringLiteral FAST_TOKEN_DELIVERY =
       "fast-token-delivery";
+=======
+  static constexpr llvm::StringLiteral SHARING = "sharing";
+>>>>>>> 58fa4c6 ([Sharing][hdl] Resource sharing support in VHDL backend (#85))
 
   Compile(FrontendState &state)
       : Command("compile",
@@ -261,7 +265,11 @@ public:
                 "produces both handshake-level IR and an equivalent DOT file",
                 state) {
     addFlag({SIMPLE_BUFFERS, "Use simple buffer placement"});
+<<<<<<< HEAD
     addFlag({FAST_TOKEN_DELIVERY, "Use fast token delivery strategy"});
+=======
+    addFlag({SHARING, "Use credit-based resource sharing"});
+>>>>>>> 58fa4c6 ([Sharing][hdl] Resource sharing support in VHDL backend (#85))
   }
 
   CommandResult execute(CommandArguments &args) override;
@@ -562,17 +570,24 @@ CommandResult Compile::execute(CommandArguments &args) {
 
   std::string script = state.getScriptsPath() + getSeparator() + "compile.sh";
   std::string buffers = args.flags.contains(SIMPLE_BUFFERS) ? "1" : "0";
+<<<<<<< HEAD
   std::string fastTokenDelivery =
       args.flags.contains(FAST_TOKEN_DELIVERY) ? "1" : "0";
 
+=======
+  std::string sharing = args.flags.contains(SHARING) ? "1" : "0";
+>>>>>>> 58fa4c6 ([Sharing][hdl] Resource sharing support in VHDL backend (#85))
   state.polygeistPath = state.polygeistPath.empty()
                             ? state.dynamaticPath + getSeparator() + "polygeist"
                             : state.polygeistPath;
-
   return execCmd(script, state.dynamaticPath, state.getKernelDir(),
                  state.getOutputDir(), state.getKernelName(), buffers,
                  floatToString(state.targetCP, 3), state.polygeistPath,
+<<<<<<< HEAD
                  fastTokenDelivery);
+=======
+                 sharing);
+>>>>>>> 58fa4c6 ([Sharing][hdl] Resource sharing support in VHDL backend (#85))
 }
 
 CommandResult WriteHDL::execute(CommandArguments &args) {
