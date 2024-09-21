@@ -433,20 +433,6 @@ private:
   /// Adds a string parameter.
   void addString(const Twine &name, const Twine &txt) {
     addParam(name, StringAttr::get(ctx, txt));
-
-    // Replace all non-alphanumeric characters by an underscore.
-    std::string cleanedName = txt.str();
-    std::replace_if(
-        cleanedName.begin(), cleanedName.end(),
-        [](char c) { return !std::isalnum(c); }, '_');
-
-    if (modName) {
-      cleanedName = *modName + "_" + cleanedName;
-    } else {
-      cleanedName = getOpName() + "_" + cleanedName;
-    }
-
-    modName = cleanedName;
   };
 
   std::string getOpName() const {
