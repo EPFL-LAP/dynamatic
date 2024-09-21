@@ -50,14 +50,6 @@ begin
       ins_ready(1) => rhs_ready
     );
 
-  buff : entity work.delay_buffer(arch) generic map(8)
-    port map(
-      clk,
-      rst,
-      join_valid,
-      oehb_ready,
-      buff_valid
-    );
 
   oehb : entity work.oehb(arch) generic map(1)
     port map(
@@ -75,6 +67,16 @@ begin
 
   gen_flopoco_ip :
     if DATA_TYPE = 32 generate
+
+      buff : entity work.delay_buffer(arch) generic map(8)
+        port map(
+          clk,
+          rst,
+          join_valid,
+          oehb_ready,
+          buff_valid
+        );
+    
       ieee2nfloat_0: entity work.InputIEEE_32bit(arch)
         port map (
             X => lhs,
@@ -102,6 +104,16 @@ begin
           R  => ip_result
       );
     elsif DATA_TYPE = 64 generate 
+
+      buff : entity work.delay_buffer(arch) generic map(11)
+        port map(
+          clk,
+          rst,
+          join_valid,
+          oehb_ready,
+          buff_valid
+        );
+
       ieee2nfloat_0: entity work.InputIEEE_64bit(arch)
         port map (
             X => lhs,
