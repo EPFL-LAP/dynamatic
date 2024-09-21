@@ -77,9 +77,10 @@ begin
       ins_valid  => buff_valid,
       outs_ready => outs_ready,
       outs_valid => outs_valid,
-      ins_ready  => ins_ready,
+      ins_ready  => oehb_ready,
       ins        => oehb_datain,
       outs       => oehb_dataOut
     );
+  ins_ready <= oehb_ready;
 
 end architecture;

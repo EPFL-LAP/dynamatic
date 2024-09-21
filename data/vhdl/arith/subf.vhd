@@ -21,10 +21,6 @@ entity subf is
     lhs_ready    : out std_logic;
     rhs_ready    : out std_logic
   );
-begin
-  assert DATA_TYPE=32
-  report "subf currently only supports 32-bit floating point operands"
-  severity failure;
 end entity;
 
 architecture arch of subf is
@@ -75,35 +71,68 @@ begin
       outs    => open
     );
 
-
-  ieee2nfloat_0: entity work.InputIEEE_32bit(arch)
-    port map (
-        X => lhs,
-        R => ip_lhs
-    );
-
   rhs_neg <= not rhs(DATA_TYPE - 1) & rhs(DATA_TYPE - 2 downto 0);
 
-  ieee2nfloat_1: entity work.InputIEEE_32bit(arch)
-    port map (
-        X => rhs_neg,
-        R => ip_rhs
-    );
+  gen_flopoco_ip :
+    if DATA_TYPE = 32 generate
+      ieee2nfloat_0: entity work.InputIEEE_32bit(arch)
+        port map (
+            X => lhs,
+            R => ip_lhs
+        );
 
-  nfloat2ieee : entity work.OutputIEEE_32bit(arch)
-    port map (
-        X => ip_result,
-        R => result
-    );
+      ieee2nfloat_1: entity work.InputIEEE_32bit(arch)
+        port map (
+            X => rhs_neg,
+            R => ip_rhs
+        );
 
-  operator :  entity work.FloatingPointAdder(arch)
-  port map (
-      clk   => clk,
-      ce => oehb_ready,
-      X  => ip_lhs,
-      Y  => ip_rhs,
-      R  => ip_result
-  );
+      nfloat2ieee : entity work.OutputIEEE_32bit(arch)
+        port map (
+            X => ip_result,
+            R => result
+        );
+
+      operator :  entity work.FloatingPointAdder(arch)
+      port map (
+          clk   => clk,
+          ce => oehb_ready,
+          X  => ip_lhs,
+          Y  => ip_rhs,
+          R  => ip_result
+      );
+    elsif DATA_TYPE = 64 generate 
+      ieee2nfloat_0: entity work.InputIEEE_64bit(arch)
+        port map (
+            X => lhs,
+            R => ip_lhs
+        );
+
+      ieee2nfloat_1: entity work.InputIEEE_64bit(arch)
+        port map (
+            X => rhs_neg,
+            R => ip_rhs
+        );
+
+      nfloat2ieee : entity work.OutputIEEE_64bit(arch)
+        port map (
+            X => ip_result,
+            R => result
+        );
+
+      operator :  entity work.FPAdd_64bit(arch)
+      port map (
+          clk   => clk,
+          ce => oehb_ready,
+          X  => ip_lhs,
+          Y  => ip_rhs,
+          R  => ip_result
+      );
+    else generate
+      assert false
+      report "subf must operate on 32-bit or 64-bit"
+      severity failure;
+    end generate;
 
 
 end architecture;

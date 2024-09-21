@@ -21,10 +21,6 @@ entity divf is
     lhs_ready    : out std_logic;
     rhs_ready    : out std_logic
   );
-begin
-  assert DATA_TYPE=32
-  report "divf currently only supports 32-bit floating point operands"
-  severity failure;
 end entity;
 
 architecture arch of divf is
@@ -51,15 +47,6 @@ begin
       ins_ready(1) => rhs_ready
     );
 
-  buff : entity work.delay_buffer(arch) generic map(28)
-    port map(
-      clk,
-      rst,
-      join_valid,
-      oehb_ready,
-      buff_valid
-    );
-
   oehb : entity work.oehb(arch) generic map (1)
     port map(
       clk        => clk,
@@ -72,32 +59,85 @@ begin
       ins(0)    => '0',
       outs   => open
     );
+  
+  gen_flopoco_ip :
+  if DATA_TYPE = 32 generate
+    buff : entity work.delay_buffer(arch) generic map(28)
+      port map(
+        clk,
+        rst,
+        join_valid,
+        oehb_ready,
+        buff_valid
+      );
 
-  ieee2nfloat_lhs: entity work.InputIEEE_32bit(arch)
-    port map (
-        X => lhs,
-        R => ip_lhs
-    );
+    ieee2nfloat_lhs: entity work.InputIEEE_32bit(arch)
+      port map (
+          X => lhs,
+          R => ip_lhs
+      );
 
-  ieee2nfloat_rhs: entity work.InputIEEE_32bit(arch)
-    port map (
-        X => rhs,
-        R => ip_rhs
-    );
+    ieee2nfloat_rhs: entity work.InputIEEE_32bit(arch)
+      port map (
+          X => rhs,
+          R => ip_rhs
+      );
 
-  nfloat2ieee_result : entity work.OutputIEEE_32bit(arch)
-    port map (
-        X => ip_result,
-        R => result
-    );
+    nfloat2ieee_result : entity work.OutputIEEE_32bit(arch)
+      port map (
+          X => ip_result,
+          R => result
+      );
 
-  ip : entity work.FloatingPointDivider(arch)
-    port map (
-        clk => clk,
-        ce  => oehb_ready,
-        X   => ip_lhs,
-        Y   => ip_rhs,
-        R   => ip_result
-    );
+    ip : entity work.FloatingPointDivider(arch)
+      port map (
+          clk => clk,
+          ce  => oehb_ready,
+          X   => ip_lhs,
+          Y   => ip_rhs,
+          R   => ip_result
+      );
+  elsif DATA_TYPE = 64 generate
+    buff : entity work.delay_buffer(arch) generic map(35)
+      port map(
+        clk,
+        rst,
+        join_valid,
+        oehb_ready,
+        buff_valid
+      );
+
+    ieee2nfloat_lhs: entity work.InputIEEE_64bit(arch)
+      port map (
+          X => lhs,
+          R => ip_lhs
+      );
+
+    ieee2nfloat_rhs: entity work.InputIEEE_64bit(arch)
+      port map (
+          X => rhs,
+          R => ip_rhs
+      );
+
+    nfloat2ieee_result : entity work.OutputIEEE_64bit(arch)
+      port map (
+          X => ip_result,
+          R => result
+      );
+
+    ip : entity work.FPDiv_64bit(arch)
+      port map (
+          clk => clk,
+          ce  => oehb_ready,
+          X   => ip_lhs,
+          Y   => ip_rhs,
+          R   => ip_result
+      );
+  else generate
+    assert false
+    report "subf must operate on 32-bit or 64-bit"
+    severity failure;
+  end generate;
+
 
 end architecture;

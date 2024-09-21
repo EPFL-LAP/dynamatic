@@ -56,7 +56,7 @@ begin
         --output
         R => ip_rhs
     );
-  operator : entity work.FPComparator_8_23_F500_uid7(arch)
+  operator : entity work.FPComparator_32bit(arch)
   port map (clk => clk,
         ce => '1',
         X => ip_lhs,
@@ -142,7 +142,7 @@ begin
         --output
         R => ip_rhs
     );
-  operator : entity work.FPComparator_11_52_F500_uid3(arch)
+  operator : entity work.FPComparator_64bit(arch)
   port map (clk => clk,
         ce => oehb_ready,
         X => ip_lhs,
@@ -179,10 +179,6 @@ entity ENTITY_NAME is
     lhs_ready    : out std_logic;
     rhs_ready    : out std_logic
   );
-begin
-  assert DATA_TYPE=32
-  report "ENTITY_NAME currently only supports 32-bit floating point operands"
-  severity failure;
 end entity;
 
 architecture arch of ENTITY_NAME is
