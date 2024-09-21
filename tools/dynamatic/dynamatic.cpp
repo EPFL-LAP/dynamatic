@@ -74,7 +74,8 @@ namespace {
 enum class CommandResult { SYNTAX_ERROR, FAIL, SUCCESS, EXIT, HELP };
 } // namespace
 
-template <typename... Tokens> static CommandResult execCmd(Tokens... tokens) {
+template <typename... Tokens>
+static CommandResult execCmd(Tokens... tokens) {
   return exec({tokens...}) != 0 ? CommandResult::FAIL : CommandResult::SUCCESS;
 }
 
@@ -94,7 +95,7 @@ struct FrontendState {
   double targetCP = 4.0;
   std::optional<std::string> sourcePath = std::nullopt;
 
-  FrontendState(StringRef cwd) : cwd(cwd), dynamaticPath(cwd) {};
+  FrontendState(StringRef cwd) : cwd(cwd), dynamaticPath(cwd){};
 
   bool sourcePathIsSet(StringRef keyword);
 
@@ -129,7 +130,7 @@ struct Argument {
 
   Argument() = default;
 
-  Argument(StringRef name, StringRef desc) : name(name), desc(desc) {};
+  Argument(StringRef name, StringRef desc) : name(name), desc(desc){};
 };
 
 struct CommandArguments {
@@ -194,7 +195,7 @@ private:
 class Exit : public Command {
 public:
   Exit(FrontendState &state)
-      : Command("exit", "Exits the Dynamatic frontend", state) {};
+      : Command("exit", "Exits the Dynamatic frontend", state){};
 
   CommandResult execute(CommandArguments &args) override;
 };
@@ -202,7 +203,7 @@ public:
 class Help : public Command {
 public:
   Help(FrontendState &state)
-      : Command("help", "Displays this help message", state) {};
+      : Command("help", "Displays this help message", state){};
 
   CommandResult execute(CommandArguments &args) override;
 };
@@ -319,7 +320,8 @@ public:
 
   FrontendCommands() = default;
 
-  template <typename Cmd> void add(FrontendState &state) {
+  template <typename Cmd>
+  void add(FrontendState &state) {
     std::unique_ptr<Cmd> newCmd = std::make_unique<Cmd>(state);
     if (cmds.contains(newCmd->keyword)) {
       llvm::errs() << "Multiple commands exist with keyword '"
