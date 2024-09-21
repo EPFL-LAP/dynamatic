@@ -124,8 +124,8 @@ exit_on_fail "Failed to compile cf to handshake" "Compiled cf to handshake"
   --handshake-minimize-lsq-usage \
   --handshake-concretize-index-type="width=32" \
   --handshake-minimize-cst-width --handshake-optimize-bitwidths="legacy" \
-  --handshake-materialize --handshake-infer-basic-blocks \
   --handshake-rewrite-terms \
+  --handshake-materialize --handshake-infer-basic-blocks \
   > "$F_HANDSHAKE_TRANSFORMED"
 exit_on_fail "Failed to apply transformations to handshake" \
   "Applied transformations to handshake"
@@ -166,7 +166,6 @@ fi
 
 # handshake canonicalization
 "$DYNAMATIC_OPT_BIN" "$F_HANDSHAKE_BUFFERED" \
-  --handshake-canonicalize \
   --handshake-hoist-ext-instances \
   > "$F_HANDSHAKE_EXPORT"
 exit_on_fail "Failed to canonicalize Handshake" "Canonicalized handshake"
