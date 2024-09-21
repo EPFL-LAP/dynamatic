@@ -43,27 +43,19 @@ func _process(delta):
 	if is_playing:
 		elapsed_time += delta
 		if elapsed_time >= time_interval:
+			elapsed_time -= time_interval
 			nextCycle()
-			elapsed_time = 0
-
 
 func _input(event: InputEvent):
-	if event.is_action_pressed("ui_right"):
-		_on_next_pressed()
-	if event.is_action_pressed("ui_left"):
-		_on_prev_pressed()
 	if event is InputEventMouseButton:
 		if event.is_action_pressed("left_click"):
 			onClick(camera.get_global_mouse_position())
 
-
 func _on_next_pressed():
 	nextCycle()
 
-
 func _on_prev_pressed():
 	previousCycle()
-
 
 func _on_h_slider_value_changed(value):
 	changeCycle(value)
@@ -74,7 +66,7 @@ func _on_play_pressed():
 	else:
 		play_button.text = "Pause"
 	is_playing = !is_playing
-	elapsed_time = 0
+	elapsed_time = 0.0
 
 func _on_go_to_cycle_text_submitted(value):
 	changeCycle(int(value))
@@ -96,7 +88,7 @@ func _on_draw_graph_pressed():
 func _on_file_dialog_dot_file_selected(path):
 	dotFile = path
 	dotInput.text = path
-
+#
 func _on_file_dialog_csv_file_selected(path):
 	csvFile = path
 	csvInput.text = path
