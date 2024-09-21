@@ -101,6 +101,42 @@ class Handshake_Arith_IToICastOp<string mnemonic, list<Trait> traits = []> :
   let hasVerifier = 1;
 }
 
+class Handshake_Arith_FToFCastOp<string mnemonic, list<Trait> traits = []> :
+  Handshake_Arith_Op<mnemonic, traits # [SameExtraSignalsInterface,
+                                         ReshapableChannelsInterface]
+> {
+  let arguments = (ins FloatChannelType:$in);
+  let results = (outs FloatChannelType:$out);
+  
+  let assemblyFormat = "$in attr-dict `:` type($in) `to` type($out)";
+
+  // TODO: add folding operation
+}
+
+class Handshake_Arith_IToFCastOp<string mnemonic, list<Trait> traits = []> :
+  Handshake_Arith_Op<mnemonic, traits # [SameExtraSignalsInterface,
+                                         ReshapableChannelsInterface]
+> {
+  let arguments = (ins IntChannelType:$in);
+  let results = (outs FloatChannelType:$out);
+  
+  let assemblyFormat = "$in attr-dict `:` type($in) `to` type($out)";
+
+  // TODO: add folding operation
+}
+
+class Handshake_Arith_FToICastOp<string mnemonic, list<Trait> traits = []> :
+  Handshake_Arith_Op<mnemonic, traits # [SameExtraSignalsInterface,
+                                          ReshapableChannelsInterface]
+> {
+  let arguments = (ins FloatChannelType:$in);
+  let results = (outs IntChannelType:$out);
+  
+  let assemblyFormat = "$in attr-dict `:` type($in) `to` type($out)";
+
+  // TODO: add folding operation
+}
+
 //===----------------------------------------------------------------------===//
 // Operation definitions
 //===----------------------------------------------------------------------===//
@@ -288,8 +324,33 @@ def Handshake_TruncIOp : Handshake_Arith_IToICastOp<"trunci"> {
   let hasCanonicalizer = 1;
 }
 
+def Handshake_TruncFOp : Handshake_Arith_FToFCastOp<"truncf"> {
+  let summary = "Floating-point truncation.";
+  // TODO: add canonicalizer
+  let hasVerifier = 1;
+}
+
 def Handshake_XOrIOp : Handshake_Arith_IntBinaryOp<"xori", [Commutative]> {
   let summary = "Bitwise exclusive union.";
+}
+
+def Handshake_SIToFPOp : Handshake_Arith_IToFCastOp<"sitofp"> {
+  let summary = "Converts a signed integer to float.";
+}
+
+def Handshake_FPToSIOp : Handshake_Arith_FToICastOp<"fptosi"> {
+  let summary = "Converts a float to signed integer.";
+}
+
+def Handshake_ExtFOp : Handshake_Arith_FToFCastOp<"extf"> {
+  let summary = "Floating point extension.";
+  // TODO: add canonicalizer
+  let hasVerifier = 1;
+}
+
+def Handshake_AbsFOp : Handshake_Arith_FToFCastOp<"absf"> {
+  let summary = "floating point absolute-value operation";
+  // TODO: add folder
 }
 
 #endif // DYNAMATIC_DIALECT_HANDSHAKE_HANDSHAKE_ARTIH_OPS_TD
