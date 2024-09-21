@@ -610,7 +610,8 @@ ModuleDiscriminator::ModuleDiscriminator(Operation *op) {
             handshake::MulIOp, handshake::NegFOp, handshake::NotOp,
             handshake::OrIOp, handshake::ShLIOp, handshake::ShRSIOp,
             handshake::ShRUIOp, handshake::SubFOp, handshake::SubIOp,
-            handshake::XOrIOp>([&](auto) {
+            handshake::XOrIOp, handshake::SIToFPOp, handshake::FPToSIOp,
+            handshake::AbsFOp>([&](auto) {
         // Bitwidth
         addType("DATA_TYPE", op->getOperand(0));
       })
@@ -628,12 +629,12 @@ ModuleDiscriminator::ModuleDiscriminator(Operation *op) {
         addString("PREDICATE", stringifyEnum(cmpIOp.getPredicate()));
         addType("DATA_TYPE", cmpIOp.getLhs());
       })
-      .Case<handshake::ExtSIOp, handshake::ExtUIOp, handshake::TruncIOp>(
-          [&](auto) {
-            // Input bitwidth and output bitwidth
-            addType("INPUT_TYPE", op->getOperand(0));
-            addType("OUTPUT_TYPE", op->getResult(0));
-          })
+      .Case<handshake::ExtSIOp, handshake::ExtUIOp, handshake::TruncIOp,
+            handshake::ExtFOp, handshake::TruncFOp>([&](auto) {
+        // Input bitwidth and output bitwidth
+        addType("INPUT_TYPE", op->getOperand(0));
+        addType("OUTPUT_TYPE", op->getResult(0));
+      })
       .Default([&](auto) {
         op->emitError() << "This operation cannot be lowered to RTL "
                            "due to a lack of an RTL implementation for it.";
@@ -1761,7 +1762,12 @@ public:
                     ConvertToHWInstance<handshake::SubFOp>,
                     ConvertToHWInstance<handshake::SubIOp>,
                     ConvertToHWInstance<handshake::TruncIOp>,
-                    ConvertToHWInstance<handshake::XOrIOp>>(
+                    ConvertToHWInstance<handshake::TruncFOp>,
+                    ConvertToHWInstance<handshake::XOrIOp>,
+                    ConvertToHWInstance<handshake::SIToFPOp>,
+                    ConvertToHWInstance<handshake::FPToSIOp>,
+                    ConvertToHWInstance<handshake::ExtFOp>,
+                    ConvertToHWInstance<handshake::AbsFOp>>(
         typeConverter, funcOp->getContext());
 
     // Everything must be converted to operations in the hw dialect
