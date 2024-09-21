@@ -21,6 +21,7 @@ entity mulf_single_precision is
 end entity;
 
 architecture arch of mulf_single_precision is
+  constant latency : integer := 4;
   signal join_valid             : std_logic;
   signal buff_valid, oehb_ready : std_logic;
 
@@ -42,7 +43,7 @@ begin
       ins_ready(1) => rhs_ready
     );
 
-  buff : entity work.delay_buffer(arch) generic map(3)
+  buff : entity work.delay_buffer(arch) generic map(latency - 1)
     port map(
       clk,
       rst,
@@ -115,6 +116,7 @@ entity mulf_double_precision is
 end entity;
 
 architecture arch of mulf_double_precision is
+  constant latency : integer := 4;
   signal join_valid             : std_logic;
   signal buff_valid, oehb_ready : std_logic;
 
@@ -136,7 +138,7 @@ begin
       ins_ready(1) => rhs_ready
     );
 
-  buff : entity work.delay_buffer(arch) generic map(3)
+  buff : entity work.delay_buffer(arch) generic map(latency - 1)
     port map(
       clk,
       rst,

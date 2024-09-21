@@ -21,6 +21,7 @@ entity subf_single_precision is
 end entity;
 
 architecture arch of subf_single_precision is
+  constant latency : integer := 9;
   signal join_valid : std_logic;
   signal buff_valid, oehb_valid, oehb_ready : std_logic;
 
@@ -59,7 +60,7 @@ begin
 
   rhs_neg <= not rhs(32 - 1) & rhs(32 - 2 downto 0);
 
-  buff : entity work.delay_buffer(arch) generic map(8)
+  buff : entity work.delay_buffer(arch) generic map(latency - 1)
     port map(
       clk,
       rst,
@@ -119,6 +120,7 @@ entity subf_double_precision is
 end entity;
 
 architecture arch of subf_double_precision is
+  constant latency : integer := 12;
   signal join_valid : std_logic;
   signal buff_valid, oehb_valid, oehb_ready : std_logic;
 
@@ -156,7 +158,7 @@ begin
 
   rhs_neg <= not rhs(64 - 1) & rhs(64 - 2 downto 0);
 
-  buff : entity work.delay_buffer(arch) generic map(11)
+  buff : entity work.delay_buffer(arch) generic map(latency - 1)
     port map(
       clk,
       rst,
