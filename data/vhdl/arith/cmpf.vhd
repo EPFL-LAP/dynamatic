@@ -211,7 +211,7 @@ begin
         result_valid, lhs_ready, rhs_ready);
     else generate
       assert false
-      report "DATA_PATH is not yet supported!"
+      report "cmpf must operate on 32bit or 64bit data!"
       severity failure;
     end generate;
 
