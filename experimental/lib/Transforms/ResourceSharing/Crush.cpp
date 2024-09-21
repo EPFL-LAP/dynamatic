@@ -60,7 +60,7 @@ using namespace dynamatic::experimental;
 using namespace dynamatic::experimental::sharing;
 using namespace dynamatic::buffer;
 
-#define MAX_GROUP_SIZE 20
+static constexpr unsigned MAX_GROUP_SIZE = 20;
 
 /// Algorithms that do not require solving an MILP.
 static constexpr llvm::StringLiteral ON_MERGES("on-merges");
@@ -416,9 +416,8 @@ bool checkGroupMergable(const Group &g1, const Group &g2,
   gMerged.insert(g1.begin(), g1.end());
   gMerged.insert(g2.begin(), g2.end());
 
-  if (gMerged.size() > MAX_GROUP_SIZE) {
+  if (gMerged.size() > MAX_GROUP_SIZE)
     return false;
-  }
 
   OperationName opName = (*(gMerged.begin()))->getName();
 
