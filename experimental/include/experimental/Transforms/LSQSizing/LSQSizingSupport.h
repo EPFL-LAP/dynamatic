@@ -112,7 +112,7 @@ private:
   // be removed and replaced by a backedge
   void addBackedge(mlir::Operation *src, mlir::Operation *dest, int latency);
 
-  // Depth first search algorithm for Path finding between two nodes
+  // Recursive Depth-First-Search for Path finding between two nodes
   void dfsAllPaths(std::string &currentNode, std::string &end,
                    std::vector<std::string> &currentPath,
                    std::set<std::string> &visited,
@@ -120,6 +120,8 @@ private:
                    bool ignoreBackedges = false,
                    bool ignoreShiftingEdge = true);
 
+  // Recursive Depth-First-Search for finding the longest path acyclic path to
+  // any node
   void dfsLongestAcyclicPath(const std::string &currentNode,
                              std::set<std::string> &visited,
                              std::vector<std::string> &currentPath,

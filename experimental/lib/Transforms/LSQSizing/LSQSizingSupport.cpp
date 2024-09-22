@@ -26,20 +26,14 @@ int extractNodeLatency(mlir::Operation *op, TimingDatabase timingDB) {
   if (!failed(timingDB.getLatency(op, SignalType::DATA, latency)))
     return latency;
 
-  if (op->getName().getStringRef() ==
-      "handshake.buffer") { // TODO use some build in class method instead of
-                            // name?
+  if (op->getName().getStringRef() == "handshake.buffer") {
     auto params = op->getAttrOfType<DictionaryAttr>(RTL_PARAMETERS_ATTR_NAME);
     if (!params) {
-      // llvm::dbgs() << "BufferOp" << getUniqueName(op).str() << " does not
-      // have parameters\n";
       return 0;
     }
 
     auto optTiming = params.getNamed(handshake::BufferOp::TIMING_ATTR_NAME);
     if (!optTiming) {
-      // llvm::dbgs() << "BufferOp" << getUniqueName(op).str() << " does not
-      // have timing\n";
       return 0;
     }
 
@@ -49,8 +43,6 @@ int extractNodeLatency(mlir::Operation *op, TimingDatabase timingDB) {
     }
   }
 
-  // llvm::dbgs() << "Operation " << op->getName().getStringRef() << " does not
-  // have latency\n";
   return 0;
 }
 
@@ -314,6 +306,7 @@ void AdjListGraph::dfsLongestAcyclicPath(const std::string &currentNode,
   visited.erase(currentNode);
   currentPath.pop_back();
 }
+
 // Main function to find the longest non-cyclic path
 std::vector<std::string>
 AdjListGraph::findLongestNonCyclicPath(mlir::Operation *startOp) {
@@ -380,8 +373,7 @@ int AdjListGraph::findMaxPathLatency(mlir::Operation *startOp,
     if (excludeLastNodeLatency) {
       path.pop_back();
     }
-    // TODO cleanup after everything is verified (std::max instead of if
-    // statement)
+    // TODO cleanup: remove maxPath and use std::max
     int latency = getPathLatency(path);
     if (maxLatency < latency) {
       maxLatency = latency;
