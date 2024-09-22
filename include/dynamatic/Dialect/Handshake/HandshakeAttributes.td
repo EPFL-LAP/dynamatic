@@ -413,14 +413,14 @@ def CFDFCThroughputAttr : Handshake_Attr<
 //===----------------------------------------------------------------------===//
 // LSQ Sizing Results
 //===----------------------------------------------------------------------===//
-def LSQSizeAttr : Handshake_Attr<"LSQSize", "lsqSize"> {
-  let summary = "Load-Queue and Store-Queue sizes";
+def LSQDepthAttr : Handshake_Attr<"LSQDepth", "lsqDepth"> {
+  let summary = "Load-Queue and Store-Queue depths";
   let description = [{
-    Holds the Load-Queue and Store-Queue size for a LSQ.
+    Holds the Load-Queue and Store-Queue depth for a LSQ.
   }];
 
-  let parameters = (ins "unsigned":$loadQueueSize, "unsigned":$storeQueueSize);
-  let assemblyFormat = "`[` $loadQueueSize `,` $storeQueueSize `]`";
+  let parameters = (ins "unsigned":$loadQueueDepth, "unsigned":$storeQueueDepth);
+  let assemblyFormat = "`[` $loadQueueDepth `,` $storeQueueDepth `]`";
 }
 
 

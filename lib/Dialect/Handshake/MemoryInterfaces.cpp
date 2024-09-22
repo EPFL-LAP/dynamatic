@@ -358,18 +358,20 @@ LSQGenerationInfo::LSQGenerationInfo(handshake::LSQOp lsqOp, StringRef name)
 LSQGenerationInfo::LSQGenerationInfo(FuncMemoryPorts &ports, StringRef name)
     : lsqOp(cast<handshake::LSQOp>(ports.memOp)), name(name) {
   fromPorts(ports);
-
 }
 
 void LSQGenerationInfo::fromPorts(FuncMemoryPorts &ports) {
   dataWidth = ports.dataWidth;
   addrWidth = ports.addrWidth;
 
-  handshake::LSQSizeAttr lsqSizeAttr = getDialectAttr<handshake::LSQSizeAttr>(lsqOp);
-  if(lsqSizeAttr) {
-    depthLoad = lsqSizeAttr.getLoadQueueSize();
-    depthStore = lsqSizeAttr.getStoreQueueSize();
-    depth = std::max(depthLoad, depthStore); // Parameter is theoretically unused, but still needed by the current LSQGenerator
+  handshake::LSQDepthAttr lsqDepthAttr =
+      getDialectAttr<handshake::LSQDepthAttr>(lsqOp);
+  if (lsqDepthAttr) {
+    depthLoad = lsqDepthAttr.getLoadQueueDepth();
+    depthStore = lsqDepthAttr.getStoreQueueDepth();
+    depth = std::max(depthLoad,
+                     depthStore); // Parameter is theoretically unused, but
+                                  // still needed by the current LSQGenerator
   } else {
     depthLoad = 16;
     depthStore = 16;

@@ -225,11 +225,11 @@ void HandshakeSizeLSQsPass::runDynamaticPass() {
       maxStoreSize = std::max(maxStoreSize, (unsigned)2);
 
       llvm::dbgs() << " [DBG] final LSQ " << getUniqueName(lsqOp).str()
-                   << " Max Load Size: " << maxLoadSize
-                   << " Max Store Size: " << maxStoreSize << "\n";
-      handshake::LSQSizeAttr lsqSizeAttr = handshake::LSQSizeAttr::get(
+                   << " Max Load Depth: " << maxLoadSize
+                   << " Max Store Depth: " << maxStoreSize << "\n";
+      handshake::LSQDepthAttr lsqDepthAttr = handshake::LSQDepthAttr::get(
           mod.getContext(), maxLoadSize, maxStoreSize);
-      setDialectAttr(lsqOp, lsqSizeAttr);
+      setDialectAttr(lsqOp, lsqDepthAttr);
     }
   }
 }
@@ -678,7 +678,7 @@ HandshakeSizeLSQsPass::calcQueueSize(
   // Go trough all LSQs and calculate the maximum amount of slots needed
   for (auto &entry : allocDeallocTimesPerIIPerLSQ) {
     std::vector<int> allocPerCycle(maxEndTime);
-    unsigned startOffset = 0;
+    int startOffset = 0;
     unsigned iter = 0;
     // Build array for how many slots are allocated and deallocated per cycle
     // Alternate trough the different IIs in the order they are in the array
