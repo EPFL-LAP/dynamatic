@@ -18,13 +18,16 @@
 #include "dynamatic/Dialect/Handshake/HandshakeOps.h"
 #include "dynamatic/Support/CFG.h"
 #include "dynamatic/Support/LLVM.h"
+#include "mlir/IR/AsmState.h"
 #include "mlir/IR/Diagnostics.h"
 #include "mlir/IR/Operation.h"
 #include "mlir/IR/PatternMatch.h"
 #include "mlir/IR/Value.h"
 #include "mlir/IR/ValueRange.h"
+#include "mlir/Support/LLVM.h"
 #include "mlir/Support/LogicalResult.h"
 #include "mlir/Transforms/GreedyPatternRewriteDriver.h"
+#include "llvm/ADT/iterator_range.h"
 #include <vector>
 
 using namespace mlir;
@@ -161,38 +164,95 @@ struct DowngradeIndexlessControlMerge
 // inputs of the Control Merge are outputs of the Conditional Branch. The
 // results of the Merge are replaced with the data operand and condition
 // operands of the Conditional Branch.
-struct RemoveBranchCMergePairs
+struct RemoveBranchCMergeIfThenElse
     : public OpRewritePattern<handshake::ConditionalBranchOp> {
   using OpRewritePattern<handshake::ConditionalBranchOp>::OpRewritePattern;
 
   LogicalResult matchAndRewrite(handshake::ConditionalBranchOp condBranchOp,
                                 PatternRewriter &rewriter) const override {
-    Operation *useOwner1 = nullptr;
-    Operation *useOwner2 = nullptr;
 
+    // Make an extra check that the Branch has users both for the true and false
+    // successors
     auto trueResUsers = condBranchOp.getTrueResult().getUsers();
-    if (trueResUsers.empty())
-      return failure();
-    useOwner1 = *trueResUsers.begin();
     auto falseResUsers = condBranchOp.getFalseResult().getUsers();
-    if (falseResUsers.empty())
-      return failure();
-    useOwner2 = *falseResUsers.begin();
-
-    if (!isa_and_nonnull<handshake::ControlMergeOp>(useOwner1) ||
-        useOwner1 != useOwner2)
+    if (trueResUsers.empty() || falseResUsers.empty())
       return failure();
 
-    handshake::ControlMergeOp cMergeOp =
-        cast<handshake::ControlMergeOp>(useOwner1);
-    if (cMergeOp->getNumOperands() != 2)
+    // If there is not a single Cmerge that is both in the trueResUsers and
+    // the falseResUsers, the pattern match fails
+    bool foundCmerge = false;
+    handshake::ControlMergeOp cmergeOp;
+    for (auto trueSucc : trueResUsers) {
+      for (auto falseSucc : falseResUsers) {
+        if (trueSucc == falseSucc &&
+            isa_and_nonnull<handshake::ControlMergeOp>(trueSucc)) {
+          foundCmerge = true;
+          cmergeOp = cast<handshake::ControlMergeOp>(trueSucc);
+          break;
+        }
+      }
+    }
+    if (!foundCmerge)
       return failure();
 
-    Value dataOperand = condBranchOp.getDataOperand();
-    Value conditionBr = condBranchOp.getConditionOperand();
+    // Doublecheck that the CMerge has 2 inputs; otherwise, the pattern match
+    // fails
+    if (cmergeOp->getNumOperands() != 2)
+      return failure();
 
-    rewriter.replaceOp(cMergeOp, {dataOperand, conditionBr});
-    rewriter.eraseOp(condBranchOp);
+    // The two inputs of the Cmerge should be the condBranchOp; otherwise the
+    // pattern match fails
+    auto cmergeOpOperands = cmergeOp.getOperands();
+    if (!isa_and_nonnull<handshake::ConditionalBranchOp>(
+            cmergeOpOperands[0].getDefiningOp()) ||
+        !isa_and_nonnull<handshake::ConditionalBranchOp>(
+            cmergeOpOperands[1].getDefiningOp()))
+      return failure();
+
+    handshake::ConditionalBranchOp cmergeOperand1 =
+        cast<handshake::ConditionalBranchOp>(
+            cmergeOpOperands[0].getDefiningOp());
+    handshake::ConditionalBranchOp cmergeOperand2 =
+        cast<handshake::ConditionalBranchOp>(
+            cmergeOpOperands[1].getDefiningOp());
+    if (cmergeOperand1 != condBranchOp || cmergeOperand2 != condBranchOp)
+      return failure();
+
+    // Replace the Cmerge data output with the Branch data input
+    Value branchData = condBranchOp.getDataOperand();
+    Value branchCondition = condBranchOp.getConditionOperand();
+
+    Value cmergeOutput = cmergeOp.getResult();
+    Value index = cmergeOp.getIndex();
+
+    // Check if we need to negate the condition before feeding it to the index
+    // output of the cmerge
+    bool needNot = (condBranchOp.getTrueResult() == cmergeOpOperands[0] &&
+                    condBranchOp.getFalseResult() == cmergeOpOperands[1]);
+    Value cond;
+    if (needNot) {
+      handshake::NotOp notOp = rewriter.create<handshake::NotOp>(
+          cmergeOp->getLoc(), branchCondition);
+      cond = notOp.getResult();
+    } else {
+      cond = branchCondition;
+    }
+
+    // Replace all uses of the branchOuterResult with
+    // the cmergeOuterOperand
+    rewriter.replaceAllUsesWith(cmergeOutput, branchData);
+    rewriter.replaceAllUsesWith(index, cond);
+
+    // Delete the Cmerge
+    rewriter.eraseOp(cmergeOp);
+
+    // If the only user of the condBranchOp is the cmerge, delete it
+    if (std::distance(trueResUsers.begin(), trueResUsers.end()) == 0 &&
+        std::distance(trueResUsers.begin(), trueResUsers.end()) == 0)
+      rewriter.eraseOp(condBranchOp);
+
+    llvm::errs()
+        << "\t***Completed the remove-branch-cmerge-if-then-else!***\n";
     return success();
   }
 };
@@ -200,7 +260,7 @@ struct RemoveBranchCMergePairs
 // Removes Control Merge and Branch operation pairs there exits a loop between
 // the Control Merge and the Branch. The index result of the Control Merge is
 // derived from a merge operation whose operands are case dependent.
-struct RemoveCMergeBranchLoopPairs
+struct RemoveCMergeBranchLoop
     : public OpRewritePattern<handshake::ControlMergeOp> {
   using OpRewritePattern<handshake::ControlMergeOp>::OpRewritePattern;
 
@@ -324,7 +384,7 @@ struct RemoveCMergeBranchLoopPairs
       rewriter.eraseOp(condBranchOp);
     }
 
-    llvm::errs() << "REACH!!\n";
+    llvm::errs() << "\t***Completed the remove-cmerge-branch-loop!***\n";
     return success();
   }
 };
@@ -345,8 +405,8 @@ struct HandshakeRewriteTermsPass
     RewritePatternSet patterns(ctx);
     patterns.add<EraseUnconditionalBranches, EraseSingleInputMerges,
                  EraseSingleInputMuxes, EraseSingleInputControlMerges,
-                 DowngradeIndexlessControlMerge, RemoveBranchCMergePairs,
-                 RemoveCMergeBranchLoopPairs>(ctx);
+                 DowngradeIndexlessControlMerge, RemoveBranchCMergeIfThenElse,
+                 RemoveCMergeBranchLoop>(ctx);
 
     if (failed(applyPatternsAndFoldGreedily(mod, std::move(patterns), config)))
       return signalPassFailure();
