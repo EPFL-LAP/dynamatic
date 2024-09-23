@@ -673,6 +673,7 @@ HandshakeSizeLSQsPass::calcQueueSize(
       }
       // Increase the start offset for the next iteration by the II
       startOffset += II;
+      iter++;
     }
 
     // build array for many slots are actively allocated at which cycle
