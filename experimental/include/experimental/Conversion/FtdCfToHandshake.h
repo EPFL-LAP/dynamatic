@@ -88,6 +88,8 @@ public:
                   ConversionPatternRewriter &rewriter) const override;
 
 protected:
+  /// Maintains the gsa analysis performed of the function before the conversion
+  /// to the handshake dialect
   gsa::GsaAnalysis<mlir::func::FuncOp> &gsaAnalysis;
 
   LogicalResult ftdVerifyAndCreateMemInterfaces(
@@ -184,6 +186,12 @@ protected:
   LogicalResult addSuppGSA(ConversionPatternRewriter &rewriter,
                            handshake::FuncOp &funcOp,
                            FtdStoredOperations &ftdOps) const;
+
+  /// Starting from the information collected by the gsa analysis pass,
+  /// instantiate some merge operations at the beginning of each block which
+  /// work as explicit phi functions.
+  void addExplicitPhi(mlir::func::FuncOp funcOp,
+                      ConversionPatternRewriter &rewriter) const;
 };
 #define GEN_PASS_DECL_FTDCFTOHANDSHAKE
 #define GEN_PASS_DEF_FTDCFTOHANDSHAKE

@@ -132,6 +132,18 @@ SmallVector<Phi *> *GsaAnalysis<FunctionType>::getPhis(Block *bb) {
 }
 
 template <typename FunctionType>
+Phi *GsaAnalysis<FunctionType>::getPhi(Block *bb, unsigned argNumber) {
+  if (!phiList.contains(bb))
+    return nullptr;
+  auto &list = phiList[bb];
+  for (auto *phi : list) {
+    if (phi->argNumber == argNumber)
+      return phi;
+  }
+  return nullptr;
+}
+
+template <typename FunctionType>
 void GsaAnalysis<FunctionType>::printPhiList() {
   for (auto const &[block, phis] : phiList) {
     for (auto *phi : phis) {

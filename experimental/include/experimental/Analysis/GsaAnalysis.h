@@ -124,6 +124,9 @@ public:
   /// Get a pointer to the vector containing the phi functions of a block
   SmallVector<Phi *> *getPhis(Block *bb);
 
+  /// Get a pointer to the vector containing the phi functions of a block
+  Phi *getPhi(Block *bb, unsigned argNumber);
+
 private:
   /// For each block in the function, keep a list of phi functions with all
   /// their information. The size of the list associate to each block is equal

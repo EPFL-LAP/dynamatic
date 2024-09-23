@@ -49,13 +49,13 @@ struct FtdCfToHandshakePass
     ModuleOp modOp = getOperation();
 
     // Put all non-external functions into maximal SSA form
-    for (auto funcOp : modOp.getOps<func::FuncOp>()) {
-      if (!funcOp.isExternal()) {
-        FuncSSAStrategy strategy;
-        if (failed(dynamatic::maximizeSSA(funcOp.getBody(), strategy)))
-          return signalPassFailure();
-      }
-    }
+    // for (auto funcOp : modOp.getOps<func::FuncOp>()) {
+    //   if (!funcOp.isExternal()) {
+    //     FuncSSAStrategy strategy;
+    //     if (failed(dynamatic::maximizeSSA(funcOp.getBody(), strategy)))
+    //       return signalPassFailure();
+    //   }
+    // }
 
     CfToHandshakeTypeConverter converter;
     RewritePatternSet patterns(ctx);
@@ -1156,6 +1156,88 @@ FtdLowerFuncToHandshake::addSuppGSA(ConversionPatternRewriter &rewriter,
   return success();
 }
 
+void FtdLowerFuncToHandshake::addExplicitPhi(
+    func::FuncOp funcOp, ConversionPatternRewriter &rewriter) const {
+
+  struct MissingMerge {
+    gsa::Phi *operandPhi;
+    gsa::Phi *resultPhi;
+    unsigned operandInput;
+
+    MissingMerge(gsa::Phi *o, gsa::Phi *r, unsigned oi)
+        : operandPhi(o), resultPhi(r), operandInput(oi) {}
+  };
+
+  SmallVector<MissingMerge> missingMergeList;
+  DenseMap<Block *, DenseMap<unsigned, handshake::MergeOp>> mergeList;
+
+  for (Block &block : llvm::drop_begin(funcOp)) {
+
+    mergeList.insert({&block, DenseMap<unsigned, handshake::MergeOp>()});
+
+    auto arguments = block.getArguments();
+    for (auto &arg : arguments) {
+      auto *phi = gsaAnalysis.getPhi(&block, arg.getArgNumber());
+      assert(phi && "Not existent phi");
+      Location loc = block.front().getLoc();
+      rewriter.setInsertionPointToStart(&block);
+      SmallVector<Value> operands;
+
+      unsigned operandIdx = 0;
+      for (auto *operand : phi->operands) {
+        if (operand->type == gsa::PhiInputType) {
+          operands.emplace_back(arg);
+          missingMergeList.emplace_back(
+              MissingMerge(phi, operand->phi, operandIdx));
+        } else {
+          auto val = operand->v;
+          val.setType(channelifyType(val.getType()));
+          operands.emplace_back(val);
+        }
+        operandIdx++;
+      }
+
+      auto merge = rewriter.create<handshake::MergeOp>(
+          loc, channelifyType(operands[0].getType()), operands);
+      arg.replaceAllUsesWith(merge.getResult());
+      mergeList[&block].insert({arg.getArgNumber(), merge});
+    }
+  }
+
+  for (auto &missingMerge : missingMergeList) {
+
+    auto operandMerge = mergeList[missingMerge.operandPhi->blockOwner]
+                                 [missingMerge.operandPhi->argNumber];
+    auto resultMerge = mergeList[missingMerge.resultPhi->blockOwner]
+                                [missingMerge.resultPhi->argNumber];
+
+    operandMerge->setOperand(missingMerge.operandInput,
+                             resultMerge.getResult());
+  }
+
+  for (Block &block : llvm::drop_begin(funcOp))
+    block.eraseArguments(0, block.getArguments().size());
+
+  for (Block &block : funcOp) {
+    Operation *terminator = block.getTerminator();
+    if (terminator) {
+      rewriter.setInsertionPointAfter(terminator);
+      if (isa<cf::CondBranchOp>(terminator)) {
+        auto condBranch = dyn_cast<cf::CondBranchOp>(terminator);
+        auto newCondBranch = rewriter.create<cf::CondBranchOp>(
+            condBranch->getLoc(), condBranch.getCondition(),
+            condBranch.getTrueDest(), condBranch.getFalseDest());
+        rewriter.replaceOp(condBranch, newCondBranch);
+      } else if (isa<cf::BranchOp>(terminator)) {
+        auto branch = dyn_cast<cf::BranchOp>(terminator);
+        auto newBranch =
+            rewriter.create<cf::BranchOp>(branch->getLoc(), branch.getDest());
+        rewriter.replaceOp(branch, newBranch);
+      }
+    }
+  }
+}
+
 // -- -End helper functions-- -
 
 using ArgReplacements = DenseMap<BlockArgument, OpResult>;
@@ -1173,6 +1255,8 @@ LogicalResult FtdLowerFuncToHandshake::matchAndRewrite(
     if (isa<mlir::MemRefType>(arg.getType()))
       memrefToArgIdx.insert({arg, idx});
   }
+
+  addExplicitPhi(lowerFuncOp, rewriter);
 
   // First lower the parent function itself, without modifying its body
   // (except the block arguments and terminators)
@@ -1254,8 +1338,12 @@ LogicalResult FtdLowerFuncToHandshake::matchAndRewrite(
   // id basic block
   idBasicBlocks(funcOp, rewriter);
 
+  funcOp.print(llvm::dbgs());
+
   if (failed(flattenAndTerminate(funcOp, rewriter, argReplacements)))
     return failure();
+
+  funcOp.print(llvm::dbgs());
 
   return success();
 }
