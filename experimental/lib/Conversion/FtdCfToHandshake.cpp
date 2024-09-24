@@ -1233,6 +1233,7 @@ void FtdLowerFuncToHandshake::addExplicitPhi(
         auto newBranch =
             rewriter.create<cf::BranchOp>(branch->getLoc(), branch.getDest());
         rewriter.replaceOp(branch, newBranch);
+        rewriter.eraseOp(branch);
       }
     }
   }
@@ -1257,6 +1258,10 @@ LogicalResult FtdLowerFuncToHandshake::matchAndRewrite(
   }
 
   addExplicitPhi(lowerFuncOp, rewriter);
+
+  llvm::dbgs() << "\n=====================================\n";
+  lowerFuncOp.print(llvm::dbgs());
+  llvm::dbgs() << "\n=====================================\n";
 
   // First lower the parent function itself, without modifying its body
   // (except the block arguments and terminators)
@@ -1308,42 +1313,46 @@ LogicalResult FtdLowerFuncToHandshake::matchAndRewrite(
   if (failed(convertUndefinedValues(rewriter, funcOp)))
     return failure();
 
+  llvm::dbgs() << "\n=====================================\n";
+  funcOp.print(llvm::dbgs());
+  llvm::dbgs() << "\n=====================================\n";
+
   if (funcOp.getBlocks().size() != 1) {
 
     // Add phi
     if (failed(addPhi(rewriter, funcOp, ftdOps)))
       return failure();
 
-    // Add suppression blocks between each pair of producer and consumer
-    if (failed(addSupp(rewriter, funcOp, ftdOps)))
-      return failure();
+    // // Add suppression blocks between each pair of producer and consumer
+    // if (failed(addSupp(rewriter, funcOp, ftdOps)))
+    //   return failure();
 
-    // Add supp branches
-    if (failed(addSuppBranches(rewriter, funcOp, ftdOps)))
-      return failure();
+    // // Add supp branches
+    // if (failed(addSuppBranches(rewriter, funcOp, ftdOps)))
+    //   return failure();
 
-    // Add supp for start
-    if (failed(addSuppStart(rewriter, funcOp, ftdOps)))
-      return failure();
+    // // Add supp for start
+    // if (failed(addSuppStart(rewriter, funcOp, ftdOps)))
+    //   return failure();
 
-    // Convert merges to muxes
-    if (failed(convertMergesToMuxes(rewriter, funcOp, ftdOps)))
-      return failure();
+    // // Convert merges to muxes
+    // if (failed(convertMergesToMuxes(rewriter, funcOp, ftdOps)))
+    //   return failure();
 
-    // Add supp GSA
-    if (failed(addSuppGSA(rewriter, funcOp, ftdOps)))
-      return failure();
+    // // Add supp GSA
+    // if (failed(addSuppGSA(rewriter, funcOp, ftdOps)))
+    //   return failure();
   }
 
   // id basic block
   idBasicBlocks(funcOp, rewriter);
 
+  llvm::dbgs() << "\n=====================================\n";
   funcOp.print(llvm::dbgs());
+  llvm::dbgs() << "\n=====================================\n";
 
   if (failed(flattenAndTerminate(funcOp, rewriter, argReplacements)))
     return failure();
-
-  funcOp.print(llvm::dbgs());
 
   return success();
 }
@@ -1932,14 +1941,6 @@ FtdLowerFuncToHandshake::addPhi(ConversionPatternRewriter &rewriter,
   for (Block &consumerBlock : region.getBlocks()) {
     for (Operation &consumerOp : consumerBlock.getOperations()) {
 
-      // Skip if the operation was not added by the FTD algorithm AND either
-      // it is not a constant or it is a constant related to the network of
-      // constants (for MUX select signals)
-      if (!ftdOps.allocationNetwork.contains(&consumerOp) &&
-          (!isa<handshake::ConstantOp>(consumerOp) ||
-           ftdOps.networkConstants.contains(&consumerOp)))
-        continue;
-
       // Skip consumers which were were added by the `addPhi`
       // function, to avoid inifinte loops
       if (ftdOps.phiMerges.contains(&consumerOp))
@@ -1949,8 +1950,18 @@ FtdLowerFuncToHandshake::addPhi(ConversionPatternRewriter &rewriter,
 
         // Skip the analysis of the current operand if it is produced by a
         // MERGE produced by `addPhi`, to avoid infinite loops
-        if (mlir::Operation *producerOp = operand.getDefiningOp();
-            ftdOps.phiMerges.contains(producerOp))
+        mlir::Operation *producerOp = operand.getDefiningOp();
+        if (ftdOps.phiMerges.contains(producerOp))
+          continue;
+
+        // Memory controllers are in block 0, but values do not need to be
+        // regenerated [aya]
+        if (llvm::isa_and_nonnull<handshake::MemoryOpInterface>(producerOp))
+          continue;
+
+        // Due to the way memories are handled, it is appropriate to exclude
+        // memory references from the regeneration values
+        if (llvm::isa_and_nonnull<MemRefType>(operand.getType()))
           continue;
 
         // Get the parent block of the operand
@@ -1995,8 +2006,21 @@ FtdLowerFuncToHandshake::addPhi(ConversionPatternRewriter &rewriter,
           // the output of the merge, and forwarding the output of the merge
           // to its inputs.
           rewriter.setInsertionPointToStart((*it)->getHeader());
+
+          // The input of the merge might be an index cast, leading to compiling
+          // errors. In that case, we go back until we have the original
+          // non-casted operand
+          while (llvm::isa_and_nonnull<arith::IndexCastOp>(
+              producerOperand.getDefiningOp()))
+            producerOperand = producerOperand.getDefiningOp()->getOperand(0);
+
+          // The type of the input must be channelified
+          producerOperand.setType(channelifyType(producerOperand.getType()));
+
           auto mergeOp = rewriter.create<handshake::MergeOp>(
-              producerOperand.getLoc(), producerOperand);
+              producerOperand.getLoc(), producerOperand.getType(),
+              producerOperand);
+
           producerOperand = mergeOp.getResult();
           ftdOps.phiMerges.insert(mergeOp);
           ftdOps.allocationNetwork.insert(mergeOp);
