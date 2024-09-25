@@ -1824,16 +1824,6 @@ FtdLowerFuncToHandshake::addSupp(ConversionPatternRewriter &rewriter,
   for (Block &producerBlock : region.getBlocks()) {
     for (Operation &producerOp : producerBlock.getOperations()) {
 
-      // Skip if: the producer comes from the generation mechanism; the
-      // producer comes from the suppression mechanism; the producer
-      // comes from the self generation mechanism; the producer comes from the
-      // network of constants
-      if (ftdOps.shannonMUXes.contains(&producerOp) ||
-          ftdOps.suppBranches.contains(&producerOp) ||
-          ftdOps.selfGenBranches.contains(&producerOp) ||
-          ftdOps.networkConstants.contains(&producerOp))
-        continue;
-
       // For each value coming out of the producer, consider all its users
       for (Value result : producerOp.getResults()) {
         std::vector<Operation *> users(result.getUsers().begin(),
@@ -1846,9 +1836,29 @@ FtdLowerFuncToHandshake::addSupp(ConversionPatternRewriter &rewriter,
               llvm::isa_and_nonnull<UnrealizedConversionCastOp>(consumerOp))
             continue;
 
+          while (
+              llvm::isa_and_nonnull<arith::IndexCastOp>(result.getDefiningOp()))
+            result = result.getDefiningOp()->getOperand(0);
+
+          if (!result.getDefiningOp())
+            continue;
+
+          Operation *producerOpReal = result.getDefiningOp();
+          Block *producerBlockReal = result.getParentBlock();
+
+          // Skip if: the producer comes from the generation mechanism; the
+          // producer comes from the suppression mechanism; the producer
+          // comes from the self generation mechanism; the producer comes from
+          // the network of constants
+          if (ftdOps.shannonMUXes.contains(producerOpReal) ||
+              ftdOps.suppBranches.contains(producerOpReal) ||
+              ftdOps.selfGenBranches.contains(producerOpReal) ||
+              ftdOps.networkConstants.contains(producerOpReal))
+            continue;
+
           // Skip if the consumer and the producer are in the same block and
           // the consumer is not a merge
-          if (consumerBlock == &producerBlock &&
+          if (consumerBlock == producerBlockReal &&
               !isa<handshake::MergeOp>(consumerOp))
             continue;
 
@@ -1865,16 +1875,13 @@ FtdLowerFuncToHandshake::addSupp(ConversionPatternRewriter &rewriter,
           // current producer is a memory operation [aya]
           if (llvm::isa_and_nonnull<handshake::MemoryControllerOp>(
                   consumerOp) ||
-              llvm::isa_and_nonnull<handshake::MemoryControllerOp>(producerOp))
+              llvm::isa_and_nonnull<handshake::MemoryControllerOp>(
+                  producerOpReal))
             continue;
 
           // aya
           if (isa<mlir::MemRefType>(result.getType()))
             continue;
-
-          while (
-              llvm::isa_and_nonnull<arith::IndexCastOp>(result.getDefiningOp()))
-            result = result.getDefiningOp()->getOperand(0);
 
           // Different scenarios about the relationship between consumer and
           // producer should be handled:
@@ -1891,14 +1898,14 @@ FtdLowerFuncToHandshake::addSupp(ConversionPatternRewriter &rewriter,
           // Set true if the producer is in a loop which does not contains
           // the consumer
           bool producingGtUsing =
-              loopInfo.getLoopFor(&producerBlock) &&
-              !loopInfo.getLoopFor(&producerBlock)->contains(consumerBlock);
+              loopInfo.getLoopFor(producerBlockReal) &&
+              !loopInfo.getLoopFor(producerBlockReal)->contains(consumerBlock);
 
           // We need to suppress all the tokens produced within a loop and
           // used outside each time a new iteration starts. If the producer is
           // a conditional branch, they cannot be suppressed
-          if (producingGtUsing && !isBranchLoopExit(&producerOp, loopInfo))
-            addSuppMoreProdThanCons(rewriter, &producerBlock, consumerOp,
+          if (producingGtUsing && !isBranchLoopExit(producerOpReal, loopInfo))
+            addSuppMoreProdThanCons(rewriter, producerBlockReal, consumerOp,
                                     result, loopInfo, ftdOps);
 
           // Self regeneration case: the token is reused by the operation
@@ -1916,16 +1923,16 @@ FtdLowerFuncToHandshake::addSupp(ConversionPatternRewriter &rewriter,
           // higher than the consumer BB index);
           // 2. They are in the same BB, but the consumer is a loop merge
           // (phi) and the producer is a conditional branch;
-          else if (greaterThanBlocks(&producerBlock, consumerBlock) ||
+          else if (greaterThanBlocks(producerBlockReal, consumerBlock) ||
                    (isa<handshake::MergeOp>(consumerOp) &&
-                    &producerBlock == consumerBlock &&
+                    producerBlockReal == consumerBlock &&
                     isaMergeLoop(consumerOp, loopInfo) &&
-                    !isa<handshake::ConditionalBranchOp>(producerOp)))
+                    !isa<handshake::ConditionalBranchOp>(producerOpReal)))
             addSuppBackward(rewriter, consumerOp, result, loopInfo, ftdOps);
 
           // In all the other case, the producer and the consumer are not in a
           // loop
-          else if (failed(addSuppNonLoop(rewriter, funcOp, &producerBlock,
+          else if (failed(addSuppNonLoop(rewriter, funcOp, producerBlockReal,
                                          consumerOp, result, ftdOps)))
             return failure();
         }
@@ -1961,16 +1968,14 @@ FtdLowerFuncToHandshake::addPhi(ConversionPatternRewriter &rewriter,
         if (ftdOps.phiMerges.contains(producerOp))
           continue;
 
-        // Memory controllers are in block 0, but values do not need to be
-        // regenerated [aya]
+        // Everything related to memories should not undergo the FTD
+        // transformation. This also holds for the merge operations introduced
+        // with the SSA transformation
         if (llvm::isa_and_nonnull<handshake::MemoryOpInterface>(producerOp) ||
+            llvm::isa_and_nonnull<handshake::MemoryOpInterface>(consumerOp) ||
             llvm::isa_and_nonnull<handshake::MergeOp>(consumerOp) ||
-            llvm::isa_and_nonnull<handshake::ControlMergeOp>(consumerOp))
-          continue;
-
-        // Due to the way memories are handled, it is appropriate to exclude
-        // memory references from the regeneration values
-        if (llvm::isa_and_nonnull<MemRefType>(operand.getType()))
+            llvm::isa_and_nonnull<handshake::ControlMergeOp>(consumerOp) ||
+            llvm::isa_and_nonnull<MemRefType>(operand.getType()))
           continue;
 
         // Get the parent block of the operand
