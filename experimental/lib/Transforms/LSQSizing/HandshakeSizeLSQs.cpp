@@ -130,7 +130,6 @@ private:
 } // namespace
 
 void HandshakeSizeLSQsPass::runDynamaticPass() {
-  llvm::dbgs() << "\t [DBG] LSQ Sizing Pass Called!\n";
   llvm::SmallVector<LSQSizingResult> sizingResults;
 
   // Read component latencies
@@ -140,7 +139,6 @@ void HandshakeSizeLSQsPass::runDynamaticPass() {
 
   mlir::ModuleOp mod = getOperation();
   for (handshake::FuncOp funcOp : mod.getOps<handshake::FuncOp>()) {
-    llvm::dbgs() << "\t [DBG] Function: " << funcOp.getName() << "\n";
 
     std::unordered_map<unsigned, llvm::SetVector<unsigned>> cfdfcBBLists;
     std::unordered_map<unsigned, float> IIs;
@@ -177,7 +175,6 @@ void HandshakeSizeLSQsPass::runDynamaticPass() {
 
     // Size LSQs for each CFDFC
     for (auto &entry : cfdfcBBLists) {
-      llvm::dbgs() << "\n\n ==========================\n";
       std::optional<LSQSizingResult> result = sizeLSQsForCFDFC(
           funcOp, entry.second, timingDB, IIs[entry.first], collisions);
       if (result) {
@@ -212,9 +209,6 @@ void HandshakeSizeLSQsPass::runDynamaticPass() {
       maxLoadSize = std::max(maxLoadSize, (unsigned)2);
       maxStoreSize = std::max(maxStoreSize, (unsigned)2);
 
-      llvm::dbgs() << " [DBG] final LSQ " << getUniqueName(lsqOp).str()
-                   << " Max Load Depth: " << maxLoadSize
-                   << " Max Store Depth: " << maxStoreSize << "\n";
       handshake::LSQDepthAttr lsqDepthAttr = handshake::LSQDepthAttr::get(
           mod.getContext(), maxLoadSize, maxStoreSize);
       setDialectAttr(lsqOp, lsqDepthAttr);
@@ -241,9 +235,6 @@ std::optional<LSQSizingResult> HandshakeSizeLSQsPass::sizeLSQsForCFDFC(
       findStartTimes(graph);
   mlir::Operation *startNode = get<0>(startNodeAndTimes);
   StartTimes startTimes = get<1>(startNodeAndTimes);
-
-  llvm::dbgs() << "\t [DBG] Start Node: " << getUniqueName(startNode).str()
-               << "\n";
 
   // Find Phi node of each BB
   std::unordered_map<unsigned, mlir::Operation *> phiNodes =
@@ -280,35 +271,9 @@ std::optional<LSQSizingResult> HandshakeSizeLSQsPass::sizeLSQsForCFDFC(
   } else if (collisions == "half") {
     IIs.push_back(initialII);
     IIs.push_back(graph.getWorstCaseII());
-    // TODO cleanup remove test scenarios
-  } else if (collisions == "gaussian_test") {
-    if (initialII == 2)
-      IIs.push_back(6);
-    else
-      IIs.push_back(10);
-  } else if (collisions == "matrix_power_test") {
-    if (initialII == 2) {
-      IIs.push_back(2);
-      IIs.push_back(4);
-    } else {
-      IIs.push_back(10);
-    }
-  } else if (collisions == "histogram_half_test") {
-    IIs.push_back(1);
-    IIs.push_back(12);
-  } else if (collisions == "gemver_test") {
-    if (initialII == 3) {
-      IIs.push_back(2);
-    } else {
-      IIs.push_back(initialII);
-    }
   } else {
     IIs.push_back(initialII);
   }
-
-  llvm::dbgs() << "----------------------------\n";
-  graph.printGraph();
-  llvm::dbgs() << "----------------------------\n";
 
   std::unordered_map<unsigned, TimePerOpMap> loadAllocTimes;
   std::unordered_map<unsigned, TimePerOpMap> storeAllocTimes;
@@ -316,7 +281,6 @@ std::optional<LSQSizingResult> HandshakeSizeLSQsPass::sizeLSQsForCFDFC(
   std::unordered_map<unsigned, TimePerOpMap> storeDeallocTimes;
 
   for (auto &II : IIs) {
-    llvm::dbgs() << "\t [DBG] II: " << II << "\n";
     graph.setNewII(II);
     loadAllocTimes.insert_or_assign(
         II, getAllocTimes(graph, startNode, loadOps, phiNodes));
@@ -346,13 +310,6 @@ std::optional<LSQSizingResult> HandshakeSizeLSQsPass::sizeLSQsForCFDFC(
     }
   }
 
-  for (auto &entry : result) {
-    llvm::dbgs() << "\t [DBG] LSQ " << getUniqueName(entry.first).str()
-                 << " Load Size: " << std::get<0>(entry.second)
-                 << " Store Size: " << std::get<1>(entry.second) << "\n";
-  }
-
-  llvm::dbgs() << "==========================\n";
   return result;
 }
 
@@ -379,11 +336,6 @@ HandshakeSizeLSQsPass::findStartTimes(AdjListGraph graph) {
     std::vector<std::string> path = graph.findLongestNonCyclicPath(op);
     maxLatencies.insert({op, graph.getPathLatency(path)});
     nodeCounts.insert({op, path.size()});
-    llvm::dbgs() << "\t [DBG] Longest Path Candidate: "
-                 << op->getAttrOfType<StringAttr>("handshake.name").str()
-                 << " Latency: " << graph.getPathLatency(path)
-                 << " Node Count: " << path.size() << "\n";
-    graph.printPath(path);
   }
 
   // Find the node with the highest latency, if there are multiple, choose the
@@ -476,11 +428,6 @@ HandshakeSizeLSQsPass::getPhiNodes(AdjListGraph graph,
     phiNodes.insert({entry.first, phiNode});
   }
 
-  for (auto &nodes : phiNodes) {
-    llvm::dbgs() << "\t [DBG] Phi Node for BB " << nodes.first << ": "
-                 << getUniqueName(nodes.second).str() << "\n";
-  }
-
   return phiNodes;
 }
 
@@ -498,8 +445,6 @@ std::unordered_map<mlir::Operation *, int> HandshakeSizeLSQsPass::getAllocTimes(
     assert(phiNode && "Phi node not found for BB");
     int latency = graph.getEarliestStartTime(phiNode) + allocEntryLatency;
     allocTimes.insert({op, latency});
-    llvm::dbgs() << "\t\t [DBG] " << getUniqueName(op).str()
-                 << " alloc time: " << latency << "\n";
   }
   return allocTimes;
 }
@@ -515,8 +460,6 @@ HandshakeSizeLSQsPass::getStoreDeallocTimes(
     int latency = graph.findMaxPathLatency(startNode, op, false, false, true) +
                   storeDeallocEntryLatency;
     deallocTimes.insert({op, latency});
-    llvm::dbgs() << "\t\t [DBG] " << getUniqueName(op).str()
-                 << " dealloc time: " << latency << "\n";
   }
   return deallocTimes;
 }
@@ -577,8 +520,6 @@ HandshakeSizeLSQsPass::getLoadDeallocTimes(AdjListGraph graph,
       }
     }
     deallocTimes.insert({op, maxLatency});
-    llvm::dbgs() << "\t\t [DBG] " << getUniqueName(op).str()
-                 << " dealloc time: " << maxLatency << "\n";
   }
   return deallocTimes;
 }
@@ -692,13 +633,6 @@ HandshakeSizeLSQsPass::calcQueueSize(
     for (int i = 1; i < maxEndTime; i++) {
       slotsPerCycle[i] = slotsPerCycle[i - 1] + allocPerCycle[i];
     }
-
-    llvm::dbgs() << "Slots per cycle for LSQ "
-                 << getUniqueName(entry.first).str() << ": ";
-    for (int i = 0; i < slotsPerCycle.size(); i++) {
-      llvm::dbgs() << slotsPerCycle[i] << " ";
-    }
-    llvm::dbgs() << "\n";
 
     // get highest amount of slots from the array
     unsigned maxSlots =

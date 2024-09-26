@@ -277,8 +277,6 @@ std::vector<std::vector<std::string>>
 AdjListGraph::findPaths(mlir::Operation *startOp, mlir::Operation *endOp,
                         bool ignoreBackedge, bool ignoreShiftingEdge) {
   assert(startOp && endOp && "Start and end operations must not be null");
-  // llvm::dbgs() << "Finding paths from " << getUniqueName(startOp).str() << "
-  // to " << getUniqueName(endOp).str() << "\n";
   return findPaths(getUniqueName(startOp).str(), getUniqueName(endOp).str(),
                    ignoreBackedge, ignoreShiftingEdge);
 }
@@ -368,24 +366,14 @@ int AdjListGraph::findMaxPathLatency(mlir::Operation *startOp,
   }
 
   int maxLatency = 0;
-  std::vector<std::string> maxPath;
 
   // Iterate over all paths and keep track of the path with the highest latency
   for (auto &path : paths) {
     if (excludeLastNodeLatency) {
       path.pop_back();
     }
-    // TODO cleanup: remove maxPath and use std::max
-    int latency = getPathLatency(path);
-    if (maxLatency < latency) {
-      maxLatency = latency;
-      maxPath = path;
-    }
+    maxLatency = std::max(maxLatency, getPathLatency(path));
   }
-
-  llvm::dbgs() << "latency: " << maxLatency << " path: ";
-  printPath(maxPath);
-
   return maxLatency;
 }
 
@@ -397,18 +385,10 @@ int AdjListGraph::findMinPathLatency(mlir::Operation *startOp,
   std::vector<std::vector<std::string>> paths =
       findPaths(startOp, endOp, ignoreBackedge, ignoreShiftingEdge);
   int minLatency = INT_MAX;
-  std::vector<std::string> minPath;
-  // Iterate over all paths and keep track of the path with the lowest latency
-  // TODO use std::min and remove minPath
+  // Iterate over all paths and keep track of the lowest latency
   for (auto &path : paths) {
-    int latency = getPathLatency(path);
-    if (latency < minLatency) {
-      minLatency = latency;
-      minPath = path;
-    }
-    // minLatency = std::min(minLatency, getPathLatency(path));
+    minLatency = std::min(minLatency, getPathLatency(path));
   }
-  printPath(minPath);
   return minLatency;
 }
 
@@ -457,6 +437,7 @@ unsigned AdjListGraph::getWorstCaseII() {
                      std::tuple<std::vector<mlir::Operation *>,
                                 std::vector<mlir::Operation *>>>
       loadStoreOpsPerLSQ;
+  // Match up all lsq_loads and lsq_stores with the same LSQ
   for (auto &node : nodes) {
     mlir::Operation *lsqOp = nullptr;
     if (node.second.op) {
@@ -482,8 +463,8 @@ unsigned AdjListGraph::getWorstCaseII() {
     }
   }
 
+  // For each LSQ, go trough all loads and find the maxPathLatency to all stores
   int maxLatency = 0;
-
   for (auto &lsq : loadStoreOpsPerLSQ) {
     for (auto &load : std::get<0>(lsq.second)) {
       for (auto &store : std::get<1>(lsq.second)) {
@@ -499,6 +480,8 @@ unsigned AdjListGraph::getWorstCaseII() {
 
 void AdjListGraph::setEarliestStartTimes(mlir::Operation *startOp) {
   std::string startNode = getUniqueName(startOp).str();
+  // initialize the earliest start time of the start node to 0, this is the
+  // reference for all other nodes
   nodes.at(startNode).earliestStartTime = 0;
   std::set<std::string> visited;
   setEarliestStartTimes(startNode, visited);
@@ -528,6 +511,7 @@ void AdjListGraph::setEarliestStartTimes(std::string prevNode,
     }
   }
 
+  // Remove node from visited set, to allow for other paths to visit it
   visited.erase(prevNode);
 }
 
@@ -542,14 +526,18 @@ bool AdjListGraph::updateStartTimeForNode(std::string node,
   assert(nodes.at(prevNode).earliestStartTime != -1 &&
          "Previous start time must be defined");
 
+  // Update the edgeMinLatencies map
+  // This map holds the earliest argument arrival time for each incoming edge
   edgeMinLatencies[node][prevNode] =
       std::max(edgeMinLatencies[node][prevNode], prevNodePathTime);
 
   // Mux, merge and cmerge only need one of their inputs to be ready, all
   // other nodes need all of their inputs to be ready
+  // Therefore the latency for mux, merge and cmerge is the minimum of all
+  // incoming edges
   if (op && (op->getName().getStringRef() == "handshake.mux" ||
              op->getName().getStringRef() == "handshake.merge" ||
-             op->getName().getStringRef() == "handshake.cmerge")) {
+             op->getName().getStringRef() == "handshake.control_merge")) {
 
     int minLatency = INT_MAX;
     for (auto &incomgingEdge : edgeMinLatencies[node]) {
@@ -560,10 +548,10 @@ bool AdjListGraph::updateStartTimeForNode(std::string node,
     if (minLatency != nodes.at(node).earliestStartTime) {
       startTimeUpdated = true;
       nodes.at(node).earliestStartTime = minLatency;
-      llvm::dbgs() << "Setting " << node << " to " << minLatency
-                   << "(prev: " << prevNode << ")\n";
     }
   } else {
+    // For all other nodes, the operation needs to wait for all arguments to
+    // arrive. The latency is the maximum of all incoming edges
     int maxLatency = 0;
     for (auto &incomgingEdge : edgeMinLatencies[node]) {
       if (maxLatency < incomgingEdge.second) {
@@ -573,8 +561,6 @@ bool AdjListGraph::updateStartTimeForNode(std::string node,
     if (maxLatency != nodes.at(node).earliestStartTime) {
       startTimeUpdated = true;
       nodes.at(node).earliestStartTime = maxLatency;
-      llvm::dbgs() << "Setting " << node << " to " << maxLatency
-                   << "(prev: " << prevNode << ")\n";
     }
   }
   return startTimeUpdated;
