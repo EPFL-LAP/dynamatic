@@ -50,12 +50,6 @@ AdjListGraph::AdjListGraph(handshake::FuncOp funcOp,
                            llvm::SetVector<unsigned> cfdfcBBs,
                            TimingDatabase timingDB, unsigned II) {
 
-  llvm::dbgs() << "Creating AdjListGraph for CFDFC: ";
-  for (auto &bb : cfdfcBBs) {
-    llvm::dbgs() << bb << " ";
-  }
-  llvm::dbgs() << "with II: " << II << "\n";
-
   for (Operation &op : funcOp.getOps()) {
     // Get operation's basic block
     unsigned srcBB;
