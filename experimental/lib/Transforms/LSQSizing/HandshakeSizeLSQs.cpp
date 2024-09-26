@@ -280,6 +280,7 @@ std::optional<LSQSizingResult> HandshakeSizeLSQsPass::sizeLSQsForCFDFC(
     IIs.push_back(initialII);
     IIs.push_back(graph.getWorstCaseII());
   } else {
+    // none is the default case
     IIs.push_back(initialII);
   }
 
