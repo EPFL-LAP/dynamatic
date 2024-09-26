@@ -98,8 +98,8 @@ private:
       AdjListGraph &graph, std::vector<mlir::Operation *> ops,
       std::unordered_map<unsigned, mlir::Operation *> phiNodes);
 
-  // Finds the allocation time of each operation, which is the latency to the
-  // Phi Node of the BB plus a fixed additional latency
+  // Finds the allocation time of each operation, which is the earliest start
+  // time of the Phi Node of the BB plus a fixed additional latency
   TimePerOpMap
   getAllocTimes(AdjListGraph graph, mlir::Operation *startNode,
                 std::vector<mlir::Operation *> ops,
@@ -152,8 +152,6 @@ void HandshakeSizeLSQsPass::runDynamaticPass() {
         getDialectAttr<handshake::CFDFCToBBListAttr>(funcOp);
 
     if (throughputAttr == nullptr || cfdfcAttr == nullptr) {
-      llvm::dbgs()
-          << "\t [DBG] No CFDFCThroughputAttr or CFDFCToBBListAttr found\n";
       continue;
     }
 
@@ -235,7 +233,6 @@ std::optional<LSQSizingResult> HandshakeSizeLSQsPass::sizeLSQsForCFDFC(
       graph.getOperationsWithOpName("handshake.lsq_store");
 
   if (loadOps.size() == 0 && storeOps.size() == 0) {
-    llvm::dbgs() << "\t [DBG] No LSQ Ops found in CFDFC\n";
     return std::nullopt;
   }
 
@@ -259,10 +256,8 @@ std::optional<LSQSizingResult> HandshakeSizeLSQsPass::sizeLSQsForCFDFC(
   // candidate and that the start time of the candidate is not zero
   insertStartnodeShiftingEdges(graph, startNode, startTimes);
 
-  llvm::dbgs() << "----------------------------\n";
-  graph.printGraph();
-  llvm::dbgs() << "----------------------------\n";
-
+  // Calculate the earliest start times for each operation in the graph. This is
+  // needed to find the allocation times
   graph.setEarliestStartTimes(startNode);
 
   std::vector<unsigned> IIs;
