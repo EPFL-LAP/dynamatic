@@ -166,6 +166,7 @@ void HandshakeSizeLSQsPass::runDynamaticPass() {
       cfdfcBBLists.insert({std::stoi(attr.getName().str()), cfdfcBBs});
     }
 
+
     // Extract II from Attribute
     for (const NamedAttribute attr : throughputDict) {
       FloatAttr throughput = llvm::dyn_cast<FloatAttr>(attr.getValue());
@@ -173,10 +174,17 @@ void HandshakeSizeLSQsPass::runDynamaticPass() {
                   round(1 / throughput.getValueAsDouble())});
     }
 
+
     // Size LSQs for each CFDFC
     for (auto &entry : cfdfcBBLists) {
+      // If there is no II corresponding to the CFDFC skip it
+      // Something is wrong with the attributes in that case
+      if(IIs.find(entry.first) == IIs.end()){
+        continue;
+      }
+
       std::optional<LSQSizingResult> result = sizeLSQsForCFDFC(
-          funcOp, entry.second, timingDB, IIs[entry.first], collisions);
+          funcOp, entry.second, timingDB, IIs.at(entry.first), collisions);
       if (result) {
         sizingResults.push_back(result.value());
       }
