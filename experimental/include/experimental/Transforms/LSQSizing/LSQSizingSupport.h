@@ -18,6 +18,7 @@ namespace lsqsizing {
 // Define a structure for a graph node
 struct AdjListNode {
   int latency;                 // Latency of the operation
+  int earliestStartTime;       // Earliest start time of the operation
   mlir::Operation *op;         // Pointer to the operation
   std::set<std::string> edges; // Adjacency list (stores keys of adjacent nodes)
   std::set<std::string> backedges; // Backedge list (stores keys of adjacent
@@ -96,6 +97,13 @@ public:
   // Updates the graph to use a different II for the latency of the backedges
   void setNewII(unsigned II);
 
+  // iterates over the graph, starting from startOp and finds the earliest start
+  // time for each operation according to the latencies
+  void setEarliestStartTimes(mlir::Operation *startOp);
+
+  // returns the earliest start time of an operation
+  int getEarliestStartTime(mlir::Operation *op);
+
 private:
   static constexpr const char *backedgePrefix =
       "backedge_"; // Prefix for backedges
@@ -104,6 +112,11 @@ private:
 
   // Map to store the nodes by their Operations unique name
   std::unordered_map<std::string, AdjListNode> nodes;
+
+  // Map to store the startTime according to each connected edge, used for
+  // finding the earliestStartTime of each node
+  std::unordered_map<std::string, std::unordered_map<std::string, int>>
+      edgeMinLatencies;
 
   // Adds a operation with its latency to the graph as a node
   void addNode(mlir::Operation *op, int latency);
@@ -133,6 +146,15 @@ private:
 
   // Adds the backedges between nodes for a result value of an operation
   void addChannelBackedges(mlir::Value, int latency);
+
+  // Recursive algorithm to go trough nodes and update the earliest start time
+  void setEarliestStartTimes(std::string startNode,
+                             std::set<std::string> &visited);
+
+  // Updates the start time of a node, if the start time of the previous node is
+  // higher, handles edge cases for mux,merge and cmerge for which it needs the
+  // edgeMinLatencies map.
+  bool updateStartTimeForNode(std::string node, std::string prevNode);
 };
 
 } // namespace lsqsizing

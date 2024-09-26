@@ -111,7 +111,8 @@ AdjListGraph::AdjListGraph(handshake::FuncOp funcOp,
 }
 
 void AdjListGraph::addNode(mlir::Operation *op, int latency) {
-  nodes.insert({getUniqueName(op).str(), AdjListNode{latency, op, {}, {}, {}}});
+  nodes.insert(
+      {getUniqueName(op).str(), AdjListNode{latency, -1, op, {}, {}, {}}});
 }
 
 void AdjListGraph::addEdge(mlir::Operation *src, mlir::Operation *dest) {
@@ -138,7 +139,8 @@ void AdjListGraph::printGraph() {
   for (const auto &pair : nodes) {
     std::string opName = pair.first;
     const AdjListNode &node = pair.second;
-    llvm::dbgs() << opName << " (lat: " << node.latency << "): ";
+    llvm::dbgs() << opName << " (lat: " << node.latency
+                 << ", est: " << node.earliestStartTime << "): ";
     for (std::string edge : node.edges) {
       llvm::dbgs() << edge << ", ";
     }
@@ -172,7 +174,7 @@ void AdjListGraph::addBackedge(mlir::Operation *src, mlir::Operation *dest,
 
   // create node and add edge from src to new node and new node to dest
   nodes.insert(
-      {newNodeName, AdjListNode{latency, nullptr, {}, {destName}, {}}});
+      {newNodeName, AdjListNode{latency, -1, nullptr, {}, {destName}, {}}});
   nodes.at(srcName).backedges.insert(newNodeName);
 }
 
@@ -189,8 +191,8 @@ void AdjListGraph::addShiftingEdge(mlir::Operation *src, mlir::Operation *dest,
          "Nodes are already connected -> should not add shifting edge");
 
   // create node and add edge from src to new node and new node to dest
-  nodes.insert(
-      {newNodeName, AdjListNode{shiftingLatency, nullptr, {}, {}, {destName}}});
+  nodes.insert({newNodeName,
+                AdjListNode{shiftingLatency, -1, nullptr, {}, {}, {destName}}});
   nodes.at(srcName).shiftingEdges.insert(newNodeName);
 }
 
@@ -395,10 +397,18 @@ int AdjListGraph::findMinPathLatency(mlir::Operation *startOp,
   std::vector<std::vector<std::string>> paths =
       findPaths(startOp, endOp, ignoreBackedge, ignoreShiftingEdge);
   int minLatency = INT_MAX;
+  std::vector<std::string> minPath;
   // Iterate over all paths and keep track of the path with the lowest latency
+  // TODO use std::min and remove minPath
   for (auto &path : paths) {
-    minLatency = std::min(minLatency, getPathLatency(path));
+    int latency = getPathLatency(path);
+    if (latency < minLatency) {
+      minLatency = latency;
+      minPath = path;
+    }
+    // minLatency = std::min(minLatency, getPathLatency(path));
   }
+  printPath(minPath);
   return minLatency;
 }
 
@@ -485,4 +495,100 @@ unsigned AdjListGraph::getWorstCaseII() {
   // The maximal Latency between any load and store of the same LSQ is the worst
   // case II
   return (unsigned)maxLatency;
+}
+
+void AdjListGraph::setEarliestStartTimes(mlir::Operation *startOp) {
+  std::string startNode = getUniqueName(startOp).str();
+  nodes.at(startNode).earliestStartTime = 0;
+  std::set<std::string> visited;
+  setEarliestStartTimes(startNode, visited);
+}
+
+void AdjListGraph::setEarliestStartTimes(std::string prevNode,
+                                         std::set<std::string> &visited) {
+
+  // If the current node has already been visited, skip to avoid cycles
+  if (visited.find(prevNode) != visited.end()) {
+    return;
+  }
+
+  // Mark this node as visited
+  visited.insert(prevNode);
+
+  // Traverse the edges of the current node
+  for (auto &node : nodes.at(prevNode).edges) {
+    if (updateStartTimeForNode(node, prevNode) || true) {
+      setEarliestStartTimes(node, visited);
+    }
+  }
+
+  for (auto &node : nodes.at(prevNode).shiftingEdges) {
+    if (updateStartTimeForNode(node, prevNode) || true) {
+      setEarliestStartTimes(node, visited);
+    }
+  }
+
+  visited.erase(prevNode);
+}
+
+bool AdjListGraph::updateStartTimeForNode(std::string node,
+                                          std::string prevNode) {
+
+  mlir::Operation *op = nodes.at(node).op;
+  bool startTimeUpdated = false;
+
+  int prevNodePathTime =
+      nodes.at(prevNode).earliestStartTime + nodes.at(prevNode).latency;
+  assert(nodes.at(prevNode).earliestStartTime != -1 &&
+         "Previous start time must be defined");
+
+  edgeMinLatencies[node][prevNode] =
+      std::max(edgeMinLatencies[node][prevNode], prevNodePathTime);
+
+  // Mux, merge and cmerge only need one of their inputs to be ready, all
+  // other nodes need all of their inputs to be ready
+  if (op && (op->getName().getStringRef() == "handshake.mux" ||
+             op->getName().getStringRef() == "handshake.merge" ||
+             op->getName().getStringRef() == "handshake.cmerge")) {
+
+    int minLatency = INT_MAX;
+    for (auto &incomgingEdge : edgeMinLatencies[node]) {
+      if (minLatency > incomgingEdge.second) {
+        minLatency = incomgingEdge.second;
+      }
+    }
+    if (minLatency != nodes.at(node).earliestStartTime) {
+      startTimeUpdated = true;
+      nodes.at(node).earliestStartTime = minLatency;
+      llvm::dbgs() << "Setting " << node << " to " << minLatency
+                   << "(prev: " << prevNode << ")\n";
+    }
+  } else {
+    int maxLatency = 0;
+    for (auto &incomgingEdge : edgeMinLatencies[node]) {
+      if (maxLatency < incomgingEdge.second) {
+        maxLatency = incomgingEdge.second;
+      }
+    }
+    if (maxLatency != nodes.at(node).earliestStartTime) {
+      startTimeUpdated = true;
+      nodes.at(node).earliestStartTime = maxLatency;
+      llvm::dbgs() << "Setting " << node << " to " << maxLatency
+                   << "(prev: " << prevNode << ")\n";
+    }
+  }
+  return startTimeUpdated;
+}
+
+int AdjListGraph::getEarliestStartTime(mlir::Operation *op) {
+  std::string opName = getUniqueName(op).str();
+  // If earliestStartTime of node has not been initialized (is -1), it is not
+  // reachable by the start node. This should only happen for nodes that are
+  // e.g. a source. The not reachable muxes, merges and cmerges are handled by
+  // adding shifting edges for their start times and should be accounted for
+  if (nodes.at(opName).earliestStartTime == -1) {
+    return 0;
+  } else {
+    return nodes.at(opName).earliestStartTime;
+  }
 }

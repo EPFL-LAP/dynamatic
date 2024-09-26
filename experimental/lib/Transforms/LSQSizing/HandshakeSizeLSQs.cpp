@@ -234,6 +234,11 @@ std::optional<LSQSizingResult> HandshakeSizeLSQsPass::sizeLSQsForCFDFC(
   std::vector<mlir::Operation *> storeOps =
       graph.getOperationsWithOpName("handshake.lsq_store");
 
+  if (loadOps.size() == 0 && storeOps.size() == 0) {
+    llvm::dbgs() << "\t [DBG] No LSQ Ops found in CFDFC\n";
+    return std::nullopt;
+  }
+
   // Find starting node, which will be the reference to the rest
   std::tuple<mlir::Operation *, StartTimes> startNodeAndTimes =
       findStartTimes(graph);
@@ -254,10 +259,11 @@ std::optional<LSQSizingResult> HandshakeSizeLSQsPass::sizeLSQsForCFDFC(
   // candidate and that the start time of the candidate is not zero
   insertStartnodeShiftingEdges(graph, startNode, startTimes);
 
-  if (loadOps.size() == 0 && storeOps.size() == 0) {
-    llvm::dbgs() << "\t [DBG] No LSQ Ops found in CFDFC\n";
-    return std::nullopt;
-  }
+  llvm::dbgs() << "----------------------------\n";
+  graph.printGraph();
+  llvm::dbgs() << "----------------------------\n";
+
+  graph.setEarliestStartTimes(startNode);
 
   std::vector<unsigned> IIs;
 
@@ -288,9 +294,18 @@ std::optional<LSQSizingResult> HandshakeSizeLSQsPass::sizeLSQsForCFDFC(
   } else if (collisions == "matrix_power_test") {
     if (initialII == 2) {
       IIs.push_back(2);
-      IIs.push_back(3);
+      IIs.push_back(4);
     } else {
       IIs.push_back(10);
+    }
+  } else if (collisions == "histogram_half_test") {
+    IIs.push_back(1);
+    IIs.push_back(12);
+  } else if (collisions == "gemver_test") {
+    if (initialII == 3) {
+      IIs.push_back(2);
+    } else {
+      IIs.push_back(initialII);
     }
   } else {
     IIs.push_back(initialII);
@@ -405,8 +420,8 @@ void HandshakeSizeLSQsPass::insertStartnodeShiftingEdges(
   for (auto &entry : startTimes) {
     // Ignore if it is the startNode itself
     if (get<0>(entry) != startNode) {
-      // Check if there is already a Path connecting the Nodes, if not insert an
-      // edge with an artifical node The artificial node has the shifting
+      // Check if there is already a Path connecting the Nodes, if not insert
+      // an edge with an artifical node The artificial node has the shifting
       // latency as latency
       std::vector<std::vector<std::string>> paths =
           graph.findPaths(startNode, get<0>(entry), true);
@@ -426,7 +441,8 @@ HandshakeSizeLSQsPass::getPhiNodes(AdjListGraph graph,
   std::unordered_map<unsigned, mlir::Operation *> phiNodes;
 
   // Insert start_node as a candidate for cases where there is only 1 bb (will
-  // be choosen anyway for other cases, but looks cleaner then special handling)
+  // be choosen anyway for other cases, but looks cleaner then special
+  // handling)
   std::optional<unsigned> startNodeBB = getLogicBB(startNode);
   assert(startNodeBB && "Start Node must belong to basic block");
   phiNodeCandidates.insert({*startNodeBB, {startNode}});
@@ -449,8 +465,8 @@ HandshakeSizeLSQsPass::getPhiNodes(AdjListGraph graph,
     }
   }
 
-  // Go trough all candidates and choose the one with the lowest latency to the
-  // start node, ignore backedges for the path
+  // Go trough all candidates and choose the one with the lowest latency to
+  // the start node, ignore backedges for the path
   for (auto &entry : phiNodeCandidates) {
     mlir::Operation *phiNode = nullptr;
     int minLatency = INT_MAX;
@@ -485,8 +501,7 @@ std::unordered_map<mlir::Operation *, int> HandshakeSizeLSQsPass::getAllocTimes(
     assert(bb && "Load/Store Op must belong to basic block");
     mlir::Operation *phiNode = phiNodes[*bb];
     assert(phiNode && "Phi node not found for BB");
-    int latency =
-        graph.findMinPathLatency(startNode, phiNode, true) + allocEntryLatency;
+    int latency = graph.getEarliestStartTime(phiNode) + allocEntryLatency;
     allocTimes.insert({op, latency});
     llvm::dbgs() << "\t\t [DBG] " << getUniqueName(op).str()
                  << " alloc time: " << latency << "\n";
@@ -517,8 +532,8 @@ HandshakeSizeLSQsPass::getLoadDeallocTimes(AdjListGraph graph,
                                            std::vector<mlir::Operation *> ops) {
   std::unordered_map<mlir::Operation *, int> deallocTimes;
 
-  // Go trough all ops which directly succeed the load op and therefore need its
-  // result Check every succeeding nodes for the maximum latency (latest
+  // Go trough all ops which directly succeed the load op and therefore need
+  // its result Check every succeeding nodes for the maximum latency (latest
   // argument arrival), excluding the latency of the operation itself
   for (auto &op : ops) {
     int maxLatency = 0;
@@ -529,8 +544,8 @@ HandshakeSizeLSQsPass::getLoadDeallocTimes(AdjListGraph graph,
               loadDeallocEntryLatency,
           maxLatency);
 
-      // If the node is a buffer, check if it is a tehb buffer and if so, check
-      // the latency of the nodes connected to the buffer
+      // If the node is a buffer, check if it is a tehb buffer and if so,
+      // check the latency of the nodes connected to the buffer
       // TODO maybe also to the same for all buffers not only tehb
       if (succedingOp->getName().getStringRef().str() == "handshake.buffer") {
         auto params = succedingOp->getAttrOfType<DictionaryAttr>(
@@ -644,9 +659,9 @@ HandshakeSizeLSQsPass::calcQueueSize(
     }
   }
 
-  // Double the time for the analysis scope to make sure that all deallocations
-  // are included (necessary scope actually is lower, but not trivial to
-  // determine)
+  // Double the time for the analysis scope to make sure that all
+  // deallocations are included (necessary scope actually is lower, but not
+  // trivial to determine)
   maxEndTime = maxEndTime * 2;
 
   // Go trough all LSQs and calculate the maximum amount of slots needed
