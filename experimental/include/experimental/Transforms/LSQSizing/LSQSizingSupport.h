@@ -24,7 +24,7 @@ struct AdjListNode {
   std::set<std::string> backedges; // Backedge list (stores keys of adjacent
                                    // nodes connected by backedges)
   std::set<std::string>
-      shiftingEdges; // Shifting edge list (stores keys of adjacent nodes
+      shiftingedges; // Shifting edge list (stores keys of adjacent nodes
                      // connected by shifting edges)
 };
 

@@ -187,7 +187,7 @@ void AdjListGraph::addShiftingEdge(mlir::Operation *src, mlir::Operation *dest,
   // create node and add edge from src to new node and new node to dest
   nodes.insert({newNodeName,
                 AdjListNode{shiftingLatency, -1, nullptr, {}, {}, {destName}}});
-  nodes.at(srcName).shiftingEdges.insert(newNodeName);
+  nodes.at(srcName).shiftingedges.insert(newNodeName);
 }
 
 void AdjListGraph::dfsAllPaths(std::string &currentNode, std::string &end,
@@ -236,7 +236,7 @@ void AdjListGraph::dfsAllPaths(std::string &currentNode, std::string &end,
   }
 
   if (!ignoreShiftingEdge) {
-    for (auto neighbor : nodes.at(currentNode).shiftingEdges) {
+    for (auto neighbor : nodes.at(currentNode).shiftingedges) {
       // If the neighbor has not been visited, visit it
       if (visited.find(neighbor) == visited.end()) {
         visited.insert(neighbor);        // Mark as visited
@@ -499,7 +499,7 @@ void AdjListGraph::setEarliestStartTimes(std::string prevNode,
     }
   }
 
-  for (auto &node : nodes.at(prevNode).shiftingEdges) {
+  for (auto &node : nodes.at(prevNode).shiftingedges) {
     if (updateStartTimeForNode(node, prevNode) || true) {
       setEarliestStartTimes(node, visited);
     }
