@@ -49,6 +49,9 @@ struct FtdStoredOperations {
   /// contains all `handshake::MergeOp` added in the straight LSQ
   DenseSet<Operation *> memDepLoopMerges;
 
+  /// contains all `handshake::MergeOp` added by expliciting phi functions
+  DenseSet<Operation *> explicitPhiMerges;
+
   /// contains all `handshake::MuxOp` created by Shannon
   DenseSet<Operation *> shannonMUXes;
 
@@ -191,7 +194,8 @@ protected:
   /// instantiate some merge operations at the beginning of each block which
   /// work as explicit phi functions.
   void addExplicitPhi(mlir::func::FuncOp funcOp,
-                      ConversionPatternRewriter &rewriter) const;
+                      ConversionPatternRewriter &rewriter,
+                      FtdStoredOperations &ftdOps) const;
 };
 #define GEN_PASS_DECL_FTDCFTOHANDSHAKE
 #define GEN_PASS_DEF_FTDCFTOHANDSHAKE

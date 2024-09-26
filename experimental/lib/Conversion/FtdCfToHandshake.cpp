@@ -48,15 +48,6 @@ struct FtdCfToHandshakePass
     MLIRContext *ctx = &getContext();
     ModuleOp modOp = getOperation();
 
-    // Put all non-external functions into maximal SSA form
-    // for (auto funcOp : modOp.getOps<func::FuncOp>()) {
-    //   if (!funcOp.isExternal()) {
-    //     FuncSSAStrategy strategy;
-    //     if (failed(dynamatic::maximizeSSA(funcOp.getBody(), strategy)))
-    //       return signalPassFailure();
-    //   }
-    // }
-
     CfToHandshakeTypeConverter converter;
     RewritePatternSet patterns(ctx);
 
@@ -969,6 +960,7 @@ LogicalResult FtdLowerFuncToHandshake::convertMergesToMuxes(
                                                      merge.getOperands());
         ftdOps.allocationNetwork.insert(mux);
         rewriter.replaceOp(&merge, mux);
+        merge.getResult(0).replaceAllUsesWith(mux.getResult());
 
       } else {
 
@@ -1153,7 +1145,8 @@ FtdLowerFuncToHandshake::addSuppGSA(ConversionPatternRewriter &rewriter,
 }
 
 void FtdLowerFuncToHandshake::addExplicitPhi(
-    func::FuncOp funcOp, ConversionPatternRewriter &rewriter) const {
+    func::FuncOp funcOp, ConversionPatternRewriter &rewriter,
+    FtdStoredOperations &ftdOps) const {
 
   struct MissingMerge {
     gsa::Phi *operandPhi;
@@ -1197,6 +1190,7 @@ void FtdLowerFuncToHandshake::addExplicitPhi(
           loc, channelifyType(operands[0].getType()), operands);
       arg.replaceAllUsesWith(merge.getResult());
       mergeList[&block].insert({arg.getArgNumber(), merge});
+      ftdOps.explicitPhiMerges.insert(merge);
     }
   }
 
@@ -1253,11 +1247,7 @@ LogicalResult FtdLowerFuncToHandshake::matchAndRewrite(
       memrefToArgIdx.insert({arg, idx});
   }
 
-  addExplicitPhi(lowerFuncOp, rewriter);
-
-  llvm::dbgs() << "\n=====================================\n";
-  lowerFuncOp.print(llvm::dbgs());
-  llvm::dbgs() << "\n=====================================\n";
+  addExplicitPhi(lowerFuncOp, rewriter, ftdOps);
 
   // First lower the parent function itself, without modifying its body
   // (except the block arguments and terminators)
@@ -1309,17 +1299,13 @@ LogicalResult FtdLowerFuncToHandshake::matchAndRewrite(
   if (failed(convertUndefinedValues(rewriter, funcOp)))
     return failure();
 
-  llvm::dbgs() << "\n=====================================\n";
-  funcOp.print(llvm::dbgs());
-  llvm::dbgs() << "\n=====================================\n";
-
   if (funcOp.getBlocks().size() != 1) {
 
     // Add phi
     if (failed(addPhi(rewriter, funcOp, ftdOps)))
       return failure();
 
-    // // Add suppression blocks between each pair of producer and consumer
+    // Add suppression blocks between each pair of producer and consumer
     if (failed(addSupp(rewriter, funcOp, ftdOps)))
       return failure();
 
@@ -1342,10 +1328,6 @@ LogicalResult FtdLowerFuncToHandshake::matchAndRewrite(
 
   // id basic block
   idBasicBlocks(funcOp, rewriter);
-
-  llvm::dbgs() << "\n=====================================\n";
-  funcOp.print(llvm::dbgs());
-  llvm::dbgs() << "\n=====================================\n";
 
   if (failed(flattenAndTerminate(funcOp, rewriter, argReplacements)))
     return failure();
@@ -1408,6 +1390,7 @@ static Value boolVariableToCircuit(ConversionPatternRewriter &rewriter,
     auto notOp = rewriter.create<handshake::NotOp>(
         block->getOperations().front().getLoc(),
         channelifyType(condition.getType()), condition);
+    ftdOps.shannonMUXes.insert(notOp);
 
     return notOp->getResult(0);
   }
@@ -1758,6 +1741,7 @@ addSuppBranchesInternal(ConversionPatternRewriter &rewriter,
             ftdOps.networkConstants.contains(consumerOp))
           continue;
 
+        // aya (not)
         // Skip if the current consumer is a conditional branch
         if (isa<handshake::ConditionalBranchOp>(consumerOp))
           continue;
@@ -1852,6 +1836,7 @@ FtdLowerFuncToHandshake::addSupp(ConversionPatternRewriter &rewriter,
           // the network of constants
           if (ftdOps.shannonMUXes.contains(producerOpReal) ||
               ftdOps.suppBranches.contains(producerOpReal) ||
+              ftdOps.shannonMUXes.contains(consumerOp) ||
               ftdOps.selfGenBranches.contains(producerOpReal) ||
               ftdOps.networkConstants.contains(producerOpReal))
             continue;
@@ -1876,7 +1861,12 @@ FtdLowerFuncToHandshake::addSupp(ConversionPatternRewriter &rewriter,
           if (llvm::isa_and_nonnull<handshake::MemoryControllerOp>(
                   consumerOp) ||
               llvm::isa_and_nonnull<handshake::MemoryControllerOp>(
-                  producerOpReal))
+                  producerOpReal) ||
+              llvm::isa_and_nonnull<handshake::LSQOp>(producerOpReal) ||
+              llvm::isa_and_nonnull<handshake::LSQOp>(consumerOp) ||
+              llvm::isa_and_nonnull<handshake::ControlMergeOp>(
+                  producerOpReal) ||
+              llvm::isa_and_nonnull<handshake::ControlMergeOp>(consumerOp))
             continue;
 
           // aya
@@ -1973,7 +1963,7 @@ FtdLowerFuncToHandshake::addPhi(ConversionPatternRewriter &rewriter,
         // with the SSA transformation
         if (llvm::isa_and_nonnull<handshake::MemoryOpInterface>(producerOp) ||
             llvm::isa_and_nonnull<handshake::MemoryOpInterface>(consumerOp) ||
-            llvm::isa_and_nonnull<handshake::MergeOp>(consumerOp) ||
+            ftdOps.explicitPhiMerges.contains(&consumerOp) ||
             llvm::isa_and_nonnull<handshake::ControlMergeOp>(consumerOp) ||
             llvm::isa_and_nonnull<MemRefType>(operand.getType()))
           continue;
@@ -2057,7 +2047,6 @@ LogicalResult FtdLowerFuncToHandshake::convertUndefinedValues(
   auto undefinedValues = funcOp.getBody().getOps<LLVM::UndefOp>();
 
   for (auto undefOp : llvm::make_early_inc_range(undefinedValues)) {
-
     // Create an attribute of the appropriate type for the constant
     auto resType = undefOp.getRes().getType();
     TypedAttr cstAttr;
@@ -2069,14 +2058,14 @@ LogicalResult FtdLowerFuncToHandshake::convertUndefinedValues(
     } else if (FloatType floatType = dyn_cast<FloatType>(resType)) {
       cstAttr = rewriter.getFloatAttr(floatType, 0.0);
     } else {
-      return undefOp->emitError() << "operation has unsupported result type";
+      auto intType = rewriter.getIntegerType(32);
+      cstAttr = rewriter.getIntegerAttr(intType, 0);
     }
 
     // Create a constant with a default value and replace the undefined value
     rewriter.setInsertionPoint(undefOp);
     auto cstOp = rewriter.create<handshake::ConstantOp>(undefOp.getLoc(),
                                                         cstAttr, startValue);
-    // Move attributes and replace the usage of the value
     cstOp->setDialectAttrs(undefOp->getAttrDictionary());
     namer.replaceOp(cstOp, cstOp);
     rewriter.replaceOp(undefOp, cstOp.getResult());

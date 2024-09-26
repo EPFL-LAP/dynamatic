@@ -122,7 +122,7 @@ if [[ $FAST_TOKEN_DELIVERY -ne 0 ]]; then
   # handshake transformations
   "$DYNAMATIC_OPT_BIN" "$F_HANDSHAKE" \
     --handshake-analyze-lsq-usage \
-    --handshake-minimize-cst-width --handshake-optimize-bitwidths="legacy" \
+    --handshake-minimize-cst-width \
     --handshake-materialize --handshake-infer-basic-blocks \
     > "$F_HANDSHAKE_TRANSFORMED"
   exit_on_fail "Failed to apply transformations to handshake with FTD" \

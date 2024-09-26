@@ -751,6 +751,7 @@ LogicalResult LowerFuncToHandshake::convertMemoryOps(
               Value dataOut =
                   cast<handshake::LoadOpInterface>(newOp).getDataOutput();
               rewriter.replaceOp(loadOp, dataOut);
+              loadOp.getResult().replaceAllUsesWith(dataOut);
               return newOp;
             })
             .Case<memref::StoreOp>([&](memref::StoreOp storeOp) {
