@@ -40,11 +40,17 @@
 #include "llvm/ADT/SmallVector.h"
 #include "llvm/ADT/StringRef.h"
 #include "llvm/ADT/TypeSwitch.h"
+#include "llvm/Support/Debug.h"
 #include "llvm/Support/ErrorHandling.h"
 #include <algorithm>
 #include <bitset>
+#include <cctype>
+#include <charconv>
+#include <cstdint>
 #include <iterator>
 #include <string>
+
+#define DEBUG_TYPE "HandshakeToHW"
 
 using namespace mlir;
 using namespace dynamatic;
@@ -89,7 +95,7 @@ class ModuleBuilder {
 public:
   /// The MLIR context is used to create string attributes for port names
   /// and types for the clock and reset ports, should they be added.
-  ModuleBuilder(MLIRContext *ctx) : ctx(ctx) {};
+  ModuleBuilder(MLIRContext *ctx) : ctx(ctx){};
 
   /// Builds the module port information from the current list of inputs and
   /// outputs.
@@ -299,7 +305,7 @@ MemLoweringState::getMemOutputPorts(hw::HWModuleOp modOp) {
 
 LoweringState::LoweringState(mlir::ModuleOp modOp, NameAnalysis &namer,
                              OpBuilder &builder)
-    : modOp(modOp), namer(namer), edgeBuilder(builder, modOp.getLoc()) {};
+    : modOp(modOp), namer(namer), edgeBuilder(builder, modOp.getLoc()){};
 
 /// Attempts to find an external HW module in the MLIR module with the
 /// provided name. Returns it if it exists, otherwise returns `nullptr`.
@@ -506,6 +512,33 @@ ModuleDiscriminator::ModuleDiscriminator(Operation *op) {
             addType("DATA_TYPE", storeOp.getDataInput());
             addType("ADDR_TYPE", storeOp.getAddressInput());
           })
+      .Case<handshake::SharingWrapperOp>(
+          [&](handshake::SharingWrapperOp sharingWrapperOp) {
+            addType("DATA_WIDTH", sharingWrapperOp.getDataOperands()[0]);
+
+            // In a sharing wrapper, we have the credits as a list of unsigned
+            // integers. This will be encoded as a space-separated string and
+            // passed to the sharing wrapper generator.
+
+            auto addSpaceSeparatedListOfInt =
+                [&](StringRef name, ArrayRef<int64_t> array) -> void {
+              std::string strAttr;
+              for (unsigned i = 0; i < array.size(); i++) {
+                if (i > 0)
+                  strAttr += " ";
+                strAttr += std::to_string(array[i]);
+              }
+              addString(name, strAttr);
+            };
+
+            addSpaceSeparatedListOfInt("CREDITS",
+                                       sharingWrapperOp.getCredits());
+
+            addUnsigned("NUM_SHARED_OPERANDS",
+                        sharingWrapperOp.getNumSharedOperands());
+
+            addUnsigned("LATENCY", sharingWrapperOp.getLatency());
+          })
       .Case<handshake::ConstantOp>([&](handshake::ConstantOp cstOp) {
         // Bitwidth and binary-encoded constant value
         ChannelType cstType = cstOp.getResult().getType();
@@ -563,7 +596,8 @@ ModuleDiscriminator::ModuleDiscriminator(Operation *op) {
             handshake::MulIOp, handshake::NegFOp, handshake::NotOp,
             handshake::OrIOp, handshake::ShLIOp, handshake::ShRSIOp,
             handshake::ShRUIOp, handshake::SubFOp, handshake::SubIOp,
-            handshake::XOrIOp>([&](auto) {
+            handshake::XOrIOp, handshake::SIToFPOp, handshake::FPToSIOp,
+            handshake::AbsFOp>([&](auto) {
         // Bitwidth
         addType("DATA_TYPE", op->getOperand(0));
       })
@@ -581,12 +615,12 @@ ModuleDiscriminator::ModuleDiscriminator(Operation *op) {
         addString("PREDICATE", stringifyEnum(cmpIOp.getPredicate()));
         addType("DATA_TYPE", cmpIOp.getLhs());
       })
-      .Case<handshake::ExtSIOp, handshake::ExtUIOp, handshake::TruncIOp>(
-          [&](auto) {
-            // Input bitwidth and output bitwidth
-            addType("INPUT_TYPE", op->getOperand(0));
-            addType("OUTPUT_TYPE", op->getResult(0));
-          })
+      .Case<handshake::ExtSIOp, handshake::ExtUIOp, handshake::TruncIOp,
+            handshake::ExtFOp, handshake::TruncFOp>([&](auto) {
+        // Input bitwidth and output bitwidth
+        addType("INPUT_TYPE", op->getOperand(0));
+        addType("OUTPUT_TYPE", op->getResult(0));
+      })
       .Default([&](auto) {
         op->emitError() << "This operation cannot be lowered to RTL "
                            "due to a lack of an RTL implementation for it.";
@@ -691,7 +725,7 @@ namespace {
 class HWBuilder {
 public:
   /// Creates the hardware builder.
-  HWBuilder(MLIRContext *ctx) : modBuilder(ctx) {};
+  HWBuilder(MLIRContext *ctx) : modBuilder(ctx){};
 
   /// Adds a value to the list of operands for the future instance, and its type
   /// to the future external module's input port information.
@@ -1370,8 +1404,7 @@ public:
                      OpBuilder &builder)
       : ConverterBuilder(buildExternalModule(circuitMod, state, builder),
                          IOMapping(state.outputIdx, 0, 5), IOMapping(0, 0, 8),
-                         IOMapping(0, 5, 2),
-                         IOMapping(8, state.inputIdx, 1)) {};
+                         IOMapping(0, 5, 2), IOMapping(8, state.inputIdx, 1)){};
 
 private:
   /// Creates, inserts, and returns the external harware module corresponding to
@@ -1692,6 +1725,7 @@ public:
                     ConvertToHWInstance<handshake::MCStoreOp>,
                     ConvertToHWInstance<handshake::LSQStoreOp>,
                     ConvertToHWInstance<handshake::NotOp>,
+                    ConvertToHWInstance<handshake::SharingWrapperOp>,
                     // Arith operations
                     ConvertToHWInstance<handshake::AddFOp>,
                     ConvertToHWInstance<handshake::AddIOp>,
@@ -1714,7 +1748,12 @@ public:
                     ConvertToHWInstance<handshake::SubFOp>,
                     ConvertToHWInstance<handshake::SubIOp>,
                     ConvertToHWInstance<handshake::TruncIOp>,
-                    ConvertToHWInstance<handshake::XOrIOp>>(
+                    ConvertToHWInstance<handshake::TruncFOp>,
+                    ConvertToHWInstance<handshake::XOrIOp>,
+                    ConvertToHWInstance<handshake::SIToFPOp>,
+                    ConvertToHWInstance<handshake::FPToSIOp>,
+                    ConvertToHWInstance<handshake::ExtFOp>,
+                    ConvertToHWInstance<handshake::AbsFOp>>(
         typeConverter, funcOp->getContext());
 
     // Everything must be converted to operations in the hw dialect

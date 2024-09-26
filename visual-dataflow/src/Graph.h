@@ -14,10 +14,8 @@
 #ifndef DYNAMATIC_VISUAL_DATAFLOW_GRAPH_H
 #define DYNAMATIC_VISUAL_DATAFLOW_GRAPH_H
 
-#include "GraphEdge.h"
-#include "GraphNode.h"
+#include "dynamatic/Support/DOT.h"
 #include "dynamatic/Support/LLVM.h"
-#include <map>
 #include <string>
 #include <utility>
 #include <vector>
@@ -25,77 +23,94 @@
 namespace dynamatic {
 namespace visual {
 
-using CycleNb = int;
-using GraphId = int;
-using Data = std::string;
+/// All possible dataflow states. The four combinations of valid/ready wires
+/// plus one state for undefined states.
+enum DataflowState { UNDEFINED, ACCEPT, IDLE, STALL, TRANSFER };
 
-/// State of an edge of the graph
-enum State { UNDEFINED, ACCEPT, IDLE, STALL, TRANSFER };
-
-struct BB {
-  std::vector<float> boundries;
-  std::string label;
-  std::pair<float, float> labelPosition;
-  std::pair<float, float> labelSize;
+struct EdgeState {
+  DataflowState state;
+  std::string data;
 };
 
-using NodePortPair = std::pair<NodeId, size_t>;
-using EdgePorts = std::pair<NodePortPair, NodePortPair>;
-
-/// Stores channel state transitions as a map from edge IDs to corresponding
-/// state transition information (and data, when relevant).
-using ChannelTransitions = std::map<EdgeId, std::pair<State, Data>>;
-
-/// Stores the set of state transitionss at each cycle, mapping each cycle
-/// number to the set of channel state transitions that occur during it.
-using CycleTransitions = std::map<CycleNb, ChannelTransitions>;
-
 /// Implements the logic to create and update a Graph
-class Graph {
-
+class GodotGraph {
 public:
-  /// Constructs a graph
-  Graph() = default;
-  /// Adds an edge to the graph
-  void addEdge(GraphEdge edge);
-  /// Adds a node to the graph
-  void addNode(GraphNode node);
-  /// Retrieves a node based on a given node identifier
-  LogicalResult getNode(NodeId &id, GraphNode &result);
-  /// Based on information about an edge, retrieves the corresponding edge
-  /// identifier
-  LogicalResult getEdgeId(EdgePorts &edgeInfo, EdgeId &edgeId);
-  /// Given a specific clock cycle, adds a pair (edge, state) to the map
-  void addEdgeState(CycleNb cycle, EdgeId edgeId, State state,
-                    const Data &data);
-  /// Returns all the Nodes in the Graph
-  std::map<NodeId, GraphNode> getNodes();
-  /// Returns all the edges in the Graph
-  std::vector<GraphEdge> getEdges();
+  using Transitions = DenseMap<const DOTGraph::Edge *, EdgeState>;
 
-  CycleTransitions &getCycleEdgeStates();
+  struct NodeProps {
+    /// Position of the node in the Graph
+    std::pair<float, float> position;
+    /// Width of the node
+    float width;
+    /// Color of the Node
+    std::string color = "white";
+    /// Shape of the Node
+    std::string shape = "rectangle";
+    /// Style of the borders
+    bool isDotted = false;
+  };
 
-  void dupilcateEdgeStates(CycleNb from, CycleNb until);
-  /// Adds a BB to the Graph
-  void addBB(BB &bb);
-  /// Gets the graph's BBs
-  std::vector<BB> getBBs();
-  /// Retrieves a list of edge IDs that are either incoming to or outgoing from
-  /// a specified node
-  std::vector<EdgeId> getInOutEdgesOfNode(const NodeId &nodeId);
+  struct EdgeProps {
+    /// Positions of the edge in the graph
+    std::vector<std::pair<float, float>> positions;
+    /// Arrowhead style.
+    std::string arrowhead;
+    // Source port index.
+    size_t fromIdx;
+    // Destination port index.
+    size_t toIdx;
+    /// Style of the edge
+    bool isDotted = false;
+  };
+
+  struct SubgraphProps {
+    std::vector<float> boundaries;
+    std::string label;
+    std::pair<float, float> labelPosition;
+    std::pair<float, float> labelSize;
+  };
+
+  LogicalResult fromDOTAndCSV(StringRef dotFilePath, StringRef csvFilePath);
+
+  void addEdgeState(unsigned cycle, const DOTGraph::Edge *edge,
+                    DataflowState state, StringRef data);
+
+  size_t getLastCycleIdx() const {
+    if (transitions.empty())
+      return 0;
+    return transitions.size() - 1;
+  }
+
+  const Transitions &getChanges(unsigned cycle) const {
+    return transitions.at(cycle);
+  }
+
+  const DOTGraph &getGraph() const { return graph; }
+
+  const NodeProps &getNodeProperties(const DOTGraph::Node *node) const {
+    return nodes.at(node);
+  }
+
+  const EdgeProps &getEdgeProperties(const DOTGraph::Edge *edge) const {
+    return edges.at(edge);
+  }
+
+  const SubgraphProps &
+  getSubgraphProperties(const DOTGraph::Subgraph *subgraph) const {
+    return subgraphs.at(subgraph);
+  }
 
 private:
-  /// Edges of the graph
-  std::vector<GraphEdge> edges;
-  /// Nodes of the graph mapped with their corresponding node identifier
-  std::map<NodeId, GraphNode> nodes;
-  /// State of each edge given a specific clock cycle
-  CycleTransitions cycleEdgeStates;
-  /// Map of the edges of the graph :
-  /// ((src node id, outPort number), (dest node id, inPort number)) -> edge id
-  std::map<EdgePorts, EdgeId> mapEdges;
-  /// BBs of the Graph
-  std::vector<BB> bbs;
+  DOTGraph graph;
+  std::vector<Transitions> transitions;
+
+  DenseMap<const DOTGraph::Node *, GodotGraph::NodeProps> nodes;
+  DenseMap<const DOTGraph::Edge *, GodotGraph::EdgeProps> edges;
+  DenseMap<const DOTGraph::Subgraph *, GodotGraph::SubgraphProps> subgraphs;
+
+  LogicalResult parseDOT(StringRef filepath);
+
+  LogicalResult parseCSV(StringRef filepath);
 };
 
 } // namespace visual

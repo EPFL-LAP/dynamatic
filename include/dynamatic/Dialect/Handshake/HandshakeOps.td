@@ -1039,19 +1039,51 @@ def SpeculatingBranchOp : Handshake_Op<"speculating_branch", [
 //===----------------------------------------------------------------------===//
 
 def SharingWrapperOp : Handshake_Op<"sharing_wrapper", [
-  SameOperandsAndResultType
+  SameOperandsAndResultType, 
+  DeclareOpInterfaceMethods<NamedIOInterface, ["getOperandName", "getResultName"]>,
 ]> {
+
   let summary = "sharing wrapper operation";
   let description = [{
-    The sharing_wrapper operation represents the selecting & distributing logic
-    that wraps around a functional unit.
-  }];
+    The sharing_wrapper operation represents the selecting & distributing logic 
+    that manages access to a shared unit.
+    
+    The sharing wrapper interfaces with the shared unit and the rest of the
+    circuit.
 
-  let arguments = (ins Variadic<ChannelType>:$dataOperands,
-                       ChannelType:$sharedOpResult,
-                       DefaultValuedAttr<DenseI64ArrayAttr, "{}">:$credits,
-                       ConfinedAttr<I32Attr, [IntMinValue<1>]>:$numSharedOperands);
-  let results = (outs Variadic<ChannelType>:$dataOut);
+    Attributes:
+    - $credits: an array of integers that indicates, each integer indicates the
+      maximum number of in-flight accesses in the shared resource of one
+      operation that share the unit.
+    - $numSharedOperands: the number of operands of the shared unit.
+    - $latency: the execution latency of the shared unit.
+    
+    The convention for the input operands:
+    - the first "numSharedOperands * len(credits)" operands are the operands
+      from the circuit
+    - the last operand is the result computed by the shared unit
+    
+    The convention for the output results:
+    - the first "len(credits)" results are results dispatched to the rest of the
+      circuit
+    - the last "numSharedOperands" result is the selected operands that will be
+      delivered to the shared unit.
+    
+    Future improvement:
+    - Add the number of operations that share the unit (now it is assumed to be
+      the size of the DenseI64ArrayAttr credits).
+    - More verbose separations between the operands/results that interface with
+      the rest of the circuit or interface with the shared unit (i.e., add a
+      custom interface printing for different operand/result types).
+    }];
+
+  let arguments = (ins Variadic<ChannelType> : $dataOperands,
+    ChannelType : $sharedOpResult,
+    DefaultValuedAttr<DenseI64ArrayAttr, "{}">:$credits,
+    ConfinedAttr<I32Attr, [IntMinValue<2>]>:$numSharedOperations,
+    ConfinedAttr<I32Attr, [IntMinValue<1>]>:$numSharedOperands,
+    ConfinedAttr<I32Attr, [IntMinValue<1>]>:$latency);
+  let results = (outs Variadic<ChannelType> : $dataOut);
 
   let assemblyFormat = [{
     `[` $dataOperands `]` `,` `[` $sharedOpResult `]` attr-dict `:`

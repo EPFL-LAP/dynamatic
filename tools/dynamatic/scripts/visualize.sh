@@ -15,7 +15,7 @@ KERNEL_NAME=$5
 
 # Generated directories/files
 VISUAL_DIR="$OUTPUT_DIR/visual"
-F_CSV="$VISUAL_DIR/sim.csv"
+F_CSV="$VISUAL_DIR/$KERNEL_NAME.csv"
 F_DOT_POS_TMP="$VISUAL_DIR/$KERNEL_NAME.tmp.dot"
 F_DOT_POS="$VISUAL_DIR/$KERNEL_NAME.dot"
 
