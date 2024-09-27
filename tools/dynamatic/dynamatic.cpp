@@ -251,7 +251,7 @@ public:
 
 class Compile : public Command {
 public:
-  static constexpr llvm::StringLiteral SIMPLE_BUFFERS = "simple-buffers";
+  static constexpr llvm::StringLiteral BUFFER_ALGORITHM = "buffer-algorithm";
   static constexpr llvm::StringLiteral SHARING = "sharing";
 
   Compile(FrontendState &state)
@@ -259,7 +259,8 @@ public:
                 "Compiles the source kernel into a dataflow circuit; "
                 "produces both handshake-level IR and an equivalent DOT file",
                 state) {
-    addFlag({SIMPLE_BUFFERS, "Use simple buffer placement"});
+    addOption({BUFFER_ALGORITHM, "The buffering algorithm to use, values are "
+                                 "'simple-buffers', 'fpga20', or 'fpl22'"});
     addFlag({SHARING, "Use credit-based resource sharing"});
   }
 
@@ -560,7 +561,20 @@ CommandResult Compile::execute(CommandArguments &args) {
     return CommandResult::FAIL;
 
   std::string script = state.getScriptsPath() + getSeparator() + "compile.sh";
-  std::string buffers = args.flags.contains(SIMPLE_BUFFERS) ? "1" : "0";
+  std::string buffers = "simple-buffers";
+
+  if (auto it = args.options.find(BUFFER_ALGORITHM); it != args.options.end()) {
+    if (it->second == "simple-buffers" || it->second == "fpga20" ||
+        it->second == "fpl22")
+      buffers = it->second;
+    else {
+      llvm::errs()
+          << "Unknown buffering algorithm " << it->second
+          << "! Possible options are 'simple-buffers', 'fpga20', or 'fpl22'.";
+      return CommandResult::FAIL;
+    }
+  }
+
   std::string sharing = args.flags.contains(SHARING) ? "1" : "0";
   state.polygeistPath = state.polygeistPath.empty()
                             ? state.dynamaticPath + getSeparator() + "polygeist"
