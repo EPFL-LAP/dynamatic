@@ -259,8 +259,9 @@ public:
                 "Compiles the source kernel into a dataflow circuit; "
                 "produces both handshake-level IR and an equivalent DOT file",
                 state) {
-    addOption({BUFFER_ALGORITHM, "The buffering algorithm to use, values are "
-                                 "'simple-buffers', 'fpga20', or 'fpl22'"});
+    addOption({BUFFER_ALGORITHM,
+               "The buffer placement algorithm to use, values are "
+               "'simple-buffers', 'fpga20', or 'fpl22'"});
     addFlag({SHARING, "Use credit-based resource sharing"});
   }
 
@@ -569,7 +570,7 @@ CommandResult Compile::execute(CommandArguments &args) {
       buffers = it->second;
     else {
       llvm::errs()
-          << "Unknown buffering algorithm " << it->second
+          << "Unknown buffer placement algorithm " << it->second
           << "! Possible options are 'simple-buffers', 'fpga20', or 'fpl22'.";
       return CommandResult::FAIL;
     }
