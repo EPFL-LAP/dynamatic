@@ -1112,7 +1112,8 @@ FtdLowerFuncToHandshake::addSuppGSA(ConversionPatternRewriter &rewriter,
       // correct situation, as you cannot have both the values at the same
       // time
       assert(!domInfo.dominates(nonDominatingInput.getParentBlock(), &block) &&
-             "The BB of the other input of the Mux should not dominate the BB "
+             "The BB of the other input of the Mux should not dominate "
+             "the BB "
              "of the Mux");
 
       Value desiredCond;
@@ -1661,17 +1662,9 @@ FtdLowerFuncToHandshake::addSuppStart(ConversionPatternRewriter &rewriter,
                                       FtdStoredOperations &ftdOps) const {
 
   Region &region = funcOp.getBody();
-  auto startValue = (Value)funcOp.getArguments().back();
 
   for (Block &consumerBlock : region.getBlocks()) {
     for (Operation &consumerOp : consumerBlock.getOperations()) {
-
-      // At this point, we are only interested in applying the algorithm to
-      // constants which were not inserted by the FTD algorithm
-      if (!ftdOps.allocationNetwork.contains(&consumerOp) &&
-          (!isa<handshake::ConstantOp>(consumerOp) ||
-           ftdOps.networkConstants.contains(&consumerOp)))
-        continue;
 
       // Skip if the consumer is a shannon's mux
       if (ftdOps.shannonMUXes.contains(&consumerOp))
@@ -1684,16 +1677,20 @@ FtdLowerFuncToHandshake::addSuppStart(ConversionPatternRewriter &rewriter,
       // For all the operands of the consumer, take into account only the
       // start value if exists
       for (Value operand : consumerOp.getOperands()) {
-        if (operand != startValue)
+
+        Operation *producerOpReal = operand.getDefiningOp();
+        Block *producerBlock = operand.getParentBlock();
+
+        if (producerOpReal)
           continue;
 
-        if (operand.getParentBlock() == &consumerBlock &&
+        if (producerBlock == &consumerBlock &&
             !isa<handshake::MergeOp>(consumerOp))
           continue;
 
         // Handle the regeneration
-        if (failed(addSuppNonLoop(rewriter, funcOp, operand.getParentBlock(),
-                                  &consumerOp, operand, ftdOps)))
+        if (failed(addSuppNonLoop(rewriter, funcOp, producerBlock, &consumerOp,
+                                  operand, ftdOps)))
           return failure();
       }
     }
@@ -1815,14 +1812,6 @@ FtdLowerFuncToHandshake::addSupp(ConversionPatternRewriter &rewriter,
 
         for (Operation *consumerOp : users) {
           Block *consumerBlock = consumerOp->getBlock();
-
-          if (llvm::isa_and_nonnull<arith::IndexCastOp>(consumerOp) ||
-              llvm::isa_and_nonnull<UnrealizedConversionCastOp>(consumerOp))
-            continue;
-
-          while (
-              llvm::isa_and_nonnull<arith::IndexCastOp>(result.getDefiningOp()))
-            result = result.getDefiningOp()->getOperand(0);
 
           if (!result.getDefiningOp())
             continue;
@@ -2011,13 +2000,6 @@ FtdLowerFuncToHandshake::addPhi(ConversionPatternRewriter &rewriter,
           // to its inputs.
           rewriter.setInsertionPointToStart((*it)->getHeader());
 
-          // The input of the merge might be an index cast, leading to
-          // compiling errors. In that case, we go back until we have the
-          // original non-casted operand
-          while (llvm::isa_and_nonnull<arith::IndexCastOp>(
-              producerOperand.getDefiningOp()))
-            producerOperand = producerOperand.getDefiningOp()->getOperand(0);
-
           // The type of the input must be channelified
           producerOperand.setType(channelifyType(producerOperand.getType()));
 
@@ -2067,6 +2049,7 @@ LogicalResult FtdLowerFuncToHandshake::convertUndefinedValues(
     auto cstOp = rewriter.create<handshake::ConstantOp>(undefOp.getLoc(),
                                                         cstAttr, startValue);
     cstOp->setDialectAttrs(undefOp->getAttrDictionary());
+    undefOp.getResult().replaceAllUsesWith(cstOp.getResult());
     namer.replaceOp(cstOp, cstOp);
     rewriter.replaceOp(undefOp, cstOp.getResult());
   }

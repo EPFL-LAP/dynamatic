@@ -237,12 +237,10 @@ void ControlDependenceAnalysis<FunctionType>::identifyForwardControlDeps(
 template <typename FunctionType>
 LogicalResult ControlDependenceAnalysis<FunctionType>::getBlockAllControlDeps(
     Block *block, DenseSet<Block *> &allControlDeps) const {
-  if (!blocksControlDeps.contains(block)) {
-    llvm::errs() << "call to ControlDependenceAnalysis::getBlockAllControlDeps "
-                    "on a block which is in not in the associated funcOp";
-    return failure();
-  }
-  allControlDeps = blocksControlDeps.lookup(block).allControlDeps;
+  if (!blocksControlDeps.contains(block))
+    allControlDeps = DenseSet<Block *>();
+  else
+    allControlDeps = blocksControlDeps.lookup(block).allControlDeps;
   return success();
 }
 
@@ -250,13 +248,10 @@ template <typename FunctionType>
 LogicalResult
 ControlDependenceAnalysis<FunctionType>::getBlockForwardControlDeps(
     Block *block, DenseSet<Block *> &forwardControlDeps) const {
-  if (!blocksControlDeps.contains(block)) {
-    llvm::errs()
-        << "call to ControlDependenceAnalysis::getBlockForwardControlDeps "
-           "on a block which is in not in the associated funcOp";
-    return failure();
-  }
-  forwardControlDeps = blocksControlDeps.lookup(block).forwardControlDeps;
+  if (!blocksControlDeps.contains(block))
+    forwardControlDeps = DenseSet<Block *>();
+  else
+    forwardControlDeps = blocksControlDeps.lookup(block).forwardControlDeps;
   return success();
 }
 

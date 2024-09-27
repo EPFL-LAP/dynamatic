@@ -1050,6 +1050,9 @@ LogicalResult ConvertIndexCast<CastOp, ExtOp>::matchAndRewrite(
   auto getWidth = [](Type type) -> unsigned {
     if (isa<IndexType>(type))
       return 32;
+    // temporary
+    if (isa<handshake::ChannelType>(type))
+      return 32;
     return type.getIntOrFloatBitWidth();
   };
 
@@ -1070,6 +1073,7 @@ LogicalResult ConvertIndexCast<CastOp, ExtOp>::matchAndRewrite(
   }
   namer.replaceOp(castOp, newOp);
   rewriter.replaceOp(castOp, newOp);
+  castOp.getResult().replaceAllUsesWith(newOp->getResult(0));
   return success();
 }
 
