@@ -118,88 +118,61 @@ def MemoryOpInterface : OpInterface<"MemoryOpInterface"> {
   ];
 }
 
-def LoadOpInterface : OpInterface<"LoadOpInterface"> {
+def MemPortOpInterface : OpInterface<"MemPortOpInterface"> {
   let cppNamespace = "::dynamatic::handshake";
   let description = [{
-    Handshake operations which act as load ports to a memory interface.
+    Handshake operations which act as a memory port (load or store) to a memory
+    interface.
   }];
 
-  let methods = [
+ let methods = [
     InterfaceMethod<
-    "Returns the load port's address input (from the circuit).",
-    "mlir::Value", "getAddressInput", (ins),
-    "",
-    [{
-      ConcreteOp concreteOp = mlir::cast<ConcreteOp>($_op);
-      return concreteOp.getAddress();
-    }]>,
+      "Returns the port's address input.",
+      "::mlir::TypedValue<::dynamatic::handshake::ChannelType>", "getAddressInput",
+      (ins), "", [{
+        ConcreteOp concreteOp = mlir::cast<ConcreteOp>($_op);
+        return concreteOp.getAddress();
+      }]
+    >,
     InterfaceMethod<
-    "Returns the load port's data input (from the memory interface).",
-    "mlir::Value", "getDataInput", (ins),
-    "",
-    [{
-      ConcreteOp concreteOp = mlir::cast<ConcreteOp>($_op);
-      return concreteOp.getData();
-    }]>,
+      "Returns the port's data input.",
+      "::mlir::TypedValue<::dynamatic::handshake::ChannelType>", "getDataInput",
+      (ins), "", [{
+        ConcreteOp concreteOp = mlir::cast<ConcreteOp>($_op);
+        return concreteOp.getData();
+      }]
+    >,
     InterfaceMethod<
-    "Returns the load port's address output (to the memory interface).",
-    "mlir::Value", "getAddressOutput", (ins),
-    "",
-    [{
-      ConcreteOp concreteOp = mlir::cast<ConcreteOp>($_op);
-      return concreteOp.getAddressResult();
-    }]>,
+      "Returns the port's address output.",
+      "::mlir::TypedValue<::dynamatic::handshake::ChannelType>", "getAddressOutput",
+      (ins), "", [{
+        ConcreteOp concreteOp = mlir::cast<ConcreteOp>($_op);
+        return concreteOp.getAddressResult();
+      }]
+    >,
     InterfaceMethod<
-    "Returns the load port's data output (to the circuit).",
-    "mlir::Value", "getDataOutput", (ins),
-    "",
-    [{
-      ConcreteOp concreteOp = mlir::cast<ConcreteOp>($_op);
-      return concreteOp.getDataResult();
-    }]>,
+      "Returns the port's data output.",
+      "::mlir::TypedValue<::dynamatic::handshake::ChannelType>", "getDataOutput",
+      (ins), "", [{
+        ConcreteOp concreteOp = mlir::cast<ConcreteOp>($_op);
+        return concreteOp.getDataResult();
+      }]
+    >,
   ];
 }
 
-def StoreOpInterface : OpInterface<"StoreOpInterface"> {
+def LoadOpInterface : OpInterface<"LoadOpInterface", [MemPortOpInterface]> {
   let cppNamespace = "::dynamatic::handshake";
   let description = [{
-    Handshake operations which act as store ports to a memory interface.
+    Handshake operations which act as a load port to a memory interface.
   }];
+}
 
-  let methods = [
-    InterfaceMethod<
-    "Returns the store port's address input (from the circuit).",
-    "mlir::Value", "getAddressInput", (ins),
-    "",
-    [{
-      ConcreteOp concreteOp = mlir::cast<ConcreteOp>($_op);
-      return concreteOp.getAddress();
-    }]>,
-    InterfaceMethod<
-    "Returns the store port's data input (from the circuit).",
-    "mlir::Value", "getDataInput", (ins),
-    "",
-    [{
-      ConcreteOp concreteOp = mlir::cast<ConcreteOp>($_op);
-      return concreteOp.getData();
-    }]>,
-    InterfaceMethod<
-    "Returns the store port's address output (to the memory interface).",
-    "mlir::Value", "getAddressOutput", (ins),
-    "",
-    [{
-      ConcreteOp concreteOp = mlir::cast<ConcreteOp>($_op);
-      return concreteOp.getAddressResult();
-    }]>,
-    InterfaceMethod<
-    "Returns the store port's data output (to the memory interface).",
-    "mlir::Value", "getDataOutput", (ins),
-    "",
-    [{
-      ConcreteOp concreteOp = mlir::cast<ConcreteOp>($_op);
-      return concreteOp.getDataResult();
-    }]>,
-  ];
+def StoreOpInterface : OpInterface<"StoreOpInterface", [MemPortOpInterface]> {
+  let cppNamespace = "::dynamatic::handshake";
+  let description = [{
+    Handshake operations which act as a store port to a memory interface.
+  }];
 }
 
 def NamedIOInterface : OpInterface<"NamedIOInterface"> {

@@ -50,8 +50,8 @@ handshake.func @cmergeToMuxIndexOpt(%arg0: !handshake.channel<i32>, %arg1: !hand
 // CHECK:           %[[VAL_17:.*]] = constant %[[VAL_2]] {value = 42 : i32} : <i32>
 // CHECK:           %[[VAL_5]] = constant %[[VAL_2]] {handshake.bb = 0 : ui32, value = 2 : i32} : <i32>
 // CHECK:           %[[VAL_6]], %[[VAL_18:.*]] = mc_load{{\[}}%[[VAL_12]]] %[[VAL_3]] {handshake.bb = 0 : ui32} : <i10>, <i32>
-// CHECK:           %[[VAL_7]], %[[VAL_8]] = mc_store{{\[}}%[[VAL_14]]] %[[VAL_17]] {handshake.bb = 0 : ui32} : <i32>, <i10>
-// CHECK:           %[[VAL_9]], %[[VAL_10]] = mc_store{{\[}}%[[VAL_16]]] %[[VAL_17]] {handshake.bb = 0 : ui32} : <i32>, <i10>
+// CHECK:           %[[VAL_7]], %[[VAL_8]] = mc_store{{\[}}%[[VAL_14]]] %[[VAL_17]] {handshake.bb = 0 : ui32} : <i10>, <i32>
+// CHECK:           %[[VAL_9]], %[[VAL_10]] = mc_store{{\[}}%[[VAL_16]]] %[[VAL_17]] {handshake.bb = 0 : ui32} : <i10>, <i32>
 // CHECK:           end %[[VAL_18]], %[[VAL_4]] : <i32>, <>
 // CHECK:         }
 handshake.func @memAddrOpt(%mem: memref<1000xi32>, %mem_start: !handshake.control<>, %start: !handshake.control<>) -> (!handshake.channel<i32>, !handshake.control<>) {
