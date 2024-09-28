@@ -890,8 +890,7 @@ struct ForwardCycleOpt : public OpRewritePattern<Op> {
 
   LogicalResult matchAndRewrite(Op op,
                                 PatternRewriter &rewriter) const override {
-    // This pattern only works for merge-like operations with a valid data
-    // type
+    // This pattern only works for merge-like operations with a valid data type
     auto mergeLikeOp =
         dyn_cast<handshake::MergeLikeOpInterface>((Operation *)op);
     if (!mergeLikeOp)
@@ -900,9 +899,8 @@ struct ForwardCycleOpt : public OpRewritePattern<Op> {
     if (!channelVal)
       return failure();
 
-    // For each operand, determine whether it is in a forwarding cycle. If
-    // yes, keep track of other values coming in the cycle through merge-like
-    // ops
+    // For each operand, determine whether it is in a forwarding cycle. If yes,
+    // keep track of other values coming in the cycle through merge-like ops
     OperandRange dataOperands = mergeLikeOp.getDataOperands();
     SmallVector<bool> operandInCycle;
     DenseSet<ChannelVal> allMergedValues;
@@ -953,8 +951,8 @@ struct ForwardCycleOpt : public OpRewritePattern<Op> {
     inheritBB(op, newOp);
     cfg.modResults(newOp, dataWidth, ext, rewriter, newResults);
 
-    // Replace uses of the original operation's results with the results of
-    // the optimized operation we just created
+    // Replace uses of the original operation's results with the results of the
+    // optimized operation we just created
     rewriter.replaceOp(op, newResults);
     return success();
   }
@@ -975,8 +973,7 @@ namespace {
 
 /// Transfer function type for arithmetic operations with two operands and a
 /// single result of the same type. Returns the result bitwidth required to
-/// achieve the operation behavior given the two operands' respective
-/// bitwidths.
+/// achieve the operation behavior given the two operands' respective bitwidths.
 using FTransfer = std::function<unsigned(unsigned, unsigned)>;
 
 /// Generic rewrite pattern for arith operations that have two operands and a
@@ -986,10 +983,9 @@ using FTransfer = std::function<unsigned(unsigned, unsigned)>;
 /// optimized.
 ///
 /// In forward mode, the pattern uses a transfer function to determine the
-/// required result bitwidth based on the operands' respective "minimal"
-/// bitwidth. In backward mode, the maximum number of bits used from the
-/// result drives a potential reduction in the number of bits in the two
-/// operands.
+/// required result bitwidth based on the operands' respective "minimale
+/// bitwidth. In backward mode, the maximum number of bits used from the result
+/// drives a potential reduction in the number of bits in the twe operands.
 template <typename Op>
 struct ArithSingleType : public OpRewritePattern<Op> {
   using OpRewritePattern<Op>::OpRewritePattern;
@@ -1040,9 +1036,9 @@ private:
 };
 
 /// Optimizes the bitwidth of select operations using the same logic as in the
-/// ArithSingleType pattern. The latter cannot be used directly since the
-/// select operation has a third i1 operand to select which of the two others
-/// to forward to the output.
+/// ArithSingleType pattern. The latter cannot be used directly since the select
+/// operation has a third i1 operand to select which of the two others to
+/// forward to the output.
 struct ArithSelect : public OpRewritePattern<handshake::SelectOp> {
   using OpRewritePattern<handshake::SelectOp>::OpRewritePattern;
 
@@ -1099,8 +1095,8 @@ private:
 /// Optimizes the bitwidth of shift-type operations. The first template
 /// parameter is meant to be either handshake::ShLIOp, handshake::ShRSIOp, or
 /// handshake::ShRUIOp. In both modes (forward and backward), the matched
-/// operation's bitwidth may only be reduced when the data operand is shifted
-/// by a known constant amount.
+/// operation's bitwidth may only be reduced when the data operand is shifted by
+/// a known constant amount.
 template <typename Op>
 struct ArithShift : public OpRewritePattern<Op> {
   using OpRewritePattern<Op>::OpRewritePattern;
@@ -1149,23 +1145,22 @@ struct ArithShift : public OpRewritePattern<Op> {
       ChannelVal newRes = newOp.getResult();
       if (isRightShift)
         // In the case of a right shift, we first truncate the result of the
-        // newly inserted shift operation to discard high-significance bits
-        // that we know are 0s, then extend the result back to satisfy the
-        // users of the original operation's result
+        // newly inserted shift operation to discard high-significance bits that
+        // we know are 0s, then extend the result back to satisfy the users of
+        // the original operation's result
         newRes = modVal({newRes, extToShift}, optWidth - cstVal, rewriter);
       Value modRes = modVal({newRes, extToShift}, resWidth, rewriter);
       inheritBB(op, newOp);
 
-      // Replace uses of the original operation's result with the result of
-      // the optimized operation we just created
+      // Replace uses of the original operation's result with the result of the
+      // optimized operation we just created
       rewriter.replaceOp(op, modRes);
     } else {
       ChannelVal modToShift = minToShift;
       if (!isRightShift) {
-        // In the case of a left shift, we first truncate the shifted integer
-        // to discard high-significance bits that were discarded in the
-        // result, then extend back to satisfy the users of the original
-        // integer
+        // In the case of a left shift, we first truncate the shifted integer to
+        // discard high-significance bits that were discarded in the result,
+        // then extend back to satisfy the users of the original integer
         unsigned requiredToShiftWidth = optWidth - std::min(cstVal, optWidth);
         modToShift =
             modVal({minToShift, extToShift}, requiredToShiftWidth, rewriter);
