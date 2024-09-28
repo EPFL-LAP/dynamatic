@@ -983,9 +983,9 @@ using FTransfer = std::function<unsigned(unsigned, unsigned)>;
 /// optimized.
 ///
 /// In forward mode, the pattern uses a transfer function to determine the
-/// required result bitwidth based on the operands' respective "minimale
-/// bitwidth. In backward mode, the maximum number of bits used from the result
-/// drives a potential reduction in the number of bits in the twe operands.
+/// required result bitwidth based on the operands' respective "minimal
+/// bitwidth". In backward mode, the maximum number of bits used from the result
+/// drives a potential reduction in the number of bits in the two operands.
 template <typename Op>
 struct ArithSingleType : public OpRewritePattern<Op> {
   using OpRewritePattern<Op>::OpRewritePattern;
@@ -1280,8 +1280,7 @@ struct ArithBoundOpt : public OpRewritePattern<handshake::ConditionalBranchOp> {
       } else
         continue;
 
-      // Determine whether one of the branches can be optimized and by how
-      // much
+      // Determine whether one of the branches can be optimized and by how much
       Value branch = getBranchToOptimize(condOp, cmpOp, isDataLhs);
       if (!branch)
         continue;
