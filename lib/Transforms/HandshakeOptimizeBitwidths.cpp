@@ -1241,12 +1241,12 @@ struct ArithExtToTruncOpt : public OpRewritePattern<handshake::TruncIOp> {
 };
 
 /// Optimizes an IR pattern where a comparison between a number and a constant
-/// is used to make a control flow decision. Depending on the branch outcome,
-/// it is possible to truncate one of the Handshake::ConditionalBranchOp's
-/// output to the bitwidth required by the constant involved in the
-/// comparison. This is a pattern present in loops whose exist condition is a
-/// comparison with a constant, and allows to reduce the bitwidth of the loop
-/// iterator in those cases.
+/// is used to make a control flow decision. Depending on the branch outcome, it
+/// is possible to truncate one of the Handshake::ConditionalBranchOp's output
+/// to the bitwidth required by the constant involved in the comparison. This is
+/// a pattern present in loops whose exist condition is a comparison with a
+/// constant, and allows to reduce the bitwidth of the loop iterator in those
+/// cases.
 struct ArithBoundOpt : public OpRewritePattern<handshake::ConditionalBranchOp> {
   using OpRewritePattern<handshake::ConditionalBranchOp>::OpRewritePattern;
 
@@ -1259,9 +1259,9 @@ struct ArithBoundOpt : public OpRewritePattern<handshake::ConditionalBranchOp> {
     ChannelVal dataOperand = backtrackToMinimalValue(channelVal);
 
     // Find all comparison operations whose result is used in a logical and to
-    // determine the condition operand and which have the data operand as one
-    // of their inputs; then determine which comparison gives the tighest
-    // bound on each branch outcome
+    // determine the condition operand and which have the data operand as one of
+    // their inputs; then determine which comparison gives the tighest bound on
+    // each branch outcome
     ChannelVal trueRes = cast<ChannelVal>(condOp.getTrueResult()),
                falseRes = cast<ChannelVal>(condOp.getFalseResult());
     std::optional<std::pair<unsigned, ExtType>> trueBranch, falseBranch;
@@ -1333,14 +1333,14 @@ private:
   Value getBranchToOptimize(handshake::ConditionalBranchOp condOp,
                             handshake::CmpIOp cmpOp, bool isDataLhs) const;
 
-  /// Returns the real optimized bitwidth assuming that the bound against
-  /// which the comparison is performed is provably tight. The real optimized
-  /// bitwidth may be one less than the one passed as argument or identical.
+  /// Returns the real optimized bitwidth assuming that the bound against which
+  /// the comparison is performed is provably tight. The real optimized bitwidth
+  /// may be one less than the one passed as argument or identical.
   unsigned getRealOptWidth(handshake::CmpIOp cmpOp, unsigned optWidth,
                            bool isDataLhs) const;
 
-  /// Optimizes the branch output provided as argument to the given bitwidth
-  /// is there is any benefit in doing so. Returns true if any optimization is
+  /// Optimizes the branch output provided as argument to the given bitwidth is
+  /// there is any benefit in doing so. Returns true if any optimization is
   /// performed; otherwise returns false;
   bool optBranchIfPossible(ChannelVal optBranch, unsigned optWidth, ExtType ext,
                            PatternRewriter &rewriter) const;
