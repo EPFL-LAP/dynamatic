@@ -868,22 +868,22 @@ protected:
 };
 
 /// Optimizes the bitwidth of channels contained inside "forwarding cycles".
-/// These are values that generally circulate between branch-like and
-/// merge-like operations without modification (i.e., in a block that branches
-/// to itself). These require special treatment to be optimized as the rest of
-/// the rewrite patterns only look at the operation they are matched on when
-/// optimizing, whereas this pattern attempts to backtracks through operands
-/// of merge-like operations to identify whether it was produced by the
-/// operation itself. If an operand is identified as being part of a cycle,
-/// all other out-of-cycle merged values incoming to the cycle through
-/// merge-like operation operands are considered to determine the optimized
-/// width that can be given to the in-cycle operand.
+/// These are values that generally circulate between branch-like and merge-like
+/// operations without modification (i.e., in a block that branches to itself).
+/// These require special treatment to be optimized as the rest of the rewrite
+/// patterns only look at the operation they are matched on when optimizing,
+/// whereas this pattern attempts to backtracks through operands of merge-like
+/// operations to identify whether it was produced by the operation itself. If
+/// an operand is identified as being part of a cycle, all other out-of-cycle
+/// merged values incoming to the cycle through merge-like operation operands
+/// are considered to determine the optimized width that can be given to the
+/// in-cycle operand.
 ///
 /// The first template parameter is meant to be a merge-like operation i.e., a
-/// Handshake operation implementing the MergeLikeOpInterface trait on which
-/// to apply the rewrite pattern. The second template parameter is meant to
-/// hold a subclass of OptDataConfig (or the class itself) that specifies how
-/// the transformation may be performed on that specific operation type.
+/// Handshake operation implementing the MergeLikeOpInterface trait on which to
+/// apply the rewrite pattern. The second template parameter is meant to hold a
+/// subclass of OptDataConfig (or the class itself) that specifies how the
+/// transformation may be performed on that specific operation type.
 template <typename Op, typename Cfg>
 struct ForwardCycleOpt : public OpRewritePattern<Op> {
   using OpRewritePattern<Op>::OpRewritePattern;
