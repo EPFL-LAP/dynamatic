@@ -204,13 +204,7 @@ HlsVhdlTb::HlsVhdlTb(const VerificationContext &ctx) : ctx(ctx) {
 
     if (mElem.isArray) {
 
-      string addrwidthvalue;
-      if (ctx.useAddrWidth32) {
-        addrwidthvalue = "32";
-      } else {
-        addrwidthvalue = to_string(((int)ceil(log2(p.arrayLength))));
-      }
-
+      string addrwidthvalue = to_string(((int)ceil(log2(p.arrayLength))));
       Constant addrWidth("ADDR_WIDTH_" + p.parameterName, "INTEGER",
                          addrwidthvalue);
       // to_string(((int) ceil(log2(p.arrayLength)))));
