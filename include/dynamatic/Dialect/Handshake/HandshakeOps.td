@@ -940,8 +940,8 @@ def SpeculatorOp : Handshake_Op<"speculator", [
 class Handshake_SpecOp<string mnemonic> : Handshake_Op<mnemonic, [
   SpeculationOpInterface, AllTypesMatch<["dataIn", "dataOut"]>
 ]> {
-  let arguments = (ins ChannelType:$dataIn, BoolChannel:$ctrl);
-  let results = (outs ChannelType:$dataOut);
+  let arguments = (ins HandshakeType:$dataIn, BoolChannel:$ctrl);
+  let results = (outs HandshakeType:$dataOut);
   let assemblyFormat = [{
     `[` $ctrl `]` $dataIn attr-dict `:` type($dataIn) `,` type($ctrl)
   }];
