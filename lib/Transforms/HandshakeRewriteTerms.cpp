@@ -28,6 +28,7 @@
 #include "mlir/Support/LogicalResult.h"
 #include "mlir/Transforms/GreedyPatternRewriteDriver.h"
 #include "llvm/ADT/iterator_range.h"
+#include <cassert>
 #include <vector>
 
 using namespace mlir;
@@ -490,7 +491,7 @@ struct RemoveMuxBranchLoop : public OpRewritePattern<handshake::MuxOp> {
       return failure();
     muxOuterInputIdx = (muxCycleInputIdx == 0) ? 1 : 0;
 
-    // Retrieve the values at the merge inputs
+    // Retrieve the values at the mux inputs
     OperandRange muxDataOperands = muxOp.getDataOperands();
     Value muxOuterOperand = muxDataOperands[muxOuterInputIdx];
     Value muxInnerOperand = muxDataOperands[muxCycleInputIdx];
@@ -737,6 +738,637 @@ struct ExtractIfThenElseMuxCondition
   }
 };
 
+// Rules C
+// Replaces a pair of consecutive Suppress operations with a
+// a single suppress operation with a mux at its condition input.
+struct ShortenSuppressPairs
+    : public OpRewritePattern<handshake::ConditionalBranchOp> {
+  using OpRewritePattern<handshake::ConditionalBranchOp>::OpRewritePattern;
+
+  LogicalResult
+  matchAndRewrite(handshake::ConditionalBranchOp firstCondBranchOp,
+                  PatternRewriter &rewriter) const override {
+    // Consider only Branches that either has trueSuccs or falseSuccs but not
+    // both
+    Value firstTrueResult = firstCondBranchOp.getTrueResult();
+    Value firstFalseResult = firstCondBranchOp.getFalseResult();
+    bool firstTrueSuccOnlyFlag = (!firstTrueResult.getUsers().empty() &&
+                                  firstFalseResult.getUsers().empty());
+    bool firstFalseSuccOnlyFlag = (firstTrueResult.getUsers().empty() &&
+                                   !firstFalseResult.getUsers().empty());
+    if (!firstTrueSuccOnlyFlag && !firstFalseSuccOnlyFlag)
+      return failure();
+
+    // There must be only 1 successor; otherwise, we cannot optimize
+    if (std::distance(firstTrueResult.getUsers().begin(),
+                      firstTrueResult.getUsers().end()) > 1 ||
+        std::distance(firstFalseResult.getUsers().begin(),
+                      firstFalseResult.getUsers().end()) > 1)
+      return failure();
+
+    Operation *succ = nullptr;
+    Value succVal;
+    if (firstTrueSuccOnlyFlag) {
+      succ = *firstTrueResult.getUsers().begin();
+      succVal = firstTrueResult;
+    } else {
+      succ = *firstFalseResult.getUsers().begin();
+      succVal = firstFalseResult;
+    }
+
+    // This succ must be a conditional branch; otherwise, the pattern match
+    // fails
+    if (!isa_and_nonnull<handshake::ConditionalBranchOp>(succ))
+      return failure();
+
+    handshake::ConditionalBranchOp secondCondBranchOp =
+        cast<handshake::ConditionalBranchOp>(succ);
+
+    // The pattern match should fail if this Branch has succs both in the true
+    // and false sides
+    Value secondTrueResult = secondCondBranchOp.getTrueResult();
+    Value secondFalseResult = secondCondBranchOp.getFalseResult();
+    bool secondTrueSuccOnlyFlag = (!secondTrueResult.getUsers().empty() &&
+                                   secondFalseResult.getUsers().empty());
+    bool secondFalseSuccOnlyFlag = (secondTrueResult.getUsers().empty() &&
+                                    !secondFalseResult.getUsers().empty());
+    if (!secondTrueSuccOnlyFlag && !secondFalseSuccOnlyFlag)
+      return failure();
+
+    // For the shortening to work, the two branches should have their successor
+    // in the same direction (either true or false); otherwise, we need to
+    // enforce it by negating.. When they are not consistent, we will force both
+    // to have their succs in the false side and sink in true side (like a
+    // typical suppress)
+    Value condBr1 = firstCondBranchOp.getConditionOperand();
+    Value condBr2 = secondCondBranchOp.getConditionOperand();
+    if (firstTrueSuccOnlyFlag && secondFalseSuccOnlyFlag) {
+      // Insert a NOT at the condition input of the first Branch
+      handshake::NotOp notOp = rewriter.create<handshake::NotOp>(
+          firstCondBranchOp->getLoc(), condBr1);
+      Value newCond = notOp.getResult();
+      rewriter.replaceAllUsesWith(condBr1, newCond);
+
+      // Replace all uses coming from the true side of the first Branch with the
+      // false side of it
+      rewriter.replaceAllUsesWith(firstTrueResult, firstFalseResult);
+      // Adjust the firstTrueSuccOnlyFlag and firstFalseSuccOnlyFlag
+      firstTrueSuccOnlyFlag = false;
+      firstFalseSuccOnlyFlag = true;
+
+      // Retrieve the new value of the condition, in case it is not updated
+      condBr1 = firstCondBranchOp.getConditionOperand();
+    } else {
+      assert(firstFalseSuccOnlyFlag && secondTrueSuccOnlyFlag);
+      // Insert a NOT at the condition input of the second Branch
+      handshake::NotOp notOp = rewriter.create<handshake::NotOp>(
+          secondCondBranchOp->getLoc(), condBr2);
+      Value newCond = notOp.getResult();
+      rewriter.replaceAllUsesWith(condBr2, newCond);
+
+      // Replace all uses coming from the true side of the first Branch with the
+      // false side of it
+      rewriter.replaceAllUsesWith(secondTrueResult, secondFalseResult);
+      // Adjust the secondTrueSuccOnlyFlag and firstFalseSuccOnlyFlag
+      secondTrueSuccOnlyFlag = false;
+      secondFalseSuccOnlyFlag = true;
+
+      // Retrieve the new value of the condition, in case it is not updated
+      condBr2 = secondCondBranchOp.getConditionOperand();
+    }
+
+    // The goal now is to replace the two Branches with a single Branch, we do
+    // so by deleting the first branch and adjusting the inputs of the second
+    // branch
+    // The new condition is a Mux, calculate its inputs: One input of the
+    // Mux will be a constant that should take the value of the condition that
+    // feeds a sink (for suppressing) and should be triggered from Source
+    int64_t constantValue;
+    if (firstTrueSuccOnlyFlag) {
+      assert(secondTrueSuccOnlyFlag);
+      // this means suppress when the condition is false
+      constantValue = 0;
+    } else {
+      assert(firstFalseSuccOnlyFlag && secondFalseSuccOnlyFlag);
+      // this means suppress when the condition is true
+      constantValue = 1;
+    }
+    Value source =
+        rewriter.create<handshake::SourceOp>(secondCondBranchOp->getLoc());
+    Type constantType = rewriter.getIntegerType(1);
+    Value constantVal = rewriter.create<handshake::ConstantOp>(
+        secondCondBranchOp->getLoc(), constantType,
+        rewriter.getIntegerAttr(constantType, constantValue), source);
+
+    // Create a new Mux and assign its operands
+    ValueRange muxOperands;
+    if (firstTrueSuccOnlyFlag) {
+      assert(secondTrueSuccOnlyFlag);
+      // This means suppress when the condition is false, so put the constVal at
+      // in0 and the additional condition at in1
+      muxOperands = {constantVal, condBr2};
+    } else {
+      assert(firstFalseSuccOnlyFlag && secondFalseSuccOnlyFlag);
+      // This means suppress when the condition is true, so put the constVal at
+      // in1 and the additional condition at in0
+      muxOperands = {condBr2, constantVal};
+    }
+    rewriter.setInsertionPoint(secondCondBranchOp);
+    handshake::MuxOp mux = rewriter.create<handshake::MuxOp>(
+        secondCondBranchOp->getLoc(), condBr1, muxOperands);
+
+    // Correct the inputs of the second Branch
+    Value muxResult = mux.getResult();
+    Value dataOperand = firstCondBranchOp.getDataOperand();
+    ValueRange branchOperands = {muxResult, dataOperand};
+    secondCondBranchOp->setOperands(branchOperands);
+
+    // Erase the first Branch
+    rewriter.eraseOp(firstCondBranchOp);
+
+    return success();
+  }
+};
+
+// Rules C
+// Replaces a pair of consecutive Repeats with a
+// a single Repeat with a mux at its condition input.
+struct ShortenMuxRepeatPairs : public OpRewritePattern<handshake::MuxOp> {
+  using OpRewritePattern<handshake::MuxOp>::OpRewritePattern;
+
+  LogicalResult matchAndRewrite(handshake::MuxOp firstMuxOp,
+                                PatternRewriter &rewriter) const override {
+    // Search for a Repeat structure
+    // (1) Get the users of the Mux. If they are not exactly two, the pattern
+    // match fails
+    auto firstMuxUsers = (firstMuxOp.getResult()).getUsers();
+    if (std::distance(firstMuxUsers.begin(), firstMuxUsers.end()) != 2)
+      return failure();
+
+    // If the mux is not driven by a Merge (i.e., INIT), the pattern match fails
+    if (!isa_and_nonnull<handshake::MergeOp>(
+            firstMuxOp.getSelectOperand().getDefiningOp()))
+      return failure();
+
+    // One user must be a Branch; otherwise, the pattern match fails
+    bool firstFoundCondBranch = false;
+    handshake::ConditionalBranchOp firstCondBranchOp;
+    // One user must be another Mux belonging to a second Repeat; otherwise, the
+    // pattern match fails
+    bool foundSecondMux = false;
+    handshake::MuxOp secondMuxOp;
+    for (auto muxUser : firstMuxUsers) {
+      if (isa_and_nonnull<handshake::ConditionalBranchOp>(muxUser)) {
+        firstFoundCondBranch = true;
+        firstCondBranchOp = cast<handshake::ConditionalBranchOp>(muxUser);
+      } else if (isa_and_nonnull<handshake::MuxOp>(muxUser)) {
+        foundSecondMux = true;
+        secondMuxOp = cast<handshake::MuxOp>(muxUser);
+      }
+    }
+    if (!firstFoundCondBranch && !foundSecondMux)
+      return failure();
+
+    // The firstCondBranchOp must be also be an operand
+    // forming a cycle with the firstMuxOp; otherwise, the pattern match fails
+    bool firstFoundCycle = false;
+    int operIdx = 0;
+    int firstMuxCycleInputIdx = 0;
+    for (auto muxOperand : firstMuxOp->getOperands()) {
+      if (isa_and_nonnull<handshake::ConditionalBranchOp>(
+              muxOperand.getDefiningOp()))
+        if (cast<handshake::ConditionalBranchOp>(muxOperand.getDefiningOp()) ==
+            firstCondBranchOp) {
+          firstFoundCycle = true;
+          firstMuxCycleInputIdx = operIdx;
+          break;
+        }
+      operIdx++;
+    }
+    if (!firstFoundCycle)
+      return failure();
+    int firstMuxOuterInputIdx = (firstMuxCycleInputIdx == 0) ? 1 : 0;
+
+    // The firstCondBranchOp should not have any more successors; otherwise, it
+    // is not a Repeat structure
+    if (std::distance(firstCondBranchOp->getResults().getUsers().begin(),
+                      firstCondBranchOp->getResults().getUsers().end()) != 1)
+      return failure();
+
+    // At this point we have firstMuxOp and firstCondBranchOp which constitute
+    // the first Repeat sturcture. It should feed a second Repeat structure
+    // otherwise the pattern match fails
+    // Check if secondMuxOp also has a Branch forming a cycle
+    auto secondMuxUsers = (secondMuxOp.getResult()).getUsers();
+    if (secondMuxUsers.empty())
+      return failure();
+
+    // If the mux is not driven by a Merge (i.e., INIT), the pattern match fails
+    if (!isa_and_nonnull<handshake::MergeOp>(
+            secondMuxOp.getSelectOperand().getDefiningOp()))
+      return failure();
+
+    // One user must be a Branch; otherwise, the pattern match fails
+    bool secondFoundCondBranch = false;
+    // This second Repeat could be feeding many users including maybe another
+    // non-loop Branch
+    DenseSet<handshake::ConditionalBranchOp> branches;
+    for (auto muxUser : secondMuxUsers) {
+      if (isa_and_nonnull<handshake::ConditionalBranchOp>(muxUser)) {
+        secondFoundCondBranch = true;
+        branches.insert(cast<handshake::ConditionalBranchOp>(muxUser));
+      }
+    }
+    if (!secondFoundCondBranch)
+      return failure();
+
+    // One of the branches in the set of Branches must be also be an operand
+    // forming a cycle with the mux; otherwise, the pattern match fails
+    bool secondFoundCycle = false;
+    operIdx = 0;
+    int secondMuxCycleInputIdx = 0;
+    handshake::ConditionalBranchOp secondCondBranchOp;
+    for (auto muxOperand : secondMuxOp->getOperands()) {
+      if (isa_and_nonnull<handshake::ConditionalBranchOp>(
+              muxOperand.getDefiningOp()))
+        if (branches.contains(cast<handshake::ConditionalBranchOp>(
+                muxOperand.getDefiningOp()))) {
+          secondFoundCycle = true;
+          secondMuxCycleInputIdx = operIdx;
+          secondCondBranchOp =
+              cast<handshake::ConditionalBranchOp>(muxOperand.getDefiningOp());
+          break;
+        }
+      operIdx++;
+    }
+    if (!secondFoundCycle)
+      return failure();
+    int secondMuxOuterInputIdx = (secondMuxCycleInputIdx == 0) ? 1 : 0;
+
+    // The secondCondBranchOp should not have any more successors; otherwise, it
+    // is not a Repeat structure
+    if (std::distance(secondCondBranchOp->getResults().getUsers().begin(),
+                      secondCondBranchOp->getResults().getUsers().end()) != 1)
+      return failure();
+
+    // Now, we are sure we have two consecutive Repeats, check the signs of loop
+    // conditions.
+    // Retrieve the values at the Muxes inputs
+    // Retrieve the values at the mux inputs
+    OperandRange firstMuxDataOperands = firstMuxOp.getDataOperands();
+    Value firstMuxOuterOperand = firstMuxDataOperands[firstMuxOuterInputIdx];
+    Value firstMuxInnerOperand = firstMuxDataOperands[firstMuxCycleInputIdx];
+    OperandRange secondMuxDataOperands = secondMuxOp.getDataOperands();
+    Value secondMuxOuterOperand = secondMuxDataOperands[secondMuxOuterInputIdx];
+    Value secondMuxInnerOperand = secondMuxDataOperands[secondMuxCycleInputIdx];
+
+    // Identify which output of the two Branches feeds the muxInnerOperand
+    Value firstBranchTrueResult = firstCondBranchOp.getTrueResult();
+    Value firstBranchFalseResult = firstCondBranchOp.getFalseResult();
+    bool firstTrueIterFlag = (firstBranchTrueResult == firstMuxInnerOperand);
+    Value secondBranchTrueResult = secondCondBranchOp.getTrueResult();
+    Value secondBranchFalseResult = secondCondBranchOp.getFalseResult();
+    bool secondTrueIterFlag = (secondBranchTrueResult == secondMuxInnerOperand);
+
+    Value condBr1 = firstCondBranchOp.getConditionOperand();
+    Value condBr2 = secondCondBranchOp.getConditionOperand();
+    if (firstTrueIterFlag && !secondTrueIterFlag) {
+      // Insert a NOT at the condition input of the second Branch
+      handshake::NotOp notOp = rewriter.create<handshake::NotOp>(
+          secondCondBranchOp->getLoc(), condBr2);
+      Value newCond = notOp.getResult();
+      rewriter.replaceAllUsesWith(condBr2, newCond);
+
+      // Replace all uses coming from the false side of the second Branch with
+      // the true side of it
+      rewriter.replaceAllUsesWith(secondBranchFalseResult,
+                                  secondBranchTrueResult);
+      // Adjust the secondTrueIterFlag
+      secondTrueIterFlag = true;
+
+      // Retrieve the new value of the condition, in case it is not updated
+      condBr2 = secondCondBranchOp.getConditionOperand();
+
+    } else if (!firstTrueIterFlag && secondTrueIterFlag) {
+      // Insert a NOT at the condition input of the first Branch
+      handshake::NotOp notOp = rewriter.create<handshake::NotOp>(
+          firstCondBranchOp->getLoc(), condBr1);
+      Value newCond = notOp.getResult();
+      rewriter.replaceAllUsesWith(condBr1, newCond);
+
+      // Replace all uses coming from the false side of the second Branch with
+      // the true side of it
+      rewriter.replaceAllUsesWith(firstBranchFalseResult,
+                                  firstBranchTrueResult);
+      // Adjust the secondTrueIterFlag
+      firstTrueIterFlag = true;
+
+      // Retrieve the new value of the condition, in case it is not updated
+      condBr1 = firstCondBranchOp.getConditionOperand();
+    }
+
+    // The goal now is to replace the two Repeats with a single Repeat, we do
+    // so by deleting the first Mux and Branch and adjusting the inputs of the
+    // second Mux The new condition is a Mux, calculate its inputs: One input
+    // of the Mux will be a constant that should take the value of the
+    // condition that feeds a sink (for suppressing) and should be triggered
+    // from Source
+    int64_t constantValue;
+    if (firstTrueIterFlag) {
+      assert(secondTrueIterFlag);
+      // this means repeat when the condition is true
+      constantValue = 1;
+    } else {
+      assert(!firstTrueIterFlag && !secondTrueIterFlag);
+      // this means repeat when the condition is false
+      constantValue = 0;
+    }
+    Value source =
+        rewriter.create<handshake::SourceOp>(secondCondBranchOp->getLoc());
+    Type constantType = rewriter.getIntegerType(1);
+    Value constantVal = rewriter.create<handshake::ConstantOp>(
+        secondCondBranchOp->getLoc(), constantType,
+        rewriter.getIntegerAttr(constantType, constantValue), source);
+
+    // Create a new Mux and assign its operands
+    ValueRange muxOperands;
+    if (firstTrueIterFlag) {
+      assert(firstTrueIterFlag);
+      // This means repeat when the condition is true, so put the constVal at
+      // in1 and the additional condition (i.e., condition of the first Repeat)
+      // at in0
+      muxOperands = {condBr1, constantVal};
+    } else {
+      assert(!firstTrueIterFlag && !firstTrueIterFlag);
+      // This means repeat when the condition is false, so put the constVal at
+      // in0 and the additional condition (i.e., the condition of the first
+      // Repeat) at in1
+      muxOperands = {constantVal, condBr1};
+    }
+    rewriter.setInsertionPoint(secondCondBranchOp);
+    handshake::MuxOp mux = rewriter.create<handshake::MuxOp>(
+        secondCondBranchOp->getLoc(), condBr2, muxOperands);
+    Value muxResult = mux.getResult();
+
+    // Correct the select of the second Mux; at this point, we are sure it comes
+    // from a Merge (INIT), so retrieve it
+    assert(isa_and_nonnull<handshake::MergeOp>(
+        secondMuxOp.getSelectOperand().getDefiningOp()));
+    handshake::MergeOp initOp = cast<handshake::MergeOp>(
+        secondMuxOp.getSelectOperand().getDefiningOp());
+    // The convention used in the ExtractLoopMuxCondition rewrite puts the loop
+    // condition at in0 of the Merge
+    rewriter.replaceAllUsesWith(initOp.getDataOperands()[0], muxResult);
+
+    // Correct the condition of the second Branch
+    rewriter.replaceAllUsesWith(condBr2, muxResult);
+
+    // Correct the external input of the second Mux
+    rewriter.replaceAllUsesWith(secondMuxOuterOperand, firstMuxOuterOperand);
+
+    // Erase the first Branch and first Mux
+    rewriter.replaceAllUsesWith(firstCondBranchOp.getDataOperand(),
+                                firstMuxOuterOperand);
+    rewriter.eraseOp(firstMuxOp);
+    rewriter.eraseOp(firstCondBranchOp);
+
+    // TODO: Erase the first INIT as well
+    return success();
+  }
+};
+
+// Rules C
+// Replaces a pair of consecutive Repeats with a
+// a single Repeat with a merge at its condition input.
+struct ShortenMergeRepeatPairs : public OpRewritePattern<handshake::MergeOp> {
+  using OpRewritePattern<handshake::MergeOp>::OpRewritePattern;
+
+  LogicalResult matchAndRewrite(handshake::MergeOp firstMergeOp,
+                                PatternRewriter &rewriter) const override {
+    // Search for a Repeat structure
+    // (1) Get the users of the Merge. If they are not exactly two, the pattern
+    // match fails
+    auto firstMergeUsers = (firstMergeOp.getResult()).getUsers();
+    if (std::distance(firstMergeUsers.begin(), firstMergeUsers.end()) != 2)
+      return failure();
+
+    // One user must be a Branch; otherwise, the pattern match fails
+    bool firstFoundCondBranch = false;
+    handshake::ConditionalBranchOp firstCondBranchOp;
+    // One user must be another Merge belonging to a second Repeat; otherwise,
+    // the pattern match fails
+    bool foundSecondMerge = false;
+    handshake::MergeOp secondMergeOp;
+    for (auto mergeUser : firstMergeUsers) {
+      if (isa_and_nonnull<handshake::ConditionalBranchOp>(mergeUser)) {
+        firstFoundCondBranch = true;
+        firstCondBranchOp = cast<handshake::ConditionalBranchOp>(mergeUser);
+      } else if (isa_and_nonnull<handshake::MergeOp>(mergeUser)) {
+        foundSecondMerge = true;
+        secondMergeOp = cast<handshake::MergeOp>(mergeUser);
+      }
+    }
+    if (!firstFoundCondBranch && !foundSecondMerge)
+      return failure();
+
+    // The firstCondBranchOp must be also be an operand
+    // forming a cycle with the firstMergeOp; otherwise, the pattern match fails
+    bool firstFoundCycle = false;
+    int operIdx = 0;
+    int firstMergeCycleInputIdx = 0;
+    for (auto mergeOperand : firstMergeOp->getOperands()) {
+      if (isa_and_nonnull<handshake::ConditionalBranchOp>(
+              mergeOperand.getDefiningOp()))
+        if (cast<handshake::ConditionalBranchOp>(
+                mergeOperand.getDefiningOp()) == firstCondBranchOp) {
+          firstFoundCycle = true;
+          firstMergeCycleInputIdx = operIdx;
+          break;
+        }
+      operIdx++;
+    }
+    if (!firstFoundCycle)
+      return failure();
+    int firstMergeOuterInputIdx = (firstMergeCycleInputIdx == 0) ? 1 : 0;
+
+    // The firstCondBranchOp should not have any more successors; otherwise, it
+    // is not a Repeat structure
+    if (std::distance(firstCondBranchOp->getResults().getUsers().begin(),
+                      firstCondBranchOp->getResults().getUsers().end()) != 1)
+      return failure();
+
+    // At this point we have firstMergeOp and firstCondBranchOp which constitute
+    // the first Repeat sturcture. It should feed a second Repeat structure
+    // otherwise the pattern match fails
+    // Check if secondMergeOp also has a Branch forming a cycle
+    auto secondMergeUsers = (secondMergeOp.getResult()).getUsers();
+    if (secondMergeUsers.empty())
+      return failure();
+
+    // One user must be a Branch; otherwise, the pattern match fails
+    bool secondFoundCondBranch = false;
+    // This second Repeat could be feeding many users including maybe another
+    // non-loop Branch
+    DenseSet<handshake::ConditionalBranchOp> branches;
+    for (auto mergeUser : secondMergeUsers) {
+      if (isa_and_nonnull<handshake::ConditionalBranchOp>(mergeUser)) {
+        secondFoundCondBranch = true;
+        branches.insert(cast<handshake::ConditionalBranchOp>(mergeUser));
+      }
+    }
+    if (!secondFoundCondBranch)
+      return failure();
+
+    // One of the branches in the set of Branches must be also be an operand
+    // forming a cycle with the merge; otherwise, the pattern match fails
+    bool secondFoundCycle = false;
+    operIdx = 0;
+    int secondMergeCycleInputIdx = 0;
+    handshake::ConditionalBranchOp secondCondBranchOp;
+    for (auto mergeOperand : secondMergeOp->getOperands()) {
+      if (isa_and_nonnull<handshake::ConditionalBranchOp>(
+              mergeOperand.getDefiningOp()))
+        if (branches.contains(cast<handshake::ConditionalBranchOp>(
+                mergeOperand.getDefiningOp()))) {
+          secondFoundCycle = true;
+          secondMergeCycleInputIdx = operIdx;
+          secondCondBranchOp = cast<handshake::ConditionalBranchOp>(
+              mergeOperand.getDefiningOp());
+          break;
+        }
+      operIdx++;
+    }
+    if (!secondFoundCycle)
+      return failure();
+    int secondMergeOuterInputIdx = (secondMergeCycleInputIdx == 0) ? 1 : 0;
+
+    // The secondCondBranchOp should not have any more successors; otherwise, it
+    // is not a Repeat structure
+    if (std::distance(secondCondBranchOp->getResults().getUsers().begin(),
+                      secondCondBranchOp->getResults().getUsers().end()) != 1)
+      return failure();
+
+    // Now, we are sure we have two consecutive Repeats, check the signs of loop
+    // conditions.
+    // Retrieve the values at the Merges inputs
+    // Retrieve the values at the merge inputs
+    OperandRange firstMergeDataOperands = firstMergeOp.getDataOperands();
+    Value firstMergeOuterOperand =
+        firstMergeDataOperands[firstMergeOuterInputIdx];
+    Value firstMergeInnerOperand =
+        firstMergeDataOperands[firstMergeCycleInputIdx];
+    OperandRange secondMergeDataOperands = secondMergeOp.getDataOperands();
+    Value secondMergeOuterOperand =
+        secondMergeDataOperands[secondMergeOuterInputIdx];
+    Value secondMergeInnerOperand =
+        secondMergeDataOperands[secondMergeCycleInputIdx];
+
+    // Identify which output of the two Branches feeds the mergeInnerOperand
+    Value firstBranchTrueResult = firstCondBranchOp.getTrueResult();
+    Value firstBranchFalseResult = firstCondBranchOp.getFalseResult();
+    bool firstTrueIterFlag = (firstBranchTrueResult == firstMergeInnerOperand);
+    Value secondBranchTrueResult = secondCondBranchOp.getTrueResult();
+    Value secondBranchFalseResult = secondCondBranchOp.getFalseResult();
+    bool secondTrueIterFlag =
+        (secondBranchTrueResult == secondMergeInnerOperand);
+
+    Value condBr1 = firstCondBranchOp.getConditionOperand();
+    Value condBr2 = secondCondBranchOp.getConditionOperand();
+    if (firstTrueIterFlag && !secondTrueIterFlag) {
+      // Insert a NOT at the condition input of the second Branch
+      handshake::NotOp notOp = rewriter.create<handshake::NotOp>(
+          secondCondBranchOp->getLoc(), condBr2);
+      Value newCond = notOp.getResult();
+      rewriter.replaceAllUsesWith(condBr2, newCond);
+
+      // Replace all uses coming from the false side of the second Branch with
+      // the true side of it
+      rewriter.replaceAllUsesWith(secondBranchFalseResult,
+                                  secondBranchTrueResult);
+      // Adjust the secondTrueIterFlag
+      secondTrueIterFlag = true;
+
+      // Retrieve the new value of the condition, in case it is not updated
+      condBr2 = secondCondBranchOp.getConditionOperand();
+
+    } else if (!firstTrueIterFlag && secondTrueIterFlag) {
+      // Insert a NOT at the condition input of the first Branch
+      handshake::NotOp notOp = rewriter.create<handshake::NotOp>(
+          firstCondBranchOp->getLoc(), condBr1);
+      Value newCond = notOp.getResult();
+      rewriter.replaceAllUsesWith(condBr1, newCond);
+
+      // Replace all uses coming from the false side of the second Branch with
+      // the true side of it
+      rewriter.replaceAllUsesWith(firstBranchFalseResult,
+                                  firstBranchTrueResult);
+      // Adjust the secondTrueIterFlag
+      firstTrueIterFlag = true;
+
+      // Retrieve the new value of the condition, in case it is not updated
+      condBr1 = firstCondBranchOp.getConditionOperand();
+    }
+
+    // The goal now is to replace the two Repeats with a single Repeat, we do
+    // so by deleting the first Merge and Branch and adjusting the inputs of the
+    // second Merge The new condition is a Merge, calculate its inputs: One
+    // input of the Merge will be a constant that should take the value of the
+    // condition that feeds a sink (for suppressing) and should be triggered
+    // from Source
+    int64_t constantValue;
+    if (firstTrueIterFlag) {
+      assert(secondTrueIterFlag);
+      // this means repeat when the condition is true
+      constantValue = 1;
+    } else {
+      assert(!firstTrueIterFlag && !secondTrueIterFlag);
+      // this means repeat when the condition is false
+      constantValue = 0;
+    }
+    Value source =
+        rewriter.create<handshake::SourceOp>(secondCondBranchOp->getLoc());
+    Type constantType = rewriter.getIntegerType(1);
+    Value constantVal = rewriter.create<handshake::ConstantOp>(
+        secondCondBranchOp->getLoc(), constantType,
+        rewriter.getIntegerAttr(constantType, constantValue), source);
+
+    // Create a new Mux and assign its operands
+    ValueRange muxOperands;
+    if (firstTrueIterFlag) {
+      assert(firstTrueIterFlag);
+      // This means repeat when the condition is true, so put the constVal at
+      // in1 and the additional condition (i.e., condition of the first Repeat)
+      // at in0
+      muxOperands = {condBr1, constantVal};
+    } else {
+      assert(!firstTrueIterFlag && !firstTrueIterFlag);
+      // This means repeat when the condition is false, so put the constVal at
+      // in0 and the additional condition (i.e., the condition of the first
+      // Repeat) at in1
+      muxOperands = {constantVal, condBr1};
+    }
+    rewriter.setInsertionPoint(secondCondBranchOp);
+    handshake::MuxOp mux = rewriter.create<handshake::MuxOp>(
+        secondCondBranchOp->getLoc(), condBr2, muxOperands);
+    Value muxResult = mux.getResult();
+
+    // Correct the condition of the second Branch
+    rewriter.replaceAllUsesWith(condBr2, muxResult);
+
+    // Correct the external input of the second Merge
+    rewriter.replaceAllUsesWith(secondMergeOuterOperand,
+                                firstMergeOuterOperand);
+
+    // Erase the first Branch and first Merge
+    rewriter.replaceAllUsesWith(firstCondBranchOp.getDataOperand(),
+                                firstMergeOuterOperand);
+    rewriter.eraseOp(firstMergeOp);
+    rewriter.eraseOp(firstCondBranchOp);
+
+    return success();
+  }
+};
+
 /// Simple driver for the Handshake Rewrite Terms pass, based on a greedy
 /// pattern rewriter.
 struct HandshakeRewriteTermsPass
@@ -756,7 +1388,8 @@ struct HandshakeRewriteTermsPass
                  DowngradeIndexlessControlMerge, ExtractIfThenElseMuxCondition,
                  ExtractLoopMuxCondition, RemoveBranchMergeIfThenElse,
                  RemoveBranchMuxIfThenElse, RemoveMergeBranchLoop,
-                 RemoveMuxBranchLoop>(ctx);
+                 RemoveMuxBranchLoop, ShortenSuppressPairs,
+                 ShortenMuxRepeatPairs, ShortenMergeRepeatPairs>(ctx);
 
     if (failed(applyPatternsAndFoldGreedily(mod, std::move(patterns), config)))
       return signalPassFailure();
