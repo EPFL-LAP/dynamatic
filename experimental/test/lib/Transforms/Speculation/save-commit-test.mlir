@@ -26,14 +26,14 @@
 // CHECK:           %[[VAL_36:.*]] = spec_commit{{\[}}%[[VAL_34]]] %[[VAL_10]] {handshake.bb = 1 : ui32, handshake.name = "spec_commit0"} : i1
 // CHECK:           end {handshake.bb = 1 : ui32, handshake.name = "end0"} %[[VAL_36]] : i1
 // CHECK:         }
-handshake.func @placeSaveCommitsOnAllPaths(%start: none) {
-  %0:2 =  fork [2] %start  {handshake.bb = 0 : ui32, handshake.name = "fork1"} : none
-  %4 = constant %0#0 {handshake.bb = 0 : ui32, handshake.name = "constant1", value = 0 : i1} : i1
-  %result, %index = control_merge %trueResult, %4 {handshake.bb = 1 : ui32, handshake.name = "control_merge0"} : i1, i1
-  %trueResult, %falseResult = cond_br %3#2, %result {handshake.bb = 1 : ui32, handshake.name = "cond_br0"} : i1
-  %1 = constant %0#1 {handshake.bb = 1 : ui32, handshake.name = "constant0", value = 1 : i1} : i1
-  %2 = mux %index [%trueResult1, %1] {handshake.bb = 1 : ui32, handshake.name = "mux0"} : i1, i1
-  %3:3 = fork [3] %2  {handshake.bb = 1 : ui32, handshake.name = "fork0"} : i1
-  %trueResult1, %falseResult1 = cond_br %3#0, %3#1 {handshake.bb = 1 : ui32, handshake.name = "cond_br1"} : i1
-  end {handshake.bb = 1 : ui32, handshake.name =  "end0"} %falseResult  : i1
+handshake.func @placeSaveCommitsOnAllPaths(%start: !handshake.control<>) -> !handshake.channel<i1> {
+  %0:2 =  fork [2] %start  {handshake.bb = 0 : ui32, handshake.name = "fork1"} : <>
+  %4 = constant %0#0 {handshake.bb = 0 : ui32, handshake.name = "constant1", value = 0 : i1} : <i1>
+  %result, %index = control_merge %trueResult, %4 {handshake.bb = 1 : ui32, handshake.name = "control_merge0"} : <i1>, <i1>
+  %trueResult, %falseResult = cond_br %3#2, %result {handshake.bb = 1 : ui32, handshake.name = "cond_br0"} : <i1>, <i1>
+  %1 = constant %0#1 {handshake.bb = 1 : ui32, handshake.name = "constant0", value = 1 : i1} : <i1>
+  %2 = mux %index [%trueResult1, %1] {handshake.bb = 1 : ui32, handshake.name = "mux0"} : <i1>, <i1>
+  %3:3 = fork [3] %2  {handshake.bb = 1 : ui32, handshake.name = "fork0"} : <i1>
+  %trueResult1, %falseResult1 = cond_br %3#0, %3#1 {handshake.bb = 1 : ui32, handshake.name = "cond_br1"} : <i1>, <i1>
+  end {handshake.bb = 1 : ui32, handshake.name =  "end0"} %falseResult  : <i1>
 }
