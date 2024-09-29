@@ -1003,6 +1003,7 @@ def SpecSaveCommitOp : Handshake_SpecOp<"spec_save_commit"> {
     %dataOut = spec_save_commit[%ctrl] %dataIn : i11
     ```
   }];
+  let arguments = (ins HandshakeType:$dataIn, IntSizedChannel<3>:$ctrl);
 }
 
 def SpeculatingBranchOp : Handshake_Op<"speculating_branch", [
