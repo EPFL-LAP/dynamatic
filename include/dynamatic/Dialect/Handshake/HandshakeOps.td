@@ -1026,7 +1026,7 @@ def SpeculatingBranchOp : Handshake_Op<"speculating_branch", [
     ```
   }];
 
-  let arguments = (ins BoolChannel:$tagFromOperand, ChannelType:$dataOperand);
+  let arguments = (ins ChannelType:$tagFromOperand, ChannelType:$dataOperand);
   let results = (outs ChannelType:$trueResult, ChannelType:$falseResult);
   let assemblyFormat = [{
     `[` $tagFromOperand `]` $dataOperand attr-dict `:` 
