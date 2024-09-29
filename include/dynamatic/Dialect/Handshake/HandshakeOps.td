@@ -926,8 +926,8 @@ def SpeculatorOp : Handshake_Op<"speculator", [
     ```
   }];
 
-  let arguments = (ins ChannelType:$dataIn, ControlType:$enable);
-  let results = (outs ChannelType:$dataOut,
+  let arguments = (ins HandshakeType:$dataIn, ControlType:$enable);
+  let results = (outs HandshakeType:$dataOut,
                       BoolChannel:$saveCtrl, BoolChannel:$commitCtrl, 
                       IntSizedChannel<3>:$SCSaveCtrl,
                       IntSizedChannel<3>:$SCCommitCtrl, 
@@ -1027,8 +1027,8 @@ def SpeculatingBranchOp : Handshake_Op<"speculating_branch", [
     ```
   }];
 
-  let arguments = (ins ChannelType:$tagFromOperand, ChannelType:$dataOperand);
-  let results = (outs ChannelType:$trueResult, ChannelType:$falseResult);
+  let arguments = (ins HandshakeType:$tagFromOperand, HandshakeType:$dataOperand);
+  let results = (outs HandshakeType:$trueResult, HandshakeType:$falseResult);
   let assemblyFormat = [{
     `[` $tagFromOperand `]` $dataOperand attr-dict `:` 
       type($tagFromOperand) `,` type($dataOperand)
