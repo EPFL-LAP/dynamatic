@@ -147,6 +147,17 @@ else
     "applied transformations to handshake"
 fi
 
+<<<<<<< HEAD
+=======
+# handshake transformations
+"$DYNAMATIC_OPT_BIN" "$F_HANDSHAKE" \
+  --handshake-analyze-lsq-usage --handshake-replace-memory-interfaces \
+  --handshake-minimize-cst-width --handshake-optimize-bitwidths \
+  --handshake-materialize --handshake-infer-basic-blocks \
+  > "$F_HANDSHAKE_TRANSFORMED"
+exit_on_fail "Failed to apply transformations to handshake" \
+  "Applied transformations to handshake"
+>>>>>>> 2b5761a ([Handshake] Optimize width of address-carrying channels (#157))
 
 
 # Credit-based sharing
