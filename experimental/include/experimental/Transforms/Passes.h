@@ -19,6 +19,7 @@
 #include "experimental/Transforms/ResourceSharing/Crush.h"
 #include "experimental/Transforms/Speculation/HandshakeSpeculation.h"
 #include "experimental/Transforms/Speculation/SpecAnnotatePaths.h"
+#include "experimental/Transforms/LSQSizing/HandshakeSizeLSQs.h"
 #include "mlir/Pass/Pass.h"
 
 namespace dynamatic {
