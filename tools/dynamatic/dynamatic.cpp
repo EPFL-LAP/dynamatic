@@ -261,7 +261,9 @@ public:
                 state) {
     addOption({BUFFER_ALGORITHM,
                "The buffer placement algorithm to use, values are "
-               "'simple-buffers', 'fpga20', or 'fpl22'"});
+               "'on-merges' (default option: minimum buffering for "
+               "correctness), 'fpga20' (throughput-driven buffering), or "
+               "'fpl22' (throughput- and timing-driven buffering)"});
     addFlag({SHARING, "Use credit-based resource sharing"});
   }
 
@@ -562,16 +564,20 @@ CommandResult Compile::execute(CommandArguments &args) {
     return CommandResult::FAIL;
 
   std::string script = state.getScriptsPath() + getSeparator() + "compile.sh";
-  std::string buffers = "simple-buffers";
+  // If unspecified, we place a OB + TB after every merge to guarantee
+  // the deadlock freeness.
+  std::string buffers = "on-merges";
 
   if (auto it = args.options.find(BUFFER_ALGORITHM); it != args.options.end()) {
-    if (it->second == "simple-buffers" || it->second == "fpga20" ||
-        it->second == "fpl22")
+    if (it->second == "on-merges" || it->second == "fpga20" ||
+        it->second == "fpl22") {
       buffers = it->second;
-    else {
+    } else {
       llvm::errs()
           << "Unknown buffer placement algorithm " << it->second
-          << "! Possible options are 'simple-buffers', 'fpga20', or 'fpl22'.";
+          << "! Possible options are 'on-merges' (minimum buffering for "
+             "correctness), 'fpga20' (throughput-driven buffering), or 'fpl22' "
+             "(throughput- and timing-driven buffering).";
       return CommandResult::FAIL;
     }
   }

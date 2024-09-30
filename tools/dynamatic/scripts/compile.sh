@@ -135,12 +135,12 @@ else
 fi
 
 # Buffer placement
-if [[ "$BUFFER_ALGORITHM" == "simple-buffers" ]]; then
+if [[ "$BUFFER_ALGORITHM" == "on-merges" ]]; then
   # Simple buffer placement
   echo_info "Running simple buffer placement (on-merges)."
   "$DYNAMATIC_OPT_BIN" "$F_HANDSHAKE_TRANSFORMED" \
     --handshake-set-buffering-properties="version=fpga20" \
-    --$BUFFER_PLACEMENT_PASS="algorithm=on-merges timing-models=$DYNAMATIC_DIR/data/components.json" \
+    --$BUFFER_PLACEMENT_PASS="algorithm=$BUFFER_ALGORITHM timing-models=$DYNAMATIC_DIR/data/components.json" \
     > "$F_HANDSHAKE_BUFFERED"
   exit_on_fail "Failed to place simple buffers" "Placed simple buffers"
 else
