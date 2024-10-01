@@ -10,7 +10,7 @@ set-src             integration-test/fir/fir.c
 
 # Compile (from source to Handshake IR/DOT)
 # Remove the flag to run smart buffer placement (requires Gurobi)
-compile             --simple-buffers
+compile             --buffer-algorithm simple-buffers
 
 # Generate the VHDL for the dataflow circuit
 write-hdl
