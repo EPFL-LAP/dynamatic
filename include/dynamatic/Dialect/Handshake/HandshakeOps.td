@@ -929,8 +929,8 @@ def SpeculatorOp : Handshake_Op<"speculator", [
     ```
   }];
 
-  let arguments = (ins ChannelType:$dataIn, ControlType:$enable);
-  let results = (outs ChannelType:$dataOut,
+  let arguments = (ins HandshakeType:$dataIn, ControlType:$enable);
+  let results = (outs HandshakeType:$dataOut,
                       BoolChannel:$saveCtrl, BoolChannel:$commitCtrl, 
                       IntSizedChannel<3>:$SCSaveCtrl,
                       IntSizedChannel<3>:$SCCommitCtrl, 
@@ -943,8 +943,8 @@ def SpeculatorOp : Handshake_Op<"speculator", [
 class Handshake_SpecOp<string mnemonic> : Handshake_Op<mnemonic, [
   SpeculationOpInterface, AllTypesMatch<["dataIn", "dataOut"]>
 ]> {
-  let arguments = (ins ChannelType:$dataIn, BoolChannel:$ctrl);
-  let results = (outs ChannelType:$dataOut);
+  let arguments = (ins HandshakeType:$dataIn, BoolChannel:$ctrl);
+  let results = (outs HandshakeType:$dataOut);
   let assemblyFormat = [{
     `[` $ctrl `]` $dataIn attr-dict `:` type($dataIn) `,` type($ctrl)
   }];
@@ -1006,6 +1006,7 @@ def SpecSaveCommitOp : Handshake_SpecOp<"spec_save_commit"> {
     %dataOut = spec_save_commit[%ctrl] %dataIn : i11
     ```
   }];
+  let arguments = (ins HandshakeType:$dataIn, IntSizedChannel<3>:$ctrl);
 }
 
 def SpeculatingBranchOp : Handshake_Op<"speculating_branch", [
@@ -1029,8 +1030,8 @@ def SpeculatingBranchOp : Handshake_Op<"speculating_branch", [
     ```
   }];
 
-  let arguments = (ins BoolChannel:$tagFromOperand, ChannelType:$dataOperand);
-  let results = (outs ChannelType:$trueResult, ChannelType:$falseResult);
+  let arguments = (ins HandshakeType:$tagFromOperand, HandshakeType:$dataOperand);
+  let results = (outs HandshakeType:$trueResult, HandshakeType:$falseResult);
   let assemblyFormat = [{
     `[` $tagFromOperand `]` $dataOperand attr-dict `:` 
       type($tagFromOperand) `,` type($dataOperand)
