@@ -621,9 +621,26 @@ ModuleDiscriminator::ModuleDiscriminator(Operation *op) {
         addType("INPUT_TYPE", op->getOperand(0));
         addType("OUTPUT_TYPE", op->getResult(0));
       })
-      .Case<handshake::SpecCommitOp, handshake::SpecSaveOp, handshake::SpecSaveCommitOp,
-            handshake::SpeculatorOp, handshake::SpeculatingBranchOp>([&](auto) {
-        addType("DATA_TYPE", op->getOperand(0));
+      .Case<handshake::SpecCommitOp, handshake::SpecSaveOp>([&](auto) {
+        addType("DATA_SIZE_IN", op->getOperand(0));
+        addType("DATA_SIZE_OUT", op->getResult(0));
+      })
+      .Case<handshake::SpeculatorOp>([&](auto) {
+        addType("DATA_SIZE_IN", op->getOperand(0));
+        addType("DATA_SIZE_OUT", op->getResult(0));
+        addUnsigned("FIFO_DEPTH", 4); // temp
+      })
+      .Case<handshake::SpecSaveCommitOp>([&](auto) {
+        addType("DATA_SIZE_IN", op->getOperand(0));
+        addType("DATA_SIZE_OUT", op->getResult(0));
+        addUnsigned("FIFO_DEPTH", 4); // temp
+      })
+      .Case<handshake::SpeculatingBranchOp>([&](auto) {
+        addUnsigned("INPUTS", 2);
+        addUnsigned("OUTPUTS", 1);
+        addType("DATA_SIZE_IN", op->getOperand(0));
+        addType("DATA_SIZE_OUT", op->getOperand(0));
+        addUnsigned("FIFO_DEPTH", 4); // temp
       })
       .Default([&](auto) {
         op->emitError() << "This operation cannot be lowered to RTL "
