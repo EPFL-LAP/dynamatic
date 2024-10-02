@@ -711,6 +711,51 @@
     "module-name": "logic_not"
   },
   {
+    "name": "handshake.speculator",
+    "parameters": [
+      { "name": "DATA_SIZE_IN", "type": "dataflow", "data-lb": 0, "extra-eq": 0 },
+      { "name": "DATA_SIZE_OUT", "type": "dataflow", "data-lb": 0, "extra-eq": 0 },
+      { "name": "FIFO_DEPTH", "type": "unsigned", "lb": 1 }
+    ],
+    "generic": "$DYNAMATIC/experimental/data/vhdl/speculation/speculator.vhd"
+  },
+  {
+    "name": "handshake.spec_commit",
+    "parameters": [
+      { "name": "DATA_SIZE_IN", "type": "dataflow", "data-lb": 0, "extra-eq": 0 },
+      { "name": "DATA_SIZE_OUT", "type": "dataflow", "data-lb": 0, "extra-eq": 0 }
+    ],
+    "generic": "$DYNAMATIC/experimental/data/vhdl/speculation/spec_commit.vhd"
+  },
+  {
+    "name": "handshake.spec_save",
+    "parameters": [
+      { "name": "DATA_SIZE_IN", "type": "dataflow", "data-lb": 0, "extra-eq": 0 },
+      { "name": "DATA_SIZE_OUT", "type": "dataflow", "data-lb": 0, "extra-eq": 0 }
+    ],
+    "generic": "$DYNAMATIC/experimental/data/vhdl/speculation/spec_save.vhd"
+  },
+  {
+    "name": "handshake.spec_save_commit",
+    "parameters": [
+      { "name": "DATA_SIZE_IN", "type": "dataflow", "data-lb": 0, "extra-eq": 0 },
+      { "name": "DATA_SIZE_OUT", "type": "dataflow", "data-lb": 0, "extra-eq": 0 },
+      { "name": "FIFO_DEPTH", "type": "unsigned", "lb": 1 }
+    ],
+    "generic": "$DYNAMATIC/experimental/data/vhdl/speculation/spec_save_commit.vhd"
+  },
+  {
+    "name": "handshake.speculating_branch",
+    "parameters": [
+      { "name": "INPUTS", "type": "unsigned", "eq": 2 },
+      { "name": "OUTPUTS", "type": "unsigned", "eq": 1 },
+      { "name": "DATA_SIZE_IN", "type": "dataflow", "data-lb": 0, "extra-eq": 0 },
+      { "name": "DATA_SIZE_OUT", "type": "dataflow", "data-lb": 0, "extra-eq": 0 },
+      { "name": "FIFO_DEPTH", "type": "unsigned", "lb": 1 }
+    ],
+    "generic": "$DYNAMATIC/experimental/data/vhdl/speculation/speculating_branch.vhd"
+  },
+  {
     "generic": "$DYNAMATIC/data/vhdl/support/delay_buffer.vhd"
   },
   {
