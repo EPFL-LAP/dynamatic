@@ -61,10 +61,14 @@ struct BoolExpression {
   /// Prints BooolExpression tree in inorder traversal
   /// Inspired from
   /// https://www.geeksforgeeks.org/print-binary-tree-2-dimensions/
-  void print(int space = 0);
+  void print();
 
   /// Converts a BoolExpression tree into its string representation
   std::string toString();
+
+  /// Return true if the expression contains the input mintern, either directed
+  /// or complemented
+  bool containsMintern(const std::string &toSearch);
 
   /// Retrieve all the variables inside a BoolExpression
   std::set<std::string> getVariables();

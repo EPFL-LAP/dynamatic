@@ -51,7 +51,7 @@ std::string BoolExpression::toString() {
     s += "1";
     break;
   case ExpressionType::Zero:
-    s += "0";
+    et += "0";
     break;
   case ExpressionType::Or:
     s += " + ";
@@ -160,6 +160,20 @@ BoolExpression::generateTruthTable() {
   return truthTable;
 }
 
+bool BoolExpression::containsMintern(const std::string &toSearch) {
+  if (type == ExpressionType::And || type == ExpressionType::Or) {
+    Operator *op = static_cast<Operator *>(this);
+    return op->left->containsMintern(toSearch) ||
+           op->right->containsMintern(toSearch);
+  }
+
+  if (type == ExpressionType::Variable) {
+    SingleCond *singleCond = static_cast<SingleCond *>(this);
+    return toSearch == singleCond->id;
+  }
+  return false;
+}
+
 //---------Generating Truth Table based on Mintems (SOP Only)-----------
 
 void dynamatic::experimental::boolean::replaceDontCaresRec(
@@ -263,41 +277,36 @@ std::set<std::string> BoolExpression::generateTruthTableSop() {
 }
 
 //--------Printing BoolExpresssion--------
-static constexpr unsigned PRINTING_SPACE = 10;
 
-void BoolExpression::print(int space) {
+void BoolExpression::print() {
   /// Increase distance between levels
-  space += PRINTING_SPACE;
 
   /// Process right child first
   if (type == ExpressionType::Or || type == ExpressionType::And) {
     Operator *op = static_cast<Operator *>(this);
-    op->right->print(space);
+    llvm::errs() << "(";
+    op->right->print();
   }
-
-  llvm::errs() << "\n";
-  for (int i = PRINTING_SPACE; i < space; i++)
-    llvm::errs() << " ";
 
   switch (type) {
   case ExpressionType::Variable: {
     SingleCond *singleCond = static_cast<SingleCond *>(this);
     if (singleCond->isNegated)
       llvm::errs() << "~";
-    llvm::errs() << singleCond->id << "\n";
+    llvm::errs() << singleCond->id;
     break;
   }
   case ExpressionType::One:
-    llvm::errs() << "1 \n";
+    llvm::errs() << "1";
     break;
   case ExpressionType::Zero:
-    llvm::errs() << "0 \n";
+    llvm::errs() << "0";
     break;
   case ExpressionType::Or:
-    llvm::errs() << "+ \n";
+    llvm::errs() << " + ";
     break;
   case ExpressionType::And:
-    llvm::errs() << ". \n";
+    llvm::errs() << " * ";
     break;
   default:
     break;
@@ -306,7 +315,8 @@ void BoolExpression::print(int space) {
   /// Process left child
   if (type == ExpressionType::Or || type == ExpressionType::And) {
     Operator *op = static_cast<Operator *>(this);
-    op->left->print(space);
+    op->left->print();
+    llvm::errs() << ")";
   }
 }
 
