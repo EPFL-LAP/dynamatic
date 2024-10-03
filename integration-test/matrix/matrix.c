@@ -8,9 +8,10 @@
 #include "dynamatic/Integration.h"
 #include <stdlib.h>
 
-void matrix(in_int_t inA[A_ROWS][A_COLS], in_int_t inB[A_COLS][B_COLS],
-            out_int_t outC[A_ROWS][B_COLS]) {
-  for (unsigned i = 0; i < A_ROWS; i++) {
+int matrix(in_int_t inA[A_ROWS][A_COLS], in_int_t inB[A_COLS][B_COLS],
+           out_int_t outC[A_ROWS][B_COLS]) {
+  unsigned i;
+  for (i = 0; i < A_ROWS; i++) {
     for (unsigned j = 0; j < B_COLS; j++) {
       int sumMult = 0;
       for (unsigned k = 0; k < A_COLS; k++) {
@@ -19,6 +20,7 @@ void matrix(in_int_t inA[A_ROWS][A_COLS], in_int_t inB[A_COLS][B_COLS],
       outC[i][j] = sumMult;
     }
   }
+  return i;
 }
 
 int main(void) {

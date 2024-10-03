@@ -20,7 +20,8 @@ int bicg(in_int_t a[N][N], inout_int_t s[N], inout_int_t q[N], in_int_t p[N],
     for (unsigned j = 0; j < N; j++) {
       int val = a[i][j];
       s[j] = s[j] + r[i] * val;
-      tmp += val * p[j];
+      if (j > 5) // ADD THIS ONE TO TEST IF-THEN-ELSE!!
+        tmp += val * p[j];
     }
 
     q[i] = tmp;

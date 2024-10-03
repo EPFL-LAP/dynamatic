@@ -14,5 +14,5 @@ typedef int out_int_t;
 
 /// Multiplies two matrices and stores the multiplication's result in the last
 /// argument.
-void matrix(in_int_t inA[A_ROWS][A_COLS], in_int_t inB[A_COLS][B_COLS],
-            out_int_t outC[A_ROWS][B_COLS]);
+int matrix(in_int_t inA[A_ROWS][A_COLS], in_int_t inB[A_COLS][B_COLS],
+           out_int_t outC[A_ROWS][B_COLS]);

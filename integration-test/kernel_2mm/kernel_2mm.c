@@ -11,9 +11,10 @@
 #include <stdio.h>
 #include <stdlib.h>
 
-void kernel_2mm(in_int_t alpha, in_int_t beta, inout_int_t tmp[NI][NJ],
-                in_int_t A[NI][NK], in_int_t B[NK][NJ], in_int_t C[NK][NL],
-                inout_int_t D[NI][NL]) {
+int kernel_2mm(in_int_t alpha, in_int_t beta, inout_int_t tmp[NI][NJ],
+               in_int_t A[NI][NK], in_int_t B[NK][NJ], in_int_t C[NK][NL],
+               inout_int_t D[NI][NL]) {
+  int ii;
   for (unsigned i = 0; i < NI; i++) {
     for (unsigned j = 0; j < NJ; j++) {
       tmp[i][j] = 0;
@@ -22,13 +23,15 @@ void kernel_2mm(in_int_t alpha, in_int_t beta, inout_int_t tmp[NI][NJ],
     }
   }
 
-  for (unsigned i = 0; i < NI; i++) {
+  for (ii = 0; ii < NI; ii++) {
     for (unsigned l = 0; l < NL; l++) {
-      D[i][l] *= beta;
+      D[ii][l] *= beta;
       for (unsigned k = 0; k < NJ; ++k)
-        D[i][l] += tmp[i][k] * C[k][l];
+        D[ii][l] += tmp[ii][k] * C[k][l];
     }
   }
+
+  return ii;
 }
 
 int main(void) {
