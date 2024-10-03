@@ -16,10 +16,12 @@
 #include "dynamatic/Dialect/Handshake/HandshakeOps.h"
 #include "dynamatic/Dialect/Handshake/MemoryInterfaces.h"
 #include "dynamatic/Support/CFG.h"
+#include "mlir/IR/Operation.h"
 #include "mlir/Transforms/GreedyPatternRewriteDriver.h"
 #include "llvm/ADT/STLExtras.h"
 #include "llvm/ADT/SetVector.h"
 #include "llvm/Support/ErrorHandling.h"
+#include "llvm/Support/raw_ostream.h"
 #include <iterator>
 
 using namespace mlir;
@@ -312,6 +314,27 @@ struct HandshakeMaterializePass
   void runDynamaticPass() override {
     mlir::ModuleOp modOp = getOperation();
     MLIRContext *ctx = &getContext();
+
+    // Aya: Printing details of the circuit to evaluate if the prior
+    // optimizations worked
+    // llvm::errs() << "\n**********************************************\n";
+    // llvm::errs() << "\tPrinting the details of the circuit components\n";
+    // for (handshake::FuncOp funcOp : modOp.getOps<handshake::FuncOp>()) {
+    //   for (Operation &prod : llvm::make_early_inc_range(funcOp.getOps())) {
+    //     if (prod.getAttr("handshake.bb") != NULL)
+    //       llvm::errs() << "NEW PRODUCER WITH THE FOLLOWING DETAILS: ";
+    //     llvm::errs() << prod.getName() << " in BB"
+    //                  << prod.getAttr("handshake.bb")
+    //                  << " has the following consumers: ";
+    //     for (Operation *cons : prod.getUsers()) {
+    //       if (cons->getAttr("handshake.bb") != prod.getAttr("handshake.bb"))
+    //         llvm::errs() << cons->getName() << " in BB"
+    //                      << cons->getAttr("handshake.bb") << " $$$ ";
+    //     }
+    //     llvm::errs() << "\n";
+    //   }
+    // }
+    // llvm::errs() << "\n**********************************************\n";
 
     // First make sure that every value within Handshake functions is used
     // exactly once
