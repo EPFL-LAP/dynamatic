@@ -4,7 +4,7 @@ use ieee.numeric_std.all;
 
 entity ofifo_dataless is
   generic (
-    SIZE : integer;
+    SIZE : integer
   );
   port (
     clk, rst : in std_logic;
