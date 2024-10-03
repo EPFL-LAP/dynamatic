@@ -11,9 +11,10 @@
 #include <stdio.h>
 #include <stdlib.h>
 
-void kernel_3mm(in_int_t A[NI][NK], in_int_t B[NK][NJ], in_int_t C[NJ][NM],
-                in_int_t D[NM][NL], inout_int_t E[NI][NJ],
-                inout_int_t F[NJ][NL], inout_int_t G[NI][NL]) {
+int kernel_3mm(in_int_t A[NI][NK], in_int_t B[NK][NJ], in_int_t C[NJ][NM],
+               in_int_t D[NM][NL], inout_int_t E[NI][NJ], inout_int_t F[NJ][NL],
+               inout_int_t G[NI][NL]) {
+  unsigned ii;
   for (unsigned i = 0; i < NI; i++) {
     for (unsigned j = 0; j < NJ; j++) {
       E[i][j] = 0;
@@ -30,13 +31,14 @@ void kernel_3mm(in_int_t A[NI][NK], in_int_t B[NK][NJ], in_int_t C[NJ][NM],
     }
   }
 
-  for (unsigned i = 0; i < NI; i++) {
+  for (unsigned ii = 0; ii < NI; ii++) {
     for (unsigned l = 0; l < NL; l++) {
-      G[i][l] = 0;
+      G[ii][l] = 0;
       for (unsigned j = 0; j < NJ; ++j)
-        G[i][l] += E[i][j] * F[j][l];
+        G[ii][l] += E[ii][j] * F[j][l];
     }
   }
+  return ii;
 }
 
 int main(void) {
