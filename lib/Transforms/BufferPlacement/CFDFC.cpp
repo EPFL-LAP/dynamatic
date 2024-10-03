@@ -154,7 +154,6 @@ static void setBBConstraints(GRBModel &model, MILPVars &vars) {
 
 CFDFC::CFDFC(handshake::FuncOp funcOp, ArchSet &archs, unsigned numExec)
     : numExecs(numExec) {
-
   // Identify the block that starts the CFDFC; it's the only one that is both
   // the source of an arch and the destination of another
   std::optional<unsigned> startBB;
