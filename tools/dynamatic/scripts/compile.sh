@@ -166,6 +166,7 @@ fi
 
 # handshake canonicalization
 "$DYNAMATIC_OPT_BIN" "$F_HANDSHAKE_BUFFERED" \
+  --handshake-canonicalize \
   --handshake-hoist-ext-instances \
   > "$F_HANDSHAKE_EXPORT"
 exit_on_fail "Failed to canonicalize Handshake" "Canonicalized handshake"
