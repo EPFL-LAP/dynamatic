@@ -22,6 +22,7 @@
 #include "mlir/Dialect/ControlFlow/IR/ControlFlowOps.h"
 #include "mlir/Dialect/Func/IR/FuncOps.h"
 #include "mlir/Dialect/Math/IR/Math.h"
+#include "mlir/Dialect/MemRef/IR/MemRef.h"
 #include "mlir/IR/Block.h"
 #include "mlir/IR/BuiltinAttributes.h"
 #include "mlir/IR/BuiltinDialect.h"
@@ -980,8 +981,8 @@ LogicalResult FtdLowerFuncToHandshake::convertMergesToMuxes(
 
         bool swap = false;
 
-        swap = (domInfo.dominates(mergeFirstBlock, cmergeSecondBlock));
-        swap = (domInfo.dominates(mergeSecondBlock, cmergeFirstBlock));
+        swap = (domInfo.dominates(mergeFirstBlock, cmergeSecondBlock)) &&
+               (domInfo.dominates(mergeSecondBlock, cmergeFirstBlock));
 
         if (swap) {
           rewriter.setInsertionPointAfterValue(select);
@@ -1063,6 +1064,7 @@ LogicalResult
 FtdLowerFuncToHandshake::addSuppGSA(ConversionPatternRewriter &rewriter,
                                     handshake::FuncOp &funcOp,
                                     FtdStoredOperations &ftdOps) const {
+
   Region &region = funcOp.getBody();
 
   mlir::DominanceInfo domInfo;
@@ -1325,6 +1327,23 @@ LogicalResult FtdLowerFuncToHandshake::matchAndRewrite(
     // Add supp GSA
     if (failed(addSuppGSA(rewriter, funcOp, ftdOps)))
       return failure();
+
+    // do while versus while
+    for (auto &br : ftdOps.backwardBranches) {
+      auto condBranch = dyn_cast<handshake::ConditionalBranchOp>(br);
+      rewriter.setInsertionPointAfter(br);
+      auto branchOpCond = rewriter.create<handshake::ConditionalBranchOp>(
+          condBranch.getLoc(), condBranch.getConditionOperand(),
+          condBranch.getConditionOperand());
+
+      if (isa<handshake::NotOp>(
+              condBranch.getConditionOperand().getDefiningOp()))
+        condBranch.setOperand(0, branchOpCond.getFalseResult());
+      else
+        condBranch.setOperand(0, branchOpCond.getTrueResult());
+
+      ftdOps.allocationNetwork.insert(branchOpCond);
+    }
   }
 
   // id basic block
@@ -1395,6 +1414,7 @@ static Value boolVariableToCircuit(ConversionPatternRewriter &rewriter,
 
     return notOp->getResult(0);
   }
+  condition.setType(channelifyType(condition.getType()));
   return condition;
 }
 
@@ -1492,16 +1512,20 @@ static Value insertBranchToLoop(ConversionPatternRewriter &rewriter,
 
     // A conditional branch is now to be added next to the loop terminator, so
     // that the token can be suppressed
-    rewriter.setInsertionPointToStart(loopExit);
-    auto conditionValue = boolVariableToCircuit(
-        rewriter, getBlockLoopExitCondition(loopExit, loop, li), loopExit,
-        ftdOps);
+    auto *exitCondition = getBlockLoopExitCondition(loopExit, loop, li);
+    auto conditionValue =
+        boolVariableToCircuit(rewriter, exitCondition, loopExit, ftdOps);
 
+    rewriter.setInsertionPointToStart(loopExit);
     // Since only one output is used, the other one will be optimized to a
     // sink, as we expect from a suppress branch
     branchOp = rewriter.create<handshake::ConditionalBranchOp>(
         loopExit->getOperations().back().getLoc(), handshakeResultTypes,
         conditionValue, connection);
+
+    if (!selfRegeneration && !moreProdThanCons &&
+        greaterThanBlocks(connection.getParentBlock(), loopExit))
+      ftdOps.backwardBranches.insert(branchOp);
 
     // Case in which there are more than one terminal blocks
   } else {
@@ -1738,7 +1762,6 @@ addSuppBranchesInternal(ConversionPatternRewriter &rewriter,
             ftdOps.networkConstants.contains(consumerOp))
           continue;
 
-        // aya (not)
         // Skip if the current consumer is a conditional branch
         if (isa<handshake::ConditionalBranchOp>(consumerOp))
           continue;
@@ -2254,8 +2277,8 @@ LogicalResult FtdLowerFuncToHandshake::ftdVerifyAndCreateMemInterfaces(
               ftdOps.allocationNetwork)))
         return failure();
 
-      // [TBD] Instead of adding things this way, introduce a custom pass about
-      // the analysis of these merges. Unify them with SSA?
+      // [TBD] Instead of adding things this way, introduce a custom pass
+      // about the analysis of these merges. Unify them with SSA?
       if (failed(addMergeNonLoop(funcOp, rewriter, allMemDeps, groupsGraph,
                                  forksGraph, ftdOps, startValue)))
         return failure();

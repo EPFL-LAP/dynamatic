@@ -51,7 +51,7 @@ std::string BoolExpression::toString() {
     s += "1";
     break;
   case ExpressionType::Zero:
-    et += "0";
+    s += "0";
     break;
   case ExpressionType::Or:
     s += " + ";

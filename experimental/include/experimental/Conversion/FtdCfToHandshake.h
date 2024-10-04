@@ -58,6 +58,8 @@ struct FtdStoredOperations {
   /// contains all constants created by `addInit` or for Shannon’s
   DenseSet<Operation *> networkConstants;
 
+  DenseSet<Operation *> backwardBranches;
+
   /// For each condition of the block, represented in abstract as `cN` where `N`
   /// is the index of the basic block, associate its corresponding control
   /// value, Associates the condition of the block in string format to its
