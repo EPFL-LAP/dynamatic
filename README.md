@@ -12,6 +12,25 @@ There are currently two ways to setup and use Dynamatic locally.
 
 2. **Use the provided virtual machine**. We provide an [Ubuntu-based virtual machine](docs/VMSetup.md) (VM) that already has Dynamatic, Modelsim, and our dataflow circuit visualizer set up. This machine was originally set-up for the [*Dynamatic Reloaded* tutorial given at the FPGA'24 conference](https://www.isfpga.org/workshops-tutorials/#t7) in Monterey, California. You can use it to simply follow the tutorial (available in the [repository's documentation](docs/Tutorials/Introduction/Introduction.md)) or as a starting point to use/modify Dynamatic in general.
 
+Also, please note the following post-install recommendations. They are necessary for running the integration tests successfully.
+
+1.  **Gurobi Optimization** is an optional dependency, necessary for compiling with MILP-based placement algorithms. After installing Gurobi, add the following lines in your `~/.bashrc` or `~/.zshrc` (replace `<version>` with your version number of Gurobi, e.g. `1103`, and change the path to match your installation path):
+    ```sh
+    export GUROBI_HOME="/opt/gurobi<version>/linux64"
+    export PATH="${PATH}:${GUROBI_HOME}/bin"
+    export LD_LIBRARY_PATH="$LD_LIBRARY_PATH:$GUROBI_HOME/lib"
+    ```
+    These environment variables are used by Dynamatic's cmake settings to determine how to include Gurobi headers. **Rerun the build script** after adding the environment variables in order for cmake to recognize them.
+
+2.  Although Dynamatic can be used in conjunction with any synthesis and simulation tools, it is strongly recommended to use **Vivado** for synthesis and **ModelSim** for simulation. When installing them, make sure you use versions that are [compatible with each other](https://docs.amd.com/r/en-US/ug973-vivado-release-notes-install-license/Compatible-Third-Party-Tools). As with Gurobi in the previous step, add the following environment variables (also replace `<version>` and change the path if necessary):
+    ```sh
+    export XILINX_HOME="/opt/Xilinx/Vivado/<version>"
+    export MODELSIM_HOME="/opt/intelFPGA/<version>/modelsim_ase"
+    ```
+    Again, **rerun the build script**.
+
+3.  In order to simulate floating-point circuits, you will need to [compile floating-point AMD/Xilinx libraries](docs/FPSimulation.md).
+
 ## Using Dynamatic
 
 To get started using Dynamatic (after setting it up), check out our [introductory tutorial](docs/Tutorials/Introduction/Introduction.md), which guides you through your first compilation of C code into a synthesizable dataflow circuit! If you want to start modifying Dynamatic and are new to MLIR or compilers in general, our [MLIR primer](docs/Tutorials/MLIRPrimer.md) and [pass creation tutorial](docs/Tutorials/CreatingPasses/CreatingPasses.md) will help you take your first steps.
