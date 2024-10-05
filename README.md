@@ -97,3 +97,7 @@ The following instructions can be used to setup Dynamatic from source. If you in
     cd build
     ninja check-dynamatic
     ```
+    You can also run the integration tests using the provided Dynamatic [script](tools/dynamatic/samples/run-all-tests.dyn).
+    ```sh
+    bin/dynamatic --run=/tools/dynamatic/samples/run-all-tests.dyn
+    ```
