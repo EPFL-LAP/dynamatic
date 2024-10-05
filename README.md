@@ -16,7 +16,7 @@ There are currently two ways to setup and use Dynamatic locally.
 
 To get started using Dynamatic (after setting it up), check out our [introductory tutorial](docs/Tutorials/Introduction/Introduction.md), which guides you through your first compilation of C code into a synthesizable dataflow circuit! If you want to start modifying Dynamatic and are new to MLIR or compilers in general, our [MLIR primer](docs/Tutorials/MLIRPrimer.md) and [pass creation tutorial](docs/Tutorials/CreatingPasses/CreatingPasses.md) will help you take your first steps.
 
-For an high-level overview of the project's structure and of our contribution guidelines. see our [*Getting Started*](docs/GettingStarted.md) page.
+For an high-level overview of the project's structure and of our contribution guidelines. see our [*Contribution Guide*](docs/ContribGuide.md).
 
 ## Building from source
 
@@ -25,7 +25,7 @@ The following instructions can be used to setup Dynamatic from source. If you in
 1. **Install dependencies required by the project.**
 
     Most of our dependencies are provided as standard packages on most Linux distributions. Dynamatic needs a working C/C++ toolchain (compiler, linker), `cmake` and `ninja` for building the project, Python (3.6 or newer), a recent JDK (Java Development Kit) for Scala, GraphViz to work with `.dot` files, Boost's regex library, and standard command-line tools like `git`.
-  
+
     On `apt`-based Linux distributions:
 
     ```sh

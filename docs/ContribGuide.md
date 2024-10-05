@@ -1,4 +1,4 @@
-# Getting Started with Dynamatic
+# Contribution Guide
 
 ## Overview
 
@@ -51,7 +51,7 @@ Dynamatic uses [git submodules](https://git-scm.com/book/en/v2/Git-Tools-Submodu
 
 ### Polygeist
 
-[Polygeist](https://github.com/llvm/Polygeist) is a C/C++ frontend for MLIR including polyhedral optimizations and parallel optimizations features. Polygeist is thus responsible for the first step of our compilation process, that is taking source code written in C/C++ into the MLIR ecosystem. In particular, we care that our entry point to MLIR is at a very high semantic level, namely, at a level where polyhedral analysis is possible. The latter allows us to easily identify dependencies between memory accesses in source programs in a very accurate manner, which is key to optimizing the allocation of memory interfaces and resources in our elastic circuits down the line. Polygeist is able to emit MLIR code in the [*Affine*](https://mlir.llvm.org/docs/Dialects/Affine/) dialect, which is perfectly suited for this kind of analysis. 
+[Polygeist](https://github.com/llvm/Polygeist) is a C/C++ frontend for MLIR including polyhedral optimizations and parallel optimizations features. Polygeist is thus responsible for the first step of our compilation process, that is taking source code written in C/C++ into the MLIR ecosystem. In particular, we care that our entry point to MLIR is at a very high semantic level, namely, at a level where polyhedral analysis is possible. The latter allows us to easily identify dependencies between memory accesses in source programs in a very accurate manner, which is key to optimizing the allocation of memory interfaces and resources in our elastic circuits down the line. Polygeist is able to emit MLIR code in the [*Affine*](https://mlir.llvm.org/docs/Dialects/Affine/) dialect, which is perfectly suited for this kind of analysis.
 
 ### CIRCT
 
@@ -61,7 +61,7 @@ Dynamatic uses [git submodules](https://git-scm.com/book/en/v2/Git-Tools-Submodu
 
 Having a project with submodules means that you have to pay attention to a couple additional things when pulling/pushing code to the project to maintain it in sync with the submodules. If you are unfamiliar with submodules, you can learn more about how to work with them [here](https://git-scm.com/book/en/v2/Git-Tools-Submodules). Below is a very short and incomplete description of how our submodules are managed by our repository as well as a few pointers on how to perform simple git-related tasks in this context.
 
-Along the history of Dynamatic's (in this context, called the *superproject*) directory structure and file contents, the repository stores the commit hash of a specific commit for each submodule's repository to identify the version of each *subproject* that the superproject currently depends on. These commit hashes are added and commited the same way as any other modification to the repository, and can thus evolve as development moves forward, allowing us to use more recent version of our submodules as they are pushed to their respective repositories. Here are a few concrete things you need to keep in mind while using the repository that may differ from your usual submodule-free workflow. 
+Along the history of Dynamatic's (in this context, called the *superproject*) directory structure and file contents, the repository stores the commit hash of a specific commit for each submodule's repository to identify the version of each *subproject* that the superproject currently depends on. These commit hashes are added and commited the same way as any other modification to the repository, and can thus evolve as development moves forward, allowing us to use more recent version of our submodules as they are pushed to their respective repositories. Here are a few concrete things you need to keep in mind while using the repository that may differ from your usual submodule-free workflow.
 - Clone the repository with `git clone --recurse-submodules git@github.com:EPFL-LAP/dynamatic.git` to instruct git to also pull and check out the version of the submodules referenced in the latest commit of Dynamatic's `main` branch.
 - When pulling the latest commit(s), use `git pull --recurse-submodules` from the top level repository to also update the checked out commit from submodules in case the superproject changed the subprojects commits it is tracking.
 - To commit changes made to files within Polygeist from the superproject (which is possible thanks to the fact that we use a fork of Polygeist), you first need to commit these changes to the Polygeist fork, and then update the Polygeist commit tracked by the superproject. More precisely,
@@ -69,8 +69,8 @@ Along the history of Dynamatic's (in this context, called the *superproject*) di
   2. `git add` your changes and `git commit` them to the Polygeist fork,
   3. `cd` back to the top level directory,
   4. `git add polygeist` to tell the superproject to track your new Polygeist commit and `git commit` to Dynamatic.
-  
-  If you want to push these changes to remote, note that you will need to `git push` *twice*, once from the `polygeist` subdirectory (the Polygeist commit) and once from the top level directory (the Dynamatic commit). 
+
+  If you want to push these changes to remote, note that you will need to `git push` *twice*, once from the `polygeist` subdirectory (the Polygeist commit) and once from the top level directory (the Dynamatic commit).
 
 ## Testing
 
@@ -78,11 +78,11 @@ Dynamatic features unit tests that evaluate the behavior of a small part of the 
 
 Dynamatic also contains integration tests that assess the whole flow by going from C to VHDL. Each folder containing C source code inside the `integration-test` directory is a separate integration test.
 
-# Contributing 
+# Contributing
 
 Dynamatic welcomes contributions from the open-source community and from students as part of academic projects. We generally follow the LLVM and MLIR community practices, and currently use [GitHub issues and pull requests](#github-issues--pull-requests) to handle bug reports/design proposals and code contributions, respectively. Here are some high-level guidelines (inspired from CIRCT's guidelines):
 - Please use `clang-format` in the LLVM style to format the code (see [`.clang-format`](../.clang-format)). There are good plugins for common editors like [VSCode](https://marketplace.visualstudio.com/items?itemName=ms-vscode.cpptools&ssr=false) that can be set up to format each file on save, or you can run it manually. This makes code easier to read and understand, and more uniform throuhgout the codebase.
-- Please pay attention to warnings from `clang-tidy` (see [`.clang-tidy`](../.clang-tidy)). Not all necessarily need to be acted upon, but in the majority of cases they help in identifying code-smells. 
+- Please pay attention to warnings from `clang-tidy` (see [`.clang-tidy`](../.clang-tidy)). Not all necessarily need to be acted upon, but in the majority of cases they help in identifying code-smells.
 - Please follow the [LLVM Coding Standards](https://llvm.org/docs/CodingStandards.html).
 - Please practice [*incremental development*](https://llvm.org/docs/DeveloperPolicy.html#incremental-development), preferring to send a small series of incremental patches rather than large patches. There are other policies in the LLVM Developer Policy document that are worth skimming.
 - Please create an issue if you run into a a bug or problem with Dynamatic.
@@ -91,7 +91,7 @@ Dynamatic welcomes contributions from the open-source community and from student
 ## GitHub Issues & Pull requests
 
 The project uses GitHub [issues](https://github.com/features/issues) and [pull requests (PRs)](https://docs.github.com/en/pull-requests/collaborating-with-pull-requests/proposing-changes-to-your-work-with-pull-requests/about-pull-requests) to handle contributions from the community. If you are unfamiliar with those, here are some guidelines on how to use them productively:
-- Use meaningful titles and descriptions for issues and PRs you create. Titles should be short yet specific and descriptions should give a good sense of what you are bringing forward, be it a bug report or code contribution.  
+- Use meaningful titles and descriptions for issues and PRs you create. Titles should be short yet specific and descriptions should give a good sense of what you are bringing forward, be it a bug report or code contribution.
 - If you intend to contribute a large chunk of code to the project, it may be a good idea to first open a GitHub issue to describe the high-level design of your contribution there and leave it up for discussion. This can only increase the likelihood of your work eventually being merged, as the community will have had a chance to discuss the design before you propose your implementation in a PR (e.g., if the contribution is deemed to large, the community may advise to split it up in several incremental patches). This is especially advisable to first-time contributors to open-source projects and/or compiler development beginners.
 - Use "Squash and Merge" in PRs when they are approved - we don't need the intra-change history in the repository history.
 
@@ -101,4 +101,4 @@ One of Dynamatic's priority is to keep the repository's `main` branch stable at 
 
 To achieve these dual and slightly conflicting goals, Dynamatic supports *experimental* contributions to the repository. These will still have to go through a PR but will be merged more easily (i.e., with *slightly* less regards to code quality) compared to *non-experimental* contributions. We offer this possibility as a way to push for the integration of research work inside the project, with the ultimate goal of having these contributions graduate to full *non-experimental* work. Obviously, we strongly encourage developers to make their submitted code contributions as clean and reliable as possible regardless of whether they are classified as experimental. It can only increase their chance of acceptance.
 
-To clearly separate them from the rest, all *experimental* contributions should exist within the `experimental` directory which is located at the top level of the repository. The latter's internal structure is identical to the one at the top level (see the [repository's structure](#directory-structure)) with an `include` folder for all headers, a `lib` folder for pass implementations, etc. All public code entities defined within experimental work should live under the `dynamatic::experimental` C++ namespace for clear separation with *non-experimental* publicly defined entities. 
+To clearly separate them from the rest, all *experimental* contributions should exist within the `experimental` directory which is located at the top level of the repository. The latter's internal structure is identical to the one at the top level (see the [repository's structure](#directory-structure)) with an `include` folder for all headers, a `lib` folder for pass implementations, etc. All public code entities defined within experimental work should live under the `dynamatic::experimental` C++ namespace for clear separation with *non-experimental* publicly defined entities.
