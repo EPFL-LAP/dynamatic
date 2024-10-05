@@ -18,7 +18,7 @@ Also, please note the following post-install recommendations. They are necessary
     ```sh
     export GUROBI_HOME="/opt/gurobi<version>/linux64"
     export PATH="${PATH}:${GUROBI_HOME}/bin"
-    export LD_LIBRARY_PATH="$LD_LIBRARY_PATH:$GUROBI_HOME/lib"
+    export LD_LIBRARY_PATH="${LD_LIBRARY_PATH}:${GUROBI_HOME}/lib"
     ```
     These environment variables are used by Dynamatic's cmake settings to determine how to include Gurobi headers. **Rerun the build script** after adding the environment variables in order for cmake to recognize them.
 
