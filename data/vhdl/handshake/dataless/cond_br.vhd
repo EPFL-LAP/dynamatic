@@ -44,6 +44,10 @@ begin
   branch_ready   <= (falseOut_ready and not condition(0)) or (trueOut_ready and condition(0));
 end architecture;
 
+library ieee;
+use ieee.std_logic_1164.all;
+use ieee.numeric_std.all;
+
 entity cond_br_dataless_with_tag is
   port (
     clk, rst : in std_logic;

@@ -48,6 +48,10 @@ begin
   falseOut <= data;
 end architecture;
 
+library ieee;
+use ieee.std_logic_1164.all;
+use ieee.numeric_std.all;
+
 entity cond_br_with_tag is
   generic (
     DATA_TYPE : integer
@@ -77,7 +81,7 @@ entity cond_br_with_tag is
   );
 end entity;
 
-architecture arch of cond_br is
+architecture arch of cond_br_with_tag is
 begin
   control : entity work.cond_br_dataless_with_tag
     port map(
@@ -88,7 +92,7 @@ begin
       data_ready      => data_ready,
       condition       => condition,
       condition_valid => condition_valid,
-      condition_spec_tag => condition_spec_tag
+      condition_spec_tag => condition_spec_tag,
       condition_ready => condition_ready,
       trueOut_valid   => trueOut_valid,
       trueOut_spec_tag => trueOut_spec_tag,

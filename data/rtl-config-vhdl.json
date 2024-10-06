@@ -261,7 +261,8 @@
       }
     ],
     "generic": "$DYNAMATIC/data/vhdl/handshake/dataless/oehb.vhd",
-    "module-name": "oehb_dataless"
+    "module-name": "oehb_dataless",
+    "dependencies": ["oehb_dataless_with_tag"]
   },
   {
     "name": "handshake.buffer",
@@ -337,7 +338,8 @@
       }
     ],
     "generic": "$DYNAMATIC/data/vhdl/handshake/dataless/tehb.vhd",
-    "module-name": "tehb_dataless"
+    "module-name": "tehb_dataless",
+    "dependencies": ["tehb_dataless_with_tag"]
   },
   {
     "name": "handshake.buffer",
@@ -405,7 +407,7 @@
     ],
     "generic": "$DYNAMATIC/data/vhdl/handshake/dataless/fork.vhd",
     "module-name": "fork_dataless",
-    "dependencies": ["logic", "eager_fork_register_block"]
+    "dependencies": ["logic", "eager_fork_register_block", "fork_dataless_with_tag"]
   },
   {
     "name": "handshake.fork",
@@ -505,7 +507,7 @@
     ],
     "generic": "$DYNAMATIC/data/vhdl/handshake/dataless/control_merge.vhd",
     "module-name": "control_merge_dataless",
-    "dependencies": ["merge_notehb_dataless", "tehb", "fork_dataless"]
+    "dependencies": ["merge_notehb_dataless", "tehb", "fork_dataless", "control_merge_dataless_with_tag"]
   },
   {
     "name": "handshake.control_merge",
@@ -796,6 +798,26 @@
   },
   {
     "generic": "$DYNAMATIC/data/vhdl/support/types.vhd"
+  },
+  {
+    "generic": "$DYNAMATIC/data/vhdl/support/dataless/fork_with_tag.vhd",
+    "module-name": "fork_dataless_with_tag",
+    "dependencies": ["handshake_fork"]
+  },
+  {
+    "generic": "$DYNAMATIC/data/vhdl/support/dataless/control_merge_with_tag.vhd",
+    "module-name": "control_merge_dataless_with_tag",
+    "dependencies": ["control_merge"]
+  },
+  {
+    "generic": "$DYNAMATIC/data/vhdl/support/dataless/oehb_with_tag.vhd",
+    "module-name": "oehb_dataless_with_tag",
+    "dependencies": ["oehb"]
+  },
+  {
+    "generic": "$DYNAMATIC/data/vhdl/support/dataless/tehb_with_tag.vhd",
+    "module-name": "tehb_dataless_with_tag",
+    "dependencies": ["tehb"]
   },
   {
     "name": "mem_to_bram",

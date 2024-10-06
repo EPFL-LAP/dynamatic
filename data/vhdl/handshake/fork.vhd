@@ -40,6 +40,10 @@ begin
   end process;
 end architecture;
 
+library ieee;
+use ieee.std_logic_1164.all;
+use work.types.all;
+
 entity handshake_fork_with_tag is
   generic (
     SIZE     : integer;
@@ -86,5 +90,5 @@ begin
       outs => outs_inner,
       outs_valid => outs_valid,
       outs_ready => outs_ready
-    )
+    );
 end architecture;

@@ -40,6 +40,10 @@ begin
   result <= std_logic_vector(unsigned(lhs) - unsigned(rhs));
 end architecture;
 
+library ieee;
+use ieee.std_logic_1164.all;
+use ieee.numeric_std.all;
+
 entity subi_with_tag is
   generic (
     DATA_TYPE : integer
