@@ -30,6 +30,10 @@ architecture arch of control_merge is
   signal index_internal : std_logic_vector(DATA_TYPE - 1 downto 0);
 begin
   control : entity work.control_merge_dataless
+    generic map(
+      SIZE        => SIZE,
+      INDEX_TYPE  => INDEX_TYPE
+    )
     port map(
       clk         => clk,
       rst         => rst,
@@ -43,5 +47,5 @@ begin
     );
 
   index <= index_internal;
-  outs  <= ins(index_internal);
+  outs  <= ins(to_integer(unsigned(index_internal)));
 end architecture;
