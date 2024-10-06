@@ -59,6 +59,10 @@ begin
 
 end architecture;
 
+library ieee;
+use ieee.std_logic_1164.all;
+use ieee.numeric_std.all;
+
 entity tehb_with_tag is
   generic (
     DATA_TYPE : integer

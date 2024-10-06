@@ -28,6 +28,10 @@ begin
   ins_ready                                 <= outs_ready;
 end architecture;
 
+library ieee;
+use ieee.std_logic_1164.all;
+use ieee.numeric_std.all;
+
 entity extsi_with_tag is
   generic (
     INPUT_TYPE  : integer;

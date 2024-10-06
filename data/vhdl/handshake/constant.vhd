@@ -25,6 +25,10 @@ begin
   ctrl_ready <= outs_ready;
 end architecture;
 
+library ieee;
+use ieee.std_logic_1164.all;
+use ieee.numeric_std.all;
+
 entity ENTITY_NAME_with_tag is
   generic (
     DATA_WIDTH : integer

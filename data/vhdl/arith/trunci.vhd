@@ -28,6 +28,10 @@ begin
   ins_ready  <= not ins_valid or (ins_valid and outs_ready);
 end architecture;
 
+library ieee;
+use ieee.std_logic_1164.all;
+use ieee.numeric_std.all;
+
 entity trunci_with_tag is
   generic (
     INPUT_TYPE  : integer;
@@ -63,4 +67,4 @@ begin
       outs_valid => outs_valid,
       ins_ready  => ins_ready
     );
-end architecture
+end architecture;

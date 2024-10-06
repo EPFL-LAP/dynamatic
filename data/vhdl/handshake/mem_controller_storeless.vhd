@@ -87,6 +87,11 @@ begin
 
 end architecture;
 
+library ieee;
+use ieee.std_logic_1164.all;
+use ieee.numeric_std.all;
+use work.types.all;
+
 entity mem_controller_storeless_with_tag is
   generic (
     NUM_LOADS  : integer;
