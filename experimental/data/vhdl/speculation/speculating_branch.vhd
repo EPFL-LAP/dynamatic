@@ -1,6 +1,6 @@
 library ieee;
 use ieee.std_logic_1164.all;
-use work.customTypes.all;
+use work.types.all;
 
 entity speculating_branch is 
     generic(

@@ -717,7 +717,8 @@
       { "name": "DATA_SIZE_OUT", "type": "dataflow", "data-lb": 0, "extra-eq": 0 },
       { "name": "FIFO_DEPTH", "type": "unsigned", "lb": 1 }
     ],
-    "generic": "$DYNAMATIC/experimental/data/vhdl/speculation/speculator.vhd"
+    "generic": "$DYNAMATIC/experimental/data/vhdl/speculation/speculator.vhd",
+    "dependencies": ["types"]
   },
   {
     "name": "handshake.spec_commit",
@@ -725,7 +726,8 @@
       { "name": "DATA_SIZE_IN", "type": "dataflow", "data-lb": 0, "extra-eq": 0 },
       { "name": "DATA_SIZE_OUT", "type": "dataflow", "data-lb": 0, "extra-eq": 0 }
     ],
-    "generic": "$DYNAMATIC/experimental/data/vhdl/speculation/spec_commit.vhd"
+    "generic": "$DYNAMATIC/experimental/data/vhdl/speculation/spec_commit.vhd",
+    "dependencies": ["types"]
   },
   {
     "name": "handshake.spec_save",
@@ -733,7 +735,8 @@
       { "name": "DATA_SIZE_IN", "type": "dataflow", "data-lb": 0, "extra-eq": 0 },
       { "name": "DATA_SIZE_OUT", "type": "dataflow", "data-lb": 0, "extra-eq": 0 }
     ],
-    "generic": "$DYNAMATIC/experimental/data/vhdl/speculation/spec_save.vhd"
+    "generic": "$DYNAMATIC/experimental/data/vhdl/speculation/spec_save.vhd",
+    "dependencies": ["types"]
   },
   {
     "name": "handshake.spec_save_commit",
@@ -742,7 +745,8 @@
       { "name": "DATA_SIZE_OUT", "type": "dataflow", "data-lb": 0, "extra-eq": 0 },
       { "name": "FIFO_DEPTH", "type": "unsigned", "lb": 1 }
     ],
-    "generic": "$DYNAMATIC/experimental/data/vhdl/speculation/spec_save_commit.vhd"
+    "generic": "$DYNAMATIC/experimental/data/vhdl/speculation/spec_save_commit.vhd",
+    "dependencies": ["types"]
   },
   {
     "name": "handshake.speculating_branch",
@@ -753,7 +757,8 @@
       { "name": "DATA_SIZE_OUT", "type": "dataflow", "data-lb": 0, "extra-eq": 0 },
       { "name": "FIFO_DEPTH", "type": "unsigned", "lb": 1 }
     ],
-    "generic": "$DYNAMATIC/experimental/data/vhdl/speculation/speculating_branch.vhd"
+    "generic": "$DYNAMATIC/experimental/data/vhdl/speculation/speculating_branch.vhd",
+    "dependencies": ["types"]
   },
   {
     "generic": "$DYNAMATIC/data/vhdl/support/delay_buffer.vhd"
