@@ -43,3 +43,49 @@ begin
   falseOut_valid <= (not condition(0)) and branchInputs_valid;
   branch_ready   <= (falseOut_ready and not condition(0)) or (trueOut_ready and condition(0));
 end architecture;
+
+entity cond_br_dataless_with_tag is
+  port (
+    clk, rst : in std_logic;
+    -- data input channel
+    data_valid : in  std_logic;
+    data_spec_tag : in std_logic;
+    data_ready : out std_logic;
+    -- condition input channel
+    condition       : in  std_logic_vector(0 downto 0);
+    condition_valid : in  std_logic;
+    condition_spec_tag : in std_logic;
+    condition_ready : out std_logic;
+    -- true output channel
+    trueOut_valid : out std_logic;
+    trueOut_spec_tag : out std_logic;
+    trueOut_ready : in  std_logic;
+    -- false output channel
+    falseOut_valid : out std_logic;
+    falseOut_spec_tag : out std_logic;
+    falseOut_ready : in  std_logic
+  );
+end entity;
+
+architecture arch of cond_br_dataless_with_tag is
+  signal spec_tag : std_logic;
+begin
+  spec_tag <= data_spec_tag or condition_spec_tag;
+  trueOut_spec_tag <= spec_tag;
+  falseOut_spec_tag <= spec_tag;
+
+  cond_br_inner : entity work.cond_br_dataless(arch)
+    port map(
+      clk             => clk,
+      rst             => rst,
+      data_valid      => data_valid,
+      data_ready      => data_ready,
+      condition       => condition,
+      condition_valid => condition_valid,
+      condition_ready => condition_ready,
+      trueOut_valid   => trueOut_valid,
+      trueOut_ready   => trueOut_ready,
+      falseOut_valid  => falseOut_valid,
+      falseOut_ready  => falseOut_ready
+    );
+end architecture;
