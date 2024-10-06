@@ -1,7 +1,7 @@
 library IEEE;
 USE IEEE.STD_LOGIC_1164.ALL;
 USE IEEE.NUMERIC_STD.ALL;
-USE work.customTypes.all;
+USE work.types.all;
 entity spec_save_commit is
 
   Generic (

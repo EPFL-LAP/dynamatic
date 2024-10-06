@@ -1,7 +1,7 @@
 library IEEE;
 USE IEEE.STD_LOGIC_1164.ALL;
 USE IEEE.NUMERIC_STD.ALL;
-use work.customTypes.all;
+use work.types.all;
 entity specgenCore is
 
   Generic (
@@ -330,7 +330,7 @@ end architecture;
 library IEEE;
 USE IEEE.STD_LOGIC_1164.ALL;
 USE IEEE.NUMERIC_STD.ALL;
-use work.customTypes.all;
+use work.types.all;
 entity decodeSave is
     Port (
         controlInArray : in data_array(0 downto 0)(2 downto 0);
@@ -381,7 +381,7 @@ end architecture;
 library IEEE;
 USE IEEE.STD_LOGIC_1164.ALL;
 USE IEEE.NUMERIC_STD.ALL;
-use work.customTypes.all;
+use work.types.all;
 entity decodeCommit is
     Port (
         controlInArray : in data_array(0 downto 0)(2 downto 0);
@@ -430,7 +430,7 @@ end architecture;
 library IEEE;
 USE IEEE.STD_LOGIC_1164.ALL;
 USE IEEE.NUMERIC_STD.ALL;
-use work.customTypes.all;
+use work.types.all;
 entity decodeBranch is
     Port (
         controlInArray : in data_array(0 downto 0)(2 downto 0);
@@ -479,7 +479,7 @@ end architecture;
 library IEEE;
 USE IEEE.STD_LOGIC_1164.ALL;
 USE IEEE.NUMERIC_STD.ALL;
-use work.customTypes.all;
+use work.types.all;
 entity decodeSC is
     Port (
         controlInArray : in data_array(0 downto 0)(2 downto 0);
@@ -538,7 +538,7 @@ end architecture;
 library IEEE;
 USE IEEE.STD_LOGIC_1164.ALL;
 USE IEEE.NUMERIC_STD.ALL;
-use work.customTypes.all;
+use work.types.all;
 entity decodeOutput is
     Port (
         controlInArray : in data_array(0 downto 0)(2 downto 0);
@@ -583,7 +583,7 @@ end architecture;
 library IEEE;
 USE IEEE.STD_LOGIC_1164.ALL;
 USE IEEE.NUMERIC_STD.ALL;
-use work.customTypes.all;
+use work.types.all;
 entity predictor is
     generic (
         DATA_SIZE_OUT : integer   -- use normal data size, eg- 32
@@ -642,7 +642,7 @@ end arch;
 library IEEE;
 USE IEEE.STD_LOGIC_1164.ALL;
 USE IEEE.NUMERIC_STD.ALL;
-use work.customTypes.all;
+use work.types.all;
 entity predFifo is
 
   Generic (
@@ -822,7 +822,7 @@ end architecture;
 
 library ieee;
 use ieee.std_logic_1164.all;
-use work.customTypes.all;
+use work.types.all;
 entity speculator is
     generic (
         DATA_SIZE_IN  : integer;  -- use normal data size, eg- 32
