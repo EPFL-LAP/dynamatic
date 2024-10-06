@@ -342,7 +342,7 @@ struct RemoveMuxFloatingLoop : public OpRewritePattern<handshake::MuxOp> {
 };
 
 // TODO: In its current form, the rule will apply even if the Branches has more
-// succs than the Merge. It is not wrong given that we are implement the
+// succs than the Merge. It is not wrong given that we are implementing the
 // Supp->Fork distribute rule
 // Rules A Removes Conditional Branch and Merge
 // operation pairs if both the inputs of the Merge are outputs of the
@@ -565,7 +565,7 @@ struct RemoveMergeBranchLoop : public OpRewritePattern<handshake::MergeOp> {
       return failure();
     mergeOuterInputIdx = (mergeCycleInputIdx == 0) ? 1 : 0;
 
-    llvm::errs() << "\t\t(1) Found a Merge-Branch loop\n";
+    // llvm::errs() << "\t\t(1) Found a Merge-Branch loop\n";
 
     // One of the branches in the set of Branches must have the same condition
     // as that of iterCondBranchOp but has none of its succs equal to the merge
@@ -606,7 +606,7 @@ struct RemoveMergeBranchLoop : public OpRewritePattern<handshake::MergeOp> {
     if (!foundExitBranch)
       return failure();
 
-    llvm::errs() << "\t\t(2) Found an exit Branch\n";
+    // llvm::errs() << "\t\t(2) Found an exit Branch\n";
 
     // This exitCondBranchOp has to be a suppress with at least one succ in only
     // one side; otherwise, the pattern match fails
@@ -616,7 +616,7 @@ struct RemoveMergeBranchLoop : public OpRewritePattern<handshake::MergeOp> {
          exitCondBranchOp.getFalseResult().getUsers().empty()))
       return failure();
 
-    llvm::errs() << "\t\t(3) Exit Branch is a Suppress\n";
+    // llvm::errs() << "\t\t(3) Exit Branch is a Suppress\n";
 
     // The two branches must be steering oppositely: Either have the same exact
     // condition but opposite result signs OR opposite conditions and same
@@ -638,8 +638,8 @@ struct RemoveMergeBranchLoop : public OpRewritePattern<handshake::MergeOp> {
     if (secondPassWithTrueCond == firstPassWithTrueCond)
       return failure();
 
-    llvm::errs()
-        << "\t\t(3) Exit Branch and Loop Branch haave opposite signs\n";
+    // llvm::errs() << "\t\t(3) Exit Branch and Loop Branch haave opposite
+    // signs\n";
 
     // Replace all uses of the branchOuterResult with
     // the muxOuterOperand
@@ -955,8 +955,10 @@ struct ExtractLoopCondition
                     (!isTrueOutputOuter && cmergeCycleInputIdx == 0));
     Value iterCond;
     if (needNot) {
+      rewriter.setInsertionPoint(condBranchOp);
       handshake::NotOp notOp =
           rewriter.create<handshake::NotOp>(condBranchOp->getLoc(), condition);
+      inheritBB(notOp, condBranchOp);
       iterCond = notOp.getResult();
     } else {
       iterCond = condition;
@@ -984,9 +986,11 @@ struct ExtractLoopCondition
 
     // 3rd) Add a new Merge operation to serve as the INIT
     ValueRange operands = {iterCond, valueOfConstant};
+    rewriter.setInsertionPoint(cmergeOp);
     handshake::MergeOp mergeOp =
         rewriter.create<handshake::MergeOp>(cmergeOp.getLoc(), operands);
     Value muxSel = mergeOp.getResult();
+    inheritBB(cmergeOp, mergeOp);
 
     Value index = cmergeOp.getIndex();
     rewriter.replaceAllUsesWith(index, muxSel);
@@ -1854,6 +1858,134 @@ struct DistributeSuppresses
   }
 };
 
+struct ConvertLoopMergeToMux : public OpRewritePattern<handshake::MergeOp> {
+  using OpRewritePattern<handshake::MergeOp>::OpRewritePattern;
+
+  LogicalResult matchAndRewrite(handshake::MergeOp mergeOp,
+                                PatternRewriter &rewriter) const override {
+    // Doublecheck that the Merge has 2 inputs
+    if (mergeOp->getNumOperands() != 2)
+      return failure();
+
+    // Get the users of the Merge
+    auto mergeUsers = (mergeOp.getResult()).getUsers();
+    if (mergeUsers.empty())
+      return failure();
+
+    // One user must be a Branch; otherwise, the pattern match fails
+    bool foundCondBranch = false;
+    DenseSet<handshake::ConditionalBranchOp> branches;
+    for (auto mergeUser : mergeUsers) {
+      if (isa_and_nonnull<handshake::ConditionalBranchOp>(mergeUser)) {
+        foundCondBranch = true;
+        branches.insert(cast<handshake::ConditionalBranchOp>(mergeUser));
+      }
+    }
+    if (!foundCondBranch)
+      return failure();
+
+    // This condBranchOp must also be an operand forming a cycle with the
+    // merge; otherwise, the pattern match fails
+    bool foundCycle = false;
+    int operIdx = 0;
+    int mergeOuterInputIdx = 0;
+    int mergeCycleInputIdx = 0;
+    handshake::ConditionalBranchOp condBranchOp;
+    for (auto mergeOperand : mergeOp->getOperands()) {
+      if (isa_and_nonnull<handshake::ConditionalBranchOp>(
+              mergeOperand.getDefiningOp()))
+        if (branches.contains(cast<handshake::ConditionalBranchOp>(
+                mergeOperand.getDefiningOp()))) {
+          foundCycle = true;
+          mergeCycleInputIdx = operIdx;
+          condBranchOp = cast<handshake::ConditionalBranchOp>(
+              mergeOperand.getDefiningOp());
+          break;
+        }
+      operIdx++;
+    }
+    if (!foundCycle)
+      return failure();
+    mergeOuterInputIdx = (mergeCycleInputIdx == 0) ? 1 : 0;
+
+    // Retrieve the values at the merge inputs
+    OperandRange mergeDataOperands = mergeOp.getDataOperands();
+    Value mergeInnerOperand = mergeDataOperands[mergeCycleInputIdx];
+
+    // Identify the output of the Branch going outside of the loop (even if it
+    // has no users)
+    bool isTrueOutputOuter = false;
+    Value branchTrueResult = condBranchOp.getTrueResult();
+    Value branchFalseResult = condBranchOp.getFalseResult();
+    Value branchOuterResult;
+    if (branchTrueResult == mergeInnerOperand)
+      branchOuterResult = branchFalseResult;
+    else if (branchFalseResult == mergeInnerOperand) {
+      branchOuterResult = branchTrueResult;
+      isTrueOutputOuter = true;
+    } else
+      return failure();
+
+    // 1st) Identify whether the loop condition will be connected directly or
+    // through a NOT
+    // Note: This strategy is correct, but might result in the insertion of
+    Value condition = condBranchOp.getConditionOperand();
+    bool needNot = ((isTrueOutputOuter && mergeCycleInputIdx == 1) ||
+                    (!isTrueOutputOuter && mergeCycleInputIdx == 0));
+    Value iterCond;
+    if (needNot) {
+      rewriter.setInsertionPoint(condBranchOp);
+      handshake::NotOp notOp =
+          rewriter.create<handshake::NotOp>(condBranchOp->getLoc(), condition);
+      inheritBB(condBranchOp, notOp);
+      iterCond = notOp.getResult();
+    } else {
+      iterCond = condition;
+    }
+
+    // 2nd) Identify the value of the constant that will be triggered from Start
+    // and add it
+    // The value of the constant should be the mergeOuterInputIdx
+    int constVal = mergeOuterInputIdx;
+    // Obtain the start signal from the last argument of any block
+    Block *mergeBlock = mergeOp->getBlock();
+    MutableArrayRef<BlockArgument> l = mergeBlock->getArguments();
+    if (l.empty())
+      return failure();
+    mlir::Value start = l.back();
+    if (!isa<NoneType>(start.getType()))
+      return failure();
+
+    // Create a new ConstantOp in the same block as that of the branch
+    // forming the cycle
+    Type constantType = rewriter.getIntegerType(1);
+    rewriter.setInsertionPoint(mergeOp);
+    Value valueOfConstant = rewriter.create<handshake::ConstantOp>(
+        mergeOp->getLoc(), constantType,
+        rewriter.getIntegerAttr(constantType, constVal), start);
+
+    // 3rd) Add a new Merge operation to serve as the INIT
+    ValueRange operands = {iterCond, valueOfConstant};
+    rewriter.setInsertionPoint(mergeOp);
+    handshake::MergeOp initMergeOp =
+        rewriter.create<handshake::MergeOp>(mergeOp.getLoc(), operands);
+    inheritBB(mergeOp, initMergeOp);
+
+    Value muxSel = initMergeOp.getResult();
+
+    // Create a new muxOp and make it replace the mergeOp
+    rewriter.setInsertionPoint(mergeOp);
+    handshake::MuxOp newMuxOp = rewriter.create<handshake::MuxOp>(
+        mergeOp.getLoc(), muxSel, mergeOp->getOperands());
+    rewriter.replaceOp(mergeOp, newMuxOp);
+    inheritBB(mergeOp, newMuxOp);
+
+    llvm::errs() << "\t***Converted Merge to Mux!***\n";
+
+    return success();
+  }
+};
+
 /// Simple driver for the Handshake Rewrite Terms pass, based on a greedy
 /// pattern rewriter.
 struct HandshakeRewriteTermsPass
@@ -1876,7 +2008,8 @@ struct HandshakeRewriteTermsPass
              ConstructSuppresses, FixBranchesToSuppresses, DistributeSuppresses,
              ExtractIfThenElseCondition, ExtractLoopCondition,
              RemoveBranchMergeIfThenElse, RemoveBranchMuxIfThenElse,
-             RemoveMergeBranchLoop, RemoveMuxBranchLoop>(ctx);
+             RemoveMergeBranchLoop, RemoveMuxBranchLoop, ConvertLoopMergeToMux>(
+            ctx);
 
     if (failed(applyPatternsAndFoldGreedily(mod, std::move(patterns), config)))
       return signalPassFailure();
@@ -1884,59 +2017,6 @@ struct HandshakeRewriteTermsPass
 };
 }; // namespace
 
-// (1) Test gcd and spmv and sobel, (2) Fix bugs of Shorten, (3) Implement
-// Distribute Repeat->Fork, (4) See if you could suggest and explain which of
-// rules are enough for which benchmark OR apply only one class at a time and
-// collect results..
-
-// ShortenSuppressPairs, ShortenMuxRepeatPairs, ShortenMergeRepeatPairs
-
-// TODO: (1) Test the shorten rules, (2) Implement and test the rule of
-// distributing Repeats?, (3) Run full benchmarks
-// Might need TODO a rewriter
-// that erases any 2 NOTs in a sequence!!!!
-
-// VIP TODO: IN SHORTENING THE REPEAT, MAYBE IT IS WISER TO PUT IT IN THE LOOP
-// EXIT BLOCK OF THE OUTER LOOP TO TRICK THE BUFFERS???
-
-// TODO: FInish extract and remove loops and test, check the
-// situation of SHorten, add distribute of Repeat? (Rethink when is it needed??)
-
-// TODO: MAKE THE REMOVERULES consistent with the idea of extracting Suppresses
-// out of Branches first... Then, implement DistributeRepeats??? Then collect
-// numbers
-
-// EraseUnconditionalBranches, EraseSingleInputMerges,
-//              EraseSingleInputMuxes, EraseSingleInputControlMerges,
-//              DowngradeIndexlessControlMerge, BreakBranches,
-//              ExtractIfThenElseMuxCondition, ExtractLoopMuxCondition,
-//              RemoveBranchMergeIfThenElse, RemoveBranchMuxIfThenElse,
-//              RemoveMergeBranchLoop, RemoveMuxBranchLoop,
-//              ShortenSuppressPairs, ShortenMuxRepeatPairs,
-//              ShortenMergeRepeatPairs
-
-// WORTH THINKING::: The whole point of the local optimization rules is to make
-// the rules of the remove redundant datapath and the shorten datapath
-// applicable.. In particular the Repeat distribution over fork makes both
-// classes applicable, whereas the Branch-> Fork distibution makes only the
-// shorten datapath applicable. Now, due to my current way of implementing the
-// remove redundant datapath, we do not need to implement the Repeat->Fork
-// distribution in the need future...
-// BUT, WE need the rule that breaks one Branch into 2 suppresses...
-
-// TODO: (1) DEbug Sobel, (2) Test the datapath rules: Correctness and
-// effectiveness, (3) IMplement the SUPP->SUPP and REP->REP, (4) TODO anything
-// for the Supp rule that breaks one Branch into 2??, (5) Do you want to do
-// anything for forks (in particular the exchange fork supp rules...), (6) START
-// THINKING OF THE BUFFERS PROBLEM!!!
-
-// TODO: (Maybe after the BUffers): Change all rules to start applying (1)
-// canonicalization, (2) the rules of local changes, (3) extracting Mux
-// conditions, (4) Eliminating redundant datapaths, (5) Shortening datapaths
-// Then, add 1 function to the materialization pass (maybe) to
-// undo the effect of the local optimization rules by combine Branches AND
-// Muxes/Merges........ ALSO, in that additional pass, combine common Merges of
-// INIT
 std::unique_ptr<dynamatic::DynamaticPass> dynamatic::rewriteHandshakeTerms() {
   return std::make_unique<HandshakeRewriteTermsPass>();
 }
