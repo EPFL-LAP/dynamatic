@@ -38,3 +38,36 @@ begin
   end process;
 
 end architecture;
+
+entity join_with_tag is
+  generic (
+    SIZE : integer
+  );
+  port (
+    -- inputs
+    ins_valid  : in std_logic_vector(SIZE - 1 downto 0);
+    ins_spec_tag  : in std_logic_vector(SIZE - 1 downto 0);
+    outs_ready : in std_logic;
+    -- outputs
+    outs_valid : out std_logic;
+    outs_spec_tag : out std_logic;
+    ins_ready  : out std_logic_vector(SIZE - 1 downto 0)
+  );
+end join_with_tag;
+
+architecture arch of join_with_tag is
+  signal oneSpec : std_logic;
+begin
+  oneSpecOrGate : entity work.or_n generic map(SIZE) port map(ins_spec_tag, oneSpec);
+  outs_spec_tag <= oneSpec;
+
+  join_inner : entity work.join(arch) generic map(SIZE)
+    port map(
+      -- inputs
+      ins_valid  => ins_valid,
+      outs_ready => outs_ready,
+      -- outputs
+      outs_valid => outs_valid,
+      ins_ready  => ins_ready
+    );
+end architecture;

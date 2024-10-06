@@ -64,3 +64,60 @@ begin
       outs_ready => dataOut_ready
     );
 end architecture;
+
+entity mc_load_with_tag is
+  generic (
+    DATA_TYPE : integer;
+    ADDR_TYPE : integer
+  );
+  port (
+    clk, rst : in std_logic;
+    -- address from circuit channel
+    addrIn       : in  std_logic_vector(ADDR_TYPE - 1 downto 0);
+    addrIn_valid : in  std_logic;
+    addrIn_spec_tag : in std_logic;
+    addrIn_ready : out std_logic;
+    -- address to interface channel
+    addrOut       : out std_logic_vector(ADDR_TYPE - 1 downto 0);
+    addrOut_valid : out std_logic;
+    addrOut_spec_tag : out std_logic;
+    addrOut_ready : in  std_logic;
+    -- data from interface channel
+    dataFromMem       : in  std_logic_vector(DATA_TYPE - 1 downto 0);
+    dataFromMem_valid : in  std_logic;
+    dataFromMem_spec_tag : in std_logic;
+    dataFromMem_ready : out std_logic;
+    -- data from memory channel
+    dataOut       : out std_logic_vector(DATA_TYPE - 1 downto 0);
+    dataOut_valid : out std_logic;
+    dataOut_spec_tag : out std_logic;
+    dataOut_ready : in  std_logic
+  );
+end entity;
+
+architecture arch of mc_load_with_tag is
+begin
+  addrOut_spec_tag <= '0'; -- temp
+  dataOut_spec_tag <= '0'; -- temp
+  inner : entity work.mc_load(arch)
+    generic map(
+      DATA_TYPE,
+      ADDR_TYPE
+    )
+    port map(
+      clk => clk,
+      rst => rst,
+      addrIn => addrIn,
+      addrIn_valid => addrIn_valid,
+      addrIn_ready => addrIn_ready,
+      addrOut => addrOut,
+      addrOut_valid => addrOut_valid,
+      addrOut_ready => addrOut_ready,
+      dataFromMem => dataFromMem,
+      dataFromMem_valid => dataFromMem_valid,
+      dataFromMem_ready => dataFromMem_ready,
+      dataOut => dataOut,
+      dataOut_valid => dataOut_valid,
+      dataOut_ready => dataOut_ready
+    );
+end architecture;
