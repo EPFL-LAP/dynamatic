@@ -28,7 +28,7 @@ static constexpr const char *RTL_NAME_ATTR_NAME = "hw.name";
 static constexpr const char *RTL_PARAMETERS_ATTR_NAME = "hw.parameters";
 
 /// The type of a signal in a handshake channel: DATA, VALID, or READY.
-enum class SignalType { DATA, VALID, READY };
+enum class SignalType { DATA, VALID, READY, SPEC_TAG };
 
 /// Returns all the possible signal types in a dataflow channel.
 std::array<SignalType, 3> getSignalTypes();
