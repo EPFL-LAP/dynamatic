@@ -4,6 +4,8 @@ Dynamatic is an academic, open-source high-level synthesis compiler that produce
 
 We welcome contributions and feedback from the community. If you would like to participate, please check out our [contribution guidelines](docs/ContribGuide.md) and/or join our [Zulip community server](https://dynamatic.zulipchat.com/join/kb5xdsftwz2gr76rlxqa6vz5/).
 
+You can find tutorials and detailed documentation on various topics regarding Dynamatic in the [docs](docs) folder.
+
 ## Setting up Dynamatic
 
 There are currently two ways to setup and use Dynamatic locally.
