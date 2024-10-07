@@ -215,6 +215,7 @@ public:
 
   /// Suffixes for specfic signal types.
   static constexpr StringLiteral VALID_SUFFIX = StringLiteral("_valid"),
+                                 SPEC_TAG_SUFFIX = StringLiteral("_spec_tag"),
                                  READY_SUFFIX = StringLiteral("_ready");
 
   /// Export information (external modules must have already been concretized).
@@ -585,6 +586,7 @@ void VHDLWriter::writeSignalAssignments(WriteData &data) const {
   raw_indented_ostream &os = data.os;
   auto addValidReady = [&](StringRef name, StringRef signal) -> void {
     os << name << VALID_SUFFIX << " <= " << signal << VALID_SUFFIX << ";\n";
+    os << name << SPEC_TAG_SUFFIX << " <= " << signal << SPEC_TAG_SUFFIX << ";\n";
     os << signal << READY_SUFFIX << " <= " << name << READY_SUFFIX << ";\n";
   };
 
@@ -632,7 +634,14 @@ void VHDLWriter::writeModuleInstantiations(WriteData &data) const {
 
     raw_indented_ostream &os = data.os;
     // Declare the instance
-    os << instOp.getInstanceName() << " : entity work." << moduleName << "_with_tag";
+    std::string moduleNameWithTag;
+    // Temp: very rough way to handle fir and mem_to_bram
+    if (moduleName == "fir" || moduleName == "mem_to_bram") {
+      moduleNameWithTag = moduleName;
+    } else {
+      moduleNameWithTag = moduleName + "_with_tag";
+    }
+    os << instOp.getInstanceName() << " : entity work." << moduleNameWithTag;
     if (hdl == HDL::VHDL)
       os << "(" << archName << ")";
 
