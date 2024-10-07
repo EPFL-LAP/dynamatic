@@ -143,7 +143,7 @@ branch_disc: entity work.branch(arch) generic map(1, 2, DATA_SIZE_IN, DATA_SIZE_
 merge_out_dataIn <= (branch_disc_dataOut(0), branch_in_dataOut(0));
 merge_out_pValid <= (branch_disc_valid(0), branch_in_valid(0));
 merge_out_nReady(0) <= nReadyArray(0);  -- data nReady
-merge_out: entity work.merge(arch) generic map (2, 1, DATA_SIZE_IN, DATA_SIZE_IN)
+merge_out: entity work.merge_old(arch) generic map (2, 1, DATA_SIZE_IN, DATA_SIZE_IN)
     port map (
         clk => clk,
         rst => rst,

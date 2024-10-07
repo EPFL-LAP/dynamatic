@@ -1062,7 +1062,7 @@ fork_nReadyArray(0) <= decodeBranch_readyArray(0);
 -- instantiation
 
 ----------------------------------------------------------------
-data_fork: entity work.fork(arch) generic map(1, 2, DATA_SIZE_IN, DATA_SIZE_IN)
+data_fork: entity work.fork_old(arch) generic map(1, 2, DATA_SIZE_IN, DATA_SIZE_IN)
     port map (
         clk => clk,
         rst => rst,
@@ -1127,7 +1127,7 @@ predFifo0: entity work.predFifo(arch) generic map(DATA_SIZE_IN, DATA_SIZE_IN, FI
         nReadyArray => predFifo_nReadyArray
 );
 
-fork0: entity work.fork(arch) generic map(1, 5, 3, 3)
+fork0: entity work.fork_old(arch) generic map(1, 5, 3, 3)
     port map (
         clk => clk,
         rst => rst,

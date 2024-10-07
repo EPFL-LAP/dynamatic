@@ -60,7 +60,7 @@ readyArray(1) <= branch_resend_ready(1); -- control ready
 fork_in_dataIn(0) <= dataInArray(0);
 fork_in_pValid(0) <= pValidArray(0); -- data pValid
 fork_in_nReady <= (buff_ready(0), merge_out_ready(0));
-fork_in: entity work.fork(arch) generic map(1, 2, DATA_SIZE_IN, DATA_SIZE_IN)
+fork_in: entity work.fork_old(arch) generic map(1, 2, DATA_SIZE_IN, DATA_SIZE_IN)
     port map (
         clk => clk,
         rst => rst,
@@ -114,7 +114,7 @@ branch_resend: entity work.branch(arch) generic map(1, 2, DATA_SIZE_IN, DATA_SIZ
 merge_out_dataIn <= (branch_resend_dataOut(1), fork_in_dataOut(0));
 merge_out_pValid <= (branch_resend_valid(1), fork_in_valid(0));
 merge_out_nReady(0) <= nReadyArray(0);  -- data nReady
-merge_out: entity work.merge(arch) generic map (2, 1, DATA_SIZE_IN, DATA_SIZE_IN)
+merge_out: entity work.merge_old(arch) generic map (2, 1, DATA_SIZE_IN, DATA_SIZE_IN)
     port map (
         clk => clk,
         rst => rst,
