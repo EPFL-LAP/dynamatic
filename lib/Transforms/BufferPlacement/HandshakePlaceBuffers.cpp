@@ -513,6 +513,21 @@ LogicalResult HandshakePlaceBuffersPass::placeWithoutUsingMILP() {
       }
     }
 
+    for (auto sostInterfaceOp : funcOp.getOps<handshake::ForkOp>()) {
+      for (auto res : sostInterfaceOp->getResults()) {
+        ChannelBufProps &resProps = channelProps[res];
+        if (resProps.maxTrans.value_or(1) >= 1) {
+          resProps.minTrans = 5;
+        } else {
+          sostInterfaceOp->emitWarning()
+              << "Cannot place transparent buffer on merge-like operation's "
+                 "output due to channel-specific buffering constraints. This "
+                 "may "
+                 "yield an invalid buffering.";
+        }
+      }
+    }
+
     // Place the minimal number of buffers (as specified by the buffering
     // constraints on each channel) for each channel, deducting internal unit
     // buffers at the same time
