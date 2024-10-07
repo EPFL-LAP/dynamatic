@@ -246,7 +246,7 @@ use ieee.std_logic_1164.all;
 use ieee.numeric_std.all;
 use work.types.all;
 
-entity TEHB is 
+entity TEHB_old is 
     generic(
         INPUTS        : integer;  -- assumed always 1
         OUTPUTS       : integer;  -- assumed always 1
@@ -264,9 +264,9 @@ entity TEHB is
         validArray   : out std_logic_vector(0 downto 0);
         readyArray   : out std_logic_vector(0 downto 0)
     );
-end TEHB;
+end TEHB_old;
 
-architecture arch of TEHB is
+architecture arch of TEHB_old is
     signal full_reg, reg_en, mux_sel : std_logic;
     signal data_reg : std_logic_vector(DATA_SIZE_IN+1 -1 downto 0);
 
@@ -326,7 +326,7 @@ use ieee.std_logic_1164.all;
 use ieee.numeric_std.all;
 use work.types.all;
 
-entity OEHB is 
+entity OEHB_old is 
     generic(
         INPUTS        : integer;  -- assumed always 1
         OUTPUTS       : integer;  -- assumed always 1
@@ -344,9 +344,9 @@ entity OEHB is
         validArray   : out std_logic_vector(0 downto 0);
         readyArray   : out std_logic_vector(0 downto 0)
     );
-end OEHB;
+end OEHB_old;
 
-architecture arch of OEHB is
+architecture arch of OEHB_old is
     signal full_reg, reg_en, mux_sel : std_logic;
     signal data_reg : std_logic_vector(DATA_SIZE_IN+1 -1 downto 0);
 
@@ -431,7 +431,7 @@ begin
     specdataInArray(0) <= specInArray(0) & dataInArray(0);
     -----
 
-    tehb1: entity work.TEHB(arch) generic map (1, 1, DATA_SIZE_IN+1, DATA_SIZE_IN+1)
+    tehb1: entity work.TEHB_old(arch) generic map (1, 1, DATA_SIZE_IN+1, DATA_SIZE_IN+1)
             port map (
                 clk => clk,
                 rst => rst,
@@ -445,7 +445,7 @@ begin
                 specOutArray        => unconnected_spec
             );
 
-    oehb1: entity work.OEHB(arch) generic map (1, 1, DATA_SIZE_IN+1, DATA_SIZE_IN+1)
+    oehb1: entity work.OEHB_old(arch) generic map (1, 1, DATA_SIZE_IN+1, DATA_SIZE_IN+1)
             port map (
                 clk => clk, 
                 rst => rst, 
@@ -540,7 +540,7 @@ begin
         end loop;
     end process;
 
-    tehb1: entity work.TEHB(arch) generic map (1, 1, DATA_SIZE_IN+1, DATA_SIZE_IN+1)
+    tehb1: entity work.TEHB_old(arch) generic map (1, 1, DATA_SIZE_IN+1, DATA_SIZE_IN+1)
         port map (
             clk => clk,
             rst => rst,

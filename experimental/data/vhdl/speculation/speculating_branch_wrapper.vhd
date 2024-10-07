@@ -3,9 +3,10 @@ use ieee.std_logic_1164.all;
 use ieee.numeric_std.all;
 use work.types.all;
 
-entity speculating_branch_wrapper is
+entity speculating_branch_wrapper_with_tag is
   generic(
-    DATA_TYPE : integer
+    DATA_TYPE : integer;
+    SPEC_TAG_DATA_TYPE : integer
   );
   port(
     clk, rst : in std_logic;
@@ -14,11 +15,11 @@ entity speculating_branch_wrapper is
     data_valid : in  std_logic;
     data_spec_tag : in std_logic;
     data_ready : out std_logic;
-    -- condition input channel
-    condition       : in  std_logic;
-    condition_valid : in  std_logic;
-    condition_spec_tag : in std_logic;
-    condition_ready : out std_logic;
+    -- spec_tag_data used for condition
+    spec_tag_data       : in  std_logic_vector(SPEC_TAG_DATA_TYPE - 1 downto 0);
+    spec_tag_data_valid : in  std_logic;
+    spec_tag_data_spec_tag : in std_logic;
+    spec_tag_data_ready : out std_logic;
     -- true output channel
     trueOut       : out std_logic_vector(DATA_TYPE - 1 downto 0);
     trueOut_valid : out std_logic;
@@ -32,7 +33,7 @@ entity speculating_branch_wrapper is
   );
 end entity;
 
-architecture arch of speculating_branch_wrapper is
+architecture arch of speculating_branch_wrapper_with_tag is
   signal condition_inner : data_array(0 downto 0)(0 downto 0);
   signal dataInArray : data_array(0 downto 0)(DATA_TYPE - 1 downto 0);
   signal specInArray : data_array(1 downto 0)(0 downto 0);
@@ -44,12 +45,12 @@ architecture arch of speculating_branch_wrapper is
   signal validArray : std_logic_vector(1 downto 0);
   signal nReadyArray : std_logic_vector(1 downto 0);
 begin
-  condition_inner(0)(0) <= condition(0);
+  condition_inner(0)(0) <= '0';
   dataInArray(0) <= data;
   specInArray(0)(0) <= data_spec_tag;
-  specInArray(1)(0) <= condition_spec_tag;
-  pValidArray <= condition_valid & data_valid;
-  condition_ready <= readyArray(1);
+  specInArray(1)(0) <= spec_tag_data_spec_tag;
+  pValidArray <= spec_tag_data_valid & data_valid;
+  spec_tag_data_ready <= readyArray(1);
   data_ready <= readyArray(0);
   trueOut <= dataOutArray(0);
   falseOut <= dataOutArray(1);

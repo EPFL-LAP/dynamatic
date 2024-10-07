@@ -3,7 +3,7 @@ use ieee.std_logic_1164.all;
 use ieee.numeric_std.all;
 use work.types.all;
 
-entity spec_commit_wrapper is
+entity spec_commit_wrapper_with_tag is
   generic (
     DATA_TYPE : integer
   );
@@ -13,20 +13,20 @@ entity spec_commit_wrapper is
     ins : in std_logic_vector(DATA_TYPE - 1 downto 0);
     ins_valid : in std_logic;
     ins_spec_tag : in std_logic;
-    ctrl : in std_logic;
+    ctrl : in std_logic_vector(0 downto 0);
     ctrl_valid : in std_logic;
     ctrl_spec_tag : in std_logic; -- not used
-    result_ready : in std_logic;
+    outs_ready : in std_logic;
     -- outputs
-    result : out std_logic_vector(DATA_TYPE - 1 downto 0);
-    result_valid : out std_logic;
-    result_spec_tag : out std_logic;
+    outs : out std_logic_vector(DATA_TYPE - 1 downto 0);
+    outs_valid : out std_logic;
+    outs_spec_tag : out std_logic;
     ins_ready : out std_logic;
     ctrl_ready : out std_logic
   );
 end entity;
 
-architecture arch of spec_commit_wrapper is
+architecture arch of spec_commit_wrapper_with_tag is
   signal dataInArray   :  data_array(0 downto 0)(DATA_TYPE - 1 downto 0);
   signal specInArray   :  data_array(0 downto 0)(0 downto 0);
   signal ControlInArray  :  data_array(0 downto 0)(0 downto 0);
@@ -39,14 +39,14 @@ architecture arch of spec_commit_wrapper is
 begin
   dataInArray(0) <= ins;
   specInArray(0)(0) <= ins_spec_tag;
-  ControlInArray(0)(0) <= ctrl;
+  ControlInArray(0) <= ctrl;
   pValidArray <= ctrl_valid & ins_valid;
   ctrl_ready <= readyArray(1);
   ins_ready <= readyArray(0);
-  result <= dataOutArray(0);
-  result_valid <= validArray(0);
-  nReadyArray(0) <= result_ready;
-  result_spec_tag <= '0'; -- always 0
+  outs <= dataOutArray(0);
+  outs_valid <= validArray(0);
+  nReadyArray(0) <= outs_ready;
+  outs_spec_tag <= '0'; -- always 0
   spec_commit : entity work.spec_commit(arch)
     generic map(
       DATA_SIZE_IN => DATA_TYPE,

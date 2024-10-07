@@ -136,6 +136,16 @@ std::string handshake::ConditionalBranchOp::getResultName(unsigned idx) {
   return idx == ConditionalBranchOp::trueIndex ? "trueOut" : "falseOut";
 }
 
+std::string handshake::SpeculatingBranchOp::getOperandName(unsigned idx) {
+  assert(idx < getNumOperands() && "index too high");
+  return idx == 0 ? "spec_tag_data" : "data";
+}
+
+std::string handshake::SpeculatingBranchOp::getResultName(unsigned idx) {
+  assert(idx < getNumResults() && "index too high");
+  return idx == SpeculatingBranchOp::trueIndex ? "trueOut" : "falseOut";
+}
+
 std::string handshake::ConstantOp::getOperandName(unsigned idx) {
   assert(idx == 0 && "index too high");
   return "ctrl";
@@ -162,6 +172,29 @@ std::string handshake::SelectOp::getOperandName(unsigned idx) {
 std::string handshake::SelectOp::getResultName(unsigned idx) {
   assert(idx == 0 && "index too high");
   return "result";
+}
+
+std::string handshake::SpeculatorOp::getOperandName(unsigned idx) {
+  assert(idx < getNumOperands() && "index too high");
+  return idx == 0 ? "ins" : "enable";
+}
+
+std::string handshake::SpeculatorOp::getResultName(unsigned idx) {
+  assert(idx < getNumResults() && "index too high");
+  switch (idx) {
+  case 0:
+    return "outs";
+  case 1:
+    return "ctrl_commit";
+  case 2:
+    return "ctrl_save";
+  case 3:
+    return "ctrl_sc_save";
+  case 4:
+    return "ctrl_sc_commit";
+  default:
+    return "ctrl_sc_branch";
+  }
 }
 
 /// Load/Store base signal names common to all memory interfaces

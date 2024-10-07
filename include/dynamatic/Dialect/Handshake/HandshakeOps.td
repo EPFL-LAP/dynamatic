@@ -860,6 +860,7 @@ def EndOp : Handshake_Op<"end", [
 def SpeculatorOp : Handshake_Op<"speculator", [
   SpeculationOpInterface,
   AllTypesMatch<["dataIn", "dataOut"]>,
+  DeclareOpInterfaceMethods<NamedIOInterface, ["getOperandName", "getResultName"]>,
   DeclareOpInterfaceMethods<InferTypeOpInterface, ["inferReturnTypes"]>
 ]> {
   let summary = "Central control unit of the speculative circuit.";
@@ -895,12 +896,24 @@ def SpeculatorOp : Handshake_Op<"speculator", [
 }
 
 class Handshake_SpecOp<string mnemonic> : Handshake_Op<mnemonic, [
-  SpeculationOpInterface, AllTypesMatch<["dataIn", "dataOut"]>
+  SpeculationOpInterface, AllTypesMatch<["dataIn", "dataOut"]>,
+  DeclareOpInterfaceMethods<NamedIOInterface, ["getOperandName", "getResultName"]>
 ]> {
   let arguments = (ins HandshakeType:$dataIn, BoolChannel:$ctrl);
   let results = (outs HandshakeType:$dataOut);
   let assemblyFormat = [{
     `[` $ctrl `]` $dataIn attr-dict `:` type($dataIn) `,` type($ctrl)
+  }];
+  let extraClassDefinition = [{
+    std::string $cppClass::getOperandName(unsigned idx) {
+      assert(idx < getOperation()->getNumOperands() && "index too high");
+      return (idx == 0) ? "ins" : "ctrl";
+    }
+
+    std::string $cppClass::getResultName(unsigned idx) {
+      assert(idx < getOperation()->getNumResults() && "index too high");
+      return "outs";
+    }
   }];
 }
 
@@ -965,7 +978,8 @@ def SpecSaveCommitOp : Handshake_SpecOp<"spec_save_commit"> {
 
 def SpeculatingBranchOp : Handshake_Op<"speculating_branch", [
   SpeculationOpInterface,
-  AllTypesMatch<["dataOperand", "trueResult", "falseResult"]>
+  AllTypesMatch<["dataOperand", "trueResult", "falseResult"]>,
+  DeclareOpInterfaceMethods<NamedIOInterface, ["getOperandName", "getResultName"]>
 ]> {
   let summary = "speculating branch operation";
   let description = [{
@@ -989,6 +1003,10 @@ def SpeculatingBranchOp : Handshake_Op<"speculating_branch", [
   let assemblyFormat = [{
     `[` $tagFromOperand `]` $dataOperand attr-dict `:` 
       type($tagFromOperand) `,` type($dataOperand)
+  }];
+  let extraClassDeclaration = [{
+    // These are the indices into the dests list.
+    enum { trueIndex = 0, falseIndex = 1 };
   }];
 }
 
