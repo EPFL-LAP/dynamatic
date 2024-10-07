@@ -706,52 +706,45 @@
   {
     "name": "handshake.speculator",
     "parameters": [
-      { "name": "DATA_SIZE_IN", "type": "dataflow", "data-lb": 0, "extra-eq": 0 },
-      { "name": "DATA_SIZE_OUT", "type": "dataflow", "data-lb": 0, "extra-eq": 0 },
+      { "name": "DATA_TYPE", "type": "dataflow", "data-lb": 0, "extra-eq": 0 },
       { "name": "FIFO_DEPTH", "type": "unsigned", "lb": 1 }
     ],
-    "generic": "$DYNAMATIC/experimental/data/vhdl/speculation/speculator.vhd",
-    "dependencies": ["types"]
+    "generic": "$DYNAMATIC/experimental/data/vhdl/speculation/speculator_wrapper.vhd",
+    "dependencies": ["types", "speculator"]
   },
   {
     "name": "handshake.spec_commit",
     "parameters": [
-      { "name": "DATA_SIZE_IN", "type": "dataflow", "data-lb": 0, "extra-eq": 0 },
-      { "name": "DATA_SIZE_OUT", "type": "dataflow", "data-lb": 0, "extra-eq": 0 }
+      { "name": "DATA_TYPE", "type": "dataflow", "data-lb": 0, "extra-eq": 0 }
     ],
-    "generic": "$DYNAMATIC/experimental/data/vhdl/speculation/spec_commit.vhd",
-    "dependencies": ["types"]
+    "generic": "$DYNAMATIC/experimental/data/vhdl/speculation/spec_commit_wrapper.vhd",
+    "dependencies": ["types", "spec_commit"]
   },
   {
     "name": "handshake.spec_save",
     "parameters": [
-      { "name": "DATA_SIZE_IN", "type": "dataflow", "data-lb": 0, "extra-eq": 0 },
-      { "name": "DATA_SIZE_OUT", "type": "dataflow", "data-lb": 0, "extra-eq": 0 }
+      { "name": "DATA_TYPE", "type": "dataflow", "data-lb": 0, "extra-eq": 0 }
     ],
-    "generic": "$DYNAMATIC/experimental/data/vhdl/speculation/spec_save.vhd",
-    "dependencies": ["types"]
+    "generic": "$DYNAMATIC/experimental/data/vhdl/speculation/spec_save_wrapper.vhd",
+    "dependencies": ["types", "spec_save"]
   },
   {
     "name": "handshake.spec_save_commit",
     "parameters": [
-      { "name": "DATA_SIZE_IN", "type": "dataflow", "data-lb": 0, "extra-eq": 0 },
-      { "name": "DATA_SIZE_OUT", "type": "dataflow", "data-lb": 0, "extra-eq": 0 },
+      { "name": "DATA_TYPE", "type": "dataflow", "data-lb": 0, "extra-eq": 0 },
       { "name": "FIFO_DEPTH", "type": "unsigned", "lb": 1 }
     ],
-    "generic": "$DYNAMATIC/experimental/data/vhdl/speculation/spec_save_commit.vhd",
-    "dependencies": ["types"]
+    "generic": "$DYNAMATIC/experimental/data/vhdl/speculation/spec_save_commit_wrapper.vhd",
+    "dependencies": ["types", "spec_save_commit"]
   },
   {
     "name": "handshake.speculating_branch",
     "parameters": [
-      { "name": "INPUTS", "type": "unsigned", "eq": 2 },
-      { "name": "OUTPUTS", "type": "unsigned", "eq": 1 },
-      { "name": "DATA_SIZE_IN", "type": "dataflow", "data-lb": 0, "extra-eq": 0 },
-      { "name": "DATA_SIZE_OUT", "type": "dataflow", "data-lb": 0, "extra-eq": 0 },
+      { "name": "DATA_TYPE", "type": "dataflow", "data-lb": 0, "extra-eq": 0 },
       { "name": "FIFO_DEPTH", "type": "unsigned", "lb": 1 }
     ],
-    "generic": "$DYNAMATIC/experimental/data/vhdl/speculation/speculating_branch.vhd",
-    "dependencies": ["types"]
+    "generic": "$DYNAMATIC/experimental/data/vhdl/speculation/speculating_branch_wrapper.vhd",
+    "dependencies": ["types", "speculating_branch"]
   },
   {
     "generic": "$DYNAMATIC/data/vhdl/support/delay_buffer.vhd"
@@ -809,6 +802,29 @@
     "generic": "$DYNAMATIC/data/vhdl/support/dataless/tehb_with_tag.vhd",
     "module-name": "tehb_dataless_with_tag",
     "dependencies": ["tehb"]
+  },
+  {
+    "generic": "$DYNAMATIC/experimental/data/vhdl/speculation/old-dep.vhd"
+  },
+  {
+    "generic": "$DYNAMATIC/experimental/data/vhdl/speculation/spec_commit.vhd",
+    "dependencies": ["old-dep"]
+  },
+  {
+    "generic": "$DYNAMATIC/experimental/data/vhdl/speculation/spec_save.vhd",
+    "dependencies": ["old-dep"]
+  },
+  {
+    "generic": "$DYNAMATIC/experimental/data/vhdl/speculation/spec_save_commit.vhd",
+    "dependencies": ["old-dep"]
+  },
+  {
+    "generic": "$DYNAMATIC/experimental/data/vhdl/speculation/speculating_branch.vhd",
+    "dependencies": ["old-dep"]
+  },
+  {
+    "generic": "$DYNAMATIC/experimental/data/vhdl/speculation/speculator.vhd",
+    "dependencies": ["old-dep"]
   },
   {
     "name": "mem_to_bram",
