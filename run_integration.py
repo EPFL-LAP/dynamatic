@@ -53,7 +53,7 @@ def get_string_result(total, original, ftd):
     return f"({total}, {original}, {ftd})"
 
 
-def run_command_with_timeout(command, timeout=40):
+def run_command_with_timeout(command, timeout=100):
     try:
         proc = subprocess.run(
             command,

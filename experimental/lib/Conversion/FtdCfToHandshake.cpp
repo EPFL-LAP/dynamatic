@@ -979,12 +979,40 @@ LogicalResult FtdLowerFuncToHandshake::convertMergesToMuxes(
         auto *cmergeSecondBlock =
             select.getDefiningOp()->getOperand(1).getParentBlock();
 
-        bool swap = false;
+        auto *op1 = merge.getOperand(0).getDefiningOp();
+        while (isa<handshake::ConditionalBranchOp>(op1) &&
+               op1->getBlock() == merge.getBlock()) {
+          auto op = dyn_cast<handshake::ConditionalBranchOp>(op1);
+          mergeFirstBlock = op.getOperand(1).getParentBlock();
+          if (op.getOperand(1).getDefiningOp())
+            op1 = op.getOperand(1).getDefiningOp();
+          else
+            break;
+        }
 
-        swap = (domInfo.dominates(mergeFirstBlock, cmergeSecondBlock)) &&
-               (domInfo.dominates(mergeSecondBlock, cmergeFirstBlock));
+        auto *op2 = merge.getOperand(1).getDefiningOp();
+        while (isa<handshake::ConditionalBranchOp>(op2) &&
+               op2->getBlock() == merge.getBlock()) {
+          auto op = dyn_cast<handshake::ConditionalBranchOp>(op2);
+          mergeSecondBlock = op.getOperand(1).getParentBlock();
+          if (op.getOperand(1).getDefiningOp())
+            op2 = op.getOperand(1).getDefiningOp();
+          else
+            break;
+        }
 
-        if (swap) {
+        bool s1 = domInfo.dominates(mergeFirstBlock, cmergeSecondBlock) &&
+                  domInfo.dominates(mergeFirstBlock, cmergeFirstBlock) &&
+                  !domInfo.dominates(mergeSecondBlock, cmergeSecondBlock);
+
+        bool s2 = domInfo.dominates(mergeSecondBlock, cmergeSecondBlock) &&
+                  domInfo.dominates(mergeSecondBlock, cmergeFirstBlock) &&
+                  !domInfo.dominates(mergeFirstBlock, cmergeFirstBlock);
+
+        bool s3 = domInfo.dominates(mergeFirstBlock, cmergeSecondBlock) &&
+                  domInfo.dominates(mergeSecondBlock, cmergeFirstBlock);
+
+        if (s1 || s2 || s3) {
           rewriter.setInsertionPointAfterValue(select);
           auto notOp =
               rewriter.create<handshake::NotOp>(select.getLoc(), select);
@@ -1374,10 +1402,41 @@ static void mapConditionsToValues(Region &region, FtdStoredOperations &ftdOps) {
 /// Given an operation, return true if the two operands of a merge come from
 /// two different loops. When this happens, the merge is connecting two loops
 bool isaMergeLoop(Operation *merge, CFGLoopInfo &li) {
+
   if (merge->getNumOperands() == 1)
     return false;
-  return li.getLoopFor(merge->getOperand(0).getParentBlock()) !=
-         li.getLoopFor(merge->getOperand(1).getParentBlock());
+
+  Block *bb1 = merge->getOperand(0).getParentBlock();
+  if (merge->getOperand(0).getDefiningOp()) {
+    auto *op1 = merge->getOperand(0).getDefiningOp();
+    while (llvm::isa_and_nonnull<handshake::ConditionalBranchOp>(op1) &&
+           op1->getBlock() == merge->getBlock()) {
+      auto op = dyn_cast<handshake::ConditionalBranchOp>(op1);
+      if (op.getOperand(1).getDefiningOp()) {
+        op1 = op.getOperand(1).getDefiningOp();
+        bb1 = op1->getBlock();
+      } else {
+        break;
+      }
+    }
+  }
+
+  Block *bb2 = merge->getOperand(1).getParentBlock();
+  if (merge->getOperand(1).getDefiningOp()) {
+    auto *op2 = merge->getOperand(1).getDefiningOp();
+    while (llvm::isa_and_nonnull<handshake::ConditionalBranchOp>(op2) &&
+           op2->getBlock() == merge->getBlock()) {
+      auto op = dyn_cast<handshake::ConditionalBranchOp>(op2);
+      if (op.getOperand(1).getDefiningOp()) {
+        op2 = op.getOperand(1).getDefiningOp();
+        bb2 = op2->getBlock();
+      } else {
+        break;
+      }
+    }
+  }
+
+  return li.getLoopFor(bb1) != li.getLoopFor(bb2);
 }
 
 /// Get a boolean expression representing the exit condition of the current
