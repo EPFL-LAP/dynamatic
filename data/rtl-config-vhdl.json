@@ -750,6 +750,7 @@
     "name": "handshake.speculating_branch",
     "parameters": [
       { "name": "DATA_TYPE", "type": "dataflow", "data-lb": 0, "extra-eq": 0 },
+      { "name": "SPEC_TAG_DATA_TYPE", "type": "dataflow", "data-lb": 0, "extra-eq": 0 },
       { "name": "FIFO_DEPTH", "type": "unsigned", "lb": 1 }
     ],
     "generic": "$DYNAMATIC/experimental/data/vhdl/speculation/speculating_branch_wrapper.vhd",
@@ -813,27 +814,27 @@
     "dependencies": ["tehb"]
   },
   {
-    "generic": "$DYNAMATIC/experimental/data/vhdl/speculation/old-dep.vhd"
+    "generic": "$DYNAMATIC/experimental/data/vhdl/speculation/old_dep.vhd"
   },
   {
     "generic": "$DYNAMATIC/experimental/data/vhdl/speculation/spec_commit.vhd",
-    "dependencies": ["old-dep"]
+    "dependencies": ["old_dep"]
   },
   {
     "generic": "$DYNAMATIC/experimental/data/vhdl/speculation/spec_save.vhd",
-    "dependencies": ["old-dep"]
+    "dependencies": ["old_dep"]
   },
   {
     "generic": "$DYNAMATIC/experimental/data/vhdl/speculation/spec_save_commit.vhd",
-    "dependencies": ["old-dep"]
+    "dependencies": ["old_dep"]
   },
   {
     "generic": "$DYNAMATIC/experimental/data/vhdl/speculation/speculating_branch.vhd",
-    "dependencies": ["old-dep"]
+    "dependencies": ["old_dep"]
   },
   {
     "generic": "$DYNAMATIC/experimental/data/vhdl/speculation/speculator.vhd",
-    "dependencies": ["old-dep"]
+    "dependencies": ["old_dep"]
   },
   {
     "name": "mem_to_bram",

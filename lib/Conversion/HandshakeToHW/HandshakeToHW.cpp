@@ -622,24 +622,19 @@ ModuleDiscriminator::ModuleDiscriminator(Operation *op) {
         addType("OUTPUT_TYPE", op->getResult(0));
       })
       .Case<handshake::SpecCommitOp, handshake::SpecSaveOp>([&](auto) {
-        addType("DATA_SIZE_IN", op->getOperand(0));
-        addType("DATA_SIZE_OUT", op->getResult(0));
+        addType("DATA_TYPE", op->getOperand(0));
       })
       .Case<handshake::SpeculatorOp>([&](auto) {
-        addType("DATA_SIZE_IN", op->getOperand(0));
-        addType("DATA_SIZE_OUT", op->getResult(0));
+        addType("DATA_TYPE", op->getOperand(0));
         addUnsigned("FIFO_DEPTH", 4); // temp
       })
       .Case<handshake::SpecSaveCommitOp>([&](auto) {
-        addType("DATA_SIZE_IN", op->getOperand(0));
-        addType("DATA_SIZE_OUT", op->getResult(0));
+        addType("DATA_TYPE", op->getOperand(0));
         addUnsigned("FIFO_DEPTH", 4); // temp
       })
       .Case<handshake::SpeculatingBranchOp>([&](auto) {
-        addUnsigned("INPUTS", 2);
-        addUnsigned("OUTPUTS", 1);
-        addType("DATA_SIZE_IN", op->getOperand(0));
-        addType("DATA_SIZE_OUT", op->getOperand(0));
+        addType("SPEC_TAG_DATA_TYPE", op->getOperand(0));
+        addType("DATA_TYPE", op->getOperand(1));
         addUnsigned("FIFO_DEPTH", 4); // temp
       })
       .Default([&](auto) {
