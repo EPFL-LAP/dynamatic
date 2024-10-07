@@ -14,7 +14,7 @@ entity speculator_wrapper_with_tag is
     ins: in std_logic_vector(DATA_TYPE - 1 downto 0);
     ins_valid: in std_logic;
     ins_spec_tag: in std_logic;
-    enable: in std_logic;
+    -- enable is dataless (control token)
     enable_valid: in std_logic;
     enable_spec_tag: in std_logic;
     outs_ready: in std_logic;
@@ -65,7 +65,7 @@ architecture arch of speculator_wrapper_with_tag is
 begin
   dataInArray(0) <= ins;
   specInArray(0)(0) <= ins_spec_tag;
-  enableInArray(0)(0) <= enable;
+  enableInArray(0)(0) <= '0'; -- not used
   pValidArray <= enable_valid & ins_valid;
   enable_ready <= readyArray(1);
   ins_ready <= readyArray(0);

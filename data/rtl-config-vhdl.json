@@ -715,7 +715,7 @@
   {
     "name": "handshake.speculator",
     "parameters": [
-      { "name": "DATA_TYPE", "type": "dataflow", "data-lb": 0, "extra-eq": 0 },
+      { "name": "DATA_TYPE", "type": "dataflow" },
       { "name": "FIFO_DEPTH", "type": "unsigned", "lb": 1 }
     ],
     "generic": "$DYNAMATIC/experimental/data/vhdl/speculation/speculator_wrapper.vhd",
@@ -724,34 +724,61 @@
   {
     "name": "handshake.spec_commit",
     "parameters": [
-      { "name": "DATA_TYPE", "type": "dataflow", "data-lb": 0, "extra-eq": 0 }
+      { "name": "DATA_TYPE", "type": "dataflow", "data-lb": 1, "extra-eq": 0 }
     ],
     "generic": "$DYNAMATIC/experimental/data/vhdl/speculation/spec_commit_wrapper.vhd",
     "dependencies": ["types", "spec_commit"]
   },
   {
+    "name": "handshake.spec_commit",
+    "parameters": [
+      { "name": "DATA_TYPE", "type": "dataflow", "data-eq": 0, "extra-eq": 0, "generic": false }
+    ],
+    "generic": "$DYNAMATIC/experimental/data/vhdl/speculation/dataless/spec_commit_wrapper.vhd",
+    "module-name": "spec_commit_wrapper_dataless",
+    "dependencies": ["types", "spec_commit_wrapper"]
+  },
+  {
     "name": "handshake.spec_save",
     "parameters": [
-      { "name": "DATA_TYPE", "type": "dataflow", "data-lb": 0, "extra-eq": 0 }
+      { "name": "DATA_TYPE", "type": "dataflow", "data-lb": 1, "extra-eq": 0 }
     ],
     "generic": "$DYNAMATIC/experimental/data/vhdl/speculation/spec_save_wrapper.vhd",
     "dependencies": ["types", "spec_save"]
   },
   {
+    "name": "handshake.spec_save",
+    "parameters": [
+      { "name": "DATA_TYPE", "type": "dataflow", "data-eq": 0, "extra-eq": 0, "generic": false }
+    ],
+    "generic": "$DYNAMATIC/experimental/data/vhdl/speculation/dataless/spec_save_wrapper.vhd",
+    "module-name": "spec_save_wrapper_dataless",
+    "dependencies": ["types", "spec_save_wrapper"]
+  },
+  {
     "name": "handshake.spec_save_commit",
     "parameters": [
-      { "name": "DATA_TYPE", "type": "dataflow", "data-lb": 0, "extra-eq": 0 },
+      { "name": "DATA_TYPE", "type": "dataflow", "data-lb": 1, "extra-eq": 0 },
       { "name": "FIFO_DEPTH", "type": "unsigned", "lb": 1 }
     ],
     "generic": "$DYNAMATIC/experimental/data/vhdl/speculation/spec_save_commit_wrapper.vhd",
     "dependencies": ["types", "spec_save_commit"]
   },
   {
+    "name": "handshake.spec_save_commit",
+    "parameters": [
+      { "name": "DATA_TYPE", "type": "dataflow", "data-eq": 0, "extra-eq": 0, "generic": false },
+      { "name": "FIFO_DEPTH", "type": "unsigned", "lb": 1 }
+    ],
+    "generic": "$DYNAMATIC/experimental/data/vhdl/speculation/dataless/spec_save_commit_wrapper.vhd",
+    "module-name": "spec_save_commit_wrapper_dataless",
+    "dependencies": ["types", "spec_save_commit_wrapper"]
+  },
+  {
     "name": "handshake.speculating_branch",
     "parameters": [
       { "name": "DATA_TYPE", "type": "dataflow", "data-lb": 0, "extra-eq": 0 },
-      { "name": "SPEC_TAG_DATA_TYPE", "type": "dataflow", "data-lb": 0, "extra-eq": 0 },
-      { "name": "FIFO_DEPTH", "type": "unsigned", "lb": 1 }
+      { "name": "SPEC_TAG_DATA_TYPE", "type": "dataflow", "data-lb": 0, "extra-eq": 0 }
     ],
     "generic": "$DYNAMATIC/experimental/data/vhdl/speculation/speculating_branch_wrapper.vhd",
     "dependencies": ["types", "speculating_branch"]
