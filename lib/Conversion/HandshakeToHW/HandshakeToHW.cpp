@@ -626,7 +626,6 @@ ModuleDiscriminator::ModuleDiscriminator(Operation *op) {
       .Case<handshake::SpeculatingBranchOp>([&](auto) {
         addType("SPEC_TAG_DATA_TYPE", op->getOperand(0));
         addType("DATA_TYPE", op->getOperand(1));
-        addUnsigned("FIFO_DEPTH", 4); // temp
       })
       .Default([&](auto) {
         op->emitError() << "This operation cannot be lowered to RTL "
