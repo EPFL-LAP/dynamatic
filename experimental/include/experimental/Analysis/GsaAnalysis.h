@@ -15,7 +15,11 @@
 #ifndef DYNAMATIC_ANALYSIS_GSAANALYSIS_H
 #define DYNAMATIC_ANALYSIS_GSAANALYSIS_H
 
+#include <utility>
+
 #include "dynamatic/Support/LLVM.h"
+#include "experimental/Support/BooleanLogic/BoolExpression.h"
+#include "experimental/Support/BooleanLogic/Shannon.h"
 #include "mlir/Dialect/Func/IR/FuncOps.h"
 #include "mlir/Pass/AnalysisManager.h"
 #include "mlir/Transforms/DialectConversion.h"
@@ -25,7 +29,8 @@ namespace experimental {
 namespace gsa {
 
 /// Define the three possible kinds of phi inputs
-enum PhiInputType { OpInputType, PhiInputType, ArgInputType };
+enum PhiInputType { OpInputType, PhiInputType, ArgInputType, EmptyInputType };
+enum GsaGateFunction { GammaGate, MuGate, EtaGate, PhiGate };
 
 struct Phi;
 
@@ -41,14 +46,18 @@ struct PhiInput {
   Value v;
 
   /// Pointer to the phi result in case of a phi
-  Phi *phi;
+  struct Phi *phi;
 
   /// Constructor for the result of an operation
   PhiInput(Value v) : type(OpInputType), v(v), phi(nullptr){};
   /// Constructor for the result of a phi
-  PhiInput(Phi *p) : type(PhiInputType), v(nullptr), phi(p){};
+  PhiInput(struct Phi *p) : type(PhiInputType), v(nullptr), phi(p){};
   /// Constructor for the result of a block argument
   PhiInput(BlockArgument ba) : type(ArgInputType), v(Value(ba)), phi(nullptr){};
+  /// Constructor for an empty input
+  PhiInput() : type(EmptyInputType), v(nullptr), phi(nullptr){};
+
+  Block *getBlock();
 };
 
 /// The structure collects all the information related to a phi. Each block
@@ -60,13 +69,25 @@ struct Phi {
   /// Index of the block argument
   unsigned argNumber;
   /// List of operands of the phi
-  DenseSet<PhiInput *> operands;
+  SmallVector<PhiInput *> operands;
   /// Pointer to the block argument
   Block *blockOwner;
+  /// Type of GSA gate function
+  GsaGateFunction gsaGateFunction;
+  /// Boolean expression for the gate
+  boolean::BoolExpression *boolExpression = nullptr;
+  /// Minterm used to determine the outcome of the choice
+  std::string minterm;
+  /// Index of the current phi
+  unsigned index;
 
   /// Initialize the values of the phi
-  Phi(Value v, unsigned n, DenseSet<PhiInput *> &pi, Block *b)
-      : result(v), argNumber(n), operands(pi), blockOwner(b) {}
+  Phi(Value v, unsigned n, SmallVector<PhiInput *> &pi, Block *b,
+      GsaGateFunction ggf, std::string m = "")
+      : result(v), argNumber(n), operands(pi), blockOwner(b),
+        gsaGateFunction(ggf), minterm(std::move(m)) {}
+
+  void print();
 };
 
 /// Class in charge of performing the GSA analysis prior to the cf to handshake
@@ -128,6 +149,9 @@ public:
   Phi *getPhi(Block *bb, unsigned argNumber);
 
 private:
+  // Associate an index to each phi
+  unsigned uniquePhiIndex;
+
   /// For each block in the function, keep a list of phi functions with all
   /// their information. The size of the list associate to each block is equal
   /// to the number of block arguments.
@@ -139,6 +163,19 @@ private:
 
   /// Print the list of the phi functions
   void printPhiList();
+
+  /// Mark as mu all the phi functions which correspond to loop variables
+  void convertPhiToMu(FunctionType &funcOp);
+
+  /// Convert each phi function to a gamma function
+  void convertPhiToGamma(FunctionType &funcOp);
+
+  /// Given a boolean expression for each of a phi's inputs, expand it in a tree
+  /// of gamma functions
+  Phi *expandExpressions(
+      std::vector<std::pair<boolean::BoolExpression *, PhiInput *>>
+          &expressions,
+      std::vector<std::string> &cofactors, Phi *originalPhi);
 };
 
 } // namespace gsa
