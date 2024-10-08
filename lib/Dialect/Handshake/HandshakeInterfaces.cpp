@@ -185,9 +185,9 @@ std::string handshake::SpeculatorOp::getResultName(unsigned idx) {
   case 0:
     return "outs";
   case 1:
-    return "ctrl_commit";
-  case 2:
     return "ctrl_save";
+  case 2:
+    return "ctrl_commit";
   case 3:
     return "ctrl_sc_save";
   case 4:
