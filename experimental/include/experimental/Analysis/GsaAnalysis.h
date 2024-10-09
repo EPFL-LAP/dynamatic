@@ -48,14 +48,21 @@ struct PhiInput {
   /// Pointer to the phi result in case of a phi
   struct Phi *phi;
 
+  /// Pointer to the block
+  Block *blockOwner;
+
   /// Constructor for the result of an operation
-  PhiInput(Value v) : type(OpInputType), v(v), phi(nullptr){};
+  PhiInput(Value v, Block *bb)
+      : type(OpInputType), v(v), phi(nullptr), blockOwner(bb){};
   /// Constructor for the result of a phi
-  PhiInput(struct Phi *p) : type(PhiInputType), v(nullptr), phi(p){};
+  PhiInput(struct Phi *p, Block *bb)
+      : type(PhiInputType), v(nullptr), phi(p), blockOwner(bb){};
   /// Constructor for the result of a block argument
-  PhiInput(BlockArgument ba) : type(ArgInputType), v(Value(ba)), phi(nullptr){};
+  PhiInput(BlockArgument ba, Block *bb)
+      : type(ArgInputType), v(Value(ba)), phi(nullptr), blockOwner(bb){};
   /// Constructor for an empty input
-  PhiInput() : type(EmptyInputType), v(nullptr), phi(nullptr){};
+  PhiInput()
+      : type(EmptyInputType), v(nullptr), phi(nullptr), blockOwner(nullptr){};
 
   Block *getBlock();
 };
@@ -74,8 +81,6 @@ struct Phi {
   Block *blockOwner;
   /// Type of GSA gate function
   GsaGateFunction gsaGateFunction;
-  /// Boolean expression for the gate
-  boolean::BoolExpression *boolExpression = nullptr;
   /// Minterm used to determine the outcome of the choice
   std::string minterm;
   /// Index of the current phi

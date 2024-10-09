@@ -223,7 +223,7 @@ Phi *GsaAnalysis<FunctionType>::expandExpressions(
   if (cofactorTrueExpressions.size() > 1) {
     auto *trueGamma =
         expandExpressions(cofactorTrueExpressions, cofactors, originalPhi);
-    auto *phiInput = new PhiInput(trueGamma);
+    auto *phiInput = new PhiInput(trueGamma, originalPhi->blockOwner);
     operandsGamma.push_back(phiInput);
 
   } else if (cofactorTrueExpressions.size() == 1) {
@@ -246,7 +246,7 @@ Phi *GsaAnalysis<FunctionType>::expandExpressions(
   if (cofactorFalseExpressions.size() > 1) {
     auto *falseGamma =
         expandExpressions(cofactorFalseExpressions, cofactors, originalPhi);
-    auto *phiInput = new PhiInput(falseGamma);
+    auto *phiInput = new PhiInput(falseGamma, originalPhi->blockOwner);
     operandsGamma.push_back(phiInput);
   } else if (cofactorFalseExpressions.size() == 1) {
     operandsGamma.push_back(cofactorFalseExpressions[0].second);
@@ -346,11 +346,11 @@ void GsaAnalysis<FunctionType>::identifyAllPhi(FunctionType &funcOp) {
                   alreadyPresent = true;
               }
               if (!alreadyPresent)
-                phiInput = new PhiInput(ba);
+                phiInput = new PhiInput(ba, pred);
 
             } else if (ba) {
               // TODO double chcek that arg is used only once
-              phiInput = new PhiInput((Phi *)nullptr);
+              phiInput = new PhiInput((Phi *)nullptr, pred);
               phiToConnect.push_back(
                   MissingPhi(phiInput, ba.getParentBlock(), ba.getArgNumber()));
 
@@ -362,7 +362,7 @@ void GsaAnalysis<FunctionType>::identifyAllPhi(FunctionType &funcOp) {
                   alreadyPresent = true;
               }
               if (!alreadyPresent)
-                phiInput = new PhiInput(dyn_cast<Value>(producer));
+                phiInput = new PhiInput(dyn_cast<Value>(producer), pred);
             }
 
             // Insert the value among the inputs of the phi
@@ -530,12 +530,17 @@ void GsaAnalysis<FunctionType>::convertPhiToMu(FunctionType &funcOp) {
           phi->gsaGateFunction = GsaGateFunction::MuGate;
 
           // Use the initial value of mu as first input of the gate
-          if (loopInfo.getLoopFor(op0Block) == loopInfo.getLoopFor(phiBlock)) {
+          if (domInfo.dominates(op1Block, phiBlock)) {
             auto *firstOperand = phi->operands[0];
             auto *secondOperand = phi->operands[1];
             phi->operands[0] = secondOperand;
             phi->operands[1] = firstOperand;
           }
+
+          auto *terminator = loopInfo.getLoopFor(phi->blockOwner)
+                                 ->getExitingBlock()
+                                 ->getTerminator();
+          phi->minterm = getBlockCondition(terminator->getBlock());
         }
       }
     }
@@ -590,7 +595,7 @@ void gsa::Phi::print() {
   llvm::dbgs() << " arg " << argNumber << " type " << getPhiName(this) << "_"
                << index;
 
-  if (gsaGateFunction == GammaGate) {
+  if (gsaGateFunction == GammaGate || gsaGateFunction == MuGate) {
     llvm::dbgs() << " minterm " << minterm;
   }
 
@@ -624,14 +629,7 @@ void gsa::Phi::print() {
   }
 }
 
-Block *PhiInput::getBlock() {
-  switch (type) {
-  case PhiInputType:
-    return phi->blockOwner;
-  default:
-    return v.getParentBlock();
-  }
-}
+Block *PhiInput::getBlock() { return this->blockOwner; }
 
 } // namespace gsa
 } // namespace experimental

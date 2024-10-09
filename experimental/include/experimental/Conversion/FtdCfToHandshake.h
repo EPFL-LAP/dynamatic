@@ -58,6 +58,8 @@ struct FtdStoredOperations {
   /// contains all constants created by `addInit` or for Shannon’s
   DenseSet<Operation *> networkConstants;
 
+  /// contains all the branches whose condition must be suppressed due to a
+  /// `while` loop CFG structure
   DenseSet<Operation *> backwardBranches;
 
   /// For each condition of the block, represented in abstract as `cN` where `N`
@@ -68,6 +70,12 @@ struct FtdStoredOperations {
   std::map<std::string, Value> conditionToValue;
 
   DenseMap<Block *, Value> blockControls;
+
+  // Contains the init merges related to the MU functions
+  DenseSet<Operation *> initMerges;
+
+  // Contains the init merges related to the MU functions
+  DenseSet<Operation *> initMergesConstants;
 };
 
 /// Convert a func-level function into an handshake-level function. A custom
@@ -191,6 +199,10 @@ protected:
   LogicalResult addSuppGSA(ConversionPatternRewriter &rewriter,
                            handshake::FuncOp &funcOp,
                            FtdStoredOperations &ftdOps) const;
+
+  LogicalResult addSuppBackwardLoop(ConversionPatternRewriter &rewriter,
+                                    handshake::FuncOp &funcOp,
+                                    FtdStoredOperations &ftdOps) const;
 
   /// Starting from the information collected by the gsa analysis pass,
   /// instantiate some merge operations at the beginning of each block which
