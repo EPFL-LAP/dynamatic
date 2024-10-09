@@ -208,7 +208,7 @@ Phi *GsaAnalysis<FunctionType>::expandExpressions(
       cofactorFalseExpressions.emplace_back(exprFalse, expression.second);
   }
 
-  SmallVector<PhiInput *> operandsGamma;
+  SmallVector<PhiInput *> operandsGamma(2);
 
   // If the number of non-null expressions obtained with cofactor = 1 is greater
   // than 1, then the expansions must be done again over those inputs with a new
@@ -224,13 +224,13 @@ Phi *GsaAnalysis<FunctionType>::expandExpressions(
     auto *trueGamma =
         expandExpressions(cofactorTrueExpressions, cofactors, originalPhi);
     auto *phiInput = new PhiInput(trueGamma, originalPhi->blockOwner);
-    operandsGamma.push_back(phiInput);
+    operandsGamma[1] = phiInput;
 
   } else if (cofactorTrueExpressions.size() == 1) {
-    operandsGamma.push_back(cofactorTrueExpressions[0].second);
+    operandsGamma[1] = cofactorTrueExpressions[0].second;
   } else {
     auto *phiInput = new PhiInput();
-    operandsGamma.push_back(phiInput);
+    operandsGamma[1] = phiInput;
   }
 
   // If the number of non-null expressions obtained with cofactor = 0 is greater
@@ -247,12 +247,12 @@ Phi *GsaAnalysis<FunctionType>::expandExpressions(
     auto *falseGamma =
         expandExpressions(cofactorFalseExpressions, cofactors, originalPhi);
     auto *phiInput = new PhiInput(falseGamma, originalPhi->blockOwner);
-    operandsGamma.push_back(phiInput);
+    operandsGamma[0] = phiInput;
   } else if (cofactorFalseExpressions.size() == 1) {
-    operandsGamma.push_back(cofactorFalseExpressions[0].second);
+    operandsGamma[0] = cofactorFalseExpressions[0].second;
   } else {
     auto *phiInput = new PhiInput();
-    operandsGamma.push_back(phiInput);
+    operandsGamma[0] = phiInput;
   }
 
   // Create a new gamma and add it to the list of phis for the original basic
@@ -262,6 +262,7 @@ Phi *GsaAnalysis<FunctionType>::expandExpressions(
                          cofactorToUse);
   phiList[originalPhi->blockOwner].push_back(newPhi);
   newPhi->index = ++uniquePhiIndex;
+  newPhi->result = originalPhi->result;
 
   return newPhi;
 }
@@ -492,7 +493,17 @@ void GsaAnalysis<FunctionType>::convertPhiToGamma(FunctionType &funcOp) {
                  });
 
       // Expand the expressions to get the tree of gammas
-      expandExpressions(expressionsList, cofactorList, phi);
+      auto *newPhi = expandExpressions(expressionsList, cofactorList, phi);
+      newPhi->isRoot = true;
+
+      for (auto &[bb, phis] : phiList) {
+        for (auto &phii : phis) {
+          for (auto &op : phii->operands) {
+            if (op->phi && op->phi == phi)
+              op->phi = newPhi;
+          }
+        }
+      }
     }
   }
 }
@@ -541,6 +552,7 @@ void GsaAnalysis<FunctionType>::convertPhiToMu(FunctionType &funcOp) {
                                  ->getExitingBlock()
                                  ->getTerminator();
           phi->minterm = getBlockCondition(terminator->getBlock());
+          phi->isRoot = true;
         }
       }
     }
@@ -552,18 +564,6 @@ SmallVector<Phi *> *GsaAnalysis<FunctionType>::getPhis(Block *bb) {
   if (!phiList.contains(bb))
     return nullptr;
   return &phiList[bb];
-}
-
-template <typename FunctionType>
-Phi *GsaAnalysis<FunctionType>::getPhi(Block *bb, unsigned argNumber) {
-  if (!phiList.contains(bb))
-    return nullptr;
-  auto &list = phiList[bb];
-  for (auto *phi : list) {
-    if (phi->argNumber == argNumber && phi->gsaGateFunction != GammaGate)
-      return phi;
-  }
-  return nullptr;
 }
 
 template <typename FunctionType>

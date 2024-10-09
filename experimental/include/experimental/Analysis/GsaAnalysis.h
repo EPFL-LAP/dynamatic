@@ -85,6 +85,8 @@ struct Phi {
   std::string minterm;
   /// Index of the current phi
   unsigned index;
+  /// In a tree of Gamma functions, determines whether it is the root or not
+  bool isRoot = false;
 
   /// Initialize the values of the phi
   Phi(Value v, unsigned n, SmallVector<PhiInput *> &pi, Block *b,
@@ -149,9 +151,6 @@ public:
 
   /// Get a pointer to the vector containing the phi functions of a block
   SmallVector<Phi *> *getPhis(Block *bb);
-
-  /// Get a pointer to the vector containing the phi functions of a block
-  Phi *getPhi(Block *bb, unsigned argNumber);
 
 private:
   // Associate an index to each phi

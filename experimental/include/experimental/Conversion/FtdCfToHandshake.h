@@ -36,7 +36,7 @@ struct FtdStoredOperations {
   /// contains all operations created by fast token delivery algorithm
   DenseSet<Operation *> allocationNetwork;
 
-  /// contains all `handshake::MergeOp` created by `addPhi`
+  /// contains all `handshake::MergeOp` created by `addRegen`
   DenseSet<Operation *> phiMerges;
 
   /// contains all `handshake::BranchOp` created by `manageMoreProdThanCons`
@@ -155,9 +155,9 @@ protected:
   /// adding some merges to the network, to that this can be done. The new
   /// merge is moved inside of the loop, and it works like a reassignment
   /// (cfr. FPGA'22, Section V.C).
-  LogicalResult addPhi(ConversionPatternRewriter &rewriter,
-                       handshake::FuncOp &funcOp,
-                       FtdStoredOperations &ftdOps) const;
+  LogicalResult addRegen(ConversionPatternRewriter &rewriter,
+                         handshake::FuncOp &funcOp,
+                         FtdStoredOperations &ftdOps) const;
 
   /// Given each pairs of producers and consumers within the circuit, the
   /// producer might create a token which is never used by the corresponding
@@ -187,18 +187,6 @@ protected:
   LogicalResult addSuppStart(ConversionPatternRewriter &rewriter,
                              handshake::FuncOp &funcOp,
                              FtdStoredOperations &ftdOps) const;
-
-  /// Convert all the merges in the circuit to muxes
-  LogicalResult convertMergesToMuxes(ConversionPatternRewriter &rewriter,
-                                     handshake::FuncOp &funcOp,
-                                     FtdStoredOperations &ftdOps) const;
-
-  /// After the merges have been converted into muxes, a suppress is to be added
-  /// so there we get rid of the possibility of the consumer executing when the
-  /// input connected to its producer is not activated
-  LogicalResult addSuppGSA(ConversionPatternRewriter &rewriter,
-                           handshake::FuncOp &funcOp,
-                           FtdStoredOperations &ftdOps) const;
 
   LogicalResult addSuppBackwardLoop(ConversionPatternRewriter &rewriter,
                                     handshake::FuncOp &funcOp,
