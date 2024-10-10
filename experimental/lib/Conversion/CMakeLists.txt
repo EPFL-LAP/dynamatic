@@ -18,5 +18,6 @@ add_dynamatic_library(DynamaticExperimentalConversion
   MLIRAffineToStandard
   DynamaticExperimentalSupportBooleanLogic
   DynamaticSupportEspresso
+  DynamaticExperimentalSupport
   )
 

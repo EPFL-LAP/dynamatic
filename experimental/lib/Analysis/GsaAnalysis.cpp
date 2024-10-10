@@ -14,6 +14,7 @@
 
 #include "experimental/Analysis/GsaAnalysis.h"
 #include "experimental/Support/BooleanLogic/Shannon.h"
+#include "experimental/Support/FtdSupport.h"
 #include "mlir/Analysis/CFGLoopInfo.h"
 #include "mlir/Dialect/ControlFlow/IR/ControlFlowOps.h"
 #include "mlir/IR/Dominance.h"
@@ -23,136 +24,11 @@
 
 using namespace mlir;
 using namespace mlir::func;
+using namespace dynamatic::experimental::ftd;
 
 namespace dynamatic {
 namespace experimental {
 namespace gsa {
-
-/// Get the index of a basic block
-static int getBlockIndex(Block *bb) {
-  std::string result1;
-  llvm::raw_string_ostream os1(result1);
-  bb->printAsOperand(os1);
-  std::string block1id = os1.str();
-  return std::stoi(block1id.substr(3));
-}
-
-/// Given a block whose name is `^BBN` (where N is an integer) return a string
-/// in the format `cN`, used to identify the condition which allows the block
-/// to be executed.
-static std::string getBlockCondition(Block *block) {
-  std::string blockCondition = "c" + std::to_string(getBlockIndex(block));
-  return blockCondition;
-}
-
-/// Recursive function which allows to obtain all the paths from block `start`
-/// to block `end` using a DFS. We are interested in paths which go through
-/// `blockToTravers` but don't go through any of `blocksToAvoid`
-static void dfsPathsWithConditions(Block *start, Block *end,
-                                   std::vector<Block *> &path,
-                                   std::unordered_set<Block *> &visited,
-                                   std::vector<std::vector<Block *>> &allPaths,
-                                   Block *blockToTraverse,
-                                   std::vector<Block *> &blocksToAvoid,
-                                   bool blockToTraverseFound) {
-
-  // The current block is part of the current path
-  path.push_back(start);
-
-  // The current block has been visited
-  visited.insert(start);
-
-  // Mark the target block as found if it is identical to block to traverse
-  bool blockFound = (start == blockToTraverse);
-
-  // If we are at the end of the path and we have traversed the target one, then
-  // add it to the list
-  if (start == end && blockToTraverseFound) {
-    allPaths.push_back(path);
-  } else {
-
-    // Else, for each successor which was not visited, run DFS again
-    for (Block *successor : start->getSuccessors()) {
-
-      // Do not run DFS if the successor is in the list of blocks to traverse
-      bool incorrectPath = false;
-      for (auto *toAvoid : blocksToAvoid) {
-        if (toAvoid == successor &&
-            getBlockIndex(toAvoid) > getBlockIndex(blockToTraverse)) {
-          incorrectPath = true;
-          break;
-        }
-      }
-
-      if (incorrectPath)
-        continue;
-
-      // Do not run DFS if the successor was already visited
-      if (visited.find(successor) == visited.end()) {
-        dfsPathsWithConditions(successor, end, path, visited, allPaths,
-                               blockToTraverse, blocksToAvoid,
-                               blockFound || blockToTraverseFound);
-      }
-    }
-  }
-
-  // Remove the current block from the current path and from the list of
-  // visited blocks
-  path.pop_back();
-  visited.erase(start);
-}
-
-/// Get the boolean condition determining when a path is executed. While
-/// covering each block in the path, add the cofactor of each block to the list
-/// of cofactors if not already covered
-static boolean::BoolExpression *
-getPathCondition(const std::vector<Block *> &path,
-                 std::vector<std::string> &cofactorList) {
-
-  // Start with a boolean expression of one
-  boolean::BoolExpression *exp = boolean::BoolExpression::boolOne();
-
-  // Cover each pair of adjacent blocks
-  for (int i = 0; i < (int)path.size() - 1; i++) {
-    Block *firstBlock = path[i];
-    Block *secondBlock = path[i + 1];
-
-    // Skip pair if the first block has only one successor, thus no conditional
-    // branch
-    if (firstBlock->getSuccessors().size() == 1)
-      continue;
-
-    // Get last operation of the block, also called `terminator`
-    Operation *terminatorOp = firstBlock->getTerminator();
-
-    // TODO: use a general model for this same conditional branch
-    if (isa<cf::CondBranchOp>(terminatorOp)) {
-      auto blockCondition = getBlockCondition(firstBlock);
-
-      // Get a boolean condition out of the block condition
-      boolean::BoolExpression *pathCondition =
-          boolean::BoolExpression::parseSop(blockCondition);
-
-      // Possibly add the condition to the list of cofactors
-      if (std::find(cofactorList.begin(), cofactorList.end(), blockCondition) ==
-          cofactorList.end()) {
-        cofactorList.push_back(blockCondition);
-      }
-
-      // Negate the condition if `secondBlock` is reached when the condition is
-      // false
-      auto condOp = dyn_cast<cf::CondBranchOp>(terminatorOp);
-      if (condOp.getFalseDest() == secondBlock)
-        pathCondition->boolNegate();
-
-      // And the condition with the rest path
-      exp = boolean::BoolExpression::boolAnd(exp, pathCondition);
-    }
-  }
-
-  // Minimize the condition and return
-  return exp->boolMinimize();
-}
 
 template <typename FunctionType>
 Phi *GsaAnalysis<FunctionType>::expandExpressions(
@@ -265,19 +141,6 @@ Phi *GsaAnalysis<FunctionType>::expandExpressions(
   newPhi->result = originalPhi->result;
 
   return newPhi;
-}
-
-/// Gets all the paths from block `start` to block `end` using a dfs
-/// search
-static std::vector<std::vector<Block *>>
-findAllPaths(Block *start, Block *end, Block *blockToTraverse,
-             std::vector<Block *> blocksToAvoid) {
-  std::vector<std::vector<Block *>> allPaths;
-  std::vector<Block *> path;
-  std::unordered_set<Block *> visited;
-  dfsPathsWithConditions(start, end, path, visited, allPaths, blockToTraverse,
-                         blocksToAvoid, false);
-  return allPaths;
 }
 
 template <typename FunctionType>
@@ -474,7 +337,7 @@ void GsaAnalysis<FunctionType>::convertPhiToGamma(FunctionType &funcOp) {
 
         // Sum all the conditions for each path
         for (auto &path : paths) {
-          auto *condition = getPathCondition(path, cofactorList);
+          auto *condition = getPathExpression(path, cofactorList);
           phiInputCondition =
               boolean::BoolExpression::boolOr(condition, phiInputCondition);
           phiInputCondition = phiInputCondition->boolMinimize();
@@ -496,6 +359,9 @@ void GsaAnalysis<FunctionType>::convertPhiToGamma(FunctionType &funcOp) {
       auto *newPhi = expandExpressions(expressionsList, cofactorList, phi);
       newPhi->isRoot = true;
 
+      // Once that a phi has been converted into a tree of gammas, all the
+      // functions which were previously connected to the phi are now to be
+      // connected to the new gamma
       for (auto &[bb, phis] : phiList) {
         for (auto &phii : phis) {
           for (auto &op : phii->operands) {
@@ -548,6 +414,8 @@ void GsaAnalysis<FunctionType>::convertPhiToMu(FunctionType &funcOp) {
             phi->operands[1] = firstOperand;
           }
 
+          // The MU condition is given by the condition used for the termination
+          // of the loop
           auto *terminator = loopInfo.getLoopFor(phi->blockOwner)
                                  ->getExitingBlock()
                                  ->getTerminator();

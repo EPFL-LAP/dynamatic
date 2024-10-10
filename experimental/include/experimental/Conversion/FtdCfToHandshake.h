@@ -22,8 +22,8 @@
 #include "dynamatic/Support/LLVM.h"
 #include "experimental/Analysis/GsaAnalysis.h"
 #include "experimental/Conversion/FtdMemoryInterface.h"
+#include "experimental/Support/FtdSupport.h"
 #include "mlir/Analysis/CFGLoopInfo.h"
-#include "mlir/Dialect/Func/IR/FuncOps.h"
 
 namespace dynamatic {
 namespace experimental {

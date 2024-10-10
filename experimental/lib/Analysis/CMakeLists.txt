@@ -5,4 +5,5 @@ add_dynamatic_library(DynamaticExperimentalAnalysis
   MLIRIR
   MLIRSupport
   DynamaticSupport
+  DynamaticExperimentalSupport
 )

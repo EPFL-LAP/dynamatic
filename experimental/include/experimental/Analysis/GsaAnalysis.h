@@ -85,7 +85,8 @@ struct Phi {
   std::string minterm;
   /// Index of the current phi
   unsigned index;
-  /// In a tree of Gamma functions, determines whether it is the root or not
+  /// Determintes whether it is a root or not (all MUs are roots, only the base
+  /// of a tree of GAMMAs is the root)
   bool isRoot = false;
 
   /// Initialize the values of the phi
