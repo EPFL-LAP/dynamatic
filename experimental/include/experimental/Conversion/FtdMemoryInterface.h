@@ -18,7 +18,6 @@
 #include "dynamatic/Dialect/Handshake/HandshakeOps.h"
 #include "dynamatic/Dialect/Handshake/MemoryInterfaces.h"
 #include "dynamatic/Support/LLVM.h"
-#include <set>
 
 namespace dynamatic {
 namespace experimental {
@@ -87,8 +86,7 @@ public:
   LogicalResult instantiateInterfacesWithForks(
       OpBuilder &builder, handshake::MemoryControllerOp &mcOp,
       handshake::LSQOp &lsqOp, DenseSet<Group *> &groups,
-      DenseMap<Block *, Operation *> &forksGraph, Value start,
-      DenseSet<Operation *> &alloctionNetwork);
+      DenseMap<Block *, Operation *> &forksGraph, Value start);
 
   /// Determines the list of inputs for the memory interface(s) to instantiate
   /// from the sets of recorded ports. This performs no verification of the
@@ -99,8 +97,7 @@ public:
   /// fork nodes to the lsq inputs.
   LogicalResult determineInterfaceInputsWithForks(
       InterfaceInputs &inputs, OpBuilder &builder, DenseSet<Group *> &groups,
-      DenseMap<Block *, Operation *> &forksGraphs, Value start,
-      DenseSet<Operation *> &alloctionNetwork);
+      DenseMap<Block *, Operation *> &forksGraphs, Value start);
 };
 
 } // namespace ftd

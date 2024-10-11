@@ -39,8 +39,7 @@ namespace ftd {
 LogicalResult FtdMemoryInterfaceBuilder::instantiateInterfacesWithForks(
     OpBuilder &builder, handshake::MemoryControllerOp &mcOp,
     handshake::LSQOp &lsqOp, DenseSet<Group *> &groups,
-    DenseMap<Block *, Operation *> &forksGraph, Value start,
-    DenseSet<Operation *> &alloctionNetwork) {
+    DenseMap<Block *, Operation *> &forksGraph, Value start) {
 
   // Get the edgeBuilder
   BackedgeBuilder edgeBuilder((PatternRewriter &)builder, memref.getLoc());
@@ -55,8 +54,7 @@ LogicalResult FtdMemoryInterfaceBuilder::instantiateInterfacesWithForks(
   // Determine interfaces' inputs
   InterfaceInputs interfaceInputs;
   if (failed(determineInterfaceInputsWithForks(interfaceInputs, builder, groups,
-                                               forksGraph, start,
-                                               alloctionNetwork)))
+                                               forksGraph, start)))
     return failure();
 
   // If we need no inputs both for the standard memory controller and the LSQ,
@@ -137,8 +135,7 @@ LogicalResult FtdMemoryInterfaceBuilder::instantiateInterfacesWithForks(
 
 LogicalResult FtdMemoryInterfaceBuilder::determineInterfaceInputsWithForks(
     InterfaceInputs &inputs, OpBuilder &builder, DenseSet<Group *> &groups,
-    DenseMap<Block *, Operation *> &forksGraph, Value start,
-    DenseSet<Operation *> &alloctionNetwork) {
+    DenseMap<Block *, Operation *> &forksGraph, Value start) {
 
   // Create the fork nodes: for each group among the set of groups
   for (Group *group : groups) {
@@ -152,7 +149,6 @@ LogicalResult FtdMemoryInterfaceBuilder::determineInterfaceInputsWithForks(
 
     // Add the new component to the list of components create for FTD and to the
     // fork graph
-    alloctionNetwork.insert(forkOp);
     forksGraph[bb] = forkOp;
   }
 
@@ -231,11 +227,14 @@ LogicalResult FtdMemoryInterfaceBuilder::determineInterfaceInputsWithForks(
     }
 
     // Blocks with at least one store need to provide a control signal fed
-    // through a constant indicating the number of stores in the block
+    // through a constant indicating the number of stores in the block. The
+    // output of the corresponding lazy fork is used as control signal of that
+    // constant
     if (numStoresInBlock > 0) {
-      Value blockCtrl = getCtrl(block);
-      if (!blockCtrl)
-        return failure();
+      Block *bb = nullptr;
+      for (auto [blockIdx, bbPointer] : llvm::enumerate(funcOp))
+        bb = (blockIdx == block) ? &bbPointer : bb;
+      Value blockCtrl = forksGraph[bb]->getResult(0);
       inputs.mcInputs.push_back(
           getMCControl(blockCtrl, numStoresInBlock, builder));
     }

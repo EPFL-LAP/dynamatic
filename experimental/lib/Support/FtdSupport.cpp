@@ -444,6 +444,13 @@ BoolExpression *getBlockLoopExitCondition(Block *loopExit, CFGLoop *loop,
   return blockCond;
 }
 
+SmallVector<Type> getBranchResultTypes(Type inputType) {
+  SmallVector<Type> handshakeResultTypes;
+  handshakeResultTypes.push_back(channelifyType(inputType));
+  handshakeResultTypes.push_back(channelifyType(inputType));
+  return handshakeResultTypes;
+}
+
 }; // namespace ftd
 }; // namespace experimental
 }; // namespace dynamatic

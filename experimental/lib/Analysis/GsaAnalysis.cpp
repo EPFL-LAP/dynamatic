@@ -16,9 +16,7 @@
 #include "experimental/Support/BooleanLogic/Shannon.h"
 #include "experimental/Support/FtdSupport.h"
 #include "mlir/Analysis/CFGLoopInfo.h"
-#include "mlir/Dialect/ControlFlow/IR/ControlFlowOps.h"
 #include "mlir/IR/Dominance.h"
-#include "unordered_set"
 #include "vector"
 #include "llvm/Support/Debug.h"
 

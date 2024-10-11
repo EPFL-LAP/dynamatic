@@ -22,29 +22,25 @@
 #include "dynamatic/Support/LLVM.h"
 #include "experimental/Analysis/GsaAnalysis.h"
 #include "experimental/Conversion/FtdMemoryInterface.h"
-#include "experimental/Support/FtdSupport.h"
 #include "mlir/Analysis/CFGLoopInfo.h"
 
 namespace dynamatic {
 namespace experimental {
 namespace ftd {
 
+enum BranchToLoopType {
+  MoreProducerThanConsumers,
+  SelfRegeneration,
+  BackwardRelationship
+};
+
 /// Structure to store a set of data structures useful for the whole FTD
 /// algorithm.
 struct FtdStoredOperations {
 
-  /// contains all operations created by fast token delivery algorithm
-  DenseSet<Operation *> allocationNetwork;
-
-  /// contains all `handshake::MergeOp` created by `addRegen`
-  DenseSet<Operation *> phiMerges;
-
   /// contains all `handshake::BranchOp` created by `manageMoreProdThanCons`
   /// or `manageDifferentRegeneration`
   DenseSet<Operation *> suppBranches;
-
-  /// contains all `handshake::BranchOp` created by `manageSelfRegeneration`
-  DenseSet<Operation *> selfGenBranches;
 
   /// contains all `handshake::MergeOp` added in the straight LSQ
   DenseSet<Operation *> memDepLoopMerges;
@@ -52,15 +48,8 @@ struct FtdStoredOperations {
   /// contains all `handshake::MergeOp` added by expliciting phi functions
   DenseSet<Operation *> explicitPhiMerges;
 
-  /// contains all `handshake::MuxOp` created by Shannon
-  DenseSet<Operation *> shannonMUXes;
-
-  /// contains all constants created by `addInit` or for Shannon’s
-  DenseSet<Operation *> networkConstants;
-
-  /// contains all the branches whose condition must be suppressed due to a
-  /// `while` loop CFG structure
-  DenseSet<Operation *> backwardBranches;
+  /// contains all operations related to shannon's expansion
+  DenseSet<Operation *> shannonOperations;
 
   /// For each condition of the block, represented in abstract as `cN` where `N`
   /// is the index of the basic block, associate its corresponding control
@@ -69,13 +58,9 @@ struct FtdStoredOperations {
   /// terminator of the block, in case it's a conditional branch
   std::map<std::string, Value> conditionToValue;
 
-  DenseMap<Block *, Value> blockControls;
-
-  // Contains the init merges related to the MU functions
-  DenseSet<Operation *> initMerges;
-
-  // Contains the init merges related to the MU functions
-  DenseSet<Operation *> initMergesConstants;
+  // Contains the operations related to init merges, thus both merges and
+  // constants
+  DenseSet<Operation *> initMergesOperations;
 };
 
 /// Convert a func-level function into an handshake-level function. A custom
@@ -168,17 +153,6 @@ protected:
                         handshake::FuncOp &funcOp,
                         FtdStoredOperations &ftdOps) const;
 
-  /// The relationship between a producer and a consumer might pass through many
-  /// basic blocks with many entering conditions. All of them should be taken
-  /// into account when handling the suppression mechanism. This function is
-  /// called iteratively many times until all the relationships have been taken
-  /// into account. In concrete, this means that the branches introduced in
-  /// `addSupp` are now new producers which have to undergo the requirements of
-  /// the FTD algorithm.
-  LogicalResult addSuppBranches(ConversionPatternRewriter &rewriter,
-                                handshake::FuncOp &funcOp,
-                                FtdStoredOperations &ftdOps) const;
-
   /// The suppression mechanism must be used for the start token as well.
   /// However, in the handshake IR, the signal is considered as a value, so it
   /// cannot be handled by the prevvious `addSupp` functions. This funciton is
@@ -188,16 +162,12 @@ protected:
                              handshake::FuncOp &funcOp,
                              FtdStoredOperations &ftdOps) const;
 
-  LogicalResult addSuppBackwardLoop(ConversionPatternRewriter &rewriter,
-                                    handshake::FuncOp &funcOp,
-                                    FtdStoredOperations &ftdOps) const;
-
   /// Starting from the information collected by the gsa analysis pass,
   /// instantiate some merge operations at the beginning of each block which
   /// work as explicit phi functions.
-  void addExplicitPhi(mlir::func::FuncOp funcOp,
-                      ConversionPatternRewriter &rewriter,
-                      FtdStoredOperations &ftdOps) const;
+  LogicalResult addExplicitPhi(mlir::func::FuncOp funcOp,
+                               ConversionPatternRewriter &rewriter,
+                               FtdStoredOperations &ftdOps) const;
 };
 #define GEN_PASS_DECL_FTDCFTOHANDSHAKE
 #define GEN_PASS_DEF_FTDCFTOHANDSHAKE

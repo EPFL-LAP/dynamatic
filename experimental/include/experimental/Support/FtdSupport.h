@@ -115,6 +115,10 @@ boolean::BoolExpression *getBlockLoopExitCondition(Block *loopExit,
                                                    mlir::CFGLoop *loop,
                                                    mlir::CFGLoopInfo &li);
 
+/// Get an array of two types containing the result type of a branch operation,
+/// channelifying the input type
+SmallVector<Type> getBranchResultTypes(Type inputType);
+
 }; // namespace ftd
 }; // namespace experimental
 }; // namespace dynamatic
