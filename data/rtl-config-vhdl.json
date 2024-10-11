@@ -710,7 +710,7 @@
       { "name": "FIFO_DEPTH", "type": "unsigned", "lb": 1 }
     ],
     "generic": "$DYNAMATIC/experimental/data/vhdl/speculation/speculator_wrapper.vhd",
-    "dependencies": ["types", "speculator"]
+    "dependencies": ["types", "speculator", "tehb"]
   },
   {
     "name": "handshake.spec_commit",
