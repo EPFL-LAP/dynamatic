@@ -84,7 +84,7 @@ exit_on_fail "Failed to compile source to affine" "Compiled source to affine"
 "$DYNAMATIC_OPT_BIN" "$F_AFFINE" --allow-unregistered-dialect \
   --remove-polygeist-attributes \
   --func-set-arg-names="source=$SRC_DIR/$KERNEL_NAME.c" \
-  --mark-memory-dependencies \
+  --force-memory-interface="force-mc" \
   > "$F_AFFINE_MEM"
 exit_on_fail "Failed to run memory analysis" "Ran memory analysis"
 
