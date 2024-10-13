@@ -494,13 +494,27 @@ LogicalResult HandshakePlaceBuffersPass::placeWithoutUsingMILP() {
     // at least one opaque and one transparent slot, unless a constraint
     // explicitly prevents us from putting a buffer there
     for (auto mergeLikeOp : funcOp.getOps<MergeLikeOpInterface>()) {
+      // Aya: added a condition to skip INITs
+      // bool hasBranchOperand = false;
+      // for (auto mergeOperand : mergeLikeOp->getOperands())
+      //   if (isa_and_nonnull<handshake::ConditionalBranchOp>(mergeOperand)) {
+      //     hasBranchOperand = true;
+      //     break;
+      //   }
+      // if (!hasBranchOperand)
+      //   continue; // Aya: INITs should not have any Branches at its input
+      if (isa_and_nonnull<handshake::MergeOp>(mergeLikeOp))
+        continue; // Skip any Merge because Merges are only used to implement
+                  // INITs
+
       ChannelBufProps &resProps = channelProps[mergeLikeOp->getResult(0)];
       if (resProps.maxTrans.value_or(1) >= 1) {
         resProps.minTrans = std::max(resProps.minTrans, 1U);
       } else {
         mergeLikeOp->emitWarning()
             << "Cannot place transparent buffer on merge-like operation's "
-               "output due to channel-specific buffering constraints. This may "
+               "output due to channel-specific buffering constraints. This "
+               "may "
                "yield an invalid buffering.";
       }
       if (resProps.maxOpaque.value_or(1) >= 1) {
@@ -508,7 +522,8 @@ LogicalResult HandshakePlaceBuffersPass::placeWithoutUsingMILP() {
       } else {
         mergeLikeOp->emitWarning()
             << "Cannot place opaque buffer on merge-like operation's "
-               "output due to channel-specific buffering constraints. This may "
+               "output due to channel-specific buffering constraints. This "
+               "may "
                "yield an invalid buffering.";
       }
     }
