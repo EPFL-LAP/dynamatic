@@ -717,13 +717,13 @@ HandshakeLowering::connectConstants(ConversionPatternRewriter &rewriter) {
     rewriter.setInsertionPoint(cstOp);
     TypedAttr cstAttr = cstOp.getValue();
     Value controlVal;
-    // if (isCstSourcable(cstOp)) {
-    //   auto sourceOp = rewriter.create<handshake::SourceOp>(
-    //       cstOp.getLoc(), rewriter.getNoneType());
-    //   controlVal = sourceOp.getResult();
-    // } else {
-    controlVal = getBlockEntryControl(cstOp->getBlock());
-    //}
+    if (isCstSourcable(cstOp)) {
+      auto sourceOp = rewriter.create<handshake::SourceOp>(
+          cstOp.getLoc(), rewriter.getNoneType());
+      controlVal = sourceOp.getResult();
+    } else {
+      controlVal = getBlockEntryControl(cstOp->getBlock());
+    }
     rewriter.replaceOpWithNewOp<handshake::ConstantOp>(cstOp, cstAttr.getType(),
                                                        cstAttr, controlVal);
   }
