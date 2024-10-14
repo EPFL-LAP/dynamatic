@@ -48,15 +48,28 @@ begin
         selectedData       := ins(i);
         selectedData_valid := '1';
       end if;
-      ins_ready(i) <= (indexEqual and index_valid and ins_valid(i) and outs_ready) or (not ins_valid(i));
+      ins_ready(i) <= (indexEqual and index_valid and ins_valid(i) and tehb_ins_ready) or (not ins_valid(i));
     end loop;
 
-    index_ready    <= (not index_valid) or (selectedData_valid and outs_ready);
+    index_ready    <= (not index_valid) or (selectedData_valid and tehb_ins_ready);
     tehb_ins       <= selectedData;
     tehb_ins_valid <= selectedData_valid;
   end process;
 
-  outs_valid <= tehb_ins_valid;
-  outs <= tehb_ins;
-
+  tehb : entity work.tehb(arch)
+    generic map(
+      DATA_WIDTH => DATA_WIDTH
+    )
+    port map(
+      clk => clk,
+      rst => rst,
+      -- input channel
+      ins       => tehb_ins,
+      ins_valid => tehb_ins_valid,
+      ins_ready => tehb_ins_ready,
+      -- output channel
+      outs       => outs,
+      outs_valid => outs_valid,
+      outs_ready => outs_ready
+    );
 end architecture;
