@@ -35,7 +35,7 @@ int gemver(in_int_t alpha, in_int_t beta, in_int_t u1[N], in_int_t v1[N],
     w[i] = tmp;
   }
 
-  return i;
+  return y[i];
 }
 
 int main(void) {
