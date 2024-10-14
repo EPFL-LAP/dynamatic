@@ -2859,11 +2859,12 @@ struct HandshakeRewriteTermsPass
         EraseUnconditionalBranches, EraseSingleInputMerges,
         EraseSingleInputMuxes, EraseSingleInputControlMerges,
         DowngradeIndexlessControlMerge, RemoveDoubleSinkBranches,
-        RemoveMuxFloatingLoop, RemoveMergeFloatingLoop,/*, ConstructSuppresses,
-        FixBranchesToSuppresses,*/ /*DistributeSuppresses, DistributeMergeRepeats,
-        DistributeMuxRepeats,*/
-        ExtractIfThenElseCondition, ExtractLoopCondition, RemoveBranchMergeIfThenElse, RemoveBranchMuxIfThenElse,
-        RemoveMergeBranchLoop, RemoveMuxBranchLoop/*, ConvertLoopMergeToMux*/>(ctx);
+        RemoveMuxFloatingLoop, RemoveMergeFloatingLoop, /* ConstructSuppresses,
+         FixBranchesToSuppresses, DistributeSuppresses, DistributeMergeRepeats,
+         DistributeMuxRepeats, */
+        ExtractIfThenElseCondition, ExtractLoopCondition,
+        RemoveBranchMergeIfThenElse, RemoveBranchMuxIfThenElse,
+        RemoveMergeBranchLoop, RemoveMuxBranchLoop, ConvertLoopMergeToMux>(ctx);
 
     if (failed(applyPatternsAndFoldGreedily(mod, std::move(patterns), config)))
       return signalPassFailure();
