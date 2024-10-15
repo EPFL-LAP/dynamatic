@@ -685,17 +685,6 @@
     }
   },
   {
-    "name": "handshake.sharing_wrapper",
-    "generator": "\"$DYNAMATIC/bin/generators/exp-sharing-wrapper-generator\" \"$OUTPUT_DIR/$MODULE_NAME.vhd\" $MODULE_NAME \"$CREDITS\" \"$NUM_SHARED_OPERANDS\" \"$DATA_WIDTH\" \"$LATENCY\"" ,
-    "parameters": [
-      { "name": "CREDITS", "type": "string" },
-      { "name": "NUM_SHARED_OPERANDS", "type": "unsigned", "lb" : 1},
-      { "name": "DATA_WIDTH", "type": "dataflow", "data-lb": 1, "extra-eq" : 0},
-      { "name": "LATENCY", "type": "unsigned", "lb": 1}
-    ],
-    "dependencies": ["logic", "types", "sharing_support", "ofifo", "tfifo", "lazy_fork"]
-  },
-  {
     "name": "handshake.join",
     "parameters": [{ "name": "SIZE", "type": "unsigned", "lb": 1 }],
     "generic": "$DYNAMATIC/data/vhdl/handshake/join.vhd",
@@ -754,9 +743,5 @@
       { "name": "ADDR_WIDTH", "type": "unsigned", "lb": 1 }
     ],
     "generic": "$DYNAMATIC/data/vhdl/support/mem_to_bram.vhd"
-  },
-  {
-    "generic": "$DYNAMATIC/data/vhdl/support/sharing_support.vhd",
-    "dependencies" : ["types"]
   }
 ]

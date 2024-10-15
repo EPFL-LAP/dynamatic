@@ -14,11 +14,7 @@ KERNEL_NAME=$4
 USE_SIMPLE_BUFFERS=$5
 TARGET_CP=$6
 POLYGEIST_PATH=$7
-<<<<<<< HEAD
 FAST_TOKEN_DELIVERY=$8
-=======
-USE_SHARING=$8
->>>>>>> 58fa4c6 ([Sharing][hdl] Resource sharing support in VHDL backend (#85))
 
 POLYGEIST_CLANG_BIN="$DYNAMATIC_DIR/bin/cgeist"
 CLANGXX_BIN="$DYNAMATIC_DIR/bin/clang++"
@@ -148,20 +144,12 @@ else
 fi
 
 
-
-# Credit-based sharing
-if [[ $USE_SHARING -ne 0 ]]; then
-  BUFFER_PLACEMENT_PASS="credit-based-sharing"
-else
-  BUFFER_PLACEMENT_PASS="handshake-place-buffers"
-fi
-
 # Buffer placement
 if [[ $USE_SIMPLE_BUFFERS -ne 0 ]]; then
   # Simple buffer placement
   "$DYNAMATIC_OPT_BIN" "$F_HANDSHAKE_TRANSFORMED" \
     --handshake-set-buffering-properties="version=fpga20" \
-    --$BUFFER_PLACEMENT_PASS="algorithm=on-merges timing-models=$DYNAMATIC_DIR/data/components.json" \
+    --handshake-place-buffers="algorithm=on-merges timing-models=$DYNAMATIC_DIR/data/components.json" \
     > "$F_HANDSHAKE_BUFFERED"
   exit_on_fail "Failed to place simple buffers" "Placed simple buffers"
 else
@@ -184,7 +172,7 @@ else
   cd "$COMP_DIR"
   "$DYNAMATIC_OPT_BIN" "$F_HANDSHAKE_TRANSFORMED" \
     --handshake-set-buffering-properties="version=fpga20" \
-    --$BUFFER_PLACEMENT_PASS="algorithm=fpl22 frequencies=$F_FREQUENCIES timing-models=$DYNAMATIC_DIR/data/components.json target-period=$TARGET_CP timeout=300 dump-logs" \
+    --handshake-place-buffers="algorithm=fpl22 frequencies=$F_FREQUENCIES timing-models=$DYNAMATIC_DIR/data/components.json target-period=$TARGET_CP timeout=300 dump-logs" \
     > "$F_HANDSHAKE_BUFFERED"
   exit_on_fail "Failed to place smart buffers" "Placed smart buffers"
   cd - > /dev/null

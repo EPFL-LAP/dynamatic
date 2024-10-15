@@ -22,7 +22,6 @@
 #include "mlir/Support/LogicalResult.h"
 #include "mlir/Transforms/InliningUtils.h"
 #include "llvm/ADT/TypeSwitch.h"
-#include <string>
 
 using namespace mlir;
 using namespace dynamatic;
@@ -313,22 +312,6 @@ std::string handshake::LSQOp::getResultName(unsigned idx) {
     return "stAddrToMC";
   assert(mcPort.getStoreDataOutputIndex() == idx && "unknown LSQ/MC result");
   return "stDataToMC";
-}
-
-std::string handshake::SharingWrapperOp::getOperandName(unsigned idx) {
-  assert(idx < getNumOperands() && "index too high");
-  if (idx < getNumSharedOperands() * getNumSharedOperations()) {
-    return "op" + std::to_string(idx / getNumSharedOperands()) + "in" +
-           std::to_string(idx % getNumSharedOperands());
-  }
-  return "fromSharedUnitOut0";
-}
-
-std::string handshake::SharingWrapperOp::getResultName(unsigned idx) {
-  assert(idx < getNumResults() && "index too high");
-  if (idx < getNumSharedOperations())
-    return "op" + std::to_string(idx) + "out0";
-  return "toSharedUnitIn" + std::to_string(idx - getNumSharedOperations());
 }
 
 //===----------------------------------------------------------------------===//
