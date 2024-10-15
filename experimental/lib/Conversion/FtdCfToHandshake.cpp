@@ -1,9 +1,4 @@
-<<<<<<< HEAD
 //===- FtdCfToHandshake.cpp - FTD conversion cf -> handshake --*--- C++ -*-===//
-=======
-//===- FtdCfToHandshake.cpp - FTD conversion cf -> handshake -----*- C++
-//-*-===//
->>>>>>> 1762f18 (Skeleton of FTD `cf` to `handshake` conversion pass)
 //
 // Implements the fast token delivery methodology as depicted in FPGA'22,
 // together with the fast LSQ allocation as depicted in FPGA'23.
@@ -11,15 +6,11 @@
 //===----------------------------------------------------------------------===//
 
 #include "experimental/Conversion/FtdCfToHandshake.h"
-<<<<<<< HEAD
 #include "dynamatic/Analysis/ControlDependenceAnalysis.h"
-=======
->>>>>>> 1762f18 (Skeleton of FTD `cf` to `handshake` conversion pass)
 #include "dynamatic/Analysis/NameAnalysis.h"
 #include "dynamatic/Conversion/CfToHandshake.h"
 #include "dynamatic/Dialect/Handshake/HandshakeDialect.h"
 #include "dynamatic/Dialect/Handshake/HandshakeOps.h"
-<<<<<<< HEAD
 #include "dynamatic/Support/CFG.h"
 #include "experimental/Analysis/GsaAnalysis.h"
 #include "experimental/Support/BooleanLogic/BoolExpression.h"
@@ -33,13 +24,6 @@
 #include "mlir/Dialect/Math/IR/Math.h"
 #include "mlir/Dialect/MemRef/IR/MemRef.h"
 #include "mlir/IR/Block.h"
-=======
-#include "mlir/Dialect/Affine/Utils.h"
-#include "mlir/Dialect/Arith/IR/Arith.h"
-#include "mlir/Dialect/ControlFlow/IR/ControlFlow.h"
-#include "mlir/Dialect/Func/IR/FuncOps.h"
-#include "mlir/Dialect/Math/IR/Math.h"
->>>>>>> 1762f18 (Skeleton of FTD `cf` to `handshake` conversion pass)
 #include "mlir/IR/BuiltinAttributes.h"
 #include "mlir/IR/BuiltinDialect.h"
 #include "mlir/IR/BuiltinOps.h"
@@ -51,10 +35,7 @@
 
 using namespace mlir;
 using namespace dynamatic;
-<<<<<<< HEAD
 using namespace dynamatic::experimental::boolean;
-=======
->>>>>>> 1762f18 (Skeleton of FTD `cf` to `handshake` conversion pass)
 
 namespace {
 
@@ -66,7 +47,6 @@ struct FtdCfToHandshakePass
     MLIRContext *ctx = &getContext();
     ModuleOp modOp = getOperation();
 
-<<<<<<< HEAD
     CfToHandshakeTypeConverter converter;
     RewritePatternSet patterns(ctx);
 
@@ -75,24 +55,6 @@ struct FtdCfToHandshakePass
         getAnalysis<NameAnalysis>(), converter, ctx);
 
     patterns.add<ConvertCalls,
-=======
-    // Print a message on stdout to prove that the pass is running
-    // llvm::outs() << "FTD pass is running as expected";
-
-    // Put all non-external functions into maximal SSA form
-    for (auto funcOp : modOp.getOps<func::FuncOp>()) {
-      if (!funcOp.isExternal()) {
-        FuncSSAStrategy strategy;
-        if (failed(dynamatic::maximizeSSA(funcOp.getBody(), strategy)))
-          return signalPassFailure();
-      }
-    }
-
-    CfToHandshakeTypeConverter converter;
-    RewritePatternSet patterns(ctx);
-    patterns.add<LowerFuncToHandshake, ConvertConstants, ConvertCalls,
-                 ConvertUndefinedValues,
->>>>>>> 1762f18 (Skeleton of FTD `cf` to `handshake` conversion pass)
                  ConvertIndexCast<arith::IndexCastOp, handshake::ExtSIOp>,
                  ConvertIndexCast<arith::IndexCastUIOp, handshake::ExtUIOp>,
                  OneToOneConversion<arith::AddFOp, handshake::AddFOp>,
@@ -139,7 +101,6 @@ namespace dynamatic {
 namespace experimental {
 namespace ftd {
 
-<<<<<<< HEAD
 using ArgReplacements = DenseMap<BlockArgument, OpResult>;
 
 // ------------------------ Forwarded declarations ------------------------
@@ -1678,8 +1639,6 @@ FtdLowerFuncToHandshake::addExplicitPhi(func::FuncOp funcOp,
 
   return success();
 }
-=======
->>>>>>> 1762f18 (Skeleton of FTD `cf` to `handshake` conversion pass)
 std::unique_ptr<dynamatic::DynamaticPass> createFtdCfToHandshake() {
   return std::make_unique<FtdCfToHandshakePass>();
 }

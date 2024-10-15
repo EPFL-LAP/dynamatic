@@ -252,27 +252,16 @@ public:
 class Compile : public Command {
 public:
 <<<<<<< HEAD
-<<<<<<< HEAD
   static constexpr llvm::StringLiteral SIMPLE_BUFFERS = "simple-buffers";
 <<<<<<< HEAD
   static constexpr llvm::StringLiteral FAST_TOKEN_DELIVERY =
       "fast-token-delivery";
 =======
 =======
-=======
->>>>>>> 1762f18 (Skeleton of FTD `cf` to `handshake` conversion pass)
   static constexpr llvm::StringLiteral BUFFER_ALGORITHM = "buffer-algorithm";
 >>>>>>> f9b9400 ([Frontend] Buffer placement option in the compile command (#156))
   static constexpr llvm::StringLiteral SHARING = "sharing";
-<<<<<<< HEAD
 >>>>>>> 58fa4c6 ([Sharing][hdl] Resource sharing support in VHDL backend (#85))
-=======
-=======
-  static constexpr llvm::StringLiteral SIMPLE_BUFFERS = "simple-buffers";
-  static constexpr llvm::StringLiteral FAST_TOKEN_DELIVERY =
-      "fast-token-delivery";
->>>>>>> 40a3f59 (Skeleton of FTD `cf` to `handshake` conversion pass)
->>>>>>> 1762f18 (Skeleton of FTD `cf` to `handshake` conversion pass)
 
   Compile(FrontendState &state)
       : Command("compile",
@@ -280,14 +269,11 @@ public:
                 "produces both handshake-level IR and an equivalent DOT file",
                 state) {
 <<<<<<< HEAD
-<<<<<<< HEAD
     addFlag({SIMPLE_BUFFERS, "Use simple buffer placement"});
 <<<<<<< HEAD
     addFlag({FAST_TOKEN_DELIVERY, "Use fast token delivery strategy"});
 =======
 =======
-=======
->>>>>>> 1762f18 (Skeleton of FTD `cf` to `handshake` conversion pass)
     addOption({BUFFER_ALGORITHM,
                "The buffer placement algorithm to use, values are "
                "'on-merges' (default option: minimum buffering for "
@@ -295,14 +281,7 @@ public:
                "'fpl22' (throughput- and timing-driven buffering)"});
 >>>>>>> f9b9400 ([Frontend] Buffer placement option in the compile command (#156))
     addFlag({SHARING, "Use credit-based resource sharing"});
-<<<<<<< HEAD
 >>>>>>> 58fa4c6 ([Sharing][hdl] Resource sharing support in VHDL backend (#85))
-=======
-=======
-    addFlag({SIMPLE_BUFFERS, "Use simple buffer placement"});
-    addFlag({FAST_TOKEN_DELIVERY, "Use fast token delivery strategy"});
->>>>>>> 40a3f59 (Skeleton of FTD `cf` to `handshake` conversion pass)
->>>>>>> 1762f18 (Skeleton of FTD `cf` to `handshake` conversion pass)
   }
 
   CommandResult execute(CommandArguments &args) override;
@@ -603,7 +582,6 @@ CommandResult Compile::execute(CommandArguments &args) {
 
   std::string script = state.getScriptsPath() + getSeparator() + "compile.sh";
 <<<<<<< HEAD
-<<<<<<< HEAD
   std::string buffers = args.flags.contains(SIMPLE_BUFFERS) ? "1" : "0";
 <<<<<<< HEAD
   std::string fastTokenDelivery =
@@ -611,16 +589,9 @@ CommandResult Compile::execute(CommandArguments &args) {
 
 =======
 =======
-=======
->>>>>>> 1762f18 (Skeleton of FTD `cf` to `handshake` conversion pass)
   // If unspecified, we place a OB + TB after every merge to guarantee
   // the deadlock freeness.
   std::string buffers = "on-merges";
-=======
-  std::string buffers = args.flags.contains(SIMPLE_BUFFERS) ? "1" : "0";
-  std::string fastTokenDelivery =
-      args.flags.contains(FAST_TOKEN_DELIVERY) ? "1" : "0";
->>>>>>> 40a3f59 (Skeleton of FTD `cf` to `handshake` conversion pass)
 
   if (auto it = args.options.find(BUFFER_ALGORITHM); it != args.options.end()) {
     if (it->second == "on-merges" || it->second == "fpga20" ||
@@ -646,17 +617,10 @@ CommandResult Compile::execute(CommandArguments &args) {
                  state.getOutputDir(), state.getKernelName(), buffers,
                  floatToString(state.targetCP, 3), state.polygeistPath,
 <<<<<<< HEAD
-<<<<<<< HEAD
                  fastTokenDelivery);
 =======
                  sharing);
 >>>>>>> 58fa4c6 ([Sharing][hdl] Resource sharing support in VHDL backend (#85))
-=======
-                 sharing);
-=======
-                 fastTokenDelivery);
->>>>>>> 40a3f59 (Skeleton of FTD `cf` to `handshake` conversion pass)
->>>>>>> 1762f18 (Skeleton of FTD `cf` to `handshake` conversion pass)
 }
 
 CommandResult WriteHDL::execute(CommandArguments &args) {

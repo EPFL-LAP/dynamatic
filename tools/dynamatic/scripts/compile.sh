@@ -15,17 +15,10 @@ BUFFER_ALGORITHM=$5
 TARGET_CP=$6
 POLYGEIST_PATH=$7
 <<<<<<< HEAD
-<<<<<<< HEAD
 FAST_TOKEN_DELIVERY=$8
 =======
 USE_SHARING=$8
 >>>>>>> 58fa4c6 ([Sharing][hdl] Resource sharing support in VHDL backend (#85))
-=======
-USE_SHARING=$8
-=======
-FAST_TOKEN_DELIVERY=$8
->>>>>>> 40a3f59 (Skeleton of FTD `cf` to `handshake` conversion pass)
->>>>>>> 1762f18 (Skeleton of FTD `cf` to `handshake` conversion pass)
 
 POLYGEIST_CLANG_BIN="$DYNAMATIC_DIR/bin/cgeist"
 CLANGXX_BIN="$DYNAMATIC_DIR/bin/clang++"
@@ -125,17 +118,6 @@ exit_on_fail "Failed to apply Dynamatic transformations to cf" \
 
 # cf level -> handshake level
 if [[ $FAST_TOKEN_DELIVERY -ne 0 ]]; then
-<<<<<<< HEAD
-=======
-  "$DYNAMATIC_OPT_BIN" "$F_CF_DYN_TRANSFORMED" --ftd-lower-cf-to-handshake \
-    > "$F_HANDSHAKE"
-  exit_on_fail "Failed to compile cf to handshake with FTD" "Compiled cf to handshake with FTD"
-else
-  "$DYNAMATIC_OPT_BIN" "$F_CF_DYN_TRANSFORMED" --lower-cf-to-handshake \
-    > "$F_HANDSHAKE"
-  exit_on_fail "Failed to compile cf to handshake" "Compiled cf to handshake"
-fi
->>>>>>> 1762f18 (Skeleton of FTD `cf` to `handshake` conversion pass)
 
   "$DYNAMATIC_OPT_BIN" "$F_CF_DYN_TRANSFORMED" --ftd-lower-cf-to-handshake \
     > "$F_HANDSHAKE"
