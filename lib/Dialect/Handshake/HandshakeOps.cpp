@@ -1574,8 +1574,8 @@ ParseResult SpeculatorOp::parse(OpAsmParser &parser, OperationState &result) {
   result.addTypes(
       {dataType, ctrlType, ctrlType, wideCtrlType, wideCtrlType, ctrlType});
 
-  if (parser.resolveOperands({dataIn, enable},
-                             {dataType, ControlType::get(parser.getContext())},
+  if (parser.resolveOperands({enable, dataIn},
+                             {ControlType::get(parser.getContext()), dataType},
                              allOperandLoc, result.operands))
     return failure();
   return success();
