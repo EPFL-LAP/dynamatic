@@ -546,7 +546,7 @@ def NotOp : Handshake_Op<"not", [Pure, SameOperandsAndResultType,
 }
 
 //===----------------------------------------------------------------------===//
-// Memory interfaces
+// Memory interfaces and access ports
 //===----------------------------------------------------------------------===//
 
 def MemoryControllerOp : Handshake_Op<"mem_controller", [
@@ -602,6 +602,7 @@ def MemoryControllerOp : Handshake_Op<"mem_controller", [
                        I32ArrayAttr:$connectedBlocks);
   let results = (outs Variadic<ChannelType>:$outputs, ControlType:$memEnd);
 
+  let skipDefaultBuilders = 1;
   let builders = [OpBuilder<(ins "Value":$memRef, "Value":$memStart,
                                  "ValueRange":$inputs, "Value":$ctrlEnd,
                                  "ArrayRef<unsigned>":$blocks, 
@@ -678,6 +679,7 @@ def LSQOp : Handshake_Op<"lsq", [
   let arguments = (ins Variadic<AnyType>:$inputs, I32ArrayAttr:$groupSizes);
   let results = (outs Variadic<HandshakeType>:$outputs);
 
+  let skipDefaultBuilders = 1;
   let builders = [
     OpBuilder<(ins "Value":$memref, "Value":$memStart, "ValueRange":$inputs, 
                    "Value":$ctrlEnd, "ArrayRef<unsigned>":$groupSizes, "unsigned":$numLoads)>,
@@ -722,27 +724,16 @@ def LSQOp : Handshake_Op<"lsq", [
   }];
 }
 
-//===----------------------------------------------------------------------===//
-// Memory ports
-//===----------------------------------------------------------------------===//
-
-class Handshake_MemPortOp<string mnemonic, Trait PortInterface> :
-  Handshake_Op<mnemonic, [PortInterface] # [
-    AllTypesMatch<["address", "addressResult"]>,
-    AllTypesMatch<["data", "dataResult"]>,
-    DeclareOpInterfaceMethods<NamedIOInterface, ["getOperandName", "getResultName"]>
-  ]
-> {
+class Handshake_LoadOp<string mnemonic> : Handshake_Op<mnemonic, [
+  LoadOpInterface,
+  AllTypesMatch<["address", "addressResult"]>,
+  AllTypesMatch<["data", "dataResult"]>,
+  DeclareOpInterfaceMethods<NamedIOInterface, ["getOperandName", "getResultName"]>
+]> {
   let arguments = (ins IntChannelType:$address, ChannelType:$data);
   let results = (outs IntChannelType:$addressResult, ChannelType:$dataResult);
-  let assemblyFormat = [{
-    `[` $address `]` $data attr-dict `:` type($address) `,` type($data)
-  }];
-}
-
-class Handshake_LoadOp<string mnemonic> :
-  Handshake_MemPortOp<mnemonic, LoadOpInterface> {
   let builders = [OpBuilder<(ins "MemRefType":$memrefType, "Value":$address)>];
+  let assemblyFormat = "`[` $address `]` $data attr-dict `:` type($address) `,` type($data)";
 
   let extraClassDefinition = [{
     std::string $cppClass::getOperandName(unsigned idx) {
@@ -753,19 +744,6 @@ class Handshake_LoadOp<string mnemonic> :
     std::string $cppClass::getResultName(unsigned idx) {
       assert(idx < getNumResults() && "index too high");
       return (idx == 0) ? "addrOut" : "dataOut";
-    }
-  }];
-}
-
-class Handshake_StoreOp<string mnemonic> :
-  Handshake_MemPortOp<mnemonic, StoreOpInterface> {
-  let extraClassDefinition = [{
-    std::string $cppClass::getOperandName(unsigned int idx) {
-      return (idx == 0) ? "addrIn" : "dataIn";
-    }
-
-    std::string $cppClass::getResultName(unsigned int idx) {
-      return (idx == 0) ? "addrOut" : "dataToMem";
     }
   }];
 }
@@ -791,7 +769,8 @@ def MCLoadOp : Handshake_LoadOp<"mc_load"> {
     Example:
 
     ```mlir
-    %addrOut, %dataOut = mc_load [%addrIn] %dataFromMem : <i32>, <i32>
+    %addrToMem, %dataToSucc = mc_load [%addrFromPred] %dataFromMem :
+      !handshake.channel<i32>, !handshake.channel<i32>
     ```
   }];
 }
@@ -816,8 +795,30 @@ def LSQLoadOp : Handshake_LoadOp<"lsq_load"> {
     Example:
 
     ```mlir
-    %addrOut, %dataOut = lsq_load [%addrIn] %dataFromMem : <i32>, <i32>
+    %addrToMem, %dataToSucc = lsq_load [%addrFromPred] %dataFromMem :
+      !handshake.channel<i32>, !handshake.channel<i32>
     ```
+  }];
+}
+
+class Handshake_StoreOp<string mnemonic> : Handshake_Op<mnemonic, [
+  StoreOpInterface,
+  AllTypesMatch<["address", "addressResult"]>,
+  AllTypesMatch<["data", "dataResult"]>,
+  DeclareOpInterfaceMethods<NamedIOInterface, ["getOperandName", "getResultName"]>
+]> {
+  let arguments = (ins IntChannelType:$address, ChannelType:$data);
+  let results = (outs IntChannelType:$addressResult, ChannelType:$dataResult);
+  let assemblyFormat = "`[` $address `]` $data attr-dict `:` type($data) `,` type($address)";
+
+  let extraClassDefinition = [{
+    std::string $cppClass::getOperandName(unsigned int idx) {
+      return (idx == 0) ? "addrIn" : "dataIn";
+    }
+
+    std::string $cppClass::getResultName(unsigned int idx) {
+      return (idx == 0) ? "addrOut" : "dataToMem";
+    }
   }];
 }
 
@@ -839,9 +840,9 @@ def MCStoreOp : Handshake_StoreOp<"mc_store"> {
     2. data value (to memory interface)
 
     Example:
-
     ```mlir
-    %addrOut, %dataToMem = mc_load [%addrIn] %dataIn : <i32>, <i32>
+    %addrToMem, %dataToMem = mc_store [%addrFromPred] %dataFromPred :
+      !handshake.channel<i32>, !handshake.channel<i32>
     ```
   }];
 }
@@ -863,16 +864,12 @@ def LSQStoreOp : Handshake_StoreOp<"lsq_store"> {
     2. data value (to memory interface)
 
     Example:
-
     ```mlir
-    %addrOut, %dataToMem = lsq_load [%addrIn] %dataIn : <i32>, <i32>
+    %addrToMem, %dataToMem = lsq_store [%addrFromPred] %dataFromPred :
+      !handshake.channel<i32>, !handshake.channel<i32>
     ```
   }];
 }
-
-//===----------------------------------------------------------------------===//
-// Terminator
-//===----------------------------------------------------------------------===//
 
 def EndOp : Handshake_Op<"end", [
   DeclareOpInterfaceMethods<NamedIOInterface, ["getOperandName"]>,
