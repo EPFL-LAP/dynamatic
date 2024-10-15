@@ -635,8 +635,8 @@ struct RemoveMergeBranchLoop : public OpRewritePattern<handshake::MergeOp> {
     if (!foundCycle)
       return failure();
 
-    llvm::errs() << "\t\t(1) Found an iter Branch in "
-                 << getLogicBB(iterCondBranchOp) << "\n";
+    // llvm::errs() << "\t\t(1) Found an iter Branch in "
+    //              << getLogicBB(iterCondBranchOp) << "\n";
 
     mergeOuterInputIdx = (mergeCycleInputIdx == 0) ? 1 : 0;
 
@@ -739,8 +739,8 @@ struct RemoveMergeBranchLoop : public OpRewritePattern<handshake::MergeOp> {
     if (!foundExitBranch)
       return failure();
 
-    llvm::errs() << "\t\t(2) Found an exit Branch in "
-                 << getLogicBB(exitCondBranchOp) << "\n";
+    // llvm::errs() << "\t\t(2) Found an exit Branch in "
+    //              << getLogicBB(exitCondBranchOp) << "\n";
 
     // Pattern match fails if both outputs of the exitCondBranchOp are empty
     if (exitCondBranchOp.getTrueResult().getUsers().empty() &&
@@ -934,8 +934,8 @@ struct RemoveMuxBranchLoop : public OpRewritePattern<handshake::MuxOp> {
     if (!foundCycle)
       return failure();
 
-    llvm::errs() << "\t\t(1) Found an iter Branch in "
-                 << getLogicBB(iterCondBranchOp) << "\n";
+    // llvm::errs() << "\t\t(1) Found an iter Branch in "
+    //              << getLogicBB(iterCondBranchOp) << "\n";
 
     muxOuterInputIdx = (muxCycleInputIdx == 0) ? 1 : 0;
 
@@ -1037,8 +1037,8 @@ struct RemoveMuxBranchLoop : public OpRewritePattern<handshake::MuxOp> {
     if (!foundExitBranch)
       return failure();
 
-    llvm::errs() << "\t\t(2) Found an exit Branch in "
-                 << getLogicBB(exitCondBranchOp) << "\n";
+    // llvm::errs() << "\t\t(2) Found an exit Branch in "
+    //              << getLogicBB(exitCondBranchOp) << "\n";
 
     // Pattern match fails if both outputs of the exitCondBranchOp are empty
     if (exitCondBranchOp.getTrueResult().getUsers().empty() &&
@@ -1540,45 +1540,49 @@ struct ShortenSuppressPairs
       // Retrieve the new value of the condition, in case it is not updated
       condBr1 = firstCondBranchOp.getConditionOperand();
     } else {
-      llvm::errs() << firstFalseSuccOnlyFlag << ", " << secondTrueSuccOnlyFlag
-                   << ", " << firstTrueSuccOnlyFlag << ", "
-                   << secondFalseSuccOnlyFlag << "\n";
-      assert(firstFalseSuccOnlyFlag && secondTrueSuccOnlyFlag);
+      // llvm::errs() << firstFalseSuccOnlyFlag << ", " <<
+      // secondTrueSuccOnlyFlag
+      //              << ", " << firstTrueSuccOnlyFlag << ", "
+      //              << secondFalseSuccOnlyFlag << "\n";
+      // assert(firstFalseSuccOnlyFlag && secondTrueSuccOnlyFlag);
 
-      // Check if the condition already feeds a NOT, no need to create a new one
-      bool foundNot = false;
-      handshake::NotOp existingNotOp;
-      for (auto condRes : condBr2.getUsers()) {
-        if (isa_and_nonnull<handshake::NotOp>(condRes)) {
-          foundNot = true;
-          existingNotOp = cast<handshake::NotOp>(condRes);
-          break;
+      if (firstFalseSuccOnlyFlag && secondTrueSuccOnlyFlag) {
+        // Check if the condition already feeds a NOT, no need to create a new
+        // one
+        bool foundNot = false;
+        handshake::NotOp existingNotOp;
+        for (auto condRes : condBr2.getUsers()) {
+          if (isa_and_nonnull<handshake::NotOp>(condRes)) {
+            foundNot = true;
+            existingNotOp = cast<handshake::NotOp>(condRes);
+            break;
+          }
         }
+        Value newCond;
+        if (foundNot) {
+          newCond = existingNotOp.getResult();
+        } else {
+          // Insert a NOT at the condition input of the second Branch
+          rewriter.setInsertionPoint(secondCondBranchOp);
+          handshake::NotOp notOp = rewriter.create<handshake::NotOp>(
+              secondCondBranchOp->getLoc(), condBr2);
+          inheritBB(secondCondBranchOp, notOp);
+
+          newCond = notOp.getResult();
+        }
+
+        rewriter.replaceAllUsesWith(condBr2, newCond);
+
+        // Replace all uses coming from the true side of the first Branch with
+        // the false side of it
+        rewriter.replaceAllUsesWith(secondTrueResult, secondFalseResult);
+        // Adjust the secondTrueSuccOnlyFlag and firstFalseSuccOnlyFlag
+        secondTrueSuccOnlyFlag = false;
+        secondFalseSuccOnlyFlag = true;
+
+        // Retrieve the new value of the condition, in case it is not updated
+        condBr2 = secondCondBranchOp.getConditionOperand();
       }
-      Value newCond;
-      if (foundNot) {
-        newCond = existingNotOp.getResult();
-      } else {
-        // Insert a NOT at the condition input of the second Branch
-        rewriter.setInsertionPoint(secondCondBranchOp);
-        handshake::NotOp notOp = rewriter.create<handshake::NotOp>(
-            secondCondBranchOp->getLoc(), condBr2);
-        inheritBB(secondCondBranchOp, notOp);
-
-        newCond = notOp.getResult();
-      }
-
-      rewriter.replaceAllUsesWith(condBr2, newCond);
-
-      // Replace all uses coming from the true side of the first Branch with
-      // the false side of it
-      rewriter.replaceAllUsesWith(secondTrueResult, secondFalseResult);
-      // Adjust the secondTrueSuccOnlyFlag and firstFalseSuccOnlyFlag
-      secondTrueSuccOnlyFlag = false;
-      secondFalseSuccOnlyFlag = true;
-
-      // Retrieve the new value of the condition, in case it is not updated
-      condBr2 = secondCondBranchOp.getConditionOperand();
     }
 
     // The goal now is to replace the two Branches with a single Branch, we do
@@ -2222,6 +2226,8 @@ struct ConstructSuppresses
 
   LogicalResult matchAndRewrite(handshake::ConditionalBranchOp condBranchOp,
                                 PatternRewriter &rewriter) const override {
+    if (OPTIM_BRANCH_TO_SUPP)
+      return failure();
     // If this Branch does not have users both in the true and false sides,
     // the pattern match fails
     Value branchTrueResult = condBranchOp.getTrueResult();
@@ -2260,6 +2266,8 @@ struct FixBranchesToSuppresses
 
   LogicalResult matchAndRewrite(handshake::ConditionalBranchOp condBranchOp,
                                 PatternRewriter &rewriter) const override {
+    if (OPTIM_BRANCH_TO_SUPP)
+      return failure();
     // The pattern match fails if the Branch has no true succs or has both
     // true and false succs
     Value branchTrueResult = condBranchOp.getTrueResult();
@@ -2327,6 +2335,9 @@ struct DistributeSuppresses
 
   LogicalResult matchAndRewrite(handshake::ConditionalBranchOp condBranchOp,
                                 PatternRewriter &rewriter) const override {
+
+    if (OPTIM_DISTR)
+      return failure();
     // If this Branch has any users in the true side, then it is not a
     // suppress, so the pattern match fails. It also fails if it has no users
     // on the false side
@@ -2382,6 +2393,9 @@ struct DistributeMergeRepeats : public OpRewritePattern<handshake::MergeOp> {
 
   LogicalResult matchAndRewrite(handshake::MergeOp mergeOp,
                                 PatternRewriter &rewriter) const override {
+
+    if (OPTIM_DISTR)
+      return failure();
     // 1st) Search for a Repeat that is composed of a Merge feeding a Supp and
     // feeding other stuff
     auto mergeUsers = (mergeOp.getResult()).getUsers();
@@ -2530,6 +2544,9 @@ struct DistributeMuxRepeats : public OpRewritePattern<handshake::MuxOp> {
 
   LogicalResult matchAndRewrite(handshake::MuxOp muxOp,
                                 PatternRewriter &rewriter) const override {
+    if (OPTIM_DISTR)
+      return failure();
+
     // 1st) Search for a Repeat that is composed of a Mux feeding a Supp and
     // feeding other stuff
     auto muxUsers = (muxOp.getResult()).getUsers();
@@ -2859,12 +2876,12 @@ struct HandshakeRewriteTermsPass
         EraseUnconditionalBranches, EraseSingleInputMerges,
         EraseSingleInputMuxes, EraseSingleInputControlMerges,
         DowngradeIndexlessControlMerge, RemoveDoubleSinkBranches,
-        RemoveMuxFloatingLoop, RemoveMergeFloatingLoop, /* ConstructSuppresses,
-         FixBranchesToSuppresses, DistributeSuppresses, DistributeMergeRepeats,
-         DistributeMuxRepeats, */
-        ExtractIfThenElseCondition, ExtractLoopCondition,
+        RemoveMuxFloatingLoop, RemoveMergeFloatingLoop, ConstructSuppresses,
+        FixBranchesToSuppresses, DistributeSuppresses, DistributeMergeRepeats,
+        DistributeMuxRepeats, ExtractIfThenElseCondition, ExtractLoopCondition,
         RemoveBranchMergeIfThenElse, RemoveBranchMuxIfThenElse,
-        RemoveMergeBranchLoop, RemoveMuxBranchLoop, ConvertLoopMergeToMux>(ctx);
+        RemoveMergeBranchLoop, RemoveMuxBranchLoop, ShortenSuppressPairs,
+        ConvertLoopMergeToMux, ShortenMuxRepeatPairs>(ctx);
 
     if (failed(applyPatternsAndFoldGreedily(mod, std::move(patterns), config)))
       return signalPassFailure();
