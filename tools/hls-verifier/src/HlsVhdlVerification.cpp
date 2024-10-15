@@ -25,11 +25,18 @@ bool runVhdlVerification(vector<string> args) {
     return true;
   }
 
+  bool useAddrWidth32 = false;
+
   vector<string> temp;
 
   for (auto &arg : args) {
-    if (arg.empty() || arg[0] != '-')
+    if (!arg.empty() && arg[0] == '-') {
+      if (arg == "-aw32") {
+        useAddrWidth32 = true;
+      }
+    } else {
       temp.push_back(arg);
+    }
   }
 
   args = temp;
@@ -42,6 +49,7 @@ bool runVhdlVerification(vector<string> args) {
   vector<string> otherCPaths;
   VerificationContext ctx(cTbPath, "", cFuvFunctionName, vhdlDuvEntityName,
                           otherCPaths);
+  ctx.useAddrWidth32 = useAddrWidth32;
   executeVhdlTestbench(ctx, resourceDir);
   checkVhdlTestbenchOutputs(ctx);
   return true;

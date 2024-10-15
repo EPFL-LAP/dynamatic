@@ -186,6 +186,10 @@ def HandshakeOptimizeBitwidths : DynamaticPass< "handshake-optimize-bitwidths",
     the Handhsake level.
   }];
   let constructor = "dynamatic::createHandshakeOptimizeBitwidths()";
+  let options = [Option<"legacy", "legacy", "bool", "false",
+    "When legacy mode is enabled, disables bitwidth optimization of memory "
+    "address channels since they sometime make the legacy dot2vhdl tool "
+    "fail.">];
 }
 
 def HandshakeMinimizeCstWidth : DynamaticPass<"handshake-minimize-cst-width",
