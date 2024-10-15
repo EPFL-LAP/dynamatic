@@ -11,6 +11,7 @@
 //
 //===----------------------------------------------------------------------===//
 
+#include "RegisterTypes.h"
 #include "VisualDataflow.h"
 #include <gdextension_interface.h>
 #include <godot_cpp/core/class_db.hpp>
@@ -19,15 +20,16 @@
 
 using namespace godot;
 
-static void initializeModule(ModuleInitializationLevel level) {
+void initializeModule(ModuleInitializationLevel level) {
   if (level != MODULE_INITIALIZATION_LEVEL_SCENE)
     return;
   ClassDB::register_class<VisualDataflow>();
 }
 
-static void terminateModule(ModuleInitializationLevel level) {}
+void terminateModule(ModuleInitializationLevel level) {}
 
 extern "C" {
+
 GDExtensionBool GDE_EXPORT
 visualDataflowInit(GDExtensionInterfaceGetProcAddress getProdAddress,
                    GDExtensionClassLibraryPtr library,
