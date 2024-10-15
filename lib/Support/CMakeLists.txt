@@ -2,7 +2,7 @@ add_dynamatic_library(DynamaticSupport
   Attribute.cpp
   Backedge.cpp
   CFG.cpp
-  DOT.cpp
+  DOTPrinter.cpp
   Logging.cpp
   MILP.cpp
   System.cpp

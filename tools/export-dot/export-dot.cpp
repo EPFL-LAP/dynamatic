@@ -16,7 +16,7 @@
 //
 //===----------------------------------------------------------------------===//
 
-#include "dynamatic/Support/DOT.h"
+#include "dynamatic/Support/DOTPrinter.h"
 #include "mlir/Dialect/Math/IR/Math.h"
 #include "mlir/Dialect/MemRef/IR/MemRef.h"
 #include "mlir/IR/BuiltinOps.h"
