@@ -95,7 +95,7 @@ struct FrontendState {
   double targetCP = 4.0;
   std::optional<std::string> sourcePath = std::nullopt;
 
-  FrontendState(StringRef cwd) : cwd(cwd), dynamaticPath(cwd) {};
+  FrontendState(StringRef cwd) : cwd(cwd), dynamaticPath(cwd){};
 
   bool sourcePathIsSet(StringRef keyword);
 
@@ -130,7 +130,7 @@ struct Argument {
 
   Argument() = default;
 
-  Argument(StringRef name, StringRef desc) : name(name), desc(desc) {};
+  Argument(StringRef name, StringRef desc) : name(name), desc(desc){};
 };
 
 struct CommandArguments {
@@ -195,7 +195,7 @@ private:
 class Exit : public Command {
 public:
   Exit(FrontendState &state)
-      : Command("exit", "Exits the Dynamatic frontend", state) {};
+      : Command("exit", "Exits the Dynamatic frontend", state){};
 
   CommandResult execute(CommandArguments &args) override;
 };
@@ -203,7 +203,7 @@ public:
 class Help : public Command {
 public:
   Help(FrontendState &state)
-      : Command("help", "Displays this help message", state) {};
+      : Command("help", "Displays this help message", state){};
 
   CommandResult execute(CommandArguments &args) override;
 };
@@ -251,14 +251,20 @@ public:
 
 class Compile : public Command {
 public:
-  static constexpr llvm::StringLiteral SIMPLE_BUFFERS = "simple-buffers";
+  static constexpr llvm::StringLiteral BUFFER_ALGORITHM = "buffer-algorithm";
+  static constexpr llvm::StringLiteral SHARING = "sharing";
 
   Compile(FrontendState &state)
       : Command("compile",
                 "Compiles the source kernel into a dataflow circuit; "
                 "produces both handshake-level IR and an equivalent DOT file",
                 state) {
-    addFlag({SIMPLE_BUFFERS, "Use simple buffer placement"});
+    addOption({BUFFER_ALGORITHM,
+               "The buffer placement algorithm to use, values are "
+               "'on-merges' (default option: minimum buffering for "
+               "correctness), 'fpga20' (throughput-driven buffering), or "
+               "'fpl22' (throughput- and timing-driven buffering)"});
+    addFlag({SHARING, "Use credit-based resource sharing"});
   }
 
   CommandResult execute(CommandArguments &args) override;
@@ -558,15 +564,32 @@ CommandResult Compile::execute(CommandArguments &args) {
     return CommandResult::FAIL;
 
   std::string script = state.getScriptsPath() + getSeparator() + "compile.sh";
-  std::string buffers = args.flags.contains(SIMPLE_BUFFERS) ? "1" : "0";
+  // If unspecified, we place a OB + TB after every merge to guarantee
+  // the deadlock freeness.
+  std::string buffers = "on-merges";
 
+  if (auto it = args.options.find(BUFFER_ALGORITHM); it != args.options.end()) {
+    if (it->second == "on-merges" || it->second == "fpga20" ||
+        it->second == "fpl22") {
+      buffers = it->second;
+    } else {
+      llvm::errs()
+          << "Unknown buffer placement algorithm " << it->second
+          << "! Possible options are 'on-merges' (minimum buffering for "
+             "correctness), 'fpga20' (throughput-driven buffering), or 'fpl22' "
+             "(throughput- and timing-driven buffering).";
+      return CommandResult::FAIL;
+    }
+  }
+
+  std::string sharing = args.flags.contains(SHARING) ? "1" : "0";
   state.polygeistPath = state.polygeistPath.empty()
                             ? state.dynamaticPath + getSeparator() + "polygeist"
                             : state.polygeistPath;
-
   return execCmd(script, state.dynamaticPath, state.getKernelDir(),
                  state.getOutputDir(), state.getKernelName(), buffers,
-                 floatToString(state.targetCP, 3), state.polygeistPath);
+                 floatToString(state.targetCP, 3), state.polygeistPath,
+                 sharing);
 }
 
 CommandResult WriteHDL::execute(CommandArguments &args) {

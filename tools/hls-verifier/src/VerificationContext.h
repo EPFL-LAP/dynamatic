@@ -93,8 +93,6 @@ public:
   vector<CFunctionParameter> getFuvInputParams() const;
   vector<CFunctionParameter> getFuvParams() const;
 
-  bool useAddrWidth32;
-
 private:
   Properties properties;
   CFunction fuv;

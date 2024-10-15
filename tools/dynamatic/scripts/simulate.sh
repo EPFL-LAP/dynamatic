@@ -67,7 +67,7 @@ exit_on_fail "Failed to run kernel for IO gen." "Ran kernel for IO gen."
 # Simulate and verify design
 echo_info "Launching Modelsim simulation"
 cd "$HLS_VERIFY_DIR"
-"$HLS_VERIFIER_BIN" cover -aw32 "$RESOURCE_DIR" "../C_SRC/$KERNEL_NAME.c" \
+"$HLS_VERIFIER_BIN" cover "$RESOURCE_DIR" "../C_SRC/$KERNEL_NAME.c" \
   "../C_SRC/$KERNEL_NAME.c" "$KERNEL_NAME" "$KERNEL_NAME"_wrapper \
   > "../report.txt"
 exit_on_fail "Simulation failed" "Simulation succeeded"

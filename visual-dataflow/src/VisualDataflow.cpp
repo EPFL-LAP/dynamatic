@@ -12,45 +12,29 @@
 
 #include "VisualDataflow.h"
 #include "Graph.h"
-#include "GraphParser.h"
-#include "dynamatic/Support/DOTPrinter.h"
-#include "dynamatic/Support/TimingModels.h"
+#include "dynamatic/Support/DOT.h"
 #include "godot_cpp/classes/area2d.hpp"
 #include "godot_cpp/classes/canvas_item.hpp"
-#include "godot_cpp/classes/canvas_layer.hpp"
 #include "godot_cpp/classes/center_container.hpp"
-#include "godot_cpp/classes/color_rect.hpp"
-#include "godot_cpp/classes/control.hpp"
 #include "godot_cpp/classes/font.hpp"
-#include "godot_cpp/classes/global_constants.hpp"
 #include "godot_cpp/classes/label.hpp"
 #include "godot_cpp/classes/line2d.hpp"
-#include "godot_cpp/classes/node.hpp"
-#include "godot_cpp/classes/node2d.hpp"
-#include "godot_cpp/classes/panel.hpp"
 #include "godot_cpp/classes/polygon2d.hpp"
 #include "godot_cpp/classes/rich_text_label.hpp"
-#include "godot_cpp/classes/style_box_flat.hpp"
 #include "godot_cpp/classes/text_server.hpp"
 #include "godot_cpp/core/class_db.hpp"
 #include "godot_cpp/core/math.hpp"
 #include "godot_cpp/core/memory.hpp"
 #include "godot_cpp/variant/color.hpp"
 #include "godot_cpp/variant/packed_vector2_array.hpp"
-#include "godot_cpp/variant/utility_functions.hpp"
 #include "godot_cpp/variant/vector2.hpp"
-#include "mlir/Dialect/Func/IR/FuncOps.h"
-#include "mlir/Dialect/LLVMIR/LLVMDialect.h"
-#include "mlir/Dialect/MemRef/IR/MemRef.h"
-#include "mlir/IR/BuiltinOps.h"
-#include "mlir/IR/MLIRContext.h"
-#include "mlir/Parser/Parser.h"
 #include "mlir/Support/LogicalResult.h"
 #include "llvm/ADT/STLExtras.h"
-#include "llvm/Support/CommandLine.h"
-#include "llvm/Support/InitLLVM.h"
-#include "llvm/Support/SourceMgr.h"
+#include "llvm/ADT/SmallPtrSet.h"
+#include "llvm/Support/raw_ostream.h"
+#include <algorithm>
 #include <cstdint>
+#include <unordered_map>
 #include <vector>
 
 using namespace llvm;
@@ -63,12 +47,37 @@ const godot::Color TRANSPARENT_BLACK(0, 0, 0, 0.075);
 const godot::Color OPAQUE_BLACK(0, 0, 0, 1.0);
 const godot::Color OPAQUE_WHITE(1, 1, 1, 1.0);
 
-static const double LINE_WIDTH = 1.5;
-static const double NODE_HEIGHT = 35;
-static const double NODE_WIDTH_SCALING_COEFFICIENT = 70;
-static const double DASH_LENGTH = 3;
-static const double DASH_SPACE_LENGTH = DASH_LENGTH * 2;
-static const unsigned NUM_OVAL_POINTS = 50;
+static constexpr double LINE_WIDTH = 1.5, NODE_HEIGHT = 35,
+                        NODE_WIDTH_SCALING_COEFFICIENT = 70, DASH_LENGTH = 3,
+                        DASH_SPACE_LENGTH = DASH_LENGTH * 2;
+static constexpr unsigned NUM_OVAL_POINTS = 50;
+
+static constexpr double SELECT_TRANSPARENCY = 1.0, UNSELECT_TRANSPARENCY = 0.3;
+
+/// Maps color names to their corresponding RGBA Color values in Godot
+static const std::unordered_map<std::string, Color> NAMED_COLORS = {
+    {"lavender", Color(0.9, 0.9, 0.98, 1)},
+    {"plum", Color(0.867, 0.627, 0.867, 1)},
+    {"moccasin", Color(1.0, 0.894, 0.71, 1)},
+    {"lightblue", Color(0.68, 0.85, 1.0, 1)},
+    {"lightgreen", Color(0.56, 0.93, 0.56, 1)},
+    {"coral", Color(1.0, 0.5, 0.31, 1)},
+    {"gainsboro", Color(0.86, 0.86, 0.86, 1)},
+    {"blue", Color(0, 0, 1, 1)},
+    {"gold", Color(1.0, 0.843, 0.0, 1)},
+    {"tan2", Color(1.0, 0.65, 0.0, 1)}};
+
+static void setTransparency(Polygon2D *polygon, double transparency) {
+  Color c = polygon->get_color();
+  c.a = transparency;
+  polygon->set_color(c);
+}
+
+static void setTransparency(Line2D *line, double transparency) {
+  Color c = line->get_default_color();
+  c.a = transparency;
+  line->set_default_color(c);
+}
 
 void VisualDataflow::_bind_methods() {
 
@@ -78,7 +87,7 @@ void VisualDataflow::_bind_methods() {
   ClassDB::bind_method(D_METHOD("previousCycle"),
                        &VisualDataflow::previousCycle);
   ClassDB::bind_method(D_METHOD("changeCycle", "cycleNb"),
-                       &VisualDataflow::changeCycle);
+                       &VisualDataflow::gotoCycle);
   ClassDB::bind_method(D_METHOD("changeStateColor", "state", "color"),
                        &VisualDataflow::changeStateColor);
   ClassDB::bind_method(D_METHOD("onClick", "position"),
@@ -87,49 +96,36 @@ void VisualDataflow::_bind_methods() {
                        &VisualDataflow::resetSelection);
 }
 
-VisualDataflow::VisualDataflow() = default;
-
-void VisualDataflow::start(const godot::String &inputDOTFile,
-                           const godot::String &inputCSVFile) {
+void VisualDataflow::start(const godot::String &dotFilepath,
+                           const godot::String &csvFilepath) {
   cycleLabel = (Label *)get_node_internal(
       NodePath("CanvasLayer/Timeline/MarginContainer/VBoxContainer/"
                "HBoxContainer/CycleNumber"));
   cycleSlider = (HSlider *)get_node_internal(
       NodePath("CanvasLayer/Timeline/MarginContainer/VBoxContainer/HSlider"));
-  if (failed(createGraph(inputDOTFile.utf8().get_data(),
-                         inputCSVFile.utf8().get_data()))) {
-    llvm::errs() << "Failed to create graph\n";
-  } else {
-    cycleSlider->set_max(graph.getCycleEdgeStates().size() - 1);
-    drawGraph();
-    changeCycle(0);
-  }
-}
 
-LogicalResult VisualDataflow::createGraph(std::string inputDOTFile,
-                                          std::string inputCSVFile) {
-  GraphParser parser = GraphParser(&graph);
-  if (failed(parser.parse(inputDOTFile))) {
-    UtilityFunctions::printerr("Failed to parse the graph");
-    return failure();
+  if (failed(graph.fromDOTAndCSV(dotFilepath.utf8().get_data(),
+                                 csvFilepath.utf8().get_data()))) {
+    llvm::errs() << "Failed to parse graph data\n";
+    return;
   }
-  if (failed(parser.parse(inputCSVFile))) {
-    UtilityFunctions::printerr("Failed to parse the graphs transitions");
-    return failure();
-  }
-  return success();
+  maxCycle = graph.getLastCycleIdx();
+  cycleSlider->set_max(maxCycle);
+  drawGraph();
 }
 
 void VisualDataflow::drawBBs() {
-  for (const auto &bb : graph.getBBs()) {
-    std::vector<float> boundries = bb.boundries;
+  for (const DOTGraph::Subgraph &subgraph : graph.getGraph().getSubgraphs()) {
+    const GodotGraph::SubgraphProps &props =
+        graph.getSubgraphProperties(&subgraph);
+
+    std::vector<float> boundaries = props.boundaries;
     Polygon2D *p = memnew(Polygon2D);
     PackedVector2Array points;
-
-    points.push_back(Vector2(boundries.at(0), -boundries.at(1)));
-    points.push_back(Vector2(boundries.at(2), -boundries.at(1)));
-    points.push_back(Vector2(boundries.at(2), -boundries.at(3)));
-    points.push_back(Vector2(boundries.at(0), -boundries.at(3)));
+    points.push_back(Vector2(boundaries.at(0), -boundaries.at(1)));
+    points.push_back(Vector2(boundaries.at(2), -boundaries.at(1)));
+    points.push_back(Vector2(boundaries.at(2), -boundaries.at(3)));
+    points.push_back(Vector2(boundaries.at(0), -boundaries.at(3)));
 
     p->set_polygon(points);
     p->set_color(TRANSPARENT_BLACK);
@@ -142,13 +138,13 @@ void VisualDataflow::drawBBs() {
     bbLabel->set_fit_content(true);
     bbLabel->set_autowrap_mode(TextServer::AUTOWRAP_OFF);
     bbLabel->set_position(
-        Vector2(bb.boundries.at(0) + 5,
-                -bb.labelPosition.second - bb.labelSize.first * 35));
+        Vector2(props.boundaries.at(0) + 5,
+                -props.labelPosition.second - props.labelSize.first * 35));
 
     // Set the label's content
     bbLabel->push_font(get_theme_default_font(), 12);
     bbLabel->push_color(OPAQUE_BLACK);
-    bbLabel->append_text(bb.label.c_str());
+    bbLabel->append_text(props.label.c_str());
     bbLabel->pop();
     bbLabel->pop();
 
@@ -191,12 +187,15 @@ static void createDashedLine(PackedVector2Array &points,
 
 void VisualDataflow::drawNodes() {
 
-  for (auto &[id, node] : graph.getNodes()) {
-    auto [centerX, centerY] = node.getPosition();
-    float width = node.getWidth() * NODE_WIDTH_SCALING_COEFFICIENT;
+  for (const DOTGraph::Node *node : graph.getGraph().getNodes()) {
+    const GodotGraph::NodeProps &props = graph.getNodeProperties(node);
+    NodeGeometry &geometry = nodeGeometries.try_emplace(node).first->second;
+
+    auto [centerX, centerY] = props.position;
+    float width = props.width * NODE_WIDTH_SCALING_COEFFICIENT;
     Area2D *area2D = memnew(Area2D);
     Polygon2D *godotNode = memnew(Polygon2D);
-    Shape shape = node.getShape();
+    std::string shape = props.shape;
 
     double halfWidth = width / 2;
     double halfHeight = NODE_HEIGHT / 2;
@@ -220,7 +219,7 @@ void VisualDataflow::drawNodes() {
       }
 
       // The collision area is the same as the node itself
-      nodeIdToGodoPos[id] = points;
+      geometry.collision = points;
     } else {
       // Create points to characterize an oval shape
       double angle = 0;
@@ -238,13 +237,13 @@ void VisualDataflow::drawNodes() {
       rectanglePoints.push_back(Vector2(centerX + width / 2, -centerY));
       rectanglePoints.push_back(Vector2(centerX, -centerY - NODE_HEIGHT / 2));
       rectanglePoints.push_back(Vector2(centerX - width / 2, -centerY));
-      nodeIdToGodoPos[id] = rectanglePoints;
+      geometry.collision = rectanglePoints;
     }
 
     // Sets the node's polygon and color
     godotNode->set_polygon(points);
-    godotNode->set_color(colorNameToRGB.count(node.getColor())
-                             ? colorNameToRGB.at(node.getColor())
+    godotNode->set_color(NAMED_COLORS.count(props.color)
+                             ? NAMED_COLORS.at(props.color)
                              : OPAQUE_WHITE);
 
     // Create the label and configure it
@@ -257,7 +256,7 @@ void VisualDataflow::drawNodes() {
     // Set the label's content
     nodeName->push_font(get_theme_default_font(), 11);
     nodeName->push_color(OPAQUE_BLACK);
-    std::string text = "[center]" + node.getNodeId() + "[/center]";
+    std::string text = "[center]" + node->id + "[/center]";
     nodeName->append_text(text.c_str());
     nodeName->pop();
     nodeName->pop();
@@ -270,35 +269,33 @@ void VisualDataflow::drawNodes() {
     centerContainer->add_child(nodeName);
     area2D->add_child(godotNode);
     area2D->add_child(centerContainer);
-    nodeIdToPolygon[id] = godotNode;
+    geometry.shape = godotNode;
 
     // Create the ouline of the node
     Line2D *outline = memnew(Line2D);
     setBasicLineProps(outline);
     std::vector<Line2D *> lines;
-    if (node.getDashed()) {
+    if (props.isDotted) {
       points.push_back(points[0]);
-      createDashedLine(points, &lines, area2D);
+      createDashedLine(points, &geometry.shapeLines, area2D);
     } else {
       outline->set_points(points);
       outline->add_point(points[0]);
-      lines.push_back(outline);
+      geometry.shapeLines.push_back(outline);
     }
-
     // Set outline color and width, and add to the area
     area2D->add_child(outline);
     add_child(area2D);
-    nodeIdToContourLine[id] = lines;
-    nodeIdToTransparency[id] = false;
   }
 }
 
 void VisualDataflow::drawEdges() {
-  for (GraphEdge &edge : graph.getEdges()) {
+  for (const DOTGraph::Edge *edge : graph.getGraph().getEdges()) {
+    const GodotGraph::EdgeProps &props = graph.getEdgeProperties(edge);
+    EdgeGeometry &geometry = edgeGeometries.try_emplace(edge).first->second;
 
     Area2D *area2D = memnew(Area2D);
-    std::vector<Line2D *> lines;
-    std::vector<std::pair<float, float>> positions = edge.getPositions();
+    std::vector<std::pair<float, float>> positions = props.positions;
     PackedVector2Array linePoints;
 
     // Generate points for the edge line, inverting the y-axis due to a change
@@ -307,17 +304,15 @@ void VisualDataflow::drawEdges() {
       linePoints.push_back(Vector2(x, -y));
 
     // Draw dashed or solid lines based on edge properties
-    if (edge.getDashed()) {
-      createDashedLine(linePoints, &lines, area2D);
+    if (props.isDotted) {
+      createDashedLine(linePoints, &geometry.segments, area2D);
     } else {
       Line2D *line = memnew(Line2D);
       line->set_points(linePoints);
       setBasicLineProps(line);
       area2D->add_child(line);
-      lines.push_back(line);
+      geometry.segments.push_back(line);
     }
-
-    edgeIdToLines[edge.getEdgeId()] = lines;
 
     size_t numPoints = linePoints.size();
     Vector2 secondToLastPoint = linePoints[numPoints - 2];
@@ -328,7 +323,7 @@ void VisualDataflow::drawEdges() {
     arrowheadPoly->set_color(OPAQUE_BLACK);
 
     PackedVector2Array points;
-    if (edge.getArrowhead() == "normal") {
+    if (props.arrowhead == "normal") {
       // Draw an arrow
       if (secondToLastPoint.x == lastPoint.x) {
         // Horizontal arrow
@@ -379,23 +374,20 @@ void VisualDataflow::drawEdges() {
 
     arrowheadPoly->set_polygon(points);
     area2D->add_child(arrowheadPoly);
-    edgeIdToArrowHead[edge.getEdgeId()] = arrowheadPoly;
+    geometry.arrowhead = arrowheadPoly;
 
     // Create the label and configure it
-    RichTextLabel *label = memnew(RichTextLabel);
-    label->set_use_bbcode(true);
-    label->set_fit_content(true);
-    label->set_autowrap_mode(TextServer::AUTOWRAP_OFF);
+    geometry.data = memnew(RichTextLabel);
+    geometry.data->set_use_bbcode(true);
+    geometry.data->set_fit_content(true);
+    geometry.data->set_autowrap_mode(TextServer::AUTOWRAP_OFF);
     // Lightly offset the label toward the bottom right compared to the start of
     // the line
     Vector2 firstPoint = linePoints[0];
-    label->set_position(Vector2(firstPoint.x + 4, firstPoint.y + 4));
+    geometry.data->set_position(Vector2(firstPoint.x + 4, firstPoint.y + 4));
 
-    add_child(label);
-    edgeIdToData[edge.getEdgeId()] = label;
-
+    add_child(geometry.data);
     add_child(area2D);
-    edgeIdToTransparency[edge.getEdgeId()] = 0;
   }
 }
 
@@ -403,101 +395,74 @@ void VisualDataflow::drawGraph() {
   drawBBs();
   drawNodes();
   drawEdges();
+  drawCycle();
 }
 
 void VisualDataflow::nextCycle() {
-  if (cycle < cycleSlider->get_max()) {
-    changeCycle(cycle + 1);
+  if (cycle != maxCycle) {
+    ++cycle;
+    drawCycle();
   }
 }
 
 void VisualDataflow::previousCycle() {
-  if (cycle > 0) {
-    changeCycle(cycle - 1);
+  if (cycle != 0) {
+    --cycle;
+    drawCycle();
   }
 }
 
-void VisualDataflow::changeCycle(int64_t cycleNb) {
-  if (cycle == cycleNb)
+void VisualDataflow::gotoCycle(int64_t cycleNum) {
+  unsigned saveCycle = cycle;
+  cycle = cycleNum < 0 ? 0 : std::min(maxCycle, (unsigned)cycleNum);
+  if (saveCycle != cycle)
+    drawCycle();
+}
+
+void VisualDataflow::drawCycle() {
+  // Edge case where there are no cycles
+  if (maxCycle == 0)
     return;
 
-  int64_t maxCycle = (int64_t)cycleSlider->get_max();
-  cycle = std::min(std::max(cycleNb, (int64_t)0), maxCycle);
-  cycleLabel->set_text("Cycle: " + String::num_int64(cycle));
+  cycleLabel->set_text("Cycle: " + String::num_uint64(cycle));
   cycleSlider->set_value(cycle);
-  setEdgeColors(cycleNb);
 
-  if (graph.getCycleEdgeStates().count(cycle)) {
-    ChannelTransitions edgeStates = graph.getCycleEdgeStates().at(cycle);
-    for (auto &[edgeID, state] : edgeStates) {
-      std::vector<Line2D *> &lines = edgeIdToLines[edgeID];
-      Polygon2D *arrowHead = edgeIdToArrowHead[edgeID];
-      setEdgeColor(state.first, lines, arrowHead);
+  for (const auto &[edge, edgeState] : graph.getChanges(cycle)) {
+    assert(edgeGeometries.contains(edge) && "unknown edge");
+    EdgeGeometry &geo = edgeGeometries.getOrInsertDefault(edge);
+    const Color &color = stateColors.at(edgeState.state);
+    geo.setColor(color);
 
-      // Display channel content if the valid wire is set
-      RichTextLabel *dataValue = edgeIdToData.at(edgeID);
-      dataValue->clear();
-      if (state.first == State::STALL || state.first == State::TRANSFER) {
-        // Write the data value only when it is valid
-        dataValue->push_font(get_theme_default_font(), 11);
-        dataValue->push_color(OPAQUE_BLACK);
-        dataValue->append_text(state.second.c_str());
-        dataValue->pop();
-        dataValue->pop();
-      }
+    // Display channel content if the valid wire is set
+    geo.data->clear();
+    if (edgeState.state == DataflowState::STALL ||
+        edgeState.state == DataflowState::TRANSFER) {
+      // Write the data value only when it is valid
+      geo.data->push_font(get_theme_default_font(), 11);
+      geo.data->push_color(OPAQUE_BLACK);
+      geo.data->append_text(edgeState.data.c_str());
+      geo.data->pop();
+      geo.data->pop();
     }
   }
-}
-
-void VisualDataflow::setEdgeColors(CycleNb cycle) {
-  ChannelTransitions edgeStates = graph.getCycleEdgeStates().at(cycle);
-  for (auto &[edgeID, state] : edgeStates) {
-    std::vector<Line2D *> &lines = edgeIdToLines[edgeID];
-    Polygon2D *arrowHead = edgeIdToArrowHead[edgeID];
-    Color color = stateColors[state.first];
-    for (Line2D *line : lines) {
-      color.a = line->get_default_color().a;
-
-      line->set_default_color(color);
-    }
-    arrowHead->set_color(color);
-  }
-}
-
-void VisualDataflow::setEdgeColor(State state, std::vector<Line2D *> &lines,
-                                  Polygon2D *arrowHead) {
-  Color color = stateColors[state];
-  for (Line2D *line : lines) {
-    color.a = line->get_default_color().a;
-    line->set_default_color(color);
-  }
-  arrowHead->set_color(color);
 }
 
 void VisualDataflow::changeStateColor(int64_t state, Color color) {
+  static const std::array<DataflowState, 5> intToState = {
+      DataflowState::UNDEFINED, DataflowState::IDLE, DataflowState::ACCEPT,
+      DataflowState::STALL, DataflowState::TRANSFER};
+
   // Update the color associated to the state
-  State stateEnum;
-  if (state == 0)
-    stateEnum = State::UNDEFINED;
-  else if (state == 1)
-    stateEnum = State::IDLE;
-  else if (state == 2)
-    stateEnum = State::ACCEPT;
-  else if (state == 3)
-    stateEnum = State::STALL;
-  else if (state == 4)
-    stateEnum = State::TRANSFER;
-  else
-    llvm_unreachable("invalid channel state!");
-  stateColors[stateEnum] = color;
+  assert(state < 0 || state > 4 && "invalid channel state!");
+  DataflowState stateEnum = intToState[state];
+  stateColors.insert_or_assign(stateEnum, color);
 
   // Change color of all edges currently in the state whose color was changed
-  CycleTransitions &cycleStates = graph.getCycleEdgeStates();
-  for (auto &[edgeID, state] : cycleStates[cycle]) {
-    if (state.first == stateEnum) {
-      std::vector<Line2D *> &lines = edgeIdToLines[edgeID];
-      Polygon2D *arrowHead = edgeIdToArrowHead[edgeID];
-      setEdgeColor(stateEnum, lines, arrowHead);
+  for (const auto &[edge, edgeState] : graph.getChanges(cycle)) {
+    if (edgeState.state == stateEnum) {
+      Color &color = stateColors[edgeState.state];
+      assert(edgeGeometries.contains(edge) && "unknown edge");
+      edgeGeometries.getOrInsertDefault(edge).setColor(color);
     }
   }
 }
@@ -512,117 +477,99 @@ static bool isInside(Vector2 p, Vector2 a, Vector2 b, Vector2 c, Vector2 d) {
 }
 
 void VisualDataflow::onClick(Vector2 position) {
-  for (auto &elem : nodeIdToGodoPos) {
+  for (auto &[node, geometry] : nodeGeometries) {
+    PackedVector2Array &points = geometry.collision;
+    if (!isInside(position, points[0], points[1], points[2], points[3]))
+      continue;
 
-    PackedVector2Array points = elem.second;
+    if (selectedNodes.contains(node)) {
+      // Node was already selected, remove it from the selection set
+      selectedNodes.erase(node);
 
-    if (isInside(position, points[0], points[1], points[2], points[3])) {
-      if (nbClicked == 0) {
-        ++nbClicked;
-        transparentEffect(0.3);
-        highlightNode(elem.first);
-      } else {
-        if (nodeIdToTransparency[elem.first]) {
-          ++nbClicked;
-          highlightNode(elem.first);
+      if (selectedNodes.empty()) {
+        // Nothing is currently selected, everything should become opaque again
+        setGraphTransparency(SELECT_TRANSPARENCY);
+        selectedEdges.clear();
+        return;
+      }
+
+      // Update the selection set of adjacent edges; those whose other endpoint
+      // is selected become (single-)selected, others become unselected
+      nodeGeometries.getOrInsertDefault(node).setTransparency(
+          UNSELECT_TRANSPARENCY);
+      SmallPtrSet<const DOTGraph::Edge *, 4> edgesToUnselect;
+      for (const auto *edge : graph.getGraph().getAdjacentEdges(*node)) {
+        auto it = selectedEdges.find(edge);
+        assert(it != selectedEdges.end() && "adjacent edge not selected");
+        bool &doubleSelected = it->getSecond();
+        if (doubleSelected) {
+          doubleSelected = false;
         } else {
-          --nbClicked;
+          edgesToUnselect.insert(edge);
+          edgeGeometries.getOrInsertDefault(edge).setTransparency(
+              UNSELECT_TRANSPARENCY);
+        }
+      }
+      llvm::for_each(edgesToUnselect,
+                     [&](const auto *e) { selectedEdges.erase(e); });
 
-          if (nbClicked == 0) {
-            transparentEffect(1);
-          } else {
-            transparentNode(elem.first);
-          }
+    } else {
+      // Node was not selected, add it to the selection set
+
+      if (selectedNodes.empty()) {
+        // Nothing is currently selected, everything should become transparent
+        // first
+        setGraphTransparency(UNSELECT_TRANSPARENCY);
+      }
+      selectedNodes.insert(node);
+
+      // Update the selection set of adjacent edges; those whose other endpoint
+      // is selected become (double-)selected, others become selected
+      nodeGeometries.getOrInsertDefault(node).setTransparency(
+          SELECT_TRANSPARENCY);
+      for (const auto *edge : graph.getGraph().getAdjacentEdges(*node)) {
+        if (auto it = selectedEdges.find(edge); it != selectedEdges.end()) {
+          // Edge already selected, just mark it as selected "twice"
+          it->getSecond() = true;
+        } else {
+          selectedEdges.insert({edge, false});
+          edgeGeometries.getOrInsertDefault(edge).setTransparency(
+              SELECT_TRANSPARENCY);
         }
       }
     }
+    return;
   }
 }
 
-void VisualDataflow::transparentEffect(double transparency) {
-
-  for (auto &elem : nodeIdToPolygon) {
-    Color color = elem.second->get_color();
-    color.a = transparency;
-    elem.second->set_color(color);
-    nodeIdToTransparency[elem.first] = (transparency < 1);
-  }
-
-  for (auto &elem : nodeIdToContourLine) {
-    for (auto &line : elem.second) {
-      Color color = line->get_default_color();
-      color.a = transparency;
-      line->set_default_color(color);
-    }
-  }
-
-  for (auto &elem : edgeIdToArrowHead) {
-    Color color = elem.second->get_color();
-    color.a = transparency;
-    elem.second->set_color(color);
-    edgeIdToTransparency[elem.first] = 0;
-  }
-
-  for (auto &elem : edgeIdToLines) {
-    for (auto &line : elem.second) {
-      Color color = line->get_default_color();
-      color.a = transparency;
-      line->set_default_color(color);
-    }
-  }
+void VisualDataflow::setGraphTransparency(double transparency) {
+  for (auto &[_, geo] : nodeGeometries)
+    geo.setTransparency(transparency);
+  for (auto &[_, geo] : edgeGeometries)
+    geo.setTransparency(transparency);
 }
 
-void VisualDataflow::highlightNode(const NodeId &nodeId) {
-
-  Color c = nodeIdToPolygon[nodeId]->get_color();
-  c.a = 1;
-  nodeIdToPolygon[nodeId]->set_color(c);
-  for (auto &line : nodeIdToContourLine[nodeId]) {
-    Color c3 = line->get_default_color();
-    c3.a = 1;
-    line->set_default_color(c3);
-  }
-  nodeIdToTransparency[nodeId] = false;
-  for (auto &edge : graph.getInOutEdgesOfNode(nodeId)) {
-    ++edgeIdToTransparency[edge];
-    Color c2 = edgeIdToArrowHead[edge]->get_color();
-    c2.a = 1;
-    edgeIdToArrowHead[edge]->set_color(c2);
-    for (auto &line : edgeIdToLines[edge]) {
-      Color c3 = line->get_default_color();
-      c3.a = 1;
-      line->set_default_color(c3);
-    }
-  }
+void VisualDataflow::NodeGeometry::setTransparency(double transparency) {
+  ::setTransparency(shape, transparency);
+  for (Line2D *line : shapeLines)
+    ::setTransparency(line, transparency);
 }
 
-void VisualDataflow::transparentNode(const NodeId &nodeId) {
+void VisualDataflow::EdgeGeometry::setTransparency(double transparency) {
+  ::setTransparency(arrowhead, transparency);
+  for (Line2D *seg : segments)
+    ::setTransparency(seg, transparency);
+}
 
-  Color c = nodeIdToPolygon[nodeId]->get_color();
-  c.a = 0.3;
-  nodeIdToPolygon[nodeId]->set_color(c);
-  for (auto &line : nodeIdToContourLine[nodeId]) {
-    Color c3 = line->get_default_color();
-    c3.a = 0.3;
-    line->set_default_color(c3);
-  }
-  nodeIdToTransparency[nodeId] = true;
-  for (auto &edge : graph.getInOutEdgesOfNode(nodeId)) {
-    --edgeIdToTransparency[edge];
-    if (edgeIdToTransparency[edge] == 0) {
-      Color c2 = edgeIdToArrowHead[edge]->get_color();
-      c2.a = 0.3;
-      edgeIdToArrowHead[edge]->set_color(c2);
-      for (auto &line : edgeIdToLines[edge]) {
-        Color c3 = line->get_default_color();
-        c3.a = 0.3;
-        line->set_default_color(c3);
-      }
-    }
-  }
+void VisualDataflow::EdgeGeometry::setColor(Color color) {
+  color.a = arrowhead->get_color().a;
+  for (Line2D *seg : segments)
+    seg->set_default_color(color);
+  arrowhead->set_color(color);
 }
 
 void VisualDataflow::resetSelection() {
-  nbClicked = 0;
-  transparentEffect(1);
+  selectedNodes.clear();
+  selectedEdges.clear();
+  setGraphTransparency(1);
 }

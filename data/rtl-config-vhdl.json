@@ -197,12 +197,49 @@
     "generic": "$DYNAMATIC/data/vhdl/arith/trunci.vhd"
   },
   {
+    "name": "handshake.truncf",
+    "parameters": [
+      { "name": "INPUT_TYPE", "type": "dataflow", "data-lb": 1, "extra-eq": 0 },
+      { "name": "OUTPUT_TYPE", "type": "dataflow", "data-lb": 1, "extra-eq": 0 }
+    ],
+    "generic": "$DYNAMATIC/data/vhdl/arith/truncf.vhd"
+  },
+  {
     "name": "handshake.xori",
     "parameters": [
       { "name": "DATA_TYPE", "type": "dataflow", "data-lb": 1, "extra-eq": 0 }
     ],
     "generic": "$DYNAMATIC/data/vhdl/arith/xori.vhd",
     "dependencies": ["join"]
+  },
+  {
+    "name": "handshake.sitofp",
+    "parameters": [
+      { "name": "DATA_TYPE", "type": "dataflow", "data-lb": 1, "extra-eq": 0 }
+    ],
+    "generic": "$DYNAMATIC/data/vhdl/arith/sitofp.vhd"
+  },
+  {
+    "name": "handshake.fptosi",
+    "parameters": [
+      { "name": "DATA_TYPE", "type": "dataflow", "data-lb": 1, "extra-eq": 0 }
+    ],
+    "generic": "$DYNAMATIC/data/vhdl/arith/fptosi.vhd"
+  },
+  {
+    "name": "handshake.absf",
+    "parameters": [
+      { "name": "DATA_TYPE", "type": "dataflow", "data-lb": 1, "extra-eq": 0 }
+    ],
+    "generic": "$DYNAMATIC/data/vhdl/arith/absf.vhd"
+  },
+  {
+    "name": "handshake.extf",
+    "parameters": [
+      { "name": "INPUT_TYPE", "type": "dataflow", "data-lb": 1, "extra-eq": 0 },
+      { "name": "OUTPUT_TYPE", "type": "dataflow", "data-lb": 1, "extra-eq": 0 }
+    ],
+    "generic": "$DYNAMATIC/data/vhdl/arith/extf.vhd"
   },
   {
     "name": "handshake.buffer",
@@ -648,6 +685,17 @@
     }
   },
   {
+    "name": "handshake.sharing_wrapper",
+    "generator": "\"$DYNAMATIC/bin/generators/exp-sharing-wrapper-generator\" \"$OUTPUT_DIR/$MODULE_NAME.vhd\" $MODULE_NAME \"$CREDITS\" \"$NUM_SHARED_OPERANDS\" \"$DATA_WIDTH\" \"$LATENCY\"" ,
+    "parameters": [
+      { "name": "CREDITS", "type": "string" },
+      { "name": "NUM_SHARED_OPERANDS", "type": "unsigned", "lb" : 1},
+      { "name": "DATA_WIDTH", "type": "dataflow", "data-lb": 1, "extra-eq" : 0},
+      { "name": "LATENCY", "type": "unsigned", "lb": 1}
+    ],
+    "dependencies": ["logic", "types", "sharing_support", "ofifo", "tfifo", "lazy_fork"]
+  },
+  {
     "name": "handshake.join",
     "parameters": [{ "name": "SIZE", "type": "unsigned", "lb": 1 }],
     "generic": "$DYNAMATIC/data/vhdl/handshake/join.vhd",
@@ -706,5 +754,9 @@
       { "name": "ADDR_WIDTH", "type": "unsigned", "lb": 1 }
     ],
     "generic": "$DYNAMATIC/data/vhdl/support/mem_to_bram.vhd"
+  },
+  {
+    "generic": "$DYNAMATIC/data/vhdl/support/sharing_support.vhd",
+    "dependencies" : ["types"]
   }
 ]
