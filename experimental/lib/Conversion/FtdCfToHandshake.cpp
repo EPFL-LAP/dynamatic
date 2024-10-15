@@ -648,6 +648,7 @@ FtdLowerFuncToHandshake::addSupp(ConversionPatternRewriter &rewriter,
 
       std::vector<Operation *> users(result.getUsers().begin(),
                                      result.getUsers().end());
+      users.erase(unique(users.begin(), users.end()), users.end());
 
       for (Operation *consumerOp : users) {
         Block *consumerBlock = consumerOp->getBlock();
@@ -673,6 +674,16 @@ FtdLowerFuncToHandshake::addSupp(ConversionPatternRewriter &rewriter,
             llvm::isa_and_nonnull<handshake::ControlMergeOp>(producerOp) ||
             llvm::isa_and_nonnull<handshake::ControlMergeOp>(consumerOp) ||
             llvm::isa<handshake::ConditionalBranchOp>(consumerOp) ||
+            llvm::isa<cf::CondBranchOp>(consumerOp) ||
+            llvm::isa<cf::BranchOp>(consumerOp) ||
+            (llvm::isa<memref::LoadOp>(consumerOp) &&
+             !llvm::isa<handshake::LSQLoadOp>(consumerOp)) ||
+            (llvm::isa<memref::StoreOp>(consumerOp) &&
+             !llvm::isa<handshake::LSQStoreOp>(consumerOp)) ||
+            (llvm::isa<memref::LoadOp>(consumerOp) &&
+             !llvm::isa<handshake::MCLoadOp>(consumerOp)) ||
+            (llvm::isa<memref::StoreOp>(consumerOp) &&
+             !llvm::isa<handshake::MCStoreOp>(consumerOp)) ||
             llvm::isa<mlir::MemRefType>(result.getType()))
           continue;
 
