@@ -48,33 +48,16 @@ void FPL22BuffersBase::extractResult(BufferPlacement &placement) {
     handshake::ChannelBufProps &props = channelProps[channel];
     PlacementResult result;
     if (placeOpaque && placeTransparent) {
-      // Place the minumum number of opaque slots; at least one and enough to
-      // satisfy all our opaque/transparent requirements
-      if (props.maxTrans) {
-        // We must place enough opaque slots as to not exceed the maximum number
-        // of transparent slots
-        result.numOpaque =
-            std::max(props.minOpaque, numSlotsToPlace - *props.maxTrans);
-      } else {
-        // At least one slot, but no more than necessary
-        result.numOpaque = std::max(props.minOpaque, 1U);
-      }
-      // All remaining slots are transparent
+      // Place at least one opaque slot and satisfy the opaque slot requirement,
+      // all other slots are transparent
+      result.numOpaque = std::max(props.minOpaque, 1U);
       result.numTrans = numSlotsToPlace - result.numOpaque;
     } else if (placeOpaque) {
-      // Place the minimum number of transparent slots; at least the expected
-      // minimum and enough to satisfy all our opaque/transparent requirements
-      if (props.maxOpaque) {
-        result.numTrans =
-            std::max(props.minTrans, numSlotsToPlace - *props.maxOpaque);
-      } else {
-        result.numTrans = props.minTrans;
-      }
-      // All remaining slots are opaque
-      result.numOpaque = numSlotsToPlace - result.numTrans;
+      // Satisfy the transparent slots requirement, all other slots are opaque
+      result.numTrans = props.minTrans;
+      result.numOpaque = numSlotsToPlace - props.minTrans;
     } else {
-      // placeOpaque == 0 --> props.minOpaque == 0 so all slots can be
-      // transparent
+      // All slots transparent
       result.numTrans = numSlotsToPlace;
     }
 
@@ -121,20 +104,11 @@ void FPL22BuffersBase::addCustomChannelConstraints(Value channel) {
   // Set constraints based on maximum number of buffer slots
   if (props.maxOpaque && props.maxTrans) {
     unsigned maxSlots = *props.maxOpaque + *props.maxTrans;
-    if (maxSlots == 0) {
-      // Forbid buffer placement on the channel entirely when no slots are
-      // allowed
+    // Forbid buffer placement on the channel entirely when no slots are allowed
+    if (maxSlots == 0)
       model.addConstr(chVars.bufPresent == 0, "custom_noBuffer");
-      model.addConstr(chVars.bufNumSlots == 0, "custom_maxSlots");
-    } else {
-      // Restrict the maximum number of slots allowed. If both types are allowed
-      // but the MILP decides to only place one type, then the maximum allowed
-      // number is the maximum number of slots we can place for that type
-      model.addConstr(chVars.bufNumSlots <=
-                          maxSlots - *props.maxOpaque * (1 - bufData) -
-                              *props.maxTrans * (1 - bufReady),
-                      "custom_maxSlots");
-    }
+    // Restrict the maximum number of slots allowed
+    model.addConstr(chVars.bufNumSlots <= maxSlots, "custom_maxSlots");
   }
 
   // Forbid placement of some buffer type based on maximum number of allowed
