@@ -39,7 +39,6 @@ build/
 bin/
 .cache/
 __pycache__/
-cs
 
 # Scala/Metals-related
 .metals/
