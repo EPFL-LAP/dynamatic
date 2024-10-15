@@ -251,15 +251,11 @@ public:
 
 class Compile : public Command {
 public:
-<<<<<<< HEAD
   static constexpr llvm::StringLiteral SIMPLE_BUFFERS = "simple-buffers";
 <<<<<<< HEAD
   static constexpr llvm::StringLiteral FAST_TOKEN_DELIVERY =
       "fast-token-delivery";
 =======
-=======
-  static constexpr llvm::StringLiteral BUFFER_ALGORITHM = "buffer-algorithm";
->>>>>>> f9b9400 ([Frontend] Buffer placement option in the compile command (#156))
   static constexpr llvm::StringLiteral SHARING = "sharing";
 >>>>>>> 58fa4c6 ([Sharing][hdl] Resource sharing support in VHDL backend (#85))
 
@@ -268,18 +264,10 @@ public:
                 "Compiles the source kernel into a dataflow circuit; "
                 "produces both handshake-level IR and an equivalent DOT file",
                 state) {
-<<<<<<< HEAD
     addFlag({SIMPLE_BUFFERS, "Use simple buffer placement"});
 <<<<<<< HEAD
     addFlag({FAST_TOKEN_DELIVERY, "Use fast token delivery strategy"});
 =======
-=======
-    addOption({BUFFER_ALGORITHM,
-               "The buffer placement algorithm to use, values are "
-               "'on-merges' (default option: minimum buffering for "
-               "correctness), 'fpga20' (throughput-driven buffering), or "
-               "'fpl22' (throughput- and timing-driven buffering)"});
->>>>>>> f9b9400 ([Frontend] Buffer placement option in the compile command (#156))
     addFlag({SHARING, "Use credit-based resource sharing"});
 >>>>>>> 58fa4c6 ([Sharing][hdl] Resource sharing support in VHDL backend (#85))
   }
@@ -581,33 +569,12 @@ CommandResult Compile::execute(CommandArguments &args) {
     return CommandResult::FAIL;
 
   std::string script = state.getScriptsPath() + getSeparator() + "compile.sh";
-<<<<<<< HEAD
   std::string buffers = args.flags.contains(SIMPLE_BUFFERS) ? "1" : "0";
 <<<<<<< HEAD
   std::string fastTokenDelivery =
       args.flags.contains(FAST_TOKEN_DELIVERY) ? "1" : "0";
 
 =======
-=======
-  // If unspecified, we place a OB + TB after every merge to guarantee
-  // the deadlock freeness.
-  std::string buffers = "on-merges";
-
-  if (auto it = args.options.find(BUFFER_ALGORITHM); it != args.options.end()) {
-    if (it->second == "on-merges" || it->second == "fpga20" ||
-        it->second == "fpl22") {
-      buffers = it->second;
-    } else {
-      llvm::errs()
-          << "Unknown buffer placement algorithm " << it->second
-          << "! Possible options are 'on-merges' (minimum buffering for "
-             "correctness), 'fpga20' (throughput-driven buffering), or 'fpl22' "
-             "(throughput- and timing-driven buffering).";
-      return CommandResult::FAIL;
-    }
-  }
-
->>>>>>> f9b9400 ([Frontend] Buffer placement option in the compile command (#156))
   std::string sharing = args.flags.contains(SHARING) ? "1" : "0";
 >>>>>>> 58fa4c6 ([Sharing][hdl] Resource sharing support in VHDL backend (#85))
   state.polygeistPath = state.polygeistPath.empty()

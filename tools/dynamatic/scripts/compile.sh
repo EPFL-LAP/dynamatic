@@ -11,7 +11,7 @@ DYNAMATIC_DIR=$1
 SRC_DIR=$2
 OUTPUT_DIR=$3
 KERNEL_NAME=$4
-BUFFER_ALGORITHM=$5
+USE_SIMPLE_BUFFERS=$5
 TARGET_CP=$6
 POLYGEIST_PATH=$7
 <<<<<<< HEAD
@@ -168,12 +168,11 @@ else
 fi
 
 # Buffer placement
-if [[ "$BUFFER_ALGORITHM" == "on-merges" ]]; then
+if [[ $USE_SIMPLE_BUFFERS -ne 0 ]]; then
   # Simple buffer placement
-  echo_info "Running simple buffer placement (on-merges)."
   "$DYNAMATIC_OPT_BIN" "$F_HANDSHAKE_TRANSFORMED" \
     --handshake-set-buffering-properties="version=fpga20" \
-    --$BUFFER_PLACEMENT_PASS="algorithm=$BUFFER_ALGORITHM timing-models=$DYNAMATIC_DIR/data/components.json" \
+    --$BUFFER_PLACEMENT_PASS="algorithm=on-merges timing-models=$DYNAMATIC_DIR/data/components.json" \
     > "$F_HANDSHAKE_BUFFERED"
   exit_on_fail "Failed to place simple buffers" "Placed simple buffers"
 else
@@ -192,11 +191,11 @@ else
   exit_on_fail "Failed to profile cf-level" "Profiled cf-level"
 
   # Smart buffer placement
-  echo_info "Running smart buffer placement with CP = $TARGET_CP and algorithm = '$BUFFER_ALGORITHM'"
+  echo_info "Running smart buffer placement with CP = $TARGET_CP"
   cd "$COMP_DIR"
   "$DYNAMATIC_OPT_BIN" "$F_HANDSHAKE_TRANSFORMED" \
     --handshake-set-buffering-properties="version=fpga20" \
-    --$BUFFER_PLACEMENT_PASS="algorithm=$BUFFER_ALGORITHM frequencies=$F_FREQUENCIES timing-models=$DYNAMATIC_DIR/data/components.json target-period=$TARGET_CP timeout=300 dump-logs" \
+    --$BUFFER_PLACEMENT_PASS="algorithm=fpl22 frequencies=$F_FREQUENCIES timing-models=$DYNAMATIC_DIR/data/components.json target-period=$TARGET_CP timeout=300 dump-logs" \
     > "$F_HANDSHAKE_BUFFERED"
   exit_on_fail "Failed to place smart buffers" "Placed smart buffers"
   cd - > /dev/null
