@@ -86,22 +86,17 @@ set(GODOT_LIB_NAME "VisualDataflow.linux.x86_64")
 add_library(${GODOT_LIB_NAME}
   SHARED
 
-  src/CSVParser.cpp
-  src/DOTParser.cpp
-  src/DOTReformat.cpp
   src/Graph.cpp
-  src/GraphEdge.cpp
-  src/GraphNode.cpp
-  src/GraphParser.cpp
   src/RegisterTypes.cpp
   src/VisualDataflow.cpp
-  src/MLIRMapper.cpp
 )
 
 target_link_libraries(${GODOT_LIB_NAME}
   PRIVATE
   ${DYNAMATIC_BINARY_DIR}/lib/libDynamaticSupport.a
   ${DYNAMATIC_BINARY_DIR}/lib/libDynamaticHandshake.a
+  ${DYNAMATIC_BINARY_DIR}/lib/libDynamaticAnalysis.a
+  ${DYNAMATIC_BINARY_DIR}/lib/libDynamaticSpeculation.a
 
   MLIRIR
   MLIRLLVMDialect

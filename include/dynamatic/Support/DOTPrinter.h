@@ -82,7 +82,7 @@ struct DOTNode {
   std::map<std::string, int> intAttr;
 
   /// Constructs a NodeInfo with a specific type.
-  DOTNode(std::string type) : type(std::move(type)) {};
+  DOTNode(std::string type) : type(std::move(type)){};
 
   /// Prints all stored data attributes on the output stream. The function
   /// doesn't insert [brackets] around the attributes; it is the responsibility

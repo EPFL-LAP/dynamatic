@@ -16,9 +16,9 @@ module elastic_fifo_inner #(
   // Internal Signal Definition
   wire ReadEn, WriteEn;
   reg [$clog2(NUM_SLOTS) - 1 : 0] Tail = 0, Head = 0;
-  reg Full = 0, Empty = 0, fifo_valid;
-
+  reg Full = 0, Empty = 0;
   reg [DATA_TYPE - 1 : 0] Memory[0 : NUM_SLOTS - 1];
+  integer i;
   
   // Ready if there is space in the FIFO
   assign ins_ready = ~Full | outs_ready;

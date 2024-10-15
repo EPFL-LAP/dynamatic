@@ -12,13 +12,13 @@
 // CHECK:           %[[VAL_13:.*]] = spec_commit{{\[}}%[[VAL_6]]] %[[VAL_11]] {name = #[[?]]<"spec_commit1">, speculative = true} : i1
 // CHECK:           end {name = #[[?]]<"end0">} %[[VAL_12]], %[[VAL_13]] : i1, i1
 // CHECK:         }
-handshake.func @multiplePathsAfterSpeculator(%start: i1) {
+handshake.func @multiplePathsAfterSpeculator(%start: !handshake.control<>) -> (!handshake.channel<i1>, !handshake.channel<i1>) {
     %0 = source
-    %1 = constant %0 {value = 1 : i1} : i1
-    %dataOutSave = spec_save[%saveCtrl] %1 : i1
-    %dataOut, %saveCtrl, %commitCtrl, %SCSaveCtrl, %SCCommitCtrl, %SCBranchCtrl = speculator %start : i1
-    %trueResult, %falseResult = cond_br %dataOut, %dataOutSave: i1
-    %dataOut1 = spec_commit[%commitCtrl] %trueResult : i1
-    %dataOut2 = spec_commit[%commitCtrl] %falseResult : i1
-    end %dataOut1, %dataOut2 : i1, i1
+    %1 = constant %0 {value = 1 : i1} : <i1>
+    %dataOutSave = spec_save[%saveCtrl] %1 : !handshake.channel<i1>, <i1>
+    %dataOut, %saveCtrl, %commitCtrl, %SCSaveCtrl, %SCCommitCtrl, %SCBranchCtrl = speculator [%start] %dataOutSave : !handshake.channel<i1> -> (!handshake.channel<i1>, !handshake.channel<i1>, !handshake.channel<i3>)
+    %trueResult, %falseResult = cond_br %dataOut, %dataOutSave: <i1>, <i1>
+    %dataOut1 = spec_commit[%commitCtrl] %trueResult : !handshake.channel<i1>, <i1>
+    %dataOut2 = spec_commit[%commitCtrl] %falseResult : !handshake.channel<i1>, <i1>
+    end %dataOut1, %dataOut2 : <i1>, <i1>
 }
