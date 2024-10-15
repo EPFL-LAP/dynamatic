@@ -165,20 +165,6 @@ protected:
                         handshake::FuncOp &funcOp,
                         FtdStoredOperations &ftdOps) const;
 
-<<<<<<< HEAD
-=======
-  /// The relationship between a producer and a consumer might pass through many
-  /// basic blocks with many entering conditions. All of them should be taken
-  /// into account when handling the suprression mechanism. This function is
-  /// called iteratively many times until all the relationships have been taken
-  /// into account. In concrete, this means that the branches introduced in
-  /// `addSupp` are now new producers which have to undergo the requirements of
-  /// the FTD algorithm.
-  LogicalResult addSuppBranches(ConversionPatternRewriter &rewriter,
-                                handshake::FuncOp &funcOp,
-                                FtdStoredOperations &ftdOps) const;
-
->>>>>>> e641cbb ([FTD][Integration] Small fixes and refactoring)
   /// The suppression mechanism must be used for the start token as well.
   /// However, in the handshake IR, the signal is considered as a value, so it
   /// cannot be handled by the prevvious `addSupp` functions. This funciton is
