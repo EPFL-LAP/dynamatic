@@ -1,6 +1,7 @@
 library ieee;
 use ieee.std_logic_1164.all;
 use ieee.numeric_std.all;
+use work.types.all;
 
 entity two_tehb_with_tag is
   generic (
@@ -22,43 +23,38 @@ entity two_tehb_with_tag is
 end entity;
 
 architecture arch of two_tehb_with_tag is
-  signal outs_inner : std_logic_vector(DATA_TYPE - 1 downto 0);
-  signal outs_valid_inner : std_logic;
-  signal outs_spec_tag_inner : std_logic;
-  signal outs_ready_inner : std_logic;
+  constant BUFFERS : integer := 10;
+  signal data_inner : data_array(BUFFERS downto 0) (DATA_TYPE - 1 downto 0);
+  signal data_valid_inner : std_logic_vector(BUFFERS downto 0);
+  signal data_spec_tag_inner : std_logic_vector(BUFFERS downto 0);
+  signal data_ready_inner : std_logic_vector(BUFFERS downto 0);
 begin
-  tehb0 : entity work.tehb_with_tag(arch)
-    generic map(
-      DATA_TYPE => DATA_TYPE
-    )
-    port map(
-      clk => clk,
-      rst => rst,
-      ins => ins,
-      ins_valid => ins_valid,
-      ins_spec_tag => ins_spec_tag,
-      ins_ready => ins_ready,
-      outs => outs_inner,
-      outs_valid => outs_valid_inner,
-      outs_spec_tag => outs_spec_tag_inner,
-      outs_ready => outs_ready_inner
-    );
-  tehb1 : entity work.tehb_with_tag(arch)
-    generic map(
-      DATA_TYPE => DATA_TYPE
-    )
-    port map(
-      clk => clk,
-      rst => rst,
-      ins => outs_inner,
-      ins_valid => outs_valid_inner,
-      ins_spec_tag => outs_spec_tag_inner,
-      ins_ready => outs_ready_inner,
-      outs => outs,
-      outs_valid => outs_valid,
-      outs_spec_tag => outs_spec_tag,
-      outs_ready => outs_ready
-    );
+  data_inner(0) <= ins;
+  data_valid_inner(0) <= ins_valid;
+  data_spec_tag_inner(0) <= ins_spec_tag;
+  ins_ready <= data_ready_inner(0);
+  outs <= data_inner(BUFFERS);
+  outs_valid <= data_valid_inner(BUFFERS);
+  outs_spec_tag <= data_spec_tag_inner(BUFFERS);
+  data_ready_inner(BUFFERS) <= outs_ready;
+  generateTehb : for i in BUFFERS - 1 downto 0 generate
+    tehb : entity work.tehb_with_tag(arch)
+      generic map(
+        DATA_TYPE => DATA_TYPE
+      )
+      port map(
+        clk => clk,
+        rst => rst,
+        ins => data_inner(i),
+        ins_valid => data_valid_inner(i),
+        ins_spec_tag => data_spec_tag_inner(i),
+        ins_ready => data_ready_inner(i),
+        outs => data_inner(i + 1),
+        outs_valid => data_valid_inner(i + 1),
+        outs_spec_tag => data_spec_tag_inner(i + 1),
+        outs_ready => data_ready_inner(i + 1)
+      );
+  end generate;
 end architecture;
 
 library ieee;

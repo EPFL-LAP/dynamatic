@@ -73,10 +73,30 @@ end entity;
 
 architecture arch of cond_br_dataless_with_tag is
   signal spec_tag : std_logic;
+  signal condition_inner : std_logic_vector(0 downto 0);
+  signal condition_valid_inner : std_logic;
+  signal condition_spec_tag_inner : std_logic;
+  signal condition_ready_inner : std_logic;
 begin
-  spec_tag <= data_spec_tag or condition_spec_tag;
+  spec_tag <= data_spec_tag or condition_spec_tag_inner;
   trueOut_spec_tag <= spec_tag;
   falseOut_spec_tag <= spec_tag;
+  tehb0 : entity work.tehb_for_cond_br(arch)
+    generic map(
+      DATA_TYPE => 1
+    )
+    port map(
+      clk => clk,
+      rst => rst,
+      ins => condition,
+      ins_valid => condition_valid,
+      ins_spec_tag => condition_spec_tag,
+      ins_ready => condition_ready,
+      outs => condition_inner,
+      outs_valid => condition_valid_inner,
+      outs_spec_tag => condition_spec_tag_inner,
+      outs_ready => condition_ready_inner
+    );
 
   cond_br_inner : entity work.cond_br_dataless(arch)
     port map(
@@ -84,9 +104,9 @@ begin
       rst             => rst,
       data_valid      => data_valid,
       data_ready      => data_ready,
-      condition       => condition,
-      condition_valid => condition_valid,
-      condition_ready => condition_ready,
+      condition       => condition_inner,
+      condition_valid => condition_valid_inner,
+      condition_ready => condition_ready_inner,
       trueOut_valid   => trueOut_valid,
       trueOut_ready   => trueOut_ready,
       falseOut_valid  => falseOut_valid,
