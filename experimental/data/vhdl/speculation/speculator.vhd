@@ -627,9 +627,8 @@ begin
 
      
     
-    -- Always ready for enable and data
-    readyArray(0) <= '1';
-    readyArray(1) <= '1';
+    readyArray(0) <= nReadyArray(0);
+    readyArray(1) <= nReadyArray(0);
 
     -- Predictor output valid if enabled
     dataOutArray(0) <= data_reg;
