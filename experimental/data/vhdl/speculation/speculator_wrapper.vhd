@@ -3,7 +3,7 @@ use ieee.std_logic_1164.all;
 use ieee.numeric_std.all;
 use work.types.all;
 
-entity two_tehb_with_tag is
+entity speculator_buffers is
   generic (
     DATA_TYPE : integer
   );
@@ -22,7 +22,7 @@ entity two_tehb_with_tag is
   );
 end entity;
 
-architecture arch of two_tehb_with_tag is
+architecture arch of speculator_buffers is
   constant BUFFERS : integer := 10;
   signal data_inner : data_array(BUFFERS downto 0) (DATA_TYPE - 1 downto 0);
   signal data_valid_inner : std_logic_vector(BUFFERS downto 0);
@@ -203,7 +203,7 @@ begin
       validArray => validArray,
       nReadyArray => nReadyArray
     );
-  tehb_outs : entity work.two_tehb_with_tag(arch)
+  tehb_outs : entity work.speculator_buffers(arch)
     generic map(
       DATA_TYPE => DATA_TYPE
     )
@@ -219,7 +219,7 @@ begin
       outs_spec_tag => outs_spec_tag,
       outs_ready => outs_ready
     );
-  tehb_ctrl_save : entity work.two_tehb_with_tag(arch)
+  tehb_ctrl_save : entity work.speculator_buffers(arch)
     generic map(
       DATA_TYPE => 1
     )
@@ -235,7 +235,7 @@ begin
       outs_spec_tag => ctrl_save_spec_tag,
       outs_ready => ctrl_save_ready
     );
-  tehb_ctrl_commit : entity work.two_tehb_with_tag(arch)
+  tehb_ctrl_commit : entity work.speculator_buffers(arch)
     generic map(
       DATA_TYPE => 1
     )
@@ -251,7 +251,7 @@ begin
       outs_spec_tag => ctrl_commit_spec_tag,
       outs_ready => ctrl_commit_ready
     );
-  tehb_ctrl_sc_save : entity work.two_tehb_with_tag(arch)
+  tehb_ctrl_sc_save : entity work.speculator_buffers(arch)
     generic map(
       DATA_TYPE => 3
     )
@@ -267,7 +267,7 @@ begin
       outs_spec_tag => ctrl_sc_save_spec_tag,
       outs_ready => ctrl_sc_save_ready
     );
-  tehb_ctrl_sc_commit : entity work.two_tehb_with_tag(arch)
+  tehb_ctrl_sc_commit : entity work.speculator_buffers(arch)
     generic map(
       DATA_TYPE => 3
     )
@@ -283,7 +283,7 @@ begin
       outs_spec_tag => ctrl_sc_commit_spec_tag,
       outs_ready => ctrl_sc_commit_ready
     );
-  tehb_ctrl_sc_branch : entity work.two_tehb_with_tag(arch)
+  tehb_ctrl_sc_branch : entity work.speculator_buffers(arch)
     generic map(
       DATA_TYPE => 1
     )
