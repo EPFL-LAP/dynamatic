@@ -305,6 +305,13 @@ LogicalResult HandshakeSpeculationPass::prepareAndPlaceSaveCommits() {
       branchDiscardCondNonMisspec.getTrueResult(), specOp.getSCCommitCtrl());
   inheritBB(specOp, branchReplicated);
 
+  // This branch will propagate the signal SCCommitControl according to
+  // the control branch condition, which comes from branchDiscardNonSpec
+  auto branchDiscardControl = builder.create<handshake::ConditionalBranchOp>(
+      branchDiscardControlIfPass.getLoc(),
+      branchDiscardControlIfPass.getTrueResult(), specOp.getSCCommitCtrl());
+  inheritBB(specOp, branchDiscardControl);
+
   // We create a Merge operation to join SCCSaveCtrl and SCCommitCtrl signals
   SmallVector<Value, 2> mergeOperands;
   mergeOperands.push_back(specOp.getSCSaveCtrl());
