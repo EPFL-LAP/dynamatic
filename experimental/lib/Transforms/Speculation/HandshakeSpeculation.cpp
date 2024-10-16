@@ -274,20 +274,20 @@ LogicalResult HandshakeSpeculationPass::prepareAndPlaceSaveCommits() {
       controlBranch.getConditionOperand());
   inheritBB(specOp, branchDiscardNonSpec);
 
-  // This branch will propagate the signal SCCommitControl according to
-  // the control branch condition, which comes from branchDiscardNonSpec
-  auto branchDiscardControl = builder.create<handshake::ConditionalBranchOp>(
-      branchDiscardNonSpec.getLoc(), branchDiscardNonSpec.getTrueResult(),
-      specOp.getSCCommitCtrl());
-  inheritBB(specOp, branchDiscardControl);
-
   // Create a conditional branch driven by SCBranchControl from speculator
   // SCBranchControl discards the commit-like signal when speculation is correct
   auto branchDiscardControlIfPass =
       builder.create<handshake::ConditionalBranchOp>(
-          branchDiscardControl.getLoc(), specOp.getSCBranchCtrl(),
-          branchDiscardControl.getTrueResult());
+          branchDiscardNonSpec.getLoc(), specOp.getSCBranchCtrl(),
+          branchDiscardNonSpec.getTrueResult());
   inheritBB(specOp, branchDiscardControlIfPass);
+
+  // This branch will propagate the signal SCCommitControl according to
+  // the control branch condition, which comes from branchDiscardNonSpec
+  auto branchDiscardControl = builder.create<handshake::ConditionalBranchOp>(
+      branchDiscardControlIfPass.getLoc(), branchDiscardControlIfPass.getTrueResult(),
+      specOp.getSCCommitCtrl());
+  inheritBB(specOp, branchDiscardControl);
 
   // We create a Merge operation to join SCCSaveCtrl and SCCommitCtrl signals
   SmallVector<Value, 2> mergeOperands;
@@ -306,11 +306,11 @@ LogicalResult HandshakeSpeculationPass::prepareAndPlaceSaveCommits() {
 
   // Check if trueResult of controlBranch leads to a backedge (loop)
   if (isBranchBackedge(controlBranch.getTrueResult())) {
-    mergeOperands.push_back(branchDiscardControlIfPass.getTrueResult());
+    mergeOperands.push_back(branchDiscardControl.getTrueResult());
   }
   // Check if falseResult of controlBranch leads to a backedge (loop)
   else if (isBranchBackedge(controlBranch.getFalseResult())) {
-    mergeOperands.push_back(branchDiscardControlIfPass.getFalseResult());
+    mergeOperands.push_back(branchDiscardControl.getFalseResult());
   }
   // If neither trueResult nor falseResult leads to a backedge, handle the error
   else {
@@ -322,7 +322,7 @@ LogicalResult HandshakeSpeculationPass::prepareAndPlaceSaveCommits() {
 
   // All the inputs to the merge operation are ready
   auto mergeOp = builder.create<handshake::MergeOp>(
-      branchDiscardControlIfPass.getLoc(), mergeOperands);
+      branchDiscardControl.getLoc(), mergeOperands);
   inheritBB(specOp, mergeOp);
 
   // All the control logic is set up, now connect the Save-Commits with
