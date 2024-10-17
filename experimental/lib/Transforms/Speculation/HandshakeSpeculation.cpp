@@ -83,7 +83,10 @@ LogicalResult HandshakeSpeculationPass::placeUnits(Value ctrlSignal) {
     inheritBB(dstOp, newOp);
 
     // Connect the new Operation to dstOp
-    srcOpResult.replaceAllUsesExcept(newOp.getResult(), newOp);
+    // Note: srcOpResult.replaceAllUsesExcept cannot be used here
+    // because the uses of srcOpResult may include a newly created
+    // operand for the speculator enable signal.
+    operand->set(newOp.getResult());
   }
 
   return success();
