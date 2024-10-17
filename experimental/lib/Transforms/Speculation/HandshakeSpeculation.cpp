@@ -349,6 +349,10 @@ std::optional<Value> findControlInputToBB(Operation *op) {
     // Iterate the operands in the edge
     for (mlir::OpOperand *p : arc.edges) {
       Operation *ctrlSignalFrom = p->getOwner();
+      // At first ctrlSignalFrom should be a CMerge.
+      // TODO: I think there is an easier way to find ControlMergeOp
+      // just like PlacementFinder::findSaveCommitPositions in PlacementFinder.cpp,
+      // which doesn't use BBToArcsMap but uses funcOp.getOps
       assert(isa<handshake::ControlMergeOp>(ctrlSignalFrom) && "The BBArc should be connected to a CMerge");
       // According to Section 7.4.2 of Haoran's thesis, it's better to
       // connect the control signal from the buffers after the cmerge
