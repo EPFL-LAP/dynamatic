@@ -83,7 +83,10 @@ LogicalResult HandshakeSpeculationPass::placeUnits(Value ctrlSignal) {
     inheritBB(dstOp, newOp);
 
     // Connect the new Operation to dstOp
-    srcOpResult.replaceAllUsesExcept(newOp.getResult(), newOp);
+    // Note: srcOpResult.replaceAllUsesExcept cannot be used here
+    // because the uses of srcOpResult may include a newly created
+    // operand for the speculator enable signal.
+    operand->set(newOp.getResult());
   }
 
   return success();
@@ -342,7 +345,26 @@ std::optional<Value> findControlInputToBB(Operation *op) {
   for (const BBArc &arc : bbToPredecessorArcs[bb]) {
     // Iterate the operands in the edge
     for (mlir::OpOperand *p : arc.edges) {
-      Value inEdge = p->get();
+      Operation *ctrlSignalFrom = p->getOwner();
+      // At first ctrlSignalFrom should be a CMerge.
+      // TODO: I think there is an easier way to find ControlMergeOp
+      // just like PlacementFinder::findSaveCommitPositions in PlacementFinder.cpp,
+      // which doesn't use BBToArcsMap but uses funcOp.getOps
+      assert(isa<handshake::ControlMergeOp>(ctrlSignalFrom) && "The BBArc should be connected to a CMerge");
+      // According to Section 7.4.2 of Haoran's thesis, it's better to
+      // connect the control signal from the buffers after the cmerge
+      bool succBuffer;
+      do {
+        succBuffer = false;
+        for (Operation *succOp : ctrlSignalFrom->getResult(0).getUsers()) {
+          if (isa<handshake::BufferOp>(succOp)) {
+            succBuffer = true;
+            ctrlSignalFrom = succOp;
+            break;
+          }
+        }
+      } while (succBuffer);
+      Value inEdge = ctrlSignalFrom->getResult(0);
       // The control signal should be the only control input to the BB
       if (inEdge.getType().isa<handshake::ControlType>())
         return inEdge;
