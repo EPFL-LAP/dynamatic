@@ -2880,8 +2880,8 @@ struct HandshakeRewriteTermsPass
         FixBranchesToSuppresses, DistributeSuppresses, DistributeMergeRepeats,
         DistributeMuxRepeats, ExtractIfThenElseCondition, ExtractLoopCondition,
         RemoveBranchMergeIfThenElse, RemoveBranchMuxIfThenElse,
-        RemoveMergeBranchLoop, RemoveMuxBranchLoop, ShortenSuppressPairs,
-        ConvertLoopMergeToMux, ShortenMuxRepeatPairs>(ctx);
+        RemoveMergeBranchLoop, RemoveMuxBranchLoop, /*, ShortenSuppressPairs,*/
+        ConvertLoopMergeToMux /*, ShortenMuxRepeatPairs*/>(ctx);
 
     if (failed(applyPatternsAndFoldGreedily(mod, std::move(patterns), config)))
       return signalPassFailure();
