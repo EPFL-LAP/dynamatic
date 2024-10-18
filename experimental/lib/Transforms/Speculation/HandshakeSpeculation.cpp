@@ -83,7 +83,10 @@ LogicalResult HandshakeSpeculationPass::placeUnits(Value ctrlSignal) {
     inheritBB(dstOp, newOp);
 
     // Connect the new Operation to dstOp
-    srcOpResult.replaceAllUsesExcept(newOp.getResult(), newOp);
+    // Note: srcOpResult.replaceAllUsesExcept cannot be used here
+    // because the uses of srcOpResult may include a newly created
+    // operand for the speculator enable signal.
+    operand->set(newOp.getResult());
   }
 
   return success();
@@ -334,21 +337,34 @@ std::optional<Value> findControlInputToBB(Operation *op) {
   handshake::FuncOp funcOp = op->getParentOfType<handshake::FuncOp>();
   assert(funcOp && "op should have parent function");
 
-  // Find input arcs to BBs in the IR
-  BBtoArcsMap bbToPredecessorArcs = getBBPredecessorArcs(funcOp);
-  unsigned bb = getLogicBB(op).value();
+  std::optional<unsigned> targetBB = getLogicBB(op);
+  if (!targetBB) {
+    op->emitError("Operation does not have a BB.");
+    return {};
+  }
 
-  // Iterate input arcs to the speculation BB to find the control signal
-  for (const BBArc &arc : bbToPredecessorArcs[bb]) {
-    // Iterate the operands in the edge
-    for (mlir::OpOperand *p : arc.edges) {
-      Value inEdge = p->get();
-      // The control signal should be the only control input to the BB
-      if (inEdge.getType().isa<handshake::ControlType>())
-        return inEdge;
+  std::optional<mlir::Value> ctrlSignal = {};
+  for (auto branchOp : funcOp.getOps<handshake::ConditionalBranchOp>()) {
+    if (auto brBB = getLogicBB(branchOp);
+        !brBB || brBB != targetBB)
+      continue;
+
+    if (branchOp.getDataOperand().getType().isa<handshake::ControlType>()) {
+      if (ctrlSignal.has_value()) {
+        branchOp->emitError("Found many control branches in the same BB");
+        return {};
+      }
+      ctrlSignal = branchOp.getDataOperand();
     }
   }
-  return {};
+
+  if (!ctrlSignal.has_value()) {
+    funcOp->emitError("Its BB #" + std::to_string(targetBB.value()) +
+                      " does not have a control branch.");
+    return {};
+  }
+
+  return ctrlSignal.value();
 }
 
 LogicalResult HandshakeSpeculationPass::placeSpeculator() {
