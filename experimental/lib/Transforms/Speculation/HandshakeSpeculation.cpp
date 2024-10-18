@@ -269,17 +269,17 @@ LogicalResult HandshakeSpeculationPass::prepareAndPlaceSaveCommits() {
   // The tokens take differents paths. One (SCSaveCtrl) needs to always reach the SC,
   // the other (SCCommitCtrl) should follow the actual branches similarly to the Commits
   builder.setInsertionPointAfterValue(specOp.getSCCommitCtrl());
-  auto branchDiscardNonSpec = builder.create<handshake::SpeculatingBranchOp>(
+  auto branchDiscardCondNonSpec = builder.create<handshake::SpeculatingBranchOp>(
       controlBranch.getLoc(), specOp.getDataOut() /* spec tag */,
       controlBranch.getConditionOperand());
-  inheritBB(specOp, branchDiscardNonSpec);
+  inheritBB(specOp, branchDiscardCondNonSpec);
 
   // Create a conditional branch driven by SCBranchControl from speculator
   // SCBranchControl discards the commit-like signal when speculation is correct
   auto branchDiscardCondNonMisspec =
       builder.create<handshake::ConditionalBranchOp>(
-          branchDiscardNonSpec.getLoc(), specOp.getSCBranchCtrl(),
-          branchDiscardNonSpec.getTrueResult());
+          branchDiscardCondNonSpec.getLoc(), specOp.getSCBranchCtrl(),
+          branchDiscardCondNonSpec.getTrueResult());
   inheritBB(specOp, branchDiscardCondNonMisspec);
 
   // This branch will propagate the signal SCCommitControl according to
