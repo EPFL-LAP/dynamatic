@@ -1,3 +1,18 @@
+//===- LSQSizingSupport.cpp - Support functions for LSQ Sizing -*-- C++ -*-===//
+//
+// Dynamatic is under the Apache License v2.0 with LLVM Exceptions.
+// See https://llvm.org/LICENSE.txt for license information.
+// SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
+//
+//===----------------------------------------------------------------------===//
+//
+// Implements Helper Classes and Functions for the LSQ sizing pass.
+// The Helper functions mainly consist of the AdjListGraph class which is used
+// to represent the CFDFC as an adjacency list graph and provides functions to
+// find paths, calculate latencies and start times of nodes.
+//
+//===----------------------------------------------------------------------===//
+
 #include "experimental/Transforms/LSQSizing/LSQSizingSupport.h"
 #include "dynamatic/Dialect/Handshake/HandshakeAttributes.h"
 #include "dynamatic/Dialect/Handshake/HandshakeOps.h"
@@ -13,14 +28,14 @@ using namespace mlir;
 using namespace dynamatic;
 using namespace dynamatic::experimental::lsqsizing;
 
-// Extracts the latency for each operation
-// This is done in 3 ways:
-// 1. If the operation is in the timingDB, the latency is extracted from the
-// timingDB
-// 2. If the operation is a buffer operation, the latency is extracted from the
-// timing attribute
-// 3. If the operation is neither, then its latency is set to 0
-int extractNodeLatency(mlir::Operation *op, TimingDatabase timingDB) {
+/// Extracts the latency for each operation
+/// This is done in 3 ways:
+/// 1. If the operation is in the timingDB, the latency is extracted from the
+/// timingDB
+/// 2. If the operation is a buffer operation, the latency is extracted from the
+/// timing attribute
+/// 3. If the operation is neither, then its latency is set to 0
+static int extractNodeLatency(mlir::Operation *op, TimingDatabase timingDB) {
   double latency = 0;
 
   if (!failed(timingDB.getLatency(op, SignalType::DATA, latency)))
@@ -133,26 +148,26 @@ void AdjListGraph::printGraph() {
   for (const auto &pair : nodes) {
     std::string opName = pair.first;
     const AdjListNode &node = pair.second;
-    llvm::dbgs() << opName << " (lat: " << node.latency
+    llvm::errs() << opName << " (lat: " << node.latency
                  << ", est: " << node.earliestStartTime << "): ";
     for (std::string edge : node.edges) {
-      llvm::dbgs() << edge << ", ";
+      llvm::errs() << edge << ", ";
     }
     if (node.backedges.size() > 0) {
-      llvm::dbgs() << " || ";
+      llvm::errs() << " || ";
       for (std::string backedge : node.backedges) {
-        llvm::dbgs() << backedge << ", ";
+        llvm::errs() << backedge << ", ";
       }
     }
-    llvm::dbgs() << "\n";
+    llvm::errs() << "\n";
   }
 }
 
 void AdjListGraph::printPath(std::vector<std::string> path) {
   for (std::string node : path) {
-    llvm::dbgs() << node << "(" << nodes.at(node).latency << ") - ";
+    llvm::errs() << node << "(" << nodes.at(node).latency << ") - ";
   }
-  llvm::dbgs() << "\n";
+  llvm::errs() << "\n";
 }
 
 void AdjListGraph::addBackedge(mlir::Operation *src, mlir::Operation *dest,
@@ -458,12 +473,12 @@ unsigned AdjListGraph::getWorstCaseII() {
   }
 
   // For each LSQ, go trough all loads and find the maxPathLatency to all stores
-  int maxLatency = 0;
+  unsigned maxLatency = 0;
   for (auto &lsq : loadStoreOpsPerLSQ) {
     for (auto &load : std::get<0>(lsq.second)) {
       for (auto &store : std::get<1>(lsq.second)) {
-        maxLatency =
-            std::max(findMaxPathLatency(load, store, true, true), maxLatency);
+        maxLatency = std::max(findMaxPathLatency(load, store, true, true),
+                              (int)maxLatency);
       }
     }
   }
@@ -565,10 +580,8 @@ int AdjListGraph::getEarliestStartTime(mlir::Operation *op) {
   // If earliestStartTime of node has not been initialized (is -1), it is not
   // reachable by the start node. This should only happen for nodes that are
   // e.g. a source. The not reachable muxes, merges and cmerges are handled by
-  // adding shifting edges for their start times and should be accounted for
-  if (nodes.at(opName).earliestStartTime == -1) {
-    return 0;
-  } else {
-    return nodes.at(opName).earliestStartTime;
-  }
+  // adding shifting edges for their start times and should be accounted fo
+  return nodes.at(opName).earliestStartTime == -1
+             ? 0
+             : nodes.at(opName).earliestStartTime;
 }

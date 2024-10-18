@@ -1,4 +1,4 @@
-//===- HandshakeSizeLSQs.cpp - LSQ Sizing --------*- C++ -*-===//
+//===- HandshakeSizeLSQs.cpp - LSQ Sizing -----------------------*- C++ -*-===//
 //
 // Dynamatic is under the Apache License v2.0 with LLVM Exceptions.
 // See https://llvm.org/LICENSE.txt for license information.
@@ -34,12 +34,12 @@ using namespace dynamatic::handshake;
 using namespace dynamatic::experimental;
 using namespace dynamatic::experimental::lsqsizing;
 
+/// TUPLE: <load_size, store_size>
 using LSQSizingResult =
-    std::unordered_map<mlir::Operation *,
-                       std::tuple<unsigned, unsigned>>; // TUPLE: <load_size,
-                                                        // store_size>
-using StartTimes =
-    std::vector<std::tuple<mlir::Operation *, int>>; // TUPLE: <Operation, time>
+    std::unordered_map<mlir::Operation *, std::tuple<unsigned, unsigned>>;
+
+/// TUPLE: <Operation, time>
+using StartTimes = std::vector<std::tuple<mlir::Operation *, int>>;
 using SizePerOpMap = std::unordered_map<mlir::Operation *, unsigned>;
 using TimePerOpMap = std::unordered_map<mlir::Operation *, int>;
 using AllocDeallocTimesPerII =
@@ -63,65 +63,71 @@ private:
   // allocation/deallocation time inside the LSQ For allocation it is the same
   // for both load and stores, for deallocation it is different between loads
   // and stores
-  static const int allocEntryLatency = 1;
-  static const int storeDeallocEntryLatency = 2;
-  static const int loadDeallocEntryLatency = 1;
+  static const unsigned allocEntryLatency = 1;
+  static const unsigned storeDeallocEntryLatency = 2;
+  static const unsigned loadDeallocEntryLatency = 1;
 
-  // Determines the LSQ sizes, given a CFDFC and its II
+  /// Determines the LSQ sizes, given a CFDFC and its II
   std::optional<LSQSizingResult>
   sizeLSQsForCFDFC(handshake::FuncOp funcOp, llvm::SetVector<unsigned> cfdfcBBs,
                    TimingDatabase timingDB, unsigned initialII,
                    std::string collisions);
 
-  // Finds the Start Node in a CFDFC
-  // The start node, is the node with the longest non-cyclic path to any other
-  // node
+  /// Finds the Start Node in a CFDFC
+  /// The start node, is the node with the longest non-cyclic path to any other
+  /// node
   std::tuple<mlir::Operation *, StartTimes> findStartTimes(AdjListGraph graph);
 
-  // TODO add description
+  /// Inserts edges to handle an edge case where the start node is not connected
+  /// to other "potential start nodes", which do not start at the same time, but
+  /// could supply an argument to a node in the graph. This argument would
+  /// impact the timing of the node, but would not be considered in timing
+  /// anlysis. By adding an edge which has a aritificial node with a latency,
+  /// that models the difference of this other "potential start node" in start
+  /// time to the chosen start node, the timing analysis can be done correctly
   void insertStartnodeShiftingEdges(AdjListGraph &graph,
                                     mlir::Operation *startNode,
                                     StartTimes startTimes);
 
-  // Finds the Phi Node for each Basic Block in a CFDFC
-  // Checks all operations which get their input from a different BB and chooses
-  // the one with the lowest latency from the start node
+  /// Finds the Phi Node for each Basic Block in a CFDFC
+  /// Checks all operations which get their input from a different BB and
+  /// chooses the one with the lowest latency from the start node
   std::unordered_map<unsigned, mlir::Operation *>
   getPhiNodes(AdjListGraph graph, mlir::Operation *startNode);
 
-  // Inserts edges to make sure that sizing is done correctly
-  // These edges make sure that in the timing analysis, the allocation precedes
-  // the memory access Edges are inserted from the Phi Node of a BB to the LSQ
-  // operations in the BB Therefore the LSQ operations will be allocated at the
-  // start of the BB
+  /// Inserts edges to make sure that sizing is done correctly
+  /// These edges make sure that in the timing analysis, the allocation precedes
+  /// the memory access Edges are inserted from the Phi Node of a BB to the LSQ
+  /// operations in the BB Therefore the LSQ operations will be allocated at the
+  /// start of the BB
   void insertAllocPrecedesMemoryAccessEdges(
       AdjListGraph &graph, std::vector<mlir::Operation *> ops,
       std::unordered_map<unsigned, mlir::Operation *> phiNodes);
 
-  // Finds the allocation time of each operation, which is the earliest start
-  // time of the Phi Node of the BB plus a fixed additional latency
+  /// Finds the allocation time of each operation, which is the earliest start
+  /// time of the Phi Node of the BB plus a fixed additional latency
   TimePerOpMap
   getAllocTimes(AdjListGraph graph, mlir::Operation *startNode,
                 std::vector<mlir::Operation *> ops,
                 std::unordered_map<unsigned, mlir::Operation *> phiNodes);
 
-  // Finds the deallocation time of each store operation, which is the the
-  // latency of the last argument arriving plus a fixed additional latency
+  /// Finds the deallocation time of each store operation, which is the the
+  /// latency of the last argument arriving plus a fixed additional latency
   TimePerOpMap getStoreDeallocTimes(AdjListGraph graph,
                                     mlir::Operation *startNode,
                                     std::vector<mlir::Operation *> storeOps);
 
-  // Finds the deallocation time of each load operation, which is the latest
-  // argument arriving at the operation succeding the load operation plus a
-  // fixed additional latency This is due to to the fact that the load operation
-  // frees the queue entry as soon as the load result is passed on to the
-  // succeeding operation
+  /// Finds the deallocation time of each load operation, which is the latest
+  /// argument arriving at the operation succeding the load operation plus a
+  /// fixed additional latency This is due to to the fact that the load
+  /// operation frees the queue entry as soon as the load result is passed on to
+  /// the succeeding operation
   TimePerOpMap getLoadDeallocTimes(AdjListGraph graph,
                                    mlir::Operation *startNode,
                                    std::vector<mlir::Operation *> loadOps);
 
-  // Given the alloc and dealloc times of each operation, calculates the maximum
-  // queue size needed for each LSQ
+  /// Given the alloc and dealloc times of each operation, calculates the
+  /// maximum queue size needed for each LSQ
   SizePerOpMap
   calcQueueSize(std::unordered_map<unsigned, TimePerOpMap> allocTimes,
                 std::unordered_map<unsigned, TimePerOpMap> deallocTimes,
@@ -144,28 +150,30 @@ void HandshakeSizeLSQsPass::runDynamaticPass() {
     std::unordered_map<unsigned, float> IIs;
 
     // Extract CFDFCs and II from the Attributes
-    handshake::CFDFCThroughputAttr throughputAttr =
+    auto throughputAttr =
         getDialectAttr<handshake::CFDFCThroughputAttr>(funcOp);
-    handshake::CFDFCToBBListAttr cfdfcAttr =
-        getDialectAttr<handshake::CFDFCToBBListAttr>(funcOp);
+    auto cfdfcAttr = getDialectAttr<handshake::CFDFCToBBListAttr>(funcOp);
 
-    if (throughputAttr == nullptr || cfdfcAttr == nullptr) {
+    if (throughputAttr == nullptr || cfdfcAttr == nullptr)
       continue;
-    }
 
     DictionaryAttr throughputDict = throughputAttr.getThroughputMap();
     DictionaryAttr cfdfcDict = cfdfcAttr.getCfdfcMap();
 
     // Convert Attribute into better usable data structure
-    for (auto &attr : cfdfcDict) {
+    for (const mlir::NamedAttribute attr : cfdfcDict) {
       ArrayAttr bbList = llvm::dyn_cast<ArrayAttr>(attr.getValue());
       llvm::SetVector<unsigned> cfdfcBBs;
-      for (auto &bb : bbList) {
+      for (auto bb : bbList) {
         cfdfcBBs.insert(bb.cast<IntegerAttr>().getUInt());
       }
-      cfdfcBBLists.insert({std::stoi(attr.getName().str()), cfdfcBBs});
+      unsigned index;
+      if (attr.getName().getValue().getAsInteger(10, index)) {
+        llvm::errs() << "Could not convert attribute name to integer\n";
+        continue;
+      }
+      cfdfcBBLists.insert({index, cfdfcBBs});
     }
-
 
     // Extract II from Attribute
     for (const NamedAttribute attr : throughputDict) {
@@ -174,12 +182,11 @@ void HandshakeSizeLSQsPass::runDynamaticPass() {
                   round(1 / throughput.getValueAsDouble())});
     }
 
-
     // Size LSQs for each CFDFC
     for (auto &entry : cfdfcBBLists) {
       // If there is no II corresponding to the CFDFC skip it
       // Something is wrong with the attributes in that case
-      if(IIs.find(entry.first) == IIs.end()){
+      if (IIs.find(entry.first) == IIs.end()) {
         continue;
       }
 
@@ -250,6 +257,7 @@ std::optional<LSQSizingResult> HandshakeSizeLSQsPass::sizeLSQsForCFDFC(
 
   // connect all phi nodes to the lsq ops in their BB
   insertAllocPrecedesMemoryAccessEdges(graph, loadOps, phiNodes);
+
   // connect all start node candidates, with a latency of their shifting time,
   // for the case that there is no path from the start node to the start node
   // candidate and that the start time of the candidate is not zero
@@ -336,8 +344,8 @@ HandshakeSizeLSQsPass::findStartTimes(AdjListGraph graph) {
   std::merge(muxOps.begin(), muxOps.end(), cmergeOps.begin(), cmergeOps.end(),
              startNodeCandidates.begin());
 
-  std::unordered_map<mlir::Operation *, int> maxLatencies;
-  std::unordered_map<mlir::Operation *, int> nodeCounts;
+  std::unordered_map<mlir::Operation *, unsigned> maxLatencies;
+  std::unordered_map<mlir::Operation *, unsigned> nodeCounts;
 
   // Go trough all candidates and save the longest path, its latency and node
   // count
@@ -350,8 +358,8 @@ HandshakeSizeLSQsPass::findStartTimes(AdjListGraph graph) {
   // Find the node with the highest latency, if there are multiple, choose the
   // one with the most nodes
   mlir::Operation *maxLatencyNode = nullptr;
-  int maxLatency = 0;
-  int maxNodeCount = 0;
+  unsigned maxLatency = 0;
+  unsigned maxNodeCount = 0;
   for (auto &node : maxLatencies) {
     if (node.second > maxLatency) {
       maxLatency = node.second;
@@ -488,12 +496,11 @@ HandshakeSizeLSQsPass::getLoadDeallocTimes(AdjListGraph graph,
 
       maxLatency = std::max(
           graph.findMaxPathLatency(startNode, succedingOp, false, false, true) +
-              loadDeallocEntryLatency,
+              (int)loadDeallocEntryLatency,
           maxLatency);
 
       // If the node is a buffer, check if it is a tehb buffer and if so,
       // check the latency of the nodes connected to the buffer
-      // TODO maybe also to the same for all buffers not only tehb
       if (succedingOp->getName().getStringRef().str() == "handshake.buffer") {
         auto params = succedingOp->getAttrOfType<DictionaryAttr>(
             RTL_PARAMETERS_ATTR_NAME);
@@ -522,7 +529,7 @@ HandshakeSizeLSQsPass::getLoadDeallocTimes(AdjListGraph graph,
             maxLatency =
                 std::max(graph.findMaxPathLatency(startNode, succedingOp2,
                                                   false, false, true) +
-                             loadDeallocEntryLatency - 1,
+                             (int)loadDeallocEntryLatency - 1,
                          maxLatency);
           }
         }

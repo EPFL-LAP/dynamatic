@@ -369,9 +369,9 @@ void LSQGenerationInfo::fromPorts(FuncMemoryPorts &ports) {
   if (lsqDepthAttr) {
     depthLoad = lsqDepthAttr.getLoadQueueDepth();
     depthStore = lsqDepthAttr.getStoreQueueDepth();
-    depth = std::max(depthLoad,
-                     depthStore); // Parameter is theoretically unused, but
-                                  // still needed by the current LSQGenerator
+    // "depth" Parameter is theoretically unused, but still needed by the
+    // current LSQGenerator
+    depth = std::max(depthLoad, depthStore);
   } else {
     depthLoad = 16;
     depthStore = 16;

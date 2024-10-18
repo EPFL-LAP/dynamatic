@@ -295,7 +295,6 @@ def HandshakePlaceBuffers : DynamaticPass<"handshake-place-buffers"> {
     "'buffer-placement' at the binary's location.">];
 }
 
-
 //===----------------------------------------------------------------------===//
 // Other passes
 //===----------------------------------------------------------------------===//
