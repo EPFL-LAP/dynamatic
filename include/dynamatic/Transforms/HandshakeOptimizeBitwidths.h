@@ -14,10 +14,7 @@
 #define DYNAMATIC_TRANSFORMS_HANDSHAKEOPTIMIZEBITWIDTHS_H
 
 #include "dynamatic/Support/DynamaticPass.h"
-#include "dynamatic/Support/LLVM.h"
 #include "mlir/Dialect/Arith/IR/Arith.h"
-#include "mlir/IR/DialectRegistry.h"
-#include "mlir/Pass/Pass.h"
 
 namespace dynamatic {
 
@@ -25,8 +22,7 @@ namespace dynamatic {
 #define GEN_PASS_DEF_HANDSHAKEOPTIMIZEBITWIDTHS
 #include "dynamatic/Transforms/Passes.h.inc"
 
-std::unique_ptr<dynamatic::DynamaticPass>
-createHandshakeOptimizeBitwidths(bool legacy = false);
+std::unique_ptr<dynamatic::DynamaticPass> createHandshakeOptimizeBitwidths();
 
 } // namespace dynamatic
 

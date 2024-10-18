@@ -14,6 +14,7 @@
 
 #include "dynamatic/Transforms/ForceMemoryInterface.h"
 #include "dynamatic/Dialect/Handshake/HandshakeAttributes.h"
+#include "dynamatic/Support/Attribute.h"
 #include "mlir/Dialect/Affine/IR/AffineOps.h"
 #include "mlir/Dialect/MemRef/IR/MemRef.h"
 
@@ -44,7 +45,6 @@ struct ForceMemoryInterfacePass
           << " flags were provided. However, exactly one needs to be set.";
 
     MLIRContext *ctx = &getContext();
-    StringRef mnemonic = handshake::MemInterfaceAttr::getMnemonic();
     DenseMap<Block *, unsigned> lsqGroups;
     unsigned nextGroupID = 0;
 
@@ -57,7 +57,7 @@ struct ForceMemoryInterfacePass
         return;
 
       if (forceMC) {
-        op->setAttr(mnemonic, handshake::MemInterfaceAttr::get(ctx));
+        setDialectAttr<handshake::MemInterfaceAttr>(op, ctx);
         return;
       }
 
@@ -72,7 +72,7 @@ struct ForceMemoryInterfacePass
       else
         lsqGroups[block] = groupID = nextGroupID++;
 
-      op->setAttr(mnemonic, handshake::MemInterfaceAttr::get(ctx, groupID));
+      setDialectAttr<handshake::MemInterfaceAttr>(op, ctx, groupID);
     });
   }
 };

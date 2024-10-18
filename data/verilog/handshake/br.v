@@ -1,7 +1,4 @@
 `timescale 1ns/1ps
-// The original implementation has a parameter called INPUTS,
-// used to indicate the number of input channels. I removed
-// it. -- Jiantao, 21/07/2024
 module br #(
 	parameter DATA_TYPE = 32 // Default bit width set to 32
 )(
