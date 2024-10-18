@@ -346,25 +346,28 @@ std::optional<Value> findControlInputToBB(Operation *op) {
     return {};
   }
 
-  bool foundCBranch = false;
+  std::optional<mlir::Value> ctrlSignal = {};
   for (auto branchOp : funcOp.getOps<handshake::ConditionalBranchOp>()) {
     if (auto brBB = getLogicBB(branchOp);
         !brBB || brBB != targetBB)
       continue;
 
     if (branchOp.getDataOperand().getType().isa<handshake::ControlType>()) {
-      if (foundCBranch) {
+      if (ctrlSignal.has_value()) {
         branchOp->emitError("Found many control branches in the same BB");
         return {};
       }
-      foundCBranch = true;
-      return branchOp.getDataOperand();
+      ctrlSignal = branchOp.getDataOperand();
     }
   }
 
-  funcOp->emitError("Its BB #" + std::to_string(targetBB.value()) +
-                    " does not have a control branch.");
-  return {};
+  if (!ctrlSignal.has_value()) {
+    funcOp->emitError("Its BB #" + std::to_string(targetBB.value()) +
+                      " does not have a control branch.");
+    return {};
+  }
+
+  return ctrlSignal.value();
 }
 
 LogicalResult HandshakeSpeculationPass::placeSpeculator() {
