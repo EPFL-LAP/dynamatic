@@ -340,39 +340,30 @@ std::optional<Value> findControlInputToBB(Operation *op) {
   handshake::FuncOp funcOp = op->getParentOfType<handshake::FuncOp>();
   assert(funcOp && "op should have parent function");
 
-  // Find input arcs to BBs in the IR
-  BBtoArcsMap bbToPredecessorArcs = getBBPredecessorArcs(funcOp);
-  unsigned bb = getLogicBB(op).value();
+  std::optional<unsigned> targetBB = getLogicBB(op);
+  if (!targetBB) {
+    op->emitError("Operation does not have a BB.");
+    return {};
+  }
 
-  // Iterate input arcs to the speculation BB to find the control signal
-  for (const BBArc &arc : bbToPredecessorArcs[bb]) {
-    // Iterate the operands in the edge
-    for (mlir::OpOperand *p : arc.edges) {
-      Operation *ctrlSignalFrom = p->getOwner();
-      // At first ctrlSignalFrom should be a CMerge.
-      // TODO: I think there is an easier way to find ControlMergeOp
-      // just like PlacementFinder::findSaveCommitPositions in PlacementFinder.cpp,
-      // which doesn't use BBToArcsMap but uses funcOp.getOps
-      assert(isa<handshake::ControlMergeOp>(ctrlSignalFrom) && "The BBArc should be connected to a CMerge");
-      // According to Section 7.4.2 of Haoran's thesis, it's better to
-      // connect the control signal from the buffers after the cmerge
-      bool succBuffer;
-      do {
-        succBuffer = false;
-        for (Operation *succOp : ctrlSignalFrom->getResult(0).getUsers()) {
-          if (isa<handshake::BufferOp>(succOp)) {
-            succBuffer = true;
-            ctrlSignalFrom = succOp;
-            break;
-          }
-        }
-      } while (succBuffer);
-      Value inEdge = ctrlSignalFrom->getResult(0);
-      // The control signal should be the only control input to the BB
-      if (inEdge.getType().isa<handshake::ControlType>())
-        return inEdge;
+  bool foundCBranch = false;
+  for (auto branchOp : funcOp.getOps<handshake::ConditionalBranchOp>()) {
+    if (auto brBB = getLogicBB(branchOp);
+        !brBB || brBB != targetBB)
+      continue;
+
+    if (branchOp.getDataOperand().getType().isa<handshake::ControlType>()) {
+      if (foundCBranch) {
+        branchOp->emitError("Found many control branches in the same BB");
+        return {};
+      }
+      foundCBranch = true;
+      return branchOp.getDataOperand();
     }
   }
+
+  funcOp->emitError("Its BB #" + std::to_string(targetBB.value()) +
+                    " does not have a control branch.");
   return {};
 }
 
