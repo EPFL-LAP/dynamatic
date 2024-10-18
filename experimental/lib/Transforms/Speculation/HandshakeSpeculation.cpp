@@ -270,13 +270,13 @@ LogicalResult HandshakeSpeculationPass::prepareAndPlaceSaveCommits() {
   // the other (SCCommitCtrl) should follow the actual branches similarly to the Commits
   builder.setInsertionPointAfterValue(specOp.getSCCommitCtrl());
 
-  // First, discard the case speculation didn't happen
+  // First, discard if speculation didn't happen
   auto branchDiscardCondNonSpec = builder.create<handshake::SpeculatingBranchOp>(
       controlBranch.getLoc(), specOp.getDataOut() /* spec tag */,
       controlBranch.getConditionOperand());
   inheritBB(specOp, branchDiscardCondNonSpec);
 
-  // Second, discard the case speculation happened but it was correct
+  // Second, discard if speculation happened but it was correct
   // Create a conditional branch driven by SCBranchControl from speculator
   // SCBranchControl discards the commit-like signal when speculation is correct
   auto branchDiscardCondNonMisspec =
