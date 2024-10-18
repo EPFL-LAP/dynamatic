@@ -43,14 +43,12 @@ static int extractNodeLatency(mlir::Operation *op, TimingDatabase timingDB) {
 
   if (op->getName().getStringRef() == "handshake.buffer") {
     auto params = op->getAttrOfType<DictionaryAttr>(RTL_PARAMETERS_ATTR_NAME);
-    if (!params) {
+    if (!params)
       return 0;
-    }
 
     auto optTiming = params.getNamed(handshake::BufferOp::TIMING_ATTR_NAME);
-    if (!optTiming) {
+    if (!optTiming)
       return 0;
-    }
 
     if (auto timing = dyn_cast<handshake::TimingAttr>(optTiming->getValue())) {
       handshake::TimingInfo info = timing.getInfo();
@@ -132,16 +130,14 @@ void AdjListGraph::addEdge(mlir::Operation *src, mlir::Operation *dest) {
 
 void AdjListGraph::addChannelEdges(mlir::Value res) {
   mlir::Operation *srcOp = res.getDefiningOp();
-  for (Operation *destOp : res.getUsers()) {
+  for (Operation *destOp : res.getUsers())
     addEdge(srcOp, destOp);
-  }
 }
 
 void AdjListGraph::addChannelBackedges(mlir::Value res, int latency) {
   mlir::Operation *srcOp = res.getDefiningOp();
-  for (Operation *destOp : res.getUsers()) {
+  for (Operation *destOp : res.getUsers())
     addBackedge(srcOp, destOp, latency);
-  }
 }
 
 void AdjListGraph::printGraph() {
@@ -150,23 +146,22 @@ void AdjListGraph::printGraph() {
     const AdjListNode &node = pair.second;
     llvm::errs() << opName << " (lat: " << node.latency
                  << ", est: " << node.earliestStartTime << "): ";
-    for (std::string edge : node.edges) {
+    for (std::string edge : node.edges)
       llvm::errs() << edge << ", ";
-    }
+
     if (node.backedges.size() > 0) {
       llvm::errs() << " || ";
-      for (std::string backedge : node.backedges) {
+      for (std::string backedge : node.backedges)
         llvm::errs() << backedge << ", ";
-      }
     }
     llvm::errs() << "\n";
   }
 }
 
 void AdjListGraph::printPath(std::vector<std::string> path) {
-  for (std::string node : path) {
+  for (std::string node : path)
     llvm::errs() << node << "(" << nodes.at(node).latency << ") - ";
-  }
+
   llvm::errs() << "\n";
 }
 
@@ -332,9 +327,9 @@ AdjListGraph::findLongestNonCyclicPath(mlir::Operation *startOp) {
 int AdjListGraph::getPathLatency(std::vector<std::string> path) {
   // Sum up the latencies of all nodes in the path
   int latency = 0;
-  for (auto &node : path) {
+  for (auto &node : path)
     latency += nodes.at(node).latency;
-  }
+
   return latency;
 }
 
@@ -343,12 +338,11 @@ AdjListGraph::getOperationsWithOpName(std::string opName) {
   std::vector<mlir::Operation *> ops;
   // Iterate over all nodes and return the operations with the specified
   // operation name
-  for (auto &node : nodes) {
+  for (auto &node : nodes)
     if (node.second.op &&
-        std::string(node.second.op->getName().getStringRef()) == opName) {
+        std::string(node.second.op->getName().getStringRef()) == opName)
       ops.push_back(node.second.op);
-    }
-  }
+
   return ops;
 }
 
@@ -378,9 +372,9 @@ int AdjListGraph::findMaxPathLatency(mlir::Operation *startOp,
 
   // Iterate over all paths and keep track of the path with the highest latency
   for (auto &path : paths) {
-    if (excludeLastNodeLatency) {
+    if (excludeLastNodeLatency)
       path.pop_back();
-    }
+
     maxLatency = std::max(maxLatency, getPathLatency(path));
   }
   return maxLatency;
@@ -395,9 +389,9 @@ int AdjListGraph::findMinPathLatency(mlir::Operation *startOp,
       findPaths(startOp, endOp, ignoreBackedge, ignoreShiftingEdge);
   int minLatency = INT_MAX;
   // Iterate over all paths and keep track of the lowest latency
-  for (auto &path : paths) {
+  for (auto &path : paths)
     minLatency = std::min(minLatency, getPathLatency(path));
-  }
+
   return minLatency;
 }
 
@@ -407,37 +401,31 @@ AdjListGraph::getConnectedOps(mlir::Operation *op) {
   std::string opName = getUniqueName(op).str();
 
   // Get all Ops which are connected via a regular edge
-  for (auto &node : nodes.at(opName).edges) {
+  for (auto &node : nodes.at(opName).edges)
     connectedOps.push_back(nodes.at(node).op);
-  }
 
   // Get all Ops which are connected via a backedge, by skipping the artificial
   // nodes and going over the nodes connected to the artificial nodes
-  for (auto &aritificalNode : nodes.at(opName).backedges) {
-    for (auto &node : nodes.at(aritificalNode).backedges) {
+  for (auto &aritificalNode : nodes.at(opName).backedges)
+    for (auto &node : nodes.at(aritificalNode).backedges)
       connectedOps.push_back(nodes.at(node).op);
-    }
-  }
 
   return connectedOps;
 }
 
 std::vector<mlir::Operation *> AdjListGraph::getOperations() {
   std::vector<mlir::Operation *> ops;
-  for (auto &node : nodes) {
-    if (node.second.op) {
+  for (auto &node : nodes)
+    if (node.second.op)
       ops.push_back(node.second.op);
-    }
-  }
+
   return ops;
 }
 
 void AdjListGraph::setNewII(unsigned II) {
-  for (auto &node : nodes) {
-    if (node.first.find(backedgePrefix) != std::string::npos) {
+  for (auto &node : nodes)
+    if (node.first.find(backedgePrefix) != std::string::npos)
       node.second.latency = II * -1;
-    }
-  }
 }
 
 unsigned AdjListGraph::getWorstCaseII() {
@@ -475,12 +463,10 @@ unsigned AdjListGraph::getWorstCaseII() {
   // For each LSQ, go trough all loads and find the maxPathLatency to all stores
   unsigned maxLatency = 0;
   for (auto &lsq : loadStoreOpsPerLSQ) {
-    for (auto &load : std::get<0>(lsq.second)) {
-      for (auto &store : std::get<1>(lsq.second)) {
+    for (auto &load : std::get<0>(lsq.second))
+      for (auto &store : std::get<1>(lsq.second))
         maxLatency = std::max(findMaxPathLatency(load, store, true, true),
                               (int)maxLatency);
-      }
-    }
   }
   // The maximal Latency between any load and store of the same LSQ is the worst
   // case II
@@ -500,25 +486,20 @@ void AdjListGraph::setEarliestStartTimes(std::string prevNode,
                                          std::set<std::string> &visited) {
 
   // If the current node has already been visited, skip to avoid cycles
-  if (visited.find(prevNode) != visited.end()) {
+  if (visited.find(prevNode) != visited.end())
     return;
-  }
 
   // Mark this node as visited
   visited.insert(prevNode);
 
   // Traverse the edges of the current node
-  for (auto &node : nodes.at(prevNode).edges) {
-    if (updateStartTimeForNode(node, prevNode) || true) {
+  for (auto &node : nodes.at(prevNode).edges)
+    if (updateStartTimeForNode(node, prevNode) || true)
       setEarliestStartTimes(node, visited);
-    }
-  }
 
-  for (auto &node : nodes.at(prevNode).shiftingedges) {
-    if (updateStartTimeForNode(node, prevNode) || true) {
+  for (auto &node : nodes.at(prevNode).shiftingedges)
+    if (updateStartTimeForNode(node, prevNode) || true)
       setEarliestStartTimes(node, visited);
-    }
-  }
 
   // Remove node from visited set, to allow for other paths to visit it
   visited.erase(prevNode);
@@ -549,11 +530,10 @@ bool AdjListGraph::updateStartTimeForNode(std::string node,
              op->getName().getStringRef() == "handshake.control_merge")) {
 
     int minLatency = INT_MAX;
-    for (auto &incomgingEdge : edgeMinLatencies[node]) {
-      if (minLatency > incomgingEdge.second) {
+    for (auto &incomgingEdge : edgeMinLatencies[node])
+      if (minLatency > incomgingEdge.second)
         minLatency = incomgingEdge.second;
-      }
-    }
+
     if (minLatency != nodes.at(node).earliestStartTime) {
       startTimeUpdated = true;
       nodes.at(node).earliestStartTime = minLatency;
@@ -562,11 +542,10 @@ bool AdjListGraph::updateStartTimeForNode(std::string node,
     // For all other nodes, the operation needs to wait for all arguments to
     // arrive. The latency is the maximum of all incoming edges
     int maxLatency = 0;
-    for (auto &incomgingEdge : edgeMinLatencies[node]) {
-      if (maxLatency < incomgingEdge.second) {
+    for (auto &incomgingEdge : edgeMinLatencies[node])
+      if (maxLatency < incomgingEdge.second)
         maxLatency = incomgingEdge.second;
-      }
-    }
+
     if (maxLatency != nodes.at(node).earliestStartTime) {
       startTimeUpdated = true;
       nodes.at(node).earliestStartTime = maxLatency;

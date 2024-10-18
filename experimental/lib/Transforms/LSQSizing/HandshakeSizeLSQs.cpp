@@ -164,14 +164,13 @@ void HandshakeSizeLSQsPass::runDynamaticPass() {
     for (const mlir::NamedAttribute attr : cfdfcDict) {
       ArrayAttr bbList = llvm::dyn_cast<ArrayAttr>(attr.getValue());
       llvm::SetVector<unsigned> cfdfcBBs;
-      for (auto bb : bbList) {
+      for (auto bb : bbList)
         cfdfcBBs.insert(bb.cast<IntegerAttr>().getUInt());
-      }
+
       unsigned index;
-      if (attr.getName().getValue().getAsInteger(10, index)) {
-        llvm::errs() << "Could not convert attribute name to integer\n";
-        continue;
-      }
+      if (attr.getName().getValue().getAsInteger(10, index))
+        signalPassFailure();
+
       cfdfcBBLists.insert({index, cfdfcBBs});
     }
 
@@ -186,15 +185,13 @@ void HandshakeSizeLSQsPass::runDynamaticPass() {
     for (auto &entry : cfdfcBBLists) {
       // If there is no II corresponding to the CFDFC skip it
       // Something is wrong with the attributes in that case
-      if (IIs.find(entry.first) == IIs.end()) {
+      if (IIs.find(entry.first) == IIs.end())
         continue;
-      }
 
       std::optional<LSQSizingResult> result = sizeLSQsForCFDFC(
           funcOp, entry.second, timingDB, IIs.at(entry.first), collisions);
-      if (result) {
+      if (result)
         sizingResults.push_back(result.value());
-      }
     }
 
     // Extract maximum Queue sizes for each LSQ
@@ -241,9 +238,8 @@ std::optional<LSQSizingResult> HandshakeSizeLSQsPass::sizeLSQsForCFDFC(
   std::vector<mlir::Operation *> storeOps =
       graph.getOperationsWithOpName("handshake.lsq_store");
 
-  if (loadOps.size() == 0 && storeOps.size() == 0) {
+  if (loadOps.size() == 0 && storeOps.size() == 0)
     return std::nullopt;
-  }
 
   // Find starting node, which will be the reference to the rest
   std::tuple<mlir::Operation *, StartTimes> startNodeAndTimes =
@@ -322,9 +318,8 @@ std::optional<LSQSizingResult> HandshakeSizeLSQsPass::sizeLSQsForCFDFC(
   }
 
   for (auto &entry : storeSizes) {
-    if (result.find(entry.first) == result.end()) {
+    if (result.find(entry.first) == result.end())
       result.insert({entry.first, std::make_tuple(0, entry.second)});
-    }
   }
 
   return result;
@@ -372,9 +367,8 @@ HandshakeSizeLSQsPass::findStartTimes(AdjListGraph graph) {
     }
   }
 
-  for (auto &entry : maxLatencies) {
+  for (auto &entry : maxLatencies)
     startTimes.push_back({entry.first, maxLatency - entry.second});
-  }
 
   return {maxLatencyNode, startTimes};
 }
@@ -389,10 +383,8 @@ void HandshakeSizeLSQsPass::insertStartnodeShiftingEdges(
       // latency as latency
       std::vector<std::vector<std::string>> paths =
           graph.findPaths(startNode, get<0>(entry), true);
-      if (paths.size() == 0) {
-
+      if (paths.size() == 0)
         graph.addShiftingEdge(startNode, get<0>(entry), get<1>(entry));
-      }
     }
   }
 }
@@ -421,9 +413,8 @@ HandshakeSizeLSQsPass::getPhiNodes(AdjListGraph graph,
       std::optional<unsigned> destBB = getLogicBB(destOp);
       assert(destBB && "Dest Op must belong to basic block");
       if (*destBB != *srcBB) {
-        if (phiNodeCandidates.find(*destBB) == phiNodeCandidates.end()) {
+        if (phiNodeCandidates.find(*destBB) == phiNodeCandidates.end())
           phiNodeCandidates.insert({*destBB, std::vector<mlir::Operation *>()});
-        }
         phiNodeCandidates.at(*destBB).push_back(destOp);
       }
     }
@@ -505,19 +496,16 @@ HandshakeSizeLSQsPass::getLoadDeallocTimes(AdjListGraph graph,
         auto params = succedingOp->getAttrOfType<DictionaryAttr>(
             RTL_PARAMETERS_ATTR_NAME);
 
-        if (!params) {
+        if (!params)
           continue;
-        }
 
         auto optTiming = params.getNamed(handshake::BufferOp::TIMING_ATTR_NAME);
-        if (!optTiming) {
+        if (!optTiming)
           continue;
-        }
 
         auto timing = dyn_cast<handshake::TimingAttr>(optTiming->getValue());
-        if (!timing) {
+        if (!timing)
           continue;
-        }
 
         handshake::TimingInfo info = timing.getInfo();
 
@@ -526,11 +514,10 @@ HandshakeSizeLSQsPass::getLoadDeallocTimes(AdjListGraph graph,
             // -1 because buffer can get the load result 1 cycle earlier
             // Maybe it could also be earlier for a buffer with multiple slots
             // But its not clear for now
-            maxLatency =
-                std::max(graph.findMaxPathLatency(startNode, succedingOp2,
-                                                  false, false, true) +
-                             (int)loadDeallocEntryLatency - 1,
-                         maxLatency);
+            maxLatency = std::max(
+                maxLatency, graph.findMaxPathLatency(startNode, succedingOp2,
+                                                     false, false, true) +
+                                (int)loadDeallocEntryLatency - 1);
           }
         }
       }
@@ -605,11 +592,9 @@ HandshakeSizeLSQsPass::calcQueueSize(
 
   int maxEndTime = 0;
   // Choose the maxiumm time of all dealloc times for analysis time scope
-  for (auto &II : IIs) {
-    for (auto &entry : deallocTimes.at(II)) {
+  for (auto &II : IIs)
+    for (auto &entry : deallocTimes.at(II))
       maxEndTime = std::max(maxEndTime, entry.second);
-    }
-  }
 
   // Double the time for the analysis scope to make sure that all
   // deallocations are included (necessary scope actually is lower, but not
@@ -628,15 +613,13 @@ HandshakeSizeLSQsPass::calcQueueSize(
 
       for (auto &allocTime : std::get<0>(entry.second.at(II))) {
         int t = allocTime + startOffset;
-        if (t >= 0 && t < maxEndTime) {
+        if (t >= 0 && t < maxEndTime)
           allocPerCycle[t]++;
-        }
       }
       for (auto &deallocTime : std::get<1>(entry.second.at(II))) {
         int t = deallocTime + startOffset;
-        if (t >= 0 && t < maxEndTime) {
+        if (t >= 0 && t < maxEndTime)
           allocPerCycle[t]--;
-        }
       }
       // Increase the start offset for the next iteration by the II
       startOffset += II;
@@ -646,9 +629,8 @@ HandshakeSizeLSQsPass::calcQueueSize(
     // build array for many slots are actively allocated at which cycle
     std::vector<int> slotsPerCycle(maxEndTime);
     slotsPerCycle[0] = allocPerCycle[0];
-    for (int i = 1; i < maxEndTime; i++) {
+    for (int i = 1; i < maxEndTime; i++)
       slotsPerCycle[i] = slotsPerCycle[i - 1] + allocPerCycle[i];
-    }
 
     // get highest amount of slots from the array
     unsigned maxSlots =
