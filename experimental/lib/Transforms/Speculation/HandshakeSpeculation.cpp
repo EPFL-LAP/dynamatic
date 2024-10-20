@@ -266,28 +266,31 @@ LogicalResult HandshakeSpeculationPass::prepareAndPlaceSaveCommits() {
 
   // To connect a Save-Commit, two control signals are sent from the Speculator
   // and are merged before reaching the Save-Commit.
-  // The tokens take differents paths. One needs to always reach the SC,
-  // the other should follow the actual branches similarly to the Commits
+  // The tokens take differents paths. One (SCSaveCtrl) needs to always reach the SC,
+  // the other (SCCommitCtrl) should follow the actual branches similarly to the Commits
   builder.setInsertionPointAfterValue(specOp.getSCCommitCtrl());
-  auto branchDiscardNonSpec = builder.create<handshake::SpeculatingBranchOp>(
+
+  // First, discard if speculation didn't happen
+  auto branchDiscardCondNonSpec = builder.create<handshake::SpeculatingBranchOp>(
       controlBranch.getLoc(), specOp.getDataOut() /* spec tag */,
       controlBranch.getConditionOperand());
-  inheritBB(specOp, branchDiscardNonSpec);
+  inheritBB(specOp, branchDiscardCondNonSpec);
 
-  // This branch will propagate the signal SCCommitControl according to
-  // the control branch condition, which comes from branchDiscardNonSpec
-  auto branchDiscardControl = builder.create<handshake::ConditionalBranchOp>(
-      branchDiscardNonSpec.getLoc(), branchDiscardNonSpec.getTrueResult(),
-      specOp.getSCCommitCtrl());
-  inheritBB(specOp, branchDiscardControl);
-
+  // Second, discard if speculation happened but it was correct
   // Create a conditional branch driven by SCBranchControl from speculator
   // SCBranchControl discards the commit-like signal when speculation is correct
-  auto branchDiscardControlIfPass =
+  auto branchDiscardCondNonMisspec =
       builder.create<handshake::ConditionalBranchOp>(
-          branchDiscardControl.getLoc(), specOp.getSCBranchCtrl(),
-          branchDiscardControl.getTrueResult());
-  inheritBB(specOp, branchDiscardControlIfPass);
+          branchDiscardCondNonSpec.getLoc(), specOp.getSCBranchCtrl(),
+          branchDiscardCondNonSpec.getTrueResult());
+  inheritBB(specOp, branchDiscardCondNonMisspec);
+
+  // This branch will propagate the signal SCCommitControl according to
+  // the control branch condition, which comes from branchDiscardCondNonMisSpec
+  auto branchReplicated = builder.create<handshake::ConditionalBranchOp>(
+      branchDiscardCondNonMisspec.getLoc(), branchDiscardCondNonMisspec.getTrueResult(),
+      specOp.getSCCommitCtrl());
+  inheritBB(specOp, branchReplicated);
 
   // We create a Merge operation to join SCCSaveCtrl and SCCommitCtrl signals
   SmallVector<Value, 2> mergeOperands;
@@ -306,11 +309,11 @@ LogicalResult HandshakeSpeculationPass::prepareAndPlaceSaveCommits() {
 
   // Check if trueResult of controlBranch leads to a backedge (loop)
   if (isBranchBackedge(controlBranch.getTrueResult())) {
-    mergeOperands.push_back(branchDiscardControlIfPass.getTrueResult());
+    mergeOperands.push_back(branchReplicated.getTrueResult());
   }
   // Check if falseResult of controlBranch leads to a backedge (loop)
   else if (isBranchBackedge(controlBranch.getFalseResult())) {
-    mergeOperands.push_back(branchDiscardControlIfPass.getFalseResult());
+    mergeOperands.push_back(branchReplicated.getFalseResult());
   }
   // If neither trueResult nor falseResult leads to a backedge, handle the error
   else {
@@ -322,7 +325,7 @@ LogicalResult HandshakeSpeculationPass::prepareAndPlaceSaveCommits() {
 
   // All the inputs to the merge operation are ready
   auto mergeOp = builder.create<handshake::MergeOp>(
-      branchDiscardControlIfPass.getLoc(), mergeOperands);
+      branchReplicated.getLoc(), mergeOperands);
   inheritBB(specOp, mergeOp);
 
   // All the control logic is set up, now connect the Save-Commits with
