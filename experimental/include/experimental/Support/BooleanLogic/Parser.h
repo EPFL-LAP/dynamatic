@@ -16,6 +16,7 @@
 
 #include "experimental/Support/BooleanLogic/BoolExpression.h"
 #include "experimental/Support/BooleanLogic/Lexer.h"
+#include <optional>
 #include <stack>
 #include <utility>
 
@@ -30,9 +31,9 @@ struct StackNode {
   std::optional<Token> term;
 
   // Constructors
-  StackNode(Token tt) : term(std::move(tt)){};
+  StackNode(Token tt) : expr(nullptr), term(std::move(tt)){};
 
-  StackNode(BoolExpression *e) : expr(e){};
+  StackNode(BoolExpression *e) : expr(e), term(std::nullopt){};
 
   ~StackNode() {
     if (expr != nullptr)
