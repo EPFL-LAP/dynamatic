@@ -346,28 +346,35 @@ std::optional<Value> findControlInputToBB(Operation *op) {
     return {};
   }
 
-  std::optional<mlir::Value> ctrlSignal = {};
+  // We use the control token, which is an input to the control branch
+  // as the enable signal for the speculator.
+  mlir::Value ctrlSignal;
+  bool isControlBranchFound = false;
   for (auto branchOp : funcOp.getOps<handshake::ConditionalBranchOp>()) {
+    // Check if the branch is in the same BB as the operation
+    // specified as the location for the speculator
     if (auto brBB = getLogicBB(branchOp);
         !brBB || brBB != targetBB)
       continue;
 
+    // Check if the branch targets a control token
     if (branchOp.getDataOperand().getType().isa<handshake::ControlType>()) {
-      if (ctrlSignal.has_value()) {
-        branchOp->emitError("Found many control branches in the same BB");
+      if (isControlBranchFound) {
+        branchOp->emitError("Multiple control branches found in the same BB");
         return {};
       }
       ctrlSignal = branchOp.getDataOperand();
+      isControlBranchFound = true;
     }
   }
 
-  if (!ctrlSignal.has_value()) {
+  if (!isControlBranchFound) {
     funcOp->emitError("Its BB #" + std::to_string(targetBB.value()) +
                       " does not have a control branch.");
     return {};
   }
 
-  return ctrlSignal.value();
+  return ctrlSignal;
 }
 
 LogicalResult HandshakeSpeculationPass::placeSpeculator() {
