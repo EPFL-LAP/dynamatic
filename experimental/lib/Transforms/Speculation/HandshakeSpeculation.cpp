@@ -83,7 +83,10 @@ LogicalResult HandshakeSpeculationPass::placeUnits(Value ctrlSignal) {
     inheritBB(dstOp, newOp);
 
     // Connect the new Operation to dstOp
-    srcOpResult.replaceAllUsesExcept(newOp.getResult(), newOp);
+    // Note: srcOpResult.replaceAllUsesExcept cannot be used here
+    // because the uses of srcOpResult may include a newly created
+    // operand for the speculator enable signal.
+    operand->set(newOp.getResult());
   }
 
   return success();
@@ -334,21 +337,41 @@ std::optional<Value> findControlInputToBB(Operation *op) {
   handshake::FuncOp funcOp = op->getParentOfType<handshake::FuncOp>();
   assert(funcOp && "op should have parent function");
 
-  // Find input arcs to BBs in the IR
-  BBtoArcsMap bbToPredecessorArcs = getBBPredecessorArcs(funcOp);
-  unsigned bb = getLogicBB(op).value();
+  std::optional<unsigned> targetBB = getLogicBB(op);
+  if (!targetBB) {
+    op->emitError("Operation does not have a BB.");
+    return {};
+  }
 
-  // Iterate input arcs to the speculation BB to find the control signal
-  for (const BBArc &arc : bbToPredecessorArcs[bb]) {
-    // Iterate the operands in the edge
-    for (mlir::OpOperand *p : arc.edges) {
-      Value inEdge = p->get();
-      // The control signal should be the only control input to the BB
-      if (inEdge.getType().isa<handshake::ControlType>())
-        return inEdge;
+  // We use the control token, which is an input to the control branch
+  // as the enable signal for the speculator.
+  mlir::Value ctrlSignal;
+  bool isControlBranchFound = false;
+  for (auto branchOp : funcOp.getOps<handshake::ConditionalBranchOp>()) {
+    // Check if the branch is in the same BB as the operation
+    // specified as the location for the speculator
+    if (auto brBB = getLogicBB(branchOp);
+        !brBB || brBB != targetBB)
+      continue;
+
+    // Check if the branch targets a control token
+    if (branchOp.getDataOperand().getType().isa<handshake::ControlType>()) {
+      if (isControlBranchFound) {
+        branchOp->emitError("Multiple control branches found in the same BB");
+        return {};
+      }
+      ctrlSignal = branchOp.getDataOperand();
+      isControlBranchFound = true;
     }
   }
-  return {};
+
+  if (!isControlBranchFound) {
+    funcOp->emitError("Its BB #" + std::to_string(targetBB.value()) +
+                      " does not have a control branch.");
+    return {};
+  }
+
+  return ctrlSignal;
 }
 
 LogicalResult HandshakeSpeculationPass::placeSpeculator() {
