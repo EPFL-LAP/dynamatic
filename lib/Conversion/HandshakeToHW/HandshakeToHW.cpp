@@ -621,6 +621,21 @@ ModuleDiscriminator::ModuleDiscriminator(Operation *op) {
         addType("INPUT_TYPE", op->getOperand(0));
         addType("OUTPUT_TYPE", op->getResult(0));
       })
+      .Case<handshake::SpecCommitOp, handshake::SpecSaveOp>([&](auto) {
+        addType("DATA_TYPE", op->getOperand(0));
+      })
+      .Case<handshake::SpeculatorOp>([&](auto) {
+        addType("DATA_TYPE", op->getOperand(0));
+        addUnsigned("FIFO_DEPTH", 4); // temp
+      })
+      .Case<handshake::SpecSaveCommitOp>([&](auto) {
+        addType("DATA_TYPE", op->getOperand(0));
+        addUnsigned("FIFO_DEPTH", 4); // temp
+      })
+      .Case<handshake::SpeculatingBranchOp>([&](auto) {
+        addType("SPEC_TAG_DATA_TYPE", op->getOperand(0));
+        addType("DATA_TYPE", op->getOperand(1));
+      })
       .Default([&](auto) {
         op->emitError() << "This operation cannot be lowered to RTL "
                            "due to a lack of an RTL implementation for it.";
@@ -1753,7 +1768,13 @@ public:
                     ConvertToHWInstance<handshake::SIToFPOp>,
                     ConvertToHWInstance<handshake::FPToSIOp>,
                     ConvertToHWInstance<handshake::ExtFOp>,
-                    ConvertToHWInstance<handshake::AbsFOp>>(
+                    ConvertToHWInstance<handshake::AbsFOp>,
+                    // Operations for speculation
+                    ConvertToHWInstance<handshake::SpecCommitOp>,
+                    ConvertToHWInstance<handshake::SpecSaveOp>,
+                    ConvertToHWInstance<handshake::SpecSaveCommitOp>,
+                    ConvertToHWInstance<handshake::SpeculatorOp>,
+                    ConvertToHWInstance<handshake::SpeculatingBranchOp>>(
         typeConverter, funcOp->getContext());
 
     // Everything must be converted to operations in the hw dialect

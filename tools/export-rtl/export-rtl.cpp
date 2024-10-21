@@ -215,6 +215,7 @@ public:
 
   /// Suffixes for specfic signal types.
   static constexpr StringLiteral VALID_SUFFIX = StringLiteral("_valid"),
+                                 SPEC_TAG_SUFFIX = StringLiteral("_spec_tag"),
                                  READY_SUFFIX = StringLiteral("_ready");
 
   /// Export information (external modules must have already been concretized).
@@ -299,6 +300,8 @@ static std::string getInternalSignalName(StringRef baseName, SignalType type) {
     return baseName.str() + "_valid";
   case (SignalType::READY):
     return baseName.str() + "_ready";
+  case (SignalType::SPEC_TAG):
+    return baseName.str() + "_spec_tag";
   }
 }
 
@@ -306,6 +309,8 @@ RTLWriter::EntityIO::EntityIO(hw::HWModuleOp modOp) {
   auto addValidAndReady = [&](StringRef portName, std::vector<IOPort> &down,
                               std::vector<IOPort> &up) -> void {
     down.emplace_back(getInternalSignalName(portName, SignalType::VALID),
+                      std::nullopt);
+    down.emplace_back(getInternalSignalName(portName, SignalType::SPEC_TAG),
                       std::nullopt);
     up.emplace_back(getInternalSignalName(portName, SignalType::READY),
                     std::nullopt);
@@ -382,6 +387,8 @@ void RTLWriter::constructIOMappings(
         getInternalSignalName(signal, SignalType::VALID));
     mappings[getTypedSignalName(port, SignalType::READY)].push_back(
         getInternalSignalName(signal, SignalType::READY));
+    mappings[getTypedSignalName(port, SignalType::SPEC_TAG)].push_back(
+        getInternalSignalName(signal, SignalType::SPEC_TAG));
   };
 
   auto addPortType = [&](Type portType, StringRef port, StringRef signal) {
@@ -553,6 +560,8 @@ void VHDLWriter::writeInternalSignals(WriteData &data) const {
        << " : std_logic;\n";
     os << "signal " << getInternalSignalName(name, SignalType::READY)
        << " : std_logic;\n";
+    os << "signal " << getInternalSignalName(name, SignalType::SPEC_TAG)
+       << " : std_logic;\n";
   };
 
   for (auto &valueAndName : make_filter_range(data.signals, isNotBlockArg)) {
@@ -577,6 +586,7 @@ void VHDLWriter::writeSignalAssignments(WriteData &data) const {
   raw_indented_ostream &os = data.os;
   auto addValidReady = [&](StringRef name, StringRef signal) -> void {
     os << name << VALID_SUFFIX << " <= " << signal << VALID_SUFFIX << ";\n";
+    os << name << SPEC_TAG_SUFFIX << " <= " << signal << SPEC_TAG_SUFFIX << ";\n";
     os << signal << READY_SUFFIX << " <= " << name << READY_SUFFIX << ";\n";
   };
 
@@ -624,7 +634,14 @@ void VHDLWriter::writeModuleInstantiations(WriteData &data) const {
 
     raw_indented_ostream &os = data.os;
     // Declare the instance
-    os << instOp.getInstanceName() << " : entity work." << moduleName;
+    std::string moduleNameWithTag;
+    // Temp: very rough way to handle fir and mem_to_bram
+    if (moduleName == "fir" || moduleName == "mem_to_bram") {
+      moduleNameWithTag = moduleName;
+    } else {
+      moduleNameWithTag = moduleName + "_with_tag";
+    }
+    os << instOp.getInstanceName() << " : entity work." << moduleNameWithTag;
     if (hdl == HDL::VHDL)
       os << "(" << archName << ")";
 

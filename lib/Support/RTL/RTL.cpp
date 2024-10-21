@@ -575,6 +575,7 @@ bool RTLComponent::checkValidAndSetDefaults(llvm::json::Path path) {
   setDefaultSignalSuffix(SignalType::DATA, "");
   setDefaultSignalSuffix(SignalType::VALID, "_valid");
   setDefaultSignalSuffix(SignalType::READY, "_ready");
+  setDefaultSignalSuffix(SignalType::SPEC_TAG, "_spec_tag");
 
   // Make sure the IO map makes sense
   return llvm::all_of(ioMap, [&](std::pair<std::string, std::string> &mapping) {

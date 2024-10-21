@@ -351,10 +351,13 @@ string HlsVhdlTb::getSignalDeclaration() {
   code << "\tsignal tb_rst : std_logic := '0';" << endl;
 
   code << "\tsignal tb_start_valid : std_logic := '0';" << endl;
+  // code << "\tsignal tb_start_spec_tag : std_logic := '0';" << endl;
   code << "\tsignal tb_start_ready, tb_started : std_logic;" << endl;
 
   code << "\tsignal tb_end_valid, tb_end_ready : std_logic;" << endl;
+  code << "\tsignal tb_end_spec_tag : std_logic;" << endl;
   code << "\tsignal tb_out0_valid, tb_out0_ready : std_logic;" << endl;
+  code << "\tsignal tb_out0_spec_tag : std_logic;" << endl;
   code << "\tsignal tb_global_valid, tb_global_ready, tb_stop : std_logic;"
        << endl;
 
@@ -387,9 +390,13 @@ string HlsVhdlTb::getSignalDeclaration() {
 
       code << "\tsignal " << m.memStartSignalName << "_valid : std_logic;"
            << endl;
+      // code << "\tsignal " << m.memStartSignalName << "_spec_tag : std_logic := '0';"
+      //      << endl;
       code << "\tsignal " << m.memStartSignalName << "_ready : std_logic;"
            << endl;
       code << "\tsignal " << m.memEndSignalName << "_valid : std_logic;"
+           << endl;
+      code << "\tsignal " << m.memEndSignalName << "_spec_tag : std_logic;"
            << endl;
       code << "\tsignal " << m.memEndSignalName << "_ready : std_logic;" << endl
            << endl;
@@ -405,6 +412,8 @@ string HlsVhdlTb::getSignalDeclaration() {
         code << "\tsignal " << m.dIn0SignalName << " : std_logic_vector("
              << m.dataWidthParamValue << " - 1 downto 0);" << endl;
         code << "\tsignal " << m.dOut0SignalName << "_valid : std_logic;"
+             << endl;
+        code << "\tsignal " << m.dOut0SignalName << "_spec_tag : std_logic;"
              << endl;
         code << "\tsignal " << m.dOut0SignalName << "_ready : std_logic;"
              << endl
@@ -687,12 +696,15 @@ string HlsVhdlTb::getDuvInstanceGeneration() {
 
       // Memory start signal
       duvPortMap.emplace_back(p.parameterName + "_start_valid", "'1'");
+      duvPortMap.emplace_back(p.parameterName + "_start_spec_tag", "'0'");
       duvPortMap.emplace_back(p.parameterName + "_start_ready",
                               m.memStartSignalName + "_ready");
 
       // Memory completion signal
       duvPortMap.emplace_back(p.parameterName + "_end_valid",
                               m.memEndSignalName + "_valid");
+      duvPortMap.emplace_back(p.parameterName + "_end_spec_tag",
+                              m.memEndSignalName + "_spec_tag"); // output signal
       duvPortMap.emplace_back(p.parameterName + "_end_ready",
                               m.memEndSignalName + "_ready");
 
@@ -701,6 +713,7 @@ string HlsVhdlTb::getDuvInstanceGeneration() {
         duvPortMap.emplace_back(p.parameterName, m.dOut0SignalName);
         duvPortMap.emplace_back(p.parameterName + "_valid",
                                 m.dOut0SignalName + "_valid");
+        duvPortMap.emplace_back(p.parameterName + "_spec_tag", "'0'");
         duvPortMap.emplace_back(p.parameterName + "_ready",
                                 m.dOut0SignalName + "_ready");
       }
@@ -709,6 +722,7 @@ string HlsVhdlTb::getDuvInstanceGeneration() {
         if (p.isReturn) {
           duvPortMap.emplace_back(p.parameterName, m.dIn0SignalName);
           duvPortMap.emplace_back(p.parameterName + "_valid", "tb_out0_valid");
+          duvPortMap.emplace_back(p.parameterName + "_spec_tag", "tb_out0_spec_tag");
           duvPortMap.emplace_back(p.parameterName + "_ready", "tb_out0_ready");
         } else {
           duvPortMap.emplace_back(getValidOutPortNameForCParam(p.parameterName),
@@ -717,6 +731,7 @@ string HlsVhdlTb::getDuvInstanceGeneration() {
               getDataOutSaPortNameForCParam(p.parameterName), m.dIn0SignalName);
           duvPortMap.emplace_back(getReadyInPortNameForCParam(p.parameterName),
                                   "'1'");
+          // todo: add spec tag
         }
       }
     }
@@ -724,8 +739,10 @@ string HlsVhdlTb::getDuvInstanceGeneration() {
 
   // Start and end signal
   duvPortMap.emplace_back("start_valid", "tb_start_valid");
+  duvPortMap.emplace_back("start_spec_tag", "'0'");
   duvPortMap.emplace_back("start_ready", "tb_start_ready");
   duvPortMap.emplace_back("end_valid", "tb_end_valid");
+  duvPortMap.emplace_back("end_spec_tag", "tb_end_spec_tag");
   duvPortMap.emplace_back("end_ready", "tb_end_ready");
 
   stringstream code;

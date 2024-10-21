@@ -115,3 +115,49 @@ begin
       outs       => oehb_dataOut
     );
 end architecture;
+
+library ieee;
+use ieee.std_logic_1164.all;
+use ieee.numeric_std.all;
+
+entity muli_with_tag is
+  generic (
+    DATA_TYPE : integer
+  );
+  port (
+    -- inputs
+    clk, rst     : in std_logic;
+    lhs          : in std_logic_vector(DATA_TYPE - 1 downto 0);
+    lhs_valid    : in std_logic;
+    lhs_spec_tag : in std_logic;
+    rhs          : in std_logic_vector(DATA_TYPE - 1 downto 0);
+    rhs_valid    : in std_logic;
+    rhs_spec_tag : in std_logic;
+    result_ready : in std_logic;
+    -- outputs
+    result       : out std_logic_vector(DATA_TYPE - 1 downto 0);
+    result_valid : out std_logic;
+    result_spec_tag : out std_logic;
+    lhs_ready    : out std_logic;
+    rhs_ready    : out std_logic
+  );
+end entity;
+
+architecture arch of muli_with_tag is
+begin
+  result_spec_tag <= lhs_spec_tag or rhs_spec_tag;
+  muli_inner : entity work.muli(arch) generic map(DATA_TYPE)
+    port map(
+      clk          => clk,
+      rst          => rst,
+      lhs          => lhs,
+      lhs_valid    => lhs_valid,
+      rhs          => rhs,
+      rhs_valid    => rhs_valid,
+      result_ready => result_ready,
+      result       => result,
+      result_valid => result_valid,
+      lhs_ready    => lhs_ready,
+      rhs_ready    => rhs_ready
+    );
+end architecture;

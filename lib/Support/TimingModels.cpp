@@ -136,6 +136,8 @@ LogicalResult TimingDatabase::getInternalDelay(Operation *op, SignalType type,
   switch (type) {
   case SignalType::DATA:
     return model->dataDelay.getCeilMetric(op, delay);
+  case SignalType::SPEC_TAG:
+    return model->dataDelay.getCeilMetric(op, delay); // todo
   case SignalType::VALID:
     delay = model->validDelay;
     return success();
@@ -158,6 +160,8 @@ LogicalResult TimingDatabase::getPortDelay(Operation *op, SignalType signalType,
   switch (signalType) {
   case SignalType::DATA:
     return portModel.dataDelay.getCeilMetric(op, delay);
+  case SignalType::SPEC_TAG:
+    return portModel.dataDelay.getCeilMetric(op, delay); // todo
   case SignalType::VALID:
     delay = portModel.validDelay;
     return success();
@@ -175,6 +179,8 @@ LogicalResult TimingDatabase::getTotalDelay(Operation *op, SignalType type,
   switch (type) {
   case SignalType::DATA:
     return model->getTotalDataDelay(getOpDatawidth(op), delay);
+  case SignalType::SPEC_TAG:
+    return model->getTotalDataDelay(getOpDatawidth(op), delay); // todo
   case SignalType::VALID:
     delay = model->getTotalValidDelay();
     return success();
