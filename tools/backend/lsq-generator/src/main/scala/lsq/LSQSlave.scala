@@ -22,7 +22,7 @@ class LSQSlave(lsqConfig: LsqConfigs) extends Module {
 
   val io = IO(new Bundle {
     val ldAddrToMC = Decoupled(UInt(lsqConfig.addrWidth.W))
-    val ldDataFromMC = Flipped(Decoupled(UInt(lsqConfig.addrWidth.W)))
+    val ldDataFromMC = Flipped(Decoupled(UInt(lsqConfig.dataWidth.W)))
     val stAddrToMC = Decoupled(UInt(lsqConfig.addrWidth.W))
     val stDataToMC = Decoupled(UInt(lsqConfig.dataWidth.W))
 

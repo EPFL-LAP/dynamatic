@@ -170,14 +170,14 @@ handshake.func @simpleLoop(%start: !handshake.control<>) -> !handshake.channel<i
 // CHECK:           %[[VAL_6:.*]] = constant %[[VAL_1]] {value = 1 : i2} : <i2>
 // CHECK:           %[[VAL_7:.*]] = extsi %[[VAL_6]] : <i2> to <i6>
 // CHECK:           %[[VAL_8:.*]], %[[VAL_9:.*]] = control_merge %[[VAL_0]], %[[VAL_10:.*]]  : <>, <i1>
-// CHECK:           %[[VAL_11:.*]] = mux %[[VAL_9]] {{\[}}%[[VAL_4]], %[[VAL_12:.*]]] : <i1>, <i5>
-// CHECK:           %[[VAL_13:.*]] = extsi %[[VAL_11]] : <i5> to <i6>
-// CHECK:           %[[VAL_14:.*]] = mux %[[VAL_9]] {{\[}}%[[VAL_5]], %[[VAL_15:.*]]] : <i1>, <i32>
-// CHECK:           %[[VAL_16:.*]] = addi %[[VAL_13]], %[[VAL_7]] : <i6>
+// CHECK:           %[[VAL_11:.*]] = mux %[[VAL_9]] {{\[}}%[[VAL_5]], %[[VAL_12:.*]]] : <i1>, <i32>
+// CHECK:           %[[VAL_13:.*]] = mux %[[VAL_9]] {{\[}}%[[VAL_4]], %[[VAL_14:.*]]] : <i1>, <i5>
+// CHECK:           %[[VAL_15:.*]] = extsi %[[VAL_13]] : <i5> to <i6>
+// CHECK:           %[[VAL_16:.*]] = addi %[[VAL_15]], %[[VAL_7]] : <i6>
 // CHECK:           %[[VAL_17:.*]] = trunci %[[VAL_16]] : <i6> to <i5>
 // CHECK:           %[[VAL_18:.*]] = cmpi ult, %[[VAL_16]], %[[VAL_2]] : <i6>
-// CHECK:           %[[VAL_12]], %[[VAL_19:.*]] = cond_br %[[VAL_18]], %[[VAL_17]] : <i1>, <i5>
-// CHECK:           %[[VAL_20:.*]], %[[VAL_21:.*]] = cond_br %[[VAL_18]], %[[VAL_14]] : <i1>, <i32>
+// CHECK:           %[[VAL_14]], %[[VAL_19:.*]] = cond_br %[[VAL_18]], %[[VAL_17]] : <i1>, <i5>
+// CHECK:           %[[VAL_20:.*]], %[[VAL_21:.*]] = cond_br %[[VAL_18]], %[[VAL_11]] : <i1>, <i32>
 // CHECK:           %[[VAL_22:.*]], %[[VAL_23:.*]] = cond_br %[[VAL_18]], %[[VAL_8]] : <i1>, <>
 // CHECK:           %[[VAL_24:.*]] = source
 // CHECK:           %[[VAL_25:.*]] = constant %[[VAL_24]] {value = 32 : i7} : <i7>
@@ -186,14 +186,14 @@ handshake.func @simpleLoop(%start: !handshake.control<>) -> !handshake.channel<i
 // CHECK:           %[[VAL_28:.*]] = constant %[[VAL_24]] {value = 1 : i2} : <i2>
 // CHECK:           %[[VAL_29:.*]] = extsi %[[VAL_28]] : <i2> to <i7>
 // CHECK:           %[[VAL_30:.*]], %[[VAL_31:.*]] = control_merge %[[VAL_22]], %[[VAL_32:.*]]  : <>, <i1>
-// CHECK:           %[[VAL_33:.*]] = mux %[[VAL_31]] {{\[}}%[[VAL_27]], %[[VAL_34:.*]]] : <i1>, <i6>
-// CHECK:           %[[VAL_35:.*]] = extsi %[[VAL_33]] : <i6> to <i7>
-// CHECK:           %[[VAL_36:.*]] = mux %[[VAL_31]] {{\[}}%[[VAL_20]], %[[VAL_37:.*]]] : <i1>, <i32>
-// CHECK:           %[[VAL_38:.*]] = addi %[[VAL_35]], %[[VAL_29]] : <i7>
+// CHECK:           %[[VAL_33:.*]] = mux %[[VAL_31]] {{\[}}%[[VAL_20]], %[[VAL_34:.*]]] : <i1>, <i32>
+// CHECK:           %[[VAL_35:.*]] = mux %[[VAL_31]] {{\[}}%[[VAL_27]], %[[VAL_36:.*]]] : <i1>, <i6>
+// CHECK:           %[[VAL_37:.*]] = extsi %[[VAL_35]] : <i6> to <i7>
+// CHECK:           %[[VAL_38:.*]] = addi %[[VAL_37]], %[[VAL_29]] : <i7>
 // CHECK:           %[[VAL_39:.*]] = trunci %[[VAL_38]] : <i7> to <i6>
 // CHECK:           %[[VAL_40:.*]] = cmpi ult, %[[VAL_38]], %[[VAL_25]] : <i7>
-// CHECK:           %[[VAL_34]], %[[VAL_41:.*]] = cond_br %[[VAL_40]], %[[VAL_39]] : <i1>, <i6>
-// CHECK:           %[[VAL_42:.*]], %[[VAL_15]] = cond_br %[[VAL_40]], %[[VAL_36]] : <i1>, <i32>
+// CHECK:           %[[VAL_36]], %[[VAL_41:.*]] = cond_br %[[VAL_40]], %[[VAL_39]] : <i1>, <i6>
+// CHECK:           %[[VAL_42:.*]], %[[VAL_12]] = cond_br %[[VAL_40]], %[[VAL_33]] : <i1>, <i32>
 // CHECK:           %[[VAL_43:.*]], %[[VAL_10]] = cond_br %[[VAL_40]], %[[VAL_30]] : <i1>, <>
 // CHECK:           %[[VAL_44:.*]] = source
 // CHECK:           %[[VAL_45:.*]] = constant %[[VAL_44]] {value = 10 : i5} : <i5>
@@ -201,11 +201,12 @@ handshake.func @simpleLoop(%start: !handshake.control<>) -> !handshake.channel<i
 // CHECK:           %[[VAL_47:.*]], %[[VAL_48:.*]] = control_merge %[[VAL_43]]  : <>, <i1>
 // CHECK:           %[[VAL_49:.*]] = merge %[[VAL_42]] : <i32>
 // CHECK:           %[[VAL_50:.*]] = addi %[[VAL_49]], %[[VAL_46]] : <i32>
-// CHECK:           %[[VAL_37]] = br %[[VAL_50]] : <i32>
+// CHECK:           %[[VAL_34]] = br %[[VAL_50]] : <i32>
 // CHECK:           %[[VAL_32]] = br %[[VAL_47]] : <>
 // CHECK:           %[[VAL_51:.*]] = merge %[[VAL_21]] : <i32>
 // CHECK:           end %[[VAL_51]] : <i32>
 // CHECK:         }
+
 handshake.func @nestedLoop(%start: !handshake.control<>) -> !handshake.channel<i32> {
 // ^^entry outer loop:
   %sourceOut = source {handshake.bb = 0 : ui32}
