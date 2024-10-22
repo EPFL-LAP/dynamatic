@@ -1,4 +1,4 @@
-//===- Shannon.h - Shannon Decomposition for Boolean Expressions -*- C++ -*-==//
+//===- Shannon.h - Shannon Decomposition for Bool Expressions --*-- C++ -*-===//
 //
 // Dynamatic is under the Apache License v2.0 with LLVM Exceptions.
 // See https://llvm.org/LICENSE.txt for license information.
@@ -26,14 +26,13 @@ namespace boolean {
 /// Forward declaration of the Multiplexer struct.
 struct Multiplexer;
 
-/// Represents either a boolean expression or a Multiplexer. A multiplixer can
-/// have either another multiplexer or a boolean expression as input.
+/// Represents either a boolean expression or a Multiplexer.
 struct MultiplexerIn {
   Multiplexer *mux;
   std::optional<BoolExpression *> boolexpression;
 
   /// Constructor for initializing with a Multiplexer.
-  MultiplexerIn(Multiplexer *m) : mux(m), boolexpression(nullptr) {}
+  MultiplexerIn(Multiplexer *m) : mux(m) {}
 
   /// Constructor for initializing with a boolean expression.
   MultiplexerIn(BoolExpression *b) : mux(nullptr), boolexpression(b) {}
@@ -42,13 +41,13 @@ struct MultiplexerIn {
   void print();
 };
 
-/// Represents a multiplexer for boolean logic expressions
+/// Represents a multiplexer for boolean logic expressions.
 struct Multiplexer {
-  /// Input 0 for the Multiplexer.
+  // Input 0 for the Multiplexer.
   MultiplexerIn *in0;
-  /// Input 1 for the Multiplexer.
+  // Input 1 for the Multiplexer.
   MultiplexerIn *in1;
-  /// Condition for selecting the input.
+  // Condition for selecting the input.
   MultiplexerIn *cond;
 
   /// Constructor for initializing the Multiplexer with inputs and condition.
@@ -60,8 +59,23 @@ struct Multiplexer {
   void print();
 };
 
+/// Replaces a variable with a specified value in a boolean expression.
+void replaceVarWithValue(BoolExpression *exp, const std::string &var,
+                         ExpressionType t);
+
+/// Performs Shannon expansion for the positive cofactor of a boolean
+/// expression.
+BoolExpression *shannonExpansionPositive(BoolExpression *exp,
+                                         const std::string &var);
+
+/// Performs Shannon expansion for the negative cofactor of a boolean
+/// expression.
+BoolExpression *shannonExpansionNegative(BoolExpression *exp,
+                                         const std::string &var);
+
 /// Applies Shannon decomposition on a boolean expression based on a list of
-/// cofactors. Returns a dynamically-allocated variable
+/// cofactors.
+/// Returns a dynamically-allocated variable
 MultiplexerIn *applyShannon(BoolExpression *exp,
                             const std::vector<std::string> &cofactorList);
 
