@@ -5,14 +5,14 @@ from random import shuffle
 
 INTEGRATION_FOLDER = "./integration-test/"
 SCRIPT_CONTENT = """set-src integration-test/if_loop_3/if_loop_3.c
-compile --simple-buffers
+compile --buffer-algorithm on-merges 
 write-hdl
 simulate
 exit
 """
 FTD_DYN_FILE = "./build/ftd_run.dyn"
 DYN_FILE = "./build/original_run.dyn"
-FTD_COMPILE_COMMAND = "compile --fast-token-delivery --simple-buffers"
+FTD_COMPILE_COMMAND = "compile --fast-token-delivery --buffer-algorithm on-merges"
 SET_SRC_COMMAND = "set-src "
 DYNAMATIC_COMMAND = "./bin/dynamatic --run "
 TESTS_FAIL_FILE = "./tests_to_skip.txt"
@@ -53,7 +53,7 @@ def get_string_result(total, original, ftd):
     return f"({total}, {original}, {ftd})"
 
 
-def run_command_with_timeout(command, timeout=100):
+def run_command_with_timeout(command, timeout=200):
     try:
         proc = subprocess.run(
             command,

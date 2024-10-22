@@ -59,3 +59,12 @@
 ./integration-test/memory/test_memory_17/test_memory_17.c
 ./integration-test/memory/test_memory_11/test_memory_11.c
 ./integration-test/video_filter/video_filter.c
+./integration-test/lu/lu.c
+./integration-test/mvt_float/mvt_float.c
+./integration-test/kernel_3mm/kernel_3mm.c
+./integration-test/gemver/gemver.c
+./integration-test/kernel_2mm_float/kernel_2mm_float.c
+./integration-test/syr2k_float/syr2k_float.c
+./integration-test/matrix/matrix.c
+./integration-test/gemm_float/gemm_float.c
+./integration-test/gemm/gemm.c
