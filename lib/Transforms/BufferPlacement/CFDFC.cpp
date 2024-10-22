@@ -238,18 +238,32 @@ CFDFC::CFDFC(handshake::FuncOp funcOp, ArchSet &archs, unsigned numExec)
 }
 
 bool CFDFC::isCFDFCBackedge(Value val) {
-  // A CFDFC backedge is a backedge
-  if (!isBackedge(val))
-    return false;
-
   Operation *defOp = val.getDefiningOp();
   std::optional<unsigned> srcBB = getLogicBB(defOp);
   std::optional<unsigned> dstBB = getLogicBB(*val.getUsers().begin());
 
   // If the edge is between operations in the same block, the source operation
-  // must be a conditional branch
-  if (srcBB.has_value() && dstBB.has_value() && *srcBB == *dstBB)
-    return isa<handshake::ConditionalBranchOp>(defOp);
+  // must be a conditional branch Or the destination operation is a Merge (for
+  // the INIT case)
+  if (srcBB.has_value() && dstBB.has_value() && *srcBB == *dstBB) {
+    // Aya: if one of the users is a Merge, then it should be also considered as
+    // a bwd edge
+    auto valUsers = val.getUsers();
+    bool isMergeUser = false;
+    for (auto user : valUsers) {
+      if (isa_and_nonnull<handshake::MergeOp>(user) ||
+          isa_and_nonnull<handshake::MuxOp>(user)) {
+        isMergeUser = true;
+        break;
+      }
+    }
+    return (isa<handshake::ConditionalBranchOp>(defOp) || isMergeUser);
+  }
+
+  // A CFDFC backedge is a backedge: Mainly governed by comparing the block ids,
+  // where a back edge is seen as coming from a later BB to an earlier one
+  if (!isBackedge(val))
+    return false;
 
   // Otherwise the edge must be between different blocks, where the destination
   // can be out of all blocks
