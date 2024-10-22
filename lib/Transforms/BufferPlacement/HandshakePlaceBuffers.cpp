@@ -23,6 +23,7 @@
 #include "dynamatic/Transforms/BufferPlacement/CFDFC.h"
 #include "dynamatic/Transforms/BufferPlacement/FPGA20Buffers.h"
 #include "dynamatic/Transforms/BufferPlacement/FPL22Buffers.h"
+#include "dynamatic/Transforms/BufferPlacement/CostAwareBuffers.h"
 #include "dynamatic/Transforms/HandshakeMaterialize.h"
 #include "experimental/Support/StdProfiler.h"
 #include "mlir/IR/OperationSupport.h"
@@ -42,7 +43,7 @@ static constexpr llvm::StringLiteral ON_MERGES("on-merges");
 #ifndef DYNAMATIC_GUROBI_NOT_INSTALLED
 /// Algorithms that do require solving an MILP.
 static constexpr llvm::StringLiteral FPGA20("fpga20"),
-    FPGA20_LEGACY("fpga20-legacy"), FPL22("fpl22");
+    FPGA20_LEGACY("fpga20-legacy"), FPL22("fpl22"), CostAware("costaware");
 #endif // DYNAMATIC_GUROBI_NOT_INSTALLED
 
 namespace {
@@ -121,6 +122,7 @@ void HandshakePlaceBuffersPass::runDynamaticPass() {
   allAlgorithms[FPGA20] = &HandshakePlaceBuffersPass::placeUsingMILP;
   allAlgorithms[FPGA20_LEGACY] = &HandshakePlaceBuffersPass::placeUsingMILP;
   allAlgorithms[FPL22] = &HandshakePlaceBuffersPass::placeUsingMILP;
+  allAlgorithms[CostAware] = &HandshakePlaceBuffersPass::placeUsingMILP;
 #endif // DYNAMATIC_GUROBI_NOT_INSTALLED
 
   // Check that the algorithm exists
@@ -470,6 +472,13 @@ LogicalResult HandshakePlaceBuffersPass::getBufferPlacement(
         logger, "out_of_cycle", placement, env, info, timingDB, targetCP);
   }
 
+  if (algorithm == CostAware) {
+    // Create and solve the MILP
+    return checkLoggerAndSolve<costaware::CostAwareBuffers>(
+        logger, "placement", placement, env, info, timingDB, targetCP,
+        algorithm != CostAware);
+  }
+
   llvm_unreachable("unknown algorithm");
 }
 #endif // DYNAMATIC_GUROBI_NOT_INSTALLED
@@ -554,11 +563,11 @@ void HandshakePlaceBuffersPass::instantiateBuffers(BufferPlacement &placement) {
     };
 
     if (placeRes.opaqueBeforeTrans) {
-      placeBuffer(TimingInfo::oehb(), placeRes.numOpaque);
-      placeBuffer(TimingInfo::tehb(), placeRes.numTrans);
+      placeBuffer(TimingInfo::oehb(), placeRes.numOBChain);
+      placeBuffer(TimingInfo::tehb(), placeRes.numTBchain);
     } else {
-      placeBuffer(TimingInfo::tehb(), placeRes.numTrans);
-      placeBuffer(TimingInfo::oehb(), placeRes.numOpaque);
+      placeBuffer(TimingInfo::tehb(), placeRes.numTBChain);
+      placeBuffer(TimingInfo::oehb(), placeRes.numOBChain);
     }
   }
 }

@@ -53,34 +53,41 @@ void FPL22BuffersBase::extractResult(BufferPlacement &placement) {
       if (props.maxTrans) {
         // We must place enough opaque slots as to not exceed the maximum number
         // of transparent slots
-        result.numOpaque =
+        result.numOBChain =
             std::max(props.minOpaque, numSlotsToPlace - *props.maxTrans);
       } else {
         // At least one slot, but no more than necessary
-        result.numOpaque = std::max(props.minOpaque, 1U);
+        result.numOBChain = std::max(props.minOpaque, 1U);
       }
       // All remaining slots are transparent
-      result.numTrans = numSlotsToPlace - result.numOpaque;
+      result.numTBChain = numSlotsToPlace - result.numOBChain;
     } else if (placeOpaque) {
       // Place the minimum number of transparent slots; at least the expected
       // minimum and enough to satisfy all our opaque/transparent requirements
       if (props.maxOpaque) {
-        result.numTrans =
+        result.numTBChain =
             std::max(props.minTrans, numSlotsToPlace - *props.maxOpaque);
       } else {
-        result.numTrans = props.minTrans;
+        result.numTBChain = props.minTrans;
       }
       // All remaining slots are opaque
-      result.numOpaque = numSlotsToPlace - result.numTrans;
+      result.numOBChain = numSlotsToPlace - result.numTBChain;
     } else {
       // placeOpaque == 0 --> props.minOpaque == 0 so all slots can be
       // transparent
-      result.numTrans = numSlotsToPlace;
+      result.numTBChain = numSlotsToPlace;
     }
 
     result.deductInternalBuffers(Channel(channel), timingDB);
     placement[channel] = result;
   }
+
+  if (result.numOBChain > 1) {
+    result.numDVFIFO = result.numOBChain;
+    result.numOBChain = 0;
+  }
+
+  // TODO: numTrans from TB chain to fulltran + TB
 
   if (logger)
     logResults(placement);

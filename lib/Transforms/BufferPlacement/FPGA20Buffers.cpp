@@ -55,6 +55,7 @@ void FPGA20Buffers::extractResult(BufferPlacement &placement) {
     if (numSlotsToPlace == 0)
       continue;
 
+    // TODO: placeOpaque == 1 means cut D, V, R. placeOpaque == 0 means cut nothing.
     bool placeOpaque = channelVars.signalVars[SignalType::DATA].bufPresent.get(
                            GRB_DoubleAttr_X) > 0;
 
@@ -64,27 +65,38 @@ void FPGA20Buffers::extractResult(BufferPlacement &placement) {
     if (placeOpaque) {
       if (legacyPlacement) {
         // Satisfy the transparent slots requirement, all other slots are opaque
-        result.numTrans = props.minTrans;
-        result.numOpaque = numSlotsToPlace - props.minTrans;
+        result.numTranFIFO = props.minTrans;
+        result.numOBChain = numSlotsToPlace - props.minTrans;
       } else {
         // We want as many slots as possible to be transparent and at least one
         // opaque slot, while satisfying all buffering constraints
         unsigned actualMinOpaque = std::max(1U, props.minOpaque);
         if (props.maxTrans.has_value() &&
             (props.maxTrans.value() < numSlotsToPlace - actualMinOpaque)) {
-          result.numTrans = props.maxTrans.value();
-          result.numOpaque = numSlotsToPlace - result.numTrans;
+          result.numTranFIFO = props.maxTrans.value();
+          result.numOBChain = numSlotsToPlace - result.numTranFIFO;
         } else {
-          result.numOpaque = actualMinOpaque;
-          result.numTrans = numSlotsToPlace - result.numOpaque;
+          result.numOBChain = actualMinOpaque;
+          result.numTranFIFO = numSlotsToPlace - result.numOBChain;
         }
       }
     } else {
       // All slots should be transparent
-      result.numTrans = numSlotsToPlace;
+      result.numTranFIFO = numSlotsToPlace;
     }
 
     result.deductInternalBuffers(Channel(channel), timingDB);
+
+    // TODO: Can change OB to DVR;
+    if (result.numOBChain == 2){
+      result.numOBChain = 1;
+      result.numTBChain = 1;
+    } else if (result.numOBChain > 2){
+      result.numDVFIFO = result.numOBChain - 1;
+      result.numTBChain = 1;
+      result.numOBChain = 0;
+    }
+
     placement[channel] = result;
   }
 
