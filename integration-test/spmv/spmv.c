@@ -14,8 +14,8 @@ int spmv(in_int_t n, inout_int_t row[10], inout_int_t col[10],
          inout_int_t val[10], inout_int_t vec[10], inout_int_t out[10]) {
   int s = 0;
   int e = 0;
-  int tmp, cid;
-  for (int i = 0; i < n; i++) {
+  int tmp, cid, i;
+  for (i = 0; i < n - 1; i++) {
     tmp = 0;
     s = row[i];
     e = row[i + 1];
