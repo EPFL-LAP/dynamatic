@@ -374,7 +374,9 @@ struct CreditBasedSharingPass
     for (Operation &op : funcOp.getOps()) {
       // This is a list of sharable operations. To support more operation types,
       // simply add in the end of the list.
-      if (isa<handshake::MulFOp, handshake::AddFOp, handshake::SubFOp>(op)) {
+      if (isa<handshake::MulFOp, handshake::AddFOp, handshake::SubFOp,
+              handshake::MulIOp, handshake::DivUIOp, handshake::DivSIOp,
+              handshake::DivFOp>(op)) {
         assert(op.getNumOperands() > 1 && op.getNumResults() == 1 &&
                "Invalid sharing target is being added to the list of sharing "
                "targets! Currently operations with 1 input or more than 1 "
