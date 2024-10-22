@@ -18,7 +18,10 @@
 #include "dynamatic/Dialect/Handshake/HandshakeCanonicalize.h"
 #include "dynamatic/Dialect/Handshake/HandshakeOps.h"
 #include "dynamatic/Support/CFG.h"
+#include "mlir/Support/LogicalResult.h"
 #include "mlir/Transforms/GreedyPatternRewriteDriver.h"
+#include "llvm/Support/Casting.h"
+#include <iterator>
 
 using namespace mlir;
 using namespace dynamatic;
@@ -149,6 +152,176 @@ struct DowngradeIndexlessControlMerge
     return success();
   }
 };
+
+// // Rules E
+// /// Remove Conditional Branches that have no successors
+// // Added an extra check here because this pass comes after materialization so
+// // some sinks are inserted
+// struct RemoveDoubleSinkBranches
+//     : public OpRewritePattern<handshake::ConditionalBranchOp> {
+//   using OpRewritePattern<handshake::ConditionalBranchOp>::OpRewritePattern;
+
+//   LogicalResult matchAndRewrite(handshake::ConditionalBranchOp condBranchOp,
+//                                 PatternRewriter &rewriter) const override {
+//     Value branchTrueResult = condBranchOp.getTrueResult();
+//     Value branchFalseResult = condBranchOp.getFalseResult();
+
+//     // Pattern match fails if the Branch has a true or false successor that
+//     is
+//     // not a sink OR if it has no successors at all
+//     if (!branchTrueResult.getUsers().empty() &&
+//         !isa_and_nonnull<handshake::SinkOp>(
+//             condBranchOp.getTrueResult().getUsers().begin()))
+//       return failure();
+
+//     if (!branchFalseResult.getUsers().empty() &&
+//         !isa_and_nonnull<handshake::SinkOp>(
+//             condBranchOp.getFalseResult().getUsers().begin()))
+//       return failure();
+
+//     rewriter.eraseOp(condBranchOp);
+//     // llvm::errs() << "\t***Rules E: remove-double-sink-branch!***\n";
+
+//     return success();
+//   }
+// };
+
+// /// Erases forks with a single result unless their operand originates from a
+// /// lazy fork, in which case they may exist to prevent a combinational cycle.
+// struct EraseSingleOutputForks : OpRewritePattern<handshake::ForkOp> {
+//   using mlir::OpRewritePattern<handshake::ForkOp>::OpRewritePattern;
+
+//   LogicalResult matchAndRewrite(handshake::ForkOp forkOp,
+//                                 PatternRewriter &rewriter) const override {
+//     // The fork must have a single result
+//     if (forkOp.getSize() != 1)
+//       return failure();
+
+//     // The defining operation must not be a lazy fork, otherwise the fork may
+//     be
+//     // here to avoid a combination cycle between the valid and ready wires
+//     if (forkOp.getOperand().getDefiningOp<handshake::LazyForkOp>())
+//       return failure();
+
+//     // Bypass the fork and succeed
+//     rewriter.replaceOp(forkOp, forkOp.getOperand());
+//     return success();
+//   }
+// };
+
+// Incomplete because of the complexity of doing it after the materialization...
+// Ideally, we should do this in a separate pass from the term rewriting but
+// before the materialization
+// /// For any Fork having ALL of its outputs feeding the data inputs of
+// Suppresses
+// /// that (as an extra check) have the same exact condition or the same but
+// with
+// /// a NOT input, insert a Fork at the output of one of those Branches and let
+// it
+// /// feed all other outputs and rely on two additional patterns to delete the
+// /// original fork and the old supps, respectively
+// // Deal with the complexity of deciding if the output should go on the false
+// or
+// // the true side!!
+// struct CombineBranches : public OpRewritePattern<handshake::ForkOp> {
+//   using OpRewritePattern<handshake::ForkOp>::OpRewritePattern;
+
+//   LogicalResult matchAndRewrite(handshake::ForkOp forkOp,
+//                                 PatternRewriter &rewriter) const override {
+//     // Pattern match fails if any of the users of the fork is not a Branch
+//     DenseSet<handshake::ConditionalBranchOp> branches;
+//     for (auto forkUser : forkOp->getResults().getUsers()) {
+//       if (!isa_and_nonnull<handshake::ConditionalBranchOp>(forkUser))
+//         return failure();
+//       branches.insert(cast<handshake::ConditionalBranchOp>(forkUser));
+//     }
+
+//     // Pattern match fails if the fork is feeding a Branch condition (not
+//     data) for (auto branch : branches) {
+//       if (forkOp == branch.getConditionOperand().getDefiningOp())
+//         return failure();
+//     }
+
+//     // All Branches must be supps, since we are after materialization, we
+//     need
+//     // to check for Sinks
+//     for (auto branch : branches) {
+//       assert(std::distance(branch.getTrueResult().getUsers().begin(),
+//                            branch.getTrueResult().getUsers().end()) == 1);
+//       assert(std::distance(branch.getFalseResult().getUsers().begin(),
+//                            branch.getFalseResult().getUsers().end()) == 1);
+
+//       if (!isa_and_nonnull<handshake::SinkOp>(
+//               branch.getTrueResult().getUsers().begin()) ||
+//           isa_and_nonnull<handshake::SinkOp>(
+//               branch.getFalseResult().getUsers().begin()))
+//         // if (!branch.getTrueResult().getUsers().empty() ||
+//         //     branch.getFalseResult().getUsers().empty())
+//         return failure();
+//     }
+
+//     // All Branches must have the same original condition
+//     // Search for a Branch that does not have a NOT at its condition input
+//     Value branchCondition;
+//     bool foundBranchWithNoInvertedCond = false;
+//     handshake::ConditionalBranchOp brToAccumTo;
+//     for (auto branch : branches) {
+//       if (!isa_and_nonnull<handshake::NotOp>(
+//               branch.getConditionOperand().getDefiningOp()) &&
+//           !isa_and_nonnull<handshake::ForkOp>(
+//               branch.getConditionOperand().getDefiningOp())) {
+//         branchCondition = branch.getConditionOperand();
+//         foundBranchWithNoInvertedCond = true;
+//         brToAccumTo = branch;
+//         break;
+//       }
+//     }
+//     assert(foundBranchWithNoInvertedCond);
+
+//     for (auto branch : branches) {
+//       Value correctConditionToCheck;
+//       if ((!isa_and_nonnull<handshake::NotOp>(
+//                branch.getConditionOperand().getDefiningOp()) &&
+//            !isa_and_nonnull<handshake::ForkOp>(
+//                branch.getConditionOperand().getDefiningOp())))
+//         correctConditionToCheck = branch.getConditionOperand();
+//       else
+//         correctConditionToCheck =
+//             branch.getConditionOperand().getDefiningOp()->getOperand(0);
+//       if (correctConditionToCheck != branchCondition)
+//         return failure();
+//     }
+
+//     for (auto forkRes : forkOp->getResults()) {
+//       assert(std::distance(forkRes.getUsers().begin(),
+//                            forkRes.getUsers().end()) == 1);
+//       handshake::ConditionalBranchOp br =
+//           cast<handshake::ConditionalBranchOp>(forkRes.getUsers().begin());
+
+//       if (isa_and_nonnull<handshake::NotOp>(
+//               br.getConditionOperand().getDefiningOp()) ||
+//           (isa_and_nonnull<handshake::ForkOp>(
+//                br.getConditionOperand().getDefiningOp()) &&
+//            isa_and_nonnull<handshake::NotOp>(br.getConditionOperand()
+//                                                  .getDefiningOp()
+//                                                  ->getOperand(0)
+//                                                  .getDefiningOp())))
+//         rewriter.replaceAllUsesExcept(forkRes, brToAccumTo.getTrueResult(),
+//                                       brToAccumTo);
+
+//       else
+//         rewriter.replaceAllUsesExcept(forkRes, brToAccumTo.getFalseResult(),
+//                                       brToAccumTo);
+
+//       // Note: Will call the materialize pass afterwards to add the
+//       unnecessary
+//       // forks at the Branches outputs
+//     }
+
+//     llvm::errs() << "\t***Combine Branches!***\n";
+//     return success();
+//   }
+// };
 
 /// Simple driver for the Handshake canonicalization pass, based on a greedy
 /// pattern rewriter.
