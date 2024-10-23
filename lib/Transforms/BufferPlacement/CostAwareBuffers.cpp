@@ -79,7 +79,7 @@ CostAwareBuffers::CostAwareBuffers(GRBEnv &env, FuncInfo &funcInfo,
     setup();
 }
 
-void CostAwareBuffers::addChannelVars(Value channel, ArrayRef<BufferType> buffers,
+void CostAwareBuffers::addChannelVars(Value channel, ArrayRef<BufferType> buffertypes,
                                          ArrayRef<SignalType> signals) {
 
   // Default-initialize channel variables and retrieve a reference
@@ -106,9 +106,9 @@ void CostAwareBuffers::addChannelVars(Value channel, ArrayRef<BufferType> buffer
   // Variables for placement information
   channelVars.bufPresent = createVar("bufPresent", GRB_BINARY);
 
-  for (BufferType buf : buffers) {
-    GRBVar &bufnumSlots = channelVars.bufNumSlots[buf];
-    StringRef name = getBufferName(buf);
+  for (BufferType buffertype : buffertypes) {
+    GRBVar &bufnumSlots = channelVars.bufNumSlots[buffertype];
+    StringRef name = getBufferName(buffertype);
     bufnumSlots = createVar(name + "BufNumSlots", GRB_INTEGER);
   }
   
@@ -292,8 +292,8 @@ void CostAwareBuffers::addChannelCustomConstraints(
   // Decide whether there is at least a type of buffer present on a signal
   for (auto &[sig, signalVars] : channelVars.signalVars) {
     GRBLinExpr signalbufSlots = 0;
-    for (auto &[buf, buffernumSlots] : channelVars.bufNumSlots) {
-      if (signalBufferMatrix[sig][buf]) {
+    for (auto &[buffertype, buffernumSlots] : channelVars.bufNumSlots) {
+      if (signalBufferMatrix[sig][buffertype]) {
         signalbufSlots += buffernumSlots;
       }
     }
@@ -305,12 +305,12 @@ void CostAwareBuffers::addChannelCustomConstraints(
 
   // If there is at least one slot, there must be a buffer
   GRBLinExpr TotalSlotNum = 0;
-  for (auto &[buf, buffernumSlots] : channelVars.bufNumSlots) {
+  for (auto &[buffertype, buffernumSlots] : channelVars.bufNumSlots) {
     TotalSlotNum += buffernumSlots;
     // Temporary setting since the current model is imprecise.
     // More than one TBs bring higher cost but lower elasticity
     // compared with FTs.
-    if (buf == BufferType::TB){
+    if (buffertype== BufferType::TB){
       model.addConstr(buffernumSlots <= 1, "oneTBslotatMost");
     }
   }
@@ -397,7 +397,7 @@ void CostAwareBuffers::addUnitThroughputConstraints(CFDFC &cfdfc) {
   }
 }
 
-void CostAwareBuffers::addObjective(ValueRange channels, ArrayRef<BufferType> buffers,
+void CostAwareBuffers::addObjective(ValueRange channels, ArrayRef<BufferType> buffertypes,
                                        ArrayRef<CFDFC *> cfdfcs) {
   // Compute the total number of executions over channels that are part of any
   // CFDFC
@@ -439,22 +439,22 @@ void CostAwareBuffers::addObjective(ValueRange channels, ArrayRef<BufferType> bu
   // For each channel, add a "penalty" in case a buffer is added to the channel,
   // and another penalty that depends on the number of slots
   double slotPenaltycoef = 3e-5;
-  bool seExists = std::find(buffers.begin(), buffers.end(), BufferType::SE) != buffers.end();
+  bool seExists = std::find(buffertypes.begin(), buffertypes.end(), BufferType::SE) != buffertypes.end();
   if (seExists) {
     for (Value channel : channels) {
-      for (BufferType buf : buffers) {
-        objective -= getpenaltycoef(getBufferName(buf)) * slotPenaltycoef * channelVars.bufNumSlots[buf];
+      for (BufferType buffertype : buffertypes) {
+        objective -= getpenaltycoef(getBufferName(buffertype)) * slotPenaltycoef * channelVars.bufNumSlots[buffertype];
       }
       GRBVar sePresent = model.addVar(0, 1, 0.0, GRB_BINARY, "sePresent");
-      model.addconstr(1000 * sePresent >= channelVars.bufNumSlots[buf], "sePresentConstr");
+      model.addconstr(1000 * sePresent >= channelVars.bufNumSlots[buffertype], "sePresentConstr");
       objective -= getpenaltycoef("seExist") * slotPenaltycoef * sePresent;
       objective -= getpenaltycoef("bufExist") * slotPenaltycoef * channelVars.bufPresent;
     }
   }
   else {
     for (Value channel : channels) {
-      for (BufferType buf : buffers) {
-        objective -= getpenaltycoef(getBufferName(buf)) * slotPenaltycoef * channelVars.bufNumSlots[buf];
+      for (BufferType buffertype : buffertypes) {
+        objective -= getpenaltycoef(getBufferName(buffertype)) * slotPenaltycoef * channelVars.bufNumSlots[buffertype];
       }
       objective -= getpenaltycoef("bufExist") * slotPenaltycoef * channelVars.bufPresent;
     }
@@ -465,7 +465,7 @@ void CostAwareBuffers::addObjective(ValueRange channels, ArrayRef<BufferType> bu
 }
 
 
-void CostAwareBuffers::extractResult(BufferPlacement &placement, ArrayRef<BufferType> buffers) {
+void CostAwareBuffers::extractResult(BufferPlacement &placement, ArrayRef<BufferType> buffertypes) {
   // Iterate over all channels in the circuit
   for (auto &[channel, channelVars] : vars.channelVars) {
     
@@ -473,28 +473,29 @@ void CostAwareBuffers::extractResult(BufferPlacement &placement, ArrayRef<Buffer
     
     // Extract number and type of slots from the MILP solution, as well as
     // channel-specific buffering properties
-    for (BufferType buf : buffers) {
+    for (BufferType buffertype : buffertypes) {
       unsigned numSlotsToPlace = static_cast<unsigned>(
-          channelVars.bufNumSlots[buf].get(GRB_DoubleAttr_X) + 0.5);
+          channelVars.bufNumSlots[buffertype].get(GRB_DoubleAttr_X) + 0.5);
       if (numSlotsToPlace == 0)
         continue;
-      else if (buf == BufferType::OB)
-        result.numOBChain = numSlotsToPlace;
-      else if (buf == BufferType::TB)
-        result.numTBChain = numSlotsToPlace;
-      else if (buf == BufferType::FT)
-        result.numTranFIFO = numSlotsToPlace;
-      else if (buf == BufferType::SE)
+      else if (buffertype== BufferType::OB)
+        result.numSlotOB = numSlotsToPlace;
+      else if (buffertype== BufferType::TB)
+        result.numSlotTB = numSlotsToPlace;
+      else if (buffertype== BufferType::FT)
+        result.numTranspFIFO = numSlotsToPlace;
+      else if (buffertype== BufferType::SE)
         result.numDVSE = numSlotsToPlace;
-      else if (buf == BufferType::DR)
+      else if (buffertype== BufferType::DR)
         result.numDVR = numSlotsToPlace;
     }
     
-    // TODO: Comment on this Optimization
-    if (result.numOBChain && result.numTranFIFO) {
-      result.numOBChain -= 1;
-      result.numDVFIFO = result.numTranFIFO + 1;
-      result.numTranFIFO = 0;
+    // This is an optimization to combine one slot OB and a n-slot TranspFIFO to
+    // a (n+1)-slot DVFIFO. This optimization saves the area cost.
+    if (result.numSlotOB && result.numTranspFIFO) {
+      result.numSlotOB -= 1;
+      result.numDVFIFO = result.numTranspFIFO + 1;
+      result.numTranspFIFO = 0;
     }
 
     placement[channel] = result;
@@ -511,7 +512,7 @@ void CostAwareBuffers::setup() {
   signals.push_back(SignalType::VALID);
   signals.push_back(SignalType::READY);
 
-  SmallVector<BufferType, 8> buffers;
+  SmallVector<BufferType, 8> buffertypes;
   signals.push_back(BufferType::OB);
   signals.push_back(BufferType::TB);
   signals.push_back(BufferType::FT);
@@ -528,7 +529,7 @@ void CostAwareBuffers::setup() {
   std::vector<Value> allChannels;
   for (auto &[channel, _] : channelProps) {
     allChannels.push_back(channel);
-    addChannelVars(channel, buffers, signals);
+    addChannelVars(channel, buffertypes, signals);
 
     // Add single-domain path constraints
     addChannelPathConstraints(channel, SignalType::DATA, bufModel);
@@ -558,7 +559,7 @@ void CostAwareBuffers::setup() {
   }
 
   // Add the MILP objective and mark the MILP ready to be optimized
-  addObjective(allChannels, buffers, cfdfcs);
+  addObjective(allChannels, buffertypes, cfdfcs);
   markReadyToOptimize();
 }
 

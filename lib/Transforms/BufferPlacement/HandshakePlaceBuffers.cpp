@@ -563,11 +563,11 @@ void HandshakePlaceBuffersPass::instantiateBuffers(BufferPlacement &placement) {
     };
 
     if (placeRes.opaqueBeforeTrans) {
-      placeBuffer(TimingInfo::oehb(), placeRes.numOBChain);
-      placeBuffer(TimingInfo::tehb(), placeRes.numTBchain);
+      placeBuffer(TimingInfo::oehb(), placeRes.numSlotOB);
+      placeBuffer(TimingInfo::tehb(), placeRes.numSlotTB);
     } else {
-      placeBuffer(TimingInfo::tehb(), placeRes.numTBChain);
-      placeBuffer(TimingInfo::oehb(), placeRes.numOBChain);
+      placeBuffer(TimingInfo::tehb(), placeRes.numSlotTB);
+      placeBuffer(TimingInfo::oehb(), placeRes.numSlotOB);
     }
   }
 }

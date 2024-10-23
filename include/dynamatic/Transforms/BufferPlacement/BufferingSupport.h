@@ -170,20 +170,20 @@ struct Channel {
 /// channel.
 struct PlacementResult {
   /// The number of oehb chain slots that should be placed.
-  unsigned numOBChain = 0;
+  unsigned numSlotOB = 0;
   /// The number of tehb chain slots that should be placed.
-  unsigned numTBChain = 0;
+  unsigned numSlotTB = 0;
   /// The number of elasticFifoInner (FIFO that cut D, V) slots that should be placed. 
   unsigned numDVFIFO = 0;
   /// The number of transpFifo slots that should be placed.
-  unsigned numTranFIFO = 0;
+  unsigned numTranspFIFO = 0;
   /// The number of Pipeline (Pipeline is not an accurate name, we prefer
   /// cut D, V, Single Enable) slots that should be placed.
   unsigned numDVSE = 0;
   /// The number of DVR buffer slots that should be placed.
   unsigned numDVR = 0;
   
-  /// Prefered order: DVSE, OBChain, DVFIFO, TranFIFO, DVR, TBChain
+  /// Prefered order: DVSE, OB, DVFIFO, TranspFIFO, DVR, TB
   /// Whether opaque slots should be placed transparent slots for placement
   /// results that include both.
   bool opaqueBeforeTrans = true;
