@@ -1,0 +1,49 @@
+library ieee;
+use ieee.std_logic_1164.all;
+use ieee.numeric_std.all;
+
+entity dvse_dataless is
+  generic(
+    DEPTH : integer
+  );
+  port(
+    -- inputs
+    clk, rst   : in std_logic;
+    ins_valid  : in std_logic;
+    outs_ready : in std_logic;
+    -- outputs
+    outs_valid : out std_logic;
+    ins_ready  : out std_logic
+  );
+end entity;
+
+architecture arch of dvse_dataless is
+
+  signal regEn      : std_logic;
+  type DVSE_VALID is array (0 to DEPTH - 1) of std_logic;
+  signal valid_reg  : DVSE_VALID;
+
+begin
+
+  process(clk) is
+  begin
+    if (rising_edge(clk)) then
+      if (rst = '1') then
+        for i in 0 to DEPTH - 1 loop
+          valid_reg(i) <= '0';
+        end loop;
+      else
+        if (regEn) then
+          for i in 1 to DEPTH - 1 loop
+            valid_reg(i) <= valid_reg(i - 1);
+          end loop;
+          valid_reg(0) <= ins_valid;
+        end if;               
+      end if;
+  end process; 
+
+  outs_valid <= valid_reg(DEPTH - 1);
+  regEn <= not outs_valid or outs_ready;
+  ins_ready <= regEn;
+
+end architecture;
