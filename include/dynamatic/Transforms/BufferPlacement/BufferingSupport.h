@@ -169,10 +169,21 @@ struct Channel {
 /// Holds information about what type of buffer should be placed on a specific
 /// channel.
 struct PlacementResult {
-  /// The number of transparent buffer slots that should be placed.
-  unsigned numTrans = 0;
-  /// The number of opaque buffer slots that should be placed.
-  unsigned numOpaque = 0;
+  /// The number of oehb chain slots that should be placed.
+  unsigned numSlotOB = 0;
+  /// The number of tehb chain slots that should be placed.
+  unsigned numSlotTB = 0;
+  /// The number of elasticFifoInner (FIFO that cut D, V) slots that should be placed. 
+  unsigned numDVFIFO = 0;
+  /// The number of transpFifo slots that should be placed.
+  unsigned numTranspFIFO = 0;
+  /// The number of Pipeline (Pipeline is not an accurate name, we prefer
+  /// cut D, V, Single Enable) slots that should be placed.
+  unsigned numDVSE = 0;
+  /// The number of DVR buffer slots that should be placed.
+  unsigned numDVR = 0;
+  
+  /// Prefered order: DVSE, OB, DVFIFO, TranspFIFO, DVR, TB
   /// Whether opaque slots should be placed transparent slots for placement
   /// results that include both.
   bool opaqueBeforeTrans = true;

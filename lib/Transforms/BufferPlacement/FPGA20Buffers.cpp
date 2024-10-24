@@ -55,6 +55,7 @@ void FPGA20Buffers::extractResult(BufferPlacement &placement) {
     if (numSlotsToPlace == 0)
       continue;
 
+    // placeOpaque == 1 means cut D, V, R; placeOpaque == 0 means cut nothing.
     bool placeOpaque = channelVars.signalVars[SignalType::DATA].bufPresent.get(
                            GRB_DoubleAttr_X) > 0;
 
@@ -64,27 +65,40 @@ void FPGA20Buffers::extractResult(BufferPlacement &placement) {
     if (placeOpaque) {
       if (legacyPlacement) {
         // Satisfy the transparent slots requirement, all other slots are opaque
-        result.numTrans = props.minTrans;
-        result.numOpaque = numSlotsToPlace - props.minTrans;
+        result.numTranspFIFO = props.minTrans;
+        result.numSlotOB = numSlotsToPlace - props.minTrans;
       } else {
         // We want as many slots as possible to be transparent and at least one
         // opaque slot, while satisfying all buffering constraints
         unsigned actualMinOpaque = std::max(1U, props.minOpaque);
         if (props.maxTrans.has_value() &&
             (props.maxTrans.value() < numSlotsToPlace - actualMinOpaque)) {
-          result.numTrans = props.maxTrans.value();
-          result.numOpaque = numSlotsToPlace - result.numTrans;
+          result.numTranspFIFO = props.maxTrans.value();
+          result.numSlotOB = numSlotsToPlace - result.numTranspFIFO;
         } else {
-          result.numOpaque = actualMinOpaque;
-          result.numTrans = numSlotsToPlace - result.numOpaque;
+          result.numSlotOB = actualMinOpaque;
+          result.numTranspFIFO = numSlotsToPlace - result.numSlotOB;
         }
       }
     } else {
       // All slots should be transparent
-      result.numTrans = numSlotsToPlace;
+      result.numTranspFIFO = numSlotsToPlace;
     }
 
     result.deductInternalBuffers(Channel(channel), timingDB);
+
+    if (result.numSlotOB == 1){
+      result.numSlotOB = 0;
+      result.numSlotDVR = 1;
+    } else if (result.numSlotOB == 2){
+      result.numSlotOB = 1;
+      result.numSlotTB = 1;
+    } else if (result.numSlotOB > 2){
+      result.numDVFIFO = result.numSlotOB - 1;
+      result.numSlotTB = 1;
+      result.numSlotOB = 0;
+    }
+
     placement[channel] = result;
   }
 
