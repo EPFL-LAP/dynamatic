@@ -162,6 +162,8 @@ std::optional<unsigned> TimingInfo::getLatency(SignalType type) {
     return validLatency;
   case SignalType::READY:
     return readyLatency;
+  case SignalType::SPEC_TAG:
+    return dataLatency; // todo
   }
 }
 
