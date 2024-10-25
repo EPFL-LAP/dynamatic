@@ -298,7 +298,7 @@ static void minimizeGroupsConnections(DenseSet<Group *> &groupsGraph) {
       for (auto &sp : group->preds) {
 
         // if we are considering the same elements, ignore them
-        if (sp->bb == bp->bb)
+        if (sp->bb == bp->bb || greaterThanBlocks(sp->bb, bp->bb))
           continue;
 
         // Add the small predecessors to the list of elements to remove in
@@ -369,7 +369,7 @@ static Value boolVariableToCircuit(ConversionPatternRewriter &rewriter,
     auto notOp = rewriter.create<handshake::NotOp>(
         block->getOperations().front().getLoc(),
         channelifyType(condition.getType()), condition);
-    ftdOps.shannonOperations.insert(notOp);
+    ftdOps.opsToSkip.insert(notOp);
     return notOp->getResult(0);
   }
   condition.setType(channelifyType(condition.getType()));
@@ -393,7 +393,7 @@ static Value muxToCircuit(ConversionPatternRewriter &rewriter, Multiplexer *mux,
   // Create the multiplxer and add it to the rest of the circuit
   auto muxOp = rewriter.create<handshake::MuxOp>(
       block->getOperations().front().getLoc(), muxCond, muxOperands);
-  ftdOps.shannonOperations.insert(muxOp);
+  ftdOps.opsToSkip.insert(muxOp);
   return muxOp.getResult();
 }
 
@@ -419,7 +419,7 @@ static Value boolExpressionToCircuit(ConversionPatternRewriter &rewriter,
 
   auto constOp = rewriter.create<handshake::ConstantOp>(
       block->getOperations().front().getLoc(), cstAttr, cnstTrigger);
-  ftdOps.shannonOperations.insert(constOp);
+  ftdOps.opsToSkip.insert(constOp);
 
   return constOp.getResult();
 }
@@ -639,7 +639,7 @@ FtdLowerFuncToHandshake::addSupp(ConversionPatternRewriter &rewriter,
 
     // Skip the prod-cons if the producer is part of the operations related to
     // the Shannon expansion or initial merges
-    if (ftdOps.shannonOperations.contains(producerOp) ||
+    if (ftdOps.opsToSkip.contains(producerOp) ||
         ftdOps.initMergesOperations.contains(producerOp))
       continue;
 
@@ -661,7 +661,7 @@ FtdLowerFuncToHandshake::addSupp(ConversionPatternRewriter &rewriter,
 
         // Skip the prod-cons if the consumer is part of the operations related
         // to the Shannon expansion or initial merges
-        if (ftdOps.shannonOperations.contains(consumerOp) ||
+        if (ftdOps.opsToSkip.contains(consumerOp) ||
             ftdOps.initMergesOperations.contains(consumerOp))
           continue;
 
@@ -813,6 +813,8 @@ FtdLowerFuncToHandshake::addRegen(ConversionPatternRewriter &rewriter,
             llvm::isa_and_nonnull<handshake::MemoryOpInterface>(consumerOp) ||
             ftdOps.explicitPhiMerges.contains(&consumerOp) ||
             ftdOps.initMergesOperations.contains(&consumerOp) ||
+            ftdOps.opsToSkip.contains(producerOp) ||
+            ftdOps.opsToSkip.contains(&consumerOp) ||
             llvm::isa_and_nonnull<handshake::ControlMergeOp>(consumerOp) ||
             llvm::isa_and_nonnull<MemRefType>(operand.getType()))
           continue;
@@ -1495,6 +1497,8 @@ FtdLowerFuncToHandshake::addExplicitPhi(func::FuncOp funcOp,
 
   // List of missing GSA functions
   SmallVector<MissingGsa> missingGsaList;
+  // List of gammas with only one input
+  DenseSet<Operation *> oneInputGammaList;
   // Maps the index of each GSA function to each real operation
   DenseMap<unsigned, Operation *> gsaList;
   ControlDependenceAnalysis<func::FuncOp> cdgAnalysis(funcOp);
@@ -1544,26 +1548,6 @@ FtdLowerFuncToHandshake::addExplicitPhi(func::FuncOp funcOp,
       rewriter.setInsertionPointAfterValue(phi->result);
       Value conditionValue = ftdOps.conditionToValue[phi->minterm];
 
-      // If there was an empty input, then we instantiate a branch rather than a
-      // multiplexer
-      if (nullOperand >= 0) {
-        auto branchOp = rewriter.create<handshake::ConditionalBranchOp>(
-            loc, getBranchResultTypes(phi->result.getType()), conditionValue,
-            operands[1 - nullOperand]);
-        ftdOps.explicitPhiMerges.insert(branchOp);
-
-        // The function might be the root of a tree of GAMMAs: in this case, we
-        // replace the usage of the block argument with its result
-        if (phi->isRoot)
-          phi->result.replaceAllUsesWith(nullOperand == 0
-                                             ? branchOp.getTrueResult()
-                                             : branchOp.getFalseResult());
-
-        gsaList.insert({phi->index, branchOp});
-        ftdOps.explicitPhiMerges.insert(branchOp);
-        continue;
-      }
-
       // If the function is MU, then we use create a merge and use its result as
       // condition
       if (phi->gsaGateFunction == gsa::MuGate) {
@@ -1588,12 +1572,28 @@ FtdLowerFuncToHandshake::addExplicitPhi(func::FuncOp funcOp,
         conditionValue.setType(channelifyType(conditionValue.getType()));
       }
 
+      // When a single input gamma is encountered, a mux is inserted as a
+      // placeholder to perform the gamma/mu allocation flow. In the end, these
+      // muxes are erased from the IR
+      if (nullOperand >= 0) {
+        operands[0] = operands[1 - nullOperand];
+        operands[1] = operands[1 - nullOperand];
+      }
+
       // Create the multiplexer
       auto mux = rewriter.create<handshake::MuxOp>(
           loc, channelifyType(phi->result.getType()), conditionValue, operands);
 
+      // The one input gamma is marked at an operation to skip in the IR and
+      // later removed
+      if (nullOperand >= 0) {
+        oneInputGammaList.insert(mux);
+        ftdOps.opsToSkip.insert(mux);
+      }
+
       if (phi->isRoot)
         phi->result.replaceAllUsesWith(mux.getResult());
+
       gsaList.insert({phi->index, mux});
       ftdOps.explicitPhiMerges.insert(mux);
 
@@ -1610,12 +1610,25 @@ FtdLowerFuncToHandshake::addExplicitPhi(func::FuncOp funcOp,
     auto *operandMerge = gsaList[missingMerge.phiIndex];
     auto *resultMerge = gsaList[missingMerge.edgeIndex];
 
-    // The input might be a branch (due to empty gsa input) rather than a mux
-    unsigned operandIndex = isa<handshake::ConditionalBranchOp>(operandMerge)
-                                ? 1
-                                : missingMerge.operandInput + 1;
+    operandMerge->setOperand(missingMerge.operandInput + 1,
+                             resultMerge->getResult(0));
 
-    operandMerge->setOperand(operandIndex, resultMerge->getResult(0));
+    // In case of a one-input gamma, the other input must be replaced as well,
+    // to avoid errors when the block arguments are erased later on
+    if (oneInputGammaList.contains(operandMerge))
+      operandMerge->setOperand(2 - missingMerge.operandInput,
+                               resultMerge->getResult(0));
+  }
+
+  // Get rid of the multiplexers adopted as place-holders of one input gamma
+  for (auto &op : llvm::make_early_inc_range(oneInputGammaList)) {
+    int operandToUse = llvm::isa_and_nonnull<handshake::MuxOp>(
+                           op->getOperand(1).getDefiningOp())
+                           ? 1
+                           : 2;
+    op->getResult(0).replaceAllUsesWith(op->getOperand(operandToUse));
+    ftdOps.explicitPhiMerges.erase(op);
+    rewriter.eraseOp(op);
   }
 
   // Remove all the block arguments for all the non starting blocks
