@@ -80,7 +80,12 @@ struct FtdCfToHandshakePass
                  OneToOneConversion<arith::SubFOp, handshake::SubFOp>,
                  OneToOneConversion<arith::SubIOp, handshake::SubIOp>,
                  OneToOneConversion<arith::TruncIOp, handshake::TruncIOp>,
-                 OneToOneConversion<arith::XOrIOp, handshake::XOrIOp>>(
+                 OneToOneConversion<arith::TruncFOp, handshake::TruncFOp>,
+                 OneToOneConversion<arith::XOrIOp, handshake::XOrIOp>,
+                 OneToOneConversion<arith::SIToFPOp, handshake::SIToFPOp>,
+                 OneToOneConversion<arith::FPToSIOp, handshake::FPToSIOp>,
+                 OneToOneConversion<arith::ExtFOp, handshake::ExtFOp>,
+                 OneToOneConversion<math::AbsFOp, handshake::AbsFOp>>(
         getAnalysis<NameAnalysis>(), converter, ctx);
 
     // All func-level functions must become handshake-level functions
@@ -1544,9 +1549,9 @@ FtdLowerFuncToHandshake::addExplicitPhi(func::FuncOp funcOp,
         operandIndex++;
       }
 
-      // The condition value is provided by the `minterm` field of the phi
+      // The condition value is provided by the `condition` field of the phi
       rewriter.setInsertionPointAfterValue(phi->result);
-      Value conditionValue = ftdOps.conditionToValue[phi->minterm];
+      Value conditionValue = ftdOps.conditionToValue[phi->condition];
 
       // If the function is MU, then we use create a merge and use its result as
       // condition
