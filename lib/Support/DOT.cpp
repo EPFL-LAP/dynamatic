@@ -550,6 +550,14 @@ static std::string getPrettyNodeLabel(Operation *op) {
                 return "oehb" + numSlotsStr;
               if (info == TimingInfo::tehb())
                 return "tehb" + numSlotsStr;
+              if (info == TimingInfo::dvfifo())
+                return "dvfifo" + numSlotsStr;
+              if (info == TimingInfo::tfifo())
+                return "tfifo" + numSlotsStr;
+              if (info == TimingInfo::dvse())
+                return "dvse" + numSlotsStr;
+              if (info == TimingInfo::dvr())
+                return "dvr" + numSlotsStr;
             }
             return "buffer" + numSlotsStr;
           })

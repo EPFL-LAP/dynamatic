@@ -551,9 +551,21 @@ void HandshakePlaceBuffersPass::instantiateBuffers(BufferPlacement &placement) {
     auto placeBuffer = [&](const TimingInfo &timing, unsigned numSlots) {
       if (numSlots == 0)
         return;
-
+      StringRef bufferType;
+      if (timing == TimingInfo::oehb())
+        bufferType = BufferOp::DV_TYPE;
+      else if (timing == TimingInfo::tehb())
+        bufferType = BufferOp::R_TYPE;
+      else if (timing == TimingInfo::dvfifo())
+        bufferType = BufferOp::DVE_TYPE;
+      else if (timing == TimingInfo::tfifo())
+        bufferType = BufferOp::T_TYPE;
+      else if (timing == TimingInfo::dvse())
+        bufferType = BufferOp::DVSE_TYPE;
+      else if (timing == TimingInfo::dvr())
+        bufferType = BufferOp::DVR_TYPE;
       auto bufOp = builder.create<handshake::BufferOp>(
-          bufferIn.getLoc(), bufferIn, timing, numSlots);
+          bufferIn.getLoc(), bufferIn, timing, numSlots, bufferType);
       inheritBB(opDst, bufOp);
       nameAnalysis.setName(bufOp);
 
@@ -563,11 +575,19 @@ void HandshakePlaceBuffersPass::instantiateBuffers(BufferPlacement &placement) {
     };
 
     if (placeRes.opaqueBeforeTrans) {
+      placeBuffer(TimingInfo::dvr(), placeRes.numSlotOB);
+      placeBuffer(TimingInfo::dvse(), placeRes.numSlotTB);
       placeBuffer(TimingInfo::oehb(), placeRes.numSlotOB);
+      placeBuffer(TimingInfo::dvfifo(), placeRes.numSlotOB);
+      placeBuffer(TimingInfo::tfifo(), placeRes.numSlotTB);
       placeBuffer(TimingInfo::tehb(), placeRes.numSlotTB);
     } else {
       placeBuffer(TimingInfo::tehb(), placeRes.numSlotTB);
+      placeBuffer(TimingInfo::tfifo(), placeRes.numSlotTB);
+      placeBuffer(TimingInfo::dvfifo(), placeRes.numSlotOB);
       placeBuffer(TimingInfo::oehb(), placeRes.numSlotOB);
+      placeBuffer(TimingInfo::dvse(), placeRes.numSlotTB);
+      placeBuffer(TimingInfo::dvr(), placeRes.numSlotOB);
     }
   }
 }

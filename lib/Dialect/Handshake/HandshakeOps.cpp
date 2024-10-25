@@ -181,7 +181,7 @@ namespace {
 
 void BufferOp::build(OpBuilder &odsBuilder, OperationState &odsState,
                      Value operand, const TimingInfo &timing,
-                     std::optional<unsigned> numSlots) {
+                     std::optional<unsigned> numSlots, StringRef bufferType) {
   odsState.addOperands(operand);
   odsState.addTypes(operand.getType());
 
@@ -197,6 +197,9 @@ void BufferOp::build(OpBuilder &odsBuilder, OperationState &odsState,
                          *numSlots));
   }
 
+  attributes.emplace_back(StringAttr::get(ctx, BUFFER_TYPE_ATTR_NAME),
+                          StringAttr::get(ctx, bufferType));
+                          
   odsState.addAttribute(RTL_PARAMETERS_ATTR_NAME,
                         DictionaryAttr::get(ctx, attributes));
 }

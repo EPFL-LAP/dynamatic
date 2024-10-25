@@ -33,11 +33,11 @@ static StringRef getBufferName(BufferType type) {
   case BufferType::TB:
     return "tehb";
   case BufferType::FT:
-    return "fullTran";
+    return "tfifo";
   case BufferType::SE:
-    return "singleEnable";
+    return "dvse";
   case BufferType::DR:
-    return "DVR";
+    return "dvr";
   }
 }
 
