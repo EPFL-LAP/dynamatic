@@ -299,7 +299,7 @@
       }
     ],
     "generic": "$DYNAMATIC/data/vhdl/support/dataless/elastic_fifo_inner.vhd",
-    "module-name": "elastic_fifo_inner_dataless",
+    "module-name": "elastic_fifo_inner_dataless"
   },
   {
     "name": "handshake.buffer",
