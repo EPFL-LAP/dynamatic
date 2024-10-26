@@ -31,6 +31,7 @@
 #include "mlir/IR/PatternMatch.h"
 #include "mlir/Support/LogicalResult.h"
 #include "mlir/Transforms/DialectConversion.h"
+#include <fstream>
 #include <utility>
 
 using namespace mlir;
@@ -122,6 +123,36 @@ static Value dataToCircuit(ConversionPatternRewriter &rewriter,
 
 // ------------------------ End forwarded declarations ------------------------
 
+void FtdLowerFuncToHandshake::analyzeLoop(handshake::FuncOp funcOp,
+                                          FtdStoredOperations &ftdOps) const {
+
+  Region &region = funcOp.getBody();
+  mlir::DominanceInfo domInfo;
+  mlir::CFGLoopInfo loopInfo(domInfo.getDomTree(&region));
+  std::ofstream ofs;
+
+  ofs.open("ftdscripting/loopinfo.txt", std::ofstream::out);
+  std::string loopDescription;
+  llvm::raw_string_ostream loopDescriptionStream(loopDescription);
+
+  auto muxes = funcOp.getBody().getOps<handshake::MuxOp>();
+  for (auto phi : muxes) {
+    if (!loopInfo.getLoopFor(phi->getBlock()))
+      continue;
+    ofs << namer.getName(phi).str();
+    if (llvm::isa<handshake::MergeOp>(phi->getOperand(0).getDefiningOp()))
+      ofs << " (MU)\n";
+    else
+      ofs << " (GAMMA)\n";
+    loopInfo.getLoopFor(phi->getBlock())
+        ->print(loopDescriptionStream, false, false, 0);
+    ofs << loopDescription << "\n";
+    loopDescription = "";
+  }
+
+  ofs.close();
+}
+
 LogicalResult FtdLowerFuncToHandshake::matchAndRewrite(
     func::FuncOp lowerFuncOp, OpAdaptor adaptor,
     ConversionPatternRewriter &rewriter) const {
@@ -196,6 +227,8 @@ LogicalResult FtdLowerFuncToHandshake::matchAndRewrite(
     // Add muxes for regeneration of values in loop
     if (failed(addRegen(rewriter, funcOp, ftdOps)))
       return failure();
+
+    analyzeLoop(funcOp, ftdOps);
 
     // Add suppression blocks between each pair of producer and consumer
     if (failed(addSupp(rewriter, funcOp, ftdOps)))

@@ -94,6 +94,8 @@ protected:
       handshake::FuncOp &funcOp, ConversionPatternRewriter &rewriter,
       MemInterfacesInfo &memInfo, FtdStoredOperations &ftdOps) const;
 
+  void analyzeLoop(handshake::FuncOp funcOp, FtdStoredOperations &ftdOps) const;
+
   /// Given a list of operations, return the list of memory dependencies for
   /// each block. This allows to build the group graph, which allows to
   /// determine the dependencies between memory access inside basic blocks.
