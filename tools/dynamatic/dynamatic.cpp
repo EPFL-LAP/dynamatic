@@ -570,7 +570,7 @@ CommandResult Compile::execute(CommandArguments &args) {
 
   if (auto it = args.options.find(BUFFER_ALGORITHM); it != args.options.end()) {
     if (it->second == "on-merges" || it->second == "fpga20" ||
-        it->second == "fpl22") {
+        it->second == "fpl22" || it->second == "costaware") {
       buffers = it->second;
     } else {
       llvm::errs()
