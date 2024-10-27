@@ -108,13 +108,36 @@ end entity;
 
 -- a bit complex and cannot override the original mux
 architecture arch of mux_with_tag is
+  signal index_inner : std_logic_vector(SELECT_TYPE - 1 downto 0);
+  signal index_valid_inner : std_logic; 
+  signal index_spec_tag_inner : std_logic;
+  signal index_ready_inner : std_logic;
   signal tehb_ins                       : std_logic_vector(DATA_TYPE downto 0);
   signal tehb_ins_valid, tehb_ins_ready : std_logic;
   signal outs_inner : std_logic_vector(DATA_TYPE downto 0);
 begin
+
+  index_buf : entity work.speculator_buffers(arch)
+    generic map(
+      DATA_TYPE => SELECT_TYPE,
+      BUFFERS => 3
+    )
+    port map(
+      clk => clk,
+      rst => rst,
+      ins       => index,
+      ins_valid => index_valid,
+      ins_spec_tag => index_spec_tag,
+      ins_ready => index_ready,
+      outs       => index_inner,
+      outs_valid => index_valid_inner,
+      outs_spec_tag => index_spec_tag_inner,
+      outs_ready => index_ready_inner
+    );
+
   outs <= outs_inner(DATA_TYPE - 1 downto 0);
   outs_spec_tag <= outs_inner(DATA_TYPE);
-  process (ins, ins_valid, ins_spec_tag, outs_ready, index, index_valid, index_spec_tag, tehb_ins_ready)
+  process (ins, ins_valid, ins_spec_tag, outs_ready, index_inner, index_valid_inner, index_spec_tag_inner, tehb_ins_ready)
     variable selectedData                   : std_logic_vector(DATA_TYPE - 1 downto 0);
     variable selectedData_spec_tag          : std_logic;
     variable selectedData_valid, indexEqual : std_logic;
@@ -123,21 +146,21 @@ begin
     selectedData_valid := '0';
 
     for i in SIZE - 1 downto 0 loop
-      if unsigned(index) = to_unsigned(i, index'length) then
+      if unsigned(index_inner) = to_unsigned(i, index_inner'length) then
         indexEqual := '1';
       else
         indexEqual := '0';
       end if;
-      if indexEqual and index_valid and ins_valid(i) then
+      if indexEqual and index_valid_inner and ins_valid(i) then
         selectedData       := ins(i);
         selectedData_spec_tag := ins_spec_tag(i);
         selectedData_valid := '1';
       end if;
-      ins_ready(i) <= (indexEqual and index_valid and ins_valid(i) and tehb_ins_ready) or (not ins_valid(i));
+      ins_ready(i) <= (indexEqual and index_valid_inner and ins_valid(i) and tehb_ins_ready) or (not ins_valid(i));
     end loop;
 
-    index_ready    <= (not index_valid) or (selectedData_valid and tehb_ins_ready);
-    tehb_ins       <= (selectedData_spec_tag or index_spec_tag) & selectedData;
+    index_ready_inner    <= (not index_valid_inner) or (selectedData_valid and tehb_ins_ready);
+    tehb_ins       <= (selectedData_spec_tag or index_spec_tag_inner) & selectedData;
     tehb_ins_valid <= selectedData_valid;
   end process;
 
