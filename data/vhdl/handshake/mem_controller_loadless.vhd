@@ -119,3 +119,91 @@ begin
     );
 
 end architecture;
+
+library ieee;
+use ieee.std_logic_1164.all;
+use ieee.numeric_std.all;
+use work.types.all;
+
+entity mem_controller_loadless_with_tag is
+  generic (
+    NUM_CONTROLS : integer;
+    NUM_STORES   : integer;
+    DATA_TYPE   : integer;
+    ADDR_TYPE   : integer
+  );
+  port (
+    clk, rst : in std_logic;
+    -- start input control
+    memStart_valid : in  std_logic;
+    memStart_spec_tag : in std_logic;
+    memStart_ready : out std_logic;
+    -- end output control
+    memEnd_valid : out std_logic;
+    memEnd_spec_tag : out std_logic;
+    memEnd_ready : in  std_logic;
+    -- "no more requests" input control
+    ctrlEnd_valid : in  std_logic;
+    ctrlEnd_spec_tag : in std_logic;
+    ctrlEnd_ready : out std_logic;
+    -- control input channels
+    ctrl       : in  data_array (NUM_CONTROLS - 1 downto 0)(31 downto 0);
+    ctrl_valid : in  std_logic_vector(NUM_CONTROLS - 1 downto 0);
+    ctrl_spec_tag : in std_logic_vector(NUM_CONTROLS - 1 downto 0);
+    ctrl_ready : out std_logic_vector(NUM_CONTROLS - 1 downto 0);
+    -- store address input channels
+    stAddr       : in  data_array (NUM_STORES - 1 downto 0)(ADDR_TYPE - 1 downto 0);
+    stAddr_valid : in  std_logic_vector(NUM_STORES - 1 downto 0);
+    stAddr_spec_tag : in std_logic_vector(NUM_STORES - 1 downto 0);
+    stAddr_ready : out std_logic_vector(NUM_STORES - 1 downto 0);
+    -- store data input channels
+    stData       : in  data_array (NUM_STORES - 1 downto 0)(DATA_TYPE - 1 downto 0);
+    stData_valid : in  std_logic_vector(NUM_STORES - 1 downto 0);
+    stData_spec_tag : in std_logic_vector(NUM_STORES - 1 downto 0);
+    stData_ready : out std_logic_vector(NUM_STORES - 1 downto 0);
+    -- interface to dual-port BRAM
+    loadData  : in  std_logic_vector(DATA_TYPE - 1 downto 0);
+    loadEn    : out std_logic;
+    loadAddr  : out std_logic_vector(ADDR_TYPE - 1 downto 0);
+    storeEn   : out std_logic;
+    storeAddr : out std_logic_vector(ADDR_TYPE - 1 downto 0);
+    storeData : out std_logic_vector(DATA_TYPE - 1 downto 0)
+  );
+end entity;
+
+architecture arch of mem_controller_loadless_with_tag is
+begin
+  memEnd_spec_tag <= '0';
+  mem_controller_loadless : entity work.mem_controller_loadless
+    generic map(
+      NUM_CONTROLS => NUM_CONTROLS,
+      NUM_STORES   => NUM_STORES,
+      DATA_TYPE   => DATA_TYPE,
+      ADDR_TYPE   => ADDR_TYPE
+    )
+    port map(
+      clk            => clk,
+      rst            => rst,
+      memStart_valid => memStart_valid,
+      memStart_ready => memStart_ready,
+      memEnd_valid   => memEnd_valid,
+      memEnd_ready   => memEnd_ready,
+      ctrlEnd_valid  => ctrlEnd_valid,
+      ctrlEnd_ready  => ctrlEnd_ready,
+      ctrl           => ctrl,
+      ctrl_valid     => ctrl_valid,
+      ctrl_ready     => ctrl_ready,
+      stAddr         => stAddr,
+      stAddr_valid   => stAddr_valid,
+      stAddr_ready   => stAddr_ready,
+      stData         => stData,
+      stData_valid   => stData_valid,
+      stData_ready   => stData_ready,
+      loadData       => loadData,
+      loadEn         => loadEn,
+      loadAddr       => loadAddr,
+      storeEn        => storeEn,
+      storeAddr      => storeAddr,
+      storeData      => storeData
+    );
+end architecture;
