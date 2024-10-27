@@ -1,7 +1,8 @@
 //===- FtdCfToHandshake.cpp - FTD conversion cf -> handshake --*--- C++ -*-===//
 //
-// Implements the fast token delivery methodology as depicted in FPGA'22,
-// together with the fast LSQ allocation as depicted in FPGA'23.
+// Implements the fast token delivery methodology
+// https://ieeexplore.ieee.org/abstract/document/10035134, together with the
+// straight LSQ allocation https://dl.acm.org/doi/abs/10.1145/3543622.3573050.
 //
 //===----------------------------------------------------------------------===//
 
@@ -156,6 +157,13 @@ LogicalResult FtdLowerFuncToHandshake::matchAndRewrite(
   // Stores mapping from each value that passes through a merge-like
   // operation to the data result of that merge operation
   ArgReplacements argReplacements;
+
+  // Currently, the following 2 functions do nothing but construct the network
+  // of CMerges in complete isolation from the rest of the components
+  // implementing the operations
+  // In particular, the addMergeOps relies on adding Merges for every block
+  // argument but because we removed all "real" arguments, we are only left with
+  // the Start value as an argument for every block
   addMergeOps(funcOp, rewriter, argReplacements);
   addBranchOps(funcOp, rewriter);
 
@@ -172,9 +180,9 @@ LogicalResult FtdLowerFuncToHandshake::matchAndRewrite(
   // instantiation logic)
   idBasicBlocks(funcOp, rewriter);
 
-  // Create the memory interface according to the algorithm from FPGA'23. The
-  // data dependencies which are created in this way will be then modified by
-  // the FTD methodology.
+  // Create the memory interface according to the algorithm from FPGA'23. This
+  // functions introduce new data dependencies that are then passed to FTD for
+  // correctly delivering data between them like any real data dependencies
   if (failed(
           ftdVerifyAndCreateMemInterfaces(funcOp, rewriter, memInfo, ftdOps)))
     return failure();
@@ -469,8 +477,8 @@ static Value addSuppressionInLoop(ConversionPatternRewriter &rewriter,
 
     rewriter.setInsertionPointToStart(loopExit);
 
-    // Since only one output is used, the other one will be optimized to a
-    // sink, as we expect from a suppress branch
+    // Since only one output is used, the other one will be connected to sink in
+    // the materialization pass, as we expect from a suppress branch
     branchOp = rewriter.create<handshake::ConditionalBranchOp>(
         loopExit->getOperations().back().getLoc(),
         getBranchResultTypes(connection.getType()), conditionValue, connection);
@@ -515,7 +523,8 @@ static Value addSuppressionInLoop(ConversionPatternRewriter &rewriter,
   }
 
   // If we are handling a case with more producers than consumers, the new
-  // branch must undergo the `addSupp` function
+  // branch must undergo the `addSupp` function so we add it to our structure to
+  // be able to loop over it
   if (btlt == BranchToLoopType::MoreProducerThanConsumers) {
     ftdOps.suppBranches.insert(branchOp);
     producersToCover.push_back(branchOp);
@@ -529,7 +538,7 @@ static Value addSuppressionInLoop(ConversionPatternRewriter &rewriter,
   return newConnection;
 }
 
-/// Apply the algorithm from FPGA'22 to handle a non-loop situation of
+/// Apply the algorithm from FPL'22 to handle a non-loop situation of
 /// producer and consumer
 static LogicalResult
 insertDirectSuppression(ConversionPatternRewriter &rewriter,
@@ -561,8 +570,9 @@ insertDirectSuppression(ConversionPatternRewriter &rewriter,
       enumeratePaths(entryBlock, consumer->getBlock(), consControlDeps);
 
   // The condition related to the select signal of the consumer mux must be
-  // added if the following conditions hold: The consumer is a multiplexer; The
-  // mux was a GAMMA from GSA analysis; The input of the mux is a data input.
+  // added if the following conditions hold: The consumer is a mux; The
+  // mux was a GAMMA from GSA analysis; The input of the mux (i.e., coming from
+  // the producer) is a data input.
   if (llvm::isa_and_nonnull<handshake::MuxOp>(consumer) &&
       ftdOps.explicitPhiMerges.contains(consumer) &&
       consumer->getOperand(0) != connection &&
@@ -619,9 +629,9 @@ FtdLowerFuncToHandshake::addSupp(ConversionPatternRewriter &rewriter,
 
   // A set of relationships between producer and consumer needs to be covered.
   // To do that, we consider each possible operation in the circuit as producer.
-  // However, some operation are added throughout the execution of the function,
-  // and those are possibly to be analyzed as well. This vector maintains the
-  // list of operations to be analyzed.
+  // However, some operations are added throughout the execution of the
+  // function, and those are possibly to be analyzed as well. This vector
+  // maintains the list of operations to be analyzed.
   std::vector<Operation *> producersToCover;
 
   // Add all the operations in the IR to the above vector
@@ -638,7 +648,7 @@ FtdLowerFuncToHandshake::addSupp(ConversionPatternRewriter &rewriter,
     Block *producerBlock = producerOp->getBlock();
 
     // Skip the prod-cons if the producer is part of the operations related to
-    // the Shannon expansion or initial merges
+    // the Shannon expansion or INIT merges
     if (ftdOps.shannonOperations.contains(producerOp) ||
         ftdOps.initMergesOperations.contains(producerOp))
       continue;
@@ -654,13 +664,13 @@ FtdLowerFuncToHandshake::addSupp(ConversionPatternRewriter &rewriter,
         Block *consumerBlock = consumerOp->getBlock();
 
         // If the consumer and the producer are in the same block without the
-        // consumer being a multiplxer skip
+        // consumer being a multiplxer skip because no delivery is needed
         if (consumerBlock == producerBlock &&
             !isa<handshake::MuxOp>(consumerOp))
           continue;
 
         // Skip the prod-cons if the consumer is part of the operations related
-        // to the Shannon expansion or initial merges
+        // to the Shannon expansion or INIT merges
         if (ftdOps.shannonOperations.contains(consumerOp) ||
             ftdOps.initMergesOperations.contains(consumerOp))
           continue;
@@ -686,6 +696,10 @@ FtdLowerFuncToHandshake::addSupp(ConversionPatternRewriter &rewriter,
              !llvm::isa<handshake::MCStoreOp>(consumerOp)) ||
             llvm::isa<mlir::MemRefType>(result.getType()))
           continue;
+
+        // The next step is to identify the relationship between the producer
+        // and consumer in hand: Are they in the same loop or at different loop
+        // levels? Are they connected through a bwd edge?
 
         // Set true if the producer is in a loop which does not contains
         // the consumer
@@ -807,7 +821,7 @@ FtdLowerFuncToHandshake::addRegen(ConversionPatternRewriter &rewriter,
           continue;
 
         // Everything related to memories should not undergo the FTD
-        // transformation. Same goes for explicit phi multiplexers and initial
+        // transformation. Same goes for explicit phi multiplexers and INIT
         // merges.
         if (llvm::isa_and_nonnull<handshake::MemoryOpInterface>(producerOp) ||
             llvm::isa_and_nonnull<handshake::MemoryOpInterface>(consumerOp) ||
@@ -866,7 +880,7 @@ FtdLowerFuncToHandshake::addRegen(ConversionPatternRewriter &rewriter,
           // The type of the input must be channelified
           producerOperand.setType(channelifyType(producerOperand.getType()));
 
-          // Create an initial merge of the multiplexer
+          // Create an INIT merge to provide the select of the multiplexer
           auto constOp = rewriter.create<handshake::ConstantOp>(
               consumerOp.getLoc(), cstAttr, startValue);
           ftdOps.initMergesOperations.insert(constOp);
@@ -1466,8 +1480,9 @@ FtdLowerFuncToHandshake::addExplicitPhi(func::FuncOp funcOp,
   // The function instantiates the GAMMA and MU gates as provided by the GSA
   // analysis pass. A GAMMA function is translated into a multiplxer driven by
   // single control signal and fed by two operands; a MU function is translated
-  // into a multiplxer driven by a in init merge (fed by a false constant and a
-  // condition). The input of one of these functions might be another GSA
+  // into a multiplxer driven by an init (it is currently implemented as a Merge
+  // fed by a constant triggered from Start once and from the loop condition
+  // thereafter). The input of one of these functions might be another GSA
   // function, and it's possible that the function was not instantiated yet. For
   // this reason, we keep track of the missing operands, and reconnect them
   // later on.
@@ -1564,7 +1579,7 @@ FtdLowerFuncToHandshake::addExplicitPhi(func::FuncOp funcOp,
         continue;
       }
 
-      // If the function is MU, then we use create a merge and use its result as
+      // If the function is MU, then we create a merge and use its result as
       // condition
       if (phi->gsaGateFunction == gsa::MuGate) {
         Region &region = funcOp.getBody();
