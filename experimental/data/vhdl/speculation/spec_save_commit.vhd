@@ -35,6 +35,7 @@ architecture arch of spec_save_commit is
     signal PassEn  : std_logic := '0';
     signal KillEn  : std_logic := '0';
     signal ResendEn  : std_logic := '0';
+    signal NoCmpEn : std_logic := '0';
 
     signal Tail : natural range 0 to FIFO_DEPTH - 1;
     signal Head : natural range 0 to FIFO_DEPTH - 1;
@@ -60,7 +61,7 @@ begin
     
     TailEn <= not Full and pValidArray(0);
     HeadEn <= not Empty and ((nReadyArray(0) and ResendEn) or killEn);
-    CurrEn <= ( (not CurrEmpty or pValidArray(0)) and (nReadyArray(0) and PassEn) );
+    CurrEn <= ( (not CurrEmpty or pValidArray(0)) and (nReadyArray(0) and PassEn) ) or (not Empty and (nReadyArray(0) and NoCmpEn) );
 
     bypass <= pValidArray(0) and CurrEmpty;
 -------------------
@@ -70,6 +71,7 @@ en_proc : process (pValidArray, controlInArray)
         PassEn <= '0';
         KillEn <= '0';
         ResendEn <= '0';
+        NoCmpEn <= '0';
 
         if pValidArray(1) = '1' and controlInArray(0) = "000" then
             PassEn <= '1';
@@ -82,6 +84,7 @@ en_proc : process (pValidArray, controlInArray)
             KillEn <= '1';
         elsif pValidArray(1) = '1' and controlInArray(0) = "100" then
             ResendEn <= '1';
+            NoCmpEn <= '1';
         end if;
     end process;
 
