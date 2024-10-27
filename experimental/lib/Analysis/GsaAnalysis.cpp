@@ -417,7 +417,7 @@ void GsaAnalysis<FunctionType>::convertPhiToMu(FunctionType &funcOp) {
           auto *terminator = loopInfo.getLoopFor(phi->blockOwner)
                                  ->getExitingBlock()
                                  ->getTerminator();
-          phi->minterm = getBlockCondition(terminator->getBlock());
+          phi->condition = getBlockCondition(terminator->getBlock());
           phi->isRoot = true;
         }
       }
@@ -449,8 +449,6 @@ void gsa::Phi::print() {
       return "GAMMA";
     case MuGate:
       return "MU";
-    case EtaGate:
-      return "ETA";
     default:
       return "PHI";
     }
@@ -462,7 +460,7 @@ void gsa::Phi::print() {
                << index;
 
   if (gsaGateFunction == GammaGate || gsaGateFunction == MuGate) {
-    llvm::dbgs() << " minterm " << minterm;
+    llvm::dbgs() << " condition " << condition;
   }
 
   llvm::dbgs() << "\n";

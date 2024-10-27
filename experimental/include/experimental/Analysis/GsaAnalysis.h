@@ -30,7 +30,7 @@ namespace gsa {
 
 /// Define the three possible kinds of phi inputs
 enum PhiInputType { OpInputType, PhiInputType, ArgInputType, EmptyInputType };
-enum GsaGateFunction { GammaGate, MuGate, EtaGate, PhiGate };
+enum GsaGateFunction { GammaGate, MuGate, PhiGate };
 
 struct Phi;
 
@@ -81,8 +81,8 @@ struct Phi {
   Block *blockOwner;
   /// Type of GSA gate function
   GsaGateFunction gsaGateFunction;
-  /// Minterm used to determine the outcome of the choice
-  std::string minterm;
+  /// Condition used to determine the outcome of the choice
+  std::string condition;
   /// Index of the current phi
   unsigned index;
   /// Determintes whether it is a root or not (all MUs are roots, only the base
@@ -91,9 +91,9 @@ struct Phi {
 
   /// Initialize the values of the phi
   Phi(Value v, unsigned n, SmallVector<PhiInput *> &pi, Block *b,
-      GsaGateFunction ggf, std::string m = "")
+      GsaGateFunction ggf, std::string c = "")
       : result(v), argNumber(n), operands(pi), blockOwner(b),
-        gsaGateFunction(ggf), minterm(std::move(m)) {}
+        gsaGateFunction(ggf), condition(std::move(c)) {}
 
   void print();
 };

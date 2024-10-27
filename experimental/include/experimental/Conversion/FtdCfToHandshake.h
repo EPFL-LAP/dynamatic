@@ -48,9 +48,6 @@ struct FtdStoredOperations {
   /// contains all `handshake::MergeOp` added by expliciting phi functions
   DenseSet<Operation *> explicitPhiMerges;
 
-  /// contains all operations related to shannon's expansion
-  DenseSet<Operation *> shannonOperations;
-
   /// For each condition of the block, represented in abstract as `cN` where `N`
   /// is the index of the basic block, associate its corresponding control
   /// value, Associates the condition of the block in string format to its
@@ -61,6 +58,9 @@ struct FtdStoredOperations {
   // Contains the operations related to init merges, thus both merges and
   // constants
   DenseSet<Operation *> initMergesOperations;
+
+  // Contains operations which are to be skipped by `addRegen` and `addSupp`
+  DenseSet<Operation *> opsToSkip;
 };
 
 /// Convert a func-level function into an handshake-level function. A custom
@@ -93,6 +93,8 @@ protected:
   LogicalResult ftdVerifyAndCreateMemInterfaces(
       handshake::FuncOp &funcOp, ConversionPatternRewriter &rewriter,
       MemInterfacesInfo &memInfo, FtdStoredOperations &ftdOps) const;
+
+  void analyzeLoop(handshake::FuncOp funcOp, FtdStoredOperations &ftdOps) const;
 
   /// Given a list of operations, return the list of memory dependencies for
   /// each block. This allows to build the group graph, which allows to
