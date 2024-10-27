@@ -552,7 +552,7 @@ void BufferPlacementMILP::logResults(BufferPlacement &placement) {
     os << "- Placement decision: \n" << result.numSlotOB
        << " OB slot(s)\n" << result.numSlotTB
        << " TB slot(s)\n" << result.numDVFIFO
-       << " DVFIFO slot(s)\n" << result.numTranspFIFO
+       << " DVFIFO slot(s)\n" << result.numTFIFO
        << " TranspFIFO slot(s)\n" << result.numDVSE
        << " DVSE slot(s)\n" << result.numDVR
        << " DVR slot(s)\n";

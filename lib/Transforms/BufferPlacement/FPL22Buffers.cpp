@@ -89,7 +89,7 @@ void FPL22BuffersBase::extractResult(BufferPlacement &placement) {
   // We change from a tehb chain to transpFIFO + tehb to
   // ensure it performs the correct timing behavior.
   if (result.numSlotTB > 1) {
-    result.numTranspFIFO = result.numSlotTB - 1;
+    result.numTFIFO = result.numSlotTB - 1;
     result.numSlotTB = 1;
   }
 

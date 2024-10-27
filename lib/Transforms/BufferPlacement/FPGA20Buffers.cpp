@@ -65,7 +65,7 @@ void FPGA20Buffers::extractResult(BufferPlacement &placement) {
     if (placeOpaque) {
       if (legacyPlacement) {
         // Satisfy the transparent slots requirement, all other slots are opaque
-        result.numTranspFIFO = props.minTrans;
+        result.numTFIFO = props.minTrans;
         result.numSlotOB = numSlotsToPlace - props.minTrans;
       } else {
         // We want as many slots as possible to be transparent and at least one
@@ -73,16 +73,16 @@ void FPGA20Buffers::extractResult(BufferPlacement &placement) {
         unsigned actualMinOpaque = std::max(1U, props.minOpaque);
         if (props.maxTrans.has_value() &&
             (props.maxTrans.value() < numSlotsToPlace - actualMinOpaque)) {
-          result.numTranspFIFO = props.maxTrans.value();
-          result.numSlotOB = numSlotsToPlace - result.numTranspFIFO;
+          result.numTFIFO = props.maxTrans.value();
+          result.numSlotOB = numSlotsToPlace - result.numTFIFO;
         } else {
           result.numSlotOB = actualMinOpaque;
-          result.numTranspFIFO = numSlotsToPlace - result.numSlotOB;
+          result.numTFIFO = numSlotsToPlace - result.numSlotOB;
         }
       }
     } else {
       // All slots should be transparent
-      result.numTranspFIFO = numSlotsToPlace;
+      result.numTFIFO = numSlotsToPlace;
     }
 
     result.deductInternalBuffers(Channel(channel), timingDB);

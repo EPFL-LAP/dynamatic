@@ -483,7 +483,7 @@ void CostAwareBuffers::extractResult(BufferPlacement &placement, ArrayRef<Buffer
       else if (buffertype== BufferType::TB)
         result.numSlotTB = numSlotsToPlace;
       else if (buffertype== BufferType::FT)
-        result.numTranspFIFO = numSlotsToPlace;
+        result.numTFIFO = numSlotsToPlace;
       else if (buffertype== BufferType::SE)
         result.numDVSE = numSlotsToPlace;
       else if (buffertype== BufferType::DR)
@@ -492,10 +492,10 @@ void CostAwareBuffers::extractResult(BufferPlacement &placement, ArrayRef<Buffer
     
     // This is an optimization to combine one slot OB and a n-slot TranspFIFO to
     // a (n+1)-slot DVFIFO. This optimization saves the area cost.
-    if (result.numSlotOB && result.numTranspFIFO) {
+    if (result.numSlotOB && result.numTFIFO) {
       result.numSlotOB -= 1;
-      result.numDVFIFO = result.numTranspFIFO + 1;
-      result.numTranspFIFO = 0;
+      result.numDVFIFO = result.numTFIFO + 1;
+      result.numTFIFO = 0;
     }
 
     placement[channel] = result;

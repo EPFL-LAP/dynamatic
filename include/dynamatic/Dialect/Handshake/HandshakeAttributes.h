@@ -64,6 +64,10 @@ struct TimingInfo {
   /// Returns timing information for a standard TEHB.
   /// NOTE: (lucas-rami) I am not sure these make sense, see type's note above.
   static TimingInfo tehb();
+  static TimingInfo dvfifo();
+  static TimingInfo tfifo();
+  static TimingInfo dvse();
+  static TimingInfo dvr();
 };
 
 bool operator==(const TimingInfo &lhs, const TimingInfo &rhs);

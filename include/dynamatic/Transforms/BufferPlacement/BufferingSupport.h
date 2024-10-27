@@ -176,7 +176,7 @@ struct PlacementResult {
   /// The number of elasticFifoInner (FIFO that cut D, V) slots that should be placed. 
   unsigned numDVFIFO = 0;
   /// The number of transpFifo slots that should be placed.
-  unsigned numTranspFIFO = 0;
+  unsigned numTFIFO = 0;
   /// The number of Pipeline (Pipeline is not an accurate name, we prefer
   /// cut D, V, Single Enable) slots that should be placed.
   unsigned numDVSE = 0;
