@@ -39,11 +39,11 @@ using namespace dynamatic;
 namespace {
 
 #define OPTIM_DISTR                                                            \
-  true // associate it with a disable of DistributeSuppresses,
-       // DistributeMergeRepeats,DistributeMuxRepeats
+  false // associate it with a disable of DistributeSuppresses,
+        // DistributeMergeRepeats,DistributeMuxRepeats
 #define OPTIM_BRANCH_TO_SUPP                                                   \
-  true // associate it with a disable of ConstructSuppresses,
-       // FixBranchesToSuppresses
+  false // associate it with a disable of ConstructSuppresses,
+        // FixBranchesToSuppresses
 
 // Rules E
 /// Erases unconditional branches (which would eventually lower to simple
@@ -571,6 +571,8 @@ struct RemoveBranchMuxIfThenElse : public OpRewritePattern<handshake::MuxOp> {
   }
 };
 
+// Update: 27/10: This should not be the case now that we check if a similar NOT
+// is already there before inserting a new one
 // TODO: A limitation here and in other patterns is that NOTs are inserted
 // separately, so two values outputted from a NOT fed from the same condition
 // will be considered different although they are equivalent... [But, this
@@ -1297,6 +1299,7 @@ struct ExtractLoopCondition
       }
     }
     Value muxSel;
+
     if (foundInit) {
       muxSel = existingInit.getResult();
     } else {
@@ -2823,6 +2826,7 @@ struct ConvertLoopMergeToMux : public OpRewritePattern<handshake::MergeOp> {
         break;
       }
     }
+
     Value muxSel;
     if (foundInit) {
       muxSel = existingInit.getResult();
