@@ -109,19 +109,7 @@ def FuncSetArgNames : DynamaticPass<"func-set-arg-names"> {
 // Handshake passes
 //===----------------------------------------------------------------------===//
 
-def HandshakeCanonicalize : DynamaticPass<"handshake-canonicalize"> {
-  let summary = "Canonicalize Handshake operations.";
-  let description = [{
-    Canonicalizes and folds all Handshake operations in the module using a
-    greedy pattern rewriter. The pass preserves the circuit's materialization
-    status i.e., it inserts forks and sinks as needed to compensate for changes
-    made to the IR.
-  }];
-  let constructor = "dynamatic::createHandshakeCanonicalize()";
-}
-
-def HandshakeRewriteTerms : DynamaticPass< "handshake-rewrite-terms", 
-                                                ["mlir::arith::ArithDialect"]>  {
+def HandshakeRewriteTerms : DynamaticPass< "handshake-rewrite-terms">  {
   let summary = "Rewrite terms in Handshake operation sequences.";
   let description = [{
       Removes redundant operations and simplifies the IR by applying a series
@@ -131,6 +119,26 @@ def HandshakeRewriteTerms : DynamaticPass< "handshake-rewrite-terms",
       transformations that could potentially change the behavior of the circuit.
   }];
   let constructor = "dynamatic::rewriteHandshakeTerms()";
+}
+
+def HandshakeCombineSteeringLogic : DynamaticPass< "handshake-combine-steering-logic">  {
+  let summary = "Combine common steering logic between different handshake operations.";
+  let description = [{
+      Eliminates redundant steering units that have the same inputs but
+      different outputs by combining them into single units feeding multiple outputs.
+  }];
+  let constructor = "dynamatic::combineSteeringLogic()";
+}
+
+def HandshakeCanonicalize : DynamaticPass<"handshake-canonicalize"> {
+  let summary = "Canonicalize Handshake operations.";
+  let description = [{
+    Canonicalizes and folds all Handshake operations in the module using a
+    greedy pattern rewriter. The pass preserves the circuit's materialization
+    status i.e., it inserts forks and sinks as needed to compensate for changes
+    made to the IR.
+  }];
+  let constructor = "dynamatic::createHandshakeCanonicalize()";
 }
 
 def HandshakeHoistExtInstances : DynamaticPass<"handshake-hoist-ext-instances"> {
