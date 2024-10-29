@@ -268,9 +268,7 @@ static void connectInitMerges(ConversionPatternRewriter &rewriter,
   auto startValue = (Value)funcOp.getArguments().back();
   auto cstType = rewriter.getIntegerType(1);
   auto cstAttr = IntegerAttr::get(cstType, 0);
-  for (auto &initMerge : ftdOps.initMergesOperations) {
-    if (!llvm::isa<handshake::MergeOp>(initMerge))
-      continue;
+  for (auto initMerge : funcOp.getBody().getOps<handshake::MergeOp>()) {
     rewriter.setInsertionPointToStart(initMerge->getBlock());
     auto constOp = rewriter.create<handshake::ConstantOp>(initMerge->getLoc(),
                                                           cstAttr, startValue);

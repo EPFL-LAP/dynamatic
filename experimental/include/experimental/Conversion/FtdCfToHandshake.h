@@ -72,14 +72,14 @@ public:
   FtdLowerFuncToHandshake(gsa::GsaAnalysis<mlir::func::FuncOp> &gsa,
                           NameAnalysis &namer, MLIRContext *ctx,
                           mlir::PatternBenefit benefit = 1)
-      : LowerFuncToHandshake(namer, ctx, benefit), gsaAnalysis(gsa){};
+      : LowerFuncToHandshake(namer, ctx, benefit), gsaAnalysis(gsa) {};
 
   FtdLowerFuncToHandshake(gsa::GsaAnalysis<mlir::func::FuncOp> &gsa,
                           NameAnalysis &namer,
                           const TypeConverter &typeConverter, MLIRContext *ctx,
                           mlir::PatternBenefit benefit = 1)
       : LowerFuncToHandshake(namer, typeConverter, ctx, benefit),
-        gsaAnalysis(gsa){};
+        gsaAnalysis(gsa) {};
 
   LogicalResult
   matchAndRewrite(mlir::func::FuncOp funcOp, OpAdaptor adaptor,
