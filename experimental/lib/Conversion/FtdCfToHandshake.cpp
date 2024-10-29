@@ -249,6 +249,11 @@ LogicalResult FtdLowerFuncToHandshake::matchAndRewrite(
   if (failed(flattenAndTerminate(funcOp, rewriter, argReplacements)))
     return failure();
 
+  // TEMP
+  auto muxes = funcOp.getBody().getOps<handshake::MuxOp>();
+  for (auto mux : muxes)
+    mux->getResult(0).setType(channelifyType(mux->getResult(0).getType()));
+
   return success();
 }
 
@@ -1640,8 +1645,8 @@ FtdLowerFuncToHandshake::addExplicitPhi(func::FuncOp funcOp,
       }
 
       // Create the multiplexer
-      auto mux = rewriter.create<handshake::MuxOp>(
-          loc, channelifyType(phi->result.getType()), conditionValue, operands);
+      auto mux = rewriter.create<handshake::MuxOp>(loc, phi->result.getType(),
+                                                   conditionValue, operands);
 
       // The one input gamma is marked at an operation to skip in the IR and
       // later removed
