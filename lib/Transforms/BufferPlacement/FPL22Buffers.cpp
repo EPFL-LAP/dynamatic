@@ -79,20 +79,21 @@ void FPL22BuffersBase::extractResult(BufferPlacement &placement) {
     }
 
     result.deductInternalBuffers(Channel(channel), timingDB);
+    if (result.numSlotOB > 1) {
+      result.numDVFIFO = result.numSlotOB;
+      result.numSlotOB = 0;
+    }
+    // We change from a tehb chain to transpFIFO + tehb to
+    // ensure it performs the correct timing behavior.
+    if (result.numSlotTB > 1) {
+      result.numTFIFO = result.numSlotTB - 1;
+      result.numSlotTB = 1;
+    }
+
     placement[channel] = result;
   }
 
-  if (result.numSlotOB > 1) {
-    result.numDVFIFO = result.numSlotOB;
-    result.numSlotOB = 0;
-  }
-  // We change from a tehb chain to transpFIFO + tehb to
-  // ensure it performs the correct timing behavior.
-  if (result.numSlotTB > 1) {
-    result.numTFIFO = result.numSlotTB - 1;
-    result.numSlotTB = 1;
-  }
-
+  
   if (logger)
     logResults(placement);
 }

@@ -33,7 +33,6 @@
 #include "dynamatic/Transforms/BufferPlacement/CFDFC.h"
 #include "dynamatic/Transforms/BufferPlacement/FPGA20Buffers.h"
 #include "dynamatic/Transforms/BufferPlacement/FPL22Buffers.h"
-#include "dynamatic/Transforms/BufferPlacement/CostAwareBuffers.h"
 #include "dynamatic/Transforms/BufferPlacement/HandshakePlaceBuffers.h"
 #include "dynamatic/Transforms/HandshakeMaterialize.h"
 #include "experimental/Transforms/ResourceSharing/SharingSupport.h"
@@ -68,7 +67,7 @@ static constexpr llvm::StringLiteral ON_MERGES("on-merges");
 #ifndef DYNAMATIC_GUROBI_NOT_INSTALLED
 /// Algorithms that do require solving an MILP.
 static constexpr llvm::StringLiteral FPGA20("fpga20"),
-    FPGA20_LEGACY("fpga20-legacy"), FPL22("fpl22"), CostAware("costaware");
+    FPGA20_LEGACY("fpga20-legacy"), FPL22("fpl22");
 #endif // DYNAMATIC_GUROBI_NOT_INSTALLED
 
 // A FuncPerfInfo holds the extracted data from buffer placement, for a single
@@ -223,36 +222,6 @@ private:
 
 } // namespace fpl22
 
-namespace costaware {
-
-// An wrapper class for extracting CFDFC performance from Cost Aware buffers.
-class CostAwareBuffersWrapper : public CostAwareBuffers {
-public:
-  CostAwareBuffersWrapper(SharingInfo &sharingInfo, GRBEnv &env,
-                       FuncInfo &funcInfo, const TimingDatabase &timingDB,
-                       double targetPeriod,
-                       Logger &logger, StringRef milpName)
-      : CostAwareBuffers(env, funcInfo, timingDB, targetPeriod,
-                      logger, milpName),
-        sharingInfo(sharingInfo){};
-  CostAwareBuffersWrapper(SharingInfo &sharingInfo, GRBEnv &env,
-                       FuncInfo &funcInfo, const TimingDatabase &timingDB,
-                       double targetPeriod)
-      : CostAwareBuffers(env, funcInfo, timingDB, targetPeriod),
-        sharingInfo(sharingInfo){};
-
-private:
-  SharingInfo &sharingInfo;
-
-  void extractResult(BufferPlacement &placement) override {
-    // Run the CostAwareBuffers's extractResult as it is
-    CostAwareBuffers::extractResult(placement);
-
-    loadFuncPerfInfo(sharingInfo, vars, funcInfo);
-  }
-};
-
-} // namespace costaware
 
 } // namespace buffer
 } // namespace dynamatic
@@ -368,11 +337,6 @@ struct HandshakePlaceBuffersPassWrapper : public HandshakePlaceBuffersPass {
       return checkLoggerAndSolve<fpl22::OutOfCycleBuffers>(
           logger, "out_of_cycle", placement, env, funcInfo, timingDB, targetCP);
     }
-    if (algorithm == CostAware)
-      // Create and solve the MILP
-      return checkLoggerAndSolve<buffer::costaware::CostAwareBuffersWrapper>(
-          logger, "placement", placement, sharingInfo, env, funcInfo, timingDB,
-          targetCP, algorithm != CostAware);
 
     llvm_unreachable("unknown algorithm");
   }

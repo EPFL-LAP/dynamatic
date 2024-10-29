@@ -475,8 +475,7 @@ LogicalResult HandshakePlaceBuffersPass::getBufferPlacement(
   if (algorithm == CostAware) {
     // Create and solve the MILP
     return checkLoggerAndSolve<costaware::CostAwareBuffers>(
-        logger, "placement", placement, env, info, timingDB, targetCP,
-        algorithm != CostAware);
+        logger, "placement", placement, env, info, timingDB, targetCP);
   }
 
   llvm_unreachable("unknown algorithm");
@@ -564,6 +563,7 @@ void HandshakePlaceBuffersPass::instantiateBuffers(BufferPlacement &placement) {
         bufferType = BufferOp::DVSE_TYPE;
       else if (timing == TimingInfo::dvr())
         bufferType = BufferOp::DVR_TYPE;
+
       auto bufOp = builder.create<handshake::BufferOp>(
           bufferIn.getLoc(), bufferIn, timing, numSlots, bufferType);
       inheritBB(opDst, bufOp);
@@ -575,19 +575,19 @@ void HandshakePlaceBuffersPass::instantiateBuffers(BufferPlacement &placement) {
     };
 
     if (placeRes.opaqueBeforeTrans) {
-      placeBuffer(TimingInfo::dvr(), placeRes.numSlotOB);
-      placeBuffer(TimingInfo::dvse(), placeRes.numSlotTB);
+      placeBuffer(TimingInfo::dvr(), placeRes.numDVR);
+      placeBuffer(TimingInfo::dvse(), placeRes.numDVSE);
       placeBuffer(TimingInfo::oehb(), placeRes.numSlotOB);
-      placeBuffer(TimingInfo::dvfifo(), placeRes.numSlotOB);
-      placeBuffer(TimingInfo::tfifo(), placeRes.numSlotTB);
+      placeBuffer(TimingInfo::dvfifo(), placeRes.numDVFIFO);
+      placeBuffer(TimingInfo::tfifo(), placeRes.numTFIFO);
       placeBuffer(TimingInfo::tehb(), placeRes.numSlotTB);
     } else {
       placeBuffer(TimingInfo::tehb(), placeRes.numSlotTB);
-      placeBuffer(TimingInfo::tfifo(), placeRes.numSlotTB);
-      placeBuffer(TimingInfo::dvfifo(), placeRes.numSlotOB);
+      placeBuffer(TimingInfo::tfifo(), placeRes.numTFIFO);
+      placeBuffer(TimingInfo::dvfifo(), placeRes.numDVFIFO);
       placeBuffer(TimingInfo::oehb(), placeRes.numSlotOB);
-      placeBuffer(TimingInfo::dvse(), placeRes.numSlotTB);
-      placeBuffer(TimingInfo::dvr(), placeRes.numSlotOB);
+      placeBuffer(TimingInfo::dvse(), placeRes.numDVSE);
+      placeBuffer(TimingInfo::dvr(), placeRes.numDVR);
     }
   }
 }
