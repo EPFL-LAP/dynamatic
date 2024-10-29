@@ -123,7 +123,7 @@ protected:
 
   void addObjective(ValueRange channels, ArrayRef<BufferType> buffers, ArrayRef<CFDFC *> cfdfcs);
 
-  void extractResult(BufferPlacement &placement, ArrayRef<BufferType> buffers) override;
+  void extractResult(BufferPlacement &placement) override;
 
 private:
 

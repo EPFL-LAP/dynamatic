@@ -465,7 +465,7 @@ void CostAwareBuffers::addObjective(ValueRange channels, ArrayRef<BufferType> bu
 }
 
 
-void CostAwareBuffers::extractResult(BufferPlacement &placement, ArrayRef<BufferType> buffertypes) {
+void CostAwareBuffers::extractResult(BufferPlacement &placement) {
   // Iterate over all channels in the circuit
   for (auto &[channel, channelVars] : vars.channelVars) {
     
