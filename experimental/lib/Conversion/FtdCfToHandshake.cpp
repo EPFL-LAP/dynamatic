@@ -1711,7 +1711,6 @@ FtdLowerFuncToHandshake::addExplicitPhi(func::FuncOp funcOp,
         auto newBranch =
             rewriter.create<cf::BranchOp>(branch->getLoc(), branch.getDest());
         rewriter.replaceOp(branch, newBranch);
-        rewriter.eraseOp(branch);
       }
     }
   }
