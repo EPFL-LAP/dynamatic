@@ -89,7 +89,7 @@ void FPGA20Buffers::extractResult(BufferPlacement &placement) {
 
     if (result.numSlotOB == 1){
       result.numSlotOB = 0;
-      result.numSlotDVR = 1;
+      result.numDVR = 1;
     } else if (result.numSlotOB == 2){
       result.numSlotOB = 1;
       result.numSlotTB = 1;

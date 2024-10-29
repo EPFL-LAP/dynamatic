@@ -473,23 +473,28 @@ void CostAwareBuffers::extractResult(BufferPlacement &placement, ArrayRef<Buffer
     
     // Extract number and type of slots from the MILP solution, as well as
     // channel-specific buffering properties
-    for (BufferType buffertype : buffertypes) {
-      unsigned numSlotsToPlace = static_cast<unsigned>(
-          channelVars.bufNumSlots[buffertype].get(GRB_DoubleAttr_X) + 0.5);
-      if (numSlotsToPlace == 0)
-        continue;
-      else if (buffertype== BufferType::OB)
-        result.numSlotOB = numSlotsToPlace;
-      else if (buffertype== BufferType::TB)
-        result.numSlotTB = numSlotsToPlace;
-      else if (buffertype== BufferType::FT)
-        result.numTFIFO = numSlotsToPlace;
-      else if (buffertype== BufferType::SE)
-        result.numDVSE = numSlotsToPlace;
-      else if (buffertype== BufferType::DR)
-        result.numDVR = numSlotsToPlace;
-    }
     
+    unsigned numSlotsToPlace = static_cast<unsigned>(
+        channelVars.bufNumSlots[BufferType::OB].get(GRB_DoubleAttr_X) + 0.5);
+    if (numSlotsToPlace != 0)
+      result.numSlotOB = numSlotsToPlace;
+    numSlotsToPlace = static_cast<unsigned>(
+        channelVars.bufNumSlots[BufferType::TB].get(GRB_DoubleAttr_X) + 0.5);
+    if (numSlotsToPlace != 0)
+      result.numSlotTB = numSlotsToPlace;
+    numSlotsToPlace = static_cast<unsigned>(
+        channelVars.bufNumSlots[BufferType::FT].get(GRB_DoubleAttr_X) + 0.5);
+    if (numSlotsToPlace != 0)
+      result.numTFIFO = numSlotsToPlace;
+    numSlotsToPlace = static_cast<unsigned>(
+        channelVars.bufNumSlots[BufferType::SE].get(GRB_DoubleAttr_X) + 0.5);
+    if (numSlotsToPlace != 0)
+      result.numDVSE = numSlotsToPlace;
+    numSlotsToPlace = static_cast<unsigned>(
+        channelVars.bufNumSlots[BufferType::DR].get(GRB_DoubleAttr_X) + 0.5);
+    if (numSlotsToPlace != 0)
+      result.numDVR = numSlotsToPlace;
+  
     // This is an optimization to combine one slot OB and a n-slot TranspFIFO to
     // a (n+1)-slot DVFIFO. This optimization saves the area cost.
     if (result.numSlotOB && result.numTFIFO) {
