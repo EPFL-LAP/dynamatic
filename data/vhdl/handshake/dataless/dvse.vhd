@@ -4,7 +4,7 @@ use ieee.numeric_std.all;
 
 entity dvse_dataless is
   generic(
-    DEPTH : integer
+    NUM_SLOTS : integer
   );
   port(
     -- inputs
@@ -20,7 +20,7 @@ end entity;
 architecture arch of dvse_dataless is
 
   signal regEn      : std_logic;
-  type DVSE_VALID is array (0 to DEPTH - 1) of std_logic;
+  type DVSE_VALID is array (0 to NUM_SLOTS - 1) of std_logic;
   signal valid_reg  : DVSE_VALID;
 
 begin
@@ -29,12 +29,12 @@ begin
   begin
     if (rising_edge(clk)) then
       if (rst = '1') then
-        for i in 0 to DEPTH - 1 loop
+        for i in 0 to NUM_SLOTS - 1 loop
           valid_reg(i) <= '0';
         end loop;
       else
         if (regEn) then
-          for i in 1 to DEPTH - 1 loop
+          for i in 1 to NUM_SLOTS - 1 loop
             valid_reg(i) <= valid_reg(i - 1);
           end loop;
           valid_reg(0) <= ins_valid;
@@ -42,7 +42,7 @@ begin
       end if;
   end process; 
 
-  outs_valid <= valid_reg(DEPTH - 1);
+  outs_valid <= valid_reg(NUM_SLOTS - 1);
   regEn <= not outs_valid or outs_ready;
   ins_ready <= regEn;
 

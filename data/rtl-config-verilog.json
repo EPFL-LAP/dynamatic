@@ -231,6 +231,7 @@
   {
     "name": "handshake.buffer",
     "parameters": [
+      { "name": "NUM_SLOTS", "type": "unsigned", "lb": 1},
       { "name": "BUFFER_TYPE", "type": "string", "eq": "DV", "generic": false },
       {
         "name": "DATA_TYPE",
@@ -247,13 +248,15 @@
         "generic": false
       }
     ],
-    "generic": "$DYNAMATIC/data/verilog/handshake/dataless/oehb.v",
-    "module-name": "oehb_dataless",
+    "generic": "$DYNAMATIC/data/verilog/handshake/dataless/oehb_chain.v",
+    "module-name": "oehb_chain_dataless",
+    "dependencies": ["oehb_dataless"],
     "hdl": "verilog"
   },
   {
     "name": "handshake.buffer",
     "parameters": [
+      { "name": "NUM_SLOTS", "type": "unsigned", "lb": 1},
       { "name": "BUFFER_TYPE", "type": "string", "eq": "DV", "generic": false },
       { "name": "DATA_TYPE", "type": "dataflow", "data-lb": 1, "extra-eq": 0 },
       {
@@ -264,13 +267,14 @@
         "generic": false
       }
     ],
-    "generic": "$DYNAMATIC/data/verilog/handshake/oehb.v",
-    "dependencies": ["oehb_dataless"],
+    "generic": "$DYNAMATIC/data/verilog/handshake/oehb_chain.v",
+    "dependencies": ["oehb"],
     "hdl": "verilog"
   },
   {
     "name": "handshake.buffer",
     "parameters": [
+      { "name": "NUM_SLOTS", "type": "unsigned", "lb": 1},
       { "name": "BUFFER_TYPE", "type": "string", "eq": "DVE", "generic": false },
       {
         "name": "DATA_TYPE",
@@ -294,6 +298,7 @@
   {
     "name": "handshake.buffer",
     "parameters": [
+      { "name": "NUM_SLOTS", "type": "unsigned", "lb": 1},
       { "name": "BUFFER_TYPE", "type": "string", "eq": "DVE", "generic": false },
       { "name": "DATA_TYPE", "type": "dataflow", "data-lb": 1, "extra-eq": 0 },
       {
@@ -310,6 +315,7 @@
   {
     "name": "handshake.buffer",
     "parameters": [
+      { "name": "NUM_SLOTS", "type": "unsigned", "lb": 1},
       { "name": "BUFFER_TYPE", "type": "string", "eq": "R", "generic": false },
       {
         "name": "DATA_TYPE",
@@ -325,13 +331,15 @@
         "generic": false
       }
     ],
-    "generic": "$DYNAMATIC/data/verilog/handshake/dataless/tehb.v",
-    "module-name": "tehb_dataless",
+    "generic": "$DYNAMATIC/data/verilog/handshake/dataless/tehb_chain.v",
+    "module-name": "tehb_chain_dataless",
+    "dependencies": ["tehb_dataless"],
     "hdl": "verilog"
   },
   {
     "name": "handshake.buffer",
     "parameters": [
+      { "name": "NUM_SLOTS", "type": "unsigned", "lb": 1},
       { "name": "BUFFER_TYPE", "type": "string", "eq": "R", "generic": false },
       { "name": "DATA_TYPE", "type": "dataflow", "data-lb": 1, "extra-eq": 0 },
       {
@@ -341,13 +349,14 @@
         "generic": false
       }
     ],
-    "generic": "$DYNAMATIC/data/verilog/handshake/tehb.v",
-    "dependencies": ["tehb_dataless"],
+    "generic": "$DYNAMATIC/data/verilog/handshake/tehb_chain.v",
+    "dependencies": ["tehb"],
     "hdl": "verilog"
   },
   {
     "name": "handshake.buffer",
     "parameters": [
+      { "name": "NUM_SLOTS", "type": "unsigned", "lb": 1},
       { "name": "BUFFER_TYPE", "type": "string", "eq": "T", "generic": false },
       {
         "name": "DATA_TYPE",
@@ -370,6 +379,7 @@
   {
     "name": "handshake.buffer",
     "parameters": [
+      { "name": "NUM_SLOTS", "type": "unsigned", "lb": 1},
       { "name": "BUFFER_TYPE", "type": "string", "eq": "T", "generic": false },
       { "name": "DATA_TYPE", "type": "dataflow", "data-lb": 1, "extra-eq": 0 },
       {
@@ -385,6 +395,7 @@
   {
     "name": "handshake.buffer",
     "parameters": [
+      { "name": "NUM_SLOTS", "type": "unsigned", "lb": 1},
       { "name": "BUFFER_TYPE", "type": "string", "eq": "DVSE", "generic": false },
       {
         "name": "DATA_TYPE",
@@ -408,6 +419,7 @@
   {
     "name": "handshake.buffer",
     "parameters": [
+      { "name": "NUM_SLOTS", "type": "unsigned", "lb": 1},
       { "name": "BUFFER_TYPE", "type": "string", "eq": "DVSE", "generic": false },
       { "name": "DATA_TYPE", "type": "dataflow", "data-lb": 1, "extra-eq": 0 },
       {
@@ -425,6 +437,7 @@
   {
     "name": "handshake.buffer",
     "parameters": [
+      { "name": "NUM_SLOTS", "type": "unsigned", "lb": 1},
       { "name": "BUFFER_TYPE", "type": "string", "eq": "DVR", "generic": false },
       {
         "name": "DATA_TYPE",
@@ -442,13 +455,15 @@
         "generic": false
       }
     ],
-    "generic": "$DYNAMATIC/data/verilog/handshake/dataless/dvr.v",
-    "module-name": "dvr_dataless",
+    "generic": "$DYNAMATIC/data/verilog/handshake/dataless/dvr_chain.v",
+    "module-name": "dvr_chain_dataless",
+    "dependencies": ["dvr_dataless"],
     "hdl": "verilog"
   },
   {
     "name": "handshake.buffer",
     "parameters": [
+      { "name": "NUM_SLOTS", "type": "unsigned", "lb": 1},
       { "name": "BUFFER_TYPE", "type": "string", "eq": "DVR", "generic": false },
       { "name": "DATA_TYPE", "type": "dataflow", "data-lb": 1, "extra-eq": 0 },
       {
@@ -460,8 +475,8 @@
         "generic": false
       }
     ],
-    "generic": "$DYNAMATIC/data/verilog/handshake/dvr.v",
-    "dependencies": ["dvr_dataless"],
+    "generic": "$DYNAMATIC/data/verilog/handshake/dvr_chain.v",
+    "dependencies": ["dvr"],
     "hdl": "verilog"
   },
   {
@@ -804,13 +819,31 @@
     "hdl": "verilog"
   },
   {
-    "generic": "$DYNAMATIC/data/verilog/support/elastic_fifo_inner.v",
-    "hdl": "verilog"
+    "generic": "$DYNAMATIC/data/verilog/handshake/dataless/oehb.v",
+    "module-name": "oehb_dataless"
   },
   {
-    "generic": "$DYNAMATIC/data/verilog/support/dataless/elastic_fifo_inner.v",
-    "module-name": "elastic_fifo_inner_dataless",
-    "hdl": "verilog"
+    "generic": "$DYNAMATIC/data/verilog/handshake/oehb.v",
+    "module-name": "oehb",
+    "dependencies": ["oehb_dataless"]
+  },
+  {
+    "generic": "$DYNAMATIC/data/verilog/handshake/dataless/tehb.v",
+    "module-name": "tehb_dataless"
+  },
+  {
+    "generic": "$DYNAMATIC/data/verilog/handshake/tehb.v",
+    "module-name": "tehb",
+    "dependencies": ["tehb_dataless"]
+  },
+  {
+    "generic": "$DYNAMATIC/data/verilog/handshake/dataless/dvr.v",
+    "module-name": "dvr_dataless"
+  },
+  {
+    "generic": "$DYNAMATIC/data/verilog/handshake/dvr.v",
+    "module-name": "dvr",
+    "dependencies": ["dvr_dataless"]
   },
   {
     "generic": "$DYNAMATIC/data/verilog/support/logic.v",

@@ -4,7 +4,7 @@ use ieee.numeric_std.all;
 
 entity dvse is
   generic (
-    DEPTH     : integer;
+    NUM_SLOTS     : integer;
     DATA_TYPE : integer
   );
   port (
@@ -23,7 +23,7 @@ end entity;
 architecture arch of dvse is
 
   signal regEn, inputReady : std_logic;
-  type DVSE_MEMORY is array (0 to DEPTH - 1) of std_logic_vector(DATA_TYPE - 1 downto 0);
+  type DVSE_MEMORY is array (0 to NUM_SLOTS - 1) of std_logic_vector(DATA_TYPE - 1 downto 0);
   signal Memory  : DVSE_MEMORY;
 
 begin
@@ -42,14 +42,14 @@ begin
   -- Hence, no need to reset
   -- If reset is necessary, then add the following lines:
   -- if (rst = '1') then
-  --   for i in 0 to DEPTH - 1 loop
+  --   for i in 0 to NUM_SLOTS - 1 loop
   --     Memory(i) <= (others => '0');
   --   end loop;
   process (clk) is
   begin
     if (rising_edge(clk)) then
       if (regEn) then
-        for i in 1 to DEPTH - 1 loop
+        for i in 1 to NUM_SLOTS - 1 loop
           Memory(i) <= Memory(i - 1);
         end loop;
         Memory(0) <= ins;
@@ -59,6 +59,6 @@ begin
 
   regEn <= inputReady;
   ins_ready <= inputReady;
-  outs <= Memory(DEPTH - 1);
+  outs <= Memory(NUM_SLOTS - 1);
 
 end architecture;

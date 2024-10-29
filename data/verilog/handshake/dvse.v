@@ -1,7 +1,7 @@
 `timescale 1ns/1ps
 
 module dvse #(
-  parameter integer DEPTH = 4,
+  parameter integer NUM_SLOTS = 4,
   parameter integer DATA_TYPE = 32
 )(
   input  clk,
@@ -18,11 +18,11 @@ module dvse #(
 
   // Internal signals
   wire regEn, inputReady;
-  reg [DATA_TYPE - 1 : 0] Memory [0 : DEPTH - 1];
+  reg [DATA_TYPE - 1 : 0] Memory [0 : NUM_SLOTS - 1];
   
   // Instance of dvse_dataless to manage handshaking
   dvse_dataless #(
-    .DEPTH(DEPTH)
+    .NUM_SLOTS(NUM_SLOTS)
   ) control (
     .clk        (clk        ),
     .rst        (rst        ),
@@ -35,7 +35,7 @@ module dvse #(
   integer i;
   always @(posedge clk) begin
     if (regEn) begin
-      for (i = DEPTH - 1; i > 0; i = i - 1) begin
+      for (i = NUM_SLOTS - 1; i > 0; i = i - 1) begin
         Memory[i] <= Memory[i - 1];
       end
       Memory[0] <= ins;
@@ -44,6 +44,6 @@ module dvse #(
   
   assign regEn     = inputReady;
   assign ins_ready = inputReady;
-  assign outs      = Memory[DEPTH - 1];
+  assign outs      = Memory[NUM_SLOTS - 1];
 
 endmodule
