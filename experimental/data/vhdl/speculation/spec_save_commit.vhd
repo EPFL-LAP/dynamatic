@@ -60,7 +60,7 @@ begin
     --validArray(0) <= (PassEn and not CurrEmpty) or (ResendEn and not Empty);
     
     TailEn <= not Full and pValidArray(0);
-    HeadEn <= not Empty and ((nReadyArray(0) and ResendEn) or killEn);
+    HeadEn <= not Empty and ((nReadyArray(0) and ResendEn) or (readyArray(1) and KillEn));
     CurrEn <= ( (not CurrEmpty or pValidArray(0)) and (nReadyArray(0) and PassEn) ) or (not Empty and (nReadyArray(0) and NoCmpEn) );
 
     bypass <= pValidArray(0) and CurrEmpty;
@@ -92,6 +92,8 @@ en_proc : process (pValidArray, controlInArray)
 -- comb process for control ready
 ready_proc : process (PassEn, KillEn, ResendEn, CurrEmpty, Empty, nReadyArray, pValidArray)
     begin
+        -- Note: PassEn and KillEn can be simultaneously '1'
+        -- In that case, PassEn is prioritized
         if PassEn = '1' then
             readyArray(1) <= (not CurrEmpty or pValidArray(0)) and nReadyArray(0);
             --readyArray(1) <= not CurrEmpty and nReadyArray(0);
