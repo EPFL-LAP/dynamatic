@@ -421,12 +421,19 @@ bool checkGroupMergable(const Group &g1, const Group &g2,
   if (gMerged.size() > MAX_GROUP_SIZE)
     return false;
 
+  // All operations in the group must have the same type as the first op in the
+  // group
   OperationName opName = (*(gMerged.begin()))->getName();
+  Type groupType = (*(gMerged.begin()))->getResultTypes().front();
 
-  // 1. The merged group must have operations of the same type.
-  for (Operation *op : gMerged)
+  // 1. The merged group must have operations of the same type (both op type and
+  // data type).
+  for (Operation *op : gMerged) {
     if (op->getName() != opName)
       return false;
+    if (op->getResultTypes().front() != groupType)
+      return false;
+  }
 
   // 2. For each CFC, the sum of occupancy must be smaller than the capacity
   // (i.e., units in CFC must no greater than the II).

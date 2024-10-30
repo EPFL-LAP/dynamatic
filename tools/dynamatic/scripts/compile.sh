@@ -130,6 +130,7 @@ exit_on_fail "Failed to apply transformations to handshake" \
 # Credit-based sharing
 if [[ $USE_SHARING -ne 0 ]]; then
   BUFFER_PLACEMENT_PASS="credit-based-sharing"
+  echo_info "Set to apply credit-based sharing after buffer placement."
 else
   BUFFER_PLACEMENT_PASS="handshake-place-buffers"
 fi
