@@ -19,7 +19,6 @@
 
 #include "dynamatic/Support/LLVM.h"
 #include "experimental/Support/BooleanLogic/BoolExpression.h"
-#include "experimental/Support/BooleanLogic/Shannon.h"
 #include "mlir/Dialect/Func/IR/FuncOps.h"
 #include "mlir/Pass/AnalysisManager.h"
 #include "mlir/Transforms/DialectConversion.h"
@@ -53,16 +52,16 @@ struct PhiInput {
 
   /// Constructor for the result of an operation
   PhiInput(Value v, Block *bb)
-      : type(OpInputType), v(v), phi(nullptr), blockOwner(bb){};
+      : type(OpInputType), v(v), phi(nullptr), blockOwner(bb) {};
   /// Constructor for the result of a phi
   PhiInput(struct Phi *p, Block *bb)
-      : type(PhiInputType), v(nullptr), phi(p), blockOwner(bb){};
+      : type(PhiInputType), v(nullptr), phi(p), blockOwner(bb) {};
   /// Constructor for the result of a block argument
   PhiInput(BlockArgument ba, Block *bb)
-      : type(ArgInputType), v(Value(ba)), phi(nullptr), blockOwner(bb){};
+      : type(ArgInputType), v(Value(ba)), phi(nullptr), blockOwner(bb) {};
   /// Constructor for an empty input
   PhiInput()
-      : type(EmptyInputType), v(nullptr), phi(nullptr), blockOwner(nullptr){};
+      : type(EmptyInputType), v(nullptr), phi(nullptr), blockOwner(nullptr) {};
 
   Block *getBlock();
 };

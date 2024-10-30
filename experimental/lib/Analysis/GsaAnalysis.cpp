@@ -13,7 +13,7 @@
 //===----------------------------------------------------------------------===//
 
 #include "experimental/Analysis/GsaAnalysis.h"
-#include "experimental/Support/BooleanLogic/Shannon.h"
+#include "experimental/Support/BooleanLogic/BDD.h"
 #include "experimental/Support/FtdSupport.h"
 #include "mlir/Analysis/CFGLoopInfo.h"
 #include "mlir/IR/Dominance.h"
@@ -68,11 +68,13 @@ Phi *GsaAnalysis<FunctionType>::expandExpressions(
   for (auto expression : expressions) {
 
     // Substitute the cofactor with `true`
-    auto *exprTrue = boolean::shannonExpansionPositive(
-        expression.first->deepCopy(), cofactorToUse);
+    auto *exprTrue = expression.first->deepCopy();
+    boolean::restrict(exprTrue, cofactorToUse, true);
+    exprTrue = exprTrue->boolMinimize();
     // Substitute the cofactor with `false`
-    auto *exprFalse = boolean::shannonExpansionNegative(
-        expression.first->deepCopy(), cofactorToUse);
+    auto *exprFalse = expression.first->deepCopy();
+    boolean::restrict(exprFalse, cofactorToUse, false);
+    exprFalse = exprFalse->boolMinimize();
 
     // One of the two expressions above will be zero: add the input to the other
     // list

@@ -19,6 +19,7 @@
 #include "mlir/IR/Dominance.h"
 #include "mlir/Pass/AnalysisManager.h"
 #include "mlir/Transforms/DialectConversion.h"
+#include <optional>
 
 namespace dynamatic {
 
@@ -50,15 +51,13 @@ public:
 
   // given a BB within that function, return all the BBs the block is control
   // dependant on.
-  LogicalResult getBlockAllControlDeps(Block *block,
-                                       DenseSet<Block *> &allControlDeps) const;
+  std::optional<DenseSet<Block *>> getBlockAllControlDeps(Block *block) const;
 
   // given a BB within that function, return all the BBs the bloc
   // is control dependant on, without taking into account backward dependencies
   // (i.e. excluding loop exits)
-  LogicalResult
-  getBlockForwardControlDeps(Block *block,
-                             DenseSet<Block *> &forwardControlDeps) const;
+  std::optional<DenseSet<Block *>>
+  getBlockForwardControlDeps(Block *block) const;
 
   /// Invalidation hook to keep the analysis cached across passes. Returns true
   /// if the analysis should be invalidated and fully reconstructed the next
@@ -96,16 +95,14 @@ private:
   void enumeratePathsInPostDomTree(
       Block *startBlock, Block *endBlock, Region *funcReg,
       llvm::DominatorTreeBase<Block, true> *postDomTree,
-      SmallVector<SmallVector<mlir::DominanceInfoNode *, 6>, 6>
-          *traversedNodes);
+      SmallVector<SmallVector<mlir::DominanceInfoNode *>> *traversedNodes);
 
   // Helper recursive function called inside `enumeratePathsInPostDomTree`
   void enumeratePathsInPostDomTreeUtil(
       mlir::DominanceInfoNode *startNode, mlir::DominanceInfoNode *endNode,
       DenseMap<mlir::DominanceInfoNode *, bool> isVisited,
-      SmallVector<mlir::DominanceInfoNode *, 6> path, int pathIndex,
-      SmallVector<SmallVector<mlir::DominanceInfoNode *, 6>, 6>
-          *traversedNodes);
+      SmallVector<mlir::DominanceInfoNode *> path, int pathIndex,
+      SmallVector<SmallVector<mlir::DominanceInfoNode *>> *traversedNodes);
 
   // adjusts the dependencies of each block to include nested dependencies
   // (i.e., the dependencies of its depenendencies)

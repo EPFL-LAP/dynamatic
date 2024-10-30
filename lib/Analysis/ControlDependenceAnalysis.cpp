@@ -21,12 +21,13 @@
 #include "mlir/IR/Dominance.h"
 #include "mlir/IR/Region.h"
 #include "mlir/Support/LLVM.h"
+#include <optional>
 
 using namespace mlir;
 using namespace mlir::func;
 using namespace dynamatic;
 
-using PathInDomTree = SmallVector<DominanceInfoNode *, 6>;
+using PathInDomTree = SmallVector<DominanceInfoNode *>;
 
 template <typename FunctionType>
 void ControlDependenceAnalysis<FunctionType>::identifyAllControlDeps(
@@ -63,7 +64,7 @@ void ControlDependenceAnalysis<FunctionType>::identifyAllControlDeps(
         blockControlDepsMap[blockSucc].allControlDeps.insert(&block);
 
         // Enumerate all paths between "least_common_anc" and "block_succ"
-        SmallVector<PathInDomTree, 6> allPathsFromLeastCommonAncToBlockSucc;
+        SmallVector<PathInDomTree> allPathsFromLeastCommonAncToBlockSucc;
         enumeratePathsInPostDomTree(leastCommonAnc, blockSucc, &funcReg,
                                     &postDomTree,
                                     &allPathsFromLeastCommonAncToBlockSucc);
@@ -103,7 +104,7 @@ template <typename FunctionType>
 void ControlDependenceAnalysis<FunctionType>::enumeratePathsInPostDomTree(
     Block *startBlock, Block *endBlock, Region *funcReg,
     llvm::DominatorTreeBase<Block, true> *postDomTree,
-    SmallVector<PathInDomTree, 6> *traversedNodes) {
+    SmallVector<PathInDomTree> *traversedNodes) {
 
   DominanceInfoNode *startNode = postDomTree->getNode(startBlock);
   DominanceInfoNode *endNode = postDomTree->getNode(endBlock);
@@ -126,7 +127,7 @@ template <typename FunctionType>
 void ControlDependenceAnalysis<FunctionType>::enumeratePathsInPostDomTreeUtil(
     DominanceInfoNode *startNode, DominanceInfoNode *endNode,
     DenseMap<DominanceInfoNode *, bool> isVisited, PathInDomTree path,
-    int pathIndex, SmallVector<PathInDomTree, 6> *traversedNodes) {
+    int pathIndex, SmallVector<PathInDomTree> *traversedNodes) {
   isVisited[startNode] = true;
   path[pathIndex] = startNode;
   pathIndex++;
@@ -235,24 +236,23 @@ void ControlDependenceAnalysis<FunctionType>::identifyForwardControlDeps(
 }
 
 template <typename FunctionType>
-LogicalResult ControlDependenceAnalysis<FunctionType>::getBlockAllControlDeps(
-    Block *block, DenseSet<Block *> &allControlDeps) const {
+std::optional<DenseSet<Block *>>
+ControlDependenceAnalysis<FunctionType>::getBlockAllControlDeps(
+    Block *block) const {
   if (!blocksControlDeps.contains(block))
-    allControlDeps = DenseSet<Block *>();
-  else
-    allControlDeps = blocksControlDeps.lookup(block).allControlDeps;
-  return success();
+    return std::nullopt;
+
+  return blocksControlDeps.lookup(block).allControlDeps;
 }
 
 template <typename FunctionType>
-LogicalResult
+std::optional<DenseSet<Block *>>
 ControlDependenceAnalysis<FunctionType>::getBlockForwardControlDeps(
-    Block *block, DenseSet<Block *> &forwardControlDeps) const {
+    Block *block) const {
   if (!blocksControlDeps.contains(block))
-    forwardControlDeps = DenseSet<Block *>();
-  else
-    forwardControlDeps = blocksControlDeps.lookup(block).forwardControlDeps;
-  return success();
+    return std::nullopt;
+
+  return blocksControlDeps.lookup(block).forwardControlDeps;
 }
 
 template <typename FunctionType>

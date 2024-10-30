@@ -14,8 +14,8 @@
 #include "dynamatic/Dialect/Handshake/HandshakeOps.h"
 #include "dynamatic/Support/CFG.h"
 #include "experimental/Analysis/GsaAnalysis.h"
+#include "experimental/Support/BooleanLogic/BDD.h"
 #include "experimental/Support/BooleanLogic/BoolExpression.h"
-#include "experimental/Support/BooleanLogic/Shannon.h"
 #include "experimental/Support/FtdSupport.h"
 #include "mlir/Dialect/Affine/Utils.h"
 #include "mlir/Dialect/Arith/IR/Arith.h"
@@ -117,10 +117,6 @@ static void mapConditionsToValues(Region &region, FtdStoredOperations &ftdOps);
 static void connectInitMerges(ConversionPatternRewriter &rewriter,
                               handshake::FuncOp funcOp,
                               FtdStoredOperations &ftdOps);
-
-static Value dataToCircuit(ConversionPatternRewriter &rewriter,
-                           MultiplexerIn *data, Block *block,
-                           FtdStoredOperations &ftdOps);
 
 // ------------------------ End forwarded declarations ------------------------
 
@@ -425,27 +421,6 @@ static Value boolVariableToCircuit(ConversionPatternRewriter &rewriter,
   return condition;
 }
 
-/// Given an instance of a multiplexer, convert it to a circuit by using the
-/// Shannon expansion
-static Value muxToCircuit(ConversionPatternRewriter &rewriter, Multiplexer *mux,
-                          Block *block, FtdStoredOperations &ftdOps) {
-
-  rewriter.setInsertionPointToStart(block);
-
-  // Get the two operands by recursively calling `dataToCircuit` (it possibly
-  // creates other muxes in a hierarchical way)
-  SmallVector<Value, 4> muxOperands;
-  muxOperands.push_back(dataToCircuit(rewriter, mux->in0, block, ftdOps));
-  muxOperands.push_back(dataToCircuit(rewriter, mux->in1, block, ftdOps));
-  Value muxCond = dataToCircuit(rewriter, mux->cond, block, ftdOps);
-
-  // Create the multiplxer and add it to the rest of the circuit
-  auto muxOp = rewriter.create<handshake::MuxOp>(
-      block->getOperations().front().getLoc(), muxCond, muxOperands);
-  ftdOps.opsToSkip.insert(muxOp);
-  return muxOp.getResult();
-}
-
 /// Get a circuit out a boolean expression, depending on the different kinds
 /// of expressions you might have
 static Value boolExpressionToCircuit(ConversionPatternRewriter &rewriter,
@@ -473,16 +448,31 @@ static Value boolExpressionToCircuit(ConversionPatternRewriter &rewriter,
   return constOp.getResult();
 }
 
-/// Convert a `MultiplexerIn` object as obtained from Shannon expansion to a
+/// Convert a `BDD` object as obtained from the bdd expansion to a
 /// circuit
-static Value dataToCircuit(ConversionPatternRewriter &rewriter,
-                           MultiplexerIn *data, Block *block,
-                           FtdStoredOperations &ftdOps) {
-  if (data->boolexpression.has_value())
-    return boolExpressionToCircuit(rewriter, data->boolexpression.value(),
-                                   block, ftdOps);
+static Value bddToCircuit(ConversionPatternRewriter &rewriter, BDD *bdd,
+                          Block *block, FtdStoredOperations &ftdOps) {
+  if (!bdd->inputs.has_value())
+    return boolExpressionToCircuit(rewriter, bdd->boolVariable, block, ftdOps);
 
-  return muxToCircuit(rewriter, data->mux, block, ftdOps);
+  rewriter.setInsertionPointToStart(block);
+
+  // Get the two operands by recursively calling `bddToCircuit` (it possibly
+  // creates other muxes in a hierarchical way)
+  SmallVector<Value> muxOperands;
+  muxOperands.push_back(
+      bddToCircuit(rewriter, bdd->inputs.value().first, block, ftdOps));
+  muxOperands.push_back(
+      bddToCircuit(rewriter, bdd->inputs.value().second, block, ftdOps));
+  Value muxCond =
+      boolExpressionToCircuit(rewriter, bdd->boolVariable, block, ftdOps);
+
+  // Create the multiplxer and add it to the rest of the circuit
+  auto muxOp = rewriter.create<handshake::MuxOp>(
+      block->getOperations().front().getLoc(), muxCond, muxOperands);
+  ftdOps.opsToSkip.insert(muxOp);
+
+  return muxOp.getResult();
 }
 
 /// Insert a branch to the correct position, taking into account whether it
@@ -544,12 +534,12 @@ static Value addSuppressionInLoop(ConversionPatternRewriter &rewriter,
     // Sort the cofactors alphabetically
     std::sort(cofactorList.begin(), cofactorList.end());
 
-    // Apply shannon expansion to the loop exit expression and the list of
+    // Apply a BDD expansion to the loop exit expression and the list of
     // cofactors
-    MultiplexerIn *shannonResult = applyShannon(fLoopExit, cofactorList);
+    BDD *bdd = buildBDD(fLoopExit, cofactorList);
 
-    // Convert the boolean expression obtained through Shannon to a circuit
-    Value branchCond = dataToCircuit(rewriter, shannonResult, loopExit, ftdOps);
+    // Convert the boolean expression obtained through bdd to a circuit
+    Value branchCond = bddToCircuit(rewriter, bdd, loopExit, ftdOps);
 
     Operation *loopTerminator = loopExit->getTerminator();
     assert(isa<cf::CondBranchOp>(loopTerminator) &&
@@ -590,16 +580,12 @@ insertDirectSuppression(ConversionPatternRewriter &rewriter,
   Block *producerBlock = connection.getParentBlock();
 
   // Get the control dependencies from the producer
-  DenseSet<Block *> prodControlDeps;
-  if (failed(cdgAnalysis.getBlockForwardControlDeps(producerBlock,
-                                                    prodControlDeps)))
-    return failure();
+  auto res = cdgAnalysis.getBlockForwardControlDeps(producerBlock);
+  DenseSet<Block *> prodControlDeps = res.value_or(DenseSet<Block *>());
 
   // Get the control dependencies from the consumer
-  DenseSet<Block *> consControlDeps;
-  if (failed(cdgAnalysis.getBlockForwardControlDeps(consumer->getBlock(),
-                                                    consControlDeps)))
-    return failure();
+  res = cdgAnalysis.getBlockForwardControlDeps(consumer->getBlock());
+  DenseSet<Block *> consControlDeps = res.value_or(DenseSet<Block *>());
 
   // Get rid of common entries in the two sets
   eliminateCommonBlocks(prodControlDeps, consControlDeps);
@@ -646,9 +632,9 @@ insertDirectSuppression(ConversionPatternRewriter &rewriter,
     std::set<std::string> blocks = fSup->getVariables();
 
     std::vector<std::string> cofactorList(blocks.begin(), blocks.end());
-    MultiplexerIn *shannonResult = applyShannon(fSup, cofactorList);
+    BDD *bdd = buildBDD(fSup, cofactorList);
     Value branchCond =
-        dataToCircuit(rewriter, shannonResult, consumer->getBlock(), ftdOps);
+        bddToCircuit(rewriter, bdd, consumer->getBlock(), ftdOps);
 
     rewriter.setInsertionPointToStart(consumer->getBlock());
     auto branchOp = rewriter.create<handshake::ConditionalBranchOp>(
@@ -692,7 +678,7 @@ FtdLowerFuncToHandshake::addSupp(ConversionPatternRewriter &rewriter,
     Block *producerBlock = producerOp->getBlock();
 
     // Skip the prod-cons if the producer is part of the operations related to
-    // the Shannon expansion or INIT merges
+    // the BDD expansion or INIT merges
     if (ftdOps.opsToSkip.contains(producerOp) ||
         ftdOps.initMergesOperations.contains(producerOp))
       continue;
@@ -714,7 +700,7 @@ FtdLowerFuncToHandshake::addSupp(ConversionPatternRewriter &rewriter,
           continue;
 
         // Skip the prod-cons if the consumer is part of the operations related
-        // to the Shannon expansion or INIT merges
+        // to the BDD expansion or INIT merges
         if (ftdOps.opsToSkip.contains(consumerOp) ||
             ftdOps.initMergesOperations.contains(consumerOp))
           continue;
@@ -1336,10 +1322,8 @@ LogicalResult FtdLowerFuncToHandshake::addMergeNonLoop(
     Block *producerBlock = producerGroup->bb;
 
     // Compute all the forward dependencies of that block
-    DenseSet<Block *> producerControlDeps;
-    if (failed(cdgAnalysis.getBlockForwardControlDeps(producerBlock,
-                                                      producerControlDeps)))
-      return failure();
+    auto res = cdgAnalysis.getBlockForwardControlDeps(producerBlock);
+    DenseSet<Block *> producerControlDeps = res.value_or(DenseSet<Block *>());
 
     // For each successor (which is now considered as a consumer)
     for (Group *consumerGroup : producerGroup->succs) {
@@ -1348,10 +1332,8 @@ LogicalResult FtdLowerFuncToHandshake::addMergeNonLoop(
       Block *consumerBlock = consumerGroup->bb;
 
       // Compute all the forward dependencies of that block
-      DenseSet<Block *> consumerControlDeps;
-      if (failed(cdgAnalysis.getBlockForwardControlDeps(consumerBlock,
-                                                        consumerControlDeps)))
-        return failure();
+      auto res = cdgAnalysis.getBlockForwardControlDeps(consumerBlock);
+      DenseSet<Block *> consumerControlDeps = res.value_or(DenseSet<Block *>());
 
       // Remove the common forward dependencies among the two blocks
       eliminateCommonBlocks(producerControlDeps, consumerControlDeps);
