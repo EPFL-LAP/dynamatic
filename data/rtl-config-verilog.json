@@ -245,6 +245,7 @@
         "type": "timing",
         "data-lat-eq": 1,
         "valid-lat-eq": 1,
+        "ready-lat-eq": 0,
         "generic": false
       }
     ],
@@ -264,10 +265,12 @@
         "type": "timing",
         "data-lat-eq": 1,
         "valid-lat-eq": 1,
+        "ready-lat-eq": 0,
         "generic": false
       }
     ],
     "generic": "$DYNAMATIC/data/verilog/handshake/oehb_chain.v",
+    "module-name": "oehb_chain",
     "dependencies": ["oehb"],
     "hdl": "verilog"
   },
@@ -286,8 +289,9 @@
       {
         "name": "TIMING",
         "type": "timing",
-        "data-lat-eq": 1,
+        "data-lat-eq": 0,
         "valid-lat-eq": 1,
+        "ready-lat-eq": 0,
         "generic": false
       }
     ],
@@ -304,12 +308,14 @@
       {
         "name": "TIMING",
         "type": "timing",
-        "data-lat-eq": 1,
+        "data-lat-eq": 0,
         "valid-lat-eq": 1,
+        "ready-lat-eq": 0,
         "generic": false
       }
     ],
     "generic": "$DYNAMATIC/data/verilog/support/elastic_fifo_inner.v",
+    "module-name": "elastic_fifo_inner",
     "hdl": "verilog"
   },
   {
@@ -327,6 +333,8 @@
       {
         "name": "TIMING",
         "type": "timing",
+        "data-lat-eq": 0,
+        "valid-lat-eq": 0,
         "ready-lat-eq": 1,
         "generic": false
       }
@@ -345,11 +353,14 @@
       {
         "name": "TIMING",
         "type": "timing",
+        "data-lat-eq": 0,
+        "valid-lat-eq": 0,
         "ready-lat-eq": 1,
         "generic": false
       }
     ],
     "generic": "$DYNAMATIC/data/verilog/handshake/tehb_chain.v",
+    "module-name": "tehb_chain",
     "dependencies": ["tehb"],
     "hdl": "verilog"
   },
@@ -368,6 +379,9 @@
       {
         "name": "TIMING",
         "type": "timing",
+        "data-lat-eq": 0,
+        "valid-lat-eq": 0,
+        "ready-lat-eq": 0,
         "generic": false
       }
     ],
@@ -385,10 +399,14 @@
       {
         "name": "TIMING",
         "type": "timing",
+        "data-lat-eq": 0,
+        "valid-lat-eq": 0,
+        "ready-lat-eq": 0,
         "generic": false
       }
     ],
     "generic": "$DYNAMATIC/data/verilog/handshake/tfifo.v",
+    "module-name": "tfifo",
     "dependencies": ["elastic_fifo_inner"],
     "hdl": "verilog"
   },
@@ -408,7 +426,8 @@
         "name": "TIMING",
         "type": "timing",
         "data-lat-eq": 1,
-        "valid-lat-eq": 1,
+        "valid-lat-eq": 0,
+        "ready-lat-eq": 0,
         "generic": false
       }
     ],
@@ -426,11 +445,13 @@
         "name": "TIMING",
         "type": "timing",
         "data-lat-eq": 1,
-        "valid-lat-eq": 1,
+        "valid-lat-eq": 0,
+        "ready-lat-eq": 0,
         "generic": false
       }
     ],
     "generic": "$DYNAMATIC/data/verilog/handshake/dvse.v",
+    "module-name": "dvse",
     "dependencies": ["dvse_dataless"],
     "hdl": "verilog"
   },
@@ -476,6 +497,7 @@
       }
     ],
     "generic": "$DYNAMATIC/data/verilog/handshake/dvr_chain.v",
+    "module-name": "dvr_chain",
     "dependencies": ["dvr"],
     "hdl": "verilog"
   },
@@ -820,30 +842,36 @@
   },
   {
     "generic": "$DYNAMATIC/data/verilog/handshake/dataless/oehb.v",
-    "module-name": "oehb_dataless"
+    "module-name": "oehb_dataless",
+    "hdl": "verilog"
   },
   {
     "generic": "$DYNAMATIC/data/verilog/handshake/oehb.v",
     "module-name": "oehb",
-    "dependencies": ["oehb_dataless"]
+    "dependencies": ["oehb_dataless"],
+    "hdl": "verilog"
   },
   {
     "generic": "$DYNAMATIC/data/verilog/handshake/dataless/tehb.v",
-    "module-name": "tehb_dataless"
+    "module-name": "tehb_dataless",
+    "hdl": "verilog"
   },
   {
     "generic": "$DYNAMATIC/data/verilog/handshake/tehb.v",
     "module-name": "tehb",
-    "dependencies": ["tehb_dataless"]
+    "dependencies": ["tehb_dataless"],
+    "hdl": "verilog"
   },
   {
     "generic": "$DYNAMATIC/data/verilog/handshake/dataless/dvr.v",
-    "module-name": "dvr_dataless"
+    "module-name": "dvr_dataless",
+    "hdl": "verilog"
   },
   {
     "generic": "$DYNAMATIC/data/verilog/handshake/dvr.v",
     "module-name": "dvr",
-    "dependencies": ["dvr_dataless"]
+    "dependencies": ["dvr_dataless"],
+    "hdl": "verilog"
   },
   {
     "generic": "$DYNAMATIC/data/verilog/support/logic.v",

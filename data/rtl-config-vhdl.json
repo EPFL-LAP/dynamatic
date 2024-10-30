@@ -258,6 +258,7 @@
         "type": "timing",
         "data-lat-eq": 1,
         "valid-lat-eq": 1,
+        "ready-lat-eq": 0,
         "generic": false
       }
     ],
@@ -276,10 +277,12 @@
         "type": "timing",
         "data-lat-eq": 1,
         "valid-lat-eq": 1,
+        "ready-lat-eq": 0,
         "generic": false
       }
     ],
     "generic": "$DYNAMATIC/data/vhdl/handshake/oehb_chain.vhd",
+    "module-name": "oehb_chain",
     "dependencies": ["oehb"]
   },
   {
@@ -297,8 +300,9 @@
       {
         "name": "TIMING",
         "type": "timing",
-        "data-lat-eq": 1,
+        "data-lat-eq": 0,
         "valid-lat-eq": 1,
+        "ready-lat-eq": 0,
         "generic": false
       }
     ],
@@ -314,12 +318,14 @@
       {
         "name": "TIMING",
         "type": "timing",
-        "data-lat-eq": 1,
+        "data-lat-eq": 0,
         "valid-lat-eq": 1,
+        "ready-lat-eq": 0,
         "generic": false
       }
     ],
-    "generic": "$DYNAMATIC/data/vhdl/support/dataless/elastic_fifo_inner.vhd",
+    "generic": "$DYNAMATIC/data/vhdl/support/elastic_fifo_inner.vhd",
+    "module-name": "elastic_fifo_inner",
     "dependencies": ["elastic_fifo_inner_dataless"]
   },
   {
@@ -337,6 +343,8 @@
       {
         "name": "TIMING",
         "type": "timing",
+        "data-lat-eq": 0,
+        "valid-lat-eq": 0,
         "ready-lat-eq": 1,
         "generic": false
       }
@@ -354,11 +362,14 @@
       {
         "name": "TIMING",
         "type": "timing",
+        "data-lat-eq": 0,
+        "valid-lat-eq": 0,
         "ready-lat-eq": 1,
         "generic": false
       }
     ],
     "generic": "$DYNAMATIC/data/vhdl/handshake/tehb_chain.vhd",
+    "module-name": "tehb_chain",
     "dependencies": ["tehb"]
   },
   {
@@ -376,6 +387,9 @@
       {
         "name": "TIMING",
         "type": "timing",
+        "data-lat-eq": 0,
+        "valid-lat-eq": 0,
+        "ready-lat-eq": 0,
         "generic": false
       }
     ],
@@ -392,10 +406,14 @@
       {
         "name": "TIMING",
         "type": "timing",
+        "data-lat-eq": 0,
+        "valid-lat-eq": 0,
+        "ready-lat-eq": 0,
         "generic": false
       }
     ],
     "generic": "$DYNAMATIC/data/vhdl/handshake/tfifo.vhd",
+    "module-name": "tfifo",
     "dependencies": ["elastic_fifo_inner"]
   },
   {
@@ -414,7 +432,8 @@
         "name": "TIMING",
         "type": "timing",
         "data-lat-eq": 1,
-        "valid-lat-eq": 1,
+        "valid-lat-eq": 0,
+        "ready-lat-eq": 0,
         "generic": false
       }
     ],
@@ -431,11 +450,13 @@
         "name": "TIMING",
         "type": "timing",
         "data-lat-eq": 1,
-        "valid-lat-eq": 1,
+        "valid-lat-eq": 0,
+        "ready-lat-eq": 0,
         "generic": false
       }
     ],
     "generic": "$DYNAMATIC/data/vhdl/handshake/dvse.vhd",
+    "module-name": "dvse",
     "dependencies": ["dvse_dataless"]
   },
   {

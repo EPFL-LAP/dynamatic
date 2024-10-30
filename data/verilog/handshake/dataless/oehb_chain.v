@@ -1,5 +1,5 @@
 `timescale 1ns/1ps
-module oehb_dataless_chain #(
+module oehb_chain_dataless #(
   parameter NUM_SLOTS = 4
 ) (
   input  clk,

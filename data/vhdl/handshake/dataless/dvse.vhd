@@ -40,6 +40,7 @@ begin
           valid_reg(0) <= ins_valid;
         end if;               
       end if;
+    end if;
   end process; 
 
   outs_valid <= valid_reg(NUM_SLOTS - 1);

@@ -230,7 +230,7 @@ TimingInfo TimingInfo::tehb() {
 
 TimingInfo TimingInfo::dvfifo() {
   return TimingInfo()
-      .setLatency(SignalType::DATA, 1)
+      .setLatency(SignalType::DATA, 0)
       .setLatency(SignalType::VALID, 1)
       .setLatency(SignalType::READY, 0);
 }
@@ -245,7 +245,7 @@ TimingInfo TimingInfo::tfifo() {
 TimingInfo TimingInfo::dvse() {
   return TimingInfo()
       .setLatency(SignalType::DATA, 1)
-      .setLatency(SignalType::VALID, 1)
+      .setLatency(SignalType::VALID, 0)
       .setLatency(SignalType::READY, 0);
 }
 

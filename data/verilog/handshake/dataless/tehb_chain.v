@@ -1,5 +1,5 @@
 `timescale 1ns/1ps
-module tehb_dataless_chain #(
+module tehb_chain_dataless #(
   parameter NUM_SLOTS = 4
 ) (
   input  clk,

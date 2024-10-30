@@ -2,7 +2,7 @@ library ieee;
 use ieee.std_logic_1164.all;
 use ieee.numeric_std.all;
 
-entity tehb_dataless_chain is
+entity tehb_chain_dataless is
   generic (
     NUM_SLOTS : integer
   );
@@ -17,7 +17,7 @@ entity tehb_dataless_chain is
   );
 end entity;
 
-architecture arch of tehb_dataless_chain is
+architecture arch of tehb_chain_dataless is
   type valid_array is array (0 to NUM_SLOTS) of std_logic;
   type ready_array is array (0 to NUM_SLOTS) of std_logic;
 

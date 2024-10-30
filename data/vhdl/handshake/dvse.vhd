@@ -29,6 +29,9 @@ architecture arch of dvse is
 begin
 
   control : entity work.dvse_dataless
+    generic map (
+      NUM_SLOTS => NUM_SLOTS
+    )
     port map(
       clk        => clk,
       rst        => rst,
