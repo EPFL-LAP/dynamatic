@@ -47,6 +47,8 @@ struct ChannelVars {
   GRBVar bufPresent;
   /// Number of each type of buffer's slots on the channel (integer).
   std::map<BufferType, GRBVar> bufNumSlots;
+  /// Presence of a DVSE on the channel (binary).
+  GRBVar sePresent;
 };
 
 struct MILPVars {
