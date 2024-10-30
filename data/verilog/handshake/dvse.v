@@ -1,8 +1,8 @@
 `timescale 1ns/1ps
 
 module dvse #(
-  parameter integer NUM_SLOTS = 4,
-  parameter integer DATA_TYPE = 32
+  parameter integer DATA_TYPE = 32,
+  parameter integer NUM_SLOTS = 4
 )(
   input  clk,
   input  rst,

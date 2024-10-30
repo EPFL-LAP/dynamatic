@@ -30,8 +30,8 @@ module ofifo #(
   );
 
   elastic_fifo_inner #(
-    .NUM_SLOTS  (NUM_SLOTS ),
-    .DATA_TYPE (DATA_TYPE)
+    .DATA_TYPE (DATA_TYPE),
+    .NUM_SLOTS  (NUM_SLOTS )
   ) fifo (
     .clk        (clk         ),
     .rst        (rst         ),

@@ -39,7 +39,7 @@ begin
       ins_ready  => tehb_ready
     );
 
-  fifo : entity work.elastic_fifo_inner(arch) generic map (NUM_SLOTS, DATA_TYPE)
+  fifo : entity work.elastic_fifo_inner(arch) generic map (DATA_TYPE, NUM_SLOTS)
     port map(
       --inputs
       clk        => clk,

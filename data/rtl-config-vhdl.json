@@ -268,9 +268,9 @@
   {
     "name": "handshake.buffer",
     "parameters": [
-      { "name": "NUM_SLOTS", "type": "unsigned", "lb": 1},
       { "name": "BUFFER_TYPE", "type": "string", "eq": "DV", "generic": false },
       { "name": "DATA_TYPE", "type": "dataflow", "data-lb": 1, "extra-eq": 0 },
+      { "name": "NUM_SLOTS", "type": "unsigned", "lb": 1},
       {
         "name": "TIMING",
         "type": "timing",
@@ -308,9 +308,9 @@
   {
     "name": "handshake.buffer",
     "parameters": [
-      { "name": "NUM_SLOTS", "type": "unsigned", "lb": 1},
       { "name": "BUFFER_TYPE", "type": "string", "eq": "DVE", "generic": false },
       { "name": "DATA_TYPE", "type": "dataflow", "data-lb": 1, "extra-eq": 0 },
+      { "name": "NUM_SLOTS", "type": "unsigned", "lb": 1},
       {
         "name": "TIMING",
         "type": "timing",
@@ -348,9 +348,9 @@
   {
     "name": "handshake.buffer",
     "parameters": [
-      { "name": "NUM_SLOTS", "type": "unsigned", "lb": 1},
       { "name": "BUFFER_TYPE", "type": "string", "eq": "R", "generic": false },
       { "name": "DATA_TYPE", "type": "dataflow", "data-lb": 1, "extra-eq": 0 },
+      { "name": "NUM_SLOTS", "type": "unsigned", "lb": 1},
       {
         "name": "TIMING",
         "type": "timing",
@@ -386,9 +386,9 @@
   {
     "name": "handshake.buffer",
     "parameters": [
-      { "name": "NUM_SLOTS", "type": "unsigned", "lb": 1},
       { "name": "BUFFER_TYPE", "type": "string", "eq": "T", "generic": false },
       { "name": "DATA_TYPE", "type": "dataflow", "data-lb": 1, "extra-eq": 0 },
+      { "name": "NUM_SLOTS", "type": "unsigned", "lb": 1},
       {
         "name": "TIMING",
         "type": "timing",
@@ -424,9 +424,9 @@
   {
     "name": "handshake.buffer",
     "parameters": [
-      { "name": "NUM_SLOTS", "type": "unsigned", "lb": 1},
       { "name": "BUFFER_TYPE", "type": "string", "eq": "DVSE", "generic": false },
       { "name": "DATA_TYPE", "type": "dataflow", "data-lb": 1, "extra-eq": 0 },
+      { "name": "NUM_SLOTS", "type": "unsigned", "lb": 1},
       {
         "name": "TIMING",
         "type": "timing",
@@ -466,9 +466,9 @@
   {
     "name": "handshake.buffer",
     "parameters": [
-      { "name": "NUM_SLOTS", "type": "unsigned", "lb": 1},
       { "name": "BUFFER_TYPE", "type": "string", "eq": "DVR", "generic": false },
       { "name": "DATA_TYPE", "type": "dataflow", "data-lb": 1, "extra-eq": 0 },
+      { "name": "NUM_SLOTS", "type": "unsigned", "lb": 1},
       {
         "name": "TIMING",
         "type": "timing",

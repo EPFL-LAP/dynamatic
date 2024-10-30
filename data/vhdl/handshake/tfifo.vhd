@@ -4,8 +4,8 @@ use ieee.numeric_std.all;
 
 entity tfifo is
   generic (
-    NUM_SLOTS  : integer;
-    DATA_TYPE : integer
+    DATA_TYPE  : integer;
+    NUM_SLOTS  : integer
   );
   port (
     clk, rst : in std_logic;
@@ -44,7 +44,7 @@ begin
   fifo_nready <= outs_ready;
   fifo_in     <= ins;
 
-  fifo : entity work.elastic_fifo_inner(arch) generic map (NUM_SLOTS, DATA_TYPE)
+  fifo : entity work.elastic_fifo_inner(arch) generic map (DATA_TYPE, NUM_SLOTS)
     port map(
       -- inputs
       clk        => clk,

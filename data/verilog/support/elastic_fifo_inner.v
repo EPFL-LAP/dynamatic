@@ -1,7 +1,7 @@
 `timescale 1ns/1ps
 module elastic_fifo_inner #(
-  parameter NUM_SLOTS = 2,
-  parameter DATA_TYPE = 32
+  parameter DATA_TYPE = 32,
+  parameter NUM_SLOTS = 2
 ) (
   input  clk,
   input  rst,

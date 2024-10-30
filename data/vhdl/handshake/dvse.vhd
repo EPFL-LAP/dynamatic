@@ -4,8 +4,8 @@ use ieee.numeric_std.all;
 
 entity dvse is
   generic (
-    NUM_SLOTS     : integer;
-    DATA_TYPE : integer
+    DATA_TYPE   : integer;
+    NUM_SLOTS   : integer
   );
   port (
     clk, rst : in std_logic;

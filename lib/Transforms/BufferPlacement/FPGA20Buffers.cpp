@@ -65,7 +65,7 @@ void FPGA20Buffers::extractResult(BufferPlacement &placement) {
     if (placeOpaque) {
       if (legacyPlacement) {
         // Satisfy the transparent slots requirement, all other slots are opaque
-        result.numTFIFO = props.minTrans;
+        result.numSlotTB = props.minTrans;
         result.numSlotOB = numSlotsToPlace - props.minTrans;
       } else {
         // We want as many slots as possible to be transparent and at least one
@@ -73,23 +73,30 @@ void FPGA20Buffers::extractResult(BufferPlacement &placement) {
         unsigned actualMinOpaque = std::max(1U, props.minOpaque);
         if (props.maxTrans.has_value() &&
             (props.maxTrans.value() < numSlotsToPlace - actualMinOpaque)) {
-          result.numTFIFO = props.maxTrans.value();
-          result.numSlotOB = numSlotsToPlace - result.numTFIFO;
+          result.numSlotTB = props.maxTrans.value();
+          result.numSlotOB = numSlotsToPlace - result.numSlotTB;
         } else {
           result.numSlotOB = actualMinOpaque;
-          result.numTFIFO = numSlotsToPlace - result.numSlotOB;
+          result.numSlotTB = numSlotsToPlace - result.numSlotOB;
         }
       }
     } else {
       // All slots should be transparent
-      result.numTFIFO = numSlotsToPlace;
+      result.numSlotTB = numSlotsToPlace;
     }
 
-    result.deductInternalBuffers(Channel(channel), timingDB);
+    if (result.numSlotOB > 0 || result.numSlotTB > 0)
+      llvm::errs() << "Opaque: " << result.numSlotOB << "\n" << "Transp: " << result.numSlotTB << "\n";
 
+    result.deductInternalBuffers(Channel(channel), timingDB);
+    
+    if (result.numSlotOB > 0 || result.numSlotTB > 0)
+      llvm::errs() << "Opaque: " << result.numSlotOB << "\n" << "Transp: " << result.numSlotTB << "\n";
+    
     if (result.numSlotOB == 1){
-      result.numSlotOB = 0;
-      result.numDVR = 1;
+      // result.numSlotOB = 0;
+      // result.numDVR = 1; 
+      result.numSlotOB = 1;
     } else if (result.numSlotOB == 2){
       result.numSlotOB = 1;
       result.numSlotTB = 1;
@@ -97,6 +104,11 @@ void FPGA20Buffers::extractResult(BufferPlacement &placement) {
       result.numDVFIFO = result.numSlotOB - 1;
       result.numSlotTB = 1;
       result.numSlotOB = 0;
+    }
+
+    if (result.numSlotTB > 1){
+      result.numDVFIFO = result.numSlotTB;
+      result.numSlotTB = 0;
     }
 
     placement[channel] = result;
