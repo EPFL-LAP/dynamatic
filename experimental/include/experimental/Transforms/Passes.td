@@ -16,6 +16,16 @@
 include "dynamatic/Support/Passes.td"
 include "mlir/Pass/PassBase.td"
 
+def HandshakeCombineSteeringLogic : DynamaticPass< "handshake-combine-steering-logic">  {
+  let summary = "Combine common steering logic between different handshake operations.";
+  let description = [{
+      Eliminates redundant steering units that have the same inputs but
+      different outputs by combining them into single units feeding multiple outputs.
+      This is a simplification which comes immediately after the FTD logic.
+  }];
+  let constructor = "dynamatic::experimental::ftd::combineSteeringLogic()";
+}
+
 def HandshakeSpeculation : DynamaticPass<"handshake-speculation"> {
   let summary = "Place Speculation operations";
   let description = [{

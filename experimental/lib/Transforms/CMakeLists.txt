@@ -1,5 +1,6 @@
 add_dynamatic_library(DynamaticExperimentalTransforms
   HandshakePlaceBuffersCustom.cpp
+  HandshakeCombineSteeringLogic.cpp
 
   DEPENDS
   DynamaticExperimentalTransformsPassIncGen
