@@ -24,15 +24,15 @@ namespace boolean {
 /// A BDD is a tree which represents a boolean expression by considering all the
 /// outcomes of the expression as a decision tree, with two edges (positive and
 /// negative) for each non terminal node. Each node is charaterized by a boolean
-/// variable and possibly 2 subsequent nodes, stored into `inputs`
+/// variable and possibly 2 subsequent nodes, stored into `successors`
 struct BDD {
   // First element is the `negative` branch; second is the `positive` branch
-  std::optional<std::pair<BDD *, BDD *>> inputs;
+  std::optional<std::pair<BDD *, BDD *>> successors;
   BoolExpression *boolVariable;
 
   /// Build a BDD node with two descendents
   BDD(BDD *ni, BDD *pi, BoolExpression *bv)
-      : inputs({ni, pi}), boolVariable(bv) {}
+      : successors({ni, pi}), boolVariable(bv) {}
 
   /// Build a leaf
   BDD(BoolExpression *bv) : boolVariable(bv) {}
