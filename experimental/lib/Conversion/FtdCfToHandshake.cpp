@@ -245,11 +245,6 @@ LogicalResult FtdLowerFuncToHandshake::matchAndRewrite(
   if (failed(flattenAndTerminate(funcOp, rewriter, argReplacements)))
     return failure();
 
-  // TEMP
-  auto muxes = funcOp.getBody().getOps<handshake::MuxOp>();
-  for (auto mux : muxes)
-    mux->getResult(0).setType(channelifyType(mux->getResult(0).getType()));
-
   return success();
 }
 
@@ -950,6 +945,14 @@ FtdLowerFuncToHandshake::addRegen(ConversionPatternRewriter &rewriter,
       }
     }
   }
+
+  // Once that all the multiplexers have been added, it is necessary to modify
+  // the type of the result, for it to be a channel type (that could not be done
+  // before)
+  auto muxes = funcOp.getBody().getOps<handshake::MuxOp>();
+  for (auto mux : muxes)
+    mux->getResult(0).setType(channelifyType(mux->getResult(0).getType()));
+
   return success();
 }
 
