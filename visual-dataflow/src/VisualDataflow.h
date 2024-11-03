@@ -111,16 +111,11 @@ private:
   Label *cycleLabel;
   HSlider *cycleSlider;
 
+  void drawSubgraph(const dynamatic::DOTGraph::Subgraph &sub, bool isRoot);
   /// Draws each component of the graph in Godot
   void drawGraph();
   /// Modifies the transparency of all graph elements
   void setGraphTransparency(double transparency);
-  /// Draws the basic blocks of the graph
-  void drawBBs();
-  /// Draws the nodes of the graph
-  void drawNodes();
-  /// Draws the edges of the graph
-  void drawEdges();
   /// Draw the current cycle.
   void drawCycle();
 };

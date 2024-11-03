@@ -114,44 +114,6 @@ void VisualDataflow::start(const godot::String &dotFilepath,
   drawGraph();
 }
 
-void VisualDataflow::drawBBs() {
-  for (const DOTGraph::Subgraph &subgraph : graph.getGraph().getSubgraphs()) {
-    const GodotGraph::SubgraphProps &props =
-        graph.getSubgraphProperties(&subgraph);
-
-    std::vector<float> boundaries = props.boundaries;
-    Polygon2D *p = memnew(Polygon2D);
-    PackedVector2Array points;
-    points.push_back(Vector2(boundaries.at(0), -boundaries.at(1)));
-    points.push_back(Vector2(boundaries.at(2), -boundaries.at(1)));
-    points.push_back(Vector2(boundaries.at(2), -boundaries.at(3)));
-    points.push_back(Vector2(boundaries.at(0), -boundaries.at(3)));
-
-    p->set_polygon(points);
-    p->set_color(TRANSPARENT_BLACK);
-
-    add_child(p);
-
-    // Create the label and configure it
-    RichTextLabel *bbLabel = memnew(RichTextLabel);
-    bbLabel->set_use_bbcode(true);
-    bbLabel->set_fit_content(true);
-    bbLabel->set_autowrap_mode(TextServer::AUTOWRAP_OFF);
-    bbLabel->set_position(
-        Vector2(props.boundaries.at(0) + 5,
-                -props.labelPosition.second - props.labelSize.first * 35));
-
-    // Set the label's content
-    bbLabel->push_font(get_theme_default_font(), 12);
-    bbLabel->push_color(OPAQUE_BLACK);
-    bbLabel->append_text(props.label.c_str());
-    bbLabel->pop();
-    bbLabel->pop();
-
-    add_child(bbLabel);
-  }
-}
-
 static void setBasicLineProps(Line2D *line) {
   line->set_width(LINE_WIDTH);
   line->set_default_color(OPAQUE_BLACK);
@@ -185,9 +147,43 @@ static void createDashedLine(PackedVector2Array &points,
   }
 }
 
-void VisualDataflow::drawNodes() {
+void VisualDataflow::drawSubgraph(const DOTGraph::Subgraph &sub, bool isRoot) {
+  if (!isRoot) {
+    const GodotGraph::SubgraphProps &props = graph.getSubgraphProperties(&sub);
 
-  for (const DOTGraph::Node *node : graph.getGraph().getNodes()) {
+    std::vector<float> boundaries = props.boundaries;
+    Polygon2D *p = memnew(Polygon2D);
+    PackedVector2Array points;
+    points.push_back(Vector2(boundaries.at(0), -boundaries.at(1)));
+    points.push_back(Vector2(boundaries.at(2), -boundaries.at(1)));
+    points.push_back(Vector2(boundaries.at(2), -boundaries.at(3)));
+    points.push_back(Vector2(boundaries.at(0), -boundaries.at(3)));
+
+    p->set_polygon(points);
+    p->set_color(TRANSPARENT_BLACK);
+
+    add_child(p);
+
+    // Create the label and configure it
+    RichTextLabel *bbLabel = memnew(RichTextLabel);
+    bbLabel->set_use_bbcode(true);
+    bbLabel->set_fit_content(true);
+    bbLabel->set_autowrap_mode(TextServer::AUTOWRAP_OFF);
+    bbLabel->set_position(
+        Vector2(props.boundaries.at(0) + 5,
+                -props.labelPosition.second - props.labelSize.first * 35));
+
+    // Set the label's content
+    bbLabel->push_font(get_theme_default_font(), 12);
+    bbLabel->push_color(OPAQUE_BLACK);
+    bbLabel->append_text(props.label.c_str());
+    bbLabel->pop();
+    bbLabel->pop();
+
+    add_child(bbLabel);
+  }
+
+  for (const DOTGraph::Node *node : sub.nodes) {
     const GodotGraph::NodeProps &props = graph.getNodeProperties(node);
     NodeGeometry &geometry = nodeGeometries.try_emplace(node).first->second;
 
@@ -287,10 +283,8 @@ void VisualDataflow::drawNodes() {
     area2D->add_child(outline);
     add_child(area2D);
   }
-}
 
-void VisualDataflow::drawEdges() {
-  for (const DOTGraph::Edge *edge : graph.getGraph().getEdges()) {
+  for (const DOTGraph::Edge *edge : sub.edges) {
     const GodotGraph::EdgeProps &props = graph.getEdgeProperties(edge);
     EdgeGeometry &geometry = edgeGeometries.try_emplace(edge).first->second;
 
@@ -381,21 +375,21 @@ void VisualDataflow::drawEdges() {
     geometry.data->set_use_bbcode(true);
     geometry.data->set_fit_content(true);
     geometry.data->set_autowrap_mode(TextServer::AUTOWRAP_OFF);
-    // Lightly offset the label toward the bottom right compared to the start of
-    // the line
+    // Lightly offset the label toward the bottom right compared to the start
+    // of the line
     Vector2 firstPoint = linePoints[0];
     geometry.data->set_position(Vector2(firstPoint.x + 4, firstPoint.y + 4));
 
     add_child(geometry.data);
     add_child(area2D);
   }
+
+  for (const DOTGraph::Subgraph *subsub : sub.subgraphs)
+    drawSubgraph(*subsub, false);
 }
 
 void VisualDataflow::drawGraph() {
-  drawBBs();
-  drawNodes();
-  drawEdges();
-  drawCycle();
+  drawSubgraph(graph.getGraph().getRoot(), true);
 }
 
 void VisualDataflow::nextCycle() {
