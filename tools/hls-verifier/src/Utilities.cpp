@@ -46,6 +46,11 @@ bool FloatCompare::compare(const string &token1, const string &token2) const {
   stringstream is2(token2);
   is1 >> hex >> i1;
   is2 >> hex >> i2;
+
+  if (isnan(*((float *)&i1)) && isnan(*((float *)&i2))) {
+    return true;
+  }
+
   float diff = abs(*((float *)&i1) - *((float *)&i2));
   return (diff < threshold);
 }
@@ -59,6 +64,11 @@ bool DoubleCompare::compare(const string &token1, const string &token2) const {
   stringstream is2(token2);
   is1 >> hex >> i1;
   is2 >> hex >> i2;
+
+  if (isnan(*((double *)&i1)) && isnan(*((double *)&i2))) {
+    return true;
+  }
+
   double diff = abs(*((double *)&i1) - *((double *)&i2));
   return (diff < threshold);
 }
