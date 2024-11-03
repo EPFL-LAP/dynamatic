@@ -55,14 +55,27 @@ static cl::opt<std::string> timingDBFilepath(
         "file defining the default timing models in Dynamatic."),
     cl::init("data/components.json"), cl::cat(mainCategory));
 
-static cl::opt<std::string> edgeStyleArg(
+static cl::opt<DOTGraph::EdgeStyle> edgeStyle(
     "edge-style", cl::Optional,
-    cl::desc("Style in which to render edges in the resulting DOTs (this is "
-             "essentially the 'splines' attribute of the top-level DOT graph). "
-             "Available options are:\n"
-             "\t- spline (default)\n"
-             "\t- ortho (orthogonal polylines)\n"),
-    cl::init("spline"), cl::cat(mainCategory));
+    cl::desc(
+        "Style in which to render edges in the resulting DOTs (this is "
+        "essentially the 'splines' attribute of the top-level DOT graph):"),
+    cl::values(clEnumValN(DOTGraph::EdgeStyle::SPLINE, "spline",
+                          "splines, default"),
+               clEnumValN(DOTGraph::EdgeStyle::ORTHO, "ortho",
+                          "orthogonal polylines")),
+    cl::init(DOTGraph::EdgeStyle::SPLINE), cl::cat(mainCategory));
+
+enum class LabelType { TYPE, UNAME };
+
+static cl::opt<LabelType>
+    labelType("label-type", cl::Optional,
+              cl::desc("Information to use as node labels:"),
+              cl::values(clEnumValN(LabelType::TYPE, "type",
+                                    "type of the operation, default"),
+                         clEnumValN(LabelType::UNAME, "uname",
+                                    "unique name of the operation")),
+              cl::init(LabelType::TYPE), cl::cat(mainCategory));
 
 static constexpr StringLiteral DOTTED("dotted"), SOLID("solid"), DOT("dot"),
     NORMAL("normal");
@@ -310,7 +323,15 @@ static LogicalResult getDOTGraph(handshake::FuncOp funcOp, DOTGraph &graph) {
                      DOTGraph::Subgraph &subgraph) -> LogicalResult {
     // The node's DOT "mlir_op" attribute
     std::string mlirOpName = op->getName().getStringRef().str();
-    std::string prettyLabel = getPrettyNodeLabel(op);
+    std::string prettyLabel;
+    switch (labelType) {
+    case LabelType::TYPE:
+      prettyLabel = getPrettyNodeLabel(op);
+      break;
+    case LabelType::UNAME:
+      prettyLabel = getUniqueName(op);
+      break;
+    }
     if (isa<handshake::CmpIOp, handshake::CmpFOp>(op))
       mlirOpName += prettyLabel;
 
@@ -515,18 +536,6 @@ int main(int argc, char **argv) {
   DOTGraph graph;
   if (failed(getDOTGraph(funcOp, graph)))
     return 1;
-
-  // Decode the "edgeStyle" argument
-  DOTGraph::EdgeStyle edgeStyle;
-  if (edgeStyleArg == "spline") {
-    edgeStyle = DOTGraph::EdgeStyle::SPLINE;
-  } else if (edgeStyleArg == "ortho") {
-    edgeStyle = DOTGraph::EdgeStyle::ORTHO;
-  } else {
-    llvm::errs() << "Unkwown edge style \"" << edgeStyleArg
-                 << "\" provided, must be one of \"spline\", \"ortho\".\n";
-    return 1;
-  }
 
   graph.print(llvm::outs(), edgeStyle);
   return 0;
