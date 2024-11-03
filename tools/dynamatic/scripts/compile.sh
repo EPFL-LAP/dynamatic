@@ -11,7 +11,7 @@ DYNAMATIC_DIR=$1
 SRC_DIR=$2
 OUTPUT_DIR=$3
 KERNEL_NAME=$4
-USE_SIMPLE_BUFFERS=$5
+BUFFER_ALGORITHM=$5
 TARGET_CP=$6
 POLYGEIST_PATH=$7
 USE_SHARING=$8
@@ -120,7 +120,7 @@ exit_on_fail "Failed to compile cf to handshake" "Compiled cf to handshake"
 # handshake transformations
 "$DYNAMATIC_OPT_BIN" "$F_HANDSHAKE" \
   --handshake-analyze-lsq-usage --handshake-replace-memory-interfaces \
-  --handshake-minimize-cst-width --handshake-optimize-bitwidths="legacy" \
+  --handshake-minimize-cst-width --handshake-optimize-bitwidths \
   --handshake-materialize --handshake-infer-basic-blocks \
   > "$F_HANDSHAKE_TRANSFORMED"
 exit_on_fail "Failed to apply transformations to handshake" \
@@ -130,16 +130,18 @@ exit_on_fail "Failed to apply transformations to handshake" \
 # Credit-based sharing
 if [[ $USE_SHARING -ne 0 ]]; then
   BUFFER_PLACEMENT_PASS="credit-based-sharing"
+  echo_info "Set to apply credit-based sharing after buffer placement."
 else
   BUFFER_PLACEMENT_PASS="handshake-place-buffers"
 fi
 
 # Buffer placement
-if [[ $USE_SIMPLE_BUFFERS -ne 0 ]]; then
+if [[ "$BUFFER_ALGORITHM" == "on-merges" ]]; then
   # Simple buffer placement
+  echo_info "Running simple buffer placement (on-merges)."
   "$DYNAMATIC_OPT_BIN" "$F_HANDSHAKE_TRANSFORMED" \
     --handshake-set-buffering-properties="version=fpga20" \
-    --$BUFFER_PLACEMENT_PASS="algorithm=on-merges timing-models=$DYNAMATIC_DIR/data/components.json" \
+    --$BUFFER_PLACEMENT_PASS="algorithm=$BUFFER_ALGORITHM timing-models=$DYNAMATIC_DIR/data/components.json" \
     > "$F_HANDSHAKE_BUFFERED"
   exit_on_fail "Failed to place simple buffers" "Placed simple buffers"
 else
@@ -158,11 +160,11 @@ else
   exit_on_fail "Failed to profile cf-level" "Profiled cf-level"
 
   # Smart buffer placement
-  echo_info "Running smart buffer placement with CP = $TARGET_CP"
+  echo_info "Running smart buffer placement with CP = $TARGET_CP and algorithm = '$BUFFER_ALGORITHM'"
   cd "$COMP_DIR"
   "$DYNAMATIC_OPT_BIN" "$F_HANDSHAKE_TRANSFORMED" \
     --handshake-set-buffering-properties="version=fpga20" \
-    --$BUFFER_PLACEMENT_PASS="algorithm=fpl22 frequencies=$F_FREQUENCIES timing-models=$DYNAMATIC_DIR/data/components.json target-period=$TARGET_CP timeout=300 dump-logs" \
+    --$BUFFER_PLACEMENT_PASS="algorithm=$BUFFER_ALGORITHM frequencies=$F_FREQUENCIES timing-models=$DYNAMATIC_DIR/data/components.json target-period=$TARGET_CP timeout=300 dump-logs" \
     > "$F_HANDSHAKE_BUFFERED"
   exit_on_fail "Failed to place smart buffers" "Placed smart buffers"
   cd - > /dev/null

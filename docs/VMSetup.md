@@ -1,6 +1,6 @@
 # VM Setup Instructions
 
-We provide a virtual machine (VM) which contains a pre-built/ready-to-use version of our entire toolchain. While it is slightly heavy (around 16GB) it is very easy to set up on your machine using QEMU (an open-source virtualizer available on all operating systems). You can download the VM image [here](https://drive.google.com/file/d/1ddXUHIyK7fEnDPCbSVKzRwGeai80Emr5/view?usp=drive_link).
+We provide a virtual machine (VM) which contains a pre-built/ready-to-use version of our entire toolchain. While it is slightly heavy (around 16GB) it is very easy to set up on your machine using QEMU (an open-source virtualizer available on all operating systems). You can download the VM image [here](https://drive.proton.me/urls/E6RDDQ8WEC#jl2vSIjaPekf).
 
 This VM was originally set-up for the [*Dynamatic Reloaded tutorial* given at the FPGA'24 conference](https://www.isfpga.org/workshops-tutorials/#t7) in Monterey, California. You can use it to simply follow the tutorial (available in the [repository's documentation](Tutorials/Introduction/Introduction.md)) or as a starting point to use/modify Dynamatic in general.
 

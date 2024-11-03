@@ -22,12 +22,13 @@
 // slightly convoluted but we are forced to do this like that since shift
 // operations enforce that all their operands are of the same type. Ideally, we
 // would have a Handshake version of shift operations that accept varrying
-// bitwidths between its operands and result.
-//
+// bitwidths between its operands and results.
 //
 //===----------------------------------------------------------------------===//
 
 #include "dynamatic/Transforms/HandshakeOptimizeBitwidths.h"
+#include "dynamatic/Analysis/NameAnalysis.h"
+#include "dynamatic/Dialect/Handshake/HandshakeInterfaces.h"
 #include "dynamatic/Dialect/Handshake/HandshakeOps.h"
 #include "dynamatic/Dialect/Handshake/HandshakeTypes.h"
 #include "dynamatic/Support/CFG.h"
@@ -187,10 +188,10 @@ static unsigned getUsefulResultWidth(ChannelVal val) {
 /// truncation operation in the IR after the original value if necessary. If an
 /// extension operation is required, the provided extension type determines
 /// which type of extension operation is inserted. If the extension type is
-/// unknown, the value's signedness  determines whether the extension should be
+/// unknown, the value's signedness determines whether the extension should be
 /// logical or arithmetic.
-static ChannelVal modVal(ExtValue extVal, unsigned targetWidth,
-                         PatternRewriter &rewriter) {
+static ChannelVal modBitWidth(ExtValue extVal, unsigned targetWidth,
+                              PatternRewriter &rewriter) {
   auto &[val, ext] = extVal;
 
   // Return the original value when it already has the target width
@@ -325,11 +326,11 @@ static void modArithOp(Op op, ExtValue lhs, ExtValue rhs, unsigned optWidth,
 
   // Create a new operation as well as appropriate bitwidth
   // modification operations to keep the IR valid
-  Value newLhs = modVal(lhs, optWidth, rewriter);
-  Value newRhs = modVal(rhs, optWidth, rewriter);
+  Value newLhs = modBitWidth(lhs, optWidth, rewriter);
+  Value newRhs = modBitWidth(rhs, optWidth, rewriter);
   rewriter.setInsertionPoint(op);
   auto newOp = rewriter.create<Op>(op.getLoc(), newLhs, newRhs);
-  Value newRes = modVal({newOp.getResult(), extRes}, resWidth, rewriter);
+  Value newRes = modBitWidth({newOp.getResult(), extRes}, resWidth, rewriter);
   inheritBB(op, newOp);
 
   // Replace uses of the original operation's result with
@@ -404,9 +405,10 @@ public:
                               ArrayRef<ChannelVal> minDataOperands,
                               PatternRewriter &rewriter,
                               SmallVector<Value> &newOperands) {
-    llvm::transform(
-        minDataOperands, std::back_inserter(newOperands),
-        [&](ChannelVal val) { return modVal({val, ext}, optWidth, rewriter); });
+    llvm::transform(minDataOperands, std::back_inserter(newOperands),
+                    [&](ChannelVal val) {
+                      return modBitWidth({val, ext}, optWidth, rewriter);
+                    });
   }
 
   /// Determines the list of result types that will be given to the builder of
@@ -437,7 +439,7 @@ public:
                           SmallVector<Value> &newResults) {
     llvm::transform(
         newOp->getResults(), std::back_inserter(newResults), [&](OpResult res) {
-          return modVal({cast<ChannelVal>(res), ext}, width, rewriter);
+          return modBitWidth({cast<ChannelVal>(res), ext}, width, rewriter);
         });
   }
 
@@ -469,8 +471,8 @@ public:
   void modResults(handshake::ControlMergeOp newOp, unsigned width, ExtType ext,
                   PatternRewriter &rewriter,
                   SmallVector<Value> &newResults) override {
-    newResults.push_back(
-        modVal({cast<ChannelVal>(newOp.getResult()), ext}, width, rewriter));
+    newResults.push_back(modBitWidth({cast<ChannelVal>(newOp.getResult()), ext},
+                                     width, rewriter));
     newResults.push_back(newOp.getIndex());
   }
 };
@@ -490,7 +492,7 @@ public:
     newOperands.push_back(op.getSelectOperand());
     llvm::transform(
         minDataOperands, std::back_inserter(newOperands), [&](Value val) {
-          return modVal({cast<ChannelVal>(val), ext}, optWidth, rewriter);
+          return modBitWidth({cast<ChannelVal>(val), ext}, optWidth, rewriter);
         });
   }
 };
@@ -511,7 +513,7 @@ public:
                       SmallVector<Value> &newOperands) override {
     newOperands.push_back(op.getConditionOperand());
     newOperands.push_back(
-        modVal({minDataOperands[0], ext}, optWidth, rewriter));
+        modBitWidth({minDataOperands[0], ext}, optWidth, rewriter));
   }
 };
 
@@ -531,7 +533,7 @@ public:
                       PatternRewriter &rewriter,
                       SmallVector<Value> &newOperands) override {
     newOperands.push_back(
-        modVal({minDataOperands[0], ext}, optWidth, rewriter));
+        modBitWidth({minDataOperands[0], ext}, optWidth, rewriter));
   }
 
   handshake::BufferOp createOp(ArrayRef<Type> newResTypes,
@@ -636,12 +638,14 @@ private:
   bool forward;
 };
 
-/// Optimizes the bitwidth of muxes' select operand so that it can just support
-/// the number of data operands. This pattern can be applied as part of a single
-/// greedy rewriting pass and doesn't need to be part of the forward/backward
-/// process.
+/// Optimizes the bitwidth of muxes' select operand so that it is just wide
+/// enough to support indexing into the number of data operands. This pattern
+/// can be applied as part of a single greedy rewriting pass; it doesn't need to
+/// be part of the forward/backward process.
 struct HandshakeMuxSelect : public OpRewritePattern<handshake::MuxOp> {
-  using OpRewritePattern<handshake::MuxOp>::OpRewritePattern;
+
+  HandshakeMuxSelect(NameAnalysis &namer, MLIRContext *ctx)
+      : OpRewritePattern<handshake::MuxOp>(ctx), namer(namer) {}
 
   LogicalResult matchAndRewrite(handshake::MuxOp muxOp,
                                 PatternRewriter &rewriter) const override {
@@ -657,23 +661,34 @@ struct HandshakeMuxSelect : public OpRewritePattern<handshake::MuxOp> {
     if (optWidth >= selectWidth)
       return failure();
 
-    // Replace the select operand with one with optimize bitwidth
-    Value newSelect =
-        modVal({selectOperand, ExtType::LOGICAL}, optWidth, rewriter);
-    rewriter.replaceUsesWithIf(selectOperand, newSelect, [&](OpOperand &oprd) {
-      return oprd.getOwner() == muxOp;
-    });
+    // Create a new mux whose select operand is optimized
+    SmallVector<Value, 3> newOperands;
+    newOperands.push_back(
+        modBitWidth({selectOperand, ExtType::LOGICAL}, optWidth, rewriter));
+    auto dataOprds = muxOp.getDataOperands();
+    newOperands.append(dataOprds.begin(), dataOprds.end());
+    auto newMuxOp = rewriter.create<handshake::MuxOp>(
+        muxOp.getLoc(), muxOp->getResultTypes(), newOperands,
+        muxOp->getAttrs());
+    namer.replaceOp(muxOp, newMuxOp);
+    rewriter.replaceOp(muxOp, newMuxOp);
     return success();
   }
+
+protected:
+  /// A reference to the pass's name analysis.
+  NameAnalysis &namer;
 };
 
-/// Optimizes the bitwidth of control merges' index result so that it can just
-/// support the number of data operands. This pattern can be applied as part of
-/// a single greedy rewriting pass and doesn't need to be part of the
-/// forward/backward process.
+/// Optimizes the bitwidth of control merges' index result so that it is just
+/// wide enough to support indexing into the number of data operands. This
+/// pattern can be applied as part of a single greedy rewriting pass; it doesn't
+/// need to be part of the forward/backward process.
 struct HandshakeCMergeIndex
     : public OpRewritePattern<handshake::ControlMergeOp> {
-  using OpRewritePattern<handshake::ControlMergeOp>::OpRewritePattern;
+
+  HandshakeCMergeIndex(NameAnalysis &namer, MLIRContext *ctx)
+      : OpRewritePattern<handshake::ControlMergeOp>(ctx), namer(namer) {}
 
   LogicalResult matchAndRewrite(handshake::ControlMergeOp cmergeOp,
                                 PatternRewriter &rewriter) const override {
@@ -689,114 +704,173 @@ struct HandshakeCMergeIndex
     if (optWidth >= indexWidth)
       return failure();
 
-    // Create a new control merge with whose index result is optimized
-    SmallVector<Type, 2> resTypes;
-    resTypes.push_back(cmergeOp->getOperandTypes().front());
-    resTypes.push_back(
-        indexType.withDataType(rewriter.getIntegerType(optWidth)));
+    // Create a new control merge whose index result is optimized
+    SmallVector<Type, 2> newResultTypes{
+        cmergeOp->getOperandTypes().front(),
+        indexType.withDataType(rewriter.getIntegerType(optWidth))};
     rewriter.setInsertionPoint(cmergeOp);
-    auto newOp = rewriter.create<handshake::ControlMergeOp>(
-        cmergeOp.getLoc(), resTypes, cmergeOp.getDataOperands());
-    inheritBB(cmergeOp, newOp);
-    Value modIndex =
-        modVal({newOp.getIndex(), ExtType::LOGICAL}, indexWidth, rewriter);
-    rewriter.replaceOp(cmergeOp, {newOp.getResult(), modIndex});
+    auto newCmergeOp = rewriter.create<handshake::ControlMergeOp>(
+        cmergeOp.getLoc(), newResultTypes, cmergeOp.getDataOperands(),
+        cmergeOp->getAttrs());
+    namer.replaceOp(cmergeOp, newCmergeOp);
+    Value modIndex = modBitWidth({newCmergeOp.getIndex(), ExtType::LOGICAL},
+                                 indexWidth, rewriter);
+    rewriter.replaceOp(cmergeOp, {newCmergeOp.getResult(), modIndex});
     return success();
   }
+
+protected:
+  /// A reference to the pass's name analysis.
+  NameAnalysis &namer;
 };
 
-/// Optimizes the bitwidth of memory controller's address-carrying channels so
-/// that they can just support indexing into the memory region attached to the
-/// controller. This pattern can be applied as part of a single
-/// greedy rewriting pass and doesn't need to be part of the forward/backward
+/// Optimizes the bitwidth of memory interfaces' address-carrying channels so
+/// that they are just wide enough to support indexing into the memory region
+/// attached to the interface. This pattern can be applied as part of a single
+/// greedy rewriting pass; it doesn't need to be part of the forward/backward
 /// process.
-struct HandshakeMCAddress
-    : public OpRewritePattern<handshake::MemoryControllerOp> {
-  using OpRewritePattern<handshake::MemoryControllerOp>::OpRewritePattern;
+struct MemInterfaceAddrOpt
+    : public OpInterfaceRewritePattern<handshake::MemoryOpInterface> {
 
-  LogicalResult matchAndRewrite(handshake::MemoryControllerOp mcOp,
+  MemInterfaceAddrOpt(NameAnalysis &namer, MLIRContext *ctx)
+      : OpInterfaceRewritePattern<handshake::MemoryOpInterface>(ctx),
+        namer(namer) {}
+
+  LogicalResult matchAndRewrite(handshake::MemoryOpInterface memOp,
                                 PatternRewriter &rewriter) const override {
     unsigned optWidth = APInt(APInt::APINT_BITS_PER_WORD,
-                              mcOp.getMemRef().getType().getDimSize(0))
+                              memOp.getMemRef().getType().getDimSize(0))
                             .ceilLogBase2();
 
-    FuncMemoryPorts ports = mcOp.getPorts();
+    FuncMemoryPorts ports = getMemoryPorts(memOp);
     if (ports.addrWidth == 0 || optWidth >= ports.addrWidth)
       return failure();
 
-    ValueRange inputs = mcOp.getOperands();
+    ValueRange operands = memOp->getOperands();
+    TypeRange resultTypes = memOp->getResultTypes();
     // Optimizes the bitwidth of the address channel currently being pointed to
     // by inputIdx, and increment inputIdx before returning the optimized value
     auto getOptAddrInput = [&](unsigned inputIdx) {
-      return modVal({getMinimalValue(cast<ChannelVal>(inputs[inputIdx])),
-                     ExtType::LOGICAL},
-                    optWidth, rewriter);
+      return modBitWidth({getMinimalValue(cast<ChannelVal>(operands[inputIdx])),
+                          ExtType::LOGICAL},
+                         optWidth, rewriter);
     };
 
-    // Iterate over memory controller inputs to create the new inputs and the
-    // list of accesses
-    SmallVector<Value> newInputs;
-    for (GroupMemoryPorts &blockPorts : ports.groups) {
-      // Handle eventual control input
-      if (blockPorts.hasControl())
-        newInputs.push_back(inputs[blockPorts.ctrlPort->getCtrlInputIndex()]);
+    // Replace new operands and result types with the narrrower address type by
+    // iterating over the memory interface's ports
+    SmallVector<Value> newOperands(operands);
+    SmallVector<Type> newResultTypes(resultTypes);
+    SmallVector<unsigned, 2> addrResultIndices;
 
+    // First iterate over regular load/store ports directly connecting to the
+    // memory interface
+    for (GroupMemoryPorts &blockPorts : ports.groups) {
       for (MemoryPort &port : blockPorts.accessPorts) {
         if (std::optional<LoadPort> loadPort = dyn_cast<LoadPort>(port)) {
-          newInputs.push_back(getOptAddrInput(loadPort->getAddrInputIndex()));
+          unsigned addrIdx = loadPort->getAddrInputIndex();
+          newOperands[addrIdx] = getOptAddrInput(addrIdx);
         } else {
           std::optional<StorePort> storePort = dyn_cast<StorePort>(port);
           assert(storePort && "port must be load or store");
-          newInputs.push_back(getOptAddrInput(storePort->getAddrInputIndex()));
-          newInputs.push_back(inputs[storePort->getDataInputIndex()]);
+          unsigned addrIdx = storePort->getAddrInputIndex();
+          newOperands[addrIdx] = getOptAddrInput(addrIdx);
         }
       }
     }
 
-    // Replace the existing memory controller with the optimized one
-    rewriter.setInsertionPoint(mcOp);
-    auto newOp = rewriter.create<handshake::MemoryControllerOp>(
-        mcOp.getLoc(), mcOp.getMemRef(), mcOp.getMemStart(), newInputs,
-        mcOp.getCtrlEnd(), mcOp.getMCBlocks(),
-        mcOp.getPorts().getNumPorts<LoadPort, LSQLoadStorePort>());
-    inheritBB(mcOp, newOp);
-    rewriter.replaceOp(mcOp, newOp.getResults());
+    // Then iterate over ports connecting this memory interface to another one
+    // that references the same memory region
+    for (MemoryPort &port : ports.interfacePorts) {
+      if (std::optional<MCLoadStorePort> mcPort =
+              dyn_cast<MCLoadStorePort>(port)) {
+        // Load address and store address results are modified
+        Type optAddrType =
+            handshake::ChannelType::get(rewriter.getIntegerType(optWidth));
+        unsigned ldAddrIdx = mcPort->getLoadAddrOutputIndex();
+        addrResultIndices.push_back(ldAddrIdx);
+        newResultTypes[ldAddrIdx] = optAddrType;
+        unsigned stAddrIdx = mcPort->getStoreAddrOutputIndex();
+        addrResultIndices.push_back(stAddrIdx);
+        newResultTypes[stAddrIdx] = optAddrType;
+      } else {
+        std::optional<LSQLoadStorePort> lsqPort =
+            dyn_cast<LSQLoadStorePort>(port);
+        // Load address and store address operands are modified
+        assert(lsqPort && "interface port must be to MC or LSQ");
+        unsigned ldAddrIdx = lsqPort->getLoadAddrInputIndex();
+        newOperands[ldAddrIdx] = getOptAddrInput(ldAddrIdx);
+        unsigned stAddrIdx = lsqPort->getStoreAddrInputIndex();
+        newOperands[stAddrIdx] = getOptAddrInput(stAddrIdx);
+      }
+    }
+
+    // Replace the memory interface
+    rewriter.setInsertionPoint(memOp);
+    auto newMemOp = cast<handshake::MemoryOpInterface>(rewriter.create(
+        memOp->getLoc(),
+        StringAttr::get(getContext(), memOp->getName().getStringRef()),
+        newOperands, newResultTypes, memOp->getAttrs()));
+    SmallVector<Value> replacementValues(newMemOp->getResults());
+    for (unsigned resIdx : addrResultIndices) {
+      replacementValues[resIdx] = modBitWidth(
+          {cast<ChannelVal>(replacementValues[resIdx]), ExtType::LOGICAL},
+          ports.addrWidth, rewriter);
+    }
+    namer.replaceOp(memOp, newMemOp);
+    rewriter.replaceOp(memOp, replacementValues);
     return success();
   }
+
+protected:
+  /// A reference to the pass's name analysis.
+  NameAnalysis &namer;
 };
 
 /// Optimizes the bitwidth of memory ports's address-carrying channels so that
-/// they can just support indexing into the memory region these ports ultimately
-/// talk to. The first template parameter is meant to be either
-/// handshake::LoadOpInterface or handshake::StoreOpInterface. This pattern can
-/// be applied as part of a single greedy rewriting pass and doesn't need to be
-/// part of the forward/backward process.
-template <typename Op>
-struct HandshakeMemPortAddress : public OpRewritePattern<Op> {
-  using OpRewritePattern<Op>::OpRewritePattern;
+/// they are just wide enough to support indexing into the memory region these
+/// ports ultimately talk to. This pattern can be applied as part of a single
+/// greedy rewriting pass; it doesn't need to be part of the forward/backward
+/// process.
+struct MemPortAddrOpt
+    : public OpInterfaceRewritePattern<handshake::MemPortOpInterface> {
 
-  LogicalResult matchAndRewrite(Op memOp,
+  MemPortAddrOpt(NameAnalysis &namer, MLIRContext *ctx)
+      : OpInterfaceRewritePattern<handshake::MemPortOpInterface>(ctx),
+        namer(namer) {}
+
+  LogicalResult matchAndRewrite(handshake::MemPortOpInterface portOp,
                                 PatternRewriter &rewriter) const override {
     // Check whether we can optimize the address bitwidth
-    ChannelVal addrRes = memOp.getAddressResult();
+    ChannelVal addrRes = portOp.getAddressOutput();
     unsigned addrWidth = addrRes.getType().getDataBitWidth();
     unsigned optWidth = getUsefulResultWidth(addrRes);
     if (optWidth >= addrWidth)
       return failure();
 
-    Value newAddr =
-        modVal({getMinimalValue(memOp.getAddress()), ExtType::LOGICAL},
-               optWidth, rewriter);
-    rewriter.setInsertionPoint(memOp);
-    auto newOp = rewriter.create<Op>(memOp.getLoc(), newAddr.getType(),
-                                     memOp.getDataResult().getType(), newAddr,
-                                     memOp.getData());
-    Value newAddrRes = modVal({newOp.getAddressResult(), ExtType::LOGICAL},
-                              addrWidth, rewriter);
-    inheritBB(memOp, newOp);
-    rewriter.replaceOp(memOp, {newAddrRes, newOp.getDataResult()});
+    // Derive new operands and result types with the narrrower address type
+    Value newAddr = modBitWidth(
+        {getMinimalValue(portOp.getAddressInput()), ExtType::LOGICAL}, optWidth,
+        rewriter);
+    Value dataIn = portOp.getDataInput();
+    SmallVector<Value, 2> newOperands{newAddr, dataIn};
+    SmallVector<Type, 2> newResultTypes{newAddr.getType(), dataIn.getType()};
+
+    // Replace the memory port
+    rewriter.setInsertionPoint(portOp);
+    auto newPortOp = cast<handshake::MemPortOpInterface>(rewriter.create(
+        portOp.getLoc(),
+        StringAttr::get(getContext(), portOp->getName().getStringRef()),
+        newOperands, newResultTypes, portOp->getAttrs()));
+    namer.replaceOp(portOp, newPortOp);
+    Value newAddrRes = modBitWidth(
+        {newPortOp.getAddressOutput(), ExtType::LOGICAL}, addrWidth, rewriter);
+    rewriter.replaceOp(portOp, {newAddrRes, newPortOp.getDataOutput()});
     return success();
   }
+
+protected:
+  /// A reference to the pass's name analysis.
+  NameAnalysis &namer;
 };
 
 /// Optimizes the bitwidth of channels contained inside "forwarding cycles".
@@ -915,8 +989,8 @@ using FTransfer = std::function<unsigned(unsigned, unsigned)>;
 /// optimized.
 ///
 /// In forward mode, the pattern uses a transfer function to determine the
-/// required result bitwidth based on the operands' respective "minimal"
-/// bitwidth. In backward mode, the maximum number of bits used from the result
+/// required result bitwidth based on the operands' respective "minimal
+/// bitwidth". In backward mode, the maximum number of bits used from the result
 /// drives a potential reduction in the number of bits in the two operands.
 template <typename Op>
 struct ArithSingleType : public OpRewritePattern<Op> {
@@ -1005,12 +1079,12 @@ struct ArithSelect : public OpRewritePattern<handshake::SelectOp> {
 
     // Create a new operation as well as appropriate bitwidth modification
     // operations to keep the IR valid
-    Value newLhs = modVal({minLhs, extLhs}, optWidth, rewriter);
-    Value newRhs = modVal({minRhs, extRhs}, optWidth, rewriter);
+    Value newLhs = modBitWidth({minLhs, extLhs}, optWidth, rewriter);
+    Value newRhs = modBitWidth({minRhs, extRhs}, optWidth, rewriter);
     rewriter.setInsertionPoint(selectOp);
     auto newOp = rewriter.create<handshake::SelectOp>(
         selectOp.getLoc(), selectOp.getCondition(), newLhs, newRhs);
-    Value newRes = modVal({newOp.getResult(), extLhs}, resWidth, rewriter);
+    Value newRes = modBitWidth({newOp.getResult(), extLhs}, resWidth, rewriter);
     inheritBB(selectOp, newOp);
 
     // Replace uses of the original operation's result with the result of the
@@ -1069,9 +1143,10 @@ struct ArithShift : public OpRewritePattern<Op> {
     if (forward) {
       // Create a new operation as well as appropriate bitwidth modification
       // operations to keep the IR valid
-      Value newToShift = modVal({minToShift, extToShift}, optWidth, rewriter);
+      Value newToShift =
+          modBitWidth({minToShift, extToShift}, optWidth, rewriter);
       Value newShifyBy =
-          modVal({minShiftBy, ExtType::LOGICAL}, optWidth, rewriter);
+          modBitWidth({minShiftBy, ExtType::LOGICAL}, optWidth, rewriter);
       rewriter.setInsertionPoint(op);
       auto newOp = rewriter.create<Op>(op.getLoc(), newToShift, newShifyBy);
       ChannelVal newRes = newOp.getResult();
@@ -1080,8 +1155,8 @@ struct ArithShift : public OpRewritePattern<Op> {
         // newly inserted shift operation to discard high-significance bits that
         // we know are 0s, then extend the result back to satisfy the users of
         // the original operation's result
-        newRes = modVal({newRes, extToShift}, optWidth - cstVal, rewriter);
-      Value modRes = modVal({newRes, extToShift}, resWidth, rewriter);
+        newRes = modBitWidth({newRes, extToShift}, optWidth - cstVal, rewriter);
+      Value modRes = modBitWidth({newRes, extToShift}, resWidth, rewriter);
       inheritBB(op, newOp);
 
       // Replace uses of the original operation's result with the result of the
@@ -1094,8 +1169,8 @@ struct ArithShift : public OpRewritePattern<Op> {
         // discard high-significance bits that were discarded in the result,
         // then extend back to satisfy the users of the original integer
         unsigned requiredToShiftWidth = optWidth - std::min(cstVal, optWidth);
-        modToShift =
-            modVal({minToShift, extToShift}, requiredToShiftWidth, rewriter);
+        modToShift = modBitWidth({minToShift, extToShift}, requiredToShiftWidth,
+                                 rewriter);
       }
       modArithOp(op, {modToShift, extToShift}, {minShiftBy, ExtType::LOGICAL},
                  optWidth, extToShift, rewriter);
@@ -1128,8 +1203,8 @@ struct ArithCmpFW : public OpRewritePattern<handshake::CmpIOp> {
 
     // Create a new operation as well as appropriate bitwidth modification
     // operations to keep the IR valid
-    Value newLhs = modVal({minLhs, extLhs}, optWidth, rewriter);
-    Value newRhs = modVal({minRhs, extRhs}, optWidth, rewriter);
+    Value newLhs = modBitWidth({minLhs, extLhs}, optWidth, rewriter);
+    Value newRhs = modBitWidth({minRhs, extRhs}, optWidth, rewriter);
     rewriter.setInsertionPoint(cmpOp);
     auto newOp = rewriter.create<handshake::CmpIOp>(
         cmpOp.getLoc(), cmpOp.getPredicate(), newLhs, newRhs);
@@ -1161,7 +1236,7 @@ struct ArithExtToTruncOpt : public OpRewritePattern<handshake::TruncIOp> {
 
     // Bypass all extensions and truncation operation and replace it with a
     // single bitwidth modification operation
-    auto newExtRes = modVal({minVal, extType}, finalWidth, rewriter);
+    auto newExtRes = modBitWidth({minVal, extType}, finalWidth, rewriter);
     rewriter.replaceOp(truncOp, {newExtRes});
     return success();
   }
@@ -1378,8 +1453,8 @@ bool ArithBoundOpt::optBranchIfPossible(ChannelVal optBranch, unsigned optWidth,
   // Insert a truncation operation and an extension between the result branch
   // to optimize and its users, to let the rest of the rewrite patterns know
   // that some bits of the value can be safely discarded
-  ChannelVal truncVal = modVal({optBranch, ext}, optWidth, rewriter);
-  ChannelVal extVal = modVal({truncVal, ext}, dataWidth, rewriter);
+  ChannelVal truncVal = modBitWidth({optBranch, ext}, optWidth, rewriter);
+  ChannelVal extVal = modBitWidth({truncVal, ext}, dataWidth, rewriter);
   rewriter.replaceAllUsesExcept(optBranch, extVal, truncVal.getDefiningOp());
   return true;
 }
@@ -1398,8 +1473,6 @@ struct HandshakeOptimizeBitwidthsPass
     : public dynamatic::impl::HandshakeOptimizeBitwidthsBase<
           HandshakeOptimizeBitwidthsPass> {
 
-  HandshakeOptimizeBitwidthsPass(bool legacy) { this->legacy = legacy; }
-
   void runDynamaticPass() override {
     auto *ctx = &getContext();
     mlir::ModuleOp modOp = getOperation();
@@ -1416,17 +1489,11 @@ struct HandshakeOptimizeBitwidthsPass
     // correct) because it is not this pass's job to perform this kind of
     // optimization, which down-the-line passes may be sensitive to.
     RewritePatternSet patterns(ctx);
-    patterns.add<HandshakeMuxSelect, HandshakeCMergeIndex>(ctx);
-    if (!legacy) {
-      patterns
-          .add<HandshakeMCAddress, HandshakeMemPortAddress<handshake::MCLoadOp>,
-               HandshakeMemPortAddress<handshake::LSQLoadOp>,
-               HandshakeMemPortAddress<handshake::MCStoreOp>,
-               HandshakeMemPortAddress<handshake::LSQStoreOp>>(ctx);
-      if (failed(
-              applyPatternsAndFoldGreedily(modOp, std::move(patterns), config)))
-        return signalPassFailure();
-    }
+    patterns.add<HandshakeMuxSelect, HandshakeCMergeIndex, MemInterfaceAddrOpt,
+                 MemPortAddrOpt>(getAnalysis<NameAnalysis>(), ctx);
+    if (failed(
+            applyPatternsAndFoldGreedily(modOp, std::move(patterns), config)))
+      return signalPassFailure();
 
     for (auto funcOp : modOp.getOps<handshake::FuncOp>()) {
       bool fwChanged, bwChanged;
@@ -1535,6 +1602,6 @@ void HandshakeOptimizeBitwidthsPass::addBackwardPatterns(
 } // namespace
 
 std::unique_ptr<dynamatic::DynamaticPass>
-dynamatic::createHandshakeOptimizeBitwidths(bool legacy) {
-  return std::make_unique<HandshakeOptimizeBitwidthsPass>(legacy);
+dynamatic::createHandshakeOptimizeBitwidths() {
+  return std::make_unique<HandshakeOptimizeBitwidthsPass>();
 }
