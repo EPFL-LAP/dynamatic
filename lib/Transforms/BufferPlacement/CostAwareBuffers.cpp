@@ -86,8 +86,8 @@ double getpenaltycoef(const llvm::StringRef &type) {
     static const std::unordered_map<std::string, double> lookupTable = {
         {"oehb", 2},
         {"tehb", 20},
-        {"fullTran", 25},
-        {"singleEnable", 0.01},
+        {"tfifo", 25},
+        {"dvse", 0.01},
         {"dvr", 2.1},
         {"seExist", 0.01},
         {"bufExist", 16},
@@ -395,18 +395,18 @@ void CostAwareBuffers::addChannelThroughputConstraints(CFDFC &cfdfc) {
     GRBQuadExpr chThroughputLower = chVars.bufNumSlots[BufferType::OB] * cfVars.throughput +
                                 chVars.bufNumSlots[BufferType::SE] * cfVars.throughput +
                                 chVars.bufNumSlots[BufferType::DR] * cfVars.throughput;
-    model.addConstr(chThroughput >= chThroughputLower, "throughput_channel_lower");
+    model.addQConstr(chThroughput >= chThroughputLower, "throughput_channel_lower");
 
     // Set a ceiling funciton for SE type
     GRBVar Ceiling = model.addVar(0, GRB_INFINITY, 0.0, GRB_INTEGER, "ceiling");
-    model.addConstr(Ceiling <= chVars.bufNumSlots[BufferType::SE] * cfVars.throughput + 0.999, "throughput_channel_seCeiling");
+    model.addQConstr(Ceiling <= chVars.bufNumSlots[BufferType::SE] * cfVars.throughput + 0.999, "throughput_channel_seCeiling");
     // The Upperbound of channel Throughput
     GRBQuadExpr chThroughputUpper = chVars.bufNumSlots[BufferType::OB] +
                                 chVars.bufNumSlots[BufferType::TB] * (1 - cfVars.throughput) +
                                 chVars.bufNumSlots[BufferType::FT] +
                                 Ceiling +
                                 chVars.bufNumSlots[BufferType::DR] * (1 - cfVars.throughput);
-    model.addConstr(chThroughput <= chThroughputUpper, "throughput_channel_upper");
+    model.addQConstr(chThroughput <= chThroughputUpper, "throughput_channel_upper");
   }
   model.update();
 }
