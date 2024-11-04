@@ -435,8 +435,10 @@ LogicalResult HandshakePlaceBuffersPass::getBufferPlacement(
 
   // Create Gurobi environment
   GRBEnv env = GRBEnv(true);
-  env.set(GRB_IntParam_OutputFlag, 1);
-  env.set("LogFile", "gurobi.log"); 
+  bool print_log = 1;
+  env.set(GRB_IntParam_OutputFlag, print_log);
+  if (print_log)
+    env.set("LogFile", "gurobi.log"); 
   if (timeout > 0)
     env.set(GRB_DoubleParam_TimeLimit, timeout);
   env.start();

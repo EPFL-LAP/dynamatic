@@ -53,34 +53,6 @@ static StringRef getBufferName(BufferType type) {
   }
 }
 
-
-/// Returns the input and output port delays of the model for a specific signal
-/// type. If the type is `SignalType::DATA`, the channel's bitwidth is used as a
-/// parameter to determine the delays. If the model is nullptr, delays are
-/// assumed to be 0.
-static std::pair<double, double> getPortDelays(Value channel, SignalType signal,
-                                               const TimingModel *model) {
-  if (!model)
-    return {0.0, 0.0};
-
-  double inBufDelay = 0.0, outBufDelay = 0.0;
-  unsigned bitwidth;
-  switch (signal) {
-  case SignalType::DATA:
-    bitwidth = dynamatic::handshake::getHandshakeTypeBitWidth(channel.getType());
-    /// TODO: It's bad to discard these results, needs a safer way of querying
-    /// for these delays
-    (void)model->inputModel.dataDelay.getCeilMetric(bitwidth, inBufDelay);
-    (void)model->outputModel.dataDelay.getCeilMetric(bitwidth, outBufDelay);
-    return {inBufDelay, outBufDelay};
-  case SignalType::VALID:
-    return {model->inputModel.validDelay, model->outputModel.validDelay};
-  case SignalType::READY:
-    return {model->inputModel.readyDelay, model->outputModel.readyDelay};
-  }
-}
-
-
 /// Returns penalty weight for buffer existence and each buffertype.
 double getpenaltycoef(const llvm::StringRef &type) {
     static const std::unordered_map<std::string, double> lookupTable = {
@@ -126,7 +98,7 @@ void CostAwareBuffers::addChannelVars(Value channel, ArrayRef<BufferType> buffer
   // Default-initialize channel variables and retrieve a reference
   ChannelVars &channelVars = vars.channelVars[channel];
   std::string suffix = "_" + getUniqueName(*channel.getUses().begin());
-
+  
   // Create a Gurobi variable of the given name and type for the channel
   auto createVar = [&](const llvm::Twine &name, char type) {
     return model.addVar(0, GRB_INFINITY, 0.0, type, (name + suffix).str());
@@ -169,7 +141,6 @@ void CostAwareBuffers::addCFDFCVars(CFDFC &cfdfc) {
   // Create a set of variables for each unit in the CFDFC
   for (Operation *unit : cfdfc.units) {
     std::string suffix = "_" + getUniqueName(unit).str();
-
     // Default-initialize unit variables and retrieve a reference
     UnitVars &unitVars = cfVars.unitVars[unit];
     unitVars.retIn = createVar("retIn" + suffix);
@@ -192,7 +163,8 @@ void CostAwareBuffers::addCFDFCVars(CFDFC &cfdfc) {
   }
 
   // Create a variable for the CFDFC's throughput
-  cfVars.throughput = createVar("throughput");
+  cfVars.throughput = model.addVar(0, 1, 0.0, GRB_CONTINUOUS,
+                        "throughput");
 
   // Update the model before returning so that these variables can be referenced
   // safely during the rest of model creation
@@ -200,57 +172,29 @@ void CostAwareBuffers::addCFDFCVars(CFDFC &cfdfc) {
 }
 
 void CostAwareBuffers::addChannelPathConstraints(
-    Value channel, SignalType signal, const TimingModel *bufModel,
-    ArrayRef<BufferingGroup> before, ArrayRef<BufferingGroup> after) {
-
+    Value channel, SignalType signal, const TimingModel *bufModel) {
+  
   ChannelVars &channelVars = vars.channelVars[channel];
   double bigCst = targetPeriod * 10;
 
-  // Sum up conditional delays of buffers before the one that cuts the path
-  GRBLinExpr bufsBeforeDelay;
-  for (const BufferingGroup &group : before)
-    bufsBeforeDelay += channelVars.signalVars[group.getRefSignal()].bufPresent *
-                       group.getCombinationalDelay(channel, signal);
-
-  // Sum up conditional delays of buffers after the one that cuts the path
-  GRBLinExpr bufsAfterDelay;
-  for (const BufferingGroup &group : after)
-    bufsAfterDelay += channelVars.signalVars[group.getRefSignal()].bufPresent *
-                      group.getCombinationalDelay(channel, signal);
-
-  handshake::ChannelBufProps &props = channelProps[channel];
   ChannelSignalVars &signalVars = channelVars.signalVars[signal];
   GRBVar &t1 = signalVars.path.tIn;
   GRBVar &t2 = signalVars.path.tOut;
   GRBVar &bufPresent = signalVars.bufPresent;
-  auto [inBufDelay, outBufDelay] = getPortDelays(channel, signal, bufModel);
 
-  // Arrival time at channel's output must be lower than target clock period
-  model.addConstr(t2 <= targetPeriod, "path_period");
+  std::string pathbufferedChannelInName = "path_bufferedChannelIn_" 
+                                          + getUniqueName(*channel.getUses().begin()) 
+                                          + '_' + getSignalName(signal).str();
+  model.addConstr(t1 <= targetPeriod,
+                  pathbufferedChannelInName);
 
-  // If a buffer is present on the signal's path, then the arrival time at the
-  // buffer's register must be lower than the clock period. The signal must
-  // propagate on the channel through all potential buffers cutting other
-  // signals before its own, and inside its own buffer's input pin logic
-  double preBufCstDelay = props.inDelay + inBufDelay;
-  model.addConstr(t1 + bufsBeforeDelay + bufPresent * preBufCstDelay <=
-                      targetPeriod,
-                  "path_bufferedChannelIn");
+  std::string pathunbufferedChannelName = "path_unbufferedChannel_" 
+                                          + getUniqueName(*channel.getUses().begin()) 
+                                          + '_' + getSignalName(signal).str();
+  model.addConstr(t1 - bigCst * bufPresent <= t2,
+                  pathunbufferedChannelName);
 
-  // If a buffer is present on the signal's path, then the arrival time at the
-  // channel's output must be greater than the propagation time through its own
-  // buffer's output pin logic and all potential buffers cutting other signals
-  // after its own
-  double postBufCstDelay = outBufDelay + props.outDelay;
-  model.addConstr(bufPresent * postBufCstDelay + bufsAfterDelay <= t2,
-                  "path_bufferedChannelOut");
-
-  // If there are no buffers cutting the signal's path, arrival time at
-  // channel's output must still propagate through entire channel and all
-  // potential buffers cutting through other signals
-  GRBLinExpr unbufChannelDelay = bufsBeforeDelay + props.delay + bufsAfterDelay;
-  model.addConstr(t1 + unbufChannelDelay - bigCst * bufPresent <= t2,
-                  "path_unbufferedChannel");
+  model.update();
 }
 
 void CostAwareBuffers::addUnitPathConstraints(Operation *unit,
@@ -318,15 +262,19 @@ void CostAwareBuffers::addUnitPathConstraints(Operation *unit,
     TimeVars &path = vars.channelVars[out].signalVars[type].path;
     GRBVar &tOutPort = path.tIn;
     // Arrival time at unit's output port is equal to the output port delay
-    model.addConstr(tOutPort == outPortDelay, "path_outDelay");
+    model.addConstr(tOutPort >= outPortDelay, "path_outDelay");
   }
+
+  model.update();
 }
 
 void CostAwareBuffers::addChannelCustomConstraints(
     Value channel) {
+  
   ChannelVars &chVars = vars.channelVars[channel];
   GRBVar &bufPresent = chVars.bufPresent;
 
+  std::string ChannelName = getUniqueName(*channel.getUses().begin());
   // Decide whether there is at least a type of buffer present on a signal
   for (auto &[sig, signalVars] : chVars.signalVars) {
     GRBLinExpr signalbufSlots = 0;
@@ -335,10 +283,14 @@ void CostAwareBuffers::addChannelCustomConstraints(
         signalbufSlots += buffernumSlots;
       }
     }
-    model.addConstr(0.01 * signalbufSlots <= signalVars.bufPresent,
-                    getSignalName(sig).str() + "PresenceLower");
+    model.addConstr(0.001 * signalbufSlots <= signalVars.bufPresent,
+                    getSignalName(sig).str() 
+                    + '_' + ChannelName
+                    + "_PresenceLower");
     model.addConstr(signalbufSlots >= signalVars.bufPresent,
-                    getSignalName(sig).str() + "PresenceUpper");
+                    getSignalName(sig).str() 
+                    + '_' + ChannelName
+                    + "_PresenceUpper");
   }
 
   // If there is at least one slot, there must be a buffer
@@ -348,14 +300,15 @@ void CostAwareBuffers::addChannelCustomConstraints(
     // Temporary setting since the current model is imprecise.
     // More than one TBs bring higher cost but lower elasticity
     // compared with FTs.
-    if (buffertype== BufferType::TB){
-      model.addConstr(buffernumSlots <= 1, "oneTBslotatMost");
+    if (buffertype == BufferType::TB){
+      model.addConstr(buffernumSlots <= 1, ChannelName + "_oneTBslotatMost");
     }
   }
-  model.addConstr(0.01 * TotalSlotNum <= bufPresent, "bufPresence");
+  model.addConstr(0.001 * TotalSlotNum <= bufPresent, ChannelName + "bufPresence");
   // Whether a DVSE is on the channel.
-  model.addConstr(1000 * chVars.sePresent >= chVars.bufNumSlots[BufferType::SE], "sePresentConstrlb");
-  model.addConstr(chVars.sePresent <= chVars.bufNumSlots[BufferType::SE], "sePresentConstrub");
+  model.addConstr(1000 * chVars.sePresent >= chVars.bufNumSlots[BufferType::SE], ChannelName + "sePresentConstrlb");
+  model.addConstr(chVars.sePresent <= chVars.bufNumSlots[BufferType::SE], ChannelName + "sePresentConstrub");
+  model.update();
 }
 
 void CostAwareBuffers::addChannelThroughputConstraints(CFDFC &cfdfc) {
@@ -385,28 +338,58 @@ void CostAwareBuffers::addChannelThroughputConstraints(CFDFC &cfdfc) {
     GRBVar &retDst = cfVars.unitVars[dstOp].retIn;
     unsigned backedge = cfdfc.backedges.contains(channel) ? 1 : 0;
 
+    std::string ChannelName = getUniqueName(*channel.getUses().begin());
     // If the channel isn't a backedge, its throughput equals the difference
     // between the fluid retiming of tokens at its endpoints. Otherwise, it is
     // one less than this difference
+    std::string RetimingConstrName = "throughput_channelRetiming_" + ChannelName;
     model.addConstr(chThroughput - backedge == retDst - retSrc,
-                    "throughput_channelRetiming");
+                    RetimingConstrName);
 
     // The Lowerbound of channel Throuhgput
     GRBQuadExpr chThroughputLower = chVars.bufNumSlots[BufferType::OB] * cfVars.throughput +
                                 chVars.bufNumSlots[BufferType::SE] * cfVars.throughput +
                                 chVars.bufNumSlots[BufferType::DR] * cfVars.throughput;
-    model.addQConstr(chThroughput >= chThroughputLower, "throughput_channel_lower");
+    std::string throughputLowerConstrName = "throughput_channel_lower_" + ChannelName;
+    model.addQConstr(chThroughput >= chThroughputLower, throughputLowerConstrName);
 
     // Set a ceiling funciton for SE type
-    GRBVar Ceiling = model.addVar(0, GRB_INFINITY, 0.0, GRB_INTEGER, "ceiling");
-    model.addQConstr(Ceiling <= chVars.bufNumSlots[BufferType::SE] * cfVars.throughput + 0.999, "throughput_channel_seCeiling");
+    std::string ceilingVarName = "ceiling_" + ChannelName;
+    GRBVar Ceiling = model.addVar(0, GRB_INFINITY, 0.0, GRB_INTEGER, ceilingVarName);
+    std::string ceilingConstrName = "throughput_channel_seCeiling_" + ChannelName;
+    model.addQConstr(Ceiling <= chVars.bufNumSlots[BufferType::SE] * cfVars.throughput + 0.99, ceilingConstrName);
     // The Upperbound of channel Throughput
     GRBQuadExpr chThroughputUpper = chVars.bufNumSlots[BufferType::OB] +
                                 chVars.bufNumSlots[BufferType::TB] * (1 - cfVars.throughput) +
                                 chVars.bufNumSlots[BufferType::FT] +
                                 Ceiling +
                                 chVars.bufNumSlots[BufferType::DR] * (1 - cfVars.throughput);
-    model.addQConstr(chThroughput <= chThroughputUpper, "throughput_channel_upper");
+    std::string throughputUpperConstrName = "throughput_channel_upper_" + ChannelName;
+    model.addQConstr(chThroughput <= chThroughputUpper, throughputUpperConstrName);
+    
+    
+    // // The Lowerbound of channel Throuhgput
+    // double temp = 0.5;
+    // GRBLinExpr chThroughputLower = chVars.bufNumSlots[BufferType::OB] * temp +
+    //                             chVars.bufNumSlots[BufferType::SE] * temp +
+    //                             chVars.bufNumSlots[BufferType::DR] * temp;
+    // std::string throughputLowerConstrName = "throughput_channel_lower_" + ChannelName;
+    // model.addConstr(chThroughput >= chThroughputLower, throughputLowerConstrName);
+
+    // // Set a ceiling funciton for SE type
+    // std::string ceilingVarName = "ceiling_" + ChannelName;
+    // GRBVar Ceiling = model.addVar(0, GRB_INFINITY, 0.0, GRB_INTEGER, ceilingVarName);
+    // std::string ceilingConstrName = "throughput_channel_seCeiling_" + ChannelName;
+    // model.addConstr(Ceiling <= chVars.bufNumSlots[BufferType::SE] * temp + 0.99, ceilingConstrName);
+    // temp = 0;
+    // The Upperbound of channel Throughput
+    // GRBLinExpr chThroughputUpper = chVars.bufNumSlots[BufferType::OB] +
+    //                             chVars.bufNumSlots[BufferType::TB] * (1 - temp) +
+    //                             chVars.bufNumSlots[BufferType::FT] +
+    //                             Ceiling +
+    //                             chVars.bufNumSlots[BufferType::DR] * (1 - temp);
+    // std::string throughputUpperConstrName = "throughput_channel_upper_" + ChannelName;
+    // model.addConstr(chThroughput <= chThroughputUpper, throughputUpperConstrName);
   }
   model.update();
 }
@@ -429,6 +412,7 @@ void CostAwareBuffers::addUnitThroughputConstraints(CFDFC &cfdfc) {
     model.addConstr(cfVars.throughput * latency == retOut - retIn,
                     "through_unitRetiming");
   }
+  model.update();
 }
 
 void CostAwareBuffers::addObjective(ValueRange channels, ArrayRef<BufferType> buffertypes,
@@ -550,6 +534,9 @@ void CostAwareBuffers::setup() {
   // Create channel variables and constraints
   std::vector<Value> allChannels;
   for (auto &[channel, _] : channelProps) {
+    // std::string find_mem = getUniqueName(*channel.getUses().begin());
+    // if (find_mem.find("mem_controller") == std::string::npos)
+    //   continue;
     allChannels.push_back(channel);
     addChannelVars(channel, buffertypes, signals);
 

@@ -40,6 +40,7 @@ begin
       else
         outputValid <= enable or stop;
       end if;
+    end if;
   end process;
 
   enable <= ins_valid and inputReady;

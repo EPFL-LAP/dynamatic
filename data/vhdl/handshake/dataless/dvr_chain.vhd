@@ -2,7 +2,7 @@ library ieee;
 use ieee.std_logic_1164.all;
 use ieee.numeric_std.all;
 
-entity dvr_dataless_chain is
+entity dvr_chain_dataless is
   generic (
     NUM_SLOTS : integer
   );
@@ -17,7 +17,7 @@ entity dvr_dataless_chain is
   );
 end entity;
 
-architecture arch of dvr_dataless_chain is
+architecture arch of dvr_chain_dataless is
   type valid_array is array (0 to NUM_SLOTS) of std_logic;
   type ready_array is array (0 to NUM_SLOTS) of std_logic;
 

@@ -85,17 +85,8 @@ void FPGA20Buffers::extractResult(BufferPlacement &placement) {
       result.numSlotTB = numSlotsToPlace;
     }
 
-    // if (result.numSlotOB > 0 || result.numSlotTB > 0)
-    //   llvm::errs() << "Opaque: " << result.numSlotOB << "\n" << "Transp: " << result.numSlotTB << "\n";
-
-    // result.deductInternalBuffers(Channel(channel), timingDB);
-    
-    // if (result.numSlotOB > 0 || result.numSlotTB > 0)
-    //   llvm::errs() << "Opaque: " << result.numSlotOB << "\n" << "Transp: " << result.numSlotTB << "\n";
-    
+    // Remap to general buffer types.
     if (result.numSlotOB == 1){
-      // result.numSlotOB = 0;
-      // result.numDVR = 1; 
       result.numSlotOB = 1;
     } else if (result.numSlotOB == 2){
       result.numSlotOB = 1;
@@ -110,15 +101,6 @@ void FPGA20Buffers::extractResult(BufferPlacement &placement) {
       result.numTFIFO = result.numSlotTB;
       result.numSlotTB = 0;
     }
-
-    // if (result.numSlotOB >= 1){
-    //   result.numSlotOB = 0;
-    // }
-
-    // if (result.numSlotTB >= 1){
-    //   result.numSlotTB = 0;
-    //   result.numTFIFO = 3;
-    // }
 
     placement[channel] = result;
   }

@@ -110,9 +110,7 @@ protected:
                                           ArrayRef<SignalType> signals);
 
   void addChannelPathConstraints(Value channel, SignalType signal,
-                                 const TimingModel *bufModel,
-                                 ArrayRef<BufferingGroup> before = {},
-                                 ArrayRef<BufferingGroup> after = {});
+                                 const TimingModel *bufModel);
 
   void addUnitPathConstraints(Operation *unit, SignalType type,
                               ChannelFilter filter = nullFilter);  
