@@ -150,6 +150,291 @@ void FtdLowerFuncToHandshake::analyzeLoop(handshake::FuncOp funcOp,
   ofs.close();
 }
 
+/// This algorithm comes from the following paper:
+/// Cooper, Keith D., Timothy J. Harvey and Ken Kennedy. “AS imple, Fast
+/// Dominance Algorithm.” (1999).
+static DenseMap<Block *, DenseSet<Block *>>
+getDominanceFrontier(Region &region) {
+  DominanceInfo domInfo;
+  DenseMap<Block *, DenseSet<Block *>> result;
+  llvm::DominatorTreeBase<Block, false> &domTree = domInfo.getDomTree(&region);
+
+  auto idom = [&](Block *bb) -> Block * {
+    return domTree.getNode(bb)->getIDom()->getBlock();
+  };
+
+  for (Block &bb : region.getBlocks())
+    result.insert({&bb, DenseSet<Block *>()});
+
+  for (Block &bb : region.getBlocks()) {
+
+    auto predecessors = bb.getPredecessors();
+
+    for (auto *pred : predecessors) {
+      Block *runner = pred;
+      while (runner != idom(&bb)) {
+        result[runner].insert(&bb);
+        runner = idom(runner);
+      }
+    }
+  }
+
+  return result;
+}
+
+static LogicalResult insertPhi(func::FuncOp funcOp,
+                               ConversionPatternRewriter &rewriter,
+                               SmallVector<Operation *> ops, Block *bbPhi) {
+
+  DominanceInfo domInfo;
+  llvm::DominatorTreeBase<Block, false> &domTree =
+      domInfo.getDomTree(&funcOp.getRegion());
+
+  auto idom = [&](Block *bb) -> Block * {
+    return domTree.getNode(bb)->getIDom()->getBlock();
+  };
+
+  auto dominanceFrontier = getDominanceFrontier(funcOp.getRegion());
+
+  if (ops.empty()) {
+    llvm::errs() << "Empty set\n";
+    return failure();
+  }
+
+  auto typeArgument = ops[0]->getResult(0).getType();
+  for (auto &op : ops) {
+    if (op->getResult(0).getType() != typeArgument) {
+      llvm::errs() << "Wrong types\n";
+      return failure();
+    }
+  }
+
+  for (auto &entry : dominanceFrontier) {
+
+    llvm::dbgs() << "Current node: ";
+    entry.first->printAsOperand(llvm::dbgs());
+    llvm::dbgs() << "\n";
+    for (auto &dom : entry.second) {
+      llvm::dbgs() << "\t";
+      dom->printAsOperand(llvm::dbgs());
+      llvm::dbgs() << "\n";
+    }
+  }
+
+  llvm::dbgs() << "Inserting a value in : ";
+  bbPhi->printAsOperand(llvm::dbgs());
+  llvm::dbgs() << "\nProducers in: ";
+  for (auto &op : ops) {
+    op->getBlock()->printAsOperand(llvm::dbgs());
+    llvm::dbgs() << " ";
+  }
+  llvm::dbgs() << "\n";
+
+  DenseMap<Block *, bool> work;
+  DenseMap<Block *, bool> hasAlready;
+  SmallVector<Block *> w;
+  SmallVector<Block *> blocksToAddPhi;
+
+  for (auto &bb : funcOp.getBlocks()) {
+    work.insert({&bb, false});
+    hasAlready.insert({&bb, false});
+  }
+
+  for (auto *op : ops) {
+    w.push_back(op->getBlock());
+    work[op->getBlock()] = true;
+  }
+
+  while (w.size() != 0) {
+    auto *x = w.back();
+    w.pop_back();
+    auto xFrontier = dominanceFrontier[x];
+    for (auto &y : xFrontier) {
+      if (!hasAlready[y]) {
+        blocksToAddPhi.push_back(y);
+        hasAlready[y] = true;
+        if (!work[y])
+          work[y] = true, w.push_back(y);
+      }
+    }
+  }
+
+  auto loc = UnknownLoc::get(ops[0]->getContext());
+
+  for (auto &bb : blocksToAddPhi) {
+    llvm::dbgs() << "Inserting a phi in: ";
+    bb->printAsOperand(llvm::dbgs());
+    llvm::dbgs() << "\n";
+    bb->addArgument(typeArgument, loc);
+  }
+
+  for (auto &bb : blocksToAddPhi) {
+
+    auto predecessors = bb->getPredecessors();
+
+    for (auto *pred : predecessors) {
+
+      auto *predTemp = pred;
+      auto *terminator = pred->getTerminator();
+      rewriter.setInsertionPointAfter(terminator);
+
+      if (llvm::isa_and_nonnull<cf::BranchOp>(terminator)) {
+
+        bool inserted = false;
+
+        while (true) {
+          auto branch = cast<cf::BranchOp>(terminator);
+
+          for (auto &op : ops) {
+
+            if (op->getBlock() == predTemp) {
+              SmallVector<Value> operands;
+              if (failed(rewriter.getRemappedValues(branch.getDestOperands(),
+                                                    operands)))
+                return failure();
+
+              operands.push_back(op->getResult(0));
+
+              auto newBranch = rewriter.create<cf::BranchOp>(
+                  branch->getLoc(), branch.getDest(), operands);
+              rewriter.replaceOp(branch, newBranch);
+
+              inserted = true;
+              break;
+            }
+          }
+
+          if (inserted)
+            break;
+
+          for (auto &phibb : blocksToAddPhi) {
+            if (predTemp == phibb) {
+              SmallVector<Value> operands;
+              if (failed(rewriter.getRemappedValues(branch.getDestOperands(),
+                                                    operands)))
+                return failure();
+              operands.push_back(
+                  phibb->getArgument(phibb->getNumArguments() - 1));
+
+              auto newBranch = rewriter.create<cf::BranchOp>(
+                  branch->getLoc(), branch.getDest(), operands);
+              rewriter.replaceOp(branch, newBranch);
+
+              inserted = true;
+              break;
+            }
+          }
+
+          if (inserted)
+            break;
+
+          if (predTemp->hasNoPredecessors())
+            break;
+
+          predTemp = idom(predTemp);
+        }
+
+        if (!inserted) {
+          llvm::errs() << "OH NO!!!!\n";
+          return failure();
+        }
+
+        continue;
+
+      } else if (llvm::isa_and_nonnull<cf::CondBranchOp>(terminator)) {
+
+        bool inserted = false;
+
+        while (true) {
+
+          auto branch = dyn_cast<cf::CondBranchOp>(terminator);
+
+          for (auto &op : ops) {
+            if (op->getBlock() == predTemp) {
+              SmallVector<Value> trueOperands, falseOperands;
+
+              if (failed(rewriter.getRemappedValues(
+                      branch.getTrueDestOperands(), trueOperands)) ||
+                  failed(rewriter.getRemappedValues(
+                      branch.getFalseDestOperands(), falseOperands)))
+                return failure();
+
+              if (branch.getTrueDest() == bb)
+                trueOperands.push_back(op->getResult(0));
+              else if (branch.getTrueDest() == bb)
+                falseOperands.push_back(op->getResult(0));
+              else
+                llvm::dbgs() << "!!!!!!!!!!!!!!!!!!!!!!";
+
+              falseOperands.push_back(op->getResult(0));
+
+              inserted = true;
+              auto newBranch = rewriter.create<cf::CondBranchOp>(
+                  branch->getLoc(), branch.getCondition(), branch.getTrueDest(),
+                  trueOperands, branch.getFalseDest(), falseOperands);
+              rewriter.replaceOp(branch, newBranch);
+              break;
+            }
+          }
+
+          if (inserted)
+            break;
+
+          for (auto &phibb : blocksToAddPhi) {
+            if (predTemp == phibb) {
+              SmallVector<Value> trueOperands, falseOperands;
+
+              if (failed(rewriter.getRemappedValues(
+                      branch.getTrueDestOperands(), trueOperands)) ||
+                  failed(rewriter.getRemappedValues(
+                      branch.getFalseDestOperands(), falseOperands)))
+                return failure();
+
+              if (branch.getTrueDest() == bb)
+                trueOperands.push_back(
+                    phibb->getArgument(predTemp->getNumArguments() - 1));
+              else if (branch.getTrueDest() == bb)
+                falseOperands.push_back(
+                    phibb->getArgument(predTemp->getNumArguments() - 1));
+              else
+                llvm::dbgs() << "!!!!!!!!!!!!!!!!!!!!!!";
+
+              inserted = true;
+              auto newBranch = rewriter.create<cf::CondBranchOp>(
+                  branch->getLoc(), branch.getCondition(), branch.getTrueDest(),
+                  trueOperands, branch.getFalseDest(), falseOperands);
+              rewriter.replaceOp(branch, newBranch);
+              break;
+            }
+          }
+
+          if (inserted)
+            break;
+
+          if (predTemp->hasNoPredecessors())
+            break;
+
+          predTemp = idom(predTemp);
+        }
+
+        if (!inserted) {
+          llvm::errs() << "OH NO!!!!\n";
+          predTemp->printAsOperand(llvm::errs());
+          bb->printAsOperand(llvm::errs());
+          return failure();
+        }
+
+        continue;
+
+      } else {
+        return failure();
+      }
+    }
+  }
+
+  return success();
+}
+
 LogicalResult FtdLowerFuncToHandshake::matchAndRewrite(
     func::FuncOp lowerFuncOp, OpAdaptor adaptor,
     ConversionPatternRewriter &rewriter) const {
@@ -164,13 +449,24 @@ LogicalResult FtdLowerFuncToHandshake::matchAndRewrite(
       memrefToArgIdx.insert({arg, idx});
   }
 
+  // TEMP
+  auto *op1 = this->namer.getOp("addf0");
+  auto *op2 = this->namer.getOp("constant6");
+  auto *op3 = this->namer.getOp("constant5");
+  auto *op4 = this->namer.getOp("addi0");
+
+  // if (failed(
+  //         insertPhi(lowerFuncOp, rewriter, {op1, op2, op3},
+  //         op4->getBlock())))
+  //   return failure();
+
   // Map for each block its exit condition (if exists). This allows to build
   // boolean expressions as circuits
   mapConditionsToValues(lowerFuncOp.getRegion(), ftdOps);
 
   // Add the muxes as obtained by the GSA analysis pass
-  if (failed(addExplicitPhi(lowerFuncOp, rewriter, ftdOps)))
-    return failure();
+  // if (failed(addExplicitPhi(lowerFuncOp, rewriter, ftdOps)))
+  // return failure();
 
   // First lower the parent function itself, without modifying its body
   auto funcOrFailure = lowerSignature(lowerFuncOp, rewriter);
@@ -180,10 +476,17 @@ LogicalResult FtdLowerFuncToHandshake::matchAndRewrite(
   if (funcOp.isExternal())
     return success();
 
-  // When GSA-MU functions are translated into multiplexers, an `init merge` is
-  // created to feed them. This merge requires the start value of the function
-  // as one of its data inputs. However, the start value was not present yet
-  // when `addExplicitPhi` is called, thus we need to reconnect it.
+  llvm::dbgs() << "\n==============================\n";
+  funcOp.print(llvm::dbgs());
+  llvm::dbgs() << "\n==============================\n";
+
+  return success();
+
+  // When GSA-MU functions are translated into multiplexers, an `init merge`
+  // is created to feed them. This merge requires the start value of the
+  // function as one of its data inputs. However, the start value was not
+  // present yet when `addExplicitPhi` is called, thus we need to reconnect
+  // it.
   connectInitMerges(rewriter, funcOp, ftdOps);
 
   // Stores mapping from each value that passes through a merge-like
@@ -194,8 +497,8 @@ LogicalResult FtdLowerFuncToHandshake::matchAndRewrite(
   // of CMerges in complete isolation from the rest of the components
   // implementing the operations
   // In particular, the addMergeOps relies on adding Merges for every block
-  // argument but because we removed all "real" arguments, we are only left with
-  // the Start value as an argument for every block
+  // argument but because we removed all "real" arguments, we are only left
+  // with the Start value as an argument for every block
   addMergeOps(funcOp, rewriter, argReplacements);
   addBranchOps(funcOp, rewriter);
 
@@ -219,15 +522,14 @@ LogicalResult FtdLowerFuncToHandshake::matchAndRewrite(
           ftdVerifyAndCreateMemInterfaces(funcOp, rewriter, memInfo, ftdOps)))
     return failure();
 
-  // Convert the constants and undefined values from the `arith` dialect to the
-  // `handshake` dialect, while also using the start value as their control
-  // value
+  // Convert the constants and undefined values from the `arith` dialect to
+  // the `handshake` dialect, while also using the start value as their
+  // control value
   if (failed(convertConstants(rewriter, funcOp)) ||
       failed(convertUndefinedValues(rewriter, funcOp)))
     return failure();
 
   if (funcOp.getBlocks().size() != 1) {
-
     // Add muxes for regeneration of values in loop
     if (failed(addRegen(rewriter, funcOp, ftdOps)))
       return failure();
@@ -251,8 +553,8 @@ LogicalResult FtdLowerFuncToHandshake::matchAndRewrite(
 // --- Helper functions ---
 
 /// When init merges for MU functions are instantiated, the function does not
-/// have a start signal yet. Once that the start signal is created, it needs to
-/// be connected to all the init merges.
+/// have a start signal yet. Once that the start signal is created, it needs
+/// to be connected to all the init merges.
 static void connectInitMerges(ConversionPatternRewriter &rewriter,
                               handshake::FuncOp funcOp,
                               FtdStoredOperations &ftdOps) {
@@ -503,8 +805,8 @@ static Value addSuppressionInLoop(ConversionPatternRewriter &rewriter,
 
     rewriter.setInsertionPointToStart(loopExit);
 
-    // Since only one output is used, the other one will be connected to sink in
-    // the materialization pass, as we expect from a suppress branch
+    // Since only one output is used, the other one will be connected to sink
+    // in the materialization pass, as we expect from a suppress branch
     branchOp = rewriter.create<handshake::ConditionalBranchOp>(
         loopExit->getOperations().back().getLoc(),
         getBranchResultTypes(connection.getType()), conditionValue, connection);
@@ -549,8 +851,8 @@ static Value addSuppressionInLoop(ConversionPatternRewriter &rewriter,
   }
 
   // If we are handling a case with more producers than consumers, the new
-  // branch must undergo the `addSupp` function so we add it to our structure to
-  // be able to loop over it
+  // branch must undergo the `addSupp` function so we add it to our structure
+  // to be able to loop over it
   if (btlt == BranchToLoopType::MoreProducerThanConsumers) {
     ftdOps.suppBranches.insert(branchOp);
     producersToCover.push_back(branchOp);
@@ -593,8 +895,8 @@ insertDirectSuppression(ConversionPatternRewriter &rewriter,
 
   // The condition related to the select signal of the consumer mux must be
   // added if the following conditions hold: The consumer is a mux; The
-  // mux was a GAMMA from GSA analysis; The input of the mux (i.e., coming from
-  // the producer) is a data input.
+  // mux was a GAMMA from GSA analysis; The input of the mux (i.e., coming
+  // from the producer) is a data input.
   if (llvm::isa_and_nonnull<handshake::MuxOp>(consumer) &&
       ftdOps.explicitPhiMerges.contains(consumer) &&
       consumer->getOperand(0) != connection &&
@@ -605,9 +907,9 @@ insertDirectSuppression(ConversionPatternRewriter &rewriter,
     BoolExpression *selectOperandCondition = BoolExpression::parseSop(
         getBlockCondition(selectOperand.getDefiningOp()->getBlock()));
 
-    // The condition must be taken into account for `fCons` only if the producer
-    // is not control dependent from the block which produces the condition of
-    // the mux
+    // The condition must be taken into account for `fCons` only if the
+    // producer is not control dependent from the block which produces the
+    // condition of the mux
     if (!prodControlDeps.contains(selectOperand.getParentBlock())) {
       if (consumer->getOperand(1) == connection)
         fCons = BoolExpression::boolAnd(fCons,
@@ -650,13 +952,13 @@ FtdLowerFuncToHandshake::addSupp(ConversionPatternRewriter &rewriter,
   mlir::CFGLoopInfo loopInfo(domInfo.getDomTree(&region));
 
   // A set of relationships between producer and consumer needs to be covered.
-  // To do that, we consider each possible operation in the circuit as producer.
-  // However, some operations are added throughout the execution of the
-  // function, and those are possibly to be analyzed as well. This vector
+  // To do that, we consider each possible operation in the circuit as
+  // producer. However, some operations are added throughout the execution of
+  // the function, and those are possibly to be analyzed as well. This vector
   // maintains the list of operations to be analyzed.
-  // [TBD] We could consider slightly changing the analysis to avoid needing to
-  // rerun the analysis on the operations inserted throughout the execution, but
-  // this is future work...
+  // [TBD] We could consider slightly changing the analysis to avoid needing
+  // to rerun the analysis on the operations inserted throughout the
+  // execution, but this is future work...
   std::vector<Operation *> producersToCover;
 
   // Add all the operations in the IR to the above vector
@@ -694,8 +996,8 @@ FtdLowerFuncToHandshake::addSupp(ConversionPatternRewriter &rewriter,
             !isa<handshake::MuxOp>(consumerOp))
           continue;
 
-        // Skip the prod-cons if the consumer is part of the operations related
-        // to the BDD expansion or INIT merges
+        // Skip the prod-cons if the consumer is part of the operations
+        // related to the BDD expansion or INIT merges
         if (ftdOps.opsToSkip.contains(consumerOp) ||
             ftdOps.initMergesOperations.contains(consumerOp))
           continue;
@@ -726,8 +1028,8 @@ FtdLowerFuncToHandshake::addSupp(ConversionPatternRewriter &rewriter,
           continue;
 
         // The next step is to identify the relationship between the producer
-        // and consumer in hand: Are they in the same loop or at different loop
-        // levels? Are they connected through a bwd edge?
+        // and consumer in hand: Are they in the same loop or at different
+        // loop levels? Are they connected through a bwd edge?
 
         // Set true if the producer is in a loop which does not contains
         // the consumer
@@ -769,8 +1071,8 @@ FtdLowerFuncToHandshake::addSupp(ConversionPatternRewriter &rewriter,
                                loopInfo, producersToCover);
         }
 
-        // We need to suppress a token if the consumer comes before the producer
-        // (backward edge)
+        // We need to suppress a token if the consumer comes before the
+        // producer (backward edge)
         else if ((greaterThanBlocks(producerBlock, consumerBlock) ||
                   (isa<handshake::MuxOp>(consumerOp) &&
                    producerBlock == consumerBlock &&
@@ -791,8 +1093,8 @@ FtdLowerFuncToHandshake::addSupp(ConversionPatternRewriter &rewriter,
 
     // Once that we have considered all the consumers of the results of a
     // producer, we consider the operands of the producer. Some of these
-    // operands might be the arguments of the functions, and these might need to
-    // be suppressed as well.
+    // operands might be the arguments of the functions, and these might need
+    // to be suppressed as well.
 
     // Do not take into account conditional branch
     if (llvm::isa<handshake::ConditionalBranchOp>(producerOp))
@@ -947,8 +1249,8 @@ FtdLowerFuncToHandshake::addRegen(ConversionPatternRewriter &rewriter,
   }
 
   // Once that all the multiplexers have been added, it is necessary to modify
-  // the type of the result, for it to be a channel type (that could not be done
-  // before)
+  // the type of the result, for it to be a channel type (that could not be
+  // done before)
   auto muxes = funcOp.getBody().getOps<handshake::MuxOp>();
   for (auto mux : muxes)
     mux->getResult(0).setType(channelifyType(mux->getResult(0).getType()));
@@ -1513,13 +1815,13 @@ FtdLowerFuncToHandshake::addExplicitPhi(func::FuncOp funcOp,
 
   // The function instantiates the GAMMA and MU gates as provided by the GSA
   // analysis pass. A GAMMA function is translated into a multiplxer driven by
-  // single control signal and fed by two operands; a MU function is translated
-  // into a multiplxer driven by an init (it is currently implemented as a Merge
-  // fed by a constant triggered from Start once and from the loop condition
-  // thereafter). The input of one of these functions might be another GSA
-  // function, and it's possible that the function was not instantiated yet. For
-  // this reason, we keep track of the missing operands, and reconnect them
-  // later on.
+  // single control signal and fed by two operands; a MU function is
+  // translated into a multiplxer driven by an init (it is currently
+  // implemented as a Merge fed by a constant triggered from Start once and
+  // from the loop condition thereafter). The input of one of these functions
+  // might be another GSA function, and it's possible that the function was
+  // not instantiated yet. For this reason, we keep track of the missing
+  // operands, and reconnect them later on.
   //
   // Also, a GAMMA function might have an empty data input: GAMMA(c, EMPTY,
   // V). In this case, the function is translated into a branch.
@@ -1603,8 +1905,8 @@ FtdLowerFuncToHandshake::addExplicitPhi(func::FuncOp funcOp,
         mlir::CFGLoopInfo loopInfo(domInfo.getDomTree(&region));
 
         // The inputs of the merge are the condition value and a `false`
-        // constant driven by the start value of the function. This will created
-        // later on, so we use a dummy value.
+        // constant driven by the start value of the function. This will
+        // created later on, so we use a dummy value.
         SmallVector<Value> mergeOperands;
         mergeOperands.push_back(conditionValue);
         mergeOperands.push_back(conditionValue);
@@ -1620,8 +1922,8 @@ FtdLowerFuncToHandshake::addExplicitPhi(func::FuncOp funcOp,
       }
 
       // When a single input gamma is encountered, a mux is inserted as a
-      // placeholder to perform the gamma/mu allocation flow. In the end, these
-      // muxes are erased from the IR
+      // placeholder to perform the gamma/mu allocation flow. In the end,
+      // these muxes are erased from the IR
       if (nullOperand >= 0) {
         operands[0] = operands[1 - nullOperand];
         operands[1] = operands[1 - nullOperand];
