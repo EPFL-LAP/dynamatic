@@ -77,7 +77,7 @@ module selector #(
 
   assign result = condition ? trueValue : falseValue;
 
-  antitokens #() antitokens (
+  antitokens antitokens (
     .clk(clk),
     .reset(rst),
     .pvalid0(trueValue_valid),
