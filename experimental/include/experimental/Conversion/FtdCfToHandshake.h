@@ -69,27 +69,20 @@ struct FtdStoredOperations {
 class FtdLowerFuncToHandshake : public LowerFuncToHandshake {
 public:
   // Use the same constructors from the base class
-  FtdLowerFuncToHandshake(gsa::GsaAnalysis<mlir::func::FuncOp> &gsa,
-                          NameAnalysis &namer, MLIRContext *ctx,
+  FtdLowerFuncToHandshake(NameAnalysis &namer, MLIRContext *ctx,
                           mlir::PatternBenefit benefit = 1)
-      : LowerFuncToHandshake(namer, ctx, benefit), gsaAnalysis(gsa) {};
+      : LowerFuncToHandshake(namer, ctx, benefit) {};
 
-  FtdLowerFuncToHandshake(gsa::GsaAnalysis<mlir::func::FuncOp> &gsa,
-                          NameAnalysis &namer,
+  FtdLowerFuncToHandshake(NameAnalysis &namer,
                           const TypeConverter &typeConverter, MLIRContext *ctx,
                           mlir::PatternBenefit benefit = 1)
-      : LowerFuncToHandshake(namer, typeConverter, ctx, benefit),
-        gsaAnalysis(gsa) {};
+      : LowerFuncToHandshake(namer, typeConverter, ctx, benefit) {};
 
   LogicalResult
   matchAndRewrite(mlir::func::FuncOp funcOp, OpAdaptor adaptor,
                   ConversionPatternRewriter &rewriter) const override;
 
 protected:
-  /// Maintains the gsa analysis performed of the function before the conversion
-  /// to the handshake dialect
-  gsa::GsaAnalysis<mlir::func::FuncOp> &gsaAnalysis;
-
   LogicalResult ftdVerifyAndCreateMemInterfaces(
       handshake::FuncOp &funcOp, ConversionPatternRewriter &rewriter,
       MemInterfacesInfo &memInfo, FtdStoredOperations &ftdOps) const;

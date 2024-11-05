@@ -119,6 +119,21 @@ boolean::BoolExpression *getBlockLoopExitCondition(Block *loopExit,
 /// channelifying the input type
 SmallVector<Type> getBranchResultTypes(Type inputType);
 
+/// Given a block, get its immediate dominator if exists
+Block *getImmediateDominator(Region &region, Block *bb);
+
+/// Get the dominance frontier of each block in the region
+DenseMap<Block *, DenseSet<Block *>> getDominanceFrontier(Region &region);
+
+/// Given a set of values defining the same value in different blocks of a CFG,
+/// modify the SSA representation to connect the values through some phi. The
+/// final representation is coherent, so that in each block you can obtain one
+/// only definition for the value. The resulting map provides such association,
+/// with the value as it is available at the beginning of the block.
+FailureOr<DenseMap<Block *, Value>>
+insertPhi(Region &funcRegion, ConversionPatternRewriter &rewriter,
+          SmallVector<Value> &vals);
+
 }; // namespace ftd
 }; // namespace experimental
 }; // namespace dynamatic

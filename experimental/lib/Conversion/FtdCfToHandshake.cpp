@@ -52,11 +52,7 @@ struct FtdCfToHandshakePass
     CfToHandshakeTypeConverter converter;
     RewritePatternSet patterns(ctx);
 
-    patterns.add<experimental::ftd::FtdLowerFuncToHandshake>(
-        getAnalysis<experimental::gsa::GsaAnalysis<func::FuncOp>>(),
-        getAnalysis<NameAnalysis>(), converter, ctx);
-
-    patterns.add<ConvertCalls,
+    patterns.add<experimental::ftd::FtdLowerFuncToHandshake, ConvertCalls,
                  ConvertIndexCast<arith::IndexCastOp, handshake::ExtSIOp>,
                  ConvertIndexCast<arith::IndexCastUIOp, handshake::ExtUIOp>,
                  OneToOneConversion<arith::AddFOp, handshake::AddFOp>,
@@ -150,291 +146,6 @@ void FtdLowerFuncToHandshake::analyzeLoop(handshake::FuncOp funcOp,
   ofs.close();
 }
 
-/// This algorithm comes from the following paper:
-/// Cooper, Keith D., Timothy J. Harvey and Ken Kennedy. “AS imple, Fast
-/// Dominance Algorithm.” (1999).
-static DenseMap<Block *, DenseSet<Block *>>
-getDominanceFrontier(Region &region) {
-  DominanceInfo domInfo;
-  DenseMap<Block *, DenseSet<Block *>> result;
-  llvm::DominatorTreeBase<Block, false> &domTree = domInfo.getDomTree(&region);
-
-  auto idom = [&](Block *bb) -> Block * {
-    return domTree.getNode(bb)->getIDom()->getBlock();
-  };
-
-  for (Block &bb : region.getBlocks())
-    result.insert({&bb, DenseSet<Block *>()});
-
-  for (Block &bb : region.getBlocks()) {
-
-    auto predecessors = bb.getPredecessors();
-
-    for (auto *pred : predecessors) {
-      Block *runner = pred;
-      while (runner != idom(&bb)) {
-        result[runner].insert(&bb);
-        runner = idom(runner);
-      }
-    }
-  }
-
-  return result;
-}
-
-static LogicalResult insertPhi(func::FuncOp funcOp,
-                               ConversionPatternRewriter &rewriter,
-                               SmallVector<Operation *> ops, Block *bbPhi) {
-
-  DominanceInfo domInfo;
-  llvm::DominatorTreeBase<Block, false> &domTree =
-      domInfo.getDomTree(&funcOp.getRegion());
-
-  auto idom = [&](Block *bb) -> Block * {
-    return domTree.getNode(bb)->getIDom()->getBlock();
-  };
-
-  auto dominanceFrontier = getDominanceFrontier(funcOp.getRegion());
-
-  if (ops.empty()) {
-    llvm::errs() << "Empty set\n";
-    return failure();
-  }
-
-  auto typeArgument = ops[0]->getResult(0).getType();
-  for (auto &op : ops) {
-    if (op->getResult(0).getType() != typeArgument) {
-      llvm::errs() << "Wrong types\n";
-      return failure();
-    }
-  }
-
-  for (auto &entry : dominanceFrontier) {
-
-    llvm::dbgs() << "Current node: ";
-    entry.first->printAsOperand(llvm::dbgs());
-    llvm::dbgs() << "\n";
-    for (auto &dom : entry.second) {
-      llvm::dbgs() << "\t";
-      dom->printAsOperand(llvm::dbgs());
-      llvm::dbgs() << "\n";
-    }
-  }
-
-  llvm::dbgs() << "Inserting a value in : ";
-  bbPhi->printAsOperand(llvm::dbgs());
-  llvm::dbgs() << "\nProducers in: ";
-  for (auto &op : ops) {
-    op->getBlock()->printAsOperand(llvm::dbgs());
-    llvm::dbgs() << " ";
-  }
-  llvm::dbgs() << "\n";
-
-  DenseMap<Block *, bool> work;
-  DenseMap<Block *, bool> hasAlready;
-  SmallVector<Block *> w;
-  SmallVector<Block *> blocksToAddPhi;
-
-  for (auto &bb : funcOp.getBlocks()) {
-    work.insert({&bb, false});
-    hasAlready.insert({&bb, false});
-  }
-
-  for (auto *op : ops) {
-    w.push_back(op->getBlock());
-    work[op->getBlock()] = true;
-  }
-
-  while (w.size() != 0) {
-    auto *x = w.back();
-    w.pop_back();
-    auto xFrontier = dominanceFrontier[x];
-    for (auto &y : xFrontier) {
-      if (!hasAlready[y]) {
-        blocksToAddPhi.push_back(y);
-        hasAlready[y] = true;
-        if (!work[y])
-          work[y] = true, w.push_back(y);
-      }
-    }
-  }
-
-  auto loc = UnknownLoc::get(ops[0]->getContext());
-
-  for (auto &bb : blocksToAddPhi) {
-    llvm::dbgs() << "Inserting a phi in: ";
-    bb->printAsOperand(llvm::dbgs());
-    llvm::dbgs() << "\n";
-    bb->addArgument(typeArgument, loc);
-  }
-
-  for (auto &bb : blocksToAddPhi) {
-
-    auto predecessors = bb->getPredecessors();
-
-    for (auto *pred : predecessors) {
-
-      auto *predTemp = pred;
-      auto *terminator = pred->getTerminator();
-      rewriter.setInsertionPointAfter(terminator);
-
-      if (llvm::isa_and_nonnull<cf::BranchOp>(terminator)) {
-
-        bool inserted = false;
-
-        while (true) {
-          auto branch = cast<cf::BranchOp>(terminator);
-
-          for (auto &op : ops) {
-
-            if (op->getBlock() == predTemp) {
-              SmallVector<Value> operands;
-              if (failed(rewriter.getRemappedValues(branch.getDestOperands(),
-                                                    operands)))
-                return failure();
-
-              operands.push_back(op->getResult(0));
-
-              auto newBranch = rewriter.create<cf::BranchOp>(
-                  branch->getLoc(), branch.getDest(), operands);
-              rewriter.replaceOp(branch, newBranch);
-
-              inserted = true;
-              break;
-            }
-          }
-
-          if (inserted)
-            break;
-
-          for (auto &phibb : blocksToAddPhi) {
-            if (predTemp == phibb) {
-              SmallVector<Value> operands;
-              if (failed(rewriter.getRemappedValues(branch.getDestOperands(),
-                                                    operands)))
-                return failure();
-              operands.push_back(
-                  phibb->getArgument(phibb->getNumArguments() - 1));
-
-              auto newBranch = rewriter.create<cf::BranchOp>(
-                  branch->getLoc(), branch.getDest(), operands);
-              rewriter.replaceOp(branch, newBranch);
-
-              inserted = true;
-              break;
-            }
-          }
-
-          if (inserted)
-            break;
-
-          if (predTemp->hasNoPredecessors())
-            break;
-
-          predTemp = idom(predTemp);
-        }
-
-        if (!inserted) {
-          llvm::errs() << "OH NO!!!!\n";
-          return failure();
-        }
-
-        continue;
-
-      } else if (llvm::isa_and_nonnull<cf::CondBranchOp>(terminator)) {
-
-        bool inserted = false;
-
-        while (true) {
-
-          auto branch = dyn_cast<cf::CondBranchOp>(terminator);
-
-          for (auto &op : ops) {
-            if (op->getBlock() == predTemp) {
-              SmallVector<Value> trueOperands, falseOperands;
-
-              if (failed(rewriter.getRemappedValues(
-                      branch.getTrueDestOperands(), trueOperands)) ||
-                  failed(rewriter.getRemappedValues(
-                      branch.getFalseDestOperands(), falseOperands)))
-                return failure();
-
-              if (branch.getTrueDest() == bb)
-                trueOperands.push_back(op->getResult(0));
-              else if (branch.getTrueDest() == bb)
-                falseOperands.push_back(op->getResult(0));
-              else
-                llvm::dbgs() << "!!!!!!!!!!!!!!!!!!!!!!";
-
-              falseOperands.push_back(op->getResult(0));
-
-              inserted = true;
-              auto newBranch = rewriter.create<cf::CondBranchOp>(
-                  branch->getLoc(), branch.getCondition(), branch.getTrueDest(),
-                  trueOperands, branch.getFalseDest(), falseOperands);
-              rewriter.replaceOp(branch, newBranch);
-              break;
-            }
-          }
-
-          if (inserted)
-            break;
-
-          for (auto &phibb : blocksToAddPhi) {
-            if (predTemp == phibb) {
-              SmallVector<Value> trueOperands, falseOperands;
-
-              if (failed(rewriter.getRemappedValues(
-                      branch.getTrueDestOperands(), trueOperands)) ||
-                  failed(rewriter.getRemappedValues(
-                      branch.getFalseDestOperands(), falseOperands)))
-                return failure();
-
-              if (branch.getTrueDest() == bb)
-                trueOperands.push_back(
-                    phibb->getArgument(predTemp->getNumArguments() - 1));
-              else if (branch.getTrueDest() == bb)
-                falseOperands.push_back(
-                    phibb->getArgument(predTemp->getNumArguments() - 1));
-              else
-                llvm::dbgs() << "!!!!!!!!!!!!!!!!!!!!!!";
-
-              inserted = true;
-              auto newBranch = rewriter.create<cf::CondBranchOp>(
-                  branch->getLoc(), branch.getCondition(), branch.getTrueDest(),
-                  trueOperands, branch.getFalseDest(), falseOperands);
-              rewriter.replaceOp(branch, newBranch);
-              break;
-            }
-          }
-
-          if (inserted)
-            break;
-
-          if (predTemp->hasNoPredecessors())
-            break;
-
-          predTemp = idom(predTemp);
-        }
-
-        if (!inserted) {
-          llvm::errs() << "OH NO!!!!\n";
-          predTemp->printAsOperand(llvm::errs());
-          bb->printAsOperand(llvm::errs());
-          return failure();
-        }
-
-        continue;
-
-      } else {
-        return failure();
-      }
-    }
-  }
-
-  return success();
-}
-
 LogicalResult FtdLowerFuncToHandshake::matchAndRewrite(
     func::FuncOp lowerFuncOp, OpAdaptor adaptor,
     ConversionPatternRewriter &rewriter) const {
@@ -449,24 +160,13 @@ LogicalResult FtdLowerFuncToHandshake::matchAndRewrite(
       memrefToArgIdx.insert({arg, idx});
   }
 
-  // TEMP
-  auto *op1 = this->namer.getOp("addf0");
-  auto *op2 = this->namer.getOp("constant6");
-  auto *op3 = this->namer.getOp("constant5");
-  auto *op4 = this->namer.getOp("addi0");
-
-  // if (failed(
-  //         insertPhi(lowerFuncOp, rewriter, {op1, op2, op3},
-  //         op4->getBlock())))
-  //   return failure();
-
   // Map for each block its exit condition (if exists). This allows to build
   // boolean expressions as circuits
   mapConditionsToValues(lowerFuncOp.getRegion(), ftdOps);
 
   // Add the muxes as obtained by the GSA analysis pass
-  // if (failed(addExplicitPhi(lowerFuncOp, rewriter, ftdOps)))
-  // return failure();
+  if (failed(addExplicitPhi(lowerFuncOp, rewriter, ftdOps)))
+    return failure();
 
   // First lower the parent function itself, without modifying its body
   auto funcOrFailure = lowerSignature(lowerFuncOp, rewriter);
@@ -475,12 +175,6 @@ LogicalResult FtdLowerFuncToHandshake::matchAndRewrite(
   handshake::FuncOp funcOp = *funcOrFailure;
   if (funcOp.isExternal())
     return success();
-
-  llvm::dbgs() << "\n==============================\n";
-  funcOp.print(llvm::dbgs());
-  llvm::dbgs() << "\n==============================\n";
-
-  return success();
 
   // When GSA-MU functions are translated into multiplexers, an `init merge`
   // is created to feed them. This merge requires the start value of the
@@ -1843,6 +1537,8 @@ FtdLowerFuncToHandshake::addExplicitPhi(func::FuncOp funcOp,
 
   if (funcOp.getBlocks().size() == 1)
     return success();
+
+  auto gsaAnalysis = gsa::GsaAnalysis<func::FuncOp>(funcOp);
 
   // List of missing GSA functions
   SmallVector<MissingGsa> missingGsaList;

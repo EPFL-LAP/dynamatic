@@ -144,7 +144,8 @@ Phi *GsaAnalysis<FunctionType>::expandExpressions(
 }
 
 template <typename FunctionType>
-void GsaAnalysis<FunctionType>::identifyAllPhi(FunctionType &funcOp) {
+void GsaAnalysis<FunctionType>::identifyAllPhi(FunctionType &funcOp,
+                                               bool skipLastArg) {
 
   // The input of a phi might be another phi. This is the case when the
   // input of a phi is a block argument from a block with index different
@@ -175,8 +176,9 @@ void GsaAnalysis<FunctionType>::identifyAllPhi(FunctionType &funcOp) {
   for (Block &block : funcOp.getBlocks()) {
     // Create a list for the phi functions corresponding to the block
     llvm::SmallVector<Phi *> phiListBlock;
-    // For each block argument
-    for (BlockArgument &arg : block.getArguments()) {
+    // For each block argument (possibly excluding the last one)
+    for (BlockArgument &arg :
+         llvm::drop_end(block.getArguments(), skipLastArg)) {
       unsigned argNumber = arg.getArgNumber();
       // Create a set for the operands of the corresponding phi function
       SmallVector<PhiInput *> operands;

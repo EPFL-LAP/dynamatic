@@ -109,7 +109,7 @@ class GsaAnalysis {
 
 public:
   /// Constructor for the GSA analysis
-  GsaAnalysis(Operation *operation) {
+  GsaAnalysis(Operation *operation, bool skipLastArg = false) {
 
     // Accepts only modules as input
     ModuleOp modOp = dyn_cast<ModuleOp>(operation);
@@ -127,18 +127,23 @@ public:
 
         // Analyze the function
         if (!functionsCovered) {
-          identifyAllPhi(funcOp);
+          identifyAllPhi(funcOp, skipLastArg);
           functionsCovered++;
         } else {
           llvm::errs() << "[GSA] Too many functions to handle in the module";
         }
       }
     } else {
-      // report an error indicating that the analysis is instantiated over
-      // an inappropriate operation
-      llvm::errs()
-          << "[GSA] GsaAnalysis is instantiated over an operation that is "
-             "not ModuleOp!\n";
+      FunctionType fOp = dyn_cast<FunctionType>(operation);
+      if (fOp) {
+        identifyAllPhi(fOp, skipLastArg);
+      } else {
+        // report an error indicating that the analysis is instantiated over
+        // an inappropriate operation
+        llvm::errs()
+            << "[GSA] GsaAnalysis is instantiated over an operation that is "
+               "not ModuleOp!\n";
+      }
     }
   };
 
@@ -163,7 +168,7 @@ private:
 
   /// Identify the phi necessary in the function, referencing all of their
   /// inputs
-  void identifyAllPhi(FunctionType &funcOp);
+  void identifyAllPhi(FunctionType &funcOp, bool skipLastArg = false);
 
   /// Print the list of the phi functions
   void printPhiList();

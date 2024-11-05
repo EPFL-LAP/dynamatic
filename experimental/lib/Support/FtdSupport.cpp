@@ -15,6 +15,7 @@
 #include "experimental/Support/FtdSupport.h"
 #include "dynamatic/Dialect/Handshake/HandshakeOps.h"
 #include "mlir/Dialect/ControlFlow/IR/ControlFlowOps.h"
+#include "mlir/Transforms/DialectConversion.h"
 #include "llvm/ADT/TypeSwitch.h"
 #include <unordered_set>
 
@@ -449,6 +450,342 @@ SmallVector<Type> getBranchResultTypes(Type inputType) {
   handshakeResultTypes.push_back(channelifyType(inputType));
   handshakeResultTypes.push_back(channelifyType(inputType));
   return handshakeResultTypes;
+}
+
+Block *getImmediateDominator(Region &region, Block *bb) {
+  // Avoid a situation with no blocks in the region
+  if (region.getBlocks().empty())
+    return nullptr;
+  // The first block in the CFG has both non predecessors and no dominators
+  if (bb->hasNoPredecessors())
+    return nullptr;
+  DominanceInfo domInfo;
+  llvm::DominatorTreeBase<Block, false> &domTree = domInfo.getDomTree(&region);
+  return domTree.getNode(bb)->getIDom()->getBlock();
+}
+
+DenseMap<Block *, DenseSet<Block *>> getDominanceFrontier(Region &region) {
+
+  // This algorithm comes from the following paper:
+  // Cooper, Keith D., Timothy J. Harvey and Ken Kennedy. “AS imple, Fast
+  // Dominance Algorithm.” (1999).
+
+  DenseMap<Block *, DenseSet<Block *>> result;
+
+  // Create an empty set of reach available block
+  for (Block &bb : region.getBlocks())
+    result.insert({&bb, DenseSet<Block *>()});
+
+  for (Block &bb : region.getBlocks()) {
+
+    // Get the predecessors of the block
+    auto predecessors = bb.getPredecessors();
+
+    // Count the number of predecessors
+    int numberOfPredecessors = 0;
+    for (auto *pred : predecessors)
+      if (pred)
+        numberOfPredecessors++;
+
+    // Skip if the node has none or only one predecessors
+    if (numberOfPredecessors < 2)
+      continue;
+
+    // Run the algorihm as explained in the paper
+    for (auto *pred : predecessors) {
+      Block *runner = pred;
+      // Runer performs a bottom up traversal of the dominator tree
+      while (runner != getImmediateDominator(region, &bb)) {
+        result[runner].insert(&bb);
+        runner = getImmediateDominator(region, runner);
+      }
+    }
+  }
+
+#define PRINT_DEBUG
+#ifdef PRINT_DEBUG
+  for (auto &entry : result) {
+    llvm::dbgs() << "[DOM FRONT] Domination frontier of ";
+    entry.first->printAsOperand(llvm::dbgs());
+    llvm::dbgs() << ": ";
+    llvm::dbgs() << "{";
+    for (auto &dom : entry.second) {
+      dom->printAsOperand(llvm::dbgs());
+      llvm::dbgs() << " ";
+    }
+    llvm::dbgs() << "}\n";
+  }
+#endif
+
+  return result;
+}
+
+FailureOr<DenseMap<Block *, Value>>
+insertPhi(Region &funcRegion, ConversionPatternRewriter &rewriter,
+          SmallVector<Value> &vals) {
+
+  auto dominanceFrontier = getDominanceFrontier(funcRegion);
+
+  // The number of values to be considered cannot be empty
+  if (vals.empty())
+    return funcRegion.getParentOp()->emitError()
+           << "The number values provided in `insertPhi` "
+              "must be larger than 2\n";
+
+  // All the values provided must have the same type.
+  // As an additional constraint, all the values should be in a different basic
+  // block
+  DenseSet<Block *> foundBlocks;
+  for (auto &val : vals) {
+    if (val.getType() != vals[0].getType())
+      return funcRegion.getParentOp()->emitError()
+             << "The values provided to `addPhi` do not all have the same type";
+    if (foundBlocks.contains(val.getParentBlock()))
+      return funcRegion.getParentOp()->emitError()
+             << "Some of the values provided to `addPhi` "
+                "belong to the same basic block";
+    foundBlocks.insert(val.getParentBlock());
+  }
+
+  llvm::dbgs() << "[NEW PHI] Producers in: {";
+  for (auto &val : vals) {
+    val.getParentBlock()->printAsOperand(llvm::dbgs());
+    llvm::dbgs() << " ";
+  }
+  llvm::dbgs() << "}\n";
+
+  // Temporary data structures to run the Cryton algorithm for phi positioning
+  DenseMap<Block *, bool> work;
+  DenseMap<Block *, bool> hasAlready;
+  SmallVector<Block *> w;
+
+  // Initialize data structures
+  for (auto &bb : funcRegion.getBlocks()) {
+    work.insert({&bb, false});
+    hasAlready.insert({&bb, false});
+  }
+
+  for (auto val : vals) {
+    w.push_back(val.getParentBlock());
+    work[val.getParentBlock()] = true;
+  }
+
+  // This vector ends up containig the blocks in which a new argument is to be
+  // added
+  DenseSet<Block *> blocksToAddPhi;
+
+  // Until there are no more elements in `w`
+  while (w.size() != 0) {
+
+    // Pop the top of `w`
+    auto *x = w.back();
+    w.pop_back();
+
+    // Get the dominance frontier of `w`
+    auto xFrontier = dominanceFrontier[x];
+
+    // For each of its elements
+    for (auto &y : xFrontier) {
+
+      // Add the block in the dominance frontier to the list of blocks which
+      // require a new phi. If it was not analyzed yet, also add it to `w`
+      if (!hasAlready[y]) {
+        blocksToAddPhi.insert(y);
+        hasAlready[y] = true;
+        if (!work[y])
+          work[y] = true, w.push_back(y);
+      }
+    }
+  }
+
+  // Get a location to insert the new phis
+  auto loc = UnknownLoc::get(vals[0].getContext());
+  for (auto &bb : blocksToAddPhi)
+    bb->addArgument(vals[0].getType(), loc);
+
+  llvm::dbgs() << "[NEW PHI] Insertion in { ";
+  for (auto &bb : blocksToAddPhi) {
+    bb->printAsOperand(llvm::dbgs());
+    llvm::dbgs() << " ";
+  }
+  llvm::dbgs() << "}\n";
+
+  if (blocksToAddPhi.empty())
+    return success();
+
+  // Since a new block argument was added for each block in `blocksToAddPhi`,
+  // new values must be provided to them together with the branches (either
+  // conditional or non-conditional). The values might come from one of the
+  // input operations or from another of the added block arguments. In order to
+  // find the correct value, we first anlayzed the predecessor of each node: if
+  // it has a redefinition of the value, then we use it, otherwise we move the
+  // anlaysis to its immediate dominator. Since a definition of the value must
+  // always exist, BB0 must define the value as well.
+
+  for (auto &bb : blocksToAddPhi) {
+
+    // For each bb in `blocksToAddPhi`, we need to modify the terminator of each
+    // of its predecessors
+    auto predecessors = bb->getPredecessors();
+
+    for (auto *pred : predecessors) {
+
+      auto *terminator = pred->getTerminator();
+      rewriter.setInsertionPointAfter(terminator);
+
+      // If the predecessor does not contains a definition of the value, we move
+      // to its immediate dominator, until we have found a definition.
+      auto *predecessorOrDominator = pred;
+
+      Value valueToUse = nullptr;
+
+      while (valueToUse == nullptr) {
+
+        // For each of the values provided as input
+        for (auto &val : vals) {
+
+          // If the block of the current `predecessorOrDominator` contains a
+          // definition of the value, then we use it in the terminator
+          if (val.getParentBlock() == predecessorOrDominator) {
+            valueToUse = val;
+            break;
+          }
+        }
+
+        if (valueToUse == nullptr) {
+          // Go through the blocks having a new arugment for the value
+          for (auto &phibb : blocksToAddPhi) {
+            if (predecessorOrDominator == phibb) {
+              valueToUse = phibb->getArgument(phibb->getNumArguments() - 1);
+              break;
+            }
+          }
+        }
+
+        if (valueToUse) {
+
+          // Case in which the terminator is a branch
+          if (llvm::isa_and_nonnull<cf::BranchOp>(terminator)) {
+            auto branch = cast<cf::BranchOp>(terminator);
+            SmallVector<Value> operands = branch.getDestOperands();
+            operands.push_back(valueToUse);
+            auto newBranch = rewriter.create<cf::BranchOp>(
+                branch->getLoc(), branch.getDest(), operands);
+            rewriter.replaceOp(branch, newBranch);
+          }
+
+          // Case in which the terminator is a conditional branch
+          if (llvm::isa_and_nonnull<cf::CondBranchOp>(terminator)) {
+            auto branch = cast<cf::CondBranchOp>(terminator);
+            SmallVector<Value> trueOperands = branch.getTrueDestOperands();
+            SmallVector<Value> falseOperands = branch.getFalseDestOperands();
+
+            if (branch.getTrueDest() == bb)
+              trueOperands.push_back(valueToUse);
+            else
+              falseOperands.push_back(valueToUse);
+
+            auto newBranch = rewriter.create<cf::CondBranchOp>(
+                branch->getLoc(), branch.getCondition(), branch.getTrueDest(),
+                trueOperands, branch.getFalseDest(), falseOperands);
+            rewriter.replaceOp(branch, newBranch);
+            break;
+          }
+        }
+
+        // Terminate if the value was found
+        if (valueToUse != nullptr ||
+            predecessorOrDominator->hasNoPredecessors())
+          break;
+
+        // Move to the immediate dominator
+        predecessorOrDominator =
+            getImmediateDominator(funcRegion, predecessorOrDominator);
+      }
+
+      if (!valueToUse)
+        return funcRegion.getParentOp()->emitError()
+               << "A branch could not be modified, because no definition of "
+                  "the value was found\n";
+    }
+  }
+
+  DenseMap<Block *, Value> result;
+
+  for (auto &bb : funcRegion.getBlocks()) {
+
+    if (blocksToAddPhi.contains(&bb)) {
+      result.insert({&bb, bb.getArgument(bb.getNumArguments() - 1)});
+      continue;
+    }
+
+    auto predecessors = bb.getPredecessors();
+
+    for (auto *pred : predecessors) {
+
+      auto *terminator = pred->getTerminator();
+      rewriter.setInsertionPointAfter(terminator);
+
+      // If the predecessor does not contains a definition of the value, we move
+      // to its immediate dominator, until we have found a definition.
+      auto *predecessorOrDominator = pred;
+
+      Value valueToUse = nullptr;
+
+      while (valueToUse == nullptr) {
+
+        // For each of the values provided as input
+        for (auto &val : vals) {
+
+          // If the block of the current `predecessorOrDominator` contains a
+          // definition of the value, then we use it in the terminator
+          if (val.getParentBlock() == predecessorOrDominator) {
+            valueToUse = val;
+            break;
+          }
+        }
+
+        if (valueToUse == nullptr) {
+          // Go through the blocks having a new arugment for the value
+          for (auto &phibb : blocksToAddPhi) {
+            if (predecessorOrDominator == phibb) {
+              valueToUse = phibb->getArgument(phibb->getNumArguments() - 1);
+              break;
+            }
+          }
+        }
+
+        if (valueToUse)
+          result.insert({&bb, valueToUse});
+
+        // Terminate if the value was found
+        if (valueToUse != nullptr ||
+            predecessorOrDominator->hasNoPredecessors())
+          break;
+
+        // Move to the immediate dominator
+        predecessorOrDominator =
+            getImmediateDominator(funcRegion, predecessorOrDominator);
+      }
+
+      if (!valueToUse)
+        return funcRegion.getParentOp()->emitError()
+               << "Cannot find defintion of a value for a block";
+    }
+  }
+
+#define PRINT_DEBUG
+#ifdef PRINT_DEBUG
+  for (auto &entry : result) {
+    llvm::dbgs() << "[PHI RESULT] In ";
+    entry.first->printAsOperand(llvm::dbgs());
+    llvm::dbgs() << " value is ";
+    entry.second.print(llvm::dbgs());
+    llvm::dbgs() << "\n";
+  }
+#endif
+
+  return result;
 }
 
 }; // namespace ftd
