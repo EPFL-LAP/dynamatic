@@ -145,13 +145,13 @@ static void markPathToCommits(llvm::DenseSet<Operation *> &markedPath,
 void HandshakeSpeculationPass::routeCommitControl(llvm::DenseSet<Operation *> &markedPath) {
   // Perform BFS
   // create the queue of operations to visit
-  std::queue<std::tuple<Operation *, Value, Value>> queue;
-  Operation *startOp = specOp.getOperation();
+  std::queue<std::tuple<const OpOperand &, Value>> queue;
   for (OpOperand &succOpOperand : specOp.getDataOut().getUses()) {
-    queue.push(std::make_tuple(startOp, specOp.getCommitCtrl(), succOpOperand.get()));
+    queue.push(std::tuple<const OpOperand &, Value>(succOpOperand, specOp.getCommitCtrl()));
   }
   while (!queue.empty()) {
-    auto [currOp, ctrlSignal, currOpOperandValue] = queue.front();
+    auto [currOpOperand, ctrlSignal] = queue.front();
+    Operation *currOp = currOpOperand.getOwner();
     queue.pop();
 
     if (auto commitOp = dyn_cast<handshake::SpecCommitOp>(currOp)) {
@@ -172,7 +172,7 @@ void HandshakeSpeculationPass::routeCommitControl(llvm::DenseSet<Operation *> &m
       // branch output is non-speculative. Speculative tag of the token is
       // currently implicit, so the branch input itself is used at the IR level.
       auto branchDiscardNonSpec = builder.create<handshake::SpeculatingBranchOp>(
-          branchOp.getLoc(), currOpOperandValue /* specTag */,
+          branchOp.getLoc(), currOpOperand.get() /* specTag */,
           branchOp.getConditionOperand());
       inheritBB(specOp, branchDiscardNonSpec);
 
@@ -191,7 +191,7 @@ void HandshakeSpeculationPass::routeCommitControl(llvm::DenseSet<Operation *> &m
           Operation *dstOp = dstOpOperand.getOwner();
           if (markedPath.contains(dstOp)) {
             markedPath.erase(dstOp);
-            queue.push(std::make_tuple(dstOp, ctrl, dstOpOperand.get()));
+            queue.push(std::tuple<const OpOperand &, Value>(dstOpOperand, ctrl));
           }
         }
       }
@@ -202,7 +202,7 @@ void HandshakeSpeculationPass::routeCommitControl(llvm::DenseSet<Operation *> &m
           Operation *dstOp = dstOpOperand.getOwner();
           if (markedPath.contains(dstOp)) {
             markedPath.erase(dstOp);
-            queue.push(std::make_tuple(dstOp, ctrlSignal, dstOpOperand.get()));
+            queue.push(std::tuple<const OpOperand &, Value>(dstOpOperand, ctrlSignal));
           }
         }
       }
