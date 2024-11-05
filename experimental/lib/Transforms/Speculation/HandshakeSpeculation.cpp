@@ -58,8 +58,7 @@ private:
   LogicalResult placeUnits(Value ctrlSignal);
 
   /// Create the control path for commit signals by replicating branches
-  void routeCommitControl(llvm::DenseSet<Operation *> &markedPath,
-                          Value ctrlSignal, OpOperand &currOpOperand);
+  void routeCommitControl(llvm::DenseSet<Operation *> &markedPath);
 
   /// Wrapper around routeCommitControl to prepare and invoke the placement
   LogicalResult prepareAndPlaceCommits();
@@ -143,18 +142,16 @@ static void markPathToCommits(llvm::DenseSet<Operation *> &markedPath,
 // a control path by replicating the branches it finds in the way. It stops
 // at commits and connects them to the newly created path with value
 // ctrlSignal
-void HandshakeSpeculationPass::routeCommitControl(
-    llvm::DenseSet<Operation *> &markedPath, Value ctrlSignal,
-    OpOperand &currOpOperand) {
+void HandshakeSpeculationPass::routeCommitControl(llvm::DenseSet<Operation *> &markedPath) {
   // Perform BFS
-  // create the queue of (operation, current ctrlSignal)
-  std::queue<std::tuple<Operation *, Value>> queue;
-  Operation *startOp = currOpOperand.getOwner();
-  if (!markedPath.contains(startOp))
-    return;
-  queue.push(std::make_tuple(startOp, ctrlSignal));
+  // create the queue of operations to visit
+  std::queue<std::tuple<Operation *, Value, Value>> queue;
+  Operation *startOp = specOp.getOperation();
+  for (OpOperand &succOpOperand : specOp.getDataOut().getUses()) {
+    queue.push(std::make_tuple(startOp, specOp.getCommitCtrl(), succOpOperand.get()));
+  }
   while (!queue.empty()) {
-    auto [currOp, ctrlSignal] = queue.front();
+    auto [currOp, ctrlSignal, currOpOperandValue] = queue.front();
     queue.pop();
 
     if (auto commitOp = dyn_cast<handshake::SpecCommitOp>(currOp)) {
@@ -175,7 +172,7 @@ void HandshakeSpeculationPass::routeCommitControl(
       // branch output is non-speculative. Speculative tag of the token is
       // currently implicit, so the branch input itself is used at the IR level.
       auto branchDiscardNonSpec = builder.create<handshake::SpeculatingBranchOp>(
-          branchOp.getLoc(), currOpOperand.get() /* specTag */,
+          branchOp.getLoc(), currOpOperandValue /* specTag */,
           branchOp.getConditionOperand());
       inheritBB(specOp, branchDiscardNonSpec);
 
@@ -194,7 +191,7 @@ void HandshakeSpeculationPass::routeCommitControl(
           Operation *dstOp = dstOpOperand.getOwner();
           if (markedPath.contains(dstOp)) {
             markedPath.erase(dstOp);
-            queue.push(std::make_tuple(dstOp, ctrl));
+            queue.push(std::make_tuple(dstOp, ctrl, dstOpOperand.get()));
           }
         }
       }
@@ -205,7 +202,7 @@ void HandshakeSpeculationPass::routeCommitControl(
           Operation *dstOp = dstOpOperand.getOwner();
           if (markedPath.contains(dstOp)) {
             markedPath.erase(dstOp);
-            queue.push(std::make_tuple(dstOp, ctrlSignal));
+            queue.push(std::make_tuple(dstOp, ctrlSignal, dstOpOperand.get()));
           }
         }
       }
@@ -243,8 +240,7 @@ LogicalResult HandshakeSpeculationPass::prepareAndPlaceCommits() {
   markPathToCommits(markedPath, specOp);
 
   // Follow the marked path and replicate branches
-  for (OpOperand &succOpOperand : specOp.getDataOut().getUses())
-    routeCommitControl(markedPath, commitCtrl, succOpOperand);
+  routeCommitControl(markedPath);
 
   // Verify that all commits are routed to a control signal
   return success(areAllCommitsRouted(fakeControl));
