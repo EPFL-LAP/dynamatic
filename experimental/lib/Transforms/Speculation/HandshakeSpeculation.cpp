@@ -370,7 +370,8 @@ std::optional<Value> findControlInputToBB(Operation *op) {
 
   if (!isControlBranchFound) {
     funcOp->emitError("Its BB #" + std::to_string(targetBB.value()) +
-                      " does not have a control branch.");
+                      " does not have a control branch. We only target the" +
+                      " condition speculation and the BB should have it.");
     return {};
   }
 
