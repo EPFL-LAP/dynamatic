@@ -151,7 +151,6 @@ LogicalResult FtdLowerFuncToHandshake::matchAndRewrite(
     ConversionPatternRewriter &rewriter) const {
 
   FtdStoredOperations ftdOps;
-
   // Map all memory accesses in the matched function to the index of their
   // memref in the function's arguments
   DenseMap<Value, unsigned> memrefToArgIdx;
@@ -159,6 +158,66 @@ LogicalResult FtdLowerFuncToHandshake::matchAndRewrite(
     if (isa<mlir::MemRefType>(arg.getType()))
       memrefToArgIdx.insert({arg, idx});
   }
+
+#ifdef NEW_ORDER
+
+  // First lower the parent function itself, without modifying its body
+  auto funcOrFailure = lowerSignature(lowerFuncOp, rewriter);
+  if (failed(funcOrFailure))
+    return failure();
+  handshake::FuncOp funcOp = *funcOrFailure;
+  if (funcOp.isExternal())
+    return success();
+
+  // Map for each block its exit condition (if exists). This allows to build
+  // boolean expressions as circuits
+  mapConditionsToValues(funcOp.getRegion(), ftdOps);
+
+  // The memory operations are converted to the corresponding handshake
+  // counterparts. No LSQ interface is created yet.
+  BackedgeBuilder edgeBuilder(rewriter, funcOp->getLoc());
+  LowerFuncToHandshake::MemInterfacesInfo memInfo;
+  if (failed(convertMemoryOps(funcOp, rewriter, memrefToArgIdx, edgeBuilder,
+                              memInfo)))
+    return failure();
+
+  // Add the muxes as obtained by the GSA analysis pass
+  if (failed(addExplicitPhi<handshake::FuncOp>(funcOp, rewriter, ftdOps, true)))
+    return failure();
+
+  // When GSA-MU functions are translated into multiplexers, an `init merge`
+  // is created to feed them. This merge requires the start value of the
+  // function as one of its data inputs. However, the start value was not
+  // present yet when `addExplicitPhi` is called, thus we need to reconnect
+  // it.
+  connectInitMerges(rewriter, funcOp, ftdOps);
+
+  // Stores mapping from each value that passes through a merge-like
+  // operation to the data result of that merge operation
+  ArgReplacements argReplacements;
+
+  // Currently, the following 2 functions do nothing but construct the network
+  // of CMerges in complete isolation from the rest of the components
+  // implementing the operations
+  // In particular, the addMergeOps relies on adding Merges for every block
+  // argument but because we removed all "real" arguments, we are only left
+  // with the Start value as an argument for every block
+  addMergeOps(funcOp, rewriter, argReplacements);
+  addBranchOps(funcOp, rewriter);
+
+  // First round of bb-tagging so that newly inserted Dynamatic memory ports
+  // get tagged with the BB they belong to (required by memory interface
+  // instantiation logic)
+  idBasicBlocks(funcOp, rewriter);
+
+  // Create the memory interface according to the algorithm from FPGA'23. This
+  // functions introduce new data dependencies that are then passed to FTD for
+  // correctly delivering data between them like any real data dependencies
+  if (failed(
+          ftdVerifyAndCreateMemInterfaces(funcOp, rewriter, memInfo, ftdOps)))
+    return failure();
+
+#else
 
   // Map for each block its exit condition (if exists). This allows to build
   // boolean expressions as circuits
@@ -215,6 +274,7 @@ LogicalResult FtdLowerFuncToHandshake::matchAndRewrite(
   if (failed(
           ftdVerifyAndCreateMemInterfaces(funcOp, rewriter, memInfo, ftdOps)))
     return failure();
+#endif
 
   // Convert the constants and undefined values from the `arith` dialect to
   // the `handshake` dialect, while also using the start value as their
@@ -1502,10 +1562,12 @@ LogicalResult FtdLowerFuncToHandshake::addMergeLoop(
   return success();
 }
 
-LogicalResult
-FtdLowerFuncToHandshake::addExplicitPhi(func::FuncOp funcOp,
-                                        ConversionPatternRewriter &rewriter,
-                                        FtdStoredOperations &ftdOps) const {
+template <typename FunctionType>
+LogicalResult FtdLowerFuncToHandshake::addExplicitPhi(
+    FunctionType funcOp, ConversionPatternRewriter &rewriter,
+    FtdStoredOperations &ftdOps, bool skipLastArgument) const {
+
+  using namespace experimental::gsa;
 
   // The function instantiates the GAMMA and MU gates as provided by the GSA
   // analysis pass. A GAMMA function is translated into a multiplxer driven by
@@ -1538,25 +1600,24 @@ FtdLowerFuncToHandshake::addExplicitPhi(func::FuncOp funcOp,
   if (funcOp.getBlocks().size() == 1)
     return success();
 
-  auto gsaAnalysis = gsa::GsaAnalysis<func::FuncOp>(funcOp);
-
   // List of missing GSA functions
   SmallVector<MissingGsa> missingGsaList;
   // List of gammas with only one input
   DenseSet<Operation *> oneInputGammaList;
   // Maps the index of each GSA function to each real operation
   DenseMap<unsigned, Operation *> gsaList;
-  ControlDependenceAnalysis<func::FuncOp> cdgAnalysis(funcOp);
+  ControlDependenceAnalysis<FunctionType> cdgAnalysis(funcOp);
+  GsaAnalysis<FunctionType> gsaAnalysis(funcOp, skipLastArgument);
 
   // For each block excluding the first one, which has no gsa
   for (Block &block : llvm::drop_begin(funcOp)) {
 
     // For each GSA function
-    auto *phis = gsaAnalysis.getPhis(&block);
-    for (auto &phi : *phis) {
+    SmallVector<Phi *> *phis = gsaAnalysis.getPhis(&block);
+    for (Phi *&phi : *phis) {
 
       // Skip if it's a phi
-      if (phi->gsaGateFunction == gsa::PhiGate)
+      if (phi->gsaGateFunction == PhiGate)
         continue;
 
       Location loc = block.front().getLoc();
@@ -1574,11 +1635,11 @@ FtdLowerFuncToHandshake::addExplicitPhi(func::FuncOp funcOp,
         // operand and the operations will be reconnected later on.
         // If the input is empty, we keep track of its index.
         // In the other cases, we already have the operand of the function.
-        if (operand->type == gsa::PhiInputType) {
+        if (operand->type == PhiInputType) {
           operands.emplace_back(operand->phi->result);
           missingGsaList.emplace_back(
               MissingGsa(phi->index, operand->phi->index, operandIndex));
-        } else if (operand->type == gsa::EmptyInputType) {
+        } else if (operand->type == EmptyInputType) {
           nullOperand = operandIndex;
           operands.emplace_back(nullptr);
         } else {
@@ -1595,7 +1656,7 @@ FtdLowerFuncToHandshake::addExplicitPhi(func::FuncOp funcOp,
 
       // If the function is MU, then we create a merge and use its result as
       // condition
-      if (phi->gsaGateFunction == gsa::MuGate) {
+      if (phi->gsaGateFunction == MuGate) {
         Region &region = funcOp.getBody();
         mlir::DominanceInfo domInfo;
         mlir::CFGLoopInfo loopInfo(domInfo.getDomTree(&region));
@@ -1637,7 +1698,7 @@ FtdLowerFuncToHandshake::addExplicitPhi(func::FuncOp funcOp,
       }
 
       if (phi->isRoot)
-        phi->result.replaceAllUsesWith(mux.getResult());
+        rewriter.replaceAllUsesWith(phi->result, mux.getResult());
 
       gsaList.insert({phi->index, mux});
       ftdOps.explicitPhiMerges.insert(mux);
@@ -1678,24 +1739,36 @@ FtdLowerFuncToHandshake::addExplicitPhi(func::FuncOp funcOp,
 
   // Remove all the block arguments for all the non starting blocks
   for (Block &block : llvm::drop_begin(funcOp))
-    block.eraseArguments(0, block.getArguments().size());
+    block.eraseArguments(0, block.getArguments().size() - skipLastArgument);
 
   // Each terminator must be replaced so that it does not provide any block
-  // arguments
+  // arguments (possibly only the final control argument)
   for (Block &block : funcOp) {
     Operation *terminator = block.getTerminator();
     if (terminator) {
       rewriter.setInsertionPointAfter(terminator);
       if (isa<cf::CondBranchOp>(terminator)) {
         auto condBranch = dyn_cast<cf::CondBranchOp>(terminator);
+        SmallVector<Value> trueOperands;
+        SmallVector<Value> falseOperands;
+        if (skipLastArgument) {
+          trueOperands.push_back(
+              condBranch.getTrueOperand(condBranch.getNumTrueOperands() - 1));
+          falseOperands.push_back(
+              condBranch.getFalseOperand(condBranch.getNumFalseOperands() - 1));
+        }
         auto newCondBranch = rewriter.create<cf::CondBranchOp>(
             condBranch->getLoc(), condBranch.getCondition(),
-            condBranch.getTrueDest(), condBranch.getFalseDest());
+            condBranch.getTrueDest(), trueOperands, condBranch.getFalseDest(),
+            falseOperands);
         rewriter.replaceOp(condBranch, newCondBranch);
       } else if (isa<cf::BranchOp>(terminator)) {
         auto branch = dyn_cast<cf::BranchOp>(terminator);
-        auto newBranch =
-            rewriter.create<cf::BranchOp>(branch->getLoc(), branch.getDest());
+        SmallVector<Value> operands;
+        if (skipLastArgument)
+          operands.push_back(branch.getOperand(branch.getNumOperands() - 1));
+        auto newBranch = rewriter.create<cf::BranchOp>(
+            branch->getLoc(), branch.getDest(), operands);
         rewriter.replaceOp(branch, newBranch);
       }
     }

@@ -13,6 +13,7 @@
 //===----------------------------------------------------------------------===//
 
 #include "experimental/Analysis/GsaAnalysis.h"
+#include "dynamatic/Dialect/Handshake/HandshakeOps.h"
 #include "experimental/Support/BooleanLogic/BDD.h"
 #include "experimental/Support/FtdSupport.h"
 #include "mlir/Analysis/CFGLoopInfo.h"
@@ -182,9 +183,14 @@ void GsaAnalysis<FunctionType>::identifyAllPhi(FunctionType &funcOp,
       unsigned argNumber = arg.getArgNumber();
       // Create a set for the operands of the corresponding phi function
       SmallVector<PhiInput *> operands;
+      DenseSet<Block *> coveredPredecessors;
       // For each predecessor of the block, which is in charge of
       // providing the inputs of the phi functions
       for (Block *pred : block.getPredecessors()) {
+        // Make sure that a predecessor is covered only once
+        if (coveredPredecessors.contains(pred))
+          continue;
+        coveredPredecessors.insert(pred);
         // Get the branch terminator
         auto branchOp = dyn_cast<BranchOpInterface>(pred->getTerminator());
         assert(branchOp && "Expected terminator operation in a predecessor "
@@ -197,7 +203,10 @@ void GsaAnalysis<FunctionType>::identifyAllPhi(FunctionType &funcOp,
             // Get the value used on that branch
             auto successorOperands = branchOp.getSuccessorOperands(successorId);
             // Get the corresponding producer/value
-            auto producer = successorOperands[argNumber];
+            Value producer = successorOperands[argNumber];
+            while (llvm::isa_and_nonnull<UnrealizedConversionCastOp>(
+                producer.getDefiningOp()))
+              producer = producer.getDefiningOp()->getOperand(0);
             PhiInput *phiInput = nullptr;
             // Try to convert the producer to a block argument
             BlockArgument ba = dyn_cast<BlockArgument>(producer);
@@ -205,7 +214,7 @@ void GsaAnalysis<FunctionType>::identifyAllPhi(FunctionType &funcOp,
             // then it is a function argument. Otherwise, if it is a BA,
             // it must be connected to another phi. In all the other
             // situations, it comes from an operation.
-            if (ba && producer.getParentBlock()->getPredecessors().empty()) {
+            if (ba && producer.getParentBlock()->hasNoPredecessors()) {
               bool alreadyPresent = false;
               for (auto &phi : operands) {
                 if (phi->type == ArgInputType && phi->v == ba)
@@ -507,5 +516,6 @@ namespace dynamatic {
 
 // Explicit template instantiation
 template class experimental::gsa::GsaAnalysis<mlir::func::FuncOp>;
+template class experimental::gsa::GsaAnalysis<handshake::FuncOp>;
 
 } // namespace dynamatic

@@ -160,9 +160,11 @@ protected:
   /// Starting from the information collected by the gsa analysis pass,
   /// instantiate some merge operations at the beginning of each block which
   /// work as explicit phi functions.
-  LogicalResult addExplicitPhi(mlir::func::FuncOp funcOp,
+  template <typename FunctionType>
+  LogicalResult addExplicitPhi(FunctionType funcOp,
                                ConversionPatternRewriter &rewriter,
-                               FtdStoredOperations &ftdOps) const;
+                               FtdStoredOperations &ftdOps,
+                               bool skipLastArgument = false) const;
 };
 #define GEN_PASS_DECL_FTDCFTOHANDSHAKE
 #define GEN_PASS_DEF_FTDCFTOHANDSHAKE
