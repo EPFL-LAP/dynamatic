@@ -158,14 +158,14 @@ void HandshakeSpeculationPass::routeCommitControl(llvm::DenseSet<Operation *> &m
   OpBuilder builder(ctx);
   while (!queue.empty()) {
     auto [currOpOperand, commitBranchList] = queue.front();
-    Operation *currOp = currOpOperand.getOwner();
     queue.pop();
+    Operation *currOp = currOpOperand.getOwner();
 
     if (auto commitOp = dyn_cast<handshake::SpecCommitOp>(currOp)) {
-      Value ctrlSignal = specOp.getCommitCtrl();
       // We only replicate branches only if the traverse reaches a commit.
       // Because sometimes the commit unit is already connected to the shortest (appropriate) path
       // when we traverse other branches.
+      Value ctrlSignal = specOp.getCommitCtrl();
       for (auto [valueForSpecTag, branchOp, branchDir] : commitBranchList) {
         // Replicate a branch in the control path and use new control signal.
         // To do so, a structure of two connected branches is created.
