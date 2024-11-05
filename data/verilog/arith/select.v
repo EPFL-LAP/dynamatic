@@ -1,5 +1,5 @@
 `timescale 1ns/1ps
-module antitokens #()(
+module antitokens (
   // inputs
   input  clk,
   input  reset,
