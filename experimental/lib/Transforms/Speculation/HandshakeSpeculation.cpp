@@ -139,6 +139,10 @@ static void markPathToCommits(llvm::DenseSet<Operation *> &markedPath,
     markPathToCommitsRecursive(visited, markedPath, succOp);
 }
 
+// The list to record the branches that need to be replicated
+// Value: The value whose spec tag is used
+// handshake::ConditionalBranchOp: The branch to replicate
+// unsigned: The direction of the branch to follow
 typedef std::list<std::tuple<Value, handshake::ConditionalBranchOp, unsigned>> CommitBranchList;
 // This recursive function traverses the IR along a marked path and creates
 // a control path by replicating the branches it finds in the way. It stops
@@ -146,7 +150,6 @@ typedef std::list<std::tuple<Value, handshake::ConditionalBranchOp, unsigned>> C
 // ctrlSignal
 void HandshakeSpeculationPass::routeCommitControl(llvm::DenseSet<Operation *> &markedPath) {
   // Perform BFS
-  // create the queue of operations to visit
   std::queue<std::tuple<const OpOperand &, CommitBranchList>> queue;
   for (OpOperand &succOpOperand : specOp.getDataOut().getUses()) {
     queue.push(std::tuple<const OpOperand &, CommitBranchList>(succOpOperand, {}));
@@ -160,13 +163,15 @@ void HandshakeSpeculationPass::routeCommitControl(llvm::DenseSet<Operation *> &m
 
     if (auto commitOp = dyn_cast<handshake::SpecCommitOp>(currOp)) {
       Value ctrlSignal = specOp.getCommitCtrl();
+      // We only replicate branches only if the traverse reaches a commit.
+      // Because sometimes the commit unit is already connected to the shortest (appropriate) path
+      // when we traverse other branches.
       for (auto [valueForSpecTag, branchOp, branchDir] : commitBranchList) {
         // Replicate a branch in the control path and use new control signal.
         // To do so, a structure of two connected branches is created.
         // A speculating branch first discards the condition in case that
         // the data is not speculative. In case it is speculative, a new branch
         // is created that replicates the current branch.
-
         builder.setInsertionPointAfterValue(ctrlSignal);
 
         // The speculating branch will discard the branch's condition token if the
@@ -192,6 +197,7 @@ void HandshakeSpeculationPass::routeCommitControl(llvm::DenseSet<Operation *> &m
     } else if (auto branchOp = dyn_cast<handshake::ConditionalBranchOp>(currOp)) {
       // Follow the two branch results with a different control signal
       for (unsigned i = 0; i <= 1; ++i) {
+        // Copy the current list. Can be optimized by using a data structure with reference
         auto newList(commitBranchList);
         newList.push_back(std::tuple<Value, handshake::ConditionalBranchOp, unsigned>(
             currOpOperand.get(), branchOp, i));
