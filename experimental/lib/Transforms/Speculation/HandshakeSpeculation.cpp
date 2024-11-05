@@ -26,6 +26,7 @@
 #include "llvm/ADT/DenseSet.h"
 #include <string>
 #include <queue>
+#include <list>
 
 using namespace llvm::sys;
 using namespace mlir;
@@ -138,6 +139,7 @@ static void markPathToCommits(llvm::DenseSet<Operation *> &markedPath,
     markPathToCommitsRecursive(visited, markedPath, succOp);
 }
 
+typedef std::list<std::tuple<Value, handshake::ConditionalBranchOp, unsigned>> CommitBranchList;
 // This recursive function traverses the IR along a marked path and creates
 // a control path by replicating the branches it finds in the way. It stops
 // at commits and connects them to the newly created path with value
@@ -145,53 +147,59 @@ static void markPathToCommits(llvm::DenseSet<Operation *> &markedPath,
 void HandshakeSpeculationPass::routeCommitControl(llvm::DenseSet<Operation *> &markedPath) {
   // Perform BFS
   // create the queue of operations to visit
-  std::queue<std::tuple<const OpOperand &, Value>> queue;
+  std::queue<std::tuple<const OpOperand &, CommitBranchList>> queue;
   for (OpOperand &succOpOperand : specOp.getDataOut().getUses()) {
-    queue.push(std::tuple<const OpOperand &, Value>(succOpOperand, specOp.getCommitCtrl()));
+    queue.push(std::tuple<const OpOperand &, CommitBranchList>(succOpOperand, {}));
   }
+  MLIRContext *ctx = &getContext();
+  OpBuilder builder(ctx);
   while (!queue.empty()) {
-    auto [currOpOperand, ctrlSignal] = queue.front();
+    auto [currOpOperand, commitBranchList] = queue.front();
     Operation *currOp = currOpOperand.getOwner();
     queue.pop();
 
     if (auto commitOp = dyn_cast<handshake::SpecCommitOp>(currOp)) {
+      Value ctrlSignal = specOp.getCommitCtrl();
+      for (auto [valueForSpecTag, branchOp, branchDir] : commitBranchList) {
+        // Replicate a branch in the control path and use new control signal.
+        // To do so, a structure of two connected branches is created.
+        // A speculating branch first discards the condition in case that
+        // the data is not speculative. In case it is speculative, a new branch
+        // is created that replicates the current branch.
+
+        builder.setInsertionPointAfterValue(ctrlSignal);
+
+        // The speculating branch will discard the branch's condition token if the
+        // branch output is non-speculative. Speculative tag of the token is
+        // currently implicit, so the branch input itself is used at the IR level.
+        auto branchDiscardNonSpec = builder.create<handshake::SpeculatingBranchOp>(
+            branchOp.getLoc(), valueForSpecTag /* specTag */,
+            branchOp.getConditionOperand());
+        inheritBB(specOp, branchDiscardNonSpec);
+
+        // The replicated branch directs the control token based on the path the
+        // speculative token took
+        auto branchReplicated = builder.create<handshake::ConditionalBranchOp>(
+            branchDiscardNonSpec->getLoc(),
+            branchDiscardNonSpec.getTrueResult() /* condition */,
+            ctrlSignal /* data */);
+        inheritBB(specOp, branchReplicated);
+
+        ctrlSignal = branchReplicated->getResult(branchDir);
+      }
       // Connect commit to the correct control signal and end traversal
       commitOp.setOperand(1, ctrlSignal);
     } else if (auto branchOp = dyn_cast<handshake::ConditionalBranchOp>(currOp)) {
-      // Replicate a branch in the control path and use new control signal.
-      // To do so, a structure of two connected branches is created.
-      // A speculating branch first discards the condition in case that
-      // the data is not speculative. In case it is speculative, a new branch
-      // is created that replicates the current branch.
-
-      MLIRContext *ctx = &getContext();
-      OpBuilder builder(ctx);
-      builder.setInsertionPointAfterValue(ctrlSignal);
-
-      // The speculating branch will discard the branch's condition token if the
-      // branch output is non-speculative. Speculative tag of the token is
-      // currently implicit, so the branch input itself is used at the IR level.
-      auto branchDiscardNonSpec = builder.create<handshake::SpeculatingBranchOp>(
-          branchOp.getLoc(), currOpOperand.get() /* specTag */,
-          branchOp.getConditionOperand());
-      inheritBB(specOp, branchDiscardNonSpec);
-
-      // The replicated branch directs the control token based on the path the
-      // speculative token took
-      auto branchReplicated = builder.create<handshake::ConditionalBranchOp>(
-          branchDiscardNonSpec->getLoc(),
-          branchDiscardNonSpec.getTrueResult() /* condition */,
-          ctrlSignal /* data */);
-      inheritBB(specOp, branchReplicated);
-
       // Follow the two branch results with a different control signal
       for (unsigned i = 0; i <= 1; ++i) {
-        Value ctrl = branchReplicated->getResult(i);
+        auto newList(commitBranchList);
+        newList.push_back(std::tuple<Value, handshake::ConditionalBranchOp, unsigned>(
+            currOpOperand.get(), branchOp, i));
         for (OpOperand &dstOpOperand : branchOp->getResult(i).getUses()) {
           Operation *dstOp = dstOpOperand.getOwner();
           if (markedPath.contains(dstOp)) {
             markedPath.erase(dstOp);
-            queue.push(std::tuple<const OpOperand &, Value>(dstOpOperand, ctrl));
+            queue.push(std::tuple<const OpOperand &, CommitBranchList>(dstOpOperand, newList));
           }
         }
       }
@@ -202,7 +210,7 @@ void HandshakeSpeculationPass::routeCommitControl(llvm::DenseSet<Operation *> &m
           Operation *dstOp = dstOpOperand.getOwner();
           if (markedPath.contains(dstOp)) {
             markedPath.erase(dstOp);
-            queue.push(std::tuple<const OpOperand &, Value>(dstOpOperand, ctrlSignal));
+            queue.push(std::tuple<const OpOperand &, CommitBranchList>(dstOpOperand, commitBranchList));
           }
         }
       }
