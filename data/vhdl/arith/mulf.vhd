@@ -265,8 +265,30 @@ entity mulf_with_tag is
 end entity;
 
 architecture arch of mulf_with_tag is
+  signal spec_tag_inner : std_logic_vector(0 downto 0);
+  signal spec_tag_inner2 : std_logic_vector(0 downto 0);
+  signal spec_tag_tfifo_pvalid : std_logic;
+  signal spec_tag_tfifo_nready : std_logic;
 begin
-  result_spec_tag <= lhs_spec_tag or rhs_spec_tag;
+  spec_tag_inner(0) <= lhs_spec_tag or rhs_spec_tag;
+  spec_tag_tfifo_pvalid <= lhs_valid and rhs_valid and lhs_ready and rhs_ready;
+  spec_tag_tfifo_nready <= result_valid and result_ready;
+  result_spec_tag <= spec_tag_inner2(0);
+  spec_tag_tfifo : entity work.tfifo(arch)
+    generic map(
+      NUM_SLOTS => 8,
+      DATA_TYPE => 1
+    )
+    port map(
+      clk => clk,
+      rst => rst,
+      ins => spec_tag_inner,
+      ins_valid => spec_tag_tfifo_pvalid,
+      ins_ready => open,
+      outs => spec_tag_inner2,
+      outs_valid => open,
+      outs_ready => spec_tag_tfifo_nready
+    );
   mulf : entity work.mulf(arch)
     generic map(DATA_TYPE)
     port map(

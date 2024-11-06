@@ -5,7 +5,7 @@
       { "name": "DATA_TYPE", "type": "dataflow", "data-lb": 1, "extra-eq": 0 }
     ],
     "generic": "$DYNAMATIC/data/vhdl/arith/addf.vhd",
-    "dependencies": ["join", "delay_buffer", "oehb", "flopoco_ip_cores"]
+    "dependencies": ["join", "delay_buffer", "oehb", "flopoco_ip_cores", "tfifo"]
   },
   {
     "name": "handshake.addi",
@@ -115,7 +115,7 @@
       { "name": "DATA_TYPE", "type": "dataflow", "data-lb": 1, "extra-eq": 0 }
     ],
     "generic": "$DYNAMATIC/data/vhdl/arith/mulf.vhd",
-    "dependencies": ["join", "delay_buffer", "oehb", "flopoco_ip_cores"]
+    "dependencies": ["join", "delay_buffer", "oehb", "flopoco_ip_cores", "tfifo"]
   },
   {
     "name": "handshake.muli",
@@ -612,7 +612,7 @@
       { "name": "ADDR_TYPE", "type": "dataflow", "data-lb": 1, "extra-eq": 0 }
     ],
     "generic": "$DYNAMATIC/data/vhdl/handshake/load.vhd",
-    "dependencies": ["tehb"]
+    "dependencies": ["tehb", "tfifo"]
   },
   {
     "name": "handshake.store",
