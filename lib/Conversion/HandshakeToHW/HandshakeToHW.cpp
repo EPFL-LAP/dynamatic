@@ -617,11 +617,11 @@ ModuleDiscriminator::ModuleDiscriminator(Operation *op) {
       })
       .Case<handshake::SpeculatorOp>([&](auto) {
         addType("DATA_TYPE", op->getOperand(0));
-        addUnsigned("FIFO_DEPTH", 4); // temp
+        addUnsigned("FIFO_DEPTH", 32); // temp
       })
       .Case<handshake::SpecSaveCommitOp>([&](auto) {
         addType("DATA_TYPE", op->getOperand(0));
-        addUnsigned("FIFO_DEPTH", 4); // temp
+        addUnsigned("FIFO_DEPTH", 32); // temp
       })
       .Case<handshake::SpeculatingBranchOp>([&](auto) {
         addType("SPEC_TAG_DATA_TYPE", op->getOperand(0));
