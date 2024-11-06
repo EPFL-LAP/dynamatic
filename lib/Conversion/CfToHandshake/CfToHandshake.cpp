@@ -726,7 +726,10 @@ LogicalResult LowerFuncToHandshake::convertMemoryOps(
                                "'handshake::MemInterfaceAttr' to encode "
                                "which memory interface it should connect to.";
     }
-    bool connectToMC = memAttr.connectsToMC();
+    // Rouzbeh
+    // bool connectToMC = memAttr.connectsToMC();
+    bool connectToMC = true;
+    
 
     // Replace memref operation with corresponding handshake operation
     Operation *newOp =
@@ -781,10 +784,12 @@ LogicalResult LowerFuncToHandshake::convertMemoryOps(
     // the memory interface it should connect to
     auto *accessesIt = memInfo.find(funcArgs[memrefIndices.at(memref)]);
     assert(accessesIt != memInfo.end() && "unknown memref");
-    if (memAttr.connectsToMC())
-      accessesIt->second.mcPorts[block].push_back(newOp);
-    else
-      accessesIt->second.lsqPorts[*memAttr.getLsqGroup()].push_back(newOp);
+    // Rouzbeh
+    // if (memAttr.connectsToMC())
+    //   accessesIt->second.mcPorts[block].push_back(newOp);
+    // else
+    //   accessesIt->second.lsqPorts[*memAttr.getLsqGroup()].push_back(newOp);
+    accessesIt->second.mcPorts[block].push_back(newOp);
   }
 
   memOpLowering.renameDependencies(funcOp);
