@@ -35,6 +35,7 @@ F_PROFILER_INPUTS="$COMP_DIR/profiler-inputs.txt"
 F_HANDSHAKE="$COMP_DIR/handshake.mlir"
 F_HANDSHAKE_TRANSFORMED="$COMP_DIR/handshake_transformed.mlir"
 F_HANDSHAKE_BUFFERED="$COMP_DIR/handshake_buffered.mlir"
+F_HANDSHAKE_CANONICALIZED="$COMP_DIR/handshake_canonicalized.mlir"
 F_HANDSHAKE_EXPORT="$COMP_DIR/handshake_export.mlir"
 F_HW="$COMP_DIR/hw.mlir"
 F_FREQUENCIES="$COMP_DIR/frequencies.csv"
@@ -174,8 +175,16 @@ fi
   --handshake-canonicalize \
   --handshake-hoist-ext-instances \
   --handshake-reshape-channels \
-  > "$F_HANDSHAKE_EXPORT"
+  > "$F_HANDSHAKE_CANONICALIZED"
+  # > "$F_HANDSHAKE_EXPORT"
 exit_on_fail "Failed to canonicalize Handshake" "Canonicalized handshake"
+
+"$DYNAMATIC_OPT_BIN" "$F_HANDSHAKE_CANONICALIZED" \
+  --handshake-speculation="json-path=integration-test/$KERNEL_NAME/spec.json" \
+  --handshake-materialize \
+  --handshake-canonicalize \
+  > "$F_HANDSHAKE_EXPORT"
+exit_on_fail "Failed to add speculation to Handshake" "Speculative handshake"
 
 # Export to DOT
 export_dot "$F_HANDSHAKE_EXPORT" "$KERNEL_NAME"
