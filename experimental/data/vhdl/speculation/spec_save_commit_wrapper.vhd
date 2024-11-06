@@ -38,12 +38,34 @@ architecture arch of spec_save_commit_wrapper_with_tag is
   signal specOutArray  : data_array(0 downto 0)(0 downto 0);
   signal validArray   : std_logic_vector(0 downto 0);
   signal nReadyArray  : std_logic_vector(0 downto 0);
+
+  signal ctrl_inner : std_logic_vector(2 downto 0);
+  signal ctrl_valid_inner : std_logic;
+  signal ctrl_spec_tag_inner : std_logic;
+  signal ctrl_ready_inner : std_logic;
 begin
+  ctrl_buf : entity work.tfifo_with_tag(arch)
+    generic map(
+      NUM_SLOTS => 32,
+      DATA_TYPE => 3
+    )
+    port map(
+      clk => clk,
+      rst => rst,
+      ins => ctrl,
+      ins_valid => ctrl_valid,
+      ins_spec_tag => ctrl_spec_tag,
+      ins_ready => ctrl_ready,
+      outs => ctrl_inner,
+      outs_valid => ctrl_valid_inner,
+      outs_spec_tag => ctrl_spec_tag_inner,
+      outs_ready => ctrl_ready_inner
+    );
   dataInArray(0) <= ins;
   specInArray(0)(0) <= ins_spec_tag;
-  controlInArray(0) <= ctrl;
-  pValidArray <= ctrl_valid & ins_valid;
-  ctrl_ready <= readyArray(1);
+  controlInArray(0) <= ctrl_inner;
+  pValidArray <= ctrl_valid_inner & ins_valid;
+  ctrl_ready_inner <= readyArray(1);
   ins_ready <= readyArray(0);
   outs <= dataOutArray(0);
   outs_spec_tag <= specOutArray(0)(0);

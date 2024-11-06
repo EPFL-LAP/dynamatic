@@ -3,60 +3,6 @@ use ieee.std_logic_1164.all;
 use ieee.numeric_std.all;
 use work.types.all;
 
-entity speculator_buffers is
-  generic (
-    DATA_TYPE : integer
-  );
-  port (
-    clk, rst : in std_logic;
-    -- input channel
-    ins       : in  std_logic_vector(DATA_TYPE - 1 downto 0);
-    ins_valid : in  std_logic;
-    ins_spec_tag : in std_logic;
-    ins_ready : out std_logic;
-    -- output channel
-    outs       : out std_logic_vector(DATA_TYPE - 1 downto 0);
-    outs_valid : out std_logic;
-    outs_spec_tag : out std_logic;
-    outs_ready : in  std_logic
-  );
-end entity;
-
-architecture arch of speculator_buffers is
-  constant BUFFERS : integer := 10;
-  signal data_inner : data_array(BUFFERS downto 0) (DATA_TYPE - 1 downto 0);
-  signal data_valid_inner : std_logic_vector(BUFFERS downto 0);
-  signal data_spec_tag_inner : std_logic_vector(BUFFERS downto 0);
-  signal data_ready_inner : std_logic_vector(BUFFERS downto 0);
-begin
-  data_inner(0) <= ins;
-  data_valid_inner(0) <= ins_valid;
-  data_spec_tag_inner(0) <= ins_spec_tag;
-  ins_ready <= data_ready_inner(0);
-  outs <= data_inner(BUFFERS);
-  outs_valid <= data_valid_inner(BUFFERS);
-  outs_spec_tag <= data_spec_tag_inner(BUFFERS);
-  data_ready_inner(BUFFERS) <= outs_ready;
-  generateTehb : for i in BUFFERS - 1 downto 0 generate
-    tehb : entity work.tehb_with_tag(arch)
-      generic map(
-        DATA_TYPE => DATA_TYPE
-      )
-      port map(
-        clk => clk,
-        rst => rst,
-        ins => data_inner(i),
-        ins_valid => data_valid_inner(i),
-        ins_spec_tag => data_spec_tag_inner(i),
-        ins_ready => data_ready_inner(i),
-        outs => data_inner(i + 1),
-        outs_valid => data_valid_inner(i + 1),
-        outs_spec_tag => data_spec_tag_inner(i + 1),
-        outs_ready => data_ready_inner(i + 1)
-      );
-  end generate;
-end architecture;
-
 library ieee;
 use ieee.std_logic_1164.all;
 use ieee.numeric_std.all;
@@ -203,9 +149,10 @@ begin
       validArray => validArray,
       nReadyArray => nReadyArray
     );
-  tehb_outs : entity work.speculator_buffers(arch)
+  tehb_outs : entity work.tfifo_with_tag(arch)
     generic map(
-      DATA_TYPE => DATA_TYPE
+      DATA_TYPE => DATA_TYPE,
+      NUM_SLOTS => 32
     )
     port map(
       clk => clk,
@@ -219,9 +166,10 @@ begin
       outs_spec_tag => outs_spec_tag,
       outs_ready => outs_ready
     );
-  tehb_ctrl_save : entity work.speculator_buffers(arch)
+  tehb_ctrl_save : entity work.tfifo_with_tag(arch)
     generic map(
-      DATA_TYPE => 1
+      DATA_TYPE => 1,
+      NUM_SLOTS => 32
     )
     port map(
       clk => clk,
@@ -235,9 +183,10 @@ begin
       outs_spec_tag => ctrl_save_spec_tag,
       outs_ready => ctrl_save_ready
     );
-  tehb_ctrl_commit : entity work.speculator_buffers(arch)
+  tehb_ctrl_commit : entity work.tfifo_with_tag(arch)
     generic map(
-      DATA_TYPE => 1
+      DATA_TYPE => 1,
+      NUM_SLOTS => 32
     )
     port map(
       clk => clk,
@@ -251,9 +200,10 @@ begin
       outs_spec_tag => ctrl_commit_spec_tag,
       outs_ready => ctrl_commit_ready
     );
-  tehb_ctrl_sc_save : entity work.speculator_buffers(arch)
+  tehb_ctrl_sc_save : entity work.tfifo_with_tag(arch)
     generic map(
-      DATA_TYPE => 3
+      DATA_TYPE => 3,
+      NUM_SLOTS => 32
     )
     port map(
       clk => clk,
@@ -267,9 +217,10 @@ begin
       outs_spec_tag => ctrl_sc_save_spec_tag,
       outs_ready => ctrl_sc_save_ready
     );
-  tehb_ctrl_sc_commit : entity work.speculator_buffers(arch)
+  tehb_ctrl_sc_commit : entity work.tfifo_with_tag(arch)
     generic map(
-      DATA_TYPE => 3
+      DATA_TYPE => 3,
+      NUM_SLOTS => 32
     )
     port map(
       clk => clk,
@@ -283,9 +234,10 @@ begin
       outs_spec_tag => ctrl_sc_commit_spec_tag,
       outs_ready => ctrl_sc_commit_ready
     );
-  tehb_ctrl_sc_branch : entity work.speculator_buffers(arch)
+  tehb_ctrl_sc_branch : entity work.tfifo_with_tag(arch)
     generic map(
-      DATA_TYPE => 1
+      DATA_TYPE => 1,
+      NUM_SLOTS => 32
     )
     port map(
       clk => clk,
