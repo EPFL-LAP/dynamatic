@@ -358,7 +358,9 @@ string HlsVhdlTb::getSignalDeclaration() {
   code << "\tsignal tb_end_spec_tag : std_logic;" << endl;
   code << "\tsignal tb_out0_valid, tb_out0_ready : std_logic;" << endl;
   code << "\tsignal tb_out0_spec_tag : std_logic;" << endl;
-  code << "\tsignal tb_global_valid, tb_global_ready, tb_stop : std_logic;"
+  code << "\tsignal tb_global_valid, tb_global_ready, tb_stop : std_logic;" << endl;
+  code << "\tsignal clock_count : std_logic_vector(15 downto 0);" << endl;
+  code << "\tsignal tb_global_valid_inner : std_logic;"
        << endl;
 
   code << endl;
@@ -657,7 +659,7 @@ string HlsVhdlTb::getMemoryInstanceGeneration() {
     }
   }
   code << "\t\tins_ready(" << idx++ << ") => tb_end_ready,\n";
-  code << "\t\touts_valid => tb_global_valid,\n";
+  code << "\t\touts_valid => tb_global_valid_inner,\n";
   code << "\t\touts_ready => tb_global_ready\n\t);";
 
   return code.str();
@@ -746,7 +748,7 @@ string HlsVhdlTb::getDuvInstanceGeneration() {
   duvPortMap.emplace_back("end_ready", "tb_end_ready");
 
   stringstream code;
-  code << "duv: \t entity work." << duvName << endl;
+  code << "duv: \t entity work." << duvName << "_with_tag" << endl;
   code << "\t\tport map (" << endl;
   for (size_t i = 0; i < duvPortMap.size(); i++) {
     pair<string, string> elem = duvPortMap[i];
@@ -821,6 +823,16 @@ string HlsVhdlTb::generateVhdlTestbench() {
   tbOut << getArchitectureBegin() << endl;
   tbOut << getDuvInstanceGeneration() << endl;
   tbOut << getMemoryInstanceGeneration() << endl;
+  tbOut << "timeout : process(tb_clk, tb_rst)" << endl;
+  tbOut << "begin" << endl;
+  tbOut << "if tb_rst = '1' then" << endl;
+  tbOut << "clock_count <= (others => '0');" << endl;
+  tbOut << "elsif rising_edge(tb_clk) then" << endl;
+  tbOut << "clock_count <= clock_count + 1;" << endl;
+  tbOut << "end if;" << endl;
+  tbOut << "end process;" << endl;
+  tbOut << "tb_global_valid <= tb_global_valid_inner or clock_count(15);"
+        << endl;
   tbOut << getOutputTagGeneration() << endl;
   tbOut << getCommonBody() << endl;
   tbOut << getArchitectureEnd() << endl;

@@ -492,7 +492,7 @@ LogicalResult VHDLWriter::write(hw::HWModuleOp modOp,
   os << "use ieee.numeric_std.all;\n\n";
 
   // Declare the entity
-  os << "entity " << modOp.getSymName() << " is\n";
+  os << "entity " << modOp.getSymName() << "_with_tag is\n";
   os.indent();
   os << "port (\n";
   os.indent();
@@ -507,7 +507,7 @@ LogicalResult VHDLWriter::write(hw::HWModuleOp modOp,
 
   // Open the entity's architecture
   os << "architecture " << ARCH_NAME << " of " << modOp.getSymName()
-     << " is\n\n";
+     << "_with_tag is\n\n";
   os.indent();
 
   // Declare signals inside the architecture
@@ -635,8 +635,8 @@ void VHDLWriter::writeModuleInstantiations(WriteData &data) const {
     raw_indented_ostream &os = data.os;
     // Declare the instance
     std::string moduleNameWithTag;
-    // Temp: very rough way to handle fir and mem_to_bram
-    if (moduleName == "fir" || moduleName == "mem_to_bram") {
+    // Temp: very rough way to handle mem_to_bram
+    if (moduleName == "mem_to_bram") {
       moduleNameWithTag = moduleName;
     } else {
       moduleNameWithTag = moduleName + "_with_tag";
