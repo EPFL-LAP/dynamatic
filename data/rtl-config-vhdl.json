@@ -710,7 +710,7 @@
       { "name": "FIFO_DEPTH", "type": "unsigned", "lb": 1 }
     ],
     "generic": "$DYNAMATIC/experimental/data/vhdl/speculation/speculator_wrapper.vhd",
-    "dependencies": ["types", "speculator", "tehb"]
+    "dependencies": ["types", "speculator", "tehb", "tfifo"]
   },
   {
     "name": "handshake.spec_commit",
@@ -753,7 +753,7 @@
       { "name": "FIFO_DEPTH", "type": "unsigned", "lb": 1 }
     ],
     "generic": "$DYNAMATIC/experimental/data/vhdl/speculation/spec_save_commit_wrapper.vhd",
-    "dependencies": ["types", "spec_save_commit"]
+    "dependencies": ["types", "spec_save_commit", "tfifo"]
   },
   {
     "name": "handshake.spec_save_commit",
@@ -763,7 +763,7 @@
     ],
     "generic": "$DYNAMATIC/experimental/data/vhdl/speculation/dataless/spec_save_commit_wrapper.vhd",
     "module-name": "spec_save_commit_wrapper_dataless",
-    "dependencies": ["types", "spec_save_commit_wrapper"]
+    "dependencies": ["types", "spec_save_commit_wrapper", "tfifo"]
   },
   {
     "name": "handshake.speculating_branch",
@@ -772,7 +772,7 @@
       { "name": "SPEC_TAG_DATA_TYPE", "type": "dataflow", "data-lb": 0, "extra-eq": 0 }
     ],
     "generic": "$DYNAMATIC/experimental/data/vhdl/speculation/speculating_branch_wrapper.vhd",
-    "dependencies": ["types", "speculating_branch"]
+    "dependencies": ["types", "speculating_branch", "tfifo"]
   },
   {
     "generic": "$DYNAMATIC/data/vhdl/support/delay_buffer.vhd"

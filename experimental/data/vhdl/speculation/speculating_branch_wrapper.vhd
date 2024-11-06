@@ -34,6 +34,15 @@ entity speculating_branch_wrapper_with_tag is
 end entity;
 
 architecture arch of speculating_branch_wrapper_with_tag is
+  signal data_inner : std_logic_vector(DATA_TYPE - 1 downto 0);
+  signal data_valid_inner : std_logic;
+  signal data_spec_tag_inner : std_logic;
+  signal data_ready_inner : std_logic;
+  signal spec_tag_data_inner : std_logic_vector(SPEC_TAG_DATA_TYPE - 1 downto 0);
+  signal spec_tag_data_valid_inner : std_logic;
+  signal spec_tag_data_spec_tag_inner : std_logic;
+  signal spec_tag_data_ready_inner : std_logic;
+
   signal condition_inner : data_array(0 downto 0)(0 downto 0);
   signal dataInArray : data_array(0 downto 0)(DATA_TYPE - 1 downto 0);
   signal specInArray : data_array(1 downto 0)(0 downto 0);
@@ -45,13 +54,49 @@ architecture arch of speculating_branch_wrapper_with_tag is
   signal validArray : std_logic_vector(1 downto 0);
   signal nReadyArray : std_logic_vector(1 downto 0);
 begin
+
+  data_buf : entity work.tfifo_with_tag(arch)
+    generic map(
+      DATA_TYPE => DATA_TYPE,
+      NUM_SLOTS => 32
+    )
+    port map(
+      clk => clk,
+      rst => rst,
+      ins => data,
+      ins_valid => data_valid,
+      ins_spec_tag => data_spec_tag,
+      ins_ready => data_ready,
+      outs => data_inner,
+      outs_valid => data_valid_inner,
+      outs_spec_tag => data_spec_tag_inner,
+      outs_ready => data_ready_inner
+    );
+  spec_tag_buf : entity work.tfifo_with_tag(arch)
+    generic map(
+      DATA_TYPE => SPEC_TAG_DATA_TYPE,
+      NUM_SLOTS => 32
+    )
+    port map(
+      clk => clk,
+      rst => rst,
+      ins => spec_tag_data,
+      ins_valid => spec_tag_data_valid,
+      ins_spec_tag => spec_tag_data_spec_tag,
+      ins_ready => spec_tag_data_ready,
+      outs => spec_tag_data_inner,
+      outs_valid => spec_tag_data_valid_inner,
+      outs_spec_tag => spec_tag_data_spec_tag_inner,
+      outs_ready => spec_tag_data_ready_inner
+    );
+
   condition_inner(0)(0) <= '0';
-  dataInArray(0) <= data;
-  specInArray(0)(0) <= data_spec_tag;
-  specInArray(1)(0) <= spec_tag_data_spec_tag;
-  pValidArray <= spec_tag_data_valid & data_valid;
-  spec_tag_data_ready <= readyArray(1);
-  data_ready <= readyArray(0);
+  dataInArray(0) <= data_inner;
+  specInArray(0)(0) <= data_spec_tag_inner;
+  specInArray(1)(0) <= spec_tag_data_spec_tag_inner;
+  pValidArray <= spec_tag_data_valid_inner & data_valid_inner;
+  spec_tag_data_ready_inner <= readyArray(1);
+  data_ready_inner <= readyArray(0);
   trueOut <= dataOutArray(0);
   falseOut <= dataOutArray(1);
   trueOut_spec_tag <= specOutArray(0)(0);
