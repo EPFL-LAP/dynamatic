@@ -119,7 +119,7 @@ begin
       clk => clk,
       rst => rst,
       ins => spec_tag_tfifo_ins_inner,
-      ins_valid => addrIn_valid,
+      ins_valid => addrIn_valid and addrIn_ready_inner,
       ins_ready => spec_tag_tfifo_ready,
       outs => spec_tag_tfifo_outs_inner,
       outs_valid => spec_tag_tfifo_valid,
