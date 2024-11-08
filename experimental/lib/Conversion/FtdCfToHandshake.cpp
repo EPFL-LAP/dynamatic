@@ -159,66 +159,6 @@ LogicalResult FtdLowerFuncToHandshake::matchAndRewrite(
       memrefToArgIdx.insert({arg, idx});
   }
 
-#ifdef NEW_ORDER
-
-  // First lower the parent function itself, without modifying its body
-  auto funcOrFailure = lowerSignature(lowerFuncOp, rewriter);
-  if (failed(funcOrFailure))
-    return failure();
-  handshake::FuncOp funcOp = *funcOrFailure;
-  if (funcOp.isExternal())
-    return success();
-
-  // Map for each block its exit condition (if exists). This allows to build
-  // boolean expressions as circuits
-  mapConditionsToValues(funcOp.getRegion(), ftdOps);
-
-  // The memory operations are converted to the corresponding handshake
-  // counterparts. No LSQ interface is created yet.
-  BackedgeBuilder edgeBuilder(rewriter, funcOp->getLoc());
-  LowerFuncToHandshake::MemInterfacesInfo memInfo;
-  if (failed(convertMemoryOps(funcOp, rewriter, memrefToArgIdx, edgeBuilder,
-                              memInfo)))
-    return failure();
-
-  // Add the muxes as obtained by the GSA analysis pass
-  if (failed(addExplicitPhi<handshake::FuncOp>(funcOp, rewriter, ftdOps, true)))
-    return failure();
-
-  // When GSA-MU functions are translated into multiplexers, an `init merge`
-  // is created to feed them. This merge requires the start value of the
-  // function as one of its data inputs. However, the start value was not
-  // present yet when `addExplicitPhi` is called, thus we need to reconnect
-  // it.
-  connectInitMerges(rewriter, funcOp, ftdOps);
-
-  // Stores mapping from each value that passes through a merge-like
-  // operation to the data result of that merge operation
-  ArgReplacements argReplacements;
-
-  // Currently, the following 2 functions do nothing but construct the network
-  // of CMerges in complete isolation from the rest of the components
-  // implementing the operations
-  // In particular, the addMergeOps relies on adding Merges for every block
-  // argument but because we removed all "real" arguments, we are only left
-  // with the Start value as an argument for every block
-  addMergeOps(funcOp, rewriter, argReplacements);
-  addBranchOps(funcOp, rewriter);
-
-  // First round of bb-tagging so that newly inserted Dynamatic memory ports
-  // get tagged with the BB they belong to (required by memory interface
-  // instantiation logic)
-  idBasicBlocks(funcOp, rewriter);
-
-  // Create the memory interface according to the algorithm from FPGA'23. This
-  // functions introduce new data dependencies that are then passed to FTD for
-  // correctly delivering data between them like any real data dependencies
-  if (failed(
-          ftdVerifyAndCreateMemInterfaces(funcOp, rewriter, memInfo, ftdOps)))
-    return failure();
-
-#else
-
   // Map for each block its exit condition (if exists). This allows to build
   // boolean expressions as circuits
   mapConditionsToValues(lowerFuncOp.getRegion(), ftdOps);
@@ -271,10 +211,8 @@ LogicalResult FtdLowerFuncToHandshake::matchAndRewrite(
   // Create the memory interface according to the algorithm from FPGA'23. This
   // functions introduce new data dependencies that are then passed to FTD for
   // correctly delivering data between them like any real data dependencies
-  if (failed(
-          ftdVerifyAndCreateMemInterfaces(funcOp, rewriter, memInfo, ftdOps)))
+  if (failed(verifyAndCreateMemInterfaces(funcOp, rewriter, memInfo)))
     return failure();
-#endif
 
   // Convert the constants and undefined values from the `arith` dialect to
   // the `handshake` dialect, while also using the start value as their
