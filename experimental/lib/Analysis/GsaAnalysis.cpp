@@ -203,10 +203,7 @@ void GsaAnalysis<FunctionType>::identifyAllPhi(FunctionType &funcOp,
             // Get the value used on that branch
             auto successorOperands = branchOp.getSuccessorOperands(successorId);
             // Get the corresponding producer/value
-            Value producer = successorOperands[argNumber];
-            while (llvm::isa_and_nonnull<UnrealizedConversionCastOp>(
-                producer.getDefiningOp()))
-              producer = producer.getDefiningOp()->getOperand(0);
+            auto producer = successorOperands[argNumber];
             PhiInput *phiInput = nullptr;
             // Try to convert the producer to a block argument
             BlockArgument ba = dyn_cast<BlockArgument>(producer);
