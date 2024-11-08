@@ -15,47 +15,30 @@
 #define DYNAMATIC_ANALYSIS_CONTROLDEPENDENCEANALYSIS_H
 
 #include "dynamatic/Support/LLVM.h"
-#include "mlir/Dialect/Func/IR/FuncOps.h"
-#include "mlir/IR/Dominance.h"
 #include "mlir/Pass/AnalysisManager.h"
-#include "mlir/Transforms/DialectConversion.h"
 #include <optional>
 
 namespace dynamatic {
 
-/// Analysis to maintain the control dependencies of basic blocks throughout the
-/// IR's lifetime. Query at the beginning of Dynamatic passes using
-/// `getAnalysis<ControlDependenceAnalysis>()` and cache it to avoid
-/// recomputations for further passes using
-/// `markAnalysesPreserved<ControlDependenceAnalysis>()` at the end.
+/// Analysis to obtain the control dependence analysis of each block in the CFG
 template <typename FunctionType>
 class ControlDependenceAnalysis {
 public:
-  /// Constructor called automatically by
-  /// `getAnalysis<ControlDependenceAnalysis>()` if the analysis is not already
-  /// cached.
   ControlDependenceAnalysis(Operation *operation) {
-    // type-cast it into FunctionType
+    // Run the analysis only on a valid operation of type `FunctionType`
     FunctionType funcOp = dyn_cast<FunctionType>(operation);
     if (funcOp) {
-      // if the operation is a function, then identify all the control
-      // dependencies among its BBs
       identifyAllControlDeps(funcOp);
     } else {
-      // report an error indicating that the analysis is instantiated over
-      // an inappropriate operation
       llvm::errs() << "ControlDependenceAnalysis is instantiated over an "
                       "operation that is not FuncOp!\n";
     }
   };
 
-  // given a BB within that function, return all the BBs the block is control
-  // dependant on.
+  // Given a BB, return all its control dependencies
   std::optional<DenseSet<Block *>> getBlockAllControlDeps(Block *block) const;
 
-  // given a BB within that function, return all the BBs the bloc
-  // is control dependant on, without taking into account backward dependencies
-  // (i.e. excluding loop exits)
+  // Given a BB, return all its forward control dependencies
   std::optional<DenseSet<Block *>>
   getBlockForwardControlDeps(Block *block) const;
 
@@ -70,44 +53,26 @@ public:
   void printAllBlocksDeps() const;
 
 private:
-  // Each block has a structure of type `BlockControlDeps` containing the list
-  // of BBs it is control dependent on, both in the forward and backward
-  // direction.
+  /// This structure contains all the control dependencies of a block, also
+  /// separating the forward ones
   struct BlockControlDeps {
     DenseSet<Block *> allControlDeps;
     DenseSet<Block *> forwardControlDeps;
   };
-  using BlockControlDepsMap = DenseMap<Block *, BlockControlDeps>;
 
-  // Store the list of dependencies for each block
+  /// Store the dependencies of each block into a map
+  using BlockControlDepsMap = DenseMap<Block *, BlockControlDeps>;
   BlockControlDepsMap blocksControlDeps;
 
-  // Fill the `allControlDeps` field of the entry in `funcBlocksControlDeps`
-  // corresponding to the input `funcOp`
+  /// Get all the control dependencies of a block
   void identifyAllControlDeps(FunctionType &funcOp);
 
-  // Fill the `forwardControlDeps` field of the entry in `funcBlocksControlDeps`
-  // corresponding to the input `funcOp`
+  // Get the forward dependencies only of a block
   void identifyForwardControlDeps(FunctionType &funcOp);
 
-  // Given a start block and en end block withing a function region, return all
-  // the post dominator trees
-  void enumeratePathsInPostDomTree(
-      Block *startBlock, Block *endBlock, Region *funcReg,
-      llvm::DominatorTreeBase<Block, true> *postDomTree,
-      SmallVector<SmallVector<mlir::DominanceInfoNode *>> *traversedNodes);
-
-  // Helper recursive function called inside `enumeratePathsInPostDomTree`
-  void enumeratePathsInPostDomTreeUtil(
-      mlir::DominanceInfoNode *startNode, mlir::DominanceInfoNode *endNode,
-      DenseMap<mlir::DominanceInfoNode *, bool> isVisited,
-      SmallVector<mlir::DominanceInfoNode *> path, int pathIndex,
-      SmallVector<SmallVector<mlir::DominanceInfoNode *>> *traversedNodes);
-
-  // adjusts the dependencies of each block to include nested dependencies
-  // (i.e., the dependencies of its depenendencies)
-  void addDepsOfDeps(FunctionType &funcOp,
-                     BlockControlDepsMap &blockControlDepsMap);
+  /// Modify the control dependencies to include the dependencies of each
+  /// dependent block too
+  void addDepsOfDeps(FunctionType &funcOp);
 };
 
 } // namespace dynamatic
