@@ -1,20 +1,20 @@
-//===- admm.c - Incorporates OSQP for model predictive control --*- C -*-===// 
+//===- admm.c - Incorporates OSQP for model predictive control --*- C -*-===//
 //
 // This kernel is adapted from code provided to us by Min Jeong, and was used in
 // When FPGAs Meet ADMM with High-level Synthesis (HLS):
 // A Real-time Implementation of Long-Horizon MPC for Power Electronic Systems
 // ICPE'23
-// 
+//
 // It is based off
 // OSQP: An Operator Splitting Solver for Quadratic Programs
 // MPC'20
 
 // While we do not distribute any of the OSQP code itself, it is
 
-// Copyright (c) 2019 Bartolomeo Stellato, Goran Banjac, Paul Goulart, Stephen Boyd
+// Copyright (c) 2019 Bartolomeo Stellato, Goran Banjac, Paul Goulart, Stephen
+// Boyd
 //
 //===------------------------------------------------------------------===//
-
 
 #include "admm.h"
 #include "dynamatic/Integration.h"
