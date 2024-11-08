@@ -269,14 +269,16 @@ LogicalResult HandshakeSpeculationPass::prepareAndPlaceSaveCommits() {
 
   // To connect a Save-Commit, two control signals are sent from the Speculator
   // and are merged before reaching the Save-Commit.
-  // The tokens take differents paths. One (SCSaveCtrl) needs to always reach the SC,
-  // the other (SCCommitCtrl) should follow the actual branches similarly to the Commits
+  // The tokens take differents paths. One (SCSaveCtrl) needs to always reach
+  // the SC, the other (SCCommitCtrl) should follow the actual branches
+  // similarly to the Commits
   builder.setInsertionPointAfterValue(specOp.getSCCommitCtrl());
 
   // First, discard if speculation didn't happen
-  auto branchDiscardCondNonSpec = builder.create<handshake::SpeculatingBranchOp>(
-      controlBranch.getLoc(), specOp.getDataOut() /* spec tag */,
-      controlBranch.getConditionOperand());
+  auto branchDiscardCondNonSpec =
+      builder.create<handshake::SpeculatingBranchOp>(
+          controlBranch.getLoc(), specOp.getDataOut() /* spec tag */,
+          controlBranch.getConditionOperand());
   inheritBB(specOp, branchDiscardCondNonSpec);
 
   // Second, discard if speculation happened but it was correct
@@ -291,8 +293,8 @@ LogicalResult HandshakeSpeculationPass::prepareAndPlaceSaveCommits() {
   // This branch will propagate the signal SCCommitControl according to
   // the control branch condition, which comes from branchDiscardCondNonMisSpec
   auto branchReplicated = builder.create<handshake::ConditionalBranchOp>(
-      branchDiscardCondNonMisspec.getLoc(), branchDiscardCondNonMisspec.getTrueResult(),
-      specOp.getSCCommitCtrl());
+      branchDiscardCondNonMisspec.getLoc(),
+      branchDiscardCondNonMisspec.getTrueResult(), specOp.getSCCommitCtrl());
   inheritBB(specOp, branchReplicated);
 
   // We create a Merge operation to join SCCSaveCtrl and SCCommitCtrl signals
@@ -327,8 +329,8 @@ LogicalResult HandshakeSpeculationPass::prepareAndPlaceSaveCommits() {
   }
 
   // All the inputs to the merge operation are ready
-  auto mergeOp = builder.create<handshake::MergeOp>(
-      branchReplicated.getLoc(), mergeOperands);
+  auto mergeOp = builder.create<handshake::MergeOp>(branchReplicated.getLoc(),
+                                                    mergeOperands);
   inheritBB(specOp, mergeOp);
 
   // All the control logic is set up, now connect the Save-Commits with
@@ -353,8 +355,7 @@ std::optional<Value> findControlInputToBB(Operation *op) {
   for (auto branchOp : funcOp.getOps<handshake::ConditionalBranchOp>()) {
     // Check if the branch is in the same BB as the operation
     // specified as the location for the speculator
-    if (auto brBB = getLogicBB(branchOp);
-        !brBB || brBB != targetBB)
+    if (auto brBB = getLogicBB(branchOp); !brBB || brBB != targetBB)
       continue;
 
     // Check if the branch targets a control token
