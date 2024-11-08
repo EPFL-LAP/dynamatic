@@ -342,41 +342,49 @@ std::optional<Value> findControlInputToBB(Operation *op) {
   handshake::FuncOp funcOp = op->getParentOfType<handshake::FuncOp>();
   assert(funcOp && "op should have parent function");
 
+  // Get the BB number of the operation safely
   std::optional<unsigned> targetBB = getLogicBB(op);
   if (!targetBB) {
     op->emitError("Operation does not have a BB.");
     return {};
   }
 
-  // We use the control token, which is an input to the control branch
-  // as the enable signal for the speculator.
-  mlir::Value ctrlSignal;
+  // Here we fork control token to use as enable signal to speculator.
+  // The presence of a buffer between this fork and the control branch creates
+  // performance issues (see detailed speculation documentation). Therefore we
+  // fork control token from directly above the control branch
+  mlir::Value enableChannelOrigin;
+
+  // Find the control branch we want to speculate on.
+  // To find: Iterate over every branch, looking for 1) same bb as speculator,
+  // and 2) is a control branch
   bool isControlBranchFound = false;
   for (auto branchOp : funcOp.getOps<handshake::ConditionalBranchOp>()) {
-    // Check if the branch is in the same BB as the operation
-    // specified as the location for the speculator
+    // Ignore branches that are not in the speculator's BB
     if (auto brBB = getLogicBB(branchOp); !brBB || brBB != targetBB)
       continue;
 
-    // Check if the branch targets a control token
+    // We are looking for the control branch: data should be of control type
     if (branchOp.getDataOperand().getType().isa<handshake::ControlType>()) {
+      // BB should have only one control branch at most
       if (isControlBranchFound) {
-        branchOp->emitError("Multiple control branches found in the same BB");
+        branchOp->emitError("Multiple control branches found in the BB #" +
+                            std::to_string(targetBB.value()));
         return {};
       }
-      ctrlSignal = branchOp.getDataOperand();
+      enableChannelOrigin = branchOp.getDataOperand();
       isControlBranchFound = true;
     }
   }
 
   if (!isControlBranchFound) {
-    funcOp->emitError("Its BB #" + std::to_string(targetBB.value()) +
-                      " does not have a control branch. We only target the" +
-                      " condition speculation and the BB should have it.");
+    funcOp->emitError("BB #" + std::to_string(targetBB.value()) +
+                      " was marked for speculation, but no corresponding "
+                      "control branch was found.");
     return {};
   }
 
-  return ctrlSignal;
+  return enableChannelOrigin;
 }
 
 LogicalResult HandshakeSpeculationPass::placeSpeculator() {
