@@ -457,6 +457,10 @@ std::unordered_map<mlir::Operation *, int> HandshakeSizeLSQsPass::getAllocTimes(
   return allocTimes;
 }
 
+// For a store operation, the deallocation time is the time when the last
+// argument arrives at the store operation plus a fixed additional latency.
+// This is because the store operation can deallocate the slot as soon as the
+// data and address are known and therefore can issue the memory operation.
 std::unordered_map<mlir::Operation *, int>
 HandshakeSizeLSQsPass::getStoreDeallocTimes(
     CFDFCGraph graph, mlir::Operation *startNode,
@@ -472,15 +476,20 @@ HandshakeSizeLSQsPass::getStoreDeallocTimes(
   return deallocTimes;
 }
 
+// Go trough all ops which directly succeed the load op. These ops are waiting
+// for the result of the load operation. Check every succeeding node for the
+// maximum latency (latest argument arrival), which is the time it can accept
+// the results from the load operation. As soon as the succeeding operation
+// has accepted the result, the LSQ can deallocate the slot. The latency of
+// the succeding operation itself does not matter, because only the time when
+// the succeeding operation can accept the result is relevant for the
+// deallocation time.
 std::unordered_map<mlir::Operation *, int>
 HandshakeSizeLSQsPass::getLoadDeallocTimes(CFDFCGraph graph,
                                            mlir::Operation *startNode,
                                            std::vector<mlir::Operation *> ops) {
   std::unordered_map<mlir::Operation *, int> deallocTimes;
 
-  // Go trough all ops which directly succeed the load op and therefore need
-  // its result Check every succeeding nodes for the maximum latency (latest
-  // argument arrival), excluding the latency of the operation itself
   for (auto &op : ops) {
     int maxLatency = 0;
     for (auto &succedingOp : graph.getConnectedOps(op)) {
