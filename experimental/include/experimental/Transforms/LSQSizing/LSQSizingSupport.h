@@ -110,10 +110,8 @@ public:
     std::vector<mlir::Operation *> ops;
     // Iterate over all nodes and use dyn_cast to filter operations by type
     for (auto &node : nodes) {
-      if (node.second.op) {
-        if (auto op = llvm::dyn_cast<OpType>(node.second.op)) {
-          ops.push_back(static_cast<mlir::Operation *>(op));
-        }
+      if (node.second.op && isa<OpType>(node.second.op)) {
+        ops.push_back(node.second.op);
       }
     }
     return ops;
