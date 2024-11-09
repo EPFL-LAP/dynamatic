@@ -574,7 +574,7 @@
   },
   "handshake.addf": {
     "latency": {
-      "64": 8.0
+      "64": 9.0
     },
     "delay": {
       "data": {
@@ -635,7 +635,7 @@
   },
   "handshake.subf": {
     "latency": {
-      "64": 8.0
+      "64": 9.0
     },
     "delay": {
       "data": {
