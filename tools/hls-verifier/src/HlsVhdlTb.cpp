@@ -358,10 +358,10 @@ string HlsVhdlTb::getSignalDeclaration() {
   code << "\tsignal tb_end_spec_tag : std_logic;" << endl;
   code << "\tsignal tb_out0_valid, tb_out0_ready : std_logic;" << endl;
   code << "\tsignal tb_out0_spec_tag : std_logic;" << endl;
-  code << "\tsignal tb_global_valid, tb_global_ready, tb_stop : std_logic;" << endl;
-  code << "\tsignal clock_count : std_logic_vector(15 downto 0);" << endl;
-  code << "\tsignal tb_global_valid_inner : std_logic;"
+  code << "\tsignal tb_global_valid, tb_global_ready, tb_stop : std_logic;"
        << endl;
+  code << "\tsignal clock_count : std_logic_vector(15 downto 0);" << endl;
+  code << "\tsignal tb_global_valid_inner : std_logic;" << endl;
 
   code << endl;
 
@@ -392,7 +392,8 @@ string HlsVhdlTb::getSignalDeclaration() {
 
       code << "\tsignal " << m.memStartSignalName << "_valid : std_logic;"
            << endl;
-      // code << "\tsignal " << m.memStartSignalName << "_spec_tag : std_logic := '0';"
+      // code << "\tsignal " << m.memStartSignalName << "_spec_tag : std_logic
+      // := '0';"
       //      << endl;
       code << "\tsignal " << m.memStartSignalName << "_ready : std_logic;"
            << endl;
@@ -706,7 +707,8 @@ string HlsVhdlTb::getDuvInstanceGeneration() {
       duvPortMap.emplace_back(p.parameterName + "_end_valid",
                               m.memEndSignalName + "_valid");
       duvPortMap.emplace_back(p.parameterName + "_end_spec_tag",
-                              m.memEndSignalName + "_spec_tag"); // output signal
+                              m.memEndSignalName +
+                                  "_spec_tag"); // output signal
       duvPortMap.emplace_back(p.parameterName + "_end_ready",
                               m.memEndSignalName + "_ready");
 
@@ -724,7 +726,8 @@ string HlsVhdlTb::getDuvInstanceGeneration() {
         if (p.isReturn) {
           duvPortMap.emplace_back(p.parameterName, m.dIn0SignalName);
           duvPortMap.emplace_back(p.parameterName + "_valid", "tb_out0_valid");
-          duvPortMap.emplace_back(p.parameterName + "_spec_tag", "tb_out0_spec_tag");
+          duvPortMap.emplace_back(p.parameterName + "_spec_tag",
+                                  "tb_out0_spec_tag");
           duvPortMap.emplace_back(p.parameterName + "_ready", "tb_out0_ready");
         } else {
           duvPortMap.emplace_back(getValidOutPortNameForCParam(p.parameterName),

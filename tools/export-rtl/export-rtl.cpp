@@ -586,7 +586,8 @@ void VHDLWriter::writeSignalAssignments(WriteData &data) const {
   raw_indented_ostream &os = data.os;
   auto addValidReady = [&](StringRef name, StringRef signal) -> void {
     os << name << VALID_SUFFIX << " <= " << signal << VALID_SUFFIX << ";\n";
-    os << name << SPEC_TAG_SUFFIX << " <= " << signal << SPEC_TAG_SUFFIX << ";\n";
+    os << name << SPEC_TAG_SUFFIX << " <= " << signal << SPEC_TAG_SUFFIX
+       << ";\n";
     os << signal << READY_SUFFIX << " <= " << name << READY_SUFFIX << ";\n";
   };
 
