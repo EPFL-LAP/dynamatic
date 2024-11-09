@@ -426,46 +426,48 @@ void CFDFCGraph::setNewII(unsigned II) {
 // IT2:        #L'#####S'#
 unsigned CFDFCGraph::getWorstCaseII() {
 
-  std::unordered_map<mlir::Operation *,
-                     std::tuple<std::vector<mlir::Operation *>,
-                                std::vector<mlir::Operation *>>>
-      loadStoreOpsPerLSQ;
-  // Match up all lsq_loads and lsq_stores with the same LSQ
+  unsigned maxLatency = 0;
+
+  // Iterate through all nodes to find LSQOps and their associated loads and
+  // stores
   for (auto &node : nodes) {
     mlir::Operation *lsqOp = nullptr;
+
     if (node.second.op) {
-      for (Operation *destOp : node.second.op->getUsers()) {
+      // Find the associated LSQOp for the current node operation
+      for (mlir::Operation *destOp : node.second.op->getUsers()) {
         if (isa<handshake::LSQOp>(destOp)) {
           lsqOp = destOp;
           break;
         }
       }
 
-      if (loadStoreOpsPerLSQ.find(lsqOp) == loadStoreOpsPerLSQ.end()) {
-        loadStoreOpsPerLSQ.insert(
-            {lsqOp, std::make_tuple(std::vector<mlir::Operation *>(),
-                                    std::vector<mlir::Operation *>())});
-      }
+      if (!lsqOp)
+        continue;
 
+      unsigned tempMaxLatency = 0;
+
+      // Check if the node operation is a load or store and compute latencies
       if (isa<handshake::LSQLoadOp>(node.second.op)) {
-        std::get<0>(loadStoreOpsPerLSQ[lsqOp]).push_back(node.second.op);
-      } else if (isa<handshake::LSQStoreOp>(node.second.op)) {
-        std::get<1>(loadStoreOpsPerLSQ[lsqOp]).push_back(node.second.op);
+        // Iterate through nodes again to find corresponding stores for this
+        // LSQOp
+        for (auto &otherNode : nodes) {
+          if (otherNode.second.op &&
+              isa<handshake::LSQStoreOp>(otherNode.second.op)) {
+            // Calculate path latency between the load and store
+            unsigned latency = findMaxPathLatency(
+                node.second.op, otherNode.second.op, true, true);
+            tempMaxLatency = std::max(tempMaxLatency, latency);
+          }
+        }
       }
+      maxLatency = std::max(maxLatency, tempMaxLatency);
     }
   }
 
-  // For each LSQ, go trough all loads and find the maxPathLatency to all stores
-  unsigned maxLatency = 0;
-  for (auto &lsq : loadStoreOpsPerLSQ) {
-    for (auto &load : std::get<0>(lsq.second))
-      for (auto &store : std::get<1>(lsq.second))
-        maxLatency = std::max(findMaxPathLatency(load, store, true, true),
-                              (int)maxLatency);
-  }
-  // The maximal Latency between any load and store of the same LSQ is the worst
+  // The maximal latency between any load and store of the same LSQ is the worst
   // case II
-  return (unsigned)maxLatency;
+  return maxLatency;
 }
 
 void CFDFCGraph::setEarliestStartTimes(mlir::Operation *startOp) {
