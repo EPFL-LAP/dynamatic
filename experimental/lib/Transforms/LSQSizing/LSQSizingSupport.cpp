@@ -7,7 +7,7 @@
 //===----------------------------------------------------------------------===//
 //
 // Implements Helper Classes and Functions for the LSQ sizing pass.
-// The Helper functions mainly consist of the AdjListGraph class which is used
+// The Helper functions mainly consist of the CFDFCGraph class which is used
 // to represent the CFDFC as an adjacency list graph and provides functions to
 // find paths, calculate latencies and start times of nodes.
 //
@@ -15,7 +15,10 @@
 
 #include "experimental/Transforms/LSQSizing/LSQSizingSupport.h"
 #include "dynamatic/Dialect/Handshake/HandshakeAttributes.h"
+#include "dynamatic/Dialect/Handshake/HandshakeDialect.h"
+#include "dynamatic/Dialect/Handshake/HandshakeInterfaces.h"
 #include "dynamatic/Dialect/Handshake/HandshakeOps.h"
+#include "dynamatic/Dialect/Handshake/MemoryInterfaces.h"
 #include "dynamatic/Support/CFG.h"
 #include "dynamatic/Support/TimingModels.h"
 #include "dynamatic/Transforms/BufferPlacement/CFDFC.h"
@@ -41,7 +44,7 @@ static int extractNodeLatency(mlir::Operation *op, TimingDatabase timingDB) {
   if (!failed(timingDB.getLatency(op, SignalType::DATA, latency)))
     return latency;
 
-  if (op->getName().getStringRef() == "handshake.buffer") {
+  if (isa<handshake::BufferOp>(op)) {
     auto params = op->getAttrOfType<DictionaryAttr>(RTL_PARAMETERS_ATTR_NAME);
     if (!params)
       return 0;
@@ -59,9 +62,9 @@ static int extractNodeLatency(mlir::Operation *op, TimingDatabase timingDB) {
   return 0;
 }
 
-AdjListGraph::AdjListGraph(handshake::FuncOp funcOp,
-                           llvm::SetVector<unsigned> cfdfcBBs,
-                           TimingDatabase timingDB, unsigned II) {
+CFDFCGraph::CFDFCGraph(handshake::FuncOp funcOp,
+                       llvm::SetVector<unsigned> cfdfcBBs,
+                       TimingDatabase timingDB, unsigned II) {
 
   for (Operation &op : funcOp.getOps()) {
     // Get operation's basic block
@@ -117,33 +120,33 @@ AdjListGraph::AdjListGraph(handshake::FuncOp funcOp,
   }
 }
 
-void AdjListGraph::addNode(mlir::Operation *op, int latency) {
+void CFDFCGraph::addNode(mlir::Operation *op, int latency) {
   nodes.insert(
-      {getUniqueName(op).str(), AdjListNode{latency, -1, op, {}, {}, {}}});
+      {getUniqueName(op).str(), CFDFCNode{latency, -1, op, {}, {}, {}}});
 }
 
-void AdjListGraph::addEdge(mlir::Operation *src, mlir::Operation *dest) {
+void CFDFCGraph::addEdge(mlir::Operation *src, mlir::Operation *dest) {
   nodes.at(getUniqueName(src).str())
       .edges.insert(
           getUniqueName(dest).str()); // Add edge from node u to node v
 }
 
-void AdjListGraph::addChannelEdges(mlir::Value res) {
+void CFDFCGraph::addChannelEdges(mlir::Value res) {
   mlir::Operation *srcOp = res.getDefiningOp();
   for (Operation *destOp : res.getUsers())
     addEdge(srcOp, destOp);
 }
 
-void AdjListGraph::addChannelBackedges(mlir::Value res, int latency) {
+void CFDFCGraph::addChannelBackedges(mlir::Value res, int latency) {
   mlir::Operation *srcOp = res.getDefiningOp();
   for (Operation *destOp : res.getUsers())
     addBackedge(srcOp, destOp, latency);
 }
 
-void AdjListGraph::printGraph() {
+void CFDFCGraph::printGraph() {
   for (const auto &pair : nodes) {
     std::string opName = pair.first;
-    const AdjListNode &node = pair.second;
+    const CFDFCNode &node = pair.second;
     llvm::errs() << opName << " (lat: " << node.latency
                  << ", est: " << node.earliestStartTime << "): ";
     for (std::string edge : node.edges)
@@ -158,15 +161,15 @@ void AdjListGraph::printGraph() {
   }
 }
 
-void AdjListGraph::printPath(std::vector<std::string> path) {
+void CFDFCGraph::printPath(std::vector<std::string> path) {
   for (std::string node : path)
     llvm::errs() << node << "(" << nodes.at(node).latency << ") - ";
 
   llvm::errs() << "\n";
 }
 
-void AdjListGraph::addBackedge(mlir::Operation *src, mlir::Operation *dest,
-                               int latency) {
+void CFDFCGraph::addBackedge(mlir::Operation *src, mlir::Operation *dest,
+                             int latency) {
   // create new node name from src and dest name
   std::string srcName = getUniqueName(src).str();
   std::string destName = getUniqueName(dest).str();
@@ -178,12 +181,12 @@ void AdjListGraph::addBackedge(mlir::Operation *src, mlir::Operation *dest,
 
   // create node and add edge from src to new node and new node to dest
   nodes.insert(
-      {newNodeName, AdjListNode{latency, -1, nullptr, {}, {destName}, {}}});
+      {newNodeName, CFDFCNode{latency, -1, nullptr, {}, {destName}, {}}});
   nodes.at(srcName).backedges.insert(newNodeName);
 }
 
-void AdjListGraph::addShiftingEdge(mlir::Operation *src, mlir::Operation *dest,
-                                   int shiftingLatency) {
+void CFDFCGraph::addShiftingEdge(mlir::Operation *src, mlir::Operation *dest,
+                                 int shiftingLatency) {
   // create new node name from src and dest name
   std::string srcName = getUniqueName(src).str();
   std::string destName = getUniqueName(dest).str();
@@ -196,15 +199,15 @@ void AdjListGraph::addShiftingEdge(mlir::Operation *src, mlir::Operation *dest,
 
   // create node and add edge from src to new node and new node to dest
   nodes.insert({newNodeName,
-                AdjListNode{shiftingLatency, -1, nullptr, {}, {}, {destName}}});
+                CFDFCNode{shiftingLatency, -1, nullptr, {}, {}, {destName}}});
   nodes.at(srcName).shiftingedges.insert(newNodeName);
 }
 
-void AdjListGraph::dfsAllPaths(std::string &currentNode, std::string &end,
-                               std::vector<std::string> &currentPath,
-                               std::set<std::string> &visited,
-                               std::vector<std::vector<std::string>> &paths,
-                               bool ignoreBackedges, bool ignoreShiftingEdge) {
+void CFDFCGraph::dfsAllPaths(std::string &currentNode, std::string &end,
+                             std::vector<std::string> &currentPath,
+                             std::set<std::string> &visited,
+                             std::vector<std::vector<std::string>> &paths,
+                             bool ignoreBackedges, bool ignoreShiftingEdge) {
   // If the current node is the target, add the current path to paths and
   // return.
   if (currentNode == end) {
@@ -264,8 +267,8 @@ void AdjListGraph::dfsAllPaths(std::string &currentNode, std::string &end,
 }
 
 std::vector<std::vector<std::string>>
-AdjListGraph::findPaths(std::string start, std::string end, bool ignoreBackedge,
-                        bool ignoreShiftingEdge) {
+CFDFCGraph::findPaths(std::string start, std::string end, bool ignoreBackedge,
+                      bool ignoreShiftingEdge) {
   // Initialize the vectors for DFS
   std::vector<std::vector<std::string>> paths;
   std::vector<std::string> currentPath{start};
@@ -278,19 +281,19 @@ AdjListGraph::findPaths(std::string start, std::string end, bool ignoreBackedge,
 }
 
 std::vector<std::vector<std::string>>
-AdjListGraph::findPaths(mlir::Operation *startOp, mlir::Operation *endOp,
-                        bool ignoreBackedge, bool ignoreShiftingEdge) {
+CFDFCGraph::findPaths(mlir::Operation *startOp, mlir::Operation *endOp,
+                      bool ignoreBackedge, bool ignoreShiftingEdge) {
   assert(startOp && endOp && "Start and end operations must not be null");
   return findPaths(getUniqueName(startOp).str(), getUniqueName(endOp).str(),
                    ignoreBackedge, ignoreShiftingEdge);
 }
 
 // Recursive helper function
-void AdjListGraph::dfsLongestAcyclicPath(const std::string &currentNode,
-                                         std::set<std::string> &visited,
-                                         std::vector<std::string> &currentPath,
-                                         int &maxLatency,
-                                         std::vector<std::string> &bestPath) {
+void CFDFCGraph::dfsLongestAcyclicPath(const std::string &currentNode,
+                                       std::set<std::string> &visited,
+                                       std::vector<std::string> &currentPath,
+                                       int &maxLatency,
+                                       std::vector<std::string> &bestPath) {
   visited.insert(currentNode);
   currentPath.push_back(currentNode);
   // Update the best path if current path latency is greater than maxLatency
@@ -313,7 +316,7 @@ void AdjListGraph::dfsLongestAcyclicPath(const std::string &currentNode,
 
 // Main function to find the longest non-cyclic path
 std::vector<std::string>
-AdjListGraph::findLongestNonCyclicPath(mlir::Operation *startOp) {
+CFDFCGraph::findLongestNonCyclicPath(mlir::Operation *startOp) {
   std::string start = getUniqueName(startOp).str();
   std::vector<std::string> bestPath;
   std::vector<std::string> currentPath;
@@ -324,7 +327,7 @@ AdjListGraph::findLongestNonCyclicPath(mlir::Operation *startOp) {
   return bestPath;
 }
 
-int AdjListGraph::getPathLatency(std::vector<std::string> path) {
+int CFDFCGraph::getPathLatency(std::vector<std::string> path) {
   // Sum up the latencies of all nodes in the path
   int latency = 0;
   for (auto &node : path)
@@ -333,24 +336,10 @@ int AdjListGraph::getPathLatency(std::vector<std::string> path) {
   return latency;
 }
 
-std::vector<mlir::Operation *>
-AdjListGraph::getOperationsWithOpName(std::string opName) {
-  std::vector<mlir::Operation *> ops;
-  // Iterate over all nodes and return the operations with the specified
-  // operation name
-  for (auto &node : nodes)
-    if (node.second.op &&
-        std::string(node.second.op->getName().getStringRef()) == opName)
-      ops.push_back(node.second.op);
-
-  return ops;
-}
-
-int AdjListGraph::findMaxPathLatency(mlir::Operation *startOp,
-                                     mlir::Operation *endOp,
-                                     bool ignoreBackedge,
-                                     bool ignoreShiftingEdge,
-                                     bool excludeLastNodeLatency) {
+int CFDFCGraph::findMaxPathLatency(mlir::Operation *startOp,
+                                   mlir::Operation *endOp, bool ignoreBackedge,
+                                   bool ignoreShiftingEdge,
+                                   bool excludeLastNodeLatency) {
 
   std::vector<std::vector<std::string>> paths;
 
@@ -380,10 +369,9 @@ int AdjListGraph::findMaxPathLatency(mlir::Operation *startOp,
   return maxLatency;
 }
 
-int AdjListGraph::findMinPathLatency(mlir::Operation *startOp,
-                                     mlir::Operation *endOp,
-                                     bool ignoreBackedge,
-                                     bool ignoreShiftingEdge) {
+int CFDFCGraph::findMinPathLatency(mlir::Operation *startOp,
+                                   mlir::Operation *endOp, bool ignoreBackedge,
+                                   bool ignoreShiftingEdge) {
   // Find all paths between the start and end node
   std::vector<std::vector<std::string>> paths =
       findPaths(startOp, endOp, ignoreBackedge, ignoreShiftingEdge);
@@ -396,7 +384,7 @@ int AdjListGraph::findMinPathLatency(mlir::Operation *startOp,
 }
 
 std::vector<mlir::Operation *>
-AdjListGraph::getConnectedOps(mlir::Operation *op) {
+CFDFCGraph::getConnectedOps(mlir::Operation *op) {
   std::vector<mlir::Operation *> connectedOps;
   std::string opName = getUniqueName(op).str();
 
@@ -413,7 +401,7 @@ AdjListGraph::getConnectedOps(mlir::Operation *op) {
   return connectedOps;
 }
 
-std::vector<mlir::Operation *> AdjListGraph::getOperations() {
+std::vector<mlir::Operation *> CFDFCGraph::getOperations() {
   std::vector<mlir::Operation *> ops;
   for (auto &node : nodes)
     if (node.second.op)
@@ -422,13 +410,21 @@ std::vector<mlir::Operation *> AdjListGraph::getOperations() {
   return ops;
 }
 
-void AdjListGraph::setNewII(unsigned II) {
+void CFDFCGraph::setNewII(unsigned II) {
   for (auto &node : nodes)
     if (node.first.find(backedgePrefix) != std::string::npos)
       node.second.latency = II * -1;
 }
 
-unsigned AdjListGraph::getWorstCaseII() {
+// Example of how the worst case II is calculated
+// When there is a memory dependecy, the II is the distance between load (L) and
+// store (S). The Load of the next iteration (L') is dependent on the store of
+// the current iteration (S), therefore L' can only start after S has finished.
+//
+// IT1: #L#####S#
+// Dist: |<--->|
+// IT2:        #L'#####S'#
+unsigned CFDFCGraph::getWorstCaseII() {
 
   std::unordered_map<mlir::Operation *,
                      std::tuple<std::vector<mlir::Operation *>,
@@ -439,7 +435,7 @@ unsigned AdjListGraph::getWorstCaseII() {
     mlir::Operation *lsqOp = nullptr;
     if (node.second.op) {
       for (Operation *destOp : node.second.op->getUsers()) {
-        if (destOp->getName().getStringRef().str() == "handshake.lsq") {
+        if (isa<handshake::LSQOp>(destOp)) {
           lsqOp = destOp;
           break;
         }
@@ -451,10 +447,9 @@ unsigned AdjListGraph::getWorstCaseII() {
                                     std::vector<mlir::Operation *>())});
       }
 
-      if (node.second.op->getName().getStringRef() == "handshake.lsq_load") {
+      if (isa<handshake::LSQLoadOp>(node.second.op)) {
         std::get<0>(loadStoreOpsPerLSQ[lsqOp]).push_back(node.second.op);
-      } else if (node.second.op->getName().getStringRef() ==
-                 "handshake.lsq_store") {
+      } else if (isa<handshake::LSQStoreOp>(node.second.op)) {
         std::get<1>(loadStoreOpsPerLSQ[lsqOp]).push_back(node.second.op);
       }
     }
@@ -473,7 +468,7 @@ unsigned AdjListGraph::getWorstCaseII() {
   return (unsigned)maxLatency;
 }
 
-void AdjListGraph::setEarliestStartTimes(mlir::Operation *startOp) {
+void CFDFCGraph::setEarliestStartTimes(mlir::Operation *startOp) {
   std::string startNode = getUniqueName(startOp).str();
   // initialize the earliest start time of the start node to 0, this is the
   // reference for all other nodes
@@ -482,8 +477,8 @@ void AdjListGraph::setEarliestStartTimes(mlir::Operation *startOp) {
   setEarliestStartTimes(startNode, visited);
 }
 
-void AdjListGraph::setEarliestStartTimes(std::string prevNode,
-                                         std::set<std::string> &visited) {
+void CFDFCGraph::setEarliestStartTimes(std::string prevNode,
+                                       std::set<std::string> &visited) {
 
   // If the current node has already been visited, skip to avoid cycles
   if (visited.find(prevNode) != visited.end())
@@ -505,8 +500,8 @@ void AdjListGraph::setEarliestStartTimes(std::string prevNode,
   visited.erase(prevNode);
 }
 
-bool AdjListGraph::updateStartTimeForNode(std::string node,
-                                          std::string prevNode) {
+bool CFDFCGraph::updateStartTimeForNode(std::string node,
+                                        std::string prevNode) {
 
   mlir::Operation *op = nodes.at(node).op;
   bool startTimeUpdated = false;
@@ -525,9 +520,7 @@ bool AdjListGraph::updateStartTimeForNode(std::string node,
   // other nodes need all of their inputs to be ready
   // Therefore the latency for mux, merge and cmerge is the minimum of all
   // incoming edges
-  if (op && (op->getName().getStringRef() == "handshake.mux" ||
-             op->getName().getStringRef() == "handshake.merge" ||
-             op->getName().getStringRef() == "handshake.control_merge")) {
+  if (op && isa<handshake::MergeLikeOpInterface>(op)) {
 
     int minLatency = INT_MAX;
     for (auto &incomgingEdge : edgeMinLatencies[node])
@@ -554,7 +547,7 @@ bool AdjListGraph::updateStartTimeForNode(std::string node,
   return startTimeUpdated;
 }
 
-int AdjListGraph::getEarliestStartTime(mlir::Operation *op) {
+int CFDFCGraph::getEarliestStartTime(mlir::Operation *op) {
   std::string opName = getUniqueName(op).str();
   // If earliestStartTime of node has not been initialized (is -1), it is not
   // reachable by the start node. This should only happen for nodes that are

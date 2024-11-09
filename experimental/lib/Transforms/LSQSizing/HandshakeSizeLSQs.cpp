@@ -12,7 +12,10 @@
 
 #include "experimental/Transforms/LSQSizing/HandshakeSizeLSQs.h"
 #include "dynamatic/Dialect/Handshake/HandshakeAttributes.h"
+#include "dynamatic/Dialect/Handshake/HandshakeDialect.h"
+#include "dynamatic/Dialect/Handshake/HandshakeInterfaces.h"
 #include "dynamatic/Dialect/Handshake/HandshakeOps.h"
+#include "dynamatic/Dialect/Handshake/MemoryInterfaces.h"
 #include "dynamatic/Support/Attribute.h"
 #include "dynamatic/Support/Backedge.h"
 #include "dynamatic/Support/CFG.h"
@@ -76,7 +79,7 @@ private:
   /// Finds the Start Node in a CFDFC
   /// The start node, is the node with the longest non-cyclic path to any other
   /// node
-  std::tuple<mlir::Operation *, StartTimes> findStartTimes(AdjListGraph graph);
+  std::tuple<mlir::Operation *, StartTimes> findStartTimes(CFDFCGraph graph);
 
   /// Inserts edges to handle an edge case where the start node is not connected
   /// to other "potential start nodes", which do not start at the same time, but
@@ -85,7 +88,7 @@ private:
   /// anlysis. By adding an edge which has a aritificial node with a latency,
   /// that models the difference of this other "potential start node" in start
   /// time to the chosen start node, the timing analysis can be done correctly
-  void insertStartnodeShiftingEdges(AdjListGraph &graph,
+  void insertStartnodeShiftingEdges(CFDFCGraph &graph,
                                     mlir::Operation *startNode,
                                     StartTimes startTimes);
 
@@ -93,7 +96,7 @@ private:
   /// Checks all operations which get their input from a different BB and
   /// chooses the one with the lowest latency from the start node
   std::unordered_map<unsigned, mlir::Operation *>
-  getPhiNodes(AdjListGraph graph, mlir::Operation *startNode);
+  getPhiNodes(CFDFCGraph graph, mlir::Operation *startNode);
 
   /// Inserts edges to make sure that sizing is done correctly
   /// These edges make sure that in the timing analysis, the allocation precedes
@@ -101,19 +104,19 @@ private:
   /// operations in the BB Therefore the LSQ operations will be allocated at the
   /// start of the BB
   void insertAllocPrecedesMemoryAccessEdges(
-      AdjListGraph &graph, std::vector<mlir::Operation *> ops,
+      CFDFCGraph &graph, std::vector<mlir::Operation *> ops,
       std::unordered_map<unsigned, mlir::Operation *> phiNodes);
 
   /// Finds the allocation time of each operation, which is the earliest start
   /// time of the Phi Node of the BB plus a fixed additional latency
   TimePerOpMap
-  getAllocTimes(AdjListGraph graph, mlir::Operation *startNode,
+  getAllocTimes(CFDFCGraph graph, mlir::Operation *startNode,
                 std::vector<mlir::Operation *> ops,
                 std::unordered_map<unsigned, mlir::Operation *> phiNodes);
 
   /// Finds the deallocation time of each store operation, which is the the
   /// latency of the last argument arriving plus a fixed additional latency
-  TimePerOpMap getStoreDeallocTimes(AdjListGraph graph,
+  TimePerOpMap getStoreDeallocTimes(CFDFCGraph graph,
                                     mlir::Operation *startNode,
                                     std::vector<mlir::Operation *> storeOps);
 
@@ -122,8 +125,7 @@ private:
   /// fixed additional latency This is due to to the fact that the load
   /// operation frees the queue entry as soon as the load result is passed on to
   /// the succeeding operation
-  TimePerOpMap getLoadDeallocTimes(AdjListGraph graph,
-                                   mlir::Operation *startNode,
+  TimePerOpMap getLoadDeallocTimes(CFDFCGraph graph, mlir::Operation *startNode,
                                    std::vector<mlir::Operation *> loadOps);
 
   /// Given the alloc and dealloc times of each operation, calculates the
@@ -232,11 +234,9 @@ std::optional<LSQSizingResult> HandshakeSizeLSQsPass::sizeLSQsForCFDFC(
     handshake::FuncOp funcOp, llvm::SetVector<unsigned> cfdfcBBs,
     TimingDatabase timingDB, unsigned initialII, std::string collisions) {
 
-  AdjListGraph graph(funcOp, cfdfcBBs, timingDB, initialII);
-  std::vector<mlir::Operation *> loadOps =
-      graph.getOperationsWithOpName("handshake.lsq_load");
-  std::vector<mlir::Operation *> storeOps =
-      graph.getOperationsWithOpName("handshake.lsq_store");
+  CFDFCGraph graph(funcOp, cfdfcBBs, timingDB, initialII);
+  auto loadOps = graph.getOperationsWithOpType<handshake::LSQLoadOp>();
+  auto storeOps = graph.getOperationsWithOpType<handshake::LSQStoreOp>();
 
   if (loadOps.size() == 0 && storeOps.size() == 0)
     return std::nullopt;
@@ -326,14 +326,14 @@ std::optional<LSQSizingResult> HandshakeSizeLSQsPass::sizeLSQsForCFDFC(
 }
 
 std::tuple<mlir::Operation *, StartTimes>
-HandshakeSizeLSQsPass::findStartTimes(AdjListGraph graph) {
+HandshakeSizeLSQsPass::findStartTimes(CFDFCGraph graph) {
   StartTimes startTimes;
 
   // Find all mux and control_merge ops as candidates for start node
   std::vector<mlir::Operation *> muxOps =
-      graph.getOperationsWithOpName("handshake.mux");
+      graph.getOperationsWithOpType<handshake::MuxOp>();
   std::vector<mlir::Operation *> cmergeOps =
-      graph.getOperationsWithOpName("handshake.control_merge");
+      graph.getOperationsWithOpType<handshake::ControlMergeOp>();
   std::vector<mlir::Operation *> startNodeCandidates =
       std::vector<mlir::Operation *>(muxOps.size() + cmergeOps.size());
   std::merge(muxOps.begin(), muxOps.end(), cmergeOps.begin(), cmergeOps.end(),
@@ -374,7 +374,7 @@ HandshakeSizeLSQsPass::findStartTimes(AdjListGraph graph) {
 }
 
 void HandshakeSizeLSQsPass::insertStartnodeShiftingEdges(
-    AdjListGraph &graph, mlir::Operation *startNode, StartTimes startTimes) {
+    CFDFCGraph &graph, mlir::Operation *startNode, StartTimes startTimes) {
   for (auto &entry : startTimes) {
     // Ignore if it is the startNode itself
     if (get<0>(entry) != startNode) {
@@ -390,7 +390,7 @@ void HandshakeSizeLSQsPass::insertStartnodeShiftingEdges(
 }
 
 std::unordered_map<unsigned, mlir::Operation *>
-HandshakeSizeLSQsPass::getPhiNodes(AdjListGraph graph,
+HandshakeSizeLSQsPass::getPhiNodes(CFDFCGraph graph,
                                    mlir::Operation *startNode) {
   std::unordered_map<unsigned, std::vector<mlir::Operation *>>
       phiNodeCandidates;
@@ -440,7 +440,7 @@ HandshakeSizeLSQsPass::getPhiNodes(AdjListGraph graph,
 }
 
 std::unordered_map<mlir::Operation *, int> HandshakeSizeLSQsPass::getAllocTimes(
-    AdjListGraph graph, mlir::Operation *startNode,
+    CFDFCGraph graph, mlir::Operation *startNode,
     std::vector<mlir::Operation *> ops,
     std::unordered_map<unsigned, mlir::Operation *> phiNodes) {
   std::unordered_map<mlir::Operation *, int> allocTimes;
@@ -459,7 +459,7 @@ std::unordered_map<mlir::Operation *, int> HandshakeSizeLSQsPass::getAllocTimes(
 
 std::unordered_map<mlir::Operation *, int>
 HandshakeSizeLSQsPass::getStoreDeallocTimes(
-    AdjListGraph graph, mlir::Operation *startNode,
+    CFDFCGraph graph, mlir::Operation *startNode,
     std::vector<mlir::Operation *> ops) {
   std::unordered_map<mlir::Operation *, int> deallocTimes;
 
@@ -473,7 +473,7 @@ HandshakeSizeLSQsPass::getStoreDeallocTimes(
 }
 
 std::unordered_map<mlir::Operation *, int>
-HandshakeSizeLSQsPass::getLoadDeallocTimes(AdjListGraph graph,
+HandshakeSizeLSQsPass::getLoadDeallocTimes(CFDFCGraph graph,
                                            mlir::Operation *startNode,
                                            std::vector<mlir::Operation *> ops) {
   std::unordered_map<mlir::Operation *, int> deallocTimes;
@@ -492,7 +492,7 @@ HandshakeSizeLSQsPass::getLoadDeallocTimes(AdjListGraph graph,
 
       // If the node is a buffer, check if it is a tehb buffer and if so,
       // check the latency of the nodes connected to the buffer
-      if (succedingOp->getName().getStringRef().str() == "handshake.buffer") {
+      if (isa<handshake::BufferOp>(succedingOp)) {
         auto params = succedingOp->getAttrOfType<DictionaryAttr>(
             RTL_PARAMETERS_ATTR_NAME);
 
@@ -543,7 +543,7 @@ HandshakeSizeLSQsPass::calcQueueSize(
     for (auto &timeForOp : allocTimeMapForII) {
       mlir::Operation *lsqOp = nullptr;
       for (Operation *destOp : timeForOp.first->getUsers()) {
-        if (destOp->getName().getStringRef().str() == "handshake.lsq") {
+        if (isa<handshake::LSQOp>(destOp)) {
           lsqOp = destOp;
           break;
         }
@@ -570,7 +570,7 @@ HandshakeSizeLSQsPass::calcQueueSize(
     for (auto &timeForOp : deallocTimeMapForII) {
       mlir::Operation *lsqOp = nullptr;
       for (Operation *destOp : timeForOp.first->getUsers()) {
-        if (destOp->getName().getStringRef().str() == "handshake.lsq") {
+        if (isa<handshake::LSQOp>(destOp)) {
           lsqOp = destOp;
           break;
         }
@@ -642,7 +642,7 @@ HandshakeSizeLSQsPass::calcQueueSize(
 }
 
 void HandshakeSizeLSQsPass::insertAllocPrecedesMemoryAccessEdges(
-    AdjListGraph &graph, std::vector<mlir::Operation *> ops,
+    CFDFCGraph &graph, std::vector<mlir::Operation *> ops,
     std::unordered_map<unsigned, mlir::Operation *> phiNodes) {
   // Iterate over all provided ops and add an edge from the phi node of the
   // ops BB to the op

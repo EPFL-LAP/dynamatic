@@ -7,12 +7,14 @@
 //===----------------------------------------------------------------------===//
 //
 // Implements Helper Classes and Functions for the LSQ sizing pass.
-// The Helper functions mainly consist of the AdjListGraph class which is used
+// The Helper functions mainly consist of the CFDFCGraph class which is used
 // to represent the CFDFC as an adjacency list graph and provides functions to
 // find paths, calculate latencies and start times of nodes.
 //
 //===----------------------------------------------------------------------===//
 
+#include "dynamatic/Dialect/Handshake/HandshakeDialect.h"
+#include "dynamatic/Dialect/Handshake/HandshakeOps.h"
 #include "dynamatic/Support/TimingModels.h"
 #include "dynamatic/Transforms/BufferPlacement/CFDFC.h"
 #include <list>
@@ -31,7 +33,7 @@ namespace experimental {
 namespace lsqsizing {
 
 /// Define a structure for a graph node
-struct AdjListNode {
+struct CFDFCNode {
   /// Latency of the operation
   int latency;
   /// Earliest start time of the operation
@@ -48,12 +50,12 @@ struct AdjListNode {
   std::set<std::string> shiftingedges;
 };
 
-class AdjListGraph {
+class CFDFCGraph {
 public:
   /// Constructor for the graph, which takes a Vector of BBs, which make up a
   /// single CFDFC
-  AdjListGraph(handshake::FuncOp funcOp, llvm::SetVector<unsigned> cfdfcBBs,
-               TimingDatabase timingDB, unsigned II);
+  CFDFCGraph(handshake::FuncOp funcOp, llvm::SetVector<unsigned> cfdfcBBs,
+             TimingDatabase timingDB, unsigned II);
 
   /// Adds the edges between the start node and the start node candidates, with
   /// their respective shifting in the start time These edges are necessary to
@@ -102,9 +104,20 @@ public:
   /// Returns all operations in the graph
   std::vector<mlir::Operation *> getOperations();
 
-  /// Returns all operations in the graph with a specific operation name (not
-  /// unique name, but type of operation e.g. "handshake.mux")
-  std::vector<mlir::Operation *> getOperationsWithOpName(std::string opName);
+  /// Returns all operations in the graph with a specific operation type
+  template <typename OpType>
+  std::vector<mlir::Operation *> getOperationsWithOpType() {
+    std::vector<mlir::Operation *> ops;
+    // Iterate over all nodes and use dyn_cast to filter operations by type
+    for (auto &node : nodes) {
+      if (node.second.op) {
+        if (auto op = llvm::dyn_cast<OpType>(node.second.op)) {
+          ops.push_back(static_cast<mlir::Operation *>(op));
+        }
+      }
+    }
+    return ops;
+  }
 
   /// Returns all operations which are connected to a specific operation
   /// (includes backedges, but skips the artificial nodes)
@@ -131,7 +144,7 @@ private:
       "shifting_"; // Prefix for shifting edges
 
   /// Map to store the nodes by their Operations unique name
-  std::unordered_map<std::string, AdjListNode> nodes;
+  std::unordered_map<std::string, CFDFCNode> nodes;
 
   /// Map to store the startTime according to each connected edge, used for
   /// finding the earliestStartTime of each node
