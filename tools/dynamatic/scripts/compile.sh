@@ -35,7 +35,6 @@ F_PROFILER_INPUTS="$COMP_DIR/profiler-inputs.txt"
 F_HANDSHAKE="$COMP_DIR/handshake.mlir"
 F_HANDSHAKE_TRANSFORMED="$COMP_DIR/handshake_transformed.mlir"
 F_HANDSHAKE_BUFFERED="$COMP_DIR/handshake_buffered.mlir"
-F_HANDSHAKE_LSQ_SIZED="$COMP_DIR/handshake_lsq_sized.mlir"
 F_HANDSHAKE_EXPORT="$COMP_DIR/handshake_export.mlir"
 F_HW="$COMP_DIR/hw.mlir"
 F_FREQUENCIES="$COMP_DIR/frequencies.csv"
@@ -179,17 +178,11 @@ fi
   > "$F_HANDSHAKE_EXPORT"
 exit_on_fail "Failed to canonicalize Handshake" "Canonicalized handshake"
 
-# handshake lsq sizing
-"$DYNAMATIC_OPT_BIN" "$F_HANDSHAKE_EXPORT" \
-  --handshake-size-lsqs="timing-models=$DYNAMATIC_DIR/data/components.json collisions=none" \
-  > "$F_HANDSHAKE_LSQ_SIZED"
-exit_on_fail "Failed to size LSQs" "Ran LSQ sizing"
-
 # Export to DOT
-export_dot "$F_HANDSHAKE_LSQ_SIZED" "$KERNEL_NAME"
+export_dot "$F_HANDSHAKE_EXPORT" "$KERNEL_NAME"
 
 # handshake level -> hw level
-"$DYNAMATIC_OPT_BIN" "$F_HANDSHAKE_LSQ_SIZED" --lower-handshake-to-hw \
+"$DYNAMATIC_OPT_BIN" "$F_HANDSHAKE_EXPORT" --lower-handshake-to-hw \
   > "$F_HW"
 exit_on_fail "Failed to lower to HW" "Lowered to HW"
 
