@@ -1731,6 +1731,7 @@ public:
                     ConvertToHWInstance<handshake::StoreOp>,
                     ConvertToHWInstance<handshake::NotOp>,
                     ConvertToHWInstance<handshake::SharingWrapperOp>,
+
                     // Arith operations
                     ConvertToHWInstance<handshake::AddFOp>,
                     ConvertToHWInstance<handshake::AddIOp>,
@@ -1759,6 +1760,7 @@ public:
                     ConvertToHWInstance<handshake::FPToSIOp>,
                     ConvertToHWInstance<handshake::ExtFOp>,
                     ConvertToHWInstance<handshake::AbsFOp>,
+
                     // Operations for speculation
                     ConvertToHWInstance<handshake::SpecCommitOp>,
                     ConvertToHWInstance<handshake::SpecSaveOp>,
