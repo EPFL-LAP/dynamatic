@@ -339,7 +339,6 @@ create_symlink ../build/bin/dynamatic-opt
 create_symlink ../build/bin/export-dot
 create_symlink ../build/bin/export-rtl
 create_symlink ../build/bin/exp-frequency-profiler
-create_symlink ../build/bin/exp-sharing-wrapper-generator
 create_symlink ../build/bin/handshake-simulator
 create_symlink ../build/bin/hls-verifier
 create_symlink ../build/bin/wlf2csv
@@ -347,6 +346,7 @@ create_generator_symlink build/bin/rtl-cmpf-generator
 create_generator_symlink build/bin/rtl-cmpi-generator
 create_generator_symlink build/bin/rtl-text-generator
 create_generator_symlink build/bin/rtl-constant-generator-verilog
+create_generator_symlink build/bin/exp-sharing-wrapper-generator
 create_generator_symlink "$LSQ_GEN_PATH/$LSQ_GEN_JAR"
 if [[ $GODOT_PATH != "" ]]; then
   create_symlink ../visual-dataflow/bin/visual-dataflow
