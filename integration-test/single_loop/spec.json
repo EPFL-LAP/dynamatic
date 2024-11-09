@@ -1,0 +1,28 @@
+{
+  "speculator": {
+    "operation-name": "fork3",
+    "operand-idx": 0
+  },
+  "buffers": [
+    {
+      "operation-name": "mux0",
+      "operand-idx": 0
+    },
+    {
+      "operation-name": "mux1",
+      "operand-idx": 0
+    },
+    {
+      "operation-name": "trunci0",
+      "operand-idx": 0
+    },
+    {
+      "operation-name": "cond_br1",
+      "operand-idx": 0
+    },
+    {
+      "operation-name": "extsi2",
+      "operand-idx": 0
+    }
+  ]
+}
