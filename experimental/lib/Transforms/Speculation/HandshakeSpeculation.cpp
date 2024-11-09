@@ -84,8 +84,16 @@ LogicalResult HandshakeSpeculationPass::placeUnits(Value ctrlSignal) {
 
     // Connect the new Operation to dstOp
     // Note: srcOpResult.replaceAllUsesExcept cannot be used here
-    // because the uses of srcOpResult may include a newly created
-    // operand for the speculator enable signal.
+    // The following bug may occur:
+    // (a) Consider a scenario where a control value from a buffer is passed to
+    // the control branch.
+    // (b) At the same time, a speculator uses the same control value from the
+    // buffer as an enable signal.
+    // (c) A save-commit unit is positioned on the edge from the buffer to the
+    // control branch.
+    // (d) If we apply replaceAllUsesExcept to the value referenced by the
+    // save-commit unit, the speculator will also be placed after the
+    // save-commit unit, which is undesirable.
     operand->set(newOp.getResult());
   }
 
