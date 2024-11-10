@@ -29,13 +29,6 @@ namespace gsa {
 /// In this library, the word `gate` is used both for a `PHI` in SSA
 /// representation and for `GAMMA`/`MU` in GSA representation
 
-/// Define the possible kinds of inputs for a gate:
-/// - the result of an operation;
-/// - the output of another gate;
-/// - a block argument;
-/// - no input (this is the case of a GAMMA gate receiving only one input).
-enum GateInputType { OpInput, GSAInput, ArgInput, EmptyInput };
-
 /// Define the three possible kinds of gate:
 /// - A GAMMA gate, having two inputs and a predicate;
 /// - A MU gate, having one init input and a `next` input;
@@ -44,34 +37,53 @@ enum GateType { GammaGate, MuGate, PhiGate };
 
 struct Gate;
 
-/// Single structure to collect a possible gate inputs according to the type in
-/// `GateInputType`.
+/// Single class to collect a possible gate input, among these three
+/// alternatives:
+/// - a value, either produced by an operation in the IR or a block argument;
+/// - another gate;
+/// - an empty input (this happens for gammas having onlyo one input).
 struct GateInput {
 
-  /// Type of the input
-  enum GateInputType type;
-
   /// Depending on the type of the input, it might be a reference to a value on
-  /// the IR or another gate
+  /// the IR, another gate or empty
   std::variant<Value, struct Gate *> input;
 
   /// Constructor a gate input being the result of an operation
-  GateInput(Value v) : type(OpInput), input(v) {};
+  GateInput(Value v) : input(v) {};
 
   /// Constructor for a gate input being the output of another gate
-  GateInput(struct Gate *p) : type(GSAInput), input(p) {};
-
-  /// Constructor for a gate input being a block argument
-  GateInput(BlockArgument ba) : type(ArgInput), input(ba) {};
+  GateInput(struct Gate *p) : input(p) {};
 
   /// Constructor for a gate input being empty
-  GateInput() : type(EmptyInput), input(nullptr) {};
+  GateInput() : input(nullptr) {};
 
+  /// Returns the block owner of the input
   Block *getBlock();
+
+  /// Returns true if the input is of type `Value`
+  bool isTypeValue() { return std::holds_alternative<Value>(input); }
+
+  /// Returns true if the input is empty
+  bool isTypeEmpty() {
+    return std::holds_alternative<Gate *>(input) && !std::get<Gate *>(input);
+  }
+
+  /// Returns true if the input is a gate
+  bool isTypeGate() {
+    return std::holds_alternative<Gate *>(input) && std::get<Gate *>(input);
+  }
+
+  /// Returns the input gate (raise an error if input is not a  gate)
+  Gate *getGate() { return std::get<Gate *>(input); }
+  /// Returns the input value (raise an error if input is not a value)
+  Value getValue() { return std::get<Value>(input); }
 };
 
-/// The structure collects all the information related to a phi. Each block
-/// argument is associated to a phi, and has a set of inputs
+using ListExpressionsPerGate =
+    std::vector<std::pair<boolean::BoolExpression *, GateInput *>>;
+
+/// The structure collects all the information related to a gate. Each gate has
+/// a set of inputs, a type, a condition, an index and it might be a root.
 struct Gate {
 
   /// Reference to the value produced by the gate (block argument)
@@ -83,21 +95,22 @@ struct Gate {
   /// Type of gate function
   GateType gsaGateFunction;
 
-  /// Condition used to determine the outcome of the choice. The foramt is `cX`
+  /// Condition used to determine the outcome of the choice. The format is `cX`
   /// where `X` is the number of the block argument where
   std::string condition;
 
-  /// Index of the current gate
+  /// Index of the current gate, which uniquely identifies it
   unsigned index;
 
-  /// Determintes whether it is a root or not (all MUs are roots, only the base
+  /// Determines whether it is a root or not (all MUs are roots, only the base
   /// of a tree of GAMMAs is the root)
   bool isRoot = false;
 
   /// Initialize the values of the gate
-  Gate(BlockArgument v, SmallVector<GateInput *> &pi, GateType gt,
+  Gate(BlockArgument v, SmallVector<GateInput *> &pi, GateType gt, int i,
        std::string c = "")
-      : result(v), operands(pi), gsaGateFunction(gt), condition(std::move(c)) {}
+      : result(v), operands(pi), gsaGateFunction(gt), condition(std::move(c)),
+        index(i) {}
 
   void print();
 
@@ -120,7 +133,7 @@ public:
     // functions
     int functionsCovered = 0;
 
-    // The anlaysis can be instantiated either over a module containing one
+    // The analysis can be instantiated either over a module containing one
     // function only or over a function
     if (ModuleOp modOp = dyn_cast<ModuleOp>(operation); modOp) {
       for (FunctionType funcOp : modOp.getOps<FunctionType>()) {
@@ -181,10 +194,9 @@ private:
 
   /// Given a boolean expression for each phi's inputs, expand it in a tree
   /// of gamma functions
-  Gate *expandExpressions(
-      std::vector<std::pair<boolean::BoolExpression *, GateInput *>>
-          &expressions,
-      std::vector<std::string> &cofactors, Gate *originalPhi);
+  Gate *expandGammaTree(ListExpressionsPerGate &expressions,
+                        std::vector<std::string> &conditions,
+                        Gate *originalPhi);
 };
 
 } // namespace gsa
