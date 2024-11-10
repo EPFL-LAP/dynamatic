@@ -1501,9 +1501,10 @@ LogicalResult FtdLowerFuncToHandshake::addMergeLoop(
 }
 
 template <typename FunctionType>
-LogicalResult FtdLowerFuncToHandshake::addExplicitPhi(
-    FunctionType funcOp, ConversionPatternRewriter &rewriter,
-    FtdStoredOperations &ftdOps, bool skipLastArgument) const {
+LogicalResult
+FtdLowerFuncToHandshake::addExplicitPhi(FunctionType funcOp,
+                                        ConversionPatternRewriter &rewriter,
+                                        FtdStoredOperations &ftdOps) const {
 
   using namespace experimental::gsa;
 
@@ -1545,14 +1546,15 @@ LogicalResult FtdLowerFuncToHandshake::addExplicitPhi(
   // Maps the index of each GSA function to each real operation
   DenseMap<unsigned, Operation *> gsaList;
   ControlDependenceAnalysis<FunctionType> cdgAnalysis(funcOp);
-  GsaAnalysis<FunctionType> gsaAnalysis(funcOp, skipLastArgument);
+  GsaAnalysis<FunctionType> gsaAnalysis(funcOp);
+  cdgAnalysis.printAllBlocksDeps();
 
   // For each block excluding the first one, which has no gsa
   for (Block &block : llvm::drop_begin(funcOp)) {
 
     // For each GSA function
-    SmallVector<Phi *> *phis = gsaAnalysis.getPhis(&block);
-    for (Phi *&phi : *phis) {
+    SmallVector<Gate *> *phis = gsaAnalysis.getGates(&block);
+    for (Gate *&phi : *phis) {
 
       // Skip if it's a phi
       if (phi->gsaGateFunction == PhiGate)
@@ -1573,11 +1575,11 @@ LogicalResult FtdLowerFuncToHandshake::addExplicitPhi(
         // operand and the operations will be reconnected later on.
         // If the input is empty, we keep track of its index.
         // In the other cases, we already have the operand of the function.
-        if (operand->type == PhiInputType) {
-          operands.emplace_back(operand->phi->result);
+        if (operand->type == gsa::GSAInput) {
+          operands.emplace_back(operand->gate->result);
           missingGsaList.emplace_back(
-              MissingGsa(phi->index, operand->phi->index, operandIndex));
-        } else if (operand->type == EmptyInputType) {
+              MissingGsa(phi->index, operand->gate->index, operandIndex));
+        } else if (operand->type == gsa::EmptyInput) {
           nullOperand = operandIndex;
           operands.emplace_back(nullptr);
         } else {
@@ -1677,7 +1679,7 @@ LogicalResult FtdLowerFuncToHandshake::addExplicitPhi(
 
   // Remove all the block arguments for all the non starting blocks
   for (Block &block : llvm::drop_begin(funcOp))
-    block.eraseArguments(0, block.getArguments().size() - skipLastArgument);
+    block.eraseArguments(0, block.getArguments().size());
 
   // Each terminator must be replaced so that it does not provide any block
   // arguments (possibly only the final control argument)
@@ -1689,12 +1691,6 @@ LogicalResult FtdLowerFuncToHandshake::addExplicitPhi(
         auto condBranch = dyn_cast<cf::CondBranchOp>(terminator);
         SmallVector<Value> trueOperands;
         SmallVector<Value> falseOperands;
-        if (skipLastArgument) {
-          trueOperands.push_back(
-              condBranch.getTrueOperand(condBranch.getNumTrueOperands() - 1));
-          falseOperands.push_back(
-              condBranch.getFalseOperand(condBranch.getNumFalseOperands() - 1));
-        }
         auto newCondBranch = rewriter.create<cf::CondBranchOp>(
             condBranch->getLoc(), condBranch.getCondition(),
             condBranch.getTrueDest(), trueOperands, condBranch.getFalseDest(),
@@ -1703,8 +1699,6 @@ LogicalResult FtdLowerFuncToHandshake::addExplicitPhi(
       } else if (isa<cf::BranchOp>(terminator)) {
         auto branch = dyn_cast<cf::BranchOp>(terminator);
         SmallVector<Value> operands;
-        if (skipLastArgument)
-          operands.push_back(branch.getOperand(branch.getNumOperands() - 1));
         auto newBranch = rewriter.create<cf::BranchOp>(
             branch->getLoc(), branch.getDest(), operands);
         rewriter.replaceOp(branch, newBranch);

@@ -15,111 +15,127 @@
 #ifndef DYNAMATIC_ANALYSIS_GSAANALYSIS_H
 #define DYNAMATIC_ANALYSIS_GSAANALYSIS_H
 
-#include <utility>
-
 #include "dynamatic/Support/LLVM.h"
 #include "experimental/Support/BooleanLogic/BoolExpression.h"
 #include "mlir/Dialect/Func/IR/FuncOps.h"
 #include "mlir/Pass/AnalysisManager.h"
 #include "mlir/Transforms/DialectConversion.h"
+#include <utility>
 
 namespace dynamatic {
 namespace experimental {
 namespace gsa {
 
-/// Define the three possible kinds of phi inputs
-enum PhiInputType { OpInputType, PhiInputType, ArgInputType, EmptyInputType };
-enum GsaGateFunction { GammaGate, MuGate, PhiGate };
+/// In this library, the word `gate` is used both for a `PHI` in SSA
+/// representation and for `GAMMA`/`MU` in GSA representation
 
-struct Phi;
+/// Define the possible kinds of inputs for a gate:
+/// - the result of an operation;
+/// - the output of another gate;
+/// - a block argument;
+/// - no input (this is the case of a GAMMA gate receiving only one input).
+enum GateInputType { OpInput, GSAInput, ArgInput, EmptyInput };
 
-/// Single structure to collect a possible phi input. Either `v` or `phi` are
-/// used to maintain information about the input. The value of `type` discerns
-/// what kind of input it is.
-struct PhiInput {
+/// Define the three possible kinds of gate:
+/// - A GAMMA gate, having two inputs and a predicate;
+/// - A MU gate, having one init input and a `next` input;
+/// - a PHI gate, having N possible inputs chosen in a *merge* fashon.
+enum GateType { GammaGate, MuGate, PhiGate };
 
-  /// type of the input
-  enum PhiInputType type;
+struct Gate;
+
+/// Single structure to collect a possible gate inputs according to the type in
+/// `GateInputType`.
+struct GateInput {
+
+  /// Type of the input
+  enum GateInputType type;
 
   /// Value in case of result operation or block argument
   Value v;
 
   /// Pointer to the phi result in case of a phi
-  struct Phi *phi;
+  struct Gate *gate;
 
   /// Pointer to the block
   Block *blockOwner;
 
-  /// Constructor for the result of an operation
-  PhiInput(Value v, Block *bb)
-      : type(OpInputType), v(v), phi(nullptr), blockOwner(bb) {};
-  /// Constructor for the result of a phi
-  PhiInput(struct Phi *p, Block *bb)
-      : type(PhiInputType), v(nullptr), phi(p), blockOwner(bb) {};
-  /// Constructor for the result of a block argument
-  PhiInput(BlockArgument ba, Block *bb)
-      : type(ArgInputType), v(Value(ba)), phi(nullptr), blockOwner(bb) {};
-  /// Constructor for an empty input
-  PhiInput()
-      : type(EmptyInputType), v(nullptr), phi(nullptr), blockOwner(nullptr) {};
+  /// Constructor a gate input being the result of an operation
+  GateInput(Value v, Block *bb)
+      : type(OpInput), v(v), gate(nullptr), blockOwner(bb) {};
+
+  /// Constructor for a gate input being the output of another gate
+  GateInput(struct Gate *p, Block *bb)
+      : type(GSAInput), v(nullptr), gate(p), blockOwner(bb) {};
+
+  /// Constructor for a gate input being a block argument
+  GateInput(BlockArgument ba, Block *bb)
+      : type(ArgInput), v(Value(ba)), gate(nullptr), blockOwner(bb) {};
+
+  /// Constructor for a gate input being empty
+  GateInput()
+      : type(EmptyInput), v(nullptr), gate(nullptr), blockOwner(nullptr) {};
 
   Block *getBlock();
 };
 
 /// The structure collects all the information related to a phi. Each block
 /// argument is associated to a phi, and has a set of inputs
-struct Phi {
+struct Gate {
 
-  /// Reference to the value produced by the phi (block argument)
+  /// Reference to the value produced by the gate (block argument)
   Value result;
-  /// Index of the block argument
+
+  /// Index of the block argument in the block
   unsigned argNumber;
-  /// List of operands of the phi
-  SmallVector<PhiInput *> operands;
-  /// Pointer to the block argument
+
+  /// List of operands of the gate
+  SmallVector<GateInput *> operands;
+
+  /// Pointer to the block owning the gate
   Block *blockOwner;
-  /// Type of GSA gate function
-  GsaGateFunction gsaGateFunction;
+
+  /// Type of gate function
+  GateType gsaGateFunction;
+
   /// Condition used to determine the outcome of the choice
   std::string condition;
-  /// Index of the current phi
+
+  /// Index of the current gate
   unsigned index;
+
   /// Determintes whether it is a root or not (all MUs are roots, only the base
   /// of a tree of GAMMAs is the root)
   bool isRoot = false;
 
-  /// Initialize the values of the phi
-  Phi(Value v, unsigned n, SmallVector<PhiInput *> &pi, Block *b,
-      GsaGateFunction ggf, std::string c = "")
+  /// Initialize the values of the gate
+  Gate(Value v, unsigned n, SmallVector<GateInput *> &pi, Block *b, GateType gt,
+       std::string c = "")
       : result(v), argNumber(n), operands(pi), blockOwner(b),
-        gsaGateFunction(ggf), condition(std::move(c)) {}
+        gsaGateFunction(gt), condition(std::move(c)) {}
 
   void print();
 };
 
 /// Class in charge of performing the GSA analysis prior to the cf to handshake
-/// conversion. For each block arguments, it takes note of the possible
-/// predecessors (input of a phi function). The input of a
-/// phi can be:
-/// - the value resulting from an operation;
-/// - the value resulting from another phi;
-/// - an argument of the parent function.
+/// conversion. For each block arguments, it provides the information necessary
+/// for a conversion into a `Gate` structure.
 template <typename FunctionType>
 class GsaAnalysis {
 
 public:
-  /// Constructor for the GSA analysis
-  GsaAnalysis(Operation *operation, bool skipLastArg = false) {
-
-    // Accepts only modules as input
-    ModuleOp modOp = dyn_cast<ModuleOp>(operation);
+  /// Constructor for the GSA analysis. It requires an operation consisting of a
+  /// functino to get the SSA information from.
+  GsaAnalysis(Operation *operation) {
 
     // Only one function should be present in the module, excluding external
     // functions
     int functionsCovered = 0;
-    if (modOp) {
-      auto funcOps = modOp.getOps<FunctionType>();
-      for (FunctionType funcOp : funcOps) {
+
+    // The anlaysis can be instantiated either over a module containing one
+    // function only or over a function
+    if (ModuleOp modOp = dyn_cast<ModuleOp>(operation); modOp) {
+      for (FunctionType funcOp : modOp.getOps<FunctionType>()) {
 
         // Skip if external
         if (funcOp.isExternal())
@@ -127,24 +143,21 @@ public:
 
         // Analyze the function
         if (!functionsCovered) {
-          identifyAllPhi(funcOp, skipLastArg);
+          identifyAllGates(funcOp);
           functionsCovered++;
         } else {
           llvm::errs() << "[GSA] Too many functions to handle in the module";
         }
       }
-    } else {
-      FunctionType fOp = dyn_cast<FunctionType>(operation);
-      if (fOp) {
-        identifyAllPhi(fOp, skipLastArg);
-      } else {
-        // report an error indicating that the analysis is instantiated over
-        // an inappropriate operation
-        llvm::errs()
-            << "[GSA] GsaAnalysis is instantiated over an operation that is "
-               "not ModuleOp!\n";
-      }
+    } else if (FunctionType fOp = dyn_cast<FunctionType>(operation); fOp) {
+      identifyAllGates(fOp);
+      functionsCovered = 1;
     }
+
+    // report an error indicating that the analysis is instantiated over
+    // an inappropriate operation
+    if (functionsCovered != 1)
+      llvm::errs() << "[GSA] GsaAnalysis failed due to a wrong input type\n";
   };
 
   /// Invalidation hook to keep the analysis cached across passes. Returns
@@ -154,37 +167,36 @@ public:
     return !pa.isPreserved<GsaAnalysis>();
   }
 
-  /// Get a pointer to the vector containing the phi functions of a block
-  SmallVector<Phi *> *getPhis(Block *bb);
+  /// Get a pointer to the vector containing the gate functions of a block
+  SmallVector<Gate *> *getGates(Block *bb);
 
 private:
-  // Associate an index to each phi
-  unsigned uniquePhiIndex;
+  // Associate an index to each gate
+  unsigned uniqueGateIndex;
 
-  /// For each block in the function, keep a list of phi functions with all
-  /// their information. The size of the list associate to each block is equal
-  /// to the number of block arguments.
-  DenseMap<Block *, SmallVector<Phi *>> phiList;
+  /// For each block in the function, keep a list of gate functions with all
+  /// their information.
+  DenseMap<Block *, SmallVector<Gate *>> gateList;
 
-  /// Identify the phi necessary in the function, referencing all of their
+  /// Identify the gates necessary in the function, referencing all of their
   /// inputs
-  void identifyAllPhi(FunctionType &funcOp, bool skipLastArg = false);
+  void identifyAllGates(FunctionType &funcOp);
 
-  /// Print the list of the phi functions
-  void printPhiList();
+  /// Print the list of the gate functions
+  void printGateList();
 
-  /// Mark as mu all the phi functions which correspond to loop variables
+  /// Mark as mu all the phi gates which correspond to loop variables
   void convertPhiToMu(FunctionType &funcOp);
 
-  /// Convert each phi function to a gamma function
+  /// Convert some phi gates to trees of gamma gates
   void convertPhiToGamma(FunctionType &funcOp);
 
-  /// Given a boolean expression for each of a phi's inputs, expand it in a tree
+  /// Given a boolean expression for each phi's inputs, expand it in a tree
   /// of gamma functions
-  Phi *expandExpressions(
-      std::vector<std::pair<boolean::BoolExpression *, PhiInput *>>
+  Gate *expandExpressions(
+      std::vector<std::pair<boolean::BoolExpression *, GateInput *>>
           &expressions,
-      std::vector<std::string> &cofactors, Phi *originalPhi);
+      std::vector<std::string> &cofactors, Gate *originalPhi);
 };
 
 } // namespace gsa

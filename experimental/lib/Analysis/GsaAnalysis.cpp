@@ -30,9 +30,9 @@ namespace experimental {
 namespace gsa {
 
 template <typename FunctionType>
-Phi *GsaAnalysis<FunctionType>::expandExpressions(
-    std::vector<std::pair<boolean::BoolExpression *, PhiInput *>> &expressions,
-    std::vector<std::string> &cofactors, Phi *originalPhi) {
+Gate *GsaAnalysis<FunctionType>::expandExpressions(
+    std::vector<std::pair<boolean::BoolExpression *, GateInput *>> &expressions,
+    std::vector<std::string> &cofactors, Gate *originalPhi) {
 
   // At each iteration, we want to use a cofactor that is present in all the
   // expressions in `expressions`. Since the cofactors are ordered according to
@@ -60,9 +60,9 @@ Phi *GsaAnalysis<FunctionType>::expandExpressions(
     assert(false && "A cofactor is used only by some expressions");
   }
 
-  std::vector<std::pair<boolean::BoolExpression *, PhiInput *>>
+  std::vector<std::pair<boolean::BoolExpression *, GateInput *>>
       cofactorFalseExpressions;
-  std::vector<std::pair<boolean::BoolExpression *, PhiInput *>>
+  std::vector<std::pair<boolean::BoolExpression *, GateInput *>>
       cofactorTrueExpressions;
 
   // For each expression
@@ -85,7 +85,7 @@ Phi *GsaAnalysis<FunctionType>::expandExpressions(
       cofactorFalseExpressions.emplace_back(exprFalse, expression.second);
   }
 
-  SmallVector<PhiInput *> operandsGamma(2);
+  SmallVector<GateInput *> operandsGamma(2);
 
   // If the number of non-null expressions obtained with cofactor = 1 is greater
   // than 1, then the expansions must be done again over those inputs with a new
@@ -100,13 +100,13 @@ Phi *GsaAnalysis<FunctionType>::expandExpressions(
   if (cofactorTrueExpressions.size() > 1) {
     auto *trueGamma =
         expandExpressions(cofactorTrueExpressions, cofactors, originalPhi);
-    auto *phiInput = new PhiInput(trueGamma, originalPhi->blockOwner);
+    auto *phiInput = new GateInput(trueGamma, originalPhi->blockOwner);
     operandsGamma[1] = phiInput;
 
   } else if (cofactorTrueExpressions.size() == 1) {
     operandsGamma[1] = cofactorTrueExpressions[0].second;
   } else {
-    auto *phiInput = new PhiInput();
+    auto *phiInput = new GateInput();
     operandsGamma[1] = phiInput;
   }
 
@@ -123,32 +123,31 @@ Phi *GsaAnalysis<FunctionType>::expandExpressions(
   if (cofactorFalseExpressions.size() > 1) {
     auto *falseGamma =
         expandExpressions(cofactorFalseExpressions, cofactors, originalPhi);
-    auto *phiInput = new PhiInput(falseGamma, originalPhi->blockOwner);
+    auto *phiInput = new GateInput(falseGamma, originalPhi->blockOwner);
     operandsGamma[0] = phiInput;
   } else if (cofactorFalseExpressions.size() == 1) {
     operandsGamma[0] = cofactorFalseExpressions[0].second;
   } else {
-    auto *phiInput = new PhiInput();
+    auto *phiInput = new GateInput();
     operandsGamma[0] = phiInput;
   }
 
   // Create a new gamma and add it to the list of phis for the original basic
   // block.
-  auto *newPhi = new Phi(nullptr, originalPhi->argNumber, operandsGamma,
-                         originalPhi->blockOwner, GsaGateFunction::GammaGate,
-                         cofactorToUse);
-  phiList[originalPhi->blockOwner].push_back(newPhi);
-  newPhi->index = ++uniquePhiIndex;
-  newPhi->result = originalPhi->result;
+  auto *newGate =
+      new Gate(nullptr, originalPhi->argNumber, operandsGamma,
+               originalPhi->blockOwner, GateType::GammaGate, cofactorToUse);
+  gateList[originalPhi->blockOwner].push_back(newGate);
+  newGate->index = ++uniqueGateIndex;
+  newGate->result = originalPhi->result;
 
-  return newPhi;
+  return newGate;
 }
 
 template <typename FunctionType>
-void GsaAnalysis<FunctionType>::identifyAllPhi(FunctionType &funcOp,
-                                               bool skipLastArg) {
+void GsaAnalysis<FunctionType>::identifyAllGates(FunctionType &funcOp) {
 
-  // The input of a phi might be another phi. This is the case when the
+  // The input of a gate might be another phi. This is the case when the
   // input of a phi is a block argument from a block with index different
   // from 0. In this situation, we mark the phi input as `missing`, and we
   // store the necessary information (block of the block argument and
@@ -156,33 +155,32 @@ void GsaAnalysis<FunctionType>::identifyAllPhi(FunctionType &funcOp,
   struct MissingPhi {
 
     // Which input is missing
-    PhiInput *pi;
+    GateInput *pi;
     // Which is the block owning the phi function which will provide the
     // input
     Block *blockOwner;
     // Argument number of the missing phi
     unsigned argNumber;
 
-    MissingPhi(PhiInput *pi, Block *blockOwner, unsigned argNumber)
+    MissingPhi(GateInput *pi, Block *blockOwner, unsigned argNumber)
         : pi(pi), blockOwner(blockOwner), argNumber(argNumber) {}
   };
 
   // Initialize the index of the class
-  uniquePhiIndex = 0;
+  uniqueGateIndex = 0;
 
   // Vector to store all the missing phi
-  SmallVector<MissingPhi> phiToConnect;
+  SmallVector<MissingPhi> phisToConnect;
 
   // For each block in the function
   for (Block &block : funcOp.getBlocks()) {
     // Create a list for the phi functions corresponding to the block
-    llvm::SmallVector<Phi *> phiListBlock;
-    // For each block argument (possibly excluding the last one)
-    for (BlockArgument &arg :
-         llvm::drop_end(block.getArguments(), skipLastArg)) {
+    llvm::SmallVector<Gate *> gateListBlock;
+    // For each block argument
+    for (BlockArgument &arg : block.getArguments()) {
       unsigned argNumber = arg.getArgNumber();
       // Create a set for the operands of the corresponding phi function
-      SmallVector<PhiInput *> operands;
+      SmallVector<GateInput *> operands;
       DenseSet<Block *> coveredPredecessors;
       // For each predecessor of the block, which is in charge of
       // providing the inputs of the phi functions
@@ -204,7 +202,7 @@ void GsaAnalysis<FunctionType>::identifyAllPhi(FunctionType &funcOp,
             auto successorOperands = branchOp.getSuccessorOperands(successorId);
             // Get the corresponding producer/value
             auto producer = successorOperands[argNumber];
-            PhiInput *phiInput = nullptr;
+            GateInput *gateInput = nullptr;
             // Try to convert the producer to a block argument
             BlockArgument ba = dyn_cast<BlockArgument>(producer);
             // If the producer is a BA but its block has no predecessor,
@@ -214,32 +212,31 @@ void GsaAnalysis<FunctionType>::identifyAllPhi(FunctionType &funcOp,
             if (ba && producer.getParentBlock()->hasNoPredecessors()) {
               bool alreadyPresent = false;
               for (auto &phi : operands) {
-                if (phi->type == ArgInputType && phi->v == ba)
+                if (phi->type == ArgInput && phi->v == ba)
                   alreadyPresent = true;
               }
               if (!alreadyPresent)
-                phiInput = new PhiInput(ba, pred);
+                gateInput = new GateInput(ba, pred);
 
             } else if (ba) {
               // TODO double chcek that arg is used only once
-              phiInput = new PhiInput((Phi *)nullptr, pred);
-              phiToConnect.push_back(
-                  MissingPhi(phiInput, ba.getParentBlock(), ba.getArgNumber()));
+              gateInput = new GateInput((Gate *)nullptr, pred);
+              phisToConnect.push_back(MissingPhi(gateInput, ba.getParentBlock(),
+                                                 ba.getArgNumber()));
 
             } else {
               bool alreadyPresent = false;
-              for (auto &phi : operands) {
-                if (phi->type == OpInputType &&
-                    phi->v == dyn_cast<Value>(producer))
+              for (auto &in : operands) {
+                if (in->type == OpInput && in->v == dyn_cast<Value>(producer))
                   alreadyPresent = true;
               }
               if (!alreadyPresent)
-                phiInput = new PhiInput(dyn_cast<Value>(producer), pred);
+                gateInput = new GateInput(dyn_cast<Value>(producer), pred);
             }
 
             // Insert the value among the inputs of the phi
-            if (phiInput)
-              operands.push_back(phiInput);
+            if (gateInput)
+              operands.push_back(gateInput);
 
             break;
           }
@@ -250,33 +247,33 @@ void GsaAnalysis<FunctionType>::identifyAllPhi(FunctionType &funcOp,
       // one input), add it to the phis associated to that block
       if (!operands.empty()) {
         auto *newPhi =
-            new Phi(arg, argNumber, operands, &block, GsaGateFunction::PhiGate);
-        newPhi->index = ++uniquePhiIndex;
-        phiListBlock.push_back(newPhi);
+            new Gate(arg, argNumber, operands, &block, GateType::PhiGate);
+        newPhi->index = ++uniqueGateIndex;
+        gateListBlock.push_back(newPhi);
       }
     }
 
     // Associate the list of phis to the basic block
-    phiList.insert({&block, phiListBlock});
+    gateList.insert({&block, gateListBlock});
   }
 
   // For each missing phi, look for it among the phis related to the
   // marked block and connect it
-  for (auto &missing : phiToConnect) {
-    Phi *foundPhi = nullptr;
-    for (auto &phi : phiList[missing.blockOwner]) {
-      if (phi->argNumber == missing.argNumber) {
-        foundPhi = phi;
+  for (auto &missing : phisToConnect) {
+    Gate *foundGate = nullptr;
+    for (auto &g : gateList[missing.blockOwner]) {
+      if (g->argNumber == missing.argNumber) {
+        foundGate = g;
         break;
       }
     }
-    assert(foundPhi && "[GSA] Not found phi to reconnect");
-    missing.pi->phi = foundPhi;
+    assert(foundGate && "[GSA] Not found phi to reconnect");
+    missing.pi->gate = foundGate;
   }
 
   convertPhiToMu(funcOp);
   convertPhiToGamma(funcOp);
-  printPhiList();
+  printGateList();
 }
 
 template <typename FunctionType>
@@ -289,7 +286,7 @@ void GsaAnalysis<FunctionType>::convertPhiToGamma(FunctionType &funcOp) {
   mlir::CFGLoopInfo loopInfo(domInfo.getDomTree(&funcOp.getBody()));
 
   // For each block
-  for (auto const &[phiBlock, phis] : phiList) {
+  for (auto const &[phiBlock, phis] : gateList) {
 
     // For each phi
     for (auto *phi : phis) {
@@ -303,10 +300,11 @@ void GsaAnalysis<FunctionType>::convertPhiToGamma(FunctionType &funcOp) {
       // `index_Bi`<`index_Bj`
       auto phiOperands = phi->operands;
 
-      llvm::sort(
-          phiOperands.begin(), phiOperands.end(), [](PhiInput *a, PhiInput *b) {
-            return getBlockIndex(a->getBlock()) < getBlockIndex(b->getBlock());
-          });
+      llvm::sort(phiOperands.begin(), phiOperands.end(),
+                 [](GateInput *a, GateInput *b) {
+                   return getBlockIndex(a->getBlock()) <
+                          getBlockIndex(b->getBlock());
+                 });
 
       // Find the nearest common dominator among all the blocks involved
       // in the phi inputs
@@ -325,7 +323,7 @@ void GsaAnalysis<FunctionType>::convertPhiToGamma(FunctionType &funcOp) {
       std::vector<std::string> cofactorList;
 
       // Vector associating each input of the Phi to a boolean expression
-      std::vector<std::pair<boolean::BoolExpression *, PhiInput *>>
+      std::vector<std::pair<boolean::BoolExpression *, GateInput *>>
           expressionsList;
 
       // For each input of the phi, compute the boolean expression which defines
@@ -370,11 +368,11 @@ void GsaAnalysis<FunctionType>::convertPhiToGamma(FunctionType &funcOp) {
       // Once that a phi has been converted into a tree of gammas, all the
       // functions which were previously connected to the phi are now to be
       // connected to the new gamma
-      for (auto &[bb, phis] : phiList) {
+      for (auto &[bb, phis] : gateList) {
         for (auto &phii : phis) {
           for (auto &op : phii->operands) {
-            if (op->phi && op->phi == phi)
-              op->phi = newPhi;
+            if (op->gate && op->gate == phi)
+              op->gate = newPhi;
           }
         }
       }
@@ -391,7 +389,7 @@ void GsaAnalysis<FunctionType>::convertPhiToMu(FunctionType &funcOp) {
   mlir::DominanceInfo domInfo;
   mlir::CFGLoopInfo loopInfo(domInfo.getDomTree(&funcOp.getBody()));
 
-  for (auto const &[phiBlock, phis] : phiList) {
+  for (auto const &[phiBlock, phis] : gateList) {
     for (auto *phi : phis) {
 
       // A phi might be a MU iff it is inside a for loop and has exactly
@@ -412,7 +410,7 @@ void GsaAnalysis<FunctionType>::convertPhiToMu(FunctionType &funcOp) {
 
         // If both the conditions hold, then we have a MU gate
         if (isBlockHeader && operandFromOutsideLoop) {
-          phi->gsaGateFunction = GsaGateFunction::MuGate;
+          phi->gsaGateFunction = GateType::MuGate;
 
           // Use the initial value of mu as first input of the gate
           if (domInfo.dominates(op1Block, phiBlock)) {
@@ -436,24 +434,23 @@ void GsaAnalysis<FunctionType>::convertPhiToMu(FunctionType &funcOp) {
 }
 
 template <typename FunctionType>
-SmallVector<Phi *> *GsaAnalysis<FunctionType>::getPhis(Block *bb) {
-  if (!phiList.contains(bb))
+SmallVector<Gate *> *GsaAnalysis<FunctionType>::getGates(Block *bb) {
+  if (!gateList.contains(bb))
     return nullptr;
-  return &phiList[bb];
+  return &gateList[bb];
 }
 
 template <typename FunctionType>
-void GsaAnalysis<FunctionType>::printPhiList() {
-  for (auto const &[_, phis] : phiList) {
-    for (auto *phi : phis) {
-      phi->print();
-    }
+void GsaAnalysis<FunctionType>::printGateList() {
+  for (auto const &[_, gates] : gateList) {
+    for (auto *g : gates)
+      g->print();
   }
 }
 
-void gsa::Phi::print() {
+void gsa::Gate::print() {
 
-  auto getPhiName = [&](Phi *p) -> std::string {
+  auto getPhiName = [&](Gate *p) -> std::string {
     switch (p->gsaGateFunction) {
     case GammaGate:
       return "GAMMA";
@@ -477,24 +474,24 @@ void gsa::Phi::print() {
 
   for (auto &op : operands) {
     switch (op->type) {
-    case ArgInputType:
+    case ArgInput:
       llvm::dbgs() << "[GSA]\t ARG\t: ";
       op->v.print(llvm::dbgs());
       break;
-    case OpInputType:
+    case OpInput:
       llvm::dbgs() << "[GSA]\t OP\t: ";
       op->v.print(llvm::dbgs());
       break;
-    case EmptyInputType:
+    case EmptyInput:
       llvm::dbgs() << "[GSA]\t EMPTY";
       break;
     default:
-      llvm::dbgs() << "[GSA]\t PHI\t: " << getPhiName(op->phi) << "_"
-                   << op->phi->index;
+      llvm::dbgs() << "[GSA]\t PHI\t: " << getPhiName(op->gate) << "_"
+                   << op->gate->index;
       break;
     }
 
-    if (op->type != EmptyInputType) {
+    if (op->type != EmptyInput) {
       llvm::dbgs() << "\t(";
       op->getBlock()->printAsOperand(llvm::dbgs());
       llvm::dbgs() << ")";
@@ -503,7 +500,7 @@ void gsa::Phi::print() {
   }
 }
 
-Block *PhiInput::getBlock() { return this->blockOwner; }
+Block *GateInput::getBlock() { return this->blockOwner; }
 
 } // namespace gsa
 } // namespace experimental

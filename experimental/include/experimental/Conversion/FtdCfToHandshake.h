@@ -163,8 +163,7 @@ protected:
   template <typename FunctionType>
   LogicalResult addExplicitPhi(FunctionType funcOp,
                                ConversionPatternRewriter &rewriter,
-                               FtdStoredOperations &ftdOps,
-                               bool skipLastArgument = false) const;
+                               FtdStoredOperations &ftdOps) const;
 };
 #define GEN_PASS_DECL_FTDCFTOHANDSHAKE
 #define GEN_PASS_DEF_FTDCFTOHANDSHAKE
