@@ -51,30 +51,21 @@ struct GateInput {
   /// Type of the input
   enum GateInputType type;
 
-  /// Value in case of result operation or block argument
-  Value v;
-
-  /// Pointer to the phi result in case of a phi
-  struct Gate *gate;
-
-  /// Pointer to the block
-  Block *blockOwner;
+  /// Depending on the type of the input, it might be a reference to a value on
+  /// the IR or another gate
+  std::variant<Value, struct Gate *> input;
 
   /// Constructor a gate input being the result of an operation
-  GateInput(Value v, Block *bb)
-      : type(OpInput), v(v), gate(nullptr), blockOwner(bb) {};
+  GateInput(Value v) : type(OpInput), input(v) {};
 
   /// Constructor for a gate input being the output of another gate
-  GateInput(struct Gate *p, Block *bb)
-      : type(GSAInput), v(nullptr), gate(p), blockOwner(bb) {};
+  GateInput(struct Gate *p) : type(GSAInput), input(p) {};
 
   /// Constructor for a gate input being a block argument
-  GateInput(BlockArgument ba, Block *bb)
-      : type(ArgInput), v(Value(ba)), gate(nullptr), blockOwner(bb) {};
+  GateInput(BlockArgument ba) : type(ArgInput), input(ba) {};
 
   /// Constructor for a gate input being empty
-  GateInput()
-      : type(EmptyInput), v(nullptr), gate(nullptr), blockOwner(nullptr) {};
+  GateInput() : type(EmptyInput), input(nullptr) {};
 
   Block *getBlock();
 };
@@ -84,21 +75,16 @@ struct GateInput {
 struct Gate {
 
   /// Reference to the value produced by the gate (block argument)
-  Value result;
-
-  /// Index of the block argument in the block
-  unsigned argNumber;
+  BlockArgument result;
 
   /// List of operands of the gate
   SmallVector<GateInput *> operands;
 
-  /// Pointer to the block owning the gate
-  Block *blockOwner;
-
   /// Type of gate function
   GateType gsaGateFunction;
 
-  /// Condition used to determine the outcome of the choice
+  /// Condition used to determine the outcome of the choice. The foramt is `cX`
+  /// where `X` is the number of the block argument where
   std::string condition;
 
   /// Index of the current gate
@@ -109,12 +95,14 @@ struct Gate {
   bool isRoot = false;
 
   /// Initialize the values of the gate
-  Gate(Value v, unsigned n, SmallVector<GateInput *> &pi, Block *b, GateType gt,
+  Gate(BlockArgument v, SmallVector<GateInput *> &pi, GateType gt,
        std::string c = "")
-      : result(v), argNumber(n), operands(pi), blockOwner(b),
-        gsaGateFunction(gt), condition(std::move(c)) {}
+      : result(v), operands(pi), gsaGateFunction(gt), condition(std::move(c)) {}
 
   void print();
+
+  Block *getBlock() { return result.getParentBlock(); }
+  unsigned getArgumentNumber() { return result.getArgNumber(); }
 };
 
 /// Class in charge of performing the GSA analysis prior to the cf to handshake

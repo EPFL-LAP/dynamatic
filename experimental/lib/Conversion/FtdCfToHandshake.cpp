@@ -1576,14 +1576,15 @@ FtdLowerFuncToHandshake::addExplicitPhi(FunctionType funcOp,
         // If the input is empty, we keep track of its index.
         // In the other cases, we already have the operand of the function.
         if (operand->type == gsa::GSAInput) {
-          operands.emplace_back(operand->gate->result);
+          Gate *g = std::get<Gate *>(operand->input);
+          operands.emplace_back(g->result);
           missingGsaList.emplace_back(
-              MissingGsa(phi->index, operand->gate->index, operandIndex));
+              MissingGsa(phi->index, g->index, operandIndex));
         } else if (operand->type == gsa::EmptyInput) {
           nullOperand = operandIndex;
           operands.emplace_back(nullptr);
         } else {
-          auto val = operand->v;
+          auto val = std::get<Value>(operand->input);
           val.setType(channelifyType(val.getType()));
           operands.emplace_back(val);
         }
