@@ -160,6 +160,20 @@ BoolExpression::generateTruthTable() {
   return truthTable;
 }
 
+bool BoolExpression::containsMintern(const std::string &toSearch) {
+  if (type == ExpressionType::And || type == ExpressionType::Or) {
+    Operator *op = static_cast<Operator *>(this);
+    return op->left->containsMintern(toSearch) ||
+           op->right->containsMintern(toSearch);
+  }
+
+  if (type == ExpressionType::Variable) {
+    SingleCond *singleCond = static_cast<SingleCond *>(this);
+    return toSearch == singleCond->id;
+  }
+  return false;
+}
+
 //---------Generating Truth Table based on Mintems (SOP Only)-----------
 
 void dynamatic::experimental::boolean::replaceDontCaresRec(
