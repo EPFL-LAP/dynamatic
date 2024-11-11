@@ -17,28 +17,8 @@
 #include <unordered_set>
 
 using namespace mlir;
-using namespace dynamatic::experimental::boolean;
-
-namespace dynamatic {
-namespace experimental {
-namespace ftd {
-
-std::string getBlockCondition(Block *block) {
-  std::string blockCondition = "c" + std::to_string(ftd::getBlockIndex(block));
-  return blockCondition;
-}
-
-int getBlockIndex(Block *bb) {
-  std::string result1;
-  llvm::raw_string_ostream os1(result1);
-  bb->printAsOperand(os1);
-  std::string block1id = os1.str();
-  return std::stoi(block1id.substr(3));
-}
-
-bool lessThanBlocks(Block *block1, Block *block2) {
-  return getBlockIndex(block1) < getBlockIndex(block2);
-}
+using namespace dynamatic;
+using namespace experimental::boolean;
 
 /// Recursive function which allows to obtain all the paths from block `start`
 /// to block `end` using a DFS, possibly traversing `blockToTraverse` and not
@@ -49,6 +29,8 @@ static void dfsAllPaths(Block *start, Block *end, std::vector<Block *> &path,
                         Block *blockToTraverse,
                         const std::vector<Block *> &blocksToAvoid,
                         bool blockToTraverseFound) {
+
+  DominanceInfo domInfo;
 
   // The current block is part of the current path
   path.push_back(start);
@@ -68,7 +50,7 @@ static void dfsAllPaths(Block *start, Block *end, std::vector<Block *> &path,
       bool incorrectPath = false;
       for (auto *toAvoid : blocksToAvoid) {
         if (toAvoid == successor &&
-            getBlockIndex(toAvoid) > getBlockIndex(blockToTraverse)) {
+            domInfo.dominates(blockToTraverse, toAvoid)) {
           incorrectPath = true;
           break;
         }
@@ -90,8 +72,9 @@ static void dfsAllPaths(Block *start, Block *end, std::vector<Block *> &path,
 }
 
 std::vector<std::vector<Block *>>
-findAllPaths(Block *start, Block *end, Block *blockToTraverse,
-             const std::vector<Block *> &blocksToAvoid) {
+experimental::ftd::findAllPaths(Block *start, Block *end,
+                                Block *blockToTraverse,
+                                ArrayRef<Block *> blocksToAvoid) {
   std::vector<std::vector<Block *>> allPaths;
   std::vector<Block *> path;
   std::unordered_set<Block *> visited;
@@ -100,16 +83,17 @@ findAllPaths(Block *start, Block *end, Block *blockToTraverse,
   return allPaths;
 }
 
-boolean::BoolExpression *
-getPathExpression(const std::vector<Block *> &path,
-                  std::vector<std::string> &cofactorList,
-                  const DenseSet<Block *> &deps, const bool ignoreDeps) {
+BoolExpression *experimental::ftd::getPathExpression(
+    ArrayRef<Block *> path, DenseSet<unsigned> &blockIndexSet,
+    const DenseMap<Block *, unsigned> &mapBlockToIndex,
+    const DenseSet<Block *> &deps, const bool ignoreDeps) {
 
   // Start with a boolean expression of one
   boolean::BoolExpression *exp = boolean::BoolExpression::boolOne();
 
   // Cover each pair of adjacent blocks
-  for (int i = 0; i < (int)path.size() - 1; i++) {
+  unsigned pathSize = path.size();
+  for (unsigned i = 0; i < pathSize - 1; i++) {
     Block *firstBlock = path[i];
     Block *secondBlock = path[i + 1];
 
@@ -118,39 +102,35 @@ getPathExpression(const std::vector<Block *> &path,
     if (firstBlock->getSuccessors().size() == 1)
       continue;
 
-    if (!ignoreDeps && !deps.contains(firstBlock))
-      continue;
+    if (ignoreDeps || deps.contains(firstBlock)) {
 
-    // Get last operation of the block, also called `terminator`
-    Operation *terminatorOp = firstBlock->getTerminator();
+      // Get last operation of the block, also called `terminator`
+      Operation *terminatorOp = firstBlock->getTerminator();
 
-    if (!isa<cf::CondBranchOp>(terminatorOp))
-      continue;
+      if (isa<cf::CondBranchOp>(terminatorOp)) {
+        unsigned blockIndex = mapBlockToIndex.lookup(firstBlock);
+        std::string blockCondition = "c" + std::to_string(blockIndex);
 
-    auto blockCondition = getBlockCondition(firstBlock);
+        // Get a boolean condition out of the block condition
+        boolean::BoolExpression *pathCondition =
+            boolean::BoolExpression::parseSop(blockCondition);
 
-    // Get a boolean condition out of the block condition
-    boolean::BoolExpression *pathCondition =
-        boolean::BoolExpression::parseSop(blockCondition);
+        // Possibly add the condition to the list of cofactors
+        if (!blockIndexSet.contains(blockIndex))
+          blockIndexSet.insert(blockIndex);
 
-    // Possibly add the condition to the list of cofactors
-    if (std::find(cofactorList.begin(), cofactorList.end(), blockCondition) ==
-        cofactorList.end())
-      cofactorList.push_back(blockCondition);
+        // Negate the condition if `secondBlock` is reached when the condition
+        // is false
+        auto condOp = dyn_cast<cf::CondBranchOp>(terminatorOp);
+        if (condOp.getFalseDest() == secondBlock)
+          pathCondition->boolNegate();
 
-    // Negate the condition if `secondBlock` is reached when the condition
-    // is false
-    auto condOp = dyn_cast<cf::CondBranchOp>(terminatorOp);
-    if (condOp.getFalseDest() == secondBlock)
-      pathCondition->boolNegate();
-
-    // And the condition with the rest path
-    exp = boolean::BoolExpression::boolAnd(exp, pathCondition);
+        // And the condition with the rest path
+        exp = boolean::BoolExpression::boolAnd(exp, pathCondition);
+      }
+    }
   }
 
+  // Minimize the condition and return
   return exp;
 }
-
-}; // namespace ftd
-}; // namespace experimental
-}; // namespace dynamatic

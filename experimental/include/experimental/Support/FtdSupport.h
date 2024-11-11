@@ -23,31 +23,20 @@ namespace dynamatic {
 namespace experimental {
 namespace ftd {
 
-/// Get the index of a basic block
-int getBlockIndex(Block *bb);
-
-/// Check whether the index of `block1` is less than the one of `block2`
-bool lessThanBlocks(Block *block1, Block *block2);
-
 /// Gets all the paths from block `start` to block `end` using a dfs search. If
 /// `blockToTraverse` is non null, then we want the paths having that block in
 /// the path; if `blocksToAvoid` is non empty, then we want the paths which do
-/// not cross those bbs.
-std::vector<std::vector<Block *>> findAllPaths(
-    Block *start, Block *end, Block *blockToTraverse = nullptr,
-    const std::vector<Block *> &blocksToAvoid = std::vector<Block *>());
-
-/// Given a block whose name is `^BBN` (where N is an integer) return a string
-/// in the format `cN`, used to identify the condition which allows the block
-/// to be executed.
-std::string getBlockCondition(Block *block);
+/// not cross those paths.
+std::vector<std::vector<Block *>>
+findAllPaths(Block *start, Block *end, Block *blockToTraverse = nullptr,
+             ArrayRef<Block *> blocksToAvoid = std::vector<Block *>());
 
 /// Get the boolean condition determining when a path is executed. While
 /// covering each block in the path, add the cofactor of each block to the list
 /// of cofactors if not already covered
 boolean::BoolExpression *
-getPathExpression(const std::vector<Block *> &path,
-                  std::vector<std::string> &cofactorList,
+getPathExpression(ArrayRef<Block *> path, DenseSet<unsigned> &blockIndexSet,
+                  const DenseMap<Block *, unsigned> &mapBlockToIndex,
                   const DenseSet<Block *> &deps = DenseSet<Block *>(),
                   bool ignoreDeps = true);
 
