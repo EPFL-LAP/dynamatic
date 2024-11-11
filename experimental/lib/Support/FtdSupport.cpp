@@ -26,7 +26,7 @@ namespace dynamatic {
 namespace experimental {
 namespace ftd {
 
-int getBlockIndex(Block *bb) {
+unsigned getBlockIndex(Block *bb) {
   std::string result1;
   llvm::raw_string_ostream os1(result1);
   bb->printAsOperand(os1);
@@ -159,9 +159,10 @@ static void dfsAllPaths(Block *start, Block *end, std::vector<Block *> &path,
       if (incorrectPath)
         continue;
 
-      if (visited.find(successor) == visited.end())
+      if (visited.find(successor) == visited.end()) {
         dfsAllPaths(successor, end, path, visited, allPaths, blockToTraverse,
                     blocksToAvoid, blockFound || blockToTraverseFound);
+      }
     }
   }
 
@@ -210,7 +211,7 @@ std::vector<std::vector<Operation *>> findAllPaths(Operation *start,
 
 std::vector<std::vector<Block *>>
 findAllPaths(Block *start, Block *end, Block *blockToTraverse,
-             const std::vector<Block *> &blocksToAvoid) {
+             ArrayRef<Block *> blocksToAvoid) {
   std::vector<std::vector<Block *>> allPaths;
   std::vector<Block *> path;
   std::unordered_set<Block *> visited;
@@ -337,15 +338,16 @@ bool isaMergeLoop(Operation *merge, CFGLoopInfo &li) {
 }
 
 boolean::BoolExpression *
-getPathExpression(const std::vector<Block *> &path,
-                  std::vector<std::string> &cofactorList,
+getPathExpression(ArrayRef<Block *> path, DenseSet<unsigned> &blockIndexSet,
+                  const DenseMap<Block *, unsigned> &mapBlockToIndex,
                   const DenseSet<Block *> &deps, const bool ignoreDeps) {
 
   // Start with a boolean expression of one
   boolean::BoolExpression *exp = boolean::BoolExpression::boolOne();
 
   // Cover each pair of adjacent blocks
-  for (int i = 0; i < (int)path.size() - 1; i++) {
+  unsigned pathSize = path.size();
+  for (unsigned i = 0; i < pathSize - 1; i++) {
     Block *firstBlock = path[i];
     Block *secondBlock = path[i + 1];
 
@@ -360,16 +362,16 @@ getPathExpression(const std::vector<Block *> &path,
       Operation *terminatorOp = firstBlock->getTerminator();
 
       if (isa<cf::CondBranchOp>(terminatorOp)) {
-        auto blockCondition = getBlockCondition(firstBlock);
+        unsigned blockIndex = mapBlockToIndex.lookup(firstBlock);
+        std::string blockCondition = "c" + std::to_string(blockIndex);
 
         // Get a boolean condition out of the block condition
         boolean::BoolExpression *pathCondition =
             boolean::BoolExpression::parseSop(blockCondition);
 
         // Possibly add the condition to the list of cofactors
-        if (std::find(cofactorList.begin(), cofactorList.end(),
-                      blockCondition) == cofactorList.end())
-          cofactorList.push_back(blockCondition);
+        if (!blockIndexSet.contains(blockIndex))
+          blockIndexSet.insert(blockIndex);
 
         // Negate the condition if `secondBlock` is reached when the condition
         // is false
@@ -387,8 +389,10 @@ getPathExpression(const std::vector<Block *> &path,
   return exp;
 }
 
-BoolExpression *enumeratePaths(Block *start, Block *end,
-                               const DenseSet<Block *> &controlDeps) {
+BoolExpression *
+enumeratePaths(Block *start, Block *end,
+               const DenseMap<Block *, unsigned> &mapBlockToIndex,
+               const DenseSet<Block *> &controlDeps) {
   // Start with a boolean expression of zero (so that new conditions can be
   // added)
   BoolExpression *sop = BoolExpression::boolZero();
@@ -399,11 +403,11 @@ BoolExpression *enumeratePaths(Block *start, Block *end,
   // For each path
   for (const std::vector<Block *> &path : allPaths) {
 
-    std::vector<std::string> tempCofactorList;
+    DenseSet<unsigned> tempCofactorSet;
     // Compute the product of the conditions which allow that path to be
     // executed
-    BoolExpression *minterm =
-        getPathExpression(path, tempCofactorList, controlDeps, false);
+    BoolExpression *minterm = getPathExpression(
+        path, tempCofactorSet, mapBlockToIndex, controlDeps, false);
 
     // Add the value to the result
     sop = BoolExpression::boolOr(sop, minterm);

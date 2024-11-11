@@ -13,7 +13,6 @@
 #include "dynamatic/Dialect/Handshake/HandshakeDialect.h"
 #include "dynamatic/Dialect/Handshake/HandshakeOps.h"
 #include "dynamatic/Support/CFG.h"
-#include "experimental/Analysis/GsaAnalysis.h"
 #include "experimental/Support/BooleanLogic/BDD.h"
 #include "experimental/Support/BooleanLogic/BoolExpression.h"
 #include "experimental/Support/FtdSupport.h"
@@ -568,6 +567,11 @@ insertDirectSuppression(ConversionPatternRewriter &rewriter,
   ControlDependenceAnalysis<dynamatic::handshake::FuncOp> cdgAnalysis(funcOp);
   Block *producerBlock = connection.getParentBlock();
 
+  DenseMap<Block *, unsigned> indexPerBlock;
+  for (auto &bb : funcOp.getBlocks()) {
+    indexPerBlock.insert({&bb, getBlockIndex(&bb)});
+  }
+
   // Get the control dependencies from the producer
   auto res = cdgAnalysis.getBlockForwardControlDeps(producerBlock);
   DenseSet<Block *> prodControlDeps = res.value_or(DenseSet<Block *>());
@@ -581,9 +585,9 @@ insertDirectSuppression(ConversionPatternRewriter &rewriter,
 
   // Compute the activation function of producer and consumer
   BoolExpression *fProd =
-      enumeratePaths(entryBlock, producerBlock, prodControlDeps);
-  BoolExpression *fCons =
-      enumeratePaths(entryBlock, consumer->getBlock(), consControlDeps);
+      enumeratePaths(entryBlock, producerBlock, indexPerBlock, prodControlDeps);
+  BoolExpression *fCons = enumeratePaths(entryBlock, consumer->getBlock(),
+                                         indexPerBlock, consControlDeps);
 
   // The condition related to the select signal of the consumer mux must be
   // added if the following conditions hold: The consumer is a mux; The
@@ -1308,6 +1312,11 @@ LogicalResult FtdLowerFuncToHandshake::addMergeNonLoop(
   // Get entry block of the function to lower
   Block *entryBlock = &funcOp.getRegion().front();
 
+  DenseMap<Block *, unsigned> indexPerBlock;
+  for (auto &bb : funcOp.getBlocks()) {
+    indexPerBlock.insert({&bb, getBlockIndex(&bb)});
+  }
+
   // Stores the information related to the control dependencies ob basic
   // blocks within an handshake::funcOp object
   ControlDependenceAnalysis<dynamatic::handshake::FuncOp> cdgAnalysis(funcOp);
@@ -1338,14 +1347,14 @@ LogicalResult FtdLowerFuncToHandshake::addMergeNonLoop(
       // Compute the boolean function `fProd`, that is true when the producer
       // is going to produce the token (cfr. FPGA'22, IV.C: Generating and
       // Suppressing Tokens)
-      BoolExpression *fProd =
-          enumeratePaths(entryBlock, producerBlock, producerControlDeps);
+      BoolExpression *fProd = enumeratePaths(
+          entryBlock, producerBlock, indexPerBlock, producerControlDeps);
 
       // Compute the boolean function `fCons`, that is true when the consumer
       // is going to consume the token (cfr. FPGA'22, IV.C: Generating and
       // Suppressing Tokens)
-      BoolExpression *fCons =
-          enumeratePaths(entryBlock, consumerBlock, consumerControlDeps);
+      BoolExpression *fCons = enumeratePaths(
+          entryBlock, consumerBlock, indexPerBlock, consumerControlDeps);
 
       // A token needs to be generated when the consumer consumes  but the
       // producer does not producer. Compute the corresponding function and
@@ -1546,15 +1555,15 @@ FtdLowerFuncToHandshake::addExplicitPhi(FunctionType funcOp,
   // Maps the index of each GSA function to each real operation
   DenseMap<unsigned, Operation *> gsaList;
   ControlDependenceAnalysis<FunctionType> cdgAnalysis(funcOp);
-  GsaAnalysis<FunctionType> gsaAnalysis(funcOp);
+  GSAAnalysis gsaAnalysis(funcOp);
   cdgAnalysis.printAllBlocksDeps();
 
   // For each block excluding the first one, which has no gsa
   for (Block &block : llvm::drop_begin(funcOp)) {
 
     // For each GSA function
-    SmallVector<Gate *> *phis = gsaAnalysis.getGates(&block);
-    for (Gate *&phi : *phis) {
+    ArrayRef<Gate *> phis = gsaAnalysis.getGates(&block);
+    for (Gate *phi : phis) {
 
       // Skip if it's a phi
       if (phi->gsaGateFunction == PhiGate)
@@ -1593,10 +1602,11 @@ FtdLowerFuncToHandshake::addExplicitPhi(FunctionType funcOp,
 
       // The condition value is provided by the `condition` field of the phi
       rewriter.setInsertionPointAfterValue(phi->result);
-      Value conditionValue = ftdOps.conditionToValue[phi->condition];
+      Value conditionValue =
+          phi->conditionBlock->getTerminator()->getOperand(0);
 
-      // If the function is MU, then we create a merge and use its result as
-      // condition
+      // If the function is MU, then we create a merge
+      // and use its result as condition
       if (phi->gsaGateFunction == MuGate) {
         Region &region = funcOp.getBody();
         mlir::DominanceInfo domInfo;

@@ -1,4 +1,4 @@
-//===- GsaAnalysis.h - GSA analyis utilities --------------------*- C++ -*-===//
+//===- GSAAnalysis.h - GSA analyis utilities --------------------*- C++ -*-===//
 //
 // Dynamatic is under the Apache License v2.0 with LLVM Exceptions.
 // See https://llvm.org/LICENSE.txt for license information.
@@ -20,6 +20,7 @@
 #include "mlir/Dialect/Func/IR/FuncOps.h"
 #include "mlir/Pass/AnalysisManager.h"
 #include "mlir/Transforms/DialectConversion.h"
+#include <queue>
 #include <utility>
 
 namespace dynamatic {
@@ -45,37 +46,38 @@ struct Gate;
 struct GateInput {
 
   /// Depending on the type of the input, it might be a reference to a value on
-  /// the IR, another gate or empty
-  std::variant<Value, struct Gate *> input;
+  /// the IR, another gate or empty.
+  std::variant<Value, Gate *> input;
 
-  /// Constructor a gate input being the result of an operation
+  /// Constructor a gate input being the result of an operation.
   GateInput(Value v) : input(v) {};
 
-  /// Constructor for a gate input being the output of another gate
-  GateInput(struct Gate *p) : input(p) {};
+  /// Constructor for a gate input being the output of another gate.
+  GateInput(Gate *p) : input(p) {};
 
-  /// Constructor for a gate input being empty
+  /// Constructor for a gate input being empty.
   GateInput() : input(nullptr) {};
 
-  /// Returns the block owner of the input
+  /// Returns the block owner of the input.
   Block *getBlock();
 
-  /// Returns true if the input is of type `Value`
+  /// Returns true if the input is of type `Value`.
   bool isTypeValue() { return std::holds_alternative<Value>(input); }
 
-  /// Returns true if the input is empty
+  /// Returns true if the input is empty.
   bool isTypeEmpty() {
     return std::holds_alternative<Gate *>(input) && !std::get<Gate *>(input);
   }
 
-  /// Returns true if the input is a gate
+  /// Returns true if the input is a gate.
   bool isTypeGate() {
     return std::holds_alternative<Gate *>(input) && std::get<Gate *>(input);
   }
 
-  /// Returns the input gate (raise an error if input is not a  gate)
+  /// Returns the input gate (raise an error if input is not a  gate).
   Gate *getGate() { return std::get<Gate *>(input); }
-  /// Returns the input value (raise an error if input is not a value)
+
+  /// Returns the input value (raise an error if input is not a value).
   Value getValue() { return std::get<Value>(input); }
 };
 
@@ -86,117 +88,102 @@ using ListExpressionsPerGate =
 /// a set of inputs, a type, a condition, an index and it might be a root.
 struct Gate {
 
-  /// Reference to the value produced by the gate (block argument)
+  /// Reference to the value produced by the gate (block argument).
   BlockArgument result;
 
-  /// List of operands of the gate
+  /// List of operands of the gate.
   SmallVector<GateInput *> operands;
 
-  /// Type of gate function
+  /// Type of gate function.
   GateType gsaGateFunction;
 
-  /// Condition used to determine the outcome of the choice. The format is `cX`
-  /// where `X` is the number of the block argument where
-  std::string condition;
+  /// Block whose terminator is used to drive the condition of the gate.
+  Block *conditionBlock;
 
-  /// Index of the current gate, which uniquely identifies it
+  /// Index of the current gate, which uniquely identifies it.
   unsigned index;
 
   /// Determines whether it is a root or not (all MUs are roots, only the base
-  /// of a tree of GAMMAs is the root)
+  /// of a tree of GAMMAs is the root).
   bool isRoot = false;
 
-  /// Initialize the values of the gate
-  Gate(BlockArgument v, SmallVector<GateInput *> &pi, GateType gt, int i,
-       std::string c = "")
-      : result(v), operands(pi), gsaGateFunction(gt), condition(std::move(c)),
+  /// Initialize the values of the gate.
+  Gate(BlockArgument v, ArrayRef<GateInput *> pi, GateType gt, unsigned i,
+       Block *c = nullptr)
+      : result(v), operands(pi), gsaGateFunction(gt), conditionBlock(c),
         index(i) {}
 
   void print();
 
-  Block *getBlock() { return result.getParentBlock(); }
-  unsigned getArgumentNumber() { return result.getArgNumber(); }
+  inline Block *getBlock() { return result.getParentBlock(); }
+
+  inline unsigned getArgumentNumber() { return result.getArgNumber(); }
 };
 
 /// Class in charge of performing the GSA analysis prior to the cf to handshake
 /// conversion. For each block arguments, it provides the information necessary
 /// for a conversion into a `Gate` structure.
-template <typename FunctionType>
-class GsaAnalysis {
+class GSAAnalysis {
 
 public:
   /// Constructor for the GSA analysis. It requires an operation consisting of a
   /// functino to get the SSA information from.
-  GsaAnalysis(Operation *operation) {
-
-    // Only one function should be present in the module, excluding external
-    // functions
-    int functionsCovered = 0;
-
-    // The analysis can be instantiated either over a module containing one
-    // function only or over a function
-    if (ModuleOp modOp = dyn_cast<ModuleOp>(operation); modOp) {
-      for (FunctionType funcOp : modOp.getOps<FunctionType>()) {
-
-        // Skip if external
-        if (funcOp.isExternal())
-          continue;
-
-        // Analyze the function
-        if (!functionsCovered) {
-          identifyAllGates(funcOp);
-          functionsCovered++;
-        } else {
-          llvm::errs() << "[GSA] Too many functions to handle in the module";
-        }
-      }
-    } else if (FunctionType fOp = dyn_cast<FunctionType>(operation); fOp) {
-      identifyAllGates(fOp);
-      functionsCovered = 1;
-    }
-
-    // report an error indicating that the analysis is instantiated over
-    // an inappropriate operation
-    if (functionsCovered != 1)
-      llvm::errs() << "[GSA] GsaAnalysis failed due to a wrong input type\n";
-  };
+  GSAAnalysis(Operation *operation);
 
   /// Invalidation hook to keep the analysis cached across passes. Returns
   /// true if the analysis should be invalidated and fully reconstructed the
   /// next time it is queried.
   bool isInvalidated(const mlir::AnalysisManager::PreservedAnalyses &pa) {
-    return !pa.isPreserved<GsaAnalysis>();
+    return !pa.isPreserved<GSAAnalysis>();
   }
 
-  /// Get a pointer to the vector containing the gate functions of a block
-  SmallVector<Gate *> *getGates(Block *bb);
+  /// Get a pointer to the vector containing the gate functions of a block.
+  ArrayRef<Gate *> getGates(Block *bb);
+
+  /// Deallocates all the gates created.
+  ~GSAAnalysis();
 
 private:
-  // Associate an index to each gate
+  /// Associate an index to each gate.
   unsigned uniqueGateIndex;
+
+  /// Associate a index to each block.
+  DenseMap<Block *, unsigned> indexPerBlock;
 
   /// For each block in the function, keep a list of gate functions with all
   /// their information.
-  DenseMap<Block *, SmallVector<Gate *>> gateList;
+  DenseMap<Block *, SmallVector<Gate *>> gatesPerBlock;
+
+  /// List of all gate inputs which have been created (and must be thus
+  /// deallocated).
+  SmallVector<GateInput *> gateInputList;
 
   /// Identify the gates necessary in the function, referencing all of their
-  /// inputs
-  void identifyAllGates(FunctionType &funcOp);
+  /// inputs.
+  void convertSSAToGSA(mlir::func::FuncOp &funcOp);
 
-  /// Print the list of the gate functions
-  void printGateList();
+  /// Print the list of the gate functions.
+  void printAllGates();
 
-  /// Mark as mu all the phi gates which correspond to loop variables
-  void convertPhiToMu(FunctionType &funcOp);
+  /// Mark as mu all the phi gates which correspond to loop variables.
+  void convertPhiToMu(mlir::func::FuncOp &funcOp);
 
-  /// Convert some phi gates to trees of gamma gates
-  void convertPhiToGamma(FunctionType &funcOp);
+  /// Convert some phi gates to trees of gamma gates.
+  void convertPhiToGamma(mlir::func::FuncOp &funcOp);
 
   /// Given a boolean expression for each phi's inputs, expand it in a tree
-  /// of gamma functions
+  /// of gamma functions.
   Gate *expandGammaTree(ListExpressionsPerGate &expressions,
-                        std::vector<std::string> &conditions,
-                        Gate *originalPhi);
+                        std::queue<unsigned> &conditions, Gate *originalPhi);
+
+  /// Map each block to an unsigned index, so that the following relationship
+  /// holds: if Bi dominates Bj than i < j.
+  void mapBlocksToIndex(mlir::func::FuncOp &funcOp);
+
+  /// Return the index of a block
+  unsigned getIndexFromBlock(Block *bb) { return indexPerBlock[bb]; }
+
+  Block *getBlockFromIndex(unsigned index);
 };
 
 } // namespace gsa

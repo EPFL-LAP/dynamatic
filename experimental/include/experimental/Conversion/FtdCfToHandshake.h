@@ -20,7 +20,7 @@
 #include "dynamatic/Dialect/Handshake/HandshakeOps.h"
 #include "dynamatic/Support/DynamaticPass.h"
 #include "dynamatic/Support/LLVM.h"
-#include "experimental/Analysis/GsaAnalysis.h"
+#include "experimental/Analysis/GSAAnalysis.h"
 #include "experimental/Conversion/FtdMemoryInterface.h"
 #include "mlir/Analysis/CFGLoopInfo.h"
 

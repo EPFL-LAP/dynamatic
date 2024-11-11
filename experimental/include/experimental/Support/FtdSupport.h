@@ -24,7 +24,7 @@ namespace experimental {
 namespace ftd {
 
 /// Get the index of a basic block
-int getBlockIndex(Block *bb);
+unsigned getBlockIndex(Block *bb);
 
 /// Check whether the index of `block1` is less than the one of `block2`
 bool lessThanBlocks(Block *block1, Block *block2);
@@ -69,9 +69,9 @@ std::vector<std::vector<Operation *>> findAllPaths(Operation *start,
 /// `blockToTraverse` is non null, then we want the paths having that block in
 /// the path; if `blocksToAvoid` is non empty, then we want the paths which do
 /// not cross those paths.
-std::vector<std::vector<Block *>> findAllPaths(
-    Block *start, Block *end, Block *blockToTraverse = nullptr,
-    const std::vector<Block *> &blocksToAvoid = std::vector<Block *>());
+std::vector<std::vector<Block *>>
+findAllPaths(Block *start, Block *end, Block *blockToTraverse = nullptr,
+             ArrayRef<Block *> blocksToAvoid = std::vector<Block *>());
 
 /// Given a pair of consumer and producer, we are interested in a basic block
 /// which is a successor of the producer and post-dominates the consumer.
@@ -93,8 +93,8 @@ bool isaMergeLoop(Operation *merge, mlir::CFGLoopInfo &li);
 /// covering each block in the path, add the cofactor of each block to the list
 /// of cofactors if not already covered
 boolean::BoolExpression *
-getPathExpression(const std::vector<Block *> &path,
-                  std::vector<std::string> &cofactorList,
+getPathExpression(ArrayRef<Block *> path, DenseSet<unsigned> &blockIndexSet,
+                  const DenseMap<Block *, unsigned> &mapBlockToIndex,
                   const DenseSet<Block *> &deps = DenseSet<Block *>(),
                   bool ignoreDeps = true);
 
@@ -103,8 +103,10 @@ getPathExpression(const std::vector<Block *> &path,
 /// (`end`). "Each path identifies a Boolean product of elementary conditions
 /// expressing the reaching of the target BB from the corresponding member of
 /// the set; the product of all such paths are added".
-boolean::BoolExpression *enumeratePaths(Block *start, Block *end,
-                                        const DenseSet<Block *> &controlDeps);
+boolean::BoolExpression *
+enumeratePaths(Block *start, Block *end,
+               const DenseMap<Block *, unsigned> &mapBlockToIndex,
+               const DenseSet<Block *> &controlDeps);
 
 /// Return the channelified version of the input type
 Type channelifyType(Type type);
