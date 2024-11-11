@@ -1,4 +1,5 @@
-//===- GSAAnalysis.cpp - GSA analyis utilities ------------------*- C++ -*-===//
+//===- GSAAnalysis.cpp - GSA analysis utilities ------------------*- C++
+//-*-===//
 //
 // Dynamatic is under the Apache License v2.0 with LLVM Exceptions.
 // See https://llvm.org/LICENSE.txt for license information.
@@ -76,7 +77,7 @@ experimental::gsa::Gate *experimental::gsa::GSAAnalysis::expandGammaTree(
     Gate *originalPhi) {
 
   // At each iteration, we want to use a cofactor that is present in all the
-  // expressions in `expressions`. Since the cofactors are ordered according to
+  // expressions in "expressions". Since the cofactors are ordered according to
   // the basic block number, we can say that if a cofactor is present in one
   // expression, then it must be present in all the others, since they all have
   // the blocks associated to that cofactor as common dominator.
@@ -182,7 +183,7 @@ void experimental::gsa::GSAAnalysis::mapBlocksToIndex(func::FuncOp &funcOp) {
   std::sort(allBlocks.begin(), allBlocks.end(),
             [&](Block *a, Block *b) { return domInfo.dominates(a, b); });
 
-  // Associate a smalled index in the map to the blocks at higer levels of the
+  // Associate a smaller index in the map to the blocks at higher levels of the
   // dominance tree
   unsigned bbIndex = 0;
   for (Block *bb : allBlocks)
@@ -339,7 +340,7 @@ void experimental::gsa::GSAAnalysis::convertPhiToGamma(func::FuncOp &funcOp) {
     // For each phi
     for (Gate *phi : phis) {
 
-      // Skip if the phi is not of type `Phi`
+      // Skip if the phi is not of type "Phi"
       if (phi->gsaGateFunction != PhiGate)
         continue;
 
@@ -378,8 +379,8 @@ void experimental::gsa::GSAAnalysis::convertPhiToGamma(func::FuncOp &funcOp) {
         // Remove the current operand from the list of blocks to avoid
         blocksToAvoid.erase(blocksToAvoid.begin());
 
-        // Find all the paths from `commonDominator` to `phiBlock` which pass
-        // through operand's block but not through any of the `blocksToAvoid`
+        // Find all the paths from "commonDominator" to "phiBlock" which pass
+        // through operand's block but not through any of the "blocksToAvoid"
         auto paths = findAllPaths(commonDominator, phiBlock,
                                   operand->getBlock(), blocksToAvoid);
 

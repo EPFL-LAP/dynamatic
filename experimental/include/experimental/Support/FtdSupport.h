@@ -23,9 +23,9 @@ namespace dynamatic {
 namespace experimental {
 namespace ftd {
 
-/// Gets all the paths from block `start` to block `end` using a dfs search. If
-/// `blockToTraverse` is non null, then we want the paths having that block in
-/// the path; if `blocksToAvoid` is non empty, then we want the paths which do
+/// Gets all the paths from block "start" to block "end" using a dfs search. If
+/// "blockToTraverse" is non null, then we want the paths having that block in
+/// the path; if "blocksToAvoid" is non empty, then we want the paths which do
 /// not cross those paths.
 std::vector<std::vector<Block *>>
 findAllPaths(Block *start, Block *end, Block *blockToTraverse = nullptr,

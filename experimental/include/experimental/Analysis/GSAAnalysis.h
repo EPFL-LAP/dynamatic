@@ -33,7 +33,7 @@ namespace gsa {
 /// Define the three possible kinds of gate:
 /// - A GAMMA gate, having two inputs and a predicate;
 /// - A MU gate, having one init input and a `next` input;
-/// - a PHI gate, having N possible inputs chosen in a *merge* fashon.
+/// - a PHI gate, having N possible inputs chosen in a *merge* fashion.
 enum GateType { GammaGate, MuGate, PhiGate };
 
 struct Gate;
@@ -42,7 +42,7 @@ struct Gate;
 /// alternatives:
 /// - a value, either produced by an operation in the IR or a block argument;
 /// - another gate;
-/// - an empty input (this happens for gammas having onlyo one input).
+/// - an empty input (this happens for gammas having only one input).
 struct GateInput {
 
   /// Depending on the type of the input, it might be a reference to a value on
@@ -127,7 +127,7 @@ class GSAAnalysis {
 
 public:
   /// Constructor for the GSA analysis. It requires an operation consisting of a
-  /// functino to get the SSA information from.
+  /// function to get the SSA information from.
   GSAAnalysis(Operation *operation);
 
   /// Invalidation hook to keep the analysis cached across passes. Returns

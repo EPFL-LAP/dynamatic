@@ -7,8 +7,8 @@
 //===----------------------------------------------------------------------===//
 //
 // Implements some utility functions which are useful for both the fast token
-// delivery algorithm and for the GSA anlaysis pass. All the functions are about
-// anlayzing relationships between blocks and handshake operations.
+// delivery algorithm and for the GSA analysis pass. All the functions are about
+// analyzing relationships between blocks and handshake operations.
 //
 //===----------------------------------------------------------------------===//
 
@@ -20,9 +20,9 @@ using namespace mlir;
 using namespace dynamatic;
 using namespace experimental::boolean;
 
-/// Recursive function which allows to obtain all the paths from block `start`
-/// to block `end` using a DFS, possibly traversing `blockToTraverse` and not
-/// traversing `blocksToAvoid`.
+/// Recursive function which allows to obtain all the paths from block "start"
+/// to block "end" using a DFS, possibly traversing "blockToTraverse" and not
+/// traversing "blocksToAvoid".
 static void dfsAllPaths(Block *start, Block *end, std::vector<Block *> &path,
                         std::unordered_set<Block *> &visited,
                         std::vector<std::vector<Block *>> &allPaths,
@@ -104,7 +104,7 @@ BoolExpression *experimental::ftd::getPathExpression(
 
     if (ignoreDeps || deps.contains(firstBlock)) {
 
-      // Get last operation of the block, also called `terminator`
+      // Get last operation of the block, also called "terminator"
       Operation *terminatorOp = firstBlock->getTerminator();
 
       if (isa<cf::CondBranchOp>(terminatorOp)) {
@@ -119,7 +119,7 @@ BoolExpression *experimental::ftd::getPathExpression(
         if (!blockIndexSet.contains(blockIndex))
           blockIndexSet.insert(blockIndex);
 
-        // Negate the condition if `secondBlock` is reached when the condition
+        // Negate the condition if "secondBlock" is reached when the condition
         // is false
         auto condOp = dyn_cast<cf::CondBranchOp>(terminatorOp);
         if (condOp.getFalseDest() == secondBlock)
