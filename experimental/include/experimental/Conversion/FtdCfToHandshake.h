@@ -38,29 +38,12 @@ enum BranchToLoopType {
 /// algorithm.
 struct FtdStoredOperations {
 
-  /// contains all `handshake::BranchOp` created by `manageMoreProdThanCons`
-  /// or `manageDifferentRegeneration`
-  DenseSet<Operation *> suppBranches;
-
-  /// contains all `handshake::MergeOp` added in the straight LSQ
-  DenseSet<Operation *> memDepLoopMerges;
-
-  /// contains all `handshake::MergeOp` added by expliciting phi functions
-  DenseSet<Operation *> explicitPhiMerges;
-
   /// For each condition of the block, represented in abstract as `cN` where `N`
   /// is the index of the basic block, associate its corresponding control
   /// value, Associates the condition of the block in string format to its
   /// corresponding control value. This is given by the condition of the
   /// terminator of the block, in case it's a conditional branch
   std::map<std::string, Value> conditionToValue;
-
-  // Contains the operations related to init merges, thus both merges and
-  // constants
-  DenseSet<Operation *> initMergesOperations;
-
-  // Contains operations which are to be skipped by `addRegen` and `addSupp`
-  DenseSet<Operation *> opsToSkip;
 };
 
 /// Convert a func-level function into an handshake-level function. A custom

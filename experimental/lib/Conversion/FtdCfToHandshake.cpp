@@ -38,6 +38,12 @@ using namespace mlir;
 using namespace dynamatic;
 using namespace dynamatic::experimental::boolean;
 
+constexpr llvm::StringLiteral FTD_OP_TO_SKIP("ftd.op_to_skip");
+constexpr llvm::StringLiteral FTD_SUPP_BRANCH("ftd.supp_branch");
+constexpr llvm::StringLiteral FTD_EXPLICIT_PHI("ftd.phi");
+constexpr llvm::StringLiteral FTD_MEM_DEP("ftd.med_dep");
+constexpr llvm::StringLiteral FTD_INIT_MERGE("ftd.init_merge");
+
 namespace {
 
 struct FtdCfToHandshakePass
@@ -256,7 +262,7 @@ static void connectInitMerges(ConversionPatternRewriter &rewriter,
     rewriter.setInsertionPointToStart(initMerge->getBlock());
     auto constOp = rewriter.create<handshake::ConstantOp>(initMerge->getLoc(),
                                                           cstAttr, startValue);
-    ftdOps.initMergesOperations.insert(constOp);
+    constOp->setAttr(FTD_INIT_MERGE, rewriter.getUnitAttr());
     initMerge->setOperand(0, constOp.getResult());
   }
 }
@@ -402,7 +408,7 @@ static Value boolVariableToCircuit(ConversionPatternRewriter &rewriter,
     auto notOp = rewriter.create<handshake::NotOp>(
         block->getOperations().front().getLoc(),
         channelifyType(condition.getType()), condition);
-    ftdOps.opsToSkip.insert(notOp);
+    notOp->setAttr(FTD_OP_TO_SKIP, rewriter.getUnitAttr());
     return notOp->getResult(0);
   }
   condition.setType(channelifyType(condition.getType()));
@@ -431,7 +437,8 @@ static Value boolExpressionToCircuit(ConversionPatternRewriter &rewriter,
 
   auto constOp = rewriter.create<handshake::ConstantOp>(
       block->getOperations().front().getLoc(), cstAttr, cnstTrigger);
-  ftdOps.opsToSkip.insert(constOp);
+
+  constOp->setAttr(FTD_OP_TO_SKIP, rewriter.getUnitAttr());
 
   return constOp.getResult();
 }
@@ -458,7 +465,7 @@ static Value bddToCircuit(ConversionPatternRewriter &rewriter, BDD *bdd,
   // Create the multiplxer and add it to the rest of the circuit
   auto muxOp = rewriter.create<handshake::MuxOp>(
       block->getOperations().front().getLoc(), muxCond, muxOperands);
-  ftdOps.opsToSkip.insert(muxOp);
+  muxOp->setAttr(FTD_OP_TO_SKIP, rewriter.getUnitAttr());
 
   return muxOp.getResult();
 }
@@ -545,7 +552,7 @@ static Value addSuppressionInLoop(ConversionPatternRewriter &rewriter,
   // branch must undergo the `addSupp` function so we add it to our structure
   // to be able to loop over it
   if (btlt == BranchToLoopType::MoreProducerThanConsumers) {
-    ftdOps.suppBranches.insert(branchOp);
+    branchOp->setAttr(FTD_SUPP_BRANCH, rewriter.getUnitAttr());
     producersToCover.push_back(branchOp);
   }
 
@@ -594,7 +601,7 @@ insertDirectSuppression(ConversionPatternRewriter &rewriter,
   // mux was a GAMMA from GSA analysis; The input of the mux (i.e., coming
   // from the producer) is a data input.
   if (llvm::isa_and_nonnull<handshake::MuxOp>(consumer) &&
-      ftdOps.explicitPhiMerges.contains(consumer) &&
+      consumer->hasAttr(FTD_EXPLICIT_PHI) &&
       consumer->getOperand(0) != connection &&
       consumer->getOperand(0).getParentBlock() != consumer->getBlock() &&
       consumer->getBlock() != producerBlock) {
@@ -672,8 +679,8 @@ FtdLowerFuncToHandshake::addSupp(ConversionPatternRewriter &rewriter,
 
     // Skip the prod-cons if the producer is part of the operations related to
     // the BDD expansion or INIT merges
-    if (ftdOps.opsToSkip.contains(producerOp) ||
-        ftdOps.initMergesOperations.contains(producerOp))
+    if (producerOp->hasAttr(FTD_OP_TO_SKIP) ||
+        producerOp->hasAttr(FTD_INIT_MERGE))
       continue;
 
     // Consider all the consumers of each value of the producer
@@ -694,8 +701,8 @@ FtdLowerFuncToHandshake::addSupp(ConversionPatternRewriter &rewriter,
 
         // Skip the prod-cons if the consumer is part of the operations
         // related to the BDD expansion or INIT merges
-        if (ftdOps.opsToSkip.contains(consumerOp) ||
-            ftdOps.initMergesOperations.contains(consumerOp))
+        if (consumerOp->hasAttr(FTD_OP_TO_SKIP) ||
+            consumerOp->hasAttr(FTD_INIT_MERGE))
           continue;
 
         // TODO: Group the conditions of memory and the conditions of Branches
@@ -761,7 +768,7 @@ FtdLowerFuncToHandshake::addSupp(ConversionPatternRewriter &rewriter,
         // We need to suppress a token if the consumer is the producer itself
         // within a loop
         else if (selfRegeneration && consumerLoop &&
-                 !ftdOps.suppBranches.contains(producerOp)) {
+                 !producerOp->hasAttr(FTD_SUPP_BRANCH)) {
           addSuppressionInLoop(rewriter, consumerLoop, consumerOp, result,
                                BranchToLoopType::SelfRegeneration, ftdOps,
                                loopInfo, producersToCover);
@@ -851,10 +858,10 @@ FtdLowerFuncToHandshake::addRegen(ConversionPatternRewriter &rewriter,
         // merges.
         if (llvm::isa_and_nonnull<handshake::MemoryOpInterface>(producerOp) ||
             llvm::isa_and_nonnull<handshake::MemoryOpInterface>(consumerOp) ||
-            ftdOps.explicitPhiMerges.contains(&consumerOp) ||
-            ftdOps.initMergesOperations.contains(&consumerOp) ||
-            ftdOps.opsToSkip.contains(producerOp) ||
-            ftdOps.opsToSkip.contains(&consumerOp) ||
+            consumerOp.hasAttr(FTD_EXPLICIT_PHI) ||
+            consumerOp.hasAttr(FTD_INIT_MERGE) ||
+            (producerOp && producerOp->hasAttr(FTD_OP_TO_SKIP)) ||
+            consumerOp.hasAttr(FTD_OP_TO_SKIP) ||
             llvm::isa_and_nonnull<handshake::ControlMergeOp>(consumerOp) ||
             llvm::isa_and_nonnull<MemRefType>(operand.getType()))
           continue;
@@ -895,8 +902,7 @@ FtdLowerFuncToHandshake::addRegen(ConversionPatternRewriter &rewriter,
 
           // If we are in the innermost loop (thus the iterator is at its end)
           // and the consumer is a loop merge, stop
-          if (std::next(it) == loops.end() &&
-              ftdOps.memDepLoopMerges.contains(&consumerOp))
+          if (std::next(it) == loops.end() && consumerOp.hasAttr(FTD_MEM_DEP))
             break;
 
           // Add the merge to the network, by substituting the operand with
@@ -911,7 +917,7 @@ FtdLowerFuncToHandshake::addRegen(ConversionPatternRewriter &rewriter,
           // Create an INIT merge to provide the select of the multiplexer
           auto constOp = rewriter.create<handshake::ConstantOp>(
               consumerOp.getLoc(), cstAttr, startValue);
-          ftdOps.initMergesOperations.insert(constOp);
+          constOp->setAttr(FTD_INIT_MERGE, rewriter.getUnitAttr());
           Value conditionValue = ftdOps.conditionToValue[getBlockCondition(
               (*it)->getExitingBlock())];
           SmallVector<Value> mergeOperands;
@@ -919,7 +925,7 @@ FtdLowerFuncToHandshake::addRegen(ConversionPatternRewriter &rewriter,
           mergeOperands.push_back(conditionValue);
           auto initMergeOp = rewriter.create<handshake::MergeOp>(
               consumerOp.getLoc(), mergeOperands);
-          ftdOps.initMergesOperations.insert(initMergeOp);
+          initMergeOp->setAttr(FTD_INIT_MERGE, rewriter.getUnitAttr());
 
           // Create the multiplexer
           auto selectSignal = initMergeOp->getResult(0);
@@ -1471,7 +1477,7 @@ LogicalResult FtdLowerFuncToHandshake::addMergeLoop(
           auto constOp = builder.create<handshake::ConstantOp>(
               muxOperand.getLoc(), cstAttr, startCtrl);
 
-          ftdOps.initMergesOperations.insert(constOp);
+          constOp->setAttr(FTD_INIT_MERGE, builder.getUnitAttr());
 
           Value conditionValue =
               ftdOps
@@ -1488,14 +1494,14 @@ LogicalResult FtdLowerFuncToHandshake::addMergeLoop(
           auto selectSignal = initMergeOp->getResult(0);
           selectSignal.setType(channelifyType(selectSignal.getType()));
 
-          ftdOps.initMergesOperations.insert(initMergeOp);
+          initMergeOp->setAttr(FTD_INIT_MERGE, builder.getUnitAttr());
 
           // Add the merge and update the FTD data structures
           auto muxOp = builder.create<handshake::MuxOp>(muxOperand.getLoc(),
                                                         muxOperand.getType(),
                                                         selectSignal, operands);
 
-          ftdOps.memDepLoopMerges.insert(muxOp);
+          muxOp->setAttr(FTD_MEM_DEP, builder.getUnitAttr());
 
           // The merge becomes the producer now, so connect the result of
           // the MERGE as an operand of the Consumer. Also remove the old
@@ -1622,7 +1628,7 @@ FtdLowerFuncToHandshake::addExplicitPhi(FunctionType funcOp,
         auto initMergeOp =
             rewriter.create<handshake::MergeOp>(loc, mergeOperands);
 
-        ftdOps.initMergesOperations.insert(initMergeOp);
+        initMergeOp->setAttr(FTD_INIT_MERGE, rewriter.getUnitAttr());
 
         // Replace the new condition value
         conditionValue = initMergeOp->getResult(0);
@@ -1645,14 +1651,14 @@ FtdLowerFuncToHandshake::addExplicitPhi(FunctionType funcOp,
       // later removed
       if (nullOperand >= 0) {
         oneInputGammaList.insert(mux);
-        ftdOps.opsToSkip.insert(mux);
+        mux->setAttr(FTD_OP_TO_SKIP, rewriter.getUnitAttr());
       }
 
       if (phi->isRoot)
         rewriter.replaceAllUsesWith(phi->result, mux.getResult());
 
       gsaList.insert({phi->index, mux});
-      ftdOps.explicitPhiMerges.insert(mux);
+      mux->setAttr(FTD_EXPLICIT_PHI, rewriter.getUnitAttr());
 
       // It might be that the condition of a block was coming from a block
       // argument. For this reason, a remapping of the block conditions is
@@ -1684,7 +1690,6 @@ FtdLowerFuncToHandshake::addExplicitPhi(FunctionType funcOp,
                            ? 1
                            : 2;
     op->getResult(0).replaceAllUsesWith(op->getOperand(operandToUse));
-    ftdOps.explicitPhiMerges.erase(op);
     rewriter.eraseOp(op);
   }
 
