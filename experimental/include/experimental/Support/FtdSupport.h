@@ -24,6 +24,30 @@ namespace dynamatic {
 namespace experimental {
 namespace ftd {
 
+/// Class to associate an index to each block, that if block Bi dominates block
+/// Bj then i < j. While this is guaranteed by the MLIR CFG construction, it
+/// cannot really be given for granted, thus it is more convenient to make a
+/// custom one.
+class BlockIndexing {
+
+  /// Map to store the connection between blocks and unsigned numbers.
+  DenseMap<unsigned, Block *> blockIndexing;
+
+public:
+  /// Build the map.
+  BlockIndexing(mlir::Region &region);
+
+  /// Get a block out of an index.
+  Block *getBlockFromIndex(unsigned index);
+
+  /// Get a block out of a string condition in the format `cX` where X is a
+  /// number.
+  Block *getBlockFromCondition(const std::string &condition);
+
+  /// Get the index of a block.
+  unsigned getIndexFromBlock(Block *bb);
+};
+
 constexpr llvm::StringLiteral FTD_OP_TO_SKIP("ftd.skip");
 constexpr llvm::StringLiteral FTD_SUPP_BRANCH("ftd.supp");
 constexpr llvm::StringLiteral FTD_EXPLICIT_PHI("ftd.phi");

@@ -36,7 +36,9 @@
 
 using namespace mlir;
 using namespace dynamatic;
+using namespace dynamatic::experimental;
 using namespace dynamatic::experimental::boolean;
+using namespace dynamatic::experimental::ftd;
 
 namespace {
 
@@ -99,24 +101,16 @@ struct FtdCfToHandshakePass
 };
 } // namespace
 
-namespace dynamatic {
-namespace experimental {
-namespace ftd {
-
 using ArgReplacements = DenseMap<BlockArgument, OpResult>;
 
 // ------------------------ Forwarded declarations ------------------------
 
-static void mapConditionsToValues(Region &region, FtdStoredOperations &ftdOps);
-
 static void connectInitMerges(ConversionPatternRewriter &rewriter,
-                              handshake::FuncOp funcOp,
-                              FtdStoredOperations &ftdOps);
+                              handshake::FuncOp funcOp);
 
 // ------------------------ End forwarded declarations ------------------------
 
-void FtdLowerFuncToHandshake::analyzeLoop(handshake::FuncOp funcOp,
-                                          FtdStoredOperations &ftdOps) const {
+void ftd::FtdLowerFuncToHandshake::analyzeLoop(handshake::FuncOp funcOp) const {
 
   Region &region = funcOp.getBody();
   mlir::DominanceInfo domInfo;
@@ -145,11 +139,10 @@ void FtdLowerFuncToHandshake::analyzeLoop(handshake::FuncOp funcOp,
   ofs.close();
 }
 
-LogicalResult FtdLowerFuncToHandshake::matchAndRewrite(
+LogicalResult ftd::FtdLowerFuncToHandshake::matchAndRewrite(
     func::FuncOp lowerFuncOp, OpAdaptor adaptor,
     ConversionPatternRewriter &rewriter) const {
 
-  FtdStoredOperations ftdOps;
   // Map all memory accesses in the matched function to the index of their
   // memref in the function's arguments
   DenseMap<Value, unsigned> memrefToArgIdx;
@@ -158,12 +151,8 @@ LogicalResult FtdLowerFuncToHandshake::matchAndRewrite(
       memrefToArgIdx.insert({arg, idx});
   }
 
-  // Map for each block its exit condition (if exists). This allows to build
-  // boolean expressions as circuits
-  mapConditionsToValues(lowerFuncOp.getRegion(), ftdOps);
-
   // Add the muxes as obtained by the GSA analysis pass
-  if (failed(addExplicitPhi(lowerFuncOp, rewriter, ftdOps)))
+  if (failed(addExplicitPhi(lowerFuncOp, rewriter)))
     return failure();
 
   // First lower the parent function itself, without modifying its body
@@ -179,7 +168,7 @@ LogicalResult FtdLowerFuncToHandshake::matchAndRewrite(
   // function as one of its data inputs. However, the start value was not
   // present yet when `addExplicitPhi` is called, thus we need to reconnect
   // it.
-  connectInitMerges(rewriter, funcOp, ftdOps);
+  connectInitMerges(rewriter, funcOp);
 
   // Stores mapping from each value that passes through a merge-like
   // operation to the data result of that merge operation
@@ -225,10 +214,10 @@ LogicalResult FtdLowerFuncToHandshake::matchAndRewrite(
     if (failed(addRegen(rewriter, funcOp)))
       return failure();
 
-    analyzeLoop(funcOp, ftdOps);
+    analyzeLoop(funcOp);
 
     // Add suppression blocks between each pair of producer and consumer
-    if (failed(addSupp(rewriter, funcOp, ftdOps)))
+    if (failed(addSupp(rewriter, funcOp)))
       return failure();
   }
 
@@ -247,8 +236,7 @@ LogicalResult FtdLowerFuncToHandshake::matchAndRewrite(
 /// have a start signal yet. Once that the start signal is created, it needs
 /// to be connected to all the init merges.
 static void connectInitMerges(ConversionPatternRewriter &rewriter,
-                              handshake::FuncOp funcOp,
-                              FtdStoredOperations &ftdOps) {
+                              handshake::FuncOp funcOp) {
   auto startValue = (Value)funcOp.getArguments().back();
   auto cstType = rewriter.getIntegerType(1);
   auto cstAttr = IntegerAttr::get(cstType, 0);
@@ -378,25 +366,13 @@ static LogicalResult joinInsertion(OpBuilder &builder,
   return success();
 }
 
-/// For each block extract the terminator condition, i.e. the value driving
-/// the final conditional branch (in case it exists)
-static void mapConditionsToValues(Region &region, FtdStoredOperations &ftdOps) {
-  for (Block &block : region.getBlocks()) {
-    Operation *terminator = block.getTerminator();
-    if (isa_and_nonnull<cf::CondBranchOp>(terminator)) {
-      auto condBranch = dyn_cast<cf::CondBranchOp>(terminator);
-      ftdOps.conditionToValue[getBlockCondition(&block)] =
-          condBranch.getCondition();
-    }
-  }
-}
-
 /// Get a value out of the input boolean expression
 static Value boolVariableToCircuit(ConversionPatternRewriter &rewriter,
                                    experimental::boolean::BoolExpression *expr,
-                                   Block *block, FtdStoredOperations &ftdOps) {
+                                   Block *block, BlockIndexing &bi) {
   SingleCond *singleCond = static_cast<SingleCond *>(expr);
-  auto condition = ftdOps.conditionToValue[singleCond->id];
+  auto condition =
+      bi.getBlockFromCondition(singleCond->id)->getTerminator()->getOperand(0);
   if (singleCond->isNegated) {
     rewriter.setInsertionPointToStart(block);
     auto notOp = rewriter.create<handshake::NotOp>(
@@ -413,11 +389,11 @@ static Value boolVariableToCircuit(ConversionPatternRewriter &rewriter,
 /// of expressions you might have
 static Value boolExpressionToCircuit(ConversionPatternRewriter &rewriter,
                                      BoolExpression *expr, Block *block,
-                                     FtdStoredOperations &ftdOps) {
+                                     BlockIndexing &bi) {
 
   // Variable case
   if (expr->type == ExpressionType::Variable)
-    return boolVariableToCircuit(rewriter, expr, block, ftdOps);
+    return boolVariableToCircuit(rewriter, expr, block, bi);
 
   // Constant case (either 0 or 1)
   rewriter.setInsertionPointToStart(block);
@@ -440,9 +416,9 @@ static Value boolExpressionToCircuit(ConversionPatternRewriter &rewriter,
 /// Convert a `BDD` object as obtained from the bdd expansion to a
 /// circuit
 static Value bddToCircuit(ConversionPatternRewriter &rewriter, BDD *bdd,
-                          Block *block, FtdStoredOperations &ftdOps) {
+                          Block *block, BlockIndexing &bi) {
   if (!bdd->inputs.has_value())
-    return boolExpressionToCircuit(rewriter, bdd->boolVariable, block, ftdOps);
+    return boolExpressionToCircuit(rewriter, bdd->boolVariable, block, bi);
 
   rewriter.setInsertionPointToStart(block);
 
@@ -450,11 +426,11 @@ static Value bddToCircuit(ConversionPatternRewriter &rewriter, BDD *bdd,
   // creates other muxes in a hierarchical way)
   SmallVector<Value> muxOperands;
   muxOperands.push_back(
-      bddToCircuit(rewriter, bdd->inputs.value().first, block, ftdOps));
+      bddToCircuit(rewriter, bdd->inputs.value().first, block, bi));
   muxOperands.push_back(
-      bddToCircuit(rewriter, bdd->inputs.value().second, block, ftdOps));
+      bddToCircuit(rewriter, bdd->inputs.value().second, block, bi));
   Value muxCond =
-      boolExpressionToCircuit(rewriter, bdd->boolVariable, block, ftdOps);
+      boolExpressionToCircuit(rewriter, bdd->boolVariable, block, bi);
 
   // Create the multiplxer and add it to the rest of the circuit
   auto muxOp = rewriter.create<handshake::MuxOp>(
@@ -469,8 +445,9 @@ static Value bddToCircuit(ConversionPatternRewriter &rewriter, BDD *bdd,
 static Value addSuppressionInLoop(ConversionPatternRewriter &rewriter,
                                   CFGLoop *loop, Operation *consumer,
                                   Value connection, BranchToLoopType btlt,
-                                  FtdStoredOperations &ftdOps, CFGLoopInfo &li,
-                                  std::vector<Operation *> &producersToCover) {
+                                  CFGLoopInfo &li,
+                                  std::vector<Operation *> &producersToCover,
+                                  BlockIndexing &bi) {
 
   handshake::ConditionalBranchOp branchOp;
 
@@ -493,7 +470,7 @@ static Value addSuppressionInLoop(ConversionPatternRewriter &rewriter,
     // that the token can be suppressed
     auto *exitCondition = getBlockLoopExitCondition(loopExit, loop, li);
     auto conditionValue =
-        boolVariableToCircuit(rewriter, exitCondition, loopExit, ftdOps);
+        boolVariableToCircuit(rewriter, exitCondition, loopExit, bi);
 
     rewriter.setInsertionPointToStart(loopExit);
 
@@ -528,7 +505,7 @@ static Value addSuppressionInLoop(ConversionPatternRewriter &rewriter,
     BDD *bdd = buildBDD(fLoopExit, cofactorList);
 
     // Convert the boolean expression obtained through bdd to a circuit
-    Value branchCond = bddToCircuit(rewriter, bdd, loopExit, ftdOps);
+    Value branchCond = bddToCircuit(rewriter, bdd, loopExit, bi);
 
     Operation *loopTerminator = loopExit->getTerminator();
     assert(isa<cf::CondBranchOp>(loopTerminator) &&
@@ -563,7 +540,7 @@ static Value addSuppressionInLoop(ConversionPatternRewriter &rewriter,
 static LogicalResult
 insertDirectSuppression(ConversionPatternRewriter &rewriter,
                         handshake::FuncOp &funcOp, Operation *consumer,
-                        Value connection, FtdStoredOperations &ftdOps) {
+                        Value connection, BlockIndexing &bi) {
   Block *entryBlock = &funcOp.getBody().front();
   ControlDependenceAnalysis<dynamatic::handshake::FuncOp> cdgAnalysis(funcOp);
   Block *producerBlock = connection.getParentBlock();
@@ -627,8 +604,7 @@ insertDirectSuppression(ConversionPatternRewriter &rewriter,
 
     std::vector<std::string> cofactorList(blocks.begin(), blocks.end());
     BDD *bdd = buildBDD(fSup, cofactorList);
-    Value branchCond =
-        bddToCircuit(rewriter, bdd, consumer->getBlock(), ftdOps);
+    Value branchCond = bddToCircuit(rewriter, bdd, consumer->getBlock(), bi);
 
     rewriter.setInsertionPointToStart(consumer->getBlock());
     auto branchOp = rewriter.create<handshake::ConditionalBranchOp>(
@@ -641,9 +617,8 @@ insertDirectSuppression(ConversionPatternRewriter &rewriter,
 }
 
 LogicalResult
-FtdLowerFuncToHandshake::addSupp(ConversionPatternRewriter &rewriter,
-                                 handshake::FuncOp &funcOp,
-                                 FtdStoredOperations &ftdOps) const {
+ftd::FtdLowerFuncToHandshake::addSupp(ConversionPatternRewriter &rewriter,
+                                      handshake::FuncOp &funcOp) const {
   Region &region = funcOp.getBody();
   mlir::DominanceInfo domInfo;
   mlir::CFGLoopInfo loopInfo(domInfo.getDomTree(&region));
@@ -657,6 +632,8 @@ FtdLowerFuncToHandshake::addSupp(ConversionPatternRewriter &rewriter,
   // to rerun the analysis on the operations inserted throughout the
   // execution, but this is future work...
   std::vector<Operation *> producersToCover;
+
+  BlockIndexing bi(region);
 
   // Add all the operations in the IR to the above vector
   for (Block &producerBlock : region.getBlocks()) {
@@ -754,8 +731,8 @@ FtdLowerFuncToHandshake::addSupp(ConversionPatternRewriter &rewriter,
             if (!loop->contains(consumerBlock))
               con = addSuppressionInLoop(
                   rewriter, loop, consumerOp, con,
-                  BranchToLoopType::MoreProducerThanConsumers, ftdOps, loopInfo,
-                  producersToCover);
+                  BranchToLoopType::MoreProducerThanConsumers, loopInfo,
+                  producersToCover, bi);
           }
         }
 
@@ -764,8 +741,8 @@ FtdLowerFuncToHandshake::addSupp(ConversionPatternRewriter &rewriter,
         else if (selfRegeneration && consumerLoop &&
                  !producerOp->hasAttr(FTD_SUPP_BRANCH)) {
           addSuppressionInLoop(rewriter, consumerLoop, consumerOp, result,
-                               BranchToLoopType::SelfRegeneration, ftdOps,
-                               loopInfo, producersToCover);
+                               BranchToLoopType::SelfRegeneration, loopInfo,
+                               producersToCover, bi);
         }
 
         // We need to suppress a token if the consumer comes before the
@@ -776,14 +753,14 @@ FtdLowerFuncToHandshake::addSupp(ConversionPatternRewriter &rewriter,
                    isaMergeLoop(consumerOp, loopInfo))) &&
                  consumerLoop) {
           addSuppressionInLoop(rewriter, consumerLoop, consumerOp, result,
-                               BranchToLoopType::BackwardRelationship, ftdOps,
-                               loopInfo, producersToCover);
+                               BranchToLoopType::BackwardRelationship, loopInfo,
+                               producersToCover, bi);
         }
 
         // If no loop is involved, then there is a direct relationship between
         // consumer and producer
         else if (failed(insertDirectSuppression(rewriter, funcOp, consumerOp,
-                                                result, ftdOps)))
+                                                result, bi)))
           return failure();
       }
     }
@@ -812,7 +789,7 @@ FtdLowerFuncToHandshake::addSupp(ConversionPatternRewriter &rewriter,
 
       // Handle the suppression
       if (failed(insertDirectSuppression(rewriter, funcOp, producerOp, operand,
-                                         ftdOps)))
+                                         bi)))
         return failure();
     }
   }
@@ -821,8 +798,8 @@ FtdLowerFuncToHandshake::addSupp(ConversionPatternRewriter &rewriter,
 }
 
 LogicalResult
-FtdLowerFuncToHandshake::addRegen(ConversionPatternRewriter &rewriter,
-                                  handshake::FuncOp &funcOp) const {
+ftd::FtdLowerFuncToHandshake::addRegen(ConversionPatternRewriter &rewriter,
+                                       handshake::FuncOp &funcOp) const {
 
   // For each producer/consumer relationship
   for (Operation &consumerOp : funcOp.getOps()) {
@@ -839,7 +816,7 @@ FtdLowerFuncToHandshake::addRegen(ConversionPatternRewriter &rewriter,
   return success();
 }
 
-LogicalResult FtdLowerFuncToHandshake::convertUndefinedValues(
+LogicalResult ftd::FtdLowerFuncToHandshake::convertUndefinedValues(
     ConversionPatternRewriter &rewriter, handshake::FuncOp &funcOp) const {
 
   // Get the start value of the current function
@@ -877,9 +854,8 @@ LogicalResult FtdLowerFuncToHandshake::convertUndefinedValues(
   return success();
 }
 
-LogicalResult
-FtdLowerFuncToHandshake::convertConstants(ConversionPatternRewriter &rewriter,
-                                          handshake::FuncOp &funcOp) const {
+LogicalResult ftd::FtdLowerFuncToHandshake::convertConstants(
+    ConversionPatternRewriter &rewriter, handshake::FuncOp &funcOp) const {
 
   // Get the start value of the current function
   auto startValue = (Value)funcOp.getArguments().back();
@@ -913,9 +889,9 @@ FtdLowerFuncToHandshake::convertConstants(ConversionPatternRewriter &rewriter,
   return success();
 }
 
-LogicalResult FtdLowerFuncToHandshake::ftdVerifyAndCreateMemInterfaces(
+LogicalResult ftd::FtdLowerFuncToHandshake::ftdVerifyAndCreateMemInterfaces(
     handshake::FuncOp &funcOp, ConversionPatternRewriter &rewriter,
-    MemInterfacesInfo &memInfo, FtdStoredOperations &ftdOps) const {
+    MemInterfacesInfo &memInfo) const {
 
   /// Given an LSQ, extract the list of operations which require that same LSQ
   auto getLSQOperations =
@@ -1093,11 +1069,11 @@ LogicalResult FtdLowerFuncToHandshake::ftdVerifyAndCreateMemInterfaces(
       // [TBD] Instead of adding things this way, introduce a custom pass
       // about the analysis of these merges. Unify them with SSA?
       if (failed(addMergeNonLoop(funcOp, rewriter, allMemDeps, groupsGraph,
-                                 forksGraph, ftdOps, startValue)))
+                                 forksGraph, startValue)))
         return failure();
 
       if (failed(addMergeLoop(funcOp, rewriter, allMemDeps, groupsGraph,
-                              forksGraph, ftdOps, startValue)))
+                              forksGraph, startValue)))
         return failure();
 
       if (failed(joinInsertion(rewriter, groupsGraph, forksGraph)))
@@ -1113,7 +1089,7 @@ LogicalResult FtdLowerFuncToHandshake::ftdVerifyAndCreateMemInterfaces(
   return success();
 }
 
-void FtdLowerFuncToHandshake::identifyMemoryDependencies(
+void ftd::FtdLowerFuncToHandshake::identifyMemoryDependencies(
     const SmallVector<Operation *> &operations,
     SmallVector<ProdConsMemDep> &allMemDeps,
     const mlir::CFGLoopInfo &li) const {
@@ -1188,11 +1164,10 @@ void FtdLowerFuncToHandshake::identifyMemoryDependencies(
   }
 }
 
-LogicalResult FtdLowerFuncToHandshake::addMergeNonLoop(
+LogicalResult ftd::FtdLowerFuncToHandshake::addMergeNonLoop(
     handshake::FuncOp &funcOp, OpBuilder &builder,
     SmallVector<ProdConsMemDep> &allMemDeps, DenseSet<Group *> &groups,
-    DenseMap<Block *, Operation *> &forksGraph, FtdStoredOperations &ftdOps,
-    Value startCtrl) const {
+    DenseMap<Block *, Operation *> &forksGraph, Value startCtrl) const {
 
   // Get entry block of the function to lower
   Block *entryBlock = &funcOp.getRegion().front();
@@ -1304,11 +1279,10 @@ LogicalResult FtdLowerFuncToHandshake::addMergeNonLoop(
   return success();
 }
 
-LogicalResult FtdLowerFuncToHandshake::addMergeLoop(
+LogicalResult ftd::FtdLowerFuncToHandshake::addMergeLoop(
     handshake::FuncOp &funcOp, OpBuilder &builder,
     SmallVector<ProdConsMemDep> &allMemDeps, DenseSet<Group *> &groups,
-    DenseMap<Block *, Operation *> &forksGraph, FtdStoredOperations &ftdOps,
-    Value startCtrl) const {
+    DenseMap<Block *, Operation *> &forksGraph, Value startCtrl) const {
 
   // Get the dominance info about the current region, in order to compute the
   // properties of loop
@@ -1359,8 +1333,7 @@ LogicalResult FtdLowerFuncToHandshake::addMergeLoop(
           constOp->setAttr(FTD_INIT_MERGE, builder.getUnitAttr());
 
           Value conditionValue =
-              ftdOps
-                  .conditionToValue[getBlockCondition(loop->getExitingBlock())];
+              loop->getExitingBlock()->getTerminator()->getOperand(0);
 
           SmallVector<Value> mergeOperands;
           mergeOperands.push_back(constOp.getResult());
@@ -1395,10 +1368,8 @@ LogicalResult FtdLowerFuncToHandshake::addMergeLoop(
 }
 
 template <typename FunctionType>
-LogicalResult
-FtdLowerFuncToHandshake::addExplicitPhi(FunctionType funcOp,
-                                        ConversionPatternRewriter &rewriter,
-                                        FtdStoredOperations &ftdOps) const {
+LogicalResult ftd::FtdLowerFuncToHandshake::addExplicitPhi(
+    FunctionType funcOp, ConversionPatternRewriter &rewriter) const {
 
   using namespace experimental::gsa;
 
@@ -1538,11 +1509,6 @@ FtdLowerFuncToHandshake::addExplicitPhi(FunctionType funcOp,
 
       gsaList.insert({phi->index, mux});
       mux->setAttr(FTD_EXPLICIT_PHI, rewriter.getUnitAttr());
-
-      // It might be that the condition of a block was coming from a block
-      // argument. For this reason, a remapping of the block conditions is
-      // necessary
-      mapConditionsToValues(funcOp.getRegion(), ftdOps);
     }
   }
 
@@ -1601,16 +1567,9 @@ FtdLowerFuncToHandshake::addExplicitPhi(FunctionType funcOp,
     }
   }
 
-  // Since the terminators have been modified, a new remapping is necessary as
-  // well
-  mapConditionsToValues(funcOp.getRegion(), ftdOps);
-
   return success();
 }
-std::unique_ptr<dynamatic::DynamaticPass> createFtdCfToHandshake() {
+
+std::unique_ptr<dynamatic::DynamaticPass> ftd::createFtdCfToHandshake() {
   return std::make_unique<FtdCfToHandshakePass>();
 }
-
-} // namespace ftd
-} // namespace experimental
-} // namespace dynamatic

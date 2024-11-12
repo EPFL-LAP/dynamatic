@@ -28,22 +28,11 @@ namespace dynamatic {
 namespace experimental {
 namespace ftd {
 
+/// Different types of loop suppression.
 enum BranchToLoopType {
   MoreProducerThanConsumers,
   SelfRegeneration,
   BackwardRelationship
-};
-
-/// Structure to store a set of data structures useful for the whole FTD
-/// algorithm.
-struct FtdStoredOperations {
-
-  /// For each condition of the block, represented in abstract as `cN` where `N`
-  /// is the index of the basic block, associate its corresponding control
-  /// value, Associates the condition of the block in string format to its
-  /// corresponding control value. This is given by the condition of the
-  /// terminator of the block, in case it's a conditional branch
-  std::map<std::string, Value> conditionToValue;
 };
 
 /// Convert a func-level function into an handshake-level function. A custom
@@ -66,11 +55,12 @@ public:
                   ConversionPatternRewriter &rewriter) const override;
 
 protected:
-  LogicalResult ftdVerifyAndCreateMemInterfaces(
-      handshake::FuncOp &funcOp, ConversionPatternRewriter &rewriter,
-      MemInterfacesInfo &memInfo, FtdStoredOperations &ftdOps) const;
+  LogicalResult
+  ftdVerifyAndCreateMemInterfaces(handshake::FuncOp &funcOp,
+                                  ConversionPatternRewriter &rewriter,
+                                  MemInterfacesInfo &memInfo) const;
 
-  void analyzeLoop(handshake::FuncOp funcOp, FtdStoredOperations &ftdOps) const;
+  void analyzeLoop(handshake::FuncOp funcOp) const;
 
   /// Given a list of operations, return the list of memory dependencies for
   /// each block. This allows to build the group graph, which allows to
@@ -89,7 +79,6 @@ protected:
                                 SmallVector<ProdConsMemDep> &allMemDeps,
                                 DenseSet<Group *> &groups,
                                 DenseMap<Block *, Operation *> &forksGraph,
-                                FtdStoredOperations &ftdOps,
                                 Value startCtrl) const;
 
   /// For each pair of producer and consumer which are in loop possibly
@@ -98,7 +87,6 @@ protected:
                              SmallVector<ProdConsMemDep> &allMemDeps,
                              DenseSet<Group *> &groups,
                              DenseMap<Block *, Operation *> &forksGraph,
-                             FtdStoredOperations &ftdOps,
                              Value startCtrl) const;
 
   /// Convers arith-level constants to handshake-level constants. Constants are
@@ -127,25 +115,14 @@ protected:
   /// must be suprressed. This function inserts a `SUPPRESS` block whenever it
   /// is necessary, according to FPGA'22 (IV.C and V)
   LogicalResult addSupp(ConversionPatternRewriter &rewriter,
-                        handshake::FuncOp &funcOp,
-                        FtdStoredOperations &ftdOps) const;
-
-  /// The suppression mechanism must be used for the start token as well.
-  /// However, in the handshake IR, the signal is considered as a value, so it
-  /// cannot be handled by the prevvious `addSupp` functions. This funciton is
-  /// in charge of handling this scenario, by adding appropriate suppressions
-  /// for the start token.
-  LogicalResult addSuppStart(ConversionPatternRewriter &rewriter,
-                             handshake::FuncOp &funcOp,
-                             FtdStoredOperations &ftdOps) const;
+                        handshake::FuncOp &funcOp) const;
 
   /// Starting from the information collected by the gsa analysis pass,
   /// instantiate some merge operations at the beginning of each block which
   /// work as explicit phi functions.
   template <typename FunctionType>
   LogicalResult addExplicitPhi(FunctionType funcOp,
-                               ConversionPatternRewriter &rewriter,
-                               FtdStoredOperations &ftdOps) const;
+                               ConversionPatternRewriter &rewriter) const;
 };
 #define GEN_PASS_DECL_FTDCFTOHANDSHAKE
 #define GEN_PASS_DEF_FTDCFTOHANDSHAKE

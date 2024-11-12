@@ -20,13 +20,11 @@
 #include <unordered_set>
 
 using namespace mlir;
+using namespace dynamatic;
+using namespace dynamatic::experimental;
 using namespace dynamatic::experimental::boolean;
 
-namespace dynamatic {
-namespace experimental {
-namespace ftd {
-
-unsigned getBlockIndex(Block *bb) {
+unsigned ftd::getBlockIndex(Block *bb) {
   std::string result1;
   llvm::raw_string_ostream os1(result1);
   bb->printAsOperand(os1);
@@ -34,15 +32,15 @@ unsigned getBlockIndex(Block *bb) {
   return std::stoi(block1id.substr(3));
 }
 
-bool lessThanBlocks(Block *block1, Block *block2) {
+bool ftd::lessThanBlocks(Block *block1, Block *block2) {
   return getBlockIndex(block1) < getBlockIndex(block2);
 }
 
-bool greaterThanBlocks(Block *block1, Block *block2) {
+bool ftd::greaterThanBlocks(Block *block1, Block *block2) {
   return getBlockIndex(block1) > getBlockIndex(block2);
 }
 
-bool isSameLoop(const CFGLoop *loop1, const CFGLoop *loop2) {
+bool ftd::isSameLoop(const CFGLoop *loop1, const CFGLoop *loop2) {
   if (!loop1 || !loop2)
     return false;
   return (loop1 == loop2 || isSameLoop(loop1->getParentLoop(), loop2) ||
@@ -50,20 +48,21 @@ bool isSameLoop(const CFGLoop *loop1, const CFGLoop *loop2) {
           isSameLoop(loop1->getParentLoop(), loop2->getParentLoop()));
 }
 
-bool isSameLoopBlocks(Block *source, Block *dest, const mlir::CFGLoopInfo &li) {
+bool ftd::isSameLoopBlocks(Block *source, Block *dest,
+                           const mlir::CFGLoopInfo &li) {
   return isSameLoop(li.getLoopFor(source), li.getLoopFor(dest));
 }
 
-std::string getBlockCondition(Block *block) {
+std::string ftd::getBlockCondition(Block *block) {
   std::string blockCondition = "c" + std::to_string(ftd::getBlockIndex(block));
   return blockCondition;
 }
 
-bool isHandhsakeLSQOperation(Operation *op) {
+bool ftd::isHandhsakeLSQOperation(Operation *op) {
   return isa<handshake::LSQStoreOp, handshake::LSQLoadOp>(op);
 }
 
-void eliminateCommonBlocks(DenseSet<Block *> &s1, DenseSet<Block *> &s2) {
+void ftd::eliminateCommonBlocks(DenseSet<Block *> &s1, DenseSet<Block *> &s2) {
 
   std::vector<Block *> intersection;
   for (auto &e1 : s1) {
@@ -107,12 +106,12 @@ static CFGLoop *checkInnermostCommonLoop(CFGLoop *loop1, CFGLoop *loop2) {
   return nullptr;
 }
 
-CFGLoop *getInnermostCommonLoop(Block *block1, Block *block2,
-                                mlir::CFGLoopInfo &li) {
+CFGLoop *ftd::getInnermostCommonLoop(Block *block1, Block *block2,
+                                     mlir::CFGLoopInfo &li) {
   return checkInnermostCommonLoop(li.getLoopFor(block1), li.getLoopFor(block2));
 }
 
-bool isBranchLoopExit(Operation *op, CFGLoopInfo &li) {
+bool ftd::isBranchLoopExit(Operation *op, CFGLoopInfo &li) {
   if (isa<handshake::ConditionalBranchOp>(op)) {
     if (CFGLoop *loop = li.getLoopFor(op->getBlock()); loop) {
       llvm::SmallVector<Block *> exitBlocks;
@@ -150,7 +149,7 @@ static void dfsAllPaths(Block *start, Block *end, std::vector<Block *> &path,
       bool incorrectPath = false;
       for (auto *toAvoid : blocksToAvoid) {
         if (toAvoid == successor &&
-            getBlockIndex(toAvoid) > getBlockIndex(blockToTraverse)) {
+            ftd::getBlockIndex(toAvoid) > ftd::getBlockIndex(blockToTraverse)) {
           incorrectPath = true;
           break;
         }
@@ -200,8 +199,8 @@ static void dfsAllPaths(Operation *current, Operation *end,
   visited.erase(current);
 }
 
-std::vector<std::vector<Operation *>> findAllPaths(Operation *start,
-                                                   Operation *end) {
+std::vector<std::vector<Operation *>> ftd::findAllPaths(Operation *start,
+                                                        Operation *end) {
   std::vector<std::vector<Operation *>> allPaths;
   std::unordered_set<Operation *> visited;
   std::vector<Operation *> path;
@@ -210,8 +209,8 @@ std::vector<std::vector<Operation *>> findAllPaths(Operation *start,
 }
 
 std::vector<std::vector<Block *>>
-findAllPaths(Block *start, Block *end, Block *blockToTraverse,
-             ArrayRef<Block *> blocksToAvoid) {
+ftd::findAllPaths(Block *start, Block *end, Block *blockToTraverse,
+                  ArrayRef<Block *> blocksToAvoid) {
   std::vector<std::vector<Block *>> allPaths;
   std::vector<Block *> path;
   std::unordered_set<Block *> visited;
@@ -250,10 +249,10 @@ static Block *getPostDominantSuccessor(Block *prod, Block *cons,
   return nullptr;
 }
 
-Block *getPostDominantSuccessor(Block *prod, Block *cons) {
+Block *ftd::getPostDominantSuccessor(Block *prod, Block *cons) {
   std::unordered_set<Block *> visited;
   PostDominanceInfo postDomInfo;
-  return getPostDominantSuccessor(prod, cons, visited, postDomInfo);
+  return ::getPostDominantSuccessor(prod, cons, visited, postDomInfo);
 }
 
 /// Helper recursive function for getPredecessorDominatingAndPostDominating
@@ -289,17 +288,18 @@ static Block *getPredecessorDominatingAndPostDominating(
   return nullptr;
 }
 
-Block *getPredecessorDominatingAndPostDominating(Block *prod, Block *cons) {
+Block *ftd::getPredecessorDominatingAndPostDominating(Block *prod,
+                                                      Block *cons) {
   std::unordered_set<Block *> visited;
   DominanceInfo domInfo;
   PostDominanceInfo postDomInfo;
-  return getPredecessorDominatingAndPostDominating(prod, cons, visited, domInfo,
-                                                   postDomInfo);
+  return ::getPredecessorDominatingAndPostDominating(prod, cons, visited,
+                                                     domInfo, postDomInfo);
 }
 
 /// Given an operation, return true if the two operands of a merge come from
 /// two different loops. When this happens, the merge is connecting two loops
-bool isaMergeLoop(Operation *merge, CFGLoopInfo &li) {
+bool ftd::isaMergeLoop(Operation *merge, CFGLoopInfo &li) {
 
   if (merge->getNumOperands() == 1)
     return false;
@@ -338,9 +338,10 @@ bool isaMergeLoop(Operation *merge, CFGLoopInfo &li) {
 }
 
 boolean::BoolExpression *
-getPathExpression(ArrayRef<Block *> path, DenseSet<unsigned> &blockIndexSet,
-                  const DenseMap<Block *, unsigned> &mapBlockToIndex,
-                  const DenseSet<Block *> &deps, const bool ignoreDeps) {
+ftd::getPathExpression(ArrayRef<Block *> path,
+                       DenseSet<unsigned> &blockIndexSet,
+                       const DenseMap<Block *, unsigned> &mapBlockToIndex,
+                       const DenseSet<Block *> &deps, const bool ignoreDeps) {
 
   // Start with a boolean expression of one
   boolean::BoolExpression *exp = boolean::BoolExpression::boolOne();
@@ -390,9 +391,9 @@ getPathExpression(ArrayRef<Block *> path, DenseSet<unsigned> &blockIndexSet,
 }
 
 BoolExpression *
-enumeratePaths(Block *start, Block *end,
-               const DenseMap<Block *, unsigned> &mapBlockToIndex,
-               const DenseSet<Block *> &controlDeps) {
+ftd::enumeratePaths(Block *start, Block *end,
+                    const DenseMap<Block *, unsigned> &mapBlockToIndex,
+                    const DenseSet<Block *> &controlDeps) {
   // Start with a boolean expression of zero (so that new conditions can be
   // added)
   BoolExpression *sop = BoolExpression::boolZero();
@@ -415,7 +416,7 @@ enumeratePaths(Block *start, Block *end,
   return sop->boolMinimizeSop();
 }
 
-Type channelifyType(Type type) {
+Type ftd::channelifyType(Type type) {
   return llvm::TypeSwitch<Type, Type>(type)
       .Case<IndexType, IntegerType, FloatType>(
           [](auto type) { return handshake::ChannelType::get(type); })
@@ -432,8 +433,8 @@ Type channelifyType(Type type) {
       .Default([](auto type) { return nullptr; });
 }
 
-BoolExpression *getBlockLoopExitCondition(Block *loopExit, CFGLoop *loop,
-                                          CFGLoopInfo &li) {
+BoolExpression *ftd::getBlockLoopExitCondition(Block *loopExit, CFGLoop *loop,
+                                               CFGLoopInfo &li) {
   BoolExpression *blockCond =
       BoolExpression::parseSop(getBlockCondition(loopExit));
   auto *terminatorOperation = loopExit->getTerminator();
@@ -449,14 +450,14 @@ BoolExpression *getBlockLoopExitCondition(Block *loopExit, CFGLoop *loop,
   return blockCond;
 }
 
-SmallVector<Type> getBranchResultTypes(Type inputType) {
+SmallVector<Type> ftd::getBranchResultTypes(Type inputType) {
   SmallVector<Type> handshakeResultTypes;
   handshakeResultTypes.push_back(channelifyType(inputType));
   handshakeResultTypes.push_back(channelifyType(inputType));
   return handshakeResultTypes;
 }
 
-Block *getImmediateDominator(Region &region, Block *bb) {
+Block *ftd::getImmediateDominator(Region &region, Block *bb) {
   // Avoid a situation with no blocks in the region
   if (region.getBlocks().empty())
     return nullptr;
@@ -468,7 +469,7 @@ Block *getImmediateDominator(Region &region, Block *bb) {
   return domTree.getNode(bb)->getIDom()->getBlock();
 }
 
-DenseMap<Block *, DenseSet<Block *>> getDominanceFrontier(Region &region) {
+DenseMap<Block *, DenseSet<Block *>> ftd::getDominanceFrontier(Region &region) {
 
   // This algorithm comes from the following paper:
   // Cooper, Keith D., Timothy J. Harvey and Ken Kennedy. “AS imple, Fast
@@ -525,8 +526,8 @@ DenseMap<Block *, DenseSet<Block *>> getDominanceFrontier(Region &region) {
 }
 
 FailureOr<DenseMap<Block *, Value>>
-insertPhi(Region &funcRegion, ConversionPatternRewriter &rewriter,
-          SmallVector<Value> &vals) {
+ftd::insertPhi(Region &funcRegion, ConversionPatternRewriter &rewriter,
+               SmallVector<Value> &vals) {
 
   auto dominanceFrontier = getDominanceFrontier(funcRegion);
 
@@ -792,8 +793,8 @@ insertPhi(Region &funcRegion, ConversionPatternRewriter &rewriter,
   return result;
 }
 
-SmallVector<CFGLoop *> getLoopsConsNotInProd(Block *cons, Block *prod,
-                                             mlir::CFGLoopInfo &li) {
+SmallVector<CFGLoop *> ftd::getLoopsConsNotInProd(Block *cons, Block *prod,
+                                                  mlir::CFGLoopInfo &li) {
   SmallVector<CFGLoop *> result;
 
   // Get all the loops in which the consumer is but the producer is
@@ -809,9 +810,9 @@ SmallVector<CFGLoop *> getLoopsConsNotInProd(Block *cons, Block *prod,
   return result;
 };
 
-LogicalResult addRegenToConsumer(ConversionPatternRewriter &rewriter,
-                                 handshake::FuncOp &funcOp,
-                                 Operation *consumerOp) {
+LogicalResult ftd::addRegenToConsumer(ConversionPatternRewriter &rewriter,
+                                      handshake::FuncOp &funcOp,
+                                      Operation *consumerOp) {
 
   mlir::DominanceInfo domInfo;
   mlir::CFGLoopInfo loopInfo(domInfo.getDomTree(&funcOp.getBody()));
@@ -913,6 +914,44 @@ LogicalResult addRegenToConsumer(ConversionPatternRewriter &rewriter,
   return success();
 }
 
-}; // namespace ftd
-}; // namespace experimental
-}; // namespace dynamatic
+dynamatic::experimental::ftd::BlockIndexing::BlockIndexing(Region &region) {
+  mlir::DominanceInfo domInfo;
+
+  // Create a vector with all the blocks
+  SmallVector<Block *> allBlocks;
+  for (Block &bb : region.getBlocks())
+    allBlocks.push_back(&bb);
+
+  // Sort the vector according to the dominance information
+  std::sort(allBlocks.begin(), allBlocks.end(),
+            [&](Block *a, Block *b) { return domInfo.dominates(a, b); });
+
+  // Associate a smalled index in the map to the blocks at higer levels of the
+  // dominance tree
+  unsigned bbIndex = 0;
+  for (Block *bb : allBlocks)
+    blockIndexing.insert({bbIndex++, bb});
+}
+
+Block *
+dynamatic::experimental::ftd::BlockIndexing::getBlockFromIndex(unsigned index) {
+  auto it = blockIndexing.find(index);
+  return (it == blockIndexing.end()) ? nullptr : it->getSecond();
+}
+
+Block *dynamatic::experimental::ftd::BlockIndexing::getBlockFromCondition(
+    const std::string &condition) {
+  std::string conditionNumber = condition;
+  conditionNumber.erase(0, 1);
+  unsigned index = std::stoi(conditionNumber);
+  return this->getBlockFromIndex(index);
+}
+
+unsigned
+dynamatic::experimental::ftd::BlockIndexing::getIndexFromBlock(Block *bb) {
+  for (auto const &[i, b] : blockIndexing) {
+    if (bb == b)
+      return i;
+  }
+  return -1;
+}
