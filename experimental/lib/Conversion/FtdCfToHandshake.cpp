@@ -38,12 +38,6 @@ using namespace mlir;
 using namespace dynamatic;
 using namespace dynamatic::experimental::boolean;
 
-constexpr llvm::StringLiteral FTD_OP_TO_SKIP("ftd.op_to_skip");
-constexpr llvm::StringLiteral FTD_SUPP_BRANCH("ftd.supp_branch");
-constexpr llvm::StringLiteral FTD_EXPLICIT_PHI("ftd.phi");
-constexpr llvm::StringLiteral FTD_MEM_DEP("ftd.med_dep");
-constexpr llvm::StringLiteral FTD_INIT_MERGE("ftd.init_merge");
-
 namespace {
 
 struct FtdCfToHandshakePass
@@ -228,7 +222,7 @@ LogicalResult FtdLowerFuncToHandshake::matchAndRewrite(
 
   if (funcOp.getBlocks().size() != 1) {
     // Add muxes for regeneration of values in loop
-    if (failed(addRegen(rewriter, funcOp, ftdOps)))
+    if (failed(addRegen(rewriter, funcOp)))
       return failure();
 
     analyzeLoop(funcOp, ftdOps);
@@ -828,133 +822,18 @@ FtdLowerFuncToHandshake::addSupp(ConversionPatternRewriter &rewriter,
 
 LogicalResult
 FtdLowerFuncToHandshake::addRegen(ConversionPatternRewriter &rewriter,
-                                  handshake::FuncOp &funcOp,
-                                  FtdStoredOperations &ftdOps) const {
-
-  Region &region = funcOp.getBody();
-  mlir::DominanceInfo domInfo;
-  mlir::CFGLoopInfo loopInfo(domInfo.getDomTree(&region));
-  auto startValue = (Value)funcOp.getArguments().back();
-
-  DenseSet<Operation *> regenMuxes;
+                                  handshake::FuncOp &funcOp) const {
 
   // For each producer/consumer relationship
-  for (Block &consumerBlock : region.getBlocks()) {
-    for (Operation &consumerOp : consumerBlock.getOperations()) {
-
-      // Skip if the consumer was added by this function, to avoid loops
-      if (regenMuxes.contains(&consumerOp))
-        continue;
-
-      for (Value operand : consumerOp.getOperands()) {
-
-        // Skip if the producer was added by this function, to avoid loops
-        mlir::Operation *producerOp = operand.getDefiningOp();
-        if (regenMuxes.contains(producerOp))
-          continue;
-
-        // Everything related to memories should not undergo the FTD
-        // transformation. Same goes for explicit phi multiplexers and INIT
-        // merges.
-        if (llvm::isa_and_nonnull<handshake::MemoryOpInterface>(producerOp) ||
-            llvm::isa_and_nonnull<handshake::MemoryOpInterface>(consumerOp) ||
-            consumerOp.hasAttr(FTD_EXPLICIT_PHI) ||
-            consumerOp.hasAttr(FTD_INIT_MERGE) ||
-            (producerOp && producerOp->hasAttr(FTD_OP_TO_SKIP)) ||
-            consumerOp.hasAttr(FTD_OP_TO_SKIP) ||
-            llvm::isa_and_nonnull<handshake::ControlMergeOp>(consumerOp) ||
-            llvm::isa_and_nonnull<MemRefType>(operand.getType()))
-          continue;
-
-        // Get the parent block of the operand
-        Block *producerBlock = operand.getParentBlock();
-        Value producerOperand = operand;
-
-        // Function to obtain all the loops in which the consumer is but the
-        // producer is not (which specifies how many times a value has to be
-        // regenerated)
-        auto getLoopsConsNotInProd =
-            [&](Block *cons, Block *prod) -> SmallVector<CFGLoop *> {
-          SmallVector<CFGLoop *> result;
-
-          // Get all the loops in which the consumer is but the producer is
-          // not, starting from the innermost
-          for (CFGLoop *loop = loopInfo.getLoopFor(cons); loop;
-               loop = loop->getParentLoop()) {
-            if (!loop->contains(prod))
-              result.push_back(loop);
-          }
-
-          // Reverse to the get the loops from outermost to innermost
-          std::reverse(result.begin(), result.end());
-          return result;
-        };
-
-        // Get all the loops for which we need to regenerate the
-        // corresponding value
-        SmallVector<CFGLoop *> loops =
-            getLoopsConsNotInProd(&consumerBlock, producerBlock);
-        auto cstType = rewriter.getIntegerType(1);
-        auto cstAttr = IntegerAttr::get(cstType, 0);
-
-        // For each of the loop, from the outermost to the innermost
-        for (auto *it = loops.begin(); it != loops.end(); ++it) {
-
-          // If we are in the innermost loop (thus the iterator is at its end)
-          // and the consumer is a loop merge, stop
-          if (std::next(it) == loops.end() && consumerOp.hasAttr(FTD_MEM_DEP))
-            break;
-
-          // Add the merge to the network, by substituting the operand with
-          // the output of the merge, and forwarding the output of the merge
-          // to its inputs.
-          //
-          rewriter.setInsertionPointToStart((*it)->getHeader());
-
-          // The type of the input must be channelified
-          producerOperand.setType(channelifyType(producerOperand.getType()));
-
-          // Create an INIT merge to provide the select of the multiplexer
-          auto constOp = rewriter.create<handshake::ConstantOp>(
-              consumerOp.getLoc(), cstAttr, startValue);
-          constOp->setAttr(FTD_INIT_MERGE, rewriter.getUnitAttr());
-          Value conditionValue = ftdOps.conditionToValue[getBlockCondition(
-              (*it)->getExitingBlock())];
-          SmallVector<Value> mergeOperands;
-          mergeOperands.push_back(constOp.getResult());
-          mergeOperands.push_back(conditionValue);
-          auto initMergeOp = rewriter.create<handshake::MergeOp>(
-              consumerOp.getLoc(), mergeOperands);
-          initMergeOp->setAttr(FTD_INIT_MERGE, rewriter.getUnitAttr());
-
-          // Create the multiplexer
-          auto selectSignal = initMergeOp->getResult(0);
-          selectSignal.setType(channelifyType(selectSignal.getType()));
-
-          SmallVector<Value> muxOperands;
-          muxOperands.push_back(producerOperand);
-          muxOperands.push_back(producerOperand);
-
-          auto muxOp = rewriter.create<handshake::MuxOp>(
-              producerOperand.getLoc(), producerOperand.getType(), selectSignal,
-              muxOperands);
-
-          // The new producer operand is the output of the multiplxer
-          producerOperand = muxOp.getResult();
-          // Set the output of the mux as its input as well
-          muxOp->setOperand(2, muxOp->getResult(0));
-          regenMuxes.insert(muxOp);
-        }
-        consumerOp.replaceUsesOfWith(operand, producerOperand);
-      }
-    }
+  for (Operation &consumerOp : funcOp.getOps()) {
+    if (failed(addRegenToConsumer(rewriter, funcOp, &consumerOp)))
+      return failure();
   }
 
   // Once that all the multiplexers have been added, it is necessary to modify
   // the type of the result, for it to be a channel type (that could not be
   // done before)
-  auto muxes = funcOp.getBody().getOps<handshake::MuxOp>();
-  for (auto mux : muxes)
+  for (Operation *mux : funcOp.getOps<handshake::MuxOp>())
     mux->getResult(0).setType(channelifyType(mux->getResult(0).getType()));
 
   return success();

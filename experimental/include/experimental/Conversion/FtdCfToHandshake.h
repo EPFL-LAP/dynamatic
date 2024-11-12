@@ -119,8 +119,7 @@ protected:
   /// merge is moved inside of the loop, and it works like a reassignment
   /// (cfr. FPGA'22, Section V.C).
   LogicalResult addRegen(ConversionPatternRewriter &rewriter,
-                         handshake::FuncOp &funcOp,
-                         FtdStoredOperations &ftdOps) const;
+                         handshake::FuncOp &funcOp) const;
 
   /// Given each pairs of producers and consumers within the circuit, the
   /// producer might create a token which is never used by the corresponding

@@ -15,6 +15,7 @@
 #ifndef DYNAMATIC_SUPPORT_FTD_SUPPORT_H
 #define DYNAMATIC_SUPPORT_FTD_SUPPORT_H
 
+#include "dynamatic/Dialect/Handshake/HandshakeOps.h"
 #include "dynamatic/Support/LLVM.h"
 #include "experimental/Support/BooleanLogic/BoolExpression.h"
 #include "mlir/Analysis/CFGLoopInfo.h"
@@ -22,6 +23,13 @@
 namespace dynamatic {
 namespace experimental {
 namespace ftd {
+
+constexpr llvm::StringLiteral FTD_OP_TO_SKIP("ftd.skip");
+constexpr llvm::StringLiteral FTD_SUPP_BRANCH("ftd.supp");
+constexpr llvm::StringLiteral FTD_EXPLICIT_PHI("ftd.phi");
+constexpr llvm::StringLiteral FTD_MEM_DEP("ftd.memdep");
+constexpr llvm::StringLiteral FTD_INIT_MERGE("ftd.imerge");
+constexpr llvm::StringLiteral FTD_REGEN("ftd.regen");
 
 /// Get the index of a basic block
 unsigned getBlockIndex(Block *bb);
@@ -135,6 +143,17 @@ DenseMap<Block *, DenseSet<Block *>> getDominanceFrontier(Region &region);
 FailureOr<DenseMap<Block *, Value>>
 insertPhi(Region &funcRegion, ConversionPatternRewriter &rewriter,
           SmallVector<Value> &vals);
+
+/// Get a list of all the loops in which the consumer is but the producer is
+/// not, starting from the innermost.
+SmallVector<mlir::CFGLoop *> getLoopsConsNotInProd(Block *cons, Block *prod,
+                                                   mlir::CFGLoopInfo &li);
+
+/// Add some regen multiplexers to all the operands of a given consumer whenever
+/// it is necessary according to the CFG structure of the input function
+LogicalResult addRegenToConsumer(ConversionPatternRewriter &rewriter,
+                                 dynamatic::handshake::FuncOp &funcOp,
+                                 Operation *consumerOp);
 
 }; // namespace ftd
 }; // namespace experimental
