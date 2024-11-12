@@ -28,13 +28,6 @@ namespace dynamatic {
 namespace experimental {
 namespace ftd {
 
-/// Different types of loop suppression.
-enum BranchToLoopType {
-  MoreProducerThanConsumers,
-  SelfRegeneration,
-  BackwardRelationship
-};
-
 /// Convert a func-level function into an handshake-level function. A custom
 /// behavior is defined so that the functionalities of the `fast delivery token`
 /// methodology can be implemented.

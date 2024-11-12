@@ -24,6 +24,13 @@ namespace dynamatic {
 namespace experimental {
 namespace ftd {
 
+/// Different types of loop suppression.
+enum BranchToLoopType {
+  MoreProducerThanConsumers,
+  SelfRegeneration,
+  BackwardRelationship
+};
+
 /// Class to associate an index to each block, that if block Bi dominates block
 /// Bj then i < j. While this is guaranteed by the MLIR CFG construction, it
 /// cannot really be given for granted, thus it is more convenient to make a
@@ -46,6 +53,9 @@ public:
 
   /// Get the index of a block.
   unsigned getIndexFromBlock(Block *bb);
+
+  /// Return true if the index of bb1 is smaller than then index of bb2.
+  bool greaterIndex(Block *bb1, Block *bb2);
 };
 
 constexpr llvm::StringLiteral FTD_OP_TO_SKIP("ftd.skip");
@@ -178,6 +188,12 @@ SmallVector<mlir::CFGLoop *> getLoopsConsNotInProd(Block *cons, Block *prod,
 LogicalResult addRegenToConsumer(ConversionPatternRewriter &rewriter,
                                  dynamatic::handshake::FuncOp &funcOp,
                                  Operation *consumerOp);
+
+/// Add suppression mechanism to all the inputs and outputs of a producer
+LogicalResult addSuppToProducer(ConversionPatternRewriter &rewriter,
+                                handshake::FuncOp &funcOp,
+                                Operation *producerOp, ftd::BlockIndexing &bi,
+                                std::vector<Operation *> &producersToCover);
 
 }; // namespace ftd
 }; // namespace experimental
