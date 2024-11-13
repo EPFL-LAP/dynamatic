@@ -105,21 +105,23 @@ LogicalResult HandshakeSpeculationPass::placeUnits(Value ctrlSignal) {
   return success();
 }
 
-// The list to record the branches that need to be replicated
-// Value: The value whose spec tag is used
-// handshake::ConditionalBranchOp: The branch to replicate
-// unsigned: The direction of the branch to follow
-using CommitBranchList =
-    std::list<std::tuple<Value, handshake::ConditionalBranchOp, unsigned int>>;
+// The list item to trace the branches that need to be replicated
+struct BranchTracingItem {
+  // A value whose spec tag is used to discard non spec case
+  Value valueForSpecTag;
+  // The branch to replicate
+  handshake::ConditionalBranchOp branchOp;
+  // The index of the result of the branchOp
+  unsigned branchDirection;
+};
 
 // This function traverses the IR and creates a control path by replicating the
 // branches it finds in the way. It stops at commits and connects them to the
 // newly created path with value ctrlSignal
-static void
-routeCommitControlRecursive(MLIRContext *ctx, SpeculatorOp &specOp,
-                            llvm::DenseSet<Operation *> &arrived,
-                            OpOperand &currOpOperand,
-                            const CommitBranchList &commitBranchList) {
+static void routeCommitControlRecursive(
+    MLIRContext *ctx, SpeculatorOp &specOp,
+    llvm::DenseSet<Operation *> &arrived, OpOperand &currOpOperand,
+    const std::list<BranchTracingItem> &branchTracingList) {
   Operation *currOp = currOpOperand.getOwner();
 
   // End traversal if currOpOperand is already arrived
@@ -140,7 +142,8 @@ routeCommitControlRecursive(MLIRContext *ctx, SpeculatorOp &specOp,
     // We replicate branches only if the traversal reaches a commit.
     // Because sometimes a path of branches does not reach a commit unit.
     Value ctrlSignal = specOp.getCommitCtrl();
-    for (auto [valueForSpecTag, branchOp, branchDir] : commitBranchList) {
+    for (auto [valueForSpecTag, branchOp, branchDirection] :
+         branchTracingList) {
       // Replicate a branch in the control path and use new control signal.
       // To do so, a structure of two connected branches is created.
       // A speculating branch first discards the condition in case that
@@ -168,7 +171,8 @@ routeCommitControlRecursive(MLIRContext *ctx, SpeculatorOp &specOp,
           ctrlSignal /* data */);
       inheritBB(specOp, branchReplicated);
 
-      ctrlSignal = branchReplicated->getResult(branchDir);
+      // Update ctrlSignal
+      ctrlSignal = branchReplicated->getResult(branchDirection);
     }
     // Connect commit to the correct control signal and end traversal
     commitOp.setOperand(1, ctrlSignal);
@@ -178,10 +182,8 @@ routeCommitControlRecursive(MLIRContext *ctx, SpeculatorOp &specOp,
       for (OpOperand &dstOpOperand : branchOp->getResult(i).getUses()) {
         // Copy the current list. Can be optimized by using a data structure
         // with reference
-        CommitBranchList newList(commitBranchList);
-        newList.push_back(
-            std::tuple<Value, handshake::ConditionalBranchOp, unsigned>(
-                currOpOperand.get(), branchOp, i));
+        std::list<BranchTracingItem> newList(branchTracingList);
+        newList.push_back({currOpOperand.get(), branchOp, i});
         routeCommitControlRecursive(ctx, specOp, arrived, dstOpOperand,
                                     newList);
       }
@@ -191,7 +193,7 @@ routeCommitControlRecursive(MLIRContext *ctx, SpeculatorOp &specOp,
     for (OpResult res : currOp->getResults()) {
       for (OpOperand &dstOpOperand : res.getUses()) {
         routeCommitControlRecursive(ctx, specOp, arrived, dstOpOperand,
-                                    commitBranchList);
+                                    branchTracingList);
       }
     }
   }
