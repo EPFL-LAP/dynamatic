@@ -346,17 +346,8 @@ LogicalResult HandshakeSpeculationPass::prepareAndPlaceSaveCommits() {
   return placeUnits<handshake::SpecSaveCommitOp>(mergeOp.getResult());
 }
 
-std::optional<Value> findControlInputToBB(Operation *op) {
-  handshake::FuncOp funcOp = op->getParentOfType<handshake::FuncOp>();
-  assert(funcOp && "op should have parent function");
-
-  // Get the BB number of the operation safely
-  std::optional<unsigned> targetBB = getLogicBB(op);
-  if (!targetBB) {
-    op->emitError("Operation does not have a BB.");
-    return {};
-  }
-
+std::optional<Value> findControlInputToBB(handshake::FuncOp &funcOp,
+                                          unsigned targetBB) {
   // Here we fork control token to use as enable signal to speculator.
   // The presence of a buffer between this fork and the control branch creates
   // performance issues (see detailed speculation documentation). Therefore we
@@ -377,7 +368,7 @@ std::optional<Value> findControlInputToBB(Operation *op) {
       // BB should have only one control branch at most
       if (isControlBranchFound) {
         branchOp->emitError("Multiple control branches found in the BB #" +
-                            std::to_string(targetBB.value()));
+                            std::to_string(targetBB));
         return {};
       }
       enableChannelOrigin = branchOp.getDataOperand();
@@ -386,7 +377,7 @@ std::optional<Value> findControlInputToBB(Operation *op) {
   }
 
   if (!isControlBranchFound) {
-    funcOp->emitError("BB #" + std::to_string(targetBB.value()) +
+    funcOp->emitError("BB #" + std::to_string(targetBB) +
                       " was marked for speculation, but no corresponding "
                       "control branch was found.");
     return {};
@@ -402,7 +393,18 @@ LogicalResult HandshakeSpeculationPass::placeSpeculator() {
   Operation *dstOp = operand.getOwner();
   Value srcOpResult = operand.get();
 
-  std::optional<Value> enableSpecIn = findControlInputToBB(dstOp);
+  handshake::FuncOp funcOp = dstOp->getParentOfType<handshake::FuncOp>();
+  assert(funcOp && "op should have parent function");
+
+  // Get the BB number of the operation safely
+  std::optional<unsigned> targetBB = getLogicBB(dstOp);
+  if (!targetBB) {
+    dstOp->emitError("Operation does not have a BB.");
+    return failure();
+  }
+
+  std::optional<Value> enableSpecIn =
+      findControlInputToBB(funcOp, targetBB.value());
   if (not enableSpecIn.has_value()) {
     dstOp->emitError("Control signal for speculator's enableIn not found.");
     return failure();
