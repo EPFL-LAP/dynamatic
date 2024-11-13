@@ -88,7 +88,7 @@ LogicalResult HandshakeSpeculationPass::placeUnits(Value ctrlSignal) {
     // (a) Consider a scenario where a control value from a buffer is passed to
     // the control branch.
     // (b) Simultaneously, a speculator uses the same control value from the
-    // buffer as an enable signal.
+    // buffer as a trigger signal.
     // (c) A save-commit unit is positioned on the edge from the buffer to the
     // control branch.
     // (d) If we apply replaceAllUsesExcept to the value referenced by the
@@ -348,11 +348,11 @@ LogicalResult HandshakeSpeculationPass::prepareAndPlaceSaveCommits() {
 
 std::optional<Value> findControlInputToBB(handshake::FuncOp &funcOp,
                                           unsigned targetBB) {
-  // Here we fork control token to use as enable signal to speculator.
+  // Here we fork control token to use as trigger signal to speculator.
   // The presence of a buffer between this fork and the control branch creates
   // performance issues (see detailed speculation documentation). Therefore we
   // fork control token from directly above the control branch
-  mlir::Value enableChannelOrigin;
+  mlir::Value triggerChannelOrigin;
 
   // Find the control branch we want to speculate on.
   // To find: Iterate over every branch, looking for 1) same bb as speculator,
@@ -371,7 +371,7 @@ std::optional<Value> findControlInputToBB(handshake::FuncOp &funcOp,
                             std::to_string(targetBB));
         return {};
       }
-      enableChannelOrigin = branchOp.getDataOperand();
+      triggerChannelOrigin = branchOp.getDataOperand();
       isControlBranchFound = true;
     }
   }
@@ -383,7 +383,7 @@ std::optional<Value> findControlInputToBB(handshake::FuncOp &funcOp,
     return {};
   }
 
-  return enableChannelOrigin;
+  return triggerChannelOrigin;
 }
 
 LogicalResult HandshakeSpeculationPass::placeSpeculator() {
@@ -403,10 +403,10 @@ LogicalResult HandshakeSpeculationPass::placeSpeculator() {
     return failure();
   }
 
-  std::optional<Value> enableSpecIn =
+  std::optional<Value> specTrigger =
       findControlInputToBB(funcOp, targetBB.value());
-  if (not enableSpecIn.has_value()) {
-    dstOp->emitError("Control signal for speculator's enableIn not found.");
+  if (not specTrigger.has_value()) {
+    dstOp->emitError("Control signal for speculator's trigger not found.");
     return failure();
   }
 
@@ -414,7 +414,7 @@ LogicalResult HandshakeSpeculationPass::placeSpeculator() {
   builder.setInsertionPoint(dstOp);
 
   specOp = builder.create<handshake::SpeculatorOp>(dstOp->getLoc(), srcOpResult,
-                                                   enableSpecIn.value());
+                                                   specTrigger.value());
 
   // Replace uses of the original source operation's result with the
   // speculator's result, except in the speculator's operands (otherwise this
