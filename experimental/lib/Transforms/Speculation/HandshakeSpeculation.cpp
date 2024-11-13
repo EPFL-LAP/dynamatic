@@ -75,7 +75,7 @@ private:
   /// Create the control path for commit signals by replicating branches
   LogicalResult routeCommitControl();
 
-  /// Wrapper around routeCommitControl to prepare and invoke the placement
+  /// Place the Commit operations
   LogicalResult placeCommits();
 
   /// Place the SaveCommit operations and the control path
