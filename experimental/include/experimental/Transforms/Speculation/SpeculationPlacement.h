@@ -44,6 +44,7 @@ private:
   llvm::DenseSet<OpOperand *> saves;
   llvm::DenseSet<OpOperand *> commits;
   llvm::DenseSet<OpOperand *> saveCommits;
+  llvm::DenseSet<OpOperand *> buffers;
 
 public:
   /// Empty constructor
@@ -51,6 +52,9 @@ public:
 
   /// Initializer with the destination operation operand for the Speculator
   SpeculationPlacements(OpOperand &dstOpOperand) : speculator(&dstOpOperand){};
+  SpeculationPlacements(OpOperand &dstOpOperand,
+                        llvm::DenseSet<OpOperand *> buffers)
+      : speculator(&dstOpOperand), buffers(buffers){};
 
   /// Set the speculator operations positions according to a JSON file
   static LogicalResult readFromJSON(const std::string &jsonPath,
@@ -68,6 +72,8 @@ public:
 
   /// Add the position of a SaveCommit operation
   void addSaveCommit(OpOperand &dstOpOperand);
+
+  void addBuffer(OpOperand &dstOpOperand);
 
   /// Check if there is a save in the given OpOperand edge
   bool containsSave(OpOperand &dstOpOperand);
