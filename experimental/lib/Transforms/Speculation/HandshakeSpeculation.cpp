@@ -145,28 +145,34 @@ static void markPathToCommits(llvm::DenseSet<Operation *> &markedPath,
 // unsigned: The direction of the branch to follow
 typedef std::list<std::tuple<Value, handshake::ConditionalBranchOp, unsigned>>
     CommitBranchList;
-// This recursive function traverses the IR along a marked path and creates
+// This function traverses the IR along a marked path and creates
 // a control path by replicating the branches it finds in the way. It stops
 // at commits and connects them to the newly created path with value
 // ctrlSignal
 void HandshakeSpeculationPass::routeCommitControl(
     llvm::DenseSet<Operation *> &markedPath) {
-  // Perform BFS
+
+  // Queue for BFS
   std::queue<std::tuple<const OpOperand &, CommitBranchList>> queue;
+
+  // Initialize the queue with the dataOut Operand of specOp (usually only one)
   for (OpOperand &succOpOperand : specOp.getDataOut().getUses()) {
     queue.push(
         std::tuple<const OpOperand &, CommitBranchList>(succOpOperand, {}));
   }
+
   MLIRContext *ctx = &getContext();
   OpBuilder builder(ctx);
+
+  // Perform BFS
   while (!queue.empty()) {
     auto [currOpOperand, commitBranchList] = queue.front();
     queue.pop();
     Operation *currOp = currOpOperand.getOwner();
 
     if (auto commitOp = dyn_cast<handshake::SpecCommitOp>(currOp)) {
-      // We only replicate branches only if the traverse reaches a commit.
-      // Because sometimes the commit unit is already connected to the shortest
+      // We replicate branches only if the traversal reaches a commit.
+      // Because sometimes a path of branches does not reach a commit unit.
       // (appropriate) path when we traverse other branches.
       Value ctrlSignal = specOp.getCommitCtrl();
       for (auto [valueForSpecTag, branchOp, branchDir] : commitBranchList) {
@@ -175,6 +181,7 @@ void HandshakeSpeculationPass::routeCommitControl(
         // A speculating branch first discards the condition in case that
         // the data is not speculative. In case it is speculative, a new branch
         // is created that replicates the current branch.
+
         builder.setInsertionPointAfterValue(ctrlSignal);
 
         // The speculating branch will discard the branch's condition token if
