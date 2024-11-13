@@ -101,6 +101,9 @@ static void enumeratePathsInPostDomTree(Block *startBlock, Block *endBlock,
 void dynamatic::ControlDependenceAnalysis::identifyAllControlDeps(
     mlir::func::FuncOp &funcOp) {
 
+  if (funcOp.getBlocks().size() == 1)
+    return;
+
   // Get post-domination information
   Region &funcReg = funcOp.getRegion();
   PostDominanceInfo postDomInfo;
