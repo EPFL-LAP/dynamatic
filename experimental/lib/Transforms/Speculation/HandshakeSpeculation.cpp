@@ -21,6 +21,7 @@
 #include "dynamatic/Support/Logging.h"
 #include "experimental/Transforms/Speculation/PlacementFinder.h"
 #include "experimental/Transforms/Speculation/SpeculationPlacement.h"
+#include "mlir/IR/BuiltinOps.h"
 #include "mlir/IR/BuiltinTypes.h"
 #include "mlir/IR/MLIRContext.h"
 #include "mlir/IR/OperationSupport.h"
@@ -61,7 +62,7 @@ struct HandshakeSpeculationPass
 private:
   SpeculationPlacements placements;
   SpeculatorOp specOp;
-  std::optional<Backedge> fakeControlForCommits;
+  std::optional<Value> fakeControlForCommits;
 
   /// Place the operation handshake::SpeculatorOp
   LogicalResult placeSpeculator();
@@ -120,16 +121,15 @@ using CommitBranchList =
 // ctrlSignal
 static void
 routeCommitControlRecursive(MLIRContext *ctx, SpeculatorOp &specOp,
-                            llvm::DenseSet<OpOperand *> &arrived,
+                            llvm::DenseSet<Operation *> &arrived,
                             OpOperand &currOpOperand,
                             const CommitBranchList &commitBranchList) {
+  Operation *currOp = currOpOperand.getOwner();
 
   // End traversal if currOpOperand is already arrived
-  if (!arrived.contains(&currOpOperand))
+  if (arrived.contains(currOp))
     return;
-  arrived.insert(&currOpOperand);
-
-  Operation *currOp = currOpOperand.getOwner();
+  arrived.insert(currOp);
 
   // If the traversal reaches a speculator, stop it
   if (isa<handshake::SpeculatorOp>(currOp))
@@ -201,11 +201,10 @@ routeCommitControlRecursive(MLIRContext *ctx, SpeculatorOp &specOp,
 }
 
 // Check that all commits have been correctly routed
-static bool areAllCommitsRouted(Backedge fakeControl) {
-  Value fakeValue = static_cast<Value>(fakeControl);
-  if (not fakeValue.use_empty()) {
+static bool areAllCommitsRouted(Value fakeControl) {
+  if (not fakeControl.use_empty()) {
     // fakeControl is still in use, so at least one commit is not routed
-    for (Operation *user : fakeValue.getUsers()) {
+    for (Operation *user : fakeControl.getUsers()) {
       user->emitError() << "This Commit could not be routed\n";
     }
     llvm::errs() << "Error: commit routing failed.\n";
@@ -215,13 +214,13 @@ static bool areAllCommitsRouted(Backedge fakeControl) {
 }
 
 LogicalResult HandshakeSpeculationPass::routeCommitControl() {
-  if (fakeControlForCommits.has_value()) {
+  if (!fakeControlForCommits.has_value()) {
     llvm::errs() << "Error: fakeControlForCommits doesn't have a value. Please "
                     "place commit units first.\n";
     return failure();
   }
 
-  llvm::DenseSet<OpOperand *> arrived;
+  llvm::DenseSet<Operation *> arrived;
   for (OpOperand &succOpOperand : specOp.getDataOut().getUses())
     routeCommitControlRecursive(&getContext(), specOp, arrived, succOpOperand,
                                 {});
@@ -234,8 +233,11 @@ LogicalResult HandshakeSpeculationPass::prepareAndPlaceCommits() {
   // Create a temporal value to connect the commits
   Value commitCtrl = specOp.getCommitCtrl();
   OpBuilder builder(&getContext());
-  BackedgeBuilder edgeBuilder(builder, specOp->getLoc());
-  fakeControlForCommits = edgeBuilder.get(commitCtrl.getType());
+  fakeControlForCommits =
+      builder
+          .create<mlir::UnrealizedConversionCastOp>(
+              specOp->getLoc(), commitCtrl.getType(), ValueRange{})
+          .getResult(0);
 
   // Place commits and connect to the fake control signal
   if (failed(
