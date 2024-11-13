@@ -21,8 +21,10 @@
 #include "experimental/Transforms/Speculation/PlacementFinder.h"
 #include "experimental/Transforms/Speculation/SpeculationPlacement.h"
 #include "mlir/IR/BuiltinTypes.h"
+#include "mlir/IR/MLIRContext.h"
 #include "mlir/IR/OperationSupport.h"
 #include "mlir/Pass/PassManager.h"
+#include "mlir/Support/LogicalResult.h"
 #include "llvm/ADT/DenseSet.h"
 #include <list>
 #include <string>
@@ -49,6 +51,7 @@ struct HandshakeSpeculationPass
 private:
   SpeculationPlacements placements;
   SpeculatorOp specOp;
+  std::optional<Backedge> fakeControlForCommits;
 
   /// Place the operation handshake::SpeculatorOp
   LogicalResult placeSpeculator();
@@ -57,16 +60,8 @@ private:
   template <typename T>
   LogicalResult placeUnits(Value ctrlSignal);
 
-  // The list to record the branches that need to be replicated
-  // Value: The value whose spec tag is used
-  // handshake::ConditionalBranchOp: The branch to replicate
-  // unsigned: The direction of the branch to follow
-  using CommitBranchList = std::list<
-      std::tuple<Value, handshake::ConditionalBranchOp, unsigned int>>;
   /// Create the control path for commit signals by replicating branches
-  void routeCommitControl(llvm::DenseSet<Operation *> &markedPath,
-                          OpOperand &currOpOperand,
-                          const CommitBranchList &commitBranchList);
+  LogicalResult routeCommitControl();
 
   /// Wrapper around routeCommitControl to prepare and invoke the placement
   LogicalResult prepareAndPlaceCommits();
@@ -108,67 +103,35 @@ LogicalResult HandshakeSpeculationPass::placeUnits(Value ctrlSignal) {
   return success();
 }
 
-// Traverse the IR in a DFS manner. Mark all paths that lead to commit units
-// by adding them to the set markedPath. Returns a true if a Commit is reached.
-static bool markPathToCommitsRecursive(llvm::DenseSet<Operation *> &visited,
-                                       llvm::DenseSet<Operation *> &markedPath,
-                                       Operation *currOp) {
-  // End traversal if currOp is already in visited set
-  if (auto [_, isNewOp] = visited.insert(currOp); !isNewOp)
-    return false;
-
-  if (isa<handshake::SpecCommitOp>(currOp)) {
-    // End traversal at Commits and notify that the path leads to a commit
-    markedPath.insert(currOp);
-    return true;
-  } else {
-    bool foundCommit = false;
-    // Continue DFS traversal
-    for (Operation *succOp : currOp->getUsers())
-      foundCommit |= markPathToCommitsRecursive(visited, markedPath, succOp);
-
-    if (foundCommit)
-      markedPath.insert(currOp);
-
-    return foundCommit;
-  }
-}
-
-// Mark all paths that lead to commit units by adding them to markedPath
-static void markPathToCommits(llvm::DenseSet<Operation *> &markedPath,
-                              SpeculatorOp &specOp) {
-  // Create visited set
-  llvm::DenseSet<Operation *> visited;
-  visited.insert(specOp);
-
-  // Traverse IR starting at the speculator's output
-  for (Operation *succOp : specOp.getDataOut().getUsers())
-    markPathToCommitsRecursive(visited, markedPath, succOp);
-}
+// The list to record the branches that need to be replicated
+// Value: The value whose spec tag is used
+// handshake::ConditionalBranchOp: The branch to replicate
+// unsigned: The direction of the branch to follow
+using CommitBranchList =
+    std::list<std::tuple<Value, handshake::ConditionalBranchOp, unsigned int>>;
 
 // This function traverses the IR along a marked path and creates
 // a control path by replicating the branches it finds in the way. It stops
 // at commits and connects them to the newly created path with value
 // ctrlSignal
-void HandshakeSpeculationPass::routeCommitControl(
-    llvm::DenseSet<Operation *> &markedPath, OpOperand &currOpOperand,
-    const CommitBranchList &commitBranchList) {
+static void
+routeCommitControlRecursive(MLIRContext *ctx, SpeculatorOp &specOp,
+                            llvm::DenseSet<OpOperand *> &arrived,
+                            OpOperand &currOpOperand,
+                            const CommitBranchList &commitBranchList) {
 
-  // If the traversal reaches a save commit, stop it
-  if (placements.containsSaveCommit(currOpOperand)) {
+  // End traversal if currOpOperand is already arrived
+  if (!arrived.contains(&currOpOperand))
     return;
-  }
+  arrived.insert(&currOpOperand);
 
   Operation *currOp = currOpOperand.getOwner();
-  // End traversal if currOp is not in the marked path to commits
-  if (!markedPath.contains(currOp))
-    return;
-
-  // Remove operation from the set to avoid visiting it twice
-  markedPath.erase(currOp);
 
   // If the traversal reaches a speculator, stop it
   if (isa<handshake::SpeculatorOp>(currOp))
+    return;
+  // If the traversal reaches a save commit, stop it
+  if (isa<handshake::SpecSaveCommitOp>(currOp))
     return;
 
   if (auto commitOp = dyn_cast<handshake::SpecCommitOp>(currOp)) {
@@ -182,7 +145,6 @@ void HandshakeSpeculationPass::routeCommitControl(
       // the data is not speculative. In case it is speculative, a new branch
       // is created that replicates the current branch.
 
-      MLIRContext *ctx = &getContext();
       OpBuilder builder(ctx);
       builder.setInsertionPointAfterValue(ctrlSignal);
 
@@ -218,14 +180,16 @@ void HandshakeSpeculationPass::routeCommitControl(
         newList.push_back(
             std::tuple<Value, handshake::ConditionalBranchOp, unsigned>(
                 currOpOperand.get(), branchOp, i));
-        routeCommitControl(markedPath, dstOpOperand, newList);
+        routeCommitControlRecursive(ctx, specOp, arrived, dstOpOperand,
+                                    newList);
       }
     }
   } else {
     // Continue Traversal
     for (OpResult res : currOp->getResults()) {
       for (OpOperand &dstOpOperand : res.getUses()) {
-        routeCommitControl(markedPath, dstOpOperand, commitBranchList);
+        routeCommitControlRecursive(ctx, specOp, arrived, dstOpOperand,
+                                    commitBranchList);
       }
     }
   }
@@ -245,27 +209,35 @@ static bool areAllCommitsRouted(Backedge fakeControl) {
   return true;
 }
 
+LogicalResult HandshakeSpeculationPass::routeCommitControl() {
+  if (fakeControlForCommits.has_value()) {
+    llvm::errs() << "Error: fakeControlForCommits doesn't have a value. Please "
+                    "place commit units first.\n";
+    return failure();
+  }
+
+  llvm::DenseSet<OpOperand *> arrived;
+  for (OpOperand &succOpOperand : specOp.getDataOut().getUses())
+    routeCommitControlRecursive(&getContext(), specOp, arrived, succOpOperand,
+                                {});
+
+  // Verify that all commits are routed to a control signal
+  return success(areAllCommitsRouted(fakeControlForCommits.value()));
+}
+
 LogicalResult HandshakeSpeculationPass::prepareAndPlaceCommits() {
   // Create a temporal value to connect the commits
   Value commitCtrl = specOp.getCommitCtrl();
   OpBuilder builder(&getContext());
   BackedgeBuilder edgeBuilder(builder, specOp->getLoc());
-  Backedge fakeControl = edgeBuilder.get(commitCtrl.getType());
+  fakeControlForCommits = edgeBuilder.get(commitCtrl.getType());
 
   // Place commits and connect to the fake control signal
-  if (failed(placeUnits<handshake::SpecCommitOp>(fakeControl)))
+  if (failed(
+          placeUnits<handshake::SpecCommitOp>(fakeControlForCommits.value())))
     return failure();
 
-  // Start traversal to mark the path to commits the speculator output
-  llvm::DenseSet<Operation *> markedPath;
-  markPathToCommits(markedPath, specOp);
-
-  // Follow the marked path and replicate branches
-  for (OpOperand &succOpOperand : specOp.getDataOut().getUses())
-    routeCommitControl(markedPath, succOpOperand, {});
-
-  // Verify that all commits are routed to a control signal
-  return success(areAllCommitsRouted(fakeControl));
+  return success();
 }
 
 static handshake::ConditionalBranchOp findControlBranch(Operation *op) {
@@ -485,6 +457,9 @@ void HandshakeSpeculationPass::runDynamaticPass() {
 
   // Place SaveCommit operations and the SaveCommit control path
   if (failed(prepareAndPlaceSaveCommits()))
+    return signalPassFailure();
+
+  if (failed(routeCommitControl()))
     return signalPassFailure();
 }
 
