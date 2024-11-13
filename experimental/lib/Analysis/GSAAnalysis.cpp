@@ -473,10 +473,16 @@ void experimental::gsa::GSAAnalysis::convertPhiToMu(func::FuncOp &funcOp) {
   }
 }
 
-ArrayRef<experimental::gsa::Gate *>
+SmallVector<const experimental::gsa::Gate *>
 experimental::gsa::GSAAnalysis::getGates(Block *bb) {
   auto it = gatesPerBlock.find(bb);
-  return it == gatesPerBlock.end() ? ArrayRef<Gate *>() : it->getSecond();
+  // Block was not found
+  if (it == gatesPerBlock.end())
+    return SmallVector<const gsa::Gate *>();
+
+  // Cast the vector so that it contains constant pointers
+  SmallVector<Gate *> gates = it->getSecond();
+  return SmallVector<const gsa::Gate *>(gates.begin(), gates.end());
 }
 
 void experimental::gsa::GSAAnalysis::printAllGates() {

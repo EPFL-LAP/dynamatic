@@ -137,8 +137,8 @@ public:
     return !pa.isPreserved<GSAAnalysis>();
   }
 
-  /// Get a pointer to the vector containing the gate functions of a block.
-  ArrayRef<Gate *> getGates(Block *bb);
+  /// Get a vector containing all the gates related to a basic block
+  SmallVector<const Gate *> getGates(Block *bb);
 
   /// Deallocates all the gates created.
   ~GSAAnalysis();
