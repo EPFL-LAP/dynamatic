@@ -35,7 +35,8 @@ PlacementFinder::PlacementFinder(SpeculationPlacements &placements)
 
 void PlacementFinder::clearPlacements() {
   OpOperand &specPos = placements.getSpeculatorPlacement();
-  this->placements = SpeculationPlacements(specPos);
+  auto buffers = this->placements.getPlacements<handshake::BufferOp>();
+  this->placements = SpeculationPlacements(specPos, buffers);
 }
 
 //===----------------------------------------------------------------------===//
@@ -101,6 +102,10 @@ LogicalResult PlacementFinder::findSavePositions() {
           if (isa<handshake::SourceOp>(operand.get().getDefiningOp()))
             continue;
 
+          // tmp
+          if (isa<handshake::MCStoreOp>(operand.getOwner()))
+            continue;
+
           placements.addSave(operand);
         }
       }
@@ -132,13 +137,21 @@ void PlacementFinder::findCommitsTraversal(llvm::DenseSet<Operation *> &visited,
         // consecutive Commit-Save units.
         placements.addSaveCommit(dstOpOperand);
         placements.eraseSave(dstOpOperand);
-      } else if (isa<handshake::MemoryOpInterface, handshake::LoadOpInterface,
-                     handshake::StoreOpInterface>(succOp)) {
+      } else if (isa<handshake::StoreOpInterface>(succOp)) {
         // A commit is needed in front of memory operations
         placements.addCommit(dstOpOperand);
       } else if (isa<handshake::EndOp>(succOp)) {
         // A commit is needed in front of the end/exit operation
         placements.addCommit(dstOpOperand);
+      } else if (isa<handshake::MemoryControllerOp>(succOp)) {
+        if (dstOpOperand.getOperandNumber() == 2 &&
+            !isa<handshake::MCLoadOp>(currOp)) {
+          // A commit is needed in front of the memory controller
+          // On the operand indicating the number of stores
+          placements.addCommit(dstOpOperand);
+        }
+        // Exceptionally stop the traversal
+        continue;
       } else {
         findCommitsTraversal(visited, succOp);
       }
